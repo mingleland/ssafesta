@@ -148,6 +148,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a32e7267e5b93f34eae6edd4f382d304, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _apiConfig: {fileID: 11400000, guid: 83f40df4ddaa1774b866e23d424f4b9d, type: 2}
   _useMockApi: 1
   _springBaseUrl: http://localhost:8080
   _aiBaseUrl: http://localhost:8000
@@ -708,7 +709,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2a8065baa8d4fe41a710dd36a0007fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _boothId: 7
+  _boothId: 99
   _registry: {fileID: 11400000, guid: c6a420a61717a494aa870d7133f92959, type: 2}
   _loadOnStart: 1
 --- !u!4 &1818069021

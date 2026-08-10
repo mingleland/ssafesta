@@ -10,13 +10,12 @@ namespace Festa.Core
     public class GameBootstrap : MonoBehaviour
     {
         [Header("Integration")]
-        [Tooltip("체크 시 Spring/FastAPI 대신 Mock 클라이언트를 사용한다.")]
+        [Tooltip("환경별 API 설정 (FESTA/Api Config로 생성). 미할당 시 아래 레거시 필드 사용")]
+        [SerializeField] ApiConfig _apiConfig;
+
+        [Header("Legacy (ApiConfig 미할당 시)")]
         [SerializeField] bool _useMockApi = true;
-
-        [Tooltip("Spring Boot API base URL (Mock 해제 시 사용)")]
         [SerializeField] string _springBaseUrl = "http://localhost:8080";
-
-        [Tooltip("FastAPI AI base URL (Mock 해제 시 사용)")]
         [SerializeField] string _aiBaseUrl = "http://localhost:8000";
 
         public static GameBootstrap Instance { get; private set; }
@@ -32,8 +31,12 @@ namespace Festa.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            ApiServices.Init(_useMockApi, _springBaseUrl, _aiBaseUrl);
-            Debug.Log($"[GameBootstrap] Initialized. useMockApi={_useMockApi}");
+            if (_apiConfig != null)
+                ApiServices.Init(_apiConfig);
+            else
+                ApiServices.Init(_useMockApi, _springBaseUrl, _aiBaseUrl);
+
+            Debug.Log($"[GameBootstrap] Initialized. mock={ApiServices.IsMock}");
         }
     }
 }
