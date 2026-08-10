@@ -1,0 +1,25 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+
+# Build output — 빌드 결과물은 절대 커밋하지 않는다
+[Bb]uilds/
+*.apk
+*.aab
+*.unitypackage
+
+# IDE
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.user
+
+# OS
+.DS_Store
+Thumbs.db

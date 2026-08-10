@@ -1,0 +1,17 @@
+# 외부 레퍼런스 프로젝트 — 저장소에 포함하지 않는다 (용량 + 라이선스)
+# BossRoom / VampireSurvivors / IdleGameScripts는 로컬 참고용으로만 유지
+reference/
+references/
+Reference/
+
+# Secret / Credential — 절대 커밋 금지 (.env.example은 허용)
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+
+# OS
+.DS_Store
+Thumbs.db
