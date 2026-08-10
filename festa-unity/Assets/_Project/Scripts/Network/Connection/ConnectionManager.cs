@@ -1,4 +1,6 @@
+using System;
 using System.Text;
+using Festa.Integration;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -38,20 +40,43 @@ namespace Festa.Network
         // ---------- Client ----------
 
         /// <summary>
-        /// 서버에 접속한다. endpoint/token은 향후 Spring world-sessions API 응답에서 온다.
-        /// Unity Client는 endpoint를 하드코딩하지 않는다 (Channel 확장 대비).
+        /// 정식 접속 경로: world-sessions API 응답(endpoint + connectionToken)으로 접속한다.
+        /// scheme이 "wss"면 TLS 클라이언트 파라미터를 설정한다 (LB의 ACM 인증서를 브라우저/OS 신뢰 저장소로 검증).
+        /// Unity Client는 endpoint를 하드코딩하지 않는다 (Channel 확장 대비, handoff §3).
         /// </summary>
+        public bool StartClient(WorldSessionDto session, ConnectionPayload payload)
+        {
+            if (session?.endpoint == null || string.IsNullOrEmpty(session.endpoint.host))
+            {
+                Debug.LogError("[ConnectionManager] world session endpoint가 비어있음");
+                return false;
+            }
+
+            payload.connectionToken = session.connectionToken;
+
+            bool secure = string.Equals(session.endpoint.scheme, "wss", StringComparison.OrdinalIgnoreCase);
+            return StartClientInternal(session.endpoint.host, (ushort)session.endpoint.port, secure, payload);
+        }
+
+        /// <summary>개발용 직접 접속 (DevConnectionHud 수동 입력, 항상 평문 ws).</summary>
         public bool StartClient(string address, ushort port, ConnectionPayload payload)
+            => StartClientInternal(address, port, secure: false, payload);
+
+        bool StartClientInternal(string host, ushort port, bool secure, ConnectionPayload payload)
         {
             var nm = NetworkManager.Singleton;
             var transport = nm.GetComponent<UnityTransport>();
-            transport.UseWebSockets = true;
-            transport.SetConnectionData(address, port);
 
+            transport.UseWebSockets = true;
+            transport.UseEncryption = secure;
+            if (secure)
+                transport.SetClientSecrets(host); // 서버 인증서 CN 검증 대상 = 접속 도메인
+
+            transport.SetConnectionData(host, port);
             nm.NetworkConfig.ConnectionData = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
 
             bool ok = nm.StartClient();
-            Debug.Log($"[ConnectionManager] StartClient {address}:{port} → {ok}");
+            Debug.Log($"[ConnectionManager] StartClient {(secure ? "wss" : "ws")}://{host}:{port} → {ok}");
             return ok;
         }
 

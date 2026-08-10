@@ -709,7 +709,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d2a8065baa8d4fe41a710dd36a0007fc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _boothId: 99
+  _boothId: 7
   _registry: {fileID: 11400000, guid: c6a420a61717a494aa870d7133f92959, type: 2}
   _loadOnStart: 1
 --- !u!4 &1818069021

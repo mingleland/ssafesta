@@ -1,3 +1,4 @@
+using Festa.Integration;
 using UnityEngine;
 
 namespace Festa.Network
@@ -44,7 +45,7 @@ namespace Festa.Network
                 if (GUILayout.Button("Start Server (로컬 테스트용)"))
                     nm.StartServer();
 
-                if (GUILayout.Button("Connect as Client"))
+                if (GUILayout.Button("Connect as Client (직접 입력)"))
                 {
                     ushort.TryParse(_port, out var port);
                     _connection.StartClient(_address, port == 0 ? (ushort)7777 : port, new ConnectionPayload
@@ -56,6 +57,9 @@ namespace Festa.Network
                         connectionToken = "poc-dummy-token"
                     });
                 }
+
+                if (GUILayout.Button("Connect via Session API"))
+                    ConnectViaSessionApi();
             }
             else
             {
@@ -66,6 +70,31 @@ namespace Festa.Network
             }
 
             GUILayout.EndArea();
+        }
+
+        /// <summary>
+        /// 정식 접속 흐름 검증: world-sessions API(현재 Mock) → endpoint/token → StartClient.
+        /// AWS 배포 후에는 응답의 scheme만 wss로 바뀌면 그대로 동작해야 한다.
+        /// </summary>
+        async void ConnectViaSessionApi()
+        {
+            ApiServices.EnsureInitialized();
+            var session = await ApiServices.User.CreateWorldSessionAsync();
+            if (session == null)
+            {
+                Debug.LogError("[DevConnectionHud] world session 발급 실패");
+                return;
+            }
+
+            Debug.Log($"[DevConnectionHud] session={session.sessionId} channel={session.channelId} " +
+                      $"→ {session.endpoint.scheme}://{session.endpoint.host}:{session.endpoint.port}");
+
+            _connection.StartClient(session, new ConnectionPayload
+            {
+                userId = Random.Range(1, 100000),
+                nickname = _nickname,
+                avatarCode = "default"
+            });
         }
     }
 }

@@ -26,7 +26,7 @@ namespace Festa.Integration
                 sessionId = "ws_mock_001",
                 worldId = "11F",
                 channelId = "11F-01",
-                serverEndpoint = "127.0.0.1:7777",
+                endpoint = new WorldEndpointDto { scheme = "ws", host = "127.0.0.1", port = 7777 },
                 connectionToken = "mock-connection-token",
                 expiresAt = "2999-12-31T00:00:00+09:00"
             };
