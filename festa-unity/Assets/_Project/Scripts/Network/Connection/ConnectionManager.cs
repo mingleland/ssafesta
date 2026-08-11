@@ -96,7 +96,7 @@ namespace Festa.Network
             {
                 Approve(response, request.ClientNetworkId, new ConnectionPayload
                 {
-                    userId = 0, nickname = "Host", avatarCode = "default"
+                    userId = 0, nickname = "Host", avatarCode = "sk_01"
                 });
                 return;
             }

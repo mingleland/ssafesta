@@ -14,6 +14,12 @@ namespace Festa.Network
         string _port = "7777";
         string _nickname = "Player";
 
+        // POC: 접속마다 다른 아바타가 배정되도록 순환 (멀티 접속 시 외형 구분 확인용).
+        // 정식 구현에서는 Spring User 프로필의 avatarCode를 사용한다.
+        static readonly string[] AvatarCodes = { "sk_01", "sk_02", "sk_03" };
+        static int s_avatarIndex;
+        static string NextAvatarCode() => AvatarCodes[s_avatarIndex++ % AvatarCodes.Length];
+
         ConnectionManager _connection;
 
         void Awake() => _connection = GetComponent<ConnectionManager>();
@@ -52,7 +58,7 @@ namespace Festa.Network
                     {
                         userId = Random.Range(1, 100000),
                         nickname = _nickname,
-                        avatarCode = "default",
+                        avatarCode = NextAvatarCode(),
                         // POC 더미 토큰. 실제로는 Spring world-sessions 응답 토큰 사용.
                         connectionToken = "poc-dummy-token"
                     });

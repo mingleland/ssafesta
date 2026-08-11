@@ -17,6 +17,7 @@ GameObject:
   - component: {fileID: 1731498946974123893}
   - component: {fileID: 8836840528167371394}
   - component: {fileID: 6561185523781856892}
+  - component: {fileID: 4543201849085386913}
   m_Layer: 0
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -54,7 +55,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8589622438861398775}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -229,3 +230,20 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _offset: {x: 0, y: 4, z: -6}
   _followLerp: 8
+--- !u!114 &4543201849085386913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba1c03625dfb8ea448884aa60f688913, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  _catalog: {fileID: 11400000, guid: d5888423d6caf6a40bc6813c0ef57b2e, type: 2}
+  _visualRoot: {fileID: 0}
+  _visualOffset: {x: 0, y: -1, z: 0}
+  _visualScale: 1

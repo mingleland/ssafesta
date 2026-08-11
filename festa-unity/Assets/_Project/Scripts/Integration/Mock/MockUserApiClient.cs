@@ -13,7 +13,7 @@ namespace Festa.Integration
             {
                 userId = 12,
                 nickname = "MockUser",
-                avatarCode = "default"
+                avatarCode = "sk_01" // AvatarCatalog에 등록된 코드
             };
         }
 
