@@ -32,6 +32,8 @@ docs/
 
 현재 팀 운영 방식에 맞게 하나를 선택한다. 중간에 이유 없이 구조를 바꾸지 않는다.
 
+> **✅ 팀 결정 (2026-08-12)**: Repo 구성은 **파트별 자율 결정**. 단, 브랜치/CI-CD 전략(§2-1)과 develop 병합 규칙은 전 파트 공통이다.
+
 ---
 
 ## 2. Branch 전략
@@ -76,6 +78,29 @@ fix/FESTA-345-duplicate-lease
 ### hotfix
 
 발표 직전 main 긴급 수정처럼 실제 필요가 있을 때만 사용한다.
+
+---
+
+## 2-1. 파트 브랜치 + CI/CD 전략 ✅ (2026-08-12 팀 결정)
+
+기본 전략(§2) 위에 파트 통합 브랜치 계층을 둔다:
+
+```text
+main
+└─ develop            ← 실사용 환경 기준 CI/CD (전 컴포넌트 통합 배포 + 통합 헬스체크)
+   ├─ ai              ← 파트 브랜치: 각자 CI/CD + 개발환경 "개별" 배포
+   ├─ back
+   ├─ front
+   ├─ game
+   │    └─ feature/FESTA-xxx-...   ← 작업 브랜치는 자기 파트 브랜치에서 분기
+```
+
+규칙:
+
+1. **파트 브랜치(ai/back/front/game)는 각각 CI/CD를 가진다** — push 시 자체 빌드·테스트 후 해당 파트의 개발환경에 자동 배포된다. 파트끼리 서로의 배포를 기다리지 않는다.
+2. **develop은 실제 사용 환경 기준으로 CI/CD한다** — 완료된 상태만 파트 브랜치에서 develop으로 병합하며, develop을 일상 작업장으로 쓰지 않는다.
+3. feature/fix 브랜치는 자기 파트 브랜치에서 분기하고 자기 파트 브랜치로 MR한다.
+4. 파이프라인 상세 사양은 `docs/sdd/parts/INFRA.md` (infra-001)에서 spec으로 관리한다.
 
 ---
 
@@ -207,14 +232,12 @@ Jira Title Prefix와 유사하게 맞춘다.
 
 ## 9. Merge 방식
 
-팀 규모에서는 `Squash Merge`를 권장할 수 있다.
+> **✅ 팀 결정 (2026-08-12)**: `Squash Merge`로 통일한다 (이의 제기 시 재논의).
 
 장점:
 
 - feature branch의 중간 WIP Commit을 정리
 - Jira 단위 History 확인 용이
-
-다만 팀이 개별 Commit History를 중요하게 쓰면 일반 Merge도 가능하다. 시작 시 한 방식으로 통일한다.
 
 ---
 
@@ -367,9 +390,11 @@ Type/Interface: PascalCase
 
 ## 15. Unity C# Convention
 
+> **✅ 팀 결정 (2026-08-12)**: private field는 `_camelCase`로 확정 (POC 코드 전체가 이미 사용 중).
+
 ```text
 Class / Method / Property: PascalCase
-private field: camelCase 또는 _camelCase 중 팀에서 하나로 통일
+private field: _camelCase (확정)
 local variable: camelCase
 constant: PascalCase 또는 UPPER_SNAKE_CASE 중 Unity 팀 규칙 통일
 Interface: IInteractable

@@ -30,3 +30,7 @@ Assets/Synty.meta
 # OS
 .DS_Store
 Thumbs.db
+
+# Unity Performance Testing 패키지 자동 생성물 (커밋 불필요)
+[Aa]ssets/Resources/PerformanceTestRun*.json
+[Aa]ssets/Resources/PerformanceTestRun*.json.meta

@@ -15,3 +15,6 @@ Reference/
 # OS
 .DS_Store
 Thumbs.db
+
+# 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
+_to_delete/
