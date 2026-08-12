@@ -18,6 +18,7 @@ GameObject:
   - component: {fileID: 8836840528167371394}
   - component: {fileID: 6561185523781856892}
   - component: {fileID: 4543201849085386913}
+  - component: {fileID: 6286039337160174439}
   m_Layer: 0
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -182,7 +183,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
-  NetworkTransformExpanded: 1
+  NetworkTransformExpanded: 0
   AutoOwnerAuthorityTickOffset: 1
   PositionInterpolationType: 0
   RotationInterpolationType: 0
@@ -247,3 +248,17 @@ MonoBehaviour:
   _visualRoot: {fileID: 0}
   _visualOffset: {x: 0, y: -1, z: 0}
   _visualScale: 1
+  _animatorController: {fileID: 9100000, guid: f8d5fa92a218de346b05c7a59e31aa67, type: 2}
+--- !u!114 &6286039337160174439
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d3118cd6cf1cb4438cd942d79248e65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1

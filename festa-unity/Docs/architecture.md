@@ -46,6 +46,21 @@ Spring Published Layout (JSON)
 - Unknown type은 스킵 (구버전 클라이언트가 신규 타입에 깨지지 않게)
 - Layout JSON 스키마는 **Draft** — React/Spring/Unity 3파트 합의로만 변경
 
+## 3-1. 아바타 (Booth Runtime과 같은 원칙)
+
+```
+커스터마이징 창(현재 Unity HUD, 향후 React 오버레이)
+  → PlayerAppearanceController.RequestChange()  [Owner]
+  → ServerRpc → 서버가 NetworkPlayer.AvatarCode에 기록
+  → 전원 전파 → 각 클라이언트 PlayerAvatarVisual이 로컬 외형 재생성
+```
+
+- **문자열 하나(`avatarCode`)만 동기화**한다. 3D 모델은 NetworkObject가 아니며 각자 로컬 생성
+- 포맷: `sk_01` 또는 `sk_01|c=E85D5D` (최대 29자, 미지원 세그먼트는 무시 → forward compatible)
+- 외형 에셋은 Synty Sidekick 프리셋(에디터에서 사전 제작). 런타임 파츠 조립 없음
+- Unity는 `IAvatarVisualProvider` 뒤에 숨겨져 Sidekick에 종속되지 않는다
+- 파트 간 계약 상세: **`Docs/avatar-customization-contract.md`**
+
 ## 4. Integration 경계
 
 ```

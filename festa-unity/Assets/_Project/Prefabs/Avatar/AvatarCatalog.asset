@@ -13,10 +13,20 @@ MonoBehaviour:
   m_Name: AvatarCatalog
   m_EditorClassIdentifier: 
   _entries:
-  - avatarCode: sk_01
+  - presetCode: 
+    displayName: "\uD669\uB355"
     prefab: {fileID: 4139639460098842272, guid: 8f2898cb4ac4cdc43b1a38d6b4d41f22, type: 3}
-  - avatarCode: sk_02
+  - presetCode: 
+    displayName: "\uBC15\uC900\uC6B0"
     prefab: {fileID: 4585230603553425972, guid: 27d6b5633758f9948baeda81347a7022, type: 3}
-  - avatarCode: sk_03
+  - presetCode: 
+    displayName: "\uC774\uC815\uD5CC"
     prefab: {fileID: 3223244780260258906, guid: 5e972413cfa693442a82f59b962d6baa, type: 3}
   _fallbackPrefab: {fileID: 4139639460098842272, guid: 8f2898cb4ac4cdc43b1a38d6b4d41f22, type: 3}
+  _tintPalette:
+  - 
+  - E85D5D
+  - 5D8CE8
+  - 5DE887
+  - E8D25D
+  - B45DE8
