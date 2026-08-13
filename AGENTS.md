@@ -1,17 +1,25 @@
 # SSAFY FESTA — AI 에이전트 운영 매뉴얼
 
-> **이 저장소는 Codex 단독 운영을 기준으로 한다.**
-> Codex는 세션 시작 시 이 파일을 자동으로 읽는다. **이 파일 하나로 작업을 시작할 수 있게** 쓴다.
-> 규칙이 바뀌면 다른 문서보다 **여기를 먼저** 고친다.
+> **이 파일이 AI 에이전트 규칙의 단일 출처다. Codex든 Claude Code든 똑같이 적용된다.**
+> 두 도구의 차이는 **명령 접두사 하나뿐**이고(`$` vs `/`), 결과물은 같은 `specs/`에 쌓인다.
+> **이 파일 하나로 작업을 시작할 수 있게** 쓴다. 규칙이 바뀌면 다른 문서보다 **여기를 먼저** 고친다.
 >
-> 최종 갱신: 2026-08-13 | 대상: Codex(주) / Claude(부) / 기타 AI 에이전트
+> 최종 갱신: 2026-08-13 | 대상: **Codex · Claude Code** / 기타 AI 에이전트
+
+| 도구 | 자동으로 읽는 파일 | speckit 명령 | 명령 정의 위치 |
+|---|---|---|---|
+| **Codex** | `AGENTS.md` (이 파일) | `$speckit-plan` | `.agents/skills/speckit-*/SKILL.md` |
+| **Claude Code** | `CLAUDE.md` → 이 파일을 가리킨다 | `/speckit-plan` | `.claude/skills/speckit-*/SKILL.md` |
+
+> **Claude Code로 작업한다면**: `CLAUDE.md`만 읽고 시작하지 마라. 거기엔 요약만 있다.
+> **이 파일 전문을 읽고** 그대로 따른다. 규칙은 두 도구가 완전히 동일하다.
 
 ---
 
 ## 0. 세션을 시작하면 이 순서로 한다
 
 ```text
-[1] 이 파일 전체를 읽는다
+[1] 이 파일 전체를 읽는다                          ← Codex / Claude Code 공통
 [2] .specify/memory/constitution.md (헌법 v1.2)  ← 모든 결정의 최상위 근거
 [3] 작업할 spec 지정:  .specify/feature.json      ← §2-3. 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
@@ -30,9 +38,11 @@
 | 들어 있는 것 | 위치 | 커밋됨 |
 |---|---|:---:|
 | 헌법 · 템플릿 · 스크립트 | `.specify/` | ✅ (21개 파일) |
-| Codex용 speckit 명령 10종 | `.agents/skills/speckit-*/SKILL.md` | ✅ |
-| Claude용 speckit 명령 10종 | `.claude/skills/speckit-*/SKILL.md` | ✅ |
+| **Codex용** speckit 명령 10종 | `.agents/skills/speckit-*/SKILL.md` | ✅ |
+| **Claude Code용** speckit 명령 10종 | `.claude/skills/speckit-*/SKILL.md` | ✅ |
 | 기능 명세 18종 | `specs/` | ✅ |
+
+**두 도구 모두 설치 없이 바로 동작한다.** Codex를 쓰든 Claude Code를 쓰든 `git pull`이면 끝이다.
 
 ### 하지 말 것
 
@@ -44,8 +54,8 @@
 
 | 항목 | 비고 |
 |---|---|
-| Codex CLI | 저장소 루트에서 실행한다. 하위 폴더에서 실행하면 `.specify/`를 못 찾는다 |
-| **bash** | 스크립트가 `.sh`다. **Windows는 Git Bash 또는 WSL**에서 돌린다 |
+| **Codex CLI 또는 Claude Code** | 둘 중 아무거나. **저장소 루트에서** 실행한다 — 하위 폴더면 `.specify/`를 못 찾는다 |
+| **bash** | 스크립트가 `.sh`다. **Windows는 Git Bash 또는 WSL**에서 돌린다 (두 도구 공통) |
 | git | — |
 
 ### 30초 확인
@@ -61,22 +71,26 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 
 ## 2. SDD 작업 흐름
 
-### 2-1. 명령 이름 (Codex)
+### 2-1. 명령 이름
 
-```text
-$speckit-clarify     모호한 부분을 질문으로 좁힌다   ← spec의 C-xx 답할 때
-$speckit-plan        기술 계획 수립                 ← 각 파트의 시작점
-$speckit-tasks       작업 목록 생성
-$speckit-analyze     spec·plan·tasks 일관성 점검
-$speckit-implement   구현
-$speckit-checklist   품질 체크리스트
-```
+**이름은 같고 접두사만 다르다.** Codex는 `$`, Claude Code는 `/`.
 
-> **스킬이 인식되지 않는 Codex 버전이라면** 이렇게 시키면 똑같이 동작한다:
-> *"`.agents/skills/speckit-plan/SKILL.md`를 읽고 거기 적힌 절차를 그대로 실행해."*
+| 명령 | Codex | Claude Code | 언제 |
+|---|---|---|---|
+| clarify | `$speckit-clarify` | `/speckit-clarify` | 모호한 부분을 질문으로 좁힌다 (spec의 C-xx 답할 때) |
+| **plan** | `$speckit-plan` | `/speckit-plan` | 기술 계획 수립 — **각 파트의 시작점** |
+| tasks | `$speckit-tasks` | `/speckit-tasks` | 작업 목록 생성 |
+| analyze | `$speckit-analyze` | `/speckit-analyze` | spec·plan·tasks 일관성 점검 |
+| implement | `$speckit-implement` | `/speckit-implement` | 구현 |
+| checklist | `$speckit-checklist` | `/speckit-checklist` | 품질 체크리스트 |
+
+**결과물은 두 도구가 같은 `specs/`에 쌓는다.** 누가 무엇으로 작업해도 한 곳에 모인다.
+
+> **도구가 스킬을 인식하지 못하면** 이렇게 시키면 똑같이 동작한다:
+> - Codex — *"`.agents/skills/speckit-plan/SKILL.md`를 읽고 거기 적힌 절차를 그대로 실행해."*
+> - Claude Code — *"`.claude/skills/speckit-plan/SKILL.md`를 읽고 거기 적힌 절차를 그대로 실행해."*
+>
 > SKILL.md는 그 자체가 완전한 절차서라 별도 설치 없이 동작한다.
-
-Claude Code를 쓸 경우 이름은 같고 접두사만 `/speckit-plan` 형태다. **결과물은 같은 `specs/`에 쌓인다.**
 
 ### 2-2. 순서
 
@@ -261,14 +275,14 @@ docker run -d --name festa-world-01 -p 7777:7777 festa-world:dev
 
 ```text
 SSAFESTA/
-├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처)
-├── CLAUDE.md                       ← 이 파일을 가리키기만 한다
+├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처, 두 도구 공통)
+├── CLAUDE.md                       ← 요약 + 이 파일로 안내 (Claude Code 진입점)
 ├── .specify/
 │   ├── memory/constitution.md      ★ 헌법 v1.2
 │   ├── templates/  scripts/bash/
 │   └── feature.json                ★ 작업 중인 spec 지정 (커밋 안 됨, 각자 생성)
-├── .agents/skills/speckit-*/       Codex 명령
-├── .claude/skills/speckit-*/       Claude 명령
+├── .agents/skills/speckit-*/       Codex 명령      ($speckit-plan)
+├── .claude/skills/speckit-*/       Claude Code 명령 (/speckit-plan)
 ├── specs/
 │   ├── README.md                   spec 18종 목록 + 확정 사항
 │   └── NNN-이름/{spec,plan,tasks}.md
@@ -293,5 +307,5 @@ SSAFESTA/
 | 결정이 없어서 막힘 | `docs/26_팀_결정_필요사항.md`에 등록 + 리드에게 알림. **혼자 정하지 않는다** |
 | 기술 문제로 막힘 | 본인 트러블슈팅에 **먼저 기록**하고 공유 (같은 문제를 둘이 겪지 않게) |
 | spec이 틀린 것 같음 | spec 하단 리뷰 ②칸에 적는다. **그러라고 만든 칸이다** |
-| speckit 명령이 안 돌아감 | §1 확인 → §2-3 `feature.json` 지정 확인 |
-| Codex가 스킬을 못 찾음 | §2-1 하단의 "SKILL.md를 읽고 실행" 방식으로 우회 |
+| speckit 명령이 안 돌아감 | §1 확인(루트에서 실행? bash 있나?) → §2-3 `feature.json` 지정 확인 |
+| Codex / Claude Code가 스킬을 못 찾음 | §2-1 하단의 "SKILL.md를 읽고 실행" 방식으로 우회 |
