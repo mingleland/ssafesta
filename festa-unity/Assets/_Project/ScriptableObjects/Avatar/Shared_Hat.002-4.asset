@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e06607204b4f4c41abcc8535d022981, type: 3}
+  m_Name: Shared_Hat.002-4
+  m_EditorClassIdentifier: 
+  itemId: 703097281
+  displayName: Hat.002-4
+  category: 2
+  gender: 2
+  meshes: []
+  objectPrefabs:
+  - {fileID: 2508792684523485923, guid: cc83e4f2c4c64c94083ef2363f98e32b, type: 3}
+  targetBones: 0a000000
+  hiddenBodyParts: 
+  thumbnail: {fileID: 0}
+  isDefault: 0
+  hairGroup: 0
+  familyId: 1002
+  requiredHairGroup: 4

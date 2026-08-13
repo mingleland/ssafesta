@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e06607204b4f4c41abcc8535d022981, type: 3}
+  m_Name: F_Top.10
+  m_EditorClassIdentifier: 
+  itemId: 2066129387
+  displayName: Top.10
+  category: 4
+  gender: 1
+  meshes:
+  - {fileID: 298094935749147364, guid: 74fcd5f50cc43b64885d3eb95556533b, type: 3}
+  objectPrefabs: []
+  targetBones: 
+  hiddenBodyParts: 0100000002000000030000001400000015000000
+  thumbnail: {fileID: 0}
+  isDefault: 0
+  hairGroup: 0
+  familyId: 0
+  requiredHairGroup: 0

@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e06607204b4f4c41abcc8535d022981, type: 3}
+  m_Name: Shared_Hairstyle.04
+  m_EditorClassIdentifier: 
+  itemId: 2055903654
+  displayName: Hairstyle.04
+  category: 1
+  gender: 2
+  meshes: []
+  objectPrefabs:
+  - {fileID: 1398059577341380902, guid: d20df99f819391b4cb82b98fb1c0a751, type: 3}
+  targetBones: 0a000000
+  hiddenBodyParts: 
+  thumbnail: {fileID: 0}
+  isDefault: 0
+  hairGroup: 1
+  familyId: 0
+  requiredHairGroup: 0
