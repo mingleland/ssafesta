@@ -1,21 +1,52 @@
 # SSAFY FESTA — SDD 작업 가이드
 
 > **이 문서가 SDD의 출발점이다.** 처음이면 §1부터, 이미 알면 §3(내 파트)부터 보면 된다.
-> 작성: 2026-08-12 (Unity 리드) | spec-kit 0.16.3 설치 완료
+> 작성: 2026-08-12 (Unity 리드) | 갱신: 2026-08-13 — **Codex 기준**으로 정리
+> AI 에이전트가 지켜야 할 규칙 전문은 루트 **`AGENTS.md`**다. 이 문서는 사람이 읽는 입문서다.
 
 ---
 
 ## 1. 5분 요약 — 지금 뭘 해야 하나
 
 ```text
+[0] 세팅                →  §1-1  ★ spec-kit은 깔지 않는다. clone하면 끝이다
 [1] 내 spec 찾기        →  §3 표에서 내 이름/파트 칸
 [2] 내 spec 점검하기     →  §4 리뷰 3칸을 채운다  ← 지금 여기
-[3] plan/tasks 만들기   →  §5 /speckit-plan 실행
+[3] plan/tasks 만들기   →  §5 $speckit-plan 실행
 [4] 구현 + 기록          →  §6 작업 사이클
 ```
 
 **지금 할 일은 [2]다.** spec 18종의 초안이 이미 있고, 각 파트가 자기 것을 검토해야 확정된다.
 *(Unity 파트 6종은 리드가 이미 확정 — §3 참조)*
+
+### 1-1. 세팅 — spec-kit은 설치하지 않는다 ★
+
+**"나는 spec-kit이 없는데?" → 깔 필요 없다. 저장소 안에 들어 있고 전부 커밋돼 있다.**
+
+| 들어 있는 것 | 위치 |
+|---|---|
+| 헌법 · 템플릿 · 스크립트 | `.specify/` |
+| **Codex용** speckit 명령 10종 | `.agents/skills/speckit-*/SKILL.md` |
+| **Claude Code용** speckit 명령 10종 | `.claude/skills/speckit-*/SKILL.md` |
+| 기능 명세 18종 | `specs/` |
+
+`git pull` → **저장소 루트에서** Codex 실행 → 끝이다.
+
+> ❌ **`pip install specify-cli` / `specify init`을 실행하지 마라.**
+> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+
+필요한 것은 두 가지뿐이다.
+
+| 항목 | 비고 |
+|---|---|
+| Codex CLI (또는 Claude Code) | **반드시 저장소 루트에서** 실행. 하위 폴더면 `.specify/`를 못 찾는다 |
+| **bash** | 스크립트가 `.sh`라서 **Windows는 Git Bash 또는 WSL**에서 돌린다 |
+
+확인 한 줄 — `FEATURE_DIR` 등이 나오면 정상이다.
+
+```bash
+bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
+```
 
 ---
 
@@ -157,15 +188,26 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 # FEATURE_DIR / FEATURE_SPEC / IMPL_PLAN / TASKS 가 나오면 정상
 ```
 
-### 5-2. 명령 실행 (Claude·Codex 이름 동일)
+### 5-2. 명령 실행
 
 ```text
-/speckit-clarify    모호한 부분을 질문으로 좁힌다   ← C-xx 답할 때 유용
-/speckit-plan       기술 계획 수립                ← 여기서 시작
-/speckit-tasks      작업 목록 생성
-/speckit-analyze    spec·plan·tasks 일관성 점검
-/speckit-implement  구현
+$speckit-clarify    모호한 부분을 질문으로 좁힌다   ← C-xx 답할 때 유용
+$speckit-plan       기술 계획 수립                ← 여기서 시작
+$speckit-tasks      작업 목록 생성
+$speckit-analyze    spec·plan·tasks 일관성 점검
+$speckit-implement  구현
 ```
+
+| 도구 | 접두사 |
+|---|---|
+| **Codex** (기준) | `$speckit-plan` |
+| Claude Code | `/speckit-plan` |
+
+이름은 같고 접두사만 다르다. **결과물은 같은 `specs/`에 쌓인다** — 누가 작업해도 한 곳에 모인다.
+
+> **Codex가 스킬을 못 찾으면** 이렇게 시키면 똑같이 동작한다:
+> *"`.agents/skills/speckit-plan/SKILL.md`를 읽고 거기 적힌 절차를 그대로 실행해."*
+> SKILL.md 자체가 완전한 절차서라 별도 설치가 필요 없다.
 
 **왜 plan을 리드가 안 써줬나**: plan은 "어떤 기술로 어떻게"라서 그 파트만 정확하게 쓸 수 있다.
 남이 추측으로 써준 plan은 오너십도 정확도도 잃는다.
@@ -247,6 +289,8 @@ AI 세션(Claude/Codex)에 시킨 작업도 동일하게 기록한다.
 | 실수 | 왜 문제인가 |
 |---|---|
 | `.specify/feature.json` 지정 안 하고 명령 실행 | 명령이 어느 spec인지 몰라 실패한다 |
+| **spec-kit을 새로 설치**(`specify init`) | **헌법 v1.2가 빈 템플릿으로 덮인다.** 이미 저장소에 있다 (§1-1) |
+| 저장소 루트가 아닌 하위 폴더에서 실행 | `.specify/`를 못 찾아 명령이 실패한다 |
 | 리뷰 ②칸에 "좋아요"만 쓰기 | 검토가 아니다. 통합 시점에 터진다 |
 | 미정 항목을 혼자 정하고 구현 | 나중에 뒤집힐 때 비용이 크다 (헌법 30조) |
 | 계약을 혼자 바꾸고 알리지 않기 | 다른 파트가 조용히 깨진다 |
@@ -284,4 +328,6 @@ AI 세션(Claude/Codex)에 시킨 작업도 동일하게 기록한다.
 | 결정이 필요해서 막힘 | `docs/26_팀_결정_필요사항.md`에 등록 + 리드에게 알림 |
 | 기술 문제로 막힘 | 본인 트러블슈팅에 먼저 기록하고 공유 (같은 문제를 둘이 겪지 않게) |
 | spec이 틀린 것 같음 | 리뷰 ②에 적는다. **그게 정상이고 그러라고 만든 칸이다** |
-| 명령이 안 돌아감 | §5-1 `feature.json` 지정 확인 |
+| 명령이 안 돌아감 | §1-1 (루트에서 실행? bash 있나?) → §5-1 `feature.json` 지정 확인 |
+| Codex가 speckit 스킬을 못 찾음 | §5-2 아래의 "SKILL.md를 읽고 실행" 방식으로 우회 |
+| AI 에이전트 규칙 전문이 필요함 | 루트 **`AGENTS.md`** |

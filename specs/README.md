@@ -48,27 +48,35 @@
 
 ## 3. spec-kit 사용법
 
-이 저장소에는 spec-kit이 이미 설치되어 있다. **추가 설치가 필요 없다.**
+**설치하지 마라. 저장소 안에 이미 들어 있고 전부 커밋돼 있다.** `git pull`이면 끝이다.
 
 ```text
 .specify/memory/constitution.md   ← 헌법 v1.2 (모든 명령이 참조)
 .specify/templates/               ← spec / plan / tasks 템플릿
 .specify/scripts/bash/            ← 명령이 호출하는 스크립트
+.agents/skills/speckit-*/         ← Codex 용 (기준)
 .claude/skills/speckit-*/         ← Claude Code 용
-.agents/skills/speckit-*/         ← Codex 용
 specs/                            ← 이 폴더
 ```
 
-**명령 실행 순서** (Claude와 Codex 모두 동일한 이름):
+> ❌ **`pip install specify-cli` / `specify init`을 실행하지 마라.**
+> 재설치하면 위 `constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+
+**필요한 것**: Codex CLI를 **저장소 루트에서** 실행 + **bash**(Windows는 Git Bash / WSL — 스크립트가 `.sh`다).
+
+**명령 실행 순서** — 이름은 같고 접두사만 다르다 (Codex `$`, Claude Code `/`):
 
 ```text
-/speckit-specify    새 기능 명세 작성 (이미 있는 것은 건너뛴다)
-/speckit-clarify    모호한 부분을 질문으로 좁힌다  ← C-xx 답할 때 유용
-/speckit-plan       기술 계획 수립         ← 각 파트가 여기서 시작
-/speckit-tasks      작업 목록 생성
-/speckit-analyze    일관성 점검
-/speckit-implement  구현
+$speckit-specify    새 기능 명세 작성 (이미 있는 것은 건너뛴다)
+$speckit-clarify    모호한 부분을 질문으로 좁힌다  ← C-xx 답할 때 유용
+$speckit-plan       기술 계획 수립         ← 각 파트가 여기서 시작
+$speckit-tasks      작업 목록 생성
+$speckit-analyze    일관성 점검
+$speckit-implement  구현
 ```
+
+> **Codex가 스킬을 못 찾으면**: *"`.agents/skills/speckit-plan/SKILL.md`를 읽고 그대로 실행해"* 라고 시키면
+> 동일하게 동작한다. SKILL.md 자체가 완전한 절차서다.
 
 **⚠️ 중요 — 작업할 spec을 먼저 지정한다.**
 
@@ -90,7 +98,9 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 # → {"REPO_ROOT":...,"FEATURE_DIR":...,"FEATURE_SPEC":...,"IMPL_PLAN":...,"TASKS":...} 가 나오면 정상
 ```
 
-**각 파트의 시작점**: 위처럼 자기 spec을 지정한 뒤 `/speckit-plan` 실행.
+> 이 파일은 `.specify/.gitignore`에 의해 **커밋되지 않는다.** 사람마다 각자 만든다 — 정상이다.
+
+**각 파트의 시작점**: 위처럼 자기 spec을 지정한 뒤 `$speckit-plan` 실행.
 plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있다 — 그래서 리드가 미리 쓰지 않았다.
 
 ## 4. 2026-08-12 확정 사항 (전 spec 반영 완료)

@@ -1,31 +1,34 @@
 # SSAFY FESTA — AI 세션 공통 규칙
 
-이 폴더에서 작업하는 모든 AI 세션(Claude 등)은 아래 규칙을 따른다.
+> **규칙의 단일 출처는 저장소 루트의 [`AGENTS.md`](./AGENTS.md)다.**
+> 이 파일은 중복해서 적지 않는다. 규칙이 두 곳에 있으면 반드시 어긋난다.
 
-## 필수: 기록 규칙
+이 저장소는 **Codex 단독 운영**을 기준으로 한다. Claude Code로 작업하는 경우에도
+`AGENTS.md`를 **먼저 전부 읽고** 그 규칙을 그대로 따른다.
 
-1. **작업일지** — 하나의 작업(기능 구현, 검증, 문서 작성, 설정 변경)이 끝나면
-   `docs/24_작업일지.md`의 **해당 날짜 섹션에 즉시 기록**한다.
-   날짜 섹션이 없으면 만든다 (최신 날짜가 위). 👤 사람 / 🤖 AI 구분 표기.
-2. **트러블슈팅** — 작업 중 문제가 발생하면 해결 여부와 무관하게
-   `docs/25_트러블슈팅.md`에 **T-번호를 따서 반드시 등록**한다 (증상/원인/해결/예방).
-   작업일지에는 T-번호로 링크만 남긴다. 이 규칙에 예외는 없다.
-3. 세션을 종료하기 전, 위 두 문서가 이번 세션의 작업을 반영하고 있는지 확인한다.
+## Claude Code에서만 다른 점 — 명령 접두사
 
-## 필수: 코드 규칙
+| Codex | Claude Code |
+|---|---|
+| `$speckit-plan` | `/speckit-plan` |
+| `$speckit-tasks` | `/speckit-tasks` |
+| `$speckit-implement` | `/speckit-implement` |
 
-- **기준선 동결 준수** — `docs/23_기준선_동결_워크플로.md`. 동결된 기준선 코드를
-  재구현/리팩터링하지 않는다. 현재 기준선: `v0.0.1-poc` (POC — Multiplayer + Booth Runtime)
-- Git/커밋/브랜치 규칙: `docs/17_Git_개발_Convention.md`
-- `reference/` 폴더는 READ ONLY. 절대 수정하지 않는다.
-- Unity 관련 함정 목록: `docs/25_트러블슈팅.md` — 같은 실수를 반복하지 않는다.
-  특히: WebGL에서 Task.Delay 금지(Awaitable 사용), 런타임 TextMesh는 폰트 명시,
-  런타임 머티리얼은 URP Lit 명시, NetworkVariable은 필드로 선언.
+명령 정의는 `.claude/skills/speckit-*/SKILL.md`에 있고 **저장소에 커밋되어 있다.
+spec-kit을 따로 설치하지 마라** (`specify init`은 헌법 파일을 덮어쓸 수 있다 — `AGENTS.md` §1).
 
-## 프로젝트 컨텍스트
+결과물은 Codex와 **같은 `specs/`**에 쌓인다. 누가 작업해도 한 곳에 모인다.
 
-- 기획/설계 문서: `docs/00~20`, 착수 전 기술 결정: `docs/21`, 남은 작업: `docs/22`
-- Unity 프로젝트: `festa-unity/` (상태: `festa-unity/Docs/poc-status.md`)
-- Infra 인수인계: `festa-unity/Docs/deployment-handoff.md`
-- 아키텍처 원칙: Booth 정적 오브젝트는 NetworkObject 금지(Local Spawn),
-  텍스트 입력 UI는 Unity가 아닌 React 오버레이, Coin/Lease 등 영구 상태는 Spring이 Source of Truth
+## 먼저 읽을 것
+
+1. `AGENTS.md` — 전체 규칙
+2. `.specify/memory/constitution.md` — 헌법 v1.2
+3. `docs/00_SDD_가이드.md` — 사람이 읽는 SDD 입문서
+
+## 최소한 이것만은 (전문은 AGENTS.md)
+
+- `.specify/feature.json`에 작업할 spec을 **먼저 지정**한다. 안 하면 명령이 실패한다.
+- `git push --force` / `git reset --hard` / `git clean -fd` **금지**. 로컬 파일 삭제 금지.
+- Secret 커밋 금지. `reference/`는 READ ONLY.
+- 작업일지(`docs/24`) · 트러블슈팅(`docs/25`) 기록은 **의무**다 (헌법 29조).
+- 미정 항목을 **임의로 확정하지 않는다** (헌법 30조).
