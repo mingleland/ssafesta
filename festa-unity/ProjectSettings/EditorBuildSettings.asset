@@ -5,10 +5,10 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
+  - enabled: 1
     path: Assets/_Project/Scenes/main.unity
     guid: 867cdf102f4c92743b1b0de0c135dfa9
-  - enabled: 1
+  - enabled: 0
     path: Assets/_Project/Experimental/Sidekick/SidekickTestScene.unity
     guid: e98ec8ecddda7ee42be187e583d53cb0
   m_configObjects:

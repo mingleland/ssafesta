@@ -1,77 +1,116 @@
 # Implementation Plan: 캐릭터 커스터마이징
 
-**Spec**: `specs/013-avatar-customization/spec.md`
-**Branch**: `game`
-**Date**: 2026-08-12
+**Branch**: `game` | **Date**: 2026-08-12 | **Spec**: [spec.md](./spec.md)
+
+**Input**: Feature specification from `/specs/013-avatar-customization/spec.md`
 
 ---
 
 ## Summary
 
-파츠 조립과 실시간 전파는 **동작 확인 완료**다 (16종 파츠 교체, 서버 권위 전파, T-24/T-25/T-27 해결).
-남은 일은 **① Spring 영구 저장·복원 ② React 창으로 이관 ③ 성능 확인** 셋이다.
+월드 입장 전 캐릭터 생성 화면에서 외형을 고르고, 확정한 외형이 월드의 내 캐릭터와 **다른 접속자 화면에 동일하게** 적용된다.
 
-Unity 파트의 실질 작업은 ②의 **브릿지 양방향 완성**과 ③이다. 저장은 BE 완성에 종속된다.
+기술 접근: 모듈러 프리팹 에셋의 파츠를 **ID 집합**으로 표현하고, 그 ID만 NGO로 동기화한다.
+3D 조립은 각 클라이언트가 로컬에서 수행한다. 기존 `IAvatarVisualProvider` 경계를 그대로 재사용해
+`NetworkPlayer`·Connection·Booth Runtime을 건드리지 않고 시각 계층만 교체한다.
+
+**이 계획의 지배적 제약은 기능이 아니라 용량이다.** 신규 에셋 소스가 약 141MB(텍스처 약 80MB)이고
+현재 Web 빌드가 약 87MB이므로, 카테고리·항목 수는 용량 실측 결과로 역산한다 (Phase 0).
 
 ## Technical Context
 
-| 항목 | 값 |
-|---|---|
-| Engine | Unity 6000.0.78f1 / URP 17.0.4 |
-| 아바타 | Synty Sidekick Runtime API (`SidekickRuntime`, `Combiner`, SQLite 파츠 DB) |
-| 동기화 | NGO `NetworkVariable<FixedString4096Bytes>` (서버 쓰기 / 전원 읽기) |
-| 렌더링 | `CreateCharacter(combineMesh: true)` → 캐릭터당 드로우콜 1 |
-| 브릿지 | `SendMessage`(JS→Unity) / jslib 콜백(Unity→JS, **미구현**) |
-| 저장 | `IUserApiClient.UpdateMyAvatarAsync` (현재 Mock) |
-| Target | Unity Web (WebGL) — Sidekick SQLite는 `:memory:` + Deserialize로 동작 확인 |
-| 제약 | 인코딩 상한 3800자(현행), Synty 패키지는 저장소 미포함(.gitignore) |
+**Language/Version**: C# 9 / Unity 6000.0.78f1
+
+**Primary Dependencies**: Netcode for GameObjects 2.4.3, Unity Transport 2.5.1, URP 17.0.4, 모듈러 캐릭터 에셋(벤더), uGUI
+
+**Storage**: `IAvatarProfileStore` 추상화 — 1차는 PlayerPrefs(로컬). Backend는 계약 제안만 (`contracts/avatar-profile-api.md`)
+
+**Testing**: 에디터 수동 검증 + Multiplayer Play Mode + 브라우저 2탭 + Docker Dedicated Server 회귀
+
+**Target Platform**: Unity Web (WebGL, 데스크톱 크롬 기준) 클라이언트 + Linux Dedicated Server
+
+**Project Type**: Unity 클라이언트 단일 프로젝트 (서버는 같은 프로젝트의 Dedicated Server 빌드)
+
+**Performance Goals**: 조립은 Spawn·변경 시점에만 1회. 목표 인원 동시 접속 시 데스크톱 크롬 30fps 이상.
+외형 동기화가 이동 동기화 지연에 영향을 주지 않을 것
+
+**Constraints**: **Web 빌드 총량이 현재(약 87MB)를 넘지 않을 것**. 네트워크 payload는 고정 크기 struct(수십 바이트).
+`NetworkPlayer` 수정 금지. 벤더 에셋 원본 수정 금지
+
+**Scale/Scope**: 카테고리 6~10종 예상(실조사로 확정), 항목 수는 용량 예산으로 역산. 1채널 30~40명 목표
 
 ## Constitution Check
 
-| 조항 | 준수 방법 |
-|---|---|
-| 5조 아바타는 데이터로 생성 | 문자열만 동기화, 3D는 로컬 생성, 외형에 NetworkObject 미부착 (현행 준수) |
-| 12조 클라이언트 불신 | 서버 RPC에서 길이·형식 검증 (현행). 파츠 소유권 검증은 P1 |
-| 17조 UI는 웹 레이어 | Unity HUD는 **임시**. React 창 완성 시 제거 또는 개발 전용 격리 |
-| 18조 기준선 동결 | `NetworkPlayer` 무수정 유지 — 별도 컴포넌트로 확장 (현행) |
-| 21조 계약 변경 절차 | 인코딩 상한 변경은 BE 스키마에 직결 → 단독 변경 금지 |
+*GATE: Phase 0 이전 통과 필수. Phase 1 설계 후 재확인.*
 
-**계약 문서 정정 필요**: `festa-unity/Docs/avatar-customization-contract.md`의 **29~32자 제한은 무효**.
-파츠 조립 시 실측 약 600자. 이 문서를 갱신하지 않으면 BE가 `VARCHAR(32)`로 만들어 T-24가 DB에서 재발한다.
+| 조항 | 게이트 | 판정 |
+|---|---|---|
+| 2 — 실시간/영구 분리 | 게임 서버가 외형 **식별자**만 권위 보유, 경제·임대 미변경 | ✅ 통과 |
+| 5 — 아바타는 데이터로 생성 | ID만 동기화 / 3D는 로컬 생성 / 외형에 NetworkObject 없음 / 캐릭터당 NetworkObject 1개 | ✅ 통과 |
+| 16 — 클라이언트 불신 | 서버가 카탈로그 범위 내 ID인지 검증 | ✅ 통과 |
+| 23 — 외형 데이터 표현 | 네트워크=고정 크기 struct, 저장=TEXT, itemId는 인덱스 아님 | ✅ 통과 |
+| 24 — 계약 변경 절차 | 외형 데이터 형식 변경은 Unity+BE 합의 | ✅ 통과 (contracts/ 문서화) |
+| 25 — UI는 웹 레이어 | Unity Lobby는 이관 전까지의 구현. `AvatarBridge` 경계 유지 | ⚠️ 조건부 통과 → Complexity Tracking |
+| 27 — 기준선 동결 | `NetworkPlayer`/`ConnectionManager`/`BoothRuntime` 무수정 | ✅ 통과 |
+| 28 — 범위 통제 | 상점·인벤토리·BlendShape 제외 | ✅ 통과 |
+
+**Post-Design 재확인 (Phase 1 이후)**: `contracts/`와 `data-model.md` 작성 후에도 위 판정 변동 없음.
+외형 struct가 고정 크기이므로 23조가 설계 수준에서 강제된다.
 
 ## Project Structure
 
-```text
-Assets/_Project/Scripts/World/Avatar/
-├── AvatarAppearance.cs             [완료] 이중 인코딩, forward compatible
-├── SidekickRuntimeService.cs       [완료] DB 1회 초기화, 미러 파츠 폴백
-├── PlayerAppearanceController.cs   [완료] 서버 권위 전파 + 미반영 감지
-├── PlayerAvatarVisual.cs           [완료] 구독 → 로컬 생성, Animator 폴백
-├── AvatarCatalog.cs                [완료] 프리셋 매핑 (FormerlySerializedAs)
-├── AvatarCustomizationHud.cs       [임시] React 이관 후 개발 전용 격리
-└── AvatarBridge.cs                 [수정] Unity→JS 콜백 추가 필요
+### Documentation (this feature)
 
-Assets/Plugins/WebGL/festa-bridge.jslib   [신규] 006과 공용
-festa-unity/Docs/avatar-customization-contract.md  [갱신 필수] 길이 제한 정정
+```text
+specs/013-avatar-customization/
+├── plan.md              # 이 파일
+├── research.md          # Phase 0 — 미확정 항목 해소
+├── data-model.md        # Phase 1 — 엔티티 정의
+├── quickstart.md        # Phase 1 — 새 항목 추가 절차
+├── contracts/
+│   ├── network-avatar-config.md   NGO 동기화 계약
+│   ├── avatar-profile-api.md      Spring 저장 API 제안
+│   └── avatar-bridge.md           Unity ↔ React 브릿지 계약
+└── tasks.md             # Phase 2 — $speckit-tasks 산출물
 ```
 
-## 접근 방식
+### Source Code (repository root)
 
-1. **저장은 인터페이스 뒤에서 이미 끝나 있다.** `IUserApiClient.UpdateMyAvatarAsync` 구현만 Mock→Http로 바꾸면 된다.
-   BE 완성 전까지 Mock 유지 — 개발이 막히지 않는다.
-2. **복원 경로가 신규**: 접속 시 프로필의 외형 값을 초기값으로 사용해야 한다.
-   현재는 접속 payload의 `avatarCode`를 초기값으로 쓰는데, 이 경로가 실제 저장값을 받도록 연결한다.
-3. **React 이관은 브릿지 양방향이 전제**: 지금은 JS→Unity(`SendMessage`)만 된다.
-   React가 파츠 목록과 현재 값을 알아야 창을 그릴 수 있으므로 **Unity→JS 콜백**이 필요하다.
-4. **Unity HUD를 지우지 않는다.** React 창이 완성될 때까지 유일한 검증 수단이고,
-   완성 후에도 개발 빌드에서 유용하다. `DEVELOPMENT_BUILD`로 격리만 한다.
+```text
+festa-unity/Assets/_Project/
+├── Scripts/World/Avatar/
+│   ├── Core/            AvatarConfig, AvatarPartCategory, Gender
+│   ├── Catalog/         AvatarItemDefinition(SO), AvatarCatalog(SO), AvatarPreset(SO)
+│   ├── Assembly/        AvatarAssembler, ModularAvatarVisualProvider
+│   ├── Network/         NetworkAvatarConfig(struct), PlayerAppearanceController
+│   ├── Persistence/     IAvatarProfileStore, LocalAvatarProfileStore
+│   └── Lobby/           AvatarPreviewController, CharacterLobbyFlow, UI/
+├── ScriptableObjects/Avatar/    항목 정의 에셋 (항목 추가의 등록 지점)
+├── Prefabs/Avatar/              프로젝트용 아바타 프리팹 (벤더 원본 복제)
+└── Scenes/
+    ├── CharacterLobby.unity     [신규] 월드 접속 앞단
+    └── main.unity               [기존] 무수정
+
+festa-unity/Assets/_Project/Scripts/World/Avatar/   ← 기존 파일 처리
+   IAvatarVisualProvider.cs      유지 (교체 가능성의 근거)
+   PlayerAvatarVisual.cs         유지 + Provider 교체
+   PlayerAppearanceController.cs 유지 + 동기화 타입 교체
+   AvatarBridge.cs               유지
+   AvatarAppearance.cs           대체 → Core/AvatarConfig
+   AvatarCatalog.cs              대체 → Catalog/AvatarCatalog
+   CatalogAvatarVisualProvider.cs 대체 → Assembly/ModularAvatarVisualProvider
+   SidekickRuntimeService.cs     제거 (Phase 9)
+   AvatarCustomizationHud.cs     제거 (Lobby로 대체)
+```
+
+**Structure Decision**: Unity 단일 프로젝트. 아바타 기능은 `Scripts/World/Avatar/` 아래 6개 하위 폴더로
+책임을 분리한다 — Core(표현) / Catalog(정의) / Assembly(조립) / Network(동기화) / Persistence(저장) / Lobby(UI).
+이 분리는 §Complexity Tracking의 "Lobby는 나중에 React로 이관" 조건을 지키기 위해서다.
+Lobby 폴더만 들어내도 나머지가 그대로 동작해야 한다.
 
 ## Complexity Tracking
 
-| 위험 | 대응 |
-|---|---|
-| **인코딩 길이 상한 미확정(C-01)** — BE 스키마 결정 전 | 현행 3800 유지, 계약 문서에 "32자 무효" 명시하고 BE에 즉시 통지 |
-| 파츠 목록 마스터 미결(C-02) | Unity가 소유한 상태로 진행. Spring 이관 시 `AvatarBridge`가 목록을 넘기는 형태로 확장 |
-| 썸네일 없음(C-03) | 없으면 React 창이 이름 텍스트만 보여줘야 함 → **에디터에서 파츠별 캡처 자동화** 검토 |
-| 30~40명 동시 렌더링 | `combineMesh:true`로 드로우콜 1 유지 중. 다만 **인원수만큼 메시 병합 비용** 발생 → 측정 필요 |
-| 파츠 DB 초기화 지연 | 준비 완료 시 재생성하는 폴백 이미 존재 (`Update`에서 감시) |
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|---|---|---|
+| 헌법 25조 — 커스터마이징 UI를 Unity에 구현 | 정식 창은 React 담당이지만, FE의 Overlay Platform이 아직 확정되지 않았고 아바타 검증에는 즉시 조작 가능한 UI가 필요하다 | React 창을 기다리면 아바타 기능 전체가 FE 일정에 종속된다. `AvatarBridge` 경계를 유지해 **Lobby 폴더만 들어내면 이관 가능**하도록 격리하는 조건으로 허용 |
+| 벤더 프리팹 복제본을 `_Project/Prefabs/Avatar/`에 생성 | 벤더 원본을 수정하지 않으면서 프로젝트 전용 설정(레이어·스케일·Animator)을 적용해야 한다 | 원본 직접 수정은 에셋 업데이트 시 전부 소실된다 |

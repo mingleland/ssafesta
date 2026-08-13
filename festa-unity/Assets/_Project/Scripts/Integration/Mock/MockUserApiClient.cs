@@ -17,6 +17,14 @@ namespace Festa.Integration
             };
         }
 
+        public async Task<bool> UpdateMyAvatarAsync(string encodedAppearance)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            // 실제 구현: PATCH /api/v1/users/me/avatar { "avatarCode": "..." }
+            Debug.Log($"[MockUserApi] 아바타 저장(모의): {encodedAppearance}");
+            return true;
+        }
+
         public async Task<WorldSessionDto> CreateWorldSessionAsync()
         {
             await Awaitable.WaitForSecondsAsync(0.12f);

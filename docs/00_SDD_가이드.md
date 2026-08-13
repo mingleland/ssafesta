@@ -23,7 +23,7 @@
 ```text
 SSAFESTA/
 ├── .specify/
-│   ├── memory/constitution.md      ★ 프로젝트 헌법 v1.1 — 모든 결정의 최상위 근거
+│   ├── memory/constitution.md      ★ 프로젝트 헌법 v1.2 — 모든 결정의 최상위 근거
 │   ├── templates/                  spec/plan/tasks 템플릿
 │   ├── scripts/bash/               명령이 호출하는 스크립트
 │   └── feature.json                ★ "지금 작업 중인 spec" 지정 파일
@@ -71,7 +71,7 @@ SSAFESTA/
 | **005** | booth-studio-layout | 주담당 — **Layout 계약의 주인** |
 | **016** | booth-laptop-homepage | 주담당 — ⚠️ iframe 차단 대응이 핵심 |
 | 001 | auth-user | 로그인 UI + FE 공통 구조 |
-| 013 | avatar-customization | 커스터마이징 창 (Unity 쪽은 완료) |
+| 013 | avatar-customization | 커스터마이징 창 이관 (Unity Lobby 완성 후) |
 | 009·010 | 프로젝트·설문 | |
 
 **spec보다 먼저 할 일**: FE 공통 구조와 Overlay Platform 계약 확정. 김가현이 여기에 얹는다.
@@ -102,8 +102,9 @@ SSAFESTA/
 
 | Spec | 상태 |
 |---|---|
-| 002·006·013·014·017·018 | spec + plan + tasks 보유 |
-| 013 | Phase 0(인스펙터 작업)이 즉시 가능 |
+| 002·006·014·017·018 | spec + plan + tasks 보유 |
+| **013 (v2)** | **모듈러 프리팹 방식으로 재구현.** 작업 지시서: `docs/29_아바타_커스터마이징_작업지시.md` |
+| | ⚠️ 013은 **용량 실측이 선행 조건** — 신규 에셋 소스 약 141MB vs 현재 빌드 약 87MB |
 
 ---
 
@@ -198,8 +199,9 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 
 1. **spec을 고치면 plan/tasks를 다시 만든다.** 요구사항이 바뀌었는데 계획이 그대로면 어긋난다.
 2. **구현하며 몰래 요구사항을 늘리지 않는다.** 필요하면 spec에 먼저 적는다.
-3. **이미 동작하는 기준선 코드를 재작성하지 않는다** (헌법 27조). 002·006·013은 소급 spec이라
+3. **이미 동작하는 기준선 코드를 재작성하지 않는다** (헌법 27조). 002·006은 소급 spec이라
    `[구현됨]` 표시가 있다. 그건 다시 만들라는 뜻이 아니다.
+   *(013은 예외 — 에셋 교체로 재구현하되 `NetworkPlayer`·Connection·Booth는 그대로 둔다.)*
 
 ---
 
@@ -212,7 +214,7 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 | **Layout JSON** (좌표·필드) | 005·006·016 | FE + BE + Unity |
 | Unity → React 상호작용 payload | 006·008·016 | FE + Unity |
 | SSE 이벤트 payload | 008 | AI + FE |
-| 아바타 인코딩 문자열 | 013 | Unity + BE |
+| 아바타 외형 데이터(ID·저장 형식) | 013 | Unity + BE |
 | world-sessions 응답·층 파라미터 | 002·018 | BE + Unity |
 
 **변경 절차** (헌법 24조): 영향 파트 확인 → 문서 수정 → DTO 변경 → Consumer 수정 → 통합 테스트 → MR에 Breaking Change 표시.
@@ -245,8 +247,8 @@ AI 세션(Claude/Codex)에 시킨 작업도 동일하게 기록한다.
 | 미정 항목을 혼자 정하고 구현 | 나중에 뒤집힐 때 비용이 크다 (헌법 30조) |
 | 계약을 혼자 바꾸고 알리지 않기 | 다른 파트가 조용히 깨진다 |
 | spec 안 고치고 구현만 바꾸기 | 문서와 코드가 갈라진다 |
-| 아바타 컬럼을 `VARCHAR(32)`로 만들기 | 실제 600자 넘는다. **TEXT로** (헌법 23조) |
-| 이미 되는 기능을 spec 보고 다시 만들기 | 002·006·013은 소급 spec이다 (헌법 27조) |
+| 아바타 컬럼을 `VARCHAR(32)`로 만들기 | 구 계약이며 무효다. **TEXT로** (헌법 23조) |
+| 이미 되는 기능을 spec 보고 다시 만들기 | 002·006은 소급 spec이다 (헌법 27조) |
 
 ---
 
@@ -258,7 +260,7 @@ AI 세션(Claude/Codex)에 시킨 작업도 동일하게 기록한다.
 | 접속 토큰 | **서명 자체 검증** + 사용 토큰 식별자 기록 |
 | Layout 좌표 | **미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0 = +Z** |
 | 부스 오브젝트 | **최대 12개** |
-| 아바타 인코딩 | **최대 2000자, 저장은 TEXT** |
+| 아바타 외형 | **ID 집합.** 네트워크는 고정 크기 struct, 저장은 TEXT |
 | 미니게임 | **타이머 정지 게임** (목표 5~10초 무작위, 단독) |
 | 월드 세션 | **1차부터 층 파라미터 포함** |
 | 층 구조 | **층 = 별도 씬 + 별도 세션** (2차) |
