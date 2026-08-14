@@ -121,9 +121,9 @@ Home → Unity World
 ### 진행
 
 1. A가 Booth Studio 진입
-2. AI NPC 추가
-3. Video Screen 추가
-4. Survey Kiosk 추가
+2. `외부 설정`에서 간판·대표색 확인
+3. `내부 꾸미기`로 전환
+4. AI NPC, Video Screen, Survey Kiosk 추가
 5. Object를 이동/회전
 6. Properties에서 Agent/Project/Survey 연결
 
@@ -200,12 +200,20 @@ React Booth Studio
 
 ### 진행
 
-1. B가 A의 Booth로 이동
-2. Video Screen 확인
-3. Project Panel 확인
-4. AI NPC 선택
+1. B가 A의 외부 Booth 슬롯으로 이동
+2. 문에서 `부스 내부로 이동하시겠습니까?` 확인
+3. Server의 활성 임대 검증 후 같은 Scene의 내부 슬롯으로 이동
+4. Published Layout으로 생성된 Video Screen과 Project Panel 확인
+5. AI NPC 선택
 
 A와 B 화면을 번갈아 보여주며 같은 Booth를 보고 있음을 강조한다.
+
+### 기술 포인트
+
+- 사용자별 서버/Scene을 만들지 않고 물리 임대 슬롯 수만큼 내부 앵커를 재사용한다.
+- 정적 부스 오브젝트는 각 Client가 같은 Published Layout으로 로컬 생성한다.
+- 일반 방문은 공유형이며, 사람 상담 같은 독점 기능만 별도 예약/세션 대상으로 둔다.
+- 임대 만료 시 슬롯 연결과 화면 표시만 초기화하고 기존 소유자의 콘텐츠는 Draft로 보존한다.
 
 ---
 
@@ -324,7 +332,7 @@ NGO + Dedicated Server.
 
 ### 4. Horizontally Scalable World
 
-World Channel + Booth Instance + ECS Task 확장 구조.
+현재 MVP는 World Channel + 동일 Scene 내부 슬롯 풀을 사용한다. 규모가 커지면 Layout·Lease 계약을 유지한 채 Additive Scene 또는 Booth Instance로 확장한다.
 
 구현된 범위와 설계 범위를 정확히 구분해 설명한다.
 

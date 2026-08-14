@@ -119,10 +119,15 @@ Unity Root
 → World 접속
 → 다른 사용자와 이동
 → 관심 Booth 발견
-→ Booth 입장
+→ 외부 Booth 간판·운영 상태 확인
+→ 문에서 `부스 내부로 이동하시겠습니까?` 확인
+→ Dedicated Server가 활성 Lease 확인
+→ 같은 Scene의 해당 Interior Anchor로 이동
+→ Unity Client가 Published Layout 로드
 → 프로젝트 패널 / 영상 확인
 → AI 직원 질문
 → 설문 참여 또는 사람 상담
+→ 출구로 이동해 외부 Booth 앞 복귀
 → 다른 Booth 탐색
 ```
 
@@ -145,6 +150,21 @@ Unity Root
 → Publish
 → Unity 월드에서 반영 확인
 ```
+
+### 4.2-A 임대 만료 — 슬롯 비우기
+
+```text
+Lease 만료
+→ Backend가 Slot ↔ Booth 연결 해제
+→ 신규 입장 차단
+→ 내부 방문자에게 종료 안내
+→ Dedicated Server가 방문자를 외부 복귀 지점으로 이동
+→ Unity Client가 Interior Layout 제거
+→ 외부 Slot을 기본 빈 간판 상태로 표시
+→ 기존 Owner의 Layout·AI·문서·설문·프로젝트는 Draft로 보존
+```
+
+새 임차인은 이전 Owner의 외부·내부 구성을 물려받지 않고 기본 Facade와 빈 내부 템플릿에서 시작한다.
 
 ### 4.3 Booth Owner — AI 직원 생성
 
