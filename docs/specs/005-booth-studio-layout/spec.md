@@ -87,9 +87,9 @@
 
 ---
 
-## 계약 초안 — Layout JSON (3파트 합동 확정 대상)
+## 공통 계약 기준 — Layout JSON
 
-> 아래는 **Unity가 현재 실제로 파싱하고 있는 형태**다 (POC 검증 완료). 출발점으로 삼되 확정은 3파트 합의로 한다.
+> 아래 필드명과 Object Type은 Backend/Frontend/Unity 공통 기준이며 Unity 파싱을 검증했다. 좌표 원점·오브젝트 상한·스케일 등 아래 미결정 항목은 3파트 합의 후 확정한다.
 
 ```json
 {
@@ -97,16 +97,17 @@
   "template": "PROJECT_EXHIBITION",
   "version": 2,
   "objects": [
-    { "id": "screen-1", "type": "VIDEO_SCREEN",
+    { "objectId": "screen-1", "type": "VIDEO_SCREEN",
       "position": { "x": 2.1, "y": 0, "z": 3.4 }, "rotationY": 90, "configId": 152 },
-    { "id": "ai-1", "type": "AI_AGENT",
+    { "objectId": "ai-1", "type": "AI_AGENT",
       "position": { "x": 1.2, "y": 0, "z": 1.5 }, "rotationY": 0, "configId": 78 }
   ]
 }
 ```
 
-**현재 Unity가 아는 type 문자열**: `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY`, `RECRUITMENT_BOARD`, `CONSULT_DESK`, `LIKE_VOTE`, `FURNITURE`, `DECORATION`
-**추가 예정**: `LAPTOP` (spec 016)
+**공통 canonical type 문자열**: `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY_KIOSK`, `RECRUITMENT_BOARD`, `CONSULTATION_DESK`, `LAPTOP`, `LIKE_VOTE`, `FURNITURE`, `DECORATION`
+
+Unity는 v0.0.1 POC 데이터 하위 호환을 위해 `SURVEY`, `CONSULT_DESK`도 읽지만 Frontend와 Backend는 신규 Layout에 canonical 문자열만 저장한다.
 
 **확정이 필요한 지점**:
 
