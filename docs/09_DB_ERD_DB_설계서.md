@@ -139,6 +139,8 @@ booth_slots
 - created_at
 ```
 
+`slot_no`는 Unity의 고정 `ExteriorSlot`과 `InteriorAnchor`를 매핑하는 안정 식별자다. 내부 월드 좌표 자체는 Unity Scene 설정이 소유하며 DB에 저장하지 않는다.
+
 ### slot_type
 
 ```text
@@ -163,6 +165,10 @@ booths
 - current_slot_id FK NULL
 - name
 - description
+- facade_theme_code NULL
+- facade_primary_color NULL
+- facade_sign_text NULL
+- facade_logo_url NULL
 - status
 - published_layout_version NULL
 - created_at
@@ -170,6 +176,8 @@ booths
 ```
 
 임대 만료 시 `current_slot_id`를 해제해도 Booth 콘텐츠 자체는 유지할 수 있다.
+
+Facade 설정은 논리 Booth의 소유 데이터다. Lease가 없을 때도 보존하지만 외부 물리 슬롯에는 표시하지 않으며, 새 임차인에게 이전 Booth의 Facade를 승계하지 않는다.
 
 ---
 
@@ -200,6 +208,8 @@ UNIQUE ACTIVE lease by slot_id
 ```
 
 구현 방식은 JPA/DB 제약 설계에서 최종 확정한다.
+
+만료 트랜잭션은 `booth_leases.status=EXPIRED`, `booths.current_slot_id=NULL`, `booth_slots.status=AVAILABLE`을 함께 반영한다. `booth_layouts`, AI, 문서, 설문, 프로젝트 데이터는 삭제하지 않는다.
 
 ---
 
@@ -264,6 +274,9 @@ MVP에는 JSONB가 적합하다.
 - `type`: Registry에 존재하는 타입
 - Transform
 - 기능 Object면 `configId`
+- 장식·가구 Object면 `assetCode`
+
+신규 Layout의 canonical 기능 타입은 `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY_KIOSK`, `RECRUITMENT_BOARD`, `CONSULTATION_DESK`, `LAPTOP`, `LIKE_VOTE`다. Unity의 과거 POC 별칭은 읽기 호환용일 뿐 DB 신규 저장값으로 사용하지 않는다.
 
 ---
 

@@ -235,19 +235,38 @@ Published Layout
 
 Booth Decoration은 Dedicated Server가 NetworkObject로 Spawn하지 않는다.
 
+### MVP 내부 슬롯 이동
+
+Dedicated Server는 같은 World Scene 안에 물리 임대 슬롯별 `InteriorAnchor`와 외부 복귀 지점을 가진다. 정적 내부 오브젝트는 서버가 생성하지 않지만 플레이어 이동과 현재 Booth 상태는 서버 권한으로 처리한다.
+
+```text
+Client 입장 요청(boothId)
+→ Server가 활성 Lease/slotNo/입장 가능 상태 확인
+→ Player.currentBoothId 설정
+→ InteriorAnchor(slotNo)로 Teleport
+→ 해당 Client가 Published Layout을 Local Spawn
+```
+
+퇴장 시 서버가 외부 복귀 지점으로 이동시킨 뒤 `currentBoothId`를 해제한다. 임대가 만료되면 신규 입장을 거부하고 현재 방문자를 외부로 이동시킨 다음 각 Client가 로컬 내부 Layout을 제거한다.
+
 ### Server가 아는 Booth 정보
 
 필요한 최소 상태:
 
 ```text
 Player.currentBoothId
+Player.currentBoothSlotNo
 Zone occupancy (필요한 경우)
 Shared interaction state (필요한 경우)
 ```
 
+일반 Booth는 공유 입장이며 전체 공간 예약·독점 상태를 네트워크 기본 모델에 넣지 않는다. 독점이 필요한 상담·행사는 별도 세션 상태로 확장한다.
+
 ---
 
 ## 14. Booth Instance — P2
+
+MVP의 같은 Scene 내부 슬롯 풀과 Booth Instance는 다른 개념이다. 내부 슬롯 풀은 동일 World Server 안에서 좌표만 분리하고, Booth Instance는 별도 서버 프로세스/연결로 분리하는 P2 확장이다.
 
 ```text
 11F World
