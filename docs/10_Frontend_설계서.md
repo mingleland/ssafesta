@@ -148,7 +148,15 @@ EditorState
 - dirty
 - saveStatus
 - history(P1)
+
+FacadeEditorState
+- themeCode
+- primaryColor
+- signText
+- logoUrl
 ```
+
+MVP에서 `EditorState`는 내부 Booth Layout 전용이다. 외부는 자유 오브젝트 배치를 제공하지 않고 `FacadeEditorState`의 제한된 값만 편집한다.
 
 ---
 
@@ -199,6 +207,13 @@ EditorCanvas ────── Selection
         └──── API ────┘
 ```
 
+편집 화면은 `외부 설정`과 `내부 꾸미기`를 분리한다.
+
+- 외부 설정: 간판·로고·대표색·허용된 Facade 테마
+- 내부 꾸미기: Unity가 제공한 Object Palette의 위치·회전·콘텐츠 연결
+- 외부와 내부 모두 Lease가 활성일 때만 월드에 노출되며, 만료 후 데이터는 Owner 계정에 보존한다.
+- 일반 방문 예약 UI는 만들지 않는다. 상담·비공개 행사처럼 독점이 필요한 기능에서만 별도 예약 UI를 추가한다.
+
 ---
 
 ## 7. Layout Type
@@ -218,7 +233,9 @@ type BoothObjectType =
   | 'RECRUITMENT_BOARD'
   | 'CONSULTATION_DESK'
   | 'LIKE_VOTE'
-  | 'DECORATION';
+  | 'LAPTOP'
+  | 'DECORATION'
+  | 'FURNITURE';
 
 type BoothObjectDto = {
   objectId: string;
@@ -231,12 +248,20 @@ type BoothObjectDto = {
 
 type BoothLayoutDto = {
   boothId: number;
+  version: number;
   template: string;
   objects: BoothObjectDto[];
 };
+
+type BoothFacadeDto = {
+  themeCode?: string;
+  primaryColor?: string;
+  signText?: string;
+  logoUrl?: string;
+};
 ```
 
-실제 Type은 Backend/Unity와 계약 테스트를 통해 맞춘다.
+Layout Object 식별자는 `objectId`, 공개 조회 경로는 `/booths/{boothId}/layouts/published`로 통일한다. 신규 Object Type은 Backend 기능 명세의 canonical 문자열을 사용한다.
 
 ---
 
