@@ -49,7 +49,8 @@ Bootstrap
 
 World_11F
 ├─ Static Environment
-├─ Booth Slots
+├─ Booth Exterior Slots (고정 외부 건물·간판·입구)
+├─ Booth Interior Anchors (시야 밖 원거리, 물리 임대 슬롯별 1개)
 ├─ Player Spawn Points
 ├─ Interaction Zones
 └─ UI Root
@@ -290,26 +291,31 @@ Prefab가 API Client를 직접 생성하지 않는다.
 
 ## 13. Booth 입장 / Zone
 
-MVP:
+1차 MVP는 사용자별 Scene이나 서버를 만들지 않고 같은 `World_11F` Scene 안의 내부 슬롯 풀을 사용한다.
 
 ```text
-World Scene 안의 Booth Zone
+ExteriorSlot(slotNo)
+→ 입장 확인 UI
+→ Dedicated Server에 boothId 입장 요청
+→ 활성 Lease·입장 가능 상태 확인
+→ InteriorAnchor(slotNo)로 서버 권한 이동
+→ Local Player Client가 Published Layout 조회
+→ 해당 Anchor 아래 Local Prefab Spawn
 ```
 
-Client는 Trigger/Zone을 통해 현재 Booth를 식별한다.
+내부 앵커는 사용자 수가 아니라 물리 임대 슬롯 수만큼만 둔다. 사용자 임대 슬롯이 7개면 내부 앵커도 7개다. 각 Client는 자신이 입장한 내부 Layout만 로드하고, 다른 내부의 정적 오브젝트는 생성하지 않는다.
 
 ```text
-Enter Booth Zone
-→ CurrentBooth 변경 요청/표현
-→ Published Layout Load
-→ Interaction 활성화
-
 Exit
 → UI 종료
-→ 필요 시 Local Object 정리
+→ Dedicated Server가 외부 복귀 지점으로 이동
+→ BoothRuntime.Clear()
+→ CurrentBooth 해제
 ```
 
-P2 Booth Instance 전환은 Server/Realtime 문서에서 확장한다.
+외부는 고정 Prefab과 제한된 Facade 설정만 사용하고, 내부만 자유 Layout으로 꾸민다. 임대 만료 시 신규 입장을 막고 내부 플레이어를 먼저 외부로 이동한 뒤 Runtime Object를 제거한다. 기존 Owner 데이터는 Spring에 보존하며 새 임차인의 내부에는 사용하지 않는다.
+
+일반 방문은 공유 입장이다. 상담·비공개 행사 등 독점이 필요한 기능은 추후 별도 세션/예약으로 분리한다. P2 Booth Instance 전환은 Server/Realtime 문서에서 확장한다.
 
 ---
 
