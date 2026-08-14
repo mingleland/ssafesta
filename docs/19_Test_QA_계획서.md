@@ -113,13 +113,39 @@ Studio
 → AI NPC + Video Screen 배치
 → Draft 저장
 → Publish
-→ Unity 방문
+→ Unity 외부 Slot 방문
+→ 입장 확인
+→ 같은 Scene의 Interior Anchor로 이동
+→ 내부 Published Layout 확인
+→ 외부로 퇴장
 ```
 
 Expected:
 
 - Published Version 증가
+- 외부 Slot의 Booth명·Facade·입장 가능 상태 일치
 - Unity Object Type/Transform 동일
+- 퇴장 후 내부 Local Object 정리
+
+### E2E-002-A Lease 만료·재임대
+
+```text
+Owner A Booth Publish
+→ 방문자 내부 입장
+→ Lease 만료 처리
+→ 신규 입장 차단
+→ 기존 방문자 외부 이동
+→ 외부 Slot 빈 상태 확인
+→ Owner B가 같은 Slot 임대
+```
+
+Expected:
+
+- Owner A의 Layout·AI·문서 데이터는 Draft로 보존
+- Slot과 Owner A Booth 연결 해제
+- 내부 Runtime Object 제거
+- 외부 Facade 기본 빈 상태 복원
+- Owner B에게 Owner A의 외부·내부 구성이 노출되지 않음
 
 ### E2E-003 Multiplayer
 
@@ -361,9 +387,15 @@ Issue
 - AI_AGENT
 - VIDEO_SCREEN
 - SURVEY_KIOSK
+- CONSULTATION_DESK
+- LAPTOP
 - 미지원 Type
 - configId 누락
 - 빈 Layout
+- Backend canonical `objectId` 파싱
+- `/booths/{boothId}/layouts/published` 조회
+- ExteriorSlot → InteriorAnchor 이동
+- 퇴장·임대 만료 후 `BoothRuntime.Clear()`
 
 ### Interaction
 

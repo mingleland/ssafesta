@@ -98,7 +98,9 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
     "type": "USER_RENTAL",
     "status": "AVAILABLE",
     "boothId": null,
-    "leaseEndsAt": null
+    "leaseEndsAt": null,
+    "entryAvailable": false,
+    "facade": null
   }
 ]
 ```
@@ -154,9 +156,34 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 
 공개 가능한 Booth 기본 정보 조회.
 
+```json
+{
+  "boothId": 7,
+  "slotId": 5,
+  "name": "AI 프로젝트 전시관",
+  "leaseStatus": "ACTIVE",
+  "entryAvailable": true,
+  "facade": {
+    "themeCode": "SSAFY_BLUE",
+    "primaryColor": "#1677C8",
+    "signText": "AI 프로젝트 전시관",
+    "logoUrl": null
+  },
+  "publishedLayoutVersion": 4
+}
+```
+
 ### POST `/booths/{boothId}/leases/extend` — P1
 
 임대 연장. 정확한 정책은 TBD.
+
+### Lease 만료 처리 계약
+
+- `ACTIVE → EXPIRED` 전환과 `booths.current_slot_id` 해제는 하나의 트랜잭션으로 처리한다.
+- 만료 즉시 해당 슬롯의 `entryAvailable`을 `false`로 반환한다.
+- 외부 Facade는 슬롯 응답에서 숨기고 기본 빈 슬롯으로 표시한다.
+- 기존 Published Layout은 일반 Runtime 조회 대상에서 제외하되 Owner의 Draft/보존 데이터는 삭제하지 않는다.
+- 현재 내부 방문자 퇴장은 Unity Server가 처리할 수 있도록 Realtime event 또는 주기 검증 계약을 별도로 확정한다.
 
 ---
 
@@ -222,6 +249,8 @@ Unity가 사용할 Published Layout 조회.
   "objects": []
 }
 ```
+
+활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 
 ---
 
