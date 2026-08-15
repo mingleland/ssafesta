@@ -1,5 +1,7 @@
 # 아바타(Sidekick) 에디터 세팅 체크리스트
 
+> **적용 범위 안내 (2026-08-16)**: 이 문서는 `sk_01~03` 구형 프리셋 아바타를 수동 연결할 때의 레거시 체크리스트다. 현재 `CharacterLobby`의 Rukha93 모듈형 파츠·정밀 색상·최초 추천 외형·멀티플레이 `fa` 동기화 규칙은 `avatar-customization-contract.md`와 `docs/specs/013-avatar-customization/spec.md`를 기준으로 한다. 이 체크리스트의 `AvatarCatalog` 예시는 현재 모듈형 카탈로그를 덮어쓰지 않는다.
+
 > 코드(Adapter 4종)는 작성 완료. 아래는 에디터에서만 가능한 클릭 작업.
 > 소요 ~30분. 막히면 Console 에러를 복사해서 전달할 것.
 
