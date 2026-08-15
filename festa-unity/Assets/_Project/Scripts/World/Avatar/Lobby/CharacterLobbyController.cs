@@ -54,6 +54,11 @@ namespace Festa.Avatar
         Text _wardrobeColorTitle;
         RectTransform _itemScroll;
         Text _colorTitle;
+        CanvasScaler _uiScaler;
+        RectTransform _responsiveFrame;
+        RectTransform _previewArea;
+        int _lastScreenWidth = -1;
+        int _lastScreenHeight = -1;
         PointerEventData _pointerEventData;
         readonly List<RaycastResult> _uiRaycastResults = new();
         readonly List<RectTransform> _previewInputBlockers = new();
@@ -93,6 +98,7 @@ namespace Festa.Avatar
 
         void Update()
         {
+            UpdateResponsiveLayout();
             float cameraSmoothing=1f-Mathf.Exp(-Time.deltaTime*8f);
             _previewCamera.transform.position=Vector3.Lerp(_previewCamera.transform.position,_cameraTarget,cameraSmoothing);
             _cameraLook=Vector3.Lerp(_cameraLook,_cameraFocus,cameraSmoothing);
@@ -127,9 +133,7 @@ namespace Festa.Avatar
         bool IsPointerInPreviewArea(Vector2 pointer)
         {
             if (Screen.width <= 0 || Screen.height <= 0) return false;
-            float normalizedX = pointer.x / Screen.width;
-            float normalizedY = pointer.y / Screen.height;
-            if (normalizedX < .145f || normalizedX > .78f || normalizedY < 0f || normalizedY > 1f) return false;
+            if (_previewArea && !RectTransformUtility.RectangleContainsScreenPoint(_previewArea, pointer, null)) return false;
             foreach (var blocker in _previewInputBlockers)
                 if (blocker && blocker.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(blocker, pointer, null))
                     return false;
@@ -146,11 +150,15 @@ namespace Festa.Avatar
             if (!FindFirstObjectByType<EventSystem>()) { var e = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule)); }
             var canvas = new GameObject("Avatar UI", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster)).GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler=canvas.GetComponent<CanvasScaler>();scaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;scaler.referenceResolution=new Vector2(1600,900);scaler.matchWidthOrHeight=.5f;
+            _uiScaler=canvas.GetComponent<CanvasScaler>();_uiScaler.uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;_uiScaler.referenceResolution=new Vector2(1600,900);_uiScaler.screenMatchMode=CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            _responsiveFrame=new GameObject("Responsive 16:9 Frame",typeof(RectTransform),typeof(AspectRatioFitter)).GetComponent<RectTransform>();
+            _responsiveFrame.SetParent(canvas.transform,false);Anchor(_responsiveFrame,Vector2.zero,Vector2.one);
+            var frameAspect=_responsiveFrame.GetComponent<AspectRatioFitter>();frameAspect.aspectMode=AspectRatioFitter.AspectMode.FitInParent;frameAspect.aspectRatio=16f/9f;
+            UpdateResponsiveLayout(true);
 
             // Reference composition: wardrobe rail / focused portrait / appearance inspector.
-            var left=Panel(canvas.transform,"Preset Rail",Vector2.zero,new Vector2(.205f,1),new Color(.002f,.005f,.012f,.985f));
-            var centerShade=ImageLayer(canvas.transform,"Portrait Shade",new Vector2(.205f,0),new Vector2(.735f,1),new Color(.005f,.012f,.022f,.16f));centerShade.raycastTarget=false;
+            var left=Panel(_responsiveFrame,"Preset Rail",Vector2.zero,new Vector2(.205f,1),new Color(.002f,.005f,.012f,.985f));
+            var centerShade=ImageLayer(_responsiveFrame,"Portrait Shade",new Vector2(.205f,0),new Vector2(.735f,1),new Color(.005f,.012f,.022f,.16f));centerShade.raycastTarget=false;_previewArea=centerShade.rectTransform;
             var wardrobeHeader=Label(left,"의상 선택",23,48,new Vector2(.06f,.93f),new Vector2(.94f,.99f));wardrobeHeader.fontStyle=FontStyle.Bold;wardrobeHeader.color=new Color(.94f,.88f,.72f);
             var wardrobeHeaderRect=wardrobeHeader.rectTransform;
             wardrobeHeaderRect.anchorMin=new Vector2(0,1);wardrobeHeaderRect.anchorMax=new Vector2(1,1);wardrobeHeaderRect.pivot=new Vector2(.5f,1);
@@ -166,7 +174,7 @@ namespace Festa.Avatar
             Button(quickRow,"성별",()=>{_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},66,42,new Color(.23f,.17f,.08f,1));
             Button(quickRow,"무작위",Randomize,66,42);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},66,42);
 
-            var right=Panel(canvas.transform,"Detail Inspector",new Vector2(.735f,0),Vector2.one,new Color(.002f,.007f,.016f,.985f));
+            var right=Panel(_responsiveFrame,"Detail Inspector",new Vector2(.735f,0),Vector2.one,new Color(.002f,.007f,.016f,.985f));
             var title=Label(right,"✦  캐릭터 생성  ✦",27,54);title.fontStyle=FontStyle.Bold;title.color=new Color(.96f,.86f,.64f);
             _categoryTabs=Horizontal(right,58,new Vector2(.045f,1),new Vector2(.955f,1));_categoryTabs.sizeDelta=new Vector2(0,108);
             var tabLayout=_categoryTabs.GetComponent<HorizontalLayoutGroup>();tabLayout.spacing=8;tabLayout.childAlignment=TextAnchor.UpperCenter;
@@ -180,7 +188,7 @@ namespace Festa.Avatar
             var previewBar=ActionButton(right,"미리보기 설정","▣",()=>SetStatus("좌클릭 드래그는 캐릭터, 우클릭 드래그는 카메라를 회전하며 휠로 확대할 수 있습니다."));Anchor(previewBar.transform as RectTransform,new Vector2(.055f,.085f),new Vector2(.945f,.145f));
             var infoBar=ActionButton(right,"현재 외형 정보","▤",()=>SetStatus(VerificationState()));Anchor(infoBar.transform as RectTransform,new Vector2(.055f,.018f),new Vector2(.945f,.078f));
 
-            _colorPopup=Panel(canvas.transform,"Color Popup",new Vector2(.595f,.18f),new Vector2(.885f,.82f),new Color(.007f,.013f,.024f,.996f));
+            _colorPopup=Panel(_responsiveFrame,"Color Popup",new Vector2(.595f,.18f),new Vector2(.885f,.82f),new Color(.007f,.013f,.024f,.996f));
             _previewInputBlockers.Add(_colorPopup);
             var innerFrame=Panel(_colorPopup,"Inner Gold Frame",new Vector2(.018f,.018f),new Vector2(.982f,.982f),new Color(.007f,.013f,.024f,.995f));innerFrame.GetComponent<Image>().raycastTarget=false;
             _colorPopupTitle=Label(_colorPopup,"색상 변경",25,58);_colorPopupTitle.color=new Color(.98f,.88f,.61f);_colorPopupTitle.fontStyle=FontStyle.Bold;
@@ -192,6 +200,18 @@ namespace Festa.Avatar
             var finishColor=Button(popupActions,"완료",()=>_colorPopup.gameObject.SetActive(false),190,60,new Color(.45f,.29f,.055f,1));finishColor.GetComponentInChildren<Text>().fontSize=20;BorderFrame(finishColor.transform,new Color(.86f,.61f,.2f,.95f));
             _colorPopup.gameObject.SetActive(false);
 
+        }
+
+        void UpdateResponsiveLayout(bool force=false)
+        {
+            if (!_uiScaler || Screen.width <= 0 || Screen.height <= 0) return;
+            if (!force && Screen.width == _lastScreenWidth && Screen.height == _lastScreenHeight) return;
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            const float referenceAspect = 16f / 9f;
+            float screenAspect = (float)Screen.width / Screen.height;
+            _uiScaler.matchWidthOrHeight = screenAspect < referenceAspect ? 0f : 1f;
+            if (_responsiveFrame) LayoutRebuilder.ForceRebuildLayoutImmediate(_responsiveFrame);
         }
 
         void SetStatus(string message)
