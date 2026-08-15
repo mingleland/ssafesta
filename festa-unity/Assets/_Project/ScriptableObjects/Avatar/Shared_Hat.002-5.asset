@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Shared_Hat.002-5
   m_EditorClassIdentifier: 
   itemId: 966029226
-  displayName: Hat.002-5
+  displayName: "\uBE44\uB2C8"
   category: 2
   gender: 2
   meshes: []
@@ -21,7 +21,7 @@ MonoBehaviour:
   - {fileID: 3897669597225961932, guid: 611911455b2b691449cbe9848f439464, type: 3}
   targetBones: 0a000000
   hiddenBodyParts: 
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: d91cab08d21aac5418b3ac0dd2f8799a, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 1002

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Shared_Hat.001-5
   m_EditorClassIdentifier: 
   itemId: 1331256250
-  displayName: Hat.001-5
+  displayName: "\uBCFC\uCEA1"
   category: 2
   gender: 2
   meshes: []
@@ -21,7 +21,7 @@ MonoBehaviour:
   - {fileID: 527804738595469006, guid: ad91fd69f2362d14bb002c70efbead35, type: 3}
   targetBones: 0a000000
   hiddenBodyParts: 
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: df9c6ff4f2ce7a14e837e8f08811269e, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 1001

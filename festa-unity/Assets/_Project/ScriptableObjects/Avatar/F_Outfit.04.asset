@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: F_Outfit.04
   m_EditorClassIdentifier: 
   itemId: 682157702
-  displayName: Outfit.04
+  displayName: "\uC720\uB2C8\uD3FC \uC810\uD504\uC218\uD2B8"
   category: 6
   gender: 1
   meshes:
@@ -23,7 +23,7 @@ MonoBehaviour:
   objectPrefabs: []
   targetBones: 
   hiddenBodyParts: 000000000100000002000000030000001400000015000000160000001e0000001f0000002000000021000000
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: 9c9dbccf7e2d40345b801173b57cdcb8, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

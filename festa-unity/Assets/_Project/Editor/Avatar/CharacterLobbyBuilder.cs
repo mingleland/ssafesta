@@ -38,6 +38,8 @@ namespace Festa.Editor.Avatar
                 var prefabs = new List<GameObject>(); var bones = new List<HumanBodyBones>();
                 if (objects != null) for (int i = 0; i < objects.arraySize; i++) { var e=objects.GetArrayElementAtIndex(i); prefabs.Add(e.FindPropertyRelative("prefab").objectReferenceValue as GameObject); bones.Add((HumanBodyBones)e.FindPropertyRelative("targetBone").enumValueIndex); }
                 def.objectPrefabs = prefabs.Where(x=>x).ToArray(); def.targetBones = bones.ToArray(); def.hiddenBodyParts = ReadInts(so.FindProperty("bodyParts"));
+                // Top.02 exposes the waist below its cropped inner layer. Keeping Torso_Spine01 hidden leaves a visible hole.
+                if(category==AvatarPartCategory.Top&&def.displayName=="Top.02")def.hiddenBodyParts=def.hiddenBodyParts.Where(x=>x!=1).ToArray();
                 if(category==AvatarPartCategory.Hair) def.hairGroup = HairFromName(VisualName(def));
                 if(category==AvatarPartCategory.Hat) { string n=VisualName(def); def.familyId=n.Contains("hat.001")?1001:n.Contains("hat.002")?1002:1003; def.requiredHairGroup=HairFromName(n); }
                 EditorUtility.SetDirty(def); definitions.Add(def);
@@ -59,16 +61,26 @@ namespace Festa.Editor.Avatar
             Light("Key Light",new Vector3(2.5f,4,-2),new Vector3(45,-25,0),1.45f,new Color(1,.84f,.72f));
             Light("Rim Light",new Vector3(-2,3,2),new Vector3(130,35,0),1.8f,new Color(.35f,.55f,1));
             var stage=GameObject.CreatePrimitive(PrimitiveType.Cylinder);stage.name="Stage";stage.transform.position=new Vector3(0,-.08f,0);stage.transform.localScale=new Vector3(1.25f,.08f,1.25f);SetMaterial(stage,new Color(.11f,.14f,.23f));
-            var backdrop=GameObject.CreatePrimitive(PrimitiveType.Quad);backdrop.name="Gradient Backdrop";backdrop.transform.position=new Vector3(0,2.2f,1.2f);backdrop.transform.rotation=Quaternion.Euler(0,180,0);backdrop.transform.localScale=new Vector3(7,5,1);SetMaterial(backdrop,new Color(.045f,.07f,.14f));UnityEngine.Object.DestroyImmediate(backdrop.GetComponent<Collider>());
+            var backdrop=GameObject.CreatePrimitive(PrimitiveType.Quad);backdrop.name="Cinematic Backdrop";backdrop.transform.position=new Vector3(0,2.05f,1.35f);backdrop.transform.rotation=Quaternion.identity;backdrop.transform.localScale=new Vector3(8,4.5f,1);SetBackdropMaterial(backdrop);UnityEngine.Object.DestroyImmediate(backdrop.GetComponent<Collider>());
             var root=new GameObject("Avatar Preview");var assembler=root.AddComponent<AvatarAssembler>();assembler.Catalog=catalog;
             var flow=new GameObject("Character Lobby Flow").AddComponent<CharacterLobbyController>();flow.Configure(catalog,assembler,cam);EditorUtility.SetDirty(flow);
             EditorSceneManager.SaveScene(scene,"Assets/_Project/Scenes/CharacterLobby.unity");
         }
         static void Light(string name,Vector3 position,Vector3 rotation,float intensity,Color color){var go=new GameObject(name,typeof(Light));go.transform.position=position;go.transform.rotation=Quaternion.Euler(rotation);var l=go.GetComponent<Light>();l.type=LightType.Directional;l.intensity=intensity;l.color=color;l.shadows=LightShadows.Soft;}
         static void SetMaterial(GameObject go,Color color){var shader=Shader.Find("Universal Render Pipeline/Lit");var m=new Material(shader){color=color};go.GetComponent<Renderer>().sharedMaterial=m;}
+        static void SetBackdropMaterial(GameObject go)
+        {
+            var texture=AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/_Project/Art/UI/CharacterLobbyBackdrop.png");
+            var shader=Shader.Find("Universal Render Pipeline/Unlit");
+            var material=new Material(shader){name="Character Lobby Backdrop"};
+            material.SetTexture("_BaseMap",texture);material.SetColor("_BaseColor",new Color(.56f,.58f,.62f,1));
+            go.GetComponent<Renderer>().sharedMaterial=material;
+        }
         static GameObject CloneBody(string sourcePath,string targetPath)
         {
             EnsureFolder("Assets/_Project/Prefabs"); EnsureFolder("Assets/_Project/Prefabs/Avatar");
+            var existing=AssetDatabase.LoadAssetAtPath<GameObject>(targetPath);
+            if(existing)return existing;
             var source=AssetDatabase.LoadAssetAtPath<GameObject>(sourcePath);var instance=PrefabUtility.InstantiatePrefab(source) as GameObject;
             foreach(var t in instance.GetComponentsInChildren<Transform>(true)) GameObjectUtility.RemoveMonoBehavioursWithMissingScript(t.gameObject);
             var result=PrefabUtility.SaveAsPrefabAsset(instance,targetPath);UnityEngine.Object.DestroyImmediate(instance);return result;

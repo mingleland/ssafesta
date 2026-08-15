@@ -11,6 +11,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/_Project/Experimental/Sidekick/SidekickTestScene.unity
     guid: e98ec8ecddda7ee42be187e583d53cb0
+  - enabled: 1
+    path: Assets/_Project/Scenes/CharacterLobby.unity
+    guid: 043e675b288a49d41ac6b967ce8e84e5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -4,20 +4,22 @@ namespace Festa.World
 {
     /// <summary>
     /// 외형 생성 구현.
-    ///   - 런타임 조립 모드: SidekickRuntimeService로 파츠 병합 생성
+    ///   - 모듈 조립 모드: Rukha93 AvatarAssembler로 파츠 생성
     ///   - 프리셋 모드: Catalog의 사전 제작 프리팹 Instantiate
     /// 어느 쪽이든 실패하면 placeholder로 폴백하고 월드는 계속 동작한다.
     /// </summary>
     public class CatalogAvatarVisualProvider : IAvatarVisualProvider
     {
         readonly AvatarCatalog _catalog;
+        readonly Festa.Avatar.AvatarCatalog _modularCatalog;
 
-        public CatalogAvatarVisualProvider(AvatarCatalog catalog) => _catalog = catalog;
+        public CatalogAvatarVisualProvider(AvatarCatalog catalog, Festa.Avatar.AvatarCatalog modularCatalog = null)
+        { _catalog = catalog; _modularCatalog = modularCatalog; }
 
         public GameObject CreateVisual(AvatarAppearance appearance, Transform parent)
         {
-            GameObject go = appearance.IsRuntime
-                ? CreateRuntime(appearance, parent)
+            GameObject go = appearance.IsModular
+                ? CreateModular(appearance, parent)
                 : CreateFromCatalog(appearance, parent);
 
             go ??= CreatePlaceholder(parent);
@@ -30,24 +32,22 @@ namespace Festa.World
             return go;
         }
 
-        // ---------- 런타임 조립 ----------
+        // ---------- 모듈 조립 ----------
 
-        static GameObject CreateRuntime(AvatarAppearance appearance, Transform parent)
+        GameObject CreateModular(AvatarAppearance appearance, Transform parent)
         {
-            var service = SidekickRuntimeService.Instance;
-
-            if (!service.IsReady)
+            if (_modularCatalog == null)
             {
-                // 초기화가 아직이면 시작만 걸어두고 이번엔 폴백 — 준비되면 재요청 시 정상 생성된다.
-                _ = service.EnsureInitializedAsync();
-                Debug.Log("[AvatarVisual] Sidekick 런타임 준비 중 — 임시 외형 사용");
+                Debug.LogError("[AvatarVisual] Modular AvatarCatalog 미할당");
                 return null;
             }
-
-            var go = service.BuildCharacter(appearance.Parts, "AvatarVisual_Runtime");
-            if (go == null)
-                Debug.LogWarning("[AvatarVisual] 런타임 조립 실패 — placeholder 사용");
-            return go;
+            var root = new GameObject("AvatarVisual_Modular");
+            root.transform.SetParent(parent, false);
+            var assembler = root.AddComponent<Festa.Avatar.AvatarAssembler>();
+            assembler.Catalog = _modularCatalog;
+            assembler.Apply(appearance.ModularConfig);
+            if (!string.IsNullOrEmpty(assembler.LastError)) Debug.LogError($"[AvatarVisual] {assembler.LastError}");
+            return root;
         }
 
         // ---------- 프리셋 ----------

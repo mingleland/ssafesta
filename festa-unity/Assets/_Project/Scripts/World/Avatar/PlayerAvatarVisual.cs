@@ -20,6 +20,7 @@ namespace Festa.World
         static readonly int IsWalkingHash = Animator.StringToHash("IsWalking");
 
         [SerializeField] AvatarCatalog _catalog;
+        [SerializeField] Festa.Avatar.AvatarCatalog _modularCatalog;
 
         [Tooltip("외형이 붙을 위치. 비우면 자신의 Transform 사용")]
         [SerializeField] Transform _visualRoot;
@@ -39,12 +40,13 @@ namespace Festa.World
         string _appliedEncoded;
 
         public AvatarCatalog Catalog => _catalog;
+        public Festa.Avatar.AvatarCatalog ModularCatalog => _modularCatalog;
 
         void Awake()
         {
             _player = GetComponent<NetworkPlayer>();
             _appearance = GetComponent<PlayerAppearanceController>();
-            _provider = new CatalogAvatarVisualProvider(_catalog);
+            _provider = new CatalogAvatarVisualProvider(_catalog, _modularCatalog);
             if (_visualRoot == null) _visualRoot = transform;
         }
 
@@ -52,9 +54,6 @@ namespace Festa.World
         {
             _appearance.Encoded.OnValueChanged += OnEncodedChanged;
             _player.AnimState.OnValueChanged += OnAnimStateChanged;
-
-            // 런타임 조립은 DB 초기화가 필요하므로 미리 시작해둔다
-            _ = SidekickRuntimeService.Instance.EnsureInitializedAsync();
 
             Rebuild(_appearance.Encoded.Value.ToString());
         }
@@ -88,7 +87,7 @@ namespace Festa.World
             EnsureAnimatorController();
 
             ApplyAnimState(_player.AnimState.Value);
-            Debug.Log($"[AvatarVisual] 적용 (owner={OwnerClientId}, runtime={appearance.IsRuntime})");
+            Debug.Log($"[AvatarVisual] 적용 (owner={OwnerClientId}, modular={appearance.IsModular})");
         }
 
         /// <summary>
@@ -131,19 +130,6 @@ namespace Festa.World
             if (_animator.avatar == null)
                 Debug.LogWarning("[AvatarVisual] Animator에 Avatar(휴머노이드 정의)가 없습니다 — " +
                                  "Sidekick 기본 모델의 Rig가 Humanoid인지 확인하세요");
-        }
-
-        void Update()
-        {
-            // Sidekick DB 초기화가 늦게 끝난 경우, 준비되면 한 번 재생성한다.
-            if (_appliedEncoded == null) return;
-            if (!SidekickRuntimeService.Instance.IsReady) return;
-
-            var appearance = AvatarAppearance.Decode(_appliedEncoded);
-            if (!appearance.IsRuntime) return;
-            if (_currentVisual != null && _currentVisual.name != "Visual_Placeholder") return;
-
-            Rebuild(_appliedEncoded);
         }
 
         void ApplyAnimState(PlayerAnimState state)

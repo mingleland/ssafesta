@@ -97,20 +97,6 @@ namespace Festa.World
             Debug.LogError($"[Appearance] {LastRequestError}");
         }
 
-        /// <summary>파츠 하나만 바꾸는 편의 메서드 (커스터마이징 UI용).</summary>
-        public void RequestPartChange(int partType, string partName)
-        {
-            var current = Current;
-            var parts = current.Parts != null
-                ? new Dictionary<int, string>(current.Parts)
-                : new Dictionary<int, string>();
-
-            parts[partType] = partName;
-            SidekickRuntimeService.SyncMirrorParts(parts);
-
-            RequestChange(AvatarAppearance.FromParts(parts, current.TintHex));
-        }
-
         [Rpc(SendTo.Server)]
         void RequestChangeServerRpc(string encoded)
         {

@@ -13,15 +13,15 @@ MonoBehaviour:
   m_Name: F_Top.02
   m_EditorClassIdentifier: 
   itemId: 884777048
-  displayName: Top.02
+  displayName: "\uD3EC\uCF13 \uD6C4\uB4DC\uC9D1\uC5C5"
   category: 4
   gender: 1
   meshes:
   - {fileID: -2839161049728361461, guid: 9ed52c1fd17892644a479afbc02be012, type: 3}
   objectPrefabs: []
   targetBones: 
-  hiddenBodyParts: 0100000002000000030000001500000014000000
-  thumbnail: {fileID: 0}
+  hiddenBodyParts: 02000000030000001500000014000000
+  thumbnail: {fileID: 21300000, guid: 14c2c6746e4e10c439ba4f19ef3e70cf, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

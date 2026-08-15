@@ -8,8 +8,14 @@
 
 ## 1. 개요
 
-캐릭터 외형은 **프리셋 방식**이다. Sidekick Character Creator(에디터 툴)로 미리 제작한
-캐릭터 프리셋 중 하나를 고르고, 색상 틴트를 얹는다. 런타임 파츠 조립은 하지 않는다.
+캐릭터 외형은 **Rukha93 모듈 파츠 조립 방식**이다. 머리·헤어·모자·안경·상의·하의·한벌옷·신발과
+피부·헤어·홍채·눈썹·입술·상의·하의·흰자위·동공 색상을 런타임에 조립한다. 입술색은 원본 얼굴 명암을 보존하도록 피부색과 혼합한 색조로 적용한다. Sidekick 패키지는 신규 생성 경로에서 사용하지 않는다.
+
+피부색 한 슬롯은 얼굴과 목·몸통·팔·손·다리·발의 모든 노출 신체 메시가 함께 사용한다. 얼굴과 신체 피부 셰이더는 동일한 기본 조명 계산을 사용해 목 경계에서 색이 갈라지지 않아야 한다.
+
+기본 Body의 속옷은 Body RGB 마스크의 녹색 채널로 피부와 분리하고 검정색으로 고정한다. 속옷 색은 `AvatarConfig`나 네트워크 외형 문자열에 포함하지 않으며 피부색을 바꿔도 함께 변하지 않는다.
+
+상의·하의·한벌옷·신발과 안경 프레임은 각각 RGB 마스크 A/B/C 세 영역을 가지며, 각 영역의 어두운색·밝은색을 합친 6개 색상 값을 독립적으로 사용한다. 안경 렌즈는 프레임과 분리된 투명 머티리얼을 유지하며 안경 B2 색으로 조절한다. 왼쪽 의상 패널은 네 의상 종류를 탭으로 전환하고 선택한 종류의 파츠와 6색만 표시하며, 안경 6색은 오른쪽 액세서리 탭에 표시한다.
 
 ```
 [커스터마이징 창]  →  avatarCode 문자열  →  ┬→ Unity 월드: 즉시 동기화 (전원에게 보임)
@@ -21,18 +27,21 @@
 
 ## 2. avatarCode 포맷 (3파트 공통 계약)
 
+의상 A1/A2·B1/B2·C1/C2는 여섯 개의 별도 옷 조각이 아니라 RGB 마스크 A/B/C 세 원단 영역의 명암 그라데이션 끝점이다. Unity는 원본 머티리얼의 `_MaskRemap`·`_Mask_Factor`와 A → B → C 순차 영역 선택을 유지하며, 겹치는 마스크 픽셀을 색 평균으로 처리하지 않는다.
+
 ```
-sk_01                 프리셋만
-sk_01|c=E85D5D        프리셋 + 색상 틴트(RRGGBB)
+fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 정밀 RGB 값>|w=<36개 의상·모자·안경 RGB 값>
 ```
 
 | 규칙 | 내용 |
 |---|---|
-| 최대 길이 | **29자** (Unity NetworkVariable 제한) |
+| 최대 길이 | Unity `FixedString4096Bytes` 이내 |
 | 구분자 | `\|` (파이프), 세그먼트는 `키=값` |
 | 알 수 없는 세그먼트 | **무시한다** — 구버전 클라이언트가 깨지지 않음 (forward compatible) |
-| 빈 값/오류 | `sk_01`(기본값)로 폴백 |
-| 확장 예정 | 파츠 단위가 필요해지면 `\|h=3\|u=7` 형태로 세그먼트 추가 |
+| 빈 값/오류 | Catalog 기본 외형으로 폴백 |
+| 정밀 색상 | `q=`에 피부·헤어·홍채·눈썹·입술·상의·하의·흰자위·동공 순서로 각 슬롯을 `RRGGBB`로 기록하며 미지정은 `-` |
+| 파츠 영역 색상 | `w=`에 상의·하의·한벌옷·신발·모자·안경 순서로 각 파츠의 A1·A2·B1·B2·C1·C2를 기록한다. 총 36개 `RRGGBB`이며 미지정은 `-`. 기존 24개·30개 입력도 읽어 하위 호환한다. |
+| 구버전 7·8색 입력 | 기존 7개 또는 8개 `p`/`q` 값도 허용하며 누락된 흰자위는 흰색, 동공은 짙은 기본색으로 복원 |
 
 프리셋 코드는 `sk_01`, `sk_02`, … 형식이며 **실제 목록은 Unity AvatarCatalog가 소유**한다
 (아래 §5 참조).
@@ -117,13 +126,13 @@ window.FestaUnity.onAvatarApplied = (json) => {
 |---|---|
 | `AvatarAppearance` | avatarCode 인코딩/디코딩, forward-compatible 파서 |
 | `AvatarCatalog` (SO) | presetCode → 프리팹 매핑, 표시 이름, 색상 팔레트 |
-| `IAvatarVisualProvider` / `CatalogAvatarVisualProvider` | 외형 생성 경계 (Sidekick 비종속) |
+| `IAvatarVisualProvider` / `CatalogAvatarVisualProvider` | 외형 생성 경계. 신규 `fa` 코드는 Rukha93 `AvatarAssembler`로 로컬 생성 |
 | `PlayerAvatarVisual` | avatarCode 구독 → 외형 재생성 + 틴트 + Animator 연결 |
 | `PlayerAppearanceController` | 변경 요청(ServerRpc) → 서버 반영 → 전원 전파 + 프로필 저장 호출 |
 | `AvatarCustomizationHud` | **임시 Unity 창** (React 구현 전까지 사용, 월드 단독 데모용) |
 | `AvatarBridge` | React ↔ Unity 연결 지점 |
 
-**동기화 방식**: `avatarCode` 문자열만 NetworkVariable로 동기화된다.
+**동기화 방식**: `avatarCode` 문자열만 NetworkVariable로 동기화된다. 신규 모듈 외형은 `fa|g=...|i=...|p=...|q=...|w=...` 형식이며 로비와 월드가 동일한 `AvatarConfig`를 사용한다. 과거 `rt`(Sidekick) 형식은 읽기 호환만 유지하고 신규 생성에는 사용하지 않는다.
 3D 모델·머티리얼은 각 클라이언트가 로컬에서 생성하며 NetworkObject가 아니다
 (Booth Runtime과 동일 원칙 — doc 07 §9).
 

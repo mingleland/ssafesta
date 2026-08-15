@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Shared_Glasses.002
   m_EditorClassIdentifier: 
   itemId: 218425618
-  displayName: Glasses.002
+  displayName: "\uB77C\uC6B4\uB4DC \uC548\uACBD"
   category: 3
   gender: 2
   meshes: []
@@ -21,7 +21,7 @@ MonoBehaviour:
   - {fileID: 4876037951994480605, guid: 07d4c6e881ed440428b0d68a2e7a2168, type: 3}
   targetBones: 0a000000
   hiddenBodyParts: 
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: 7f58b440380662842ae87ac06d41f207, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

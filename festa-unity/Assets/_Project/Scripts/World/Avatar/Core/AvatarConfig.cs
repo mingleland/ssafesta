@@ -5,15 +5,43 @@ namespace Festa.Avatar
 {
     public enum AvatarGender : byte { Male, Female, Both }
     public enum AvatarPartCategory : byte { Head, Hair, Hat, Glasses, Top, Bottom, Outfit, Shoes }
-    public enum AvatarColorSlot : byte { Skin, Hair, Iris, Eyebrow, Lips, Top, Bottom }
+    // Keep existing numeric values stable for network/backward compatibility.
+    public enum AvatarColorSlot : byte { Skin, Hair, Iris, Eyebrow, Lips, Top, Bottom, Sclera, Pupil }
+    public enum AvatarGarmentColorSlot : byte { A1, A2, B1, B2, C1, C2 }
     public enum HairGroup : byte { None, Buzzcut, Short, Medium, Long, Tied }
+
+    [Serializable]
+    public struct AvatarGarmentColors
+    {
+        public Color32 a1, a2, b1, b2, c1, c2;
+
+        public Color32 Get(AvatarGarmentColorSlot slot) => slot switch
+        {
+            AvatarGarmentColorSlot.A1 => a1, AvatarGarmentColorSlot.A2 => a2,
+            AvatarGarmentColorSlot.B1 => b1, AvatarGarmentColorSlot.B2 => b2,
+            AvatarGarmentColorSlot.C1 => c1, AvatarGarmentColorSlot.C2 => c2, _ => default
+        };
+
+        public void Set(AvatarGarmentColorSlot slot, Color32 value)
+        {
+            switch (slot)
+            {
+                case AvatarGarmentColorSlot.A1: a1 = value; break; case AvatarGarmentColorSlot.A2: a2 = value; break;
+                case AvatarGarmentColorSlot.B1: b1 = value; break; case AvatarGarmentColorSlot.B2: b2 = value; break;
+                case AvatarGarmentColorSlot.C1: c1 = value; break; case AvatarGarmentColorSlot.C2: c2 = value; break;
+            }
+        }
+    }
 
     [Serializable]
     public struct AvatarConfig
     {
         public AvatarGender gender;
         public int headId, hairId, hatId, glassesId, topId, bottomId, outfitId, shoesId;
-        public byte skinColorId, hairColorId, irisColorId, eyebrowColorId, lipsColorId, topColorId, bottomColorId;
+        public byte skinColorId, hairColorId, irisColorId, eyebrowColorId, lipsColorId, topColorId, bottomColorId, scleraColorId, pupilColorId;
+        public byte garmentColorVersion;
+        public Color32 skinColor, hairColor, irisColor, eyebrowColor, lipsColor, topColor, bottomColor, scleraColor, pupilColor;
+        public AvatarGarmentColors topGarmentColors, bottomGarmentColors, outfitGarmentColors, shoesGarmentColors, hatGarmentColors, glassesGarmentColors;
 
         public int GetItem(AvatarPartCategory category) => category switch
         {
@@ -41,7 +69,8 @@ namespace Festa.Avatar
             AvatarColorSlot.Skin => skinColorId, AvatarColorSlot.Hair => hairColorId,
             AvatarColorSlot.Iris => irisColorId, AvatarColorSlot.Eyebrow => eyebrowColorId,
             AvatarColorSlot.Lips => lipsColorId, AvatarColorSlot.Top => topColorId,
-            AvatarColorSlot.Bottom => bottomColorId, _ => 0
+            AvatarColorSlot.Bottom => bottomColorId, AvatarColorSlot.Sclera => scleraColorId,
+            AvatarColorSlot.Pupil => pupilColorId, _ => 0
         };
 
         public void SetColor(AvatarColorSlot slot, byte value)
@@ -51,7 +80,83 @@ namespace Festa.Avatar
                 case AvatarColorSlot.Skin: skinColorId = value; break; case AvatarColorSlot.Hair: hairColorId = value; break;
                 case AvatarColorSlot.Iris: irisColorId = value; break; case AvatarColorSlot.Eyebrow: eyebrowColorId = value; break;
                 case AvatarColorSlot.Lips: lipsColorId = value; break; case AvatarColorSlot.Top: topColorId = value; break;
-                case AvatarColorSlot.Bottom: bottomColorId = value; break;
+                case AvatarColorSlot.Bottom: bottomColorId = value; break; case AvatarColorSlot.Sclera: scleraColorId = value; break;
+                case AvatarColorSlot.Pupil: pupilColorId = value; break;
+            }
+        }
+
+        public Color GetColor(AvatarColorSlot slot, AvatarCatalog catalog)
+        {
+            Color32 precise = slot switch
+            {
+                AvatarColorSlot.Skin => skinColor, AvatarColorSlot.Hair => hairColor,
+                AvatarColorSlot.Iris => irisColor, AvatarColorSlot.Eyebrow => eyebrowColor,
+                AvatarColorSlot.Lips => lipsColor, AvatarColorSlot.Top => topColor,
+                AvatarColorSlot.Bottom => bottomColor, AvatarColorSlot.Sclera => scleraColor,
+                AvatarColorSlot.Pupil => pupilColor, _ => default
+            };
+            if (precise.a > 0) return precise;
+            if (slot == AvatarColorSlot.Sclera && scleraColorId == 0) return Color.white;
+            if (slot == AvatarColorSlot.Pupil && pupilColorId == 0) return new Color32(20, 16, 18, 255);
+            return catalog.GetColor(GetColor(slot));
+        }
+
+        public void SetColor(AvatarColorSlot slot, Color value)
+        {
+            var precise = (Color32)value; precise.a = 255;
+            switch (slot)
+            {
+                case AvatarColorSlot.Skin: skinColor = precise; break; case AvatarColorSlot.Hair: hairColor = precise; break;
+                case AvatarColorSlot.Iris: irisColor = precise; break; case AvatarColorSlot.Eyebrow: eyebrowColor = precise; break;
+                case AvatarColorSlot.Lips: lipsColor = precise; break; case AvatarColorSlot.Top: topColor = precise; break;
+                case AvatarColorSlot.Bottom: bottomColor = precise; break; case AvatarColorSlot.Sclera: scleraColor = precise; break;
+                case AvatarColorSlot.Pupil: pupilColor = precise; break;
+            }
+        }
+
+        public Color32 GetGarmentColor(AvatarPartCategory category, AvatarGarmentColorSlot slot) => category switch
+        {
+            AvatarPartCategory.Top => topGarmentColors.Get(slot),
+            AvatarPartCategory.Bottom => bottomGarmentColors.Get(slot),
+            AvatarPartCategory.Outfit => outfitGarmentColors.Get(slot),
+            AvatarPartCategory.Shoes => shoesGarmentColors.Get(slot),
+            AvatarPartCategory.Hat => hatGarmentColors.Get(slot),
+            AvatarPartCategory.Glasses => glassesGarmentColors.Get(slot),
+            _ => default
+        };
+
+        public void SetGarmentColor(AvatarPartCategory category, AvatarGarmentColorSlot slot, Color value)
+        {
+            var precise = (Color32)value; precise.a = 255;
+            switch (category)
+            {
+                case AvatarPartCategory.Top: topGarmentColors.Set(slot, precise); break;
+                case AvatarPartCategory.Bottom: bottomGarmentColors.Set(slot, precise); break;
+                case AvatarPartCategory.Outfit: outfitGarmentColors.Set(slot, precise); break;
+                case AvatarPartCategory.Shoes: shoesGarmentColors.Set(slot, precise); break;
+                case AvatarPartCategory.Hat: hatGarmentColors.Set(slot, precise); break;
+                case AvatarPartCategory.Glasses: glassesGarmentColors.Set(slot, precise); break;
+            }
+        }
+
+        public Color32 GetGarmentColor(int index)
+        {
+            var category = index < 6 ? AvatarPartCategory.Top : index < 12 ? AvatarPartCategory.Bottom : index < 18 ? AvatarPartCategory.Outfit : index < 24 ? AvatarPartCategory.Shoes : index < 30 ? AvatarPartCategory.Hat : AvatarPartCategory.Glasses;
+            return GetGarmentColor(category, (AvatarGarmentColorSlot)(index % 6));
+        }
+
+        public void SetGarmentColor(int index, Color32 value)
+        {
+            var category = index < 6 ? AvatarPartCategory.Top : index < 12 ? AvatarPartCategory.Bottom : index < 18 ? AvatarPartCategory.Outfit : index < 24 ? AvatarPartCategory.Shoes : index < 30 ? AvatarPartCategory.Hat : AvatarPartCategory.Glasses;
+            var slot = (AvatarGarmentColorSlot)(index % 6);
+            switch (category)
+            {
+                case AvatarPartCategory.Top: topGarmentColors.Set(slot, value); break;
+                case AvatarPartCategory.Bottom: bottomGarmentColors.Set(slot, value); break;
+                case AvatarPartCategory.Outfit: outfitGarmentColors.Set(slot, value); break;
+                case AvatarPartCategory.Shoes: shoesGarmentColors.Set(slot, value); break;
+                case AvatarPartCategory.Hat: hatGarmentColors.Set(slot, value); break;
+                case AvatarPartCategory.Glasses: glassesGarmentColors.Set(slot, value); break;
             }
         }
     }

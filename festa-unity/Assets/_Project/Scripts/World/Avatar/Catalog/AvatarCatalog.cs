@@ -22,13 +22,26 @@ namespace Festa.Avatar
         public Color GetColor(byte id) => palette.FirstOrDefault(x => x.id == id).color;
         public AvatarItemDefinition Default(AvatarPartCategory category, AvatarGender gender) =>
             GetItems(category, gender).FirstOrDefault(x => x.isDefault) ?? GetItems(category, gender).FirstOrDefault();
-        public AvatarItemDefinition ResolveHat(int familyId, HairGroup group) => items.FirstOrDefault(x => x && x.category == AvatarPartCategory.Hat && x.familyId == familyId && (x.requiredHairGroup == group || x.requiredHairGroup == HairGroup.None));
+        public AvatarItemDefinition ResolveHat(int familyId, HairGroup group)
+        {
+            var variants = items.Where(x => x && x.category == AvatarPartCategory.Hat && x.familyId == familyId).ToArray();
+            return variants.FirstOrDefault(x => x.requiredHairGroup == group)
+                ?? variants.FirstOrDefault(x => x.requiredHairGroup == HairGroup.None)
+                ?? variants.FirstOrDefault();
+        }
 
         public AvatarConfig CreateDefault(AvatarGender gender)
         {
-            var c = new AvatarConfig { gender = gender, skinColorId = 1, hairColorId = 6, irisColorId = 8, eyebrowColorId = 6, lipsColorId = 10, topColorId = 12, bottomColorId = 15 };
-            foreach (var category in new[] { AvatarPartCategory.Head, AvatarPartCategory.Hair, AvatarPartCategory.Top, AvatarPartCategory.Bottom, AvatarPartCategory.Shoes })
-                c.SetItem(category, Default(category, gender)?.itemId ?? 0);
+            var c = new AvatarConfig { gender = gender, skinColorId = 1, hairColorId = 6, irisColorId = 8, eyebrowColorId = 6, lipsColorId = 10, topColorId = 12, bottomColorId = 15, scleraColorId = 16, pupilColorId = 6, garmentColorVersion = 1 };
+            c.SetItem(AvatarPartCategory.Head,Default(AvatarPartCategory.Head,gender)?.itemId??0);
+            var hair=GetItems(AvatarPartCategory.Hair,gender).FirstOrDefault(x=>x.hairGroup==HairGroup.Long)??Default(AvatarPartCategory.Hair,gender);
+            c.SetItem(AvatarPartCategory.Hair,hair?hair.itemId:0);
+            var top=Default(AvatarPartCategory.Top,gender);
+            var bottom=Default(AvatarPartCategory.Bottom,gender);
+            c.SetItem(AvatarPartCategory.Top,top?top.itemId:0);
+            c.SetItem(AvatarPartCategory.Bottom,bottom?bottom.itemId:0);
+            c.SetItem(AvatarPartCategory.Outfit,0);
+            c.SetItem(AvatarPartCategory.Shoes,Default(AvatarPartCategory.Shoes,gender)?.itemId??0);
             return c;
         }
     }

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Synty.SidekickCharacters.Enums;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -16,25 +14,7 @@ namespace Festa.World
     {
         [SerializeField] bool _openByDefault;
 
-        // WebGL IMGUI는 기본 폰트에 한글 글리프가 없어 영문 라벨을 쓴다.
-        // 정식 UI(React/uGUI)로 넘어가면 해결되는 임시 제약.
-        static readonly Dictionary<CharacterPartType, string> PartLabels = new()
-        {
-            { CharacterPartType.Head, "Head" },
-            { CharacterPartType.Hair, "Hair" },
-            { CharacterPartType.FacialHair, "Beard" },
-            { CharacterPartType.Torso, "Torso" },
-            { CharacterPartType.ArmUpperLeft, "Arm (upper)" },
-            { CharacterPartType.ArmLowerLeft, "Arm (lower)" },
-            { CharacterPartType.HandLeft, "Hands" },
-            { CharacterPartType.Hips, "Hips" },
-            { CharacterPartType.LegLeft, "Legs" },
-            { CharacterPartType.FootLeft, "Feet" },
-            { CharacterPartType.AttachmentHead, "Headgear" },
-        };
-
         bool _open;
-        Vector2 _scroll;
 
         void Awake() => _open = _openByDefault;
 
@@ -62,99 +42,19 @@ namespace Festa.World
 
         void DrawPanel(PlayerAppearanceController controller)
         {
-            var service = SidekickRuntimeService.Instance;
             var current = controller.Current;
             var visual = controller.GetComponent<PlayerAvatarVisual>();
 
             GUILayout.BeginArea(new Rect(Screen.width - 300, 44, 290, Screen.height - 60), GUI.skin.box);
             GUILayout.Label("<b>Character Creator</b>", Rich());
 
-            // ── 준비 상태 ──
-            if (!service.IsReady)
-            {
-                GUILayout.Space(8);
-                GUILayout.Label(string.IsNullOrEmpty(service.LastError)
-                    ? "Loading part data..."
-                    : $"Load failed:\n{service.LastError}");
-                GUILayout.EndArea();
-                return;
-            }
-
-            GUILayout.Space(4);
-
-            // ── 모드 전환 ──
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button(current.IsRuntime ? "▶ Custom" : "Custom", GUILayout.Height(24)) && !current.IsRuntime)
-                controller.RequestChange(AvatarAppearance.FromParts(service.RandomParts(), current.TintHex));
-
-            if (GUILayout.Button(!current.IsRuntime ? "▶ Preset" : "Preset", GUILayout.Height(24)) && current.IsRuntime)
-                controller.RequestChange(new AvatarAppearance
-                {
-                    PresetCode = AvatarAppearance.DefaultPreset,
-                    TintHex = current.TintHex
-                });
-            GUILayout.EndHorizontal();
-
-            // 요청이 거부됐다면 이유를 화면에 보여준다 (콘솔을 안 봐도 알 수 있게, T-24)
+            GUILayout.Label("정식 커스터마이징은 로비 또는 웹 오버레이에서 변경됩니다.");
+            GUILayout.Label("변경한 외형은 같은 월드의 모든 사용자에게 즉시 동기화됩니다.");
             if (!string.IsNullOrEmpty(controller.LastRequestError))
                 GUILayout.Label($"! {controller.LastRequestError}");
-
-            GUILayout.Space(6);
-
-            _scroll = GUILayout.BeginScrollView(_scroll);
-
-            if (current.IsRuntime)
-                DrawPartSelectors(controller, service, current);
-            else
-                DrawPresetSelectors(controller, visual, current);
-
-            DrawTintPalette(controller, visual, current);
-
-            GUILayout.EndScrollView();
+            if (current.IsModular) GUILayout.Label("현재 외형: Rukha93 모듈 아바타");
+            else GUILayout.Label("현재 외형: 이전 프리셋 (새 외형 선택 시 자동 전환)");
             GUILayout.EndArea();
-        }
-
-        // ── 파츠 선택 (런타임 조립 모드) ──
-        static void DrawPartSelectors(PlayerAppearanceController controller,
-                                      SidekickRuntimeService service,
-                                      AvatarAppearance current)
-        {
-            GUILayout.Label("<b>Parts</b>", Rich());
-
-            if (GUILayout.Button("Randomize All", GUILayout.Height(24)))
-            {
-                controller.RequestChange(AvatarAppearance.FromParts(service.RandomParts(), current.TintHex));
-                return;
-            }
-
-            GUILayout.Space(4);
-
-            foreach (var kv in service.PartNames)
-            {
-                var type = kv.Key;
-                var names = kv.Value;
-                if (names.Count == 0) continue;
-
-                // 좌우 짝의 오른쪽은 UI에 노출하지 않는다 (왼쪽 변경 시 자동 동기화)
-                if (SidekickRuntimeService.MirrorPairs.ContainsValue(type)) continue;
-                if (!PartLabels.TryGetValue(type, out var label)) label = type.ToString();
-
-                current.Parts.TryGetValue((int)type, out var currentName);
-                int index = Mathf.Max(0, names.IndexOf(currentName));
-
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(label, GUILayout.Width(90));
-
-                if (GUILayout.Button("<", GUILayout.Width(26)))
-                    controller.RequestPartChange((int)type, names[(index - 1 + names.Count) % names.Count]);
-
-                GUILayout.Label($"{index + 1}/{names.Count}", GUILayout.Width(46));
-
-                if (GUILayout.Button(">", GUILayout.Width(26)))
-                    controller.RequestPartChange((int)type, names[(index + 1) % names.Count]);
-
-                GUILayout.EndHorizontal();
-            }
         }
 
         // ── 프리셋 선택 ──

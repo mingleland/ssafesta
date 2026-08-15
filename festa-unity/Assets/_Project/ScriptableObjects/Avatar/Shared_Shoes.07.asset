@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Shared_Shoes.07
   m_EditorClassIdentifier: 
   itemId: 762260482
-  displayName: Shoes.07
+  displayName: "\uCCBC\uC2DC \uBD80\uCE20"
   category: 7
   gender: 2
   meshes:
@@ -21,7 +21,7 @@ MonoBehaviour:
   objectPrefabs: []
   targetBones: 
   hiddenBodyParts: 21000000
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: ecaf28de9389f104391ab29a923f2e30, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

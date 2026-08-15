@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: F_Top.04
   m_EditorClassIdentifier: 
   itemId: 664315711
-  displayName: Top.04
+  displayName: "\uD3EC\uCF13 \uC154\uCE20"
   category: 4
   gender: 1
   meshes:
@@ -21,7 +21,7 @@ MonoBehaviour:
   objectPrefabs: []
   targetBones: 
   hiddenBodyParts: 01000000020000000300000015000000
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: b463e61f1da2b234b8605dfb275d1590, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

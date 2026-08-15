@@ -22,7 +22,7 @@ MonoBehaviour:
   - {fileID: 620236341892659282, guid: c249c69af123d7a4d882f69dba5b0910, type: 3}
   targetBones: 0a0000000a000000
   hiddenBodyParts: 
-  thumbnail: {fileID: 0}
+  thumbnail: {fileID: 21300000, guid: 87ebeffe63517334f9ac6998cc86d589, type: 3}
   isDefault: 0
   hairGroup: 3
   familyId: 0
