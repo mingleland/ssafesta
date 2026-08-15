@@ -75,12 +75,12 @@ uvx --from git+https://github.com/github/spec-kit.git specify init --here --ai c
 
 - **Layout JSON**: React ↔ Spring ↔ Unity (spec 005가 Source)
 - **Bridge Event / 오버레이 페이로드**: FE 이정헌 + Unity (016·AI_AGENT_INTERACT 등)
-- **아바타 인코딩·저장 API**: Unity + FE + Spring (013a, festa-unity/Docs/avatar-customization-contract.md 기존안 참조)
+- **아바타 인코딩·저장 API**: Unity + Spring (013a, `festa-unity/Docs/avatar-customization-contract.md`; FE는 WebGL 인증/호스트 연동만)
 - **SSE 스키마**: AI 김가현 + FE (start/token/source/done/error)
 
 ## 5. 오늘(2026-08-12) 결정으로 달라진 것
 
-- 캐릭터 커스터마이징 **P0 승격** → spec 013a (Unity 구현은 POC 완료, React 창·Spring 저장이 신규)
+- 캐릭터 커스터마이징 **P0 승격** → spec 013a. 2026-08-16 Unity `CharacterLobby`를 정식 UI로 확정해 React 교체 요구를 폐기했고, Spring 저장·재접속 복원이 남음
 - **016 booth-laptop-homepage 신설 (P0)** — 노트북 클릭 → 임대자 등록 홈페이지 열람
 - 017 proximity-voice, 018 world-floors 신설 (P1/2차) — 1차 월드는 11층 단일
 - 마피아 게임은 P2 후보로 기록만 (014 비고)
