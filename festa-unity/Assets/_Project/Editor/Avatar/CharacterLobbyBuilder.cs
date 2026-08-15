@@ -31,15 +31,19 @@ namespace Festa.Editor.Avatar
                 var defPath = $"{Output}/{Sanitize(path[(VendorAssets.Length + 1)..])}.asset";
                 var def = AssetDatabase.LoadAssetAtPath<AvatarItemDefinition>(defPath);
                 if (!def) { def = ScriptableObject.CreateInstance<AvatarItemDefinition>(); AssetDatabase.CreateAsset(def, defPath); }
-                def.itemId = StableId(guid); def.displayName = Path.GetFileNameWithoutExtension(path); def.category = category; def.gender = gender;
+                string sourceName = Path.GetFileNameWithoutExtension(path);
+                def.itemId = StableId(guid); def.displayName = sourceName; def.category = category; def.gender = gender;
                 def.isDefault = definitions.All(x => x.category != category || x.gender != gender);
                 def.meshes = ReadRefs<SkinnedMeshRenderer>(so.FindProperty("meshes"));
                 var objects = so.FindProperty("objects");
                 var prefabs = new List<GameObject>(); var bones = new List<HumanBodyBones>();
                 if (objects != null) for (int i = 0; i < objects.arraySize; i++) { var e=objects.GetArrayElementAtIndex(i); prefabs.Add(e.FindPropertyRelative("prefab").objectReferenceValue as GameObject); bones.Add((HumanBodyBones)e.FindPropertyRelative("targetBone").enumValueIndex); }
-                def.objectPrefabs = prefabs.Where(x=>x).ToArray(); def.targetBones = bones.ToArray(); def.hiddenBodyParts = ReadInts(so.FindProperty("bodyParts"));
-                // Top.02 exposes the waist below its cropped inner layer. Keeping Torso_Spine01 hidden leaves a visible hole.
+                def.objectPrefabs = prefabs.Where(x=>x).ToArray(); def.targetBones = bones.ToArray(); def.hiddenBodyParts = ReadInts(so.FindProperty("bodyParts")); def.forcedVisibleBodyParts = Array.Empty<int>();
+                def.garmentColorAreaMask = GarmentColorAreaMask(category, gender, sourceName);
+                // Top.02 only needs its own Spine01 hide removed. Top.07-A needs Spine01
+                // to override other garments, but Hips must stay hidden to avoid pants clipping.
                 if(category==AvatarPartCategory.Top&&def.displayName=="Top.02")def.hiddenBodyParts=def.hiddenBodyParts.Where(x=>x!=1).ToArray();
+                if(category==AvatarPartCategory.Top&&def.displayName=="Top.07-A")def.forcedVisibleBodyParts=new[]{1};
                 if(category==AvatarPartCategory.Hair) def.hairGroup = HairFromName(VisualName(def));
                 if(category==AvatarPartCategory.Hat) { string n=VisualName(def); def.familyId=n.Contains("hat.001")?1001:n.Contains("hat.002")?1002:1003; def.requiredHairGroup=HairFromName(n); }
                 EditorUtility.SetDirty(def); definitions.Add(def);
@@ -91,6 +95,24 @@ namespace Festa.Editor.Avatar
         static int[] ReadInts(SerializedProperty p){if(p==null)return Array.Empty<int>();var a=new int[p.arraySize];for(int i=0;i<a.Length;i++)a[i]=p.GetArrayElementAtIndex(i).intValue;return a;}
         static string VisualName(AvatarItemDefinition d)=>d.objectPrefabs.FirstOrDefault()?.name??d.meshes.FirstOrDefault()?.name??d.displayName;
         static HairGroup HairFromName(string n){n=n.ToLowerInvariant();if(n.Contains("buzz")||n.Contains("afro"))return HairGroup.Buzzcut;if(n.Contains("short")||n.Contains("bangs"))return HairGroup.Short;if(n.Contains("medium")||n.Contains("curly"))return HairGroup.Medium;if(n.Contains("long"))return HairGroup.Long;if(n.Contains("tied"))return HairGroup.Tied;return HairGroup.None;}
+        static byte GarmentColorAreaMask(AvatarPartCategory category, AvatarGender gender, string sourceName)
+        {
+            if(category==AvatarPartCategory.Top)
+            {
+                if(sourceName=="Top.04"||sourceName=="Top.09")return 0x1;
+                if(sourceName=="Top.10")return 0x5;
+                if(sourceName=="Top.11")return 0x2;
+                if(gender==AvatarGender.Male&&sourceName=="Top.07-A")return 0x2;
+                if(sourceName=="Top.02")return 0x7;
+                return 0x3;
+            }
+            if(category==AvatarPartCategory.Bottom)return sourceName=="Bot.02"||sourceName=="Bot.06"?(byte)0x3:(byte)0x1;
+            if(category==AvatarPartCategory.Outfit)return sourceName=="Outfit.02"?(byte)0x7:(byte)0x3;
+            if(category==AvatarPartCategory.Shoes)return sourceName=="Shoes.03"||sourceName=="Shoes.04"?(byte)0x3:sourceName=="Shoes.07"?(byte)0x1:(byte)0x7;
+            if(category==AvatarPartCategory.Hat)return sourceName.StartsWith("Hat.002")?(byte)0x1:sourceName.StartsWith("Hat.003")?(byte)0x3:(byte)0x7;
+            if(category==AvatarPartCategory.Glasses)return 0x3;
+            return 0x7;
+        }
         static int StableId(string guid)=>unchecked((int)(Convert.ToUInt32(guid[..8],16)&0x7fffffff));
         static string Sanitize(string path)=>path.Replace('/','_').Replace('\\','_').Replace(".asset","");
         static void EnsureFolder(string path){if(AssetDatabase.IsValidFolder(path))return;string parent=Path.GetDirectoryName(path).Replace('\\','/');EnsureFolder(parent);AssetDatabase.CreateFolder(parent,Path.GetFileName(path));}

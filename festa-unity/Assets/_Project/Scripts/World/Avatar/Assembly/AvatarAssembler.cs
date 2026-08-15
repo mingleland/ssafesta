@@ -106,14 +106,19 @@ namespace Festa.Avatar
         void UpdateBodyVisibility()
         {
             var hidden = new HashSet<int>();
+            var forcedVisible = new HashSet<int>();
             if (_config.headId != 0 && _spawned.TryGetValue(AvatarPartCategory.Head, out var heads) && heads.Any(x => x)) hidden.Add(4);
             foreach (AvatarPartCategory c in Enum.GetValues(typeof(AvatarPartCategory)))
             {
                 var d = c == AvatarPartCategory.Hat ? null : _catalog.Get(_config.GetItem(c));
                 if (!_spawned.TryGetValue(c, out var visibleParts) || !visibleParts.Any(x => x)) continue;
-                if (d?.hiddenBodyParts == null) continue;
-                foreach (var p in d.hiddenBodyParts) hidden.Add(p);
+                if (d == null) continue;
+                if (d.hiddenBodyParts != null)
+                    foreach (var p in d.hiddenBodyParts) hidden.Add(p);
+                if (d.forcedVisibleBodyParts != null)
+                    foreach (var p in d.forcedVisibleBodyParts) forcedVisible.Add(p);
             }
+            hidden.ExceptWith(forcedVisible);
             foreach (var pair in _bodyParts) pair.Value.SetActive(!hidden.Contains(pair.Key));
         }
 
