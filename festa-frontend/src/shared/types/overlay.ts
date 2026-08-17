@@ -28,10 +28,6 @@ export function closeOverlay(): void {
   emit();
 }
 
-export function getOverlay(): OverlayRequest | null {
-  return current;
-}
-
 export function subscribeOverlay(listener: OverlayListener): () => void {
   listeners.add(listener);
   return () => {

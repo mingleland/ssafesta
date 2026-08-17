@@ -6,7 +6,7 @@ export interface BoothInteractEvent {
   type: 'BOOTH_LAPTOP_INTERACT'; // 후속 spec에서 union 확장 (AI_AGENT_INTERACT 등)
   boothId: number;
   objectId: string;
-  url?: string; // LAPTOP 전용
+  url?: string; // LAPTOP 전용, 선택 — 016 FR-009: 주소 미등록 노트북도 상호작용은 발생하고 "안내"를 띄운다
 }
 
 type BoothInteractListener = (event: BoothInteractEvent) => void;
