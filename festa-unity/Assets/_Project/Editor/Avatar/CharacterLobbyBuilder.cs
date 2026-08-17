@@ -40,10 +40,10 @@ namespace Festa.Editor.Avatar
                 if (objects != null) for (int i = 0; i < objects.arraySize; i++) { var e=objects.GetArrayElementAtIndex(i); prefabs.Add(e.FindPropertyRelative("prefab").objectReferenceValue as GameObject); bones.Add((HumanBodyBones)e.FindPropertyRelative("targetBone").enumValueIndex); }
                 def.objectPrefabs = prefabs.Where(x=>x).ToArray(); def.targetBones = bones.ToArray(); def.hiddenBodyParts = ReadInts(so.FindProperty("bodyParts")); def.forcedVisibleBodyParts = Array.Empty<int>();
                 def.garmentColorAreaMask = GarmentColorAreaMask(category, gender, sourceName);
-                // Top.02 only needs its own Spine01 hide removed. Top.07-A needs Spine01
-                // to override other garments, but Hips must stay hidden to avoid pants clipping.
+                // Top.02 only needs its own Spine01 hide removed. Top.07-A must keep the
+                // lower torso visible for both body rigs while Hips stays hidden for pants.
                 if(category==AvatarPartCategory.Top&&def.displayName=="Top.02")def.hiddenBodyParts=def.hiddenBodyParts.Where(x=>x!=1).ToArray();
-                if(category==AvatarPartCategory.Top&&def.displayName=="Top.07-A")def.forcedVisibleBodyParts=new[]{1};
+                if(category==AvatarPartCategory.Top&&def.displayName=="Top.07-A")def.forcedVisibleBodyParts=gender==AvatarGender.Male?new[]{1,2}:new[]{1};
                 if(category==AvatarPartCategory.Hair) def.hairGroup = HairFromName(VisualName(def));
                 if(category==AvatarPartCategory.Hat) { string n=VisualName(def); def.familyId=n.Contains("hat.001")?1001:n.Contains("hat.002")?1002:1003; def.requiredHairGroup=HairFromName(n); }
                 EditorUtility.SetDirty(def); definitions.Add(def);

@@ -303,10 +303,12 @@ namespace Festa.Avatar
             foreach(Transform child in _wardrobeGrid)Destroy(child.gameObject);
             if(_wardrobeItemScroll)_wardrobeItemScroll.GetComponent<ScrollRect>().verticalNormalizedPosition=1f;
             ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
-            foreach(var item in _catalog.GetItems(_wardrobeCategory,_config.gender))
+            var wardrobeItems=_catalog.GetItems(_wardrobeCategory,_config.gender).ToArray();
+            for(int index=0;index<wardrobeItems.Length;index++)
             {
-                var captured=item;
-                ImageButton(_wardrobeGrid,PrettyName(captured.displayName),captured.thumbnail,()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),158,148,IsSelected(_wardrobeCategory,captured));
+                var captured=wardrobeItems[index];
+                var presentation=WardrobePresentation(_wardrobeCategory,captured);
+                ImageButton(_wardrobeGrid,PrettyName(presentation.displayName),presentation.thumbnail,()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),158,148,IsSelected(_wardrobeCategory,captured));
             }
             RefreshWardrobeColors();
         }
@@ -316,7 +318,7 @@ namespace Festa.Avatar
             foreach(Transform child in _wardrobeColorSlots)Destroy(child.gameObject);
             bool hasItem=CurrentItemId(_wardrobeCategory)!=0;
             int areaMask=CurrentGarmentAreaMask(_wardrobeCategory);
-            var selectedItem=CurrentGarmentDefinition(_wardrobeCategory);
+            var selectedItem=WardrobePresentation(_wardrobeCategory,CurrentGarmentDefinition(_wardrobeCategory));
             if(_wardrobeColorTitle)_wardrobeColorTitle.text=hasItem&&selectedItem?PrettyName(selectedItem.displayName)+" 색상":"의상 색상 · 의상을 선택하세요";
             if(!hasItem)return;
             for(int area=0;area<3;area++)
@@ -728,6 +730,17 @@ namespace Festa.Avatar
         AvatarItemDefinition CurrentGarmentDefinition(AvatarPartCategory category)=>category==AvatarPartCategory.Hat
             ?_catalog.ResolveHat(_config.hatId,_catalog.Get(_config.hairId)?.hairGroup??HairGroup.None)
             :_catalog.Get(CurrentItemId(category));
+        AvatarItemDefinition WardrobePresentation(AvatarPartCategory category,AvatarItemDefinition actual)
+        {
+            if(!actual||category==AvatarPartCategory.Shoes)return actual;
+            string styleKey=actual.name.StartsWith("M_")||actual.name.StartsWith("F_")?actual.name.Substring(2):actual.name;
+            var canonical=_catalog.GetItems(category,AvatarGender.Female).FirstOrDefault(item=>
+            {
+                string candidateKey=item.name.StartsWith("M_")||item.name.StartsWith("F_")?item.name.Substring(2):item.name;
+                return candidateKey==styleKey;
+            });
+            return canonical?canonical:actual;
+        }
         int CurrentGarmentAreaMask(AvatarPartCategory category)
         {
             var item=CurrentGarmentDefinition(category);

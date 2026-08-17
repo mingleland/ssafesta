@@ -89,6 +89,7 @@ Content-Type: application/json
 ### 4-1. Unity 화면 책임
 
 - `AvatarConfig`를 기준으로 얼굴·헤어·모자·안경·상의·하의·한벌옷·신발의 썸네일과 선택 상태를 표시한다.
+- 같은 디자인의 여성·남성 상의·하의·한벌옷은 실제 메시와 itemId만 성별별로 유지하고, 한국어 이름과 일러스트 썸네일은 공통 표시 원본을 사용한다.
 - 아이템별로 실제 화면 변화가 확인된 색상 영역만 제공하고, 선택 즉시 중앙 캐릭터와 네트워크 외형에 반영한다.
 - 최초 진입은 저장된 `fa` 외형을 우선 복원하고, 값이 없으면 자연스러운 추천 무작위 외형을 생성한다.
 - 확정 시 `IUserApiClient.UpdateMyAvatarAsync`를 통해 Spring에 저장하며 실패해도 세션 외형은 유지한다.
@@ -122,6 +123,8 @@ unityInstance.SendMessage('AvatarBridge', 'ApplyAppearance', 'fa|g=1|i=...|p=...
 **동기화 방식**: `avatarCode` 문자열만 NetworkVariable로 동기화된다. 신규 모듈 외형은 `fa|g=...|i=...|p=...|q=...|w=...` 형식이며 로비와 월드가 동일한 `AvatarConfig`를 사용한다. 과거 `rt`(Sidekick) 형식은 읽기 호환만 유지하고 신규 생성에는 사용하지 않는다.
 3D 모델·머티리얼은 각 클라이언트가 로컬에서 생성하며 NetworkObject가 아니다
 (Booth Runtime과 동일 원칙 — doc 07 §9).
+
+크롭형 상의처럼 일부 신체를 다시 노출해야 하는 의상은 `forcedVisibleBodyParts`를 사용한다. 이 값은 성별 Body의 파츠 번호가 다를 수 있으므로 여성·남성을 각각 정의하며, 현재 `Top.07-A`는 여성 Spine01과 남성 Spine01/Spine02를 표시해 하의 위 허리가 끊기지 않게 한다.
 
 **검증 완료**: 클라이언트 A가 프리셋/색상을 바꾸면 클라이언트 B 화면에서 즉시 반영됨.
 
