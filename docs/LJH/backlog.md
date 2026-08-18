@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간. `.gitignore:23`로 커밋 제외.
-최종 갱신: 2026-08-18 — 블록 0 종결
+최종 갱신: 2026-08-18 — 블록 1 선행 해소
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -34,18 +34,19 @@
 
 미완: 김가현(AI) 쪽 `openOverlay` 확인 응답 없음. **블록 0 종결 조건은 아님**(FE 단독 확정 사항) — 별도 추적.
 
+추가: Unity 리드가 Issue #1에서 `BOOTH_LAPTOP_INTERACT` 송신부 구현 계획 회신(2026-08-18) — 기존 `window.FestaUnity.onBoothInteract(json)` 콜백 재사용, url 없어도 정상 송신, 커밋 2단위 분리(① canonical 10종 → `e8209bc` 반영 완료 / ② LAPTOP 송신부 → 미반영, `git grep BOOTH_LAPTOP_INTERACT origin/game` 0건). spec 006 문서 "표준 타입 10종 완료" 표기와 실제 코드 불일치도 Unity 리드가 인지·후속 반영 예정이라 코멘트.
+
 메모: 013a 축소로 아바타 오버레이는 빠졌으나 AI 채팅·설문·상담·016 노트북이 남아 여전히 필요.
 
 ---
 
-## 블록 1 — 좌표 왕복 검증 1회 (블록 2 대기 중 병렬)
+## 블록 1 — 좌표 왕복 검증 1회
 
 C-02 규칙은 확정됨 — 미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z.
 spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반드시 틀린다."
 
-- [ ] **선행**: 게임 담당에 Unity canonical 매핑 푸시 요청
-      `origin/game`에 아직 `SURVEY_KIOSK`·`CONSULTATION_DESK` 없음 (구 별칭 `Survey`/`ConsultDesk`만)
-      확인: `git grep -n "SURVEY_KIOSK" origin/game -- '*.cs'` → 0건
+- [x] **선행**: Unity canonical 매핑 — `origin/game e8209bc`(2026-08-18 15:55, 강형순) "부스 표준 타입 10종 지원"으로 해소
+      확인: `git grep -n "SURVEY_KIOSK" origin/game -- '*.cs'` → `BoothObjectType.cs:28` 매핑 존재
 - [ ] 오브젝트 1개짜리 Layout JSON 전송 (편집기 불필요, curl로 충분)
 - [ ] 검증 대상에 `SURVEY_KIOSK`·`CONSULTATION_DESK` 포함 — 좌표만 보면 신규 매핑이 실제로 도는지 확인 안 됨
 - [ ] Unity에서 같은 위치인지 육안 확인
@@ -54,25 +55,18 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 ---
 
-## 블록 2 — 타 파트 결정 (요청은 지금, 회신 대기)
+## 블록 2 — 타 파트 결정 (2026-08-18 5건 일괄 정리)
 
-회의 안건 5건을 한 번에 상정. 개별 확인으로 쪼개면 왕복만 늘어남.
-
-### 계약 동결 전 필수 3건
-
-- [ ] **C-03** 오브젝트 크기 조절 — 기획 + Unity. 허용 시 `scale` 추가 → 3파트 재합의. FE 의견: MVP 제외
-- [ ] **C-05** 동시 편집 — BE + FE. `PUT /layouts/draft`에 충돌 감지 없음. FE 제안: `version` 낙관적 잠금 + 409
-- [ ] **C-06** 템플릿 종수 — 기획. **가장 아픔** — 부스 크기가 정해져야 FR-003 스냅 간격·영역 이탈 검증값이 나옴. 편집기 그리드 코어
-
-### 범위 확정 2건 (docs/26 등록분)
-
-- [ ] **LAPTOP 주소 저장 위치** — `booths`에 URL 컬럼 신규 추가 의견. 016 C-02(여러 개 허용 여부)와 묶어야 함
-- [ ] **Facade 저장 계약** — 조회 API·DB 컬럼 4종은 있고 저장 endpoint만 없음. 신규 FR 제안 상태라 005 범위 포함 여부부터
+- [x] **C-03** 오브젝트 크기 조절 — ✅ **고정 크기 확정.** `scale` 없음, 계약 변경 없음. spec 005·docs/26 반영
+- [ ] **C-05** 동시 편집 — **[Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5)로 상정, 황덕(strdeok) 지정.** `version` 낙관적 잠금 + 409 제안. 기한: BE Draft API 스키마 확정 전. 회신 대기
+- [ ] **C-06** 템플릿 종수 — **보류 판단(지금 결정 불요).** FE는 스냅 간격·부스 크기를 설정값으로 두고 확정 후 주입. docs/26 메모 반영
+- [ ] **LAPTOP 주소 저장 위치** — 문서 추적 결과 방향 일관: docs/02 PROJECT-05(Owner 등록·수정)·spec 016 FR-001("주소 1개")·Key Entity Booth Homepage(부스 단위)·FE 의견(booths 컬럼, 부스당 1개)·Issue #1 Unity 회신(url은 저장 위치 확정 후 포함) 전부 **부스 단위 1개**로 수렴. 형식상 016 C-01·C-02만 open — BE 컬럼 추가 확인만 남음
+- [x] **Facade 저장 계약** — ✅ **spec 005 범위 제외 확정.** FE 외부 설정 화면 착수 전 별도 확정. docs/26 반영
 
 ### 착수 안 막음 (후순위)
 
 - C-04 미연결 공개 — publish validation 동작. 후반 작업
-- C-07 공개 이력 — BE 소관. FE는 `version` 단조 증가만 유지
+- C-07 공개 이력 — BE 소관. FE는 `version` 단조 증가만 유지 (Issue #5에 부가 사항으로 포함됨)
 
 ---
 
@@ -100,13 +94,13 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 ```
 블록 0 (Architecture 문서 4종) ✅ 종결
       │
-      ├─ 블록 1 (왕복 검증)                ← Issue #1 응답 대기 (Unity canonical 매핑)
+      ├─ 블록 1 (왕복 검증)                ← 선행 해소, 착수 가능
       └─ 블록 2 요청 (안건 5건 상정)        ← 미착수, 다음 액션
 
 블록 2 회신 ─→ 블록 3 (spec 확정) ─→ 블록 4 (plan/tasks/implement)
 ```
 
-블록 1·2요청은 동시 출발 가능. 블록 2는 아직 아무 데도 상정 안 함 — 지금 유일하게 손댈 수 있는 다음 액션.
+블록 1·2요청은 동시 출발 가능. 둘 다 지금 손댈 수 있는 다음 액션.
 
 ---
 
