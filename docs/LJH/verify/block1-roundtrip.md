@@ -55,7 +55,8 @@ Unity `BoothObjectDto`는 `id` 필드를 읽는다(`Booth/Layout/BoothLayoutDto.
 
 - **위치·회전·타입 매핑 판정에는 영향 없음** — position/rotationY/type은 정상 파싱됨
 - 오브젝트 이름이 `Booth7_`로 비어 보이거나 라벨에 objectId가 안 뜨면 이 불일치가 원인 — 검증 실패가 아니라 계약 불일치의 실증
-- 이 문제는 Issue에 별도로 `id`→`objectId` 수정 요청으로 전달 (BOOTH_LAPTOP_INTERACT의 objectId도 이 필드에서 읽으므로 실사용에 영향)
+- 실사용 영향: `BOOTH_LAPTOP_INTERACT`도 같은 필드에서 objectId를 읽는다. `dto.id`가 null이면 `BoothInteractBridge.cs:18-26`의 `string.IsNullOrEmpty` 가드에 걸려 **이벤트 자체가 전송되지 않는다** — 빈 값이 담긴 이벤트가 나가는 게 아니라 노트북 클릭이 무반응이 된다. 이번 검증 JSON은 `LAPTOP`을 쓰지 않으므로 여기서는 재현되지 않음
+- Unity 리드가 [Issue #6](https://github.com/kanghyunsoon/ssafesta/issues/6)에서 DTO 정식 필드를 `objectId`로 변경하고 구 `id`는 하위 호환 보정값으로만 지원하기로 회신 — **수정 후 검증하면 좌표와 식별자 경로를 한 번에 확인 가능**
 
 ## 결과 (회신 후 기입)
 

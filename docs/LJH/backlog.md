@@ -50,7 +50,10 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 - [x] 오브젝트 2개짜리 Layout JSON 작성 — BE 스켈레톤뿐이라 curl 대상 없음, 대신 Unity `Tools/mock-api` 정적 파일 경로 사용. 사본: `docs/LJH/verify/block1-roundtrip.md`
 - [x] 검증 대상에 `SURVEY_KIOSK`·`CONSULTATION_DESK` 포함, x/z 양음·rotationY 0 외 2종까지 4개 모호 축 커버
 - [ ] Unity에서 같은 위치인지 육안 확인 — **[Issue #6](https://github.com/kanghyunsoon/ssafesta/issues/6) 상정, 강형순 지정. 회신 대기**
-      부가: 검증 중 발견한 계약 불일치 3건(`id`↔`objectId`, 엔드포인트 단복수, `assetCode` 부재)도 같은 이슈에 포함 — ①번은 `BOOTH_LAPTOP_INTERACT` objectId 공백 버그로 이어질 수 있어 우선 확인 요청
+      부가: 검증 중 발견한 계약 불일치 3건(`id`↔`objectId`, 엔드포인트 단복수, `assetCode` 부재)도 같은 이슈에 포함
+      - **①은 Unity 리드가 수용, DTO 정식 필드를 `objectId`로 변경 + 구 `id`는 하위 호환 보정값으로만 지원하기로 회신.** 실제 증상은 "objectId 공백 전송"이 아니라 `BoothInteractBridge.cs:18-26` 가드에 걸려 **이벤트 자체 무전송**(노트북 클릭 무반응) — 최초 서술 오류를 Codex 검증으로 발견·정정 (T-4)
+      - ②③은 아직 무응답. 좌표 검증 스크린샷도 미회신
+      - **순서 판단**: DTO 수정 후 검증하면 좌표·식별자 경로를 왕복 1회로 함께 확인 가능. 다만 spec 006 T005·T006 대기 비용이 있어 Unity 수정 일정에 따라 결정
 
 완료 시: 리뷰 ④칸 ☑, SC-004 근거 확보, 006 `T005`·`T006` 잠금 해제
 
