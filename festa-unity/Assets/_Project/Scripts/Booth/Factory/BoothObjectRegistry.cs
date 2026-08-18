@@ -17,18 +17,38 @@ namespace Festa.Booth
         public class Entry
         {
             public BoothObjectType type;
+            public string assetCode;
             public GameObject prefab;
         }
 
         [SerializeField] List<Entry> _entries = new();
 
         Dictionary<BoothObjectType, GameObject> _map;
+        Dictionary<string, GameObject> _assetMap;
 
-        public GameObject GetPrefab(BoothObjectType type)
+        public GameObject GetPrefab(BoothObjectType type, string assetCode = null)
         {
+            if (!string.IsNullOrEmpty(assetCode))
+            {
+                _assetMap ??= BuildAssetMap();
+                if (_assetMap.TryGetValue(Key(type, assetCode), out var assetPrefab))
+                    return assetPrefab;
+            }
+
             _map ??= BuildMap();
             return _map.TryGetValue(type, out var prefab) ? prefab : null;
         }
+
+        Dictionary<string, GameObject> BuildAssetMap()
+        {
+            var map = new Dictionary<string, GameObject>(StringComparer.OrdinalIgnoreCase);
+            foreach (var e in _entries)
+                if (e.prefab != null && !string.IsNullOrEmpty(e.assetCode))
+                    map[Key(e.type, e.assetCode)] = e.prefab;
+            return map;
+        }
+
+        static string Key(BoothObjectType type, string assetCode) => $"{type}:{assetCode}";
 
         Dictionary<BoothObjectType, GameObject> BuildMap()
         {

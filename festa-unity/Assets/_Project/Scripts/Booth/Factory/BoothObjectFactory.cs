@@ -18,20 +18,21 @@ namespace Festa.Booth
         public GameObject Create(int boothId, BoothObjectDto dto, Transform anchor)
         {
             var type = BoothObjectTypes.Parse(dto.type);
+            var objectId = dto.ResolvedObjectId;
             if (type == BoothObjectType.Unknown)
             {
                 // 알 수 없는 타입은 클라이언트를 깨뜨리지 않고 스킵한다 (forward compat).
-                Debug.LogWarning($"[BoothObjectFactory] Unknown type '{dto.type}' (id={dto.id}) — skipped");
+                Debug.LogWarning($"[BoothObjectFactory] Unknown type '{dto.type}' (objectId={objectId}) — skipped");
                 return null;
             }
 
-            var prefab = _registry != null ? _registry.GetPrefab(type) : null;
+            var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
             float groundLift = 0f; // 프리팹은 피벗을 바닥 기준으로 제작한다고 가정
             var go = prefab != null
                 ? Object.Instantiate(prefab, anchor)
                 : CreatePlaceholder(type, anchor, out groundLift);
 
-            go.name = $"Booth{boothId}_{dto.id}";
+            go.name = $"Booth{boothId}_{objectId}";
             go.transform.localPosition =
                 (dto.position?.ToVector3() ?? Vector3.zero) + Vector3.up * groundLift;
             go.transform.localRotation = Quaternion.Euler(0f, dto.rotationY, 0f);

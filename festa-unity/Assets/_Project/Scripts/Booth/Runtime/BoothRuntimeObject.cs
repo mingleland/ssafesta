@@ -10,13 +10,15 @@ namespace Festa.Booth
     {
         public int BoothId { get; private set; }
         public string ObjectId { get; private set; }
+        public string AssetCode { get; private set; }
         public BoothObjectType Type { get; private set; }
         public int ConfigId { get; private set; }
 
         public void Init(int boothId, BoothObjectDto dto, BoothObjectType type)
         {
             BoothId = boothId;
-            ObjectId = dto.id;
+            ObjectId = dto.ResolvedObjectId;
+            AssetCode = dto.assetCode;
             Type = type;
             ConfigId = dto.configId;
         }

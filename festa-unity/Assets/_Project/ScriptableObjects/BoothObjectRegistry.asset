@@ -30,6 +30,8 @@ MonoBehaviour:
   - type: 8
     prefab: {fileID: 5162731688218373322, guid: 96b76174a6bb2024b8b43db70f407ffe, type: 3}
   - type: 9
+    assetCode: FURNITURE_DEFAULT
     prefab: {fileID: 2297048041205122791, guid: 2b43cc1ee42d36b4fae7ae3348a46d0f, type: 3}
   - type: 10
+    assetCode: DECORATION_DEFAULT
     prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}

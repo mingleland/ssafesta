@@ -25,8 +25,7 @@ namespace Festa.Integration
 
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
-            // Draft endpoint — doc 08 확정 시 조정
-            var url = $"{_baseUrl}/api/v1/booths/{boothId}/layout/published";
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";
 
             using var request = UnityWebRequest.Get(url);
             request.timeout = TimeoutSeconds;

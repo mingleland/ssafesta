@@ -45,6 +45,7 @@ namespace Festa.Editor.Booth
             {
                 var entry = list.GetArrayElementAtIndex(i);
                 entry.FindPropertyRelative("type").enumValueIndex = (int)entries[i].type;
+                entry.FindPropertyRelative("assetCode").stringValue = DefaultAssetCode(entries[i].type);
                 entry.FindPropertyRelative("prefab").objectReferenceValue = entries[i].prefab;
             }
             serialized.ApplyModifiedPropertiesWithoutUndo();
@@ -60,6 +61,13 @@ namespace Festa.Editor.Booth
             BoothObjectType.SurveyKiosk, BoothObjectType.RecruitmentBoard,
             BoothObjectType.ConsultationDesk, BoothObjectType.Laptop, BoothObjectType.LikeVote,
             BoothObjectType.Furniture, BoothObjectType.Decoration,
+        };
+
+        static string DefaultAssetCode(BoothObjectType type) => type switch
+        {
+            BoothObjectType.Furniture => "FURNITURE_DEFAULT",
+            BoothObjectType.Decoration => "DECORATION_DEFAULT",
+            _ => string.Empty,
         };
 
         static void BuildWhenRegistryIsEmpty()

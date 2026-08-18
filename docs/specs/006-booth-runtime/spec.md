@@ -105,6 +105,10 @@ window.FestaUnity.onBoothInteract(json)
 - `url`: LAPTOP 전용 선택 `string`. 주소가 없어도 이벤트는 발생하며 FE는 오류 대신 안내를 표시한다.
 - FE는 JSON 파싱 실패를 해당 이벤트 하나로 격리하고 다른 부스 기능을 계속 처리한다.
 
+Layout의 정식 식별자 필드도 `objectId`다. Unity DTO는 `objectId`를 우선 읽고 기존 Mock·구 저장 데이터의 `id`는 하위 호환 fallback으로만 읽는다. 이 보정이 없으면 `dto.id == null`이 `BoothRuntimeObject.ObjectId`까지 전달되고, `BoothInteractBridge`의 빈 식별자 검사에서 조기 반환되어 **빈 값 이벤트가 전송되는 것이 아니라 클릭 이벤트 자체가 React로 전송되지 않는다.**
+
+`FURNITURE`와 `DECORATION`은 `assetCode`로 구체 Prefab을 선택한다. Registry는 `type + assetCode` 정확 일치를 우선하고, 아직 개별 카탈로그가 없는 코드는 타입 기본 Prefab으로 폴백한다.
+
 > **구현 상태**: Unity의 `LAPTOP` 클릭 컴포넌트와 WebGL `.jslib` 송신부가 구현되었다. 프리팹의 Collider가 자식에 있는 경우에도 클릭 릴레이를 통해 루트의 `BoothRuntimeObject` 식별자를 송신하며, C#/JavaScript 양쪽의 콜백 예외는 해당 이벤트 하나로 격리한다. URL 저장 위치는 아직 미확정이므로 현재 이벤트는 `boothId + objectId`를 필수로 송신하고, URL 값이 생긴 경우에만 선택 필드를 포함한다.
 
 ### Key Entities
@@ -141,13 +145,13 @@ window.FestaUnity.onBoothInteract(json)
 
 | 항목 | 상태 |
 |---|---|
-| Layout JSON 파싱 | 완료 (`BoothLayoutDto`, 실패 시 null 반환·예외 미전파) |
+| Layout JSON 파싱 | 완료 (`objectId` 정식, 구 `id` fallback, `assetCode` 포함; 실패 시 null 반환·예외 미전파) |
 | 오브젝트 타입 매핑 | 완료 10종 (`BoothObjectTypes`) — Backend 표준 타입 10종, 구 POC 별칭 읽기 호환 |
 | 생성 팩토리 | 완료 (`BoothObjectFactory`) — canonical 10종 정식 POC Prefab 카탈로그 연결 |
 | 공통 상호작용 기반 | 완료 (`BoothInteractionTarget`) — Collider, 거리 제한, Hover Highlight 공통화 |
 | Mock 배치 검증 | 완료 — canonical 10종을 격자 배치하고 위치·Y 회전·Unknown 격리를 함께 확인 |
 | 미지원 타입 격리 | 완료·검증 (`HOLOGRAM` 테스트 케이스로 확인) |
-| HTTP 조회 | 완료 (`HttpBoothApiClient`, timeout 10s, 404/5xx 분기, 실패 시 null) |
+| HTTP 조회 | 완료 (`/api/v1/booths/{boothId}/layouts/published`, timeout 10s, 404/5xx 분기, 실패 시 null) |
 | Mock/실서버 전환 | 완료 (`ApiConfig`의 useMock 플래그) |
 | 상호작용 | LAPTOP 완료 — `window.FestaUnity.onBoothInteract(json)` 송신, Editor/Server 호출 분리 |
 
