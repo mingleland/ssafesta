@@ -18,3 +18,6 @@ Thumbs.db
 
 # 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
 _to_delete/
+
+# 개인 분석·메모 공간 — 커밋하지 않는다 (local/README.md 참조)
+local/
