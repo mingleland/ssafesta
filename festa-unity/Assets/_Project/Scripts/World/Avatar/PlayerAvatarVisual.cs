@@ -18,6 +18,7 @@ namespace Festa.World
     {
         static readonly int SpeedHash = Animator.StringToHash("Speed");
         static readonly int IsWalkingHash = Animator.StringToHash("IsWalking");
+        const float RunPlaybackSpeed = 1.45f;
 
         [SerializeField] AvatarCatalog _catalog;
         [SerializeField] Festa.Avatar.AvatarCatalog _modularCatalog;
@@ -136,13 +137,15 @@ namespace Festa.World
         {
             if (_animator == null || _animator.runtimeAnimatorController == null) return;
 
-            bool walking = state == PlayerAnimState.Walk;
+            bool moving = state != PlayerAnimState.Idle;
+            bool running = state == PlayerAnimState.Run;
+            _animator.speed = running ? RunPlaybackSpeed : 1f;
             foreach (var p in _animator.parameters)
             {
                 if (p.nameHash == IsWalkingHash && p.type == AnimatorControllerParameterType.Bool)
-                    _animator.SetBool(IsWalkingHash, walking);
+                    _animator.SetBool(IsWalkingHash, moving);
                 else if (p.nameHash == SpeedHash && p.type == AnimatorControllerParameterType.Float)
-                    _animator.SetFloat(SpeedHash, walking ? 1f : 0f);
+                    _animator.SetFloat(SpeedHash, running ? 2f : moving ? 1f : 0f);
             }
         }
     }

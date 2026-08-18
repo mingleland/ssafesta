@@ -12,6 +12,7 @@ namespace Festa.Network
     public class PlayerMovement : NetworkBehaviour
     {
         [SerializeField] float _moveSpeed = 4f;
+        [SerializeField] float _runSpeed = 6.5f;
         [SerializeField] float _rotateSpeedDeg = 720f;
 
         NetworkPlayer _player;
@@ -28,17 +29,21 @@ namespace Festa.Network
 
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
+            bool running = moving && IsRunPressed();
 
             if (moving)
             {
-                var dir = new Vector3(input.x, 0f, input.y).normalized;
-                transform.position += dir * (_moveSpeed * Time.deltaTime);
+                var dir = CameraRelativeDirection(input);
+                var speed = running ? _runSpeed : _moveSpeed;
+                transform.position += dir * (speed * Time.deltaTime);
                 var target = Quaternion.LookRotation(dir, Vector3.up);
                 transform.rotation = Quaternion.RotateTowards(
                     transform.rotation, target, _rotateSpeedDeg * Time.deltaTime);
             }
 
-            var next = moving ? PlayerAnimState.Walk : PlayerAnimState.Idle;
+            var next = !moving
+                ? PlayerAnimState.Idle
+                : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
             if (_player.AnimState.Value != next)
                 _player.AnimState.Value = next;
         }
@@ -54,6 +59,28 @@ namespace Festa.Network
             if (kb.dKey.isPressed || kb.rightArrowKey.isPressed) v.x += 1f;
             if (kb.aKey.isPressed || kb.leftArrowKey.isPressed) v.x -= 1f;
             return v;
+        }
+
+        static bool IsRunPressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
+        }
+
+        static Vector3 CameraRelativeDirection(Vector2 input)
+        {
+            var camera = Camera.main;
+            if (camera == null) return new Vector3(input.x, 0f, input.y).normalized;
+
+            var forward = camera.transform.forward;
+            var right = camera.transform.right;
+            forward.y = 0f;
+            right.y = 0f;
+
+            if (forward.sqrMagnitude < 0.0001f || right.sqrMagnitude < 0.0001f)
+                return new Vector3(input.x, 0f, input.y).normalized;
+
+            return (forward.normalized * input.y + right.normalized * input.x).normalized;
         }
     }
 }

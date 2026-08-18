@@ -169,6 +169,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   _moveSpeed: 4
+  _runSpeed: 6.5
   _rotateSpeedDeg: 720
 --- !u!114 &8836840528167371394
 MonoBehaviour:
@@ -231,6 +232,14 @@ MonoBehaviour:
   ShowTopMostFoldoutHeaderGroup: 1
   _offset: {x: 0, y: 4, z: -6}
   _followLerp: 8
+  _collisionRadius: 0.25
+  _collisionPadding: 0.15
+  _collisionMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  _minDistance: 3
+  _maxDistance: 8
+  _zoomStep: 0.35
 --- !u!114 &4543201849085386913
 MonoBehaviour:
   m_ObjectHideFlags: 0
