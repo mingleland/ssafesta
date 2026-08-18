@@ -119,6 +119,10 @@ namespace Festa.Booth
                     if (go.GetComponent<VideoScreenPlaceholder>() == null)
                         go.AddComponent<VideoScreenPlaceholder>();
                     break;
+                case BoothObjectType.Laptop:
+                    if (go.GetComponent<LaptopInteractable>() == null)
+                        go.AddComponent<LaptopInteractable>();
+                    break;
                 // 이후 타입별 컴포넌트는 해당 기능 spec 작성 후 추가한다.
             }
         }

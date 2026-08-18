@@ -80,6 +80,33 @@
 - **FR-010** [신규]: 상호작용 이벤트에는 어떤 부스의 어떤 오브젝트인지 식별 정보가 포함되어야 한다.
 - **FR-011** [신규]: 배치가 변경되어 재조회가 필요할 때 기존 오브젝트를 정리하고 다시 생성해야 한다. [NEEDS CLARIFICATION: 갱신 시점 — 진입 시 / 주기적 / 이벤트 수신 시]
 
+### Unity → React 상호작용 이벤트 계약 (2026-08-18 확정)
+
+Unity WebGL은 기존 합의 네임스페이스인 `window.FestaUnity`를 사용하며, 부스 상호작용 이벤트를 JSON 문자열로 전달한다.
+
+```text
+window.FestaUnity.onBoothInteract(json)
+```
+
+노트북 상호작용의 최초 확정 이벤트는 다음과 같다.
+
+```json
+{
+  "type": "BOOTH_LAPTOP_INTERACT",
+  "boothId": 7,
+  "objectId": "laptop-1",
+  "url": "https://example.com"
+}
+```
+
+- `type`: `BOOTH_LAPTOP_INTERACT` 고정. 이후 기능 오브젝트는 같은 이벤트 union에 추가한다.
+- `boothId`: 필수 `number`. 상호작용이 발생한 부스 식별자다.
+- `objectId`: 필수 `string`. Layout과 Runtime Object가 공유하는 오브젝트 식별자다.
+- `url`: LAPTOP 전용 선택 `string`. 주소가 없어도 이벤트는 발생하며 FE는 오류 대신 안내를 표시한다.
+- FE는 JSON 파싱 실패를 해당 이벤트 하나로 격리하고 다른 부스 기능을 계속 처리한다.
+
+> **구현 상태**: Unity의 `LAPTOP` 클릭 컴포넌트와 WebGL `.jslib` 송신부가 구현되었다. URL 저장 위치는 아직 미확정이므로 현재 이벤트는 `boothId + objectId`를 필수로 송신하고, URL 값이 생긴 경우에만 선택 필드를 포함한다.
+
 ### Key Entities
 
 - **Booth Runtime Instance**: 월드에 생성된 부스 하나. 부스 식별자, 적용된 배치 버전, 생성된 오브젝트 목록
@@ -102,7 +129,7 @@
 | # | 질문 | 담당 | 메모 |
 |---|---|---|---|
 | C-01 | 배치 변경을 언제 반영하는가? (진입 시 / 주기 조회 / 서버 알림) | Unity + BE | 임대 만료 반영과도 연결 (004 D03) |
-| C-02 | 상호작용 이벤트의 payload 형식은? | **Unity + FE 합동** | `AI_AGENT_INTERACT { boothId, objectId, configId }` 형태 초안 |
+| C-02 | 상호작용 이벤트의 payload 형식은? | **Unity + FE 합동** | ✅ 2026-08-18 확정 — `window.FestaUnity.onBoothInteract(json)`, `BOOTH_LAPTOP_INTERACT { boothId, objectId, url? }` |
 | C-03 | 겹침·영역 이탈 보정 책임은 편집기인가 런타임인가? | FE + Unity | |
 | C-04 | 목표 프레임과 오브젝트 수 상한은? | Unity | 005 C-01과 함께 결정 |
 | C-05 | 장식 오브젝트의 3D 자산은 누가 언제 준비하는가? | Unity + 기획 | 현재는 임시 도형(placeholder) |
@@ -120,7 +147,7 @@
 | 미지원 타입 격리 | 완료·검증 (`HOLOGRAM` 테스트 케이스로 확인) |
 | HTTP 조회 | 완료 (`HttpBoothApiClient`, timeout 10s, 404/5xx 분기, 실패 시 null) |
 | Mock/실서버 전환 | 완료 (`ApiConfig`의 useMock 플래그) |
-| 상호작용 | **미구현** — 이번 spec의 주 증분 |
+| 상호작용 | LAPTOP 완료 — `window.FestaUnity.onBoothInteract(json)` 송신, Editor/Server 호출 분리 |
 
 ---
 
@@ -130,6 +157,6 @@
 |---|---|---|
 | ① Clarification 답변 (C-01~C-06) | C-06 확정, 나머지 후속 합의 | ◐ |
 | ② 005 계약 확정 후 계약 필드 정합성 재확인 | | ☐ |
-| ③ C-02 상호작용 payload를 FE와 합의 | FE ____ / Unity ____ | ☐ |
+| ③ C-02 상호작용 payload를 FE와 합의 | FE 확인 / Unity 확인 (`kanghyunsoon`, 2026-08-18) | ✅ |
 
 검토자: __________ / 검토일: __________
