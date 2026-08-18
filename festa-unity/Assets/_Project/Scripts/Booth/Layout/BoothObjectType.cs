@@ -8,9 +8,10 @@ namespace Festa.Booth
         AiAgent,
         VideoScreen,
         ProjectPanel,
-        Survey,
+        SurveyKiosk,
         RecruitmentBoard,
-        ConsultDesk,
+        ConsultationDesk,
+        Laptop,
         LikeVote,
         Furniture,
         Decoration,
@@ -18,18 +19,21 @@ namespace Festa.Booth
 
     public static class BoothObjectTypes
     {
-        // JSON 계약의 type 문자열 ↔ enum 매핑 (Draft — 계약 확정 시 함께 확정)
+        // JSON 계약의 canonical type 10종과 이전 POC 문자열의 읽기 호환 매핑.
         static readonly Dictionary<string, BoothObjectType> s_FromString = new()
         {
             { "AI_AGENT", BoothObjectType.AiAgent },
             { "VIDEO_SCREEN", BoothObjectType.VideoScreen },
             { "PROJECT_PANEL", BoothObjectType.ProjectPanel },
-            { "SURVEY", BoothObjectType.Survey },
+            { "SURVEY_KIOSK", BoothObjectType.SurveyKiosk },
             { "RECRUITMENT_BOARD", BoothObjectType.RecruitmentBoard },
-            { "CONSULT_DESK", BoothObjectType.ConsultDesk },
+            { "CONSULTATION_DESK", BoothObjectType.ConsultationDesk },
+            { "LAPTOP", BoothObjectType.Laptop },
             { "LIKE_VOTE", BoothObjectType.LikeVote },
             { "FURNITURE", BoothObjectType.Furniture },
             { "DECORATION", BoothObjectType.Decoration },
+            { "SURVEY", BoothObjectType.SurveyKiosk },
+            { "CONSULT_DESK", BoothObjectType.ConsultationDesk },
         };
 
         public static BoothObjectType Parse(string raw) =>

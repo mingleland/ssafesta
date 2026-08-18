@@ -53,9 +53,10 @@ namespace Festa.Booth
                 BoothObjectType.AiAgent => (PrimitiveType.Capsule, new Color(0.4f, 0.7f, 1f), new Vector3(0.6f, 1f, 0.6f)),
                 BoothObjectType.VideoScreen => (PrimitiveType.Cube, Color.black, new Vector3(2.4f, 1.4f, 0.1f)),
                 BoothObjectType.ProjectPanel => (PrimitiveType.Cube, new Color(0.9f, 0.9f, 0.8f), new Vector3(1.2f, 1.6f, 0.08f)),
-                BoothObjectType.Survey => (PrimitiveType.Cube, new Color(0.5f, 1f, 0.6f), new Vector3(0.5f, 1.2f, 0.5f)),
+                BoothObjectType.SurveyKiosk => (PrimitiveType.Cube, new Color(0.5f, 1f, 0.6f), new Vector3(0.5f, 1.2f, 0.5f)),
                 BoothObjectType.RecruitmentBoard => (PrimitiveType.Cube, new Color(1f, 0.8f, 0.4f), new Vector3(1.4f, 1.8f, 0.08f)),
-                BoothObjectType.ConsultDesk => (PrimitiveType.Cube, new Color(0.6f, 0.4f, 0.2f), new Vector3(1.6f, 0.8f, 0.8f)),
+                BoothObjectType.ConsultationDesk => (PrimitiveType.Cube, new Color(0.6f, 0.4f, 0.2f), new Vector3(1.6f, 0.8f, 0.8f)),
+                BoothObjectType.Laptop => (PrimitiveType.Cube, new Color(0.15f, 0.2f, 0.3f), new Vector3(0.7f, 0.08f, 0.5f)),
                 BoothObjectType.LikeVote => (PrimitiveType.Sphere, new Color(1f, 0.4f, 0.5f), Vector3.one * 0.5f),
                 _ => (PrimitiveType.Cube, Color.gray, Vector3.one * 0.8f),
             };
