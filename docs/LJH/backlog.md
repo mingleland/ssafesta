@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간. `.gitignore:23`로 커밋 제외.
-최종 갱신: 2026-08-18 — 블록 1 선행 해소
+최종 갱신: 2026-08-18 — LAPTOP 송신부 구현 완료, front→origin 푸시
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -30,11 +30,11 @@
 검증:
 - `npm run build` 오류 0건, 브라우저 콘솔로 3파일 동작 확인
 - Codex 독립 검증(gpt-5.6-sol) — BLOCKER 1(`url` 선택 필드 지적)은 `spec 016` FR-009 근거로 반박·기각, MINOR 2건(미사용 `getOverlay` 제거, 일지 과장 표현 수정) 반영
-- **[Issue #2](https://github.com/kanghyunsoon/ssafesta/issues/2)에서 강형순(Unity 리드)이 `events.ts` 계약 확인** — "url은 선택값으로 두는 것이 맞다"고 독립 확인, Codex 반박 판단과 일치. 단 Unity 측 `BOOTH_LAPTOP_INTERACT` 송신부는 아직 미구현(Unity 후속 과제, FE 소관 아님)
+- **[Issue #2](https://github.com/kanghyunsoon/ssafesta/issues/2)에서 강형순(Unity 리드)이 `events.ts` 계약 확인** — "url은 선택값으로 두는 것이 맞다"고 독립 확인, Codex 반박 판단과 일치. Unity 측 `BOOTH_LAPTOP_INTERACT` 송신부는 이후 `origin/game 2ec6a9d`로 구현 완료(아래)
 
 미완: 김가현(AI) 쪽 `openOverlay` 확인 응답 없음. **블록 0 종결 조건은 아님**(FE 단독 확정 사항) — 별도 추적.
 
-추가: Unity 리드가 Issue #1에서 `BOOTH_LAPTOP_INTERACT` 송신부 구현 계획 회신(2026-08-18) — 기존 `window.FestaUnity.onBoothInteract(json)` 콜백 재사용, url 없어도 정상 송신, 커밋 2단위 분리(① canonical 10종 → `e8209bc` 반영 완료 / ② LAPTOP 송신부 → 미반영, `git grep BOOTH_LAPTOP_INTERACT origin/game` 0건). spec 006 문서 "표준 타입 10종 완료" 표기와 실제 코드 불일치도 Unity 리드가 인지·후속 반영 예정이라 코멘트.
+추가: Unity 리드가 Issue #1에서 `BOOTH_LAPTOP_INTERACT` 송신부 구현 계획 회신(2026-08-18) — 기존 `window.FestaUnity.onBoothInteract(json)` 콜백 재사용, url 없어도 정상 송신, 커밋 2단위 분리 예고. **양쪽 다 반영 완료**: ① canonical 10종 → `e8209bc` / ② LAPTOP 송신부 → `origin/game 2ec6a9d`(16:04, "노트북 상호작용 웹 브리지 연결") — `BoothInteractBridge.cs:45`에서 계약대로 JSON 조립 확인(`git grep BOOTH_LAPTOP_INTERACT origin/game`). 후속 `756e3b1`(자식 콜라이더 클릭 전달) 별도. spec 006 문서 "표준 타입 10종 완료" 불일치는 Unity 리드가 인지·후속 반영 예정.
 
 메모: 013a 축소로 아바타 오버레이는 빠졌으나 AI 채팅·설문·상담·016 노트북이 남아 여전히 필요.
 
@@ -92,15 +92,15 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 ## 순서
 
 ```
-블록 0 (Architecture 문서 4종) ✅ 종결
+블록 0 (Architecture 문서 4종 + LAPTOP 송신부) ✅ 종결
       │
-      ├─ 블록 1 (왕복 검증)                ← 선행 해소, 착수 가능
-      └─ 블록 2 요청 (안건 5건 상정)        ← 미착수, 다음 액션
+      ├─ 블록 1 (왕복 검증)                ← 선행 해소, 미착수, 다음 액션
+      └─ 블록 2 (5건 중 4건 처리, C-05만 잔여) ← Issue #5 회신 대기
 
 블록 2 회신 ─→ 블록 3 (spec 확정) ─→ 블록 4 (plan/tasks/implement)
 ```
 
-블록 1·2요청은 동시 출발 가능. 둘 다 지금 손댈 수 있는 다음 액션.
+블록 1이 지금 유일하게 손댈 수 있는 실행 항목. 블록 2는 회신 대기.
 
 ---
 
