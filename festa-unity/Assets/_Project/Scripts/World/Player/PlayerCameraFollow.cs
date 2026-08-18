@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Festa.Network;
 
 namespace Festa.World
 {
@@ -20,9 +21,17 @@ namespace Festa.World
         [SerializeField] float _minDistance = 3f;
         [SerializeField] float _maxDistance = 8f;
         [SerializeField] float _zoomStep = 0.35f;
+        [SerializeField] float _orbitSensitivity = 0.12f;
+        [SerializeField] float _minPitch = -20f;
+        [SerializeField] float _maxPitch = 65f;
+        [SerializeField] float _collisionReturnLerp = 5f;
 
         Camera _cam;
         float _distance;
+        float _yaw;
+        float _pitch = 27f;
+        float _resolvedDistance;
+        readonly RaycastHit[] _collisionHits = new RaycastHit[64];
 
         public override void OnNetworkSpawn()
         {
@@ -31,6 +40,8 @@ namespace Festa.World
 
             _cam = Camera.main;
             _distance = Mathf.Clamp(Mathf.Abs(_offset.z), _minDistance, _maxDistance);
+            _resolvedDistance = _distance;
+            _yaw = transform.eulerAngles.y;
         }
 
         void LateUpdate()
@@ -42,43 +53,42 @@ namespace Festa.World
             }
 
             UpdateDistance();
+            UpdateOrbit();
 
             var lookTarget = transform.position + Vector3.up * 1f;
-            var localOffset = _offset;
-            localOffset.z = -_distance;
-            // 캐릭터가 이동 방향으로 회전해도 카메라 기준축은 흔들리지 않게
-            // 월드 오프셋을 유지한다. 그렇지 않으면 A/D를 누르는 동안
-            // 카메라까지 계속 회전해 이동 경로가 원을 그리게 된다.
-            var desiredPos = transform.position + localOffset;
-            var castDirection = desiredPos - lookTarget;
-            var targetPos = desiredPos;
+            var orbitRotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            var orbitDirection = orbitRotation * Vector3.back;
+            var desiredDistance = _distance;
 
-            if (castDirection.sqrMagnitude > 0.0001f)
+            var hitCount = Physics.SphereCastNonAlloc(
+                lookTarget,
+                _collisionRadius,
+                orbitDirection,
+                _collisionHits,
+                desiredDistance,
+                _collisionMask,
+                QueryTriggerInteraction.Ignore);
+
+            for (var i = 0; i < hitCount; i++)
             {
-                var hits = Physics.SphereCastAll(
-                    lookTarget,
-                    _collisionRadius,
-                    castDirection.normalized,
-                    castDirection.magnitude,
-                    _collisionMask,
-                    QueryTriggerInteraction.Ignore);
-
-                var nearestDistance = castDirection.magnitude;
-                foreach (var hit in hits)
-                {
-                    if (hit.collider.transform.IsChildOf(transform)) continue;
-                    if (hit.distance < nearestDistance) nearestDistance = hit.distance;
-                }
-
-                if (nearestDistance < castDirection.magnitude)
-                {
-                    targetPos = lookTarget + castDirection.normalized *
-                        Mathf.Max(0f, nearestDistance - _collisionPadding);
-                }
+                var hit = _collisionHits[i];
+                if (IsPlayerCollider(hit.collider)) continue;
+                desiredDistance = Mathf.Min(
+                    desiredDistance,
+                    Mathf.Max(_collisionRadius, hit.distance - _collisionPadding));
             }
 
-            _cam.transform.position = Vector3.Lerp(
-                _cam.transform.position, targetPos, _followLerp * Time.deltaTime);
+            // 벽에 닿을 때는 즉시 당겨 관통을 막고, 벽에서 벗어날 때만
+            // 부드럽게 원래 거리로 돌아가 근접 건축물 사이의 떨림을 줄인다.
+            _resolvedDistance = desiredDistance < _resolvedDistance
+                ? desiredDistance
+                : Mathf.Lerp(_resolvedDistance, desiredDistance, _collisionReturnLerp * Time.deltaTime);
+
+            var targetPos = lookTarget + orbitDirection * _resolvedDistance;
+            var obstructed = desiredDistance < _distance - 0.001f;
+            _cam.transform.position = obstructed
+                ? targetPos
+                : Vector3.Lerp(_cam.transform.position, targetPos, _followLerp * Time.deltaTime);
             _cam.transform.LookAt(lookTarget);
         }
 
@@ -94,6 +104,29 @@ namespace Festa.World
                 _distance - Mathf.Sign(scroll) * _zoomStep,
                 _minDistance,
                 _maxDistance);
+        }
+
+        void UpdateOrbit()
+        {
+            var mouse = Mouse.current;
+            if (mouse == null || !mouse.rightButton.isPressed) return;
+
+            var delta = mouse.delta.ReadValue();
+            _yaw += delta.x * _orbitSensitivity;
+            _pitch = Mathf.Clamp(
+                _pitch - delta.y * _orbitSensitivity,
+                _minPitch,
+                _maxPitch);
+        }
+
+        bool IsPlayerCollider(Collider collider)
+        {
+            if (collider == null) return false;
+            if (collider.transform.IsChildOf(transform)) return true;
+
+            // 접속 인원이 늘어나도 다른 플레이어의 CapsuleCollider 때문에
+            // 카메라가 앞으로 튀지 않도록 모든 NetworkPlayer를 제외한다.
+            return collider.GetComponentInParent<NetworkPlayer>() != null;
         }
     }
 }

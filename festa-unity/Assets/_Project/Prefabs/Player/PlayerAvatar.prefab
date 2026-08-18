@@ -240,6 +240,10 @@ MonoBehaviour:
   _minDistance: 3
   _maxDistance: 8
   _zoomStep: 0.35
+  _orbitSensitivity: 0.12
+  _minPitch: -20
+  _maxPitch: 65
+  _collisionReturnLerp: 5
 --- !u!114 &4543201849085386913
 MonoBehaviour:
   m_ObjectHideFlags: 0
