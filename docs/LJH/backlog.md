@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
-개인 작업 공간. `.gitignore:23`로 커밋 제외.
-최종 갱신: 2026-08-18 — LAPTOP 송신부 구현 완료, front→origin 푸시
+개인 작업 공간(`docs/LJH/`). 2026-08-18부터 git 추적 대상 — `local/` gitignore 시절의 "커밋 제외"는 더 이상 유효하지 않다.
+최종 갱신: 2026-08-18 — Issue #6 증상 정정, 계약 불일치 3건 회신 대기
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -11,8 +11,9 @@
 
 - spec 005: `spec.md`만 존재. `plan.md`·`tasks.md` 없음
 - spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`이 "⛔ 005 Layout 계약 확정 대기"로 차단 중
-- 리뷰 4칸: ①②③ 작성 완료(2026-08-14), ④ 왕복 검증 미수행, BE 검토칸 공란
+- 리뷰 4칸: ①②③ 작성 완료(2026-08-14), ④ 왕복 검증 미수행(키트 준비 완료, Issue #6 회신 대기), BE 검토칸 공란
 - 013a: Unity 소유로 축소 확정 — FE는 WebGL 호스트·Access Token 전달만
+- Clarification: C-03 확정(고정 크기), C-05 Issue #5 대기, C-06 보류, C-04·C-07 후순위
 
 ---
 
