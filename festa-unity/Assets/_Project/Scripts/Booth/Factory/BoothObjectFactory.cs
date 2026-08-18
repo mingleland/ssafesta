@@ -40,6 +40,7 @@ namespace Festa.Booth
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
             runtimeObject.Init(boothId, dto, type);
 
+            AttachCommonInteraction(go, type);
             AttachContentBehaviour(go, type);
             return go;
         }
@@ -106,6 +107,14 @@ namespace Festa.Booth
         }
 
         // ---------- Content Behaviour 연결 ----------
+
+        static void AttachCommonInteraction(GameObject go, BoothObjectType type)
+        {
+            bool interactive = type is not BoothObjectType.Furniture and not BoothObjectType.Decoration;
+            var target = go.GetComponent<BoothInteractionTarget>();
+            if (target == null) target = go.AddComponent<BoothInteractionTarget>();
+            target.Configure(interactive ? 3f : 2.2f, interactive);
+        }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)
         {

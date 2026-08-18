@@ -143,7 +143,9 @@ window.FestaUnity.onBoothInteract(json)
 |---|---|
 | Layout JSON 파싱 | 완료 (`BoothLayoutDto`, 실패 시 null 반환·예외 미전파) |
 | 오브젝트 타입 매핑 | 완료 10종 (`BoothObjectTypes`) — Backend 표준 타입 10종, 구 POC 별칭 읽기 호환 |
-| 생성 팩토리 | 완료 (`BoothObjectFactory`) — 현재는 임시 도형 + 라벨 |
+| 생성 팩토리 | 완료 (`BoothObjectFactory`) — canonical 10종 정식 POC Prefab 카탈로그 연결 |
+| 공통 상호작용 기반 | 완료 (`BoothInteractionTarget`) — Collider, 거리 제한, Hover Highlight 공통화 |
+| Mock 배치 검증 | 완료 — canonical 10종을 격자 배치하고 위치·Y 회전·Unknown 격리를 함께 확인 |
 | 미지원 타입 격리 | 완료·검증 (`HOLOGRAM` 테스트 케이스로 확인) |
 | HTTP 조회 | 완료 (`HttpBoothApiClient`, timeout 10s, 404/5xx 분기, 실패 시 null) |
 | Mock/실서버 전환 | 완료 (`ApiConfig`의 useMock 플래그) |

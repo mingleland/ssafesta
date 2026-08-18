@@ -75,13 +75,15 @@ URL이나 긴 콘텐츠 원문을 Layout에 직접 넣지 않고 `configId`로 �
 
 이 구조는 서버·Scene 수를 폭증시키지 않으면서 부스 내부를 분리해 보여 준다.
 
-현재 Unity 독립 월드 뼈대는 `WorldSceneLayout`이 담당한다. `main` Scene 진입 시 11층 공용 바닥, 외벽, 이동 통로, 조명, 외부 부스 8슬롯을 로컬 정적 오브젝트로 구성한다. 내부 슬롯은 월드에서 보이지 않는 먼 좌표에 8개를 미리 두고, 각 슬롯에 다음 기준점을 둔다.
+현재 Unity 독립 월드 뼈대는 `WorldSceneLayout`이 담당한다. `main` Scene 진입 시 기존 Plane 대신 `Models/11th-0818`을 공용 건축물로 생성하고, Renderer Bounds를 기준으로 양쪽 끝에 통로와 대형 부스 섹션을 자동 배치한다. 모델 크기나 원점이 달라져도 통로가 건물의 서쪽·동쪽 경계에서 시작하도록 계산하며, 각 대형 섹션에는 외부 부스 4개씩 총 8슬롯과 입구 Anchor를 둔다. 모델에 Renderer가 없거나 참조가 누락된 경우에만 안전용 바닥을 생성한다. 내부 슬롯은 월드에서 보이지 않는 먼 좌표에 8개를 미리 두고, 각 슬롯에 다음 기준점을 둔다.
 
 - `EntryAnchor`: 부스 내부 입장 시 플레이어 도착 위치
 - `ExitAnchor`: 내부에서 외부로 나갈 때 기준 위치
 - `ContentAnchor`: Published Layout 오브젝트를 조립할 부모 위치
 
 이 단계는 React 편집기나 Spring API 없이 Unity 단독으로 공간과 이동 동선을 검증할 수 있다. 이후 Layout 연동 시 `ContentAnchor` 아래만 동적으로 채우면 고정 건축 구조와 임대 콘텐츠의 수명주기가 섞이지 않는다.
+
+11층 모델 Import에는 Collider 생성을 활성화했다. 따라서 중앙 건축물, 양쪽 연결 통로, 대형 섹션 바닥이 각자의 충돌 경계를 제공하고, Booth Layout 데이터와 무관한 고정 월드 지형으로 유지된다.
 
 공용 입장 구역은 최대 40명을 8 × 5 그리드로 분산한다. Dedicated Server의 Connection Approval도 동일 좌표 규칙을 사용하므로 Scene에 보이는 Spawn 기준과 실제 Network Player 생성 위치가 일치한다.
 
@@ -96,10 +98,14 @@ URL이나 긴 콘텐츠 원문을 Layout에 직접 넣지 않고 `configId`로 �
 - Unknown Type 격리
 - AI NPC·Video Screen POC Component 연결
 - URP 호환 Placeholder Material과 Runtime Font 지정
+- canonical 10종 Prefab 카탈로그와 `BoothObjectRegistry` 매핑
+- 공통 `BoothInteractionTarget` 기반 Collider·상호작용 거리·Hover Highlight
+- 노트북·상담 데스크·프로젝트 패널·영상 스크린 등 기능별 POC 외형
+- Mock Layout 격자 배치로 위치·Y 회전·구 별칭·Unknown 격리 검증
 
 ### 설계/후속
 
-- 정식 Prefab과 `assetCode` 매핑
+- 실제 서비스 아트 Prefab과 `assetCode` 세부 매핑
 - 외부 Facade Runtime
 - 서버 승인 텔레포트와 내부 Anchor 연결
 - Publish 변경 자동 새로고침
@@ -111,6 +117,9 @@ URL이나 긴 콘텐츠 원문을 Layout에 직접 넣지 않고 `configId`로 �
 - `festa-unity/Assets/_Project/Scripts/Booth/Runtime/BoothRuntime.cs`
 - `festa-unity/Assets/_Project/Scripts/Booth/Factory/BoothObjectFactory.cs`
 - `festa-unity/Assets/_Project/Scripts/Booth/Factory/BoothObjectRegistry.cs`
+- `festa-unity/Assets/_Project/Scripts/Booth/Interaction/BoothInteractionTarget.cs`
+- `festa-unity/Assets/_Project/Editor/Booth/BoothPrefabCatalogBuilder.cs`
+- `festa-unity/Assets/_Project/Prefabs/Booth`
 - `festa-unity/Assets/_Project/Scripts/Integration/Spring/HttpBoothApiClient.cs`
 - [Booth Studio 계약](../../specs/005-booth-studio-layout/spec.md)
 - [Booth Runtime 계약](../../specs/006-booth-runtime/spec.md)
