@@ -18,9 +18,21 @@ namespace Festa.World
 
         public GameObject CreateVisual(AvatarAppearance appearance, Transform parent)
         {
-            GameObject go = appearance.IsModular
-                ? CreateModular(appearance, parent)
-                : CreateFromCatalog(appearance, parent);
+            GameObject go;
+            if (appearance.IsModular)
+            {
+                go = CreateModular(appearance.ModularConfig, parent);
+            }
+            else if (appearance.PresetCode == AvatarAppearance.DefaultPreset && _modularCatalog != null)
+            {
+                // 메인 씬을 직접 실행하는 개발 테스트처럼 저장된 외형이 없을 때도
+                // 삭제 예정인 구형 sk_01 프리팹 대신 현재 모듈형 기본 아바타를 사용한다.
+                go = CreateModular(_modularCatalog.CreateDefault(Festa.Avatar.AvatarGender.Female), parent);
+            }
+            else
+            {
+                go = CreateFromCatalog(appearance, parent);
+            }
 
             go ??= CreatePlaceholder(parent);
 
@@ -34,7 +46,7 @@ namespace Festa.World
 
         // ---------- 모듈 조립 ----------
 
-        GameObject CreateModular(AvatarAppearance appearance, Transform parent)
+        GameObject CreateModular(Festa.Avatar.AvatarConfig config, Transform parent)
         {
             if (_modularCatalog == null)
             {
@@ -45,7 +57,7 @@ namespace Festa.World
             root.transform.SetParent(parent, false);
             var assembler = root.AddComponent<Festa.Avatar.AvatarAssembler>();
             assembler.Catalog = _modularCatalog;
-            assembler.Apply(appearance.ModularConfig);
+            assembler.Apply(config);
             if (!string.IsNullOrEmpty(assembler.LastError)) Debug.LogError($"[AvatarVisual] {assembler.LastError}");
             return root;
         }

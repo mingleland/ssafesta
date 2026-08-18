@@ -151,10 +151,15 @@ namespace Festa.Network
 
         static Vector3 GetSpawnPosition(ulong clientId)
         {
-            // 스폰 겹침 방지용 간단 분산. 월드 스폰 존 확정 시 교체.
-            // Y=1: 캡슐 피벗이 중심이므로 바닥(Y=0) 위에 서려면 1m 올려야 한다.
-            float angle = clientId * 0.618034f * Mathf.PI * 2f;
-            return new Vector3(Mathf.Cos(angle) * 2f, 1f, Mathf.Sin(angle) * 2f);
+            // 40명 기준 8 x 5 스폰 그리드. 중앙 통로 안에서 초기 충돌을 피한다.
+            const int columns = 8;
+            const float spacing = 1.35f;
+            var slot = (int)(clientId % 40);
+            var column = slot % columns;
+            var row = slot / columns;
+            var x = (column - (columns - 1) * 0.5f) * spacing;
+            var z = (row - 2f) * spacing;
+            return new Vector3(x, 1f, z);
         }
 
         void OnConnectionEvent(NetworkManager nm, ConnectionEventData data)
