@@ -25,7 +25,15 @@ namespace Festa.Integration
 
             var json = BuildLaptopJson(boothId, objectId, url);
 #if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
-            FestaNotifyBoothInteract(json);
+            try
+            {
+                FestaNotifyBoothInteract(json);
+            }
+            catch (System.Exception ex)
+            {
+                // 브리지 하나의 실패가 다른 부스 오브젝트 상호작용을 막지 않는다.
+                Debug.LogError($"[BoothInteractBridge] onBoothInteract 송신 실패: {ex.Message}");
+            }
 #elif !UNITY_SERVER
             Debug.Log($"[BoothInteractBridge] onBoothInteract → {json}");
 #endif

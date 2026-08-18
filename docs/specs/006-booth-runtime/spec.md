@@ -105,7 +105,7 @@ window.FestaUnity.onBoothInteract(json)
 - `url`: LAPTOP 전용 선택 `string`. 주소가 없어도 이벤트는 발생하며 FE는 오류 대신 안내를 표시한다.
 - FE는 JSON 파싱 실패를 해당 이벤트 하나로 격리하고 다른 부스 기능을 계속 처리한다.
 
-> **구현 상태**: Unity의 `LAPTOP` 클릭 컴포넌트와 WebGL `.jslib` 송신부가 구현되었다. URL 저장 위치는 아직 미확정이므로 현재 이벤트는 `boothId + objectId`를 필수로 송신하고, URL 값이 생긴 경우에만 선택 필드를 포함한다.
+> **구현 상태**: Unity의 `LAPTOP` 클릭 컴포넌트와 WebGL `.jslib` 송신부가 구현되었다. 프리팹의 Collider가 자식에 있는 경우에도 클릭 릴레이를 통해 루트의 `BoothRuntimeObject` 식별자를 송신하며, C#/JavaScript 양쪽의 콜백 예외는 해당 이벤트 하나로 격리한다. URL 저장 위치는 아직 미확정이므로 현재 이벤트는 `boothId + objectId`를 필수로 송신하고, URL 값이 생긴 경우에만 선택 필드를 포함한다.
 
 ### Key Entities
 

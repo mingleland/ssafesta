@@ -13,11 +13,20 @@ namespace Festa.Content
         void Awake()
         {
             _runtimeObject = GetComponent<BoothRuntimeObject>();
-            if (GetComponentInChildren<Collider>() == null)
-                gameObject.AddComponent<BoxCollider>();
-        }
+            var colliders = GetComponentsInChildren<Collider>(true);
+            if (colliders.Length == 0)
+                colliders = new Collider[] { gameObject.AddComponent<BoxCollider>() };
 
-        void OnMouseDown() => Interact();
+            // OnMouseDown은 Collider가 붙은 GameObject에만 전달된다.
+            // 실제 LAPTOP 프리팹의 Collider가 자식에 있어도 루트 상호작용으로 중계한다.
+            foreach (var targetCollider in colliders)
+            {
+                var clickTarget = targetCollider.GetComponent<LaptopClickTarget>();
+                if (clickTarget == null)
+                    clickTarget = targetCollider.gameObject.AddComponent<LaptopClickTarget>();
+                clickTarget.Bind(this);
+            }
+        }
 
         public void Interact(string url = null)
         {
@@ -31,6 +40,20 @@ namespace Festa.Content
                 _runtimeObject.BoothId,
                 _runtimeObject.ObjectId,
                 url);
+        }
+    }
+
+    /// <summary>Collider가 있는 자식 오브젝트의 클릭을 LAPTOP 루트로 전달한다.</summary>
+    public sealed class LaptopClickTarget : MonoBehaviour
+    {
+        LaptopInteractable _owner;
+
+        public void Bind(LaptopInteractable owner) => _owner = owner;
+
+        void OnMouseDown()
+        {
+            if (_owner != null)
+                _owner.Interact();
         }
     }
 }
