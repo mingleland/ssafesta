@@ -2,7 +2,6 @@ package com.example.ssafesta.auth;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +11,7 @@ import com.example.ssafesta.user.OAuthIdentityRepository;
 import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.WalletService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,8 @@ class RegistrationServiceTest {
         OAuthIdentity identity = new OAuthIdentity(user, OAuthProvider.GOOGLE, "subject");
         when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "subject")).thenReturn(Optional.of(identity));
 
-        RegistrationService service = new RegistrationService(users, identities, new NicknamePolicy());
+        WalletService wallets = mock(WalletService.class);
+        RegistrationService service = new RegistrationService(users, identities, new NicknamePolicy(), wallets);
 
         assertFalse(service.complete(OAuthProvider.GOOGLE, "subject", "다른닉네임").newlyRegistered());
     }

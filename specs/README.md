@@ -14,7 +14,7 @@
 |---|---|---|---|:---:|:---:|:---:|
 | 001 | auth-user | P0 | BE + FE | ✅ | ✅ | ✅ |
 | 002 | world-session | P0 | Unity + BE | ✅ **확정** | ✅ | ✅ |
-| 003 | wallet-coin | P0 | BE | ✅ | — | — |
+| 003 | wallet-coin | P0 | BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 004 | booth-slot-lease | P0 | BE + FE | ✅ | — | — |
 | 005 | booth-studio-layout | P0 | FE + BE | ✅ | — | — |
 | 006 | booth-runtime | P0 | Unity | ✅ **확정** | ✅ | ✅ |
