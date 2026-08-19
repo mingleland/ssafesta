@@ -27,6 +27,14 @@ namespace Festa.Booth
             }
 
             var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
+            if (prefab == null && type == BoothObjectType.Laptop)
+            {
+                // 노트북은 정식 Free Laptop Prefab만 사용한다. 임시 큐브로 대체하면
+                // 실제 상호작용/표현 오류를 숨기므로 이 오브젝트만 건너뛴다.
+                Debug.LogError($"[BoothObjectFactory] Laptop prefab missing (objectId={objectId}) — skipped");
+                return null;
+            }
+
             float groundLift = 0f; // 프리팹은 피벗을 바닥 기준으로 제작한다고 가정
             var go = prefab != null
                 ? Object.Instantiate(prefab, anchor)
@@ -58,7 +66,6 @@ namespace Festa.Booth
                 BoothObjectType.SurveyKiosk => (PrimitiveType.Cube, new Color(0.5f, 1f, 0.6f), new Vector3(0.5f, 1.2f, 0.5f)),
                 BoothObjectType.RecruitmentBoard => (PrimitiveType.Cube, new Color(1f, 0.8f, 0.4f), new Vector3(1.4f, 1.8f, 0.08f)),
                 BoothObjectType.ConsultationDesk => (PrimitiveType.Cube, new Color(0.6f, 0.4f, 0.2f), new Vector3(1.6f, 0.8f, 0.8f)),
-                BoothObjectType.Laptop => (PrimitiveType.Cube, new Color(0.15f, 0.2f, 0.3f), new Vector3(0.7f, 0.08f, 0.5f)),
                 BoothObjectType.LikeVote => (PrimitiveType.Sphere, new Color(1f, 0.4f, 0.5f), Vector3.one * 0.5f),
                 _ => (PrimitiveType.Cube, Color.gray, Vector3.one * 0.8f),
             };

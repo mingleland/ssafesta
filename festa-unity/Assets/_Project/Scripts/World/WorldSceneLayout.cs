@@ -11,7 +11,16 @@ namespace Festa.World
     {
         const string RootName = "@World_11F";
 
-        [SerializeField] Vector2 _worldSize = new(42f, 30f);
+        [Header("11층 원본 모델")]
+        [SerializeField] GameObject _worldModelPrefab;
+        [SerializeField] Vector3 _worldModelPosition = Vector3.zero;
+        [SerializeField] Vector3 _worldModelRotation = Vector3.zero;
+        [SerializeField] Vector3 _worldModelScale = Vector3.one;
+
+        [Header("좌우 부스 섹션")]
+        [SerializeField, Min(2f)] float _sidePassageLength = 10f;
+        [SerializeField, Min(2f)] float _sidePassageWidth = 6f;
+        [SerializeField] Vector2 _sectionSize = new(18f, 22f);
         [SerializeField] int _externalBoothCount = 8;
         [SerializeField] int _interiorSlotCount = 8;
 
@@ -31,57 +40,89 @@ namespace Festa.World
             var root = new GameObject(RootName).transform;
             BuildMaterials();
 
-            CreateBox("Floor", root, new Vector3(0f, -0.15f, 0f),
-                new Vector3(_worldSize.x, 0.3f, _worldSize.y), _floorMaterial, true);
+            var modelBounds = BuildWorldModel(root);
+            var leftSectionX = modelBounds.min.x - _sidePassageLength - _sectionSize.x * 0.5f;
+            var rightSectionX = modelBounds.max.x + _sidePassageLength + _sectionSize.x * 0.5f;
 
-            CreateBox("Wall_North", root, new Vector3(0f, 2.4f, _worldSize.y * 0.5f),
-                new Vector3(_worldSize.x, 4.8f, 0.35f), _wallMaterial, true);
-            CreateBox("Wall_South", root, new Vector3(0f, 2.4f, -_worldSize.y * 0.5f),
-                new Vector3(_worldSize.x, 4.8f, 0.35f), _wallMaterial, true);
-            CreateBox("Wall_East", root, new Vector3(_worldSize.x * 0.5f, 2.4f, 0f),
-                new Vector3(0.35f, 4.8f, _worldSize.y), _wallMaterial, true);
-            CreateBox("Wall_West", root, new Vector3(-_worldSize.x * 0.5f, 2.4f, 0f),
-                new Vector3(0.35f, 4.8f, _worldSize.y), _wallMaterial, true);
-
-            BuildCentralWalkway(root);
-            BuildExternalBooths(root);
+            BuildSidePassages(root, modelBounds, leftSectionX, rightSectionX);
+            BuildBoothSections(root, leftSectionX, rightSectionX, modelBounds.min.y, modelBounds.center.z);
             BuildInteriorAnchors(root);
-            BuildSpawnArea(root);
-            BuildLighting(root);
+            BuildSpawnArea(root, new Vector3(modelBounds.center.x, modelBounds.min.y, modelBounds.center.z));
+            BuildLighting(root, leftSectionX, rightSectionX, modelBounds.center.z);
         }
 
-        void BuildCentralWalkway(Transform root)
+        Bounds BuildWorldModel(Transform root)
         {
-            var walkway = new GameObject("WalkableArea").transform;
-            walkway.SetParent(root, false);
-            CreateBox("MainAisle", walkway, new Vector3(0f, 0.02f, 0f),
-                new Vector3(8f, 0.04f, _worldSize.y - 3f), _accentMaterial, false);
-            CreateBox("CrossAisle", walkway, new Vector3(0f, 0.025f, 0f),
-                new Vector3(_worldSize.x - 3f, 0.05f, 5f), _accentMaterial, false);
-        }
-
-        void BuildExternalBooths(Transform root)
-        {
-            var slots = new GameObject("ExternalBoothSlots").transform;
-            slots.SetParent(root, false);
-
-            for (var i = 0; i < _externalBoothCount; i++)
+            if (!_worldModelPrefab)
             {
-                var left = i < _externalBoothCount / 2;
-                var row = i % (_externalBoothCount / 2);
-                var x = left ? -13f : 13f;
-                var z = -10.5f + row * 7f;
-                var slot = new GameObject($"ExternalBoothSlot_{i + 1:00}").transform;
-                slot.SetParent(slots, false);
+                Debug.LogWarning("[WorldSceneLayout] 11층 모델이 없어 안전용 바닥을 생성합니다.");
+                CreateBox("FallbackFloor", root, new Vector3(0f, -0.15f, 0f),
+                    new Vector3(42f, 0.3f, 30f), _floorMaterial, true);
+                return new Bounds(Vector3.zero, new Vector3(42f, 0.3f, 30f));
+            }
+
+            var instance = Instantiate(_worldModelPrefab, root);
+            instance.name = "11th-0818";
+            instance.transform.localPosition = _worldModelPosition;
+            instance.transform.localRotation = Quaternion.Euler(_worldModelRotation);
+            instance.transform.localScale = _worldModelScale;
+
+            var renderers = instance.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+                return new Bounds(instance.transform.position, new Vector3(42f, 0.3f, 30f));
+
+            var bounds = renderers[0].bounds;
+            for (var i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            return bounds;
+        }
+
+        void BuildSidePassages(Transform root, Bounds modelBounds, float leftSectionX, float rightSectionX)
+        {
+            var passages = new GameObject("SidePassages").transform;
+            passages.SetParent(root, false);
+
+            var leftStart = modelBounds.min.x;
+            var rightStart = modelBounds.max.x;
+            CreateBox("Passage_West", passages,
+                new Vector3((leftStart + leftSectionX + _sectionSize.x * 0.5f) * 0.5f, modelBounds.min.y - 0.08f, modelBounds.center.z),
+                new Vector3(_sidePassageLength, 0.16f, _sidePassageWidth), _accentMaterial, true);
+            CreateBox("Passage_East", passages,
+                new Vector3((rightStart + rightSectionX - _sectionSize.x * 0.5f) * 0.5f, modelBounds.min.y - 0.08f, modelBounds.center.z),
+                new Vector3(_sidePassageLength, 0.16f, _sidePassageWidth), _accentMaterial, true);
+        }
+
+        void BuildBoothSections(Transform root, float leftSectionX, float rightSectionX, float groundY, float centerZ)
+        {
+            var sections = new GameObject("BoothSections").transform;
+            sections.SetParent(root, false);
+            BuildSection("Section_West", sections, leftSectionX, groundY, centerZ, true, 0);
+            BuildSection("Section_East", sections, rightSectionX, groundY, centerZ, false, _externalBoothCount / 2);
+        }
+
+        void BuildSection(string name, Transform parent, float centerX, float groundY, float centerZ, bool west, int firstSlotIndex)
+        {
+            var section = new GameObject(name).transform;
+            section.SetParent(parent, false);
+            section.localPosition = new Vector3(centerX, groundY, centerZ);
+            CreateBox("SectionFloor", section, new Vector3(0f, -0.12f, 0f),
+                new Vector3(_sectionSize.x, 0.24f, _sectionSize.y), _floorMaterial, true);
+
+            var count = Mathf.Max(1, _externalBoothCount / 2);
+            for (var localIndex = 0; localIndex < count; localIndex++)
+            {
+                var column = localIndex % 2;
+                var row = localIndex / 2;
+                var x = (column - 0.5f) * (_sectionSize.x * 0.48f);
+                var z = (row - 0.5f) * (_sectionSize.y * 0.48f);
+                var slotIndex = firstSlotIndex + localIndex;
+
+                var slot = new GameObject($"ExternalBoothSlot_{slotIndex + 1:00}").transform;
+                slot.SetParent(section, false);
                 slot.localPosition = new Vector3(x, 0f, z);
-                slot.localRotation = Quaternion.Euler(0f, left ? 90f : -90f, 0f);
+                slot.localRotation = Quaternion.Euler(0f, west ? 90f : -90f, 0f);
 
                 CreateBox("Back", slot, new Vector3(0f, 1.6f, 2.2f),
-                    new Vector3(6f, 3.2f, 0.25f), _boothMaterial, true);
-                CreateBox("Side_L", slot, new Vector3(-2.9f, 1.6f, 0f),
-                    new Vector3(0.2f, 3.2f, 4.5f), _boothMaterial, true);
-                CreateBox("Side_R", slot, new Vector3(2.9f, 1.6f, 0f),
-                    new Vector3(0.2f, 3.2f, 4.5f), _boothMaterial, true);
+                    new Vector3(6.5f, 3.2f, 0.18f), _boothMaterial, true);
 
                 var entrance = new GameObject("EntranceAnchor").transform;
                 entrance.SetParent(slot, false);
@@ -106,7 +147,7 @@ namespace Festa.World
             }
         }
 
-        void BuildSpawnArea(Transform root)
+        void BuildSpawnArea(Transform root, Vector3 center)
         {
             var spawns = new GameObject("PlayerSpawnPoints").transform;
             spawns.SetParent(root, false);
@@ -116,7 +157,7 @@ namespace Festa.World
                 point.SetParent(spawns, false);
                 var column = i % 8;
                 var row = i / 8;
-                point.localPosition = new Vector3((column - 3.5f) * 1.35f, 0.1f, (row - 2f) * 1.35f);
+                point.localPosition = center + new Vector3((column - 3.5f) * 1.35f, 0.1f, (row - 2f) * 1.35f);
                 point.localRotation = Quaternion.identity;
             }
         }
@@ -130,15 +171,16 @@ namespace Festa.World
             return anchor;
         }
 
-        void BuildLighting(Transform root)
+        void BuildLighting(Transform root, float leftSectionX, float rightSectionX, float centerZ)
         {
             var lighting = new GameObject("WorldLighting").transform;
             lighting.SetParent(root, false);
-            for (var i = -2; i <= 2; i++)
+            var centers = new[] { leftSectionX, 0f, rightSectionX };
+            for (var i = 0; i < centers.Length; i++)
             {
-                var go = new GameObject($"CeilingLight_{i + 3:00}");
+                var go = new GameObject($"CeilingLight_{i + 1:00}");
                 go.transform.SetParent(lighting, false);
-                go.transform.localPosition = new Vector3(i * 8f, 4.3f, 0f);
+                go.transform.localPosition = new Vector3(centers[i], 4.3f, centerZ);
                 go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 var light = go.AddComponent<Light>();
                 light.type = LightType.Point;

@@ -140,17 +140,16 @@ namespace Festa.Editor.Booth
         static void BuildLaptop(GameObject root)
         {
             var imported = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Models/Laptop/laptop.prefab");
-            if (imported != null)
+            if (imported == null)
             {
-                var model = (GameObject)PrefabUtility.InstantiatePrefab(imported);
-                model.name = "LaptopModel";
-                model.transform.SetParent(root.transform, false);
-                model.transform.localScale = Vector3.one * .7f;
+                Debug.LogError("[BoothPrefabCatalogBuilder] Formal Laptop source prefab is missing. A placeholder laptop will not be generated.");
                 return;
             }
-            Part(root, PrimitiveType.Cube, "Keyboard", new Vector3(0, .08f, 0), new Vector3(.75f, .08f, .5f), new Color(.12f, .14f, .18f));
-            var display = Part(root, PrimitiveType.Cube, "Display", new Vector3(0, .38f, .22f), new Vector3(.75f, .52f, .05f), new Color(.08f, .12f, .18f));
-            display.transform.localRotation = Quaternion.Euler(-12f, 0, 0);
+
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(imported);
+            model.name = "LaptopModel";
+            model.transform.SetParent(root.transform, false);
+            model.transform.localScale = Vector3.one * .7f;
         }
 
         static GameObject Part(GameObject root, PrimitiveType primitive, string name, Vector3 position, Vector3 scale, Color color)
