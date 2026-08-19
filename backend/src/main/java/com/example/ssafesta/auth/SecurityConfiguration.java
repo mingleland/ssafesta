@@ -35,6 +35,11 @@ class SecurityConfiguration {
                 .build();
     }
 
+    /**
+     * "/swagger-ui.html" is listed separately on purpose: it is springdoc's entry point and only
+     * redirects to /swagger-ui/index.html, so the "/swagger-ui/**" pattern does not cover it and
+     * the URL people actually type would be rejected with 401 before the redirect happens.
+     */
     @Bean
     @Order(2)
     SecurityFilterChain securityFilterChain(HttpSecurity http, OAuthLoginSuccessHandler successHandler,
@@ -42,7 +47,7 @@ class SecurityConfiguration {
         return http.cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**"))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))

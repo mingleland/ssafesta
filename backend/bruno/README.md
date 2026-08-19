@@ -10,6 +10,7 @@
 |---|---|---|
 | `01-auth` | 게스트·소셜 OAuth·refresh·logout | OAuth 완료는 임시 handoff 필요 |
 | `02-users` | 내 정보·닉네임·탈퇴 | 회원 Access Token |
+| `03-wallet` | 코인 잔액·거래 내역 조회 | 회원 Access Token |
 | 이후 `03-world`, `04-booth`, `05-wallet` | 도메인 구현 시 추가 | 각 도메인별 값 |
 | `06-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
 
@@ -63,11 +64,16 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 `02-users/01-get-my-account`를 실행한다. 이 요청과 이후 회원 보호 API는 `{{accessToken}}`을 `Authorization: Bearer` 헤더로 자동 전송한다.
 
 ```text
-02-users/01-get-my-account
-→ 02-users/02-change-nickname
-→ 01-auth/05-refresh
-→ 01-auth/06-logout
+02-users/내 정보 조회
+→ 03-wallet/내 지갑 조회
+→ 03-wallet/내 거래 내역 조회
+→ 02-users/닉네임 변경
+→ 01-auth/액세스 토큰 재발급
+→ 01-auth/로그아웃
 ```
+
+`03-wallet/내 지갑 조회`는 신규 가입 계정에서 **250**을 반환한다 — 가입 초기 200 + 당일 일일 50.
+같은 요청을 여러 번 반복해도 값이 변하지 않아야 한다. 변한다면 일일 지급이 하루에 두 번 일어난 것이다.
 
 `05-refresh`는 Bruno cookie jar에 저장된 `refresh_token`을 자동 전송하고, 새 Access Token을 `accessToken` 환경변수에 덮어쓴다. Refresh Token을 body나 환경변수에 수동으로 넣지 않는다.
 
@@ -85,9 +91,12 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 | `Get my account` | 내 닉네임·상태·연결 제공자 조회 | 회원 정보 JSON |
 | `Change nickname` | 환경의 `nickname` 값으로 변경 | 변경된 회원 정보 JSON |
 | `Withdraw account - confirm manually` | 즉시 hard delete 탈퇴 | 기본값은 안전하게 `confirmed: false` |
+| `내 지갑 조회` | 현재 코인 잔액 조회 | `{ userId, balance, updatedAt }`. 당일 첫 요청이면 일일 50코인이 함께 지급된다 |
+| `내 거래 내역 조회` | 지급·차감 내역 페이지 조회 | 최신순 `content` + 페이지 정보. `amount`는 지급 양수·차감 음수 |
 
 ## 주의
 
 - 탈퇴 테스트는 폐기 가능한 소셜 계정으로만 한다. 실제 실행하려면 request body의 `confirmed`를 `true`로 바꿔야 하며, 계정과 연결 데이터가 즉시 삭제된다.
-- 게스트 Access Token은 공개 관람 전용이다. 내 정보·닉네임·탈퇴 API에는 사용할 수 없다.
+- 게스트 Access Token은 공개 관람 전용이다. 내 정보·닉네임·탈퇴·지갑 API에는 사용할 수 없다. 게스트에게는 지갑도 코인도 없다.
+- 코인을 충전하거나 차감하는 API는 **없다.** 차감은 임대·AI 이용 같은 기능의 서버 로직에서만 일어난다 (헌법 2·16조).
 - 새 OAuth 로그인이나 Refresh 성공 뒤에는 이전 Access Token이 무효화될 수 있으므로, Bruno 환경변수에 저장된 최신 `accessToken`을 사용한다.

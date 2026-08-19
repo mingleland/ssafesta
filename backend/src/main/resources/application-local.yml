@@ -53,3 +53,8 @@ app:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
     # HTTP localhost test only. Set AUTH_COOKIE_SECURE=true in HTTPS deployment.
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+
+  wallet:
+    initial-grant: 200
+    daily-grant: 50
+    daily-grant-zone: Asia/Seoul
