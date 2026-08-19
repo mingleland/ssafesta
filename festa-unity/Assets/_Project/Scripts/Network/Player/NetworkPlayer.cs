@@ -11,6 +11,19 @@ namespace Festa.Network
         Run = 2,
     }
 
+    public enum PlayerEmoteId : byte
+    {
+        None = 0,
+        Greeting = 1,
+        Salute = 2,
+        King = 3,
+        GangnamStyle = 4,
+        Defeat = 5,
+        Praying = 6,
+        Twerk = 7,
+        JoyfulJump = 8,
+    }
+
     /// <summary>
     /// 네트워크로 동기화되는 Player 상태 (doc 16 §4 NetworkVariables 후보 기준).
     /// nickname/avatarCode는 서버가 승인된 세션 데이터로만 기록한다 —
@@ -34,8 +47,8 @@ namespace Festa.Network
         public readonly NetworkVariable<PlayerAnimState> AnimState =
             new(PlayerAnimState.Idle, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
-        public readonly NetworkVariable<byte> EmoteId =
-            new(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+        public readonly NetworkVariable<PlayerEmoteId> EmoteId =
+            new(PlayerEmoteId.None, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         public override void OnNetworkSpawn()
         {

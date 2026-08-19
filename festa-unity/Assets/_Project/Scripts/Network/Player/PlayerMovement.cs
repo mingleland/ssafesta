@@ -1,6 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Festa.World;
 
 namespace Festa.Network
 {
@@ -11,15 +12,19 @@ namespace Festa.Network
     [RequireComponent(typeof(NetworkPlayer))]
     public class PlayerMovement : NetworkBehaviour
     {
-        [SerializeField] float _moveSpeed = 4f;
-        [SerializeField] float _runSpeed = 6.5f;
-        [SerializeField] float _rotateSpeedDeg = 720f;
+        [SerializeField] float _moveSpeed = 36f;
+        [SerializeField] float _runSpeed = 52f;
+        [SerializeField, Min(0.01f)] float _turnSmoothTime = 0.08f;
+        [SerializeField, Min(1f)] float _maxTurnSpeedDeg = 1080f;
 
         NetworkPlayer _player;
+        PlayerCameraFollow _cameraFollow;
+        float _turnVelocity;
 
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
+            _cameraFollow = GetComponent<PlayerCameraFollow>();
             enabled = IsOwner; // 원격 플레이어는 NetworkTransform 수신만
         }
 
@@ -31,14 +36,31 @@ namespace Festa.Network
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
 
+            if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
+                _player.EmoteId.Value = PlayerEmoteId.None;
+
             if (moving)
             {
                 var dir = CameraRelativeDirection(input);
                 var speed = running ? _runSpeed : _moveSpeed;
                 transform.position += dir * (speed * Time.deltaTime);
-                var target = Quaternion.LookRotation(dir, Vector3.up);
-                transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation, target, _rotateSpeedDeg * Time.deltaTime);
+
+                // 이동 벡터는 즉시 새 입력을 따르되, 보이는 방향만 짧게 보간한다.
+                // 키를 바꿀 때 한 프레임 만에 각도가 튀는 현상을 없애면서도
+                // 카메라 기준 WASD 조작 방향은 그대로 유지한다.
+                var targetYaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+                var nextYaw = Mathf.SmoothDampAngle(
+                    transform.eulerAngles.y,
+                    targetYaw,
+                    ref _turnVelocity,
+                    _turnSmoothTime,
+                    _maxTurnSpeedDeg,
+                    Time.deltaTime);
+                transform.rotation = Quaternion.Euler(0f, nextYaw, 0f);
+            }
+            else
+            {
+                _turnVelocity = 0f;
             }
 
             var next = !moving
@@ -67,15 +89,21 @@ namespace Festa.Network
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
         }
 
-        static Vector3 CameraRelativeDirection(Vector2 input)
+        Vector3 CameraRelativeDirection(Vector2 input)
         {
-            var camera = Camera.main;
-            if (camera == null) return new Vector3(input.x, 0f, input.y).normalized;
+            if (_cameraFollow != null &&
+                _cameraFollow.TryGetPlanarBasis(out var forward, out var right))
+            {
+                return (forward * input.y + right * input.x).normalized;
+            }
 
-            var forward = camera.transform.forward;
-            var right = camera.transform.right;
-            forward.y = 0f;
-            right.y = 0f;
+            // 카메라 Follow가 없는 테스트 프리팹에서만 전역 카메라를 폴백으로 쓴다.
+            var camera = Camera.main;
+            if (camera == null)
+                return new Vector3(input.x, 0f, input.y).normalized;
+
+            forward = Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up);
+            right = Vector3.ProjectOnPlane(camera.transform.right, Vector3.up);
 
             if (forward.sqrMagnitude < 0.0001f || right.sqrMagnitude < 0.0001f)
                 return new Vector3(input.x, 0f, input.y).normalized;
