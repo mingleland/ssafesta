@@ -1,0 +1,83 @@
+package com.example.ssafesta.auth;
+
+import com.example.ssafesta.user.OAuthProvider;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Base64;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/** A short-lived OAuth callback result. Its opaque identifier is only sent in an HttpOnly cookie. */
+@Service
+public class OAuthHandoffService {
+    private static final Logger log = LoggerFactory.getLogger(OAuthHandoffService.class);
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String PREFIX = "auth:oauth-handoff:";
+    private final StringRedisTemplate redis;
+    private final AuthProperties properties;
+
+    public OAuthHandoffService(StringRedisTemplate redis, AuthProperties properties) {
+        this.redis = redis;
+        this.properties = properties;
+    }
+
+    public String createMember(MemberSessionService.MemberSession session) {
+        return store("MEMBER", session.accessToken(), session.refreshToken(), session.expiresAt().toString());
+    }
+
+    public String createRegistration(OAuthProvider provider, String providerSubject) {
+        return store("REGISTRATION", provider.name(), encode(providerSubject));
+    }
+
+    public Kind kind(String handoff) {
+        String value = redis.opsForValue().get(key(handoff));
+        if (value == null) {
+            log.warn("OAuth handoff is absent before completion lookup");
+            throw new InvalidOAuthHandoffException();
+        }
+        return Kind.valueOf(value.substring(0, value.indexOf('|')));
+    }
+
+    public MemberSessionService.MemberSession consumeMember(String handoff) {
+        String[] fields = consume(handoff, Kind.MEMBER, 4);
+        return new MemberSessionService.MemberSession(fields[1], Instant.parse(fields[3]), fields[2]);
+    }
+
+    public PendingRegistration consumeRegistration(String handoff) {
+        String[] fields = consume(handoff, Kind.REGISTRATION, 3);
+        return new PendingRegistration(OAuthProvider.valueOf(fields[1]), decode(fields[2]));
+    }
+
+    private String store(String... fields) {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        String handoff = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String key = key(handoff);
+        redis.opsForValue().set(key, String.join("|", fields), properties.oauthStateTtl());
+        log.info("Created OAuth handoff type={}, stored={}, ttlSeconds={}", fields[0],
+                Boolean.TRUE.equals(redis.hasKey(key)), redis.getExpire(key));
+        return handoff;
+    }
+
+    private String[] consume(String handoff, Kind expected, int fieldCount) {
+        String value = redis.opsForValue().getAndDelete(key(handoff));
+        if (value == null) {
+            log.warn("OAuth handoff was absent when completion tried to consume it");
+            throw new InvalidOAuthHandoffException();
+        }
+        String[] fields = value.split("\\|", fieldCount);
+        if (fields.length != fieldCount || !expected.name().equals(fields[0])) throw new InvalidOAuthHandoffException();
+        log.info("Consumed OAuth handoff type={}", expected);
+        return fields;
+    }
+
+    private String key(String handoff) { return PREFIX + handoff; }
+    private String encode(String value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8)); }
+    private String decode(String value) { return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8); }
+
+    public enum Kind { MEMBER, REGISTRATION }
+    public record PendingRegistration(OAuthProvider provider, String providerSubject) { }
+}

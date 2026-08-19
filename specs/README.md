@@ -12,7 +12,7 @@
 
 | Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
 |---|---|---|---|:---:|:---:|:---:|
-| 001 | auth-user | P0 | BE + FE | ✅ | — | — |
+| 001 | auth-user | P0 | BE + FE | ✅ | ✅ | ✅ |
 | 002 | world-session | P0 | Unity + BE | ✅ **확정** | ✅ | ✅ |
 | 003 | wallet-coin | P0 | BE | ✅ | — | — |
 | 004 | booth-slot-lease | P0 | BE + FE | ✅ | — | — |

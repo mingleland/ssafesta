@@ -643,21 +643,9 @@ TTL과 값 구조는 Realtime/Infra 설계에서 확정한다.
 
 ## 27. 삭제 / 보존
 
-### Soft Delete 후보
+### 회원 탈퇴 삭제 정책
 
-- User
-- Booth
-- Agent
-- Document
-- Survey
-
-다만 모든 테이블에 무조건 `deleted_at`을 넣지 말고 실제 복구·감사 요구가 있는 데이터만 적용한다.
-
-### 반드시 이력 유지가 필요한 데이터
-
-- Coin Transaction
-- Lease
-- Event Redemption(P2)
+회원 탈퇴 확정 즉시 User 및 직접·종속·참여 데이터를 hard delete한다. Coin Transaction·Lease를 포함한 이력도 이 회원 탈퇴 정책에서는 보존 예외가 아니다. 삭제 순서는 외부 공개 차단 → 파일/Vector → Redis → DB 종속 데이터 → OAuth revoke/unlink → User 순서이며 재실행 가능해야 한다.
 
 ---
 
