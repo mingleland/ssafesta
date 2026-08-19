@@ -1,0 +1,39 @@
+meta {
+  name: 회원 탈퇴
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/users/me
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "confirmed": false
+  }
+}
+
+docs {
+  ## 회원 탈퇴
+
+  탈퇴를 확정하면 취소 대기 없이 계정과 직접 연결된 데이터를 즉시 hard delete한다.
+
+  - 인증: 회원 Access Token 필요
+  - Request body: `{ "confirmed": true }`일 때만 실제 탈퇴
+  - 기본 body: `confirmed: false`로 안전하게 유지
+  - 성공: `204 No Content`
+  - `400`: confirmed가 false인 경우
+
+  실제 탈퇴 시 현재 세션·Refresh Token, Profile, OAuth 연결, Wallet/Coin Ledger, Booth와 참여 데이터 등이 삭제된다. 반드시 폐기 가능한 테스트 계정에서만 `true`로 바꾼다.
+}

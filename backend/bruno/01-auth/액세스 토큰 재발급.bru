@@ -1,0 +1,35 @@
+meta {
+  name: 액세스 토큰 재발급
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/refresh
+  body: none
+  auth: none
+}
+
+headers {
+  Origin: {{frontendOrigin}}
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.accessToken) {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  ## Access Token 갱신
+
+  브라우저/Bruno cookie jar의 `refresh_token`으로 새 Access Token과 새 Refresh Token을 발급한다.
+
+  - 인증: Authorization 헤더 불필요
+  - Header: `Origin: {{baseUrl}}` 필수
+  - Cookie: Bruno cookie jar가 `refresh_token`을 자동 전송
+  - Request body: 없음
+  - 성공: `200 OK`, 새 `{ accessToken, expiresAt }`와 교체된 Refresh Token cookie
+
+  기존 Refresh Token은 즉시 폐기된다. 이미 교체된 Token을 재사용하면 서버가 세션을 종료하고 재로그인을 요구한다. Refresh Token을 body, Params, 환경변수에 넣지 않는다.
+}

@@ -1,0 +1,39 @@
+meta {
+  name: 닉네임 변경
+  type: http
+  seq: 2
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/users/me
+  body: json
+  auth: bearer
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "nickname": "{{nickname}}"
+  }
+}
+
+docs {
+  ## 닉네임 변경
+
+  `nickname` 환경변수 값을 현재 회원의 닉네임으로 변경한다.
+
+  - 인증: 회원 Access Token 필요
+  - Request body: `{ "nickname": "{{nickname}}" }`
+  - 성공: `200 OK`, 변경된 `{ userId, nickname, status, providers }`
+  - `400`: 형식 또는 금칙어·예약어·광고/개인정보 유도 패턴 위반
+  - `409`: 다른 회원이 이미 사용하는 닉네임
+
+  실패해도 기존 닉네임은 변경되지 않는다.
+}

@@ -1,0 +1,41 @@
+meta {
+  name: OAuth 완료 - 신규 유저
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/oauth/complete
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: oauth_handoff={{oauthHandoff}}
+}
+
+body:json {
+  {
+    "nickname": "{{nickname}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.status === "AUTHENTICATED") {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  ## OAuth 완료: 신규 회원 닉네임 입력
+
+  `03-oauth-complete-existing-member`의 결과가 `NICKNAME_REQUIRED`일 때만 호출한다.
+
+  - 인증: Access Token 불필요
+  - Header: `Cookie: oauth_handoff={{oauthHandoff}}`
+  - Request body: `{ "nickname": "{{nickname}}" }`
+  - 성공: `200 AUTHENTICATED`. 회원·OAuth 연결·세션이 생성되고 Access Token body와 Refresh Token cookie가 발급된다.
+
+  닉네임은 금칙어·예약어·광고/개인정보 유도 패턴·중복 검사를 통과해야 한다. 실패하면 닉네임을 바꿔 다시 호출할 수 있지만, 성공 후 handoff는 소비된다.
+}
