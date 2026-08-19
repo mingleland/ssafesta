@@ -151,15 +151,17 @@ namespace Festa.Network
 
         static Vector3 GetSpawnPosition(ulong clientId)
         {
-            // 40명 기준 8 x 5 스폰 그리드. 중앙 통로 안에서 초기 충돌을 피한다.
+            // 11th-0819 로비의 SSAFY 바닥 로고 앞 지정 구역.
+            // 40명 기준 8 x 5 그리드로, 확대된 아바타끼리 겹치지 않도록 간격을 둔다.
             const int columns = 8;
-            const float spacing = 1.35f;
+            const float spacing = 2.25f;
+            var center = new Vector3(-75f, 0f, -235f);
             var slot = (int)(clientId % 40);
             var column = slot % columns;
             var row = slot / columns;
             var x = (column - (columns - 1) * 0.5f) * spacing;
             var z = (row - 2f) * spacing;
-            return new Vector3(x, 1f, z);
+            return center + new Vector3(x, 0f, z);
         }
 
         void OnConnectionEvent(NetworkManager nm, ConnectionEventData data)

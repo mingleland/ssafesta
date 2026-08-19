@@ -41,12 +41,15 @@ Properties Panel에서 속성을 편집한다. Draft 저장과 Publish를 분리
 ```text
 부스 안의 노트북 오브젝트를 방문자가 클릭하면, 임대 사용자가 등록해 둔 홈페이지가
 "노트북 화면이 켜지는" 연출과 함께 React 오버레이로 열리고 그 안에서 웹서핑할 수 있다.
-흐름: Unity 노트북 클릭 → Bridge Event(BOOTH_LAPTOP_INTERACT { boothId, objectId, url })
+흐름: Unity 노트북 클릭 → `window.FestaUnity.onBoothInteract(json)`
+→ Bridge Event(`BOOTH_LAPTOP_INTERACT { boothId, objectId, url? }`)
 → Interaction Dispatcher → 오버레이에서 iframe으로 표시.
 필수 fallback: 대상 사이트가 X-Frame-Options/CSP로 iframe을 차단하면 감지 후
 "새 탭에서 열기" 버튼을 제공한다 (많은 사이트가 차단하므로 이 경로가 사실상 기본).
 소유자 측: Booth Studio(또는 부스 설정)에서 홈페이지 URL 등록 UI.
 ```
+
+> **2026-08-19 FE·Unity 계약 및 Unity 송신부 구현 완료**: `boothId`와 `objectId`는 필수, `url`은 선택이다. URL이 없으면 오류가 아닌 안내를 표시한다. Unity의 `LaptopInteractable → BoothInteractBridge → FestaWebBridge.jslib` 경로가 `window.FestaUnity.onBoothInteract(json)`을 호출한다. React의 실제 오버레이 연결과 브라우저 E2E는 FE 통합 단계에서 검증한다.
 
 **예상 clarify**: iframe 차단 감지 방식(onload 휴리스틱 vs 사전 HEAD 체크는 CORS 불가 → UX로 해결), 오버레이 크기(노트북 프레임 연출 여부), URL 1개 vs 여러 개, http 사이트 혼합콘텐츠 경고 처리.
 

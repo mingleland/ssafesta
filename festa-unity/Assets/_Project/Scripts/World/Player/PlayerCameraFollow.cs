@@ -13,18 +13,19 @@ namespace Festa.World
     /// </summary>
     public class PlayerCameraFollow : NetworkBehaviour
     {
-        [SerializeField] Vector3 _offset = new(0f, 4f, -6f);
+        [SerializeField] Vector3 _offset = new(0f, 4f, -18f);
         [SerializeField] float _followLerp = 8f;
         [SerializeField] float _collisionRadius = 0.25f;
         [SerializeField] float _collisionPadding = 0.15f;
         [SerializeField] LayerMask _collisionMask = ~0;
-        [SerializeField] float _minDistance = 3f;
-        [SerializeField] float _maxDistance = 8f;
-        [SerializeField] float _zoomStep = 0.35f;
+        [SerializeField] float _minDistance = 9f;
+        [SerializeField] float _maxDistance = 36f;
+        [SerializeField] float _zoomStep = 1.2f;
         [SerializeField] float _orbitSensitivity = 0.12f;
         [SerializeField] float _minPitch = -20f;
         [SerializeField] float _maxPitch = 65f;
         [SerializeField] float _collisionReturnLerp = 5f;
+        [SerializeField] float _lookHeight = 8.05f;
 
         Camera _cam;
         float _distance;
@@ -32,6 +33,25 @@ namespace Festa.World
         float _pitch = 27f;
         float _resolvedDistance;
         readonly RaycastHit[] _collisionHits = new RaycastHit[64];
+
+        /// <summary>
+        /// 이 플레이어를 실제로 따라가는 카메라의 수평 이동 축을 반환한다.
+        /// 전역 Camera.main을 다시 찾지 않고 카메라 궤도 yaw를 단일 기준으로 쓴다.
+        /// </summary>
+        public bool TryGetPlanarBasis(out Vector3 forward, out Vector3 right)
+        {
+            if (!IsOwner)
+            {
+                forward = Vector3.forward;
+                right = Vector3.right;
+                return false;
+            }
+
+            var yawRotation = Quaternion.Euler(0f, _yaw, 0f);
+            forward = yawRotation * Vector3.forward;
+            right = yawRotation * Vector3.right;
+            return true;
+        }
 
         public override void OnNetworkSpawn()
         {
@@ -55,7 +75,7 @@ namespace Festa.World
             UpdateDistance();
             UpdateOrbit();
 
-            var lookTarget = transform.position + Vector3.up * 1f;
+            var lookTarget = transform.position + Vector3.up * _lookHeight;
             var orbitRotation = Quaternion.Euler(_pitch, _yaw, 0f);
             var orbitDirection = orbitRotation * Vector3.back;
             var desiredDistance = _distance;

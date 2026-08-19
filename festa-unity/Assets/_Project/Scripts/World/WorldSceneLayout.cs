@@ -47,7 +47,7 @@ namespace Festa.World
             BuildSidePassages(root, modelBounds, leftSectionX, rightSectionX);
             BuildBoothSections(root, leftSectionX, rightSectionX, modelBounds.min.y, modelBounds.center.z);
             BuildInteriorAnchors(root);
-            BuildSpawnArea(root, new Vector3(modelBounds.center.x, modelBounds.min.y, modelBounds.center.z));
+            BuildSpawnArea(root, new Vector3(-75f, 0.08f, -235f));
             BuildLighting(root, leftSectionX, rightSectionX, modelBounds.center.z);
         }
 
@@ -62,7 +62,7 @@ namespace Festa.World
             }
 
             var instance = Instantiate(_worldModelPrefab, root);
-            instance.name = "11th-0818";
+            instance.name = "11th-0819";
             instance.transform.localPosition = _worldModelPosition;
             instance.transform.localRotation = Quaternion.Euler(_worldModelRotation);
             instance.transform.localScale = _worldModelScale;
@@ -157,7 +157,7 @@ namespace Festa.World
                 point.SetParent(spawns, false);
                 var column = i % 8;
                 var row = i / 8;
-                point.localPosition = center + new Vector3((column - 3.5f) * 1.35f, 0.1f, (row - 2f) * 1.35f);
+                point.localPosition = center + new Vector3((column - 3.5f) * 2.25f, 0.1f, (row - 2f) * 2.25f);
                 point.localRotation = Quaternion.identity;
             }
         }

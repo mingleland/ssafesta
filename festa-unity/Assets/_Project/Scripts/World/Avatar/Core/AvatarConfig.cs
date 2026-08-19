@@ -98,8 +98,28 @@ namespace Festa.Avatar
             if (precise.a > 0) return precise;
             if (slot == AvatarColorSlot.Sclera && scleraColorId == 0) return Color.white;
             if (slot == AvatarColorSlot.Pupil && pupilColorId == 0) return new Color32(20, 16, 18, 255);
-            return catalog.GetColor(GetColor(slot));
+
+            // A network payload can be restored before its palette asset is
+            // available (or can contain an older palette id). Never hand the
+            // transparent default Color to a runtime avatar shader: it renders
+            // the entire corresponding mesh as a black silhouette in WebGL.
+            var paletteColor = catalog != null ? catalog.GetColor(GetColor(slot)) : default;
+            return paletteColor.a > 0 ? paletteColor : DefaultColor(slot);
         }
+
+        static Color DefaultColor(AvatarColorSlot slot) => slot switch
+        {
+            AvatarColorSlot.Skin => new Color32(255, 204, 176, 255),
+            AvatarColorSlot.Hair => new Color32(48, 32, 28, 255),
+            AvatarColorSlot.Iris => new Color32(45, 92, 145, 255),
+            AvatarColorSlot.Eyebrow => new Color32(52, 34, 28, 255),
+            AvatarColorSlot.Lips => new Color32(170, 88, 102, 255),
+            AvatarColorSlot.Top => new Color32(35, 56, 98, 255),
+            AvatarColorSlot.Bottom => new Color32(48, 50, 58, 255),
+            AvatarColorSlot.Sclera => Color.white,
+            AvatarColorSlot.Pupil => new Color32(20, 16, 18, 255),
+            _ => Color.white
+        };
 
         public void SetColor(AvatarColorSlot slot, Color value)
         {

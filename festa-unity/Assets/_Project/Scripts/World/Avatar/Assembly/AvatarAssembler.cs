@@ -283,9 +283,16 @@ namespace Festa.Avatar
                     {
                         var garmentShader = Shader.Find("Festa/Avatar/GarmentTint");
                         material = new Material(garmentShader ? garmentShader : shader) { name = source.name + "_RuntimeGarment" };
+                        Texture garmentMask = source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap")
+                            : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap")
+                            : source.mainTexture;
+                        if (!garmentMask)
+                            foreach (var property in source.GetTexturePropertyNames())
+                                if (source.GetTexture(property)) { garmentMask = source.GetTexture(property); break; }
+                        if (garmentMask && material.HasProperty("_BaseMap"))
+                            material.SetTexture("_BaseMap", garmentMask);
                         if (source.HasProperty("_BaseMap") && material.HasProperty("_BaseMap"))
                         {
-                            material.SetTexture("_BaseMap", source.GetTexture("_BaseMap"));
                             material.SetTextureScale("_BaseMap", source.GetTextureScale("_BaseMap"));
                             material.SetTextureOffset("_BaseMap", source.GetTextureOffset("_BaseMap"));
                         }
@@ -308,7 +315,12 @@ namespace Festa.Avatar
                     // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
                     bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");
                     Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : source.mainTexture) : null;
-                    if(preserveAlbedo && !texture)
+                    // The vendor materials do not all expose their visible map
+                    // as _BaseMap.  WebGL then used a newly-created material
+                    // with no source map, which made some assembled parts look
+                    // uniformly black.  Fall back to the first texture on every
+                    // material, including generic garment materials.
+                    if (!texture)
                         foreach(var property in source.GetTexturePropertyNames())
                             if(source.GetTexture(property)){texture=source.GetTexture(property);break;}
                     if(isEye && !texture)texture=Resources.Load<Texture2D>("Avatar/EyeTexture");

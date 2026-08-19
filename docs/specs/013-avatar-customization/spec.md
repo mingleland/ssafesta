@@ -112,6 +112,7 @@ Unity `CharacterLobby` 화면에서 캐릭터를 계속 보면서 파츠·색상
 - **FR-036**: 최초 커스터마이징 진입은 고정 기본 캐릭터가 아니라 자연스러운 추천 무작위 외형으로 시작해야 한다. 최초 추천은 상의·하의 조합을 사용해 기본 의상 탭을 `상의`로 유지하며, 저장된 `fa` 모듈형 외형이나 현재 로컬 플레이어 외형이 있으면 무작위보다 이를 우선 복원해야 한다. 무작위 버튼은 자연스러운 피부·머리·눈·입술 팔레트와 조화된 의상 테마를 사용하고, 모자와 안경을 동시에 강제하지 않아야 한다.
 - **FR-037**: 왼쪽 의상 탭의 상의·하의·한벌옷·신발 아이콘은 원본 이미지의 카드 배경·장식 프레임을 포함하지 않는 투명 누끼여야 한다. 네 탭은 오른쪽 외형 탭과 비슷한 카드 간격을 유지하고 아이콘과 프레임 사이에 내부 여백을 두며, 라벨은 아이콘 프레임 아래에서 일정 간격 떨어져야 한다.
 - **FR-038**: 같은 디자인의 여성·남성 상의·하의·한벌옷은 성별별 메시와 itemId를 유지하되 사용자에게 표시하는 한국어 이름과 썸네일은 하나의 공통 기준을 사용해야 한다. 성별 전환이나 카탈로그 재생성으로 구형 렌더 썸네일이 다시 노출되어서는 안 되며, 크롭형 상의의 신체 숨김 예외는 여성·남성 Body 모두에서 허리 연속성을 보장해야 한다.
+- **FR-039**: `CharacterLobby`의 **월드 입장**은 현재 `fa` 외형을 로컬 handoff에 저장하고 월드 접속 요청을 만든 뒤 `main` 씬으로 이동해야 한다. `main`은 이 요청을 받으면 world-session API를 호출해 서버 접속을 자동 시작하고, 해당 외형을 최초 네트워크 아바타 상태로 사용한다. 메인 씬의 **커스터마이징으로 돌아가기**는 현재 동기화된 외형을 저장하고 연결을 종료한 뒤 `CharacterLobby`로 돌아가야 한다.
 
 > 의상 영역 판정은 공통 임계값이나 RGB 가중 평균을 사용하지 않는다. 각 원본 머티리얼의 `_MaskRemap`과 `_Mask_Factor`를 보존하고, 원본 서브그래프와 동일하게 A 적용 후 B, C를 순차 선택한다. A1/A2·B1/B2·C1/C2는 네트워크 하위 호환을 위해 남아 있는 내부 슬롯이며, 현재 UI는 부위별 한 색을 각 쌍에 동일하게 기록한다.
 
@@ -183,6 +184,9 @@ fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 RGB>|w=<36개 영역 RGB
 | 무작위 조합 | 완료 |
 | 좌우 짝 자동 동기화 | 완료 (인덱스 폴백 포함) |
 | 정식 Unity `CharacterLobby` 화면 | **완료 — 2026-08-16 정식 UI로 확정** |
+| `CharacterLobby` ↔ `main` 씬 외형 handoff | **완료 — runtime cache + PlayerPrefs 보조 저장** |
+| 멀티플레이 전체 `fa` 동기화 | **완료 — `FixedString4096Bytes`, Owner 재시도 포함** |
+| WebGL 모듈 파츠 색상·Shader 보존 | **완료 — 색상 fallback, 텍스처 속성 호환, Always Included Shader 적용** |
 | Spring 저장 | **미구현** — 현재 Mock |
 | 재접속 복원 | **미구현** |
 
@@ -198,3 +202,21 @@ fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 RGB>|w=<36개 영역 RGB
 | ④ **C-01 길이 상한 합의** (`VARCHAR(3800)` 이상 또는 `TEXT`) | BE ____ / Unity 확정 | ☐ |
 
 검토자: __________ / 검토일: __________
+
+---
+
+## 2026-08-17 World Entry Appearance Handoff
+
+`fa` 모듈 외형 문자열은 최대 3800자까지 가능하므로, 접속 승인 및 기존 `NetworkPlayer.AvatarCode`의 32-byte 필드에 넣지 않는다. 이 필드는 짧은 호환용 preset만 유지한다.
+
+월드 입장 시의 확정 순서는 다음과 같다.
+
+1. `CharacterLobby`가 현재 `AvatarConfig`를 `fa` 문자열로 저장하고 `AvatarSceneHandoff`에 전달한다.
+2. `main`은 월드 접속 요청만 소비하여 서버 연결을 시작한다.
+3. Owner 플레이어가 Spawn된 뒤, 전체 `fa` 문자열을 `PlayerAppearanceController.Encoded` (`FixedString4096Bytes`)로 서버에 요청한다.
+4. 서버가 길이를 검증하고 `Encoded`를 갱신한다.
+5. 각 Client가 같은 값을 Decode하여 `PlayerAvatarVisual`과 `AvatarAssembler`로 로컬 파츠를 다시 조립한다.
+
+첫 RPC가 Spawn/Scene 전환과 경합하더라도 Owner는 서버 값이 되돌아올 때까지 제한 시간 동안 재시도한다. 같은 Unity 실행 안의 즉시 Scene 전환은 PlayerPrefs 기록 시점에 의존하지 않도록 runtime handoff cache를 우선 사용한다.
+
+**배포 규칙:** 이 경로는 Dedicated Server가 최종 `NetworkVariable` 값을 소유한다. WebGL만 교체하면 안 되며, WebGL과 Linux Dedicated Server를 같은 소스 리비전으로 빌드하고 서버 컨테이너/프로세스를 재시작해야 한다. E2E 검증은 새 서버와 새 WebGL 조합에서 수행한다.

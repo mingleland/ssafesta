@@ -18,3 +18,7 @@ Thumbs.db
 
 # 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
 _to_delete/
+
+# 로컬 Unity 시각 QA 산출물 — 소스 에셋이 아니므로 커밋하지 않는다
+festa-unity/Assets/Screenshots/
+design-qa.md

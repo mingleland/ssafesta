@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Festa.Avatar
@@ -110,6 +111,16 @@ namespace Festa.Avatar
 
         void Awake()
         {
+#if UNITY_SERVER
+            // Dedicated Server builds share the project's scene list with the
+            // WebGL client, whose first scene is the character lobby.  A server
+            // must never construct the preview avatar/UI here: the world scene
+            // owns NetworkBootstrap and starts Netcode.  Redirect before any
+            // lobby renderer, material, or UI work can run.
+            SceneManager.LoadScene(Festa.World.AvatarSceneHandoff.WorldSceneName);
+            enabled = false;
+            return;
+#endif
             if (!_assembler) _assembler = GetComponentInChildren<AvatarAssembler>();
             if (!_previewCamera) _previewCamera = Camera.main;
             if (!_catalog || !_assembler || !_previewCamera) { Debug.LogError("[CharacterLobby] 필수 참조가 비어 있습니다.", this); enabled = false; return; }
@@ -117,7 +128,9 @@ namespace Festa.Avatar
             _assembler.transform.localRotation = Quaternion.Euler(0, 180f, 0);
             _config = TryGetLiveAppearance(out var liveConfig)
                 ? liveConfig
-                : CreateRecommendedRandomConfig(AvatarGender.Female, false);
+                : TryGetSceneHandoffAppearance(out var handoffConfig)
+                    ? handoffConfig
+                    : CreateRecommendedRandomConfig(AvatarGender.Female, false);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
             if (!_restoredExistingAppearance) LoadPersistedAppearanceAsync();
@@ -132,6 +145,18 @@ namespace Festa.Avatar
             if (!appearanceController) return false;
             var appearance = appearanceController.Current;
             if (!appearance.IsModular || !IsUsableAppearance(appearance.ModularConfig)) return false;
+            config = appearance.ModularConfig;
+            _restoredExistingAppearance = true;
+            return true;
+        }
+
+        bool TryGetSceneHandoffAppearance(out AvatarConfig config)
+        {
+            config = default;
+            var encoded = Festa.World.AvatarSceneHandoff.GetEncodedOrFallback(string.Empty);
+            var appearance = Festa.World.AvatarAppearance.Decode(encoded);
+            if (!appearance.IsModular || !IsUsableAppearance(appearance.ModularConfig)) return false;
+
             config = appearance.ModularConfig;
             _restoredExistingAppearance = true;
             return true;
@@ -234,11 +259,14 @@ namespace Festa.Avatar
             _wardrobeGrid=ScrollGrid(left,new Vector2(.06f,.43f),new Vector2(.94f,.669f),2,new Vector2(158,148));_wardrobeItemScroll=(RectTransform)_wardrobeGrid.parent;
             _wardrobeColorTitle=Label(left,"의상 세부 색상",18,38,new Vector2(.06f,.45f),new Vector2(.94f,.50f));_wardrobeColorTitle.alignment=TextAnchor.MiddleLeft;_wardrobeColorTitle.color=UiTextMuted;
             _wardrobeColorSlots=ColorList(left);Anchor(_wardrobeColorSlots,new Vector2(.06f,.10f),new Vector2(.94f,.35f));
-            var quickRow=Horizontal(left,820,new Vector2(.05f,1),new Vector2(.95f,1));quickRow.sizeDelta=new Vector2(0,52);
+            var quickRow=Horizontal(left,740,new Vector2(.05f,1),new Vector2(.95f,1));quickRow.sizeDelta=new Vector2(0,52);
             Anchor(_wardrobeTitle.rectTransform,new Vector2(.06f,.684f),new Vector2(.94f,.739f));
             Anchor(_wardrobeColorTitle.rectTransform,new Vector2(.06f,.36f),new Vector2(.94f,.41f));
             Button(quickRow,"성별",()=>{_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
             Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
+            var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
+            Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+
 
             var right=Panel(_responsiveFrame,"Detail Inspector",new Vector2(.715f,0),Vector2.one,UiPanel);
             var title=Label(right,"나만의 캐릭터",30,58);title.fontStyle=FontStyle.Bold;title.color=UiText;title.rectTransform.anchoredPosition=new Vector2(0,-16);
@@ -525,11 +553,18 @@ namespace Festa.Avatar
         }
         void ApplyToWorld()
         {
+            Festa.World.AvatarSceneHandoff.Save(Festa.World.AvatarAppearance.FromModularConfig(_config));
             var nm = Unity.Netcode.NetworkManager.Singleton;
             var player = nm != null && nm.IsClient ? nm.LocalClient?.PlayerObject : null;
             var controller = player ? player.GetComponent<Festa.World.PlayerAppearanceController>() : null;
             if (controller) { controller.RequestChange(Festa.World.AvatarAppearance.FromModularConfig(_config)); SetStatus("월드 아바타에 적용했습니다."); }
             else SetStatus("외형이 준비되었습니다. 월드 접속 후 자동 적용할 수 있습니다.");
+        }
+        void EnterWorld()
+        {
+            Festa.World.AvatarSceneHandoff.Save(Festa.World.AvatarAppearance.FromModularConfig(_config));
+            Festa.World.AvatarSceneHandoff.RequestWorldConnection();
+            SceneManager.LoadScene(Festa.World.AvatarSceneHandoff.WorldSceneName);
         }
         void Randomize()
         {

@@ -38,6 +38,8 @@ namespace Festa.World
 
             go.transform.SetParent(parent, false);
             go.transform.localPosition = Vector3.zero;
+            // 월드 플레이어의 이동 정면과 모듈 아바타 정면이 일치하므로
+            // 생성 외형에는 별도의 180도 보정을 적용하지 않는다.
             go.transform.localRotation = Quaternion.identity;
 
             ApplyTint(go, appearance);

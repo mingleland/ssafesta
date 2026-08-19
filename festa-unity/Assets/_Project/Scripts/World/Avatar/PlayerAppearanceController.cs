@@ -29,10 +29,15 @@ namespace Festa.World
         public string LastRequestError { get; private set; }
 
         const float ServerApplyTimeout = 2f;
+        const float SceneHandoffRetryInterval = .35f;
+        const float SceneHandoffRetryDeadline = 8f;
 
         NetworkPlayer _player;
         string _pendingEncoded;
         float _pendingSince;
+        string _sceneHandoffEncoded;
+        float _nextSceneHandoffAttempt;
+        float _sceneHandoffDeadline;
 
         void Awake() => _player = GetComponent<NetworkPlayer>();
 
@@ -41,11 +46,60 @@ namespace Festa.World
             if (IsServer && Encoded.Value.Length == 0)
             {
                 // 접속 시 전달된 avatarCode(프리셋)를 초기값으로
-                var initial = _player.AvatarCode.Value.ToString();
+                // NetworkPlayer.AvatarCode is a legacy short field. Use the
+                // approved payload so the complete modular appearance reaches
+                // the first world spawn too.
+                var initial = SessionDataStore.Get(OwnerClientId)?.avatarCode;
+                if (string.IsNullOrEmpty(initial)) initial = _player.AvatarCode.Value.ToString();
+                if (!string.IsNullOrEmpty(initial) && initial.Length > AvatarAppearance.MaxEncodedLength)
+                    initial = AvatarAppearance.DefaultPreset;
                 Encoded.Value = string.IsNullOrEmpty(initial)
                     ? AvatarAppearance.DefaultPreset
                     : initial;
             }
+
+            // Connection approval is intentionally kept small and carries only a
+            // legacy preset.  The local lobby's full modular payload is applied
+            // after ownership is established, through the 4096-byte appearance
+            // NetworkVariable.  This avoids the transport/legacy 32-byte limits
+            // dropping clothing and hair item ids during world entry.
+            if (IsOwner)
+                BeginSceneHandoff();
+        }
+
+        void BeginSceneHandoff()
+        {
+            var encoded = AvatarSceneHandoff.GetEncodedOrFallback(string.Empty);
+            if (string.IsNullOrEmpty(encoded) || encoded.Length > AvatarAppearance.MaxEncodedLength) return;
+
+            _sceneHandoffEncoded = encoded;
+            _nextSceneHandoffAttempt = Time.unscaledTime;
+            _sceneHandoffDeadline = Time.unscaledTime + SceneHandoffRetryDeadline;
+            TryApplySceneHandoff();
+        }
+
+        void TryApplySceneHandoff()
+        {
+            if (string.IsNullOrEmpty(_sceneHandoffEncoded)) return;
+            if (Encoded.Value.ToString() == _sceneHandoffEncoded)
+            {
+                _sceneHandoffEncoded = null;
+                return;
+            }
+
+            // A host owns both sides of the connection.  Writing directly here
+            // avoids waiting for an owner-to-server RPC that is unnecessary in
+            // that configuration, while remote WebGL clients still use the RPC.
+            if (IsServer)
+            {
+                Encoded.Value = _sceneHandoffEncoded;
+                _sceneHandoffEncoded = null;
+                return;
+            }
+
+            _pendingEncoded = _sceneHandoffEncoded;
+            _pendingSince = Time.time;
+            RequestChangeServerRpc(_sceneHandoffEncoded);
         }
 
         public AvatarAppearance Current => AvatarAppearance.Decode(Encoded.Value.ToString());
@@ -82,6 +136,28 @@ namespace Festa.World
         /// </summary>
         void Update()
         {
+            // WebGL/WebSocket clients can receive their player spawn before the
+            // server accepts an RPC for that player object. Retry the local lobby
+            // handoff until the replicated value acknowledges it, so the initial
+            // fallback body cannot remain bald and unclothed.
+            if (!string.IsNullOrEmpty(_sceneHandoffEncoded))
+            {
+                if (Encoded.Value.ToString() == _sceneHandoffEncoded)
+                {
+                    _sceneHandoffEncoded = null;
+                }
+                else if (Time.unscaledTime <= _sceneHandoffDeadline && Time.unscaledTime >= _nextSceneHandoffAttempt)
+                {
+                    _nextSceneHandoffAttempt = Time.unscaledTime + SceneHandoffRetryInterval;
+                    TryApplySceneHandoff();
+                }
+                else if (Time.unscaledTime > _sceneHandoffDeadline)
+                {
+                    Debug.LogError("[Appearance] World-entry appearance synchronization timed out.");
+                    _sceneHandoffEncoded = null;
+                }
+            }
+
             if (_pendingEncoded == null) return;
 
             if (Encoded.Value.ToString() == _pendingEncoded)

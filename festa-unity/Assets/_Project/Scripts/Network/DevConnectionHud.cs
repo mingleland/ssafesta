@@ -1,5 +1,7 @@
 using Festa.Integration;
+using Festa.World;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Festa.Network
 {
@@ -24,6 +26,14 @@ namespace Festa.Network
 
         void Awake() => _connection = GetComponent<ConnectionManager>();
 
+        void Start()
+        {
+            // Only the lobby entry path starts a session automatically. Running
+            // the world scene directly still leaves the development controls usable.
+            if (AvatarSceneHandoff.ConsumeWorldConnectionRequest())
+                ConnectViaSessionApi();
+        }
+
         void OnGUI()
         {
             if (Application.isBatchMode) return;
@@ -31,7 +41,7 @@ namespace Festa.Network
             var nm = Unity.Netcode.NetworkManager.Singleton;
             if (nm == null) return;
 
-            GUILayout.BeginArea(new Rect(10, 10, 260, 220), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10, 10, 260, 260), GUI.skin.box);
             GUILayout.Label("FESTA Dev Connection (POC)");
 
             if (!nm.IsClient && !nm.IsServer)
@@ -58,7 +68,11 @@ namespace Festa.Network
                     {
                         userId = Random.Range(1, 100000),
                         nickname = _nickname,
-                        avatarCode = NextAvatarCode(),
+                        // Full modular data is sent after the owner player spawns
+                        // (PlayerAppearanceController.ApplySceneHandoff). Keeping
+                        // connection approval payload short prevents transport and
+                        // legacy FixedString truncation.
+                        avatarCode = AvatarAppearance.DefaultPreset,
                         // POC 더미 토큰. 실제로는 Spring world-sessions 응답 토큰 사용.
                         connectionToken = "poc-dummy-token"
                     });
@@ -73,6 +87,9 @@ namespace Festa.Network
                                             : "CLIENT — connected");
                 if (GUILayout.Button("Disconnect"))
                     _connection.Shutdown();
+
+                if (nm.IsClient && !nm.IsServer && GUILayout.Button("커스터마이징으로 돌아가기"))
+                    ReturnToCustomization(nm);
             }
 
             GUILayout.EndArea();
@@ -99,8 +116,18 @@ namespace Festa.Network
             {
                 userId = Random.Range(1, 100000),
                 nickname = _nickname,
-                avatarCode = "default"
+                avatarCode = AvatarAppearance.DefaultPreset
             });
+        }
+
+        void ReturnToCustomization(Unity.Netcode.NetworkManager networkManager)
+        {
+            var player = networkManager.LocalClient?.PlayerObject;
+            var appearance = player ? player.GetComponent<PlayerAppearanceController>() : null;
+            if (appearance != null) AvatarSceneHandoff.Save(appearance.Current);
+
+            _connection.Shutdown();
+            SceneManager.LoadScene(AvatarSceneHandoff.LobbySceneName);
         }
     }
 }

@@ -75,7 +75,7 @@ URL이나 긴 콘텐츠 원문을 Layout에 직접 넣지 않고 `configId`로 �
 
 이 구조는 서버·Scene 수를 폭증시키지 않으면서 부스 내부를 분리해 보여 준다.
 
-현재 Unity 독립 월드 뼈대는 `WorldSceneLayout`이 담당한다. `main` Scene 진입 시 기존 Plane 대신 `Models/11th-0818`을 공용 건축물로 생성하고, Renderer Bounds를 기준으로 양쪽 끝에 통로와 대형 부스 섹션을 자동 배치한다. 모델 크기나 원점이 달라져도 통로가 건물의 서쪽·동쪽 경계에서 시작하도록 계산하며, 각 대형 섹션에는 외부 부스 4개씩 총 8슬롯과 입구 Anchor를 둔다. 모델에 Renderer가 없거나 참조가 누락된 경우에만 안전용 바닥을 생성한다. 내부 슬롯은 월드에서 보이지 않는 먼 좌표에 8개를 미리 두고, 각 슬롯에 다음 기준점을 둔다.
+현재 공용 월드는 `Models/11th-0819`을 `main` Scene의 `@World_11F` 아래에 정적으로 배치한다. 런타임에 빈 월드 Root를 복제하지 않으며 `WorldSceneLayout`은 Scene에 저장된 월드, 외부 Booth Slot, 내부 Anchor와 Spawn 표시를 보조한다. 새 맵의 실제 네트워크 Spawn 중심은 SSAFY 로고 앞 `(-75, 0, -235)`이고 최대 40명을 8 × 5, 2.25m 간격으로 분산한다. 내부 슬롯은 월드에서 보이지 않는 먼 좌표에 8개를 미리 두고, 각 슬롯에 다음 기준점을 둔다.
 
 - `EntryAnchor`: 부스 내부 입장 시 플레이어 도착 위치
 - `ExitAnchor`: 내부에서 외부로 나갈 때 기준 위치
@@ -83,7 +83,7 @@ URL이나 긴 콘텐츠 원문을 Layout에 직접 넣지 않고 `configId`로 �
 
 이 단계는 React 편집기나 Spring API 없이 Unity 단독으로 공간과 이동 동선을 검증할 수 있다. 이후 Layout 연동 시 `ContentAnchor` 아래만 동적으로 채우면 고정 건축 구조와 임대 콘텐츠의 수명주기가 섞이지 않는다.
 
-11층 모델 Import에는 Collider 생성을 활성화했다. 따라서 중앙 건축물, 양쪽 연결 통로, 대형 섹션 바닥이 각자의 충돌 경계를 제공하고, Booth Layout 데이터와 무관한 고정 월드 지형으로 유지된다.
+11층 결합 Mesh에는 정적 비볼록 `MeshCollider`를 연결했다. 따라서 공용 건축물과 바닥은 Booth Layout 데이터와 무관한 고정 월드 지형으로 유지된다.
 
 공용 입장 구역은 최대 40명을 8 × 5 그리드로 분산한다. Dedicated Server의 Connection Approval도 동일 좌표 규칙을 사용하므로 Scene에 보이는 Spawn 기준과 실제 Network Player 생성 위치가 일치한다.
 
