@@ -11,6 +11,7 @@
 | `01-auth` | 게스트·소셜 OAuth·refresh·logout | OAuth 완료는 임시 handoff 필요 |
 | `02-users` | 내 정보·닉네임·탈퇴 | 회원 Access Token |
 | `03-wallet` | 코인 잔액·거래 내역 조회 | 회원 Access Token |
+| `04-booth-lease` | 슬롯 목록·부스 임대·내 부스 | 회원 Access Token, `slotId`/`boothId` 환경변수 |
 | 이후 `03-world`, `04-booth`, `05-wallet` | 도메인 구현 시 추가 | 각 도메인별 값 |
 | `06-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
 
@@ -67,6 +68,8 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 02-users/내 정보 조회
 → 03-wallet/내 지갑 조회
 → 03-wallet/내 거래 내역 조회
+→ 04-booth-lease/슬롯 목록 조회
+→ 04-booth-lease/부스 임대
 → 02-users/닉네임 변경
 → 01-auth/액세스 토큰 재발급
 → 01-auth/로그아웃
@@ -93,10 +96,16 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 | `Withdraw account - confirm manually` | 즉시 hard delete 탈퇴 | 기본값은 안전하게 `confirmed: false` |
 | `내 지갑 조회` | 현재 코인 잔액 조회 | `{ userId, balance, updatedAt }`. 당일 첫 요청이면 일일 50코인이 함께 지급된다 |
 | `내 거래 내역 조회` | 지급·차감 내역 페이지 조회 | 최신순 `content` + 페이지 정보. `amount`는 지급 양수·차감 음수 |
+| `슬롯 목록 조회` | 전체 슬롯 점유 상태 | 인증 불필요. `status`는 만료를 반영한 값 |
+| `부스 임대` | 빈 슬롯을 100코인으로 임대 | `201` + 차감액·잔액. 코인 차감과 임대는 한 트랜잭션 |
+| `내 부스 조회` | 내 부스와 남은 시간 | 임대 이력이 없으면 `204` |
+| `부스 상세 조회` | 방문자 관점 부스 정보 | 만료 시 `409 BOOTH_LEASE_EXPIRED` |
 
 ## 주의
 
 - 탈퇴 테스트는 폐기 가능한 소셜 계정으로만 한다. 실제 실행하려면 request body의 `confirmed`를 `true`로 바꿔야 하며, 계정과 연결 데이터가 즉시 삭제된다.
 - 게스트 Access Token은 공개 관람 전용이다. 내 정보·닉네임·탈퇴·지갑 API에는 사용할 수 없다. 게스트에게는 지갑도 코인도 없다.
+- 임대는 **1인 1부스**다. 이미 활성 임대가 있으면 `409 ACTIVE_LEASE_LIMIT`이며, 만료돼야 다시 임대할 수 있다.
+- 만료를 월드에 실시간 전파하지 않는다. 슬롯 목록이 `AVAILABLE`이어도 3D 월드에는 부스가 남아 있을 수 있다 — **API 응답이 권위다.**
 - 코인을 충전하거나 차감하는 API는 **없다.** 차감은 임대·AI 이용 같은 기능의 서버 로직에서만 일어난다 (헌법 2·16조).
 - 새 OAuth 로그인이나 Refresh 성공 뒤에는 이전 Access Token이 무효화될 수 있으므로, Bruno 환경변수에 저장된 최신 `accessToken`을 사용한다.

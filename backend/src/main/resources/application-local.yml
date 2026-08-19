@@ -58,3 +58,7 @@ app:
     initial-grant: 200
     daily-grant: 50
     daily-grant-zone: Asia/Seoul
+
+  lease:
+    price-coin: 100
+    duration: PT24H

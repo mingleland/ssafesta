@@ -3,6 +3,7 @@ package com.example.ssafesta.auth;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -48,6 +49,9 @@ class SecurityConfiguration {
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**"))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
+                        // Slot browsing is open: a guest session exists to look around (헌법 12조).
+                        // Leasing under /booth-slots/{id}/leases stays authenticated.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots", "/api/v1/booths/*").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
