@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간(`docs/LJH/`). 2026-08-18부터 git 추적 대상 — `local/` gitignore 시절의 "커밋 제외"는 더 이상 유효하지 않다.
-최종 갱신: 2026-08-20 — spec.md C-05·④ 반영, 블록 3 착수, BE 서명 가이드 게시
+최종 갱신: 2026-08-20 — spec.md develop 동기화(PR #12), 서명 방식 PR 기반으로 재확정
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -85,7 +85,7 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 - [x] C-05 확정 반영 — Clarifications 표 취소선 처리, `spec.md` 커밋(`b050026`)
 - [x] ④ 왕복 검증 ☑ 기입 — 통과 결과·sign-off(FE 이정헌/Unity 강형순) 반영, 비고에 계약 정합 3건 확인 추가 (`b050026`)
-- [ ] **BE 검토칸 작성** — 황덕 회신 대기. [Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5)에 브랜치 전환 서명 가이드 게시(2026-08-20). BE가 `front`로 전환해 직접 커밋하는 방식 — FE가 대신 채우지 않음
+- [ ] **BE 검토칸 작성** — 황덕 회신 대기. **서명 방식 2차 변경**(2026-08-20) — "front 전환 서명" → "develop에 작은 PR"로 팀 재협의. `spec.md`를 `front`→`develop` sync하는 [PR #12](https://github.com/kanghyunsoon/ssafesta/pull/12) 병합 완료(리뷰어 스킵, `festa-unity/` 0줄). Issue #5에 정정 가이드 게시 — BE는 `develop` 기준 새 브랜치+PR로 서명(직접 push 아님, T-7). FE가 대신 채우지 않음
 - [ ] SC-002 `[NEEDS CLARIFICATION: 목표 수치]` 해소 — 대응 C-xx가 없음. `/speckit-clarify`로 등록하거나 006 C-01(갱신 트리거)에서 역산
 - [ ] 제목 `리뷰 — FE 1차 검토 (확정 아님)` → 확정 상태로 교체
 
@@ -133,15 +133,15 @@ FE 잔여:
 
 ---
 
-## 별건 — 문서 서명 공간·브랜치 운영 (2026-08-20 확인)
+## 별건 — 문서 서명 공간·브랜치 운영 (2026-08-20, 당일 2차 갱신)
 
-`spec.md` 등 spec 문서의 **원본은 `front`**. `back`·`develop`·`main`에도 같은 파일이 있으나 FE 검토 4칸·C-03 확정이 없는 구버전이다.
+`spec.md` 최신본은 이제 **`develop`에 있다** (`front`→`develop` sync, [PR #12](https://github.com/kanghyunsoon/ssafesta/pull/12) 병합 완료). `back`·`main`은 여전히 구버전.
 
-경위: 08-18에 `front`→`develop` 통합을 시도(`f8c47fc`, PR #3)했다가 커밋 타입·브랜치명·PR 제목이 `docs/17` 컨벤션을 벗어나 되돌림(`95cd845`, develop은 병합 이전 상태로 완전 복원). 이때 **"`front`를 현재 시점의 최종 작업 브랜치로 간주하고 계속 작업"** 합의.
+경위: 08-18에 `front`→`develop` 전체 통합을 시도(`f8c47fc`, PR #3)했다가 커밋 타입·브랜치명·PR 제목이 `docs/17` 컨벤션을 벗어나 되돌림(`95cd845`). 그때는 "`front`를 최종 작업 브랜치로 간주" 합의였으나, **당일 오후 2차 협의로 "서명만 담은 작은 PR을 develop에 직접"으로 대체.**
 
-- **당장 규칙**: 타 파트 문서를 검토·서명할 때는 문서 소유 브랜치로 전환해 그 자리에서 서명·커밋한다. BE의 spec 005 검토는 `front`로 전환해서 진행
-- **추후**: 주 서명 공간은 `develop`으로 통합 예정
-- ⚠️ PR #3이 남긴 미해결 구조 문제 — `front`/`back`/`ai`가 `festa-unity/` 삭제 이력을 갖고 있어 일반 merge 시 **1,462개 파일이 조용히 삭제 스테이징**된다(실측 확인). 제안 2건이 팀 결정 대기: ① `festa-unity/`를 별도 저장소로 분리 ② 통합 시 일반 Merge 버튼 금지를 `docs/17`에 규칙화. **develop 통합 재시도 전에 반드시 결론 필요**
+- **현재 규칙**: 서명 대상 문서는 `develop`에 최소 diff로 먼저 올린다(전체 merge 아님 — `git checkout <owner-branch> -- <path>`로 파일 단위 sync). 서명 자체는 `develop` 기준 새 브랜치를 따 **PR로** 진행한다 — 직접 push 금지(`docs/17` §2, T-7에서 이 실수를 자체 발견·정정)
+- PR #12로 실증된 안전한 sync 절차: `develop`에서 브랜치 생성 → 파일 단위 checkout → `festa-unity/` 0줄 확인 → `docs(sdd):` 타입 커밋 → PR → 리스크 낮으면 리뷰어 스킵 가능(팀 협의로 결정, 문서화된 근거 남길 것)
+- ⚠️ PR #3이 남긴 미해결 구조 문제는 여전히 미결 — `front`/`back`/`ai`가 `festa-unity/` 삭제 이력을 갖고 있어 **전체 merge**는 여전히 위험(파일 단위 sync는 이 문제를 안 겪음, 근본 해결 아님). 제안 2건 팀 결정 대기: ① `festa-unity/`를 별도 저장소로 분리 ② 일반 Merge 버튼 금지 규칙화 (`docs/26` ①표 16번)
 
 ---
 
