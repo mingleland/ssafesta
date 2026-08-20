@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간(`docs/LJH/`). 2026-08-18부터 git 추적 대상 — `local/` gitignore 시절의 "커밋 제외"는 더 이상 유효하지 않다.
-최종 갱신: 2026-08-20 — spec.md develop 동기화(PR #12), 서명 방식 PR 기반으로 재확정
+최종 갱신: 2026-08-20 — spec 005 BE 검토 완료(PR #13), 리뷰 4칸+BE 서명 전부 종결
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -85,9 +85,10 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 - [x] C-05 확정 반영 — Clarifications 표 취소선 처리, `spec.md` 커밋(`b050026`)
 - [x] ④ 왕복 검증 ☑ 기입 — 통과 결과·sign-off(FE 이정헌/Unity 강형순) 반영, 비고에 계약 정합 3건 확인 추가 (`b050026`)
-- [ ] **BE 검토칸 작성** — 황덕 회신 대기. **서명 방식 2차 변경**(2026-08-20) — "front 전환 서명" → "develop에 작은 PR"로 팀 재협의. `spec.md`를 `front`→`develop` sync하는 [PR #12](https://github.com/kanghyunsoon/ssafesta/pull/12) 병합 완료(리뷰어 스킵, `festa-unity/` 0줄). Issue #5에 정정 가이드 게시 — BE는 `develop` 기준 새 브랜치+PR로 서명(직접 push 아님, T-7). FE가 대신 채우지 않음
+- [x] **BE 검토칸 작성** — ✅ **완료.** 황덕이 [Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5) 정정 가이드대로 `develop` 기준 PR [#13](https://github.com/kanghyunsoon/ssafesta/pull/13)으로 서명(`BE 검토: 황덕 / 검토일: 2026-08-20`). 서명과 동시에 C-05 잔여였던 409 응답 body 형식도 확정 — `{code, message, requestId}`(`docs/08` §1.3, `D-BE-01`, 계약 테스트로 구현·고정됨). `develop`·`front`의 `spec.md` diff 0 재확인. **spec 005 리뷰 4칸+BE 검토칸 전부 완료**
 - [ ] SC-002 `[NEEDS CLARIFICATION: 목표 수치]` 해소 — 대응 C-xx가 없음. `/speckit-clarify`로 등록하거나 006 C-01(갱신 트리거)에서 역산
-- [ ] 제목 `리뷰 — FE 1차 검토 (확정 아님)` → 확정 상태로 교체
+- [ ] 제목 `리뷰 — FE 1차 검토 (확정 아님)` → 확정 상태로 교체 — 이제 착수 가능(리뷰 실질 완료)
+- [ ] C-05 잔여 — 요청 스키마 `version` 위치만 미결 (BE 착수 시 확정 예정)
 
 ---
 
