@@ -54,6 +54,25 @@ public interface BoothLeaseRepository extends JpaRepository<BoothLease, Long> {
             select l from BoothLease l
             where l.slotId = :slotId and l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
               and l.endsAt <= :moment
+            order by l.id
             """)
     List<BoothLease> findStaleActiveBySlotId(@Param("slotId") Long slotId, @Param("moment") Instant moment);
+
+    /**
+     * The member's own leases still marked {@code ACTIVE} whose time has passed.
+     *
+     * <p>Needed for the same reason as {@link #findStaleActiveBySlotId}: {@code
+     * ux_booth_leases_active_lessee} (V6) does not look at {@code ends_at}, so a stale row of the
+     * member's own would block every future lease they attempt, on any slot.
+     *
+     * <p>Ordered by id so that two transactions cleaning up the same rows take them in the same
+     * order and queue instead of deadlocking.
+     */
+    @Query("""
+            select l from BoothLease l
+            where l.lesseeUserId = :userId and l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
+              and l.endsAt <= :moment
+            order by l.id
+            """)
+    List<BoothLease> findStaleActiveByLesseeUserId(@Param("userId") Long userId, @Param("moment") Instant moment);
 }

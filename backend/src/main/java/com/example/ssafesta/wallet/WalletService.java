@@ -75,6 +75,22 @@ public class WalletService {
         return requireWallet(userId).getBalance();
     }
 
+    /**
+     * Takes this member's wallet row lock for the caller's transaction, changing nothing.
+     *
+     * <p>For callers that must serialize one member's concurrent requests <b>before</b> reading
+     * state they are about to write. A check-then-act without it lets parallel requests all pass
+     * the same check — spec 004 lost the one-lease-per-member rule exactly that way (T-110).
+     *
+     * <p>Joins the caller's transaction (REQUIRED), so the lock is held until that transaction
+     * ends. Every wallet mutation already goes through the same row lock, so this adds no new
+     * lock ordering: it only moves the moment the lock is taken earlier.
+     */
+    @Transactional
+    public void lockOwner(Long userId) {
+        wallets.findByUserIdForUpdate(userId).orElseThrow(() -> new WalletNotFoundException(userId));
+    }
+
     /** Grants coins — {@code CHARGE}, {@code REWARD} or {@code REFUND}. */
     @Transactional
     public LedgerResult credit(CoinCreditCommand command) {

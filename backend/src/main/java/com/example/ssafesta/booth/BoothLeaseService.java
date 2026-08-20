@@ -6,6 +6,7 @@ import com.example.ssafesta.wallet.WalletService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +29,8 @@ public class BoothLeaseService {
     private static final int ALLOWED_DURATION_DAYS = 1;
     static final String LEASE_REASON = "LEASE_PAYMENT";
     static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
+    /** V6, lower case: PostgreSQL reports index names folded. */
+    private static final String ACTIVE_LESSEE_INDEX = "ux_booth_leases_active_lessee";
 
     private final BoothSlotRepository slots;
     private final BoothRepository booths;
@@ -62,6 +65,14 @@ public class BoothLeaseService {
             throw new SlotNotRentableException(slotId);
         }
 
+        // Serialize this member's own concurrent requests before reading anything they are about
+        // to write. Every check below is read-then-write, and seven parallel clicks on seven
+        // different slots each read "no active lease" and each got one — a member ended up with
+        // seven booths and paid seven times (T-110). ux_booth_leases_active_lessee (V6) is the
+        // hard stop; this lock is what turns the race into a queue, so the second request gets a
+        // clean ACTIVE_LEASE_LIMIT instead of a rolled-back constraint violation.
+        wallets.lockOwner(userId);
+
         Optional<BoothLease> holder = leases.findValidBySlotId(slotId, now);
         if (holder.isPresent()) {
             BoothLease existing = holder.get();
@@ -78,6 +89,7 @@ public class BoothLeaseService {
         });
 
         releaseStaleLeases(slotId, now);
+        releaseStaleLeasesOfMember(userId, now);
 
         Booth booth = ownBooth(userId);
         booth.attachSlot(slotId);
@@ -87,11 +99,10 @@ public class BoothLeaseService {
             lease = leases.saveAndFlush(new BoothLease(booth.getId(), slotId, userId, now,
                     properties.duration(), properties.priceCoin()));
         } catch (DataIntegrityViolationException exception) {
-            // Lost the race on ux_booth_leases_active_slot (or on booths.current_slot_id). The
+            // Lost a race on one of the partial unique indexes (or on booths.current_slot_id). The
             // transaction is doomed, which is exactly what this case needs: the losing request
             // must leave nothing behind — no lease and no coin charge (SC-002).
-            log.info("동시 임대 경합에서 밀렸습니다 — userId={}, slotId={}", userId, slotId);
-            throw new SlotAlreadyLeasedException(slotId);
+            throw translateRace(exception, userId, slotId);
         }
 
         LedgerResult payment = charge(userId, lease);
@@ -133,6 +144,51 @@ public class BoothLeaseService {
         booths.findByCurrentSlotId(slotId).ifPresent(Booth::detachSlot);
         leases.flush();
         booths.flush();
+    }
+
+    /**
+     * Transitions the member's own leases that are still {@code ACTIVE} but whose time has passed,
+     * wherever they sit.
+     *
+     * <p>{@code ux_booth_leases_active_lessee} (V6) does not look at {@code ends_at}, so without
+     * this a member who once leased a slot could never lease again — the same trap the slot index
+     * set, one table column over (FR-017).
+     */
+    private void releaseStaleLeasesOfMember(Long userId, Instant now) {
+        for (BoothLease lease : leases.findStaleActiveByLesseeUserId(userId, now)) {
+            lease.expire();
+            booths.findById(lease.getBoothId()).ifPresent(Booth::detachSlot);
+            log.info("만료 임대 정리(회원) — leaseId={}, userId={}, slotId={}",
+                    lease.getId(), userId, lease.getSlotId());
+        }
+        leases.flush();
+        booths.flush();
+    }
+
+    /**
+     * Names the race that was lost, so the caller hears the accurate reason.
+     *
+     * <p>"Someone else took the slot" and "you already hold a booth" are different problems with
+     * different fixes for the member, and after V6 either index can be the one that fires.
+     */
+    private RuntimeException translateRace(DataIntegrityViolationException exception, Long userId, Long slotId) {
+        String constraint = constraintNameOf(exception);
+        if (constraint != null && constraint.toLowerCase().contains(ACTIVE_LESSEE_INDEX)) {
+            log.info("동시 임대 경합 — 이미 임대를 보유한 회원입니다, userId={}, slotId={}", userId, slotId);
+            return new ActiveLeaseLimitException(null);
+        }
+        log.info("동시 임대 경합에서 밀렸습니다 — userId={}, slotId={}, constraint={}", userId, slotId, constraint);
+        return new SlotAlreadyLeasedException(slotId);
+    }
+
+    /** The database's name for the violated constraint, or {@code null} when the driver omits it. */
+    private static String constraintNameOf(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null && cause != cause.getCause(); cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+        }
+        return null;
     }
 
     /**
