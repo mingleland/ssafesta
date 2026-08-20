@@ -22,3 +22,6 @@ _to_delete/
 # 로컬 Unity 시각 QA 산출물 — 소스 에셋이 아니므로 커밋하지 않는다
 festa-unity/Assets/Screenshots/
 design-qa.md
+
+# Claude Code 로컬 권한/개인 설정 — 팀 공유 대상이 아니다 (.claude/settings.json 은 공유)
+.claude/settings.local.json

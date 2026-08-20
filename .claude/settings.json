@@ -1,0 +1,56 @@
+﻿{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "defaultMode": "acceptEdits",
+  "env": {
+    "CLAUDE_CODE_GIT_BASH_PATH": "C:\\Program Files\\Git\\bin\\bash.exe"
+  },
+  "permissions": {
+    "allow": [
+      "Read", "Edit", "Write",
+      "Bash(git status *)", "Bash(git diff *)", "Bash(git log *)", "Bash(git show *)",
+      "Bash(git branch *)", "Bash(git switch *)", "Bash(git checkout *)",
+      "Bash(git add *)", "Bash(git commit *)", "Bash(git restore *)", "Bash(git stash *)",
+      "Bash(git fetch *)", "Bash(git pull *)", "Bash(git rebase *)", "Bash(git merge *)",
+      "Bash(git push -u origin feature/*)", "Bash(git push -u origin fix/*)",
+      "Bash(git push origin feature/*)", "Bash(git push origin fix/*)",
+      "Bash(gh pr create *)", "Bash(gh pr list *)", "Bash(gh pr view *)",
+      "Bash(gh pr diff *)", "Bash(gh pr checks *)", "Bash(gh pr edit *)",
+      "Bash(gh pr comment *)", "Bash(gh issue *)", "Bash(gh repo view *)",
+      "Bash(gh run list *)", "Bash(gh run view *)",
+      "Bash(mv *)", "Bash(cp *)", "Bash(mkdir *)",
+      "Bash(dotnet build *)", "Bash(dotnet test *)",
+      "Bash(npm *)", "Bash(python *)", "Bash(python3 *)",
+      "WebFetch(domain:docs.unity3d.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:code.claude.com)",
+      "mcp__unityMCP__*",
+      "mcp__unity-mcp__*"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin master *)",
+      "Bash(git push origin develop *)",
+      "Bash(gh pr merge *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)", "Bash(git push -f *)",
+      "Bash(git reset --hard *)", "Bash(git clean -fdx *)",
+      "Bash(git branch -D *)", "Bash(git push origin --delete *)",
+      "Bash(gh repo delete *)",
+      "Bash(rm -r *)", "Bash(rm -rf *)", "Bash(rm -fr *)",
+      "Bash(*Unity.exe *)", "Bash(*-buildTarget *)", "Bash(*-executeMethod *)",
+      "Bash(git rm reference/*)",
+      "Read(.env)", "Read(.env.*)", "Read(**/*.pem)", "Read(**/id_rsa*)",
+      "Edit(.env)", "Edit(.env.*)", "Edit(.git/**)",
+      "Edit(.claude/settings.json)",
+      "Edit(reference/**)", "Write(reference/**)",
+      "Edit(docs/23_*)",
+      "Edit(**/*.meta)", "Edit(**/*.unity)", "Edit(**/*.prefab)",
+      "Edit(Library/**)", "Edit(Temp/**)", "Edit(Obj/**)",
+      "Edit(Build/**)", "Edit(Logs/**)", "Edit(ProjectSettings/**)",
+      "Edit(festa-unity/Assets/Screenshots/**)"
+    ],
+    "additionalDirectories": []
+  }
+}
