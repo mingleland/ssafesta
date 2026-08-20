@@ -25,3 +25,8 @@ design-qa.md
 
 # Claude Code 로컬 권한/개인 설정 — 팀 공유 대상이 아니다 (.claude/settings.json 은 공유)
 .claude/settings.local.json
+festa-unity/Assets/Screenshots.meta
+
+# Booth 임시 편집기의 로컬 상태 — published 는 mock 픽스처라 커밋 대상이다
+festa-unity/Tools/mock-api/api/v1/booths/*/layouts/draft
+festa-unity/Tools/mock-api/api/v1/booths/*/facade.json

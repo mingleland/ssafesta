@@ -1,0 +1,17 @@
+{
+  "footprintMeters": { "w": 6.0, "d": 6.0 },
+  "maxObjects": 12,
+  "worldUnitsPerMeter": 10,
+  "parts": [
+    { "type": "AI_AGENT", "label": "AI 직원 키오스크", "w": 0.62, "d": 0.32, "h": 1.15, "ox": 0.00, "oz": 0.00 },
+    { "type": "VIDEO_SCREEN", "label": "영상 스크린", "w": 2.70, "d": 0.30, "h": 2.10, "ox": -0.15, "oz": 0.00 },
+    { "type": "PROJECT_PANEL", "label": "프로젝트 패널", "w": 1.55, "d": 0.35, "h": 2.72, "ox": 0.00, "oz": 0.00 },
+    { "type": "SURVEY_KIOSK", "label": "설문 키오스크", "w": 0.62, "d": 0.32, "h": 0.93, "ox": 0.00, "oz": 0.00 },
+    { "type": "RECRUITMENT_BOARD", "label": "채용 보드", "w": 3.00, "d": 0.35, "h": 2.72, "ox": 0.00, "oz": 0.00 },
+    { "type": "CONSULTATION_DESK", "label": "상담 데스크", "w": 1.86, "d": 1.16, "h": 0.92, "ox": 0.00, "oz": -0.42 },
+    { "type": "LAPTOP", "label": "노트북 테이블", "w": 0.80, "d": 0.80, "h": 0.94, "ox": 0.00, "oz": 0.00 },
+    { "type": "LIKE_VOTE", "label": "좋아요 투표", "w": 0.62, "d": 0.32, "h": 1.23, "ox": 0.00, "oz": 0.00 },
+    { "type": "FURNITURE", "label": "테이블·스툴", "w": 1.50, "d": 1.72, "h": 0.75, "ox": 0.14, "oz": 0.00 },
+    { "type": "DECORATION", "label": "진열장", "w": 0.60, "d": 0.60, "h": 1.61, "ox": 0.00, "oz": 0.00 }
+  ]
+}
