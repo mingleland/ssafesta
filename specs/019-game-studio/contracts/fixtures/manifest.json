@@ -1,0 +1,31 @@
+{
+  "contractVersion": "1.0.0",
+  "positive": [
+    {
+      "name": "minimal-top-down-dialogue",
+      "file": "minimal-top-down-dialogue.json"
+    }
+  ],
+  "negative": [
+    {
+      "name": "unsupported-schema",
+      "file": "invalid/unsupported-schema.json",
+      "expectedCode": "GAME_SCHEMA_UNSUPPORTED"
+    },
+    {
+      "name": "missing-start-scene",
+      "file": "invalid/missing-start-scene.json",
+      "expectedCode": "START_SCENE_NOT_FOUND"
+    },
+    {
+      "name": "duplicate-object-id",
+      "file": "invalid/duplicate-object-id.json",
+      "expectedCode": "DUPLICATE_OBJECT_ID"
+    },
+    {
+      "name": "invalid-dialogue-target",
+      "file": "invalid/invalid-dialogue-target.json",
+      "expectedCode": "DIALOGUE_TARGET_INVALID"
+    }
+  ]
+}

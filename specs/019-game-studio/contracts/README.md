@@ -7,6 +7,8 @@
 | GameProject v1 | `game-project-v1.schema.json` | Studio / Spring Published API | Preview / Web Runtime / Spring Validator |
 | Game API 경계 | `game-api.md` | Spring | FESTA Web / Game Studio / Web Runtime |
 | Booth Game Portal | `game-portal-bridge.md` | Unity WebGL | FESTA React Host |
+| Preview Protocol | `game-preview-protocol.md` | Studio | Preview Web Runtime |
+| Event Runtime | `event-runtime-semantics.md` | Contract owner | Studio / Runtime / Spring Validator |
 | 파트 책임 | `part-boundaries.md` | FE·BE·AI·Unity 합의 | 전 파트 |
 | 최소 수직 Fixture | `fixtures/minimal-top-down-dialogue.json` | 계약 담당 | Studio / Runtime / Spring Validator |
 
@@ -32,8 +34,7 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 - Object Component가 참조하는 Asset·Item은 존재하며, 같은 Object에 동일 Component type을 중복하지 않는다.
 - `SHOW_DIALOGUE.sceneId`는 `DIALOGUE` Scene을 가리키고, `nextNodeId`는 같은 Scene의 Node를 가리킨다.
 - Variable의 `type`과 `initialValue` 실제 타입은 일치한다.
-- 한 Event 실행당 Action 수와 연쇄 실행 깊이에 상한을 둔다. 수치는 #20·#21 검토 후 plan에서 확정한다.
-- Scene 이동이 발생하면 같은 Event의 후속 Action 처리 정책을 Runtime 전체에서 통일한다.
+- Event 순서, terminal Action, Action/transition budget은 `event-runtime-semantics.md`를 따른다.
 
 ## Version 정책
 

@@ -15,15 +15,15 @@
 
 **Purpose**: 앱·DB 결정을 선점하지 않고 모든 consumer가 공유할 실행 규칙을 고정한다.
 
-- [ ] T001 [P] Add unsupported-schema negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/unsupported-schema.json`
-- [ ] T002 [P] Add missing-start-scene negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/missing-start-scene.json`
-- [ ] T003 [P] Add duplicate-object-id negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/duplicate-object-id.json`
-- [ ] T004 [P] Add invalid-dialogue-target negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/invalid-dialogue-target.json`
-- [ ] T005 Define fixture names and expected semantic error codes in `specs/019-game-studio/contracts/fixtures/manifest.json`
-- [ ] T006 Extend the no-dependency contract runner to execute the manifest in `specs/019-game-studio/contracts/fixtures/validate-fixtures.mjs`
-- [ ] T007 [P] Define Studio-to-Preview postMessage envelope, origin checks, and lifecycle in `specs/019-game-studio/contracts/game-preview-protocol.md`
-- [ ] T008 [P] Define deterministic Trigger→Condition→Action ordering and execution budgets in `specs/019-game-studio/contracts/event-runtime-semantics.md`
-- [ ] T009 Update runnable positive/negative validation steps in `specs/019-game-studio/quickstart.md`
+- [x] T001 [P] Add unsupported-schema negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/unsupported-schema.json`
+- [x] T002 [P] Add missing-start-scene negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/missing-start-scene.json`
+- [x] T003 [P] Add duplicate-object-id negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/duplicate-object-id.json`
+- [x] T004 [P] Add invalid-dialogue-target negative fixture in `specs/019-game-studio/contracts/fixtures/invalid/invalid-dialogue-target.json`
+- [x] T005 Define fixture names and expected semantic error codes in `specs/019-game-studio/contracts/fixtures/manifest.json`
+- [x] T006 Extend the no-dependency contract runner to execute the manifest in `specs/019-game-studio/contracts/fixtures/validate-fixtures.mjs`
+- [x] T007 [P] Define Studio-to-Preview postMessage envelope, origin checks, and lifecycle in `specs/019-game-studio/contracts/game-preview-protocol.md`
+- [x] T008 [P] Define deterministic Trigger→Condition→Action ordering and execution budgets in `specs/019-game-studio/contracts/event-runtime-semantics.md`
+- [x] T009 Update runnable positive/negative validation steps in `specs/019-game-studio/quickstart.md`
 
 **Checkpoint**: Positive fixture and every negative fixture produce deterministic results without FE/BE/Unity.
 

@@ -27,11 +27,19 @@ node specs/019-game-studio/contracts/fixtures/validate-fixtures.mjs
 예상 결과:
 
 ```text
-GameProject fixture semantic validation: OK
+PASS positive minimal-top-down-dialogue
+PASS negative unsupported-schema -> GAME_SCHEMA_UNSUPPORTED
+PASS negative missing-start-scene -> START_SCENE_NOT_FOUND
+PASS negative duplicate-object-id -> DUPLICATE_OBJECT_ID
+PASS negative invalid-dialogue-target -> DIALOGUE_TARGET_INVALID
+GameProject contract fixtures: 5/5 passed
 ```
 
-검증 대상은 시작 Scene, 중복 ID, Asset/Item/Variable/Object 참조, Player Spawn 수,
-Tile 크기, Component 중복, DIALOGUE 대상, Node 이동이다.
+검증 대상은 시작 Scene, 중복 ID, Asset/Item/Variable/Object 참조, Player Spawn 수, Tile 크기,
+Component 중복, DIALOGUE 대상, Node 이동과 terminal Action 순서다. Negative fixture는 다른 오류가
+발생해도 실패하므로 Frontend/Backend의 validation 순서 차이도 드러낸다.
+
+Fixture 목록과 기대 code는 `contracts/fixtures/manifest.json`이 소유한다.
 
 ## 3. 수동 수직 시나리오
 
