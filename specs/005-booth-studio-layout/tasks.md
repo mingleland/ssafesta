@@ -37,20 +37,21 @@
 
 **⚠️ 이 단계가 끝나기 전에는 어떤 User Story도 시작할 수 없다**
 
-- [ ] T010 `db/migration/V8__booth_published_layout_version.sql` — `booths.published_layout_version INTEGER NULL` 추가 + **복합 FK** `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사가 면제되어 "공개된 것 없음"이 표현된다 (data-model I-3)
-- [ ] T011 `db/migration/V9__booth_facade_fields.sql` — `facade_code` → `facade_theme_code` **rename**, `facade_primary_color VARCHAR(7)` · `facade_sign_text VARCHAR(60)` · `facade_logo_url VARCHAR(2048)` 추가 (전부 NULL 허용). **`booth/Booth.java`의 `facadeCode` 필드도 같은 커밋에서 고친다** — 아무도 안 읽는 필드라 빠뜨려도 테스트가 통과해 버린다 (data-model §5)
-- [ ] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분. **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
-- [ ] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다
-- [ ] T014 `booth/LayoutJson.java` — **요청 원문을 보관**하고 검증용 파싱만 별도로 수행. 좌표는 `BigDecimal`로 읽는다. **`double`로 파싱해 재직렬화하지 않는다** (research R-04). JPA는 `@JdbcTypeCode(SqlTypes.JSON) String`으로 매핑
-- [ ] T015 [P] `booth/BoothLayoutDraft.java` — `booth_layout_drafts` 매핑. PK가 `booth_id`(I-1). `revision` 증가는 전용 메서드로만
-- [ ] T016 [P] `booth/BoothLayoutPublishedVersion.java` — `booth_layout_published_versions` 매핑. **생성 후 `layout_json`을 바꾸는 경로를 만들지 않는다** (I-7)
-- [ ] T017 [P] `booth/BoothStaff.java` + `booth/BoothStaffRepository.java` — `@IdClass`로 복합 PK. **읽기 전용** — 초대·수락은 spec 011 (research R-07)
-- [ ] T018 [P] `booth/BoothLayoutDraftRepository.java` · `booth/BoothLayoutPublishedVersionRepository.java` — 부스별 Draft 조회, `(boothId, versionNo)` 조회, `MAX(version_no)` 조회, **`revision` 조건부 UPDATE**(영향 행 0이면 충돌 — I-6)
-- [ ] T019 [P] `booth/LayoutValidationResult.java` + `booth/LayoutValidator.java` — [data-model.md](data-model.md) §3 규칙표대로 `errors`·`warnings` 두 목록 생성. **Draft 저장용과 공개용 진입점을 분리**해 같은 규칙집합을 다른 강도로 적용한다 (research R-05)
-- [ ] T020 [P] `booth/BoothEditorGuard.java` — `Booth.isOwnedBy(userId) || boothStaffs.existsById(boothId, userId)` (FR-012)
-- [ ] T021 [P] 예외 3종 — `LayoutValidationFailedException`(errors·warnings 첨부) · `LayoutRevisionConflictException`(현재 revision 첨부) · `BoothEditorForbiddenException`. 전부 `ApiException` 상속
+- [X] T010 `db/migration/V8__booth_published_layout_version.sql` — `booths.published_layout_version INTEGER NULL` 추가 + **복합 FK** `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사가 면제되어 "공개된 것 없음"이 표현된다 (data-model I-3)
+- [X] T011 `db/migration/V9__booth_facade_fields.sql` — `facade_code` → `facade_theme_code` **rename**, `facade_primary_color VARCHAR(7)` · `facade_sign_text VARCHAR(60)` · `facade_logo_url VARCHAR(2048)` 추가 (전부 NULL 허용). **`booth/Booth.java`의 `facadeCode` 필드도 같은 커밋에서 고친다** — 아무도 안 읽는 필드라 빠뜨려도 테스트가 통과해 버린다 (data-model §5)
+- [X] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분. **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
+- [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다
+- [X] T014 `booth/LayoutJson.java` — **요청 원문을 보관**하고 검증용 파싱만 별도로 수행. 좌표는 `BigDecimal`로 읽는다. **`double`로 파싱해 재직렬화하지 않는다** (research R-04). JPA는 `@JdbcTypeCode(SqlTypes.JSON) String`으로 매핑
+- [X] T015 [P] `booth/BoothLayoutDraft.java` — `booth_layout_drafts` 매핑. PK가 `booth_id`(I-1). `revision` 증가는 전용 메서드로만
+- [X] T016 [P] `booth/BoothLayoutPublishedVersion.java` — `booth_layout_published_versions` 매핑. **생성 후 `layout_json`을 바꾸는 경로를 만들지 않는다** (I-7)
+- [X] T017 [P] `booth/BoothStaff.java` + `booth/BoothStaffRepository.java` — `@IdClass`로 복합 PK. **읽기 전용** — 초대·수락은 spec 011 (research R-07)
+- [X] T018 [P] `booth/BoothLayoutDraftRepository.java` · `booth/BoothLayoutPublishedVersionRepository.java` — 부스별 Draft 조회, `(boothId, versionNo)` 조회, `MAX(version_no)` 조회, **`revision` 조건부 UPDATE**(영향 행 0이면 충돌 — I-6)
+- [X] T019 [P] `booth/LayoutValidationResult.java` + `booth/LayoutValidator.java` — [data-model.md](data-model.md) §3 규칙표대로 `errors`·`warnings` 두 목록 생성. **Draft 저장용과 공개용 진입점을 분리**해 같은 규칙집합을 다른 강도로 적용한다 (research R-05)
+- [X] T020 [P] `booth/BoothEditorGuard.java` — `Booth.isOwnedBy(userId) || boothStaffs.existsById(boothId, userId)` (FR-012)
+- [X] T021 [P] 예외 3종 — `LayoutValidationFailedException`(errors·warnings 첨부) · `LayoutRevisionConflictException`(현재 revision 첨부) · `BoothEditorForbiddenException`. 전부 `ApiException` 상속
+- [X] T052 `test/.../booth/BoothLayoutSchemaIntegrationTest.java` — **구현 중 추가.** Phase 2는 "스키마가 준비됐다"고 선언하는데 그걸 확인하는 것이 하나도 없었다. jsonb 정밀도 왕복 / Draft PK가 곧 I-1 / 포인터 FK가 없는 회차를 막음 / NULL 포인터 허용 / **공개한 소유자의 탈퇴가 성공** / facade 4컬럼 / 회차 카운트가 부스별. 다섯 번째가 핵심 — `AccountDeletionService`에 테스트가 0건이라 V8 FK가 탈퇴를 깨도 아무도 몰랐다
 
-**Checkpoint**: 스키마·엔티티·검증기·권한 판정이 준비됐다
+**Checkpoint**: 스키마·엔티티·검증기·권한 판정이 준비됐다 — **회귀 119건 통과(Phase 1 대비 +7), 실패 0**
 
 ---
 

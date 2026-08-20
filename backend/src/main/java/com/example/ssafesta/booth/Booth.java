@@ -47,8 +47,31 @@ public class Booth {
     @Column(columnDefinition = "text")
     private String description;
 
-    @Column(name = "facade_code", nullable = false, length = 50)
-    private String facadeCode = "DEFAULT";
+    /**
+     * The exterior slot's limited presentation (spec 005 FR-018, spec 006 — "제한형 Facade").
+     * Not a layout: four fixed fields, not free placement.
+     */
+    @Column(name = "facade_theme_code", nullable = false, length = 50)
+    private String facadeThemeCode = "DEFAULT";
+
+    @Column(name = "facade_primary_color", length = 7)
+    private String facadePrimaryColor;
+
+    @Column(name = "facade_sign_text", length = 60)
+    private String facadeSignText;
+
+    @Column(name = "facade_logo_url", length = 2048)
+    private String facadeLogoUrl;
+
+    /**
+     * Which published layout version visitors currently see, or {@code null} when nothing is
+     * published (spec 005 R-02, invariant I-3).
+     *
+     * <p>The nullable pointer is what makes FR-011 expressible: on re-lease it is cleared, so the
+     * previous owner's last published layout cannot come back to life on its own.
+     */
+    @Column(name = "published_layout_version")
+    private Integer publishedLayoutVersion;
 
     @Column(name = "homepage_url", length = 2048)
     private String homepageUrl;
@@ -78,6 +101,34 @@ public class Booth {
     public String getDescription() { return description; }
     public BoothStatus getStatus() { return status; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public String getFacadeThemeCode() { return facadeThemeCode; }
+    public String getFacadePrimaryColor() { return facadePrimaryColor; }
+    public String getFacadeSignText() { return facadeSignText; }
+    public String getFacadeLogoUrl() { return facadeLogoUrl; }
+    public Integer getPublishedLayoutVersion() { return publishedLayoutVersion; }
+
+    /** Points visitors at a newly published version — only ever called from the publish transaction. */
+    void publishLayoutVersion(int versionNo) {
+        this.publishedLayoutVersion = versionNo;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Stops serving a published layout while keeping every version row intact (FR-011: preserved,
+     * but not automatically republished).
+     */
+    void clearPublishedLayoutVersion() {
+        this.publishedLayoutVersion = null;
+        this.updatedAt = Instant.now();
+    }
+
+    void changeFacade(String themeCode, String primaryColor, String signText, String logoUrl) {
+        this.facadeThemeCode = themeCode;
+        this.facadePrimaryColor = primaryColor;
+        this.facadeSignText = signText;
+        this.facadeLogoUrl = logoUrl;
+        this.updatedAt = Instant.now();
+    }
 
     void attachSlot(Long slotId) {
         this.currentSlotId = slotId;
