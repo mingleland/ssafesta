@@ -86,9 +86,9 @@ status = 'ACTIVE' AND ends_at > now()
 |---|---|---|
 | I-1 | 한 슬롯에 유효한 활성 임대는 최대 1개 | `ux_booth_leases_active_slot` (FR-004, SC-001) |
 | I-2 | 코인이 차감됐다면 대응하는 임대가 반드시 있다 | 단일 트랜잭션 (FR-003, SC-002) |
-| I-3 | 사용자당 유효한 활성 임대는 최대 1개 | 임대 생성 시 만료 술어로 검사 (FR-005, D01) |
+| I-3 | 사용자당 유효한 활성 임대는 최대 1개 | `ux_booth_leases_active_lessee` + 임대 진입부의 지갑 행 락 (FR-005, D01) |
 | I-4 | `ends_at = starts_at + 24h` | 서버가 계산. 요청값을 쓰지 않는다 (FR-006, 헌법 16조) |
-| I-5 | Booth의 콘텐츠는 소유자가 바뀌지 않는다 | Booth가 `owner_user_id`에 귀속 (C-01, SC-004) |
+| I-5 | Booth의 콘텐츠는 소유자가 바뀌지 않는다 | Booth가 `owner_user_id`에 귀속 + `ux_booths_owner` (C-01, SC-004) |
 | I-6 | 만료된 임대의 슬롯 연결은 남지 않는다 | 재임대 트랜잭션에서 해제 (FR-017) |
 | I-7 | 게스트는 임대 기록을 만들 수 없다 | 컨트롤러 role 검사 (FR-016, 헌법 12조) |
 
@@ -96,11 +96,17 @@ status = 'ACTIVE' AND ends_at > now()
 
 | 인덱스 | 상태 | 용도 |
 |---|---|---|
-| `ux_booth_leases_active_slot` | V1에 존재 | 슬롯 독점 |
+| `ux_booth_leases_active_slot` | V1에 존재 | 슬롯 독점 (I-1) |
 | `booths.current_slot_id` UNIQUE | V1에 존재 | 슬롯당 Booth 1개 |
 | `booth_slots.slot_code` UNIQUE | V1에 존재 | 슬롯 식별 |
+| `ux_booth_leases_active_lessee` | **V6에서 추가** | 회원당 활성 임대 1건 (I-3) |
+| `ux_booths_owner` | **V7에서 추가** | 회원당 Booth 1개 (I-5) |
 
-추가 인덱스를 두지 않는다. 슬롯이 7개라 전체 조회가 곧 최적이다.
+**조회 성능용 인덱스는 두지 않는다** — 슬롯이 7개라 전체 조회가 곧 최적이다. 위 목록은 전부 **무결성 제약**이다.
+
+> V6·V7은 처음 설계에 없었다. 부하 테스트에서 **한 회원이 7개 슬롯에 동시 요청해 임대 7건과 부스 7개를 만드는 것**을 발견하고 추가했다 (T-110). I-3과 I-5가 코드의 조회 한 줄에만 기대고 있었고, 그건 check-then-act라 경합에서 통과한다.
+>
+> **두 인덱스 모두 `ends_at`을 보지 않는다.** `ux_booth_leases_active_slot`이 그랬듯, 만료된 `ACTIVE` 행이 남으면 그 회원은 영구히 재임대 불가가 된다. 그래서 재임대 트랜잭션이 **슬롯 기준과 회원 기준 양쪽**의 낡은 임대를 전이한다 (FR-017).
 
 ## 6. 상태 전이
 

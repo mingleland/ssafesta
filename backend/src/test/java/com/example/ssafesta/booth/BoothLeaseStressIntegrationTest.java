@@ -52,6 +52,7 @@ class BoothLeaseStressIntegrationTest {
 
     @Autowired private BoothLeaseService leaseService;
     @Autowired private BoothSlotRepository slots;
+    @Autowired private BoothRepository booths;
     @Autowired private BoothLeaseRepository leases;
     @Autowired private WalletService wallets;
     @Autowired private UserRepository users;
@@ -164,7 +165,8 @@ class BoothLeaseStressIntegrationTest {
         List<Long> rentable = rentableSlotIds();
         Map<String, AtomicLong> outcomes = new ConcurrentHashMap<>();
 
-        for (int round = 0; round < rounds; round++) {
+        for (int roundIndex = 0; roundIndex < rounds; roundIndex++) {
+            final int round = roundIndex;
             BoothTestSupport.releaseAllSlots(jdbc);
             int before = wallets.balanceOf(userId);
 
@@ -175,9 +177,16 @@ class BoothLeaseStressIntegrationTest {
             long held = validLeaseCountOf(userId);
             int spent = before - wallets.balanceOf(userId);
             assertBalanceMatchesLedger(wallets, userId);
-            log.info("시나리오2b round={} 보유임대={} 차감코인={}", round, held, spent);
+            log.info("시나리오2b round={} 보유임대={} 차감코인={} 부스={}",
+                    round, held, spent, boothCountOf(userId));
             assertEquals(1, held, "라운드 " + round + ": 회원 한 명은 임대를 하나만 가질 수 있습니다 (D01).");
             assertEquals(properties.priceCoin(), spent, "라운드 " + round + ": 차감은 한 건이어야 합니다.");
+            // Before V7 each of the seven threads created its own booth. findByOwnerUserId returns
+            // Optional, so the second row would not just be untidy — it would throw and lock the
+            // member out of leasing entirely (C-01, invariant I-5).
+            assertEquals(1, boothCountOf(userId), "라운드 " + round + ": 회원의 부스는 하나여야 합니다 (C-01).");
+            booths.findByOwnerUserId(userId).orElseThrow(
+                    () -> new AssertionError("라운드 " + round + ": 소유 부스를 단건으로 읽을 수 있어야 합니다."));
         }
         log.info("시나리오2b - 슬롯 {}개 동시 광클 x {}라운드, 결과 분포 {}", rentable.size(), rounds, describe(outcomes));
     }
@@ -205,6 +214,10 @@ class BoothLeaseStressIntegrationTest {
         wallets.credit(new CoinCreditCommand(userId, LedgerEntryType.CHARGE, amount,
                 CoinReason.ADMIN_ADJUSTMENT, "STRESS_TEST", String.valueOf(userId),
                 "STRESS_FUND:" + userId));
+    }
+
+    private long boothCountOf(Long userId) {
+        return jdbc.queryForObject("SELECT count(*) FROM booths WHERE owner_user_id = ?", Long.class, userId);
     }
 
     private long validLeaseCountOf(Long userId) {
