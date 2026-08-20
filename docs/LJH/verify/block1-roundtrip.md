@@ -105,5 +105,16 @@ DTO → `BoothRuntimeObject.AssetCode`까지 온전히 전달되고, 미등록 �
 ### 잔여
 
 - `BOOTH_LAPTOP_INTERACT` 실제 브라우저 왕복은 WebGL 빌드에서만 발생(에디터는 로그만) — 배포 후 별도 검증
-- `assetCode`로 **서로 다른 자산이 선택되는지** — 프리팹 카탈로그 확장 후. FE가 쓸 코드 목록 제공이 선행
+- `assetCode`로 **서로 다른 자산이 선택되는지** — 프리팹 카탈로그 확장 후. FE가 쓸 코드 목록 제공이 선행.
+  **주의**: Unity `BuildMap()`이 현재 last-wins라 한 타입에 자산 2개 이상 등록 시 미지정·오타 케이스가 Registry
+  배열 순서에 좌우된다(Unity가 인지, 타입별 기본 자산 명시로 좁힐 예정 — FE 계약 무관)
 - ~~mock 파일 경로 단수 잔존~~ → 2026-08-20 FE 회신으로 복수형 이동 승인(FE는 `Tools/mock-api` 미사용, 레포 확인 완료)
+
+### Issue #6 종료 (2026-08-20, 강형순)
+
+- mock 경로 복수형 이동 완료 — `git mv`, 커밋 `bad201b`. 부수: README의 `python -m http.server`가
+  Windows Store 별칭으로 실행 안 됨 → `py -m http.server`로 주석 수정
+- `assetCode` 오타 경고 로그 구현 완료 — 커밋 `6e03998`. 4케이스 검증(`null`·빈 문자열·정확 일치는
+  무로그, 오타만 경고 1건)
+- 본래 요청(좌표 왕복 검증)·계약 불일치 3건 전부 처리 확인 후 이슈 닫음. 위 잔여 2건은 FE 결정 대기로
+  남겨두고 재오픈 가능 상태
