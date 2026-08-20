@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const fixtureDir = dirname(fileURLToPath(import.meta.url));
@@ -193,30 +193,36 @@ const loadNegativeFixture = (fixtureFile) => {
   return project;
 };
 
-const manifest = readJson(join(fixtureDir, "manifest.json"));
-let passed = 0;
+export function runFixtureSuite() {
+  const manifest = readJson(join(fixtureDir, "manifest.json"));
+  let passed = 0;
 
-for (const fixture of manifest.positive) {
-  validateProject(readJson(join(fixtureDir, fixture.file)));
-  console.log(`PASS positive ${fixture.name}`);
-  passed += 1;
-}
-
-for (const fixture of manifest.negative) {
-  try {
-    validateProject(loadNegativeFixture(fixture.file));
-    fail("NEGATIVE_FIXTURE_ACCEPTED", `${fixture.name} unexpectedly passed`);
-  } catch (error) {
-    if (!(error instanceof ContractError)) throw error;
-    expect(
-      error.code === fixture.expectedCode,
-      "NEGATIVE_FIXTURE_WRONG_ERROR",
-      `${fixture.name}: expected ${fixture.expectedCode}, got ${error.code}`,
-    );
-    console.log(`PASS negative ${fixture.name} -> ${error.code}`);
+  for (const fixture of manifest.positive) {
+    validateProject(readJson(join(fixtureDir, fixture.file)));
+    console.log(`PASS positive ${fixture.name}`);
     passed += 1;
   }
+
+  for (const fixture of manifest.negative) {
+    try {
+      validateProject(loadNegativeFixture(fixture.file));
+      fail("NEGATIVE_FIXTURE_ACCEPTED", `${fixture.name} unexpectedly passed`);
+    } catch (error) {
+      if (!(error instanceof ContractError)) throw error;
+      expect(
+        error.code === fixture.expectedCode,
+        "NEGATIVE_FIXTURE_WRONG_ERROR",
+        `${fixture.name}: expected ${fixture.expectedCode}, got ${error.code}`,
+      );
+      console.log(`PASS negative ${fixture.name} -> ${error.code}`);
+      passed += 1;
+    }
+  }
+
+  const total = manifest.positive.length + manifest.negative.length;
+  console.log(`GameProject contract fixtures: ${passed}/${total} passed`);
 }
 
-const total = manifest.positive.length + manifest.negative.length;
-console.log(`GameProject contract fixtures: ${passed}/${total} passed`);
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  runFixtureSuite();
+}

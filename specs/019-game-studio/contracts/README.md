@@ -43,6 +43,25 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 - 호환 가능한 선택 필드 추가는 MINOR, 기존 의미 변경은 MAJOR를 올린다.
 - `revision`은 Draft 편집 충돌 탐지용이며 Published Version 번호와 다르다.
 
+### Supported major matrix
+
+| Consumer | GameProject major | Preview protocol major | Unknown major policy |
+|---|:---:|:---:|---|
+| Studio editor | 1 | 1 | read-only 안내 또는 load 거부 |
+| Preview Runtime | 1 | 1 | `GAME_SCHEMA_UNSUPPORTED` |
+| Published Web Runtime | 1 | N/A | `GAME_SCHEMA_UNSUPPORTED` |
+| Spring Draft validator | 1 | N/A | 저장/Publish 거부 |
+| Unity | N/A | N/A | GameProject를 소비하지 않음 |
+
+### Migration policy
+
+1. 기존 Published Version JSON을 제자리 수정하지 않는다.
+2. MAJOR migration은 원본 snapshot을 입력으로 새 Draft 또는 새 Published Version을 만든다.
+3. migration은 결정적이고 반복 실행 가능해야 하며 `fromVersion`, `toVersion`, 결과 validation을 기록한다.
+4. Runtime은 알 수 없는 field를 추측하거나 unknown MAJOR를 best-effort 실행하지 않는다.
+5. 호환 가능한 optional field 추가는 MINOR, 설명·문서·fixture 수정은 PATCH로 관리한다.
+6. 지원 major 제거는 사용 중인 Published Version 수를 확인하고 변환·rollback 계획을 승인한 뒤 수행한다.
+
 ## Scene/Component 적용 판단
 
 - `TOP_DOWN`과 후속 `PLATFORMER`만 이동·물리 Runtime 유형으로 본다.

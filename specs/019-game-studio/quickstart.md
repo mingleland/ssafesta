@@ -41,7 +41,23 @@ Component 중복, DIALOGUE 대상, Node 이동과 terminal Action 순서다. Neg
 
 Fixture 목록과 기대 code는 `contracts/fixtures/manifest.json`이 소유한다.
 
-## 3. 수동 수직 시나리오
+## 3. Runtime 상태 전이 검증
+
+```powershell
+node specs/019-game-studio/contracts/fixtures/validate-runtime-traces.mjs
+```
+
+예상 결과:
+
+```text
+PASS runtime step 1 START
+PASS runtime step 2 ENTER
+PASS runtime step 3 INTERACT
+PASS runtime step 4 CHOOSE
+GameProject runtime trace: 4/4 passed
+```
+
+## 4. 수동 수직 시나리오
 
 `contracts/fixtures/minimal-top-down-dialogue.json`을 읽어 다음 순서가 데이터만으로 표현되는지 확인한다.
 
@@ -51,7 +67,7 @@ Fixture 목록과 기대 code는 `contracts/fixtures/manifest.json`이 소유한
 4. `ending` DIALOGUE Scene 표시.
 5. 선택지에서 `COMPLETE_GAME` 실행.
 
-## 4. 파트별 구현 후 추가할 검증
+## 5. 파트별 구현 후 추가할 검증
 
 - #20 이후: Studio→Preview snapshot, 독립 `/play/:gameId`, Overlay 종료/복귀 E2E
 - #21 이후: revision conflict, invalid Publish 거부, Published 불변, Portal resolution integration test
