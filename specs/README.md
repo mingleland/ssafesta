@@ -16,7 +16,7 @@
 | 002 | world-session | P0 | Unity + BE | ✅ **확정** | ✅ | ✅ |
 | 003 | wallet-coin | P0 | BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 004 | booth-slot-lease | P0 | BE + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
-| 005 | booth-studio-layout | P0 | FE + BE | ✅ | — | — |
+| 005 | booth-studio-layout | P0 | FE + BE | ✅ **BE 검토 완료** (FE 대기) | ✅ +research/data-model/contracts/quickstart | — |
 | 006 | booth-runtime | P0 | Unity | ✅ **확정** | ✅ | ✅ |
 | 007 | ai-agent-document | P0 | AI | ✅ | — | — |
 | 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |

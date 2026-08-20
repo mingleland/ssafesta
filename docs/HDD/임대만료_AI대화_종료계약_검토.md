@@ -15,7 +15,7 @@
 |---|---|
 | 임대 유효 조건 `status='ACTIVE' AND ends_at > now()` | ✅ `BoothLeaseRepository` 쿼리에만 존재 |
 | 스케줄러 없이 조회 시점 논리 판정 | ✅ `BoothQueryService` |
-| 만료 부스 공개 조회 `409 BOOTH_LEASE_EXPIRED` | ✅ `BoothExpiredException` + `ErrorCode` |
+| 만료 부스 공개 조회 `409 BOOTH_LEASE_EXPIRED` | ✅ `BoothExpiredException` → `BoothController`가 409로 변환 |
 | 재임대 시 stale ACTIVE → EXPIRED + 슬롯 연결 해제 | ✅ `BoothLeaseService.releaseStaleLeases()` |
 | Conversation API·SSE 유예 종료·만료 Push 없음 | ✅ 백엔드에 대화 관련 코드 0 |
 
@@ -192,10 +192,10 @@ GET /internal/ai/booth-access?boothId=7&agentId=78
 ### 권고 — **새 코드를 만들지 않는다. `BOOTH_LEASE_EXPIRED` 하나로 통일**
 
 요청서 권장안 5는 SSE 오류 코드로 `LEASE_EXPIRED`를 제안하는데, **이건 정정을 권한다.**
-`BOOTH_LEASE_EXPIRED`가 이미 `ErrorCode` enum에 있고 `GET /booths/{id}`가 이미 그 코드로 응답하며
-**FE·Unity가 이미 그걸로 분기한다.** 같은 조건에 두 번째 이름을 만들면
+`BOOTH_LEASE_EXPIRED`는 **`GET /booths/{id}`가 이미 만료에 쓰고 있는 이름**이고 docs/08의 오류 코드 표에도 있다.
+같은 조건에 두 번째 이름을 만들면
 
-- FE가 파서·문구를 두 벌 관리한다 (D-BE-01에서 막 끝낸 문제와 같은 종류)
+- FE가 파서·문구를 두 벌 관리한다
 - 헌법 24조 통보 대상이 늘어난다
 - "부스 입장 거부"와 "AI 질문 거부"가 사용자에게는 **같은 사건**인데 코드가 달라진다
 
@@ -205,8 +205,14 @@ GET /internal/ai/booth-access?boothId=7&agentId=78
 | 스트림 **개시 후** | `event: error` / `data: {"code":"BOOTH_LEASE_EXPIRED", ...}` → 연결 종료 |
 | Conversation 상태 | `EXPIRED`로 전이 (docs/14 §4의 `status` 어휘에 추가 필요) |
 
-**FastAPI도 Spring과 같은 오류 봉투 `{code, message, requestId}`를 쓴다.** D-BE-01에서 확정된 형태다.
+**FastAPI도 Spring과 같은 오류 봉투 `{code, message, requestId}`를 쓴다** — docs/08 §1.3의 형태다.
 다르면 FE가 서버별로 파서를 두 개 만든다.
+
+> ⚠️ **정정 (2026-08-20, spec 005 착수 중 확인).** 이 봉투는 **문서에만 있고 Spring에 구현되어 있지 않다.**
+> 현재 004는 `ResponseStatusException`으로 `"BOOTH_LEASE_EXPIRED: …"` 문자열을 ProblemDetail `detail`에
+> 넣을 뿐이고, 전역 예외 핸들러도 `ErrorCode` enum도 없다. 005가 **신규 endpoint에 한해** 이 봉투를
+> 도입하며(`specs/005/research.md` R-09), 003·004까지 통일하는 것은 FE 통보가 필요한 별건으로
+> `docs/26`에 올렸다. **AI 파트에는 "현재 구현이 아니라 합의된 목표 형태"로 전달해야 한다.**
 
 **새 SSE 이벤트 이름은 만들 수 없다** — 헌법 19조가 `start/token/source/done/error` 5종으로 고정했다.
 따라서 종료 통지는 반드시 `error` 이벤트다.
