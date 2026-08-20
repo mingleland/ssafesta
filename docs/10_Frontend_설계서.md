@@ -517,6 +517,33 @@ Secret 값은 Frontend 환경변수에 넣지 않는다.
 
 ---
 
+## 19A. Game Studio P2 독립 앱
+
+Game Studio는 Unity WebGL 위에 그리는 UI가 아니라 React 계층의 독립 제작기와 2D Runtime이다.
+기존 FESTA Host와 인증·라우팅·API Client·오버레이 Shell만 공유하고, 편집 상태와 Runtime 코드는
+별도 폴더/패키지 경계로 둔다.
+
+Frontend 책임:
+
+- TOP_DOWN/DIALOGUE Scene 편집, 제한형 Component/Event 조합 UI
+- 공통 GameProject 타입과 Schema 기반 client validation
+- Draft autosave/revision 충돌 UI, Preview, Publish 요청
+- Published Version의 Canvas 기반 2D 실행
+- 독립 게임 URL과 FESTA 오버레이 진입 경로
+- 기존 `window.FestaUnity.onBoothInteract` 이벤트를 Portal Resolver에 연결
+
+Frontend 비책임:
+
+- Published Version의 최종 유효성·권한 판정
+- 보상·랭킹·영구 결과 계산
+- Unity 안에서 GameProject를 실행하는 기능
+- AI 응답 없이는 저장할 수 없는 제작 흐름
+
+권장 경계와 폴더 초안은 [`specs/019-game-studio/contracts/part-boundaries.md`](../specs/019-game-studio/contracts/part-boundaries.md),
+Frontend 미확정 항목은 [GitHub #20](https://github.com/kanghyunsoon/ssafesta/issues/20)에서 관리한다.
+
+---
+
 ## 20. 확정 필요 사항
 
 - 상태관리 / Server State 라이브러리
@@ -526,3 +553,5 @@ Secret 값은 Frontend 환경변수에 넣지 않는다.
 - Layout 충돌 처리
 - 모바일 Booth Studio 지원 범위
 - WebSocket 인증 갱신 방식
+- Game Studio를 기존 앱 workspace package로 둘지 독립 배포 앱으로 둘지
+- Game Runtime 렌더러와 오버레이/새 경로 진입 UX

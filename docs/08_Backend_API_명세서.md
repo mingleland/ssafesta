@@ -610,6 +610,24 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
+## 17A. Game Studio — P2 Draft
+
+Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 Draft/Published Version과
+부스 Portal Binding의 Source of Truth이며, 웹 Runtime은 Published Version만 조회한다.
+
+- 편집: `POST /api/v1/games`, `GET /api/v1/games/{gameId}/draft`, `PUT /api/v1/games/{gameId}/draft`, `POST /api/v1/games/{gameId}/validate`
+- 발행: `POST /api/v1/games/{gameId}/publish`, `GET /api/v1/games/{gameId}/versions`
+- 실행: `GET /api/v1/games/{gameId}/published`
+- 부스 연결: `GET /api/v1/game-portals/{configId}`
+- 저장 요청은 `schemaVersion`과 `revision`을 포함하고 충돌 시 명시적 오류를 반환한다.
+- Publish는 JSON Schema와 의미 검증을 모두 통과해야 하며 발행본은 불변이다.
+- MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+
+초안 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md),
+미확정 항목과 백엔드 답변은 [GitHub #21](https://github.com/kanghyunsoon/ssafesta/issues/21)에서 관리한다.
+
+---
+
 ## 18. 주요 오류 코드
 
 | Code | 의미 |
@@ -621,6 +639,12 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 |
+| `GAME_NOT_FOUND` *(P2 후보)* | GameProject 없음 또는 접근 불가 |
+| `GAME_REVISION_CONFLICT` *(P2 후보)* | Draft revision 충돌 |
+| `GAME_PROJECT_VALIDATION_FAILED` *(P2 후보)* | Schema 또는 의미 검증 실패 |
+| `GAME_NOT_PUBLISHED` *(P2 후보)* | 실행 가능한 Published Version 없음 |
+| `GAME_PORTAL_UNAVAILABLE` *(P2 후보)* | Portal 연결 해제·비활성·접근 불가 |
+| `GAME_SCHEMA_UNSUPPORTED` *(P2 후보)* | Runtime이 지원하지 않는 schemaVersion |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

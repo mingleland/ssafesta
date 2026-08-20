@@ -696,6 +696,46 @@ Item 검증
 
 ---
 
+## 28A. Game Studio 저장 모델 — P2 Draft
+
+Game Studio 데이터는 Booth Layout이나 Unity 미니게임 결과 테이블에 섞지 않는다.
+
+```text
+games
+- id PK
+- owner_user_id FK
+- title
+- status
+- created_at / updated_at
+
+game_versions
+- id PK
+- game_id FK
+- version_no
+- state (DRAFT | PUBLISHED)
+- schema_version
+- revision
+- project_json JSONB
+- published_at NULL
+
+game_portal_bindings
+- id PK
+- booth_id FK
+- object_id
+- game_id FK
+- published_version_id FK NULL
+- enabled
+- UNIQUE (booth_id, object_id)
+```
+
+- Draft 저장은 `revision` 낙관적 잠금으로 편집 충돌을 검출한다.
+- Published Version은 수정하지 않고 새 버전을 추가한다.
+- Runtime 조회는 Published Version만 반환한다.
+- JSONB 인덱싱·에셋 메타데이터 분리·버전 보존 기간은 구현 계획 전 확정한다.
+- 상세 백엔드 결정은 [GitHub #21](https://github.com/kanghyunsoon/ssafesta/issues/21)에서 관리한다.
+
+---
+
 ## 29. 확정이 필요한 DB 결정
 
 - User 인증 필드
@@ -705,3 +745,5 @@ Item 검증
 - 익명 Survey의 중복 방지 방식
 - 링크를 JSON/컬럼/별도 테이블 중 무엇으로 둘지
 - P2 Event/Competition 실제 스키마
+- Game Studio Draft의 1행 갱신 vs 버전별 행 추가 정책
+- Game Studio Published Version 보존 기간과 Portal Binding 고정 방식
