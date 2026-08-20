@@ -9,9 +9,11 @@
 
 - spec 005: 리뷰 ①②③④+BE 검토칸 전부 완료. 제목 `FE 검토 완료 (C-04 기획 승인 대기)` — 전체 "확정"은 아님
 - spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`은 왕복 검증 통과로 **잠금 해제 가능**
-- Clarification: C-03·C-05 확정, C-06 보류, C-07 후순위, **C-04만 진짜 미결**
+- Clarification: C-03·C-05 확정, C-07 후순위, **C-04 미결(기획 승인)**, **C-06 재점화(#19 footprint)**
+- Unity 신규 계약 요청 3건(#17 색상 / #18 파츠 잠금 / #19 template·footprint) — **FE 회신 완료, 재회신 대기**
 - 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만
-- Issue #1·#2·#5·#6 전부 CLOSED
+- Issue #1·#2·#5·#6 CLOSED / #14·#17·#18·#19 OPEN
+- ⚠️ `docs/26`이 브랜치별 3-way 분기 — 아래 별건 절 참조
 
 ---
 
@@ -23,13 +25,29 @@
       **spec 005 전체 확정의 마지막 조건**
 - [ ] **C-05 잔여** 요청 스키마의 `version` 위치 — BE 착수 시 확정
 - [ ] **LAPTOP 주소 저장 위치** — BE `booths` URL 컬럼 추가 확인. 방향은 부스 단위 1개로 이미 수렴
-- [ ] **C-06** 템플릿 종수 — 보류 판단(지금 결정 불요). FE는 스냅 간격·부스 크기를 설정값으로 두고 확정 후 주입
+- [ ] **C-06** 템플릿 종수 — 보류 판단이었으나 **[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)로 재점화**.
+      Unity가 셸을 6×6m 임의값으로 만들어 둔 상태라 footprint 확정이 필요해짐. FE는 여전히 설정값 주입 구조 유지
+
+### Unity 신규 이슈 3건 — FE 회신 완료, 재회신 대기 (2026-08-20)
+
+- [x] **[#19](https://github.com/kanghyunsoon/ssafesta/issues/19) template·footprint** — 회신 완료.
+      **footprint는 서버 SSOT 제안**(BE가 영역 검증에 필요 + 편집기는 Unity 없이 뜸). `template → 셸 프리팹 1:1`·MVP 1종 동의.
+      **6×6m 확정 전 파츠 12개 실배치 확인 요청** — 헌법 22조 상한 12개는 되돌리기 비쌈.
+      → 회신 오면 **C-06 닫히고 FR-003 스냅 간격 착수 가능**
+- [x] **[#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 계약** — 회신 완료.
+      팔레트 방식 동의 + **저장은 hex 문자열, 입력만 팔레트로 제한** 제안(나중에 자유 입력 열어도 데이터 층 불변).
+      **Facade `primaryColor`는 저장 endpoint 부재로 지금 불가** — `docs/26` Facade 저장 계약 미결이 선행.
+      오브젝트 단위 확장 비용 표로 제시(가장 비싼 건 Layout 계약 재개방 = FR-013 3파트 재합의)
+- [x] **[#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금** — 회신 완료.
+      BE(황덕) 선회신과 **3건 일치 확인** — 검증 시점(Draft+Publish), 거부 형식(부분 거부 + id 배열), 카탈로그 SSOT(Spring).
+      BE 질문(스태프 인벤토리 개인/부스 단위)에 **부스 단위 권고** — 개인 단위면 스태프 이탈 시 공개된 부스가 SC-004 위반으로 전환.
+      FE UX: 미보유는 회색+잠금 배지(숨기지 않음), 게스트는 로그인 유도 분기
 
 ### FE 착수 가능
 
-- [ ] `events.ts`에 `AI_AGENT_INTERACT { boothId, objectId, configId }` 타입 추가 →
-      `configId`를 `agentId`로 매핑해 `openOverlay('AI_CHAT', { boothId, agentId })` 연결.
-      계약은 3파트 확정 완료(Issue #2)
+- [x] `events.ts`에 `AI_AGENT_INTERACT { boothId, objectId, configId }` 타입 추가 ✅ 08-20 (`d1bbb4a`) —
+      discriminated union으로 확장 + `toAiChatPayload`(`configId`→`agentId`) 추가. `npm run build` 오류 0건.
+      담당 선 확인: 역할분담 §2.3·§5.2가 Bridge·Dispatcher를 이정헌으로 규정(`AIChatOverlay` 화면은 김가현 소관이라 제외)
 - [ ] **블록 4 speckit 파이프라인** — `.specify/feature.json` 지정 → `/speckit-clarify` → `plan` → `tasks` → `implement`.
       `plan` 구조는 `specs/006-booth-runtime/plan.md` 참조. C-04 확정 전 착수하면 잠정 상태
 
@@ -63,9 +81,29 @@
 
 ---
 
+## 별건 — ⚠️ `docs/26` 3-way 분기 (2026-08-20 발견, 정리 필요)
+
+`docs/26`이 브랜치별로 각자 갱신되어 **세 파트가 서로의 결정을 못 보는 상태**다. 문서 머리말이 "흩어진 팀 결정을 한 곳에 모은다"인데 정확히 반대로 작동 중.
+
+| 브랜치 | 줄수 | 최종 수정 |
+|---|---|---|
+| front | 113 | 08-20 colosair |
+| game | 98 | 08-20 강형순 |
+| back | 97 | 08-19 Deok |
+| develop | 94 | 08-18 (PR #3 revert 이후 정지) |
+
+**실증 사례**: `back`에만 있던 08-19 코인 정책 확정(신규 200/일일 50, **현금 충전 영구 제외**, 게스트 지갑 없음)을 모른 채 #18 회신을 쓸 뻔했다. 이 결정은 파츠 유료화 전제를 바꾸는 내용이라 회신 직전 발견해 반영. `game`에도 없어 강형순 역시 모르고 이슈를 열었을 가능성.
+
+**back에만 있는 FE 영향 결정 3건** — 회원 탈퇴 데이터 hard delete(08-19, spec 001 미결이었음) / 코인 지급 정책 / 현금 충전 영구 제외
+**game에만 있는 것** — 아바타 파츠 마스터·UI 소유권(08-16). `FE.md`에 이미 반영돼 실무 영향은 없음
+
+- [ ] 세 버전 병합 — 단순 파일 checkout은 한쪽이 다른 쪽을 덮으므로 3자 추가분을 합쳐야 함. #18 회신에서 "별도 정리 제안 드리겠다"고 공개 예고한 상태
+- [ ] 재분기 방지책 — 서명 PR 방식(PR #12·#13·#15)을 `docs/26`에도 적용할지 팀 합의
+
+---
+
 ## 별건 — 문서 정합 (병합 시점 처리)
 
-- `docs/26` front·game 분기 — front가 최신본, 병합 때 front 채택
 - spec 013 vs 헌법 25조 — 충돌 아님으로 판정, 조치 없음
 - front `specs/013/spec.md`가 "FE는 창 이관만"·FR-020 웹 이관·C-07 React 이관 방식 기술.
   `FE.md`만 갱신된 상태 — 013 진행 시 정리 필요
