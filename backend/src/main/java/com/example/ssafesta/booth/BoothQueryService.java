@@ -76,7 +76,8 @@ public class BoothQueryService {
         BoothLease lease = leases.findValidByBoothId(boothId, now)
                 .orElseThrow(() -> new BoothExpiredException(boothId));
         return new PublicBoothView(booth.getId(), lease.getSlotId(), booth.getName(),
-                lease.getStatus().name(), true, lease.getEndsAt());
+                lease.getStatus().name(), true, lease.getEndsAt(),
+                BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion());
     }
 
     public record SlotView(Long slotId, String slotCode, short floorNo, String type, String status,
@@ -114,7 +115,12 @@ public class BoothQueryService {
         }
     }
 
+    /**
+     * What docs/08 §3 promised all along. {@code facade} and {@code publishedLayoutVersion} were in
+     * the documented contract before spec 005; they are only now backed by columns (V8·V9).
+     */
     public record PublicBoothView(Long boothId, Long slotId, String name, String leaseStatus,
-                                  boolean entryAvailable, Instant endsAt) {
+                                  boolean entryAvailable, Instant endsAt,
+                                  BoothFacadeService.FacadeView facade, Integer publishedLayoutVersion) {
     }
 }

@@ -1,0 +1,36 @@
+meta {
+  name: 작업본 조회
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/layouts/draft
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 작업본(Draft) 조회
+
+  편집기가 처음 열릴 때 마지막 저장 상태를 불러온다.
+
+  - 인증: **필수** (소유자 또는 `booth_staffs`에 등록된 직원)
+  - 성공: `200 OK` — `{ boothId, revision, schemaVersion, template, objects, updatedAt, updatedByUserId, publishedVersion }`
+  - **한 번도 편집하지 않았으면 `204 No Content`** — 편집기는 빈 배치로 시작하고, 첫 저장에 `expectedRevision: 0`을 보낸다
+
+  응답의 `revision`을 그대로 들고 있다가 저장할 때 `expectedRevision`으로 되돌려 보낸다. 이게 동시 편집 보호의 전부다.
+
+  `publishedVersion`은 현재 공개 중인 회차이며 `null`일 수 있다. `revision`과 **다른 개념**이다 — 편집기가 "공개본과 다름"을 표시할 때 쓴다.
+
+  ### 임대가 만료돼도 열린다
+
+  소유자의 콘텐츠는 만료 후에도 보존되며 계속 편집할 수 있다 (FR-011). 만료가 막는 것은 **공개와 방문자 조회**다.
+
+  - `403 BOOTH_EDITOR_FORBIDDEN`: 소유자도 직원도 아님
+  - `404 BOOTH_NOT_FOUND`: 없는 부스
+}

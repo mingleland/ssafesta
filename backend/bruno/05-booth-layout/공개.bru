@@ -1,0 +1,39 @@
+meta {
+  name: 공개
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/layouts/publish
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 공개 — 작업본을 새 회차로 복사한다
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `200 OK` — `{ boothId, publishedVersion, publishedAt, warnings? }`
+
+  공개는 **복사**다. 이후 작업본을 고쳐도 방문자가 보는 것은 바뀌지 않는다 (FR-006). 다시 공개하면 회차가 1 오른다.
+
+  공개본 INSERT와 `booths.published_layout_version` 갱신은 **한 트랜잭션**이다. "공개했는데 아무도 못 보는 버전"이 생길 수 없다.
+
+  ### 거부되는 것
+
+  - `409 BOOTH_LEASE_EXPIRED`: 만료된 부스는 공개할 수 없다
+  - `409 LAYOUT_VALIDATION_FAILED` + `errors`
+    - `NO_DRAFT`: 저장부터 해야 한다
+    - `CONFIG_NOT_OWNED`: **다른 부스의 콘텐츠**를 연결했다. 클라이언트가 보낸 `configId`를 서버가 확인한다 (헌법 16·17조)
+    - 저장 시점 규칙 전부 (12개 상한 등)
+
+  ### `warnings`가 있어도 공개된다
+
+  - `CONFIG_NOT_LINKED`: 기능 오브젝트가 비어 있음 (C-04 미정)
+  - `CONFIG_UNVERIFIED`: 그 종류의 콘텐츠는 아직 서버가 소유를 확인할 수 없음 — 확인했다는 뜻이 아니라는 것을 명시적으로 알린다
+}

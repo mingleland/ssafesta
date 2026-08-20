@@ -70,6 +70,10 @@ class SecurityConfiguration {
                         // Slot browsing is open: a guest session exists to look around (헌법 12조).
                         // Leasing under /booth-slots/{id}/leases stays authenticated.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots", "/api/v1/booths/*").permitAll()
+                        // Unity and every visitor read the published layout on entering a booth
+                        // (spec 005 FR-006). The draft and publish paths under the same prefix stay
+                        // authenticated — only this exact suffix is open.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/layouts/published").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an

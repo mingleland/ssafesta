@@ -136,10 +136,18 @@ public class Booth {
         this.updatedAt = Instant.now();
     }
 
-    /** Releases the slot while keeping every piece of content intact (spec 004 FR-010). */
+    /**
+     * Releases the slot while keeping every piece of content intact (spec 004 FR-010).
+     *
+     * <p>Clearing the published pointer <b>here</b> rather than at the three places that call this
+     * is the whole of spec 005 FR-017: a booth that leaves its slot stops serving its published
+     * layout, and no future release path can forget to do it. The draft and the version history
+     * stay exactly where they are — preserved, but not republished on their own (FR-011).
+     */
     void detachSlot() {
         this.currentSlotId = null;
         this.status = BoothStatus.INACTIVE;
+        this.publishedLayoutVersion = null;
         this.updatedAt = Instant.now();
     }
 

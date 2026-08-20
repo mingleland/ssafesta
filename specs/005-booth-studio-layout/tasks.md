@@ -61,17 +61,17 @@
 
 **Independent Test**: 오브젝트 3개 배치 저장 → 새로고침해도 남아 있음 → 공개 → 비인증 조회로 보임. **저장만 한 내용은 공개 조회에 나타나지 않는다**
 
-- [ ] T022 [US1] `booth/BoothLayoutQueryService.java` — Draft 조회(권한 필요, 없으면 empty → 컨트롤러가 204) · Published 조회. **Published는 004 `BoothLeaseRepository.findValidByBoothId`로 임대 유효성을 먼저 확인**하고 없으면 `BOOTH_LEASE_EXPIRED` (research R-06, I-5). 새 만료 술어를 쓰지 않는다
-- [ ] T023 [US1] `booth/BoothLayoutService.java` — `saveDraft(boothId, userId, request)`. 권한 → 검증(저장 강도) → `expectedRevision` 조건부 UPDATE → 실패 시 `LayoutRevisionConflictException`. 최초 저장(`expectedRevision=0`)은 INSERT
-- [ ] T024 [US1] `booth/BoothLayoutService.java` — `publish(boothId, userId)`를 **하나의 `@Transactional`** 로. 순서는 [data-model.md](data-model.md) §4 그대로: 권한 → 임대 유효 → 검증(공개 강도, errors면 중단) → `MAX(version_no)+1` INSERT → `booths.published_layout_version` 갱신. **4만 되고 5가 실패하면 "공개했는데 아무도 못 보는 버전"이 남는다**
-- [ ] T025 [US1] `booth/BoothLayoutController.java` — `GET/PUT /api/v1/booths/{boothId}/layouts/draft` · `POST …/layouts/publish` · `GET …/layouts/published`. 응답 필드는 [contracts/layout-api.md](contracts/layout-api.md) §2~§5 그대로. **409 `LAYOUT_REVISION_CONFLICT` 본문에 최신 Draft를 함께 싣는다** (FE 추가 왕복 제거)
-- [ ] T026 [US1] `auth/SecurityConfiguration.java` — `GET /api/v1/booths/*/layouts/published`를 **permitAll**로. Unity·방문자 경로다. **draft·publish는 인증 유지**
-- [ ] T027 [P] [US1] `test/.../booth/BoothLayoutRoundTripIntegrationTest.java` — 저장한 좌표가 조회에서 그대로 나오는지. `2.123456789` · 음수 · `0.0` · `-0.0` · `rotationY: 359.9`를 포함하고, **알 수 없는 필드가 섞인 요청의 처리가 명시적인지**(조용히 버리지 않는다 — T-24의 교훈) 확인 (SC-004, quickstart §1)
-- [ ] T028 [P] [US1] `test/.../booth/BoothLayoutServiceIntegrationTest.java` — 저장→공개→포인터 전이 / 공개 후 Draft를 고쳐도 **공개본이 변하지 않음**(I-7) / 두 번 공개하면 `version_no`가 1→2 / 공개 트랜잭션 중간 실패 시 포인터와 버전이 **함께** 롤백
-- [ ] T029 [P] [US1] `test/.../booth/BoothLayoutConcurrencyIntegrationTest.java` — 같은 `expectedRevision`으로 동시 저장 시 **하나만 성공**, 나머지는 409 (FR-014, I-6). 004처럼 `@RepeatedTest`로 반복
-- [ ] T030 [P] [US1] `test/.../booth/BoothLayoutApiIntegrationTest.java` — Draft 없을 때 204 / 비소유자 403 / 없는 부스 404 / **저장만 하고 공개 안 한 상태에서 published가 404**(SC-003 핵심) / 만료 부스 published 409
+- [X] T022 [US1] `booth/BoothLayoutQueryService.java` — Draft 조회(권한 필요, 없으면 empty → 컨트롤러가 204) · Published 조회. **Published는 004 `BoothLeaseRepository.findValidByBoothId`로 임대 유효성을 먼저 확인**하고 없으면 `BOOTH_LEASE_EXPIRED` (research R-06, I-5). 새 만료 술어를 쓰지 않는다
+- [X] T023 [US1] `booth/BoothLayoutService.java` — `saveDraft(boothId, userId, request)`. 권한 → 검증(저장 강도) → `expectedRevision` 조건부 UPDATE → 실패 시 `LayoutRevisionConflictException`. 최초 저장(`expectedRevision=0`)은 INSERT
+- [X] T024 [US1] `booth/BoothLayoutService.java` — `publish(boothId, userId)`를 **하나의 `@Transactional`** 로. 순서는 [data-model.md](data-model.md) §4 그대로: 권한 → 임대 유효 → 검증(공개 강도, errors면 중단) → `MAX(version_no)+1` INSERT → `booths.published_layout_version` 갱신. **4만 되고 5가 실패하면 "공개했는데 아무도 못 보는 버전"이 남는다**
+- [X] T025 [US1] `booth/BoothLayoutController.java` — `GET/PUT /api/v1/booths/{boothId}/layouts/draft` · `POST …/layouts/publish` · `GET …/layouts/published`. 응답 필드는 [contracts/layout-api.md](contracts/layout-api.md) §2~§5 그대로. **409 `LAYOUT_REVISION_CONFLICT` 본문에 최신 Draft를 함께 싣는다** (FE 추가 왕복 제거)
+- [X] T026 [US1] `auth/SecurityConfiguration.java` — `GET /api/v1/booths/*/layouts/published`를 **permitAll**로. Unity·방문자 경로다. **draft·publish는 인증 유지**
+- [X] T027 [P] [US1] `test/.../booth/BoothLayoutRoundTripIntegrationTest.java` — 저장한 좌표가 조회에서 그대로 나오는지. `2.123456789` · 음수 · `0.0` · `-0.0` · `rotationY: 359.9`를 포함하고, **알 수 없는 필드가 섞인 요청의 처리가 명시적인지**(조용히 버리지 않는다 — T-24의 교훈) 확인 (SC-004, quickstart §1)
+- [X] T028 [P] [US1] `test/.../booth/BoothLayoutServiceIntegrationTest.java` — 저장→공개→포인터 전이 / 공개 후 Draft를 고쳐도 **공개본이 변하지 않음**(I-7) / 두 번 공개하면 `version_no`가 1→2 / 공개 트랜잭션 중간 실패 시 포인터와 버전이 **함께** 롤백
+- [X] T029 [P] [US1] `test/.../booth/BoothLayoutConcurrencyIntegrationTest.java` — 같은 `expectedRevision`으로 동시 저장 시 **하나만 성공**, 나머지는 409 (FR-014, I-6). 004처럼 `@RepeatedTest`로 반복
+- [X] T030 [P] [US1] `test/.../booth/BoothLayoutApiIntegrationTest.java` — Draft 없을 때 204 / 비소유자 403 / 없는 부스 404 / **저장만 하고 공개 안 한 상태에서 published가 404**(SC-003 핵심) / 만료 부스 published 409
 
-**Checkpoint**: US1 단독 배포 가능 — Unity가 실물 published 경로를 붙일 수 있다
+**Checkpoint**: US1 단독 배포 가능 — Unity가 실물 published 경로를 붙일 수 있다 ✅
 
 ---
 
@@ -81,12 +81,12 @@
 
 **Independent Test**: AI 오브젝트에 그 부스의 agent를 연결 → 공개 성공. 다른 부스의 agent를 연결 → 공개 거부
 
-- [ ] T031 [US2] `booth/LayoutConfigResolver.java` — 타입별 `configId` 소유 검증. `AI_AGENT` → `ai_agents.booth_id` 일치 + `status='ACTIVE'`. **검증 대상이 아직 없는 타입은 통과시키되 warning을 남긴다** — 검증이 없다는 사실이 조용해지지 않게 (data-model §3)
-- [ ] T032 [US2] `booth/LayoutValidator.java` 확장 — 공개 시점에 `LayoutConfigResolver`를 호출해 소유 불일치를 **error**로, 미연결을 **warning**으로 분류 (헌법 16·17조, C-04 미정)
-- [ ] T033 [US2] Draft 저장에서는 `configId` 소유 검증을 **하지 않는다** — 편집 중에는 콘텐츠를 아직 안 만들었을 수 있다. 저장 응답의 `warnings`로만 알린다
-- [ ] T034 [P] [US2] `test/.../booth/BoothLayoutConfigLinkIntegrationTest.java` — 자기 부스 agent 연결 공개 성공 / **다른 부스 agent 연결 시 공개 거부**(errors) / 미연결은 warning이며 공개는 성공(현재 C-04 기본값) / Draft 저장은 남의 configId여도 통과하고 warning만
+- [X] T031 [US2] `booth/LayoutConfigResolver.java` — 타입별 `configId` 소유 검증. `AI_AGENT` → `ai_agents.booth_id` 일치 + `status='ACTIVE'`. **검증 대상이 아직 없는 타입은 통과시키되 warning을 남긴다** — 검증이 없다는 사실이 조용해지지 않게 (data-model §3)
+- [X] T032 [US2] `booth/LayoutValidator.java` 확장 — 공개 시점에 `LayoutConfigResolver`를 호출해 소유 불일치를 **error**로, 미연결을 **warning**으로 분류 (헌법 16·17조, C-04 미정)
+- [X] T033 [US2] Draft 저장에서는 `configId` 소유 검증을 **하지 않는다** — 편집 중에는 콘텐츠를 아직 안 만들었을 수 있다. 저장 응답의 `warnings`로만 알린다
+- [X] T034 [P] [US2] `test/.../booth/BoothLayoutConfigLinkIntegrationTest.java` — 자기 부스 agent 연결 공개 성공 / **다른 부스 agent 연결 시 공개 거부**(errors) / 미연결은 warning이며 공개는 성공(현재 C-04 기본값) / Draft 저장은 남의 configId여도 통과하고 warning만
 
-**Checkpoint**: 부스 경계를 넘는 콘텐츠 연결이 막힌다
+**Checkpoint**: 부스 경계를 넘는 콘텐츠 연결이 막힌다 ✅
 
 ---
 
@@ -96,13 +96,13 @@
 
 **Independent Test**: 공개된 부스의 임대를 만료시키고 같은 사용자가 재임대 → 콘텐츠는 남아 있고 `publishedLayoutVersion`은 `null`
 
-- [ ] T035 [US3] `booth/Booth.java` — `detachSlot()`에서 `published_layout_version`을 **함께 `null`로** 만든다. 슬롯 해제와 공개 해제가 같은 지점이라 새 스케줄러가 필요 없다 (FR-017, data-model §4)
-- [ ] T036 [US3] `booth/BoothLeaseService.java` — `releaseStaleLeases()` / 재임대 경로가 `detachSlot()`을 거치는지 확인하고, **거치지 않는 경로가 있으면 그 자리에도 해제를 넣는다**. 004의 T-110이 "한 곳만 빠뜨려 조용히 틀린" 사례다
-- [ ] T037 [US3] Draft·공개본 이력은 **삭제하지 않는다**는 것을 코드와 주석으로 고정 (FR-011 — 보존하되 자동 공개 금지)
-- [ ] T038 [P] [US3] `test/.../booth/BoothLayoutReleaseIntegrationTest.java` — 공개 상태에서 만료 → `published_layout_version`이 `null` / Draft와 공개본 **행은 그대로 남아 있음** / 재임대 후 published 조회가 404(`LAYOUT_NOT_PUBLISHED`) / 재공개하면 `version_no`가 **이어서 증가**(1→2, 리셋 아님)
-- [ ] T039 [P] [US3] `test/.../booth/BoothLayoutValidationTest.java` — 13개 초과 / 중복 `objectId` / 미지원 `type` / `NaN`·`Infinity` 좌표 / 영역 이탈 / `rotationY` 범위 밖 / 미지원 `schemaVersion`이 각각 **errors의 어느 rule로 분류되는지** 단언
+- [X] T035 [US3] `booth/Booth.java` — `detachSlot()`에서 `published_layout_version`을 **함께 `null`로** 만든다. 슬롯 해제와 공개 해제가 같은 지점이라 새 스케줄러가 필요 없다 (FR-017, data-model §4)
+- [X] T036 [US3] `booth/BoothLeaseService.java` — `releaseStaleLeases()` / 재임대 경로가 `detachSlot()`을 거치는지 확인하고, **거치지 않는 경로가 있으면 그 자리에도 해제를 넣는다**. 004의 T-110이 "한 곳만 빠뜨려 조용히 틀린" 사례다
+- [X] T037 [US3] Draft·공개본 이력은 **삭제하지 않는다**는 것을 코드와 주석으로 고정 (FR-011 — 보존하되 자동 공개 금지)
+- [X] T038 [P] [US3] `test/.../booth/BoothLayoutReleaseIntegrationTest.java` — 공개 상태에서 만료 → `published_layout_version`이 `null` / Draft와 공개본 **행은 그대로 남아 있음** / 재임대 후 published 조회가 404(`LAYOUT_NOT_PUBLISHED`) / 재공개하면 `version_no`가 **이어서 증가**(1→2, 리셋 아님)
+- [X] T039 [P] [US3] `test/.../booth/BoothLayoutValidationTest.java` — 13개 초과 / 중복 `objectId` / 미지원 `type` / `NaN`·`Infinity` 좌표 / 영역 이탈 / `rotationY` 범위 밖 / 미지원 `schemaVersion`이 각각 **errors의 어느 rule로 분류되는지** 단언
 
-**Checkpoint**: 재임대 시나리오가 FR-011의 의도대로 동작한다
+**Checkpoint**: 재임대 시나리오가 FR-011의 의도대로 동작한다 ✅
 
 ---
 
@@ -112,25 +112,25 @@
 
 **Independent Test**: facade 수정 → `GET /booths/{id}` 응답의 `facade` 4필드가 바뀐다
 
-- [ ] T040 [US4] `booth/BoothFacadeService.java` — 수정·조회. 권한은 `BoothEditorGuard` 재사용. 만료 부스는 수정 거부
-- [ ] T041 [US4] `booth/BoothFacadeController.java` — `PUT /api/v1/booths/{boothId}/facade`. 검증: `themeCode` 화이트리스트 · `primaryColor`는 `#RRGGBB` · `signText` 60자 · `logoUrl`은 `https://` 2048자 ([contracts/layout-api.md](contracts/layout-api.md) §6)
-- [ ] T042 [US4] `booth/BoothQueryService.java` — `PublicBoothView`에 `facade` 4필드와 `publishedLayoutVersion` 추가. **기존 필드는 그대로 둔다** (추가만, 헌법 24조 / contracts §7)
-- [ ] T043 [P] [US4] `test/.../booth/BoothFacadeApiIntegrationTest.java` — 수정 후 공개 조회 반영 / 잘못된 색 형식 400 / `http://` 로고 거부 / 비소유자 403 / 만료 부스 409
+- [X] T040 [US4] `booth/BoothFacadeService.java` — 수정·조회. 권한은 `BoothEditorGuard` 재사용. 만료 부스는 수정 거부
+- [X] T041 [US4] `booth/BoothFacadeController.java` — `PUT /api/v1/booths/{boothId}/facade`. 검증: `themeCode` 화이트리스트 · `primaryColor`는 `#RRGGBB` · `signText` 60자 · `logoUrl`은 `https://` 2048자 ([contracts/layout-api.md](contracts/layout-api.md) §6)
+- [X] T042 [US4] `booth/BoothQueryService.java` — `PublicBoothView`에 `facade` 4필드와 `publishedLayoutVersion` 추가. **기존 필드는 그대로 둔다** (추가만, 헌법 24조 / contracts §7)
+- [X] T043 [P] [US4] `test/.../booth/BoothFacadeApiIntegrationTest.java` — 수정 후 공개 조회 반영 / 잘못된 색 형식 400 / `http://` 로고 거부 / 비소유자 403 / 만료 부스 409
 
-**Checkpoint**: docs/08 §3의 booth 응답이 문서와 실제로 일치한다
+**Checkpoint**: docs/08 §3의 booth 응답이 문서와 실제로 일치한다 ✅ — **전체 회귀 182건 통과, 실패 0**
 
 ---
 
 ## Phase 7: Polish & 기록
 
-- [ ] T044 [P] `backend/bruno/05-booth-layout/` — [quickstart.md](quickstart.md) §2의 18단계를 request로. 003·004처럼 각 request의 Docs 탭에 목적·인증·성공/실패 응답·다음 흐름을 적는다
-- [ ] T045 [P] `docs/08_Backend_API_명세서.md` — ① `PUT /booths/{boothId}/facade` 신설 반영 ② §1.3 오류 응답을 "제안"에서 **확정·구현됨**으로 ③ layout 응답의 `schemaVersion` 추가 ④ 오류 코드 표에 005 신규 4종 추가
-- [ ] T046 [P] `docs/09_DB_ERD_DB_설계서.md` — §9를 실물(`booth_layout_drafts` + `booth_layout_published_versions` 2테이블)로 정정하고 §7 facade 4컬럼·`published_layout_version`을 V8·V9 결과와 일치시킨다 (research R-01·R-08)
-- [ ] T047 **3파트 통보** — ① 오류 봉투가 005부터 실제 동작(Breaking 아님, 문서와의 정합 회복) ② `PUT /facade` 신설 ③ `schemaVersion`과 `version`을 갈라 쓰기로 한 것(research R-10)과 spec 005 §Layout JSON 예시의 `"version": 2` 정정 제안. AI·FE·Unity 파트에 전달하고 `docs/26`에 결과 기록 (헌법 24조)
-- [ ] T048 [quickstart.md](quickstart.md) 수동 검증 수행 — Bruno 18단계 + 만료 경로 4단계. **결과를 문서에 적지 말고 실제로 실행한다**
-- [ ] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
-- [ ] T050 **부스 영역 경계 확정** — data-model §3의 `|x|,|z| ≤ 10m` · `0 ≤ y ≤ 5m`는 **근거 없는 잠정값**이다. Unity에 실제 부스 프리팹 치수를 확인해 교체하고, 확정 전까지 `docs/26`에 남긴다
-- [ ] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신
+- [X] T044 [P] `backend/bruno/05-booth-layout/` — [quickstart.md](quickstart.md) §2의 18단계를 request로. 003·004처럼 각 request의 Docs 탭에 목적·인증·성공/실패 응답·다음 흐름을 적는다
+- [X] T045 [P] `docs/08_Backend_API_명세서.md` — ① `PUT /booths/{boothId}/facade` 신설 반영 ② §1.3 오류 응답을 "제안"에서 **확정·구현됨**으로 ③ layout 응답의 `schemaVersion` 추가 ④ 오류 코드 표에 005 신규 4종 추가
+- [X] T046 [P] `docs/09_DB_ERD_DB_설계서.md` — §9를 실물(`booth_layout_drafts` + `booth_layout_published_versions` 2테이블)로 정정하고 §7 facade 4컬럼·`published_layout_version`을 V8·V9 결과와 일치시킨다 (research R-01·R-08)
+- [ ] T047 **3파트 통보** ⚠️ **사람이 해야 함** — ① 오류 봉투가 005부터 실제 동작(Breaking 아님, 문서와의 정합 회복) ② `PUT /facade` 신설 ③ `schemaVersion`과 `version`을 갈라 쓰기로 한 것(research R-10)과 spec 005 §Layout JSON 예시의 `"version": 2` 정정 제안. AI·FE·Unity 파트에 전달하고 `docs/26`에 결과 기록 (헌법 24조)
+- [ ] T048 ⚠️ **사람이 해야 함** — [quickstart.md](quickstart.md) 수동 검증 수행 — Bruno 18단계 + 만료 경로 4단계. **결과를 문서에 적지 말고 실제로 실행한다**
+- [X] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
+- [ ] T050 ⚠️ **Unity 입력 필요** — **부스 영역 경계 확정** — data-model §3의 `|x|,|z| ≤ 10m` · `0 ≤ y ≤ 5m`는 **근거 없는 잠정값**이다. Unity에 실제 부스 프리팹 치수를 확인해 교체하고, 확정 전까지 `docs/26`에 남긴다
+- [X] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신
 
 ---
 

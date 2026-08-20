@@ -1,0 +1,65 @@
+meta {
+  name: 작업본 저장
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/layouts/draft
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "expectedRevision": 0,
+    "schemaVersion": 1,
+    "template": "PROJECT_EXHIBITION",
+    "objects": [
+      {
+        "objectId": "screen-1",
+        "type": "VIDEO_SCREEN",
+        "position": { "x": 2.1, "y": 0.0, "z": 3.4 },
+        "rotationY": 90.0,
+        "configId": 152
+      }
+    ]
+  }
+}
+
+docs {
+  ## 작업본 저장 — 공개되지 않는다
+
+  저장은 방문자에게 아무 영향이 없다. 공개는 별도 요청이다 (FR-005·FR-006).
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `200 OK` — `{ boothId, revision, schemaVersion, template, objects, updatedAt, warnings? }`
+
+  ### `expectedRevision`은 필수다
+
+  마지막으로 읽은 `revision`을 보낸다. **최초 저장은 `0`**이다. 서버 값과 다르면 저장하지 않고 거부한다.
+
+  ```json
+  { "code": "LAYOUT_REVISION_CONFLICT", "errors": [ { "rule": "CURRENT_REVISION", "message": "서버의 현재 revision은 3입니다. ..." } ] }
+  ```
+
+  남의 저장을 조용히 덮어쓰지 않기 위한 것이다. 충돌이 나면 다시 불러온 뒤 저장한다.
+
+  ### 좌표 규칙 (헌법 21조)
+
+  단위는 **미터**, 원점은 **부스 바닥 중앙**, `y=0`이 바닥, **+Z가 부스 정면**, `rotationY`는 도(degree)이고 `0`이면 +Z를 본다. React가 픽셀·그리드를 환산해 보낸다 — 서버는 값을 고치지 않는다.
+
+  ### 거부되는 것
+
+  - 오브젝트 **12개 초과** (`OBJECT_LIMIT`) — 공개가 아니라 **저장 시점에** 막는다
+  - `objectId` 중복·형식 위반, 미지원 `type`·`template`, 좌표 범위 이탈, `rotationY`가 `[0,360)` 밖
+  - **모르는 필드** (`MALFORMED_LAYOUT`) — 조용히 버리지 않는다. 계약에 필드를 추가하려면 3파트 합의가 먼저다
+
+  ### `warnings`는 저장을 막지 않는다
+
+  기능 오브젝트에 `configId`가 없으면 `CONFIG_NOT_LINKED` 경고가 함께 온다. 공개까지 허용할지는 미정(C-04)이라 지금은 경고다.
+}

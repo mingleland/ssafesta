@@ -17,6 +17,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class LayoutValidator {
 
+    private final LayoutConfigResolver configResolver;
+
+    public LayoutValidator(LayoutConfigResolver configResolver) {
+        this.configResolver = configResolver;
+    }
+
     /** The only structure the server currently understands (contracts/layout-api.md §1). */
     static final int SUPPORTED_SCHEMA_VERSION = 1;
 
@@ -43,37 +49,25 @@ public class LayoutValidator {
      * enforced here as well as on publish: checking it only on publish lets a broken editor grow
      * {@code layout_json} unbounded and the user finds out much later (research R-05).
      */
-    public LayoutValidationResult validateForDraft(String rawJson) {
+    public LayoutValidationResult validateForDraft(LayoutJson.LayoutDocument document) {
         LayoutValidationResult result = new LayoutValidationResult();
-        LayoutJson layout = readOrReport(rawJson, result);
-        if (layout == null) {
-            return result;
-        }
-        checkStructure(layout.document(), result);
+        checkStructure(document, result);
         return result;
     }
 
-    /** Publishing: everything the draft check does, plus the completeness warnings. */
-    public LayoutValidationResult validateForPublish(String rawJson) {
+    /**
+     * Publishing: everything the draft check does, plus ownership of linked content and the
+     * completeness warnings.
+     *
+     * <p>Ownership is checked here and not on save because a half-built booth legitimately points
+     * at content that does not exist yet — refusing to save that would make the editor unusable.
+     * Publishing is the moment it has to be true.
+     */
+    public LayoutValidationResult validateForPublish(LayoutJson.LayoutDocument document, Long boothId) {
         LayoutValidationResult result = new LayoutValidationResult();
-        LayoutJson layout = readOrReport(rawJson, result);
-        if (layout == null) {
-            return result;
-        }
-        checkStructure(layout.document(), result);
-        checkContentLinks(layout.document(), result);
+        checkStructure(document, result);
+        checkContentLinks(document, boothId, result);
         return result;
-    }
-
-    private LayoutJson readOrReport(String rawJson, LayoutValidationResult result) {
-        try {
-            return LayoutJson.parse(rawJson);
-        } catch (LayoutParseException exception) {
-            // Unreadable input is a finding, not a crash — it comes back in the same envelope as
-            // every other rejection.
-            result.addError("MALFORMED_LAYOUT", exception.getMessage());
-            return null;
-        }
     }
 
     private void checkStructure(LayoutJson.LayoutDocument document, LayoutValidationResult result) {
@@ -147,21 +141,46 @@ public class LayoutValidator {
     }
 
     /**
-     * Functional objects that point at nothing.
+     * Content links: who owns them, and whether they are there at all.
      *
-     * <p>A <b>warning</b> today. Whether it should block publishing is C-04 and belongs to 기획·FE;
-     * when they decide, this one call moves to {@code addError} and the contract does not change.
+     * <p>Three outcomes, deliberately different:
+     *
+     * <ul>
+     *   <li><b>error</b> — the reference belongs to another booth. Client claims are not trusted
+     *       (헌법 16·17조).
+     *   <li><b>warning</b> {@code CONFIG_NOT_LINKED} — a functional object points at nothing.
+     *       Whether that should block publishing is C-04, still 기획·FE's to decide; when they do,
+     *       this one call becomes {@code addError} and nothing else changes.
+     *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the kind of content cannot be checked yet
+     *       because the spec that owns it does not exist. Said out loud so "no error" is not
+     *       mistaken for "verified".
+     * </ul>
      */
-    private void checkContentLinks(LayoutJson.LayoutDocument document, LayoutValidationResult result) {
+    private void checkContentLinks(LayoutJson.LayoutDocument document, Long boothId,
+                                   LayoutValidationResult result) {
         if (document.objects() == null) {
             return;
         }
         for (LayoutJson.LayoutObject object : document.objects()) {
-            LayoutObjectType.from(object.type())
-                    .filter(LayoutObjectType::requiresConfig)
-                    .filter(type -> object.configId() == null)
-                    .ifPresent(type -> result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
-                            type.name() + "에 연결된 콘텐츠가 없습니다."));
+            LayoutObjectType type = LayoutObjectType.from(object.type()).orElse(null);
+            if (type == null) {
+                continue; // Already reported as UNKNOWN_OBJECT_TYPE.
+            }
+            if (type.requiresConfig() && object.configId() == null) {
+                result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
+                        type.name() + "에 연결된 콘텐츠가 없습니다.");
+                continue;
+            }
+            if (object.configId() == null) {
+                continue;
+            }
+            if (!configResolver.belongsToBooth(type, object.configId(), boothId)) {
+                result.addError("CONFIG_NOT_OWNED", object.objectId(),
+                        "이 부스의 콘텐츠가 아닙니다. configId=" + object.configId());
+            } else if (!configResolver.isVerifiable(type)) {
+                result.addWarning("CONFIG_UNVERIFIED", object.objectId(),
+                        type.name() + "의 연결 대상은 아직 서버가 확인할 수 없습니다.");
+            }
         }
     }
 

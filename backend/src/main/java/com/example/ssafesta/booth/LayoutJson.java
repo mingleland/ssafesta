@@ -1,5 +1,6 @@
 package com.example.ssafesta.booth;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.util.List;
 import tools.jackson.core.JacksonException;
@@ -7,17 +8,16 @@ import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * A layout document as it travels: the <b>request text exactly as received</b> plus a parsed view
- * used only for checking it.
+ * Reading and writing layout documents (research R-04).
  *
- * <p>The separation is the point (research R-04). What gets stored is {@link #raw}; the parsed
- * records never turn back into JSON. If the server parsed coordinates into {@code double} and
- * re-serialised them, SC-004 ("React 미리보기와 Unity 월드의 배치가 일치한다") would drift by
- * rounding and nobody would see it happen — {@code jsonb} itself stores numbers as {@code numeric}
- * and loses nothing, so the only place precision can die is in our own code.
+ * <p><b>Every number stays a {@link BigDecimal} from end to end.</b> That single rule is what makes
+ * SC-004 ("React 미리보기와 Unity 월드의 배치가 일치한다") hold: {@code jsonb} keeps numbers as
+ * {@code numeric} and loses nothing, so the only place precision could die is in our own code — and
+ * it would die silently, as a coordinate that is slightly wrong rather than an error anyone sees.
  *
- * <p>{@code jsonb} does normalise key order and whitespace, so "lossless" here means <b>same keys,
- * same values</b> — not byte equality. Byte equality was never available.
+ * <p>Byte-for-byte preservation of the request is <b>not</b> offered, and was never available:
+ * {@code jsonb} normalises key order and whitespace as it stores. "Lossless" here means the same
+ * keys with the same values, which is the part any consumer can observe.
  */
 public final class LayoutJson {
 
@@ -56,9 +56,34 @@ public final class LayoutJson {
         }
     }
 
-    /** Rebuilds the pair for content already in the database, which was validated on the way in. */
-    public static LayoutJson ofStored(String raw) {
-        return parse(raw);
+    /**
+     * Reads a save request: the layout document plus the revision the editor believes it has.
+     *
+     * <p>Parsed here rather than bound by the controller because Spring Boot's ObjectMapper has
+     * {@code FAIL_ON_UNKNOWN_PROPERTIES} <b>off</b> — an unknown field would vanish on the way in
+     * and the editor would never learn its save was partly ignored.
+     */
+    public static SaveRequest parseSaveRequest(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new LayoutParseException("요청 본문이 비어 있습니다.");
+        }
+        try {
+            return STRICT.readValue(raw, SaveRequest.class);
+        } catch (JacksonException exception) {
+            throw new LayoutParseException(readableReason(exception));
+        }
+    }
+
+    /**
+     * Renders a document for storage.
+     *
+     * <p>Numbers survive this because they never leave {@link BigDecimal} — Jackson writes the
+     * decimal it was given. Byte-for-byte preservation of the request is not on offer and never
+     * was: {@code jsonb} normalises key order and whitespace on the way into the column. What must
+     * survive is the <b>value</b>, and that is what this guarantees (research R-04).
+     */
+    public static String write(LayoutDocument document) {
+        return STRICT.writeValueAsString(document);
     }
 
     public String raw() {
@@ -80,6 +105,15 @@ public final class LayoutJson {
                 : "배치 JSON을 읽을 수 없습니다: " + message;
     }
 
+    /** A draft save: the document plus the revision the client read (contracts/layout-api.md §3). */
+    public record SaveRequest(Long expectedRevision, Integer schemaVersion, String template,
+                              List<LayoutObject> objects) {
+
+        public LayoutDocument document() {
+            return new LayoutDocument(schemaVersion, template, objects);
+        }
+    }
+
     /** The whole document. Field names are the 3파트 contract (contracts/layout-api.md §1). */
     public record LayoutDocument(Integer schemaVersion, String template, List<LayoutObject> objects) { }
 
@@ -89,7 +123,12 @@ public final class LayoutJson {
      * <p>Coordinates are {@link BigDecimal} on purpose — see the class comment. {@code configId} and
      * {@code assetCode} are optional: a decoration has no content to point at, and an object being
      * edited may not be linked yet.
+     *
+     * <p>Absent optionals are omitted rather than written as {@code null}: Unity binds
+     * {@code configId} to an {@code int} through {@code JsonUtility}, and a literal null there is
+     * worse than a missing key.
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record LayoutObject(String objectId, String type, String assetCode,
                                Position position, BigDecimal rotationY, Integer configId) { }
 

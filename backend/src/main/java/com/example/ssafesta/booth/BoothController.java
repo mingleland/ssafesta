@@ -1,7 +1,5 @@
 package com.example.ssafesta.booth;
 
-import com.example.ssafesta.common.ApiException;
-import com.example.ssafesta.common.ErrorCode;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,12 +36,7 @@ public class BoothController {
      */
     @GetMapping("/{boothId}")
     public BoothQueryService.PublicBoothView booth(@PathVariable Long boothId) {
-        try {
-            return queries.findPublicBooth(boothId);
-        } catch (BoothNotFoundException exception) {
-            throw new ApiException(ErrorCode.BOOTH_NOT_FOUND);
-        } catch (BoothExpiredException exception) {
-            throw new ApiException(ErrorCode.BOOTH_LEASE_EXPIRED);
-        }
+        // No translation needed: both failures carry their own ErrorCode now.
+        return queries.findPublicBooth(boothId);
     }
 }
