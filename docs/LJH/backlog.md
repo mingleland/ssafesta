@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간(`docs/LJH/`). 2026-08-18부터 git 추적 대상 — `local/` gitignore 시절의 "커밋 제외"는 더 이상 유효하지 않다.
-최종 갱신: 2026-08-18 — Issue #6 증상 정정, 계약 불일치 3건 회신 대기
+최종 갱신: 2026-08-20 — 블록 1 완결(왕복 검증 통과), C-05 확정, 블록 3 착수 가능
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -11,9 +11,9 @@
 
 - spec 005: `spec.md`만 존재. `plan.md`·`tasks.md` 없음
 - spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`이 "⛔ 005 Layout 계약 확정 대기"로 차단 중
-- 리뷰 4칸: ①②③ 작성 완료(2026-08-14), ④ 왕복 검증 미수행(키트 준비 완료, Issue #6 회신 대기), BE 검토칸 공란
+- 리뷰 4칸: ①②③ 작성 완료(2026-08-14), ④ 왕복 검증 **통과**(2026-08-20, spec.md 기입 대기), BE 검토칸 공란
 - 013a: Unity 소유로 축소 확정 — FE는 WebGL 호스트·Access Token 전달만
-- Clarification: C-03 확정(고정 크기), C-05 Issue #5 대기, C-06 보류, C-04·C-07 후순위
+- Clarification: C-03 확정(고정 크기), C-05 **확정(낙관적 잠금)**, C-06 보류, C-04·C-07 후순위
 
 ---
 
@@ -41,29 +41,29 @@
 
 ---
 
-## 블록 1 — 좌표 왕복 검증 1회
+## 블록 1 — 좌표 왕복 검증 1회 ✅ 종결 (2026-08-20)
 
 C-02 규칙은 확정됨 — 미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z.
 spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반드시 틀린다."
 
-- [x] **선행**: Unity canonical 매핑 — `origin/game e8209bc`(2026-08-18 15:55, 강형순) "부스 표준 타입 10종 지원"으로 해소
-      확인: `git grep -n "SURVEY_KIOSK" origin/game -- '*.cs'` → `BoothObjectType.cs:28` 매핑 존재
+- [x] **선행**: Unity canonical 매핑 — `origin/game e8209bc`(2026-08-18, 강형순) "부스 표준 타입 10종 지원"으로 해소
 - [x] 오브젝트 2개짜리 Layout JSON 작성 — BE 스켈레톤뿐이라 curl 대상 없음, 대신 Unity `Tools/mock-api` 정적 파일 경로 사용. 사본: `docs/LJH/verify/block1-roundtrip.md`
 - [x] 검증 대상에 `SURVEY_KIOSK`·`CONSULTATION_DESK` 포함, x/z 양음·rotationY 0 외 2종까지 4개 모호 축 커버
-- [ ] Unity에서 같은 위치인지 육안 확인 — **[Issue #6](https://github.com/kanghyunsoon/ssafesta/issues/6) 상정, 강형순 지정. 회신 대기**
-      부가: 검증 중 발견한 계약 불일치 3건(`id`↔`objectId`, 엔드포인트 단복수, `assetCode` 부재)도 같은 이슈에 포함
-      - **①은 Unity 리드가 수용, DTO 정식 필드를 `objectId`로 변경 + 구 `id`는 하위 호환 보정값으로만 지원하기로 회신.** 실제 증상은 "objectId 공백 전송"이 아니라 `BoothInteractBridge.cs:18-26` 가드에 걸려 **이벤트 자체 무전송**(노트북 클릭 무반응) — 최초 서술 오류를 Codex 검증으로 발견·정정 (T-4)
-      - ②③은 아직 무응답. 좌표 검증 스크린샷도 미회신
-      - **순서 판단**: DTO 수정 후 검증하면 좌표·식별자 경로를 왕복 1회로 함께 확인 가능. 다만 spec 006 T005·T006 대기 비용이 있어 Unity 수정 일정에 따라 결정
+- [x] **Unity 실측 통과** ([Issue #6](https://github.com/kanghyunsoon/ssafesta/issues/6), 강형순) — 실측 world 좌표·forward 벡터가 기대표와 소수점까지 일치, 부호 오류 0건. 육안 판정을 요청했으나 Unity 측이 숫자로 회신(부호 검증에는 그쪽이 정확하다는 판단). 앵커 `(5,0,5)` 전제도 검증됨
+- [x] **부수 성과 — 계약 불일치 3건 전부 Unity 반영** (`origin/game 8852861`)
+      ① `objectId` 정식 필드화 + 구 `id` fallback(`ResolvedObjectId`) ② 엔드포인트 복수형 전환(액세스 로그 실증) ③ `assetCode` DTO·Registry 조회 연결 — **FE는 지금부터 `assetCode` 포함 송신 가능**
+      ①의 최초 증상 서술 오류(“objectId 공백 전송” → 실제는 가드 조기 반환으로 이벤트 무전송)는 Codex 검증으로 발견·정정 (T-4)
 
-완료 시: 리뷰 ④칸 ☑, SC-004 근거 확보, 006 `T005`·`T006` 잠금 해제
+**획득**: C-02 실측 확정, SC-004 근거 확보, spec 006 `T005`·`T006` 잠금 해제 가능
+
+**잔여(블록 1 범위 밖)**: `assetCode` 지정 케이스 미검증(프리팹 카탈로그 확장과 함께), `BOOTH_LAPTOP_INTERACT` 브라우저 왕복은 WebGL 빌드 후 별도 검증. mock 파일 경로 단수 잔존 — 정식 이동 여부 FE 판단 대기 (T-5)
 
 ---
 
 ## 블록 2 — 타 파트 결정 (2026-08-18 5건 일괄 정리)
 
 - [x] **C-03** 오브젝트 크기 조절 — ✅ **고정 크기 확정.** `scale` 없음, 계약 변경 없음. spec 005·docs/26 반영
-- [ ] **C-05** 동시 편집 — **[Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5)로 상정, 황덕(strdeok) 지정.** `version` 낙관적 잠금 + 409 제안. 기한: BE Draft API 스키마 확정 전. 회신 대기
+- [x] **C-05** 동시 편집 — ✅ **낙관적 잠금 채택.** 황덕(strdeok) 회신([Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5), 2026-08-20). 제안한 `version` + 409 방향 그대로. 구현 세부(요청 스키마 `version` 위치·409 응답 body 형식)는 BE 착수 시 확정
 - [ ] **C-06** 템플릿 종수 — **보류 판단(지금 결정 불요).** FE는 스냅 간격·부스 크기를 설정값으로 두고 확정 후 주입. docs/26 메모 반영
 - [ ] **LAPTOP 주소 저장 위치** — 문서 추적 결과 방향 일관: docs/02 PROJECT-05(Owner 등록·수정)·spec 016 FR-001("주소 1개")·Key Entity Booth Homepage(부스 단위)·FE 의견(booths 컬럼, 부스당 1개)·Issue #1 Unity 회신(url은 저장 위치 확정 후 포함) 전부 **부스 단위 1개**로 수렴. 형식상 016 C-01·C-02만 open — BE 컬럼 추가 확인만 남음
 - [x] **Facade 저장 계약** — ✅ **spec 005 범위 제외 확정.** FE 외부 설정 화면 착수 전 별도 확정. docs/26 반영
@@ -98,14 +98,27 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 ```
 블록 0 (Architecture 문서 4종 + LAPTOP 송신부) ✅ 종결
+블록 1 (좌표 왕복 검증)                      ✅ 종결 (2026-08-20)
+블록 2 (타 파트 결정 5건)                    ✅ 종결 (C-05 회신으로 소진)
       │
-      ├─ 블록 1 (왕복 검증)                ← 선행 해소, 미착수, 다음 액션
-      └─ 블록 2 (5건 중 4건 처리, C-05만 잔여) ← Issue #5 회신 대기
-
-블록 2 회신 ─→ 블록 3 (spec 확정) ─→ 블록 4 (plan/tasks/implement)
+      └─ 블록 3 (spec 확정)  ← 착수 가능, 다음 액션
+                │
+                └─ 블록 4 (plan/tasks/implement)
 ```
 
-블록 1이 지금 유일하게 손댈 수 있는 실행 항목. 블록 2는 회신 대기.
+**블록 0~2 전부 종결. 블록 3이 다음 액션이며 선행 대기 없음.**
+단 블록 3의 `BE 검토칸`은 BE 담당 작성 사항이라 FE 단독으로 채울 수 없다 — 나머지 3항목 먼저 처리 후 BE에 요청.
+
+---
+
+## 별건 — spec 008 선행 (이 백로그 범위 밖, [Issue #2](https://github.com/kanghyunsoon/ssafesta/issues/2))
+
+2026-08-20 김가현(AI)·강형순(Unity) 회신으로 발생한 FE 액션.
+
+- AI 파트가 `AI_CHAT` payload를 `{ boothId: number, agentId: number }`로 확정 — 블록 0 미완이던 `openOverlay` 확인 해소
+- 신규 요청: `AI_AGENT_INTERACT { boothId, objectId, configId }` 이벤트. Unity는 `configId`가 이미 DTO·런타임에 있어 **계약 변경 없이 송신부만 붙이면 됨**(강형순 확인). 기존 `AiNpcInteractable`의 Unity 내부 Mock AI 호출을 브리지 이벤트로 교체하는 것이 원래 예정 경로
+- [ ] **FE 결정 대기 — 이벤트 필드명**: `configId`(Unity/Layout 계약 용어와 일치) vs `agentId`(FE 오버레이 용어와 일치). 강형순은 1번 권고, `events.ts` 소유자 판단을 따르겠다고 함
+- [ ] 확정 후 `events.ts`에 `AI_AGENT_INTERACT` 타입 추가
 
 ---
 
