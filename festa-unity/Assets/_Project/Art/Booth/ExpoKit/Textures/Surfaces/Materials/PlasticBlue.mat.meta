@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 52f6653ae7ca8c746b6fcf5652369cec
+timeCreated: 1507823692
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: -1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Textures/Surfaces/Materials/PlasticBlue.mat
+  uploadId: 237227
