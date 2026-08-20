@@ -1,0 +1,125 @@
+# specs/ — SDD 기능 명세
+
+> **작성 기준일**: 2026-08-12 | **작성자**: Unity 리드 (초안)
+> **spec-kit 버전**: 0.16.3 — `.specify/` 골격이 설치되어 있어 `/speckit-*` 명령이 바로 동작한다.
+
+---
+
+## 1. 지금 상태
+
+**18개 spec 전부 초안이 있다.** 팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을
+담당 파트가 채우면 확정된다.
+
+| Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
+|---|---|---|---|:---:|:---:|:---:|
+| 001 | auth-user | P0 | BE + FE | ✅ | — | — |
+| 002 | world-session | P0 | Unity + BE | ✅ | ✅ | ✅ |
+| 003 | wallet-coin | P0 | BE | ✅ | — | — |
+| 004 | booth-slot-lease | P0 | BE + FE | ✅ | — | — |
+| 005 | booth-studio-layout | P0 | FE + BE | ✅ | — | — |
+| 006 | booth-runtime | P0 | Unity | ✅ | ✅ | ✅ |
+| 007 | ai-agent-document | P0 | AI | ✅ | — | — |
+| 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |
+| 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
+| 013 | avatar-customization | **P0** | Unity + FE + BE | ✅ | ✅ | ✅ |
+| 016 | booth-laptop-homepage | **P0** | FE + Unity + BE | ✅ | — | — |
+| 010 | survey | P1 | FE + BE | ✅ | — | — |
+| 011 | staff-consultation | P1 | BE + FE | ✅ | — | — |
+| 012 | economy-inventory | P1 | BE | ✅ | — | — |
+| 014 | minigame | P1 | Unity + BE | ✅ | ✅ | ✅ |
+| 015 | dashboard | P1 | BE + FE | ✅ | — | — |
+| 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
+| 018 | world-floors | P1 | Unity | ✅ | ✅ | ✅ |
+
+**plan / tasks가 비어 있는 것은 각 파트가 직접 생성한다.** 그게 SDD의 정상 흐름이고,
+`.specify/` 골격이 설치돼 있어서 명령만 실행하면 된다 (아래 §3).
+
+## 2. 검토하는 법 (담당 파트가 먼저 할 일)
+
+각 spec 맨 아래에 **리뷰 3칸**이 있다. 세 칸을 다 채워야 검토 완료다.
+
+| 칸 | 해야 할 일 |
+|---|---|
+| ① Clarification 답변 | `C-xx` 표에 답한다. 모르면 비우지 말고 "언제까지 누가 정함"이라도 쓴다 |
+| ② 틀린 요구사항 지적 | 리드가 추측으로 쓴 것을 고친다. **"좋아요"만 남기면 검토가 아니다** |
+| ③ 빠진 요구사항 추가 | 담당자만 아는 필수 요구사항을 넣는다 |
+
+> 초안 작성자가 clarify를 대신 답하지 않은 것은 의도다 — 헌법 30조.
+
+## 3. spec-kit 사용법
+
+이 저장소에는 spec-kit이 이미 설치되어 있다. **추가 설치가 필요 없다.**
+
+```text
+.specify/memory/constitution.md   ← 헌법 v1.1 (모든 명령이 참조)
+.specify/templates/               ← spec / plan / tasks 템플릿
+.specify/scripts/bash/            ← 명령이 호출하는 스크립트
+.claude/skills/speckit-*/         ← Claude Code 용
+.agents/skills/speckit-*/         ← Codex 용
+specs/                            ← 이 폴더
+```
+
+**명령 실행 순서** (Claude와 Codex 모두 동일한 이름):
+
+```text
+/speckit-specify    새 기능 명세 작성 (이미 있는 것은 건너뛴다)
+/speckit-clarify    모호한 부분을 질문으로 좁힌다  ← C-xx 답할 때 유용
+/speckit-plan       기술 계획 수립         ← 각 파트가 여기서 시작
+/speckit-tasks      작업 목록 생성
+/speckit-analyze    일관성 점검
+/speckit-implement  구현
+```
+
+**⚠️ 중요 — 작업할 spec을 먼저 지정한다.**
+
+이 저장소의 spec들은 `/speckit-specify`가 아니라 손으로 만들었기 때문에, 명령이 "지금 어느 spec을 다루는지"를
+모른다. 작업 전에 아래 둘 중 하나로 지정한다.
+
+```bash
+# 방법 A — 파일로 지정 (권장, 계속 유지됨)
+echo '{ "feature_directory": "specs/004-booth-slot-lease" }' > .specify/feature.json
+
+# 방법 B — 환경변수로 한 번만
+export SPECIFY_FEATURE=specs/004-booth-slot-lease
+```
+
+지정이 되었는지 확인:
+
+```bash
+bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
+# → {"REPO_ROOT":...,"FEATURE_DIR":...,"FEATURE_SPEC":...,"IMPL_PLAN":...,"TASKS":...} 가 나오면 정상
+```
+
+**각 파트의 시작점**: 위처럼 자기 spec을 지정한 뒤 `/speckit-plan` 실행.
+plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있다 — 그래서 리드가 미리 쓰지 않았다.
+
+## 4. 2026-08-12 확정 사항 (전 spec 반영 완료)
+
+| 항목 | 확정값 |
+|---|---|
+| 로그인 | **Google + Kakao 소셜만.** 자체 가입 없음. 게스트는 둘러보기 전용(비영속) |
+| 접속 토큰 검증 | **서명 자체 검증** + 사용 토큰 식별자 기록으로 재사용 차단 |
+| Layout 좌표 | **미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z, 시계방향 +** |
+| 부스 오브젝트 상한 | **12개** |
+| 아바타 인코딩 | **최대 2000자, 저장은 TEXT** (기존 "32자"는 무효) |
+| 미니게임 | **타이머 정지 게임** (목표 5~10초 무작위, 단독 플레이) |
+| 월드 세션 | **1차부터 목적 층 파라미터 포함** |
+| 층 구조 | **층 = 별도 씬 + 별도 세션.** 엘리베이터가 전환을 가린다 |
+| 임대 정책 | D01~D11 **권장안 전부 채택** (spec 004 상단 표 참조) |
+| SSE 스키마 | `start / token / source / done / error` |
+| Embedding | 1536차원 고정 |
+| 1층 | **뼈대만** (부스 자리 + 포토존 위치). 상세 기획은 추후 |
+
+## 5. 합동 확정이 남은 것
+
+| 계약 | spec | 참여자 |
+|---|---|---|
+| Layout **왕복 검증 1회** (규칙은 확정, 실제 일치 확인 필요) | 005, 006 | FE + Unity |
+| Unity → React 상호작용 payload | 006, 008, 016 | FE + Unity |
+| SSE payload 상세 필드 | 008 | AI + FE |
+| 층별 서버 인스턴스 구성 | 018 | Unity + Infra |
+
+## 6. 주의 — 무효가 된 기존 문서
+
+`festa-unity/Docs/avatar-customization-contract.md`의 **"avatarCode 최대 29~32자"는 무효**다.
+파츠 조립 방식 채택으로 실측 600자를 넘는다. 확정값은 **2000자 / TEXT** (헌법 23조, T-24 참조).

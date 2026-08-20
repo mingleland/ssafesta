@@ -505,6 +505,29 @@ S3_BUCKET=
 
 ---
 
+## 21-1. SDD (spec-kit) 사용
+
+저장소 루트에 spec-kit 0.16.3 골격이 설치되어 있다. **추가 설치가 필요 없다.**
+
+```text
+.specify/memory/constitution.md   프로젝트 헌법 v1.1
+.specify/scripts/bash/            명령이 호출하는 스크립트
+.claude/skills/speckit-*/         Claude Code 용
+.agents/skills/speckit-*/         Codex 용
+specs/NNN-name/                   기능별 spec / plan / tasks
+```
+
+작업 전 **대상 spec을 지정**한다 (손으로 만든 spec이라 명령이 자동 인식하지 못한다):
+
+```bash
+echo '{ "feature_directory": "specs/004-booth-slot-lease" }' > .specify/feature.json
+```
+
+이후 `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` 순으로 진행한다.
+상세는 `specs/README.md` 참조.
+
+---
+
 ## 22. Release Tag
 
 시연 안정 버전은 Tag를 남긴다.
