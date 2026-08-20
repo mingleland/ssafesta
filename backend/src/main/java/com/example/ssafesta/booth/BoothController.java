@@ -1,7 +1,8 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -9,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** Booth reads (spec 004 contracts/lease-api.md). */
 @RestController
@@ -41,10 +41,9 @@ public class BoothController {
         try {
             return queries.findPublicBooth(boothId);
         } catch (BoothNotFoundException exception) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
+            throw new ApiException(ErrorCode.BOOTH_NOT_FOUND);
         } catch (BoothExpiredException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "BOOTH_LEASE_EXPIRED: 임대가 만료된 부스입니다.");
+            throw new ApiException(ErrorCode.BOOTH_LEASE_EXPIRED);
         }
     }
 }

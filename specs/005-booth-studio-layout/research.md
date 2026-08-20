@@ -111,7 +111,7 @@ Draft 저장에도 상한 12개를 거는 이유는 따로 있다 — 공개 시
 | React | **없음** — 소스가 아직 저장소에 없다 |
 | Bruno 문서 | `04-booth-lease/부스 상세 조회.bru`가 **이미 `{code, message}`로 기재** |
 
-게다가 현재 상태는 단순한 "형태 차이"가 아니라 결손이다. `ResponseStatusException` **33곳 중 코드를 붙이는 곳은 1곳**이고, 나머지는 한국어 문장만 반환한다. `BoothSlotController`·`WalletController` 등이 `conflict(code, message)` 헬퍼를 **각자 복제**해 갖고 있다. docs/08이 정의한 오류 코드 표가 응답에 나타나지 않으므로, FE가 붙는 순간 **한국어 문자열 매칭**을 하게 된다.
+게다가 현재 상태는 단순한 "형태 차이"가 아니라 결손이다. `ResponseStatusException` **23곳 중 코드를 붙이는 곳은 1곳**이고, 나머지는 한국어 문장만 반환한다. `BoothSlotController`·`WalletController` 등이 `conflict(code, message)` 헬퍼를 **각자 복제**해 갖고 있다. docs/08이 정의한 오류 코드 표가 응답에 나타나지 않으므로, FE가 붙는 순간 **한국어 문자열 매칭**을 하게 된다.
 
 따라서 이 작업은 계약을 바꾸는 것이 아니라 **문서가 이미 약속한 계약에 구현을 맞추는 것**이다. FE가 생기기 전인 지금이 가장 싸고, 미룰수록 비싸진다.
 

@@ -1,10 +1,11 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import io.swagger.v3.oas.annotations.Parameter;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -12,7 +13,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -68,7 +68,7 @@ public class GuestAuthController {
 
     private void requireTrustedOrigin(String origin, AuthProperties properties) {
         if (!properties.frontendBaseUrl().equals(origin)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다.");
+            throw new ApiException(ErrorCode.UNTRUSTED_ORIGIN);
         }
     }
 

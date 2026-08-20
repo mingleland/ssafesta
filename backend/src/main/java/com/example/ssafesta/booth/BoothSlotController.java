@@ -1,5 +1,7 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.wallet.InsufficientCoinException;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.time.Instant;
@@ -14,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** Slot listing and leasing (spec 004 contracts/lease-api.md). */
 @RestController
@@ -47,25 +48,21 @@ public class BoothSlotController {
             HttpStatus status = outcome.alreadyHeld() ? HttpStatus.OK : HttpStatus.CREATED;
             return ResponseEntity.status(status).body(LeaseResponse.of(outcome));
         } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, exception.getMessage());
         } catch (SlotNotFoundException exception) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, exception.getMessage());
+            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_FOUND);
         } catch (SlotNotRentableException exception) {
-            throw conflict("BOOTH_SLOT_NOT_RENTABLE", "임대할 수 없는 슬롯입니다.");
+            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_RENTABLE);
         } catch (SlotAlreadyLeasedException exception) {
-            throw conflict("BOOTH_SLOT_ALREADY_LEASED", "이미 임대 중인 슬롯입니다.");
+            throw new ApiException(ErrorCode.BOOTH_SLOT_ALREADY_LEASED);
         } catch (ActiveLeaseLimitException exception) {
-            throw conflict("ACTIVE_LEASE_LIMIT", "이미 임대 중인 부스가 있습니다. 만료 후 다시 임대할 수 있습니다.");
+            throw new ApiException(ErrorCode.ACTIVE_LEASE_LIMIT);
         } catch (InsufficientCoinException exception) {
             // Surfaced with the concrete shortfall — a silent fallback would leave the user
             // guessing why the booth was not rented (spec 003 FR-009).
-            throw conflict("INSUFFICIENT_COIN",
+            throw new ApiException(ErrorCode.INSUFFICIENT_COIN,
                     "코인이 부족합니다. 필요: " + exception.getRequired() + ", 잔액: " + exception.getBalance());
         }
-    }
-
-    private ResponseStatusException conflict(String code, String message) {
-        return new ResponseStatusException(HttpStatus.CONFLICT, code + ": " + message);
     }
 
     public record LeaseRequest(Integer durationDays) { }

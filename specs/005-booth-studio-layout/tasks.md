@@ -19,15 +19,15 @@
 
 **왜 먼저인가**: 005의 모든 endpoint가 이 봉투로 응답한다. 나중에 하면 005 코드를 두 번 고친다. 003·004 이관도 같은 이유로 여기서 끝낸다 — 봉투가 두 종류인 기간을 만들지 않는다.
 
-- [ ] T001 [P] `common/ErrorCode.java` — 코드·기본 HTTP status·기본 메시지를 갖는 enum. **docs/08 오류 코드 표와 1:1**로 맞춘다. 005 신규분(`LAYOUT_VALIDATION_FAILED` · `LAYOUT_REVISION_CONFLICT` · `LAYOUT_NOT_PUBLISHED` · `BOOTH_EDITOR_FORBIDDEN`)과 기존분(`BOOTH_LEASE_EXPIRED` · `BOOTH_SLOT_ALREADY_LEASED` · `BOOTH_SLOT_NOT_RENTABLE` · `ACTIVE_LEASE_LIMIT` · `BOOTH_NOT_FOUND` 등)을 함께 등록
-- [ ] T002 [P] `common/ApiErrorResponse.java` — `{code, message, requestId}` record. `errors`·`warnings`는 **null이면 직렬화에서 빠지도록** `@JsonInclude(NON_NULL)` (검증 응답에만 등장, [contracts/layout-api.md](contracts/layout-api.md) §0)
-- [ ] T003 `common/ApiException.java` — `ErrorCode`를 싣는 기반 예외. 메시지 override와 상세 목록 첨부를 허용한다 (T001 의존)
-- [ ] T004 [P] `common/RequestIdFilter.java` — 요청당 `req_{8자}` 생성 → **MDC + 응답 헤더 `X-Request-Id`**. 봉투의 `requestId`와 서버 로그가 같은 값이어야 문의 추적이 성립한다. 로그 패턴에 `%X{requestId}` 추가
-- [ ] T005 `common/GlobalExceptionHandler.java` — `@RestControllerAdvice`. `ApiException` → 봉투, `ResponseStatusException` → 봉투(코드 미상은 `INTERNAL_ERROR`), Bean Validation 실패 → `400 VALIDATION_FAILED`. **스택트레이스·예외 클래스명을 본문에 넣지 않는다** (T002·T003·T004 의존)
-- [ ] T006 `auth/SecurityConfiguration.java` — `AuthenticationEntryPoint`·`AccessDeniedHandler`를 봉투로 응답하도록 등록. **⚠️ Security 필터 체인에서 나는 401/403은 `@RestControllerAdvice`를 타지 않는다** — 이걸 빠뜨리면 인증 실패만 형태가 다른 채 남는다
-- [ ] T007 기존 throw 지점 이관 — `booth/BoothController.java` · `booth/BoothSlotController.java`(**중복 `conflict()` 헬퍼 삭제**) · `booth/BoothPrincipal.java` · `wallet/WalletController.java` · `user/MyAccountController.java` · `auth/GuestAuthController.java` · `auth/OAuthAuthorizationController.java` · `auth/OAuthCompletionController.java`. `ResponseStatusException` 33곳을 `ApiException`으로 옮기고, **코드 없이 한국어 문장만 나가던 곳에 코드를 부여**한다
-- [ ] T008 [P] `test/.../common/ErrorEnvelopeIntegrationTest.java` — 만료 부스 409 본문이 `{code:"BOOTH_LEASE_EXPIRED", message, requestId}`인지 / 본문 `requestId`와 응답 헤더 `X-Request-Id`가 **같은 값**인지 / 토큰 없는 요청의 401도 같은 형태인지(T006 회귀) / 404 본문에 스택트레이스가 없는지
-- [ ] T009 `./mvnw test` 전체 회귀 — 기존 103건이 그대로 통과하는지 확인. **오류 본문 단언이 0건이므로 실패가 나면 그건 이관 실수다**
+- [X] T001 [P] `common/ErrorCode.java` — 코드·기본 HTTP status·기본 메시지를 갖는 enum. **docs/08 오류 코드 표와 1:1**로 맞춘다. 005 신규분(`LAYOUT_VALIDATION_FAILED` · `LAYOUT_REVISION_CONFLICT` · `LAYOUT_NOT_PUBLISHED` · `BOOTH_EDITOR_FORBIDDEN`)과 기존분(`BOOTH_LEASE_EXPIRED` · `BOOTH_SLOT_ALREADY_LEASED` · `BOOTH_SLOT_NOT_RENTABLE` · `ACTIVE_LEASE_LIMIT` · `BOOTH_NOT_FOUND` 등)을 함께 등록
+- [X] T002 [P] `common/ApiErrorResponse.java` — `{code, message, requestId}` record. `errors`·`warnings`는 **null이면 직렬화에서 빠지도록** `@JsonInclude(NON_NULL)` (검증 응답에만 등장, [contracts/layout-api.md](contracts/layout-api.md) §0)
+- [X] T003 `common/ApiException.java` — `ErrorCode`를 싣는 기반 예외. 메시지 override와 상세 목록 첨부를 허용한다 (T001 의존)
+- [X] T004 [P] `common/RequestIdFilter.java` — 요청당 `req_{8자}` 생성 → **MDC + 응답 헤더 `X-Request-Id`**. 봉투의 `requestId`와 서버 로그가 같은 값이어야 문의 추적이 성립한다. 로그 패턴에 `%X{requestId}` 추가
+- [X] T005 `common/GlobalExceptionHandler.java` — `@RestControllerAdvice`. `ApiException` → 봉투, `ResponseStatusException` → 봉투(코드 미상은 `INTERNAL_ERROR`), Bean Validation 실패 → `400 VALIDATION_FAILED`. **스택트레이스·예외 클래스명을 본문에 넣지 않는다** (T002·T003·T004 의존)
+- [X] T006 `auth/SecurityConfiguration.java` — `AuthenticationEntryPoint`·`AccessDeniedHandler`를 봉투로 응답하도록 등록. **⚠️ Security 필터 체인에서 나는 401/403은 `@RestControllerAdvice`를 타지 않는다** — 이걸 빠뜨리면 인증 실패만 형태가 다른 채 남는다
+- [X] T007 기존 throw 지점 이관 — `booth/BoothController.java` · `booth/BoothSlotController.java`(**중복 `conflict()` 헬퍼 삭제**) · `booth/BoothPrincipal.java` · `wallet/WalletController.java` · `user/MyAccountController.java` · `auth/GuestAuthController.java` · `auth/OAuthAuthorizationController.java` · `auth/OAuthCompletionController.java`. `ResponseStatusException` 23곳을 `ApiException`으로 옮기고, **코드 없이 한국어 문장만 나가던 곳에 코드를 부여**한다
+- [X] T008 [P] `test/.../common/ErrorEnvelopeIntegrationTest.java` — 만료 부스 409 본문이 `{code:"BOOTH_LEASE_EXPIRED", message, requestId}`인지 / 본문 `requestId`와 응답 헤더 `X-Request-Id`가 **같은 값**인지 / 토큰 없는 요청의 401도 같은 형태인지(T006 회귀) / 404 본문에 스택트레이스가 없는지
+- [X] T009 `./mvnw test` 전체 회귀 — 기존 103건이 그대로 통과하는지 확인 — **결과: 112건 통과(103 + 신규 9), 실패 0**. **오류 본문 단언이 0건이므로 실패가 나면 그건 이관 실수다**
 
 **Checkpoint**: 전 endpoint가 같은 봉투로 응답하고 docs/08 §1.3이 실제 동작이 됐다
 
