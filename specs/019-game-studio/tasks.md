@@ -171,7 +171,7 @@
 - [ ] T065 [P] Add maximum-size fixture performance checks in `festa-game-studio/tests/performance/maxProject.test.ts`
 - [x] T066 Add schema migration policy and supported-major matrix in `specs/019-game-studio/contracts/README.md`
 - [ ] T067 Run all commands and record expected results in `specs/019-game-studio/quickstart.md`
-- [ ] T068 Update implementation status and remaining gates in `docs/22_다음_할일.md` and `docs/KHS/24_작업일지.md`
+- [x] T068 Update implementation status and remaining gates in `docs/22_다음_할일.md` and `docs/KHS/24_작업일지.md`
 - [x] T069 [P] Add deterministic input/state trace in `specs/019-game-studio/contracts/fixtures/runtime-traces/minimal-top-down-dialogue.trace.json`
 - [x] T070 Implement renderer-free reference state/event runtime in `specs/019-game-studio/contracts/fixtures/reference-runtime.mjs`
 - [x] T071 Document and verify the runtime trace command in `specs/019-game-studio/quickstart.md`
@@ -207,7 +207,7 @@ AI #22 does not block MVP
 ## Task Summary
 
 - 총 71개
-- 완료된 결정 비의존 계약 작업: T001~T009, T066, T069~T071 (13개)
+- 완료된 결정 비의존 계약 작업: T001~T009, T066, T068~T071 (14개)
 - User Story 1: T017~T031 (15개)
 - User Story 2: T032~T043 (12개)
 - User Story 3: T044~T050 (7개)
