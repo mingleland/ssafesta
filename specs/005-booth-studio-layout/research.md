@@ -98,13 +98,37 @@ Draft 저장에도 상한 12개를 거는 이유는 따로 있다 — 공개 시
 
 ---
 
-## R-09. 오류 봉투 — 005 endpoint에만 적용한다
+## R-09. 오류 봉투 — `ErrorCode` enum과 전역 핸들러를 **지금 만든다**
 
-**결정**: `{code, message, requestId}`(docs/08 §1.3) + 검증 실패 시 `errors`·`warnings`를 얹은 봉투를 **005 신규 endpoint에만** 적용한다.
+**결정**: `common/ErrorCode` enum + 전역 `@RestControllerAdvice`로 `{code, message, requestId}`(docs/08 §1.3)를 **전 endpoint에 적용한다.** 005의 검증 실패는 같은 봉투에 `errors`·`warnings`를 얹는다. 기존 003·004의 throw 지점도 함께 옮긴다.
 
-**근거**: 현재 코드에는 전역 예외 핸들러도 `ErrorCode` enum도 **없다.** 004는 `ResponseStatusException`으로 `"BOOTH_LEASE_EXPIRED: …"` 문자열을 ProblemDetail `detail`에 넣는다. FR-016의 목록을 실으려면 봉투가 필요한데, 전역으로 바꾸면 **003·004의 기존 응답 형태가 함께 바뀐다** — FE 통보 없는 Breaking Change다(헌법 24조).
+**근거**: 처음에는 "003·004 응답이 바뀌므로 Breaking Change(헌법 24조)"라고 판단했으나 **바뀌는 것을 보는 소비자가 없다는 사실을 확인했다.**
 
-**따라오는 일**: "전역 오류 봉투 통일"을 `docs/26`에 별도 항목으로 올린다. 지금 합치지 않는 이유는 미루기가 아니라 **통보 절차가 필요하기 때문**이다.
+| 소비자 | 오류 본문 의존 |
+|---|---|
+| Unity `HttpBoothApiClient` | **없음** — `responseCode`만 분기하고 본문은 성공 시에만 파싱한다 |
+| 백엔드 테스트 | **없음** — 오류 본문에 대한 `jsonPath` 단언 0건 |
+| React | **없음** — 소스가 아직 저장소에 없다 |
+| Bruno 문서 | `04-booth-lease/부스 상세 조회.bru`가 **이미 `{code, message}`로 기재** |
+
+게다가 현재 상태는 단순한 "형태 차이"가 아니라 결손이다. `ResponseStatusException` **33곳 중 코드를 붙이는 곳은 1곳**이고, 나머지는 한국어 문장만 반환한다. `BoothSlotController`·`WalletController` 등이 `conflict(code, message)` 헬퍼를 **각자 복제**해 갖고 있다. docs/08이 정의한 오류 코드 표가 응답에 나타나지 않으므로, FE가 붙는 순간 **한국어 문자열 매칭**을 하게 된다.
+
+따라서 이 작업은 계약을 바꾸는 것이 아니라 **문서가 이미 약속한 계약에 구현을 맞추는 것**이다. FE가 생기기 전인 지금이 가장 싸고, 미룰수록 비싸진다.
+
+**구성**
+
+| 요소 | 역할 |
+|---|---|
+| `common/ErrorCode` (enum) | 코드 · 기본 HTTP status · 기본 메시지의 단일 출처. docs/08 코드 표와 1:1 |
+| `common/ApiException` | `ErrorCode`를 실어 던지는 기반 예외. 도메인 예외가 상속하거나 핸들러가 매핑 |
+| `common/GlobalExceptionHandler` | `@RestControllerAdvice` — 봉투 직렬화 |
+| `common/RequestIdFilter` | 요청당 `req_{8자}` 생성 → MDC + 응답 헤더 `X-Request-Id`. 로그와 봉투의 `requestId`가 같은 값이 된다 |
+
+**버린 대안**:
+- *005 endpoint에만 적용* — 같은 API에 봉투가 두 종류가 된다. FE가 endpoint별로 파서를 갈라야 하고, 통일 시점에 결국 한 번 더 바꾼다.
+- *ProblemDetail(RFC 9457) 확장 필드 사용* — Spring 기본형이라 코드가 가장 적지만, docs/08 §1.3과 Bruno 문서가 이미 `{code, message, requestId}`로 나가 있어 문서 3곳을 되레 고쳐야 한다.
+
+**남는 통보 의무**: 소비자가 없어도 형태가 바뀌는 것은 사실이므로 AI·FE 파트에 **"docs/08 §1.3이 이제 실제 동작"**임을 알린다 (헌법 24조). Breaking이 아니라 **문서와의 정합 회복**으로 전달한다.
 
 ---
 

@@ -12,7 +12,7 @@
 
 **Base**: `/api/v1` · **인증**: 편집 계열은 `Authorization: Bearer <access token>` (MEMBER only, GUEST 거부)
 
-### 오류 봉투 — **005 endpoint 한정** (research R-09)
+### 오류 봉투 — **전 endpoint 공통** (research R-09, 005에서 신설)
 
 ```json
 { "code": "LAYOUT_VALIDATION_FAILED", "message": "배치를 공개할 수 없습니다.", "requestId": "req_…",
@@ -20,7 +20,9 @@
   "warnings": [ { "rule": "CONFIG_NOT_LINKED", "objectId": "ai-1", "message": "AI 직원이 연결되지 않았습니다." } ] }
 ```
 
-`errors`·`warnings`는 검증 응답에만 있다. 003·004의 기존 오류 형태는 **바뀌지 않는다**.
+`errors`·`warnings`는 검증 응답에만 있다. `requestId`는 요청당 발급되며 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**이라 문의가 들어오면 바로 추적된다.
+
+> **003·004 오류 응답도 이 형태로 바뀐다.** 지금까지는 코드 없이 한국어 문장만 나갔다 — docs/08 §1.3과 Bruno 문서가 약속한 형태에 구현을 맞추는 것이다 (R-09). 오류 본문을 읽는 소비자가 아직 없음을 확인하고 결정했다.
 
 | code | HTTP | 언제 |
 |---|---|---|

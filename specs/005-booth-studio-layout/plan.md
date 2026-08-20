@@ -48,7 +48,7 @@ facade는 **docs/08·09 설계 문서대로** 4필드로 간다 (2026-08-20 결�
 | 16 | 클라이언트 주장 불신 | `configId`가 **그 부스 소유 콘텐츠**인지 서버가 확인한다. 요청의 boothId·소유자 주장은 JWT subject로만 유도 |
 | 21 | Layout 좌표 규칙 | **BE는 값을 변형하지 않는다.** 범위 검증만 하고 반올림·정규화하지 않는다. 왕복 무손실 테스트로 고정 |
 | 22 | 오브젝트 12개 상한 | 공개 시점뿐 아니라 **Draft 저장 시점에도** 건다 |
-| 24 | 계약 변경은 합의로만 | docs/08에 없는 `PUT /booths/{id}/facade`를 신설한다 — **추가**이지 Breaking Change는 아니나 FE 통보 대상. docs/08 갱신을 tasks에 포함 |
+| 24 | 계약 변경은 합의로만 | ① docs/08에 없는 `PUT /booths/{id}/facade` 신설 — **추가**라 Breaking은 아니나 통보 대상 ② 오류 봉투를 전 endpoint에 적용 — **소비자가 없음을 확인**했고(R-09) docs/08 §1.3·Bruno 문서가 이미 그 형태로 나가 있어 **정합 회복**에 해당한다. 둘 다 docs/08 갱신 + AI·FE 통보를 tasks에 포함 |
 | 29 | 기록 의무 | `docs/HDD/작업일지.md` · `트러블슈팅.md` |
 | 30 | 미정 항목 임의 확정 금지 | C-03(scale)·C-04(미연결)·C-06(템플릿)을 확정하지 않는다. scale은 `schema_version`으로 후행 확장, C-04는 warning 자리에 두어 확정 시 error로 **옮기기만** 하면 되게 한다 |
 
@@ -93,8 +93,12 @@ backend/src/main/java/com/example/ssafesta/booth/
 ├── LayoutValidationFailedException.java
 └── BoothEditorForbiddenException.java
 
-backend/src/main/java/com/example/ssafesta/booth/api/
-└── BoothLayoutErrorHandler.java       # 005 endpoint 한정 {code,message,requestId,errors,warnings}
+backend/src/main/java/com/example/ssafesta/common/       # ← 005에서 신설, 전 endpoint 적용 (R-09)
+├── ErrorCode.java                     # 코드·HTTP status·기본 메시지 단일 출처 (docs/08 코드 표와 1:1)
+├── ApiException.java                  # ErrorCode를 싣는 기반 예외
+├── ApiErrorResponse.java              # {code, message, requestId} (+errors/warnings)
+├── GlobalExceptionHandler.java        # @RestControllerAdvice
+└── RequestIdFilter.java               # req_{8자} → MDC + 응답 헤더 X-Request-Id
 
 backend/src/main/resources/db/migration/
 ├── V8__booth_published_layout_version.sql   # booths.published_layout_version (NULL 허용)
@@ -117,5 +121,5 @@ backend/bruno/05-booth-layout/                   # 003·004와 같은 형식
 
 | 항목 | 왜 필요한가 | 더 단순한 대안을 버린 이유 |
 |---|---|---|
-| 005 전용 오류 봉투 (`booth/api/BoothLayoutErrorHandler`) | FR-016이 `errors`·`warnings` **목록**을 요구한다. 현재 코드는 `ResponseStatusException`으로 `"CODE: 메시지"` 문자열을 ProblemDetail `detail`에 넣을 뿐이라 목록을 실을 자리가 없다 | ① 문자열에 계속 욱여넣기 → FE가 문자열을 파싱해야 한다 ② **전역 봉투로 통일** → 003·004의 기존 응답 형태가 바뀐다. FE 통보 없는 Breaking Change라 헌법 24조에 걸린다. 전역 통일은 별도 건으로 `docs/26`에 올린다 |
+| 전역 `ErrorCode` + 봉투를 005에서 신설 (`common/`) | FR-016이 `errors`·`warnings` **목록**을 요구하는데 현재는 실을 자리가 없다. 더 근본적으로 `ResponseStatusException` 33곳 중 **코드를 붙이는 곳이 1곳**이고 컨트롤러마다 `conflict()` 헬퍼가 복제돼 있다 — docs/08 코드 표가 응답에 없다 | ① 문자열에 계속 욱여넣기 → FE가 한국어 문장을 매칭한다 ② **005 endpoint에만 적용** → 한 API에 봉투가 두 종류가 되고 통일 시점에 한 번 더 바꾼다. 소비자가 없음을 확인했으므로(R-09) 지금 통일하는 것이 가장 싸다 |
 | `LayoutJson` 원문 보관 | 왕복 무손실(SC-004). 파싱한 객체를 다시 직렬화하면 키 순서·소수 표기가 바뀔 수 있다 | 파싱 후 재직렬화 → Unity·React가 받는 값이 저장한 값과 문자 단위로 달라진다. 좌표 규칙 왕복 검증(spec ④칸)이 무엇을 검증한 것인지 모호해진다 |

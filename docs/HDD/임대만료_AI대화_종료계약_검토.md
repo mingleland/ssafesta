@@ -208,11 +208,11 @@ GET /internal/ai/booth-access?boothId=7&agentId=78
 **FastAPI도 Spring과 같은 오류 봉투 `{code, message, requestId}`를 쓴다** — docs/08 §1.3의 형태다.
 다르면 FE가 서버별로 파서를 두 개 만든다.
 
-> ⚠️ **정정 (2026-08-20, spec 005 착수 중 확인).** 이 봉투는 **문서에만 있고 Spring에 구현되어 있지 않다.**
-> 현재 004는 `ResponseStatusException`으로 `"BOOTH_LEASE_EXPIRED: …"` 문자열을 ProblemDetail `detail`에
-> 넣을 뿐이고, 전역 예외 핸들러도 `ErrorCode` enum도 없다. 005가 **신규 endpoint에 한해** 이 봉투를
-> 도입하며(`specs/005/research.md` R-09), 003·004까지 통일하는 것은 FE 통보가 필요한 별건으로
-> `docs/26`에 올렸다. **AI 파트에는 "현재 구현이 아니라 합의된 목표 형태"로 전달해야 한다.**
+> ⚠️ **정정 (2026-08-20, spec 005 착수 중 확인).** 작성 시점에 이 봉투는 **문서에만 있고 Spring에는 없었다.**
+> `ResponseStatusException` 33곳 중 코드를 붙이는 곳이 1곳뿐이었고 전역 핸들러도 `ErrorCode` enum도 없었다.
+> **005에서 `ErrorCode` enum + 전역 핸들러로 구현한다** (`specs/005/research.md` R-09) — 오류 본문을 읽는
+> 소비자가 아직 없음을(Unity는 상태 코드만 분기, 테스트 단언 0건, React 미존재) 확인하고 지금 통일하기로 했다.
+> **AI 파트에는 "005 완료 시점부터 실제 동작하는 형태"로 전달한다.**
 
 **새 SSE 이벤트 이름은 만들 수 없다** — 헌법 19조가 `start/token/source/done/error` 5종으로 고정했다.
 따라서 종료 통지는 반드시 `error` 이벤트다.
