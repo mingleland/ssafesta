@@ -21,7 +21,9 @@ namespace Festa.Booth
         [SerializeField] Transform _shell;
         [Tooltip("primaryColor 를 적용할 머티리얼 이름. 셸에서 이 이름으로 시작하는 슬롯만 칠한다.\n" +
                  "팩 공용 머티리얼(Aluminium 등)을 넣으면 부스 밖까지 물들므로 프로젝트 소유 머티리얼만 지정한다.")]
-        [SerializeField] string[] _facadeMaterialNames = { "BoothCarpet" };
+        // 기본은 벽면 패널만. 실제 엑스포 부스도 브랜드 색은 벽면에 쓰고 바닥은 중성색으로 둔다.
+        // 카펫까지 칠하려면 "BoothCarpet" 을 추가하면 되지만 부스 전체가 한 색이 되어 단조로워진다.
+        [SerializeField] string[] _facadeMaterialNames = { "BoothPanelGraphic" };
 
         readonly List<GameObject> _spawned = new();
         BoothObjectFactory _factory;
