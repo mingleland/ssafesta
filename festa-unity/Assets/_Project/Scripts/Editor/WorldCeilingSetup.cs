@@ -53,6 +53,12 @@ namespace Festa.World.EditorTools
         const float FillIntensity = 260f;
         const float FillRange = 160f;
 
+        // 살짝 웜톤. B 만 조금 내린다 — 더 내리면 노랗게 뜬다.
+        // 환경광도 같은 방향이어야 한다. 쿨한 환경광은 광원의 웜톤을 상쇄해 버린다.
+        static readonly Color SpotColor = new Color(1f, 0.945f, 0.855f);
+        static readonly Color FillColor = new Color(1f, 0.955f, 0.885f);
+        static readonly Color AmbientColor = new Color(0.215f, 0.208f, 0.198f, 1f);
+
         [MenuItem("Festa/World/천장 조명 셋업 다시 적용", false, 100)]
         static void Reapply()
         {
@@ -276,7 +282,7 @@ namespace Festa.World.EditorTools
                 go.transform.rotation = Quaternion.Euler(90f, 0f, 0f); // 정면(+Z)을 아래로
                 var li = go.AddComponent<Light>();
                 li.type = LightType.Spot;
-                li.color = new Color(1f, 0.96f, 0.90f);
+                li.color = SpotColor;
                 li.intensity = SpotIntensity;
                 li.range = SpotRange;
                 li.spotAngle = SpotAngle;
@@ -296,7 +302,7 @@ namespace Festa.World.EditorTools
                 go.transform.position = new Vector3(tb.center.x, tb.min.y - 1f, tb.center.z);
                 var li = go.AddComponent<Light>();
                 li.type = LightType.Point;
-                li.color = new Color(1f, 0.98f, 0.95f);
+                li.color = FillColor;
                 li.intensity = FillIntensity;
                 li.range = FillRange;
                 li.shadows = LightShadows.None;
@@ -309,7 +315,7 @@ namespace Festa.World.EditorTools
         {
             RenderSettings.sun = null;
             RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.20f, 0.21f, 0.24f, 1f);
+            RenderSettings.ambientLight = AmbientColor;
             RenderSettings.ambientIntensity = 1f;
         }
 
