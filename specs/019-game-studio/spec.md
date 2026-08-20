@@ -12,6 +12,8 @@
 
 **Related Specs**: 005(Booth Layout), 006(Booth Runtime), 014(관리자 미니게임), 016(Web Overlay)
 
+**Work Records**: `docs/KHS/27_Game_Studio_작업일지.md` / `docs/KHS/28_Game_Studio_트러블슈팅.md`
+
 **Input**: 사용자가 웹에서 하나의 공통 2D 제작기로 Scene·오브젝트·이벤트를 조합해 게임을 만들고, 같은 웹 Runtime에서 미리보기·공개·플레이한다. FESTA 부스 NPC와의 상호작용은 선택적 진입점이며 Unity가 2D 게임을 실행하거나 해석하지 않는다.
 
 > 이 기능은 `014-minigame`을 대체하지 않는다. 014는 Unity 관리자 부스의 타이머 정지 게임 1종이고, 019는 사용자가 제작한 웹 2D 콘텐츠를 다루는 독립 UGC 기능이다.

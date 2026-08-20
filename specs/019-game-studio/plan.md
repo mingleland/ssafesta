@@ -78,6 +78,10 @@ specs/019-game-studio/
 │   ├── part-boundaries.md
 │   └── fixtures/
 └── tasks.md
+
+docs/KHS/
+├── 27_Game_Studio_작업일지.md
+└── 28_Game_Studio_트러블슈팅.md
 ```
 
 ### Source Code
@@ -115,7 +119,8 @@ festa-frontend/src/game-studio/
 
 **Structure Decision**: Game Studio 본체는 기존 FESTA 화면과 분리하고 Host adapter만 기존 Frontend에 둔다.
 루트 앱 이름과 배포 단위는 #20 승인 대상이므로, 승인 전에는 `specs/019-game-studio/contracts/`의
-framework-independent 코드와 fixture만 변경한다.
+framework-independent 코드와 fixture만 변경한다. 이 feature의 작업·문제 기록은 KHS 일반 24/25가
+아니라 전용 27/28 문서에 남긴다.
 
 ## Design Phases
 
