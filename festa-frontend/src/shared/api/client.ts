@@ -1,3 +1,4 @@
+// Spring 서버와 통신하는 단일 창구 — 인증 헤더·타임아웃·에러 형식을 여기서 통일
 // API Client — docs/10_Frontend_설계서.md §5 + docs/08_Backend_API_명세서.md §1
 
 export type ApiError = { code: string; message: string; requestId?: string };
