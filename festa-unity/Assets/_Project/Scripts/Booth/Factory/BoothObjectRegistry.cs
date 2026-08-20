@@ -33,6 +33,10 @@ namespace Festa.Booth
                 _assetMap ??= BuildAssetMap();
                 if (_assetMap.TryGetValue(Key(type, assetCode), out var assetPrefab))
                     return assetPrefab;
+
+                // 값이 있는데 못 찾은 경우는 대부분 오타다. 미지정(정상 경로)과 구분해 알린다.
+                Debug.LogWarning(
+                    $"[BoothObjectRegistry] Unknown assetCode '{assetCode}' for type {type} — 타입 기본 자산으로 대체");
             }
 
             _map ??= BuildMap();
