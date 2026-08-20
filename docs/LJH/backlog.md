@@ -1,7 +1,7 @@
 # FE 백로그 — spec 005 착수
 
 개인 작업 공간(`docs/LJH/`). 2026-08-18부터 git 추적 대상 — `local/` gitignore 시절의 "커밋 제외"는 더 이상 유효하지 않다.
-최종 갱신: 2026-08-20 — 블록 1 완결(왕복 검증 통과), C-05 확정, 블록 3 착수 가능
+최종 갱신: 2026-08-20 — 이슈 #1·#2 종결, `assetCode` 검증 통과, 서명 브랜치 확정
 
 기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
 
@@ -56,7 +56,13 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 **획득**: C-02 실측 확정, SC-004 근거 확보, spec 006 `T005`·`T006` 잠금 해제 가능
 
-**잔여(블록 1 범위 밖)**: `assetCode` 지정 케이스 미검증(프리팹 카탈로그 확장과 함께), `BOOTH_LAPTOP_INTERACT` 브라우저 왕복은 WebGL 빌드 후 별도 검증. mock 파일 경로 단수 잔존 — 정식 이동 여부 FE 판단 대기 (T-5)
+**잔여(블록 1 범위 밖)** — 2026-08-20 추가 회신으로 일부 해소:
+
+- [x] `assetCode` 지정 케이스 — **검증 통과**. 전달 경로·fallback·대소문자 무시·`type:assetCode` 복합키 전부 확인. 상세: `docs/LJH/verify/block1-roundtrip.md`
+- [x] mock 파일 경로 복수형 이동 — FE는 `Tools/mock-api` 미사용 확인 후 이동 승인 (T-5)
+- [x] 잘못된 `assetCode` 무경고 대체 — **Unity가 `Debug.LogWarning` 추가로 처리.** FE 편집기 검증은 추가하지 않기로 회신
+- [ ] **FE가 쓸 `assetCode` 목록 제공** — 카탈로그 확장 시 Unity가 그 값으로 등록. 편집기에서 쓸 자산 종류를 FE가 정한 뒤 전달. 이게 선행돼야 "서로 다른 자산이 실제로 선택되는지"를 검증할 수 있음(현재 타입당 프리팹 1개라 원리적으로 구분 불가)
+- [ ] `BOOTH_LAPTOP_INTERACT` 브라우저 왕복 — WebGL 빌드 후 별도 검증
 
 ---
 
@@ -111,14 +117,32 @@ spec 원문: "말로 합의하고 넘어가지 말 것 — 부호 하나는 반�
 
 ---
 
-## 별건 — spec 008 선행 (이 백로그 범위 밖, [Issue #2](https://github.com/kanghyunsoon/ssafesta/issues/2))
+## 별건 — spec 008 선행 ([Issue #2](https://github.com/kanghyunsoon/ssafesta/issues/2) ✅ 종결, FE 구현만 잔여)
 
-2026-08-20 김가현(AI)·강형순(Unity) 회신으로 발생한 FE 액션.
+2026-08-20 김가현(AI)·강형순(Unity) 회신으로 계약 확정. **이슈는 "계약 리뷰 요청" 범위라 확정 시점에 종결**했고, 뒤따르는 구현은 별도 추적.
 
-- AI 파트가 `AI_CHAT` payload를 `{ boothId: number, agentId: number }`로 확정 — 블록 0 미완이던 `openOverlay` 확인 해소
-- 신규 요청: `AI_AGENT_INTERACT { boothId, objectId, configId }` 이벤트. Unity는 `configId`가 이미 DTO·런타임에 있어 **계약 변경 없이 송신부만 붙이면 됨**(강형순 확인). 기존 `AiNpcInteractable`의 Unity 내부 Mock AI 호출을 브리지 이벤트로 교체하는 것이 원래 예정 경로
-- [ ] **FE 결정 대기 — 이벤트 필드명**: `configId`(Unity/Layout 계약 용어와 일치) vs `agentId`(FE 오버레이 용어와 일치). 강형순은 1번 권고, `events.ts` 소유자 판단을 따르겠다고 함
-- [ ] 확정 후 `events.ts`에 `AI_AGENT_INTERACT` 타입 추가
+확정 내용:
+- `AI_CHAT` payload `{ boothId: number, agentId: number }` — 블록 0 미완이던 `openOverlay` 확인 해소
+- **`AI_AGENT_INTERACT { boothId: number, objectId: string, configId: number }`** — Unity는 `configId`로 송신(Layout 계약·DTO 필드명과 일치), `agentId`라는 이름은 Unity에서 쓰지 않음. **`configId` → `agentId` 매핑은 FE가 `AI_CHAT` payload를 만들 때 처리**
+- Unity 구현 계획(미착수): `BoothInteractBridge`를 `type` 인자 받도록 일반화, `AiNpcInteractable`의 내부 Mock AI 직접 호출을 브리지 송신으로 교체(ADR 결정 4 — 텍스트 입력 UI는 React 담당)
+
+FE 잔여:
+- [ ] `events.ts`에 `AI_AGENT_INTERACT` 타입 추가 — 필드 3개 확정됐으므로 바로 구현 가능
+- [ ] 수신 시 `configId`를 `agentId`로 매핑해 `openOverlay('AI_CHAT', { boothId, agentId })` 호출하는 흐름 연결
+
+---
+
+## 별건 — 문서 서명 공간·브랜치 운영 (2026-08-20 확인)
+
+`spec.md` 등 spec 문서의 **원본은 `front`**. `back`·`develop`·`main`에도 같은 파일이 있으나 FE 검토 4칸·C-03 확정이 없는 구버전이다.
+
+경위: 08-18에 `front`→`develop` 통합을 시도(`f8c47fc`, PR #3)했다가 커밋 타입·브랜치명·PR 제목이 `docs/17` 컨벤션을 벗어나 되돌림(`95cd845`, develop은 병합 이전 상태로 완전 복원). 이때 **"`front`를 현재 시점의 최종 작업 브랜치로 간주하고 계속 작업"** 합의.
+
+- **당장 규칙**: 타 파트 문서를 검토·서명할 때는 문서 소유 브랜치로 전환해 그 자리에서 서명·커밋한다. BE의 spec 005 검토는 `front`로 전환해서 진행
+- **추후**: 주 서명 공간은 `develop`으로 통합 예정
+- ⚠️ PR #3이 남긴 미해결 구조 문제 — `front`/`back`/`ai`가 `festa-unity/` 삭제 이력을 갖고 있어 일반 merge 시 **1,462개 파일이 조용히 삭제 스테이징**된다(실측 확인). 제안 2건이 팀 결정 대기: ① `festa-unity/`를 별도 저장소로 분리 ② 통합 시 일반 Merge 버튼 금지를 `docs/17`에 규칙화. **develop 통합 재시도 전에 반드시 결론 필요**
+
+---
 
 ---
 
