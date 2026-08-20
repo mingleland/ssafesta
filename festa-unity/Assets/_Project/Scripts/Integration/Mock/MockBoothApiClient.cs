@@ -45,12 +45,36 @@ namespace Festa.Integration
   ]
 }";
 
+        // Facade 회귀 검증용. primaryColor 는 hex 문자열 계약(#17 합의)을 따른다.
+        const string MockDetailJson = @"{
+  ""boothId"": 7,
+  ""slotId"": 5,
+  ""name"": ""AI 프로젝트 전시관"",
+  ""leaseStatus"": ""ACTIVE"",
+  ""entryAvailable"": true,
+  ""facade"": {
+    ""themeCode"": ""SSAFY_BLUE"",
+    ""primaryColor"": ""#1677C8"",
+    ""signText"": ""AI 프로젝트 전시관"",
+    ""logoUrl"": null
+  },
+  ""publishedLayoutVersion"": 1
+}";
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             await Awaitable.WaitForSecondsAsync(0.15f); // 네트워크 지연 흉내 (WebGL 호환)
             var layout = BoothLayoutParser.Parse(MockLayoutJson);
             if (layout != null) layout.boothId = boothId;
             return layout;
+        }
+
+        public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            var detail = BoothFacadeParser.Parse(MockDetailJson);
+            if (detail != null) detail.boothId = boothId;
+            return detail;
         }
     }
 }

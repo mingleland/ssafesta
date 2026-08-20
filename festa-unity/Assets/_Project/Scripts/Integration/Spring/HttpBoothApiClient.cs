@@ -23,10 +23,43 @@ namespace Festa.Integration
             _tokenProvider = tokenProvider ?? new EmptyAccessTokenProvider();
         }
 
+        public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
+        {
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}";
+            var body = await GetAsync(url, boothId, "booth detail");
+            if (body == null) return null;
+
+            var detail = BoothFacadeParser.Parse(body);
+            if (detail == null)
+            {
+                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 상세 응답 JSON 파싱 실패");
+                return null;
+            }
+            return detail;
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";
+            var body = await GetAsync(url, boothId, "published layout");
+            if (body == null) return null;
 
+            var layout = BoothLayoutParser.Parse(body);
+            if (layout == null)
+            {
+                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 응답 JSON 파싱 실패");
+                return null;
+            }
+
+            if (layout.objects.Length == 0)
+                Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: 빈 layout (objects 0개)");
+
+            return layout;
+        }
+
+        /// <summary>GET 공통부. 실패는 예외 대신 null + 로그 (부스 로딩 실패가 클라이언트를 깨지 않게).</summary>
+        async Task<string> GetAsync(string url, int boothId, string what)
+        {
             using var request = UnityWebRequest.Get(url);
             request.timeout = TimeoutSeconds;
 
@@ -49,7 +82,7 @@ namespace Festa.Integration
                     break;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404:
-                    Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: published layout 없음 (404)");
+                    Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: {what} 없음 (404)");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError:
@@ -61,17 +94,7 @@ namespace Festa.Integration
                     return null;
             }
 
-            var layout = BoothLayoutParser.Parse(request.downloadHandler.text);
-            if (layout == null)
-            {
-                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 응답 JSON 파싱 실패");
-                return null;
-            }
-
-            if (layout.objects.Length == 0)
-                Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: 빈 layout (objects 0개)");
-
-            return layout;
+            return request.downloadHandler.text;
         }
     }
 }

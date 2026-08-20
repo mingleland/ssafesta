@@ -14656,6 +14656,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2133422583562328688, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 3370056717297922193, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 5489414845156662691, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
       propertyPath: m_Name
       value: BoothShell
@@ -17103,6 +17111,9 @@ MonoBehaviour:
   _boothId: 7
   _registry: {fileID: 11400000, guid: c6a420a61717a494aa870d7133f92959, type: 2}
   _loadOnStart: 1
+  _shell: {fileID: 0}
+  _facadeMaterialNames:
+  - BoothPanelGraphic
 --- !u!4 &1818069021
 Transform:
   m_ObjectHideFlags: 0
