@@ -13,19 +13,14 @@ namespace Festa.Content
         void Awake()
         {
             _runtimeObject = GetComponent<BoothRuntimeObject>();
-            var colliders = GetComponentsInChildren<Collider>(true);
-            if (colliders.Length == 0)
-                colliders = new Collider[] { gameObject.AddComponent<BoxCollider>() };
 
-            // OnMouseDown은 Collider가 붙은 GameObject에만 전달된다.
-            // 실제 LAPTOP 프리팹의 Collider가 자식에 있어도 루트 상호작용으로 중계한다.
-            foreach (var targetCollider in colliders)
-            {
-                var clickTarget = targetCollider.GetComponent<LaptopClickTarget>();
-                if (clickTarget == null)
-                    clickTarget = targetCollider.gameObject.AddComponent<LaptopClickTarget>();
-                clickTarget.Bind(this);
-            }
+            // 레이캐스트 대상이 되도록 콜라이더를 보장한다. 실제 LAPTOP 프리팹은
+            // 자식(TableSquare)에 콜라이더가 있고, 디스패처가 부모에서 이 컴포넌트를 찾는다.
+            if (GetComponentsInChildren<Collider>(true).Length == 0)
+                gameObject.AddComponent<BoxCollider>();
+
+            // 클릭 감지는 중앙 디스패처가 한다. OnMouseDown 은 WebGL 에서 발생하지 않는다 (T-166).
+            BoothInteractionInput.Ensure();
         }
 
         public void Interact(string url = null)
@@ -40,20 +35,6 @@ namespace Festa.Content
                 _runtimeObject.BoothId,
                 _runtimeObject.ObjectId,
                 url);
-        }
-    }
-
-    /// <summary>Collider가 있는 자식 오브젝트의 클릭을 LAPTOP 루트로 전달한다.</summary>
-    public sealed class LaptopClickTarget : MonoBehaviour
-    {
-        LaptopInteractable _owner;
-
-        public void Bind(LaptopInteractable owner) => _owner = owner;
-
-        void OnMouseDown()
-        {
-            if (_owner != null)
-                _owner.Interact();
         }
     }
 }
