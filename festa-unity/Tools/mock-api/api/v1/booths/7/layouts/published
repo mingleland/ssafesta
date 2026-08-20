@@ -1,51 +1,139 @@
 {
   "boothId": 7,
   "template": "PROJECT_EXHIBITION",
-  "version": 2,
+  "version": 5,
   "objects": [
     {
       "objectId": "board-1",
       "type": "RECRUITMENT_BOARD",
       "position": {
-        "x": 0,
+        "x": -1.35,
         "y": 0,
-        "z": -2.85
+        "z": -2.8
       },
       "rotationY": 0,
       "configId": 1
     },
     {
-      "objectId": "desk-1",
-      "type": "CONSULTATION_DESK",
+      "objectId": "screen-1",
+      "type": "VIDEO_SCREEN",
       "position": {
-        "x": 1.75,
+        "x": 1.5,
         "y": 0,
-        "z": 1.5
+        "z": -2.8
       },
       "rotationY": 0,
       "configId": 2
     },
     {
+      "objectId": "panel-1",
+      "type": "PROJECT_PANEL",
+      "position": {
+        "x": -2.8,
+        "y": 0,
+        "z": -1.3
+      },
+      "rotationY": 90,
+      "configId": 3
+    },
+    {
       "objectId": "ai-1",
       "type": "AI_AGENT",
       "position": {
-        "x": -1.9,
+        "x": -2.75,
         "y": 0,
-        "z": 2.0
+        "z": 0.6
+      },
+      "rotationY": 90,
+      "configId": 4
+    },
+    {
+      "objectId": "ai-2",
+      "type": "AI_AGENT",
+      "position": {
+        "x": 2.75,
+        "y": 0,
+        "z": -1.3
+      },
+      "rotationY": 270,
+      "configId": 5
+    },
+    {
+      "objectId": "kiosk-1",
+      "type": "SURVEY_KIOSK",
+      "position": {
+        "x": 2.75,
+        "y": 0,
+        "z": -0.3
+      },
+      "rotationY": 270,
+      "configId": 6
+    },
+    {
+      "objectId": "vote-1",
+      "type": "LIKE_VOTE",
+      "position": {
+        "x": 2.75,
+        "y": 0,
+        "z": 0.7
+      },
+      "rotationY": 270,
+      "configId": 7
+    },
+    {
+      "objectId": "laptop-1",
+      "type": "LAPTOP",
+      "position": {
+        "x": -1,
+        "y": 0,
+        "z": -1.6
       },
       "rotationY": 0,
-      "configId": 3
+      "configId": 8
+    },
+    {
+      "objectId": "desk-1",
+      "type": "CONSULTATION_DESK",
+      "position": {
+        "x": -1.5,
+        "y": 0,
+        "z": 2.2
+      },
+      "rotationY": 0,
+      "configId": 9
     },
     {
       "objectId": "table-1",
       "type": "FURNITURE",
       "position": {
-        "x": -1.3,
+        "x": 1.6,
         "y": 0,
-        "z": -0.6
+        "z": 2
       },
       "rotationY": 0,
-      "configId": 4
+      "configId": 10
+    },
+    {
+      "objectId": "deco-1",
+      "type": "DECORATION",
+      "position": {
+        "x": -2.7,
+        "y": 0,
+        "z": -2.7
+      },
+      "rotationY": 0,
+      "configId": 11
+    },
+    {
+      "objectId": "deco-2",
+      "type": "DECORATION",
+      "position": {
+        "x": 2.7,
+        "y": 0,
+        "z": 2.7
+      },
+      "rotationY": 0,
+      "configId": 12
     }
   ]
 }
