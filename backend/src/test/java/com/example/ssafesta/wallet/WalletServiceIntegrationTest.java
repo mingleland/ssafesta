@@ -109,13 +109,15 @@ class WalletServiceIntegrationTest {
         Long userId = createMember(users, "차감");
         wallets.openWallet(userId);
 
+        String key = "LEASE_PAYMENT:BOOTH_LEASE:" + leaseReference(userId);
+
         LedgerResult result = wallets.spend(new CoinSpendCommand(userId, 120, "LEASE_PAYMENT",
-                "BOOTH_LEASE", "317", "LEASE_PAYMENT:BOOTH_LEASE:317"));
+                "BOOTH_LEASE", leaseReference(userId), key));
 
         assertFalse(result.alreadyApplied());
         assertEquals(properties.initialGrant() - 120, result.balanceAfter());
         assertEquals(properties.initialGrant() - 120, wallets.balanceOf(userId));
-        CoinLedgerEntry entry = ledger.findByIdempotencyKey("LEASE_PAYMENT:BOOTH_LEASE:317").orElseThrow();
+        CoinLedgerEntry entry = ledger.findByIdempotencyKey(key).orElseThrow();
         assertEquals(-120, entry.getAmount());
         assertEquals(LedgerEntryType.SPEND, entry.getEntryType());
         assertBalanceMatchesLedger(wallets, userId);
@@ -126,15 +128,16 @@ class WalletServiceIntegrationTest {
         Long userId = createMember(users, "잔액부족");
         wallets.openWallet(userId);
         int before = wallets.balanceOf(userId);
+        String key = "LEASE_PAYMENT:BOOTH_LEASE:" + leaseReference(userId);
 
         InsufficientCoinException exception = assertThrows(InsufficientCoinException.class,
                 () -> wallets.spend(new CoinSpendCommand(userId, before + 1, "LEASE_PAYMENT",
-                        "BOOTH_LEASE", "999", "LEASE_PAYMENT:BOOTH_LEASE:999")));
+                        "BOOTH_LEASE", leaseReference(userId), key)));
 
         assertEquals(before + 1, exception.getRequired());
         assertEquals(before, exception.getBalance());
         assertEquals(before, wallets.balanceOf(userId));
-        assertTrue(ledger.findByIdempotencyKey("LEASE_PAYMENT:BOOTH_LEASE:999").isEmpty());
+        assertTrue(ledger.findByIdempotencyKey(key).isEmpty());
         assertBalanceMatchesLedger(wallets, userId);
     }
 
@@ -142,12 +145,12 @@ class WalletServiceIntegrationTest {
     void aRetriedSpendWithTheSameKeyChangesTheBalanceOnce() {
         Long userId = createMember(users, "멱등차감");
         wallets.openWallet(userId);
-        String key = "LEASE_PAYMENT:BOOTH_LEASE:401";
+        String key = "LEASE_PAYMENT:BOOTH_LEASE:" + leaseReference(userId);
 
         LedgerResult first = wallets.spend(new CoinSpendCommand(userId, 30, "LEASE_PAYMENT",
-                "BOOTH_LEASE", "401", key));
+                "BOOTH_LEASE", leaseReference(userId), key));
         LedgerResult retry = wallets.spend(new CoinSpendCommand(userId, 30, "LEASE_PAYMENT",
-                "BOOTH_LEASE", "401", key));
+                "BOOTH_LEASE", leaseReference(userId), key));
 
         assertFalse(first.alreadyApplied());
         assertTrue(retry.alreadyApplied());
@@ -163,9 +166,11 @@ class WalletServiceIntegrationTest {
         wallets.openWallet(userId);
 
         wallets.credit(new CoinCreditCommand(userId, LedgerEntryType.REWARD, 15, "MINIGAME_REWARD",
-                "MINIGAME_SESSION", "7", "MINIGAME_REWARD:MINIGAME_SESSION:7"));
+                "MINIGAME_SESSION", leaseReference(userId),
+                "MINIGAME_REWARD:MINIGAME_SESSION:" + leaseReference(userId)));
         wallets.credit(new CoinCreditCommand(userId, LedgerEntryType.REFUND, 100, "LEASE_REFUND",
-                "BOOTH_LEASE", "317", "LEASE_REFUND:BOOTH_LEASE:317"));
+                "BOOTH_LEASE", leaseReference(userId),
+                "LEASE_REFUND:BOOTH_LEASE:" + leaseReference(userId)));
 
         assertEquals(properties.initialGrant() + 115, wallets.balanceOf(userId));
         assertBalanceMatchesLedger(wallets, userId);
@@ -197,6 +202,18 @@ class WalletServiceIntegrationTest {
 
         assertThrows(WalletNotFoundException.class, () -> wallets.balanceOf(userId));
         assertTrue(walletRepository.findByUserId(userId).isEmpty());
+    }
+
+    /**
+     * A business reference that cannot collide with a real one.
+     *
+     * <p>{@code idempotency_key} is globally UNIQUE and the test database is shared across classes,
+     * so a hardcoded key such as {@code LEASE_PAYMENT:BOOTH_LEASE:317} breaks as soon as some other
+     * test creates lease #317 — which is exactly what the 004 stress test did (T-111). The
+     * non-numeric prefix keeps these out of the range real references can ever take.
+     */
+    private static String leaseReference(Long userId) {
+        return "T" + userId;
     }
 
     private long ledgerEntriesOf(Long userId, String reasonType) {
