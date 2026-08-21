@@ -9,7 +9,9 @@ interface Props {
   onClose: () => void;
 }
 
-function DetailList({ items }: { items: ApiErrorDetail[] }) {
+// StudioPage의 공개 전 미리보기(precheckErrors/precheckWarnings)도 같은 렌더링을 쓴다 —
+// 요청 전 미리보기와 요청 후 서버 결과가 다른 컴포넌트로 보이면 사용자가 다른 것으로 오해한다.
+export function DetailList({ items }: { items: ApiErrorDetail[] }) {
   if (items.length === 0) return null;
   return (
     <ul>

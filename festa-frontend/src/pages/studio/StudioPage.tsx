@@ -11,7 +11,9 @@ import { createInitialState, editorReducer } from '../../features/studio/model/e
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
 import { EditorCanvas } from '../../features/studio/ui/EditorCanvas';
 import { ObjectPalette } from '../../features/studio/ui/ObjectPalette';
-import { PublishDialog } from '../../features/studio/ui/PublishDialog';
+import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
+import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
+import { precheckErrors, precheckWarnings } from '../../features/studio/lib/validate';
 
 // VITE_USE_MOCK=true면 실 BE 없이 메모리 mock으로 개발한다 (FE/research.md R-09)
 const layoutApi = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
@@ -77,6 +79,11 @@ export function StudioPage() {
   const publishWarnings = publishMutation.data?.warnings ?? [];
   const showPublishResult = publishMutation.isSuccess || publishMutation.isError;
 
+  // 공개 요청 전 미리보기 — 서버 응답이 오면(showPublishResult) 그 값으로 교체된다(T016)
+  const preErrors = precheckErrors(state.objects, maxObjects);
+  const preWarnings = precheckWarnings(state.objects);
+  const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
+
   return (
     <div>
       <p>저장 상태: {state.saveStatus}</p>
@@ -103,10 +110,35 @@ export function StudioPage() {
         onMove={(objectId, x, z) => dispatch({ type: 'MOVE_OBJECT', objectId, x, z })}
       />
 
+      {selectedObject && (
+        <PropertiesPanel
+          object={selectedObject}
+          bounds={bounds}
+          onMove={(x, z) => dispatch({ type: 'MOVE_OBJECT', objectId: selectedObject.objectId, x, z })}
+          onRotate={(rotationY) => dispatch({ type: 'ROTATE_OBJECT', objectId: selectedObject.objectId, rotationY })}
+          onLinkContent={(configId) => dispatch({ type: 'LINK_CONTENT', objectId: selectedObject.objectId, configId })}
+          onSetAssetCode={(assetCode) => dispatch({ type: 'SET_ASSET_CODE', objectId: selectedObject.objectId, assetCode })}
+          onRemove={() => dispatch({ type: 'REMOVE_OBJECT', objectId: selectedObject.objectId })}
+        />
+      )}
+
       <button type="button" onClick={handleSave} disabled={!state.dirty}>
         저장
       </button>
-      <button type="button" onClick={() => publishMutation.mutate(boothIdNum)} disabled={publishMutation.isPending}>
+
+      {!showPublishResult && (preErrors.length > 0 || preWarnings.length > 0) && (
+        <div>
+          <p>공개 전 확인</p>
+          <DetailList items={preErrors} />
+          <DetailList items={preWarnings} />
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => publishMutation.mutate(boothIdNum)}
+        disabled={publishMutation.isPending || preErrors.length > 0}
+      >
         공개
       </button>
 
