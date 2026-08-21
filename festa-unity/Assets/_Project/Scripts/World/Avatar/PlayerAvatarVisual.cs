@@ -483,12 +483,16 @@ namespace Festa.World
             // 나올 때: 착지를 짧게 끊으면 급정지처럼 보인다. Jump 클립의 무릎 접기
             // (착지 흡수) 앞부분이 블렌드 동안 재생되도록 길게 준다 — 별도 착지
             // 상태를 만들지 않고 클립이 이어 재생되는 것을 그대로 쓴다.
-            // 도약은 **보여야 하는 순간**이라 거의 스냅으로 넣는다. Launch → Air 는
-            // 인접한 프레임끼리라 짧게 섞어도 이어져 보인다.
-            float fade = state == PlayerAnimState.JumpLaunch || state == PlayerAnimState.Jump
-                ? 0.03f
-                : _lastLocomotion == PlayerAnimState.Jump ? 0.15f
-                : 0.2f;
+            // 0.03초로 스냅해 넣었더니 선 자세에서 웅크린 자세로 **뚝 끊겼다**.
+            // 발 구르기는 이완돼 보여야 하므로 들어가는 구간을 준다.
+            // Launch → Air 는 인접 프레임이지만 루트 Y 베이크가 반대라 3 cm 단차가
+            // 있어 조금 섞는다. 착지는 더 길게 — 그 동안 착지 흡수가 재생된다.
+            float fade = state switch
+            {
+                PlayerAnimState.JumpLaunch => 0.10f,
+                PlayerAnimState.Jump => 0.06f,
+                _ => _lastLocomotion == PlayerAnimState.Jump ? 0.25f : 0.2f,
+            };
             _lastLocomotion = state;
             _animator.CrossFadeInFixedTime(stateName, fade, 0);
         }

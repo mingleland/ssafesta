@@ -152,8 +152,8 @@ MonoBehaviour:
   _maxTurnSpeedDeg: 1080
   _gravity: 98.1
   _groundedStick: -20
-  _jumpSpeed: 26.5
-  _jumpGravity: 59
+  _jumpSpeed: 40.2
+  _jumpGravity: 90
   ServerSpawnPosition:
     m_InternalValue: {x: 0, y: 0, z: 0}
 --- !u!114 &8836840528167371394

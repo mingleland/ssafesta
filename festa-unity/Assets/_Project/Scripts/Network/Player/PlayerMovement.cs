@@ -40,10 +40,11 @@ namespace Festa.Network
         // 그래서 게임들이 하는 대로 도약 구간만 중력을 낮춘다. 낙하(발판에서 벗어남)는
         // 현실 중력을 그대로 쓴다.
         //
-        // v = 26.5, g = 59 → 체공 0.898초, 도달 5.95 unit = 0.60 m.
-        // 이 체공에 Jump 클립 재생 속도(0.705)를 맞춰 포물선과 포즈가 겹치게 했다.
-        [SerializeField] float _jumpSpeed = 26.5f;
-        [SerializeField] float _jumpGravity = 59f;
+        // v = 40.2, g = 90 → 체공 0.893초, 도달 8.98 unit = 0.90 m.
+        // 0.60 m 는 발 구르기 웅크림(0.34 m)에 먹혀 낮아 보였다. 체공은 그대로 두고
+        // 높이만 1.5배 올렸다 — 애니메이션 재생 속도(0.709)를 건드리지 않아도 된다.
+        [SerializeField] float _jumpSpeed = 40.2f;
+        [SerializeField] float _jumpGravity = 90f;
 
         // ── 스폰 위치 강제 ────────────────────────────────────────
         // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
@@ -71,9 +72,12 @@ namespace Festa.Network
 
         bool _jumpPending;
         float _jumpPressedAt;
-        // Jump_Launch 클립(f7~f15 = 0.267초)을 speed 2.05 로 재생하는 시간.
+        // Jump_Launch 클립(f6~f15 = 0.300초)을 speed 1.25 로 재생하는 시간.
         // 이 값이 그 재생 시간과 어긋나면 도약 순간이 다시 어긋난다 — 같이 바꿔야 한다.
-        const float JumpAnticipation = 0.13f;
+        //
+        // 0.13초(f7 시작, speed 2.05)였는데 선 자세에서 깊은 웅크림으로 뚝 끊겼다.
+        // 발 구르기는 이완돼 보여야 해서 조금 이르게 시작하고 느리게 재생한다.
+        const float JumpAnticipation = 0.24f;
 
         public override void OnNetworkSpawn()
         {
