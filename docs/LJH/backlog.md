@@ -14,8 +14,8 @@
 - 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만. `FE.md` develop 완전 동기화 완료
 - `BOOTH_LAPTOP_INTERACT` 브라우저 왕복 — ✅ 검증 완료(PR #25)
 - Issue #1·#2·#5·#6·#18 CLOSED / #14·#17·#19·#20·#21·#22·#24 OPEN
-- ⚠️ **신규 — Game Studio** (#20 front / #21 back / #22 ai) — `specs/019-game-studio` 근거로 FE 확정 9개 항목 요청받음.
-  **`specs/019`가 어느 브랜치에도 없음 — 회신 전 소재 확인 필요**
+- **Game Studio** (#20 front / #21 back / #22 ai) — `specs/019`는 `feature/game-studio-foundation` 브랜치 확인.
+  **수직 구현 담당자 @busypark 신설** — FE는 소켓(진입·인증·Overlay·Bridge)만, Studio 내부는 이관. #20 회신 완료
 - 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`·`FE.md` 완료, 나머지 순차 진행
 
 ---
@@ -36,14 +36,19 @@
 - [x] [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) template·footprint — **회신 오면 C-06 닫히고 FR-003 스냅 간격 착수 가능**
 - [x] [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 — `docs/26`의 Facade 저장 계약 미결이 선행 조건
 - [x] [#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금 — ✅ CLOSED, 4건 확정. 구현 계약은 spec 012 착수 시
-- [ ] **[#20](https://github.com/kanghyunsoon/ssafesta/issues/20) Game Studio (신규, front 소관)** — FE 확정 항목 9개(독립 앱 위치·인증 공유·진입 경로·`BOOTH_GAME_INTERACT` 등).
-      `specs/019-game-studio` 소재 미확인 — 회신 전 확보 필요
+- [x] **[#20](https://github.com/kanghyunsoon/ssafesta/issues/20) Game Studio** — 회신 완료(9개 항목 전부).
+      **핵심 답**: 앱은 `festa-frontend` 내부 lazy 라우트(인증 공유가 결정적) / 경로는 `/app/games/:gameId/edit|play`
+      (제안된 `/studio/:gameId`가 `/app/` 규약 이탈 + Booth Studio와 이름 충돌) / lifecycle은 `OnOverlayStateChanged` 단일 진입점.
+      renderer·asset resolver·validation 시점·Studio 화면은 @busypark 이관. **`specs/019` contracts 편집 주체 확인 대기**
 
 ### FE 착수 가능
 
 - [x] `events.ts` `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` 매핑 ✅ 08-20 (`d1bbb4a`)
 - [ ] **블록 4 speckit 파이프라인** — `.specify/feature.json` 지정 → `clarify` → `plan` → `tasks` → `implement`.
       C-04 확정 전 착수하면 잠정 상태
+- [ ] **Game Studio 소켓 4종** — #20 승인 후 착수. `events.ts`에 `BOOTH_GAME_INTERACT` union 멤버 /
+      `overlay.ts`에 `GAME` 타입 / 라우터 lazy 연결부 / Host→Unity lifecycle 송신부.
+      `features/game-entry/`(`configId → gameId`)는 [#21](https://github.com/kanghyunsoon/ssafesta/issues/21) BE 계약 확정 후
 
 ### 선행 조건 대기
 
