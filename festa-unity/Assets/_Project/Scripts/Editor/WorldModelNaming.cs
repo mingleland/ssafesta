@@ -158,7 +158,31 @@ namespace Festa.EditorTools
                 if (c.name == RoomName) { foreach (Transform rc in c) targets.Add(rc); }
                 else targets.Add(c);
             }
+            return CombineNodes(targets, registerMesh);
+        }
 
+        /// <summary>
+        /// 엘리베이터용 병합. 루트 직속 노드마다 자식 서브트리를 하나로 굽는다.
+        ///
+        /// **문은 제외한다** — 열려야 하므로 독립 오브젝트로 남아야 한다. 지금은 자식이
+        /// 없어서 어차피 건너뛰지만, 나중 export 가 문 아래에 손잡이라도 넣으면 삼켜진다.
+        /// 의도를 코드로 못박아 둔다.
+        ///
+        /// 무게는 버튼 패널에 있다 — 정점 419k 중 404k(96%)가 패널 2개다. 11층 사물함과
+        /// 같은 형태(같은 메시를 개별 드로우콜로 그린다)라 같은 처방이 듣는다.
+        /// </summary>
+        public static (int nodes, int removedRenderers, string report) CombineElevatorSubtrees(
+            Transform model, System.Action<string, Mesh> registerMesh)
+        {
+            var targets = model.Cast<Transform>()
+                .Where(c => !c.name.StartsWith(ElevatorDoorPrefix))
+                .ToList();
+            return CombineNodes(targets, registerMesh);
+        }
+
+        static (int nodes, int removedRenderers, string report) CombineNodes(
+            List<Transform> targets, System.Action<string, Mesh> registerMesh)
+        {
             var sb = new StringBuilder();
             int nodes = 0, removed = 0;
             foreach (var node in targets)
@@ -371,6 +395,96 @@ namespace Festa.EditorTools
         {
             var c = t.GetComponent<T>();
             return c == null ? t.gameObject.AddComponent<T>() : c;   // ?? 금지 — Unity 가짜 null (T-168)
+        }
+
+        // ── 엘리베이터 ────────────────────────────────────────────────────────
+        // 별도 지역으로 관리할 예정이라(2026-08-21 방향) 11층 모델과 다른 규칙을 쓴다.
+        // 원본이 이미 의미 이름을 갖고 있어 정리할 것이 적다 — 오타 하나와 export 접미사뿐이다.
+
+        public const string ElevatorShellName = "elevator";
+        public const string ElevatorDoorPrefix = "elevator-door";
+        const string ElevatorSwitchName = "elevator-switch";
+
+        /// <summary>양문이 둘 다 있으면 엘리베이터 모델이다. 파일명이 아니라 구조로 판별한다.</summary>
+        public static bool IsElevatorModel(Transform root) =>
+            root.Find("elevator-door-left") != null && root.Find("elevator-door-right") != null;
+
+        /// <summary>
+        /// 루트 직속 이름 정리. 병합이 자식을 지우므로 **루트 직속 이름만 살아남는다** —
+        /// 안쪽 `Group N` 490개는 병합으로 사라지니 따로 손대지 않는다.
+        /// </summary>
+        public static string TidyElevatorNames(Transform model)
+        {
+            var renames = new (string from, string to)[]
+            {
+                // 원본 오타(disablity)를 고치고, 무엇을 위한 패널인지 이름에 담는다.
+                ("elevator-button-disablity",     "elevator-panel-accessible"),
+                // "-resized" 는 모델링 과정의 흔적이라 의미가 없다.
+                ("elevator-button-group-resized", "elevator-panel-main"),
+            };
+            var sb = new StringBuilder();
+            foreach (var (from, to) in renames)
+            {
+                var t = model.Find(from);
+                if (t == null) continue;
+                t.name = to;
+                sb.AppendLine($"    {from,-30} → {to}");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 엘리베이터 콜리전. 형태별로 최소한만 붙인다.
+        ///   셸  — 자기 메시(246 verts)로 MeshCollider. 칸 안을 걸어다닐 수 있어야 한다.
+        ///         병합 결과(손잡이)에는 붙이지 않는다 — 손잡이에 걸릴 이유가 없다.
+        ///   문  — 각각 MeshCollider(80 verts). **여닫아야 하므로 독립 콜라이더여야 한다.**
+        ///   스위치 — BoxCollider. 상호작용 레이캐스트 대상이다. 병합 메시가 12k verts 라
+        ///         MeshCollider 는 낭비다.
+        ///   패널 — 없음. 장식이고 스위치가 상호작용을 담당한다.
+        /// </summary>
+        public static (int mesh, int box, string report) AddElevatorColliders(Transform model)
+        {
+            int nMesh = 0, nBox = 0;
+            var sb = new StringBuilder();
+
+            var shell = model.Find(ElevatorShellName);
+            var shellMesh = shell != null ? shell.GetComponent<MeshFilter>()?.sharedMesh : null;
+            if (shellMesh != null)
+            {
+                var mc = GetOrAdd<MeshCollider>(shell);
+                mc.sharedMesh = shellMesh;
+                mc.convex = false;
+                nMesh++;
+                sb.AppendLine($"    {ElevatorShellName} MeshCollider ({shellMesh.vertexCount} verts)");
+            }
+            else sb.AppendLine($"    ⚠ {ElevatorShellName} 의 자기 메시가 없다 — 칸 콜리전 없음");
+
+            foreach (Transform c in model)
+            {
+                if (!c.name.StartsWith(ElevatorDoorPrefix)) continue;
+                var m = c.GetComponent<MeshFilter>()?.sharedMesh;
+                if (m == null) { sb.AppendLine($"    ⚠ {c.name} 메시 없음"); continue; }
+                var mc = GetOrAdd<MeshCollider>(c);
+                mc.sharedMesh = m;
+                mc.convex = false;
+                nMesh++;
+                sb.AppendLine($"    {c.name} MeshCollider ({m.vertexCount} verts, 여닫이용 독립)");
+            }
+
+            var sw = model.Find(ElevatorSwitchName);
+            if (sw != null)
+            {
+                var b = LocalBounds(sw, sw);
+                if (b.size != Vector3.zero)
+                {
+                    var bc = GetOrAdd<BoxCollider>(sw);
+                    bc.center = b.center;
+                    bc.size = b.size;
+                    nBox++;
+                    sb.AppendLine($"    {ElevatorSwitchName} BoxCollider (상호작용 대상)");
+                }
+            }
+            return (nMesh, nBox, sb.ToString());
         }
 
         /// <summary>
@@ -633,6 +747,7 @@ namespace Festa.EditorTools
             // 탄젠트 제거 범위에 들어온 모델이 노멀맵을 쓰면 경고한다 (월드/엘리베이터 공통).
             if (IsArchitecturalModel(assetPath)) WarnIfNormalMapWithoutTangents(root, assetPath);
 
+            if (WorldModelNaming.IsElevatorModel(t)) { ProcessElevator(t); return; }
             if (!WorldModelNaming.IsWorldModel(t)) return;
 
             // 마커를 먼저 끈다 — 이름으로 찾으므로 재명명 뒤에는 찾을 수 없다.
@@ -662,6 +777,29 @@ namespace Festa.EditorTools
                 colReport +
                 $"  GPU 인스턴싱 켜기   : 머티리얼 {instanced}개\n" +
                 "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다. 벽 개구부 봉쇄만 씬 메뉴로 돌린다.");
+        }
+
+        /// <summary>
+        /// 엘리베이터 모델 처리. 11층과 규칙이 달라 분리했다 — 별도 지역으로 관리할 예정이고,
+        /// 원본이 이미 의미 이름을 갖고 있어 정리할 것이 적다.
+        /// </summary>
+        void ProcessElevator(Transform t)
+        {
+            string renames = WorldModelNaming.TidyElevatorNames(t);
+            var (nodes, removed, combineReport) =
+                WorldModelNaming.CombineElevatorSubtrees(t, (id, mesh) => context.AddObjectToAsset(id, mesh));
+            var (nMesh, nBox, colReport) = WorldModelNaming.AddElevatorColliders(t);
+            int instanced = WorldModelNaming.EnableGpuInstancing(t, dryRun: false);
+
+            Debug.Log(
+                $"[WorldModelPostprocessor] 엘리베이터 정리 — {assetPath}\n" +
+                (renames.Length > 0 ? "  이름 정리\n" + renames : "  이름 정리: 없음\n") +
+                $"  서브트리 병합 : {nodes}개 노드, 렌더러 {removed}개 감소 (문은 제외 — 여닫이용)\n" +
+                combineReport +
+                $"  콜라이더      : Mesh {nMesh} / Box {nBox}\n" +
+                colReport +
+                $"  GPU 인스턴싱  : 머티리얼 {instanced}개\n" +
+                "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다.");
         }
 
         /// <summary>
