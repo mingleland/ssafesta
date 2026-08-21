@@ -160,6 +160,49 @@ namespace Festa.World.EditorTools
         }
 
         /// <summary>
+        /// 조명만 다시 적용한다 — 콜라이더와 벽 봉쇄는 건드리지 않는다.
+        ///
+        /// 모델을 교체하는 중에는 콜라이더 대상 이름이 아직 맞지 않는다. 그 상태로
+        /// 전체 재적용을 돌리면 없는 이름은 조용히 건너뛰고 남은 개구부 탐색도
+        /// 잘못된 벽 기준으로 돌아간다. 조명은 천장 기구 이름만 보므로 콜라이더
+        /// 대상을 정리하기 전에 먼저 맞출 수 있다.
+        /// </summary>
+        [MenuItem("Festa/World/조명만 다시 적용 (콜라이더 제외)", false, 103)]
+        static void ReapplyLightsOnly()
+        {
+            var world = GameObject.Find(WorldRootName);
+            if (world == null) { Debug.LogError($"[WorldCeilingSetup] '{WorldRootName}' 이 씬에 없다."); return; }
+
+            var ceiling = FindDeep(world.transform, CeilingName);
+            if (ceiling == null)
+            {
+                Debug.LogError($"[WorldCeilingSetup] '{CeilingName}' 을 찾지 못했다. " +
+                               "모델 구조가 바뀌었으면 이 도구의 이름 상수를 먼저 맞춰라.");
+                return;
+            }
+
+            var strip = Load<Material>(StripMatPath);
+            var downlight = Load<Material>(DownlightMatPath);
+            var black = Load<Material>(BlackMatPath);
+            if (strip == null || downlight == null || black == null) return;
+
+            var (nStrip, nDown, nBlack) = ApplyCeilingMaterials(ceiling, strip, downlight, black);
+            var (nSpot, nFill) = RebuildLights(world.transform, ceiling);
+            ApplyAmbient();
+
+            EditorSceneManager.MarkSceneDirty(world.scene);
+
+            Debug.Log(
+                "[WorldCeilingSetup] 조명만 재적용 완료 — 콜라이더·봉쇄는 건드리지 않았다\n" +
+                $"  라인조명 슬롯   : {nStrip}\n" +
+                $"  다운라이트 슬롯 : {nDown}\n" +
+                $"  천장배경 슬롯   : {nBlack}\n" +
+                $"  Spot / Fill     : {nSpot} / {nFill}\n" +
+                "  천장 높이는 건드리지 않았다 — 필요하면 '천장을 벽 상단에 맞춤' 을 따로 실행한다.\n" +
+                "  씬은 저장하지 않았다 — 검증 후 직접 저장한다.");
+        }
+
+        /// <summary>
         /// 천장 정렬은 재적용에서 분리해 뒀다. 층고를 의도적으로 조정해 둔 경우
         /// 재적용이 그 값을 덮어쓰면 안 되기 때문이다.
         /// </summary>
@@ -488,13 +531,21 @@ namespace Festa.World.EditorTools
             return (nStrip, nDown, nBlack);
         }
 
-        /// <summary>천장을 벽 상단에 앉힌다. 원본은 벽 위 공중에 떠 있다 (T-157).</summary>
+        /// <summary>
+        /// 천장을 벽 상단에 앉힌다. 원본은 벽 위 공중에 떠 있다 (T-157).
+        ///
+        /// 나눗셈에 **부모의** lossyScale 을 쓴다 — `localPosition` 은 부모 공간이라
+        /// 월드 거리를 부모 스케일로 나눠야 한다. 자기 lossyScale 로 나누면 자신의
+        /// localScale 만큼 어긋난다. 이 천장은 localScale 0.8, 부모 12.5 라
+        /// lossyScale 은 10 이고, 10 으로 나누면 25% 과다 이동한다 (T-172).
+        /// 매 회 오차가 ¼로 줄어 여러 번 돌리면 수렴하기 때문에 오래 안 드러났다.
+        /// </summary>
         static float AlignCeiling(Transform room, Transform ceiling)
         {
             var wall = room.Find("wall-elevatorside");
             if (wall == null) return float.NaN;
             float wallTop = Bounds(wall).max.y;
-            float scaleY = ceiling.lossyScale.y;
+            float scaleY = ceiling.parent != null ? ceiling.parent.lossyScale.y : 1f;
             if (Mathf.Approximately(scaleY, 0f)) return float.NaN;
 
             float delta = wallTop - Bounds(ceiling).min.y;
