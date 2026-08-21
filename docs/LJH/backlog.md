@@ -5,6 +5,25 @@
 
 ---
 
+## 📍 세션 인수인계 (2026-08-21 종료 시점)
+
+**브랜치 상태**: `front` = `origin/front`(`b9be65e`), 워킹트리 clean. push 밀린 것 없음.
+
+**진행률**: `specs/005-booth-studio-layout/FE/tasks.md` **20/25** (US1~US3 완료). 남은 건 US4(facade, T020~021)·Polish(T022~025)·**T026(중간 검증 결함 수정, 신설)**.
+
+**⚠️ 다음 세션 시작 전 필수** — 착수 전 `origin/develop` 대조(메모리 규칙). `specs/005/spec.md`·`docs/26`이 develop보다 20줄 뒤처짐(PR #57 반영분) — `git checkout origin/develop -- specs/005-booth-studio-layout/spec.md docs/26_팀_결정_필요사항.md`로 동기화 먼저.
+
+**다음 뭘 할지 — 추천 순서**:
+1. **T026 상위 2건** — 미지 ObjectType 크래시(spec SC-005 위반) / mock publish 스냅샷 미복사(US1 시나리오6 위반, SC-003 검증 불가) — spec 요구사항과 직접 배치되는 것부터
+2. T026 나머지(편집 소실·공개 dirty 미확인·충돌 UI 소실·pointer capture)
+3. US4(facade) → Polish(§10 기하)
+
+**막힌 것 아님, 그냥 안 한 것**: `#43` FE 산출물(`specs/005/FE/`) develop PR — 언제든 올릴 수 있음, 미착수.
+
+상세 근거는 아래 "🔴 중간 검증에서 나온 미수정 결함" 섹션과 `24_작업일지.md` 08-21 항목.
+
+---
+
 ## 지금 할 수 있는 것
 
 - [x] ~~`client.ts`의 `ApiError` 갱신~~ — ✅ 08-21 완료. `ApiErrorDetail{rule, objectId?, message}` + fallback 배열 보정 + `isApiError` 가드. `ApiErrorDetail.java`(NON_NULL) 직접 대조로 검증(Codex 미가용)
