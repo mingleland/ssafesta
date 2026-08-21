@@ -1,8 +1,10 @@
 # Feature Specification: FESTA Game Studio
 
-**Feature Branch**: `019-game-studio`
+**Feature Branch**: `feature/game-studio-foundation`
 
 **Created**: 2026-08-20
+
+**Updated**: 2026-08-21 — 편집기 시안, Asset 참조, DIALOGUE Overlay 복귀 규칙 반영
 
 **Status**: Draft — FE·BE·AI 계약 이슈 검토 대기 (#20, #21, #22)
 
@@ -26,13 +28,16 @@
 
 **Why this priority**: 실행 가능한 가장 작은 공통 제작 경험이며, 방탈출·조사·대화형 어드벤처를 하나의 데이터 구조로 검증할 수 있다.
 
-**Independent Test**: 빈 프로젝트에서 시작 Scene, 플레이어, NPC, 열쇠, 문과 대화를 배치하고 "열쇠 획득 → 문 상호작용 → 다음 Scene 이동" 흐름을 완성한다.
+**Independent Test**: 빈 프로젝트에서 시작 Scene, 플레이어, NPC, 열쇠, 문과 대화를 배치하고
+"열쇠 획득 → 문 상호작용 → 맵 위 대화 → 기존 맵 복귀 → 다음 Scene 이동" 흐름을 완성한다.
 
 **Acceptance Scenarios**:
 
 1. **Given** 빈 게임 프로젝트, **When** 제작자가 시작 Scene과 플레이어 시작점을 구성하면, **Then** 프로젝트는 실행 가능한 시작 위치를 가진다.
 2. **Given** 오브젝트가 배치된 Scene, **When** 제작자가 Trigger·Condition·Action을 설정하면, **Then** 시스템은 허용된 조합만 저장하고 잘못된 참조를 알려준다.
 3. **Given** NPC와 대화 데이터, **When** 제작자가 선택지와 변수 조건을 연결하면, **Then** 선택 결과에 따라 서로 다른 대화 또는 Scene으로 진행할 수 있다.
+4. **Given** 제작자가 Scene 또는 Object를 선택한 상태, **When** 속성이나 이벤트를 수정하면, **Then** 선택 대상과 수정 결과를 한 화면에서 확인할 수 있다.
+5. **Given** TOP_DOWN Scene에서 대화가 시작된 상태, **When** 대화를 닫는 선택지를 실행하면, **Then** 기존 맵 상태를 유지한 채 같은 위치로 복귀하고 월드 입력이 다시 활성화된다.
 
 ---
 
@@ -49,6 +54,7 @@
 1. **Given** 저장 전 편집 상태, **When** 제작자가 미리보기를 실행하면, **Then** 공개 버전을 변경하지 않고 현재 상태로 게임이 시작된다.
 2. **Given** 유효하지 않은 오브젝트·Scene 참조, **When** Publish를 시도하면, **Then** 공개되지 않고 수정 위치와 사유가 표시된다.
 3. **Given** 유효한 Draft, **When** 제작자가 Publish하면, **Then** 새로운 불변 Published Version이 생성되고 이전 공개 버전은 보존된다.
+4. **Given** 같은 Draft snapshot, **When** Preview와 Published 플레이에서 각각 실행하면, **Then** 동일한 Scene·Asset·Event 의미와 상태 전이가 재현된다.
 
 ---
 
@@ -105,6 +111,10 @@
 - 같은 Event가 자기 자신을 다시 실행해 무한 반복하려는 경우
 - 한 처리 주기에 너무 많은 Action이 연쇄 실행되는 경우
 - 지원하지 않는 Component·Action·schemaVersion이 포함된 경우
+- 대화 Overlay를 시작한 맵이 삭제되거나 대화 종료 전에 다른 Scene으로 이동하는 경우
+- 전체 화면 대화에서 복귀 Action을 사용하거나 Overlay 대화를 시작 Scene으로 지정한 경우
+- 참조 Asset이 삭제·비공개·변조되었거나 Runtime에서 해석할 수 없는 형식인 경우
+- 편집 중 Object preset의 편의 속성과 생성된 Event 규칙이 서로 다른 값을 가리키는 경우
 - 제작자가 편집 중 다른 기기에서 같은 Draft를 저장한 경우
 - Published 게임 또는 Portal Binding이 플레이 직전에 비공개·삭제된 경우
 - 게임 Runtime 로딩 실패가 FESTA 월드나 다른 Overlay에 영향을 주려는 경우
@@ -122,7 +132,7 @@
 - **FR-006**: 이벤트는 허용된 Trigger·Condition·Action의 구조화된 조합으로만 구성되어야 하며 사용자 임의 스크립트를 실행해서는 안 된다.
 - **FR-007**: 첫 MVP Trigger는 `ON_SCENE_START`, `ON_INTERACT`, `ON_ENTER`를 지원해야 한다.
 - **FR-008**: 첫 MVP Condition은 변수 비교와 아이템 보유 여부를 지원해야 한다.
-- **FR-009**: 첫 MVP Action은 대화 표시, 변수 변경, 아이템 지급·제거, 오브젝트 표시·숨김, Scene 이동, 게임 완료를 지원해야 한다.
+- **FR-009**: 첫 MVP Action은 대화 표시·종료, 변수 변경, 아이템 지급·제거, 오브젝트 표시·숨김, Scene 이동, 게임 완료를 지원해야 한다.
 - **FR-010**: 시스템은 저장 전 구조 검증과 Publish 전 참조·진행 가능성 검증을 수행해야 한다.
 - **FR-011**: 제작자는 Published Version을 변경하지 않고 현재 편집 상태를 미리볼 수 있어야 한다.
 - **FR-012**: Published Version은 생성 후 변경되지 않아야 하며 새 Publish는 새 버전을 만들어야 한다.
@@ -139,6 +149,14 @@
 - **FR-023**: 게스트는 Published 게임을 플레이할 수 있지만 게임 생성·Draft 저장·Publish는 할 수 없어야 한다.
 - **FR-024**: GameProject 계약은 명시적인 버전을 포함하고, 소비자는 지원하는 버전 범위를 확인해야 한다.
 - **FR-025**: 편집 충돌이 발생하면 마지막 저장으로 조용히 덮어쓰지 않고 현재 서버 버전과 충돌 사실을 알려야 한다.
+- **FR-026**: 제작 화면은 Scene 목록, 재사용 가능한 Object/Asset 목록, 배치 공간, 선택 대상 속성, Event 구성을 오가며 현재 선택과 수정 결과를 잃지 않게 해야 한다.
+- **FR-027**: 배경과 Object의 시각 자료는 배치 데이터와 분리된 안정적인 Asset 참조로 저장해야 하며, 완성 화면의 캡처 이미지를 게임 원본으로 저장해서는 안 된다.
+- **FR-028**: Tile Layer는 Scene 크기와 일치하는 셀 배치 데이터로 저장하고, Object 위치는 TOP_DOWN 격자 좌표 기준으로 해석해야 한다.
+- **FR-029**: 문 잠금·필요 아이템 같은 편의 설정은 공통 Component·Condition·Action으로 표현되어야 하며 동일 의미를 가진 별도 Runtime 규칙을 만들지 않아야 한다.
+- **FR-030**: TOP_DOWN에서 호출한 대화는 현재 맵 상태를 보존한 Overlay로 표시하고, 대화 중 월드 입력을 차단해야 한다.
+- **FR-031**: Overlay 대화는 명시적 종료 시 호출한 맵으로 복귀할 수 있어야 하며, 선택에 따라 다른 Scene으로 이동하거나 게임을 완료할 수도 있어야 한다.
+- **FR-032**: 시작 Scene 또는 일반 Scene 이동 대상으로 쓰는 전체 화면 대화와, 맵 위에서 호출하는 Overlay 대화를 구분하고 잘못된 호출·복귀 조합을 Publish 전에 거부해야 한다.
+- **FR-033**: GameProject에는 실행에 필요한 Asset 식별자와 검증 가능한 참조만 포함하고 이미지·오디오 원본 binary, 만료되는 임시 주소, 브라우저 로컬 파일 경로를 포함하지 않아야 한다.
 
 ### Part Boundaries
 
@@ -154,7 +172,8 @@
 - **Game**: 소유자, 제목, 공개 상태와 현재 Published Version을 가진 사용자 제작 게임의 루트.
 - **Game Version**: 특정 시점의 GameProject. Draft 또는 불변 Published 상태를 가진다.
 - **Game Project**: Scene, 변수, 아이템, 에셋 참조와 시작 Scene을 묶는 버전 계약.
-- **Scene**: `TOP_DOWN`, `DIALOGUE`, 후속 `PLATFORMER` 중 하나의 실행 단위.
+- **Scene**: `TOP_DOWN`, `DIALOGUE`, 후속 `PLATFORMER` 중 하나의 실행 단위. DIALOGUE는 전체 화면 또는 호출한 맵 위 Overlay로 제시된다.
+- **Game Asset Reference**: 타일셋·스프라이트·오디오 원본을 직접 포함하지 않고 안정적인 식별자와 종류로 가리키는 값.
 - **Game Object**: Scene에 배치된 안정적인 식별자와 허용된 동작 구성을 가진 요소.
 - **Game Event**: Trigger, Conditions, Actions의 제한된 실행 규칙.
 - **Game Portal Binding**: Booth Object와 Published 가능한 Game을 연결하는 서버 소유 설정.
@@ -172,13 +191,16 @@
 - **SC-006**: 부스 진입 통합 테스트에서 게임 실행·종료 뒤 월드 연결과 플레이어 위치가 유지되는 비율이 100%다.
 - **SC-007**: 손상된 게임 한 건 때문에 Unity 월드 또는 다른 Published 게임이 중단되는 사례가 0건이다.
 - **SC-008**: AI 서비스가 중단된 상태에서도 제작·저장·Publish·Published 플레이 핵심 시나리오가 모두 성공한다.
+- **SC-009**: Overlay 대화 종료 후 호출 전 Scene, 변수, 인벤토리, Object 표시 상태가 보존되는 계약 테스트가 100% 통과한다.
+- **SC-010**: 정상 프로젝트의 Preview와 Published 플레이에서 같은 입력 순서에 대한 최종 상태가 100% 일치한다.
 
 ## Assumptions
 
 - 기존 Google/Kakao 인증과 Access/Refresh 정책을 재사용한다.
 - Game Studio는 기존 FESTA Web과 같은 저장소 안의 독립 웹 앱으로 시작한다.
 - 첫 MVP는 데스크톱 브라우저 편집을 우선하며 모바일은 플레이만 허용할 수 있다.
-- 기본 제공 에셋으로 먼저 검증하며 사용자 업로드 정책은 Backend 계약 확정 후 추가한다.
+- 첫 MVP는 버전이 고정된 기본 Asset catalog로 검증하며 사용자 업로드와 보존 정책은 Backend 계약 확정 후 추가한다.
+- Object preset의 편의 입력은 저장 전에 공통 Component/Event 데이터로 변환되며 별도 실행 엔진을 만들지 않는다.
 - 미리보기는 공개 버전을 변경하지 않는 로컬/격리 실행을 기본으로 한다.
 - `014-minigame`의 Coin 보상과 서버 권위 게임 규칙은 019에 재사용하지 않는다.
 - `PUZZLE`, 전투, 적 AI, Quest, Projectile, Spawner, 멀티플레이 UGC는 첫 MVP에 포함하지 않는다.

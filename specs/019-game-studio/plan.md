@@ -1,6 +1,6 @@
 # Implementation Plan: FESTA Game Studio
 
-**Branch**: `019-game-studio` *(feature context; current integration branch is `game`)* | **Date**: 2026-08-20 | **Spec**: [spec.md](./spec.md)
+**Branch**: `feature/game-studio-foundation` *(전용 worktree; integration branch `game` 미사용)* | **Date**: 2026-08-21 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Unity와 분리된 웹 2D Game Studio/Runtime, Spring Draft·Publish, 선택적 Booth Portal 연동.
 
@@ -13,7 +13,9 @@ Game Studio를 기존 Unity WebGL의 하위 게임으로 만들지 않고 웹 �
 Studio와 Runtime은 같은 versioned GameProject 계약과 순수 TypeScript 상태 전이 코어를 공유한다.
 Spring은 Draft, 불변 Published Version, Portal Binding의 Source of Truth다. Unity는 기존 부스 상호작용을
 React Host에 전달하는 선택적 진입점만 맡는다. 첫 수직 범위는 TOP_DOWN 탐색과 DIALOGUE 그래프이며,
-PLATFORMER는 공통 상태·Event 계약을 검증한 뒤 별도 renderer/physics adapter로 추가한다.
+TOP_DOWN 위 `OVERLAY` 대화와 독립 `FULL_SCREEN` 대화를 구분한다. Asset binary가 아닌 안정적인
+reference와 Tile/Object 배치를 저장한다. PLATFORMER는 공통 상태·Event 계약을 검증한 뒤 별도
+renderer/physics adapter로 추가한다.
 
 ## Technical Context
 
@@ -38,7 +40,8 @@ Flyway, PostgreSQL. 2D renderer/physics library는 공통 코어의 선행 의�
 최대 100×100 tile·500 object·300 event 프로젝트가 Preview에서 중단 없이 열린다.
 
 **Constraints**: 사용자 임의 코드 실행 금지, AI 비의존, Published 불변, Draft 충돌 무음 덮어쓰기 금지,
-Unity/Game Runtime 장애 격리, Booth Layout과 GameProject 분리.
+Unity/Game Runtime 장애 격리, Booth Layout과 GameProject 분리, Asset binary·임시 URL의 Project 저장 금지,
+Overlay Dialogue 중 World input 차단과 호출 Scene 상태 보존.
 
 **Scale/Scope**: MVP Scene 유형 2개(TOP_DOWN, DIALOGUE), 프로젝트당 Scene 50개 이하,
 변수·아이템 각 100개 이하, Asset reference 300개 이하. PLATFORMER는 후속 P2.
@@ -75,6 +78,9 @@ specs/019-game-studio/
 │   ├── game-project-v1.schema.json
 │   ├── game-api.md
 │   ├── game-portal-bridge.md
+│   ├── game-preview-protocol.md
+│   ├── event-runtime-semantics.md
+│   ├── studio-authoring-model.md
 │   ├── part-boundaries.md
 │   └── fixtures/
 └── tasks.md
@@ -129,21 +135,25 @@ framework-independent 코드와 fixture만 변경한다. 이 feature의 작업·
 1. Schema positive/negative fixture를 확장한다.
 2. ID 참조, Component 중복, Scene 전환, Event budget을 검증하는 reference validator를 완성한다.
 3. Runtime state와 Trigger→Condition→Action 순서를 데이터 모델로 고정한다.
-4. Preview/Portal 메시지의 보안 불변식과 오류 격리 시나리오를 문서화한다.
+4. Asset reference/Tile/Object authoring과 preset recipe 변환 기준을 고정한다.
+5. OVERLAY/FULL_SCREEN Dialogue와 명시적 close/resume 상태 전이를 fixture로 검증한다.
+6. Preview/Portal 메시지의 보안 불변식과 오류 격리 시나리오를 문서화한다.
 
 ### Phase B — #20 이후: Web Studio/Runtime
 
 1. 승인된 앱 경계와 테스트 도구로 프로젝트를 생성한다.
 2. 계약 adapter와 순수 state/event core를 이식한다.
-3. TOP_DOWN renderer, DIALOGUE runner, Preview를 차례로 구현한다.
-4. 독립 URL을 먼저 검증한 뒤 FESTA Host/Unity Portal을 연결한다.
+3. Scene/Object palette, Tile canvas, Properties/Event inspector를 같은 authoring store에 연결한다.
+4. TOP_DOWN renderer, OVERLAY/FULL_SCREEN DIALOGUE runner, Preview를 차례로 구현한다.
+5. 독립 URL을 먼저 검증한 뒤 FESTA Host/Unity Portal을 연결한다.
 
 ### Phase C — #21 이후: Spring Draft/Publish
 
 1. 확정 Aggregate/migration을 추가한다.
 2. Draft revision과 server validation을 구현한다.
 3. immutable Publish/runtime query/Portal resolution을 구현한다.
-4. 권한·충돌·불변성 integration test를 추가한다.
+4. Asset reference allow-list와 향후 upload/resolver 경계를 구현한다.
+5. 권한·충돌·불변성 integration test를 추가한다.
 
 ### Phase D — 후속 P2
 

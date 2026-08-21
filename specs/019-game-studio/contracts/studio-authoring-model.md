@@ -1,0 +1,100 @@
+# Game Studio 편집·Asset 모델 v1
+
+> 상태: Draft v1.0 — 편집기 시안의 화면 개념을 GameProject 계약으로 변환하는 공통 기준
+
+## 1. 편집 화면의 논리 영역
+
+편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 실제 반응형 배치와 컴포넌트 이름은 #20에서
+정하되, 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
+
+| 영역 | 주 역할 | 수정 대상 |
+|---|---|---|
+| Scene 목록 | 생성·정렬·시작 Scene 지정 | `scenes[]`, `startSceneId` |
+| Object/Asset 목록 | 준비된 preset·시각 자료 선택 | `assets[]`, 새 Object 기본값 |
+| Map/Dialogue 작업 공간 | Tile 칠하기, Object 배치, Dialogue graph 편집 | 선택한 Scene |
+| Properties | 선택 대상의 이름·위치·Component 편집 | Scene/Object/Component |
+| Event Editor | Trigger·Condition·Action 구성 | `events[]`, Dialogue Choice |
+
+선택 상태, 확대/축소, 열린 패널, undo/redo history는 편집기 로컬 상태이며 GameProject에 저장하지 않는다.
+
+## 2. 원본 데이터와 실행 결과
+
+```text
+Asset Catalog + GameProject JSON
+              ↓
+      Preview / Published Runtime
+              ↓
+         플레이 화면 구성
+```
+
+- GameProject JSON이 배치와 규칙의 원본이다.
+- 배경을 한 장의 완성 이미지로 저장하거나 플레이 화면 캡처를 원본으로 사용하지 않는다.
+- Preview와 Published Runtime은 같은 GameProject snapshot, Asset resolver, Event 의미를 사용한다.
+- Runtime은 Studio store나 화면 컴포넌트를 직접 읽지 않는다.
+
+## 3. Asset 참조
+
+`assets[]`는 binary가 아니라 `id`, `kind`, `source`, 선택적 `integrity`만 저장한다.
+
+- MVP 영구 저장은 버전이 고정된 `builtin://` catalog를 우선한다.
+- 이미지·타일셋·오디오 binary, base64 `data:` URL, `blob:` URL, `file:` 경로는 저장·Publish 금지다.
+- 만료되는 서명 URL을 Published GameProject에 넣지 않는다.
+- 사용자 업로드를 추가할 때는 Spring이 소유한 안정적인 Asset ID를 저장하고 Runtime이 별도 조회로
+  실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위는 #21 결정 대상이다.
+- catalog metadata는 타일 크기, atlas slicing, 기본 표시 크기를 소유한다. GameProject는 같은 정보를
+  중복 저장하지 않는다.
+
+## 4. Tile과 Object 배치
+
+- TOP_DOWN의 `width`, `height`는 셀 수다.
+- `tileLayers[].data`는 왼쪽 위에서 오른쪽 아래로 진행하는 row-major 1차원 배열이며 길이는
+  `width × height`다. `-1`은 빈 셀이다.
+- Layer 배열 순서가 그리기 순서다. MVP 권장 이름은 `FLOOR`, `WALL`, `DECORATION`이지만 이름으로
+  충돌이나 동작을 추론하지 않는다.
+- TOP_DOWN Object의 `position.x/y`는 0부터 시작하는 정수 셀 좌표다.
+- Sprite 표시 크기와 기본 Collider footprint는 preset/catalog 기본값을 사용한다. 임의 크기·회전·다중 셀
+  footprint는 실제 제작 사례가 확인된 뒤 별도 계약으로 확장한다.
+
+## 5. Preset은 편집 편의 기능
+
+`DOOR`, `ITEM`, `NPC` 같은 preset은 사용자가 빠르게 시작하도록 Component와 Event 초안을 만드는
+recipe다. Runtime이 preset별 별도 로직을 가져서는 안 된다.
+
+예: 편집기의 `잠김=true`, `필요 아이템=key` 입력은 아래 공통 데이터로 변환한다.
+
+```text
+INTERACTABLE Component
++ ON_INTERACT(door)
++ HAS_ITEM(key)
++ SET_VARIABLE / SHOW·HIDE_OBJECT / GO_TO_SCENE
+```
+
+Inspector는 생성된 원본 Component/Event를 다시 읽어 편의 속성을 표시해야 한다. 편의 속성과 원본
+Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 수 없으면 일반 Event 편집 화면으로 전환한다.
+
+## 6. DIALOGUE 표시 방식
+
+| presentation | 시작 방식 | 종료 방식 |
+|---|---|---|
+| `OVERLAY` | TOP_DOWN Event의 `SHOW_DIALOGUE` | `CLOSE_DIALOGUE`로 호출 Scene 복귀, 또는 `GO_TO_SCENE`/`COMPLETE_GAME` |
+| `FULL_SCREEN` | `startSceneId` 또는 `GO_TO_SCENE` | 다른 Scene 이동 또는 게임 완료 |
+
+- OVERLAY가 열리면 호출 Scene, Player 위치, 변수, inventory, Object visibility를 그대로 유지하고 월드
+  입력만 중지한다.
+- `CLOSE_DIALOGUE`는 OVERLAY Choice에서만 허용한다.
+- OVERLAY Scene을 시작 Scene이나 일반 `GO_TO_SCENE` 대상으로 사용할 수 없다.
+- FULL_SCREEN Dialogue에서는 복귀할 호출 Scene이 없으므로 `CLOSE_DIALOGUE`를 사용할 수 없다.
+
+## 7. Preview·Save·Publish
+
+- Preview는 현재 편집 snapshot을 복제해 격리 Runtime에서 실행하며 Draft revision을 변경하지 않는다.
+- Save는 GameProject JSON과 revision만 영구 저장한다. Editor selection/history는 저장하지 않는다.
+- Publish는 구조·참조·Asset 정책·Dialogue presentation을 검증한 뒤 불변 Version을 만든다.
+- Preview에서만 보이는 임시 Asset이나 지원하지 않는 recipe가 남아 있으면 Publish를 거부한다.
+
+## 8. 파트 경계
+
+- Frontend: 편집 UX, recipe 변환, local validation, Preview/Runtime Asset resolve.
+- Backend: 저장 가능한 Asset reference 정책, Draft/Publish 검증, 업로드를 도입할 경우 Asset 영구 상태.
+- Unity: 위 데이터를 소비하지 않으며 Booth Portal trigger만 전달.
+- AI: 선택적으로 Asset/Dialogue/Event 초안을 제안할 수 있으나 저장 전 동일 계약으로 변환·검토.

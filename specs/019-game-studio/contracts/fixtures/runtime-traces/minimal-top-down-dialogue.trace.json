@@ -7,6 +7,7 @@
       "expect": {
         "status": "PLAYING",
         "currentSceneId": "room",
+        "activeDialogueSceneId": null,
         "currentDialogueNodeId": null,
         "variables": { "doorOpened": false },
         "inventory": [],
@@ -18,6 +19,7 @@
       "expect": {
         "status": "PLAYING",
         "currentSceneId": "room",
+        "activeDialogueSceneId": null,
         "variables": { "doorOpened": false },
         "inventory": ["key"],
         "objectVisibility": { "roomKey": false }
@@ -27,7 +29,31 @@
       "input": { "type": "INTERACT", "targetId": "exitDoor" },
       "expect": {
         "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": "doorHint",
+        "currentDialogueNodeId": "opened",
+        "variables": { "doorOpened": true },
+        "inventory": ["key"]
+      }
+    },
+    {
+      "input": { "type": "CHOOSE", "choiceId": "continue" },
+      "expect": {
+        "status": "PLAYING",
+        "currentSceneId": "room",
+        "activeDialogueSceneId": null,
+        "currentDialogueNodeId": null,
+        "variables": { "doorOpened": true },
+        "inventory": ["key"],
+        "objectVisibility": { "roomKey": false }
+      }
+    },
+    {
+      "input": { "type": "INTERACT", "targetId": "exitDoor" },
+      "expect": {
+        "status": "PLAYING",
         "currentSceneId": "ending",
+        "activeDialogueSceneId": null,
         "currentDialogueNodeId": "success",
         "variables": { "doorOpened": true },
         "inventory": ["key"]
@@ -38,6 +64,7 @@
       "expect": {
         "status": "COMPLETED",
         "currentSceneId": "ending",
+        "activeDialogueSceneId": null,
         "currentDialogueNodeId": "success",
         "variables": { "doorOpened": true },
         "inventory": ["key"]

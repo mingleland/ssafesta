@@ -12,7 +12,10 @@ GameVersion.projectJson
 ├─ Variables / Items / Assets
 └─ Scenes
    ├─ TOP_DOWN → TileLayers / Objects / Events
-   └─ DIALOGUE → Nodes / Choices
+   └─ DIALOGUE → presentation + Nodes / Choices
+
+Asset Catalog / Asset Storage
+└─ GameProject.assets[].source가 안정적인 reference로만 가리킴
 ```
 
 Spring은 Aggregate의 영구 상태를 소유한다. Web Runtime은 Published snapshot으로부터 한 번의
@@ -64,33 +67,44 @@ Unique 후보: `(boothId, objectId)`. Booth Layout은 `configId`만 가지고 Ga
 - `schemaVersion`, `gameId`, `revision`, `title`, `startSceneId`
 - `variables[]`, `items[]`, `assets[]`, `scenes[]`
 - 상세 구조는 `contracts/game-project-v1.schema.json`이 유일한 구조 계약이다.
+- Asset binary, editor selection/history, 완성 화면 캡처는 포함하지 않는다.
+
+### GameAssetReference
+
+- `id`, `kind(IMAGE/TILESET/AUDIO)`, `source`, 선택적 `integrity`.
+- MVP `source`는 버전이 고정된 `builtin://` 또는 서버가 관리하는 `asset://` reference다.
+- Runtime 전달 주소와 원본 binary는 계약 밖의 Asset resolver가 관리한다.
 
 ### Scene
 
 | Type | Own data | Runtime |
 |---|---|---|
 | TOP_DOWN | width/height, tileLayers, objects, events | grid movement + interaction |
-| DIALOGUE | startNodeId, nodes, choices | graph traversal |
+| DIALOGUE/OVERLAY | startNodeId, nodes, choices | 호출 Scene 보존 + world input 중지 + graph traversal |
+| DIALOGUE/FULL_SCREEN | startNodeId, nodes, choices | 독립 graph Scene traversal |
 | PLATFORMER | 후속 계약 | side-view physics adapter |
 
 ### GameObject
 
-- `id`, `preset`, `position`, `visible`, `components[]`
+- `id`, `preset`, 0-based 정수 셀 `position`, `visible`, `components[]`
 - preset은 editor 기본값이며 runtime capability를 대신하지 않는다.
 - v1 Component: SPRITE, COLLIDER, INTERACTABLE, PICKUP.
+- 문 잠금·필요 Item 같은 편의 입력은 별도 필드로 이중 저장하지 않고 Event recipe로 변환한다.
 
 ### GameEvent
 
 - Trigger: ON_SCENE_START, ON_INTERACT(target), ON_ENTER(target)
 - Conditions: VARIABLE_EQUALS, HAS_ITEM
-- Actions: SHOW_DIALOGUE, SET_VARIABLE, GIVE/REMOVE_ITEM, SHOW/HIDE_OBJECT, GO_TO_SCENE, COMPLETE_GAME
+- Actions: SHOW/CLOSE_DIALOGUE, SET_VARIABLE, GIVE/REMOVE_ITEM, SHOW/HIDE_OBJECT, GO_TO_SCENE, COMPLETE_GAME
 
 ## RuntimeSessionState
 
 ```text
 projectVersionId
 currentSceneId
+activeDialogueSceneId?
 currentDialogueNodeId?
+inputMode: WORLD | DIALOGUE
 variables: Map<variableId, scalar>
 inventory: Set<itemId>
 objectVisibility: Map<objectId, boolean>
@@ -120,6 +134,8 @@ PUBLISHED(version M) → immutable
 LOADING → PLAYING
 LOADING → FAILED
 PLAYING → PLAYING (Scene/Node transition)
+PLAYING/WORLD → PLAYING/DIALOGUE (OVERLAY open)
+PLAYING/DIALOGUE → PLAYING/WORLD (OVERLAY close)
 PLAYING → COMPLETED
 PLAYING → FAILED
 PLAYING|COMPLETED|FAILED → CLOSED
@@ -134,7 +150,11 @@ Runtime failure는 Game overlay 안에 격리되며 Unity 월드/다른 FESTA �
 3. TOP_DOWN Scene은 PLAYER_SPAWN을 정확히 하나 가진다.
 4. Tile layer data 길이는 width×height다.
 5. 같은 Object에 동일 Component type을 중복하지 않는다.
-6. SHOW_DIALOGUE는 DIALOGUE Scene만 참조한다.
-7. Variable 선언 type과 initialValue 실제 type이 일치한다.
-8. 한 tick Action 수와 transition depth가 budget을 넘으면 FAILED로 격리한다.
-9. 지원하지 않는 schema major는 migration 추측 없이 거부한다.
+6. SHOW_DIALOGUE는 OVERLAY DIALOGUE만 참조하며, OVERLAY는 시작 Scene이나 GO_TO_SCENE 대상이 아니다.
+7. CLOSE_DIALOGUE는 OVERLAY DIALOGUE Choice에서만 허용한다.
+8. Choice의 nextNodeId는 같은 DIALOGUE Scene Node를 가리키며 flow terminal Action과 함께 둘 수 없다.
+9. TOP_DOWN Object 위치는 Scene 범위 안의 정수 셀 좌표다.
+10. Asset source는 저장 가능한 안정 reference이며 binary·임시 URL을 포함하지 않는다.
+11. Variable 선언 type과 initialValue 실제 type이 일치한다.
+12. 한 tick Action 수와 transition depth가 budget을 넘으면 FAILED로 격리한다.
+13. 지원하지 않는 schema major는 migration 추측 없이 거부한다.

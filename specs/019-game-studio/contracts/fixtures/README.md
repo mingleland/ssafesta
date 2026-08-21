@@ -8,7 +8,10 @@ TOP_DOWN 방 시작
 → 아이템 지급 + 열쇠 숨김
 → 문 ON_INTERACT
 → 아이템 조건 확인
-→ DIALOGUE Scene 표시
+→ OVERLAY DIALOGUE 표시
+→ 대화 종료 후 같은 방 복귀
+→ 열린 문 재상호작용
+→ FULL_SCREEN DIALOGUE Scene 이동
 → 게임 완료
 ```
 
@@ -30,6 +33,8 @@ Negative 파일은 전체 GameProject를 복제하지 않고 `base` fixture에 J
 | `invalid/missing-start-scene.json` | `START_SCENE_NOT_FOUND` |
 | `invalid/duplicate-object-id.json` | `DUPLICATE_OBJECT_ID` |
 | `invalid/invalid-dialogue-target.json` | `DIALOGUE_TARGET_INVALID` |
+| `invalid/dialogue-next-with-terminal.json` | `DIALOGUE_NEXT_WITH_TERMINAL_ACTION` |
+| `invalid/invalid-dialogue-close-context.json` | `DIALOGUE_CLOSE_CONTEXT_INVALID` |
 
 Runner가 다른 code로 실패해도 테스트 실패다. 따라서 consumer마다 첫 오류가 달라지는 계약 drift를 발견한다.
 
@@ -38,9 +43,10 @@ Runner가 다른 code로 실패해도 테스트 실패다. 따라서 consumer마
 `runtime-traces/minimal-top-down-dialogue.trace.json`은 같은 positive project에 다음 입력을 순서대로 적용한다.
 
 ```text
-START → ENTER(roomKey) → INTERACT(exitDoor) → CHOOSE(finish)
+START → ENTER(roomKey) → INTERACT(exitDoor) → CHOOSE(continue)
+→ INTERACT(exitDoor) → CHOOSE(finish)
 ```
 
 `reference-runtime.mjs`는 renderer 없는 v1 Event/State 기준 구현이고, `validate-runtime-traces.mjs`가 각 단계의
-Scene, Dialogue Node, 변수, inventory, visibility, status snapshot을 검사한다. 실제 Frontend Runtime은
+Scene, active Dialogue Overlay, Dialogue Node, 변수, inventory, visibility, status snapshot을 검사한다. 실제 Frontend Runtime은
 구현 언어·라이브러리와 무관하게 같은 trace를 통과해야 한다.

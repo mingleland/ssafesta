@@ -9,6 +9,7 @@
 | Booth Game Portal | `game-portal-bridge.md` | Unity WebGL | FESTA React Host |
 | Preview Protocol | `game-preview-protocol.md` | Studio | Preview Web Runtime |
 | Event Runtime | `event-runtime-semantics.md` | Contract owner | Studio / Runtime / Spring Validator |
+| Studio/Asset 모델 | `studio-authoring-model.md` | Studio / Asset catalog | Preview / Runtime / Spring Validator |
 | 파트 책임 | `part-boundaries.md` | FE·BE·AI·Unity 합의 | 전 파트 |
 | 최소 수직 Fixture | `fixtures/minimal-top-down-dialogue.json` | 계약 담당 | Studio / Runtime / Spring Validator |
 
@@ -21,6 +22,7 @@
 5. Runtime은 AI 서버를 호출하지 않는다.
 6. Published Version은 불변이다.
 7. 계약 변경은 영향 파트 합의와 fixture 기반 소비자 검증을 거친다.
+8. GameProject에는 Asset binary나 완성 화면 캡처를 넣지 않고 안정적인 Asset reference만 둔다.
 
 ## v1 의미 검증 규칙
 
@@ -32,7 +34,10 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 - `TOP_DOWN` Scene은 Player Spawn을 정확히 하나 가진다.
 - `TOP_DOWN.tileLayers[].data` 길이는 Scene의 `width × height`와 같다.
 - Object Component가 참조하는 Asset·Item은 존재하며, 같은 Object에 동일 Component type을 중복하지 않는다.
-- `SHOW_DIALOGUE.sceneId`는 `DIALOGUE` Scene을 가리키고, `nextNodeId`는 같은 Scene의 Node를 가리킨다.
+- `SHOW_DIALOGUE.sceneId`는 `OVERLAY` DIALOGUE를 가리키며, Overlay는 시작 Scene이나 `GO_TO_SCENE` 대상이 될 수 없다.
+- `CLOSE_DIALOGUE`는 `OVERLAY` DIALOGUE Choice에서만 허용하고, `nextNodeId`는 같은 Scene의 Node를 가리킨다.
+- TOP_DOWN Object 위치는 Scene 범위 안의 0-based 정수 셀 좌표다.
+- 저장되는 Asset source는 `builtin://` 또는 서버가 관리하는 `asset://` reference이며 binary·임시 URL을 포함하지 않는다.
 - Variable의 `type`과 `initialValue` 실제 타입은 일치한다.
 - Event 순서, terminal Action, Action/transition budget은 `event-runtime-semantics.md`를 따른다.
 
@@ -65,6 +70,7 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 ## Scene/Component 적용 판단
 
 - `TOP_DOWN`과 후속 `PLATFORMER`만 이동·물리 Runtime 유형으로 본다.
-- `DIALOGUE`는 이동 물리가 없는 Scene 유형이며 Node/Choice 그래프로 실행한다.
+- `DIALOGUE`는 이동 물리가 없는 Node/Choice 그래프다. `OVERLAY`는 호출한 이동 Scene을 보존하고,
+  `FULL_SCREEN`은 시작/전환 대상 Scene으로 실행한다.
 - `PUZZLE`은 v1의 별도 Scene 유형으로 만들지 않는다. 변수·아이템·Event·Object Component 조합으로 먼저 검증하고, 조합만으로 표현할 수 없는 퍼즐이 반복해서 확인될 때 확장한다.
 - `preset`은 제작 UI의 빠른 시작값이고, 실행 능력은 허용 목록의 typed `components`와 `events`가 결정한다.

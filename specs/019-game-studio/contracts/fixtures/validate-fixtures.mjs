@@ -29,7 +29,7 @@ const uniqueMap = (values, namespace, duplicateCode) => {
   return map;
 };
 
-const terminalActions = new Set(["SHOW_DIALOGUE", "GO_TO_SCENE", "COMPLETE_GAME"]);
+const terminalActions = new Set(["SHOW_DIALOGUE", "CLOSE_DIALOGUE", "GO_TO_SCENE", "COMPLETE_GAME"]);
 
 export function validateProject(project) {
   expect(project.schemaVersion === "1.0.0", "GAME_SCHEMA_UNSUPPORTED", `unsupported schemaVersion: ${project.schemaVersion}`);
@@ -39,6 +39,19 @@ export function validateProject(project) {
   const items = uniqueMap(project.items, "item", "DUPLICATE_ITEM_ID");
   const assets = uniqueMap(project.assets, "asset", "DUPLICATE_ASSET_ID");
   expect(scenes.has(project.startSceneId), "START_SCENE_NOT_FOUND", `unknown startSceneId: ${project.startSceneId}`);
+  expect(
+    scenes.get(project.startSceneId)?.presentation !== "OVERLAY",
+    "DIALOGUE_PRESENTATION_INVALID",
+    "OVERLAY dialogue cannot be the start scene",
+  );
+
+  for (const asset of project.assets) {
+    expect(
+      /^(builtin|asset):\/\//.test(asset.source),
+      "ASSET_SOURCE_INVALID",
+      `persisted asset source must use builtin:// or asset://: ${asset.id}`,
+    );
+  }
 
   for (const variable of project.variables) {
     const actualType = typeof variable.initialValue;
@@ -73,7 +86,7 @@ export function validateProject(project) {
     }
   };
 
-  const validateAction = (action) => {
+  const validateAction = (action, context) => {
     if (action.type === "SET_VARIABLE") {
       expect(variables.has(action.variableId), "VARIABLE_REFERENCE_NOT_FOUND", `unknown variable: ${action.variableId}`);
     }
@@ -85,14 +98,32 @@ export function validateProject(project) {
     }
     if (action.type === "GO_TO_SCENE") {
       expect(scenes.has(action.sceneId), "SCENE_REFERENCE_NOT_FOUND", `unknown scene: ${action.sceneId}`);
+      expect(
+        scenes.get(action.sceneId)?.presentation !== "OVERLAY",
+        "DIALOGUE_PRESENTATION_INVALID",
+        `GO_TO_SCENE cannot target OVERLAY dialogue: ${action.sceneId}`,
+      );
     }
     if (action.type === "SHOW_DIALOGUE") {
       expect(scenes.get(action.sceneId)?.type === "DIALOGUE", "DIALOGUE_TARGET_INVALID", `not a DIALOGUE scene: ${action.sceneId}`);
+      expect(
+        scenes.get(action.sceneId)?.presentation === "OVERLAY",
+        "DIALOGUE_PRESENTATION_INVALID",
+        `SHOW_DIALOGUE requires OVERLAY presentation: ${action.sceneId}`,
+      );
+    }
+    if (action.type === "CLOSE_DIALOGUE") {
+      expect(
+        context.dialoguePresentation === "OVERLAY",
+        "DIALOGUE_CLOSE_CONTEXT_INVALID",
+        `${context.ownerId} cannot close dialogue outside an OVERLAY choice`,
+      );
     }
   };
 
-  const validateActions = (actions, ownerId) => {
-    actions.forEach(validateAction);
+  const validateActions = (actions, ownerId, context = {}) => {
+    const actionContext = { ...context, ownerId };
+    actions.forEach((action) => validateAction(action, actionContext));
     const terminalIndex = actions.findIndex((action) => terminalActions.has(action.type));
     expect(
       terminalIndex === -1 || terminalIndex === actions.length - 1,
@@ -119,6 +150,16 @@ export function validateProject(project) {
 
       const localObjectIds = new Set(scene.objects.map((object) => object.id));
       for (const object of scene.objects) {
+        expect(
+          Number.isInteger(object.position.x)
+          && Number.isInteger(object.position.y)
+          && object.position.x >= 0
+          && object.position.y >= 0
+          && object.position.x < scene.width
+          && object.position.y < scene.height,
+          "OBJECT_POSITION_INVALID",
+          `${object.id} position is outside ${scene.id}`,
+        );
         const componentTypes = object.components.map((component) => component.type);
         expect(new Set(componentTypes).size === componentTypes.length, "DUPLICATE_COMPONENT_TYPE", `${object.id} has duplicate component types`);
         for (const component of object.components) {
@@ -136,11 +177,16 @@ export function validateProject(project) {
           expect(localObjectIds.has(event.trigger.targetId), "TRIGGER_TARGET_NOT_FOUND", `unknown trigger target: ${event.trigger.targetId}`);
         }
         event.conditions.forEach(validateCondition);
-        validateActions(event.actions, event.id);
+        validateActions(event.actions, event.id, { ownerType: "EVENT" });
       }
     }
 
     if (scene.type === "DIALOGUE") {
+      expect(
+        scene.presentation === "OVERLAY" || scene.presentation === "FULL_SCREEN",
+        "DIALOGUE_PRESENTATION_INVALID",
+        `${scene.id} has invalid presentation`,
+      );
       const nodes = uniqueMap(scene.nodes, `dialogue node in ${scene.id}`, "DUPLICATE_DIALOGUE_NODE_ID");
       expect(nodes.has(scene.startNodeId), "DIALOGUE_START_NODE_NOT_FOUND", `${scene.id} startNodeId does not exist`);
       for (const node of scene.nodes) {
@@ -154,7 +200,10 @@ export function validateProject(project) {
             );
           }
           (choice.conditions ?? []).forEach(validateCondition);
-          validateActions(choice.actions, choice.id);
+          validateActions(choice.actions, choice.id, {
+            ownerType: "DIALOGUE_CHOICE",
+            dialoguePresentation: scene.presentation,
+          });
         }
       }
     }

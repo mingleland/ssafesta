@@ -6,7 +6,7 @@
 
 ```text
 Studio(FE)
-  → GameProject Draft
+  → Asset reference + Tile/Object/Event GameProject Draft
   → Spring(BE) validate/save/publish
   → Published GameProject
   → Web Runtime(FE)
@@ -28,6 +28,7 @@ AI(optional, future)
 |---|---|---|---|:---:|
 | Studio → Spring | FE | BE | GameProject Draft + revision | ✅ |
 | Spring → Runtime | BE | FE Runtime | Published GameProject + version | ✅ |
+| Asset Catalog → Studio/Runtime | FE static catalog / future BE | FE | stable Asset reference + metadata | ✅ builtin only |
 | Studio → Preview | FE Studio | FE Runtime | GameProject preview message | ✅ |
 | Unity → React Host | Unity | FE Host | `BOOTH_GAME_INTERACT` | 선택 통합 |
 | React Host → Spring | FE | BE | Portal Binding resolution | 선택 통합 |
@@ -41,9 +42,11 @@ AI(optional, future)
 - AI 장애가 Studio 저장, Publish, Runtime 로드를 차단하지 않는다.
 - AI raw provider 응답을 GameProject에 저장하지 않는다.
 - Runtime 완료 payload를 Coin/Reward 근거로 그대로 사용하지 않는다.
+- Asset binary, `data:`/`blob:`/`file:` URI, 만료 URL을 GameProject에 저장하지 않는다.
+- preset 편의 속성을 Runtime 전용 Door/NPC 로직으로 이중 구현하지 않는다.
 
 ## 답변 대기 항목
 
-- FE: 앱/배포 단위, 인증 공유, preview/overlay lifecycle — #20
-- BE: revision/상태코드, 저장 모델, semantic validation, portal resolution — #21
+- FE: 앱/배포 단위, 인증 공유, preview/overlay lifecycle, 편집 패널 실제 배치 — #20
+- BE: revision/상태코드, 저장 모델, semantic validation, portal resolution, Asset upload/resolver — #21
 - AI: MVP 제외 확정, 후속 생성 기능과 async job 경계 — #22

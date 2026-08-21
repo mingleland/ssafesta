@@ -153,10 +153,12 @@
       "required": ["x", "y"],
       "properties": {
         "x": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 0
         },
         "y": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
@@ -359,6 +361,16 @@
               "const": "COMPLETE_GAME"
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "const": "CLOSE_DIALOGUE"
+            }
+          }
         }
       ]
     },
@@ -398,9 +410,6 @@
           },
           "maxItems": 10
         },
-        "nextNodeId": {
-          "$ref": "#/$defs/stableId"
-        },
         "actions": {
           "type": "array",
           "minItems": 1,
@@ -430,6 +439,9 @@
             "$ref": "#/$defs/condition"
           },
           "maxItems": 10
+        },
+        "nextNodeId": {
+          "$ref": "#/$defs/stableId"
         },
         "actions": {
           "type": "array",
@@ -516,7 +528,7 @@
     "dialogueScene": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "type", "name", "startNodeId", "nodes"],
+      "required": ["id", "type", "name", "presentation", "startNodeId", "nodes"],
       "properties": {
         "id": {
           "$ref": "#/$defs/stableId"
@@ -528,6 +540,9 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 50
+        },
+        "presentation": {
+          "enum": ["OVERLAY", "FULL_SCREEN"]
         },
         "startNodeId": {
           "$ref": "#/$defs/stableId"

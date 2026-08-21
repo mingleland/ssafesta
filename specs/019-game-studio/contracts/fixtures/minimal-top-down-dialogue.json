@@ -102,11 +102,45 @@
           "id": "openDoor",
           "trigger": { "type": "ON_INTERACT", "targetId": "exitDoor" },
           "conditions": [
-            { "type": "HAS_ITEM", "itemId": "key" }
+            { "type": "HAS_ITEM", "itemId": "key" },
+            { "type": "VARIABLE_EQUALS", "variableId": "doorOpened", "value": false }
           ],
           "actions": [
             { "type": "SET_VARIABLE", "variableId": "doorOpened", "value": true },
-            { "type": "SHOW_DIALOGUE", "sceneId": "ending" }
+            { "type": "SHOW_DIALOGUE", "sceneId": "doorHint" }
+          ]
+        },
+        {
+          "id": "leaveRoom",
+          "trigger": { "type": "ON_INTERACT", "targetId": "exitDoor" },
+          "conditions": [
+            { "type": "VARIABLE_EQUALS", "variableId": "doorOpened", "value": true }
+          ],
+          "actions": [
+            { "type": "GO_TO_SCENE", "sceneId": "ending" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "doorHint",
+      "type": "DIALOGUE",
+      "name": "문 열림 안내",
+      "presentation": "OVERLAY",
+      "startNodeId": "opened",
+      "nodes": [
+        {
+          "id": "opened",
+          "speaker": "안내",
+          "text": "열쇠가 맞았습니다. 문이 열렸습니다.",
+          "choices": [
+            {
+              "id": "continue",
+              "text": "계속하기",
+              "actions": [
+                { "type": "CLOSE_DIALOGUE" }
+              ]
+            }
           ]
         }
       ]
@@ -115,6 +149,7 @@
       "id": "ending",
       "type": "DIALOGUE",
       "name": "탈출",
+      "presentation": "FULL_SCREEN",
       "startNodeId": "success",
       "nodes": [
         {

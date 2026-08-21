@@ -33,9 +33,19 @@ const transitionTo = (project, state, sceneId, context) => {
 
   const scene = sceneById(project, sceneId);
   if (!scene) runtimeFail("SCENE_REFERENCE_NOT_FOUND", `unknown scene: ${sceneId}`);
+  state.activeDialogueSceneId = null;
   state.currentSceneId = scene.id;
   state.currentDialogueNodeId = scene.type === "DIALOGUE" ? scene.startNodeId : null;
   if (scene.type === "TOP_DOWN") dispatchTopDown(project, state, "ON_SCENE_START", undefined, context);
+};
+
+const showDialogue = (project, state, sceneId) => {
+  const scene = sceneById(project, sceneId);
+  if (scene?.type !== "DIALOGUE" || scene.presentation !== "OVERLAY") {
+    runtimeFail("DIALOGUE_PRESENTATION_INVALID", `SHOW_DIALOGUE requires OVERLAY: ${sceneId}`);
+  }
+  state.activeDialogueSceneId = scene.id;
+  state.currentDialogueNodeId = scene.startNodeId;
 };
 
 const applyAction = (project, state, action, context) => {
@@ -49,7 +59,15 @@ const applyAction = (project, state, action, context) => {
   else if (action.type === "REMOVE_ITEM") state.inventory.delete(action.itemId);
   else if (action.type === "SHOW_OBJECT") state.objectVisibility[action.objectId] = true;
   else if (action.type === "HIDE_OBJECT") state.objectVisibility[action.objectId] = false;
-  else if (action.type === "SHOW_DIALOGUE" || action.type === "GO_TO_SCENE") transitionTo(project, state, action.sceneId, context);
+  else if (action.type === "SHOW_DIALOGUE") showDialogue(project, state, action.sceneId);
+  else if (action.type === "CLOSE_DIALOGUE") {
+    if (!state.activeDialogueSceneId) {
+      runtimeFail("DIALOGUE_CLOSE_CONTEXT_INVALID", "no active OVERLAY dialogue");
+    }
+    state.activeDialogueSceneId = null;
+    state.currentDialogueNodeId = null;
+  }
+  else if (action.type === "GO_TO_SCENE") transitionTo(project, state, action.sceneId, context);
   else if (action.type === "COMPLETE_GAME") state.status = "COMPLETED";
 };
 
@@ -79,6 +97,7 @@ export function startRuntime(project) {
   const state = {
     status: "PLAYING",
     currentSceneId: project.startSceneId,
+    activeDialogueSceneId: null,
     currentDialogueNodeId: null,
     variables: Object.fromEntries(project.variables.map((variable) => [variable.id, variable.initialValue])),
     inventory: new Set(),
@@ -112,7 +131,8 @@ export function applyRuntimeInput(project, state, input) {
   }
 
   if (input.type === "CHOOSE") {
-    const scene = sceneById(project, state.currentSceneId);
+    const dialogueSceneId = state.activeDialogueSceneId ?? state.currentSceneId;
+    const scene = sceneById(project, dialogueSceneId);
     if (scene?.type !== "DIALOGUE") runtimeFail("INPUT_NOT_ALLOWED", "CHOOSE requires DIALOGUE scene");
     const node = scene.nodes.find((candidate) => candidate.id === state.currentDialogueNodeId);
     const choice = node?.choices.find((candidate) => candidate.id === input.choiceId);
@@ -130,6 +150,7 @@ export function snapshotRuntimeState(state) {
   return {
     status: state.status,
     currentSceneId: state.currentSceneId,
+    activeDialogueSceneId: state.activeDialogueSceneId,
     currentDialogueNodeId: state.currentDialogueNodeId,
     variables: { ...state.variables },
     inventory: [...state.inventory].sort(),

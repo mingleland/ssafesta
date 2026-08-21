@@ -32,7 +32,9 @@ PASS negative unsupported-schema -> GAME_SCHEMA_UNSUPPORTED
 PASS negative missing-start-scene -> START_SCENE_NOT_FOUND
 PASS negative duplicate-object-id -> DUPLICATE_OBJECT_ID
 PASS negative invalid-dialogue-target -> DIALOGUE_TARGET_INVALID
-GameProject contract fixtures: 5/5 passed
+PASS negative dialogue-next-with-terminal -> DIALOGUE_NEXT_WITH_TERMINAL_ACTION
+PASS negative invalid-dialogue-close-context -> DIALOGUE_CLOSE_CONTEXT_INVALID
+GameProject contract fixtures: 7/7 passed
 ```
 
 검증 대상은 시작 Scene, 중복 ID, Asset/Item/Variable/Object 참조, Player Spawn 수, Tile 크기,
@@ -54,7 +56,9 @@ PASS runtime step 1 START
 PASS runtime step 2 ENTER
 PASS runtime step 3 INTERACT
 PASS runtime step 4 CHOOSE
-GameProject runtime trace: 4/4 passed
+PASS runtime step 5 INTERACT
+PASS runtime step 6 CHOOSE
+GameProject runtime trace: 6/6 passed
 ```
 
 ## 4. 수동 수직 시나리오
@@ -64,8 +68,10 @@ GameProject runtime trace: 4/4 passed
 1. `room` TOP_DOWN Scene에서 Player Spawn.
 2. `roomKey` 진입으로 `key` 지급 및 오브젝트 숨김.
 3. `exitDoor` 상호작용에서 `HAS_ITEM(key)` 통과.
-4. `ending` DIALOGUE Scene 표시.
-5. 선택지에서 `COMPLETE_GAME` 실행.
+4. `doorHint` OVERLAY DIALOGUE 표시. 이때 `currentSceneId=room`과 기존 상태를 유지한다.
+5. `CLOSE_DIALOGUE`로 같은 방에 복귀한다.
+6. 열린 문을 다시 상호작용해 `ending` FULL_SCREEN DIALOGUE로 이동한다.
+7. 선택지에서 `COMPLETE_GAME`을 실행한다.
 
 ## 5. 파트별 구현 후 추가할 검증
 

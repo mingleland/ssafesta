@@ -27,6 +27,15 @@
 
 **Checkpoint**: Positive fixture and every negative fixture produce deterministic results without FE/BE/Unity.
 
+### Phase 1A: 시안 기반 계약 보완 — 즉시 완료
+
+- [x] T072 [P] Define Scene/Object/Properties/Event workspace and Asset reference rules in `specs/019-game-studio/contracts/studio-authoring-model.md`
+- [x] T073 Add OVERLAY/FULL_SCREEN Dialogue and CLOSE_DIALOGUE semantics in `specs/019-game-studio/contracts/event-runtime-semantics.md`
+- [x] T074 Fix Dialogue Choice nextNodeId schema placement and add presentation/close negative fixtures in `specs/019-game-studio/contracts/`
+- [x] T075 Extend the minimal project and renderer-free trace through Overlay close/resume and Full-screen transition in `specs/019-game-studio/contracts/fixtures/`
+
+**Checkpoint**: 같은 방 상태를 보존한 대화 Overlay 종료와 실제 Scene 이동이 서로 다른 상태 전이로 검증된다.
+
 ---
 
 ## Phase 2: Project Setup & Shared Foundations — decision gated
@@ -63,7 +72,7 @@
 - [ ] T021 [P] [US1] Implement condition evaluation in `festa-game-studio/src/core/evaluateCondition.ts`
 - [ ] T022 [P] [US1] Implement action reduction in `festa-game-studio/src/core/applyAction.ts`
 - [ ] T023 [US1] Implement event ordering, action budget, and transition-depth guard in `festa-game-studio/src/core/runEvent.ts`
-- [ ] T024 [US1] Implement DIALOGUE node/choice runner in `festa-game-studio/src/runtime/dialogue/dialogueRunner.ts`
+- [ ] T024 [US1] Implement OVERLAY/FULL_SCREEN DIALOGUE node/choice runner in `festa-game-studio/src/runtime/dialogue/dialogueRunner.ts`
 - [ ] T025 After #20 [US1] Implement TOP_DOWN renderer adapter in `festa-game-studio/src/runtime/top-down/TopDownRuntime.ts`
 - [ ] T026 After #20 [US1] Implement project authoring store with undo/redo in `festa-game-studio/src/studio/store/gameProjectStore.ts`
 - [ ] T027 [P] After #20 [US1] Implement Scene list/start Scene editor in `festa-game-studio/src/studio/scenes/SceneListPanel.tsx`
@@ -71,6 +80,8 @@
 - [ ] T029 [P] After #20 [US1] Implement typed Component/Event inspector in `festa-game-studio/src/studio/inspector/EventInspector.tsx`
 - [ ] T030 [P] After #20 [US1] Implement DIALOGUE node/choice editor in `festa-game-studio/src/studio/dialogue/DialogueEditor.tsx`
 - [ ] T031 [US1] Add the minimal authoring-to-local-preview integration test in `festa-game-studio/tests/integration/minimalAuthoringPreview.test.tsx`
+- [ ] T076 After #20 [US1] Implement the Scene/Object palette, canvas, Properties and Event workspace shell in `festa-game-studio/src/studio/StudioWorkspace.tsx`
+- [ ] T077 After #20 [US1] Implement preset convenience fields as reversible Component/Event recipes in `festa-game-studio/src/studio/presets/presetRecipes.ts`
 
 **Checkpoint**: 서버와 Unity 없이 US1 수직 시나리오를 제작하고 Preview할 수 있다.
 
@@ -99,6 +110,9 @@
 - [ ] T041 After #20 [US2] Implement isolated iframe Preview host in `festa-game-studio/src/preview/PreviewHost.tsx`
 - [ ] T042 After #20 [US2] Implement save-conflict and validation-error UI in `festa-game-studio/src/studio/publish/PublishPanel.tsx`
 - [ ] T043 [US2] Run and document Draft→Preview→Publish acceptance flow in `specs/019-game-studio/quickstart.md`
+- [ ] T078 After #20 [US2] Implement builtin Asset reference resolution and reject transient sources in `festa-game-studio/src/runtime/assets/resolveAsset.ts`
+- [ ] T079 After #21 [US2] Implement persisted Asset source allow-list validation in `backend/src/main/java/com/example/ssafesta/game/application/GameAssetPolicy.java`
+- [ ] T080 After #20 and #21 [US2] Add Preview-versus-Published state parity E2E in `festa-game-studio/tests/e2e/previewPublishedParity.spec.ts`
 
 **Checkpoint**: Draft와 Published 격리가 서버 통합 테스트로 증명된다.
 
@@ -206,8 +220,8 @@ AI #22 does not block MVP
 
 ## Task Summary
 
-- 총 71개
-- 완료된 결정 비의존 계약 작업: T001~T009, T066, T068~T071 (14개)
+- 총 80개
+- 완료된 결정 비의존 계약 작업: T001~T009, T066, T068~T075 (18개)
 - User Story 1: T017~T031 (15개)
 - User Story 2: T032~T043 (12개)
 - User Story 3: T044~T050 (7개)

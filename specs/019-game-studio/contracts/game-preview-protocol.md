@@ -115,10 +115,12 @@ Studio, FESTA Host, Unity WebGL을 reload/close하지 않는다.
 ## Security Invariants
 
 1. Access/Refresh/Connection Token을 message payload에 넣지 않는다.
-2. `project.assets[].source`는 Runtime의 Asset 정책을 통과한 URL/builtin reference만 사용한다.
+2. `project.assets[].source`는 `builtin://` 또는 서버가 관리하는 `asset://` reference만 사용한다.
+   binary, base64 `data:`, `blob:`, `file:`, 만료되는 서명 URL은 snapshot에 포함하지 않는다.
 3. Runtime은 message의 `gameId`나 owner 정보를 권한 근거로 사용하지 않는다.
 4. iframe Runtime은 parent DOM과 Unity instance를 직접 조작하지 않는다.
 5. 반복/늦게 도착한 이전 `requestId` 응답은 현재 lifecycle 상태를 변경하지 않는다.
+6. Preview와 Published Runtime은 같은 Asset resolver를 사용하며 Studio DOM이나 로컬 파일 선택 상태를 읽지 않는다.
 
 ## #20 결정 후 채울 값
 
