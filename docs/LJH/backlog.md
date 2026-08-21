@@ -1,108 +1,65 @@
 # FE 백로그 — spec 005
 
-기준 문서: `specs/005-booth-studio-layout/spec.md`, `docs/sdd/parts/FE.md`, `docs/26_팀_결정_필요사항.md`
-경위·판단 근거는 `24_작업일지.md`, 확정값은 `docs/26` 결정 로그가 원본. 여기는 상태·다음 액션만 둔다.
-**작성 규칙**: 완료 항목은 결과·파급만 1~2줄. 경위·근거·검증 내용은 쓰지 않는다(작업일지·이슈·PR이 원본).
+경위·판단 근거는 `24_작업일지.md`, 확정값은 `docs/26` 결정 로그가 원본. **여기는 상태·다음 액션만 둔다.**
+완료 항목은 결과 1줄. 경위·근거·검증 내용은 쓰지 않는다.
 
 ---
 
-## 현재 상태 (2026-08-21)
+## 지금 할 수 있는 것
 
-- spec 005: 리뷰 ①②③④+BE 검토칸 전부 완료. 제목 `FE 검토 완료 (C-04 기획 승인 대기)` — 전체 "확정"은 아님.
-  **`/speckit-plan` 산출물 완성**(plan/research/data-model/quickstart, C-04는 PROVISIONAL로 잠정 진행). 다음 단계 `/speckit-tasks`
-- spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`은 왕복 검증 통과로 **잠금 해제 가능**
-- Clarification: C-03·C-05 확정, C-07 후순위, **C-04 미결(기획 승인)**, **C-06 재점화(#19 footprint)**
-- 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만. `FE.md` develop 완전 동기화 완료
-- `BOOTH_LAPTOP_INTERACT` 브라우저 왕복 — ✅ 검증 완료(PR #25)
-- Issue #1·#2·#5·#6·#18 CLOSED / #14·#17·#19·#20·#21·#22·#24 OPEN
-- **Game Studio** (#20 front / #21 back / #22 ai) — `specs/019`는 `feature/game-studio-foundation` 브랜치 확인.
-  **수직 구현 담당자 @busypark 신설** — FE는 소켓(진입·인증·Overlay·Bridge)만, Studio 내부는 이관. #20 회신 완료
-- 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`·`FE.md` 완료, 나머지 순차 진행
-- ⚠️ **신규 — #30 인프라 구조 전면 변경(blocker)**: 단일 EC2+Jenkins+Cloudflare로 `docs/21` ADR 2건 무효.
-  **FE 영향**: refresh 토큰 쿠키 도메인 재확정 필요(@Alexjung0115 TLS 답변 후). #31 1층 폐기 — FE엔 로딩 오버레이 경계 질문 1건(WebGL 로더 미구현 상태로 답변)
-- **신규 — #32 spec 008 C-08 SSE payload** — assignee=colosair, 유일한 배정 이슈. 회신 완료, AI 재회신 대기(아래 참조)
-- **신규 — #36 spec 005 BE 구현 통보** — back PR #27 머지 완료(테스트 191개, 실서버 22단계 검증). `revision`/`version`/`schemaVersion` 3분리, 오류 봉투 5필드, 미지 필드 거부 확정. **FE plan 산출물에 전부 반영. #36 자체 회신은 미착수**
+- [ ] **`/speckit-tasks`** — plan 산출물 4종 완료. 단, [#43](https://github.com/kanghyunsoon/ssafesta/issues/43)(산출물 경로 구조) 확정 후가 안전
+- [ ] **`client.ts`의 `ApiError` 갱신** — 봉투 `{code, message, requestId, errors, warnings}`, 원소는 **`{rule, objectId, message}`**(`contracts/layout-api.md`). 확답 나왔으므로 **착수 가능**
+- [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
 
----
+## 막힌 것 — 대기 중
 
-## 남은 액션
+| 항목 | 막는 것 | 상대 |
+|---|---|---|
+| **#43** spec 산출물 경로 구조 | FE 산출물 develop PR 전체 | 리드·BE |
+| **C-04** 미연결 오브젝트 공개 차단 | spec 005 전체 확정 (구현은 PROVISIONAL로 진행 가능) | 기획 |
+| **#30** refresh 토큰 쿠키 도메인 | 인증 경로 | @Alexjung0115 TLS 결정 |
+| **#34** `GAME_PORTAL`이 `schemaVersion` 올리는가 | ObjectType union 확장 시점 | BE (#36에서 질문함) |
+| **#21** GameProject 계약 | `features/game-entry/`(`configId → gameId`) | BE |
+| **#20** `specs/019` contracts 편집 주체 | Game Studio 소켓 4종 | 리드 |
+| `assetCode` 목록 | 자산 분기 종단 검증 | Unity 카탈로그 확장 |
+| **#33** 공개 중단·삭제·랭킹 정책 4건 | Game Studio 범위 | **내 회신 미착수** |
 
-### 타 파트 결정 대기
+## 회신 완료 — 상대 답변 대기
 
-- [ ] **C-04** 콘텐츠 미연결 오브젝트의 공개를 막는가 — 기획 승인. FE 의견은 "막지 않고 경고".
-      **spec 005 전체 확정의 마지막 조건.** plan 산출물은 이 값으로 PROVISIONAL 진행(2026-08-21)
-- [x] **C-05 잔여** 요청 스키마의 `version` 위치 — **#36으로 해소.** `expectedRevision`(PUT body) + `409 LAYOUT_REVISION_CONFLICT`로 확정 구현됨
-- [ ] **LAPTOP 주소 저장 위치** — BE `booths` URL 컬럼 추가 확인. 방향은 부스 단위 1개로 이미 수렴
-- [ ] **C-06** 템플릿 종수 — 보류 판단이었으나 **[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)로 재점화**.
-      Unity가 셸을 6×6m 임의값으로 만들어 둔 상태라 footprint 확정이 필요해짐. FE는 여전히 설정값 주입 구조 유지
+| 이슈 | 내가 답한 것 | 대기 |
+|---|---|---|
+| [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) | 6건 수용 + 계약서 모순 1건 지적(409에 Draft 동봉 서술) | BE 정정 |
+| [#31](https://github.com/kanghyunsoon/ssafesta/issues/31) | 로딩 경계 동의, `onWorldGateReady` B안 제안 | Unity |
+| [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) | footprint | Unity (셸 실측 2.72m 불일치) |
+| [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | hex 6자리·팔레트 12색 | 팔레트 서버 검증 방식 |
+| [#43](https://github.com/kanghyunsoon/ssafesta/issues/43) | 구조 제안 + 도구 검증 | 리드 채택 여부 |
 
-### Unity 이슈 — 재회신 대기 / 신규
+## 내 것 아님
 
-- [x] [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) template·footprint — **회신 오면 C-06 닫히고 FR-003 스냅 간격 착수 가능**
-- [x] [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 — BE가 Facade 저장 API 구현 완료(선행 조건 해소).
-      hex `#RRGGBB` 6자리·팔레트 12색(A안, `code`/`label` 제안) 회신. **`ApiError` 타입 확답 대기** — 아래 참조
-- [x] [#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금 — ✅ CLOSED, 4건 확정. 구현 계약은 spec 012 착수 시
-- [x] **[#20](https://github.com/kanghyunsoon/ssafesta/issues/20) Game Studio** — 회신 완료(9개 항목 전부).
-      **핵심 답**: 앱은 `festa-frontend` 내부 lazy 라우트(인증 공유가 결정적) / 경로는 `/app/games/:gameId/edit|play`
-      (제안된 `/studio/:gameId`가 `/app/` 규약 이탈 + Booth Studio와 이름 충돌) / lifecycle은 `OnOverlayStateChanged` 단일 진입점.
-      renderer·asset resolver·validation 시점·Studio 화면은 @busypark 이관. **`specs/019` contracts 편집 주체 확인 대기**
-- [x] **[#31](https://github.com/kanghyunsoon/ssafesta/issues/31) 1층 폐기·로딩 오버레이 경계** — 회신 완료(1단계 React·2단계 Unity 동의, `onWorldGateReady` 신호 B안 제안, FR-011 FE 타임아웃 몫 지적). **Unity 답변 대기**
-
-### AI 이슈 — 재회신 대기
-
-- [x] **[#32](https://github.com/kanghyunsoon/ssafesta/issues/32) spec 008 C-08 SSE payload** — 회신 완료(6개 질문 답, envelope·이벤트 순서·오류 구분 동의).
-      **미확인 항목**: `sourceUrl`(출처 문서 열람 링크) 신규 요청 / `retryable` 코드별 매핑 / 15초·60초 타임아웃 code 분리 여부 /
-      `data.type` 중복 필드(SSE 프레이밍 대비) / 재시도 시 `conversationId` 유지·실패 요청 이력 보존 여부 / `handoffRecommended` true 시 FE 반응 범위.
-      **AI(@ghkim1632) 재회신 대기**
-
-### FE 착수 가능
-
-- [x] `events.ts` `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` 매핑 ✅ 08-20 (`d1bbb4a`)
-- [x] **블록 4 speckit 파이프라인 — plan 완료** ✅ 08-21. `specs/005-booth-studio-layout/{plan,research,data-model,quickstart}.md` 작성
-      (C-04 PROVISIONAL, #36 BE 구현 반영). **다음: `/speckit-tasks` → `/speckit-implement`**
-- [ ] **Game Studio 소켓 4종** — #20 승인 후 착수. `events.ts`에 `BOOTH_GAME_INTERACT` union 멤버 /
-      `overlay.ts`에 `GAME` 타입 / 라우터 lazy 연결부 / Host→Unity lifecycle 송신부.
-      `features/game-entry/`(`configId → gameId`)는 [#21](https://github.com/kanghyunsoon/ssafesta/issues/21) BE 계약 확정 후
-
-### 선행 조건 대기
-
-- [ ] FE가 쓸 `assetCode` 목록 제공 → Unity 카탈로그 확장 후 "서로 다른 자산이 실제로 선택되는지" 종단 검증.
-      목록 제공 시 last-wins 주의사항 있음 (`verify/block1-roundtrip.md`)
-- [ ] **`client.ts`의 `ApiError` 타입 갱신** — 서버가 오류 봉투를 `{code, message, requestId, errors, warnings}`로 통일(#17).
-      `errors` 원소 타입 확답 대기(`{field?, code}` 제안, #18 objectId 연계 여부 포함). 확답 오면 착수
-- [x] **#31 로딩 오버레이 경계** — 회신 완료. 미구현 상태 명시, 1단계 React·2단계 Unity 동의, `onWorldGateReady` 신호(B안) 제안, FR-011 FE 타임아웃 몫 지적. **Unity 답변 대기**
-- [ ] **#30 refresh 토큰 도메인** — @Alexjung0115 TLS 종료 지점 답변 후 착수
+`#35` @busypark / `#22` AI+@busypark / `#24` back·game 잔여 (FE 몫 완료)
 
 ---
 
 ## 완료
 
-- **블록 0** Architecture 4종 ✅ 08-18 — `overlay.ts`·`events.ts`·`client.ts` + `app/{router,providers}` 스캐폴딩
-- **블록 1** 좌표 왕복 검증 통과 ✅ 08-20 — C-02 실측 확정, SC-004 근거 확보,
-      부수로 Unity 계약 불일치 3건 정합. 수치·재현 절차: `verify/block1-roundtrip.md`
-- **블록 2** 타 파트 결정 5건 소진 ✅ 08-20 — C-03 고정 크기 / C-05 낙관적 잠금 / C-06 보류 /
-      LAPTOP 부스 단위 수렴 / Facade는 005 범위 제외
-- **블록 3** FE·BE 몫 완료 ✅ 08-20 — 리뷰 4칸+BE 검토칸 서명, SC-002 해소, 제목 정정
+| | 결과 |
+|---|---|
+| **블록 0** 08-18 | Architecture 4종 — `overlay.ts`·`events.ts`·`client.ts` + `app/{router,providers}` |
+| **블록 1** 08-20 | 좌표 왕복 검증 통과 — C-02 실측 확정, SC-004 근거. 수치: `verify/block1-roundtrip.md` |
+| **블록 2** 08-20 | 타 파트 결정 5건 소진 |
+| **블록 3** 08-20 | 리뷰 4칸+BE 검토칸 서명, SC-002 해소 |
+| **블록 4** 08-21 | spec 005 plan 산출물 4종 (`plan`·`research` R-01~R-11·`data-model`·`quickstart`) |
+| `events.ts` 08-20 | `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` (`d1bbb4a`) |
+| `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
+| 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
+| **CLOSED** | #1 #2 #5 #6 #14 #18 #20 #21 #22 #32 |
+
+**해소된 미결** — C-02 좌표 / C-03 고정 크기 / C-05 `expectedRevision`(#36) / C-07 보관O·되돌리기 MVP제외 / **부스 6×6×6m 확정** / 오류 봉투 원소 타입 / SSE payload 전체(#32)
 
 ---
 
-## 절차 — 문서 develop 통합 (2026-08-20 확정, MM 팀장 승인)
+## 참고
 
-**방식**: 각 파트가 자기 변경분만 develop PR로 올려 누적. 남의 변경분을 대신 옮기지 않는다.
-
-`develop`에서 브랜치 생성 → `git checkout <자기브랜치> -- <path>` 파일 단위 sync →
-`git diff --stat origin/develop -- festa-unity/` 0줄 확인 → `docs(sdd):` 커밋 → PR.
-가져올 때는 `git checkout origin/develop -- <path>`.
-
-- **직접 push 금지**(`docs/17` §2, T-7) / **전체 merge 금지** — `festa-unity/` 1,462개 파일이 조용히 삭제됨(PR #3 실측). 근본 해결 2건은 `docs/26` ①표 16·17번
-- [x] `docs/26` — [PR #23](https://github.com/kanghyunsoon/ssafesta/pull/23) 병합(`develop aeccede`), front 사본 교체
-- [x] `docs/sdd/parts/FE.md` — ✅ 완료. PR [#25](https://github.com/kanghyunsoon/ssafesta/pull/25)(강형순, spec 016 브리지+브라우저 왕복 검증) + PR [#26](https://github.com/kanghyunsoon/ssafesta/pull/26)(013a 담당 경계) 둘 다 병합, front도 완전 동기화
-- [ ] back·game 몫(`09`·`27`·`README`)은 [Issue #24](https://github.com/kanghyunsoon/ssafesta/issues/24)로 안내 — 파트별 현황표도 그쪽
-
----
-
-## 별건 — 문서 정합 (병합 시점 처리)
-
-- spec 013 vs 헌법 25조 — 충돌 아님으로 판정, 조치 없음
-- front `specs/013/spec.md`가 "FE는 창 이관만"·FR-020 웹 이관·C-07 React 이관 방식 기술.
-  `FE.md`만 갱신된 상태 — 013 진행 시 정리 필요
+- **develop 통합 절차**: `develop`에서 브랜치 → `git checkout <자기브랜치> -- <path>` 파일 단위 → `git diff --stat origin/develop -- festa-unity/` 0줄 확인 → PR. **직접 push·전체 merge 금지**(`festa-unity/` 1,462개 삭제)
+- **착수 전 `origin/develop` 대조 필수** — 내 브랜치의 공유 문서 사본은 낡았다고 가정
+- **013 문서 정합**: front `specs/013/spec.md`가 "FE는 창 이관만"·FR-020·C-07을 기술하는데 `FE.md`만 갱신됨 — 013 진행 시 정리

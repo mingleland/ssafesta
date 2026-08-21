@@ -29,19 +29,21 @@
 
 ## R-04. 스냅 간격
 
-**⚠️ PROVISIONAL — C-06(템플릿 종수) 확정에 종속**
+**⚠️ PROVISIONAL — FE 단독 UX 판단, 서버 계약과 무관**
 
 - **Decision**: `SNAP_METERS = 0.5`. 스냅은 미터 도메인에서 `Math.round(v / SNAP_METERS) * SNAP_METERS`로 적용한다.
-- **Rationale**: `BOOTH_SIZE.width/depth = 6`(R-05) 기준으로 0.5m 간격이면 축당 12칸이 생겨 배치 자유도와 정렬감이 균형을 이룬다. C-06(Unity가 셸을 6×6m 임의값으로 만들어 둔 상태 — Issue #19 진행 중)이 확정되면 `shared/config/studio.ts`의 값 하나만 바뀌고 스냅 로직·검증식은 그대로 유지된다. spec.md §BE 검토 상세 A는 **스냅을 "순수 FE 기능이며 BE 계약에 영향 0"**으로 판정했다 — 저장되는 값은 이미 환산된 미터 좌표이므로 이 상수 선택은 FE 단독 결정이고, 서버와 합의할 대상이 아니다.
+- **Rationale**: 부스 6×6m 확정(R-05) 기준으로 0.5m 간격이면 축당 12칸이 생겨 배치 자유도와 정렬감이 균형을 이룬다. **부스 크기가 확정됐으므로 이 값은 이제 "정렬감"이라는 UX 판단만 남은 항목**이고, 바꾸더라도 `shared/config/studio.ts`의 값 하나만 바뀐다. spec.md §BE 검토 상세 A는 **스냅을 "순수 FE 기능이며 BE 계약에 영향 0"**으로 판정했다 — 저장되는 값은 이미 환산된 미터 좌표이므로 이 상수 선택은 FE 단독 결정이고, 서버와 합의할 대상이 아니다.
 - **Alternatives**: 1m — 6×6m 부스에서 너무 성기다. 0.1m — 스냅의 의미(정렬 보조)가 사실상 사라진다. 기각.
 
-## R-05. 부스 크기
+## R-05. 부스 크기·template 화이트리스트
 
-**⚠️ PROVISIONAL — C-06 확정에 종속**
+**✅ 해소 — 부스 6m × 6m × 6m 확정 (2026-08-20, `docs/26`)**
 
-- **Decision**: `BOOTH_SIZE = { width: 6, depth: 6 }` (Unity 현행 임의값 준용, Issue #31 회신에서도 같은 값 언급). 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`. 숫자를 검증식에 직접 박아 넣지 않는다. `template`은 서버 화이트리스트 값만 보낸다 — 현재 `DEFAULT`·`PROJECT_EXHIBITION`(spec.md:177). 편집기는 이 목록을 하드코딩하지 않고 서버가 주는 값에서 고르는 구조로 두되, 목록 제공 endpoint가 아직 없으므로 1차는 두 값을 상수로 두고 확정 시 교체한다.
-- **Rationale**: 원점이 부스 바닥 중앙(헌법 21조 2항)이므로 반너비 비교 하나로 경계 검사가 끝난다. 상수에서 식을 도출하는 구조라 C-06 확정으로 부스 크기가 바뀌거나, 템플릿별로 크기가 달라지는 요구가 생겨도 `BOOTH_SIZE`를 템플릿 키로 조회하도록 확장하는 지점이 이미 하나로 모여 있다 — 지금은 그 확장을 만들지 않는다(YAGNI).
-- **Alternatives**: 경계값(`3`, `-3` 등)을 검증 코드에 직접 하드코딩 — C-06 확정 시 여러 곳을 찾아 고쳐야 하는 산탄 수정이 된다. 기각.
+- **Decision**: `BOOTH_SIZE = { width: 6, depth: 6, height: 6 }`. 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`. 숫자를 검증식에 직접 박아 넣지 않는다. `template`은 서버 화이트리스트 값만 보낸다 — 현재 `DEFAULT`·`PROJECT_EXHIBITION`(`contracts/layout-api.md` §1).
+- **Rationale**: 잠정값이 아니라 **서버 `LayoutValidator`가 이미 그 값으로 검증하고 있다** — `|x|,|z| ≤ 3`, `0 ≤ y ≤ 6`(`contracts/layout-api.md` §1, `data-model.md` §3). FE가 다른 값을 쓰면 저장이 서버에서 거부되므로 이건 선택지가 아니라 계약이다. 원점이 부스 바닥 중앙(헌법 21조 2항)이라 수평은 반값 비교, 높이는 0~6이다. 편집기는 2D 톱뷰라 `y`를 노출하지 않고 `0`으로 고정 기록하므로 높이 검증은 사실상 통과 보장이다.
+- **잔여**: Unity 셸 실측 높이가 2.72m라 6m와 불일치하며 [#19](https://github.com/kanghyunsoon/ssafesta/issues/19)에서 유효 높이 회신 대기다. **FE 영향 없음** — 편집기가 쓰지 않는 축이다.
+- **template 목록 제공**: 편집기는 목록을 하드코딩하지 않고 서버가 주는 값에서 고르는 구조로 둔다. 다만 목록 제공 endpoint가 아직 없어 1차는 두 값을 상수로 두고 endpoint가 생기면 교체한다.
+- **Alternatives**: 경계값(`3`, `-3`)을 검증 코드에 직접 하드코딩 — 값이 바뀌면 산탄 수정이 된다. 기각.
 
 ## R-06. 낙관적 잠금 필드 위치
 
@@ -101,7 +103,7 @@
 | ID | 항목 | 해소 시점 |
 |---|---|---|
 | R-01 | C-04(콘텐츠 미연결 오브젝트 공개 차단 여부) 기획 승인 | 기획 결정 시 — **서버가 `warnings`↔`errors`로 옮기면 FE 코드 변경 없음**(FR-016) |
-| R-04·R-05 | 스냅 간격·부스 크기 실값 | C-06(템플릿·부스 크기 Layout 계약 회의, Issue #19) — `shared/config/studio.ts` 값 교체만 |
+| R-04 | 스냅 간격 `0.5m` | FE 단독 UX 판단 — 서버 계약과 무관, `shared/config/studio.ts` 값 교체만 |
 | — | `ApiError.errors` 원소 타입 | Issue #17 BE 확답 대기 — `data-model.md`에는 잠정 `unknown[]`로 기록 |
 | — | spec.md 예시의 `"version": 2` → `"schemaVersion": 1` 정정 | Issue #36에서 BE 제안, 3파트 합의 진행 중 |
 | — | `GET /draft` 응답 형태·최초 진입 분기 | Issue #36 회신 대기 — 요청/응답 필드 차이(`revision` vs `expectedRevision`)와 Draft 미존재 시 응답 |
