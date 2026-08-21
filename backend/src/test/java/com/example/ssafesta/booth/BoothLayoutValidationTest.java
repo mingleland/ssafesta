@@ -118,6 +118,27 @@ class BoothLayoutValidationTest {
         }
     }
 
+    /**
+     * Every message the server writes is Korean — warnings included.
+     *
+     * <p>Warnings ride in <b>successful</b> responses (save and publish both return them), so they
+     * are the one place server-authored prose reaches a client outside an error. Pinned here so the
+     * Korean-only rule is enforced rather than merely true today.
+     */
+    @Test
+    void warningsAreKoreanToo() {
+        LayoutValidationResult result = validator.validateForPublish(LayoutJson.parse(document("""
+                [{"objectId":"ai-1","type":"AI_AGENT","position":{"x":0,"y":0,"z":0},"rotationY":0},
+                 {"objectId":"panel-1","type":"PROJECT_PANEL","position":{"x":1,"y":0,"z":1},"rotationY":0}]
+                """)).document(), 1L);
+
+        assertFalse(result.warnings().isEmpty(), "이 배치는 경고가 나와야 합니다.");
+        for (ApiErrorDetail warning : result.warnings()) {
+            assertTrue(warning.message().chars().anyMatch(c -> c >= 0xAC00 && c <= 0xD7A3),
+                    "경고 메시지가 한글이 아닙니다: " + warning);
+        }
+    }
+
     private String document(String objectsJson) {
         return """
                 {"schemaVersion":1,"template":"DEFAULT","objects":%s}
