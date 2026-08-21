@@ -620,7 +620,10 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - 실행: `GET /api/v1/games/{gameId}/published`
 - 부스 연결: `GET /api/v1/game-portals/{configId}`
 - 저장 요청은 `schemaVersion`과 `revision`을 포함하고 충돌 시 명시적 오류를 반환한다.
-- Publish는 JSON Schema와 의미 검증을 모두 통과해야 하며 발행본은 불변이다.
+- Publish는 JSON Schema와 의미 검증을 모두 통과해야 하며 발행본은 불변이다. Asset source, Dialogue
+  presentation과 복귀 Action 조합도 의미 검증 대상이다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 기본 Asset catalog reference를
+  사용하고 사용자 업로드·resolver API는 #21에서 별도 확정한다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
 
 초안 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md),

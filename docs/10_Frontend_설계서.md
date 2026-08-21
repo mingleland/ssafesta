@@ -525,7 +525,9 @@ Game Studio는 Unity WebGL 위에 그리는 UI가 아니라 React 계층의 독�
 
 Frontend 책임:
 
-- TOP_DOWN/DIALOGUE Scene 편집, 제한형 Component/Event 조합 UI
+- Scene 목록 + Object/Asset palette + Map/Dialogue 작업 공간 + Properties/Event inspector 편집 흐름
+- TOP_DOWN과 OVERLAY/FULL_SCREEN DIALOGUE 편집, 제한형 Component/Event 조합 UI
+- Tile/Object 배치와 Asset reference 분리, preset 편의 입력의 공통 Event recipe 변환
 - 공통 GameProject 타입과 Schema 기반 client validation
 - Draft autosave/revision 충돌 UI, Preview, Publish 요청
 - Published Version의 Canvas 기반 2D 실행
@@ -555,3 +557,5 @@ Frontend 미확정 항목은 [GitHub #20](https://github.com/kanghyunsoon/ssafes
 - WebSocket 인증 갱신 방식
 - Game Studio를 기존 앱 workspace package로 둘지 독립 배포 앱으로 둘지
 - Game Runtime 렌더러와 오버레이/새 경로 진입 UX
+- Game Studio 실제 반응형 패널 배치와 Preview 표시 형태
+- 사용자 Asset upload 도입 시 Runtime resolver와 cache 정책

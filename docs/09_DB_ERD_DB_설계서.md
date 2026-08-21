@@ -731,7 +731,9 @@ game_portal_bindings
 - Draft 저장은 `revision` 낙관적 잠금으로 편집 충돌을 검출한다.
 - Published Version은 수정하지 않고 새 버전을 추가한다.
 - Runtime 조회는 Published Version만 반환한다.
-- JSONB 인덱싱·에셋 메타데이터 분리·버전 보존 기간은 구현 계획 전 확정한다.
+- `project_json`은 Asset reference만 가지며 이미지·오디오 binary와 만료 URL을 저장하지 않는다.
+- 기본 Asset catalog와 향후 사용자 업로드 Asset의 메타데이터·binary 저장소는 `game_versions`와 분리한다.
+- JSONB 인덱싱·업로드 Asset 모델·resolver·버전 보존 기간은 구현 계획 전 확정한다.
 - 상세 백엔드 결정은 [GitHub #21](https://github.com/kanghyunsoon/ssafesta/issues/21)에서 관리한다.
 
 ---
