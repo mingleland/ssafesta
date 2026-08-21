@@ -154,4 +154,3 @@ export type DeepMutable<T> = T extends readonly (infer Item)[]
 export const cloneMinimalGameProject = (): DeepMutable<GameProject> => (
   structuredClone(minimalGameProject) as DeepMutable<GameProject>
 );
-

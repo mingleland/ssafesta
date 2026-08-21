@@ -158,7 +158,6 @@ const expect = (condition: boolean, code: string, message: string): void => {
 const isRecord = (value: unknown): value is UnknownRecord => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 );
-
 const recordAt = (
   value: unknown,
   path: string,
@@ -696,4 +695,3 @@ export const isGameProject = (input: unknown): input is GameProject => {
 export const findScene = (project: GameProject, sceneId: string): GameScene | undefined => (
   project.scenes.find((scene) => scene.id === sceneId)
 );
-

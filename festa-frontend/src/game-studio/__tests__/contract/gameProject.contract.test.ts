@@ -114,4 +114,3 @@ describe('GameProject v1 contract', () => {
     expect(isGameProject({ schemaVersion: '1.0.0' })).toBe(false);
   });
 });
-
