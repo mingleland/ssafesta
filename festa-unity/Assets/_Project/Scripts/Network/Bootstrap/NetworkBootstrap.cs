@@ -34,7 +34,7 @@ namespace Festa.Network
             // 두면 그 심볼이 **에디터에도 정의된다.** 그러면 Play 를 누르는 순간 에디터가
             // 서버가 되고, 로비에서 넘어온 핸드오프가 같은 NetworkManager 에 StartClient 를
             // 걸어 "Failed to connect to server." 로 끝난다 — 원인이 전혀 드러나지 않는
-            // 형태였다 (T-180). 에디터에서 서버를 띄우려면 DevConnectionHud 의
+            // 형태였다 (T-182). 에디터에서 서버를 띄우려면 DevConnectionHud 의
             // "Start Server" 버튼이나 `-server` 인자를 쓴다.
             bool isRealServerBuild = !Application.isEditor;
             if (isRealServerBuild || Application.isBatchMode || HasArg("-server"))

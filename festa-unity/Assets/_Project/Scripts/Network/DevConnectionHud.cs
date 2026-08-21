@@ -117,7 +117,7 @@ namespace Festa.Network
         {
             // 이미 서버/클라이언트로 떠 있으면 StartClient 를 걸지 않는다.
             // NetworkManager 는 싱글턴이라 겹쳐 요청하면 전송 계층이
-            // "Failed to connect to server." 만 남기고 원인을 알려주지 않는다 (T-180).
+            // "Failed to connect to server." 만 남기고 원인을 알려주지 않는다 (T-182).
             var running = Unity.Netcode.NetworkManager.Singleton;
             if (running != null && (running.IsListening || running.IsClient))
             {
