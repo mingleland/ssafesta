@@ -1,5 +1,7 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import io.swagger.v3.oas.annotations.Parameter;
 import java.time.Instant;
 import org.springframework.http.ResponseCookie;
@@ -9,8 +11,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/v1/auth/oauth")
@@ -34,7 +34,7 @@ public class OAuthCompletionController {
             @Parameter(hidden = true) @CookieValue(name = HANDOFF_COOKIE, required = false) String handoff,
             @RequestBody(required = false) CompleteOAuthRequest request) {
         if (handoff == null || handoff.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OAuth 로그인 handoff cookie가 없습니다.");
+            throw new ApiException(ErrorCode.OAUTH_HANDOFF_MISSING);
         }
         if (handoffs.kind(handoff) == OAuthHandoffService.Kind.REGISTRATION
                 && (request == null || request.nickname() == null || request.nickname().isBlank())) {

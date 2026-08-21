@@ -1,5 +1,7 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
@@ -9,7 +11,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /** Public API entrypoint for starting an OAuth browser redirect. */
 @RestController
@@ -22,7 +23,7 @@ public class OAuthAuthorizationController {
     public ResponseEntity<Void> authorize(@PathVariable String provider) {
         String normalized = provider.toLowerCase(Locale.ROOT);
         if (!SUPPORTED_PROVIDERS.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "지원하지 않는 소셜 로그인 제공자입니다.");
+            throw new ApiException(ErrorCode.OAUTH_PROVIDER_NOT_SUPPORTED);
         }
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create("/oauth2/authorization/" + normalized))

@@ -1,5 +1,8 @@
 package com.example.ssafesta.wallet;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.common.MemberPrincipal;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.time.Instant;
 import java.util.List;
@@ -7,14 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Read-only wallet API (spec 003 contracts/wallet-api.md).
@@ -50,10 +51,10 @@ public class WalletController {
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "20") int size) {
         if (page < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page는 0 이상이어야 합니다.");
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "page는 0 이상이어야 합니다.");
         }
         if (size < 1 || size > MAX_PAGE_SIZE) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "size는 1 이상 " + MAX_PAGE_SIZE + " 이하여야 합니다.");
         }
         Long userId = memberId(jwt);
@@ -82,23 +83,13 @@ public class WalletController {
      * A member without a wallet is a broken state, not an expected 404: the wallet is created in
      * the member-creation transaction. Report it, and leave a trace to investigate with.
      */
-    private ResponseStatusException missingWallet(Long userId, WalletNotFoundException exception) {
+    private ApiException missingWallet(Long userId, WalletNotFoundException exception) {
         log.error("회원에게 지갑이 없습니다 — 가입 트랜잭션을 확인해야 합니다. userId={}", userId, exception);
-        return new ResponseStatusException(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다.");
+        return new ApiException(ErrorCode.WALLET_NOT_FOUND);
     }
 
     private Long memberId(Jwt jwt) {
-        if (jwt == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access Token이 필요합니다.");
-        }
-        if (!"MEMBER".equals(jwt.getClaimAsString("role"))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "회원 계정만 코인 지갑을 사용할 수 있습니다.");
-        }
-        try {
-            return Long.valueOf(jwt.getSubject());
-        } catch (NumberFormatException exception) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 회원 토큰입니다.");
-        }
+        return MemberPrincipal.requireMemberId(jwt, "회원 계정만 코인 지갑을 사용할 수 있습니다.");
     }
 
     public record WalletBalanceResponse(Long userId, int balance, Instant updatedAt) { }
