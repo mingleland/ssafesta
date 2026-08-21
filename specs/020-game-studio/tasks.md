@@ -4,6 +4,7 @@
 
 **Organization**: #20 Frontend Host, #21 Backend, #22 AI 답변은 반영됐다. 앱 내부 구현과 Spring
 수직 작업은 착수 가능하고, 제품 정책 #33·Portal ID #34·renderer/Preview 내부 #35만 gate로 남긴다.
+구현 진행은 Frontend Workspace #49와 Backend Draft/Publish #48에서 추적한다.
 
 ## Format: `[ID] [P?] [Story] Description`
 

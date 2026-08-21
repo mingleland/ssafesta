@@ -18,6 +18,7 @@
 - 🤖 구현 변경 23경로는 전부 `festa-frontend/**`이며 `festa-unity/**`와 `backend/**`는 0건이다. 원격 브랜치를 최신 `front` 위로 충돌 없이 재배치하고 `--force-with-lease`로 갱신했다.
 - 🤖 Frontend 검토용 [PR #47](https://github.com/kanghyunsoon/ssafesta/pull/47)을 `front` 대상으로 열고, #35에 완료한 비의존 범위와 남은 renderer/Preview/Asset gate를 분리해 공유했다.
 - 🤖 #33의 신규 진입 판정 질문에는 전용 게임 소켓 없이 route/overlay 진입 때 REST로 상태를 재검증하고 이미 로드된 무보상 로컬 Session은 완료까지 허용한다고 답변했다. Backend 응답 코드 확인 전까지 #33은 유지한다.
+- 🤖 남은 수직 구현을 [#48 Backend Draft/Publish](https://github.com/kanghyunsoon/ssafesta/issues/48)(`@strdeok`)와 [#49 Frontend Workspace](https://github.com/kanghyunsoon/ssafesta/issues/49)(`@busypark`, `@colosair`, `@ghkim1632`)로 분리했다. 결정 gate #33~#35와 구현 추적 #48~#49가 중복되지 않도록 범위를 나눴다.
 - 🤖 `tasks.md`의 T010~T013, T017~T024, T026, T077을 완료 처리해 총 90개 중 누적 **35개 완료**로 갱신했다. Renderer/Preview iframe/Asset resolver는 #35, Portal은 #34, 제품 정책은 #33의 gate를 유지한다.
 - 트러블슈팅: GS-T020~GS-T022
 
