@@ -6,7 +6,13 @@ using Festa.World;
 namespace Festa.Network
 {
     /// <summary>
-    /// Owner 전용 WASD/화살표 이동. POC 수준 — CharacterController/물리는 월드 확정 후.
+    /// Owner 전용 WASD/화살표 이동. CharacterController 로 월드 콜리전을 받는다.
+    ///
+    /// 이동은 client-authoritative 다 (<see cref="ClientAuthoritativeNetworkTransform"/>).
+    /// 각 Owner 가 자기 클라이언트에서 충돌을 해결하고 결과 위치만 복제되므로,
+    /// 월드 콜라이더는 각 클라이언트 씬에 있으면 된다 — 월드는 로컬 씬 오브젝트라 자동으로 충족된다.
+    /// 서버는 이동을 검증하지 않는다.
+    ///
     /// AnimState를 이동 여부에 따라 갱신해 원격 클라이언트가 Idle/Walk를 표현할 수 있게 한다.
     /// </summary>
     [RequireComponent(typeof(NetworkPlayer))]
@@ -17,15 +23,28 @@ namespace Festa.Network
         [SerializeField, Min(0.01f)] float _turnSmoothTime = 0.08f;
         [SerializeField, Min(1f)] float _maxTurnSpeedDeg = 1080f;
 
+        [Header("물리")]
+        [Tooltip("중력 가속도. 월드가 1 m = 10 unit 이므로 9.81 m/s² = 98.1 unit/s² 이다.")]
+        [SerializeField] float _gravity = 98.1f;
+        [Tooltip("접지 상태에서 유지하는 하강 속도 — 경사·계단에서 붙어 있게 한다.")]
+        [SerializeField] float _groundedStick = -20f;
+
         NetworkPlayer _player;
         PlayerCameraFollow _cameraFollow;
+        CharacterController _controller;
         float _turnVelocity;
+        float _verticalSpeed;
 
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
             _cameraFollow = GetComponent<PlayerCameraFollow>();
+            _controller = GetComponent<CharacterController>();
             enabled = IsOwner; // 원격 플레이어는 NetworkTransform 수신만
+
+            // 원격 플레이어는 NetworkTransform 이 transform 을 직접 쓴다.
+            // CharacterController 가 켜져 있으면 그 대입과 싸우므로 Owner 만 남긴다.
+            if (_controller != null) _controller.enabled = IsOwner;
         }
 
         void Update()
@@ -39,11 +58,19 @@ namespace Festa.Network
             if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
+            // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.
+            if (_controller != null && _controller.enabled)
+            {
+                _verticalSpeed = _controller.isGrounded
+                    ? _groundedStick
+                    : _verticalSpeed - _gravity * Time.deltaTime;
+            }
+
             if (moving)
             {
                 var dir = CameraRelativeDirection(input);
                 var speed = running ? _runSpeed : _moveSpeed;
-                transform.position += dir * (speed * Time.deltaTime);
+                MoveWithCollision(dir * speed);
 
                 // 이동 벡터는 즉시 새 입력을 따르되, 보이는 방향만 짧게 보간한다.
                 // 키를 바꿀 때 한 프레임 만에 각도가 튀는 현상을 없애면서도
@@ -61,6 +88,7 @@ namespace Festa.Network
             else
             {
                 _turnVelocity = 0f;
+                MoveWithCollision(Vector3.zero); // 정지 중에도 중력은 적용한다
             }
 
             var next = !moving
@@ -68,6 +96,24 @@ namespace Festa.Network
                 : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
             if (_player.AnimState.Value != next)
                 _player.AnimState.Value = next;
+        }
+
+        /// <summary>
+        /// 수평 속도에 중력을 더해 CharacterController 로 이동한다.
+        /// CharacterController 가 없으면(구 프리팹·테스트 씬) 이전처럼 transform 을 직접 옮긴다 —
+        /// 콜리전은 없지만 이동 자체는 멈추지 않게 한다.
+        /// </summary>
+        void MoveWithCollision(Vector3 horizontalVelocity)
+        {
+            if (_controller == null || !_controller.enabled)
+            {
+                if (horizontalVelocity != Vector3.zero)
+                    transform.position += horizontalVelocity * Time.deltaTime;
+                return;
+            }
+
+            var velocity = horizontalVelocity + Vector3.up * _verticalSpeed;
+            _controller.Move(velocity * Time.deltaTime);
         }
 
         static Vector2 ReadMoveInput()

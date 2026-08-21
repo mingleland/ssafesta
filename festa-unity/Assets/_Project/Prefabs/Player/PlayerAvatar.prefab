@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 191311738975744200}
   - component: {fileID: 514182222725770568}
   - component: {fileID: 6959059860911793272}
-  - component: {fileID: 3896691499564955234}
   - component: {fileID: 744650536453440225}
   - component: {fileID: 1947201262378931551}
   - component: {fileID: 1731498946974123893}
@@ -20,7 +19,8 @@ GameObject:
   - component: {fileID: 4543201849085386913}
   - component: {fileID: 6286039337160174439}
   - component: {fileID: 2574389333232708985}
-  m_Layer: 0
+  - component: {fileID: 4477108905412324781}
+  m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -95,29 +95,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!136 &3896691499564955234
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8589622438861398775}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 2.2
-  m_Height: 13.5
-  m_Direction: 1
-  m_Center: {x: 0, y: 6.75, z: 0}
 --- !u!114 &744650536453440225
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -173,6 +150,8 @@ MonoBehaviour:
   _runSpeed: 52
   _turnSmoothTime: 0.08
   _maxTurnSpeedDeg: 1080
+  _gravity: 98.1
+  _groundedStick: -20
 --- !u!114 &8836840528167371394
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -295,3 +274,28 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!143 &4477108905412324781
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Height: 13.5
+  m_Radius: 2.2
+  m_SlopeLimit: 45
+  m_StepOffset: 3
+  m_SkinWidth: 0.176
+  m_MinMoveDistance: 0
+  m_Center: {x: 0, y: 6.75, z: 0}
