@@ -4,11 +4,11 @@
 
 ```text
 Game
-├─ Draft GameVersion (mutable by revision)
-├─ Published GameVersion 0..N (immutable)
+├─ GameDraft 0..1 (mutable by revision, PK=gameId)
+├─ GamePublishedVersion 0..N (immutable, UNIQUE gameId+versionNo)
 └─ PortalBinding 0..N
 
-GameVersion.projectJson
+GameDraft/GamePublishedVersion.projectJson
 ├─ Variables / Items / Assets
 └─ Scenes
    ├─ TOP_DOWN → TileLayers / Objects / Events
@@ -30,35 +30,49 @@ Spring은 Aggregate의 영구 상태를 소유한다. Web Runtime은 Published s
 | id | long | 서버 발급, immutable |
 | ownerUserId | long | Guest 불가 |
 | title | string(1..100) | 표시용, GameProject title과 publish 시 동기 검증 |
-| visibility | PRIVATE/PUBLIC | 공개 조회 정책은 #21 |
-| latestPublishedVersionId | nullable long | 같은 Game의 PUBLISHED만 참조 |
+| visibility | PRIVATE/PUBLIC | 신규 실행 가능 여부. 세션 중 비공개 정책은 #33 |
+| publishedVersion | nullable positive integer | 현재 공개 versionNo. null은 공개본 없음 |
 | createdAt/updatedAt | instant | 서버 기록 |
 
-### GameVersion
+복합 FK `(id, publishedVersion) → game_published_versions(game_id, version_no)`를 사용한다.
+공개본 삭제 시 `ON DELETE SET NULL (published_version)`처럼 **nullable 포인터 컬럼만** 지정한다.
+FK 전체를 SET NULL하여 `games.id`까지 비우려는 삭제 오류를 금지한다.
+
+### GameDraft
 
 | Field | Type | Rule |
 |---|---|---|
-| id | long | 서버 발급 |
-| gameId | long | Game FK |
-| state | DRAFT/PUBLISHED | PUBLISHED→DRAFT 역전 금지 |
+| gameId | long | PK이자 Game FK. Game마다 Draft 최대 1개를 DB로 강제 |
 | schemaVersion | semver string | Project envelope와 일치 |
 | revision | non-negative integer | Draft 낙관적 잠금용 |
-| versionNo | positive integer nullable | Published 순번 |
 | projectJson | JSONB | Schema + semantic validation 대상 |
-| publishedAt | instant nullable | PUBLISHED에서 필수 |
+| updatedByUserId | long | Guest 불가, 서버 인증 사용자 |
+| updatedAt | instant | 서버 기록 |
+
+### GamePublishedVersion
+
+| Field | Type | Rule |
+|---|---|---|
+| id | long | 서버 내부 식별자 |
+| gameId | long | Game FK |
+| versionNo | positive integer | `UNIQUE(gameId, versionNo)` |
+| schemaVersion | semver string | Project envelope와 일치 |
+| projectJson | JSONB | 생성 후 update 금지 |
+| publishedByUserId | long | 서버 인증 사용자 |
+| publishedAt | instant | 서버 기록 |
 
 ### GamePortalBinding
 
 | Field | Type | Rule |
 |---|---|---|
-| id/configId | long | Unity가 전달하는 opaque identifier |
+| id/configId | signed Int32 wire contract | DB PK와 동일하게 둘지 별도 public ID로 둘지는 #34 |
 | boothId | long | Booth FK |
 | objectId | stable string | Booth Layout canonical objectId |
 | gameId | long | Game FK |
-| publishedVersionId | nullable long | null이면 최신 공개본 정책 후보, #21 결정 |
 | enabled | boolean | 실행 가능성의 한 조건 |
 
-Unique 후보: `(boothId, objectId)`. Booth Layout은 `configId`만 가지고 GameProject를 포함하지 않는다.
+Unique: `(boothId, objectId)`. Booth Layout은 `configId`만 가지고 GameProject를 포함하지 않는다.
+Portal resolver는 `Game.publishedVersion`이 가리키는 현재 공개본을 반환하며 실행 가능 여부 응답은 캐시하지 않는다.
 
 ## Contract Value Objects
 
@@ -122,11 +136,13 @@ Runtime state는 브라우저 메모리의 비권위 상태다. MVP에서는 완
 ```text
 NO_GAME → DRAFT
 DRAFT(revision N) → DRAFT(revision N+1)
-DRAFT(valid) → PUBLISHED(version M) + DRAFT 유지
+DRAFT(valid) → PUBLISHED(version M) insert + Game.publishedVersion=M + DRAFT 유지 (single transaction)
 PUBLISHED(version M) → immutable
 ```
 
-동일 revision 재저장은 conflict다. Publish 실패는 Draft를 변경하지 않는다.
+요청 `expectedRevision`이 현재 revision과 다르면 `409 GAME_REVISION_CONFLICT`다. Publish 실패는
+Published 행·포인터를 남기지 않고 Draft도 변경하지 않는다. Draft 저장은 구조·스키마·상한을,
+Publish는 구조·참조·소유권·진행 가능성을 다시 검증하며 자동 보정하지 않는다.
 
 ### Runtime
 

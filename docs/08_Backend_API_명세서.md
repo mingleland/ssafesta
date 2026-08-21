@@ -615,19 +615,23 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 Draft/Published Version과
 부스 Portal Binding의 Source of Truth이며, 웹 Runtime은 Published Version만 조회한다.
 
-- 편집: `POST /api/v1/games`, `GET /api/v1/games/{gameId}/draft`, `PUT /api/v1/games/{gameId}/draft`, `POST /api/v1/games/{gameId}/validate`
+- 편집: `POST /api/v1/games`, `GET /api/v1/games/{gameId}/draft`, `PUT /api/v1/games/{gameId}/draft`
 - 발행: `POST /api/v1/games/{gameId}/publish`, `GET /api/v1/games/{gameId}/versions`
 - 실행: `GET /api/v1/games/{gameId}/published`
 - 부스 연결: `GET /api/v1/game-portals/{configId}`
-- 저장 요청은 `schemaVersion`과 `revision`을 포함하고 충돌 시 명시적 오류를 반환한다.
-- Publish는 JSON Schema와 의미 검증을 모두 통과해야 하며 발행본은 불변이다. Asset source, Dialogue
-  presentation과 복귀 Action 조합도 의미 검증 대상이다.
-- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 기본 Asset catalog reference를
-  사용하고 사용자 업로드·resolver API는 #21에서 별도 확정한다.
+- 저장 요청은 `expectedRevision`과 GameProject를 포함하고 불일치 시 HTTP 409
+  `GAME_REVISION_CONFLICT`를 반환한다. 좌표 clamp·unknown field 삭제 같은 자동 보정은 금지한다.
+- Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
+- Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
+  단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
+  builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
+- Published 본문은 ETag/장기 cache가 가능하지만 Portal 실행 가능 여부는 `Cache-Control: no-store`다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
 
-초안 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md),
-미확정 항목과 백엔드 답변은 [GitHub #21](https://github.com/kanghyunsoon/ssafesta/issues/21)에서 관리한다.
+상세 계약은 [`specs/020-game-studio/contracts/game-api.md`](../specs/020-game-studio/contracts/game-api.md)다.
+#21의 기술 답변은 반영했으며 제품 정책은 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33),
+Portal ID는 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)에서 추적한다.
 
 ---
 

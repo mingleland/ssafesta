@@ -4,13 +4,13 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-21 — 편집기 시안, Asset 참조, DIALOGUE Overlay 복귀 규칙 반영
+**Updated**: 2026-08-21 — #20~#22 파트 답변, FE same-origin 모듈, BE Draft/Published 분리, AI P2 경계 반영
 
-**Status**: Draft — FE·BE·AI 계약 이슈 검토 대기 (#20, #21, #22)
+**Status**: Draft — 파트 계약 답변 반영 완료 / 제품 정책 #33, Portal ID #34, Studio 내부 선택 #35 대기
 
 **Priority**: P2 — 기존 P0/P1 안정화 이후 착수
 
-**Primary Owners**: Frontend + Backend / Unity는 선택적 부스 진입 연동 / AI는 MVP 비의존
+**Primary Owners**: Game Studio Frontend + Backend / FESTA Host Frontend는 진입·인증·Bridge / Unity는 선택적 부스 진입 / AI는 MVP 비의존
 
 **Related Specs**: 005(Booth Layout), 006(Booth Runtime), 014(관리자 미니게임), 016(Web Overlay)
 
@@ -18,7 +18,15 @@
 
 **Input**: 사용자가 웹에서 하나의 공통 2D 제작기로 Scene·오브젝트·이벤트를 조합해 게임을 만들고, 같은 웹 Runtime에서 미리보기·공개·플레이한다. FESTA 부스 NPC와의 상호작용은 선택적 진입점이며 Unity가 2D 게임을 실행하거나 해석하지 않는다.
 
-> 이 기능은 `014-minigame`을 대체하지 않는다. 014는 Unity 관리자 부스의 타이머 정지 게임 1종이고, 019는 사용자가 제작한 웹 2D 콘텐츠를 다루는 독립 UGC 기능이다.
+> 이 기능은 `014-minigame`을 대체하지 않는다. 014는 Unity 관리자 부스의 타이머 정지 게임 1종이고, 020은 사용자가 제작한 웹 2D 콘텐츠를 다루는 독립 UGC 기능이다.
+
+## Clarifications
+
+### Session 2026-08-21
+
+- Q: Game Studio와 Runtime을 어디에 배치하고 어떤 URL·인증 경계를 사용할 것인가? → A: 기존 FESTA Web 안의 분리된 영역에서 인증을 공유하고 편집·플레이 화면을 지연 로드하며 Preview도 같은 출처에서 실행한다(#20).
+- Q: Draft와 Published 데이터를 어떻게 저장·충돌 검출·Publish할 것인가? → A: 게임별 현재 Draft와 불변 Published Version을 분리하고 revision 충돌을 명시하며 Publish는 전부 성공하거나 전부 취소되게 한다(#21).
+- Q: AI는 MVP와 후속 제작 보조에 어떤 방식으로 연결되는가? → A: P0/P1은 FastAPI 비의존이며 P2는 GameProject v1 호환 candidate/patch를 사용자 승인 후 일반 데이터로 저장하고 spec 007 Job 정책을 재사용한다(#22).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -117,6 +125,8 @@
 - 편집 중 Object preset의 편의 속성과 생성된 Event 규칙이 서로 다른 값을 가리키는 경우
 - 제작자가 편집 중 다른 기기에서 같은 Draft를 저장한 경우
 - Published 게임 또는 Portal Binding이 플레이 직전에 비공개·삭제된 경우
+- 게임이 비공개 전환될 때 이미 GameProject를 로드한 로컬 플레이 세션이 남아 있는 경우(#33 결정 대상)
+- Portal Binding의 DB 식별자가 기존 Layout/Bridge의 signed Int32 `configId` 범위를 넘는 경우(#34 결정 대상)
 - 게임 Runtime 로딩 실패가 FESTA 월드나 다른 Overlay에 영향을 주려는 경우
 - 게스트가 제작·Publish를 시도하는 경우
 
@@ -133,22 +143,22 @@
 - **FR-007**: 첫 MVP Trigger는 `ON_SCENE_START`, `ON_INTERACT`, `ON_ENTER`를 지원해야 한다.
 - **FR-008**: 첫 MVP Condition은 변수 비교와 아이템 보유 여부를 지원해야 한다.
 - **FR-009**: 첫 MVP Action은 대화 표시·종료, 변수 변경, 아이템 지급·제거, 오브젝트 표시·숨김, Scene 이동, 게임 완료를 지원해야 한다.
-- **FR-010**: 시스템은 저장 전 구조 검증과 Publish 전 참조·진행 가능성 검증을 수행해야 한다.
+- **FR-010**: 시스템은 Draft 저장 시 구조·스키마·상한을 검증하고 Publish 시 구조·참조·소유권·진행 가능성을 서버에서 다시 검증해야 한다.
 - **FR-011**: 제작자는 Published Version을 변경하지 않고 현재 편집 상태를 미리볼 수 있어야 한다.
-- **FR-012**: Published Version은 생성 후 변경되지 않아야 하며 새 Publish는 새 버전을 만들어야 한다.
+- **FR-012**: Publish는 검증·새 Published Version 생성·현재 공개본 전환이 전부 성공하거나 전부 취소되어야 하며 성공 후에도 Draft를 유지해야 한다.
 - **FR-013**: 방문자는 Unity를 실행하지 않고도 Published 게임을 웹에서 시작·진행·종료할 수 있어야 한다.
 - **FR-014**: Runtime은 지원하지 않는 계약 버전과 손상된 프로젝트를 실행하지 않고 명시적 오류를 표시해야 한다.
 - **FR-015**: Game Studio의 제작·저장·Publish·플레이 핵심 흐름은 AI 서비스 가용성에 의존해서는 안 된다.
-- **FR-016**: AI 생성 기능을 추가하더라도 사용자 검토 후 일반 Asset·Dialogue·Event 데이터로 저장되어야 하며 Runtime은 AI 서버를 호출하지 않아야 한다.
+- **FR-016**: P2 AI 생성 기능은 GameProject v1 호환 candidate 또는 patch만 반환하고 Editor 검증과 사용자 승인 후 일반 Dialogue·Event 데이터로 저장해야 하며 Runtime은 AI 서버를 호출하지 않아야 한다.
 - **FR-017**: Unity 연동 시 Unity는 부스 상호작용과 실행 요청만 담당하고 GameProject를 조회·해석·실행해서는 안 된다.
 - **FR-018**: 부스와 게임의 연결은 Booth Layout 안에 GameProject를 포함하지 않고 별도 연결 식별자로 참조해야 한다.
 - **FR-019**: 게임 화면이 열려 있는 동안 월드 연결은 유지되어야 하며 로컬 이동 입력은 차단되어야 한다.
 - **FR-020**: 게임 종료·로드 실패는 해당 게임 화면에만 영향을 주고 Unity 월드와 다른 FESTA 기능을 종료해서는 안 된다.
 - **FR-021**: 서버는 클라이언트가 주장한 게임 완료·점수·사용자 식별자를 검증 없이 보상이나 랭킹에 사용해서는 안 된다.
-- **FR-022**: 첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 한다.
+- **FR-022**: 첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 하며 표시 전용 Ranking의 P1 도입 여부는 #33 결정 전 구현해서는 안 된다.
 - **FR-023**: 게스트는 Published 게임을 플레이할 수 있지만 게임 생성·Draft 저장·Publish는 할 수 없어야 한다.
 - **FR-024**: GameProject 계약은 명시적인 버전을 포함하고, 소비자는 지원하는 버전 범위를 확인해야 한다.
-- **FR-025**: 편집 충돌이 발생하면 마지막 저장으로 조용히 덮어쓰지 않고 현재 서버 버전과 충돌 사실을 알려야 한다.
+- **FR-025**: Draft 저장은 현재 revision의 일치를 확인하고 불일치 시 충돌 사실과 최신 revision을 알려 조용한 덮어쓰기를 금지해야 한다.
 - **FR-026**: 제작 화면은 Scene 목록, 재사용 가능한 Object/Asset 목록, 배치 공간, 선택 대상 속성, Event 구성을 오가며 현재 선택과 수정 결과를 잃지 않게 해야 한다.
 - **FR-027**: 배경과 Object의 시각 자료는 배치 데이터와 분리된 안정적인 Asset 참조로 저장해야 하며, 완성 화면의 캡처 이미지를 게임 원본으로 저장해서는 안 된다.
 - **FR-028**: Tile Layer는 Scene 크기와 일치하는 셀 배치 데이터로 저장하고, Object 위치는 TOP_DOWN 격자 좌표 기준으로 해석해야 한다.
@@ -157,12 +167,17 @@
 - **FR-031**: Overlay 대화는 명시적 종료 시 호출한 맵으로 복귀할 수 있어야 하며, 선택에 따라 다른 Scene으로 이동하거나 게임을 완료할 수도 있어야 한다.
 - **FR-032**: 시작 Scene 또는 일반 Scene 이동 대상으로 쓰는 전체 화면 대화와, 맵 위에서 호출하는 Overlay 대화를 구분하고 잘못된 호출·복귀 조합을 Publish 전에 거부해야 한다.
 - **FR-033**: GameProject에는 실행에 필요한 Asset 식별자와 검증 가능한 참조만 포함하고 이미지·오디오 원본 binary, 만료되는 임시 주소, 브라우저 로컬 파일 경로를 포함하지 않아야 한다.
+- **FR-034**: 서버는 잘못된 좌표·참조·알 수 없는 필드를 clamp·삭제·치환하여 자동 보정하지 않고 명시적인 오류로 거부해야 한다.
+- **FR-035**: Published 내용이 캐시되어 있더라도 새 Portal 진입 가능 여부는 비공개·임대 만료·연결 해제를 즉시 반영해야 한다.
+- **FR-036**: Editor와 Runtime은 기존 FESTA Web의 인증을 공유하는 같은 출처의 분리된 화면으로 제공되어야 하며 일반 FESTA 화면의 초기 로드를 불필요하게 지연시키지 않아야 한다.
+- **FR-037**: P2 AI Job은 spec 007의 heartbeat·lease·sweeper·retry·오류 정제·상태 소유권 정책을 재사용하고 생성 실패 시 기존 수동 편집 데이터를 변경해서는 안 된다.
 
 ### Part Boundaries
 
 | Part | Owns | Must Not Own |
 |---|---|---|
-| Frontend | Studio, Preview, Web 2D Runtime, Game Overlay, 계약 검증 UX | 영구 Published 판정, Coin 지급, Unity 상호작용 판정 |
+| Game Studio Frontend | Editor, Preview, Web 2D Runtime, builtin Asset resolver, 계약 검증 UX | FESTA 인증 재구현, 영구 Published 판정, Coin 지급 |
+| FESTA Host Frontend | lazy route, 인증/API client, Game Overlay, Unity Bridge와 오류 격리 | GameProject 실행 규칙, renderer 내부, 서버 권한 판정 |
 | Backend | Game/Version/Portal Binding, 권한, 검증, Draft/Publish, 공개 조회 | 2D 프레임 실행, Unity Prefab, AI 동기 중계 |
 | Unity | 부스 NPC/Portal 표현, 거리·입력 판정, 웹 실행 요청 | GameProject 해석, 2D Runtime, 결과·보상 판정 |
 | AI | 후속 선택형 제작 보조 | MVP 핵심 경로, Runtime 실행 의존성 |
@@ -170,14 +185,15 @@
 ### Key Entities *(include if feature involves data)*
 
 - **Game**: 소유자, 제목, 공개 상태와 현재 Published Version을 가진 사용자 제작 게임의 루트.
-- **Game Version**: 특정 시점의 GameProject. Draft 또는 불변 Published 상태를 가진다.
+- **Game Draft**: Game마다 최대 하나 존재하며 revision으로 충돌을 검출하는 가변 작업본.
+- **Game Published Version**: `(gameId, versionNo)`로 식별되고 생성 후 변경되지 않는 공개 snapshot.
 - **Game Project**: Scene, 변수, 아이템, 에셋 참조와 시작 Scene을 묶는 버전 계약.
 - **Scene**: `TOP_DOWN`, `DIALOGUE`, 후속 `PLATFORMER` 중 하나의 실행 단위. DIALOGUE는 전체 화면 또는 호출한 맵 위 Overlay로 제시된다.
 - **Game Asset Reference**: 타일셋·스프라이트·오디오 원본을 직접 포함하지 않고 안정적인 식별자와 종류로 가리키는 값.
 - **Game Object**: Scene에 배치된 안정적인 식별자와 허용된 동작 구성을 가진 요소.
 - **Game Event**: Trigger, Conditions, Actions의 제한된 실행 규칙.
 - **Game Portal Binding**: Booth Object와 Published 가능한 Game을 연결하는 서버 소유 설정.
-- **Game Play Session**: 선택적으로 기록되는 한 번의 게임 실행. MVP에서는 보상 근거가 아니다.
+- **Game Score**: #33에서 P1 도입을 선택할 때만 추가하는 회원별 표시용 최고 점수. 서버 검증 점수나 보상 근거가 아니다.
 
 ## Success Criteria *(mandatory)*
 
@@ -197,19 +213,23 @@
 ## Assumptions
 
 - 기존 Google/Kakao 인증과 Access/Refresh 정책을 재사용한다.
-- Game Studio는 기존 FESTA Web과 같은 저장소 안의 독립 웹 앱으로 시작한다.
+- Game Studio는 기존 FESTA Web과 인증을 공유하는 같은 출처의 분리 영역으로 시작하며 별도 인증 앱을 만들지 않는다.
+- 편집과 Published 플레이는 서로 구분되는 인증된 게임 화면으로 제공한다.
 - 첫 MVP는 데스크톱 브라우저 편집을 우선하며 모바일은 플레이만 허용할 수 있다.
 - 첫 MVP는 버전이 고정된 기본 Asset catalog로 검증하며 사용자 업로드와 보존 정책은 Backend 계약 확정 후 추가한다.
 - Object preset의 편의 입력은 저장 전에 공통 Component/Event 데이터로 변환되며 별도 실행 엔진을 만들지 않는다.
 - 미리보기는 공개 버전을 변경하지 않는 로컬/격리 실행을 기본으로 한다.
-- `014-minigame`의 Coin 보상과 서버 권위 게임 규칙은 019에 재사용하지 않는다.
+- `014-minigame`의 Coin 보상과 서버 권위 게임 규칙은 020에 재사용하지 않는다.
 - `PUZZLE`, 전투, 적 AI, Quest, Projectile, Spawner, 멀티플레이 UGC는 첫 MVP에 포함하지 않는다.
 
 ## Dependencies
 
-- FE 계약 결정: GitHub Issue #20
-- BE 계약 결정: GitHub Issue #21
-- AI 범위 결정: GitHub Issue #22
+- FE Host 계약 답변: GitHub Issue #20 — 반영 완료, Studio 내부 후속은 #35
+- BE 저장·Publish 계약 답변: GitHub Issue #21 — 반영 완료, 제품 정책 #33·Portal ID #34 분리
+- AI 범위 결정: GitHub Issue #22 — 완료·종료
+- 공개 중단·삭제·표시 전용 Ranking 정책: GitHub Issue #33
+- `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34
+- Renderer·Preview sandbox·Asset resolver 수직 구현: GitHub Issue #35
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
@@ -217,6 +237,6 @@
 
 - 사용자 코드·수식·플러그인 실행
 - 턴제 전투, 적 AI, 디펜스, 네트워크 멀티플레이
-- 사용자 제작 게임의 Coin 보상과 경쟁 랭킹
+- 사용자 제작 게임의 Coin 보상과 MVP 랭킹. 표시 전용 P1 후보는 #33에서 별도 결정한다.
 - Unity 안에서 2D 게임을 렌더링하거나 Unity Dedicated Server가 게임 상태를 권위 처리하는 구조
 - AI가 플레이 중 응답해야만 진행되는 게임

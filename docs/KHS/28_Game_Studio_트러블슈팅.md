@@ -1,12 +1,33 @@
 # FESTA Game Studio 트러블슈팅
 
-> **범위**: spec 019, GameProject/Preview/Event 계약, Web 2D Studio/Runtime, Spring Game API,
+> **범위**: spec 020, GameProject/Preview/Event 계약, Web 2D Studio/Runtime, Spring Game API,
 > FESTA Host/Portal 연동 작업에서 발생한 문제.
 >
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
 ## 2026-08-21
+
+### GS-T018. 원격 게시 후 develop 재정렬로 로컬·원격 feature 이력이 갈라짐 (해결 예정)
+
+- **증상** — 원격에 게시한 `feature/game-studio-foundation`이 최신 develop보다 3커밋 뒤였고, rebase 후 로컬은 원격 기준 ahead/behind가 동시에 표시됐다.
+- **원인** — Game Studio 원격 게시 뒤 PR #29 등 공통 문서 커밋이 develop에 추가되어 최신 기준선 재정렬이 필요했다.
+- **해결** — 기존 tip을 `backup/game-studio-pre-issue-sync-20260821`에 보존하고 최신 `origin/develop` 위로 충돌 없이 rebase했다. 최종 검증 뒤 `--force-with-lease`로 소유 feature 브랜치만 갱신한다.
+- **예방** — 원격 feature를 rebase할 때는 사전 backup, 원격 fetch, develop 가상 병합, `--force-with-lease` 순서를 지키고 공유 파트 브랜치에는 강제 push하지 않는다.
+
+### GS-T017. 큰 문서 패치가 마지막 문맥 불일치로 전체 실패함 (해결)
+
+- **증상** — data-model과 상위 아키텍처 문서를 여러 구간 한 번에 바꾸던 패치가 마지막 예상 문장 불일치 때문에 적용되지 않았다.
+- **원인** — 긴 원자 패치 안에 서로 떨어진 문맥을 묶었고 실제 줄바꿈·문장이 예상과 달랐다.
+- **해결** — 파일에 변경이 없음을 확인한 뒤 줄 번호와 실제 인접 문장을 다시 읽고 Aggregate·Entity·State, 문서별로 작은 패치로 나눠 적용했다.
+- **예방** — 기존 대형 문서는 먼저 대상 구간을 출력하고 의미 단위별 패치를 사용한다. 한 패치에 독립 파일·멀리 떨어진 구간을 과도하게 묶지 않는다.
+
+### GS-T016. Game Studio와 Backend ERD spec 번호가 019로 충돌함 (해결)
+
+- **증상** — #21 답변에서 `specs/019-game-studio`와 `origin/back`의 `specs/019-erd-schema`가 같은 번호를 사용 중인 것이 확인됐다.
+- **원인** — Backend spec이 `specs/README.md`에 등록되지 않아 Game Studio 생성 시 전체 원격 브랜치의 경로까지 보이지 않았다.
+- **해결** — 모든 원격 브랜치의 spec 019~022 경로를 검색하고 비어 있는 020으로 Game Studio 디렉터리·참조·Spec-Kit feature 경로를 이동했다.
+- **예방** — 신규 spec 번호는 develop의 인덱스뿐 아니라 `git ls-tree`로 모든 활성 원격 브랜치를 검색한 뒤 배정하고 `specs/README.md`에 즉시 등록한다.
 
 ### GS-T015. 전용 worktree의 Git 메타데이터 접근이 제한됨 (해결)
 
@@ -45,7 +66,7 @@
 
 ### GS-T010. 공유 작업트리가 Game Studio 브랜치가 아니어서 전용 문서 조회가 실패함 (해결)
 
-- **증상** — `specs/019-game-studio`와 `docs/KHS/27`, `28` 문서를 현재 경로에서 읽으려 했으나 파일이 없다는 오류가 발생했다.
+- **증상** — `specs/020-game-studio`와 `docs/KHS/27`, `28` 문서를 현재 경로에서 읽으려 했으나 파일이 없다는 오류가 발생했다.
 - **원인** — 다른 작업이 진행되면서 공유 작업트리의 현재 브랜치가 `feature/game-studio-foundation`에서 `game`으로 변경되었고, Game Studio 문서는 아직 기능 브랜치에만 존재했다.
 - **해결** — 현재 `game` 작업트리를 전환하거나 되돌리지 않고 Git object에서 기능 브랜치 문서를 확인한 뒤, 별도 Git worktree에 `feature/game-studio-foundation`을 checkout하여 기록을 갱신했다.
 - **예방** — Game Studio 후속 작업은 전용 worktree에서 수행하고, 파일 조회 전에 현재 branch와 worktree 목록을 먼저 확인한다.

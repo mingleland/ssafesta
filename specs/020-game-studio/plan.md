@@ -4,8 +4,8 @@
 
 **Input**: Unity와 분리된 웹 2D Game Studio/Runtime, Spring Draft·Publish, 선택적 Booth Portal 연동.
 
-> 이 계획은 GitHub #20~#22 답변을 선점하지 않는다. 계약·상태 머신·fixture 작업은 즉시 가능하고,
-> 앱 생성·DB migration·Unity Bridge 변경은 각 이슈 결정 뒤 시작한다.
+> GitHub #20~#22 파트 답변은 반영했다. 공개·삭제·Ranking(#33), Portal ID(#34),
+> renderer·Preview sandbox·Asset resolver(#35)만 결정 gate로 남긴다.
 
 ## Summary
 
@@ -23,18 +23,19 @@ renderer/physics adapter로 추가한다.
 
 **Primary Dependencies**: 현재 `origin/front` 기준 React 19.2, Vite 8.2, React Router 7.18,
 TanStack Query 5.101; 현재 `origin/back` 기준 Spring Boot 4.1, Spring MVC/JPA/Security,
-Flyway, PostgreSQL. 2D renderer/physics library는 공통 코어의 선행 의존성이 아니며 #20에서 선택한다.
+Flyway, PostgreSQL. 2D renderer/physics library는 공통 코어의 선행 의존성이 아니며 #35에서 선택한다.
 
-**Storage**: Spring/PostgreSQL. Game root와 Portal Binding은 관계형 컬럼, GameProject Version은 JSONB 후보.
-정확한 Draft 행·버전 보존·cache 정책은 #21 결정 게이트다.
+**Storage**: Spring/PostgreSQL. `game_drafts`는 PK(gameId)의 가변 JSONB, `game_published_versions`는
+UNIQUE(gameId, versionNo)의 불변 JSONB다. Publish는 append+pointer 갱신 단일 transaction이고 Portal은 no-store다.
 
-**Testing**: 현재 계약은 Node 무의존 reference validator와 fixtures. Frontend는 #20에서 기존 앱과
-테스트 도구를 맞춘다. Backend는 JUnit/Spring integration test/Testcontainers 패턴을 재사용한다.
+**Testing**: 현재 계약은 Node 무의존 reference validator와 fixtures. Frontend는 기존 앱에 test runner가
+없으므로 #35 선택과 함께 Game Studio module 전용 unit/integration/E2E 도구를 추가한다. Backend는
+JUnit/Spring integration test/Testcontainers 패턴을 재사용한다.
 
 **Target Platform**: 데스크톱 최신 브라우저 제작, 데스크톱·모바일 브라우저 플레이. Unity WebGL은
 선택적 Host sibling이며 Runtime target이 아니다.
 
-**Project Type**: 독립 웹 앱 + Spring API + versioned cross-part contract
+**Project Type**: 기존 FESTA React 앱 내부 lazy Game Studio module + Spring API + versioned cross-part contract
 
 **Performance Goals**: TOP_DOWN Runtime 60fps 목표, 일반 편집 동작 100ms 이내 반응,
 최대 100×100 tile·500 object·300 event 프로젝트가 Preview에서 중단 없이 열린다.
@@ -61,14 +62,14 @@ Overlay Dialogue 중 World input 차단과 호출 Scene 상태 보존.
 | 25 React UI | PASS | 제작·대화·외부 화면은 Web UI 소유 |
 | 27 기준선 동결 | PASS | 현재 Unity Booth Runtime/014 Minigame 코드를 변경하지 않음 |
 | 28 범위 통제 | PASS | 사용자 지시로 추가된 P2 UGC이며 기존 Unity 미니게임 종류를 늘리지 않음 |
-| 30 미정 임의 확정 금지 | PASS | #20~#22 결정 게이트를 tasks에 명시 |
+| 30 미정 임의 확정 금지 | PASS | 파트 답변은 반영하고 #33~#35 결정 게이트를 tasks에 명시 |
 
 ## Project Structure
 
 ### Documentation
 
 ```text
-specs/019-game-studio/
+specs/020-game-studio/
 ├── spec.md
 ├── plan.md
 ├── research.md
@@ -93,22 +94,23 @@ docs/KHS/
 ### Source Code
 
 ```text
-# #20 승인 후 생성할 독립 Frontend 경계(제안)
-festa-game-studio/
+# #20 확정: 기존 FESTA Frontend 내부 소유 module
+festa-frontend/
 ├── src/
-│   ├── app/                 # routes, providers, auth handoff
-│   ├── contracts/           # generated/handwritten TS contract adapter
-│   ├── core/                # pure state, event interpreter, validation
-│   ├── studio/              # map/object/dialogue/event editors
-│   ├── runtime/             # scene lifecycle + renderer adapters
-│   ├── preview/             # Studio ↔ iframe Runtime protocol
-│   └── host/                # standalone/FESTA overlay entry adapters
-└── tests/
-    ├── contract/
-    ├── unit/
-    └── integration/
+│   ├── app/router/          # /app/games/:gameId/edit|play lazy entry
+│   ├── shared/              # 기존 auth/api client/overlay type 재사용
+│   ├── unity/bridge/        # BOOTH_GAME_INTERACT adapter
+│   └── game-studio/
+│       ├── contracts/       # generated/handwritten TS contract adapter
+│       ├── core/            # pure state, event interpreter, validation
+│       ├── studio/          # map/object/dialogue/event editors
+│       ├── runtime/         # scene lifecycle + renderer adapters
+│       ├── preview/         # same-origin iframe protocol
+│       ├── host/            # FESTA Overlay/Portal adapter
+│       └── __tests__/
+└── e2e/game-studio/
 
-# origin/back의 기존 Spring 앱에 #21 승인 후 추가
+# #21 확정: origin/back의 기존 Spring 앱에 추가
 backend/src/main/java/com/example/ssafesta/game/
 ├── api/
 ├── application/
@@ -118,15 +120,11 @@ backend/src/main/java/com/example/ssafesta/game/
 backend/src/test/java/com/example/ssafesta/game/
 backend/src/main/resources/db/migration/
 
-# 기존 festa-frontend에는 #20 승인 후 Host adapter만 추가
-festa-frontend/src/game-studio/
-└── gameStudioHost.ts
 ```
 
-**Structure Decision**: Game Studio 본체는 기존 FESTA 화면과 분리하고 Host adapter만 기존 Frontend에 둔다.
-루트 앱 이름과 배포 단위는 #20 승인 대상이므로, 승인 전에는 `specs/019-game-studio/contracts/`의
-framework-independent 코드와 fixture만 변경한다. 이 feature의 작업·문제 기록은 KHS 일반 24/25가
-아니라 전용 27/28 문서에 남긴다.
+**Structure Decision**: Game Studio는 별도 Vite/origin이 아니라 `festa-frontend/src/game-studio/` 내부
+소유 module이다. 기존 인증과 `shared/api/client.ts`를 재사용하고 lazy chunk로 일반 FESTA 초기 번들과
+분리한다. 이 feature의 작업·문제 기록은 KHS 전용 27/28 문서에만 남긴다.
 
 ## Design Phases
 
@@ -139,17 +137,17 @@ framework-independent 코드와 fixture만 변경한다. 이 feature의 작업·
 5. OVERLAY/FULL_SCREEN Dialogue와 명시적 close/resume 상태 전이를 fixture로 검증한다.
 6. Preview/Portal 메시지의 보안 불변식과 오류 격리 시나리오를 문서화한다.
 
-### Phase B — #20 이후: Web Studio/Runtime
+### Phase B — #20 반영: Web Studio/Runtime
 
-1. 승인된 앱 경계와 테스트 도구로 프로젝트를 생성한다.
+1. 기존 `festa-frontend`에 `src/game-studio/` 소유 경계와 테스트 도구를 추가한다.
 2. 계약 adapter와 순수 state/event core를 이식한다.
 3. Scene/Object palette, Tile canvas, Properties/Event inspector를 같은 authoring store에 연결한다.
 4. TOP_DOWN renderer, OVERLAY/FULL_SCREEN DIALOGUE runner, Preview를 차례로 구현한다.
 5. 독립 URL을 먼저 검증한 뒤 FESTA Host/Unity Portal을 연결한다.
 
-### Phase C — #21 이후: Spring Draft/Publish
+### Phase C — #21 반영: Spring Draft/Publish
 
-1. 확정 Aggregate/migration을 추가한다.
+1. `game_drafts`·`game_published_versions`·nullable 공개본 포인터 migration을 추가한다.
 2. Draft revision과 server validation을 구현한다.
 3. immutable Publish/runtime query/Portal resolution을 구현한다.
 4. Asset reference allow-list와 향후 upload/resolver 경계를 구현한다.
@@ -157,7 +155,8 @@ framework-independent 코드와 fixture만 변경한다. 이 feature의 작업·
 
 ### Phase D — 후속 P2
 
-PLATFORMER adapter, 사용자 Asset upload, AI 제작 보조, 결과·보상·랭킹은 각각 별도 결정과 spec을 거친다.
+PLATFORMER adapter, 사용자 Asset upload, AI 제작 보조, 결과·보상은 각각 별도 결정과 spec을 거친다.
+표시 전용 Ranking은 #33에서 P1 도입을 선택한 경우에만 후속 tasks를 생성한다.
 
 ## Post-Design Constitution Check
 
@@ -166,5 +165,5 @@ Published 불변 원칙을 모두 유지한다. 즉시 가능한 계약 작업�
 
 ## Complexity Tracking
 
-위반 없음. 별도 웹 앱은 Unity와 한 Runtime으로 합치는 것보다 실행·장애·배포 경계를 단순화하며,
-공통 계약과 순수 코어를 Studio/Preview/Published Runtime이 공유해 중복을 제한한다.
+위반 없음. FESTA 내부 lazy module은 별도 origin 인증 복잡도를 피하면서 Unity Runtime과 실행·장애 경계를
+분리한다. 공통 계약과 순수 코어를 Studio/Preview/Published Runtime이 공유해 중복을 제한한다.

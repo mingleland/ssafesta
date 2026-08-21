@@ -430,6 +430,7 @@ Unity 책임:
 
 - 기존 Booth 상호작용에서 `boothId`, `objectId`, `configId`를 Host에 전달
 - Host가 게임 오버레이를 여는 동안 입력 잠금·복귀 UX 제공
+- Host의 `OnOverlayStateChanged` 단일 lifecycle payload에서 `OPENED/CLOSED/FAILED`를 받아 입력을 복구
 
 Unity가 하지 않는 일:
 
@@ -438,9 +439,9 @@ Unity가 하지 않는 일:
 - 게임 Draft/Publish 또는 플레이 결과 저장
 - Game Studio를 위한 별도 WebGL Scene/Build 생성
 
-현재 동결 기준선 코드는 변경하지 않으며, 실제 Portal 오브젝트 등록은 Frontend/Backend 계약 확정 후
-기존 Bridge 확장으로만 다룬다. 메시지 초안은
-[`specs/019-game-studio/contracts/game-portal-bridge.md`](../specs/019-game-studio/contracts/game-portal-bridge.md)를 따른다.
+현재 동결 기준선 코드는 변경하지 않는다. 실제 `GAME_PORTAL` 오브젝트와 signed Int32 `configId` 매핑은
+[#34](https://github.com/kanghyunsoon/ssafesta/issues/34) 확정 후 기존 Bridge 확장으로만 다룬다. 메시지 계약은
+[`specs/020-game-studio/contracts/game-portal-bridge.md`](../specs/020-game-studio/contracts/game-portal-bridge.md)를 따른다.
 
 ---
 

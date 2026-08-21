@@ -7,9 +7,10 @@
 
 ## 1. 지금 상태
 
-**기존 18개 spec과 신규 P2 Game Studio spec(019)의 초안이 있다.** 기존 spec은 팀 결정(2026-08-12)이
-반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다. 019는 GitHub 이슈
-#20~#22의 파트별 답변을 반영하기 전까지 Draft다.
+**기존 18개 spec과 신규 P2 Game Studio spec(020)의 초안이 있다.** 기존 spec은 팀 결정(2026-08-12)이
+반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다. Backend 브랜치의
+`019-erd-schema`와 충돌하지 않도록 Game Studio는 020을 사용한다. #20~#22 답변은 반영했고
+#33~#35의 제품·Portal·Studio 내부 선택이 남아 있다.
 
 | Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
 |---|---|---|---|:---:|:---:|:---:|
@@ -31,7 +32,7 @@
 | 015 | dashboard | P1 | BE + FE | ✅ | — | — |
 | 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
 | 018 | world-floors | P1 | Unity | ✅ | ✅ | ✅ |
-| 019 | game-studio | **P2** | FE + BE / Unity 선택 연동 | ✅ Draft | — | — |
+| 020 | game-studio | **P2** | Game Studio FE + BE / Unity 선택 연동 | ✅ Draft | ✅ | ✅ |
 
 **plan / tasks가 비어 있는 것은 각 파트가 직접 생성한다.** 그게 SDD의 정상 흐름이고,
 `.specify/` 골격이 설치돼 있어서 명령만 실행하면 된다 (아래 §3).

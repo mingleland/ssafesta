@@ -1,6 +1,6 @@
 # Game Studio Preview Protocol
 
-> 상태: Draft v1.0 / #20에서 앱 origin과 iframe 배치 방식만 확정한다.
+> 상태: Draft v1.1 / #20 same-origin 결정 반영. iframe sandbox/CSP와 UI는 #35에서 확정한다.
 
 ## 목적
 
@@ -11,7 +11,8 @@ Preview Runtime은 Published Runtime과 같은 validator/state/event core를 사
 
 - 브라우저 `window.postMessage`를 사용한다.
 - Studio가 parent, Preview Runtime이 전용 iframe이다.
-- `targetOrigin="*"`를 사용하지 않고 환경 설정의 정확한 Runtime origin을 사용한다.
+- Studio와 Preview Runtime은 `festa-frontend`의 same-origin lazy module이다.
+- `targetOrigin="*"`를 사용하지 않고 `window.location.origin`의 정확한 origin을 사용한다.
 - 수신자는 `event.origin === allowedStudioOrigin`과 `event.source === parent/knownIframe`을 모두 검사한다.
 - payload는 2 MiB 이하의 JSON 직렬화 가능 데이터만 허용한다. Asset binary와 Token은 포함하지 않는다.
 
@@ -122,9 +123,10 @@ Studio, FESTA Host, Unity WebGL을 reload/close하지 않는다.
 5. 반복/늦게 도착한 이전 `requestId` 응답은 현재 lifecycle 상태를 변경하지 않는다.
 6. Preview와 Published Runtime은 같은 Asset resolver를 사용하며 Studio DOM이나 로컬 파일 선택 상태를 읽지 않는다.
 
-## #20 결정 후 채울 값
+## 확정값과 후속 선택
 
-- Studio origin / Preview origin 환경변수 이름
-- same-origin route와 별도 Runtime 배포 중 선택
-- iframe `sandbox`/CSP 최종값
-- Preview UI가 modal, side panel, full-screen 중 어느 형태인지
+- Studio/Preview origin: FESTA Web과 동일. 별도 인증 전달이나 Preview origin 환경변수 없음.
+- Authoring route: `/app/games/:gameId/edit`.
+- Published play route: `/app/games/:gameId/play`.
+- 내부 Preview iframe route, `sandbox`/CSP 최종값, modal/side panel/full-screen UI는 #35의 Game Studio 수직 구현 범위다.
+- 환경변수가 추가되면 기존 API 값과 섞지 않고 `VITE_GAME_*` namespace를 사용한다.

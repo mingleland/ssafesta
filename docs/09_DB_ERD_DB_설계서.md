@@ -706,35 +706,47 @@ games
 - owner_user_id FK
 - title
 - status
+- published_version NULL
 - created_at / updated_at
 
-game_versions
-- id PK
-- game_id FK
-- version_no
-- state (DRAFT | PUBLISHED)
+game_drafts
+- game_id PK/FK
 - schema_version
 - revision
 - project_json JSONB
-- published_at NULL
+- updated_by_user_id FK
+- updated_at
+
+game_published_versions
+- id PK
+- game_id FK
+- version_no
+- schema_version
+- project_json JSONB
+- published_by_user_id FK
+- published_at
+- UNIQUE (game_id, version_no)
 
 game_portal_bindings
-- id PK
+- id/config_id (signed Int32 wire mapping은 #34)
 - booth_id FK
 - object_id
 - game_id FK
-- published_version_id FK NULL
 - enabled
 - UNIQUE (booth_id, object_id)
 ```
 
-- Draft 저장은 `revision` 낙관적 잠금으로 편집 충돌을 검출한다.
-- Published Version은 수정하지 않고 새 버전을 추가한다.
+- `game_drafts.game_id` PK로 Game당 작업본 하나를 강제하고 `revision` 낙관적 잠금으로 충돌을 검출한다.
+- Published Version은 수정하지 않고 `(game_id, version_no)` 불변 행을 추가한다.
+- `(games.id, games.published_version)`은 같은 Game의 공개본만 가리키는 복합 FK다. 공개본 삭제 시
+  `ON DELETE SET NULL (published_version)`처럼 nullable 포인터 컬럼만 지정해 PK `games.id`가 NULL 대상이 되지 않게 한다.
+- Publish는 Draft read·검증·Published insert·포인터 갱신을 단일 트랜잭션으로 수행하고 Draft를 유지한다.
 - Runtime 조회는 Published Version만 반환한다.
 - `project_json`은 Asset reference만 가지며 이미지·오디오 binary와 만료 URL을 저장하지 않는다.
-- 기본 Asset catalog와 향후 사용자 업로드 Asset의 메타데이터·binary 저장소는 `game_versions`와 분리한다.
-- JSONB 인덱싱·업로드 Asset 모델·resolver·버전 보존 기간은 구현 계획 전 확정한다.
-- 상세 백엔드 결정은 [GitHub #21](https://github.com/kanghyunsoon/ssafesta/issues/21)에서 관리한다.
+- 기본 Asset catalog와 향후 사용자 업로드 Asset의 메타데이터·binary 저장소는 Draft/Published JSONB와 분리한다.
+- JSONB 인덱싱·사용자 업로드 Asset은 후속 구현 계획에서 정한다.
+- 수동 삭제·Published 이력·표시 전용 Ranking은 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33),
+  Portal `configId` DB 매핑은 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)에서 관리한다.
 
 ---
 
@@ -747,5 +759,6 @@ game_portal_bindings
 - 익명 Survey의 중복 방지 방식
 - 링크를 JSON/컬럼/별도 테이블 중 무엇으로 둘지
 - P2 Event/Competition 실제 스키마
-- Game Studio Draft의 1행 갱신 vs 버전별 행 추가 정책
-- Game Studio Published Version 보존 기간과 Portal Binding 고정 방식
+- Game Studio 수동 삭제·Published Version 보존·진행 중 세션 정책 (#33)
+- Game Studio 표시 전용 Ranking의 P1 도입 여부 (#33)
+- Game Portal `configId` signed Int32와 DB PK 매핑 (#34)

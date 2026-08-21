@@ -32,7 +32,7 @@
 
 ## Notes
 
-- FE·BE·AI의 세부 구현 계약은 Issues #20~#22 답변 후 `contracts/`와 plan에서 확정한다.
+- FE·BE·AI의 세부 구현 계약은 Issues #20~#22 답변을 `contracts/`와 plan에 반영했다. 남은 선택은 #33~#35에서 추적한다.
 - 이 spec은 사용자 가치와 파트 경계를 확정한 Draft이며, 헌법 28조의 기존 미니게임 1종 제한은 `014-minigame`에 유지된다.
 - Validation iteration 2: 편집 화면, Asset reference, OVERLAY/FULL_SCREEN Dialogue와 복귀 요구사항을 추가한 뒤 모든 항목 통과.
 - 구현 선택은 plan/contracts에만 두고 spec 요구사항은 사용자가 관찰·검증할 수 있는 결과로 유지했다.

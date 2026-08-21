@@ -1,6 +1,6 @@
 # Booth Game Portal Bridge 계약
 
-> 상태: Draft / FE Issue #20 검토 대기
+> 상태: Draft v0.2 — FE Issue #20 Host 계약 반영 / `configId` 세부는 #34
 
 ## 목적
 
@@ -30,7 +30,7 @@ Payload:
 | `type` | ✅ | `BOOTH_GAME_INTERACT` 고정 |
 | `boothId` | ✅ | 현재 Published Booth 식별자 |
 | `objectId` | ✅ | Layout 안의 canonical objectId |
-| `configId` | ✅ | Spring 소유 Game Portal Binding 식별자 |
+| `configId` | ✅ | Spring 소유 Game Portal Binding 식별자. wire는 signed Int32, DB 매핑은 #34 |
 
 ## 처리 흐름
 
@@ -39,6 +39,7 @@ Unity Booth Object Interact
 → onBoothInteract(payload)
 → React가 configId 실행 가능 여부 조회
 → Game Overlay 열기
+→ `/app/games/:gameId/play` lazy route
 → Web Runtime이 Published GameProject 조회
 → 종료
 → Overlay 닫기 + Unity 입력 복구
@@ -55,10 +56,25 @@ Unity Booth Object Interact
 
 ## Host → Unity Lifecycle
 
-구체 메서드명은 #20 답변 후 확정한다. 의미 이벤트는 다음 세 가지다.
+React Host는 Unity loader가 보유한 instance에 단일 메서드로 상태를 전달한다.
+
+```js
+unityInstance.SendMessage(receiverObjectName, "OnOverlayStateChanged", JSON.stringify({
+  state: "OPENED" | "CLOSED" | "FAILED",
+  overlay: "GAME"
+}))
+```
+
+`receiverObjectName`은 Scene 구현 시 한 상수로 확정하고 코드 여러 곳에 문자열을 흩뿌리지 않는다.
+Unity 수신 컴포넌트는 알 수 없는 state/overlay를 무시하고 월드 연결을 종료하지 않는다.
+
+의미 이벤트는 다음 세 가지다.
 
 | Event | Meaning |
 |---|---|
 | `GAME_OVERLAY_OPENED` | 로컬 이동·상호작용 입력 차단 |
 | `GAME_OVERLAY_CLOSED` | 로컬 입력·포커스 복구 |
 | `GAME_OVERLAY_FAILED` | 입력 복구 후 안내, 월드 연결 유지 |
+
+React Error Boundary는 Overlay 하위 오류를 `FAILED`로 변환한 뒤 Unity 입력을 복구한다. Access/Refresh,
+Connection Token, GameProject, 점수·완료 결과는 이 lifecycle payload에 포함하지 않는다.

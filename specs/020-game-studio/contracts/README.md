@@ -1,6 +1,6 @@
 # Game Studio 계약 인덱스
 
-> 상태: Draft — GitHub Issues #20, #21, #22 검토 대기
+> 상태: Draft v0.2 — #20~#22 답변 반영 / 제품·Portal·Studio 내부 후속은 #33~#35
 
 | 계약 | 파일 | Producer | Consumer |
 |---|---|---|---|
@@ -23,6 +23,8 @@
 6. Published Version은 불변이다.
 7. 계약 변경은 영향 파트 합의와 fixture 기반 소비자 검증을 거친다.
 8. GameProject에는 Asset binary나 완성 화면 캡처를 넣지 않고 안정적인 Asset reference만 둔다.
+9. Draft와 Published는 별도 저장 모델이며 Publish는 불변 version append와 pointer 갱신을 단일 트랜잭션으로 수행한다.
+10. Preview는 FESTA Web same-origin에서 실행하고 Published Runtime과 같은 validator/state/event core를 사용한다.
 
 ## v1 의미 검증 규칙
 

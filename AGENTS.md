@@ -7,7 +7,7 @@
 1. **작업일지** — 하나의 작업(기능 구현, 검증, 문서 작성, 설정 변경)이 끝나면
    `docs/24_작업일지.md`의 **해당 날짜 섹션에 즉시 기록**한다.
    날짜 섹션이 없으면 만든다 (최신 날짜가 위). 👤 사람 / 🤖 AI 구분 표기.
-   단, **Game Studio(spec 019, `festa-game-studio/`, GameProject·Web Runtime·Game API) 작업은**
+   단, **Game Studio(spec 020, `festa-frontend/src/game-studio/`, GameProject·Web Runtime·Game API) 작업은**
    `docs/KHS/27_Game_Studio_작업일지.md`에만 기록하고 24번 문서에 중복 기록하지 않는다.
 2. **트러블슈팅** — 작업 중 문제가 발생하면 해결 여부와 무관하게
    `docs/25_트러블슈팅.md`에 **T-번호를 따서 반드시 등록**한다 (증상/원인/해결/예방).

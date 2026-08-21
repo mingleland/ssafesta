@@ -10,8 +10,8 @@ Unity Editor, WebGL Build, Spring, AI 서버는 필요 없다.
 PowerShell에서 저장소 루트를 기준으로 실행한다.
 
 ```powershell
-Get-Content -Raw -Encoding UTF8 specs/019-game-studio/contracts/game-project-v1.schema.json | ConvertFrom-Json | Out-Null
-Get-Content -Raw -Encoding UTF8 specs/019-game-studio/contracts/fixtures/minimal-top-down-dialogue.json | ConvertFrom-Json | Out-Null
+Get-Content -Raw -Encoding UTF8 specs/020-game-studio/contracts/game-project-v1.schema.json | ConvertFrom-Json | Out-Null
+Get-Content -Raw -Encoding UTF8 specs/020-game-studio/contracts/fixtures/minimal-top-down-dialogue.json | ConvertFrom-Json | Out-Null
 ```
 
 예상 결과: 출력과 오류가 없다.
@@ -21,7 +21,7 @@ Get-Content -Raw -Encoding UTF8 specs/019-game-studio/contracts/fixtures/minimal
 Node.js 18 이상에서 실행한다.
 
 ```powershell
-node specs/019-game-studio/contracts/fixtures/validate-fixtures.mjs
+node specs/020-game-studio/contracts/fixtures/validate-fixtures.mjs
 ```
 
 예상 결과:
@@ -46,7 +46,7 @@ Fixture 목록과 기대 code는 `contracts/fixtures/manifest.json`이 소유한
 ## 3. Runtime 상태 전이 검증
 
 ```powershell
-node specs/019-game-studio/contracts/fixtures/validate-runtime-traces.mjs
+node specs/020-game-studio/contracts/fixtures/validate-runtime-traces.mjs
 ```
 
 예상 결과:
@@ -75,10 +75,11 @@ GameProject runtime trace: 6/6 passed
 
 ## 5. 파트별 구현 후 추가할 검증
 
-- #20 이후: Studio→Preview snapshot, 독립 `/play/:gameId`, Overlay 종료/복귀 E2E
-- #21 이후: revision conflict, invalid Publish 거부, Published 불변, Portal resolution integration test
+- FE 구현: Studio→same-origin Preview snapshot, `/app/games/:gameId/play`, Overlay 종료/복귀 E2E
+- BE 구현: revision conflict, invalid Publish 거부, Published 불변, atomic pointer update integration test
+- #34 이후: Portal resolution과 `GAME_PORTAL`/signed Int32 `configId` integration test
 - 선택적 Unity 연동 이후: 부스 진입·종료 후 월드 연결과 위치 유지
-- #22와 무관한 필수 검증: AI 서버 중단 상태에서 create/save/publish/play 성공
+- #22 확정 필수 검증: AI 서버 중단 상태에서 create/save/publish/play 성공
 
 ## 완료 판정
 

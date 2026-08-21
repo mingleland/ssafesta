@@ -4,7 +4,7 @@
 
 ## 1. 편집 화면의 논리 영역
 
-편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 실제 반응형 배치와 컴포넌트 이름은 #20에서
+편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 실제 반응형 배치와 컴포넌트 이름은 #35에서
 정하되, 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
 
 | 영역 | 주 역할 | 수정 대상 |
@@ -40,7 +40,7 @@ Asset Catalog + GameProject JSON
 - 이미지·타일셋·오디오 binary, base64 `data:` URL, `blob:` URL, `file:` 경로는 저장·Publish 금지다.
 - 만료되는 서명 URL을 Published GameProject에 넣지 않는다.
 - 사용자 업로드를 추가할 때는 Spring이 소유한 안정적인 Asset ID를 저장하고 Runtime이 별도 조회로
-  실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위는 #21 결정 대상이다.
+  실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위는 MVP와 분리한 후속 Asset spec 대상이다.
 - catalog metadata는 타일 크기, atlas slicing, 기본 표시 크기를 소유한다. GameProject는 같은 정보를
   중복 저장하지 않는다.
 
@@ -94,7 +94,8 @@ Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 �
 
 ## 8. 파트 경계
 
-- Frontend: 편집 UX, recipe 변환, local validation, Preview/Runtime Asset resolve.
+- Game Studio Frontend: `src/game-studio/` 편집 UX, recipe 변환, local validation, Preview/Runtime Asset resolve.
+- FESTA Host Frontend: lazy route, 기존 인증/API client, Game Overlay와 Unity lifecycle.
 - Backend: 저장 가능한 Asset reference 정책, Draft/Publish 검증, 업로드를 도입할 경우 Asset 영구 상태.
 - Unity: 위 데이터를 소비하지 않으며 Booth Portal trigger만 전달.
 - AI: 선택적으로 Asset/Dialogue/Event 초안을 제안할 수 있으나 저장 전 동일 계약으로 변환·검토.

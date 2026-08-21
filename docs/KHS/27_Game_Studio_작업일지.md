@@ -1,6 +1,6 @@
 # FESTA Game Studio 작업일지
 
-> **범위**: `specs/019-game-studio`, 향후 `festa-game-studio/`, GameProject 계약, Web 2D Runtime,
+> **범위**: `specs/020-game-studio`, `festa-frontend/src/game-studio/`, GameProject 계약, Web 2D Runtime,
 > Spring Draft/Publish·Portal Binding, FESTA Host 연동.
 >
 > Unity 월드·Booth Runtime 일반 작업은 이 문서에 기록하지 않는다.
@@ -8,6 +8,16 @@
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
 ## 2026-08-21
+
+### 파트 이슈 답변 반영·spec 020 이동·후속 결정 분리 ✅
+
+- 🤖 GitHub #20 Frontend, #21 Backend, #22 AI의 신규 답변을 전체 확인했다. FE는 기존 `festa-frontend` 내부 lazy module과 same-origin Preview, BE는 Draft/Published 2테이블·revision 409·atomic Publish, AI는 P0/P1 비의존과 P2 candidate/patch·spec 007 Job 정책을 확정했다.
+- 🤖 기존 Backend 브랜치의 `019-erd-schema`와 번호 충돌을 피하기 위해 Game Studio 전체 경로를 `specs/019-game-studio/`에서 `specs/020-game-studio/`로 선제 이동하고 agent 규칙·상위 문서·Spec-Kit feature 경로를 동기화했다.
+- 🤖 완료된 AI 이슈 #22를 닫았다. #20·#21의 남은 항목은 [#33 제품 정책](https://github.com/kanghyunsoon/ssafesta/issues/33), [#34 Portal ID](https://github.com/kanghyunsoon/ssafesta/issues/34), [#35 Studio 내부](https://github.com/kanghyunsoon/ssafesta/issues/35)로 분리했다.
+- 🤖 API/DB 계약을 `game_drafts` + `game_published_versions`, `expectedRevision`, 불변 append, nullable 공개본 포인터, Portal `no-store`, builtin Asset MVP로 구체화했다. FE 계획·tasks의 별도 `festa-game-studio/` 가정을 폐기하고 실제 `festa-frontend/src/game-studio/` 경로로 고쳤다.
+- 🤖 최신 `origin/develop`(`a8b0398`) 위로 전용 브랜치를 다시 맞췄으며 Game/Unity 작업트리는 변경하지 않았다.
+- 🤖 `tasks.md`는 정합성 분석에서 찾은 Guest 권한·자동 보정 금지·lazy chunk 격리·20분 사용성 검증을 보강해 총 90개, 완료 21개로 갱신했다. 계약 fixture 7/7, Runtime trace 6/6, JSON 10/10, task ID 90/90 unique, checklist 16/16을 통과했다.
+- 트러블슈팅: GS-T016~GS-T018
 
 ### 전체 브랜치 재대조 및 develop 기준선 재정렬 ✅
 
@@ -20,7 +30,7 @@
 
 ### 편집기 시안 반영 및 계약 정합화 ✅
 
-- 🤖 spec 019에 실제 편집기 작업공간(Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish), Asset reference, TOP_DOWN 격자 좌표, preset recipe를 요구사항으로 반영했다.
+- 🤖 당시 spec 019(현재 spec 020)에 실제 편집기 작업공간(Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish), Asset reference, TOP_DOWN 격자 좌표, preset recipe를 요구사항으로 반영했다.
 - 🤖 DIALOGUE를 `OVERLAY`와 `FULL_SCREEN`으로 구분하고 `SHOW_DIALOGUE`, `CLOSE_DIALOGUE`, `GO_TO_SCENE`의 호출·복귀 의미를 고정했다. Web 2D Runtime이 직접 실행하며 Unity는 Portal 진입 트리거만 담당한다는 경계는 유지했다.
 - 🤖 JSON Schema의 `nextNodeId` 위치를 Event가 아닌 Dialogue Choice로 바로잡고, asset scheme·Scene 경계·Object 위치 검증과 음수 fixture 2종을 추가했다. Preview와 Published Runtime이 같은 GameProject 해석 결과를 내야 한다는 작업도 명시했다.
 - 🤖 상위 서비스·아키텍처·Backend API·DB·Frontend·다음 할 일·팀 결정 문서를 동기화했다. Frontend asset catalog/resolver와 Backend asset metadata·publish validation 책임은 별도 작업으로 나눴다.
@@ -32,7 +42,7 @@
 
 ### Game Studio 편집기 시안 구현 가능성 검토 ✅
 
-- 🤖 사용자 제공 시안의 Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish 구성을 spec 019와 대조했다.
+- 🤖 사용자 제공 시안의 Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish 구성을 당시 spec 019(현재 spec 020)와 대조했다.
 - 🤖 시안의 핵심인 `타일 레이어 + Asset 참조 + Object/Component + Trigger/Condition/Action + GameProject JSON + Web Runtime` 흐름은 현재 v1 계약과 일치하며, 첫 MVP 화면 구조로 사용할 수 있음을 확인했다.
 - 🤖 실제 구현에서는 브라우저 로컬 `Assets 폴더`를 영구 기준으로 삼지 않고, 기본 asset catalog 또는 서버가 발급한 asset reference를 GameProject가 참조하도록 구분해야 한다. 편집기와 Runtime은 같은 원본 JSON을 소비하되 Runtime은 편집기 상태를 직접 읽지 않는다.
 - 🤖 첫 수직 범위는 `TOP_DOWN + DIALOGUE`, 열쇠 획득→문 열기→대화→Scene 이동으로 유지한다. PLATFORMER와 범용 퍼즐 노드 편집기는 MVP 검증 뒤 확장한다.
@@ -45,7 +55,7 @@
 
 - 🤖 사용자 요청에 따라 Game Studio 작업 기록을 일반 Unity/프로젝트 일지에서 분리했다.
 - 🤖 기존 `24_작업일지.md`의 Game Studio 3개 작업 섹션을 이 문서로 이동하고, 기존 T-162~T-168은 `28_Game_Studio_트러블슈팅.md`의 `GS-T001~GS-T007`로 재분류했다.
-- 🤖 `AGENTS.md`, `CLAUDE.md`, `docs/KHS/README.md`, spec 019의 spec/plan/tasks, `docs/22_다음_할일.md`에 전용 기록 경로를 반영했다.
+- 🤖 `AGENTS.md`, `CLAUDE.md`, `docs/KHS/README.md`, 당시 spec 019(현재 spec 020)의 spec/plan/tasks, `docs/22_다음_할일.md`에 전용 기록 경로를 반영했다.
 - 🤖 앞으로 Game Studio 작업 완료 시 이 파일만 갱신하고, 일반 `24_작업일지.md`에는 중복 기록하지 않는다.
 - 트러블슈팅: GS-T008, GS-T009
 
@@ -71,7 +81,7 @@
 
 ### Game Studio P2 스펙·파트 계약·GitHub 이슈 등록 ✅
 
-- 🤖 기존 001~018 기능 spec과 Unity 동결 기준선은 수정하지 않고, 웹 2D UGC 전용 **`019-game-studio` Draft spec**을 신설했다. 첫 범위는 `TOP_DOWN + DIALOGUE`, 후속은 `PLATFORMER`이며 `PUZZLE`은 별도 Runtime이 아니라 Event/Component 조합으로 먼저 검증한다.
+- 🤖 기존 001~018 기능 spec과 Unity 동결 기준선은 수정하지 않고, 웹 2D UGC 전용 Draft spec을 당시 `019-game-studio`로 신설했다(현재 Backend 번호 충돌 회피로 `020-game-studio`). 첫 범위는 `TOP_DOWN + DIALOGUE`, 후속은 `PLATFORMER`이며 `PUZZLE`은 별도 Runtime이 아니라 Event/Component 조합으로 먼저 검증한다.
 - 🤖 실행 경계를 확정 가능한 수준까지 정리했다. **독립 URL은 React 2D Runtime이 바로 실행**하고, 부스 안에서는 `Unity 상호작용 → React Host → Spring Portal Binding → React Runtime` 순서로 진입한다. Unity는 GameProject를 조회·해석·실행하지 않으며 별도 WebGL 게임 Build도 만들지 않는다.
 - 🤖 파트 답변이 필요한 계약을 GitHub 이슈로 등록했다 — [#20 Frontend](https://github.com/kanghyunsoon/ssafesta/issues/20)(`@ghkim1632`, `@colosair`), [#21 Backend](https://github.com/kanghyunsoon/ssafesta/issues/21)(`@strdeok`), [#22 AI](https://github.com/kanghyunsoon/ssafesta/issues/22)(담당 계정 미지정).
 - 🤖 답변 전 진행 가능한 공통 계약을 작성했다. GameProject JSON Schema, Draft/Publish·Runtime·Portal API 경계, Unity→React Bridge, 파트 책임표와 최소 수직 fixture(`열쇠 → 문 → 대화 → 완료`)를 추가했다.

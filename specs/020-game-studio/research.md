@@ -43,7 +43,7 @@ PUZZLE은 v1 별도 Scene이 아니라 Object Component + Event 조합이다.
 ## 4. Asset과 배치 데이터 분리
 
 **Decision**: GameProject에는 Asset reference와 Tile/Object 배치만 저장하고 binary나 완성 화면 이미지를
-저장하지 않는다. MVP는 versioned builtin catalog를 사용하고 업로드는 #21 이후 확장한다.
+저장하지 않는다. MVP는 Game Studio가 소유하는 versioned builtin catalog를 사용하고 업로드는 별도 Asset spec으로 확장한다.
 
 **Rationale**: 같은 프로젝트를 Studio Preview와 Published Runtime이 동일하게 재구성할 수 있고,
 이미지 중복·만료 URL·브라우저 로컬 경로가 Published snapshot에 섞이지 않는다.
@@ -80,22 +80,37 @@ Spring Publish 전, Runtime load 시 각 경계에 맞춰 반복한다.
 
 ## 7. Draft와 Published
 
-**Decision**: Draft는 revision 충돌을 검출하고 Published Version은 불변으로 유지한다.
+**Decision**: `game_drafts`는 Game당 하나를 PK로 강제하고 revision 충돌을 검출한다.
+`game_published_versions`는 `(gameId, versionNo)`별 불변 행을 append하며 Publish는 새 행과
+`games.publishedVersion` 포인터 갱신을 단일 트랜잭션으로 처리한다.
 
 **Rationale**: 편집 중 저장이 현재 방문자 게임을 바꾸지 않고, rollback과 cache가 단순해진다.
 
 **Alternatives considered**:
 
 - 한 JSON 행을 Draft/Published가 공유: 편집 노출과 rollback 문제가 있어 제외.
-- 모든 autosave를 영구 version으로 보존: 저장량·정리 정책이 불필요하게 커져 #21 전에는 채택하지 않는다.
+- 모든 autosave를 영구 version으로 보존: 저장량·정리 정책이 불필요하게 커져 채택하지 않는다.
 
-## 8. 확정 보류 항목
+## 8. FESTA Frontend 내부 모듈
 
-다음은 조사 부족이 아니라 담당 파트 결정권 때문에 보류한다.
+**Decision**: 별도 origin/Vite 앱 대신 `festa-frontend/src/game-studio/` 내부 소유 모듈로 두고
+`/app/games/:gameId/edit`, `/app/games/:gameId/play` lazy route를 사용한다. Preview도 same-origin이다.
 
-- #20: 독립 앱 물리 경로, renderer/physics library, iframe preview origin/lifecycle, auth/CI 경계,
-  편집 화면의 실제 반응형 배치
-- #21: Game aggregate 실제 테이블, revision HTTP 계약, cache/보존, Asset upload·resolver
-- #22: AI 기능 MVP 제외 확정과 후속 async generation
+**Rationale**: Access Token은 JavaScript 메모리에 있고 Preview payload로 Token 전달을 금지하므로,
+같은 앱에서 기존 인증과 API client를 재사용하는 것이 가장 작은 안전 경계다. lazy chunk로 일반 FESTA
+사용자의 초기 번들 결합을 줄이고 디렉터리 소유권으로 수직 구현 책임을 분리한다.
 
-계약·fixture·순수 상태 전이 작업은 이 결정과 독립적이다.
+**Alternatives considered**:
+
+- 별도 Vite origin: 인증 전달·배포·CSP 계약이 추가되어 제외.
+- 새 workspace/monorepo: 현재 단일 앱 규모에서 설정 비용이 커 제외.
+
+## 9. 확정 보류 항목
+
+다음은 조사 부족이 아니라 담당 파트 또는 제품 결정권 때문에 보류한다.
+
+- #33: 공개 중단 중 세션, 수동 삭제·Published 이력, 표시 전용 Ranking 도입 시점
+- #34: Portal `configId` DB key와 signed Int32 wire mapping, `GAME_PORTAL` whitelist
+- #35: TOP_DOWN renderer, Preview sandbox/CSP/UI, builtin Asset resolver 세부
+
+계약 fixture와 순수 상태 전이는 이 결정과 독립적이다.

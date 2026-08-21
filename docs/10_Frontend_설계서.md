@@ -517,11 +517,15 @@ Secret 값은 Frontend 환경변수에 넣지 않는다.
 
 ---
 
-## 19A. Game Studio P2 독립 앱
+## 19A. Game Studio P2 내부 lazy 모듈
 
 Game Studio는 Unity WebGL 위에 그리는 UI가 아니라 React 계층의 독립 제작기와 2D Runtime이다.
-기존 FESTA Host와 인증·라우팅·API Client·오버레이 Shell만 공유하고, 편집 상태와 Runtime 코드는
-별도 폴더/패키지 경계로 둔다.
+배포와 origin은 기존 `festa-frontend`를 사용하되 코드 소유권은 `src/game-studio/`로 분리한다.
+기존 인증·`shared/api/client.ts`·오버레이 Shell을 재사용하고 lazy route로 초기 번들을 격리한다.
+
+- 제작: `/app/games/:gameId/edit`
+- 플레이: `/app/games/:gameId/play`
+- Preview: 같은 origin의 내부 Runtime iframe. Token은 `postMessage`에 넣지 않는다.
 
 Frontend 책임:
 
@@ -533,6 +537,7 @@ Frontend 책임:
 - Published Version의 Canvas 기반 2D 실행
 - 독립 게임 URL과 FESTA 오버레이 진입 경로
 - 기존 `window.FestaUnity.onBoothInteract` 이벤트를 Portal Resolver에 연결
+- `OnOverlayStateChanged({ state: OPENED|CLOSED|FAILED, overlay: GAME })`로 Unity 입력 lifecycle 전달
 
 Frontend 비책임:
 
@@ -541,8 +546,9 @@ Frontend 비책임:
 - Unity 안에서 GameProject를 실행하는 기능
 - AI 응답 없이는 저장할 수 없는 제작 흐름
 
-권장 경계와 폴더 초안은 [`specs/019-game-studio/contracts/part-boundaries.md`](../specs/019-game-studio/contracts/part-boundaries.md),
-Frontend 미확정 항목은 [GitHub #20](https://github.com/kanghyunsoon/ssafesta/issues/20)에서 관리한다.
+확정 경계는 [`specs/020-game-studio/contracts/part-boundaries.md`](../specs/020-game-studio/contracts/part-boundaries.md)다.
+Host 계약 #20은 반영했으며 Studio 내부 선택은 [#35](https://github.com/kanghyunsoon/ssafesta/issues/35),
+Portal 타입은 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)에서 관리한다.
 
 ---
 
@@ -555,7 +561,7 @@ Frontend 미확정 항목은 [GitHub #20](https://github.com/kanghyunsoon/ssafes
 - Layout 충돌 처리
 - 모바일 Booth Studio 지원 범위
 - WebSocket 인증 갱신 방식
-- Game Studio를 기존 앱 workspace package로 둘지 독립 배포 앱으로 둘지
-- Game Runtime 렌더러와 오버레이/새 경로 진입 UX
-- Game Studio 실제 반응형 패널 배치와 Preview 표시 형태
-- 사용자 Asset upload 도입 시 Runtime resolver와 cache 정책
+- Game Runtime renderer와 후속 PLATFORMER physics adapter (#35)
+- Game Studio 실제 반응형 패널 배치, Preview 표시 형태와 iframe sandbox/CSP (#35)
+- builtin Asset resolver 내부 구조 (#35)
+- 사용자 Asset upload 도입 시 Runtime resolver와 cache 정책 (별도 Asset spec)
