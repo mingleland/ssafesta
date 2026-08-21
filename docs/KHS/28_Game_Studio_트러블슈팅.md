@@ -8,11 +8,11 @@
 
 ## 2026-08-21
 
-### GS-T018. 원격 게시 후 develop 재정렬로 로컬·원격 feature 이력이 갈라짐 (해결 예정)
+### GS-T018. 원격 게시 후 develop 재정렬로 로컬·원격 feature 이력이 갈라짐 (해결)
 
 - **증상** — 원격에 게시한 `feature/game-studio-foundation`이 최신 develop보다 3커밋 뒤였고, rebase 후 로컬은 원격 기준 ahead/behind가 동시에 표시됐다.
 - **원인** — Game Studio 원격 게시 뒤 PR #29 등 공통 문서 커밋이 develop에 추가되어 최신 기준선 재정렬이 필요했다.
-- **해결** — 기존 tip을 `backup/game-studio-pre-issue-sync-20260821`에 보존하고 최신 `origin/develop` 위로 충돌 없이 rebase했다. 최종 검증 뒤 `--force-with-lease`로 소유 feature 브랜치만 갱신한다.
+- **해결** — 기존 tip을 `backup/game-studio-pre-issue-sync-20260821`에 보존하고 최신 `origin/develop` 위로 충돌 없이 rebase한 뒤, `--force-with-lease`로 소유 feature 브랜치만 원격 갱신했다.
 - **예방** — 원격 feature를 rebase할 때는 사전 backup, 원격 fetch, develop 가상 병합, `--force-with-lease` 순서를 지키고 공유 파트 브랜치에는 강제 push하지 않는다.
 
 ### GS-T017. 큰 문서 패치가 마지막 문맥 불일치로 전체 실패함 (해결)

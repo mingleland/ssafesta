@@ -11,6 +11,8 @@
 
 ### 파트 이슈 답변 반영·spec 020 이동·후속 결정 분리 ✅
 
+- 🤖 결정 반영이 완료된 GitHub #20 Frontend, #21 Backend를 후속 이슈 링크와 함께 닫았다. #22 AI까지 원계약 질의 3건은 모두 종료했으며, 미결정·구현 항목은 #33~#35에서 독립 추적한다.
+- 🤖 최신 `origin/develop` 위로 재정렬한 `feature/game-studio-foundation`을 `--force-with-lease`로 원격 동기화했다. 사전 백업 브랜치를 보존했으며 Unity/Game 작업 경로는 포함하지 않았다.
 - 🤖 GitHub #20 Frontend, #21 Backend, #22 AI의 신규 답변을 전체 확인했다. FE는 기존 `festa-frontend` 내부 lazy module과 same-origin Preview, BE는 Draft/Published 2테이블·revision 409·atomic Publish, AI는 P0/P1 비의존과 P2 candidate/patch·spec 007 Job 정책을 확정했다.
 - 🤖 기존 Backend 브랜치의 `019-erd-schema`와 번호 충돌을 피하기 위해 Game Studio 전체 경로를 `specs/019-game-studio/`에서 `specs/020-game-studio/`로 선제 이동하고 agent 규칙·상위 문서·Spec-Kit feature 경로를 동기화했다.
 - 🤖 완료된 AI 이슈 #22를 닫았다. #20·#21의 남은 항목은 [#33 제품 정책](https://github.com/kanghyunsoon/ssafesta/issues/33), [#34 Portal ID](https://github.com/kanghyunsoon/ssafesta/issues/34), [#35 Studio 내부](https://github.com/kanghyunsoon/ssafesta/issues/35)로 분리했다.
