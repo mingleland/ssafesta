@@ -16,6 +16,8 @@
 - 🤖 `/app/games/:gameId/edit|play` lazy route 경계, 유효 snapshot만 보관하는 undo/redo authoring store, Pickup/Locked Door 편의 필드와 표준 Component/Event 간 왕복 preset recipe를 추가했다.
 - 🤖 Unity 없이 `열쇠 → 문 → Overlay → Full-screen Dialogue → 완료` 전체 상태 전이를 통합 검증했다. Vitest **7 files / 29 tests**, TypeScript+Vite production build, oxlint를 모두 통과했고 Edit/Play가 별도 lazy chunk로 출력됨을 확인했다.
 - 🤖 구현 변경 23경로는 전부 `festa-frontend/**`이며 `festa-unity/**`와 `backend/**`는 0건이다. 원격 브랜치를 최신 `front` 위로 충돌 없이 재배치하고 `--force-with-lease`로 갱신했다.
+- 🤖 Frontend 검토용 [PR #47](https://github.com/kanghyunsoon/ssafesta/pull/47)을 `front` 대상으로 열고, #35에 완료한 비의존 범위와 남은 renderer/Preview/Asset gate를 분리해 공유했다.
+- 🤖 #33의 신규 진입 판정 질문에는 전용 게임 소켓 없이 route/overlay 진입 때 REST로 상태를 재검증하고 이미 로드된 무보상 로컬 Session은 완료까지 허용한다고 답변했다. Backend 응답 코드 확인 전까지 #33은 유지한다.
 - 🤖 `tasks.md`의 T010~T013, T017~T024, T026, T077을 완료 처리해 총 90개 중 누적 **35개 완료**로 갱신했다. Renderer/Preview iframe/Asset resolver는 #35, Portal은 #34, 제품 정책은 #33의 gate를 유지한다.
 - 트러블슈팅: GS-T020~GS-T022
 
