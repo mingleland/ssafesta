@@ -58,6 +58,20 @@ namespace Festa.Network
                 _nickname = GUILayout.TextField(_nickname);
                 GUILayout.EndHorizontal();
 
+                // Host = 서버 + 클라이언트를 한 인스턴스에서. 스폰·이동·상호작용을
+                // 에디터 하나로 검증할 때 가장 빠르고, 승인 흐름도 같은 경로를 탄다.
+                // (원격 표현 검증은 인스턴스가 둘 필요하다 — 그때 Server + Client 를 쓴다.)
+                if (GUILayout.Button("Start Host (서버+클라 한 인스턴스)"))
+                {
+                    _connection.StartHost(new ConnectionPayload
+                    {
+                        userId = Random.Range(1, 100000),
+                        nickname = _nickname,
+                        avatarCode = AvatarAppearance.DefaultPreset,
+                        connectionToken = "poc-dummy-token"
+                    });
+                }
+
                 if (GUILayout.Button("Start Server (로컬 테스트용)"))
                     nm.StartServer();
 
@@ -101,6 +115,19 @@ namespace Festa.Network
         /// </summary>
         async void ConnectViaSessionApi()
         {
+            // 이미 서버/클라이언트로 떠 있으면 StartClient 를 걸지 않는다.
+            // NetworkManager 는 싱글턴이라 겹쳐 요청하면 전송 계층이
+            // "Failed to connect to server." 만 남기고 원인을 알려주지 않는다 (T-180).
+            var running = Unity.Netcode.NetworkManager.Singleton;
+            if (running != null && (running.IsListening || running.IsClient))
+            {
+                Debug.LogWarning(
+                    $"[DevConnectionHud] 이미 네트워크가 떠 있어 접속 요청을 건너뛴다 " +
+                    $"(IsServer={running.IsServer} IsClient={running.IsClient}). " +
+                    "로비에서 넘어왔는데 이 인스턴스가 서버로 시작된 경우다.");
+                return;
+            }
+
             ApiServices.EnsureInitialized();
             var session = await ApiServices.User.CreateWorldSessionAsync();
             if (session == null)

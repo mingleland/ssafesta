@@ -80,6 +80,32 @@ namespace Festa.Network
             return ok;
         }
 
+        /// <summary>
+        /// 개발용 Host — 서버와 클라이언트를 한 인스턴스에서 띄운다.
+        ///
+        /// 배포 구조는 Dedicated Server 이고 Host 는 쓰지 않는다. 다만 스폰·이동·상호작용을
+        /// 에디터 하나로 검증할 때는 인스턴스 두 개를 띄우는 것보다 빠르고, 승인 콜백과
+        /// 스폰 슬롯 배정이 클라이언트와 **같은 경로**를 타므로 검증 가치가 유지된다.
+        /// 원격 표현(다른 사람 아바타)까지 보려면 인스턴스가 둘 필요하다 — 그때는
+        /// Server + Client 를 쓴다.
+        /// </summary>
+        public bool StartHost(ConnectionPayload payload)
+        {
+            var nm = NetworkManager.Singleton;
+            var transport = nm.GetComponent<UnityTransport>();
+
+            transport.UseWebSockets = true;
+            transport.UseEncryption = false;
+            transport.SetConnectionData("127.0.0.1", _hostPort, "0.0.0.0");
+            nm.NetworkConfig.ConnectionData = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
+
+            bool ok = nm.StartHost();
+            Debug.Log($"[ConnectionManager] StartHost ws://127.0.0.1:{_hostPort} → {ok}");
+            return ok;
+        }
+
+        const ushort _hostPort = 7777;
+
         public void Shutdown()
         {
             NetworkManager.Singleton.Shutdown();

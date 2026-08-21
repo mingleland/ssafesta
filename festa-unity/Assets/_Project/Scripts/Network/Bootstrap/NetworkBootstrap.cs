@@ -28,15 +28,24 @@ namespace Festa.Network
             // 배포 시 브라우저는 wss:// → ALB(TLS 종료) → ws:// 서버 순서로 연결된다.
             transport.UseWebSockets = true;
 
-#if UNITY_SERVER
-            StartDedicatedServer(transport);
-#else
-            if (Application.isBatchMode || HasArg("-server"))
+            // 자동 시작 조건 — **에디터에서는 자동으로 서버가 되지 않는다.**
+            //
+            // 전에는 `#if UNITY_SERVER` 만 보고 시작했는데, 빌드 타깃을 Dedicated Server 로
+            // 두면 그 심볼이 **에디터에도 정의된다.** 그러면 Play 를 누르는 순간 에디터가
+            // 서버가 되고, 로비에서 넘어온 핸드오프가 같은 NetworkManager 에 StartClient 를
+            // 걸어 "Failed to connect to server." 로 끝난다 — 원인이 전혀 드러나지 않는
+            // 형태였다 (T-180). 에디터에서 서버를 띄우려면 DevConnectionHud 의
+            // "Start Server" 버튼이나 `-server` 인자를 쓴다.
+            bool isRealServerBuild = !Application.isEditor;
+            if (isRealServerBuild || Application.isBatchMode || HasArg("-server"))
             {
                 StartDedicatedServer(transport);
+                return;
             }
-            // 그 외에는 DevConnectionHud가 수동 시작을 담당한다.
-#endif
+
+            Debug.Log("[NetworkBootstrap] 에디터에서는 자동 시작하지 않는다 — " +
+                      "DevConnectionHud 로 Host/Server/Client 를 고른다. " +
+                      $"(빌드 타깃 서브타깃이 Server 여도 마찬가지다)");
         }
 
         void StartDedicatedServer(UnityTransport transport)
