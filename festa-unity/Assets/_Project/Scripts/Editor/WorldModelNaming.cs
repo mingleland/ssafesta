@@ -410,6 +410,49 @@ namespace Festa.EditorTools
             root.Find("elevator-door-left") != null && root.Find("elevator-door-right") != null;
 
         /// <summary>
+        /// 칸 안쪽 세부. **기본값은 비활성**이다 — 11층 월드에서 엘리베이터는 문만 보이는
+        /// 외관이고, 안쪽은 문이 닫혀 있어 보이지 않는다.
+        ///
+        /// 왜 애셋에서 끄는가 (씬에서 끄지 않고) —
+        /// 씬의 `SetActive(false)` 는 `m_IsActive` 프리팹 오버라이드라 모델을 교체하면
+        /// 사라진다 (T-156 과 같은 부류). 여기서 끄면 재임포트에도 유지된다.
+        ///
+        /// 비용 근거 (실측, 3대 합 드로우 정점):
+        ///   패널 2개 1,212,564 (99.3%)  /  셸+손잡이 8,370  /  문 4장 480
+        /// 즉 **안쪽을 끄면 그려지는 양이 1/138 로 줄고 겉모습은 그대로다.**
+        /// 오클루전 컬링 데이터가 없어 문 뒤라도 프러스텀에 들면 그려지므로 실제 절약이다.
+        ///
+        /// 엘리베이터를 **별도 지역**으로 만들어 칸에 들어가게 할 때는, 그 씬(혹은 프리팹
+        /// 배리언트)에서 이 오브젝트들을 다시 켜면 된다 — 거기서는 오버라이드가 의도된 것이다.
+        /// </summary>
+        static readonly string[] ElevatorInteriorDetail =
+        {
+            "elevator-panel-accessible",  // 606,378 / 3대
+            "elevator-panel-main",        // 606,186 / 3대
+            // 스위치는 벽 두께(x 8.02~15.45) 안에 묻혀 방에서 영구히 보이지 않는다.
+            // 상호작용 트리거는 외부 부스가 담당하므로 이 메시가 필요하지 않다.
+            "elevator-switch",
+        };
+
+        /// <summary>칸 안쪽 세부를 끈다. 켜는 것은 엘리베이터 지역 쪽 책임이다.</summary>
+        public static (int count, string report) DisableElevatorInterior(Transform model)
+        {
+            int n = 0;
+            var sb = new StringBuilder();
+            foreach (var name in ElevatorInteriorDetail)
+            {
+                var t = model.Find(name);
+                if (t == null) { sb.AppendLine($"    ⚠ 없음: {name}"); continue; }
+                if (!t.gameObject.activeSelf) continue;
+                int v = t.GetComponentsInChildren<MeshFilter>(true).Sum(f => f.sharedMesh?.vertexCount ?? 0);
+                t.gameObject.SetActive(false);
+                n++;
+                sb.AppendLine($"    {name,-28} 비활성 (정점 {v:N0}/대)");
+            }
+            return (n, sb.ToString());
+        }
+
+        /// <summary>
         /// 루트 직속 이름 정리. 병합이 자식을 지우므로 **루트 직속 이름만 살아남는다** —
         /// 안쪽 `Group N` 490개는 병합으로 사라지니 따로 손대지 않는다.
         /// </summary>
@@ -789,6 +832,8 @@ namespace Festa.EditorTools
             var (nodes, removed, combineReport) =
                 WorldModelNaming.CombineElevatorSubtrees(t, (id, mesh) => context.AddObjectToAsset(id, mesh));
             var (nMesh, nBox, colReport) = WorldModelNaming.AddElevatorColliders(t);
+            // 콜라이더를 먼저 붙인 뒤에 끈다 — 지역 쪽에서 다시 켜면 콜라이더가 함께 살아난다.
+            var (nOff, offReport) = WorldModelNaming.DisableElevatorInterior(t);
             int instanced = WorldModelNaming.EnableGpuInstancing(t, dryRun: false);
 
             Debug.Log(
@@ -798,6 +843,8 @@ namespace Festa.EditorTools
                 combineReport +
                 $"  콜라이더      : Mesh {nMesh} / Box {nBox}\n" +
                 colReport +
+                $"  칸 안쪽 비활성 : {nOff}개 (문만 보이는 외관 — 지역 쪽에서 다시 켠다)\n" +
+                offReport +
                 $"  GPU 인스턴싱  : 머티리얼 {instanced}개\n" +
                 "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다.");
         }
