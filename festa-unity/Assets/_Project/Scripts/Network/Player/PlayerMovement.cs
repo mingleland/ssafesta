@@ -29,27 +29,114 @@ namespace Festa.Network
         [Tooltip("접지 상태에서 유지하는 하강 속도 — 경사·계단에서 붙어 있게 한다.")]
         [SerializeField] float _groundedStick = -20f;
 
+        // ── 스폰 위치 강제 ────────────────────────────────────────
+        // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
+        // (<see cref="ClientAuthoritativeNetworkTransform"/>) 스폰 직후 경합에서 Owner 쪽
+        // 초기 상태(프리팹 원위치 = 원점)가 이기면 서버 배정이 무시된다 — 원점은 방 밖
+        // 허공이라 "대부분 허공에서 떨어지고 가끔만 맵에서 스폰" 이 된다 (T-177).
+        // 권위자인 Owner 스스로 이 값으로 텔레포트하면 어떤 경합이 있어도 결정적이다.
+        public NetworkVariable<Vector3> ServerSpawnPosition = new(
+            Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+        const float SpawnWaitTimeout = 3f; // 값 미수신(버전 불일치 등) 시 현재 위치로 진행
+
         NetworkPlayer _player;
         PlayerCameraFollow _cameraFollow;
         CharacterController _controller;
+        Unity.Netcode.Components.NetworkTransform _networkTransform;
         float _turnVelocity;
         float _verticalSpeed;
+        bool _spawnPlaced;
+        float _spawnWaitStart;
 
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
             _cameraFollow = GetComponent<PlayerCameraFollow>();
             _controller = GetComponent<CharacterController>();
+            _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
             enabled = IsOwner; // 원격 플레이어는 NetworkTransform 수신만
 
             // 원격 플레이어는 NetworkTransform 이 transform 을 직접 쓴다.
             // CharacterController 가 켜져 있으면 그 대입과 싸우므로 Owner 만 남긴다.
             if (_controller != null) _controller.enabled = IsOwner;
+
+            if (IsServer)
+                ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
+
+            if (IsOwner)
+            {
+                _spawnWaitStart = Time.time;
+                ServerSpawnPosition.OnValueChanged += OnServerSpawnPositionChanged;
+                TryPlaceAtServerSpawn(); // 초기 동기화로 이미 와 있으면 즉시
+            }
+            else
+            {
+                _spawnPlaced = true; // 원격/서버 표현은 NetworkTransform 이 책임진다
+            }
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (IsOwner) ServerSpawnPosition.OnValueChanged -= OnServerSpawnPositionChanged;
+        }
+
+        void OnServerSpawnPositionChanged(Vector3 _, Vector3 next)
+        {
+            if (!_spawnPlaced) PlaceAt(next);
+        }
+
+        void TryPlaceAtServerSpawn()
+        {
+            var pos = ServerSpawnPosition.Value;
+            if (pos == Vector3.zero) return; // 아직 미수신 — 실제 스폰 y 는 항상 0보다 크다
+            PlaceAt(pos);
+        }
+
+        /// <summary>
+        /// Owner 를 서버 배정 위치에 강제로 놓는다.
+        /// CharacterController 는 켜진 상태의 transform 대입을 무시하므로 껐다 켠다.
+        /// NetworkTransform.Teleport 로 원격에도 보간 없이 즉시 반영한다.
+        /// </summary>
+        void PlaceAt(Vector3 pos)
+        {
+            _spawnPlaced = true;
+
+            float drift = Vector3.Distance(transform.position, pos);
+            if (drift > 0.5f)
+                Debug.LogWarning($"[PlayerMovement] 스폰 경합 감지 — Owner 가 {transform.position} 에 있었다. " +
+                                 $"서버 배정 {pos} 로 강제 이동 (이탈 {drift:F1})");
+
+            bool controllerWasEnabled = _controller != null && _controller.enabled;
+            if (controllerWasEnabled) _controller.enabled = false;
+
+            if (_networkTransform != null && _networkTransform.CanCommitToTransform)
+                _networkTransform.Teleport(pos, transform.rotation, transform.localScale);
+            else
+                transform.position = pos;
+            Physics.SyncTransforms();
+
+            if (controllerWasEnabled) _controller.enabled = true;
+            _verticalSpeed = 0f;
         }
 
         void Update()
         {
             if (!IsOwner) return;
+
+            // 서버 배정 위치를 받기 전에는 움직이지 않는다 — 잘못된 자리에서
+            // 중력으로 떨어지기 시작하면 배정 위치가 와도 이미 이탈해 있다.
+            if (!_spawnPlaced)
+            {
+                TryPlaceAtServerSpawn();
+                if (!_spawnPlaced && Time.time - _spawnWaitStart > SpawnWaitTimeout)
+                {
+                    Debug.LogWarning("[PlayerMovement] 서버 스폰 위치를 받지 못했다 — 현재 위치로 진행 " +
+                                     "(서버/클라이언트 빌드 버전이 같은지 확인해라)");
+                    _spawnPlaced = true;
+                }
+                if (!_spawnPlaced) return;
+            }
 
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
