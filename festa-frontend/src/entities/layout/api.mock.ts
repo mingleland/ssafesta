@@ -32,7 +32,29 @@ interface StoredDraft {
   publishedVersion: number | null;
 }
 
-const drafts = new Map<number, StoredDraft>();
+// sessionStorage로 백업 — 순수 메모리면 브라우저 새로고침마다 초기화돼 "새로고침 후 복원"(SC-001)을
+// mock으로 증명할 수 없다. 탭을 닫으면 사라지는 정도가 딱 맞는 휘발성이라 sessionStorage를 쓴다.
+const STORAGE_KEY = 'festa-mock-layout-drafts';
+
+function loadDrafts(): Map<number, StoredDraft> {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return new Map();
+    return new Map(JSON.parse(raw) as Array<[number, StoredDraft]>);
+  } catch {
+    return new Map();
+  }
+}
+
+function persistDrafts(): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(drafts.entries())));
+  } catch {
+    // sessionStorage 미가용(예: 프라이빗 모드 제한) — mock은 이번 세션만 메모리로 동작
+  }
+}
+
+const drafts = loadDrafts();
 
 export async function getDraft(boothId: number): Promise<DraftGetResponse | null> {
   const stored = drafts.get(boothId);
@@ -101,6 +123,7 @@ export async function putDraft(boothId: number, body: DraftPutRequest): Promise<
     updatedByUserId: 1,
     publishedVersion: existing?.publishedVersion ?? null,
   });
+  persistDrafts();
 
   return {
     boothId,
@@ -124,6 +147,7 @@ export async function publish(boothId: number): Promise<PublishResponse> {
 
   const nextPublished = (stored.publishedVersion ?? 0) + 1;
   stored.publishedVersion = nextPublished;
+  persistDrafts();
   return { boothId, publishedVersion: nextPublished, publishedAt: new Date().toISOString(), warnings };
 }
 
