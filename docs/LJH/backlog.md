@@ -8,7 +8,8 @@
 
 ## 현재 상태 (2026-08-21)
 
-- spec 005: 리뷰 ①②③④+BE 검토칸 전부 완료. 제목 `FE 검토 완료 (C-04 기획 승인 대기)` — 전체 "확정"은 아님
+- spec 005: 리뷰 ①②③④+BE 검토칸 전부 완료. 제목 `FE 검토 완료 (C-04 기획 승인 대기)` — 전체 "확정"은 아님.
+  **`/speckit-plan` 산출물 완성**(plan/research/data-model/quickstart, C-04는 PROVISIONAL로 잠정 진행). 다음 단계 `/speckit-tasks`
 - spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`은 왕복 검증 통과로 **잠금 해제 가능**
 - Clarification: C-03·C-05 확정, C-07 후순위, **C-04 미결(기획 승인)**, **C-06 재점화(#19 footprint)**
 - 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만. `FE.md` develop 완전 동기화 완료
@@ -19,6 +20,8 @@
 - 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`·`FE.md` 완료, 나머지 순차 진행
 - ⚠️ **신규 — #30 인프라 구조 전면 변경(blocker)**: 단일 EC2+Jenkins+Cloudflare로 `docs/21` ADR 2건 무효.
   **FE 영향**: refresh 토큰 쿠키 도메인 재확정 필요(@Alexjung0115 TLS 답변 후). #31 1층 폐기 — FE엔 로딩 오버레이 경계 질문 1건(WebGL 로더 미구현 상태로 답변)
+- **신규 — #32 spec 008 C-08 SSE payload** — assignee=colosair, 유일한 배정 이슈. 회신 완료, AI 재회신 대기(아래 참조)
+- **신규 — #36 spec 005 BE 구현 통보** — back PR #27 머지 완료(테스트 191개, 실서버 22단계 검증). `revision`/`version`/`schemaVersion` 3분리, 오류 봉투 5필드, 미지 필드 거부 확정. **FE plan 산출물에 전부 반영. #36 자체 회신은 미착수**
 
 ---
 
@@ -27,8 +30,8 @@
 ### 타 파트 결정 대기
 
 - [ ] **C-04** 콘텐츠 미연결 오브젝트의 공개를 막는가 — 기획 승인. FE 의견은 "막지 않고 경고".
-      **spec 005 전체 확정의 마지막 조건**
-- [ ] **C-05 잔여** 요청 스키마의 `version` 위치 — BE 착수 시 확정
+      **spec 005 전체 확정의 마지막 조건.** plan 산출물은 이 값으로 PROVISIONAL 진행(2026-08-21)
+- [x] **C-05 잔여** 요청 스키마의 `version` 위치 — **#36으로 해소.** `expectedRevision`(PUT body) + `409 LAYOUT_REVISION_CONFLICT`로 확정 구현됨
 - [ ] **LAPTOP 주소 저장 위치** — BE `booths` URL 컬럼 추가 확인. 방향은 부스 단위 1개로 이미 수렴
 - [ ] **C-06** 템플릿 종수 — 보류 판단이었으나 **[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)로 재점화**.
       Unity가 셸을 6×6m 임의값으로 만들어 둔 상태라 footprint 확정이 필요해짐. FE는 여전히 설정값 주입 구조 유지
@@ -43,12 +46,20 @@
       **핵심 답**: 앱은 `festa-frontend` 내부 lazy 라우트(인증 공유가 결정적) / 경로는 `/app/games/:gameId/edit|play`
       (제안된 `/studio/:gameId`가 `/app/` 규약 이탈 + Booth Studio와 이름 충돌) / lifecycle은 `OnOverlayStateChanged` 단일 진입점.
       renderer·asset resolver·validation 시점·Studio 화면은 @busypark 이관. **`specs/019` contracts 편집 주체 확인 대기**
+- [x] **[#31](https://github.com/kanghyunsoon/ssafesta/issues/31) 1층 폐기·로딩 오버레이 경계** — 회신 완료(1단계 React·2단계 Unity 동의, `onWorldGateReady` 신호 B안 제안, FR-011 FE 타임아웃 몫 지적). **Unity 답변 대기**
+
+### AI 이슈 — 재회신 대기
+
+- [x] **[#32](https://github.com/kanghyunsoon/ssafesta/issues/32) spec 008 C-08 SSE payload** — 회신 완료(6개 질문 답, envelope·이벤트 순서·오류 구분 동의).
+      **미확인 항목**: `sourceUrl`(출처 문서 열람 링크) 신규 요청 / `retryable` 코드별 매핑 / 15초·60초 타임아웃 code 분리 여부 /
+      `data.type` 중복 필드(SSE 프레이밍 대비) / 재시도 시 `conversationId` 유지·실패 요청 이력 보존 여부 / `handoffRecommended` true 시 FE 반응 범위.
+      **AI(@ghkim1632) 재회신 대기**
 
 ### FE 착수 가능
 
 - [x] `events.ts` `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` 매핑 ✅ 08-20 (`d1bbb4a`)
-- [ ] **블록 4 speckit 파이프라인** — `.specify/feature.json` 지정 → `clarify` → `plan` → `tasks` → `implement`.
-      C-04 확정 전 착수하면 잠정 상태
+- [x] **블록 4 speckit 파이프라인 — plan 완료** ✅ 08-21. `specs/005-booth-studio-layout/{plan,research,data-model,quickstart}.md` 작성
+      (C-04 PROVISIONAL, #36 BE 구현 반영). **다음: `/speckit-tasks` → `/speckit-implement`**
 - [ ] **Game Studio 소켓 4종** — #20 승인 후 착수. `events.ts`에 `BOOTH_GAME_INTERACT` union 멤버 /
       `overlay.ts`에 `GAME` 타입 / 라우터 lazy 연결부 / Host→Unity lifecycle 송신부.
       `features/game-entry/`(`configId → gameId`)는 [#21](https://github.com/kanghyunsoon/ssafesta/issues/21) BE 계약 확정 후
@@ -59,7 +70,7 @@
       목록 제공 시 last-wins 주의사항 있음 (`verify/block1-roundtrip.md`)
 - [ ] **`client.ts`의 `ApiError` 타입 갱신** — 서버가 오류 봉투를 `{code, message, requestId, errors, warnings}`로 통일(#17).
       `errors` 원소 타입 확답 대기(`{field?, code}` 제안, #18 objectId 연계 여부 포함). 확답 오면 착수
-- [ ] **#31 로딩 오버레이 경계 회신** — WebGL 로더 미구현 상태 명시하고 "1단계 React·2단계 Unity" 경계에 동의
+- [x] **#31 로딩 오버레이 경계** — 회신 완료. 미구현 상태 명시, 1단계 React·2단계 Unity 동의, `onWorldGateReady` 신호(B안) 제안, FR-011 FE 타임아웃 몫 지적. **Unity 답변 대기**
 - [ ] **#30 refresh 토큰 도메인** — @Alexjung0115 TLS 종료 지점 답변 후 착수
 
 ---
