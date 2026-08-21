@@ -1,0 +1,64 @@
+# FE Implementation Plan: FESTA Game Studio
+
+**Date**: 2026-08-21 | **Shared spec**: [../spec.md](../spec.md) | **Shared contracts**: [../contracts/](../contracts/)
+
+## Summary
+
+Game Studio는 기존 `festa-frontend` 안의 lazy-loaded 독립 모듈로 구현한다. 제작기와 2D Runtime은
+동일한 GameProject v1 계약과 순수 TypeScript 상태 전이 코어를 공유한다. 첫 수직 범위는
+`TOP_DOWN + DIALOGUE`이며 `PLATFORMER`는 같은 코어 위의 별도 renderer/physics adapter로 추가한다.
+`PUZZLE`은 새 Runtime 종류가 아니라 제한형 Component/Event 조합으로 먼저 제공한다.
+
+Unity WebGL은 게임을 실행하지 않는다. 독립 URL과 Local Preview가 기본 실행 경로이고, 부스 연동 시에만
+Unity가 기존 상호작용을 React Host로 전달한다. React는 Portal Resolver를 조회한 뒤 같은 Web Runtime
+overlay를 연다.
+
+## Technical Context
+
+- TypeScript `~6.0.2`, React 19.2, Vite 8.2, React Router 7.18, TanStack Query 5.101
+- Game Studio 전용 Vitest unit/contract/integration test
+- `/app/games/:gameId/edit`, `/app/games/:gameId/play` lazy route
+- same-origin Preview; 인증 토큰을 `postMessage` payload로 전달하지 않음
+- 사용자 JavaScript·표현식 실행 금지
+- 최대 100×100 tile, 500 objects, 300 events; Runtime 60fps 목표
+
+## Source Boundary
+
+```text
+festa-frontend/src/game-studio/
+├── app/          # edit/play route entry와 API adapter
+├── contracts/    # GameProject TypeScript type/guard
+├── core/         # renderer-independent state/event interpreter
+├── studio/       # Scene/Object/Map/Dialogue/Event editor
+├── runtime/      # scene lifecycle와 renderer adapters
+├── preview/      # same-origin Preview protocol
+├── host/         # FESTA overlay·Portal adapter
+└── __tests__/
+```
+
+기존 인증, `shared/api/client.ts`, 전역 오류 봉투를 재사용한다. 일반 FESTA route는 Game Studio chunk를
+로드하지 않아야 한다. `festa-unity/`와 `backend/`는 FE 구현 브랜치에서 수정하지 않는다.
+
+## Implementation Phases
+
+1. **완료 — 순수 코어**: GameProject type/guard, Runtime state, Condition/Action/Event, Dialogue,
+   undo/redo, reversible preset recipe, lazy edit/play entry를 PR #47에 구현했다.
+2. **Authoring shell**: Scene list, Tile/Object canvas, typed inspector, Dialogue editor를 하나의 store에 연결한다.
+3. **Renderer/Preview**: #35 합의 후 TOP_DOWN renderer, Asset resolver, PreviewHost를 같은 Runtime adapter로 연결한다.
+4. **Backend integration**: [BE plan](../BE/plan.md)의 Draft/Publish API가 준비되면 revision conflict,
+   validation error, Published loader를 연결한다.
+5. **Portal integration**: 독립 URL 수직 흐름을 먼저 통과한 뒤 `BOOTH_GAME_INTERACT`와 overlay lifecycle을 연결한다.
+6. **P2 extension**: PLATFORMER adapter를 추가한다. AI 제작 보조와 사용자 Asset upload는 별도 범위다.
+
+## Gates
+
+- #33은 합의 완료: 새 진입은 REST 조회에서 차단하고 이미 로드된 무보상 로컬 세션은 종료까지 허용한다.
+- #34는 wire/DB 계약 합의 완료: `configId`는 signed Int32 `1..2147483647`, `0` 금지다.
+- #35는 미결: renderer, Preview sandbox/CSP, builtin Asset resolver 구현 선택 전 관련 작업을 시작하지 않는다.
+
+## Verification
+
+- 계약 fixture와 FE unit test가 같은 오류 코드·상태 전이를 검증한다.
+- Edit/Play route가 별도 lazy chunk로 빌드되는지 확인한다.
+- Preview와 Published Runtime에 같은 GameProject를 넣어 최종 상태가 같은지 E2E로 확인한다.
+- Unity와 Backend가 없어도 최소 key→door→dialogue 게임을 제작·완료할 수 있어야 한다.
