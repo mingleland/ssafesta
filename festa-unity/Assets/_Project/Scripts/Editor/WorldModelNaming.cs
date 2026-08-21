@@ -562,23 +562,41 @@ namespace Festa.EditorTools
             set => EditorPrefs.SetBool(DisableKey, value);
         }
 
+        const string ModelsFolder = "Assets/_Project/Models/";
+
+        /// <summary>
+        /// 건축 모델인가 — `Models/` **직속** 파일만 해당한다.
+        ///
+        /// 하위 폴더를 제외하는 이유가 있다. `Models/Laptop/laptop.FBX` 는 노멀맵을 쓰는데
+        /// (`laptop.mat` 에 `_NORMALMAP` 키워드와 `_BumpMap` 슬롯), 아래 `importTangents = None`
+        /// 이 그 파일까지 덮으면 재임포트되는 순간 음영이 깨진다. 탄젠트 제거의 근거는
+        /// "월드 모델 머티리얼 42개 중 노멀맵 0개" 라는 **실측**이고 그 근거는 다른 모델로
+        /// 전이되지 않는다. 처음에 폴더 전체로 잡아 이 잠복 버그를 만들었다 (T-178).
+        ///
+        /// 건축 모델(11층 월드·엘리베이터)은 `Models/` 직속에 둔다. 노멀맵을 쓰는 소품은
+        /// 하위 폴더에 둔다 — 그러면 이 설정이 닿지 않는다.
+        /// </summary>
+        static bool IsArchitecturalModel(string path) =>
+            path.StartsWith(ModelsFolder) &&
+            path.IndexOf('/', ModelsFolder.Length) < 0;   // 직속 = 이후 '/' 없음
+
         /// <summary>
         /// 임포터 설정. `SketchUpImporter` 는 `ModelImporter` 를 상속하므로 FBX 와 같은
         /// 설정이 `.skp` 에도 그대로 적용된다 — 별도 포맷 전환이 필요 없다.
         ///
         /// 이 단계에서는 모델이 아직 임포트되지 않아 계층으로 대상을 판별할 수 없으므로
-        /// 폴더 경로로 거른다. 이 폴더에는 월드 모델만 둔다.
+        /// 경로로 거른다 (<see cref="IsArchitecturalModel"/>).
         /// </summary>
         void OnPreprocessModel()
         {
             if (Disabled) return;
-            if (!assetPath.StartsWith("Assets/_Project/Models/")) return;
+            if (!IsArchitecturalModel(assetPath)) return;
             var mi = assetImporter as ModelImporter;
             if (mi == null) return;
 
-            // 탄젠트 제거 — 모델 머티리얼 42개 중 노멀맵 사용이 0개라 실측으로 확인했다.
-            // 정점당 Float32x4 = 16 byte 를 그냥 버리고 있었다. 노멀맵 있는 에셋을
-            // 이 폴더에 넣으면 음영이 깨지니 그때는 이 줄을 조건부로 바꾼다.
+            // 탄젠트 제거 — 월드 모델 머티리얼 42개 중 노멀맵 사용이 0개라 실측으로 확인했다.
+            // 정점당 Float32x4 = 16 byte 를 그냥 버리고 있었다.
+            // 노멀맵을 쓰는 모델이 이 범위에 들어오면 OnPostprocessModel 이 경고한다.
             mi.importTangents = ModelImporterTangents.None;
             mi.importBlendShapes = false;   // 건축 모델에 블렌드셰이프 없음
             mi.importLights = false;        // 조명은 WorldCeilingSetup 이 만든다
@@ -589,10 +607,32 @@ namespace Festa.EditorTools
             mi.meshCompression = ModelImporterMeshCompression.Medium;
         }
 
+        /// <summary>
+        /// 탄젠트를 지운 모델이 실제로 노멀맵을 쓰면 경고한다. 탄젠트 없이 노멀맵을 쓰면
+        /// 음영이 조용히 틀어지므로 — 화면을 보고 알아채기 전에 로그로 잡는다.
+        /// </summary>
+        static void WarnIfNormalMapWithoutTangents(GameObject root, string path)
+        {
+            var offenders = root.GetComponentsInChildren<MeshRenderer>(true)
+                .SelectMany(r => r.sharedMaterials)
+                .Where(m => m != null && m.HasProperty("_BumpMap") && m.GetTexture("_BumpMap") != null)
+                .Select(m => m.name).Distinct().ToArray();
+            if (offenders.Length == 0) return;
+
+            Debug.LogWarning(
+                $"[WorldModelPostprocessor] {path} 의 머티리얼 {offenders.Length}개가 노멀맵을 쓴다: " +
+                $"{string.Join(", ", offenders.Take(5))}\n" +
+                "  이 경로는 탄젠트를 제거하는 범위(Models/ 직속)다 — 탄젠트 없이 노멀맵을 쓰면 음영이 틀어진다.\n" +
+                "  이 모델을 하위 폴더로 옮기거나(권장), IsArchitecturalModel 판정을 좁혀라.");
+        }
+
         void OnPostprocessModel(GameObject root)
         {
             if (Disabled) return;
             var t = root.transform;
+            // 탄젠트 제거 범위에 들어온 모델이 노멀맵을 쓰면 경고한다 (월드/엘리베이터 공통).
+            if (IsArchitecturalModel(assetPath)) WarnIfNormalMapWithoutTangents(root, assetPath);
+
             if (!WorldModelNaming.IsWorldModel(t)) return;
 
             // 마커를 먼저 끈다 — 이름으로 찾으므로 재명명 뒤에는 찾을 수 없다.
