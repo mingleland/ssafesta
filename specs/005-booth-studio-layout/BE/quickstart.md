@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-20 | **Phase**: 1
 
-구현이 요구사항을 실제로 만족하는지 확인하는 절차다. 계약 세부는 [contracts/layout-api.md](contracts/layout-api.md), 제약·불변식은 [data-model.md](data-model.md)를 본다.
+구현이 요구사항을 실제로 만족하는지 확인하는 절차다. 계약 세부는 [contracts/layout-api.md](../contracts/layout-api.md), 제약·불변식은 [data-model.md](data-model.md)를 본다.
 
 ---
 
