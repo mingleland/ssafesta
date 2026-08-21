@@ -100,18 +100,15 @@
 {
   "boothId": 7,
   "template": "PROJECT_EXHIBITION",
-  "schemaVersion": 1,
+  "version": 2,
   "objects": [
     { "objectId": "screen-1", "type": "VIDEO_SCREEN",
-      "position": { "x": 2.1, "y": 0, "z": 1.4 }, "rotationY": 90, "configId": 152 },
+      "position": { "x": 2.1, "y": 0, "z": 3.4 }, "rotationY": 90, "configId": 152 },
     { "objectId": "ai-1", "type": "AI_AGENT",
       "position": { "x": 1.2, "y": 0, "z": 1.5 }, "rotationY": 0, "configId": 78 }
   ]
 }
 ```
-
-> **`schemaVersion` ≠ `version`** — `schemaVersion`은 Layout JSON의 **구조 버전**(현재 1, 모양이 바뀔 때만 증가)이고, `version`은 published 응답에만 실리는 **공개 회차**다. 예시가 `"version": 2`로 적혀 있던 것을 #36 합의(2026-08-21)로 정정했다.
-> 좌표·실물 검증과 통행 판정의 기하 계약(타입별 bounds 실측, 회전 규칙, 래스터 파라미터)은 **`contracts/layout-api.md` §9~§10**이 원본이다 (#19, 2026-08-21 확정 — 부스는 6×6×**2.72**m).
 
 **공통 canonical type 문자열**: `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY_KIOSK`, `RECRUITMENT_BOARD`, `CONSULTATION_DESK`, `LAPTOP`, `LIKE_VOTE`, `FURNITURE`, `DECORATION`
 
@@ -177,7 +174,7 @@ React 편집기는 **위에서 내려다보는 2D 평면**에서 오브젝트를
 | ~~C-03~~ | ~~오브젝트 크기 조절을 허용하는가?~~ | — | ✅ **확정: 고정 크기** (2026-08-18). `scale` 필드 없음 — Layout 계약 변경 없음 |
 | C-04 | 콘텐츠 미연결 오브젝트의 공개를 막는가? | FE + 기획 | ⏳ 기획 대기 — BE 구현은 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하므로, 확정은 이 항목을 두 리스트 사이에서 옮기는 것뿐이다(FR-016). 현재 기본값 **warning**(공개 허용) |
 | ~~C-05~~ | ~~Owner와 Staff의 동시 편집 정책은?~~ | — | ✅ **확정: `version` 낙관적 잠금 + 409.** BE 채택([Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5), 2026-08-20). 409 응답 body는 **`{code, message, requestId}`로 확정·구현 완료** (2026-08-20, `docs/08` §1.3 — 클라이언트는 `code`로만 분기). 요청 스키마는 body `expectedRevision` 필수로 확정·구현 완료, 코드 `LAYOUT_REVISION_CONFLICT` (2026-08-20) |
-| C-06 | 템플릿은 몇 종이며 무엇이 다른가? | 기획 | ⏳ 기획 대기(종수·차이) — BE는 화이트리스트 검증만 한다. **허용값은 `PROJECT_EXHIBITION` 단독** — `DEFAULT`는 셸 1종·1:1 확정으로 제거([#19](https://github.com/kanghyunsoon/ssafesta/issues/19) ④, 2026-08-21, V11 이관). footprint·상한 SSOT는 `GET /booth-layout-templates` 신설로 해소 (contracts §9) |
+| C-06 | 템플릿은 몇 종이며 무엇이 다른가? | 기획 | ⏳ 기획 대기 — BE는 화이트리스트 검증만 한다(현재 허용값 `DEFAULT`·`PROJECT_EXHIBITION`). footprint 서버 SSOT 논의는 [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) |
 | C-07 | 공개 이력(과거 버전)을 보관하고 되돌릴 수 있는가? | BE | ✅ **BE 답변(2026-08-20): 보관은 한다, 되돌리기 API는 MVP 제외.** `booth_layout_published_versions`가 이미 이력 구조라 보관 비용 0. 되돌리기는 UI·권한·"되돌린 것도 새 버전인가"를 함께 정해야 하므로 지금 열지 않는다 (재임대 미리보기와 연관) |
 
 ---
@@ -247,12 +244,10 @@ FR-007이 "유효성 검사"를 요구하는데 **무엇을 검사하는지가 �
 | 오브젝트 12개 이하 (FR-010) | error |
 | `objectId`가 한 배치 안에서 유일 | error |
 | `type`이 canonical 문자열 화이트리스트에 있음 | error |
-| `position`·`rotationY`가 유한한 수, 부스 영역 내 (`0 ≤ y ≤ 2.72` — 셸 실측, #19 ②) | error |
-| **실물(회전 반영 AABB)이 부스 영역 안** — 앵커는 안인데 실물이 옆 슬롯에 걸치는 배치 차단 (#19 ③, contracts §10-2) | error `AREA_OUT_OF_BOUNDS` |
-| `template`이 화이트리스트에 있음 (`PROJECT_EXHIBITION` 단독 — #19 ④) | error |
+| `position`·`rotationY`가 유한한 수, 부스 영역 내 | error |
+| `template`이 화이트리스트에 있음 | error |
 | `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error |
 | 기능 오브젝트의 `configId` 미연결 (C-04) | **warning** — 확정 시 error로 옮길 수 있다 |
-| **통행 판정** (공개 시점만, #19 ⑤·contracts §10-3): 관람 띠 도달 <50% → `FRONT_BLOCKED`, 고립 공간 ≥1㎡ → `ISOLATED_AREA` | **warning** — 뒷공간 활용은 소유자의 선택일 수 있어 공개를 막지 않는다 |
 
 ---
 

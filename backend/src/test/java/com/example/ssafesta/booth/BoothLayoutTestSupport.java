@@ -38,17 +38,12 @@ final class BoothLayoutTestSupport {
                 """, boothId);
     }
 
-    /**
-     * A valid save request with one screen.
-     *
-     * <p>z가 1.4인 이유: VIDEO_SCREEN(로컬 x −1.50~+1.20)을 90° 돌리면 z 방향 실물이
-     * [z−1.2, z+1.5]가 된다. 실물 검증(#19 ③) 기준으로 z ≤ 1.5여야 부스 안이다.
-     */
+    /** A valid save request with one screen. */
     static String saveRequest(long expectedRevision) {
         return """
                 {"expectedRevision":%d,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"screen-1","type":"VIDEO_SCREEN",
-                   "position":{"x":2.1,"y":0.0,"z":1.4},"rotationY":90.0,"configId":152}]}
+                   "position":{"x":2.1,"y":0.0,"z":2.4},"rotationY":90.0,"configId":152}]}
                 """.formatted(expectedRevision);
     }
 

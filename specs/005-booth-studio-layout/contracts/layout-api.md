@@ -45,7 +45,7 @@
   "template": "PROJECT_EXHIBITION",
   "objects": [
     { "objectId": "screen-1", "type": "VIDEO_SCREEN",
-      "position": { "x": 2.1, "y": 0.0, "z": 1.4 }, "rotationY": 90.0, "configId": 152 },
+      "position": { "x": 2.1, "y": 0.0, "z": 2.4 }, "rotationY": 90.0, "configId": 152 },
     { "objectId": "sofa-1", "type": "FURNITURE", "assetCode": "SOFA_A",
       "position": { "x": -1.0, "y": 0.0, "z": 0.5 }, "rotationY": 180.0 }
   ]
@@ -55,15 +55,13 @@
 | 필드 | 타입 | 필수 | 규칙 |
 |---|---|---|---|
 | `schemaVersion` | int | ✅ | 구조 버전. 현재 **1**. 공개 회차(`version`)와 **다른 값이다** (research R-10) |
-| `template` | string | ✅ | `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 #19 ④(2026-08-21)로 제거, 기존 저장분은 V11이 이관. 종수 확장은 C-06 확정 시 (목록은 §9로 조회) |
+| `template` | string | ✅ | `DEFAULT` \| `PROJECT_EXHIBITION` (C-06 확정 시 확장) |
 | `objects[].objectId` | string | ✅ | 1~64자 `[A-Za-z0-9_-]`, 배치 안에서 유일 |
 | `objects[].type` | string | ✅ | `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
-| `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조). 부스는 **6×6×2.72m** (높이는 셸 벽 패널 실측 — #19 ②) → 앵커는 `|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`, **실물(회전 반영 AABB)도 같은 영역 안이어야 한다** (§10) |
+| `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조). 부스는 **6×6×6m** → `|x|,|z| ≤ 3`, `0 ≤ y ≤ 6` |
 | `objects[].rotationY` | number | ✅ | 도(degree), `[0,360)`. `0`이면 +Z를 바라봄 |
 | `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID. 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조) |
 | `objects[].assetCode` | string | ❌ | `FURNITURE`·`DECORATION`의 구체 자산 식별자 |
-
-**표에 없는 필드는 거부된다** — 계약에 없는 필드가 하나라도 있으면 저장 자체가 `409 LAYOUT_VALIDATION_FAILED` + `rule: MALFORMED_LAYOUT`로 실패한다(조용히 버리지 않는다 — 버리면 편집기는 저장됐다고 믿는데 서버에는 없는 T-24 모양이 된다). 필드 추가 순서는 **3파트 합의 → BE가 `schemaVersion` 올리고 배포 → 그다음 FE 전송**이다 (헌법 24조).
 
 **BE는 이 값들을 변형하지 않는다** — 반올림·정규화·기본값 주입을 하지 않고 저장하고 그대로 돌려준다 (research R-04). 서버가 유일하게 덧붙이는 것은 `version`·`revision` 같은 **메타 필드**다.
 
@@ -121,7 +119,7 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **오류**: 403 · 404 · 409 `LAYOUT_REVISION_CONFLICT` (본문에 서버의 현재 `revision` 포함) · 409 `LAYOUT_VALIDATION_FAILED`
 
-> **409 REVISION_CONFLICT 본문에 최신 Draft는 실리지 않는다** — 오류 봉투에 자리가 없어 서버의 현재 `revision`만 알린다. 충돌 시 FE가 `GET /draft`를 한 번 더 호출한다. *(초안의 "최신 Draft 동봉"은 구현하지 않았고, FE가 구현 쪽을 채택해 확정 — #36, 2026-08-21. FE는 자동 병합을 하지 않으므로 동봉본을 쓸 자리가 없다.)*
+> **409 REVISION_CONFLICT 응답에는 최신 Draft를 함께 싣는다.** FE가 "다시 불러오기"와 "병합" 중 무엇을 택하든 추가 왕복이 필요 없다 (research R-03).
 
 ---
 
@@ -198,73 +196,8 @@ docs/08이 이미 정의한 두 필드를 실제로 채운다. **추가일 뿐 �
 
 ---
 
-## 8. 왕복 검증 (spec 005 리뷰 ④칸 — ✅ 2026-08-20 통과)
+## 8. 왕복 검증 (spec 005 리뷰 ④칸 — 미수행)
 
-**통과했다** — FE 작성 JSON을 Unity가 실측해 world 좌표·회전이 소수점까지 일치, 부호 오류 0건 ([#6](https://github.com/kanghyunsoon/ssafesta/issues/6), `docs/LJH/verify/block1-roundtrip.md`).
+계약 문서로는 닫히지 않는 항목이다. **오브젝트 1개짜리 Layout을 FE가 저장 → Unity가 같은 위치에 놓는지 눈으로 확인**해야 한다 (헌법 21조).
 
-BE가 보장하는 것은 **저장·조회 왕복에서 값이 바뀌지 않는다**는 것이다(SC-004의 절반). 부호와 원점은 위 실측으로 FE·Unity가 확인했다.
-
----
-
-## 9. `GET /booth-layout-templates` — **신설** (#19 ④, 2026-08-21)
-
-편집기가 Unity 없이 뜨는 데 필요한 카탈로그. footprint(6×6×2.72)와 오브젝트 상한(12)을 FE·Unity·서버가 각자 알던 것을 **한 곳에서 받는다**. 서버 구현도 이 값을 검증 상수에서 유도하므로 검증과 카탈로그가 어긋날 수 없다. **권한 필요** (편집기 전용 데이터).
-
-**200**
-```json
-{
-  "templates": [
-    { "template": "PROJECT_EXHIBITION",
-      "footprint": { "width": 6.0, "depth": 6.0, "height": 2.72 },
-      "maxObjects": 12 }
-  ]
-}
-```
-
-- `template → 셸 프리팹`은 1:1이고 현재 셸이 1종이라 목록도 1개다. C-06(종수)이 확정되면 행이 늘어난다.
-- `height`는 셸 유효 높이(벽 패널 상단 실측 2.725의 내림) — 정면 트러스(z 2.85~3.15 띠, y 1.85↑)는 부스 경계 밖이라 배치 공간을 제약하지 않는다.
-
----
-
-## 10. 기하 계약 — type→로컬 bounds · 실물 검증 · 통행 판정 (#19 ③·⑤, 2026-08-21 확정)
-
-> FE 편집기의 실시간 판정과 서버의 저장·공개 판정이 **같은 답**을 내야 하므로, 여기 값은 전부 계약이다. 바꾸려면 3파트 합의가 필요하다 (헌법 24조).
-
-### 10-1. type → 로컬 AABB (Unity 프리팹 실측, rotationY=0 기준, 단위 m)
-
-원점은 전 타입 바닥(min.y = 0)이고 **x·z는 비대칭**이다 — size만 들고 중앙 원점을 가정하면 회전 계산이 틀린다. 파츠의 "정면"은 로컬 **+z**다.
-
-| type | min (x, y, z) | max (x, y, z) |
-|---|---|---|
-| `AI_AGENT` | (−0.31, 0, −0.16) | (0.31, 1.15, 0.16) |
-| `VIDEO_SCREEN` | (−1.50, 0, −0.15) | (1.20, 2.10, 0.15) |
-| `PROJECT_PANEL` | (−0.78, 0, −0.18) | (0.77, 2.72, 0.18) |
-| `SURVEY_KIOSK` | (−0.31, 0, −0.16) | (0.31, 0.93, 0.16) |
-| `RECRUITMENT_BOARD` | (−1.50, 0, −0.18) | (1.50, 2.72, 0.18) |
-| `CONSULTATION_DESK` | (−0.93, 0, −1.00) | (0.93, 0.92, 0.16) |
-| `LAPTOP` | (−0.40, 0, −0.40) | (0.40, 0.94, 0.40) |
-| `LIKE_VOTE` | (−0.31, 0, −0.16) | (0.31, 1.23, 0.16) |
-| `FURNITURE` | (−0.61, 0, −0.86) | (0.89, 0.75, 0.86) |
-| `DECORATION` | (−0.30, 0, −0.30) | (0.30, 1.61, 0.30) |
-
-이 값은 **프리팹이 바뀌면 같이 바뀐다.** 타입당 프리팹이 2개 이상이 되면 타입별 최대 포락(가장 큰 프리팹)으로 갱신한다 — 서버가 보수적인 쪽.
-
-**회전 규칙**: `rotationY`(0~360 연속값)를 **원점 기준으로 네 모서리에 적용한 뒤 AABB를 다시 잡는다** — 90° 단위 스왑이 아니다. 행렬은 Unity Y축 회전과 같다: `x' = x·cos + z·sin`, `z' = −x·sin + z·cos` (위에서 볼 때 시계방향 +).
-
-### 10-2. 실물 영역 검증 — **error `AREA_OUT_OF_BOUNDS`** (Draft 저장·공개 모두)
-
-회전 반영 AABB + position이 부스 영역(`|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`)을 벗어나면 거부. 남의 슬롯을 침범하는 객관적 결함이라 error다. 경계선상은 안이다(서버는 부동소수점 잡음 1e-9 m만 허용 — 판정을 뒤집을 수 없는 크기).
-
-### 10-3. 통행 판정 — **warning** (공개 시점만, 공개는 막지 않음)
-
-| 항목 | 계약값 |
-|---|---|
-| 래스터 해상도 | **0.05 m** — 부스 로컬 x·z ∈ [−3, +3], **셀 중심 = −2.975 + 0.05k** (k = 0…119), 120×120 |
-| 점유 판정 | 회전 적용 후 AABB와 셀 중심의 포함 검사 (**경계선상은 점유** — 보수적) |
-| 아바타 침식 | 점유 셀을 **유클리드 반경 0.22 m** 팽창 (`PlayerAvatar` 캡슐 반지름 2.2 world unit ÷ 10) |
-| flood fill | **4-방향 연결**, 시작점은 **+z 경계(z = +3) 쪽 비점유 셀 전부** — 정면만 개방, 좌·우·후면 벽 |
-| 관람 띠 | 상호작용 파츠(장식 `FURNITURE`·`DECORATION` 제외)의 **+z(정면) 면에서 바깥으로 0.7 m** 폭 |
-| **`FRONT_BLOCKED`** (warning, objectId 포함) | 관람 띠 셀 중 도달 가능 비율 **50% 미만** |
-| **`ISOLATED_AREA`** (warning, 배치 전체) | 침식 후 비점유인데 flood fill 미도달 셀이 **1 ㎡ 이상** |
-
-publish 응답의 기존 `warnings` 채널(`CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED`와 동일 형식)에 실린다 — FE 파서 추가 작업 없음, rule 이름 두 개만 새로 안다.
+BE가 대신 보장할 수 있는 것은 **저장·조회 왕복에서 값이 바뀌지 않는다**는 것뿐이다(SC-004의 절반). 부호와 원점이 맞는지는 FE·Unity가 확인한다.

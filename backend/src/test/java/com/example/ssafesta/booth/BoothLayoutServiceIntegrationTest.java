@@ -113,7 +113,7 @@ class BoothLayoutServiceIntegrationTest {
         layouts.publish(owner.boothId(), owner.userId());
         jdbc.update("UPDATE booth_layout_drafts SET layout_json = ?::jsonb WHERE booth_id = ?",
                 """
-                {"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":%s}
+                {"schemaVersion":1,"template":"DEFAULT","objects":%s}
                 """.formatted(decorations(13)), owner.boothId());
 
         assertThrows(LayoutValidationFailedException.class,

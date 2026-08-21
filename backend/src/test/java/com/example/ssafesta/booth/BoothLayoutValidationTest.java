@@ -17,8 +17,8 @@ import org.mockito.Mockito;
  */
 class BoothLayoutValidationTest {
 
-    private final LayoutValidator validator = new LayoutValidator(
-            Mockito.mock(LayoutConfigResolver.class), new LayoutPassageChecker());
+    private final LayoutValidator validator =
+            new LayoutValidator(Mockito.mock(LayoutConfigResolver.class));
 
     @Test
     void tooManyObjects() {
@@ -70,63 +70,6 @@ class BoothLayoutValidationTest {
                 """));
     }
 
-    /** 셸 유효 높이는 실측 2.72다 — 옛 대칭 가정(6)으로 저장된 높이는 이제 거부된다 (#19 ②). */
-    @Test
-    void aPositionAboveTheShellHeight() {
-        assertRule("POSITION_OUT_OF_BOUNDS", document("""
-                [{"objectId":"a","type":"DECORATION","position":{"x":0,"y":2.73,"z":0},"rotationY":0}]
-                """));
-    }
-
-    /** 앵커 점은 안인데 실물이 벽을 넘는 배치 — 점 검사만으로는 잡히지 않던 것 (#19 ③). */
-    @Test
-    void anExtentPastTheWall() {
-        // RECRUITMENT_BOARD는 로컬 x ±1.50이라 x=1.6이면 실물이 3.1까지 나간다.
-        assertRule("AREA_OUT_OF_BOUNDS", document("""
-                [{"objectId":"a","type":"RECRUITMENT_BOARD","position":{"x":1.6,"y":0,"z":0},"rotationY":0}]
-                """));
-    }
-
-    /** 같은 위치라도 회전이 실물을 벽 밖으로 돌릴 수 있다 — 90° 스왑이 아닌 코너 회전 검증. */
-    @Test
-    void rotationMovesTheExtent() {
-        // VIDEO_SCREEN(로컬 x −1.50~+1.20, z ±0.15)을 90° 돌리면 z 실물이 [z−1.2, z+1.5]가 된다.
-        assertNoErrors(document("""
-                [{"objectId":"a","type":"VIDEO_SCREEN","position":{"x":0,"y":0,"z":1.6},"rotationY":0}]
-                """));
-        assertRule("AREA_OUT_OF_BOUNDS", document("""
-                [{"objectId":"a","type":"VIDEO_SCREEN","position":{"x":0,"y":0,"z":1.6},"rotationY":90}]
-                """));
-    }
-
-    /** 최고 파츠(2.72)는 바닥에서만 성립한다 — 셸 높이와 정확히 같아서다 (#19 ② 교차 검증). */
-    @Test
-    void theTallestPartsFitOnlyOnTheFloor() {
-        assertNoErrors(document("""
-                [{"objectId":"a","type":"PROJECT_PANEL","position":{"x":0,"y":0,"z":0},"rotationY":0}]
-                """));
-        assertRule("AREA_OUT_OF_BOUNDS", document("""
-                [{"objectId":"a","type":"PROJECT_PANEL","position":{"x":0,"y":0.01,"z":0},"rotationY":0}]
-                """));
-    }
-
-    /** 실물이 벽 세 면에 정확히 닿는 배치는 허용 — 경계선상은 안이다. */
-    @Test
-    void anExtentTouchingTheWallsIsAllowed() {
-        assertNoErrors(document("""
-                [{"objectId":"a","type":"DECORATION","position":{"x":2.7,"y":1.11,"z":-2.7},"rotationY":0}]
-                """));
-    }
-
-    /** 회전 후의 딱 맞는 배치도 부동소수점 잡음으로 거부되면 안 된다 (EXTENT_EPS의 존재 이유). */
-    @Test
-    void aRotatedExtentTouchingTheWallIsAllowed() {
-        // 90°에서 z 실물은 [1.5−1.2, 1.5+1.5] = [0.3, 3.0], x 실물은 ±0.15 — 전부 경계선상 이내.
-        assertNoErrors(document("""
-                [{"objectId":"a","type":"VIDEO_SCREEN","position":{"x":2.85,"y":0,"z":1.5},"rotationY":90}]
-                """));
-    }
-
     @Test
     void rotationAtThreeSixty() {
         // 360 and 0 are the same angle; allowing both would mean two spellings of one value.
@@ -145,7 +88,7 @@ class BoothLayoutValidationTest {
     @Test
     void aFutureSchemaVersion() {
         assertRule("UNSUPPORTED_SCHEMA_VERSION", """
-                {"schemaVersion":2,"template":"PROJECT_EXHIBITION","objects":[]}
+                {"schemaVersion":2,"template":"DEFAULT","objects":[]}
                 """);
     }
 
@@ -156,18 +99,10 @@ class BoothLayoutValidationTest {
                 """);
     }
 
-    /** DEFAULT는 #19 ④에서 제거됐다 — 셸이 1종이라 "DEFAULT는 어느 셸인가"에 답이 없다. */
-    @Test
-    void theRetiredDefaultTemplateIsRefused() {
-        assertRule("UNKNOWN_TEMPLATE", """
-                {"schemaVersion":1,"template":"DEFAULT","objects":[]}
-                """);
-    }
-
     @Test
     void missingObjectsArray() {
         assertRule("MISSING_OBJECTS", """
-                {"schemaVersion":1,"template":"PROJECT_EXHIBITION"}
+                {"schemaVersion":1,"template":"DEFAULT"}
                 """);
     }
 
@@ -206,7 +141,7 @@ class BoothLayoutValidationTest {
 
     private String document(String objectsJson) {
         return """
-                {"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":%s}
+                {"schemaVersion":1,"template":"DEFAULT","objects":%s}
                 """.formatted(objectsJson);
     }
 

@@ -131,10 +131,6 @@
 - [X] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
 - [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가
 - [X] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신
-- [X] T052 **셸 유효 높이 반영** (#19 ②, 2026-08-21) — `MAX_HEIGHT` 6 → **2.72** (벽 패널 실측 2.725의 내림). 관련 테스트·문서 갱신
-- [X] T053 **실물 영역 검증** (#19 ③) — 타입 10종 실측 bounds를 `LayoutObjectType`에 계약값으로 탑재, 원점 기준 코너 회전 후 AABB 재계산(`LayoutGeometry`), error `AREA_OUT_OF_BOUNDS` (Draft·공개 모두). 경계 딱 맞춤·회전 float 잡음 허용 테스트 포함
-- [X] T054 **통행 판정** (#19 ⑤) — `LayoutPassageChecker` 신설: 0.05m 래스터 120×120, 0.22m 유클리드 침식, +z flood fill(4방향), 관람 띠 0.7m 도달<50% → warning `FRONT_BLOCKED`, 고립 ≥1㎡ → warning `ISOLATED_AREA`. 공개 시점만, 공개는 막지 않음
-- [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과
 
 ---
 
