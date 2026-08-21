@@ -68,6 +68,22 @@ class BoothLayoutApiIntegrationTest {
                 .andExpect(jsonPath("$.objects[0].objectId").value("screen-1"));
     }
 
+    /** The template catalogue (#19 ④): footprint·상한을 세 파트가 각자 알던 것을 한 곳에서 받는다. */
+    @Test
+    void theTemplateCatalogueServesFootprintAndCap() throws Exception {
+        Owner owner = leasedOwner("템플릿API");
+
+        mockMvc.perform(get("/api/v1/booth-layout-templates")
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.templates.length()").value(1))
+                .andExpect(jsonPath("$.templates[0].template").value("PROJECT_EXHIBITION"))
+                .andExpect(jsonPath("$.templates[0].footprint.width").value(6.0))
+                .andExpect(jsonPath("$.templates[0].footprint.depth").value(6.0))
+                .andExpect(jsonPath("$.templates[0].footprint.height").value(2.72))
+                .andExpect(jsonPath("$.templates[0].maxObjects").value(12));
+    }
+
     /** SC-003, the core of it: saving is not publishing. */
     @Test
     void aSavedButUnpublishedBoothServesNoLayout() throws Exception {
@@ -139,7 +155,7 @@ class BoothLayoutApiIntegrationTest {
                         .header("Authorization", bearerFor(owner.userId()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                                   {"objectId":"a","type":"DECORATION","scale":2.0,
                                    "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                                 """))

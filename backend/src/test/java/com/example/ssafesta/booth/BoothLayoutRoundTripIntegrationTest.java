@@ -43,11 +43,11 @@ class BoothLayoutRoundTripIntegrationTest {
         Owner owner = newOwner("왕복");
 
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"a","type":"DECORATION",
                    "position":{"x":2.123456789,"y":0.0,"z":-0.0},"rotationY":359.9},
                   {"objectId":"b","type":"DECORATION",
-                   "position":{"x":-2.999999999,"y":5.999,"z":0.000000001},"rotationY":0.1}]}
+                   "position":{"x":-2.599999999,"y":0.999,"z":0.000000001},"rotationY":0.1}]}
                 """);
 
         var draft = queries.findDraft(owner.boothId(), owner.userId()).orElseThrow();
@@ -56,8 +56,8 @@ class BoothLayoutRoundTripIntegrationTest {
 
         assertExactly("2.123456789", first.position().x());
         assertExactly("359.9", first.rotationY());
-        assertExactly("-2.999999999", second.position().x());
-        assertExactly("5.999", second.position().y());
+        assertExactly("-2.599999999", second.position().x());
+        assertExactly("0.999", second.position().y());
         assertExactly("0.000000001", second.position().z());
         assertExactly("0.1", second.rotationY());
     }
@@ -66,7 +66,7 @@ class BoothLayoutRoundTripIntegrationTest {
     void publishingCarriesTheSameNumbers() {
         Owner owner = newOwner("공개왕복");
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"a","type":"DECORATION",
                    "position":{"x":1.100000000000001,"y":0,"z":0},"rotationY":270}]}
                 """);
@@ -90,7 +90,7 @@ class BoothLayoutRoundTripIntegrationTest {
 
         LayoutValidationFailedException failure = assertThrows(LayoutValidationFailedException.class,
                 () -> layouts.saveDraft(owner.boothId(), owner.userId(), """
-                        {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                        {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                           {"objectId":"a","type":"DECORATION","scale":2.0,
                            "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                         """));
@@ -110,7 +110,7 @@ class BoothLayoutRoundTripIntegrationTest {
         Owner owner = newOwner("원문보존");
 
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"a","type":"DECORATION",
                    "position":{"x":2.10,"y":0.000,"z":-1.500},"rotationY":45.0}]}
                 """);
@@ -138,7 +138,7 @@ class BoothLayoutRoundTripIntegrationTest {
         Owner owner = newOwner("영과지수");
 
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"a","type":"DECORATION",
                    "position":{"x":-0.0,"y":1e0,"z":0},"rotationY":0}]}
                 """);
@@ -153,11 +153,12 @@ class BoothLayoutRoundTripIntegrationTest {
     void theBoothEdgeIsInsideTheBooth() {
         Owner owner = newOwner("경계");
 
-        // 6m × 6m × 6m with the origin at the floor centre: ±3 horizontally, 0..6 up.
+        // 6m × 6m × 2.72m, origin at the floor centre. DECORATION의 실물이 벽 세 면에 정확히
+        // 닿는 배치: x 2.7+0.3=3.0, z −2.7−0.3=−3.0, y 1.11+1.61=2.72. 경계는 안이다 (#19 ③).
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"corner","type":"DECORATION",
-                   "position":{"x":3,"y":6,"z":-3},"rotationY":0}]}
+                   "position":{"x":2.7,"y":1.11,"z":-2.7},"rotationY":0}]}
                 """);
 
         assertEquals(1, queries.findDraft(owner.boothId(), owner.userId()).orElseThrow().objects().size());
@@ -169,7 +170,7 @@ class BoothLayoutRoundTripIntegrationTest {
 
         assertThrows(LayoutValidationFailedException.class,
                 () -> layouts.saveDraft(owner.boothId(), owner.userId(), """
-                        {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                        {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                           {"objectId":"a","type":"DECORATION",
                            "position":{"x":3.001,"y":0,"z":0},"rotationY":0}]}
                         """));
@@ -181,7 +182,7 @@ class BoothLayoutRoundTripIntegrationTest {
 
         layouts.saveDraft(owner.boothId(), owner.userId(),
                 """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[]}
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[]}
                 """);
 
         assertEquals(0, queries.findDraft(owner.boothId(), owner.userId()).orElseThrow().objects().size());
