@@ -3,10 +3,30 @@
 > **범위**: `specs/019-game-studio`, 향후 `festa-game-studio/`, GameProject 계약, Web 2D Runtime,
 > Spring Draft/Publish·Portal Binding, FESTA Host 연동.
 >
-> Unity 월드·Booth Runtime 일반 작업은 기존 `24_작업일지.md`에 기록한다.
-> Game Studio 작업 중 문제는 `28_Game_Studio_트러블슈팅.md`의 `GS-T###`으로 참조한다.
+> Unity 월드·Booth Runtime 일반 작업은 이 문서에 기록하지 않는다.
+> Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
+> `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
 ## 2026-08-21
+
+### 전체 브랜치 재대조 및 develop 기준선 재정렬 ✅
+
+- 🤖 전체 로컬·원격 브랜치를 갱신해 비교한 결과, 기능 브랜치가 처음 `game` 커밋에서 분기되어 `origin/develop` 기준 변경 목록에 무관한 Unity 경로 **2,057개**가 따라오는 것을 확인했다.
+- 🤖 원본 이력을 `backup/game-studio-gamebase-20260821`에 보존한 뒤 Game Studio 9개 커밋만 최신 `origin/develop`(`41b119b`) 위로 재배치했다. 최종 변경은 문서·spec 43개 경로이며 `festa-unity/**` 변경은 **0개**다.
+- 🤖 작업트리를 바꾸지 않는 가상 병합으로 `origin/develop` 병합이 충돌 없이 가능한 것을 확인했다. `front/back/ai/game`에 직접 병합하면 각 브랜치의 오래된 공통 문서·삭제 이력 때문에 충돌하므로, 이 브랜치의 병합 대상은 **develop 한 곳**으로 제한한다.
+- 🤖 공유 `game` 작업트리와 사용자의 미커밋 Unity Scene은 수정·stage·commit하지 않았다. Game Studio 작업은 별도 worktree에서만 수행했다.
+- 트러블슈팅: GS-T012~GS-T015
+
+### 편집기 시안 반영 및 계약 정합화 ✅
+
+- 🤖 spec 019에 실제 편집기 작업공간(Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish), Asset reference, TOP_DOWN 격자 좌표, preset recipe를 요구사항으로 반영했다.
+- 🤖 DIALOGUE를 `OVERLAY`와 `FULL_SCREEN`으로 구분하고 `SHOW_DIALOGUE`, `CLOSE_DIALOGUE`, `GO_TO_SCENE`의 호출·복귀 의미를 고정했다. Web 2D Runtime이 직접 실행하며 Unity는 Portal 진입 트리거만 담당한다는 경계는 유지했다.
+- 🤖 JSON Schema의 `nextNodeId` 위치를 Event가 아닌 Dialogue Choice로 바로잡고, asset scheme·Scene 경계·Object 위치 검증과 음수 fixture 2종을 추가했다. Preview와 Published Runtime이 같은 GameProject 해석 결과를 내야 한다는 작업도 명시했다.
+- 🤖 상위 서비스·아키텍처·Backend API·DB·Frontend·다음 할 일·팀 결정 문서를 동기화했다. Frontend asset catalog/resolver와 Backend asset metadata·publish validation 책임은 별도 작업으로 나눴다.
+- 🤖 계약 fixture **7/7**, 결정론적 runtime trace **6/6**, 계약 JSON **10/10**을 통과했다. `tasks.md`는 총 80개 중 결정 비의존 작업 **18개 완료**다.
+- 🤖 Spec-Kit 비파괴 정합성 분석에서 발견한 branch 표기, Dialogue 종료, Preview/Published 동등성, FE/BE asset 책임 분리 문제를 모두 수정했다.
+- 🤖 관련 커밋: `e2b86ad docs(game-studio): align editor and dialogue contracts`, `b4d842e docs(game-studio): sync cross-part architecture`.
+- 트러블슈팅: GS-T011
 
 ### Game Studio 편집기 시안 구현 가능성 검토 ✅
 
@@ -41,7 +61,7 @@
 
 ### Game Studio 구현 계획·작업분할 + 기능 브랜치 분리 ✅
 
-- 🤖 사용자 요청에 따라 `game`에서 **`feature/game-studio-foundation`** 브랜치를 분기하고, 검증된 spec·상위 문서·공통 계약을 `fabef30 docs(game-studio): define web runtime contracts`로 먼저 커밋했다.
+- 🤖 사용자 요청에 따라 **`feature/game-studio-foundation`** 브랜치를 만들고, 검증된 spec·상위 문서·공통 계약을 커밋했다. 이후 브랜치 오염 점검에서 `game` 기준선 문제를 발견해 develop 위로 재배치했으며 현재 대응 커밋은 `52f6973 docs(game-studio): define web runtime contracts`다.
 - 🤖 Spec-Kit plan/tasks 흐름으로 `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, `tasks.md`를 작성했다. 파트 답변 없이 가능한 작업과 #20 Frontend·#21 Backend 결정 gate를 파일 경로 단위로 분리했다. #22 AI 답변은 MVP 선행 조건이 아니다.
 - 🤖 실제 파트 브랜치를 다시 확인했다. Frontend는 `festa-frontend/`의 React 19.2 + Vite 8.2 + TypeScript 6 + npm, Backend는 `backend/`의 Java 21 + Spring Boot 4.1 + Maven + JPA/Flyway/PostgreSQL/Testcontainers다. 계획은 이 기준을 사용하되 앱 위치·2D renderer와 DB 모델은 담당자 결정을 선점하지 않는다.
 - 🤖 구현 순서는 **공통 계약 → 로컬 TOP_DOWN/DIALOGUE 제작·Preview → Draft/Publish → Unity 없는 독립 웹 플레이 → 선택적 Unity Portal → PLATFORMER**로 고정했다.

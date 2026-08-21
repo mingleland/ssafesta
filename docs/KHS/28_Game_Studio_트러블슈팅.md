@@ -8,6 +8,41 @@
 
 ## 2026-08-21
 
+### GS-T015. 전용 worktree의 Git 메타데이터 접근이 제한됨 (해결)
+
+- **증상** — 임시 전용 worktree에서 `git update-index --refresh`가 저장소 object database 접근 권한 오류로 실패했다.
+- **원인** — worktree 파일은 임시 경로에 있지만 공용 `.git` 메타데이터는 원 저장소 아래에 있어 제한된 실행 컨텍스트의 쓰기 범위와 달랐다.
+- **해결** — 파일 편집은 전용 worktree 안에서 유지하고, Git index·rebase·commit 작업만 동일 사용자 권한의 승인된 컨텍스트에서 실행했다.
+- **예방** — 별도 worktree 사용 시 작업 파일 경로와 Git 메타데이터 경로가 다름을 전제로 하고, Git 상태 변경은 처음부터 저장소 범위가 명확한 동일 컨텍스트에서 수행한다.
+
+### GS-T014. 리베이스 도중 origin/develop이 한 커밋 더 진행됨 (해결)
+
+- **증상** — 첫 리베이스 완료 직후 `origin/develop`이 `462c4a2`에서 `41b119b`로 진행되어 기능 브랜치가 다시 1커밋 뒤가 됐다.
+- **원인** — 작업 중 다른 문서 PR이 develop에 병합됐다.
+- **해결** — 변경 경로와 충돌 가능성을 다시 확인하고 Game Studio 9개 커밋을 최신 `41b119b` 위로 한 번 더 리베이스했다.
+- **예방** — 장시간 문서 작업은 최종 검증 직전에 원격 참조와 ahead/behind를 다시 확인하고, PR 전 최신 develop 기준 가상 병합을 반복한다.
+
+### GS-T013. develop 리베이스에서 삭제된 일반 일지와 공통 결정 문서가 충돌함 (해결)
+
+- **증상** — 10개 커밋을 develop 위로 옮기는 동안 `docs/KHS/24`, `25`, `README`와 `docs/26_팀_결정_필요사항.md`에서 modify/delete 또는 내용 충돌이 반복됐다.
+- **원인** — 이전 game 기준선에는 일반 KHS 기록이 있었지만 최신 develop에는 없었고, docs/26은 develop과 Game Studio가 각각 최신 항목을 추가한 상태였다.
+- **해결** — 일반 24/25는 develop의 삭제 상태를 유지하고 Game Studio 전용 27/28만 보존했다. docs/26은 최신 develop의 아바타 결정을 유지하면서 Game Studio #20~#22 행을 수동 병합했다. KHS README는 존재하는 27/28만 가리키도록 축소했다.
+- **예방** — 공통 문서 충돌은 파일 전체의 ours/theirs를 선택하지 않고 행 단위로 병합한다. Game Studio 기록은 27/28 외 문서에 중복하지 않는다.
+
+### GS-T012. feature 브랜치가 game 기준선 이력 2,057개 Unity 경로를 포함함 (해결)
+
+- **증상** — 작업 파일은 문서뿐인데 `origin/develop...feature/game-studio-foundation` 비교에는 Unity 경로 2,057개와 총 2,126개 변경이 표시됐다.
+- **원인** — 브랜치를 당시의 `game` 커밋 `8c116f1`에서 만들었기 때문에 Game Studio 커밋과 무관한 Unity/game 이력이 조상으로 포함됐다.
+- **해결** — 원본 tip을 `backup/game-studio-gamebase-20260821`로 보존하고, Game Studio 전용 9개 커밋만 최신 `origin/develop` 위로 리베이스했다. 재검증 결과 Unity 변경 경로는 0개다.
+- **예방** — 여러 파트가 소비하는 spec·공통 계약 브랜치는 항상 최신 `origin/develop`에서 만들고 전용 worktree를 사용한다. 커밋 전 기준 브랜치 대비 경로 분포를 확인한다.
+
+### GS-T011. Dialogue Choice 이동 필드가 Runtime과 JSON Schema에서 서로 다른 위치에 정의됨 (해결)
+
+- **증상** — reference Runtime은 선택지의 `choice.nextNodeId`를 읽지만 JSON Schema는 같은 필드를 Event 객체 속성으로 허용하고 있었다.
+- **원인** — 초기 schema 작성 시 Dialogue Choice 전이와 Event 전이를 혼동해 속성 위치가 잘못 배치됐다.
+- **해결** — `nextNodeId`를 Dialogue Choice 속성으로 이동하고, terminal Action과 `nextNodeId`를 동시에 쓰는 잘못된 fixture를 추가해 `DIALOGUE_NEXT_WITH_TERMINAL_ACTION`으로 거부하도록 했다.
+- **예방** — 계약 필드 추가 시 schema·fixture·reference Runtime 세 곳의 실제 접근 경로를 대조하고 positive/negative trace를 함께 갱신한다.
+
 ### GS-T010. 공유 작업트리가 Game Studio 브랜치가 아니어서 전용 문서 조회가 실패함 (해결)
 
 - **증상** — `specs/019-game-studio`와 `docs/KHS/27`, `28` 문서를 현재 경로에서 읽으려 했으나 파일이 없다는 오류가 발생했다.
