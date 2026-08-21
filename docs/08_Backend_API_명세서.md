@@ -384,7 +384,7 @@ S3 Presigned Upload URL 발급 구조를 권장한다.
 {
   "documentId": 152,
   "uploadUrl": "<presigned-url>",
-  "s3Key": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
 }
 ```
 

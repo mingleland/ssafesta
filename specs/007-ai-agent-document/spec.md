@@ -74,7 +74,7 @@
 - **FR-007**: 실패한 문서는 사용자가 이해하고 대응할 수 있도록 정제된 **실패 사유**를 제공해야 하며, 내부 예외·Stack Trace·외부 Provider 원문 오류를 노출해서는 안 된다.
 - **FR-008**: 처리된 문서 조각에는 **boothId, agentId, 임베딩 모델 식별자**가 기록되어야 한다 (헌법 18조).
 - **FR-009**: 임베딩 차원은 **1536으로 고정**한다 (헌법 18조).
-- **FR-010**: 문서 원본은 **S3**, 문서 메타데이터의 Source of Truth는 **Spring**이 소유하고, 처리·검색은 FastAPI가 담당한다 (헌법 1조).
+- **FR-010**: 문서 원본은 **Cloudflare R2(S3-compatible)** 를 우선 사용하고 R2를 사용할 수 없을 때는 S3-compatible fallback을 적용한다. 문서 메타데이터의 Source of Truth는 **Spring**이 소유하고, 처리·검색은 FastAPI가 담당한다 (헌법 1조).
 - **FR-011**: MVP는 PDF만 허용하며 파일당 최대 크기는 20MB다. 허용 형식과 크기를 초과하면 명확한 사유와 함께 거부해야 한다.
 - **FR-012**: 소유자는 문서를 삭제할 수 있어야 하며, 삭제 후 답변에 사용되지 않아야 한다.
 - **FR-013**: 처리 실패나 중단이 **월드·부스·비AI 기능을 중단시켜서는 안 된다** (헌법 3조).
@@ -129,7 +129,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 ### Key Entities
 
 - **AI Agent**: AI 직원. 부스, 이름, 역할, 지시문, 생성 시각
-- **Document**: 업로드된 문서. 부스, 에이전트, 파일명, 크기, SHA-256, S3 Key, 상태, 실패 사유, 업로드 시각
+- **Document**: 업로드된 문서. 부스, 에이전트, 파일명, 크기, SHA-256, object key, 상태, 실패 사유, 업로드 시각
 - **Processing Job**: 문서 처리 실행 단위. 문서, 작업 상태, 재시도 횟수, Worker 소유권과 heartbeat 만료 시각, 다음 재시도 시각, 시작·종료 시각, 내부 실패 정보
 - **Chunk**: 문서 조각. 문서, boothId, agentId, 텍스트, 임베딩 벡터, `embedding_model_id`
 
@@ -159,7 +159,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-04 | 처리 큐를 도입하는가? | AI + Infra | **확정: P0 인프로세스 Worker + 영속 Job 저장소. heartbeat 30초, Worker lease 90초, sweeper 60초, 최대 3회 재시도(1·5·15분 대기). 부하 실측 후 SQS 검토. 세부 계약은 [Issue #11](https://github.com/kanghyunsoon/ssafesta/issues/11) 참조** |
 | C-05 | AI 직원당 문서 수·총량 상한은? | AI + 기획 | **확정: 최대 10개·총 100MB** |
 | C-06 | 스캔 PDF(OCR 필요)를 지원하는가? | AI | **확정: MVP 제외, 텍스트 추출 불가 시 구체적 실패 사유와 함께 `FAILED`** |
-| C-07 | 문서 원본 저장 위치는? (S3 등) | BE + Infra | **확정: 원본 S3, 메타데이터 Source of Truth는 Spring** |
+| C-07 | 문서 원본 저장 위치는? | BE + Infra | **확정: Cloudflare R2(S3-compatible) 우선, R2 사용 불가 시 S3-compatible fallback. 메타데이터 Source of Truth는 Spring** ([Issue #51](https://github.com/kanghyunsoon/ssafesta/issues/51)) |
 
 ### Session 2026-08-20
 

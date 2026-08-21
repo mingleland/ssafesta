@@ -3,7 +3,7 @@
 > **서버**: FastAPI  
 > **기본 통신**: REST(JSON)  
 > **실시간 응답**: SSE 우선 검토  
-> **문서 저장**: S3  
+> **문서 저장**: Cloudflare R2(S3-compatible) 우선, S3-compatible fallback
 > **Vector DB**: PostgreSQL + pgvector  
 > **인증**: Spring 발급 JWT 기반, 검증 방식 세부 TBD
 
@@ -173,7 +173,7 @@ event: source
 data: {"type":"source","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":8,"documentId":152,"title":"프로젝트_기획서.pdf","chunkId":"chunk_152_03"}
 ```
 
-`sourceUrl`은 선택 필드로 예약한다. P0에서는 원문 접근 계약이 없으므로 생략하고 문서명만 표시한다. 향후 제공할 때는 인증·권한 검증이 적용된 URL만 허용하며 S3 Key나 무제한 공개 URL을 전달하지 않는다.
+`sourceUrl`은 선택 필드로 예약한다. P0에서는 원문 접근 계약이 없으므로 생략하고 문서명만 표시한다. 향후 제공할 때는 인증·권한 검증이 적용된 URL만 허용하며 object key나 무제한 공개 URL을 전달하지 않는다.
 
 ### Event: done
 
@@ -211,7 +211,7 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
 
 ## 7. Document Processing
 
-파일 업로드 자체는 Spring/S3가 담당하고 FastAPI는 업로드된 문서를 처리한다.
+파일 업로드 자체는 Spring/R2 object storage가 담당하고 FastAPI는 업로드된 문서를 처리한다.
 
 ### POST `/ai/v1/documents/process`
 
@@ -222,7 +222,7 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
   "documentId": 152,
   "boothId": 7,
   "agentId": 78,
-  "s3Key": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
 }
 ```
 
@@ -239,7 +239,7 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
 ### 처리
 
 ```text
-S3 Download
+R2 Download (S3-compatible API)
 → Parsing
 → Normalization
 → Chunking

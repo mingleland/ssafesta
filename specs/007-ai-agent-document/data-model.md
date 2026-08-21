@@ -27,7 +27,7 @@ FastAPI는 처리 요청의 `booth_id`, `agent_id` 조합이 실제 소유 관�
 | `id` | PK, Job과 Chunk의 기준 식별자 |
 | `booth_id`, `agent_id` | 검색 격리 범위, NOT NULL |
 | `original_filename` | 사용자 표시용 파일명 |
-| `s3_key` | Spring이 생성·관리, 클라이언트 임의 지정 금지 |
+| `object_key` | Spring이 생성·관리하는 저장소 중립 object key, 클라이언트 임의 지정 금지 |
 | `content_sha256` | 동일 Agent 중복 판정 및 개정본 경쟁 방지 |
 | `file_size_bytes` | 파일당 20MB 및 Agent 총 100MB 검증 |
 | `processing_status` | `QUEUED/PROCESSING/READY/FAILED/DISABLED` |

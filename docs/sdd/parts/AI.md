@@ -23,7 +23,7 @@
 
 ```text
 부스 소유자가 AI 직원(Agent)을 만들고 문서를 업로드하면 AI가 그 문서로 답할 준비가 된다.
-파이프라인: 업로드(원본은 Spring/S3, 메타데이터 Spring 소유) → FastAPI가 파싱 → 청킹 → 임베딩
+파이프라인: 업로드(원본은 Spring/R2 object storage, 메타데이터 Spring 소유) → FastAPI가 파싱 → 청킹 → 임베딩
 → pgvector 저장 (chunk에 boothId, agentId, embedding_model_id 기록).
 문서 상태 머신: UPLOADED → PROCESSING → READY / FAILED — 상태는 조회 가능하고 실패 사유를 남긴다.
 처리 중에도 다른 기능은 정상 동작한다(비동기).
