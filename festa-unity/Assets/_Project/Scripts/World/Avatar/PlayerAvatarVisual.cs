@@ -462,6 +462,9 @@ namespace Festa.World
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
         }
 
+        // 나올 때의 블렌드 길이를 정하려면 직전 상태를 알아야 한다 (착지 처리).
+        PlayerAnimState _lastLocomotion = PlayerAnimState.Idle;
+
         void CrossFadeLocomotion(PlayerAnimState state)
         {
             var stateName = state switch
@@ -471,8 +474,14 @@ namespace Festa.World
                 PlayerAnimState.Walk => "Walk",
                 _ => "Idle",
             };
-            // 점프는 짧아서 0.2초 블렌드로 들어가면 도약 순간을 놓친다.
-            float fade = state == PlayerAnimState.Jump ? 0.05f : 0.2f;
+            // 들어갈 때: 점프는 짧아서 0.2초 블렌드면 도약 순간을 놓친다.
+            // 나올 때: 착지를 짧게 끊으면 급정지처럼 보인다. Jump 클립의 무릎 접기
+            // (착지 흡수) 앞부분이 블렌드 동안 재생되도록 길게 준다 — 별도 착지
+            // 상태를 만들지 않고 클립이 이어 재생되는 것을 그대로 쓴다.
+            float fade = state == PlayerAnimState.Jump ? 0.05f
+                : _lastLocomotion == PlayerAnimState.Jump ? 0.15f
+                : 0.2f;
+            _lastLocomotion = state;
             _animator.CrossFadeInFixedTime(stateName, fade, 0);
         }
     }

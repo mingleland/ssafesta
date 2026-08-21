@@ -34,7 +34,10 @@ namespace Festa.Network
         // h≈4.5 unit(0.45 m) 를 노려 v≈30 을 쓴다. 체공 시간 t = 2v/g ≈ 0.61초로
         // Jumping 클립(1.90초)보다 짧아 착지 시 로코모션으로 크로스페이드된다.
         [Tooltip("점프 초기 상승 속도 (unit/s). 1 m = 10 unit 이다.")]
-        [SerializeField] float _jumpSpeed = 30f;
+        // 애니메이션에 물리를 맞춘다 — 반대로 하면 어긋난다. Jump 클립의 체공 구간이
+        // 0.633초(f15 도약 ~ f34 착지)이므로 v = g·T/2 = 31.1 이면 포물선과 포즈가
+        // 프레임 단위로 겹친다. 도달 4.9 unit = 0.49 m.
+        [SerializeField] float _jumpSpeed = 31.1f;
 
         // ── 스폰 위치 강제 ────────────────────────────────────────
         // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
@@ -56,6 +59,9 @@ namespace Festa.Network
         bool _spawnPlaced;
         float _spawnWaitStart;
         bool _airborne;
+        bool _jumped;
+        float _airborneSince;
+        const float AirborneAnimGrace = 0.12f;
 
         public override void OnNetworkSpawn()
         {
@@ -168,14 +174,17 @@ namespace Festa.Network
                 {
                     _verticalSpeed = _jumpSpeed;
                     _airborne = true;
+                    _jumped = true;   // 의도한 도약은 유예 없이 즉시 포즈를 낸다
                     grounded = false;
                 }
                 else if (grounded)
                 {
                     _airborne = false;
+                    _jumped = false;
                 }
                 else
                 {
+                    if (!_airborne) _airborneSince = Time.time;
                     _airborne = true;
                 }
             }
@@ -207,7 +216,11 @@ namespace Festa.Network
 
             // 공중에서는 이동 입력과 무관하게 Jump 를 보낸다 — 원격 클라이언트가
             // 같은 애니메이션을 재생한다 (AnimState 는 Owner 쓰기 권한이다).
-            var next = _airborne
+            // 접지 판정은 바닥 이음새·경사에서 한두 프레임씩 끊긴다. 그때마다 점프
+            // 포즈가 번쩍이지 않도록 **의도한 도약이 아니면** 짧은 유예를 둔다.
+            bool showAirborne = _airborne &&
+                (_jumped || Time.time - _airborneSince > AirborneAnimGrace);
+            var next = showAirborne
                 ? PlayerAnimState.Jump
                 : !moving ? PlayerAnimState.Idle
                 : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
