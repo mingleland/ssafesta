@@ -100,15 +100,17 @@
 {
   "boothId": 7,
   "template": "PROJECT_EXHIBITION",
-  "version": 2,
+  "schemaVersion": 1,
   "objects": [
     { "objectId": "screen-1", "type": "VIDEO_SCREEN",
-      "position": { "x": 2.1, "y": 0, "z": 3.4 }, "rotationY": 90, "configId": 152 },
+      "position": { "x": 2.1, "y": 0, "z": 1.4 }, "rotationY": 90, "configId": 152 },
     { "objectId": "ai-1", "type": "AI_AGENT",
       "position": { "x": 1.2, "y": 0, "z": 1.5 }, "rotationY": 0, "configId": 78 }
   ]
 }
 ```
+
+> **`schemaVersion` ≠ `version`** — `schemaVersion`은 Layout JSON의 **구조 버전**(현재 1, 문서의 모양이 바뀔 때만 증가)이고, `version`은 published 응답에만 실리는 **공개 회차**(공개할 때마다 1 증가)다. 예시가 `"version": 2`로 적혀 있던 것을 #36 합의(2026-08-21, game·FE 동의)로 정정했다. 예시의 z 3.4도 확정 규칙(`|z| ≤ 3`) 위반 오기라 1.4로 함께 정정.
 
 **공통 canonical type 문자열**: `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY_KIOSK`, `RECRUITMENT_BOARD`, `CONSULTATION_DESK`, `LAPTOP`, `LIKE_VOTE`, `FURNITURE`, `DECORATION`
 

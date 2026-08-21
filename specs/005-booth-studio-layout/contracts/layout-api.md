@@ -63,6 +63,8 @@
 | `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID. 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조) |
 | `objects[].assetCode` | string | ❌ | `FURNITURE`·`DECORATION`의 구체 자산 식별자 |
 
+**표에 없는 필드는 거부된다** — 계약에 없는 필드가 하나라도 있으면 저장 자체가 `409 LAYOUT_VALIDATION_FAILED` + `rule: MALFORMED_LAYOUT`로 실패한다(조용히 버리지 않는다 — 버리면 편집기는 저장됐다고 믿는데 서버에는 없는 T-24 모양이 된다). 필드 추가 순서는 **3파트 합의 → BE가 `schemaVersion` 올리고 배포 → 그다음 FE 전송**이다 (헌법 24조, #36 명문화 2026-08-21).
+
 **BE는 이 값들을 변형하지 않는다** — 반올림·정규화·기본값 주입을 하지 않고 저장하고 그대로 돌려준다 (research R-04). 서버가 유일하게 덧붙이는 것은 `version`·`revision` 같은 **메타 필드**다.
 
 보낸 자릿수도 유지된다 — `2.10`을 보내면 `2.10`으로 돌아온다. 다만 PostgreSQL `numeric`이 다시 쓰는 표기가 **두 가지** 있다. 둘 다 값은 같다.
@@ -119,7 +121,7 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **오류**: 403 · 404 · 409 `LAYOUT_REVISION_CONFLICT` (본문에 서버의 현재 `revision` 포함) · 409 `LAYOUT_VALIDATION_FAILED`
 
-> **409 REVISION_CONFLICT 응답에는 최신 Draft를 함께 싣는다.** FE가 "다시 불러오기"와 "병합" 중 무엇을 택하든 추가 왕복이 필요 없다 (research R-03).
+> **409 REVISION_CONFLICT 본문에 최신 Draft는 실리지 않는다** — 오류 봉투에 자리가 없어 서버의 현재 `revision`만 알린다. 충돌 시 FE가 `GET /draft`를 한 번 더 호출한다. *(초안의 "최신 Draft 동봉"(research R-03)은 구현하지 않았고, FE가 구현 쪽을 채택해 확정 — #36, 2026-08-21. FE는 자동 병합을 하지 않으므로 동봉본을 쓸 자리가 없다.)*
 
 ---
 
@@ -196,8 +198,8 @@ docs/08이 이미 정의한 두 필드를 실제로 채운다. **추가일 뿐 �
 
 ---
 
-## 8. 왕복 검증 (spec 005 리뷰 ④칸 — 미수행)
+## 8. 왕복 검증 (spec 005 리뷰 ④칸 — ✅ 2026-08-20 통과)
 
-계약 문서로는 닫히지 않는 항목이다. **오브젝트 1개짜리 Layout을 FE가 저장 → Unity가 같은 위치에 놓는지 눈으로 확인**해야 한다 (헌법 21조).
+**통과했다** — FE 작성 JSON을 Unity가 실측해 world 좌표·회전이 소수점까지 일치, 부호 오류 0건. `x` 양·음 / `z` 양·음 / `rotationY` 90·180 네 모호 축 전부 확인 ([#6](https://github.com/kanghyunsoon/ssafesta/issues/6), `docs/LJH/verify/block1-roundtrip.md`, FE 이정헌 / Unity 강형순).
 
-BE가 대신 보장할 수 있는 것은 **저장·조회 왕복에서 값이 바뀌지 않는다**는 것뿐이다(SC-004의 절반). 부호와 원점이 맞는지는 FE·Unity가 확인한다.
+BE가 보장하는 것은 **저장·조회 왕복에서 값이 바뀌지 않는다**는 것이다(SC-004의 절반). 부호와 원점은 위 실측으로 FE·Unity가 확인했다.

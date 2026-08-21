@@ -1,6 +1,6 @@
 # Implementation Plan: Booth Studio / Layout 계약
 
-**Branch**: `feature/booth-studio-layout` | **Date**: 2026-08-20 | **Spec**: [spec.md](spec.md)
+**Branch**: `feature/booth-studio-layout` | **Date**: 2026-08-20 | **Spec**: [spec.md](../spec.md)
 
 **Input**: Feature specification from `specs/005-booth-studio-layout/spec.md`
 
@@ -60,13 +60,15 @@ facade는 **docs/08·09 설계 문서대로** 4필드로 간다 (2026-08-20 결�
 
 ```text
 specs/005-booth-studio-layout/
-├── plan.md              # 이 파일
-├── research.md          # Phase 0 — 설계 결정과 근거
-├── data-model.md        # Phase 1 — 엔티티·제약·불변식
-├── quickstart.md        # Phase 1 — 검증 절차
+├── spec.md              # 공동 정본 (3파트)
 ├── contracts/
-│   └── layout-api.md    # REST 계약 (FE·Unity 소비)
-└── tasks.md             # Phase 2 (/speckit-tasks)
+│   └── layout-api.md    # 파트 경계를 넘는 REST 계약 (FE·Unity 소비)
+└── BE/                  # BE 실행 산출물 (#43 구조, 2026-08-21 이관)
+    ├── plan.md          # 이 파일
+    ├── research.md      # Phase 0 — 설계 결정과 근거
+    ├── data-model.md    # Phase 1 — 엔티티·제약·불변식
+    ├── quickstart.md    # Phase 1 — 검증 절차
+    └── tasks.md         # Phase 2 (/speckit-tasks)
 ```
 
 ### Source Code (repository root)
