@@ -10,7 +10,8 @@
 - [x] ~~`client.ts`의 `ApiError` 갱신~~ — ✅ 08-21 완료. `ApiErrorDetail{rule, objectId?, message}` + fallback 배열 보정 + `isApiError` 가드. `ApiErrorDetail.java`(NON_NULL) 직접 대조로 검증(Codex 미가용)
 - [ ] **`#43` FE 산출물 develop PR** — PR #44 머지됨(08:17). `specs/005/FE/` 4종 develop 반영 가능해짐, 아직 미착수
 - [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
-- [ ] **Studio 편집기 착수** — C-04·C-06·부스 크기(2.72m)·스냅(0.25m) 전부 확정([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)·[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)). §10 기하 계약(회전 AABB·통행 판정)까지 FE 몫으로 명확. **`/speckit-tasks`는 [#43](https://github.com/kanghyunsoon/ssafesta/issues/43) PR #44 머지 후 `FE/`로 이관하고 착수**
+- [x] ~~**Studio 편집기 MVP(US1) 착수**~~ — ✅ 08-21 완료. `FE/tasks.md` T001~T013, 배치→저장→새로고침 복원→공개 완결. 커밋 `dea2779`·`cc4b8eb`·`10fbb2f`
+- [ ] **Studio 편집기 US2~US4·Polish** — `FE/tasks.md` T014~T025. PropertiesPanel(configId 연결)·충돌 UX 재검증·facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정)
 - [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
 
 ## 막힌 것 — 대기 중
@@ -59,6 +60,7 @@
 | **블록 2** 08-20 | 타 파트 결정 5건 소진 |
 | **블록 3** 08-20 | 리뷰 4칸+BE 검토칸 서명, SC-002 해소 |
 | **블록 4** 08-21 | spec 005 plan 산출물 4종 작성 → 발견된 어긋남 5건 정정(부스 높이·스냅·template·409 revision 파싱 불가·통행 판정 FE 몫) — 단, 산출물 경로 구조 확정 전까지 develop PR 보류 |
+| **블록 5** 08-21 | spec 005 Studio 편집기 MVP(US1) — 계약 전사·API·mock·좌표·편집기 본체. 브라우저 실측 검증(quickstart §2·§3·§4·§6) 통과. 검증 중 conflict 상태가 자동 refetch로 덮이는 버그 발견·수정 |
 | `events.ts` 08-20 | `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` (`d1bbb4a`) — 단 오버레이로 잇는 배선은 미완료 |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |

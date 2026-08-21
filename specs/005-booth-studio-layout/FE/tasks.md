@@ -18,9 +18,9 @@
 
 **Purpose**: 서버 계약을 TS 타입으로 옮긴다. 여기가 틀리면 전부 틀린다(미지 필드 = 저장 거부).
 
-- [ ] T001 [P] `shared/config/studio.ts` — `SNAP_METERS=0.25`(확정, #19)·`PX_PER_M=60`(FE 단독 표시 상수)·`BOOTH_SIZE_FALLBACK={width:6,depth:6,height:2.72}`(서버 응답 도착 전 기본값). PX_PER_M이 직렬화와 무관함을 주석으로 명시
-- [ ] T002 [P] `entities/layout/types.ts` — contracts §1 전사: `LayoutObject{objectId,type,position{x,y,z},rotationY,configId?,assetCode?}` / `DraftGetResponse`(revision·updatedByUserId·publishedVersion 포함, 204 가능) / `DraftPutRequest`(expectedRevision 필수) / `DraftPutResponse`(warnings 포함, updatedByUserId·publishedVersion 없음 — **GET/PUT 분리**, data-model.md 표) / `PublishResponse` / `TemplateCatalog`(§9)
-- [ ] T003 [P] `entities/layout/objectTypes.ts` — ObjectType 10종 union + 판정표(분류·연결 요건·사전 경고 대상, data-model.md) + §10-1 로컬 AABB 10행(min/max 비대칭 그대로 — size로 뭉개지 말 것)
+- [x] T001 [P] `shared/config/studio.ts` — `SNAP_METERS=0.25`(확정, #19)·`PX_PER_M=60`(FE 단독 표시 상수)·`BOOTH_SIZE_FALLBACK={width:6,depth:6,height:2.72}`(서버 응답 도착 전 기본값). PX_PER_M이 직렬화와 무관함을 주석으로 명시
+- [x] T002 [P] `entities/layout/types.ts` — contracts §1 전사: `LayoutObject{objectId,type,position{x,y,z},rotationY,configId?,assetCode?}` / `DraftGetResponse`(revision·updatedByUserId·publishedVersion 포함, 204 가능) / `DraftPutRequest`(expectedRevision 필수) / `DraftPutResponse`(warnings 포함, updatedByUserId·publishedVersion 없음 — **GET/PUT 분리**, data-model.md 표) / `PublishResponse` / `TemplateCatalog`(§9)
+- [x] T003 [P] `entities/layout/objectTypes.ts` — ObjectType 10종 union + 판정표(분류·연결 요건·사전 경고 대상, data-model.md) + §10-1 로컬 AABB 10행(min/max 비대칭 그대로 — size로 뭉개지 말 것)
 
 **Checkpoint**: `tsc -b` 통과. 타입만으로 커밋 가능.
 
@@ -30,10 +30,10 @@
 
 **Purpose**: 모든 US가 딛는 기반. US 착수 전 완료 필수.
 
-- [ ] T004 `entities/layout/api.ts` — `getDraft`(204→null)·`putDraft`·`publish`·`getPublished`·`getTemplates`(§9, bearerAuth) 5함수. `client.ts`의 `api<T>()` 재사용, 204는 client가 이미 undefined 반환
-- [ ] T005 `entities/layout/api.mock.ts` — 메모리 mock, `VITE_USE_MOCK` 분기. revision 증가·`expectedRevision` 불일치 409(`LAYOUT_REVISION_CONFLICT`)·미지 필드 409(`MALFORMED_LAYOUT`)·12개 초과 409·publish 시 warnings(`CONFIG_NOT_LINKED`) 재현. 오류는 `ApiError` 5필드 봉투 형태로 throw
-- [ ] T006 [P] `features/studio/lib/coords.ts` — 화면 y↔`-Z` 부호 반전 유일 지점(`svgY = -z`)·스냅(`Math.round(v/SNAP_METERS)*SNAP_METERS`)·경계 클램프(`|x|≤width/2, |z|≤depth/2` — 상수 도출, 하드코딩 금지)
-- [ ] T007 `app/router/index.tsx`에 `/app/studio/:boothId` 라우트 추가 + `pages/studio/StudioPage.tsx` 골격(boothId 파싱, draft query 결선만)
+- [x] T004 `entities/layout/api.ts` — `getDraft`(204→null)·`putDraft`·`publish`·`getPublished`·`getTemplates`(§9, bearerAuth) 5함수. `client.ts`의 `api<T>()` 재사용, 204는 client가 이미 undefined 반환
+- [x] T005 `entities/layout/api.mock.ts` — 메모리 mock, `VITE_USE_MOCK` 분기. revision 증가·`expectedRevision` 불일치 409(`LAYOUT_REVISION_CONFLICT`)·미지 필드 409(`MALFORMED_LAYOUT`)·12개 초과 409·publish 시 warnings(`CONFIG_NOT_LINKED`) 재현. 오류는 `ApiError` 5필드 봉투 형태로 throw
+- [x] T006 [P] `features/studio/lib/coords.ts` — 화면 y↔`-Z` 부호 반전 유일 지점(`svgY = -z`)·스냅(`Math.round(v/SNAP_METERS)*SNAP_METERS`)·경계 클램프(`|x|≤width/2, |z|≤depth/2` — 상수 도출, 하드코딩 금지)
+- [x] T007 `app/router/index.tsx`에 `/app/studio/:boothId` 라우트 추가 + `pages/studio/StudioPage.tsx` 골격(boothId 파싱, draft query 결선만)
 
 **Checkpoint**: mock으로 `getDraft` 호출이 화면에 raw 표시되면 통과.
 
@@ -45,12 +45,12 @@
 
 **Independent Test**: quickstart §2(SC-001) — 3개 배치→저장→새로고침 복원→공개→published에 3개.
 
-- [ ] T008 [US1] `features/studio/model/editorReducer.ts` — `EditorState{boothId,template,objects,selectedObjectId,dirty,saveStatus,baseRevision}` + 이산 액션(`ADD_OBJECT`/`MOVE_OBJECT`/`ROTATE_OBJECT`/`REMOVE_OBJECT`/`SELECT_OBJECT`/`LOAD_DRAFT`). objectId는 `crypto.randomUUID()`(R-02)
-- [ ] T009 [US1] `features/studio/ui/EditorCanvas.tsx` — SVG 톱뷰, `viewBox="-w/2 -d/2 w d"`(미터), 오브젝트 `<g>` 렌더+`transform=rotate()`, pointer 드래그(이동 중 서버 요청 0건)+스냅+클램프(T006 사용), 클릭 선택
-- [ ] T010 [P] [US1] `features/studio/ui/ObjectPalette.tsx` — 10종 목록, `maxObjects`(서버 §9 응답) 도달 시 전체 비활성
-- [ ] T011 [US1] `features/studio/model/useLayoutMutations.ts` — draft PUT(`expectedRevision` echo, 성공 시 `baseRevision` 갱신)·publish POST. react-query mutation, `saveStatus` 전이(idle→dirty→saving→saved/error/conflict)
-- [ ] T012 [US1] `features/studio/ui/PublishDialog.tsx` — publish 응답의 `errors`(진행 차단)/`warnings`(허용) 두 리스트 렌더링. `isApiError` 가드 사용. C-04 표시 지점 — FE 자체 판정 없음
-- [ ] T013 [US1] `StudioPage.tsx` 조립 — draft 로드(`LOAD_DRAFT`, 204면 빈 배치+`expectedRevision:0`)·저장/공개 버튼·dirty 표시
+- [x] T008 [US1] `features/studio/model/editorReducer.ts` — `EditorState{boothId,template,objects,selectedObjectId,dirty,saveStatus,baseRevision}` + 이산 액션(`ADD_OBJECT`/`MOVE_OBJECT`/`ROTATE_OBJECT`/`REMOVE_OBJECT`/`SELECT_OBJECT`/`LOAD_DRAFT`). objectId는 `crypto.randomUUID()`(R-02)
+- [x] T009 [US1] `features/studio/ui/EditorCanvas.tsx` — SVG 톱뷰, `viewBox="-w/2 -d/2 w d"`(미터), 오브젝트 `<g>` 렌더+`transform=rotate()`, pointer 드래그(이동 중 서버 요청 0건)+스냅+클램프(T006 사용), 클릭 선택
+- [x] T010 [P] [US1] `features/studio/ui/ObjectPalette.tsx` — 10종 목록, `maxObjects`(서버 §9 응답) 도달 시 전체 비활성
+- [x] T011 [US1] `features/studio/model/useLayoutMutations.ts` — draft PUT(`expectedRevision` echo, 성공 시 `baseRevision` 갱신)·publish POST. react-query mutation, `saveStatus` 전이(idle→dirty→saving→saved/error/conflict)
+- [x] T012 [US1] `features/studio/ui/PublishDialog.tsx` — publish 응답의 `errors`(진행 차단)/`warnings`(허용) 두 리스트 렌더링. `isApiError` 가드 사용. C-04 표시 지점 — FE 자체 판정 없음
+- [x] T013 [US1] `StudioPage.tsx` 조립 — draft 로드(`LOAD_DRAFT`, 204면 빈 배치+`expectedRevision:0`)·저장/공개 버튼·dirty 표시
 
 **Checkpoint**: quickstart §2·§3(좌표 부호: 화면 아래 드래그→`z<0`, 오른쪽→`x>0`, rotationY 90→+X) 통과 — **MVP 완성**.
 
