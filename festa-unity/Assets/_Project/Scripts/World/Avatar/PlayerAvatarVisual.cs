@@ -464,10 +464,16 @@ namespace Festa.World
 
         void CrossFadeLocomotion(PlayerAnimState state)
         {
-            var stateName = state == PlayerAnimState.Run
-                ? "Run"
-                : state == PlayerAnimState.Walk ? "Walk" : "Idle";
-            _animator.CrossFadeInFixedTime(stateName, 0.2f, 0);
+            var stateName = state switch
+            {
+                PlayerAnimState.Jump => "Jump",
+                PlayerAnimState.Run => "Run",
+                PlayerAnimState.Walk => "Walk",
+                _ => "Idle",
+            };
+            // 점프는 짧아서 0.2초 블렌드로 들어가면 도약 순간을 놓친다.
+            float fade = state == PlayerAnimState.Jump ? 0.05f : 0.2f;
+            _animator.CrossFadeInFixedTime(stateName, fade, 0);
         }
     }
 }

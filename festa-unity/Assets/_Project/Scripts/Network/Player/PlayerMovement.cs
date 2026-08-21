@@ -29,6 +29,13 @@ namespace Festa.Network
         [Tooltip("접지 상태에서 유지하는 하강 속도 — 경사·계단에서 붙어 있게 한다.")]
         [SerializeField] float _groundedStick = -20f;
 
+        // 점프 — 스페이스바. 도약 속도는 원하는 높이에서 역산한다.
+        // h = v² / 2g 이므로 v = √(2gh). g=98.1, h=45(=4.5 m 는 과하다) 대신
+        // h≈4.5 unit(0.45 m) 를 노려 v≈30 을 쓴다. 체공 시간 t = 2v/g ≈ 0.61초로
+        // Jumping 클립(1.90초)보다 짧아 착지 시 로코모션으로 크로스페이드된다.
+        [Tooltip("점프 초기 상승 속도 (unit/s). 1 m = 10 unit 이다.")]
+        [SerializeField] float _jumpSpeed = 30f;
+
         // ── 스폰 위치 강제 ────────────────────────────────────────
         // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
         // (<see cref="ClientAuthoritativeNetworkTransform"/>) 스폰 직후 경합에서 Owner 쪽
@@ -48,6 +55,7 @@ namespace Festa.Network
         float _verticalSpeed;
         bool _spawnPlaced;
         float _spawnWaitStart;
+        bool _airborne;
 
         public override void OnNetworkSpawn()
         {
@@ -146,11 +154,30 @@ namespace Festa.Network
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
             // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.
+            bool grounded = false;
             if (_controller != null && _controller.enabled)
             {
-                _verticalSpeed = _controller.isGrounded
+                grounded = _controller.isGrounded;
+                _verticalSpeed = grounded
                     ? _groundedStick
                     : _verticalSpeed - _gravity * Time.deltaTime;
+
+                // 접지 상태에서만 도약한다 — 이중 점프를 만들지 않는다.
+                // 중력·접지 처리 **뒤에** 적용해야 _groundedStick 이 도약을 지우지 않는다.
+                if (grounded && IsJumpPressed())
+                {
+                    _verticalSpeed = _jumpSpeed;
+                    _airborne = true;
+                    grounded = false;
+                }
+                else if (grounded)
+                {
+                    _airborne = false;
+                }
+                else
+                {
+                    _airborne = true;
+                }
             }
 
             if (moving)
@@ -178,8 +205,11 @@ namespace Festa.Network
                 MoveWithCollision(Vector3.zero); // 정지 중에도 중력은 적용한다
             }
 
-            var next = !moving
-                ? PlayerAnimState.Idle
+            // 공중에서는 이동 입력과 무관하게 Jump 를 보낸다 — 원격 클라이언트가
+            // 같은 애니메이션을 재생한다 (AnimState 는 Owner 쓰기 권한이다).
+            var next = _airborne
+                ? PlayerAnimState.Jump
+                : !moving ? PlayerAnimState.Idle
                 : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
             if (_player.AnimState.Value != next)
                 _player.AnimState.Value = next;
@@ -220,6 +250,16 @@ namespace Festa.Network
         {
             var kb = Keyboard.current;
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
+        }
+
+        /// <summary>
+        /// 스페이스바가 이번 프레임에 눌렸는지. `isPressed` 가 아니라 `wasPressedThisFrame` 이다 —
+        /// 누르고 있는 동안 매 프레임 도약하면 바닥에 닿을 때마다 튀어오른다.
+        /// </summary>
+        static bool IsJumpPressed()
+        {
+            var kb = Keyboard.current;
+            return kb != null && kb.spaceKey.wasPressedThisFrame;
         }
 
         Vector3 CameraRelativeDirection(Vector2 input)

@@ -9,6 +9,8 @@ namespace Festa.Network
         Idle = 0,
         Walk = 1,
         Run = 2,
+        // 값을 뒤에 붙인다 — byte 백업이라 기존 값의 의미가 바뀌지 않아 호환이 유지된다.
+        Jump = 3,
     }
 
     public enum PlayerEmoteId : byte

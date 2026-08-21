@@ -28,8 +28,16 @@ namespace Festa.World
         [SerializeField] float _collisionReturnLerp = 5f;
         // 당기는 쪽은 밀려나는 쪽보다 빨라야 한다 — 느리면 벽에 파묻힌다.
         // 다만 즉시(무한)로 두면 얇은 기물 뒤에서 화면이 튄다 (T-183).
-        [SerializeField] float _collisionPullLerp = 18f;
-        [SerializeField] float _lookHeight = 8.05f;
+        // 18 도 여전히 급하다는 피드백을 받아 8 로 내렸다. 관통은 아래 즉시-당김
+        // 예외(근평면 반경 × 2)가 막으므로 이 값은 체감만 결정한다.
+        [SerializeField] float _collisionPullLerp = 8f;
+
+        // ── 시선 높이 ─────────────────────────────────────────────
+        // 하나로 고정하면 줌인할 때 엉덩이를 들여다본다. 3인칭 게임은 가까워질수록
+        // 시선을 **어깨 쪽으로 올린다** — 멀리서는 발밑까지 보여 주고, 가까이서는
+        // 상체를 본다. 아바타 목표 높이가 17.9 unit 이라 어깨는 대략 14 다.
+        [SerializeField] float _lookHeight = 8.05f;      // 최대 줌아웃에서의 높이
+        [SerializeField] float _lookHeightNear = 14f;    // 최대 줌인에서의 높이
 
         // ── 자기 몸 가리기 ────────────────────────────────────────
         // 뒤에 벽·기물이 있으면 카메라가 앞으로 당겨지고, 그러다 아바타 안으로 들어가
@@ -95,7 +103,12 @@ namespace Festa.World
             UpdateDistance();
             UpdateOrbit();
 
-            var lookTarget = transform.position + Vector3.up * _lookHeight;
+            // 줌 거리에 따라 시선 높이를 옮긴다 — 가까울수록 어깨 쪽으로 올린다.
+            // 기준은 사용자가 고른 `_distance` 다. 가림 때문에 당겨진 거리를 쓰면
+            // 기물 뒤를 지날 때 시선까지 위아래로 흔들린다.
+            float zoomT = Mathf.InverseLerp(_minDistance, _maxDistance, _distance);
+            float lookHeight = Mathf.Lerp(_lookHeightNear, _lookHeight, zoomT);
+            var lookTarget = transform.position + Vector3.up * lookHeight;
             var orbitRotation = Quaternion.Euler(_pitch, _yaw, 0f);
             var orbitDirection = orbitRotation * Vector3.back;
             var desiredDistance = _distance;

@@ -152,6 +152,7 @@ MonoBehaviour:
   _maxTurnSpeedDeg: 1080
   _gravity: 98.1
   _groundedStick: -20
+  _jumpSpeed: 30
   ServerSpawnPosition:
     m_InternalValue: {x: 0, y: 0, z: 0}
 --- !u!114 &8836840528167371394
@@ -227,7 +228,9 @@ MonoBehaviour:
   _minPitch: -20
   _maxPitch: 65
   _collisionReturnLerp: 5
+  _collisionPullLerp: 8
   _lookHeight: 8.05
+  _lookHeightNear: 14
   _selfHideDistance: 6
   _selfShowDistance: 8
 --- !u!114 &4543201849085386913
@@ -250,7 +253,7 @@ MonoBehaviour:
   _visualScale: 1
   _targetVisualHeight: 17.9
   _groundClearance: 0.03
-  _groundShadowSize: {x: 6.4, y: 4.4}
+  _groundShadowSize: {x: 9.6, y: 6.8}
   _animatorController: {fileID: 9100000, guid: f8d5fa92a218de346b05c7a59e31aa67, type: 2}
 --- !u!114 &6286039337160174439
 MonoBehaviour:
