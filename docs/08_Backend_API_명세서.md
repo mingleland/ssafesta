@@ -219,12 +219,14 @@ Draft 저장.
 
 ```json
 {
+  "expectedRevision": 0,
+  "schemaVersion": 1,
   "template": "PROJECT_EXHIBITION",
   "objects": [
     {
       "objectId": "screen-1",
       "type": "VIDEO_SCREEN",
-      "position": {"x": 2.1, "y": 0.0, "z": 3.4},
+      "position": {"x": 2.1, "y": 0.0, "z": 1.4},
       "rotationY": 90.0,
       "configId": 152
     },
@@ -274,6 +276,28 @@ Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
 
 공개된 것이 없으면 `404 LAYOUT_NOT_PUBLISHED`, 임대가 유효하지 않으면 `409 BOOTH_LEASE_EXPIRED`다.
 
+### GET `/booth-layout-templates` — spec 005 신설 (#19 ④, 2026-08-21)
+
+편집기용 템플릿 카탈로그. footprint와 오브젝트 상한을 세 파트가 각자 알던 것을 한 곳에서 받는다. **권한 필요.**
+
+```json
+{
+  "templates": [
+    {
+      "template": "PROJECT_EXHIBITION",
+      "footprint": {"width": 6.0, "depth": 6.0, "height": 2.72},
+      "maxObjects": 12
+    }
+  ]
+}
+```
+
+- `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관, #19 ④·#45 C-06).
+- `height` 2.72는 셸 벽 패널 실측이다. Layout 좌표·실물 검증도 같은 값을 쓴다 (`0 ≤ y ≤ 2.72`).
+- 검증 오류·경고 rule 추가분: 실물 영역 이탈 `AREA_OUT_OF_BOUNDS`(error), 통행 판정
+  `FRONT_BLOCKED`·`ISOLATED_AREA`(warning, 공개 시점만). 기하 계약 상세는
+  `specs/005-booth-studio-layout/contracts/layout-api.md` §10.
+
 ### PUT `/booths/{boothId}/facade` — spec 005 신설
 
 부스 외부 표현 수정. 내부 Layout과 달리 자유 배치가 아니라 정해진 4필드다.
@@ -292,8 +316,9 @@ Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
 - `signText`: 60자 이하 또는 null
 - `logoUrl`: **https만 허용**, 2048자 이하 또는 null (http는 mixed content로 차단되어 조용히 안 보인다)
 
-소유자·Staff만 호출할 수 있고, 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는 `GET /booths/{boothId}`의
-`facade` 필드를 쓴다.
+소유자·Staff만 호출할 수 있고, 필드 검증 실패는 `400 VALIDATION_FAILED`(#17 확정 — 예:
+`"대표색은 #RRGGBB 형식이어야 합니다."`), 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는
+`GET /booths/{boothId}`의 `facade` 필드를 쓴다.
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 

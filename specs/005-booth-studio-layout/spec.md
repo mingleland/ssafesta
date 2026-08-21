@@ -246,10 +246,12 @@ FR-007이 "유효성 검사"를 요구하는데 **무엇을 검사하는지가 �
 | 오브젝트 12개 이하 (FR-010) | error |
 | `objectId`가 한 배치 안에서 유일 | error |
 | `type`이 canonical 문자열 화이트리스트에 있음 | error |
-| `position`·`rotationY`가 유한한 수, 부스 영역 내 | error |
-| `template`이 화이트리스트에 있음 | error |
+| `position`·`rotationY`가 유한한 수, 부스 영역 내 (`0 ≤ y ≤ 2.72` — 셸 실측, #19 ②) | error |
+| **실물(회전 반영 AABB)이 부스 영역 안** — 앵커는 안인데 실물이 옆 슬롯에 걸치는 배치 차단 (#19 ③, contracts §10-2) | error `AREA_OUT_OF_BOUNDS` |
+| `template`이 화이트리스트에 있음 (`PROJECT_EXHIBITION` 단독 — #19 ④·#45) | error |
 | `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error |
-| 기능 오브젝트의 `configId` 미연결 (C-04) | **warning** — 확정 시 error로 옮길 수 있다 |
+| 기능 오브젝트의 `configId` 미연결 (C-04 확정: 경고 유지 — #45) | **warning** |
+| **통행 판정** (공개 시점만, #19 ⑤·contracts §10-3): 관람 띠 도달 <50% → `FRONT_BLOCKED`, 고립 공간 ≥1㎡ → `ISOLATED_AREA` | **warning** — 뒷공간 활용은 소유자의 선택일 수 있어 공개를 막지 않는다 |
 
 ---
 
