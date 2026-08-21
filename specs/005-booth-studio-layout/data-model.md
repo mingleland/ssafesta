@@ -43,9 +43,9 @@
 
 ## ObjectType — canonical 10종 판정표
 
-> **이 표가 C-04(research.md R-01) 판정의 원본이다.** "연결 요건" 열이 `validate.ts`가 참조하는 데이터이며, 판정 로직을 `configId` 필드 검사로 하드코딩하지 않고 이 표를 조회하는 방식으로 짠다 — 요건이 바뀌는 타입(LAPTOP 등)이나 기획 결정이 뒤집히는 경우 모두 표 갱신만으로 흡수된다.
+> **이 표는 FE 사전 경고(UX 보조)의 원본이다.** 공개 가부의 최종 판정은 서버가 `errors`/`warnings`로 내려준다(FR-016, research.md R-01) — 이 표는 요청을 보내기 전에 같은 경고를 미리 띄우기 위한 것이다. "연결 요건" 열이 `validate.ts`가 참조하는 데이터이며, 판정 로직을 `configId` 필드 검사로 하드코딩하지 않고 이 표를 조회하는 방식으로 짠다 — 요건이 바뀌는 타입(LAPTOP 등)을 표 갱신만으로 흡수하기 위해서다. **서버 응답과 이 표의 판정이 갈리면 서버가 이긴다**(헌법 16조).
 
-| type | 분류 | 연결 필드 | 연결 요건 | C-04 경고 대상 |
+| type | 분류 | 연결 필드 | 연결 요건 | 사전 경고 대상 |
 |---|---|---|---|---|
 | `AI_AGENT` | 기능 | `configId` | agentId 필요 | ✅ |
 | `VIDEO_SCREEN` | 기능 | `configId` | 영상 설정 ID 필요 | ✅ |
@@ -85,18 +85,49 @@ Unity는 하위 호환을 위해 `SURVEY`·`CONSULT_DESK`도 읽지만, FE는 �
 | `errors` | `unknown[]` | ⚠️ 원소 타입은 Issue #17 BE 확답 대기 — 확정 전까지 `unknown[]`로 두고 `code`가 `LAYOUT_REVISION_CONFLICT`일 때만 `errors[0]`에서 서버 revision을 꺼내 쓴다 |
 | `warnings` | `unknown[]` | 동일 |
 
-## FE 검증 규칙 6종
+## FE 사전 검증 6종
 
 | 규칙 | 시점 | 결과 |
 |---|---|---|
 | `objectId` 중복 | publish 전 | 차단 (UUID 채택으로 사실상 방어 코드) |
 | 미지원 `type` | draft 로드 시 | **보존하되 미지원으로 표시** — 삭제·drop하지 않는다(spec SC-005, spec 006과 대칭) |
-| 연결 요건 미충족 (ObjectType 판정표 기준) | publish 전 | **경고 + 진행 가능** (C-04 PROVISIONAL — research.md R-01) |
+| 연결 요건 미충족 (ObjectType 판정표 기준) | publish 전 | **경고 + 진행 가능** (C-04 — research.md R-01. 최종 표시는 서버 `warnings`) |
 | 비숫자 transform | 입력 시 | 입력단 차단(도달 불가로 설계) |
 | 경계 밖 위치 (`|x|>width/2` 또는 `|z|>depth/2`) | 드래그 중 + publish 전 | 드래그 중 클램프, publish 전 재검증으로 이중 방어 |
-| 12개 초과 | 추가 시 + publish 전 | 팔레트 비활성 + publish 전 재검증 |
+| 12개 초과 | 추가 시 + publish 전 | 팔레트 비활성 + publish 전 재검증. **Draft 저장 시점에도 서버가 같은 상한을 건다**(spec.md §BE 검토 상세 A) |
 
 이 표는 UX용 빠른 검증이며, 서버가 전체를 독립적으로 재검증한다(헌법 16조). FE 검증 통과가 저장 성공을 보장하지 않는다.
+
+**서버 검증 규칙과의 관계** — spec.md §BE 검토 상세 C가 서버 측 분류를 명세한다. FE에 없는 서버 전용 규칙이 둘 있다:
+
+| 서버 규칙 | 분류 | FE 대응 |
+|---|---|---|
+| `template`이 화이트리스트에 있음 | error | 편집기가 목록에서만 고르게 해 도달 자체를 막는다 |
+| `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error | **FE가 검사할 수 없다** — 서버 `errors`를 렌더링하는 것 외에 할 일이 없다 |
+
+## BoothFacade (FR-018 — research.md R-11)
+
+Layout과 **별개 엔티티**다. Draft/Publish를 타지 않고 `PUT /booths/{boothId}/facade`로 즉시 반영되며 낙관적 잠금이 없다.
+
+| 필드 | 타입 | 제약 |
+|---|---|---|
+| `themeCode` | string | 화이트리스트 `DEFAULT` \| `SSAFY_BLUE` \| `WARM` \| `MONO` |
+| `primaryColor` | string | hex `#RRGGBB` 6자리. `themeCode`와 **독립** |
+| `signText` | string | 간판 문구. `booths.name`과의 화면상 관계는 FE 몫으로 미정 |
+| `logoUrl` | string | **업로드가 아니라 https URL 참조**, ≤2048자 |
+
+만료 부스는 편집이 거부된다(`BOOTH_LEASE_EXPIRED`). `EditorState`와 상태를 합치지 않는다 — 저장 경로·잠금 방식이 달라 `dirty`·`saveStatus`의 의미가 갈리기 때문이다(R-11).
+
+## Publish 검증 응답 (FR-016)
+
+Publish 요청의 검증 결과는 **차단 사유와 경고를 서버가 나눠서** 준다. FE는 이 둘을 그대로 렌더링한다.
+
+| 리스트 | 의미 | FE 동작 |
+|---|---|---|
+| `errors` | 공개를 **막는** 사유 | 목록 표시 + 진행 버튼 비활성 |
+| `warnings` | 막지 않는 경고 | 목록 표시 + 진행 버튼 활성 |
+
+C-04(연결 요건 미충족)는 현재 `warnings`에 있다. 기획이 차단으로 확정하면 서버가 `errors`로 옮기고 **FE는 코드 변경 없이 따라간다** — 이것이 FR-016의 설계 의도다.
 
 ## 상태 전이
 
@@ -115,9 +146,16 @@ conflict --(GET /draft 재로드)--> idle   # 자동 병합 없음 — 유일한
 ## 엔티티 관계
 
 ```text
-BoothLayout (1) ──< objects >── (0..12) LayoutObject
-     │                                        │
-     │ template                               │ type
-     ▼                                        ▼
-  (string)                            ObjectType 판정표 ──> 연결 요건 ──> C-04 경고 대상 여부
+Booth (1) ──── (1) BoothFacade      # FR-018, 즉시 반영·잠금 없음
+  │
+  └──── (1) BoothLayout (1) ──< objects >── (0..12) LayoutObject
+                │                                        │
+                │ template                               │ type
+                ▼                                        ▼
+        서버 화이트리스트                        ObjectType 판정표
+     (DEFAULT | PROJECT_EXHIBITION)                       │
+                                                          ▼
+                                          연결 요건 ──> FE 사전 경고 대상 여부
+                                                          │
+                                          (최종 판정은 서버 errors/warnings — FR-016)
 ```

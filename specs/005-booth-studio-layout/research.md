@@ -8,9 +8,10 @@
 
 **⚠️ PROVISIONAL — 기획 승인 대기**
 
-- **Decision**: 막지 않고 경고한다. `PublishDialog`가 연결 요건을 충족하지 못한 오브젝트 목록을 표시하고, 사용자가 그대로 진행할지 선택한다. 방문자 쪽은 spec 016 FR-009와 동일하게 "오류"가 아니라 "안내"로 처리한다.
-- **Rationale**: spec.md FR-007의 문언은 "실패 시 사유를 안내한다"이지 "차단한다"가 아니다. FE 검토(2026-08-14, spec.md:211~)에서 이미 낸 의견과 동일하다. 판정 기준을 `configId` 필드 유무 같은 하나의 필드 검사로 두지 않고, **"타입별 연결 요건을 충족했는가"라는 상위 개념**으로 설계했다 — 원본은 `data-model.md`의 `ObjectType` 판정표(연결 요건 열)이고, `validate.ts`는 이 표를 데이터로 읽어 판정한다. 기획이 "차단"으로 뒤집혀도 `PublishDialog`의 진행 버튼을 `disabled`로 바꾸는 한 줄로 흡수되고, LAPTOP처럼 연결 요건 자체가 바뀌는 경우(016에서 URL 계약으로 변경 가능)도 판정표 행 수정만으로 흡수된다 — 필드 검사로 하드코딩했다면 두 변경 모두 여러 곳을 고쳐야 했다.
-- **Alternatives**: 차단 — FR-007을 "실패 시 안내"보다 강하게 해석하는 셈이고, 빈 부스라도 우선 공개하고 싶은 운영 시나리오(예: 오프닝 전 자리 확보)를 막는다. 기각.
+- **Decision**: 막지 않고 경고한다. **판정 주체는 서버다** — FR-016에 따라 BE가 Publish 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하고, 미연결은 현재 `warnings`에 들어간다(spec.md:175, BE 구현 기본값). `PublishDialog`는 그 두 리스트를 **그대로 렌더링**하고, `errors`가 비어 있으면 진행 버튼을 연다. 방문자 쪽은 spec 016 FR-009와 동일하게 "오류"가 아니라 "안내"로 처리한다.
+- **Rationale**: spec.md FR-007의 문언은 "실패 시 사유를 안내한다"이지 "차단한다"가 아니고, BE 구현도 같은 방향으로 이미 배포돼 있다. **기획이 "차단"으로 뒤집히면 서버가 그 항목을 `warnings`에서 `errors`로 옮기고, FE는 코드 변경 없이 따라간다** — 이것이 FR-016이 존재하는 이유("확정되지 않은 규칙은 이 구분 안에서 자리만 옮기면 되도록 한다")다. FE가 공개 가부를 자체 판정하면 서버와 갈릴 수 있고, 갈릴 때 이기는 쪽은 서버다(헌법 16조).
+- **FE 사전 검증의 위치**: 저장·공개 요청을 보내기 전에 같은 종류의 경고를 미리 띄우는 것은 **UX 보조**로만 둔다. 그 판정 기준은 `configId` 필드 유무 같은 단일 필드 검사가 아니라 **"타입별 연결 요건을 충족했는가"라는 상위 개념**으로 두고, 원본은 `data-model.md`의 `ObjectType` 판정표(연결 요건 열)다. LAPTOP처럼 연결 요건 자체가 바뀌는 경우(016에서 URL 계약으로 변경 가능)에 판정표 행 수정만으로 흡수된다. 다만 이 사전 판정은 **공개 가부의 근거가 아니다** — 최종 표시는 항상 서버 응답이다.
+- **Alternatives**: FE가 자체 판정해 진행 버튼을 막는다 — 서버 응답과 갈릴 여지가 생기고, 기획 결정이 바뀔 때마다 FE 배포가 필요해진다. 기각.
 
 ## R-02. objectId 생성 주체
 
@@ -31,14 +32,14 @@
 **⚠️ PROVISIONAL — C-06(템플릿 종수) 확정에 종속**
 
 - **Decision**: `SNAP_METERS = 0.5`. 스냅은 미터 도메인에서 `Math.round(v / SNAP_METERS) * SNAP_METERS`로 적용한다.
-- **Rationale**: `BOOTH_SIZE.width/depth = 6`(R-05) 기준으로 0.5m 간격이면 축당 12칸이 생겨 배치 자유도와 정렬감이 균형을 이룬다. C-06(Unity가 셸을 6×6m 임의값으로 만들어 둔 상태 — Issue #19 진행 중)이 확정되면 `shared/config/studio.ts`의 값 하나만 바뀌고 스냅 로직·검증식은 그대로 유지된다.
+- **Rationale**: `BOOTH_SIZE.width/depth = 6`(R-05) 기준으로 0.5m 간격이면 축당 12칸이 생겨 배치 자유도와 정렬감이 균형을 이룬다. C-06(Unity가 셸을 6×6m 임의값으로 만들어 둔 상태 — Issue #19 진행 중)이 확정되면 `shared/config/studio.ts`의 값 하나만 바뀌고 스냅 로직·검증식은 그대로 유지된다. spec.md §BE 검토 상세 A는 **스냅을 "순수 FE 기능이며 BE 계약에 영향 0"**으로 판정했다 — 저장되는 값은 이미 환산된 미터 좌표이므로 이 상수 선택은 FE 단독 결정이고, 서버와 합의할 대상이 아니다.
 - **Alternatives**: 1m — 6×6m 부스에서 너무 성기다. 0.1m — 스냅의 의미(정렬 보조)가 사실상 사라진다. 기각.
 
 ## R-05. 부스 크기
 
 **⚠️ PROVISIONAL — C-06 확정에 종속**
 
-- **Decision**: `BOOTH_SIZE = { width: 6, depth: 6 }` (Unity 현행 임의값 준용, Issue #31 회신에서도 같은 값 언급). 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`. 숫자를 검증식에 직접 박아 넣지 않는다.
+- **Decision**: `BOOTH_SIZE = { width: 6, depth: 6 }` (Unity 현행 임의값 준용, Issue #31 회신에서도 같은 값 언급). 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`. 숫자를 검증식에 직접 박아 넣지 않는다. `template`은 서버 화이트리스트 값만 보낸다 — 현재 `DEFAULT`·`PROJECT_EXHIBITION`(spec.md:177). 편집기는 이 목록을 하드코딩하지 않고 서버가 주는 값에서 고르는 구조로 두되, 목록 제공 endpoint가 아직 없으므로 1차는 두 값을 상수로 두고 확정 시 교체한다.
 - **Rationale**: 원점이 부스 바닥 중앙(헌법 21조 2항)이므로 반너비 비교 하나로 경계 검사가 끝난다. 상수에서 식을 도출하는 구조라 C-06 확정으로 부스 크기가 바뀌거나, 템플릿별로 크기가 달라지는 요구가 생겨도 `BOOTH_SIZE`를 템플릿 키로 조회하도록 확장하는 지점이 이미 하나로 모여 있다 — 지금은 그 확장을 만들지 않는다(YAGNI).
 - **Alternatives**: 경계값(`3`, `-3` 등)을 검증 코드에 직접 하드코딩 — C-06 확정 시 여러 곳을 찾아 고쳐야 하는 산탄 수정이 된다. 기각.
 
@@ -83,14 +84,26 @@
 - **Alternatives**: `node:test` — 런타임 의존성은 0이지만 TS strip 설정을 별도로 갖춰야 해 Vite 프로젝트 관례에서 벗어난다. 팀이 "신규 의존성 금지"를 devDependency까지 확대 해석하면 이 대안으로 전환한다.
 - **참고**: plan.md 제약("신규 런타임 의존성 0")은 프로덕션 번들 기준이다. devDependency 추가 여부는 이 plan 단독으로 확정하지 않고 팀 승인 항목으로 남긴다.
 
+## R-11. facade(외부 표현) 편집 — FR-018
+
+**✅ 범위 확정 — 2026-08-20 BE 검토로 005에 포함**
+
+- **Decision**: facade 편집을 이 plan 범위에 넣는다. `features/studio/ui/FacadePanel.tsx` + `entities/booth/facadeApi.ts` 2파일로, **Layout 편집기의 상태 기계와 분리된 단순 폼**으로 만든다. 4필드(`themeCode`·`primaryColor`·`signText`·`logoUrl`)를 `PUT /booths/{boothId}/facade`로 저장한다.
+- **Rationale**: FR-018이 2026-08-20 BE 검토에서 신설됐고, 이는 FE가 리뷰에서 올린 "외부 설정(Facade) 편집 요구사항이 005에 없다"는 지적(spec.md:211)을 BE가 채택한 결과다. 이전의 "Facade는 005 범위 제외"(2026-08-18) 판단은 폐기다. **Layout과 같은 화면 안에 두되 상태를 합치지 않는 이유**는 저장 방식이 다르기 때문이다 — facade는 Draft/Publish를 타지 않고 `booths` 컬럼에 직접·즉시 반영되며(`docs/26`), 낙관적 잠금(`expectedRevision`)도 없다. `EditorState`에 섞으면 dirty·saveStatus 의미가 두 갈래가 된다.
+- **확정된 계약값**(`docs/26`, #17 통보): `themeCode` 화이트리스트 `{DEFAULT, SSAFY_BLUE, WARM, MONO}` / `primaryColor`는 hex `#RRGGBB` 6자리로 `themeCode`와 독립 / `logoUrl`은 업로드가 아니라 https URL 참조(≤2048자) / 만료 부스는 편집 거부(`BOOTH_LEASE_EXPIRED`).
+- **미확정**: 전역 팔레트 12색의 서버 소속 검증 방식은 [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 합의 진행 중이고, `booths.name`과 `facade_sign_text`의 화면상 관계는 FE 몫으로 남아 있다(`docs/26`). 둘 다 폼 구현을 막지 않는다.
+- **Alternatives**: 별도 spec으로 분리 — FR-018이 이미 005 FR로 신설됐으므로 spec을 거스르게 된다. 기각. `EditorState`에 facade 필드 병합 — 저장 경로·잠금 방식이 달라 상태 의미가 오염된다. 기각.
+
 ---
 
 ## 미해소 항목 요약
 
 | ID | 항목 | 해소 시점 |
 |---|---|---|
-| R-01 | C-04(콘텐츠 미연결 오브젝트 공개 차단 여부) 기획 승인 | 기획 결정 시 — `PublishDialog`에 격리돼 있어 코드 영향 최소 |
+| R-01 | C-04(콘텐츠 미연결 오브젝트 공개 차단 여부) 기획 승인 | 기획 결정 시 — **서버가 `warnings`↔`errors`로 옮기면 FE 코드 변경 없음**(FR-016) |
 | R-04·R-05 | 스냅 간격·부스 크기 실값 | C-06(템플릿·부스 크기 Layout 계약 회의, Issue #19) — `shared/config/studio.ts` 값 교체만 |
 | — | `ApiError.errors` 원소 타입 | Issue #17 BE 확답 대기 — `data-model.md`에는 잠정 `unknown[]`로 기록 |
 | — | spec.md 예시의 `"version": 2` → `"schemaVersion": 1` 정정 | Issue #36에서 BE 제안, 3파트 합의 진행 중 |
+| — | `GET /draft` 응답 형태·최초 진입 분기 | Issue #36 회신 대기 — 요청/응답 필드 차이(`revision` vs `expectedRevision`)와 Draft 미존재 시 응답 |
+| R-11 | facade 팔레트 서버 검증·`booths.name` 관계 | #17 합의 / FE 화면 설계 — 폼 구현은 막지 않음 |
 | R-10 | vitest devDependency 추가 | 팀 승인 |
