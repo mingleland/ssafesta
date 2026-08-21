@@ -6,15 +6,17 @@
 
 ---
 
-## 현재 상태 (2026-08-20)
+## 현재 상태 (2026-08-21)
 
 - spec 005: 리뷰 ①②③④+BE 검토칸 전부 완료. 제목 `FE 검토 완료 (C-04 기획 승인 대기)` — 전체 "확정"은 아님
 - spec 006: `plan.md`·`tasks.md` 완료. `T005`·`T006`은 왕복 검증 통과로 **잠금 해제 가능**
 - Clarification: C-03·C-05 확정, C-07 후순위, **C-04 미결(기획 승인)**, **C-06 재점화(#19 footprint)**
-- Unity 신규 계약 요청 3건(#17 색상 / #18 파츠 잠금 / #19 template·footprint) — **FE 회신 완료, 재회신 대기**
-- 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만
-- Issue #1·#2·#5·#6 CLOSED / #14·#17·#18·#19 OPEN
-- 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`은 PR #23 병합 완료, 나머지 순차 진행
+- 013a: Unity 소유로 축소 — FE는 WebGL 호스트·Access Token 전달만. `FE.md` develop 완전 동기화 완료
+- `BOOTH_LAPTOP_INTERACT` 브라우저 왕복 — ✅ 검증 완료(PR #25)
+- Issue #1·#2·#5·#6·#18 CLOSED / #14·#17·#19·#20·#21·#22·#24 OPEN
+- ⚠️ **신규 — Game Studio** (#20 front / #21 back / #22 ai) — `specs/019-game-studio` 근거로 FE 확정 9개 항목 요청받음.
+  **`specs/019`가 어느 브랜치에도 없음 — 회신 전 소재 확인 필요**
+- 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`·`FE.md` 완료, 나머지 순차 진행
 
 ---
 
@@ -29,11 +31,13 @@
 - [ ] **C-06** 템플릿 종수 — 보류 판단이었으나 **[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)로 재점화**.
       Unity가 셸을 6×6m 임의값으로 만들어 둔 상태라 footprint 확정이 필요해짐. FE는 여전히 설정값 주입 구조 유지
 
-### Unity 이슈 3건 — FE 회신 완료, 재회신 대기 (2026-08-20)
+### Unity 이슈 — 재회신 대기 / 신규
 
 - [x] [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) template·footprint — **회신 오면 C-06 닫히고 FR-003 스냅 간격 착수 가능**
 - [x] [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 — `docs/26`의 Facade 저장 계약 미결이 선행 조건
-- [x] [#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금 — BE와 3건 일치. 인벤토리 소유 주체(개인 vs 부스) 회신 대기
+- [x] [#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금 — ✅ CLOSED, 4건 확정. 구현 계약은 spec 012 착수 시
+- [ ] **[#20](https://github.com/kanghyunsoon/ssafesta/issues/20) Game Studio (신규, front 소관)** — FE 확정 항목 9개(독립 앱 위치·인증 공유·진입 경로·`BOOTH_GAME_INTERACT` 등).
+      `specs/019-game-studio` 소재 미확인 — 회신 전 확보 필요
 
 ### FE 착수 가능
 
@@ -45,7 +49,6 @@
 
 - [ ] FE가 쓸 `assetCode` 목록 제공 → Unity 카탈로그 확장 후 "서로 다른 자산이 실제로 선택되는지" 종단 검증.
       목록 제공 시 last-wins 주의사항 있음 (`verify/block1-roundtrip.md`)
-- [ ] `BOOTH_LAPTOP_INTERACT` 브라우저 왕복 — WebGL 빌드 후 (에디터는 로그만)
 
 ---
 
@@ -70,8 +73,8 @@
 
 - **직접 push 금지**(`docs/17` §2, T-7) / **전체 merge 금지** — `festa-unity/` 1,462개 파일이 조용히 삭제됨(PR #3 실측). 근본 해결 2건은 `docs/26` ①표 16·17번
 - [x] `docs/26` — [PR #23](https://github.com/kanghyunsoon/ssafesta/pull/23) 병합(`develop aeccede`), front 사본 교체
-- [ ] **FE 몫: `docs/sdd/parts/FE.md`** — game도 같은 파일이 달라(12+/10-) 대조·조율 후 올림
-- [ ] back·game 몫은 [Issue #24](https://github.com/kanghyunsoon/ssafesta/issues/24)로 안내 — 파트별 현황표도 그쪽
+- [x] `docs/sdd/parts/FE.md` — ✅ 완료. PR [#25](https://github.com/kanghyunsoon/ssafesta/pull/25)(강형순, spec 016 브리지+브라우저 왕복 검증) + PR [#26](https://github.com/kanghyunsoon/ssafesta/pull/26)(013a 담당 경계) 둘 다 병합, front도 완전 동기화
+- [ ] back·game 몫(`09`·`27`·`README`)은 [Issue #24](https://github.com/kanghyunsoon/ssafesta/issues/24)로 안내 — 파트별 현황표도 그쪽
 
 ---
 
