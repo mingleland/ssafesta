@@ -7,7 +7,8 @@
 
 ## 지금 할 수 있는 것
 
-- [ ] **`client.ts`의 `ApiError` 갱신** — 봉투 `{code, message, requestId, errors, warnings}`, 원소는 `{rule, objectId?, message}`(`objectId`는 optional 키, 없으면 키 자체가 빠짐). `rule` 값은 계약 문서에 7개뿐이라 분기 대상 늘리지 않고 목록 렌더링 위주로
+- [x] ~~`client.ts`의 `ApiError` 갱신~~ — ✅ 08-21 완료. `ApiErrorDetail{rule, objectId?, message}` + fallback 배열 보정 + `isApiError` 가드. `ApiErrorDetail.java`(NON_NULL) 직접 대조로 검증(Codex 미가용)
+- [ ] **`#43` FE 산출물 develop PR** — PR #44 머지됨(08:17). `specs/005/FE/` 4종 develop 반영 가능해짐, 아직 미착수
 - [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
 - [ ] **Studio 편집기 착수** — C-04·C-06·부스 크기(2.72m)·스냅(0.25m) 전부 확정([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)·[#19](https://github.com/kanghyunsoon/ssafesta/issues/19)). §10 기하 계약(회전 AABB·통행 판정)까지 FE 몫으로 명확. **`/speckit-tasks`는 [#43](https://github.com/kanghyunsoon/ssafesta/issues/43) PR #44 머지 후 `FE/`로 이관하고 착수**
 - [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
