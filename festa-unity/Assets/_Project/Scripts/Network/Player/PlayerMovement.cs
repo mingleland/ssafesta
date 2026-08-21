@@ -69,6 +69,12 @@ namespace Festa.Network
         float _airborneSince;
         const float AirborneAnimGrace = 0.12f;
 
+        bool _jumpPending;
+        float _jumpPressedAt;
+        // Jump_Launch 클립(f7~f15 = 0.267초)을 speed 2.05 로 재생하는 시간.
+        // 이 값이 그 재생 시간과 어긋나면 도약 순간이 다시 어긋난다 — 같이 바꿔야 한다.
+        const float JumpAnticipation = 0.13f;
+
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
@@ -176,11 +182,26 @@ namespace Festa.Network
                     ? _groundedStick
                     : _verticalSpeed - gravity * Time.deltaTime;
 
-                // 접지 상태에서만 도약한다 — 이중 점프를 만들지 않는다.
+                // 스페이스를 누르면 **애니메이션만 먼저** 시작하고 몸은 아직 바닥에 있다.
+                //
+                // 즉시 띄우면 안 된다. Animator 는 applyRootMotion = false 라 클립의 수직
+                // 이동(RootT.y)을 버리므로, 화면에 보이는 것은 엉덩이 기준 다리 포즈뿐이다.
+                // 도약 프레임부터 재생하면 시작 포즈가 "다리 펴고 선" 자세이고 다리 접기는
+                // 0.1~0.3초 뒤에 나온다 — 몸이 먼저 올라가고 애니메이션이 뒤따르는 것으로
+                // 보인다. 발 구르기(Jump_Launch)를 바닥에서 먼저 재생하고 그 뒤에 띄운다.
+                //
+                // 접지 상태에서만 시작한다 — 이중 점프를 만들지 않는다.
+                if (grounded && !_jumpPending && IsJumpPressed())
+                {
+                    _jumpPending = true;
+                    _jumpPressedAt = Time.time;
+                }
+
                 // 중력·접지 처리 **뒤에** 적용해야 _groundedStick 이 도약을 지우지 않는다.
-                if (grounded && IsJumpPressed())
+                if (_jumpPending && Time.time - _jumpPressedAt >= JumpAnticipation)
                 {
                     _verticalSpeed = _jumpSpeed;
+                    _jumpPending = false;
                     _airborne = true;
                     _jumped = true;   // 의도한 도약은 유예 없이 즉시 포즈를 낸다
                     grounded = false;
@@ -192,6 +213,8 @@ namespace Festa.Network
                 }
                 else
                 {
+                    // 발 구르는 중에 발판에서 벗어났다면 도약은 취소한다.
+                    _jumpPending = false;
                     if (!_airborne) _airborneSince = Time.time;
                     _airborne = true;
                 }
@@ -228,7 +251,9 @@ namespace Festa.Network
             // 포즈가 번쩍이지 않도록 **의도한 도약이 아니면** 짧은 유예를 둔다.
             bool showAirborne = _airborne &&
                 (_jumped || Time.time - _airborneSince > AirborneAnimGrace);
-            var next = showAirborne
+            var next = _jumpPending
+                ? PlayerAnimState.JumpLaunch
+                : showAirborne
                 ? PlayerAnimState.Jump
                 : !moving ? PlayerAnimState.Idle
                 : running ? PlayerAnimState.Run : PlayerAnimState.Walk;

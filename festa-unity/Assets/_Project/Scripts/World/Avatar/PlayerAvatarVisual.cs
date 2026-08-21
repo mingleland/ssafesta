@@ -473,7 +473,8 @@ namespace Festa.World
         {
             var stateName = state switch
             {
-                PlayerAnimState.Jump => "Jump",
+                PlayerAnimState.JumpLaunch => "Jump_Launch",
+                PlayerAnimState.Jump => "Jump_Air",
                 PlayerAnimState.Run => "Run",
                 PlayerAnimState.Walk => "Walk",
                 _ => "Idle",
@@ -482,7 +483,10 @@ namespace Festa.World
             // 나올 때: 착지를 짧게 끊으면 급정지처럼 보인다. Jump 클립의 무릎 접기
             // (착지 흡수) 앞부분이 블렌드 동안 재생되도록 길게 준다 — 별도 착지
             // 상태를 만들지 않고 클립이 이어 재생되는 것을 그대로 쓴다.
-            float fade = state == PlayerAnimState.Jump ? 0.05f
+            // 도약은 **보여야 하는 순간**이라 거의 스냅으로 넣는다. Launch → Air 는
+            // 인접한 프레임끼리라 짧게 섞어도 이어져 보인다.
+            float fade = state == PlayerAnimState.JumpLaunch || state == PlayerAnimState.Jump
+                ? 0.03f
                 : _lastLocomotion == PlayerAnimState.Jump ? 0.15f
                 : 0.2f;
             _lastLocomotion = state;

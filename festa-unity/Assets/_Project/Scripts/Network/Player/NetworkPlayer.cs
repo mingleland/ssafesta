@@ -11,6 +11,9 @@ namespace Festa.Network
         Run = 2,
         // 값을 뒤에 붙인다 — byte 백업이라 기존 값의 의미가 바뀌지 않아 호환이 유지된다.
         Jump = 3,
+        // 도약 **직전** 의 발 구르기. 몸은 아직 바닥에 붙어 있다 — 이게 화면에 먼저
+        // 나와야 점프로 읽힌다 (T-184).
+        JumpLaunch = 4,
     }
 
     public enum PlayerEmoteId : byte
