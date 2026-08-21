@@ -16,6 +16,21 @@
 - [ ] **Studio 편집기 US4·Polish** — `FE/tasks.md` T020~T025. facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정). ⚠️ PR #50 병합으로 §9·§10 계약 develop 정본화됨 — Polish 문서 각주 갱신 필요. configId 입력에 Int32 범위(1~2,147,483,647, 0 금지) 검증 없음(#34·PR #57) — Polish에서 보강
 - [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
 
+## 🔴 중간 검증에서 나온 미수정 결함 (08-21, 지시 범위 밖이라 보류)
+
+우선순위순. 상세 근거는 `24_작업일지.md` 중간 검증 항목.
+
+- [ ] **미저장 편집 소실** — `QueryClient`가 옵션 없이 생성돼 `refetchOnWindowFocus` 기본 true. 편집 중 탭 왕복하면 refetch→`LOAD_DRAFT`가 작업을 덮어씀. 저장 직후 드래그도 레이스로 되돌아가고 `dirty:false`가 돼 저장 불가. `useLayoutMutations`가 invalidate 경로만 막았고 focus 경로가 열려 있음
+- [ ] **미지 ObjectType 하나로 편집기 영구 크래시** — `validate.ts:13`·`PropertiesPanel.tsx:21`이 `OBJECT_TYPE_INFO[type]`을 옵셔널 조회 없이 사용. 서버가 타입 추가 시(`GAME_PORTAL` 예정) 그 부스는 새로고침해도 계속 터짐. **spec SC-005("미지 타입이 있어도 나머지 정상 표시")와 정면 배치**
+- [ ] **공개 버튼이 `dirty` 미확인** — `publish`는 본문 없이 **서버 draft**를 공개하는데 미리보기는 로컬 state 기준. 저장 안 한 삭제 후 공개하면 삭제한 오브젝트가 공개됨
+- [ ] **충돌 UI가 편집하면 사라짐** — 편집 액션이 `saveStatus`를 `dirty`로 덮어써 conflict 안내·재로드 버튼 소실. `baseRevision`은 낡아 저장 실패 루프
+- [ ] **드래그 눌어붙음** — `setPointerCapture`·`onPointerCancel` 부재. 창 밖에서 버튼 떼고 돌아오면 안 누른 채 따라다님. `touch-action: none`도 없어 터치는 스크롤에 인계됨
+- [ ] **mock이 실 BE와 다름 3건** — publish가 스냅샷 미복사(**spec US1 시나리오 6을 mock이 반증**, SC-003 검증 불가) / draft 저장 응답에 `CONFIG_NOT_LINKED` warning(계약은 공개 시점만) / `BOOTH_LEASE_EXPIRED`를 draft GET·PUT에서 던짐(계약에 없는 경로, 내가 만든 sentinel에 프로덕션 코드가 맞춰진 형태)
+- [ ] **quickstart §5 재현 수단 부재** — [T-12](25_트러블슈팅.md). mock에 강제 충돌 훅 추가 또는 `localStorage` 전환 필요
+- [ ] **로컬 `front`에 계약서 파일 없음** — 코드 주석이 `contracts/layout-api.md` §1·§10-1을 인용하는데 레포에 그 파일이 없다(develop에만). 검증 가능한 상태가 아니라 동기화 필요
+- [ ] **스냅 0.25가 계약 정본에 근거 없음** — 로컬 `FE/research.md` R-04에만 존재. develop `spec.md` FR-003 또는 contracts에 명문화 필요
+- [ ] **`client.ts:9`·`FE/research.md` R-12 주석 무효화** — "rule 전체 목록이 계약 문서에 없다"가 근거였는데 PR #57이 19종을 명문화해 해소됨. 코드 동작은 여전히 안전(보수적)하나 근거 서술이 사실과 다름
+
 ## 막힌 것 — 대기 중
 
 | 항목 | 막는 것 | 상대 |

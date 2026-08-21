@@ -76,7 +76,7 @@
 
 **Independent Test**: quickstart §5(탭 2개 revision 충돌) + §4(13개 주입 시 저장 거부).
 
-- [x] T017 [US3] 409 `LAYOUT_REVISION_CONFLICT` UX — conflict 상태에서 "다른 편집자가 저장했습니다" 안내+재로드 버튼(`GET /draft` 재호출→`LOAD_DRAFT`). **revision 파싱 금지**(errors[0].message는 한글 문장뿐 — data-model.md). MVP(T011) 단계에서 이미 구현됨, 이번엔 재확인만
+- [x] T017 [US3] 409 `LAYOUT_REVISION_CONFLICT` UX — conflict 상태에서 "다른 편집자가 저장했습니다" 안내+재로드 버튼(`GET /draft` 재호출→`LOAD_DRAFT`). **revision 파싱 금지**(errors[0].message는 한글 문장뿐 — data-model.md). MVP(T011) 단계에서 이미 구현됨. ⚠️ **코드 경로만 확인, 브라우저 동작 미검증** — 현재 mock 구조로는 409 재현 불가(T-12). 별도로 ⚠️ 충돌 안내가 편집 시 사라지는 결함 발견(백로그)
 - [x] T018 [P] [US3] `LAYOUT_VALIDATION_FAILED` 시 errors 목록 렌더(`objectId` 있으면 해당 오브젝트 선택·강조)·`BOOTH_LEASE_EXPIRED` 시 편집 차단 안내
 - [x] T019 [US3] 재임대 진입 — draft만 있고 published 없는 상태(`publishedVersion: null`)에서 "비공개" 표시(FR-011·FR-017은 서버 몫, FE는 표시만)
 
@@ -101,7 +101,8 @@
 
 - [ ] T022 `features/studio/lib/validate.ts`에 §10-1 회전 AABB 사전 검증 추가 — 네 모서리 회전(`x'=x·cos+z·sin, z'=−x·sin+z·cos`) 후 AABB 재계산, 오차 1e-9. objectTypes.ts의 bounds 사용. 드래그 중 실물 이탈 표시
 - [ ] T023 `features/studio/lib/passage.ts` — §10-3 통행 판정 실시간 경고(래스터 0.05m·120×120·침식 0.22m·flood fill 4방향·관람 띠 0.7m·50%·고립 1㎡). **서버와 같은 답**이 계약 전제(#19). 12개 규모라 배치 변경 시 재계산으로 충분
-- [ ] T024 quickstart §1~§7 전 시나리오 수동 실행 + 결과를 `docs/LJH/verify/`에 기록
+- [ ] T024 quickstart §1~§7 전 시나리오 수동 실행 + 결과를 `docs/LJH/verify/`에 기록. **선행**: §5(revision 충돌)는 현재 mock으로 재현 불가(T-12) — mock에 강제 충돌 훅을 넣거나 `localStorage` 전환 후에야 실행 가능. 중간 검증(08-21)에서 §2·§3·§4는 이미 통과 확인
+- [ ] T026 [Polish] 중간 검증에서 나온 미수정 결함 6종 — refetchOnWindowFocus로 인한 편집 소실 / 미지 ObjectType 크래시(SC-005 배치) / 공개 버튼 dirty 미확인 / 충돌 UI 소실 / 드래그 pointer capture / mock 3건. 상세는 `docs/LJH/backlog.md`
 - [ ] T025 (R-10 승인 시) vitest 추가 — coords 부호 왕복표(`block1-roundtrip.md` 실측값)·validate·회전 AABB·passage 테이블 테스트
 
 ---
