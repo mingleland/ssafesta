@@ -42,7 +42,7 @@
 
 **Performance Goals**: 드래그 조작 중 서버 요청 0건(`docs/10` §17). 오브젝트 이동은 로컬 상태만 갱신, 저장 시점에만 통신
 
-**Constraints**: Layout JSON 필드 추가·변경 금지(FR-013) — BE는 계약 외 필드를 전부 거부한다(#36). FE 검증은 UX용 빠른 검증이고 **공개 가부의 최종 판정은 서버**다(헌법 16조, FR-016). `template`은 서버 화이트리스트에 있는 값만 허용(현재 `DEFAULT`·`PROJECT_EXHIBITION`)
+**Constraints**: Layout JSON 필드 추가·변경 금지(FR-013) — BE는 계약 외 필드를 전부 거부한다(#36). FE 검증은 UX용 빠른 검증이고 **공개 가부의 최종 판정은 서버**다(헌법 16조, FR-016) — 단 §10-3 통행 판정은 FE도 같은 알고리즘으로 실시간 경고를 구현한다(#19, research.md R-01 인접 서술). `template`은 서버 값만 허용(현재 `PROJECT_EXHIBITION` 단독, `GET /booth-layout-templates`로 조회)
 
 **Scale/Scope**: 페이지 1개(`/app/studio/:boothId`) + 컴포넌트 6~7개(facade 폼 포함) + 순수 모듈 2개(`coords.ts`, `validate.ts`), Object Type 10종, facade 4필드
 
@@ -59,9 +59,9 @@
 | 22 — 오브젝트 상한 12개 | 팔레트 12개 도달 시 추가 비활성 + publish 전 재검증 이중 적용 | ✅ 통과 |
 | 24 — 계약 변경 절차 | Layout JSON 스키마는 무변경. 유일한 델타(`schemaVersion` vs `version` 표기 정정)는 spec 예시 오기 수정이며 BE가 #36에서 제안, 3파트 합의 진행 중 | ⚠️ 조건부 통과 — 합의 확정 시 spec.md 예시 갱신 |
 | 25 — 텍스트 입력은 React | 속성 편집·콘텐츠 연결 전부 React. Unity는 트리거만 | ✅ 통과 |
-| 30 — 임의 확정 금지 | C-04(공개 차단 여부)와 스냅 간격을 PROVISIONAL 표기하고 `docs/26`에 등록. 코드에서는 설정값 1곳 격리. **부스 크기는 6×6×6m로 확정(2026-08-20)돼 잠정 항목에서 빠졌다** | ⚠️ 조건부 통과 — research.md 미해소 항목 표 참조 |
+| 30 — 임의 확정 금지 | **C-04·C-06·부스 크기·스냅 간격 전부 확정됨**([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)·[#19](https://github.com/kanghyunsoon/ssafesta/issues/19), 2026-08-21) — PROVISIONAL 항목 소진. 남은 미확정은 `rule` 문자열 12개·facade 팔레트 hex 값(research.md R-12) 뿐이며 코드 착수를 막지 않는다 | ✅ 통과 |
 
-**Post-Design 재확인 (Phase 1 이후)**: `data-model.md` 작성 후에도 위 판정 변동 없음. C-04는 **서버가 `warnings`로 내려주는 것을 FE가 렌더링**하는 구조라 기획 결정이 뒤집혀도 FE 코드 변경이 없다. `ObjectType` 판정표(연결 요건 열)는 저장 전 사전 경고를 띄우기 위한 **UX 보조**이며 공개 가부의 근거가 아니다 — 24·30조 조건부 통과 상태를 코드 구조로 최소화했다는 뜻이지 완전 해소는 아니다.
+**Post-Design 재확인 (Phase 1 이후)**: `data-model.md` 작성 후에도 위 판정 변동 없음. C-04는 **서버가 `warnings`로 내려주는 것을 FE가 렌더링**하는 구조라 기획 결정이 뒤집혀도 FE 코드 변경이 없다. `ObjectType` 판정표(연결 요건 열)는 저장 전 사전 경고를 띄우기 위한 **UX 보조**이며 공개 가부의 근거가 아니다. 24조는 여전히 조건부 통과다 — `spec.md`의 `"version": 2` 예시 정정은 `origin/feature/booth-layout-geometry`(BE, 미병합)가 이미 해 뒀지만 내 `spec.md` 사본에는 반영하지 않았다(작업 1의 충돌 회피 결정) — 그 브랜치가 병합되면 자동으로 해소된다.
 
 ## Project Structure
 
@@ -73,11 +73,13 @@ specs/005-booth-studio-layout/
 ├── research.md          # Phase 0 — 미확정 항목 해소/기록
 ├── data-model.md         # Phase 1 — 엔티티 정의
 ├── quickstart.md         # Phase 1 — 검증 시나리오
-├── contracts/            # 작성하지 않음 — 사유는 아래
+├── contracts/            # BE 작성 — 공동 정본, FE는 소비만 (아래)
 └── tasks.md              # Phase 2 — $speckit-tasks 산출물 (아직 없음)
 ```
 
-**`contracts/`를 만들지 않는 이유**: Layout JSON 계약은 이미 `spec.md`(§공통 계약 기준, 원본) · `docs/08_Backend_API_명세서.md` §4(API) · `docs/10_Frontend_설계서.md` §7(TS 타입) 세 곳에 있다. 헌법 24조상 이 계약의 변경은 3파트 합의 사항인데, `contracts/`에 네 번째 사본을 두면 drift 지점만 늘어난다. 013이 `contracts/`를 만든 건 그 세 문서 어디에도 없던 신규 계약(NGO struct·Bridge)이었기 때문이고, 005는 반대로 계약이 이미 3벌 있는 상황이다.
+**`contracts/`는 FE가 별도 사본을 만들지 않는다**: `contracts/layout-api.md`는 BE가 이미 작성해 develop에 있다(203줄, `origin/feature/booth-layout-geometry`에서 §9·§10 추가돼 270줄). Layout JSON 필드·오류 봉투·§9 `GET /booth-layout-templates`·§10 기하 계약(type별 bounds·회전 규칙·통행 판정 파라미터)이 전부 여기 있다. 헌법 24조상 이 계약의 변경은 3파트 합의 사항인데, FE가 네 번째 사본(`spec.md`·`docs/08`·`docs/10`에 이어)을 두면 drift 지점만 늘어난다. #43 구조에서도 최상위 `contracts/`는 공동 정본이다. 013이 `contracts/`를 새로 만든 건 그 세 문서 어디에도 없던 신규 계약(NGO struct·Bridge)이었기 때문이고, 005는 반대로 BE가 이미 계약을 써 둔 상황이다.
+
+> 산출물 작성 초판에서 이 문서는 "`contracts/`를 만들지 않는다"고 적었으나, 그 근거로 든 `contracts/layout-api.md` §1 인용(research.md R-05)과 자기모순이었다. 그 파일은 이미 존재하며 원본은 BE 소유다 — FE는 참조만 하고 사본을 두지 않는다는 것이 정확한 서술이다.
 
 ### Source Code (repository root)
 
@@ -99,12 +101,12 @@ festa-frontend/src/
 │       ├── coords.ts                      [신규] 화면축↔Z 부호 반전 단일 지점
 │       └── validate.ts                    [신규] FE 사전 검증(순수 함수, ObjectType 판정표 참조 — UX 보조)
 ├── entities/layout/
-│   ├── types.ts                           [신규] docs/10 §7 타입 전사(정확 일치 필수 — 미지 필드 거부)
-│   ├── objectTypes.ts                     [신규] Object Type 10종 판정표(연결 요건 열 — 사전 경고용)
-│   ├── api.ts                             [신규] layouts 4개 endpoint 클라이언트
-│   └── api.mock.ts                        [신규] 로컬 개발용 메모리 mock(실 BE 시맨틱 재현)
-├── entities/booth/facadeApi.ts            [신규] PUT /booths/{id}/facade — FR-018
-└── shared/config/studio.ts                [신규] BOOTH_SIZE·SNAP_METERS·PX_PER_M — PROVISIONAL 설정값
+│   ├── types.ts                           [신규] contracts/layout-api.md §1 타입 전사(정확 일치 필수 — 미지 필드 거부). GET/PUT draft 응답 타입은 분리(필드 차이 있음)
+│   ├── objectTypes.ts                     [신규] Object Type 10종 판정표(연결 요건 열 — 사전 경고용) + §10-1 로컬 bounds(회전 판정용, 착수 시 §10-1에서 옮김)
+│   ├── api.ts                             [신규] layouts 4개 + `GET /booth-layout-templates` endpoint 클라이언트
+│   └── api.mock.ts                        [신규] 로컬 개발용 메모리 mock(실 BE 시맨틱 재현 — revision 충돌·필드 거부·§10 검증 포함)
+├── entities/booth/facadeApi.ts            [신규] PUT /booths/{id}/facade + GET /booth-facade-palette(미구현, #17) — FR-018
+└── shared/config/studio.ts                [신규] `BOOTH_SIZE`(서버 응답 기본값, `SNAP_METERS=0.25`(확정)·`PX_PER_M`(FE 단독 표시 상수)
 ```
 
 **Structure Decision**: `entities/layout`(계약 타입·API)과 `features/studio`(편집기 UI·상태)를 분리한다. Layout 타입은 spec 006 미리보기 등 다른 소비자가 생길 수 있고, 계약 타입 파일 하나가 3파트 계약의 FE 측 사본임을 구조로 드러내기 위해서다.

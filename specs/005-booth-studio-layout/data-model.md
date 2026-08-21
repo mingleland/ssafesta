@@ -1,6 +1,6 @@
 # Data Model: Booth Studio Layout (FE 편집기)
 
-> 필드명·타입·Object Type 10종은 Backend/Frontend/Unity 3파트 공통 계약(`spec.md` §공통 계약 기준)의 전사이며, 이 문서에서 임의로 변경할 수 없다(헌법 24조). [Issue #36](https://github.com/kanghyunsoon/ssafesta/issues/36)에 따르면 **계약에 없는 필드를 하나라도 보내면 저장 자체가 거부되므로**(`409 LAYOUT_VALIDATION_FAILED`, `rule: MALFORMED_LAYOUT`), `entities/layout/types.ts`의 전사 정확성은 스타일이 아니라 기능 요건이다.
+> 필드명·타입·Object Type 10종은 `spec.md` §공통 계약 기준과 `contracts/layout-api.md`(BE 작성, 공동 정본)의 전사이며, 이 문서에서 임의로 변경할 수 없다(헌법 24조). [Issue #36](https://github.com/kanghyunsoon/ssafesta/issues/36)에 따르면 **계약에 없는 필드를 하나라도 보내면 저장 자체가 거부되므로**(`409 LAYOUT_VALIDATION_FAILED`, `rule: MALFORMED_LAYOUT`), `entities/layout/types.ts`의 전사 정확성은 스타일이 아니라 기능 요건이다.
 
 ---
 
@@ -9,8 +9,8 @@
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `boothId` | number | 부스 식별자 |
-| `template` | string | 템플릿 키 |
-| `objects` | `LayoutObject[]` | 배치된 오브젝트 목록, 최대 12개 |
+| `template` | string | 템플릿 키. **`PROJECT_EXHIBITION` 단독**([#19](https://github.com/kanghyunsoon/ssafesta/issues/19) — `DEFAULT` 제거, V11 이관). 목록은 `GET /booth-layout-templates`(§9) 조회 |
+| `objects` | `LayoutObject[]` | 배치된 오브젝트 목록, 최대 12개(`maxObjects`도 §9 응답에서 옴 — 하드코딩 금지) |
 
 ### 버전 필드 3분리 (Issue #36 — spec.md 예시의 `"version": 2` 정정 대상)
 
@@ -38,7 +38,8 @@
 
 **불변식**:
 - 좌표 3필드는 전부 finite(FE 검증 4번 — 입력단에서 비숫자를 차단해 도달 자체를 막는다)
-- `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2` (research.md R-05 — 상수에서 도출, 하드코딩 금지)
+- 앵커 위치가 `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`(=2.72) 안 (research.md R-05 — 상수에서 도출, 하드코딩 금지)
+- **앵커가 안이어도 실물이 밖일 수 있다** — 타입별 크기가 원점 기준 비대칭이라(`contracts/layout-api.md` §10-1), 회전 적용 후 AABB가 부스 밖으로 나가면 서버가 `AREA_OUT_OF_BOUNDS`로 거부한다. FE 사전 검증도 같은 회전식(`x' = x·cos + z·sin`, `z' = −x·sin + z·cos`)을 써야 서버와 답이 갈리지 않는다 — 아래 "서버 검증 규칙" 표 참조
 - 좌표 직렬화는 FE가 환산한 값을 그대로 보내고 BE가 값을 고치지 않는다. 단 `-0.0`→`0.0`, `1e2`→`100`처럼 **표기**가 바뀔 수 있음(PostgreSQL `numeric` 동작, #36) — 값 자체가 다른 게 아니므로 버그로 취급하지 않는다
 
 ## ObjectType — canonical 10종 판정표
@@ -82,8 +83,31 @@ Unity는 하위 호환을 위해 `SURVEY`·`CONSULT_DESK`도 읽지만, FE는 �
 | `code` | string | 분기는 이 필드로만. 문자열 매칭 금지 |
 | `message` | string | 한글, 그대로 사용자에게 노출 가능(#36) |
 | `requestId` | string | |
-| `errors` | `unknown[]` | ⚠️ 원소 타입은 Issue #17 BE 확답 대기 — 확정 전까지 `unknown[]`로 두고 `code`가 `LAYOUT_REVISION_CONFLICT`일 때만 `errors[0]`에서 서버 revision을 꺼내 쓴다 |
-| `warnings` | `unknown[]` | 동일 |
+| `errors` | `ApiErrorDetail[]` | 항상 존재(빈 배열 가능). 아래 참조 |
+| `warnings` | `ApiErrorDetail[]` | 동일 |
+
+**`ApiErrorDetail`** — `{ rule: string; objectId?: string; message: string }`. 구현이 `@JsonInclude(NON_NULL)`이라 **`objectId`가 없으면 키 자체가 빠진다**(계약 문서 예시는 `"objectId": null`이지만 실제로는 키 부재) — FE 타입은 `objectId`를 optional로 둔다.
+
+🔴 **409 `LAYOUT_REVISION_CONFLICT`에서 revision 값을 구조적으로 꺼내지 않는다.** 서버는 숫자 필드를 주지 않는다:
+
+```
+errors: [ { rule: "CURRENT_REVISION", message: "서버의 현재 revision은 N입니다. 다시 불러온 뒤 저장하세요." } ]
+```
+
+숫자가 **한글 메시지 문장 안에만** 있다. FE는 이 문자열을 파싱하지 않고, `code === 'LAYOUT_REVISION_CONFLICT'`를 확인하는 즉시 `GET /draft`를 재호출해 전체 갱신한다(research.md R-06).
+
+`rule` 값은 계약 문서에 7개(`MALFORMED_LAYOUT`·`OBJECT_LIMIT`·`AREA_OUT_OF_BOUNDS`·`CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED`·`FRONT_BLOCKED`·`ISOLATED_AREA`)만 있고, 구현에는 12개가 더 있으나 문서화돼 있지 않다(research.md R-12). FE는 `rule`로 분기하지 않고 **목록을 그대로 렌더링**하는 것을 기본으로 두며, 분기는 `CURRENT_REVISION` 하나뿐이다.
+
+## `GET /draft`와 `PUT /draft` 응답 — 타입을 합치면 안 된다
+
+| 필드 | `GET /draft` 200 | `PUT /draft` 200 |
+|---|---|---|
+| `boothId` `revision` `schemaVersion` `template` `objects` `updatedAt` | ✅ | ✅ |
+| `updatedByUserId` | ✅ | ❌ |
+| `publishedVersion`(null 가능 — 공개본과 다름 표시용) | ✅ | ❌ |
+| `warnings` | ❌ | ✅ (항상, 빈 배열 가능) |
+
+`entities/layout/types.ts`에 `DraftResponse`·`DraftSaveResponse` 두 타입을 따로 둔다. 작업본이 없으면 `GET /draft`는 **204 No Content**를 반환하고, 편집기는 빈 배치로 시작해 첫 저장에 `expectedRevision: 0`을 보낸다.
 
 ## FE 사전 검증 6종
 
@@ -98,12 +122,14 @@ Unity는 하위 호환을 위해 `SURVEY`·`CONSULT_DESK`도 읽지만, FE는 �
 
 이 표는 UX용 빠른 검증이며, 서버가 전체를 독립적으로 재검증한다(헌법 16조). FE 검증 통과가 저장 성공을 보장하지 않는다.
 
-**서버 검증 규칙과의 관계** — spec.md §BE 검토 상세 C가 서버 측 분류를 명세한다. FE에 없는 서버 전용 규칙이 둘 있다:
+**서버 검증 규칙과의 관계** — `contracts/layout-api.md` §10(기하 계약, #19 확정)이 FE 사전 검증 6종에 없는 규칙 2개를 추가한다. 이 둘은 "서버 전용"이 아니라 **FE도 같은 알고리즘으로 실시간 구현해야** 서버와 답이 갈리지 않는다(BE: *"FE 실시간 경고와 서버 경고가 다른 답을 내면 '편집기는 괜찮다는데 공개하니 경고가 뜬다'가 문의로 옵니다"*):
 
-| 서버 규칙 | 분류 | FE 대응 |
-|---|---|---|
-| `template`이 화이트리스트에 있음 | error | 편집기가 목록에서만 고르게 해 도달 자체를 막는다 |
-| `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error | **FE가 검사할 수 없다** — 서버 `errors`를 렌더링하는 것 외에 할 일이 없다 |
+| 규칙 | 분류 | Draft 저장에도? | FE 대응 |
+|---|---|---|---|
+| **실물(회전 반영 AABB)이 부스 영역 안** — `AREA_OUT_OF_BOUNDS` | error | ✅ | **FE가 같은 회전식으로 실시간 클램프.** 타입별 로컬 bounds는 §10-1(`objectTypes.ts`로 옮김), 회전 공식은 §10-2(허용 오차 `1e-9`) |
+| **통행 판정** — 관람 띠 도달 <50% `FRONT_BLOCKED` / 고립 ≥1㎡ `ISOLATED_AREA` | warning | ❌(공개 시점만) | **FE가 §10-3 알고리즘으로 실시간 경고 구현**(래스터 0.05m·침식 0.22m·flood fill 4방향·관람 띠 0.7m·기준선 50%·고립 1㎡). 리드가 명시적으로 FE 몫으로 배분(#19) — "공개 버튼을 눌렀을 때 거부되는 것보다 배치하는 순간 보여주는 쪽이 낫다" |
+
+**FE가 검사할 수 없는 것은 이 규칙 하나뿐**: `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지(헌법 16·17조, error) — 편집기가 그 콘텐츠의 소유 여부를 알 방법이 없어 서버 `errors`를 렌더링하는 것 외에 할 일이 없다. `template`이 화이트리스트에 있음(error)도 편집기가 서버 목록(`GET /booth-layout-templates`)에서만 고르게 해 도달 자체를 막는다.
 
 ## BoothFacade (FR-018 — research.md R-11)
 
@@ -111,12 +137,14 @@ Layout과 **별개 엔티티**다. Draft/Publish를 타지 않고 `PUT /booths/{
 
 | 필드 | 타입 | 제약 |
 |---|---|---|
-| `themeCode` | string | 화이트리스트 `DEFAULT` \| `SSAFY_BLUE` \| `WARM` \| `MONO` |
-| `primaryColor` | string | hex `#RRGGBB` 6자리. `themeCode`와 **독립** |
+| `themeCode` | string | 화이트리스트 `DEFAULT` \| `SSAFY_BLUE` \| `WARM` \| `MONO` — ⚠️ 값은 `docs/08_Backend_API_명세서.md`·구현에만 있고 **계약 문서(`contracts/layout-api.md`)에는 없음**(research.md R-12) |
+| `primaryColor` | string | hex `#RRGGBB` 6자리만. `themeCode`와 **독립**. `#RGB`·`#RRGGBBAA`·이름 문자열은 전부 400 |
 | `signText` | string | 간판 문구. `booths.name`과의 화면상 관계는 FE 몫으로 미정 |
 | `logoUrl` | string | **업로드가 아니라 https URL 참조**, ≤2048자 |
 
 만료 부스는 편집이 거부된다(`BOOTH_LEASE_EXPIRED`). `EditorState`와 상태를 합치지 않는다 — 저장 경로·잠금 방식이 달라 `dirty`·`saveStatus`의 의미가 갈리기 때문이다(R-11).
+
+**팔레트**: `GET /booth-facade-palette`는 응답 형태가 합의됐으나(`{colors:[{code,hex,label}], themeCodes:[...]}`, 12색, 전역 1개) **아직 구현되지 않았다**(research.md R-11). 구체 hex 12개는 FE↔BE 구현 트랙에서 정해야 하는 FE 착수 항목이다.
 
 ## Publish 검증 응답 (FR-016)
 
@@ -152,10 +180,14 @@ Booth (1) ──── (1) BoothFacade      # FR-018, 즉시 반영·잠금 없�
                 │                                        │
                 │ template                               │ type
                 ▼                                        ▼
-        서버 화이트리스트                        ObjectType 판정표
-     (DEFAULT | PROJECT_EXHIBITION)                       │
-                                                          ▼
-                                          연결 요건 ──> FE 사전 경고 대상 여부
-                                                          │
-                                          (최종 판정은 서버 errors/warnings — FR-016)
+     GET /booth-layout-templates              ObjectType 판정표(연결 요건)
+       (PROJECT_EXHIBITION 단독,                          │
+        footprint·maxObjects 응답)                        ▼
+                │                             ┌─ 연결 요건 미충족 → FE 사전 경고 대상
+                ▼                             │  (최종 판정은 서버 errors/warnings — FR-016)
+     §10-1 로컬 bounds(회전 후 AABB)  ────────┘
+                │
+                ▼
+     AREA_OUT_OF_BOUNDS(error) / FRONT_BLOCKED·ISOLATED_AREA(warning)
+     — FE가 §10-2·§10-3 알고리즘으로 실시간 구현, 서버가 최종 판정
 ```
