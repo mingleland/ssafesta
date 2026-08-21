@@ -127,7 +127,7 @@
 - [X] T045 [P] `docs/08_Backend_API_명세서.md` — ① `PUT /booths/{boothId}/facade` 신설 반영 ② §1.3 오류 응답을 "제안"에서 **확정·구현됨**으로 ③ layout 응답의 `schemaVersion` 추가 ④ 오류 코드 표에 005 신규 4종 추가
 - [X] T046 [P] `docs/09_DB_ERD_DB_설계서.md` — §9를 실물(`booth_layout_drafts` + `booth_layout_published_versions` 2테이블)로 정정하고 §7 facade 4컬럼·`published_layout_version`을 V8·V9 결과와 일치시킨다 (research R-01·R-08)
 - [ ] T047 **3파트 통보** ⚠️ **사람이 해야 함** — ① 오류 봉투가 005부터 실제 동작(Breaking 아님, 문서와의 정합 회복) ② `PUT /facade` 신설 ③ `schemaVersion`과 `version`을 갈라 쓰기로 한 것(research R-10)과 spec 005 §Layout JSON 예시의 `"version": 2` 정정 제안. AI·FE·Unity 파트에 전달하고 `docs/26`에 결과 기록 (헌법 24조)
-- [ ] T048 ⚠️ **사람이 해야 함** — [quickstart.md](quickstart.md) 수동 검증 수행 — Bruno 18단계 + 만료 경로 4단계. **결과를 문서에 적지 말고 실제로 실행한다**
+- [X] T048 [quickstart.md](quickstart.md) 수동 검증 **수행 완료 (2026-08-21)** — 로컬 Spring 실서버에 curl로 18단계 + 만료 4단계를 전부 실행했다. 로컬 DB v5→v9 마이그레이션·`ddl-auto: validate` 통과, 좌표 원문 보존, 공개 포인터가 걸린 상태의 회원 탈퇴까지 확인. **최초 저장 경합 결함을 여기서 잡았다 (T-114)**
 - [X] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
 - [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가
 - [X] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신

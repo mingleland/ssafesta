@@ -3,7 +3,6 @@ package com.example.ssafesta.booth;
 import com.example.ssafesta.common.ApiErrorDetail;
 import java.time.Instant;
 import java.util.List;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,14 +108,14 @@ public class BoothLayoutService {
             // than quietly creating one, so a stale editor learns its view is wrong.
             throw new LayoutRevisionConflictException(0L);
         }
-        try {
-            return drafts.saveAndFlush(new BoothLayoutDraft(
-                    boothId, requireSchemaVersion(document), layoutJson, userId));
-        } catch (DataIntegrityViolationException exception) {
-            // Two first-saves raced. The primary key (invariant I-1) decided the winner; the loser
-            // is told the revision moved, which is exactly what happened.
+        // Deliberately not save(): with an assigned primary key that becomes a merge, and a merge
+        // turns into an UPDATE when a concurrent first save has already committed — overwriting it
+        // without a word. insertIfAbsent is one statement and reports the loser.
+        if (drafts.insertIfAbsent(boothId, requireSchemaVersion(document), layoutJson, userId,
+                Instant.now()) == 0) {
             throw new LayoutRevisionConflictException(currentRevisionOf(boothId));
         }
+        return drafts.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
     }
 
     private BoothLayoutDraft updateExisting(Long boothId, Long userId,

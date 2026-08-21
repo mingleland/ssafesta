@@ -119,6 +119,22 @@ class ErrorEnvelopeIntegrationTest {
         assertFalse(body.contains("No static resource"), "Spring 원문이 새어 나왔습니다: " + body);
     }
 
+    /**
+     * A message is for the person reading it, not for the developer.
+     *
+     * <p>Caught in the manual run: the expiry message came back as
+     * {@code "임대가 만료된 부스입니다 — boothId=1"}. Korean, but the tail is debugging text in a
+     * user-facing field.
+     */
+    @Test
+    void messagesCarryNoDebuggingTail() throws Exception {
+        String body = mockMvc.perform(get("/api/v1/booths/{id}", 9_999_999L))
+                .andReturn().getResponse().getContentAsString();
+
+        assertFalse(body.contains("boothId="), "식별자 덧붙임이 사용자 메시지에 남아 있습니다: " + body);
+        assertFalse(body.contains("—"), "메시지에 개발자용 꼬리표가 있습니다: " + body);
+    }
+
     @Test
     void everyErrorCodeMessageIsKorean() {
         for (ErrorCode code : ErrorCode.values()) {

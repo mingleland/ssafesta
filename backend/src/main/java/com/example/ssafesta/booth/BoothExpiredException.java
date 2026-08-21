@@ -16,6 +16,8 @@ import com.example.ssafesta.common.ErrorCode;
 public class BoothExpiredException extends ApiException {
 
     public BoothExpiredException(Long boothId) {
-        super(ErrorCode.BOOTH_LEASE_EXPIRED, "임대가 만료된 부스입니다 — boothId=" + boothId);
+        // The id stays out of the message: it is developer text, and the client already knows which
+        // booth it asked for. The request path plus requestId identifies it in the log.
+        super(ErrorCode.BOOTH_LEASE_EXPIRED);
     }
 }
