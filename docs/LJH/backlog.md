@@ -16,7 +16,7 @@
 | 항목 | 막는 것 | 상대 |
 |---|---|---|
 | **#43** spec 산출물 경로 구조 | FE 산출물 develop PR 전체 | 리드·BE |
-| **C-04** 미연결 오브젝트 공개 차단 | spec 005 전체 확정 (구현은 PROVISIONAL로 진행 가능) | 기획 |
+| **C-04·C-06** 미연결 오브젝트 공개·템플릿 종수 | spec 005 전체 확정 (구현은 PROVISIONAL로 진행 가능) | 기획 — [#45](https://github.com/kanghyunsoon/ssafesta/issues/45) 게시 |
 | **#30** refresh 토큰 쿠키 도메인 | 인증 경로 | @Alexjung0115 TLS 결정 |
 | **#34** `GAME_PORTAL`이 `schemaVersion` 올리는가 | ObjectType union 확장 시점 | BE (#36에서 질문함) |
 | **#21** GameProject 계약 | `features/game-entry/`(`configId → gameId`) | BE |
