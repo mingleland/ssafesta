@@ -1,0 +1,33 @@
+meta {
+  name: 내 부스 조회
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/booths/mine
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 내 부스 조회
+
+  내 부스와 현재 임대 정보를 조회한다. (spec 004 FR-007)
+
+  - 인증: 회원 Access Token 필요
+  - 성공: `200 OK`, `{ boothId, name, status, lease }`
+  - `204 No Content`: 임대한 적이 없어 부스가 없다
+
+  ### 임대가 끝난 뒤
+
+  `status`가 `INACTIVE`가 되고 `lease`는 `null`이 되지만 **부스는 남아 있다.**
+  Layout·AI 문서·설문·프로젝트가 보존되며, 다시 임대하면 그 콘텐츠를 이어서 쓴다 (FR-010).
+
+  부스는 **소유자에게 귀속**되므로, 내 슬롯을 다른 사람이 재임대해도 그 사람은 자기 부스를 새로 받는다.
+  내 콘텐츠가 넘어가지 않는다 (C-01).
+}

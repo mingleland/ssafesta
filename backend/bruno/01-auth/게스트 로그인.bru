@@ -1,0 +1,30 @@
+meta {
+  name: 게스트 로그인
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/guest
+  body: none
+  auth: none
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.accessToken) {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  ## 게스트 로그인
+
+  소셜 로그인 없이 공개 월드·부스만 둘러볼 수 있는 게스트 Access Token을 발급한다.
+
+  - 인증: 필요 없음
+  - Request body: 없음
+  - 성공: `200 OK`, `{ accessToken, expiresAt }`
+  - 후속: response script가 `accessToken` 환경변수에 자동 저장한다.
+
+  게스트 토큰으로는 내 정보, 닉네임 변경, 부스 임대, 코인, 스튜디오 등 영속 상태 변경 API를 호출할 수 없다. Refresh Token은 발급되지 않으며 만료되면 이 API를 다시 호출한다.
+}
