@@ -86,8 +86,6 @@ requestId
 4. Agent 설정 로드
 5. Conversation 생성
 
-유료 AI 이용 승인은 FastAPI가 Coin을 직접 차감하지 않고 Spring에서 선행 처리한다.
-
 #### Lease 검증 계약 (spec 008 C-09, Issue #14)
 
 - Spring 검증은 **Conversation 생성 시 한 번만** 수행한다. 이후 질문마다 Spring을 호출하지 않는다.
@@ -304,8 +302,6 @@ FastAPI는 Summary만 생성하며 Staff 선택·상담방 생성은 Spring이 �
 }
 ```
 
-Test Mode의 Coin 차감 여부는 Spring 정책과 연계한다. 기본 방향은 실제 과금 없음이다.
-
 ---
 
 ## 11. Health Check
@@ -423,7 +419,7 @@ Access Token, API Key, Password는 로그에 기록하지 않는다.
 ```text
 Client              Spring             FastAPI            Vector/LLM
   | AI 이용 요청 ---->|                   |                    |
-  |<-- 승인/결제 ------|                   |                    |
+  |<-- 인증/접근 승인 --|                   |                    |
   |---------------- Conversation ------->|                    |
   |<--------------- conversationId ------|                    |
   |---------------- Stream ------------->|                    |
@@ -469,7 +465,6 @@ Spring → Visitor Connected
 - JWT 검증 방식
 - Spring ↔ FastAPI 내부 인증
 - Conversation 저장 위치/보존
-- 결제 선처리/환불 정책
 - LLM Provider
 - Embedding Model
 - Chunk 크기
