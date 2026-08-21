@@ -62,9 +62,9 @@
 
 **Independent Test**: AI 오브젝트 배치→configId 입력→저장 JSON에 포함. 미연결 상태로 공개 시도→warnings에 표시 + 진행 가능(C-04 확정값).
 
-- [ ] T014 [US2] `features/studio/ui/PropertiesPanel.tsx` — 선택 오브젝트의 위치(x·z 숫자 입력, 비숫자 입력단 차단)·회전(0≤r<360 정규화)·configId 연결(기능형만)·assetCode(장식형만) 편집. `LINK_CONTENT` 액션 추가
-- [ ] T015 [P] [US2] `features/studio/lib/validate.ts` — 사전 경고(순수 함수): 판정표 기반 연결 요건 미충족 목록·objectId 중복·12개 초과. **UX 보조 — 최종 판정은 서버**(헌법 16조) 주석 명시
-- [ ] T016 [US2] PublishDialog에 사전 경고 통합 — 공개 요청 전 T015 결과 표시, 요청 후 서버 warnings로 교체
+- [x] T014 [US2] `features/studio/ui/PropertiesPanel.tsx` — 선택 오브젝트의 위치(x·z 숫자 입력, 비숫자 입력단 차단)·회전(0≤r<360 정규화)·configId 연결(기능형만)·assetCode(장식형만) 편집. `LINK_CONTENT` 액션 추가
+- [x] T015 [P] [US2] `features/studio/lib/validate.ts` — 사전 경고(순수 함수): 판정표 기반 연결 요건 미충족 목록·objectId 중복·12개 초과. **UX 보조 — 최종 판정은 서버**(헌법 16조) 주석 명시
+- [x] T016 [US2] PublishDialog에 사전 경고 통합 — 공개 요청 전 T015 결과 표시, 요청 후 서버 warnings로 교체
 
 **Checkpoint**: quickstart §6(C-04 — configId 없는 AI_AGENT 공개 시 warnings 표시+진행 가능, FURNITURE는 목록에 없음) 통과.
 

@@ -11,7 +11,8 @@
 - [ ] **`#43` FE 산출물 develop PR** — PR #44 머지됨(08:17). `specs/005/FE/` 4종 develop 반영 가능해짐, 아직 미착수
 - [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
 - [x] ~~**Studio 편집기 MVP(US1) 착수**~~ — ✅ 08-21 완료. `FE/tasks.md` T001~T013, 배치→저장→새로고침 복원→공개 완결. 커밋 `dea2779`·`cc4b8eb`·`10fbb2f`
-- [ ] **Studio 편집기 US2~US4·Polish** — `FE/tasks.md` T014~T025. PropertiesPanel(configId 연결)·충돌 UX 재검증·facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정)
+- [x] ~~**Studio 편집기 US2(콘텐츠 연결)**~~ — ✅ 08-21 완료. `FE/tasks.md` T014~T016. PropertiesPanel(위치·회전·configId·assetCode)·사전 경고(precheck)·PublishDialog 통합. 브라우저 실측(configId 연결 시 precheck 1건 감소·저장 후 유지·공개 응답 warnings 일치) 통과
+- [ ] **Studio 편집기 US3~US4·Polish** — `FE/tasks.md` T017~T025. 충돌 UX 재검증·facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정)
 - [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
 
 ## 막힌 것 — 대기 중
