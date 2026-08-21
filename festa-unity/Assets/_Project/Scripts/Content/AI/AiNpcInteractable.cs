@@ -23,6 +23,19 @@ namespace Festa.Content
         public async void Interact(string message)
         {
             if (_busy) return;
+
+            // 콘텐츠 미연결(configId 0)이면 서버를 부르지 않는다.
+            // C-04 가 "경고만 하고 공개 허용"이므로 미연결 오브젝트가 월드에 실제로 선다 (#45).
+            // 가드가 없으면 방문자가 클릭할 때마다 agentId=0 으로 대화 생성이 호출되고,
+            // 겉보기에는 동작하는 오브젝트가 조용히 실패한다 — 빈 오브젝트보다 나쁘다.
+            if (_runtimeObject == null || !_runtimeObject.HasConfig)
+            {
+                Debug.LogWarning(
+                    $"[AiNpc] AI 직원이 연결되지 않아 상호작용을 건너뜁니다. " +
+                    $"booth={_runtimeObject?.BoothId} object={_runtimeObject?.ObjectId}");
+                return;
+            }
+
             _busy = true;
 
             var conversationId = await ApiServices.Ai.CreateConversationAsync(
