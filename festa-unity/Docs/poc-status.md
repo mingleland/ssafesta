@@ -38,7 +38,11 @@
 
 ## 알려진 이슈 (신규)
 
-- **플레이어끼리 충돌 없음** — PlayerMovement가 물리 없이 Transform 직접 이동(POC). 정식 이동 구현(CharacterController) 때 처리
+- ~~**플레이어끼리 충돌 없음** — PlayerMovement가 물리 없이 Transform 직접 이동(POC). 정식 이동 구현(CharacterController) 때 처리~~
+  → **2026-08-21 해결.** `CharacterController` 이동으로 교체하고 11층 월드 콜리전을 넣었다 (T-167).
+  단 **플레이어끼리 충돌은 의도적으로 껐다** — `Player` 레이어(8) 를 만들어 Player↔Player 를 해제했다.
+  이동이 client-authoritative 라 서로 밀면 클라이언트마다 결과가 달라 떨리고, 40명 로비에서 통행도 막힌다.
+  되돌리려면 충돌 매트릭스에서 다시 켜면 된다.
 
 ## 이번 검증에서 잡은 버그 (재발 방지)
 
