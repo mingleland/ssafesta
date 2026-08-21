@@ -1,0 +1,42 @@
+meta {
+  name: OAuth 완료 - 기존 유저
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/oauth/complete
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Cookie: oauth_handoff={{oauthHandoff}}
+}
+
+body:json {
+  {}
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.status === "AUTHENTICATED") {
+    bru.setEnvVar("accessToken", res.body.accessToken);
+  }
+}
+
+docs {
+  ## OAuth 완료: 기존 회원 확인
+
+  OAuth callback 뒤 발급된 `oauth_handoff`로 기존 회원 로그인 또는 신규 회원 여부를 판별한다.
+
+  - 인증: Access Token 불필요
+  - Header: `Cookie: oauth_handoff={{oauthHandoff}}`
+  - Request body: `{}`
+  - `200 AUTHENTICATED`: 기존 회원 로그인 성공. `{ status, accessToken, expiresAt }`를 받고 Refresh Token은 응답 cookie로 발급된다.
+  - `200 NICKNAME_REQUIRED`: 신규 회원. 아직 User·지갑·세션을 만들지 않았으므로 다음 요청에서 닉네임을 제출한다. (닉네임을 적고 한 번 더 호출하면 됨)
+  - `400`: handoff cookie가 없다.
+  - `410`: handoff가 만료됐거나 이미 소비됐다. OAuth를 다시 시작한다.
+
+  성공 시 response script가 `accessToken` 환경변수에 저장한다. 이 handoff는 단 한 번만 소비된다.
+}

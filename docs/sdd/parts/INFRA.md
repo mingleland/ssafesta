@@ -40,30 +40,33 @@ Secret은 파이프라인 Secret 저장소에서 주입하며 저장소에 커�
 Unity 빌드는 캐시(Library) 전략 필수 — 캐시 없으면 빌드 시간이 파이프라인을 지배한다.
 ```
 
-**예상 clarify**: CI 러너(GitLab CI 예상 — 팀 GitLab 사용 시), Unity 라이선스 활성화 방식(개인 라이선스 CLI), 파트 브랜치 dev 인스턴스를 1대에 포트 분리 vs 분리 인스턴스(제공 서버 사양 확인 후), 배포 실패 롤백 방식.
+**infra-001 clarify 확정 (2026-08-18)**: CI/CD는 Jenkins를 사용한다. 초기에는 단일 EC2 안에서 Jenkins Controller와 Agent를 논리적으로 분리하고 Controller는 Executor 0으로 빌드를 직접 실행하지 않는다. 소스 저장소가 GitHub에서 GitLab으로 이전되더라도 Jenkins 파이프라인은 유지하고 Webhook 연동만 전환한다.
 
 ## 3. infra-002 — environments
 
 ```text
 dev: 파트 브랜치별 배포 대상. 서로 독립적으로 갱신된다. Mock 연동 허용.
-demo(=develop): 실사용 기준 — wss, 실제 도메인, 실제 GMS 키, 전 컴포넌트 통합.
-도메인: 팀 구매 도메인 기준 서브도메인 설계 권장 (예: app./api./ai./world.) — 특히 world는 wss 인증서 필요.
+demo(=develop): 실사용 기준 — HTTPS/WSS, 실제 도메인, 실제 GMS 키, 전 컴포넌트 통합.
+dev는 EC2 공인 IP의 제한된 진입점을 유지하고, 도메인과 TLS는 최종 demo에만 적용한다.
+Cloudflare DNS에서 demo./api./ai./world. 서브도메인을 같은 EC2에 연결하고 Proxy를 사용한다.
+원본 TLS는 EC2 Nginx의 Let's Encrypt 인증서로 처리하며 Cloudflare는 Full (strict)로 연결한다.
 ```
 
-**예상 clarify**: 도메인 이름·서브도메인 구조, 인증서(ACM), dev에 도메인 붙일지(포트 직결 허용?).
+**infra-002 clarify 반영 (2026-08-21)**: dev는 EC2 IP를 유지하고 demo에만 신규 도메인과 TLS를 적용한다. 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다. 실제 루트 도메인과 Cloudflare 계정 담당자는 도메인 구매 전에 확정한다.
 
 ## 4. infra-003 — unity-server-deploy
 
-기존 산출물 재사용: `festa-unity/Docker/Dockerfile`(검증 완료), `festa-unity/Docs/deployment-handoff.md`(NLB/ALB 트레이드오프, idle timeout, endpoint 계약).
+기존 산출물 재사용: `festa-unity/Docker/Dockerfile`(검증 완료)과 `festa-unity/Docs/deployment-handoff.md`의 WebSocket·endpoint 계약. 기존 handoff의 ECS/LB 전제는 현재 단일 EC2 구조에 맞춰 별도로 정합화한다.
 
 ```text
-Unity Dedicated Server 컨테이너를 EC2에 배포하고 LB 뒤에서 wss://로 노출한다.
-TLS는 LB에서 종료 (Unity 컨테이너는 ws). Health check 방식에 따라 NLB(TCP 체크, 코드수정 0)
-vs ALB(/healthz 추가 필요)를 실측으로 결정한다 — docs/26 ③.
-검증 완료 조건: 외부 브라우저 2개가 wss://world.<도메인>으로 동시 접속해 서로의 이동이 보인다.
+11층·단일 채널용 Unity Dedicated Server 컨테이너 1개를 단일 EC2에 배포한다.
+브라우저는 wss://world.<도메인>:443으로 접속하고, Cloudflare DNS/Proxy를 거쳐
+EC2 Nginx(Let's Encrypt)에서 원본 TLS를 종료한 뒤 Docker 내부의 ws://unity:7777로 전달한다.
+7777은 외부에 공개하지 않는다. ECS·ALB·NLB·ACM과 층별 인스턴스·자동 채널링은 현재 범위에서 사용하지 않는다.
+검증 완료 조건: 외부 브라우저 2개 동시 접속과 상호 이동, 무입력 연결 유지, 연결 종료 후 재접속이 모두 성공한다.
 ```
 
-이것이 **docs/22의 "AWS wss 실측"** 항목 — SDD와 병행 가능하며 헌법 6조의 마지막 빈칸(ALB/NLB)을 채운다.
+이것이 **docs/22의 "AWS wss 실측"** 항목이며, Nginx WebSocket Upgrade·timeout·heartbeat 설정까지 실제 외부 경로로 검증한다.
 
 ## 5. P1 대비 메모 (spec 017 proximity-voice)
 

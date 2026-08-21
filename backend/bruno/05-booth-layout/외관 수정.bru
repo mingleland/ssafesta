@@ -1,0 +1,55 @@
+meta {
+  name: 외관 수정
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/facade
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "themeCode": "SSAFY_BLUE",
+    "primaryColor": "#1677C8",
+    "signText": "AI 프로젝트 전시관",
+    "logoUrl": null
+  }
+}
+
+docs {
+  ## 외관(Facade) 수정 — 신설 endpoint
+
+  부스 **외부** 표현이다. 내부 Layout과 달리 자유 배치가 아니라 **정해진 4필드**다 (FR-018, spec 006 "제한형 Facade").
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `200 OK` — 저장된 facade 전체
+  - 조회는 `04-booth-lease > 부스 상세 조회`(`GET /booths/{boothId}`)의 `facade` 필드로 한다
+
+  ### 요청·응답 필드
+
+  | 필드 | 의미 | 규칙 |
+  |---|---|---|
+  | `themeCode` | 외부 건물의 **테마 프리셋**. Unity가 이 값으로 외관 세트를 고른다 | `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`. 생략하면 `DEFAULT` |
+  | `primaryColor` | 부스 **대표색**. 간판·포인트 색으로 쓰인다 | `#RRGGBB` 또는 `null`(테마 기본색) |
+  | `signText` | **외부 간판 문구.** 부스 이름과 별개로 걸고 싶은 문장 | 60자 이하 또는 `null` |
+  | `logoUrl` | 간판에 띄울 **로고 이미지 주소** | **`https://`만 허용**, 2048자 이하, 또는 `null` |
+
+  `http` 로고를 막는 이유는 월드가 TLS로 서빙되기 때문이다. mixed content로 차단되면 로고가 그냥 안 보이고, 소유자는 원인을 알 수 없다.
+
+  ### 거부되는 것
+
+  | 응답 | 상황 |
+  |---|---|
+  | `400 VALIDATION_FAILED` | 색 형식·글자 수·`http` 로고·모르는 테마 |
+  | `403 BOOTH_EDITOR_FORBIDDEN` | 소유자도 직원도 아님 |
+  | `409 BOOTH_LEASE_EXPIRED` | 만료된 부스는 외관을 숨기므로 수정도 막는다 |
+
+  > 이 endpoint는 **docs/08에 없던 신설**이다. 추가라 Breaking Change는 아니지만 FE·Unity 통보 대상이다 (헌법 24조).
+}

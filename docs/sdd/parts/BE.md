@@ -79,8 +79,9 @@ Layout JSON의 저장(Draft)·게시(Published) API. **Layout JSON 스키마는 
 ## spec 013a — avatar-customization (BE분)
 
 ```text
-사용자 아바타 저장. PUT /users/me/avatar — 인코딩 문자열(최대 500자, 예: "rt|10=Torso_A|17=Hips_B|c=E85D5D")을
-저장하고 GET /users/me 에 포함해 반환한다. 서버는 문자열을 파싱하지 않고 길이·문자셋만 검증한다(외형 해석은 클라이언트).
+사용자 아바타 저장. PUT /users/me/avatar — 요청·응답 필드명 avatarCode (2026-08-21 #24 확정). 인코딩 문자열을
+저장하고(저장 컬럼 TEXT, 실측 참고: fa 형식 최대 414자·프리셋 5자 — #24) GET /users/me 에 포함해 반환한다.
+서버는 문자열을 파싱하지 않고 길이·문자셋만 검증한다(외형 해석은 클라이언트).
 재접속 시 Unity가 이 값으로 외형을 복원한다. 기존 계약안: festa-unity/Docs/avatar-customization-contract.md.
 ```
 

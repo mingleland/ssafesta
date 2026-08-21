@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/detection-rule.schema.json",
+  "title": "SSAFY FESTA Detection Rule",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "version", "name", "enabled", "source", "query", "scope", "severity", "labels", "annotations", "notification", "approval", "owner"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 1000 },
+    "enabled": { "type": "boolean" },
+    "source": { "enum": ["prometheus", "loki"] },
+    "query": { "type": "string", "minLength": 1 },
+    "condition": { "type": "string" },
+    "evaluationInterval": { "type": "string", "pattern": "^[1-9][0-9]*(s|m|h)$" },
+    "pendingFor": { "type": "string", "pattern": "^[0-9]+(s|m|h)$" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "service", "domain"],
+      "properties": {
+        "environment": { "type": "string", "minLength": 1 },
+        "service": { "type": "string", "minLength": 1 },
+        "instance": { "type": "string" },
+        "domain": { "enum": ["runtime", "host", "observability"] }
+      }
+    },
+    "severity": { "enum": ["info", "warning", "critical"] },
+    "labels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "required": ["managed_by", "approval_status", "notify"],
+      "properties": {
+        "managed_by": { "const": "infra" },
+        "approval_status": { "const": "approved" },
+        "notify": { "const": "mattermost" }
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "description", "runbookUrl"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "runbookUrl": { "type": "string", "format": "uri" },
+        "dashboardUid": { "type": "string" },
+        "panelId": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "notification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groupBy", "sendResolved"],
+      "properties": {
+        "groupBy": { "type": "array", "items": { "enum": ["alertname", "environment", "service", "severity", "instance"] } },
+        "groupWait": { "type": "string" },
+        "groupInterval": { "type": "string" },
+        "repeatInterval": { "type": "string" },
+        "sendResolved": { "type": "boolean" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "approvedBy", "approvedAt", "changeRef"],
+      "properties": {
+        "status": { "const": "approved" },
+        "approvedBy": { "type": "string", "minLength": 1 },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "changeRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "owner": { "type": "string", "minLength": 1 },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "testFixtureRef": { "type": "string" }
+  }
+}

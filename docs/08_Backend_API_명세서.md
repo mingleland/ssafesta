@@ -28,13 +28,31 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 }
 ```
 
-### 1.3 오류 응답 제안
+### 1.3 오류 응답 (확정 · 구현됨)
 
 ```json
 {
   "code": "BOOTH_SLOT_ALREADY_LEASED",
   "message": "이미 임대 중인 부스입니다.",
   "requestId": "req_..."
+}
+```
+
+**2026-08-20부터 전 endpoint가 실제로 이 형태로 응답한다** (spec 005). 그 전까지는 "제안"이었고 구현은
+코드 없이 한국어 문장만 반환하고 있었다. Breaking Change가 아니라 문서와의 정합 회복이다.
+
+- `requestId`는 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**이다. 사용자가 화면에서 본 id 하나로 로그를 찾을 수 있다.
+- **`errors`·`warnings` 배열은 항상 있다** — 보고할 것이 없으면 빈 배열이다. `errors`가 비어 있지 않으면
+  요청은 거부된 것이고, `warnings`는 진행을 막지 않는다. 저장·공개 **성공** 응답의 `warnings`도 같은 규칙이다.
+  키를 조건부로 빼면 `errors.length`가 클라이언트에서 터지므로 빼지 않는다.
+
+```json
+{
+  "code": "LAYOUT_VALIDATION_FAILED",
+  "message": "배치를 공개할 수 없습니다.",
+  "requestId": "req_1a2b3c4d",
+  "errors":   [ { "rule": "OBJECT_LIMIT", "message": "오브젝트는 12개까지입니다. 현재 14개" } ],
+  "warnings": [ { "rule": "CONFIG_NOT_LINKED", "objectId": "ai-1", "message": "AI 직원이 연결되지 않았습니다." } ]
 }
 ```
 
@@ -237,7 +255,7 @@ Draft 저장.
 
 ### GET `/booths/{boothId}/layouts/published`
 
-Unity가 사용할 Published Layout 조회.
+Unity가 사용할 Published Layout 조회. **인증 불필요.**
 
 #### Response
 
@@ -245,10 +263,37 @@ Unity가 사용할 Published Layout 조회.
 {
   "boothId": 7,
   "version": 4,
+  "schemaVersion": 1,
   "template": "PROJECT_EXHIBITION",
   "objects": []
 }
 ```
+
+`version`은 **공개 회차**, `schemaVersion`은 **Layout JSON 구조 버전**이다. 두 값을 같은 이름으로 부르면
+Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
+
+공개된 것이 없으면 `404 LAYOUT_NOT_PUBLISHED`, 임대가 유효하지 않으면 `409 BOOTH_LEASE_EXPIRED`다.
+
+### PUT `/booths/{boothId}/facade` — spec 005 신설
+
+부스 외부 표현 수정. 내부 Layout과 달리 자유 배치가 아니라 정해진 4필드다.
+
+```json
+{
+  "themeCode": "SSAFY_BLUE",
+  "primaryColor": "#1677C8",
+  "signText": "AI 프로젝트 전시관",
+  "logoUrl": null
+}
+```
+
+- `themeCode`: `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`
+- `primaryColor`: `#RRGGBB` 또는 null
+- `signText`: 60자 이하 또는 null
+- `logoUrl`: **https만 허용**, 2048자 이하 또는 null (http는 mixed content로 차단되어 조용히 안 보인다)
+
+소유자·Staff만 호출할 수 있고, 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는 `GET /booths/{boothId}`의
+`facade` 필드를 쓴다.
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 
@@ -603,7 +648,13 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
-| `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 |
+| `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
+| `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
+| `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
+| `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·Staff 아님) |
+| `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
+| `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
+| `VALIDATION_FAILED` | 요청 값 오류 (400) |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

@@ -16,5 +16,8 @@ Reference/
 .DS_Store
 Thumbs.db
 
+# 개인 에디터 설정 — 사람마다 다르고 문서 서식을 임의로 바꾼다 (Obsidian이 표를 자동 정렬해 확정 spec에 diff를 낸 적 있음)
+.obsidian/
+
 # 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
 _to_delete/
