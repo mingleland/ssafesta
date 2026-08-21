@@ -23,6 +23,7 @@
 - 🤖 DIALOGUE를 `OVERLAY`와 `FULL_SCREEN`으로 구분하고 `SHOW_DIALOGUE`, `CLOSE_DIALOGUE`, `GO_TO_SCENE`의 호출·복귀 의미를 고정했다. Web 2D Runtime이 직접 실행하며 Unity는 Portal 진입 트리거만 담당한다는 경계는 유지했다.
 - 🤖 JSON Schema의 `nextNodeId` 위치를 Event가 아닌 Dialogue Choice로 바로잡고, asset scheme·Scene 경계·Object 위치 검증과 음수 fixture 2종을 추가했다. Preview와 Published Runtime이 같은 GameProject 해석 결과를 내야 한다는 작업도 명시했다.
 - 🤖 상위 서비스·아키텍처·Backend API·DB·Frontend·다음 할 일·팀 결정 문서를 동기화했다. Frontend asset catalog/resolver와 Backend asset metadata·publish validation 책임은 별도 작업으로 나눴다.
+- 🤖 갱신된 계약과 미결정 항목을 GitHub [#20 Frontend](https://github.com/kanghyunsoon/ssafesta/issues/20#issuecomment-5364266235), [#21 Backend](https://github.com/kanghyunsoon/ssafesta/issues/21#issuecomment-5364266871), [#22 AI](https://github.com/kanghyunsoon/ssafesta/issues/22#issuecomment-5364267551)에 댓글로 남기고 담당자를 다시 태그했다.
 - 🤖 계약 fixture **7/7**, 결정론적 runtime trace **6/6**, 계약 JSON **10/10**을 통과했다. `tasks.md`는 총 80개 중 결정 비의존 작업 **18개 완료**다.
 - 🤖 Spec-Kit 비파괴 정합성 분석에서 발견한 branch 표기, Dialogue 종료, Preview/Published 동등성, FE/BE asset 책임 분리 문제를 모두 수정했다.
 - 🤖 관련 커밋: `e2b86ad docs(game-studio): align editor and dialogue contracts`, `b4d842e docs(game-studio): sync cross-part architecture`.
