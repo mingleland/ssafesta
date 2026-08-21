@@ -118,7 +118,7 @@ plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있�
 |---|---|---|---|---|---|
 | 001 auth-user | `spec.md` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
 | 004 booth-slot-lease | `spec.md`, `contracts/` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
-| 005 booth-studio-layout | `spec.md`, `contracts/` | `FE/*` | `BE/*` (루트에서 이관) | — | — |
+| 005 booth-studio-layout | `spec.md`, `contracts/` | `FE/*` | `BE/*` ✅ 이관 완료 | — | — |
 | 008 ai-conversation-rag | `spec.md`, `contracts/` | `FE/*` | — | — | `AI/*` (착수 전 적용) |
 | 013 avatar-customization | `spec.md`, `contracts/` | `FE/*` (필요 시) | `BE/*` (필요 시) | `Unity/*` ✅ 이관 완료 | — |
 | 019 game-studio | `spec.md`, `contracts/` | `FE/*` (착수 전 적용) | `BE/*` | `Unity/*` | `AI/*` |
