@@ -7,8 +7,8 @@
 
 ## 1. 지금 상태
 
-**18개 spec 전부 초안이 있다.** 팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을
-담당 파트가 채우면 확정된다.
+**목록의 spec 20종 중 001~018은 전부 초안이 있다** (019는 feature 브랜치에서 작성 중, 020은 완료).
+팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다.
 
 | Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
 |---|---|---|---|:---:|:---:|:---:|
@@ -30,6 +30,8 @@
 | 015 | dashboard | P1 | BE + FE | ✅ | — | — |
 | 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
 | 018 | world-floors | P1 | Unity | ✅ | ✅ | ✅ |
+| 019 | game-studio | 미정 | Game + FE + BE | 작성 중 — `feature/game-studio-foundation`, 계약 협의 [#20](https://github.com/kanghyunsoon/ssafesta/issues/20)·[#21](https://github.com/kanghyunsoon/ssafesta/issues/21) | — | — |
+| 020 | erd-schema | — | BE | ✅ (V1 스키마 구현 완료, 구 019에서 개명) | ✅ | ✅ |
 
 **plan / tasks가 비어 있는 것은 각 파트가 직접 생성한다.** 그게 SDD의 정상 흐름이고,
 `.specify/` 골격이 설치돼 있어서 명령만 실행하면 된다 (아래 §3).

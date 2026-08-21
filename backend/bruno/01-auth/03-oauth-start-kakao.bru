@@ -1,0 +1,30 @@
+meta {
+  name: 카카오 로그인
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/oauth/kakao
+  body: none
+  auth: none
+}
+
+docs {
+  ## Kakao OAuth 시작
+
+  Kakao 인증 화면으로 redirect하는 브라우저 시작 endpoint다.
+
+  - 인증: 필요 없음
+  - Request body: 없음
+  - 응답: `302 Found`로 Kakao 인가 화면 이동
+  - callback 뒤: 백엔드는 `oauth_handoff` HttpOnly cookie를 만들고 `/auth/callback`으로 이동한다.
+
+프론트에서는 fetch/axios가 아니라 반드시 브라우저 최상위 이동으로 시작한다.
+
+```javascript
+window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/kakao`;
+```
+
+Bruno는 Kakao의 외부 브라우저 인증을 완료할 수 없으므로 이 요청은 URL 확인용이다. 이후 Bruno 완료 API를 검증해야 한다면, 개발자 도구에서 5분짜리 1회성 `oauth_handoff` 값을 `oauthHandoff` 환경변수에 일시적으로 넣는다.
+}
