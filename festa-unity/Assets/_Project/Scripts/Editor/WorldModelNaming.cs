@@ -129,6 +129,148 @@ namespace Festa.EditorTools
         }
 
         /// <summary>
+        /// 각 상위 노드의 **자식 서브트리**를 머티리얼별 서브메시 하나로 병합한다.
+        ///
+        /// 왜 — 사물함 잠금장치 하나가 12개 오브젝트라 모델 전체가 2043개다.
+        /// 오브젝트 수는 씬 로드·계층 순회·WebGL 메모리에 그대로 비용이 된다.
+        /// GPU 인스턴싱은 드로우콜만 줄이고 오브젝트 수는 못 줄인다.
+        ///
+        /// 설계 결정 —
+        ///   - **노드 자신의 메시는 남긴다.** 병합 결과는 `<이름> (combined)` 자식 하나에 담는다.
+        ///     `wall-elevatorside` 는 자기 벽 메시(776 verts)에 MeshCollider 를 붙이는 것이
+        ///     콜리전 계획인데, 본체에 78만 verts 병합 메시를 얹으면 그 계획이 깨진다.
+        ///   - **노드 단위로만 합친다** (room 자식끼리 교차 병합 금지). 이름·콜리전 대상의
+        ///     의미 단위를 지키기 위해서다.
+        ///   - **ceiling 은 통째로 건너뛴다.** 조명 도구가 기구 오브젝트 이름과 머티리얼
+        ///     슬롯 구조에 의존한다 (WorldCeilingSetup).
+        ///   - 음수 스케일(SketchUp 미러 인스턴스)은 삼각형 감기를 뒤집어 보정한다.
+        ///     CombineMeshes 는 이것을 처리하지 않으므로 직접 굽는다.
+        ///
+        /// 임포트 중에만 쓸 수 있다 — 씬의 프리팹 인스턴스에서는 자식 삭제가 불가능하다.
+        /// </summary>
+        public static (int nodes, int removedRenderers, string report) CombineSubtrees(
+            Transform model, System.Action<string, Mesh> registerMesh)
+        {
+            var targets = new List<Transform>();
+            foreach (Transform c in model)
+            {
+                if (c.name == CeilingName) continue;
+                if (c.name == RoomName) { foreach (Transform rc in c) targets.Add(rc); }
+                else targets.Add(c);
+            }
+
+            var sb = new StringBuilder();
+            int nodes = 0, removed = 0;
+            foreach (var node in targets)
+            {
+                int childRenderers = node.GetComponentsInChildren<MeshFilter>(true)
+                    .Count(f => f.transform != node && f.sharedMesh != null);
+                if (childRenderers < 2) continue;   // 합칠 것이 없다
+
+                var (mesh, mats) = BakeChildren(node);
+                if (mesh == null) continue;
+
+                registerMesh($"combined:{node.name}", mesh);
+
+                // 자식을 전부 지우고 병합 결과 하나로 대체한다.
+                for (int i = node.childCount - 1; i >= 0; i--)
+                    Object.DestroyImmediate(node.GetChild(i).gameObject);
+
+                var go = new GameObject($"{node.name} (combined)");
+                go.transform.SetParent(node, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                go.AddComponent<MeshRenderer>().sharedMaterials = mats;
+
+                sb.AppendLine($"    {node.name,-24} 렌더러 {childRenderers,4} → 1  (정점 {mesh.vertexCount:N0}, 서브메시 {mats.Length})");
+                nodes++;
+                removed += childRenderers - 1;
+            }
+            return (nodes, removed, sb.ToString());
+        }
+
+        /// <summary>
+        /// 노드의 자식 메시를 머티리얼별로 묶어 서브메시 하나짜리 메시로 굽는다.
+        /// 노드 자신의 MeshFilter 는 제외한다.
+        /// </summary>
+        static (Mesh mesh, Material[] mats) BakeChildren(Transform node)
+        {
+            var verts = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var matOrder = new List<Material>();                 // 등장 순서 고정 — 결정적 임포트
+            var trisByMat = new Dictionary<Material, List<int>>();
+
+            // 같은 메시 16개를 1250곳에서 쓰므로 정점 데이터는 메시당 한 번만 읽는다.
+            var cache = new Dictionary<Mesh, (Vector3[] v, Vector3[] n, Vector2[] u)>();
+
+            foreach (var mf in node.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (mf.transform == node || mf.sharedMesh == null) continue;
+                var r = mf.GetComponent<MeshRenderer>();
+                if (r == null) continue;
+
+                var m = mf.sharedMesh;
+                if (!cache.TryGetValue(m, out var data))
+                {
+                    var u = m.uv;
+                    if (u.Length != m.vertexCount) u = new Vector2[m.vertexCount];
+                    data = (m.vertices, m.normals, u);
+                    if (data.n.Length != m.vertexCount) data.n = new Vector3[m.vertexCount];
+                    cache[m] = data;
+                }
+
+                var toNode = node.worldToLocalMatrix * mf.transform.localToWorldMatrix;
+                var normalMat = toNode.inverse.transpose;
+                bool flip = toNode.determinant < 0f;             // 미러 인스턴스 → 감기 뒤집기
+
+                int baseIndex = verts.Count;
+                for (int i = 0; i < data.v.Length; i++)
+                {
+                    verts.Add(toNode.MultiplyPoint3x4(data.v[i]));
+                    normals.Add(((Vector3)(normalMat * data.n[i])).normalized);
+                    uvs.Add(data.u[i]);
+                }
+
+                var rMats = r.sharedMaterials;
+                for (int si = 0; si < m.subMeshCount; si++)
+                {
+                    var mat = si < rMats.Length ? rMats[si] : null;
+                    if (mat == null) continue;
+                    if (!trisByMat.TryGetValue(mat, out var list))
+                    {
+                        list = new List<int>();
+                        trisByMat[mat] = list;
+                        matOrder.Add(mat);
+                    }
+                    var tris = m.GetTriangles(si);
+                    if (flip)
+                        for (int i = 0; i < tris.Length; i += 3)
+                        { list.Add(tris[i] + baseIndex); list.Add(tris[i + 2] + baseIndex); list.Add(tris[i + 1] + baseIndex); }
+                    else
+                        for (int i = 0; i < tris.Length; i++) list.Add(tris[i] + baseIndex);
+                }
+            }
+
+            if (verts.Count == 0 || matOrder.Count == 0) return (null, null);
+
+            var mesh = new Mesh
+            {
+                name = $"{node.name} (combined)",
+                indexFormat = verts.Count > 65535
+                    ? UnityEngine.Rendering.IndexFormat.UInt32
+                    : UnityEngine.Rendering.IndexFormat.UInt16,
+            };
+            mesh.SetVertices(verts);
+            mesh.SetNormals(normals);
+            mesh.SetUVs(0, uvs);
+            mesh.subMeshCount = matOrder.Count;
+            for (int i = 0; i < matOrder.Count; i++)
+                mesh.SetTriangles(trisByMat[matOrder[i]], i);
+            mesh.RecalculateBounds();
+            return (mesh, matOrder.ToArray());
+        }
+
+        /// <summary>
         /// 모델 내장 머티리얼에 GPU 인스턴싱을 켠다.
         ///
         /// 왜 이것으로 충분한가 — 사물함이 무거운 이유는 조각이 많아서가 아니라
@@ -326,6 +468,11 @@ namespace Festa.EditorTools
             // 마커를 먼저 끈다 — 이름으로 찾으므로 재명명 뒤에는 찾을 수 없다.
             int markers = WorldModelNaming.DisableScaleMarkers(t, dryRun: false);
             string report = WorldModelNaming.Apply(t, dryRun: false);
+            // 병합은 이름 정리 뒤 — 결과 오브젝트가 정리된 이름을 물려받는다.
+            // 병합 메시는 서브애셋으로 등록해야 임포트 결과에 저장된다.
+            var (nodes, removedRenderers, combineReport) =
+                WorldModelNaming.CombineSubtrees(t, (id, mesh) => context.AddObjectToAsset(id, mesh));
+
             int instanced = WorldModelNaming.EnableGpuInstancing(t, dryRun: false);
 
             // 메시 이름 유일화(`MakeMeshNamesUnique`)는 여기서 호출하지 않는다 — T-173 참고.
@@ -338,6 +485,8 @@ namespace Festa.EditorTools
                 $"[WorldModelPostprocessor] 임포트 시 정리 — {assetPath}\n" +
                 report +
                 $"  스케일 마커 비활성  : {markers}개 (mock-floor / mock-wall)\n" +
+                $"  서브트리 병합       : {nodes}개 노드, 렌더러 {removedRenderers}개 감소\n" +
+                combineReport +
                 $"  GPU 인스턴싱 켜기   : 머티리얼 {instanced}개\n" +
                 "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다.");
         }
