@@ -165,7 +165,7 @@ booths
 - current_slot_id FK NULL
 - name
 - description
-- facade_theme_code NULL
+- facade_theme_code NOT NULL DEFAULT 'DEFAULT'
 - facade_primary_color NULL
 - facade_sign_text NULL
 - facade_logo_url NULL
@@ -213,36 +213,45 @@ UNIQUE ACTIVE lease by slot_id
 
 ---
 
-## 9. booth_layouts
+## 9. Booth Layout — 실물 스키마 (2026-08-20 정정)
 
-Booth Studio의 버전 데이터.
-
-### 권장안 A — JSONB 중심
+> **이 절은 원래 단일 `booth_layouts` + `state` 테이블을 권장안으로 적고 있었으나, V1 실물은 처음부터
+> 2테이블이었다.** spec 005 착수 시 불일치를 확인하고 **실물을 유지하고 문서를 고치는 쪽**으로 확정했다
+> (`specs/005-booth-studio-layout/research.md` R-01).
 
 ```text
-booth_layouts
-- id PK BIGINT
-- booth_id FK
-- version INT
-- state DRAFT/PUBLISHED/ARCHIVED
-- template_code
-- layout_json JSONB
-- created_by FK users
-- created_at
-- published_at NULL
+booth_layout_drafts                     booth_layout_published_versions
+- booth_id PK FK  ← 작업본은 부스당 1개   - id PK BIGINT
+- schema_version                        - booth_id FK
+- layout_json JSONB                     - version_no          ← UNIQUE(booth_id, version_no)
+- revision        ← 낙관적 잠금            - schema_version
+- updated_by_user_id FK                 - layout_json JSONB
+- updated_at                            - published_by_user_id FK
+                                        - published_at
 ```
 
-### 장점
+### 왜 2테이블인가
 
-- Layout 구조 변경에 유연
-- Unity DTO와 계약하기 쉬움
-- Object 수가 많아도 저장 구조 단순
+작업본은 부스당 **하나**여야 하고(FR-005) 공개본은 **여럿**이어야 이력이 남는다(C-07). 요구가 다르므로
+테이블이 둘인 게 자연스럽다.
 
-### 단점
+결정적인 차이는 강제력이다. `booth_layout_drafts`의 **PK가 `booth_id`**이므로 "작업본은 하나"가 규칙이 아니라
+**스키마**다. 단일 테이블 + `state`는 DRAFT 행이 둘 생기는 것을 막지 못하고, 막으려면 부분 UNIQUE 인덱스를
+따로 얹어야 하는데 그러면 표현력이 같아지면서 상태 전이 코드만 늘어난다.
 
-- 개별 Object DB Query는 불편
+### 공개본 포인터 (V8)
 
-MVP에는 JSONB가 적합하다.
+`booths.published_layout_version`은 **NULL 허용**이며 `(id, published_layout_version) →
+booth_layout_published_versions(booth_id, version_no)` 복합 FK를 갖는다.
+
+- `NULL` = 공개된 것이 없음. MATCH SIMPLE 규칙으로 FK 검사가 면제된다
+- 이 표현이 있어야 **FR-011/FR-017**(재임대 시 자동 공개 금지)이 데이터로 성립한다. `MAX(version_no)`로
+  유도하면 이전 소유자의 마지막 공개본이 되살아난다
+- `ON DELETE SET NULL (published_layout_version)` — 컬럼 목록이 **필수**다. 목록이 없으면 PostgreSQL이
+  `booths.id`까지 NULL로 만들려다 실패하고, **회원 탈퇴가 깨진다**(삭제 순서상 공개본이 먼저 지워진다)
+
+JSONB 선택은 그대로 유효하다 — Layout 구조 변경에 유연하고 Unity DTO와 계약하기 쉽다. 개별 Object 질의는
+불편하지만 MVP에 그런 질의가 없다.
 
 ### Constraint
 
@@ -643,21 +652,9 @@ TTL과 값 구조는 Realtime/Infra 설계에서 확정한다.
 
 ## 27. 삭제 / 보존
 
-### Soft Delete 후보
+### 회원 탈퇴 삭제 정책
 
-- User
-- Booth
-- Agent
-- Document
-- Survey
-
-다만 모든 테이블에 무조건 `deleted_at`을 넣지 말고 실제 복구·감사 요구가 있는 데이터만 적용한다.
-
-### 반드시 이력 유지가 필요한 데이터
-
-- Coin Transaction
-- Lease
-- Event Redemption(P2)
+회원 탈퇴 확정 즉시 User 및 직접·종속·참여 데이터를 hard delete한다. Coin Transaction·Lease를 포함한 이력도 이 회원 탈퇴 정책에서는 보존 예외가 아니다. 삭제 순서는 외부 공개 차단 → 파일/Vector → Redis → DB 종속 데이터 → OAuth revoke/unlink → User 순서이며 재실행 가능해야 한다.
 
 ---
 

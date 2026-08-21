@@ -1,0 +1,27 @@
+meta {
+  name: 내 정보 조회
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 내 계정 조회
+
+  현재 로그인한 회원의 기본 계정 정보를 조회한다.
+
+  - 인증: 회원 Access Token 필요
+  - Request body: 없음
+  - 성공: `200 OK`, `{ userId, nickname, status, providers }`
+  - `401`: Token이 없거나 만료됐거나 세션이 종료됐다. refresh 또는 OAuth 로그인을 다시 수행한다.
+  - `403`: 게스트 Token처럼 회원 권한이 아닌 Token이다.
+}

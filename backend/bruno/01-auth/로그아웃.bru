@@ -1,0 +1,38 @@
+meta {
+  name: 로그아웃
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/logout
+  body: none
+  auth: bearer
+}
+
+headers {
+  Origin: {{frontendOrigin}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  if (res.status === 204) {
+    bru.setEnvVar("accessToken", "");
+  }
+}
+
+docs {
+  ## 로그아웃
+
+  현재 회원의 Redis 세션과 Refresh Token을 폐기하고 Refresh cookie를 삭제한다.
+
+  - 인증: 회원 Access Token 필요 (`{{accessToken}}`이 Bearer 헤더로 자동 전송)
+  - Header: `Origin: {{baseUrl}}` 필수
+  - Request body: 없음
+  - 성공: `204 No Content`
+
+  성공 후 response script가 Bruno 환경의 `accessToken`도 비운다. 이후 보호 API를 호출하려면 OAuth 로그인을 다시 완료해야 한다.
+}
