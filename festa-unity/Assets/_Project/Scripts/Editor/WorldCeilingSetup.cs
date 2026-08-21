@@ -42,46 +42,10 @@ namespace Festa.World.EditorTools
         const string SrcStripMat = "[Translucent Glass Gray]";
         const string SrcPlainMat = "_defaultMat";
 
-        // ── 콜리전 구성 ────────────────────────────────────────────
-        // 형태에 맞는 콜라이더를 쓴다. 전부 박스로 덮으면 기둥 모서리에 걸리고,
-        // 전부 메시로 덮으면 장식 지오메트리(벽 하나가 784k verts)까지 물려 비싸진다.
-        //
-        // 메시: 자기 메시가 정확하고 정점이 적은 것. 개구부가 있으면 박스로는 막혀버린다.
-        // 박스: 실제로 직육면체인 것. 끝벽 16장처럼 한 평면에 늘어선 것은 하나로 묶는다.
-        // 캡슐: 기둥·사람 형태. 박스로 하면 모서리에 걸려 이동이 끊긴다.
-
-        /// <summary>자기 메시로 MeshCollider — 정점이 적고 형태가 정확해야 하는 면.</summary>
-        static readonly string[] MeshColliderTargets =
-        {
-            "floor",             //     78 verts — 걷는 면
-            "wall-windowside",   //    152 verts — 창측 벽
-            "wall-elevatorside", //    776 verts — 엘리베이터측 벽 (자식 도어락 784k 는 제외)
-            "Group 50",          //    140 verts — 내부 구조물. 개구부가 있어 박스로 막으면 못 지나간다
-            "Group 116",         //     96 verts — 슬래브형 구조물
-        };
-
-        /// <summary>BoxCollider — 실제로 직육면체인 것 (소파·선반·벽면판).</summary>
-        static readonly string[] BoxColliderTargets =
-        {
-            "Group 46", "Group 48", "Group 106", "Group 108", "Group 118", // 소파
-            "Group 52",  // 벽 선반 (하단 0.93 m — 허리 높이라 막아야 한다)
-            "Group 54",  // 벽면 사이니지 패널
-        };
-
-        /// <summary>CapsuleCollider — 기둥·사람 형태. 모서리 걸림을 피한다.</summary>
-        static readonly string[] CapsuleColliderTargets = { "cylinder", "cylinder 1", "Niraj" };
-
-        /// <summary>
-        /// 끝벽. 한 평면에 21.7 m 패널이 늘어서 있어 그룹별로 콜라이더를 달면 16개가 된다.
-        /// 완전한 직선이므로 라인별로 BoxCollider 하나로 묶는다 (16 → 2).
-        /// </summary>
-        static readonly string[][] EndWallGroups =
-        {
-            new[] { "Group 4", "Group 9", "Group 16" },   // 후면 z≈-333
-            new[] { "Group 23", "Group 28", "Group 35" }, // 전면 z≈-120
-        };
-
-        const float EndWallMinThickness = 3f; // 실측 0.26 — 얇으면 빠른 이동에서 통과하므로 두껍게 잡는다
+        // ── 콜리전 ─────────────────────────────────────────────────
+        // 2026-08-21 부터 콜라이더는 임포트 시 애셋에 내장된다 — WorldModelNaming.AddColliders
+        // (WorldModelPostprocessor 가 호출). 씬에 붙이면 프리팹 오버라이드라 모델 교체 때
+        // 사라지는 문제(T-156)가 원천 차단된다. 이 파일에는 씬에 있어야 하는 것(봉쇄·광원)만 남긴다.
 
         // ── 벽 구멍 막기 ──────────────────────────────────────────
         // 엘리베이터 문처럼 벽에 실제 개구부가 있으면 콜라이더를 다 붙여도 그 틈으로 나간다.
@@ -136,8 +100,8 @@ namespace Festa.World.EditorTools
             var black = Load<Material>(BlackMatPath);
             if (strip == null || downlight == null || black == null) return;
 
-            var (nMesh, nBox, nCapsule) = ApplyColliders(room, room.parent);
-            // 콜라이더를 먼저 붙인 뒤에 훑어야 남은 구멍만 찾아낸다.
+            // 콜라이더는 2026-08-21 부터 임포트 시 애셋에 내장된다 (WorldModelPostprocessor).
+            // 여기서는 그 콜라이더를 전제로 남은 개구부만 훑어 막는다.
             int nSeal = SealWallGaps(world.transform, room);
             var (nStrip, nDown, nBlack) = ApplyCeilingMaterials(ceiling, strip, downlight, black);
             var (nSpot, nFill) = RebuildLights(world.transform, ceiling);
@@ -146,8 +110,7 @@ namespace Festa.World.EditorTools
             EditorSceneManager.MarkSceneDirty(world.scene);
 
             Debug.Log(
-                "[WorldCeilingSetup] 재적용 완료\n" +
-                $"  콜라이더 Mesh/Box/Capsule : {nMesh} / {nBox} / {nCapsule}\n" +
+                "[WorldCeilingSetup] 재적용 완료 (콜라이더는 애셋 내장 — WorldModelPostprocessor)\n" +
                 $"  벽 개구부 봉쇄     : {nSeal}개\n" +
                 $"  라인조명 슬롯      : {nStrip}\n" +
                 $"  다운라이트 슬롯    : {nDown}\n" +
@@ -289,80 +252,6 @@ namespace Festa.World.EditorTools
         // ---------- 단계별 ----------
 
         /// <summary>
-        /// 월드 콜리전을 구성한다. 형태별로 다른 콜라이더를 쓰고, 장식 자식에는 달지 않는다 (T-156).
-        /// 반환값은 (메시, 박스, 캡슐) 개수.
-        /// </summary>
-        static (int mesh, int box, int capsule) ApplyColliders(Transform room, Transform worldModel)
-        {
-            int nMesh = 0, nBox = 0, nCapsule = 0;
-
-            // 1) 자기 메시로 정확히 막을 것
-            foreach (var name in MeshColliderTargets)
-            {
-                var t = room.Find(name);
-                if (t == null) { Debug.LogWarning($"[WorldCeilingSetup] 메시 콜라이더 대상 '{name}' 없음"); continue; }
-                var mf = t.GetComponent<MeshFilter>();
-                if (mf == null || mf.sharedMesh == null) continue;
-                var mc = GetOrAdd<MeshCollider>(t);
-                mc.sharedMesh = mf.sharedMesh;
-                mc.convex = false; // 정적 지오메트리는 non-convex 가 정확하고 BVH 로 질의된다
-                nMesh++;
-            }
-
-            // 방 노드 자체 메시(내부 구조물·SSAFY 글자 등)
-            var ownMf = room.GetComponent<MeshFilter>();
-            if (ownMf != null && ownMf.sharedMesh != null)
-            {
-                var mc = GetOrAdd<MeshCollider>(room);
-                mc.sharedMesh = ownMf.sharedMesh;
-                mc.convex = false;
-                nMesh++;
-            }
-
-            // 2) 직육면체인 것
-            foreach (var name in BoxColliderTargets)
-            {
-                var t = room.Find(name);
-                if (t == null) { Debug.LogWarning($"[WorldCeilingSetup] 박스 콜라이더 대상 '{name}' 없음"); continue; }
-                if (TryFitBox(t, 0f)) nBox++;
-            }
-
-            // 3) 기둥·사람 형태
-            foreach (var name in CapsuleColliderTargets)
-            {
-                var t = room.Find(name);
-                if (t == null) { Debug.LogWarning($"[WorldCeilingSetup] 캡슐 콜라이더 대상 '{name}' 없음"); continue; }
-                if (TryFitCapsule(t)) nCapsule++;
-            }
-
-            // 4) 끝벽 — 라인별로 하나로 묶는다
-            if (worldModel != null)
-            {
-                foreach (var group in EndWallGroups)
-                {
-                    var holder = worldModel.Find(group[0]);
-                    if (holder == null) { Debug.LogWarning($"[WorldCeilingSetup] 끝벽 그룹 '{group[0]}' 없음"); continue; }
-
-                    var union = new Bounds();
-                    bool any = false;
-                    foreach (var gname in group)
-                    {
-                        var g = worldModel.Find(gname);
-                        if (g == null) continue;
-                        var b = Bounds(g);
-                        if (!any) { union = b; any = true; } else union.Encapsulate(b);
-                    }
-                    if (!any) continue;
-
-                    // 첫 그룹 오브젝트에 union 크기의 BoxCollider 를 단다.
-                    if (FitBoxToWorldBounds(holder, union, EndWallMinThickness)) nBox++;
-                }
-            }
-
-            return (nMesh, nBox, nCapsule);
-        }
-
-        /// <summary>
         /// 벽을 훑어 실제 개구부(엘리베이터 문 등)를 찾아 막는다.
         /// 모델 좌표를 박아 넣지 않고 물리 질의로 찾으므로 모델이 바뀌어도 다시 맞는다.
         /// 생성물은 모델 밖의 독립 오브젝트라 모델 교체에 영향받지 않는다.
@@ -452,58 +341,6 @@ namespace Festa.World.EditorTools
             }
             return made;
         }
-
-        /// <summary>렌더러 바운즈에 맞춘 BoxCollider. minThickness 는 얇은 벽의 통과를 막는 최소 두께.</summary>
-        static bool TryFitBox(Transform t, float minThickness) =>
-            FitBoxToWorldBounds(t, Bounds(t), minThickness);
-
-        static bool FitBoxToWorldBounds(Transform t, Bounds world, float minThickness)
-        {
-            if (world.size == Vector3.zero) return false;
-            var bc = GetOrAdd<BoxCollider>(t);
-
-            // world → 로컬. 회전이 90° 배수라 축 맞교환만 일어나므로 절대값으로 환산한다.
-            var localCenter = t.InverseTransformPoint(world.center);
-            var lossy = t.lossyScale;
-            var size = t.InverseTransformVector(world.size);
-            size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
-
-            if (minThickness > 0f)
-            {
-                // 가장 얇은 축을 최소 두께로 늘린다 (로컬 스케일 반영).
-                var scaled = new Vector3(size.x * Mathf.Abs(lossy.x), size.y * Mathf.Abs(lossy.y), size.z * Mathf.Abs(lossy.z));
-                int thin = scaled.x <= scaled.y && scaled.x <= scaled.z ? 0 : (scaled.y <= scaled.z ? 1 : 2);
-                float need = minThickness / Mathf.Max(0.0001f, Mathf.Abs(lossy[thin]));
-                if (size[thin] < need) size[thin] = need;
-            }
-
-            bc.center = localCenter;
-            bc.size = size;
-            return true;
-        }
-
-        /// <summary>세로로 긴 형태에 맞춘 CapsuleCollider. 기둥·마네킹처럼 모서리 걸림을 피할 대상에 쓴다.</summary>
-        static bool TryFitCapsule(Transform t)
-        {
-            var world = Bounds(t);
-            if (world.size == Vector3.zero) return false;
-            var cc = GetOrAdd<CapsuleCollider>(t);
-
-            var localCenter = t.InverseTransformPoint(world.center);
-            var size = t.InverseTransformVector(world.size);
-            size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z));
-
-            // 가장 긴 로컬 축을 캡슐 축으로 잡는다 (모델 회전이 축을 바꿔놓기 때문).
-            int axis = size.x >= size.y && size.x >= size.z ? 0 : (size.y >= size.z ? 1 : 2);
-            int a = (axis + 1) % 3, b = (axis + 2) % 3;
-
-            cc.center = localCenter;
-            cc.direction = axis;
-            cc.height = size[axis];
-            cc.radius = Mathf.Max(size[a], size[b]) * 0.5f;
-            return true;
-        }
-
         /// <summary>
         /// 천장 재질 배정. 순서가 중요하다 — 다운라이트 렌즈를 먼저 바꿔야
         /// 남은 _defaultMat 만 배경으로 검게 칠할 수 있다.

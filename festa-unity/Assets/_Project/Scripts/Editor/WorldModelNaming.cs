@@ -270,6 +270,109 @@ namespace Festa.EditorTools
             return (mesh, matOrder.ToArray());
         }
 
+        // ── 콜리전 ────────────────────────────────────────────────────────────
+        // 씬이 아니라 **임포트된 애셋에** 붙인다. 씬에 붙이면 프리팹 오버라이드라
+        // 모델 교체 때 사라진다 (T-156 이 그렇게 났다). 여기 붙이면 재임포트마다 자동이다.
+        //
+        // 대상 이름은 우리 후처리기가 직접 붙인 것이라 열거해도 안전하다 —
+        // export 마다 바뀌는 `Group N` 과 달리 이 이름들은 지오메트리에서 유도된다.
+        //
+        // 형태별 원칙 (T-167 의 "다 네모로 하지 말 것" 유지):
+        //   메시  — 걷는 면·벽·곡면 가구. 정점이 적어(78~2만) non-convex 정적 BVH 로 싸다.
+        //   캡슐  — 기둥·사람. 박스로 하면 모서리에 걸려 이동이 끊긴다.
+        //   끝벽  — 자기 메시가 없다. (combined) 자식 메시가 **노드 로컬 공간에 구워져**
+        //           있으므로 그 메시를 노드의 MeshCollider 에 그대로 문다 (116~174 verts).
+        //
+        // 일부러 안 붙이는 것: wall-elevatorside 의 (combined) 78만 verts 장식,
+        // y≈34 의 사이니지(EDUCATION 등 — 플레이어 키 13.5 위), ceiling, 방 밖 wall-flat.
+
+        static readonly string[] MeshColliderTargets =
+        {
+            "floor",                // 걷는 면
+            "wall-elevatorside",    // 본체 벽 메시 776v — (combined) 도어락은 제외
+            "wall-windowside",
+            "counter-plain",
+            "counter-samsung",
+            "SSAFY-center",
+            "content-introduction", // 개구부 있는 전시벽 — 박스로 막으면 못 지나간다
+            "content-education",    // 하단 y=10 — 플레이어 머리(13.5)와 겹친다
+            "lounge-zone",          // 데크 0.32 단차 — stepOffset 3.0 으로 올라간다
+        };
+        const string SofaPrefix = "sofa-";           // 곡면 소파 — 메시가 정확하다
+        static readonly string[] CapsuleColliderTargets = { "cylinder", "cylinder 1", "Niraj" };
+        static readonly string[] EndWallPrefixes = { "wall-rear-", "wall-front-" };
+
+        /// <summary>임포트된 모델에 월드 콜리전을 붙인다. 병합(CombineSubtrees) 뒤에 불러야 한다.</summary>
+        public static (int mesh, int capsule, string report) AddColliders(Transform model)
+        {
+            var room = FindChild(model, RoomName);
+            if (room == null) return (0, 0, "  방 없음 — 콜리전 생략\n");
+
+            int nMesh = 0, nCapsule = 0;
+            var sb = new StringBuilder();
+
+            void AddMesh(Transform t, Mesh m, string why)
+            {
+                if (t == null || m == null) { sb.AppendLine($"    ⚠ 콜리전 대상 없음 ({why})"); return; }
+                var mc = GetOrAdd<MeshCollider>(t);
+                mc.sharedMesh = m;
+                mc.convex = false;   // 정적 지오메트리 — non-convex 가 정확하고 BVH 질의로 싸다
+                nMesh++;
+            }
+
+            foreach (var name in MeshColliderTargets)
+            {
+                var t = room.Find(name);
+                AddMesh(t, t != null ? t.GetComponent<MeshFilter>()?.sharedMesh : null, name);
+            }
+
+            foreach (Transform c in room)
+                if (c.name.StartsWith(SofaPrefix))
+                    AddMesh(c, c.GetComponent<MeshFilter>()?.sharedMesh, c.name);
+
+            // 방 노드 자체 메시 (있으면 — 내부 구조물)
+            var roomMf = room.GetComponent<MeshFilter>();
+            if (roomMf != null && roomMf.sharedMesh != null)
+                AddMesh(room, roomMf.sharedMesh, RoomName);
+
+            // 끝벽 — (combined) 자식 메시는 노드 로컬 공간이라 노드 콜라이더에 그대로 맞는다
+            foreach (Transform c in model)
+            {
+                if (!EndWallPrefixes.Any(p => c.name.StartsWith(p))) continue;
+                var comb = c.GetComponentsInChildren<MeshFilter>(true)
+                            .FirstOrDefault(f => f.sharedMesh != null);
+                AddMesh(c, comb != null ? comb.sharedMesh : null, c.name);
+            }
+
+            foreach (var name in CapsuleColliderTargets)
+            {
+                var t = room.Find(name);
+                if (t == null) { sb.AppendLine($"    ⚠ 캡슐 대상 없음 ({name})"); continue; }
+                var b = LocalBounds(t, t);
+                if (b.size == Vector3.zero) continue;
+                var cc = GetOrAdd<CapsuleCollider>(t);
+                // 가장 긴 로컬 축을 캡슐 축으로 잡는다 — SketchUp Z-up 변환이 노드 로컬
+                // 축을 돌려놓아 세로가 Y 라는 보장이 없다 (구 TryFitCapsule 의 교훈).
+                var s = b.size;
+                int axis = s.x >= s.y && s.x >= s.z ? 0 : (s.y >= s.z ? 1 : 2);
+                int a2 = (axis + 1) % 3, b2 = (axis + 2) % 3;
+                cc.center = b.center;
+                cc.direction = axis;
+                cc.height = s[axis];
+                cc.radius = Mathf.Max(s[a2], s[b2]) * 0.5f;
+                nCapsule++;
+            }
+
+            sb.AppendLine($"    Mesh {nMesh} / Capsule {nCapsule}");
+            return (nMesh, nCapsule, sb.ToString());
+        }
+
+        static T GetOrAdd<T>(Transform t) where T : Component
+        {
+            var c = t.GetComponent<T>();
+            return c == null ? t.gameObject.AddComponent<T>() : c;   // ?? 금지 — Unity 가짜 null (T-168)
+        }
+
         /// <summary>
         /// 모델 내장 머티리얼에 GPU 인스턴싱을 켠다.
         ///
@@ -500,6 +603,7 @@ namespace Festa.EditorTools
             var (nodes, removedRenderers, combineReport) =
                 WorldModelNaming.CombineSubtrees(t, (id, mesh) => context.AddObjectToAsset(id, mesh));
 
+            var (nColMesh, nColCapsule, colReport) = WorldModelNaming.AddColliders(t);
             int instanced = WorldModelNaming.EnableGpuInstancing(t, dryRun: false);
 
             // 메시 이름 유일화(`MakeMeshNamesUnique`)는 여기서 호출하지 않는다 — T-173 참고.
@@ -514,8 +618,24 @@ namespace Festa.EditorTools
                 $"  스케일 마커 비활성  : {markers}개 (mock-floor / mock-wall)\n" +
                 $"  서브트리 병합       : {nodes}개 노드, 렌더러 {removedRenderers}개 감소\n" +
                 combineReport +
+                $"  콜라이더            : Mesh {nColMesh} / Capsule {nColCapsule} (애셋에 내장 — 재적용 불필요)\n" +
+                colReport +
                 $"  GPU 인스턴싱 켜기   : 머티리얼 {instanced}개\n" +
-                "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다.");
+                "  애셋 자체를 고쳤다 — 씬에 오버라이드가 남지 않는다. 벽 개구부 봉쇄만 씬 메뉴로 돌린다.");
+        }
+
+        /// <summary>
+        /// 월드 텍스처 임포터 설정 — WebGL 다운로드 크기용 crunch 압축.
+        /// 25장 전부 crunch 미적용 상태였다. 품질 75 는 월드 배경 텍스처에서 식별 불가.
+        /// </summary>
+        void OnPreprocessTexture()
+        {
+            if (Disabled) return;
+            if (!assetPath.StartsWith("Assets/_Project/Models/MapTexture/")) return;
+            var ti = (TextureImporter)assetImporter;
+            ti.textureCompression = TextureImporterCompression.Compressed;
+            ti.crunchedCompression = true;
+            ti.compressionQuality = 75;
         }
     }
 }
