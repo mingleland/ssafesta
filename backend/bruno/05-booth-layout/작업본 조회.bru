@@ -20,12 +20,48 @@ docs {
   편집기가 처음 열릴 때 마지막 저장 상태를 불러온다.
 
   - 인증: **필수** (소유자 또는 `booth_staffs`에 등록된 직원)
-  - 성공: `200 OK` — `{ boothId, revision, schemaVersion, template, objects, updatedAt, updatedByUserId, publishedVersion }`
+  - 성공: `200 OK`
   - **한 번도 편집하지 않았으면 `204 No Content`** — 편집기는 빈 배치로 시작하고, 첫 저장에 `expectedRevision: 0`을 보낸다
 
-  응답의 `revision`을 그대로 들고 있다가 저장할 때 `expectedRevision`으로 되돌려 보낸다. 이게 동시 편집 보호의 전부다.
+  ### 헷갈리는 숫자 네 개를 먼저 가른다
 
-  `publishedVersion`은 현재 공개 중인 회차이며 `null`일 수 있다. `revision`과 **다른 개념**이다 — 편집기가 "공개본과 다름"을 표시할 때 쓴다.
+  | 필드 | 무엇인가 | 언제 오르나 | 누가 보내나 |
+  |---|---|---|---|
+  | `revision` | **작업본이 몇 번 저장됐나.** 동시 편집 감지용 카운터 | 저장 성공마다 +1 | 서버가 응답에 실어 준다 |
+  | `expectedRevision` | **내가 알고 있는 `revision`.** 서버 값과 다르면 저장이 거부된다 | — | **클라이언트가 보낸다** (최초 0) |
+  | `version` / `publishedVersion` | **몇 번째로 공개했나.** 방문자가 보는 회차 | 공개 성공마다 +1 | 서버 |
+  | `schemaVersion` | **Layout JSON의 구조 버전.** 필드 구성이 바뀔 때만 오른다 (현재 **1**) | 3파트 합의로 계약이 바뀔 때 | 클라이언트가 보내고 서버가 검증 |
+
+  `revision`과 `version`은 서로 아무 관계가 없다. 10번 저장하고 1번 공개하면 `revision=10`, `version=1`이다.
+
+  ### 응답 필드
+
+  | 필드 | 의미 |
+  |---|---|
+  | `boothId` | 부스 id |
+  | `revision` | 이 작업본이 몇 번 저장됐나. **저장할 때 `expectedRevision`으로 되돌려 보낸다** |
+  | `schemaVersion` | Layout JSON 구조 버전 |
+  | `template` | 부스 기본 구성 (`DEFAULT` / `PROJECT_EXHIBITION`) |
+  | `objects` | 배치된 오브젝트 목록 (아래 표) |
+  | `updatedAt` | 마지막 저장 시각 (UTC) |
+  | `updatedByUserId` | 마지막으로 저장한 사람. **소유자가 아닐 수 있다** — 직원도 편집한다 |
+  | `publishedVersion` | 지금 공개 중인 회차. **`null`이면 공개된 것이 없다.** 편집기가 "공개본과 다름"을 표시하는 데 쓴다 |
+
+  ### `objects[]` 한 칸의 의미
+
+  | 필드 | 필수 | 의미 |
+  |---|---|---|
+  | `objectId` | O | **배치 안에서만 유일한 이름.** DB id가 아니라 편집기가 붙이는 식별자다. 1~64자 영문·숫자·`-`·`_`. 중복이면 Unity가 어느 것을 남길지 정할 수 없어 거부된다 |
+  | `type` | O | 무슨 오브젝트인가. `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
+  | `position.x` | O | 좌우. **미터**, 부스 바닥 중앙이 0, 오른쪽이 + |
+  | `position.y` | O | 높이. **0이 바닥** |
+  | `position.z` | O | 앞뒤. **+Z가 부스 정면**(방문자가 부스를 볼 때 안쪽) |
+  | `rotationY` | O | 수평 회전. **도(degree)**, `0`이면 +Z를 바라본다. 위에서 볼 때 시계방향이 +. `[0, 360)` |
+  | `configId` | X | **이 오브젝트가 가리키는 콘텐츠의 id.** AI 오브젝트면 `ai_agents.id`. 없으면 "아직 연결 안 됨" |
+  | `assetCode` | X | `FURNITURE`·`DECORATION`이 쓸 구체 자산 이름 (예: `SOFA_A`). Unity 프리팹을 고르는 값 |
+
+  부스는 **6m × 6m × 6m**, 원점이 바닥 중앙이므로 `|x| <= 3`, `|z| <= 3`, `0 <= y <= 6`이고 경계값은 포함이다.
+  좌표는 **React가 미터로 환산해서 보내고 서버는 고치지 않는다.**
 
   ### 임대가 만료돼도 열린다
 

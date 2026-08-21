@@ -14,14 +14,40 @@ docs {
 
   **인증 불필요.** Unity Client가 부스 진입 시 1회 호출한다 (spec 006 `BoothRuntime`).
 
-  - 성공: `200 OK` — `{ boothId, version, schemaVersion, template, objects }`
+  ### 응답 필드
 
-  `version`은 **공개 회차**이고 `schemaVersion`은 **구조 버전**이다. Unity `BoothLayoutDto`에는 `version`만 있으므로 `schemaVersion`은 무시된다 — 필드 추가는 안전하지만 **이름 변경은 값이 조용히 0/null이 되므로 3파트 합의 없이 불가**하다.
+  | 필드 | Unity `BoothLayoutDto` | 의미 |
+  |---|---|---|
+  | `boothId` | `int boothId` | 부스 id |
+  | `version` | `int version` | **공개 회차.** 구조 버전이 아니다 |
+  | `schemaVersion` | (없음 — 무시된다) | Layout JSON 구조 버전 |
+  | `template` | `string template` | 부스 기본 구성 |
+  | `objects[]` | `BoothObjectDto[]` | 배치된 오브젝트 |
+
+  필드 **추가**는 `JsonUtility`가 무시하므로 Unity 재빌드 없이 안전하다. 반대로 **이름을 바꾸면 값이 `0`/`null`로 떨어지며 오류 없이 잘못 렌더링된다** — 이름 변경·삭제는 3파트 합의 없이 불가하다 (헌법 24조).
+
+  ### `objects[]` 한 칸의 의미
+
+  | 필드 | 필수 | 의미 |
+  |---|---|---|
+  | `objectId` | O | **배치 안에서만 유일한 이름.** DB id가 아니라 편집기가 붙이는 식별자다. 1~64자 영문·숫자·`-`·`_`. 중복이면 Unity가 어느 것을 남길지 정할 수 없어 거부된다 |
+  | `type` | O | 무슨 오브젝트인가. `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
+  | `position.x` | O | 좌우. **미터**, 부스 바닥 중앙이 0, 오른쪽이 + |
+  | `position.y` | O | 높이. **0이 바닥** |
+  | `position.z` | O | 앞뒤. **+Z가 부스 정면**(방문자가 부스를 볼 때 안쪽) |
+  | `rotationY` | O | 수평 회전. **도(degree)**, `0`이면 +Z를 바라본다. 위에서 볼 때 시계방향이 +. `[0, 360)` |
+  | `configId` | X | **이 오브젝트가 가리키는 콘텐츠의 id.** AI 오브젝트면 `ai_agents.id`. 없으면 "아직 연결 안 됨" |
+  | `assetCode` | X | `FURNITURE`·`DECORATION`이 쓸 구체 자산 이름 (예: `SOFA_A`). Unity 프리팹을 고르는 값 |
+
+  부스는 **6m × 6m × 6m**, 원점이 바닥 중앙이므로 `|x| <= 3`, `|z| <= 3`, `0 <= y <= 6`이고 경계값은 포함이다.
+  좌표는 **React가 미터로 환산해서 보내고 서버는 고치지 않는다.**
 
   ### 못 받는 경우
 
-  - `404 LAYOUT_NOT_PUBLISHED`: 공개한 적이 없거나, 재임대로 공개 연결이 끊겼다. Unity는 404를 경고 후 graceful skip으로 처리한다
-  - `409 BOOTH_LEASE_EXPIRED`: 임대가 유효하지 않다 (FR-015)
+  | 응답 | 의미 |
+  |---|---|
+  | `404 LAYOUT_NOT_PUBLISHED` | 공개한 적이 없거나, **재임대로 공개 연결이 끊겼다.** Unity는 404를 경고 후 graceful skip으로 처리한다 |
+  | `409 BOOTH_LEASE_EXPIRED` | 임대가 유효하지 않다 (FR-015). 부스가 사라진 게 아니라 **닫힌** 것이다 |
 
   ### 저장만으로는 여기 안 보인다
 

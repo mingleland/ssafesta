@@ -18,22 +18,46 @@ docs {
   ## 공개 — 작업본을 새 회차로 복사한다
 
   - 인증: **필수** (소유자 또는 직원)
-  - 성공: `200 OK` — `{ boothId, publishedVersion, publishedAt, warnings? }`
+  - 요청 본문 없음. **지금 저장돼 있는 작업본**이 그대로 공개된다
+  - 성공: `200 OK`
 
-  공개는 **복사**다. 이후 작업본을 고쳐도 방문자가 보는 것은 바뀌지 않는다 (FR-006). 다시 공개하면 회차가 1 오른다.
+  ### 응답 필드
 
-  공개본 INSERT와 `booths.published_layout_version` 갱신은 **한 트랜잭션**이다. "공개했는데 아무도 못 보는 버전"이 생길 수 없다.
+  | 필드 | 의미 |
+  |---|---|
+  | `boothId` | 부스 id |
+  | `publishedVersion` | **이번에 만들어진 공개 회차.** 처음 공개면 1, 다음이 2 … 재임대해도 리셋되지 않는다 |
+  | `publishedAt` | 공개 시각 (UTC) |
+  | `warnings` | 공개를 막지는 않은 지적들. 없으면 필드 자체가 없다 |
+
+  공개는 **복사**다. 이후 작업본을 고쳐도 방문자가 보는 것은 바뀌지 않는다 (FR-006).
+  공개본 INSERT와 `booths.published_layout_version` 갱신은 **한 트랜잭션**이라 "공개했는데 아무도 못 보는 버전"이 생길 수 없다.
 
   ### 거부되는 것
 
-  - `409 BOOTH_LEASE_EXPIRED`: 만료된 부스는 공개할 수 없다
-  - `409 LAYOUT_VALIDATION_FAILED` + `errors`
-    - `NO_DRAFT`: 저장부터 해야 한다
-    - `CONFIG_NOT_OWNED`: **다른 부스의 콘텐츠**를 연결했다. 클라이언트가 보낸 `configId`를 서버가 확인한다 (헌법 16·17조)
-    - 저장 시점 규칙 전부 (12개 상한 등)
+  | 응답 | 상황 |
+  |---|---|
+  | `409 BOOTH_LEASE_EXPIRED` | 만료된 부스는 공개할 수 없다 |
+  | `409 LAYOUT_VALIDATION_FAILED` + `rule: NO_DRAFT` | 저장부터 해야 한다 |
+  | `409 LAYOUT_VALIDATION_FAILED` + `rule: CONFIG_NOT_OWNED` | **다른 부스의 콘텐츠**를 연결했다. 클라이언트가 보낸 `configId`를 서버가 확인한다 (헌법 16·17조) |
+  | `409 LAYOUT_VALIDATION_FAILED` + 그 외 | 저장 시점 규칙 전부 (12개 상한 등) |
 
   ### `warnings`가 있어도 공개된다
 
-  - `CONFIG_NOT_LINKED`: 기능 오브젝트가 비어 있음 (C-04 미정)
-  - `CONFIG_UNVERIFIED`: 그 종류의 콘텐츠는 아직 서버가 소유를 확인할 수 없음 — 확인했다는 뜻이 아니라는 것을 명시적으로 알린다
+  | `rule` | 의미 |
+  |---|---|
+  | `CONFIG_NOT_LINKED` | 기능 오브젝트가 비어 있다 (C-04 미정이라 경고) |
+  | `CONFIG_UNVERIFIED` | **그 종류의 콘텐츠는 아직 서버가 소유를 확인할 수 없다.** 담당 spec(009·010·016)이 없어서다. "확인했다"는 뜻이 아니라는 것을 명시적으로 알리는 값이다 |
+
+  ### 오류 본문 필드
+
+  | 필드 | 의미 |
+  |---|---|
+  | `code` | **분기용 기계 식별자.** FE는 이 값으로 분기한다 |
+  | `message` | 사람에게 보여줄 한글 문장. 그대로 노출해도 된다 |
+  | `requestId` | 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**. 문의할 때 이걸 준다 |
+  | `errors[]` | **요청을 막은 사유들.** 하나라도 있으면 저장·공개가 되지 않았다 |
+  | `warnings[]` | **막지 않은 지적들.** 요청은 성공했다 |
+  | `errors[].rule` / `warnings[].rule` | 어떤 규칙인지 (예: `OBJECT_LIMIT`). 세부 분기는 `code`가 아니라 이걸 본다 |
+  | `errors[].objectId` | 어느 오브젝트가 문제인지. 배치 전체에 대한 지적이면 없다 |
 }
