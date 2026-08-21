@@ -9,6 +9,16 @@
 
 ## 2026-08-21
 
+### Frontend Web Runtime Core·Authoring 기반 구현 ✅
+
+- 🤖 최신 `front`(`da2ea76`)를 기준으로 `codex/game-studio-web-runtime-core` 브랜치를 분리하고 GameProject v1 TypeScript 타입·구조/참조/의미 검증기와 fixture 기반 계약 테스트를 구현했다.
+- 🤖 불변 `RuntimeSessionState`, Condition 평가, Action reducer, Event 배열 순서, Action 64회·Scene transition depth 8 예산, 실패 Session 격리, OVERLAY/FULL_SCREEN DIALOGUE 실행기를 구현했다.
+- 🤖 `/app/games/:gameId/edit|play` lazy route 경계, 유효 snapshot만 보관하는 undo/redo authoring store, Pickup/Locked Door 편의 필드와 표준 Component/Event 간 왕복 preset recipe를 추가했다.
+- 🤖 Unity 없이 `열쇠 → 문 → Overlay → Full-screen Dialogue → 완료` 전체 상태 전이를 통합 검증했다. Vitest **7 files / 29 tests**, TypeScript+Vite production build, oxlint를 모두 통과했고 Edit/Play가 별도 lazy chunk로 출력됨을 확인했다.
+- 🤖 구현 변경 23경로는 전부 `festa-frontend/**`이며 `festa-unity/**`와 `backend/**`는 0건이다. 원격 브랜치를 최신 `front` 위로 충돌 없이 재배치하고 `--force-with-lease`로 갱신했다.
+- 🤖 `tasks.md`의 T010~T013, T017~T024, T026, T077을 완료 처리해 총 90개 중 누적 **35개 완료**로 갱신했다. Renderer/Preview iframe/Asset resolver는 #35, Portal은 #34, 제품 정책은 #33의 gate를 유지한다.
+- 트러블슈팅: GS-T020~GS-T022
+
 ### 파트 이슈 답변 반영·spec 020 이동·후속 결정 분리 ✅
 
 - 🤖 결정 반영이 완료된 GitHub #20 Frontend, #21 Backend를 후속 이슈 링크와 함께 닫았다. #22 AI까지 원계약 질의 3건은 모두 종료했으며, 미결정·구현 항목은 #33~#35에서 독립 추적한다.

@@ -50,10 +50,10 @@
 
 **Purpose**: 승인된 파트 구조 안에 공통 계약과 테스트 기반을 설치한다.
 
-- [ ] T010 Add `/app/games/:gameId/edit|play` lazy routes and the `src/game-studio/` ownership boundary in `festa-frontend/src/app/router/index.tsx`
-- [ ] T011 [P] Add the approved Game Studio test scripts/dependencies while preserving existing build/lint in `festa-frontend/package.json` and `festa-frontend/vite.config.ts`
-- [ ] T012 Generate or hand-map GameProject v1 TypeScript types and guards in `festa-frontend/src/game-studio/contracts/gameProject.ts`
-- [ ] T013 Add fixture-driven contract tests in `festa-frontend/src/game-studio/__tests__/contract/gameProject.contract.test.ts`
+- [x] T010 Add `/app/games/:gameId/edit|play` lazy routes and the `src/game-studio/` ownership boundary in `festa-frontend/src/app/router/index.tsx`
+- [x] T011 [P] Add the approved Game Studio test scripts/dependencies while preserving existing build/lint in `festa-frontend/package.json` and `festa-frontend/vite.config.ts`
+- [x] T012 Generate or hand-map GameProject v1 TypeScript types and guards in `festa-frontend/src/game-studio/contracts/gameProject.ts`
+- [x] T013 Add fixture-driven contract tests in `festa-frontend/src/game-studio/__tests__/contract/gameProject.contract.test.ts`
 - [ ] T014 create the Spring game package boundary in `backend/src/main/java/com/example/ssafesta/game/`
 - [ ] T015 [P] Add append-only `games`, `game_drafts`, `game_published_versions`, and pointer-FK migration in `backend/src/main/resources/db/migration/V*_game_studio.sql`
 - [ ] T016 [P] define Game Studio error codes and exception mapping in `backend/src/main/java/com/example/ssafesta/game/api/GameErrorCode.java`
@@ -70,26 +70,26 @@
 
 ### Tests
 
-- [ ] T017 [P] [US1] Add runtime-state reducer unit tests in `festa-frontend/src/game-studio/__tests__/unit/runtimeState.test.ts`
-- [ ] T018 [P] [US1] Add condition/action interpreter unit tests in `festa-frontend/src/game-studio/__tests__/unit/eventInterpreter.test.ts`
-- [ ] T019 [P] [US1] Add dialogue graph traversal unit tests in `festa-frontend/src/game-studio/__tests__/unit/dialogueRunner.test.ts`
+- [x] T017 [P] [US1] Add runtime-state reducer unit tests in `festa-frontend/src/game-studio/__tests__/unit/runtimeState.test.ts`
+- [x] T018 [P] [US1] Add condition/action interpreter unit tests in `festa-frontend/src/game-studio/__tests__/unit/eventInterpreter.test.ts`
+- [x] T019 [P] [US1] Add dialogue graph traversal unit tests in `festa-frontend/src/game-studio/__tests__/unit/dialogueRunner.test.ts`
 
 ### Implementation
 
-- [ ] T020 [US1] Implement immutable RuntimeSessionState initialization in `festa-frontend/src/game-studio/core/runtimeState.ts`
-- [ ] T021 [P] [US1] Implement condition evaluation in `festa-frontend/src/game-studio/core/evaluateCondition.ts`
-- [ ] T022 [P] [US1] Implement action reduction in `festa-frontend/src/game-studio/core/applyAction.ts`
-- [ ] T023 [US1] Implement event ordering, action budget, and transition-depth guard in `festa-frontend/src/game-studio/core/runEvent.ts`
-- [ ] T024 [US1] Implement OVERLAY/FULL_SCREEN DIALOGUE node/choice runner in `festa-frontend/src/game-studio/runtime/dialogue/dialogueRunner.ts`
+- [x] T020 [US1] Implement immutable RuntimeSessionState initialization in `festa-frontend/src/game-studio/core/runtimeState.ts`
+- [x] T021 [P] [US1] Implement condition evaluation in `festa-frontend/src/game-studio/core/evaluateCondition.ts`
+- [x] T022 [P] [US1] Implement action reduction in `festa-frontend/src/game-studio/core/applyAction.ts`
+- [x] T023 [US1] Implement event ordering, action budget, and transition-depth guard in `festa-frontend/src/game-studio/core/runEvent.ts`
+- [x] T024 [US1] Implement OVERLAY/FULL_SCREEN DIALOGUE node/choice runner in `festa-frontend/src/game-studio/runtime/dialogue/dialogueRunner.ts`
 - [ ] T025 After #35 [US1] Implement the selected TOP_DOWN renderer adapter in `festa-frontend/src/game-studio/runtime/top-down/TopDownRuntime.ts`
-- [ ] T026 [US1] Implement project authoring store with undo/redo in `festa-frontend/src/game-studio/studio/store/gameProjectStore.ts`
+- [x] T026 [US1] Implement project authoring store with undo/redo in `festa-frontend/src/game-studio/studio/store/gameProjectStore.ts`
 - [ ] T027 [P] [US1] Implement Scene list/start Scene editor in `festa-frontend/src/game-studio/studio/scenes/SceneListPanel.tsx`
 - [ ] T028 [P] [US1] Implement grid/tile/object canvas in `festa-frontend/src/game-studio/studio/map/TopDownMapEditor.tsx`
 - [ ] T029 [P] [US1] Implement typed Component/Event inspector in `festa-frontend/src/game-studio/studio/inspector/EventInspector.tsx`
 - [ ] T030 [P] [US1] Implement DIALOGUE node/choice editor in `festa-frontend/src/game-studio/studio/dialogue/DialogueEditor.tsx`
 - [ ] T031 [US1] Add the minimal authoring-to-local-preview integration test in `festa-frontend/src/game-studio/__tests__/integration/minimalAuthoringPreview.test.tsx`
 - [ ] T076 [US1] Implement the Scene/Object palette, canvas, Properties and Event workspace shell in `festa-frontend/src/game-studio/studio/StudioWorkspace.tsx`
-- [ ] T077 [US1] Implement preset convenience fields as reversible Component/Event recipes in `festa-frontend/src/game-studio/studio/presets/presetRecipes.ts`
+- [x] T077 [US1] Implement preset convenience fields as reversible Component/Event recipes in `festa-frontend/src/game-studio/studio/presets/presetRecipes.ts`
 
 **Checkpoint**: 서버와 Unity 없이 US1 수직 시나리오를 제작하고 Preview할 수 있다.
 
@@ -237,6 +237,7 @@ AI #22 completed and does not block MVP
 
 - 총 90개
 - 완료된 계약·파트 답변 반영 작업: T001~T009, T066, T068~T075, T081~T083 (21개)
+- 완료된 Web Core 구현: T010~T013, T017~T024, T026, T077 (14개, 누적 35개)
 - User Story 1: T017~T031 + T076~T077 + T090
 - User Story 2: T032~T043 + T078~T080 + T087~T088
 - User Story 3: T044~T050 (7개)
