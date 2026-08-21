@@ -27,11 +27,26 @@ namespace Festa.World
         [SerializeField] float _collisionReturnLerp = 5f;
         [SerializeField] float _lookHeight = 8.05f;
 
+        // ── 자기 몸 가리기 ────────────────────────────────────────
+        // 뒤에 벽·기물이 있으면 카메라가 앞으로 당겨지고, 그러다 아바타 안으로 들어가
+        // 화면이 몸통으로 가득 찬다. 3인칭 게임의 표준 처리는 **가까워지면 자기 캐릭터를
+        // 감추는 것**이다 (카메라를 억지로 밀어내면 벽을 뚫고 밖이 보인다).
+        //
+        // 히스테리시스를 둔다 — 임계값 하나면 경계에서 깜빡인다.
+        //
+        // 임계값은 최소 줌 거리(`_minDistance` 9)보다 **낮아야** 한다. 같거나 높으면
+        // 사용자가 의도적으로 최대 줌인만 해도 자기 아바타가 사라진다 — 그건 버그로 보인다.
+        // 여기 걸리는 것은 벽에 밀려 강제로 당겨진 경우뿐이다 (거리가 캐스트 반경까지 내려간다).
+        // 1 m = 10 unit 이므로 6 = 0.6 m, 8 = 0.8 m 다.
+        [SerializeField] float _selfHideDistance = 6f;   // 이보다 가까우면 숨긴다
+        [SerializeField] float _selfShowDistance = 8f;   // 이보다 멀어지면 다시 보인다
+
         Camera _cam;
         float _distance;
         float _yaw;
         float _pitch = 27f;
         float _resolvedDistance;
+        bool _selfHidden;
         readonly RaycastHit[] _collisionHits = new RaycastHit[64];
 
         /// <summary>
@@ -80,9 +95,14 @@ namespace Festa.World
             var orbitDirection = orbitRotation * Vector3.back;
             var desiredDistance = _distance;
 
+            // 근평면이 지오메트리에 들어가면 벽을 뚫고 밖이 보인다. 그러지 않도록
+            // 캐스트 반경을 **근평면 모서리까지의 거리** 이상으로 잡는다 —
+            // 상수로 두면 FOV·해상도·near 를 바꿀 때 조용히 어긋난다.
+            float radius = Mathf.Max(_collisionRadius, NearPlaneRadius());
+
             var hitCount = Physics.SphereCastNonAlloc(
                 lookTarget,
-                _collisionRadius,
+                radius,
                 orbitDirection,
                 _collisionHits,
                 desiredDistance,
@@ -95,7 +115,7 @@ namespace Festa.World
                 if (IsPlayerCollider(hit.collider)) continue;
                 desiredDistance = Mathf.Min(
                     desiredDistance,
-                    Mathf.Max(_collisionRadius, hit.distance - _collisionPadding));
+                    Mathf.Max(radius, hit.distance - _collisionPadding));
             }
 
             // 벽에 닿을 때는 즉시 당겨 관통을 막고, 벽에서 벗어날 때만
@@ -110,6 +130,44 @@ namespace Festa.World
                 ? targetPos
                 : Vector3.Lerp(_cam.transform.position, targetPos, _followLerp * Time.deltaTime);
             _cam.transform.LookAt(lookTarget);
+
+            UpdateSelfVisibility();
+        }
+
+        /// <summary>근평면 모서리까지의 거리. 이보다 작은 반경으로 캐스트하면 벽이 뚫린다.</summary>
+        float NearPlaneRadius()
+        {
+            float h = _cam.nearClipPlane * Mathf.Tan(_cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float w = h * Mathf.Max(0.01f, _cam.aspect);
+            return new Vector3(w, h, _cam.nearClipPlane).magnitude;
+        }
+
+        /// <summary>
+        /// 카메라가 가까워지면 자기 아바타를 감춘다. **로컬 렌더링만 끄는 것이므로
+        /// 다른 접속자에게는 그대로 보인다** — 네트워크로 나가는 상태가 아니다.
+        ///
+        /// 렌더러 목록을 캐시하지 않는다. `PlayerAvatarVisual` 이 외형 변경마다 아바타를
+        /// 다시 조립하므로 캐시는 곧 낡는다. 전환 순간에만 훑으므로 비용이 없다
+        /// (매 프레임이 아니라 임계값을 넘을 때 한 번).
+        /// </summary>
+        void UpdateSelfVisibility()
+        {
+            bool shouldHide = _selfHidden
+                ? _resolvedDistance < _selfShowDistance   // 숨은 상태면 더 멀어져야 다시 보인다
+                : _resolvedDistance < _selfHideDistance;
+            if (shouldHide == _selfHidden) return;
+
+            _selfHidden = shouldHide;
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                r.enabled = !shouldHide;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            // 숨긴 채로 사라지면 다음 스폰이나 다른 용도에서 안 보이는 채로 남는다.
+            if (!_selfHidden) return;
+            _selfHidden = false;
+            foreach (var r in GetComponentsInChildren<Renderer>(true)) r.enabled = true;
         }
 
         void UpdateDistance()

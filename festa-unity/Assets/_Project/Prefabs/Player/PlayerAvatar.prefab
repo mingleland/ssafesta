@@ -107,7 +107,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1901812825
+  GlobalObjectIdHash: 2993748127
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -152,6 +152,8 @@ MonoBehaviour:
   _maxTurnSpeedDeg: 1080
   _gravity: 98.1
   _groundedStick: -20
+  ServerSpawnPosition:
+    m_InternalValue: {x: 0, y: 0, z: 0}
 --- !u!114 &8836840528167371394
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -226,6 +228,8 @@ MonoBehaviour:
   _maxPitch: 65
   _collisionReturnLerp: 5
   _lookHeight: 8.05
+  _selfHideDistance: 6
+  _selfShowDistance: 8
 --- !u!114 &4543201849085386913
 MonoBehaviour:
   m_ObjectHideFlags: 0
