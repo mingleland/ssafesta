@@ -75,7 +75,9 @@
 | `objectId` 형식 (1~64자, `[A-Za-z0-9_-]`) | error | ✅ | |
 | `type`이 canonical 10종에 있음 | error | ✅ | spec 005 §공통 계약 |
 | `position.{x,y,z}`가 유한한 수 | error | ✅ | `NaN`·`Infinity`는 Unity에서 오브젝트를 사라지게 한다 |
-| `position`이 부스 영역 안 (`|x|,|z| ≤ 3`, `0 ≤ y ≤ 6`) | error | ✅ | **부스는 6m × 6m × 6m** (2026-08-20 확정). 원점이 바닥 중앙이라 수평만 반값이고 높이는 0~6이다 |
+| `position`이 부스 영역 안 (`|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`) | error | ✅ | **부스는 6m × 6m × 2.72m** — 높이는 셸 벽 패널 실측 2.725의 내림 (#19 ②, 2026-08-21 확정). 원점이 바닥 중앙이라 수평만 반값이다 |
+| **실물(회전 반영 AABB)이 부스 영역 안** — `AREA_OUT_OF_BOUNDS` | error | ✅ | 앵커는 안인데 실물이 옆 슬롯에 걸치는 배치를 점 검사는 못 잡는다. 타입별 실측 bounds·회전 규칙은 contracts §10 (#19 ③) |
+| **통행 판정** — 관람 띠 도달 <50% `FRONT_BLOCKED` / 고립 ≥1㎡ `ISOLATED_AREA` | warning | ❌ (공개 시점만) | 뒷공간 활용은 소유자의 선택일 수 있어 공개를 막지 않는다. 래스터 파라미터는 contracts §10-3 (#19 ⑤) |
 | `rotationY`가 `[0, 360)` | error | ✅ | |
 | `template`이 화이트리스트에 있음 | error | ✅ | C-06 확정 시 목록만 확장 |
 | `schemaVersion`이 서버가 아는 값 | error | ✅ | 미래 버전을 저장해 두면 조용히 못 읽는다 |

@@ -87,7 +87,7 @@ class BoothLayoutConfigLinkIntegrationTest {
     void anUnlinkedFunctionalObjectPublishesWithAWarning() {
         Owner owner = leasedOwner("미연결");
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"ai-1","type":"AI_AGENT","position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                 """);
 
@@ -104,7 +104,7 @@ class BoothLayoutConfigLinkIntegrationTest {
     void anUncheckableTypeIsReportedAsUnverified() {
         Owner owner = leasedOwner("검증불가");
         layouts.saveDraft(owner.boothId(), owner.userId(), """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"panel-1","type":"PROJECT_PANEL","configId":4242,
                    "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                 """);
@@ -117,7 +117,7 @@ class BoothLayoutConfigLinkIntegrationTest {
 
     private String aiLayout(long agentId) {
         return """
-                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"ai-1","type":"AI_AGENT","configId":%d,
                    "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                 """.formatted(agentId);
