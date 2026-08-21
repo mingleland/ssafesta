@@ -32,3 +32,5 @@ festa-unity/Tools/mock-api/api/v1/booths/*/layouts/draft
 festa-unity/Tools/mock-api/api/v1/booths/*/facade.json
 # ASC — 로컬 작업 통제 체계. 세션 상태는 팀 산출물이 아니다 (.asc/README.md)
 .asc/
+# ASC GitHub 모니터의 로컬 산출물 — 팀 산출물이 아니다 (.asc/README.md)
+docs/KHS/inbox/
