@@ -63,6 +63,8 @@ class BoothLayoutApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.revision").value(1))
                 .andExpect(jsonPath("$.schemaVersion").value(1))
+                // Present even with nothing to report, so the client never branches on its absence.
+                .andExpect(jsonPath("$.warnings").isArray())
                 .andExpect(jsonPath("$.objects[0].objectId").value("screen-1"));
     }
 
@@ -193,7 +195,8 @@ class BoothLayoutApiIntegrationTest {
         mockMvc.perform(post(publishPath(owner.boothId())).header("Authorization", bearerFor(owner.userId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.publishedVersion").value(1))
-                .andExpect(jsonPath("$.publishedAt").isString());
+                .andExpect(jsonPath("$.publishedAt").isString())
+                .andExpect(jsonPath("$.warnings").isArray());
     }
 
     private Owner leasedOwner(String prefix) {

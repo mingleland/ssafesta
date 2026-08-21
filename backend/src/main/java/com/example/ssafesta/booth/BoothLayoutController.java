@@ -1,7 +1,6 @@
 package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiErrorDetail;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.time.Instant;
 import java.util.List;
@@ -63,7 +62,7 @@ public class BoothLayoutController {
         Long userId = BoothPrincipal.requireMemberId(jwt);
         BoothLayoutService.PublishOutcome outcome = layouts.publish(boothId, userId);
         return new PublishedResponse(outcome.boothId(), outcome.publishedVersion(),
-                outcome.publishedAt(), warningsOrNull(outcome.warnings()));
+                outcome.publishedAt(), outcome.warnings());
     }
 
     /** Unauthenticated: this is what Unity and every visitor read on entering a booth (spec 006). */
@@ -72,7 +71,10 @@ public class BoothLayoutController {
         return queries.findPublished(boothId);
     }
 
-    @JsonInclude(JsonInclude.Include.NON_NULL)
+    /**
+     * {@code warnings} is always present, empty when there is nothing to say — see
+     * {@link com.example.ssafesta.common.ApiErrorResponse}.
+     */
     public record DraftSavedResponse(Long boothId, long revision, Integer schemaVersion, String template,
                                      List<LayoutJson.LayoutObject> objects, Instant updatedAt,
                                      List<ApiErrorDetail> warnings) {
@@ -82,16 +84,10 @@ public class BoothLayoutController {
             LayoutJson.LayoutDocument document = LayoutJson.parse(draft.getLayoutJson()).document();
             return new DraftSavedResponse(draft.getBoothId(), draft.getRevision(),
                     document.schemaVersion(), document.template(), document.objects(),
-                    draft.getUpdatedAt(), warningsOrNull(outcome.warnings()));
+                    draft.getUpdatedAt(), outcome.warnings());
         }
     }
 
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PublishedResponse(Long boothId, int publishedVersion, Instant publishedAt,
                                     List<ApiErrorDetail> warnings) { }
-
-    /** An empty warning list is noise in every successful response; omit it. */
-    private static List<ApiErrorDetail> warningsOrNull(List<ApiErrorDetail> warnings) {
-        return warnings == null || warnings.isEmpty() ? null : warnings;
-    }
 }

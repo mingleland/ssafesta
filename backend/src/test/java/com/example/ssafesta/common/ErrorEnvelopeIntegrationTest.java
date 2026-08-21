@@ -156,6 +156,22 @@ class ErrorEnvelopeIntegrationTest {
         }
     }
 
+    /**
+     * The arrays are always there, empty when there is nothing to report.
+     *
+     * <p>A key that is only sometimes present is the kind of contract that reads fine and crashes
+     * a client: {@code errors.length} throws on an absent key and returns 0 on an empty array.
+     */
+    @Test
+    void errorsAndWarningsAreAlwaysPresent() throws Exception {
+        mockMvc.perform(get("/api/v1/booths/{id}", 9_999_999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errors").isArray())
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(jsonPath("$.warnings").isArray())
+                .andExpect(jsonPath("$.warnings").isEmpty());
+    }
+
     @Test
     void validationDetailsRideInTheSameEnvelope() {
         // FR-016: the layout validator will fill these. The shape is asserted here so it cannot
@@ -167,8 +183,9 @@ class ErrorEnvelopeIntegrationTest {
         assertEquals("LAYOUT_VALIDATION_FAILED", response.code());
         assertEquals(1, response.errors().size());
         assertEquals("ai-1", response.warnings().get(0).objectId());
-        assertEquals(null, ApiErrorResponse.of(ErrorCode.BOOTH_NOT_FOUND, null, "req_test", java.util.List.of(), null)
-                .errors(), "빈 목록은 직렬화에서 빠지도록 null이어야 합니다.");
+        assertEquals(java.util.List.of(),
+                ApiErrorResponse.of(ErrorCode.BOOTH_NOT_FOUND, null, "req_test", java.util.List.of(), null).errors(),
+                "빈 목록도 null이 아니라 빈 배열이어야 합니다.");
     }
 
     private String idOf(MvcResult result) {

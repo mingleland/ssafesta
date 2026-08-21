@@ -42,8 +42,9 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 코드 없이 한국어 문장만 반환하고 있었다. Breaking Change가 아니라 문서와의 정합 회복이다.
 
 - `requestId`는 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**이다. 사용자가 화면에서 본 id 하나로 로그를 찾을 수 있다.
-- 검증 실패 응답에는 `errors`·`warnings` 배열이 추가된다. `errors`가 비어 있지 않으면 요청은 거부된 것이고,
-  `warnings`는 진행을 막지 않는다.
+- **`errors`·`warnings` 배열은 항상 있다** — 보고할 것이 없으면 빈 배열이다. `errors`가 비어 있지 않으면
+  요청은 거부된 것이고, `warnings`는 진행을 막지 않는다. 저장·공개 **성공** 응답의 `warnings`도 같은 규칙이다.
+  키를 조건부로 빼면 `errors.length`가 클라이언트에서 터지므로 빼지 않는다.
 
 ```json
 {
