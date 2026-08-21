@@ -31,7 +31,7 @@
 |---|---|---|---|---|
 | **010** | survey | SURVEY-01~08 | 004, 005 | 보상(SURVEY-07)은 003 계약 사용 |
 | **011** | staff-consultation | STAFF-01~03, CONSULT-01~05, AI-06 | 001, 008 | WebSocket 상담 + Presence + Handoff Summary |
-| **012** | economy-extended | ECON-05~08 | 003 | AI 결제·수익, Inventory, 장식 구매 |
+| **012** | economy-extended | ECON-06~08 | 003 | Inventory, 장식 구매, 거래 내역 |
 | **013b** | avatar-presence | WORLD-05~06 | 002, 013a | Emote·Presence·닉네임 표시 등 커스터마이징 제외 잔여분 (커스터마이징은 013a로 P0 이동) |
 | **014** | minigame | GAME-01~03 | 002, 003 | 1종만. 정산은 Spring. **P2 확장 후보: 마피아 게임(GAME-05)** — 접속자 대상 역할 부여 + 연출("지직" 글리치). spec은 P0/P1 안정 후 판단 |
 | **015** | dashboard | DASH-01~05 | 007~012 | 집계 지표 — 데이터 소스 spec들 이후 |

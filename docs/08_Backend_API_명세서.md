@@ -422,23 +422,6 @@ Cursor 또는 Page 기반 거래 내역 조회.
 
 중복 요청 시 같은 날 한 번만 지급한다.
 
-### POST `/agents/{agentId}/usage-authorizations` — P1 제안
-
-유료 AI 서비스 사용 전 Spring이 잔액·권한을 검증하고 사용 승인/결제를 처리하는 Endpoint 후보.
-
-```json
-{
-  "authorizationId": "aiuse_...",
-  "chargedCoin": 20,
-  "balanceAfter": 130,
-  "expiresAt": "..."
-}
-```
-
-AI 호출 실패 환불 정책은 TBD다.
-
----
-
 ## 9. Survey
 
 ### POST `/booths/{boothId}/surveys`
