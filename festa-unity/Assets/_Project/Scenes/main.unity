@@ -9736,6 +9736,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -9020007166999299508, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-center-panel-03
+      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: m_LocalScale.x
       value: 12.5
@@ -9792,6 +9796,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -8551876548600138420, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-elevatorside-panel-01
+      objectReference: {fileID: 0}
     - target: {fileID: -8534091357461459278, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9800,6 +9808,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -8324663177818040125, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-elevatorside-panel-01
+      objectReference: {fileID: 0}
+    - target: {fileID: -8306220345584339321, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-center-panel-02
+      objectReference: {fileID: 0}
     - target: {fileID: -8061702237934295347, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9852,6 +9868,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -6958361550839181114, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-windowside-panel-03
+      objectReference: {fileID: 0}
+    - target: {fileID: -6843846536160940139, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-elevatorside
+      objectReference: {fileID: 0}
     - target: {fileID: -6660031259899615359, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9880,6 +9904,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -5752960467304349922, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-elevatorside-panel-02
+      objectReference: {fileID: 0}
     - target: {fileID: -5228257405742887057, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9932,6 +9960,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -4114141125615396466, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-windowside-panel-02
+      objectReference: {fileID: 0}
     - target: {fileID: -4002193045537729981, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9948,6 +9980,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[2]'
       value: 
       objectReference: {fileID: 2100000, guid: 82f887d1a5ac47240b8fb83f885b0e02, type: 2}
+    - target: {fileID: -3732285042390853606, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: sofa-05
+      objectReference: {fileID: 0}
     - target: {fileID: -3671645395699079723, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9972,6 +10008,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -3025113058634170507, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: sofa-01
+      objectReference: {fileID: 0}
     - target: {fileID: -2788109272946463301, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -9984,6 +10024,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: -2532365942576653504, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-windowside-panel-03
+      objectReference: {fileID: 0}
     - target: {fileID: -2355016885052707590, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10068,6 +10112,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 108824332344415583, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: lounge-zone
+      objectReference: {fileID: 0}
     - target: {fileID: 456917751713727156, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10104,10 +10152,18 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 1423541858002676282, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: sofa-04
+      objectReference: {fileID: 0}
     - target: {fileID: 1833630624515939229, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 1845493940922760711, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-center-panel-02
+      objectReference: {fileID: 0}
     - target: {fileID: 1954075753432627527, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10128,10 +10184,22 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 2853656924516529251, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-elevatorside
+      objectReference: {fileID: 0}
     - target: {fileID: 2878411800293095687, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 3020062257942359379, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-windowside-panel-02
+      objectReference: {fileID: 0}
+    - target: {fileID: 3453589319785466945, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-center-panel-03
+      objectReference: {fileID: 0}
     - target: {fileID: 3737660374647190079, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10160,6 +10228,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 5618657211066383663, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: sofa-02
+      objectReference: {fileID: 0}
     - target: {fileID: 5754858626919713382, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10172,6 +10244,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 6279297063376913994, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-windowside
+      objectReference: {fileID: 0}
     - target: {fileID: 6448091831614218319, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10180,6 +10256,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[2]'
       value: 
       objectReference: {fileID: 2100000, guid: 82f887d1a5ac47240b8fb83f885b0e02, type: 2}
+    - target: {fileID: 6487942292338947889, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-windowside-panel-01
+      objectReference: {fileID: 0}
+    - target: {fileID: 6516087879042035112, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-center-panel-01
+      objectReference: {fileID: 0}
     - target: {fileID: 6686818595914323391, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10188,6 +10272,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 7089662036914136283, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: ceiling-backdrop
+      objectReference: {fileID: 0}
+    - target: {fileID: 7408232370901583028, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-windowside
+      objectReference: {fileID: 0}
     - target: {fileID: 7446251125551711084, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10196,14 +10288,30 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 7547981600832603360, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: sofa-03
+      objectReference: {fileID: 0}
     - target: {fileID: 7602478578785259417, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 7659533098658879155, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-windowside-panel-01
+      objectReference: {fileID: 0}
     - target: {fileID: 7683400979908658913, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 8029279611827927281, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-center
+      objectReference: {fileID: 0}
+    - target: {fileID: 8092304842838043913, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-rear-center-panel-01
+      objectReference: {fileID: 0}
     - target: {fileID: 8555682743779032468, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -10212,6 +10320,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 928581c069b79b940856dc6664b4b3af, type: 2}
+    - target: {fileID: 8920763742882671428, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
+      propertyPath: m_Name
+      value: wall-front-center
+      objectReference: {fileID: 0}
     - target: {fileID: 8949231505757119218, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
