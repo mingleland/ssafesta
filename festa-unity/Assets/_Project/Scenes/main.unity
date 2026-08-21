@@ -9375,11 +9375,11 @@ PrefabInstance:
     - target: {fileID: 2133422583562328688, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 2100000, guid: fad3d3f460ba7634baf176fef5630414, type: 2}
     - target: {fileID: 3370056717297922193, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 2100000, guid: fad3d3f460ba7634baf176fef5630414, type: 2}
     - target: {fileID: 5489414845156662691, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
       propertyPath: m_Name
       value: BoothShell
