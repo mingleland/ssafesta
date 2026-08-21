@@ -1,0 +1,19 @@
+{
+  "boothId": 7,
+  "template": "PROJECT_EXHIBITION",
+  "version": 2,
+  "objects": [
+    { "id": "screen-1", "type": "VIDEO_SCREEN",
+      "position": { "x": 2.1, "y": 0, "z": 3.4 }, "rotationY": 90, "configId": 152 },
+    { "id": "ai-1", "type": "AI_AGENT",
+      "position": { "x": 1.2, "y": 0, "z": 1.5 }, "rotationY": 0, "configId": 78 },
+    { "id": "panel-1", "type": "PROJECT_PANEL",
+      "position": { "x": -1.5, "y": 0, "z": 2.0 }, "rotationY": 45, "configId": 33 },
+    { "id": "survey-1", "type": "SURVEY",
+      "position": { "x": -0.5, "y": 0, "z": 3.5 }, "rotationY": 180, "configId": 12 },
+    { "id": "desk-1", "type": "CONSULT_DESK",
+      "position": { "x": 0.5, "y": 0, "z": 5.0 }, "rotationY": 0, "configId": 9 },
+    { "id": "future-1", "type": "HOLOGRAM",
+      "position": { "x": 3.0, "y": 0, "z": 5.0 }, "rotationY": 0, "configId": 999 }
+  ]
+}
