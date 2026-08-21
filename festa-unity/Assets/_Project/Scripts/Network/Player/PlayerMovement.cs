@@ -34,10 +34,16 @@ namespace Festa.Network
         // h≈4.5 unit(0.45 m) 를 노려 v≈30 을 쓴다. 체공 시간 t = 2v/g ≈ 0.61초로
         // Jumping 클립(1.90초)보다 짧아 착지 시 로코모션으로 크로스페이드된다.
         [Tooltip("점프 초기 상승 속도 (unit/s). 1 m = 10 unit 이다.")]
-        // 애니메이션에 물리를 맞춘다 — 반대로 하면 어긋난다. Jump 클립의 체공 구간이
-        // 0.633초(f15 도약 ~ f34 착지)이므로 v = g·T/2 = 31.1 이면 포물선과 포즈가
-        // 프레임 단위로 겹친다. 도달 4.9 unit = 0.49 m.
-        [SerializeField] float _jumpSpeed = 31.1f;
+        // 도약에는 **중력을 따로 쓴다.** 현실 중력(98.1 = 9.81 m/s² × 10)으로는 0.6 m 를
+        // 뛰면 체공이 0.70초밖에 안 나와 눈으로 읽히기 전에 끝난다 — "점프가 너무 빠르다".
+        // 체공을 늘리려면 현실 중력에서는 1 m 씩 뛰어야 하는데 로비 천장에 맞지 않는다.
+        // 그래서 게임들이 하는 대로 도약 구간만 중력을 낮춘다. 낙하(발판에서 벗어남)는
+        // 현실 중력을 그대로 쓴다.
+        //
+        // v = 26.5, g = 59 → 체공 0.898초, 도달 5.95 unit = 0.60 m.
+        // 이 체공에 Jump 클립 재생 속도(0.705)를 맞춰 포물선과 포즈가 겹치게 했다.
+        [SerializeField] float _jumpSpeed = 26.5f;
+        [SerializeField] float _jumpGravity = 59f;
 
         // ── 스폰 위치 강제 ────────────────────────────────────────
         // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
@@ -164,9 +170,11 @@ namespace Festa.Network
             if (_controller != null && _controller.enabled)
             {
                 grounded = _controller.isGrounded;
+                // 의도한 도약 중에는 낮춘 중력을 쓴다 (위 주석). 그냥 떨어지는 것은 현실 중력.
+                float gravity = _jumped ? _jumpGravity : _gravity;
                 _verticalSpeed = grounded
                     ? _groundedStick
-                    : _verticalSpeed - _gravity * Time.deltaTime;
+                    : _verticalSpeed - gravity * Time.deltaTime;
 
                 // 접지 상태에서만 도약한다 — 이중 점프를 만들지 않는다.
                 // 중력·접지 처리 **뒤에** 적용해야 _groundedStick 이 도약을 지우지 않는다.

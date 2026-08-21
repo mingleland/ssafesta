@@ -429,7 +429,11 @@ namespace Festa.World
         {
             if (_animator == null || _animator.runtimeAnimatorController == null) return;
 
-            bool moving = state != PlayerAnimState.Idle;
+            // Jump 를 "걷는 중" 으로 신고하지 않는다. 이 컨트롤러에는 IsWalking 으로
+            // 걸린 Idle↔Walk 트랜지션이 있어서, 제자리에서 뛸 때 Idle→Walk 가 동시에
+            // 유효해진다. 지금은 크로스페이드가 진행 중인 트랜지션을 그래프가 끊지
+            // 못해 문제되지 않지만, 상태를 거짓으로 알리는 것 자체가 함정이다.
+            bool moving = state == PlayerAnimState.Walk || state == PlayerAnimState.Run;
             bool running = state == PlayerAnimState.Run;
             _animator.speed = 1f;
             foreach (var p in _animator.parameters)
