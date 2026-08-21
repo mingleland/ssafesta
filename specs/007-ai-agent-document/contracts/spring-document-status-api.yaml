@@ -1,0 +1,87 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA Spring Internal AI Document Status API
+  version: 0.1.0
+  description: FastAPI가 처리 결과를 Spring 소유 DocumentStatus에 반영하는 내부 콜백 계약이다.
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /documents/{documentId}/status:
+    patch:
+      operationId: updateDocumentProcessingStatus
+      summary: AI 문서 상태 결과 반영
+      description: 동일 jobId와 status의 반복 요청은 멱등하게 성공해야 한다.
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentStatusUpdateRequest'
+      responses:
+        '204':
+          description: 신규 또는 중복 상태 반영 성공
+        '409':
+          description: sourceHash가 현재 문서 개정본과 달라 오래된 결과를 적용하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 문서 없음
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    DocumentStatus:
+      type: string
+      enum: [QUEUED, PROCESSING, READY, FAILED, DISABLED]
+    DocumentStatusUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [jobId, status, sourceHash, occurredAt]
+      properties:
+        jobId:
+          type: string
+          pattern: '^job_[0-9]+$'
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        sourceHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        chunkCount:
+          type: [integer, 'null']
+          minimum: 0
+        failureCode:
+          type: [string, 'null']
+          enum: [PARSE_FAILED, UNSUPPORTED_SCAN_PDF, EMBEDDING_TIMEOUT, SOURCE_NOT_FOUND, PROCESSING_INTERRUPTED, INTERNAL_ERROR, null]
+        failureReason:
+          type: [string, 'null']
+          maxLength: 500
+          description: 사용자 노출 가능한 정제 메시지
+        processedAt:
+          type: [string, 'null']
+          format: date-time
+        occurredAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
