@@ -15,6 +15,7 @@
 - 🤖 원본 이력을 `backup/game-studio-gamebase-20260821`에 보존한 뒤 Game Studio 9개 커밋만 최신 `origin/develop`(`41b119b`) 위로 재배치했다. 최종 변경은 문서·spec 43개 경로이며 `festa-unity/**` 변경은 **0개**다.
 - 🤖 작업트리를 바꾸지 않는 가상 병합으로 `origin/develop` 병합이 충돌 없이 가능한 것을 확인했다. `front/back/ai/game`에 직접 병합하면 각 브랜치의 오래된 공통 문서·삭제 이력 때문에 충돌하므로, 이 브랜치의 병합 대상은 **develop 한 곳**으로 제한한다.
 - 🤖 공유 `game` 작업트리와 사용자의 미커밋 Unity Scene은 수정·stage·commit하지 않았다. Game Studio 작업은 별도 worktree에서만 수행했다.
+- 🤖 로컬 검증 완료 후 `feature/game-studio-foundation`을 동명의 원격 브랜치에 최초 push하고 upstream 추적을 연결했다.
 - 트러블슈팅: GS-T012~GS-T015
 
 ### 편집기 시안 반영 및 계약 정합화 ✅
