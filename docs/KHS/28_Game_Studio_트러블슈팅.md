@@ -6,6 +6,15 @@
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
+## 2026-08-21
+
+### GS-T010. 공유 작업트리가 Game Studio 브랜치가 아니어서 전용 문서 조회가 실패함 (해결)
+
+- **증상** — `specs/019-game-studio`와 `docs/KHS/27`, `28` 문서를 현재 경로에서 읽으려 했으나 파일이 없다는 오류가 발생했다.
+- **원인** — 다른 작업이 진행되면서 공유 작업트리의 현재 브랜치가 `feature/game-studio-foundation`에서 `game`으로 변경되었고, Game Studio 문서는 아직 기능 브랜치에만 존재했다.
+- **해결** — 현재 `game` 작업트리를 전환하거나 되돌리지 않고 Git object에서 기능 브랜치 문서를 확인한 뒤, 별도 Git worktree에 `feature/game-studio-foundation`을 checkout하여 기록을 갱신했다.
+- **예방** — Game Studio 후속 작업은 전용 worktree에서 수행하고, 파일 조회 전에 현재 branch와 worktree 목록을 먼저 확인한다.
+
 ## 2026-08-20
 
 ### GS-T001. GitHub CLI 인증이 일반 샌드박스에서만 무효로 표시됨 (해결)

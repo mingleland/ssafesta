@@ -6,6 +6,17 @@
 > Unity 월드·Booth Runtime 일반 작업은 기존 `24_작업일지.md`에 기록한다.
 > Game Studio 작업 중 문제는 `28_Game_Studio_트러블슈팅.md`의 `GS-T###`으로 참조한다.
 
+## 2026-08-21
+
+### Game Studio 편집기 시안 구현 가능성 검토 ✅
+
+- 🤖 사용자 제공 시안의 Scene 목록, Object palette, Tile/Object canvas, Properties, Event Editor, Preview/Save/Publish 구성을 spec 019와 대조했다.
+- 🤖 시안의 핵심인 `타일 레이어 + Asset 참조 + Object/Component + Trigger/Condition/Action + GameProject JSON + Web Runtime` 흐름은 현재 v1 계약과 일치하며, 첫 MVP 화면 구조로 사용할 수 있음을 확인했다.
+- 🤖 실제 구현에서는 브라우저 로컬 `Assets 폴더`를 영구 기준으로 삼지 않고, 기본 asset catalog 또는 서버가 발급한 asset reference를 GameProject가 참조하도록 구분해야 한다. 편집기와 Runtime은 같은 원본 JSON을 소비하되 Runtime은 편집기 상태를 직접 읽지 않는다.
+- 🤖 첫 수직 범위는 `TOP_DOWN + DIALOGUE`, 열쇠 획득→문 열기→대화→Scene 이동으로 유지한다. PLATFORMER와 범용 퍼즐 노드 편집기는 MVP 검증 뒤 확장한다.
+- 🤖 시안 검토만 수행했으며 spec, schema, 구현 코드는 변경하지 않았다.
+- 트러블슈팅: GS-T010
+
 ## 2026-08-20
 
 ### Game Studio 전용 기록 문서 분리 ✅
