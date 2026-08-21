@@ -12,7 +12,8 @@
 - [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
 - [x] ~~**Studio 편집기 MVP(US1) 착수**~~ — ✅ 08-21 완료. `FE/tasks.md` T001~T013, 배치→저장→새로고침 복원→공개 완결. 커밋 `dea2779`·`cc4b8eb`·`10fbb2f`
 - [x] ~~**Studio 편집기 US2(콘텐츠 연결)**~~ — ✅ 08-21 완료. `FE/tasks.md` T014~T016. PropertiesPanel(위치·회전·configId·assetCode)·사전 경고(precheck)·PublishDialog 통합. 브라우저 실측(configId 연결 시 precheck 1건 감소·저장 후 유지·공개 응답 warnings 일치) 통과
-- [ ] **Studio 편집기 US3~US4·Polish** — `FE/tasks.md` T017~T025. 충돌 UX 재검증·facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정)
+- [x] ~~**Studio 편집기 US3(실수 방지)**~~ — ✅ 08-21 완료. `FE/tasks.md` T017~T019. lease-expired 전면 차단(draftQuery·save·publish 3경로 판정)·저장 오류 상세+objectId 자동 선택·재임대 "비공개" 표시. 브라우저 실측(boothId=999 sentinel로 만료 확인, boothId=42로 신규 부스 비공개 확인) 통과
+- [ ] **Studio 편집기 US4·Polish** — `FE/tasks.md` T020~T025. facade 폼·§10 기하 실시간 검증(회전 AABB·통행 판정). ⚠️ PR #50 병합으로 §9·§10 계약 develop 정본화됨 — Polish 문서 각주 갱신 필요. configId 입력에 Int32 범위(1~2,147,483,647, 0 금지) 검증 없음(#34·PR #57) — Polish에서 보강
 - [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
 
 ## 막힌 것 — 대기 중

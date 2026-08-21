@@ -76,9 +76,9 @@
 
 **Independent Test**: quickstart §5(탭 2개 revision 충돌) + §4(13개 주입 시 저장 거부).
 
-- [ ] T017 [US3] 409 `LAYOUT_REVISION_CONFLICT` UX — conflict 상태에서 "다른 편집자가 저장했습니다" 안내+재로드 버튼(`GET /draft` 재호출→`LOAD_DRAFT`). **revision 파싱 금지**(errors[0].message는 한글 문장뿐 — data-model.md)
-- [ ] T018 [P] [US3] `LAYOUT_VALIDATION_FAILED` 시 errors 목록 렌더(`objectId` 있으면 해당 오브젝트 선택·강조)·`BOOTH_LEASE_EXPIRED` 시 편집 차단 안내
-- [ ] T019 [US3] 재임대 진입 — draft만 있고 published 없는 상태(`publishedVersion: null`)에서 "비공개" 표시(FR-011·FR-017은 서버 몫, FE는 표시만)
+- [x] T017 [US3] 409 `LAYOUT_REVISION_CONFLICT` UX — conflict 상태에서 "다른 편집자가 저장했습니다" 안내+재로드 버튼(`GET /draft` 재호출→`LOAD_DRAFT`). **revision 파싱 금지**(errors[0].message는 한글 문장뿐 — data-model.md). MVP(T011) 단계에서 이미 구현됨, 이번엔 재확인만
+- [x] T018 [P] [US3] `LAYOUT_VALIDATION_FAILED` 시 errors 목록 렌더(`objectId` 있으면 해당 오브젝트 선택·강조)·`BOOTH_LEASE_EXPIRED` 시 편집 차단 안내
+- [x] T019 [US3] 재임대 진입 — draft만 있고 published 없는 상태(`publishedVersion: null`)에서 "비공개" 표시(FR-011·FR-017은 서버 몫, FE는 표시만)
 
 **Checkpoint**: quickstart §4·§5 통과.
 
