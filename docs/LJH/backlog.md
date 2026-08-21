@@ -17,6 +17,8 @@
 - **Game Studio** (#20 front / #21 back / #22 ai) — `specs/019`는 `feature/game-studio-foundation` 브랜치 확인.
   **수직 구현 담당자 @busypark 신설** — FE는 소켓(진입·인증·Overlay·Bridge)만, Studio 내부는 이관. #20 회신 완료
 - 문서 develop 통합 관리 확정(팀장 승인, 문서 전반으로 확대) — `docs/26`·`FE.md` 완료, 나머지 순차 진행
+- ⚠️ **신규 — #30 인프라 구조 전면 변경(blocker)**: 단일 EC2+Jenkins+Cloudflare로 `docs/21` ADR 2건 무효.
+  **FE 영향**: refresh 토큰 쿠키 도메인 재확정 필요(@Alexjung0115 TLS 답변 후). #31 1층 폐기 — FE엔 로딩 오버레이 경계 질문 1건(WebGL 로더 미구현 상태로 답변)
 
 ---
 
@@ -34,7 +36,8 @@
 ### Unity 이슈 — 재회신 대기 / 신규
 
 - [x] [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) template·footprint — **회신 오면 C-06 닫히고 FR-003 스냅 간격 착수 가능**
-- [x] [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 — `docs/26`의 Facade 저장 계약 미결이 선행 조건
+- [x] [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) 색상 — BE가 Facade 저장 API 구현 완료(선행 조건 해소).
+      hex `#RRGGBB` 6자리·팔레트 12색(A안, `code`/`label` 제안) 회신. **`ApiError` 타입 확답 대기** — 아래 참조
 - [x] [#18](https://github.com/kanghyunsoon/ssafesta/issues/18) 파츠 잠금 — ✅ CLOSED, 4건 확정. 구현 계약은 spec 012 착수 시
 - [x] **[#20](https://github.com/kanghyunsoon/ssafesta/issues/20) Game Studio** — 회신 완료(9개 항목 전부).
       **핵심 답**: 앱은 `festa-frontend` 내부 lazy 라우트(인증 공유가 결정적) / 경로는 `/app/games/:gameId/edit|play`
@@ -54,6 +57,10 @@
 
 - [ ] FE가 쓸 `assetCode` 목록 제공 → Unity 카탈로그 확장 후 "서로 다른 자산이 실제로 선택되는지" 종단 검증.
       목록 제공 시 last-wins 주의사항 있음 (`verify/block1-roundtrip.md`)
+- [ ] **`client.ts`의 `ApiError` 타입 갱신** — 서버가 오류 봉투를 `{code, message, requestId, errors, warnings}`로 통일(#17).
+      `errors` 원소 타입 확답 대기(`{field?, code}` 제안, #18 objectId 연계 여부 포함). 확답 오면 착수
+- [ ] **#31 로딩 오버레이 경계 회신** — WebGL 로더 미구현 상태 명시하고 "1단계 React·2단계 Unity" 경계에 동의
+- [ ] **#30 refresh 토큰 도메인** — @Alexjung0115 TLS 종료 지점 답변 후 착수
 
 ---
 
