@@ -20,6 +20,8 @@
   "warnings": [ { "rule": "CONFIG_NOT_LINKED", "objectId": "ai-1", "message": "AI 직원이 연결되지 않았습니다." } ] }
 ```
 
+**모든 `message`는 한글이다.** 프레임워크가 만드는 영문 문구(Spring의 `No static resource …`, Jackson의 `Unrecognized field …`)는 응답에 싣지 않고 로그로만 남긴다. FE는 `message`를 그대로 노출해도 된다 — 단 **분기는 `code`·`rule`로** 한다.
+
 `errors`·`warnings`는 검증 응답에만 있다. `requestId`는 요청당 발급되며 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**이라 문의가 들어오면 바로 추적된다.
 
 > **003·004 오류 응답도 이 형태로 바뀐다.** 지금까지는 코드 없이 한국어 문장만 나갔다 — docs/08 §1.3과 Bruno 문서가 약속한 형태에 구현을 맞추는 것이다 (R-09). 오류 본문을 읽는 소비자가 아직 없음을 확인하고 결정했다.
@@ -43,7 +45,7 @@
   "template": "PROJECT_EXHIBITION",
   "objects": [
     { "objectId": "screen-1", "type": "VIDEO_SCREEN",
-      "position": { "x": 2.1, "y": 0.0, "z": 3.4 }, "rotationY": 90.0, "configId": 152 },
+      "position": { "x": 2.1, "y": 0.0, "z": 2.4 }, "rotationY": 90.0, "configId": 152 },
     { "objectId": "sofa-1", "type": "FURNITURE", "assetCode": "SOFA_A",
       "position": { "x": -1.0, "y": 0.0, "z": 0.5 }, "rotationY": 180.0 }
   ]
@@ -56,12 +58,21 @@
 | `template` | string | ✅ | `DEFAULT` \| `PROJECT_EXHIBITION` (C-06 확정 시 확장) |
 | `objects[].objectId` | string | ✅ | 1~64자 `[A-Za-z0-9_-]`, 배치 안에서 유일 |
 | `objects[].type` | string | ✅ | `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
-| `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조) |
+| `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조). 부스는 **6×6×6m** → `|x|,|z| ≤ 3`, `0 ≤ y ≤ 6` |
 | `objects[].rotationY` | number | ✅ | 도(degree), `[0,360)`. `0`이면 +Z를 바라봄 |
 | `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID. 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조) |
 | `objects[].assetCode` | string | ❌ | `FURNITURE`·`DECORATION`의 구체 자산 식별자 |
 
 **BE는 이 값들을 변형하지 않는다** — 반올림·정규화·기본값 주입을 하지 않고 저장하고 그대로 돌려준다 (research R-04). 서버가 유일하게 덧붙이는 것은 `version`·`revision` 같은 **메타 필드**다.
+
+보낸 자릿수도 유지된다 — `2.10`을 보내면 `2.10`으로 돌아온다. 다만 PostgreSQL `numeric`이 다시 쓰는 표기가 **두 가지** 있다. 둘 다 값은 같다.
+
+| 보낸 값 | 저장·응답 | 이유 |
+|---|---|---|
+| `-0.0` | `0.0` | `numeric`에 부호 있는 0이 없다. 같은 지점이다 |
+| `1e2` | `100` | 지수 표기를 평문으로 편다 |
+
+JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 `scale`은 **없다** (C-03 미정). 도입 시 `schemaVersion`을 2로 올린다.
 

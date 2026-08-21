@@ -74,7 +74,7 @@
 | `objectId` 형식 (1~64자, `[A-Za-z0-9_-]`) | error | ✅ | |
 | `type`이 canonical 10종에 있음 | error | ✅ | spec 005 §공통 계약 |
 | `position.{x,y,z}`가 유한한 수 | error | ✅ | `NaN`·`Infinity`는 Unity에서 오브젝트를 사라지게 한다 |
-| `position`이 부스 영역 안 (`|x|,|z| ≤ 10`, `0 ≤ y ≤ 5`) | error | ✅ | 헌법 21조 좌표계 기준. **수치는 Unity 확인 후 조정** — 잠정값 |
+| `position`이 부스 영역 안 (`|x|,|z| ≤ 3`, `0 ≤ y ≤ 6`) | error | ✅ | **부스는 6m × 6m × 6m** (2026-08-20 확정). 원점이 바닥 중앙이라 수평만 반값이고 높이는 0~6이다 |
 | `rotationY`가 `[0, 360)` | error | ✅ | |
 | `template`이 화이트리스트에 있음 | error | ✅ | C-06 확정 시 목록만 확장 |
 | `schemaVersion`이 서버가 아는 값 | error | ✅ | 미래 버전을 저장해 두면 조용히 못 읽는다 |

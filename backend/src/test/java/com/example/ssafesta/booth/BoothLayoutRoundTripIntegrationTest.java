@@ -47,7 +47,7 @@ class BoothLayoutRoundTripIntegrationTest {
                   {"objectId":"a","type":"DECORATION",
                    "position":{"x":2.123456789,"y":0.0,"z":-0.0},"rotationY":359.9},
                   {"objectId":"b","type":"DECORATION",
-                   "position":{"x":-9.999999999,"y":4.999,"z":0.000000001},"rotationY":0.1}]}
+                   "position":{"x":-2.999999999,"y":5.999,"z":0.000000001},"rotationY":0.1}]}
                 """);
 
         var draft = queries.findDraft(owner.boothId(), owner.userId()).orElseThrow();
@@ -56,8 +56,8 @@ class BoothLayoutRoundTripIntegrationTest {
 
         assertExactly("2.123456789", first.position().x());
         assertExactly("359.9", first.rotationY());
-        assertExactly("-9.999999999", second.position().x());
-        assertExactly("4.999", second.position().y());
+        assertExactly("-2.999999999", second.position().x());
+        assertExactly("5.999", second.position().y());
         assertExactly("0.000000001", second.position().z());
         assertExactly("0.1", second.rotationY());
     }
@@ -97,6 +97,82 @@ class BoothLayoutRoundTripIntegrationTest {
 
         assertTrue(failure.errors().stream().anyMatch(error -> "MALFORMED_LAYOUT".equals(error.rule())),
                 "알 수 없는 필드는 MALFORMED_LAYOUT로 거부되어야 합니다: " + failure.errors());
+    }
+
+    /**
+     * The stored text carries the numbers the editor typed, not a re-rendered version of them.
+     *
+     * <p>Reads the column as text rather than through the entity: going back through the parser
+     * would hide a change that both sides happen to parse the same way.
+     */
+    @Test
+    void theStoredTextKeepsTheNumbersAsSent() {
+        Owner owner = newOwner("원문보존");
+
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                  {"objectId":"a","type":"DECORATION",
+                   "position":{"x":2.10,"y":0.000,"z":-1.500},"rotationY":45.0}]}
+                """);
+
+        String stored = jdbc.queryForObject(
+                "SELECT layout_json::text FROM booth_layout_drafts WHERE booth_id = ?",
+                String.class, owner.boothId());
+
+        // Trailing zeros are part of what the client sent; numeric keeps scale, so they survive.
+        assertTrue(stored.contains("2.10"), "보낸 자릿수가 그대로여야 합니다: " + stored);
+        assertTrue(stored.contains("0.000"), "보낸 자릿수가 그대로여야 합니다: " + stored);
+        assertTrue(stored.contains("-1.500"), "보낸 자릿수가 그대로여야 합니다: " + stored);
+        assertTrue(stored.contains("45.0"), "보낸 자릿수가 그대로여야 합니다: " + stored);
+    }
+
+    /**
+     * The two spellings the database does change, pinned so they are known rather than discovered.
+     *
+     * <p>PostgreSQL {@code numeric} has no signed zero and writes exponents in full, so {@code -0.0}
+     * is stored as {@code 0.0} and {@code 1e2} as {@code 100}. Both are the same <b>value</b> — the
+     * same point in space — and nothing downstream can tell the difference; only the text differs.
+     */
+    @Test
+    void negativeZeroAndExponentsAreRewrittenToTheSameValue() {
+        Owner owner = newOwner("영과지수");
+
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                  {"objectId":"a","type":"DECORATION",
+                   "position":{"x":-0.0,"y":1e0,"z":0},"rotationY":0}]}
+                """);
+
+        var object = queries.findDraft(owner.boothId(), owner.userId()).orElseThrow().objects().get(0);
+
+        assertEquals(0, object.position().x().signum(), "-0.0과 0.0은 같은 지점입니다.");
+        assertExactly("1", object.position().y());
+    }
+
+    @Test
+    void theBoothEdgeIsInsideTheBooth() {
+        Owner owner = newOwner("경계");
+
+        // 6m × 6m × 6m with the origin at the floor centre: ±3 horizontally, 0..6 up.
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                  {"objectId":"corner","type":"DECORATION",
+                   "position":{"x":3,"y":6,"z":-3},"rotationY":0}]}
+                """);
+
+        assertEquals(1, queries.findDraft(owner.boothId(), owner.userId()).orElseThrow().objects().size());
+    }
+
+    @Test
+    void justOutsideTheBoothIsRefused() {
+        Owner owner = newOwner("경계밖");
+
+        assertThrows(LayoutValidationFailedException.class,
+                () -> layouts.saveDraft(owner.boothId(), owner.userId(), """
+                        {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                          {"objectId":"a","type":"DECORATION",
+                           "position":{"x":3.001,"y":0,"z":0},"rotationY":0}]}
+                        """));
     }
 
     @Test

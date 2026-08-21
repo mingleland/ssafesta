@@ -104,6 +104,33 @@ class ErrorEnvelopeIntegrationTest {
         assertFalse(body.contains("\tat "), "스택트레이스가 노출되면 안 됩니다: " + body);
     }
 
+    /**
+     * Client-facing messages are Korean, including the ones the framework would otherwise write.
+     *
+     * <p>Spring's own reasons are English ("No static resource ...") and would have gone straight
+     * into the body — the failure mode is a user seeing half the API in one language.
+     */
+    @Test
+    void frameworkRejectionsAreStillKorean() throws Exception {
+        String body = mockMvc.perform(get("/api/v1/no-such-endpoint"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(containsHangul(body), "프레임워크가 만든 오류도 한글이어야 합니다: " + body);
+        assertFalse(body.contains("No static resource"), "Spring 원문이 새어 나왔습니다: " + body);
+    }
+
+    @Test
+    void everyErrorCodeMessageIsKorean() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertTrue(containsHangul(code.defaultMessage()),
+                    code + "의 기본 메시지가 한글이 아닙니다: " + code.defaultMessage());
+        }
+    }
+
+    private boolean containsHangul(String text) {
+        return text != null && text.chars().anyMatch(c -> c >= 0xAC00 && c <= 0xD7A3);
+    }
+
     @Test
     void everyErrorCodeHasAStatusAndAMessage() {
         for (ErrorCode code : ErrorCode.values()) {

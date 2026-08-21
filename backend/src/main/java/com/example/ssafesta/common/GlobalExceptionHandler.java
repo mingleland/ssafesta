@@ -48,9 +48,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception) {
         HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
         ErrorCode code = codeFor(status);
-        String message = exception.getReason() == null ? code.defaultMessage() : exception.getReason();
+        // Spring writes its own reason in English ("No static resource api/v1/...", "Request method
+        // 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes to the log
+        // and the client gets the code's message.
+        log.debug("프레임워크 거부 — status={} reason={}", status, exception.getReason());
         return ResponseEntity.status(exception.getStatusCode())
-                .body(ApiErrorResponse.of(code, message, RequestIdFilter.current()));
+                .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
     }
 
     /** A body that could not be parsed at all — malformed JSON, wrong type in a field. */
@@ -60,15 +63,34 @@ public class GlobalExceptionHandler {
         return badRequest("요청 본문을 읽을 수 없습니다.");
     }
 
+    /**
+     * Bean Validation failures.
+     *
+     * <p>A constraint's default message is English ("must not be blank"), so any annotation we add
+     * has to carry its own Korean {@code message}. Until one does, the field name is reported with a
+     * Korean fallback rather than the framework's text.
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> handleBeanValidation(MethodArgumentNotValidException exception) {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
                 ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
                 RequestIdFilter.current(),
                 exception.getBindingResult().getFieldErrors().stream()
-                        .map(error -> ApiErrorDetail.of(error.getField(), error.getDefaultMessage()))
+                        .map(error -> ApiErrorDetail.of(error.getField(), koreanOrFallback(error.getDefaultMessage())))
                         .toList(),
                 null));
+    }
+
+    /** Anything without a Hangul character is a framework default and must not reach the client. */
+    private String koreanOrFallback(String message) {
+        if (message == null || message.chars().noneMatch(GlobalExceptionHandler::isHangul)) {
+            return "값이 올바르지 않습니다.";
+        }
+        return message;
+    }
+
+    private static boolean isHangul(int codePoint) {
+        return codePoint >= 0xAC00 && codePoint <= 0xD7A3;
     }
 
     /**

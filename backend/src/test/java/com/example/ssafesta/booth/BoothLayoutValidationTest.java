@@ -59,7 +59,7 @@ class BoothLayoutValidationTest {
     @Test
     void aPositionOutsideTheBooth() {
         assertRule("POSITION_OUT_OF_BOUNDS", document("""
-                [{"objectId":"a","type":"DECORATION","position":{"x":10.1,"y":0,"z":0},"rotationY":0}]
+                [{"objectId":"a","type":"DECORATION","position":{"x":3.1,"y":0,"z":0},"rotationY":0}]
                 """));
     }
 

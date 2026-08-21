@@ -128,6 +128,31 @@ class BoothLayoutApiIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    /** The message names the offending key, in Korean, without exposing a class name. */
+    @Test
+    void anUnknownFieldIsReportedInKorean() throws Exception {
+        Owner owner = leasedOwner("미지필드API");
+
+        String body = mockMvc.perform(put(draftPath(owner.boothId()))
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expectedRevision":0,"schemaVersion":1,"template":"DEFAULT","objects":[
+                                  {"objectId":"a","type":"DECORATION","scale":2.0,
+                                   "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errors[0].rule").value("MALFORMED_LAYOUT"))
+                .andReturn().getResponse().getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(body.contains("scale"),
+                "어떤 필드가 문제인지 알려야 합니다: " + body);
+        org.junit.jupiter.api.Assertions.assertFalse(body.contains("com.example"),
+                "클래스 경로가 노출되면 안 됩니다: " + body);
+        org.junit.jupiter.api.Assertions.assertFalse(body.contains("Unrecognized"),
+                "Jackson 원문(영문)이 새어 나왔습니다: " + body);
+    }
+
     @Test
     void aMissingBoothIs404() throws Exception {
         Long userId = createMemberWithWallet(users, wallets, "없는부스");

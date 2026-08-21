@@ -29,14 +29,13 @@ public class LayoutValidator {
     static final int MAX_OBJECTS = 12;
 
     /**
-     * Booth extent in metres, origin at the floor centre (헌법 21조).
+     * Booth extent: <b>6m × 6m × 6m</b>, origin at the centre of the floor (헌법 21조, 2026-08-20 확정).
      *
-     * <p><b>Provisional.</b> These numbers have no source yet — Unity has to supply the real booth
-     * prefab dimensions and then they change (tasks T050). Until then the check exists and its
-     * threshold is a guess, which is worth knowing when a rejection looks wrong.
+     * <p>The origin being central is why the horizontal limit is half the width: x and z run from
+     * −3 to +3. Height is not halved — {@code y = 0} is the floor, so it runs 0 to 6.
      */
-    static final BigDecimal MAX_HORIZONTAL = new BigDecimal("10");
-    static final BigDecimal MAX_HEIGHT = new BigDecimal("5");
+    static final BigDecimal MAX_HORIZONTAL = new BigDecimal("3");
+    static final BigDecimal MAX_HEIGHT = new BigDecimal("6");
 
     private static final BigDecimal FULL_TURN = new BigDecimal("360");
     private static final Pattern OBJECT_ID = Pattern.compile("[A-Za-z0-9_-]{1,64}");

@@ -43,7 +43,7 @@ final class BoothLayoutTestSupport {
         return """
                 {"expectedRevision":%d,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
                   {"objectId":"screen-1","type":"VIDEO_SCREEN",
-                   "position":{"x":2.1,"y":0.0,"z":3.4},"rotationY":90.0,"configId":152}]}
+                   "position":{"x":2.1,"y":0.0,"z":2.4},"rotationY":90.0,"configId":152}]}
                 """.formatted(expectedRevision);
     }
 

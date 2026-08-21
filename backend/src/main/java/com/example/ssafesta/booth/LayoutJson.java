@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -95,14 +96,20 @@ public final class LayoutJson {
     }
 
     /**
-     * Jackson's own message carries class names and byte offsets. Neither belongs in a response
-     * body ({@code GlobalExceptionHandler} keeps internals out), so only the location survives.
+     * A Korean reason, built here rather than borrowed from Jackson.
+     *
+     * <p>Jackson's own text is English and carries the mapped class name — {@code Unrecognized field
+     * "scale" (class com.example.ssafesta.booth.LayoutJson$LayoutObject)} — so passing it through
+     * would both break the Korean-only rule for client messages and leak the package layout.
+     *
+     * <p>The offending field name is worth keeping: without it "형식이 올바르지 않습니다" tells the
+     * editor nothing about which key to remove.
      */
     private static String readableReason(JacksonException exception) {
-        String message = exception.getOriginalMessage();
-        return message == null || message.isBlank()
-                ? "배치 JSON을 읽을 수 없습니다."
-                : "배치 JSON을 읽을 수 없습니다: " + message;
+        if (exception instanceof UnrecognizedPropertyException unknown) {
+            return "계약에 없는 필드입니다: " + unknown.getPropertyName();
+        }
+        return "배치 JSON 형식이 올바르지 않습니다.";
     }
 
     /** A draft save: the document plus the revision the client read (contracts/layout-api.md §3). */
