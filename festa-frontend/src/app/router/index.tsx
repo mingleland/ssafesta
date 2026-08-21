@@ -17,4 +17,18 @@ export const router = createBrowserRouter([
     path: '/app/studio/:boothId',
     element: <StudioPage />,
   },
+  {
+    path: '/app/games/:gameId/edit',
+    lazy: async () => {
+      const { EditGamePage } = await import('../../game-studio/app/routes/EditGamePage.tsx');
+      return { Component: EditGamePage };
+    },
+  },
+  {
+    path: '/app/games/:gameId/play',
+    lazy: async () => {
+      const { PlayGamePage } = await import('../../game-studio/app/routes/PlayGamePage.tsx');
+      return { Component: PlayGamePage };
+    },
+  },
 ]);
