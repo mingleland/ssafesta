@@ -29,7 +29,7 @@ backend/
 ├── compose.yaml
 ├── src/main/resources/db/migration/V1__initial_schema.sql
 └── src/test/java/com/example/ssafesta/TestcontainersConfiguration.java
-specs/019-erd-schema/
+specs/020-erd-schema/
 ├── spec.md
 ├── plan.md
 ├── research.md
