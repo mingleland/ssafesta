@@ -7,17 +7,17 @@
 
 ## 1. 지금 상태
 
-**18개 spec 전부 초안이 있고, Unity 파트 6종(002·006·013·014·017·018)은 확정 완료다.**
-나머지 12종은 팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다.
+**목록의 spec 20종 중 001~018은 전부 초안이 있다** (019는 feature 브랜치에서 작성 중, 020은 완료).
+팀 결정(2026-08-12)이 반영되어 있으며, 각 spec 하단의 **리뷰 3칸**을 담당 파트가 채우면 확정된다.
 
 | Spec | 이름 | 우선순위 | 담당 | spec | plan | tasks |
 |---|---|---|---|:---:|:---:|:---:|
 | 001 | auth-user | P0 | BE + FE | ✅ | ✅ | ✅ |
-| 002 | world-session | P0 | Unity + BE | ✅ **확정** | ✅ | ✅ |
+| 002 | world-session | P0 | Unity + BE | ✅ | ✅ | ✅ |
 | 003 | wallet-coin | P0 | BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 004 | booth-slot-lease | P0 | BE + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 005 | booth-studio-layout | P0 | FE + BE | ✅ **BE 검토 완료** (FE 대기) | ✅ +research/data-model/contracts/quickstart | ✅ |
-| 006 | booth-runtime | P0 | Unity | ✅ **확정** | ✅ | ✅ |
+| 006 | booth-runtime | P0 | Unity | ✅ | ✅ | ✅ |
 | 007 | ai-agent-document | P0 | AI | ✅ | — | — |
 | 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |
 | 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
@@ -28,8 +28,10 @@
 | 012 | economy-inventory | P1 | BE | ✅ | — | — |
 | 014 | minigame | P1 | Unity + BE | ✅ **확정** | ✅ | ✅ |
 | 015 | dashboard | P1 | BE + FE | ✅ | — | — |
-| 017 | proximity-voice | P1 | **FE + Infra** | ✅ **확정** | ✅ | ✅ |
-| 018 | world-floors | P1 | Unity | ✅ **확정** | ✅ | ✅ |
+| 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
+| 018 | world-floors | P1 | Unity | ✅ | ✅ | ✅ |
+| 019 | game-studio | 미정 | Game + FE + BE | 작성 중 — `feature/game-studio-foundation`, 계약 협의 [#20](https://github.com/kanghyunsoon/ssafesta/issues/20)·[#21](https://github.com/kanghyunsoon/ssafesta/issues/21) | — | — |
+| 020 | erd-schema | — | BE | ✅ (V1 스키마 구현 완료, 구 019에서 개명) | ✅ | ✅ |
 
 **plan / tasks가 비어 있는 것은 각 파트가 직접 생성한다.** 그게 SDD의 정상 흐름이고,
 `.specify/` 골격이 설치돼 있어서 명령만 실행하면 된다 (아래 §3).

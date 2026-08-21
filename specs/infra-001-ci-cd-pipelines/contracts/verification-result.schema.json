@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/verification-result.schema.json",
+  "title": "SSAFY FESTA Verification Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "verificationId", "releaseId", "targetId", "checks", "requiredNonAiPassed", "finalDecision", "startedAt", "finishedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "verificationId": { "type": "string", "minLength": 1 },
+    "releaseId": { "type": "string", "minLength": 1 },
+    "targetId": { "type": "string", "minLength": 1 },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "enum": ["component-readiness", "web", "login", "world", "ai"] },
+          "status": { "enum": ["PASSED", "FAILED", "SKIPPED"] },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "evidenceRef": { "type": "string" }
+        }
+      }
+    },
+    "requiredNonAiPassed": { "type": "boolean" },
+    "aiPassed": { "type": ["boolean", "null"] },
+    "failureCode": {
+      "type": ["string", "null"],
+      "enum": [null, "CONTAINER_START", "VERIFY_NON_AI", "VERIFY_AI_ONLY", "DB_CHANGE", "SECRET_CONFIG", "IRREVERSIBLE_CHANGE", "UNKNOWN"]
+    },
+    "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+    "finalDecision": { "enum": ["PASS", "ROLLBACK", "MANUAL", "AI_RETRY"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" }
+  }
+}

@@ -13,7 +13,7 @@
 | 001 | auth-user | 이정헌 | 로그인/가입 UI + Auth 기반 구조 |
 | 005 | booth-studio-layout | 이정헌 | **Layout JSON Source spec** — Mock API로 004와 병렬 가능 |
 | 016 | booth-laptop-homepage | 이정헌 | 신설 P0 |
-| 013a | avatar-customization | 이정헌(창) + Unity | 신설 P0 승격 |
+| 013a | avatar-customization | Unity(UI) + 이정헌(WebGL 호스트·인증 연동) | P0 — Unity 정식 UI 확정 |
 | 009 | project-exhibition | 이정헌 | |
 | 008 | ai-conversation-rag | 김가현 | AI Chat Overlay·SSE Client (parts/AI.md 참조) |
 | 010 | survey (P1) | 이정헌 | 결과 화면 사양은 업로드 설문 문서에 이미 확정 |
@@ -41,28 +41,34 @@ Properties Panel에서 속성을 편집한다. Draft 저장과 Publish를 분리
 ```text
 부스 안의 노트북 오브젝트를 방문자가 클릭하면, 임대 사용자가 등록해 둔 홈페이지가
 "노트북 화면이 켜지는" 연출과 함께 React 오버레이로 열리고 그 안에서 웹서핑할 수 있다.
-흐름: Unity 노트북 클릭 → Bridge Event(BOOTH_LAPTOP_INTERACT { boothId, objectId, url })
+흐름: Unity 노트북 클릭 → `window.FestaUnity.onBoothInteract(json)`
+→ Bridge Event(`BOOTH_LAPTOP_INTERACT { boothId, objectId, url? }`)
 → Interaction Dispatcher → 오버레이에서 iframe으로 표시.
 필수 fallback: 대상 사이트가 X-Frame-Options/CSP로 iframe을 차단하면 감지 후
 "새 탭에서 열기" 버튼을 제공한다 (많은 사이트가 차단하므로 이 경로가 사실상 기본).
 소유자 측: Booth Studio(또는 부스 설정)에서 홈페이지 URL 등록 UI.
 ```
 
+> **2026-08-20 계약·구현·브라우저 왕복 검증 완료**: `boothId`·`objectId`는 필수, `url`은 선택이다. URL이 없으면 오류가 아닌 안내를 표시한다. Unity 경로는 `LaptopInteractable → BoothInteractionInput(레이캐스트) → BoothInteractBridge → FestaUnityBridge.jslib` 이고 최종적으로 `window.FestaUnity.onBoothInteract(json)`을 호출한다.
+>
+> **WebGL 빌드에서 실제 클릭으로 왕복을 검증했다** — 노트북 클릭 1회당 이벤트 1건, 빈 공간·다른 파츠 클릭은 0건(오탐 없음). `url` 없음·정상·따옴표·백슬래시·한글 5종 모두 보낸 값과 정확히 일치했다. FE는 `window.FestaUnity.onBoothInteract`를 설치하기만 하면 된다.
+>
+> 참고: 클릭 감지에 `OnMouseDown`을 쓰지 않는다. Unity 6 WebGL에서 레거시 마우스 메시지가 디스패치되지 않아 Input System 포인터 + `Physics.Raycast`로 교체했다 (game `de38269`, T-166).
+
 **예상 clarify**: iframe 차단 감지 방식(onload 휴리스틱 vs 사전 HEAD 체크는 CORS 불가 → UX로 해결), 오버레이 크기(노트북 프레임 연출 여부), URL 1개 vs 여러 개, http 사이트 혼합콘텐츠 경고 처리.
 
-## spec 013a — avatar-customization (FE분) ★ P0 승격
+## spec 013a — avatar-customization (FE 연동 경계) ★ P0
 
-**specify 입력 (초안)**
+> **2026-08-16 결정**: 완성된 Unity `CharacterLobby`를 정식 커스터마이징 화면으로 사용한다. React 오버레이 교체 요구는 폐기하며 FE는 같은 화면을 중복 구현하지 않는다. Unity 기준 커밋은 `game 6be0cfd`다.
 
-```text
-정식 캐릭터 커스터마이징 창(React 오버레이). Unity 임시 HUD가 이미 검증한 기능을 정식 UI로:
-파츠 카테고리별(머리/헤어/상의/하의 등) 선택, 색상 팔레트, 랜덤, 프리셋.
-선택 즉시 Unity에 반영(AvatarBridge.ApplyAppearance(encoded))되고 다른 접속자에게 실시간 전파된다(Unity 검증 완료).
-저장: PUT /users/me/avatar. 계약 기준 문서: festa-unity/Docs/avatar-customization-contract.md.
-인코딩 문자열 형식은 Unity가 Source — FE는 생성 규칙을 공유 모듈로 받거나 Unity가 인코딩해 돌려준다.
-```
+- 파츠·썸네일·색상·무작위·미리보기 상태와 외형 인코딩은 Unity가 소유한다.
+- FE는 아바타 편집용 Overlay route, 상태 store, 파츠 카탈로그를 만들지 않고 `avatarCode`를 opaque payload로 취급한다.
+- FE 담당 범위는 Unity WebGL 로더, 화면 진입·이탈 같은 호스트 통합, 인증된 Access Token 전달 계약이다. Refresh Token은 Unity에 전달하지 않는다.
+- Spring 영구 저장은 Unity `IUserApiClient.UpdateMyAvatarAsync`가 호출한다. FE가 저장 API를 직접 호출하는 아바타 편집 화면을 만들지 않는다.
+- `AvatarBridge`는 외부 호스트에서 화면을 열어야 할 때만 선택적으로 사용하며, React 커스터마이징 UI 계약으로 사용하지 않는다.
+- AI 채팅·상담·설문처럼 장문 한글 입력이 필요한 기능은 기존 React 오버레이 원칙을 유지한다.
 
-**예상 clarify**: 인코딩 생성 주체(권장: Unity가 인코딩·React는 의미 단위로 조작), 파츠 썸네일 제작·호스팅, 프리셋 종수.
+**남은 협의**: Access Token을 Unity API Client에 전달하는 방식과 저장 실패 UX의 Spring/Unity 공통 오류 코드.
 
 ## spec 010 — survey 결과 화면 (P1, 미리 메모)
 
