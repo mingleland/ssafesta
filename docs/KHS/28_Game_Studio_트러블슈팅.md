@@ -8,6 +8,13 @@
 
 ## 2026-08-21
 
+### GS-T019. 제한 권한의 가상 병합 검사가 Git 객체 기록 단계에서 실패함 (해결)
+
+- **증상** — `git merge-tree --write-tree origin/develop HEAD`가 저장소 object database에 객체를 추가할 권한이 부족하다는 오류로 중단됐다.
+- **원인** — Game Studio worktree의 Git object database는 공유 저장소 아래에 있고, 일반 검증 컨텍스트에는 해당 `.git/objects` 쓰기 권한이 없었다.
+- **해결** — 같은 읽기 전용 병합 검증을 승인된 저장소 권한으로 다시 실행해 merge tree 생성과 무충돌 결과를 확인했다. 실제 브랜치나 작업 파일은 변경하지 않았다.
+- **예방** — `merge-tree --write-tree`처럼 이름과 달리 임시 Git 객체를 기록하는 검증 명령은 처음부터 저장소 object database 권한이 있는 컨텍스트에서 실행한다.
+
 ### GS-T018. 원격 게시 후 develop 재정렬로 로컬·원격 feature 이력이 갈라짐 (해결)
 
 - **증상** — 원격에 게시한 `feature/game-studio-foundation`이 최신 develop보다 3커밋 뒤였고, rebase 후 로컬은 원격 기준 ahead/behind가 동시에 표시됐다.

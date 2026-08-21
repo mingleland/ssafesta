@@ -13,13 +13,14 @@
 
 - 🤖 결정 반영이 완료된 GitHub #20 Frontend, #21 Backend를 후속 이슈 링크와 함께 닫았다. #22 AI까지 원계약 질의 3건은 모두 종료했으며, 미결정·구현 항목은 #33~#35에서 독립 추적한다.
 - 🤖 최신 `origin/develop` 위로 재정렬한 `feature/game-studio-foundation`을 `--force-with-lease`로 원격 동기화했다. 사전 백업 브랜치를 보존했으며 Unity/Game 작업 경로는 포함하지 않았다.
+- 🤖 원격 tip과 로컬 HEAD 일치, `origin/develop` 대비 behind 0/ahead 14, 가상 병합 성공, 변경 43경로 중 `festa-unity/**`와 Frontend 구현 경로 0건을 재확인했다. 계약 fixture 7/7과 Runtime trace 6/6도 다시 통과했다.
 - 🤖 GitHub #20 Frontend, #21 Backend, #22 AI의 신규 답변을 전체 확인했다. FE는 기존 `festa-frontend` 내부 lazy module과 same-origin Preview, BE는 Draft/Published 2테이블·revision 409·atomic Publish, AI는 P0/P1 비의존과 P2 candidate/patch·spec 007 Job 정책을 확정했다.
 - 🤖 기존 Backend 브랜치의 `019-erd-schema`와 번호 충돌을 피하기 위해 Game Studio 전체 경로를 `specs/019-game-studio/`에서 `specs/020-game-studio/`로 선제 이동하고 agent 규칙·상위 문서·Spec-Kit feature 경로를 동기화했다.
 - 🤖 완료된 AI 이슈 #22를 닫았다. #20·#21의 남은 항목은 [#33 제품 정책](https://github.com/kanghyunsoon/ssafesta/issues/33), [#34 Portal ID](https://github.com/kanghyunsoon/ssafesta/issues/34), [#35 Studio 내부](https://github.com/kanghyunsoon/ssafesta/issues/35)로 분리했다.
 - 🤖 API/DB 계약을 `game_drafts` + `game_published_versions`, `expectedRevision`, 불변 append, nullable 공개본 포인터, Portal `no-store`, builtin Asset MVP로 구체화했다. FE 계획·tasks의 별도 `festa-game-studio/` 가정을 폐기하고 실제 `festa-frontend/src/game-studio/` 경로로 고쳤다.
 - 🤖 최신 `origin/develop`(`a8b0398`) 위로 전용 브랜치를 다시 맞췄으며 Game/Unity 작업트리는 변경하지 않았다.
 - 🤖 `tasks.md`는 정합성 분석에서 찾은 Guest 권한·자동 보정 금지·lazy chunk 격리·20분 사용성 검증을 보강해 총 90개, 완료 21개로 갱신했다. 계약 fixture 7/7, Runtime trace 6/6, JSON 10/10, task ID 90/90 unique, checklist 16/16을 통과했다.
-- 트러블슈팅: GS-T016~GS-T018
+- 트러블슈팅: GS-T016~GS-T019
 
 ### 전체 브랜치 재대조 및 develop 기준선 재정렬 ✅
 
