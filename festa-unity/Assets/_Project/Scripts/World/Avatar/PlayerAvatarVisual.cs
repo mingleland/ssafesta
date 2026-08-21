@@ -47,6 +47,7 @@ namespace Festa.World
         IAvatarVisualProvider _provider;
         GameObject _currentVisual;
         GameObject _groundShadow;
+        MeshRenderer _groundShadowRenderer;
         Material _groundShadowMaterial;
         Texture2D _groundShadowTexture;
         Animator _animator;
@@ -243,8 +244,12 @@ namespace Festa.World
             // 새 그림자를 만들기 전에 정리해 플레이어당 하나만 유지한다.
             DestroyGroundShadow();
 
-            if (!TryFindGroundHeight(out var groundY))
-                return;
+            // 바닥을 못 찾아도 **만들어 두고 숨긴다.** 예전에는 여기서 조기 반환했는데,
+            // 스폰 직후 플레이어가 아직 방 밖(원점)에 있는 동안 이 함수가 돌면 아래에
+            // 바닥이 없어 **그림자가 영구히 생기지 않았다** — 외형을 다시 바꿀 때까지
+            // 복구되지 않는다 (T-183). 이제 `LateUpdate` 가 매 프레임 바닥을 다시 찾아
+            // 위치를 맞추고 보이기/숨기기를 결정한다.
+            bool groundFound = TryFindGroundHeight(out var groundY);
 
             var shadow = GameObject.CreatePrimitive(PrimitiveType.Quad);
             shadow.name = "AvatarGroundShadow";
@@ -291,11 +296,38 @@ namespace Festa.World
             meshRenderer.sharedMaterial = material;
             meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
+            _groundShadowRenderer = meshRenderer;
+            meshRenderer.enabled = groundFound;
+        }
+
+        /// <summary>
+        /// 접지 그림자를 매 프레임 바닥에 붙인다.
+        ///
+        /// 생성 시점 한 번만 놓으면 두 가지가 깨진다 — 스폰 직후 방 밖에 있었으면 영구히
+        /// 안 보이고(T-183), 층높이가 다른 곳(라운지 데크 0.32 단차 등)으로 가면 뜬다.
+        /// 아바타당 레이캐스트 1회라 40명이어도 프레임당 40회로 무시할 수 있다.
+        /// </summary>
+        void LateUpdate()
+        {
+            if (_groundShadow == null || _groundShadowRenderer == null) return;
+
+            if (!TryFindGroundHeight(out var groundY))
+            {
+                _groundShadowRenderer.enabled = false;   // 바닥이 없으면 숨긴다
+                return;
+            }
+
+            _groundShadowRenderer.enabled = true;
+            _groundShadow.transform.position = new Vector3(
+                _visualRoot.position.x, groundY + 0.025f, _visualRoot.position.z);
+            // 회전은 고정한다 — 부모(플레이어)가 돌아도 그림자는 바닥에 누워 있어야 한다.
+            _groundShadow.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
         }
 
         void DestroyGroundShadow()
         {
             var trackedShadow = _groundShadow;
+            _groundShadowRenderer = null;
             if (_groundShadow != null)
             {
                 Destroy(_groundShadow);

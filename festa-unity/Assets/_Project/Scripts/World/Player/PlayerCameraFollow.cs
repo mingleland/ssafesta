@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -25,6 +26,9 @@ namespace Festa.World
         [SerializeField] float _minPitch = -20f;
         [SerializeField] float _maxPitch = 65f;
         [SerializeField] float _collisionReturnLerp = 5f;
+        // 당기는 쪽은 밀려나는 쪽보다 빨라야 한다 — 느리면 벽에 파묻힌다.
+        // 다만 즉시(무한)로 두면 얇은 기물 뒤에서 화면이 튄다 (T-183).
+        [SerializeField] float _collisionPullLerp = 18f;
         [SerializeField] float _lookHeight = 8.05f;
 
         // ── 자기 몸 가리기 ────────────────────────────────────────
@@ -47,6 +51,7 @@ namespace Festa.World
         float _pitch = 27f;
         float _resolvedDistance;
         bool _selfHidden;
+        readonly List<Renderer> _hiddenRenderers = new();
         readonly RaycastHit[] _collisionHits = new RaycastHit[64];
 
         /// <summary>
@@ -118,11 +123,23 @@ namespace Festa.World
                     Mathf.Max(radius, hit.distance - _collisionPadding));
             }
 
-            // 벽에 닿을 때는 즉시 당겨 관통을 막고, 벽에서 벗어날 때만
-            // 부드럽게 원래 거리로 돌아가 근접 건축물 사이의 떨림을 줄인다.
-            _resolvedDistance = desiredDistance < _resolvedDistance
-                ? desiredDistance
-                : Mathf.Lerp(_resolvedDistance, desiredDistance, _collisionReturnLerp * Time.deltaTime);
+            // 당길 때도 보간한다. 예전에는 즉시 당겼는데, 벽처럼 넓은 면은 궤도를 돌면서
+            // 가림 정도가 서서히 바뀌어 괜찮았지만 **사람 모형·기둥처럼 얇은 기물**은
+            // 캐스트가 맞았다/안 맞았다를 급히 오가며 화면이 튀었다 (T-183).
+            //
+            // 다만 근평면이 지오메트리에 닿을 만큼 가까우면 즉시 당긴다 — 거기서 보간하면
+            // 한두 프레임 동안 벽을 뚫고 밖이 보인다. 그 경계만 즉시, 나머지는 부드럽게.
+            if (desiredDistance < _resolvedDistance)
+            {
+                _resolvedDistance = desiredDistance <= radius * 2f
+                    ? desiredDistance
+                    : Mathf.Lerp(_resolvedDistance, desiredDistance, _collisionPullLerp * Time.deltaTime);
+            }
+            else
+            {
+                _resolvedDistance = Mathf.Lerp(
+                    _resolvedDistance, desiredDistance, _collisionReturnLerp * Time.deltaTime);
+            }
 
             var targetPos = lookTarget + orbitDirection * _resolvedDistance;
             var obstructed = desiredDistance < _distance - 0.001f;
@@ -158,8 +175,33 @@ namespace Festa.World
             if (shouldHide == _selfHidden) return;
 
             _selfHidden = shouldHide;
+            if (shouldHide) HideSelf();
+            else RestoreSelf();
+        }
+
+        /// <summary>
+        /// **켜져 있던 렌더러만** 기억해서 끈다.
+        ///
+        /// 복귀할 때 전부 켜면 **의도적으로 꺼 둔 렌더러가 되살아난다.** 실제로 그렇게 됐다 —
+        /// `PlayerAvatar` 프리팹 루트에는 POC 시절 캡슐 메시가 `enabled = false` 로 남아 있는데,
+        /// 처음 구현이 무조건 `enabled = true` 로 켜서 발밑에 회색 봉이 따라다녔다 (T-183).
+        /// </summary>
+        void HideSelf()
+        {
+            _hiddenRenderers.Clear();
             foreach (var r in GetComponentsInChildren<Renderer>(true))
-                r.enabled = !shouldHide;
+            {
+                if (!r.enabled) continue;   // 원래 꺼져 있던 것은 건드리지 않는다
+                r.enabled = false;
+                _hiddenRenderers.Add(r);
+            }
+        }
+
+        void RestoreSelf()
+        {
+            foreach (var r in _hiddenRenderers)
+                if (r != null) r.enabled = true;
+            _hiddenRenderers.Clear();
         }
 
         public override void OnNetworkDespawn()
@@ -167,7 +209,7 @@ namespace Festa.World
             // 숨긴 채로 사라지면 다음 스폰이나 다른 용도에서 안 보이는 채로 남는다.
             if (!_selfHidden) return;
             _selfHidden = false;
-            foreach (var r in GetComponentsInChildren<Renderer>(true)) r.enabled = true;
+            RestoreSelf();
         }
 
         void UpdateDistance()
