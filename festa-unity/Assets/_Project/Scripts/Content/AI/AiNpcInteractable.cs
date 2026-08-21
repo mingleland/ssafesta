@@ -16,9 +16,20 @@ namespace Festa.Content
         BoothRuntimeObject _runtimeObject;
         bool _busy;
 
-        void Awake() => _runtimeObject = GetComponent<BoothRuntimeObject>();
+        const string DefaultPrompt = "이 부스의 프로젝트에 대해 알려줘";
 
-        void OnMouseDown() => Interact("이 부스의 프로젝트에 대해 알려줘");
+        void Awake()
+        {
+            _runtimeObject = GetComponent<BoothRuntimeObject>();
+
+            // 클릭 감지는 중앙 디스패처가 한다. `OnMouseDown` 은 Unity 6 WebGL 에서
+            // 발생하지 않는다 (T-166) — 여기 있던 `OnMouseDown` 은 배포 환경에서 죽은 코드였고,
+            // 존재만으로 Unity 가 매 프레임 레거시 마우스 디스패처를 돌려 경고를 뿜었다 (T-176).
+            BoothInteractionInput.Ensure();
+        }
+
+        /// <summary>디스패처용 기본 진입점.</summary>
+        public void Interact() => Interact(DefaultPrompt);
 
         public async void Interact(string message)
         {

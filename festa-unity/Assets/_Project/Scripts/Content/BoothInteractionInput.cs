@@ -45,19 +45,62 @@ namespace Festa.Content
             if (_instance == this) _instance = null;
         }
 
+        Festa.Booth.BoothInteractionTarget _hovered;
+
         void Update()
         {
-            if (!TryReadPress(out var screenPosition)) return;
-
             var cam = ResolveCamera();
             if (cam == null) return;
 
-            var ray = cam.ScreenPointToRay(screenPosition);
-            if (!Physics.Raycast(ray, out var hit, MaxRayDistance)) return;
+            bool pressed = TryReadPress(out var pressPosition);
+            if (!TryReadPointer(out var pointerPosition)) { UpdateHover(null); return; }
+
+            // 호버는 매 프레임, 클릭은 눌린 프레임에만. 레이는 한 번만 쏜다.
+            bool hasHit = Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance);
 
             // 콜라이더가 자식에 있어도 루트의 상호작용 컴포넌트를 찾는다.
+            UpdateHover(hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null);
+
+            if (!pressed) return;
+
+            // 누른 좌표가 호버 좌표와 다를 수 있으므로(터치) 클릭은 따로 쏜다.
+            if (pressPosition != pointerPosition)
+                hasHit = Physics.Raycast(cam.ScreenPointToRay(pressPosition), out hit, MaxRayDistance);
+            if (!hasHit) return;
+
             var laptop = hit.collider.GetComponentInParent<LaptopInteractable>();
-            if (laptop != null) laptop.Interact();
+            if (laptop != null) { laptop.Interact(); return; }
+
+            var ai = hit.collider.GetComponentInParent<AiNpcInteractable>();
+            if (ai != null) ai.Interact();
+        }
+
+        void UpdateHover(Festa.Booth.BoothInteractionTarget next)
+        {
+            if (ReferenceEquals(_hovered, next)) return;
+            if (_hovered != null) _hovered.SetHighlight(false);
+            _hovered = next;
+            if (_hovered != null) _hovered.SetHighlight(true);
+        }
+
+        /// <summary>현재 포인터 화면 좌표. 마우스가 없으면(터치 전용) 실패한다.</summary>
+        static bool TryReadPointer(out Vector2 screenPosition)
+        {
+            screenPosition = default;
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            if (mouse != null) { screenPosition = mouse.position.ReadValue(); return true; }
+            var touch = Touchscreen.current;
+            if (touch != null && touch.primaryTouch.press.isPressed)
+            { screenPosition = touch.primaryTouch.position.ReadValue(); return true; }
+            if (mouse != null || touch != null) return false;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            screenPosition = Input.mousePosition;
+            return true;
+#else
+            return false;
+#endif
         }
 
         /// <summary>

@@ -36,10 +36,16 @@ namespace Festa.Booth
         {
             EnsureCollider();
             CacheRenderers();
+
+            // 호버 감지는 중앙 디스패처가 한다. `OnMouseEnter/Exit` 은 Unity 6 WebGL 에서
+            // 발생하지 않는다 (T-166) — 배포 환경에서 하이라이트가 아예 동작하지 않았고,
+            // 이 메서드들이 존재하는 것만으로 Unity 가 매 프레임 레거시 마우스 디스패처를
+            // 돌려 "Screen position out of view frustum" 경고를 뿜었다 (T-176).
+            Festa.Content.BoothInteractionInput.Ensure();
         }
 
-        void OnMouseEnter() => SetHighlighted(true);
-        void OnMouseExit() => SetHighlighted(false);
+        /// <summary>디스패처가 호버 상태를 알려준다.</summary>
+        public void SetHighlight(bool highlighted) => SetHighlighted(highlighted);
 
         void CacheRenderers()
         {
