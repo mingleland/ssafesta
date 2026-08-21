@@ -459,6 +459,33 @@ namespace Festa.EditorTools
             set => EditorPrefs.SetBool(DisableKey, value);
         }
 
+        /// <summary>
+        /// 임포터 설정. `SketchUpImporter` 는 `ModelImporter` 를 상속하므로 FBX 와 같은
+        /// 설정이 `.skp` 에도 그대로 적용된다 — 별도 포맷 전환이 필요 없다.
+        ///
+        /// 이 단계에서는 모델이 아직 임포트되지 않아 계층으로 대상을 판별할 수 없으므로
+        /// 폴더 경로로 거른다. 이 폴더에는 월드 모델만 둔다.
+        /// </summary>
+        void OnPreprocessModel()
+        {
+            if (Disabled) return;
+            if (!assetPath.StartsWith("Assets/_Project/Models/")) return;
+            var mi = assetImporter as ModelImporter;
+            if (mi == null) return;
+
+            // 탄젠트 제거 — 모델 머티리얼 42개 중 노멀맵 사용이 0개라 실측으로 확인했다.
+            // 정점당 Float32x4 = 16 byte 를 그냥 버리고 있었다. 노멀맵 있는 에셋을
+            // 이 폴더에 넣으면 음영이 깨지니 그때는 이 줄을 조건부로 바꾼다.
+            mi.importTangents = ModelImporterTangents.None;
+            mi.importBlendShapes = false;   // 건축 모델에 블렌드셰이프 없음
+            mi.importLights = false;        // 조명은 WorldCeilingSetup 이 만든다
+            mi.importCameras = false;
+            // 직렬화 압축 — 빌드(WebGL 다운로드) 크기용. 런타임 메모리는 그대로다.
+            // 방 폭 217 unit 기준 16-bit 양자화 오차 ≈ 0.003 unit — 시각적으로 무의미.
+            // 단 임포트 후 검증(바닥 y·천장 오차)이 틀어지면 Off 로 되돌린다.
+            mi.meshCompression = ModelImporterMeshCompression.Medium;
+        }
+
         void OnPostprocessModel(GameObject root)
         {
             if (Disabled) return;
