@@ -128,6 +128,5 @@
 | R-12 | `rule` 문자열 12개가 계약 문서에 없음 | #36에 문서화 요청 — 요청 전까지 분기 대상으로 쓰지 않음 |
 | — | `themeCode` 4값이 계약 문서에 없음 | `docs/08`·구현에만 있음. 계약 문서 승격 시 반영 |
 | — | facade 팔레트 12색 구체 hex 값 | "FE↔BE 구현 트랙에서" — FE 착수 필요 |
-| — | `booths.name`↔`facade_sign_text` 화면 관계 | FE 화면 설계 몫 |
-| R-11 | facade 팔레트 서버 검증·`booths.name` 관계 | #17 합의 / FE 화면 설계 — 폼 구현은 막지 않음 |
+| R-11 | `booths.name`↔`facade_sign_text` 화면 관계 | FE 화면 설계 몫 — 폼 구현은 막지 않음 |
 | R-10 | vitest devDependency 추가 | 팀 승인 |

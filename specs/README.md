@@ -109,6 +109,22 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 **각 파트의 시작점**: 위처럼 자기 spec을 지정한 뒤 `$speckit-plan`(Claude Code는 `/speckit-plan`) 실행.
 plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있다 — 그래서 리드가 미리 쓰지 않았다.
 
+### 다중 파트 spec 산출물 소유권 (#43, 2026-08-21 채택)
+
+실행 산출물(plan·research·data-model·quickstart·tasks)은 파트별 디렉터리에 둔다.
+`spec.md` 와 최상위 `contracts/` 만 공동 정본. 규칙 상세: `docs/00_SDD_가이드.md` §2.
+
+| Spec | 공동 정본 | FE | BE | Unity | AI |
+|---|---|---|---|---|---|
+| 001 auth-user | `spec.md` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
+| 004 booth-slot-lease | `spec.md`, `contracts/` | `FE/*` | `BE/*` (루트에서 이관 예정) | — | — |
+| 005 booth-studio-layout | `spec.md`, `contracts/` | `FE/*` | `BE/*` (루트에서 이관) | — | — |
+| 008 ai-conversation-rag | `spec.md`, `contracts/` | `FE/*` | — | — | `AI/*` (착수 전 적용) |
+| 013 avatar-customization | `spec.md`, `contracts/` | `FE/*` (필요 시) | `BE/*` (필요 시) | `Unity/*` ✅ 이관 완료 | — |
+| 019 game-studio | `spec.md`, `contracts/` | `FE/*` (착수 전 적용) | `BE/*` | `Unity/*` | `AI/*` |
+
+단일 파트 spec 은 루트 산출물 유지. 두 번째 파트 착수 시점에 담당 파트가 이관한다.
+
 ## 4. 2026-08-12 확정 사항 (전 spec 반영 완료)
 
 | 항목 | 확정값 |

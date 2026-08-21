@@ -1,14 +1,12 @@
 # Implementation Plan: Booth Studio Layout (FE 편집기)
 
-**Branch**: `front` | **Date**: 2026-08-21 | **Spec**: [spec.md](./spec.md)
+**Branch**: `front` | **Date**: 2026-08-21 | **Spec**: [../spec.md](../spec.md) (공동 정본 — 상위 디렉터리, 스텁 금지 규칙은 `docs/00` §2)
 
 **Input**: Feature specification from `/specs/005-booth-studio-layout/spec.md`
 
-> **C-04 진행 상태**: 콘텐츠 미연결 오브젝트의 공개 차단 여부(spec.md:175)는 기획 승인 대기 중이다.
-> 이 plan은 **BE 구현 기본값과 같은 방향("막지 않고 경고")으로 PROVISIONAL 확정하고 진행**한다(사용자 결정, 2026-08-21).
-> **판정 주체는 서버다** — FR-016에 따라 BE가 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하고, C-04 확정은 이 항목을 두 리스트 사이에서 옮기는 것뿐이다.
-> 따라서 FE는 서버 응답의 `warnings`를 렌더링하는 구조로 만들고 자체 사전 검증은 UX 보조로만 둔다 — 기획이 뒤집혀도 서버가 `errors`로 옮기면 FE는 코드 변경 없이 따라간다. research.md R-01 참조.
-> spec 전체의 "확정"은 아니며 PROVISIONAL 항목은 `docs/26`에 등록한다(헌법 30조).
+> **C-04 확정 (2026-08-21, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45))**: 콘텐츠 미연결 오브젝트는 **막지 않고 경고**한다 — 리드·BE 승인 완료, spec 전체 **확정** 상태.
+> **판정 주체는 서버다** — FR-016에 따라 BE가 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하고, 미연결은 `warnings`다.
+> FE는 서버 응답의 두 리스트를 렌더링하는 구조로 만들고 자체 사전 검증은 UX 보조로만 둔다 — 향후 재논의로 뒤집혀도 서버가 `errors`로 옮기면 FE는 코드 변경 없이 따라간다. research.md R-01 참조.
 
 > **BE 구현 완료 반영**: [Issue #36](https://github.com/kanghyunsoon/ssafesta/issues/36)에서 BE(`strdeok`)가 spec 005를 이미 구현·머지했다(`back` PR #27, 테스트 191개, 실서버 22단계 수동 검증).
 > 이 plan은 그 실구현 계약(`expectedRevision`/`version`/`schemaVersion` 3분리, 오류 봉투 5필드, 미지 필드 거부)을 기준으로 작성한다 — 초안 단계의 잠정 계약이 아니라 **이미 배포된 API**에 맞춘다.
