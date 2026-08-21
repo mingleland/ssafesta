@@ -18,6 +18,16 @@ const KNOWN_DRAFT_FIELDS = new Set(['expectedRevision', 'schemaVersion', 'templa
 const KNOWN_OBJECT_FIELDS = new Set(['objectId', 'type', 'position', 'rotationY', 'configId', 'assetCode']);
 const MAX_OBJECTS = 12;
 
+// 임대 만료 UX(T018) 수동 검증용 sentinel — 이 boothId는 항상 BOOTH_LEASE_EXPIRED를 낸다.
+// 실 BE에는 없는 값이라 real api.ts에는 이 분기가 없다.
+const LEASE_EXPIRED_BOOTH_ID = 999;
+
+function assertLeaseActive(boothId: number): void {
+  if (boothId === LEASE_EXPIRED_BOOTH_ID) {
+    throw apiError('BOOTH_LEASE_EXPIRED', '임대가 만료되어 편집할 수 없습니다.');
+  }
+}
+
 function apiError(code: string, message: string, errors: ApiErrorDetail[] = []): ApiError {
   return { code, message, requestId: `mock_${Date.now()}`, errors, warnings: [] };
 }
@@ -57,6 +67,7 @@ function persistDrafts(): void {
 const drafts = loadDrafts();
 
 export async function getDraft(boothId: number): Promise<DraftGetResponse | null> {
+  assertLeaseActive(boothId);
   const stored = drafts.get(boothId);
   if (!stored) return null;
   const { revision, schemaVersion, template, objects, updatedAt, updatedByUserId, publishedVersion } = stored;
@@ -67,6 +78,7 @@ export async function getDraft(boothId: number): Promise<DraftGetResponse | null
 // "계약에 없는 필드" 검사는 JS 런타임에선 타입이 지워지므로, 원시 키 목록을 그대로 조회해
 // quickstart §7(devtools로 계약 외 필드를 끼워 보내면 거부되는지 확인)을 재현한다.
 export async function putDraft(boothId: number, body: DraftPutRequest): Promise<DraftPutResponse> {
+  assertLeaseActive(boothId);
   const rawTopKeys = Object.keys(body as unknown as Record<string, unknown>);
   const unknownTop = rawTopKeys.filter((k) => !KNOWN_DRAFT_FIELDS.has(k));
   if (unknownTop.length > 0) {
@@ -137,6 +149,7 @@ export async function putDraft(boothId: number, body: DraftPutRequest): Promise<
 }
 
 export async function publish(boothId: number): Promise<PublishResponse> {
+  assertLeaseActive(boothId);
   const stored = drafts.get(boothId);
   if (!stored) {
     throw apiError('BOOTH_NOT_FOUND', '작업본이 없습니다.');

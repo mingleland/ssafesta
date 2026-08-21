@@ -18,6 +18,12 @@ import { precheckErrors, precheckWarnings } from '../../features/studio/lib/vali
 // VITE_USE_MOCK=true면 실 BE 없이 메모리 mock으로 개발한다 (FE/research.md R-09)
 const layoutApi = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
 
+// draftQuery·save·publish 세 경로 어디서든 BOOTH_LEASE_EXPIRED가 뜰 수 있다(만료된 부스에 진입·저장·공개 시도).
+// 편집을 전부 막는 게 목적이라 한 곳에서 판정한다(T018).
+function isLeaseExpired(...errors: unknown[]): boolean {
+  return errors.some((e) => isApiError(e) && e.code === 'BOOTH_LEASE_EXPIRED');
+}
+
 export function StudioPage() {
   const { boothId } = useParams<{ boothId: string }>();
   const boothIdNum = Number(boothId);
@@ -54,7 +60,20 @@ export function StudioPage() {
     });
   }, [draftQuery.data, boothIdNum]);
 
+  // 저장 실패(revision 충돌 제외) 시 첫 오류 대상 오브젝트를 자동 선택해 PropertiesPanel에서 바로 보이게 한다(T018)
+  useEffect(() => {
+    const err = saveMutation.error;
+    if (isApiError(err) && err.code !== 'LAYOUT_REVISION_CONFLICT') {
+      const target = err.errors.find((d) => d.objectId !== undefined);
+      if (target?.objectId) dispatch({ type: 'SELECT_OBJECT', objectId: target.objectId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveMutation.error]);
+
   if (draftQuery.isLoading) return <div>불러오는 중...</div>;
+  if (isLeaseExpired(draftQuery.error)) {
+    return <div>임대가 만료되어 이 부스를 편집할 수 없습니다.</div>;
+  }
   if (draftQuery.isError) return <div>작업본을 불러오지 못했습니다.</div>;
 
   const template = templatesQuery.data?.templates.find((t) => t.template === state.template);
@@ -79,6 +98,13 @@ export function StudioPage() {
   const publishWarnings = publishMutation.data?.warnings ?? [];
   const showPublishResult = publishMutation.isSuccess || publishMutation.isError;
 
+  // LAYOUT_VALIDATION_FAILED 등 conflict가 아닌 저장 실패의 상세 — conflict는 위에서 별도 안내로 처리한다(T018)
+  const saveError = saveMutation.error;
+  const saveErrorDetails: ApiErrorDetail[] =
+    isApiError(saveError) && saveError.code !== 'LAYOUT_REVISION_CONFLICT' ? saveError.errors : [];
+
+  const leaseExpired = isLeaseExpired(saveError, publishError);
+
   // 공개 요청 전 미리보기 — 서버 응답이 오면(showPublishResult) 그 값으로 교체된다(T016)
   const preErrors = precheckErrors(state.objects, maxObjects);
   const preWarnings = precheckWarnings(state.objects);
@@ -91,6 +117,13 @@ export function StudioPage() {
         <p>
           다른 편집자가 저장했습니다. <button type="button" onClick={handleReload}>새로고침</button>
         </p>
+      )}
+      {leaseExpired && <p>임대가 만료되어 더 이상 편집할 수 없습니다.</p>}
+      {saveErrorDetails.length > 0 && (
+        <div>
+          <p>저장하지 못했습니다</p>
+          <DetailList items={saveErrorDetails} />
+        </div>
       )}
       {state.publishedVersion !== null && state.publishedVersion !== undefined
         ? <p>공개 회차: {state.publishedVersion}</p>
@@ -122,7 +155,7 @@ export function StudioPage() {
         />
       )}
 
-      <button type="button" onClick={handleSave} disabled={!state.dirty}>
+      <button type="button" onClick={handleSave} disabled={!state.dirty || leaseExpired}>
         저장
       </button>
 
@@ -137,7 +170,7 @@ export function StudioPage() {
       <button
         type="button"
         onClick={() => publishMutation.mutate(boothIdNum)}
-        disabled={publishMutation.isPending || preErrors.length > 0}
+        disabled={publishMutation.isPending || preErrors.length > 0 || leaseExpired}
       >
         공개
       </button>
