@@ -129,8 +129,12 @@
 - [X] T047 **3파트 통보** ⚠️ **사람이 해야 함** — ① 오류 봉투가 005부터 실제 동작(Breaking 아님, 문서와의 정합 회복) ② `PUT /facade` 신설 ③ `schemaVersion`과 `version`을 갈라 쓰기로 한 것(research R-10)과 spec 005 §Layout JSON 예시의 `"version": 2` 정정 제안. AI·FE·Unity 파트에 전달하고 `docs/26`에 결과 기록 (헌법 24조) → **2026-08-21 GitHub 이슈로 통보 완료**: ①②는 #17, 경계·서버 검증은 #19, ③과 잔여 항목은 #36, avatar 필드명은 #24. `docs/26` 결과 기록은 develop 문서 PR에서
 - [X] T048 [quickstart.md](quickstart.md) 수동 검증 **수행 완료 (2026-08-21)** — 로컬 Spring 실서버에 curl로 18단계 + 만료 4단계를 전부 실행했다. 로컬 DB v5→v9 마이그레이션·`ddl-auto: validate` 통과, 좌표 원문 보존, 공개 포인터가 걸린 상태의 회원 탈퇴까지 확인. **최초 저장 경합 결함을 여기서 잡았다 (T-114)**
 - [X] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
-- [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가
+- [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가 *(→ 높이는 #19 셸 실측으로 **2.72**로 갱신 — T052)*
 - [X] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신
+- [X] T052 **셸 유효 높이 반영** (#19 ②, 2026-08-21) — `MAX_HEIGHT` 6 → **2.72** (벽 패널 실측 2.725의 내림). 관련 테스트·문서 갱신
+- [X] T053 **실물 영역 검증** (#19 ③) — 타입 10종 실측 bounds를 `LayoutObjectType`에 계약값으로 탑재, 원점 기준 코너 회전 후 AABB 재계산(`LayoutGeometry`), error `AREA_OUT_OF_BOUNDS` (Draft·공개 모두). 경계 딱 맞춤·회전 float 잡음 허용 테스트 포함
+- [X] T054 **통행 판정** (#19 ⑤) — `LayoutPassageChecker` 신설: 0.05m 래스터 120×120, 0.22m 유클리드 침식, +z flood fill(4방향), 관람 띠 0.7m 도달<50% → warning `FRONT_BLOCKED`, 고립 ≥1㎡ → warning `ISOLATED_AREA`. 공개 시점만, 공개는 막지 않음
+- [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과 — 구현은 back PR #50으로 반입 완료
 
 ---
 
