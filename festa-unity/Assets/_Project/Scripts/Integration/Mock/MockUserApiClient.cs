@@ -20,10 +20,9 @@ namespace Festa.Integration
         public async Task<bool> UpdateMyAvatarAsync(string encodedAppearance)
         {
             await Awaitable.WaitForSecondsAsync(0.05f);
-            // 실제 구현: PUT /api/v1/users/me/avatar { "avatar": "..." }
-            // 메서드·필드명은 specs/013-avatar-customization/contracts/avatar-profile-api.md 기준이다.
-            // 아래 UserProfileDto.avatarCode 는 GET /users/me 응답 필드로, BE 가 프로필 응답에
-            // 외형을 함께 담을지 확정되면 그때 이름을 맞춘다 (Issue #24).
+            // 실제 구현: PUT /api/v1/users/me/avatar { "avatarCode": "..." } (#24 확정)
+            // 메서드는 spec 계약서 기준(PUT), 필드명은 #24 에서 avatarCode 로 확정됐다 —
+            // DB avatar_code·JPA avatarCode·Unity AvatarCode 와 같은 이름이다.
             Debug.Log($"[MockUserApi] 아바타 저장(모의): {encodedAppearance}");
             return true;
         }

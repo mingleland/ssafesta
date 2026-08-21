@@ -61,7 +61,9 @@ fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 정밀 RGB 값>|w=<36개
 
 > **계약 권위는 `specs/013-avatar-customization/contracts/avatar-profile-api.md` 다.**
 > 이 문서가 `PATCH` + 필드 `avatarCode` 로 적고 있었으나 spec 계약서와 `docs/sdd/parts/BE.md` 는 둘 다
-> **`PUT` + 필드 `avatar`** 다. spec 을 기준으로 맞췄다 (2026-08-21, Issue #24).
+> **`PUT`** 이다. spec 을 기준으로 맞췄다 (2026-08-21, Issue #24). 필드명은 이후 #24 에서
+> **`avatarCode` 로 확정**됐다(BE 통보) — DB `avatar_code`·JPA `avatarCode`·Unity `AvatarCode` 세 층이
+> 이미 같은 이름이라 와이어만 `avatar` 로 다르게 둘 이유가 없다는 근거다. spec 계약서 3곳은 BE 가 고친다.
 >
 > **길이** — spec 은 컬럼을 `TEXT`(넉넉한 가변 문자열)로 규정하고 `VARCHAR(32)` 를 명시적으로 금지한다.
 > `BE.md` 는 검증 상한을 500자로 적고 있는데 **현재 `fa` 형식에는 충분하다** — `Encode()` 의 `fa` 분기를
@@ -74,16 +76,16 @@ fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 정밀 RGB 값>|w=<36개
 **조회** — 전용 엔드포인트가 기본. 기존 내 정보 조회(`GET /users/me`)에 `avatar` 필드를 포함시키는 형태도 허용된다.
 ```http
 GET /api/v1/users/me/avatar
-→ 200 { "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
+→ 200 { "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
 ```
 
 **저장**
 ```http
 PUT /api/v1/users/me/avatar
 Content-Type: application/json
-{ "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
+{ "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
 
-→ 200 { "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
+→ 200 { "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
 → 400 잘못된 형식 (길이 초과, 허용되지 않은 포맷)
 → 401 미인증
 ```
