@@ -15,3 +15,9 @@ export const BOOTH_SIZE_FALLBACK = { width: 6, depth: 6, height: 2.72 } as const
 
 // 오브젝트 상한 기본값 — 정본은 §9 응답의 maxObjects. 헌법 22조.
 export const MAX_OBJECTS_FALLBACK = 12;
+
+// configId 유효 범위 — signed Int32의 양수만(계약 §1, #34에서 DB CHECK(config_id > 0)로 강제).
+// 0을 금지하는 이유가 따로 있다: Unity JsonUtility가 int 필드 부재를 0으로 읽어 "미연결"로 판정하므로
+// 0을 유효 ID로 쓰면 연결된 오브젝트가 조용히 미연결로 렌더링된다(#45 전제).
+export const CONFIG_ID_MIN = 1;
+export const CONFIG_ID_MAX = 2_147_483_647;

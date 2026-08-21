@@ -2,9 +2,10 @@
 // 좌표는 EditorCanvas 드래그로도 바뀌지만, 정확한 숫자 입력·configId 연결은 여기서만 가능하다
 // 출처: specs/005-booth-studio-layout/FE/tasks.md T014, data-model.md ObjectType 판정표
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LayoutObject } from '../../../entities/layout/types';
 import { OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
 import { clampToBooth, normalizeRotation } from '../lib/coords';
 
 interface Props {
@@ -26,6 +27,17 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
   const [zText, setZText] = useState(String(object.position.z));
   const [configText, setConfigText] = useState(object.configId !== undefined ? String(object.configId) : '');
 
+  // 위치는 이 패널 밖에서도 바뀐다 — 캔버스 드래그(MOVE_OBJECT)와 다른 오브젝트 선택.
+  // 로컬 문자열 상태만 두면 그 변화를 못 따라가 화면 숫자와 실제 저장값이 어긋난다(드래그로 옮겨도 0으로 남음).
+  useEffect(() => {
+    setXText(String(object.position.x));
+    setZText(String(object.position.z));
+  }, [object.objectId, object.position.x, object.position.z]);
+
+  useEffect(() => {
+    setConfigText(object.configId !== undefined ? String(object.configId) : '');
+  }, [object.objectId, object.configId]);
+
   function commitPosition(nextXText: string, nextZText: string) {
     const x = Number(nextXText);
     const z = Number(nextZText);
@@ -34,13 +46,15 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
     onMove(clamped.x, clamped.z);
   }
 
+  // configId는 signed Int32의 양수만 유효하다(계약 §1). 특히 0은 Unity가 "필드 부재"와 구별하지 못해
+  // 미연결로 렌더링하고 서버 CHECK(config_id > 0)에도 걸리므로, 입력단에서 막아 상태에 들어가지 않게 한다.
   function commitConfigId(text: string) {
     if (text.trim() === '') {
       onLinkContent(undefined);
       return;
     }
     const n = Number(text);
-    if (!Number.isFinite(n)) return;
+    if (!Number.isInteger(n) || n < CONFIG_ID_MIN || n > CONFIG_ID_MAX) return;
     onLinkContent(n);
   }
 
@@ -92,6 +106,9 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
           연결 콘텐츠 ID
           <input
             type="number"
+            min={CONFIG_ID_MIN}
+            max={CONFIG_ID_MAX}
+            step={1}
             value={configText}
             onChange={(e) => setConfigText(e.target.value)}
             onBlur={() => commitConfigId(configText)}
