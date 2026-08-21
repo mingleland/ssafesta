@@ -19,7 +19,7 @@
 | **007** | ai-agent-document | AI-01, AI-02 | AI + BE + FE | 001, 004 | Document Pipeline + 상태 머신 (doc 13 §5~6) |
 | **008** | ai-conversation-rag | AI-03~05 | AI + FE | 007 | 격리 Critical Test 포함. SSE + React 오버레이(ADR 결정4) |
 | **009** | project-exhibition | PROJECT-01~04 | BE + FE + Unity | 004, 005 | RUNTIME-05 중 Video/Panel 상호작용 일부 포함 |
-| **013a** | avatar-customization | WORLD-04 | Unity + BE | 001, 002 | **P0 승격** — Rukha93 모듈 파츠·정식 Unity `CharacterLobby` UI·실시간 동기화 완료. 2026-08-16 React 교체 요구 폐기. 신규 잔여: Spring 저장(`PATCH /users/me/avatar`), 재접속 복원, 멀티클라이언트 E2E |
+| **013a** | avatar-customization | WORLD-04 | Unity(UI) + FE(호스트·인증) + BE(저장) | 001, 002 | **P0 승격 (2026-08-12 팀 결정)** — Sidekick 모듈 파츠 커스텀 + 실시간 동기화는 POC 완료(소급 spec). **2026-08-16 결정: 완성된 Unity `CharacterLobby`를 정식 커스터마이징 화면으로 쓰고 React 오버레이 교체 요구는 폐기** — `FE.md` 013a 에 반영 완료(#26). 신규 잔여: Spring 저장(`PUT /users/me/avatar`, 인코딩 문자열 `fa`), 재접속 복원, 멀티클라이언트 E2E |
 | **016** | booth-laptop-homepage | RUNTIME-06, PROJECT-05 | FE + Unity + BE | 004, 005 계약 | **신설 (2026-08-12)** — Studio에서 홈페이지 URL 등록 → 부스 노트북 오브젝트 클릭 → React 오버레이에서 해당 페이지 열람·웹서핑. Unity는 상호작용 트리거만 (Article V). iframe 차단(X-Frame-Options) 시 새 탭 fallback 필수 |
 
 **1차 MVP 완료 판정** = doc 02 §5.1의 10단계 연속 흐름 (001~009 전부) + 캐릭터 커스텀(013a) + 노트북 홈페이지(016)

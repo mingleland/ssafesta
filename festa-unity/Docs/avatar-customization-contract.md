@@ -59,25 +59,37 @@ fa|g=1|i=<8개 파츠 ID>|p=<9개 팔레트 ID>|q=<9개 정밀 RGB 값>|w=<36개
 
 ### 3-2. API 2개
 
-**조회** — 기존 내 정보 조회에 포함하면 됨
+> **계약 권위는 `specs/013-avatar-customization/contracts/avatar-profile-api.md` 다.**
+> 이 문서가 `PATCH` + 필드 `avatarCode` 로 적고 있었으나 spec 계약서와 `docs/sdd/parts/BE.md` 는 둘 다
+> **`PUT` + 필드 `avatar`** 다. spec 을 기준으로 맞췄다 (2026-08-21, Issue #24).
+>
+> **길이** — spec 은 컬럼을 `TEXT`(넉넉한 가변 문자열)로 규정하고 `VARCHAR(32)` 를 명시적으로 금지한다.
+> `BE.md` 는 검증 상한을 500자로 적고 있는데 **현재 `fa` 형식에는 충분하다** — `Encode()` 의 `fa` 분기를
+> 재현해 재 보면 기본값 138자, 색 전부 지정 + tint 406자, item ID 4자리여도 414자다. 필드 수가
+> 고정(`g` 1 + `i` 8 + `p` 9 + `q` 9 + `w` 36)이라 길이가 거의 변하지 않는다.
+> 단 **여유는 86자(17%)뿐**이라 의상 색 슬롯(`w`, 현재 36개)이 12개만 늘어도 500을 넘는다.
+> `AvatarAppearance.MaxEncodedLength = 3800` 은 `fa` 가 아니라 **구 `rt` 모드**(Sidekick 파츠 이름
+> ~25자 × 16종) 때문에 잡은 값이고, `rt` 는 읽기 호환만 유지한다.
+
+**조회** — 전용 엔드포인트가 기본. 기존 내 정보 조회(`GET /users/me`)에 `avatar` 필드를 포함시키는 형태도 허용된다.
 ```http
-GET /api/v1/users/me
-→ { "userId": 12, "nickname": "홍길동", "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
+GET /api/v1/users/me/avatar
+→ 200 { "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
 ```
 
 **저장**
 ```http
-PATCH /api/v1/users/me/avatar
+PUT /api/v1/users/me/avatar
 Content-Type: application/json
-{ "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
+{ "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
 
-→ 200 { "avatarCode": "fa|g=1|i=...|p=...|q=...|w=..." }
-→ 400 잘못된 형식 (3800자 초과, 허용되지 않은 포맷)
+→ 200 { "avatar": "fa|g=1|i=...|p=...|q=...|w=..." }
+→ 400 잘못된 형식 (길이 초과, 허용되지 않은 포맷)
 → 401 미인증
 ```
 
 검증 권장 사항:
-- UTF-8 기준 길이 ≤ 3800, 첫 세그먼트는 신규 저장 시 `fa`
+- 길이 상한과 허용 문자셋만 검증한다. **문자열 내용을 파싱하지 않는다** — 항목 해석은 클라이언트 책임이다 (spec 계약서 규정). 첫 세그먼트는 신규 저장 시 `fa`
 - `|`, `=`, `,`, `-`, 영문·숫자와 6자리 HEX로 구성된 세그먼트 구조를 검증한다. 알 수 없는 세그먼트는 forward compatibility를 위해 허용한다.
 - Unity가 모르는 파츠 ID는 클라이언트가 기본 파츠로 폴백하되, 서버는 길이 초과나 구조 오류를 명확한 400 응답으로 거부한다.
 - (P1) 상점에서 구매하지 않은 아이템 차단이 필요해지면 같은 저장 경계에서 검증한다.
