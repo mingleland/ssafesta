@@ -36,7 +36,7 @@ namespace Festa.World
         Color[] _baseColors;
         Vector3[] _bobOrigins;
 
-        void Start()
+        void Awake()
         {
             _mpb = new MaterialPropertyBlock();
             _baseColors = new Color[_twinkleRenderers?.Length ?? 0];
@@ -52,6 +52,7 @@ namespace Festa.World
 
         void Update()
         {
+            if (_mpb == null || _baseColors == null) return;   // 초기화 전 프레임 방어
             float t = Time.time;
 
             if (_twinkleRenderers != null)

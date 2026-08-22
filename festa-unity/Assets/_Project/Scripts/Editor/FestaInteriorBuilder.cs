@@ -5,20 +5,28 @@ using UnityEngine;
 namespace Festa.EditorTools
 {
     /// <summary>
-    /// 내부 부스 공간 12실 생성기. 외부 FestivalSlot_XX 와 번호(boothId 1~12)로 1:1 연결.
+    /// 내부 부스 공간 12실 생성기 v2. 외부 FestivalSlot_XX 와 번호(boothId 1~12)로 1:1 연결.
     ///
-    /// - 방은 밀폐 상자(바닥·벽4·천장)로 40 m 간격 격자 배치 — 서로 안 보인다.
-    /// - 출입은 BoothPortal 쌍: 외부 부스 앞 → 내부 스폰 / 내부 출구 패드 → 외부 복귀점.
-    /// - NetworkObject 없음 (정적 로컬 오브젝트 원칙). 백엔드 연동 시 boothId 를 쓴다.
-    /// - 위치는 플레이 가능 영역(x -1225~30)에서 멀리: x 700~1900, z 0~800.
-    ///   카메라 far 2800 이라 축제에서 안 보이고, 방 안에서는 밀폐라 밖이 안 보인다.
+    /// - 방 32×32 m 밀폐 상자, 40 m 격자 (x 700~1900) — 서로 안 보인다.
+    /// - 방마다 **BoothSlot_{id} 앵커 (스케일 20)** + ExpoKit BoothShell 기본 틀(트러스 제외)
+    ///   + BoothRuntime — Published Layout 을 실제 통신 경로로 로드해 오브젝트를 Local Spawn 한다.
+    ///
+    /// 규격 계약 (FE·BE 와 공유):
+    ///   레이아웃 좌표는 부스 로컬 **미터** 그대로다. 앵커 스케일 20 = "부스 로컬 1 m 를
+    ///   월드 2 m 로" 그리는 표현 배율일 뿐이라, FE 스튜디오의 그리드·오브젝트 상대 규격은
+    ///   기존(스케일 10, T-153)과 완전히 동일하게 유지된다. 데이터 계약 변경 없음.
+    ///
+    /// NetworkObject 없음 (Booth 정적 오브젝트 Local Spawn 원칙).
     /// </summary>
     public static class FestaInteriorBuilder
     {
         const string MatDir = "Assets/_Project/Art/World/Materials/";
-        const float RoomHalf = 90f;    // 바닥 반변 (18 m 방)
-        const float WallH = 50f;       // 5 m
+        const string ShellPrefabPath = "Assets/_Project/Prefabs/Booth/BoothShell.prefab";
+        const string RegistryPath = "Assets/_Project/ScriptableObjects/BoothObjectRegistry.asset";
+        const float RoomHalf = 160f;   // 바닥 반변 (32 m 방)
+        const float WallH = 70f;       // 7 m — 2배 셸(5.4 m)이 여유 있게 들어간다
         const float Pitch = 400f;      // 방 간격 40 m
+        const float AnchorScale = 20f; // 부스 로컬 1 m = 월드 2 m (기존 10 의 2배)
 
         [MenuItem("Festa/World/내부 부스 공간 재생성")]
         public static void Rebuild()
@@ -29,14 +37,24 @@ namespace Festa.EditorTools
             var slots = fest != null ? fest.transform.Find("Festival_Slots") : null;
             if (slots == null) { Debug.LogError("[Interior] Festival_Slots 없음"); return; }
 
+            var shellPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ShellPrefabPath);
+            var registry = AssetDatabase.LoadAssetAtPath<ScriptableObject>(RegistryPath);
+            if (shellPrefab == null || registry == null)
+            { Debug.LogError($"[Interior] 셸({shellPrefab != null}) 또는 레지스트리({registry != null}) 없음"); return; }
+
+            // 야외에 떠 있던 구 BoothSlot_7 은 제거한다 — 부스 런타임의 거처가 내부 공간으로
+            // 옮겨졌고, 같은 boothId 런타임이 둘이면 콘텐츠·상호작용이 이중으로 생긴다.
+            var legacy = GameObject.Find("/BoothSlot_7");
+            if (legacy != null) { Object.DestroyImmediate(legacy); Debug.Log("[Interior] 야외 구 BoothSlot_7 제거 (내부로 이관)"); }
+
             var oldRoot = GameObject.Find("/@BoothInteriors");
             if (oldRoot != null) Object.DestroyImmediate(oldRoot);
             var root = new GameObject("@BoothInteriors");
 
             var wallMat = Mat("InteriorWall", new Color(0.78f, 0.76f, 0.72f), 0.1f);
-            var floorMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "CorridorMid.mat");   // 목재 재사용
-            var padMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FestivalLamp.mat");    // 발광 패드 재사용
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");                    // 런타임 TextMesh 폰트 명시 (내장 리소스)
+            var floorMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "CorridorMid.mat");
+            var padMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FestivalLamp.mat");
+            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             var extGroup = fest.transform.Find("Festival_Portals");
             if (extGroup != null) Object.DestroyImmediate(extGroup.gameObject);
@@ -49,31 +67,29 @@ namespace Festa.EditorTools
                 i++;
                 int col = (i - 1) % 4, row = (i - 1) / 4;
                 var center = new Vector3(700f + col * Pitch, 0f, row * Pitch);
-                var room = BuildRoom(root.transform, center, i, wallMat, floorMat, font);
+                var room = BuildRoom(root.transform, center, i, wallMat, floorMat, font, shellPrefab, registry);
 
-                // 부스 정면 = 거리(z 145) 쪽
                 var front = slot.position.z > 145f ? Vector3.back : Vector3.forward;
                 var doorPos = slot.position + front * 42f;
 
-                // 외부 포털 (부스 앞) → 내부 스폰
                 var interiorSpawn = room.Find("SpawnPoint");
                 MakePortal(ext.transform, $"Portal_Ext_{i:D2}", doorPos, i,
                            interiorSpawn, $"{i}번 부스 입장", 28f, padMat);
 
-                // 내부 출구 포털 → 외부 복귀점 (문 앞보다 거리 쪽으로 한 걸음)
                 var returnPoint = new GameObject($"ReturnPoint_{i:D2}");
                 returnPoint.transform.SetParent(ext.transform, false);
                 returnPoint.transform.position = doorPos + front * 12f + Vector3.up * 1f;
-                var exitPos = center + new Vector3(0f, 0f, 62f);
+                var exitPos = center + new Vector3(0f, 0f, RoomHalf - 28f);
                 MakePortal(room, $"Portal_Int_{i:D2}", exitPos, i,
                            returnPoint.transform, "축제로 나가기", 26f, padMat);
             }
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(root.scene);
-            Debug.Log($"[Interior] 방 {i}실 + 포털 {i * 2}개 생성 — 씬 저장 필요");
+            Debug.Log($"[Interior] 방 {i}실(32 m) + 부스 앵커(스케일 {AnchorScale}) + 포털 {i * 2}개 — 씬 저장 필요");
         }
 
-        static Transform BuildRoom(Transform parent, Vector3 c, int id, Material wall, Material floor, Font font)
+        static Transform BuildRoom(Transform parent, Vector3 c, int id, Material wall, Material floor,
+                                   Font font, GameObject shellPrefab, ScriptableObject registry)
         {
             var room = new GameObject($"Interior_{id:D2}");
             room.transform.SetParent(parent, false);
@@ -88,7 +104,6 @@ namespace Festa.EditorTools
                 b.transform.localScale = size;
                 var r = b.GetComponent<Renderer>();
                 r.sharedMaterial = m;
-                // 천장·벽이 달빛을 막아야 방이 자체 조명만 받는다
                 r.shadowCastingMode = castShadow
                     ? UnityEngine.Rendering.ShadowCastingMode.On
                     : UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -104,32 +119,60 @@ namespace Festa.EditorTools
 
             var light = new GameObject("RoomLight");
             light.transform.SetParent(room.transform, false);
-            light.transform.localPosition = new Vector3(0, WallH - 6f, 0);
+            light.transform.localPosition = new Vector3(0, WallH - 8f, 0);
             var l = light.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = new Color(1f, 0.93f, 0.82f);
-            l.intensity = 420f;
-            l.range = 260f;
+            l.intensity = 520f;
+            l.range = 420f;
             l.shadows = LightShadows.None;
 
-            // 부스 번호 표지
             var signGo = new GameObject("Sign");
             signGo.transform.SetParent(room.transform, false);
-            signGo.transform.localPosition = new Vector3(0, 32f, RoomHalf - 5f);
+            signGo.transform.localPosition = new Vector3(0, WallH - 20f, RoomHalf - 5f);
             var tm = signGo.AddComponent<TextMesh>();
             tm.text = $"BOOTH {id:D2}";
-            tm.font = font;
+            tm.font = font;   // 런타임 TextMesh 폰트 명시 (T-158)
             tm.fontSize = 64;
-            tm.characterSize = 1.6f;
+            tm.characterSize = 2.4f;
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = new Color(0.25f, 0.2f, 0.15f);
             var tr = signGo.GetComponent<MeshRenderer>();
             tr.sharedMaterial = font.material;
             tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
+            // ── 부스 앵커: FE 레이아웃 미터 좌표의 원점. 스케일 20 = 2배 표현 ──
+            var anchor = new GameObject($"BoothSlot_{id}");
+            anchor.transform.SetParent(room.transform, false);
+            anchor.transform.localPosition = Vector3.zero;
+            anchor.transform.localScale = Vector3.one * AnchorScale;
+
+            // ExpoKit 셸 = 수정 가능한 기본 틀. 트러스(철근)는 제외 — 적용 까다로움.
+            var shell = (GameObject)PrefabUtility.InstantiatePrefab(shellPrefab);
+            shell.name = "BoothShell";   // BoothRuntime 의 셸 자동 탐색 이름
+            shell.transform.SetParent(anchor.transform, false);
+            shell.transform.localPosition = Vector3.zero;
+            shell.transform.localScale = Vector3.one;
+            foreach (var t in shell.GetComponentsInChildren<Transform>(true).ToArray())
+                if (t != null && t.name.StartsWith("Truss"))
+                    Object.DestroyImmediate(t.gameObject);
+
+            // BoothRuntime — 실제 통신 경로(ApiServices→클라이언트→파서→팩토리)로
+            // Published Layout 을 로드한다. Mock 모드에서는 모든 번호가 내장 레이아웃을,
+            // Spring 전환 시에는 번호별 실데이터를 받는다.
+            var runtimeType = System.AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return new System.Type[0]; } })
+                .First(t => t.FullName == "Festa.Booth.BoothRuntime");
+            var runtime = anchor.AddComponent(runtimeType);
+            var so = new SerializedObject(runtime);
+            so.FindProperty("_boothId").intValue = id;
+            so.FindProperty("_registry").objectReferenceValue = registry;
+            so.FindProperty("_loadOnStart").boolValue = true;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
             var spawn = new GameObject("SpawnPoint");
             spawn.transform.SetParent(room.transform, false);
-            spawn.transform.localPosition = new Vector3(0, 1.2f, -40f);
+            spawn.transform.localPosition = new Vector3(0, 1.2f, -(RoomHalf - 40f));
             return room.transform;
         }
 
@@ -145,7 +188,6 @@ namespace Festa.EditorTools
             portal.promptText = prompt;
             portal.interactRadius = radius;
 
-            // 상호작용 지점이 보이도록 발광 패드 (콜라이더 제거 — 통행 방해 금지)
             var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             Object.DestroyImmediate(pad.GetComponent<Collider>());
             pad.name = "Pad";
