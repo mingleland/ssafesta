@@ -128,6 +128,28 @@ namespace Festa.Network
         /// CharacterController 는 켜진 상태의 transform 대입을 무시하므로 껐다 켠다.
         /// NetworkTransform.Teleport 로 원격에도 보간 없이 즉시 반영한다.
         /// </summary>
+        /// <summary>
+        /// 포털 등 게임플레이 텔레포트. 스폰 배치(PlaceAt)와 같은 절차 —
+        /// CC 끔 → NetworkTransform.Teleport → Physics.SyncTransforms → CC 켬 (T-177).
+        /// </summary>
+        public void TeleportTo(Vector3 pos)
+        {
+            bool wasEnabled = _controller != null && _controller.enabled;
+            if (wasEnabled) _controller.enabled = false;
+
+            if (_networkTransform != null && _networkTransform.CanCommitToTransform)
+                _networkTransform.Teleport(pos, transform.rotation, transform.localScale);
+            else
+                transform.position = pos;
+            Physics.SyncTransforms();
+
+            if (wasEnabled) _controller.enabled = true;
+            _verticalSpeed = 0f;
+            _airborne = false;
+            _jumped = false;
+            _jumpPending = false;
+        }
+
         void PlaceAt(Vector3 pos)
         {
             _spawnPlaced = true;

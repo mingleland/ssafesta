@@ -93,6 +93,20 @@ namespace Festa.World
             _yaw = transform.eulerAngles.y;
         }
 
+        /// <summary>
+        /// 텔레포트 직후 카메라를 플레이어 뒤로 즉시 스냅한다. 보간에 맡기면
+        /// 카메라가 맵을 가로질러 날아오며 오클루전이 셀마다 번쩍인다.
+        /// </summary>
+        public void SnapBehind()
+        {
+            if (_cam == null) return;
+            var lookTarget = transform.position + Vector3.up * _lookHeight;
+            var dir = Quaternion.Euler(_pitch, _yaw, 0f) * Vector3.back;
+            _resolvedDistance = _distance;
+            _cam.transform.position = lookTarget + dir * _distance;
+            _cam.transform.LookAt(lookTarget);
+        }
+
         void LateUpdate()
         {
             if (_cam == null)

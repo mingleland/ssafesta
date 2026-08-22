@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 6286039337160174439}
   - component: {fileID: 2574389333232708985}
   - component: {fileID: 4477108905412324781}
+  - component: {fileID: 8037092520390793218}
   m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -107,7 +108,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2993748127
+  GlobalObjectIdHash: 1901812825
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -307,3 +308,17 @@ CharacterController:
   m_SkinWidth: 0.176
   m_MinMoveDistance: 0
   m_Center: {x: 0, y: 6.75, z: 0}
+--- !u!114 &8037092520390793218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4e9c30157794484459c06ff41dc9e0e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  _cooldown: 0.6
