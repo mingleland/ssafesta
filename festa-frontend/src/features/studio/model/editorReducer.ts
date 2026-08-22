@@ -63,7 +63,11 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         dirty: false,
         saveStatus: 'idle',
         conflict: false,
-        selectedObjectId: null,
+        // 저장 성공→refetch나 충돌 재로드로 새 objects가 들어와도 선택하던 오브젝트가
+        // 여전히 있으면 선택을 유지한다 — 매번 무조건 풀면 저장할 때마다 PropertiesPanel이 닫힌다.
+        selectedObjectId: action.objects.some((o) => o.objectId === state.selectedObjectId)
+          ? state.selectedObjectId
+          : null,
       };
 
     case 'ADD_OBJECT': {

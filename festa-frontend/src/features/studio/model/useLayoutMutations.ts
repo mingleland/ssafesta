@@ -4,7 +4,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { layoutApi } from '../../../entities/layout/api.select';
-import type { LayoutObject } from '../../../entities/layout/types';
+import type { DraftGetResponse, LayoutObject } from '../../../entities/layout/types';
 import type { EditorAction } from './editorReducer';
 
 interface SaveArgs {
@@ -22,10 +22,22 @@ export function useSaveDraft(dispatch: (action: EditorAction) => void) {
     onMutate: () => dispatch({ type: 'SAVE_START' }),
     onSuccess: (result, variables) => {
       dispatch({ type: 'SAVE_SUCCESS', revision: result.revision });
-      // 성공했을 때만 캐시를 무효화한다 — 실패(특히 409 conflict) 시에도 무효화하면
-      // 자동 refetch가 LOAD_DRAFT를 다시 태워 conflict 상태와 사용자의 미저장 변경분을
-      // 아무 경고 없이 서버본으로 덮어써 버린다. 재로드는 사용자가 명시적으로 눌러야 한다(StudioPage).
-      queryClient.invalidateQueries({ queryKey: ['layout-draft', variables.boothId] });
+      // 실패(특히 409 conflict) 시에는 캐시를 손대지 않는다 — refetch가 LOAD_DRAFT를 다시 태워
+      // conflict 상태와 사용자의 미저장 변경분을 경고 없이 서버본으로 덮어쓰기 때문이다.
+      // 재로드는 사용자가 명시적으로 눌러야 한다(StudioPage).
+      //
+      // 성공 시에는 invalidateQueries 대신 PUT 응답을 캐시에 직접 반영한다 — 어차피 최신본을
+      // 이미 들고 있는데 GET을 한 번 더 부르는 중복을 없앤다. 204(작업본 없음)에서 시작한
+      // 첫 저장은 캐시가 null이라 병합할 대상이 없으므로 그 경우에만 invalidate로 되돌아간다.
+      const queryKey = ['layout-draft', variables.boothId];
+      const hadCache = queryClient.getQueryData<DraftGetResponse | null>(queryKey) != null;
+      if (hadCache) {
+        queryClient.setQueryData<DraftGetResponse | null>(queryKey, (old) =>
+          old ? { ...old, revision: result.revision, schemaVersion: result.schemaVersion, template: result.template, objects: result.objects, updatedAt: result.updatedAt } : old,
+        );
+      } else {
+        queryClient.invalidateQueries({ queryKey });
+      }
       return result;
     },
     onError: (error) => {
