@@ -17,7 +17,7 @@ namespace Festa.World
         [SerializeField] Vector3 _offset = new(0f, 4f, -18f);
         [SerializeField] float _followLerp = 8f;
         [SerializeField] float _collisionRadius = 0.25f;
-        [SerializeField] float _collisionPadding = 0.15f;
+        [SerializeField] float _collisionPadding = 2f;   // 0.2 m — 벽면과의 최소 이격
         [SerializeField] LayerMask _collisionMask = ~0;
         [SerializeField] float _minDistance = 9f;
         [SerializeField] float _maxDistance = 36f;
@@ -27,10 +27,10 @@ namespace Festa.World
         [SerializeField] float _minPitch = 4f;
         [SerializeField] float _maxPitch = 65f;
         [SerializeField] float _collisionReturnLerp = 5f;
-        // 당기는 쪽은 밀려나는 쪽보다 빨라야 한다 — 느리면 벽에 파묻힌다.
-        // 다만 즉시(무한)로 두면 얇은 기물 뒤에서 화면이 튄다 (T-183).
-        // 18 도 여전히 급하다는 피드백을 받아 8 로 내렸다. 관통은 아래 즉시-당김
-        // 예외(근평면 반경 × 2)가 막으므로 이 값은 체감만 결정한다.
+        // (구) 당김 보간 계수 — 더 이상 쓰지 않는다. 보간 당김은 전환하는 동안
+        // 카메라가 장애물 너머에 머물게 하는데, 오클루전 컬링이 베이크된 뒤로는
+        // 그 한 순간에 실내 전체가 컬링돼 "바깥 세상이 번쩍" 하는 최악의 화면이
+        // 된다 (T-190). 당김은 즉시(하드 클램프), 복귀만 부드럽게 — 업계 표준.
         [SerializeField] float _collisionPullLerp = 8f;
 
         // ── 시선 높이 ─────────────────────────────────────────────
@@ -137,23 +137,16 @@ namespace Festa.World
                     Mathf.Max(radius, hit.distance - _collisionPadding));
             }
 
-            // 당길 때도 보간한다. 예전에는 즉시 당겼는데, 벽처럼 넓은 면은 궤도를 돌면서
-            // 가림 정도가 서서히 바뀌어 괜찮았지만 **사람 모형·기둥처럼 얇은 기물**은
-            // 캐스트가 맞았다/안 맞았다를 급히 오가며 화면이 튀었다 (T-183).
-            //
-            // 다만 근평면이 지오메트리에 닿을 만큼 가까우면 즉시 당긴다 — 거기서 보간하면
-            // 한두 프레임 동안 벽을 뚫고 밖이 보인다. 그 경계만 즉시, 나머지는 부드럽게.
+            // 당김은 **즉시**다. 보간하면 전환 프레임 동안 카메라가 장애물 너머에
+            // 남는데, 단면 벽 + 베이크된 오클루전에서는 그 순간 실내가 통째로 컬링돼
+            // 바깥 하늘이 번쩍인다 (T-190 — "외부환경이 보이고 아바타가 사라진다").
+            // 얇은 기물 뒤의 튐(T-183)은 근접 자기 숨김과 시선 높이가 흡수한다.
+            // 복귀(밀려남)만 부드럽게 푼다.
             if (desiredDistance < _resolvedDistance)
-            {
-                _resolvedDistance = desiredDistance <= radius * 2f
-                    ? desiredDistance
-                    : Mathf.Lerp(_resolvedDistance, desiredDistance, _collisionPullLerp * Time.deltaTime);
-            }
+                _resolvedDistance = desiredDistance;
             else
-            {
                 _resolvedDistance = Mathf.Lerp(
                     _resolvedDistance, desiredDistance, _collisionReturnLerp * Time.deltaTime);
-            }
 
             var targetPos = lookTarget + orbitDirection * _resolvedDistance;
 
