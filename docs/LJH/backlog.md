@@ -7,13 +7,13 @@
 
 ## 📍 세션 인수인계 (2026-08-23 종료 시점)
 
-**브랜치 상태**: `front` = `origin/front`(push 대기 커밋 5개). spec 005 완결, Block A(001·013a·016·002 계약 회수) 완결, **013a WebGL Host 기반 완료**.
+**브랜치 상태**: `front` = `origin/front`. spec 005 완결, Block A(001·013a·016·002 계약 회수) 완결, **013a WebGL Host 기반 완료**.
 
 **013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증(§6b 방식과 동일 — mock이 실 Unity와 같은 신호 경로 재현).
 
-**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 담당 질의 초안 작성 완료, **게시는 미승인 — 다음 세션 확인 필요**.
+**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 담당(kanghyunsoon) 확인 요청 [Issue #60](https://github.com/kanghyunsoon/ssafesta/issues/60) 게시 완료 — 빌드 URL 4종 제공 방식·Spring REST credential 정본 2건, 응답 대기.
 
-**다음 뭘 할지 — 확정 순서**: Unity 질의 게시 확인 → **016 E2E**(Bridge→Dispatcher→OverlayHost→iframe, 이번에 만든 Host 위에서) → 001 Auth FE → 010 Survey → 009 Exhibition.
+**다음 뭘 할지 — 확정 순서**: #60 응답 대기 중 **016 E2E** 착수(Bridge→Dispatcher→OverlayHost→iframe, 이번에 만든 Host 위에서 — #60과 독립적으로 진행 가능) → 001 Auth FE → 010 Survey → 009 Exhibition.
 
 **추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 착수 시 Unity 담당에게 대응 SHA 확인 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함).
 
