@@ -1,26 +1,18 @@
 // spec 005 Booth Studio 편집기의 조립 지점 — /app/studio/:boothId가 마운트하는 화면
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useReducer } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
-import type { ApiErrorDetail } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
 import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
+import { useStudioGates } from '../../features/studio/model/useStudioGates';
 import { EditorCanvas } from '../../features/studio/ui/EditorCanvas';
 import { ObjectPalette } from '../../features/studio/ui/ObjectPalette';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';
-import { precheckErrors, precheckWarnings } from '../../features/studio/lib/validate';
-import { passageWarnings } from '../../entities/layout/passage';
-
-// draftQuery·save·publish 세 경로 어디서든 BOOTH_LEASE_EXPIRED가 뜰 수 있다(만료된 부스에 진입·저장·공개 시도).
-// 편집을 전부 막는 게 목적이라 한 곳에서 판정한다(T018).
-function isLeaseExpired(...errors: unknown[]): boolean {
-  return errors.some((e) => isApiError(e) && e.code === 'BOOTH_LEASE_EXPIRED');
-}
 
 export function StudioPage() {
   const { boothId } = useParams<{ boothId: string }>();
@@ -78,20 +70,29 @@ export function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveMutation.error]);
 
-  // 통행 판정(§10-3)은 120×120 래스터라 다른 렌더(선택·입력 중 텍스트 변경)마다 다시 돌리지 않는다 —
-  // 12개 규모라 배치가 실제로 바뀔 때만 재계산해도 충분하다(계약 명시, T023). early return보다 위에
-  // 둬야 훅 호출 순서가 매 렌더 같다(react-hooks/rules-of-hooks).
-  const passage = useMemo(() => passageWarnings(state.objects), [state.objects]);
-
-  if (draftQuery.isLoading) return <div>불러오는 중...</div>;
-  if (isLeaseExpired(draftQuery.error)) {
-    return <div>임대가 만료되어 이 부스를 편집할 수 없습니다.</div>;
-  }
-  if (draftQuery.isError) return <div>작업본을 불러오지 못했습니다.</div>;
-
+  // template/bounds/maxObjects는 draftQuery 로딩 중에도 안전하게 계산된다(fallback 상수) —
+  // 아래 훅 호출이 early return보다 위에 있어야 하므로(react-hooks/rules-of-hooks) 여기서 먼저 구한다.
   const template = templatesQuery.data?.templates.find((t) => t.template === state.template);
   const bounds = template?.footprint ?? BOOTH_SIZE_FALLBACK;
   const maxObjects = template?.maxObjects ?? MAX_OBJECTS_FALLBACK;
+
+  const gates = useStudioGates({
+    state,
+    draftError: draftQuery.error,
+    saveError: saveMutation.error,
+    publishError: publishMutation.error,
+    publishData: publishMutation.data,
+    publishIsSuccess: publishMutation.isSuccess,
+    publishIsError: publishMutation.isError,
+    maxObjects,
+    bounds,
+  });
+
+  if (draftQuery.isLoading) return <div>불러오는 중...</div>;
+  if (gates.draftLeaseExpired) {
+    return <div>임대가 만료되어 이 부스를 편집할 수 없습니다.</div>;
+  }
+  if (draftQuery.isError) return <div>작업본을 불러오지 못했습니다.</div>;
 
   function handleSave() {
     saveMutation.mutate({
@@ -106,21 +107,6 @@ export function StudioPage() {
     draftQuery.refetch();
   }
 
-  const publishError = publishMutation.error;
-  const publishErrors: ApiErrorDetail[] = isApiError(publishError) ? publishError.errors : [];
-  const publishWarnings = publishMutation.data?.warnings ?? [];
-  const showPublishResult = publishMutation.isSuccess || publishMutation.isError;
-
-  // LAYOUT_VALIDATION_FAILED 등 conflict가 아닌 저장 실패의 상세 — conflict는 위에서 별도 안내로 처리한다(T018)
-  const saveError = saveMutation.error;
-  const saveErrorDetails: ApiErrorDetail[] =
-    isApiError(saveError) && saveError.code !== 'LAYOUT_REVISION_CONFLICT' ? saveError.errors : [];
-
-  const leaseExpired = isLeaseExpired(saveError, publishError);
-
-  // 공개 요청 전 미리보기 — 서버 응답이 오면(showPublishResult) 그 값으로 교체된다(T016)
-  const preErrors = precheckErrors(state.objects, maxObjects, bounds);
-  const preWarnings = [...precheckWarnings(state.objects), ...passage];
   const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
 
   return (
@@ -131,11 +117,11 @@ export function StudioPage() {
           다른 편집자가 저장했습니다. <button type="button" onClick={handleReload}>새로고침</button>
         </p>
       )}
-      {leaseExpired && <p>임대가 만료되어 더 이상 편집할 수 없습니다.</p>}
-      {saveErrorDetails.length > 0 && (
+      {gates.leaseExpired && <p>임대가 만료되어 더 이상 편집할 수 없습니다.</p>}
+      {gates.saveErrorDetails.length > 0 && (
         <div>
           <p>저장하지 못했습니다</p>
-          <DetailList items={saveErrorDetails} />
+          <DetailList items={gates.saveErrorDetails} />
         </div>
       )}
       {state.publishedVersion !== null && state.publishedVersion !== undefined
@@ -175,15 +161,15 @@ export function StudioPage() {
       </details>
 
       {/* conflict 중 저장 버튼 disable — 낡은 baseRevision으로 재시도하면 같은 409가 반복된다. 재로드가 유일한 출구 */}
-      <button type="button" onClick={handleSave} disabled={!state.dirty || leaseExpired || state.conflict}>
+      <button type="button" onClick={handleSave} disabled={!state.dirty || gates.leaseExpired || state.conflict}>
         저장
       </button>
 
-      {!showPublishResult && (preErrors.length > 0 || preWarnings.length > 0) && (
+      {!gates.showPublishResult && (gates.preErrors.length > 0 || gates.preWarnings.length > 0) && (
         <div>
           <p>공개 전 확인</p>
-          <DetailList items={preErrors} />
-          <DetailList items={preWarnings} />
+          <DetailList items={gates.preErrors} />
+          <DetailList items={gates.preWarnings} />
         </div>
       )}
 
@@ -192,15 +178,15 @@ export function StudioPage() {
       <button
         type="button"
         onClick={() => publishMutation.mutate(boothIdNum)}
-        disabled={publishMutation.isPending || preErrors.length > 0 || leaseExpired || state.dirty}
+        disabled={publishMutation.isPending || gates.preErrors.length > 0 || gates.leaseExpired || state.dirty}
       >
         공개
       </button>
 
-      {showPublishResult && (
+      {gates.showPublishResult && (
         <PublishDialog
-          errors={publishErrors}
-          warnings={publishWarnings}
+          errors={gates.publishErrors}
+          warnings={gates.publishWarnings}
           published={publishMutation.isSuccess}
           onClose={() => publishMutation.reset()}
         />

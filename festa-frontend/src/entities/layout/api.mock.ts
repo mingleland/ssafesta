@@ -7,6 +7,7 @@ import { BOOTH_SIZE_FALLBACK } from '../../shared/config/studio';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO, OBJECT_TYPES } from './objectTypes';
 import { isAreaOutOfBounds, worldAABB } from './geometry';
 import { passageWarnings } from './passage';
+import { AREA_OUT_OF_BOUNDS_MESSAGE, CONFIG_NOT_LINKED_MESSAGE, objectLimitMessage } from './messages';
 import type {
   DraftGetResponse,
   DraftPutRequest,
@@ -112,15 +113,15 @@ export async function putDraft(boothId: number, body: DraftPutRequest): Promise<
     // §10-2 실물(회전 반영 AABB) 이탈 — Draft 저장에도 적용된다(계약 명시, T022·T023 mock 정합)
     const local = OBJECT_LOCAL_BOUNDS[obj.type];
     if (local && isAreaOutOfBounds(worldAABB(local, obj.rotationY, obj.position), BOOTH_SIZE_FALLBACK)) {
-      throw apiError('LAYOUT_VALIDATION_FAILED', '회전한 실물이 부스 영역을 벗어났습니다.', [
-        { rule: 'AREA_OUT_OF_BOUNDS', objectId: obj.objectId, message: '회전한 실물이 부스 영역을 벗어났습니다.' },
+      throw apiError('LAYOUT_VALIDATION_FAILED', AREA_OUT_OF_BOUNDS_MESSAGE, [
+        { rule: 'AREA_OUT_OF_BOUNDS', objectId: obj.objectId, message: AREA_OUT_OF_BOUNDS_MESSAGE },
       ]);
     }
   }
 
   if (req.objects.length > MAX_OBJECTS) {
-    throw apiError('LAYOUT_VALIDATION_FAILED', `오브젝트는 ${MAX_OBJECTS}개까지입니다. (현재 ${req.objects.length}개)`, [
-      { rule: 'OBJECT_LIMIT', message: `오브젝트는 ${MAX_OBJECTS}개까지입니다. (현재 ${req.objects.length}개)` },
+    throw apiError('LAYOUT_VALIDATION_FAILED', objectLimitMessage(MAX_OBJECTS, req.objects.length), [
+      { rule: 'OBJECT_LIMIT', message: objectLimitMessage(MAX_OBJECTS, req.objects.length) },
     ]);
   }
 
@@ -170,7 +171,7 @@ export async function publish(boothId: number): Promise<PublishResponse> {
   }
   const configWarnings: ApiErrorDetail[] = stored.objects
     .filter((o) => OBJECT_TYPE_INFO[o.type]?.warnOnMissingConfig && o.configId == null)
-    .map((o) => ({ rule: 'CONFIG_NOT_LINKED', objectId: o.objectId, message: '연결된 콘텐츠가 없습니다.' }));
+    .map((o) => ({ rule: 'CONFIG_NOT_LINKED', objectId: o.objectId, message: CONFIG_NOT_LINKED_MESSAGE }));
   // §10-3 통행 판정은 공개 시점 경고다(계약 명시) — 실 BE와 같은 lib(passage.ts)으로 계산해
   // FE 실시간 경고와 mock 서버 응답이 항상 같은 답을 내게 한다(T023, quickstart §6b).
   const warnings: ApiErrorDetail[] = [...configWarnings, ...passageWarnings(stored.objects)];

@@ -5,6 +5,7 @@
 import type { LayoutObject, ValidationDetail } from '../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../entities/layout/geometry';
+import { AREA_OUT_OF_BOUNDS_MESSAGE, CONFIG_NOT_LINKED_MESSAGE, objectLimitMessage } from '../../../entities/layout/messages';
 
 // rule 이름은 서버 계약(contracts/layout-api.md)과 맞춰 사전 경고와 서버 응답을 같은 문구로 보이게 한다.
 export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
@@ -18,7 +19,7 @@ export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
       details.push({
         rule: 'CONFIG_NOT_LINKED',
         objectId: o.objectId,
-        message: '연결된 콘텐츠가 없습니다.',
+        message: CONFIG_NOT_LINKED_MESSAGE,
       });
     }
   }
@@ -39,7 +40,7 @@ export function precheckErrors(
   if (objects.length > maxObjects) {
     details.push({
       rule: 'OBJECT_LIMIT',
-      message: `오브젝트는 ${maxObjects}개까지입니다. (현재 ${objects.length}개)`,
+      message: objectLimitMessage(maxObjects, objects.length),
     });
   }
 
@@ -56,7 +57,7 @@ export function precheckErrors(
       details.push({
         rule: 'AREA_OUT_OF_BOUNDS',
         objectId: o.objectId,
-        message: '회전한 실물이 부스 영역을 벗어났습니다.',
+        message: AREA_OUT_OF_BOUNDS_MESSAGE,
       });
     }
   }
