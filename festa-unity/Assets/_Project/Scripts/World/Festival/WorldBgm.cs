@@ -64,9 +64,13 @@ namespace Festa.World
             if (p.x < -228f) return (0f, 1f);      // 축제 부지
             if (p.z < -118f) return (1f, 0f);      // 11층 방
 
-            // 복도·개활 전실: 남쪽 끝(방 문턱)에서 북쪽(꺾임)으로 갈수록 축제가 차오른다
+            // 복도·개활 전실 — 계곡형 크로스페이드. 두 곡을 절반씩 섞으면 조성이
+            // 달라 불협화음이 난다. 전반부에서 아침이 완전히 꺼지고, 짧은 고요를
+            // 지나 후반부에서 서커스가 차오른다 — 겹침은 낮은 볼륨의 한 뼘뿐이다.
             float t = Mathf.InverseLerp(-110f, 100f, p.z);
-            return (1f - t, t);
+            float morning = Mathf.Clamp01(1f - t * 1.9f);          // t 0.53 에서 소멸
+            float circus = Mathf.Clamp01((t - 0.47f) * 1.9f);      // t 0.47 부터 상승
+            return (morning, circus);
         }
     }
 }
