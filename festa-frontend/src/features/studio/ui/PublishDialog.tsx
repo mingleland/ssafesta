@@ -13,10 +13,12 @@ interface Props {
 // 요청 전 미리보기와 요청 후 서버 결과가 다른 컴포넌트로 보이면 사용자가 다른 것으로 오해한다.
 export function DetailList({ items }: { items: ApiErrorDetail[] }) {
   if (items.length === 0) return null;
+  // rule+objectId 조합 key는 구분자가 모호해 충돌할 수 있었다(예: rule="a-b",objectId="c"와
+  // rule="a",objectId="b-c"가 같은 문자열) — 이 목록은 재정렬·부분 삭제가 없어 인덱스로 충분하다(#58, T026)
   return (
     <ul>
       {items.map((d, i) => (
-        <li key={`${d.rule}-${d.objectId ?? i}`}>{d.message}</li>
+        <li key={i}>{d.message}</li>
       ))}
     </ul>
   );

@@ -45,10 +45,13 @@ export function EditorCanvas({ objects, selectedObjectId, bounds, onSelect, onMo
       width={bounds.width * PX_PER_M}
       height={bounds.depth * PX_PER_M}
       viewBox={`${-halfW} ${-halfD} ${bounds.width} ${bounds.depth}`}
-      style={{ background: '#f0f0f0', border: '1px solid #999' }}
+      // setPointerCapture로 이후 move/up이 물리적 좌표와 무관하게 이 svg로만 온다 — 없으면 버튼을
+      // 캔버스 밖에서 떼도 드래그가 안 풀려 오브젝트가 따라다닌다(T026 눌어붙음). touch-action:none은
+      // 터치에서 같은 제스처를 스크롤이 가로채지 않게 한다.
+      style={{ background: '#f0f0f0', border: '1px solid #999', touchAction: 'none' }}
       onPointerMove={handlePointerMove}
       onPointerUp={() => setDraggingId(null)}
-      onPointerLeave={() => setDraggingId(null)}
+      onPointerCancel={() => setDraggingId(null)}
     >
       {objects.map((obj) => {
         const screenY = worldZToScreenY(obj.position.z);
@@ -58,6 +61,7 @@ export function EditorCanvas({ objects, selectedObjectId, bounds, onSelect, onMo
             transform={`translate(${obj.position.x} ${screenY}) rotate(${obj.rotationY})`}
             onPointerDown={(e) => {
               e.stopPropagation();
+              svgRef.current?.setPointerCapture(e.pointerId);
               setDraggingId(obj.objectId);
               onSelect(obj.objectId);
             }}
