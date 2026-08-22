@@ -18,7 +18,7 @@
 - 🤖 불변 Authoring command, undo/redo, Scene 생성·삭제, Tile painting, drag/place, typed Component inspector, Trigger/Condition/Action editor, 빠른 행동 recipe, Dialogue 배경·인물·표정·대사·선택지 live preview를 구현했다.
 - 🤖 Reference Runtime에 이동·충돌·인벤토리·문·대화·Scene 전환 외에도 중력·점프·체력·피해 회복 시간·점수·체크포인트·자동 이동·투사체·bounded spawner를 연결했다. Preview는 Unity/WebGL 없이 same-origin `/play?source=local` route에서 같은 validator/state/event core를 실행한다.
 - 🤖 DB 보호 경계는 GameProject JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300으로 고정했다. 이미지·오디오 binary는 JSON/DB 대상이 아니다.
-- 🤖 Vitest **16 files / 85 tests**, TypeScript production build와 lint를 통과했고 Edit/Play가 별도 lazy chunk로 출력되는 것을 확인했다.
+- 🤖 최초 구현 검증은 Vitest **16 files / 85 tests**였고, 최신 `front` 재정렬 뒤 전체 Frontend 기준 **19 files / 98 tests**, TypeScript production build와 lint를 다시 통과했다. Edit/Play가 별도 lazy chunk로 출력되는 것도 유지됐다.
 
 ### 인앱 브라우저 실제 사용자 여정 검증 ✅
 
@@ -26,8 +26,17 @@
 - 🤖 `슬라임 블래스터 선택 → 교체 확인 → 로컬 저장 → 플레이 → F 발사` 흐름과 상태 HUD를 실제 브라우저에서 검증했다. 템플릿은 시스템 confirm 대신 선택→명시적 불러오기 2단계로 교체한다.
 - 🤖 `탐색 맵 이동 → NPC 상호작용 → 인물 Overlay 대화 → 선택지 → 같은 맵 복귀`를 실제로 완료했다. 대화 중 월드 입력이 차단되고 종료 뒤 체력·맵·인벤토리가 유지된다.
 - 🤖 배경/인물 선택 목록은 역할에 맞는 builtin만 노출하고 사용자 Asset은 선택 후보로 유지했다. Dialogue layer가 높은 zIndex Object 아래로 들어가던 문제도 수정했다.
-- 관련 기능 커밋: `39ebcde feat(game-studio): build visual authoring and playable runtimes`
+- 관련 기능 커밋: `43c1451 feat(game-studio): build visual authoring and playable runtimes` (최신 `front` 재정렬 후 원격 커밋)
 - 트러블슈팅: GS-T026~GS-T030
+
+### 원격 PR·파트 이슈 인계 완료 ✅
+
+- 🤖 코드 브랜치 `codex/game-studio-authoring-shell`을 최신 `github/front`(`b92593e`) 위로 재정렬했다. 원격 `front`가 추가한 15개 커밋은 router·Unity Host·기존 shared 영역이었고, 이번 구현은 `festa-frontend/src/game-studio/**` 45개 경로에만 있어 충돌 없이 적용됐다.
+- 🤖 코드 커밋 `43c1451`을 원격에 게시하고 `front` 대상 [PR #63](https://github.com/kanghyunsoon/ssafesta/pull/63)을 생성했다. PR 본문은 구현·격리·검증 범위를 기록하고 Workspace 완료 이슈 #49를 병합 시 닫도록 연결했다.
+- 🤖 문서 커밋 `bc5d095`를 기존 `codex/game-studio-docs-sync`에 원격 반영해 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53)의 spec·JSON Schema·FE 계획·작업일지·트러블슈팅을 최신 구현과 일치시켰다.
+- 🤖 [#35](https://github.com/kanghyunsoon/ssafesta/issues/35), [#48](https://github.com/kanghyunsoon/ssafesta/issues/48), [#49](https://github.com/kanghyunsoon/ssafesta/issues/49), [#55](https://github.com/kanghyunsoon/ssafesta/issues/55), [#56](https://github.com/kanghyunsoon/ssafesta/issues/56)에 구현 완료 범위와 남은 Frontend·Backend 연결 경계를 담당자 태그로 갱신했다.
+- 🤖 사용자 Asset 운영 경계는 #35의 resolver와 #48의 stable `asset://` allow-list, 공개 Runtime은 #55, Booth 진입은 #56에 이미 포함되어 있어 중복 신규 이슈는 만들지 않았다. PR이 아직 병합되지 않았거나 운영 완료 조건이 남은 이슈는 닫지 않았다.
+- 트러블슈팅: GS-T031
 
 ## 2026-08-22
 

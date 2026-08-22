@@ -8,6 +8,13 @@
 
 ## 2026-08-23
 
+### GS-T031. 최종 fetch 중 원격 추적 ref가 먼저 갱신되어 lock 비교가 실패함 (해결)
+
+- **증상** — 코드 복제본의 최종 `fetch`가 `github/front`와 `github/game`에 대해 현재 ref가 예상값보다 이미 앞서 있다는 `cannot lock ref ... is at ... but expected ...` 오류로 종료됐다.
+- **원인** — fetch가 원격 값을 읽은 뒤 ref를 기록하기 전에 같은 복제본의 원격 추적 ref가 다른 갱신 동작으로 최신 값으로 이동했다. 남은 lock 파일이나 손상된 객체가 아니라 compare-and-swap 보호가 중복 갱신을 거부한 상태였다.
+- **해결** — lock 파일을 임의 삭제하지 않고 실제 `github/front` ref와 branch ahead/behind를 다시 읽었다. 최신 ref `b92593e`가 정상임을 확인하고, Game Studio 단일 커밋을 그 위로 충돌 없이 rebase한 뒤 전체 98 tests·build·lint를 재실행하고 새 원격 브랜치로 push했다.
+- **예방** — fetch lock 오류가 나면 먼저 ref가 이미 목표 값으로 전진했는지 확인한다. 손상으로 단정해 lock/ref를 삭제하지 말고 `status`, `rev-list`, 변경 경로 대조 후 필요한 rebase와 전체 검증을 수행한다.
+
 ### GS-T030. root `.gitignore`의 `Reference/` 규칙이 Web Runtime 디렉터리까지 숨김 (해결)
 
 - **증상** — 테스트와 build는 `runtime/reference`를 정상 사용했지만 일반 `git add src/game-studio` 뒤 staged 목록에 핵심 Runtime 3파일이 없었다.
