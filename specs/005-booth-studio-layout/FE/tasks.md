@@ -90,8 +90,8 @@
 
 **Independent Test**: quickstart §7 — themeCode·primaryColor 변경 저장 시 layout revision 불변, `#FFF`(3자리) 거부.
 
-- [ ] T020 [P] [US4] `entities/booth/facadeApi.ts` — `PUT /booths/{id}/facade`(4필드 전부 nullable)·`GET /booths/{id}`에서 facade 초기값. 팔레트 endpoint는 미구현(#17)이라 themeCode 4값(`docs/08` 출처)을 상수로
-- [ ] T021 [US4] `features/studio/ui/FacadePanel.tsx` — 4필드 폼(themeCode 선택·primaryColor `#RRGGBB` 입력단 검증·signText ≤60자·logoUrl https ≤2048자), 만료 부스 이중 방어(진입 시 확인+`BOOTH_LEASE_EXPIRED` 처리). EditorState와 상태 분리(R-11)
+- [x] T020 [P] [US4] `entities/booth/facadeApi.ts` — `PUT /booths/{id}/facade`(4필드 전부 nullable)·`GET /booths/{id}`에서 facade 초기값. 팔레트 endpoint는 미구현(#17)이라 themeCode 4값(`docs/08` 출처)을 상수로
+- [x] T021 [US4] `features/studio/ui/FacadePanel.tsx` — 4필드 폼(themeCode 선택·primaryColor `#RRGGBB` 입력단 검증·signText ≤60자·logoUrl https ≤2048자), 만료 부스 이중 방어(진입 시 확인+`BOOTH_LEASE_EXPIRED` 처리). EditorState와 상태 분리(R-11)
 
 **Checkpoint**: quickstart §7 통과.
 

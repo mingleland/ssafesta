@@ -13,6 +13,7 @@ import { EditorCanvas } from '../../features/studio/ui/EditorCanvas';
 import { ObjectPalette } from '../../features/studio/ui/ObjectPalette';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
+import { FacadePanel } from '../../features/studio/ui/FacadePanel';
 import { precheckErrors, precheckWarnings } from '../../features/studio/lib/validate';
 
 // VITE_USE_MOCK=true면 실 BE 없이 메모리 mock으로 개발한다 (FE/research.md R-09)
@@ -164,6 +165,12 @@ export function StudioPage() {
           onRemove={() => dispatch({ type: 'REMOVE_OBJECT', objectId: selectedObject.objectId })}
         />
       )}
+
+      {/* facade는 Draft/Publish·revision과 무관하게 저장 즉시 반영된다(FR-018, R-11) — 위 편집기 상태와 분리 */}
+      <details>
+        <summary>외부 표현 편집</summary>
+        <FacadePanel boothId={boothIdNum} />
+      </details>
 
       {/* conflict 중 저장 버튼 disable — 낡은 baseRevision으로 재시도하면 같은 409가 반복된다. 재로드가 유일한 출구 */}
       <button type="button" onClick={handleSave} disabled={!state.dirty || leaseExpired || state.conflict}>
