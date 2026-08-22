@@ -36,10 +36,10 @@ const dispatchTriggerInternal = (
   }
 
   const scene = findScene(project, initialState.currentSceneId);
-  if (scene?.type !== 'TOP_DOWN') {
+  if (scene === undefined || scene.type === 'DIALOGUE') {
     throw new RuntimeExecutionError(
       'INPUT_NOT_ALLOWED',
-      `${trigger.type} requires a TOP_DOWN scene`,
+      `${trigger.type} requires a playable world scene`,
     );
   }
 
@@ -63,7 +63,7 @@ const dispatchTriggerInternal = (
       state = applyAction(project, state, action, context);
       if (action.type === 'GO_TO_SCENE') {
         const target = findScene(project, state.currentSceneId);
-        if (target?.type === 'TOP_DOWN') {
+        if (target !== undefined && target.type !== 'DIALOGUE') {
           state = dispatchTriggerInternal(
             project,
             state,
@@ -105,7 +105,7 @@ export const dispatchTrigger = (
 export const startRuntimeSession = (project: GameProject): RuntimeSessionState => {
   const state = createRuntimeSessionState(project);
   const scene = findScene(project, state.currentSceneId);
-  if (scene?.type !== 'TOP_DOWN') return state;
+  if (scene === undefined || scene.type === 'DIALOGUE') return state;
 
   try {
     return dispatchTriggerInternal(

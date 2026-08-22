@@ -46,12 +46,21 @@ export const createGameProjectStore = (
   let present = snapshot(initialProject);
   let future: GameProject[] = [];
   const listeners = new Set<() => void>();
-
-  const state = (): GameProjectHistoryState => ({
+  let cachedState: GameProjectHistoryState = {
     project: present,
-    canUndo: past.length > 0,
-    canRedo: future.length > 0,
-  });
+    canUndo: false,
+    canRedo: false,
+  };
+
+  const state = (): GameProjectHistoryState => cachedState;
+
+  const refreshState = (): void => {
+    cachedState = {
+      project: present,
+      canUndo: past.length > 0,
+      canRedo: future.length > 0,
+    };
+  };
 
   const emit = (): void => {
     for (const listener of [...listeners]) listener();
@@ -63,6 +72,7 @@ export const createGameProjectStore = (
     past = [...past, present].slice(-historyLimit);
     present = next;
     future = [];
+    refreshState();
     emit();
     return state();
   };
@@ -77,6 +87,7 @@ export const createGameProjectStore = (
       past = past.slice(0, -1);
       future = [present, ...future].slice(0, historyLimit);
       present = previous;
+      refreshState();
       emit();
       return state();
     },
@@ -86,6 +97,7 @@ export const createGameProjectStore = (
       future = future.slice(1);
       past = [...past, present].slice(-historyLimit);
       present = next;
+      refreshState();
       emit();
       return state();
     },
@@ -93,6 +105,7 @@ export const createGameProjectStore = (
       present = snapshot(nextProject);
       past = [];
       future = [];
+      refreshState();
       emit();
       return state();
     },

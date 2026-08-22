@@ -39,7 +39,7 @@ export const createRuntimeSessionState = (project: GameProject): RuntimeSessionS
     inventory: new Set<string>(),
     objectVisibility: Object.freeze(Object.fromEntries(
       project.scenes.flatMap((scene) => (
-        scene.type === 'TOP_DOWN'
+        scene.type !== 'DIALOGUE'
           ? scene.objects.map((object) => [object.id, object.visible] as const)
           : []
       )),

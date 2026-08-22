@@ -104,7 +104,7 @@ export const chooseDialogueChoice = (
       state = applyAction(project, state, action, context);
       if (action.type === 'GO_TO_SCENE') {
         const target = findScene(project, state.currentSceneId);
-        if (target?.type === 'TOP_DOWN') {
+        if (target !== undefined && target.type !== 'DIALOGUE') {
           state = dispatchTrigger(
             project,
             state,
