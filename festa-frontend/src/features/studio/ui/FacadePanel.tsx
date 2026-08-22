@@ -5,12 +5,9 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
-import * as realApi from '../../../entities/booth/facadeApi';
-import * as mockApi from '../../../entities/booth/facadeApi.mock';
+import { facadeApi } from '../../../entities/booth/facadeApi.select';
 import { THEME_CODES } from '../../../entities/booth/types';
 import type { BoothFacade } from '../../../entities/booth/types';
-
-const facadeApi = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
 
 const HEX_RRGGBB = /^#[0-9A-Fa-f]{6}$/;
 const HTTPS_URL = /^https:\/\//;

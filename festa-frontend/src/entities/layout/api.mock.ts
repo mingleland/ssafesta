@@ -1,5 +1,5 @@
 // 로컬 개발용 메모리 mock — 실 BE 시맨틱(revision 충돌·미지 필드 거부·12개 상한·publish 경고)을 재현한다.
-// VITE_USE_MOCK=true일 때 api.ts 대신 이 모듈을 쓴다(엔트리 조립은 features/studio에서 분기).
+// VITE_USE_MOCK=true일 때 api.ts 대신 이 모듈을 쓴다(선택은 api.select.ts에서 한다).
 // 출처: specs/005-booth-studio-layout/FE/research.md R-09, contracts/layout-api.md
 
 import type { ApiError, ApiErrorDetail } from '../../shared/api/client';

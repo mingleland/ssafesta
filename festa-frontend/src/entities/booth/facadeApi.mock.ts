@@ -1,5 +1,5 @@
 // 로컬 개발용 메모리 mock — facade PUT의 서버 검증(§6)과 만료 거부(§6 409)를 재현한다.
-// VITE_USE_MOCK=true일 때 facadeApi.ts 대신 이 모듈을 쓴다(엔트리 조립은 features/studio에서 분기).
+// VITE_USE_MOCK=true일 때 facadeApi.ts 대신 이 모듈을 쓴다(선택은 facadeApi.select.ts에서 한다).
 // 출처: specs/005-booth-studio-layout/contracts/layout-api.md §6·§7
 
 import type { ApiError } from '../../shared/api/client';

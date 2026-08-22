@@ -4,8 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import type { ApiErrorDetail } from '../../shared/api/client';
-import * as realApi from '../../entities/layout/api';
-import * as mockApi from '../../entities/layout/api.mock';
+import { layoutApi } from '../../entities/layout/api.select';
 import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
@@ -15,9 +14,6 @@ import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';
 import { precheckErrors, precheckWarnings } from '../../features/studio/lib/validate';
-
-// VITE_USE_MOCK=true면 실 BE 없이 메모리 mock으로 개발한다 (FE/research.md R-09)
-const layoutApi = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
 
 // draftQuery·save·publish 세 경로 어디서든 BOOTH_LEASE_EXPIRED가 뜰 수 있다(만료된 부스에 진입·저장·공개 시도).
 // 편집을 전부 막는 게 목적이라 한 곳에서 판정한다(T018).

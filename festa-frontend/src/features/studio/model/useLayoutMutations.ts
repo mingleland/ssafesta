@@ -3,12 +3,9 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
-import * as realApi from '../../../entities/layout/api';
-import * as mockApi from '../../../entities/layout/api.mock';
+import { layoutApi } from '../../../entities/layout/api.select';
 import type { LayoutObject } from '../../../entities/layout/types';
 import type { EditorAction } from './editorReducer';
-
-const layoutApi = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
 
 interface SaveArgs {
   boothId: number;
