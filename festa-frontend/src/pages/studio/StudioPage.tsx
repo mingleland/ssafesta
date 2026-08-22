@@ -1,5 +1,5 @@
 // spec 005 Booth Studio 편집기의 조립 지점 — /app/studio/:boothId가 마운트하는 화면
-import { useEffect, useReducer } from 'react';
+import { useEffect, useMemo, useReducer } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
@@ -14,6 +14,7 @@ import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';
 import { precheckErrors, precheckWarnings } from '../../features/studio/lib/validate';
+import { passageWarnings } from '../../entities/layout/passage';
 
 // draftQuery·save·publish 세 경로 어디서든 BOOTH_LEASE_EXPIRED가 뜰 수 있다(만료된 부스에 진입·저장·공개 시도).
 // 편집을 전부 막는 게 목적이라 한 곳에서 판정한다(T018).
@@ -77,6 +78,11 @@ export function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveMutation.error]);
 
+  // 통행 판정(§10-3)은 120×120 래스터라 다른 렌더(선택·입력 중 텍스트 변경)마다 다시 돌리지 않는다 —
+  // 12개 규모라 배치가 실제로 바뀔 때만 재계산해도 충분하다(계약 명시, T023). early return보다 위에
+  // 둬야 훅 호출 순서가 매 렌더 같다(react-hooks/rules-of-hooks).
+  const passage = useMemo(() => passageWarnings(state.objects), [state.objects]);
+
   if (draftQuery.isLoading) return <div>불러오는 중...</div>;
   if (isLeaseExpired(draftQuery.error)) {
     return <div>임대가 만료되어 이 부스를 편집할 수 없습니다.</div>;
@@ -113,8 +119,8 @@ export function StudioPage() {
   const leaseExpired = isLeaseExpired(saveError, publishError);
 
   // 공개 요청 전 미리보기 — 서버 응답이 오면(showPublishResult) 그 값으로 교체된다(T016)
-  const preErrors = precheckErrors(state.objects, maxObjects);
-  const preWarnings = precheckWarnings(state.objects);
+  const preErrors = precheckErrors(state.objects, maxObjects, bounds);
+  const preWarnings = [...precheckWarnings(state.objects), ...passage];
   const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
 
   return (

@@ -3,17 +3,20 @@
 import { useRef, useState } from 'react';
 import { PX_PER_M } from '../../../shared/config/studio';
 import type { LayoutObject } from '../../../entities/layout/types';
+import { OBJECT_LOCAL_BOUNDS } from '../../../entities/layout/objectTypes';
+import { isAreaOutOfBounds, worldAABB } from '../../../entities/layout/geometry';
 import { clampToBooth, screenYToWorldZ, snap, worldZToScreenY } from '../lib/coords';
 
 interface Props {
   objects: LayoutObject[];
   selectedObjectId: string | null;
-  bounds: { width: number; depth: number };
+  bounds: { width: number; depth: number; height: number };
   onSelect: (objectId: string | null) => void;
   onMove: (objectId: string, x: number, z: number) => void;
 }
 
-const OBJECT_SIZE_M = 0.4; // MVP 표시용 고정 크기 — 실측 bounds는 Polish 단계(§10-1)에서 회전 판정에 사용
+// 실물 bounds를 모르는 타입(서버가 신설했지만 로컬 표에 없는 타입, SC-005)의 표시용 대체 크기.
+const UNKNOWN_TYPE_SIZE_M = 0.4;
 
 export function EditorCanvas({ objects, selectedObjectId, bounds, onSelect, onMove }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -55,6 +58,22 @@ export function EditorCanvas({ objects, selectedObjectId, bounds, onSelect, onMo
     >
       {objects.map((obj) => {
         const screenY = worldZToScreenY(obj.position.z);
+        const local = OBJECT_LOCAL_BOUNDS[obj.type];
+
+        // 로컬(x,z)을 이 <g>의 화면 좌표로: x는 그대로, z는 부호 반전(worldZToScreenY와 같은 규칙) —
+        // <g>의 rotate()가 이미 §10-1과 같은 방향(위에서 시계방향 +)으로 돌리므로 미리 돌리지 않는다.
+        const rect = local
+          ? { x: local.min.x, y: -local.max.z, width: local.max.x - local.min.x, height: local.max.z - local.min.z }
+          : {
+              x: -UNKNOWN_TYPE_SIZE_M / 2,
+              y: -UNKNOWN_TYPE_SIZE_M / 2,
+              width: UNKNOWN_TYPE_SIZE_M,
+              height: UNKNOWN_TYPE_SIZE_M,
+            };
+
+        // 실물(회전 반영 AABB)이 부스 영역을 벗어났는지 — 앵커 점은 안이어도 몸체가 걸치는 배치를 드래그 중 바로 보여준다(T022)
+        const outOfBounds = local != null && isAreaOutOfBounds(worldAABB(local, obj.rotationY, obj.position), bounds);
+
         return (
           <g
             key={obj.objectId}
@@ -67,16 +86,16 @@ export function EditorCanvas({ objects, selectedObjectId, bounds, onSelect, onMo
             }}
           >
             <rect
-              x={-OBJECT_SIZE_M / 2}
-              y={-OBJECT_SIZE_M / 2}
-              width={OBJECT_SIZE_M}
-              height={OBJECT_SIZE_M}
+              x={rect.x}
+              y={rect.y}
+              width={rect.width}
+              height={rect.height}
               fill={obj.objectId === selectedObjectId ? '#4a90d9' : '#ccc'}
-              stroke="#333"
-              strokeWidth={0.02}
+              stroke={outOfBounds ? '#e63946' : '#333'}
+              strokeWidth={outOfBounds ? 0.05 : 0.02}
             />
-            {/* 정면(+Z, 화면 위쪽) 방향 표시선 */}
-            <line x1={0} y1={0} x2={0} y2={-OBJECT_SIZE_M} stroke="#e63946" strokeWidth={0.03} />
+            {/* 정면(+Z, 화면 위쪽) 방향 표시선 — rect 앞쪽 끝을 살짝 지나 눈에 띄게 */}
+            <line x1={0} y1={0} x2={0} y2={rect.y - 0.15} stroke="#e63946" strokeWidth={0.03} />
           </g>
         );
       })}

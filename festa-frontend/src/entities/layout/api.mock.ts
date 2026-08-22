@@ -3,7 +3,10 @@
 // 출처: specs/005-booth-studio-layout/FE/research.md R-09, contracts/layout-api.md
 
 import type { ApiError, ApiErrorDetail } from '../../shared/api/client';
-import { OBJECT_TYPE_INFO, OBJECT_TYPES } from './objectTypes';
+import { BOOTH_SIZE_FALLBACK } from '../../shared/config/studio';
+import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO, OBJECT_TYPES } from './objectTypes';
+import { isAreaOutOfBounds, worldAABB } from './geometry';
+import { passageWarnings } from './passage';
 import type {
   DraftGetResponse,
   DraftPutRequest,
@@ -106,6 +109,13 @@ export async function putDraft(boothId: number, body: DraftPutRequest): Promise<
         { rule: 'UNKNOWN_OBJECT_TYPE', objectId: obj.objectId, message: `알 수 없는 타입: ${obj.type}` },
       ]);
     }
+    // §10-2 실물(회전 반영 AABB) 이탈 — Draft 저장에도 적용된다(계약 명시, T022·T023 mock 정합)
+    const local = OBJECT_LOCAL_BOUNDS[obj.type];
+    if (local && isAreaOutOfBounds(worldAABB(local, obj.rotationY, obj.position), BOOTH_SIZE_FALLBACK)) {
+      throw apiError('LAYOUT_VALIDATION_FAILED', '회전한 실물이 부스 영역을 벗어났습니다.', [
+        { rule: 'AREA_OUT_OF_BOUNDS', objectId: obj.objectId, message: '회전한 실물이 부스 영역을 벗어났습니다.' },
+      ]);
+    }
   }
 
   if (req.objects.length > MAX_OBJECTS) {
@@ -158,9 +168,12 @@ export async function publish(boothId: number): Promise<PublishResponse> {
   if (!stored) {
     throw apiError('BOOTH_NOT_FOUND', '작업본이 없습니다.');
   }
-  const warnings: ApiErrorDetail[] = stored.objects
+  const configWarnings: ApiErrorDetail[] = stored.objects
     .filter((o) => OBJECT_TYPE_INFO[o.type]?.warnOnMissingConfig && o.configId == null)
     .map((o) => ({ rule: 'CONFIG_NOT_LINKED', objectId: o.objectId, message: '연결된 콘텐츠가 없습니다.' }));
+  // §10-3 통행 판정은 공개 시점 경고다(계약 명시) — 실 BE와 같은 lib(passage.ts)으로 계산해
+  // FE 실시간 경고와 mock 서버 응답이 항상 같은 답을 내게 한다(T023, quickstart §6b).
+  const warnings: ApiErrorDetail[] = [...configWarnings, ...passageWarnings(stored.objects)];
 
   const nextPublished = (stored.publishedVersion ?? 0) + 1;
   stored.publishedVersion = nextPublished;

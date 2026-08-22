@@ -3,7 +3,8 @@
 // 출처: specs/005-booth-studio-layout/FE/tasks.md T015, data-model.md ObjectType 판정표
 
 import type { LayoutObject, ValidationDetail } from '../../../entities/layout/types';
-import { OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { isAreaOutOfBounds, worldAABB } from '../../../entities/layout/geometry';
 
 // rule 이름은 서버 계약(contracts/layout-api.md)과 맞춰 사전 경고와 서버 응답을 같은 문구로 보이게 한다.
 export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
@@ -26,7 +27,13 @@ export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
 }
 
 // objectId는 crypto.randomUUID()로 생성돼 실질적으로 충돌하지 않지만, 계약상 유일성 요건이라 방어적으로 둔다.
-export function precheckErrors(objects: LayoutObject[], maxObjects: number): ValidationDetail[] {
+// boothBounds는 §10-2 실물(회전 반영 AABB) 이탈 판정에 쓴다 — 앵커 점은 안인데 회전한 몸체가
+// 옆 슬롯에 걸치는 배치를 드래그 중에 미리 잡아준다(T022).
+export function precheckErrors(
+  objects: LayoutObject[],
+  maxObjects: number,
+  boothBounds: { width: number; depth: number; height: number },
+): ValidationDetail[] {
   const details: ValidationDetail[] = [];
 
   if (objects.length > maxObjects) {
@@ -42,6 +49,16 @@ export function precheckErrors(objects: LayoutObject[], maxObjects: number): Val
       details.push({ rule: 'DUPLICATE_OBJECT_ID', objectId: o.objectId, message: '오브젝트 식별자가 중복됐습니다.' });
     }
     seen.add(o.objectId);
+
+    // 미지 타입은 실물 크기를 모르니 판정하지 않고 건너뛴다 — 서버 몫(SC-005, T026과 같은 원칙).
+    const local = OBJECT_LOCAL_BOUNDS[o.type];
+    if (local && isAreaOutOfBounds(worldAABB(local, o.rotationY, o.position), boothBounds)) {
+      details.push({
+        rule: 'AREA_OUT_OF_BOUNDS',
+        objectId: o.objectId,
+        message: '회전한 실물이 부스 영역을 벗어났습니다.',
+      });
+    }
   }
 
   return details;
