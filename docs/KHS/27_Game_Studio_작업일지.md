@@ -7,6 +7,17 @@
 > Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
+## 2026-08-22
+
+### Web Runtime Core front 병합·후속 이슈 상태 정리 ✅
+
+- 🤖 [PR #47](https://github.com/kanghyunsoon/ssafesta/pull/47)이 `@colosair`의 최신 `front` 병합 상태 검증과 승인 후 `front`에 병합됐다. 병합 커밋은 `3b7349f`이며 Vitest **7 files / 29 tests**, build, lint, Booth Studio route 보존, lazy chunk 격리가 재확인됐다.
+- 🤖 #35에는 renderer 비의존 기반만 완료됐음을 기록하고 TOP_DOWN renderer, PreviewHost/sandbox, builtin Asset resolver, Preview/Published parity, PLATFORMER adapter가 남아 있어 OPEN을 유지했다.
+- 🤖 #49에는 Authoring Workspace가 이제 정식 `front`의 GameProject/Runtime/Event/Dialogue/undo·redo 기반 위에서 진행 가능하다고 공유했다. renderer·Preview·Asset 구현은 #35 경계를 침범하지 않도록 분리했다.
+- 🤖 #55에는 play route와 순수 Runtime 기반은 준비됐지만 Published loader·오류 UI·E2E는 #48 Published DTO/오류 코드와 #35 renderer/Asset resolver를 기다린다고 기록했다.
+- 🤖 라벨이 없던 Backend #48에 `back`, Frontend #49에 `front` 라벨을 추가했다. #35·#48·#49·#55·#56은 서로 범위가 다르고 완료 조건이 남아 있어 닫거나 합치지 않았다.
+- 🤖 최신 `front`와 `back`을 대조한 결과 PR #47 이후 Game Studio 구현 커밋은 없고 Backend #48·Portal #56 구현 PR도 없다. 완료 근거 없는 상태 변경은 하지 않았다.
+
 ## 2026-08-21
 
 ### 최신 front 재동기화·남은 Runtime 이슈 분리 ✅
