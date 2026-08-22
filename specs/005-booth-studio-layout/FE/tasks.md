@@ -101,8 +101,8 @@
 
 - [ ] T022 `features/studio/lib/validate.ts`에 §10-1 회전 AABB 사전 검증 추가 — 네 모서리 회전(`x'=x·cos+z·sin, z'=−x·sin+z·cos`) 후 AABB 재계산, 오차 1e-9. objectTypes.ts의 bounds 사용. 드래그 중 실물 이탈 표시
 - [ ] T023 `features/studio/lib/passage.ts` — §10-3 통행 판정 실시간 경고(래스터 0.05m·120×120·침식 0.22m·flood fill 4방향·관람 띠 0.7m·50%·고립 1㎡). **서버와 같은 답**이 계약 전제(#19). 12개 규모라 배치 변경 시 재계산으로 충분
-- [ ] T024 quickstart §1~§7 전 시나리오 수동 실행 + 결과를 `docs/LJH/verify/`에 기록. **선행**: §5(revision 충돌)는 현재 mock으로 재현 불가(T-12) — mock에 강제 충돌 훅을 넣거나 `localStorage` 전환 후에야 실행 가능. 중간 검증(08-21)에서 §2·§3·§4는 이미 통과 확인
-- [ ] T026 [Polish] 중간 검증에서 나온 미수정 결함 6종 — refetchOnWindowFocus로 인한 편집 소실 / 미지 ObjectType 크래시(SC-005 배치) / 공개 버튼 dirty 미확인 / 충돌 UI 소실 / 드래그 pointer capture / mock 3건. 상세는 `docs/LJH/backlog.md`
+- [ ] T024 quickstart §1~§7 전 시나리오 수동 실행 + 결과를 `docs/LJH/verify/`에 기록. §5(revision 충돌)는 `window.__festaForceConflict(boothId)` 훅으로 재현 가능(T026). 중간 검증(08-21)에서 §2·§3·§4 통과 확인
+- [x] T026 [Polish] 중간 검증에서 나온 결함 10건 수정 — 커밋 `fb24ef4`(미지 ObjectType 크래시·편집 소실·공개 dirty·충돌 UI 분리)·`0d584f6`(mock publish 스냅샷·lease 경로 정정·draft warnings 제거·드래그 pointer capture·§5 재현 훅·PublishDialog key)·`cd0e709`(계약서 pull·rule 주석 정본화). 브라우저 실측 6/6 — 상세는 `docs/LJH/24_작업일지.md` 08-22
 - [ ] T025 (R-10 승인 시) vitest 추가 — coords 부호 왕복표(`block1-roundtrip.md` 실측값)·validate·회전 AABB·passage 테이블 테스트
 
 ---
