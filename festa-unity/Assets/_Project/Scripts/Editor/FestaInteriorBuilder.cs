@@ -53,7 +53,6 @@ namespace Festa.EditorTools
 
             var wallMat = Mat("InteriorWall", new Color(0.78f, 0.76f, 0.72f), 0.1f);
             var floorMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "CorridorMid.mat");
-            var padMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FestivalLamp.mat");
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
             var extGroup = fest.transform.Find("Festival_Portals");
@@ -72,16 +71,21 @@ namespace Festa.EditorTools
                 var front = slot.position.z > 145f ? Vector3.back : Vector3.forward;
                 var doorPos = slot.position + front * 42f;
 
+                // 거리 판정·하이라이트 대상 = 부스 실물 (병합 렌더러)
+                var boothRenderer = slot.GetComponentsInChildren<Renderer>(false)
+                    .FirstOrDefault(r => r.name.EndsWith("_Combined")) 
+                    ?? slot.GetComponentsInChildren<Renderer>(false).FirstOrDefault();
+
                 var interiorSpawn = room.Find("SpawnPoint");
-                MakePortal(ext.transform, $"Portal_Ext_{i:D2}", doorPos, i,
-                           interiorSpawn, $"{i}번 부스 입장", 28f, padMat);
+                MakePortal(ext.transform, $"Portal_Ext_{i:D2}", slot.position, i,
+                           interiorSpawn, $"{i}번 부스 입장", 32f, boothRenderer);
 
                 var returnPoint = new GameObject($"ReturnPoint_{i:D2}");
                 returnPoint.transform.SetParent(ext.transform, false);
                 returnPoint.transform.position = doorPos + front * 12f + Vector3.up * 1f;
                 var exitPos = center + new Vector3(0f, 0f, RoomHalf - 28f);
                 MakePortal(room, $"Portal_Int_{i:D2}", exitPos, i,
-                           returnPoint.transform, "축제로 나가기", 26f, padMat);
+                           returnPoint.transform, "축제로 나가기", 40f, null);
             }
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(root.scene);
@@ -177,8 +181,9 @@ namespace Festa.EditorTools
         }
 
         static void MakePortal(Transform parent, string name, Vector3 worldPos, int id,
-                               Transform dest, string prompt, float radius, Material padMat)
+                               Transform dest, string prompt, float radius, Renderer boundsSource)
         {
+            // 비콘 패드 없음 — 거리 판정은 부스 실물 경계, 표시는 하이라이트 링·키캡 프롬프트가 한다.
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.position = worldPos;
@@ -187,16 +192,7 @@ namespace Festa.EditorTools
             portal.destination = dest;
             portal.promptText = prompt;
             portal.interactRadius = radius;
-
-            var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            Object.DestroyImmediate(pad.GetComponent<Collider>());
-            pad.name = "Pad";
-            pad.transform.SetParent(go.transform, false);
-            pad.transform.localPosition = new Vector3(0f, 0.35f, 0f);
-            pad.transform.localScale = new Vector3(11f, 0.3f, 11f);
-            var r = pad.GetComponent<Renderer>();
-            r.sharedMaterial = padMat;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            portal.boundsSource = boundsSource;
         }
 
         static Material Mat(string name, Color c, float smooth)

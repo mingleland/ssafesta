@@ -6,12 +6,13 @@ using UnityEngine.InputSystem;
 namespace Festa.World
 {
     /// <summary>
-    /// Owner 플레이어의 포털 상호작용. 가장 가까운 <see cref="BoothPortal"/> 이
-    /// 반경 안이면 화면 하단에 "[F] …" 프롬프트를 띄우고, F 입력 시 목적지로
-    /// 텔레포트한다 (PlayerMovement 의 스폰과 같은 절차 재사용 — T-177).
+    /// Owner 플레이어의 포털 상호작용.
     ///
-    /// 프롬프트는 POC 관례대로 OnGUI 다 (DevConnectionHud 와 동일). 표시 전용이라
-    /// React 오버레이 규정(텍스트 입력 UI)과 충돌하지 않는다.
+    /// - 부스 실물 경계 기준 거리로 가장 가까운 <see cref="BoothPortal"/> 을 찾고,
+    /// - 대상 부스 위에 **키캡 스타일 프롬프트**([F] + 행동 문구)를 띄우고,
+    /// - 대상 발밑에 **하이라이트 링**을 깐다 — 로컬 렌더링 전용이라 다른 접속자에게는
+    ///   보이지 않는다 (네트워크로 나가는 상태 없음),
+    /// - F 입력 시 목적지로 텔레포트한다 (스폰과 같은 절차 — T-177).
     /// </summary>
     public class PortalInteractor : NetworkBehaviour
     {
@@ -22,6 +23,13 @@ namespace Festa.World
         BoothPortal _nearest;
         float _lastTeleportTime = -10f;
 
+        // ── 하이라이트 링 (Owner 로컬 전용) ──
+        GameObject _ring;
+        Material _ringMat;
+        static Texture2D _ringTex;
+        static Texture2D _panelTex;
+        static Texture2D _capTex;
+
         public override void OnNetworkSpawn()
         {
             enabled = IsOwner;
@@ -30,9 +38,16 @@ namespace Festa.World
             _camera = GetComponent<PlayerCameraFollow>();
         }
 
+        public override void OnNetworkDespawn()
+        {
+            if (_ring != null) Destroy(_ring);
+            if (_ringMat != null) Destroy(_ringMat);
+        }
+
         void Update()
         {
             _nearest = FindNearest();
+            UpdateHighlight();
             if (_nearest == null) return;
             if (Time.time - _lastTeleportTime < _cooldown) return;
 
@@ -48,32 +63,130 @@ namespace Festa.World
         BoothPortal FindNearest()
         {
             BoothPortal best = null;
-            float bestSq = float.MaxValue;
+            float bestDist = float.MaxValue;
             var pos = transform.position;
             foreach (var p in BoothPortal.All)
             {
-                float sq = (p.transform.position - pos).sqrMagnitude;
-                if (sq > p.interactRadius * p.interactRadius || sq >= bestSq) continue;
-                bestSq = sq;
+                float d = p.DistanceFrom(pos);
+                if (d > p.interactRadius || d >= bestDist) continue;
+                bestDist = d;
                 best = p;
             }
             return best;
         }
 
+        // ── 하이라이트: 대상 발밑의 부드러운 링. 로컬 오브젝트라 본인 화면에만 보인다 ──
+
+        void UpdateHighlight()
+        {
+            bool show = _nearest != null && Time.time - _lastTeleportTime >= _cooldown;
+            if (!show)
+            {
+                if (_ring != null) _ring.SetActive(false);
+                return;
+            }
+            if (_ring == null) CreateRing();
+            var (pos, radius) = _nearest.HighlightFootprint();
+            _ring.SetActive(true);
+            _ring.transform.position = pos;
+            float pulse = 1f + 0.06f * Mathf.Sin(Time.time * 4.2f);
+            _ring.transform.localScale = new Vector3(radius * 2f * pulse, 1f, radius * 2f * pulse);
+        }
+
+        void CreateRing()
+        {
+            _ring = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            Destroy(_ring.GetComponent<Collider>());
+            _ring.name = "InteractHighlight (local)";
+            _ring.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            _ringMat = new Material(Shader.Find("Mobile/Particles/Additive"));
+            _ringMat.mainTexture = RingTexture();
+            var r = _ring.GetComponent<Renderer>();
+            r.sharedMaterial = _ringMat;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        static Texture2D RingTexture()
+        {
+            if (_ringTex != null) return _ringTex;
+            const int S = 128;
+            _ringTex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+            for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                float d = Vector2.Distance(new Vector2(x, y), new Vector2(S / 2f, S / 2f)) / (S / 2f);
+                // 가장자리 링 + 안쪽 은은한 채움
+                float ring = Mathf.Exp(-Mathf.Pow((d - 0.82f) / 0.08f, 2f));
+                float fill = d < 0.82f ? 0.10f * (1f - d) : 0f;
+                float a = Mathf.Clamp01(ring * 0.85f + fill);
+                _ringTex.SetPixel(x, y, new Color(1f, 0.82f, 0.35f, 1f) * a);
+            }
+            _ringTex.Apply();
+            return _ringTex;
+        }
+
+        // ── 프롬프트: 대상 부스 위 화면 좌표에 키캡 스타일로 ──
+
         void OnGUI()
         {
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
+            var cam = Camera.main;
+            if (cam == null) return;
 
-            float w = 380f, h = 44f;
-            var rect = new Rect((Screen.width - w) * 0.5f, Screen.height * 0.72f, w, h);
-            GUI.Box(rect, GUIContent.none);
-            var style = new GUIStyle(GUI.skin.label)
+            var sp = cam.WorldToScreenPoint(_nearest.PromptAnchor());
+            if (sp.z <= 0f) return;   // 등 뒤
+            float ui = Screen.height / 1080f;
+
+            var label = _nearest.promptText;
+            var labelStyle = new GUIStyle(GUI.skin.label)
             {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = 17,
+                alignment = TextAnchor.MiddleLeft,
+                fontSize = Mathf.RoundToInt(19f * ui),
                 fontStyle = FontStyle.Bold,
             };
-            GUI.Label(rect, $"[F]  {_nearest.promptText}", style);
+            labelStyle.normal.textColor = Color.white;
+            var capStyle = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = Mathf.RoundToInt(18f * ui),
+                fontStyle = FontStyle.Bold,
+            };
+            capStyle.normal.textColor = new Color(0.12f, 0.12f, 0.12f);
+
+            float cap = 30f * ui;                                    // 키캡 한 변
+            float labelW = labelStyle.CalcSize(new GUIContent(label)).x;
+            float pad = 10f * ui;
+            float w = cap + pad * 3f + labelW;
+            float h = cap + pad * 1.4f;
+            float x = sp.x - w / 2f;
+            float y = Screen.height - sp.y - h / 2f;
+
+            GUI.DrawTexture(new Rect(x, y, w, h), PanelTexture(), ScaleMode.StretchToFill);
+            GUI.DrawTexture(new Rect(x + pad, y + (h - cap) / 2f, cap, cap), CapTexture(), ScaleMode.StretchToFill);
+            GUI.Label(new Rect(x + pad, y + (h - cap) / 2f, cap, cap), "F", capStyle);
+            GUI.Label(new Rect(x + pad * 2f + cap, y, labelW + pad, h), label, labelStyle);
+        }
+
+        static Texture2D PanelTexture()
+        {
+            if (_panelTex != null) return _panelTex;
+            _panelTex = Solid(new Color(0.07f, 0.07f, 0.09f, 0.82f));
+            return _panelTex;
+        }
+
+        static Texture2D CapTexture()
+        {
+            if (_capTex != null) return _capTex;
+            _capTex = Solid(new Color(0.93f, 0.93f, 0.9f, 0.98f));
+            return _capTex;
+        }
+
+        static Texture2D Solid(Color c)
+        {
+            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            t.SetPixels(new[] { c, c, c, c });
+            t.Apply();
+            return t;
         }
     }
 }

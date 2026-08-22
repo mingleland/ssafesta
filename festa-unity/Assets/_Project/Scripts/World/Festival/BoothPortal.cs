@@ -4,15 +4,16 @@ using UnityEngine;
 namespace Festa.World
 {
     /// <summary>
-    /// 부스 출입 포털. 외부 부스 앞과 내부 공간 출구에 하나씩 놓이며,
-    /// <see cref="PortalInteractor"/> 가 근접한 포털의 프롬프트를 띄우고 F 로 이동시킨다.
+    /// 부스 출입 포털. 외부 부스와 내부 공간 출구에 하나씩 놓이며,
+    /// <see cref="PortalInteractor"/> 가 근접 시 키캡 프롬프트·하이라이트를 띄우고
+    /// F 로 이동시킨다.
     ///
-    /// 정적 씬 오브젝트다 — NetworkObject 를 붙이지 않는다 (아키텍처 원칙: Booth 정적
-    /// 오브젝트는 Local Spawn). 이동 자체는 client-authoritative NetworkTransform 이
-    /// 동기화하므로 다른 접속자에게도 이동 결과가 그대로 보인다.
+    /// 거리 판정은 비콘 지점이 아니라 **부스 실물 경계(boundsSource 렌더러)의
+    /// 최근접점**을 기준으로 한다 — 부스 어느 면으로 다가가도 같은 거리에서 열린다.
+    /// boundsSource 가 없으면(내부 출구 등) 포털 위치 기준으로 폴백한다.
     ///
-    /// boothId 는 외부 FestivalSlot_XX ↔ 내부 Interior_XX 를 잇는 번호로,
-    /// 백엔드 연동 시 이 번호를 부스 식별자로 쓴다.
+    /// 정적 씬 오브젝트 — NetworkObject 없음. boothId 는 외부 슬롯 ↔ 내부 공간 ↔
+    /// 백엔드 부스 식별자를 잇는 번호다 (1~12).
     /// </summary>
     public class BoothPortal : MonoBehaviour
     {
@@ -27,10 +28,44 @@ namespace Festa.World
         [Tooltip("프롬프트에 표시할 행동 문구 (예: '3번 부스 입장')")]
         public string promptText;
 
-        [Tooltip("프롬프트가 뜨는 반경 (world unit, 1 m = 10)")]
+        [Tooltip("상호작용 가능 거리 (world unit, 1 m = 10). boundsSource 가 있으면 표면 기준.")]
         public float interactRadius = 30f;
+
+        [Tooltip("거리 판정·하이라이트 대상인 부스 실물 렌더러. 비우면 포털 위치 기준.")]
+        public Renderer boundsSource;
 
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
+
+        /// <summary>플레이어 위치에서 이 포털(부스 실물 우선)까지의 거리.</summary>
+        public float DistanceFrom(Vector3 pos)
+        {
+            if (boundsSource != null)
+                return Vector3.Distance(pos, boundsSource.bounds.ClosestPoint(pos));
+            return Vector3.Distance(pos, transform.position);
+        }
+
+        /// <summary>프롬프트를 띄울 월드 지점 — 부스 실물 상단, 없으면 포털 위 2 m.</summary>
+        public Vector3 PromptAnchor()
+        {
+            if (boundsSource != null)
+            {
+                var b = boundsSource.bounds;
+                return new Vector3(b.center.x, b.max.y + 6f, b.center.z);
+            }
+            return transform.position + Vector3.up * 20f;
+        }
+
+        /// <summary>하이라이트 링을 놓을 바닥 지점과 반경.</summary>
+        public (Vector3 pos, float radius) HighlightFootprint()
+        {
+            if (boundsSource != null)
+            {
+                var b = boundsSource.bounds;
+                return (new Vector3(b.center.x, 0.6f, b.center.z),
+                        Mathf.Max(b.extents.x, b.extents.z) * 1.25f);
+            }
+            return (new Vector3(transform.position.x, 0.6f, transform.position.z), 14f);
+        }
     }
 }
