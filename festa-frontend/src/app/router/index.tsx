@@ -18,6 +18,14 @@ export const router = createBrowserRouter([
     element: <StudioPage />,
   },
   {
+    // spec 013a — Unity WebGL Host. 무거운 로더 코드를 메인 번들에서 뺀다(lazy)
+    path: '/app/world',
+    lazy: async () => {
+      const { WorldPage } = await import('../../pages/world/WorldPage.tsx');
+      return { Component: WorldPage };
+    },
+  },
+  {
     path: '/app/games/:gameId/edit',
     lazy: async () => {
       const { EditGamePage } = await import('../../game-studio/app/routes/EditGamePage.tsx');
