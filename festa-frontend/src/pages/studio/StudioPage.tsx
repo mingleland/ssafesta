@@ -63,7 +63,12 @@ export function StudioPage() {
       revision: draftQuery.data.revision,
       publishedVersion: draftQuery.data.publishedVersion,
     });
-  }, [draftQuery.data, boothIdNum, state.dirty, state.conflict]);
+    // state.dirty·state.conflict는 일부러 deps에서 뺀다 — draftQuery.data가 실제로 바뀔 때만
+    // 재실행하되, 그 시점의 최신 dirty/conflict는 이 클로저가 매 렌더 새로 만들어지므로 자동 반영된다.
+    // deps에 넣으면 두 값이 바뀔 때마다(예: SAVE_CONFLICT로 conflict:true) 낡은 draftQuery.data로
+    // 재실행돼 방금 만든 편집을 덮어쓴다(실측으로 확인한 실버그, T026).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftQuery.data, boothIdNum]);
 
   // 저장 실패(revision 충돌 제외) 시 첫 오류 대상 오브젝트를 자동 선택해 PropertiesPanel에서 바로 보이게 한다(T018)
   useEffect(() => {
