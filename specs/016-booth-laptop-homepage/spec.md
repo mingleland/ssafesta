@@ -75,6 +75,34 @@
 - **FR-010**: 방문자가 외부 사이트로 이동함을 인지할 수 있어야 한다 (출처 표시).
 - **FR-011**: `LAPTOP` 오브젝트는 Layout 계약(spec 005)에 추가되어야 하며, **주소는 정수 `configId`로 표현할 수 없으므로** 계약 확장이 필요하다.
 
+### Unity → React 이벤트 계약 (2026-08-18 확정)
+
+```json
+{
+  "type": "BOOTH_LAPTOP_INTERACT",
+  "boothId": 7,
+  "objectId": "laptop-1",
+  "url": "https://example.com"
+}
+```
+
+전달 경로는 다음으로 고정한다.
+
+```text
+Unity 노트북 클릭
+→ WebGL Bridge
+→ window.FestaUnity.onBoothInteract(json)
+→ React 이벤트 구독자
+→ openOverlay('LAPTOP', payload)
+```
+
+- `boothId: number`와 `objectId: string`은 필수다.
+- `url?: string`은 선택이다. URL 미등록 상태도 정상 상호작용이며 FR-009의 안내 화면으로 연결한다.
+- React는 잘못된 JSON 이벤트 하나를 격리하고 이후 이벤트 구독을 유지한다.
+- AI 직원 등 후속 상호작용은 같은 `BoothInteractEvent` union을 확장하며 새 전역 콜백 패턴을 만들지 않는다.
+
+> **구현 상태**: Unity의 LAPTOP 타입, 클릭 송신부와 WebGL 브리지는 구현 완료다. 루트 또는 자식 Collider 클릭을 모두 처리하고, React 콜백 실패는 해당 이벤트 하나로 격리한다. 주소의 저장 위치와 Layout 계약 확장은 C-01에서 별도로 결정하며, 그전까지 URL 없는 이벤트도 정상 송신한다.
+
 ### Key Entities
 
 - **Booth Homepage**: 부스에 연결된 외부 홈페이지. 부스 식별자, 주소, 표시 이름, 등록 시각
@@ -137,5 +165,6 @@
 | ② **기술 리스크 §1~4를 확인했는가** (특히 삽입 거부 대응) | | ☐ |
 | ③ 빠진 요구사항 추가 | | ☐ |
 | ④ C-01 계약 위치 합의 (005와 함께) | FE ____ / BE ____ / Unity ____ | ☐ |
+| ⑤ Unity→React 이벤트 계약 합의 | `BOOTH_LAPTOP_INTERACT` + `window.FestaUnity.onBoothInteract(json)` | ✅ 2026-08-18 |
 
 검토자: __________ / 검토일: __________
