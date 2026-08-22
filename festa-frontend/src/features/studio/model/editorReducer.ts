@@ -5,7 +5,7 @@
 import type { LayoutObject, ObjectType } from '../../../entities/layout/types';
 import { normalizeRotation } from '../lib/coords';
 
-export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
+export type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
 export interface EditorState {
   boothId: number;
@@ -14,6 +14,9 @@ export interface EditorState {
   selectedObjectId: string | null;
   dirty: boolean;
   saveStatus: SaveStatus;
+  // saveStatus와 분리 — 편집 액션이 dirty로 되돌려도 배너·재로드 버튼이 사라지면 안 된다(T026 결함4).
+  // LOAD_DRAFT(재로드)만 해소하고, 편집 자체는 계속 허용하되 저장은 막는다(낡은 baseRevision 재실패 루프 방지).
+  conflict: boolean;
   baseRevision: number; // 마지막으로 읽은 revision — PUT 시 expectedRevision으로 echo (R-06)
   publishedVersion: number | null;
 }
@@ -41,6 +44,7 @@ export function createInitialState(boothId: number): EditorState {
     selectedObjectId: null,
     dirty: false,
     saveStatus: 'idle',
+    conflict: false,
     baseRevision: 0,
     publishedVersion: null,
   };
@@ -58,6 +62,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         publishedVersion: action.publishedVersion,
         dirty: false,
         saveStatus: 'idle',
+        conflict: false,
         selectedObjectId: null,
       };
 
@@ -139,7 +144,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
       return { ...state, saveStatus: 'error' };
 
     case 'SAVE_CONFLICT':
-      return { ...state, saveStatus: 'conflict' };
+      return { ...state, saveStatus: 'error', conflict: true };
 
     case 'PUBLISH_SUCCESS':
       return { ...state, publishedVersion: action.publishedVersion };

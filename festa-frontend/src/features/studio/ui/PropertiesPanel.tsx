@@ -19,8 +19,10 @@ interface Props {
 }
 
 export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkContent, onSetAssetCode, onRemove }: Props) {
+  // 서버가 이 편집기가 모르는 타입을 보낼 수 있다(#56 GAME_PORTAL 등) — 판정 대신 안내만 하고
+  // 위치·회전 편집은 계속 허용한다(SC-005: 미지 타입이 있어도 나머지는 정상 동작해야 한다, T026)
   const info = OBJECT_TYPE_INFO[object.type];
-  const isDecorative = info.category === 'DECORATIVE';
+  const isDecorative = info?.category === 'DECORATIVE';
 
   // 입력 중 빈 문자열·"-"까지 허용하기 위해 로컬 문자열 상태를 두고, 유효한 숫자일 때만 dispatch한다.
   const [xText, setXText] = useState(String(object.position.x));
@@ -92,7 +94,9 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
         />
       </label>
 
-      {isDecorative ? (
+      {info === undefined ? (
+        <p>알 수 없는 타입입니다 — 서버 계약이 이 편집기보다 앞서 있습니다. 위치·회전만 편집할 수 있습니다.</p>
+      ) : isDecorative ? (
         <label>
           자산 코드
           <input

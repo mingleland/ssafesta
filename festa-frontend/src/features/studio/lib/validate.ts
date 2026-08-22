@@ -10,8 +10,10 @@ export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
   const details: ValidationDetail[] = [];
 
   for (const o of objects) {
+    // 서버가 새 타입을 추가하면(#56 GAME_PORTAL 등) 이 맵에 없는 type이 올 수 있다 — 판정은 서버 몫이라
+    // 여기서는 조용히 건너뛴다(SC-005: 미지 타입이 있어도 나머지는 정상 동작해야 한다, T026)
     const info = OBJECT_TYPE_INFO[o.type];
-    if (info.warnOnMissingConfig && o.configId === undefined) {
+    if (info?.warnOnMissingConfig && o.configId === undefined) {
       details.push({
         rule: 'CONFIG_NOT_LINKED',
         objectId: o.objectId,

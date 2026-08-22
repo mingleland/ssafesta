@@ -33,6 +33,8 @@ export function StudioPage() {
     queryKey: ['layout-draft', boothIdNum],
     queryFn: () => layoutApi.getDraft(boothIdNum),
     enabled: Number.isFinite(boothIdNum),
+    // 탭 전환·창 복귀 시 자동 refetch가 미저장 편집을 서버본으로 덮어쓰던 결함(T026) — 이 쿼리에서만 끈다
+    refetchOnWindowFocus: false,
   });
 
   const templatesQuery = useQuery({
@@ -45,6 +47,9 @@ export function StudioPage() {
 
   useEffect(() => {
     if (draftQuery.data === undefined) return; // 로딩 중
+    // 미저장 편집 중에는 refetch가 와도 무시한다 — refetchOnWindowFocus 외에도 invalidateQueries
+    // 레이스로 새 데이터가 도착할 수 있다(T026). conflict 중 "새로고침" 클릭은 의도적 폐기라 통과시킨다.
+    if (state.dirty && !state.conflict) return;
     if (draftQuery.data === null) {
       // 204 — 작업본 없음: 빈 배치로 시작, 첫 저장은 expectedRevision:0 (계약 §2)
       dispatch({ type: 'LOAD_DRAFT', boothId: boothIdNum, template: 'PROJECT_EXHIBITION', objects: [], revision: 0, publishedVersion: null });
@@ -58,7 +63,7 @@ export function StudioPage() {
       revision: draftQuery.data.revision,
       publishedVersion: draftQuery.data.publishedVersion,
     });
-  }, [draftQuery.data, boothIdNum]);
+  }, [draftQuery.data, boothIdNum, state.dirty, state.conflict]);
 
   // 저장 실패(revision 충돌 제외) 시 첫 오류 대상 오브젝트를 자동 선택해 PropertiesPanel에서 바로 보이게 한다(T018)
   useEffect(() => {
@@ -113,7 +118,7 @@ export function StudioPage() {
   return (
     <div>
       <p>저장 상태: {state.saveStatus}</p>
-      {state.saveStatus === 'conflict' && (
+      {state.conflict && (
         <p>
           다른 편집자가 저장했습니다. <button type="button" onClick={handleReload}>새로고침</button>
         </p>
@@ -155,7 +160,8 @@ export function StudioPage() {
         />
       )}
 
-      <button type="button" onClick={handleSave} disabled={!state.dirty || leaseExpired}>
+      {/* conflict 중 저장 버튼 disable — 낡은 baseRevision으로 재시도하면 같은 409가 반복된다. 재로드가 유일한 출구 */}
+      <button type="button" onClick={handleSave} disabled={!state.dirty || leaseExpired || state.conflict}>
         저장
       </button>
 
@@ -167,10 +173,12 @@ export function StudioPage() {
         </div>
       )}
 
+      {/* dirty 상태로 공개하면 서버 draft(마지막 저장본)가 공개되는데 미리보기는 로컬 state 기준이라 어긋난다(T026) */}
+      {state.dirty && <p>저장하지 않은 변경 사항이 있습니다. 저장 후 공개할 수 있습니다.</p>}
       <button
         type="button"
         onClick={() => publishMutation.mutate(boothIdNum)}
-        disabled={publishMutation.isPending || preErrors.length > 0 || leaseExpired}
+        disabled={publishMutation.isPending || preErrors.length > 0 || leaseExpired || state.dirty}
       >
         공개
       </button>
