@@ -158,7 +158,17 @@ namespace Festa.EditorTools
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = new Color(0.25f, 0.2f, 0.15f);
             var tr = signGo.GetComponent<MeshRenderer>();
-            tr.sharedMaterial = font.material;
+            // 기본 폰트 재질은 ZTest Always 라 벽을 뚫고 보인다 — 깊이 검사하는
+            // 월드 텍스트 재질로 교체 (Festa/WorldText, 폰트 아틀라스 공유).
+            var signMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "InteriorSignText.mat");
+            if (signMat == null)
+            {
+                signMat = new Material(Shader.Find("Festa/WorldText"));
+                AssetDatabase.CreateAsset(signMat, MatDir + "InteriorSignText.mat");
+            }
+            signMat.mainTexture = font.material.mainTexture;
+            EditorUtility.SetDirty(signMat);
+            tr.sharedMaterial = signMat;
             tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
             // ── 부스 앵커: FE 레이아웃 미터 좌표의 원점. 스케일 20 = 2배 표현 ──
