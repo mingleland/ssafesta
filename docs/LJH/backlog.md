@@ -5,17 +5,19 @@
 
 ---
 
-## 📍 세션 인수인계 (2026-08-22 종료 시점)
+## 📍 세션 인수인계 (2026-08-23 시작 시점)
 
-**브랜치 상태**: `front` = `origin/front`, 워킹트리에 타 세션 산출물(`docs/LJH/26`·`27`) 확인 대기 중 — 커밋 제외.
+**브랜치 상태**: `front` = `origin/front`. spec 005는 25/25 완료·구조 진단 RED 0·YELLOW 4건 정리까지 종결.
 
-**진행률**: `specs/005-booth-studio-layout/FE/tasks.md` **25/25 완료** — US1~US4·Polish(T020~T026) 전부. 구현 자체는 spec 005 FE 몫에서 남은 게 없다.
+**Block A(계약 회수) 완료**: 001·013a·016이 front보다 뒤처져 있던 것을 develop·game에서 회수 — 001 spec/contracts/plan/tasks 전체(develop), 013a 구조는 develop(#43 Unity/ 이관)+contracts(avatarCode 확정)·spec.md는 game(08-16 UI 소유권 확정본), 016 spec.md는 game(Unity→React 이벤트 계약 절). 전부 문서만, 코드 변경 0.
 
-**다음 뭘 할지**: 이 세션에서 새로 나온 것 없음. 남은 항목은 전부 아래 "막힌 것"·"내가 닫아야 할 것" 표 — 대부분 타 파트 응답 대기(#58 strdeok/ghkim1632, #17 BE, #59 리드).
+**다음 뭘 할지 — 확정 순서**: **013a WebGL Host 구현** 착수 → 016 E2E(Bridge→Dispatcher→OverlayHost→iframe) → 001 Auth FE → 010 Survey → 009 Exhibition.
 
-**막힌 것 아님, 그냥 안 한 것**: `#43` FE 산출물(`specs/005/FE/`) develop PR — 언제든 올릴 수 있음, 미착수.
+**013a WebGL Host 범위**(다음 세션 계획 수립 대상): React에서 Unity WebGL 로딩, 진입/이탈 lifecycle, `initUnityBridge()` 실제 초기화 지점 확정, 인증/AT 전달 경계 연결 — 이후 모든 Unity interaction(016 포함)이 이 Host 위에서 동작.
 
-상세는 `24_작업일지.md` 08-22 항목.
+**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 착수 시 Unity 담당에게 대응 SHA 확인 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함).
+
+상세는 `24_작업일지.md` 08-23 항목.
 
 ---
 
