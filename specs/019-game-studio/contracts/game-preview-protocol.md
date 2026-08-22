@@ -1,13 +1,21 @@
 # Game Studio Preview Protocol
 
-> 상태: Draft v1.1 / #20 same-origin 결정 반영. iframe sandbox/CSP와 UI는 #35에서 확정한다.
+> 상태: v1.2 / same-origin local Preview route 구현. 아래 message envelope는 embedded Preview 확장 계약이다.
 
 ## 목적
 
-Studio의 저장 전 GameProject snapshot을 Published API에 올리지 않고 격리된 Web Runtime에 전달한다.
+Studio의 현재 GameProject snapshot을 Published API에 올리지 않고 Web Runtime에 전달한다.
 Preview Runtime은 Published Runtime과 같은 validator/state/event core를 사용한다.
 
-## Transport
+## 구현된 Local Preview transport
+
+- Editor는 현재 snapshot을 동일한 validator로 확인하고 브라우저 Draft repository에 저장한다.
+- `/app/games/:gameId/play?source=local`로 이동하며 Runtime은 저장본을 다시 읽고 다시 검증한다.
+- Editor와 Play는 별도 lazy chunk이고, Runtime은 Studio store/DOM/undo history를 직접 읽지 않는다.
+- GameProject, Asset reference, preview session port만 공유하며 Backend Published pointer와 revision은 변경하지 않는다.
+- 인증 Token, Asset binary, 브라우저 파일 경로를 URL이나 GameProject에 넣지 않는다.
+
+## Embedded Preview transport (후속 선택)
 
 - 브라우저 `window.postMessage`를 사용한다.
 - Studio가 parent, Preview Runtime이 전용 iframe이다.
@@ -116,8 +124,9 @@ Studio, FESTA Host, Unity WebGL을 reload/close하지 않는다.
 ## Security Invariants
 
 1. Access/Refresh/Connection Token을 message payload에 넣지 않는다.
-2. `project.assets[].source`는 `builtin://` 또는 서버가 관리하는 `asset://` reference만 사용한다.
-   binary, base64 `data:`, `blob:`, `file:`, 만료되는 서명 URL은 snapshot에 포함하지 않는다.
+2. `project.assets[].source`는 `builtin://` 또는 resolver가 관리하는 `asset://` reference만 사용한다.
+   `asset://local/`은 local Preview 전용이며 Publish에서 거부한다. binary, base64 `data:`, `blob:`,
+   `file:`, 만료되는 서명 URL은 snapshot에 포함하지 않는다.
 3. Runtime은 message의 `gameId`나 owner 정보를 권한 근거로 사용하지 않는다.
 4. iframe Runtime은 parent DOM과 Unity instance를 직접 조작하지 않는다.
 5. 반복/늦게 도착한 이전 `requestId` 응답은 현재 lifecycle 상태를 변경하지 않는다.
@@ -128,5 +137,6 @@ Studio, FESTA Host, Unity WebGL을 reload/close하지 않는다.
 - Studio/Preview origin: FESTA Web과 동일. 별도 인증 전달이나 Preview origin 환경변수 없음.
 - Authoring route: `/app/games/:gameId/edit`.
 - Published play route: `/app/games/:gameId/play`.
-- 내부 Preview iframe route, `sandbox`/CSP 최종값, modal/side panel/full-screen UI는 #35의 Game Studio 수직 구현 범위다.
+- 현재 수직 구현은 full route Local Preview다. embedded iframe이 실제로 필요해질 때만 이 문서의 message
+  lifecycle과 함께 내부 route, `sandbox`/CSP, modal/side panel UI를 확정한다.
 - 환경변수가 추가되면 기존 API 값과 섞지 않고 `VITE_GAME_*` namespace를 사용한다.

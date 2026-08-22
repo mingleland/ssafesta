@@ -36,12 +36,12 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 - `startSceneId`는 `scenes[].id` 중 정확히 하나를 가리킨다.
 - 모든 Scene·Object·Variable·Item·Event ID는 각 namespace에서 중복되지 않는다.
 - `targetId`, `sceneId`, `variableId`, `itemId`는 존재하는 대상을 가리킨다.
-- `TOP_DOWN` Scene은 Player Spawn을 정확히 하나 가진다.
-- `TOP_DOWN.tileLayers[].data` 길이는 Scene의 `width × height`와 같다.
+- `TOP_DOWN`/`PLATFORMER` Scene은 Player Spawn을 정확히 하나 가진다.
+- World Scene의 `tileLayers[].data` 길이는 Scene의 `width × height`와 같다.
 - Object Component가 참조하는 Asset·Item은 존재하며, 같은 Object에 동일 Component type을 중복하지 않는다.
 - `SHOW_DIALOGUE.sceneId`는 `OVERLAY` DIALOGUE를 가리키며, Overlay는 시작 Scene이나 `GO_TO_SCENE` 대상이 될 수 없다.
 - `CLOSE_DIALOGUE`는 `OVERLAY` DIALOGUE Choice에서만 허용하고, `nextNodeId`는 같은 Scene의 Node를 가리킨다.
-- TOP_DOWN Object 위치는 Scene 범위 안의 0-based 정수 셀 좌표다.
+- World Object 위치는 Scene 범위 안의 0-based 정수 셀 좌표다.
 - 저장되는 Asset source는 `builtin://` 또는 서버가 관리하는 `asset://` reference이며 binary·임시 URL을 포함하지 않는다.
 - Variable의 `type`과 `initialValue` 실제 타입은 일치한다.
 - Event 순서, terminal Action, Action/transition budget은 `event-runtime-semantics.md`를 따른다.

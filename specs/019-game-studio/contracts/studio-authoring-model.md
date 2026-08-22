@@ -1,11 +1,11 @@
 # Game Studio 편집·Asset 모델 v1
 
-> 상태: Draft v1.0 — 편집기 시안의 화면 개념을 GameProject 계약으로 변환하는 공통 기준
+> 상태: Implemented reference v1.0 — 편집기와 local Preview에서 검증한 공통 기준
 
 ## 1. 편집 화면의 논리 영역
 
-편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 실제 반응형 배치와 컴포넌트 이름은 #35에서
-정하되, 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
+편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 좁은 화면에서도 페이지 전체가 가로로 밀리지 않고
+Map 작업 공간만 내부 스크롤하도록 하며, 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
 
 | 영역 | 주 역할 | 수정 대상 |
 |---|---|---|
@@ -43,21 +43,23 @@ Asset Catalog + GameProject JSON
   실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위는 MVP와 분리한 후속 Asset spec 대상이다.
 - catalog metadata는 타일 크기, atlas slicing, 기본 표시 크기를 소유한다. GameProject는 같은 정보를
   중복 저장하지 않는다.
+- 기본 catalog는 타일셋, 4방향 캐릭터 애니메이션, 상호작용/액션 오브젝트, 대화 배경과 인물 표정을
+  즉시 제공한다. 파일 선택은 `내 이미지로 교체`를 선택한 요소에서만 노출한다.
 
 ## 4. Tile과 Object 배치
 
-- TOP_DOWN의 `width`, `height`는 셀 수다.
+- TOP_DOWN/PLATFORMER의 `width`, `height`는 셀 수다.
 - `tileLayers[].data`는 왼쪽 위에서 오른쪽 아래로 진행하는 row-major 1차원 배열이며 길이는
   `width × height`다. `-1`은 빈 셀이다.
 - Layer 배열 순서가 그리기 순서다. MVP 권장 이름은 `FLOOR`, `WALL`, `DECORATION`이지만 이름으로
   충돌이나 동작을 추론하지 않는다.
-- TOP_DOWN Object의 `position.x/y`는 0부터 시작하는 정수 셀 좌표다.
-- Sprite 표시 크기와 기본 Collider footprint는 preset/catalog 기본값을 사용한다. 임의 크기·회전·다중 셀
-  footprint는 실제 제작 사례가 확인된 뒤 별도 계약으로 확장한다.
+- World Object의 `position.x/y`는 0부터 시작하는 정수 셀 좌표다.
+- Sprite 표시 크기는 `scale 25..400%`, 겹침 순서는 `zIndex 0..20`으로 조정한다. 회전·다중 셀
+  Collider footprint는 실제 제작 사례가 확인된 뒤 별도 계약으로 확장한다.
 
 ## 5. Preset은 편집 편의 기능
 
-`DOOR`, `ITEM`, `NPC` 같은 preset은 사용자가 빠르게 시작하도록 Component와 Event 초안을 만드는
+`DOOR`, `ITEM`, `NPC`, `HAZARD`, `ENEMY`, `TURRET`, `CHECKPOINT`, `SPAWNER` 같은 preset은 사용자가 빠르게 시작하도록 Component와 Event 초안을 만드는
 recipe다. Runtime이 preset별 별도 로직을 가져서는 안 된다.
 
 예: 편집기의 `잠김=true`, `필요 아이템=key` 입력은 아래 공통 데이터로 변환한다.
@@ -84,6 +86,8 @@ Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 �
 - `CLOSE_DIALOGUE`는 OVERLAY Choice에서만 허용한다.
 - OVERLAY Scene을 시작 Scene이나 일반 `GO_TO_SCENE` 대상으로 사용할 수 없다.
 - FULL_SCREEN Dialogue에서는 복귀할 호출 Scene이 없으므로 `CLOSE_DIALOGUE`를 사용할 수 없다.
+- 대화 Scene과 Node는 각각 선택적 `backgroundAssetId`, `portraitAssetId`를 가지며 표정은 인물 atlas의
+  안정 Asset reference로 선택한다. Dialogue는 장르가 아니라 두 World Runtime 위에 재사용하는 연출 계층이다.
 
 ## 7. Preview·Save·Publish
 
@@ -91,6 +95,8 @@ Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 �
 - Save는 GameProject JSON과 revision만 영구 저장한다. Editor selection/history는 저장하지 않는다.
 - Publish는 구조·참조·Asset 정책·Dialogue presentation을 검증한 뒤 불변 Version을 만든다.
 - Preview에서만 보이는 임시 Asset이나 지원하지 않는 recipe가 남아 있으면 Publish를 거부한다.
+- GameProject JSON은 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300 상한을 적용하고
+  Asset binary는 별도 저장소가 소유한다.
 
 ## 8. 파트 경계
 

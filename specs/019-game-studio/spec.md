@@ -4,9 +4,9 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-21 — #20~#22 파트 답변과 #33~#34 교차 계약 반영, FE/BE 실행 문서 분리
+**Updated**: 2026-08-23 — 독립 Web Authoring/Reference Runtime, PLATFORMER, 6종 템플릿, 자산·용량 경계 구현 반영
 
-**Status**: Draft — 제품·Portal 계약 합의 완료 / Studio 내부 renderer·Preview·Asset 선택 #35 대기
+**Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 
 **Priority**: P2 — 기존 P0/P1 안정화 이후 착수
 
@@ -21,6 +21,13 @@
 > 이 기능은 `014-minigame`을 대체하지 않는다. 014는 Unity 관리자 부스의 타이머 정지 게임 1종이고, 019는 사용자가 제작한 웹 2D 콘텐츠를 다루는 독립 UGC 기능이다.
 
 ## Clarifications
+
+### Session 2026-08-23
+
+- Q: 장르마다 별도 저장 모델을 만들 것인가? → A: 아니다. Backend 문서 형식은 `GameProject v1` 하나이고 실행 방식은 `TOP_DOWN`·`PLATFORMER` 두 개만 둔다. 스토리·방탈출·수집·점프맵·슈팅·생존은 검색/추천용 장르 태그와 제작 시작 템플릿일 뿐 별도 Runtime이나 테이블이 아니다.
+- Q: 현재 로컬 수직 구현은 무엇을 선택했는가? → A: 기존 `festa-frontend` 안의 lazy module, TypeScript 계약/상태 코어, DOM/CSS reference renderer, same-origin `/app/games/:gameId/play?source=local` Preview를 선택했다. Production renderer나 API adapter는 port 뒤에서 교체할 수 있고 GameProject 의미를 바꾸지 않는다.
+- Q: 기본 자산과 사용자 이미지는 어떻게 노출하는가? → A: versioned `builtin://` 타일셋·스프라이트·배경·인물 표정을 먼저 제공하고, 사용자는 선택한 Sprite/배경만 명시적으로 교체한다. 로컬 blob은 Preview 전용이며 Publish에는 Backend가 발급한 안정 Asset reference만 허용한다.
+- Q: DB와 브라우저를 보호하는 상한은 무엇인가? → A: GameProject JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset reference 300을 v1 상한으로 검증한다. 이미지·오디오 binary는 JSON/DB에 넣지 않는다.
 
 ### Session 2026-08-21
 
@@ -101,11 +108,11 @@
 
 ---
 
-### User Story 5 - 플랫폼 액션 Scene 확장 (Priority: P2)
+### User Story 5 - 플랫폼 액션 Scene 확장 (Priority: P1)
 
 제작자는 동일 프로젝트에 횡스크롤 플랫폼 Scene을 추가하고 대화·탐색 Scene과 전환한다.
 
-**Why this priority**: 공통 Scene·Variable·Event 구조가 두 번째 움직임 방식에서도 재사용되는지 검증하지만 첫 MVP의 선행 조건은 아니다.
+**Why this priority**: 하나의 공통 계약으로 탐색 외 액션 장르까지 만들 수 있음을 증명하고, 장르별 Backend 모델 증가를 막는다.
 
 **Independent Test**: 탐색 Scene에서 플랫폼 Scene으로 이동해 장애물을 통과하고 Goal에 도달한 뒤 대화 Scene으로 전환한다.
 
@@ -138,8 +145,8 @@
 
 - **FR-001**: 시스템은 게임 프로젝트를 Draft와 Published Version으로 구분해야 한다.
 - **FR-002**: 제작자는 여러 Scene을 생성·이름 변경·정렬·삭제하고 시작 Scene을 하나 지정할 수 있어야 한다.
-- **FR-003**: 첫 MVP는 `TOP_DOWN`과 `DIALOGUE` Scene을 지원해야 한다.
-- **FR-004**: 후속 범위는 동일 프로젝트 안에서 `PLATFORMER` Scene을 지원할 수 있어야 한다.
+- **FR-003**: Game Studio v1은 `TOP_DOWN`, `PLATFORMER`, `DIALOGUE` Scene을 지원해야 한다.
+- **FR-004**: 이동·물리 Runtime 유형은 `TOP_DOWN`과 `PLATFORMER` 두 개로 제한하고, `DIALOGUE`는 두 Runtime에서 호출할 수 있는 표현/분기 Scene으로 사용해야 한다.
 - **FR-005**: 제작자는 허용된 오브젝트 프리셋을 배치하고 각 Scene 유형에서 지원되는 속성만 편집할 수 있어야 한다.
 - **FR-006**: 이벤트는 허용된 Trigger·Condition·Action의 구조화된 조합으로만 구성되어야 하며 사용자 임의 스크립트를 실행해서는 안 된다.
 - **FR-007**: 첫 MVP Trigger는 `ON_SCENE_START`, `ON_INTERACT`, `ON_ENTER`를 지원해야 한다.
@@ -179,6 +186,13 @@
 - **FR-041**: Published Version 이력은 Game이 존속하는 동안 유지하고 hard delete 시 함께 제거해야 한다.
 - **FR-042**: Portal `configId`는 `1..2147483647`만 유효하고 0을 발급해서는 안 되며, DB 내부 BIGINT PK와 별도 INTEGER 공개 ID로 관리해야 한다.
 - **FR-043**: `GAME_PORTAL`은 Layout canonical type whitelist에 `requiresConfig=true`로 등록해야 한다. 남의/없는 Binding은 error, 소유한 비활성·비공개 Game은 Booth Publish warning, 방문자 실행은 엄격 차단해야 한다.
+- **FR-044**: 기본 제작 시작점은 스토리 탐색, 방탈출, 수집 퀘스트, 플랫폼 액션, 횡스크롤 슈팅, 생존 웨이브 6종을 제공하되 모두 동일 GameProject 계약으로 저장해야 한다.
+- **FR-045**: 액션 제작을 위해 피해·체력·점수값·체크포인트·자동 이동·발사·생성 Component를 구조화된 값으로 제공하고 임의 사용자 스크립트를 요구해서는 안 된다.
+- **FR-046**: 제작자는 오브젝트 이미지 크기와 겹침 순서를 조정할 수 있어야 하며 타일/배경이 캐릭터와 상호작용 오브젝트를 덮지 않도록 일관된 layer 규칙을 사용해야 한다.
+- **FR-047**: DIALOGUE는 별도 장르가 아니라 플레이 중 Overlay 또는 전체 화면 연출로 삽입할 수 있어야 하며 배경·인물·표정·대사·선택지를 편집할 수 있어야 한다.
+- **FR-048**: 편집 UI는 한국어 기본 재료, 빠른 행동 recipe, 4단계 사용 안내와 완성 템플릿을 제공해 사용자가 Asset 경로나 JSON을 직접 다루지 않고 배치와 기획에 집중하게 해야 한다.
+- **FR-049**: 기본 Asset은 바로 선택 가능해야 하고 사용자 파일 선택은 전역 작업 흐름이 아니라 선택한 요소의 `내 이미지로 교체` 또는 접힌 고급 영역에서만 노출해야 한다.
+- **FR-050**: v1 상한은 JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300이며 초과 데이터는 저장 전에 명시적으로 거부해야 한다.
 
 ### Part Boundaries
 
@@ -196,7 +210,7 @@
 - **Game Draft**: Game마다 최대 하나 존재하며 revision으로 충돌을 검출하는 가변 작업본.
 - **Game Published Version**: `(gameId, versionNo)`로 식별되고 생성 후 변경되지 않는 공개 snapshot.
 - **Game Project**: Scene, 변수, 아이템, 에셋 참조와 시작 Scene을 묶는 버전 계약.
-- **Scene**: `TOP_DOWN`, `DIALOGUE`, 후속 `PLATFORMER` 중 하나의 실행 단위. DIALOGUE는 전체 화면 또는 호출한 맵 위 Overlay로 제시된다.
+- **Scene**: `TOP_DOWN`, `PLATFORMER`, `DIALOGUE` 중 하나의 실행 단위. DIALOGUE는 전체 화면 또는 호출한 맵 위 Overlay로 제시된다.
 - **Game Asset Reference**: 타일셋·스프라이트·오디오 원본을 직접 포함하지 않고 안정적인 식별자와 종류로 가리키는 값.
 - **Game Object**: Scene에 배치된 안정적인 식별자와 허용된 동작 구성을 가진 요소.
 - **Game Event**: Trigger, Conditions, Actions의 제한된 실행 규칙.
@@ -224,11 +238,11 @@
 - Game Studio는 기존 FESTA Web과 인증을 공유하는 같은 출처의 분리 영역으로 시작하며 별도 인증 앱을 만들지 않는다.
 - 편집과 Published 플레이는 서로 구분되는 인증된 게임 화면으로 제공한다.
 - 첫 MVP는 데스크톱 브라우저 편집을 우선하며 모바일은 플레이만 허용할 수 있다.
-- 첫 MVP는 버전이 고정된 기본 Asset catalog로 검증하며 사용자 업로드와 보존 정책은 Backend 계약 확정 후 추가한다.
+- v1은 버전이 고정된 기본 Asset catalog와 로컬 교체 Preview를 제공한다. 사용자 업로드의 영구 보존·공개 정책은 Backend Asset 계약 뒤 연결한다.
 - Object preset의 편의 입력은 저장 전에 공통 Component/Event 데이터로 변환되며 별도 실행 엔진을 만들지 않는다.
 - 미리보기는 공개 버전을 변경하지 않는 로컬/격리 실행을 기본으로 한다.
 - `014-minigame`의 Coin 보상과 서버 권위 게임 규칙은 019에 재사용하지 않는다.
-- `PUZZLE`, 전투, 적 AI, Quest, Projectile, Spawner, 멀티플레이 UGC는 첫 MVP에 포함하지 않는다.
+- 퍼즐과 Quest는 별도 Runtime을 만들지 않고 Event/Component 조합과 템플릿으로 제공한다. 단순 체력·투사체·자동 이동·Spawner는 v1 reference 범위이며 경로 탐색 AI·복잡한 전투식·멀티플레이 UGC는 포함하지 않는다.
 
 ## Dependencies
 
@@ -237,14 +251,14 @@
 - AI 범위 결정: GitHub Issue #22 — 완료·종료
 - 공개 중단·삭제·표시 전용 Ranking 정책: GitHub Issue #33 — 합의 반영 완료
 - `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34 — BE·Unity 합의 반영, FE 구현 확인만 추적
-- Renderer·Preview sandbox·Asset resolver 수직 구현: GitHub Issue #35
+- Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — FE 구현안 반영, Production parity/CSP 후속 확인 필요
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
 ## Out of Scope
 
 - 사용자 코드·수식·플러그인 실행
-- 턴제 전투, 적 AI, 디펜스, 네트워크 멀티플레이
+- 턴제 전투, 경로 탐색/행동 트리 적 AI, 서버 권위 디펜스, 네트워크 멀티플레이
 - 사용자 제작 게임의 Coin 보상과 MVP 랭킹. 표시 전용 랭킹은 P1 별도 범위다.
 - Unity 안에서 2D 게임을 렌더링하거나 Unity Dedicated Server가 게임 상태를 권위 처리하는 구조
 - AI가 플레이 중 응답해야만 진행되는 게임

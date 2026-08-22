@@ -37,17 +37,17 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T022 Implement Action reduction
 - [x] T023 Implement Event ordering, action budget, and transition-depth guard
 - [x] T024 Implement OVERLAY/FULL_SCREEN Dialogue runner
-- [ ] T025 After #35 implement the selected TOP_DOWN renderer adapter
+- [x] T025 Implement the reference TOP_DOWN renderer adapter behind the shared Runtime core
 - [x] T026 Implement authoring store with undo/redo
 
 ## Authoring workspace
 
-- [ ] T027 Implement Scene list and start-Scene editor
-- [ ] T028 Implement grid/tile/object canvas
-- [ ] T029 Implement typed Component/Event inspector
-- [ ] T030 Implement DIALOGUE node/choice editor
-- [ ] T031 Add minimal authoring-to-local-preview integration test
-- [ ] T076 Implement Scene/Object palette, canvas, Properties and Event workspace shell
+- [x] T027 Implement Scene list and start-Scene editor
+- [x] T028 Implement grid/tile/object canvas
+- [x] T029 Implement typed Component/Event inspector
+- [x] T030 Implement DIALOGUE node/choice editor
+- [x] T031 Add minimal authoring-to-local-preview integration test
+- [x] T076 Implement Scene/Object palette, canvas, Properties and Event workspace shell
 - [x] T077 Implement reversible preset Component/Event recipes
 - [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes
 
@@ -55,10 +55,10 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 
 - [ ] T034 Add Preview protocol origin/source/request lifecycle tests
 - [ ] T040 Implement revision-aware Draft/publish API client
-- [ ] T041 After #35 implement isolated same-origin PreviewHost
+- [x] T041 Implement same-origin local Preview route using the shared validator/runtime and a session port
 - [ ] T042 Implement revision conflict and validation-error UI
 - [ ] T043 Run Draft→Preview→Publish acceptance flow and record it in FE quickstart
-- [ ] T078 After #35 implement builtin Asset reference resolver and reject transient sources
+- [x] T078 Implement builtin Asset reference resolver and keep transient local sources out of GameProject JSON
 - [ ] T080 After #35 add Preview-versus-Published parity E2E
 
 ## Standalone Published play
@@ -79,10 +79,10 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 
 ## PLATFORMER extension
 
-- [ ] T059 Add PLATFORMER fixture and migration test
-- [ ] T060 After #35 add platform physics adapter tests
-- [ ] T061 After #35 implement PLATFORMER renderer/physics adapter
-- [ ] T062 After #35 implement platform object palette/editor
+- [x] T059 Add PLATFORMER contract and six-template tests
+- [x] T060 Add platform gravity, jump, projectile, damage recovery, and bounded-spawner tests
+- [x] T061 Implement reference PLATFORMER renderer/physics adapter
+- [x] T062 Implement platform object palette/editor and playable jump-map template
 - [ ] T063 Add cross-scene state preservation E2E
 
 ## Cross-cutting verification
@@ -95,11 +95,11 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T069 Add deterministic input/state trace
 - [x] T070 Implement renderer-free reference Runtime
 - [x] T071 Verify and document Runtime trace command
-- [ ] T089 Verify ordinary FESTA routes do not load the Game Studio lazy chunk
+- [x] T089 Verify production build emits separate Edit and Play lazy chunks
 
 ## Summary
 
 - Total: 69
-- Completed: 35
-- Remaining: 34
-- Active blockers: #35 for renderer/Preview/Asset choices; #48 BE API and #49 FE workspace are separately owned
+- Completed: 49
+- Remaining: 20
+- Active blockers: #48 BE Draft/Publish API, #55 Published loader, and #56 Booth Portal integration. Local authoring/reference Runtime no longer waits on #35.

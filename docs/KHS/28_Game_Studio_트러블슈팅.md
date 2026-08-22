@@ -6,6 +6,43 @@
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
+## 2026-08-23
+
+### GS-T030. root `.gitignore`의 `Reference/` 규칙이 Web Runtime 디렉터리까지 숨김 (해결)
+
+- **증상** — 테스트와 build는 `runtime/reference`를 정상 사용했지만 일반 `git add src/game-studio` 뒤 staged 목록에 핵심 Runtime 3파일이 없었다.
+- **원인** — Unity용으로 보이는 root `.gitignore`의 `Reference/` 규칙이 Windows 대소문자 비구분 경로에서 Game Studio의 `runtime/reference/`에도 적용됐다.
+- **해결** — `git check-ignore -v`로 정확한 규칙을 확인하고 Game Studio 전용 Runtime 3파일만 `git add -f`로 최초 추적했다. root ignore나 Unity 경로는 변경하지 않았다. 추적된 뒤에는 후속 수정이 일반 Git 상태에 표시된다.
+- **예방** — 커밋 전 `git status --ignored <feature-root>`와 staged 파일 목록을 함께 확인한다. 새 디렉터리 이름이 범용 ignore pattern과 겹치면 최초 추적 여부를 명시적으로 검증한다.
+
+### GS-T029. Action Component 검증 분기가 Scene validator에 들어가 template build가 실패함 (해결)
+
+- **증상** — Vitest에서 6종 template과 SHOOTER Component가 `project.scenes[0].type is invalid`로 거부되고 TypeScript build도 새 test의 `unknown` reduce 추론으로 실패했다.
+- **원인** — `DAMAGE`부터 `SPAWNER`까지 Component 분기를 `validateComponentShape`가 아니라 인접한 `validateSceneShape`에 추가했고, generic `Array.reduce`가 Runtime state 초기값을 `unknown`으로 추론했다.
+- **해결** — Component 분기를 올바른 validator로 이동하고 test frame 진행을 명시적 typed loop로 바꿨다. 이후 Vitest 85개와 production build를 함께 통과시켰다.
+- **예방** — discriminated union을 확장할 때 각 신규 variant마다 유효 1건/오류 1건을 먼저 추가하고 test 통과뿐 아니라 `tsc -b`를 같은 검증 묶음으로 실행한다.
+
+### GS-T028. 1040px 최소 폭 때문에 인앱 브라우저에서 왼쪽 제작 패널이 화면 밖으로 밀림 (해결)
+
+- **증상** — 813px 인앱 브라우저에서 root 1040px, document scrollWidth 1040px, scrollX 237로 측정됐고 왼쪽 Scene/Object 패널과 상단 제목이 동시에 보이지 않았다.
+- **원인** — 데스크톱 3열 배치를 보호하려고 root에 `min-width: 1040px`을 고정했고 Map stage 최소 폭까지 document overflow에 합쳐졌다.
+- **해결** — 1039px 이하에서 root 최소 폭을 제거하고 170px/가변/260px 3열로 재배치했다. Map stage의 큰 폭은 중앙 canvas scroll이 소유하게 하고 palette를 한 열로 압축했다. 재측정은 root/scrollWidth 모두 813px, scrollX 0이다.
+- **예방** — 편집기 QA는 넓은 데스크톱뿐 아니라 앱 패널 폭에서 document overflow와 내부 workspace overflow를 구분해 수치로 확인한다.
+
+### GS-T027. Atlas frame·Object zIndex가 잘못되어 NPC/대화 인물 위에 다른 Object가 보임 (해결)
+
+- **증상** — NPC가 말풍선 frame처럼 보이거나 Overlay 대화 인물의 얼굴 위에 문 Sprite가 표시됐다.
+- **원인** — 생성 atlas의 실제 row/frame 위치를 눈으로 확인하지 않고 catalog index를 추정했고, Runtime Object inline zIndex가 Dialogue layer 기본 zIndex보다 높았다.
+- **해결** — 원본 atlas를 직접 열어 frame mapping을 고정하고 기존 4×4 atlas의 검증된 NPC/key/door frame을 재사용했다. Dialogue layer는 World Object 전체보다 높은 stacking context로 올린 뒤 브라우저 screenshot으로 재검증했다.
+- **예방** — 생성 atlas는 metadata만 믿지 않고 각 frame을 실제 렌더해 확인하며, World/Effect/Dialogue/HUD의 zIndex 대역을 겹치지 않게 예약한다.
+
+### GS-T026. `useSyncExternalStore` snapshot 객체가 매 호출마다 새로 생성되어 Editor가 무한 갱신됨 (해결)
+
+- **증상** — Authoring store를 React shell에 연결한 직후 `getSnapshot should be cached` 경고와 maximum update depth 오류가 발생했다.
+- **원인** — `getState()`가 내용이 같아도 매 호출 새 wrapper 객체를 반환해 React가 외부 store 상태가 계속 바뀐 것으로 판단했다.
+- **해결** — Store 내부에 현재 snapshot 객체를 캐시하고 실제 command/undo/redo/reset에서만 새 snapshot을 만들도록 바꿨다. store unit test와 브라우저 편집/저장 여정으로 재검증했다.
+- **예방** — `useSyncExternalStore` adapter는 동일 상태에서 `Object.is(getSnapshot(), getSnapshot())`가 참이 되도록 구현하고 이 항등성을 unit test로 고정한다.
+
 ## 2026-08-21
 
 ### GS-T025. Booth Studio 병합 뒤 PR #47의 공통 router가 충돌함 (해결)

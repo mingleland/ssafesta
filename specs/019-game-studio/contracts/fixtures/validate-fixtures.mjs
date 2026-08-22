@@ -139,9 +139,16 @@ export function validateProject(project) {
   }
 
   for (const scene of project.scenes) {
-    if (scene.type === "TOP_DOWN") {
+    if (scene.type === "TOP_DOWN" || scene.type === "PLATFORMER") {
+      if (scene.type === "PLATFORMER") {
+        expect(Number.isInteger(scene.gravity) && scene.gravity >= 1 && scene.gravity <= 30, "PLATFORMER_GRAVITY_INVALID", `${scene.id} gravity is invalid`);
+      }
       const playerSpawns = scene.objects.filter((object) => object.preset === "PLAYER_SPAWN");
       expect(playerSpawns.length === 1, "PLAYER_SPAWN_COUNT_INVALID", `${scene.id} must have exactly one PLAYER_SPAWN`);
+
+      if (scene.backgroundAssetId) {
+        expect(assets.get(scene.backgroundAssetId)?.kind === "IMAGE", "BACKGROUND_ASSET_INVALID", `invalid background asset: ${scene.backgroundAssetId}`);
+      }
 
       for (const layer of scene.tileLayers) {
         expect(assets.get(layer.tilesetAssetId)?.kind === "TILESET", "TILESET_ASSET_INVALID", `invalid tileset: ${layer.tilesetAssetId}`);
@@ -169,6 +176,12 @@ export function validateProject(project) {
           if (component.type === "PICKUP") {
             expect(items.has(component.itemId), "PICKUP_ITEM_NOT_FOUND", `unknown pickup item: ${component.itemId}`);
           }
+          if (component.type === "SHOOTER") {
+            expect(assets.get(component.projectileAssetId)?.kind === "IMAGE", "PROJECTILE_ASSET_INVALID", `invalid projectile asset: ${component.projectileAssetId}`);
+          }
+          if (component.type === "SPAWNER") {
+            expect(assets.get(component.enemyAssetId)?.kind === "IMAGE", "SPAWNER_ASSET_INVALID", `invalid spawner asset: ${component.enemyAssetId}`);
+          }
         }
       }
 
@@ -188,8 +201,14 @@ export function validateProject(project) {
         `${scene.id} has invalid presentation`,
       );
       const nodes = uniqueMap(scene.nodes, `dialogue node in ${scene.id}`, "DUPLICATE_DIALOGUE_NODE_ID");
+      if (scene.backgroundAssetId) {
+        expect(assets.get(scene.backgroundAssetId)?.kind === "IMAGE", "BACKGROUND_ASSET_INVALID", `invalid background asset: ${scene.backgroundAssetId}`);
+      }
       expect(nodes.has(scene.startNodeId), "DIALOGUE_START_NODE_NOT_FOUND", `${scene.id} startNodeId does not exist`);
       for (const node of scene.nodes) {
+        if (node.portraitAssetId) {
+          expect(assets.get(node.portraitAssetId)?.kind === "IMAGE", "PORTRAIT_ASSET_INVALID", `invalid portrait asset: ${node.portraitAssetId}`);
+        }
         for (const choice of node.choices) {
           if (choice.nextNodeId) {
             expect(nodes.has(choice.nextNodeId), "NEXT_DIALOGUE_NODE_NOT_FOUND", `${scene.id} unknown nextNodeId: ${choice.nextNodeId}`);

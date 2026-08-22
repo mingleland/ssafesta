@@ -7,6 +7,28 @@
 > Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
+## 2026-08-23
+
+### 범용 Authoring Tool·Reference Runtime 수직 구현 ✅
+
+- 🤖 최신 `front` 기반 전용 `codex/game-studio-authoring-shell` 브랜치에서 Scene/Object/Tile/Properties/Event/Dialogue/Data가 한 화면에서 이어지는 한국어 Game Studio를 구현했다. 공유 Unity 작업트리, `festa-unity/**`, `backend/**`는 수정하지 않았다.
+- 🤖 `TOP_DOWN`, `PLATFORMER`, `DIALOGUE`를 GameProject v1 하나로 검증하고, 장르는 Backend 문서 유형이 아니라 6종 시작 템플릿(스토리·방탈출·수집·점프맵·슈팅·생존)으로 분리했다.
+- 🤖 4방향 캐릭터 애니메이션, 도서관/플랫폼 타일셋, 50종 이상 Object·인물 표정·배경 reference catalog를 추가했다. 기본 재료를 먼저 보여주고 선택한 Sprite에서만 `내 이미지로 교체`를 열며, 로컬 binary는 IndexedDB Asset repository가 소유한다.
+- 🤖 내장 원본 PNG 8종을 화면 품질 확인 뒤 WebP로 전환해 번들 Asset을 15,440,090 bytes에서 3,587,104 bytes로 **76.8% 감소**시켰다. 저장소의 중복 PNG는 제거했고 원본 생성 결과는 Codex generated-images 기록에서 복구할 수 있다.
+- 🤖 불변 Authoring command, undo/redo, Scene 생성·삭제, Tile painting, drag/place, typed Component inspector, Trigger/Condition/Action editor, 빠른 행동 recipe, Dialogue 배경·인물·표정·대사·선택지 live preview를 구현했다.
+- 🤖 Reference Runtime에 이동·충돌·인벤토리·문·대화·Scene 전환 외에도 중력·점프·체력·피해 회복 시간·점수·체크포인트·자동 이동·투사체·bounded spawner를 연결했다. Preview는 Unity/WebGL 없이 same-origin `/play?source=local` route에서 같은 validator/state/event core를 실행한다.
+- 🤖 DB 보호 경계는 GameProject JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300으로 고정했다. 이미지·오디오 binary는 JSON/DB 대상이 아니다.
+- 🤖 Vitest **16 files / 85 tests**, TypeScript production build와 lint를 통과했고 Edit/Play가 별도 lazy chunk로 출력되는 것을 확인했다.
+
+### 인앱 브라우저 실제 사용자 여정 검증 ✅
+
+- 🤖 813px 폭에서 전체 페이지 가로 overflow가 1040px로 밀리던 문제를 수정해 `scrollWidth=813`, `scrollX=0`을 확인했다. 왼쪽 제작 재료·가운데 맵·오른쪽 속성을 유지하고 큰 맵만 작업영역 내부에서 이동한다.
+- 🤖 `슬라임 블래스터 선택 → 교체 확인 → 로컬 저장 → 플레이 → F 발사` 흐름과 상태 HUD를 실제 브라우저에서 검증했다. 템플릿은 시스템 confirm 대신 선택→명시적 불러오기 2단계로 교체한다.
+- 🤖 `탐색 맵 이동 → NPC 상호작용 → 인물 Overlay 대화 → 선택지 → 같은 맵 복귀`를 실제로 완료했다. 대화 중 월드 입력이 차단되고 종료 뒤 체력·맵·인벤토리가 유지된다.
+- 🤖 배경/인물 선택 목록은 역할에 맞는 builtin만 노출하고 사용자 Asset은 선택 후보로 유지했다. Dialogue layer가 높은 zIndex Object 아래로 들어가던 문제도 수정했다.
+- 관련 기능 커밋: `39ebcde feat(game-studio): build visual authoring and playable runtimes`
+- 트러블슈팅: GS-T026~GS-T030
+
 ## 2026-08-22
 
 ### Web Runtime Core front 병합·후속 이슈 상태 정리 ✅

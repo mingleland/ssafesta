@@ -66,6 +66,9 @@
             "$ref": "#/$defs/topDownScene"
           },
           {
+            "$ref": "#/$defs/platformerScene"
+          },
+          {
             "$ref": "#/$defs/dialogueScene"
           }
         ]
@@ -170,7 +173,9 @@
           "required": ["type", "assetId"],
           "properties": {
             "type": { "const": "SPRITE" },
-            "assetId": { "$ref": "#/$defs/stableId" }
+            "assetId": { "$ref": "#/$defs/stableId" },
+            "scale": { "type": "integer", "minimum": 25, "maximum": 400 },
+            "zIndex": { "type": "integer", "minimum": 0, "maximum": 20 }
           }
         },
         {
@@ -198,6 +203,74 @@
           "properties": {
             "type": { "const": "PICKUP" },
             "itemId": { "$ref": "#/$defs/stableId" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "DAMAGE" },
+            "amount": { "type": "integer", "minimum": 1, "maximum": 999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "max"],
+          "properties": {
+            "type": { "const": "HEALTH" },
+            "max": { "type": "integer", "minimum": 1, "maximum": 9999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "SCORE_VALUE" },
+            "value": { "type": "integer", "minimum": -999999, "maximum": 999999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "CHECKPOINT" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "axis", "speed", "range"],
+          "properties": {
+            "type": { "const": "AUTO_MOVE" },
+            "axis": { "enum": ["HORIZONTAL", "VERTICAL"] },
+            "speed": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "range": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "projectileAssetId", "damage", "cooldownMs"],
+          "properties": {
+            "type": { "const": "SHOOTER" },
+            "projectileAssetId": { "$ref": "#/$defs/stableId" },
+            "damage": { "type": "integer", "minimum": 1, "maximum": 999 },
+            "cooldownMs": { "type": "integer", "minimum": 100, "maximum": 10000 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "enemyAssetId", "intervalMs", "maxAlive"],
+          "properties": {
+            "type": { "const": "SPAWNER" },
+            "enemyAssetId": { "$ref": "#/$defs/stableId" },
+            "intervalMs": { "type": "integer", "minimum": 250, "maximum": 60000 },
+            "maxAlive": { "type": "integer", "minimum": 1, "maximum": 100 }
           }
         }
       ]
@@ -233,7 +306,14 @@
             "INTERACTABLE",
             "ITEM",
             "DOOR",
-            "GOAL"
+            "GOAL",
+            "PLATFORM",
+            "HAZARD",
+            "ENEMY",
+            "TURRET",
+            "CHECKPOINT",
+            "SPAWNER",
+            "DECORATION"
           ]
         },
         "position": {
@@ -469,6 +549,9 @@
           "minLength": 1,
           "maxLength": 1000
         },
+        "portraitAssetId": {
+          "$ref": "#/$defs/stableId"
+        },
         "choices": {
           "type": "array",
           "items": {
@@ -504,6 +587,9 @@
           "minimum": 4,
           "maximum": 100
         },
+        "backgroundAssetId": {
+          "$ref": "#/$defs/stableId"
+        },
         "tileLayers": {
           "type": "array",
           "items": { "$ref": "#/$defs/tileLayer" },
@@ -521,6 +607,35 @@
           "items": {
             "$ref": "#/$defs/event"
           },
+          "maxItems": 300
+        }
+      }
+    },
+    "platformerScene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "width", "height", "gravity", "tileLayers", "objects", "events"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "type": { "const": "PLATFORMER" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "width": { "type": "integer", "minimum": 8, "maximum": 200 },
+        "height": { "type": "integer", "minimum": 6, "maximum": 100 },
+        "gravity": { "type": "integer", "minimum": 1, "maximum": 30 },
+        "backgroundAssetId": { "$ref": "#/$defs/stableId" },
+        "tileLayers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tileLayer" },
+          "maxItems": 10
+        },
+        "objects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gameObject" },
+          "maxItems": 500
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" },
           "maxItems": 300
         }
       }
@@ -543,6 +658,9 @@
         },
         "presentation": {
           "enum": ["OVERLAY", "FULL_SCREEN"]
+        },
+        "backgroundAssetId": {
+          "$ref": "#/$defs/stableId"
         },
         "startNodeId": {
           "$ref": "#/$defs/stableId"
