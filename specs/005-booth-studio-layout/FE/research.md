@@ -88,12 +88,11 @@
 
 ## R-10. 테스트 러너
 
-**제안 — 팀 승인 필요**
+**확정 — vitest 도입**([PR #47](https://github.com/kanghyunsoon/ssafesta/pull/47), 강형순, 2026-08-22 머지)
 
-- **Decision**: `vitest`를 devDependency로 1건 추가한다. 대상은 `coords.ts`(부호 왕복 — `docs/LJH/verify/block1-roundtrip.md`의 실측 기대값을 그대로 테이블 테스트로 옮긴다)와 `validate.ts`(검증 6종).
+- **Decision**: `vitest`가 devDependency로 이미 있다(`package.json`·`vite.config.ts`). 대상은 `coords.ts`·`validate.ts`·`geometry.ts`(§10-1 회전 AABB)·`passage.ts`(§10-3 통행 판정) — 부호 왕복표는 `docs/LJH/verify/block1-roundtrip.md`·`booth-studio-quickstart.md`의 실측 기대값을 그대로 테이블 테스트로 옮겼다(T025, `__tests__/unit/`).
 - **Rationale**: 헌법 21조가 명시적으로 "부호 하나는 반드시 틀린다"고 경고하는 영역의 회귀 방어다. `docs/10` §18(Unit 테스트 항목)에 "Layout 변환·Validation"이 이미 명시돼 있다. Vite 프로젝트에서 vitest는 런타임 번들에 영향이 없는 devDependency다.
-- **Alternatives**: `node:test` — 런타임 의존성은 0이지만 TS strip 설정을 별도로 갖춰야 해 Vite 프로젝트 관례에서 벗어난다. 팀이 "신규 의존성 금지"를 devDependency까지 확대 해석하면 이 대안으로 전환한다.
-- **참고**: plan.md 제약("신규 런타임 의존성 0")은 프로덕션 번들 기준이다. devDependency 추가 여부는 이 plan 단독으로 확정하지 않고 팀 승인 항목으로 남긴다.
+- **경위**: 이 결정은 원래 FE plan 단독으로 확정하지 않고 팀 승인 항목으로 남겨뒀는데, PR #47(game-studio Web Runtime 코어)이 같은 결론(vitest devDependency 1개, `<feature>/__tests__/unit/*.test.ts` 구조)으로 먼저 들어와 팀 승인이 실질적으로 이뤄졌다. T025는 이미 있는 러너·컨벤션에 얹었을 뿐 별도로 도입하지 않았다.
 
 ## R-11. facade(외부 표현) 편집 — FR-018
 
@@ -127,4 +126,3 @@
 | — | `themeCode` 4값이 계약 문서에 없음 | `docs/08`·구현에만 있음. 계약 문서 승격 시 반영 |
 | — | facade 팔레트 12색 구체 hex 값 | "FE↔BE 구현 트랙에서" — FE 착수 필요 |
 | R-11 | `booths.name`↔`facade_sign_text` 화면 관계 | FE 화면 설계 몫 — 폼 구현은 막지 않음 |
-| R-10 | vitest devDependency 추가 | 팀 승인 |

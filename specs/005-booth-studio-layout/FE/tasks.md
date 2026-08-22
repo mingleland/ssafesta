@@ -103,7 +103,7 @@
 - [x] T023 `entities/layout/passage.ts` — §10-3 통행 판정(래스터 0.05m·120×120·침식 0.22m·flood fill 4방향·관람 띠 0.7m·50%·고립 1㎡, 계약 수치 그대로). `api.mock.ts` publish가 같은 lib을 import해 "서버와 같은 답"(#19) 전제를 mock에서도 지킨다. 브라우저 실측(§6b) — VIDEO_SCREEN 모서리 회전 배치로 FE·mock draft 저장 양쪽 `AREA_OUT_OF_BOUNDS` 일치, SURVEY_KIOSK로 관람 띠 차단해 FE·mock publish 양쪽 `FRONT_BLOCKED` 일치 확인. 커밋 `d657509`
 - [x] T024 quickstart §2~§7(+§6b) 전 시나리오 재실행, US1~US4·T022-T023·T026 누적 반영 후 최종 인수검사. 8블록 전부 일치, 불일치 0건 — `docs/LJH/verify/booth-studio-quickstart.md`
 - [x] T026 [Polish] 중간 검증에서 나온 결함 10건 수정 — 커밋 `fb24ef4`(미지 ObjectType 크래시·편집 소실·공개 dirty·충돌 UI 분리)·`0d584f6`(mock publish 스냅샷·lease 경로 정정·draft warnings 제거·드래그 pointer capture·§5 재현 훅·PublishDialog key)·`cd0e709`(계약서 pull·rule 주석 정본화). 브라우저 실측 6/6 — 상세는 `docs/LJH/24_작업일지.md` 08-22
-- [ ] T025 (R-10 승인 시) vitest 추가 — coords 부호 왕복표(`block1-roundtrip.md` 실측값)·validate·회전 AABB·passage 테이블 테스트
+- [x] T025 vitest 단위 테스트 37개 — `coords`(부호 왕복, 실측값)·`validate`(경고·오류·AREA_OUT_OF_BOUNDS)·`geometry`(회전 AABB, CONSULTATION_DESK 비대칭 함정값 90/180/270 + 45° 독립 공식 교차검증)·`passage`(빈 배치·FRONT_BLOCKED·ISOLATED_AREA). R-10은 PR #47(vitest 도입)로 이미 팀 승인 실질 충족 — 별도 승인 절차 없이 진행, research.md 정본화
 
 ---
 
