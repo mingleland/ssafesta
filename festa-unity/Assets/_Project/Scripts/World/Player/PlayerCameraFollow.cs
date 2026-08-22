@@ -23,7 +23,8 @@ namespace Festa.World
         [SerializeField] float _maxDistance = 36f;
         [SerializeField] float _zoomStep = 1.2f;
         [SerializeField] float _orbitSensitivity = 0.12f;
-        [SerializeField] float _minPitch = -20f;
+        // 수평(0) 아래로 내려가면 단면 바닥을 밑에서 보게 된다 — 지면 뚫림의 원천.
+        [SerializeField] float _minPitch = 4f;
         [SerializeField] float _maxPitch = 65f;
         [SerializeField] float _collisionReturnLerp = 5f;
         // 당기는 쪽은 밀려나는 쪽보다 빨라야 한다 — 느리면 벽에 파묻힌다.
@@ -36,7 +37,7 @@ namespace Festa.World
         // 하나로 고정하면 줌인할 때 엉덩이를 들여다본다. 3인칭 게임은 가까워질수록
         // 시선을 **어깨 쪽으로 올린다** — 멀리서는 발밑까지 보여 주고, 가까이서는
         // 상체를 본다. 아바타 목표 높이가 17.9 unit 이라 어깨는 대략 14 다.
-        [SerializeField] float _lookHeight = 8.05f;      // 최대 줌아웃에서의 높이
+        [SerializeField] float _lookHeight = 11.5f;     // 최대 줌아웃에서의 높이 (가슴 — 바닥 쏠림 방지)
         [SerializeField] float _lookHeightNear = 14f;    // 최대 줌인에서의 높이
 
         // ── 자기 몸 가리기 ────────────────────────────────────────
@@ -155,6 +156,17 @@ namespace Festa.World
             }
 
             var targetPos = lookTarget + orbitDirection * _resolvedDistance;
+
+            // 바닥 클램프 — 지면은 단면 메시라 밑에서 보면 하늘이 뚫린다. 플레이어
+            // 발밑 지면을 기준으로 최소 높이를 강제한다. 플레이어 레이어(8)는 제외.
+            int groundMask = _collisionMask & ~(1 << 8);
+            if (Physics.Raycast(transform.position + Vector3.up * 2f, Vector3.down,
+                    out var groundHit, 80f, groundMask, QueryTriggerInteraction.Ignore))
+            {
+                float minY = groundHit.point.y + 2f;
+                if (targetPos.y < minY) targetPos.y = minY;
+            }
+
             var obstructed = desiredDistance < _distance - 0.001f;
             _cam.transform.position = obstructed
                 ? targetPos

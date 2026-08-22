@@ -226,11 +226,11 @@ MonoBehaviour:
   _maxDistance: 36
   _zoomStep: 1.2
   _orbitSensitivity: 0.12
-  _minPitch: -20
+  _minPitch: 4
   _maxPitch: 65
   _collisionReturnLerp: 5
   _collisionPullLerp: 8
-  _lookHeight: 8.05
+  _lookHeight: 11.5
   _lookHeightNear: 14
   _selfHideDistance: 6
   _selfShowDistance: 8
