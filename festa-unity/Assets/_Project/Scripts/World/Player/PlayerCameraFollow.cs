@@ -23,8 +23,9 @@ namespace Festa.World
         [SerializeField] float _maxDistance = 36f;
         [SerializeField] float _zoomStep = 1.2f;
         [SerializeField] float _orbitSensitivity = 0.12f;
-        // 수평(0) 아래로 내려가면 단면 바닥을 밑에서 보게 된다 — 지면 뚫림의 원천.
-        [SerializeField] float _minPitch = 4f;
+        // 밤하늘을 올려다볼 수 있게 수평 아래로 조금 연다. 지면 뚫림은 아래의
+        // 바닥 클램프가 별도로 막으므로 안전하다 (T-190 이후 구조).
+        [SerializeField] float _minPitch = -12f;
         [SerializeField] float _maxPitch = 65f;
         [SerializeField] float _collisionReturnLerp = 5f;
         // (구) 당김 보간 계수 — 더 이상 쓰지 않는다. 보간 당김은 전환하는 동안
