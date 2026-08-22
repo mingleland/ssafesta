@@ -23,7 +23,7 @@ BE가 준비되면 구현체만 교체한다.
 
 ```http
 GET /api/v1/users/me/avatar
-→ 200 { "avatar": "<직렬화 문자열>" }
+→ 200 { "avatarCode": "<직렬화 문자열>" }
 → 404 저장된 외형 없음 (신규 사용자)
 ```
 
@@ -31,14 +31,16 @@ GET /api/v1/users/me/avatar
 
 ```http
 PUT /api/v1/users/me/avatar
-{ "avatar": "<직렬화 문자열>" }
+{ "avatarCode": "<직렬화 문자열>" }
 
-→ 200 { "avatar": "<직렬화 문자열>" }
+→ 200 { "avatarCode": "<직렬화 문자열>" }
 → 400 형식 오류
 → 401 미인증
 ```
 
-또는 기존 사용자 정보 조회에 `avatar` 필드를 포함시키는 형태도 가능하다.
+또는 기존 사용자 정보 조회에 `avatarCode` 필드를 포함시키는 형태도 가능하다.
+
+> **필드명 확정 — `avatarCode`** (2026-08-21, #24 통보). DB `avatar_code` · JPA `avatarCode` · Unity `AvatarCode`와 한 이름이다.
 
 ---
 
