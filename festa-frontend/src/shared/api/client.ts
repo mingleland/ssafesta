@@ -6,7 +6,8 @@
 export type ApiErrorDetail = { rule: string; objectId?: string; message: string };
 
 // errors·warnings는 항상 배열 — 서버가 빈 배열을 보장하고, 이 파일의 fallback도 같은 형태를 유지한다.
-// 분기는 code로만 한다(문자열 매칭·rule 분기 금지 — rule 전체 목록이 계약 문서에 없다, FE/research.md R-12)
+// 분기는 code로만 한다. rule 19종은 contracts/layout-api.md에 명문화돼 있으나(PR #57) rule 값 분기
+// 도입은 #58(오류 봉투 field 분리 결론) 이후로 미룬다 — 지금 rule에는 요청 필드명이 섞여 나올 수 있다.
 export type ApiError = {
   code: string;
   message: string;

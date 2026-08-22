@@ -111,13 +111,11 @@
 - **미확정**: `booths.name`과 `facade_sign_text`의 화면상 관계는 FE 몫으로 남아 있다(`docs/26`). 폼 구현을 막지 않는다.
 - **Alternatives**: 별도 spec으로 분리 — FR-018이 이미 005 FR로 신설됐으므로 spec을 거스르게 된다. 기각. `EditorState`에 facade 필드 병합 — 저장 경로·잠금 방식이 달라 상태 의미가 오염된다. 기각.
 
-## R-12. 오류 `rule` 문자열 — 계약 문서에 없는 것이 더 많다
+## R-12. 오류 `rule` 문자열 — 분기는 아직 안 한다
 
-**⚠️ 부분 미해소 — #36에 목록 문서화 요청**
-
-- **Decision**: FE는 `rule`로 분기하지 않고 **목록을 그대로 렌더링**하는 것을 기본으로 둔다(`message`가 한글이라 그대로 노출 가능, #36). 분기가 필요한 값은 `CURRENT_REVISION`(→ `GET /draft` 재로드, R-06) 하나뿐이다.
-- **Rationale**: 계약 문서(`contracts/layout-api.md`)에 등장하는 `rule`은 7개뿐이다 — `MALFORMED_LAYOUT`·`OBJECT_LIMIT`·`AREA_OUT_OF_BOUNDS`·`CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED`·`FRONT_BLOCKED`·`ISOLATED_AREA`. 구현(`LayoutValidator.java`)에는 그 외에도 `UNSUPPORTED_SCHEMA_VERSION`·`UNKNOWN_TEMPLATE`·`MISSING_OBJECTS`·`INVALID_OBJECT_ID`·`DUPLICATE_OBJECT_ID`·`UNKNOWN_OBJECT_TYPE`·`MISSING_POSITION`·`POSITION_OUT_OF_BOUNDS`·`MISSING_ROTATION`·`ROTATION_OUT_OF_RANGE`·`CONFIG_NOT_OWNED`·`CURRENT_REVISION` 12개가 더 있는데, **계약 문서에는 값이 하나도 안 적혀 있다.** 이 12개를 근거로 FE가 UI 분기를 짜면 계약 밖 값에 의존하게 된다.
-- **Alternatives**: 구현 코드를 근거로 12개 전부 타입에 반영 — 계약 문서가 아니라 구현 세부에 의존하는 것이라 기각. BE가 문서화하면 그때 반영한다.
+- **Decision**: FE는 `rule`로 분기하지 않고 **목록을 그대로 렌더링**한다(`message`가 한글이라 그대로 노출 가능). 분기가 필요한 값은 `CURRENT_REVISION`(→ `GET /draft` 재로드, R-06) 하나뿐이다.
+- **Rationale**: `rule` 19종은 `contracts/layout-api.md`에 전부 명문화됐다(PR #57, #36 요청 반영). 다만 Bean Validation 오류 경로가 요청 필드명(`nickname` 등)을 `rule` 자리에 넣고 있어(#58에서 발견) 지금 `rule`로 분기를 열면 규칙명과 필드명이 섞여 나온다. `field` 키 분리(#58 결론)까지는 `code`로만 분기한다.
+- **Alternatives**: 목록 명문화 이전처럼 rule을 전혀 참조 안 함 — 이미 사전 경고(`validate.ts`)가 rule 어휘로 서버와 대조하고 있어 과도한 보수. `rule`을 지금 도입 — #58 결론 전이라 §3 오염을 그대로 물려받는다. 기각.
 
 ---
 
@@ -125,7 +123,7 @@
 
 | ID | 항목 | 해소 시점 |
 |---|---|---|
-| R-12 | `rule` 문자열 12개가 계약 문서에 없음 | #36에 문서화 요청 — 요청 전까지 분기 대상으로 쓰지 않음 |
+| R-12 | `rule` 19종 명문화 완료(#36·PR #57) | 분기 대상으로 쓰지 않음 — Bean Validation이 필드명을 rule 자리에 섞어 보내는 결함(#58) 해소 전까지 |
 | — | `themeCode` 4값이 계약 문서에 없음 | `docs/08`·구현에만 있음. 계약 문서 승격 시 반영 |
 | — | facade 팔레트 12색 구체 hex 값 | "FE↔BE 구현 트랙에서" — FE 착수 필요 |
 | R-11 | `booths.name`↔`facade_sign_text` 화면 관계 | FE 화면 설계 몫 — 폼 구현은 막지 않음 |
