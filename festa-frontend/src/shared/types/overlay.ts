@@ -35,3 +35,8 @@ export function subscribeOverlay(listener: OverlayListener): () => void {
     listeners.delete(listener);
   };
 }
+
+// useSyncExternalStore의 snapshot getter — 변경이 없으면 같은 참조를 반환한다(openOverlay/closeOverlay만 current를 재할당).
+export function getCurrentOverlay(): OverlayRequest | null {
+  return current;
+}
