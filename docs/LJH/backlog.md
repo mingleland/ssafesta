@@ -1,4 +1,4 @@
-# FE 백로그 — spec 005
+# FE 백로그
 
 경위·판단 근거는 `24_작업일지.md`, 확정값은 `docs/26` 결정 로그가 원본. **여기는 상태·다음 액션만 둔다.**
 완료 항목은 결과 1줄. 경위·근거·검증 내용은 쓰지 않는다.
@@ -9,9 +9,9 @@
 
 **브랜치 상태**: `front` = `origin/front`. spec 005 완결, Block A(001·013a·016·002 계약 회수) 완결, **013a WebGL Host 기반 완료**.
 
-**013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증(§6b 방식과 동일 — mock이 실 Unity와 같은 신호 경로 재현).
+**013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증.
 
-**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 담당(kanghyunsoon) 확인 요청 [Issue #60](https://github.com/kanghyunsoon/ssafesta/issues/60) 게시 완료 — 빌드 URL 4종 제공 방식·Spring REST credential 정본 2건, 응답 대기.
+**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 담당 확인 요청 [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) 응답 대기.
 
 **다음 뭘 할지 — 확정 순서**: #60 응답 대기 중 **016 E2E** 착수(Bridge→Dispatcher→OverlayHost→iframe, 이번에 만든 Host 위에서 — #60과 독립적으로 진행 가능) → 001 Auth FE → 010 Survey → 009 Exhibition.
 
@@ -23,30 +23,16 @@
 
 ## 지금 할 수 있는 것
 
-- [x] ~~`client.ts`의 `ApiError` 갱신~~ — ✅ 08-21 완료. `ApiErrorDetail{rule, objectId?, message}` + fallback 배열 보정 + `isApiError` 가드. `ApiErrorDetail.java`(NON_NULL) 직접 대조로 검증(Codex 미가용)
-- [ ] **`#43` FE 산출물 develop PR** — PR #44 머지됨(08:17). `specs/005/FE/` 4종 develop 반영 가능해짐, 아직 미착수
+- [ ] **`#43` FE 산출물 develop PR** — 경로 구조 채택·PR #44 머지 완료로 반영 가능 상태. `specs/005/FE/` 4종, 미착수
 - [ ] **SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료. discriminated union(`data.type` 판별), `timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`), `retryable` 매핑 17종 반영
-- [x] ~~**Studio 편집기 MVP(US1) 착수**~~ — ✅ 08-21 완료. `FE/tasks.md` T001~T013, 배치→저장→새로고침 복원→공개 완결. 커밋 `dea2779`·`cc4b8eb`·`10fbb2f`
-- [x] ~~**Studio 편집기 US2(콘텐츠 연결)**~~ — ✅ 08-21 완료. `FE/tasks.md` T014~T016. PropertiesPanel(위치·회전·configId·assetCode)·사전 경고(precheck)·PublishDialog 통합. 브라우저 실측(configId 연결 시 precheck 1건 감소·저장 후 유지·공개 응답 warnings 일치) 통과
-- [x] ~~**Studio 편집기 US3(실수 방지)**~~ — ✅ 08-21 완료. `FE/tasks.md` T017~T019. lease-expired 전면 차단(draftQuery·save·publish 3경로 판정)·저장 오류 상세+objectId 자동 선택·재임대 "비공개" 표시. 브라우저 실측(boothId=999 sentinel로 만료 확인, boothId=42로 신규 부스 비공개 확인) 통과
-- [x] ~~**Studio 편집기 US4·Polish**~~ — ✅ 08-22 완료. `FE/tasks.md` T020~T026 전부. facade 폼(T020·T021)·§10 기하 실시간 검증(T022 회전 AABB·T023 통행 판정, mock도 같은 lib 참조해 FE·서버 응답 일치)·quickstart 전 시나리오 인수검사(T024, `verify/booth-studio-quickstart.md`)·vitest 37개(T025). configId Int32 검증은 T026에서 이미 보강됨
-- [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없고 `initUnityBridge()` 호출부도 없다(#2). `main.tsx`/`providers`에 배선 필요 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
-
-## 중간 검증에서 나온 결함 — T026으로 08-22 수정 완료
-
-미지 ObjectType 크래시(SC-005)·mock publish 스냅샷·미저장 편집 소실·공개 dirty 미확인·충돌 UI 소실·드래그 pointer capture·계약서 로컬 부재·client.ts R-12 주석 8건 전부 커밋 `fb24ef4`·`0d584f6`·`cd0e709`로 해소, 브라우저 실측 6/6 통과. 근거는 `24_작업일지.md` 08-22 항목.
-
-- [ ] **스냅 0.25가 계약 정본에 근거 없음** — 로컬 `FE/research.md` R-04에만 존재. develop `spec.md` FR-003 또는 contracts에 명문화 필요
+- [ ] **Interaction Dispatcher 배선** — `events.ts`의 `toAiChatPayload`는 있는데 `openOverlay('AI_CHAT')`로 잇는 코드가 없다(#2). OverlayHost 렌더러와 함께 016 E2E 범위 — 지금 상태로는 Unity 이벤트가 오버레이로 전달되지 않음
 
 ## 막힌 것 — 대기 중
 
 | 항목 | 막는 것 | 상대 |
 |---|---|---|
-| **#43** spec 산출물 경로 구조 | FE 산출물 develop PR 전체 | 리드 — 채택됨, **PR #44 머지 대기** |
-| **#30** refresh 토큰 쿠키 도메인 | 인증 경로 | @Alexjung0115 TLS 결정 |
+| **#30** refresh 토큰 쿠키 도메인 | 인증 경로(001 착수 시) | @Alexjung0115 TLS 결정 |
 | **#34** `GAME_PORTAL`이 `schemaVersion` 올리는가 | ObjectType union 확장 시점 | BE (#36에서 질문함) |
-| **#35** Game Studio renderer·sandbox | — | @busypark 몫, FE 관여 없음 |
-| facade 팔레트 12색 hex | facade 팔레트 UI 구현 | "FE↔BE 구현 트랙에서"(#17) — **FE가 먼저 움직여야 함** |
 | `assetCode` 목록 | 편집기 팔레트·자산 분기 종단 검증 | Unity 레지스트리 실측값 제공(#6·#18 — **두 이슈 모두 이걸 기다리다 닫힘**) |
 
 ## 회신 완료 — 상대 답변 대기
@@ -56,24 +42,25 @@
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) | 6건 수용 + 계약서 모순 1건 지적(409에 Draft 동봉 서술) — geometry 브랜치에서 이미 정정됨(미병합) | BE PR 병합 |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) | Game Studio 정책 4건 전부 동의, 신규 진입 차단 판정 시점 질문 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | strdeok(C 확정·구현)·ghkim1632(FastAPI 정합) |
-| [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안 | BE 확인 |
-| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) | 상태 서술 SSOT 규칙 팀 승격 제안 | 리드(kanghyunsoon) 채택 여부 |
+| [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안. 12색 hex 값은 FE 보유 — 주체 확정 시 제공 | BE 확인 |
+| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) | 리드가 §3-1~4 전부 채택, 반영안 초안 PR [#61](https://github.com/kanghyunsoon/ssafesta/pull/61) 게시 완료(`docs/00`§2·`docs/17`§2-1·§21-2) | 리드 PR 리뷰·머지 |
+| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | 013a — 빌드 URL 4종 제공 방식·Spring REST credential 정본 2건 질의 | Unity(kanghyunsoon) |
 
 ## 내가 닫아야 할 것
 
-- [ ] **#36에 추가 요청** — `rule` 문자열 12개 미문서화, `themeCode` 4값이 계약 문서에 없음, `errors[].objectId` optional 키인 것 문서 예시 정정. (#58 결론 나오면 함께 처리하는 게 효율적 — #58이 `rule` 문서화·objectId 서술과 겹침)
+- [ ] **#36에 추가 요청** — `rule` 문자열 미문서화 잔여, `themeCode` 4값이 계약 문서에 없음, `errors[].objectId` optional 키인 것 문서 예시 정정. (#58 결론 나오면 함께 처리 — #58이 `rule` 문서화·objectId 서술과 겹침)
+- [ ] **스냅 0.25 계약 명문화** — 로컬 `FE/research.md` R-04에만 존재. develop `spec.md` FR-003 또는 contracts에 반영 필요(강형순 develop 정정 PR에 포함 예고됨 — #45)
 
-## 미착수 코드 (다이어트 때 백로그에서 유실됐다가 오늘 복원)
+## 미착수 코드
 
-- [ ] `events.ts`에 **`onWorldGateReady` 콜백** + Unity WebGL 호스트 컴포넌트 + 1단계 로딩 오버레이(60초 타임아웃, Unity 강제개방 30초) — 리드가 #31에서 FE로 명시 배분. `OverlayType`에는 넣지 않음(호스트 레벨). 계약 원본: `origin/game`의 `specs/002-world-session/spec.md:82-86`(미병합)
-- [ ] **Game Studio 소켓 4종**(#20) — `events.ts`의 `BOOTH_GAME_INTERACT` union / `overlay.ts`의 `GAME` 타입(`OverlayType` 현재 4종) / `/app/games/:gameId/edit|play` lazy 라우트 / Host→Unity `OnOverlayStateChanged` 송신부(수신 GameObject명 미확정). `features/game-entry/`는 #21 BE 계약 확정 후
+- [ ] **Game Studio 소켓 3종**(#20) — `events.ts`의 `BOOTH_GAME_INTERACT` union / `overlay.ts`의 `GAME` 타입(`OverlayType` 현재 4종) / Host→Unity `OnOverlayStateChanged` 송신부(수신 GameObject명 미확정). `features/game-entry/`는 #21 BE 계약 확정 후. lazy 라우트 2종은 PR #47로 이미 존재
 - [ ] **편집기 팔레트 UI** — 미보유 파츠 회색+잠금 배지, 게스트 로그인 유도(#18, spec 012 착수 시)
 - [ ] `docs/10_Frontend_설계서.md` §3에 `/app/games/:gameId/edit|play` 라우트 추가 develop PR — 리드는 spec/contracts만 반영, 여기는 FE 몫으로 남음(#20)
 - [ ] `docs/26` 브랜치별 결정 분기 정리 제안 — FE가 #18에서 자청
 
 ## 내 것 아님
 
-`#24` back·game 잔여 (FE 몫 완료)
+`#24` back·game 잔여 (FE 몫 완료) / **#35** Game Studio renderer·sandbox — @busypark 몫
 
 ---
 
@@ -81,18 +68,13 @@
 
 | | 결과 |
 |---|---|
-| **블록 0** 08-18 | Architecture 4종 — `overlay.ts`·`events.ts`·`client.ts` + `app/{router,providers}` |
-| **블록 1** 08-20 | 좌표 왕복 검증 통과 — C-02 실측 확정, SC-004 근거. 수치: `verify/block1-roundtrip.md` |
-| **블록 2** 08-20 | 타 파트 결정 5건 소진 |
-| **블록 3** 08-20 | 리뷰 4칸+BE 검토칸 서명, SC-002 해소 |
-| **블록 4** 08-21 | spec 005 plan 산출물 4종 작성 → 발견된 어긋남 5건 정정(부스 높이·스냅·template·409 revision 파싱 불가·통행 판정 FE 몫) — 단, 산출물 경로 구조 확정 전까지 develop PR 보류 |
-| **블록 5** 08-21 | spec 005 Studio 편집기 MVP(US1) — 계약 전사·API·mock·좌표·편집기 본체. 브라우저 실측 검증(quickstart §2·§3·§4·§6) 통과. 검증 중 conflict 상태가 자동 refetch로 덮이는 버그 발견·수정 |
-| `events.ts` 08-20 | `AI_AGENT_INTERACT` 타입 + `toAiChatPayload` (`d1bbb4a`) — 단 오버레이로 잇는 배선은 미완료 |
+| **spec 005** 08-18~22 | 전체 완결 — Architecture 4종·좌표 왕복 검증·리뷰 서명·plan 산출물 4종·US1~US4·Polish(T022~T026)·quickstart 인수검사·vitest 37개·구조 진단(RED 0). 상세는 작업일지·`verify/` |
+| **Block A** 08-23 | 001·013a·016·002 계약 front 회수(develop·game 정본 대조) |
+| **013a WebGL Host** 08-23 | 위 인수인계 참조 |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
-| **CLOSED** | #1 #2 #5 #6 #14 #17 #18 #19 #20 #21 #22 #31 #32 |
 
-**해소된 미결** — C-02 좌표 / C-03 고정 크기 / C-05 `expectedRevision`(#36) / C-07 보관O·되돌리기 MVP제외 / **부스 6×6×2.72m·스냅 0.25m 확정** / **C-04·C-06 기획 승인**(#45) / 오류 봉투 원소 타입 / SSE payload 전체(#32) / 산출물 경로 구조(#43, 채택·PR #44 대기)
+**해소된 미결** — C-02 좌표 / C-03 고정 크기 / C-05 `expectedRevision`(#36) / C-07 보관O·되돌리기 MVP제외 / 부스 6×6×2.72m·스냅 0.25m 확정 / C-04·C-06 기획 승인(#45) / 오류 봉투 원소 타입 / SSE payload 전체(#32) / 산출물 경로 구조(#43 채택·반영 완료)
 
 ---
 
@@ -100,5 +82,4 @@
 
 - **develop 통합 절차**: `develop`에서 브랜치 → `git checkout <자기브랜치> -- <path>` 파일 단위 → `git diff --stat origin/develop -- festa-unity/` 0줄 확인 → PR. **직접 push·전체 merge 금지**(`festa-unity/` 1,462개 삭제)
 - **착수 전 `origin/develop` 대조 필수** — 내 브랜치의 공유 문서 사본은 낡았다고 가정
-- **013 문서 정합**: front `specs/013/spec.md`가 "FE는 창 이관만"·FR-020·C-07을 기술하는데 `FE.md`만 갱신됨 — 013 진행 시 정리
-- **닫힌 이슈 재확인 습관** — 이슈가 CLOSED돼도 후속 확정값·번복이 마지막 코멘트에만 있는 경우가 잦다(오늘 #17·#19·#31 재확인에서 미반영 확정값 다수 발견). 산출물 작성 후 관련 이슈가 새로 닫히면 재대조할 것
+- **닫힌 이슈 재확인 습관** — 이슈가 CLOSED돼도 후속 확정값·번복이 마지막 코멘트에만 있는 경우가 잦다. 산출물 작성 후 관련 이슈가 새로 닫히면 재대조할 것
