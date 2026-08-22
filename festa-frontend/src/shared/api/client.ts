@@ -35,6 +35,19 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+// TODO(013a-AT):
+// Unity credential handoff contract unresolved.
+// Do not send credentials until token type, timing,
+// receiver, and refresh behavior are agreed.
+//
+// 이 getter는 FE 내부 read boundary일 뿐이다 — 013a WebGL Host의 어떤 lifecycle
+// (인스턴스 생성·onWorldGateReady 등)에도 연결하지 않는다. Unity에 무엇을(AT 원본 vs
+// 단수명 Unity 전용 token) · 언제 · 어떤 방식(SendMessage/jslib)으로 전달할지,
+// 갱신은 어떻게 반영할지 전부 미결이다(FE.md:71). RT는 이 경계를 절대 넘기지 않는다.
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const DEFAULT_TIMEOUT_MS = 15_000;
 

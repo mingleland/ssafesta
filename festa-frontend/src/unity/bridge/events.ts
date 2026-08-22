@@ -21,10 +21,17 @@ type BoothInteractListener = (event: BoothInteractEvent) => void;
 
 const listeners = new Set<BoothInteractListener>();
 
+// 입장 게이트(엘리베이터) 첫 렌더 완료 후 다음 프레임에 1회 — payload 없음, 호스트 생명주기 신호라
+// BoothInteractEvent union에 넣지 않는다(부스 상호작용이 아니다). 계약: Issue #31, spec 002 FR-013·FR-014.
+type WorldGateReadyListener = () => void;
+
+const worldGateReadyListeners = new Set<WorldGateReadyListener>();
+
 declare global {
   interface Window {
     FestaUnity?: {
       onBoothInteract?: (json: string) => void;
+      onWorldGateReady?: () => void;
     };
   }
 }
@@ -42,12 +49,22 @@ export function initUnityBridge(): void {
     }
     for (const listener of listeners) listener(event);
   };
+  window.FestaUnity.onWorldGateReady = () => {
+    for (const listener of worldGateReadyListeners) listener();
+  };
 }
 
 export function subscribeBoothInteract(listener: BoothInteractListener): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+
+export function subscribeWorldGateReady(listener: WorldGateReadyListener): () => void {
+  worldGateReadyListeners.add(listener);
+  return () => {
+    worldGateReadyListeners.delete(listener);
   };
 }
 
