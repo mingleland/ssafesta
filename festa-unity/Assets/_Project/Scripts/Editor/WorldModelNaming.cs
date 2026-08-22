@@ -360,9 +360,15 @@ namespace Festa.EditorTools
                 AddMesh(room, roomMf.sharedMesh, RoomName);
 
             // 끝벽 — (combined) 자식 메시는 노드 로컬 공간이라 노드 콜라이더에 그대로 맞는다
+            //
+            // wall-rear-center 는 제외한다. 렌더러가 0개인 개구부(축제 복도 입구)인데
+            // 콜라이더를 붙이면 보이지 않는 벽이 문을 막는다 (T-188). 모델이 바뀌어
+            // 이 조각에 실제 벽 메시가 생기면 렌더러 유무로 다시 판단해야 한다.
             foreach (Transform c in model)
             {
                 if (!EndWallPrefixes.Any(p => c.name.StartsWith(p))) continue;
+                if (c.name == "wall-rear-center" &&
+                    c.GetComponentsInChildren<Renderer>(true).Length == 0) continue;
                 var comb = c.GetComponentsInChildren<MeshFilter>(true)
                             .FirstOrDefault(f => f.sharedMesh != null);
                 AddMesh(c, comb != null ? comb.sharedMesh : null, c.name);
