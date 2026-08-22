@@ -78,7 +78,7 @@ namespace Festa.EditorTools
 
                 var interiorSpawn = room.Find("SpawnPoint");
                 MakePortal(ext.transform, $"Portal_Ext_{i:D2}", slot.position, i,
-                           interiorSpawn, $"{i}번 부스 입장", 32f, boothRenderer);
+                           interiorSpawn, $"{i}번 부스 입장", 15f, boothRenderer);   // 표면 1.5 m — 바짝 붙어야 뜬다
 
                 var returnPoint = new GameObject($"ReturnPoint_{i:D2}");
                 returnPoint.transform.SetParent(ext.transform, false);
@@ -171,7 +171,10 @@ namespace Festa.EditorTools
             var so = new SerializedObject(runtime);
             so.FindProperty("_boothId").intValue = id;
             so.FindProperty("_registry").objectReferenceValue = registry;
-            so.FindProperty("_loadOnStart").boolValue = true;
+            // 기본 프레임만 보여준다 — mock 레이아웃은 12실 전부 같은 오브젝트로 도배돼
+            // 오히려 지저분하다. 통신 배선은 유지하고, Spring 실데이터(부스별 published)가
+            // 붙는 시점에 true 로 올리거나 포털 입장 시 로드로 바꾼다.
+            so.FindProperty("_loadOnStart").boolValue = false;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             var spawn = new GameObject("SpawnPoint");

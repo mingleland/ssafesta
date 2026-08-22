@@ -130,11 +130,8 @@ namespace Festa.World
         void OnGUI()
         {
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
-            var cam = Camera.main;
-            if (cam == null) return;
-
-            var sp = cam.WorldToScreenPoint(_nearest.PromptAnchor());
-            if (sp.z <= 0f) return;   // 등 뒤
+            // 위치는 화면 중앙 약간 아래 고정 — 부스 높이·카메라 각도와 무관하게
+            // 항상 보인다 (부스 상단 월드 앵커 방식은 3인칭 하향 카메라에서 화면 밖으로 나갔다).
             float ui = Screen.height / 1080f;
 
             var label = _nearest.promptText;
@@ -158,8 +155,8 @@ namespace Festa.World
             float pad = 10f * ui;
             float w = cap + pad * 3f + labelW;
             float h = cap + pad * 1.4f;
-            float x = sp.x - w / 2f;
-            float y = Screen.height - sp.y - h / 2f;
+            float x = (Screen.width - w) / 2f;
+            float y = Screen.height * 0.52f;   // 화면 중앙 살짝 아래 — 60% 는 너무 낮았다
 
             GUI.DrawTexture(new Rect(x, y, w, h), PanelTexture(), ScaleMode.StretchToFill);
             GUI.DrawTexture(new Rect(x + pad, y + (h - cap) / 2f, cap, cap), CapTexture(), ScaleMode.StretchToFill);
