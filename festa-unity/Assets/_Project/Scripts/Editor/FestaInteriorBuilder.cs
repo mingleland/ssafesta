@@ -23,8 +23,8 @@ namespace Festa.EditorTools
         const string MatDir = "Assets/_Project/Art/World/Materials/";
         const string ShellPrefabPath = "Assets/_Project/Prefabs/Booth/BoothShell.prefab";
         const string RegistryPath = "Assets/_Project/ScriptableObjects/BoothObjectRegistry.asset";
-        const float RoomHalf = 260f;   // 바닥 반변 (52 m 방 — 전시홀 규모)
-        const float WallH = 150f;      // 15 m 천장 — 답답함 제거
+        const float RoomHalf = 200f;   // 바닥 반변 (40 m — 부스 24 m + 사방 8 m 여백, 비율 정합)
+        const float WallH = 220f;      // 22 m 천장 — 폭 대비 절반 이상이라야 홀로 읽힌다
         const float Pitch = 700f;      // 방 간격 70 m (방이 커져 40 m 면 겹친다)
         const float AnchorScale = 40f; // 부스 로컬 1 m = 월드 4 m — 부스 높이 10.9 m (캐릭터 6배)
 
