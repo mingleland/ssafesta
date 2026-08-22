@@ -23,10 +23,10 @@ namespace Festa.EditorTools
         const string MatDir = "Assets/_Project/Art/World/Materials/";
         const string ShellPrefabPath = "Assets/_Project/Prefabs/Booth/BoothShell.prefab";
         const string RegistryPath = "Assets/_Project/ScriptableObjects/BoothObjectRegistry.asset";
-        const float RoomHalf = 160f;   // 바닥 반변 (32 m 방)
-        const float WallH = 70f;       // 7 m — 2배 셸(5.4 m)이 여유 있게 들어간다
-        const float Pitch = 400f;      // 방 간격 40 m
-        const float AnchorScale = 20f; // 부스 로컬 1 m = 월드 2 m (기존 10 의 2배)
+        const float RoomHalf = 260f;   // 바닥 반변 (52 m 방 — 전시홀 규모)
+        const float WallH = 150f;      // 15 m 천장 — 답답함 제거
+        const float Pitch = 700f;      // 방 간격 70 m (방이 커져 40 m 면 겹친다)
+        const float AnchorScale = 40f; // 부스 로컬 1 m = 월드 4 m — 부스 높이 10.9 m (캐릭터 6배)
 
         [MenuItem("Festa/World/내부 부스 공간 재생성")]
         public static void Rebuild()
@@ -51,7 +51,7 @@ namespace Festa.EditorTools
             if (oldRoot != null) Object.DestroyImmediate(oldRoot);
             var root = new GameObject("@BoothInteriors");
 
-            var wallMat = Mat("InteriorWall", new Color(0.78f, 0.76f, 0.72f), 0.1f);
+            var wallMat = Mat("InteriorWall", new Color(0.88f, 0.87f, 0.84f), 0.1f);
             var floorMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "CorridorMid.mat");
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -127,9 +127,25 @@ namespace Festa.EditorTools
             var l = light.AddComponent<Light>();
             l.type = LightType.Point;
             l.color = new Color(1f, 0.93f, 0.82f);
-            l.intensity = 520f;
-            l.range = 420f;
+            l.intensity = 950f;
+            l.range = 750f;
             l.shadows = LightShadows.None;
+
+            // 천장 발광 패널 — 광원 없이 전시홀 조명 느낌
+            var lampMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FestivalLamp.mat");
+            for (int st = 0; st < 4; st++)
+            {
+                var strip = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                Object.DestroyImmediate(strip.GetComponent<Collider>());
+                strip.name = $"CeilingStrip_{st}";
+                strip.transform.SetParent(room.transform, false);
+                strip.transform.localPosition = new Vector3(-RoomHalf * 0.6f + st * RoomHalf * 0.4f, WallH - 2f, 0f);
+                strip.transform.localRotation = Quaternion.Euler(-90f, 0f, 0f);   // 아래를 본다
+                strip.transform.localScale = new Vector3(30f, RoomHalf * 1.6f, 1f);
+                var sr = strip.GetComponent<Renderer>();
+                sr.sharedMaterial = lampMat;
+                sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
 
             var signGo = new GameObject("Sign");
             signGo.transform.SetParent(room.transform, false);
@@ -138,7 +154,7 @@ namespace Festa.EditorTools
             tm.text = $"BOOTH {id:D2}";
             tm.font = font;   // 런타임 TextMesh 폰트 명시 (T-158)
             tm.fontSize = 64;
-            tm.characterSize = 2.4f;
+            tm.characterSize = 4.5f;
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = new Color(0.25f, 0.2f, 0.15f);
             var tr = signGo.GetComponent<MeshRenderer>();
