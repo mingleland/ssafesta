@@ -7,7 +7,7 @@
 
 ## 📍 세션 인수인계 (2026-08-23 종료 시점)
 
-**브랜치 상태**: spec 005 완결, Block A 계약 회수 완결, 013a WebGL Host 완료, 016 E2E 완료, PR #63 반입 완료, **001 Auth FE 완료**(ASC 세션 구현+감사, T-17 수정 포함).
+**브랜치 상태**: spec 005 완결, Block A 계약 회수 완결, 013a WebGL Host 완료, 016 E2E 완료, PR #63 반입 완료, **001 Auth FE 완료**(ASC 세션 구현+감사, T-17 수정 포함), **D-1·D-2 PR 게시**([#64](https://github.com/kanghyunsoon/ssafesta/pull/64)·[#65](https://github.com/kanghyunsoon/ssafesta/pull/65), 머지 대기).
 
 **013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증.
 
@@ -15,7 +15,7 @@
 
 **016 E2E 완료 범위**: `features/interaction/dispatcher.ts`(LAPTOP·AI_AGENT 라우팅, 미지 type 무시)·`features/overlay/{OverlayHost,LaptopOverlay}.tsx`(URL은 `http`/`https`만 허용, iframe+새 탭+안내 동시 제공 — 차단 "감지"는 구현하지 않음, FR-007 기술 제약 기록)·`WorldPage.tsx`(Dispatcher를 화면 생명주기에 종속). vitest 8개+브라우저 9개 시나리오 검증. **AI_CHAT 등은 공통 fallback뿐** — 008·010·011 실 UI 아님.
 
-**다음 뭘 할지 — 확정 순서**: A(001 Auth FE) 완료 — 남은 "지금 할 수 있는 것" D→B→C→E 순(전부 소형). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
+**다음 뭘 할지 — 확정 순서**: A(001 Auth FE)·D-1·D-2 완료 — 남은 "지금 할 수 있는 것" B→C→E 순(전부 소형). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
 
 **추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정).
 
@@ -25,8 +25,6 @@
 
 ## 지금 할 수 있는 것 — 협의 불요 판정 완료 (08-23), 권장 순서순 (A는 완료 표로)
 
-- [ ] **D-1. `#43` FE 산출물 develop PR** — 경로 구조 채택·PR #44 머지 완료로 반영 가능 상태. `specs/005/FE/` 4종. A 진행 중 병행 가능
-- [ ] **D-2. `docs/10` §3 라우트 develop PR** — `/app/games/:gameId/edit|play` + `/app/world` 추가. #20에서 FE 몫으로 남은 것. A 진행 중 병행 가능
 - [ ] **B. SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료분의 타입 전사. discriminated union(`data.type`)·`timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`)·`retryable` 매핑 17종. 008 UI는 김가현 몫이나 shared 기반층 제공은 원래 내 항목
 - [ ] **C. Game Studio 소켓 2종** — `events.ts` `BOOTH_GAME_INTERACT` union(#20 확정, `AI_AGENT_INTERACT`와 동형·configId Int32 #34 확정) + `overlay.ts` `GAME` 타입·OverlayHost fallback. **송신부(`OnOverlayStateChanged`)는 제외** — 수신 GameObject명 미확정이라 협의 필요, "미착수 코드"에 잔류
 - [ ] **E. (P1) 010 Survey 결과 화면** — spec 명시대로 `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 그대로 입력으로. **응답 UI는 제외**(C-05 게스트 응답 등 미결)
@@ -60,7 +58,6 @@
 - [ ] **게스트 만료 실관측 경로**(G-3) — `expiresAt` 저장만 하고 소비 없음, 401 반응형 안내(T010)는 API 호출 화면이 생겨야 도달 가능. 실 API 화면 등장 시점에 재검
 - [ ] **Game Studio `OnOverlayStateChanged` 송신부**(#20) — Host→Unity 방향, 수신 GameObject명 미확정이라 Unity 협의 후. union·`GAME` 타입 2종은 "지금 할 수 있는 것" C로 분리. `features/game-entry/`는 #21 BE 계약 확정 후
 - [ ] **편집기 팔레트 UI** — 미보유 파츠 회색+잠금 배지, 게스트 로그인 유도(#18, spec 012 착수 시)
-- [ ] `docs/10_Frontend_설계서.md` §3에 `/app/games/:gameId/edit|play` 라우트 추가 develop PR — 리드는 spec/contracts만 반영, 여기는 FE 몫으로 남음(#20)
 - [ ] `docs/26` 브랜치별 결정 분기 정리 제안 — FE가 #18에서 자청
 
 ## 내 것 아님
@@ -78,6 +75,8 @@
 | **013a WebGL Host** 08-23 | 위 인수인계 참조 |
 | **016 E2E** 08-23 | 위 인수인계 참조 |
 | **001 Auth FE** 08-23 | ASC 세션 구현 + 감사(결함 T-17 수정). tasks 16/17·quickstart 8/8·vitest 129. 잔여 T016만 Blocked-on-BE |
+| **D-1. 005 FE 산출물 develop PR** 08-23 | [PR #64](https://github.com/kanghyunsoon/ssafesta/pull/64) 게시 — origin/front@a74fd43에서 7파일 회수(FE/ 5종 + verify 2종), 바이트 동일 확인. **머지 대기** |
+| **D-2. docs/10 §3 라우트 develop PR** 08-23 | [PR #65](https://github.com/kanghyunsoon/ssafesta/pull/65) 게시 — `/auth/callback`·게임 2종 추가 3줄. **머지 대기** |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
 
