@@ -81,11 +81,14 @@ src/
 ```text
 /login
 /signup
+/auth/callback
 /app/home
 /app/world
 /app/booths/slots
 /app/booths/mine
 /app/studio/:boothId
+/app/games/:gameId/edit
+/app/games/:gameId/play
 /app/agents
 /app/agents/:agentId
 /app/projects
