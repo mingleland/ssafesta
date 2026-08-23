@@ -14,19 +14,37 @@ final class BoothLayoutTestSupport {
      * <p>Inserted directly rather than through {@code BoothLeaseService}: these tests are about
      * layouts, and going through the paid path would couple them to spec 003's balances and to
      * whichever slot happens to be free in a shared database.
+     *
+     * @return the slot the lease landed on — the slot-keyed path (#62) has to know which room
      */
-    static void grantLease(JdbcTemplate jdbc, Long boothId, Long userId) {
+    static Long grantLease(JdbcTemplate jdbc, Long boothId, Long userId) {
         Long slotId = jdbc.queryForObject("""
                 SELECT id FROM booth_slots
                  WHERE slot_type = 'USER_RENTAL'
                    AND id NOT IN (SELECT slot_id FROM booth_leases WHERE status = 'ACTIVE')
                  ORDER BY id LIMIT 1
                 """, Long.class);
+        grantLeaseOnSlot(jdbc, boothId, userId, slotId);
+        return slotId;
+    }
+
+    /** The same, on a named room — for re-lease tests, where two booths must share one slot. */
+    static void grantLeaseOnSlot(JdbcTemplate jdbc, Long boothId, Long userId, Long slotId) {
         jdbc.update("""
                 INSERT INTO booth_leases (booth_id, slot_id, lessee_user_id, status, starts_at, ends_at, charged_coin)
                 VALUES (?, ?, ?, 'ACTIVE', now(), now() + interval '24 hours', 100)
                 """, boothId, slotId, userId);
         jdbc.update("UPDATE booths SET current_slot_id = ?, status = 'ACTIVE' WHERE id = ?", slotId, boothId);
+    }
+
+    /**
+     * Ends a lease the way a re-lease does: the row leaves {@code ACTIVE} and the booth lets go of
+     * the room — what {@code BoothLeaseService.releaseStaleLeases} performs (FR-017). Distinct from
+     * {@link #expireLease}, which leaves the row {@code ACTIVE} with its time passed.
+     */
+    static void releaseLease(JdbcTemplate jdbc, Long boothId) {
+        jdbc.update("UPDATE booth_leases SET status = 'EXPIRED' WHERE booth_id = ? AND status = 'ACTIVE'", boothId);
+        jdbc.update("UPDATE booths SET current_slot_id = NULL, status = 'INACTIVE' WHERE id = ?", boothId);
     }
 
     /** Pushes a booth's lease into the past, both ends — {@code CHECK(ends_at > starts_at)} forbids one. */
