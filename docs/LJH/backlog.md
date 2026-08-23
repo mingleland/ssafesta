@@ -23,18 +23,19 @@
 |---|---|---|
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T056 Portal resolver·overlay adapter / T058 E2E | [#48](https://github.com/kanghyunsoon/ssafesta/issues/48) BE resolver·whitelist 배포 — 선행 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53)(spec 019 계약)이 CONFLICTING 정체 | strdeok·리드 |
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T057 `OnOverlayStateChanged` 송신부 | 수신 GameObject명(`receiverObjectName`) 확정 | Unity |
-| [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) Published loader·`asset://` resolver·상태별 오류 UI | #48 DTO·#35 renderer. PR #63 반입분은 Local Preview까지 — Published 완료 아님(리드 명시) | strdeok·busypark |
+| [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) 잔여 E2E | **서버 비의존 FE 범위는 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드)가 선구현**(Published loader·schema guard·상태별 오류 UI·error boundary). 잔여 = #48 실 endpoint + #69 stable resolver 연결 후 browser E2E | strdeok·리드 |
 | 001 T016 게스트·refresh·logout 실경로 | BE 계약 문서(endpoint 3종) 회수 | BE |
 | `assetCode` 목록 | Unity 레지스트리 실측값(#6·#18 — 둘 다 이걸 기다리다 닫힘) | Unity |
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) 닫기 | #58 back 구현 PR 머지 후(리드 요청 — C안 결정은 났고 rule/field 구현·문서 확정이 남음. 추가 요청 3건은 PR #57로 develop 반영 확인 완료) | strdeok |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 신규 진입 차단 판정 시점 답변 | 리드 회신 | 리드 |
-| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58)·[#17](https://github.com/kanghyunsoon/ssafesta/issues/17) BE 구현 | [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71)(field 분리+팔레트 검증·정규화) **머지 대기** — FE 리뷰 회신 완료(이견 없음·머지 무방). 머지 시 예정 작업 'FE 팔레트·field 라운드' 트리거 | strdeok |
+| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58)·[#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 논점 전부 소멸(구현 대조 ✅·양쪽 자기 정정 완료, game 5곳은 자기 소유 정정 예고) — **[PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지만 남음**. 머지 시 'FE 팔레트·field 라운드' 트리거 | strdeok |
 | [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) 마무리 | `:133` 화살표(문구 확정, **PR #53에 얹는 쪽 제안** — 안 되면 #53 머지 후 내 1줄 커밋)·§21-2 grep 2층 개정(동의 회신 완료, 리드 반영) | 리드 |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 확정(08-23) | `avatar-profile-api.md` 계약 문서 반영 → wiring 착수는 예정 작업 | strdeok |
-| [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 | **경계 확정**(나 = `GameAssetRepository` 원격 구현·`shared/api`·`studio/ports` / busypark = 에디터 UI ①~④). BE 업로드 계약(API 형태·상태 DTO·오류 코드)만 대기 | strdeok |
+| [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 | **경계 확정**(나 = `GameAssetRepository` 원격 구현·`shared/api`·`studio/ports` / busypark = 에디터 UI ①~④). [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)가 **주입 경계·Publish preflight 선반영** — 내 원격 구현이 꽂힐 자리 마련됨. BE 업로드 계약(API 형태·상태 DTO·오류 코드)만 대기 | strdeok |
 
 ## 예정 작업 — 트리거 충족 시 착수
 
+- [ ] **#73 검증 게이트(release gate)** — 트리거: [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72) 머지(검증 대상이 그 구현). **FE 몫**: 활성 탭 성능 실측(최대 상한 fixture에서 편집 p95 100ms·플레이 55fps), 키보드 전용 조작(저장/undo/redo/레이어/1칸 이동·focus), 복구 UX 4종(손상·schema 미지원·Draft 409·로컬 Asset 차단). **사람 몫(대행 불가)**: 비개발 참가자 5명 모집·20분 세션 진행(4/5 완주·중앙값 15분) — 기록지 `specs/019-game-studio/FE/usability-test.md`. **완료 판정·정리는 내 몫**: 원자료·영상 이슈 첨부, P0/P1 문제 분리 발행 후 닫기
 - [ ] **FE 팔레트·field 라운드** — 트리거: [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지. ⑴ 계약 대응 먼저: `ApiError.errors[]`에 `field?: string`·mock 3곳·`PublishDialog` key 인덱스화·R-12 해제 후 `rule` 분기·`client.ts:10` 낡은 주석 정리 ⑵ 팔레트: 12색 스와치 UI(자유 입력 제거)·`facadeApi.mock.ts` 팔레트 소속+대문자 정규화 정합·하이드레이션 값이 팔레트 밖이면 안내(strdeok 지적 함정 — 간판만 고쳐도 400 방지). ⑵는 규모 보고 같은 라운드 또는 분리
 - [ ] **013a credential 전달 wiring** — 트리거: #60 계약 문서 반영 확인. `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결(AT 원본, MEMBER only). 부가: AT 만료 401 시 Unity→host 재요청 규약은 별도 후속
 - [ ] **게스트 만료 실관측 경로**(G-3) — 트리거: T016 실경로 연결 또는 실 API 소비 화면(008 등) 첫 머지. `expiresAt` 소비자 현재 0, 401 반응형 안내는 T010(`specs/001-auth-user/FE/tasks.md`)
@@ -50,6 +51,7 @@
 - Game Studio Portal Bridge 계약 정본 = `origin/codex/game-studio-docs-sync`의 `specs/019-game-studio/`(Draft v0.3, 019 개명은 #21) — develop 미반영
 - [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) 부스 규격: FE 편집기 영향 없음 — BE가 `GET /booth-slots/{slotId}/layouts/published` 신설로 흡수, 슬롯 7→12
 - GAME_PORTAL configId(Int32·0 금지, #34) FE 정수 검증·전송 순서 — #49(busypark)로 이관
+- [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드, Game Studio 실사용 보강 35파일) **미머지**. API 어댑터는 `VITE_GAME_STUDIO_API_ENABLED=false` 기본(플래그 인지)
 - #24 back·game 잔여, #35 renderer·sandbox — 타 파트 몫
 
 ## 완료
