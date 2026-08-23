@@ -42,8 +42,7 @@
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) | Game Studio 정책 4건 전부 동의, 신규 진입 차단 판정 시점 질문 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | strdeok(C 확정·구현)·ghkim1632(FastAPI 정합) |
 | [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안. 12색 hex 값은 FE 보유 — 주체 확정 시 제공 | BE 확인 |
-| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) | 리드가 §3-1~4 전부 채택, 반영안 초안 PR [#61](https://github.com/kanghyunsoon/ssafesta/pull/61) 게시 완료(`docs/00`§2·`docs/17`§2-1·§21-2) | 리드 PR 리뷰·머지 |
-| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | 013a — 빌드 URL 4종 제공 방식·Spring REST credential 정본 2건 질의 | Unity(kanghyunsoon) |
+| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | Unity 답변 도착·반영 — ①manifest.json 방향+키 4종 **확정**(생성 위치만 #30 후속), ②credential 종류는 Spring 구현체 부재로 **BE 결정 사안**(Unity 제약: provider 동기 조회·60~120초급 수명 부적합, NGO 토큰과 별개 확인) | **BE(strdeok) 결정** — #60에 back 태그·이관 필요 |
 
 ## 내가 닫아야 할 것
 
