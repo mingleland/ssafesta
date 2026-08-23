@@ -7,7 +7,7 @@
 
 ## 📍 세션 인수인계 (2026-08-23 종료 시점)
 
-**브랜치 상태**: spec 005 완결, Block A 계약 회수 완결, 013a WebGL Host 완료, 016 E2E 완료, PR #63 반입 완료, **001 Auth FE 완료**(ASC 세션 구현+감사, T-17 수정 포함), **D-1·D-2 PR 게시**([#64](https://github.com/kanghyunsoon/ssafesta/pull/64)·[#65](https://github.com/kanghyunsoon/ssafesta/pull/65), 머지 대기).
+**브랜치 상태**: spec 005 완결, Block A 계약 회수 완결, 013a WebGL Host 완료, 016 E2E 완료, PR #63 반입 완료, **001 Auth FE 완료**(ASC 세션 구현+감사, T-17 수정 포함), **D-1·D-2 develop 병합 완료**([#64](https://github.com/kanghyunsoon/ssafesta/pull/64)·[#65](https://github.com/kanghyunsoon/ssafesta/pull/65)).
 
 **013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증.
 
@@ -75,8 +75,8 @@
 | **013a WebGL Host** 08-23 | 위 인수인계 참조 |
 | **016 E2E** 08-23 | 위 인수인계 참조 |
 | **001 Auth FE** 08-23 | ASC 세션 구현 + 감사(결함 T-17 수정). tasks 16/17·quickstart 8/8·vitest 129. 잔여 T016만 Blocked-on-BE |
-| **D-1. 005 FE 산출물 develop PR** 08-23 | [PR #64](https://github.com/kanghyunsoon/ssafesta/pull/64) 게시 — origin/front@a74fd43에서 7파일 회수(FE/ 5종 + verify 2종), 바이트 동일 확인. **머지 대기** |
-| **D-2. docs/10 §3 라우트 develop PR** 08-23 | [PR #65](https://github.com/kanghyunsoon/ssafesta/pull/65) 게시 — `/auth/callback`·게임 2종 추가 3줄. **머지 대기** |
+| **D-1. 005 FE 산출물 develop PR** 08-23 | [PR #64](https://github.com/kanghyunsoon/ssafesta/pull/64) — origin/front@a74fd43에서 7파일 회수(FE/ 5종 + verify 2종), 바이트 동일 확인. **머지 완료**(squash, 자체 병합) |
+| **D-2. docs/10 §3 라우트 develop PR** 08-23 | [PR #65](https://github.com/kanghyunsoon/ssafesta/pull/65) — `/auth/callback`·게임 2종 추가 3줄. **머지 완료**(squash, 자체 병합) |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
 
