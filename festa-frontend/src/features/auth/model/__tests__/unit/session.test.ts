@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { getAccessToken } from '../../../../../shared/api/client';
 import {
   clearSession,
+  markBootstrapped,
   getSessionSnapshot,
   setGuestSession,
   setMemberSession,
@@ -16,7 +17,7 @@ beforeEach(() => {
 describe('setMemberSession', () => {
   it('kind를 member로, AT를 client.ts 메모리에 동시에 설정한다', () => {
     setMemberSession('at-1', '2026-01-01T00:00:00.000Z');
-    expect(getSessionSnapshot()).toEqual({ kind: 'member', expiresAt: '2026-01-01T00:00:00.000Z', notice: null });
+    expect(getSessionSnapshot()).toEqual({ kind: 'member', expiresAt: '2026-01-01T00:00:00.000Z', notice: null, bootstrapped: false });
     expect(getAccessToken()).toBe('at-1');
   });
 });
@@ -24,7 +25,7 @@ describe('setMemberSession', () => {
 describe('setGuestSession', () => {
   it('kind를 guest로, AT를 client.ts 메모리에 동시에 설정한다', () => {
     setGuestSession('at-guest', '2026-01-01T00:30:00.000Z');
-    expect(getSessionSnapshot()).toEqual({ kind: 'guest', expiresAt: '2026-01-01T00:30:00.000Z', notice: null });
+    expect(getSessionSnapshot()).toEqual({ kind: 'guest', expiresAt: '2026-01-01T00:30:00.000Z', notice: null, bootstrapped: false });
     expect(getAccessToken()).toBe('at-guest');
   });
 });
@@ -33,7 +34,7 @@ describe('clearSession', () => {
   it('kind를 anonymous로 되돌리고 AT를 지운다', () => {
     setMemberSession('at-1', '2026-01-01T00:00:00.000Z');
     clearSession();
-    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: null });
+    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false });
     expect(getAccessToken()).toBeNull();
   });
 
@@ -57,5 +58,17 @@ describe('토큰-kind 정합성', () => {
     clearSession();
     expect(getAccessToken()).toBeNull();
     expect(getSessionSnapshot().kind).toBe('anonymous');
+  });
+});
+
+describe('markBootstrapped', () => {
+  it('부트스트랩 완료를 표시하고, 이후 세션 전이에도 유지된다 — 가드가 redirect를 보류하는 근거(T012 레이스 수정)', () => {
+    expect(getSessionSnapshot().bootstrapped).toBe(false);
+    markBootstrapped();
+    expect(getSessionSnapshot().bootstrapped).toBe(true);
+
+    setMemberSession('at-1', '2026-01-01T00:00:00.000Z');
+    clearSession();
+    expect(getSessionSnapshot().bootstrapped).toBe(true);
   });
 });

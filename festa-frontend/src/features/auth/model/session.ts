@@ -14,9 +14,12 @@ export interface SessionState {
   kind: SessionKind;
   expiresAt: string | null;
   notice: SessionNotice;
+  // 부트스트랩(새로고침 복원 refresh)이 끝나기 전에는 가드가 redirect를 확정하면 안 된다 —
+  // 초기 anonymous는 "미확인"이지 "비로그인 확정"이 아니다(T012 레이스, quickstart §6 실측으로 발견).
+  bootstrapped: boolean;
 }
 
-let state: SessionState = { kind: 'anonymous', expiresAt: null, notice: null };
+let state: SessionState = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false };
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -41,19 +44,26 @@ export function getSessionSnapshot(): SessionState {
 // setAccessToken을 직접 부르지 않는다(T005 완료조건: 토큰과 kind가 어긋나는 경로 없음).
 export function setMemberSession(accessToken: string, expiresAt: string): void {
   setAccessToken(accessToken);
-  state = { kind: 'member', expiresAt, notice: null };
+  state = { ...state, kind: 'member', expiresAt, notice: null };
   emit();
 }
 
 export function setGuestSession(accessToken: string, expiresAt: string): void {
   setAccessToken(accessToken);
-  state = { kind: 'guest', expiresAt, notice: null };
+  state = { ...state, kind: 'guest', expiresAt, notice: null };
   emit();
 }
 
 export function clearSession(notice: SessionNotice = null): void {
   setAccessToken(null);
-  state = { kind: 'anonymous', expiresAt: null, notice };
+  state = { ...state, kind: 'anonymous', expiresAt: null, notice };
+  emit();
+}
+
+// bootstrapAuth가 refresh 성패와 무관하게 종료 시점에 1회 호출 — 이때부터 가드 판정이 유효하다.
+export function markBootstrapped(): void {
+  if (state.bootstrapped) return;
+  state = { ...state, bootstrapped: true };
   emit();
 }
 
@@ -65,6 +75,6 @@ export function useSession(): SessionState {
 // 프로덕션 코드에서는 호출하지 않는다.
 export function __resetSessionForTests(): void {
   setAccessToken(null);
-  state = { kind: 'anonymous', expiresAt: null, notice: null };
+  state = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false };
   listeners.clear();
 }

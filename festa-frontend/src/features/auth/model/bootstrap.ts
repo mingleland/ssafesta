@@ -5,7 +5,7 @@
 // 있어 게스트는 자연히 복원되지 않는다.
 
 import { authApi } from '../../../entities/auth/api.select';
-import { setMemberSession } from './session';
+import { markBootstrapped, setMemberSession } from './session';
 import { installUnauthorizedHandler } from './unauthorizedHandler';
 
 let started = false;
@@ -21,6 +21,10 @@ export async function bootstrapAuth(): Promise<void> {
     }
   } catch {
     // RT 부재·만료·게스트 등 — 조용히 anonymous로 남는다
+  } finally {
+    // 성패와 무관하게 여기서부터 가드 판정 유효 — 이전엔 refresh가 끝나기 전에 가드가
+    // 초기 anonymous로 /login redirect를 확정해 새로고침 복원이 항상 졌다(quickstart §6 실측).
+    markBootstrapped();
   }
 }
 

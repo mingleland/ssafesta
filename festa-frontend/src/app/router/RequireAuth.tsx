@@ -34,7 +34,12 @@ function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
 }
 
 export function RequireAuth({ level, children }: { level: GuardLevel; children: ReactNode }) {
-  const { kind } = useSession();
+  const { kind, bootstrapped } = useSession();
+
+  // 부트스트랩(새로고침 복원) 완료 전의 anonymous는 "미확인"이다 — 여기서 redirect를 확정하면
+  // refresh가 이길 수 없는 레이스가 돼 로그인 유지가 항상 깨진다(T012, quickstart §6 실측 발견)
+  if (!bootstrapped) return <p>세션 확인 중...</p>;
+
   const decision = evaluateGuard(kind, level);
 
   if (decision === 'redirect-login') return <Navigate to="/login" replace />;
