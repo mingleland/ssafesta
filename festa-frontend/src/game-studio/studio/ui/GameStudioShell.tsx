@@ -16,10 +16,12 @@ import {
   addTileLayer,
   addTopDownScene,
   addPlatformerScene,
+  duplicateObjects,
   fillTileLayer,
-  moveObject,
+  moveObjects,
   nextStableId,
   paintTiles,
+  removeObjects,
   removeScene,
   replaceComponent,
   renameProject,
@@ -43,7 +45,7 @@ import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
 import { ObjectLayerPanel } from './ObjectLayerPanel.tsx';
 import { ProjectDataPanel } from './ProjectDataPanel.tsx';
-import { TopDownCanvas } from './TopDownCanvas.tsx';
+import { TopDownCanvas, type CanvasTool } from './TopDownCanvas.tsx';
 import './GameStudioShell.css';
 
 type RightPanel = 'PROPERTIES' | 'EVENTS' | 'PROJECT';
@@ -147,6 +149,7 @@ export const GameStudioShell = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSceneId, setSelectedSceneId] = useState(project.startSceneId);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [selectedObjectIds, setSelectedObjectIds] = useState<ReadonlySet<string>>(new Set());
   const [placementPreset, setPlacementPreset] = useState<GameObject['preset'] | null>(null);
   const [paletteMode, setPaletteMode] = useState<'OBJECTS' | 'TILES'>('OBJECTS');
   const [objectCategory, setObjectCategory] = useState<'전체' | '기본' | '캐릭터' | '상호작용' | '액션' | '장식'>('전체');
@@ -157,6 +160,8 @@ export const GameStudioShell = ({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [notice, setNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
+  const [canvasTool, setCanvasTool] = useState<CanvasTool>('SELECT');
+  const [showGrid, setShowGrid] = useState(true);
   const [showGuide, setShowGuide] = useState(() => shouldShowFirstVisitGuide(gameId));
   const [showTemplates, setShowTemplates] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<ProjectTemplateId | null>(null);
@@ -213,6 +218,7 @@ export const GameStudioShell = ({
     if (selectedScene !== undefined) return;
     setSelectedSceneId(project.startSceneId);
     setSelectedObjectId(null);
+    setSelectedObjectIds(new Set());
   }, [project.startSceneId, selectedScene]);
 
   const apply = useCallback((nextProject: GameProject) => {
@@ -225,6 +231,66 @@ export const GameStudioShell = ({
       setNotice(error instanceof Error ? error.message : '편집 내용을 적용하지 못했습니다.');
     }
   }, [store]);
+
+  const selectObjects = useCallback((objectIds: readonly string[], primaryObjectId: string | null) => {
+    const nextIds = new Set(objectIds);
+    setSelectedObjectIds(nextIds);
+    setSelectedObjectId(primaryObjectId !== null && nextIds.has(primaryObjectId)
+      ? primaryObjectId
+      : objectIds.at(-1) ?? null);
+    if (nextIds.size > 0) setRightPanel('PROPERTIES');
+  }, []);
+
+  const clearObjectSelection = useCallback(() => {
+    setSelectedObjectIds(new Set());
+    setSelectedObjectId(null);
+  }, []);
+
+  const duplicateSelection = useCallback(() => {
+    const currentProject = store.getState().project;
+    const scene = currentProject.scenes.find((candidate) => candidate.id === selectedSceneId);
+    if (scene === undefined || scene.type === 'DIALOGUE') return;
+    const objectIds = [...selectedObjectIds].filter((id) => !editorLockedObjectIds.has(id));
+    if (objectIds.length === 0) {
+      setNotice('복제할 오브젝트를 선택해 주세요. 잠긴 오브젝트는 복제하지 않습니다.');
+      return;
+    }
+    try {
+      const result = duplicateObjects(currentProject, scene.id, objectIds);
+      apply(result.project);
+      selectObjects(result.objectIds, result.objectIds.at(-1) ?? null);
+      setNotice(`${result.objectIds.length}개 오브젝트와 연결된 동작을 복제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '오브젝트를 복제하지 못했습니다.');
+    }
+  }, [apply, editorLockedObjectIds, selectObjects, selectedObjectIds, selectedSceneId, store]);
+
+  const deleteSelection = useCallback(() => {
+    const currentProject = store.getState().project;
+    const scene = currentProject.scenes.find((candidate) => candidate.id === selectedSceneId);
+    if (scene === undefined || scene.type === 'DIALOGUE') return;
+    const objectIds = [...selectedObjectIds].filter((id) => !editorLockedObjectIds.has(id));
+    if (objectIds.length === 0) {
+      setNotice('삭제할 오브젝트를 선택해 주세요. 잠긴 오브젝트는 삭제하지 않습니다.');
+      return;
+    }
+    try {
+      const result = removeObjects(currentProject, scene.id, objectIds);
+      if (result.removedObjectIds.length > 0) apply(result.project);
+      const removedIds = new Set(result.removedObjectIds);
+      const remaining = [...selectedObjectIds].filter((id) => !removedIds.has(id));
+      selectObjects(remaining, remaining.at(-1) ?? null);
+      if (result.blocked.length > 0) {
+        setNotice(`${result.removedObjectIds.length}개 삭제 · ${result.blocked.length}개는 시작점 또는 다른 동작 참조 때문에 유지했습니다.`);
+      } else {
+        setNotice(`${result.removedObjectIds.length}개 오브젝트를 삭제했습니다.`);
+      }
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '오브젝트를 삭제하지 못했습니다.');
+    }
+  }, [apply, editorLockedObjectIds, selectObjects, selectedObjectIds, selectedSceneId, store]);
 
   const uploadAsset = useCallback(async (
     kind: AssetReference['kind'],
@@ -287,6 +353,7 @@ export const GameStudioShell = ({
       store.reset(upgradedDraft);
       setSelectedSceneId(upgradedDraft.startSceneId);
       setSelectedObjectId(null);
+      setSelectedObjectIds(new Set());
       setDraftConflict(null);
       setSaveStatus('clean');
       setNotice('내 변경을 JSON으로 보관하고 서버 최신 초안을 불러왔습니다. 필요한 부분을 다시 적용하세요.');
@@ -343,6 +410,10 @@ export const GameStudioShell = ({
           setShowTemplates(false);
           return;
         }
+        if (selectedObjectIds.size > 0) {
+          clearObjectSelection();
+          return;
+        }
         if (focusMode) {
           setFocusMode(false);
           return;
@@ -366,19 +437,60 @@ export const GameStudioShell = ({
       const keyboardCanvasContext = target === document.body || (target instanceof HTMLElement && (
         target.classList.contains('gss-map-object') || target.classList.contains('gss-map-canvas')
       ));
-      if (!editingText && keyboardCanvasContext && !(event.ctrlKey || event.metaKey) && selectedObjectId !== null && !editorLockedObjectIds.has(selectedObjectId) && event.key.startsWith('Arrow')) {
+      if (!editingText && keyboardCanvasContext && !(event.ctrlKey || event.metaKey) && !event.altKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'q') {
+          event.preventDefault();
+          setCanvasTool('SELECT');
+          setPlacementPreset(null);
+          setTileBrush(null);
+          return;
+        }
+        if (key === 'w') {
+          event.preventDefault();
+          setCanvasTool('PAN');
+          setPlacementPreset(null);
+          setTileBrush(null);
+          return;
+        }
+        if (key === 'g') {
+          event.preventDefault();
+          setShowGrid((current) => !current);
+          return;
+        }
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+          event.preventDefault();
+          deleteSelection();
+          return;
+        }
+      }
+      if (!editingText && keyboardCanvasContext && !(event.ctrlKey || event.metaKey) && selectedObjectIds.size > 0 && event.key.startsWith('Arrow')) {
         const currentProject = store.getState().project;
         const scene = currentProject.scenes.find((candidate) => candidate.id === selectedSceneId);
-        const object = scene?.type === 'DIALOGUE' ? undefined : scene?.objects.find((candidate) => candidate.id === selectedObjectId);
-        if (scene !== undefined && scene.type !== 'DIALOGUE' && object !== undefined) {
+        if (scene !== undefined && scene.type !== 'DIALOGUE') {
           event.preventDefault();
-          const x = object.position.x + (event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0);
-          const y = object.position.y + (event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0);
-          apply(moveObject(currentProject, scene.id, object.id, x, y));
+          const movableIds = [...selectedObjectIds].filter((id) => !editorLockedObjectIds.has(id));
+          const deltaX = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+          const deltaY = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+          if (movableIds.length > 0) apply(moveObjects(currentProject, scene.id, movableIds, deltaX, deltaY));
         }
         return;
       }
       if (!(event.ctrlKey || event.metaKey)) return;
+      if (!editingText && keyboardCanvasContext && event.key.toLowerCase() === 'a') {
+        const scene = store.getState().project.scenes.find((candidate) => candidate.id === selectedSceneId);
+        if (scene !== undefined && scene.type !== 'DIALOGUE') {
+          event.preventDefault();
+          const objectIds = scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)).map((object) => object.id);
+          selectObjects(objectIds, objectIds.at(-1) ?? null);
+        }
+        return;
+      }
+      if (!editingText && keyboardCanvasContext && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
+        duplicateSelection();
+        return;
+      }
       if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         void save();
@@ -396,7 +508,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, editorLockedObjectIds, focusMode, gameId, save, selectedObjectId, selectedSceneId, showGuide, showTemplates, store]);
+  }, [apply, clearObjectSelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
 
   const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -408,6 +520,7 @@ export const GameStudioShell = ({
       store.reset(imported);
       setSelectedSceneId(imported.startSceneId);
       setSelectedObjectId(null);
+      setSelectedObjectIds(new Set());
       setSaveStatus('dirty');
       setNotice(`${file.name}을 가져왔습니다. 저장 전 플레이 테스트를 권장합니다.`);
     } catch (error) {
@@ -438,6 +551,7 @@ export const GameStudioShell = ({
     setTileBrush(null);
     if (tutorialStep === 0 || tutorialStep === null) {
       setSelectedObjectId(null);
+      setSelectedObjectIds(new Set());
       return;
     }
     const target = tutorialStep === 3
@@ -446,6 +560,7 @@ export const GameStudioShell = ({
       : worldScene.objects.find((object) => object.preset !== 'PLAYER_SPAWN');
     if (target !== undefined) {
       setSelectedObjectId(target.id);
+      setSelectedObjectIds(new Set([target.id]));
       setRightPanel(tutorialStep === 3 ? 'EVENTS' : 'PROPERTIES');
     }
   };
@@ -469,6 +584,7 @@ export const GameStudioShell = ({
     apply(next);
     setSelectedSceneId(next.scenes.at(-1)?.id ?? next.startSceneId);
     setSelectedObjectId(null);
+    setSelectedObjectIds(new Set());
   };
 
   const placeObject = (preset: GameObject['preset'], x: number, y: number) => {
@@ -477,6 +593,7 @@ export const GameStudioShell = ({
       const result = addObject(project, selectedScene.id, preset, { x, y });
       apply(result.project);
       setSelectedObjectId(result.objectId);
+      setSelectedObjectIds(new Set([result.objectId]));
       setRightPanel('PROPERTIES');
     } catch (error) {
       setSaveStatus('error');
@@ -567,6 +684,7 @@ export const GameStudioShell = ({
                   onClick={() => {
                     setSelectedSceneId(scene.id);
                     setSelectedObjectId(null);
+                    setSelectedObjectIds(new Set());
                     setPlacementPreset(null);
                     setTileBrush(null);
                     setSelectedLayerId(scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null);
@@ -587,6 +705,7 @@ export const GameStudioShell = ({
                 apply(next);
                 setSelectedSceneId(next.startSceneId);
                 setSelectedObjectId(null);
+                setSelectedObjectIds(new Set());
               }}
               title={sceneRemovalReason(project, selectedScene.id) ?? '선택 Scene 삭제'}
               type="button"
@@ -716,6 +835,47 @@ export const GameStudioShell = ({
             <div><span className="gss-type-badge">{selectedScene.type}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
             {selectedScene.type !== 'DIALOGUE' && (
               <div className="gss-canvas-tools">
+                <div className="gss-tool-segment" role="group" aria-label="캔버스 도구">
+                  <button
+                    aria-keyshortcuts="Q"
+                    aria-pressed={canvasTool === 'SELECT'}
+                    className={canvasTool === 'SELECT' ? 'is-active' : ''}
+                    onClick={() => { setCanvasTool('SELECT'); setPlacementPreset(null); setTileBrush(null); }}
+                    title="클릭하거나 빈 공간을 드래그해 여러 오브젝트 선택 (Q)"
+                    type="button"
+                  >선택 <kbd>Q</kbd></button>
+                  <button
+                    aria-keyshortcuts="W"
+                    aria-pressed={canvasTool === 'PAN'}
+                    className={canvasTool === 'PAN' ? 'is-active' : ''}
+                    onClick={() => { setCanvasTool('PAN'); setPlacementPreset(null); setTileBrush(null); }}
+                    title="캔버스를 드래그해 화면 이동 (W 또는 마우스 가운데 버튼)"
+                    type="button"
+                  >화면 이동 <kbd>W</kbd></button>
+                </div>
+                <button
+                  aria-keyshortcuts="G"
+                  aria-pressed={showGrid}
+                  className={showGrid ? 'is-active' : ''}
+                  onClick={() => setShowGrid((current) => !current)}
+                  title="배치 격자 표시 전환 (G)"
+                  type="button"
+                >격자</button>
+                <button
+                  aria-keyshortcuts="Control+D Meta+D"
+                  disabled={selectedObjectIds.size === 0}
+                  onClick={duplicateSelection}
+                  title="선택한 오브젝트와 연결된 동작 복제 (Ctrl+D)"
+                  type="button"
+                >복제</button>
+                <button
+                  aria-keyshortcuts="Delete Backspace"
+                  className="is-danger"
+                  disabled={selectedObjectIds.size === 0}
+                  onClick={deleteSelection}
+                  title="선택한 오브젝트 삭제 (Delete)"
+                  type="button"
+                >삭제</button>
                 <button
                   aria-keyshortcuts="Shift+F"
                   aria-pressed={focusMode}
@@ -744,23 +904,24 @@ export const GameStudioShell = ({
             <TopDownCanvas
               assets={project.assets}
               assetUrls={assetUrls}
+              canvasTool={canvasTool}
               editorHiddenObjectIds={editorHiddenObjectIds}
               editorLockedObjectIds={editorLockedObjectIds}
-              onMoveObject={(objectId, x, y) => {
-                if (!editorLockedObjectIds.has(objectId)) apply(moveObject(store.getState().project, selectedScene.id, objectId, x, y));
+              onMoveObjects={(objectIds, deltaX, deltaY) => {
+                const movableIds = objectIds.filter((id) => !editorLockedObjectIds.has(id));
+                if (movableIds.length > 0) apply(moveObjects(store.getState().project, selectedScene.id, movableIds, deltaX, deltaY));
               }}
               onPaintTiles={(cells, tileIndex) => {
                 if (selectedTileLayer !== null) apply(paintTiles(store.getState().project, selectedScene.id, selectedTileLayer.id, cells, tileIndex));
               }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
-              onSelectObject={(objectId) => {
-                setSelectedObjectId(objectId);
-                if (objectId !== null) setRightPanel('PROPERTIES');
-              }}
+              onSelectObjects={selectObjects}
               placementPreset={placementPreset}
               scene={selectedScene}
               selectedObjectId={selectedObjectId}
+              selectedObjectIds={selectedObjectIds}
+              showGrid={showGrid}
               tileBrush={paletteMode === 'TILES' ? tileBrush : null}
               tileLayer={selectedTileLayer}
               tilesetVisual={selectedTilesetVisual}
@@ -779,8 +940,7 @@ export const GameStudioShell = ({
               }}
               onClose={() => setShowLayers(false)}
               onSelect={(objectId) => {
-                setSelectedObjectId(objectId);
-                setRightPanel('PROPERTIES');
+                selectObjects([objectId], objectId);
               }}
               onToggleHidden={(objectId) => toggleObjectInSet(setEditorHiddenObjectIds, objectId)}
               onToggleLocked={(objectId) => toggleObjectInSet(setEditorLockedObjectIds, objectId)}
@@ -790,6 +950,7 @@ export const GameStudioShell = ({
           )}
           <footer className="gss-statusbar">
             <span><i className="is-valid" />GameProject 1.0.0 검증 적용</span>
+            {selectedObjectIds.size > 0 && <strong>{selectedObjectIds.size}개 선택 · Shift/Ctrl로 추가 선택 · 화살표로 이동</strong>}
             {placementPreset !== null && <strong>배치 모드 · {placementPreset} — 맵의 위치를 클릭하세요</strong>}
             {tileBrush !== null && paletteMode === 'TILES' && <strong>타일 브러시 · {tileBrush === -1 ? '지우개' : tileBrush}</strong>}
             <span>Game #{gameId} · revision {project.revision}</span>
@@ -812,7 +973,7 @@ export const GameStudioShell = ({
               <InspectorPanel
                 assetUrls={assetUrls}
                 onApply={apply}
-                onObjectRemoved={() => setSelectedObjectId(null)}
+                onObjectRemoved={clearObjectSelection}
                 onReplaceSprite={(file) => {
                   if (selectedObject === null) return;
                   void uploadAsset('IMAGE', file).then((asset) => {
@@ -902,6 +1063,7 @@ export const GameStudioShell = ({
                       store.reset(next);
                       setSelectedSceneId(next.startSceneId);
                       setSelectedObjectId(null);
+                      setSelectedObjectIds(new Set());
                       setSelectedLayerId(null);
                       setSaveStatus('dirty');
                       setPendingTemplateId(null);

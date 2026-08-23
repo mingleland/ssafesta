@@ -1,4 +1,5 @@
 import {
+  GAME_PROJECT_LIMITS,
   parseGameProject,
   type Action,
   type AssetReference,
@@ -268,6 +269,130 @@ export const moveObject = (
   } : object),
 }));
 
+export const moveObjects = (
+  project: GameProject,
+  sceneId: string,
+  objectIds: readonly string[],
+  deltaX: number,
+  deltaY: number,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const selectedIds = new Set(objectIds);
+  const selected = scene.objects.filter((object) => selectedIds.has(object.id));
+  if (selected.length === 0) return scene;
+  const requestedX = Math.round(deltaX);
+  const requestedY = Math.round(deltaY);
+  const minX = Math.min(...selected.map((object) => object.position.x));
+  const maxX = Math.max(...selected.map((object) => object.position.x));
+  const minY = Math.min(...selected.map((object) => object.position.y));
+  const maxY = Math.max(...selected.map((object) => object.position.y));
+  const appliedX = Math.max(-minX, Math.min(scene.width - 1 - maxX, requestedX));
+  const appliedY = Math.max(-minY, Math.min(scene.height - 1 - maxY, requestedY));
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => selectedIds.has(object.id) ? {
+      ...object,
+      position: { x: object.position.x + appliedX, y: object.position.y + appliedY },
+    } : object),
+  };
+});
+
+const nextUniqueId = (usedIds: Set<string>, prefix: string): string => {
+  let suffix = 1;
+  while (usedIds.has(`${prefix}${suffix}`)) suffix += 1;
+  const id = `${prefix}${suffix}`;
+  usedIds.add(id);
+  return id;
+};
+
+export const duplicateObjects = (
+  project: GameProject,
+  sceneId: string,
+  objectIds: readonly string[],
+): { readonly project: GameProject; readonly objectIds: readonly string[] } => {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene?.type === 'DIALOGUE' || scene === undefined) throw new Error(`${sceneId} is not a world scene`);
+  const requestedIds = new Set(objectIds);
+  const sourceObjects = scene.objects.filter((object) => (
+    requestedIds.has(object.id) && object.preset !== 'PLAYER_SPAWN'
+  ));
+  if (sourceObjects.length === 0) throw new Error('복제할 수 있는 오브젝트를 선택해 주세요.');
+  if (scene.objects.length + sourceObjects.length > GAME_PROJECT_LIMITS.maxObjectsPerScene) {
+    throw new Error(`Scene에는 오브젝트를 ${GAME_PROJECT_LIMITS.maxObjectsPerScene}개까지만 둘 수 있습니다.`);
+  }
+
+  const usedIds = allIds(project);
+  const objectIdMap = new Map(sourceObjects.map((object) => [object.id, nextUniqueId(usedIds, 'object')]));
+  const maxX = Math.max(...sourceObjects.map((object) => object.position.x));
+  const maxY = Math.max(...sourceObjects.map((object) => object.position.y));
+  const minX = Math.min(...sourceObjects.map((object) => object.position.x));
+  const minY = Math.min(...sourceObjects.map((object) => object.position.y));
+  const offsetX = maxX < scene.width - 1 ? 1 : minX > 0 ? -1 : 0;
+  const offsetY = maxY < scene.height - 1 ? 1 : minY > 0 ? -1 : 0;
+  const duplicates: GameObject[] = sourceObjects.map((object) => ({
+    ...object,
+    id: objectIdMap.get(object.id) ?? object.id,
+    position: { x: object.position.x + offsetX, y: object.position.y + offsetY },
+    components: object.components.map((component) => ({ ...component })),
+  }));
+  const copiedEvents = scene.events
+    .filter((event) => event.trigger.type !== 'ON_SCENE_START' && objectIdMap.has(event.trigger.targetId))
+    .map((event): GameEvent => ({
+      ...event,
+      id: nextUniqueId(usedIds, 'event'),
+      trigger: event.trigger.type === 'ON_SCENE_START'
+        ? event.trigger
+        : { ...event.trigger, targetId: objectIdMap.get(event.trigger.targetId) ?? event.trigger.targetId },
+      conditions: event.conditions.map((condition) => ({ ...condition })),
+      actions: event.actions.map((action) => (
+        (action.type === 'SHOW_OBJECT' || action.type === 'HIDE_OBJECT') && objectIdMap.has(action.objectId)
+          ? { ...action, objectId: objectIdMap.get(action.objectId) ?? action.objectId }
+          : { ...action }
+      )),
+    }));
+  if (scene.events.length + copiedEvents.length > GAME_PROJECT_LIMITS.maxEventsPerScene) {
+    throw new Error(`동작을 포함해 복제하면 Event ${GAME_PROJECT_LIMITS.maxEventsPerScene}개 제한을 넘습니다.`);
+  }
+  return {
+    objectIds: duplicates.map((object) => object.id),
+    project: replaceTopDownScene(project, sceneId, (current) => ({
+      ...current,
+      objects: [...current.objects, ...duplicates],
+      events: [...current.events, ...copiedEvents],
+    })),
+  };
+};
+
+export const resizeWorldScene = (
+  project: GameProject,
+  sceneId: string,
+  width: number,
+  height: number,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const minWidth = scene.type === 'PLATFORMER' ? 8 : 4;
+  const nextWidth = Math.max(minWidth, Math.min(scene.type === 'PLATFORMER' ? 200 : 100, Math.round(width)));
+  const nextHeight = Math.max(scene.type === 'PLATFORMER' ? 6 : 4, Math.min(100, Math.round(height)));
+  return {
+    ...scene,
+    width: nextWidth,
+    height: nextHeight,
+    tileLayers: scene.tileLayers.map((layer) => ({
+      ...layer,
+      data: Array.from({ length: nextWidth * nextHeight }, (_, index) => {
+        const x = index % nextWidth;
+        const y = Math.floor(index / nextWidth);
+        return x < scene.width && y < scene.height ? (layer.data[y * scene.width + x] ?? -1) : -1;
+      }),
+    })),
+    objects: scene.objects.map((object) => ({
+      ...object,
+      position: {
+        x: Math.min(nextWidth - 1, object.position.x),
+        y: Math.min(nextHeight - 1, object.position.y),
+      },
+    })),
+  };
+});
+
 export const setObjectVisible = (
   project: GameProject,
   sceneId: string,
@@ -278,10 +403,18 @@ export const setObjectVisible = (
   objects: scene.objects.map((object) => object.id === objectId ? { ...object, visible } : object),
 }));
 
-const objectReferencedByAction = (project: GameProject, objectId: string): boolean => (
+const objectReferencedByAction = (
+  project: GameProject,
+  objectId: string,
+  removingIds: ReadonlySet<string> = new Set(),
+): boolean => (
   project.scenes.some((scene) => {
     const actions = scene.type !== 'DIALOGUE'
-      ? scene.events.flatMap((event) => event.actions)
+      ? scene.events.flatMap((event) => (
+        event.trigger.type !== 'ON_SCENE_START' && (event.trigger.targetId === objectId || removingIds.has(event.trigger.targetId))
+          ? []
+          : event.actions
+      ))
       : scene.nodes.flatMap((node) => node.choices.flatMap((choice) => choice.actions));
     return actions.some((action) => (
       (action.type === 'SHOW_OBJECT' || action.type === 'HIDE_OBJECT') && action.objectId === objectId
@@ -313,6 +446,42 @@ export const removeObject = (
       event.trigger.type === 'ON_SCENE_START' || event.trigger.targetId !== objectId
     )),
   }));
+};
+
+export const removeObjects = (
+  project: GameProject,
+  sceneId: string,
+  objectIds: readonly string[],
+): { readonly project: GameProject; readonly removedObjectIds: readonly string[]; readonly blocked: readonly { readonly objectId: string; readonly reason: string }[] } => {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene?.type === 'DIALOGUE' || scene === undefined) throw new Error(`${sceneId} is not a world scene`);
+  const requestedIds = new Set(objectIds);
+  const blocked = scene.objects.flatMap((object) => {
+    if (!requestedIds.has(object.id)) return [];
+    const reason = object.preset === 'PLAYER_SPAWN'
+      ? '플레이어 시작점은 삭제할 수 없습니다.'
+      : objectReferencedByAction(project, object.id, requestedIds)
+        ? '선택 밖의 다른 Event Action이 이 오브젝트를 참조하고 있습니다.'
+        : null;
+    return reason === null ? [] : [{ objectId: object.id, reason }];
+  });
+  const blockedIds = new Set(blocked.map((entry) => entry.objectId));
+  const removedObjectIds = scene.objects
+    .filter((object) => requestedIds.has(object.id) && !blockedIds.has(object.id))
+    .map((object) => object.id);
+  const removedIds = new Set(removedObjectIds);
+  if (removedIds.size === 0) return { project, removedObjectIds, blocked };
+  return {
+    blocked,
+    removedObjectIds,
+    project: replaceTopDownScene(project, sceneId, (current) => ({
+      ...current,
+      objects: current.objects.filter((object) => !removedIds.has(object.id)),
+      events: current.events.filter((event) => (
+        event.trigger.type === 'ON_SCENE_START' || !removedIds.has(event.trigger.targetId)
+      )),
+    })),
+  };
 };
 
 export const createComponent = (

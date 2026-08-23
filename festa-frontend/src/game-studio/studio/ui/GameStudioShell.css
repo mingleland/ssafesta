@@ -284,7 +284,8 @@
 .gss-zoom-controls button { background: transparent; border: 0; cursor: pointer; height: 26px; width: 28px; }
 .gss-zoom-controls span { color: var(--gss-muted); font-size: 9px; min-width: 34px; text-align: center; }
 
-.gss-canvas-scroll { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: auto; padding: 28px; }
+.gss-canvas-scroll { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: auto; padding: 28px; touch-action: none; }
+.gss-canvas-scroll.is-panning { cursor: grabbing; user-select: none; }
 .gss-map-stage { max-width: 1240px; min-width: 610px; transition: width .16s ease; }
 .gss-map-canvas {
   background-color: #17140f;
@@ -309,15 +310,18 @@
   position: absolute;
   z-index: 2;
 }
+.gss-map-canvas.is-grid-hidden::after { display: none; }
+.gss-map-canvas.is-pan-tool { cursor: grab; }
+.gss-canvas-scroll.is-panning .gss-map-canvas.is-pan-tool { cursor: grabbing; }
 .gss-tile-layer { display: grid; grid-template-columns: repeat(var(--gss-grid-columns), 1fr); grid-template-rows: repeat(var(--gss-grid-rows), 1fr); inset: 0; opacity: .78; pointer-events: none; position: absolute; z-index: 1; }
 .gss-tile-layer > span { border: 1px solid rgba(255,255,255,.05); }
 .gss-map-canvas.is-placing { cursor: crosshair; box-shadow: 0 0 0 2px var(--gss-blue), 0 22px 60px rgba(0,0,0,.4); }
 .gss-map-object {
   align-items: center;
-  background: rgba(12, 15, 20, .82);
-  border: 1px solid rgba(255,255,255,.55);
-  border-radius: 8px;
-  box-shadow: 0 3px 12px rgba(0,0,0,.55);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  box-shadow: none;
   cursor: grab;
   display: flex;
   height: 34px;
@@ -330,7 +334,8 @@
   z-index: 2;
 }
 .gss-map-object:hover,
-.gss-map-object.is-selected { border-color: #60a5ff; box-shadow: 0 0 0 3px rgba(51,136,255,.25), 0 5px 16px rgba(0,0,0,.6); z-index: 3; }
+.gss-map-object.is-selected { background: rgba(18, 34, 54, .56); border-color: #60a5ff; box-shadow: 0 0 0 2px rgba(51,136,255,.2), 0 4px 12px rgba(0,0,0,.4); z-index: 3; }
+.gss-map-object.is-primary { box-shadow: 0 0 0 3px rgba(91,160,255,.34), 0 4px 14px rgba(0,0,0,.5); }
 .gss-map-object.is-editor-locked { cursor: not-allowed; }
 .gss-map-object > span { color: #f3ca6d; font-size: 17px; pointer-events: none; }
 .gss-map-object > img { height: 30px; image-rendering: pixelated; object-fit: contain; pointer-events: none; width: 30px; }
@@ -338,10 +343,11 @@
 .gss-map-object small { background: rgba(5,7,10,.9); border-radius: 3px; bottom: -16px; color: #d5dae2; display: none; font-size: 7px; left: 50%; padding: 2px 4px; pointer-events: none; position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .gss-map-object:hover small,
 .gss-map-object.is-selected small { display: block; }
-.gss-map-object--player_spawn { border-color: #5fa5ff; }
-.gss-map-object--npc { border-color: #a687ff; }
-.gss-map-object--item { border-color: #e0b34e; }
-.gss-map-object--door { border-color: #d8844e; }
+.gss-map-object--player_spawn:not(.is-selected),
+.gss-map-object--npc:not(.is-selected),
+.gss-map-object--item:not(.is-selected),
+.gss-map-object--door:not(.is-selected) { filter: drop-shadow(0 2px 3px rgba(0,0,0,.65)); }
+.gss-selection-box { background: rgba(51,136,255,.14); border: 1px solid #5b9eff; box-shadow: inset 0 0 18px rgba(51,136,255,.08); pointer-events: none; position: absolute; z-index: 30; }
 
 .gss-statusbar { align-items: center; background: #0e1116; border-top: 1px solid var(--gss-border); color: #737d8b; display: flex; font-size: 9px; justify-content: space-between; padding: 0 12px; }
 .gss-statusbar span { align-items: center; display: flex; gap: 6px; }
@@ -352,6 +358,8 @@
 .gss-panel-tabs button.is-active { border-bottom-color: var(--gss-blue); color: var(--gss-text); }
 .gss-panel-scroll { min-height: 0; overflow-y: auto; padding: 15px; }
 .gss-panel-stack { display: grid; gap: 12px; }
+.gss-secondary-wide { background: #171d26; border: 1px solid #394453; border-radius: 6px; color: #b9c3cf; min-height: 32px; width: 100%; }
+.gss-secondary-wide:disabled { cursor: not-allowed; opacity: .4; }
 .gss-panel-heading { align-items: flex-start; display: flex; justify-content: space-between; }
 .gss-panel-heading h2 { font-size: 15px; margin: 3px 0 0; }
 .gss-eyebrow { color: #697484; display: block; font-size: 8px; font-weight: 850; letter-spacing: .15em; }
@@ -605,9 +613,17 @@
 .gss-tutorial-dock > button:disabled { background: #222a35; border-color: #35404e; color: #6f7a89; }
 .gss-tutorial-dock > .gss-tutorial-find { background: rgba(65,137,239,.08); border-color: #405f88; color: #9dc5ff; margin-bottom: 6px; }
 
-.gss-canvas-tools { align-items: center; display: flex; gap: 7px; }
-.gss-canvas-tools > button { background: #171d26; border: 1px solid #353f4d; border-radius: 6px; color: #9aa7b8; font-size: 9px; padding: 6px 9px; }
-.gss-canvas-tools > button.is-active { background: rgba(51,136,255,.14); border-color: #4f86d5; color: #9fc7ff; }
+.gss-canvas-tools { align-items: center; display: flex; gap: 7px; min-width: 0; overflow-x: auto; padding-block: 5px; }
+.gss-canvas-tools > button,
+.gss-tool-segment button { background: #171d26; border: 1px solid #353f4d; border-radius: 6px; color: #9aa7b8; flex: 0 0 auto; font-size: 9px; padding: 6px 9px; }
+.gss-canvas-tools button.is-active { background: rgba(51,136,255,.14); border-color: #4f86d5; color: #9fc7ff; }
+.gss-canvas-tools button.is-danger:not(:disabled) { color: #f29a9a; }
+.gss-canvas-tools button:disabled { cursor: not-allowed; opacity: .35; }
+.gss-tool-segment { display: flex; }
+.gss-tool-segment button { border-radius: 0; }
+.gss-tool-segment button:first-child { border-radius: 6px 0 0 6px; }
+.gss-tool-segment button:last-child { border-left: 0; border-radius: 0 6px 6px 0; }
+.gss-tool-segment kbd { background: rgba(255,255,255,.07); border-radius: 3px; color: #6f7d8f; font-family: inherit; font-size: 7px; margin-left: 3px; padding: 1px 3px; }
 .gss-layer-panel { background: rgba(16,21,29,.98); border: 1px solid #465365; border-radius: 11px; box-shadow: 0 22px 65px rgba(0,0,0,.62); display: grid; gap: 9px; max-height: calc(100% - 72px); padding: 12px; position: absolute; right: 14px; top: 54px; width: min(360px,calc(100% - 28px)); z-index: 45; }
 .gss-layer-panel > header { align-items: center; display: flex; justify-content: space-between; }
 .gss-layer-panel > header span,.gss-layer-panel > header strong { display: block; }

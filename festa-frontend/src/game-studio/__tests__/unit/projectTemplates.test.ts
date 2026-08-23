@@ -23,4 +23,29 @@ describe('Game Studio project templates', () => {
     expect(PROJECT_TEMPLATES).toHaveLength(6);
     expect(new Set(PROJECT_TEMPLATES.map((template) => template.runtimeMode))).toEqual(new Set(['TOP_DOWN', 'PLATFORMER']));
   });
+
+  it('uses six structurally distinct playable blueprints instead of title-only variants', () => {
+    const profiles = PROJECT_TEMPLATES.map((template) => {
+      const project = createProjectFromTemplate(123, template.id);
+      const sceneTypes = project.scenes.map((scene) => scene.type).sort().join(',');
+      const presets = project.scenes.flatMap((scene) => scene.type === 'DIALOGUE' ? [] : scene.objects.map((object) => object.preset)).sort().join(',');
+      const actions = project.scenes.flatMap((scene) => scene.type === 'DIALOGUE'
+        ? scene.nodes.flatMap((node) => node.choices.flatMap((choice) => choice.actions.map((action) => action.type)))
+        : scene.events.flatMap((event) => event.actions.map((action) => action.type))).sort().join(',');
+      return `${sceneTypes}|${presets}|${actions}`;
+    });
+    expect(new Set(profiles)).toHaveLength(PROJECT_TEMPLATES.length);
+
+    const story = createProjectFromTemplate(123, 'STORY');
+    expect(story.scenes.filter((scene) => scene.type === 'DIALOGUE')).toHaveLength(4);
+    expect(story.scenes.some((scene) => scene.type === 'DIALOGUE' && scene.nodes.some((node) => (
+      node.choices.some((choice) => choice.actions.some((action) => action.type === 'SET_VARIABLE'))
+    )))).toBe(true);
+
+    const escape = createProjectFromTemplate(123, 'ESCAPE');
+    expect(escape.scenes.filter((scene) => scene.type === 'TOP_DOWN')).toHaveLength(2);
+    expect(escape.scenes.some((scene) => scene.type !== 'DIALOGUE' && scene.events.some((event) => (
+      event.actions.some((action) => action.type === 'SHOW_OBJECT')
+    )))).toBe(true);
+  });
 });

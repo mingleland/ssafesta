@@ -71,7 +71,12 @@ describe('reference runtime gameplay systems', () => {
       scenes: [{
         ...scene,
         objects: scene.objects.map((object) => object.id === 'treasure1'
-          ? { ...object, components: [...object.components, { type: 'SCORE_VALUE' as const, value: 25 }] }
+          ? {
+              ...object,
+              components: object.components.some((component) => component.type === 'SCORE_VALUE')
+                ? object.components.map((component) => component.type === 'SCORE_VALUE' ? { ...component, value: 25 } : component)
+                : [...object.components, { type: 'SCORE_VALUE' as const, value: 25 }],
+            }
           : object),
       }],
     });
