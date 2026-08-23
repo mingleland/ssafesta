@@ -14,6 +14,7 @@ export const EditGamePage = () => {
   }
   return (
     <GameStudioShell
+      assetRepository={serverAuthoringEnabled ? null : undefined}
       gameId={parsedGameId}
       key={parsedGameId}
       persistenceLabel={serverAuthoringEnabled ? '서버' : '브라우저'}

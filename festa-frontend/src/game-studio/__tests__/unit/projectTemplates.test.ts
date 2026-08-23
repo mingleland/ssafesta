@@ -7,6 +7,8 @@ describe('Game Studio project templates', () => {
     const project = createProjectFromTemplate(123, template.id);
     expect(parseGameProject(project)).toBe(project);
     expect(project.title.length).toBeGreaterThan(0);
+    expect(template.previewUrl).toMatch(/\.webp$/);
+    expect(template.estimatedMinutes).toBeGreaterThanOrEqual(10);
     const start = project.scenes.find((scene) => scene.id === project.startSceneId);
     expect(start).toBeDefined();
     if (!start) throw new Error('template start scene must exist');

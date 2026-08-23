@@ -1,4 +1,10 @@
 import { parseGameProject, type GameObject, type GameProject, type PlatformerScene, type TopDownScene } from '../../contracts/gameProject.ts';
+import collectionPreviewUrl from '../../assets/template-collection-preview.webp';
+import escapePreviewUrl from '../../assets/template-escape-preview.webp';
+import platformerPreviewUrl from '../../assets/template-platformer-preview.webp';
+import shooterPreviewUrl from '../../assets/template-shooter-preview.webp';
+import storyPreviewUrl from '../../assets/template-story-preview.webp';
+import survivalPreviewUrl from '../../assets/template-survival-preview.webp';
 import { addPlatformerScene } from './authoringCommands.ts';
 import { findPresetDefinition } from './authoringRegistry.ts';
 import { createStarterProject } from './createStarterProject.ts';
@@ -7,21 +13,24 @@ export type ProjectTemplateId = 'STORY' | 'ESCAPE' | 'COLLECTION' | 'PLATFORMER'
 
 export interface ProjectTemplateDefinition {
   readonly id: ProjectTemplateId;
-  readonly icon: string;
+  readonly previewUrl: string;
   readonly title: string;
   readonly genre: string;
   readonly description: string;
   readonly systems: readonly string[];
   readonly runtimeMode: 'TOP_DOWN' | 'PLATFORMER';
+  readonly difficulty: '입문' | '쉬움' | '보통';
+  readonly estimatedMinutes: number;
+  readonly recommended?: boolean;
 }
 
 export const PROJECT_TEMPLATES: readonly ProjectTemplateDefinition[] = [
-  { id: 'STORY', icon: '💬', title: '이야기 탐색', genre: '스토리 어드벤처', description: '맵을 돌아다니며 인물과 대화하고 선택으로 이야기를 진행합니다.', systems: ['NPC 대화', '선택지', '장면 이동'], runtimeMode: 'TOP_DOWN' },
-  { id: 'ESCAPE', icon: '🔐', title: '비밀 방탈출', genre: '추리 · 퍼즐', description: '단서를 모으고 조건을 만족해 잠긴 문을 여는 완성 예제입니다.', systems: ['아이템', '조건', '잠긴 문'], runtimeMode: 'TOP_DOWN' },
-  { id: 'COLLECTION', icon: '💎', title: '보물 수집 퀘스트', genre: '수집 · RPG-lite', description: '세 가지 보물을 모두 모아 목표 지점에 도착하는 게임입니다.', systems: ['인벤토리', '다중 조건', '목표'], runtimeMode: 'TOP_DOWN' },
-  { id: 'PLATFORMER', icon: '🏁', title: '별빛 점프맵', genre: '플랫폼 액션', description: '중력과 점프로 발판을 건너 목표에 도착하는 횡스크롤 맵입니다.', systems: ['중력', '점프', '발판', '목표'], runtimeMode: 'PLATFORMER' },
-  { id: 'SHOOTER', icon: '🔥', title: '슬라임 블래스터', genre: '횡스크롤 슈팅', description: '이동과 점프, 투사체 발사로 순찰하는 적을 쓰러뜨립니다.', systems: ['체력', '자동 이동', '투사체', '점수'], runtimeMode: 'PLATFORMER' },
-  { id: 'SURVIVAL', icon: '⏱', title: '포털 생존전', genre: '생존 웨이브', description: '포털에서 반복 생성되는 적을 상대하며 점수를 올립니다.', systems: ['반복 생성', '추적 적', '체력', '점수'], runtimeMode: 'PLATFORMER' },
+  { id: 'STORY', previewUrl: storyPreviewUrl, title: '이야기 탐색', genre: '스토리 어드벤처', description: '맵을 돌아다니며 인물과 대화하고 선택으로 이야기를 진행합니다.', systems: ['NPC 대화', '선택지', '장면 이동'], runtimeMode: 'TOP_DOWN', difficulty: '입문', estimatedMinutes: 10, recommended: true },
+  { id: 'ESCAPE', previewUrl: escapePreviewUrl, title: '비밀 방탈출', genre: '추리 · 퍼즐', description: '단서를 모으고 조건을 만족해 잠긴 문을 여는 완성 예제입니다.', systems: ['아이템', '조건', '잠긴 문'], runtimeMode: 'TOP_DOWN', difficulty: '쉬움', estimatedMinutes: 15, recommended: true },
+  { id: 'COLLECTION', previewUrl: collectionPreviewUrl, title: '보물 수집 퀘스트', genre: '수집 · RPG-lite', description: '세 가지 보물을 모두 모아 목표 지점에 도착하는 게임입니다.', systems: ['인벤토리', '다중 조건', '목표'], runtimeMode: 'TOP_DOWN', difficulty: '쉬움', estimatedMinutes: 15 },
+  { id: 'PLATFORMER', previewUrl: platformerPreviewUrl, title: '별빛 점프맵', genre: '플랫폼 액션', description: '중력과 점프로 발판을 건너 목표에 도착하는 횡스크롤 맵입니다.', systems: ['중력', '점프', '발판', '목표'], runtimeMode: 'PLATFORMER', difficulty: '쉬움', estimatedMinutes: 15, recommended: true },
+  { id: 'SHOOTER', previewUrl: shooterPreviewUrl, title: '슬라임 블래스터', genre: '횡스크롤 슈팅', description: '이동과 점프, 투사체 발사로 순찰하는 적을 쓰러뜨립니다.', systems: ['체력', '자동 이동', '투사체', '점수'], runtimeMode: 'PLATFORMER', difficulty: '보통', estimatedMinutes: 20 },
+  { id: 'SURVIVAL', previewUrl: survivalPreviewUrl, title: '포털 생존전', genre: '생존 웨이브', description: '포털에서 반복 생성되는 적을 상대하며 점수를 올립니다.', systems: ['반복 생성', '추적 적', '체력', '점수'], runtimeMode: 'PLATFORMER', difficulty: '보통', estimatedMinutes: 20 },
 ] as const;
 
 const assetId = (project: GameProject, source: string): string => {

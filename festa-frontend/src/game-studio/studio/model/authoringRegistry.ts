@@ -181,7 +181,7 @@ export const PRESET_DEFINITIONS: readonly PresetDefinition[] = [
 ] as const;
 
 export const COMPONENT_LABELS: Readonly<Record<Component['type'], string>> = {
-  SPRITE: 'Sprite',
+  SPRITE: '모습',
   COLLIDER: '충돌',
   INTERACTABLE: '상호작용',
   PICKUP: '아이템 획득',
