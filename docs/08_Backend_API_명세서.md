@@ -72,6 +72,9 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 
 - `field`는 `objectId`와 같이 **없으면 키 자체가 빠진다**(`@JsonInclude(NON_NULL)`). 둘은 가리키는 대상이 달라 합치지 않는다 — `objectId`는 배치된 오브젝트, `field`는 요청 필드 경로다.
 - `rule`은 **항상 규칙 어휘**다. 필드명·식별자를 `rule`에 넣으면 클라이언트의 화이트리스트 분기가 깨진다 (#58 §3).
+- **`errors[].message`의 모양은 `rule`이 정한다.** 사용자에게 보여줄 문장은 봉투 최상위 `message`가 담고, `errors[].message`는 대개 그 항목의 사유 문장이지만 **rule이 기계값을 정의했으면 기계값이 온다.** 클라이언트는 `rule`로 분기한 뒤 그 rule의 계약대로 읽는다 — 문장에서 값을 정규식으로 캐내지 않는다.
+  - `CURRENT_REVISION`은 **spec별로 모양이 다르다** — 005(Layout)는 문장(값 소비자 없음), 019(Game Studio)는 **십진수 문자열**이다. 각 spec 계약 문서가 자기 모양을 소유한다.
+  - `ApiErrorDetail`에 타입 있는 값 필드는 **추가하지 않는다.** 전 endpoint 공유 스키마인데 값이 필요한 rule이 아직 하나뿐이다. **기계값이 둘 이상 필요한 rule이 나오면 그때 필드로 올린다** (#58 §5 재확정, 2026-08-24).
 
 ### 1.4 Idempotency
 
