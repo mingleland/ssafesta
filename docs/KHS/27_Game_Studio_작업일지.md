@@ -7,6 +7,22 @@
 > Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
+## 2026-08-24
+
+### 메이플스토리 월드 메이커 기준 초보 제작 UX 고도화 ✅
+
+- 🤖 메이플스토리 월드 Creator Center의 Scene 중심 작업, Preset, 즉시 테스트, 단축키, 학습 난이도 구조를 확인했다. FESTA에는 임의 Script/API를 노출하지 않고 `배치 → 모습 선택 → 빠른 행동 → 플레이`를 기본으로 적용했다.
+- 🤖 이야기·방탈출·수집·점프맵·슈팅·생존 6종에 16:9 실제 플레이 화면 WebP 미리보기를 추가하고 장르, 이동 방식, 난이도, 예상 수정 시간, 핵심 시스템을 한 카드에서 비교하게 했다. 이모지 설명 카드와 선택 확인 버튼 대비 문제를 제거했다.
+- 🤖 Object Inspector의 50개 이상 Asset 단일 선택 목록을 캐릭터·사물/장식·내 이미지 분류, 한국어 검색, 실제 frame/animation 미리보기가 있는 재료함으로 교체했다. 초상·배경·Tileset은 Object 후보에서 제외하고 선택한 Object만 사용자 이미지로 교체한다.
+- 🤖 기본 Inspector는 모습·크기·가시성·현재 동작만 보여주고 ID·좌표·zIndex·Component 추가/삭제·Object 삭제를 고급 설정으로 분리했다. 처음부터 내부 데이터 용어를 이해해야 하던 진입 장벽을 낮췄다.
+- 🤖 최초 안내 localStorage를 프로젝트별 key로 바꿔 새 게임마다 안내가 나타나게 했고, 열쇠/문/NPC 전용 6단계를 모든 TOP_DOWN·PLATFORMER 템플릿에서 통과 가능한 5단계 범용 튜토리얼로 교체했다. 실제 플랫폼 템플릿에서 4단계 Event까지 자동 찾기·진행을 검증했다.
+- 🤖 PC 최소 폭을 760px compact 기준으로 조정해 800px 창에서 문서 전체 가로 스크롤을 제거했다. `화면 넓게`/Shift+F 집중 모드가 양쪽 panel을 숨겨 큰 맵을 전체 폭으로 보여주며 Esc 또는 버튼으로 복구한다.
+- 🤖 #48·#69의 Backend 최신 답변도 확인했다. 로컬 Asset은 5MiB·PNG/JPEG/GIF/WebP allow-list로 좁히고 SVG·AUDIO를 거부했다. Asset repository는 서버 발급 ID와 READY 이후 반환을 지원하도록 요청 객체형 port로 바꿨으며, 원격 Asset repository가 없는 서버 Authoring 모드에서는 local repository를 주입하지 않아 `asset://local` Draft 전송을 막았다.
+- 🤖 실사용 브라우저에서 새 게임 안내, 시각 템플릿, 재료 검색 `문` 2건, 이미지 적용, 간단/고급 전환, PLATFORMER 범용 튜토리얼, 800px compact·집중 모드를 확인했다. 최종 검증은 Frontend **37 files / 191 tests**, production build, lint 모두 통과했다.
+- 🤖 초보 제작 UX 구현은 최신 `front`(`5022335`) 위 코드 커밋 `7786ed6`로 고정했으며 기존 `front` 대상 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)에 이어서 반영한다.
+- 🤖 변경은 기존 `codex/game-studio-published-runtime-shell`의 `festa-frontend/src/game-studio/**`와 별도 문서 브랜치의 spec/KHS 기록에만 한정했다. Backend·Unity·공유 `game` 작업트리는 수정하지 않았다. 운영 잔여는 기존 #48·#55·#56·#69와 사람 QA #73으로 충분해 중복 이슈를 만들지 않았다.
+- 트러블슈팅: GS-T036~GS-T039
+
 ## 2026-08-23
 
 ### 실사용 Authoring·운영 연결 완성도 보강 ✅

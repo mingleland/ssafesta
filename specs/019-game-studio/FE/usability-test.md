@@ -6,7 +6,8 @@
 
 - FESTA 또는 Game Studio를 처음 사용한다.
 - Unity, Phaser, JSON, Component/Event 용어를 사전에 설명하지 않는다.
-- PC 브라우저 작업 폭 1040px 이상, 마우스와 키보드를 사용한다.
+- PC 브라우저 권장 작업 폭 1280px 이상, compact 확인은 760~1039px에서 수행한다. 마우스와 키보드를 사용한다.
+- compact 확인자는 큰 맵에서 Shift+F 집중 모드를 찾고 패널을 복구할 수 있는지도 기록한다.
 
 ## 시작 상태
 

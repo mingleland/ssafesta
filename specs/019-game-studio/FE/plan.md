@@ -43,7 +43,7 @@ festa-frontend/src/game-studio/
 
 1. **완료 — 순수 코어**: GameProject type/guard, Runtime state, Condition/Action/Event, Dialogue,
    undo/redo, reversible preset recipe, lazy edit/play entry를 PR #47에 구현했다.
-2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, typed inspector, Dialogue editor, 한국어 guide와 6종 템플릿을 하나의 store에 연결했다.
+2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, 간단/고급 Inspector, Dialogue editor, 프로젝트별 한국어 guide와 실제 플레이 화면이 보이는 6종 템플릿을 하나의 store에 연결했다.
 3. **완료 — Reference Renderer/Preview**: TOP_DOWN/PLATFORMER renderer, builtin/local Asset resolver, same-origin local Preview route를 같은 Runtime core에 연결했다.
 4. **완료 — Backend adapter**: revision-aware Draft/Publish client, Published loader, schema guard,
    충돌 복구·검증 오류 UI를 구현했다. [BE plan](../BE/plan.md)의 endpoint가 준비되면 환경 플래그로 전환한다.
@@ -64,4 +64,5 @@ festa-frontend/src/game-studio/
 - Unity와 Backend가 없어도 최소 key→door→dialogue 게임을 제작·완료할 수 있어야 한다.
 - 500 Object Scene의 편집 commit은 자동 성능 테스트에서 100ms 미만이어야 한다.
 - Preview의 `?source=local&perf=1` 진단은 활성 PC 탭에서 55~60fps를 확인한다. 백그라운드 탭의 브라우저 throttling 결과는 합격 근거로 사용하지 않는다.
-- 첫 방문 guide, 6단계 key→door→dialogue tutorial, Object Layer 검색·잠금·편집 숨김·z-index 정렬을 PC 제작 UX 기준선으로 유지한다.
+- 프로젝트별 첫 방문 guide, 장르와 무관한 5단계 tutorial, 검색 가능한 시각 재료함, 간단/고급 Inspector, Object Layer 검색·잠금·편집 숨김·z-index 정렬을 PC 제작 UX 기준선으로 유지한다.
+- 760~1039px compact 창에서는 문서 전체 가로 스크롤을 만들지 않고, Shift+F 집중 모드로 양쪽 panel을 숨겨 큰 맵을 편집한다. 권장 작업 폭은 1280px 이상이다.

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-23 — 독립 Web Authoring/Reference Runtime, PLATFORMER, 6종 템플릿, 자산·용량 경계 구현 반영
+**Updated**: 2026-08-23 — 독립 Web Runtime, 6종 시각 템플릿, 초보/고급 편집, 재료함·집중 모드 구현 반영
 
 **Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 
@@ -24,6 +24,8 @@
 
 ### Session 2026-08-23
 
+- Q: 메이플스토리 월드 메이커를 어떤 수준으로 참고하는가? → A: Scene 중심 작업, 배치 가능한 Preset, 즉시 테스트, 단축키, 난이도별 학습 구조를 UX 기준으로 삼는다. FESTA v1은 임의 Script/API를 노출하지 않고 `배치 → 모습 선택 → 빠른 행동 → 플레이`가 기본이며 Component/ID/좌표는 고급 설정에 둔다.
+- Q: #69 운영 업로드 전 로컬 Asset이 서버 Draft를 막지 않게 하려면? → A: v1 업로드는 5MiB 이하 PNG/JPEG/GIF/WebP만 허용하고 SVG·AUDIO는 거부한다. 원격 Asset repository는 서버가 발급한 ID와 READY 상태의 stable `asset://`만 반환하며, 원격 repository가 없는 서버 Authoring 모드에서는 로컬 Asset을 GameProject에 추가하지 않는다.
 - Q: 장르마다 별도 저장 모델을 만들 것인가? → A: 아니다. Backend 문서 형식은 `GameProject v1` 하나이고 실행 방식은 `TOP_DOWN`·`PLATFORMER` 두 개만 둔다. 스토리·방탈출·수집·점프맵·슈팅·생존은 검색/추천용 장르 태그와 제작 시작 템플릿일 뿐 별도 Runtime이나 테이블이 아니다.
 - Q: 현재 로컬 수직 구현은 무엇을 선택했는가? → A: 기존 `festa-frontend` 안의 lazy module, TypeScript 계약/상태 코어, DOM/CSS reference renderer, same-origin `/app/games/:gameId/play?source=local` Preview를 선택했다. Production renderer나 API adapter는 port 뒤에서 교체할 수 있고 GameProject 의미를 바꾸지 않는다.
 - Q: 기본 자산과 사용자 이미지는 어떻게 노출하는가? → A: versioned `builtin://` 타일셋·스프라이트·배경·인물 표정을 먼저 제공하고, 사용자는 선택한 Sprite/배경만 명시적으로 교체한다. 로컬 blob은 Preview 전용이며 Publish에는 Backend가 발급한 안정 Asset reference만 허용한다.
@@ -190,13 +192,18 @@
 - **FR-045**: 액션 제작을 위해 피해·체력·점수값·체크포인트·자동 이동·발사·생성 Component를 구조화된 값으로 제공하고 임의 사용자 스크립트를 요구해서는 안 된다.
 - **FR-046**: 제작자는 오브젝트 이미지 크기와 겹침 순서를 조정할 수 있어야 하며 타일/배경이 캐릭터와 상호작용 오브젝트를 덮지 않도록 일관된 layer 규칙을 사용해야 한다.
 - **FR-047**: DIALOGUE는 별도 장르가 아니라 플레이 중 Overlay 또는 전체 화면 연출로 삽입할 수 있어야 하며 배경·인물·표정·대사·선택지를 편집할 수 있어야 한다.
-- **FR-048**: 편집 UI는 한국어 기본 재료, 빠른 행동 recipe, 첫 방문 guide, `열쇠 → 문 → 대화` 6단계 튜토리얼과 완성 템플릿을 제공해 사용자가 Asset 경로나 JSON을 직접 다루지 않고 배치와 기획에 집중하게 해야 한다.
+- **FR-048**: 편집 UI는 한국어 기본 재료, 빠른 행동 recipe, 프로젝트별 첫 방문 guide와 `시작 맵 → 오브젝트 → 모습 → 동작 → 저장·플레이` 5단계 범용 튜토리얼을 제공해 사용자가 Asset 경로나 JSON을 직접 다루지 않고 배치와 기획에 집중하게 해야 한다.
 - **FR-049**: 기본 Asset은 바로 선택 가능해야 하고 사용자 파일 선택은 전역 작업 흐름이 아니라 선택한 요소의 `내 이미지로 교체` 또는 접힌 고급 영역에서만 노출해야 한다.
 - **FR-050**: v1 상한은 JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300이며 초과 데이터는 저장 전에 명시적으로 거부해야 한다.
 - **FR-051**: PC 편집기는 배치된 Object를 ID·종류로 검색하고 편집 화면에서만 숨기거나 이동을 잠그며 `zIndex`를 조정하는 Layer UI를 제공해야 한다. 숨김·잠금은 Runtime 데이터와 분리한다.
 - **FR-052**: Draft revision 충돌 시 현재 로컬 변경을 화면에 유지하고 JSON 백업 뒤 서버 최신본을 불러오는 복구 경로를 제공해야 하며 조용히 덮어써서는 안 된다.
 - **FR-053**: Publish 전 임시·불안정 Asset이 있으면 Asset ID뿐 아니라 사용 중인 Scene·Object·Item 위치를 표시해야 한다.
 - **FR-054**: PC 키보드는 저장·undo/redo·Layer 열기·선택 Object 한 칸 이동을 제공하고 modal 입력 중에는 편집 단축키를 실행하지 않아야 한다.
+- **FR-055**: 6종 시작 템플릿은 이모지나 설명만이 아니라 장르·핵심 플레이·난이도·예상 수정 시간을 판단할 수 있는 실제 16:9 플레이 화면 미리보기를 제공해야 한다.
+- **FR-056**: Object 이미지 선택은 모든 Asset ID를 한 목록에 노출하지 않고 캐릭터·사물/장식·내 이미지 범주와 한국어 검색, 실제 frame 미리보기를 제공해야 하며 인물 초상·배경·Tileset을 Object 후보에 섞어서는 안 된다.
+- **FR-057**: Object Inspector는 기본 상태에서 모습·크기·가시성·현재 동작만 설명하고 ID·격자 좌표·zIndex·Component 추가/삭제·Object 삭제는 명시적 고급 설정에서만 노출해야 한다.
+- **FR-058**: PC 편집기는 760px 이상 창에서 문서 전체 가로 스크롤 없이 세 영역을 유지하고, 큰 맵에서는 양쪽 패널을 숨기는 집중 모드와 내부 Canvas 이동을 제공해야 한다. 1280px 이상을 권장 작업 폭으로 안내한다.
+- **FR-059**: v1 사용자 Asset은 파일당 5MiB 이하 PNG/JPEG/GIF/WebP만 허용하고 SVG·AUDIO를 거부해야 한다. 원격 업로드는 서버가 ID를 발급하고 READY가 된 stable `asset://`만 프로젝트에 추가해야 하며, 업로드 계약이 비활성인 서버 저장 모드에서 `asset://local`을 Draft로 보내서는 안 된다.
 
 ### Part Boundaries
 

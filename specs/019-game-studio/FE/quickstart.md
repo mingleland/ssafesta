@@ -23,7 +23,7 @@ npm run build
 npm run lint
 ```
 
-현재 기준은 test 35 files/183 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
+현재 기준은 test 37 files/191 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
 분리된 lazy chunk인지 함께 확인한다.
 
 ## 3. Backend 없이 편집·플레이 확인
@@ -37,11 +37,13 @@ npm run dev -- --host 127.0.0.1 --port 5174
 
 1. `/login`에서 로컬 mock 회원으로 진입한다.
 2. `/app/games/123/edit` 첫 방문 guide에서 단계별 튜토리얼을 시작한다.
-3. 열쇠 → 문 → Event 조건 → NPC 대화 순서로 “화면에서 해당 요소 찾기”와 다음 단계가 동작하는지 확인한다.
-4. 레이어 패널에서 ID 검색, 편집 숨김, 잠금, 표시 순서 변경을 확인한다. 잠금은 새로고침 뒤에도 유지돼야 한다.
-5. 플레이 테스트를 눌러 `/app/games/123/play?source=local`에서 열쇠 획득·대화·문 이동·완료를 실행한다.
-6. `?source=local&perf=1`은 활성 PC 탭에서만 FPS 진단에 사용한다. 자동화 백그라운드 탭의 1fps throttling은 제품 성능으로 기록하지 않는다.
-7. `/app/games/123/play`은 서버가 없을 때 한국어 오류·다시 시도·나가기 UI를 표시하고 렌더 반복 오류가 없어야 한다.
+3. 탐색·플랫폼 템플릿 각각에서 시작 맵 → 오브젝트 → 모습 → 동작 → 저장·플레이 순서로 “화면에서 해당 요소 찾기”와 다음 단계가 동작하는지 확인한다.
+4. 시작 템플릿에서 6개 16:9 미리보기·난이도·예상 시간이 보이고, Object 속성의 재료함에서 캐릭터/사물/내 이미지 분류와 한국어 검색이 동작하는지 확인한다.
+5. 800px 폭에서 문서 전체 가로 스크롤이 생기지 않고 `화면 넓게` 또는 Shift+F로 양쪽 panel을 숨겼다가 복구할 수 있는지 확인한다.
+6. 레이어 패널에서 ID 검색, 편집 숨김, 잠금, 표시 순서 변경을 확인한다. 잠금은 새로고침 뒤에도 유지돼야 한다.
+7. 플레이 테스트를 눌러 `/app/games/123/play?source=local`에서 열쇠 획득·대화·문 이동·완료를 실행한다.
+8. `?source=local&perf=1`은 활성 PC 탭에서만 FPS 진단에 사용한다. 자동화 백그라운드 탭의 1fps throttling은 제품 성능으로 기록하지 않는다.
+9. `/app/games/123/play`은 서버가 없을 때 한국어 오류·다시 시도·나가기 UI를 표시하고 렌더 반복 오류가 없어야 한다.
 
 사람 대상 20분 검증 기록지는 [usability-test.md](usability-test.md)를 사용한다.
 

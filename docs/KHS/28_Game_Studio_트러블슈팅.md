@@ -6,6 +6,36 @@
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
+## 2026-08-24
+
+### GS-T039. 로컬 Asset port가 서버 Authoring 모드에서도 `asset://local`을 Draft에 넣을 수 있음 (해결)
+
+- **증상** — #48·#69 Backend 검토에서 API 모드의 저장 버튼은 local Asset preflight를 거치지 않아 `asset://local`을 PUT Draft에 보낼 수 있고, 서버가 계약대로 거부하면 이후 모든 저장이 막힐 수 있음이 확인됐다. MIME 검사도 `image/*`라 SVG가 통과하고 AUDIO가 v1 port에 남아 있었다.
+- **원인** — Local Preview repository와 향후 remote READY repository가 같은 port를 쓰면서도 client가 assetId를 필수 발급했고, Edit route가 서버 API 활성 여부와 무관하게 local repository를 기본 주입했다. 파일 검사도 사용자 안내 문구보다 넓었다.
+- **해결** — save port를 `{kind,file,suggestedAssetId?}` 요청으로 바꿔 원격 구현이 client 제안을 무시하고 서버 ID를 반환할 수 있게 했고, Promise는 local preview 가능 또는 remote READY 이후에만 resolve한다는 계약을 고정했다. v1은 5MiB·PNG/JPEG/GIF/WebP만 허용하고 SVG·AUDIO를 거부한다. 서버 Authoring 모드에서는 #69 remote repository가 생기기 전 local repository를 주입하지 않는다.
+- **예방** — Local/Remote 구현을 같은 port로 교체할 때 ID 발급 주체, READY 시점, 허용 MIME, persisted source authority, API feature flag 조합을 계약 테스트에 포함한다.
+
+### GS-T038. 1040px PC 최소 폭 복구가 800px 앱 창의 가로 탐색을 다시 강제함 (해결)
+
+- **증상** — 기능은 겹치지 않았지만 800px 인앱 창에서 document가 1040px로 유지되어 왼쪽 Scene과 오른쪽 속성을 오가려면 페이지 자체를 가로 이동해야 했다. 큰 맵은 세 panel 사이에서 지나치게 작아졌다.
+- **원인** — 387px에서 panel이 겹친 GS-T034를 해결하면서 모든 PC 창에 1040px 최소 폭을 다시 적용했다. 모바일 수준의 폭과 작은 PC 도구 창을 같은 규칙으로 처리한 과보정이었다.
+- **해결** — 지원 최소 폭은 760px, 권장은 1280px로 분리했다. 760~1039px은 170px/가변/260px compact 3열과 중앙 Canvas 내부 이동을 사용하고 document 가로 overflow를 없앴다. `화면 넓게`/Shift+F 집중 모드로 양쪽 panel을 숨겨 800px에서도 맵 전체를 편집할 수 있게 했다.
+- **예방** — viewport QA는 800px compact와 1440px 권장을 모두 캡처하고 document overflow, Canvas 내부 overflow, panel hit target, 집중 모드 복구를 각각 확인한다.
+
+### GS-T037. 첫 방문 안내가 새 프로젝트에 나타나지 않고 보조 버튼 글자가 사라짐 (해결)
+
+- **증상** — 한 게임에서 안내를 닫은 뒤 다른 gameId에 처음 들어가도 안내가 나타나지 않았다. 안내·템플릿 확인의 보조 버튼은 흰 배경과 흰 글자가 겹쳐 빈 버튼처럼 보였다.
+- **원인** — 안내 완료 key가 브라우저 전체에서 하나였고, 보조 버튼이 상위 FESTA button 색상을 상속하면서 배경 대비를 명시하지 않았다.
+- **해결** — 안내 key를 `gameId`별 v3 key로 바꾸고 안내/템플릿 보조 버튼에 어두운 배경·테두리·밝은 글자를 명시했다. 새 gameId 자동 표시와 두 modal의 버튼 가독성을 실제 screenshot으로 다시 확인했다.
+- **예방** — onboarding 저장 범위는 계정·기기·프로젝트 중 무엇인지 요구사항에 명시하고, modal의 primary/secondary/destructive 버튼은 상위 전역 스타일 상속에 기대지 않는다.
+
+### GS-T036. 풍부한 Asset과 6종 템플릿이 ID 목록·이모지 카드에 숨음 (해결)
+
+- **증상** — 50개 이상 제공 이미지와 6종 playable 템플릿이 구현돼 있었지만 Object 속성은 긴 select 한 줄이고 템플릿은 이모지와 설명뿐이라 초보자가 결과를 상상하거나 재료를 찾기 어려웠다. ID·X/Y·Component 제거가 첫 화면부터 노출됐다.
+- **원인** — 데이터 계약과 범용 기능 구현을 먼저 완료하면서 Asset discoverability와 beginner disclosure를 후순위로 두었다. 기술적 가용성을 사용자 인지 가능성으로 잘못 간주했다.
+- **해결** — 6종 16:9 플레이 화면을 생성·압축해 템플릿 카드에 연결하고, Object용 Asset만 캐릭터·사물/장식·내 이미지로 분류해 검색 가능한 visual picker로 제공했다. Inspector는 기본/고급으로 나눠 내부 ID·좌표·Component 조작을 기본 화면에서 숨겼다.
+- **예방** — Asset 추가 완료 조건에는 개수뿐 아니라 실제 card preview, 역할 필터, 검색, 선택 적용, 잘못된 역할 제외, 초보자 용어 검증을 포함한다.
+
 ## 2026-08-23
 
 ### GS-T035. 자동화 브라우저의 백그라운드 throttling을 제품 FPS로 오인할 위험 (측정 경계 확정)
@@ -15,7 +45,7 @@
 - **해결** — 일반 사용자 화면에서는 FPS 계측기를 숨기고 `?perf=1`에서만 표시하도록 바꿨다. 자동 테스트는 500 Object 편집 command의 100ms gate를 담당하고, 55~60fps 합격 여부는 외부 브라우저 활성 탭·동일 fixture·측정 장비를 기록하는 사람 QA로 분리했다.
 - **예방** — FPS 결과에는 브라우저, 해상도, 장치, visibility, foreground 여부를 함께 남긴다. throttled 자동화 탭 수치는 회귀 단서로만 사용하고 release gate로 사용하지 않는다.
 
-### GS-T034. 앱의 매우 좁은 viewport에서 반응형 3열 panel이 canvas 위를 덮음 (해결)
+### GS-T034. 앱의 매우 좁은 viewport에서 반응형 3열 panel이 canvas 위를 덮음 (당시 해결, GS-T038에서 최종 개선)
 
 - **증상** — 387px 인앱 viewport에서 처음에는 document overflow가 없었지만 Scene/Object panel과 우측 속성 panel이 중앙 canvas와 겹쳐 layer·zoom 버튼 클릭을 가로챘다.
 - **원인** — GS-T028에서 1040px 최소 폭을 제거하며 3열을 매우 좁은 폭 안에 강제로 축소했다. Game Studio는 PC 편집기인데 모바일 폭까지 모든 panel을 동시에 끼워 넣으려 해 hit target과 작업영역을 잃었다.

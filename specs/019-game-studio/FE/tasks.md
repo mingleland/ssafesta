@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **BE tasks**: [../BE/tasks.md](../BE/tasks.md)
 
-FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
+FE가 소유하는 74개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
 
 ## Contract foundation
 
@@ -49,6 +49,11 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T031 Add minimal authoring-to-local-preview integration test
 - [x] T076 Implement Scene/Object palette, canvas, Properties and Event workspace shell
 - [x] T077 Implement reversible preset Component/Event recipes
+- [x] T091 Replace symbolic template cards with six real 16:9 gameplay previews and difficulty/time metadata
+- [x] T092 Add searchable character/object/custom visual Asset picker without portrait/background leakage
+- [x] T093 Split Object Inspector into beginner defaults and explicit advanced ID/position/Component controls
+- [x] T094 Make onboarding project-scoped and genre-independent; add compact layout and Shift+F focus mode
+- [x] T095 Align local Asset MIME/size/audio guard and repository ID/READY seam with #69; disable local injection in server mode
 - [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
 
 ## Preview and Publish UI
@@ -99,7 +104,7 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 
 ## Summary
 
-- Total: 69
-- Completed: 61
+- Total: 74
+- Completed: 66
 - Remaining: 8
 - Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. FE adapter·오류 격리·overlay와 실사용 편집 UX는 응답 전 구현 완료 상태다.

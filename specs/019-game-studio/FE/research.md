@@ -47,7 +47,16 @@ JSON Schema 구조 검증과 semantic reference 검증을 분리한다. FE는 �
 API client를 재사용하고 lazy chunk로 일반 FESTA 초기 번들과 격리한다. 별도 origin은 인증 전달·배포·CSP
 계약을 늘리므로 MVP에서 제외한다.
 
-## 8. 남은 FE 구현 경계
+## 8. 제작 UX 참고 기준 — MapleStory Worlds Maker
+
+공개 Creator Center의 [Scene](https://maplestoryworlds-creators.nexon.com/ko/docs?postId=1152),
+[단축키](https://maplestoryworlds-creators.nexon.com/ko/docs?postId=813),
+[UI Preset](https://maplestoryworlds-creators.nexon.com/ko/docs?postId=120) 구조를 참고한다.
+Scene 중심 편집, 배치 가능한 Preset, 즉시 테스트, 반복 작업 단축키, 난이도별 학습은 채택한다.
+다만 FESTA v1은 Script/API 작성 경험을 목표로 하지 않으므로 Component/ID/좌표는 고급 설정에 두고,
+완성 예제·시각 재료함·빠른 행동으로 `배치 → 모습 → 동작 → 플레이`를 기본 경로로 삼는다.
+
+## 9. 남은 FE 구현 경계
 
 #35의 TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver는 PR #63으로 완료됐다.
 revision-aware Draft/Publish client, Published loader·오류 격리, Booth overlay adapter도 FE port 뒤에 구현됐다.
