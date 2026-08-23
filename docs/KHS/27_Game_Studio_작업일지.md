@@ -17,7 +17,7 @@
 - 🤖 Scene Inspector에서 World map 크기를 수정할 수 있게 했고 Tile row-major 데이터를 좌상단 기준으로 보존하며 Object를 새 경계 안으로 이동한다. 모든 변경은 기존 GameProject 1.0.0과 undo/redo store를 그대로 사용한다.
 - 🤖 STORY는 다중 Dialogue·선택·변수 기반 약속 이야기, ESCAPE는 두 World Scene·단서·열쇠·스위치·숨은 출구 흐름으로 재작성했다. COLLECTION에는 배치 장애물과 점수를, PLATFORMER/SHOOTER/SURVIVAL에는 서로 다른 지형·적·포탑·Spawner·Checkpoint 구성을 넣었다. 6종의 Scene/Object/Event/Dialogue 구조 프로필이 모두 다름을 테스트로 고정했다.
 - 🤖 자동 검증은 Frontend **37 files / 196 tests**, production build, lint를 통과했다. 인앱 브라우저에서는 `2개 선택 → Event 포함 복제 → 묶음 이동`, 화면 이동/격자 상태, 1024px 전체 도구 노출, 800px document 무가로 overflow를 확인했고 console error는 0건이었다.
-- 🤖 구현 커밋 `3f695b5 feat(game-studio): add maker-style canvas editing`을 실제 GitHub 원격 `codex/game-studio-maker-redesign`에 게시했다. 잘못 등록된 로컬 `origin`으로 생긴 바탕화면 저장소 branch ref는 작업 파일을 건드리지 않고 즉시 제거했다.
+- 🤖 구현 커밋 `3f695b5 feat(game-studio): add maker-style canvas editing`을 실제 GitHub 원격 `codex/game-studio-maker-redesign`에 게시하고, PR #72 위의 독립 stacked [PR #79](https://github.com/kanghyunsoon/ssafesta/pull/79)를 열었다. #79는 `CLEAN/MERGEABLE`이며 #72 병합 뒤 `front`로 retarget한다. 잘못 등록된 로컬 `origin`으로 생긴 바탕화면 저장소 branch ref는 작업 파일을 건드리지 않고 즉시 제거했다.
 - 🤖 사람 실사용 검증은 기존 [#73](https://github.com/kanghyunsoon/ssafesta/issues/73)에 결과와 잔여 항목을 추가했다. v1.0으로 표현할 수 없는 적 처치 수·생존 시간·점수 임계 승리 규칙은 FE·BE·AI 공동 [#78](https://github.com/kanghyunsoon/ssafesta/issues/78)을 만들고 @strdeok·@ghkim1632·@colosair를 지정했다.
 - 트러블슈팅: GS-T040~GS-T042
 
