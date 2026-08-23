@@ -9,11 +9,13 @@
 
 **front = origin/front, clean.** spec 005·Block A·013a·016·001 Auth·D-1·D-2·B·C·G-2 완료, 공용 문서 develop 재회수 완료(PR #67 머지분). 상세는 완료 표.
 
-착수 가능 목록 소진 시 **FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버)·인프라(#30 실빌드·실서버)·Game Studio 체인(#48→#55·#56)에 걸린다.
+잔여 P0 중 **004 Lease·003 Wallet은 develop 계약 회수만으로 착수 가능**하다 — BE 구현 머지 완료(PR #10·#9), C-xx 미결 0, 004는 BE 리뷰 3칸 확정(08-19). 나머지 P0는 009(BE PR 미존재)·016 C-01·008 UI(AI 서버)·인프라(#30 실빌드·실서버)·Game Studio 체인(#48→#55·#56)에 걸린다.
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **E. (P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
+- [ ] **(P0) 004 Lease + 003 Wallet FE** — 계약 정본은 `origin/develop`의 `specs/004-booth-slot-lease/contracts/lease-api.md`·`specs/003-wallet-coin/contracts/wallet-api.md`(착수 시 front 회수). 소비 endpoint: `GET /booth-slots`·`POST /booth-slots/{slotId}/leases`·`GET /booths/mine`·`GET /booths/{boothId}`·`GET /wallets/me`·`GET /wallets/me/transactions`. 003을 묶는 이유 — 임대 확인 UI가 잔액·차감 후 잔액을 함께 표시해야 해서 분리하면 두 번 손댄다
+- [ ] **(P0) Owner/Staff 라우트 가드**(G-1) — `GET /booths/mine`·슬롯 목록 `mine` 필드로 트리거 충족. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
+- [ ] **(P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
 
 ## 대기
 
@@ -35,7 +37,6 @@
 
 - [ ] **FE 팔레트·field 라운드** — 트리거: [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지. ⑴ 계약 대응 먼저: `ApiError.errors[]`에 `field?: string`·mock 3곳·`PublishDialog` key 인덱스화·R-12 해제 후 `rule` 분기·`client.ts:10` 낡은 주석 정리 ⑵ 팔레트: 12색 스와치 UI(자유 입력 제거)·`facadeApi.mock.ts` 팔레트 소속+대문자 정규화 정합·하이드레이션 값이 팔레트 밖이면 안내(strdeok 지적 함정 — 간판만 고쳐도 400 방지). ⑵는 규모 보고 같은 라운드 또는 분리
 - [ ] **013a credential 전달 wiring** — 트리거: #60 계약 문서 반영 확인. `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결(AT 원본, MEMBER only). 부가: AT 만료 401 시 Unity→host 재요청 규약은 별도 후속
-- [ ] **Owner/Staff 라우트 가드**(G-1) — 트리거: 004 `GET /booths/{id}` 부스 소유 정보. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
 - [ ] **게스트 만료 실관측 경로**(G-3) — 트리거: T016 실경로 연결 또는 실 API 소비 화면(008 등) 첫 머지. `expiresAt` 소비자 현재 0, 401 반응형 안내는 T010(`specs/001-auth-user/FE/tasks.md`)
 - [ ] **편집기 팔레트 UI**(미보유 파츠 잠금·게스트 유도) — 트리거: spec 012 착수(#18)
 - [ ] **스냅 0.25 계약 명문화** — 트리거: 강형순 develop 정정 PR(#45 예고) 확인. 현재 로컬 `FE/research.md` R-04에만 존재
