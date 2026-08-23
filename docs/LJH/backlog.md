@@ -7,17 +7,17 @@
 
 ## 📍 세션 인수인계 (2026-08-23 종료 시점)
 
-**브랜치 상태**: `front` = `origin/front`. spec 005 완결, Block A(001·013a·016·002 계약 회수) 완결, 013a WebGL Host 완료, **016 E2E(Bridge→Dispatcher→OverlayHost→iframe) 완료**.
+**브랜치 상태**: `front` = `origin/front`. spec 005 완결, Block A(001·013a·016·002 계약 회수) 완결, 013a WebGL Host 완료, 016 E2E 완료, **PR #63(game-studio Authoring Workspace) 반입 완료**.
 
 **013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증.
 
-**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 담당 확인 요청 [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) 응답 대기.
+**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 답변 도착·반영 완료(manifest URL 4종 확정) — credential 종류 결정은 [#60](https://github.com/kanghyunsoon/ssafesta/issues/60)에서 BE(strdeok)로 이관, 응답 대기.
 
 **016 E2E 완료 범위**: `features/interaction/dispatcher.ts`(LAPTOP·AI_AGENT 라우팅, 미지 type 무시)·`features/overlay/{OverlayHost,LaptopOverlay}.tsx`(URL은 `http`/`https`만 허용, iframe+새 탭+안내 동시 제공 — 차단 "감지"는 구현하지 않음, FR-007 기술 제약 기록)·`WorldPage.tsx`(Dispatcher를 화면 생명주기에 종속). vitest 8개+브라우저 9개 시나리오 검증. **AI_CHAT 등은 공통 fallback뿐** — 008·010·011 실 UI 아님.
 
-**다음 뭘 할지 — 확정 순서**: #60 응답 대기 중 **001 Auth FE** 착수(BE 구현 이미 완료, front spec.md는 Block A로 회수됨) → 010 Survey → 009 Exhibition.
+**다음 뭘 할지 — 확정 순서**: #60(credential, BE 응답 대기)와 무관하게 **001 Auth FE** 착수(BE 구현 이미 완료, front spec.md는 Block A로 회수됨) → 010 Survey → 009 Exhibition.
 
-**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함).
+**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정).
 
 상세는 `24_작업일지.md` 08-23 항목.
 
@@ -42,7 +42,7 @@
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) | Game Studio 정책 4건 전부 동의, 신규 진입 차단 판정 시점 질문 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | strdeok(C 확정·구현)·ghkim1632(FastAPI 정합) |
 | [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안. 12색 hex 값은 FE 보유 — 주체 확정 시 제공 | BE 확인 |
-| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | Unity 답변 도착·반영 — ①manifest.json 방향+키 4종 **확정**(생성 위치만 #30 후속), ②credential 종류는 Spring 구현체 부재로 **BE 결정 사안**(Unity 제약: provider 동기 조회·60~120초급 수명 부적합, NGO 토큰과 별개 확인) | **BE(strdeok) 결정** — #60에 back 태그·이관 필요 |
+| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | credential 종류 결정을 BE로 이관(Unity 제약 2건 제시, `back` 태그·strdeok assignee 추가 완료) | strdeok 결정 |
 
 ## 내가 닫아야 할 것
 
