@@ -3,8 +3,8 @@
 ASC(Agent Session Control)는 프로젝트 독립적인 별도 Repository로 분리되었다 (2026-08-22).
 
 Canonical:
-- 운영모델 (v5.1 동결): `<ASC Repository>/docs/design/26_ASC_운영모델.md`
-- C-01 Approval Port 구현 계약: `<ASC Repository>/docs/contracts/27_ASC_구현계약_C01_Approval_Port.md`
+- 운영모델 (v5.1 동결): `<ASC Repository>/docs/design/operating-model.md`
+- C-01 Approval Port 구현 계약: `<ASC Repository>/docs/contracts/C-01_approval-port.md`
 
 로컬 경로: `projects/asc/` (SSAFESTA와 sibling repository).
 
