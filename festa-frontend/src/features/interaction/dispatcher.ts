@@ -16,6 +16,9 @@ function dispatch(event: BoothInteractEvent): void {
     case 'AI_AGENT_INTERACT':
       openOverlay('AI_CHAT', toAiChatPayload(event));
       return;
+    case 'BOOTH_GAME_INTERACT':
+      openOverlay('GAME', { boothId: event.boothId, objectId: event.objectId, configId: event.configId });
+      return;
     default:
       return;
   }

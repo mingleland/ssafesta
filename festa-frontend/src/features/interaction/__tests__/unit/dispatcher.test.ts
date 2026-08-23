@@ -48,6 +48,17 @@ describe('initInteractionDispatcher', () => {
     unsubscribe();
   });
 
+  it('BOOTH_GAME_INTERACT는 configId를 그대로 실어 GAME 오버레이를 연다(#20 — 이름 변환 없음)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_GAME_INTERACT', boothId: 7, objectId: 'game-npc-01', configId: 42 }));
+
+    expect(getCurrentOverlay()).toEqual({
+      type: 'GAME',
+      payload: { boothId: 7, objectId: 'game-npc-01', configId: 42 },
+    });
+    unsubscribe();
+  });
+
   it('미지 type은 무시한다 — 서버가 신설한 이벤트에도 크래시하지 않는다(전방 호환)', () => {
     const unsubscribe = initInteractionDispatcher();
     emit(JSON.stringify({ type: 'UNKNOWN_FUTURE_EVENT', boothId: 7 }));

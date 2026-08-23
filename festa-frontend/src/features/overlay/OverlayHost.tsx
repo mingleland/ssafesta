@@ -17,7 +17,7 @@ export function OverlayHost() {
     return <LaptopOverlay payload={request.payload as { boothId: number; objectId: string; url?: string }} />;
   }
 
-  // AI_CHAT·SURVEY·CONSULTATION — 각 소비 spec(008·010·011)의 UI가 아직 없다.
+  // AI_CHAT·GAME·SURVEY·CONSULTATION — 각 소비 spec(008·020·010·011)의 UI가 아직 없다.
   // 이벤트가 Dispatcher를 거쳐 여기까지 도달하는지 확인하기 위한 임시 플랫폼 동작일 뿐이다.
   return (
     <div>

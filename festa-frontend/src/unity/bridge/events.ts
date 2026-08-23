@@ -15,6 +15,12 @@ export type BoothInteractEvent =
       boothId: number;
       objectId: string;
       configId: number; // Unity/Layout 계약 용어. AI_CHAT payload로는 agentId로 바뀐다 (아래 toAiChatPayload)
+    }
+  | {
+      type: 'BOOTH_GAME_INTERACT'; // Issue #20 확정. 계약: specs/020-game-studio/contracts/game-portal-bridge.md (feature/game-studio-foundation)
+      boothId: number;
+      objectId: string;
+      configId: number; // Spring 소유 Game Portal Binding 식별자(signed Int32, #34). gameId 해석은 React가 서버 조회로 한다 — AI와 달리 이름 변환 함수가 없다
     };
 
 type BoothInteractListener = (event: BoothInteractEvent) => void;
