@@ -9,6 +9,17 @@
 
 ## 2026-08-23
 
+### 실사용 Authoring·운영 연결 완성도 보강 ✅
+
+- 🤖 `front`에서 분리한 `codex/game-studio-published-runtime-shell` 브랜치에 Draft 조회/저장·revision 충돌·Publish·Published 조회·Portal resolver용 strict adapter를 구현했다. 기본값은 API 비활성이라 기존 FESTA/Booth Studio 동작에 영향을 주지 않고, `VITE_GAME_STUDIO_API_ENABLED=true` 한 곳만 바꾸면 Backend 계약에 연결된다.
+- 🤖 Backend가 없어도 최초 방문 6단계 `열쇠 → 문 → 조건 → NPC → 대화 → 플레이` 가이드, 화면 요소 자동 찾기, 로컬 저장·Preview, 레이어 검색/숨김/잠금/z-order, 화살표 1칸 이동, Ctrl+S/Z/Y, Alt+L을 사용할 수 있게 했다. 잠금·숨김 상태는 GameProject와 분리된 사용자별 Editor 상태로 보존한다.
+- 🤖 Publish 전 `asset://local`·`blob:` 등 로컬 전용 Asset을 막고 실제 사용 위치(Scene 배경, Tile, Object, Dialogue 인물, Component)를 함께 표시한다. Draft 409에서는 서버 최신본을 즉시 덮지 않고 로컬 JSON 백업과 서버본 다시 불러오기를 선택하게 해 사용자의 변경을 보존한다.
+- 🤖 500 Object Scene에서 실제 immutable store 갱신을 반복하는 자동 성능 회귀 테스트를 추가해 최악값 100ms 미만을 gate로 고정했다. Scene 전환 뒤 체력·인벤토리·변수·숨김 Object·spawn 상태를 유지하는 Runtime E2E도 추가했다.
+- 🤖 실제 인앱 브라우저에서 최초 guide 자동 표시, 튜토리얼 요소 찾기, 레이어 잠금 새로고침 보존, 로컬 Play 왕복, Published API 부재 오류/재시도/나가기를 확인했다. 불안정한 빈 Asset 배열로 Published loader가 반복 렌더링되던 문제와 좁은 앱 폭에서 우측 panel이 canvas를 가리던 문제도 실제 console·geometry 측정으로 수정했다.
+- 🤖 최종 자동 검증은 Frontend **35 files / 183 tests**, production build, lint, 계약 fixture **7/7**, Runtime trace **6/6**을 통과했다. 지원하지 않는 schema, 손상된 Published project, Runtime crash 복구 화면도 별도 회귀 테스트로 고정했고 Edit/Play/Overlay는 FESTA entry와 분리된 lazy chunk로 출력된다.
+- 🤖 사람 대상 20분 첫 사용 테스트와 활성 PC 탭 55~60fps 측정은 자동화 결과로 가장하지 않고 `FE/usability-test.md`의 5명 기록표와 후속 Frontend QA 이슈로 분리한다. 앱 내부 백그라운드 탭의 1fps throttling 값은 제품 성능 판정에서 제외한다.
+- 트러블슈팅: GS-T033~GS-T035
+
 ### 구현 PR 병합·완료 이슈 정리 ✅
 
 - 🤖 [PR #63](https://github.com/kanghyunsoon/ssafesta/pull/63)이 @colosair의 최신 `front` 기준 독립 검증 후 병합됐다. trial merge 무충돌, 전체 **19 files / 98 tests**, TypeScript build, lint, lazy Asset chunk 격리가 재확인됐다.

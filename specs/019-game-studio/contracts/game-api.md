@@ -49,12 +49,45 @@ stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob
 }
 ```
 
+`GET draft`와 `PUT draft` 성공 응답은 같은 shape을 사용한다.
+
+```json
+{
+  "gameId": 123,
+  "revision": 8,
+  "project": "<GameProject v1 object; gameId=123, revision=8>",
+  "updatedAt": "2026-08-23T13:20:00Z",
+  "warnings": []
+}
+```
+
+- `GET`에서 Draft가 아직 없으면 HTTP 404 + `GAME_DRAFT_NOT_FOUND`를 반환한다. FE는 새 starter project를 유지한다.
+- 응답의 `gameId`, `revision`과 `project.gameId`, `project.revision`은 반드시 일치해야 한다.
+- FE는 `VITE_GAME_STUDIO_API_ENABLED=true`일 때만 서버 Draft adapter를 활성화한다. false이면 같은 UI와 validator를 IndexedDB/local adapter로 실행한다.
+
 - 성공: revision 8의 새 Draft snapshot 반환
 - 충돌: HTTP 409 + `GAME_REVISION_CONFLICT` + 현재 revision
 - 좌표 clamp, 알 수 없는 필드 삭제, 참조 치환 같은 자동 보정 금지
 - 별도 `/validate`가 후속으로 생겨도 Draft 저장과 Publish에서 각각 다시 검증
 
 ### Publish
+
+요청과 성공 응답은 다음 shape으로 고정한다.
+
+```json
+{
+  "expectedRevision": 8
+}
+```
+
+```json
+{
+  "gameId": 123,
+  "publishedVersion": 5,
+  "publishedAt": "2026-08-23T13:22:00Z",
+  "warnings": []
+}
+```
 
 Publish는 다음 순서를 **단일 DB 트랜잭션**으로 수행한다.
 
@@ -97,6 +130,19 @@ GET /api/v1/games/{gameId}/published
 - Draft는 Runtime 공개 endpoint로 노출하지 않는다.
 - Published가 없거나 비공개·삭제된 게임은 새로 실행할 수 없다.
 - 응답은 `schemaVersion`, `gameId`, `publishedVersion`, GameProject를 포함한다.
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "gameId": 123,
+  "publishedVersion": 5,
+  "project": "<immutable Published GameProject v1 object>",
+  "publishedAt": "2026-08-23T13:22:00Z"
+}
+```
+
+- FE는 `gameId`, `schemaVersion`, GameProject 내부 참조를 다시 검증하고 불일치·손상 응답을 Runtime 밖의 오류 화면으로 격리한다.
+- `GAME_NOT_FOUND`, `GAME_DELETED`, `GAME_NOT_PUBLISHED`, `GAME_NOT_PUBLIC`, `GAME_FORBIDDEN`, `GAME_SCHEMA_UNSUPPORTED`, `GAME_PROJECT_INVALID`를 사용자용 한국어 상태로 구분한다.
 - 현재 공개 포인터를 따라가는 `/games/{gameId}/published`는 재공개 즉시 새 version을 보도록 `Cache-Control: no-cache`와 ETag 재검증을 사용한다.
 - 긴 `max-age, immutable`은 후속 version 고정 URL(`/games/{gameId}/versions/{versionNo}`)을 제공할 때 해당 URL에만 적용한다.
 - Runtime은 지원하지 않는 MAJOR를 거부한다.

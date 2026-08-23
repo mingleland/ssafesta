@@ -4,8 +4,8 @@
 
 ## 1. 편집 화면의 논리 영역
 
-편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. 좁은 화면에서도 페이지 전체가 가로로 밀리지 않고
-Map 작업 공간만 내부 스크롤하도록 하며, 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
+편집기는 아래 다섯 영역을 한 작업 공간에서 제공한다. v1은 PC 편집기 1040px 작업 폭을 보존하며,
+더 좁은 창에서는 패널을 서로 겹치게 축소하지 않고 가로 탐색을 허용한다. 각 영역이 수정하는 데이터의 소유권은 바꾸지 않는다.
 
 | 영역 | 주 역할 | 수정 대상 |
 |---|---|---|
@@ -16,6 +16,8 @@ Map 작업 공간만 내부 스크롤하도록 하며, 각 영역이 수정하�
 | Event Editor | Trigger·Condition·Action 구성 | `events[]`, Dialogue Choice |
 
 선택 상태, 확대/축소, 열린 패널, undo/redo history는 편집기 로컬 상태이며 GameProject에 저장하지 않는다.
+Object Layer의 편집 숨김·이동 잠금도 Runtime 의미가 아닌 브라우저별 편집 보조 상태다. 사용자는 Layer 목록에서
+ID·종류 검색, 숨김, 잠금, Sprite `zIndex` 앞뒤 정렬을 수행할 수 있다.
 
 ## 2. 원본 데이터와 실행 결과
 
@@ -95,6 +97,8 @@ Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 �
 - Save는 GameProject JSON과 revision만 영구 저장한다. Editor selection/history는 저장하지 않는다.
 - Publish는 구조·참조·Asset 정책·Dialogue presentation을 검증한 뒤 불변 Version을 만든다.
 - Preview에서만 보이는 임시 Asset이나 지원하지 않는 recipe가 남아 있으면 Publish를 거부한다.
+- Publish blocker는 해당 Asset을 사용하는 Scene 배경, Tile Layer, Object Sprite/투사체/생성 대상, Dialogue 초상화, Item 위치를 함께 표시한다.
+- revision 충돌은 로컬 snapshot을 유지하고 JSON 백업 또는 백업 후 서버 최신 Draft 로드 중 하나를 명시적으로 선택하게 한다.
 - GameProject JSON은 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300 상한을 적용하고
   Asset binary는 별도 저장소가 소유한다.
 

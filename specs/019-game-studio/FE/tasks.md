@@ -54,27 +54,27 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 ## Preview and Publish UI
 
 - [ ] T034 Add Preview protocol origin/source/request lifecycle tests
-- [ ] T040 Implement revision-aware Draft/publish API client
+- [x] T040 Implement revision-aware Draft/publish API client
 - [x] T041 Implement same-origin local Preview route using the shared validator/runtime and a session port
-- [ ] T042 Implement revision conflict and validation-error UI
+- [x] T042 Implement revision conflict and validation-error UI
 - [ ] T043 Run Draft→Preview→Publish acceptance flow and record it in FE quickstart
 - [x] T078 Implement builtin Asset reference resolver and keep transient local sources out of GameProject JSON
 - [ ] T080 After #48/#55 Published loader integration add Preview-versus-Published parity E2E
 
 ## Standalone Published play
 
-- [ ] T045 Add unsupported-schema and damaged-project error-boundary tests
-- [ ] T047 Complete `/app/games/:gameId/play` page
-- [ ] T048 Implement Published loader and schema-major guard
-- [ ] T049 Implement Runtime-local error boundary and close lifecycle
+- [x] T045 Add unsupported-schema and damaged-project error-boundary tests
+- [x] T047 Complete `/app/games/:gameId/play` page
+- [x] T048 Implement Published loader and schema-major guard
+- [x] T049 Implement Runtime-local error boundary and close lifecycle
 - [ ] T050 Add Unity-free Published completion E2E
 
 ## Booth Portal Host integration
 
-- [ ] T052 Add `BOOTH_GAME_INTERACT` parsing and failure-isolation tests
-- [ ] T055 Extend the existing Unity event union
-- [ ] T056 Implement Portal resolver and Game overlay adapter
-- [ ] T057 Implement overlay open/close/fail input lifecycle
+- [x] T052 Add `BOOTH_GAME_INTERACT` parsing and failure-isolation tests
+- [x] T055 Extend the existing Unity event union
+- [x] T056 Implement Portal resolver and Game overlay adapter
+- [x] T057 Implement overlay open/close/fail input lifecycle
 - [ ] T058 Add Booth Portal browser E2E after BE resolver is available
 
 ## PLATFORMER extension
@@ -83,14 +83,14 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T060 Add platform gravity, jump, projectile, damage recovery, and bounded-spawner tests
 - [x] T061 Implement reference PLATFORMER renderer/physics adapter
 - [x] T062 Implement platform object palette/editor and playable jump-map template
-- [ ] T063 Add cross-scene state preservation E2E
+- [x] T063 Add cross-scene state preservation E2E
 
 ## Cross-cutting verification
 
 - [ ] T064 Verify create/save/publish/play with FastAPI unavailable
 - [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target
 - [x] T066 Document schema migration policy and supported-major matrix
-- [ ] T067 Run all FE quickstart commands and record final results
+- [x] T067 Run all FE quickstart commands and record final results
 - [x] T068 Update implementation status and KHS worklog
 - [x] T069 Add deterministic input/state trace
 - [x] T070 Implement renderer-free reference Runtime
@@ -100,6 +100,6 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 ## Summary
 
 - Total: 69
-- Completed: 49
-- Remaining: 20
-- Active blockers: #48 BE Draft/Publish API, #55 Published loader, and #56 Booth Portal integration. Local authoring/reference Runtime no longer waits on #35.
+- Completed: 61
+- Remaining: 8
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver. FE adapter·오류 격리·overlay와 실사용 편집 UX는 응답 전 구현 완료 상태다.

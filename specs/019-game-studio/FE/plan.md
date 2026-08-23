@@ -45,9 +45,9 @@ festa-frontend/src/game-studio/
    undo/redo, reversible preset recipe, lazy edit/play entry를 PR #47에 구현했다.
 2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, typed inspector, Dialogue editor, 한국어 guide와 6종 템플릿을 하나의 store에 연결했다.
 3. **완료 — Reference Renderer/Preview**: TOP_DOWN/PLATFORMER renderer, builtin/local Asset resolver, same-origin local Preview route를 같은 Runtime core에 연결했다.
-4. **Backend integration**: [BE plan](../BE/plan.md)의 Draft/Publish API가 준비되면 revision conflict,
-   validation error, Published loader를 연결한다.
-5. **Portal integration**: 독립 URL 수직 흐름을 먼저 통과한 뒤 `BOOTH_GAME_INTERACT`와 overlay lifecycle을 연결한다.
+4. **완료 — Backend adapter**: revision-aware Draft/Publish client, Published loader, schema guard,
+   충돌 복구·검증 오류 UI를 구현했다. [BE plan](../BE/plan.md)의 endpoint가 준비되면 환경 플래그로 전환한다.
+5. **완료 — Portal FE integration**: `BOOTH_GAME_INTERACT`→Portal resolver→GAME overlay와 close/fail lifecycle을 연결했다. 서버 resolver가 준비되면 브라우저 E2E만 수행한다.
 6. **확장**: Backend Asset upload를 안정 reference adapter로 연결하고, AI 제작 보조는 사용자 승인 patch로만 추가한다.
 
 ## Gates
@@ -62,3 +62,6 @@ festa-frontend/src/game-studio/
 - Edit/Play route가 별도 lazy chunk로 빌드되는지 확인한다.
 - Preview와 Published Runtime에 같은 GameProject를 넣어 최종 상태가 같은지 E2E로 확인한다.
 - Unity와 Backend가 없어도 최소 key→door→dialogue 게임을 제작·완료할 수 있어야 한다.
+- 500 Object Scene의 편집 commit은 자동 성능 테스트에서 100ms 미만이어야 한다.
+- Preview의 `?source=local&perf=1` 진단은 활성 PC 탭에서 55~60fps를 확인한다. 백그라운드 탭의 브라우저 throttling 결과는 합격 근거로 사용하지 않는다.
+- 첫 방문 guide, 6단계 key→door→dialogue tutorial, Object Layer 검색·잠금·편집 숨김·z-index 정렬을 PC 제작 UX 기준선으로 유지한다.

@@ -50,5 +50,6 @@ API client를 재사용하고 lazy chunk로 일반 FESTA 초기 번들과 격리
 ## 8. 남은 FE 구현 경계
 
 #35의 TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver는 PR #63으로 완료됐다.
-남은 FE 범위는 #48 DTO에 연결하는 revision-aware Draft/Publish client, #55 Published loader·오류 격리·Preview parity,
-#56 Booth overlay adapter다. iframe Preview를 실제 채택하지 않는 한 postMessage CSP/origin transport는 활성 병목이 아니다.
+revision-aware Draft/Publish client, Published loader·오류 격리, Booth overlay adapter도 FE port 뒤에 구현됐다.
+남은 통합 범위는 #48·#56의 서버 endpoint와 #69 stable Asset upload/resolver, 실제 Backend browser E2E다.
+iframe Preview를 실제 채택하지 않는 한 postMessage CSP/origin transport는 활성 병목이 아니다.

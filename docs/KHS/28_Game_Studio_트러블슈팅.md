@@ -8,6 +8,27 @@
 
 ## 2026-08-23
 
+### GS-T035. 자동화 브라우저의 백그라운드 throttling을 제품 FPS로 오인할 위험 (측정 경계 확정)
+
+- **증상** — Runtime에 FPS 계측기를 붙였을 때 인앱 자동화 탭에서 화면이 보이는 상태에도 약 1fps가 기록됐다.
+- **원인** — 앱 내부 브라우저·자동화 환경의 frame scheduling과 background throttling이 실제 사용자의 활성 데스크톱 탭과 달랐다. 이 값으로 Runtime 성능을 판정하면 제품 코드와 측정 환경을 혼동한다.
+- **해결** — 일반 사용자 화면에서는 FPS 계측기를 숨기고 `?perf=1`에서만 표시하도록 바꿨다. 자동 테스트는 500 Object 편집 command의 100ms gate를 담당하고, 55~60fps 합격 여부는 외부 브라우저 활성 탭·동일 fixture·측정 장비를 기록하는 사람 QA로 분리했다.
+- **예방** — FPS 결과에는 브라우저, 해상도, 장치, visibility, foreground 여부를 함께 남긴다. throttled 자동화 탭 수치는 회귀 단서로만 사용하고 release gate로 사용하지 않는다.
+
+### GS-T034. 앱의 매우 좁은 viewport에서 반응형 3열 panel이 canvas 위를 덮음 (해결)
+
+- **증상** — 387px 인앱 viewport에서 처음에는 document overflow가 없었지만 Scene/Object panel과 우측 속성 panel이 중앙 canvas와 겹쳐 layer·zoom 버튼 클릭을 가로챘다.
+- **원인** — GS-T028에서 1040px 최소 폭을 제거하며 3열을 매우 좁은 폭 안에 강제로 축소했다. Game Studio는 PC 편집기인데 모바일 폭까지 모든 panel을 동시에 끼워 넣으려 해 hit target과 작업영역을 잃었다.
+- **해결** — PC 편집기의 최소 작업 폭 1040px을 다시 계약으로 명시하고, 좁은 내장 창에서는 document 가로 탐색으로 전체 workspace를 보존하도록 고쳤다. 우측 panel이 canvas 좌표를 덮지 않게 한 뒤 layer 잠금/해제와 새로고침 보존을 실제 클릭으로 다시 검증했다.
+- **예방** — PC 제작 도구는 ‘모바일처럼 축소’와 ‘작업영역을 보존하며 탐색’ 중 하나를 명시적으로 선택한다. 배치 QA는 보이는 모양뿐 아니라 `elementFromPoint`, panel rect, 실제 클릭 성공 여부를 확인한다.
+
+### GS-T033. Published loader가 빈 Asset 배열을 새 값으로 받아 무한 렌더링함 (해결)
+
+- **증상** — Published API 오류 화면은 보이지만 console에 `Maximum update depth exceeded`가 반복됐고 재시도 전에도 render가 계속 발생했다.
+- **원인** — `project?.assets ?? []`가 render마다 새 빈 배열을 만들고 Asset URL hook이 매번 새 state object를 저장해 effect 의존성이 끝없이 바뀌었다.
+- **해결** — module-level 안정 빈 배열을 사용하고, URL map이 실제로 바뀌지 않으면 state 갱신을 생략하는 equality guard를 추가했다. Local/Published 양쪽 surface에 적용하고 브라우저 새로고침 후 console 오류가 사라졌음을 확인했다.
+- **예방** — React effect 의존성에 fallback array/object literal을 직접 넣지 않는다. 비동기 resolver hook은 입력 안정성뿐 아니라 동일 결과에서 state update를 생략하는 방어를 갖춘다.
+
 ### GS-T032. 최신 develop 정본화 병합 뒤 PR #53 공통 문서가 다시 충돌함 (해결)
 
 - **증상** — PR #53이 `CLEAN`에서 `DIRTY/CONFLICTING`으로 바뀌고 rebase 중 `docs/26_팀_결정_필요사항.md`, `specs/README.md` 두 파일에서 충돌했다.
@@ -37,7 +58,7 @@
 - **해결** — Component 분기를 올바른 validator로 이동하고 test frame 진행을 명시적 typed loop로 바꿨다. 이후 Vitest 85개와 production build를 함께 통과시켰다.
 - **예방** — discriminated union을 확장할 때 각 신규 variant마다 유효 1건/오류 1건을 먼저 추가하고 test 통과뿐 아니라 `tsc -b`를 같은 검증 묶음으로 실행한다.
 
-### GS-T028. 1040px 최소 폭 때문에 인앱 브라우저에서 왼쪽 제작 패널이 화면 밖으로 밀림 (해결)
+### GS-T028. 1040px 최소 폭 때문에 인앱 브라우저에서 왼쪽 제작 패널이 화면 밖으로 밀림 (당시 해결, GS-T034에서 PC 기준 재조정)
 
 - **증상** — 813px 인앱 브라우저에서 root 1040px, document scrollWidth 1040px, scrollX 237로 측정됐고 왼쪽 Scene/Object 패널과 상단 제목이 동시에 보이지 않았다.
 - **원인** — 데스크톱 3열 배치를 보호하려고 root에 `min-width: 1040px`을 고정했고 Map stage 최소 폭까지 document overflow에 합쳐졌다.
