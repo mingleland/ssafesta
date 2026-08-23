@@ -26,21 +26,20 @@
 | `assetCode` 목록 | Unity 레지스트리 실측값(#6·#18 — 둘 다 이걸 기다리다 닫힘) | Unity |
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) 닫기 | #58 back 구현 PR 머지 후(리드 요청 — C안 결정은 났고 rule/field 구현·문서 확정이 남음. 추가 요청 3건은 PR #57로 develop 반영 확인 완료) | strdeok |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 신규 진입 차단 판정 시점 답변 | 리드 회신 | 리드 |
-| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) C 확정(08-23) | back 구현 PR 머지 → FE 후속은 예정 작업 | strdeok |
-| #59 잔여 확인 2건 | `:134` 화살표 해석·§21-2 문구 — 규칙 작성자(리드·strdeok) 판단 대기, 결론 나오면 반영 | 리드·strdeok |
+| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58)·[#17](https://github.com/kanghyunsoon/ssafesta/issues/17) BE 구현 | [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71)(field 분리+팔레트 검증·정규화) **머지 대기** — FE 리뷰 회신 완료(이견 없음·머지 무방). 머지 시 예정 작업 'FE 팔레트·field 라운드' 트리거 | strdeok |
+| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) 마무리 | `:133` 화살표(문구 확정, **PR #53에 얹는 쪽 제안** — 안 되면 #53 머지 후 내 1줄 커밋)·§21-2 grep 2층 개정(동의 회신 완료, 리드 반영) | 리드 |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 확정(08-23) | `avatar-profile-api.md` 계약 문서 반영 → wiring 착수는 예정 작업 | strdeok |
-| [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 FE 몫 | ① 소유권 경계 회신(에디터 UI ①~④가 #49 busypark 몫인지 — 내 제안: 나는 resolver ⑤+업로드 클라이언트 기반층) ② BE 업로드 계약(API 형태·상태 DTO·오류 코드) 확정 | 리드·strdeok |
+| [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 | **경계 확정**(나 = `GameAssetRepository` 원격 구현·`shared/api`·`studio/ports` / busypark = 에디터 UI ①~④). BE 업로드 계약(API 형태·상태 DTO·오류 코드)만 대기 | strdeok |
 
 ## 예정 작업 — 트리거 충족 시 착수
 
-
-- [ ] **오류 봉투 `field` 대응** — 트리거: #58 back PR 머지. `ApiError.errors[]`에 `field?: string`, mock 3곳, `PublishDialog` key 인덱스화, R-12 해제 후 `rule` 분기
+- [ ] **FE 팔레트·field 라운드** — 트리거: [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지. ⑴ 계약 대응 먼저: `ApiError.errors[]`에 `field?: string`·mock 3곳·`PublishDialog` key 인덱스화·R-12 해제 후 `rule` 분기·`client.ts:10` 낡은 주석 정리 ⑵ 팔레트: 12색 스와치 UI(자유 입력 제거)·`facadeApi.mock.ts` 팔레트 소속+대문자 정규화 정합·하이드레이션 값이 팔레트 밖이면 안내(strdeok 지적 함정 — 간판만 고쳐도 400 방지). ⑵는 규모 보고 같은 라운드 또는 분리
 - [ ] **013a credential 전달 wiring** — 트리거: #60 계약 문서 반영 확인. `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결(AT 원본, MEMBER only). 부가: AT 만료 401 시 Unity→host 재요청 규약은 별도 후속
 - [ ] **Owner/Staff 라우트 가드**(G-1) — 트리거: 004 `GET /booths/{id}` 부스 소유 정보. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
 - [ ] **게스트 만료 실관측 경로**(G-3) — 트리거: T016 실경로 연결 또는 실 API 소비 화면(008 등) 첫 머지. `expiresAt` 소비자 현재 0, 401 반응형 안내는 T010(`specs/001-auth-user/FE/tasks.md`)
 - [ ] **편집기 팔레트 UI**(미보유 파츠 잠금·게스트 유도) — 트리거: spec 012 착수(#18)
 - [ ] **스냅 0.25 계약 명문화** — 트리거: 강형순 develop 정정 PR(#45 예고) 확인. 현재 로컬 `FE/research.md` R-04에만 존재
-- [ ] **`docs/26` 브랜치별 결정 분기 정리 제안** — 트리거: #59 회신 도착(정본화·grep 범위 결론이 이 제안의 방향을 정함). #18에서 자청한 것
+- [ ] **`docs/26` 브랜치별 결정 분기 정리 제안** — 트리거: #59 종결(§21-2 grep 2층 개정 반영 확인 — 그 결론이 이 제안의 방향을 정함). #18에서 자청한 것
 
 ## 추적 — 내 액션 없음
 
