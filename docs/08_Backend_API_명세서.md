@@ -200,7 +200,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
   "entryAvailable": true,
   "facade": {
     "themeCode": "SSAFY_BLUE",
-    "primaryColor": "#1677C8",
+    "primaryColor": "#3B82F6",
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   },
@@ -334,7 +334,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 ```json
 {
   "themeCode": "SSAFY_BLUE",
-  "primaryColor": "#1677C8",
+  "primaryColor": "#3B82F6",
   "signText": "AI 프로젝트 전시관",
   "logoUrl": null
 }

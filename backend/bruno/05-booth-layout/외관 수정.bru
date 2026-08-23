@@ -17,7 +17,7 @@ auth:bearer {
 body:json {
   {
     "themeCode": "SSAFY_BLUE",
-    "primaryColor": "#1677C8",
+    "primaryColor": "#3B82F6",
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   }
@@ -37,17 +37,26 @@ docs {
   | 필드 | 의미 | 규칙 |
   |---|---|---|
   | `themeCode` | 외부 건물의 **테마 프리셋**. Unity가 이 값으로 외관 세트를 고른다 | `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`. 생략하면 `DEFAULT` |
-  | `primaryColor` | 부스 **대표색**. 간판·포인트 색으로 쓰인다 | `#RRGGBB` 또는 `null`(테마 기본색) |
+  | `primaryColor` | 부스 **대표색**. 간판·포인트 색으로 쓰인다 | **12색 팔레트 안의 `#RRGGBB`** 또는 `null`(테마 기본색). 소문자로 보내도 대문자로 저장·응답된다 |
   | `signText` | **외부 간판 문구.** 부스 이름과 별개로 걸고 싶은 문장 | 60자 이하 또는 `null` |
   | `logoUrl` | 간판에 띄울 **로고 이미지 주소** | **`https://`만 허용**, 2048자 이하, 또는 `null` |
 
   `http` 로고를 막는 이유는 월드가 TLS로 서빙되기 때문이다. mixed content로 차단되면 로고가 그냥 안 보이고, 소유자는 원인을 알 수 없다.
 
+  ### 팔레트 12색 (#17, 2026-08-23 확정)
+
+  테마와 무관한 **전역 1개** 팔레트다. `themeCode` 4종과 곱집합이 아니다. 정본은 `contracts/layout-api.md` §6.
+
+  `#EF4444` `#F97316` `#F59E0B` `#EAB308` `#84CC16` `#22C55E` `#14B8A6` `#06B6D4` `#3B82F6` `#6366F1` `#A855F7` `#EC4899`
+
+  - 형식은 맞지만 팔레트 밖인 색(`#123456`)은 `400 VALIDATION_FAILED` — 메시지가 형식 오류와 다르다("팔레트에 없는 색입니다.")
+  - 화이트리스트 이전에 저장된 색은 그대로 렌더링되고 **다음 저장 때** 검증된다. 강제 이관하지 않는다
+
   ### 거부되는 것
 
   | 응답 | 상황 |
   |---|---|
-  | `400 VALIDATION_FAILED` | 색 형식·글자 수·`http` 로고·모르는 테마 |
+  | `400 VALIDATION_FAILED` | 색 형식·**팔레트 밖 색**·글자 수·`http` 로고·모르는 테마 |
   | `403 BOOTH_EDITOR_FORBIDDEN` | 소유자도 직원도 아님 |
   | `409 BOOTH_LEASE_EXPIRED` | 만료된 부스는 외관을 숨기므로 수정도 막는다 |
 

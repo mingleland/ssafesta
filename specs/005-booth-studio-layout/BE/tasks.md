@@ -137,8 +137,8 @@
 - [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과 — 구현은 back PR #50으로 반입 완료
 - [ ] T056 **슬롯 기준 published 경로** (#62) — `GET /booth-slots/{slotId}/layouts/published`. 인증 불필요, `슬롯 → 유효 임대 → boothId` 해석을 서버가 흡수하고 body는 §5와 동일. 빈 슬롯·미공개 404 `LAYOUT_NOT_PUBLISHED` / 만료 409 `BOOTH_LEASE_EXPIRED` / 없는 슬롯 404. 계약: `contracts/layout-api.md` §11
 - [ ] T057 **슬롯 12개 시드** (#62) — V12로 `F11-R08`~`F11-R12` 추가하고 `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 id 명시 삽입. V5 주석의 낡은 층 문구(#31 — 11층 단일 확정)도 함께 정리
-- [ ] T058 **`field` 분리** (#58) — `ApiErrorDetail`에 `field`(NON_NULL) 추가 + `ApiErrorDetail.field(name, message)` 팩토리, `GlobalExceptionHandler`의 Bean Validation 경로를 `rule: "FIELD_INVALID"` + `field`로 교체. Layout 경로 변경 0. 계약: `docs/08` §1.3-1
-- [ ] T059 **팔레트 소속 검증·정규화** (#17) — `BoothFacadeService`가 `primaryColor`를 12색 화이트리스트로 검증하고 저장 시 대문자로 정규화. 팔레트 밖은 400 `VALIDATION_FAILED`. 계약: `contracts/layout-api.md` §6
+- [X] T058 **`field` 분리** (#58) — `ApiErrorDetail`에 `field`(NON_NULL) 추가 + `ApiErrorDetail.field(name, message)` 팩토리, `GlobalExceptionHandler`의 Bean Validation 경로를 `rule: "FIELD_INVALID"` + `field`로 교체. Layout 경로 변경 0. 계약: `docs/08` §1.3-1 — 기존 `of` 2종을 그대로 둬 호출처 6곳 무수정. **본선에 `@Valid` DTO가 아직 없어** 이 분기를 실제로 태우는 요청이 없었으므로 테스트 전용 프로브 컨트롤러(`BeanValidationProbeController`)로 실경로 고정
+- [X] T059 **팔레트 소속 검증·정규화** (#17) — `BoothFacadeService`가 `primaryColor`를 12색 화이트리스트로 검증하고 저장 시 대문자로 정규화. 팔레트 밖은 400 `VALIDATION_FAILED`. 계약: `contracts/layout-api.md` §6 — 검증 순서는 **형식 → 정규화 → 소속**(형식 오류와 팔레트 이탈이 다른 메시지를 받는다). 팔레트 밖이던 예시색 `#1677C8`을 Bruno·`docs/08`·계약 문서 예시에서 `#3B82F6`(BLUE)로 정정
 
 ---
 

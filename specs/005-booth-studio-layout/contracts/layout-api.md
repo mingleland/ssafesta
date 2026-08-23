@@ -212,7 +212,7 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **Request**
 ```json
-{ "themeCode": "SSAFY_BLUE", "primaryColor": "#1677C8", "signText": "AI 프로젝트 전시관", "logoUrl": null }
+{ "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
 ```
 
 | 필드 | 규칙 |
@@ -263,7 +263,7 @@ docs/08이 이미 정의한 두 필드를 실제로 채운다. **추가일 뿐 �
 
 ```json
 { "boothId": 7, "slotId": 5, "name": "AI 프로젝트 전시관", "leaseStatus": "ACTIVE", "entryAvailable": true,
-  "facade": { "themeCode": "SSAFY_BLUE", "primaryColor": "#1677C8", "signText": "AI 프로젝트 전시관", "logoUrl": null },
+  "facade": { "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null },
   "publishedLayoutVersion": 4,
   "endsAt": "2026-08-21T02:20:25Z" }
 ```

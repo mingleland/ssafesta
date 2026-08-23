@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -19,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Every error leaves this API in one shape (spec 005 research R-09, docs/08 §1.3).
@@ -33,6 +35,8 @@ import org.springframework.test.web.servlet.MvcResult;
 class ErrorEnvelopeIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
+    /** The application's own mapper — a hand-built one would not prove the shipped shape. */
+    @Autowired private JsonMapper json;
 
     @Test
     void anUnauthenticatedRequestIsRefusedInTheEnvelope() throws Exception {
@@ -170,6 +174,56 @@ class ErrorEnvelopeIntegrationTest {
                 .andExpect(jsonPath("$.errors").isEmpty())
                 .andExpect(jsonPath("$.warnings").isArray())
                 .andExpect(jsonPath("$.warnings").isEmpty());
+    }
+
+    /**
+     * A field rejection names the field in {@code field} — never in {@code rule} (docs/08 §1.3-1).
+     *
+     * <p>The field name used to be the rule. That makes the rule vocabulary as open-ended as the set
+     * of DTO fields, so a client branching on a whitelist of rules falls through on every one of
+     * them and can only show the raw message (#58).
+     */
+    @Test
+    void aFieldRejectionCarriesTheFieldNameOutsideTheRule() throws Exception {
+        String body = mockMvc.perform(post(BeanValidationProbeController.PATH)
+                        .with(jwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"   \",\"memo\":\"짧음\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].rule").value(ApiErrorDetail.FIELD_INVALID))
+                .andExpect(jsonPath("$.errors[0].field").value("nickname"))
+                .andExpect(jsonPath("$.errors[0].message").value("닉네임을 입력해 주세요."))
+                .andExpect(jsonPath("$.warnings").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        assertFalse(body.contains("\"rule\":\"nickname\""),
+                "필드명이 rule 자리에 있으면 클라이언트의 rule 화이트리스트 분기가 깨집니다: " + body);
+        assertFalse(body.contains("objectId"),
+                "field는 요청 필드, objectId는 배치된 오브젝트입니다. 섞이면 안 됩니다: " + body);
+    }
+
+    /**
+     * Absent means the key is gone, not that it is {@code null}.
+     *
+     * <p>Both optional keys are {@code NON_NULL} for the same reason the arrays are always present:
+     * a client reading {@code detail.field} should get {@code undefined} on a rule that has none,
+     * not a {@code null} every call site has to guard.
+     */
+    @Test
+    void anAbsentFieldOrObjectIdLeavesNoKeyBehind() {
+        String ruleOnly = json.writeValueAsString(
+                ApiErrorDetail.of("OBJECT_LIMIT", "오브젝트는 12개까지입니다."));
+        String withObjectId = json.writeValueAsString(
+                ApiErrorDetail.of("CONFIG_NOT_LINKED", "ai-1", "AI 직원이 연결되지 않았습니다."));
+        String withField = json.writeValueAsString(
+                ApiErrorDetail.field("nickname", "닉네임을 입력해 주세요."));
+
+        assertFalse(ruleOnly.contains("field"), "값이 없는 field 키가 남았습니다: " + ruleOnly);
+        assertFalse(ruleOnly.contains("objectId"), "값이 없는 objectId 키가 남았습니다: " + ruleOnly);
+        assertFalse(withObjectId.contains("field"), "objectId 항목에 field 키가 붙었습니다: " + withObjectId);
+        assertFalse(withField.contains("objectId"), "field 항목에 objectId 키가 붙었습니다: " + withField);
+        assertTrue(withField.contains("\"field\":\"nickname\""), "field 값이 없습니다: " + withField);
     }
 
     @Test
