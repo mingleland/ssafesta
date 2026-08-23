@@ -55,6 +55,9 @@
 
 ## 미착수 코드
 
+- [ ] **Owner/Staff 라우트 가드**(G-1, 추적 소실 복구) — 기존 router 주석("Owner/Staff Guard는 spec 001 인증 확정 후 추가")을 001 구현이 지우면서 구현·이관 없이 소실됐던 것. 현재 member/guest 2등급뿐이라 `/app/studio/:boothId`가 모든 member에게 열림(서버 FR-012가 최종 차단 — 보안 구멍 아님, UX 가드). 부스 소유 정보(004 `GET /booths/{id}`) 필요 — 001이 아니라 **004/005 접점 후속**
+- [ ] **로그인 후 원래 목적지 복귀**(G-2) — redirect-login 시 원경로 미보존, 로그인하면 무조건 `/app/home`(딥링크 UX 결손). 협의 불요 소형
+- [ ] **게스트 만료 실관측 경로**(G-3) — `expiresAt` 저장만 하고 소비 없음, 401 반응형 안내(T010)는 API 호출 화면이 생겨야 도달 가능. 실 API 화면 등장 시점에 재검
 - [ ] **Game Studio `OnOverlayStateChanged` 송신부**(#20) — Host→Unity 방향, 수신 GameObject명 미확정이라 Unity 협의 후. union·`GAME` 타입 2종은 "지금 할 수 있는 것" C로 분리. `features/game-entry/`는 #21 BE 계약 확정 후
 - [ ] **편집기 팔레트 UI** — 미보유 파츠 회색+잠금 배지, 게스트 로그인 유도(#18, spec 012 착수 시)
 - [ ] `docs/10_Frontend_설계서.md` §3에 `/app/games/:gameId/edit|play` 라우트 추가 develop PR — 리드는 spec/contracts만 반영, 여기는 FE 몫으로 남음(#20)
@@ -86,4 +89,5 @@
 
 - **develop 통합 절차**: `develop`에서 브랜치 → `git checkout <자기브랜치> -- <path>` 파일 단위 → `git diff --stat origin/develop -- festa-unity/` 0줄 확인 → PR. **직접 push·전체 merge 금지**(`festa-unity/` 1,462개 삭제)
 - **착수 전 `origin/develop` 대조 필수** — 내 브랜치의 공유 문서 사본은 낡았다고 가정
+- **G-4 — RequireAuth 컴포넌트 테스트 공백**: guard 순수 함수만 테스트, `bootstrapped` 분기는 수동 실측뿐(컴포넌트 테스트 라이브러리 미설치 — plan 제약). T-17이 정확히 이 틈에서 났음 — 도입 여부는 팀 결정 사안(R-10 방식)
 - **닫힌 이슈 재확인 습관** — 이슈가 CLOSED돼도 후속 확정값·번복이 마지막 코멘트에만 있는 경우가 잦다. 산출물 작성 후 관련 이슈가 새로 닫히면 재대조할 것
