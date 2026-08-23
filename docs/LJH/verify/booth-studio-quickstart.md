@@ -85,6 +85,8 @@
 
 ### §7. facade 편집 (FR-018) — ✅ 6/6
 
+> ⚠️ 아래 실측의 `#1677C8`은 **팔레트 12색 확정(#17, 08-23) 이전** 값이다. 화이트리스트 시행 후 재실행하면 이 값은 **400 `VALIDATION_FAILED`가 정상**이다 — 재실행 시 팔레트 값(`#3B82F6` = `BLUE`)을 입력할 것. 400이 나와도 회귀가 아니다.
+
 | # | 확인 | 실측 |
 |---|---|---|
 | 1 | facade 패널에서 themeCode·primaryColor 변경 | `themeCode=SSAFY_BLUE`, `primaryColor=#1677C8` 입력 |
