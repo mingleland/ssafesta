@@ -31,6 +31,21 @@ describe('GameProject authoring store', () => {
     expect(redone.project.title).toBe('수정된 게임');
   });
 
+  it('synchronizes a server revision across undo history without discarding edits', () => {
+    const store = createGameProjectStore(minimalGameProject);
+    store.update((project) => ({ ...project, title: '첫 편집' }));
+    store.update((project) => ({ ...project, title: '두 번째 편집' }));
+
+    store.syncRevision(3);
+    expect(store.getState().project).toMatchObject({ title: '두 번째 편집', revision: 3 });
+    expect(store.getState().canUndo).toBe(true);
+
+    store.undo();
+    expect(store.getState().project).toMatchObject({ title: '첫 편집', revision: 3 });
+    store.redo();
+    expect(store.getState().project).toMatchObject({ title: '두 번째 편집', revision: 3 });
+  });
+
   it('clears redo history after branching from an undone snapshot', () => {
     const store = createGameProjectStore(minimalGameProject);
     store.update((project) => ({ ...project, title: '첫 번째' }));

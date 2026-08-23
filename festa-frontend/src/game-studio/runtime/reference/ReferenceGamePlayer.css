@@ -23,6 +23,8 @@
 .grp-brand { align-items: center; background: linear-gradient(135deg,#3c8cff,#765fea); border-radius: 7px; display: inline-flex; font-weight: 900; height: 29px; justify-content: center; width: 29px; }
 .grp-topbar strong { font-size: 13px; }
 .grp-topbar em { background: rgba(77,148,255,.13); border-radius: 4px; color: #7db0fc; font-size: 7px; font-style: normal; font-weight: 800; letter-spacing: .1em; padding: 4px 6px; }
+.grp-topbar em.is-good { background: rgba(77,196,139,.13); color: #72d7a6; }
+.grp-topbar em.is-low { background: rgba(235,168,73,.14); color: #efbc70; }
 
 .grp-stage-wrap { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: hidden; padding: 34px; position: relative; }
 .grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; width: 100%; }

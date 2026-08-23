@@ -19,7 +19,7 @@ describe('local GameProject repository adapter', () => {
     const project = createStarterProject(51);
     const receipt = await repository.save(project);
 
-    expect(receipt).toEqual({ savedAt: '2026-08-22T10:00:00.000Z', revision: 0 });
+    expect(receipt).toEqual({ savedAt: '2026-08-22T10:00:00.000Z', revision: 0, warnings: [] });
     expect(await repository.load(51)).toEqual(project);
     expect(await repository.load(52)).toBeNull();
   });
