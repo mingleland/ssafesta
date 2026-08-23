@@ -49,7 +49,7 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T031 Add minimal authoring-to-local-preview integration test
 - [x] T076 Implement Scene/Object palette, canvas, Properties and Event workspace shell
 - [x] T077 Implement reversible preset Component/Event recipes
-- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes
+- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
 
 ## Preview and Publish UI
 
@@ -88,7 +88,7 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 ## Cross-cutting verification
 
 - [ ] T064 Verify create/save/publish/play with FastAPI unavailable
-- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target
+- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
 - [x] T066 Document schema migration policy and supported-major matrix
 - [x] T067 Run all FE quickstart commands and record final results
 - [x] T068 Update implementation status and KHS worklog
@@ -102,4 +102,4 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - Total: 69
 - Completed: 61
 - Remaining: 8
-- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver. FE adapter·오류 격리·overlay와 실사용 편집 UX는 응답 전 구현 완료 상태다.
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. FE adapter·오류 격리·overlay와 실사용 편집 UX는 응답 전 구현 완료 상태다.

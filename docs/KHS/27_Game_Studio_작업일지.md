@@ -17,7 +17,8 @@
 - 🤖 500 Object Scene에서 실제 immutable store 갱신을 반복하는 자동 성능 회귀 테스트를 추가해 최악값 100ms 미만을 gate로 고정했다. Scene 전환 뒤 체력·인벤토리·변수·숨김 Object·spawn 상태를 유지하는 Runtime E2E도 추가했다.
 - 🤖 실제 인앱 브라우저에서 최초 guide 자동 표시, 튜토리얼 요소 찾기, 레이어 잠금 새로고침 보존, 로컬 Play 왕복, Published API 부재 오류/재시도/나가기를 확인했다. 불안정한 빈 Asset 배열로 Published loader가 반복 렌더링되던 문제와 좁은 앱 폭에서 우측 panel이 canvas를 가리던 문제도 실제 console·geometry 측정으로 수정했다.
 - 🤖 최종 자동 검증은 Frontend **35 files / 183 tests**, production build, lint, 계약 fixture **7/7**, Runtime trace **6/6**을 통과했다. 지원하지 않는 schema, 손상된 Published project, Runtime crash 복구 화면도 별도 회귀 테스트로 고정했고 Edit/Play/Overlay는 FESTA entry와 분리된 lazy chunk로 출력된다.
-- 🤖 사람 대상 20분 첫 사용 테스트와 활성 PC 탭 55~60fps 측정은 자동화 결과로 가장하지 않고 `FE/usability-test.md`의 5명 기록표와 후속 Frontend QA 이슈로 분리한다. 앱 내부 백그라운드 탭의 1fps throttling 값은 제품 성능 판정에서 제외한다.
+- 🤖 사람 대상 20분 첫 사용 테스트와 활성 PC 탭 55~60fps 측정은 자동화 결과로 가장하지 않고 `FE/usability-test.md`의 5명 기록표와 [#73](https://github.com/kanghyunsoon/ssafesta/issues/73)으로 분리했다. @ghkim1632·@colosair를 지정했으며 앱 내부 백그라운드 탭의 1fps throttling 값은 제품 성능 판정에서 제외한다.
+- 🤖 구현 커밋 `dfe5f71`을 최신 `front`(`bf45193`) 위에 재정렬해 원격 브랜치 `codex/game-studio-published-runtime-shell`로 게시하고, `front` 대상 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)을 생성했다. 변경은 `festa-frontend/.env.example`, Overlay Host, `festa-frontend/src/game-studio/**`에 한정하며 Backend·Unity 경로 변경은 0건이다.
 - 트러블슈팅: GS-T033~GS-T035
 
 ### 구현 PR 병합·완료 이슈 정리 ✅
