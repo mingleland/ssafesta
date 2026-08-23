@@ -58,7 +58,7 @@ cd backend; .\mvnw.cmd test
 cd backend && ./mvnw test -Dtest=SsafestaApplicationTests
 ```
 
-Flyway가 V1 → V5까지 올라가고 `ddl-auto=validate`가 엔티티-스키마 일치를 검증한다. V5 시딩으로 **USER_RENTAL 슬롯 7개(11층)** 가 들어간다.
+Flyway가 V1 → V5까지 올라가고 `ddl-auto=validate`가 엔티티-스키마 일치를 검증한다. V5·V12 시딩으로 **USER_RENTAL 슬롯 12개(11층)** 가 들어간다.
 
 ## 3. 수동 검증 (Bruno)
 

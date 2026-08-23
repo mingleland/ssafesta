@@ -2,7 +2,7 @@
 
 **Spec**: `005-booth-studio-layout`
 **Created**: 2026-08-12
-**Status**: Draft — **FE·BE 검토 완료, C-04(기획 승인) 대기**
+**Status**: **확정** — FE·BE 검토 완료, C-04·C-06 기획 승인 완료 ([#45](https://github.com/kanghyunsoon/ssafesta/issues/45), 2026-08-21)
 **주 담당**: Frontend(이정헌) + Backend
 **선행 spec**: 004 (임대) — Mock API로 병행 착수 가능
 **근거 문서**: docs/02 §2.4(STUDIO-01~13), docs/sdd/constitution.md Article I·21
@@ -174,9 +174,9 @@ React 편집기는 **위에서 내려다보는 2D 평면**에서 오브젝트를
 | ~~C-01~~ | ~~부스 최대 오브젝트 수~~ | — | ✅ **확정: 12개** (요청 10~12 중 상한 채택, 실측 후 하향 가능) |
 | ~~C-02~~ | ~~좌표 원점·단위 규칙~~ | — | ✅ **확정: 미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z** (헌법 21조). **왕복 검증 1회는 여전히 필수** |
 | ~~C-03~~ | ~~오브젝트 크기 조절을 허용하는가?~~ | — | ✅ **확정: 고정 크기** (2026-08-18). `scale` 필드 없음 — Layout 계약 변경 없음 |
-| C-04 | 콘텐츠 미연결 오브젝트의 공개를 막는가? | FE + 기획 | ⏳ 기획 대기 — BE 구현은 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하므로, 확정은 이 항목을 두 리스트 사이에서 옮기는 것뿐이다(FR-016). 현재 기본값 **warning**(공개 허용) |
+| ~~C-04~~ | ~~콘텐츠 미연결 오브젝트의 공개를 막는가?~~ | — | ✅ **확정: 선택지 1(경고만, 공개 허용)** — 임대 슬롯 축제라 자리를 먼저 확보하고 콘텐츠는 나중에 채우는 흐름을 막지 않는다(리드 승인, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45), 2026-08-21). BE 구현은 검증 결과를 `errors`(차단)/`warnings`(허용)로 나눠 응답하며(FR-016), 미연결은 `warnings`. `LayoutValidator.requiresConfig()` 게이트가 있어 `FURNITURE`·`DECORATION`은 경고 대상 아님. **전제 조건**: Unity `AiNpcInteractable`이 `configId` 미검사로 `agentId=0`(Unity `JsonUtility`가 null을 0으로 읽음) 호출하던 구멍을 가드로 막음(`9917d4d`) — FE는 서버 계약(`configId: null`)을 기준으로 하고 `0`을 유효 ID로 다루지 않는다 |
 | ~~C-05~~ | ~~Owner와 Staff의 동시 편집 정책은?~~ | — | ✅ **확정: `version` 낙관적 잠금 + 409.** BE 채택([Issue #5](https://github.com/kanghyunsoon/ssafesta/issues/5), 2026-08-20). 409 응답 body는 **`{code, message, requestId}`로 확정·구현 완료** (2026-08-20, `docs/08` §1.3 — 클라이언트는 `code`로만 분기). 요청 스키마는 body `expectedRevision` 필수로 확정·구현 완료, 코드 `LAYOUT_REVISION_CONFLICT` (2026-08-20) |
-| C-06 | 템플릿은 몇 종이며 무엇이 다른가? | 기획 | ⏳ 기획 대기 — BE는 화이트리스트 검증만 한다(현재 허용값 `DEFAULT`·`PROJECT_EXHIBITION`). footprint 서버 SSOT 논의는 [#19](https://github.com/kanghyunsoon/ssafesta/issues/19) |
+| ~~C-06~~ | ~~템플릿은 몇 종이며 무엇이 다른가?~~ | — | ✅ **확정: 1종 `PROJECT_EXHIBITION`, `DEFAULT` 제거**(V11 마이그레이션이 기존 저장분 이관) — 셸 프리팹이 `BoothShell.prefab` 1종뿐이라 `template → 셸 1:1`(리드 승인, [#45](https://github.com/kanghyunsoon/ssafesta/issues/45), [#19](https://github.com/kanghyunsoon/ssafesta/issues/19), 2026-08-21). 템플릿이 담는 것 = 라벨 + 셸 외형 + `footprint`/`maxObjects` 메타 — 배경·테마는 `facade.themeCode`(#17) 소관이라 중복시키지 않는다. **미리 배치된 오브젝트 세트는 반대** — 12개 상한(헌법 22조)을 잠식하고 새 부스가 `CONFIG_NOT_LINKED` 경고를 안고 태어난다. 필요해지면 "시작 템플릿"(편집기 UX, 저장 계약 아님)으로 별도 처리. footprint·목록 조회는 `GET /booth-layout-templates` 신설(BE 구현, `contracts/layout-api.md` §9) |
 | C-07 | 공개 이력(과거 버전)을 보관하고 되돌릴 수 있는가? | BE | ✅ **BE 답변(2026-08-20): 보관은 한다, 되돌리기 API는 MVP 제외.** `booth_layout_published_versions`가 이미 이력 구조라 보관 비용 0. 되돌리기는 UI·권한·"되돌린 것도 새 버전인가"를 함께 정해야 하므로 지금 열지 않는다 (재임대 미리보기와 연관) |
 
 ---
