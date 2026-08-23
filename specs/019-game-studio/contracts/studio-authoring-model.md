@@ -20,6 +20,10 @@
 Object Layer의 편집 숨김·이동 잠금도 Runtime 의미가 아닌 브라우저별 편집 보조 상태다. 사용자는 Layer 목록에서
 ID·종류 검색, 숨김, 잠금, Sprite `zIndex` 앞뒤 정렬을 수행할 수 있다.
 
+Canvas 기본 도구는 `선택`과 `화면 이동`이다. 선택 도구는 단일 클릭, Shift/Ctrl 추가 선택, 빈 영역 드래그
+선택을 제공한다. 방향키와 drag는 잠기지 않은 선택 묶음을 하나의 command로 이동하고 상대 간격을 보존한다.
+화면 이동과 격자 표시 여부는 Editor 상태이며 GameProject에 저장하지 않는다.
+
 ## 2. 원본 데이터와 실행 결과
 
 ```text
@@ -59,6 +63,12 @@ Asset Catalog + GameProject JSON
 - World Object의 `position.x/y`는 0부터 시작하는 정수 셀 좌표다.
 - Sprite 표시 크기는 `scale 25..400%`, 겹침 순서는 `zIndex 0..20`으로 조정한다. 회전·다중 셀
   Collider footprint는 실제 제작 사례가 확인된 뒤 별도 계약으로 확장한다.
+- 여러 Object를 복제할 때 Object/Event ID를 새로 발급하고, 복제 대상 Object가 Trigger인 Event와 복제
+  묶음 안의 `SHOW_OBJECT`/`HIDE_OBJECT` 참조를 새 ID로 다시 연결한다. Player Spawn은 복제하지 않는다.
+- Object 삭제는 선택 밖 Event가 참조하는 Object와 Player Spawn을 자동 삭제하지 않는다. 자기 자신을
+  Trigger로 삼아 숨기는 pickup Event처럼 삭제 대상에 종속된 Event는 Object와 함께 제거한다.
+- Scene 크기 변경은 기존 Tile의 좌상단 좌표를 유지해 새 row-major 배열로 재구성한다. 축소 경계 밖
+  Object는 새 마지막 셀로 clamp하며, 이 변환도 하나의 undo 가능한 command다.
 
 ## 5. Preset은 편집 편의 기능
 

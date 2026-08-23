@@ -8,6 +8,27 @@
 
 ## 2026-08-24
 
+### GS-T042. 로컬 브라우저 QA가 실 API 인증과 종료된 개발 서버 때문에 편집 route에 진입하지 못함 (해결)
+
+- **증상** — 5174 편집 주소는 개발 서버 종료로 연결이 거절됐고, 서버를 다시 띄운 뒤 게스트 입장은 실제 API 미구현 때문에 실패했다. Game Studio edit route는 회원 전용이라 guest mock만으로도 접근할 수 없었다.
+- **원인** — Vite 기본 실행이 `VITE_USE_MOCK=false`인 실제 API 선택 경로였고, 새 인앱 브라우저 세션에는 기존 회원 session이 없었다. 이전 화면이 열려 있었다는 사실을 인증 근거로 사용할 수 없다.
+- **해결** — 프로젝트가 제공하는 공식 `VITE_USE_MOCK=true` 선택점을 사용해 별도 5175 개발 서버를 띄우고 local Google mock callback에서 테스트 회원을 만든 뒤 편집 route를 검증했다. 저장·Publish는 실행하지 않고 Canvas의 선택·복제·이동·도구 상태와 반응형 geometry만 확인했다.
+- **예방** — 브라우저 QA 전에 대상 port와 auth API mode를 먼저 확인한다. 인증 저장소를 임의 검사·주입하거나 production guard를 우회하지 않고 공식 mock selector를 사용한다.
+
+### GS-T041. 코드 복제본의 `origin`이 GitHub가 아니라 바탕화면 기준 저장소를 가리킴 (해결)
+
+- **증상** — 새 Maker 브랜치를 `git push origin`한 출력이 GitHub URL이 아니라 `C:\Users\SSAFY\Desktop\SSAFESTA`로 나타나 기준 저장소에 branch ref가 하나 생겼다.
+- **원인** — 이 격리 복제본은 `origin`을 로컬 기준 저장소, `github`를 실제 GitHub 원격으로 등록했는데 일반적인 원격 이름을 가정했다. escalated Git 실행에서는 소유자 차이로 `safe.directory` 경고도 함께 발생했다.
+- **해결** — `git remote -v`를 다시 확인하고 명령 한 번에만 제한한 `safe.directory`로 `github/codex/game-studio-maker-redesign`에 정확히 push했다. 바탕화면 저장소에서는 방금 만든 branch ref만 삭제했으며 worktree·index·파일은 변경하지 않았다.
+- **예방** — 격리 worktree/clone에서 push 전 `remote -v`와 branch upstream을 항상 함께 출력한다. `origin`이 GitHub라는 가정을 금지하고 실제 GitHub remote 이름을 명시한다.
+
+### GS-T040. 수집 템플릿 기본 점수 Component와 기존 Runtime 테스트 주입이 중복됨 (해결)
+
+- **증상** — 수집 템플릿에 기본 `SCORE_VALUE`를 넣은 뒤 전체 테스트에서 `treasure1 has duplicate component types` 계약 오류가 발생했다.
+- **원인** — 기존 gameplay 테스트가 점수 동작을 확인하려고 `treasure1`에 `SCORE_VALUE`를 무조건 추가했다. 템플릿이 실제 점수 구성을 기본 제공하게 바뀐 뒤 테스트 setup이 중복 Component를 만들었다.
+- **해결** — 계약의 Component type 중복 금지는 유지했다. 테스트는 점수 Component가 있으면 값을 25로 교체하고 없을 때만 추가하도록 바꿔 같은 Runtime 행동을 검증했다. 전체 37 files / 196 tests와 build·lint를 재통과했다.
+- **예방** — 완성 템플릿을 테스트 fixture로 사용할 때 Component를 무조건 append하지 않고 기존 type을 조회해 replace-or-add한다. 구조적 템플릿 프로필 테스트도 함께 유지한다.
+
 ### GS-T039. 로컬 Asset port가 서버 Authoring 모드에서도 `asset://local`을 Draft에 넣을 수 있음 (해결)
 
 - **증상** — #48·#69 Backend 검토에서 API 모드의 저장 버튼은 local Asset preflight를 거치지 않아 `asset://local`을 PUT Draft에 보낼 수 있고, 서버가 계약대로 거부하면 이후 모든 저장이 막힐 수 있음이 확인됐다. MIME 검사도 `image/*`라 SVG가 통과하고 AUDIO가 v1 port에 남아 있었다.

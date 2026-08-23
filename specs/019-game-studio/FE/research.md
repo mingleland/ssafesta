@@ -59,6 +59,11 @@ Scene 중심 편집, 배치 가능한 Preset, 즉시 테스트, 반복 작업 �
 ## 9. 남은 FE 구현 경계
 
 #35의 TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver는 PR #63으로 완료됐다.
+
+메이플스토리 월드의 공식 Workspace·Hierarchy·Scene·TileMap·Map Layer·Design/Pro Mode 자료에서 확인한
+Maker 정보 구조와 FESTA 적용·배제 판단은 [maker-reference.md](maker-reference.md)에 기록한다. 핵심은
+Library와 배치된 Object 목록을 분리하고, Scene Canvas 직접 조작과 제한형 device/recipe를 기본으로 하되
+임의 Script/API는 도입하지 않는 것이다.
 revision-aware Draft/Publish client, Published loader·오류 격리, Booth overlay adapter도 FE port 뒤에 구현됐다.
 남은 통합 범위는 #48·#56의 서버 endpoint와 #69 stable Asset upload/resolver, 실제 Backend browser E2E다.
 iframe Preview를 실제 채택하지 않는 한 postMessage CSP/origin transport는 활성 병목이 아니다.

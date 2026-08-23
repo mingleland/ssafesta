@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **BE tasks**: [../BE/tasks.md](../BE/tasks.md)
 
-FE가 소유하는 74개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
+FE가 소유하는 79개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
 
 ## Contract foundation
 
@@ -54,6 +54,10 @@ FE가 소유하는 74개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T093 Split Object Inspector into beginner defaults and explicit advanced ID/position/Component controls
 - [x] T094 Make onboarding project-scoped and genre-independent; add compact layout and Shift+F focus mode
 - [x] T095 Align local Asset MIME/size/audio guard and repository ID/READY seam with #69; disable local injection in server mode
+- [x] T096 Add marquee/additive multi-selection, bounded group movement, select/pan/grid canvas tools
+- [x] T097 Add behavior-preserving Object duplication, reference-aware batch deletion, and Scene resize commands
+- [x] T098 Replace title-only STORY/ESCAPE variants and same-shape action samples with structurally distinct playable blueprints
+- [x] T099 Add template-profile, authoring-command, browser multi-select/duplicate/move, and 800/1024px regression verification
 - [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
 
 ## Preview and Publish UI
@@ -101,10 +105,11 @@ FE가 소유하는 74개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T070 Implement renderer-free reference Runtime
 - [x] T071 Verify and document Runtime trace command
 - [x] T089 Verify production build emits separate Edit and Play lazy chunks
+- [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([#78](https://github.com/kanghyunsoon/ssafesta/issues/78))
 
 ## Summary
 
-- Total: 74
-- Completed: 66
-- Remaining: 8
-- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. FE adapter·오류 격리·overlay와 실사용 편집 UX는 응답 전 구현 완료 상태다.
+- Total: 79
+- Completed: 70
+- Remaining: 9
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 타이머·점수·적 처치 승리 규약. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. FE adapter·오류 격리·overlay와 maker-style Canvas·구조적으로 다른 템플릿은 응답 전 구현 완료 상태다.

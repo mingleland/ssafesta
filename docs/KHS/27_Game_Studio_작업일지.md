@@ -9,6 +9,18 @@
 
 ## 2026-08-24
 
+### Maker형 자유 편집 Canvas·실제 템플릿 재설계 ✅
+
+- 🤖 Game Studio 관련 OPEN 이슈 #48·#55·#56·#69·#73을 다시 확인했다. 새 답변은 없고 PR #53·#72는 `CLEAN/MERGEABLE` 상태라, Backend·Unity 답변과 무관한 제작 UX를 새 코드 브랜치 `codex/game-studio-maker-redesign`에서 진행했다.
+- 🤖 Canvas에 단일/Shift·Ctrl 추가/영역 드래그 선택, 선택 묶음 경계 보존 이동, `Q` 선택·`W` 화면 이동·`G` 격자, Ctrl+D 복제, Delete 안전 삭제, 선택 수 안내를 추가했다. 선택하지 않은 Object의 카드 배경과 ID label을 숨겨 플레이 화면을 가리던 문제도 줄였다.
+- 🤖 복제 command는 새 Object/Event ID를 발급하고 선택 Object가 Trigger인 Event 및 묶음 내부 SHOW/HIDE 참조를 재연결한다. 일괄 삭제는 Player Spawn과 선택 밖 Event 참조 Object를 보존하며, 자기 자신을 숨기는 pickup Event는 Object와 함께 제거한다.
+- 🤖 Scene Inspector에서 World map 크기를 수정할 수 있게 했고 Tile row-major 데이터를 좌상단 기준으로 보존하며 Object를 새 경계 안으로 이동한다. 모든 변경은 기존 GameProject 1.0.0과 undo/redo store를 그대로 사용한다.
+- 🤖 STORY는 다중 Dialogue·선택·변수 기반 약속 이야기, ESCAPE는 두 World Scene·단서·열쇠·스위치·숨은 출구 흐름으로 재작성했다. COLLECTION에는 배치 장애물과 점수를, PLATFORMER/SHOOTER/SURVIVAL에는 서로 다른 지형·적·포탑·Spawner·Checkpoint 구성을 넣었다. 6종의 Scene/Object/Event/Dialogue 구조 프로필이 모두 다름을 테스트로 고정했다.
+- 🤖 자동 검증은 Frontend **37 files / 196 tests**, production build, lint를 통과했다. 인앱 브라우저에서는 `2개 선택 → Event 포함 복제 → 묶음 이동`, 화면 이동/격자 상태, 1024px 전체 도구 노출, 800px document 무가로 overflow를 확인했고 console error는 0건이었다.
+- 🤖 구현 커밋 `3f695b5 feat(game-studio): add maker-style canvas editing`을 실제 GitHub 원격 `codex/game-studio-maker-redesign`에 게시했다. 잘못 등록된 로컬 `origin`으로 생긴 바탕화면 저장소 branch ref는 작업 파일을 건드리지 않고 즉시 제거했다.
+- 🤖 사람 실사용 검증은 기존 [#73](https://github.com/kanghyunsoon/ssafesta/issues/73)에 결과와 잔여 항목을 추가했다. v1.0으로 표현할 수 없는 적 처치 수·생존 시간·점수 임계 승리 규칙은 FE·BE·AI 공동 [#78](https://github.com/kanghyunsoon/ssafesta/issues/78)을 만들고 @strdeok·@ghkim1632·@colosair를 지정했다.
+- 트러블슈팅: GS-T040~GS-T042
+
 ### 메이플스토리 월드 메이커 기준 초보 제작 UX 고도화 ✅
 
 - 🤖 메이플스토리 월드 Creator Center의 Scene 중심 작업, Preset, 즉시 테스트, 단축키, 학습 난이도 구조를 확인했다. FESTA에는 임의 Script/API를 노출하지 않고 `배치 → 모습 선택 → 빠른 행동 → 플레이`를 기본으로 적용했다.

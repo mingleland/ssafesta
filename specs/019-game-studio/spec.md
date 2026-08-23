@@ -204,6 +204,11 @@
 - **FR-057**: Object Inspector는 기본 상태에서 모습·크기·가시성·현재 동작만 설명하고 ID·격자 좌표·zIndex·Component 추가/삭제·Object 삭제는 명시적 고급 설정에서만 노출해야 한다.
 - **FR-058**: PC 편집기는 760px 이상 창에서 문서 전체 가로 스크롤 없이 세 영역을 유지하고, 큰 맵에서는 양쪽 패널을 숨기는 집중 모드와 내부 Canvas 이동을 제공해야 한다. 1280px 이상을 권장 작업 폭으로 안내한다.
 - **FR-059**: v1 사용자 Asset은 파일당 5MiB 이하 PNG/JPEG/GIF/WebP만 허용하고 SVG·AUDIO를 거부해야 한다. 원격 업로드는 서버가 ID를 발급하고 READY가 된 stable `asset://`만 프로젝트에 추가해야 하며, 업로드 계약이 비활성인 서버 저장 모드에서 `asset://local`을 Draft로 보내서는 안 된다.
+- **FR-060**: PC Canvas는 단일 클릭뿐 아니라 Shift/Ctrl 추가 선택과 빈 영역 드래그 선택을 제공하고, 선택 묶음의 상대 배치를 유지한 채 이동 경계 안에서 함께 이동해야 한다.
+- **FR-061**: Object 복제는 새 전역 ID를 발급하고 해당 Object가 Trigger인 Event와 선택 묶음 내부 Object Action 참조를 함께 복제해야 한다. 삭제는 Player Spawn과 선택 밖 Event가 참조하는 Object를 보존하고 삭제 가능한 선택만 명시적으로 처리해야 한다.
+- **FR-062**: 제작자는 World Scene의 허용 범위 안에서 가로·세로 크기를 바꿀 수 있어야 한다. 확대 시 기존 Tile을 같은 좌상단 좌표에 유지하고, 축소 시 남는 Tile을 재배열하며 Object는 새 경계 안으로 이동해야 한다.
+- **FR-063**: 6종 시작 템플릿은 미리보기와 제목만 달리해서는 안 되며 Scene 유형·Object 배치·Event/Dialogue·목표 흐름 중 하나 이상의 구조적 차이를 가진 즉시 플레이 가능한 GameProject를 제공해야 한다.
+- **FR-064**: 적 처치 수·경과 시간·점수 임계값 기반 승리 규칙을 추가할 때는 기존 v1 필드를 임의 재해석하지 않고 명시적 schemaVersion과 FE·BE·AI 허용 타입을 함께 확정해야 한다. v1.0.0의 Trigger·Condition·Action 집합은 그 결정 전까지 유지한다.
 
 ### Part Boundaries
 
@@ -244,6 +249,7 @@
 - **SC-010**: 정상 프로젝트의 Preview와 Published 플레이에서 같은 입력 순서에 대한 최종 상태가 100% 일치한다.
 - **SC-011**: 500개 Object를 가진 유효 Scene에서 단일 Object 이동 commit이 기준 개발 장비의 자동 테스트에서 100ms 미만이다.
 - **SC-012**: 활성 PC 브라우저 탭의 대표 TOP_DOWN·PLATFORMER Published/Preview 시나리오에서 렌더링이 55fps 아래로 3초 이상 머무르지 않는다. 백그라운드 throttling 측정은 제외한다.
+- **SC-013**: 6종 시작 템플릿의 Scene/Object/Event/Dialogue 구조 프로필이 서로 구분되고 모든 템플릿이 계약 검증과 시작 Scene 실행 검증을 100% 통과한다.
 
 ## Assumptions
 
@@ -266,6 +272,7 @@
 - `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34 — BE·Unity 합의 반영, FE 구현 확인만 추적
 - Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
 - 사용자 교체 Asset 업로드·stable `asset://` 승격·Publish 연결: GitHub Issue #69 — Frontend·Backend 후속
+- 타이머·점수·적 처치 기반 승리 조건과 GameProject v1.1 FE·BE·AI 계약: GitHub Issue #78 — 합의 전 v1.0.0 타입 확장 금지
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
