@@ -17,7 +17,7 @@
 
 ## Phase 1: Setup
 
-- [x] T001 `backend/src/main/resources/db/migration/V5__booth_slot_seed.sql` — USER_RENTAL 슬롯 7개를 11층에 시딩 (`F11-R01`~`F11-R07`). 재실행 안전하게 `slot_code` 충돌 시 무시. **테이블은 V1에 이미 있으므로 만들지 않는다**
+- [x] T001 `backend/src/main/resources/db/migration/V5__booth_slot_seed.sql` — USER_RENTAL 슬롯 7개를 11층에 시딩 (`F11-R01`~`F11-R07`). 재실행 안전하게 `slot_code` 충돌 시 무시. *(→ V12가 `F11-R08`~`F11-R12`를 추가해 12개로 확장, `slotId` 1~12를 Unity 앵커에 대응 고정 — #62, T057)* **테이블은 V1에 이미 있으므로 만들지 않는다**
 - [x] T002 [P] `booth/LeaseProperties.java` — `@ConfigurationProperties("app.lease")`로 가격 100코인, 기간 24시간을 외부화하고 `application-local.yml`에 기본값 추가
 
 **Checkpoint**: 슬롯이 존재하고 가격·기간이 설정으로 분리됐다

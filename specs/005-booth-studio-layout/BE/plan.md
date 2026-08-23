@@ -81,7 +81,7 @@ backend/src/main/java/com/example/ssafesta/booth/
 ├── BoothLayoutPublishedVersionRepository.java
 ├── LayoutJson.java                    # JSONB 저장 문자열 + 파싱 결과 (무손실 보관)
 ├── LayoutObjectType.java              # canonical 10종 화이트리스트
-├── LayoutTemplate.java                # DEFAULT / PROJECT_EXHIBITION (C-06 확정 시 확장)
+├── LayoutTemplate.java                # PROJECT_EXHIBITION 단독 (C-06 확정 — DEFAULT 제거, #19 ④·#45)
 ├── LayoutValidator.java               # errors / warnings 분리 (FR-016)
 ├── LayoutValidationResult.java
 ├── BoothLayoutService.java            # 저장 · 공개 — 트랜잭션 경계

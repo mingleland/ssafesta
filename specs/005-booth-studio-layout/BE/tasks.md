@@ -40,7 +40,7 @@
 - [X] T010 `db/migration/V8__booth_published_layout_version.sql` — `booths.published_layout_version INTEGER NULL` 추가 + **복합 FK** `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사가 면제되어 "공개된 것 없음"이 표현된다 (data-model I-3)
 - [X] T011 `db/migration/V9__booth_facade_fields.sql` — `facade_code` → `facade_theme_code` **rename**, `facade_primary_color VARCHAR(7)` · `facade_sign_text VARCHAR(60)` · `facade_logo_url VARCHAR(2048)` 추가 (전부 NULL 허용). **`booth/Booth.java`의 `facadeCode` 필드도 같은 커밋에서 고친다** — 아무도 안 읽는 필드라 빠뜨려도 테스트가 통과해 버린다 (data-model §5)
 - [X] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분. **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
-- [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다
+- [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다 *(→ C-06 확정으로 `DEFAULT` 제거, `PROJECT_EXHIBITION` 단독 — T055)*
 - [X] T014 `booth/LayoutJson.java` — **요청 원문을 보관**하고 검증용 파싱만 별도로 수행. 좌표는 `BigDecimal`로 읽는다. **`double`로 파싱해 재직렬화하지 않는다** (research R-04). JPA는 `@JdbcTypeCode(SqlTypes.JSON) String`으로 매핑
 - [X] T015 [P] `booth/BoothLayoutDraft.java` — `booth_layout_drafts` 매핑. PK가 `booth_id`(I-1). `revision` 증가는 전용 메서드로만
 - [X] T016 [P] `booth/BoothLayoutPublishedVersion.java` — `booth_layout_published_versions` 매핑. **생성 후 `layout_json`을 바꾸는 경로를 만들지 않는다** (I-7)
@@ -135,6 +135,10 @@
 - [X] T053 **실물 영역 검증** (#19 ③) — 타입 10종 실측 bounds를 `LayoutObjectType`에 계약값으로 탑재, 원점 기준 코너 회전 후 AABB 재계산(`LayoutGeometry`), error `AREA_OUT_OF_BOUNDS` (Draft·공개 모두). 경계 딱 맞춤·회전 float 잡음 허용 테스트 포함
 - [X] T054 **통행 판정** (#19 ⑤) — `LayoutPassageChecker` 신설: 0.05m 래스터 120×120, 0.22m 유클리드 침식, +z flood fill(4방향), 관람 띠 0.7m 도달<50% → warning `FRONT_BLOCKED`, 고립 ≥1㎡ → warning `ISOLATED_AREA`. 공개 시점만, 공개는 막지 않음
 - [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과 — 구현은 back PR #50으로 반입 완료
+- [ ] T056 **슬롯 기준 published 경로** (#62) — `GET /booth-slots/{slotId}/layouts/published`. 인증 불필요, `슬롯 → 유효 임대 → boothId` 해석을 서버가 흡수하고 body는 §5와 동일. 빈 슬롯·미공개 404 `LAYOUT_NOT_PUBLISHED` / 만료 409 `BOOTH_LEASE_EXPIRED` / 없는 슬롯 404. 계약: `contracts/layout-api.md` §11
+- [ ] T057 **슬롯 12개 시드** (#62) — V12로 `F11-R08`~`F11-R12` 추가하고 `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 id 명시 삽입. V5 주석의 낡은 층 문구(#31 — 11층 단일 확정)도 함께 정리
+- [ ] T058 **`field` 분리** (#58) — `ApiErrorDetail`에 `field`(NON_NULL) 추가 + `ApiErrorDetail.field(name, message)` 팩토리, `GlobalExceptionHandler`의 Bean Validation 경로를 `rule: "FIELD_INVALID"` + `field`로 교체. Layout 경로 변경 0. 계약: `docs/08` §1.3-1
+- [ ] T059 **팔레트 소속 검증·정규화** (#17) — `BoothFacadeService`가 `primaryColor`를 12색 화이트리스트로 검증하고 저장 시 대문자로 정규화. 팔레트 밖은 400 `VALIDATION_FAILED`. 계약: `contracts/layout-api.md` §6
 
 ---
 
