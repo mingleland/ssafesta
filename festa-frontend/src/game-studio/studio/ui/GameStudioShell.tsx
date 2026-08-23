@@ -49,28 +49,27 @@ import './GameStudioShell.css';
 type RightPanel = 'PROPERTIES' | 'EVENTS' | 'PROJECT';
 type SaveStatus = 'loading' | 'clean' | 'dirty' | 'saving' | 'saved' | 'publishing' | 'published' | 'error';
 
-const TUTORIAL_DISMISSAL_KEY = 'festa.game-studio.onboarding.v2';
+const tutorialDismissalKey = (gameId: number) => `festa.game-studio.onboarding.v3.${gameId}`;
 
 const TUTORIAL_STEPS = [
-  { title: '게임이 시작될 맵을 확인하세요', copy: 'START 표시가 있는 탐색 맵에서 플레이어와 오브젝트가 함께 보이면 준비 완료입니다.' },
-  { title: '열쇠의 획득 방식을 확인하세요', copy: '맵의 열쇠를 선택하세요. 속성의 “아이템 획득”이 인벤토리에 무엇을 넣을지 정합니다.' },
-  { title: '잠긴 문을 선택하세요', copy: '문은 충돌과 상호작용을 함께 가집니다. 이미지·위치·안내 문구는 속성에서 바로 바꿀 수 있습니다.' },
-  { title: '열쇠 조건과 이동을 확인하세요', copy: '이벤트 탭에서 “열쇠를 가지고 있으면 → 다음 장면으로 이동” 규칙을 확인하세요.' },
-  { title: 'NPC 대화를 확인하세요', copy: '사서를 선택하고 이벤트 탭을 여세요. “말 걸기” 규칙이 화면 위 대화 장면을 호출합니다.' },
-  { title: '저장하고 직접 플레이하세요', copy: '저장 후 플레이 테스트에서 열쇠를 줍고, NPC와 대화하고, 문을 열어 완주해 보세요.' },
+  { title: '게임이 시작될 맵을 확인하세요', copy: 'START 표시가 있는 맵이 플레이어가 처음 만나는 화면입니다. 탐색 맵과 플랫폼 맵 모두 같은 방식입니다.' },
+  { title: '바꾸고 싶은 오브젝트를 선택하세요', copy: '캐릭터, 문, 발판, 적처럼 맵에 놓인 요소를 하나 선택하면 오른쪽에서 바로 수정할 수 있습니다.' },
+  { title: '모습을 내 기획에 맞게 바꿔 보세요', copy: '속성의 재료함에서 제공 이미지를 고르세요. 꼭 필요한 오브젝트만 내 이미지로 교체할 수도 있습니다.' },
+  { title: '게임의 재미를 만드는 동작을 확인하세요', copy: '이벤트 탭에서 말 걸기, 아이템 획득, 잠긴 문, 목표 도착 같은 규칙을 한국어로 조합합니다.' },
+  { title: '저장하고 직접 플레이하세요', copy: '저장한 뒤 플레이 테스트에서 처음부터 끝까지 해보세요. 편집본은 게시 전까지 다른 사용자에게 공개되지 않습니다.' },
 ] as const;
 
-const shouldShowFirstVisitGuide = (): boolean => {
+const shouldShowFirstVisitGuide = (gameId: number): boolean => {
   try {
-    return window.localStorage.getItem(TUTORIAL_DISMISSAL_KEY) !== 'done';
+    return window.localStorage.getItem(tutorialDismissalKey(gameId)) !== 'done';
   } catch {
     return true;
   }
 };
 
-const rememberGuideSeen = (): void => {
+const rememberGuideSeen = (gameId: number): void => {
   try {
-    window.localStorage.setItem(TUTORIAL_DISMISSAL_KEY, 'done');
+    window.localStorage.setItem(tutorialDismissalKey(gameId), 'done');
   } catch {
     // 저장소가 차단된 브라우저에서도 안내 자체는 정상 동작한다.
   }
@@ -158,11 +157,12 @@ export const GameStudioShell = ({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [notice, setNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
-  const [showGuide, setShowGuide] = useState(shouldShowFirstVisitGuide);
+  const [showGuide, setShowGuide] = useState(() => shouldShowFirstVisitGuide(gameId));
   const [showTemplates, setShowTemplates] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<ProjectTemplateId | null>(null);
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [editorHiddenObjectIds, setEditorHiddenObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'hidden'));
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
   const [draftConflict, setDraftConflict] = useState<{ readonly currentRevision: number; readonly localProject: GameProject } | null>(null);
@@ -237,7 +237,7 @@ export const GameStudioShell = ({
     }
     try {
       const assetId = nextStableId(store.getState().project, kind === 'TILESET' ? 'tileset' : 'image');
-      const result = await assetRepository.save(gameId, assetId, kind, file);
+      const result = await assetRepository.save(gameId, { file, kind, suggestedAssetId: assetId });
       apply(addAssetReference(store.getState().project, result.asset));
       setNotice(`${result.originalName}을 ${kind} 자산으로 추가했습니다.`);
       return result.asset;
@@ -334,7 +334,7 @@ export const GameStudioShell = ({
       const insideDialog = target instanceof Element && target.closest('[role="dialog"]') !== null;
       if (event.key === 'Escape') {
         if (showGuide) {
-          rememberGuideSeen();
+          rememberGuideSeen(gameId);
           setShowGuide(false);
           return;
         }
@@ -343,12 +343,21 @@ export const GameStudioShell = ({
           setShowTemplates(false);
           return;
         }
+        if (focusMode) {
+          setFocusMode(false);
+          return;
+        }
         setPlacementPreset(null);
         setTileBrush(null);
         setShowLayers(false);
         return;
       }
       if (insideDialog) return;
+      if (event.shiftKey && event.key.toLowerCase() === 'f' && !editingText) {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+        return;
+      }
       if (event.altKey && event.key.toLowerCase() === 'l' && !editingText) {
         event.preventDefault();
         setShowLayers((current) => !current);
@@ -387,7 +396,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, editorLockedObjectIds, save, selectedObjectId, selectedSceneId, showGuide, showTemplates, store]);
+  }, [apply, editorLockedObjectIds, focusMode, gameId, save, selectedObjectId, selectedSceneId, showGuide, showTemplates, store]);
 
   const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -409,25 +418,17 @@ export const GameStudioShell = ({
 
   if (selectedScene === undefined) return null;
 
-  const selectedObjectEvents = selectedObject === null || selectedScene.type === 'DIALOGUE'
-    ? []
-    : selectedScene.events.filter((event) => event.trigger.type !== 'ON_SCENE_START' && event.trigger.targetId === selectedObject.id);
   const tutorialReady = tutorialStep === 0
     ? selectedScene.type !== 'DIALOGUE'
     : tutorialStep === 1
-      ? selectedObject?.preset === 'ITEM' && selectedObject.components.some((component) => component.type === 'PICKUP')
+      ? selectedObject !== null
       : tutorialStep === 2
-        ? selectedObject?.preset === 'DOOR'
+        ? selectedObject !== null
+          && rightPanel === 'PROPERTIES'
+          && selectedObject.components.some((component) => component.type === 'SPRITE')
         : tutorialStep === 3
-          ? selectedObject?.preset === 'DOOR' && rightPanel === 'EVENTS' && selectedObjectEvents.some((event) => (
-            event.conditions.some((condition) => condition.type === 'HAS_ITEM')
-            && event.actions.some((action) => action.type === 'GO_TO_SCENE')
-          ))
-          : tutorialStep === 4
-            ? selectedObject?.preset === 'NPC' && rightPanel === 'EVENTS' && selectedObjectEvents.some((event) => (
-              event.actions.some((action) => action.type === 'SHOW_DIALOGUE')
-            ))
-            : saveStatus === 'saved' || saveStatus === 'clean' || saveStatus === 'published';
+          ? selectedObject !== null && rightPanel === 'EVENTS'
+          : saveStatus === 'saved' || saveStatus === 'clean' || saveStatus === 'published';
 
   const focusTutorialTarget = () => {
     const worldScene = project.scenes.find((scene) => scene.type !== 'DIALOGUE');
@@ -439,11 +440,13 @@ export const GameStudioShell = ({
       setSelectedObjectId(null);
       return;
     }
-    const targetPreset: GameObject['preset'] = tutorialStep === 1 ? 'ITEM' : tutorialStep === 2 || tutorialStep === 3 ? 'DOOR' : 'NPC';
-    const target = worldScene.objects.find((object) => object.preset === targetPreset);
+    const target = tutorialStep === 3
+      ? worldScene.objects.find((object) => worldScene.events.some((event) => event.trigger.type !== 'ON_SCENE_START' && event.trigger.targetId === object.id))
+        ?? worldScene.objects.find((object) => object.preset !== 'PLAYER_SPAWN')
+      : worldScene.objects.find((object) => object.preset !== 'PLAYER_SPAWN');
     if (target !== undefined) {
       setSelectedObjectId(target.id);
-      setRightPanel(tutorialStep >= 3 ? 'EVENTS' : 'PROPERTIES');
+      setRightPanel(tutorialStep === 3 ? 'EVENTS' : 'PROPERTIES');
     }
   };
 
@@ -482,7 +485,7 @@ export const GameStudioShell = ({
   };
 
   return (
-    <main className="gss-root" data-game-studio-route="edit">
+    <main className={`gss-root${focusMode ? ' is-focus-mode' : ''}`} data-game-studio-route="edit">
       <header className="gss-topbar">
         <div className="gss-brand-area">
           <Link aria-label="홈으로 돌아가기" className="gss-back" to="/app/home">‹</Link>
@@ -714,6 +717,14 @@ export const GameStudioShell = ({
             {selectedScene.type !== 'DIALOGUE' && (
               <div className="gss-canvas-tools">
                 <button
+                  aria-keyshortcuts="Shift+F"
+                  aria-pressed={focusMode}
+                  className={focusMode ? 'is-active' : ''}
+                  onClick={() => setFocusMode((current) => !current)}
+                  title="양쪽 패널을 숨기거나 다시 엽니다 (Shift+F)"
+                  type="button"
+                >{focusMode ? '패널 열기' : '화면 넓게'}</button>
+                <button
                   aria-expanded={showLayers}
                   aria-keyshortcuts="Alt+L"
                   className={showLayers ? 'is-active' : ''}
@@ -840,17 +851,17 @@ export const GameStudioShell = ({
         </aside>
       </section>
       {showGuide && (
-        <div className="gss-guide-backdrop" role="presentation" onMouseDown={() => { rememberGuideSeen(); setShowGuide(false); }}>
+        <div className="gss-guide-backdrop" role="presentation" onMouseDown={() => { rememberGuideSeen(gameId); setShowGuide(false); }}>
           <section aria-modal="true" className="gss-guide-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
-            <header><div><span>처음 시작하기 · 약 10분</span><h2>열쇠 → 문 → 대화 게임을 완성해 봅시다</h2></div><button aria-label="안내 닫기" onClick={() => { rememberGuideSeen(); setShowGuide(false); }} type="button">×</button></header>
+            <header><div><span>처음 시작하기 · 약 10분</span><h2>완성 예제를 내 게임으로 바꿔 봅시다</h2></div><button aria-label="안내 닫기" onClick={() => { rememberGuideSeen(gameId); setShowGuide(false); }} type="button">×</button></header>
             <ol>
-              <li><span>1</span><div><strong>완성 예제를 분해해 배웁니다</strong><p>열쇠·잠긴 문·NPC가 이미 연결된 예제에서 각 요소를 눌러 규칙을 확인합니다.</p></div></li>
-              <li><span>2</span><div><strong>배치와 이미지는 원하는 만큼 바꿉니다</strong><p>맵에서 끌어 이동하고, 레이어에서 찾고 잠그며, 바꾸고 싶은 Sprite만 내 이미지로 교체합니다.</p></div></li>
+              <li><span>1</span><div><strong>만들고 싶은 플레이 방식부터 고릅니다</strong><p>이야기, 방탈출, 수집, 점프맵, 슈팅, 생존전 중 가장 가까운 완성 예제에서 시작합니다.</p></div></li>
+              <li><span>2</span><div><strong>배치와 이미지는 원하는 만큼 바꿉니다</strong><p>맵에서 끌어 이동하고, 재료함에서 모습을 고르며, 바꾸고 싶은 오브젝트만 내 이미지로 교체합니다.</p></div></li>
               <li><span>3</span><div><strong>조건과 결과를 한국어로 연결합니다</strong><p>“상호작용할 때 → 열쇠가 있으면 → 다음 장면 이동”처럼 읽히는 이벤트를 조합합니다.</p></div></li>
               <li><span>4</span><div><strong>즉시 플레이하고 고칩니다</strong><p>플레이 테스트는 현재 편집본의 별도 snapshot으로 실행되어 서버 게시 전에도 완주를 검증할 수 있습니다.</p></div></li>
             </ol>
-            <div className="gss-guide-tip"><strong>PC 편집 팁</strong><p>선택한 오브젝트는 방향키로 한 칸 이동, Ctrl+S로 저장, Ctrl+Z로 실행 취소, Alt+L로 레이어를 열 수 있습니다.</p></div>
-            <div className="gss-guide-actions"><button onClick={() => { rememberGuideSeen(); setShowGuide(false); }} type="button">직접 둘러보기</button><button autoFocus className="gss-guide-start" onClick={() => { rememberGuideSeen(); setShowGuide(false); setTutorialStep(0); }} type="button">단계별 튜토리얼 시작</button></div>
+            <div className="gss-guide-tip"><strong>PC 편집 팁</strong><p>방향키로 한 칸 이동, Ctrl+S로 저장, Ctrl+Z로 실행 취소, Alt+L로 레이어, Shift+F로 화면을 넓게 볼 수 있습니다.</p></div>
+            <div className="gss-guide-actions"><button onClick={() => { rememberGuideSeen(gameId); setShowGuide(false); setPendingTemplateId(null); setShowTemplates(true); }} type="button">완성 예제 선택하기</button><button autoFocus className="gss-guide-start" onClick={() => { rememberGuideSeen(gameId); setShowGuide(false); setTutorialStep(0); }} type="button">단계별 튜토리얼 시작</button></div>
           </section>
         </div>
       )}
@@ -866,8 +877,14 @@ export const GameStudioShell = ({
                   onClick={() => setPendingTemplateId(template.id)}
                   type="button"
                 >
-                  <span>{template.icon}</span>
-                  <div><small>{template.genre} · {template.runtimeMode === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</small><strong>{template.title}</strong><p>{template.description}</p><em>{template.systems.join(' · ')}</em></div>
+                  <img alt={`${template.title} 게임 화면 미리보기`} src={template.previewUrl} />
+                  <div>
+                    <small>{template.genre} · {template.runtimeMode === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</small>
+                    <strong>{template.title}</strong>
+                    <p>{template.description}</p>
+                    <em>{template.systems.join(' · ')}</em>
+                    <span className="gss-template-meta"><i>{template.difficulty}</i><i>약 {template.estimatedMinutes}분</i>{template.recommended && <i className="is-recommended">처음 추천</i>}</span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -876,7 +893,7 @@ export const GameStudioShell = ({
               if (selectedTemplate === undefined) return null;
               return (
                 <footer className="gss-template-confirm">
-                  <div><strong>{selectedTemplate.icon} {selectedTemplate.title}</strong><p>현재 편집 내용을 이 완성 예제로 바꿉니다. 저장하지 않은 변경은 사라집니다.</p></div>
+                  <div><strong>{selectedTemplate.title}</strong><p>현재 편집 내용을 이 완성 예제로 바꿉니다. 저장하지 않은 변경은 사라집니다.</p></div>
                   <button onClick={() => setPendingTemplateId(null)} type="button">취소</button>
                   <button
                     className="gss-guide-start"

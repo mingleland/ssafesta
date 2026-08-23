@@ -5,19 +5,32 @@ export interface StoredAssetResult {
   readonly originalName: string;
 }
 
+export interface SaveAssetRequest {
+  readonly kind: AssetReference['kind'];
+  readonly file: File;
+  /** Local preview may use this ID. A remote repository must ignore it and return the server-issued ID. */
+  readonly suggestedAssetId?: string;
+}
+
 export interface GameAssetRepository {
-  save(
-    gameId: number,
-    assetId: string,
-    kind: AssetReference['kind'],
-    file: File,
-  ): Promise<StoredAssetResult>;
+  /** Resolve only after the asset is previewable locally or the remote asset reached READY. */
+  save(gameId: number, request: SaveAssetRequest): Promise<StoredAssetResult>;
   resolve(source: string): Promise<string | null>;
 }
 
 const DATABASE_NAME = 'festa-game-studio-assets-v1';
 const STORE_NAME = 'assets';
 const MAX_ASSET_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+export const validateAssetFile = (
+  kind: AssetReference['kind'],
+  file: Pick<File, 'size' | 'type'>,
+): void => {
+  if (kind === 'AUDIO') throw new Error('Game Studio v1은 오디오 업로드를 지원하지 않습니다.');
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(file.type)) throw new Error('PNG, JPG, GIF 또는 WebP 이미지만 추가할 수 있습니다.');
+  if (file.size > MAX_ASSET_BYTES) throw new Error('현재 자산은 파일당 5MB까지 지원합니다.');
+};
 
 const openDatabase = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const request = indexedDB.open(DATABASE_NAME, 1);
@@ -53,10 +66,9 @@ const getBlob = async (source: string): Promise<Blob | null> => {
 export const createBrowserAssetRepository = (): GameAssetRepository | null => {
   if (typeof indexedDB === 'undefined') return null;
   return {
-    save: async (gameId, assetId, kind, file) => {
-      if (kind !== 'AUDIO' && !file.type.startsWith('image/')) throw new Error('PNG, JPG, GIF 또는 WebP 이미지만 추가할 수 있습니다.');
-      if (kind === 'AUDIO' && !file.type.startsWith('audio/')) throw new Error('오디오 파일 형식이 아닙니다.');
-      if (file.size > MAX_ASSET_BYTES) throw new Error('현재 로컬 자산은 파일당 5MB까지 지원합니다.');
+    save: async (gameId, { file, kind, suggestedAssetId }) => {
+      validateAssetFile(kind, file);
+      const assetId = suggestedAssetId ?? `localAsset_${Date.now().toString(36)}`;
       const source = `asset://local/${gameId}/${assetId}`;
       await putBlob(source, file);
       return { asset: { id: assetId, kind, source }, originalName: file.name };
