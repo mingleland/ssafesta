@@ -21,7 +21,7 @@ Web API 단일 모듈 — `backend/src/main/java/com/example/ssafesta/`, `backen
 
 **Purpose**: 전제 확인. 이 기능은 **신규 스키마·신규 의존성이 0**이라 초기화 작업이 없다.
 
-- [ ] T001 회귀 기준선 확보 — `cd backend && ./gradlew test`가 green인지 확인하고 통과 수를 기록한다 (구현 후 대조용)
+- [ ] T001 회귀 기준선 확보 — `cd backend && ./mvnw test`가 green인지 확인하고 통과 수를 기록한다 (구현 후 대조용). **기준선 217 passed / 0 failed** (2026-08-24 실측)
 - [ ] T002 [P] 전제 실측 재확인 — `users.avatar_code`가 `TEXT`인지(`backend/src/main/resources/db/migration/V10__avatar_code_text.sql`), `User.java:27-28` 매핑이 `columnDefinition = "text"`인지 확인한다. **신규 마이그레이션을 만들지 않는다**(data-model.md §1). 컬럼이 `VARCHAR`면 즉시 중단하고 헌법 23조·T-24를 근거로 보고한다
 
 ---
@@ -90,7 +90,7 @@ spec FR-011("서버는 ID가 카탈로그 범위 내인지 검증")의 "서버"�
 
 **Purpose**: 계약 문서 정합과 소비자 통보. **이 Phase를 건너뛰면 이번 건 자체가 반복된다** — 013a가 "계약 확정 + 컬럼 완료 + 엔드포인트 없음"으로 방치된 원인이 통보·문서 갱신 누락이었다.
 
-- [ ] T014 회귀 전체 — `cd backend && ./gradlew test`. T001에서 기록한 수보다 늘고 기존 테스트가 하나도 깨지지 않았는지 확인한다
+- [ ] T014 회귀 전체 — `cd backend && ./mvnw test`. T001 기준선 217보다 늘고 기존 테스트가 하나도 깨지지 않았는지 확인한다
 - [ ] T015 [P] `specs/013-avatar-customization/contracts/avatar-profile-api.md` 갱신 — 상태줄 `⚠️ 제안이다` → 구현 완료. **확정값 기입**: `PUT` 채택(R-01), `GET /users/me` 포함 분기 채택·별도 GET 미구현(R-02), 길이 상한 3800(R-04), 문자셋 인쇄 가능 ASCII(R-03)
 - [ ] T016 [P] `docs/08_Backend_API_명세서.md` §2(Auth/User)에 `PUT /users/me/avatar`와 `GET /users/me` 응답의 `avatarCode`를 추가한다 — **지금 docs/08에 아바타 절이 아예 없다**
 - [ ] T017 Unity 파트 통보(헌법 24조) — ① `festa-unity/.../Integration/Mock/MockUserApiClient.cs:23`의 `PATCH` 주석을 `PUT`으로 정정 요청(#24 확정 이전 POC C 시점 값이다), ② 문자셋 `0x20`–`0x7E` 확인 요청(R-03 — 생산자에 닿는 값이라 확인받는다). 가산적 변경이라 Breaking은 아니다

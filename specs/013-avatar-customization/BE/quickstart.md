@@ -10,13 +10,13 @@
 ## 1. 통합 테스트
 
 ```bash
-cd backend && ./gradlew test --tests "com.example.ssafesta.user.MyAccountAvatarApiIntegrationTest"
+cd backend && ./mvnw test -Dtest=MyAccountAvatarApiIntegrationTest
 ```
 
 전체 회귀:
 
 ```bash
-cd backend && ./gradlew test
+cd backend && ./mvnw test
 ```
 
 **기대**: 전부 green. 기존 테스트(#58 봉투·닉네임·탈퇴)가 하나도 깨지지 않아야 한다 — `MyAccountResponse` 필드 추가는 가산적 변경이다.

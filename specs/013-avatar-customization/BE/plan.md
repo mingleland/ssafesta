@@ -24,7 +24,7 @@ Unity가 Mock 뒤에서 기다리고 있는 아바타 영구 저장(FR-013)의 �
 
 **Storage**: PostgreSQL 17 — `users.avatar_code TEXT` (V10 완료). **신규 마이그레이션 없음**
 
-**Testing**: JUnit 5, Testcontainers(PostgreSQL), MockMvc — 003·004·005와 동일 패턴. 신규 통합 테스트 1개(`MyAccountAvatarApiIntegrationTest`)
+**Build/Testing**: **Maven**(`backend/mvnw`, Spring Boot 4.1.0 parent) — Gradle이 아니다. JUnit 5, Testcontainers(PostgreSQL), MockMvc — 003·004·005와 동일 패턴. 신규 통합 테스트 1개(`MyAccountAvatarApiIntegrationTest`). 회귀 기준선 **217 passed**(2026-08-24 실측)
 
 **Target Platform**: Docker Spring API (`backend/`)
 
