@@ -42,6 +42,7 @@
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) | Game Studio 정책 4건 전부 동의, 신규 진입 차단 판정 시점 질문 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | **strdeok C 확정(08-23)** — back PR 머지 대기. FE 후속은 "미착수 코드" 참조 |
 | [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안. 12색 hex 값은 FE 보유 — 주체 확정 시 제공 | BE 확인 |
+| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) | develop `docs/26` stale 보고(C-04·C-06이 08-18 미결 서술) + grep 범위에 `docs/26` 포함 제안. front는 `5765bca`로 정정 완료 | strdeok·리드 — develop 정정 주체 회신(내가 소형 PR로 올릴지 여부 포함) |
 
 ## 내가 닫아야 할 것
 
