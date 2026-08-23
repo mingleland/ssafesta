@@ -30,6 +30,7 @@
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) C 확정(08-23) | back 구현 PR 머지 → FE 후속은 예정 작업 | strdeok |
 | [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) develop `docs/26` stale(C-04·C-06) 보고 | develop 정정 주체 회신(내 소형 PR 여부 포함) | strdeok·리드 |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 확정(08-23) | `avatar-profile-api.md` 계약 문서 반영 → wiring 착수는 예정 작업 | strdeok |
+| [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 FE 몫 | ① 소유권 경계 회신(에디터 UI ①~④가 #49 busypark 몫인지 — 내 제안: 나는 resolver ⑤+업로드 클라이언트 기반층) ② BE 업로드 계약(API 형태·상태 DTO·오류 코드) 확정 | 리드·strdeok |
 
 ## 예정 작업 — 트리거 충족 시 착수
 
