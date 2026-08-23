@@ -3,8 +3,9 @@
 // 구현으로 함께 그린다 — 별도 공통 헤더 컴포넌트를 새로 만들 만큼의 화면이 아직 없다(plan.md
 // §기존 코드와의 접점: "버튼 위치는 가드 적용 화면 공통 헤더 최소 구현").
 import type { ReactNode } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useSession, clearSession } from '../../features/auth/model/session';
+import { saveReturnTo } from '../../features/auth/model/returnTo';
 import { authApi } from '../../entities/auth/api.select';
 import type { SessionKind } from '../../entities/auth/types';
 import { evaluateGuard, type GuardLevel } from './guard';
@@ -35,6 +36,7 @@ function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
 
 export function RequireAuth({ level, children }: { level: GuardLevel; children: ReactNode }) {
   const { kind, bootstrapped } = useSession();
+  const location = useLocation();
 
   // 부트스트랩(새로고침 복원) 완료 전의 anonymous는 "미확인"이다 — 여기서 redirect를 확정하면
   // refresh가 이길 수 없는 레이스가 돼 로그인 유지가 항상 깨진다(T012, quickstart §6 실측 발견)
@@ -42,7 +44,11 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
 
   const decision = evaluateGuard(kind, level);
 
-  if (decision === 'redirect-login') return <Navigate to="/login" replace />;
+  if (decision === 'redirect-login') {
+    // 딥링크로 들어온 원래 경로를 저장한다(G-2) — 로그인 완료 후 여기로 되돌아간다.
+    saveReturnTo(location.pathname + location.search + location.hash);
+    return <Navigate to="/login" replace />;
+  }
   if (decision === 'block-member-only') {
     return (
       <div>

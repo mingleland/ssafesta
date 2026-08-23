@@ -8,6 +8,7 @@ import { isApiError } from '../../shared/api/client';
 import { authApi } from '../../entities/auth/api.select';
 import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
+import { consumeReturnTo } from '../../features/auth/model/returnTo';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -36,7 +37,7 @@ export function LoginPage() {
       const result = await authApi.guestEnter();
       if (result.status === 'AUTHENTICATED') {
         setGuestSession(result.accessToken, result.expiresAt);
-        navigate('/app/home', { replace: true });
+        navigate(consumeReturnTo(), { replace: true });
       }
     } catch (err) {
       // FR-007 — 원인 범주(서버 message)·재시도 방법(버튼 재클릭) 표시

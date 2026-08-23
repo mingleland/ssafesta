@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../../entities/auth/api.select';
 import { setMemberSession } from '../../features/auth/model/session';
+import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { NicknameForm } from '../../features/auth/ui/NicknameForm';
 
 type Phase = 'completing' | 'nickname-required' | 'restart';
@@ -48,7 +49,7 @@ export function CallbackPage() {
         guardPhase = 'done';
         if (result.status === 'AUTHENTICATED') {
           setMemberSession(result.accessToken, result.expiresAt);
-          navigate('/app/home', { replace: true });
+          navigate(consumeReturnTo(), { replace: true });
           return;
         }
         setPhase('nickname-required');
@@ -72,7 +73,7 @@ export function CallbackPage() {
         <NicknameForm
           onAuthenticated={(accessToken, expiresAt) => {
             setMemberSession(accessToken, expiresAt);
-            navigate('/app/home', { replace: true });
+            navigate(consumeReturnTo(), { replace: true });
           }}
           onHandoffExpired={() => setPhase('restart')}
         />
