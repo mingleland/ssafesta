@@ -15,9 +15,9 @@
 
 **016 E2E 완료 범위**: `features/interaction/dispatcher.ts`(LAPTOP·AI_AGENT 라우팅, 미지 type 무시)·`features/overlay/{OverlayHost,LaptopOverlay}.tsx`(URL은 `http`/`https`만 허용, iframe+새 탭+안내 동시 제공 — 차단 "감지"는 구현하지 않음, FR-007 기술 제약 기록)·`WorldPage.tsx`(Dispatcher를 화면 생명주기에 종속). vitest 8개+브라우저 9개 시나리오 검증. **AI_CHAT 등은 공통 fallback뿐** — 008·010·011 실 UI 아님.
 
-**다음 뭘 할지 — 확정 순서**: A(001 Auth FE)·D-1·D-2·B(SSE 타입) 완료 — 남은 "지금 할 수 있는 것" C→E 순(전부 소형). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
+**다음 뭘 할지 — 확정 순서**: A(001 Auth FE)·D-1·D-2·B(SSE 타입)·C(Game Studio 소켓) 완료 — 남은 "지금 할 수 있는 것" E 하나(P1). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
 
-**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정) / **front·develop의 `docs/14_AI_Server_API_명세서.md`·`specs/008-ai-conversation-rag/spec.md`가 #32 반영 전 상태로 낡음** — 정본은 `origin/ai` 브랜치. AI 파트 소유 문서라 front에 반입하지 않음(#59 정본화 규칙), B는 코드 주석에 정본 위치만 명시하고 참조.
+**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정) / **front·develop의 `docs/14_AI_Server_API_명세서.md`·`specs/008-ai-conversation-rag/spec.md`가 #32 반영 전 상태로 낡음** — 정본은 `origin/ai` 브랜치. AI 파트 소유 문서라 front에 반입하지 않음(#59 정본화 규칙), B는 코드 주석에 정본 위치만 명시하고 참조 / **Game Studio Portal Bridge 계약**(`specs/020-game-studio/contracts/game-portal-bridge.md`)이 아직 `feature/game-studio-foundation` 브랜치 Draft v0.2 — develop 미반영. C는 코드 주석에 브랜치 정본 위치만 명시(반입 없음).
 
 상세는 `24_작업일지.md` 08-23 항목.
 
@@ -25,7 +25,6 @@
 
 ## 지금 할 수 있는 것 — 협의 불요 판정 완료 (08-23), 권장 순서순 (A는 완료 표로)
 
-- [ ] **C. Game Studio 소켓 2종** — `events.ts` `BOOTH_GAME_INTERACT` union(#20 확정, `AI_AGENT_INTERACT`와 동형·configId Int32 #34 확정) + `overlay.ts` `GAME` 타입·OverlayHost fallback. **송신부(`OnOverlayStateChanged`)는 제외** — 수신 GameObject명 미확정이라 협의 필요, "미착수 코드"에 잔류
 - [ ] **E. (P1) 010 Survey 결과 화면** — spec 명시대로 `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 그대로 입력으로. **응답 UI는 제외**(C-05 게스트 응답 등 미결)
 
 ## 막힌 것 — 대기 중
@@ -54,7 +53,7 @@
 - [ ] **Owner/Staff 라우트 가드**(G-1, 추적 소실 복구) — 기존 router 주석("Owner/Staff Guard는 spec 001 인증 확정 후 추가")을 001 구현이 지우면서 구현·이관 없이 소실됐던 것. 현재 member/guest 2등급뿐이라 `/app/studio/:boothId`가 모든 member에게 열림(서버 FR-012가 최종 차단 — 보안 구멍 아님, UX 가드). 부스 소유 정보(004 `GET /booths/{id}`) 필요 — 001이 아니라 **004/005 접점 후속**
 - [ ] **로그인 후 원래 목적지 복귀**(G-2) — redirect-login 시 원경로 미보존, 로그인하면 무조건 `/app/home`(딥링크 UX 결손). 협의 불요 소형
 - [ ] **게스트 만료 실관측 경로**(G-3) — `expiresAt` 저장만 하고 소비 없음, 401 반응형 안내(T010)는 API 호출 화면이 생겨야 도달 가능. 실 API 화면 등장 시점에 재검
-- [ ] **Game Studio `OnOverlayStateChanged` 송신부**(#20) — Host→Unity 방향, 수신 GameObject명 미확정이라 Unity 협의 후. union·`GAME` 타입 2종은 "지금 할 수 있는 것" C로 분리. `features/game-entry/`는 #21 BE 계약 확정 후
+- [ ] **Game Studio `OnOverlayStateChanged` 송신부**(#20) — Host→Unity 방향, 수신 GameObject명(`receiverObjectName`) 미확정이라 Unity 협의 후. 수신부(`BOOTH_GAME_INTERACT` union·`GAME` 타입)는 C로 완료. `features/game-entry/`(실 UI)는 #21 BE 계약 확정 후
 - [ ] **편집기 팔레트 UI** — 미보유 파츠 회색+잠금 배지, 게스트 로그인 유도(#18, spec 012 착수 시)
 - [ ] `docs/26` 브랜치별 결정 분기 정리 제안 — FE가 #18에서 자청
 - [ ] **오류 봉투 `field` 대응**(#58, back PR 머지 후 착수) — `ApiError.errors[]` 타입에 `field?: string` 추가, mock 3곳 정합, `PublishDialog` key를 인덱스 기반으로 정리, R-12(사전 경고 중복 제거) 해제 후 `rule` 분기 활성화
@@ -78,6 +77,7 @@
 | **D-1. 005 FE 산출물 develop PR** 08-23 | [PR #64](https://github.com/kanghyunsoon/ssafesta/pull/64) — origin/front@a74fd43에서 7파일 회수(FE/ 5종 + verify 2종), 바이트 동일 확인. **머지 완료**(squash, 자체 병합) |
 | **D-2. docs/10 §3 라우트 develop PR** 08-23 | [PR #65](https://github.com/kanghyunsoon/ssafesta/pull/65) — `/auth/callback`·게임 2종 추가 3줄. **머지 완료**(squash, 자체 병합) |
 | **B. SSE 타입 + Mock Stream Fixture** 08-23 | [#32](https://github.com/kanghyunsoon/ssafesta/issues/32) 확정분 전사 — `entities/conversation/{stream.types,stream.parser,stream.mock}.ts`. discriminated union 5종·`AiErrorCode` 17종·`DEFAULT_RETRYABLE`(런타임 정본은 서버 payload)·`SseProtocolError`(unknown event strict) 별도 분리. real api·소비자 wiring은 008 UI 착수 시. vitest 146/146·tsc·oxlint 그린 |
+| **C. Game Studio 소켓 수신부 2종** 08-23 | #20 확정 계약(`specs/020-game-studio/contracts/game-portal-bridge.md`, feature/game-studio-foundation) 전사 — `events.ts` `BOOTH_GAME_INTERACT` union·`overlay.ts` `GAME` 타입·`dispatcher.ts` 라우팅(configId 그대로 전달, 이름 변환 없음). bridge-level 테스트 신설로 런타임 통과 잠금. 송신부는 제외("미착수 코드"). vitest 157/157(신규 11)·tsc·oxlint 그린, 브라우저 실측(GAME fallback 노출) 통과 |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
 
