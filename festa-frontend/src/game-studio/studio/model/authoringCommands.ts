@@ -761,6 +761,27 @@ export const addTileLayer = (
   };
 };
 
+export const paintTiles = (
+  project: GameProject,
+  sceneId: string,
+  layerId: string,
+  cells: readonly { readonly x: number; readonly y: number }[],
+  tileIndex: number,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const dataIndexes = new Set(cells.map(({ x, y }) => {
+    const gridX = Math.max(0, Math.min(scene.width - 1, Math.round(x)));
+    const gridY = Math.max(0, Math.min(scene.height - 1, Math.round(y)));
+    return gridY * scene.width + gridX;
+  }));
+  return {
+    ...scene,
+    tileLayers: scene.tileLayers.map((layer) => layer.id === layerId ? {
+      ...layer,
+      data: layer.data.map((tile, index) => dataIndexes.has(index) ? Math.max(-1, Math.round(tileIndex)) : tile),
+    } : layer),
+  };
+});
+
 export const paintTile = (
   project: GameProject,
   sceneId: string,
@@ -768,18 +789,7 @@ export const paintTile = (
   x: number,
   y: number,
   tileIndex: number,
-): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
-  const gridX = Math.max(0, Math.min(scene.width - 1, Math.round(x)));
-  const gridY = Math.max(0, Math.min(scene.height - 1, Math.round(y)));
-  const dataIndex = gridY * scene.width + gridX;
-  return {
-    ...scene,
-    tileLayers: scene.tileLayers.map((layer) => layer.id === layerId ? {
-      ...layer,
-      data: layer.data.map((tile, index) => index === dataIndex ? Math.max(-1, Math.round(tileIndex)) : tile),
-    } : layer),
-  };
-});
+): GameProject => paintTiles(project, sceneId, layerId, [{ x, y }], tileIndex);
 
 export const fillTileLayer = (
   project: GameProject,

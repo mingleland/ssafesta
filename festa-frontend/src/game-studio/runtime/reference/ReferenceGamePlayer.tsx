@@ -24,6 +24,7 @@ interface ReferenceGamePlayerProps {
   readonly sessionPort: GameSessionPort;
   readonly assetUrls?: Readonly<Record<string, string>>;
   readonly onExit: () => void;
+  readonly showPerformanceMonitor?: boolean;
 }
 
 const keyDirection = (key: string): MoveDirection | null => {
@@ -34,11 +35,14 @@ const keyDirection = (key: string): MoveDirection | null => {
   return null;
 };
 
-export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit }: ReferenceGamePlayerProps) => {
+export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit, showPerformanceMonitor = false }: ReferenceGamePlayerProps) => {
   const [runtime, setRuntime] = useState(() => startReferenceRuntime(project));
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [previewFps, setPreviewFps] = useState<number | null>(null);
   const completionReported = useRef(false);
+  const sessionTokenRef = useRef<string | null>(null);
+  const sessionEndedRef = useRef(false);
   const scene = findScene(project, runtime.session.currentSceneId);
   const activeDialogue = getActiveDialogue(project, runtime.session);
   const choices = activeDialogue === null ? [] : getAvailableDialogueChoices(project, runtime.session);
@@ -60,15 +64,34 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
 
   useEffect(() => {
     let active = true;
+    sessionEndedRef.current = false;
+    sessionTokenRef.current = null;
+    setSessionToken(null);
+    setSessionError(null);
     sessionPort.start({ gameId: project.gameId, mode })
-      .then((result) => { if (active) setSessionToken(result.sessionToken); })
+      .then((result) => {
+        if (!active) {
+          void sessionPort.exit(result.sessionToken).catch(() => undefined);
+          return;
+        }
+        sessionTokenRef.current = result.sessionToken;
+        setSessionToken(result.sessionToken);
+      })
       .catch((error: unknown) => { if (active) setSessionError(error instanceof Error ? error.message : '게임 세션을 시작하지 못했습니다.'); });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      const token = sessionTokenRef.current;
+      if (token !== null && !sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        void sessionPort.exit(token).catch(() => undefined);
+      }
+    };
   }, [mode, project.gameId, sessionPort]);
 
   useEffect(() => {
     if (runtime.session.status !== 'COMPLETED' || sessionToken === null || completionReported.current) return;
     completionReported.current = true;
+    sessionEndedRef.current = true;
     void sessionPort.complete(sessionToken).catch((error: unknown) => {
       setSessionError(error instanceof Error ? error.message : '완료 결과를 전송하지 못했습니다.');
     });
@@ -105,12 +128,34 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     return () => window.clearInterval(timer);
   }, [activeDialogue, project, runtime.session.status, scene?.type]);
 
+  useEffect(() => {
+    if (!showPerformanceMonitor) return undefined;
+    let frameId = 0;
+    let frameCount = 0;
+    let measuredAt = performance.now();
+    const measure = (now: number) => {
+      frameCount += 1;
+      const elapsed = now - measuredAt;
+      if (elapsed >= 1000) {
+        setPreviewFps(Math.round((frameCount * 1000) / elapsed));
+        measuredAt = now;
+        frameCount = 0;
+      }
+      frameId = window.requestAnimationFrame(measure);
+    };
+    frameId = window.requestAnimationFrame(measure);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [showPerformanceMonitor]);
+
   const inventory = useMemo(() => [...runtime.session.inventory].map((itemId) => (
     project.items.find((item) => item.id === itemId)?.name ?? itemId
   )), [project.items, runtime.session.inventory]);
 
   const exit = () => {
-    if (sessionToken !== null && runtime.session.status === 'PLAYING') void sessionPort.exit(sessionToken);
+    if (sessionToken !== null && !sessionEndedRef.current) {
+      sessionEndedRef.current = true;
+      void sessionPort.exit(sessionToken).catch(() => undefined);
+    }
     onExit();
   };
 
@@ -122,7 +167,7 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     <main className="grp-root" data-game-studio-runtime="reference">
       <header className="grp-topbar">
         <div><span className="grp-brand">F</span><strong>{project.title}</strong><em>{mode === 'PREVIEW' ? 'PLAY TEST' : 'FESTA GAME'}</em></div>
-        <div><span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong></div>
+        <div><span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong>{showPerformanceMonitor && previewFps !== null && <em className={previewFps >= 55 ? 'is-good' : 'is-low'}>FPS {previewFps}</em>}</div>
         <button onClick={exit} type="button">게임 나가기 ×</button>
       </header>
 

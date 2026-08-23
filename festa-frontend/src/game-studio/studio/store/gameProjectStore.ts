@@ -12,6 +12,7 @@ export interface GameProjectHistoryState {
 export interface GameProjectStore {
   getState(): GameProjectHistoryState;
   replace(project: GameProject): GameProjectHistoryState;
+  syncRevision(revision: number): GameProjectHistoryState;
   update(updater: (project: GameProject) => GameProject): GameProjectHistoryState;
   undo(): GameProjectHistoryState;
   redo(): GameProjectHistoryState;
@@ -80,6 +81,17 @@ export const createGameProjectStore = (
   return {
     getState: state,
     replace,
+    syncRevision: (revision) => {
+      if (!Number.isInteger(revision) || revision < 0) throw new RangeError('revision must be a non-negative integer');
+      if (present.revision === revision) return state();
+      const withRevision = (project: GameProject): GameProject => snapshot({ ...project, revision });
+      present = withRevision(present);
+      past = past.map(withRevision);
+      future = future.map(withRevision);
+      refreshState();
+      emit();
+      return state();
+    },
     update: (updater) => replace(updater(structuredClone(present))),
     undo: () => {
       const previous = past.at(-1);

@@ -12,6 +12,7 @@ import {
   fillTileLayer,
   moveObject,
   paintTile,
+  paintTiles,
 } from '../../studio/model/authoringCommands.ts';
 import { createStarterProject } from '../../studio/model/createStarterProject.ts';
 
@@ -55,6 +56,7 @@ describe('Game Studio authoring commands', () => {
     project = fillTileLayer(layer.project, 'library', layer.layerId, 3);
     project = paintTile(project, 'library', layer.layerId, 2, 4, 7);
     project = paintTile(project, 'library', layer.layerId, 0, 0, -1);
+    project = paintTiles(project, 'library', layer.layerId, [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 1 }], 5);
 
     const library = project.scenes.find((scene) => scene.id === 'library');
     if (library?.type !== 'TOP_DOWN') throw new Error('expected library');
@@ -62,6 +64,8 @@ describe('Game Studio authoring commands', () => {
     expect(data).toHaveLength(library.width * library.height);
     expect(data?.[4 * library.width + 2]).toBe(7);
     expect(data?.[0]).toBe(-1);
+    expect(data?.[library.width + 1]).toBe(5);
+    expect(data?.[library.width + 2]).toBe(5);
     expect(parseGameProject(project)).toBe(project);
   });
 });
