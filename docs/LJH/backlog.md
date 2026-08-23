@@ -27,13 +27,12 @@
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) 닫기 | #58 back 구현 PR 머지 후(리드 요청 — C안 결정은 났고 rule/field 구현·문서 확정이 남음. 추가 요청 3건은 PR #57로 develop 반영 확인 완료) | strdeok |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 신규 진입 차단 판정 시점 답변 | 리드 회신 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) C 확정(08-23) | back 구현 PR 머지 → FE 후속은 예정 작업 | strdeok |
-| [PR #70](https://github.com/kanghyunsoon/ssafesta/pull/70) 정본화 라운드(#59 owner 수락분 + #17 docs/05·예시값) | **병합 타이밍** — PR #53 리베이스 push 후 병합(같은 `docs/26` 재리베이스 배려). #59 잔여: `:134` 화살표 해석·§21-2 문구는 규칙 작성자 판단 대기 | 리드·strdeok |
+| #59 잔여 확인 2건 | `:134` 화살표 해석·§21-2 문구 — 규칙 작성자(리드·strdeok) 판단 대기, 결론 나오면 반영 | 리드·strdeok |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 확정(08-23) | `avatar-profile-api.md` 계약 문서 반영 → wiring 착수는 예정 작업 | strdeok |
 | [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 FE 몫 | ① 소유권 경계 회신(에디터 UI ①~④가 #49 busypark 몫인지 — 내 제안: 나는 resolver ⑤+업로드 클라이언트 기반층) ② BE 업로드 계약(API 형태·상태 DTO·오류 코드) 확정 | 리드·strdeok |
 
 ## 예정 작업 — 트리거 충족 시 착수
 
-- [ ] **front 동기화 — PR #70 머지분** — 트리거: PR #70 develop 병합. `docs/26`·`docs/05`·`005/spec.md`·`FE/quickstart.md`·verify 5파일 회수. spec.md는 front가 낡은 부분(`schemaVersion` 정정·BE 검증 상세)까지 함께 들어오므로 develop 판 통째 회수가 안전해짐
 
 - [ ] **오류 봉투 `field` 대응** — 트리거: #58 back PR 머지. `ApiError.errors[]`에 `field?: string`, mock 3곳, `PublishDialog` key 인덱스화, R-12 해제 후 `rule` 분기
 - [ ] **013a credential 전달 wiring** — 트리거: #60 계약 문서 반영 확인. `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결(AT 원본, MEMBER only). 부가: AT 만료 401 시 Unity→host 재요청 규약은 별도 후속
@@ -67,6 +66,7 @@
 | **B. SSE 타입+Mock Fixture** 08-23 | #32 전사 — `entities/conversation/` 3파일. real api·wiring은 008 UI 착수 시 |
 | **C. Game Studio 소켓 수신부** 08-23 | = #56 T052·T055(#20 확정 계약). `BOOTH_GAME_INTERACT` union·`GAME` 오버레이·라우팅 |
 | **G-2. returnTo 복귀** 08-23 | ASC 구현(`cf44e6f`) — 저장·검증·소비 3곳. 통합 테스트 공백은 G-4 참조 |
+| **정본화 라운드 PR #70** 08-23 | #59 owner 몫(docs/26·spec.md 7곳) + #17(docs/05·예시값 2파일). 검증서 codex 적중 1건(:203 인접 모순) 수정 포함. **머지 완료**, front 5파일 동기화 완료 |
 | **공용 문서 재회수** 08-23 | PR #67 머지분 docs/00·17·26(`5765bca`). develop 결손은 #59 보고 |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증(PR #25) |
 

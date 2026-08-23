@@ -1,7 +1,8 @@
 # SSAFY FESTA UI/UX 디자인 가이드
 
 > **문서 목적**: Web, Unity, Admin 화면에서 공통으로 사용하는 UI/UX 원칙과 디자인 시스템 기준을 정의한다.  
-> 현재 색상·폰트·세부 수치·캐릭터 스타일은 미확정이며 팀 디자인 협의 후 확정한다.
+> 폰트·세부 수치·캐릭터 스타일과 UI 토큰 색상 값은 미확정이며 팀 디자인 협의 후 확정한다.
+> **부스 Facade 대표색 팔레트 12색은 확정** ([#17](https://github.com/kanghyunsoon/ssafesta/issues/17), 2026-08-23) — 값의 정본은 `specs/005-booth-studio-layout/contracts/layout-api.md` §6.
 
 ---
 
@@ -367,6 +368,8 @@ Booth Studio 정밀 편집은 PC 사용을 권장한다.
 ---
 
 ## 14. 브랜드 / 비주얼 미확정 항목
+
+> 여기의 "대표 색상"·"보조 색상"은 **서비스 브랜드 색**이다. 부스 Facade의 대표색(`primaryColor`) 팔레트 12색은 확정돼 이 목록에 없다 — 정본은 `layout-api.md` §6.
 
 - 로고
 - 대표 색상

@@ -94,21 +94,23 @@
 
 ## 공통 계약 기준 — Layout JSON
 
-> 아래 필드명과 Object Type은 Backend/Frontend/Unity 공통 기준이며 Unity 파싱을 검증했다. 좌표 원점·오브젝트 상한·스케일은 Clarifications 표(C-01~C-03)로 확정됐다.
+> 아래 필드명과 Object Type은 Backend/Frontend/Unity 공통 기준이며 Unity 파싱을 검증했다. 좌표 원점·오브젝트 상한·스케일 등 아래 미결정 항목은 3파트 합의 후 확정한다.
 
 ```json
 {
   "boothId": 7,
   "template": "PROJECT_EXHIBITION",
-  "version": 2,
+  "schemaVersion": 1,
   "objects": [
     { "objectId": "screen-1", "type": "VIDEO_SCREEN",
-      "position": { "x": 2.1, "y": 0, "z": 3.4 }, "rotationY": 90, "configId": 152 },
+      "position": { "x": 2.1, "y": 0, "z": 1.4 }, "rotationY": 90, "configId": 152 },
     { "objectId": "ai-1", "type": "AI_AGENT",
       "position": { "x": 1.2, "y": 0, "z": 1.5 }, "rotationY": 0, "configId": 78 }
   ]
 }
 ```
+
+> **`schemaVersion` ≠ `version`** — `schemaVersion`은 Layout JSON의 **구조 버전**(현재 1, 문서의 모양이 바뀔 때만 증가)이고, `version`은 published 응답에만 실리는 **공개 회차**(공개할 때마다 1 증가)다. 예시가 `"version": 2`로 적혀 있던 것을 #36 합의(2026-08-21, game·FE 동의)로 정정했다. 예시의 z 3.4도 확정 규칙(`|z| ≤ 3`) 위반 오기라 1.4로 함께 정정.
 
 **공통 canonical type 문자열**: `AI_AGENT`, `VIDEO_SCREEN`, `PROJECT_PANEL`, `SURVEY_KIOSK`, `RECRUITMENT_BOARD`, `CONSULTATION_DESK`, `LAPTOP`, `LIKE_VOTE`, `FURNITURE`, `DECORATION`
 
@@ -207,7 +209,7 @@ React 편집기는 **위에서 내려다보는 2D 평면**에서 오브젝트를
 | 구분 | 내용 |
 |---|---|
 | ② SC-002 | **해소** — 대응 C-xx 없이 방치되던 목표 수치를 006 C-01(부스 구역 진입 시 조회, 폴링·푸시 없음)에서 역산해 관찰 기준으로 재작성. 서버 반영 방식(동기/캐시)은 규정하지 않음 |
-| ② FR-003 | 스냅 격자 단위·간격 — `SNAP_METERS=0.25`([#45](https://github.com/kanghyunsoon/ssafesta/issues/45)), 미터 좌표에 설정값으로 주입. 서버 계약과 무관한 편집기 UX 값 |
+| ② FR-003 | 스냅 격자의 **단위·간격이 없다.** 좌표는 미터로 확정됐으나 간격은 부스 크기(C-06)에 종속된다. 설정값으로 두고 확정 후 주입 |
 | ③ 신규 FR | **외부 설정(Facade) 편집** — 부스명·간판·로고·대표색·테마·영업 상태. 2026-08-14 외부/내부 분리 결정이 006에만 반영됐고 005에 요구사항이 없다. `docs/08`에 저장 API도 없다 |
 | ③ 신규 FR | 편집기의 Loading / Error / Empty / **Forbidden** 상태 정의 (`parts/FE.md` 공통 비기능). 임대 만료 직후 진입이 Edge Case에 있는데 대응 요구가 없다 |
 | ③ 신규 FR | **서버의 독립적 개수·영역 검증** (헌법 16조). 006 C-03의 편집기 차단은 UX 책임이지 인가가 아니다 |
@@ -244,10 +246,12 @@ FR-007이 "유효성 검사"를 요구하는데 **무엇을 검사하는지가 �
 | 오브젝트 12개 이하 (FR-010) | error |
 | `objectId`가 한 배치 안에서 유일 | error |
 | `type`이 canonical 문자열 화이트리스트에 있음 | error |
-| `position`·`rotationY`가 유한한 수, 부스 영역 내 | error |
-| `template`이 화이트리스트에 있음 | error |
+| `position`·`rotationY`가 유한한 수, 부스 영역 내 (`0 ≤ y ≤ 2.72` — 셸 실측, #19 ②) | error |
+| **실물(회전 반영 AABB)이 부스 영역 안** — 앵커는 안인데 실물이 옆 슬롯에 걸치는 배치 차단 (#19 ③, contracts §10-2) | error `AREA_OUT_OF_BOUNDS` |
+| `template`이 화이트리스트에 있음 (`PROJECT_EXHIBITION` 단독 — #19 ④·#45) | error |
 | `configId`가 가리키는 콘텐츠가 **그 부스 소유**인지 (헌법 16·17조) | error |
 | 기능 오브젝트의 `configId` 미연결 (C-04 확정: 경고 유지 — #45) | **warning** |
+| **통행 판정** (공개 시점만, #19 ⑤·contracts §10-3): 관람 띠 도달 <50% → `FRONT_BLOCKED`, 고립 공간 ≥1㎡ → `ISOLATED_AREA` | **warning** — 뒷공간 활용은 소유자의 선택일 수 있어 공개를 막지 않는다 |
 
 ---
 
