@@ -13,7 +13,6 @@
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **F. `docs/05` 팔레트 12색 반영 develop PR** — #17 회신에서 내가 맡은 것. `layout-api.md` §6·`docs/08` 확정값으로 "색상 미확정" 서술 교체. 소형·문서 전용
 - [ ] **E. (P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
 
 ## 대기
@@ -28,11 +27,13 @@
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) 닫기 | #58 back 구현 PR 머지 후(리드 요청 — C안 결정은 났고 rule/field 구현·문서 확정이 남음. 추가 요청 3건은 PR #57로 develop 반영 확인 완료) | strdeok |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 신규 진입 차단 판정 시점 답변 | 리드 회신 | 리드 |
 | [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) C 확정(08-23) | back 구현 PR 머지 → FE 후속은 예정 작업 | strdeok |
-| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) develop `docs/26` stale(C-04·C-06) 보고 | develop 정정 주체 회신(내 소형 PR 여부 포함) | strdeok·리드 |
+| [PR #70](https://github.com/kanghyunsoon/ssafesta/pull/70) 정본화 라운드(#59 owner 수락분 + #17 docs/05·예시값) | **병합 타이밍** — PR #53 리베이스 push 후 병합(같은 `docs/26` 재리베이스 배려). #59 잔여: `:134` 화살표 해석·§21-2 문구는 규칙 작성자 판단 대기 | 리드·strdeok |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 확정(08-23) | `avatar-profile-api.md` 계약 문서 반영 → wiring 착수는 예정 작업 | strdeok |
 | [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 FE 몫 | ① 소유권 경계 회신(에디터 UI ①~④가 #49 busypark 몫인지 — 내 제안: 나는 resolver ⑤+업로드 클라이언트 기반층) ② BE 업로드 계약(API 형태·상태 DTO·오류 코드) 확정 | 리드·strdeok |
 
 ## 예정 작업 — 트리거 충족 시 착수
+
+- [ ] **front 동기화 — PR #70 머지분** — 트리거: PR #70 develop 병합. `docs/26`·`docs/05`·`005/spec.md`·`FE/quickstart.md`·verify 5파일 회수. spec.md는 front가 낡은 부분(`schemaVersion` 정정·BE 검증 상세)까지 함께 들어오므로 develop 판 통째 회수가 안전해짐
 
 - [ ] **오류 봉투 `field` 대응** — 트리거: #58 back PR 머지. `ApiError.errors[]`에 `field?: string`, mock 3곳, `PublishDialog` key 인덱스화, R-12 해제 후 `rule` 분기
 - [ ] **013a credential 전달 wiring** — 트리거: #60 계약 문서 반영 확인. `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결(AT 원본, MEMBER only). 부가: AT 만료 401 시 Unity→host 재요청 규약은 별도 후속
