@@ -74,6 +74,9 @@ class SecurityConfiguration {
                         // (spec 005 FR-006). The draft and publish paths under the same prefix stay
                         // authenticated — only this exact suffix is open.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/layouts/published").permitAll()
+                        // The same layout keyed by room instead of by booth — Unity's anchors are
+                        // slots (#62, contract §11). Open for the same reason as the line above.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots/*/layouts/published").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an
