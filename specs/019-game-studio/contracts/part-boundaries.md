@@ -53,4 +53,4 @@ AI(optional, P2)
 - AI 확정(#22): MVP 비의존, P2 candidate/patch, spec 007 Job 정책 재사용.
 - 제품 정책 확정(#33): 새 진입 REST 차단, loaded local session 완료 허용, 일반 soft/탈퇴 hard delete, 이력 유지, Ranking P1 절연.
 - 교차 계약 확정(#34): signed Int32 `configId`, 별도 INTEGER 공개 ID, `GAME_PORTAL requiresConfig=true`, BE-first 배포.
-- Studio 내부 완료(#35): TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver. 운영 Published parity는 #48·#55, Portal Host는 #56에서 추적.
+- Studio 내부 완료(#35): TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver. 운영 Published parity는 #48·#55, Portal Host는 #56, 사용자 Asset의 stable `asset://` 승격은 #69에서 추적.

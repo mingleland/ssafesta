@@ -252,6 +252,7 @@
 - 공개 중단·삭제·표시 전용 Ranking 정책: GitHub Issue #33 — 합의 반영 완료
 - `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34 — BE·Unity 합의 반영, FE 구현 확인만 추적
 - Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
+- 사용자 교체 Asset 업로드·stable `asset://` 승격·Publish 연결: GitHub Issue #69 — Frontend·Backend 후속
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 

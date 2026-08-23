@@ -40,7 +40,7 @@ Asset Catalog + GameProject JSON
 - 이미지·타일셋·오디오 binary, base64 `data:` URL, `blob:` URL, `file:` 경로는 저장·Publish 금지다.
 - 만료되는 서명 URL을 Published GameProject에 넣지 않는다.
 - 사용자 업로드를 추가할 때는 Spring이 소유한 안정적인 Asset ID를 저장하고 Runtime이 별도 조회로
-  실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위는 MVP와 분리한 후속 Asset spec 대상이다.
+  실제 전달 주소를 해석한다. 업로드 API·보존·공개 범위와 `asset://local` 승격은 [Issue #69](https://github.com/kanghyunsoon/ssafesta/issues/69)의 후속 Asset 계약 대상이다.
 - catalog metadata는 타일 크기, atlas slicing, 기본 표시 크기를 소유한다. GameProject는 같은 정보를
   중복 저장하지 않는다.
 - 기본 catalog는 타일셋, 4방향 캐릭터 애니메이션, 상호작용/액션 오브젝트, 대화 배경과 인물 표정을

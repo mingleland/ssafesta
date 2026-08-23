@@ -109,7 +109,7 @@ GET /api/v1/games/{gameId}/published
 - MVP는 Game Studio가 소유하는 versioned `builtin://` Asset catalog를 사용한다.
 - 서버가 관리하는 `asset://` reference를 추가하더라도 metadata/resolver와 binary 저장소는
   Draft/Published JSONB와 분리한다.
-- MVP에 사용자 upload endpoint를 추가하지 않는다. 업로드·용량·검사·보존·탈퇴 삭제는 별도 spec이다.
+- MVP에 사용자 upload endpoint를 포함하지 않는다. 업로드·용량·검사·보존·탈퇴 삭제와 `asset://local`→stable `asset://` 승격은 [Issue #69](https://github.com/kanghyunsoon/ssafesta/issues/69)에서 추적한다.
 - Preview/Runtime이 실제 전달 URL을 얻어도 blob/file/data/서명 URL을 Draft나 Published JSON에 저장하지 않는다.
 
 ## Booth Portal Resolution

@@ -14,6 +14,7 @@
 - 🤖 [PR #63](https://github.com/kanghyunsoon/ssafesta/pull/63)이 @colosair의 최신 `front` 기준 독립 검증 후 병합됐다. trial merge 무충돌, 전체 **19 files / 98 tests**, TypeScript build, lint, lazy Asset chunk 격리가 재확인됐다.
 - 🤖 로컬 Authoring Workspace·Preview 완료 범위인 [#49](https://github.com/kanghyunsoon/ssafesta/issues/49)와 renderer·same-origin route Preview·builtin/local Asset resolver 결정 범위인 [#35](https://github.com/kanghyunsoon/ssafesta/issues/35)를 완료 근거와 함께 닫았다.
 - 🤖 운영 기능은 [#48](https://github.com/kanghyunsoon/ssafesta/issues/48) Draft/Publish API, [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) Published loader·오류 격리, [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) GAME_PORTAL Binding으로 분리해 계속 OPEN 유지했다.
+- 🤖 내장 Asset을 로컬에서 교체하는 기능과 달리 Published 게임에서 사용자 이미지를 공유하려면 서버 stable `asset://` 승격 파이프라인이 필요함을 확인했다. #48의 allow-list 검증·#55의 Runtime resolver와 겹치지 않는 업로드/가공/보존 공백을 [#69](https://github.com/kanghyunsoon/ssafesta/issues/69)로 등록하고 @strdeok · @ghkim1632 · @colosair를 지정했다.
 
 ### Backend 리뷰·최신 develop 계약 동기화 ✅
 
