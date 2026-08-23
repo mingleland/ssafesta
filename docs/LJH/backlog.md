@@ -11,7 +11,7 @@
 
 **013a WebGL Host 완료 범위**: `unity/host/`(types·resolver·loader·loader.mock·loader.select·sessionManager·UnityHost) + `/app/world` 라우트 + `events.ts`(`onWorldGateReady`) + `client.ts`(`getAccessToken`, lifecycle 미연결). single-flight(StrictMode 안전)·retry 직렬화(Quit 완료 후 재생성)·60초 타임아웃 전부 vitest 5개+브라우저 5개 시나리오로 검증.
 
-**credential 전달은 의도적으로 미구현** — 종류(AT vs 단수명 token)·시점·방식 전부 미결이라 `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. Unity 답변 도착·반영 완료(manifest URL 4종 확정) — credential 종류 결정은 [#60](https://github.com/kanghyunsoon/ssafesta/issues/60)에서 BE(strdeok)로 이관, 응답 대기.
+**credential 전달은 의도적으로 미구현** — `getAccessToken()`을 read boundary로만 두고 어떤 lifecycle에도 안 걸었다. **[#60](https://github.com/kanghyunsoon/ssafesta/issues/60) BE(strdeok) 결정 완료(08-23)**: Access Token 원본 채택(신규 토큰 계층 없음), MEMBER only·GUEST 403, ③ NGO Connection Token과 무관. 계약 문서(`avatar-profile-api.md`) 반영은 strdeok 몫으로 아직 미착수. wiring 구현 자체는 "미착수 코드" 참조.
 
 **016 E2E 완료 범위**: `features/interaction/dispatcher.ts`(LAPTOP·AI_AGENT 라우팅, 미지 type 무시)·`features/overlay/{OverlayHost,LaptopOverlay}.tsx`(URL은 `http`/`https`만 허용, iframe+새 탭+안내 동시 제공 — 차단 "감지"는 구현하지 않음, FR-007 기술 제약 기록)·`WorldPage.tsx`(Dispatcher를 화면 생명주기에 종속). vitest 8개+브라우저 9개 시나리오 검증. **AI_CHAT 등은 공통 fallback뿐** — 008·010·011 실 UI 아님.
 
@@ -42,9 +42,8 @@
 |---|---|---|
 | [#36](https://github.com/kanghyunsoon/ssafesta/issues/36) | 6건 수용 + 계약서 모순 1건 지적(409에 Draft 동봉 서술) — geometry 브랜치에서 이미 정정됨(미병합) | BE PR 병합 |
 | [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) | Game Studio 정책 4건 전부 동의, 신규 진입 차단 판정 시점 질문 | 리드 |
-| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | strdeok(C 확정·구현)·ghkim1632(FastAPI 정합) |
+| [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) | 오류 봉투 C안 동의 + 근거 정정, §3 `rule`/`field` 분리 방향 제안 | **strdeok C 확정(08-23)** — back PR 머지 대기. FE 후속은 "미착수 코드" 참조 |
 | [#17](https://github.com/kanghyunsoon/ssafesta/issues/17) | 팔레트 반영 주체를 BE로 제안. 12색 hex 값은 FE 보유 — 주체 확정 시 제공 | BE 확인 |
-| [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) | credential 종류 결정을 BE로 이관(Unity 제약 2건 제시, `back` 태그·strdeok assignee 추가 완료) | strdeok 결정 |
 
 ## 내가 닫아야 할 것
 
@@ -59,6 +58,8 @@
 - [ ] **Game Studio `OnOverlayStateChanged` 송신부**(#20) — Host→Unity 방향, 수신 GameObject명 미확정이라 Unity 협의 후. union·`GAME` 타입 2종은 "지금 할 수 있는 것" C로 분리. `features/game-entry/`는 #21 BE 계약 확정 후
 - [ ] **편집기 팔레트 UI** — 미보유 파츠 회색+잠금 배지, 게스트 로그인 유도(#18, spec 012 착수 시)
 - [ ] `docs/26` 브랜치별 결정 분기 정리 제안 — FE가 #18에서 자청
+- [ ] **오류 봉투 `field` 대응**(#58, back PR 머지 후 착수) — `ApiError.errors[]` 타입에 `field?: string` 추가, mock 3곳 정합, `PublishDialog` key를 인덱스 기반으로 정리, R-12(사전 경고 중복 제거) 해제 후 `rule` 분기 활성화
+- [ ] **013a credential 전달 wiring**(#60 결정 08-23로 신규 협의 불요 후보 — 다음 판정 라운드 대상) — `getAccessToken()`을 `UnitySessionManager`/`UnityHost` lifecycle에 연결. AT를 Unity WebGL에 전달(신규 토큰 계층 없음, MEMBER only). BE 계약 문서(`avatar-profile-api.md`) 반영 여부 재확인 후 착수. 부가: AT 30분 만료 401 시 "Unity→host 재요청" 규약은 별도 후속(서버 작업 없음)
 
 ## 내 것 아님
 
@@ -80,7 +81,7 @@
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
 
-**해소된 미결** — C-02 좌표 / C-03 고정 크기 / C-05 `expectedRevision`(#36) / C-07 보관O·되돌리기 MVP제외 / 부스 6×6×2.72m·스냅 0.25m 확정 / C-04·C-06 기획 승인(#45) / 오류 봉투 원소 타입 / SSE payload 전체(#32) / 산출물 경로 구조(#43 채택·반영 완료) / **refresh 토큰 쿠키 도메인**(#30, TLS·도메인 구조 확정으로 해소) / **GAME_PORTAL configId 범위**(#34, Int32+0금지를 DB CHECK 제약으로 확정 — FE 정수 검증·전송 순서 확인만 #49로 이관, 신규 블로킹 아님)
+**해소된 미결** — C-02 좌표 / C-03 고정 크기 / C-05 `expectedRevision`(#36) / C-07 보관O·되돌리기 MVP제외 / 부스 6×6×2.72m·스냅 0.25m 확정 / C-04·C-06 기획 승인(#45) / 오류 봉투 원소 타입 / SSE payload 전체(#32) / 산출물 경로 구조(#43 채택·반영 완료) / **refresh 토큰 쿠키 도메인**(#30, TLS·도메인 구조 확정으로 해소) / **GAME_PORTAL configId 범위**(#34, Int32+0금지를 DB CHECK 제약으로 확정 — FE 정수 검증·전송 순서 확인만 #49로 이관, 신규 블로킹 아님) / **013a Unity REST credential 종류**(#60, 08-23 — Access Token 원본 채택 확정, wiring 구현은 "미착수 코드")
 
 ---
 
