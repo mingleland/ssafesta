@@ -4,6 +4,15 @@ import { createGameProjectStore } from '../../studio/store/gameProjectStore.ts';
 import { minimalGameProject } from '../fixtures/minimalGameProject.ts';
 
 describe('GameProject authoring store', () => {
+  it('returns a referentially stable snapshot until state changes', () => {
+    const store = createGameProjectStore(minimalGameProject);
+    expect(store.getState()).toBe(store.getState());
+    const before = store.getState();
+    store.replace({ ...minimalGameProject, title: 'changed' });
+    expect(store.getState()).not.toBe(before);
+    expect(store.getState()).toBe(store.getState());
+  });
+
   it('commits valid immutable snapshots and supports undo/redo', () => {
     const store = createGameProjectStore(minimalGameProject);
     const initial = store.getState().project;

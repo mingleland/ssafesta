@@ -1,5 +1,17 @@
 export type Scalar = boolean | number | string;
 
+export const GAME_PROJECT_LIMITS = {
+  maxJsonBytes: 2_000_000,
+  maxScenes: 50,
+  maxObjectsPerScene: 500,
+  maxEventsPerScene: 300,
+  maxAssets: 300,
+} as const;
+
+export const estimateGameProjectJsonBytes = (project: GameProject): number => (
+  new TextEncoder().encode(JSON.stringify(project)).byteLength
+);
+
 export type VariableType = 'BOOLEAN' | 'INTEGER' | 'STRING';
 
 export interface VariableDefinition {
@@ -27,10 +39,17 @@ export interface Position2d {
 }
 
 export type Component =
-  | { readonly type: 'SPRITE'; readonly assetId: string }
+  | { readonly type: 'SPRITE'; readonly assetId: string; readonly scale?: number; readonly zIndex?: number }
   | { readonly type: 'COLLIDER'; readonly solid: boolean }
   | { readonly type: 'INTERACTABLE'; readonly prompt: string }
-  | { readonly type: 'PICKUP'; readonly itemId: string };
+  | { readonly type: 'PICKUP'; readonly itemId: string }
+  | { readonly type: 'DAMAGE'; readonly amount: number }
+  | { readonly type: 'HEALTH'; readonly max: number }
+  | { readonly type: 'SCORE_VALUE'; readonly value: number }
+  | { readonly type: 'CHECKPOINT' }
+  | { readonly type: 'AUTO_MOVE'; readonly axis: 'HORIZONTAL' | 'VERTICAL'; readonly speed: number; readonly range: number }
+  | { readonly type: 'SHOOTER'; readonly projectileAssetId: string; readonly damage: number; readonly cooldownMs: number }
+  | { readonly type: 'SPAWNER'; readonly enemyAssetId: string; readonly intervalMs: number; readonly maxAlive: number };
 
 export interface GameObject {
   readonly id: string;
@@ -41,7 +60,14 @@ export interface GameObject {
     | 'INTERACTABLE'
     | 'ITEM'
     | 'DOOR'
-    | 'GOAL';
+    | 'GOAL'
+    | 'PLATFORM'
+    | 'HAZARD'
+    | 'ENEMY'
+    | 'TURRET'
+    | 'CHECKPOINT'
+    | 'SPAWNER'
+    | 'DECORATION';
   readonly position: Position2d;
   readonly visible: boolean;
   readonly components: readonly Component[];
@@ -84,10 +110,26 @@ export interface TopDownScene {
   readonly name: string;
   readonly width: number;
   readonly height: number;
+  readonly backgroundAssetId?: string;
   readonly tileLayers: readonly TileLayer[];
   readonly objects: readonly GameObject[];
   readonly events: readonly GameEvent[];
 }
+
+export interface PlatformerScene {
+  readonly id: string;
+  readonly type: 'PLATFORMER';
+  readonly name: string;
+  readonly width: number;
+  readonly height: number;
+  readonly backgroundAssetId?: string;
+  readonly gravity: number;
+  readonly tileLayers: readonly TileLayer[];
+  readonly objects: readonly GameObject[];
+  readonly events: readonly GameEvent[];
+}
+
+export type WorldScene = TopDownScene | PlatformerScene;
 
 export interface DialogueChoice {
   readonly id: string;
@@ -101,6 +143,7 @@ export interface DialogueNode {
   readonly id: string;
   readonly speaker: string;
   readonly text: string;
+  readonly portraitAssetId?: string;
   readonly choices: readonly DialogueChoice[];
 }
 
@@ -109,11 +152,12 @@ export interface DialogueScene {
   readonly type: 'DIALOGUE';
   readonly name: string;
   readonly presentation: 'OVERLAY' | 'FULL_SCREEN';
+  readonly backgroundAssetId?: string;
   readonly startNodeId: string;
   readonly nodes: readonly DialogueNode[];
 }
 
-export type GameScene = TopDownScene | DialogueScene;
+export type GameScene = WorldScene | DialogueScene;
 
 export interface GameProject {
   readonly schemaVersion: '1.0.0';
@@ -318,10 +362,15 @@ const validateEventShape = (value: unknown, path: string): void => {
 };
 
 const validateComponentShape = (value: unknown, path: string): void => {
-  const base = recordAt(value, path, ['type'], ['type', 'assetId', 'solid', 'prompt', 'itemId']);
+  const base = recordAt(value, path, ['type'], [
+    'type', 'assetId', 'scale', 'zIndex', 'solid', 'prompt', 'itemId', 'amount', 'max', 'value',
+    'axis', 'speed', 'range', 'projectileAssetId', 'damage', 'cooldownMs', 'enemyAssetId', 'intervalMs', 'maxAlive',
+  ]);
   if (base.type === 'SPRITE') {
-    const record = recordAt(value, path, ['type', 'assetId']);
+    const record = recordAt(value, path, ['type', 'assetId'], ['type', 'assetId', 'scale', 'zIndex']);
     stableIdAt(record.assetId, `${path}.assetId`);
+    if (record.scale !== undefined) integerAt(record.scale, `${path}.scale`, 25, 400);
+    if (record.zIndex !== undefined) integerAt(record.zIndex, `${path}.zIndex`, 0, 20);
     return;
   }
   if (base.type === 'COLLIDER') {
@@ -339,6 +388,46 @@ const validateComponentShape = (value: unknown, path: string): void => {
     stableIdAt(record.itemId, `${path}.itemId`);
     return;
   }
+  if (base.type === 'DAMAGE') {
+    const record = recordAt(value, path, ['type', 'amount']);
+    integerAt(record.amount, `${path}.amount`, 1, 999);
+    return;
+  }
+  if (base.type === 'HEALTH') {
+    const record = recordAt(value, path, ['type', 'max']);
+    integerAt(record.max, `${path}.max`, 1, 9999);
+    return;
+  }
+  if (base.type === 'SCORE_VALUE') {
+    const record = recordAt(value, path, ['type', 'value']);
+    integerAt(record.value, `${path}.value`, -999999, 999999);
+    return;
+  }
+  if (base.type === 'CHECKPOINT') {
+    recordAt(value, path, ['type']);
+    return;
+  }
+  if (base.type === 'AUTO_MOVE') {
+    const record = recordAt(value, path, ['type', 'axis', 'speed', 'range']);
+    enumAt(record.axis, `${path}.axis`, ['HORIZONTAL', 'VERTICAL']);
+    integerAt(record.speed, `${path}.speed`, 1, 20);
+    integerAt(record.range, `${path}.range`, 1, 100);
+    return;
+  }
+  if (base.type === 'SHOOTER') {
+    const record = recordAt(value, path, ['type', 'projectileAssetId', 'damage', 'cooldownMs']);
+    stableIdAt(record.projectileAssetId, `${path}.projectileAssetId`);
+    integerAt(record.damage, `${path}.damage`, 1, 999);
+    integerAt(record.cooldownMs, `${path}.cooldownMs`, 100, 10000);
+    return;
+  }
+  if (base.type === 'SPAWNER') {
+    const record = recordAt(value, path, ['type', 'enemyAssetId', 'intervalMs', 'maxAlive']);
+    stableIdAt(record.enemyAssetId, `${path}.enemyAssetId`);
+    integerAt(record.intervalMs, `${path}.intervalMs`, 250, 60000);
+    integerAt(record.maxAlive, `${path}.maxAlive`, 1, 100);
+    return;
+  }
   fail('GAME_PROJECT_INVALID', `${path}.type is invalid`);
 };
 
@@ -347,6 +436,7 @@ const validateObjectShape = (value: unknown, path: string): void => {
   stableIdAt(record.id, `${path}.id`);
   enumAt(record.preset, `${path}.preset`, [
     'PLAYER_SPAWN', 'WALL', 'NPC', 'INTERACTABLE', 'ITEM', 'DOOR', 'GOAL',
+    'PLATFORM', 'HAZARD', 'ENEMY', 'TURRET', 'CHECKPOINT', 'SPAWNER', 'DECORATION',
   ]);
   const position = recordAt(record.position, `${path}.position`, ['x', 'y']);
   integerAt(position.x, `${path}.position.x`, 0);
@@ -384,10 +474,11 @@ const validateDialogueChoiceShape = (value: unknown, path: string): void => {
 };
 
 const validateDialogueNodeShape = (value: unknown, path: string): void => {
-  const record = recordAt(value, path, ['id', 'speaker', 'text', 'choices']);
+  const record = recordAt(value, path, ['id', 'speaker', 'text', 'choices'], ['id', 'speaker', 'text', 'portraitAssetId', 'choices']);
   stableIdAt(record.id, `${path}.id`);
   stringAt(record.speaker, `${path}.speaker`, 0, 50);
   stringAt(record.text, `${path}.text`, 1, 1_000);
+  if (record.portraitAssetId !== undefined) stableIdAt(record.portraitAssetId, `${path}.portraitAssetId`);
   arrayAt(record.choices, `${path}.choices`, 0, 6)
     .forEach((choice, index) => validateDialogueChoiceShape(choice, `${path}.choices[${index}]`));
 };
@@ -397,15 +488,30 @@ const validateSceneShape = (value: unknown, path: string): void => {
     value,
     path,
     ['id', 'type', 'name'],
-    ['id', 'type', 'name', 'width', 'height', 'tileLayers', 'objects', 'events', 'presentation', 'startNodeId', 'nodes'],
+    ['id', 'type', 'name', 'width', 'height', 'backgroundAssetId', 'gravity', 'tileLayers', 'objects', 'events', 'presentation', 'startNodeId', 'nodes'],
   );
   stableIdAt(base.id, `${path}.id`);
   stringAt(base.name, `${path}.name`, 1, 50);
 
   if (base.type === 'TOP_DOWN') {
-    const record = recordAt(value, path, ['id', 'type', 'name', 'width', 'height', 'tileLayers', 'objects', 'events']);
+    const record = recordAt(value, path, ['id', 'type', 'name', 'width', 'height', 'tileLayers', 'objects', 'events'], ['id', 'type', 'name', 'width', 'height', 'backgroundAssetId', 'tileLayers', 'objects', 'events']);
     integerAt(record.width, `${path}.width`, 4, 100);
     integerAt(record.height, `${path}.height`, 4, 100);
+    if (record.backgroundAssetId !== undefined) stableIdAt(record.backgroundAssetId, `${path}.backgroundAssetId`);
+    arrayAt(record.tileLayers, `${path}.tileLayers`, 0, 10)
+      .forEach((layer, index) => validateTileLayerShape(layer, `${path}.tileLayers[${index}]`));
+    arrayAt(record.objects, `${path}.objects`, 0, 500)
+      .forEach((object, index) => validateObjectShape(object, `${path}.objects[${index}]`));
+    arrayAt(record.events, `${path}.events`, 0, 300)
+      .forEach((event, index) => validateEventShape(event, `${path}.events[${index}]`));
+    return;
+  }
+  if (base.type === 'PLATFORMER') {
+    const record = recordAt(value, path, ['id', 'type', 'name', 'width', 'height', 'gravity', 'tileLayers', 'objects', 'events'], ['id', 'type', 'name', 'width', 'height', 'backgroundAssetId', 'gravity', 'tileLayers', 'objects', 'events']);
+    integerAt(record.width, `${path}.width`, 8, 200);
+    integerAt(record.height, `${path}.height`, 6, 100);
+    integerAt(record.gravity, `${path}.gravity`, 1, 30);
+    if (record.backgroundAssetId !== undefined) stableIdAt(record.backgroundAssetId, `${path}.backgroundAssetId`);
     arrayAt(record.tileLayers, `${path}.tileLayers`, 0, 10)
       .forEach((layer, index) => validateTileLayerShape(layer, `${path}.tileLayers[${index}]`));
     arrayAt(record.objects, `${path}.objects`, 0, 500)
@@ -416,8 +522,9 @@ const validateSceneShape = (value: unknown, path: string): void => {
   }
 
   if (base.type === 'DIALOGUE') {
-    const record = recordAt(value, path, ['id', 'type', 'name', 'presentation', 'startNodeId', 'nodes']);
+    const record = recordAt(value, path, ['id', 'type', 'name', 'presentation', 'startNodeId', 'nodes'], ['id', 'type', 'name', 'presentation', 'backgroundAssetId', 'startNodeId', 'nodes']);
     enumAt(record.presentation, `${path}.presentation`, ['OVERLAY', 'FULL_SCREEN']);
+    if (record.backgroundAssetId !== undefined) stableIdAt(record.backgroundAssetId, `${path}.backgroundAssetId`);
     stableIdAt(record.startNodeId, `${path}.startNodeId`);
     arrayAt(record.nodes, `${path}.nodes`, 1, 300)
       .forEach((node, index) => validateDialogueNodeShape(node, `${path}.nodes[${index}]`));
@@ -483,12 +590,12 @@ const validateSemantics = (project: GameProject): void => {
   }
 
   const allObjects = assertUniqueIds(
-    project.scenes.flatMap((scene) => scene.type === 'TOP_DOWN' ? scene.objects : []),
+    project.scenes.flatMap((scene) => scene.type !== 'DIALOGUE' ? scene.objects : []),
     'object',
     'DUPLICATE_OBJECT_ID',
   );
   assertUniqueIds(
-    project.scenes.flatMap((scene) => scene.type === 'TOP_DOWN' ? scene.events : []),
+    project.scenes.flatMap((scene) => scene.type !== 'DIALOGUE' ? scene.events : []),
     'event',
     'DUPLICATE_EVENT_ID',
   );
@@ -568,7 +675,14 @@ const validateSemantics = (project: GameProject): void => {
   };
 
   for (const scene of project.scenes) {
-    if (scene.type === 'TOP_DOWN') {
+    if (scene.type !== 'DIALOGUE') {
+      if (scene.backgroundAssetId !== undefined) {
+        expect(
+          assets.get(scene.backgroundAssetId)?.kind === 'IMAGE',
+          'SCENE_BACKGROUND_ASSET_INVALID',
+          `invalid map background asset: ${scene.backgroundAssetId}`,
+        );
+      }
       expect(
         scene.objects.filter((object) => object.preset === 'PLAYER_SPAWN').length === 1,
         'PLAYER_SPAWN_COUNT_INVALID',
@@ -612,6 +726,12 @@ const validateSemantics = (project: GameProject): void => {
           if (component.type === 'PICKUP') {
             expect(items.has(component.itemId), 'PICKUP_ITEM_NOT_FOUND', `unknown pickup item: ${component.itemId}`);
           }
+          if (component.type === 'SHOOTER') {
+            expect(assets.get(component.projectileAssetId)?.kind === 'IMAGE', 'PROJECTILE_ASSET_INVALID', `invalid projectile asset: ${component.projectileAssetId}`);
+          }
+          if (component.type === 'SPAWNER') {
+            expect(assets.get(component.enemyAssetId)?.kind === 'IMAGE', 'SPAWNER_ASSET_INVALID', `invalid enemy asset: ${component.enemyAssetId}`);
+          }
         }
       }
 
@@ -630,8 +750,22 @@ const validateSemantics = (project: GameProject): void => {
     }
 
     const nodes = assertUniqueIds(scene.nodes, `dialogue node in ${scene.id}`, 'DUPLICATE_DIALOGUE_NODE_ID');
+    if (scene.backgroundAssetId !== undefined) {
+      expect(
+        assets.get(scene.backgroundAssetId)?.kind === 'IMAGE',
+        'DIALOGUE_BACKGROUND_ASSET_INVALID',
+        `invalid dialogue background asset: ${scene.backgroundAssetId}`,
+      );
+    }
     expect(nodes.has(scene.startNodeId), 'DIALOGUE_START_NODE_NOT_FOUND', `${scene.id} startNodeId does not exist`);
     for (const node of scene.nodes) {
+      if (node.portraitAssetId !== undefined) {
+        expect(
+          assets.get(node.portraitAssetId)?.kind === 'IMAGE',
+          'DIALOGUE_PORTRAIT_ASSET_INVALID',
+          `invalid dialogue portrait asset: ${node.portraitAssetId}`,
+        );
+      }
       assertUniqueIds(node.choices, `choice in ${scene.id}/${node.id}`, 'DUPLICATE_DIALOGUE_CHOICE_ID');
       for (const choice of node.choices) {
         choice.conditions?.forEach(validateConditionReferences);
@@ -654,6 +788,17 @@ const validateSemantics = (project: GameProject): void => {
 };
 
 export const parseGameProject = (input: unknown): GameProject => {
+  let jsonBytes = Number.POSITIVE_INFINITY;
+  try {
+    jsonBytes = new TextEncoder().encode(JSON.stringify(input)).byteLength;
+  } catch {
+    fail('GAME_PROJECT_INVALID', 'project must be JSON serializable');
+  }
+  expect(
+    jsonBytes <= GAME_PROJECT_LIMITS.maxJsonBytes,
+    'GAME_PROJECT_SIZE_EXCEEDED',
+    `project JSON exceeds ${GAME_PROJECT_LIMITS.maxJsonBytes} bytes`,
+  );
   const project = recordAt(
     input,
     'project',
