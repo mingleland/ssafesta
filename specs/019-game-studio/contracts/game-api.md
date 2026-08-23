@@ -1,18 +1,23 @@
 # Game Studio API 계약
 
-> 상태: Draft v0.3 — BE Issue #21과 제품·Portal 계약 #33·#34 반영. 구현 오류 코드명은 #48에서 고정한다.
+> 상태: Draft v0.4 — #33·#34·#48 및 전역 오류 봉투 #58 합의 반영. DTO·revision·오류 코드는 이 문서를 기준으로 구현한다.
 
 ## 공통 오류 봉투
 
-기존 FESTA 오류 봉투를 재사용한다. 예시는 다음과 같다.
+기존 FESTA의 단일 5필드 오류 봉투를 재사용한다. `errors`와 `warnings`는 값이 없어도 빈 배열로 항상 존재하며 `details` 필드는 추가하지 않는다.
 
 ```json
 {
   "code": "GAME_REVISION_CONFLICT",
   "message": "다른 편집 내용이 먼저 저장되었습니다.",
-  "details": {
-    "currentRevision": 8
-  }
+  "requestId": "req_a1b2c3d4",
+  "errors": [
+    {
+      "rule": "CURRENT_REVISION",
+      "message": "8"
+    }
+  ],
+  "warnings": []
 }
 ```
 
@@ -32,8 +37,10 @@ Owner/Editor만 호출할 수 있고 Guest는 Authoring API를 사용할 수 없
 
 ### Draft 저장
 
-요청은 `expectedRevision`과 전체 GameProject snapshot을 포함한다. 서버는 구조·schema·상한을 검증하되
-제작 중 존재하지 않는 참조의 소유권·완성도를 이유로 Draft 저장을 막지 않는다.
+요청은 `expectedRevision`과 전체 GameProject snapshot을 포함한다. 서버는 Draft 저장과 Publish 양쪽에서
+같은 구조·schema·용량·개수 상한과 내부 참조 무결성을 검증한다. JSON은 2,000,000 bytes, Scene은 50,
+Scene당 Object 500/Event 300, Asset 300을 넘을 수 없다. Asset source는 `builtin://` 또는 서버가 발급한
+stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob:`, `file:`은 거부한다.
 
 ```json
 {
@@ -90,7 +97,8 @@ GET /api/v1/games/{gameId}/published
 - Draft는 Runtime 공개 endpoint로 노출하지 않는다.
 - Published가 없거나 비공개·삭제된 게임은 새로 실행할 수 없다.
 - 응답은 `schemaVersion`, `gameId`, `publishedVersion`, GameProject를 포함한다.
-- Published 내용은 불변이므로 version별 ETag와 긴 `max-age`를 사용할 수 있다.
+- 현재 공개 포인터를 따라가는 `/games/{gameId}/published`는 재공개 즉시 새 version을 보도록 `Cache-Control: no-cache`와 ETag 재검증을 사용한다.
+- 긴 `max-age, immutable`은 후속 version 고정 URL(`/games/{gameId}/versions/{versionNo}`)을 제공할 때 해당 URL에만 적용한다.
 - Runtime은 지원하지 않는 MAJOR를 거부한다.
 - Asset binary나 만료 주소가 아니라 안정적인 Asset reference만 반환한다.
 - route 진입 시 한 번 조회해 공개 상태를 판정한다. Game Studio 전용 socket은 사용하지 않는다.

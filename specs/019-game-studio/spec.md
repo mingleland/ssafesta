@@ -27,7 +27,7 @@
 - Q: 장르마다 별도 저장 모델을 만들 것인가? → A: 아니다. Backend 문서 형식은 `GameProject v1` 하나이고 실행 방식은 `TOP_DOWN`·`PLATFORMER` 두 개만 둔다. 스토리·방탈출·수집·점프맵·슈팅·생존은 검색/추천용 장르 태그와 제작 시작 템플릿일 뿐 별도 Runtime이나 테이블이 아니다.
 - Q: 현재 로컬 수직 구현은 무엇을 선택했는가? → A: 기존 `festa-frontend` 안의 lazy module, TypeScript 계약/상태 코어, DOM/CSS reference renderer, same-origin `/app/games/:gameId/play?source=local` Preview를 선택했다. Production renderer나 API adapter는 port 뒤에서 교체할 수 있고 GameProject 의미를 바꾸지 않는다.
 - Q: 기본 자산과 사용자 이미지는 어떻게 노출하는가? → A: versioned `builtin://` 타일셋·스프라이트·배경·인물 표정을 먼저 제공하고, 사용자는 선택한 Sprite/배경만 명시적으로 교체한다. 로컬 blob은 Preview 전용이며 Publish에는 Backend가 발급한 안정 Asset reference만 허용한다.
-- Q: DB와 브라우저를 보호하는 상한은 무엇인가? → A: GameProject JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset reference 300을 v1 상한으로 검증한다. 이미지·오디오 binary는 JSON/DB에 넣지 않는다.
+- Q: DB와 브라우저를 보호하는 상한은 무엇인가? → A: GameProject JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset reference 300을 v1 상한으로 검증한다. FE 로컬 저장과 BE Draft 저장·Publish 모두 같은 상한과 내부 참조 무결성을 적용하며 이미지·오디오 binary는 JSON/DB에 넣지 않는다.
 
 ### Session 2026-08-21
 

@@ -8,6 +8,14 @@
 
 ## 2026-08-23
 
+### GS-T032. 최신 develop 정본화 병합 뒤 PR #53 공통 문서가 다시 충돌함 (해결)
+
+- **증상** — PR #53이 `CLEAN`에서 `DIRTY/CONFLICTING`으로 바뀌고 rebase 중 `docs/26_팀_결정_필요사항.md`, `specs/README.md` 두 파일에서 충돌했다.
+- **원인** — 최신 develop PR #67이 오류 봉투·spec 상태 정본·부스 계약을 공통 문서에 추가했고, Game Studio 최초 문서 커밋도 같은 표의 인접 행을 추가했다. 코드나 spec 019 내부 계약 충돌은 아니었다.
+- **해결** — rebase 전 backup branch를 만들고 최신 develop의 #58·#59·#62 정책과 폐기된 spec 018 행을 보존했다. Game Studio P2 행과 #33 공개 정책·#34 Portal ID 정책만 행 단위로 병합했다. 이어 Backend 리뷰의 5필드 오류 봉투와 Published 캐시 정정을 적용하고 계약 fixture를 재검증했다.
+- **예방** — 공통 인덱스·팀 결정 표는 기능 브랜치 장기 보유를 피하고, 최종 push 직전에 최신 develop을 받아 행 단위로 병합한다. `ours/theirs` 파일 전체 선택 뒤 필요한 상대 행을 명시적으로 복원해 정본 정책 유실을 막는다.
+
+
 ### GS-T031. 최종 fetch 중 원격 추적 ref가 먼저 갱신되어 lock 비교가 실패함 (해결)
 
 - **증상** — 코드 복제본의 최종 `fetch`가 `github/front`와 `github/game`에 대해 현재 ref가 예상값보다 이미 앞서 있다는 `cannot lock ref ... is at ... but expected ...` 오류로 종료됐다.

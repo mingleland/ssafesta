@@ -20,14 +20,17 @@ Set-Location backend
 최소 검증 행렬:
 
 1. owner save 성공과 stale `expectedRevision` 409
-2. invalid coordinate/reference/unknown field 자동 보정 없이 거부
-3. invalid Publish가 row/pointer/Draft를 부분 변경하지 않음
-4. Published row update 금지와 version history 보존
-5. 일반 soft delete 뒤 새 실행 거부, 회원 탈퇴 hard delete
-6. `GAME_PORTAL` whitelist 저장과 `requiresConfig=true`
-7. foreign/missing config는 `CONFIG_NOT_OWNED` error
-8. own inactive config는 publish warning, runtime entry는 거부
-9. `config_id` 0·음수·2147483648 거부, 2147483647 왕복 보존
-10. Portal resolution 응답 `Cache-Control: no-store`
+2. Draft와 Publish 모두 invalid coordinate/reference/unknown field를 자동 보정 없이 거부
+3. Draft와 Publish 모두 JSON 2,000,000 bytes·Scene 50·Scene당 Object 500/Event 300·Asset 300 상한 적용
+4. `asset://local`·binary/base64·`data:`·`blob:`·`file:` 거부, `builtin://`·서버 stable `asset://` 허용
+5. invalid Publish가 row/pointer/Draft를 부분 변경하지 않음
+6. Published row update 금지와 version history 보존
+7. 일반 soft delete 뒤 새 실행 거부, 회원 탈퇴 hard delete
+8. `GAME_PORTAL` whitelist 저장과 `requiresConfig=true`
+9. foreign/missing config는 `CONFIG_NOT_OWNED` error
+10. own inactive config는 publish warning, runtime entry는 거부
+11. `config_id` 0·음수·2147483648 거부, 2147483647 왕복 보존
+12. Portal resolution 응답 `Cache-Control: no-store`
+13. Published 포인터 URL은 `Cache-Control: no-cache` + ETag로 재검증
 
 FE 수직 검증은 [FE quickstart](../FE/quickstart.md)를 따른다.

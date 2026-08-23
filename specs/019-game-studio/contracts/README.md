@@ -28,6 +28,7 @@
 11. 신규 실행은 route/overlay REST 조회에서 판정하고 이미 로드된 무보상 로컬 세션은 완료까지 허용한다.
 12. Portal `configId`는 signed Int32 양수이며 DB 내부 BIGINT PK와 별도 INTEGER 공개 ID로 관리한다.
 13. 일반 삭제는 soft, 회원 탈퇴는 관련 데이터를 hard delete하고 Published 이력은 Game 존속 중 유지한다.
+14. Draft 저장과 Publish는 같은 v1 상한·내부 참조·안정 Asset source 규칙을 적용하며 서버가 자동 보정하지 않는다.
 
 ## v1 의미 검증 규칙
 
@@ -42,7 +43,8 @@ JSON Schema만으로 표현하기 어려워 Producer와 서버가 별도로 검�
 - `SHOW_DIALOGUE.sceneId`는 `OVERLAY` DIALOGUE를 가리키며, Overlay는 시작 Scene이나 `GO_TO_SCENE` 대상이 될 수 없다.
 - `CLOSE_DIALOGUE`는 `OVERLAY` DIALOGUE Choice에서만 허용하고, `nextNodeId`는 같은 Scene의 Node를 가리킨다.
 - World Object 위치는 Scene 범위 안의 0-based 정수 셀 좌표다.
-- 저장되는 Asset source는 `builtin://` 또는 서버가 관리하는 `asset://` reference이며 binary·임시 URL을 포함하지 않는다.
+- 저장되는 Asset source는 `builtin://` 또는 서버가 발급한 stable `asset://` reference다. `asset://local`, binary/base64, `data:`, `blob:`, `file:`과 임시 서명 URL은 Draft/Publish에서 거부한다.
+- Draft와 Publish 모두 JSON 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300 상한을 적용한다.
 - Variable의 `type`과 `initialValue` 실제 타입은 일치한다.
 - Event 순서, terminal Action, Action/transition budget은 `event-runtime-semantics.md`를 따른다.
 

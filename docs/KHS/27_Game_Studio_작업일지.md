@@ -9,6 +9,21 @@
 
 ## 2026-08-23
 
+### 구현 PR 병합·완료 이슈 정리 ✅
+
+- 🤖 [PR #63](https://github.com/kanghyunsoon/ssafesta/pull/63)이 @colosair의 최신 `front` 기준 독립 검증 후 병합됐다. trial merge 무충돌, 전체 **19 files / 98 tests**, TypeScript build, lint, lazy Asset chunk 격리가 재확인됐다.
+- 🤖 로컬 Authoring Workspace·Preview 완료 범위인 [#49](https://github.com/kanghyunsoon/ssafesta/issues/49)와 renderer·same-origin route Preview·builtin/local Asset resolver 결정 범위인 [#35](https://github.com/kanghyunsoon/ssafesta/issues/35)를 완료 근거와 함께 닫았다.
+- 🤖 운영 기능은 [#48](https://github.com/kanghyunsoon/ssafesta/issues/48) Draft/Publish API, [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) Published loader·오류 격리, [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) GAME_PORTAL Binding으로 분리해 계속 OPEN 유지했다.
+
+### Backend 리뷰·최신 develop 계약 동기화 ✅
+
+- 🤖 @strdeok의 PR #53 검토를 반영해 `GAME_REVISION_CONFLICT` 예시를 FESTA 단일 5필드 오류 봉투(`code/message/requestId/errors/warnings`)로 고쳤고, 존재하지 않는 `details` 필드를 제거했다.
+- 🤖 GameProject 상한과 내부 참조 무결성을 Publish뿐 아니라 Draft 저장에도 동일 적용하도록 확정했다. `asset://local`·binary/base64·`data:`·`blob:`·`file:`은 거부하고 `builtin://`·서버 stable `asset://`만 허용한다.
+- 🤖 공개 포인터 URL `/games/{gameId}/published`는 재공개 즉시 최신 version을 보도록 `Cache-Control: no-cache` + ETag 재검증으로 고쳤다. 긴 immutable cache는 후속 version 고정 URL에만 적용한다.
+- 🤖 최신 `develop`(`32737ca`) 위로 문서 브랜치를 재정렬하고 `docs/26`, `specs/README` 충돌에서 최신 전역 정책과 Game Studio #33·#34 결정을 모두 보존했다.
+- 트러블슈팅: GS-T032
+
+
 ### 범용 Authoring Tool·Reference Runtime 수직 구현 ✅
 
 - 🤖 최신 `front` 기반 전용 `codex/game-studio-authoring-shell` 브랜치에서 Scene/Object/Tile/Properties/Event/Dialogue/Data가 한 화면에서 이어지는 한국어 Game Studio를 구현했다. 공유 Unity 작업트리, `festa-unity/**`, `backend/**`는 수정하지 않았다.
