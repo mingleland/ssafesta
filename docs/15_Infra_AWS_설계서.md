@@ -109,7 +109,7 @@ Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ─
 - Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
 - `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
 - Unity 7777은 외부에 공개하지 않는다.
-- WebSocket read timeout은 초기값을 두고 heartbeat·무입력 연결 실측 후 확정한다.
+- `world.<domain>`의 Nginx `proxy_read_timeout`은 초기값 `180s`를 명시하고, heartbeat·무입력 연결 실측 결과에 따라 조정한다.
 - AI SSE 경로는 `proxy_buffering off`, cache off, 충분한 read timeout을 적용한다.
 - API·AI·World는 Cloudflare 정적 캐시 대상에서 제외한다.
 

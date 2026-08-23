@@ -208,17 +208,7 @@ Expected:
 - 첫 제출만 성공
 - 보상 1회
 
-### E2E-103 AI Service Payment
-
-```text
-Visitor AI 유료 서비스 시작
-→ Coin 처리
-→ AI Conversation
-```
-
-AI 실패 시 환불 정책이 확정되면 해당 케이스를 추가한다.
-
-### E2E-104 Minigame
+### E2E-103 Minigame
 
 ```text
 Start

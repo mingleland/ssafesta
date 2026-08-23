@@ -77,7 +77,8 @@ Catalog의 모든 항목을 순회하며 썸네일을 생성한다. 새 항목�
 ### 작업할 spec 지정
 
 ```bash
-echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feature.json
+echo '{ "feature_directory": "specs/013-avatar-customization/Unity" }' > .specify/feature.json
+# spec.md 정본은 상위 디렉터리에 있다 — #43 파트별 산출물 구조
 bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 ```
 

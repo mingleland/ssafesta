@@ -111,7 +111,6 @@
 **결정할 것**
 - [ ] 1차 LLM 모델: __________
 - [ ] TTFT timeout: ______초 / 전체 timeout: ______초
-- [ ] AI 실패 시 Coin 환불 → **`/speckit.clarify`로 유예 가능** (단 Ledger에 `REFUND` 타입 자리는 09번 스키마에 미리 만들어 둘 것)
 
 **영향 문서**: 13, 14, 16
 
@@ -175,6 +174,7 @@
 >
 > 1. **Access Token (JWT, 30분)** — React는 메모리 보관, `Authorization: Bearer`로 전송
 > 2. **Refresh Token (7일)** — `httpOnly; Secure; SameSite=None`, Domain `.festa.example.com` 쿠키. 회전(rotation) 없음 — 8주 프로젝트에 과설계
+>    *(→ **무효**: `SameSite=None`·상위 도메인은 **CloudFront 도메인(다른 사이트)** 전제였다. #30에서 `demo.<domain>`·`api.<domain>`로 확정되어 같은 등록 도메인 = same-site이므로 **`SameSite=Lax` + Domain 미지정(api 호스트 한정)** 이다 — spec 001 FR-013e, docs/26 결정 로그 2026-08-23)*
 > 3. **Unity NGO Connection Token** — Spring이 `POST /api/v1/world-sessions` 응답으로 주는 **TTL 60~120초 1회용 토큰**. **Refresh Token은 Unity에 절대 전달하지 않는다.** Unity 서버는 이 토큰만 Connection Approval에서 검증 (12번 7절 완성)
 > 4. **WebSocket 인증** — Handshake 시 Access Token. **쿼리스트링 금지** (16번 14절이 이미 경고)
 >

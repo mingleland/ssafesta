@@ -19,24 +19,24 @@
 | **007** | ai-agent-document | AI-01, AI-02 | AI + BE + FE | 001, 004 | Document Pipeline + 상태 머신 (doc 13 §5~6) |
 | **008** | ai-conversation-rag | AI-03~05 | AI + FE | 007 | 격리 Critical Test 포함. SSE + React 오버레이(ADR 결정4) |
 | **009** | project-exhibition | PROJECT-01~04 | BE + FE + Unity | 004, 005 | RUNTIME-05 중 Video/Panel 상호작용 일부 포함 |
-| **013a** | avatar-customization | WORLD-04 | Unity + FE + BE | 001, 002 | **P0 승격 (2026-08-12 팀 결정)** — **모듈러 프리팹 방식으로 재구현** (v2). 외형은 ID 집합으로 표현하고 네트워크는 고정 크기 struct. CharacterLobby 씬 + Spring 저장 + 재접속 복원. 지시: `docs/29` |
+| **013a** | avatar-customization | WORLD-04 | Unity(UI) + FE(호스트·인증) + BE(저장) | 001, 002 | **P0 승격 (2026-08-12 팀 결정)** — **모듈러 프리팹 방식으로 재구현 (v2)**: 외형은 ID 집합, 네트워크는 고정 크기 struct, 지시 `docs/29`. **2026-08-16 결정: 완성된 Unity `CharacterLobby`를 정식 커스터마이징 화면으로 쓰고 React 오버레이 교체 요구는 폐기** — `FE.md` 013a 에 반영 완료(#26). 신규 잔여: Spring 저장(`PUT /users/me/avatar`, 필드 `avatarCode` — #24 확정), 재접속 복원, 멀티클라이언트 E2E |
 | **016** | booth-laptop-homepage | RUNTIME-06, PROJECT-05 | FE + Unity + BE | 004, 005 계약 | **신설 (2026-08-12)** — Studio에서 홈페이지 URL 등록 → 부스 노트북 오브젝트 클릭 → React 오버레이에서 해당 페이지 열람·웹서핑. Unity는 상호작용 트리거만 (Article V). iframe 차단(X-Frame-Options) 시 새 탭 fallback 필수 |
 
 **1차 MVP 완료 판정** = doc 02 §5.1의 10단계 연속 흐름 (001~009 전부) + 캐릭터 커스텀(013a) + 노트북 홈페이지(016)
-**1차 월드 구성** = **11층 단일 존** (층 구조는 018/2차)
+**월드 구성** = **11층 단일 존** — 1차·2차 모두. 1층은 폐기됐다 (2026-08-21, #31)
 
-## 2차 MVP (P1) — specs 010~015, 017~018
+## 2차 MVP (P1) — specs 010~015, 017 (018 은 폐기)
 
 | Spec | 이름 | 포함 기능 ID | 선행 | 비고 |
 |---|---|---|---|---|
 | **010** | survey | SURVEY-01~08 | 004, 005 | 보상(SURVEY-07)은 003 계약 사용 |
 | **011** | staff-consultation | STAFF-01~03, CONSULT-01~05, AI-06 | 001, 008 | WebSocket 상담 + Presence + Handoff Summary |
-| **012** | economy-extended | ECON-05~08 | 003 | AI 결제·수익, Inventory, 장식 구매 |
+| **012** | economy-extended | ECON-06~08 | 003 | Inventory, 장식 구매, 거래 내역 |
 | **013b** | avatar-presence | WORLD-05~06 | 002, 013a | Emote·Presence·닉네임 표시 등 커스터마이징 제외 잔여분 (커스터마이징은 013a로 P0 이동) |
 | **014** | minigame | GAME-01~03 | 002, 003 | 1종만. 정산은 Spring. **P2 확장 후보: 마피아 게임(GAME-05)** — 접속자 대상 역할 부여 + 연출("지직" 글리치). spec은 P0/P1 안정 후 판단 |
 | **015** | dashboard | DASH-01~05 | 007~012 | 집계 지표 — 데이터 소스 spec들 이후 |
 | **017** | proximity-voice | WORLD-09 | Unity + FE + Infra | 002 | **거리 기반 음성채팅** — 거리별 볼륨 감쇠. 권장: WebRTC SFU(LiveKit 등) 별도 채널 + Unity가 위치 기반 게인 계산. NGO로 음성을 실어 나르지 않는다 |
-| **018** | world-floors | WORLD-10 | Unity | 002 | **1층+11층 + 엘리베이터 전환** — 1층 축제 부스·포토존, 엘리베이터 진입 → 내부 연출/로딩 → 층수 변화 → 11층 도착. 1차 MVP는 11층 단일이므로 2차에서 존 분리·세션 이동 설계 |
+| ~~**018**~~ | ~~world-floors~~ | WORLD-10 | — | — | ⛔ **폐기 (2026-08-21, #31)** — 1층 폐기로 전제 소멸. 엘리베이터는 11층 **입장 게이트**로 재활용하고, 살아남은 FR 2개(진행 표시·갇힘 방지)는 **spec 002 FR-013·014** 로 이전했다 |
 
 **P2 (WORLD-07/08, AI-07/08, EVENT, COMP, STUDIO-14 등)는 spec을 만들지 않는다** — doc 01 Cut Line대로 P0/P1 안정 후 판단.
 
@@ -54,7 +54,7 @@
 
 - **BE**: 001 → 003 → 004 (직렬 — 서로 의존)
 - **FE**: 001(로그인 UI) → 005(Studio) 착수 — 005는 Mock API로 004와 병렬 가능
-- **Unity**: 002·006·014·017·018 spec 확정 완료 → **013 캐릭터 커스터마이징 구현 착수** (`docs/29`)
+- **Unity**: 002 소급 spec + wss 검증 → 006 소급 spec → 013 준비
 - **AI**: 007 스파이크(이미 계획됨) → 007/008 spec
 
 ## POC 소급 spec 처리 (docs/23 원칙)

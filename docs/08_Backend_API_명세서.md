@@ -56,6 +56,23 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 }
 ```
 
+### 1.3-1 전역 `rule` 목록 (#58, 2026-08-23 확정)
+
+`errors[]`·`warnings[]`의 `rule`은 클라이언트가 분기해도 되는 계약값이다. **아래는 endpoint를 가리지 않고 나오는 전역 rule**이고, 기능별 rule은 각 spec 계약 문서가 소유한다(예: Layout 계열은 `specs/005-booth-studio-layout/contracts/layout-api.md` §0).
+
+| rule | 어디서 | 뜻 |
+|---|---|---|
+| `FIELD_INVALID` | 전 endpoint (Bean Validation) | 요청 필드 값이 제약을 위반. **문제 필드는 `field`에 담는다** — `rule` 자리에 필드명을 넣지 않는다 |
+
+```json
+{ "code": "VALIDATION_FAILED", "message": "요청 값이 올바르지 않습니다.", "requestId": "req_…",
+  "errors": [ { "rule": "FIELD_INVALID", "field": "nickname", "message": "닉네임을 입력해 주세요." } ],
+  "warnings": [] }
+```
+
+- `field`는 `objectId`와 같이 **없으면 키 자체가 빠진다**(`@JsonInclude(NON_NULL)`). 둘은 가리키는 대상이 달라 합치지 않는다 — `objectId`는 배치된 오브젝트, `field`는 요청 필드 경로다.
+- `rule`은 **항상 규칙 어휘**다. 필드명·식별자를 `rule`에 넣으면 클라이언트의 화이트리스트 분기가 깨진다 (#58 §3).
+
 ### 1.4 Idempotency
 
 금전·보상·임대 등 중복 위험 요청은 다음 Header 사용을 권장한다.
@@ -276,6 +293,18 @@ Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
 
 공개된 것이 없으면 `404 LAYOUT_NOT_PUBLISHED`, 임대가 유효하지 않으면 `409 BOOTH_LEASE_EXPIRED`다.
 
+### GET `/booth-slots/{slotId}/layouts/published` — spec 005 신설 (#62, 2026-08-23)
+
+Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응답 body는 `/booths/{boothId}/layouts/published`와 **완전히 동일**하다.
+
+`boothId`는 방 번호가 아니다 — 슬롯(고정)과 부스(임대 시 발급)는 다른 축이고 재임대하면 같은 방의 `boothId`가 바뀐다. 서버가 `슬롯 → 유효 임대 → boothId` 해석을 흡수한다.
+
+- 빈 슬롯·미공개 → `404 LAYOUT_NOT_PUBLISHED` (Unity의 graceful skip 그대로)
+- 임대 만료 → `409 BOOTH_LEASE_EXPIRED`
+- `slotId` 1~12가 Unity 앵커 `01~12`와 대응 (V12 시드가 고정)
+
+상세는 `specs/005-booth-studio-layout/contracts/layout-api.md` §11.
+
 ### GET `/booth-layout-templates` — spec 005 신설 (#19 ④, 2026-08-21)
 
 편집기용 템플릿 카탈로그. footprint와 오브젝트 상한을 세 파트가 각자 알던 것을 한 곳에서 받는다. **권한 필요.**
@@ -292,7 +321,7 @@ Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
 }
 ```
 
-- `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관).
+- `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관, #19 ④·#45 C-06).
 - `height` 2.72는 셸 벽 패널 실측이다. Layout 좌표·실물 검증도 같은 값을 쓴다 (`0 ≤ y ≤ 2.72`).
 - 검증 오류·경고 rule 추가분: 실물 영역 이탈 `AREA_OUT_OF_BOUNDS`(error), 통행 판정
   `FRONT_BLOCKED`·`ISOLATED_AREA`(warning, 공개 시점만). 기하 계약 상세는
@@ -312,12 +341,13 @@ Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
 ```
 
 - `themeCode`: `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`
-- `primaryColor`: `#RRGGBB` 또는 null
+- `primaryColor`: `#RRGGBB` 또는 null. **12색 팔레트 안의 값만 허용**하고 저장 시 **대문자로 정규화**한다 (#17, 2026-08-23 확정 — 값의 정본은 `specs/005-booth-studio-layout/contracts/layout-api.md` §6. 팔레트는 테마와 무관한 전역 1개)
 - `signText`: 60자 이하 또는 null
 - `logoUrl`: **https만 허용**, 2048자 이하 또는 null (http는 mixed content로 차단되어 조용히 안 보인다)
 
-소유자·Staff만 호출할 수 있고, 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는 `GET /booths/{boothId}`의
-`facade` 필드를 쓴다.
+소유자·Staff만 호출할 수 있고, 필드 검증 실패는 `400 VALIDATION_FAILED`(#17 확정 — 예:
+`"대표색은 #RRGGBB 형식이어야 합니다."`), 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는
+`GET /booths/{boothId}`의 `facade` 필드를 쓴다.
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 
@@ -445,23 +475,6 @@ Cursor 또는 Page 기반 거래 내역 조회.
 일일 지급 요청.
 
 중복 요청 시 같은 날 한 번만 지급한다.
-
-### POST `/agents/{agentId}/usage-authorizations` — P1 제안
-
-유료 AI 서비스 사용 전 Spring이 잔액·권한을 검증하고 사용 승인/결제를 처리하는 Endpoint 후보.
-
-```json
-{
-  "authorizationId": "aiuse_...",
-  "chargedCoin": 20,
-  "balanceAfter": 130,
-  "expiresAt": "..."
-}
-```
-
-AI 호출 실패 환불 정책은 TBD다.
-
----
 
 ## 9. Survey
 

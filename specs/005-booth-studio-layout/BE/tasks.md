@@ -1,6 +1,6 @@
 # Tasks: Booth Studio / Layout 계약
 
-**Input**: `specs/005-booth-studio-layout/` — [spec.md](spec.md) · [plan.md](plan.md) · [research.md](research.md) · [data-model.md](data-model.md) · [contracts/](contracts/) · [quickstart.md](quickstart.md)
+**Input**: `specs/005-booth-studio-layout/` — [spec.md](../spec.md) · [plan.md](plan.md) · [research.md](research.md) · [data-model.md](data-model.md) · [contracts/](../contracts/) · [quickstart.md](quickstart.md)
 
 **Tests**: 포함한다. SC-003(작업본 노출 0건)·SC-004(왕복 일치)·FR-014(덮어쓰기 0건)는 **전부 "없어야 하는 것"**이라 테스트 없이는 충족을 증명할 수 없다.
 
@@ -20,7 +20,7 @@
 **왜 먼저인가**: 005의 모든 endpoint가 이 봉투로 응답한다. 나중에 하면 005 코드를 두 번 고친다. 003·004 이관도 같은 이유로 여기서 끝낸다 — 봉투가 두 종류인 기간을 만들지 않는다.
 
 - [X] T001 [P] `common/ErrorCode.java` — 코드·기본 HTTP status·기본 메시지를 갖는 enum. **docs/08 오류 코드 표와 1:1**로 맞춘다. 005 신규분(`LAYOUT_VALIDATION_FAILED` · `LAYOUT_REVISION_CONFLICT` · `LAYOUT_NOT_PUBLISHED` · `BOOTH_EDITOR_FORBIDDEN`)과 기존분(`BOOTH_LEASE_EXPIRED` · `BOOTH_SLOT_ALREADY_LEASED` · `BOOTH_SLOT_NOT_RENTABLE` · `ACTIVE_LEASE_LIMIT` · `BOOTH_NOT_FOUND` 등)을 함께 등록
-- [X] T002 [P] `common/ApiErrorResponse.java` — `{code, message, requestId}` record. `errors`·`warnings`는 **null이면 직렬화에서 빠지도록** `@JsonInclude(NON_NULL)` (검증 응답에만 등장, [contracts/layout-api.md](contracts/layout-api.md) §0)
+- [X] T002 [P] `common/ApiErrorResponse.java` — `{code, message, requestId}` record. `errors`·`warnings`는 **null이면 직렬화에서 빠지도록** `@JsonInclude(NON_NULL)` (검증 응답에만 등장, [contracts/layout-api.md](../contracts/layout-api.md) §0)
 - [X] T003 `common/ApiException.java` — `ErrorCode`를 싣는 기반 예외. 메시지 override와 상세 목록 첨부를 허용한다 (T001 의존)
 - [X] T004 [P] `common/RequestIdFilter.java` — 요청당 `req_{8자}` 생성 → **MDC + 응답 헤더 `X-Request-Id`**. 봉투의 `requestId`와 서버 로그가 같은 값이어야 문의 추적이 성립한다. 로그 패턴에 `%X{requestId}` 추가
 - [X] T005 `common/GlobalExceptionHandler.java` — `@RestControllerAdvice`. `ApiException` → 봉투, `ResponseStatusException` → 봉투(코드 미상은 `INTERNAL_ERROR`), Bean Validation 실패 → `400 VALIDATION_FAILED`. **스택트레이스·예외 클래스명을 본문에 넣지 않는다** (T002·T003·T004 의존)
@@ -40,7 +40,7 @@
 - [X] T010 `db/migration/V8__booth_published_layout_version.sql` — `booths.published_layout_version INTEGER NULL` 추가 + **복합 FK** `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사가 면제되어 "공개된 것 없음"이 표현된다 (data-model I-3)
 - [X] T011 `db/migration/V9__booth_facade_fields.sql` — `facade_code` → `facade_theme_code` **rename**, `facade_primary_color VARCHAR(7)` · `facade_sign_text VARCHAR(60)` · `facade_logo_url VARCHAR(2048)` 추가 (전부 NULL 허용). **`booth/Booth.java`의 `facadeCode` 필드도 같은 커밋에서 고친다** — 아무도 안 읽는 필드라 빠뜨려도 테스트가 통과해 버린다 (data-model §5)
 - [X] T012 [P] `booth/LayoutObjectType.java` — canonical 10종 화이트리스트(`AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION`) + 기능형/장식형 구분. **Unity 하위 호환값 `SURVEY`·`CONSULT_DESK`는 저장에 허용하지 않는다** (spec §공통 계약)
-- [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다
+- [X] T013 [P] `booth/LayoutTemplate.java` — `DEFAULT` · `PROJECT_EXHIBITION`. C-06 확정 시 목록만 늘린다 *(→ C-06 확정으로 `DEFAULT` 제거, `PROJECT_EXHIBITION` 단독 — T055)*
 - [X] T014 `booth/LayoutJson.java` — **요청 원문을 보관**하고 검증용 파싱만 별도로 수행. 좌표는 `BigDecimal`로 읽는다. **`double`로 파싱해 재직렬화하지 않는다** (research R-04). JPA는 `@JdbcTypeCode(SqlTypes.JSON) String`으로 매핑
 - [X] T015 [P] `booth/BoothLayoutDraft.java` — `booth_layout_drafts` 매핑. PK가 `booth_id`(I-1). `revision` 증가는 전용 메서드로만
 - [X] T016 [P] `booth/BoothLayoutPublishedVersion.java` — `booth_layout_published_versions` 매핑. **생성 후 `layout_json`을 바꾸는 경로를 만들지 않는다** (I-7)
@@ -64,7 +64,7 @@
 - [X] T022 [US1] `booth/BoothLayoutQueryService.java` — Draft 조회(권한 필요, 없으면 empty → 컨트롤러가 204) · Published 조회. **Published는 004 `BoothLeaseRepository.findValidByBoothId`로 임대 유효성을 먼저 확인**하고 없으면 `BOOTH_LEASE_EXPIRED` (research R-06, I-5). 새 만료 술어를 쓰지 않는다
 - [X] T023 [US1] `booth/BoothLayoutService.java` — `saveDraft(boothId, userId, request)`. 권한 → 검증(저장 강도) → `expectedRevision` 조건부 UPDATE → 실패 시 `LayoutRevisionConflictException`. 최초 저장(`expectedRevision=0`)은 INSERT
 - [X] T024 [US1] `booth/BoothLayoutService.java` — `publish(boothId, userId)`를 **하나의 `@Transactional`** 로. 순서는 [data-model.md](data-model.md) §4 그대로: 권한 → 임대 유효 → 검증(공개 강도, errors면 중단) → `MAX(version_no)+1` INSERT → `booths.published_layout_version` 갱신. **4만 되고 5가 실패하면 "공개했는데 아무도 못 보는 버전"이 남는다**
-- [X] T025 [US1] `booth/BoothLayoutController.java` — `GET/PUT /api/v1/booths/{boothId}/layouts/draft` · `POST …/layouts/publish` · `GET …/layouts/published`. 응답 필드는 [contracts/layout-api.md](contracts/layout-api.md) §2~§5 그대로. **409 `LAYOUT_REVISION_CONFLICT` 본문에 최신 Draft를 함께 싣는다** (FE 추가 왕복 제거)
+- [X] T025 [US1] `booth/BoothLayoutController.java` — `GET/PUT /api/v1/booths/{boothId}/layouts/draft` · `POST …/layouts/publish` · `GET …/layouts/published`. 응답 필드는 [contracts/layout-api.md](../contracts/layout-api.md) §2~§5 그대로. **409 `LAYOUT_REVISION_CONFLICT` 본문에 최신 Draft를 함께 싣는다** (FE 추가 왕복 제거)
 - [X] T026 [US1] `auth/SecurityConfiguration.java` — `GET /api/v1/booths/*/layouts/published`를 **permitAll**로. Unity·방문자 경로다. **draft·publish는 인증 유지**
 - [X] T027 [P] [US1] `test/.../booth/BoothLayoutRoundTripIntegrationTest.java` — 저장한 좌표가 조회에서 그대로 나오는지. `2.123456789` · 음수 · `0.0` · `-0.0` · `rotationY: 359.9`를 포함하고, **알 수 없는 필드가 섞인 요청의 처리가 명시적인지**(조용히 버리지 않는다 — T-24의 교훈) 확인 (SC-004, quickstart §1)
 - [X] T028 [P] [US1] `test/.../booth/BoothLayoutServiceIntegrationTest.java` — 저장→공개→포인터 전이 / 공개 후 Draft를 고쳐도 **공개본이 변하지 않음**(I-7) / 두 번 공개하면 `version_no`가 1→2 / 공개 트랜잭션 중간 실패 시 포인터와 버전이 **함께** 롤백
@@ -113,7 +113,7 @@
 **Independent Test**: facade 수정 → `GET /booths/{id}` 응답의 `facade` 4필드가 바뀐다
 
 - [X] T040 [US4] `booth/BoothFacadeService.java` — 수정·조회. 권한은 `BoothEditorGuard` 재사용. 만료 부스는 수정 거부
-- [X] T041 [US4] `booth/BoothFacadeController.java` — `PUT /api/v1/booths/{boothId}/facade`. 검증: `themeCode` 화이트리스트 · `primaryColor`는 `#RRGGBB` · `signText` 60자 · `logoUrl`은 `https://` 2048자 ([contracts/layout-api.md](contracts/layout-api.md) §6)
+- [X] T041 [US4] `booth/BoothFacadeController.java` — `PUT /api/v1/booths/{boothId}/facade`. 검증: `themeCode` 화이트리스트 · `primaryColor`는 `#RRGGBB` · `signText` 60자 · `logoUrl`은 `https://` 2048자 ([contracts/layout-api.md](../contracts/layout-api.md) §6)
 - [X] T042 [US4] `booth/BoothQueryService.java` — `PublicBoothView`에 `facade` 4필드와 `publishedLayoutVersion` 추가. **기존 필드는 그대로 둔다** (추가만, 헌법 24조 / contracts §7)
 - [X] T043 [P] [US4] `test/.../booth/BoothFacadeApiIntegrationTest.java` — 수정 후 공개 조회 반영 / 잘못된 색 형식 400 / `http://` 로고 거부 / 비소유자 403 / 만료 부스 409
 
@@ -129,12 +129,16 @@
 - [X] T047 **3파트 통보** ⚠️ **사람이 해야 함** — ① 오류 봉투가 005부터 실제 동작(Breaking 아님, 문서와의 정합 회복) ② `PUT /facade` 신설 ③ `schemaVersion`과 `version`을 갈라 쓰기로 한 것(research R-10)과 spec 005 §Layout JSON 예시의 `"version": 2` 정정 제안. AI·FE·Unity 파트에 전달하고 `docs/26`에 결과 기록 (헌법 24조) → **2026-08-21 GitHub 이슈로 통보 완료**: ①②는 #17, 경계·서버 검증은 #19, ③과 잔여 항목은 #36, avatar 필드명은 #24. `docs/26` 결과 기록은 develop 문서 PR에서
 - [X] T048 [quickstart.md](quickstart.md) 수동 검증 **수행 완료 (2026-08-21)** — 로컬 Spring 실서버에 curl로 18단계 + 만료 4단계를 전부 실행했다. 로컬 DB v5→v9 마이그레이션·`ddl-auto: validate` 통과, 좌표 원문 보존, 공개 포인터가 걸린 상태의 회원 탈퇴까지 확인. **최초 저장 경합 결함을 여기서 잡았다 (T-114)**
 - [X] T049 `docs/HDD/작업일지.md`에 2026-08-20 이후 작업 기록, 문제는 해결 여부와 무관하게 `docs/HDD/트러블슈팅.md`에 T-번호로 등록 (헌법 29조)
-- [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가
+- [X] T050 **부스 영역 경계 확정** — **6m × 6m × 6m 확정 (2026-08-20)**. 원점이 바닥 중앙이라 `|x|,|z| ≤ 3` · `0 ≤ y ≤ 6`. 경계 포함/초과 테스트 추가 *(→ 높이는 #19 셸 실측으로 **2.72**로 갱신 — T052)*
 - [X] T051 `specs/README.md`의 005 행을 tasks까지 ✅로 갱신
 - [X] T052 **셸 유효 높이 반영** (#19 ②, 2026-08-21) — `MAX_HEIGHT` 6 → **2.72** (벽 패널 실측 2.725의 내림). 관련 테스트·문서 갱신
 - [X] T053 **실물 영역 검증** (#19 ③) — 타입 10종 실측 bounds를 `LayoutObjectType`에 계약값으로 탑재, 원점 기준 코너 회전 후 AABB 재계산(`LayoutGeometry`), error `AREA_OUT_OF_BOUNDS` (Draft·공개 모두). 경계 딱 맞춤·회전 float 잡음 허용 테스트 포함
 - [X] T054 **통행 판정** (#19 ⑤) — `LayoutPassageChecker` 신설: 0.05m 래스터 120×120, 0.22m 유클리드 침식, +z flood fill(4방향), 관람 띠 0.7m 도달<50% → warning `FRONT_BLOCKED`, 고립 ≥1㎡ → warning `ISOLATED_AREA`. 공개 시점만, 공개는 막지 않음
-- [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과
+- [X] T055 **템플릿 카탈로그** (#19 ④) — `GET /booth-layout-templates` 신설(footprint 6×6×2.72·maxObjects 12를 검증 상수에서 유도), `DEFAULT` 제거 + V11로 기존 저장분 이관. spec 예시 `"version": 2` → `"schemaVersion": 1` 정정(#36 합의), 계약 문서 §9·§10 신설. 전체 회귀 203/203 통과 — 구현은 back PR #50으로 반입 완료
+- [ ] T056 **슬롯 기준 published 경로** (#62) — `GET /booth-slots/{slotId}/layouts/published`. 인증 불필요, `슬롯 → 유효 임대 → boothId` 해석을 서버가 흡수하고 body는 §5와 동일. 빈 슬롯·미공개 404 `LAYOUT_NOT_PUBLISHED` / 만료 409 `BOOTH_LEASE_EXPIRED` / 없는 슬롯 404. 계약: `contracts/layout-api.md` §11
+- [ ] T057 **슬롯 12개 시드** (#62) — V12로 `F11-R08`~`F11-R12` 추가하고 `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 id 명시 삽입. V5 주석의 낡은 층 문구(#31 — 11층 단일 확정)도 함께 정리
+- [ ] T058 **`field` 분리** (#58) — `ApiErrorDetail`에 `field`(NON_NULL) 추가 + `ApiErrorDetail.field(name, message)` 팩토리, `GlobalExceptionHandler`의 Bean Validation 경로를 `rule: "FIELD_INVALID"` + `field`로 교체. Layout 경로 변경 0. 계약: `docs/08` §1.3-1
+- [ ] T059 **팔레트 소속 검증·정규화** (#17) — `BoothFacadeService`가 `primaryColor`를 12색 화이트리스트로 검증하고 저장 시 대문자로 정규화. 팔레트 밖은 400 `VALIDATION_FAILED`. 계약: `contracts/layout-api.md` §6
 
 ---
 
