@@ -101,6 +101,11 @@ main
 2. **develop은 실제 사용 환경 기준으로 CI/CD한다** — 완료된 상태만 파트 브랜치에서 develop으로 병합하며, develop을 일상 작업장으로 쓰지 않는다.
 3. feature/fix 브랜치는 자기 파트 브랜치에서 분기하고 자기 파트 브랜치로 MR한다.
 4. 파이프라인 상세 사양은 `docs/sdd/parts/INFRA.md` (infra-001)에서 spec으로 관리한다.
+5. **공유 문서·spec 통합 (#24·#59, 2026-08-23 채택)**
+   - **쓰기**: 각 파트가 **자기 변경분만** develop PR로 올려 누적한다. 한 사람이 남의 변경분을
+     해석해 옮기지 않는다.
+   - **읽기 기준**: develop이 정본이며, 파트 브랜치가 develop을 따라간다.
+   - **파트 경계를 넘는 결정**은 이슈에서 **반영 owner 1명**을 지정해 그 사람이 develop에 쓴다.
 
 ---
 
@@ -525,6 +530,18 @@ echo '{ "feature_directory": "specs/004-booth-slot-lease" }' > .specify/feature.
 
 이후 `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` 순으로 진행한다.
 상세는 `specs/README.md` 참조.
+
+---
+
+## 21-2. spec 상태 갱신 절차 (#59, 2026-08-23 채택)
+
+C-xx 상태의 SSOT는 Clarifications 표 1곳이다 (`docs/00` §2).
+
+1. **갱신은 덧붙이기가 아니라 교체** — "대기 → ✅ 확정" 마커를 쌓지 않고, 낡은 문장을
+   최종 상태 문장으로 다시 쓴다(내용 누락 없이). 변경 이력은 Git/Issue/PR이 담당한다.
+2. **C-xx 확정의 완료 조건**은 체크박스 하나가 아니라 3단계다: 상태 변경 → 관련 서술 교체 →
+   **해당 ID로 파일 전체 grep, 전 occurrence 확인**. 이관·rename도 같다 — 옛 경로·옛 값
+   잔존을 grep으로 확인한다 (#43 `feature_directory` 잔존 사례).
 
 ---
 
