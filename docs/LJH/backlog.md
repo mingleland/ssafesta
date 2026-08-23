@@ -15,9 +15,9 @@
 
 **016 E2E 완료 범위**: `features/interaction/dispatcher.ts`(LAPTOP·AI_AGENT 라우팅, 미지 type 무시)·`features/overlay/{OverlayHost,LaptopOverlay}.tsx`(URL은 `http`/`https`만 허용, iframe+새 탭+안내 동시 제공 — 차단 "감지"는 구현하지 않음, FR-007 기술 제약 기록)·`WorldPage.tsx`(Dispatcher를 화면 생명주기에 종속). vitest 8개+브라우저 9개 시나리오 검증. **AI_CHAT 등은 공통 fallback뿐** — 008·010·011 실 UI 아님.
 
-**다음 뭘 할지 — 확정 순서**: A(001 Auth FE)·D-1·D-2 완료 — 남은 "지금 할 수 있는 것" B→C→E 순(전부 소형). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
+**다음 뭘 할지 — 확정 순서**: A(001 Auth FE)·D-1·D-2·B(SSE 타입) 완료 — 남은 "지금 할 수 있는 것" C→E 순(전부 소형). **이 목록 소진 시 FE는 blocked-only** — 잔여 P0는 전부 C-xx 확정(009·016 C-01)·타 파트(008 UI·AI 서버·#60 BE)·인프라 게이트(#30 실빌드·실서버)에 걸린다.
 
-**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정).
+**추적만, 작업 안 함**: 013·016의 game발 spec 갱신이 develop에 미반영(타 파트 동기화 영역) / FE.md가 인용하는 `game de38269` 커밋이 로컬·원격에 없음 — 016 E2E는 이 SHA 확인 없이 진행했음(계약 텍스트만 필요, Unity 코드 검증 불필요했음), 미해소 그대로 남음, Unity 담당에게 별도 확인 필요 / 013 spec.md의 C-01이 docs/26(V10 TEXT 확정)에서 이미 해소됐는데 리뷰 표는 미결 표기(#59 패턴, Unity 소유라 임의 수정 안 함) / [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) Unity 부스 규격 공지 확인 완료 — FE 영향 없음(레이아웃 좌표·스튜디오 코드 무수정) / **front·develop의 `docs/14_AI_Server_API_명세서.md`·`specs/008-ai-conversation-rag/spec.md`가 #32 반영 전 상태로 낡음** — 정본은 `origin/ai` 브랜치. AI 파트 소유 문서라 front에 반입하지 않음(#59 정본화 규칙), B는 코드 주석에 정본 위치만 명시하고 참조.
 
 상세는 `24_작업일지.md` 08-23 항목.
 
@@ -25,7 +25,6 @@
 
 ## 지금 할 수 있는 것 — 협의 불요 판정 완료 (08-23), 권장 순서순 (A는 완료 표로)
 
-- [ ] **B. SSE 타입 + Mock Stream Fixture** — [#32](https://github.com/kanghyunsoon/ssafesta/issues/32)(CLOSED) 합의 완료분의 타입 전사. discriminated union(`data.type`)·`timeoutPhase`(`FIRST_TOKEN`/`TOTAL_RESPONSE`)·`retryable` 매핑 17종. 008 UI는 김가현 몫이나 shared 기반층 제공은 원래 내 항목
 - [ ] **C. Game Studio 소켓 2종** — `events.ts` `BOOTH_GAME_INTERACT` union(#20 확정, `AI_AGENT_INTERACT`와 동형·configId Int32 #34 확정) + `overlay.ts` `GAME` 타입·OverlayHost fallback. **송신부(`OnOverlayStateChanged`)는 제외** — 수신 GameObject명 미확정이라 협의 필요, "미착수 코드"에 잔류
 - [ ] **E. (P1) 010 Survey 결과 화면** — spec 명시대로 `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 그대로 입력으로. **응답 UI는 제외**(C-05 게스트 응답 등 미결)
 
@@ -78,6 +77,7 @@
 | **001 Auth FE** 08-23 | ASC 세션 구현 + 감사(결함 T-17 수정). tasks 16/17·quickstart 8/8·vitest 129. 잔여 T016만 Blocked-on-BE |
 | **D-1. 005 FE 산출물 develop PR** 08-23 | [PR #64](https://github.com/kanghyunsoon/ssafesta/pull/64) — origin/front@a74fd43에서 7파일 회수(FE/ 5종 + verify 2종), 바이트 동일 확인. **머지 완료**(squash, 자체 병합) |
 | **D-2. docs/10 §3 라우트 develop PR** 08-23 | [PR #65](https://github.com/kanghyunsoon/ssafesta/pull/65) — `/auth/callback`·게임 2종 추가 3줄. **머지 완료**(squash, 자체 병합) |
+| **B. SSE 타입 + Mock Stream Fixture** 08-23 | [#32](https://github.com/kanghyunsoon/ssafesta/issues/32) 확정분 전사 — `entities/conversation/{stream.types,stream.parser,stream.mock}.ts`. discriminated union 5종·`AiErrorCode` 17종·`DEFAULT_RETRYABLE`(런타임 정본은 서버 payload)·`SseProtocolError`(unknown event strict) 별도 분리. real api·소비자 wiring은 008 UI 착수 시. vitest 146/146·tsc·oxlint 그린 |
 | `BOOTH_LAPTOP_INTERACT` | 브라우저 왕복 검증 완료 (PR #25) |
 | 문서 develop 통합 | `docs/26`·`FE.md` 완료 |
 
