@@ -10,6 +10,7 @@ import {
   removeObject,
   renameScene,
   replaceComponent,
+  resizeWorldScene,
   setTopDownBackground,
   setObjectVisible,
 } from '../model/authoringCommands.ts';
@@ -45,12 +46,17 @@ export const InspectorPanel = ({
   const [componentToAdd, setComponentToAdd] = useState<Component['type']>('SPRITE');
   const [advanced, setAdvanced] = useState(false);
   const [showAssetPicker, setShowAssetPicker] = useState(false);
+  const [sceneSizeDraft, setSceneSizeDraft] = useState({ width: scene.width, height: scene.height });
   const replaceSpriteInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setAdvanced(false);
     setShowAssetPicker(false);
   }, [selectedObject?.id]);
+
+  useEffect(() => {
+    setSceneSizeDraft({ width: scene.width, height: scene.height });
+  }, [scene.height, scene.id, scene.width]);
 
   if (selectedObject === null) {
     return (
@@ -79,6 +85,36 @@ export const InspectorPanel = ({
             ))}
           </select>
         </label>
+        <div className="gss-section-title"><span>맵 크기</span><small>오브젝트와 타일은 안전하게 유지됩니다</small></div>
+        <div className="gss-field-row">
+          <label className="gss-field">
+            <span>가로 칸</span>
+            <input
+              max={scene.type === 'PLATFORMER' ? 200 : 100}
+              min={scene.type === 'PLATFORMER' ? 8 : 4}
+              onChange={(event) => setSceneSizeDraft((current) => ({ ...current, width: Number(event.target.value) }))}
+              type="number"
+              value={sceneSizeDraft.width}
+            />
+          </label>
+          <label className="gss-field">
+            <span>세로 칸</span>
+            <input
+              max={100}
+              min={scene.type === 'PLATFORMER' ? 6 : 4}
+              onChange={(event) => setSceneSizeDraft((current) => ({ ...current, height: Number(event.target.value) }))}
+              type="number"
+              value={sceneSizeDraft.height}
+            />
+          </label>
+        </div>
+        <button
+          className="gss-secondary-wide"
+          disabled={!Number.isFinite(sceneSizeDraft.width) || !Number.isFinite(sceneSizeDraft.height)
+            || (sceneSizeDraft.width === scene.width && sceneSizeDraft.height === scene.height)}
+          onClick={() => onApply(resizeWorldScene(project, scene.id, sceneSizeDraft.width, sceneSizeDraft.height))}
+          type="button"
+        >맵 크기 적용</button>
         <div className="gss-info-grid">
           <span>Scene ID</span><strong>{scene.id}</strong>
           <span>맵 크기</span><strong>{scene.width} × {scene.height}</strong>

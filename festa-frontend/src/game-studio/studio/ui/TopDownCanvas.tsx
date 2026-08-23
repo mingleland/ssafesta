@@ -5,21 +5,26 @@ import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import type { TilesetDefinition } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 
+export type CanvasTool = 'SELECT' | 'PAN';
+
 interface TopDownCanvasProps {
   readonly scene: WorldScene;
   readonly assets: readonly AssetReference[];
   readonly assetUrls: Readonly<Record<string, string>>;
   readonly selectedObjectId: string | null;
+  readonly selectedObjectIds: ReadonlySet<string>;
   readonly placementPreset: GameObject['preset'] | null;
   readonly tileLayer: TileLayer | null;
   readonly tileBrush: number | null;
   readonly tilesetVisual: TilesetDefinition | null;
   readonly zoom: number;
+  readonly canvasTool: CanvasTool;
+  readonly showGrid: boolean;
   readonly editorHiddenObjectIds: ReadonlySet<string>;
   readonly editorLockedObjectIds: ReadonlySet<string>;
-  readonly onSelectObject: (objectId: string | null) => void;
+  readonly onSelectObjects: (objectIds: readonly string[], primaryObjectId: string | null) => void;
   readonly onPlaceObject: (preset: GameObject['preset'], x: number, y: number) => void;
-  readonly onMoveObject: (objectId: string, x: number, y: number) => void;
+  readonly onMoveObjects: (objectIds: readonly string[], deltaX: number, deltaY: number) => void;
   readonly onPaintTiles: (cells: readonly { readonly x: number; readonly y: number }[], tileIndex: number) => void;
   readonly onPlacementComplete: () => void;
 }
@@ -37,28 +42,52 @@ const pointerToGrid = (
   };
 };
 
+interface SelectionBox {
+  readonly startX: number;
+  readonly startY: number;
+  readonly endX: number;
+  readonly endY: number;
+}
+
+interface DraggingSelection {
+  readonly objectIds: readonly string[];
+  readonly lastX: number;
+  readonly lastY: number;
+}
+
+interface PanningState {
+  readonly clientX: number;
+  readonly clientY: number;
+  readonly scrollLeft: number;
+  readonly scrollTop: number;
+}
+
 export const TopDownCanvas = ({
   scene,
   assets,
   assetUrls,
   selectedObjectId,
+  selectedObjectIds,
   placementPreset,
   tileLayer,
   tileBrush,
   tilesetVisual,
   zoom,
+  canvasTool,
+  showGrid,
   editorHiddenObjectIds,
   editorLockedObjectIds,
-  onSelectObject,
+  onSelectObjects,
   onPlaceObject,
-  onMoveObject,
+  onMoveObjects,
   onPaintTiles,
   onPlacementComplete,
 }: TopDownCanvasProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [draggingObjectId, setDraggingObjectId] = useState<string | null>(null);
+  const [draggingSelection, setDraggingSelection] = useState<DraggingSelection | null>(null);
+  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const [panning, setPanning] = useState<PanningState | null>(null);
   const [paintingTiles, setPaintingTiles] = useState(false);
-  const lastDragPositionRef = useRef<string | null>(null);
   const pendingPaintCellsRef = useRef(new Map<string, { readonly x: number; readonly y: number }>());
   const paintFrameRef = useRef<number | null>(null);
   const paintCallbackRef = useRef(onPaintTiles);
@@ -87,45 +116,88 @@ export const TopDownCanvas = ({
     if (paintFrameRef.current !== null) window.cancelAnimationFrame(paintFrameRef.current);
   }, []);
 
-  const moveDraggingObject = (event: PointerEvent<HTMLDivElement>) => {
+  const finishSelectionBox = () => {
+    if (selectionBox === null) return;
+    const minX = Math.min(selectionBox.startX, selectionBox.endX);
+    const maxX = Math.max(selectionBox.startX, selectionBox.endX);
+    const minY = Math.min(selectionBox.startY, selectionBox.endY);
+    const maxY = Math.max(selectionBox.startY, selectionBox.endY);
+    const objectIds = scene.objects
+      .filter((object) => !editorHiddenObjectIds.has(object.id)
+        && object.position.x >= minX && object.position.x <= maxX
+        && object.position.y >= minY && object.position.y <= maxY)
+      .map((object) => object.id);
+    onSelectObjects(objectIds, objectIds.at(-1) ?? null);
+  };
+
+  const moveOnCanvas = (event: PointerEvent<HTMLDivElement>) => {
     if (canvasRef.current === null) return;
     const position = pointerToGrid(canvasRef.current, event.clientX, event.clientY, scene);
-    if (draggingObjectId !== null && !editorLockedObjectIds.has(draggingObjectId)) {
-      const positionKey = `${position.x}:${position.y}`;
-      if (lastDragPositionRef.current !== positionKey) {
-        lastDragPositionRef.current = positionKey;
-        onMoveObject(draggingObjectId, position.x, position.y);
+    if (draggingSelection !== null) {
+      const deltaX = position.x - draggingSelection.lastX;
+      const deltaY = position.y - draggingSelection.lastY;
+      if (deltaX !== 0 || deltaY !== 0) {
+        onMoveObjects(draggingSelection.objectIds, deltaX, deltaY);
+        setDraggingSelection({ ...draggingSelection, lastX: position.x, lastY: position.y });
       }
     }
+    if (selectionBox !== null) setSelectionBox({ ...selectionBox, endX: position.x, endY: position.y });
     if (paintingTiles && tileBrush !== null) queuePaintCell(position);
   };
 
   const placeFromDrag = (event: DragEvent<HTMLDivElement>) => {
     const presetValue = event.dataTransfer.getData('application/festa-game-object');
     if (presetValue === '' || canvasRef.current === null) return;
-    const preset = presetValue as GameObject['preset'];
     event.preventDefault();
     const position = pointerToGrid(canvasRef.current, event.clientX, event.clientY, scene);
-    onPlaceObject(preset, position.x, position.y);
+    onPlaceObject(presetValue as GameObject['preset'], position.x, position.y);
     onPlacementComplete();
   };
 
+  const finishCanvasGesture = (event: PointerEvent<HTMLDivElement>) => {
+    if (draggingSelection !== null || paintingTiles || selectionBox !== null) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (paintingTiles) flushPaintCells();
+    finishSelectionBox();
+    setDraggingSelection(null);
+    setSelectionBox(null);
+    setPaintingTiles(false);
+  };
+
   return (
-    <div className="gss-canvas-scroll">
-      <div
-        className="gss-map-stage"
-        style={{ width: `${zoom}%` }}
-      >
+    <div
+      className={`gss-canvas-scroll${panning === null ? '' : ' is-panning'}`}
+      onPointerCancel={() => setPanning(null)}
+      onPointerDown={(event) => {
+        if (canvasTool !== 'PAN' && event.button !== 1) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setPanning({
+          clientX: event.clientX,
+          clientY: event.clientY,
+          scrollLeft: event.currentTarget.scrollLeft,
+          scrollTop: event.currentTarget.scrollTop,
+        });
+      }}
+      onPointerMove={(event) => {
+        if (panning === null) return;
+        event.currentTarget.scrollLeft = panning.scrollLeft - (event.clientX - panning.clientX);
+        event.currentTarget.scrollTop = panning.scrollTop - (event.clientY - panning.clientY);
+      }}
+      onPointerUp={(event) => {
+        if (panning === null) return;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+        setPanning(null);
+      }}
+    >
+      <div className="gss-map-stage" style={{ width: `${zoom}%` }}>
         <div
           aria-label={`${scene.name} 맵 편집 캔버스`}
-          className={`gss-map-canvas${placementPreset === null && tileBrush === null ? '' : ' is-placing'}`}
+          className={`gss-map-canvas${placementPreset === null && tileBrush === null ? '' : ' is-placing'}${showGrid ? '' : ' is-grid-hidden'}${canvasTool === 'PAN' ? ' is-pan-tool' : ''}`}
           onClick={(event) => {
-            if (event.target !== event.currentTarget) return;
-            if (tileBrush !== null) return;
-            if (placementPreset === null) {
-              onSelectObject(null);
-              return;
-            }
+            if (event.target !== event.currentTarget || tileBrush !== null || canvasTool === 'PAN') return;
+            if (placementPreset === null) return;
             const position = pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene);
             onPlaceObject(placementPreset, position.x, position.y);
             onPlacementComplete();
@@ -136,24 +208,24 @@ export const TopDownCanvas = ({
             if (paintFrameRef.current !== null) window.cancelAnimationFrame(paintFrameRef.current);
             paintFrameRef.current = null;
             pendingPaintCellsRef.current.clear();
-            setDraggingObjectId(null);
-            lastDragPositionRef.current = null;
+            setDraggingSelection(null);
+            setSelectionBox(null);
             setPaintingTiles(false);
           }}
-          onPointerMove={moveDraggingObject}
-          onPointerUp={(event) => {
-            if (draggingObjectId !== null || paintingTiles) event.currentTarget.releasePointerCapture(event.pointerId);
-            if (paintingTiles) flushPaintCells();
-            setDraggingObjectId(null);
-            lastDragPositionRef.current = null;
-            setPaintingTiles(false);
-          }}
+          onPointerMove={moveOnCanvas}
+          onPointerUp={finishCanvasGesture}
           onPointerDown={(event) => {
-            if (tileBrush === null || event.target !== event.currentTarget) return;
+            if (canvasTool === 'PAN' || event.target !== event.currentTarget) return;
+            if (tileBrush !== null) {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setPaintingTiles(true);
+              queuePaintCell(pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene));
+              return;
+            }
+            if (placementPreset !== null) return;
             event.currentTarget.setPointerCapture(event.pointerId);
-            setPaintingTiles(true);
             const position = pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene);
-            queuePaintCell(position);
+            setSelectionBox({ startX: position.x, startY: position.y, endX: position.x, endY: position.y });
           }}
           ref={canvasRef}
           role="application"
@@ -179,38 +251,61 @@ export const TopDownCanvas = ({
               ))}
             </div>
           )}
+          {selectionBox !== null && (
+            <div
+              aria-hidden="true"
+              className="gss-selection-box"
+              style={{
+                left: `${(Math.min(selectionBox.startX, selectionBox.endX) / scene.width) * 100}%`,
+                top: `${(Math.min(selectionBox.startY, selectionBox.endY) / scene.height) * 100}%`,
+                width: `${((Math.abs(selectionBox.endX - selectionBox.startX) + 1) / scene.width) * 100}%`,
+                height: `${((Math.abs(selectionBox.endY - selectionBox.startY) + 1) / scene.height) * 100}%`,
+              }}
+            />
+          )}
           {scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)).map((object) => {
             const definition = findPresetDefinition(object.preset);
             const sprite = object.components.find((component) => component.type === 'SPRITE');
             const spriteVisual = sprite?.type === 'SPRITE'
               ? resolveStaticImageVisual(assets.find((asset) => asset.id === sprite.assetId), assetUrls)
               : null;
+            const selected = selectedObjectIds.has(object.id);
             return (
               <button
                 aria-label={`${definition.label} ${object.id}, X ${object.position.x}, Y ${object.position.y}`}
-                className={`gss-map-object gss-map-object--${object.preset.toLowerCase()}${selectedObjectId === object.id ? ' is-selected' : ''}${editorLockedObjectIds.has(object.id) ? ' is-editor-locked' : ''}`}
+                aria-pressed={selected}
+                className={`gss-map-object gss-map-object--${object.preset.toLowerCase()}${selected ? ' is-selected' : ''}${selectedObjectId === object.id ? ' is-primary' : ''}${editorLockedObjectIds.has(object.id) ? ' is-editor-locked' : ''}`}
                 key={object.id}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelectObject(object.id);
+                  if (event.detail === 0) onSelectObjects([object.id], object.id);
                 }}
                 onPointerDown={(event) => {
+                  if (canvasTool === 'PAN') return;
                   event.stopPropagation();
-                  if (editorLockedObjectIds.has(object.id)) {
-                    onSelectObject(object.id);
-                    return;
-                  }
+                  const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+                  const nextIds = additive
+                    ? selected
+                      ? [...selectedObjectIds].filter((id) => id !== object.id)
+                      : [...selectedObjectIds, object.id]
+                    : selected && selectedObjectIds.size > 1
+                      ? [...selectedObjectIds]
+                      : [object.id];
+                  const primaryId = nextIds.includes(object.id) ? object.id : nextIds.at(-1) ?? null;
+                  onSelectObjects(nextIds, primaryId);
+                  if (additive && selected) return;
+                  const movableIds = nextIds.filter((id) => !editorLockedObjectIds.has(id));
+                  if (movableIds.length === 0 || canvasRef.current === null) return;
                   event.currentTarget.parentElement?.setPointerCapture(event.pointerId);
-                  setDraggingObjectId(object.id);
-                  lastDragPositionRef.current = `${object.position.x}:${object.position.y}`;
-                  onSelectObject(object.id);
+                  const position = pointerToGrid(canvasRef.current, event.clientX, event.clientY, scene);
+                  setDraggingSelection({ objectIds: movableIds, lastX: position.x, lastY: position.y });
                 }}
                 style={{
                   left: `${((object.position.x + 0.5) / scene.width) * 100}%`,
                   top: `${((object.position.y + 0.5) / scene.height) * 100}%`,
                   opacity: object.visible ? 1 : 0.45,
                   transform: `translate(-50%, -50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
-                  zIndex: selectedObjectId === object.id ? 40 : sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
+                  zIndex: selectedObjectId === object.id ? 40 : selected ? 35 : sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
                 }}
                 title={`${definition.label} · ${object.id}${editorLockedObjectIds.has(object.id) ? ' · 편집 잠금' : ''}`}
                 type="button"
