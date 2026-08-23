@@ -41,9 +41,11 @@ handoff 만료·재사용(mock 시맨틱) → 410 계열 안내 + 동일 재시�
 회원 로그인 상태에서 새로고침 → 부트스트랩 refresh 1회로 세션 복원(회원만).
 게스트 상태에서 새로고침 → 복원 없이 재입장 유도(계약대로).
 
-### 7. 다른 브라우저 로그인 → 기존 세션 종료 안내
-devtools 콘솔에서 `window.__festaTriggerOtherBrowserLogin()` 호출
-→ 현재 탭이 종료 안내와 함께 `/login`으로 이동.
+### 7. 다른 브라우저 로그인 → 기존 세션 종료
+devtools 콘솔에서 `window.__festaTriggerOtherBrowserLogin()` 호출 후 **새로고침**
+→ 복원 refresh가 실패해 `/login`으로 돌아온다(mock은 즉시 강제 이동시키지 않는다 —
+플래그를 세워 다음 refresh/401부터 실패시키는 방식이고, 보호 요청 중의 401→종료 경로는
+`unauthorizedHandler` vitest가 검증한다).
 
 ### 8. cookie / storage 미접촉
 devtools Application 탭에서 확인:
@@ -55,3 +57,11 @@ devtools Application 탭에서 확인:
 - 게스트·refresh·logout endpoint 실경로: BE 계약 미회수 — real api는 명시 오류 placeholder (tasks.md T016).
 - 게임 라우트(`/app/games/:gameId/edit|play`) 가드 등급: plan 미명시로 보수적 member-only — 재분류 가능성 `router/index.tsx` 주석 참조.
 - 오류 code 값(`OAUTH_HANDOFF_*`, `NICKNAME_REJECTED`)은 관례 명명 — BE 확정 시 mock과 함께 갱신.
+
+---
+
+## 검증 결과 (2026-08-23 실행)
+
+- [x] **판정: 8/8 통과** — mock 모드 브라우저 실측. ①최초 가입 ②재로그인 즉시 인증 ③금칙 닉네임 일반 안내→재제출 성공 ④handoff 소비 후 직진입 410 안내 ⑤게스트 입장·회원 전용 라우트 차단 안내(SPA 내 이동 기준 — 전체 리로드는 FR-009a대로 게스트 미복원) ⑥새로고침 후 member 유지 ⑦다른 브라우저 트리거→새로고침→`/login` ⑧cookie 빈 값·localStorage 빈 값·sessionStorage는 mock 상태 키뿐
+- 실행 중 발견·수정 2건: ⑥이 최초 실측에서 실패(부트스트랩 refresh와 가드 redirect의 레이스, [T-17](../../../docs/LJH/25_트러블슈팅.md)) — `bootstrapped` 플래그로 가드 판정 보류 후 통과. ⑦은 문서 절차가 구현과 불일치(즉시 이동 아님)라 본 문서 절차를 정정
+- 자동 게이트: `tsc -b`·`oxlint`·vitest 129/129
