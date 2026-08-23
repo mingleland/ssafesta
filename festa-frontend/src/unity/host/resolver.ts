@@ -1,6 +1,7 @@
-// 프로덕션 빌드 URL 해석 — manifest.json 스키마는 Unity 측 미확정 계약이다(013a Host 계획 B-1).
-// Host는 이 파일이 UnityBuildDescriptor 4종만 내주면 나머지는 모른다 — manifest 구조가
-// 바뀌어도 이 함수 내부만 고치면 된다. resolver 계약 확정은 Unity 담당 승인 후.
+// 프로덕션 빌드 URL 해석 — manifest.json 방향과 키 4종(loaderUrl/dataUrl/frameworkUrl/codeUrl)은
+// Unity 담당 확인으로 확정됐다(#60, 2026-08-22). 남은 미결은 생성 위치(로컬 빌드 vs Jenkins)·
+// 배포 경로·캐시 헤더뿐이며 이는 #30(인프라 재결정) 후속이다 — 이 함수의 반환 형태는 안 바뀐다.
+// Host는 이 파일이 UnityBuildDescriptor 4종만 내주면 나머지는 모른다.
 
 import type { UnityBuildDescriptor } from './types';
 
