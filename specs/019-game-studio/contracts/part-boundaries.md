@@ -1,6 +1,6 @@
 # Game Studio 파트 간 책임 및 통신 규약
 
-> 상태: Draft v0.3 — #20~#22와 #33~#34 반영 / FE 내부 #35만 추적
+> 상태: Draft v0.4 — #20~#22·#33~#35·#48 반영 / 운영 연결 #48·#55·#56 추적
 
 ## 데이터 흐름
 
@@ -53,4 +53,4 @@ AI(optional, P2)
 - AI 확정(#22): MVP 비의존, P2 candidate/patch, spec 007 Job 정책 재사용.
 - 제품 정책 확정(#33): 새 진입 REST 차단, loaded local session 완료 허용, 일반 soft/탈퇴 hard delete, 이력 유지, Ranking P1 절연.
 - 교차 계약 확정(#34): signed Int32 `configId`, 별도 INTEGER 공개 ID, `GAME_PORTAL requiresConfig=true`, BE-first 배포.
-- Studio 내부 대기(#35): renderer, Preview sandbox/CSP/UI, builtin Asset resolver.
+- Studio 내부 완료(#35): TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver. 운영 Published parity는 #48·#55, Portal Host는 #56에서 추적.

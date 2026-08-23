@@ -18,7 +18,7 @@ renderer 선택 전에도 계약 테스트가 가능하다.
 - `TOP_DOWN`: grid movement와 object interaction
 - `DIALOGUE/OVERLAY`: 호출 Scene을 보존하고 world input을 중지
 - `DIALOGUE/FULL_SCREEN`: 독립 graph Scene
-- `PLATFORMER`: 후속 renderer/physics adapter
+- `PLATFORMER`: reference renderer/physics adapter 구현 완료
 - `PUZZLE`: v1 별도 Scene이 아니라 Component/Event recipe
 
 장르 이름마다 Scene type을 추가하지 않는다. Scene type은 실행 방식이 다를 때만 늘린다.
@@ -47,8 +47,8 @@ JSON Schema 구조 검증과 semantic reference 검증을 분리한다. FE는 �
 API client를 재사용하고 lazy chunk로 일반 FESTA 초기 번들과 격리한다. 별도 origin은 인증 전달·배포·CSP
 계약을 늘리므로 MVP에서 제외한다.
 
-## 8. 남은 FE 결정
+## 8. 남은 FE 구현 경계
 
-#35에서 TOP_DOWN renderer, Preview sandbox/CSP/UI, builtin Asset resolver를 정한다. 이 선택은 공통
-GameProject/Event 계약을 바꾸지 않아야 한다. PLATFORMER는 TOP_DOWN 수직 흐름과 Preview/Published parity
-검증 뒤에만 착수한다.
+#35의 TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver는 PR #63으로 완료됐다.
+남은 FE 범위는 #48 DTO에 연결하는 revision-aware Draft/Publish client, #55 Published loader·오류 격리·Preview parity,
+#56 Booth overlay adapter다. iframe Preview를 실제 채택하지 않는 한 postMessage CSP/origin transport는 활성 병목이 아니다.

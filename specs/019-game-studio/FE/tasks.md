@@ -59,7 +59,7 @@ FE가 소유하는 69개 작업이다. ID는 기존 통합 목록과의 추적�
 - [ ] T042 Implement revision conflict and validation-error UI
 - [ ] T043 Run Draft→Preview→Publish acceptance flow and record it in FE quickstart
 - [x] T078 Implement builtin Asset reference resolver and keep transient local sources out of GameProject JSON
-- [ ] T080 After #35 add Preview-versus-Published parity E2E
+- [ ] T080 After #48/#55 Published loader integration add Preview-versus-Published parity E2E
 
 ## Standalone Published play
 

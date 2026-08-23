@@ -54,7 +54,7 @@ festa-frontend/src/game-studio/
 
 - #33은 합의 완료: 새 진입은 REST 조회에서 차단하고 이미 로드된 무보상 로컬 세션은 종료까지 허용한다.
 - #34는 wire/DB 계약 합의 완료: `configId`는 signed Int32 `1..2147483647`, `0` 금지다.
-- #35의 로컬 수직 구현안은 반영했다. Production Published parity와 embedded Preview CSP가 필요해질 때만 후속 결정한다.
+- #35의 로컬 수직 구현은 PR #63으로 병합·종료됐다. Production Published parity는 #48·#55, Booth overlay는 #56에서 구현하며 embedded Preview CSP는 iframe transport를 실제 채택할 때만 별도 결정한다.
 
 ## Verification
 

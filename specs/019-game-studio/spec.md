@@ -246,12 +246,12 @@
 
 ## Dependencies
 
-- FE Host 계약 답변: GitHub Issue #20 — 반영 완료, Studio 내부 후속은 #35
+- FE Host 계약 답변: GitHub Issue #20 — 반영 완료. Local renderer·Preview·Asset resolver #35도 PR #63 병합으로 완료
 - BE 저장·Publish 계약 답변: GitHub Issue #21 — 반영 완료
 - AI 범위 결정: GitHub Issue #22 — 완료·종료
 - 공개 중단·삭제·표시 전용 Ranking 정책: GitHub Issue #33 — 합의 반영 완료
 - `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34 — BE·Unity 합의 반영, FE 구현 확인만 추적
-- Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — FE 구현안 반영, Production parity/CSP 후속 확인 필요
+- Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
