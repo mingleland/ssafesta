@@ -708,7 +708,7 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
 - GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
   builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
-- Published 본문은 ETag/장기 cache가 가능하지만 Portal 실행 가능 여부는 `Cache-Control: no-store`다.
+- 현재 공개 포인터를 따라가는 `GET /games/{gameId}/published`는 `Cache-Control: no-cache` + ETag 재검증이다 — 재공개하면 같은 URL이 다른 본문을 가리키므로 장기 cache를 걸면 옛 version이 나온다. 긴 `max-age`·`immutable`은 후속 version 고정 URL에만 붙인다. Portal 실행 가능 여부는 `Cache-Control: no-store`다.
 - 독립 play route와 Portal overlay open 시 REST 조회로 신규 진입을 판정하며 Game Studio 전용 socket은 만들지 않는다.
 - 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
 - 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
