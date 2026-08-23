@@ -51,19 +51,37 @@ export function getAccessToken(): string | null {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const DEFAULT_TIMEOUT_MS = 15_000;
 
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
+// 401 인터셉트(spec 001, docs/26 AT/RT 확정분) — 등록 지점만 여기 둔다. 실 refresh 로직은
+// features/auth가 주입한다(순환 import 방지: client.ts는 entities/features를 모른다).
+// 반환값 true면 원요청을 1회 재시도한다. false면 그대로 오류를 던진다.
+type UnauthorizedHandler = () => Promise<boolean>;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+// skipAuthRetry: 401 인터셉트 재시도 자체(그리고 refresh 요청 자신)에 다시 인터셉트가 걸려
+// 무한 루프가 되는 것을 막는 내부 플래그 — 호출부(entities/auth/api.ts의 refresh)가 명시한다.
+export type ApiInit = RequestInit & { skipAuthRetry?: boolean };
+
+export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const { skipAuthRetry, ...rest } = init;
+  const headers = new Headers(rest.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
-  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (rest.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
   const response = await fetch(`${BASE_URL}${path}`, {
-    ...init,
+    ...rest,
     headers,
-    signal: init.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    signal: rest.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
 
-  // 401 처리·Refresh: docs/26 AT/RT 쿠키 속성·재발급 endpoint 미확정 — spec 001에서 확정 후 구현
-  // TODO: docs/26 AT/RT 확정 후 401 인터셉트·재발급 흐름 추가
+  if (response.status === 401 && !skipAuthRetry && unauthorizedHandler) {
+    const recovered = await unauthorizedHandler();
+    // skipAuthRetry:true로 재시도 — 재시도 응답이 다시 401이어도 인터셉트를 또 태우지 않는다(상한 1회)
+    if (recovered) return api<T>(path, { ...init, skipAuthRetry: true });
+  }
 
   if (!response.ok) {
     const requestId = response.headers.get('X-Request-Id') ?? undefined;
