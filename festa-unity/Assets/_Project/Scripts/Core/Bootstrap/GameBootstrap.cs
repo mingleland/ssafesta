@@ -31,6 +31,13 @@ namespace Festa.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
+            // 프레임 상한. 무제한(-1)이면 한 PC 에서 두 인스턴스(호스트+클라이언트)로
+            // 테스트할 때 서로 CPU/GPU 를 뺏으며 둘 다 버벅인다 — POC 데모도 그 시나리오다.
+            // WebGL 은 브라우저 vsync 가 프레임을 조율하므로 건드리지 않는다.
+#if !UNITY_WEBGL
+            Application.targetFrameRate = 60;
+#endif
+
             if (_apiConfig != null)
                 ApiServices.Init(_apiConfig);
             else

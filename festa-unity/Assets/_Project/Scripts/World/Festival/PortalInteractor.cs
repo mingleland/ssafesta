@@ -127,6 +127,9 @@ namespace Festa.World
 
         // ── 프롬프트: 대상 부스 위 화면 좌표에 키캡 스타일로 ──
 
+        static GUIStyle _labelStyle;
+        static GUIStyle _capStyle;
+
         void OnGUI()
         {
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
@@ -135,20 +138,27 @@ namespace Festa.World
             float ui = Screen.height / 1080f;
 
             var label = _nearest.promptText;
-            var labelStyle = new GUIStyle(GUI.skin.label)
+            // GUIStyle 을 매 프레임 new 하면 프롬프트가 떠 있는 내내 GC 쓰레기가 쌓여
+            // 주기적 GC 스파이크(끊김)에 일조한다 — 한 번 만들어 캐시한다.
+            if (_labelStyle == null)
             {
-                alignment = TextAnchor.MiddleLeft,
-                fontSize = Mathf.RoundToInt(19f * ui),
-                fontStyle = FontStyle.Bold,
-            };
-            labelStyle.normal.textColor = Color.white;
-            var capStyle = new GUIStyle(GUI.skin.label)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontSize = Mathf.RoundToInt(18f * ui),
-                fontStyle = FontStyle.Bold,
-            };
-            capStyle.normal.textColor = new Color(0.12f, 0.12f, 0.12f);
+                _labelStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleLeft,
+                    fontStyle = FontStyle.Bold,
+                };
+                _labelStyle.normal.textColor = Color.white;
+                _capStyle = new GUIStyle(GUI.skin.label)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontStyle = FontStyle.Bold,
+                };
+                _capStyle.normal.textColor = new Color(0.12f, 0.12f, 0.12f);
+            }
+            var labelStyle = _labelStyle;
+            var capStyle = _capStyle;
+            labelStyle.fontSize = Mathf.RoundToInt(19f * ui);
+            capStyle.fontSize = Mathf.RoundToInt(18f * ui);
 
             float cap = 30f * ui;                                    // 키캡 한 변
             float labelW = labelStyle.CalcSize(new GUIContent(label)).x;
