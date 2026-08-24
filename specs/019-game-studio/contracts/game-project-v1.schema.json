@@ -17,7 +17,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "1.0.0"
+      "enum": ["1.0.0", "1.1.0"]
     },
     "gameId": {
       "type": "integer",
@@ -73,12 +73,60 @@
           }
         ]
       }
+    },
+    "rules": {
+      "$ref": "#/$defs/gameRules"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.1.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "required": ["rules"] }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "not": { "required": ["rules"] } }
+    }
+  ],
   "$defs": {
     "stableId": {
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+    },
+    "gameRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completion", "playerDefeat"],
+      "properties": {
+        "completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "objectives"],
+          "properties": {
+            "mode": { "enum": ["ALL", "ANY"] },
+            "objectives": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "target"],
+                "properties": {
+                  "type": { "enum": ["SCORE_AT_LEAST", "DEFEAT_ENEMIES", "SURVIVE_SECONDS"] },
+                  "target": { "type": "integer", "minimum": 1, "maximum": 999999999 }
+                }
+              }
+            }
+          }
+        },
+        "playerDefeat": { "enum": ["RESPAWN", "END_GAME"] }
+      }
     },
     "scalar": {
       "oneOf": [

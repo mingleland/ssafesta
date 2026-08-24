@@ -23,7 +23,7 @@ npm run build
 npm run lint
 ```
 
-현재 Maker 브랜치 기준은 test 37 files/196 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
+현재 Local Publish Loop 브랜치 기준은 test 38 files/204 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
 분리된 lazy chunk인지 함께 확인한다.
 
 ## 3. Backend 없이 편집·플레이 확인
@@ -45,8 +45,10 @@ npm run dev -- --host 127.0.0.1 --port 5174
 8. 1024px에서 Canvas 도구가 모두 보이고, 800px에서 문서 전체 가로 스크롤 없이 도구줄만 내부 이동하며 `화면 넓게` 또는 Shift+F로 양쪽 panel을 복구할 수 있는지 확인한다.
 9. 레이어 패널에서 ID 검색, 편집 숨김, 잠금, 표시 순서 변경을 확인한다. 잠금은 새로고침 뒤에도 유지돼야 한다.
 10. 플레이 테스트를 눌러 `/app/games/123/play?source=local`에서 열쇠 획득·대화·문 이동·완료를 실행한다.
-11. `?source=local&perf=1`은 활성 PC 탭에서만 FPS 진단에 사용한다. 자동화 백그라운드 탭의 1fps throttling은 제품 성능으로 기록하지 않는다.
-12. `/app/games/123/play`은 서버가 없을 때 한국어 오류·다시 시도·나가기 UI를 표시하고 렌더 반복 오류가 없어야 한다.
+11. 슈팅 템플릿의 데이터 탭에서 `적 3명 처치`, 생존 템플릿에서 `30초 생존/체력 0 종료`가 보이는지 확인한다. 목표값, ALL/ANY, 재시작/도전 실패를 바꿔 저장할 수 있어야 한다.
+12. Mock 모드에서 `게시하기`를 누르고 `게시본 확인 v1`으로 `/app/games/123/play`에 진입한다. 제목·Scene·목표 HUD가 방금 게시한 snapshot과 같아야 하며 다시 게시하면 v2가 된다.
+13. `?source=local&perf=1`은 활성 PC 탭에서만 FPS 진단에 사용한다. 자동화 백그라운드 탭의 1fps throttling은 제품 성능으로 기록하지 않는다.
+14. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
 
 사람 대상 20분 검증 기록지는 [usability-test.md](usability-test.md)를 사용한다.
 

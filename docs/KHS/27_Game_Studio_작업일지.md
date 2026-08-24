@@ -9,6 +9,16 @@
 
 ## 2026-08-24
 
+### 로컬 게시 전체 흐름·GameProject v1.1 목표 규칙 ✅
+
+- 🤖 기존 Maker PR과 분리한 코드 브랜치 `codex/game-studio-local-publish-loop`에서 Backend·Unity 변경 없이 후속 작업을 진행했다. `VITE_USE_MOCK=true`일 때 브라우저 Draft를 불변 Published snapshot으로 복제하고 version을 올리는 Publisher/Published Repository를 추가했다. 운영 API 모드는 기존 서버 adapter를 그대로 사용한다.
+- 🤖 GameProject v1.1 FE candidate에 `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS`, `ALL/ANY`, `RESPAWN/END_GAME` 규칙을 추가했다. v1.0은 계속 읽고 편집 시 기본 규칙과 함께 v1.1로 승격한다. 120ms 결정적 tick으로 생존 시간을 계산하고, 점수·처치 수·시간 진행도를 Runtime HUD에 표시한다.
+- 🤖 SHOOTER는 적 3명 처치, SURVIVAL은 30초 생존과 체력 0 도전 실패를 기본 목표로 연결했다. 데이터 탭에서 초보자가 목표를 추가·삭제·수정하고 여러 목표 방식과 체력 0 결과를 한국어로 고를 수 있게 했다.
+- 🤖 Publish preflight에 완료 경로 검사를 추가해 목표와 `COMPLETE_GAME`이 모두 없는 끝낼 수 없는 프로젝트를 게시하지 않는다. 게시 성공 뒤 `게시본 확인 vN`으로 일반 `/app/games/{gameId}/play`를 즉시 연다.
+- 🤖 자동 검증은 Frontend **38 files / 204 tests**, production build, lint를 통과했다. 브라우저에서 game 904로 `슈팅 템플릿 → 적 3명 목표 → 저장 → 게시 v1 → /play → 동일 목표 HUD`를 확인했고 viewport 1280에서 document overflow 없이 Published Runtime이 mount됐다.
+- 🤖 v1.1 FE candidate는 Issue #78의 Backend validator와 AI 허용 출력 합의 전까지 Mock/Frontend 경계다. 실제 다중 사용자 공유·stable 사용자 Asset·Portal·Coin은 #48·#55·#56·#69 및 후속 세션 계약이 남아 있다.
+- 트러블슈팅: GS-T043~GS-T044
+
 ### Maker형 자유 편집 Canvas·실제 템플릿 재설계 ✅
 
 - 🤖 Game Studio 관련 OPEN 이슈 #48·#55·#56·#69·#73을 다시 확인했다. 새 답변은 없고 PR #53·#72는 `CLEAN/MERGEABLE` 상태라, Backend·Unity 답변과 무관한 제작 UX를 새 코드 브랜치 `codex/game-studio-maker-redesign`에서 진행했다.

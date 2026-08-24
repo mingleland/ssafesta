@@ -209,6 +209,9 @@
 - **FR-062**: 제작자는 World Scene의 허용 범위 안에서 가로·세로 크기를 바꿀 수 있어야 한다. 확대 시 기존 Tile을 같은 좌상단 좌표에 유지하고, 축소 시 남는 Tile을 재배열하며 Object는 새 경계 안으로 이동해야 한다.
 - **FR-063**: 6종 시작 템플릿은 미리보기와 제목만 달리해서는 안 되며 Scene 유형·Object 배치·Event/Dialogue·목표 흐름 중 하나 이상의 구조적 차이를 가진 즉시 플레이 가능한 GameProject를 제공해야 한다.
 - **FR-064**: 적 처치 수·경과 시간·점수 임계값 기반 승리 규칙을 추가할 때는 기존 v1 필드를 임의 재해석하지 않고 명시적 schemaVersion과 FE·BE·AI 허용 타입을 함께 확정해야 한다. v1.0.0의 Trigger·Condition·Action 집합은 그 결정 전까지 유지한다.
+- **FR-065**: Backend가 없어도 공식 Mock 모드에서 Draft 저장, 불변 Published Version 생성, 일반 `/app/games/{gameId}/play` 조회를 같은 port로 검증할 수 있어야 한다. 이 브라우저 저장소는 운영 공유 저장소로 간주해서는 안 된다.
+- **FR-066**: GameProject v1.1 FE candidate는 `rules.completion.mode(ALL|ANY)`, `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS`, `playerDefeat(RESPAWN|END_GAME)`만 추가한다. Runtime tick은 120ms 결정적 시간으로 누적하고 v1.0 프로젝트는 편집 시 기본 규칙을 가진 v1.1로 명시적으로 승격한다.
+- **FR-067**: Publish preflight는 안정 Asset뿐 아니라 `rules` 목표 또는 도달 가능한 `COMPLETE_GAME` Action의 존재를 확인해야 한다. 완료 경로가 하나도 없는 프로젝트는 다른 사용자에게 게시하지 않아야 한다.
 
 ### Part Boundaries
 
@@ -250,6 +253,7 @@
 - **SC-011**: 500개 Object를 가진 유효 Scene에서 단일 Object 이동 commit이 기준 개발 장비의 자동 테스트에서 100ms 미만이다.
 - **SC-012**: 활성 PC 브라우저 탭의 대표 TOP_DOWN·PLATFORMER Published/Preview 시나리오에서 렌더링이 55fps 아래로 3초 이상 머무르지 않는다. 백그라운드 throttling 측정은 제외한다.
 - **SC-013**: 6종 시작 템플릿의 Scene/Object/Event/Dialogue 구조 프로필이 서로 구분되고 모든 템플릿이 계약 검증과 시작 Scene 실행 검증을 100% 통과한다.
+- **SC-014**: 공식 Mock 모드의 브라우저에서 `템플릿 선택 → 저장 → 게시 v1 → 일반 /play 조회 → 동일 목표 HUD 표시` 흐름이 Backend·Unity 없이 100% 성공한다.
 
 ## Assumptions
 
@@ -272,7 +276,7 @@
 - `configId` Int32·`GAME_PORTAL` whitelist: GitHub Issue #34 — BE·Unity 합의 반영, FE 구현 확인만 추적
 - Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
 - 사용자 교체 Asset 업로드·stable `asset://` 승격·Publish 연결: GitHub Issue #69 — Frontend·Backend 후속
-- 타이머·점수·적 처치 기반 승리 조건과 GameProject v1.1 FE·BE·AI 계약: GitHub Issue #78 — 합의 전 v1.0.0 타입 확장 금지
+- 타이머·점수·적 처치 기반 승리 조건과 GameProject v1.1 FE·BE·AI 계약: GitHub Issue #78 — FE candidate와 Mock Runtime은 구현 완료, API 모드 허용·BE validator·AI 출력 허용 목록은 합의 전 미확정
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 

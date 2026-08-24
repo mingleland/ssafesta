@@ -66,7 +66,7 @@ FE가 소유하는 79개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T040 Implement revision-aware Draft/publish API client
 - [x] T041 Implement same-origin local Preview route using the shared validator/runtime and a session port
 - [x] T042 Implement revision conflict and validation-error UI
-- [ ] T043 Run Draft→Preview→Publish acceptance flow and record it in FE quickstart
+- [x] T043 Run Draft→Preview→Publish acceptance flow and record it in FE quickstart
 - [x] T078 Implement builtin Asset reference resolver and keep transient local sources out of GameProject JSON
 - [ ] T080 After #48/#55 Published loader integration add Preview-versus-Published parity E2E
 
@@ -96,7 +96,7 @@ FE가 소유하는 79개 작업이다. ID는 기존 통합 목록과의 추적�
 
 ## Cross-cutting verification
 
-- [ ] T064 Verify create/save/publish/play with FastAPI unavailable
+- [x] T064 Verify create/save/publish/play with FastAPI unavailable
 - [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
 - [x] T066 Document schema migration policy and supported-major matrix
 - [x] T067 Run all FE quickstart commands and record final results
@@ -106,10 +106,14 @@ FE가 소유하는 79개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T071 Verify and document Runtime trace command
 - [x] T089 Verify production build emits separate Edit and Play lazy chunks
 - [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([#78](https://github.com/kanghyunsoon/ssafesta/issues/78))
+- [x] T101 Implement the backward-readable GameProject v1.1 Frontend candidate and explicit v1.0 authoring upgrade
+- [x] T102 Implement deterministic score/defeat/survival objectives, progress HUD, and respawn/end-game behavior
+- [x] T103 Implement Mock immutable publication ports and block projects with no completion path
+- [x] T104 Run browser template→save→publish→public `/play` verification with visible objective parity
 
 ## Summary
 
-- Total: 79
-- Completed: 70
-- Remaining: 9
-- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 타이머·점수·적 처치 승리 규약. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. FE adapter·오류 격리·overlay와 maker-style Canvas·구조적으로 다른 템플릿은 응답 전 구현 완료 상태다.
+- Total: 83
+- Completed: 76
+- Remaining: 7
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다.

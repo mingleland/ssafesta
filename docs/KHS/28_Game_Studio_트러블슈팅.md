@@ -8,6 +8,20 @@
 
 ## 2026-08-24
 
+### GS-T044. ON_ENTER Component 효과와 Event session 병합이 Object 숨김을 되돌림 (해결)
+
+- **증상** — v1.1 점수 목표를 추가한 뒤 수집 Runtime 회귀 테스트에서 점수는 증가했지만 아이템 Object가 다시 보이고 inventory 흐름이 깨졌다. 첫 수정에서는 숨겨진 대상을 Event가 실행해 Runtime 실패까지 발생했다.
+- **원인** — `ON_ENTER` Event와 `SCORE_VALUE/PICKUP` Component가 각각 같은 `RuntimeSessionState.objectVisibility` snapshot을 변경했다. 전체 snapshot을 단순 spread하면 나중 snapshot의 변경되지 않은 `true`가 앞선 `false` 변경까지 덮어썼다.
+- **해결** — Event는 접촉 전 상태에서 실행하고 Component 효과도 같은 기준 상태에서 계산한 뒤, 기준 상태와 실제로 달라진 visibility key만 순서대로 병합했다. Event의 inventory/variable/Scene 변경과 Component의 점수/피해/숨김을 모두 보존하고 전체 204 tests로 회귀 검증했다.
+- **예방** — 독립 reducer 결과를 합칠 때 전체 상태 객체를 spread하지 않는다. 공통 base에 대한 field delta를 계산하거나 하나의 순차 reducer pipeline으로 통합하고, Event+Component가 같은 Object를 수정하는 결합 테스트를 유지한다.
+
+### GS-T043. 로컬 게시 port 신규 테스트가 잘못된 factory export를 import함 (해결)
+
+- **증상** — Local Publication unit test 3건 중 2건이 `createStarterProject is not a function`으로 실패했다.
+- **원인** — 템플릿 모듈이 내부에서 starter factory를 사용한다는 이유로 해당 factory도 재수출할 것이라고 가정해 `projectTemplates.ts`에서 import했다.
+- **해결** — 실제 export 소유 파일 `createStarterProject.ts`를 확인해 테스트 import를 수정했다. Local publish v1/v2 snapshot, 미게시 오류, revision 충돌 3건을 다시 통과시켰다.
+- **예방** — 테스트 fixture factory는 검색으로 실제 export 경계를 확인하고, 모듈 내부 import를 public re-export로 추정하지 않는다.
+
 ### GS-T042. 로컬 브라우저 QA가 실 API 인증과 종료된 개발 서버 때문에 편집 route에 진입하지 못함 (해결)
 
 - **증상** — 5174 편집 주소는 개발 서버 종료로 연결이 거절됐고, 서버를 다시 띄운 뒤 게스트 입장은 실제 API 미구현 때문에 실패했다. Game Studio edit route는 회원 전용이라 guest mock만으로도 접근할 수 없었다.

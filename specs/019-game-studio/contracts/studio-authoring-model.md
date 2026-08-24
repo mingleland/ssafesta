@@ -1,6 +1,6 @@
-# Game Studio 편집·Asset 모델 v1
+# Game Studio 편집·Asset 모델 v1.0/v1.1
 
-> 상태: Implemented reference v1.0 — 편집기와 local Preview에서 검증한 공통 기준
+> 상태: v1.0 호환 + v1.1 Frontend candidate 구현. Backend·AI 최종 허용 계약은 Issue #78에서 확정한다.
 
 ## 1. 편집 화면의 논리 영역
 
@@ -102,18 +102,47 @@ Event를 이중 저장하지 않으며, recipe 형태를 더 이상 인식할 �
 - 대화 Scene과 Node는 각각 선택적 `backgroundAssetId`, `portraitAssetId`를 가지며 표정은 인물 atlas의
   안정 Asset reference로 선택한다. Dialogue는 장르가 아니라 두 World Runtime 위에 재사용하는 연출 계층이다.
 
-## 7. Preview·Save·Publish
+## 7. GameProject v1.1 게임 목표
+
+v1.1은 기존 Trigger·Condition·Action을 재해석하지 않고 프로젝트 최상위 `rules`만 추가한다.
+
+```json
+{
+  "schemaVersion": "1.1.0",
+  "rules": {
+    "completion": {
+      "mode": "ALL",
+      "objectives": [
+        { "type": "DEFEAT_ENEMIES", "target": 3 },
+        { "type": "SURVIVE_SECONDS", "target": 30 }
+      ]
+    },
+    "playerDefeat": "END_GAME"
+  }
+}
+```
+
+- 목표 유형은 `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS` 세 가지다. 같은 유형은 한 번만 사용한다.
+- `ALL`은 모든 목표, `ANY`는 하나 이상의 목표 달성 시 완료한다. 빈 목표 배열은 자동 완료를 사용하지 않고 기존 `COMPLETE_GAME` Event를 사용한다.
+- 생존 시간은 월드가 실제 진행되는 120ms Runtime tick을 누적한다. 대화 Overlay와 일시 중지 상태에서는 시간이 흐르지 않는다.
+- `RESPAWN`은 체크포인트/시작점에서 체력을 복구하고, `END_GAME`은 `PLAYER_DEFEATED` 결과와 재도전 UI를 표시한다.
+- v1.0은 계속 읽는다. 편집기가 v1.0을 수정하면 `rules` 기본값과 함께 v1.1로 승격하며 원래 필드를 암묵적으로 재해석하지 않는다.
+- SHOOTER 기본 템플릿은 적 3명 처치, SURVIVAL은 30초 생존과 체력 0 종료를 사용한다.
+
+## 8. Preview·Save·Publish
 
 - Preview는 현재 편집 snapshot을 복제해 격리 Runtime에서 실행하며 Draft revision을 변경하지 않는다.
 - Save는 GameProject JSON과 revision만 영구 저장한다. Editor selection/history는 저장하지 않는다.
 - Publish는 구조·참조·Asset 정책·Dialogue presentation을 검증한 뒤 불변 Version을 만든다.
+- 목표와 `COMPLETE_GAME`이 모두 없으면 끝낼 수 없는 게임으로 판단해 Publish를 거부한다.
 - Preview에서만 보이는 임시 Asset이나 지원하지 않는 recipe가 남아 있으면 Publish를 거부한다.
 - Publish blocker는 해당 Asset을 사용하는 Scene 배경, Tile Layer, Object Sprite/투사체/생성 대상, Dialogue 초상화, Item 위치를 함께 표시한다.
 - revision 충돌은 로컬 snapshot을 유지하고 JSON 백업 또는 백업 후 서버 최신 Draft 로드 중 하나를 명시적으로 선택하게 한다.
 - GameProject JSON은 2,000,000 bytes, Scene 50, Scene당 Object 500/Event 300, Asset 300 상한을 적용하고
   Asset binary는 별도 저장소가 소유한다.
+- `VITE_USE_MOCK=true`에서는 브라우저 Draft를 immutable Published snapshot으로 복제하고 version을 증가시켜 일반 `/play` 경로를 검증한다. 운영 API 모드에서는 같은 Publisher/Repository port를 서버 adapter로 교체한다.
 
-## 8. 파트 경계
+## 9. 파트 경계
 
 - Game Studio Frontend: `src/game-studio/` 편집 UX, recipe 변환, local validation, Preview/Runtime Asset resolve.
 - FESTA Host Frontend: lazy route, 기존 인증/API client, Game Overlay와 Unity lifecycle.
