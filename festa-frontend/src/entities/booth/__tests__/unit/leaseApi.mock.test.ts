@@ -33,9 +33,13 @@ describe('getSlots — 목록', () => {
     }
   });
 
-  it('초기 상태는 전부 AVAILABLE·mine false', async () => {
+  it('초기 상태는 타인 점유 sentinel(908) 빼고 전부 AVAILABLE·mine false', async () => {
     const slots = await getSlots();
-    expect(slots.every((s) => s.status === 'AVAILABLE' && !s.mine)).toBe(true);
+    expect(slots.filter((s) => s.slotId !== 908).every((s) => s.status === 'AVAILABLE' && !s.mine)).toBe(true);
+    const taken = slots.find((s) => s.slotId === 908);
+    expect(taken?.status).toBe('OCCUPIED');
+    expect(taken?.mine).toBe(false);
+    expect(taken?.boothName).toBe('다른 회원 부스');
   });
 });
 
@@ -74,6 +78,12 @@ describe('leaseSlot — 임대·오류', () => {
     expect(isApiError(e) && e.code).toBe('BOOTH_SLOT_NOT_FOUND');
   });
 
+  it('타인 점유 sentinel(908) → BOOTH_SLOT_ALREADY_LEASED, 차감 없음', async () => {
+    const e = await rejection(() => leaseSlot(908));
+    expect(isApiError(e) && e.code).toBe('BOOTH_SLOT_ALREADY_LEASED');
+    expect((await getWallet()).balance).toBe(200);
+  });
+
   it('sentinel R06 → INSUFFICIENT_COIN, 차감 없음', async () => {
     const e = await rejection(() => leaseSlot(6));
     expect(isApiError(e) && e.code).toBe('INSUFFICIENT_COIN');
@@ -107,8 +117,11 @@ describe('getMyBooth · C-02 읽기 시 만료 판정', () => {
       await leaseSlot(7);
       expect((await getSlots()).find((s) => s.slotId === 7)?.status).toBe('OCCUPIED');
       vi.advanceTimersByTime(91_000); // 90초 임대 경과 — Date.now()가 endsAt을 넘는다
-      expect((await getSlots()).every((s) => s.status === 'AVAILABLE')).toBe(true);
-      expect(await getMyBooth()).toBeNull();
+      expect((await getSlots()).find((s) => s.slotId === 7)?.status).toBe('AVAILABLE');
+      // 만료 후에도 부스는 삭제되지 않는다(FR-010) — 204(null)가 아니라 INACTIVE + lease:null
+      const booth = await getMyBooth();
+      expect(booth?.status).toBe('INACTIVE');
+      expect(booth?.lease).toBeNull();
     } finally {
       vi.useRealTimers();
     }

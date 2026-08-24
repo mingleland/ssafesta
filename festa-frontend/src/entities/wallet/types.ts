@@ -17,8 +17,9 @@ export interface WalletTransaction {
   amount: number; // 부호 있음 — 지급 +, 차감 −
   balanceAfter: number;
   reasonType: string;
-  referenceType?: string;
-  referenceId?: string; // 숫자를 담아도 string (예: leaseId "317")
+  // 서버 record에 @JsonInclude가 없어 값 없음이 키 생략이 아니라 null로 온다(오류 봉투의 NON_NULL과 다름)
+  referenceType: string | null;
+  referenceId: string | null; // 숫자를 담아도 string (예: leaseId "317")
   createdAt: string; // ISO-8601 UTC
 }
 

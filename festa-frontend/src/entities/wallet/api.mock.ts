@@ -59,8 +59,8 @@ function seedTransactions(): WalletTransaction[] {
       amount: isSpend ? -100 : 50,
       balanceAfter: 200 + i, // 표시 검증용 결정값 — 실제 누계는 아님
       reasonType: i === 44 ? 'FUTURE_UNKNOWN_REASON' : isSpend ? 'LEASE_PAYMENT' : 'DAILY_GRANT',
-      referenceType: isSpend ? 'BOOTH_LEASE' : undefined,
-      referenceId: isSpend ? String(300 + i) : undefined,
+      referenceType: isSpend ? 'BOOTH_LEASE' : null,
+      referenceId: isSpend ? String(300 + i) : null,
       createdAt: new Date(Date.UTC(2026, 7, 24, 0, i)).toISOString(),
     });
   }

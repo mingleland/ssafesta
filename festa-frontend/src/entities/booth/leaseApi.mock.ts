@@ -14,6 +14,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const INSUFFICIENT_SLOT_ID = 6; // R06 임대 시도 → 항상 잔액 부족
 const SHORT_LEASE_SLOT_ID = 7; // R07 임대 성공하되 90초 만료 — 시간 진행·만료 전환 관찰용
 const ADMIN_SLOT_ID = 905; // USER_RENTAL 아님 → BOOTH_SLOT_NOT_RENTABLE
+const TAKEN_SLOT_ID = 908; // 타인이 항상 점유 중 → BOOTH_SLOT_ALREADY_LEASED (경합 패배 재현)
 
 interface MockLease {
   leaseId: number;
@@ -38,6 +39,7 @@ const SLOT_SEED: MockSlot[] = [
     type: 'USER_RENTAL',
   })),
   { slotId: ADMIN_SLOT_ID, slotCode: 'F11-A01', type: 'ADMIN_EXHIBITION' },
+  { slotId: TAKEN_SLOT_ID, slotCode: 'F11-T01', type: 'USER_RENTAL' },
 ];
 
 function loadLease(): MockLease | null {
@@ -61,6 +63,29 @@ function persistLease(): void {
 // mock 단일 사용자 가정 — 임대 주체는 항상 나(mine 재현). 타인 점유는 sentinel로만 존재.
 let myLease: MockLease | null = loadLease();
 let nextLeaseId = 1;
+
+// 첫 임대 시 Booth가 발급되면 만료돼도 삭제되지 않는다(FR-010 콘텐츠 보존) — 만료 후
+// getMyBooth는 204가 아니라 INACTIVE + lease:null을 반환해야 실서버와 같다(codex 검증 적중분).
+const HAD_BOOTH_KEY = 'festa-mock-booth-had';
+
+function loadHadBooth(): boolean {
+  try {
+    return sessionStorage.getItem(HAD_BOOTH_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+let hadBooth = loadHadBooth() || myLease !== null;
+
+function markHadBooth(): void {
+  hadBooth = true;
+  try {
+    sessionStorage.setItem(HAD_BOOTH_KEY, 'true');
+  } catch {
+    // 무시
+  }
+}
 
 function apiError(code: string, message: string): ApiError {
   return { code, message, requestId: `mock_${Date.now()}`, errors: [], warnings: [] };
@@ -88,6 +113,22 @@ function activeLease(): MockLease | null {
 export async function getSlots(): Promise<SlotView[]> {
   const lease = activeLease();
   return SLOT_SEED.map((s) => {
+    // 타인 점유 sentinel — 항상 OCCUPIED·mine false. 경합 패배(ALREADY_LEASED)와 점유 표시 재현
+    if (s.slotId === TAKEN_SLOT_ID) {
+      return {
+        slotId: s.slotId,
+        slotCode: s.slotCode,
+        floorNo: 11,
+        type: s.type,
+        status: 'OCCUPIED' as const,
+        boothId: 777,
+        boothName: '다른 회원 부스',
+        leaseEndsAt: new Date(Date.now() + DAY_MS).toISOString(),
+        remainingSeconds: 86_400,
+        entryAvailable: true,
+        mine: false,
+      };
+    }
     const occupied = lease !== null && lease.slotId === s.slotId;
     return {
       slotId: s.slotId,
@@ -116,6 +157,9 @@ export async function leaseSlot(slotId: number, durationDays = 1): Promise<Lease
   if (slot.type !== 'USER_RENTAL') {
     throw apiError('BOOTH_SLOT_NOT_RENTABLE', '임대할 수 없는 슬롯입니다.');
   }
+  if (slotId === TAKEN_SLOT_ID) {
+    throw apiError('BOOTH_SLOT_ALREADY_LEASED', '다른 회원이 임대 중인 슬롯입니다.');
+  }
 
   const lease = activeLease();
   if (lease) {
@@ -142,6 +186,7 @@ export async function leaseSlot(slotId: number, durationDays = 1): Promise<Lease
     endsAt: new Date(now + durationMs).toISOString(),
     chargedCoin: LEASE_COIN,
   };
+  markHadBooth();
   persistLease();
   return { ...toResponse(myLease), balanceAfter };
 }
@@ -159,10 +204,14 @@ function toResponse(lease: MockLease): LeaseResponse {
   };
 }
 
-// real의 204 → null 정규화와 같은 시그니처 — 활성 임대가 없으면 부스 없음으로 단순화
+// real의 204 → null 정규화와 같은 시그니처. 부스를 한 번도 못 받았을 때만 null(204) —
+// 만료 후에는 INACTIVE + lease:null (FR-010, 실서버 정합)
 export async function getMyBooth(): Promise<MyBooth | null> {
   const lease = activeLease();
-  if (!lease) return null;
+  if (!lease) {
+    if (!hadBooth) return null;
+    return { boothId: 1, name: '내 부스', status: 'INACTIVE', lease: null };
+  }
   const slot = SLOT_SEED.find((s) => s.slotId === lease.slotId);
   return {
     boothId: lease.boothId,
@@ -183,8 +232,10 @@ export async function getMyBooth(): Promise<MyBooth | null> {
 export function __resetLeaseMockForTests(): void {
   myLease = null;
   nextLeaseId = 1;
+  hadBooth = false;
   try {
     sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(HAD_BOOTH_KEY);
   } catch {
     // 무시
   }
