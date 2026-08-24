@@ -84,4 +84,5 @@
 - **착수 전 `origin/develop` 대조 필수** — 내 브랜치의 공유 문서 사본은 낡았다고 가정
 - **오프라인 가용**: `git fetch --all` 후 origin ref 23개가 로컬 객체에 있어 `git checkout origin/develop -- <path>` 계약 회수가 네트워크 없이 동작한다. 로컬 기준선 = **vitest 157/157(29 files)·build ✅·oxlint 무경고** (2026-08-24 `npm ci` 후 실측, [T-21](25_트러블슈팅.md))
 - **G-4 컴포넌트 테스트 공백**: vitest include가 `.tsx` 제외 + 라이브러리 미설치. `RequireAuth` bootstrapped 분기(T-17이 난 틈)·G-2 딥링크 흐름이 수동 실측뿐 — 도입은 팀 결정 사안
+- **원격 = GitLab**(`lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604`, origin 교체·GitHub은 `github` 별명). 이슈 번호 보존 이관, PR은 `gh:PR` 라벨 이슈. **작업 관리는 Jira**(`ssafy.atlassian.net` S15P21A604, 내 배정 34건 — dev/main 머지에 Jira 키 필수). push 10커밋·github 링크 치환 보류 중(2026-08-24)
 - **닫힌 이슈 재확인 습관** — CLOSED 후 마지막 코멘트에만 확정·번복이 남는 경우가 잦다. 관련 이슈가 새로 닫히면 재대조
