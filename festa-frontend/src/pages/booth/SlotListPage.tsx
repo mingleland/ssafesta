@@ -10,6 +10,7 @@ import { leaseApi } from '../../entities/booth/leaseApi.select';
 import { formatRemaining, remainingMs } from '../../entities/booth/remaining';
 import { useLeaseSlot } from '../../features/booth/model/useLeaseSlot';
 import { WalletBadge } from '../../features/wallet/ui/WalletBadge';
+import { TransactionsSection } from '../../features/wallet/ui/TransactionsSection';
 import type { SlotView } from '../../entities/booth/types';
 
 // 임대 실패를 사용자 언어로 — code로만 분기한다(INSUFFICIENT_COIN의 부족액 숫자는 message에만
@@ -134,6 +135,13 @@ export function SlotListPage() {
       </ul>
 
       {leaseMutation.isError && <p role="alert">{leaseErrorText(leaseMutation.error)}</p>}
+
+      {isMember && (
+        <details>
+          <summary>코인 사용 내역</summary>
+          <TransactionsSection />
+        </details>
+      )}
     </div>
   );
 }
