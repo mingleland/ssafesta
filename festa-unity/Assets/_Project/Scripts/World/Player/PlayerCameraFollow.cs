@@ -14,14 +14,16 @@ namespace Festa.World
     /// </summary>
     public class PlayerCameraFollow : NetworkBehaviour
     {
-        [SerializeField] Vector3 _offset = new(0f, 4f, -18f);
+        // 거리·높이류 기본값은 아바타 스케일과 한 몸이다 — 2026-08-24 스케일업(×1.25)
+        // 에 맞춰 프리팹 직렬화 값과 함께 올렸다 (구값: min 9, max 36, look 11.5/14 등).
+        [SerializeField] Vector3 _offset = new(0f, 5f, -22.5f);
         [SerializeField] float _followLerp = 8f;
-        [SerializeField] float _collisionRadius = 0.25f;
-        [SerializeField] float _collisionPadding = 2f;   // 0.2 m — 벽면과의 최소 이격
+        [SerializeField] float _collisionRadius = 0.8f;
+        [SerializeField] float _collisionPadding = 2.5f;   // 0.25 m — 벽면과의 최소 이격
         [SerializeField] LayerMask _collisionMask = ~0;
-        [SerializeField] float _minDistance = 9f;
-        [SerializeField] float _maxDistance = 36f;
-        [SerializeField] float _zoomStep = 1.2f;
+        [SerializeField] float _minDistance = 11.25f;
+        [SerializeField] float _maxDistance = 45f;
+        [SerializeField] float _zoomStep = 1.5f;
         [SerializeField] float _orbitSensitivity = 0.12f;
         // 밤하늘을 올려다볼 수 있게 수평 아래로 조금 연다. 지면 뚫림은 아래의
         // 바닥 클램프가 별도로 막으므로 안전하다 (T-190 이후 구조).
@@ -37,9 +39,9 @@ namespace Festa.World
         // ── 시선 높이 ─────────────────────────────────────────────
         // 하나로 고정하면 줌인할 때 엉덩이를 들여다본다. 3인칭 게임은 가까워질수록
         // 시선을 **어깨 쪽으로 올린다** — 멀리서는 발밑까지 보여 주고, 가까이서는
-        // 상체를 본다. 아바타 목표 높이가 17.9 unit 이라 어깨는 대략 14 다.
-        [SerializeField] float _lookHeight = 11.5f;     // 최대 줌아웃에서의 높이 (가슴 — 바닥 쏠림 방지)
-        [SerializeField] float _lookHeightNear = 14f;    // 최대 줌인에서의 높이
+        // 상체를 본다. 아바타 목표 높이가 22.375 unit 이라 어깨는 대략 17.5 다.
+        [SerializeField] float _lookHeight = 14.4f;     // 최대 줌아웃에서의 높이 (가슴 — 바닥 쏠림 방지)
+        [SerializeField] float _lookHeightNear = 17.5f;    // 최대 줌인에서의 높이
 
         // ── 자기 몸 가리기 ────────────────────────────────────────
         // 뒤에 벽·기물이 있으면 카메라가 앞으로 당겨지고, 그러다 아바타 안으로 들어가
@@ -48,12 +50,12 @@ namespace Festa.World
         //
         // 히스테리시스를 둔다 — 임계값 하나면 경계에서 깜빡인다.
         //
-        // 임계값은 최소 줌 거리(`_minDistance` 9)보다 **낮아야** 한다. 같거나 높으면
+        // 임계값은 최소 줌 거리(`_minDistance` 11.25)보다 **낮아야** 한다. 같거나 높으면
         // 사용자가 의도적으로 최대 줌인만 해도 자기 아바타가 사라진다 — 그건 버그로 보인다.
         // 여기 걸리는 것은 벽에 밀려 강제로 당겨진 경우뿐이다 (거리가 캐스트 반경까지 내려간다).
-        // 1 m = 10 unit 이므로 6 = 0.6 m, 8 = 0.8 m 다.
-        [SerializeField] float _selfHideDistance = 6f;   // 이보다 가까우면 숨긴다
-        [SerializeField] float _selfShowDistance = 8f;   // 이보다 멀어지면 다시 보인다
+        // 1 m = 10 unit 이므로 7.5 = 0.75 m, 10 = 1.0 m 다.
+        [SerializeField] float _selfHideDistance = 7.5f;   // 이보다 가까우면 숨긴다
+        [SerializeField] float _selfShowDistance = 10f;   // 이보다 멀어지면 다시 보인다
 
         Camera _cam;
         float _distance;

@@ -139,10 +139,13 @@ namespace Festa.World
                 visualTransform.position += Vector3.up * (desiredBottom - fittedBounds.min.y);
             }
 
-            // 월드 플레이어 루트(스폰)는 Y=0을 유지하고, 조립된 외형만 Y=10에 둔다.
+            // 월드 플레이어 루트(스폰)는 Y=0을 유지하고, 조립된 외형만 위로 올려 둔다.
             // 바닥 탐색 성공 여부와 무관하게 항상 같은 높이가 적용되어야 한다.
+            // 이 오프셋은 모델 피벗 보정이라 외형 스케일에 비례한다 —
+            // 목표 높이 17.9 에서 10 이었고, 실측 기준 스케일업(×1.25, 22.375)에서 12.5 다.
+            // _targetVisualHeight 를 바꾸면 이 값도 같은 비율로 바꿔야 발이 안 뜨거나 안 묻힌다.
             var position = visualTransform.localPosition;
-            position.y = 10f;
+            position.y = 12.5f;
             visualTransform.localPosition = position;
 
         }
@@ -487,10 +490,12 @@ namespace Festa.World
             // 발 구르기는 이완돼 보여야 하므로 들어가는 구간을 준다.
             // Launch → Air 는 인접 프레임이지만 루트 Y 베이크가 반대라 3 cm 단차가
             // 있어 조금 섞는다. 착지는 더 길게 — 그 동안 착지 흡수가 재생된다.
+            // Jump_Air 진입: 발 구르기(Launch)에서 이어질 때는 인접 프레임이라 짧게,
+            // 이동 중 즉시 도약(Run/Walk → Air 직행)은 포즈 차이가 커서 조금 길게 섞는다.
             float fade = state switch
             {
                 PlayerAnimState.JumpLaunch => 0.10f,
-                PlayerAnimState.Jump => 0.06f,
+                PlayerAnimState.Jump => _lastLocomotion == PlayerAnimState.JumpLaunch ? 0.06f : 0.12f,
                 _ => _lastLocomotion == PlayerAnimState.Jump ? 0.25f : 0.2f,
             };
             _lastLocomotion = state;

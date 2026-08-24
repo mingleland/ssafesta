@@ -112,7 +112,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Jump_Air
-  m_Speed: 0.70895517
+  m_Speed: 0.844
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -443,7 +443,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Jump_Launch
-  m_Speed: 1.2500001
+  m_Speed: 1.6667
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []

@@ -18,8 +18,11 @@ namespace Festa.Network
     [RequireComponent(typeof(NetworkPlayer))]
     public class PlayerMovement : NetworkBehaviour
     {
-        [SerializeField] float _moveSpeed = 36f;
-        [SerializeField] float _runSpeed = 52f;
+        // 속도는 아바타 스케일과 한 몸이다 — 2026-08-24 실측 스케일업(×1.25, 기준: 11층
+        // 실측 인체 모델 22.4 unit)에 맞춰 36/52 에서 함께 올렸다. 모델이 커지면 보폭도
+        // 커지므로 속도를 같은 비율로 올려야 발이 미끄러지지 않는다.
+        [SerializeField] float _moveSpeed = 45f;
+        [SerializeField] float _runSpeed = 65f;
         [SerializeField, Min(0.01f)] float _turnSmoothTime = 0.08f;
         [SerializeField, Min(1f)] float _maxTurnSpeedDeg = 1080f;
 
@@ -27,7 +30,7 @@ namespace Festa.Network
         [Tooltip("중력 가속도. 월드가 1 m = 10 unit 이므로 9.81 m/s² = 98.1 unit/s² 이다.")]
         [SerializeField] float _gravity = 98.1f;
         [Tooltip("접지 상태에서 유지하는 하강 속도 — 경사·계단에서 붙어 있게 한다.")]
-        [SerializeField] float _groundedStick = -20f;
+        [SerializeField] float _groundedStick = -25f;
 
         // 점프 — 스페이스바. 도약 속도는 원하는 높이에서 역산한다.
         // h = v² / 2g 이므로 v = √(2gh). g=98.1, h=45(=4.5 m 는 과하다) 대신
@@ -43,8 +46,16 @@ namespace Festa.Network
         // v = 40.2, g = 90 → 체공 0.893초, 도달 8.98 unit = 0.90 m.
         // 0.60 m 는 발 구르기 웅크림(0.34 m)에 먹혀 낮아 보였다. 체공은 그대로 두고
         // 높이만 1.5배 올렸다 — 애니메이션 재생 속도(0.709)를 건드리지 않아도 된다.
-        [SerializeField] float _jumpSpeed = 40.2f;
-        [SerializeField] float _jumpGravity = 90f;
+        //
+        // 2026-08-24 아바타 스케일업(×1.25)에 맞춰 v·g 를 같은 비율로 올렸다:
+        // v = 50.25, g = 112.5 → 체공 0.893초, 높이 11.2 unit = 1.12 m.
+        //
+        // 이후 "점프가 길어 답답하다" 피드백으로 체공을 0.75초로 줄였다:
+        // v = 56, g = 149.33 → 체공 2v/g = 0.75초, 높이 v²/2g = 10.5 unit = 1.05 m.
+        // 체공이 바뀌면 Jump_Air 재생 속도도 같이 바꿔야 착지 순간 포즈가 유지된다
+        // (착지 시점 클립 위치 = speed × 체공 = 0.633초 고정 → speed 0.844).
+        [SerializeField] float _jumpSpeed = 56f;
+        [SerializeField] float _jumpGravity = 149.33f;
 
         // ── 스폰 위치 강제 ────────────────────────────────────────
         // 서버가 접속 승인에서 배정한 위치. 이동 권위가 Owner(클라이언트)에 있으므로
@@ -72,12 +83,15 @@ namespace Festa.Network
 
         bool _jumpPending;
         float _jumpPressedAt;
-        // Jump_Launch 클립(f6~f15 = 0.300초)을 speed 1.25 로 재생하는 시간.
+        // Jump_Launch 클립(f6~f15 = 0.300초)을 재생하는 시간. 애니메이터의
+        // Jump_Launch 상태 speed 와 한 쌍이다 (speed = 0.300 / JumpAnticipation).
         // 이 값이 그 재생 시간과 어긋나면 도약 순간이 다시 어긋난다 — 같이 바꿔야 한다.
         //
-        // 0.13초(f7 시작, speed 2.05)였는데 선 자세에서 깊은 웅크림으로 뚝 끊겼다.
-        // 발 구르기는 이완돼 보여야 해서 조금 이르게 시작하고 느리게 재생한다.
-        const float JumpAnticipation = 0.24f;
+        // 0.13초(speed 2.05)는 선 자세에서 깊은 웅크림으로 뚝 끊겼고,
+        // 0.24초(speed 1.25)는 "점프가 길어 답답하다" — 0.18초(speed 1.667)로 절충.
+        // **제자리 점프에만 적용된다.** 이동 중 점프는 발 구르기를 생략하고 즉시
+        // 도약한다 — 몸은 전진하는데 발은 제자리를 딛는 모션이라 미끄러져 보였다.
+        const float JumpAnticipation = 0.18f;
 
         public override void OnNetworkSpawn()
         {
@@ -219,8 +233,22 @@ namespace Festa.Network
                 // 접지 상태에서만 시작한다 — 이중 점프를 만들지 않는다.
                 if (grounded && !_jumpPending && IsJumpPressed())
                 {
-                    _jumpPending = true;
-                    _jumpPressedAt = Time.time;
+                    if (moving)
+                    {
+                        // 이동 중 점프는 발 구르기 없이 즉시 도약한다. 발 구르기는
+                        // 제자리 딛기 모션이라 전진 중에 재생하면 발이 미끄러져
+                        // 보이고, Run→Launch→Air 전환이 끼어들어 끊겨 보인다.
+                        // 달리기 점프가 즉발인 것은 3인칭 게임의 관례이기도 하다.
+                        _verticalSpeed = _jumpSpeed;
+                        _airborne = true;
+                        _jumped = true;
+                        grounded = false;
+                    }
+                    else
+                    {
+                        _jumpPending = true;
+                        _jumpPressedAt = Time.time;
+                    }
                 }
 
                 // 중력·접지 처리 **뒤에** 적용해야 _groundedStick 이 도약을 지우지 않는다.
