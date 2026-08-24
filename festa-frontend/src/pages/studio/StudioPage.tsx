@@ -1,13 +1,14 @@
 // spec 005 Booth Studio 편집기의 조립 지점 — /app/studio/:boothId가 마운트하는 화면
 import { useEffect, useReducer } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
 import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
 import { useStudioGates } from '../../features/studio/model/useStudioGates';
+import { useOwnerGate } from '../../features/booth/model/useOwnerGate';
 import { EditorCanvas } from '../../features/studio/ui/EditorCanvas';
 import { ObjectPalette } from '../../features/studio/ui/ObjectPalette';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
@@ -76,6 +77,9 @@ export function StudioPage() {
   const bounds = template?.footprint ?? BOOTH_SIZE_FALLBACK;
   const maxObjects = template?.maxObjects ?? MAX_OBJECTS_FALLBACK;
 
+  // G-1 Owner 가드(UX 보조 — 서버 FR-012 403이 최종 차단). ['my-booth'] 캐시를 SlotListPage와 공유
+  const ownerGate = useOwnerGate(boothIdNum);
+
   const gates = useStudioGates({
     state,
     draftError: draftQuery.error,
@@ -87,6 +91,19 @@ export function StudioPage() {
     maxObjects,
     bounds,
   });
+
+  if (ownerGate.status === 'loading') return <p>부스 소유 확인 중...</p>;
+  if (ownerGate.status === 'not-owner') {
+    return (
+      <div>
+        <p>이 부스의 소유자만 편집할 수 있습니다.</p>
+        <Link to="/app/booths">부스 슬롯 목록으로</Link>
+      </div>
+    );
+  }
+  if (ownerGate.status === 'error') {
+    return <p>부스 소유 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>;
+  }
 
   if (draftQuery.isLoading) return <div>불러오는 중...</div>;
   if (gates.draftLeaseExpired) {
