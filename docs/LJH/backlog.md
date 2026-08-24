@@ -24,14 +24,14 @@
 
 | 항목 | 대기 대상 | 상대 |
 |---|---|---|
-| [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T056 Portal resolver·overlay adapter / T058 E2E | [#48](https://github.com/kanghyunsoon/ssafesta/issues/48) BE resolver·whitelist 배포. 선행 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53)은 **CONFLICTING → MERGEABLE 해소**(08-24) — 남은 체인은 #53 머지 → #48 배포. 추가로 strdeok가 **T054 응답 `objectId` 산출 방식 미계약** 제기(#56 §3) | strdeok·리드 |
+| [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T056 Portal resolver·overlay adapter / T058 E2E | [#48](https://github.com/kanghyunsoon/ssafesta/issues/48) BE resolver·whitelist 배포. 선행 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53) **머지 완료**(08-24, develop `64d544e` — `specs/019-game-studio/` 전량 도달). **남은 체인은 #48 배포 하나.** strdeok가 제기한 T054 `objectId` 미계약(#56 §3)은 [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)가 답 | strdeok |
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T057 `OnOverlayStateChanged` 송신부 | 수신 GameObject명(`receiverObjectName`) 확정 | Unity |
 | [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) 잔여 E2E | **서버 비의존 FE 범위는 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드)가 선구현**(Published loader·schema guard·상태별 오류 UI·error boundary). 잔여 = #48 실 endpoint + #69 stable resolver 연결 후 browser E2E | strdeok·리드 |
 | 001 T016 게스트·refresh·logout 실경로 | BE 계약 문서(endpoint 3종) 회수 | BE |
 | `assetCode` 목록 | Unity 레지스트리 실측값(#6·#18 — 둘 다 이걸 기다리다 닫힘) | Unity |
 | [#78](https://github.com/kanghyunsoon/ssafesta/issues/78) GameProject v1.1 승리 규약 | BE·AI 합의. 리드가 FE 후보 구현 선점([PR #80](https://github.com/kanghyunsoon/ssafesta/pull/80) `02a1d76`) — `completion.mode ALL/ANY`·`SCORE_AT_LEAST`/`DEFEAT_ENEMIES`/`SURVIVE_SECONDS`·`RESPAWN`/`END_GAME` | 리드·strdeok·AI |
 | [#81](https://github.com/kanghyunsoon/ssafesta/issues/81) Published 플레이 세션·Coin 차감 | BE 계약 7건. **FE 인수조건 명시됨** — `createPublishedGameSessionPort`를 API 어댑터로 교체(Editor·Runtime 무변경), 차감 사전 고지, 2계정 1회 차감·idempotency E2E | strdeok·리드 |
-| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) 마무리 | `:133` 화살표(문구 확정, **PR #53에 얹는 쪽 제안** — 안 되면 #53 머지 후 내 1줄 커밋)·§21-2 grep 2층 개정(동의 회신 완료, 리드 반영) | 리드 |
+| [#59](https://github.com/kanghyunsoon/ssafesta/issues/59) 마무리 | **§21-2 grep 2층 개정 1건만 잔존**(develop `docs/17:546` 아직 3단계, 문구 초안 작성자가 리드라 리드 몫). `:134` 화살표는 [PR #83](https://github.com/kanghyunsoon/ssafesta/pull/83)으로 반영 완료 | 리드 |
 | [#60](https://github.com/kanghyunsoon/ssafesta/issues/60) AT 채택 + [#76](https://github.com/kanghyunsoon/ssafesta/issues/76) 아바타 저장 API | 둘 다 `avatar-profile-api.md` 반영이 [PR #75](https://github.com/kanghyunsoon/ssafesta/pull/75)에 있는데 **base가 `back`(스택)이라 develop 미도달** — develop `:41`은 아직 "형태도 가능하다" 제안형. #76이 나에게 요청한 FE 타입 필드(`GET /users/me`의 `avatarCode`)는 front 참조 **0건** 실측. 착수는 예정 작업(013a wiring)에서 함께 | strdeok |
 | [#69](https://github.com/kanghyunsoon/ssafesta/issues/69) Asset 업로드 | **경계 확정**(나 = `GameAssetRepository` 원격 구현·`shared/api`·`studio/ports` / busypark = 에디터 UI ①~④). [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)가 **주입 경계·Publish preflight 선반영** — 내 원격 구현이 꽂힐 자리 마련됨. BE 업로드 계약(API 형태·상태 DTO·오류 코드)만 대기 | strdeok |
 
@@ -49,10 +49,10 @@
 - 013·016의 game발 spec 갱신 develop 미반영 / FE.md 인용 `game de38269` 커밋이 로컬·원격에 없음(016 E2E는 계약 텍스트만 필요해 무관) — Unity 확인 필요
 - 013 spec.md C-01이 docs/26(V10 TEXT)로 해소됐는데 리뷰 표는 미결 표기 — Unity 소유, 임의 수정 안 함
 - `docs/14`·spec 008이 front·develop에서 #32 미반영 stale — 정본 `origin/ai`. AI 소유라 미반입(#59 규칙), B는 주석에 정본 위치만 명시
-- Game Studio Portal Bridge 계약 정본 = `origin/codex/game-studio-docs-sync`의 `specs/019-game-studio/`(Draft v0.3, 019 개명은 #21) — develop 미반영
+- [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)(리드)가 **#56 §3(`objectId` 산출 방식 미계약)을 해소** — 서버 응답 필수값에서 `objectId` 제거, `configId + boothId`만 일치 검증. `objectId`는 Overlay 생명주기·진입 위치용 로컬 문맥으로만 유지
 - [#62](https://github.com/kanghyunsoon/ssafesta/issues/62) 부스 규격: FE 편집기 영향 없음 — BE가 `GET /booth-slots/{slotId}/layouts/published` 신설로 흡수, 슬롯 7→12
 - GAME_PORTAL configId(Int32·0 금지, #34) FE 정수 검증·전송 순서 — #49(busypark)로 이관
-- [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드, Game Studio 실사용 보강 35파일) 미머지 **→ 3단 스택으로 확대**: #72(→`front`)·[#79](https://github.com/kanghyunsoon/ssafesta/pull/79)(Maker 자유 편집 캔버스)·[#80](https://github.com/kanghyunsoon/ssafesta/pull/80)(local publish loop + v1.1 goals). **최종 base가 전부 `front`** — 머지되면 내 브랜치가 아래에서 바뀐다. API 어댑터는 `VITE_GAME_STUDIO_API_ENABLED=false` 기본(플래그 인지)
+- [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드, Game Studio 실사용 보강 35파일) 미머지 **→ 3단 스택으로 확대**: #72(→`front`)·[#79](https://github.com/kanghyunsoon/ssafesta/pull/79)(Maker 자유 편집 캔버스)·[#80](https://github.com/kanghyunsoon/ssafesta/pull/80)(local publish loop + v1.1 goals)·[#82](https://github.com/kanghyunsoon/ssafesta/pull/82)(portal 계약 수정) **4단**. **최종 base가 전부 `front`** — 머지되면 내 브랜치가 아래에서 바뀐다. API 어댑터는 `VITE_GAME_STUDIO_API_ENABLED=false` 기본(플래그 인지)
 - [PR #77](https://github.com/kanghyunsoon/ssafesta/pull/77)(strdeok, #62 슬롯 기준 published 경로 + 슬롯 12 시드) OPEN — FE 편집기 영향 없음 결론 불변
 - [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) §5 `CURRENT_REVISION`: **십진수 문자열 ⑧ 유지 확정**(strdeok 재확정 + 리드가 019 `game-api.md` 대조로 일치 확인). 이슈 OPEN이나 내 액션 없음
 - [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 확정(08-21 종결): 신규 진입 REST 차단·loaded 세션 무보상 완료 허용·일반 soft/탈퇴 hard delete·Published 이력 유지·Ranking P1 절연. 정본은 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53)의 `specs/019-game-studio/`
