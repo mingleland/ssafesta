@@ -2,7 +2,7 @@
 
 > **목적**: `docs/02_서비스_기능_명세서`의 기능 ID를 spec-kit의 spec 단위(`specs/001-…`)로 묶는다.
 > 분할 기준: ① 하나의 spec = 독립적으로 명세·구현·검증 가능한 수직 조각 ② 파트 간 계약(API/JSON)이 spec 경계와 일치 ③ P0 → P1 순서
-> **상태**: v1.1 (2026-08-12) — 팀 결정 반영: 캐릭터 커스터마이징 P0 승격, 016~018 신설, 마피아 P2 기록. spec-kit 설치 후 이 순서대로 `/speckit.specify` 진행 (파트별 권장 브리프: `docs/sdd/parts/`)
+> **상태**: v1.3 (2026-08-21) — 기존 P0/P1 기준선은 유지하고, Backend의 019-erd-schema와 번호 충돌을 피한 웹 UGC Game Studio(020)를 P2로 추가. spec-kit 설치 후 이 순서대로 `/speckit.specify` 진행 (파트별 권장 브리프: `docs/sdd/parts/`)
 
 ---
 
@@ -38,7 +38,13 @@
 | **017** | proximity-voice | WORLD-09 | Unity + FE + Infra | 002 | **거리 기반 음성채팅** — 거리별 볼륨 감쇠. 권장: WebRTC SFU(LiveKit 등) 별도 채널 + Unity가 위치 기반 게인 계산. NGO로 음성을 실어 나르지 않는다 |
 | ~~**018**~~ | ~~world-floors~~ | WORLD-10 | — | — | ⛔ **폐기 (2026-08-21, #31)** — 1층 폐기로 전제 소멸. 엘리베이터는 11층 **입장 게이트**로 재활용하고, 살아남은 FR 2개(진행 표시·갇힘 방지)는 **spec 002 FR-013·014** 로 이전했다 |
 
-**P2 (WORLD-07/08, AI-07/08, EVENT, COMP, STUDIO-14 등)는 spec을 만들지 않는다** — doc 01 Cut Line대로 P0/P1 안정 후 판단.
+## P2 독립 확장 — spec 019
+
+| Spec | 이름 | 포함 기능 ID | 주 담당 파트 | 선행 계약 | 비고 |
+|---|---|---|---|---|---|
+| **019** | game-studio | GSTUDIO-01~11 | Game Studio FE + BE / Unity 선택 연동 | 001 인증, 005의 버전·Publish 원칙 참고 | `festa-frontend/src/game-studio/` 내부 lazy 제작기와 2D Web Runtime. Unity는 부스 내 진입 트리거만 제공하며 GameProject를 실행하지 않는다. 014 Unity 미니게임을 대체하지 않는다. |
+
+그 밖의 P2(WORLD-07/08, AI-07/08, EVENT, COMP, STUDIO-14 등)는 doc 01 Cut Line대로 P0/P1 안정 후 판단하며 아직 별도 spec을 만들지 않는다.
 
 ## 의존 그래프 (착수 가능 시점 기준)
 
