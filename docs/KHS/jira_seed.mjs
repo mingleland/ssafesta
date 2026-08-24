@@ -64,7 +64,7 @@ for (const v of backlog.versions) {
 
 // ── 3. 에픽 ──
 const epicKeys = {}; // name → key
-const search = await api("GET", `/search?jql=${encodeURIComponent(`project=${PROJECT} AND issuetype=Epic`)}&maxResults=100&fields=summary`);
+const search = await api("GET", `/search/jql?jql=${encodeURIComponent(`project=${PROJECT} AND issuetype=Epic`)}&maxResults=100&fields=summary`, null, "/rest/api/3");
 for (const it of search.issues || []) epicKeys[it.fields.summary] = it.key;
 for (const e of backlog.epics) {
   if (epicKeys[e.name]) { console.log("에픽 존재:", e.name, epicKeys[e.name]); continue; }
@@ -120,6 +120,7 @@ for (const s of backlog.sprints) {
 
 // ── 7. Done 이슈 전환 ──
 for (const i of createdIssues.filter(x => x.done)) {
+  if (DRY) { console.log("[dry] Done 전환:", i.title); continue; }
   const tr = await api("GET", `/issue/${i.key}/transitions`);
   const done = tr.transitions.find(t => t.to?.statusCategory?.key === "done");
   if (done) { await api("POST", `/issue/${i.key}/transitions`, { transition: { id: done.id } }); }
