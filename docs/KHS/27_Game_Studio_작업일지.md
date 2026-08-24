@@ -9,6 +9,17 @@
 
 ## 2026-08-24
 
+### GitLab 이관 전 Game Studio 인수인계 정리 ✅
+
+- 🤖 실제 GitLab Project 생성·Import·remote 추가·push는 하지 않고, 현재 GitHub `develop`·`front`, Game Studio stacked PR #72·#79·#80, 문서 PR #53의 base/head/SHA와 OPEN Issue #48·#55·#56·#69·#73·#78·#81 담당을 `29_Game_Studio_GitLab_이관_준비.md`에 고정했다.
+- 🤖 GitHub 공식 원격은 로컬 alias `github`이고 `origin`은 `C:\Users\SSAFY\Desktop\SSAFESTA` 로컬 저장소임을 확인했다. 현재 worktree에서 `git push --mirror`를 실행하지 않고 GitHub Import 또는 fresh clone만 허용하도록 가드했다.
+- 🤖 원격 실측은 branch 23개, tag `v0.0.1-poc` 1개, tracked file 1,867개, pack 약 630.46 MiB, 최대 blob 약 11.88 MiB, submodule/LFS pointer 없음, connectivity fsck 성공이다. 저장소에 `.gitlab-ci.yml`·`Jenkinsfile`·GitHub Workflow가 없어 Jenkins Webhook과 credential은 별도 Infra 인수인계가 필요함을 기록했다.
+- 🤖 GitLab 공식 Import·Repository Mirroring·Protected Branch·CI/CD Variable 문서를 근거로 PR→MR 참조 차이, status check 수동 복원, attachment/user mapping, branch protection·Secret 검증 체크리스트를 작성했다. 제품 계약과 Backend·Unity·AI 코드는 변경하지 않았다.
+- 🤖 이관 문서만 추가하고 끝내지 않고 FE plan·maker reference·Event Runtime·part boundary·contract index의 오래된 “#78 이후 구현” 표현을 현재 상태인 “v1.1 FE candidate 구현, BE/AI 승인 대기”로 통일했다. FE tasks는 85개 중 77개 완료, 8개 잔여로 재계산했다.
+- 🤖 이관 기준 코드 브랜치에서 Frontend 38 files/204 tests, production build, lint를 다시 통과했고 문서 브랜치에서는 계약 fixture 7/7, Runtime trace 6/6, schema JSON parse, 상대 링크와 staged diff 검사를 통과했다.
+- 🤖 최신 `github/develop`은 `5e39013`이고 문서 브랜치는 behind 0이었다. PR #53·#72·#79·#80은 모두 OPEN/CLEAN/MERGEABLE 상태를 확인했다.
+- 트러블슈팅: GS-T046~GS-T047
+
 ### 로컬 게시 전체 흐름·GameProject v1.1 목표 규칙 ✅
 
 - 🤖 기존 Maker PR과 분리한 코드 브랜치 `codex/game-studio-local-publish-loop`에서 Backend·Unity 변경 없이 후속 작업을 진행했다. `VITE_USE_MOCK=true`일 때 브라우저 Draft를 불변 Published snapshot으로 복제하고 version을 올리는 Publisher/Published Repository를 추가했다. 운영 API 모드는 기존 서버 adapter를 그대로 사용한다.

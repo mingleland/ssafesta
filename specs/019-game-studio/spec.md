@@ -281,6 +281,14 @@
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
+## Repository Handoff
+
+- GitLab 이관 전 Game Studio ref, stacked PR, OPEN Issue, CI/Secret, 검증 기준은
+  [KHS Game Studio GitLab 이관 준비](../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)를 사용한다.
+- 이관 준비는 제품 계약이나 파트 소유권을 바꾸지 않는다. 팀 cutover 결정 전까지 GitHub remote와
+  PR/Issue가 정본이며, 이 문서 갱신만으로 GitLab remote·Import·mirror를 실행하지 않는다.
+- Game Studio 코드 PR 병합 순서는 #72 → #79 → #80이고 문서 PR #53은 `develop` 대상으로 별도 관리한다.
+
 ## Out of Scope
 
 - 사용자 코드·수식·플러그인 실행

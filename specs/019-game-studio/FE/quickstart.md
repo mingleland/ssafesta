@@ -72,3 +72,14 @@ npm run dev -- --host 127.0.0.1 --port 5174
 - Game Runtime 실패가 Unity 월드와 다른 FESTA route로 전파되지 않는다.
 
 Backend 검증 절차는 [BE quickstart](../BE/quickstart.md)를 따른다.
+
+## 6. GitLab 이관 전 인수인계
+
+실제 이관을 실행하기 전에는 [Game Studio GitLab 이관 준비](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의
+ref·PR·Issue 대응표와 검증 체크리스트를 사용한다.
+
+- 이 문서의 Frontend 검증은 `codex/game-studio-local-publish-loop` 또는 그 코드가 병합된 `front`에서 실행한다.
+  문서 전용 `codex/game-studio-docs-sync`에는 Frontend 전체 코드가 없을 수 있다.
+- 현재 worktree의 `origin`은 로컬 바탕화면 저장소이므로 이관 원격으로 사용하지 않는다.
+- GitLab Project 생성, remote 추가, Import, mirror, push는 팀이 namespace·cutover owner를 확정한 뒤 별도 작업으로 수행한다.
+- 이관 전후 `npm test`, `npm run build`, `npm run lint`와 Mock 게시 browser smoke를 같은 기준으로 비교한다.

@@ -1,6 +1,6 @@
-# Game Event Runtime Semantics v1
+# Game Event Runtime Semantics v1.0 / v1.1 FE Candidate
 
-> 상태: Draft v1.0 — Studio Preview, Published Web Runtime, Spring semantic validator의 공통 기준
+> 상태: v1.0 공통 기준 + v1.1 Frontend candidate. Spring validator·AI 허용 계약은 Issue #78 승인 전까지 Draft다.
 
 ## 원칙
 
@@ -59,6 +59,24 @@ Dispatch 도중 Object visibility나 inventory가 변해도 처음 만든 일치
 `SHOW_DIALOGUE`, `CLOSE_DIALOGUE`, `GO_TO_SCENE`, `COMPLETE_GAME`은 flow terminal Action이며 반드시
 actions 배열의 마지막이다.
 terminal Action 뒤 Action이 있으면 Publish validation 오류 `TERMINAL_ACTION_NOT_LAST`다.
+
+## GameProject v1.1 목표 규칙
+
+v1.1은 기존 Trigger·Condition·Action 의미를 바꾸지 않고 프로젝트 최상위 `rules`만 추가한다.
+
+- `SCORE_AT_LEAST`: Runtime score가 `target` 이상이면 달성한다.
+- `DEFEAT_ENEMIES`: session의 적 처치 수가 `target` 이상이면 달성한다.
+- `SURVIVE_SECONDS`: 결정적 Runtime 경과 시간이 `targetSeconds` 이상이면 달성한다.
+- `completion.mode=ALL`은 모든 목표, `ANY`는 하나 이상의 목표 달성 시 session을 `COMPLETED`로 바꾼다.
+- reference Runtime은 활성 session에서 120ms tick을 누적한다. wall clock이나 background tab frame rate를
+  저장 계약으로 사용하지 않는다.
+- `playerDefeat=RESPAWN`은 checkpoint 또는 Scene spawn으로 복귀하고, `END_GAME`은 session을
+  `FAILED/PLAYER_DEFEATED`로 종료한다.
+- v1.0 프로젝트는 계속 읽는다. 편집기가 수정할 때만 기본 `rules`를 가진 v1.1로 명시적으로 승격한다.
+- 목표도 `COMPLETE_GAME` Action도 없는 프로젝트는 Publish preflight에서 완료 경로 없음으로 거부한다.
+
+위 타입은 FE candidate의 정확한 허용 목록이며, Spring 저장·Publish 허용과 AI candidate 생성은 #78 승인 뒤
+같은 fixture/오류 코드로 고정한다.
 
 ## Dialogue Overlay
 

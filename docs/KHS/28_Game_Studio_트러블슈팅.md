@@ -8,6 +8,20 @@
 
 ## 2026-08-24
 
+### GS-T047. 공유 worktree object store의 임시 객체를 이관 원본으로 오인할 위험 (해결)
+
+- **증상** — 이관 전 저장소 실측에서 `git count-objects -vH`가 약 630.46 MiB pack과 함께 `tmp_obj_*` garbage 140개, 약 28.96 MiB를 보고했다. connectivity 검사는 성공했지만 현재 worktree 전체를 그대로 미러링하면 로컬 backup ref와 임시 객체까지 이관 범위로 오해할 수 있었다.
+- **원인** — 여러 worktree가 하나의 object database를 공유하고 `merge-tree --write-tree` 검증을 반복하면서 참조되지 않는 임시/dangling 객체가 남았다. 이는 GitHub branch/tag가 가리키는 이력 손상이 아니라 로컬 작업 저장소 상태다.
+- **해결** — `git fsck --connectivity-only` exit 0으로 참조 이력 무결성을 확인했다. 현재 worktree에서 `git gc`·`git prune`·`git push --mirror`를 실행하지 않고, 실제 이관은 GitHub Import 또는 별도 fresh clone에서 수행하도록 이관 준비 문서에 명시했다.
+- **예방** — 이관 source of truth는 local object directory가 아니라 원격 branch/tag ref와 SHA로 정의한다. 공유 worktree 정리는 이관과 분리하고, branch/tag 수·핵심 SHA·tag를 Import 전후 대조한다.
+
+### GS-T046. 승인된 Git fetch가 사용자 경계 변경으로 dubious ownership에 실패 (해결)
+
+- **증상** — 최신 GitHub ref를 확인하기 위해 승인된 네트워크 권한으로 `git fetch`를 실행하자, 직후 모든 Git segment가 `detected dubious ownership`으로 중단됐다.
+- **원인** — worktree는 sandbox 사용자가 만들었지만 승인된 명령은 desktop 사용자로 실행됐다. 기존 GS-T045와 같은 저장소 소유권 경계였고, 첫 명령에 저장소 단위 `safe.directory`를 주지 않았다.
+- **해결** — 전역 설정을 수정하지 않고 각 Git 호출에 `-c safe.directory=<현재 worktree>`를 적용해 fetch와 ahead/behind/merge-base 확인을 완료했다.
+- **예방** — 승인 경계 밖에서 worktree Git 명령을 실행할 때는 첫 segment부터 모든 `git` 호출에 명령 단위 `safe.directory`를 붙인다. `git config --global`로 사용자 전체 신뢰 범위를 넓히지 않는다.
+
 ### GS-T045. chained Git 명령의 두 번째 segment에 safe.directory가 적용되지 않음 (해결)
 
 - **증상** — 문서 PR의 최신 develop 가상 병합 검사에서 fetch는 성공했지만 뒤이어 실행한 `merge-tree`가 dubious ownership으로 중단됐다.
