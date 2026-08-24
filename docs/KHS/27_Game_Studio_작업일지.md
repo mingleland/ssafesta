@@ -18,7 +18,8 @@
 - 🤖 자동 검증은 Frontend **38 files / 204 tests**, production build, lint를 통과했다. 브라우저에서 game 904로 `슈팅 템플릿 → 적 3명 목표 → 저장 → 게시 v1 → /play → 동일 목표 HUD`를 확인했고 viewport 1280에서 document overflow 없이 Published Runtime이 mount됐다.
 - 🤖 v1.1 FE candidate는 Issue #78의 Backend validator와 AI 허용 출력 합의 전까지 Mock/Frontend 경계다. 실제 다중 사용자 공유·stable 사용자 Asset·Portal·Coin은 #48·#55·#56·#69 및 후속 세션 계약이 남아 있다.
 - 🤖 기존 OPEN/CLOSED 이슈에서 Published Coin 세션 계약이 추적되지 않음을 확인하고 [#81](https://github.com/kanghyunsoon/ssafesta/issues/81)을 생성해 @strdeok·@ghkim1632·@colosair를 지정했다. 가격·차감·idempotency는 GameProject가 아니라 서버 Game/session metadata가 소유하고, Unity는 웹 게임 진입 요청만 담당하도록 경계를 고정했다.
-- 트러블슈팅: GS-T043~GS-T044
+- 🤖 문서 PR #53은 GitHub API가 `UNKNOWN`을 반환했지만 최신 `develop`과 `git merge-tree --write-tree`를 다시 실행해 충돌 없이 merge tree가 생성됨을 확인했다.
+- 트러블슈팅: GS-T043~GS-T045
 
 ### Maker형 자유 편집 Canvas·실제 템플릿 재설계 ✅
 

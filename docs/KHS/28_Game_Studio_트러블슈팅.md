@@ -8,6 +8,13 @@
 
 ## 2026-08-24
 
+### GS-T045. chained Git 명령의 두 번째 segment에 safe.directory가 적용되지 않음 (해결)
+
+- **증상** — 문서 PR의 최신 develop 가상 병합 검사에서 fetch는 성공했지만 뒤이어 실행한 `merge-tree`가 dubious ownership으로 중단됐다.
+- **원인** — `-c safe.directory=...`는 첫 번째 Git 프로세스에만 적용된다. 세미콜론 뒤의 두 번째 `git merge-tree`는 별도 프로세스인데 같은 명령 단위 설정을 지정하지 않았다.
+- **해결** — 전역 Git 설정을 변경하지 않고 `merge-tree` 프로세스에도 동일한 명령 단위 safe.directory를 명시했다. merge tree `68871c5`가 생성되어 최신 develop과 충돌 없음을 확인했다.
+- **예방** — 소유자가 다른 격리 복제본에서 Git 명령을 여러 segment로 실행하면 각 `git` 호출에 명령 단위 safe.directory를 독립적으로 붙인다. 전역 safe.directory 추가로 우회하지 않는다.
+
 ### GS-T044. ON_ENTER Component 효과와 Event session 병합이 Object 숨김을 되돌림 (해결)
 
 - **증상** — v1.1 점수 목표를 추가한 뒤 수집 Runtime 회귀 테스트에서 점수는 증가했지만 아이템 Object가 다시 보이고 inventory 흐름이 깨졌다. 첫 수정에서는 숨겨진 대상을 Event가 실행해 Runtime 실패까지 발생했다.
