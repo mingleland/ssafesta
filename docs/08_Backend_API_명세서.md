@@ -106,7 +106,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 
 ### GET `/users/me`
 
-내 기본 정보 조회.
+내 기본 정보 조회. 회원 전용(게스트 `403 MEMBER_ONLY`).
 
 #### Response 예시
 
@@ -114,12 +114,39 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 {
   "userId": 12,
   "nickname": "FESTA_USER",
-  "wallet": {
-    "balance": 250
-  },
-  "boothId": 7
+  "status": "ACTIVE",
+  "providers": ["GOOGLE"],
+  "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
 }
 ```
+
+> **예시 정정 (2026-08-24)** — 이전 예시의 `wallet.balance`·`boothId`는 이 응답에 **없다.** 잔액은 `GET /wallets/me`(§8), 부스는 `GET /booths/{id}`(§3)가 소유한다. 구현(`MyAccountController.MyAccountResponse`)에 맞춰 고쳤다.
+
+`avatarCode`는 아직 저장하지 않은 사용자에게 **`null`** 이다(키는 존재). 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫이다(spec 013 FR-010).
+
+### PUT `/users/me/avatar`
+
+아바타 외형 저장 (spec 013a, #24 확정). 회원 전용.
+
+```json
+// 요청
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+
+// 200 — 저장한 값을 그대로 echo
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
+| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
+| 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
+
+상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
+
+정본 계약: `specs/013-avatar-customization/contracts/avatar-profile-api.md`
 
 ---
 
