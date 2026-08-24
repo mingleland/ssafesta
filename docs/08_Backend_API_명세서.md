@@ -722,6 +722,35 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
+## 17A. Game Studio — P2 Draft
+
+Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 Draft/Published Version과
+부스 Portal Binding의 Source of Truth이며, 웹 Runtime은 Published Version만 조회한다.
+
+- 편집: `POST /api/v1/games`, `GET /api/v1/games/{gameId}/draft`, `PUT /api/v1/games/{gameId}/draft`
+- 발행: `POST /api/v1/games/{gameId}/publish`, `GET /api/v1/games/{gameId}/versions`
+- 실행: `GET /api/v1/games/{gameId}/published`
+- 부스 연결: `GET /api/v1/game-portals/{configId}`
+- 저장 요청은 `expectedRevision`과 GameProject를 포함하고 불일치 시 HTTP 409
+  `GAME_REVISION_CONFLICT`를 반환한다. 좌표 clamp·unknown field 삭제 같은 자동 보정은 금지한다.
+- Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
+- Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
+  단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
+  builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
+- 현재 공개 포인터를 따라가는 `GET /games/{gameId}/published`는 `Cache-Control: no-cache` + ETag 재검증이다 — 재공개하면 같은 URL이 다른 본문을 가리키므로 장기 cache를 걸면 옛 version이 나온다. 긴 `max-age`·`immutable`은 후속 version 고정 URL에만 붙인다. Portal 실행 가능 여부는 `Cache-Control: no-store`다.
+- 독립 play route와 Portal overlay open 시 REST 조회로 신규 진입을 판정하며 Game Studio 전용 socket은 만들지 않는다.
+- 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
+- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
+- Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
+- MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+
+상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
+#21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
+[#34](https://github.com/kanghyunsoon/ssafesta/issues/34)의 교차 계약을 반영했다.
+
+---
+
 ## 18. 주요 오류 코드
 
 | Code | 의미 |
@@ -739,6 +768,12 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
 | `VALIDATION_FAILED` | 요청 값 오류 (400) |
+| `GAME_NOT_FOUND` *(P2 후보)* | GameProject 없음 또는 접근 불가 |
+| `GAME_REVISION_CONFLICT` *(P2 후보)* | Draft revision 충돌 |
+| `GAME_PROJECT_VALIDATION_FAILED` *(P2 후보)* | Schema 또는 의미 검증 실패 |
+| `GAME_NOT_PUBLISHED` *(P2 후보)* | 실행 가능한 Published Version 없음 |
+| `GAME_PORTAL_UNAVAILABLE` *(P2 후보)* | Portal 연결 해제·비활성·접근 불가 |
+| `GAME_SCHEMA_UNSUPPORTED` *(P2 후보)* | Runtime이 지원하지 않는 schemaVersion |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

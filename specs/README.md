@@ -30,7 +30,7 @@
 | 015 | dashboard | P1 | BE + FE | ✅ | — | — |
 | 017 | proximity-voice | P1 | **FE + Infra** | ✅ | ✅ | ✅ |
 | ~~018~~ | ~~world-floors~~ | ⛔ 폐기 | — | — | — | — |
-| 019 | game-studio | 미정 | Game + FE + BE | 작성 중 — `feature/game-studio-foundation`, 계약 협의 [#20](https://github.com/kanghyunsoon/ssafesta/issues/20)·[#21](https://github.com/kanghyunsoon/ssafesta/issues/21) | — | — |
+| 019 | game-studio | **P2** | Game Studio FE + BE / Unity 선택 연동 | ✅ Draft | ✅ | ✅ |
 | 020 | erd-schema | — | BE | ✅ (V1 스키마 구현 완료, 구 019에서 개명) | ✅ | ✅ |
 
 > **018 폐기** (2026-08-21, [#31](https://github.com/kanghyunsoon/ssafesta/issues/31)) — 1층을 폐기하고 월드를 11층 단일로 확정해 전제가 소멸했다.

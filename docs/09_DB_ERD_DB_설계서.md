@@ -696,6 +696,64 @@ Item 검증
 
 ---
 
+## 28A. Game Studio 저장 모델 — P2 Draft
+
+Game Studio 데이터는 Booth Layout이나 Unity 미니게임 결과 테이블에 섞지 않는다.
+
+```text
+games
+- id PK
+- owner_user_id FK
+- title
+- status
+- published_version NULL
+- deleted_at NULL (일반 삭제 soft-delete marker)
+- created_at / updated_at
+
+game_drafts
+- game_id PK/FK
+- schema_version
+- revision
+- project_json JSONB
+- updated_by_user_id FK
+- updated_at
+
+game_published_versions
+- id PK
+- game_id FK
+- version_no
+- schema_version
+- project_json JSONB
+- published_by_user_id FK
+- published_at
+- UNIQUE (game_id, version_no)
+
+game_portal_bindings
+- id BIGINT PK (내부 FK/조인, 외부 비노출)
+- config_id INTEGER UNIQUE NOT NULL CHECK (config_id > 0), 전용 sequence START 1
+- booth_id FK
+- object_id
+- game_id FK
+- enabled
+- UNIQUE (booth_id, object_id)
+```
+
+- `game_drafts.game_id` PK로 Game당 작업본 하나를 강제하고 `revision` 낙관적 잠금으로 충돌을 검출한다.
+- Published Version은 수정하지 않고 `(game_id, version_no)` 불변 행을 추가한다.
+- `(games.id, games.published_version)`은 같은 Game의 공개본만 가리키는 복합 FK다. 공개본 삭제 시
+  `ON DELETE SET NULL (published_version)`처럼 nullable 포인터 컬럼만 지정해 PK `games.id`가 NULL 대상이 되지 않게 한다.
+- Publish는 Draft read·검증·Published insert·포인터 갱신을 단일 트랜잭션으로 수행하고 Draft를 유지한다.
+- Runtime 조회는 Published Version만 반환한다.
+- `project_json`은 Asset reference만 가지며 이미지·오디오 binary와 만료 URL을 저장하지 않는다.
+- 기본 Asset catalog와 향후 사용자 업로드 Asset의 메타데이터·binary 저장소는 Draft/Published JSONB와 분리한다.
+- JSONB 인덱싱·사용자 업로드 Asset은 후속 구현 계획에서 정한다.
+- 일반 삭제는 `deleted_at` soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다.
+- Published Version 이력은 Game이 존속하는 동안 유지하고 hard delete 시 제거한다.
+- 표시 전용 Ranking은 P1 별도 테이블이며 Coin·Reward·Inventory와 FK로 연결하지 않는다.
+- Layout/Bridge `configId`는 signed Int32 `1..2147483647`이고 0은 Unity의 미연결 sentinel이다.
+
+---
+
 ## 29. 확정이 필요한 DB 결정
 
 - User 인증 필드
@@ -705,3 +763,4 @@ Item 검증
 - 익명 Survey의 중복 방지 방식
 - 링크를 JSON/컬럼/별도 테이블 중 무엇으로 둘지
 - P2 Event/Competition 실제 스키마
+- Game Studio 표시 전용 Ranking의 P1 상세 필드·보존 기간

@@ -60,7 +60,7 @@ npm run dev
 
 ## §7. facade 편집 (FR-018)
 
-1. Studio에서 facade 패널 진입 → `themeCode`를 `SSAFY_BLUE`로, `primaryColor`를 `#1677C8`로 변경
+1. Studio에서 facade 패널 진입 → `themeCode`를 `SSAFY_BLUE`로, `primaryColor`를 `#3B82F6`(팔레트 `BLUE`)로 변경
 2. 저장 → `PUT /booths/7/facade` 요청 1건, **Draft/Publish 흐름을 타지 않는 것** 확인(레이아웃 `revision`이 올라가지 않아야 한다)
 3. 새로고침 → 값 유지 확인
 4. `primaryColor`에 `#FFF`(3자리) 입력 → 저장 거부되고 한글 사유가 표시되는지 확인(hex 6자리 계약)
