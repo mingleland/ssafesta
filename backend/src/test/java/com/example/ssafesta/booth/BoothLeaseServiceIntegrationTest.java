@@ -45,12 +45,13 @@ class BoothLeaseServiceIntegrationTest {
         BoothTestSupport.releaseAllSlots(jdbc);
     }
 
+    /** V5의 7개를 V12가 12개로 확장했다 — Unity 축제 존 12실과 맞춘 값이다 (#62). */
     @Test
-    void sevenUserRentalSlotsAreSeeded() {
+    void twelveUserRentalSlotsAreSeeded() {
         List<BoothSlot> rentable = slots.findAllOrdered().stream()
                 .filter(slot -> slot.getSlotType() == SlotType.USER_RENTAL).toList();
 
-        assertEquals(7, rentable.size());
+        assertEquals(12, rentable.size());
         assertTrue(rentable.stream().allMatch(slot -> slot.getFloorNo() == 11));
         assertTrue(rentable.stream().allMatch(BoothSlot::isRentable));
     }
