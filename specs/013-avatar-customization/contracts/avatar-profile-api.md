@@ -1,7 +1,7 @@
-# Contract (제안): 아바타 프로필 저장 API
+# Contract: 아바타 프로필 저장 API
 
 **Spec**: 013 | **당사자**: Unity ↔ Spring
-**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T014, 회귀 232/232). Unity는 Mock을 실제 호출로 교체할 수 있다.
+**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T019, 회귀 232/232). 파트 통보 [#76](https://github.com/kanghyunsoon/ssafesta/issues/76) 완료 — Unity는 Mock을 실제 호출로 교체할 수 있다.
 
 ---
 
@@ -11,11 +11,11 @@
 
 | 항목 | 확정 | 근거 |
 |---|---|---|
-| 메서드 | **`PUT`** | 본문이 값 전체 교체다. `MockUserApiClient.cs:23`의 `PATCH` 주석은 #24 확정 **이전** POC C 시점 값이라 무효 — 정정 요청함 (R-01) |
+| 메서드 | **`PUT`** | 본문이 값 전체 교체다. `MockUserApiClient.cs:23`의 `PATCH` 주석은 #24 확정 **이전** POC C 시점 값이라 무효 — ✅ `game` 브랜치는 이미 `PUT`(`9117199`)이고 develop·back·main 계열만 낡았다(#76). game→develop 반영 때 따라간다 (R-01) |
 | 조회 경로 | **`GET /api/v1/users/me` 응답에 `avatarCode` 포함.** 별도 `GET /users/me/avatar`는 **만들지 않았다** | Unity `UserProfileDto.avatarCode`(`Dtos.cs:11`)가 이미 그 모양으로 대기 중이라 소비자가 그쪽이다. 404 분기 없이 `null` 하나로 끝난다 (R-02) |
 | 저장 전 값 | **`null`** (키는 존재, 값만 비어 있음) | 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫(FR-010) |
 | 길이 상한 | **3800자** | Unity `AvatarAppearance.MaxEncodedLength`와 동일. **하향 금지** (R-04, 헌법 23조) |
-| 문자셋 | **인쇄 가능 ASCII `0x20`–`0x7E`** | 인코더 알파벳에서 유도. 더 좁히면 파츠 이름의 `-`·공백이 거부된다 (R-03) — ⚠️ **Unity 확인 요청 중** |
+| 문자셋 | **인쇄 가능 ASCII `0x20`–`0x7E`** | 인코더 알파벳에서 유도. ✅ **Unity 확인 완료**(#76) — 영숫자·밑줄·구분자만 남기는 좁은 문자셋으로 갔다면 의상 색 36칸이 늘 내는 콤마와 알파 0을 뜻하는 하이픈 때문에 **정상 아바타가 전부 400**이었다. 비ASCII 경로는 현재 없으나 `rt` 파츠 모드(현재 호출자 0)가 살아나면 에셋명이 그대로 실리므로 그때 재검토한다 (R-03) |
 | 오류 봉투 | `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "avatarCode", message }` | #58 C 확정 봉투 재사용. 새 code·rule 0개 (R-07) |
 | 게스트 | `403 MEMBER_ONLY` | 헌법 12조. 클라이언트가 호출을 건너뛰는 것과 별개로 서버가 막는다(헌법 16조) |
 
@@ -74,6 +74,23 @@ PUT /api/v1/users/me/avatar
 
 구 계약을 그대로 믿고 `VARCHAR(32)`로 만들면, 항목이 늘어난 시점에 저장이 잘리거나 실패한다.
 **과거에 정확히 이 형태의 사고가 있었다** (T-24 — 길이 초과가 조용히 잘려 무반응).
+
+## 인증
+
+Unity가 Spring REST를 부를 때 실을 값이다. 새 결정이 아니라 2026-08-12 확정된 토큰 4계층(헌법 13조)의 적용이며 [#60](https://github.com/kanghyunsoon/ssafesta/issues/60)에서 확정했다(2026-08-23).
+
+| 항목 | 값 |
+|---|---|
+| 헤더 | `Authorization: Bearer <access token>` — **Access Token 원본**을 그대로 쓴다. Unity 전용 토큰 계층을 새로 만들지 않는다 |
+| 대상 | **MEMBER만.** 게스트는 `403 MEMBER_ONLY` (헌법 12조) |
+| 쓸 수 없는 값 | **NGO Connection Token** — `POST /world-sessions` 응답의 1회용 값(TTL 60~120초)으로 게임 서버 접속 승인 전용이다(헌법 14조). REST 인증에 쓰면 두 번째 호출부터 실패한다 |
+| Refresh Token | Unity 경계를 넘기지 않는다 (헌법 13조) |
+
+전용 토큰을 만들지 않는 근거는 셋이다. ① WebGL은 React와 같은 페이지·같은 JS 힙이라 AT를 Unity로 넘기는 것이 **새 노출 표면을 만들지 않는다**(XSS 상황이면 React 쪽에서 이미 탈취된다). ② AT가 이미 30분 단수명이다. ③ AT의 `role`·`sid` 클레임으로 게스트 거부·세션 추적이 그대로 성립한다.
+
+> **재검토 조건** — 위 ①은 "Unity가 브라우저 안에 있다"는 전제에 서 있다. 데스크톱·모바일 native 클라이언트가 생기면 토큰이 페이지 경계 밖으로 나가므로 그때는 전용 토큰이 맞을 수 있다. MVP는 WebGL 단독이다.
+
+> **AT 만료 처리** — Unity가 AT를 캐시하면 30분 후 `401`을 받는다. "Unity는 `401`을 받으면 호스트(React)에 토큰을 재요청한다" 규약이 필요하고 **서버 쪽 추가 작업은 없다.** 전달 시점·방식·갱신 주체는 #60 범위 밖이다.
 
 ## 서버 검증
 

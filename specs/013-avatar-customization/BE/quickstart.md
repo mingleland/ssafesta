@@ -57,9 +57,11 @@ curl -i -X PUT localhost:8080/api/v1/users/me/avatar \
 | 신규 사용자 `GET /users/me` → `avatarCode: null` | data-model §2 — 서버는 기본값을 만들지 않는다 |
 | 재저장(값 → 다른 값) 후 최신값 복원 | FR-013 |
 
+**대조 결과 (2026-08-24)** — `MyAccountAvatarApiIntegrationTest` 15개가 위 9종을 **전부** 덮는다. 초과 3건은 공백 보존(`surroundingWhitespaceIsPreservedRatherThanTrimmed`) · 비ASCII 거부(`aNonAsciiCharacterIsRefused`) · 닉네임 변경 후 필드 유지(`changingTheNicknameStillReturnsTheAppearance`)다. 400 봉투는 `objectId` 키 **부재**까지 단언한다. §2 수동 curl은 미실행 — 실서버(demo) 배포 시 1회 (tasks T020).
+
 ## 4. 완료 후 통보 (헌법 24조·29조)
 
-- [ ] `contracts/avatar-profile-api.md` 상태줄 갱신(제안 → 구현) + 확정값 기입: PUT 채택, `GET /users/me` 포함 분기 채택, 길이 3800, 문자셋 인쇄 가능 ASCII
-- [ ] 파트 통보 — Unity: mock 주석 `PATCH` → `PUT` 정정 요청(R-01) + 문자셋 확인(R-03). FE: `MyAccountResponse.avatarCode` 필드 추가(가산적)
-- [ ] `docs/08` §2(Auth/User)에 endpoint 추가
-- [ ] `docs/HDD/작업일지.md` 기록, 문제 발생 시 트러블슈팅 T-번호
+- [x] `contracts/avatar-profile-api.md` 상태줄 갱신(제안 → 구현) + 확정값 기입: PUT 채택, `GET /users/me` 포함 분기 채택, 길이 3800, 문자셋 인쇄 가능 ASCII
+- [x] 파트 통보 — Unity: mock 주석 `PATCH` → `PUT` 정정 요청(R-01) + 문자셋 확인(R-03). FE: `MyAccountResponse.avatarCode` 필드 추가(가산적)
+- [x] `docs/08` §2(Auth/User)에 endpoint 추가
+- [x] `docs/HDD/작업일지.md` 기록, 문제 발생 시 트러블슈팅 T-번호
