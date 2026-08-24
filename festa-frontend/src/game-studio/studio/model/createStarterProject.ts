@@ -8,10 +8,14 @@ const starterAssetSources = new Set([
 ]);
 
 export const createStarterProject = (gameId: number): GameProject => ({
-  schemaVersion: '1.0.0',
+  schemaVersion: '1.1.0',
   gameId,
   revision: 0,
   title: '비밀 도서관',
+  rules: {
+    completion: { mode: 'ALL', objectives: [] },
+    playerDefeat: 'RESPAWN',
+  },
   startSceneId: 'library',
   variables: [
     { id: 'doorOpened', type: 'BOOLEAN', initialValue: false },

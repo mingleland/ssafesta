@@ -62,6 +62,11 @@
 .grp-hud > div > span { color: #6f7a89; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
 .grp-hud small { color: #697382; font-size: 9px; }
 .grp-hud strong { background: #191e26; border: 1px solid var(--grp-border); border-radius: 6px; color: #e1bd68; font-size: 9px; padding: 8px; }
+.grp-objectives strong { align-items: center; display: grid; gap: 6px; grid-template-columns: auto minmax(0,1fr) auto; }
+.grp-objectives strong i { color: #7b8797; font-style: normal; }
+.grp-objectives strong small { color: #7b8797; font-size: 7px; }
+.grp-objectives strong.is-complete { border-color: rgba(83,196,142,.45); color: #7cdbad; }
+.grp-objectives strong.is-complete i { color: #5fd39a; }
 .grp-controls { margin-top: auto; }
 .grp-controls > div { display: grid; gap: 5px; grid-template-columns: repeat(3,1fr); }
 .grp-controls button { aspect-ratio: 1; background: #1b212a; border: 1px solid #39424e; border-radius: 6px; cursor: pointer; }

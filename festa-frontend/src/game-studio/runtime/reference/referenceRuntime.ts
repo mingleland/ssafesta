@@ -1,6 +1,6 @@
-import { findScene, type GameObject, type GameProject, type Position2d } from '../../contracts/gameProject.ts';
+import { DEFAULT_GAME_RULES, findScene, type GameObject, type GameObjective, type GameProject, type Position2d } from '../../contracts/gameProject.ts';
 import { dispatchTrigger, startRuntimeSession } from '../../core/runEvent.ts';
-import type { RuntimeSessionState } from '../../core/runtimeState.ts';
+import { failRuntimeSession, type RuntimeSessionState } from '../../core/runtimeState.ts';
 import { chooseDialogueChoice } from '../dialogue/dialogueRunner.ts';
 
 export type MoveDirection = 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
@@ -31,6 +31,8 @@ export interface ReferenceRuntimeState {
   readonly maxPlayerHealth: number;
   readonly invulnerableUntilTick: number;
   readonly score: number;
+  readonly defeatedEnemies: number;
+  readonly elapsedMs: number;
   readonly checkpointPosition: Position2d | null;
   readonly objectPositions: Readonly<Record<string, Position2d>>;
   readonly objectDirections: Readonly<Record<string, 1 | -1>>;
@@ -41,6 +43,26 @@ export interface ReferenceRuntimeState {
   readonly nextEntityId: number;
   readonly lastPlayerShotTick: number;
 }
+
+export const REFERENCE_TICK_MS = 120;
+
+export const objectiveProgress = (
+  state: Pick<ReferenceRuntimeState, 'score' | 'defeatedEnemies' | 'elapsedMs'>,
+  objective: GameObjective,
+): number => {
+  if (objective.type === 'SCORE_AT_LEAST') return state.score;
+  if (objective.type === 'DEFEAT_ENEMIES') return state.defeatedEnemies;
+  return Math.floor(state.elapsedMs / 1000);
+};
+
+const applyCompletionRules = (project: GameProject, state: ReferenceRuntimeState): ReferenceRuntimeState => {
+  if (state.session.status !== 'PLAYING') return state;
+  const completion = (project.rules ?? DEFAULT_GAME_RULES).completion;
+  if (completion.objectives.length === 0) return state;
+  const results = completion.objectives.map((objective) => objectiveProgress(state, objective) >= objective.target);
+  const completed = completion.mode === 'ALL' ? results.every(Boolean) : results.some(Boolean);
+  return completed ? { ...state, session: { ...state.session, status: 'COMPLETED' } } : state;
+};
 
 const directionDelta: Readonly<Record<MoveDirection, Position2d>> = {
   UP: { x: 0, y: -1 },
@@ -85,6 +107,8 @@ export const startReferenceRuntime = (project: GameProject): ReferenceRuntimeSta
     maxPlayerHealth: 3,
     invulnerableUntilTick: -1,
     score: 0,
+    defeatedEnemies: 0,
+    elapsedMs: 0,
     checkpointPosition: topDownSpawn(project, session.currentSceneId),
     objectPositions: Object.fromEntries(project.scenes.flatMap((scene) => (
       scene.type === 'DIALOGUE' ? [] : scene.objects.map((object) => [object.id, object.position] as const)
@@ -133,6 +157,16 @@ const damagePlayer = (
   if (state.tickCount < state.invulnerableUntilTick) return state;
   const remaining = state.playerHealth - amount;
   if (remaining > 0) return { ...state, playerHealth: remaining, invulnerableUntilTick: state.tickCount + 8 };
+  if ((project.rules ?? DEFAULT_GAME_RULES).playerDefeat === 'END_GAME') {
+    return {
+      ...state,
+      playerHealth: 0,
+      session: failRuntimeSession(state.session, {
+        code: 'PLAYER_DEFEATED',
+        message: '체력이 모두 소진되었습니다. 다시 도전해 보세요.',
+      }),
+    };
+  }
   return {
     ...state,
     playerHealth: state.maxPlayerHealth,
@@ -206,12 +240,32 @@ const enterPosition = (
   if (scene === undefined || scene.type === 'DIALOGUE') return state;
   let moved: ReferenceRuntimeState = { ...state, playerPosition: position };
   for (const object of visibleOccupantsAt(moved, scene.objects, position)) {
-    const session = dispatchTrigger(project, moved.session, { type: 'ON_ENTER', targetId: object.id });
+    const eventSession = dispatchTrigger(project, moved.session, { type: 'ON_ENTER', targetId: object.id });
     const contacted = applyContactComponents(project, moved, object);
+    const mergedVisibility = { ...moved.session.objectVisibility };
+    for (const [objectId, visible] of Object.entries(eventSession.objectVisibility)) {
+      if (visible !== moved.session.objectVisibility[objectId]) mergedVisibility[objectId] = visible;
+    }
+    for (const [objectId, visible] of Object.entries(contacted.session.objectVisibility)) {
+      if (visible !== moved.session.objectVisibility[objectId]) mergedVisibility[objectId] = visible;
+    }
+    const session: RuntimeSessionState = contacted.session.status === 'FAILED'
+      ? {
+          ...eventSession,
+          status: 'FAILED',
+          activeDialogueSceneId: null,
+          currentDialogueNodeId: null,
+          failure: contacted.session.failure,
+          objectVisibility: mergedVisibility,
+        }
+      : {
+          ...eventSession,
+          objectVisibility: mergedVisibility,
+        };
     moved = syncAfterSessionChange(project, contacted, session);
     if (session.status !== 'PLAYING' || session.currentSceneId !== scene.id || session.activeDialogueSceneId !== null) break;
   }
-  return moved;
+  return applyCompletionRules(project, moved);
 };
 
 const isPlatformerGrounded = (
@@ -232,7 +286,11 @@ export const tickReferenceWorld = (
   if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null || state.playerPosition === null) return state;
   const scene = findScene(project, state.session.currentSceneId);
   if (scene === undefined || scene.type === 'DIALOGUE') return state;
-  let nextState: ReferenceRuntimeState = { ...state, tickCount: state.tickCount + 1 };
+  let nextState: ReferenceRuntimeState = {
+    ...state,
+    tickCount: state.tickCount + 1,
+    elapsedMs: state.elapsedMs + REFERENCE_TICK_MS,
+  };
   for (const object of scene.objects) {
     const movement = object.components.find((component) => component.type === 'AUTO_MOVE');
     if (movement?.type !== 'AUTO_MOVE') continue;
@@ -300,6 +358,7 @@ export const tickReferenceWorld = (
         nextState = {
           ...nextState,
           score: health <= 0 ? nextState.score + 100 : nextState.score,
+          defeatedEnemies: health <= 0 ? nextState.defeatedEnemies + 1 : nextState.defeatedEnemies,
           objectHealth: { ...nextState.objectHealth, [target.id]: health },
           session: health <= 0 ? { ...nextState.session, objectVisibility: { ...nextState.session.objectVisibility, [target.id]: false } } : nextState.session,
         };
@@ -313,7 +372,11 @@ export const tickReferenceWorld = (
           spawnedEnemies = health <= 0
             ? spawnedEnemies.filter((_, index) => index !== dynamicIndex)
             : spawnedEnemies.map((candidate, index) => index === dynamicIndex ? { ...candidate, health } : candidate);
-          if (health <= 0) nextState = { ...nextState, score: nextState.score + 100 };
+          if (health <= 0) nextState = {
+            ...nextState,
+            score: nextState.score + 100,
+            defeatedEnemies: nextState.defeatedEnemies + 1,
+          };
         }
         continue;
       }
@@ -326,20 +389,20 @@ export const tickReferenceWorld = (
     spawnedEnemies = spawnedEnemies.filter((enemy) => enemy.id !== collidingEnemy.id);
   }
   nextState = { ...nextState, spawnedEnemies, projectiles: survivingProjectiles, nextEntityId };
-  if (nextState.playerPosition === null) return nextState;
+  if (nextState.playerPosition === null) return applyCompletionRules(project, nextState);
   for (const occupant of visibleOccupantsAt(nextState, scene.objects, nextState.playerPosition)) {
     nextState = applyContactComponents(project, nextState, occupant);
   }
-  if (nextState.playerPosition === null) return nextState;
-  if (scene.type !== 'PLATFORMER') return nextState;
+  if (nextState.playerPosition === null) return applyCompletionRules(project, nextState);
+  if (scene.type !== 'PLATFORMER') return applyCompletionRules(project, nextState);
   const grounded = isPlatformerGrounded(nextState, scene);
-  if (grounded && nextState.verticalVelocity >= 0) return nextState.verticalVelocity === 0 ? nextState : { ...nextState, verticalVelocity: 0 };
+  if (grounded && nextState.verticalVelocity >= 0) return applyCompletionRules(project, nextState.verticalVelocity === 0 ? nextState : { ...nextState, verticalVelocity: 0 });
   const direction = nextState.verticalVelocity < 0 ? -1 : 1;
   const next = { x: nextState.playerPosition.x, y: nextState.playerPosition.y + direction };
-  if (next.y < 0) return { ...nextState, verticalVelocity: 0 };
-  if (next.y >= scene.height) return damagePlayer(project, { ...nextState, verticalVelocity: 0 }, 1);
-  if (visibleOccupantsAt(nextState, scene.objects, next).some(isSolid)) return { ...nextState, verticalVelocity: 0 };
-  return enterPosition(project, { ...nextState, verticalVelocity: Math.min(3, nextState.verticalVelocity + 1) }, next);
+  if (next.y < 0) return applyCompletionRules(project, { ...nextState, verticalVelocity: 0 });
+  if (next.y >= scene.height) return applyCompletionRules(project, damagePlayer(project, { ...nextState, verticalVelocity: 0 }, 1));
+  if (visibleOccupantsAt(nextState, scene.objects, next).some(isSolid)) return applyCompletionRules(project, { ...nextState, verticalVelocity: 0 });
+  return applyCompletionRules(project, enterPosition(project, { ...nextState, verticalVelocity: Math.min(3, nextState.verticalVelocity + 1) }, next));
 };
 
 export const moveReferencePlayer = (

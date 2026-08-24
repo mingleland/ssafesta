@@ -6,9 +6,13 @@ import { ReferenceGamePlayer } from '../../runtime/reference/ReferenceGamePlayer
 import { PublishedGameSurface } from '../../runtime/ui/PublishedGameSurface.tsx';
 import { createBrowserDraftRepository } from '../../studio/ports/draftRepository.ts';
 import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepository.ts';
+import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { useResolvedAssetUrls } from '../../studio/assets/useResolvedAssetUrls.ts';
 
 const NO_ASSETS = [] as const;
+const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true'
+  && import.meta.env.VITE_GAME_STUDIO_API_ENABLED !== 'true';
+const browserPublicationPorts = browserPublicationEnabled ? createBrowserPublicationPorts() : null;
 
 interface LocalPreviewSurfaceProps {
   readonly gameId: number;
@@ -75,5 +79,11 @@ export const PlayGamePage = () => {
       />
     );
   }
-  return <PublishedGameSurface gameId={parsedGameId} onExit={() => void navigate('/app/world')} />;
+  return (
+    <PublishedGameSurface
+      gameId={parsedGameId}
+      onExit={() => void navigate('/app/world')}
+      repository={browserPublicationPorts?.repository}
+    />
+  );
 };

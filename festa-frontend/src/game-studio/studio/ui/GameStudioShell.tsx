@@ -158,6 +158,7 @@ export const GameStudioShell = ({
   const [tileBrush, setTileBrush] = useState<number | null>(null);
   const [rightPanel, setRightPanel] = useState<RightPanel>('PROPERTIES');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
+  const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>('SELECT');
@@ -383,6 +384,7 @@ export const GameStudioShell = ({
       setSaveStatus('publishing');
       const receipt = await publisher.publish(gameId, saved.revision);
       setSaveStatus('published');
+      setLastPublishedVersion(receipt.publishedVersion);
       const warningCopy = receipt.warnings.length > 0 ? ` 확인할 경고 ${receipt.warnings.length}건이 있습니다.` : '';
       setNotice(`공개 버전 ${receipt.publishedVersion} 게시를 완료했습니다.${warningCopy}`);
     } catch (error) {
@@ -663,6 +665,14 @@ export const GameStudioShell = ({
             title={publisher === null ? '서버 Draft/Publish 연결 시 자동 활성화됩니다.' : '현재 초안을 검증하고 새 공개 버전을 만듭니다.'}
             type="button"
           >게시하기</button>
+          {lastPublishedVersion !== null && (
+            <button
+              className="gss-guide-button"
+              onClick={() => void navigate(`/app/games/${gameId}/play`)}
+              title={`공개 버전 ${lastPublishedVersion}을 플레이합니다.`}
+              type="button"
+            >게시본 확인 v{lastPublishedVersion}</button>
+          )}
         </div>
       </header>
 
@@ -949,7 +959,7 @@ export const GameStudioShell = ({
             />
           )}
           <footer className="gss-statusbar">
-            <span><i className="is-valid" />GameProject 1.0.0 검증 적용</span>
+            <span><i className="is-valid" />GameProject {project.schemaVersion} 검증 적용</span>
             {selectedObjectIds.size > 0 && <strong>{selectedObjectIds.size}개 선택 · Shift/Ctrl로 추가 선택 · 화살표로 이동</strong>}
             {placementPreset !== null && <strong>배치 모드 · {placementPreset} — 맵의 위치를 클릭하세요</strong>}
             {tileBrush !== null && paletteMode === 'TILES' && <strong>타일 브러시 · {tileBrush === -1 ? '지우개' : tileBrush}</strong>}
