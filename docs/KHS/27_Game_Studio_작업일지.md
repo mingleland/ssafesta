@@ -9,15 +9,6 @@
 
 ## 2026-08-24
 
-### 프로젝트 기획서 제품 정의 최신화 ✅
-
-- 🤖 `docs/01_프로젝트_기획서.md`를 초기 부스 중심 소셜 메타버스 설명에서 **UGC 기반 프로젝트 생태계 플랫폼** 정의로 다시 구성했다. 기획 배경, 다섯 가지 문제, 핵심 순환인 `발견 → 체험 → 소통 → 피드백 → 보상 → 창작 → 재방문`을 제품 전체 기준선으로 명시했다.
-- 🤖 3D 월드는 발견 인터페이스, Booth Studio는 전시·운영 도구, AI Agent는 프로젝트 지식 인터페이스, Game Studio는 웹 2D 창작 도구, 코인은 참여를 다음 창작으로 연결하는 동력으로 역할을 분리했다. AI를 단순 부재중 안내나 FAQ로 축소하던 표현도 역할·말투·문서 RAG·방문자 수준별 설명·사람 상담 전환을 포함하는 디지털 에이전트로 바로잡았다.
-- 🤖 Game Studio를 P2 독립 UGC 범위와 대표 성공 시나리오에 편입했다. `TOP_DOWN`/`PLATFORMER` Runtime, `DIALOGUE` 연출, Event/Component 조합, 6종 템플릿, 사용자 Asset 교체, Draft/Published, 독립 웹 플레이와 선택적 Unity Portal 경계를 현재 spec 019와 일치시켰다.
-- 🤖 Unity는 GameProject를 해석·실행하지 않고 선택적 진입 신호만 담당한다는 경계를 명문화했다. 운영 배포 전에는 Spring Draft/Publish/Asset/Portal API와 실제 Published E2E가 필요하다는 현재 병목도 기획서에서 과장 없이 구분했다.
-- 🤖 기획 초안의 고정 Coin 지급액과 동접 보장 표현을 제거했다. 경제 수치는 서버 정책 설정값, Coin/임대/보상은 Spring Ledger·idempotency 권위, 동접 수치는 부하 테스트용 초기 검증 목표로 정리했다.
-- 🤖 기존 OPEN Game Studio 이슈가 추적하는 Backend·Asset·Portal·Published E2E·사용성·경제 계약 범위를 새로 만들거나 완료 처리하지 않았다. 이번 작업은 기획 기준선 동기화이며 제품 결함을 새로 발견한 작업이 아니므로 트러블슈팅 항목은 추가하지 않았다.
-
 ### GitLab 이관 후 Branch Convention 정리 ✅
 
 - 🤖 최상위 `AGENTS.md`, 헌법 10조, `docs/17_Git_개발_Convention.md` §2~§3을 다시 읽고 GitLab 실제 ref 23개를 직접 fetch해 기준선을 대조했다. `main/develop/ai/back/front/game`과 `v0.0.1-poc`는 보호 대상으로 제외했다.
