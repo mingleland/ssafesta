@@ -8,6 +8,13 @@
 
 ## 2026-08-24
 
+### GS-T049. GitLab 이관이 도구명·중간 checkpoint 브랜치를 그대로 복제함 (해결)
+
+- **증상** — GitLab 이관 후 원격에 `codex/game-studio-*`와 이미 병합된 `docs/*`, `feature/*`가 함께 남아 팀 Branch Convention의 type 의미와 현재 작업 branch가 불명확해졌다.
+- **원인** — GitHub에서 격리 worktree와 stacked PR을 구분하기 위해 만든 도구명·중간 ref를 Import가 그대로 보존했다. 이관 완료 여부와 branch lifecycle 정리는 별개인데 Import 직후 후속 정리를 하지 않았다.
+- **해결** — 최상위 `AGENTS.md` → 헌법 10조 → `docs/17_Git_개발_Convention.md` 순으로 규칙을 확인했다. GitLab 23개 ref의 ancestor·patch-equivalence·최종 stack 포함 관계를 검사하고, 새 `feature/game-studio-web-runtime`과 `docs/game-studio-contract-status`를 먼저 만든 뒤 SHA가 같은지 확인했다. 공통·파트 브랜치와 tag를 제외하고 병합·대체된 구 ref만 삭제했다.
+- **예방** — 도구명은 local worktree 이름에만 쓰고 원격 branch는 처음부터 `feature/fix/docs/chore` 유형과 kebab-case를 사용한다. 이관 체크리스트에 `새 ref 생성 → SHA 검증 → MR source 확인 → 구 ref 삭제 → ls-remote 재검증`을 포함하고, Jira Key가 없으면 임의 Key를 만들지 않는다.
+
 ### GS-T048. Portal 응답이 Binding이 소유하지 않는 objectId를 필수로 요구함 (해결)
 
 - **증상** — Frontend Portal resolver가 Backend 응답의 `configId`, `boothId`, `objectId`를 모두 요청값과 대조했다. 그러나 Backend `GamePortalBinding`은 `configId → booth/game`만 소유해 평면 `GET /game-portals/{configId}` 응답의 `objectId`를 유일하게 결정할 수 없었다.

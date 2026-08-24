@@ -115,7 +115,11 @@ main
 <type>/<jira-key>-<short-description>
 ```
 
-영문 kebab-case 권장.
+영문 kebab-case를 사용한다. Jira Key가 실제로 있으면 포함하고, 아직 발급되지 않았다면 임의 Key를
+만들지 않고 `<type>/<short-description>`을 사용한다.
+
+허용 type은 작업 목적에 따라 `feature`, `fix`, `refactor`, `docs`, `chore`, 필요한 경우 `hotfix`다.
+`codex/`, `claude/`, 사용자명처럼 **도구·작성자를 나타내는 prefix는 원격 브랜치에 금지**한다.
 
 좋음:
 
@@ -126,6 +130,8 @@ feature/FESTA-42-booth-publish
 나쁨:
 
 ```text
+codex/game-studio-runtime
+claude/booth-fix
 hyungsoon-work
 final-final
 new-feature-2

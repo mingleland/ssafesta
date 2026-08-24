@@ -1,164 +1,138 @@
-# FESTA Game Studio GitLab 이관 준비
+# FESTA Game Studio GitLab 이관·브랜치 정리 기록
 
-> **상태**: 이관 전 정리 완료 / 실제 GitLab Project 생성·Import·Remote 추가·Push는 수행하지 않음
+> **상태**: GitLab 이관 완료 / Branch Convention 정리 완료
 >
 > **기준일**: 2026-08-24
 >
-> **범위**: Game Studio spec 019, Frontend stacked PR, 관련 GitHub Issue와 운영 연결 계약
+> **GitLab 정본**: [S15P21A604](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604)
+>
+> **범위**: Game Studio spec 019, Frontend Web Runtime, 공통 계약 문서, GitHub 원본 Issue·PR 대응
 
-이 문서는 GitHub에서 진행 중인 Game Studio 작업을 잃지 않고 GitLab으로 넘기기 위한 인수인계 기준이다.
-제품 계약을 바꾸지 않으며, 이 문서만으로 이관을 자동 실행하지 않는다.
+이 문서는 이관 전 계획서가 아니라 실제 GitLab ref를 검사하고 브랜치를 정리한 결과다. 제품 계약은
+변경하지 않았으며 GitHub 원본 branch·PR·Issue는 삭제하지 않았다.
 
-## 1. 결론
+## 1. 적용한 최상위 규정
 
-- **권장 경로**는 GitHub 저장소 Import다. Git branch/tag뿐 아니라 Issue, Pull Request, comment, label,
-  milestone 등 협업 이력을 함께 옮길 수 있다.
-- 현재 Game Studio는 4단 stacked PR이므로, 가장 안전한 순서는 **GitHub에서 #72 → #79 → #80 → #82를
-  Squash Merge한 뒤 Import**하는 것이다.
-- GitHub에서 병합할 시간이 없다면 모든 source branch를 먼저 Import하고 GitLab에서 아래 대응표와 같은
-  base를 가진 MR을 다시 만든다. 중간 branch를 삭제하거나 한 번에 `front`로 합치지 않는다.
-- 현재 worktree의 `origin`은 GitHub가 아니라 `C:\Users\SSAFY\Desktop\SSAFESTA` 로컬 저장소다.
-  **`origin`을 이관 원본이나 목적지로 사용하지 않는다.** 정본 원격 별칭은 `github`이고 URL은
-  `https://github.com/kanghyunsoon/ssafesta.git`이다.
-- 현재 worktree에서 `git push --mirror`를 실행하지 않는다. 로컬 backup ref와 공유 object database의
-  임시 객체를 이관 범위로 오인할 수 있으므로 GitHub Import 또는 별도 fresh clone을 사용한다.
+브랜치 판단 순서는 다음과 같다.
 
-공식 근거:
+1. `AGENTS.md` — 저장소 운영 규칙의 단일 출처
+2. `.specify/memory/constitution.md` 10조 — `ai/back/front/game` 파트 CI/CD, `develop` 실사용 통합, Squash Merge
+3. `docs/17_Git_개발_Convention.md` §2~§3 — 작업 브랜치는 자기 파트 브랜치에서 분기하고
+   `<type>/<jira-key>-<short-description>` 또는 Jira Key가 없을 때 `<type>/<short-description>`의 영문
+   kebab-case 사용
 
-- [GitHub에서 GitLab으로 Project Import](https://docs.gitlab.com/user/project/import/github/)
-- [GitLab Repository Mirroring](https://docs.gitlab.com/user/project/repository/mirror/)
-- [GitLab Branch Rules·Protected Branch](https://docs.gitlab.com/user/project/repository/branches/protected/)
-- [GitLab CI/CD Variables](https://docs.gitlab.com/ci/variables/)
+따라서 도구 이름인 `codex/`는 팀 브랜치 유형으로 사용하지 않는다. Game Studio 코드는 `front`에서
+분기한 `feature/` 브랜치, 공통 계약 문서는 `develop` 대상 `docs/` 브랜치로 관리한다.
 
-## 2. 이관 기준 Ref
+## 2. GitLab 기준선 실측
 
-### 공통·파트 기준선
+Git transport로 GitLab의 모든 branch ref와 기본 HEAD를 직접 조회했다.
 
-| 역할 | GitHub ref | 2026-08-24 확인 SHA | 비고 |
+| 역할 | GitLab ref | 확인 SHA | 처리 |
 |---|---|---|---|
-| 문서 정본 | `develop` | `64d544e6e3ade9686b475b8dffd25edd9f164f23` | PR #53 병합 완료 기준 |
-| Frontend 파트 | `front` | `5022335c41da3d5788f65dbb0f54e3617a23471a` | Game Studio 코드 PR의 최초 base |
-| 동결 기준선 tag | `v0.0.1-poc` | Import 후 동일 tag 존재 확인 | 삭제·재발급 금지 |
+| 기본·배포 | `main` | `21eefb8` | 보존, 직접 push 금지 |
+| 통합 | `develop` | `429985d` | 보존, 문서 MR 대상 |
+| AI | `ai` | `e3133cc` | 보존 |
+| Backend | `back` | `0304230` | 보존 |
+| Frontend | `front` | `e92aeb0` | 보존, Game Studio 코드 MR 대상 |
+| Unity | `game` | `b192fc7` | 보존 |
+| 동결 기준 | `v0.0.1-poc` | peeled commit `4b1b675` | 보존, 재발급 금지 |
 
-### Game Studio Pull Request 체인
+GitLab HEAD는 `main`을 가리킨다. 위 6개 공통·파트 브랜치와 tag는 정리 대상에서 제외했다.
 
-| 순서 | GitHub PR | Base → Head | 확인된 Head SHA | 현재 상태 |
-|---:|---|---|---|---|
-| 1 | [#72](https://github.com/kanghyunsoon/ssafesta/pull/72) | `front` → `codex/game-studio-published-runtime-shell` | `7786ed651444bece6d318641ab086a7da7b1b7bb` | OPEN, CLEAN/MERGEABLE |
-| 2 | [#79](https://github.com/kanghyunsoon/ssafesta/pull/79) | `codex/game-studio-published-runtime-shell` → `codex/game-studio-maker-redesign` | `3f695b57162a79e00dcb9be226f0ea353a65c2e7` | OPEN, CLEAN/MERGEABLE |
-| 3 | [#80](https://github.com/kanghyunsoon/ssafesta/pull/80) | `codex/game-studio-maker-redesign` → `codex/game-studio-local-publish-loop` | `02a1d76a1c9cec7c65ca9ef8ef9c98532cfd61b1` | OPEN, CLEAN/MERGEABLE |
-| 4 | [#82](https://github.com/kanghyunsoon/ssafesta/pull/82) | `codex/game-studio-local-publish-loop` → `codex/game-studio-portal-contract-fix` | `1f169f9e1bf677be8ef1c4b64b63bf9195f10bb4` | OPEN, CLEAN/MERGEABLE |
-| 문서 | [#53](https://github.com/kanghyunsoon/ssafesta/pull/53) | `develop` → `codex/game-studio-docs-sync` | merge `64d544e6e3ade9686b475b8dffd25edd9f164f23` | MERGED |
+## 3. Game Studio 최종 브랜치
 
-PR #79는 #72 병합 뒤, #80은 #79 병합 뒤, #82는 #80 병합 뒤 base를 `front`로 바꿔 최종 diff를
-확인한다. GitLab에서 그대로 이어갈 경우에는 이 순서를 바꾸지 않고 각각 MR을 재생성한다. #82는
-Portal 응답에서 서버가 소유하지 않는 `objectId` 요구를 제거한 2파일 수정이므로 앞선 PR보다 먼저
-`front`에 병합하지 않는다.
+| 역할 | 최종 GitLab branch | 기준 SHA | MR 대상 | 설명 |
+|---|---|---|---|---|
+| 코드 | `feature/game-studio-web-runtime` | `1f169f9` | `front` | 기존 Published Runtime → Maker → Local Publish → Portal fix 전체를 포함 |
+| 문서 | `docs/game-studio-contract-status` | `91db12f` 이후 | `develop` | Portal·Session 계약, GitLab 인수인계, 작업일지·트러블슈팅 |
 
-## 3. GitHub Issue 인수인계표
+코드 최종 SHA에는 기존 4단 작업 브랜치의 커밋이 모두 선형으로 포함된다. 중간 branch ref를 없애도
+커밋과 최종 diff는 `feature/game-studio-web-runtime`에서 보존된다. 문서 브랜치는 이미 `develop`에
+Squash Merge된 PR #53 위에 후속 계약·이슈 상태만 더한다.
 
-GitLab은 Issue에는 `#`, Merge Request에는 `!`를 사용한다. GitHub Import 후 기존 문서의 `#번호`가
-MR을 자동으로 가리킨다고 가정하지 말고 아래 원본 URL을 MR·Issue 설명에 남긴다.
+## 4. 제거한 GitLab 브랜치
 
-| GitHub | 담당 | 이관 시 상태와 다음 행동 |
+### 이미 파트·통합 브랜치에 포함된 브랜치
+
+- `codex/game-studio-authoring-shell` — `front`의 ancestor
+- `codex/game-studio-web-runtime-core` — `front`의 ancestor
+- `codex/spec-007-develop-pr` — `develop`의 ancestor
+- `docs/005-contract-fixes` — `develop`의 ancestor
+- `docs/59-spec-canonicalization` — `develop`에 patch-equivalent 반영
+- `docs/game-studio-contract-2026-08-24` — `back`의 ancestor
+- `docs/issue-agreements-sync` — `develop`의 ancestor
+- `docs/journal-2026-08-23` — `back`의 ancestor
+- `feature/booth-slot-published-layout` — `back`의 ancestor
+- `feature/error-field-and-facade-palette` — `back`의 ancestor
+
+### 최종 브랜치로 통합한 중간·구명칭 브랜치
+
+- `codex/game-studio-published-runtime-shell`
+- `codex/game-studio-maker-redesign`
+- `codex/game-studio-local-publish-loop`
+- `codex/game-studio-portal-contract-fix`
+- `codex/game-studio-docs-sync`
+- `codex/game-studio-issue-cleanup`
+- `feature/game-studio-foundation`
+
+삭제는 새 코드·문서 ref를 먼저 push하고 SHA를 확인한 뒤 수행했다. force push, history rewrite,
+`git reset --hard`, `git clean`, tag 삭제는 하지 않았다.
+
+## 5. GitHub 원본 PR 대응
+
+아래 이름은 이력 식별용이며 GitLab의 현재 브랜치명이 아니다.
+
+| GitHub PR | 과거 Head | GitLab 현재 대응 |
+|---:|---|---|
+| [#72](https://github.com/kanghyunsoon/ssafesta/pull/72) | `codex/game-studio-published-runtime-shell` | `feature/game-studio-web-runtime`에 포함 |
+| [#79](https://github.com/kanghyunsoon/ssafesta/pull/79) | `codex/game-studio-maker-redesign` | `feature/game-studio-web-runtime`에 포함 |
+| [#80](https://github.com/kanghyunsoon/ssafesta/pull/80) | `codex/game-studio-local-publish-loop` | `feature/game-studio-web-runtime`에 포함 |
+| [#82](https://github.com/kanghyunsoon/ssafesta/pull/82) | `codex/game-studio-portal-contract-fix` | `feature/game-studio-web-runtime` tip |
+| [#53](https://github.com/kanghyunsoon/ssafesta/pull/53) | `codex/game-studio-docs-sync` | `develop`에 Squash Merge, 후속은 `docs/game-studio-contract-status` |
+
+GitLab에서는 코드 branch 하나를 `front` 대상으로, 문서 branch 하나를 `develop` 대상으로 MR한다.
+팀 규정에 따라 두 MR 모두 Squash Merge하고 완료 뒤 source branch를 삭제한다.
+
+## 6. Issue 인수인계
+
+| GitHub 원본 | 담당 | GitLab에서 유지할 완료 조건 |
 |---|---|---|
-| [#48 Draft/Publish API](https://github.com/kanghyunsoon/ssafesta/issues/48) | `strdeok` | OPEN 유지. Spring Draft/Publish/Published Query 구현과 DB migration을 GitLab Issue로 확인 |
-| [#55 Published Web Runtime](https://github.com/kanghyunsoon/ssafesta/issues/55) | `ghkim1632`, `colosair` | OPEN 유지. #48 응답과 실제 Asset resolver를 사용한 browser E2E 추가 |
-| [#56 GAME_PORTAL Binding](https://github.com/kanghyunsoon/ssafesta/issues/56) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. PR #82의 `objectId` 응답 소유권 수정 뒤 BE resolver·Unity 진입·browser E2E 연결 |
-| [#69 사용자 Asset](https://github.com/kanghyunsoon/ssafesta/issues/69) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. stable `asset://` 업로드·검사·보존·Published resolver 연결 |
-| [#73 사용성·성능](https://github.com/kanghyunsoon/ssafesta/issues/73) | `ghkim1632`, `colosair` | OPEN 유지. 사람 5명/20분 테스트와 활성 PC 탭 FPS 증거 수집 |
-| [#78 GameProject v1.1](https://github.com/kanghyunsoon/ssafesta/issues/78) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. FE candidate를 BE validator·AI 허용 출력 계약으로 승인 |
-| [#81 GameSession·Coin](https://github.com/kanghyunsoon/ssafesta/issues/81) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. 가격·차감·idempotency를 서버 권위 계약으로 확정 |
+| [#48 Draft/Publish API](https://github.com/kanghyunsoon/ssafesta/issues/48) | `strdeok` | Spring endpoint·DB migration·Published Query |
+| [#55 Published Runtime](https://github.com/kanghyunsoon/ssafesta/issues/55) | `ghKim`, `colosair` | 실제 Published API·Asset resolver browser E2E |
+| [#56 GAME_PORTAL](https://github.com/kanghyunsoon/ssafesta/issues/56) | `strdeok`, `ghKim`, `colosair` | Binding/resolver/whitelist·Unity 진입·browser E2E |
+| [#69 사용자 Asset](https://github.com/kanghyunsoon/ssafesta/issues/69) | `strdeok`, `ghKim`, `colosair` | stable `asset://` 업로드·검사·보존·Published resolve |
+| [#73 사용성·성능](https://github.com/kanghyunsoon/ssafesta/issues/73) | `ghKim`, `colosair` | 사람 5명/20분 테스트·활성 PC 탭 FPS |
+| [#78 GameProject v1.1](https://github.com/kanghyunsoon/ssafesta/issues/78) | `strdeok`, `ghKim`, `colosair` | BE validator·AI 허용 출력·API E2E |
+| [#81 GameSession·Coin](https://github.com/kanghyunsoon/ssafesta/issues/81) | `strdeok`, `ghKim`, `colosair` | 서버 권위 가격·차감·idempotency·세션 정책 |
 
-Import 직후에는 각 항목의 assignee, label(`front`, `back`), comment, attachment, 원본 작성자를 표와 대조한다.
-사용자 email mapping이 맞지 않으면 작성자·assignee가 Import 실행자로 치환될 수 있으므로 팀원 계정 연결을
-먼저 확인한다.
+GitLab Issue/MR 본문에서는 GitHub `#번호`를 그대로 쓰지 않고 위 원본 URL 또는 실제 GitLab 번호를
+사용한다. 완료 근거가 없는 항목은 이관만으로 닫지 않는다.
 
-## 4. Repository 실측 결과
+## 7. 검증 결과
 
-2026-08-24 현재 GitHub remote를 fetch한 뒤 확인한 값이다.
+- GitLab remote branch 23개를 fetch해 commit graph와 ancestor를 확인했다.
+- 열린 MR ref 패턴 `refs/merge-requests/*/{head,merge}`는 Git transport에서 광고되지 않았다.
+- 최종 코드 branch는 `front` 대비 기존 4단 코드 작업과 Portal fix를 모두 포함한다.
+- 최종 문서 branch는 `develop` 기준 후속 2개 문서 커밋을 보존한 상태에서 이 문서 갱신을 추가한다.
+- GitHub 원격과 바탕화면 Unity 작업트리는 변경하지 않았다.
+- `main/develop/ai/back/front/game`과 `v0.0.1-poc`는 삭제·이동하지 않았다.
 
-| 항목 | 결과 | 이관 판단 |
-|---|---:|---|
-| GitHub remote branch | 23개 | Import 후 동일 ref 수와 핵심 branch SHA를 재확인 |
-| Git tag | 1개 | `v0.0.1-poc` 보존 |
-| 현재 문서 기준 tracked files | 1,867개 | Import 전후 기본 file tree 비교 |
-| Git object connectivity | `git fsck --connectivity-only` exit 0 | 참조된 commit/tree/blob 손상 없음 |
-| Submodule | 없음 | 별도 submodule credential 이관 불필요 |
-| Git LFS pointer | 없음 | 현재는 일반 Git blob으로 Unity Asset을 보관 |
-| Pack size | 약 630.46 MiB | GitLab Project/Import 용량 제한 사전 확인 |
-| 가장 큰 tracked blob | 약 11.88 MiB FBX | 10 MiB 이상 FBX 3개가 있으므로 push 제한 확인 |
-| 저장소 내 CI 정의 | `.gitlab-ci.yml`, `Jenkinsfile`, GitHub Workflow 없음 | Pipeline은 저장소 Import만으로 복구되지 않음 |
-| Docker 진입점 | `backend/compose.yaml`, `festa-unity/Docker/Dockerfile` | Import 후 경로·대소문자 유지 확인 |
+## 8. 운영자가 GitLab UI에서 확인할 항목
 
-공유 worktree object store에는 가상 병합 검사에서 생긴 dangling/temporary object가 있지만 connectivity는
-정상이다. 이 객체들은 GitHub ref에 포함되지 않으므로 **삭제 작업을 이관 준비 단계에서 하지 않고**, 원격
-GitHub Import 또는 fresh clone으로 격리한다. 현재 작업 저장소에서 `git gc`, `git prune`, 강제 reset을
-실행하지 않는다.
+SSO 계정 권한이 필요한 설정은 Git ref 검사로 대신 확정하지 않는다.
 
-## 5. CI/CD·Webhook·Secret 경계
+- `main/develop/ai/back/front/game` Branch Rule과 force push 금지
+- MR Squash 기본값·approval 수
+- Jenkins Webhook과 CI/CD Variable scope
+- 이관된 Issue의 assignee·label·attachment 작성자 매핑
+- `feature/game-studio-web-runtime → front`, `docs/game-studio-contract-status → develop` MR 생성 여부
 
-- `docs/15_Infra_AWS_설계서.md`의 현재 결정대로 Jenkins Pipeline은 유지하고 GitHub Webhook만 GitLab
-  Webhook으로 전환한다.
-- 저장소에 Pipeline 정의 파일이 없으므로 Infra owner가 Jenkins Job/Shared Library/credential을 별도
-  인벤토리로 확인해야 한다. Repository Import 완료를 CI 이관 완료로 간주하지 않는다.
-- GitHub의 required status checks는 GitLab Import에서 자동 보존된다고 가정하지 않는다. `main`,
-  `develop`, `front`, `back`, `ai`, `game`의 Branch Rule과 MR approval, Squash 정책을 수동 대조한다.
-- Secret 값은 문서·Git history·명령행에 복사하지 않는다. GitLab에는 UI의 masked/hidden CI/CD Variable,
-  Jenkins Credentials 또는 AWS Secret 저장소로 다시 등록하고 key 이름·scope·owner만 체크리스트에 남긴다.
-- GitLab remote URL, deploy token, PAT는 이 문서에 적지 않는다.
+## 9. 정리 범위 밖
 
-## 6. 실행 전 체크리스트
-
-### 팀 결정
-
-- [ ] GitLab namespace, project path, visibility, default branch를 확정한다.
-- [ ] Import owner와 검증 owner를 서로 다른 사람으로 지정한다.
-- [ ] GitHub를 언제 read-only로 전환할지 cutover 시간을 정한다.
-- [ ] #72·#79·#80·#82를 GitHub에서 먼저 병합할지, GitLab에서 stacked MR로 이어갈지 결정한다.
-- [ ] GitHub Issue/PR Markdown attachment Import 옵션을 켤지 확인한다.
-- [ ] GitLab Project 용량 제한이 약 630 MiB pack과 12 MiB 단일 blob을 허용하는지 확인한다.
-
-### Import 직전 동결
-
-- [ ] `github/develop`, `github/front`와 4개 Game Studio code branch의 최종 SHA를 이 문서 표와 갱신한다.
-- [ ] PR #53·#72·#79·#80·#82가 OPEN/CLEAN인지 또는 병합 완료인지 기록한다.
-- [ ] Issue #48·#55·#56·#69·#73·#78·#81의 state/assignee/label을 export한다.
-- [ ] `v0.0.1-poc` tag를 확인한다.
-- [ ] Frontend Game Studio에서 `npm test`, `npm run build`, `npm run lint`를 통과시킨다.
-- [ ] GameProject fixture 7/7, Runtime trace 6/6을 통과시킨다.
-- [ ] 이관 시작 뒤 GitHub와 GitLab 양쪽에 동시에 쓰지 않는다.
-
-## 7. Import 후 검증 체크리스트
-
-- [ ] `main`, `develop`, `front`, `back`, `ai`, `game` 및 Game Studio 4개 branch가 존재한다.
-- [ ] 핵심 branch SHA와 `v0.0.1-poc` tag가 이관 전 snapshot과 일치한다.
-- [ ] GitLab default branch와 Branch Rule이 팀 전략과 일치하며 force push가 금지됐다.
-- [ ] PR #53·#72·#79·#80·#82에 대응하는 MR의 base/head/diff가 대응표와 같다.
-- [ ] 7개 OPEN Issue의 본문·comment·attachment·label·assignee가 보존됐다.
-- [ ] 기존 GitHub `#번호` 링크가 Issue/MR을 잘못 가리키는 곳을 원본 URL 또는 GitLab `!번호`로 고친다.
-- [ ] Jenkins Webhook을 GitLab event로 바꾸고 파트 branch push와 develop MR pipeline을 각각 1회 검증한다.
-- [ ] CI/CD Secret은 값 노출 없이 protected/environment scope만 검증한다.
-- [ ] Frontend 205 tests/build/lint와 Mock `제작 → 저장 → 게시 → /play` browser smoke를 다시 통과시킨다.
-- [ ] Backend·Unity·AI가 없는 Mock 범위와 운영 multi-user 범위를 혼동하지 않았는지 릴리스 설명을 확인한다.
-
-## 8. Cutover 완료 조건
-
-다음 조건을 모두 만족하기 전에는 GitHub를 archive하거나 GitLab을 정본으로 선언하지 않는다.
-
-1. branch/tag SHA 검증이 끝났다.
-2. OPEN PR/Issue의 GitLab 대응표가 완성됐다.
-3. Branch Rule, Squash, approval와 Jenkins Webhook이 검증됐다.
-4. Secret이 저장소 밖에서 복구됐고 로그에 노출되지 않았다.
-5. Game Studio 자동 검증과 Mock browser smoke가 통과했다.
-6. #48·#55·#56·#69·#78·#81은 운영 배포 blocker로 계속 추적된다.
-
-## 9. 이번 정리에서 의도적으로 하지 않은 일
-
-- GitLab Project/Group 생성
-- GitLab remote 추가 또는 기존 remote URL 변경
-- GitHub/GitLab mirror 설정
-- branch/tag push, force push, history rewrite
-- 추가 GitHub PR/Issue 종료 또는 GitHub 저장소 archive(PR #53은 검토 완료 후 병합)
-- local dangling object 삭제, `git gc`, `git prune`
-- Jenkins Webhook·credential·CI/CD Variable 변경
+- GitHub branch·PR·Issue 삭제 또는 archive
+- `main/develop/ai/back/front/game` push·삭제
+- tag 삭제·재발급
+- Git history rewrite와 force push
+- Jenkins credential·Secret 값 조회 또는 변경
+- 공유 Unity 작업트리와 `festa-unity/**` 수정

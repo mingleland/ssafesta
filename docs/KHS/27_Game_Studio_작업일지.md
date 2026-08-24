@@ -9,6 +9,15 @@
 
 ## 2026-08-24
 
+### GitLab 이관 후 Branch Convention 정리 ✅
+
+- 🤖 최상위 `AGENTS.md`, 헌법 10조, `docs/17_Git_개발_Convention.md` §2~§3을 다시 읽고 GitLab 실제 ref 23개를 직접 fetch해 기준선을 대조했다. `main/develop/ai/back/front/game`과 `v0.0.1-poc`는 보호 대상으로 제외했다.
+- 🤖 도구명이 들어간 `codex/` 브랜치를 운영 브랜치명으로 사용하지 않도록 최종 코드 SHA `1f169f9`를 `feature/game-studio-web-runtime`, 문서 후속을 `docs/game-studio-contract-status`로 재명명했다. Jira Key가 확정되지 않아 임의 Key는 만들지 않고 Convention이 허용하는 type + 영문 kebab-case를 적용했다.
+- 🤖 `front`·`back`·`develop`에 이미 포함된 브랜치와 최종 코드·문서 ref가 대체하는 중간 checkpoint를 분류했다. 새 ref를 먼저 게시하고 SHA를 확인한 뒤 GitLab의 구 `codex/*` 9개와 그 밖의 병합·대체 완료 branch 8개를 제거하는 순서로 정리했다.
+- 🤖 `specs/019-game-studio/spec.md`, FE quickstart, GitLab 이관 기록의 현재 브랜치명을 새 정본으로 교체했다. 과거 GitHub PR·작업일지의 `codex/*` 표기는 당시 이력이라 삭제하지 않고 현재 GitLab 대응 branch를 연결했다.
+- 🤖 GitHub 원격, `main/develop/ai/back/front/game`, tag, Backend·Unity 파일과 바탕화면 Unity 작업트리는 변경하지 않았다. force push·history rewrite·local file 삭제도 수행하지 않았다.
+- 트러블슈팅: GS-T049
+
 ### Game Studio PR 표시 복구·이슈 전수 점검·Portal 계약 정합 ✅
 
 - 🤖 PR #80·#82의 공개 화면을 직접 대조했다. 코드 diff는 각각 Game Studio 18파일과 Portal Repository/회귀 테스트 2파일로 정상이었지만, #80 제목·본문이 영어였고 #82 본문에는 실제 줄바꿈 대신 `\n` 문자가 저장돼 있었다. 두 PR의 제목·본문을 한국어, 실제 줄바꿈, 검증 결과, `#72 → #79 → #80 → #82` 병합 순서로 바로잡았다.

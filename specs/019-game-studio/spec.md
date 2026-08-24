@@ -1,10 +1,10 @@
 # Feature Specification: FESTA Game Studio
 
-**Feature Branch**: `codex/game-studio-docs-sync`
+**Feature Branch**: `feature/game-studio-web-runtime`
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-24 — Portal 응답 소유권, Published Session·Coin 후보 경계, PR #82 반영
+**Updated**: 2026-08-24 — GitLab 이관 후 브랜치 Convention 정합, Portal 응답 소유권, Published Session·Coin 후보 경계 반영
 
 **Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 

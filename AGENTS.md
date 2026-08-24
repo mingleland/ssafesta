@@ -166,6 +166,8 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 - **Non-fast-forward가 나면 force push하지 않는다.** `git pull --rebase` 또는 병합으로 푼다.
 - 커밋/브랜치 규칙: `docs/17_Git_개발_Convention.md`. Merge는 **Squash** (헌법 10조).
+- 원격 작업 브랜치에 `codex/`, `claude/`, 사용자명 같은 **도구·작성자 prefix를 쓰지 않는다.**
+  `feature/`, `fix/`, `refactor/`, `docs/`, `chore/` 등 변경 목적 type을 사용한다.
 
 ### 4-2. Secret — 커밋하면 안 되는 값
 
