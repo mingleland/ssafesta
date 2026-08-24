@@ -63,16 +63,18 @@ main
 ### feature
 
 ```text
-feature/FESTA-123-booth-layout-save
-feature/FESTA-201-player-spawn
+feat/S15P21A604-87-boothslot-list
+feature/S15P21A604-75-avatar-persist
 ```
 
-Jira Key가 있으면 포함한다.
+> **✅ 개정 (2026-08-24)**: develop/main 으로 향하는 작업 브랜치에는 **Jira Key 가 필수**다.
+> develop/main 대상 MR 파이프라인이 제목·브랜치의 키를 검증한다(`.gitlab-ci.yml` `jira-key-check`).
+> 상세: `docs/jira-gitlab-workflow.md`
 
 ### fix
 
 ```text
-fix/FESTA-345-duplicate-lease
+fix/S15P21A604-241-duplicate-lease
 ```
 
 ### hotfix
@@ -115,12 +117,16 @@ main
 <type>/<jira-key>-<short-description>
 ```
 
-영문 kebab-case 권장.
+영문 kebab-case 권장. 허용 type (2026-08-24 확정):
+
+```text
+feat feature fix refactor test docs chore build ci hotfix perf
+```
 
 좋음:
 
 ```text
-feature/FESTA-42-booth-publish
+feat/S15P21A604-42-booth-publish
 ```
 
 나쁨:
@@ -151,6 +157,10 @@ test(wallet): add duplicate reward test
 docs(api): update consultation contract
 ```
 
+> **✅ 개정 (2026-08-24)**: Jira 연동 추적을 위해 요약 끝에 이슈 키를 붙이는 것을 권장한다 —
+> `feat(auth): 로그인 API 연동 (S15P21A604-123)`. 커밋 언어는 기존대로 **한국어**를 유지한다.
+> 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+
 ### type
 
 | Type | 의미 |
@@ -180,15 +190,20 @@ docs(api): update consultation contract
 ## 6. Merge Request 제목
 
 ```text
-[FESTA-123][BE] Booth Lease API 구현
-[FESTA-201][UNITY] Player Spawn/Despawn 구현
+[S15P21A604-123][BE] Booth Lease API 구현
+[S15P21A604-201][UNITY] Player Spawn/Despawn 구현
 ```
 
 Jira Title Prefix와 유사하게 맞춘다.
+**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 없으면 파이프라인이 실패한다** (2026-08-24 적용).
 
 ---
 
 ## 7. MR Template
+
+> **✅ 개정 (2026-08-24)**: 저장소에 실제 템플릿이 있다 — `.gitlab/merge_request_templates/Default.md`.
+> MR 작성 화면에서 Description → **Choose a template → Default** 를 선택하면 자동 적용된다.
+> 아래는 참고용 구형이다.
 
 ```markdown
 ## 변경 내용
@@ -238,6 +253,7 @@ Jira Title Prefix와 유사하게 맞춘다.
 ## 9. Merge 방식
 
 > **✅ 팀 결정 (2026-08-12)**: `Squash Merge`로 통일한다 (이의 제기 시 재논의).
+> **✅ 시행 (2026-08-24)**: GitLab 프로젝트 설정 `squash_option = default_on` 적용 — MR 머지 시 Squash 가 기본 체크된다.
 
 장점:
 
