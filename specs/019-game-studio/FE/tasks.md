@@ -110,10 +110,11 @@ FE가 소유하는 79개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T102 Implement deterministic score/defeat/survival objectives, progress HUD, and respawn/end-game behavior
 - [x] T103 Implement Mock immutable publication ports and block projects with no completion path
 - [x] T104 Run browser template→save→publish→public `/play` verification with visible objective parity
+- [ ] T105 Implement the server-authoritative Published GameSession/Coin adapter after #81 agreement
 
 ## Summary
 
-- Total: 83
+- Total: 84
 - Completed: 76
-- Remaining: 7
-- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다.
+- Remaining: 8
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다.

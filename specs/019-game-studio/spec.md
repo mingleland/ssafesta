@@ -277,6 +277,7 @@
 - Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
 - 사용자 교체 Asset 업로드·stable `asset://` 승격·Publish 연결: GitHub Issue #69 — Frontend·Backend 후속
 - 타이머·점수·적 처치 기반 승리 조건과 GameProject v1.1 FE·BE·AI 계약: GitHub Issue #78 — FE candidate와 Mock Runtime은 구현 완료, API 모드 허용·BE validator·AI 출력 허용 목록은 합의 전 미확정
+- Published 플레이 세션·선택적 Coin 차감·idempotency·재시도 정책: GitHub Issue #81 — 가격과 차감은 GameProject가 아닌 Backend Game/session metadata가 소유하며 MVP 무보상 Runtime과 분리
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
