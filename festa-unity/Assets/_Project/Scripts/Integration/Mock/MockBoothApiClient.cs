@@ -45,7 +45,9 @@ namespace Festa.Integration
   ]
 }";
 
-        // Facade 회귀 검증용. primaryColor 는 hex 문자열 계약(#17 합의)을 따른다.
+        // Facade 회귀 검증용. primaryColor 는 hex 문자열 계약(#17)을 따른다.
+        // 값은 팔레트 12색 안에서 고른다 (BLUE = #3B82F6) — 서버가 팔레트 밖을 400 으로 거부하므로
+        // 계약 밖 색을 fixture 로 두면 다음 사람이 그 값을 복사한다.
         const string MockDetailJson = @"{
   ""boothId"": 7,
   ""slotId"": 5,
@@ -54,7 +56,7 @@ namespace Festa.Integration
   ""entryAvailable"": true,
   ""facade"": {
     ""themeCode"": ""SSAFY_BLUE"",
-    ""primaryColor"": ""#1677C8"",
+    ""primaryColor"": ""#3B82F6"",
     ""signText"": ""AI 프로젝트 전시관"",
     ""logoUrl"": null
   },

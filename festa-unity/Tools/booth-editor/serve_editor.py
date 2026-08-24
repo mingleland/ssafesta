@@ -35,7 +35,7 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 
 DEFAULT_FACADE = {
     "themeCode": "SSAFY_BLUE",
-    "primaryColor": "#1677C8",
+    "primaryColor": "#3B82F6",
     "signText": "AI 프로젝트 전시관",
     "logoUrl": None,
 }

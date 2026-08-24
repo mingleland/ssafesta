@@ -26,7 +26,7 @@ namespace Festa.Booth
     public class BoothFacadeDto
     {
         public string themeCode;     // 예: "SSAFY_BLUE"
-        public string primaryColor;  // hex 문자열. 예: "#1677C8" (#17 합의: 저장은 hex, 입력은 팔레트)
+        public string primaryColor;  // hex 문자열. 예: "#3B82F6" (#17: 저장은 hex, 입력은 팔레트 12색)
         public string signText;
         public string logoUrl;
     }
