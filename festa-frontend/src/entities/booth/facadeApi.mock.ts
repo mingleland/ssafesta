@@ -3,14 +3,13 @@
 // 출처: specs/005-booth-studio-layout/contracts/layout-api.md §6·§7
 
 import type { ApiError } from '../../shared/api/client';
-import { THEME_CODES } from './types';
+import { THEME_CODES, isPaletteColor } from './types';
 import type { BoothDetail, BoothFacade, FacadePutRequest } from './types';
 
 // layout mock(entities/layout/api.mock.ts)과 같은 sentinel 값 — 임대 만료 UX 수동 검증용.
 // 실 BE에는 없는 값이라 real facadeApi.ts에는 이 분기가 없다.
 const LEASE_EXPIRED_BOOTH_ID = 999;
 
-const HEX_RRGGBB = /^#[0-9A-Fa-f]{6}$/;
 const HTTPS_URL = /^https:\/\//;
 
 function apiError(code: string, message: string): ApiError {
@@ -71,8 +70,9 @@ export async function putFacade(boothId: number, body: FacadePutRequest): Promis
   if (!THEME_CODES.includes(body.themeCode)) {
     throw fieldError('themeCode', '테마는 지정된 값 중 하나여야 합니다.');
   }
-  if (body.primaryColor !== null && !HEX_RRGGBB.test(body.primaryColor)) {
-    throw fieldError('primaryColor', '대표색은 #RRGGBB 형식이어야 합니다.');
+  if (body.primaryColor !== null && !isPaletteColor(body.primaryColor)) {
+    // 형식(#RRGGBB) 검사는 팔레트 소속 검사에 포섭된다 — 12색이 전부 그 형식이다(계약 §6, PR #71)
+    throw fieldError('primaryColor', '대표색은 팔레트 12색 중 하나여야 합니다.');
   }
   if (body.signText !== null && body.signText.length > 60) {
     throw fieldError('signText', '간판 문구는 60자 이하여야 합니다.');
@@ -81,7 +81,8 @@ export async function putFacade(boothId: number, body: FacadePutRequest): Promis
     throw fieldError('logoUrl', '로고 URL은 https:// 형식 2048자 이하여야 합니다.');
   }
 
-  const saved: BoothFacade = { ...body };
+  // BE와 동일한 대문자 정규화(PR #71) — 소문자 hex로 저장해도 대문자로 돌아온다
+  const saved: BoothFacade = { ...body, primaryColor: body.primaryColor?.toUpperCase() ?? null };
   facades.set(boothId, saved);
   persistFacades();
   return saved;

@@ -6,18 +6,13 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
-import { THEME_CODES } from '../../../entities/booth/types';
+import { FACADE_PALETTE, THEME_CODES, isPaletteColor } from '../../../entities/booth/types';
 import type { BoothFacade } from '../../../entities/booth/types';
 
-const HEX_RRGGBB = /^#[0-9A-Fa-f]{6}$/;
 const HTTPS_URL = /^https:\/\//;
 
 function defaultFacade(): BoothFacade {
   return { themeCode: 'DEFAULT', primaryColor: null, signText: null, logoUrl: null };
-}
-
-function isValidColor(text: string): boolean {
-  return text === '' || HEX_RRGGBB.test(text);
 }
 
 function isValidLogoUrl(text: string): boolean {
@@ -64,9 +59,12 @@ export function FacadePanel({ boothId }: Props) {
     return <p>임대가 만료되어 이 부스의 외부 표현을 편집할 수 없습니다.</p>;
   }
 
-  const colorText = form.primaryColor ?? '';
   const logoText = form.logoUrl ?? '';
-  const colorValid = isValidColor(colorText);
+  // 팔레트 밖 기저장 값(팔레트 확정 전 저장분 등) — 이 상태로는 어느 필드를 고쳐 저장해도 서버가
+  // primaryColor 400으로 거부한다(#17 함정: "간판만 고쳐도 400"). 안내를 띄우고 저장을 막아
+  // 사용자가 12색 중 하나를 다시 고르게 한다.
+  const colorOutsidePalette = form.primaryColor !== null && !isPaletteColor(form.primaryColor);
+  const colorValid = !colorOutsidePalette;
   const logoValid = isValidLogoUrl(logoText);
   const signTextValid = (form.signText ?? '').length <= 60;
   const canSave = colorValid && logoValid && signTextValid && !facadeMutation.isPending;
@@ -86,16 +84,38 @@ export function FacadePanel({ boothId }: Props) {
         </select>
       </label>
 
-      <label>
-        대표색
-        <input
-          type="text"
-          placeholder="#RRGGBB"
-          value={colorText}
-          onChange={(e) => setForm({ ...form, primaryColor: e.target.value.trim() === '' ? null : e.target.value })}
-        />
-      </label>
-      {!colorValid && <p>대표색은 #RRGGBB 형식이어야 합니다.</p>}
+      {/* 자유 입력을 두지 않는다 — 팔레트 밖 hex는 서버가 400으로 거부하므로(계약 §6, PR #71)
+          스와치가 12색만 내면 그 경로가 애초에 닫힌다. 색 없음은 별도 라디오. */}
+      <fieldset>
+        <legend>대표색</legend>
+        <label>
+          <input
+            type="radio"
+            name="primaryColor"
+            checked={form.primaryColor === null}
+            onChange={() => setForm({ ...form, primaryColor: null })}
+          />
+          없음
+        </label>
+        {FACADE_PALETTE.map((c) => (
+          <label key={c.code}>
+            <input
+              type="radio"
+              name="primaryColor"
+              value={c.hex}
+              checked={form.primaryColor?.toUpperCase() === c.hex}
+              onChange={() => setForm({ ...form, primaryColor: c.hex })}
+            />
+            {c.label}
+          </label>
+        ))}
+      </fieldset>
+      {colorOutsidePalette && (
+        <p>
+          저장된 대표색({form.primaryColor})이 확정 팔레트에 없습니다. 위 12색 중 하나를 선택해야
+          저장할 수 있습니다.
+        </p>
+      )}
 
       <label>
         간판 문구
