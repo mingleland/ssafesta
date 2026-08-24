@@ -2,8 +2,10 @@
 
 **Date**: 2026-08-21 (리드 초안) · **2026-08-24 구현 계획 반영 — #48, strdeok** | **Shared spec**: [../spec.md](../spec.md) | **API contract**: [../contracts/game-api.md](../contracts/game-api.md)
 
-> 리드 초안은 계약과 완료 조건만 소유했다(tasks.md 명시). 이 개정은 그 내용을 전부 보존하고
-> **어떻게 구현하는가**를 채운 것이다. 결정 근거는 [research.md](research.md) §7~§12.
+> **리드 초안의 문장은 지우지 않았다.** 이 개정은 그 위에 **어떻게 구현하는가**를 더한 것이고,
+> 결정 근거는 [research.md](research.md) §7~§12다. 초안과 갈리는 지점은 두 곳뿐이며 둘 다
+> 아래에 명시했다 — **패키지 배치**는 결정하지 않고 확인 요청으로 올렸고(§Source Boundary),
+> **Published 캐시 정책**은 리드 본인의 #48 코멘트를 반영한 갱신이다(§Technical Context).
 
 ## Summary
 
@@ -30,7 +32,11 @@ Game Portal Binding을 소유한다. 게임 프레임 실행·2D 물리·진행 
 - `games`, `game_drafts`, `game_published_versions` (**V13** — V12는 #62 슬롯 12 시드가 이미 사용) / `game_portal_bindings`는 #56에서 V14
 - Draft save는 `expectedRevision` 낙관적 잠금, revision은 서버 발급 카운터 (research §10)
 - Publish는 validate → immutable append → pointer update 단일 transaction
-- Published body는 `no-cache`+ETag, Portal resolution은 `no-store` (#56)
+- Published body는 cache 가능, Portal resolution과 신규 진입 판정은 `no-store`
+  - **갱신** — Published 포인터 URL은 `no-cache`+ETag이고, 긴 `max-age, immutable`은 version 고정 URL에만 적용한다. 초안의 *"Published body는 cache 가능"* 을 좁힌 유일한 지점이다. 근거는 **리드 본인의 #48
+    코멘트**(2026-08-23) — *"Published 포인터 URL은 no-cache + ETag, immutable cache는 version 고정
+    URL에만 적용"*. 초안 작성(08-21) 이후의 결정이라 초안이 틀린 것이 아니고, `game-api.md` §Runtime도
+    이미 같은 문장이다. 다르게 읽으셨다면 알려 주십시오
 
 ## Constitution Check — PASS
 
@@ -48,23 +54,49 @@ Game Portal Binding을 소유한다. 게임 프레임 실행·2D 물리·진행 
 
 ## Source Boundary
 
+리드 초안이 정한 경계다. 그대로 둔다.
+
 ```text
-backend/src/main/java/com/example/ssafesta/game/       # 플랫 패키지 — research §11
-├── Game.java · GameDraft.java · GamePublishedVersion.java   (+Repository 3)
-├── GameProjectValidator.java · GameProjectJson.java
-├── GameDraftService.java · GamePublishService.java · GamePublishedQueryService.java
-├── GameController.java
-└── GameValidationFailedException.java · GameRevisionConflictException.java   # 2개만
-backend/src/main/resources/db/migration/V13__game_studio.sql
-backend/src/main/resources/game/game-project-v1.schema.json   # 계약 사본 (research §8)
-backend/src/test/java/com/example/ssafesta/game/              # 통합 테스트 5~6
-backend/src/test/resources/game/fixtures/                     # 계약 fixture 사본
+backend/src/main/java/com/example/ssafesta/game/
+├── api/
+├── application/
+├── domain/
+└── persistence/
+backend/src/test/java/com/example/ssafesta/game/
+backend/src/main/resources/db/migration/
 ```
 
-> 리드 초안의 `api/ application/ domain/ persistence/` 4계층 스케치는 채택하지 않는다 —
-> 이 코드베이스의 전 패키지(booth·user·wallet·auth)가 플랫이고, 019만 계층을 갖는 것이
-> 더 큰 비일관이다 (research §11).
+### 확인 요청 — 패키지 배치 (구현 착수 전, @kanghyunsoon)
+
+> **위 4계층을 그대로 갈지 물어봅니다. 제가 정하지 않았습니다.**
 >
+> 실측하면 이 코드베이스의 **전 패키지가 플랫**입니다 — `booth`·`user`·`wallet`·`auth` 어디에도
+> `api/`·`application/`·`domain/`·`persistence/` 하위 디렉터리가 없고, 컨트롤러·서비스·엔티티·리포지터리가
+> 패키지 루트에 나란히 있습니다. 019만 4계층을 가지면 **같은 저장소에 두 배치가 공존**합니다.
+>
+> 두 갈래 중 어느 쪽이든 따르겠습니다.
+>
+> **㉮ 리드 초안 유지 (4계층)** — 019가 다른 도메인보다 크고(엔티티 3종 + 검증기 + 서비스 3개) 계층
+> 경계가 실제로 도움이 된다면 이쪽입니다. 019가 선례가 되고 이후 도메인이 따라갑니다.
+>
+> **㉯ 기존 코드베이스와 같은 플랫** — 제가 research §11에서 이쪽으로 기울었던 배치입니다.
+>
+> ```text
+> backend/src/main/java/com/example/ssafesta/game/
+> ├── Game.java · GameDraft.java · GamePublishedVersion.java   (+Repository 3)
+> ├── GameProjectValidator.java · GameProjectJson.java
+> ├── GameDraftService.java · GamePublishService.java · GamePublishedQueryService.java
+> ├── GameController.java
+> └── GameValidationFailedException.java · GameRevisionConflictException.java
+> backend/src/main/resources/db/migration/V13__game_studio.sql
+> backend/src/main/resources/game/game-project-v1.schema.json   # 계약 사본 (research §8)
+> backend/src/test/java/com/example/ssafesta/game/              # 통합 테스트 5~6
+> backend/src/test/resources/game/fixtures/                     # 계약 fixture 사본
+> ```
+>
+> 파일 목록 자체(엔티티 3 + 검증기 2 + 서비스 3 + 컨트롤러 1 + 예외 2, V13, schema·fixture 사본)는
+> 배치와 무관하게 같습니다 — ㉮면 이 파일들이 4계층에 나뉘어 들어갑니다.
+
 > **예외 클래스는 2개다.** 값을 실어야 하는 것만 클래스를 만든다 — 검증 실패(`errors[]` rule 목록)와
 > revision 충돌(현재 revision을 십진수로). 실을 값이 없는 나머지 `code` 8종(`GAME_DRAFT_NOT_FOUND`·
 > `GAME_NOT_FOUND`·`GAME_DELETED`·`GAME_NOT_PUBLISHED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`·
@@ -74,7 +106,18 @@ backend/src/test/resources/game/fixtures/                     # 계약 fixture �
 > (005에서 404가 500으로 새어나간 사고), `ApiException(ErrorCode)` 생성자를 직접 쓰면 같은 보장이
 > 성립한다. 클래스 8개 ≈ -100줄.
 
-## Implementation Order — 8단계 (T014~T088, 15 tasks)
+## Implementation Phases
+
+1. migration과 도메인/오류 경계를 추가한다.
+2. revision-aware Draft와 Schema+semantic validation을 구현한다.
+3. atomic Publish와 Published query를 구현한다.
+4. `GAME_PORTAL` whitelist와 resolver를 구현한다.
+5. soft delete, 회원 탈퇴 hard delete, 이력 보존 정책을 통합 테스트로 고정한다.
+
+이 5단계가 019 전체다. **아래 8단계는 그중 #48 몫(1~3단계)을 task 단위로 쪼갠 것**이고 4·5단계를
+대체하지 않는다 — 4단계는 #56(PR-2), 5단계는 T085이며 그 endpoint가 계약에 없어 결정 ②로 올려 두었다.
+
+## Implementation Order — #48 몫(리드 1~3단계)의 8단계 분해 (T014~T088, 15 tasks)
 
 | 단계 | Tasks | 산출물 |
 |---|---|---|
@@ -97,14 +140,15 @@ backend/src/test/resources/game/fixtures/                     # 계약 fixture �
    `MALFORMED_PROJECT`로 거부하고, 저장 시 서버가 새 revision을 project에 기록해 응답 일치
    계약(§Draft 저장)을 성립시킨다. "자동 보정 금지"의 예외가 아니라 발급이다 (research §10).
 
-## Fixed Policies (리드 초안 유지)
+## Fixed Policies
 
 - 일반 게임 삭제는 `deleted_at` soft delete다.
 - 회원 탈퇴는 Game, Draft, Published Version, Asset, Score까지 hard delete한다.
 - Published Version 이력은 Game이 존속하는 동안 유지하고 hard delete 때 제거한다.
 - 랭킹은 P1 표시 전용 후보이며 Coin/Reward/Inventory와 FK도 연결하지 않는다.
 - 공개 중단은 신규 REST 조회만 차단한다. 진행 중 로컬 세션을 끊는 소켓은 만들지 않는다.
-- 공개 `config_id`는 `INTEGER UNIQUE NOT NULL CHECK (config_id > 0)`, 전용 sequence는 1부터 시작한다 (#56·V14).
+- 공개 `config_id`는 `INTEGER UNIQUE NOT NULL CHECK (config_id > 0)`, 전용 sequence는 1부터 시작한다.
+  - 이 항목은 `game_portal_bindings`와 함께 #56(PR-2, V14) 몫이다 — 이 PR 범위 밖이다.
 
 ## Rollout — PR 단위
 
@@ -117,6 +161,12 @@ backend/src/test/resources/game/fixtures/                     # 계약 fixture �
 | 잔여 | T085(공개 중단·삭제 endpoint — 결정 ②) · T086(P1) · #78 E2E · #81(spec 개정 선행) | 각 결정 |
 
 ## Verification
+
+권한, revision conflict, invalid reference, immutable Published, transaction rollback, soft/hard delete,
+Portal owner/status, `config_id` 0·음수·overflow 거부와 2147483647 왕복을 integration test로 검증한다.
+
+**이 PR(#48)에서 실제로 태우는 범위와 방법**입니다 — 위 목록 중 soft/hard delete는 T085(결정 ②),
+Portal·`config_id`는 #56이라 각각 PR-2·잔여로 갑니다.
 
 - 회귀 232 + 신규 통합 테스트. quickstart 검증 행렬 13개 중 **#48 몫 = 1~6·13**
   (7은 T085, 8~12는 #56).
