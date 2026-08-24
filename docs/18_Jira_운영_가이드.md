@@ -415,6 +415,11 @@ TO DO
 → DONE
 ```
 
+> **✅ 개정 (2026-08-24)**: 상태 전환은 GitLab 이벤트로 **자동화**되어 있다
+> (브랜치 push→진행 중, MR→`in-review` 라벨, merge→`ready-for-deploy` 라벨,
+> production 배포 성공→완료). 현재 보드는 3상태라 REVIEW 단계는 라벨로 표현한다.
+> 매핑 표·설정·트러블슈팅: **`docs/jira-gitlab-workflow.md`** (정본).
+
 필요하면:
 
 ```text
