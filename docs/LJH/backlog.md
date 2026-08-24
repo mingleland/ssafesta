@@ -15,7 +15,6 @@
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **(P0) FE 팔레트·field 라운드** — 트리거 충족([PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지 08-24 01:09). **⓪ 계약 회수 완료**(08-24, `layout-api.md` develop 판·diff 0). ⑴ 계약 정합: `ApiErrorDetail`·`ValidationDetail`에 `field?: string`(`objectId`와 합치지 않음 — `docs/08` §1.3)·`client.ts:8-10` 낡은 주석 교체·R-12를 **"분기 불요 확정"으로 종결**(#58 §5 — `CURRENT_REVISION`은 재호출 트리거로만, 현행 구현이 이미 계약과 일치라 **코드 0**) ⑵ mock: `facadeApi.mock.ts`의 `apiError()`가 `errors: []` 고정이라 `FIELD_INVALID` 봉투 미재현 — **1곳**(throw 4개가 한 헬퍼 경유. "3곳"은 리뷰 시점 추정치, 실측 정정) ⑶ 팔레트: 12색 상수(`code`/`hex`/`label`, 계약 §6 전사)·FacadePanel 자유 입력→스와치·하이드레이션 팔레트 밖 값 안내(간판만 고쳐도 400 방지)·mock 팔레트 소속+대문자 정규화. ~~PublishDialog key 인덱스화~~ — **기완료 실측**(T026, `key={i}` 확인)
 - [ ] **(P0) 004 Lease + 003 Wallet FE** — 계약 정본은 `origin/develop`의 `specs/004-booth-slot-lease/contracts/lease-api.md`·`specs/003-wallet-coin/contracts/wallet-api.md`(착수 시 front 회수). 소비 endpoint: `GET /booth-slots`·`POST /booth-slots/{slotId}/leases`·`GET /booths/mine`·`GET /booths/{boothId}`·`GET /wallets/me`·`GET /wallets/me/transactions`. 003을 묶는 이유 — 임대 확인 UI가 잔액·차감 후 잔액을 함께 표시해야 해서 분리하면 두 번 손댄다. **#81(Coin 차감) 무영향** — `wallet-api.md:121`이 차감 API를 의도적 부재로 명시(차감은 기능 서버 로직 소관), 소비 계약은 조회 2종뿐
 - [ ] **(P0) Owner/Staff 라우트 가드**(G-1) — `GET /booths/mine`·슬롯 목록 `mine` 필드로 트리거 충족. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
 - [ ] **(P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
@@ -43,6 +42,7 @@
 - [ ] **편집기 팔레트 UI**(미보유 파츠 잠금·게스트 유도) — 트리거: spec 012 착수(#18)
 - [ ] **스냅 0.25 계약 명문화** — 트리거: 강형순 develop 정정 PR(#45 예고) 확인. 현재 로컬 `FE/research.md` R-04에만 존재
 - [ ] **`docs/26` 브랜치별 결정 분기 정리 제안** — 트리거: #59 종결(§21-2 grep 2층 개정 반영 확인 — 그 결론이 이 제안의 방향을 정함). #18에서 자청한 것
+- [ ] **develop `layout-api.md` 예시 2곳(`:215`·`:266`) `#1677C8` 잔존 보고** — 트리거: 원격 복귀. #17이 예시값 `#3B82F6` 교체로 합의·CLOSED했는데 이 파일 예시가 누락 — **예시대로 보내면 400 나는 자기모순**(팔레트 표는 정상). §21-2 grep 2층의 ②층(같은 파일 내 잔존) 실사례로 #59 참조 가치
 
 ## 추적 — 내 액션 없음
 
@@ -64,6 +64,7 @@
 
 | | 결과 |
 |---|---|
+| **FE 팔레트·field 라운드** 08-24 | 전체 완결(`field?` 타입 2곳·mock `FIELD_INVALID` 봉투·R-12 종결·12색 스와치·하이드레이션 차단·mock 팔레트 검증). 커밋 `3452395`·`9a1dc76`, vitest 167/167(+10)·브라우저 실측 3종·codex 3관점 CONFIRMED |
 | **spec 005** 08-18~22 | 전체 완결(US1~US4·Polish·인수검사·vitest 37). 상세는 작업일지·`verify/` |
 | **Block A** 08-23 | 001·013a·016·002 계약 front 회수 |
 | **013a WebGL Host** 08-23 | `unity/host/` 7종+`/app/world`. credential wiring만 예정 작업으로 잔류 |
