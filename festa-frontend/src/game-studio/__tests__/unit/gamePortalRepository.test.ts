@@ -12,13 +12,15 @@ const request: GamePortalRequest = { boothId: 7, objectId: 'game-npc-01', config
 describe('Game Portal API adapter', () => {
   it('accepts a playable resolution and preserves signed Int32 configId', () => {
     expect(parseGamePortalResolution({
-      ...request,
+      configId: request.configId,
+      boothId: request.boothId,
       gameId: 123,
       publishedVersion: 5,
       playable: true,
       unavailableReason: null,
     }, request)).toEqual({
-      ...request,
+      configId: request.configId,
+      boothId: request.boothId,
       gameId: 123,
       publishedVersion: 5,
       playable: true,
@@ -28,7 +30,8 @@ describe('Game Portal API adapter', () => {
 
   it('allows a non-playable response without published identifiers', () => {
     const parsed = parseGamePortalResolution({
-      ...request,
+      configId: request.configId,
+      boothId: request.boothId,
       gameId: null,
       publishedVersion: null,
       playable: false,
@@ -40,7 +43,7 @@ describe('Game Portal API adapter', () => {
 
   it('rejects mismatched binding identifiers', () => {
     expect(() => parseGamePortalResolution({
-      ...request,
+      configId: request.configId,
       boothId: 8,
       gameId: 123,
       publishedVersion: 5,
@@ -49,12 +52,31 @@ describe('Game Portal API adapter', () => {
     }, request)).toThrow('식별자가 일치하지 않습니다');
   });
 
+  it('keeps objectId as request-local interaction context instead of requiring it from the binding response', () => {
+    expect(parseGamePortalResolution({
+      configId: request.configId,
+      boothId: request.boothId,
+      gameId: 123,
+      publishedVersion: 5,
+      playable: true,
+      unavailableReason: null,
+    }, request)).toEqual({
+      configId: request.configId,
+      boothId: request.boothId,
+      gameId: 123,
+      publishedVersion: 5,
+      playable: true,
+      unavailableReason: null,
+    });
+  });
+
   it('uses the agreed flat resolver endpoint', async () => {
     let path = '';
     const apiRequest: GameApiRequest = async <T>(nextPath: string) => {
       path = nextPath;
       return {
-        ...request,
+        configId: request.configId,
+        boothId: request.boothId,
         gameId: 123,
         publishedVersion: 5,
         playable: true,
