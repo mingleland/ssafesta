@@ -1,12 +1,13 @@
 # Game Studio 계약 인덱스
 
-> 상태: Draft v0.5 — #20~#22·#33~#35·#48·#58 반영, v1.1 FE candidate 구현 / 운영 연결은 #48·#55·#56·#69·#78·#81
+> 상태: Draft v0.6 — #20~#22·#33~#35·#48·#56·#58 반영, v1.1 FE candidate 구현 / 운영 연결은 #48·#55·#56·#69·#78·#81
 
 | 계약 | 파일 | Producer | Consumer |
 |---|---|---|---|
 | GameProject v1 | `game-project-v1.schema.json` | Studio / Spring Published API | Preview / Web Runtime / Spring Validator |
 | Game API 경계 | `game-api.md` | Spring | FESTA Web / Game Studio / Web Runtime |
 | Booth Game Portal | `game-portal-bridge.md` | Unity WebGL | FESTA React Host |
+| Published Session·Coin 후보 | `game-session-api.candidate.md` | Spring | FESTA Web Runtime |
 | Preview Protocol | `game-preview-protocol.md` | Studio | Preview Web Runtime |
 | Event Runtime | `event-runtime-semantics.md` | Contract owner | Studio / Runtime / Spring Validator |
 | Studio/Asset 모델 | `studio-authoring-model.md` | Studio / Asset catalog | Preview / Runtime / Spring Validator |
@@ -29,6 +30,7 @@
 12. Portal `configId`는 signed Int32 양수이며 DB 내부 BIGINT PK와 별도 INTEGER 공개 ID로 관리한다.
 13. 일반 삭제는 soft, 회원 탈퇴는 관련 데이터를 hard delete하고 Published 이력은 Game 존속 중 유지한다.
 14. Draft 저장과 Publish는 같은 v1 상한·내부 참조·안정 Asset source 규칙을 적용하며 서버가 자동 보정하지 않는다.
+15. 경제 계약은 GameProject와 분리하며 #81 합의 전 candidate 문서를 운영 API 정본으로 구현하지 않는다.
 
 ## v1 의미 검증 규칙
 

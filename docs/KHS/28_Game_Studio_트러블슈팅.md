@@ -8,6 +8,13 @@
 
 ## 2026-08-24
 
+### GS-T048. Portal 응답이 Binding이 소유하지 않는 objectId를 필수로 요구함 (해결)
+
+- **증상** — Frontend Portal resolver가 Backend 응답의 `configId`, `boothId`, `objectId`를 모두 요청값과 대조했다. 그러나 Backend `GamePortalBinding`은 `configId → booth/game`만 소유해 평면 `GET /game-portals/{configId}` 응답의 `objectId`를 유일하게 결정할 수 없었다.
+- **원인** — Unity 상호작용 payload의 로컬 문맥 필드와 서버 Binding의 권한 필드를 같은 응답 계약으로 간주했다. 같은 `configId`를 여러 Booth Object가 사용할 수 있어 Published Layout을 역탐색해도 `objectId`가 하나로 정해지지 않는다.
+- **해결** — `objectId`는 Overlay를 연 Object와 입력 복구를 추적하는 Unity → React 로컬 문맥으로 유지하고 Backend 응답 필수값에서 제거했다. FE는 서버가 소유하는 `configId + boothId`만 strict 대조하며 응답에 `objectId`가 없는 회귀 테스트를 추가했다. 전체 38 files / 205 tests, build, lint를 통과했고 PR #82로 분리했다.
+- **예방** — API 응답 필드는 서버가 영속·판정하는 데이터만 포함한다. 클라이언트 상호작용 문맥을 echo 검증으로 권한처럼 만들지 않고, 새 계약마다 producer의 실제 소유 테이블과 uniqueness 제약을 먼저 대조한다.
+
 ### GS-T047. 공유 worktree object store의 임시 객체를 이관 원본으로 오인할 위험 (해결)
 
 - **증상** — 이관 전 저장소 실측에서 `git count-objects -vH`가 약 630.46 MiB pack과 함께 `tmp_obj_*` garbage 140개, 약 28.96 MiB를 보고했다. connectivity 검사는 성공했지만 현재 worktree 전체를 그대로 미러링하면 로컬 backup ref와 임시 객체까지 이관 범위로 오해할 수 있었다.

@@ -9,9 +9,18 @@
 
 ## 2026-08-24
 
+### Game Studio PR 표시 복구·이슈 전수 점검·Portal 계약 정합 ✅
+
+- 🤖 PR #80·#82의 공개 화면을 직접 대조했다. 코드 diff는 각각 Game Studio 18파일과 Portal Repository/회귀 테스트 2파일로 정상이었지만, #80 제목·본문이 영어였고 #82 본문에는 실제 줄바꿈 대신 `\n` 문자가 저장돼 있었다. 두 PR의 제목·본문을 한국어, 실제 줄바꿈, 검증 결과, `#72 → #79 → #80 → #82` 병합 순서로 바로잡았다.
+- 🤖 PR #53은 미해결 review thread·요청 변경·실패 check가 없고 Backend 리뷰의 오류 봉투·cache 지적이 반영됐음을 확인한 뒤 Squash Merge했다. `develop` merge SHA는 `64d544e6e3ade9686b475b8dffd25edd9f164f23`이다.
+- 🤖 OPEN Game Studio 이슈 #48·#55·#56·#69·#73·#78·#81과 공통 의존 #58·#59를 최신 댓글·원격 화면·코드로 재검사했다. 서버 endpoint/migration, 실제 Published/Portal/Asset E2E, 사람 5명 사용성·활성 탭 FPS, v1.1 BE·AI 승인, Coin 정책 합의가 남아 있어 완료 근거 없이 닫지 않았다.
+- 🤖 #56 최신 Backend 질문을 코드로 검증해 `objectId`는 Unity → React 로컬 상호작용 문맥, Portal 응답은 Binding이 소유하는 `configId + boothId`만 대조하는 것으로 정리했다. 코드 커밋 `1f169f9`와 [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)는 Backend·Unity 변경 없이 전체 **38 files / 205 tests**, build, lint를 통과했다.
+- 🤖 #81은 합의되지 않은 경제 정책을 GameProject에 섞지 않도록 `contracts/game-session-api.candidate.md`에 서버 권위·idempotency·세션 흐름·미결 결정만 후보로 격리했다. 합의 전 운영 adapter 구현 금지를 명시했다.
+- 트러블슈팅: GS-T048
+
 ### GitLab 이관 전 Game Studio 인수인계 정리 ✅
 
-- 🤖 실제 GitLab Project 생성·Import·remote 추가·push는 하지 않고, 현재 GitHub `develop`·`front`, Game Studio stacked PR #72·#79·#80, 문서 PR #53의 base/head/SHA와 OPEN Issue #48·#55·#56·#69·#73·#78·#81 담당을 `29_Game_Studio_GitLab_이관_준비.md`에 고정했다.
+- 🤖 실제 GitLab Project 생성·Import·remote 추가·push는 하지 않고, 당시 GitHub `develop`·`front`, Game Studio stacked PR #72·#79·#80, 문서 PR #53의 base/head/SHA와 OPEN Issue #48·#55·#56·#69·#73·#78·#81 담당을 `29_Game_Studio_GitLab_이관_준비.md`에 고정했다. 이후 PR #53 병합과 #82 추가는 위 최신 섹션에서 갱신했다.
 - 🤖 GitHub 공식 원격은 로컬 alias `github`이고 `origin`은 `C:\Users\SSAFY\Desktop\SSAFESTA` 로컬 저장소임을 확인했다. 현재 worktree에서 `git push --mirror`를 실행하지 않고 GitHub Import 또는 fresh clone만 허용하도록 가드했다.
 - 🤖 원격 실측은 branch 23개, tag `v0.0.1-poc` 1개, tracked file 1,867개, pack 약 630.46 MiB, 최대 blob 약 11.88 MiB, submodule/LFS pointer 없음, connectivity fsck 성공이다. 저장소에 `.gitlab-ci.yml`·`Jenkinsfile`·GitHub Workflow가 없어 Jenkins Webhook과 credential은 별도 Infra 인수인계가 필요함을 기록했다.
 - 🤖 GitLab 공식 Import·Repository Mirroring·Protected Branch·CI/CD Variable 문서를 근거로 PR→MR 참조 차이, status check 수동 복원, attachment/user mapping, branch protection·Secret 검증 체크리스트를 작성했다. 제품 계약과 Backend·Unity·AI 코드는 변경하지 않았다.

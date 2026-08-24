@@ -1,6 +1,6 @@
 # Game Studio 파트 간 책임 및 통신 규약
 
-> 상태: Draft v0.5 — #20~#22·#33~#35·#48 반영, v1.1 FE candidate 구현 / 운영 연결 #48·#55·#56·#69·#78·#81 추적
+> 상태: Draft v0.6 — #20~#22·#33~#35·#48·#56 반영, v1.1 FE candidate 구현 / 운영 연결 #48·#55·#56·#69·#78·#81 추적
 
 ## 데이터 흐름
 
@@ -53,6 +53,8 @@ AI(optional, P2)
 - AI 확정(#22): MVP 비의존, P2 candidate/patch, spec 007 Job 정책 재사용.
 - 제품 정책 확정(#33): 새 진입 REST 차단, loaded local session 완료 허용, 일반 soft/탈퇴 hard delete, 이력 유지, Ranking P1 절연.
 - 교차 계약 확정(#34): signed Int32 `configId`, 별도 INTEGER 공개 ID, `GAME_PORTAL requiresConfig=true`, BE-first 배포.
+- Portal 응답 소유권(#56): `objectId`는 Unity → React 요청 로컬 문맥이며 Backend 응답 필드가 아니다.
+  Portal 응답은 Binding이 소유하는 `configId + boothId`만 FE 요청 문맥과 대조한다.
 - Studio 내부 완료(#35): TOP_DOWN/PLATFORMER reference renderer, same-origin route Preview, builtin/local Asset resolver. 운영 Published parity는 #48·#55, Portal Host는 #56, 사용자 Asset의 stable `asset://` 승격은 #69에서 추적.
 - GameProject v1.1 FE candidate(#78): 점수·적 처치·생존 시간 목표와 ALL/ANY, RESPAWN/END_GAME을 Mock Runtime에 구현했다. BE validator와 AI candidate/patch 허용 목록은 공동 승인 전 API 정본으로 간주하지 않는다.
-- Published Session/Coin(#81): 가격·차감·idempotency는 Backend Game/session metadata가 소유하며 GameProject와 Runtime 완료 payload를 경제 상태의 근거로 신뢰하지 않는다.
+- Published Session/Coin(#81): 가격·차감·idempotency는 Backend Game/session metadata가 소유하며 GameProject와 Runtime 완료 payload를 경제 상태의 근거로 신뢰하지 않는다. 합의 전 후보는 `game-session-api.candidate.md`에 격리한다.

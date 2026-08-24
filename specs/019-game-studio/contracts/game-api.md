@@ -1,6 +1,6 @@
 # Game Studio API 계약
 
-> 상태: Draft v0.4 — #33·#34·#48 및 전역 오류 봉투 #58 합의 반영. DTO·revision·오류 코드는 이 문서를 기준으로 구현한다.
+> 상태: Draft v0.5 — #33·#34·#48·#56 및 전역 오류 봉투 #58 합의 반영. DTO·revision·오류 코드는 이 문서를 기준으로 구현한다.
 
 ## 공통 오류 봉투
 
@@ -171,7 +171,6 @@ Cache-Control: no-store
 {
   "configId": 42,
   "boothId": 7,
-  "objectId": "game-npc-01",
   "gameId": 123,
   "publishedVersion": 5,
   "playable": true,
@@ -180,7 +179,11 @@ Cache-Control: no-store
 ```
 
 - 요청자의 접근 권한, Booth 임대 상태, Game 공개 상태와 Binding 활성 상태를 매번 서버가 판정한다.
-- Unity가 보낸 `boothId`, `objectId`, `configId`는 조회 힌트이며 권한 근거가 아니다.
+- 서버 응답은 Binding이 소유하는 `configId`, `boothId`, `gameId`, Published 상태만 반환한다.
+- `objectId`는 Unity → React 상호작용과 Overlay 복구에 쓰는 요청 로컬 문맥이다. Binding이 소유하지
+  않으므로 서버 응답에 넣거나 응답 일치 검증 대상으로 삼지 않는다.
+- FE는 응답의 `configId`와 `boothId`를 현재 요청 문맥과 대조하되, Unity가 보낸
+  `boothId`, `objectId`, `configId` 자체를 권한 근거로 신뢰하지 않는다.
 - `LayoutConfigResolver`는 `GAME_PORTAL`을 검사하되 Layout JSON에 GameProject를 포함하지 않는다.
 - wire/Unity `configId`는 signed Int32 `1..2147483647`, FE는 정수 `number`다. 0은 미연결 sentinel이므로 유효 ID로 발급하지 않는다.
 - DB는 내부 `id BIGINT`와 외부 `config_id INTEGER UNIQUE NOT NULL CHECK (config_id > 0)`를 분리하고 전용 sequence를 1부터 시작한다.

@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-23 — 독립 Web Runtime, 6종 시각 템플릿, 초보/고급 편집, 재료함·집중 모드 구현 반영
+**Updated**: 2026-08-24 — Portal 응답 소유권, Published Session·Coin 후보 경계, PR #82 반영
 
 **Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 
@@ -21,6 +21,11 @@
 > 이 기능은 `014-minigame`을 대체하지 않는다. 014는 Unity 관리자 부스의 타이머 정지 게임 1종이고, 019는 사용자가 제작한 웹 2D 콘텐츠를 다루는 독립 UGC 기능이다.
 
 ## Clarifications
+
+### Session 2026-08-24
+
+- Q: Portal 응답이 Unity 상호작용의 `objectId`를 되돌려줘야 하는가? → A: 아니다. Backend Binding은 `configId → booth/game`을 소유하고 `objectId`는 소유하지 않는다. `objectId`는 React가 Overlay를 연 Booth Object와 입력 복구 위치를 추적하는 로컬 문맥으로만 유지하고, 서버 응답에서는 `configId + boothId`만 대조한다(#56, PR #82).
+- Q: Published 게임의 선택적 Coin 차감을 GameProject에 넣는가? → A: 아니다. 가격·잔액·차감·idempotency·세션은 Backend metadata/session이 소유한다. #81 합의 전 endpoint·정책 후보는 `contracts/game-session-api.candidate.md`에 격리하며 운영 API 정본으로 구현하지 않는다.
 
 ### Session 2026-08-23
 
@@ -212,6 +217,7 @@
 - **FR-065**: Backend가 없어도 공식 Mock 모드에서 Draft 저장, 불변 Published Version 생성, 일반 `/app/games/{gameId}/play` 조회를 같은 port로 검증할 수 있어야 한다. 이 브라우저 저장소는 운영 공유 저장소로 간주해서는 안 된다.
 - **FR-066**: GameProject v1.1 FE candidate는 `rules.completion.mode(ALL|ANY)`, `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS`, `playerDefeat(RESPAWN|END_GAME)`만 추가한다. Runtime tick은 120ms 결정적 시간으로 누적하고 v1.0 프로젝트는 편집 시 기본 규칙을 가진 v1.1로 명시적으로 승격한다.
 - **FR-067**: Publish preflight는 안정 Asset뿐 아니라 `rules` 목표 또는 도달 가능한 `COMPLETE_GAME` Action의 존재를 확인해야 한다. 완료 경로가 하나도 없는 프로젝트는 다른 사용자에게 게시하지 않아야 한다.
+- **FR-068**: Portal resolution 응답은 Backend Binding이 소유하지 않는 `objectId`를 요구하거나 반사하지 않아야 한다. `objectId`는 Unity → React 요청 로컬 문맥이며 FE는 서버 소유 `configId + boothId`만 응답과 대조해야 한다.
 
 ### Part Boundaries
 
@@ -277,7 +283,7 @@
 - Reference renderer·same-origin local Preview·builtin Asset resolver: GitHub Issue #35 — PR #63 병합 및 이슈 종료. Production Published parity는 #48·#55, Booth 진입은 #56에서 추적
 - 사용자 교체 Asset 업로드·stable `asset://` 승격·Publish 연결: GitHub Issue #69 — Frontend·Backend 후속
 - 타이머·점수·적 처치 기반 승리 조건과 GameProject v1.1 FE·BE·AI 계약: GitHub Issue #78 — FE candidate와 Mock Runtime은 구현 완료, API 모드 허용·BE validator·AI 출력 허용 목록은 합의 전 미확정
-- Published 플레이 세션·선택적 Coin 차감·idempotency·재시도 정책: GitHub Issue #81 — 가격과 차감은 GameProject가 아닌 Backend Game/session metadata가 소유하며 MVP 무보상 Runtime과 분리
+- Published 플레이 세션·선택적 Coin 차감·idempotency·재시도 정책: GitHub Issue #81 — 가격과 차감은 GameProject가 아닌 Backend Game/session metadata가 소유하며 MVP 무보상 Runtime과 분리. 합의 전 후보는 `contracts/game-session-api.candidate.md`
 - Booth Layout/Runtime 연결: specs 005, 006
 - 기존 Overlay/Bridge 패턴: spec 016
 
@@ -287,7 +293,7 @@
   [KHS Game Studio GitLab 이관 준비](../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)를 사용한다.
 - 이관 준비는 제품 계약이나 파트 소유권을 바꾸지 않는다. 팀 cutover 결정 전까지 GitHub remote와
   PR/Issue가 정본이며, 이 문서 갱신만으로 GitLab remote·Import·mirror를 실행하지 않는다.
-- Game Studio 코드 PR 병합 순서는 #72 → #79 → #80이고 문서 PR #53은 `develop` 대상으로 별도 관리한다.
+- Game Studio 코드 PR 병합 순서는 #72 → #79 → #80 → #82다. 문서 PR #53은 2026-08-24 `develop`에 병합됐다(`64d544e`).
 
 ## Out of Scope
 

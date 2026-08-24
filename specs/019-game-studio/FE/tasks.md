@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **BE tasks**: [../BE/tasks.md](../BE/tasks.md)
 
-FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
+FE가 소유하는 87개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
 
 ## Contract foundation
 
@@ -112,10 +112,12 @@ FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T104 Run browser template→save→publish→public `/play` verification with visible objective parity
 - [ ] T105 Implement the server-authoritative Published GameSession/Coin adapter after #81 agreement
 - [x] T106 Record GitLab pre-migration ref/PR/Issue/CI handoff without creating a GitLab remote or changing product contracts
+- [x] T107 Align Portal resolution response ownership with #56: keep `objectId` request-local and validate server-owned `configId + boothId`
+- [x] T108 Record an explicitly unapproved Published Session/Coin candidate contract and decision checklist for #81
 
 ## Summary
 
-- Total: 85
-- Completed: 77
+- Total: 87
+- Completed: 79
 - Remaining: 8
 - Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다. GitLab 이관은 [KHS 29](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의 준비 문서만 작성했으며 실제 Import·remote 변경·push는 수행하지 않았다.

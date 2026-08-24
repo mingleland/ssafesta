@@ -1,6 +1,6 @@
 # Booth Game Portal Bridge 계약
 
-> 상태: Draft v0.3 — FE Host 계약 #20과 signed Int32/DB mapping #34 반영
+> 상태: Draft v0.4 — FE Host 계약 #20, signed Int32/DB mapping #34, 응답 소유권 #56 반영
 
 ## 목적
 
@@ -50,6 +50,9 @@ Unity Booth Object Interact
 - Unity는 `configId → gameId`를 해석하지 않는다.
 - Unity는 GameProject를 조회하지 않는다.
 - React는 이벤트의 `boothId/objectId/configId`를 권한·공개 상태의 최종 근거로 신뢰하지 않는다.
+- `objectId`는 어떤 Booth Object가 Overlay를 열었는지 추적하고 닫힐 때 입력을 복구하기 위한 React
+  로컬 문맥이다. Backend `GamePortalBinding`의 소유 필드가 아니므로 Portal 응답이 되돌려주지 않는다.
+- React는 Portal 응답에서 서버가 소유하는 `configId`와 `boothId`만 요청 문맥과 대조한다.
 - Spring이 삭제·비공개·임대 만료·연결 해제를 판정한다.
 - 새 overlay open마다 상태를 재검증한다. Game Studio 전용 socket이나 서버 push 종료 경로는 없다.
 - 이미 GameProject를 로드한 무보상 로컬 세션은 이후 비공개 전환에도 완료까지 진행할 수 있다.

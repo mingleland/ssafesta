@@ -13,7 +13,7 @@
 
 - **권장 경로**는 GitHub 저장소 Import다. Git branch/tag뿐 아니라 Issue, Pull Request, comment, label,
   milestone 등 협업 이력을 함께 옮길 수 있다.
-- 현재 Game Studio는 3단 stacked PR이므로, 가장 안전한 순서는 **GitHub에서 #72 → #79 → #80을
+- 현재 Game Studio는 4단 stacked PR이므로, 가장 안전한 순서는 **GitHub에서 #72 → #79 → #80 → #82를
   Squash Merge한 뒤 Import**하는 것이다.
 - GitHub에서 병합할 시간이 없다면 모든 source branch를 먼저 Import하고 GitLab에서 아래 대응표와 같은
   base를 가진 MR을 다시 만든다. 중간 branch를 삭제하거나 한 번에 `front`로 합치지 않는다.
@@ -36,7 +36,7 @@
 
 | 역할 | GitHub ref | 2026-08-24 확인 SHA | 비고 |
 |---|---|---|---|
-| 문서 정본 | `develop` | `5e390137c58316f5bffbdbd2f50eca27d480ce3e` | spec·공유 문서 병합 대상 |
+| 문서 정본 | `develop` | `64d544e6e3ade9686b475b8dffd25edd9f164f23` | PR #53 병합 완료 기준 |
 | Frontend 파트 | `front` | `5022335c41da3d5788f65dbb0f54e3617a23471a` | Game Studio 코드 PR의 최초 base |
 | 동결 기준선 tag | `v0.0.1-poc` | Import 후 동일 tag 존재 확인 | 삭제·재발급 금지 |
 
@@ -47,10 +47,13 @@
 | 1 | [#72](https://github.com/kanghyunsoon/ssafesta/pull/72) | `front` → `codex/game-studio-published-runtime-shell` | `7786ed651444bece6d318641ab086a7da7b1b7bb` | OPEN, CLEAN/MERGEABLE |
 | 2 | [#79](https://github.com/kanghyunsoon/ssafesta/pull/79) | `codex/game-studio-published-runtime-shell` → `codex/game-studio-maker-redesign` | `3f695b57162a79e00dcb9be226f0ea353a65c2e7` | OPEN, CLEAN/MERGEABLE |
 | 3 | [#80](https://github.com/kanghyunsoon/ssafesta/pull/80) | `codex/game-studio-maker-redesign` → `codex/game-studio-local-publish-loop` | `02a1d76a1c9cec7c65ca9ef8ef9c98532cfd61b1` | OPEN, CLEAN/MERGEABLE |
-| 문서 | [#53](https://github.com/kanghyunsoon/ssafesta/pull/53) | `develop` → `codex/game-studio-docs-sync` | 이 문서가 포함된 원격 최신 Head | OPEN, CLEAN/MERGEABLE |
+| 4 | [#82](https://github.com/kanghyunsoon/ssafesta/pull/82) | `codex/game-studio-local-publish-loop` → `codex/game-studio-portal-contract-fix` | `1f169f9e1bf677be8ef1c4b64b63bf9195f10bb4` | OPEN, CLEAN/MERGEABLE |
+| 문서 | [#53](https://github.com/kanghyunsoon/ssafesta/pull/53) | `develop` → `codex/game-studio-docs-sync` | merge `64d544e6e3ade9686b475b8dffd25edd9f164f23` | MERGED |
 
-PR #79는 #72 병합 뒤 base를 `front`로, PR #80은 #79 병합 뒤 base를 `front`로 바꿔 최종 diff를
-확인한다. GitLab에서 그대로 이어갈 경우에는 이 순서를 바꾸지 않고 각각 MR을 재생성한다.
+PR #79는 #72 병합 뒤, #80은 #79 병합 뒤, #82는 #80 병합 뒤 base를 `front`로 바꿔 최종 diff를
+확인한다. GitLab에서 그대로 이어갈 경우에는 이 순서를 바꾸지 않고 각각 MR을 재생성한다. #82는
+Portal 응답에서 서버가 소유하지 않는 `objectId` 요구를 제거한 2파일 수정이므로 앞선 PR보다 먼저
+`front`에 병합하지 않는다.
 
 ## 3. GitHub Issue 인수인계표
 
@@ -61,7 +64,7 @@ MR을 자동으로 가리킨다고 가정하지 말고 아래 원본 URL을 MR·
 |---|---|---|
 | [#48 Draft/Publish API](https://github.com/kanghyunsoon/ssafesta/issues/48) | `strdeok` | OPEN 유지. Spring Draft/Publish/Published Query 구현과 DB migration을 GitLab Issue로 확인 |
 | [#55 Published Web Runtime](https://github.com/kanghyunsoon/ssafesta/issues/55) | `ghkim1632`, `colosair` | OPEN 유지. #48 응답과 실제 Asset resolver를 사용한 browser E2E 추가 |
-| [#56 GAME_PORTAL Binding](https://github.com/kanghyunsoon/ssafesta/issues/56) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. Unity는 진입 trigger만, React가 웹 Runtime을 열도록 수직 연결 |
+| [#56 GAME_PORTAL Binding](https://github.com/kanghyunsoon/ssafesta/issues/56) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. PR #82의 `objectId` 응답 소유권 수정 뒤 BE resolver·Unity 진입·browser E2E 연결 |
 | [#69 사용자 Asset](https://github.com/kanghyunsoon/ssafesta/issues/69) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. stable `asset://` 업로드·검사·보존·Published resolver 연결 |
 | [#73 사용성·성능](https://github.com/kanghyunsoon/ssafesta/issues/73) | `ghkim1632`, `colosair` | OPEN 유지. 사람 5명/20분 테스트와 활성 PC 탭 FPS 증거 수집 |
 | [#78 GameProject v1.1](https://github.com/kanghyunsoon/ssafesta/issues/78) | `strdeok`, `ghkim1632`, `colosair` | OPEN 유지. FE candidate를 BE validator·AI 허용 출력 계약으로 승인 |
@@ -112,14 +115,14 @@ GitHub Import 또는 fresh clone으로 격리한다. 현재 작업 저장소에�
 - [ ] GitLab namespace, project path, visibility, default branch를 확정한다.
 - [ ] Import owner와 검증 owner를 서로 다른 사람으로 지정한다.
 - [ ] GitHub를 언제 read-only로 전환할지 cutover 시간을 정한다.
-- [ ] #72·#79·#80을 GitHub에서 먼저 병합할지, GitLab에서 stacked MR로 이어갈지 결정한다.
+- [ ] #72·#79·#80·#82를 GitHub에서 먼저 병합할지, GitLab에서 stacked MR로 이어갈지 결정한다.
 - [ ] GitHub Issue/PR Markdown attachment Import 옵션을 켤지 확인한다.
 - [ ] GitLab Project 용량 제한이 약 630 MiB pack과 12 MiB 단일 blob을 허용하는지 확인한다.
 
 ### Import 직전 동결
 
-- [ ] `github/develop`, `github/front`와 4개 Game Studio branch의 최종 SHA를 이 문서 표와 갱신한다.
-- [ ] PR #53·#72·#79·#80이 OPEN/CLEAN인지 또는 병합 완료인지 기록한다.
+- [ ] `github/develop`, `github/front`와 4개 Game Studio code branch의 최종 SHA를 이 문서 표와 갱신한다.
+- [ ] PR #53·#72·#79·#80·#82가 OPEN/CLEAN인지 또는 병합 완료인지 기록한다.
 - [ ] Issue #48·#55·#56·#69·#73·#78·#81의 state/assignee/label을 export한다.
 - [ ] `v0.0.1-poc` tag를 확인한다.
 - [ ] Frontend Game Studio에서 `npm test`, `npm run build`, `npm run lint`를 통과시킨다.
@@ -131,12 +134,12 @@ GitHub Import 또는 fresh clone으로 격리한다. 현재 작업 저장소에�
 - [ ] `main`, `develop`, `front`, `back`, `ai`, `game` 및 Game Studio 4개 branch가 존재한다.
 - [ ] 핵심 branch SHA와 `v0.0.1-poc` tag가 이관 전 snapshot과 일치한다.
 - [ ] GitLab default branch와 Branch Rule이 팀 전략과 일치하며 force push가 금지됐다.
-- [ ] PR #53·#72·#79·#80에 대응하는 MR의 base/head/diff가 대응표와 같다.
+- [ ] PR #53·#72·#79·#80·#82에 대응하는 MR의 base/head/diff가 대응표와 같다.
 - [ ] 7개 OPEN Issue의 본문·comment·attachment·label·assignee가 보존됐다.
 - [ ] 기존 GitHub `#번호` 링크가 Issue/MR을 잘못 가리키는 곳을 원본 URL 또는 GitLab `!번호`로 고친다.
 - [ ] Jenkins Webhook을 GitLab event로 바꾸고 파트 branch push와 develop MR pipeline을 각각 1회 검증한다.
 - [ ] CI/CD Secret은 값 노출 없이 protected/environment scope만 검증한다.
-- [ ] Frontend 204 tests/build/lint와 Mock `제작 → 저장 → 게시 → /play` browser smoke를 다시 통과시킨다.
+- [ ] Frontend 205 tests/build/lint와 Mock `제작 → 저장 → 게시 → /play` browser smoke를 다시 통과시킨다.
 - [ ] Backend·Unity·AI가 없는 Mock 범위와 운영 multi-user 범위를 혼동하지 않았는지 릴리스 설명을 확인한다.
 
 ## 8. Cutover 완료 조건
@@ -156,6 +159,6 @@ GitHub Import 또는 fresh clone으로 격리한다. 현재 작업 저장소에�
 - GitLab remote 추가 또는 기존 remote URL 변경
 - GitHub/GitLab mirror 설정
 - branch/tag push, force push, history rewrite
-- GitHub PR/Issue 종료 또는 GitHub 저장소 archive
+- 추가 GitHub PR/Issue 종료 또는 GitHub 저장소 archive(PR #53은 검토 완료 후 병합)
 - local dangling object 삭제, `git gc`, `git prune`
 - Jenkins Webhook·credential·CI/CD Variable 변경
