@@ -11,12 +11,10 @@
 
 **08-24 새벽 변동** — [PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지로 팔레트·field 라운드 트리거 발화. [#17](https://github.com/kanghyunsoon/ssafesta/issues/17)·[#36](https://github.com/kanghyunsoon/ssafesta/issues/36) CLOSED. 리드 Game Studio **3단 스택**([PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)→[#79](https://github.com/kanghyunsoon/ssafesta/pull/79)→[#80](https://github.com/kanghyunsoon/ssafesta/pull/80))이 **`front`를 base로** 대기. 신규 이슈 3건([#76](https://github.com/kanghyunsoon/ssafesta/issues/76)·[#78](https://github.com/kanghyunsoon/ssafesta/issues/78)·[#81](https://github.com/kanghyunsoon/ssafesta/issues/81)) 전부 나 배정. **오전** — [PR #83](https://github.com/kanghyunsoon/ssafesta/pull/83) 머지(C-04 화살표), `back`에 PR #74·#75·#77 머지로 **[#58](https://github.com/kanghyunsoon/ssafesta/issues/58)·[#76](https://github.com/kanghyunsoon/ssafesta/issues/76) CLOSED**. [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)가 `UNKNOWN`→**MERGEABLE** 전환 — `front`에 떨어질 수 있는 상태.
 
-잔여 P0 중 **004 Lease·003 Wallet은 develop 계약 회수만으로 착수 가능**하다 — BE 구현 머지 완료(PR #10·#9), C-xx 미결 0, 004는 BE 리뷰 3칸 확정(08-19). 나머지 P0는 009(BE PR 미존재)·016 C-01·008 UI(AI 서버)·인프라(#30 실빌드·실서버)·Game Studio 체인(#48→#55·#56)에 걸린다.
+**P0 코드 몫 소진** — 004 Lease·003 Wallet·G-1까지 완료(완료 표). 남은 P0는 전부 타 파트 블로킹: 009(BE PR 미존재)·016 C-01·008 UI(AI 서버)·인프라(#30 실빌드·실서버)·Game Studio 체인(#48→#55·#56). 즉시 착수 가능은 010 Survey(P1)뿐.
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **(P0) 004 Lease + 003 Wallet FE** — 계약 정본은 `origin/develop`의 `specs/004-booth-slot-lease/contracts/lease-api.md`·`specs/003-wallet-coin/contracts/wallet-api.md`(착수 시 front 회수). 소비 endpoint: `GET /booth-slots`·`POST /booth-slots/{slotId}/leases`·`GET /booths/mine`·`GET /booths/{boothId}`·`GET /wallets/me`·`GET /wallets/me/transactions`. 003을 묶는 이유 — 임대 확인 UI가 잔액·차감 후 잔액을 함께 표시해야 해서 분리하면 두 번 손댄다. **#81(Coin 차감) 무영향** — `wallet-api.md:121`이 차감 API를 의도적 부재로 명시(차감은 기능 서버 로직 소관), 소비 계약은 조회 2종뿐
-- [ ] **(P0) Owner/Staff 라우트 가드**(G-1) — `GET /booths/mine`·슬롯 목록 `mine` 필드로 트리거 충족. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
 - [ ] **(P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
 
 ## 대기
@@ -64,6 +62,7 @@
 
 | | 결과 |
 |---|---|
+| **004 Lease + 003 Wallet FE + G-1** 08-24 | 전체 완결(커밋 6개 C1~C5+fix, 오프라인). `/app/booths` 슬롯 목록·임대·카운트다운·WalletBadge·거래 내역 + `useOwnerGate` StudioPage 편입. vitest 200/200(+33)·수동 실측 9종·codex 3관점(적중 3건 반영: null 직렬화·ALREADY_LEASED sentinel·만료 후 INACTIVE). real api 미검증 — BE 실서버 연결은 원격 복귀 후 |
 | **FE 팔레트·field 라운드** 08-24 | 전체 완결(`field?` 타입 2곳·mock `FIELD_INVALID` 봉투·R-12 종결·12색 스와치·하이드레이션 차단·mock 팔레트 검증). 커밋 `3452395`·`9a1dc76`, vitest 167/167(+10)·브라우저 실측 3종·codex 3관점 CONFIRMED |
 | **spec 005** 08-18~22 | 전체 완결(US1~US4·Polish·인수검사·vitest 37). 상세는 작업일지·`verify/` |
 | **Block A** 08-23 | 001·013a·016·002 계약 front 회수 |
