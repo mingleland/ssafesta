@@ -83,6 +83,12 @@ Key 추출 우선순위: ① MR 제목 → ② source branch → ③ (merge 시)
   - `JIRA_SYNC_TOKEN`
 - 변수 미설정 시 sync 잡은 경고 후 통과한다 — 연동이 꺼져도 개발은 계속된다.
 
+> ⚠️ **전제: GitLab Runner (S15P21A604-216)** — 2026-08-24 실측 기준 이 프로젝트에 활성
+> 러너가 없어 파이프라인이 pending 으로 대기한다 (lab.ssafy.com 은 공유 러너 미제공).
+> 팀 EC2 에 gitlab-runner 를 등록하기 전까지 CI 는 휴면이며, **러너 등록 전에는
+> "Pipelines must succeed" 머지 조건을 절대 켜지 않는다** (모든 머지가 무기한 차단된다).
+> pending 파이프라인은 무해하다 — Pipelines 화면에서 취소해도 된다.
+
 ## 7. GitLab 저장소 정책 (Free, 18.11.5 기준)
 
 **적용 완료 (API, 2026-08-24):**
