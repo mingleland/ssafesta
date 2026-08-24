@@ -2,6 +2,26 @@
 
 이 폴더에서 작업하는 모든 AI 세션(Claude 등)은 아래 규칙을 따른다.
 
+## 필수: Jira-GitLab 워크플로 (이 절은 다른 기본 동작보다 우선한다)
+
+작업 전에 `docs/jira-gitlab-workflow.md`, `docs/17_Git_개발_Convention.md`,
+`docs/18_Jira_운영_가이드.md`를 읽고 그 규칙 아래에서 동작한다.
+
+1. 모든 개발 작업은 Jira 이슈(`S15P21A604-N`)가 선행되어야 한다. 이슈 키를 사용자가 주지
+   않았다면 작업 내용에 해당하는 이슈를 Jira에서 찾아 확인하고, 없으면 작업 시작 전에
+   사용자에게 이슈 생성 여부를 묻는다. 키 없이 develop/main행 작업을 만들지 않는다.
+2. 브랜치는 `{type}/{JIRA-KEY}-{설명}` 형식으로 자기 파트 브랜치에서 분기한다.
+   main·develop에서 직접 작업하거나 직접 push하지 않는다.
+3. 커밋은 `type(scope): 한국어 요약 (JIRA-KEY)` 형식. Secret·토큰을 커밋하지 않는다.
+4. MR 제목은 `[JIRA-KEY][영역] 제목` 형식 — develop/main 대상 MR은 CI가 키를 검증한다.
+   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채운다.
+5. Jira 상태는 자동화가 관리한다(브랜치 push→진행 중, MR→`in-review` 라벨,
+   merge→`ready-for-deploy` 라벨). 임의로 이슈 상태를 전환하지 않는다.
+   '완료' 전환은 production 배포 검증 후에만 한다.
+6. `.gitlab-ci.yml`의 stage 구조와 `jira-*` 잡을 삭제·우회하지 않는다. CI 잡 추가는
+   예약된 test/build stage에 한다.
+7. 이 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고한다.
+
 ## 필수: 기록 규칙
 
 1. **작업일지** — 하나의 작업(기능 구현, 검증, 문서 작성, 설정 변경)이 끝나면
