@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { findScene, type GameProject } from '../../contracts/gameProject.ts';
+import { DEFAULT_GAME_RULES, findScene, type GameObjective, type GameProject } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
 import { findPresetDefinition } from '../../studio/model/authoringRegistry.ts';
@@ -11,6 +11,7 @@ import {
   chooseReferenceDialogue,
   interactReferencePlayer,
   moveReferencePlayer,
+  objectiveProgress,
   shootReferenceProjectile,
   startReferenceRuntime,
   tickReferenceWorld,
@@ -33,6 +34,12 @@ const keyDirection = (key: string): MoveDirection | null => {
   if (key === 'ArrowLeft' || key.toLowerCase() === 'a') return 'LEFT';
   if (key === 'ArrowRight' || key.toLowerCase() === 'd') return 'RIGHT';
   return null;
+};
+
+const objectiveCopy = (objective: GameObjective): string => {
+  if (objective.type === 'SCORE_AT_LEAST') return `${objective.target.toLocaleString('ko-KR')}점 달성`;
+  if (objective.type === 'DEFEAT_ENEMIES') return `적 ${objective.target.toLocaleString('ko-KR')}명 처치`;
+  return `${objective.target.toLocaleString('ko-KR')}초 생존`;
 };
 
 export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit, showPerformanceMonitor = false }: ReferenceGamePlayerProps) => {
@@ -61,6 +68,7 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   const canShoot = scene !== undefined && scene.type !== 'DIALOGUE' && scene.objects.some((object) => (
     object.preset === 'PLAYER_SPAWN' && object.components.some((component) => component.type === 'SHOOTER')
   ));
+  const completionRules = (project.rules ?? DEFAULT_GAME_RULES).completion;
 
   useEffect(() => {
     let active = true;
@@ -282,12 +290,29 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
           </section>
         )}
         {runtime.session.status === 'FAILED' && (
-          <section className="grp-result is-error"><span>!</span><h1>게임 실행 오류</h1><p>{runtime.session.failure?.message}</p><button onClick={exit} type="button">편집기로 돌아가기</button></section>
+          <section className="grp-result is-error">
+            <span>!</span>
+            <h1>{runtime.session.failure?.code === 'PLAYER_DEFEATED' ? '도전 실패' : '게임 실행 오류'}</h1>
+            <p>{runtime.session.failure?.message}</p>
+            {runtime.session.failure?.code === 'PLAYER_DEFEATED'
+              ? <div><button onClick={() => setRuntime(startReferenceRuntime(project))} type="button">다시 도전</button><button onClick={exit} type="button">게임 나가기</button></div>
+              : <button onClick={exit} type="button">편집기로 돌아가기</button>}
+          </section>
         )}
       </section>
 
       <aside className="grp-hud">
         <div className="grp-player-stats"><span>상태</span><strong>♥ {runtime.playerHealth} / {runtime.maxPlayerHealth}</strong><strong>★ {runtime.score.toLocaleString('ko-KR')}점</strong></div>
+        {completionRules.objectives.length > 0 && (
+          <div className="grp-objectives">
+            <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
+            {completionRules.objectives.map((objective) => {
+              const progress = objectiveProgress(runtime, objective);
+              const completed = progress >= objective.target;
+              return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
+            })}
+          </div>
+        )}
         <div><span>INVENTORY</span>{inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}</div>
         <div className="grp-controls"><span>{scene?.type === 'PLATFORMER' ? '이동 / 점프' : '이동'}</span><div><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'UP'))} type="button">↑</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'LEFT'))} type="button">←</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'DOWN'))} type="button">↓</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'RIGHT'))} type="button">→</button></div></div>
         <button className="grp-interact" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => interactReferencePlayer(project, current))} type="button"><kbd>E</kbd> 상호작용</button>

@@ -33,6 +33,26 @@ export interface AssetReference {
   readonly integrity?: string;
 }
 
+export type GameObjectiveType = 'SCORE_AT_LEAST' | 'DEFEAT_ENEMIES' | 'SURVIVE_SECONDS';
+
+export interface GameObjective {
+  readonly type: GameObjectiveType;
+  readonly target: number;
+}
+
+export interface GameRules {
+  readonly completion: {
+    readonly mode: 'ALL' | 'ANY';
+    readonly objectives: readonly GameObjective[];
+  };
+  readonly playerDefeat: 'RESPAWN' | 'END_GAME';
+}
+
+export const DEFAULT_GAME_RULES: GameRules = Object.freeze({
+  completion: Object.freeze({ mode: 'ALL', objectives: Object.freeze([]) }),
+  playerDefeat: 'RESPAWN',
+});
+
 export interface Position2d {
   readonly x: number;
   readonly y: number;
@@ -160,7 +180,7 @@ export interface DialogueScene {
 export type GameScene = WorldScene | DialogueScene;
 
 export interface GameProject {
-  readonly schemaVersion: '1.0.0';
+  readonly schemaVersion: '1.0.0' | '1.1.0';
   readonly gameId: number;
   readonly revision: number;
   readonly title: string;
@@ -169,6 +189,7 @@ export interface GameProject {
   readonly items: readonly ItemDefinition[];
   readonly assets: readonly AssetReference[];
   readonly scenes: readonly GameScene[];
+  readonly rules?: GameRules;
 }
 
 export class GameProjectContractError extends Error {
@@ -283,6 +304,27 @@ const validateAssetShape = (value: unknown, path: string): void => {
   enumAt(record.kind, `${path}.kind`, ['IMAGE', 'TILESET', 'AUDIO']);
   stringAt(record.source, `${path}.source`, 1, 500);
   if (record.integrity !== undefined) stringAt(record.integrity, `${path}.integrity`, 0, 128);
+};
+
+const validateGameRulesShape = (value: unknown, path: string): void => {
+  const rules = recordAt(value, path, ['completion', 'playerDefeat']);
+  enumAt(rules.playerDefeat, `${path}.playerDefeat`, ['RESPAWN', 'END_GAME']);
+  const completion = recordAt(rules.completion, `${path}.completion`, ['mode', 'objectives']);
+  enumAt(completion.mode, `${path}.completion.mode`, ['ALL', 'ANY']);
+  const objectiveTypes = new Set<string>();
+  arrayAt(completion.objectives, `${path}.completion.objectives`, 0, 5).forEach((value, index) => {
+    const objectivePath = `${path}.completion.objectives[${index}]`;
+    const objective = recordAt(value, objectivePath, ['type', 'target']);
+    const type = enumAt(objective.type, `${objectivePath}.type`, ['SCORE_AT_LEAST', 'DEFEAT_ENEMIES', 'SURVIVE_SECONDS']);
+    expect(!objectiveTypes.has(type), 'GAME_RULE_DUPLICATE_OBJECTIVE', `duplicate objective type: ${type}`);
+    objectiveTypes.add(type);
+    integerAt(
+      objective.target,
+      `${objectivePath}.target`,
+      1,
+      type === 'SURVIVE_SECONDS' ? 3600 : type === 'DEFEAT_ENEMIES' ? 10000 : 999999999,
+    );
+  });
 };
 
 const validateConditionShape = (value: unknown, path: string): void => {
@@ -803,12 +845,19 @@ export const parseGameProject = (input: unknown): GameProject => {
     input,
     'project',
     ['schemaVersion', 'gameId', 'revision', 'title', 'startSceneId', 'variables', 'items', 'assets', 'scenes'],
+    ['schemaVersion', 'gameId', 'revision', 'title', 'startSceneId', 'variables', 'items', 'assets', 'scenes', 'rules'],
   );
   expect(
-    project.schemaVersion === '1.0.0',
+    project.schemaVersion === '1.0.0' || project.schemaVersion === '1.1.0',
     'GAME_SCHEMA_UNSUPPORTED',
     `unsupported schemaVersion: ${String(project.schemaVersion)}`,
   );
+  if (project.schemaVersion === '1.0.0') {
+    expect(project.rules === undefined, 'GAME_PROJECT_INVALID', 'project.rules requires schemaVersion 1.1.0');
+  } else {
+    expect(project.rules !== undefined, 'GAME_PROJECT_INVALID', 'project.rules is required for schemaVersion 1.1.0');
+    validateGameRulesShape(project.rules, 'project.rules');
+  }
   integerAt(project.gameId, 'project.gameId', 1);
   integerAt(project.revision, 'project.revision', 0);
   stringAt(project.title, 'project.title', 1, 100);

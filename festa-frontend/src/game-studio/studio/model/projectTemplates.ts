@@ -311,6 +311,9 @@ const createActionProject = (gameId: number, id: 'SHOOTER' | 'SURVIVAL'): GamePr
       ];
   return parseGameProject({
     ...project,
+    rules: id === 'SHOOTER'
+      ? { completion: { mode: 'ALL', objectives: [{ type: 'DEFEAT_ENEMIES', target: 3 }] }, playerDefeat: 'RESPAWN' }
+      : { completion: { mode: 'ALL', objectives: [{ type: 'SURVIVE_SECONDS', target: 30 }] }, playerDefeat: 'END_GAME' },
     scenes: [{
       ...scene,
       name: id === 'SHOOTER' ? '슬라임 연구소 사격장' : '차원 균열 생존 아레나',

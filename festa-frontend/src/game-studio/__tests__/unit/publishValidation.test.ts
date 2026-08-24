@@ -37,4 +37,17 @@ describe('GameProject publish preflight', () => {
       expect(findPublishBlockers(project)[0]).toMatchObject({ code: 'UNSTABLE_ASSET_SOURCE' });
     },
   );
+
+  it('blocks a project that has no rule objective or COMPLETE_GAME action', () => {
+    const project = cloneMinimalGameProject();
+    for (const scene of project.scenes) {
+      if (scene.type !== 'DIALOGUE') continue;
+      for (const node of scene.nodes) {
+        for (const choice of node.choices) {
+          choice.actions = choice.actions.filter((action) => action.type !== 'COMPLETE_GAME');
+        }
+      }
+    }
+    expect(findPublishBlockers(project)).toContainEqual(expect.objectContaining({ code: 'NO_COMPLETION_PATH' }));
+  });
 });

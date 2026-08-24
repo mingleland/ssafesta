@@ -1,7 +1,7 @@
 import { parseGameProject, type GameProject } from '../../contracts/gameProject.ts';
 
 export interface PublishBlocker {
-  readonly code: 'LOCAL_ASSET' | 'UNSTABLE_ASSET_SOURCE';
+  readonly code: 'LOCAL_ASSET' | 'UNSTABLE_ASSET_SOURCE' | 'NO_COMPLETION_PATH';
   readonly assetId: string;
   readonly message: string;
   readonly locations: readonly string[];
@@ -38,7 +38,7 @@ export const findAssetUsageLocations = (
 };
 
 export const findPublishBlockers = (project: GameProject): readonly PublishBlocker[] => {
-  const blockers = project.assets.flatMap((asset): readonly PublishBlocker[] => {
+  const blockers: PublishBlocker[] = project.assets.flatMap((asset): readonly PublishBlocker[] => {
     if (asset.source.startsWith('asset://local/')) {
       return [{
         code: 'LOCAL_ASSET',
@@ -55,6 +55,20 @@ export const findPublishBlockers = (project: GameProject): readonly PublishBlock
       locations: findAssetUsageLocations(project, asset.id),
     }];
   });
+  const hasRuleObjective = (project.rules?.completion.objectives.length ?? 0) > 0;
+  const hasCompletionAction = project.scenes.some((scene) => (
+    scene.type === 'DIALOGUE'
+      ? scene.nodes.some((node) => node.choices.some((choice) => choice.actions.some((action) => action.type === 'COMPLETE_GAME')))
+      : scene.events.some((event) => event.actions.some((action) => action.type === 'COMPLETE_GAME'))
+  ));
+  if (!hasRuleObjective && !hasCompletionAction) {
+    blockers.push({
+      code: 'NO_COMPLETION_PATH',
+      assetId: 'gameCompletion',
+      message: '게임 완료 조건이 없습니다. 데이터 탭에서 목표를 추가하거나 이벤트에 “게임 완료”를 연결하세요.',
+      locations: ['게임 규칙 · 완료 조건'],
+    });
+  }
   if (blockers.length === 0) parseGameProject(project);
   return blockers;
 };

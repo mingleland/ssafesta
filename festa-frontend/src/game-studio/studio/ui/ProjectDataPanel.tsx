@@ -1,9 +1,20 @@
 import { useRef } from 'react';
-import { estimateGameProjectJsonBytes, GAME_PROJECT_LIMITS, type AssetReference, type GameProject, type Scalar, type VariableDefinition } from '../../contracts/gameProject.ts';
+import {
+  DEFAULT_GAME_RULES,
+  estimateGameProjectJsonBytes,
+  GAME_PROJECT_LIMITS,
+  type AssetReference,
+  type GameObjective,
+  type GameObjectiveType,
+  type GameProject,
+  type Scalar,
+  type VariableDefinition,
+} from '../../contracts/gameProject.ts';
 import {
   addBooleanVariable,
   addItemDefinition,
   renameItemDefinition,
+  replaceGameRules,
   replaceVariableDefinition,
 } from '../model/authoringCommands.ts';
 import { CommitInput } from './CommitInput.tsx';
@@ -48,15 +59,69 @@ const VariableValueInput = ({
   );
 };
 
+const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: string; readonly unit: string; readonly defaultTarget: number; readonly max: number }>> = {
+  SCORE_AT_LEAST: { title: '점수 달성', unit: '점', defaultTarget: 500, max: 999999999 },
+  DEFEAT_ENEMIES: { title: '적 처치', unit: '명', defaultTarget: 5, max: 10000 },
+  SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
+};
+
 export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
+  const rules = project.rules ?? DEFAULT_GAME_RULES;
+  const replaceObjectives = (objectives: readonly GameObjective[]) => onApply(replaceGameRules(project, {
+    ...rules,
+    completion: { ...rules.completion, objectives },
+  }));
+  const addObjective = (type: GameObjectiveType) => {
+    if (rules.completion.objectives.some((objective) => objective.type === type)) return;
+    replaceObjectives([...rules.completion.objectives, { type, target: objectiveLabels[type].defaultTarget }]);
+  };
   return <div className="gss-panel-stack">
     <div className="gss-panel-heading"><div><span className="gss-eyebrow">PROJECT DATA</span><h2>게임 규칙 데이터</h2></div></div>
     <div className="gss-budget-card"><header><strong>프로젝트 저장 용량</strong><span>{(projectBytes / 1024).toFixed(1)} KB / 2 MB</span></header><div><i style={{ width: `${projectUsage}%` }} /></div><p>이미지·오디오는 별도 자산 저장소에 보관되어 이 용량에 포함되지 않습니다.</p></div>
+    <div className="gss-section-title"><span>GAME GOALS</span><small>{rules.completion.objectives.length}/3</small></div>
+    <div className="gss-help-card"><strong>게임이 언제 끝나는지 정하세요</strong><p>목표를 고르면 플레이 화면에 진행도가 자동 표시되고, 달성하는 순간 게임이 완료됩니다. 목표가 없으면 문·포털·대화 이벤트의 “게임 완료”를 사용합니다.</p></div>
+    {rules.completion.objectives.length > 1 && (
+      <label className="gss-field"><span>여러 목표의 완료 방식</span><select
+        onChange={(event) => onApply(replaceGameRules(project, { ...rules, completion: { ...rules.completion, mode: event.target.value as 'ALL' | 'ANY' } }))}
+        value={rules.completion.mode}
+      ><option value="ALL">모든 목표 달성</option><option value="ANY">하나만 달성</option></select></label>
+    )}
+    {rules.completion.objectives.map((objective, index) => {
+      const definition = objectiveLabels[objective.type];
+      return (
+        <article className="gss-data-card" key={objective.type}>
+          <header><strong>{definition.title}</strong><button aria-label={`${definition.title} 목표 삭제`} onClick={() => replaceObjectives(rules.completion.objectives.filter((_, objectiveIndex) => objectiveIndex !== index))} type="button">×</button></header>
+          <CommitInput
+            label={`목표값 (${definition.unit})`}
+            onCommit={(value) => {
+              const parsed = Number.parseInt(value, 10);
+              const target = Number.isFinite(parsed) ? Math.max(1, Math.min(definition.max, parsed)) : objective.target;
+              replaceObjectives(rules.completion.objectives.map((candidate, objectiveIndex) => objectiveIndex === index ? { ...candidate, target } : candidate));
+            }}
+            value={String(objective.target)}
+          />
+        </article>
+      );
+    })}
+    <div className="gss-inline-actions">
+      {(Object.keys(objectiveLabels) as GameObjectiveType[]).map((type) => (
+        <button
+          disabled={rules.completion.objectives.some((objective) => objective.type === type)}
+          key={type}
+          onClick={() => addObjective(type)}
+          type="button"
+        >+ {objectiveLabels[type].title}</button>
+      ))}
+    </div>
+    <label className="gss-field"><span>체력이 0이 되면</span><select
+      onChange={(event) => onApply(replaceGameRules(project, { ...rules, playerDefeat: event.target.value as 'RESPAWN' | 'END_GAME' }))}
+      value={rules.playerDefeat}
+    ><option value="RESPAWN">체크포인트에서 다시 시작</option><option value="END_GAME">도전 실패로 종료</option></select></label>
     <div className="gss-section-title"><span>VARIABLES</span><small>{project.variables.length}/100</small></div>
     {project.variables.map((variable) => (
       <article className="gss-data-card" key={variable.id}>
@@ -95,12 +160,12 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
     <div className="gss-section-title"><span>ASSETS</span><small>{project.assets.length}/300</small></div>
     {publishBlockers.length > 0 && (
       <section className="gss-publish-check" role="alert">
-        <header><strong>게시 전에 자산 {publishBlockers.length}개를 연결하세요</strong><span>{publishBlockers.length}</span></header>
-        <p>편집과 플레이 테스트는 계속할 수 있습니다. 게시할 때만 서버 자산 주소가 필요합니다.</p>
+        <header><strong>게시 전에 {publishBlockers.length}가지를 확인하세요</strong><span>{publishBlockers.length}</span></header>
+        <p>편집과 플레이 테스트는 계속할 수 있습니다. 아래 항목을 해결해야 다른 사용자가 끝까지 플레이할 수 있습니다.</p>
         {publishBlockers.map((blocker) => (
           <article key={blocker.assetId}>
             <strong>{blocker.assetId}</strong>
-            <small>{blocker.code === 'LOCAL_ASSET' ? '이 브라우저에만 있는 이미지' : '게시할 수 없는 주소'}</small>
+            <small>{blocker.code === 'LOCAL_ASSET' ? '이 브라우저에만 있는 이미지' : blocker.code === 'NO_COMPLETION_PATH' ? '완료 조건 없음' : '게시할 수 없는 주소'}</small>
             {blocker.locations.length === 0
               ? <em>현재 배치에서 사용되지 않음</em>
               : blocker.locations.map((location) => <em key={location}>⌖ {location}</em>)}

@@ -1,5 +1,6 @@
 import {
   GAME_PROJECT_LIMITS,
+  DEFAULT_GAME_RULES,
   parseGameProject,
   type Action,
   type AssetReference,
@@ -10,6 +11,7 @@ import {
   type DialogueScene,
   type GameEvent,
   type GameObject,
+  type GameRules,
   type GameProject,
   type TopDownScene,
   type PlatformerScene,
@@ -29,10 +31,19 @@ const terminalActionTypes = new Set<Action['type']>([
 const validated = (project: GameProject): GameProject => parseGameProject(project);
 
 export const withBuiltinAssetLibrary = (project: GameProject): GameProject => {
-  const sources = new Set(project.assets.map((asset) => asset.source));
+  const upgraded: GameProject = project.schemaVersion === '1.0.0'
+    ? { ...project, schemaVersion: '1.1.0', rules: DEFAULT_GAME_RULES }
+    : project;
+  const sources = new Set(upgraded.assets.map((asset) => asset.source));
   const missing = BUILTIN_PROJECT_ASSETS.filter((asset) => !sources.has(asset.source));
-  return missing.length === 0 ? project : validated({ ...project, assets: [...project.assets, ...missing] });
+  return validated(missing.length === 0 ? upgraded : { ...upgraded, assets: [...upgraded.assets, ...missing] });
 };
+
+export const replaceGameRules = (project: GameProject, rules: GameRules): GameProject => validated({
+  ...project,
+  schemaVersion: '1.1.0',
+  rules,
+});
 
 const allIds = (project: GameProject): Set<string> => new Set([
   ...project.scenes.map((scene) => scene.id),
