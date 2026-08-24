@@ -38,9 +38,11 @@
 | `LAYOUT_NOT_PUBLISHED` | 404 | 공개된 배치가 없음 — Unity는 이미 404를 **경고 후 graceful skip**으로 처리한다 |
 | `VALIDATION_FAILED` | 400 | Layout 외 일반 필드 검증 실패 — facade 등 (§6) |
 
-### `rule` 전체 목록 — 구현 19종 (#36 FE 요청으로 명문화, 2026-08-21)
+### `rule` 목록 — **Layout 한정** (#36 FE 요청으로 명문화, 2026-08-21)
 
-`errors[]`·`warnings[]`의 `rule`은 FE가 분기해도 되는 계약값이다. 구현에 있는 전부를 적는다 — 여기 없는 rule이 응답에 나오면 계약 위반이다.
+`errors[]`·`warnings[]`의 `rule`은 FE가 분기해도 되는 계약값이다. 아래는 **Layout 계열 endpoint(§2~§5·§11)가 내는 전부**이며, 여기 없는 Layout rule이 응답에 나오면 계약 위반이다.
+
+> **전 endpoint 공통 rule은 `docs/08` §1.3의 전역 rule 절에 있다** (#58, 2026-08-23). 예: Bean Validation 실패는 어느 endpoint에서든 `rule: "FIELD_INVALID"` + `field`로 온다 — Layout 전용 목록과 섞지 않는다.
 
 **error (공개 차단, ✅ = Draft 저장에도 적용)**
 
@@ -74,7 +76,7 @@
 
 | rule | 뜻 |
 |---|---|
-| `CURRENT_REVISION` | 충돌 시 `errors[0]`에 실리며 `message`에 **서버의 현재 revision**이 담긴다. FE는 이 값으로 `GET /draft` 재호출 여부를 판단 |
+| `CURRENT_REVISION` | 충돌 시 `errors[0]`에 실린다. `message`에 서버의 현재 revision이 문장으로 담기지만 **구조화된 숫자 필드는 없다** — **재호출 트리거로만 쓴다**(값을 정규식으로 뽑지 않는다). 값이 필요한 화면이 생기면 그때 타입 있는 필드를 추가한다 (#58 결론, 2026-08-23) |
 
 ---
 
@@ -216,7 +218,7 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 | 필드 | 규칙 |
 |---|---|
 | `themeCode` | ✅ 화이트리스트: **`DEFAULT` · `SSAFY_BLUE` · `WARM` · `MONO`** (#17 합의, #36에서 명문화 요청). 기본 `DEFAULT` |
-| `primaryColor` | **6자리 `#RRGGBB`만** — 축약형(`#RGB`)·알파 불허 (#17 팀 합의). 또는 `null` |
+| `primaryColor` | **6자리 `#RRGGBB`만** — 축약형(`#RGB`)·알파 불허 (#17 팀 합의). **아래 12색 팔레트 안의 값이어야 한다.** 또는 `null` |
 | `signText` | 최대 60자 또는 `null` |
 | `logoUrl` | `https://` URL 최대 2048자 또는 `null` |
 
@@ -229,7 +231,29 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
   "requestId": "req_a1b2c3d4", "errors": [], "warnings": [] }
 ```
 
-> **합의됨 · 구현 대기 (#17)** — ① hex **대소문자 정규화**를 서버 검증에 포함 ② `primaryColor`의 **팔레트 소속 검증** (팔레트는 테마와 무관한 **전역 1개** — A안). 팔레트 조회 응답 형태(FE 제안: `{ colors: [{code, hex, label}], themeCodes }`)는 endpoint 신설 시 확정 반영한다.
+### 팔레트 — 12색 확정 (#17, 2026-08-23)
+
+**팔레트는 테마와 무관한 전역 1개**(A안)다. `themeCode` 4종과 곱집합이 아니다. Tailwind 500 계열이며 값의 정본은 이 표다 — Figma는 참조이고, 색이 바뀌면 이 표를 고치고 Figma를 맞춘다.
+
+| code | hex | label |
+|---|---|---|
+| `RED` | `#EF4444` | 레드 |
+| `ORANGE` | `#F97316` | 오렌지 |
+| `AMBER` | `#F59E0B` | 앰버 |
+| `YELLOW` | `#EAB308` | 옐로 |
+| `LIME` | `#84CC16` | 라임 |
+| `GREEN` | `#22C55E` | 그린 |
+| `TEAL` | `#14B8A6` | 틸 |
+| `CYAN` | `#06B6D4` | 시안 |
+| `BLUE` | `#3B82F6` | 블루 |
+| `INDIGO` | `#6366F1` | 인디고 |
+| `PURPLE` | `#A855F7` | 퍼플 |
+| `PINK` | `#EC4899` | 핑크 |
+
+- 저장 필드는 `primaryColor`(hex)다. `code`·`label`은 FE가 "몇 번째 칸인지" 찾고 접근성 표기에 쓰는 계약값이며 서버는 저장하지 않는다.
+- **표기 정규화 1건** — 저장 시 hex를 **대문자로 정규화**한다(`#ef4444` → `#EF4444`로 저장·응답). §1의 "BE는 값을 변형하지 않는다"의 예외이며, 좌표와 달리 hex 대소문자는 같은 색의 다른 표기라 `numeric`의 `-0.0` → `0.0`과 같은 부류다.
+- 팔레트 밖 색은 **400 `VALIDATION_FAILED`**. 화이트리스트 시행 이전에 저장된 값은 그대로 렌더링되고 **다음 저장 때 검증**된다(강제 이관하지 않는다).
+- 목록을 서버가 서빙하는 `GET /booth-facade-options`는 **후속 제안**이다 (#17) — 그때까지 FE는 이 표를 상수로 쓴다.
 
 ---
 
@@ -318,3 +342,26 @@ BE가 보장하는 것은 **저장·조회 왕복에서 값이 바뀌지 않는�
 | **`ISOLATED_AREA`** (warning, 배치 전체) | 침식 후 비점유인데 flood fill 미도달 셀이 **1 ㎡ 이상** |
 
 publish 응답의 기존 `warnings` 채널(`CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED`와 동일 형식)에 실린다 — FE 파서 추가 작업 없음, rule 이름 두 개만 새로 안다.
+
+---
+
+## 11. `GET /booth-slots/{slotId}/layouts/published` — **신설** (#62, 2026-08-23)
+
+**Unity가 부스 방(앵커)에서 호출하는 경로.** **인증 불필요** — §5와 같이 방문자 전원이 본다.
+
+`boothId`는 방 번호가 아니다 — `booth_slots`(방, 시드로 고정)와 `booths`(소유자의 콘텐츠, 임대 시 발급)는 다른 축이고, **재임대하면 같은 방의 `boothId`가 바뀐다**(D05·FR-011·FR-017의 보존·격리 정책 때문). 그래서 앵커 번호로 §5를 호출하면 **404이거나 남의 부스가 그려진다.** 서버가 `슬롯 → 유효 임대 → boothId` 해석을 흡수한다.
+
+**200** — **body는 §5와 완전히 동일**하다 (`boothId` 포함 — 어느 부스를 받았는지 알 수 있다)
+```json
+{ "boothId": 27, "version": 4, "schemaVersion": 1, "template": "PROJECT_EXHIBITION",
+  "objects": [ … ] }
+```
+
+| 상황 | 응답 |
+|---|---|
+| 빈 슬롯(임대 없음) 또는 아직 공개하지 않음 | **404 `LAYOUT_NOT_PUBLISHED`** — Unity의 기존 graceful skip이 그대로 맞는다 |
+| 임대 만료 | **409 `BOOTH_LEASE_EXPIRED`** (FR-015, I-5) — #36에서 "404와 동일 처리"로 합의 |
+| 없는 슬롯 번호 | 404 |
+
+- `slotId` **1~12가 Unity 앵커 `01~12`와 대응**한다 — V12 시드가 id를 명시 삽입해 고정한다. 표시용 `slotCode`(`F11-R03`)는 `GET /booth-slots` 목록에 있다.
+- 같은 자원에 URL이 둘인 것은 **호출자의 자연 키가 달라서**다: FE 편집기는 "내 부스"(`boothId`, §5), Unity는 "이 방"(`slotId`, §11).

@@ -17,6 +17,18 @@ function apiError(code: string, message: string): ApiError {
   return { code, message, requestId: `mock_${Date.now()}`, errors: [], warnings: [] };
 }
 
+// Bean Validation 실패의 실서버 봉투(docs/08 §1.3-1, #58 C안·PR #71) — rule은 규칙 어휘 고정,
+// 문제 필드는 field에 담는다. 이전 mock이 errors: []로 내던 것은 서버보다 느슨한 결함이었다.
+function fieldError(field: string, message: string): ApiError {
+  return {
+    code: 'VALIDATION_FAILED',
+    message: '요청 값이 올바르지 않습니다.',
+    requestId: `mock_${Date.now()}`,
+    errors: [{ rule: 'FIELD_INVALID', field, message }],
+    warnings: [],
+  };
+}
+
 const STORAGE_KEY = 'festa-mock-booth-facades';
 
 function loadFacades(): Map<number, BoothFacade> {
@@ -57,16 +69,16 @@ export async function putFacade(boothId: number, body: FacadePutRequest): Promis
     throw apiError('BOOTH_LEASE_EXPIRED', '임대가 만료되어 편집할 수 없습니다.');
   }
   if (!THEME_CODES.includes(body.themeCode)) {
-    throw apiError('VALIDATION_FAILED', '테마는 지정된 값 중 하나여야 합니다.');
+    throw fieldError('themeCode', '테마는 지정된 값 중 하나여야 합니다.');
   }
   if (body.primaryColor !== null && !HEX_RRGGBB.test(body.primaryColor)) {
-    throw apiError('VALIDATION_FAILED', '대표색은 #RRGGBB 형식이어야 합니다.');
+    throw fieldError('primaryColor', '대표색은 #RRGGBB 형식이어야 합니다.');
   }
   if (body.signText !== null && body.signText.length > 60) {
-    throw apiError('VALIDATION_FAILED', '간판 문구는 60자 이하여야 합니다.');
+    throw fieldError('signText', '간판 문구는 60자 이하여야 합니다.');
   }
   if (body.logoUrl !== null && (!HTTPS_URL.test(body.logoUrl) || body.logoUrl.length > 2048)) {
-    throw apiError('VALIDATION_FAILED', '로고 URL은 https:// 형식 2048자 이하여야 합니다.');
+    throw fieldError('logoUrl', '로고 URL은 https:// 형식 2048자 이하여야 합니다.');
   }
 
   const saved: BoothFacade = { ...body };

@@ -15,7 +15,7 @@
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **(P0) FE 팔레트·field 라운드** — 트리거 충족([PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지 08-24 01:09). **⓪ 계약 회수 먼저** — front `layout-api.md`가 stale(`field` 0곳·팔레트 1곳 / develop 1·4): `git checkout origin/develop -- specs/005-booth-studio-layout/contracts/layout-api.md`. ⑴ 계약 대응: `ApiError.errors[]`에 `field?: string`·mock 3곳·`PublishDialog` key 인덱스화·R-12 해제 후 `rule` 분기·`client.ts:10` 낡은 주석 정리 ⑵ 팔레트: 12색 스와치 UI(자유 입력 제거)·`facadeApi.mock.ts` 팔레트 소속+대문자 정규화 정합·하이드레이션 값이 팔레트 밖이면 안내(strdeok 지적 함정 — 간판만 고쳐도 400 방지). ⑵는 규모 보고 같은 라운드 또는 분리
+- [ ] **(P0) FE 팔레트·field 라운드** — 트리거 충족([PR #71](https://github.com/kanghyunsoon/ssafesta/pull/71) 머지 08-24 01:09). **⓪ 계약 회수 완료**(08-24, `layout-api.md` develop 판·diff 0). ⑴ 계약 정합: `ApiErrorDetail`·`ValidationDetail`에 `field?: string`(`objectId`와 합치지 않음 — `docs/08` §1.3)·`client.ts:8-10` 낡은 주석 교체·R-12를 **"분기 불요 확정"으로 종결**(#58 §5 — `CURRENT_REVISION`은 재호출 트리거로만, 현행 구현이 이미 계약과 일치라 **코드 0**) ⑵ mock: `facadeApi.mock.ts`의 `apiError()`가 `errors: []` 고정이라 `FIELD_INVALID` 봉투 미재현 — **1곳**(throw 4개가 한 헬퍼 경유. "3곳"은 리뷰 시점 추정치, 실측 정정) ⑶ 팔레트: 12색 상수(`code`/`hex`/`label`, 계약 §6 전사)·FacadePanel 자유 입력→스와치·하이드레이션 팔레트 밖 값 안내(간판만 고쳐도 400 방지)·mock 팔레트 소속+대문자 정규화. ~~PublishDialog key 인덱스화~~ — **기완료 실측**(T026, `key={i}` 확인)
 - [ ] **(P0) 004 Lease + 003 Wallet FE** — 계약 정본은 `origin/develop`의 `specs/004-booth-slot-lease/contracts/lease-api.md`·`specs/003-wallet-coin/contracts/wallet-api.md`(착수 시 front 회수). 소비 endpoint: `GET /booth-slots`·`POST /booth-slots/{slotId}/leases`·`GET /booths/mine`·`GET /booths/{boothId}`·`GET /wallets/me`·`GET /wallets/me/transactions`. 003을 묶는 이유 — 임대 확인 UI가 잔액·차감 후 잔액을 함께 표시해야 해서 분리하면 두 번 손댄다. **#81(Coin 차감) 무영향** — `wallet-api.md:121`이 차감 API를 의도적 부재로 명시(차감은 기능 서버 로직 소관), 소비 계약은 조회 2종뿐
 - [ ] **(P0) Owner/Staff 라우트 가드**(G-1) — `GET /booths/mine`·슬롯 목록 `mine` 필드로 트리거 충족. 현재 member/guest 2등급이라 `/app/studio/:boothId`가 전 member에 열림(서버 FR-012가 최종 차단 — UX 가드일 뿐)
 - [ ] **(P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
@@ -56,6 +56,8 @@
 - [PR #77](https://github.com/kanghyunsoon/ssafesta/pull/77)(strdeok, #62 슬롯 기준 published 경로 + 슬롯 12 시드) OPEN — FE 편집기 영향 없음 결론 불변
 - [#58](https://github.com/kanghyunsoon/ssafesta/issues/58) §5 `CURRENT_REVISION`: **십진수 문자열 ⑧ 유지 확정**(strdeok 재확정 + 리드가 019 `game-api.md` 대조로 일치 확인). **CLOSED 08-24 00:59** — 결론은 십진수 문자열 ⑧ 유지
 - [#33](https://github.com/kanghyunsoon/ssafesta/issues/33) 확정(08-21 종결): 신규 진입 REST 차단·loaded 세션 무보상 완료 허용·일반 soft/탈퇴 hard delete·Published 이력 유지·Ranking P1 절연. 정본은 [PR #53](https://github.com/kanghyunsoon/ssafesta/pull/53)의 `specs/019-game-studio/`
+- `layout-api.md` `CURRENT_REVISION` 행: develop 판보다 `back`의 PR #74 정정판이 정확(#58 §5 재확정 반영, 결론 동일·문장 정밀도 차이). #59 규칙대로 미반입 — back→develop 반영은 strdeok 몫
+- `auth/api.mock.ts:13` `apiError()`도 `errors: []` 고정 — spec 001 소유라 팔레트 라운드 밖. T016 실경로 착수 시 함께
 - #24 back·game 잔여, #35 renderer·sandbox — 타 파트 몫
 
 ## 완료

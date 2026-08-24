@@ -29,11 +29,13 @@ export interface LayoutObject {
   assetCode?: string; // 장식형(FURNITURE·DECORATION) 외형 선택 코드
 }
 
-// Publish 검증 결과 원소 — errors[].objectId는 서버가 @JsonInclude(NON_NULL)이라
+// Publish 검증 결과 원소 — errors[].objectId·field는 서버가 @JsonInclude(NON_NULL)이라
 // 값이 없으면 키 자체가 빠진다(계약 문서 예시의 "objectId": null과 실제 구현이 다름 — #36 후속 요청).
+// field는 Bean Validation 경로(rule: FIELD_INVALID)의 요청 필드 경로 — docs/08 §1.3-1(#58 C안, PR #71)
 export interface ValidationDetail {
   rule: string;
   objectId?: string;
+  field?: string;
   message: string; // 한글, 그대로 노출 가능
 }
 

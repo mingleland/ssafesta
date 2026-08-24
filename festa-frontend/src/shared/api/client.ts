@@ -2,12 +2,13 @@
 // API Client — docs/10_Frontend_설계서.md §5 + docs/08_Backend_API_명세서.md §1.3
 // 오류 봉투는 전 endpoint 공통 (specs/005 contracts/layout-api.md §0, #17·#36 — 401/403 포함)
 
-// errors·warnings 원소. 서버가 objectId를 null로 두면 키 자체를 생략한다(@JsonInclude(NON_NULL))
-export type ApiErrorDetail = { rule: string; objectId?: string; message: string };
+// errors·warnings 원소. objectId·field는 서버가 값 없으면 키 자체를 생략한다(@JsonInclude(NON_NULL)).
+// objectId는 배치된 오브젝트, field는 요청 필드 경로 — 가리키는 대상이 달라 합치지 않는다(docs/08 §1.3, #58 C안).
+export type ApiErrorDetail = { rule: string; objectId?: string; field?: string; message: string };
 
 // errors·warnings는 항상 배열 — 서버가 빈 배열을 보장하고, 이 파일의 fallback도 같은 형태를 유지한다.
-// 분기는 code로만 한다. rule 19종은 contracts/layout-api.md에 명문화돼 있으나(PR #57) rule 값 분기
-// 도입은 #58(오류 봉투 field 분리 결론) 이후로 미룬다 — 지금 rule에는 요청 필드명이 섞여 나올 수 있다.
+// rule은 항상 규칙 어휘다(#58 C안, PR #71) — 전역 rule은 docs/08 §1.3-1(FIELD_INVALID 등), Layout rule은
+// contracts/layout-api.md 소유. 분기는 code로 하고, rule 분기는 필요한 소비자가 생길 때 화이트리스트로 연다.
 export type ApiError = {
   code: string;
   message: string;
