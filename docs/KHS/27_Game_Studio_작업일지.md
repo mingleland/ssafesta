@@ -16,6 +16,7 @@
 - 🤖 OPEN Game Studio 이슈 #48·#55·#56·#69·#73·#78·#81과 공통 의존 #58·#59를 최신 댓글·원격 화면·코드로 재검사했다. 서버 endpoint/migration, 실제 Published/Portal/Asset E2E, 사람 5명 사용성·활성 탭 FPS, v1.1 BE·AI 승인, Coin 정책 합의가 남아 있어 완료 근거 없이 닫지 않았다.
 - 🤖 #56 최신 Backend 질문을 코드로 검증해 `objectId`는 Unity → React 로컬 상호작용 문맥, Portal 응답은 Binding이 소유하는 `configId + boothId`만 대조하는 것으로 정리했다. 코드 커밋 `1f169f9`와 [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)는 Backend·Unity 변경 없이 전체 **38 files / 205 tests**, build, lint를 통과했다.
 - 🤖 #81은 합의되지 않은 경제 정책을 GameProject에 섞지 않도록 `contracts/game-session-api.candidate.md`에 서버 권위·idempotency·세션 흐름·미결 결정만 후보로 격리했다. 합의 전 운영 adapter 구현 금지를 명시했다.
+- 🤖 공개 이슈도 정리했다. [#56](https://github.com/kanghyunsoon/ssafesta/issues/56)에 `objectId` 비소유 결론과 PR #82 검증 결과를 등록했고, [#73](https://github.com/kanghyunsoon/ssafesta/issues/73)·[#78](https://github.com/kanghyunsoon/ssafesta/issues/78)의 영어 진행 댓글을 한국어로 교체했다. #78에는 누락된 `ai` 라벨을 추가했으며, [#81](https://github.com/kanghyunsoon/ssafesta/issues/81) 본문은 서버 권위 Coin/session 결정 항목과 FE·BE 완료 조건이 보이도록 한국어로 다시 작성했다. 네 이슈 모두 실제 완료 조건이 남아 OPEN을 유지했다.
 - 트러블슈팅: GS-T048
 
 ### GitLab 이관 전 Game Studio 인수인계 정리 ✅
