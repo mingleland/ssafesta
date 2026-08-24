@@ -10,7 +10,6 @@ export interface GamePortalRequest {
 export interface GamePortalResolution {
   readonly configId: number;
   readonly boothId: number;
-  readonly objectId: string;
   readonly gameId: number | null;
   readonly publishedVersion: number | null;
   readonly playable: boolean;
@@ -60,10 +59,7 @@ export const parseGamePortalResolution = (
   if (!isRecord(input)) throw new GamePortalLoadError('게임 포털 응답 형식이 올바르지 않습니다.');
   const configId = signedInt32(input.configId, 'configId');
   const boothId = positiveLong(input.boothId, 'boothId');
-  if (typeof input.objectId !== 'string' || input.objectId.length < 1) {
-    throw new GamePortalLoadError('objectId 값이 올바르지 않습니다.');
-  }
-  if (configId !== expected.configId || boothId !== expected.boothId || input.objectId !== expected.objectId) {
+  if (configId !== expected.configId || boothId !== expected.boothId) {
     throw new GamePortalLoadError('요청한 포털과 서버 응답의 식별자가 일치하지 않습니다.');
   }
   if (typeof input.playable !== 'boolean') throw new GamePortalLoadError('playable 값이 올바르지 않습니다.');
@@ -80,7 +76,6 @@ export const parseGamePortalResolution = (
   return {
     configId,
     boothId,
-    objectId: input.objectId,
     gameId,
     publishedVersion,
     playable: input.playable,
