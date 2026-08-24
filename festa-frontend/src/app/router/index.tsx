@@ -1,6 +1,7 @@
 // URL 경로와 화면을 연결하는 라우팅 규칙 정의
 import { createBrowserRouter } from 'react-router-dom';
 import { StudioPage } from '../../pages/studio/StudioPage';
+import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { LoginPage } from '../../pages/login/LoginPage';
 import { CallbackPage } from '../../pages/auth/CallbackPage';
 import { RequireAuth } from './RequireAuth';
@@ -24,6 +25,15 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth level="guest-allowed">
         <div>home</div>
+      </RequireAuth>
+    ),
+  },
+  {
+    // spec 004 — 슬롯 조회는 공개 API라 guest-allowed. 임대 버튼은 페이지가 member만 연다(FR-016)
+    path: '/app/booths',
+    element: (
+      <RequireAuth level="guest-allowed">
+        <SlotListPage />
       </RequireAuth>
     ),
   },

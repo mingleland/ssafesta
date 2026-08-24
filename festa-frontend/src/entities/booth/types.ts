@@ -41,10 +41,62 @@ export interface BoothFacade {
 // PUT /booths/{boothId}/facade 요청 본문 — 4필드 전부 nullable(§6)
 export type FacadePutRequest = BoothFacade;
 
+// 004 소유 상태값 — 만료 판정은 서버 읽기 시점이 권위(C-02), FE는 이 값을 만들지 않는다
+export type LeaseStatus = 'ACTIVE' | 'EXPIRED';
+
 // GET /booths/{boothId} 응답에서 이 화면이 쓰는 부분만 — 004 소유 응답의 부분 사본(§7)
 export interface BoothDetail {
   boothId: number;
   name: string;
-  leaseStatus: string; // 'ACTIVE' 외 값이면 편집 진입 자체를 막는다(T021 이중 방어 ①)
+  leaseStatus: LeaseStatus; // 'ACTIVE' 외 값이면 편집 진입 자체를 막는다(T021 이중 방어 ①)
   facade: BoothFacade | null;
+}
+
+// ── spec 004 booth-slot-lease — contracts/lease-api.md가 정본 ──
+// 출처: origin/develop:specs/004-booth-slot-lease/contracts/lease-api.md + BoothQueryService.SlotView(구현 정본)
+
+// GET /booth-slots 원소. status는 ends_at 반영 권위값 — 만료 임대가 DB에 남아도 AVAILABLE로 온다.
+// slotId(1~12)는 Unity 앵커와 고정 대응(#62), boothId와 1:1 고정 관계가 아니다 — 혼용 금지.
+export interface SlotView {
+  slotId: number;
+  slotCode: string; // "F11-R01" 형식
+  floorNo: number; // 11 고정(C-04 — 층 개념 없음, 필터 UI 금지)
+  type: string; // 'USER_RENTAL'만 임대 가능 — 그 외는 운영 슬롯
+  status: 'AVAILABLE' | 'OCCUPIED';
+  boothId: number | null;
+  boothName: string | null;
+  leaseEndsAt: string | null; // ISO-8601 UTC
+  remainingSeconds: number | null; // 응답 시점 스냅샷 — 표시·판정에 쓰지 않는다(leaseEndsAt 기준 계산)
+  entryAvailable: boolean;
+  mine: boolean; // 서버 계산값 — 비인증/게스트 요청은 항상 false
+}
+
+// POST /booth-slots/{slotId}/leases 201/200 응답 — 구현(LeaseResponse record) 정본 8필드
+export interface LeaseResponse {
+  leaseId: number;
+  boothId: number;
+  slotId: number;
+  startsAt: string;
+  endsAt: string;
+  remainingSeconds: number;
+  chargedCoin: number;
+  balanceAfter: number;
+}
+
+// GET /booths/mine 200 응답. lease는 만료 시 null(콘텐츠는 보존 — FR-010), 부스 없으면 204
+export interface MyBoothLease {
+  leaseId: number;
+  slotId: number;
+  slotCode: string | null; // 슬롯 미연결 시 null
+  startsAt: string;
+  endsAt: string;
+  remainingSeconds: number;
+  chargedCoin: number;
+}
+
+export interface MyBooth {
+  boothId: number;
+  name: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  lease: MyBoothLease | null;
 }
