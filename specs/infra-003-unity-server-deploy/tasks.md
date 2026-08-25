@@ -18,11 +18,11 @@
 
 **Purpose**: infra-003가 소유하는 코드·테스트·배포 경계와 실행 규약을 준비한다.
 
-- [ ] T001 infra-001/002 재사용 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
-- [ ] T002 [P] 실제 값을 포함하지 않는 game image·도메인·토큰 Secret·TLS·network·volume 환경 변수 예시를 `infra/unity-server/.env.example`에 작성한다
-- [ ] T003 [P] ShellCheck 대상 엄격 모드, 정리 trap, 민감정보 제거와 공통 assertion을 `infra/unity-server/tests/lib/assert.sh`에 작성한다
+- [X] T001 infra-001/002 재사용 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
+- [X] T002 [P] 실제 값을 포함하지 않는 game image·도메인·토큰 Secret·TLS·network·volume 환경 변수 예시를 `infra/unity-server/.env.example`에 작성한다
+- [X] T003 [P] ShellCheck 대상 엄격 모드, 정리 trap, 민감정보 제거와 공통 assertion을 `infra/unity-server/tests/lib/assert.sh`에 작성한다
 - [ ] T004 [P] Unity 보안 코드와 EditMode 테스트를 분리하는 assembly definition을 `festa-unity/Assets/_Project/Scripts/Network/Security/Festa.Network.Security.asmdef`와 `festa-unity/Assets/_Project/Tests/EditMode/Festa.Network.Security.Tests.asmdef`에 구성한다
-- [ ] T005 [P] 릴리스·DNS/TLS·WSS·무입력·재접속·수용량 결과만 기록하고 token/Secret/개인정보 원문을 금지하는 양식을 `infra/unity-server/evidence/template.md`에 작성한다
+- [X] T005 [P] 릴리스·DNS/TLS·WSS·무입력·재접속·수용량 결과만 기록하고 token/Secret/개인정보 원문을 금지하는 양식을 `infra/unity-server/evidence/template.md`에 작성한다
 
 **Checkpoint**: infra-003 전용 경로와 테스트 실행 기반이 준비된다.
 
@@ -37,12 +37,12 @@
 - [ ] T006 `world-session.openapi.yaml`의 구조화 endpoint·인증·필수 필드·오류 응답을 검사하는 계약 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionContractTest.java`에 작성한다
 - [ ] T007 [P] HS256 only, TTL 120초, issuer/audience, `11F/11F-01`과 전용 Base64 Secret을 바인딩·검증하는 설정 모델을 `backend/src/main/java/com/example/ssafesta/world/WorldSessionProperties.java`에 작성한다
 - [ ] T008 [P] World Entry Grant의 검증된 신원·target·시간·JTI를 표현하는 내부 모델을 `backend/src/main/java/com/example/ssafesta/world/WorldEntryGrant.java`와 `festa-unity/Assets/_Project/Scripts/Network/Security/VerifiedWorldEntryGrant.cs`에 작성한다
-- [ ] T009 [P] game runtime·world entry token 계약의 고정값과 필수 환경 변수를 검사하는 정적 테스트를 `infra/unity-server/tests/static/contracts.sh`에 작성한다
-- [ ] T010 [P] token·Secret·개인정보 원문을 제거하면서 release/client/channel/failure-layer만 남기는 로그 규약을 `infra/unity-server/contracts/logging.md`에 작성한다
-- [ ] T011 [P] immutable image ref, current/known-good, game-only lock과 검증 상태를 infra-001 스키마에 매핑하는 배포 상태 계약을 `infra/unity-server/contracts/release-state.md`에 작성한다
-- [ ] T012 Backend·Unity가 동일한 issuer/audience/world/channel/ledger 경로를 소비하도록 환경 변수 매핑을 `infra/unity-server/contracts/runtime-env.md`에 작성한다
-- [ ] T013 OpenAPI YAML, Compose config, Nginx 구문과 shell strict-mode를 한 번에 검사하는 로컬 진입점을 `infra/unity-server/tests/run-static.sh`에 작성한다
-- [ ] T014 Setup·Foundational 산출물이 계획 계약과 헌법 6·8·13~16·27조를 만족하는지 `specs/infra-003-unity-server-deploy/checklists/implementation.md`에 검증 항목으로 작성한다
+- [X] T009 [P] game runtime·world entry token 계약의 고정값과 필수 환경 변수를 검사하는 정적 테스트를 `infra/unity-server/tests/static/contracts.sh`에 작성한다
+- [X] T010 [P] token·Secret·개인정보 원문을 제거하면서 release/client/channel/failure-layer만 남기는 로그 규약을 `infra/unity-server/contracts/logging.md`에 작성한다
+- [X] T011 [P] immutable image ref, current/known-good, game-only lock과 검증 상태를 infra-001 스키마에 매핑하는 배포 상태 계약을 `infra/unity-server/contracts/release-state.md`에 작성한다
+- [X] T012 Backend·Unity가 동일한 issuer/audience/world/channel/ledger 경로를 소비하도록 환경 변수 매핑을 `infra/unity-server/contracts/runtime-env.md`에 작성한다
+- [X] T013 OpenAPI YAML, Compose config, Nginx 구문과 shell strict-mode를 한 번에 검사하는 로컬 진입점을 `infra/unity-server/tests/run-static.sh`에 작성한다
+- [X] T014 Setup·Foundational 산출물이 계획 계약과 헌법 6·8·13~16·27조를 만족하는지 `specs/infra-003-unity-server-deploy/checklists/implementation.md`에 검증 항목으로 작성한다
 
 **Checkpoint**: API·token·runtime·release·로그 경계가 고정되어 스토리별 실패 우선 테스트를 작성할 수 있다.
 
@@ -68,7 +68,7 @@
 - [ ] T021 [US1] local/demo별 구조화 endpoint와 Secret Reference를 바인딩하고 잘못된 scheme·host·port·Secret에서 조기 실패하도록 `backend/src/main/resources/application-local.yml`과 `backend/src/main/resources/application-infra.yml`을 구성한다
 - [ ] T022 [P] [US1] Access Token을 Authorization header로 사용해 로딩 완료 뒤 `POST /api/v1/world-sessions`를 호출하는 adapter를 `festa-unity/Assets/_Project/Scripts/Integration/Spring/HttpUserApiClient.cs`에 구현한다
 - [ ] T023 [US1] mock/real 환경에서 올바른 user API adapter를 선택하고 응답 endpoint로만 접속하도록 `festa-unity/Assets/_Project/Scripts/Integration/ApiServices.cs`와 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionManager.cs`를 연결한다
-- [ ] T024 [P] [US1] `world.${ROOT_DOMAIN}`의 TLS·Upgrade·Host·cache bypass와 내부 `demo-game:7777` upstream을 `infra/unity-server/nginx/world.conf.template`에 작성한다
+- [X] T024 [P] [US1] `world.${ROOT_DOMAIN}`의 TLS·Upgrade·Host·cache bypass와 내부 `demo-game:7777` upstream을 `infra/unity-server/nginx/world.conf.template`에 작성한다
 - [ ] T025 [US1] DNS→TLS→Cloudflare→Nginx→내부 listener→승인 접속과 public 7777 차단 결과를 수집하는 외부 실행기를 `infra/unity-server/scripts/verify-public-wss.sh`에 구현한다
 
 **Checkpoint**: US3의 실제 승인 검증과 결합하면 외부 브라우저의 안전한 월드 입장을 독립 검증할 수 있다.
@@ -83,15 +83,15 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
+- [X] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
 - [ ] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
 - [ ] T028 [P] [US2] 내부 listener 실패·외부 승인 실패 후보가 current/known-good으로 승격되지 않고 이전 ref로 복구되는 장애 테스트를 `infra/unity-server/tests/failure/deploy-rollback.sh`에 작성한다
 - [ ] T029 [P] [US2] process running·internal listening·external handshake·approved admission을 서로 다른 상태로 판정하는 테스트를 `infra/unity-server/tests/integration/game-readiness.sh`에 작성한다
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
-- [ ] T031 [P] [US2] image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
+- [X] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
+- [X] T031 [P] [US2] image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
 - [ ] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
 - [ ] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
 - [ ] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
@@ -122,10 +122,10 @@
 - [ ] T043 [P] [US3] `SHA-256(jti)|exp`만 원자 append·flush하고 부팅 복원·만료 정리·동시 소비를 직렬화하는 ledger를 `festa-unity/Assets/_Project/Scripts/Network/Security/UsedGrantLedger.cs`에 구현한다
 - [ ] T044 [US3] token 검증 성공 뒤 ledger 소비까지 완료된 claim으로만 승인하고 모든 보안 실패를 제한된 reason으로 거부하도록 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionManager.cs`를 수정한다
 - [ ] T045 [US3] 검증된 신원만 player spawn에 전달하고 연결 종료 시 제거하도록 `festa-unity/Assets/_Project/Scripts/Network/Session/SessionDataStore.cs`의 lifecycle 경계를 보강한다
-- [ ] T046 [US3] 전용 Secret 파일, issuer/audience, world/channel과 ledger 경로를 server process에 전달하도록 `infra/unity-server/compose.yaml`의 game 환경과 mount를 연결한다
+- [X] T046 [US3] 전용 Secret 파일, issuer/audience, world/channel과 ledger 경로를 server process에 전달하도록 `infra/unity-server/compose.yaml`의 game 환경과 mount를 연결한다
 - [ ] T047 [P] [US3] Secret·token·JTI·nickname 원문 없이 승인/거부 범주와 client ID만 남기도록 `backend/src/main/java/com/example/ssafesta/world/`와 `festa-unity/Assets/_Project/Scripts/Network/` 로그를 정리한다
 - [ ] T048 [US3] Backend network를 차단한 상태에서 미사용 정상 grant 최초 입장과 잘못된 grant 거부를 실행하는 `infra/unity-server/tests/failure/backend-unavailable-admission.sh`를 구현한다
-- [ ] T049 [US3] token 생성·검증·소비·만료 정리·Secret 회전과 ledger 장애 시 fail-closed 절차를 `infra/unity-server/runbooks/world-entry-token.md`에 작성한다
+- [X] T049 [US3] token 생성·검증·소비·만료 정리·Secret 회전과 ledger 장애 시 fail-closed 절차를 `infra/unity-server/runbooks/world-entry-token.md`에 작성한다
 
 **Checkpoint**: 안전한 월드 입장 MVP(US1+US3)가 완성되고 Backend 일시 장애와 토큰 재사용이 분리된다.
 
@@ -141,14 +141,14 @@
 
 - [ ] T050 [P] [US4] client disconnect에서 player와 SessionDataStore가 제거되고 이전 grant를 다시 쓰지 않는 Unity 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/DisconnectCleanupTests.cs`에 작성한다
 - [ ] T051 [P] [US4] 자동 재접속 없이 종료 안내→사용자 선택→새 session 발급→새 연결 상태 전이를 검증하는 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/ManualReconnectFlowTests.cs`에 작성한다
-- [ ] T052 [P] [US4] Nginx 180초 초기 timeout, Upgrade 유지와 cache/buffering off를 검사하는 테스트를 `infra/unity-server/tests/integration/idle-timeout.sh`에 작성한다
+- [X] T052 [P] [US4] Nginx 180초 초기 timeout, Upgrade 유지와 cache/buffering off를 검사하는 테스트를 `infra/unity-server/tests/integration/idle-timeout.sh`에 작성한다
 - [ ] T053 [P] [US4] 회원·게스트 브라우저 2개의 10분 무입력·종료·30초 재접속 결과 필드를 검사하는 증거 테스트를 `infra/unity-server/tests/evidence/p0-evidence.sh`에 작성한다
 
 ### Implementation for User Story 4
 
 - [ ] T054 [US4] 연결 종료 reason을 표시하고 사용자가 누를 때만 새 world-session을 요청하도록 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionStatusHud.cs`를 구현한다
 - [ ] T055 [US4] disconnect callback에서 session/player를 한 번만 정리하고 수동 재접속 시 이전 payload를 폐기하도록 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionManager.cs`를 보강한다
-- [ ] T056 [P] [US4] `proxy_read_timeout`·`proxy_send_timeout` 초기값 180초와 장시간 Upgrade 설정을 `infra/unity-server/nginx/world.conf.template`에 반영한다
+- [X] T056 [P] [US4] `proxy_read_timeout`·`proxy_send_timeout` 초기값 180초와 장시간 Upgrade 설정을 `infra/unity-server/nginx/world.conf.template`에 반영한다
 - [ ] T057 [US4] 회원·게스트 두 브라우저의 상호 이동·10분 무입력·종료 정리·새 grant 재접속을 안내하고 시간 측정하는 `infra/unity-server/scripts/verify-p0-browser.sh`를 구현한다
 - [ ] T058 [P] [US4] Cloudflare/Nginx/Unity 중 종료 계층과 관찰 시각을 분리해 기록하는 `infra/unity-server/scripts/collect-idle-evidence.sh`를 구현한다
 - [ ] T059 [US4] 10분 동안 예상 밖 종료 0이면 180초를 확정하고 실패 시 계층 진단·조정·동일 시험 반복을 요구하는 `infra/unity-server/runbooks/idle-and-reconnect.md`를 작성한다
@@ -193,7 +193,7 @@
 - [ ] T073 모든 Backend 테스트, Unity EditMode 테스트와 `infra/unity-server/tests/run-static.sh`를 실행하고 실패를 해당 코드 또는 테스트에서 해결한다
 - [ ] T074 `specs/infra-003-unity-server-deploy/quickstart.md`의 local, P0, P1 절차를 순서대로 실행하고 실제 결과 링크를 추가한다
 - [ ] T075 FR-001~FR-027과 SC-001~SC-009를 테스트·증거·운영 문서에 매핑해 `specs/infra-003-unity-server-deploy/checklists/implementation.md`를 완료한다
-- [ ] T076 INFRA 작업 결과와 발생한 문제의 `INFRA-T-번호` 링크를 `docs/JSW/24_작업일지.md` 및 `docs/JSW/25_트러블슈팅.md`에 기록한다
+- [X] T076 INFRA 작업 결과와 발생한 문제의 `INFRA-T-번호` 링크를 `docs/JSW/24_작업일지.md` 및 `docs/JSW/25_트러블슈팅.md`에 기록한다
 
 ---
 

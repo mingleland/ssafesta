@@ -1,0 +1,50 @@
+name: festa-demo-world
+
+services:
+  demo-game:
+    image: ${GAME_IMAGE_REF:?immutable GAME_IMAGE_REF is required}
+    restart: unless-stopped
+    user: "${GAME_CONTAINER_UID:-10001}:${GAME_CONTAINER_GID:-10001}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    expose: ["7777"]
+    networks: [demo]
+    environment:
+      FESTA_ENVIRONMENT: demo
+      WORLD_TRANSPORT: websocket
+      WORLD_LISTEN_PORT: "7777"
+      WORLD_ID: ${WORLD_ID:-11F}
+      WORLD_CHANNEL_ID: ${WORLD_CHANNEL_ID:-11F-01}
+      WORLD_MAX_PLAYERS: ${WORLD_MAX_PLAYERS:-40}
+      WORLD_ENTRY_TOKEN_ISSUER: ${WORLD_ENTRY_TOKEN_ISSUER:-ssafesta-backend}
+      WORLD_ENTRY_TOKEN_AUDIENCE: ${WORLD_ENTRY_TOKEN_AUDIENCE:-ssafesta-world}
+      CONNECTION_TOKEN_SECRET_FILE: /run/secrets/connection_token_secret
+      WORLD_LEDGER_PATH: ${WORLD_LEDGER_PATH:-/var/lib/festa-world/used-grants.log}
+    secrets:
+      - source: connection_token_secret
+        target: connection_token_secret
+        mode: 0400
+    volumes:
+      - world-replay:/var/lib/festa-world
+    healthcheck:
+      test: ["CMD-SHELL", "test -x /app/festa-unity.x86_64 && pgrep -f festa-unity.x86_64 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+networks:
+  demo:
+    external: true
+    name: ${DEMO_NETWORK_NAME:-festa-demo}
+
+volumes:
+  world-replay:
+    name: ${WORLD_REPLAY_LEDGER_VOLUME:-festa-demo-world-replay}
+
+secrets:
+  connection_token_secret:
+    file: ${CONNECTION_TOKEN_SECRET_FILE:?CONNECTION_TOKEN_SECRET_FILE is required}
