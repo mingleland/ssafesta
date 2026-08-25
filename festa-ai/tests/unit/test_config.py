@@ -98,3 +98,28 @@ def test_internal_tokens_reject_duplicates(monkeypatch: pytest.MonkeyPatch, env_
     _set_env(monkeypatch, overrides={env_key: "same-token,same-token"})
     with pytest.raises(ValidationError, match=env_key):
         _fresh_settings_module()
+
+
+def test_blank_chunk_tuning_env_vars_resolve_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Regression: `.env.example` ships CHUNK_SIZE= / CHUNK_OVERLAP= (blank).
+
+    A real `.env` file (loaded via python-dotenv, not pytest's
+    monkeypatch.setenv) parses `KEY=` as the var being *present* with value
+    `""` — not absent. Simulate that here by explicitly setting the env var
+    to the empty string, which previously crashed `Settings()` with a
+    pydantic int_parsing ValidationError on `uvicorn app.main:app` boot.
+    """
+    _set_env(monkeypatch, overrides={"CHUNK_SIZE": "", "CHUNK_OVERLAP": ""})
+    config = _fresh_settings_module()
+
+    assert config.settings.chunk_size is None
+    assert config.settings.chunk_overlap is None
+
+
+def test_real_chunk_tuning_values_still_coerce_to_int(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The blank-string fix must not break normal int-looking values."""
+    _set_env(monkeypatch, overrides={"CHUNK_SIZE": "512", "CHUNK_OVERLAP": "64"})
+    config = _fresh_settings_module()
+
+    assert config.settings.chunk_size == 512
+    assert config.settings.chunk_overlap == 64

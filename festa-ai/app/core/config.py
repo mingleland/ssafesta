@@ -8,7 +8,7 @@ the fail-fast behavior spec 007 plan.md Section 10 requires.
 
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,6 +46,24 @@ class Settings(BaseSettings):
     agent_document_max_total_bytes: int = 104_857_600
     chunk_size: int | None = None
     chunk_overlap: int | None = None
+
+    @field_validator("chunk_size", "chunk_overlap", mode="before")
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        """Treat a blank/whitespace-only value as absent.
+
+        `.env.example` ships `CHUNK_SIZE=` / `CHUNK_OVERLAP=` (blank) as the
+        documented "optional, no fixed default" tuning values (spec 007).
+        python-dotenv parses `KEY=` as the env var being present with value
+        `""`, not absent — so without this coercion pydantic tries to parse
+        `""` as `int` and crashes uvicorn on boot with an unmodified
+        `.env.example`-derived `.env`. Any other value (including a real
+        `None` or `int` from a non-dotenv source, or an int-looking string
+        like "512") passes through unchanged for normal int coercion.
+        """
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
     # Embedding provider — spec 007 FR-009 / 헌법 18조
     embedding_dimension: int = 1536
