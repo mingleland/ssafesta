@@ -10,10 +10,10 @@
 
 ### GS-T061. PowerShell URI 보간이 MR IID와 query 구분자를 합쳐 상태 재검증이 실패함 (해결)
 
-- **증상** — GitLab MR의 최종 merge status를 다시 조회하는 명령이 코드·문서 MR 모두 `merge_request_iid is invalid`를 반환했다.
-- **원인** — PowerShell expandable string에서 `$iid?with_merge_status_recheck=true`를 사용해 `?` 앞의 loop 변수를 명시적으로 닫지 않았다. 생성된 URI에 정상 IID가 들어가지 않아 GitLab API가 잘못된 IID로 판정했다.
-- **해결** — query string 직전 변수를 `${iid}`로 감싼 `merge_requests/${iid}?with_merge_status_recheck=true` 형식으로 바꾸고 응답 오류를 즉시 실패 처리하도록 했다.
-- **예방** — PowerShell에서 변수 바로 뒤에 URL query 또는 식별 문자가 오면 `${variable}` 문법을 사용한다. 여러 MR을 검사할 때는 HTTP 실패 응답을 null 결과로 계속 출력하지 않고 해당 URI와 오류를 바로 확인한다.
+- **증상** — GitLab MR의 최종 merge status를 다시 조회하는 명령이 코드·문서 MR 모두 `merge_request_iid is invalid`를 반환했다. URI를 고친 뒤에는 `foreach` statement 바로 뒤에 pipe를 연결한 출력 구문이 `empty pipe element` parser 오류를 냈다.
+- **원인** — PowerShell expandable string에서 `$iid?with_merge_status_recheck=true`를 사용해 `?` 앞의 loop 변수를 명시적으로 닫지 않았다. 생성된 URI에 정상 IID가 들어가지 않았고, statement 결과를 괄호나 변수로 수집하지 않은 채 바로 pipe하려 한 구문도 현재 PowerShell parser에서 유효하지 않았다.
+- **해결** — query string 직전 변수를 `${iid}`로 감싼 `merge_requests/${iid}?with_merge_status_recheck=true` 형식으로 바꿨다. `foreach` 결과는 `$rows`에 먼저 수집한 뒤 출력하고, REST 오류는 즉시 실패 처리했다. 최종 확인에서 MR !8·!9 모두 `mergeable`, 충돌 없음, Draft 아님을 반환했다.
+- **예방** — PowerShell에서 변수 바로 뒤에 URL query 또는 식별 문자가 오면 `${variable}` 문법을 사용한다. 여러 MR을 검사할 때는 loop 출력을 변수에 수집한 뒤 pipe하고, HTTP 실패 응답을 null 결과로 계속 출력하지 않고 해당 URI와 오류를 바로 확인한다.
 
 ### GS-T060. 테스트·빌드 병렬 경쟁에서 100ms 편집 gate가 일시 초과함 (측정 경계 확정)
 
