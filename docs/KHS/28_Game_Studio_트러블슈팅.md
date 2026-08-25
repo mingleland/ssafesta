@@ -8,6 +8,13 @@
 
 ## 2026-08-25
 
+### GS-T063. Atlassian API token을 Bearer로 사용해 Jira 조회가 403으로 거부됨 (해결)
+
+- **증상** — `JIRA_API_TOKEN`과 `ATLASSIAN_API_TOKEN`을 Bearer header로 사용한 `/rest/api/3/myself` 요청이 모두 403을 반환했다. 첫 진단 명령은 PowerShell `foreach` 결과를 직접 pipe하면서 parser 오류도 발생했다.
+- **원인** — 현재 제공된 Atlassian token은 OAuth access token이 아니라 Atlassian API token이라 Jira Cloud Basic 인증의 `email:token` 조합이 필요했다. loop statement 결과도 현재 PowerShell에서는 변수에 먼저 수집해야 한다.
+- **해결** — 저장소 Git 사용자 이메일과 `ATLASSIAN_API_TOKEN`을 Basic 인증으로 조합하고 `/myself`에서 활성 강형순 계정과 accountId를 확인했다. loop 결과는 `$rows`에 수집했다. 이후 15건 담당자 PUT이 모두 성공했고 `assignee=currentUser()` JQL 재조회로 검증했다.
+- **예방** — Atlassian API token과 OAuth Bearer token을 구분한다. 계정 변경 전 `/myself`로 displayName·accountId·active를 확인하고, 변경 뒤 동일 JQL로 대상 수와 담당자를 재검증한다. Secret 값은 출력하거나 파일에 기록하지 않는다.
+
 ### GS-T062. 활성 Game Studio 사양의 이슈 링크 일부가 이전 GitHub를 계속 가리킴 (해결)
 
 - **증상** — GitLab 이관 후에도 현재 계약·계획·미완료 task의 #69·#73·#78 링크가 이전 GitHub 저장소를 열었다. 작업일지의 과거 GitHub 활동 기록과 활성 추적 링크가 구분되지 않았다.
