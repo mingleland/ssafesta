@@ -48,7 +48,7 @@ festa-frontend/src/game-studio/
 4. **완료 — Backend adapter**: revision-aware Draft/Publish client, Published loader, schema guard,
    충돌 복구·검증 오류 UI를 구현했다. [BE plan](../BE/plan.md)의 endpoint가 준비되면 환경 플래그로 전환한다.
 5. **완료 — Portal FE integration**: `BOOTH_GAME_INTERACT`→Portal resolver→GAME overlay와 close/fail lifecycle을 연결했다. 서버 resolver가 준비되면 브라우저 E2E만 수행한다.
-6. **진행 중 — 운영 확장**: 적 처치 수·타이머·점수 임계 승리 조건은 v1.1 FE candidate와 Mock Runtime에 구현했다. [#78](https://github.com/kanghyunsoon/ssafesta/issues/78)에서 BE validator·AI 허용 출력 계약을 확정하고, #69의 Backend Asset upload를 stable reference adapter로 연결한다. AI 제작 보조는 사용자 승인 patch로만 추가하며 #81의 Published Session/Coin은 GameProject 밖 서버 권위 adapter로 연결한다.
+6. **진행 중 — 운영 확장**: 적 처치 수·타이머·점수 임계 승리 조건은 v1.1 FE candidate와 Mock Runtime에 구현했다. [GitLab #78](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/78)에서 BE validator·AI 허용 출력 계약을 확정하고, [GitLab #69](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/69)의 Backend Asset upload를 stable reference adapter로 연결한다. AI 제작 보조는 사용자 승인 patch로만 추가하며 [GitLab #81](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/81)의 Published Session/Coin은 GameProject 밖 서버 권위 adapter로 연결한다.
 
 ## Gates
 

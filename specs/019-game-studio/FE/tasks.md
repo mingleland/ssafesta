@@ -58,7 +58,7 @@ FE가 소유하는 100개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T097 Add behavior-preserving Object duplication, reference-aware batch deletion, and Scene resize commands
 - [x] T098 Replace title-only STORY/ESCAPE variants and same-shape action samples with structurally distinct playable blueprints
 - [x] T099 Add template-profile, authoring-command, browser multi-select/duplicate/move, and 800/1024px regression verification
-- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
+- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([GitLab #73](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/73))
 
 ## Preview and Publish UI
 
@@ -97,7 +97,7 @@ FE가 소유하는 100개 작업이다. ID는 기존 통합 목록과의 추적�
 ## Cross-cutting verification
 
 - [x] T064 Verify create/save/publish/play with FastAPI unavailable
-- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
+- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([GitLab #73](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/73))
 - [x] T066 Document schema migration policy and supported-major matrix
 - [x] T067 Run all FE quickstart commands and record final results
 - [x] T068 Update implementation status and KHS worklog
@@ -105,7 +105,7 @@ FE가 소유하는 100개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T070 Implement renderer-free reference Runtime
 - [x] T071 Verify and document Runtime trace command
 - [x] T089 Verify production build emits separate Edit and Play lazy chunks
-- [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([#78](https://github.com/kanghyunsoon/ssafesta/issues/78))
+- [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([GitLab #78](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/78))
 - [x] T101 Implement the backward-readable GameProject v1.1 Frontend candidate and explicit v1.0 authoring upgrade
 - [x] T102 Implement deterministic score/defeat/survival objectives, progress HUD, and respawn/end-game behavior
 - [x] T103 Implement Mock immutable publication ports and block projects with no completion path

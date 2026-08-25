@@ -8,6 +8,13 @@
 
 ## 2026-08-25
 
+### GS-T062. 활성 Game Studio 사양의 이슈 링크 일부가 이전 GitHub를 계속 가리킴 (해결)
+
+- **증상** — GitLab 이관 후에도 현재 계약·계획·미완료 task의 #69·#73·#78 링크가 이전 GitHub 저장소를 열었다. 작업일지의 과거 GitHub 활동 기록과 활성 추적 링크가 구분되지 않았다.
+- **원인** — 구현·검증 기준을 갱신하면서 이슈 번호와 상태는 유지했지만 문서 URL의 호스트 이관 여부를 별도 검사하지 않았다.
+- **해결** — GitLab API로 #69·#73·#78·#81의 동일 IID와 제목·OPEN 상태를 확인했다. 현재 사양의 계약·계획·task 링크만 GitLab work item으로 교체하고, 당시 작업 사실을 기록한 과거 일지의 GitHub PR/Issue 링크는 역사적 증거로 보존했다.
+- **예방** — 저장소 이관 뒤 문서 링크 검사는 현재 정본 문서와 역사 일지를 나눠 수행한다. 현재 사양은 새 tracker를 사용하고, 과거 기록은 대상과 시점을 왜곡하지 않도록 원래 링크를 유지한다.
+
 ### GS-T061. PowerShell URI 보간이 MR IID와 query 구분자를 합쳐 상태 재검증이 실패함 (해결)
 
 - **증상** — GitLab MR의 최종 merge status를 다시 조회하는 명령이 코드·문서 MR 모두 `merge_request_iid is invalid`를 반환했다. URI를 고친 뒤에는 `foreach` statement 바로 뒤에 pipe를 연결한 출력 구문이 `empty pipe element` parser 오류를 냈다.

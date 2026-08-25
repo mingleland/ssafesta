@@ -20,7 +20,8 @@
 - 🤖 FE spec/plan/tasks/quickstart를 FR-068~071, SC-015, T118~T121로 갱신했다. 총 100개/완료 92개/잔여 8개이며 사람 20분 제작 테스트와 활성 PC 55fps 증거가 남아 있어 T090·T065는 완료 처리하지 않았다.
 - 🤖 코드 변경은 Jira 브랜치 `feat/S15P21A604-156-game-studio-authoring-quality`의 `1735be1`로 고정했다. 일반 Frontend·Backend·AI·Unity 코드와 shared JSON schema는 변경하지 않았다.
 - 🤖 GitLab 최종 재검증에서 코드 MR !8(`1735be1`)과 문서 MR !9 모두 `mergeable`, 충돌 없음, Draft 아님을 확인했다. 병합은 수행하지 않았다.
-- 트러블슈팅: GS-T058~GS-T061
+- 🤖 활성 계약·계획·미완료 task에 남아 있던 이전 GitHub #69·#73·#78 링크를 실제 이관된 GitLab work item으로 정정했다. 과거 GitHub 작업 사실을 기록한 일지 링크는 역사적 증거로 유지했다.
+- 트러블슈팅: GS-T058~GS-T062
 
 ### 대형 맵 편집 성능·공간 탐색 고도화 ✅
 
