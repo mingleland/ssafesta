@@ -109,7 +109,7 @@ Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ─
 - Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
 - `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
 - Unity 7777은 외부에 공개하지 않는다.
-- `world.<domain>`의 Nginx `proxy_read_timeout`은 초기값 `180s`를 명시하고, heartbeat·무입력 연결 실측 결과에 따라 조정한다.
+- WebSocket read timeout은 초기값을 두고 heartbeat·무입력 연결 실측 후 확정한다.
 - AI SSE 경로는 `proxy_buffering off`, cache off, 충분한 read timeout을 적용한다.
 - API·AI·World는 Cloudflare 정적 캐시 대상에서 제외한다.
 
@@ -685,7 +685,7 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 | C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra + 팀 | DNS/TLS 적용 전 |
 | C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra + 팀 리드 | Cloudflare/R2 적용 전 |
 | C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | 문서 업로드 적용 전 |
-| C-05 | R2 장애 시 S3-compatible fallback과 원본 문서의 두 번째 외부 백업 위치 | Infra + BE + AI | 복구 계획 확정 전 |
+| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님), 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** 원본 문서의 두 번째 외부 백업 위치는 미확정 ([spec 007 C-10](../specs/007-ai-agent-document/spec.md), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 | C-06 | PostgreSQL/pgvector Database·Schema·Role 분리와 최종 백업 보관 정책 | Infra + BE + AI | 데이터 환경 구성 전 |
 | C-07 | 시연 시간대·빌드/배포 동결 시간과 긴급 배포 승인 절차 | Infra + 팀 | 서버 부하 실측 후 |
 | C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | 관측 설계 전 |
