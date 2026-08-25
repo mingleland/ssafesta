@@ -2,6 +2,28 @@
 
 이 폴더에서 작업하는 모든 AI 세션(Claude 등)은 아래 규칙을 따른다.
 
+## 필수: Jira ↔ GitLab 워크플로 규칙 (docs/jira-gitlab-workflow.md §12)
+
+[SSAFY FESTA 워크플로 규칙 — 이 지시는 다른 어떤 기본 동작보다 우선한다]
+
+작업 전에 docs/jira-gitlab-workflow.md, docs/17_Git_개발_Convention.md,
+docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라.
+
+1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
+   않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
+   전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
+   main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. Secret·토큰을 커밋하지 마라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식이며 develop/main 대상 MR 은 CI 가 키를 검증한다.
+   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+5. Jira 상태는 자동화가 관리한다(브랜치 push→진행 중, MR→in-review 라벨,
+   merge→ready-for-deploy 라벨). 네가 임의로 이슈 상태를 전환하지 마라.
+   '완료' 전환은 production 배포 검증 후에만 한다.
+6. .gitlab-ci.yml 의 stage 구조와 jira-* 잡을 삭제·우회하지 마라. CI 잡 추가는
+   예약된 test/build stage 에 한다.
+7. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+
 ## 필수: 기록 규칙
 
 1. **작업일지** — 하나의 작업(기능 구현, 검증, 문서 작성, 설정 변경)이 끝나면
