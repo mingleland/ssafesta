@@ -17,7 +17,7 @@ import {
 import { COMPONENT_LABELS, findPresetDefinition } from '../model/authoringRegistry.ts';
 import { AssetPickerModal } from './AssetPickerModal.tsx';
 import { CommitInput } from './CommitInput.tsx';
-import { SpriteAnimationPreview } from './SpriteAnimationPreview.tsx';
+import { SpriteAnimationInspector } from './SpriteAnimationInspector.tsx';
 
 interface InspectorPanelProps {
   readonly project: GameProject;
@@ -236,10 +236,7 @@ export const InspectorPanel = ({
           {component.type === 'SPRITE' && (
             <>
               {spriteSheet !== undefined && (
-                <div className="gss-animation-card">
-                  <SpriteAnimationPreview sheet={spriteSheet} size={74} />
-                  <div><strong>{spriteSheet.label}</strong><small>{spriteSheet.clips.length}개 애니메이션 clip</small></div>
-                </div>
+                <SpriteAnimationInspector sheet={spriteSheet} />
               )}
               {spriteSheet === undefined && staticSprite !== null && (
                 <div className="gss-custom-asset-preview"><span aria-label="이미지 미리보기" role="img" style={staticImageBackgroundStyle(staticSprite)} /></div>

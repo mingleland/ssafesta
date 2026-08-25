@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DialogueChoice, DialogueScene, GameProject } from '../../contracts/gameProject.ts';
 import {
   addDialogueChoice,
@@ -12,6 +12,7 @@ import {
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { assetDisplayLabel, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
 import { CommitInput } from './CommitInput.tsx';
+import { analyzeDialogueFlow } from '../model/dialogueFlow.ts';
 
 interface DialogueEditorProps {
   readonly project: GameProject;
@@ -33,6 +34,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
   const [selectedNodeId, setSelectedNodeId] = useState(scene.startNodeId);
   useEffect(() => setSelectedNodeId(scene.startNodeId), [scene.id, scene.startNodeId]);
   const selectedNode = scene.nodes.find((node) => node.id === selectedNodeId) ?? scene.nodes[0];
+  const dialogueFlow = useMemo(() => analyzeDialogueFlow(scene), [scene]);
 
   if (selectedNode === undefined) return null;
   const backgroundVisual = resolveStaticImageVisual(
@@ -99,6 +101,39 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
           </div>
           <span className="gss-type-badge">{scene.presentation}</span>
         </div>
+        <section className="gss-dialogue-flow" aria-label="대화 흐름 개요">
+          <header>
+            <div><span className="gss-eyebrow">FLOW OVERVIEW</span><strong>대화 흐름</strong></div>
+            <div className="gss-dialogue-flow-metrics">
+              <span>{dialogueFlow.reachableCount}/{scene.nodes.length} 도달</span>
+              {dialogueFlow.unreachableCount > 0 && <em>미연결 {dialogueFlow.unreachableCount}</em>}
+              {dialogueFlow.incompleteOutcomeCount > 0 && <em>결과 확인 {dialogueFlow.incompleteOutcomeCount}</em>}
+            </div>
+          </header>
+          <div className="gss-dialogue-flow-list">
+            {dialogueFlow.nodes.map((flow, index) => {
+              const node = scene.nodes.find((candidate) => candidate.id === flow.nodeId);
+              return (
+                <button
+                  aria-current={flow.nodeId === selectedNode.id ? 'step' : undefined}
+                  className={`${flow.nodeId === selectedNode.id ? 'is-active' : ''}${flow.reachable ? '' : ' is-unreachable'}${flow.hasIncompleteOutcome ? ' has-incomplete-outcome' : ''}`}
+                  key={flow.nodeId}
+                  onClick={() => setSelectedNodeId(flow.nodeId)}
+                  type="button"
+                >
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{node?.speaker || '내레이션'}</strong>
+                    <small>{flow.outcomes.join(' · ')}</small>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {(dialogueFlow.unreachableCount > 0 || dialogueFlow.incompleteOutcomeCount > 0) && (
+            <p>붉은 점은 시작 대화에서 갈 수 없거나 선택 후 결과가 없는 노드입니다. 눌러서 바로 수정하세요.</p>
+          )}
+        </section>
         <section
           className={`gss-dialogue-live-preview${scene.presentation === 'OVERLAY' ? ' is-overlay' : ''}`}
           style={backgroundVisual === null ? undefined : staticImageBackgroundStyle(backgroundVisual)}

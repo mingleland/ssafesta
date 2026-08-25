@@ -20,6 +20,19 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
   Math.max(minimum, Math.min(maximum, value))
 );
 
+export const calculateFitZoom = (
+  viewportWidth: number,
+  viewportHeight: number,
+  columns: number,
+  rows: number,
+  baseCellSize = 32,
+): number => {
+  if (viewportWidth <= 0 || viewportHeight <= 0 || columns <= 0 || rows <= 0 || baseCellSize <= 0) return 100;
+  const horizontal = ((viewportWidth - 56) / (columns * baseCellSize)) * 100;
+  const vertical = ((viewportHeight - 56) / (rows * baseCellSize)) * 100;
+  return clamp(Math.floor(Math.min(horizontal, vertical) / 5) * 5, 10, 200);
+};
+
 export const calculateGridViewport = (
   container: RectLike,
   canvas: RectLike,

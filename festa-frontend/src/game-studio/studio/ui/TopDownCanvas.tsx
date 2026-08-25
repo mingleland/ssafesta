@@ -5,6 +5,7 @@ import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import type { TilesetDefinition } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import {
+  calculateFitZoom,
   calculateGridViewport,
   equalGridViewports,
   expandGridViewport,
@@ -13,6 +14,8 @@ import {
   tileIndexesInViewport,
   type GridViewport,
 } from './canvasViewport.ts';
+import { CanvasMinimap } from './CanvasMinimap.tsx';
+import { TileOverviewCanvas } from './TileOverviewCanvas.tsx';
 
 export type CanvasTool = 'SELECT' | 'PAN';
 export type TileTool = 'BRUSH' | 'RECTANGLE' | 'FLOOD_FILL' | 'PICKER';
@@ -29,6 +32,8 @@ interface TopDownCanvasProps {
   readonly tileTool: TileTool;
   readonly tilesetVisual: TilesetDefinition | null;
   readonly zoom: number;
+  readonly fitRequestToken: number;
+  readonly focusRequestToken: number;
   readonly canvasTool: CanvasTool;
   readonly showGrid: boolean;
   readonly showCollisions: boolean;
@@ -41,6 +46,7 @@ interface TopDownCanvasProps {
   readonly onFloodFillTiles: (x: number, y: number, tileIndex: number) => void;
   readonly onPickTile: (tileIndex: number) => void;
   readonly onPlacementComplete: () => void;
+  readonly onZoomChange: (zoom: number) => void;
 }
 
 const pointerToGrid = (
@@ -92,6 +98,8 @@ export const TopDownCanvas = ({
   tileTool,
   tilesetVisual,
   zoom,
+  fitRequestToken,
+  focusRequestToken,
   canvasTool,
   showGrid,
   showCollisions,
@@ -104,6 +112,7 @@ export const TopDownCanvas = ({
   onFloodFillTiles,
   onPickTile,
   onPlacementComplete,
+  onZoomChange,
 }: TopDownCanvasProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -184,36 +193,59 @@ export const TopDownCanvas = ({
   const renderViewport = useMemo(() => canvasViewport === null
     ? null
     : expandGridViewport(canvasViewport, scene.width, scene.height, VIEWPORT_OVERSCAN_CELLS), [canvasViewport, scene.height, scene.width]);
+  const usingTileOverview = tileLayer !== null && zoom <= 25;
   const renderedObjects = useMemo(() => objectsInViewport(
     scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)),
     renderViewport,
     selectedObjectId,
   ), [editorHiddenObjectIds, renderViewport, scene.objects, selectedObjectId]);
-  const renderedTileIndexes = useMemo(() => tileIndexesInViewport(
+  const renderedTileIndexes = useMemo(() => usingTileOverview ? [] : tileIndexesInViewport(
     renderViewport,
     scene.width,
     tileLayer?.data.length ?? 0,
-  ), [renderViewport, scene.width, tileLayer?.data.length]);
+  ), [renderViewport, scene.width, tileLayer?.data.length, usingTileOverview]);
+
+  const scrollToGridPosition = useCallback((
+    position: { readonly x: number; readonly y: number },
+    behavior: ScrollBehavior = 'smooth',
+  ) => {
+    const scroll = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (scroll === null || canvas === null) return;
+    const scrollRect = scroll.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const targetLeft = scroll.scrollLeft + (canvasRect.left - scrollRect.left)
+      + ((position.x + 0.5) / scene.width) * canvasRect.width;
+    const targetTop = scroll.scrollTop + (canvasRect.top - scrollRect.top)
+      + ((position.y + 0.5) / scene.height) * canvasRect.height;
+    scroll.scrollTo({
+      left: Math.max(0, targetLeft - scroll.clientWidth / 2),
+      top: Math.max(0, targetTop - scroll.clientHeight / 2),
+      behavior,
+    });
+  }, [scene.height, scene.width]);
 
   useEffect(() => {
     if (selectedObjectId === null || canvasViewport === null) return;
     const selectedObject = scene.objects.find((object) => object.id === selectedObjectId);
-    const scroll = scrollRef.current;
-    const canvas = canvasRef.current;
-    if (selectedObject === undefined || scroll === null || canvas === null
+    if (selectedObject === undefined
       || gridViewportContains(canvasViewport, selectedObject.position)) return;
-    const scrollRect = scroll.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
-    const targetLeft = scroll.scrollLeft + (canvasRect.left - scrollRect.left)
-      + ((selectedObject.position.x + 0.5) / scene.width) * canvasRect.width;
-    const targetTop = scroll.scrollTop + (canvasRect.top - scrollRect.top)
-      + ((selectedObject.position.y + 0.5) / scene.height) * canvasRect.height;
-    scroll.scrollTo({
-      left: Math.max(0, targetLeft - scroll.clientWidth / 2),
-      top: Math.max(0, targetTop - scroll.clientHeight / 2),
-      behavior: 'smooth',
-    });
-  }, [canvasViewport, scene.height, scene.objects, scene.width, selectedObjectId]);
+    scrollToGridPosition(selectedObject.position);
+  }, [canvasViewport, scene.objects, selectedObjectId, scrollToGridPosition]);
+
+  useEffect(() => {
+    if (fitRequestToken === 0) return;
+    const scroll = scrollRef.current;
+    if (scroll === null) return;
+    onZoomChange(calculateFitZoom(scroll.clientWidth, scroll.clientHeight, scene.width, scene.height));
+    window.requestAnimationFrame(() => scrollToGridPosition({ x: (scene.width - 1) / 2, y: (scene.height - 1) / 2 }, 'auto'));
+  }, [fitRequestToken, onZoomChange, scene.height, scene.width, scrollToGridPosition]);
+
+  useEffect(() => {
+    if (focusRequestToken === 0) return;
+    const selectedObject = scene.objects.find((object) => object.id === selectedObjectId);
+    if (selectedObject !== undefined) scrollToGridPosition(selectedObject.position);
+  }, [focusRequestToken, scene.objects, selectedObjectId, scrollToGridPosition]);
 
   const finishSelectionBox = () => {
     if (selectionBox === null) return;
@@ -280,7 +312,8 @@ export const TopDownCanvas = ({
   const tileEditing = tileLayer !== null && (tileTool === 'PICKER' || tileBrush !== null);
 
   return (
-    <div
+    <div className="gss-canvas-frame">
+      <div
       className={`gss-canvas-scroll${panning === null ? '' : ' is-panning'}`}
       onPointerCancel={() => setPanning(null)}
       onPointerDown={(event) => {
@@ -368,7 +401,10 @@ export const TopDownCanvas = ({
             '--gss-grid-rows': scene.height,
           } as React.CSSProperties}
         >
-          {tileLayer !== null && (
+          {tileLayer !== null && usingTileOverview && (
+            <TileOverviewCanvas columns={scene.width} layer={tileLayer} rows={scene.height} tileset={tilesetVisual} />
+          )}
+          {tileLayer !== null && !usingTileOverview && (
             <div className="gss-tile-layer" aria-hidden="true">
               {renderedTileIndexes.map((index) => {
                 const tile = tileLayer.data[index] ?? -1;
@@ -386,10 +422,6 @@ export const TopDownCanvas = ({
               })}
             </div>
           )}
-          <div aria-live="polite" className="gss-render-budget">
-            화면 오브젝트 {renderedObjects.length}/{scene.objects.length}
-            {tileLayer === null ? '' : ` · 타일 ${renderedTileIndexes.length}/${tileLayer.data.length}`}
-          </div>
           {selectionBox !== null && (
             <div
               aria-hidden="true"
@@ -469,6 +501,20 @@ export const TopDownCanvas = ({
             );
           })}
         </div>
+      </div>
+      </div>
+      <div className="gss-canvas-overlay">
+        <div aria-live="polite" className="gss-render-budget">
+          화면 오브젝트 {renderedObjects.length}/{scene.objects.length}
+          {tileLayer === null ? '' : usingTileOverview ? ` · 타일 ${tileLayer.data.length}칸 합성` : ` · 타일 ${renderedTileIndexes.length}/${tileLayer.data.length}`}
+        </div>
+        <CanvasMinimap
+          hiddenObjectIds={editorHiddenObjectIds}
+          onNavigate={(position) => scrollToGridPosition(position)}
+          scene={scene}
+          selectedObjectId={selectedObjectId}
+          viewport={canvasViewport}
+        />
       </div>
     </div>
   );

@@ -107,6 +107,7 @@ const saveEditorSet = (gameId: number, kind: 'hidden' | 'locked', ids: ReadonlyS
 
 interface GameStudioShellProps {
   readonly gameId: number;
+  readonly initialProject?: GameProject;
   readonly repository?: GameDraftRepository | null;
   readonly publisher?: GamePublisher | null;
   readonly persistenceLabel?: string;
@@ -136,6 +137,7 @@ const downloadProject = (project: GameProject): void => {
 
 export const GameStudioShell = ({
   gameId,
+  initialProject,
   repository: repositoryProp,
   publisher = null,
   persistenceLabel = '브라우저',
@@ -152,7 +154,7 @@ export const GameStudioShell = ({
   );
   const previewRepository = useMemo(() => createBrowserDraftRepository(), []);
   const recoveryJournal = useMemo(() => createBrowserRecoveryJournal(), []);
-  const store = useMemo(() => createGameProjectStore(createStarterProject(gameId)), [gameId]);
+  const store = useMemo(() => createGameProjectStore(initialProject ?? createStarterProject(gameId)), [gameId, initialProject]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getState, store.getState);
   const project = snapshot.project;
   const assetUrls = useResolvedAssetUrls(project.assets, assetRepository);
@@ -173,6 +175,8 @@ export const GameStudioShell = ({
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
+  const [fitRequestToken, setFitRequestToken] = useState(0);
+  const [focusRequestToken, setFocusRequestToken] = useState(0);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>('SELECT');
   const [showGrid, setShowGrid] = useState(true);
   const [showCollisions, setShowCollisions] = useState(false);
@@ -1138,8 +1142,13 @@ export const GameStudioShell = ({
                   title="배치된 오브젝트 찾기·잠금·숨김 (Alt+L)"
                   type="button"
                 >레이어 {selectedScene.objects.length}</button>
+                <div className="gss-view-controls" role="group" aria-label="캔버스 보기">
+                  <button onClick={() => setFitRequestToken((current) => current + 1)} title="전체 맵이 화면에 들어오도록 맞춤" type="button">전체</button>
+                  <button disabled={selectedObjectId === null} onClick={() => setFocusRequestToken((current) => current + 1)} title="선택한 오브젝트를 화면 중앙으로 이동" type="button">선택 위치</button>
+                  <button onClick={() => setZoom(100)} title="셀 한 칸을 32px로 표시" type="button">1:1</button>
+                </div>
                 <div className="gss-zoom-controls">
-                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(50, current - 10))} type="button">−</button>
+                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(10, current - 10))} type="button">−</button>
                   <span>{zoom}%</span>
                   <button aria-label="확대" onClick={() => setZoom((current) => Math.min(200, current + 10))} type="button">+</button>
                 </div>
@@ -1151,6 +1160,8 @@ export const GameStudioShell = ({
               assets={project.assets}
               assetUrls={assetUrls}
               canvasTool={canvasTool}
+              fitRequestToken={fitRequestToken}
+              focusRequestToken={focusRequestToken}
               editorHiddenObjectIds={editorHiddenObjectIds}
               editorLockedObjectIds={editorLockedObjectIds}
               onMoveObjects={(objectIds, deltaX, deltaY) => {
@@ -1170,6 +1181,7 @@ export const GameStudioShell = ({
               }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
+              onZoomChange={setZoom}
               onSelectObjects={selectObjects}
               placementPreset={placementPreset}
               scene={selectedScene}

@@ -22,6 +22,7 @@ import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../a
 import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { findPublishBlockers } from '../ports/publishValidation.ts';
+import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
   readonly project: GameProject;
@@ -71,6 +72,9 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
+  const projectHealth = analyzeProjectHealth(project);
+  const passedHealthChecks = projectHealth.filter((check) => check.status === 'PASS').length;
+  const blockingHealthChecks = projectHealth.filter((check) => check.status === 'BLOCKER').length;
   const rules = project.rules ?? DEFAULT_GAME_RULES;
   const replaceObjectives = (objectives: readonly GameObjective[]) => onApply(replaceGameRules(project, {
     ...rules,
@@ -83,6 +87,25 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
   return <div className="gss-panel-stack">
     <div className="gss-panel-heading"><div><span className="gss-eyebrow">PROJECT DATA</span><h2>게임 규칙 데이터</h2></div></div>
     <div className="gss-budget-card"><header><strong>프로젝트 저장 용량</strong><span>{(projectBytes / 1024).toFixed(1)} KB / 2 MB</span></header><div><i style={{ width: `${projectUsage}%` }} /></div><p>이미지·오디오는 별도 자산 저장소에 보관되어 이 용량에 포함되지 않습니다.</p></div>
+    <section className={`gss-health-card${blockingHealthChecks === 0 && passedHealthChecks === projectHealth.length ? ' is-ready' : ''}`}>
+      <header>
+        <div><span className="gss-eyebrow">PLAYABILITY CHECK</span><strong>게임 완성도 점검</strong></div>
+        <span>{passedHealthChecks}/{projectHealth.length}</span>
+      </header>
+      <p>{blockingHealthChecks > 0 ? '게시 전에 막힌 항목부터 해결하세요.' : '경고는 게시를 막지 않지만 플레이 감각을 위해 확인하는 것이 좋습니다.'}</p>
+      <div>
+        {projectHealth.map((check) => (
+          <article className={`is-${check.status.toLowerCase()}`} key={check.id}>
+            <span aria-hidden="true">{check.status === 'PASS' ? '✓' : check.status === 'BLOCKER' ? '!' : '△'}</span>
+            <div>
+              <strong>{check.title}</strong>
+              <small>{check.detail}</small>
+              {check.locations.length > 0 && <em>{check.locations.slice(0, 3).join(' · ')}{check.locations.length > 3 ? ` 외 ${check.locations.length - 3}곳` : ''}</em>}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
     <div className="gss-section-title"><span>GAME GOALS</span><small>{rules.completion.objectives.length}/3</small></div>
     <div className="gss-help-card"><strong>게임이 언제 끝나는지 정하세요</strong><p>목표를 고르면 플레이 화면에 진행도가 자동 표시되고, 달성하는 순간 게임이 완료됩니다. 목표가 없으면 문·포털·대화 이벤트의 “게임 완료”를 사용합니다.</p></div>
     {rules.completion.objectives.length > 1 && (

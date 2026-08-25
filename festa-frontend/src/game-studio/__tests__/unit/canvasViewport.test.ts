@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GameObject } from '../../contracts/gameProject.ts';
 import {
   calculateGridViewport,
+  calculateFitZoom,
   expandGridViewport,
   objectsInViewport,
   tileIndexesInViewport,
@@ -17,6 +18,12 @@ const rect = (left: number, top: number, width: number, height: number) => ({
 });
 
 describe('Game Studio large-map viewport culling', () => {
+  it('calculates a bounded zoom that fits the whole map', () => {
+    expect(calculateFitZoom(1_000, 700, 100, 50)).toBe(25);
+    expect(calculateFitZoom(1_000, 700, 16, 10)).toBe(180);
+    expect(calculateFitZoom(200, 120, 200, 100)).toBe(10);
+  });
+
   it('converts the visible canvas intersection to grid coordinates', () => {
     const viewport = calculateGridViewport(
       rect(100, 100, 640, 480),
