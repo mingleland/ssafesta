@@ -25,23 +25,25 @@
 2. **Given** 저장된 AI 직원, **When** 설정을 수정하면, **Then** 변경이 반영된다.
 3. **Given** 다른 부스의 소유자, **When** 남의 AI 직원에 접근하면, **Then** 거부된다.
 
-### User Story 2 — 문서를 올리면 AI가 그 내용으로 답한다 (Priority: P0)
+### User Story 2 — 문서를 올리면 AI가 검색에 사용할 수 있다 (Priority: P0)
 
-소유자가 문서를 업로드하면 처리 과정을 거쳐 AI가 그 내용을 근거로 답할 수 있게 된다.
+소유자가 문서를 업로드하면 처리 과정을 거쳐 해당 AI 직원의 RAG 검색 범위에서 사용할 수 있게 된다.
 
-**Why this priority**: RAG의 입력. 이게 없으면 AI가 일반 지식만 말한다.
+**Why this priority**: RAG의 입력 준비 단계다. 실제 질문·답변 생성과 SSE 전달은 spec 008이 담당한다.
 
-**Independent Test**: 문서 업로드 → 상태가 처리중→준비완료로 변함 → 해당 문서 내용을 물으면 답변에 반영됨.
+**Independent Test**: 문서 업로드 → 상태가 처리중→준비완료로 변함 → 해당 `boothId + agentId` 범위 검색의 Top-K에 문서 조각이 포함됨.
 
 **Acceptance Scenarios**:
 
 1. **Given** AI 직원이 있는 소유자, **When** 문서를 업로드하면, **Then** 업로드가 접수되고 처리 상태를 볼 수 있다.
-2. **Given** 처리 중인 문서, **When** 상태를 조회하면, **Then** 진행 상황(대기/처리중/준비완료/실패)을 알 수 있다.
+2. **Given** 처리 중인 문서, **When** 상태를 조회하면, **Then** 진행 상황(대기/처리중/준비완료/실패/업로드 만료)을 알 수 있다.
 3. **Given** 처리에 실패한 문서, **When** 상태를 보면, **Then** **실패 사유**를 알 수 있다.
 4. **Given** 문서가 처리 중, **When** 사용자가 다른 기능을 쓰면, **Then** 정상 동작한다 (비동기).
-5. **Given** 준비완료된 문서, **When** 그 내용을 AI에게 물으면, **Then** 문서 내용을 근거로 답한다.
+5. **Given** 준비완료된 문서, **When** 해당 `boothId + agentId` 범위로 검색하면, **Then** 관련 문서 조각이 Top-K 결과에 포함된다.
 6. **Given** 문서 처리 중 실행 서버가 중단됨, **When** 서비스가 복구되면, **Then** 중단된 작업은 자동으로 재시도되거나 재시도 상한 초과 사유와 함께 실패로 종료된다.
 7. **Given** AI 처리 서비스가 일시적으로 응답하지 않음, **When** 소유자가 문서 목록과 상태를 조회하면, **Then** 기존 문서 상태를 계속 확인할 수 있다.
+8. **Given** 업로드를 완료하지 않은 문서, **When** 생성 후 1시간이 지나면, **Then** 문서는 `EXPIRED`로 표시되고 RAG 처리 대상에 포함되지 않는다.
+9. **Given** `EXPIRED` 전환 후 24시간 안에 업로드 완료를 요청함, **When** 원본 객체가 남아 있으면, **Then** 동일 문서가 `QUEUED`로 복구되어 정상 처리된다.
 
 ### User Story 3 — 문서를 관리한다 (Priority: P1)
 
@@ -55,9 +57,14 @@
 - MVP는 PDF만 허용하며 파일당 20MB를 초과하면 명확한 사유와 함께 거부한다.
 - 텍스트를 추출할 수 없는 스캔 이미지 PDF는 OCR 지원 범위 밖이므로 `FAILED`와 구체적인 실패 사유를 제공한다.
 - 같은 문서를 두 번 올린 경우 동일 AI 직원에 등록된 활성 문서와 파일 SHA-256이 같으면 중복으로 판정하고 재처리하지 않는다. 수정본 교체는 기존 문서를 지정하는 별도 교체 요청으로 처리한다.
+- 업로드 URL은 발급 후 15분간 유효하다. 문서 생성 후 1시간 동안 업로드가 완료되지 않으면 `EXPIRED`로 전환하고, 전환 후 24시간 동안 늦은 완료 요청을 복구할 수 있도록 원본을 보존한다. 이후에도 미완료면 Spring이 원본 삭제를 재시도한다.
+- `EXPIRED` 문서의 늦은 완료 요청에서 원본이 남아 있으면 `QUEUED`로 복구하고, 이미 삭제되었으면 새 업로드 권한을 받도록 안내한다.
 - 처리 중 임대가 만료되면 문서 원본·메타데이터는 보존하고 `DocumentStatus`를 `DISABLED`, 실행 중인 `JobStatus`를 `CANCELLED`로 전환한다. 완료 직전에도 Lease를 다시 확인해 만료된 문서가 `READY`가 되지 않도록 하며, 재임대 후 활성화할 때는 `QUEUED`부터 다시 처리한다.
 - 처리 도중 서버가 재시작되거나 Worker heartbeat가 끊기면 만료된 실행 작업을 회수해 재시도한다. 최대 3회의 재시도 후에도 완료하지 못하면 실행 작업은 `DEAD`, 문서는 정제된 실패 사유와 함께 `FAILED`가 되며 영원히 `PROCESSING`에 머물지 않는다.
 - 문서가 많은 경우에도 검색 전에 `boothId + agentId + READY`로 범위를 제한한다. AI 직원당 문서는 최대 10개·총 100MB로 제한하고, 최대 허용량에서 검색 응답 P95 1초 이하 및 정답 근거 문서의 Top-K 포함률 95% 이상을 검증한다.
+- 내부 Service Token 교체 중에는 수신자가 기존·신규 토큰을 먼저 함께 허용한 뒤 송신 토큰을 전환하고, 안정화 확인 후 기존 토큰을 제거해 배포 순서 차이로 `401`이 발생하지 않게 한다.
+- R2 장애 시 자동으로 MinIO로 전환하거나 양쪽에 동시에 쓰지 않는다. 운영자가 검증·승인한 뒤 활성 **쓰기** Provider만 바꾸며, 기존 문서는 문서별 `storageProvider + bucket + objectKey`가 가리키는 저장소에서 계속 읽는다.
+- 업로드를 재개하려는 동안 활성 쓰기 Provider가 바뀌었으면 기존 미완료 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 업로드를 시작한다.
 
 ---
 
@@ -70,11 +77,11 @@
 - **FR-003**: 다른 부스의 AI 직원에 접근할 수 없어야 한다.
 - **FR-004**: 소유자는 AI 직원에 문서를 업로드할 수 있어야 한다.
 - **FR-005**: 문서 처리는 **비동기**여야 하며 다른 기능을 막아서는 안 된다.
-- **FR-006**: 문서는 **`DocumentStatus`(`QUEUED`/`PROCESSING`/`READY`/`FAILED`/`DISABLED`)** 를 가져야 하고 조회할 수 있어야 한다.
+- **FR-006**: 문서는 **`DocumentStatus`(`QUEUED`/`PROCESSING`/`READY`/`FAILED`/`DISABLED`/`EXPIRED`)** 를 가져야 하고 조회할 수 있어야 한다. `EXPIRED`는 사용자에게 **업로드 만료**로 표시한다.
 - **FR-007**: 실패한 문서는 사용자가 이해하고 대응할 수 있도록 정제된 **실패 사유**를 제공해야 하며, 내부 예외·Stack Trace·외부 Provider 원문 오류를 노출해서는 안 된다.
 - **FR-008**: 처리된 문서 조각에는 **boothId, agentId, 임베딩 모델 식별자**가 기록되어야 한다 (헌법 18조).
 - **FR-009**: 임베딩 차원은 **1536으로 고정**한다 (헌법 18조).
-- **FR-010**: 문서 원본은 **Cloudflare R2(S3-compatible)** 를 우선 사용하고 R2를 사용할 수 없을 때는 S3-compatible fallback을 적용한다. 문서 메타데이터의 Source of Truth는 **Spring**이 소유하고, 처리·검색은 FastAPI가 담당한다 (헌법 1조).
+- **FR-010**: 문서 원본은 **Cloudflare R2(S3-compatible)** 를 기본으로 사용하고 장기 장애 시 운영자 승인 기반의 단일 노드 MinIO fallback을 적용한다. 자동 failover·이중 쓰기·자동 원복은 금지하며, 문서 메타데이터의 Source of Truth는 **Spring**이 소유하고 처리·검색은 FastAPI가 담당한다 (헌법 1조).
 - **FR-011**: MVP는 PDF만 허용하며 파일당 최대 크기는 20MB다. 허용 형식과 크기를 초과하면 명확한 사유와 함께 거부해야 한다.
 - **FR-012**: 소유자는 문서를 삭제할 수 있어야 하며, 삭제 후 답변에 사용되지 않아야 한다.
 - **FR-013**: 처리 실패나 중단이 **월드·부스·비AI 기능을 중단시켜서는 안 된다** (헌법 3조).
@@ -90,11 +97,19 @@
 - **FR-023**: 사용자에게 노출되는 문서 상태와 내부 실행 작업 상태는 분리해야 하며, AI 처리 서비스가 중단되어도 사용자는 문서 목록과 마지막 상태를 조회할 수 있어야 한다.
 - **FR-024**: 실행 작업을 재처리할 때 기존 문서 조각이 남거나 중복되지 않아야 하며, 완료된 새 조각 집합만 검색에 사용해야 한다.
 - **FR-025**: 동일 문서에 활성 실행 작업은 하나만 존재해야 하며, 중복 처리 요청에는 기존 활성 작업을 반환해야 한다.
+- **FR-026**: 업로드 URL의 기본 유효시간은 15분이며, 생성 후 1시간 동안 완료되지 않은 문서는 `EXPIRED`로 전환해야 한다. 만료 판정 주기는 5분을 기본값으로 하되 운영 설정으로 조정할 수 있어야 한다.
+- **FR-027**: `EXPIRED` 전환 후 24시간 동안 원본을 보존해야 한다. 이 기간의 늦은 완료 요청은 원본이 있으면 `QUEUED`로 복구하고, 원본이 없으면 새 업로드 권한이 필요함을 알려야 한다.
+- **FR-028**: Spring은 `EXPIRED` 전환 후 24시간이 지난 미완료 원본을 R2에서 삭제해야 한다. 삭제 실패 시 `EXPIRED` 상태와 object key를 유지하고 성공할 때까지 재시도해야 한다.
+- **FR-029**: Spring↔FastAPI 내부 호출은 방향별로 분리된 Bearer Service Token을 사용해야 한다. 수신자는 네트워크 차단 설정과 독립적으로 토큰을 항상 검증하고, 누락·오류·반대 방향 토큰은 `401`로 거부해야 한다. Secret은 해당 방향의 송신자와 수신자에만 주입하고 저장소·로그에 기록해서는 안 된다.
+- **FR-030**: 각 문서는 `storageProvider(R2/MINIO_LOCAL) + bucket + objectKey`를 가져야 한다. 신규 업로드는 Spring의 활성 쓰기 Provider를 사용하고, FastAPI는 전역 활성 Provider가 아니라 문서 메타데이터의 저장소 식별자로 원본을 읽어야 한다.
+- **FR-031**: R2 장애 감지는 신규 업로드를 `UPLOAD_BLOCKED`까지만 자동 전환할 수 있다. MinIO 전환과 R2 원복은 운영자의 검증·승인이 있어야 하며, 검증된 객체만 reconcile 후 Provider를 R2로 변경해야 한다.
+- **FR-032**: 업로드 미완료 문서를 재개할 때 활성 쓰기 Provider가 기존 문서의 Provider와 다르면 기존 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 시작해야 한다.
+- **FR-033**: 저장소 일시 장애는 기존 1·5·15분 정책으로 최대 3회 재시도하고, 이후 Job을 `DEAD`, 문서를 `FAILED`로 종료해야 한다. 원본 유실 방지나 MinIO 고가용성을 보장하는 것으로 표현해서는 안 된다.
 
 ### State Model
 
 ```yaml
-DocumentStatus: QUEUED / PROCESSING / READY / FAILED / DISABLED
+DocumentStatus: QUEUED / PROCESSING / READY / FAILED / DISABLED / EXPIRED
 JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 ```
 
@@ -107,6 +122,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | `READY` | 처리 완료, RAG 검색 가능 |
 | `FAILED` | 처리 실패, 실패 사유 확인 가능 |
 | `DISABLED` | 원본·메타데이터는 보존하지만 RAG 검색에서 제외 |
+| `EXPIRED` | 업로드 미완료로 만료됨. RAG 처리·검색에서 제외되며 보존 기간 안에는 완료 요청으로 복구 가능 |
 
 | JobStatus | 의미 |
 |---|---|
@@ -137,15 +153,18 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 ## Success Criteria
 
-- **SC-001**: 소유자가 안내 없이 AI 직원을 만들고 문서를 올려 준비완료까지 도달한다.
+- **SC-001**: AI 직원 생성부터 문서 업로드·`READY` 전환·해당 `boothId + agentId` 범위 검색까지의 E2E 검증이 성공한다.
 - **SC-002**: 문서 처리 중에도 월드·부스·다른 기능이 100% 정상 동작한다.
 - **SC-003**: 영원히 "처리중"에 머문 문서가 0건이다.
 - **SC-004**: 다른 부스의 문서 조각이 검색된 사례가 **0건** (008의 Critical Test와 연동).
-- **SC-005**: 실패한 문서의 사유만 보고 사용자가 대처할 수 있다.
+- **SC-005**: 정의된 문서 처리 실패 코드마다 비어 있지 않은 정제된 한국어 대응 메시지를 제공하고, 메시지에서 Secret·Stack Trace·object key·Provider 원문 오류 노출은 0건이다.
 - **SC-006**: AI 직원당 최대 허용량(문서 10개·총 100MB)에서 검색 응답 시간은 P95 1초 이하다.
 - **SC-007**: 사전에 정답 근거 문서를 지정한 품질 평가 질문에서 해당 문서가 Top-K에 포함되는 비율은 95% 이상이다.
 - **SC-008**: 처리 서버 강제 종료 시험에서 중단된 작업의 100%가 자동 회수되어 재시도되거나 최종 실패로 종료된다.
 - **SC-009**: AI 처리 서비스 중단 중에도 사용자는 기존 문서 목록과 마지막 처리 상태를 조회할 수 있다.
+- **SC-010**: 업로드 미완료 문서는 생성 후 1시간과 다음 5분 판정 주기 안에 100% `EXPIRED`로 전환되고, 보존 기한이 지난 원본은 삭제되거나 재시도 대상으로 남는다.
+- **SC-011**: 두 내부 API에서 유효한 방향 토큰만 허용하고 누락·오류·반대 방향 토큰은 100% `401`로 거부하며, `[old] → [old,new] → [new,old] → [new]` 회전 검증 중 정상 호출 실패는 0건이다.
+- **SC-012**: R2 차단→운영자 승인→MinIO 전환→문서별 Provider 읽기→R2 reconcile→승인 원복 시험에서 자동 Provider 변경과 이중 쓰기는 0건이고, 검증되지 않은 객체의 Provider 변경은 0건이다.
 
 ---
 
@@ -159,7 +178,10 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-04 | 처리 큐를 도입하는가? | AI + Infra | **확정: P0 인프로세스 Worker + 영속 Job 저장소. heartbeat 30초, Worker lease 90초, sweeper 60초, 최대 3회 재시도(1·5·15분 대기). 부하 실측 후 SQS 검토. 세부 계약은 [Issue #11](https://github.com/kanghyunsoon/ssafesta/issues/11) 참조** |
 | C-05 | AI 직원당 문서 수·총량 상한은? | AI + 기획 | **확정: 최대 10개·총 100MB** |
 | C-06 | 스캔 PDF(OCR 필요)를 지원하는가? | AI | **확정: MVP 제외, 텍스트 추출 불가 시 구체적 실패 사유와 함께 `FAILED`** |
-| C-07 | 문서 원본 저장 위치는? | BE + Infra | **확정: Cloudflare R2(S3-compatible) 우선, R2 사용 불가 시 S3-compatible fallback. 메타데이터 Source of Truth는 Spring** ([Issue #51](https://github.com/kanghyunsoon/ssafesta/issues/51)) |
+| C-07 | 문서 원본 저장 위치는? | BE + Infra | **확정: Cloudflare R2(S3-compatible) 우선, 장기 장애 시 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님, C-10 참조). 메타데이터 Source of Truth는 Spring** ([Issue #51](https://github.com/kanghyunsoon/ssafesta/issues/51), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-08 | 업로드 미완료 문서의 만료·정리 정책은? | BE + Infra + FE | **확정: 업로드 URL 15분, 생성 후 1시간에 `EXPIRED`, 전환 후 24시간 보존 뒤 Spring이 R2 원본 삭제·실패 재시도. `EXPIRED`는 업로드 만료로 표시** ([GitLab Work Item #84](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/84)) |
+| C-09 | Spring↔FastAPI 내부 API를 어떻게 인증하고 회전하는가? | AI + BE + Infra | **확정: 방향별 Bearer Token 2종, Security Group과 독립적인 애플리케이션 검증, 콤마 목록 최대 2개, 첫 값 송신·전체 값 상수 시간 검증, 단계적 무중단 회전. mTLS는 P2** ([GitLab Work Item #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/102)) |
+| C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도. 미확정: `R2_RECONCILING` 중 신규 업로드, R2 API 장애 판정 수치, reconcile 영속 기록 위치·스키마, quota 오류 HTTP 코드** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 
 ### Session 2026-08-20
 
@@ -169,14 +191,22 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: 처리 서버 재시작과 Worker heartbeat 만료를 어떻게 복구하는가? → A: 사용자 문서 상태와 내부 실행 상태를 분리하고, 영속 Job을 heartbeat 30초·lease 90초·sweeper 60초 기준으로 회수한다. 최대 3회 재시도(1·5·15분 대기) 후 `DEAD → FAILED`로 종료한다.
 - Q: Worker lease 만료와 부스 임대 만료는 같은가? → A: 다르다. Worker lease 만료는 `RETRY_WAIT`로 복구하며, 부스 임대 만료는 `CANCELLED → DISABLED`로 처리한다.
 
+### Session 2026-08-25
+
+- Q: 업로드 미완료 문서는 어떻게 정리하는가? → A: 업로드 URL은 15분, 미완료 문서는 생성 후 1시간에 `EXPIRED`, 24시간 보존 후 Spring이 R2 원본을 삭제한다. 보존 기간 내 늦은 완료는 원본이 있으면 `QUEUED`로 복구한다.
+- Q: Spring↔FastAPI 내부 API 인증과 토큰 회전은 어떻게 하는가? → A: 방향별 토큰을 콤마 목록으로 주입하고 첫 값만 송신하며 수신자는 최대 2개 값을 상수 시간으로 검증한다. 회전은 `[old] → [old,new] → [new,old] → [new]` 순서로 수행하고 mTLS는 P2로 둔다.
+- Q: R2 장애 시 저장소를 어떻게 전환하는가? → A: 자동 failover·이중 쓰기·자동 원복 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로 전환한다. 신규 쓰기는 Spring 설정을 따르고 기존 읽기는 문서별 Provider를 따른다. C-10의 잔여 항목은 추가 합의 전 구현자가 정하지 않는다.
+
 ---
 
 ## Out of Scope
 
+- 문서 기반 실제 질문·LLM 답변 생성 및 SSE 전달 (spec 008)
 - Agent Test Studio (P2 — AI-07)
 - 음성 상담 (P2 — AI-08)
 - 문서 자동 요약·태깅
 - 스캔 이미지 PDF OCR
+- 내부 API mTLS 인증서 발급·갱신·폐기 자동화(P2 보안 강화)
 
 ---
 
@@ -184,7 +214,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 | 항목 | 내용 | 완료 |
 |---|---|---|
-| ① Clarification 답변 (C-01~C-07) | 전 항목 확정. C-04 서버 재시작 복구 계약까지 Issue #11 합의로 반영 | ☑ |
+| ① Clarification 답변 (C-01~C-10) | C-01~C-09 확정. C-10 수동 fallback의 핵심 방향은 반영했으나 reconcile 중 업로드·장애 판정 수치·reconcile 기록·quota 오류 코드는 미확정 | ☐ |
 | ② 틀렸거나 과한 요구사항 지적 | | ☑ |
 | ③ 빠진 요구사항 추가 | | ☑ |
 
