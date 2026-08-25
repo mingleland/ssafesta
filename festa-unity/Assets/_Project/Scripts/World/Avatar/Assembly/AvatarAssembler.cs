@@ -187,6 +187,10 @@ namespace Festa.Avatar
             {
                 var parts = group.ToList();
                 if (parts.Count < 2) continue;
+                // 빌드에서는 메시가 읽기 불가다 — Read/Write Enabled 가 꺼져 있으면
+                // vertices/triangles 접근이 예외를 던진다. 에디터에서는 통과하고
+                // **빌드에서만 아바타가 깨지는** 형태라 반드시 먼저 확인한다 (T-203).
+                if (parts.Any(p => !p.sharedMesh.isReadable)) continue;
                 if (!BonesAndBindposesMatch(parts)) continue;
                 var mergedGo = BuildMergedRenderer(parts);
                 if (mergedGo == null) continue;
