@@ -19,7 +19,7 @@
 - 🤖 Mock 브라우저에서 일반 16×10 맵과 최대 fixture를 모두 확인했다. 최대 맵은 전체 보기 15%에서 Tile DOM 0개/10,000칸 Canvas 합성, 1:1에서 Object 36/500·Tile 640/10,000만 렌더했다. 미니맵 중앙 이동은 화면 Object를 X 34~65/Y 54~72대로 바꿨고, 레이어 검색 `playerSpawn` 선택은 원거리 Canvas와 4방향 애니메이션 Inspector로 이동했다. 대화 흐름 1/1과 완성도 6/6도 실제 화면에서 확인했다.
 - 🤖 FE spec/plan/tasks/quickstart를 FR-068~071, SC-015, T118~T121로 갱신했다. 총 100개/완료 92개/잔여 8개이며 사람 20분 제작 테스트와 활성 PC 55fps 증거가 남아 있어 T090·T065는 완료 처리하지 않았다.
 - 🤖 코드 변경은 Jira 브랜치 `feat/S15P21A604-156-game-studio-authoring-quality`의 `1735be1`로 고정했다. 일반 Frontend·Backend·AI·Unity 코드와 shared JSON schema는 변경하지 않았다.
-- 트러블슈팅: GS-T058~GS-T060
+- 트러블슈팅: GS-T058~GS-T061
 
 ### 대형 맵 편집 성능·공간 탐색 고도화 ✅
 
