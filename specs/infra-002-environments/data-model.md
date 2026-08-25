@@ -88,7 +88,7 @@
 
 | Field | Type | Rule |
 |---|---|---|
-| `providerId` | string | `r2-documents`, `r2-backups`, `minio-emergency` |
+| `providerId` | enum | 문서용 `R2`, `MINIO_LOCAL`; 백업용 `R2_BACKUPS` |
 | `providerType` | enum | `R2`, `MINIO` |
 | `endpointRef`, `region` | config | S3 adapter input |
 | `bucket` | string | document와 backup 별도 |
@@ -101,6 +101,8 @@
 
 문서 bucket과 backup bucket의 credential은 교차 접근하지 못한다.
 
+Spring과 FastAPI의 provider registry에는 문서용 `R2`와 `MINIO_LOCAL` 연결 reference를 동시에 유지한다. 활성 쓰기 provider는 Spring만 소비하며 FastAPI는 문서/Job의 `providerId`로 읽기 provider를 선택한다.
+
 ## 6. Temporary Object Grant and Upload Verification
 
 ### Temporary Object Grant
@@ -108,7 +110,7 @@
 | Field | Type | Rule |
 |---|---|---|
 | `grantId` | UUID/string | 서버 생성 |
-| `environmentId`, `documentId`, `providerId` | refs | 권위 있는 metadata에서 결정 |
+| `environmentId`, `documentId`, `providerId` | refs | grant 발급 당시 권위 있는 metadata에서 결정하고 이후 active write provider 변경으로 바꾸지 않음 |
 | `bucket`, `objectKey` | string | 단일 객체에 고정 |
 | `operation` | enum | `PUT`, `GET`, `HEAD` |
 | `expectedSizeBytes`, `expectedContentType`, `expectedSha256` | values | 허용 정책과 일치 |
@@ -134,7 +136,7 @@ ISSUED → UPLOADED_REPORTED → HEAD_VERIFIED → BODY_VERIFIED → CONSUMED
 
 `grantId`, `verifiedAt`, HEAD status, length, declared type, detected type, ETag, verified SHA-256, result, rejection reason, `processingAllowed`, evidence reference를 가진다. ETag는 SHA-256의 대체값이 아니다.
 
-## 7. Usage Guard Snapshot
+## 7. Usage Admission Snapshot
 
 JSON 형식은 [usage-guard.schema.json](./contracts/usage-guard.schema.json)을 따른다.
 
@@ -148,7 +150,7 @@ JSON 형식은 [usage-guard.schema.json](./contracts/usage-guard.schema.json)을
 | `classARequests`, `classBRequests` | integer | month-to-date account 합계 |
 | `limits` | object | 값·source URL·verified date 포함 |
 | `ratios` | object | storage current/projected, A, B, max |
-| `state` | enum | `NORMAL`, `WARNING`, `UPLOAD_BLOCKED`, `STALE_BLOCKED` |
+| `state` | enum | `UsageAdmissionState`: `NORMAL`, `WARNING`, `UPLOAD_BLOCKED`, `STALE_BLOCKED` |
 | `existingReadsAllowed` | boolean | 항상 true |
 | `evidenceRef` | string | Secret 없는 snapshot/report |
 
@@ -161,16 +163,22 @@ maxRatio ≥ 0.90                 → UPLOAD_BLOCKED
 now - dataFreshThrough > 60 min → STALE_BLOCKED (ratio보다 우선)
 ```
 
+이 snapshot은 R2 사용량과 지표 freshness만 판정한다. active write provider, MinIO 상태 또는 운영자 승인 정보는 포함하지 않으며 [storage-failover-state.schema.json](./contracts/storage-failover-state.schema.json)의 control state를 변경하지 않는다.
+
 ## 8. Storage Failover State
+
+JSON 형식은 [storage-failover-state.schema.json](./contracts/storage-failover-state.schema.json)을 따른다.
 
 | Field | Type | Rule |
 |---|---|---|
 | `state` | enum | 아래 전이 중 하나 |
-| `activeWriteProvider` | provider ref/null | blocked 상태는 null |
+| `uploadEnabled` | boolean | `R2_ACTIVE`, `LOCAL_ACTIVE`에서만 true |
+| `activeWriteProvider` | provider ref/null | true이면 각각 `R2`, `MINIO_LOCAL`; blocked/검증/reconcile 상태는 null |
+| `providerConfigRefs` | map | R2·MinIO 설정/Secret 묶음의 reference; 원문 금지 |
 | `changedBy` | operator id | 자동 전환 금지 |
-| `changedAt`, `reason` | audit | 필수 |
+| `changedAt`, `reason`, `approvalRef` | audit | 필수 |
 | `validationEvidenceRefs` | string[] | provider probe 결과 |
-| `backlogObjectCount`, `reconciliationCursor` | recovery | MinIO → R2 진행 상태 |
+| `backlogObjectCount`, `reconciliationRunId`, `reconciliationCursor` | recovery | MinIO → R2 진행 상태 |
 | `lastVerifiedAt` | timestamp | 상태 검증 시각 |
 
 ```text
@@ -182,7 +190,35 @@ R2_ACTIVE
   → R2_ACTIVE
 ```
 
-모든 전이는 운영자 승인과 evidence를 요구한다. `LOCAL_ACTIVE` 객체는 provider metadata가 `MINIO_LOCAL`이고 reconcile 검증 전에는 R2 객체로 표시하지 않는다.
+모든 전이는 운영자 승인과 evidence를 요구한다. `LOCAL_ACTIVE` 객체는 provider metadata가 `MINIO_LOCAL`이고 reconcile 검증 전에는 R2 객체로 표시하지 않는다. P0에서는 `R2_RECONCILING` 동안 `uploadEnabled=false`로 backlog를 고정한다.
+
+### Reconciliation Run
+
+| Field | Type | Rule |
+|---|---|---|
+| `runId`, `environmentId` | identity | 운영자가 시작한 reconcile 실행 |
+| `sourceProvider`, `targetProvider` | enum | `MINIO_LOCAL` → `R2` 고정 |
+| `startedBy`, `approvedBy` | operator refs | 자동 실행 금지 |
+| `startedAt`, `finishedAt` | timestamp/null | UTC |
+| `status` | enum | `RUNNING`, `VERIFIED`, `UNRESOLVED` |
+| `backlogObjectCount`, `verifiedCount`, `unresolvedCount` | integer | 합계가 inventory와 일치 |
+| `evidenceRef` | ref | 민감정보 제거 결과 |
+
+### Reconciliation Item
+
+| Field | Type | Rule |
+|---|---|---|
+| `runId`, `documentId`, `objectKey` | identity/refs | 문서 metadata와 연결 |
+| `sourceProvider`, `targetProvider` | enum | `MINIO_LOCAL` → `R2` |
+| `expectedSize`, `actualSize` | integer/null | byte 대조 |
+| `expectedDetectedType`, `actualDetectedType` | string/null | client declared type이 아닌 감지 형식 대조 |
+| `expectedSha256`, `actualSha256` | digest/null | 전체 본문 SHA-256 |
+| `status` | enum | `PENDING`, `VERIFIED`, `UNRESOLVED` |
+| `attemptCount`, `failureReason` | integer/string/null | 미해결 사유 필수 |
+| `checkedAt`, `resolvedAt` | timestamp/null | 감사 시각 |
+| `evidenceRef` | ref | Secret·presigned URL 원문 금지 |
+
+`VERIFIED` item만 application metadata의 provider를 R2로 변경할 수 있다. `UNRESOLVED` item이 1건이라도 있으면 run은 `VERIFIED`가 될 수 없고 `R2_ACTIVE` 전이를 승인하지 않는다.
 
 ## 9. Redis Cache Class
 
@@ -247,6 +283,8 @@ RAG document, metadata, chunk, vector와 survey/question/response는 이 모델�
 - Environment Manifest `deploymentTargetIds[*]` → infra-001 verification `targetId`.
 - Runtime Service `releaseId` → infra-001 release provenance.
 - PostgreSQL Binding → Backup Set N:1/1:N.
-- Temporary Object Grant → Object Storage Provider N:1, Upload Verification 1:0..1.
+- Temporary Object Grant → Object Storage Provider N:1, Upload Verification 1:0..1. grant의 provider는 active write provider가 바뀌어도 고정된다.
 - Redis Cache Class → PostgreSQL/R2 Source of Truth reference, Redis value 자체는 영구 entity가 아님.
+- Usage Admission Snapshot과 Storage Failover State는 서로 변경하지 않는 별도 상태다.
 - Storage Failover State는 active write provider만 바꾸며 기존 object provider metadata를 일괄 추정하지 않는다.
+- Storage Failover State → Reconciliation Run 1:0..N, Reconciliation Run → Reconciliation Item 1:N.

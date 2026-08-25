@@ -25,6 +25,9 @@ CLOUDFLARE_ACCOUNT_ID_REF
 CLOUDFLARE_ANALYTICS_TOKEN_REF
 R2_DOCUMENT_SIGNER_CREDENTIAL_REF
 R2_DOCUMENT_READER_CREDENTIAL_REF
+MINIO_DOCUMENT_SIGNER_CREDENTIAL_REF
+MINIO_DOCUMENT_READER_CREDENTIAL_REF
+STORAGE_FAILOVER_STATE_REF
 R2_BACKUP_WRITER_CREDENTIAL_REF
 R2_RESTORE_READER_CREDENTIAL_REF
 POSTGRES_ADMIN_CREDENTIAL_REF
@@ -202,7 +205,7 @@ Expected:
 | max 90% | `UPLOAD_BLOCKED` | deny | allow |
 | 61m stale | `STALE_BLOCKED` | deny | allow |
 
-각 storage/current+projected, Class A, Class B 지표가 단독으로 임계값을 넘는 case와 다른 project bucket을 포함한 account 합계를 검증한다. snapshot은 [usage schema](./contracts/usage-guard.schema.json)에 맞아야 한다.
+각 storage/current+projected, Class A, Class B 지표가 단독으로 임계값을 넘는 case와 다른 project bucket을 포함한 account 합계를 검증한다. snapshot은 [usage schema](./contracts/usage-guard.schema.json)에 맞아야 하며 active provider 필드를 포함해서는 안 된다.
 
 ## 10. R2 outage, MinIO fallback and reconciliation
 
@@ -215,11 +218,13 @@ Expected sequence:
 1. `R2_ACTIVE → UPLOAD_BLOCKED`; 자동 provider 전환 없음.
 2. 운영자 승인 없이 `FALLBACK_VALIDATING` 또는 `LOCAL_ACTIVE` 진입 거부.
 3. disk/credential/PUT/HEAD/CORS/public-port probe 통과 후에만 `LOCAL_ACTIVE`.
-4. MinIO 9000/9001 외부 접근 실패, approved HTTPS upload만 성공.
-5. R2 복귀 후 `R2_RECONCILING`; object size/type/SHA 불일치가 있으면 상태 유지.
-6. 전량 검증 뒤 metadata provider가 R2로 바뀌고 `R2_ACTIVE`.
+4. `LOCAL_ACTIVE`의 Spring 신규 grant만 `MINIO_LOCAL`을 사용하고, 기존 R2 문서와 FastAPI Job은 문서별 provider를 사용한다.
+5. MinIO 9000/9001 외부 접근 실패, approved HTTPS upload만 성공.
+6. R2 복귀 후 `R2_RECONCILING`에서 신규 grant가 차단되고 고정 backlog만 검사된다.
+7. object size/detected type/SHA 불일치가 있으면 item은 `UNRESOLVED`, state는 `R2_RECONCILING`을 유지한다.
+8. 전량 검증과 운영자 승인 뒤 `VERIFIED` 객체의 metadata provider만 R2로 바뀌고 `R2_ACTIVE`.
 
-`LOCAL_ACTIVE` object가 EC2 유실 시 복구되지 않는다는 warning과 backlog count를 evidence에 남긴다. MinIO를 backup으로 보고하지 않는다.
+control state는 [storage failover schema](./contracts/storage-failover-state.schema.json)에 맞아야 한다. `LOCAL_ACTIVE` object가 EC2 유실 시 복구되지 않는다는 warning, backlog count, run/item별 검증 결과와 미해결 사유를 Secret 없는 evidence에 남긴다. MinIO를 backup으로 보고하지 않는다.
 
 ## 11. PostgreSQL backup and restore
 

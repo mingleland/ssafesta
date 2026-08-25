@@ -8,7 +8,7 @@
 
 IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반 dev/demo 실행 환경을 구성한다. Nginx만 80/443 공개 진입점으로 두고 최종 demo는 `Cloudflare DNS/Proxy → EC2 Nginx → 내부 서비스` 경로를 사용한다. 파트별 dev 배포와 `develop` 통합 demo는 network·설정·데이터·release state를 분리하고, 기존 `infra-001`의 release/verification/rollback 계약을 그대로 소비한다.
 
-한 PostgreSQL 인스턴스 안에서 환경별 Spring DB와 AI pgvector DB를 별도 database/role로 분리한다. Redis는 환경·서비스별 ACL과 key prefix를 적용한 단일 임시 저장소로 사용하며 영구 원본을 저장하지 않는다. AI 원본 문서는 비공개 Cloudflare R2 Standard bucket에 저장하고 PostgreSQL dump는 별도 private backup bucket에 보관한다. R2 장애 시 자동 failover 없이 업로드를 차단한 뒤 운영자가 검증한 단일 노드 MinIO로만 수동 전환한다.
+한 PostgreSQL 인스턴스 안에서 환경별 Spring DB와 AI pgvector DB를 별도 database/role로 분리한다. Redis는 환경·서비스별 ACL과 key prefix를 적용한 단일 임시 저장소로 사용하며 영구 원본을 저장하지 않는다. AI 원본 문서는 비공개 Cloudflare R2 Standard bucket에 저장하고 PostgreSQL dump는 별도 private backup bucket에 보관한다. R2 장애 시 자동 failover 없이 업로드를 차단한 뒤 운영자가 검증한 단일 노드 MinIO로만 수동 전환한다. Usage admission과 active write provider control을 분리하고, 기존 객체는 문서별 provider로 읽으며 R2 reconcile 중에는 신규 업로드를 차단한다.
 
 ## Technical Context
 
@@ -18,7 +18,7 @@ IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반
 
 **Storage**: 단일 PostgreSQL 인스턴스의 `dev_app`/`dev_ai`/`demo_app`/`demo_ai` database와 전용 role, 환경별 named volume; 단일 Redis의 환경·서비스별 ACL/keyspace; R2 private document bucket와 private PostgreSQL backup bucket; R2 원본 문서의 별도 2차 백업은 없음
 
-**Testing**: Compose config/health 검증, JSON Schema validation, `curl`/`openssl`/외부 port scan, `psql` 권한 시험, `redis-cli` ACL·유실 시험, R2 presigned PUT/HEAD·CORS 시험, backup/restore rehearsal, 장애 주입과 demo 사용자 여정 smoke
+**Testing**: Compose config/health 검증, usage admission·storage failover JSON Schema validation, `curl`/`openssl`/외부 port scan, `psql` 권한 시험, `redis-cli` ACL·유실 시험, R2 presigned PUT/HEAD·CORS 시험, mixed-provider read·manual cutover·reconcile 시험, backup/restore rehearsal, 장애 주입과 demo 사용자 여정 smoke
 
 **Target Platform**: SSH로 관리하는 Ubuntu 단일 EC2; 외부 공개 포트 22/80/443; 브라우저 React·Unity WebGL, 내부 Docker 서비스 Spring/FastAPI/Unity Dedicated Server
 
@@ -79,8 +79,10 @@ IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반
 - browser upload는 서버가 영구 metadata에서 결정한 unique object key에 대한 짧은 PUT presigned URL을 발급하고, 허용 origin/method/header만 CORS에 등록한다. 완료 callback 후 server-side HEAD로 존재·크기·declared content type을 확인하고 본문 magic bytes·SHA-256 검증까지 통과한 뒤 처리 상태를 진행한다.
 - R2 Standard의 storage·Class A·Class B 한도는 configuration으로 관리한다. GraphQL Analytics를 15분마다 수집하고 storage current/projected ratio 및 월 누적 operation ratio 중 최댓값으로 판정한다. 80%는 warning, 90%는 신규 upload grant 차단이며 기존 GET은 유지한다.
 - 마지막 정상 usage snapshot이 60분을 넘으면 신규 upload는 fail-closed한다. 지표 조회 실패를 0%로 취급하지 않는다.
-- storage state는 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`로만 전이한다. 전환에는 운영자 승인과 S3 contract probe가 필요하며 자동 failover는 금지한다.
-- 단일 노드 MinIO는 EC2 장애와 함께 유실될 수 있는 임시 가용성 수단이다. backup 또는 R2 복제본으로 계산하지 않으며 R2 복귀 후 object checksum/metadata를 대조해 명시적으로 reconcile한다.
+- Usage Guard snapshot은 `UsageAdmissionState`만 제공하고 active provider를 포함하지 않는다. 별도 storage failover control이 Spring의 `upload-enabled`와 `active-write-provider` 배포 설정을 결정하며 FastAPI에는 active provider를 주입하지 않는다.
+- R2와 MinIO provider config reference는 기존 객체 읽기를 위해 Spring/FastAPI registry에 함께 유지한다. 신규 grant는 active write provider를 따르고 완료·처리 읽기는 grant/문서에 기록된 provider를 따른다.
+- storage state는 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`로만 전이한다. 전환에는 운영자 승인과 S3 contract probe가 필요하며 자동 failover·이중 쓰기·자동 복제·자동 원복은 금지한다.
+- 단일 노드 MinIO는 EC2 장애와 함께 유실될 수 있는 임시 가용성 수단이다. backup 또는 R2 복제본으로 계산하지 않는다. R2 복귀 후 신규 업로드를 차단해 backlog를 고정하고 object size/detected type/SHA-256과 metadata를 대조하며, 미해결 객체가 있으면 `R2_RECONCILING`을 유지한다.
 
 ## Project Structure
 
@@ -96,6 +98,7 @@ specs/infra-002-environments/
 ├── contracts/
 │   ├── environment-manifest.schema.json
 │   ├── usage-guard.schema.json
+│   ├── storage-failover-state.schema.json
 │   ├── public-entry-contract.md
 │   ├── object-storage-contract.md
 │   ├── postgres-boundary-contract.md
@@ -141,7 +144,7 @@ infra/
 2. **Shared data plane**: PostgreSQL database/role/volume 분리, Redis ACL/key namespace/TTL, R2 document/backup bucket contract.
 3. **dev/demo runtime**: Compose project/network/volume/release state 분리, dev component-only deployment, demo integration release.
 4. **Ingress/static**: Nginx IP dev 경로, demo host/TLS, Cloudflare cache/bypass, origin verification.
-5. **Object safety**: presigned PUT/CORS/HEAD/body 검증, usage snapshot/80·90/stale guard, manual MinIO transition/reconcile.
+5. **Object safety**: presigned PUT/CORS/HEAD/body 검증, usage snapshot/80·90/stale guard, active write provider 배포 설정, manual MinIO transition, mixed-provider read와 upload-blocked reconciliation.
 6. **Recovery/acceptance**: PostgreSQL backup/restore, Redis total-loss rebuild, port/secret/cross-env isolation, build/demo contention and failure isolation.
 7. **Operational documentation**: `docs/15_Infra_AWS_설계서.md`의 stale schema/prefix/R2 2차 backup/시연 동결 표현을 최신 spec·constitution 결정으로 정합화하고, infra-003 소유 WSS 실측값은 변경하지 않는다.
 
