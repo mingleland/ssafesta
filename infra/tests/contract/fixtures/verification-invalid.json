@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "verificationId": "verify-broken",
+  "releaseId": "broken",
+  "targetId": "dev-back",
+  "checks": [],
+  "requiredNonAiPassed": false,
+  "failureCode": "MADE_UP_FAILURE",
+  "finalDecision": "SUCCESS",
+  "startedAt": "not-a-date",
+  "finishedAt": "not-a-date"
+}

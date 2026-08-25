@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordId": "invalid",
+  "targetId": "integration-develop",
+  "candidateReleaseId": "release-44",
+  "runId": "festa-develop-44",
+  "state": "ACTIVE",
+  "stages": [],
+  "recovery": {"decision": "AUTO_ROLLBACK", "result": "FAILED", "reason": "contradictory active state"},
+  "currentReleaseId": "release-41",
+  "startedAt": "2026-08-20T00:00:00Z"
+}

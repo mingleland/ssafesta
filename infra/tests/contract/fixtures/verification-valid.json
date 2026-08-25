@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "verificationId": "verify-back-42",
+  "releaseId": "back-0123456789abcdef0123456789abcdef01234567-42",
+  "targetId": "dev-back",
+  "checks": [
+    {
+      "name": "component-readiness",
+      "status": "PASSED",
+      "durationMs": 1200,
+      "evidenceRef": "evidence/readiness.json"
+    }
+  ],
+  "requiredNonAiPassed": true,
+  "aiPassed": null,
+  "failureCode": null,
+  "evidenceRefs": ["evidence/readiness.json"],
+  "finalDecision": "PASS",
+  "startedAt": "2026-08-19T00:00:00Z",
+  "finishedAt": "2026-08-19T00:00:02Z"
+}

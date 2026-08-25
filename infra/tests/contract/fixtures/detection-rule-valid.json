@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "host.disk.high",
+  "version": 1,
+  "name": "Host disk usage high",
+  "description": "Approved host capacity signal; CI pipeline status is excluded.",
+  "enabled": true,
+  "source": "prometheus",
+  "query": "100 - node_filesystem_avail_bytes / node_filesystem_size_bytes * 100",
+  "condition": "A > 90",
+  "evaluationInterval": "1m",
+  "pendingFor": "5m",
+  "scope": {
+    "environment": "integration",
+    "service": "host",
+    "domain": "host"
+  },
+  "severity": "warning",
+  "labels": {
+    "managed_by": "infra",
+    "approval_status": "approved",
+    "notify": "mattermost"
+  },
+  "annotations": {
+    "summary": "Host disk usage exceeded the approved threshold",
+    "description": "Inspect disk consumers and the retention runbook.",
+    "runbookUrl": "https://docs.example.invalid/runbooks/host-disk"
+  },
+  "notification": {
+    "groupBy": ["alertname", "environment", "service", "severity"],
+    "groupWait": "30s",
+    "groupInterval": "5m",
+    "repeatInterval": "4h",
+    "sendResolved": true
+  },
+  "approval": {
+    "status": "approved",
+    "approvedBy": "infra-owner",
+    "approvedAt": "2026-08-19T00:00:00Z",
+    "changeRef": "INFRA-001"
+  },
+  "owner": "infra"
+}

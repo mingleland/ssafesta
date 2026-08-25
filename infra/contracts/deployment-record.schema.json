@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/deployment-record.schema.json",
+  "title": "SSAFY FESTA Deployment Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "recordId", "targetId", "candidateReleaseId", "runId", "state", "stages", "recovery", "currentReleaseId", "startedAt"],
+  "properties": {
+    "schemaVersion": {"const": "1.0.0"},
+    "recordId": {"type": "string", "minLength": 1},
+    "targetId": {"type": "string", "minLength": 1},
+    "candidateReleaseId": {"type": "string", "minLength": 1},
+    "previousKnownGoodReleaseId": {"type": ["string", "null"]},
+    "runId": {"type": "string", "minLength": 1},
+    "state": {"enum": ["CANDIDATE", "DEPLOYING", "VERIFYING", "ACTIVE", "FAILED_PENDING_DECISION", "ROLLING_BACK", "ROLLED_BACK", "ROLLBACK_FAILED", "MANUAL_ACTION_REQUIRED", "AWAITING_AI_RETRY_OR_APPROVAL"]},
+    "stages": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": {"enum": ["candidate", "deploy", "web", "login", "world", "ai", "verify", "rollback", "promote"]},
+          "status": {"enum": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED", "SKIPPED"]},
+          "failureCode": {"type": ["string", "null"]},
+          "evidenceRef": {"type": "string"},
+          "startedAt": {"type": "string", "format": "date-time"},
+          "finishedAt": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "failure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "evidenceRef"],
+      "properties": {"code": {"type": "string"}, "component": {"type": "string"}, "evidenceRef": {"type": "string"}}
+    },
+    "recovery": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "result", "reason"],
+      "properties": {
+        "decision": {"enum": ["NONE", "AUTO_ROLLBACK", "MANUAL", "AI_RETRY"]},
+        "fromReleaseId": {"type": "string"}, "toReleaseId": {"type": "string"},
+        "result": {"enum": ["NOT_RUN", "SUCCEEDED", "FAILED"]},
+        "reason": {"type": "string", "minLength": 1}, "verifiedAt": {"type": "string", "format": "date-time"}
+      }
+    },
+    "currentReleaseId": {"type": ["string", "null"]},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"state": {"const": "ACTIVE"}}},
+      "then": {
+        "properties": {"recovery": {"properties": {"decision": {"const": "NONE"}, "result": {"const": "NOT_RUN"}}}},
+        "required": ["finishedAt"]
+      }
+    },
+    {
+      "if": {"properties": {"state": {"const": "ROLLED_BACK"}}},
+      "then": {
+        "properties": {
+          "recovery": {
+            "properties": {"decision": {"const": "AUTO_ROLLBACK"}, "result": {"const": "SUCCEEDED"}},
+            "required": ["fromReleaseId", "toReleaseId"]
+          }
+        },
+        "required": ["finishedAt"]
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "uid":"festa-host-overview","title":"FESTA EC2 Host Overview","schemaVersion":41,"version":1,"refresh":"30s",
+  "tags":["festa","host"],"time":{"from":"now-6h","to":"now"},
+  "panels":[
+    {"id":1,"type":"timeseries","title":"CPU usage","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)","refId":"A"}],"gridPos":{"h":8,"w":12,"x":0,"y":0}},
+    {"id":2,"type":"timeseries","title":"Memory usage","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)","refId":"A"}],"gridPos":{"h":8,"w":12,"x":12,"y":0}},
+    {"id":3,"type":"timeseries","title":"Disk usage","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"100 * (1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})","refId":"A"}],"gridPos":{"h":8,"w":12,"x":0,"y":8}},
+    {"id":4,"type":"timeseries","title":"Network throughput","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"rate(node_network_receive_bytes_total{device!=\"lo\"}[5m])","refId":"A"},{"expr":"rate(node_network_transmit_bytes_total{device!=\"lo\"}[5m])","refId":"B"}],"gridPos":{"h":8,"w":12,"x":12,"y":8}}
+  ]
+}
