@@ -7,6 +7,7 @@ import { SpriteAnimationPreview } from '../../studio/ui/SpriteAnimationPreview.t
 import { resolveTilesetVisual, tileBackgroundStyle } from '../../studio/assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../../studio/assets/staticImageVisual.ts';
 import type { GameSessionPort } from '../ports/gameSessionPort.ts';
+import { summarizeFramePerformance, type FramePerformanceSummary } from './framePerformance.ts';
 import {
   chooseReferenceDialogue,
   interactReferencePlayer,
@@ -46,7 +47,10 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   const [runtime, setRuntime] = useState(() => startReferenceRuntime(project));
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [previewFps, setPreviewFps] = useState<number | null>(null);
+  const [framePerformance, setFramePerformance] = useState<FramePerformanceSummary | null>(null);
+  const [performanceTabActive, setPerformanceTabActive] = useState(() => (
+    typeof document === 'undefined' || document.visibilityState === 'visible'
+  ));
   const completionReported = useRef(false);
   const sessionTokenRef = useRef<string | null>(null);
   const sessionEndedRef = useRef(false);
@@ -137,22 +141,46 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   }, [activeDialogue, project, runtime.session.status, scene?.type]);
 
   useEffect(() => {
-    if (!showPerformanceMonitor) return undefined;
+    if (!showPerformanceMonitor) {
+      setFramePerformance(null);
+      return undefined;
+    }
     let frameId = 0;
-    let frameCount = 0;
+    let frameDurations: number[] = [];
     let measuredAt = performance.now();
+    let previousFrameAt: number | null = null;
+    const resetWindow = (now: number) => {
+      frameDurations = [];
+      measuredAt = now;
+      previousFrameAt = null;
+    };
+    const onVisibilityChange = () => {
+      const active = document.visibilityState === 'visible';
+      setPerformanceTabActive(active);
+      resetWindow(performance.now());
+      if (!active) setFramePerformance(null);
+    };
     const measure = (now: number) => {
-      frameCount += 1;
-      const elapsed = now - measuredAt;
-      if (elapsed >= 1000) {
-        setPreviewFps(Math.round((frameCount * 1000) / elapsed));
-        measuredAt = now;
-        frameCount = 0;
+      if (document.visibilityState === 'visible') {
+        if (previousFrameAt !== null) frameDurations.push(now - previousFrameAt);
+        previousFrameAt = now;
+        const elapsed = now - measuredAt;
+        if (elapsed >= 1_000) {
+          setFramePerformance(summarizeFramePerformance(frameDurations, elapsed));
+          resetWindow(now);
+        }
+      } else {
+        previousFrameAt = null;
       }
       frameId = window.requestAnimationFrame(measure);
     };
+    setPerformanceTabActive(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVisibilityChange);
     frameId = window.requestAnimationFrame(measure);
-    return () => window.cancelAnimationFrame(frameId);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.cancelAnimationFrame(frameId);
+    };
   }, [showPerformanceMonitor]);
 
   const inventory = useMemo(() => [...runtime.session.inventory].map((itemId) => (
@@ -175,7 +203,25 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     <main className="grp-root" data-game-studio-runtime="reference">
       <header className="grp-topbar">
         <div><span className="grp-brand">F</span><strong>{project.title}</strong><em>{mode === 'PREVIEW' ? 'PLAY TEST' : 'FESTA GAME'}</em></div>
-        <div><span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong>{showPerformanceMonitor && previewFps !== null && <em className={previewFps >= 55 ? 'is-good' : 'is-low'}>FPS {previewFps}</em>}</div>
+        <div>
+          <span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong>
+          {showPerformanceMonitor && (!performanceTabActive
+            ? <em className="is-low">비활성 탭 · 측정 일시정지</em>
+            : framePerformance === null
+              ? <em>성능 측정 준비</em>
+              : (
+                <span
+                  aria-label={`성능 측정 FPS ${framePerformance.fps}, 95퍼센타일 ${framePerformance.p95FrameMs}밀리초, 느린 프레임 ${framePerformance.slowFramePercent}퍼센트`}
+                  className="grp-perf-monitor"
+                  role="status"
+                  title="활성 탭에서 1초 단위로 측정합니다. 목표: 55fps 이상, p95 18.2ms 이하, 느린 프레임 5% 이하"
+                >
+                  <em className={framePerformance.meetsTarget ? 'is-good' : 'is-low'}>FPS {framePerformance.fps}</em>
+                  <em className={framePerformance.p95FrameMs <= 1_000 / 55 ? 'is-good' : 'is-low'}>p95 {framePerformance.p95FrameMs}ms</em>
+                  <em className={framePerformance.slowFramePercent <= 5 ? 'is-good' : 'is-low'}>끊김 {framePerformance.slowFramePercent}%</em>
+                </span>
+              ))}
+        </div>
         <button onClick={exit} type="button">게임 나가기 ×</button>
       </header>
 

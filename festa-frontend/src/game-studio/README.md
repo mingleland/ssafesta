@@ -27,8 +27,10 @@ Unity는 이 코드를 실행하거나 GameProject를 해석하지 않는다.
 - `/app/games/:gameId/edit`, `/app/games/:gameId/play` lazy route 경계
 - Mock 모드의 `초안 저장 → 버전 게시 → 일반 /play 주소` 전체 사용자 여정
 - revision-aware Draft/Publish adapter와 충돌 시 로컬 JSON 백업 복구 UX
+- 저장 전 변경을 800ms 지연으로 이 기기에 보관하는 복구 저널, 이탈 경고, 복구/폐기/JSON 보관 UX
 - Published loader, 손상/미지원 schema 오류 격리, Booth Portal GAME overlay
 - 내 이미지 게시 blocker의 Scene/Object/Item별 사용 위치 안내
+- 활성 탭 FPS·p95 frame time·느린 frame 비율을 함께 표시하는 플레이 성능 점검
 
 ## 아직 연결하지 않은 외부 경계
 
@@ -45,7 +47,7 @@ Unity에서 2D 게임을 실행하지 않는다. Local Preview는 Backend와 Uni
 - `VITE_USE_MOCK=true`: 브라우저 게시본 저장소를 사용해 서버 없이 게시·공개 플레이 E2E를 검증한다.
 - `/app/games/:gameId/play`: Published 조회만 사용한다.
 - `/app/games/:gameId/play?source=local`: 현재 편집 snapshot 플레이 테스트다.
-- `&perf=1`: 로컬 플레이 테스트에 렌더 FPS 측정값을 표시한다. 백그라운드 탭은 브라우저가 FPS를 제한하므로 활성 탭에서 측정한다.
+- 편집기의 `성능 점검`: 로컬 플레이에 FPS·p95 frame time·느린 frame 비율을 표시한다. 비활성 탭에서는 측정을 멈추며 목표는 55fps 이상, p95 18.2ms 이하, 느린 frame 5% 이하다.
 - 좁은 브라우저에서는 PC 편집기의 1040px 작업 폭을 유지해 패널이 서로 겹치지 않으며 가로 탐색으로 접근한다.
 
 ## 검증

@@ -41,6 +41,11 @@ import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisu
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { createBrowserDraftRepository, type DraftSaveReceipt, type GameDraftRepository } from '../ports/draftRepository.ts';
 import { GameAuthoringApiError, type GamePublisher } from '../ports/gameAuthoringApi.ts';
+import {
+  createBrowserRecoveryJournal,
+  shouldOfferRecovery,
+  type RecoverySnapshot,
+} from '../ports/localRecoveryJournal.ts';
 import { findPublishBlockers } from '../ports/publishValidation.ts';
 import { createGameProjectStore } from '../store/gameProjectStore.ts';
 import { CommitInput } from './CommitInput.tsx';
@@ -146,6 +151,7 @@ export const GameStudioShell = ({
     [assetRepositoryProp],
   );
   const previewRepository = useMemo(() => createBrowserDraftRepository(), []);
+  const recoveryJournal = useMemo(() => createBrowserRecoveryJournal(), []);
   const store = useMemo(() => createGameProjectStore(createStarterProject(gameId)), [gameId]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getState, store.getState);
   const project = snapshot.project;
@@ -163,6 +169,7 @@ export const GameStudioShell = ({
   const [tileTool, setTileTool] = useState<TileTool>('BRUSH');
   const [rightPanel, setRightPanel] = useState<RightPanel>('PROPERTIES');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
@@ -179,6 +186,9 @@ export const GameStudioShell = ({
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
   const [objectClipboard, setObjectClipboard] = useState<{ readonly sourceSceneId: string; readonly objectIds: readonly string[] } | null>(null);
   const [draftConflict, setDraftConflict] = useState<{ readonly currentRevision: number; readonly localProject: GameProject } | null>(null);
+  const [recoveryCandidate, setRecoveryCandidate] = useState<RecoverySnapshot | null>(null);
+  const [recoverySavedAt, setRecoverySavedAt] = useState<string | null>(null);
+  const recoveryFailureReported = useRef(false);
 
   const selectedScene = project.scenes.find((scene) => scene.id === selectedSceneId) ?? project.scenes[0];
   const selectedObject = selectedScene !== undefined && selectedScene.type !== 'DIALOGUE'
@@ -195,7 +205,15 @@ export const GameStudioShell = ({
   useEffect(() => {
     let active = true;
     if (repository === null) {
+      const currentProject = store.getState().project;
+      const recovery = recoveryJournal?.load(gameId) ?? null;
+      if (recovery !== null && shouldOfferRecovery(recovery, currentProject)) {
+        setRecoveryCandidate(recovery);
+      } else if (recovery !== null) {
+        recoveryJournal?.clear(gameId);
+      }
       setSaveStatus('clean');
+      setHasUnsavedChanges(false);
       setNotice('브라우저 저장소를 사용할 수 없습니다. JSON 내보내기를 이용하세요.');
       return () => { active = false; };
     }
@@ -203,13 +221,22 @@ export const GameStudioShell = ({
     repository.load(gameId)
       .then((draft) => {
         if (!active) return;
+        let loadedProject = store.getState().project;
         if (draft !== null) {
           const upgradedDraft = withBuiltinAssetLibrary(draft);
           store.reset(upgradedDraft);
           setSelectedSceneId(upgradedDraft.startSceneId);
+          loadedProject = upgradedDraft;
           setNotice(`${persistenceLabel}에 저장한 초안을 불러왔습니다.`);
         }
+        const recovery = recoveryJournal?.load(gameId) ?? null;
+        if (recovery !== null && shouldOfferRecovery(recovery, loadedProject)) {
+          setRecoveryCandidate(recovery);
+        } else if (recovery !== null) {
+          recoveryJournal?.clear(gameId);
+        }
         setSaveStatus('clean');
+        setHasUnsavedChanges(false);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -217,7 +244,35 @@ export const GameStudioShell = ({
         setNotice(error instanceof Error ? error.message : '초안을 불러오지 못했습니다.');
       });
     return () => { active = false; };
-  }, [gameId, persistenceLabel, repository, store]);
+  }, [gameId, persistenceLabel, recoveryJournal, repository, store]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges || saveStatus === 'loading' || saveStatus === 'saving' || recoveryJournal === null || recoveryCandidate !== null) return undefined;
+    const projectToRecover = project;
+    const timer = window.setTimeout(() => {
+      try {
+        const recovery = recoveryJournal.save(projectToRecover);
+        setRecoverySavedAt(recovery.savedAt);
+        recoveryFailureReported.current = false;
+      } catch {
+        if (!recoveryFailureReported.current) {
+          recoveryFailureReported.current = true;
+          setNotice('이 기기의 임시 복구 저장 공간이 부족합니다. JSON 내보내기로 변경을 보관해 주세요.');
+        }
+      }
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [hasUnsavedChanges, project, recoveryCandidate, recoveryJournal, saveStatus]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges && draftConflict === null) return undefined;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [draftConflict, hasUnsavedChanges]);
 
   useEffect(() => saveEditorSet(gameId, 'hidden', editorHiddenObjectIds), [editorHiddenObjectIds, gameId]);
   useEffect(() => saveEditorSet(gameId, 'locked', editorLockedObjectIds), [editorLockedObjectIds, gameId]);
@@ -232,6 +287,7 @@ export const GameStudioShell = ({
   const apply = useCallback((nextProject: GameProject) => {
     try {
       store.replace(nextProject);
+      setHasUnsavedChanges(true);
       setSaveStatus('dirty');
       setNotice(null);
     } catch (error) {
@@ -375,7 +431,11 @@ export const GameStudioShell = ({
       setSaveStatus('saving');
       const receipt = await repository.save(store.getState().project);
       store.syncRevision(receipt.revision);
+      recoveryJournal?.clear(gameId);
+      setRecoveryCandidate(null);
+      setRecoverySavedAt(null);
       setDraftConflict(null);
+      setHasUnsavedChanges(false);
       setSaveStatus('saved');
       const warningCopy = receipt.warnings?.length ? ` · 확인 ${receipt.warnings.length}건` : '';
       setNotice(`${new Date(receipt.savedAt).toLocaleTimeString('ko-KR')}에 ${persistenceLabel} 초안을 저장했습니다${warningCopy}.`);
@@ -390,7 +450,29 @@ export const GameStudioShell = ({
       }
       return null;
     }
-  }, [persistenceLabel, repository, store]);
+  }, [gameId, persistenceLabel, recoveryJournal, repository, store]);
+
+  const restoreRecovery = useCallback(() => {
+    if (recoveryCandidate === null) return;
+    const recoveredProject = withBuiltinAssetLibrary(recoveryCandidate.project);
+    store.reset(recoveredProject);
+    setSelectedSceneId(recoveredProject.startSceneId);
+    setSelectedObjectId(null);
+    setSelectedObjectIds(new Set());
+    setSelectedLayerId(null);
+    setRecoverySavedAt(recoveryCandidate.savedAt);
+    setRecoveryCandidate(null);
+    setHasUnsavedChanges(true);
+    setSaveStatus('dirty');
+    setNotice('저장되지 않았던 편집 내용을 복구했습니다. 확인한 뒤 저장해 주세요.');
+  }, [recoveryCandidate, store]);
+
+  const discardRecovery = useCallback(() => {
+    recoveryJournal?.clear(gameId);
+    setRecoveryCandidate(null);
+    setRecoverySavedAt(null);
+    setNotice('이 기기의 이전 임시 복구본을 삭제했습니다. 현재 저장본은 그대로 유지됩니다.');
+  }, [gameId, recoveryJournal]);
 
   const restoreServerDraftWithBackup = useCallback(async (): Promise<void> => {
     if (draftConflict === null || repository === null) return;
@@ -405,6 +487,7 @@ export const GameStudioShell = ({
       setSelectedObjectId(null);
       setSelectedObjectIds(new Set());
       setDraftConflict(null);
+      setHasUnsavedChanges(false);
       setSaveStatus('clean');
       setNotice('내 변경을 JSON으로 보관하고 서버 최신 초안을 불러왔습니다. 필요한 부분을 다시 적용하세요.');
     } catch (error) {
@@ -441,6 +524,23 @@ export const GameStudioShell = ({
       setNotice(error instanceof Error ? error.message : '게임을 게시하지 못했습니다.');
     }
   }, [gameId, publisher, save, store]);
+
+  const openPreview = useCallback(async (performanceMode = false): Promise<void> => {
+    if (hasUnsavedChanges && (await save()) === null) return;
+    if (previewRepository === null) {
+      setSaveStatus('error');
+      setNotice('이 브라우저에서는 로컬 플레이 snapshot을 만들 수 없습니다.');
+      return;
+    }
+    try {
+      await previewRepository.save(store.getState().project);
+      const performanceQuery = performanceMode ? '&perf=1' : '';
+      void navigate(`/app/games/${gameId}/play?source=local${performanceQuery}`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '플레이 테스트용 snapshot을 만들지 못했습니다.');
+    }
+  }, [gameId, hasUnsavedChanges, navigate, previewRepository, save, store]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -564,11 +664,13 @@ export const GameStudioShell = ({
       if (event.key.toLowerCase() === 'z' && !event.shiftKey) {
         event.preventDefault();
         store.undo();
+        setHasUnsavedChanges(true);
         setSaveStatus('dirty');
       }
       if (event.key.toLowerCase() === 'y' || (event.key.toLowerCase() === 'z' && event.shiftKey)) {
         event.preventDefault();
         store.redo();
+        setHasUnsavedChanges(true);
         setSaveStatus('dirty');
       }
     };
@@ -587,6 +689,7 @@ export const GameStudioShell = ({
       setSelectedSceneId(imported.startSceneId);
       setSelectedObjectId(null);
       setSelectedObjectIds(new Set());
+      setHasUnsavedChanges(true);
       setSaveStatus('dirty');
       setNotice(`${file.name}을 가져왔습니다. 저장 전 플레이 테스트를 권장합니다.`);
     } catch (error) {
@@ -679,12 +782,18 @@ export const GameStudioShell = ({
         </div>
         <div className="gss-history-tools">
           <span className={`gss-save-state is-${saveStatus}`}><i />{saveLabel[saveStatus]}</span>
+          {hasUnsavedChanges && recoverySavedAt !== null && (
+            <span
+              className="gss-recovery-state"
+              title={`${new Date(recoverySavedAt).toLocaleString('ko-KR')}에 이 기기에 임시 복구본을 보관했습니다.`}
+            >임시 복구 {new Date(recoverySavedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>
+          )}
           <button
             aria-label="실행 취소"
             aria-keyshortcuts="Control+Z Meta+Z"
             className="gss-icon-button"
             disabled={!snapshot.canUndo}
-            onClick={() => { store.undo(); setSaveStatus('dirty'); }}
+            onClick={() => { store.undo(); setHasUnsavedChanges(true); setSaveStatus('dirty'); }}
             title="실행 취소 (Ctrl+Z)"
             type="button"
           >↶</button>
@@ -693,7 +802,7 @@ export const GameStudioShell = ({
             aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
             className="gss-icon-button"
             disabled={!snapshot.canRedo}
-            onClick={() => { store.redo(); setSaveStatus('dirty'); }}
+            onClick={() => { store.redo(); setHasUnsavedChanges(true); setSaveStatus('dirty'); }}
             title="다시 실행 (Ctrl+Y)"
             type="button"
           >↷</button>
@@ -704,23 +813,16 @@ export const GameStudioShell = ({
           <button
             className="gss-preview-button"
             disabled={saveStatus === 'loading' || saveStatus === 'saving'}
-            onClick={async () => {
-              if (saveStatus === 'dirty' && (await save()) === null) return;
-              if (previewRepository === null) {
-                setSaveStatus('error');
-                setNotice('이 브라우저에서는 로컬 플레이 snapshot을 만들 수 없습니다.');
-                return;
-              }
-              try {
-                await previewRepository.save(store.getState().project);
-                void navigate(`/app/games/${gameId}/play?source=local`);
-              } catch (error) {
-                setSaveStatus('error');
-                setNotice(error instanceof Error ? error.message : '플레이 테스트용 snapshot을 만들지 못했습니다.');
-              }
-            }}
+            onClick={() => void openPreview()}
             type="button"
           ><span>▶</span> 플레이 테스트</button>
+          <button
+            className="gss-guide-button"
+            disabled={saveStatus === 'loading' || saveStatus === 'saving'}
+            onClick={() => void openPreview(true)}
+            title="활성 탭 FPS, p95 프레임 시간, 끊김 비율을 보며 플레이합니다."
+            type="button"
+          >성능 점검</button>
           <button aria-keyshortcuts="Control+S Meta+S" disabled={saveStatus === 'saving' || saveStatus === 'publishing'} onClick={() => void save()} type="button">저장</button>
           <button
             className="gss-publish-button"
@@ -1219,6 +1321,7 @@ export const GameStudioShell = ({
                       setSelectedObjectId(null);
                       setSelectedObjectIds(new Set());
                       setSelectedLayerId(null);
+                      setHasUnsavedChanges(true);
                       setSaveStatus('dirty');
                       setPendingTemplateId(null);
                       setShowTemplates(false);
@@ -1254,6 +1357,18 @@ export const GameStudioShell = ({
           <div>
             <button onClick={() => downloadProject(draftConflict.localProject)} type="button">내 변경 JSON 보관</button>
             <button className="is-primary" onClick={() => void restoreServerDraftWithBackup()} type="button">백업 후 서버본 불러오기</button>
+          </div>
+        </aside>
+      )}
+      {recoveryCandidate !== null && draftConflict === null && (
+        <aside aria-live="polite" className="gss-conflict-dock gss-recovery-dock" role="status">
+          <header><span>로컬 안전 복구</span><button aria-label="복구 안내 닫기" onClick={() => setRecoveryCandidate(null)} type="button">×</button></header>
+          <strong>저장되지 않은 편집 내용을 발견했습니다</strong>
+          <p>{new Date(recoveryCandidate.savedAt).toLocaleString('ko-KR')}에 이 기기에 임시 보관한 내용입니다. 현재 저장본과 비교해 복구할 수 있습니다.</p>
+          <div>
+            <button onClick={() => downloadProject(recoveryCandidate.project)} type="button">JSON 보관</button>
+            <button onClick={discardRecovery} type="button">임시본 버리기</button>
+            <button className="is-primary" onClick={restoreRecovery} type="button">복구해서 계속 편집</button>
           </div>
         </aside>
       )}
