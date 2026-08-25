@@ -65,8 +65,11 @@ NEEDS CLARIFICATION 잔여 **0건** — 단, R-05(게스트 닉네임 claim)는 
 ## R-08. 403 경로 — 정지 계정만, 게스트는 조회 없이 발급
 
 - **Decision**: 회원은 `users` 행을 조회해 claims(`playerId=id`, `nickname`, `avatarCode`)를 채우면서 `status != ACTIVE`면 403 `FORBIDDEN` + 전용 메시지. 게스트는 행이 없으므로 조회 없이 발급. 미인증은 기존 체인이 401 봉투로 거부(추가 코드 0).
-- **실측 정정**: 이 status 검사는 **재사용이 아니라 신규**다. `MyAccountController.activeMember()`는 이름과 달리 존재 여부만 보고 상태를 보지 않으며(`USER_NOT_FOUND`만 던진다), `SessionRevocationFilter`도 세션 활성만 확인한다. 즉 저장소에 "정지 계정 거부" 경로가 아직 없다. 여기서는 계약이 403을 요구하므로(OpenAPI "Account cannot enter the world") 두 줄로 넣되 신규 `ErrorCode`는 만들지 않는다.
-- **파생 발견 (별건)**: 정지된 회원의 기존 Access Token은 만료까지 `/users/me` 계열을 그대로 통과한다. 이 spec 범위가 아니라 별도 이슈로 올린다 — 여기서 함께 고치면 002 MR이 001 인증 경로를 건드리게 된다.
+- **실측 정정**: 이 status 검사는 **재사용이 아니라 신규**다. `AccountStatus`를 보는 코드는 `OAuthLoginSuccessHandler:41`(로그인 시점) **한 곳뿐**이다. `MyAccountController.activeMember()`는 이름과 달리 존재 여부만 보고 상태를 보지 않으며(`USER_NOT_FOUND`만 던진다), `SessionRevocationFilter`도 **세션 활성만** 확인한다. 즉 요청 처리 경로에 "정지 계정 거부" 판정이 없다. 여기서는 계약이 403을 요구하므로(OpenAPI "Account cannot enter the world") 두 줄로 넣되 신규 `ErrorCode`는 만들지 않는다.
+- **정정 (2026-08-25 실측)**: 앞서 이 자리에 *"정지된 회원의 기존 Access Token은 만료까지 `/users/me` 계열을 그대로 통과한다"* 고 적고 별도 이슈 대상으로 뒀는데, **성립하지 않는다.** 코드를 확인하지 않고 "필터가 status를 안 본다"에서 "정지가 안 먹는다"로 건너뛴 결론이었다(T-115와 같은 종류).
+  - **정지는 즉시 막힌다.** `AccountLifecycleService.change()`가 상태 전이마다 `sessions.revoke(userId)`를 부르고(`withdraw()`도 동일), `revoke`가 Redis `auth:session:{userId}`를 지운다. 다음 요청에서 `SessionRevocationFilter`의 `isActive(userId, sid)`가 `null`과 대조돼 실패하고 **401 "로그인 세션이 종료되었습니다"** 로 끊긴다. 만료를 기다리지 않는다.
+  - **남는 잔여는 두 가지이고 둘 다 지금 뚫린 구멍이 아니다.** ⑴ 세션 무효화가 정지를 막아 주는 것이지 status 판정이 막는 게 아니라서, `AccountLifecycleService`를 거치지 않고 status만 바꾸면(직접 SQL 등) 아무도 잡지 않는다. ⑵ 이 동작을 덮는 테스트가 **0건**이다 — `backend/src/test`에 `suspend`·`SUSPENDED` 문자열이 없다. 지금 동작하는 것은 확인했지만 `sessions.revoke()` 한 줄이 지워지면 조용히 뚫린다(T-119 "합의됐지만 미관측"과 같은 모양).
+  - **그래서 이 R-08의 403은 심층방어로서 값이 있다.** 세션 무효화가 놓치는 ⑴ 경로를 status 직접 판정이 잡는다 — world 입장은 게임 서버 접속 승인으로 이어지므로 두 겹을 두는 편이 맞다.
 - **Rationale**: OpenAPI가 403("Account cannot enter the world")을 응답에 뒀다. 회원 claims는 어차피 DB에서 읽어야 하므로(헌법 16조 — 클라이언트가 보낸 닉네임·아바타를 믿지 않는다) 상태 검사가 공짜다. `SecurityConfiguration` 변경도 0 — `anyRequest().authenticated()`가 이미 회원·게스트 AT를 모두 통과시킨다.
 - **Alternatives**: 별도 권한 규칙 추가 — 필요 없는 코드. 탈락.
 
