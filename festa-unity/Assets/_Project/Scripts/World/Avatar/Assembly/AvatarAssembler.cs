@@ -14,7 +14,12 @@ namespace Festa.Avatar
         // MaterialPropertyBlock 으로 나가므로 재질 자체에 개인 상태가 없다. 그래서
         // **모든 아바타가 공유**한다. 인스턴스마다 만들면 40명 기준 480개가 생기고
         // SRP Batcher 가 배칭할 수 없어 SetPass 가 인원수에 비례해 늘어난다 (실측 18.2/기).
-        static readonly Dictionary<(int source, int category), Material> SharedMaterials = new();
+        // ⚠ 키는 **재질 오브젝트 참조**여야 한다. `GetInstanceID()` 를 쓰면 안 된다 —
+        // 씬 전환 시 Resources.UnloadUnusedAssets 로 원본이 해제되면 그 인스턴스 ID가
+        // **다른 에셋에 재사용**돼, 새 원본이 엉뚱한 캐시 항목을 집어간다(T-204).
+        // 로비→월드 전환 후 머리카락이 사라진 원인이 이것이다. 참조를 키로 쓰면
+        // 딕셔너리가 원본을 살려 두므로 ID 재사용 자체가 일어나지 않는다.
+        static readonly Dictionary<(Material source, int category), Material> SharedMaterials = new();
         readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
         MaterialPropertyBlock _block;
         Animator _animator;
@@ -401,7 +406,7 @@ namespace Festa.Avatar
                 var source = originals[i]; if (!source) continue;
                 // 캐시 키에 카테고리를 넣는다 — 같은 원본이 의상/모자 헤어/바이저로 다르게
                 // 변환되기 때문이다. Play 종료 시 파괴된 재질이 남을 수 있어 유효성도 본다.
-                var cacheKey = (source.GetInstanceID(), category.HasValue ? (int)category.Value : -1);
+                var cacheKey = (source, category.HasValue ? (int)category.Value : -1);
                 if (!SharedMaterials.TryGetValue(cacheKey, out var material) || !material)
                 {
                     string lowerName = source.name.ToLowerInvariant();
