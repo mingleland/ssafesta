@@ -37,6 +37,7 @@ namespace Festa.Avatar
             foreach (AvatarPartCategory c in Enum.GetValues(typeof(AvatarPartCategory))) Equip(c);
             UpdateHairVisibilityForHat();
             UpdateBodyVisibility();
+            CombineSameMaterialParts();   // 가시성 확정 뒤에 합쳐야 옷에 가려지는 신체가 반영된다
             ApplyColors();
             ValidateAnimator();
         }
@@ -155,6 +156,129 @@ namespace Festa.Avatar
             if (!renderer) return false;
             if (renderer.name.ToLowerInvariant().Contains("hair")) return true;
             return renderer.sharedMaterials.Any(x => x && x.name.ToLowerInvariant().Contains("hair"));
+        }
+
+
+        // ── 같은 재질 파츠 결합 (드로우콜 감축) ──────────────────────────
+        // WebGL 40기 실측에서 드로우콜 990 · 25.7 FPS 였고, 캔버스 픽셀을 9분의 1로 줄여도
+        // 12% 개선뿐이라 **CPU/드로우콜 병목**이 확정됐다(docs/KHS/28 §10).
+        // 아바타 1기가 SkinnedMeshRenderer 11개를 쓰는데, 그중 신체 파츠 5개
+        // (팔 상/하·손·다리·몸통)는 **같은 재질·같은 골격**이라 손실 없이 하나로 합칠 수 있다.
+        //
+        // 합칠 수 있는 조건 — 하나라도 어긋나면 건너뛴다:
+        //   · 재질 동일 · rootBone 동일 · 뼈 배열 길이·순서 동일 · bindpose 동일
+        //   · 서브메시 1개 · 블렌드셰이프 없음
+        // 정점은 이미 같은 스킨 공간에 있으므로 좌표 변환 없이 이어 붙이면 된다.
+        readonly List<GameObject> _merged = new();
+
+        void CombineSameMaterialParts()
+        {
+            foreach (var go in _merged) if (go) DestroySafe(go);
+            _merged.Clear();
+
+            var actives = GetComponentsInChildren<SkinnedMeshRenderer>(false)
+                .Where(r => r && r.enabled && r.sharedMesh &&
+                            r.sharedMaterials.Length == 1 && r.sharedMaterials[0] &&
+                            r.sharedMesh.subMeshCount == 1 && r.sharedMesh.blendShapeCount == 0 &&
+                            r.bones != null && r.bones.Length > 0)
+                .ToList();
+
+            foreach (var group in actives.GroupBy(r => (r.sharedMaterials[0], r.rootBone, r.bones.Length)))
+            {
+                var parts = group.ToList();
+                if (parts.Count < 2) continue;
+                if (!BonesAndBindposesMatch(parts)) continue;
+                var mergedGo = BuildMergedRenderer(parts);
+                if (mergedGo == null) continue;
+                foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
+                _merged.Add(mergedGo);
+            }
+        }
+
+        static bool BonesAndBindposesMatch(List<SkinnedMeshRenderer> parts)
+        {
+            var first = parts[0];
+            var bp0 = first.sharedMesh.bindposes;
+            for (int k = 1; k < parts.Count; k++)
+            {
+                var s = parts[k];
+                for (int i = 0; i < s.bones.Length; i++)
+                    if (s.bones[i] != first.bones[i]) return false;
+                var bp = s.sharedMesh.bindposes;
+                if (bp.Length != bp0.Length) return false;
+                for (int i = 0; i < bp.Length; i++)
+                    if (bp[i] != bp0[i]) return false;
+            }
+            return true;
+        }
+
+        GameObject BuildMergedRenderer(List<SkinnedMeshRenderer> parts)
+        {
+            var first = parts[0];
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var tans = new List<Vector4>();
+            var uvs = new List<Vector2>();
+            var cols = new List<Color32>();
+            var weights = new List<BoneWeight>();
+            var tris = new List<int>();
+
+            bool hasNormals = true, hasTangents = true, hasUv = true, hasColors = true;
+            foreach (var p in parts)
+            {
+                var m = p.sharedMesh;
+                if (m.normals.Length != m.vertexCount) hasNormals = false;
+                if (m.tangents.Length != m.vertexCount) hasTangents = false;
+                if (m.uv.Length != m.vertexCount) hasUv = false;
+                if (m.colors32.Length != m.vertexCount) hasColors = false;
+            }
+
+            foreach (var p in parts)
+            {
+                var m = p.sharedMesh;
+                int offset = verts.Count;
+                verts.AddRange(m.vertices);
+                if (hasNormals) norms.AddRange(m.normals);
+                if (hasTangents) tans.AddRange(m.tangents);
+                if (hasUv) uvs.AddRange(m.uv);
+                if (hasColors) cols.AddRange(m.colors32);
+                // 뼈 인덱스는 같은 bones 배열을 가리키므로 재매핑이 필요 없다.
+                weights.AddRange(m.boneWeights);
+                foreach (var t in m.triangles) tris.Add(t + offset);
+            }
+
+            var mesh = new Mesh { name = first.sharedMaterials[0].name + "_Merged" };
+            mesh.indexFormat = verts.Count > 65000
+                ? UnityEngine.Rendering.IndexFormat.UInt32
+                : UnityEngine.Rendering.IndexFormat.UInt16;
+            mesh.SetVertices(verts);
+            if (hasNormals) mesh.SetNormals(norms);
+            if (hasTangents) mesh.SetTangents(tans);
+            if (hasUv) mesh.SetUVs(0, uvs);
+            if (hasColors) mesh.SetColors(cols);
+            mesh.SetTriangles(tris, 0);
+            mesh.boneWeights = weights.ToArray();
+            mesh.bindposes = first.sharedMesh.bindposes;
+            if (!hasNormals) mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            var go = new GameObject("Merged_" + first.sharedMaterials[0].name);
+            go.transform.SetParent(first.transform.parent, false);
+            var smr = go.AddComponent<SkinnedMeshRenderer>();
+            smr.sharedMesh = mesh;
+            smr.bones = first.bones;
+            smr.rootBone = first.rootBone;
+            smr.sharedMaterial = first.sharedMaterials[0];
+            smr.localBounds = first.localBounds;
+            smr.shadowCastingMode = first.shadowCastingMode;
+            smr.updateWhenOffscreen = first.updateWhenOffscreen;
+            smr.quality = first.quality;
+            return go;
+        }
+
+        static void DestroySafe(UnityEngine.Object o)
+        {
+            if (Application.isPlaying) Destroy(o); else DestroyImmediate(o);
         }
 
         void ApplyColors()
