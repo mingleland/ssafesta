@@ -8,7 +8,7 @@
 - Python 3.12 이상
 - PostgreSQL + pgvector 테스트 인스턴스
 - AI migration role과 runtime role
-- 테스트용 S3 adapter 또는 격리된 bucket
+- 테스트용 S3-compatible object storage adapter 또는 격리된 R2 bucket
 - deterministic Embedding fake: 입력별 고정 1536차원 vector 반환
 - Spring callback fake 또는 Backend 로컬 인스턴스
 
@@ -31,7 +31,7 @@ alembic upgrade head
 
 ## 2. 기본 처리 성공
 
-1. Spring Fixture에 `QUEUED` Document와 S3 PDF를 준비한다.
+1. Spring Fixture에 `QUEUED` Document와 R2 PDF를 준비한다.
 2. `POST /ai/v1/documents/process`를 호출한다.
 3. Worker가 처리할 때까지 기다린다.
 
