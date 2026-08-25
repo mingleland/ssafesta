@@ -76,7 +76,9 @@
 
 | rule | 뜻 |
 |---|---|
-| `CURRENT_REVISION` | 충돌 시 `errors[0]`에 실린다. `message`에 서버의 현재 revision이 문장으로 담기지만 **구조화된 숫자 필드는 없다** — **재호출 트리거로만 쓴다**(값을 정규식으로 뽑지 않는다). 값이 필요한 화면이 생기면 그때 타입 있는 필드를 추가한다 (#58 결론, 2026-08-23) |
+| `CURRENT_REVISION` | 충돌 시 `errors[0]`에 실린다. **Layout에서는 `message`가 사람이 읽는 문장이고 구조화된 숫자 필드는 없다** — **재호출 트리거로만 쓴다**(문장에서 값을 정규식으로 뽑지 않는다). 값을 읽는 소비자가 없어 이 모양을 유지한다 (#58, 2026-08-23) |
+
+> ⚠️ **같은 rule 이름이 spec마다 `message` 모양이 다르다.** spec 019(Game Studio)는 이 자리에 **십진수 문자열**을 싣는다(`"message": "8"`) — 충돌 해결 UI가 그 값을 쓰기 때문이다. `rule`이 값의 뜻을 못 박고 있어 문장에서 캐내는 정규식과 달리 깨지지 않는다. **`ApiErrorDetail`에 타입 있는 값 필드는 추가하지 않는다** — 기계값이 둘 이상 필요한 rule이 나오면 그때 재검토한다 (#58 §5 재확정, 2026-08-24).
 
 ---
 
@@ -212,7 +214,7 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **Request**
 ```json
-{ "themeCode": "SSAFY_BLUE", "primaryColor": "#1677C8", "signText": "AI 프로젝트 전시관", "logoUrl": null }
+{ "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
 ```
 
 | 필드 | 규칙 |
@@ -263,7 +265,7 @@ docs/08이 이미 정의한 두 필드를 실제로 채운다. **추가일 뿐 �
 
 ```json
 { "boothId": 7, "slotId": 5, "name": "AI 프로젝트 전시관", "leaseStatus": "ACTIVE", "entryAvailable": true,
-  "facade": { "themeCode": "SSAFY_BLUE", "primaryColor": "#1677C8", "signText": "AI 프로젝트 전시관", "logoUrl": null },
+  "facade": { "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null },
   "publishedLayoutVersion": 4,
   "endsAt": "2026-08-21T02:20:25Z" }
 ```
