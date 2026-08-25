@@ -23,7 +23,7 @@ npm run build
 npm run lint
 ```
 
-현재 Authoring Quality 브랜치 기준은 test 47 files/264 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
+현재 Authoring Quality 브랜치 기준은 test 49 files/269 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
 분리된 lazy chunk인지 함께 확인한다.
 
 ## 3. Backend 없이 편집·플레이 확인
@@ -57,6 +57,10 @@ npm run dev -- --host 127.0.0.1 --port 5174
 20. 큰 맵의 먼 위치로 이동한 뒤 레이어 검색에서 화면 밖 Object를 선택하면 Canvas가 해당 위치로 자동 이동해야 한다. 레이어가 80개를 넘으면 `더 보기`로 점진 표시되며 검색은 아직 표시하지 않은 Object까지 포함해야 한다.
 21. PLATFORMER 크기에 200×100을 입력하면 `현재 20,000칸`과 10,000칸 저장 한도가 표시되고 적용 버튼이 비활성화되어야 한다. 200×50은 적용 가능해야 한다.
 22. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
+23. 개발 모드에서 `/app/games/9302/edit?fixture=max`를 열면 100×100, Object 500개, Tile 10,000칸 fixture가 계약 검증을 통과해 열려야 한다. 이 fixture는 운영 저장용이 아니므로 저장·게시 버튼으로 운영 데이터를 만들지 않는다.
+24. `전체`를 누르면 약 15% 배율에서 전체 맵이 보이고 badge가 `타일 10000칸 합성`, `data-rendered-tile-count=0`을 표시해야 한다. `1:1`에서는 viewport 주변 수백 Tile만 DOM으로 돌아와야 한다. 미니맵 중앙을 누르면 화면 Object ID 구성이 중간 좌표대로 바뀌어야 한다.
+25. Dialogue Scene의 `대화 흐름`에서 시작 Node 도달 수와 선택 결과가 보이고, Node card를 누르면 같은 Node 편집 폼으로 이동해야 한다. 테스트 fixture의 도달 불가·선택지 없음은 warning으로 집계하되 JSON에 분석 결과를 저장하지 않는다.
+26. 데이터 탭의 `게임 완성도 점검`은 시작 위치·완료 경로·상호작용·대화·Scene·Asset 6가지를 표시한다. Player Sprite 속성에서는 4방향 clip을 바꾸고 재생/일시정지할 수 있으며 Runtime 자동 방향 선택 안내가 보여야 한다.
 
 사람 대상 20분 검증 기록지는 [usability-test.md](usability-test.md)를 사용한다.
 

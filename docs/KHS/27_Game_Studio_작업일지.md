@@ -9,6 +9,18 @@
 
 ## 2026-08-25
 
+### 제작 전 영역 탐색·진단·재료 검증 고도화 ✅
+
+- 🤖 큰 맵에만 한정하지 않고 World Canvas, Dialogue, Project 데이터, Sprite 재료 확인을 하나의 품질 묶음으로 개선했다. 공통 GameProject JSON·Backend API·Unity Bridge는 변경하지 않고 Editor 파생 상태와 교체 가능한 UI 경계에만 구현했다.
+- 🤖 모든 World Scene에 미니맵 위치 이동, 전체 맵 맞춤, 1:1 배율, 선택 위치 이동을 추가했다. 좁은 Canvas toolbar는 Scene 제목을 고정하고 도구 영역만 내부 이동하게 해 3열 PC 편집 화면에서 제목이 세로로 찢어지던 문제도 막았다.
+- 🤖 25% 이하 전체 보기에서는 Tile 10,000칸을 단일 Canvas로 합성하고, 1:1 편집 배율에서는 기존 2칸 overscan DOM 가상화로 복귀한다. 개발 전용 `?fixture=max`는 100×100, Object 500, Tile 10,000을 실제 builtin Sprite와 함께 재현한다.
+- 🤖 Dialogue `대화 흐름`에 시작 Node 도달 여부, 선택 결과, 결과 미설정 경고와 Node 바로가기를 추가했다. 데이터 탭에는 시작 위치·완료 경로·상호작용·대화·Scene·Asset 6축 `게임 완성도 점검`을 제공한다. builtin 4방향 Sprite Sheet는 clip·frame·fps·반복과 재생/일시정지를 Inspector에서 확인한다.
+- 🤖 `dialogueFlow`, `projectHealth`, 최대 fixture, fit zoom 회귀를 추가해 전체 Frontend **49 files / 269 tests**, lint, production build를 통과했다. 500 Object 이동 100ms gate는 단독·전체 suite에서 통과했으며, build와 test를 동시에 실행한 CPU 경쟁 상태의 일시 초과는 GS-T060으로 측정 경계를 기록했다.
+- 🤖 Mock 브라우저에서 일반 16×10 맵과 최대 fixture를 모두 확인했다. 최대 맵은 전체 보기 15%에서 Tile DOM 0개/10,000칸 Canvas 합성, 1:1에서 Object 36/500·Tile 640/10,000만 렌더했다. 미니맵 중앙 이동은 화면 Object를 X 34~65/Y 54~72대로 바꿨고, 레이어 검색 `playerSpawn` 선택은 원거리 Canvas와 4방향 애니메이션 Inspector로 이동했다. 대화 흐름 1/1과 완성도 6/6도 실제 화면에서 확인했다.
+- 🤖 FE spec/plan/tasks/quickstart를 FR-068~071, SC-015, T118~T121로 갱신했다. 총 100개/완료 92개/잔여 8개이며 사람 20분 제작 테스트와 활성 PC 55fps 증거가 남아 있어 T090·T065는 완료 처리하지 않았다.
+- 🤖 코드 변경은 Jira 브랜치 `feat/S15P21A604-156-game-studio-authoring-quality`의 `1735be1`로 고정했다. 일반 Frontend·Backend·AI·Unity 코드와 shared JSON schema는 변경하지 않았다.
+- 트러블슈팅: GS-T058~GS-T060
+
 ### 대형 맵 편집 성능·공간 탐색 고도화 ✅
 
 - 🤖 고정 폭에 맵 전체를 압축하던 Canvas를 32px cell×zoom 기반 실제 작업 공간으로 바꿨다. 100×50 맵은 3200×1600으로 펼쳐지며 중앙 Canvas만 scroll되어 Scene/속성 panel 배치를 오염시키지 않는다.

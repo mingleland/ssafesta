@@ -8,6 +8,27 @@
 
 ## 2026-08-25
 
+### GS-T060. 테스트·빌드 병렬 경쟁에서 100ms 편집 gate가 일시 초과함 (측정 경계 확정)
+
+- **증상** — 전체 Vitest, TypeScript/Vite build, lint를 동시에 실행한 검증에서 최대 fixture Object 이동 최악값이 120.25ms로 100ms gate를 한 차례 넘었다. 같은 test file 단독 실행과 build 종료 뒤 전체 suite는 통과했다.
+- **원인** — 500 Object·10,000 Tile·실제 Sprite Component를 가진 fixture의 immutable parse 검증이 CPU를 쓰는 동안 별도 `tsc`와 Vite transform을 같은 장비에서 동시에 수행해 wall-clock 시간이 늘었다. 제품 편집 동작과 CI 빌드 경합을 같은 표본으로 섞었다.
+- **해결** — 100ms 기준이나 assertion을 완화하지 않았다. 성능 test file을 단독 재실행한 뒤 CPU 경쟁이 없는 전체 `npm test`에서도 통과함을 확인하고, build·lint는 각각 성공시켰다. 활성 브라우저 FPS는 기존 T065 사람 QA로 분리된 상태를 유지했다.
+- **예방** — wall-clock 성능 gate는 같은 장비의 대형 build와 병렬 실행하지 않는다. 기능 회귀는 병렬화할 수 있지만 100ms 기준과 활성 탭 FPS는 측정 조건·foreground·동시 프로세스를 기록하고 격리해서 판정한다.
+
+### GS-T059. 전체 맵 맞춤에서 10,000 Tile DOM이 다시 생기고 Canvas가 폭보다 커짐 (해결)
+
+- **증상** — 100×100 맵에서 `전체`를 누르면 zoom 표시는 15%였지만 map child의 min-content가 stage 폭을 밀어내 viewport가 전체를 담지 못했다. 폭을 100%로 고정하자 이번에는 전체 Tile이 화면 안으로 판정되어 span 10,000개가 생성됐다.
+- **원인** — `.gss-map-canvas`에 명시적인 `width:100%`가 없었고, 기존 viewport culling은 화면에 실제로 보이는 모든 Tile을 렌더하는 규칙이라 전체 맞춤에서는 자연스럽게 상한 전체가 visible이 됐다. 편집 배율 가상화와 전체 overview가 같은 렌더 경로를 사용했다.
+- **해결** — map child 폭을 stage에 고정했다. zoom 25% 이하에서는 TileLayer를 최대 1,000px의 단일 Canvas에 pixelated 합성하고 Tile span은 0개로 유지한다. 1:1로 돌아오면 기존 viewport/2칸 overscan span 경로로 자동 전환한다. 브라우저 실측은 전체 15%에서 Tile DOM 0/10,000 합성, 1:1에서 640/10,000이었다.
+- **예방** — 가상화 완료 조건은 스크롤 상태뿐 아니라 “전체 보기”처럼 모든 데이터가 viewport에 들어오는 상태를 포함한다. DOM 편집 표현과 저배율 overview 표현을 분리하고 badge/data attribute로 어느 경로인지 관찰 가능하게 한다.
+
+### GS-T058. 검증 도구의 명령·locator 가정을 그대로 사용해 첫 실행이 실패함 (해결)
+
+- **증상** — Vitest에 Jest 전용 `--runInBand`를 넘겨 unknown option으로 종료됐고, 첫 JSX wrapper에는 scroll div 닫기 하나가 빠져 build가 실패했다. 브라우저의 `전체` 버튼도 팔레트와 toolbar에 둘 존재해 exact role locator가 strict mode로 거부됐으며 해당 runtime에는 `getByTitle` helper가 없었다.
+- **원인** — 다른 test runner와 일반 Playwright API를 현재 프로젝트·인앱 브라우저 wrapper에도 동일하게 사용할 수 있다고 가정했다. UI wrapper 구조 변경은 unit test만 먼저 실행해 TypeScript JSX parse를 뒤에서 발견했다.
+- **해결** — 표준 `npm test`로 전환하고 JSX closing tag와 hook dependency를 build/lint 결과에 맞춰 수정했다. 브라우저는 `캔버스 보기` role group 안의 `전체` 버튼으로 범위를 좁혔다. 이후 49 files/269 tests, build, lint와 실제 클릭 여정을 모두 통과했다.
+- **예방** — 검증 명령은 `package.json` script를 정본으로 사용한다. UI 구조 변경은 unit test만이 아니라 `tsc -b`와 lint를 같은 묶음에서 확인하고, 중복 한국어 label은 상위 landmark/group으로 locator 범위를 좁힌다.
+
 ### GS-T057. PLATFORMER 최대 크기와 TileLayer 저장 상한이 달라 레이어 추가 시 계약 오류가 발생함 (FE 차단, 계약 결정 대기)
 
 - **증상** — PLATFORMER width/height는 각각 200×100까지 허용하지만 JSON Schema와 Frontend validator의 TileLayer `data`는 10,000개가 상한이다. 200×100 빈 Scene은 만들어지지만 Tile Layer 추가 순간 20,000개 배열이 생성되어 저장·검증이 실패한다.
