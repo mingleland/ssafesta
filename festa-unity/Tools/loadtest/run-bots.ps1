@@ -34,12 +34,19 @@ if (-not (Test-Path $exe)) {
     return
 }
 
+$logDir = Join-Path $PSScriptRoot "../../Builds/bot/logs"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 Write-Host "봇 $Count 기 → ws://${Addr}:${Port}"
+Write-Host "로그: $logDir"
 for ($i = 1; $i -le $Count; $i++) {
     $name = "bot{0:D2}" -f $i
+    $log = Join-Path $logDir "$name.log"
     Start-Process -FilePath $exe -ArgumentList @(
         "-batchmode", "-nographics", "-bot",
-        "-addr", $Addr, "-port", $Port, "-botName", $name
+        "-addr", $Addr, "-port", $Port, "-botName", $name,
+        # 로그가 없으면 접속 실패 원인을 볼 방법이 없다 — 실제로 이것 때문에
+        # 봇이 스스로 서버로 뜨던 문제를 한참 못 찾았다 (T-202).
+        "-logFile", $log
     ) -WindowStyle Hidden
     Start-Sleep -Milliseconds 400   # 동시 접속 폭주로 승인 큐가 막히지 않게 간격을 둔다
 }

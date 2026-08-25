@@ -36,16 +36,27 @@ namespace Festa.Network
             // 걸어 "Failed to connect to server." 로 끝난다 — 원인이 전혀 드러나지 않는
             // 형태였다 (T-182). 에디터에서 서버를 띄우려면 DevConnectionHud 의
             // "Start Server" 버튼이나 `-server` 인자를 쓴다.
+            //
+            // ⚠ 그 수정이 만든 두 번째 함정 (T-202, 2026-08-25):
+            // `!Application.isEditor` 는 **모든 플레이어 빌드**를 서버로 만든다 — 브라우저
+            // (WebGL)와 부하 테스트 봇까지. 봇은 자기 자신이 서버로 떠서 StartClient 가
+            // 전부 실패했고, 원인이 로그 없이는 보이지 않았다.
+            //   · WebGL: 브라우저는 소켓을 열 수 없어 서버가 될 수 없다 — 항상 클라이언트다.
+            //   · 봇(-bot): 클라이언트로만 붙어야 트래픽 모양이 실제 사용자와 같다.
+            bool botMode = HasArg("-bot");
             bool isRealServerBuild = !Application.isEditor;
-            if (isRealServerBuild || Application.isBatchMode || HasArg("-server"))
+#if UNITY_WEBGL
+            isRealServerBuild = false;
+#endif
+            if (!botMode && (isRealServerBuild || Application.isBatchMode || HasArg("-server")))
             {
                 StartDedicatedServer(transport);
                 return;
             }
 
-            Debug.Log("[NetworkBootstrap] 에디터에서는 자동 시작하지 않는다 — " +
-                      "DevConnectionHud 로 Host/Server/Client 를 고른다. " +
-                      $"(빌드 타깃 서브타깃이 Server 여도 마찬가지다)");
+            Debug.Log(botMode
+                ? "[NetworkBootstrap] 봇 모드 — 서버로 뜨지 않는다. LoadTestBot 이 클라이언트로 접속한다."
+                : "[NetworkBootstrap] 자동 시작하지 않는다 — DevConnectionHud 로 Host/Server/Client 를 고른다.");
         }
 
         void StartDedicatedServer(UnityTransport transport)

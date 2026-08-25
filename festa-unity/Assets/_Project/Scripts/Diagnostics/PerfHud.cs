@@ -41,9 +41,20 @@ namespace Festa.Diagnostics
         int _gcPerWindow;
         long _heapBytes;
 
+        // ── 네트워크 트래픽 ──
+        // NGO 의 TotalBytesSent/Received 카운터는 **매 프레임 dispatch 후 리셋**된다.
+        // 따라서 한 번 읽어서는 초당 트래픽을 알 수 없다 — 매 프레임 누적해야 한다.
+        // 내부 API(NetworkManager.NetworkMetrics)라 리플렉션으로 잡는다.
+        object _metrics;
+        System.Reflection.FieldInfo _sentField, _recvField;
+        System.Reflection.PropertyInfo _counterValue;
+        long _sentAccum, _recvAccum;
+        float _netWindow;
+        float _sentPerSec, _recvPerSec;
+
         // ── ProfilerRecorder — 개발 빌드/에디터에서 유효 ──
         ProfilerRecorder _drawCalls, _setPass, _batches, _tris, _sysMemory;
-
+        const string FmtNet = "송신 {0,7:F1} KB/s   수신 {1,7:F1} KB/s";
         static readonly StringBuilder Sb = new StringBuilder(512);
         static Texture2D _bg;
         static GUIStyle _style;
@@ -76,6 +87,8 @@ namespace Festa.Diagnostics
             if (ms > _windowWorstMs) _windowWorstMs = ms;
             if (ms > _sessionWorstMs) _sessionWorstMs = ms;
 
+            SampleNetwork();
+
             if (_windowElapsed >= _window)
             {
                 _fps = _windowFrames / _windowElapsed;
@@ -88,6 +101,46 @@ namespace Festa.Diagnostics
                 _heapBytes = System.GC.GetTotalMemory(false);
 
                 _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f;
+            }
+        }
+
+
+        /// <summary>
+        /// 매 프레임 NGO 트래픽 카운터를 누적한다. 카운터는 dispatch 때 0 으로 리셋되므로
+        /// 프레임마다 읽어 더하지 않으면 초당 값을 만들 수 없다.
+        /// 서버(Host)에서 읽으면 **전 클라이언트 합계**라 인원수에 따른 증가를 그대로 볼 수 있다.
+        /// </summary>
+        void SampleNetwork()
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null || (!nm.IsClient && !nm.IsServer)) { _sentPerSec = _recvPerSec = 0f; return; }
+
+            if (_metrics == null)
+            {
+                const System.Reflection.BindingFlags BF =
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance;
+                var prop = nm.GetType().GetProperty("NetworkMetrics", BF);
+                _metrics = prop?.GetValue(nm);
+                if (_metrics == null) return;
+                _sentField = _metrics.GetType().GetField("m_TransportBytesSent", BF);
+                _recvField = _metrics.GetType().GetField("m_TransportBytesReceived", BF);
+                var counter = _sentField?.GetValue(_metrics);
+                _counterValue = counter?.GetType().GetProperty("Value", BF);
+            }
+            if (_counterValue == null) return;
+
+            var s = _sentField.GetValue(_metrics);
+            var r = _recvField.GetValue(_metrics);
+            _sentAccum += (long)_counterValue.GetValue(s);
+            _recvAccum += (long)_counterValue.GetValue(r);
+
+            _netWindow += Time.unscaledDeltaTime;
+            if (_netWindow >= 1f)
+            {
+                _sentPerSec = _sentAccum / _netWindow;
+                _recvPerSec = _recvAccum / _netWindow;
+                _sentAccum = 0; _recvAccum = 0; _netWindow = 0f;
             }
         }
 
@@ -130,10 +183,11 @@ namespace Festa.Diagnostics
             }
             else Sb.Append("네트워크 미연결\n");
 
-            Sb.Append("네트워크 트래픽은 RNSM 오버레이 참조");
+            Sb.AppendFormat(FmtNet, _sentPerSec / 1024f, _recvPerSec / 1024f);
+            Sb.AppendLine();
 
             float w = 380f * Mathf.Max(1f, Screen.height / 1080f);
-            float h = 210f * Mathf.Max(1f, Screen.height / 1080f);
+            float h = 228f * Mathf.Max(1f, Screen.height / 1080f);
             var rect = new Rect(10f, 10f, w, h);
             GUI.DrawTexture(rect, Bg(), ScaleMode.StretchToFill);
             GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width - 20f, rect.height - 16f), Sb.ToString(), _style);

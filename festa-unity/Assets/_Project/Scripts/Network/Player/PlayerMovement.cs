@@ -333,7 +333,29 @@ namespace Festa.Network
             _controller.Move(velocity * Time.deltaTime);
         }
 
-        static Vector2 ReadMoveInput()
+        // ── 합성 입력 (부하 테스트 봇 전용) ─────────────────────────
+        // 봇이 CharacterController 를 직접 밀면 이 경로를 건너뛰어 **AnimState 가
+        // Idle 에 머문다.** 그러면 걷기 애니메이션이 원격에 전파되지 않아
+        //   ① AnimState 동기화 트래픽이 빠지고
+        //   ② 다른 클라이언트가 그 아바타를 애니메이션하지 않아 CPU 가 과소평가된다.
+        // 실제 사용자와 같은 부하를 만들려면 입력 자체를 주입해야 한다.
+        [System.NonSerialized] public bool UseSyntheticInput;
+        [System.NonSerialized] public Vector2 SyntheticInput;
+        [System.NonSerialized] public bool SyntheticRun;
+
+        Vector2 ReadMoveInput()
+        {
+            if (UseSyntheticInput) return SyntheticInput;
+            return ReadKeyboardInput();
+        }
+
+        bool IsRunPressed()
+        {
+            if (UseSyntheticInput) return SyntheticRun;
+            return IsRunKeyPressed();
+        }
+
+        static Vector2 ReadKeyboardInput()
         {
             var kb = Keyboard.current;
             if (kb == null) return Vector2.zero;
@@ -346,7 +368,7 @@ namespace Festa.Network
             return v;
         }
 
-        static bool IsRunPressed()
+        static bool IsRunKeyPressed()
         {
             var kb = Keyboard.current;
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
