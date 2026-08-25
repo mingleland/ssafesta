@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "jam": {
+      "command": "node",
+      "args": [
+        "C:\\colosair\\projects\\jira-agent-mcp\\dist\\index.js",
+        "serve"
+      ],
+      "env": {
+        "JIRA_BASE_URL": "${JIRA_BASE_URL}",
+        "JIRA_EMAIL": "${JIRA_EMAIL}",
+        "JIRA_API_TOKEN": "${JIRA_API_TOKEN}"
+      }
+    }
+  }
+}
