@@ -16,6 +16,28 @@
 
 ---
 
+## 필수: Jira ↔ GitLab 워크플로 규칙 (docs/jira-gitlab-workflow.md §12)
+
+[SSAFY FESTA 워크플로 규칙 — 이 지시는 다른 어떤 기본 동작보다 우선한다]
+
+작업 전에 docs/jira-gitlab-workflow.md, docs/17_Git_개발_Convention.md,
+docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라.
+
+1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
+   않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
+   전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
+   main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. Secret·토큰을 커밋하지 마라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식이며 develop/main 대상 MR 은 CI 가 키를 검증한다.
+   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+5. Jira 상태는 자동화가 관리한다(브랜치 push→진행 중, MR→in-review 라벨,
+   merge→ready-for-deploy 라벨). 네가 임의로 이슈 상태를 전환하지 마라.
+   '완료' 전환은 production 배포 검증 후에만 한다.
+6. .gitlab-ci.yml 의 stage 구조와 jira-* 잡을 삭제·우회하지 마라. CI 잡 추가는
+   예약된 test/build stage 에 한다.
+7. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+
 ## 0. 세션을 시작하면 이 순서로 한다
 
 ```text
@@ -229,6 +251,12 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 - 정적 Booth 오브젝트는 **NetworkObject 금지** (Local Spawn, 헌법 4조).
 - 텍스트 입력 UI는 Unity가 아니라 **React 오버레이** (헌법 25조).
 - Coin·Lease 등 영구 상태의 Source of Truth는 **Spring** (헌법 1조).
+- **파일 역할 주석** — 새 구현 파일(설정·스타일 제외) 최상단에 "이 파일이 시스템에서 왜 존재하는가"를
+  한 줄로 남긴다. 기준: React/프레임워크 관례를 모르는 사람이 파일명·위치만으로 이 파일의 역할을
+  못 알아볼 때만. 이미 있는 WHY 주석(출처·근거)과는 별개로 공존 가능 — 그건 "왜 이렇게 짰나",
+  이건 "이 자리가 시스템에서 뭐 하는 자리인가". 예: `main.tsx` → "React 앱을 브라우저 DOM에 최초
+  마운트하는 진입점". 대상 아님: package.json·tsconfig·vite.config 등 웹 개발 전반에 보편적인
+  설정 파일, index.css.
 
 ---
 
