@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GameObject, WorldScene } from '../../contracts/gameProject.ts';
 import { findPresetDefinition } from '../model/authoringRegistry.ts';
 
@@ -19,6 +19,8 @@ const objectZIndex = (object: GameObject): number => {
   return sprite?.type === 'SPRITE' ? sprite.zIndex ?? 2 : 2;
 };
 
+const OBJECT_PAGE_SIZE = 80;
+
 export const ObjectLayerPanel = ({
   scene,
   selectedObjectId,
@@ -31,6 +33,7 @@ export const ObjectLayerPanel = ({
   onChangeZIndex,
 }: ObjectLayerPanelProps) => {
   const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(OBJECT_PAGE_SIZE);
   const objects = useMemo(() => {
     const query = search.trim().toLowerCase();
     return scene.objects
@@ -41,6 +44,11 @@ export const ObjectLayerPanel = ({
       .map((object, index) => ({ object, index, zIndex: objectZIndex(object) }))
       .sort((left, right) => right.zIndex - left.zIndex || right.index - left.index);
   }, [scene.objects, search]);
+  const visibleObjects = objects.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(OBJECT_PAGE_SIZE);
+  }, [scene.id, search]);
 
   return (
     <aside aria-label="오브젝트 레이어" className="gss-layer-panel">
@@ -54,9 +62,9 @@ export const ObjectLayerPanel = ({
         placeholder="ID 또는 종류로 찾기"
         value={search}
       />
-      <p>눈은 편집 화면에서만 숨기고, 자물쇠는 실수로 움직이지 않게 합니다. 숫자는 게임 화면의 앞뒤 순서입니다.</p>
+      <p>눈은 편집 화면에서만 숨기고, 자물쇠는 실수로 움직이지 않게 합니다. 검색하면 전체 오브젝트에서 바로 찾습니다.</p>
       <div className="gss-layer-list">
-        {objects.map(({ object, zIndex }) => {
+        {visibleObjects.map(({ object, zIndex }) => {
           const definition = findPresetDefinition(object.preset);
           const hidden = hiddenObjectIds.has(object.id);
           const locked = lockedObjectIds.has(object.id);
@@ -92,6 +100,13 @@ export const ObjectLayerPanel = ({
           );
         })}
         {objects.length === 0 && <div className="gss-empty-inline">검색 결과가 없습니다.</div>}
+        {visibleCount < objects.length && (
+          <button
+            className="gss-layer-more"
+            onClick={() => setVisibleCount((current) => Math.min(objects.length, current + OBJECT_PAGE_SIZE))}
+            type="button"
+          >{Math.min(OBJECT_PAGE_SIZE, objects.length - visibleCount)}개 더 보기 · 현재 {visibleCount}/{objects.length}</button>
+        )}
       </div>
     </aside>
   );

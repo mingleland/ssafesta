@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState, type DragEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent } from 'react';
 import type { AssetReference, GameObject, TileLayer, WorldScene } from '../../contracts/gameProject.ts';
 import { findPresetDefinition } from '../model/authoringRegistry.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import type { TilesetDefinition } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
+import {
+  calculateGridViewport,
+  equalGridViewports,
+  expandGridViewport,
+  gridViewportContains,
+  objectsInViewport,
+  tileIndexesInViewport,
+  type GridViewport,
+} from './canvasViewport.ts';
 
 export type CanvasTool = 'SELECT' | 'PAN';
 export type TileTool = 'BRUSH' | 'RECTANGLE' | 'FLOOD_FILL' | 'PICKER';
@@ -67,6 +76,10 @@ interface PanningState {
   readonly scrollTop: number;
 }
 
+const BASE_CELL_SIZE_PX = 32;
+const MIN_CANVAS_WIDTH_PX = 480;
+const VIEWPORT_OVERSCAN_CELLS = 2;
+
 export const TopDownCanvas = ({
   scene,
   assets,
@@ -92,7 +105,10 @@ export const TopDownCanvas = ({
   onPickTile,
   onPlacementComplete,
 }: TopDownCanvasProps) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const viewportFrameRef = useRef<number | null>(null);
+  const [canvasViewport, setCanvasViewport] = useState<GridViewport | null>(null);
   const [draggingSelection, setDraggingSelection] = useState<DraggingSelection | null>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
   const [tileRectangle, setTileRectangle] = useState<SelectionBox | null>(null);
@@ -104,6 +120,7 @@ export const TopDownCanvas = ({
   const tileBrushRef = useRef(tileBrush);
   paintCallbackRef.current = onPaintTiles;
   tileBrushRef.current = tileBrush;
+  const canvasWidth = Math.max(MIN_CANVAS_WIDTH_PX, Math.round(scene.width * BASE_CELL_SIZE_PX * (zoom / 100)));
   const backgroundVisual = resolveStaticImageVisual(
     assets.find((asset) => asset.id === scene.backgroundAssetId),
     assetUrls,
@@ -125,6 +142,78 @@ export const TopDownCanvas = ({
   useEffect(() => () => {
     if (paintFrameRef.current !== null) window.cancelAnimationFrame(paintFrameRef.current);
   }, []);
+
+  const measureViewport = useCallback(() => {
+    viewportFrameRef.current = null;
+    if (scrollRef.current === null || canvasRef.current === null) return;
+    const nextViewport = calculateGridViewport(
+      scrollRef.current.getBoundingClientRect(),
+      canvasRef.current.getBoundingClientRect(),
+      scene.width,
+      scene.height,
+    );
+    setCanvasViewport((current) => equalGridViewports(current, nextViewport) ? current : nextViewport);
+  }, [scene.height, scene.width]);
+
+  const scheduleViewportMeasurement = useCallback(() => {
+    if (viewportFrameRef.current !== null) return;
+    viewportFrameRef.current = window.requestAnimationFrame(measureViewport);
+  }, [measureViewport]);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (scroll === null || canvas === null) return;
+    scheduleViewportMeasurement();
+    scroll.addEventListener('scroll', scheduleViewportMeasurement, { passive: true });
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(scheduleViewportMeasurement);
+    resizeObserver?.observe(scroll);
+    resizeObserver?.observe(canvas);
+    window.addEventListener('resize', scheduleViewportMeasurement);
+    return () => {
+      scroll.removeEventListener('scroll', scheduleViewportMeasurement);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', scheduleViewportMeasurement);
+      if (viewportFrameRef.current !== null) window.cancelAnimationFrame(viewportFrameRef.current);
+      viewportFrameRef.current = null;
+    };
+  }, [canvasWidth, scheduleViewportMeasurement]);
+
+  const renderViewport = useMemo(() => canvasViewport === null
+    ? null
+    : expandGridViewport(canvasViewport, scene.width, scene.height, VIEWPORT_OVERSCAN_CELLS), [canvasViewport, scene.height, scene.width]);
+  const renderedObjects = useMemo(() => objectsInViewport(
+    scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)),
+    renderViewport,
+    selectedObjectId,
+  ), [editorHiddenObjectIds, renderViewport, scene.objects, selectedObjectId]);
+  const renderedTileIndexes = useMemo(() => tileIndexesInViewport(
+    renderViewport,
+    scene.width,
+    tileLayer?.data.length ?? 0,
+  ), [renderViewport, scene.width, tileLayer?.data.length]);
+
+  useEffect(() => {
+    if (selectedObjectId === null || canvasViewport === null) return;
+    const selectedObject = scene.objects.find((object) => object.id === selectedObjectId);
+    const scroll = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (selectedObject === undefined || scroll === null || canvas === null
+      || gridViewportContains(canvasViewport, selectedObject.position)) return;
+    const scrollRect = scroll.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const targetLeft = scroll.scrollLeft + (canvasRect.left - scrollRect.left)
+      + ((selectedObject.position.x + 0.5) / scene.width) * canvasRect.width;
+    const targetTop = scroll.scrollTop + (canvasRect.top - scrollRect.top)
+      + ((selectedObject.position.y + 0.5) / scene.height) * canvasRect.height;
+    scroll.scrollTo({
+      left: Math.max(0, targetLeft - scroll.clientWidth / 2),
+      top: Math.max(0, targetTop - scroll.clientHeight / 2),
+      behavior: 'smooth',
+    });
+  }, [canvasViewport, scene.height, scene.objects, scene.width, selectedObjectId]);
 
   const finishSelectionBox = () => {
     if (selectionBox === null) return;
@@ -215,8 +304,9 @@ export const TopDownCanvas = ({
         if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
         setPanning(null);
       }}
+      ref={scrollRef}
     >
-      <div className="gss-map-stage" style={{ width: `${zoom}%` }}>
+      <div className="gss-map-stage" style={{ width: `${canvasWidth}px` }}>
         <div
           aria-label={`${scene.name} 맵 편집 캔버스`}
           className={`gss-map-canvas${placementPreset === null && !tileEditing ? '' : ' is-placing'}${showGrid ? '' : ' is-grid-hidden'}${canvasTool === 'PAN' ? ' is-pan-tool' : ''}${tileEditing ? ' is-tile-editing' : ''}${showCollisions ? ' is-showing-collisions' : ''}`}
@@ -269,6 +359,8 @@ export const TopDownCanvas = ({
           }}
           ref={canvasRef}
           role="application"
+          data-rendered-object-count={renderedObjects.length}
+          data-rendered-tile-count={renderedTileIndexes.length}
           style={{
             aspectRatio: `${scene.width} / ${scene.height}`,
             ...(backgroundVisual === null ? {} : staticImageBackgroundStyle(backgroundVisual)),
@@ -278,7 +370,9 @@ export const TopDownCanvas = ({
         >
           {tileLayer !== null && (
             <div className="gss-tile-layer" aria-hidden="true">
-              {tileLayer.data.map((tile, index) => tile < 0 ? null : (
+              {renderedTileIndexes.map((index) => {
+                const tile = tileLayer.data[index] ?? -1;
+                return tile < 0 ? null : (
                 <span
                   className={`is-tile-${tile % 8}`}
                   key={`${tileLayer.id}-${index}`}
@@ -288,9 +382,14 @@ export const TopDownCanvas = ({
                     ...(tilesetVisual === null ? {} : tileBackgroundStyle(tilesetVisual, tile)),
                   }}
                 />
-              ))}
+                );
+              })}
             </div>
           )}
+          <div aria-live="polite" className="gss-render-budget">
+            화면 오브젝트 {renderedObjects.length}/{scene.objects.length}
+            {tileLayer === null ? '' : ` · 타일 ${renderedTileIndexes.length}/${tileLayer.data.length}`}
+          </div>
           {selectionBox !== null && (
             <div
               aria-hidden="true"
@@ -315,7 +414,7 @@ export const TopDownCanvas = ({
               }}
             />
           )}
-          {scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)).map((object) => {
+          {renderedObjects.map((object) => {
             const definition = findPresetDefinition(object.preset);
             const sprite = object.components.find((component) => component.type === 'SPRITE');
             const spriteVisual = sprite?.type === 'SPRITE'

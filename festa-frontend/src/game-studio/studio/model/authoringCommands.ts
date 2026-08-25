@@ -500,6 +500,9 @@ export const resizeWorldScene = (
   const minWidth = scene.type === 'PLATFORMER' ? 8 : 4;
   const nextWidth = Math.max(minWidth, Math.min(scene.type === 'PLATFORMER' ? 200 : 100, Math.round(width)));
   const nextHeight = Math.max(scene.type === 'PLATFORMER' ? 6 : 4, Math.min(100, Math.round(height)));
+  if (nextWidth * nextHeight > GAME_PROJECT_LIMITS.maxTileCellsPerLayer) {
+    throw new Error(`맵은 타일 저장 한도인 ${GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸까지 만들 수 있습니다.`);
+  }
   return {
     ...scene,
     width: nextWidth,
@@ -584,6 +587,9 @@ export const removeObjects = (
 ): { readonly project: GameProject; readonly removedObjectIds: readonly string[]; readonly blocked: readonly { readonly objectId: string; readonly reason: string }[] } => {
   const scene = project.scenes.find((candidate) => candidate.id === sceneId);
   if (scene?.type === 'DIALOGUE' || scene === undefined) throw new Error(`${sceneId} is not a world scene`);
+  if (scene.width * scene.height > GAME_PROJECT_LIMITS.maxTileCellsPerLayer) {
+    throw new Error(`Tile Layer는 맵 크기를 ${GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸 이하로 줄인 뒤 추가할 수 있습니다.`);
+  }
   const requestedIds = new Set(objectIds);
   const blocked = scene.objects.flatMap((object) => {
     if (!requestedIds.has(object.id)) return [];

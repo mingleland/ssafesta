@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Component, GameObject, GameProject, WorldScene } from '../../contracts/gameProject.ts';
+import { GAME_PROJECT_LIMITS, type Component, type GameObject, type GameProject, type WorldScene } from '../../contracts/gameProject.ts';
 import { assetDisplayLabel, findBuiltinSpriteSheet, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import {
@@ -48,6 +48,8 @@ export const InspectorPanel = ({
   const [showAssetPicker, setShowAssetPicker] = useState(false);
   const [sceneSizeDraft, setSceneSizeDraft] = useState({ width: scene.width, height: scene.height });
   const replaceSpriteInput = useRef<HTMLInputElement>(null);
+  const sceneSizeCells = Math.round(sceneSizeDraft.width) * Math.round(sceneSizeDraft.height);
+  const sceneSizeTooLarge = sceneSizeCells > GAME_PROJECT_LIMITS.maxTileCellsPerLayer;
 
   useEffect(() => {
     setAdvanced(false);
@@ -108,9 +110,15 @@ export const InspectorPanel = ({
             />
           </label>
         </div>
+        {sceneSizeTooLarge && (
+          <p className="gss-field-warning" role="alert">
+            현재 {sceneSizeCells.toLocaleString('ko-KR')}칸입니다. 저장 가능한 최대 크기는 {GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸입니다.
+          </p>
+        )}
         <button
           className="gss-secondary-wide"
           disabled={!Number.isFinite(sceneSizeDraft.width) || !Number.isFinite(sceneSizeDraft.height)
+            || sceneSizeTooLarge
             || (sceneSizeDraft.width === scene.width && sceneSizeDraft.height === scene.height)}
           onClick={() => onApply(resizeWorldScene(project, scene.id, sceneSizeDraft.width, sceneSizeDraft.height))}
           type="button"

@@ -5,6 +5,7 @@ import {
   addDialogueScene,
   addObject,
   addObjectEvent,
+  addPlatformerScene,
   addTileLayer,
   addTopDownScene,
   appendEventAction,
@@ -199,5 +200,18 @@ describe('Game Studio authoring commands', () => {
     expect(library.tileLayers[0]?.data[3 * 8 + 3]).toBe(7);
     expect(library.objects.every((object) => object.position.x < 8 && object.position.y < 6)).toBe(true);
     expect(parseGameProject(project)).toBe(project);
+  });
+
+  it('blocks authoring map sizes that cannot be represented by the shared tile contract', () => {
+    let project = createStarterProject(48);
+    project = addPlatformerScene(project);
+    const platformer = project.scenes.at(-1);
+    if (platformer?.type !== 'PLATFORMER') throw new Error('expected platformer');
+
+    expect(() => resizeWorldScene(project, platformer.id, 200, 100)).toThrow('10,000칸');
+    const valid = resizeWorldScene(project, platformer.id, 200, 50);
+    const resized = valid.scenes.find((scene) => scene.id === platformer.id);
+    expect(resized?.type === 'PLATFORMER' ? [resized.width, resized.height] : null).toEqual([200, 50]);
+    expect(parseGameProject(valid)).toBe(valid);
   });
 });

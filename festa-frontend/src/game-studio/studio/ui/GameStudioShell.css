@@ -293,9 +293,9 @@
 .gss-zoom-controls button { background: transparent; border: 0; cursor: pointer; height: 26px; width: 28px; }
 .gss-zoom-controls span { color: var(--gss-muted); font-size: 9px; min-width: 34px; text-align: center; }
 
-.gss-canvas-scroll { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: auto; padding: 28px; touch-action: none; }
+.gss-canvas-scroll { align-items: flex-start; display: flex; justify-content: flex-start; min-height: 0; overflow: auto; padding: 28px; touch-action: none; }
 .gss-canvas-scroll.is-panning { cursor: grabbing; user-select: none; }
-.gss-map-stage { max-width: 1240px; min-width: 610px; transition: width .16s ease; }
+.gss-map-stage { flex: 0 0 auto; margin: auto; transition: width .16s ease; }
 .gss-map-canvas {
   background-color: #17140f;
   background-position: center;
@@ -324,6 +324,7 @@
 .gss-canvas-scroll.is-panning .gss-map-canvas.is-pan-tool { cursor: grabbing; }
 .gss-tile-layer { display: grid; grid-template-columns: repeat(var(--gss-grid-columns), 1fr); grid-template-rows: repeat(var(--gss-grid-rows), 1fr); inset: 0; opacity: .78; pointer-events: none; position: absolute; z-index: 1; }
 .gss-tile-layer > span { border: 1px solid rgba(255,255,255,.05); }
+.gss-render-budget { background: rgba(7,10,15,.78); border: 1px solid rgba(119,150,190,.3); border-radius: 5px; color: #91a1b5; font-family: ui-monospace,Consolas,monospace; font-size: 8px; left: 8px; padding: 4px 6px; pointer-events: none; position: absolute; top: 8px; z-index: 32; }
 .gss-map-canvas.is-placing { cursor: crosshair; box-shadow: 0 0 0 2px var(--gss-blue), 0 22px 60px rgba(0,0,0,.4); }
 .gss-map-object {
   align-items: center;
@@ -360,6 +361,7 @@
 .gss-map-object--door:not(.is-selected) { filter: drop-shadow(0 2px 3px rgba(0,0,0,.65)); }
 .gss-selection-box { background: rgba(51,136,255,.14); border: 1px solid #5b9eff; box-shadow: inset 0 0 18px rgba(51,136,255,.08); pointer-events: none; position: absolute; z-index: 30; }
 .gss-selection-box.is-tile-rectangle { background: rgba(244,184,73,.18); border-color: #f4b849; box-shadow: inset 0 0 18px rgba(244,184,73,.13); }
+.gss-field-warning { background: rgba(222,155,54,.08); border: 1px solid rgba(222,155,54,.32); border-radius: 6px; color: #e4b96f; font-size: 8px; line-height: 1.45; margin: 0; padding: 7px 8px; }
 
 .gss-statusbar { align-items: center; background: #0e1116; border-top: 1px solid var(--gss-border); color: #737d8b; display: flex; font-size: 9px; justify-content: space-between; padding: 0 12px; }
 .gss-statusbar span { align-items: center; display: flex; gap: 6px; }
@@ -655,6 +657,7 @@
 .gss-layer-select small { color: #707d8d; font-size: 7px; margin-top: 2px; }
 .gss-layer-list article > button:not(.gss-layer-select),.gss-layer-order button { background: #1b222c; border: 1px solid #333d4a; border-radius: 5px; color: #8d9bac; height: 25px; padding: 0; width: 25px; }
 .gss-layer-list article > button.is-active { border-color: #557fb9; color: #9dc5ff; }
+.gss-layer-list > .gss-layer-more { background: rgba(51,136,255,.09); border: 1px solid #3c659b; border-radius: 6px; color: #9cc6ff; font-size: 8px; padding: 8px; width: 100%; }
 .gss-layer-order { align-items: center; display: grid; gap: 2px; grid-template-columns: 22px 20px 22px; }
 .gss-layer-order button { height: 22px; width: 22px; }
 .gss-layer-order b { color: #8190a2; font-family: ui-monospace,Consolas,monospace; font-size: 8px; text-align: center; }

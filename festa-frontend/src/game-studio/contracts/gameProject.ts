@@ -6,6 +6,7 @@ export const GAME_PROJECT_LIMITS = {
   maxObjectsPerScene: 500,
   maxEventsPerScene: 300,
   maxAssets: 300,
+  maxTileCellsPerLayer: 10_000,
 } as const;
 
 export const estimateGameProjectJsonBytes = (project: GameProject): number => (
@@ -493,7 +494,7 @@ const validateTileLayerShape = (value: unknown, path: string): void => {
   stableIdAt(record.id, `${path}.id`);
   stringAt(record.name, `${path}.name`, 1, 50);
   stableIdAt(record.tilesetAssetId, `${path}.tilesetAssetId`);
-  arrayAt(record.data, `${path}.data`, 0, 10_000)
+  arrayAt(record.data, `${path}.data`, 0, GAME_PROJECT_LIMITS.maxTileCellsPerLayer)
     .forEach((tile, index) => integerAt(tile, `${path}.data[${index}]`, -1));
 };
 
