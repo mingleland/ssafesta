@@ -39,7 +39,6 @@
 |---|:---:|---|---|
 | `GAME_VALIDATION_FAILED` ★ | 409 | Draft 저장·Publish 검증 실패 — `errors[]`에 rule이 실린다 | 편집기: rule별 수정 위치 표시 |
 | `GAME_REVISION_CONFLICT` | 409 | `expectedRevision` 불일치 (FR-025) | `errors[0].rule=CURRENT_REVISION` → 충돌 복구 UI |
-| `GAME_DRAFT_NOT_FOUND` | 404 | Draft가 아직 없음 — **§결정 필요 ① 참조** | 편집기: starter project 유지 |
 | `GAME_NOT_FOUND` | 404 | Game이 없음 | Runtime·편집기 공통 |
 | `GAME_DELETED` | 404 | soft delete된 Game | Runtime 오류 화면 |
 | `GAME_NOT_PUBLISHED` | 404 | Published Version이 없음 | Runtime 오류 화면 |
@@ -265,7 +264,11 @@ stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob
 }
 ```
 
-- `GET`에서 Draft가 아직 없으면 HTTP 404 + `GAME_DRAFT_NOT_FOUND`를 반환한다. FE는 새 starter project를 유지한다.
+- `GET`에서 Draft가 아직 없으면 **HTTP 204 No Content**를 반환한다 (본문 없음). FE는 새 starter
+  project를 유지한다. 204이므로 `code`가 없고, `GAME_DRAFT_NOT_FOUND`는 **더 이상 쓰지 않는다** —
+  §봉투 `code` 표에서 뺐다.
+  - 204를 쓰는 이유는 **"Game은 있고 Draft만 없다"와 "Game이 없다"(404)·"내 것이 아니다"(403)가
+    상태 코드만으로 갈리기 때문**이다. 셋을 다 404로 두면 FE가 본문 `code`를 읽어야 구분된다.
 - 응답의 `gameId`, `revision`과 `project.gameId`, `project.revision`은 반드시 일치해야 한다.
   - `revision`은 **서버가 발급하는 카운터**이고 사용자 데이터가 아니다. 그래서 서버는 저장 시
     `project.revision`을 새 값으로 **기록한다** — FE가 `expectedRevision`에 옛 값을 실어 보내고
@@ -277,6 +280,11 @@ stable `asset://`만 허용하고 `asset://local`, binary/base64, `data:`, `blob
 
 - 성공: revision 8의 새 Draft snapshot 반환
 - 충돌: HTTP 409 + `GAME_REVISION_CONFLICT` + 현재 revision
+- **Draft row가 없는 상태의 첫 저장**: `expectedRevision: 0`이면 최초 생성으로 처리하고 revision 1을
+  반환한다. 그 밖의 값이면 409 + `GAME_REVISION_CONFLICT` + `CURRENT_REVISION` `"0"`.
+  - §게임 생성이 "생성은 Draft를 만들지 않는다"이고 starter project의 `revision`이 0이므로
+    (`createStarterProject.ts:13`), 첫 저장은 **반드시** `expectedRevision: 0`으로 온다. 이 규칙이
+    없으면 위의 "충돌" 줄만 읽고 구현했을 때 **모든 게임의 첫 저장이 409로 튕긴다.**
 - 좌표 clamp, 알 수 없는 필드 삭제, 참조 치환 같은 자동 보정 금지
 - 별도 `/validate`가 후속으로 생겨도 Draft 저장과 Publish에서 각각 다시 검증
 
@@ -425,22 +433,26 @@ Cache-Control: no-store
 헌법 30조에 따라 구현자가 임의로 정하지 않는다. 위에서 **"제안"** 으로 표기한 것과 별개로, 아래는
 **이미 머지된 계약·구현과 서로 어긋나 있어** 한쪽이 움직여야 하는 것들이다.
 
-> ①·⑦의 FE 근거(`gameAuthoringApi.ts`·`gamePortalRepository.ts`·`shared/api/client.ts`)는 **PR #72·#82
-> 브랜치 기준이다** — `origin/front`·develop에는 아직 없다. 그 PR이 머지되면 그대로 성립하고, 다른
-> 모양으로 머지되면 이 두 항목을 다시 본다.
+> FE 근거(`gameAuthoringApi.ts`·`gamePortalRepository.ts`·`shared/api/client.ts`)는 **PR #72·#82
+> 브랜치 기준이다** — develop에는 아직 없다. 그 PR이 머지되면 그대로 성립하고, 다른 모양으로
+> 머지되면 해당 항목을 다시 본다.
+
+### 확정됨 (2026-08-25, GitLab #104)
+
+| # | 무엇 | 확정 |
+|---|---|---|
+| ① | `GET /draft`에 Draft가 없을 때 | **204 No Content**. `GAME_DRAFT_NOT_FOUND` 폐기, §Draft 저장 반영 완료. 첫 저장 `expectedRevision: 0` 규칙도 함께 명시했다 |
+| ⑦ | `INTERNAL_SERVER_ERROR` vs `INTERNAL_ERROR` | 서버는 **`INTERNAL_ERROR` 유지**. 전 endpoint 공통 코드라 서버를 바꾸지 않고 FE `gameAuthoringApi.ts`의 재시도 판정 한 줄을 맞춘다 |
+
+### 아직 열려 있음
 
 | # | 무엇 | 지금 상태 | 왜 지금 정해야 하나 |
 |---|---|---|---|
-| ① | **`GET /draft`에 Draft가 없을 때** | 계약은 `404` + `GAME_DRAFT_NOT_FOUND`. FE `createApiGameDraftRepository.load`는 **HTTP 204만** "Draft 없음"(→`null`)으로 읽고, 404는 throw해서 `GameStudioShell`의 `.catch`가 **저장 상태를 `error`로 바꾸고 오류 문구를 띄운다** | 계약 문장("FE는 새 starter project를 유지한다")이 **새 게임 첫 방문마다** 깨진다. 예외도 테스트 실패도 없이 편집기가 오류 상태로 열린다 — 통합을 붙이기 전에는 안 잡히는 종류다. **BE가 204로 바꾸거나 FE `load`가 이 코드를 잡거나** 둘 중 하나. BE 쪽 변경을 권하는 이유: 204면 "Game은 있고 Draft만 없다"와 "Game이 없다/내 것이 아니다"(404·403)가 **구조적으로** 갈린다 |
 | ② | **공개 중단·삭제 endpoint가 없다** | `visibility` 전환과 soft delete 경로가 계약에 없다. 그런데 BE tasks **T085**가 "unpublish, soft/hard delete, Published-history 정책을 통합 테스트로 고정"을 요구하고 #33에서 정책은 이미 확정됐다 | 정책만 있고 문이 없어서 T085를 구현할 수 없다. 최소 2개가 필요하다 — `PATCH /api/v1/games/{gameId}` (`visibility`) · `DELETE /api/v1/games/{gameId}` (soft). 회원 탈퇴 hard delete는 기존 `AccountDeletionService`에 연쇄를 붙이는 것이라 새 endpoint가 아니다 |
-| ③ | **`docs/08` §18의 게임 코드 표** — ⚠️ **#53 합의를 되짚는 요청이다** | **#53에서 제가 *"이 6종 그대로 T016에서 고정하겠습니다"* 라고 적었고, 리드가 *"5번은 그대로 T016에서 고정해 주시면 됩니다"* 로 확정했다.** 그 뒤 계약을 쓰면서 6종 중 2개(`GAME_PROJECT_VALIDATION_FAILED`·`GAME_PORTAL_UNAVAILABLE`)가 **어디에서도 쓰이지 않는 이름**임을 확인했다. 실제는 `GAME_VALIDATION_FAILED`·`GAME_PROJECT_INVALID`·`CONFIG_NOT_FOUND`이고, `GAME_DELETED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`·`GAME_DRAFT_NOT_FOUND`는 §18에 없다 | **새 발견이 아니라 제가 한 약속을 뒤집는 것이라 먼저 밝힌다.** 이 MR의 §18 변경(6행 → 11행)은 **수정안이고 확정이 아니다** — ⑴ #53 합의대로 6종을 그대로 고정할지, ⑵ 이 수정안대로 11행으로 갈지, ⑶ 019 계약이 코드 표를 소유하고 §18은 링크만 둘지 정해 주십시오. ⑴을 고르시면 이 MR에서 `docs/08` 변경을 빼고 계약 문서만 남기겠습니다. 제가 ⑵·⑶을 꺼내는 이유는 §18이 전 파트가 읽는 목록이라 쓰이지 않는 이름이 남으면 다음 사람이 그 이름으로 분기를 만든다는 것뿐이다(#59와 같은 뿌리) |
+| ③ | **`docs/08` §18의 게임 코드 표** — ⚠️ **#53 합의를 되짚는 요청이다** | **#53에서 제가 *"이 6종 그대로 T016에서 고정하겠습니다"* 라고 적었고, 리드가 *"5번은 그대로 T016에서 고정해 주시면 됩니다"* 로 확정했다.** 그 뒤 계약을 쓰면서 6종 중 2개(`GAME_PROJECT_VALIDATION_FAILED`·`GAME_PORTAL_UNAVAILABLE`)가 **어디에서도 쓰이지 않는 이름**임을 확인했다. 실제는 `GAME_VALIDATION_FAILED`·`GAME_PROJECT_INVALID`·`CONFIG_NOT_FOUND`이고, `GAME_DELETED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`은 §18에 없다 (2026-08-25 ① 확정으로 `GAME_DRAFT_NOT_FOUND`는 폐기되어 목록에서 뺐다) | **새 발견이 아니라 제가 한 약속을 뒤집는 것이라 먼저 밝힌다.** 이 MR의 §18 변경(6행 → 10행)은 **수정안이고 확정이 아니다** — ⑴ #53 합의대로 6종을 그대로 고정할지, ⑵ 이 수정안대로 10행으로 갈지, ⑶ 019 계약이 코드 표를 소유하고 §18은 링크만 둘지 정해 주십시오. ⑴을 고르시면 이 MR에서 `docs/08` 변경을 빼고 계약 문서만 남기겠습니다. 제가 ⑵·⑶을 꺼내는 이유는 §18이 전 파트가 읽는 목록이라 쓰이지 않는 이름이 남으면 다음 사람이 그 이름으로 분기를 만든다는 것뿐이다(#59와 같은 뿌리) |
 | ④ | **사용자당 게임 수 상한** | 없다. `title` 하나로 무한히 만들 수 있다 | 부스는 1인 1임대(`ACTIVE_LEASE_LIMIT`)로 막았는데 게임은 열려 있다. Draft 하나가 2MB까지 커질 수 있어 계정 하나로 DB를 부풀릴 수 있다. **제안: 계정당 20개**, 초과 시 `GAME_LIMIT_EXCEEDED`(409) |
 | ⑤ | **게임 목록 endpoint** | 없다. FE 라우트는 `/app/games/:gameId/edit`·`/play`뿐이고 spec US3은 "게임 목록이나 공유된 진입점"이라 적혀 있다 | 사용자가 자기 게임으로 돌아갈 방법이 없다 — 생성 응답의 `gameId`를 잃으면 끝이다. **`GET /api/v1/games?mine=true` 최소 1개**가 필요한지 FE와 확인 |
 | ⑥ | **#81 Coin 차감** | #81이 Published 플레이에 Coin 차감·세션을 요청한다. 그런데 spec 019 **FR-022는 "첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 한다"**이고 이 문서 §MVP 제외도 같다 | 범위 확장이라 spec 개정이 선행이다. #48 구현 중에 끼워 넣으면 헌법 20조(Ledger·idempotency)와 28조(범위 통제)를 동시에 건드린다. **#48 완료 후 별건**으로 두는 것을 권한다 — 추적은 이미 갈라져 있다(`S15P21A604-108` BE · `S15P21A604-117` FE) |
-
-> ⑦ 참고 — FE `gameAuthoringApi.ts`는 재시도 가능 판정에 `error.code === 'INTERNAL_SERVER_ERROR'`를
-> 쓰지만 서버가 보내는 코드는 `INTERNAL_ERROR`다(`ErrorCode.java`, `docs/08` §18). 지금은 5xx가
-> 재시도 불가로 분류된다. 서버 코드를 바꾸면 전 endpoint에 영향이라 **FE 한 줄**이 맞다고 본다.
 
 ## MVP 제외
 

@@ -98,8 +98,8 @@ backend/src/main/resources/db/migration/
 > 배치와 무관하게 같습니다 — ㉮면 이 파일들이 4계층에 나뉘어 들어갑니다.
 
 > **예외 클래스는 2개다.** 값을 실어야 하는 것만 클래스를 만든다 — 검증 실패(`errors[]` rule 목록)와
-> revision 충돌(현재 revision을 십진수로). 실을 값이 없는 나머지 `code` 8종(`GAME_DRAFT_NOT_FOUND`·
-> `GAME_NOT_FOUND`·`GAME_DELETED`·`GAME_NOT_PUBLISHED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`·
+> revision 충돌(현재 revision을 십진수로). 실을 값이 없는 나머지 `code` 7종(`GAME_NOT_FOUND`·
+> `GAME_DELETED`·`GAME_NOT_PUBLISHED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`·
 > `GAME_SCHEMA_UNSUPPORTED`·`GAME_PROJECT_INVALID`)은 `throw new ApiException(ErrorCode.GAME_…)`로
 > 끝난다 — 전부 봉투 `code`이고 rule이 아니다. booth가 이 자리에 얇은 클래스 11개(본문 3줄 + javadoc)를
 > 둔 것은 각 예외가 `ErrorCode`를 **스스로** 들고 있게 해 컨트롤러 번역 누락을 막으려는 것이었는데
@@ -132,9 +132,10 @@ backend/src/main/resources/db/migration/
 
 ## 구현 중 계약 확인 필요 — #48 승인 묶음에 포함
 
-- **계약 결정 ①** (`game-api.md` §결정 필요의 번호) — `GET /draft` Draft 없음: 404
-  `GAME_DRAFT_NOT_FOUND` vs 204 (FE `load`는 204만 `null`로 읽음 — 404면 새 게임 첫 방문마다 편집기가
-  오류 상태). BE는 204를 권고.
+- ~~**계약 결정 ①** — `GET /draft` Draft 없음~~ → **2026-08-25 확정: 204 No Content** (GitLab #104).
+  `GAME_DRAFT_NOT_FOUND`는 폐기했다. 첫 저장은 `expectedRevision: 0`으로 오므로 **draft row가 없고
+  `expectedRevision: 0`이면 최초 생성으로 처리하고 revision 1을 반환**한다 — 그 밖의 값은 409.
+  이 규칙이 없으면 모든 게임의 첫 저장이 409로 튕긴다.
 - **확인 A** (계약 표에 없는 이 plan 고유 항목 — 번호를 계약 결정과 섞지 않는다) —
   **`project.gameId`·`project.revision`은 서버 소유 메타**다. 요청의 `gameId` 불일치는
    `MALFORMED_PROJECT`로 거부하고, 저장 시 서버가 새 revision을 project에 기록해 응답 일치
