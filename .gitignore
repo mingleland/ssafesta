@@ -34,3 +34,6 @@ festa-unity/Tools/mock-api/api/v1/booths/*/facade.json
 .asc/
 # ASC GitHub 모니터의 로컬 산출물 — 팀 산출물이 아니다 (.asc/README.md)
 docs/KHS/inbox/
+
+# 데일리 자동화 실행 로그 (로컬 산출물)
+.claude/logs/
