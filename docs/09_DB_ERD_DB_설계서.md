@@ -324,7 +324,7 @@ ai_documents
 - booth_id FK
 - agent_id FK
 - original_name
-- s3_key UNIQUE
+- object_key UNIQUE
 - content_type
 - size_bytes
 - status

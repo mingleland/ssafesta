@@ -12,8 +12,8 @@
 
 **Language/Version**: Python 3.12 이상
 **Primary Dependencies**: FastAPI, Uvicorn, SQLAlchemy 2.x async, psycopg 3, Alembic, Pydantic Settings, boto3, PDF parser, 관리형 Embedding Provider adapter
-**Storage**: 동일 PostgreSQL RDS + pgvector. Spring `public` 스키마와 FastAPI `ai` 스키마 분리, 원본은 S3
-**Testing**: pytest, pytest-asyncio, HTTPX ASGI client, PostgreSQL+pgvector 통합 Fixture/Testcontainers, S3·Embedding adapter fake
+**Storage**: 동일 PostgreSQL RDS + pgvector. Spring `public` 스키마와 FastAPI `ai` 스키마 분리, 원본은 Cloudflare R2(S3-compatible) 우선·S3-compatible fallback
+**Testing**: pytest, pytest-asyncio, HTTPX ASGI client, PostgreSQL+pgvector 통합 Fixture/Testcontainers, object storage·Embedding adapter fake
 **Target Platform**: Linux Docker container, 개발환경 EC2/ECS 후보
 **Project Type**: FastAPI web service + process-internal background Worker
 **Performance Goals**: Agent당 문서 10개·총 100MB에서 검색 P95 1초 이하, 정답 근거 Top-K 포함률 95% 이상
@@ -117,9 +117,9 @@ backend/src/main/
 
 ### 2. 처리 요청 접수
 
-1. Spring이 S3 업로드와 Document 메타데이터 저장을 완료한다.
+1. Spring이 R2 object storage 업로드와 Document 메타데이터 저장을 완료한다.
 2. Spring이 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
-3. FastAPI는 DB에서 `documentId + boothId + agentId + sourceHash`를 다시 검증한다. 요청의 S3 Key만 신뢰하지 않는다.
+3. FastAPI는 DB에서 `documentId + boothId + agentId + sourceHash`를 다시 검증한다. 요청의 `objectKey`만 신뢰하지 않는다.
 4. `ai.document_jobs`에 `QUEUED`를 INSERT한 뒤 202를 반환한다.
 5. 활성 Job 부분 유니크 인덱스 충돌은 오류로 노출하지 않고 기존 Job을 조회해 `existing: true`로 반환한다.
 
@@ -135,7 +135,7 @@ backend/src/main/
 
 ### 4. 파싱·청킹·임베딩
 
-- S3 object metadata/크기와 Document snapshot을 검증한 뒤 PDF를 내려받는다.
+- S3-compatible API로 object metadata/크기와 Document snapshot을 검증한 뒤 R2에서 PDF를 내려받는다.
 - 스캔 PDF처럼 추출 텍스트가 없으면 `UNSUPPORTED_SCAN_PDF`로 실패 처리한다.
 - chunk size와 overlap은 환경 설정으로 주입하며 코드에 고정하지 않는다.
 - Embedding adapter는 batch 입력을 사용하고 모든 결과가 1536차원인지 저장 전에 검증한다.
@@ -163,7 +163,7 @@ backend/src/main/
 - 남은 재시도가 있으면 `RETRY_WAIT`로 전환하고 실패 순서에 따라 1분, 5분, 15분 backoff를 설정한다.
 - 세 번의 재시도를 모두 사용하면 `DEAD`로 전환하고 `PROCESSING_INTERRUPTED` 또는 마지막 정제 오류를 Spring에 전달한다.
 - 최초 실행 1회 + 재시도 3회로 최대 실행 횟수는 4회다.
-- 재시도 가능한 오류: Worker 상실, 네트워크/S3 일시 오류, Embedding timeout/5xx.
+- 재시도 가능한 오류: Worker 상실, 네트워크/object storage 일시 오류, Embedding timeout/5xx.
 - 즉시 `DEAD` 가능한 오류: 손상 PDF, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음처럼 재시도로 해결되지 않는 입력 오류. 이 경우 사용하지 않은 재시도 횟수를 소모하지 않는다.
 
 ### 7. Spring 상태 callback
@@ -189,7 +189,7 @@ backend/src/main/
 - FastAPI↔Spring 내부 호출은 `Authorization: Bearer <service-token>`을 사용한다.
 - 서비스 간 네트워크는 Security Group으로 제한하고 public ALB route에서 `/internal/*`를 노출하지 않는다.
 - Service Token과 DB/Provider 자격증명은 Secrets Manager 또는 CI secret으로 주입한다.
-- 로그는 Authorization header, S3 Key 전체, 원문 문서 내용, Provider raw 오류를 마스킹한다.
+- 로그는 Authorization header, object key 전체, 원문 문서 내용, Provider raw 오류를 마스킹한다.
 - DB migration role과 runtime role을 분리한다. runtime role은 `public.ai_documents` UPDATE 권한을 갖지 않는다.
 - mTLS는 P0 이후 보안 강화 항목으로 남긴다.
 
@@ -211,7 +211,10 @@ backend/src/main/
 | `SPRING_INTERNAL_BASE_URL` | 환경별 내부 주소 |
 | `SPRING_SERVICE_TOKEN` | secret 주입, 기본값 없음 |
 | `DATABASE_URL` | secret 주입, 기본값 없음 |
-| `S3_BUCKET` | 환경별 값 |
+| `OBJECT_STORAGE_ENDPOINT` | R2 S3-compatible endpoint, fallback 시 대상 endpoint |
+| `OBJECT_STORAGE_BUCKET` | 환경별 bucket |
+| `OBJECT_STORAGE_ACCESS_KEY_ID` | secret 주입, 기본값 없음 |
+| `OBJECT_STORAGE_SECRET_ACCESS_KEY` | secret 주입, 기본값 없음 |
 
 부팅 시 `lease > heartbeat`, backoff 개수와 `max_retries` 일치, embedding dimension 1536을 검증하고 잘못된 설정이면 health ready를 실패시킨다.
 
@@ -266,7 +269,7 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 - Parsing, Embedding, Chunk commit 각 단계에서 프로세스 강제 종료
 - heartbeat 3회 누락 후 sweeper 회수
 - Spring callback 전·후 강제 종료와 reconciliation 재전송
-- S3/Embedding 5xx 후 1·5·15분 backoff
+- Object storage/Embedding 5xx 후 1·5·15분 backoff
 - 재시도 상한 후 `DEAD → FAILED`
 - 처리 중 Spring Document가 `DISABLED`가 될 때 `CANCELLED` 및 READY 미전환
 
@@ -274,7 +277,7 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 
 - 요청 boothId/agentId 위조 거부
 - 다른 Booth/Agent Chunk 검색 0건
-- 로그와 사용자 failureReason에 token, Stack Trace, S3 Key, Provider raw 오류가 없는지 검사
+- 로그와 사용자 failureReason에 token, Stack Trace, object key, Provider raw 오류가 없는지 검사
 
 검증 절차는 [quickstart.md](./quickstart.md)를 따른다.
 
@@ -295,7 +298,7 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 ### Phase 2 — Worker와 문서 처리
 
 - DB pickup, heartbeat, sweeper, retry/backoff 구현.
-- S3/PDF/Embedding adapter와 처리 pipeline 구현.
+- Object storage/PDF/Embedding adapter와 처리 pipeline 구현.
 - Chunk 전체 교체 트랜잭션 구현.
 
 ### Phase 3 — Spring 연동과 정합성
