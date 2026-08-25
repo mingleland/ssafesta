@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/environment-manifest.schema.json",
+  "title": "SSAFY FESTA Environment Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "environmentId",
+    "kind",
+    "composeProject",
+    "deploymentTargetIds",
+    "releaseManifestRef",
+    "runtimeServices",
+    "publicEntryRefs",
+    "dataBindings",
+    "secretRefs",
+    "resourcePolicy"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "environmentId": { "enum": ["dev", "demo"] },
+    "kind": { "enum": ["part-dev", "integrated-demo"] },
+    "composeProject": {
+      "type": "string",
+      "pattern": "^festa-(dev|demo)$"
+    },
+    "deploymentTargetIds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ai": { "const": "dev-ai" },
+        "back": { "const": "dev-back" },
+        "front": { "const": "dev-front" },
+        "game": { "const": "dev-game" },
+        "integration": { "const": "integration" }
+      }
+    },
+    "releaseManifestRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to infra-001 release-manifest.schema.json output; never a credential."
+    },
+    "runtimeServices": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/runtimeService" }
+    },
+    "publicEntryRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "dataBindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/dataBinding" }
+    },
+    "secretRefs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*_REF$"
+      },
+      "uniqueItems": true
+    },
+    "resourcePolicy": { "$ref": "#/$defs/resourcePolicy" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "environmentId": { "const": "dev" } },
+        "required": ["environmentId"]
+      },
+      "then": {
+        "properties": {
+          "kind": { "const": "part-dev" },
+          "composeProject": { "const": "festa-dev" },
+          "deploymentTargetIds": {
+            "required": ["ai", "back", "front", "game"],
+            "maxProperties": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "environmentId": { "const": "demo" } },
+        "required": ["environmentId"]
+      },
+      "then": {
+        "properties": {
+          "kind": { "const": "integrated-demo" },
+          "composeProject": { "const": "festa-demo" },
+          "deploymentTargetIds": { "required": ["integration"], "maxProperties": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "runtimeService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serviceId",
+        "component",
+        "imageRef",
+        "networkRefs",
+        "internalEndpoint",
+        "healthCheckRef",
+        "cpuLimitRef",
+        "memoryLimitRef",
+        "persistentVolumeRefs"
+      ],
+      "properties": {
+        "serviceId": { "type": "string", "minLength": 1 },
+        "component": {
+          "enum": ["ai", "back", "front", "game", "ingress", "postgres", "redis", "minio"]
+        },
+        "imageRef": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Immutable application image reference or pinned infrastructure image."
+        },
+        "networkRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "internalEndpoint": {
+          "type": "string",
+          "pattern": "^(http|ws|postgresql|redis)://"
+        },
+        "healthCheckRef": { "type": "string", "minLength": 1 },
+        "cpuLimitRef": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "memoryLimitRef": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "persistentVolumeRefs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "releaseId": { "type": ["string", "null"] }
+      }
+    },
+    "dataBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bindingId", "type", "environmentId", "credentialRef"],
+      "properties": {
+        "bindingId": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["postgres-business", "postgres-ai", "redis", "object-documents", "object-backups", "volume"] },
+        "environmentId": { "enum": ["dev", "demo", "shared"] },
+        "databaseName": { "type": "string" },
+        "serviceRole": { "type": "string" },
+        "keyPatterns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "bucketRef": { "type": "string" },
+        "volumeRef": { "type": "string" },
+        "credentialRef": { "type": ["string", "null"] }
+      }
+    },
+    "resourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "heavyBuildMaxConcurrency",
+        "demoPriority",
+        "ec2CapacityRefs",
+        "demoServiceLimitRefs",
+        "buildAgentLimitRefs",
+        "admissionHealthRefs"
+      ],
+      "properties": {
+        "heavyBuildMaxConcurrency": { "const": 1 },
+        "demoPriority": { "const": true },
+        "ec2CapacityRefs": {
+          "type": "array",
+          "contains": { "const": "EC2_VCPU" },
+          "minContains": 1,
+          "items": { "type": "string" }
+        },
+        "demoServiceLimitRefs": { "type": "object", "minProperties": 1 },
+        "buildAgentLimitRefs": { "type": "object", "minProperties": 1 },
+        "admissionHealthRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}
