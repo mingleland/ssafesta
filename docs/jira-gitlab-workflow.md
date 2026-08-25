@@ -87,7 +87,13 @@ Key 추출 우선순위: ① MR 제목 → ② source branch → ③ (merge 시)
 > 러너가 없어 파이프라인이 pending 으로 대기한다 (lab.ssafy.com 은 공유 러너 미제공).
 > 팀 EC2 에 gitlab-runner 를 등록하기 전까지 CI 는 휴면이며, **러너 등록 전에는
 > "Pipelines must succeed" 머지 조건을 절대 켜지 않는다** (모든 머지가 무기한 차단된다).
-> pending 파이프라인은 무해하다 — Pipelines 화면에서 취소해도 된다.
+>
+> **2026-08-25 갱신**: Jira 상태 동기화는 GitLab 내장 Jira 연동(Settings → Integrations
+> → Jira issues)으로 옮겼다. jira-sync-* 잡은 지금 불필요해, `.gitlab-ci.yml` 의
+> `workflow.rules` 맨 앞에 `when: never`를 추가해 파이프라인 생성 자체를 정지시켰다.
+> 쌓여 있던 pending 파이프라인은 Pipelines 화면에서 일괄 취소한다. 러너 등록 시
+> `when: never` 를 지우고, jira-sync-* 잡을 삭제하거나 내장 연동의 transition 값을
+> 비운다(안 그러면 같은 이슈를 두 번 전환한다).
 
 ## 7. GitLab 저장소 정책 (Free, 18.11.5 기준)
 
@@ -172,8 +178,9 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 5. Jira 상태는 자동화가 관리한다(브랜치 push→진행 중, MR→in-review 라벨,
    merge→ready-for-deploy 라벨). 네가 임의로 이슈 상태를 전환하지 마라.
    '완료' 전환은 production 배포 검증 후에만 한다.
-6. .gitlab-ci.yml 의 stage 구조와 jira-* 잡을 삭제·우회하지 마라. CI 잡 추가는
-   예약된 test/build stage 에 한다.
+6. 파이프라인 생성이 정지돼 있고(workflow.rules 맨 앞 `when: never`, 러너 없음·Jira
+   내장 연동 전환 사유), jira-* 잡 정의와 stage 구조는 보존한다. 지우거나 우회하지 마라.
+   CI 잡 추가는 예약된 test/build stage 에 한다.
 7. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
 ```
 

@@ -12,6 +12,12 @@
 
 workflow:
   rules:
+    # ⛔ 러너 없음 · Jira 는 내장 연동으로 전환 — 파이프라인 생성 정지
+    # 러너 등록 시: ① 이 when: never 를 지우고
+    #              ② jira-sync-* 잡을 삭제하거나 내장 연동의 transition 값을 비운다
+    #                 (그러지 않으면 같은 이슈를 두 번 전환한다)
+    - when: never
+    # ↓ 러너 확보 후 사용할 원래 규칙
     # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
