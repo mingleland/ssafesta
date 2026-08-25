@@ -4,7 +4,7 @@
 
 > **리드 초안의 문장은 지우지 않았다.** 이 개정은 그 위에 **어떻게 구현하는가**를 더한 것이고,
 > 결정 근거는 [research.md](research.md) §7~§12다. 초안과 갈리는 지점은 두 곳뿐이며 둘 다
-> 아래에 명시했다 — **패키지 배치**는 결정하지 않고 확인 요청으로 올렸고(§Source Boundary),
+> 아래에 명시했다 — **패키지 배치**는 2026-08-25 #48에서 flat으로 확정됐고(§패키지 배치),
 > **Published 캐시 정책**은 리드 본인의 #48 코멘트를 반영한 갱신이다(§Technical Context).
 
 ## Summary
@@ -66,36 +66,27 @@ backend/src/test/java/com/example/ssafesta/game/
 backend/src/main/resources/db/migration/
 ```
 
-### 확인 요청 — 패키지 배치 (구현 착수 전, @kanghyunsoon)
+### 패키지 배치 — flat 확정 (2026-08-25, GitLab #48)
 
-> **위 4계층을 그대로 갈지 물어봅니다. 제가 정하지 않았습니다.**
->
-> 실측하면 이 코드베이스의 **전 패키지가 플랫**입니다 — `booth`·`user`·`wallet`·`auth` 어디에도
-> `api/`·`application/`·`domain/`·`persistence/` 하위 디렉터리가 없고, 컨트롤러·서비스·엔티티·리포지터리가
-> 패키지 루트에 나란히 있습니다. 019만 4계층을 가지면 **같은 저장소에 두 배치가 공존**합니다.
->
-> 두 갈래 중 어느 쪽이든 따르겠습니다.
->
-> **㉮ 리드 초안 유지 (4계층)** — 019가 다른 도메인보다 크고(엔티티 3종 + 검증기 + 서비스 3개) 계층
-> 경계가 실제로 도움이 된다면 이쪽입니다. 019가 선례가 되고 이후 도메인이 따라갑니다.
->
-> **㉯ 기존 코드베이스와 같은 플랫** — 제가 research §11에서 이쪽으로 기울었던 배치입니다.
->
-> ```text
-> backend/src/main/java/com/example/ssafesta/game/
-> ├── Game.java · GameDraft.java · GamePublishedVersion.java   (+Repository 3)
-> ├── GameProjectValidator.java · GameProjectJson.java
-> ├── GameDraftService.java · GamePublishService.java · GamePublishedQueryService.java
-> ├── GameController.java
-> └── GameValidationFailedException.java · GameRevisionConflictException.java
-> backend/src/main/resources/db/migration/V13__game_studio.sql
-> backend/src/main/resources/game/game-project-v1.schema.json   # 계약 사본 (research §8)
-> backend/src/test/java/com/example/ssafesta/game/              # 통합 테스트 5~6
-> backend/src/test/resources/game/fixtures/                     # 계약 fixture 사본
-> ```
->
-> 파일 목록 자체(엔티티 3 + 검증기 2 + 서비스 3 + 컨트롤러 1 + 예외 2, V13, schema·fixture 사본)는
-> 배치와 무관하게 같습니다 — ㉮면 이 파일들이 4계층에 나뉘어 들어갑니다.
+**기존 Backend와 같은 flat 구조로 간다.** 리드 초안의 4계층(`api`/`application`/`domain`/`persistence`)은
+채택하지 않는다 — 이 코드베이스의 전 패키지가 플랫이고(`booth`·`user`·`wallet`·`auth` 어디에도 하위
+디렉터리가 없다), 019만 4계층을 가지면 같은 저장소에 두 배치가 공존한다. 019가 새 선례를 만들지 않는다.
+
+```text
+backend/src/main/java/com/example/ssafesta/game/
+├── Game.java · GameDraft.java · GamePublishedVersion.java   (+Repository 3)
+├── GameProjectValidator.java · GameProjectJson.java
+├── GameDraftService.java · GamePublishService.java · GamePublishedQueryService.java
+├── GameController.java
+└── GameValidationFailedException.java · GameRevisionConflictException.java
+backend/src/main/resources/db/migration/V13__game_studio.sql
+backend/src/main/resources/game/game-project-v1.schema.json   # 계약 사본 (research §8)
+backend/src/test/java/com/example/ssafesta/game/              # 통합 테스트 5~6
+backend/src/test/resources/game/fixtures/                     # 계약 fixture 사본
+```
+
+파일 목록 자체(엔티티 3 + 검증기 2 + 서비스 3 + 컨트롤러 1 + 예외 2, V13, schema·fixture 사본)는
+배치와 무관하게 같다.
 
 > **예외 클래스는 2개다.** 값을 실어야 하는 것만 클래스를 만든다 — 검증 실패(`errors[]` rule 목록)와
 > revision 충돌(현재 revision을 십진수로). 실을 값이 없는 나머지 `code` 7종(`GAME_NOT_FOUND`·

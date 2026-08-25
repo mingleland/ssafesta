@@ -742,6 +742,7 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `GAME_NOT_FOUND` *(019)* | Game 없음 |
 | `GAME_DELETED` *(019)* | soft delete된 Game |
 | `GAME_FORBIDDEN` *(019)* | 소유자 아님 — Authoring·비공개 접근 |
+| `GAME_LIMIT_EXCEEDED` *(019)* | 계정당 활성 Game 상한(기본 20) 초과 — `message`가 상한과 해결 방법을 담는다 |
 | `GAME_REVISION_CONFLICT` *(019)* | Draft revision 충돌. `errors[0].rule=CURRENT_REVISION`의 `message`는 **십진수**다 (§1.3) |
 | `GAME_VALIDATION_FAILED` *(019 제안)* | GameProject 검증 실패 (`errors` 배열 동반) — rule 표는 019 계약이 소유 |
 | `GAME_NOT_PUBLISHED` *(019)* | 실행 가능한 Published Version 없음 |

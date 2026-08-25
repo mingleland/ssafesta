@@ -1,6 +1,7 @@
 # Game Studio API 계약
 
-> 상태: Draft v0.5 — #33·#34·#48·#56 및 전역 오류 봉투 #58 합의 반영. DTO·revision·오류 코드는 이 문서를 기준으로 구현한다.
+> 상태: **v1.0 — 확정.** #33·#34·#48·#56 및 전역 오류 봉투 #58 합의 반영. 미결 항목은 2026-08-25 #104·#48에서 전부 확정됐다(§확정 기록).
+> DTO·revision·오류 코드는 이 문서를 기준으로 구현한다.
 
 ## 공통 오류 봉투
 
@@ -23,7 +24,7 @@
 
 서버 예외 클래스명, stack trace, Provider 원문을 응답하지 않는다.
 
-## 오류 코드와 rule (제안 — #48 잔여 계약, 2026-08-24)
+## 오류 코드와 rule
 
 > **상태: 제안.** BE 구현자(strdeok)가 #48에서 맡은 마지막 계약 작업이다. 형식은 005
 > `layout-api.md` §0의 rule 표를 따르되 **"Draft 저장에도 ✅" 열은 만들지 않는다** — 019는 Draft와
@@ -49,12 +50,14 @@
 | `CONFIG_NOT_FOUND` | 404 | Portal `configId`에 해당하는 Binding이 없음 | Booth Host: 연결 없음 안내 |
 | `MEMBER_ONLY` | 403 | **게스트의 Authoring 호출** — 신규 코드를 만들지 않고 기존 전역 코드를 쓴다 (FR-023) | 로그인 유도 |
 | `VALIDATION_FAILED` | 400 | GameProject 밖의 일반 필드 오류 (`title` 등) — `rule=FIELD_INVALID` + `field` | 필드 하이라이트 |
+| `BOOTH_LEASE_EXPIRED` | 409 | Portal의 부스 임대 만료 — 004·005·008과 같은 코드다 (§Booth Portal Resolution) | Booth Host: 임대 안내 |
+| `GAME_LIMIT_EXCEEDED` ★ | 409 | 활성 Game이 계정 상한(기본 20)에 도달 — §게임 생성 | 편집기: 삭제 후 재시도 안내 |
 
 세 가지는 의도적으로 **재사용**이다 — 새 이름을 만들면 같은 사건이 두 이름을 갖는다.
 
 - `MEMBER_ONLY` — 013a·001과 같다. 게스트 차단은 게임의 사정이 아니라 계정의 사정이다.
 - `VALIDATION_FAILED` + `FIELD_INVALID`/`field` — #58 C 확정(T058) 그대로.
-- `BOOTH_LEASE_EXPIRED` — Portal의 임대 만료. 004·005·008과 같은 코드다 (§Booth Portal Resolution).
+- `BOOTH_LEASE_EXPIRED` — Portal의 임대 만료. 004·005·008과 같다. 표에 행으로 두되 이름은 재사용이라 ★가 아니다.
 
 > `GAME_PROJECT_INVALID`만 500이다. 나머지는 클라이언트가 고칠 수 있는 사건이지만, 이것은
 > **서버가 저장을 허용했던 데이터가 지금 검증을 통과하지 못한다**는 뜻이라 서버 결함이다.
@@ -67,9 +70,13 @@ quickstart가 "같은 manifest의 positive/negative fixture와 오류 코드를 
 이름이 갈리면 fixture 테스트가 성립하지 않는다.
 
 **★는 fixture에 없어서 이번에 새로 정하는 이름이다.** validator를 훑어 있는 것과 없는 것을 갈라
-놓았다 — ★ 없는 행은 이미 코드로 고정된 어휘라 확인만 하면 된다. **승인이 필요한 것은 ★ 18개**다 —
-`errors[].rule` **16개** + 봉투 `code` 1개(`GAME_VALIDATION_FAILED`, §봉투 code 표) +
+놓았다 — ★ 없는 행은 이미 코드로 고정된 어휘라 확인만 하면 된다.
+
+**신규 이름은 19개이며 2026-08-25 GitLab #48에서 전부 승인됐다** — `errors[].rule` **16개** +
+봉투 `code` 2개(`GAME_VALIDATION_FAILED` · `GAME_LIMIT_EXCEEDED`, §봉투 code 표) +
 `unavailableReason` 1개(`CONFIG_DISABLED`, §Booth Portal Resolution).
+`GAME_LIMIT_EXCEEDED`는 같은 날 승인된 계정당 활성 Game 상한(§게임 생성)과 함께 추가된 것이라
+승인 코멘트의 "★ 18개"에 뒤이어 더해진 1개다.
 
 > rule 16개는 이 절의 표들에 흩어져 있고, `VARIABLE_COUNT_INVALID`·`ITEM_COUNT_INVALID`는 상한이
 > 같아 **한 행을 공유한다**. 행 수로 세면 15개로 잘못 나오니 이름으로 센다.
@@ -177,7 +184,7 @@ endpoint)의 warning이라 이 계약의 몫이 아니다. 필요해지면 그�
 |---|---|
 | `RULES_PRESENCE_INVALID` ★ | `1.1.0`인데 `rules`가 없음, 또는 `1.0.0`인데 `rules`가 있음 (schema `allOf`) |
 | `DUPLICATE_OBJECTIVE_TYPE` ★ | 같은 목표 유형을 두 번 사용 (#78 — BE 검증 요청분) |
-| `OBJECTIVE_TARGET_INVALID` ★ | `target`이 `1~999,999,999` 정수 밖, 또는 objectives 5개 초과 (schema `gameRules`. 유형 불문 필드는 `target` 하나 — `event-runtime-semantics.md`의 `targetSeconds` 표기는 schema와 다른 오기다) |
+| `OBJECTIVE_TARGET_INVALID` ★ | `target`이 `1~999,999,999` 정수 밖 (schema `gameRules`. objectives **5개 초과는 이 rule이 아니라 `MALFORMED_PROJECT`**다 — §상한 절 말미 참조. 유형 불문 필드는 `target` 하나 — `event-runtime-semantics.md`의 `targetSeconds` 표기는 schema와 다른 오기다) |
 | `PLAYER_DEFEAT_INVALID` ★ | `playerDefeat`이 `RESPAWN`/`END_GAME` 밖 |
 
 `rules`는 Draft·Published snapshot에 **그대로 보존**한다(#78 요청분). MAJOR가 다른 값
@@ -186,16 +193,20 @@ endpoint)의 warning이라 이 계약의 몫이 아니다. 필요해지면 그�
 ## Authoring
 
 ```text
-POST /api/v1/games
-GET  /api/v1/games/{gameId}/draft
-PUT  /api/v1/games/{gameId}/draft
-POST /api/v1/games/{gameId}/publish
-GET  /api/v1/games/{gameId}/versions
+POST   /api/v1/games
+GET    /api/v1/games/mine
+PATCH  /api/v1/games/{gameId}
+DELETE /api/v1/games/{gameId}
+POST   /api/v1/games/{gameId}/restore
+GET    /api/v1/games/{gameId}/draft
+PUT    /api/v1/games/{gameId}/draft
+POST   /api/v1/games/{gameId}/publish
+GET    /api/v1/games/{gameId}/versions
 ```
 
 Owner/Editor만 호출할 수 있고 Guest는 Authoring API를 사용할 수 없다.
 
-### 게임 생성 (제안 — shape 미정이었음)
+### 게임 생성
 
 ```json
 { "title": "열쇠를 찾아라" }
@@ -219,8 +230,137 @@ Owner/Editor만 호출할 수 있고 Guest는 Authoring API를 사용할 수 없
   "사용자가 만들지 않은 데이터"가 생기고, starter template 선택(6종, FR-044)이 서버로 새어 나온다.
 - `visibility` 기본값은 `PRIVATE`다. 만들자마자 공개되는 것이 놀라운 쪽이다.
 - 게스트는 `MEMBER_ONLY`. 소유자는 JWT subject로만 정하고 요청 body로 받지 않는다 (헌법 16조).
+- **계정당 활성 Game 20개**를 넘으면 `409` + `GAME_LIMIT_EXCEEDED`다. 상한은 서버 설정값이고 v1 기본이 20이다.
+  - **soft-delete된 Game은 이 상한에서 제외한다** — 지우고 새로 만들 수 있어야 한다. 삭제본은 §삭제의 별도 상한을 받는다.
+  - Draft 하나가 2,000,000 bytes까지 커질 수 있어 상한이 없으면 계정 하나로 DB를 부풀릴 수 있다.
+    부스가 1인 1임대(`ACTIVE_LEASE_LIMIT`)로 막은 것과 같은 이유다.
 
-### 버전 목록 (제안 — shape 미정이었음)
+> **`GAME_LIMIT_EXCEEDED` 알림 정책** — 사용자가 스스로 풀 수 있는 상태이므로 *"한도 초과"* 로 끝내지 않는다.
+>
+> **봉투 최상위 `message`에 상한값과 해결 방법을 담고 클라이언트는 그 문장을 그대로 표시한다.**
+> `errors[]`에 별도 rule을 만들지 않는다 — 사용자에게 보여줄 문장은 최상위 `message`의 자리이고(#58 확정, T058),
+> 상한이 서버 설정값이라 클라이언트가 숫자를 하드코딩하면 설정을 바꿀 때 문구가 어긋난다.
+>
+> ```json
+> { "code": "GAME_LIMIT_EXCEEDED",
+>   "message": "게임은 최대 20개까지 만들 수 있습니다. 기존 게임을 삭제한 뒤 다시 시도해 주세요.",
+>   "requestId": "req_a1b2c3d4", "errors": [], "warnings": [] }
+> ```
+>
+> 복구(§복구)에서 같은 code가 나올 때는 사용자가 할 행동이 다르므로 문장을 구분한다 —
+> *"게임은 최대 20개까지 활성화할 수 있습니다. 다른 게임을 삭제한 뒤 복구해 주세요."*
+
+### 내 게임 목록
+
+```text
+GET /api/v1/games/mine
+```
+
+```json
+{
+  "games": [
+    { "gameId": 123, "title": "열쇠를 찾아라", "visibility": "PRIVATE", "publishedVersion": 5, "updatedAt": "2026-08-25T13:20:00Z", "deletedAt": null },
+    { "gameId": 118, "title": "미로", "visibility": "PUBLIC", "publishedVersion": null, "updatedAt": "2026-08-24T09:10:00Z", "deletedAt": "2026-08-24T18:02:00Z" }
+  ]
+}
+```
+
+- 호출자 소유의 Game만 반환한다. 소유자는 JWT subject로 정한다.
+- **soft-delete된 Game도 포함한다.** 활성은 `deletedAt: null`이고 삭제본은 삭제 시각을 갖는다.
+  별도 `deleted` 파라미터나 전용 endpoint를 만들지 않는다 — 복구(§복구) 대상을 찾을 곳이 여기다.
+- 정렬은 **활성 먼저, 각 그룹 안에서 `updatedAt` 내림차순**이다.
+- item은 위 6필드 고정이다. **GameProject 본문을 싣지 않는다** — 목록 화면이 쓰는 것은 식별과 상태뿐이다.
+- 활성 20 + 삭제본 5로 최대 25건이므로 **v1에 페이지네이션을 두지 않는다**.
+- `deletedAt`은 클라이언트가 **삭제 확인 시 밀려날 대상을 계산**하는 재료이기도 하다(§삭제).
+- 게스트는 `MEMBER_ONLY`.
+
+> **경로가 `?mine=true`가 아니라 `/mine`인 이유** — `GET /api/v1/booths/mine` 선례와 같은 모양으로 맞춘다.
+> query 파라미터로 두면 "파라미터를 빼면 무엇이 나오는가"가 계속 따라붙는데, 공개 게임 전체 목록은
+> 페이지네이션·정렬·검색이 붙는 **다른 기능**이고 v1 범위가 아니다. 경로로 고정하면 그 질문이 생기지 않고,
+> 나중에 전체 목록이 필요해지면 `GET /api/v1/games`를 그때 따로 설계하면 된다.
+
+### 공개 설정 변경
+
+```text
+PATCH /api/v1/games/{gameId}
+```
+
+```json
+{ "visibility": "PUBLIC" }
+```
+
+```json
+{ "gameId": 123, "visibility": "PUBLIC", "publishedVersion": 5, "updatedAt": "2026-08-25T13:40:00Z" }
+```
+
+- 소유자만 호출한다. 아니면 `403` + `GAME_FORBIDDEN`. 없으면 `404` + `GAME_NOT_FOUND`,
+  soft-delete된 Game이면 `404` + `GAME_DELETED`.
+- 값은 `PRIVATE` | `PUBLIC` 둘뿐이다. 그 밖은 `400` + `VALIDATION_FAILED` + `rule=FIELD_INVALID`, `field="visibility"`.
+- **`publishedVersion`이 `null`이어도 `PUBLIC` 전환을 허용한다.** 공개 설정과 발행은 독립 축이고
+  (`games.published_version`이 nullable인 이유), 발행본이 없는 `PUBLIC`은 `GET /published`에서
+  `GAME_NOT_PUBLISHED`로 나타난다. 편집기가 "아직 발행하지 않았습니다"를 안내할 일이지 서버가 막을 일이 아니다.
+- `PUBLIC` → `PRIVATE` 전환은 #33 확정대로 **Published Version 이력과 Draft를 보존**한다. 이미 GameProject를
+  로드한 무보상 로컬 세션은 완료까지 허용하되 새 진입은 거부한다(§Runtime).
+
+### 삭제
+
+```text
+DELETE /api/v1/games/{gameId}
+POST   /api/v1/games/{gameId}/restore
+```
+
+- 성공은 `204 No Content`다. **일반 삭제는 soft delete**이고 `games.deleted_at`을 남긴다.
+- 소유자만 호출한다. 아니면 `403` + `GAME_FORBIDDEN`. 없으면 `404` + `GAME_NOT_FOUND`.
+- **이미 soft-delete된 Game에 다시 호출하면 `404` + `GAME_DELETED`다.**
+  - **클라이언트는 이 응답을 실패가 아니라 "이미 완료된 상태"로 처리한다.** 응답이 유실된 뒤의 재시도가
+    여기로 오기 때문이다 — 오류 화면을 띄우면 실제로는 성공한 삭제를 실패로 보고하게 된다.
+- Draft와 Published Version 이력은 **보존**한다. 활성 상한(§게임 생성)에서만 빠진다.
+
+#### 삭제본 보관 — 계정당 5개, 초과분은 오래된 것부터 영구 삭제
+
+soft delete가 무제한이면 활성 20을 지키면서 삭제본을 무한히 쌓을 수 있고, 각각 최대 2,000,000 bytes의
+Draft를 단다. 그래서 **삭제본에도 상한을 둔다.**
+
+- **계정당 삭제본 5개.** 서버 설정값이고 v1 기본이 5다. 활성 상한과 **독립**이라 서로 잠식하지 않는다.
+- 6번째를 삭제하면 **가장 오래된 삭제본(`deleted_at` 최소)이 hard delete**되고 삭제는 성공한다.
+  삭제를 거부하지 않는다 — 사용자가 원하는 것은 지우는 것인데 *"먼저 보관함을 비우세요"* 는 목적을 막는다.
+- 밀려난 Game은 Draft·Published Version·Asset·Score까지 함께 제거한다(탈퇴 hard delete와 같은 경로).
+- **보관 기간(시간)은 두지 않는다.** 개수로 유계이므로 sweeper·배치가 필요 없고, 밀어내기가
+  삭제 트랜잭션 안에서 끝난다. 계정당 최대 저장량은 (20 + 5) × 2MB로 확정적으로 유계다.
+
+> **밀려남은 사전에 고지한다** — 응답이 `204`라 사후에 알릴 자리가 없다. 편집기가 **삭제 확인 단계에서**
+> *"보관함이 가득 차 가장 오래된 '미로'가 영구 삭제됩니다"* 를 보여준다. 서버는 그 판단 재료로
+> §내 게임 목록에 `deletedAt`을 싣는다 — 클라이언트가 삭제본 개수와 최고령 항목을 셀 수 있다.
+>
+> 서버가 사후 통보하려면 `204`를 `200` + `warnings`로 바꿔야 하는데, 이미 지워진 뒤에 알리는 것은
+> 사용자가 손쓸 수 없는 통보라 사전 고지보다 나쁘다.
+
+### 복구
+
+```text
+POST /api/v1/games/{gameId}/restore
+```
+
+```json
+{ "gameId": 118, "title": "미로", "visibility": "PRIVATE", "publishedVersion": null, "updatedAt": "2026-08-24T09:10:00Z", "deletedAt": null }
+```
+
+- 성공은 `200`이고 본문은 §내 게임 목록의 item과 같은 모양이다. `deleted_at`을 지우고 `visibility`는
+  **삭제 전 값을 그대로 되살린다** — 삭제가 공개 설정을 바꾸는 동작이 아니었기 때문이다.
+- 소유자만 호출한다. 아니면 `403` + `GAME_FORBIDDEN`. 없으면 `404` + `GAME_NOT_FOUND`.
+- **활성 Game이 이미 상한(20)이면 `409` + `GAME_LIMIT_EXCEEDED`다.** 복구는 활성 슬롯을 차지하는
+  행위이므로 생성과 같은 게이트를 받는다. 문구는 §게임 생성의 알림 정책대로 복구용으로 구분한다.
+  이때 삭제본은 그대로 남으므로 사용자가 다른 게임을 삭제한 뒤 다시 복구하면 된다.
+- 밀려나 hard delete된 Game은 복구할 수 없다. `404` + `GAME_NOT_FOUND`다 — 행 자체가 없다.
+
+> **삭제되지 않은 Game에 호출하면 `200` + 현재 상태다(멱등).** §삭제의 재호출이 `404 GAME_DELETED`인 것과
+> **의도적으로 비대칭**이다. 대칭으로 맞추려면 `GAME_NOT_DELETED` 같은 이름을 새로 만들어야 하는데,
+> 복구 대상이 이미 활성이면 목적은 달성된 상태라 오류로 만들 값이 없다.
+> `DELETE`가 `404`를 쓰는 이유는 반대다 — *"이미 삭제됨"* 은 클라이언트가 알아야 할 상태 정보다.
+- 회원 탈퇴 hard delete는 기존 계정 삭제 흐름에 연쇄한다. **별도 endpoint를 만들지 않는다** —
+  Game, Draft, Published Version, Asset, Score를 모두 제거한다(§Persistence Boundary).
+
+### 버전 목록
 
 ```json
 {
@@ -407,7 +547,7 @@ Cache-Control: no-store
 - 임대 만료는 기존 `BOOTH_LEASE_EXPIRED` 의미를 재사용하고 Game Draft/Published 데이터는 보존한다.
 - Portal resolution이 공개·임대·Binding 상태를 판정하므로 추가 왕복이나 game socket을 만들지 않는다.
 
-### `unavailableReason` 어휘 (제안 — 어휘 미정이었음)
+### `unavailableReason` 어휘
 
 `playable: false`일 때 채운다. FE가 문구를 여기에 매핑하므로(`gamePortalRepository.ts`
 `unavailableCopy`) 계약값이다.
@@ -428,31 +568,23 @@ Cache-Control: no-store
 - `gameId`·`publishedVersion`은 nullable이다. Binding은 있고 Game이 미발행이면 `gameId`는 값이 있고
   `publishedVersion`이 `null`이다.
 
-## 결정 필요 (BE 구현 착수 전, 2026-08-24)
+## 확정 기록
 
-헌법 30조에 따라 구현자가 임의로 정하지 않는다. 위에서 **"제안"** 으로 표기한 것과 별개로, 아래는
-**이미 머지된 계약·구현과 서로 어긋나 있어** 한쪽이 움직여야 하는 것들이다.
+이 문서의 미결 항목은 **2026-08-25에 전부 확정됐다.** 근거는 GitLab #104(①⑦)와 #48(★ 승인·②③④⑤⑥)이다.
 
-> FE 근거(`gameAuthoringApi.ts`·`gamePortalRepository.ts`·`shared/api/client.ts`)는 **PR #72·#82
-> 브랜치 기준이다** — develop에는 아직 없다. 그 PR이 머지되면 그대로 성립하고, 다른 모양으로
-> 머지되면 해당 항목을 다시 본다.
-
-### 확정됨 (2026-08-25, GitLab #104)
-
-| # | 무엇 | 확정 |
-|---|---|---|
-| ① | `GET /draft`에 Draft가 없을 때 | **204 No Content**. `GAME_DRAFT_NOT_FOUND` 폐기, §Draft 저장 반영 완료. 첫 저장 `expectedRevision: 0` 규칙도 함께 명시했다 |
-| ⑦ | `INTERNAL_SERVER_ERROR` vs `INTERNAL_ERROR` | 서버는 **`INTERNAL_ERROR` 유지**. 전 endpoint 공통 코드라 서버를 바꾸지 않고 FE `gameAuthoringApi.ts`의 재시도 판정 한 줄을 맞춘다 |
-
-### 아직 열려 있음
-
-| # | 무엇 | 지금 상태 | 왜 지금 정해야 하나 |
+| # | 무엇 | 확정 | 근거 |
 |---|---|---|---|
-| ② | **공개 중단·삭제 endpoint가 없다** | `visibility` 전환과 soft delete 경로가 계약에 없다. 그런데 BE tasks **T085**가 "unpublish, soft/hard delete, Published-history 정책을 통합 테스트로 고정"을 요구하고 #33에서 정책은 이미 확정됐다 | 정책만 있고 문이 없어서 T085를 구현할 수 없다. 최소 2개가 필요하다 — `PATCH /api/v1/games/{gameId}` (`visibility`) · `DELETE /api/v1/games/{gameId}` (soft). 회원 탈퇴 hard delete는 기존 `AccountDeletionService`에 연쇄를 붙이는 것이라 새 endpoint가 아니다 |
-| ③ | **`docs/08` §18의 게임 코드 표** — ⚠️ **#53 합의를 되짚는 요청이다** | **#53에서 제가 *"이 6종 그대로 T016에서 고정하겠습니다"* 라고 적었고, 리드가 *"5번은 그대로 T016에서 고정해 주시면 됩니다"* 로 확정했다.** 그 뒤 계약을 쓰면서 6종 중 2개(`GAME_PROJECT_VALIDATION_FAILED`·`GAME_PORTAL_UNAVAILABLE`)가 **어디에서도 쓰이지 않는 이름**임을 확인했다. 실제는 `GAME_VALIDATION_FAILED`·`GAME_PROJECT_INVALID`·`CONFIG_NOT_FOUND`이고, `GAME_DELETED`·`GAME_NOT_PUBLIC`·`GAME_FORBIDDEN`은 §18에 없다 (2026-08-25 ① 확정으로 `GAME_DRAFT_NOT_FOUND`는 폐기되어 목록에서 뺐다) | **새 발견이 아니라 제가 한 약속을 뒤집는 것이라 먼저 밝힌다.** 이 MR의 §18 변경(6행 → 10행)은 **수정안이고 확정이 아니다** — ⑴ #53 합의대로 6종을 그대로 고정할지, ⑵ 이 수정안대로 10행으로 갈지, ⑶ 019 계약이 코드 표를 소유하고 §18은 링크만 둘지 정해 주십시오. ⑴을 고르시면 이 MR에서 `docs/08` 변경을 빼고 계약 문서만 남기겠습니다. 제가 ⑵·⑶을 꺼내는 이유는 §18이 전 파트가 읽는 목록이라 쓰이지 않는 이름이 남으면 다음 사람이 그 이름으로 분기를 만든다는 것뿐이다(#59와 같은 뿌리) |
-| ④ | **사용자당 게임 수 상한** | 없다. `title` 하나로 무한히 만들 수 있다 | 부스는 1인 1임대(`ACTIVE_LEASE_LIMIT`)로 막았는데 게임은 열려 있다. Draft 하나가 2MB까지 커질 수 있어 계정 하나로 DB를 부풀릴 수 있다. **제안: 계정당 20개**, 초과 시 `GAME_LIMIT_EXCEEDED`(409) |
-| ⑤ | **게임 목록 endpoint** | 없다. FE 라우트는 `/app/games/:gameId/edit`·`/play`뿐이고 spec US3은 "게임 목록이나 공유된 진입점"이라 적혀 있다 | 사용자가 자기 게임으로 돌아갈 방법이 없다 — 생성 응답의 `gameId`를 잃으면 끝이다. **`GET /api/v1/games?mine=true` 최소 1개**가 필요한지 FE와 확인 |
-| ⑥ | **#81 Coin 차감** | #81이 Published 플레이에 Coin 차감·세션을 요청한다. 그런데 spec 019 **FR-022는 "첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 한다"**이고 이 문서 §MVP 제외도 같다 | 범위 확장이라 spec 개정이 선행이다. #48 구현 중에 끼워 넣으면 헌법 20조(Ledger·idempotency)와 28조(범위 통제)를 동시에 건드린다. **#48 완료 후 별건**으로 두는 것을 권한다 — 추적은 이미 갈라져 있다(`S15P21A604-108` BE · `S15P21A604-117` FE) |
+| ① | `GET /draft`에 Draft가 없을 때 | **204 No Content**. `GAME_DRAFT_NOT_FOUND` 폐기. 첫 저장은 `expectedRevision: 0` = 최초 생성, revision 1 반환 | #104 |
+| ② | 공개 중단·삭제 endpoint | `PATCH /games/{gameId}`(visibility) · `DELETE /games/{gameId}`(soft) · `POST /games/{gameId}/restore` 신설. 탈퇴 hard delete는 기존 계정 삭제 흐름에 연쇄하고 별도 endpoint를 만들지 않는다 | #48 |
+| ③ | `docs/08` §18 게임 코드 표 | 실제 wire 이름으로 정정하고 상세 code·rule 정본은 이 문서가 갖는다. 쓰이지 않는 옛 이름은 남기지 않는다 | #48 |
+| ④ | 사용자당 게임 상한 | **활성 20개**(soft-delete 제외), 초과 시 `GAME_LIMIT_EXCEEDED`(409). 서버 설정값이고 v1 기본 20. **삭제본은 별도로 5개**이며 초과분은 오래된 것부터 hard delete (§삭제본 보관) | #48 |
+| ⑤ | 내 게임 목록 | `GET /games/mine`. soft-delete 포함(`deletedAt`), 활성 먼저 `updatedAt` 내림차순, 6필드, 페이지네이션 없음 | #48 |
+| ⑥ | #81 Coin 차감 | **#48 범위에서 제외.** MVP는 무료·무보상을 유지하고 #81 계열에서 spec 개정 후 별도 구현한다 (FR-022·§MVP 제외 그대로) | #48 |
+| ⑦ | `INTERNAL_SERVER_ERROR` vs `INTERNAL_ERROR` | 서버는 **`INTERNAL_ERROR` 유지**. 전 endpoint 공통 코드라 서버를 바꾸지 않고 FE 재시도 판정을 맞춘다 | #104 |
+| — | 신규 이름 19개 | `errors[].rule` 16 + `code` 2(`GAME_VALIDATION_FAILED`·`GAME_LIMIT_EXCEEDED`) + `unavailableReason` 1(`CONFIG_DISABLED`) 전부 승인 | #48 |
+| — | 패키지 배치 | **기존 Backend와 같은 flat 구조.** `auth`·`booth`·`user`·`wallet` 관례를 따르고 019만 4계층 선례를 만들지 않는다 (`BE/plan.md`) | #48 |
+
+> **`5개`·`20개`는 서버 설정값이다.** 문서와 테스트는 v1 기본값 기준으로 맞추되, 값 자체를 코드에 박지 않는다.
 
 ## MVP 제외
 
