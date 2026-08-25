@@ -63,16 +63,18 @@ main
 ### feature
 
 ```text
-feature/FESTA-123-booth-layout-save
-feature/FESTA-201-player-spawn
+feat/S15P21A604-87-boothslot-list
+feature/S15P21A604-75-avatar-persist
 ```
 
-Jira Key가 있으면 포함한다.
+> **✅ 개정 (2026-08-24)**: develop/main 으로 향하는 작업 브랜치에는 **Jira Key 가 필수**다.
+> develop/main 대상 MR 파이프라인이 제목·브랜치의 키를 검증한다(`.gitlab-ci.yml` `jira-key-check`).
+> 상세: `docs/jira-gitlab-workflow.md`
 
 ### fix
 
 ```text
-fix/FESTA-345-duplicate-lease
+fix/S15P21A604-241-duplicate-lease
 ```
 
 ### hotfix
@@ -101,6 +103,11 @@ main
 2. **develop은 실제 사용 환경 기준으로 CI/CD한다** — 완료된 상태만 파트 브랜치에서 develop으로 병합하며, develop을 일상 작업장으로 쓰지 않는다.
 3. feature/fix 브랜치는 자기 파트 브랜치에서 분기하고 자기 파트 브랜치로 MR한다.
 4. 파이프라인 상세 사양은 `docs/sdd/parts/INFRA.md` (infra-001)에서 spec으로 관리한다.
+5. **공유 문서·spec 통합 (#24·#59, 2026-08-23 채택)**
+   - **쓰기**: 각 파트가 **자기 변경분만** develop PR로 올려 누적한다. 한 사람이 남의 변경분을
+     해석해 옮기지 않는다.
+   - **읽기 기준**: develop이 정본이며, 파트 브랜치가 develop을 따라간다.
+   - **파트 경계를 넘는 결정**은 이슈에서 **반영 owner 1명**을 지정해 그 사람이 develop에 쓴다.
 
 ---
 
@@ -110,12 +117,16 @@ main
 <type>/<jira-key>-<short-description>
 ```
 
-영문 kebab-case 권장.
+영문 kebab-case 권장. 허용 type (2026-08-24 확정):
+
+```text
+feat feature fix refactor test docs chore build ci hotfix perf
+```
 
 좋음:
 
 ```text
-feature/FESTA-42-booth-publish
+feat/S15P21A604-42-booth-publish
 ```
 
 나쁨:
@@ -146,6 +157,10 @@ test(wallet): add duplicate reward test
 docs(api): update consultation contract
 ```
 
+> **✅ 개정 (2026-08-24)**: Jira 연동 추적을 위해 요약 끝에 이슈 키를 붙이는 것을 권장한다 —
+> `feat(auth): 로그인 API 연동 (S15P21A604-123)`. 커밋 언어는 기존대로 **한국어**를 유지한다.
+> 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+
 ### type
 
 | Type | 의미 |
@@ -175,15 +190,20 @@ docs(api): update consultation contract
 ## 6. Merge Request 제목
 
 ```text
-[FESTA-123][BE] Booth Lease API 구현
-[FESTA-201][UNITY] Player Spawn/Despawn 구현
+[S15P21A604-123][BE] Booth Lease API 구현
+[S15P21A604-201][UNITY] Player Spawn/Despawn 구현
 ```
 
 Jira Title Prefix와 유사하게 맞춘다.
+**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 없으면 파이프라인이 실패한다** (2026-08-24 적용).
 
 ---
 
 ## 7. MR Template
+
+> **✅ 개정 (2026-08-24)**: 저장소에 실제 템플릿이 있다 — `.gitlab/merge_request_templates/Default.md`.
+> MR 작성 화면에서 Description → **Choose a template → Default** 를 선택하면 자동 적용된다.
+> 아래는 참고용 구형이다.
 
 ```markdown
 ## 변경 내용
@@ -233,6 +253,7 @@ Jira Title Prefix와 유사하게 맞춘다.
 ## 9. Merge 방식
 
 > **✅ 팀 결정 (2026-08-12)**: `Squash Merge`로 통일한다 (이의 제기 시 재논의).
+> **✅ 시행 (2026-08-24)**: GitLab 프로젝트 설정 `squash_option = default_on` 적용 — MR 머지 시 Squash 가 기본 체크된다.
 
 장점:
 
@@ -525,6 +546,26 @@ echo '{ "feature_directory": "specs/004-booth-slot-lease" }' > .specify/feature.
 
 이후 `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` 순으로 진행한다.
 상세는 `specs/README.md` 참조.
+
+---
+
+## 21-2. spec 상태 갱신 절차 (#59, 2026-08-23 채택)
+
+C-xx 상태의 SSOT는 Clarifications 표 1곳이다 (`docs/00` §2).
+
+1. **갱신은 덧붙이기가 아니라 교체** — "대기 → ✅ 확정" 마커를 쌓지 않고, 낡은 문장을
+   최종 상태 문장으로 다시 쓴다(내용 누락 없이). 변경 이력은 Git/Issue/PR이 담당한다.
+2. **완료 기록과 현재 상태를 구분한다** — `tasks.md`의 `[X]` 항목처럼 *그때의 사실*을 적은 기록은
+   지우면 이력이 사라지고 그냥 두면 현재값으로 오독된다. 원문을 유지하고 *(→ 이후 …로 변경, T0xx)*
+   화살표로 최신 상태를 잇는다. 반대로 **현재 상태를 말하는 문장**(Clarifications 셀·구조 설명·필드 표)은
+   1번대로 교체한다 (#58·#62 적용 사례).
+3. **C-xx 확정의 완료 조건**은 체크박스 하나가 아니라 3단계다: 상태 변경 → 관련 서술 교체 →
+   **해당 ID로 파일 전체 grep, 전 occurrence 확인**. 이관·rename도 같다 — 옛 경로·옛 값
+   잔존을 grep으로 확인한다 (#43 `feature_directory` 잔존 사례).
+4. **파일 단위 반입(`git checkout <branch> -- <path>`)은 그 파일이 이미 깨져 있어도 그대로 옮긴다.**
+   반입 전후로 **머지 후 삭제(D) 목록**(T-117)만 보지 말고 **파일 내부 중복**도 확인한다 —
+   `grep -c '^## '`로 섹션 수를 세거나 헤더 목록을 눈으로 본다. `docs/22`의 같은 섹션이
+   1 → 3 → 4벌로 늘어난 것이 이 경로였다 (2026-08-23 확인).
 
 ---
 
