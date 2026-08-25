@@ -3,7 +3,7 @@
     "jam": {
       "command": "node",
       "args": [
-        "C:\\colosair\\projects\\jira-agent-mcp\\dist\\index.js",
+        "${JAM_HOME}/dist/index.js",
         "serve"
       ],
       "env": {
