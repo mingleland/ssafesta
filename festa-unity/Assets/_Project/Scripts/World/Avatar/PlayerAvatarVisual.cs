@@ -317,6 +317,7 @@ namespace Festa.World
         /// </summary>
         void LateUpdate()
         {
+            UpdateRemoteMoveParams();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
             if (!TryFindGroundHeight(out var groundY))
@@ -437,6 +438,44 @@ namespace Festa.World
             if (_animator.avatar == null)
                 Debug.LogWarning("[AvatarVisual] Animator에 Avatar(휴머노이드 정의)가 없습니다 — " +
                                  "Sidekick 기본 모델의 Rig가 Humanoid인지 확인하세요");
+        }
+
+
+        // ── 원격 아바타의 이동 방향 ──────────────────────────────────
+        // `PlayerMovement` 는 Owner 에서만 돌아간다(원격은 NetworkTransform 수신만).
+        // 그래서 원격 아바타에는 MoveX/MoveY 가 들어가지 않아 8방향 블렌드 트리가
+        // 항상 "정면 이동" 만 재생한다 — 남이 옆으로 걸어가도 앞으로 걷는 것처럼 보인다.
+        //
+        // 방향을 따로 동기화하지 않는다. **관측된 위치 변화**를 몸 기준으로 바꾸면
+        // 그것이 곧 재생해야 할 방향이다 — 회전은 이미 동기화되므로 추가 트래픽이 0 이다.
+        static readonly int MoveXHash = Animator.StringToHash("MoveX");
+        static readonly int MoveYHash = Animator.StringToHash("MoveY");
+        Vector3 _lastObservedPos;
+        bool _hasObserved;
+
+        void UpdateRemoteMoveParams()
+        {
+            if (IsOwner || _animator == null) return;   // Owner 는 PlayerMovement 가 직접 넣는다
+
+            var pos = transform.position;
+            if (!_hasObserved) { _lastObservedPos = pos; _hasObserved = true; return; }
+
+            var delta = pos - _lastObservedPos;
+            _lastObservedPos = pos;
+            delta.y = 0f;
+
+            Vector2 target = Vector2.zero;
+            float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+            var speed = delta.magnitude / dt;
+            // 정지 판정 임계값 — 보간 잔떨림을 이동으로 읽지 않게 한다 (1 m = 10 unit).
+            if (speed > 3f)
+            {
+                var local = transform.InverseTransformDirection(delta.normalized);
+                target = new Vector2(local.x, local.z).normalized;
+            }
+            float lerp = 1f - Mathf.Exp(-12f * Time.deltaTime);
+            _animator.SetFloat(MoveXHash, Mathf.Lerp(_animator.GetFloat(MoveXHash), target.x, lerp));
+            _animator.SetFloat(MoveYHash, Mathf.Lerp(_animator.GetFloat(MoveYHash), target.y, lerp));
         }
 
         void ApplyAnimState(PlayerAnimState state)

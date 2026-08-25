@@ -21,6 +21,7 @@ GameObject:
   - component: {fileID: 2574389333232708985}
   - component: {fileID: 4477108905412324781}
   - component: {fileID: 8037092520390793218}
+  - component: {fileID: 4169812010102789697}
   m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -322,3 +323,25 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
   _cooldown: 0.6
+--- !u!114 &4169812010102789697
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7eaf72d0120e804285550da85e677d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+  _maxHeadYaw: 70
+  _maxHeadPitchUp: 40
+  _maxHeadPitchDown: 30
+  _followLerp: 10
+  _lookWeight: 0.65
+  _bodyWeight: 0.25
+  _headWeight: 0.9
+  LookAngles:
+    m_InternalValue: {x: 0, y: 0}

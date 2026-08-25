@@ -16,17 +16,26 @@ namespace Festa.Network
         JumpLaunch = 4,
     }
 
+    /// <summary>
+    /// 감정표현 식별자. 네트워크로 byte 하나만 오가고, 각 값은 애니메이터의
+    /// `Emote_{이름}` 상태와 **이름으로** 짝지어진다 (PlayerAvatarVisual.ApplyEmote).
+    /// 값을 바꾸면 상태 이름도 함께 바꿔야 한다.
+    ///
+    /// 2026-08-25 개정 — 엑스포·축제 톤으로 교체했다. 이전 세트(강남스타일·트월킹·
+    /// 왕의 자세·패배)는 기업 부스가 있는 행사장 표현으로 맞지 않았다.
+    /// 클립은 Kevin Iglesias Human Animations (Humanoid 리타게팅).
+    /// </summary>
     public enum PlayerEmoteId : byte
     {
         None = 0,
-        Greeting = 1,
-        Salute = 2,
-        King = 3,
-        GangnamStyle = 4,
-        Defeat = 5,
-        Praying = 6,
-        Twerk = 7,
-        JoyfulJump = 8,
+        Greeting = 1,     // HandWave01 — 인사
+        Clap = 2,         // HandClap01 — 박수
+        Cheer = 3,        // Cheer01 — 환호
+        Nod = 4,          // HeadNod01 — 끄덕임
+        Laugh = 5,        // Laugh01 — 웃음
+        SitGround = 6,    // SitGround01 - Loop — 앉기 (루프)
+        Drink = 7,        // Drink01_R - Loop — 건배 (루프)
+        Thanks = 8,       // Reverence01 — 감사
     }
 
     /// <summary>

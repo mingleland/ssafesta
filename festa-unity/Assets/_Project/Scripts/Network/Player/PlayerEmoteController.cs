@@ -12,18 +12,19 @@ namespace Festa.Network
         const float DeadZone = 34f;
         const float WheelRadius = 126f;
 
+        // 휠 8칸 — 시계 방향(위부터). Labels 와 순서가 1:1 로 맞아야 한다.
         static readonly PlayerEmoteId[] Emotes =
         {
-            PlayerEmoteId.Greeting, PlayerEmoteId.Salute,
-            PlayerEmoteId.King, PlayerEmoteId.GangnamStyle,
-            PlayerEmoteId.Defeat, PlayerEmoteId.Praying,
-            PlayerEmoteId.Twerk, PlayerEmoteId.JoyfulJump,
+            PlayerEmoteId.Greeting, PlayerEmoteId.Clap,
+            PlayerEmoteId.Cheer,    PlayerEmoteId.Nod,
+            PlayerEmoteId.Laugh,    PlayerEmoteId.SitGround,
+            PlayerEmoteId.Drink,    PlayerEmoteId.Thanks,
         };
 
         static readonly string[] Labels =
         {
-            "인사", "경례", "왕의 자세", "강남스타일",
-            "패배", "기도", "트월킹", "기쁨의 점프"
+            "인사", "박수", "환호", "끄덕임",
+            "웃음", "앉기", "건배", "감사"
         };
 
         NetworkPlayer _player;
@@ -67,6 +68,8 @@ namespace Festa.Network
                 }
             }
 
+            TrackOneShotDuration();
+
             if (_oneShotStopAt > 0f && Time.unscaledTime >= _oneShotStopAt)
             {
                 _oneShotStopAt = 0f;
@@ -97,26 +100,41 @@ namespace Festa.Network
             {
                 var emote = Emotes[_selected];
                 _player.EmoteId.Value = emote;
-                _oneShotStopAt = IsLooping(emote) ? 0f : Time.unscaledTime + FindClipDuration(emote);
+                // 길이는 상태가 실제로 재생되기 시작한 뒤에 읽는다 (TrackOneShotDuration).
+                _oneShotStopAt = 0f;
+                _awaitingDuration = IsLooping(emote) ? PlayerEmoteId.None : emote;
             }
             _wheelOpen = false;
             _selected = -1;
         }
 
+        // 루프 이모트는 자동으로 끝나지 않는다 — 다시 선택하거나 이동하면 해제된다
+        // (PlayerMovement 가 이동 시 EmoteId 를 None 으로 되돌린다).
         static bool IsLooping(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.GangnamStyle || emote == PlayerEmoteId.Twerk;
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink;
 
-        float FindClipDuration(PlayerEmoteId emote)
+        // ── 원샷 이모트 종료 시점 ──────────────────────────────────
+        // 클립 이름으로 길이를 찾을 수 없다. 애니메이터 상태 이름은 `Emote_{enum}` 규약이지만
+        // **클립 파일 이름은 다르다**(예: 상태 `Emote_Greeting` ← 클립 `HumanF@HandWave01`).
+        // 이전 구현은 클립 이름이 상태 이름과 같다고 가정해, 클립을 교체한 순간 조용히
+        // 폴백 3초를 쓰게 됐다. 그래서 **실제로 재생 중인 상태의 길이**를 읽는다 —
+        // 클립을 어떻게 바꿔도 따라오고, 상태 speed 까지 반영된 값이다.
+        PlayerEmoteId _awaitingDuration;
+
+        void TrackOneShotDuration()
         {
+            if (_awaitingDuration == PlayerEmoteId.None) return;
+
             var animator = GetComponent<PlayerAvatarVisual>()?.CurrentAnimator;
-            if (animator != null && animator.runtimeAnimatorController != null)
-            {
-                var expected = $"Emote_{emote}";
-                foreach (var clip in animator.runtimeAnimatorController.animationClips)
-                    if (clip != null && clip.name == expected)
-                        return Mathf.Max(0.5f, clip.length - 0.15f);
-            }
-            return 3f;
+            if (animator == null) { _awaitingDuration = PlayerEmoteId.None; return; }
+
+            int wanted = Animator.StringToHash($"Emote_{_awaitingDuration}");
+            var cur = animator.GetCurrentAnimatorStateInfo(0);
+            if (cur.shortNameHash != wanted) return;   // 아직 크로스페이드 중
+
+            // length 는 speed 가 반영된 재생 시간이다. 끝에서 살짝 앞서 끊어 로코모션으로 넘긴다.
+            _oneShotStopAt = Time.unscaledTime + Mathf.Max(0.5f, cur.length - 0.15f);
+            _awaitingDuration = PlayerEmoteId.None;
         }
 
         void OnGUI()

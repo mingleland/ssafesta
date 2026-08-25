@@ -93,12 +93,63 @@ namespace Festa.Network
         // 도약한다 — 몸은 전진하는데 발은 제자리를 딛는 모션이라 미끄러져 보였다.
         const float JumpAnticipation = 0.18f;
 
+
+        // ── 마인크래프트식 조작 보조 ────────────────────────────────
+        static readonly int MoveXHash = Animator.StringToHash("MoveX");
+        static readonly int MoveYHash = Animator.StringToHash("MoveY");
+
+        AvatarLook _look;
+        PlayerAvatarVisual _visual;
+
+        /// <summary>카메라 궤도 yaw. 시선과 몸 정렬의 단일 기준이다.</summary>
+        float CameraYaw()
+        {
+            if (_cameraFollow != null && _cameraFollow.TryGetPlanarBasis(out var forward, out _))
+                return Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
+            return transform.eulerAngles.y;
+        }
+
+        /// <summary>몸을 목표 yaw 로 부드럽게 돌린다 (한 프레임에 튀지 않게).</summary>
+        void AlignBodyTo(float targetYaw)
+        {
+            var next = Mathf.SmoothDampAngle(
+                transform.eulerAngles.y, targetYaw, ref _turnVelocity,
+                _turnSmoothTime, _maxTurnSpeedDeg, Time.deltaTime);
+            transform.rotation = Quaternion.Euler(0f, next, 0f);
+        }
+
+        /// <summary>
+        /// 다리가 재생할 방향을 애니메이터에 넘긴다. 몸이 카메라를 보는 동안 옆·뒤로
+        /// 움직이면 **몸 기준 지역 방향**이 곧 재생해야 할 클립이다 (8방향 블렌드 트리).
+        /// 값을 부드럽게 밀어 넣어 방향 전환에서 다리가 튀지 않게 한다.
+        /// </summary>
+        void UpdateMoveParams(Vector2 input, bool moving, bool running)
+        {
+            _visual ??= GetComponent<PlayerAvatarVisual>();
+            var animator = _visual != null ? _visual.CurrentAnimator : null;
+            if (animator == null) return;
+
+            Vector2 target = Vector2.zero;
+            if (moving)
+            {
+                // 입력을 카메라 기준 월드 방향으로 바꾸고, 다시 몸 기준으로 되돌린다.
+                var world = CameraRelativeDirection(input);
+                var local = transform.InverseTransformDirection(world);
+                target = new Vector2(local.x, local.z).normalized;
+            }
+            float lerp = 1f - Mathf.Exp(-12f * Time.deltaTime);
+            animator.SetFloat(MoveXHash, Mathf.Lerp(animator.GetFloat(MoveXHash), target.x, lerp));
+            animator.SetFloat(MoveYHash, Mathf.Lerp(animator.GetFloat(MoveYHash), target.y, lerp));
+        }
+
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
             _cameraFollow = GetComponent<PlayerCameraFollow>();
             _controller = GetComponent<CharacterController>();
             _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+            _look = GetComponent<AvatarLook>();
+            _visual = GetComponent<PlayerAvatarVisual>();
             enabled = IsOwner; // 원격 플레이어는 NetworkTransform 수신만
 
             // 원격 플레이어는 NetworkTransform 이 transform 을 직접 쓴다.
@@ -274,30 +325,33 @@ namespace Festa.Network
                 }
             }
 
+            // ── 몸 정렬·이동 (마인크래프트식) ───────────────────────────
+            // 이전에는 **이동 방향으로 몸을 돌렸다.** 그래서 옆으로 가면 몸이 그쪽을 보고,
+            // 보고 있던 부스를 놓친다. 서 있을 때는 카메라만 돌아 캐릭터가 박혀 보였다.
+            // "묶여 있는 것 같다" 는 체감이 여기서 나왔다.
+            //
+            // 바꾼 규칙:
+            //   · 이동 중에는 몸을 **카메라 정면**으로 정렬한다. 다리는 8방향 블렌드 트리가
+            //     실제 이동 방향을 재생하므로, 옆·뒤로 가도 시선을 유지한 채 걷는다.
+            //   · 서 있을 때는 몸을 돌리지 않는다. 고개만 따라간다(AvatarLook).
+            //     고개 한계(±70°)를 넘으면 그때 몸이 따라 돈다.
             if (moving)
             {
                 var dir = CameraRelativeDirection(input);
                 var speed = running ? _runSpeed : _moveSpeed;
                 MoveWithCollision(dir * speed);
-
-                // 이동 벡터는 즉시 새 입력을 따르되, 보이는 방향만 짧게 보간한다.
-                // 키를 바꿀 때 한 프레임 만에 각도가 튀는 현상을 없애면서도
-                // 카메라 기준 WASD 조작 방향은 그대로 유지한다.
-                var targetYaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
-                var nextYaw = Mathf.SmoothDampAngle(
-                    transform.eulerAngles.y,
-                    targetYaw,
-                    ref _turnVelocity,
-                    _turnSmoothTime,
-                    _maxTurnSpeedDeg,
-                    Time.deltaTime);
-                transform.rotation = Quaternion.Euler(0f, nextYaw, 0f);
+                AlignBodyTo(CameraYaw());
             }
             else
             {
                 _turnVelocity = 0f;
-                MoveWithCollision(Vector3.zero); // 정지 중에도 중력은 적용한다
+                MoveWithCollision(Vector3.zero);   // 정지 중에도 중력은 적용한다
+                // 고개가 돌아갈 수 있는 한계를 넘었을 때만 몸이 따라 돈다.
+                if (_look != null && _look.NeedsBodyTurn) AlignBodyTo(CameraYaw());
             }
+
+            // 다리가 재생할 방향 — 몸 기준 지역 좌표계로 넘긴다.
+            UpdateMoveParams(input, moving, running);
 
             // 공중에서는 이동 입력과 무관하게 Jump 를 보낸다 — 원격 클라이언트가
             // 같은 애니메이션을 재생한다 (AnimState 는 Owner 쓰기 권한이다).

@@ -70,6 +70,9 @@ namespace Festa.World
         /// 이 플레이어를 실제로 따라가는 카메라의 수평 이동 축을 반환한다.
         /// 전역 Camera.main을 다시 찾지 않고 카메라 궤도 yaw를 단일 기준으로 쓴다.
         /// </summary>
+        /// <summary>현재 궤도 피치. 아바타 시선(고개 상하)이 카메라를 따라가는 데 쓴다.</summary>
+        public float CurrentPitch => _pitch;
+
         public bool TryGetPlanarBasis(out Vector3 forward, out Vector3 right)
         {
             if (!IsOwner)
