@@ -14,7 +14,8 @@
 - 🤖 최신 GitLab `front`·`develop`과 Game Studio MR !8·!9, Backend 계약 Draft MR !1의 변경 파일을 비교했다. 코드 MR !8은 73개 중 `src/game-studio/**` 71개와 공유 Frontend 파일 `.env.example`·`OverlayHost.tsx` 2개로 구분되며 최신 `front`와 실제 text conflict는 없다. 문서 MR !9도 최신 `develop`과 충돌하지 않지만, MR !1과 `contracts/game-api.md`를 함께 수정하므로 계약 owner가 반영 순서를 확인해야 한다.
 - 🤖 `src/game-studio/**` 안에서도 순수 Studio UI/model/assets/reference Runtime은 Game Studio 전용 소유, `contracts`·`ports`·`host`·route는 FE·BE·Unity 연결 경계로 분류했다. `specs/019-game-studio/spec.md`와 `FE/**`, KHS 27·28은 Game Studio 전용 문서로 유지하고, `BE/**`와 `contracts/**`는 각 파트 또는 공동 계약 owner가 관리하는 분리 기준을 확정했다. 실제 merge·rebase·파일 이동은 수행하지 않았다.
 - 🤖 Jira에서 `Game Studio`뿐 아니라 `GameProject`, `Game Portal`, `Published Web Runtime`까지 검색해 진행 중인 관련 이슈 15건(S15P21A604-12·107·111·112·113·115·155·156·159·178·180·200·201·202·217)의 담당자를 강형순으로 변경하고 재조회로 전 건을 확인했다. 이미 완료된 S15P21A604-64는 과거 작업자 기록을 보존했으며 상태·라벨은 변경하지 않았다.
-- 트러블슈팅: GS-T063
+- 🤖 중복 논의를 늘리지 않도록 병합 승인 기준은 GitLab [#104](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/104) 한 건으로 생성해 강형순에게 배정했다. `.env.example`·`OverlayHost` 공유 소유권, Portal feature flag, Draft 없음/내부 오류/CONFIG_DISABLED 응답, v1.1·Session/Coin·Tile 상한, 문서 owner를 체크리스트로 나누고 @dream_hyeon·@colosair·@ejraks1548를 태그했다. 기존 #48·#55·#56·#78·#81·#101에는 각 담당 결정과 #104 연결 댓글을 남겼다.
+- 트러블슈팅: GS-T063~GS-T064
 
 ### 제작 전 영역 탐색·진단·재료 검증 고도화 ✅
 

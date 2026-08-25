@@ -8,6 +8,13 @@
 
 ## 2026-08-25
 
+### GS-T064. GitLab Issue 목록 API에 지원하지 않는 `order_by=iid`를 사용함 (해결)
+
+- **증상** — 병합 전 논의 이슈의 중복 여부를 조회하는 GitLab API가 `order_by does not have a valid value`를 반환해 issue 목록만 비어 있고 같은 명령의 member 조회만 성공했다.
+- **원인** — Merge Request 응답의 IID 정렬 관행을 Issue 목록 API에도 그대로 적용해, 해당 GitLab 버전이 허용하지 않는 `order_by=iid`를 전달했다. 서로 독립인 두 REST 결과를 한 출력에 묶어 부분 성공도 함께 나타났다.
+- **해결** — 서버 `order_by`를 제거하고 `state=opened&per_page=100`으로 조회한 뒤 PowerShell에서 `Sort-Object iid`를 적용했다. 기존 #48·#55·#56·#69·#73·#78·#81·#101을 확인해 중복 신규 이슈 대신 통합 #104와 기존 이슈별 연결 댓글 구조를 선택했다.
+- **예방** — GitLab API resource별 허용 정렬 필드를 동일하다고 가정하지 않는다. 목록 조회 실패를 다른 API 결과와 섞지 않고 즉시 실패 처리하며, 작은 프로젝트에서는 정렬 없는 전체 페이지를 받아 client-side IID 정렬로 검증한다.
+
 ### GS-T063. Atlassian API token을 Bearer로 사용해 Jira 조회가 403으로 거부됨 (해결)
 
 - **증상** — `JIRA_API_TOKEN`과 `ATLASSIAN_API_TOKEN`을 Bearer header로 사용한 `/rest/api/3/myself` 요청이 모두 403을 반환했다. 첫 진단 명령은 PowerShell `foreach` 결과를 직접 pipe하면서 parser 오류도 발생했다.
