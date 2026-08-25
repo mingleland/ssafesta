@@ -101,7 +101,9 @@ export const normalizeGameAuthoringError = (error: unknown): GameAuthoringApiErr
         { currentRevision: currentRevisionFrom(error.errors), requestId: error.requestId },
       );
     }
-    const retryable = error.code === 'UNKNOWN' || error.code === 'INTERNAL_SERVER_ERROR';
+    // 서버 공통 오류 코드는 INTERNAL_ERROR다(#104 BE 확정, 2026-08-25). INTERNAL_SERVER_ERROR로
+    // 적혀 있던 동안 이 재시도 분기는 한 번도 타지 않았다 — entities/conversation/stream.types.ts와 같은 이름을 쓴다.
+    const retryable = error.code === 'UNKNOWN' || error.code === 'INTERNAL_ERROR';
     return new GameAuthoringApiError(error.code, error.message || '게임 저장 요청에 실패했습니다.', { requestId: error.requestId, retryable });
   }
   if (error instanceof TypeError) {
