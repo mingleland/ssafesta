@@ -59,8 +59,18 @@ namespace Festa.Diagnostics
         static Texture2D _bg;
         static GUIStyle _style;
 
+        /// <summary>
+        /// 개발 도구는 **개발 빌드·에디터에서만** 살아 있어야 한다.
+        /// 이 컴포넌트들은 main 씬에 붙어 있어 Linux 서버 빌드와 WebGL 릴리즈 빌드에도
+        /// 함께 실린다 — 릴리즈에서 실사용자가 F6 으로 아바타 40기를 소환할 수 있으면 안 되고,
+        /// 서버가 IMGUI 오버레이를 들고 있을 이유도 없다.
+        /// </summary>
+        public static bool ToolsEnabled =>
+            Application.isEditor || Debug.isDebugBuild;
+
         void OnEnable()
         {
+            if (!ToolsEnabled) { enabled = false; return; }
             _visible = _visibleOnStart;
             _lastGcCount = System.GC.CollectionCount(0);
             _drawCalls = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");

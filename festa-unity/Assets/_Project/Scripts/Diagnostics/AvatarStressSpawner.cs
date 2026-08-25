@@ -47,6 +47,13 @@ namespace Festa.Diagnostics
 
         public int Count => _spawned.Count;
 
+        void Awake()
+        {
+            // 릴리즈 빌드에서는 살려두지 않는다 — 실사용자가 F6 으로 아바타 40기를
+            // 소환할 수 있으면 안 된다 (PerfHud.ToolsEnabled 와 같은 기준).
+            if (!PerfHud.ToolsEnabled) enabled = false;
+        }
+
         void Update()
         {
             if (Input.GetKeyDown(_addKey)) Add(_step);
