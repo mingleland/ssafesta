@@ -17,6 +17,7 @@
 - 🤖 중복 논의를 늘리지 않도록 병합 승인 기준은 GitLab [#104](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/104) 한 건으로 생성해 강형순에게 배정했다. `.env.example`·`OverlayHost` 공유 소유권, Portal feature flag, Draft 없음/내부 오류/CONFIG_DISABLED 응답, v1.1·Session/Coin·Tile 상한, 문서 owner를 체크리스트로 나누고 @dream_hyeon·@colosair·@ejraks1548를 태그했다. 기존 #48·#55·#56·#78·#81·#101에는 각 담당 결정과 #104 연결 댓글을 남겼다.
 - 🤖 사용자 승인에 따라 MR !8에서 일반 Frontend 동작을 즉시 바꾸는 `OverlayHost.tsx` lazy Game 연결만 최신 `front` 상태로 되돌리고 #104·#56 후속으로 보류했다. 최종 변경은 `src/game-studio/**` 71개와 기본 `false`인 `.env.example` 1개이며 test·production build·lint 통과 후 MR !8을 `front`에 squash 병합했다(`c064fb1`, merge commit `5427f08`).
 - 🤖 문서 MR !9는 Backend 계약 Draft MR !1과 파일 owner가 겹치던 `contracts/game-api.md`와 `contracts/studio-authoring-model.md`의 tracker 링크 변경을 제외했다. Game Studio `spec.md`·`FE/**`·KHS 27·28만 `develop` 병합 대상으로 남기고 계약 의미·Backend·Unity 문서는 건드리지 않았다.
+- 🤖 분리한 문서 MR !9도 `develop`에 squash 병합했다(`0d4c80b`, merge commit `a2456ba`). 이로써 안전 범위 코드·문서는 통합됐고, 실제 Portal Overlay 활성화·Backend API 전환·공동 계약 결정만 OPEN #104와 #48·#55·#56·#78·#81·#101에서 대기한다.
 - 트러블슈팅: GS-T063~GS-T064
 
 ### 제작 전 영역 탐색·진단·재료 검증 고도화 ✅
