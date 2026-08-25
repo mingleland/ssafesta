@@ -90,6 +90,11 @@ namespace Festa.World
 
         void Rebuild(string encoded)
         {
+            // 부하 테스트 봇은 외형을 만들지 않는다 — 화면이 없어 보이지 않는데
+            // 스킨 메시·재질·본을 통째로 올리면 프로세스당 메모리가 커져 한 대에서
+            // 띄울 수 있는 봇 수가 줄어든다. 봇의 목적은 대역폭 생성이지 렌더가 아니다.
+            if (Festa.Diagnostics.LoadTestBot.IsBotProcess) return;
+
             if (string.IsNullOrEmpty(encoded)) return;
 
             if (_currentVisual != null) Destroy(_currentVisual);

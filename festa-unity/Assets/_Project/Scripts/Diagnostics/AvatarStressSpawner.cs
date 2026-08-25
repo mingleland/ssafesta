@@ -88,8 +88,11 @@ namespace Festa.Diagnostics
                 if (!string.IsNullOrEmpty(assembler.LastError))
                     Debug.LogWarning($"[AvatarStress] 조립 경고: {assembler.LastError}");
 
-                FitHeight(go);
+                // 순서 주의: 애니메이터를 먼저 세팅해야 실제 재생 포즈를 베이크해 접지할 수 있다.
+                // (바인드 포즈로 접지하면 걷기 포즈에서 발이 뜨거나 묻힌다)
                 SetupAnimator(go, index);
+                FitHeight(go);
+                MatchProductionShadows(go);
                 _spawned.Add(go);
             }
             Debug.Log($"[AvatarStress] 아바타 {_spawned.Count}기");
@@ -201,6 +204,13 @@ namespace Festa.Diagnostics
             var animator = go.GetComponentInChildren<Animator>();
             if (animator == null || _catalog.animatorController == null) return;
             animator.runtimeAnimatorController = _catalog.animatorController;
+
+            // 프로덕션(PlayerAvatarVisual)과 같은 설정이어야 측정이 유효하다.
+            // ① 루트 모션 OFF — 켜져 있으면 걷기 클립의 루트 이동이 아바타를 계속
+            //    끌어내려 접지가 무너지고(측정 중 실제로 1.2 m 씩 가라앉았다) 픽셀 비용이
+            //    과소평가된다. 프로덕션은 이동 권한이 PlayerMovement 에 있어 항상 false 다.
+            animator.applyRootMotion = false;
+
             if (!_animate)
             {
                 animator.cullingMode = AnimatorCullingMode.CullCompletely;
@@ -213,6 +223,17 @@ namespace Festa.Diagnostics
             animator.SetFloat(SpeedHash, 1f);
             // 같은 프레임에 모두 같은 포즈면 비현실적이다 — 재생 위상을 흩는다.
             animator.Update(index * 0.13f);
+        }
+
+        /// <summary>
+        /// ② 실시간 그림자 OFF — 프로덕션은 스킨 메시 그림자를 끄고 접지용 블롭 하나만 쓴다
+        /// (<see cref="Festa.World.PlayerAvatarVisual"/>.ConfigureAvatarShadows).
+        /// 켜 둔 채로 재면 축제 40기에서 드로우콜이 1,154 → 1,311 로 부풀어 실제보다 무겁게 나온다.
+        /// </summary>
+        static void MatchProductionShadows(GameObject go)
+        {
+            foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         void OnGUI()
