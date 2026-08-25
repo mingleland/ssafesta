@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-23 — 독립 Web Runtime, 6종 시각 템플릿, 초보/고급 편집, 재료함·집중 모드 구현 반영
+**Updated**: 2026-08-25 — 전체 맵 탐색, 대화 흐름, 게임 완성도 점검, 애니메이션 재료 검증 구현 반영
 
 **Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 
@@ -212,6 +212,10 @@
 - **FR-065**: Backend가 없어도 공식 Mock 모드에서 Draft 저장, 불변 Published Version 생성, 일반 `/app/games/{gameId}/play` 조회를 같은 port로 검증할 수 있어야 한다. 이 브라우저 저장소는 운영 공유 저장소로 간주해서는 안 된다.
 - **FR-066**: GameProject v1.1 FE candidate는 `rules.completion.mode(ALL|ANY)`, `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS`, `playerDefeat(RESPAWN|END_GAME)`만 추가한다. Runtime tick은 120ms 결정적 시간으로 누적하고 v1.0 프로젝트는 편집 시 기본 규칙을 가진 v1.1로 명시적으로 승격한다.
 - **FR-067**: Publish preflight는 안정 Asset뿐 아니라 `rules` 목표 또는 도달 가능한 `COMPLETE_GAME` Action의 존재를 확인해야 한다. 완료 경로가 하나도 없는 프로젝트는 다른 사용자에게 게시하지 않아야 한다.
+- **FR-068**: World Canvas는 맵 크기와 무관하게 미니맵 위치 이동, 전체 맵 맞춤, 1:1 배율, 선택 Object 위치 이동을 제공해야 한다. 전체 맞춤 저배율에서는 Tile을 단일 Canvas로 합성해 10,000개 Tile DOM을 만들지 않고, 편집 배율에서는 viewport overscan을 유지해야 한다.
+- **FR-069**: Dialogue 편집기는 GameProject를 변경하지 않는 파생 분석으로 시작 노드에서 도달 가능한 Node와 선택 후 결과가 없는 Node를 한눈에 표시하고 해당 Node로 바로 이동할 수 있어야 한다.
+- **FR-070**: Project 데이터 화면은 시작 위치, 완료 경로, 상호작용 연결, 대화 분기, Scene 연결, 게시 가능 Asset을 한국어 체크리스트로 보여야 한다. 이 점검은 Backend Publish 검증을 대체하거나 새로운 wire field로 저장되어서는 안 된다.
+- **FR-071**: builtin Sprite Sheet는 제공 clip별 방향·프레임·fps를 선택해 재생/일시정지할 수 있어야 한다. 이 선택은 Editor 재료 미리보기이며 Runtime의 자동 방향 선택 의미를 바꾸거나 GameProject에 임의 animation field를 추가해서는 안 된다.
 
 ### Part Boundaries
 
@@ -254,6 +258,7 @@
 - **SC-012**: 활성 PC 브라우저 탭의 대표 TOP_DOWN·PLATFORMER Published/Preview 시나리오에서 렌더링이 55fps 아래로 3초 이상 머무르지 않는다. 백그라운드 throttling 측정은 제외한다.
 - **SC-013**: 6종 시작 템플릿의 Scene/Object/Event/Dialogue 구조 프로필이 서로 구분되고 모든 템플릿이 계약 검증과 시작 Scene 실행 검증을 100% 통과한다.
 - **SC-014**: 공식 Mock 모드의 브라우저에서 `템플릿 선택 → 저장 → 게시 v1 → 일반 /play 조회 → 동일 목표 HUD 표시` 흐름이 Backend·Unity 없이 100% 성공한다.
+- **SC-015**: 100×100, Object 500개, Tile 10,000칸 최대 fixture에서 전체 맞춤은 Tile DOM 0개인 합성 화면을 제공하고, 1:1 편집 배율은 viewport 주변 Object/Tile만 렌더하며 미니맵·레이어 선택으로 원거리 위치를 찾을 수 있다.
 
 ## Assumptions
 

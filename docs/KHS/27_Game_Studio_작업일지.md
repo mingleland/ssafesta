@@ -7,6 +7,63 @@
 > Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
+## 2026-08-25
+
+### Frontend 병합 경계·Jira 담당자 정리 ✅
+
+- 🤖 최신 GitLab `front`·`develop`과 Game Studio MR !8·!9, Backend 계약 Draft MR !1의 변경 파일을 비교했다. 코드 MR !8은 73개 중 `src/game-studio/**` 71개와 공유 Frontend 파일 `.env.example`·`OverlayHost.tsx` 2개로 구분되며 최신 `front`와 실제 text conflict는 없다. 문서 MR !9도 최신 `develop`과 충돌하지 않지만, MR !1과 `contracts/game-api.md`를 함께 수정하므로 계약 owner가 반영 순서를 확인해야 한다.
+- 🤖 `src/game-studio/**` 안에서도 순수 Studio UI/model/assets/reference Runtime은 Game Studio 전용 소유, `contracts`·`ports`·`host`·route는 FE·BE·Unity 연결 경계로 분류했다. `specs/019-game-studio/spec.md`와 `FE/**`, KHS 27·28은 Game Studio 전용 문서로 유지하고, `BE/**`와 `contracts/**`는 각 파트 또는 공동 계약 owner가 관리하는 분리 기준을 확정했다. 실제 merge·rebase·파일 이동은 수행하지 않았다.
+- 🤖 Jira에서 `Game Studio`뿐 아니라 `GameProject`, `Game Portal`, `Published Web Runtime`까지 검색해 진행 중인 관련 이슈 15건(S15P21A604-12·107·111·112·113·115·155·156·159·178·180·200·201·202·217)의 담당자를 강형순으로 변경하고 재조회로 전 건을 확인했다. 이미 완료된 S15P21A604-64는 과거 작업자 기록을 보존했으며 상태·라벨은 변경하지 않았다.
+- 🤖 중복 논의를 늘리지 않도록 병합 승인 기준은 GitLab [#104](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/104) 한 건으로 생성해 강형순에게 배정했다. `.env.example`·`OverlayHost` 공유 소유권, Portal feature flag, Draft 없음/내부 오류/CONFIG_DISABLED 응답, v1.1·Session/Coin·Tile 상한, 문서 owner를 체크리스트로 나누고 @dream_hyeon·@colosair·@ejraks1548를 태그했다. 기존 #48·#55·#56·#78·#81·#101에는 각 담당 결정과 #104 연결 댓글을 남겼다.
+- 🤖 사용자 승인에 따라 MR !8에서 일반 Frontend 동작을 즉시 바꾸는 `OverlayHost.tsx` lazy Game 연결만 최신 `front` 상태로 되돌리고 #104·#56 후속으로 보류했다. 최종 변경은 `src/game-studio/**` 71개와 기본 `false`인 `.env.example` 1개이며 test·production build·lint 통과 후 MR !8을 `front`에 squash 병합했다(`c064fb1`, merge commit `5427f08`).
+- 🤖 문서 MR !9는 Backend 계약 Draft MR !1과 파일 owner가 겹치던 `contracts/game-api.md`와 `contracts/studio-authoring-model.md`의 tracker 링크 변경을 제외했다. Game Studio `spec.md`·`FE/**`·KHS 27·28만 `develop` 병합 대상으로 남기고 계약 의미·Backend·Unity 문서는 건드리지 않았다.
+- 트러블슈팅: GS-T063~GS-T064
+
+### 제작 전 영역 탐색·진단·재료 검증 고도화 ✅
+
+- 🤖 큰 맵에만 한정하지 않고 World Canvas, Dialogue, Project 데이터, Sprite 재료 확인을 하나의 품질 묶음으로 개선했다. 공통 GameProject JSON·Backend API·Unity Bridge는 변경하지 않고 Editor 파생 상태와 교체 가능한 UI 경계에만 구현했다.
+- 🤖 모든 World Scene에 미니맵 위치 이동, 전체 맵 맞춤, 1:1 배율, 선택 위치 이동을 추가했다. 좁은 Canvas toolbar는 Scene 제목을 고정하고 도구 영역만 내부 이동하게 해 3열 PC 편집 화면에서 제목이 세로로 찢어지던 문제도 막았다.
+- 🤖 25% 이하 전체 보기에서는 Tile 10,000칸을 단일 Canvas로 합성하고, 1:1 편집 배율에서는 기존 2칸 overscan DOM 가상화로 복귀한다. 개발 전용 `?fixture=max`는 100×100, Object 500, Tile 10,000을 실제 builtin Sprite와 함께 재현한다.
+- 🤖 Dialogue `대화 흐름`에 시작 Node 도달 여부, 선택 결과, 결과 미설정 경고와 Node 바로가기를 추가했다. 데이터 탭에는 시작 위치·완료 경로·상호작용·대화·Scene·Asset 6축 `게임 완성도 점검`을 제공한다. builtin 4방향 Sprite Sheet는 clip·frame·fps·반복과 재생/일시정지를 Inspector에서 확인한다.
+- 🤖 `dialogueFlow`, `projectHealth`, 최대 fixture, fit zoom 회귀를 추가해 전체 Frontend **49 files / 269 tests**, lint, production build를 통과했다. 500 Object 이동 100ms gate는 단독·전체 suite에서 통과했으며, build와 test를 동시에 실행한 CPU 경쟁 상태의 일시 초과는 GS-T060으로 측정 경계를 기록했다.
+- 🤖 Mock 브라우저에서 일반 16×10 맵과 최대 fixture를 모두 확인했다. 최대 맵은 전체 보기 15%에서 Tile DOM 0개/10,000칸 Canvas 합성, 1:1에서 Object 36/500·Tile 640/10,000만 렌더했다. 미니맵 중앙 이동은 화면 Object를 X 34~65/Y 54~72대로 바꿨고, 레이어 검색 `playerSpawn` 선택은 원거리 Canvas와 4방향 애니메이션 Inspector로 이동했다. 대화 흐름 1/1과 완성도 6/6도 실제 화면에서 확인했다.
+- 🤖 FE spec/plan/tasks/quickstart를 FR-068~071, SC-015, T118~T121로 갱신했다. 총 100개/완료 92개/잔여 8개이며 사람 20분 제작 테스트와 활성 PC 55fps 증거가 남아 있어 T090·T065는 완료 처리하지 않았다.
+- 🤖 코드 변경은 Jira 브랜치 `feat/S15P21A604-156-game-studio-authoring-quality`의 `1735be1`로 고정했다. 일반 Frontend·Backend·AI·Unity 코드와 shared JSON schema는 변경하지 않았다.
+- 🤖 GitLab 최종 재검증에서 코드 MR !8(`1735be1`)과 문서 MR !9 모두 `mergeable`, 충돌 없음, Draft 아님을 확인했다. 병합은 수행하지 않았다.
+- 🤖 활성 계약·계획·미완료 task에 남아 있던 이전 GitHub #69·#73·#78 링크를 실제 이관된 GitLab work item으로 정정했다. 과거 GitHub 작업 사실을 기록한 일지 링크는 역사적 증거로 유지했다.
+- 트러블슈팅: GS-T058~GS-T062
+
+### 대형 맵 편집 성능·공간 탐색 고도화 ✅
+
+- 🤖 고정 폭에 맵 전체를 압축하던 Canvas를 32px cell×zoom 기반 실제 작업 공간으로 바꿨다. 100×50 맵은 3200×1600으로 펼쳐지며 중앙 Canvas만 scroll되어 Scene/속성 panel 배치를 오염시키지 않는다.
+- 🤖 scroll/resize와 zoom 변화에서 보이는 grid 범위를 계산하고 2칸 overscan을 더해 화면 주변 Object와 Tile만 DOM에 만든다. 선택한 primary Object는 측정 전에도 보존하며 레이어 검색에서 화면 밖 Object를 고르면 해당 좌표가 viewport 중앙으로 이동한다.
+- 🤖 최대 500개 Object 레이어 목록은 검색 대상을 줄이지 않은 채 80개 단위로 점진 표시한다. 큰 맵에서도 검색·잠금·숨김·z-order 조작이 한 번에 500개 article을 만들지 않는다.
+- 🤖 PLATFORMER가 200×100 크기를 허용하지만 shared schema의 TileLayer가 10,000칸까지만 저장하는 기존 불일치를 확인했다. Wire 계약을 임의 확대하지 않고 Authoring에서 가로×세로 10,000칸을 넘는 입력을 한국어로 안내·차단하고 command에도 동일 guard를 두었다. 20,000칸 지원 결정은 FE/BE/AI 공동 [GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101)로 분리하고 @ejraks1548·@dream_hyeon·@colosair를 본문에 태그했다.
+- 🤖 viewport 계산·overscan·500 Object 필터·tile index 회귀 4건과 map-area command 회귀 1건을 추가했다. 전체 Frontend **47 files / 264 tests**, lint, production build가 통과했다.
+- 🤖 Mock 브라우저에서 100×50/5,000 Tile 전체 채우기를 실행했다. 실제 Canvas는 3200×1600, viewport는 674×575였고 화면 위치에 따라 460~598개 Tile만 DOM에 존재했다. 원거리 scroll 2400/900에서 Object 0개로 줄고, 레이어의 `lockedDoor` 선택 뒤 scroll 4/2로 복귀하며 primary Object가 다시 렌더됨을 확인했다. PLATFORMER 200×100 입력은 20,000칸 경고와 비활성 적용 버튼을 표시했다.
+- 🤖 FE plan/tasks/quickstart를 T116~T117, 총 96개/완료 88개/잔여 8개로 갱신했다. T065는 자동 viewport 회귀와 일반 대형 맵 실측을 확보했지만 500 Object가 실제로 배치된 최대 fixture의 활성 PC 60fps 증거가 남아 있어 완료 처리하지 않았다.
+- 트러블슈팅: GS-T056~GS-T057
+
+### 데이터 안전 복구·활성 탭 성능 진단 고도화 ✅
+
+- 🤖 Jira `S15P21A604-156`과 GitLab Issue #73 범위에서 Backend·Unity·GameProject JSON을 바꾸지 않고 후속 품질 작업을 진행했다. 저장하지 않은 GameProject를 800ms 지연으로 브라우저 로컬 복구 저널에 별도 보관하고, 저장 성공 때만 제거하도록 했다.
+- 🤖 복구본은 schema·gameId·revision을 검증한다. 손상 envelope는 편집기 시작을 막지 않고 제거하며, 서버/브라우저 저장본보다 오래된 revision과 동일 내용은 제안하지 않는다. 복구·폐기·JSON 보관, dirty 화면 이탈 경고, 임시 복구 시각을 한국어 UI로 제공했다.
+- 🤖 기존 단순 FPS 표시는 `성능 점검` 버튼으로 진입할 수 있게 하고, 활성 탭 기준 FPS·p95 frame time·느린 frame 비율을 1초 창으로 함께 표시했다. 비활성 탭에서는 측정을 중지·초기화해 browser throttling 값을 제품 성능으로 오인하지 않게 했다.
+- 🤖 local recovery 4건과 frame summary 3건을 추가해 전체 Frontend **46 files / 259 tests**, lint, production build를 통과했다. 브라우저에서는 `변경 → 임시 복구 시각 → 다른 화면 → 복구 제안 → 복구 → 명시 저장 → 제안 제거`와 `/play?source=local&perf=1`의 3개 성능 지표를 검증했다.
+- 🤖 시각 QA에서 복구 보조 버튼 글자가 배경과 섞이는 문제를 발견해 대비를 교정했다. FE plan/tasks/quickstart는 T114~T115, 총 94개/완료 86개/잔여 8개로 갱신했다.
+- 트러블슈팅: GS-T053~GS-T055
+
+### 제작 생산성 1차 고도화 — Scene·Clipboard·Tile·Collider ✅
+
+- 🤖 최신 GitLab `front`와 Game Studio 코드 branch를 비교해 일반 Frontend 변경 22개와 Game Studio 고유 커밋 5개의 경계를 확인했다. Jira 연결은 GitLab 이관 Issue #73의 `S15P21A604-156`임을 확인하고, Convention에 맞춘 `feat/S15P21A604-156-game-studio-authoring-quality`를 만들어 최신 `front` 위로 기존 Game Studio stack을 충돌 없이 재배치했다.
+- 🤖 World/Dialogue Scene 전체 복제를 추가했다. 새 Scene/Object/Event/Node/Choice 전역 ID를 발급하고 Trigger, Object Action, 자기 Scene 이동, Dialogue next node 참조를 새 ID로 재연결한다. Scene ↑/↓ 정렬은 배열 순서만 바꾸고 `startSceneId`와 Runtime 의미는 유지한다.
+- 🤖 선택 Object/Event 묶음을 Ctrl+C/Ctrl+V로 다른 World Scene에 붙여넣게 했다. Player Spawn·편집 잠금은 제외하고 상대 배치를 유지하며, 대상 맵보다 큰 묶음과 Object/Event 상한 초과는 적용 전에 한국어 오류로 거부한다.
+- 🤖 Tile 도구를 브러시(B), 사각형(R), 연결 영역 채우기(F), 스포이드(I)로 확장했다. 오브젝트가 타일 gesture를 가로막지 않게 편집 모드 pointer 경계를 분리하고, 사각형 preview·빈 타일 지우개 복귀를 제공했다. GameProject 계약을 늘리지 않고 Collider Component Object만 선택적으로 강조하는 충돌 가이드도 추가했다.
+- 🤖 command 테스트 5개를 추가해 Scene/Dialogue 참조 재매핑, cross-Scene Object/Event 복사, Scene 정렬, flood fill 경계를 고정했다. 전체 Frontend **44 files / 252 tests**, lint, production build가 통과했다.
+- 🤖 `VITE_USE_MOCK=true` 브라우저에서 Scene 3→4 복제·정렬, NPC+Event를 다른 Scene에 붙여넣어 Object 4→5 증가, Tile 사각형 12칸·연결 영역 160칸·스포이드·Collider 1개 강조를 직접 검증했다. Console error는 0건이었다. Backend·Unity·GameProject wire/API는 변경하지 않았다.
+- 🤖 FE plan/tasks/quickstart를 T109~T113과 실제 QA 절차로 갱신했다. 총 작업은 92개, 완료 84개, 잔여 8개로 기존 사람 사용성·활성 탭 성능 및 서버 연동 blocker 수는 변하지 않는다.
+- 트러블슈팅: GS-T050~GS-T052
+
 ## 2026-08-24
 
 ### GitLab 이관 전 Game Studio 인수인계 정리 ✅
