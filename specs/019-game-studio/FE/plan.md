@@ -43,7 +43,7 @@ festa-frontend/src/game-studio/
 
 1. **완료 — 순수 코어**: GameProject type/guard, Runtime state, Condition/Action/Event, Dialogue,
    undo/redo, reversible preset recipe, lazy edit/play entry를 PR #47에 구현했다.
-2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, 간단/고급 Inspector, Dialogue editor, 프로젝트별 한국어 guide와 실제 플레이 화면이 보이는 6종 템플릿을 하나의 store에 연결했다. Canvas는 선택 영역·다중 선택·묶음 이동·Event 보존 복제·안전 삭제·화면 이동·격자 전환을 지원하고 Scene 크기를 기존 Tile/Object와 함께 변경한다.
+2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, 간단/고급 Inspector, Dialogue editor, 프로젝트별 한국어 guide와 실제 플레이 화면이 보이는 6종 템플릿을 하나의 store에 연결했다. Canvas는 선택 영역·다중 선택·묶음 이동·Event 보존 복제·안전 삭제·화면 이동·격자 전환을 지원한다. Scene은 내부 참조를 보존해 전체 복제·정렬할 수 있고 Object/Event 묶음은 Scene 사이에 복사·붙여넣을 수 있다. Tile은 브러시·사각형·연결 영역 채우기·스포이드를 제공하며 Collider 가이드를 선택적으로 표시한다. Scene 크기는 기존 Tile/Object와 함께 변경한다.
 3. **완료 — Reference Renderer/Preview**: TOP_DOWN/PLATFORMER renderer, builtin/local Asset resolver, same-origin local Preview route를 같은 Runtime core에 연결했다.
 4. **완료 — Backend adapter**: revision-aware Draft/Publish client, Published loader, schema guard,
    충돌 복구·검증 오류 UI를 구현했다. [BE plan](../BE/plan.md)의 endpoint가 준비되면 환경 플래그로 전환한다.
@@ -67,4 +67,4 @@ festa-frontend/src/game-studio/
 - 프로젝트별 첫 방문 guide, 장르와 무관한 5단계 tutorial, 검색 가능한 시각 재료함, 간단/고급 Inspector, Object Layer 검색·잠금·편집 숨김·z-index 정렬을 PC 제작 UX 기준선으로 유지한다.
 - 760~1039px compact 창에서는 문서 전체 가로 스크롤을 만들지 않고, Shift+F 집중 모드로 양쪽 panel을 숨겨 큰 맵을 편집한다. 권장 작업 폭은 1280px 이상이다.
 - 템플릿 테스트는 제목 차이가 아니라 Scene type, Object preset, Event/Dialogue Action 프로필이 6종 모두 구분되는지 검증한다.
-- 브라우저 제작 QA는 `선택 2개 → 동작 포함 복제 → 묶음 이동`, 선택/화면 이동/격자 상태, 1024px/800px 도구 배치를 포함한다.
+- 브라우저 제작 QA는 `Scene 전체 복제·정렬 → Object/Event Scene 간 복사 → Tile 사각형·연결 영역 채우기·스포이드 → Collider 표시`, 선택 2개·묶음 이동, 선택/화면 이동/격자 상태, 1024px/800px 도구 배치를 포함한다.

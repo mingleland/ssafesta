@@ -6,6 +6,29 @@
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
+## 2026-08-25
+
+### GS-T052. 브라우저 QA를 실 API 모드로 띄우고 종료 중인 Port를 즉시 재사용함 (해결)
+
+- **증상** — 첫 5175 서버에서 게스트 입장이 편집 route로 이어지지 않았고, Mock 모드로 재시작할 때 5175가 사용 중이라 Vite가 5176으로 이동했다.
+- **원인** — Game Studio 편집 route는 회원 전용인데 첫 서버에 `VITE_USE_MOCK=true`를 주지 않았다. 기존 PTY에 Ctrl+C를 보낸 직후 프로세스 종료가 확정되기 전에 같은 Port를 재사용했다.
+- **해결** — 임의 인증 주입이나 route guard 변경 없이 공식 Mock selector로 5176 서버를 띄우고 Google mock callback·테스트 닉네임으로 회원 세션을 만들었다. 실제 선택 Port에서 Scene/Clipboard/Tile/Collider UI를 검증했다.
+- **예방** — 브라우저 QA 명령은 처음부터 quickstart의 Mock 환경변수와 명시 Port를 사용한다. 종료 요청 뒤 session exit 또는 Port 해제를 확인하고, Vite가 대체 Port를 선택하면 브라우저 URL도 출력값 기준으로 바꾼다.
+
+### GS-T051. Vitest 단일 파일 filter에 Frontend workdir 경로를 중복 지정함 (해결)
+
+- **증상** — `festa-frontend`를 작업 디렉터리로 둔 상태에서 `festa-frontend/src/.../authoringCommands.test.ts`를 filter로 넘겨 `No test files found`가 발생했다.
+- **원인** — 저장소 root 기준 파일 경로와 npm 실행 workdir 기준 경로를 혼용했다. Vitest include는 `src/**/*.test.ts`라 앞의 `festa-frontend/`가 중복됐다.
+- **해결** — filter를 `src/game-studio/__tests__/unit/authoringCommands.test.ts`로 수정해 11개를 통과시키고, 이후 전체 44 files / 252 tests를 다시 실행했다.
+- **예방** — npm script를 하위 workdir에서 실행할 때 filter와 fixture 경로는 그 workdir 상대 경로로 표기한다. 단일 테스트 성공 뒤 반드시 filter 없는 전체 suite를 실행한다.
+
+### GS-T050. 최신 GitLab fetch에서 저장소 단위 safe.directory를 첫 호출에 누락함 (해결)
+
+- **증상** — 최신 `front` 확인을 위한 승인된 `git fetch gitlab --prune`이 `detected dubious ownership`으로 중단됐다.
+- **원인** — 기존 GS-T046의 재발 방지 규칙을 알고 있었지만 첫 승인 명령에 명령 단위 `safe.directory`를 포함하지 않았다. Sandbox 소유 worktree와 승인 명령 사용자가 달랐다.
+- **해결** — 전역 Git 설정을 바꾸지 않고 `git -c safe.directory=<현재 Game Studio worktree> fetch gitlab --prune`으로 다시 실행해 최신 ref를 회수했다.
+- **예방** — 이 두 Game Studio worktree의 escalated Git 호출은 처음부터 저장소 절대경로를 포함한 `git -c safe.directory=...` 형태로만 실행한다. 재시도 절차가 아니라 기본 명령 템플릿으로 고정한다.
+
 ## 2026-08-24
 
 ### GS-T047. 공유 worktree object store의 임시 객체를 이관 원본으로 오인할 위험 (해결)

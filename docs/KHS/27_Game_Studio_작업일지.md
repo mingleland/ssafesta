@@ -7,6 +7,19 @@
 > Game Studio 작업과 문제는 각각 `27_Game_Studio_작업일지.md`,
 > `28_Game_Studio_트러블슈팅.md`에만 기록한다.
 
+## 2026-08-25
+
+### 제작 생산성 1차 고도화 — Scene·Clipboard·Tile·Collider ✅
+
+- 🤖 최신 GitLab `front`와 Game Studio 코드 branch를 비교해 일반 Frontend 변경 22개와 Game Studio 고유 커밋 5개의 경계를 확인했다. Jira 연결은 GitLab 이관 Issue #73의 `S15P21A604-156`임을 확인하고, Convention에 맞춘 `feat/S15P21A604-156-game-studio-authoring-quality`를 만들어 최신 `front` 위로 기존 Game Studio stack을 충돌 없이 재배치했다.
+- 🤖 World/Dialogue Scene 전체 복제를 추가했다. 새 Scene/Object/Event/Node/Choice 전역 ID를 발급하고 Trigger, Object Action, 자기 Scene 이동, Dialogue next node 참조를 새 ID로 재연결한다. Scene ↑/↓ 정렬은 배열 순서만 바꾸고 `startSceneId`와 Runtime 의미는 유지한다.
+- 🤖 선택 Object/Event 묶음을 Ctrl+C/Ctrl+V로 다른 World Scene에 붙여넣게 했다. Player Spawn·편집 잠금은 제외하고 상대 배치를 유지하며, 대상 맵보다 큰 묶음과 Object/Event 상한 초과는 적용 전에 한국어 오류로 거부한다.
+- 🤖 Tile 도구를 브러시(B), 사각형(R), 연결 영역 채우기(F), 스포이드(I)로 확장했다. 오브젝트가 타일 gesture를 가로막지 않게 편집 모드 pointer 경계를 분리하고, 사각형 preview·빈 타일 지우개 복귀를 제공했다. GameProject 계약을 늘리지 않고 Collider Component Object만 선택적으로 강조하는 충돌 가이드도 추가했다.
+- 🤖 command 테스트 5개를 추가해 Scene/Dialogue 참조 재매핑, cross-Scene Object/Event 복사, Scene 정렬, flood fill 경계를 고정했다. 전체 Frontend **44 files / 252 tests**, lint, production build가 통과했다.
+- 🤖 `VITE_USE_MOCK=true` 브라우저에서 Scene 3→4 복제·정렬, NPC+Event를 다른 Scene에 붙여넣어 Object 4→5 증가, Tile 사각형 12칸·연결 영역 160칸·스포이드·Collider 1개 강조를 직접 검증했다. Console error는 0건이었다. Backend·Unity·GameProject wire/API는 변경하지 않았다.
+- 🤖 FE plan/tasks/quickstart를 T109~T113과 실제 QA 절차로 갱신했다. 총 작업은 92개, 완료 84개, 잔여 8개로 기존 사람 사용성·활성 탭 성능 및 서버 연동 blocker 수는 변하지 않는다.
+- 트러블슈팅: GS-T050~GS-T052
+
 ## 2026-08-24
 
 ### GitLab 이관 전 Game Studio 인수인계 정리 ✅
