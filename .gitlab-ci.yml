@@ -12,6 +12,21 @@
 
 workflow:
   rules:
+    # ⛔ 2026-08-25 — 파이프라인 생성 정지 (러너 없음 · Jira 는 내장 연동으로 전환)
+    #
+    # 이 프로젝트에는 활성 러너가 없다(실측: 러너 0개 · pending 파이프라인 10건 이상).
+    # 러너가 없으면 어떤 잡도 실행되지 않고 파이프라인만 무한정 쌓인다.
+    # Jira 상태 동기화는 GitLab 내장 Jira 연동(Settings → Integrations → Jira issues)이
+    # 담당하므로 아래 sync 잡들은 지금 필요하지 않다 — 오히려 러너가 붙는 순간
+    # 내장 연동과 **같은 이슈를 두 번 전환**한다.
+    #
+    # 잡 정의는 그대로 보존한다 (구조 삭제 금지 — docs/jira-gitlab-workflow.md §6).
+    # 러너를 등록할 때 할 일:
+    #   1) 이 `when: never` 규칙 한 줄을 지운다
+    #   2) jira-sync-* 잡을 삭제하거나, 내장 연동의 transition 값을 비운다 (이중 전환 방지)
+    - when: never
+
+    # ↓ 러너 확보 후 사용할 원래 규칙 (위 규칙이 있는 동안은 도달하지 않는다)
     # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
