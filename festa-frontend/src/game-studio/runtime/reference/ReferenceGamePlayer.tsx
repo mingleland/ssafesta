@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { findScene, type GameProject } from '../../contracts/gameProject.ts';
+import { DEFAULT_GAME_RULES, findScene, type GameObjective, type GameProject } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
 import { findPresetDefinition } from '../../studio/model/authoringRegistry.ts';
@@ -7,10 +7,12 @@ import { SpriteAnimationPreview } from '../../studio/ui/SpriteAnimationPreview.t
 import { resolveTilesetVisual, tileBackgroundStyle } from '../../studio/assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../../studio/assets/staticImageVisual.ts';
 import type { GameSessionPort } from '../ports/gameSessionPort.ts';
+import { summarizeFramePerformance, type FramePerformanceSummary } from './framePerformance.ts';
 import {
   chooseReferenceDialogue,
   interactReferencePlayer,
   moveReferencePlayer,
+  objectiveProgress,
   shootReferenceProjectile,
   startReferenceRuntime,
   tickReferenceWorld,
@@ -24,6 +26,7 @@ interface ReferenceGamePlayerProps {
   readonly sessionPort: GameSessionPort;
   readonly assetUrls?: Readonly<Record<string, string>>;
   readonly onExit: () => void;
+  readonly showPerformanceMonitor?: boolean;
 }
 
 const keyDirection = (key: string): MoveDirection | null => {
@@ -34,11 +37,23 @@ const keyDirection = (key: string): MoveDirection | null => {
   return null;
 };
 
-export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit }: ReferenceGamePlayerProps) => {
+const objectiveCopy = (objective: GameObjective): string => {
+  if (objective.type === 'SCORE_AT_LEAST') return `${objective.target.toLocaleString('ko-KR')}점 달성`;
+  if (objective.type === 'DEFEAT_ENEMIES') return `적 ${objective.target.toLocaleString('ko-KR')}명 처치`;
+  return `${objective.target.toLocaleString('ko-KR')}초 생존`;
+};
+
+export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit, showPerformanceMonitor = false }: ReferenceGamePlayerProps) => {
   const [runtime, setRuntime] = useState(() => startReferenceRuntime(project));
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [framePerformance, setFramePerformance] = useState<FramePerformanceSummary | null>(null);
+  const [performanceTabActive, setPerformanceTabActive] = useState(() => (
+    typeof document === 'undefined' || document.visibilityState === 'visible'
+  ));
   const completionReported = useRef(false);
+  const sessionTokenRef = useRef<string | null>(null);
+  const sessionEndedRef = useRef(false);
   const scene = findScene(project, runtime.session.currentSceneId);
   const activeDialogue = getActiveDialogue(project, runtime.session);
   const choices = activeDialogue === null ? [] : getAvailableDialogueChoices(project, runtime.session);
@@ -57,18 +72,38 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   const canShoot = scene !== undefined && scene.type !== 'DIALOGUE' && scene.objects.some((object) => (
     object.preset === 'PLAYER_SPAWN' && object.components.some((component) => component.type === 'SHOOTER')
   ));
+  const completionRules = (project.rules ?? DEFAULT_GAME_RULES).completion;
 
   useEffect(() => {
     let active = true;
+    sessionEndedRef.current = false;
+    sessionTokenRef.current = null;
+    setSessionToken(null);
+    setSessionError(null);
     sessionPort.start({ gameId: project.gameId, mode })
-      .then((result) => { if (active) setSessionToken(result.sessionToken); })
+      .then((result) => {
+        if (!active) {
+          void sessionPort.exit(result.sessionToken).catch(() => undefined);
+          return;
+        }
+        sessionTokenRef.current = result.sessionToken;
+        setSessionToken(result.sessionToken);
+      })
       .catch((error: unknown) => { if (active) setSessionError(error instanceof Error ? error.message : '게임 세션을 시작하지 못했습니다.'); });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      const token = sessionTokenRef.current;
+      if (token !== null && !sessionEndedRef.current) {
+        sessionEndedRef.current = true;
+        void sessionPort.exit(token).catch(() => undefined);
+      }
+    };
   }, [mode, project.gameId, sessionPort]);
 
   useEffect(() => {
     if (runtime.session.status !== 'COMPLETED' || sessionToken === null || completionReported.current) return;
     completionReported.current = true;
+    sessionEndedRef.current = true;
     void sessionPort.complete(sessionToken).catch((error: unknown) => {
       setSessionError(error instanceof Error ? error.message : '완료 결과를 전송하지 못했습니다.');
     });
@@ -105,12 +140,58 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     return () => window.clearInterval(timer);
   }, [activeDialogue, project, runtime.session.status, scene?.type]);
 
+  useEffect(() => {
+    if (!showPerformanceMonitor) {
+      setFramePerformance(null);
+      return undefined;
+    }
+    let frameId = 0;
+    let frameDurations: number[] = [];
+    let measuredAt = performance.now();
+    let previousFrameAt: number | null = null;
+    const resetWindow = (now: number) => {
+      frameDurations = [];
+      measuredAt = now;
+      previousFrameAt = null;
+    };
+    const onVisibilityChange = () => {
+      const active = document.visibilityState === 'visible';
+      setPerformanceTabActive(active);
+      resetWindow(performance.now());
+      if (!active) setFramePerformance(null);
+    };
+    const measure = (now: number) => {
+      if (document.visibilityState === 'visible') {
+        if (previousFrameAt !== null) frameDurations.push(now - previousFrameAt);
+        previousFrameAt = now;
+        const elapsed = now - measuredAt;
+        if (elapsed >= 1_000) {
+          setFramePerformance(summarizeFramePerformance(frameDurations, elapsed));
+          resetWindow(now);
+        }
+      } else {
+        previousFrameAt = null;
+      }
+      frameId = window.requestAnimationFrame(measure);
+    };
+    setPerformanceTabActive(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    frameId = window.requestAnimationFrame(measure);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [showPerformanceMonitor]);
+
   const inventory = useMemo(() => [...runtime.session.inventory].map((itemId) => (
     project.items.find((item) => item.id === itemId)?.name ?? itemId
   )), [project.items, runtime.session.inventory]);
 
   const exit = () => {
-    if (sessionToken !== null && runtime.session.status === 'PLAYING') void sessionPort.exit(sessionToken);
+    if (sessionToken !== null && !sessionEndedRef.current) {
+      sessionEndedRef.current = true;
+      void sessionPort.exit(sessionToken).catch(() => undefined);
+    }
     onExit();
   };
 
@@ -122,7 +203,25 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     <main className="grp-root" data-game-studio-runtime="reference">
       <header className="grp-topbar">
         <div><span className="grp-brand">F</span><strong>{project.title}</strong><em>{mode === 'PREVIEW' ? 'PLAY TEST' : 'FESTA GAME'}</em></div>
-        <div><span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong></div>
+        <div>
+          <span>Scene</span><strong>{scene?.name ?? runtime.session.currentSceneId}</strong>
+          {showPerformanceMonitor && (!performanceTabActive
+            ? <em className="is-low">비활성 탭 · 측정 일시정지</em>
+            : framePerformance === null
+              ? <em>성능 측정 준비</em>
+              : (
+                <span
+                  aria-label={`성능 측정 FPS ${framePerformance.fps}, 95퍼센타일 ${framePerformance.p95FrameMs}밀리초, 느린 프레임 ${framePerformance.slowFramePercent}퍼센트`}
+                  className="grp-perf-monitor"
+                  role="status"
+                  title="활성 탭에서 1초 단위로 측정합니다. 목표: 55fps 이상, p95 18.2ms 이하, 느린 프레임 5% 이하"
+                >
+                  <em className={framePerformance.meetsTarget ? 'is-good' : 'is-low'}>FPS {framePerformance.fps}</em>
+                  <em className={framePerformance.p95FrameMs <= 1_000 / 55 ? 'is-good' : 'is-low'}>p95 {framePerformance.p95FrameMs}ms</em>
+                  <em className={framePerformance.slowFramePercent <= 5 ? 'is-good' : 'is-low'}>끊김 {framePerformance.slowFramePercent}%</em>
+                </span>
+              ))}
+        </div>
         <button onClick={exit} type="button">게임 나가기 ×</button>
       </header>
 
@@ -237,12 +336,29 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
           </section>
         )}
         {runtime.session.status === 'FAILED' && (
-          <section className="grp-result is-error"><span>!</span><h1>게임 실행 오류</h1><p>{runtime.session.failure?.message}</p><button onClick={exit} type="button">편집기로 돌아가기</button></section>
+          <section className="grp-result is-error">
+            <span>!</span>
+            <h1>{runtime.session.failure?.code === 'PLAYER_DEFEATED' ? '도전 실패' : '게임 실행 오류'}</h1>
+            <p>{runtime.session.failure?.message}</p>
+            {runtime.session.failure?.code === 'PLAYER_DEFEATED'
+              ? <div><button onClick={() => setRuntime(startReferenceRuntime(project))} type="button">다시 도전</button><button onClick={exit} type="button">게임 나가기</button></div>
+              : <button onClick={exit} type="button">편집기로 돌아가기</button>}
+          </section>
         )}
       </section>
 
       <aside className="grp-hud">
         <div className="grp-player-stats"><span>상태</span><strong>♥ {runtime.playerHealth} / {runtime.maxPlayerHealth}</strong><strong>★ {runtime.score.toLocaleString('ko-KR')}점</strong></div>
+        {completionRules.objectives.length > 0 && (
+          <div className="grp-objectives">
+            <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
+            {completionRules.objectives.map((objective) => {
+              const progress = objectiveProgress(runtime, objective);
+              const completed = progress >= objective.target;
+              return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
+            })}
+          </div>
+        )}
         <div><span>INVENTORY</span>{inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}</div>
         <div className="grp-controls"><span>{scene?.type === 'PLATFORMER' ? '이동 / 점프' : '이동'}</span><div><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'UP'))} type="button">↑</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'LEFT'))} type="button">←</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'DOWN'))} type="button">↓</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'RIGHT'))} type="button">→</button></div></div>
         <button className="grp-interact" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => interactReferencePlayer(project, current))} type="button"><kbd>E</kbd> 상호작용</button>

@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import type { Component, GameObject, GameProject, WorldScene } from '../../contracts/gameProject.ts';
+import { useEffect, useRef, useState } from 'react';
+import { GAME_PROJECT_LIMITS, type Component, type GameObject, type GameProject, type WorldScene } from '../../contracts/gameProject.ts';
 import { assetDisplayLabel, findBuiltinSpriteSheet, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import {
@@ -10,12 +10,14 @@ import {
   removeObject,
   renameScene,
   replaceComponent,
+  resizeWorldScene,
   setTopDownBackground,
   setObjectVisible,
 } from '../model/authoringCommands.ts';
 import { COMPONENT_LABELS, findPresetDefinition } from '../model/authoringRegistry.ts';
+import { AssetPickerModal } from './AssetPickerModal.tsx';
 import { CommitInput } from './CommitInput.tsx';
-import { SpriteAnimationPreview } from './SpriteAnimationPreview.tsx';
+import { SpriteAnimationInspector } from './SpriteAnimationInspector.tsx';
 
 interface InspectorPanelProps {
   readonly project: GameProject;
@@ -42,7 +44,21 @@ export const InspectorPanel = ({
   onReplaceSprite,
 }: InspectorPanelProps) => {
   const [componentToAdd, setComponentToAdd] = useState<Component['type']>('SPRITE');
+  const [advanced, setAdvanced] = useState(false);
+  const [showAssetPicker, setShowAssetPicker] = useState(false);
+  const [sceneSizeDraft, setSceneSizeDraft] = useState({ width: scene.width, height: scene.height });
   const replaceSpriteInput = useRef<HTMLInputElement>(null);
+  const sceneSizeCells = Math.round(sceneSizeDraft.width) * Math.round(sceneSizeDraft.height);
+  const sceneSizeTooLarge = sceneSizeCells > GAME_PROJECT_LIMITS.maxTileCellsPerLayer;
+
+  useEffect(() => {
+    setAdvanced(false);
+    setShowAssetPicker(false);
+  }, [selectedObject?.id]);
+
+  useEffect(() => {
+    setSceneSizeDraft({ width: scene.width, height: scene.height });
+  }, [scene.height, scene.id, scene.width]);
 
   if (selectedObject === null) {
     return (
@@ -71,6 +87,42 @@ export const InspectorPanel = ({
             ))}
           </select>
         </label>
+        <div className="gss-section-title"><span>맵 크기</span><small>오브젝트와 타일은 안전하게 유지됩니다</small></div>
+        <div className="gss-field-row">
+          <label className="gss-field">
+            <span>가로 칸</span>
+            <input
+              max={scene.type === 'PLATFORMER' ? 200 : 100}
+              min={scene.type === 'PLATFORMER' ? 8 : 4}
+              onChange={(event) => setSceneSizeDraft((current) => ({ ...current, width: Number(event.target.value) }))}
+              type="number"
+              value={sceneSizeDraft.width}
+            />
+          </label>
+          <label className="gss-field">
+            <span>세로 칸</span>
+            <input
+              max={100}
+              min={scene.type === 'PLATFORMER' ? 6 : 4}
+              onChange={(event) => setSceneSizeDraft((current) => ({ ...current, height: Number(event.target.value) }))}
+              type="number"
+              value={sceneSizeDraft.height}
+            />
+          </label>
+        </div>
+        {sceneSizeTooLarge && (
+          <p className="gss-field-warning" role="alert">
+            현재 {sceneSizeCells.toLocaleString('ko-KR')}칸입니다. 저장 가능한 최대 크기는 {GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸입니다.
+          </p>
+        )}
+        <button
+          className="gss-secondary-wide"
+          disabled={!Number.isFinite(sceneSizeDraft.width) || !Number.isFinite(sceneSizeDraft.height)
+            || sceneSizeTooLarge
+            || (sceneSizeDraft.width === scene.width && sceneSizeDraft.height === scene.height)}
+          onClick={() => onApply(resizeWorldScene(project, scene.id, sceneSizeDraft.width, sceneSizeDraft.height))}
+          type="button"
+        >맵 크기 적용</button>
         <div className="gss-info-grid">
           <span>Scene ID</span><strong>{scene.id}</strong>
           <span>맵 크기</span><strong>{scene.width} × {scene.height}</strong>
@@ -106,10 +158,16 @@ export const InspectorPanel = ({
           <span className="gss-eyebrow">OBJECT</span>
           <h2>{definition.label}</h2>
         </div>
-        <span className="gss-object-symbol" aria-hidden="true">{definition.icon}</span>
+        <button className="gss-mode-toggle" onClick={() => setAdvanced((current) => !current)} type="button">
+          {advanced ? '간단 설정으로' : '고급 설정'}
+        </button>
       </div>
-      <div className="gss-id-chip">{selectedObject.id}</div>
-      <div className="gss-field-row">
+      <div className="gss-help-card gss-help-card--compact">
+        <strong>{advanced ? '위치·구성 요소까지 직접 조정합니다' : '모습과 동작만 바꾸면 바로 플레이할 수 있습니다'}</strong>
+        <p>{advanced ? 'ID와 좌표, 표시 순서, 구성 요소 추가·삭제를 사용할 수 있습니다.' : '세부 좌표와 기술 설정은 숨겨 두었습니다. 필요할 때만 고급 설정을 여세요.'}</p>
+      </div>
+      {advanced && <div className="gss-id-chip">오브젝트 ID · {selectedObject.id}</div>}
+      {advanced && <div className="gss-field-row">
         <label className="gss-field">
           <span>X</span>
           <input
@@ -142,7 +200,7 @@ export const InspectorPanel = ({
             value={selectedObject.position.y}
           />
         </label>
-      </div>
+      </div>}
       <label className="gss-check-row">
         <input
           checked={selectedObject.visible}
@@ -158,57 +216,49 @@ export const InspectorPanel = ({
       </label>
 
       <div className="gss-section-title">
-        <span>COMPONENTS</span>
-        <small>{selectedObject.components.length}/10</small>
+        <span>{advanced ? '구성 요소' : '모습과 동작'}</span>
+        {advanced && <small>{selectedObject.components.length}/10</small>}
       </div>
       {selectedObject.components.length === 0 && (
-        <div className="gss-empty-inline">Component를 추가해 동작을 정의하세요.</div>
+        <div className="gss-empty-inline">고급 설정에서 동작을 추가할 수 있습니다.</div>
       )}
       {selectedObject.components.map((component) => (
         <article className="gss-component-card" key={component.type}>
           <header>
             <strong>{COMPONENT_LABELS[component.type]}</strong>
-            <button
-              aria-label={`${COMPONENT_LABELS[component.type]} Component 제거`}
+            {advanced && <button
+              aria-label={`${COMPONENT_LABELS[component.type]} 구성 요소 제거`}
               className="gss-icon-button"
               onClick={() => onApply(removeComponent(project, scene.id, selectedObject.id, component.type))}
               type="button"
-            >×</button>
+            >×</button>}
           </header>
           {component.type === 'SPRITE' && (
             <>
               {spriteSheet !== undefined && (
-                <div className="gss-animation-card">
-                  <SpriteAnimationPreview sheet={spriteSheet} size={74} />
-                  <div><strong>{spriteSheet.label}</strong><small>{spriteSheet.clips.length}개 애니메이션 clip</small></div>
-                </div>
+                <SpriteAnimationInspector sheet={spriteSheet} />
               )}
               {spriteSheet === undefined && staticSprite !== null && (
                 <div className="gss-custom-asset-preview"><span aria-label="이미지 미리보기" role="img" style={staticImageBackgroundStyle(staticSprite)} /></div>
               )}
-              <label className="gss-field">
-                <span>이미지 자산</span>
-                <select
-                  onChange={(event) => replace({ type: 'SPRITE', assetId: event.target.value })}
-                  value={component.assetId}
-                >
-                  {project.assets.filter((asset) => asset.kind === 'IMAGE').map((asset) => (
-                    <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="gss-field-row">
+              <button className="gss-open-asset-picker" onClick={() => setShowAssetPicker(true)} type="button">
+                <span>현재 모습</span>
+                <strong>{spriteAsset === undefined ? '이미지 선택' : assetDisplayLabel(spriteAsset)}</strong>
+                <em>재료함에서 바꾸기</em>
+              </button>
+              <div className={advanced ? 'gss-field-row' : ''}>
                 <label className="gss-field">
-                  <span>크기 %</span>
-                  <input
+                  <span>보이는 크기 · {component.scale ?? 100}%</span>
+                  <input aria-label="오브젝트 크기"
                     max={400}
                     min={25}
                     onChange={(event) => replace({ ...component, scale: Number(event.target.value) })}
-                    type="number"
+                    step={5}
+                    type="range"
                     value={component.scale ?? 100}
                   />
                 </label>
-                <label className="gss-field">
+                {advanced && <label className="gss-field">
                   <span>표시 순서</span>
                   <input
                     max={20}
@@ -217,9 +267,9 @@ export const InspectorPanel = ({
                     type="number"
                     value={component.zIndex ?? 2}
                   />
-                </label>
+                </label>}
               </div>
-              <button className="gss-replace-asset-button" onClick={() => replaceSpriteInput.current?.click()} type="button">내 이미지로 이 Sprite만 교체</button>
+              <button className="gss-replace-asset-button" onClick={() => replaceSpriteInput.current?.click()} type="button">내 이미지로 이 오브젝트만 바꾸기</button>
               <input
                 accept="image/png,image/jpeg,image/gif,image/webp"
                 hidden
@@ -285,7 +335,7 @@ export const InspectorPanel = ({
           )}
         </article>
       ))}
-      <div className="gss-inline-actions">
+      {advanced && <div className="gss-inline-actions">
         <select onChange={(event) => setComponentToAdd(event.target.value as Component['type'])} value={componentToAdd}>
           {COMPONENT_TYPES.map((type) => (
             <option disabled={usedTypes.has(type)} key={type} value={type}>+ {COMPONENT_LABELS[type]}</option>
@@ -296,8 +346,8 @@ export const InspectorPanel = ({
           onClick={() => onApply(addComponent(project, scene.id, selectedObject.id, componentToAdd))}
           type="button"
         >추가</button>
-      </div>
-      <button
+      </div>}
+      {advanced && <button
         className="gss-danger-button"
         disabled={removableReason !== null}
         onClick={() => {
@@ -306,7 +356,17 @@ export const InspectorPanel = ({
         }}
         title={removableReason ?? '오브젝트 삭제'}
         type="button"
-      >오브젝트 삭제</button>
+      >오브젝트 삭제</button>}
+      {showAssetPicker && sprite?.type === 'SPRITE' && (
+        <AssetPickerModal
+          assetUrls={assetUrls}
+          currentAssetId={sprite.assetId}
+          onClose={() => setShowAssetPicker(false)}
+          onSelect={(assetId) => replace({ ...sprite, assetId })}
+          onUpload={onReplaceSprite}
+          project={project}
+        />
+      )}
     </div>
   );
 };

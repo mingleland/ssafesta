@@ -3,6 +3,7 @@ import { parseGameProject, type GameProject } from '../../contracts/gameProject.
 export interface DraftSaveReceipt {
   readonly savedAt: string;
   readonly revision: number;
+  readonly warnings?: readonly string[];
 }
 
 export interface GameDraftRepository {
@@ -28,7 +29,7 @@ export const createLocalDraftRepository = (
   save: async (project) => {
     const validated = parseGameProject(project);
     storage.setItem(storageKey(project.gameId), JSON.stringify(validated));
-    return { savedAt: now().toISOString(), revision: validated.revision };
+    return { savedAt: now().toISOString(), revision: validated.revision, warnings: [] };
   },
 });
 

@@ -113,4 +113,43 @@ describe('GameProject v1 contract', () => {
   it('exposes a non-throwing type guard', () => {
     expect(isGameProject({ schemaVersion: '1.0.0' })).toBe(false);
   });
+
+  it('accepts v1.1 completion rules while continuing to accept v1.0 projects', () => {
+    const project = {
+      ...cloneMinimalGameProject(),
+      schemaVersion: '1.1.0',
+      rules: {
+        completion: {
+          mode: 'ALL',
+          objectives: [
+            { type: 'SCORE_AT_LEAST', target: 500 },
+            { type: 'SURVIVE_SECONDS', target: 30 },
+          ],
+        },
+        playerDefeat: 'END_GAME',
+      },
+    };
+
+    expect(parseGameProject(project)).toBe(project);
+    expect(parseGameProject(cloneMinimalGameProject())).toEqual(minimalGameProject);
+  });
+
+  it('requires valid, unique v1.1 objectives', () => {
+    const base = cloneMinimalGameProject();
+    expectContractError({ ...base, schemaVersion: '1.1.0' }, 'GAME_PROJECT_INVALID');
+    expectContractError({
+      ...base,
+      schemaVersion: '1.1.0',
+      rules: {
+        completion: {
+          mode: 'ALL',
+          objectives: [
+            { type: 'DEFEAT_ENEMIES', target: 1 },
+            { type: 'DEFEAT_ENEMIES', target: 2 },
+          ],
+        },
+        playerDefeat: 'RESPAWN',
+      },
+    }, 'GAME_RULE_DUPLICATE_OBJECTIVE');
+  });
 });
