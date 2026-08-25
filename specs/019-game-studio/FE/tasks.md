@@ -121,10 +121,12 @@ FE가 소유하는 94개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T113 Verify the authoring quality pass with command tests, full FE regression, build/lint, and browser gestures
 - [x] T114 Add an editor-only local recovery journal, dirty-exit guard, and explicit restore/discard/JSON backup UX
 - [x] T115 Add an active-tab performance check with FPS, p95 frame time, slow-frame ratio, and visibility pause semantics
+- [x] T116 Render large maps at an editable cell scale and cull off-screen Object/Tile DOM with layer-to-object focus navigation
+- [x] T117 Keep authoring map area within the current 10,000-cell TileLayer contract and surface the limit before applying an invalid size ([GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101))
 
 ## Summary
 
-- Total: 94
-- Completed: 86
+- Total: 96
+- Completed: 88
 - Remaining: 8
 - Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 GitLab #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다. GitLab 이관은 완료됐으며 [KHS 29](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의 이관 기록과 Jira 기반 브랜치 규칙을 따른다.

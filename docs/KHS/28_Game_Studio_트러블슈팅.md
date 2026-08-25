@@ -8,6 +8,20 @@
 
 ## 2026-08-25
 
+### GS-T057. PLATFORMER 최대 크기와 TileLayer 저장 상한이 달라 레이어 추가 시 계약 오류가 발생함 (FE 차단, 계약 결정 대기)
+
+- **증상** — PLATFORMER width/height는 각각 200×100까지 허용하지만 JSON Schema와 Frontend validator의 TileLayer `data`는 10,000개가 상한이다. 200×100 빈 Scene은 만들어지지만 Tile Layer 추가 순간 20,000개 배열이 생성되어 저장·검증이 실패한다.
+- **원인** — Scene 축별 크기 상한과 row-major TileLayer 배열 상한을 서로 독립적으로 정했고 `width×height` 조합 제약을 Authoring에 두지 않았다.
+- **해결** — Backend wire/schema 상한을 일방적으로 20,000으로 늘리지 않았다. 공통 `maxTileCellsPerLayer=10,000`을 validator와 Authoring command가 함께 사용하고 Inspector는 초과 cell 수를 한국어로 표시하며 적용을 비활성화한다. imported large Scene의 레이어 추가도 같은 설명으로 거부한다. 200×50 유효 경계와 200×100 거부를 unit test로 고정했다.
+- **예방** — 축별 크기, 직렬화 배열 크기, JSON byte, DB 저장 비용은 하나의 limit matrix로 검토한다. 20,000칸을 지원하려면 FE만 바꾸지 않고 shared schema·Backend validator·부하 기준을 [GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101)에서 승인한다.
+
+### GS-T056. 큰 맵을 작은 카드에 압축하고 모든 Object·Tile DOM을 동시에 생성함 (해결)
+
+- **증상** — Scene width가 커져도 Canvas 폭은 610~1240px에 머물러 한 칸이 몇 px로 줄었고, 최대 500 Object button과 최대 10,000 Tile span을 화면 밖까지 한 번에 만들었다. 배치 위치를 읽기 어렵고 scroll·선택 render 비용도 맵 전체에 비례했다.
+- **원인** — zoom을 실제 cell 크기가 아니라 고정 stage의 백분율로 적용했고, Canvas가 scroll viewport의 grid 범위를 알지 못했다. Object layer도 검색 결과 500개 article을 즉시 렌더했다.
+- **해결** — stage 폭을 `Scene width×32px×zoom`으로 계산하고 작은 맵만 480px 최소 폭을 사용한다. `ResizeObserver`와 scroll frame에서 visible grid를 계산해 2칸 overscan Object/Tile만 렌더하고, 레이어 선택으로 원거리 Object를 중앙 탐색한다. 레이어 목록은 검색 정합성을 유지하며 80개 단위로 표시한다. 100×50/5,000 Tile 브라우저 실측에서 전체 5,000개 대신 위치별 460~598개 span만 생성됐다.
+- **예방** — 대형 편집기 성능 테스트는 reducer 시간뿐 아니라 Canvas pixel 크기, viewport/scroll 범위, 실제 Object/Tile DOM 수, 화면 밖 선택 복귀를 함께 측정한다.
+
 ### GS-T055. 광범위한 `Reference/` ignore 규칙이 신규 Runtime 성능 파일을 첫 커밋에서 숨김 (해결)
 
 - **증상** — 성능 요약 테스트와 수정된 Runtime은 커밋됐지만 새 `runtime/reference/framePerformance.ts`가 commit stat에 없었다. 일반 `git status`에도 ignored untracked 파일이라 나타나지 않아 그대로 push하면 import 대상이 누락될 상태였다.

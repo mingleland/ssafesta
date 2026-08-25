@@ -23,7 +23,7 @@ npm run build
 npm run lint
 ```
 
-현재 Authoring Quality 브랜치 기준은 test 46 files/259 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
+현재 Authoring Quality 브랜치 기준은 test 47 files/264 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
 분리된 lazy chunk인지 함께 확인한다.
 
 ## 3. Backend 없이 편집·플레이 확인
@@ -53,7 +53,10 @@ npm run dev -- --host 127.0.0.1 --port 5174
 16. Mock 모드에서 `게시하기`를 누르고 `게시본 확인 v1`으로 `/app/games/123/play`에 진입한다. 제목·Scene·목표 HUD가 방금 게시한 snapshot과 같아야 하며 다시 게시하면 v2가 된다.
 17. 저장하지 않은 제목 또는 배치를 만든 뒤 1초 안에 `임시 복구 HH:mm`이 보이는지 확인한다. 다른 FESTA 화면으로 나갔다 편집기를 다시 열면 저장본은 그대로 유지되고 `로컬 안전 복구`에서 복구·폐기·JSON 보관을 선택할 수 있어야 한다. 복구 뒤 명시 저장하면 안내가 재발하지 않아야 한다.
 18. 편집기의 `성능 점검`은 `/play?source=local&perf=1`로 진입해 활성 탭 FPS, p95 frame time, 느린 frame 비율을 표시한다. 목표는 55fps 이상, p95 18.2ms 이하, 느린 frame 5% 이하이며 비활성 탭에서는 측정 일시정지가 보여야 한다.
-19. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
+19. 100×50 맵을 적용하면 Canvas가 3200×1600 작업 공간으로 펼쳐지고 중앙 영역만 scroll되는지 확인한다. 5,000 Tile 전체 채우기 뒤 화면 badge와 실제 `.gss-tile-layer > span` 수가 전체 5,000개가 아니라 viewport 주변 수백 개로 유지되어야 한다.
+20. 큰 맵의 먼 위치로 이동한 뒤 레이어 검색에서 화면 밖 Object를 선택하면 Canvas가 해당 위치로 자동 이동해야 한다. 레이어가 80개를 넘으면 `더 보기`로 점진 표시되며 검색은 아직 표시하지 않은 Object까지 포함해야 한다.
+21. PLATFORMER 크기에 200×100을 입력하면 `현재 20,000칸`과 10,000칸 저장 한도가 표시되고 적용 버튼이 비활성화되어야 한다. 200×50은 적용 가능해야 한다.
+22. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
 
 사람 대상 20분 검증 기록지는 [usability-test.md](usability-test.md)를 사용한다.
 

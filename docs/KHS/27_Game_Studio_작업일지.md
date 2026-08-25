@@ -9,6 +9,17 @@
 
 ## 2026-08-25
 
+### 대형 맵 편집 성능·공간 탐색 고도화 ✅
+
+- 🤖 고정 폭에 맵 전체를 압축하던 Canvas를 32px cell×zoom 기반 실제 작업 공간으로 바꿨다. 100×50 맵은 3200×1600으로 펼쳐지며 중앙 Canvas만 scroll되어 Scene/속성 panel 배치를 오염시키지 않는다.
+- 🤖 scroll/resize와 zoom 변화에서 보이는 grid 범위를 계산하고 2칸 overscan을 더해 화면 주변 Object와 Tile만 DOM에 만든다. 선택한 primary Object는 측정 전에도 보존하며 레이어 검색에서 화면 밖 Object를 고르면 해당 좌표가 viewport 중앙으로 이동한다.
+- 🤖 최대 500개 Object 레이어 목록은 검색 대상을 줄이지 않은 채 80개 단위로 점진 표시한다. 큰 맵에서도 검색·잠금·숨김·z-order 조작이 한 번에 500개 article을 만들지 않는다.
+- 🤖 PLATFORMER가 200×100 크기를 허용하지만 shared schema의 TileLayer가 10,000칸까지만 저장하는 기존 불일치를 확인했다. Wire 계약을 임의 확대하지 않고 Authoring에서 가로×세로 10,000칸을 넘는 입력을 한국어로 안내·차단하고 command에도 동일 guard를 두었다. 20,000칸 지원 결정은 FE/BE/AI 공동 [GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101)로 분리하고 @ejraks1548·@dream_hyeon·@colosair를 본문에 태그했다.
+- 🤖 viewport 계산·overscan·500 Object 필터·tile index 회귀 4건과 map-area command 회귀 1건을 추가했다. 전체 Frontend **47 files / 264 tests**, lint, production build가 통과했다.
+- 🤖 Mock 브라우저에서 100×50/5,000 Tile 전체 채우기를 실행했다. 실제 Canvas는 3200×1600, viewport는 674×575였고 화면 위치에 따라 460~598개 Tile만 DOM에 존재했다. 원거리 scroll 2400/900에서 Object 0개로 줄고, 레이어의 `lockedDoor` 선택 뒤 scroll 4/2로 복귀하며 primary Object가 다시 렌더됨을 확인했다. PLATFORMER 200×100 입력은 20,000칸 경고와 비활성 적용 버튼을 표시했다.
+- 🤖 FE plan/tasks/quickstart를 T116~T117, 총 96개/완료 88개/잔여 8개로 갱신했다. T065는 자동 viewport 회귀와 일반 대형 맵 실측을 확보했지만 500 Object가 실제로 배치된 최대 fixture의 활성 PC 60fps 증거가 남아 있어 완료 처리하지 않았다.
+- 트러블슈팅: GS-T056~GS-T057
+
 ### 데이터 안전 복구·활성 탭 성능 진단 고도화 ✅
 
 - 🤖 Jira `S15P21A604-156`과 GitLab Issue #73 범위에서 Backend·Unity·GameProject JSON을 바꾸지 않고 후속 품질 작업을 진행했다. 저장하지 않은 GameProject를 800ms 지연으로 브라우저 로컬 복구 저널에 별도 보관하고, 저장 성공 때만 제거하도록 했다.

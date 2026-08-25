@@ -43,7 +43,7 @@ festa-frontend/src/game-studio/
 
 1. **완료 — 순수 코어**: GameProject type/guard, Runtime state, Condition/Action/Event, Dialogue,
    undo/redo, reversible preset recipe, lazy edit/play entry를 PR #47에 구현했다.
-2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, 간단/고급 Inspector, Dialogue editor, 프로젝트별 한국어 guide와 실제 플레이 화면이 보이는 6종 템플릿을 하나의 store에 연결했다. Canvas는 선택 영역·다중 선택·묶음 이동·Event 보존 복제·안전 삭제·화면 이동·격자 전환을 지원한다. Scene은 내부 참조를 보존해 전체 복제·정렬할 수 있고 Object/Event 묶음은 Scene 사이에 복사·붙여넣을 수 있다. Tile은 브러시·사각형·연결 영역 채우기·스포이드를 제공하며 Collider 가이드를 선택적으로 표시한다. Scene 크기는 기존 Tile/Object와 함께 변경한다. 저장 전 변경은 GameProject/API 밖의 로컬 복구 저널에 800ms 지연으로 보관하고 명시 저장 성공 때 제거한다.
+2. **완료 — Authoring shell**: Scene list, Tile/Object canvas, 간단/고급 Inspector, Dialogue editor, 프로젝트별 한국어 guide와 실제 플레이 화면이 보이는 6종 템플릿을 하나의 store에 연결했다. Canvas는 선택 영역·다중 선택·묶음 이동·Event 보존 복제·안전 삭제·화면 이동·격자 전환을 지원한다. Scene은 내부 참조를 보존해 전체 복제·정렬할 수 있고 Object/Event 묶음은 Scene 사이에 복사·붙여넣을 수 있다. Tile은 브러시·사각형·연결 영역 채우기·스포이드를 제공하며 Collider 가이드를 선택적으로 표시한다. Scene 크기는 기존 Tile/Object와 함께 변경한다. 큰 맵은 32px cell 기준 실제 작업 공간으로 펼치고 scroll viewport 주변 Object/Tile만 overscan 렌더링한다. 레이어 검색에서 고른 원거리 Object는 캔버스가 자동으로 중앙 탐색하며, 500개 레이어 목록은 80개 단위로 점진 표시한다. 저장 전 변경은 GameProject/API 밖의 로컬 복구 저널에 800ms 지연으로 보관하고 명시 저장 성공 때 제거한다.
 3. **완료 — Reference Renderer/Preview**: TOP_DOWN/PLATFORMER renderer, builtin/local Asset resolver, same-origin local Preview route를 같은 Runtime core에 연결했다.
 4. **완료 — Backend adapter**: revision-aware Draft/Publish client, Published loader, schema guard,
    충돌 복구·검증 오류 UI를 구현했다. [BE plan](../BE/plan.md)의 endpoint가 준비되면 환경 플래그로 전환한다.
@@ -63,6 +63,8 @@ festa-frontend/src/game-studio/
 - Preview와 Published Runtime에 같은 GameProject를 넣어 최종 상태가 같은지 E2E로 확인한다.
 - Unity와 Backend가 없어도 최소 key→door→dialogue 게임을 제작·완료할 수 있어야 한다.
 - 500 Object Scene의 편집 commit은 자동 성능 테스트에서 100ms 미만이어야 한다.
+- 큰 맵 Canvas는 Scene 비율을 좁은 카드에 압축하지 않고 cell 크기×zoom으로 계산한다. scroll/resize마다 보이는 grid 범위를 계산해 2칸 overscan만 렌더링하고, 화면 밖 Object와 Tile DOM은 만들지 않는다.
+- 현행 shared schema의 TileLayer `maxItems=10,000`이 유지되는 동안 Authoring은 가로×세로 10,000칸을 넘는 크기 적용을 사전에 막는다. PLATFORMER 200×100 지원 여부는 [GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101)에서 Backend validator·DB 비용을 합의한 뒤 schema와 함께 변경한다.
 - 편집기의 `성능 점검`은 활성 PC 탭에서 FPS 55 이상, p95 frame 18.2ms 이하, 느린 frame 5% 이하를 함께 확인한다. 비활성 탭에서는 측정을 멈추며 브라우저 throttling 결과를 합격 근거로 사용하지 않는다.
 - 저장하지 않은 변경 뒤 화면을 다시 열면 로컬 복구본의 시각·복구/폐기/JSON 보관 선택이 나타나고, 명시 저장 뒤에는 같은 안내가 재발하지 않아야 한다.
 - 프로젝트별 첫 방문 guide, 장르와 무관한 5단계 tutorial, 검색 가능한 시각 재료함, 간단/고급 Inspector, Object Layer 검색·잠금·편집 숨김·z-index 정렬을 PC 제작 UX 기준선으로 유지한다.
