@@ -8,6 +8,27 @@
 
 ## 2026-08-25
 
+### GS-T055. 광범위한 `Reference/` ignore 규칙이 신규 Runtime 성능 파일을 첫 커밋에서 숨김 (해결)
+
+- **증상** — 성능 요약 테스트와 수정된 Runtime은 커밋됐지만 새 `runtime/reference/framePerformance.ts`가 commit stat에 없었다. 일반 `git status`에도 ignored untracked 파일이라 나타나지 않아 그대로 push하면 import 대상이 누락될 상태였다.
+- **원인** — 저장소 루트 `.gitignore`의 `Reference/` 패턴이 대소문자 구분 없이 모든 하위 `reference` 디렉터리에 적용됐다. 기존 Runtime reference 파일은 이미 tracked라 수정이 들어갔지만 신규 파일만 무시됐다.
+- **해결** — `git check-ignore -v`로 정확한 규칙과 경로를 확인하고 신규 파일 하나만 `git add -f -- <exact-path>`로 포함했다. push 전 커밋을 amend해 9개 파일과 신규 module 4개가 모두 들어간 것을 `git show --stat`으로 재확인했다.
+- **예방** — ignored 경로 아래 tracked code에 신규 파일을 만들면 일반 status만 보지 않고 `git check-ignore -v`와 commit stat을 확인한다. 강제 추가는 확인된 단일 파일에만 사용하며 광범위한 `-f`나 ignore 규칙 변경으로 우회하지 않는다.
+
+### GS-T054. PowerShell cmdlet 뒤 `$LASTEXITCODE` 검사로 문서 검증이 조용히 조기 종료됨 (해결)
+
+- **증상** — JSON schema parse, fixture, Runtime trace, task 집계를 한 명령에서 실행했지만 exit 0과 빈 출력만 남고 뒤 검증 결과가 표시되지 않았다.
+- **원인** — `ConvertFrom-Json`은 PowerShell cmdlet이라 native process용 `$LASTEXITCODE`를 새로 설정하지 않는다. 직후 `$LASTEXITCODE -ne 0`을 검사해 null/이전 값으로 분기했다.
+- **해결** — cmdlet 성공은 `$?`, 이어지는 `node` 프로세스는 각각 `$LASTEXITCODE`로 구분해 검사했다. fixture 7/7, Runtime trace 6/6, task 94/86/8을 실제 출력으로 재확인했다.
+- **예방** — PowerShell cmdlet과 native executable을 연속 검증할 때 같은 exit 변수로 묶지 않는다. cmdlet은 `$?` 또는 `try/catch`, native command는 호출 직후 `$LASTEXITCODE`를 사용한다.
+
+### GS-T053. 로컬 안전 복구 보조 버튼의 글자가 밝은 기본 배경에서 보이지 않음 (해결)
+
+- **증상** — DOM과 기능 테스트에서는 `JSON 보관`, `임시본 버리기`가 정상 존재했지만 실제 screenshot에서 두 버튼이 흰 사각형처럼 보여 문구를 식별하기 어려웠다. 기본 동작 버튼만 녹색 배경이라 정상으로 보였다.
+- **원인** — 복구 dock이 기존 충돌 dock의 크기·배치를 재사용하면서 보조 버튼의 background/border/text color를 명시하지 않았다. 상위 전역 button 스타일의 밝은 배경과 낮은 대비가 적용됐다.
+- **해결** — 복구 dock의 보조 버튼을 짙은 녹색 계열 배경·테두리와 밝은 문자로 고정하고 primary 버튼도 흰 문자 대비를 명시했다. 동일 화면을 다시 캡처해 세 버튼 문구가 모두 보이는지 확인했다.
+- **예방** — 새 dialog/dock은 DOM snapshot만으로 완료하지 않고 실제 screenshot에서 기본·보조·위험 버튼의 문자 대비, toast 겹침, 작은 창 배치를 함께 확인한다.
+
 ### GS-T052. 브라우저 QA를 실 API 모드로 띄우고 종료 중인 Port를 즉시 재사용함 (해결)
 
 - **증상** — 첫 5175 서버에서 게스트 입장이 편집 route로 이어지지 않았고, Mock 모드로 재시작할 때 5175가 사용 중이라 Vite가 5176으로 이동했다.

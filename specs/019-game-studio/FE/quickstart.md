@@ -23,7 +23,7 @@ npm run build
 npm run lint
 ```
 
-현재 Authoring Quality 브랜치 기준은 test 44 files/252 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
+현재 Authoring Quality 브랜치 기준은 test 46 files/259 tests, build, lint 통과다. 빌드 결과에서 Edit/Play가 일반 FESTA entry와
 분리된 lazy chunk인지 함께 확인한다.
 
 ## 3. Backend 없이 편집·플레이 확인
@@ -51,8 +51,9 @@ npm run dev -- --host 127.0.0.1 --port 5174
 14. 플레이 테스트를 눌러 `/app/games/123/play?source=local`에서 열쇠 획득·대화·문 이동·완료를 실행한다.
 15. 슈팅 템플릿의 데이터 탭에서 `적 3명 처치`, 생존 템플릿에서 `30초 생존/체력 0 종료`가 보이는지 확인한다. 목표값, ALL/ANY, 재시작/도전 실패를 바꿔 저장할 수 있어야 한다.
 16. Mock 모드에서 `게시하기`를 누르고 `게시본 확인 v1`으로 `/app/games/123/play`에 진입한다. 제목·Scene·목표 HUD가 방금 게시한 snapshot과 같아야 하며 다시 게시하면 v2가 된다.
-17. `?source=local&perf=1`은 활성 PC 탭에서만 FPS 진단에 사용한다. 자동화 백그라운드 탭의 1fps throttling은 제품 성능으로 기록하지 않는다.
-18. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
+17. 저장하지 않은 제목 또는 배치를 만든 뒤 1초 안에 `임시 복구 HH:mm`이 보이는지 확인한다. 다른 FESTA 화면으로 나갔다 편집기를 다시 열면 저장본은 그대로 유지되고 `로컬 안전 복구`에서 복구·폐기·JSON 보관을 선택할 수 있어야 한다. 복구 뒤 명시 저장하면 안내가 재발하지 않아야 한다.
+18. 편집기의 `성능 점검`은 `/play?source=local&perf=1`로 진입해 활성 탭 FPS, p95 frame time, 느린 frame 비율을 표시한다. 목표는 55fps 이상, p95 18.2ms 이하, 느린 frame 5% 이하이며 비활성 탭에서는 측정 일시정지가 보여야 한다.
+19. `VITE_USE_MOCK=false`, `VITE_GAME_STUDIO_API_ENABLED=true`에서는 `/play`가 실제 Published API 오류를 한국어로 격리하고 렌더 반복 오류가 없어야 한다.
 
 사람 대상 20분 검증 기록지는 [usability-test.md](usability-test.md)를 사용한다.
 

@@ -9,6 +9,15 @@
 
 ## 2026-08-25
 
+### 데이터 안전 복구·활성 탭 성능 진단 고도화 ✅
+
+- 🤖 Jira `S15P21A604-156`과 GitLab Issue #73 범위에서 Backend·Unity·GameProject JSON을 바꾸지 않고 후속 품질 작업을 진행했다. 저장하지 않은 GameProject를 800ms 지연으로 브라우저 로컬 복구 저널에 별도 보관하고, 저장 성공 때만 제거하도록 했다.
+- 🤖 복구본은 schema·gameId·revision을 검증한다. 손상 envelope는 편집기 시작을 막지 않고 제거하며, 서버/브라우저 저장본보다 오래된 revision과 동일 내용은 제안하지 않는다. 복구·폐기·JSON 보관, dirty 화면 이탈 경고, 임시 복구 시각을 한국어 UI로 제공했다.
+- 🤖 기존 단순 FPS 표시는 `성능 점검` 버튼으로 진입할 수 있게 하고, 활성 탭 기준 FPS·p95 frame time·느린 frame 비율을 1초 창으로 함께 표시했다. 비활성 탭에서는 측정을 중지·초기화해 browser throttling 값을 제품 성능으로 오인하지 않게 했다.
+- 🤖 local recovery 4건과 frame summary 3건을 추가해 전체 Frontend **46 files / 259 tests**, lint, production build를 통과했다. 브라우저에서는 `변경 → 임시 복구 시각 → 다른 화면 → 복구 제안 → 복구 → 명시 저장 → 제안 제거`와 `/play?source=local&perf=1`의 3개 성능 지표를 검증했다.
+- 🤖 시각 QA에서 복구 보조 버튼 글자가 배경과 섞이는 문제를 발견해 대비를 교정했다. FE plan/tasks/quickstart는 T114~T115, 총 94개/완료 86개/잔여 8개로 갱신했다.
+- 트러블슈팅: GS-T053~GS-T055
+
 ### 제작 생산성 1차 고도화 — Scene·Clipboard·Tile·Collider ✅
 
 - 🤖 최신 GitLab `front`와 Game Studio 코드 branch를 비교해 일반 Frontend 변경 22개와 Game Studio 고유 커밋 5개의 경계를 확인했다. Jira 연결은 GitLab 이관 Issue #73의 `S15P21A604-156`임을 확인하고, Convention에 맞춘 `feat/S15P21A604-156-game-studio-authoring-quality`를 만들어 최신 `front` 위로 기존 Game Studio stack을 충돌 없이 재배치했다.

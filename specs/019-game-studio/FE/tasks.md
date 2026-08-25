@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **BE tasks**: [../BE/tasks.md](../BE/tasks.md)
 
-FE가 소유하는 92개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
+FE가 소유하는 94개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
 
 ## Contract foundation
 
@@ -119,10 +119,12 @@ FE가 소유하는 92개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T111 Add Tile rectangle, connected flood fill, eyedropper, and keyboard-selectable drawing modes
 - [x] T112 Add opt-in Collider visualization without changing the GameProject wire contract
 - [x] T113 Verify the authoring quality pass with command tests, full FE regression, build/lint, and browser gestures
+- [x] T114 Add an editor-only local recovery journal, dirty-exit guard, and explicit restore/discard/JSON backup UX
+- [x] T115 Add an active-tab performance check with FPS, p95 frame time, slow-frame ratio, and visibility pause semantics
 
 ## Summary
 
-- Total: 92
-- Completed: 84
+- Total: 94
+- Completed: 86
 - Remaining: 8
 - Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 GitLab #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다. GitLab 이관은 완료됐으며 [KHS 29](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의 이관 기록과 Jira 기반 브랜치 규칙을 따른다.
