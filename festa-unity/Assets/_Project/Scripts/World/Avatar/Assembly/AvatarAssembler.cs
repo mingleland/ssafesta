@@ -10,7 +10,11 @@ namespace Festa.Avatar
         [SerializeField] AvatarCatalog _catalog;
         readonly Dictionary<AvatarPartCategory, List<GameObject>> _spawned = new();
         readonly Dictionary<int, GameObject> _bodyParts = new();
-        readonly Dictionary<Material, Material> _compatibleMaterials = new();
+        // 변환된 런타임 재질은 (원본 재질 + 카테고리)의 순수 함수다 — 아바타별 색은
+        // MaterialPropertyBlock 으로 나가므로 재질 자체에 개인 상태가 없다. 그래서
+        // **모든 아바타가 공유**한다. 인스턴스마다 만들면 40명 기준 480개가 생기고
+        // SRP Batcher 가 배칭할 수 없어 SetPass 가 인원수에 비례해 늘어난다 (실측 18.2/기).
+        static readonly Dictionary<(int source, int category), Material> SharedMaterials = new();
         readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
         MaterialPropertyBlock _block;
         Animator _animator;
@@ -267,7 +271,10 @@ namespace Festa.Avatar
             for (int i = 0; i < originals.Length; i++)
             {
                 var source = originals[i]; if (!source) continue;
-                if (!_compatibleMaterials.TryGetValue(source, out var material))
+                // 캐시 키에 카테고리를 넣는다 — 같은 원본이 의상/모자 헤어/바이저로 다르게
+                // 변환되기 때문이다. Play 종료 시 파괴된 재질이 남을 수 있어 유효성도 본다.
+                var cacheKey = (source.GetInstanceID(), category.HasValue ? (int)category.Value : -1);
+                if (!SharedMaterials.TryGetValue(cacheKey, out var material) || !material)
                 {
                     string lowerName = source.name.ToLowerInvariant();
                     bool isEyeHighlight = lowerName.Contains("eye") && lowerName.Contains("highlight");
@@ -305,7 +312,7 @@ namespace Festa.Avatar
                             }
                         if (source.HasProperty("_MaskRemap") && material.HasProperty("_MaskRemap")) material.SetVector("_MaskRemap", source.GetVector("_MaskRemap"));
                         if (source.HasProperty("_Mask_Factor") && material.HasProperty("_Mask_Factor")) material.SetFloat("_Mask_Factor", source.GetFloat("_Mask_Factor"));
-                        _compatibleMaterials[source] = material;
+                        SharedMaterials[cacheKey] = material;
                         converted[i] = material;
                         continue;
                     }
@@ -369,7 +376,7 @@ namespace Festa.Avatar
                     Texture normal = source.HasProperty("_Normal") ? source.GetTexture("_Normal") : source.HasProperty("_BumpMap") ? source.GetTexture("_BumpMap") : null;
                     if (normal) { material.SetTexture("_BumpMap", normal); material.EnableKeyword("_NORMALMAP"); }
                     float smoothness = lowerName.Contains("eye") ? .72f : lowerName.Contains("face") || lowerName.Contains("body") ? .42f : .3f;
-                    if(material.HasProperty("_Smoothness"))material.SetFloat("_Smoothness", smoothness); _compatibleMaterials[source] = material;
+                    if(material.HasProperty("_Smoothness"))material.SetFloat("_Smoothness", smoothness); SharedMaterials[cacheKey] = material;
                 }
                 converted[i] = material;
             }
@@ -388,7 +395,8 @@ namespace Festa.Avatar
             return name == "glasses" || name.StartsWith("glasses_") || name.Contains("lens") || name.Contains("glass_lens");
         }
 
-        void OnDestroy() { foreach (var m in _compatibleMaterials.Values) if (m) { if(Application.isPlaying) Destroy(m); else DestroyImmediate(m); } }
+        // 공유 재질은 아바타 하나가 사라졌다고 파괴하면 안 된다 — 다른 아바타가 쓰고 있다.
+        // 프로세스 수명 동안 유지하고 도메인 리로드 때 함께 정리된다.
 
         static int BodyPartCode(string name)
         {
