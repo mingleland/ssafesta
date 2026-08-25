@@ -19,6 +19,8 @@ Unity는 이 코드를 실행하거나 GameProject를 해석하지 않는다.
 - 6종 시작 템플릿과 한국어 guide/tutorial
 - 첫 방문 `열쇠 → 문 → 대화` 6단계 실습과 대상 자동 찾기
 - Object Layer 검색, 편집 잠금/숨김, z-index 정렬과 브라우저별 편집 상태 보존
+- Scene 전체 복제·순서 변경과 Scene 사이 Object/Event 복사·붙여넣기
+- Tile 브러시·사각형·연결 영역 채우기·스포이드와 Collider 편집 가이드
 - 타일 드래그의 animation-frame 단위 일괄 commit과 500 Object 편집 100ms 예산 테스트
 - versioned builtin Asset catalog와 IndexedDB local replacement resolver
 - JSON 2MB, Scene 50, Object 500/Scene, Event 300/Scene, Asset 300 상한

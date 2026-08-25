@@ -16,8 +16,12 @@ import {
   addTileLayer,
   addTopDownScene,
   addPlatformerScene,
+  copyObjectsToScene,
+  duplicateScene,
   duplicateObjects,
   fillTileLayer,
+  floodFillTiles,
+  moveScene,
   moveObjects,
   nextStableId,
   paintTiles,
@@ -45,7 +49,7 @@ import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
 import { ObjectLayerPanel } from './ObjectLayerPanel.tsx';
 import { ProjectDataPanel } from './ProjectDataPanel.tsx';
-import { TopDownCanvas, type CanvasTool } from './TopDownCanvas.tsx';
+import { TopDownCanvas, type CanvasTool, type TileTool } from './TopDownCanvas.tsx';
 import './GameStudioShell.css';
 
 type RightPanel = 'PROPERTIES' | 'EVENTS' | 'PROJECT';
@@ -156,6 +160,7 @@ export const GameStudioShell = ({
   const [objectSearch, setObjectSearch] = useState('');
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [tileBrush, setTileBrush] = useState<number | null>(null);
+  const [tileTool, setTileTool] = useState<TileTool>('BRUSH');
   const [rightPanel, setRightPanel] = useState<RightPanel>('PROPERTIES');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
@@ -163,6 +168,7 @@ export const GameStudioShell = ({
   const [zoom, setZoom] = useState(100);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>('SELECT');
   const [showGrid, setShowGrid] = useState(true);
+  const [showCollisions, setShowCollisions] = useState(false);
   const [showGuide, setShowGuide] = useState(() => shouldShowFirstVisitGuide(gameId));
   const [showTemplates, setShowTemplates] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<ProjectTemplateId | null>(null);
@@ -171,6 +177,7 @@ export const GameStudioShell = ({
   const [focusMode, setFocusMode] = useState(false);
   const [editorHiddenObjectIds, setEditorHiddenObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'hidden'));
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
+  const [objectClipboard, setObjectClipboard] = useState<{ readonly sourceSceneId: string; readonly objectIds: readonly string[] } | null>(null);
   const [draftConflict, setDraftConflict] = useState<{ readonly currentRevision: number; readonly localProject: GameProject } | null>(null);
 
   const selectedScene = project.scenes.find((scene) => scene.id === selectedSceneId) ?? project.scenes[0];
@@ -266,6 +273,48 @@ export const GameStudioShell = ({
       setNotice(error instanceof Error ? error.message : '오브젝트를 복제하지 못했습니다.');
     }
   }, [apply, editorLockedObjectIds, selectObjects, selectedObjectIds, selectedSceneId, store]);
+
+  const copySelection = useCallback(() => {
+    const currentProject = store.getState().project;
+    const scene = currentProject.scenes.find((candidate) => candidate.id === selectedSceneId);
+    if (scene === undefined || scene.type === 'DIALOGUE') return;
+    const objectIds = [...selectedObjectIds].filter((id) => (
+      !editorLockedObjectIds.has(id) && scene.objects.some((object) => object.id === id && object.preset !== 'PLAYER_SPAWN')
+    ));
+    if (objectIds.length === 0) {
+      setNotice('복사할 오브젝트를 선택해 주세요. 시작점과 잠긴 오브젝트는 제외됩니다.');
+      return;
+    }
+    setObjectClipboard({ sourceSceneId: scene.id, objectIds });
+    setNotice(`${objectIds.length}개 오브젝트를 복사했습니다. 다른 Scene에서도 붙여넣을 수 있습니다.`);
+  }, [editorLockedObjectIds, selectedObjectIds, selectedSceneId, store]);
+
+  const pasteSelection = useCallback(() => {
+    const currentProject = store.getState().project;
+    const scene = currentProject.scenes.find((candidate) => candidate.id === selectedSceneId);
+    if (scene === undefined || scene.type === 'DIALOGUE') {
+      setNotice('오브젝트는 탐색 맵이나 플랫폼 맵에만 붙여넣을 수 있습니다.');
+      return;
+    }
+    if (objectClipboard === null) {
+      setNotice('먼저 복사할 오브젝트를 선택하고 Ctrl+C를 눌러 주세요.');
+      return;
+    }
+    try {
+      const result = copyObjectsToScene(
+        currentProject,
+        objectClipboard.sourceSceneId,
+        scene.id,
+        objectClipboard.objectIds,
+      );
+      apply(result.project);
+      selectObjects(result.objectIds, result.objectIds.at(-1) ?? null);
+      setNotice(`${result.objectIds.length}개 오브젝트와 연결된 동작을 ${scene.name}에 붙여넣었습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '오브젝트를 붙여넣지 못했습니다.');
+    }
+  }, [apply, objectClipboard, selectObjects, selectedSceneId, store]);
 
   const deleteSelection = useCallback(() => {
     const currentProject = store.getState().project;
@@ -460,6 +509,11 @@ export const GameStudioShell = ({
           setShowGrid((current) => !current);
           return;
         }
+        if (paletteMode === 'TILES' && ['b', 'r', 'f', 'i'].includes(key)) {
+          event.preventDefault();
+          setTileTool(key === 'r' ? 'RECTANGLE' : key === 'f' ? 'FLOOD_FILL' : key === 'i' ? 'PICKER' : 'BRUSH');
+          return;
+        }
         if (event.key === 'Delete' || event.key === 'Backspace') {
           event.preventDefault();
           deleteSelection();
@@ -493,6 +547,16 @@ export const GameStudioShell = ({
         duplicateSelection();
         return;
       }
+      if (!editingText && keyboardCanvasContext && event.key.toLowerCase() === 'c') {
+        event.preventDefault();
+        copySelection();
+        return;
+      }
+      if (!editingText && keyboardCanvasContext && event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        pasteSelection();
+        return;
+      }
       if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         void save();
@@ -510,7 +574,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, clearObjectSelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
+  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
 
   const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -707,19 +771,51 @@ export const GameStudioShell = ({
                 </button>
               ))}
             </nav>
-            <button
-              className="gss-text-danger"
-              disabled={sceneRemovalReason(project, selectedScene.id) !== null}
-              onClick={() => {
-                const next = removeScene(project, selectedScene.id);
-                apply(next);
-                setSelectedSceneId(next.startSceneId);
-                setSelectedObjectId(null);
-                setSelectedObjectIds(new Set());
-              }}
-              title={sceneRemovalReason(project, selectedScene.id) ?? '선택 Scene 삭제'}
-              type="button"
-            >선택 Scene 삭제</button>
+            <div className="gss-scene-actions">
+              <button
+                disabled={project.scenes.length >= 50}
+                onClick={() => {
+                  try {
+                    const result = duplicateScene(project, selectedScene.id);
+                    apply(result.project);
+                    setSelectedSceneId(result.sceneId);
+                    clearObjectSelection();
+                    setNotice(`${selectedScene.name}의 배치와 동작을 새 Scene으로 복제했습니다.`);
+                  } catch (error) {
+                    setSaveStatus('error');
+                    setNotice(error instanceof Error ? error.message : 'Scene을 복제하지 못했습니다.');
+                  }
+                }}
+                title="배치·타일·이벤트·대화를 모두 복제"
+                type="button"
+              >Scene 복제</button>
+              <button
+                aria-label="Scene 위로 이동"
+                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === 0}
+                onClick={() => apply(moveScene(project, selectedScene.id, -1))}
+                title="Scene 순서를 위로 이동"
+                type="button"
+              >↑</button>
+              <button
+                aria-label="Scene 아래로 이동"
+                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === project.scenes.length - 1}
+                onClick={() => apply(moveScene(project, selectedScene.id, 1))}
+                title="Scene 순서를 아래로 이동"
+                type="button"
+              >↓</button>
+              <button
+                className="gss-text-danger"
+                disabled={sceneRemovalReason(project, selectedScene.id) !== null}
+                onClick={() => {
+                  const next = removeScene(project, selectedScene.id);
+                  apply(next);
+                  setSelectedSceneId(next.startSceneId);
+                  clearObjectSelection();
+                }}
+                title={sceneRemovalReason(project, selectedScene.id) ?? '선택 Scene 삭제'}
+                type="button"
+              >삭제</button>
+            </div>
           </div>
 
           {selectedScene.type !== 'DIALOGUE' && (
@@ -809,7 +905,24 @@ export const GameStudioShell = ({
                     <div className="gss-help-card"><strong>Tile Layer를 추가하세요</strong><p>레이어마다 바닥, 벽, 장식을 나누어 그릴 수 있습니다.</p></div>
                   ) : (
                     <>
-                      <p className="gss-sidebar-copy">브러시를 고르고 캔버스를 누른 채 드래그하세요.</p>
+                      <p className="gss-sidebar-copy">그리기 방식을 고른 뒤 캔버스에서 바로 작업하세요.</p>
+                      <div aria-label="타일 그리기 도구" className="gss-tile-mode-row" role="group">
+                        {([
+                          ['BRUSH', '브러시', 'B'],
+                          ['RECTANGLE', '사각형', 'R'],
+                          ['FLOOD_FILL', '영역 채우기', 'F'],
+                          ['PICKER', '스포이드', 'I'],
+                        ] as const).map(([tool, label, shortcut]) => (
+                          <button
+                            aria-keyshortcuts={shortcut}
+                            aria-pressed={tileTool === tool}
+                            className={tileTool === tool ? 'is-active' : ''}
+                            key={tool}
+                            onClick={() => setTileTool(tool)}
+                            type="button"
+                          ><strong>{label}</strong><kbd>{shortcut}</kbd></button>
+                        ))}
+                      </div>
                       <div className="gss-tile-palette">
                         {Array.from({ length: 16 }, (_, index) => (
                           <button
@@ -872,12 +985,33 @@ export const GameStudioShell = ({
                   type="button"
                 >격자</button>
                 <button
+                  aria-pressed={showCollisions}
+                  className={showCollisions ? 'is-active' : ''}
+                  onClick={() => setShowCollisions((current) => !current)}
+                  title="충돌 Component가 있는 오브젝트의 범위 표시"
+                  type="button"
+                >충돌 영역</button>
+                <button
                   aria-keyshortcuts="Control+D Meta+D"
                   disabled={selectedObjectIds.size === 0}
                   onClick={duplicateSelection}
                   title="선택한 오브젝트와 연결된 동작 복제 (Ctrl+D)"
                   type="button"
                 >복제</button>
+                <button
+                  aria-keyshortcuts="Control+C Meta+C"
+                  disabled={selectedObjectIds.size === 0}
+                  onClick={copySelection}
+                  title="선택한 오브젝트와 연결 동작 복사 (Ctrl+C)"
+                  type="button"
+                >복사</button>
+                <button
+                  aria-keyshortcuts="Control+V Meta+V"
+                  disabled={objectClipboard === null}
+                  onClick={pasteSelection}
+                  title="현재 Scene에 오브젝트 붙여넣기 (Ctrl+V)"
+                  type="button"
+                >붙여넣기</button>
                 <button
                   aria-keyshortcuts="Delete Backspace"
                   className="is-danger"
@@ -924,6 +1058,14 @@ export const GameStudioShell = ({
               onPaintTiles={(cells, tileIndex) => {
                 if (selectedTileLayer !== null) apply(paintTiles(store.getState().project, selectedScene.id, selectedTileLayer.id, cells, tileIndex));
               }}
+              onFloodFillTiles={(x, y, tileIndex) => {
+                if (selectedTileLayer !== null) apply(floodFillTiles(store.getState().project, selectedScene.id, selectedTileLayer.id, x, y, tileIndex));
+              }}
+              onPickTile={(tileIndex) => {
+                setTileBrush(tileIndex);
+                setTileTool('BRUSH');
+                setNotice(tileIndex < 0 ? '빈 타일을 골랐습니다. 지우개 브러시로 전환했습니다.' : `타일 ${tileIndex}을 골라 브러시로 전환했습니다.`);
+              }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
               onSelectObjects={selectObjects}
@@ -932,8 +1074,10 @@ export const GameStudioShell = ({
               selectedObjectId={selectedObjectId}
               selectedObjectIds={selectedObjectIds}
               showGrid={showGrid}
+              showCollisions={showCollisions}
               tileBrush={paletteMode === 'TILES' ? tileBrush : null}
               tileLayer={selectedTileLayer}
+              tileTool={tileTool}
               tilesetVisual={selectedTilesetVisual}
               zoom={zoom}
             />
@@ -962,7 +1106,7 @@ export const GameStudioShell = ({
             <span><i className="is-valid" />GameProject {project.schemaVersion} 검증 적용</span>
             {selectedObjectIds.size > 0 && <strong>{selectedObjectIds.size}개 선택 · Shift/Ctrl로 추가 선택 · 화살표로 이동</strong>}
             {placementPreset !== null && <strong>배치 모드 · {placementPreset} — 맵의 위치를 클릭하세요</strong>}
-            {tileBrush !== null && paletteMode === 'TILES' && <strong>타일 브러시 · {tileBrush === -1 ? '지우개' : tileBrush}</strong>}
+            {tileBrush !== null && paletteMode === 'TILES' && <strong>타일 {tileTool === 'BRUSH' ? '브러시' : tileTool === 'RECTANGLE' ? '사각형' : tileTool === 'FLOOD_FILL' ? '영역 채우기' : '스포이드'} · {tileBrush === -1 ? '지우개' : tileBrush}</strong>}
             <span>Game #{gameId} · revision {project.revision}</span>
           </footer>
         </section>

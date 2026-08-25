@@ -232,6 +232,103 @@ export const removeScene = (project: GameProject, sceneId: string): GameProject 
   return validated({ ...project, scenes: project.scenes.filter((scene) => scene.id !== sceneId) });
 };
 
+const remapCopiedAction = (
+  action: Action,
+  sourceSceneId: string,
+  copiedSceneId: string,
+  objectIdMap: ReadonlyMap<string, string>,
+): Action => {
+  if ((action.type === 'SHOW_OBJECT' || action.type === 'HIDE_OBJECT') && objectIdMap.has(action.objectId)) {
+    return { ...action, objectId: objectIdMap.get(action.objectId) ?? action.objectId };
+  }
+  if ((action.type === 'SHOW_DIALOGUE' || action.type === 'GO_TO_SCENE') && action.sceneId === sourceSceneId) {
+    return { ...action, sceneId: copiedSceneId };
+  }
+  return { ...action };
+};
+
+export const duplicateScene = (
+  project: GameProject,
+  sceneId: string,
+): { readonly project: GameProject; readonly sceneId: string } => {
+  const source = project.scenes.find((scene) => scene.id === sceneId);
+  if (source === undefined) throw new Error(`${sceneId} Scene을 찾을 수 없습니다.`);
+  if (project.scenes.length >= GAME_PROJECT_LIMITS.maxScenes) {
+    throw new Error(`프로젝트에는 Scene을 ${GAME_PROJECT_LIMITS.maxScenes}개까지만 만들 수 있습니다.`);
+  }
+
+  const usedIds = allIds(project);
+  const copiedSceneId = nextUniqueId(usedIds, source.type === 'DIALOGUE' ? 'dialogue' : source.type === 'PLATFORMER' ? 'platform' : 'map');
+  let copiedScene: GameProject['scenes'][number];
+
+  if (source.type === 'DIALOGUE') {
+    const nodeIdMap = new Map(source.nodes.map((node) => [node.id, nextUniqueId(usedIds, 'node')]));
+    const choiceIdMap = new Map(source.nodes.flatMap((node) => (
+      node.choices.map((choice) => [choice.id, nextUniqueId(usedIds, 'choice')] as const)
+    )));
+    copiedScene = {
+      ...source,
+      id: copiedSceneId,
+      name: `${source.name} 복사본`,
+      startNodeId: nodeIdMap.get(source.startNodeId) ?? source.startNodeId,
+      nodes: source.nodes.map((node) => ({
+        ...node,
+        id: nodeIdMap.get(node.id) ?? node.id,
+        choices: node.choices.map((choice) => ({
+          ...choice,
+          id: choiceIdMap.get(choice.id) ?? choice.id,
+          nextNodeId: choice.nextNodeId === undefined ? undefined : nodeIdMap.get(choice.nextNodeId) ?? choice.nextNodeId,
+          conditions: choice.conditions?.map((condition) => ({ ...condition })),
+          actions: choice.actions.map((action) => remapCopiedAction(action, source.id, copiedSceneId, new Map())),
+        })),
+      })),
+    };
+  } else {
+    const objectIdMap = new Map(source.objects.map((object) => [
+      object.id,
+      nextUniqueId(usedIds, object.preset === 'PLAYER_SPAWN' ? 'playerSpawn' : 'object'),
+    ]));
+    copiedScene = {
+      ...source,
+      id: copiedSceneId,
+      name: `${source.name} 복사본`,
+      tileLayers: source.tileLayers.map((layer) => ({ ...layer, data: [...layer.data] })),
+      objects: source.objects.map((object) => ({
+        ...object,
+        id: objectIdMap.get(object.id) ?? object.id,
+        position: { ...object.position },
+        components: object.components.map((component) => ({ ...component })),
+      })),
+      events: source.events.map((event) => ({
+        ...event,
+        id: nextUniqueId(usedIds, 'event'),
+        trigger: event.trigger.type === 'ON_SCENE_START'
+          ? { ...event.trigger }
+          : { ...event.trigger, targetId: objectIdMap.get(event.trigger.targetId) ?? event.trigger.targetId },
+        conditions: event.conditions.map((condition) => ({ ...condition })),
+        actions: event.actions.map((action) => remapCopiedAction(action, source.id, copiedSceneId, objectIdMap)),
+      })),
+    };
+  }
+
+  const sourceIndex = project.scenes.findIndex((scene) => scene.id === sceneId);
+  const scenes = [...project.scenes];
+  scenes.splice(sourceIndex + 1, 0, copiedScene);
+  return { project: validated({ ...project, scenes }), sceneId: copiedSceneId };
+};
+
+export const moveScene = (project: GameProject, sceneId: string, offset: -1 | 1): GameProject => {
+  const sourceIndex = project.scenes.findIndex((scene) => scene.id === sceneId);
+  if (sourceIndex < 0) throw new Error(`${sceneId} Scene을 찾을 수 없습니다.`);
+  const targetIndex = Math.max(0, Math.min(project.scenes.length - 1, sourceIndex + offset));
+  if (targetIndex === sourceIndex) return project;
+  const scenes = [...project.scenes];
+  const [scene] = scenes.splice(sourceIndex, 1);
+  if (scene === undefined) return project;
+  scenes.splice(targetIndex, 0, scene);
+  return validated({ ...project, scenes });
+};
+
 export const addObject = (
   project: GameProject,
   sceneId: string,
@@ -315,19 +412,22 @@ const nextUniqueId = (usedIds: Set<string>, prefix: string): string => {
   return id;
 };
 
-export const duplicateObjects = (
+export const copyObjectsToScene = (
   project: GameProject,
-  sceneId: string,
+  sourceSceneId: string,
+  targetSceneId: string,
   objectIds: readonly string[],
 ): { readonly project: GameProject; readonly objectIds: readonly string[] } => {
-  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
-  if (scene?.type === 'DIALOGUE' || scene === undefined) throw new Error(`${sceneId} is not a world scene`);
+  const sourceScene = project.scenes.find((candidate) => candidate.id === sourceSceneId);
+  const targetScene = project.scenes.find((candidate) => candidate.id === targetSceneId);
+  if (sourceScene?.type === 'DIALOGUE' || sourceScene === undefined) throw new Error(`${sourceSceneId} is not a world scene`);
+  if (targetScene?.type === 'DIALOGUE' || targetScene === undefined) throw new Error('오브젝트는 탐색 맵이나 플랫폼 맵에만 붙여넣을 수 있습니다.');
   const requestedIds = new Set(objectIds);
-  const sourceObjects = scene.objects.filter((object) => (
+  const sourceObjects = sourceScene.objects.filter((object) => (
     requestedIds.has(object.id) && object.preset !== 'PLAYER_SPAWN'
   ));
   if (sourceObjects.length === 0) throw new Error('복제할 수 있는 오브젝트를 선택해 주세요.');
-  if (scene.objects.length + sourceObjects.length > GAME_PROJECT_LIMITS.maxObjectsPerScene) {
+  if (targetScene.objects.length + sourceObjects.length > GAME_PROJECT_LIMITS.maxObjectsPerScene) {
     throw new Error(`Scene에는 오브젝트를 ${GAME_PROJECT_LIMITS.maxObjectsPerScene}개까지만 둘 수 있습니다.`);
   }
 
@@ -337,15 +437,25 @@ export const duplicateObjects = (
   const maxY = Math.max(...sourceObjects.map((object) => object.position.y));
   const minX = Math.min(...sourceObjects.map((object) => object.position.x));
   const minY = Math.min(...sourceObjects.map((object) => object.position.y));
-  const offsetX = maxX < scene.width - 1 ? 1 : minX > 0 ? -1 : 0;
-  const offsetY = maxY < scene.height - 1 ? 1 : minY > 0 ? -1 : 0;
+  const formationWidth = maxX - minX + 1;
+  const formationHeight = maxY - minY + 1;
+  if (formationWidth > targetScene.width || formationHeight > targetScene.height) {
+    throw new Error('선택한 오브젝트 묶음이 대상 Scene보다 큽니다. 맵 크기를 먼저 늘려 주세요.');
+  }
+  const sameScene = sourceSceneId === targetSceneId;
+  const targetMinX = sameScene
+    ? minX + (maxX < targetScene.width - 1 ? 1 : minX > 0 ? -1 : 0)
+    : Math.min(1, targetScene.width - formationWidth);
+  const targetMinY = sameScene
+    ? minY + (maxY < targetScene.height - 1 ? 1 : minY > 0 ? -1 : 0)
+    : Math.min(1, targetScene.height - formationHeight);
   const duplicates: GameObject[] = sourceObjects.map((object) => ({
     ...object,
     id: objectIdMap.get(object.id) ?? object.id,
-    position: { x: object.position.x + offsetX, y: object.position.y + offsetY },
+    position: { x: object.position.x - minX + targetMinX, y: object.position.y - minY + targetMinY },
     components: object.components.map((component) => ({ ...component })),
   }));
-  const copiedEvents = scene.events
+  const copiedEvents = sourceScene.events
     .filter((event) => event.trigger.type !== 'ON_SCENE_START' && objectIdMap.has(event.trigger.targetId))
     .map((event): GameEvent => ({
       ...event,
@@ -360,18 +470,26 @@ export const duplicateObjects = (
           : { ...action }
       )),
     }));
-  if (scene.events.length + copiedEvents.length > GAME_PROJECT_LIMITS.maxEventsPerScene) {
+  if (targetScene.events.length + copiedEvents.length > GAME_PROJECT_LIMITS.maxEventsPerScene) {
     throw new Error(`동작을 포함해 복제하면 Event ${GAME_PROJECT_LIMITS.maxEventsPerScene}개 제한을 넘습니다.`);
   }
   return {
     objectIds: duplicates.map((object) => object.id),
-    project: replaceTopDownScene(project, sceneId, (current) => ({
+    project: replaceTopDownScene(project, targetSceneId, (current) => ({
       ...current,
       objects: [...current.objects, ...duplicates],
       events: [...current.events, ...copiedEvents],
     })),
   };
 };
+
+export const duplicateObjects = (
+  project: GameProject,
+  sceneId: string,
+  objectIds: readonly string[],
+): { readonly project: GameProject; readonly objectIds: readonly string[] } => (
+  copyObjectsToScene(project, sceneId, sceneId, objectIds)
+);
 
 export const resizeWorldScene = (
   project: GameProject,
@@ -983,6 +1101,51 @@ export const fillTileLayer = (
     data: layer.data.map(() => Math.max(-1, Math.round(tileIndex))),
   } : layer),
 }));
+
+export const floodFillTiles = (
+  project: GameProject,
+  sceneId: string,
+  layerId: string,
+  x: number,
+  y: number,
+  tileIndex: number,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const layer = scene.tileLayers.find((candidate) => candidate.id === layerId);
+  if (layer === undefined) throw new Error(`${layerId} Tile Layer를 찾을 수 없습니다.`);
+  const startX = Math.max(0, Math.min(scene.width - 1, Math.round(x)));
+  const startY = Math.max(0, Math.min(scene.height - 1, Math.round(y)));
+  const startIndex = startY * scene.width + startX;
+  const sourceTile = layer.data[startIndex] ?? -1;
+  const replacementTile = Math.max(-1, Math.round(tileIndex));
+  if (sourceTile === replacementTile) return scene;
+
+  const data = [...layer.data];
+  const queue = [startIndex];
+  const visited = new Set<number>([startIndex]);
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const index = queue[cursor];
+    if (index === undefined || data[index] !== sourceTile) continue;
+    data[index] = replacementTile;
+    const cellX = index % scene.width;
+    const cellY = Math.floor(index / scene.width);
+    const neighbours = [
+      cellX > 0 ? index - 1 : -1,
+      cellX < scene.width - 1 ? index + 1 : -1,
+      cellY > 0 ? index - scene.width : -1,
+      cellY < scene.height - 1 ? index + scene.width : -1,
+    ];
+    neighbours.forEach((neighbour) => {
+      if (neighbour >= 0 && !visited.has(neighbour) && data[neighbour] === sourceTile) {
+        visited.add(neighbour);
+        queue.push(neighbour);
+      }
+    });
+  }
+  return {
+    ...scene,
+    tileLayers: scene.tileLayers.map((candidate) => candidate.id === layerId ? { ...candidate, data } : candidate),
+  };
+});
 
 export const removeTileLayer = (
   project: GameProject,

@@ -6,6 +6,7 @@ import type { TilesetDefinition } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 
 export type CanvasTool = 'SELECT' | 'PAN';
+export type TileTool = 'BRUSH' | 'RECTANGLE' | 'FLOOD_FILL' | 'PICKER';
 
 interface TopDownCanvasProps {
   readonly scene: WorldScene;
@@ -16,16 +17,20 @@ interface TopDownCanvasProps {
   readonly placementPreset: GameObject['preset'] | null;
   readonly tileLayer: TileLayer | null;
   readonly tileBrush: number | null;
+  readonly tileTool: TileTool;
   readonly tilesetVisual: TilesetDefinition | null;
   readonly zoom: number;
   readonly canvasTool: CanvasTool;
   readonly showGrid: boolean;
+  readonly showCollisions: boolean;
   readonly editorHiddenObjectIds: ReadonlySet<string>;
   readonly editorLockedObjectIds: ReadonlySet<string>;
   readonly onSelectObjects: (objectIds: readonly string[], primaryObjectId: string | null) => void;
   readonly onPlaceObject: (preset: GameObject['preset'], x: number, y: number) => void;
   readonly onMoveObjects: (objectIds: readonly string[], deltaX: number, deltaY: number) => void;
   readonly onPaintTiles: (cells: readonly { readonly x: number; readonly y: number }[], tileIndex: number) => void;
+  readonly onFloodFillTiles: (x: number, y: number, tileIndex: number) => void;
+  readonly onPickTile: (tileIndex: number) => void;
   readonly onPlacementComplete: () => void;
 }
 
@@ -71,21 +76,26 @@ export const TopDownCanvas = ({
   placementPreset,
   tileLayer,
   tileBrush,
+  tileTool,
   tilesetVisual,
   zoom,
   canvasTool,
   showGrid,
+  showCollisions,
   editorHiddenObjectIds,
   editorLockedObjectIds,
   onSelectObjects,
   onPlaceObject,
   onMoveObjects,
   onPaintTiles,
+  onFloodFillTiles,
+  onPickTile,
   onPlacementComplete,
 }: TopDownCanvasProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggingSelection, setDraggingSelection] = useState<DraggingSelection | null>(null);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  const [tileRectangle, setTileRectangle] = useState<SelectionBox | null>(null);
   const [panning, setPanning] = useState<PanningState | null>(null);
   const [paintingTiles, setPaintingTiles] = useState(false);
   const pendingPaintCellsRef = useRef(new Map<string, { readonly x: number; readonly y: number }>());
@@ -142,6 +152,7 @@ export const TopDownCanvas = ({
       }
     }
     if (selectionBox !== null) setSelectionBox({ ...selectionBox, endX: position.x, endY: position.y });
+    if (tileRectangle !== null) setTileRectangle({ ...tileRectangle, endX: position.x, endY: position.y });
     if (paintingTiles && tileBrush !== null) queuePaintCell(position);
   };
 
@@ -155,15 +166,29 @@ export const TopDownCanvas = ({
   };
 
   const finishCanvasGesture = (event: PointerEvent<HTMLDivElement>) => {
-    if (draggingSelection !== null || paintingTiles || selectionBox !== null) {
+    if (draggingSelection !== null || paintingTiles || selectionBox !== null || tileRectangle !== null) {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (paintingTiles) flushPaintCells();
+    if (tileRectangle !== null && tileBrush !== null) {
+      const minX = Math.min(tileRectangle.startX, tileRectangle.endX);
+      const maxX = Math.max(tileRectangle.startX, tileRectangle.endX);
+      const minY = Math.min(tileRectangle.startY, tileRectangle.endY);
+      const maxY = Math.max(tileRectangle.startY, tileRectangle.endY);
+      const cells = Array.from({ length: (maxX - minX + 1) * (maxY - minY + 1) }, (_, index) => ({
+        x: minX + (index % (maxX - minX + 1)),
+        y: minY + Math.floor(index / (maxX - minX + 1)),
+      }));
+      onPaintTiles(cells, tileBrush);
+    }
     finishSelectionBox();
     setDraggingSelection(null);
     setSelectionBox(null);
+    setTileRectangle(null);
     setPaintingTiles(false);
   };
+
+  const tileEditing = tileLayer !== null && (tileTool === 'PICKER' || tileBrush !== null);
 
   return (
     <div
@@ -194,9 +219,9 @@ export const TopDownCanvas = ({
       <div className="gss-map-stage" style={{ width: `${zoom}%` }}>
         <div
           aria-label={`${scene.name} 맵 편집 캔버스`}
-          className={`gss-map-canvas${placementPreset === null && tileBrush === null ? '' : ' is-placing'}${showGrid ? '' : ' is-grid-hidden'}${canvasTool === 'PAN' ? ' is-pan-tool' : ''}`}
+          className={`gss-map-canvas${placementPreset === null && !tileEditing ? '' : ' is-placing'}${showGrid ? '' : ' is-grid-hidden'}${canvasTool === 'PAN' ? ' is-pan-tool' : ''}${tileEditing ? ' is-tile-editing' : ''}${showCollisions ? ' is-showing-collisions' : ''}`}
           onClick={(event) => {
-            if (event.target !== event.currentTarget || tileBrush !== null || canvasTool === 'PAN') return;
+            if (event.target !== event.currentTarget || tileEditing || canvasTool === 'PAN') return;
             if (placementPreset === null) return;
             const position = pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene);
             onPlaceObject(placementPreset, position.x, position.y);
@@ -210,16 +235,31 @@ export const TopDownCanvas = ({
             pendingPaintCellsRef.current.clear();
             setDraggingSelection(null);
             setSelectionBox(null);
+            setTileRectangle(null);
             setPaintingTiles(false);
           }}
           onPointerMove={moveOnCanvas}
           onPointerUp={finishCanvasGesture}
           onPointerDown={(event) => {
             if (canvasTool === 'PAN' || event.target !== event.currentTarget) return;
-            if (tileBrush !== null) {
+            if (tileEditing) {
+              const position = pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene);
+              if (tileTool === 'PICKER') {
+                onPickTile(tileLayer?.data[position.y * scene.width + position.x] ?? -1);
+                return;
+              }
+              if (tileBrush === null) return;
+              if (tileTool === 'FLOOD_FILL') {
+                onFloodFillTiles(position.x, position.y, tileBrush);
+                return;
+              }
               event.currentTarget.setPointerCapture(event.pointerId);
-              setPaintingTiles(true);
-              queuePaintCell(pointerToGrid(event.currentTarget, event.clientX, event.clientY, scene));
+              if (tileTool === 'RECTANGLE') {
+                setTileRectangle({ startX: position.x, startY: position.y, endX: position.x, endY: position.y });
+              } else {
+                setPaintingTiles(true);
+                queuePaintCell(position);
+              }
               return;
             }
             if (placementPreset !== null) return;
@@ -263,6 +303,18 @@ export const TopDownCanvas = ({
               }}
             />
           )}
+          {tileRectangle !== null && (
+            <div
+              aria-hidden="true"
+              className="gss-selection-box is-tile-rectangle"
+              style={{
+                left: `${(Math.min(tileRectangle.startX, tileRectangle.endX) / scene.width) * 100}%`,
+                top: `${(Math.min(tileRectangle.startY, tileRectangle.endY) / scene.height) * 100}%`,
+                width: `${((Math.abs(tileRectangle.endX - tileRectangle.startX) + 1) / scene.width) * 100}%`,
+                height: `${((Math.abs(tileRectangle.endY - tileRectangle.startY) + 1) / scene.height) * 100}%`,
+              }}
+            />
+          )}
           {scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)).map((object) => {
             const definition = findPresetDefinition(object.preset);
             const sprite = object.components.find((component) => component.type === 'SPRITE');
@@ -274,7 +326,7 @@ export const TopDownCanvas = ({
               <button
                 aria-label={`${definition.label} ${object.id}, X ${object.position.x}, Y ${object.position.y}`}
                 aria-pressed={selected}
-                className={`gss-map-object gss-map-object--${object.preset.toLowerCase()}${selected ? ' is-selected' : ''}${selectedObjectId === object.id ? ' is-primary' : ''}${editorLockedObjectIds.has(object.id) ? ' is-editor-locked' : ''}`}
+                className={`gss-map-object gss-map-object--${object.preset.toLowerCase()}${selected ? ' is-selected' : ''}${selectedObjectId === object.id ? ' is-primary' : ''}${editorLockedObjectIds.has(object.id) ? ' is-editor-locked' : ''}${object.components.some((component) => component.type === 'COLLIDER') ? ' has-collider' : ''}`}
                 key={object.id}
                 onClick={(event) => {
                   event.stopPropagation();
