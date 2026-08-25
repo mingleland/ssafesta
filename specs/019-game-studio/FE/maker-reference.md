@@ -66,6 +66,6 @@ FESTA는 `TOP_DOWN`, `PLATFORMER`, `DIALOGUE`와 제한된 Trigger/Condition/Act
 
 - 반영: Library/Layer 분리, 기본/고급 Inspector, 한국어 recipe, Canvas 다중 선택·복제·이동,
   Tile 도구, Scene 크기 변경, 6종 구조적 템플릿, Local Preview.
-- 사람 검증: 개발 경험 없는 5명 중 4명 이상이 20분 안에 key→dialogue→door 게임 완성 ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73)).
+- 사람 검증: 개발 경험 없는 5명 중 4명 이상이 20분 안에 key→dialogue→door 게임 완성 ([GitLab #73](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/73)).
 - 운영 연결: Draft/Published/Portal/Asset server E2E는 #48·#55·#56·#69.
-- 계약 확장: 생존 시간·처치 수·점수 임계 승리는 v1.1 FE candidate와 Mock Runtime까지 구현했다. 공동 계약 [#78](https://github.com/kanghyunsoon/ssafesta/issues/78)에서 BE validator·AI 허용 출력 승인만 남았다.
+- 계약 확장: 생존 시간·처치 수·점수 임계 승리는 v1.1 FE candidate와 Mock Runtime까지 구현했다. 공동 계약 [GitLab #78](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/78)에서 BE validator·AI 허용 출력 승인만 남았다.
