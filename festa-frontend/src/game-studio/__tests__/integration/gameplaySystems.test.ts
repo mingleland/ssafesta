@@ -71,7 +71,12 @@ describe('reference runtime gameplay systems', () => {
       scenes: [{
         ...scene,
         objects: scene.objects.map((object) => object.id === 'treasure1'
-          ? { ...object, components: [...object.components, { type: 'SCORE_VALUE' as const, value: 25 }] }
+          ? {
+              ...object,
+              components: object.components.some((component) => component.type === 'SCORE_VALUE')
+                ? object.components.map((component) => component.type === 'SCORE_VALUE' ? { ...component, value: 25 } : component)
+                : [...object.components, { type: 'SCORE_VALUE' as const, value: 25 }],
+            }
           : object),
       }],
     });
@@ -80,5 +85,45 @@ describe('reference runtime gameplay systems', () => {
     expect(collected.score).toBe(25);
     expect(collected.session.inventory.has('moonGem')).toBe(true);
     expect(collected.session.objectVisibility.treasure1).toBe(false);
+  });
+
+  it('completes score, enemy defeat, and survival objectives deterministically', () => {
+    const collectionOriginal = createProjectFromTemplate(124, 'COLLECTION');
+    const collection = parseGameProject({
+      ...collectionOriginal,
+      rules: { completion: { mode: 'ALL', objectives: [{ type: 'SCORE_AT_LEAST', target: 100 }] }, playerDefeat: 'RESPAWN' },
+    });
+    const scored = moveReferencePlayer(collection, { ...startReferenceRuntime(collection), playerPosition: { x: 2, y: 6 } }, 'RIGHT');
+    expect(scored.session.status).toBe('COMPLETED');
+
+    const shooterOriginal = createProjectFromTemplate(125, 'SHOOTER');
+    const shooter = parseGameProject({
+      ...shooterOriginal,
+      rules: { completion: { mode: 'ALL', objectives: [{ type: 'DEFEAT_ENEMIES', target: 1 }] }, playerDefeat: 'RESPAWN' },
+    });
+    const shooterStarted = startReferenceRuntime(shooter);
+    const fired = shootReferenceProjectile(shooter, { ...shooterStarted, objectHealth: { ...shooterStarted.objectHealth, slime1: 1 } });
+    const defeated = tickReferenceWorld(shooter, tickReferenceWorld(shooter, fired));
+    expect(defeated.defeatedEnemies).toBe(1);
+    expect(defeated.session.status).toBe('COMPLETED');
+
+    const survivalOriginal = createProjectFromTemplate(126, 'SURVIVAL');
+    const survival = parseGameProject({
+      ...survivalOriginal,
+      rules: { completion: { mode: 'ALL', objectives: [{ type: 'SURVIVE_SECONDS', target: 1 }] }, playerDefeat: 'END_GAME' },
+    });
+    let survived = startReferenceRuntime(survival);
+    for (let frame = 0; frame < 9; frame += 1) survived = tickReferenceWorld(survival, survived);
+    expect(survived.elapsedMs).toBe(1080);
+    expect(survived.session.status).toBe('COMPLETED');
+  });
+
+  it('ends the challenge when an END_GAME project reaches zero health', () => {
+    const project = createProjectFromTemplate(127, 'SURVIVAL');
+    const started = { ...startReferenceRuntime(project), playerPosition: { x: 7, y: 10 }, playerHealth: 1 };
+    const defeated = tickReferenceWorld(project, started);
+    expect(defeated.playerHealth).toBe(0);
+    expect(defeated.session.status).toBe('FAILED');
+    expect(defeated.session.failure?.code).toBe('PLAYER_DEFEATED');
   });
 });
