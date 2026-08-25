@@ -8,7 +8,7 @@ the fail-fast behavior spec 007 plan.md Section 10 requires.
 
 from __future__ import annotations
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +22,18 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        # A cross-field model_validator(mode="after") that raises ValueError
+        # (e.g. _validate_embedding_dimension, _validate_job_recovery) gets
+        # wrapped by pydantic-core with the *raw pre-coercion input dict* for
+        # the whole model attached as `input_value=...` — this happens
+        # regardless of individual field types, so SecretStr alone does not
+        # stop it (SecretStr only masks a successfully-built instance's
+        # repr()/str()/model_dump(), and field-level errors on that one
+        # field). hide_input_in_errors strips that raw dict from the
+        # rendered message, which is what reaches Docker stdout / the log
+        # aggregator on a boot crash (spec 007 plan.md §9 "mask credentials
+        # in logs").
+        hide_input_in_errors=True,
     )
 
     # Runtime
@@ -29,37 +41,47 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     # Database (runtime role only; alembic reads MIGRATION_DATABASE_URL directly)
-    database_url: str = Field(min_length=1)
+    database_url: SecretStr = Field(min_length=1)
 
     # Worker lease and recovery — spec 007 plan.md Section 10 / research.md Section 5
-    job_heartbeat_seconds: int = 30
-    job_lease_seconds: int = 90
-    job_sweeper_seconds: int = 60
-    job_max_retries: int = 3
+    job_heartbeat_seconds: int = Field(default=30, gt=0)
+    job_lease_seconds: int = Field(default=90, gt=0)
+    job_sweeper_seconds: int = Field(default=60, gt=0)
+    job_max_retries: int = Field(default=3, ge=0)
     job_retry_backoff_seconds_csv: str = Field(
         default="60,300,900", validation_alias="JOB_RETRY_BACKOFF_SECONDS"
     )
 
     # Document limits and chunk tuning — spec 007 FR-011, FR-018, FR-020
-    document_max_bytes: int = 20_971_520
-    agent_document_max_count: int = 10
-    agent_document_max_total_bytes: int = 104_857_600
+    document_max_bytes: int = Field(default=20_971_520, gt=0)
+    agent_document_max_count: int = Field(default=10, gt=0)
+    agent_document_max_total_bytes: int = Field(default=104_857_600, gt=0)
     chunk_size: int | None = None
     chunk_overlap: int | None = None
 
-    @field_validator("chunk_size", "chunk_overlap", mode="before")
+    @field_validator(
+        "chunk_size",
+        "chunk_overlap",
+        "embedding_model_id",
+        "embedding_provider",
+        "embedding_api_base_url",
+        "embedding_api_key",
+        mode="before",
+    )
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         """Treat a blank/whitespace-only value as absent.
 
-        `.env.example` ships `CHUNK_SIZE=` / `CHUNK_OVERLAP=` (blank) as the
-        documented "optional, no fixed default" tuning values (spec 007).
-        python-dotenv parses `KEY=` as the env var being present with value
-        `""`, not absent — so without this coercion pydantic tries to parse
-        `""` as `int` and crashes uvicorn on boot with an unmodified
-        `.env.example`-derived `.env`. Any other value (including a real
-        `None` or `int` from a non-dotenv source, or an int-looking string
-        like "512") passes through unchanged for normal int coercion.
+        `.env.example` ships these keys blank (e.g. `CHUNK_SIZE=`,
+        `EMBEDDING_MODEL_ID=`) as documented "optional, no fixed default"
+        values (spec 007). python-dotenv parses `KEY=` as the env var being
+        present with value `""`, not absent — so without this coercion
+        pydantic tries to parse `""` as the declared type (int, or
+        `SecretStr` for `embedding_api_key`) and crashes uvicorn on boot
+        with an unmodified `.env.example`-derived `.env`. Any other value
+        (including a real `None` from a non-dotenv source, or a non-blank
+        string like "512" or "text-embedding-3-small") passes through
+        unchanged for normal coercion.
         """
         if isinstance(value, str) and value.strip() == "":
             return None
@@ -70,28 +92,31 @@ class Settings(BaseSettings):
     embedding_model_id: str | None = None
     embedding_provider: str | None = None
     embedding_api_base_url: str | None = None
-    embedding_api_key: str | None = None
+    embedding_api_key: SecretStr | None = None
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
-    internal_spring_to_ai_tokens_csv: str = Field(
+    internal_spring_to_ai_tokens_csv: SecretStr = Field(
         min_length=1, validation_alias="INTERNAL_SPRING_TO_AI_TOKENS"
     )
-    internal_ai_to_spring_tokens_csv: str = Field(
+    internal_ai_to_spring_tokens_csv: SecretStr = Field(
         min_length=1, validation_alias="INTERNAL_AI_TO_SPRING_TOKENS"
     )
 
     # R2 object storage (primary) — spec 007 FR-010, FR-030
     r2_endpoint: str = Field(min_length=1)
     r2_bucket: str = Field(min_length=1)
-    r2_access_key_id: str = Field(min_length=1)
-    r2_secret_access_key: str = Field(min_length=1)
+    r2_access_key_id: SecretStr = Field(min_length=1)
+    r2_secret_access_key: SecretStr = Field(min_length=1)
+    # boto3 requires a region_name even for R2 (S3-compatible API) — R2 itself
+    # is region-less, so "auto" is the documented literal value (팀 결정 필요사항 §①).
+    r2_region: str = "auto"
 
     # MinIO object storage (operator-approved manual fallback only) — spec 007 FR-030..033
     minio_endpoint: str = Field(min_length=1)
     minio_bucket: str = Field(min_length=1)
-    minio_access_key_id: str = Field(min_length=1)
-    minio_secret_access_key: str = Field(min_length=1)
+    minio_access_key_id: SecretStr = Field(min_length=1)
+    minio_secret_access_key: SecretStr = Field(min_length=1)
 
     @property
     def job_retry_backoff_seconds(self) -> list[int]:
@@ -99,11 +124,11 @@ class Settings(BaseSettings):
 
     @property
     def internal_spring_to_ai_tokens(self) -> list[str]:
-        return _parse_csv(self.internal_spring_to_ai_tokens_csv)
+        return _parse_csv(self.internal_spring_to_ai_tokens_csv.get_secret_value())
 
     @property
     def internal_ai_to_spring_tokens(self) -> list[str]:
-        return _parse_csv(self.internal_ai_to_spring_tokens_csv)
+        return _parse_csv(self.internal_ai_to_spring_tokens_csv.get_secret_value())
 
     @model_validator(mode="after")
     def _validate_job_recovery(self) -> "Settings":
