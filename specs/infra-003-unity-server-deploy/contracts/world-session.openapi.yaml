@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info:
+  title: SSAFESTA World Session API
+  version: 1.0.0
+paths:
+  /api/v1/world-sessions:
+    post:
+      security: [{ bearerAuth: [] }]
+      operationId: createWorldSession
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                preferredPartyId: { type: string, nullable: true }
+      responses:
+        '200':
+          description: One-time world entry grant
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorldSession' }
+        '401': { description: Missing or invalid Access Token }
+        '403': { description: Account cannot enter the world }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    WorldSession:
+      type: object
+      required: [sessionId, worldId, channelId, endpoint, connectionToken, expiresAt]
+      properties:
+        sessionId: { type: string }
+        worldId: { const: 11F }
+        channelId: { const: 11F-01 }
+        endpoint: { $ref: '#/components/schemas/WorldEndpoint' }
+        connectionToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+    WorldEndpoint:
+      type: object
+      required: [scheme, host, port]
+      properties:
+        scheme: { enum: [ws, wss] }
+        host: { type: string }
+        port: { type: integer, minimum: 1, maximum: 65535 }

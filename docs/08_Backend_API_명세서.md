@@ -28,7 +28,7 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 }
 ```
 
-### 1.3 오류 응답 제안
+### 1.3 오류 응답 (확정 · 구현됨)
 
 ```json
 {
@@ -37,6 +37,44 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
   "requestId": "req_..."
 }
 ```
+
+**2026-08-20부터 전 endpoint가 실제로 이 형태로 응답한다** (spec 005). 그 전까지는 "제안"이었고 구현은
+코드 없이 한국어 문장만 반환하고 있었다. Breaking Change가 아니라 문서와의 정합 회복이다.
+
+- `requestId`는 응답 헤더 `X-Request-Id`·서버 로그와 **같은 값**이다. 사용자가 화면에서 본 id 하나로 로그를 찾을 수 있다.
+- **`errors`·`warnings` 배열은 항상 있다** — 보고할 것이 없으면 빈 배열이다. `errors`가 비어 있지 않으면
+  요청은 거부된 것이고, `warnings`는 진행을 막지 않는다. 저장·공개 **성공** 응답의 `warnings`도 같은 규칙이다.
+  키를 조건부로 빼면 `errors.length`가 클라이언트에서 터지므로 빼지 않는다.
+
+```json
+{
+  "code": "LAYOUT_VALIDATION_FAILED",
+  "message": "배치를 공개할 수 없습니다.",
+  "requestId": "req_1a2b3c4d",
+  "errors":   [ { "rule": "OBJECT_LIMIT", "message": "오브젝트는 12개까지입니다. 현재 14개" } ],
+  "warnings": [ { "rule": "CONFIG_NOT_LINKED", "objectId": "ai-1", "message": "AI 직원이 연결되지 않았습니다." } ]
+}
+```
+
+### 1.3-1 전역 `rule` 목록 (#58, 2026-08-23 확정)
+
+`errors[]`·`warnings[]`의 `rule`은 클라이언트가 분기해도 되는 계약값이다. **아래는 endpoint를 가리지 않고 나오는 전역 rule**이고, 기능별 rule은 각 spec 계약 문서가 소유한다(예: Layout 계열은 `specs/005-booth-studio-layout/contracts/layout-api.md` §0).
+
+| rule | 어디서 | 뜻 |
+|---|---|---|
+| `FIELD_INVALID` | 전 endpoint (Bean Validation) | 요청 필드 값이 제약을 위반. **문제 필드는 `field`에 담는다** — `rule` 자리에 필드명을 넣지 않는다 |
+
+```json
+{ "code": "VALIDATION_FAILED", "message": "요청 값이 올바르지 않습니다.", "requestId": "req_…",
+  "errors": [ { "rule": "FIELD_INVALID", "field": "nickname", "message": "닉네임을 입력해 주세요." } ],
+  "warnings": [] }
+```
+
+- `field`는 `objectId`와 같이 **없으면 키 자체가 빠진다**(`@JsonInclude(NON_NULL)`). 둘은 가리키는 대상이 달라 합치지 않는다 — `objectId`는 배치된 오브젝트, `field`는 요청 필드 경로다.
+- `rule`은 **항상 규칙 어휘**다. 필드명·식별자를 `rule`에 넣으면 클라이언트의 화이트리스트 분기가 깨진다 (#58 §3).
+- **`errors[].message`의 모양은 `rule`이 정한다.** 사용자에게 보여줄 문장은 봉투 최상위 `message`가 담고, `errors[].message`는 대개 그 항목의 사유 문장이지만 **rule이 기계값을 정의했으면 기계값이 온다.** 클라이언트는 `rule`로 분기한 뒤 그 rule의 계약대로 읽는다 — 문장에서 값을 정규식으로 캐내지 않는다.
+  - `CURRENT_REVISION`은 **spec별로 모양이 다르다** — 005(Layout)는 문장(값 소비자 없음), 019(Game Studio)는 **십진수 문자열**이다. 각 spec 계약 문서가 자기 모양을 소유한다.
+  - `ApiErrorDetail`에 타입 있는 값 필드는 **추가하지 않는다.** 전 endpoint 공유 스키마인데 값이 필요한 rule이 아직 하나뿐이다. **기계값이 둘 이상 필요한 rule이 나오면 그때 필드로 올린다** (#58 §5 재확정, 2026-08-24).
 
 ### 1.4 Idempotency
 
@@ -68,7 +106,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 
 ### GET `/users/me`
 
-내 기본 정보 조회.
+내 기본 정보 조회. 회원 전용(게스트 `403 MEMBER_ONLY`).
 
 #### Response 예시
 
@@ -76,12 +114,39 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 {
   "userId": 12,
   "nickname": "FESTA_USER",
-  "wallet": {
-    "balance": 250
-  },
-  "boothId": 7
+  "status": "ACTIVE",
+  "providers": ["GOOGLE"],
+  "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
 }
 ```
+
+> **예시 정정 (2026-08-24)** — 이전 예시의 `wallet.balance`·`boothId`는 이 응답에 **없다.** 잔액은 `GET /wallets/me`(§8), 부스는 `GET /booths/{id}`(§3)가 소유한다. 구현(`MyAccountController.MyAccountResponse`)에 맞춰 고쳤다.
+
+`avatarCode`는 아직 저장하지 않은 사용자에게 **`null`** 이다(키는 존재). 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫이다(spec 013 FR-010).
+
+### PUT `/users/me/avatar`
+
+아바타 외형 저장 (spec 013a, #24 확정). 회원 전용.
+
+```json
+// 요청
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+
+// 200 — 저장한 값을 그대로 echo
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
+| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
+| 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
+
+상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
+
+정본 계약: `specs/013-avatar-customization/contracts/avatar-profile-api.md`
 
 ---
 
@@ -165,7 +230,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
   "entryAvailable": true,
   "facade": {
     "themeCode": "SSAFY_BLUE",
-    "primaryColor": "#1677C8",
+    "primaryColor": "#3B82F6",
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   },
@@ -201,12 +266,14 @@ Draft 저장.
 
 ```json
 {
+  "expectedRevision": 0,
+  "schemaVersion": 1,
   "template": "PROJECT_EXHIBITION",
   "objects": [
     {
       "objectId": "screen-1",
       "type": "VIDEO_SCREEN",
-      "position": {"x": 2.1, "y": 0.0, "z": 3.4},
+      "position": {"x": 2.1, "y": 0.0, "z": 1.4},
       "rotationY": 90.0,
       "configId": 152
     },
@@ -237,7 +304,7 @@ Draft 저장.
 
 ### GET `/booths/{boothId}/layouts/published`
 
-Unity가 사용할 Published Layout 조회.
+Unity가 사용할 Published Layout 조회. **인증 불필요.**
 
 #### Response
 
@@ -245,10 +312,72 @@ Unity가 사용할 Published Layout 조회.
 {
   "boothId": 7,
   "version": 4,
+  "schemaVersion": 1,
   "template": "PROJECT_EXHIBITION",
   "objects": []
 }
 ```
+
+`version`은 **공개 회차**, `schemaVersion`은 **Layout JSON 구조 버전**이다. 두 값을 같은 이름으로 부르면
+Unity가 하나로 파싱한다 (`BoothLayoutDto`에는 `version`만 있다).
+
+공개된 것이 없으면 `404 LAYOUT_NOT_PUBLISHED`, 임대가 유효하지 않으면 `409 BOOTH_LEASE_EXPIRED`다.
+
+### GET `/booth-slots/{slotId}/layouts/published` — spec 005 신설 (#62, 2026-08-23)
+
+Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응답 body는 `/booths/{boothId}/layouts/published`와 **완전히 동일**하다.
+
+`boothId`는 방 번호가 아니다 — 슬롯(고정)과 부스(임대 시 발급)는 다른 축이고 재임대하면 같은 방의 `boothId`가 바뀐다. 서버가 `슬롯 → 유효 임대 → boothId` 해석을 흡수한다.
+
+- 빈 슬롯·미공개 → `404 LAYOUT_NOT_PUBLISHED` (Unity의 graceful skip 그대로)
+- 임대 만료 → `409 BOOTH_LEASE_EXPIRED`
+- `slotId` 1~12가 Unity 앵커 `01~12`와 대응 (V12 시드가 고정)
+
+상세는 `specs/005-booth-studio-layout/contracts/layout-api.md` §11.
+
+### GET `/booth-layout-templates` — spec 005 신설 (#19 ④, 2026-08-21)
+
+편집기용 템플릿 카탈로그. footprint와 오브젝트 상한을 세 파트가 각자 알던 것을 한 곳에서 받는다. **권한 필요.**
+
+```json
+{
+  "templates": [
+    {
+      "template": "PROJECT_EXHIBITION",
+      "footprint": {"width": 6.0, "depth": 6.0, "height": 2.72},
+      "maxObjects": 12
+    }
+  ]
+}
+```
+
+- `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관, #19 ④·#45 C-06).
+- `height` 2.72는 셸 벽 패널 실측이다. Layout 좌표·실물 검증도 같은 값을 쓴다 (`0 ≤ y ≤ 2.72`).
+- 검증 오류·경고 rule 추가분: 실물 영역 이탈 `AREA_OUT_OF_BOUNDS`(error), 통행 판정
+  `FRONT_BLOCKED`·`ISOLATED_AREA`(warning, 공개 시점만). 기하 계약 상세는
+  `specs/005-booth-studio-layout/contracts/layout-api.md` §10.
+
+### PUT `/booths/{boothId}/facade` — spec 005 신설
+
+부스 외부 표현 수정. 내부 Layout과 달리 자유 배치가 아니라 정해진 4필드다.
+
+```json
+{
+  "themeCode": "SSAFY_BLUE",
+  "primaryColor": "#3B82F6",
+  "signText": "AI 프로젝트 전시관",
+  "logoUrl": null
+}
+```
+
+- `themeCode`: `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`
+- `primaryColor`: `#RRGGBB` 또는 null. **12색 팔레트 안의 값만 허용**하고 저장 시 **대문자로 정규화**한다 (#17, 2026-08-23 확정 — 값의 정본은 `specs/005-booth-studio-layout/contracts/layout-api.md` §6. 팔레트는 테마와 무관한 전역 1개)
+- `signText`: 60자 이하 또는 null
+- `logoUrl`: **https만 허용**, 2048자 이하 또는 null (http는 mixed content로 차단되어 조용히 안 보인다)
+
+소유자·Staff만 호출할 수 있고, 필드 검증 실패는 `400 VALIDATION_FAILED`(#17 확정 — 예:
+`"대표색은 #RRGGBB 형식이어야 합니다."`), 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는
+`GET /booths/{boothId}`의 `facade` 필드를 쓴다.
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 
@@ -376,23 +505,6 @@ Cursor 또는 Page 기반 거래 내역 조회.
 일일 지급 요청.
 
 중복 요청 시 같은 날 한 번만 지급한다.
-
-### POST `/agents/{agentId}/usage-authorizations` — P1 제안
-
-유료 AI 서비스 사용 전 Spring이 잔액·권한을 검증하고 사용 승인/결제를 처리하는 Endpoint 후보.
-
-```json
-{
-  "authorizationId": "aiuse_...",
-  "chargedCoin": 20,
-  "balanceAfter": 130,
-  "expiresAt": "..."
-}
-```
-
-AI 호출 실패 환불 정책은 TBD다.
-
----
 
 ## 9. Survey
 
@@ -610,6 +722,35 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
+## 17A. Game Studio — P2 Draft
+
+Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 Draft/Published Version과
+부스 Portal Binding의 Source of Truth이며, 웹 Runtime은 Published Version만 조회한다.
+
+- 편집: `POST /api/v1/games`, `GET /api/v1/games/{gameId}/draft`, `PUT /api/v1/games/{gameId}/draft`
+- 발행: `POST /api/v1/games/{gameId}/publish`, `GET /api/v1/games/{gameId}/versions`
+- 실행: `GET /api/v1/games/{gameId}/published`
+- 부스 연결: `GET /api/v1/game-portals/{configId}`
+- 저장 요청은 `expectedRevision`과 GameProject를 포함하고 불일치 시 HTTP 409
+  `GAME_REVISION_CONFLICT`를 반환한다. 좌표 clamp·unknown field 삭제 같은 자동 보정은 금지한다.
+- Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
+- Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
+  단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
+  builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
+- 현재 공개 포인터를 따라가는 `GET /games/{gameId}/published`는 `Cache-Control: no-cache` + ETag 재검증이다 — 재공개하면 같은 URL이 다른 본문을 가리키므로 장기 cache를 걸면 옛 version이 나온다. 긴 `max-age`·`immutable`은 후속 version 고정 URL에만 붙인다. Portal 실행 가능 여부는 `Cache-Control: no-store`다.
+- 독립 play route와 Portal overlay open 시 REST 조회로 신규 진입을 판정하며 Game Studio 전용 socket은 만들지 않는다.
+- 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
+- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
+- Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
+- MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+
+상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
+#21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
+[#34](https://github.com/kanghyunsoon/ssafesta/issues/34)의 교차 계약을 반영했다.
+
+---
+
 ## 18. 주요 오류 코드
 
 | Code | 의미 |
@@ -620,7 +761,19 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
-| `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 |
+| `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
+| `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
+| `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
+| `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·Staff 아님) |
+| `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
+| `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
+| `VALIDATION_FAILED` | 요청 값 오류 (400) |
+| `GAME_NOT_FOUND` *(P2 후보)* | GameProject 없음 또는 접근 불가 |
+| `GAME_REVISION_CONFLICT` *(P2 후보)* | Draft revision 충돌 |
+| `GAME_PROJECT_VALIDATION_FAILED` *(P2 후보)* | Schema 또는 의미 검증 실패 |
+| `GAME_NOT_PUBLISHED` *(P2 후보)* | 실행 가능한 Published Version 없음 |
+| `GAME_PORTAL_UNAVAILABLE` *(P2 후보)* | Portal 연결 해제·비활성·접근 불가 |
+| `GAME_SCHEMA_UNSUPPORTED` *(P2 후보)* | Runtime이 지원하지 않는 schemaVersion |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

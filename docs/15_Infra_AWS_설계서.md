@@ -1,198 +1,228 @@
-# SSAFY FESTA Infra / AWS 설계서
+# SSAFY FESTA Infra / 단일 EC2 운영 설계서
 
-> **목표**: React/Unity Web, Spring Boot, FastAPI, Unity Dedicated Server를 AWS에 배포하고, World Instance를 수평 확장 가능한 형태로 운영한다.  
-> **상태**: Target Architecture Draft — 비용과 팀 역량에 따라 개발 초기 배치는 단순화할 수 있다.
+> **목표**: 제공받은 단일 EC2에서 Jenkins, 파트별 dev, 통합 demo, 데이터 저장소를 논리적으로 격리해 운영하고 React/Unity Web, Spring Boot, FastAPI, Unity Dedicated Server를 실제 사용자 경로로 제공한다.
+> **상태**: Current MVP Architecture — 현재 사용할 구조를 우선 기술하며, AWS 관리형 서비스는 IAM과 추가 자원이 확보된 뒤 검토할 후속 이관 대상으로만 구분한다.
+> **근거 spec**: `specs/infra-001-ci-cd-pipelines/spec.md`, `specs/infra-002-environments/spec.md`, `docs/sdd/parts/INFRA.md`
 
 ---
 
 ## 1. 인프라 목표
 
-1. HTTPS 기반 Web 서비스 제공
-2. Unity Web 정적 파일 안정적 배포
-3. Spring / FastAPI 독립 배포
-4. Unity Dedicated Server Container 실행
-5. PostgreSQL / Redis / S3 역할 분리
-6. World Instance를 Task 단위로 추가 가능한 구조
-7. 로그·지표를 중앙에서 확인
-8. Secret을 코드 저장소와 분리
+1. 최종 demo를 도메인 기반 HTTPS/WSS로 제공한다.
+2. React와 Unity Web 정적 릴리스를 버전별로 배포하고 Cloudflare 캐시로 원본 전송 부하를 줄인다.
+3. `ai`/`back`/`front`/`game` dev와 `develop` demo가 서로의 컨테이너·네트워크·설정·배포 상태를 침범하지 않게 한다.
+4. Spring Boot, FastAPI, Unity Dedicated Server를 재현 가능한 Docker 이미지로 실행한다.
+5. PostgreSQL/pgvector 영구 데이터, Redis 임시 데이터, R2 비공개 원본 문서의 역할을 분리한다.
+6. Jenkins 빌드와 서비스 런타임이 같은 EC2의 자원을 경쟁하더라도 demo 사용자 경로를 우선 보호한다.
+7. 외부 백업과 복구 검증으로 EC2 또는 디스크 유실에 대비한다.
+8. 로그·지표를 서비스별로 확인하고 Secret을 저장소·로그·산출물에서 분리한다.
+
+단일 EC2는 고가용성이나 다중 호스트 수평 확장을 제공하지 않는다. 현재 구현하지 않은 ECS·RDS·ElastiCache·ECR·ALB·CloudFront를 사용 중이라고 설명하지 않는다.
 
 ---
 
-## 2. Target Architecture
+## 2. Current Architecture
 
 ```text
-                            Internet
-                               │
-                         Route53 / DNS
-                               │
-                      CloudFront / HTTPS
-                        │              │
-                        │              └─ S3 Static
-                        │                 React + Unity Web Build
-                        │
-                              ALB
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-        Spring Boot         FastAPI        Session Service
-        ECS/EC2 후보       ECS/EC2 후보      후보
-              │                │                │
-              └───────┬────────┴───────┬────────┘
-                      │                │
-                     RDS          ElastiCache/Redis
-                      │
-                     S3
+사용자 브라우저
+      │ HTTPS / WSS :443
+      ▼
+Cloudflare DNS / Proxy / CDN
+      │ HTTPS / WSS :443, Full (strict)
+      ▼
+단일 EC2
+├─ Nginx + Let's Encrypt
+│  ├─ demo.<domain>  → React + Unity WebGL 정적 릴리스
+│  ├─ api.<domain>   → Spring Boot
+│  ├─ ai.<domain>    → FastAPI (SSE)
+│  └─ world.<domain> → Unity Dedicated Server (내부 ws:7777)
+│
+├─ Jenkins
+│  ├─ Controller — Executor 0
+│  ├─ Build Agent
+│  ├─ Deploy Agent
+│  └─ Unity Agent — 영속 Library/라이선스
+│
+├─ dev 환경 — ai / back / front / game 논리 분리
+├─ demo 환경 — develop 통합 릴리스
+│  ├─ Spring Boot
+│  ├─ FastAPI
+│  └─ Unity Dedicated Server 1개 (11층·단일 채널)
+│
+├─ PostgreSQL + pgvector — 영구 볼륨
+├─ Redis — 유실 가능한 임시 상태
+├─ Docker 이미지 — commit SHA / current / known-good
+└─ 정적 릴리스 — version / current / known-good
 
-Unity Dedicated Server
-Linux Build → Docker → ECR → ECS Task
-                         ├─ World-01
-                         ├─ World-02
-                         └─ Booth Instance(P2)
+외부 서비스
+├─ Cloudflare R2 — 비공개 AI 원본 문서, DB 백업
+└─ 외부 LLM API — Embedding / 답변 생성
 ```
 
-Spring/FastAPI를 ECS에 둘지 EC2에 둘지는 팀 운영 부담과 비용에 따라 최종 확정한다. Unity Dedicated Server는 ECR+ECS가 대표 목표다.
+현재 모든 실행 컴포넌트는 한 EC2에 있으므로 물리 장애 영역은 분리되지 않는다. Docker Network·서비스 계정·볼륨·배포 단위를 통한 논리 격리와 외부 백업으로 위험을 줄인다.
 
 ---
 
 ## 3. Static Web
 
-### S3
+React와 Unity WebGL 산출물은 EC2의 버전별 정적 릴리스로 보관하고 Nginx가 Origin으로 제공한다.
 
-저장:
+```text
+releases/
+├─ <commit-sha>/
+│  ├─ React build
+│  └─ Unity WebGL build
+├─ current     → 현재 릴리스
+└─ known-good  → 마지막 정상 릴리스
+```
 
-- React build
-- Unity Web build
-- 공개 정적 asset
+Cloudflare는 `demo.<domain>`의 정적 파일만 CDN 캐시 대상으로 사용한다.
 
-### CloudFront
+- HTML 진입 파일: 짧은 TTL 또는 `no-cache`로 새 릴리스 확인
+- 파일명에 내용 hash가 있는 JS/CSS/WASM/Data: 긴 TTL과 `immutable`
+- API·인증·SSE·WSS·Presigned URL: Cache Bypass
+- 새 릴리스 검증 실패: `current`를 `known-good`으로 원자적 전환
+- Cloudflare를 사용할 수 없는 경우: Nginx Origin 경로로 핵심 정적 콘텐츠 제공
 
-- HTTPS
-- CDN cache
-- 정적 파일 전송
-- Unity Build 파일 Cache 정책 분리 검토
-
-React와 Unity Build를 동일 배포 단위로 둘지 별도 Origin으로 둘지는 CI/CD 편의에 따라 결정한다.
+React와 Unity WebGL은 demo 사용자 여정의 같은 릴리스 묶음으로 추적하되, 산출물별 캐시 정책은 분리한다.
 
 ---
 
-## 4. ALB
+## 4. Nginx / Public Entry
 
-용도:
-
-- Spring API routing
-- FastAPI routing
-- Health Check
-- HTTPS termination 후보
-
-예시:
+Nginx는 단일 EC2의 공개 진입점과 리버스 프록시를 담당한다.
 
 ```text
-/api/*     → Spring
-/ai/*      → FastAPI
+demo.<domain>  → versioned static release
+api.<domain>   → Spring Boot
+ai.<domain>    → FastAPI
+world.<domain> → Unity Dedicated Server:7777
 ```
 
-AI SSE를 사용할 경우 ALB/Proxy timeout과 buffering 설정을 실제 검증한다.
+TLS 경계:
+
+```text
+Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ── HTTP/WS ──> Container
+```
+
+- Nginx는 Let's Encrypt 인증서를 사용하고 자동 갱신 후 reload한다.
+- Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
+- `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
+- Unity 7777은 외부에 공개하지 않는다.
+- `world.<domain>`의 Nginx `proxy_read_timeout`은 초기값 `180s`를 명시하고, heartbeat·무입력 연결 실측 결과에 따라 조정한다.
+- AI SSE 경로는 `proxy_buffering off`, cache off, 충분한 read timeout을 적용한다.
+- API·AI·World는 Cloudflare 정적 캐시 대상에서 제외한다.
+
+최종 성공 여부는 설정 파일 존재가 아니라 외부 브라우저에서 WSS·SSE·Secure Cookie 경로가 실제 동작하는지로 판정한다.
 
 ---
 
 ## 5. Spring Boot 배포
 
-### Target
-
-Docker Container 기반 배포를 권장한다.
+Spring Boot는 Jenkins가 빌드·테스트한 뒤 commit SHA가 붙은 Docker 이미지로 패키징하고 Docker Compose로 배포한다.
 
 ```text
-Spring Build
-→ Docker Image
-→ ECR
-→ ECS Service 또는 EC2 Docker
+Gradle Build / Test
+→ Docker Image:<commit-sha>
+→ dev-back 또는 demo 배포
+→ Health Check
+→ current 승격 또는 known-good 복구
 ```
 
-### 환경변수
+주요 런타임 설정:
 
-- DB connection
-- Redis endpoint
-- JWT secret/reference
-- S3 bucket
-- AI internal endpoint
-- CORS allowed origin
+- 환경별 PostgreSQL Database/Role
+- Redis 내부 endpoint
+- JWT Secret Reference
+- R2 S3-compatible endpoint/bucket
+- FastAPI 내부 endpoint
+- CORS allowed origin (`demo.<domain>`)
+- OAuth callback URL
+
+Coin·Lease·Wallet·Reward 등 영구 상태의 Source of Truth는 PostgreSQL이다. Redis나 Unity 서버 상태만으로 영구 비즈니스 값을 변경하지 않는다.
 
 ---
 
 ## 6. FastAPI 배포
 
-```text
-FastAPI
-→ Docker
-→ ECR
-→ ECS Service 또는 EC2 Docker
-```
-
-AI Provider Key는 Secrets Manager / Parameter Store 같은 Secret 저장소 사용을 권장한다.
-
-문서 처리 부하가 커지면:
+FastAPI도 Jenkins가 테스트한 Docker 이미지를 단일 EC2의 dev-ai 또는 demo 환경에 배포한다.
 
 ```text
-API Service
-+
-Document Worker
-+
-Queue(SQS 후보)
+Test
+→ Docker Image:<commit-sha>
+→ dev-ai 또는 demo 배포
+→ /ai/health
+→ SSE 실측
 ```
 
-로 분리할 수 있다. MVP에는 동작 안정성이 우선이다.
+- 원본 문서는 비공개 R2에서 짧은 권한으로 읽는다.
+- 문서 메타데이터와 처리 상태는 영구 PostgreSQL이 관리한다.
+- Vector 데이터는 같은 PostgreSQL 인스턴스의 별도 pgvector 스키마/Role을 우선 사용한다.
+- LLM/Embedding Provider Key는 승인된 Secret 경계에서 런타임에만 주입한다.
+- FastAPI 또는 외부 AI 장애가 로그인·부스·월드 등 비AI 기능 전체로 전파되지 않게 한다.
+- Document Worker와 Queue는 부하 실측 후 필요한 경우에만 분리한다.
 
 ---
 
 ## 7. Unity Dedicated Server 배포
 
-```text
-Unity 6 Project
-→ Linux Dedicated Server Build
-→ Docker Image
-→ ECR
-→ ECS Task
-```
-
-### ECS Task 단위
+현재 범위는 11층·단일 채널이며 Unity Dedicated Server 컨테이너 1개를 사용한다.
 
 ```text
-Task #1 → 11F-01
-Task #2 → 11F-02
-Task #3 → Booth-7-01(P2)
+Unity Linux Server Build
+→ Docker Image:<commit-sha>
+→ 단일 EC2 demo 환경
+→ 내부 ws://unity:7777
+→ Nginx / Cloudflare
+→ 외부 wss://world.<domain>:443
 ```
 
-한 Task 안에 여러 World를 무리하게 몰아넣기보다 Instance 단위를 명확히 유지한다.
+- ECS Task, 층별 인스턴스, 자동 채널 분배는 현재 요구사항이 아니다.
+- Spring `world-sessions` 응답이 `scheme=wss`, `host=world.<domain>`, `port=443`을 내려준다.
+- Unity 클라이언트는 서버 주소를 하드코딩하지 않는다.
+- 7777은 Docker 내부 Network에서만 접근한다.
+- 외부 브라우저 2개 동시 접속, 상호 이동, 무입력 연결 유지, 종료 후 재접속을 검증한다.
+
+단일 컨테이너 수용 목표는 한 채널 30명이며, 수용 가능 여부는 부하 실측으로 판정한다.
 
 ---
 
 ## 8. Unity Server 이미지
 
-Dockerfile 고려:
+Dockerfile은 다음을 유지한다.
 
 - Linux runtime dependency
 - Server binary execute permission
-- 환경변수로 instance/channel 설정
-- Port expose
+- 비root 실행 사용자
 - graceful shutdown signal
 - stdout/stderr log
+- commit SHA 이미지 식별
 
-예상 환경변수:
+현재 구현된 실행 인자:
+
+```text
+-port 7777
+-maxPlayers 40
+```
+
+향후 설정 후보:
 
 ```text
 INSTANCE_ID
 WORLD_ID
 CHANNEL_ID
-MAX_PLAYERS
 SPRING_INTERNAL_URL
-REDIS_ENDPOINT(optional)
 ```
+
+향후 후보값은 실제 ENV 파싱이 구현되기 전까지 구현 완료로 기록하지 않는다. Unity Client WebGL 빌드와 Linux Server 이미지는 호환되는 commit으로 함께 추적한다.
 
 ---
 
-## 9. RDS PostgreSQL
+## 9. PostgreSQL + pgvector
 
-저장:
+PostgreSQL은 단일 EC2의 Docker 컨테이너와 영구 볼륨으로 운영한다.
+
+저장 대상:
 
 - User
 - Booth / Lease
@@ -201,231 +231,272 @@ REDIS_ENDPOINT(optional)
 - Staff
 - Survey
 - Project
-- Agent Config
-- Event / Vote(P2)
-- pgvector 또는 별도 AI DB
+- Agent Config / Document Metadata
+- AI Vector(pgvector 별도 스키마)
 
-### 운영 원칙
+운영 원칙:
 
-- Public access 비활성 권장
-- Private subnet
-- App Security Group에서만 접근
-- 자동 백업 설정
-- Migration 도구 사용
+- Docker 영구 볼륨은 애플리케이션 재배포로부터 데이터를 보호한다.
+- 볼륨은 EC2·디스크 손실에 대비한 백업이 아니다.
+- dev와 demo는 Database/Schema/Role을 구분하고 최소 권한을 적용한다.
+- PostgreSQL 5432를 외부에 공개하지 않고 Docker 내부 Network만 사용한다.
+- 불가피한 관리 접근은 SSH Tunnel 또는 `127.0.0.1` 바인딩으로 제한한다.
+- Migration 도구와 스키마 버전을 릴리스와 함께 추적한다.
+- PostgreSQL/pgvector 이미지 버전을 고정한다.
+- 정기 `pg_dump`를 EC2 밖의 비공개 R2에 업로드하고 복구를 실측한다.
+
+단일 EC2 구조에는 RDS 자동 백업, Multi-AZ, 자동 장애조치, Point-in-Time Recovery가 없다.
 
 ---
 
-## 10. Redis / ElastiCache
+## 10. Redis
+
+Redis는 유실 가능한 임시 상태만 저장한다.
 
 용도:
 
 - Presence
-- Channel Assignment
 - Staff Online
-- Session
-- Instance 상태
-- Lock
+- Cache
+- 일시 세션
+- 임시 Lock
 
-영구 비즈니스 기록을 Redis 단독으로 저장하지 않는다.
+운영 원칙:
+
+- Coin·Lease·Wallet·Reward·문서 상태 등 영구 기록을 Redis 단독으로 저장하지 않는다.
+- Redis 재시작 시 presence·cache·일시 세션·lock이 사라질 수 있음을 정상 복구 시나리오로 문서화한다.
+- 캐시는 PostgreSQL 또는 외부 Source of Truth에서 재구성할 수 있어야 한다.
+- 보안·토큰 재사용 방지처럼 유실이 보안 사고로 이어지는 기록은 PostgreSQL에 둔다.
+- Redis 6379는 외부에 공개하지 않고 필요한 내부 컨테이너만 접근한다.
 
 ---
 
-## 11. S3
+## 11. Cloudflare R2 / S3-compatible Object Storage
 
-Bucket 또는 Prefix 분리:
+R2의 우선 용도는 비공개 AI 원본 문서이며, PostgreSQL 외부 백업도 별도 Prefix에 보관한다.
 
 ```text
-static-web/
-booths/{boothId}/agents/{agentId}/documents/
-project-media/
-images/
+documents/booths/{boothId}/agents/{agentId}/...
+backups/postgresql/...
 ```
 
-### 보안
-
-- AI 문서는 기본 비공개
-- Presigned URL 사용 후보
-- Public Bucket 금지
-- 파일 타입/크기 검증
-
----
-
-## 12. 네트워크 구조
-
-권장 VPC:
+문서 업로드 흐름:
 
 ```text
-VPC
-├─ Public Subnet
-│  └─ ALB / 필요 시 NAT
-└─ Private Subnet
-   ├─ Spring
-   ├─ FastAPI
-   ├─ Unity Server
-   ├─ RDS
-   └─ Redis
+Client → Spring에 업로드 권한 요청
+Spring → 짧은 Presigned URL 발급
+Client → R2 직접 업로드
+Client → 업로드 완료 통지
+Spring → HEAD로 존재·크기·형식 검증
+Spring → 후속 AI 처리 허용
 ```
 
-초기 프로젝트 비용/복잡도 때문에 단순화할 수 있으나 RDS/Redis를 인터넷에 직접 노출하는 구조는 피한다.
+보안·운영 원칙:
+
+- AI 원본 문서는 기본 비공개다.
+- Public Bucket을 사용하지 않는다.
+- Presigned 권한은 단일 객체·단일 작업·짧은 유효기간으로 제한한다.
+- Object Key는 서버가 결정하며 클라이언트 입력을 그대로 신뢰하지 않는다.
+- 파일 타입·크기·요청량과 총 사용량에 무과금 안전 한도를 둔다.
+- API·로그에 Presigned URL과 R2 Secret 원문을 남기지 않는다.
+- R2를 사용할 수 없을 때도 S3-compatible 계약을 유지하는 fallback을 준비한다.
+- R2 원본 문서의 별도 외부 백업 위치는 §25의 확정 필요 사항으로 남긴다.
 
 ---
 
-## 13. Security Group 원칙
+## 12. 단일 EC2 네트워크 구조
 
-### ALB
+기존 VPC Public/Private Subnet과 ALB·RDS·ElastiCache 전제 대신 세 계층과 Docker Network로 보호한다.
 
-- 443 from Internet
+```text
+Internet
+   │
+AWS Security Group
+   │  22(관리자 제한), 80/443(승인된 공개 진입점)
+   ▼
+EC2 UFW
+   │
+Nginx
+   ├─ demo / api / ai / world 공개 routing
+   └─ dev 제한 접근 routing
+   │
+Docker Networks
+   ├─ ci-net       : Jenkins Controller / Agents
+   ├─ dev-ai-net   : AI dev
+   ├─ dev-back-net : Backend dev
+   ├─ dev-front-net: Frontend dev
+   ├─ dev-game-net : Game dev
+   ├─ demo-net     : Spring / FastAPI / Unity
+   └─ data-net     : PostgreSQL / Redis, 필요한 앱만 연결
+```
 
-### Spring/FastAPI
+환경별 컨테이너 이름·Network·설정·배포 상태를 분리한다. 한 파트의 dev 배포가 다른 dev와 demo 컨테이너를 재시작해서는 안 된다.
 
-- App port only from ALB 또는 내부 서비스
+PostgreSQL·Redis·애플리케이션 포트·Jenkins 관리 포트는 인터넷에 직접 publish하지 않는다. 외부 공개는 Nginx를 통한 승인된 HTTP/HTTPS/WSS 경로로 한정한다.
 
-### RDS
+---
 
-- 5432 only from Application SG
+## 13. 방화벽·포트 원칙
 
-### Redis
+AWS Security Group, EC2 UFW, Docker port binding을 함께 적용한다. 한 계층만으로 데이터 포트를 보호했다고 간주하지 않는다.
 
-- Redis port only from 필요한 Application SG
+| 포트 | 공개 범위 | 용도 |
+|---|---|---|
+| 22 | 승인된 관리자 IP | SSH 운영 접근 |
+| 80 | HTTP→HTTPS 전환 및 인증서 발급 경로 | Nginx |
+| 443 | 승인된 Web HTTPS/WSS | Cloudflare/Nginx 공개 진입점 |
+| 5432 | 외부 차단 | PostgreSQL 내부 통신 |
+| 6379 | 외부 차단 | Redis 내부 통신 |
+| 7777 | 외부 차단 | Nginx→Unity 내부 WebSocket |
+| Jenkins 관리/Agent 포트 | 외부 차단 | ci-net 또는 제한된 관리 경로 |
 
-### Unity Server
-
-실제 NGO Transport가 요구하는 Port/Protocol을 POC 후 제한적으로 Open한다.
+- PostgreSQL과 Redis는 `expose`만 사용하고 host publish를 피한다.
+- 관리상 host binding이 필요하면 `127.0.0.1`에만 바인딩한다.
+- Nginx의 기본 Host는 승인되지 않은 직접 요청을 거부한다.
+- Cloudflare Proxy 안정화 후 443 Origin 접근을 Cloudflare IP 범위로 제한하는 방안을 검토한다.
+- Security Group 변경 권한이 없으면 AWS 관리자에게 80/443과 관리자 SSH 규칙을 요청하고 적용 여부를 별도로 검증한다.
 
 ---
 
 ## 14. DNS / Domain
 
-권장 분리 예:
+Route53 대신 Cloudflare DNS를 사용한다.
 
 ```text
-festa.example.com       → Web
-api.festa.example.com   → Spring
-ai.festa.example.com    → FastAPI
+demo.<domain>   → React + Unity WebGL
+api.<domain>    → Spring Boot
+ai.<domain>     → FastAPI / SSE
+world.<domain>  → Unity Dedicated Server / WSS
 ```
 
-실제 SSAFY 배포 도메인 규칙에 맞게 조정한다.
+- 네 레코드는 같은 EC2 공인 IP를 가리키고 Cloudflare Proxy를 활성화한다.
+- 정적 캐시는 `demo.<domain>`의 허용된 파일에만 적용한다.
+- `api`, `ai`, `world`는 정적 Cache Bypass 대상이다.
+- dev는 도메인을 붙이지 않고 EC2 공인 IP의 제한된 진입점으로 검증한다.
+- 실제 루트 도메인과 관리 계정 담당자는 구매 전에 확정한다.
+- Spring `world-sessions`가 `world.<domain>:443`을 내려주며 Unity Client는 주소를 하드코딩하지 않는다.
 
 ---
 
-## 15. CI/CD
+## 15. Jenkins CI/CD
 
-### Web
-
-```text
-Git Push/MR Merge
-→ npm test/build
-→ S3 Upload
-→ CloudFront Invalidation
-```
-
-### Spring
+Jenkins는 단일 EC2에서 Controller와 작업 Agent를 논리적으로 분리한다.
 
 ```text
-Build/Test
-→ Docker Build
-→ ECR Push
-→ ECS Deploy 또는 EC2 Restart
-→ Health Check
+Jenkins Controller — Executor 0, 지휘·이력·자격증명
+├─ Build Agent  — Spring / FastAPI / Frontend 이미지·산출물
+├─ Deploy Agent — dev/demo 배포·검증·롤백
+└─ Unity Agent  — WebGL/Linux Server 빌드, 영속 Library/라이선스
 ```
 
-### FastAPI
+파트 브랜치:
 
 ```text
-Test
-→ Docker Build
-→ ECR Push
-→ Deploy
-→ /ai/health
+ai/back/front/game push
+→ 해당 파트 Build/Test
+→ Image 또는 Artifact:<commit-sha>
+→ 해당 파트 dev만 배포
+→ 다른 dev와 demo는 재시작하지 않음
 ```
 
-### Unity Client
+`develop`:
 
 ```text
-Unity Web Build
-→ Artifact
-→ S3
-→ CloudFront
+검증 완료 변경 Squash Merge
+→ 전 컴포넌트 통합 릴리스 생성
+→ demo 배포
+→ Web → Login → World → AI 사용자 여정 검증
+→ 성공 시 current 승격
+→ 되돌릴 수 있는 실패만 known-good 자동 복구
 ```
 
-### Unity Server
+운영 원칙:
 
-```text
-Linux Server Build
-→ Docker
-→ ECR
-→ ECS Task Definition Revision
-```
+- 오래된 Pipeline Run이 최신 배포를 덮어쓰지 못하게 순서를 통제한다.
+- 컨테이너 이미지는 commit SHA로 보관하고 `current`와 `known-good`을 식별한다.
+- Controller에서는 빌드를 실행하지 않는다.
+- Unity Personal 라이선스는 영속 Unity Agent에서 관리자가 Unity Hub로 1회 활성화한다.
+- Unity 계정 인증정보를 Jenkins Credentials나 Pipeline 변수에 저장하지 않는다.
+- 소스 저장소가 GitHub에서 GitLab으로 이전되면 Jenkins Pipeline은 유지하고 Webhook만 전환한다.
+- 단일 EC2에서는 동시 고부하 빌드를 1개로 제한하고 시연 시간대에는 빌드·배포를 동결한다.
+- 빌드 Agent 자원 한도를 설정하고 demo 런타임을 우선 보호한다.
+
+DB·Secret·환경 설정·비가역 데이터 변경 및 외부 AI 장애는 자동 복구하지 않고 상태를 보존한 뒤 수동 판단한다.
 
 ---
 
 ## 16. 환경 분리
 
-가능하면:
+물리 서버는 하나지만 배포 대상은 다음처럼 구분한다.
 
 ```text
-dev
-staging
-prod/demo
+dev-ai     ← ai 브랜치, Mock 연동 허용
+dev-back   ← back 브랜치, Mock 연동 허용
+dev-front  ← front 브랜치, Mock 연동 허용
+dev-game   ← game 브랜치, Mock 연동 허용
+demo       ← develop, 실제 사용자 계약과 외부 연동
 ```
 
-SSAFY 프로젝트 규모가 작다면 최소 `dev / demo`는 분리하는 것이 좋다.
+분리 기준:
 
-같은 DB를 로컬 테스트와 시연이 공유해 데이터가 망가지는 상황을 피한다.
+- Docker Compose Project/서비스 이름
+- Docker Network
+- 환경변수와 Secret Reference
+- Database/Schema/Role
+- Redis namespace 또는 환경별 인스턴스
+- 정적 릴리스 경로
+- 배포 이력과 current/known-good
+
+dev 배포는 다른 dev와 demo를 재시작하거나 교체하지 않는다. demo는 실제 도메인·HTTPS/WSS·실제 외부 API를 사용하는 통합 사용자 경로다.
 
 ---
 
 ## 17. Secret 관리
 
-저장소 금지:
+저장소에 커밋하지 않는 값:
 
-- DB password
-- JWT secret
-- AWS key
-- LLM key
-- OAuth secret
+- PostgreSQL password
+- JWT signing secret/key
+- R2 Access Key / Secret
+- LLM / Embedding API Key
+- OAuth Client Secret
+- Mattermost Webhook
+- TLS private key
 
-권장:
+관리 원칙:
 
-- AWS Secrets Manager
-- SSM Parameter Store
-- GitLab protected CI variables
+- Pipeline Secret은 Jenkins Credentials에 저장하고 필요한 Job에만 주입한다.
+- 런타임 Secret은 저장소 밖의 권한 제한 파일 또는 승인된 Secret 경계에서 주입한다.
+- Secret 파일은 최소 권한으로 읽고 이미지·정적 산출물·캐시에 포함하지 않는다.
+- 로그·테스트 보고서·알림·명령 출력에 원문을 남기지 않는다.
+- Secret Scan으로 커밋과 산출물을 검사한다.
+- Unity 계정 인증정보는 Jenkins에 저장하지 않는다.
 
-중 하나를 팀 환경에 맞게 사용한다.
+AWS IAM과 관리형 Secret 저장소가 확보되면 공급자별 값을 교체할 수 있지만 현재 필수조건으로 두지 않는다.
 
 ---
 
 ## 18. Logging / Monitoring
 
-### CloudWatch 후보
+### P0 — 로컬 운영 로그
 
-Spring:
+- Spring, FastAPI, Unity Server는 stdout/stderr로 기록한다.
+- Docker `local` 또는 `json-file` 로그 드라이버에 크기·파일 수 제한을 설정한다.
+- Nginx access/error 로그와 Jenkins Pipeline 원본 로그를 보존한다.
+- 로그에 Secret·토큰·Presigned URL·개인정보 원문을 남기지 않는다.
+- EC2 디스크 사용량을 감시해 로그가 영구 데이터 영역을 잠식하지 않게 한다.
 
-- request count
-- 4xx/5xx
-- latency
-- JVM memory
+CloudWatch는 AWS IAM이 없으므로 현재 수집 경로로 사용하지 않는다.
 
-FastAPI:
+### P1 — 수집 Agent 기반 관측
 
-- AI latency
-- LLM errors
-- token usage
-- document processing errors
+- Jenkins와 파트별 컨테이너 로그 수집
+- Host/Container CPU·메모리·디스크·네트워크 지표 수집
+- Grafana 대시보드
+- Infra 담당자가 승인한 규칙 기반 Mattermost 알림
+- 중복 이벤트 그룹화와 재알림 억제
 
-Unity Server:
-
-- instanceId
-- current players
-- disconnects
-- memory / CPU
-
-Infra:
-
-- ECS task restart
-- ALB 5xx
-- RDS connections
-- Redis memory
+일반 CI 성공·실패는 별도 탐지 규칙이 없는 한 Mattermost 알림을 만들지 않는다. 관측 스택 장애가 CI/CD와 애플리케이션 성공 판정을 변경해서도 안 된다.
 
 ---
 
@@ -434,8 +505,10 @@ Infra:
 ### Spring
 
 ```text
-/actuator/health 후보
+/actuator/health
 ```
+
+DB·Redis·필수 내부 의존성 상태를 구분해 확인한다.
 
 ### FastAPI
 
@@ -443,105 +516,187 @@ Infra:
 /ai/health
 ```
 
-### Unity Server
+프로세스 상태와 외부 LLM 장애를 구분한다. 외부 LLM 장애만으로 정상인 비AI 서비스를 재시작하지 않는다.
 
-ECS가 확인할 수 있는 process/heartbeat 방식이 필요하다. 실제 HTTP Health Endpoint 추가 여부는 구현 난이도에 따라 결정한다.
+### Static Web / Nginx
 
----
-
-## 20. Scaling
-
-### Web
-
-CloudFront/S3 자체 확장.
-
-### Spring/FastAPI
-
-필요 시 ECS Service Task count 확장.
+- 현재 HTML 진입점 응답
+- Unity WebGL 필수 파일과 Content-Encoding
+- Host별 routing과 TLS 인증서
 
 ### Unity Server
+
+- 컨테이너 process/port 상태
+- 외부 `wss://world.<domain>` Upgrade 성공
+- 브라우저 2개 상호 이동
+- 무입력 연결 유지와 재접속
+
+### develop 통합 릴리스
 
 ```text
-수용량 부족
-→ 새 World Task 실행
-→ Session Service에 READY 등록
-→ 새 사용자 배정
+Web 접속 → Login → World 입장 → AI 응답
 ```
 
-자동화는 P2다. MVP는 수동 Task 실행으로도 아키텍처 검증 가능하다.
+모든 필수 단계가 통과해야 demo 릴리스를 성공으로 기록한다.
 
 ---
 
-## 21. 비용 절감 전략
+## 20. Capacity / Resource Guardrail
 
-- 개발 초기 Spring/FastAPI를 한 EC2에 둘 수 있음
-- Unity Server도 POC 단계는 한 EC2 Docker로 검증 가능
-- RDS/ElastiCache 비용이 부담되면 개발 환경은 단순화 가능
-- 최종 발표에서는 Target Architecture와 실제 MVP 배치를 구분해 설명
+현재 단일 EC2는 수평 확장과 고가용성을 제공하지 않는다. 먼저 실제 자원 사용량을 측정하고 demo를 보호한다.
 
-구현하지 않은 AWS 서비스를 사용했다고 발표하지 않는다.
+측정 대상:
+
+- Jenkins/Unity 빌드 CPU·메모리·디스크 I/O
+- Spring/FastAPI 응답 지연과 메모리
+- Unity Server 동시 접속자·CPU·메모리
+- PostgreSQL connection·volume 사용량
+- Redis memory
+- 정적 파일 원본 전송량
+
+운영 규칙:
+
+- 고부하 Build 동시 실행 최대 1개
+- 시연 시간대 Build/Deploy 동결
+- Build Agent CPU·메모리 제한
+- demo 런타임과 PostgreSQL에 우선 자원 확보
+- 디스크 여유 공간 임계치 미만이면 새 빌드·업로드 차단
+- 한 채널 30명 목표를 실제 부하 테스트로 검증
+
+향후 EC2나 IAM이 추가되면 Agent 또는 특정 서비스를 다른 호스트로 옮길 수 있도록 이미지·설정·배포 단위를 유지한다. 이를 현재 수평 확장 구현 완료로 주장하지 않는다.
+
+---
+
+## 21. 비용·운영 복잡도 관리
+
+- 제공받은 고성능 EC2 한 대를 CI, dev, demo가 함께 사용한다.
+- Cloudflare DNS/CDN과 R2는 계정·결제 조건과 무료 사용량을 확인한 뒤 사용한다.
+- R2는 프로젝트가 정한 무과금 안전 한도에서 신규 업로드를 차단한다.
+- 관리형 AWS 서비스는 IAM·추가 자원·운영 필요성이 확인되기 전 도입하지 않는다.
+- 같은 EC2에 구성요소를 추가할 때는 기능 이점보다 자원 사용량과 장애 전파를 먼저 평가한다.
+- 구현하지 않은 AWS 서비스를 사용했다고 발표하지 않는다.
+
+현재 구조와 장기 관리형 이관 가능성을 문서와 발표에서 명확히 구분한다.
 
 ---
 
 ## 22. Backup / Recovery
 
-최소:
+### PostgreSQL
 
-- RDS 자동 백업
-- S3 파일 보존
-- DB Migration version 관리
-- 배포 이미지 ECR tag/revision 관리
+```text
+정기 pg_dump --format=custom
+→ 압축·checksum 확인
+→ 비공개 R2 backups/postgresql/ 업로드
+→ 업로드 결과·크기 기록
+```
 
-시연 직전:
+- 로컬 영구 볼륨과 로컬 dump만으로는 완전한 백업으로 간주하지 않는다.
+- 초기 보관안은 일간 7개·주간 4개이며 실제 데이터 크기와 정책 확정 후 조정한다.
+- 배포 직전 또는 DB Migration 전 수동 백업을 추가한다.
+- pgvector가 설치된 동일 계열 PostgreSQL 이미지에서 `pg_restore`를 실측한다.
+- 백업 성공 로그만 보지 않고 복구된 row·vector·문서 메타데이터를 검증한다.
 
-- DB snapshot 또는 export
-- 안정 버전 Docker/Image tag
-- Web 안정 build 보관
+### AI 원본 문서
+
+- R2 객체와 PostgreSQL의 Object Key·문서 상태 대응 관계를 복구할 수 있어야 한다.
+- 정기 Object Inventory/Manifest를 백업 세트와 연결한다.
+- R2 자체 장애·계정 상실에 대비한 두 번째 외부 보관 위치는 확정 후 반영한다.
+
+### 배포 산출물
+
+- Docker Image: commit SHA / current / known-good
+- Static Release: version / current / known-good
+- DB Migration version
+- 환경 설정의 Secret 없는 복구본
+
+복구 리허설 결과와 소요시간을 기록한다.
 
 ---
 
 ## 23. 장애 대응
 
-### FastAPI Down
+### FastAPI 또는 외부 LLM Down
 
-- AI 기능 오류
-- World/Project/Survey는 계속 동작
+- AI 기능만 실패 상태로 표시한다.
+- 로그인·부스·월드·비AI 기능은 계속 동작한다.
+- 정상 컴포넌트를 자동 복구 대상으로 삼지 않는다.
 
-### Unity World Task Down
+### Unity Server Container Down
 
-- 해당 Channel 사용자 재접속 안내
-- Spring 영구 데이터 영향 없음
+- 해당 사용자는 재접속 안내를 받는다.
+- 컨테이너를 known-good 이미지로 재기동하고 WSS 경로를 재검증한다.
+- Spring의 영구 비즈니스 데이터에는 영향을 주지 않는다.
 
 ### Spring Down
 
-- 신규 비즈니스 작업 제한
-- 알람 발생
-- 시연 시 backup 영상 준비
+- 신규 로그인·임대·코인·문서 메타데이터 변경을 제한한다.
+- known-good 복구 가능 여부를 판단하고 DB Migration 관련 실패는 수동 처리한다.
+
+### Redis Restart
+
+- presence·cache·일시 세션·lock 유실을 허용한다.
+- PostgreSQL Source of Truth에서 재구성하고 영구 비즈니스 데이터 손실이 없어야 한다.
+
+### PostgreSQL 또는 EC2 Disk 장애
+
+- 쓰기 작업을 중단하고 추가 손상을 막는다.
+- 새 PostgreSQL/EC2에 외부 R2 백업을 복구한다.
+- Schema·row·vector·R2 문서 연결을 검증한 뒤 서비스한다.
+
+### EC2 전체 장애
+
+- CI, dev, demo, DB, Redis가 함께 중단되는 단일 장애점임을 인정한다.
+- 새 호스트에 Compose·known-good 이미지·정적 릴리스·DB 백업으로 복구한다.
+
+### Cloudflare 또는 R2 장애
+
+- Cloudflare 장애 시 문서화된 Nginx Origin 접근 경로를 사용한다.
+- R2 장애는 문서 업로드·AI 문서 처리로 격리하고 비AI 기능 전체 장애로 전파하지 않는다.
 
 ---
 
-## 24. POC 순서
+## 24. 구현·실측 순서
 
-1. Unity Linux Dedicated Server local build
-2. Docker local 실행
-3. 외부 Client 연결
-4. AWS 단일 Instance에서 실행
-5. ECR push
-6. ECS Task 실행
-7. Web Client → ECS Server 연결
+1. EC2 vCPU·RAM·Disk·OS와 Security Group/UFW 권한 확인
+2. Docker/Compose 설치와 ci/dev/demo/data Network·볼륨 분리
+3. Jenkins Controller Executor 0과 Build/Deploy/Unity Agent 구성
+4. 파트별 dev 독립 배포와 다른 환경 무재시작 검증
+5. PostgreSQL/pgvector·Redis 영속/임시 데이터 경계 검증
+6. Spring·FastAPI·Unity Server demo 통합 배포
+7. Nginx HTTP Origin과 버전별 정적 릴리스·known-good 롤백 검증
+8. 도메인 구매 후 Cloudflare DNS/Proxy·Let's Encrypt·Full (strict) 적용
+9. HTTPS 페이지에서 WSS 2브라우저·idle/heartbeat·재접속 실측
+10. SSE가 중간 버퍼링 없이 순차 도착하는지 실측
+11. Refresh Cookie·CORS·OAuth callback을 실제 demo 도메인에서 검증
+12. R2 Presigned 직접 업로드·HEAD 검증·사용량 제한 시험
+13. `pg_dump→R2→pg_restore` 복구 리허설
+14. Unity Build와 demo 동시 부하 측정 후 자원 제한·시연 동결 정책 확정
 
-ECS부터 만들고 Unity 연결 자체가 안 되는 상황을 피한다.
+ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2의 실제 외부 사용자 경로와 복구 가능성이다.
 
 ---
 
 ## 25. 확정 필요 사항
 
-- Spring/FastAPI 최종 ECS vs EC2
-- Unity Transport Port/Protocol
-- ALB를 Unity Server에도 사용할지 여부
-- RDS/pgvector 분리 여부
-- Redis Managed 여부
-- SQS 도입 시점
-- CI/CD Platform 구체 설정
-- Autoscaling 기준
-- 예산 상한
+| ID | 항목 | 결정 주체 | 결정 시점 |
+|---|---|---|---|
+| C-01 | EC2 vCPU·RAM·Disk와 80/443 Security Group 변경 담당자 | Infra + AWS 관리자 | 실환경 구성 전 |
+| C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra + 팀 | DNS/TLS 적용 전 |
+| C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra + 팀 리드 | Cloudflare/R2 적용 전 |
+| C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | 문서 업로드 적용 전 |
+| C-05 | R2 장애 시 S3-compatible fallback과 원본 문서의 두 번째 외부 백업 위치 | Infra + BE + AI | 복구 계획 확정 전 |
+| C-06 | PostgreSQL/pgvector Database·Schema·Role 분리와 최종 백업 보관 정책 | Infra + BE + AI | 데이터 환경 구성 전 |
+| C-07 | 시연 시간대·빌드/배포 동결 시간과 긴급 배포 승인 절차 | Infra + 팀 | 서버 부하 실측 후 |
+| C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | 관측 설계 전 |
+| C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | 외부 실측 후 |
+
+이미 확정된 사항:
+
+- CI/CD는 Jenkins를 사용한다.
+- 초기 자원은 고성능 단일 EC2 한 대다.
+- dev는 EC2 IP, 최종 demo만 신규 도메인·TLS를 사용한다.
+- DNS/Proxy/CDN은 Cloudflare, Origin TLS는 Nginx Let's Encrypt를 사용한다.
+- demo 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다.
+- Unity Server는 11층·단일 채널 컨테이너 1개이며 외부 `wss:443`을 내부 `ws:7777`로 전달한다.
+- PostgreSQL/pgvector는 영구 데이터, Redis는 유실 가능한 임시 데이터만 담당한다.

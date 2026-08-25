@@ -1,0 +1,11 @@
+{
+  "description": "Runtime이 지원하지 않는 major schemaVersion을 거부한다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/schemaVersion",
+      "value": "2.0.0"
+    }
+  ]
+}

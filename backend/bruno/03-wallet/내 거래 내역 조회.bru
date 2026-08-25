@@ -1,0 +1,49 @@
+meta {
+  name: 내 거래 내역 조회
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/wallets/me/transactions?page=0&size=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 0
+  size: 20
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 내 코인 거래 내역 조회
+
+  지급·차감 내역을 최신순 페이지로 조회한다. (spec 003 FR-012)
+
+  - 인증: 회원 Access Token 필요
+  - Query: `page`(0 이상, 기본 0), `size`(1~100, 기본 20)
+  - 정렬은 서버가 `발생시각 내림차순`으로 고정한다. 클라이언트가 정렬을 지정하지 않는다.
+  - 성공: `200 OK`, `{ content, page, size, totalElements, totalPages }`
+
+  ### content 항목
+
+  | 필드 | 값 |
+  |---|---|
+  | `entryType` | `CHARGE`(지급) / `SPEND`(사용) / `REWARD`(보상) / `REFUND`(환불) |
+  | `amount` | **부호 있는 값.** 지급은 양수, 차감은 음수 |
+  | `balanceAfter` | 그 항목이 반영된 직후 잔액 |
+  | `reasonType` | 사유 코드. `INITIAL_GRANT`(가입 200) · `DAILY_GRANT`(일일 50) · `ADMIN_ADJUSTMENT`(관리자 조정) |
+  | `referenceType` / `referenceId` | 참조 대상(임대·미니게임 등). 없으면 `null` |
+
+  004·010·012·014가 진행되면 `reasonType` 값이 늘어난다. 프론트는 **모르는 코드를 만나도 항목을 숨기지 말고**
+  코드 그대로 또는 일반 문구로 표시한다 — 숨기면 사용자가 잔액 변화를 설명할 수 없다 (SC-005).
+
+  ### 응답 코드
+
+  - `400`: `page`가 음수거나 `size`가 1~100 밖이다.
+  - `401` / `403`: `내 지갑 조회`와 동일하다.
+}

@@ -110,11 +110,11 @@
 - **미확정**: `booths.name`과 `facade_sign_text`의 화면상 관계는 FE 몫으로 남아 있다(`docs/26`). 폼 구현을 막지 않는다.
 - **Alternatives**: 별도 spec으로 분리 — FR-018이 이미 005 FR로 신설됐으므로 spec을 거스르게 된다. 기각. `EditorState`에 facade 필드 병합 — 저장 경로·잠금 방식이 달라 상태 의미가 오염된다. 기각.
 
-## R-12. 오류 `rule` 문자열 — 분기 불요로 종결 (2026-08-24)
+## R-12. 오류 `rule` 문자열 — 분기는 아직 안 한다
 
-- **Decision(확정)**: FE는 `rule`로 분기하지 않고 **목록을 그대로 렌더링**한다(`message`가 한글이라 그대로 노출 가능). `CURRENT_REVISION`도 **재호출 트리거로만** 쓴다 — `message`에서 값을 정규식으로 뽑지 않는다(#58 §5 재확정, 계약서 `rule` 표에 명문화).
-- **Rationale**: 등재 당시(08-21) 근거였던 "Bean Validation이 필드명을 `rule` 자리에 넣는 결함"은 #58 C안 + PR #71로 해소됐다 — `rule`은 규칙 어휘로 닫히고 필드명은 `field` 키로 분리. 그 위에서 #58 §5 재확정(08-23)이 `CURRENT_REVISION`의 `message`를 구조화하지 않기로 못박아, 원래 "해소되면 도입"으로 예정했던 rule 분기가 **필요 없어졌다** — 현행 구현(`useLayoutMutations.ts`가 `code`로만 분기)이 이미 계약과 일치해 코드 변경 0. 분기는 필요한 소비자가 생길 때 화이트리스트로 연다.
-- **참고**: 계약서 `CURRENT_REVISION` 행은 `back`의 PR #74 정정판이 최신 문안이다(#58 §5 반영, 결론 동일·문장 정밀도 차이). develop 반영 전까지 이 항목의 정본 문안은 그쪽.
+- **Decision**: FE는 `rule`로 분기하지 않고 **목록을 그대로 렌더링**한다(`message`가 한글이라 그대로 노출 가능). 분기가 필요한 값은 `CURRENT_REVISION`(→ `GET /draft` 재로드, R-06) 하나뿐이다.
+- **Rationale**: `rule` 19종은 `contracts/layout-api.md`에 전부 명문화됐다(PR #57, #36 요청 반영). 다만 Bean Validation 오류 경로가 요청 필드명(`nickname` 등)을 `rule` 자리에 넣고 있어(#58에서 발견) 지금 `rule`로 분기를 열면 규칙명과 필드명이 섞여 나온다. `field` 키 분리(#58 결론)까지는 `code`로만 분기한다.
+- **Alternatives**: 목록 명문화 이전처럼 rule을 전혀 참조 안 함 — 이미 사전 경고(`validate.ts`)가 rule 어휘로 서버와 대조하고 있어 과도한 보수. `rule`을 지금 도입 — #58 결론 전이라 §3 오염을 그대로 물려받는다. 기각.
 
 ---
 
@@ -122,5 +122,7 @@
 
 | ID | 항목 | 해소 시점 |
 |---|---|---|
+| R-12 | `rule` 19종 명문화 완료(#36·PR #57) | 분기 대상으로 쓰지 않음 — Bean Validation이 필드명을 rule 자리에 섞어 보내는 결함(#58) 해소 전까지 |
 | — | `themeCode` 4값이 계약 문서에 없음 | `docs/08`·구현에만 있음. 계약 문서 승격 시 반영 |
+| — | facade 팔레트 12색 구체 hex 값 | "FE↔BE 구현 트랙에서" — FE 착수 필요 |
 | R-11 | `booths.name`↔`facade_sign_text` 화면 관계 | FE 화면 설계 몫 — 폼 구현은 막지 않음 |

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/r2-usage-guard.schema.json",
+  "title": "SSAFY FESTA R2 Usage Guard Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "billingMonthUtc",
+    "collectedAt",
+    "dataFreshThrough",
+    "source",
+    "currentStorageBytes",
+    "projectedGbMonth",
+    "classARequests",
+    "classBRequests",
+    "limits",
+    "ratios",
+    "state",
+    "existingReadsAllowed",
+    "reason",
+    "evidenceRef"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "billingMonthUtc": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$" },
+    "collectedAt": { "type": "string", "format": "date-time" },
+    "dataFreshThrough": { "type": "string", "format": "date-time" },
+    "source": { "enum": ["cloudflare-graphql", "cloudflare-http-api", "mock-test"] },
+    "currentStorageBytes": { "type": "integer", "minimum": 0 },
+    "projectedGbMonth": { "type": "number", "minimum": 0 },
+    "classARequests": { "type": "integer", "minimum": 0 },
+    "classBRequests": { "type": "integer", "minimum": 0 },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storageGbMonth", "classARequests", "classBRequests", "verifiedAt", "sourceUrl"],
+      "properties": {
+        "storageGbMonth": { "type": "number", "exclusiveMinimum": 0 },
+        "classARequests": { "type": "integer", "minimum": 1 },
+        "classBRequests": { "type": "integer", "minimum": 1 },
+        "verifiedAt": { "type": "string", "format": "date" },
+        "sourceUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "ratios": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentStorage", "projectedStorage", "classA", "classB", "max"],
+      "properties": {
+        "currentStorage": { "type": "number", "minimum": 0 },
+        "projectedStorage": { "type": "number", "minimum": 0 },
+        "classA": { "type": "number", "minimum": 0 },
+        "classB": { "type": "number", "minimum": 0 },
+        "max": { "type": "number", "minimum": 0 }
+      }
+    },
+    "state": { "enum": ["NORMAL", "WARNING", "UPLOAD_BLOCKED", "STALE_BLOCKED"] },
+    "existingReadsAllowed": { "const": true },
+    "reason": { "type": "string", "minLength": 1 },
+    "evidenceRef": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "const": "NORMAL" } }, "required": ["state"] },
+      "then": { "properties": { "ratios": { "properties": { "max": { "exclusiveMaximum": 0.8 } } } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "WARNING" } }, "required": ["state"] },
+      "then": { "properties": { "ratios": { "properties": { "max": { "minimum": 0.8, "exclusiveMaximum": 0.9 } } } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "UPLOAD_BLOCKED" } }, "required": ["state"] },
+      "then": { "properties": { "ratios": { "properties": { "max": { "minimum": 0.9 } } } } }
+    }
+  ]
+}

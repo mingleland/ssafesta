@@ -1,0 +1,148 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA AI Document Processing API
+  version: 0.1.0
+  description: Spring이 업로드를 확정한 문서를 FastAPI 처리 Job으로 접수하고 내부 진단 상태를 조회하는 계약이다.
+servers:
+  - url: /ai/v1
+security:
+  - serviceToken: []
+paths:
+  /documents/process:
+    post:
+      operationId: enqueueDocumentProcessing
+      summary: 문서 처리 Job 접수
+      description: 동일 documentId에 활성 Job이 있으면 새 Job을 만들지 않고 기존 Job을 반환한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessDocumentRequest'
+      responses:
+        '202':
+          description: 새 Job 접수 또는 기존 활성 Job 반환
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDocumentResponse'
+        '409':
+          description: 요청 snapshot이 현재 문서 개정본과 일치하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: 문서 범위 또는 요청 형식 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /documents/{documentId}/status:
+    get:
+      operationId: getInternalDocumentJobStatus
+      summary: 내부 진단용 Job 상태 조회
+      description: FE 사용자 상태 조회 경로로 사용하지 않는다. 사용자 문서 상태는 Spring API가 제공한다.
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 최신 Job 진단 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentJobStatusResponse'
+        '404':
+          description: Job 없음
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    JobStatus:
+      type: string
+      enum: [QUEUED, RUNNING, RETRY_WAIT, SUCCEEDED, DEAD, CANCELLED]
+    ProcessDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [documentId, boothId, agentId, s3Key, sourceHash]
+      properties:
+        documentId:
+          type: integer
+          format: int64
+        boothId:
+          type: integer
+          format: int64
+        agentId:
+          type: integer
+          format: int64
+        s3Key:
+          type: string
+          minLength: 1
+        sourceHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+    ProcessDocumentResponse:
+      type: object
+      additionalProperties: false
+      required: [jobId, documentId, status, existing]
+      properties:
+        jobId:
+          type: string
+          pattern: '^job_[0-9]+$'
+        documentId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        existing:
+          type: boolean
+          description: 활성 Job을 재사용했으면 true
+    DocumentJobStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [jobId, documentId, status, attemptNo, maxRetries, updatedAt]
+      properties:
+        jobId:
+          type: string
+        documentId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        attemptNo:
+          type: integer
+          minimum: 0
+        maxRetries:
+          type: integer
+          minimum: 0
+        leaseExpiresAt:
+          type: [string, 'null']
+          format: date-time
+        nextRetryAt:
+          type: [string, 'null']
+          format: date-time
+        chunkCount:
+          type: [integer, 'null']
+          minimum: 0
+        lastErrorCode:
+          type: [string, 'null']
+        updatedAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

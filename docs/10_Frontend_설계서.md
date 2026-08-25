@@ -81,11 +81,14 @@ src/
 ```text
 /login
 /signup
+/auth/callback
 /app/home
 /app/world
 /app/booths/slots
 /app/booths/mine
 /app/studio/:boothId
+/app/games/:gameId/edit
+/app/games/:gameId/play
 /app/agents
 /app/agents/:agentId
 /app/projects
@@ -517,6 +520,45 @@ Secret 값은 Frontend 환경변수에 넣지 않는다.
 
 ---
 
+## 19A. Game Studio P2 내부 lazy 모듈
+
+Game Studio는 Unity WebGL 위에 그리는 UI가 아니라 React 계층의 독립 제작기와 2D Runtime이다.
+배포와 origin은 기존 `festa-frontend`를 사용하되 코드 소유권은 `src/game-studio/`로 분리한다.
+기존 인증·`shared/api/client.ts`·오버레이 Shell을 재사용하고 lazy route로 초기 번들을 격리한다.
+
+- 제작: `/app/games/:gameId/edit`
+- 플레이: `/app/games/:gameId/play`
+- Preview: 같은 origin의 내부 Runtime iframe. Token은 `postMessage`에 넣지 않는다.
+
+Frontend 책임:
+
+- Scene 목록 + Object/Asset palette + Map/Dialogue 작업 공간 + Properties/Event inspector 편집 흐름
+- TOP_DOWN과 OVERLAY/FULL_SCREEN DIALOGUE 편집, 제한형 Component/Event 조합 UI
+- Tile/Object 배치와 Asset reference 분리, preset 편의 입력의 공통 Event recipe 변환
+- 공통 GameProject 타입과 Schema 기반 client validation
+- Draft autosave/revision 충돌 UI, Preview, Publish 요청
+- Published Version의 Canvas 기반 2D 실행
+- 독립 게임 URL과 FESTA 오버레이 진입 경로
+- 기존 `window.FestaUnity.onBoothInteract` 이벤트를 Portal Resolver에 연결
+- `OnOverlayStateChanged({ state: OPENED|CLOSED|FAILED, overlay: GAME })`로 Unity 입력 lifecycle 전달
+
+Frontend 비책임:
+
+- Published Version의 최종 유효성·권한 판정
+- 보상·랭킹·영구 결과 계산
+- Unity 안에서 GameProject를 실행하는 기능
+- AI 응답 없이는 저장할 수 없는 제작 흐름
+
+확정 경계는 [`specs/019-game-studio/contracts/part-boundaries.md`](../specs/019-game-studio/contracts/part-boundaries.md)다.
+Host 계약 #20은 반영했으며 Studio 내부 선택은 [#35](https://github.com/kanghyunsoon/ssafesta/issues/35),
+Portal 타입은 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)의 signed Int32·BE-first whitelist 계약을 따른다.
+
+신규 실행은 route/overlay 진입 시 REST 조회로 판정하고 전용 게임 socket은 만들지 않는다. 비공개 전환 전
+이미 로드된 무보상 세션은 종료까지 허용한다. FE의 `configId`는 정수 `number`이며
+`1..2147483647` 밖의 값과 0은 API 호출 전에 거부한다.
+
+---
+
 ## 20. 확정 필요 사항
 
 - 상태관리 / Server State 라이브러리
@@ -526,3 +568,7 @@ Secret 값은 Frontend 환경변수에 넣지 않는다.
 - Layout 충돌 처리
 - 모바일 Booth Studio 지원 범위
 - WebSocket 인증 갱신 방식
+- Game Runtime renderer와 후속 PLATFORMER physics adapter (#35)
+- Game Studio 실제 반응형 패널 배치, Preview 표시 형태와 iframe sandbox/CSP (#35)
+- builtin Asset resolver 내부 구조 (#35)
+- 사용자 Asset upload 도입 시 Runtime resolver와 cache 정책 (별도 Asset spec)

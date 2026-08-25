@@ -1,0 +1,36 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+
+# Build output — 빌드 결과물은 절대 커밋하지 않는다
+[Bb]uilds/
+*.apk
+*.aab
+*.unitypackage
+
+# 외부 Asset Store 패키지 — 각자 Asset Store에서 임포트한다 (용량 + EULA)
+# Synty Sidekick FREE Starter Pack: 새 아바타를 제작할 때만 필요.
+# 제작 완료된 아바타는 _Project/Experimental/Sidekick/ 에 자기완결적으로 커밋되므로
+# 이 폴더가 없어도 게임 실행/빌드에는 지장이 없다.
+Assets/Synty/
+Assets/Synty.meta
+
+# IDE
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.slnx
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Unity Performance Testing 패키지 자동 생성물 (커밋 불필요)
+[Aa]ssets/Resources/PerformanceTestRun*.json
+[Aa]ssets/Resources/PerformanceTestRun*.json.meta
