@@ -15,9 +15,9 @@ paths:
               type: object
               properties:
                 worldId:
-                  type: string
-                  const: 11F
-                  description: Optional destination world. Omission defaults to the only P0 world, 11F.
+                  type: [string, 'null']
+                  enum: [11F, null]
+                  description: Optional destination world. Omission or null defaults to the only P0 world, 11F.
                 preferredPartyId: { type: [string, 'null'] }
       responses:
         '200':
