@@ -1,6 +1,8 @@
 # FE Docker 설계 (구현 전 확정안)
 
-> **상태**: 설계 확정 · **구현 미착수**. Jira 이슈가 없어 규칙 1에 걸린다(§0).
+> **상태**: **구현 전 설계 기록.** 최종 구현은 `S15P21A604-254` · [MR !42](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/42)를 본다.
+> 아래 본문은 **착수 전 시점(2026-08-26, Jira 이슈 발급 전)의 판단을 그대로 보존한 것**이며 사후 수정하지 않는다 —
+> 구현 중 실측으로 뒤집힌 2군데(익명 볼륨 방식·HMR 동작)는 MR !42 본문에 기록돼 있다.
 > **소유 경계**: `docs/17_Git_개발_Convention.md` §2-1 규칙 6 · [#107](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/107)
 > **작성** 2026-08-26 · 실측 기준 `origin/develop` `20ecd3b`
 
