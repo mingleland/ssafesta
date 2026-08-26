@@ -68,7 +68,7 @@ feature/S15P21A604-75-avatar-persist
 ```
 
 > **✅ 개정 (2026-08-24)**: develop/main 으로 향하는 작업 브랜치에는 **Jira Key 가 필수**다.
-> develop/main 대상 MR 파이프라인이 제목·브랜치의 키를 검증한다(`.gitlab-ci.yml` `jira-key-check`).
+> develop/main 대상 MR 의 제목·브랜치 키는 MR 리뷰에서 사람이 검증한다 (CI 러너 없음). Jira 상태 전이는 Webhook→Jira Automation('진행 중')과 내장 연동('완료')이 담당한다.
 > 상세: `docs/jira-gitlab-workflow.md`
 
 ### fix
@@ -94,20 +94,26 @@ main
    ├─ back
    ├─ front
    ├─ game
-   │    └─ feature/FESTA-xxx-...   ← 작업 브랜치는 자기 파트 브랜치에서 분기
+   │    └─ (파트 내부 통합·실험용 브랜치)   ← 2026-08-26부터 작업 브랜치는 develop 발
 ```
 
 규칙:
 
 1. **파트 브랜치(ai/back/front/game)는 각각 CI/CD를 가진다** — push 시 자체 빌드·테스트 후 해당 파트의 개발환경에 자동 배포된다. 파트끼리 서로의 배포를 기다리지 않는다.
 2. **develop은 실제 사용 환경 기준으로 CI/CD한다** — 완료된 상태만 파트 브랜치에서 develop으로 병합하며, develop을 일상 작업장으로 쓰지 않는다.
-3. feature/fix 브랜치는 자기 파트 브랜치에서 분기하고 자기 파트 브랜치로 MR한다.
+3. **✅ 2026-08-26 개정**: 작업 브랜치는 **develop에서 분기**하고 develop행 MR로 완료한다.
+   파트 브랜치는 파트 내부 통합·실험용(대용량 에셋 통합 등)으로 유지할 수 있으나 완료 경로가
+   아니다. 과도기(기존 파트행 MR 소진·Closes 규칙·소급 없음)와 파트 브랜치 구현의 지위는
+   `docs/jira-gitlab-workflow.md` §4-1이 정본이다.
 4. 파이프라인 상세 사양은 `docs/sdd/parts/INFRA.md` (infra-001)에서 spec으로 관리한다.
 5. **공유 문서·spec 통합 (#24·#59, 2026-08-23 채택)**
    - **쓰기**: 각 파트가 **자기 변경분만** develop PR로 올려 누적한다. 한 사람이 남의 변경분을
      해석해 옮기지 않는다.
    - **읽기 기준**: develop이 정본이며, 파트 브랜치가 develop을 따라간다.
    - **파트 경계를 넘는 결정**은 이슈에서 **반영 owner 1명**을 지정해 그 사람이 develop에 쓴다.
+6. **공용 개발환경 Docker 소유권 (✅ 2026-08-26)**: 루트 compose(Frontend+Backend+PostgreSQL+Redis)는
+   **Infra 소유**다. 변경 제안은 어느 파트나 할 수 있으나 develop행 MR에 Infra 리뷰를 필수로
+   붙인다. `festa-frontend/Dockerfile.dev` 등 파트 디렉터리 내부의 Docker 파일은 그 파트 소관이다.
 
 ---
 
@@ -157,9 +163,28 @@ test(wallet): add duplicate reward test
 docs(api): update consultation contract
 ```
 
-> **✅ 개정 (2026-08-24)**: Jira 연동 추적을 위해 요약 끝에 이슈 키를 붙이는 것을 권장한다 —
-> `feat(auth): 로그인 API 연동 (S15P21A604-123)`. 커밋 언어는 기존대로 **한국어**를 유지한다.
-> 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+> **✅ 개정 (2026-08-25)**: GitLab 내장 Jira 연동이 켜져 **커밋 메시지가 Jira 를 직접 움직인다.**
+> 이전 권장이 **필수**로 바뀌었다.
+>
+> | 커밋 메시지 | 결과 |
+> |---|---|
+> | `feat(auth): 로그인 API 연동 (S15P21A604-123)` | Jira 이슈에 **커밋 링크 + 코멘트** 자동 추가 |
+> | `Closes S15P21A604-123` (본문 아무 줄) | 위 + 그 커밋이 **`develop` 에 도달할 때 '완료' 전환** |
+>
+> - **모든 커밋에 이슈 키를 넣는다.** 키가 없으면 Jira 에 아무 기록도 남지 않는다.
+> - **`Closes` 는 그 작업으로 이슈가 끝날 때만** 쓴다. 중간 커밋에 쓰면 머지 시 미완료 이슈가 닫힌다.
+> - `Closes` 를 파트 브랜치에 적어도 그 순간에는 전환되지 않는다 — **`develop` 도달 시점**이다.
+> - 커밋 언어는 기존대로 **한국어**를 유지한다.
+> - 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+>
+> 예:
+> ```text
+> perf(unity): 아바타 스킨메시 결합 — 렌더러 11→7 (S15P21A604-236)
+>
+> 신체 파츠 5개가 같은 재질·같은 골격이라 무손실 결합.
+>
+> Closes S15P21A604-236
+> ```
 
 ### type
 
@@ -195,7 +220,7 @@ docs(api): update consultation contract
 ```
 
 Jira Title Prefix와 유사하게 맞춘다.
-**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 없으면 파이프라인이 실패한다** (2026-08-24 적용).
+**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 반드시 있어야 한다.** GitLab CI 가 아니라 MR 리뷰 규칙으로 확인한다 (러너 없음, 2026-08-26).
 
 ---
 

@@ -1,7 +1,8 @@
 # SSAFY FESTA — CI 파이프라인
 #
-# 현재 범위: Jira 연동 (키 검증 + 상태 동기화)만. 파트별 빌드·테스트 잡은
-# S15P21A604-154 에서 이 구조 위에 추가한다 (stages 의 test·build 자리 예약).
+# Jira 상태 전이는 GitLab Project Webhook → Jira Automation이 담당한다.
+# 이 파일의 jira-* job은 이관 전 기록으로만 남기며 실행하지 않는다.
+# 애플리케이션 빌드·테스트·배포는 루트 Jenkinsfile과 ci/ adapter가 담당한다.
 #
 # 워크플로 문서: docs/jira-gitlab-workflow.md
 #
@@ -12,7 +13,12 @@
 
 workflow:
   rules:
+    # 2026-08-26: Jira Webhook 자동화와 Jenkins 전환 완료.
+    # runner 없는 legacy jira-* pipeline의 무한 pending 및 이중 전환을 방지한다.
     - when: never
+
+    # 아래 규칙과 job은 이관 기록이다. 다시 켜기 전에 jira-* job을 제거하고
+    # GitLab CI의 새 책임을 별도 이슈에서 정의해야 한다.
     # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
