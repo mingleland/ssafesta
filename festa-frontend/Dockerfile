@@ -11,8 +11,9 @@ RUN npm ci
 # ── dev: vite dev server. 소스는 bind mount 로 넣고 node_modules 는 컨테이너 것을 쓴다 ──
 #   docker run -v "$PWD:/app" -v festa-fe-node-modules:/app/node_modules -p 5173:5173 <image>
 # 두 번째 -v 가 핵심이다 — 없으면 호스트의 /app 마운트가 이미지 안 node_modules 를 가려
-# rolldown 네이티브 바인딩을 못 찾고 죽는다. **익명 볼륨(-v /app/node_modules)은 쓰지 마라** —
-# Windows 에서 이미지 내용으로 초기화되지 않아 같은 증상이 난다(실측 2026-08-26). 이름 있는 볼륨을 쓴다.
+# rolldown 네이티브 바인딩을 못 찾고 죽는다. **이름 있는 볼륨을 쓴다** — 익명 볼륨
+# (-v /app/node_modules)으로는 이 환경(Windows·Docker 29.6.1)에서 같은 증상이 났다
+# (실측 2026-08-26). 원인은 확인하지 않았고, 이름 있는 볼륨에서는 재현되지 않는다.
 FROM base AS dev
 ENV NODE_ENV=development
 # bind mount 는 inotify 를 컨테이너로 전달하지 않는다 — polling 을 켜야 HMR 이 산다(vite.config.ts).
