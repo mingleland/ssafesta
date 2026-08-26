@@ -1,0 +1,31 @@
+{
+  "sprints": [
+    { "name": "Sprint 4", "start": "2026-08-31", "end": "2026-09-06", "goal": "콘텐츠 기능 — AI Document 파이프라인, Game Studio 수직, Project 전시" },
+    { "name": "Sprint 5", "start": "2026-09-07", "end": "2026-09-13", "goal": "AI Conversation·SSE 완성, Survey, Game Studio 연동 마감" },
+    { "name": "Sprint 6", "start": "2026-09-14", "end": "2026-09-18", "goal": "개발 마감(09-18) — Game Studio 완성, 통합 QA, 부하 실측, 아키텍처 동결" },
+    { "name": "Sprint 7", "start": "2026-09-21", "end": "2026-09-25", "goal": "발표 준비 — 발표 자료·시연·영상·README·리허설 (개발은 버그 수정만)" }
+  ],
+  "deleteSprints": ["Sprint 8"],
+  "versions": [
+    { "find": "v0.1.0-mvp1", "name": "v0.1.0-mvp1", "date": "2026-09-07", "desc": "1차 주간 배포 (09-07 13:00) — MVP1: Lease→Studio→Publish→Unity 관통" },
+    { "create": true, "name": "v0.2.0", "date": "2026-09-14", "desc": "2차 주간 배포 (09-14 13:00) — AI Conversation·Survey" },
+    { "find": "v0.2.0-mvp2", "name": "v0.3.0-mvp2", "date": "2026-09-21", "desc": "3차 주간 배포 (09-21 13:00) — 개발 마감(09-18) 동결본" },
+    { "find": "v1.0.0", "name": "v1.0.0", "date": "2026-09-25", "desc": "최종 발표본 (발표 주간 핫픽스 포함)" }
+  ],
+  "links": [
+    { "outward": "S15P21A604-84", "inward": "S15P21A604-85", "type": "Blocks" },
+    { "outward": "S15P21A604-111", "inward": "S15P21A604-112", "type": "Blocks" },
+    { "outward": "S15P21A604-112", "inward": "S15P21A604-157", "type": "Blocks" },
+    { "outward": "S15P21A604-157", "inward": "S15P21A604-158", "type": "Blocks" },
+    { "outward": "S15P21A604-107", "inward": "S15P21A604-116", "type": "Blocks" },
+    { "outward": "S15P21A604-108", "inward": "S15P21A604-117", "type": "Blocks" },
+    { "outward": "S15P21A604-110", "inward": "S15P21A604-134", "type": "Blocks" },
+    { "outward": "S15P21A604-113", "inward": "S15P21A604-114", "type": "Blocks" },
+    { "outward": "S15P21A604-130", "inward": "S15P21A604-131", "type": "Blocks" },
+    { "outward": "S15P21A604-130", "inward": "S15P21A604-132", "type": "Blocks" },
+    { "outward": "S15P21A604-132", "inward": "S15P21A604-133", "type": "Blocks" },
+    { "outward": "T:[BE] Document 상태 전이·조회 API 구현", "inward": "S15P21A604-125", "type": "Blocks" },
+    { "outward": "S15P21A604-140", "inward": "T:[FE] AI Chat 실서버 API 결선·오류 표시 구현", "type": "Blocks" },
+    { "outward": "S15P21A604-92", "inward": "S15P21A604-96", "type": "Blocks" }
+  ]
+}

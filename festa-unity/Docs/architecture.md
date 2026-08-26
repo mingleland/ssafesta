@@ -49,16 +49,16 @@ Spring Published Layout (JSON)
 ## 3-1. 아바타 (Booth Runtime과 같은 원칙)
 
 ```
-커스터마이징 창(현재 Unity HUD, 향후 React 오버레이)
+정식 Unity CharacterLobby 커스터마이징 화면
   → PlayerAppearanceController.RequestChange()  [Owner]
   → ServerRpc → 서버가 NetworkPlayer.AvatarCode에 기록
   → 전원 전파 → 각 클라이언트 PlayerAvatarVisual이 로컬 외형 재생성
 ```
 
 - **문자열 하나(`avatarCode`)만 동기화**한다. 3D 모델은 NetworkObject가 아니며 각자 로컬 생성
-- 포맷: `sk_01` 또는 `sk_01|c=E85D5D` (최대 29자, 미지원 세그먼트는 무시 → forward compatible)
-- 외형 에셋은 Synty Sidekick 프리셋(에디터에서 사전 제작). 런타임 파츠 조립 없음
-- Unity는 `IAvatarVisualProvider` 뒤에 숨겨져 Sidekick에 종속되지 않는다
+- 포맷: `fa|g=...|i=...|p=...|q=...|w=...` (최대 3800자, 미지원 세그먼트는 무시 → forward compatible)
+- 외형 에셋은 Rukha93 모듈 파츠를 `AvatarConfig` 기준으로 런타임 조립한다. 과거 `sk`/`rt`는 읽기 호환만 유지한다.
+- 정식 UI와 파츠·썸네일 상태는 Unity가 소유한다. React는 이를 재구현하지 않으며 `AvatarBridge`는 선택적 WebGL 호스트 연동 경계로만 유지한다.
 - 파트 간 계약 상세: **`Docs/avatar-customization-contract.md`**
 
 ## 4. Integration 경계

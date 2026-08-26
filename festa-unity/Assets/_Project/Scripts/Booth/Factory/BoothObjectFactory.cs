@@ -18,20 +18,29 @@ namespace Festa.Booth
         public GameObject Create(int boothId, BoothObjectDto dto, Transform anchor)
         {
             var type = BoothObjectTypes.Parse(dto.type);
+            var objectId = dto.ResolvedObjectId;
             if (type == BoothObjectType.Unknown)
             {
                 // 알 수 없는 타입은 클라이언트를 깨뜨리지 않고 스킵한다 (forward compat).
-                Debug.LogWarning($"[BoothObjectFactory] Unknown type '{dto.type}' (id={dto.id}) — skipped");
+                Debug.LogWarning($"[BoothObjectFactory] Unknown type '{dto.type}' (objectId={objectId}) — skipped");
                 return null;
             }
 
-            var prefab = _registry != null ? _registry.GetPrefab(type) : null;
+            var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
+            if (prefab == null && type == BoothObjectType.Laptop)
+            {
+                // 노트북은 정식 Free Laptop Prefab만 사용한다. 임시 큐브로 대체하면
+                // 실제 상호작용/표현 오류를 숨기므로 이 오브젝트만 건너뛴다.
+                Debug.LogError($"[BoothObjectFactory] Laptop prefab missing (objectId={objectId}) — skipped");
+                return null;
+            }
+
             float groundLift = 0f; // 프리팹은 피벗을 바닥 기준으로 제작한다고 가정
             var go = prefab != null
                 ? Object.Instantiate(prefab, anchor)
                 : CreatePlaceholder(type, anchor, out groundLift);
 
-            go.name = $"Booth{boothId}_{dto.id}";
+            go.name = $"Booth{boothId}_{objectId}";
             go.transform.localPosition =
                 (dto.position?.ToVector3() ?? Vector3.zero) + Vector3.up * groundLift;
             go.transform.localRotation = Quaternion.Euler(0f, dto.rotationY, 0f);
@@ -40,6 +49,7 @@ namespace Festa.Booth
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
             runtimeObject.Init(boothId, dto, type);
 
+            AttachCommonInteraction(go, type);
             AttachContentBehaviour(go, type);
             return go;
         }
@@ -53,9 +63,9 @@ namespace Festa.Booth
                 BoothObjectType.AiAgent => (PrimitiveType.Capsule, new Color(0.4f, 0.7f, 1f), new Vector3(0.6f, 1f, 0.6f)),
                 BoothObjectType.VideoScreen => (PrimitiveType.Cube, Color.black, new Vector3(2.4f, 1.4f, 0.1f)),
                 BoothObjectType.ProjectPanel => (PrimitiveType.Cube, new Color(0.9f, 0.9f, 0.8f), new Vector3(1.2f, 1.6f, 0.08f)),
-                BoothObjectType.Survey => (PrimitiveType.Cube, new Color(0.5f, 1f, 0.6f), new Vector3(0.5f, 1.2f, 0.5f)),
+                BoothObjectType.SurveyKiosk => (PrimitiveType.Cube, new Color(0.5f, 1f, 0.6f), new Vector3(0.5f, 1.2f, 0.5f)),
                 BoothObjectType.RecruitmentBoard => (PrimitiveType.Cube, new Color(1f, 0.8f, 0.4f), new Vector3(1.4f, 1.8f, 0.08f)),
-                BoothObjectType.ConsultDesk => (PrimitiveType.Cube, new Color(0.6f, 0.4f, 0.2f), new Vector3(1.6f, 0.8f, 0.8f)),
+                BoothObjectType.ConsultationDesk => (PrimitiveType.Cube, new Color(0.6f, 0.4f, 0.2f), new Vector3(1.6f, 0.8f, 0.8f)),
                 BoothObjectType.LikeVote => (PrimitiveType.Sphere, new Color(1f, 0.4f, 0.5f), Vector3.one * 0.5f),
                 _ => (PrimitiveType.Cube, Color.gray, Vector3.one * 0.8f),
             };
@@ -106,6 +116,14 @@ namespace Festa.Booth
 
         // ---------- Content Behaviour 연결 ----------
 
+        static void AttachCommonInteraction(GameObject go, BoothObjectType type)
+        {
+            bool interactive = type is not BoothObjectType.Furniture and not BoothObjectType.Decoration;
+            var target = go.GetComponent<BoothInteractionTarget>();
+            if (target == null) target = go.AddComponent<BoothInteractionTarget>();
+            target.Configure(interactive ? 3f : 2.2f, interactive);
+        }
+
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)
         {
             switch (type)
@@ -117,6 +135,10 @@ namespace Festa.Booth
                 case BoothObjectType.VideoScreen:
                     if (go.GetComponent<VideoScreenPlaceholder>() == null)
                         go.AddComponent<VideoScreenPlaceholder>();
+                    break;
+                case BoothObjectType.Laptop:
+                    if (go.GetComponent<LaptopInteractable>() == null)
+                        go.AddComponent<LaptopInteractable>();
                     break;
                 // 이후 타입별 컴포넌트는 해당 기능 spec 작성 후 추가한다.
             }

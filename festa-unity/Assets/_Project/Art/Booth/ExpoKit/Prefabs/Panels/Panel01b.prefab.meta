@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 94eaac9f168705f42aa1fd9e65fc9566
+timeCreated: 1507769918
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Prefabs/Panels/Panel01b.prefab
+  uploadId: 237227

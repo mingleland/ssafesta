@@ -1,0 +1,8 @@
+Model Information:
+* title:	Curtains
+* source:	https://sketchfab.com/3d-models/curtains-ca2b689eb33c41d59f527100c6b6f158
+* author:	Graham Rust (https://sketchfab.com/GRXR.ca)
+
+Model License:
+* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
+* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

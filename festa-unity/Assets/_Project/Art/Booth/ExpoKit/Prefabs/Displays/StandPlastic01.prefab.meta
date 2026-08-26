@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: f729942b34a239246b9ee34ad7273d06
+timeCreated: 1507858193
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Prefabs/Displays/StandPlastic01.prefab
+  uploadId: 237227
