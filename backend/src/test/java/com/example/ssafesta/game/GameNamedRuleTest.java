@@ -127,6 +127,47 @@ class GameNamedRuleTest {
                 () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
     }
 
+    // ── DIALOGUE_PRESENTATION_INVALID — FE·계약 검증기와 갈렸던 두 자리 ──
+
+    /**
+     * A {@code SHOW_DIALOGUE} pointing at a DIALOGUE scene that is {@code FULL_SCREEN}.
+     *
+     * <p>The server used to call this {@code DIALOGUE_TARGET_INVALID}, which the reference validator
+     * and the editor both reserve for "that scene is not a dialogue at all"
+     * ({@code validate-fixtures.mjs:108}, {@code gameProject.ts:693}). Same project, two rule names
+     * depending on who validated — and the two names point the cursor at different fields: one at the
+     * {@code sceneId}, the other at that scene's {@code presentation}.
+     */
+    @Test
+    void showDialogueAtAFullScreenSceneIsAPresentationFailure() {
+        ObjectNode project = valid();
+        showDialogueAction(project).put("sceneId", dialogueSceneId(project, "FULL_SCREEN"));
+
+        assertRule(project, "DIALOGUE_PRESENTATION_INVALID");
+    }
+
+    /** Pointing at something that is not a DIALOGUE scene stays the target rule — the split holds. */
+    @Test
+    void showDialogueAtAWorldSceneIsStillATargetFailure() {
+        ObjectNode project = valid();
+        showDialogueAction(project).put("sceneId", worldScene(project).path("id").asText());
+
+        assertRule(project, "DIALOGUE_TARGET_INVALID");
+    }
+
+    /**
+     * An unknown {@code presentation} — the schema rejects it first, so it used to leave as
+     * {@code MALFORMED_PROJECT} while {@code validate-fixtures.mjs:200} named it. The rule table
+     * exists so one project cannot get two names.
+     */
+    @Test
+    void anUnknownPresentationIsNamedRatherThanMalformed() {
+        ObjectNode project = valid();
+        dialogueScenes(project).get(0).put("presentation", "SIDEBAR");
+
+        assertRule(project, "DIALOGUE_PRESENTATION_INVALID");
+    }
+
     // ── 변수 값 타입 — 서버만 느슨하던 자리 ──────────────────────────────
 
     /**
@@ -308,6 +349,26 @@ class GameNamedRuleTest {
             }
         }
         throw new IllegalStateException(eventId + " 에 SET_VARIABLE 이 없다");
+    }
+
+    private ObjectNode showDialogueAction(ObjectNode project) {
+        for (JsonNode event : worldScene(project).path("events")) {
+            for (JsonNode action : event.path("actions")) {
+                if ("SHOW_DIALOGUE".equals(action.path("type").asText())) {
+                    return (ObjectNode) action;
+                }
+            }
+        }
+        throw new IllegalStateException("SHOW_DIALOGUE 가 fixture 에 없다");
+    }
+
+    private String dialogueSceneId(ObjectNode project, String presentation) {
+        for (ObjectNode scene : dialogueScenes(project)) {
+            if (presentation.equals(scene.path("presentation").asText())) {
+                return scene.path("id").asText();
+            }
+        }
+        throw new IllegalStateException(presentation + " DIALOGUE 가 fixture 에 없다");
     }
 
     private List<ObjectNode> dialogueScenes(ObjectNode project) {
