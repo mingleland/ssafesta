@@ -457,13 +457,17 @@ namespace Festa.Avatar
                         converted[i] = material;
                         continue;
                     }
-                    // URP Lit 폴백(헤어·액세서리)은 Shader.Find 로 만들면 안 된다 — 빌드
-                    // 셰이더 스트리핑이 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이
-                    // 된다 (T-212, 빌드에서 헤어·피부가 사라진 원인). 카탈로그의 템플릿
-                    // 재질을 복제하면 그 키워드 상태의 배리언트 포함이 보장된다.
-                    // 헤어는 전용 셰이더로 간다 (T-212). URP Lit 런타임 생성은 빌드
-                    // 스트리핑에 좌우되는 잠재 결함이라, Skin/Face/Garment 와 같은
-                    // Always Included 패턴의 HairTint 를 쓴다.
+                    // URP Lit 을 런타임 Shader.Find 로 만들면 안 된다 — 빌드 셰이더 스트리핑이
+                    // 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이 된다 (T-213).
+                    //
+                    // 헤어는 **전용 HairTint 셰이더**로 간다. Skin/Face/Garment 틴트와 같은
+                    // Always Included Shaders 패턴이라 빌드 포함이 보장된다 — 이것이 실제로
+                    // 헤어를 되살린 해법이다.
+                    //
+                    // 나머지 액세서리는 카탈로그의 URP Lit 템플릿 재질을 복제한다. 다만
+                    // **템플릿 참조만으로는 헤어가 살아나지 않았다** — Lit 의 패스 구성까지
+                    // 복원되지는 않는다. 템플릿은 어디까지나 차선책이고, 안 그려지는 파츠가
+                    // 또 나오면 그 파츠도 전용 셰이더로 옮기는 것이 정답이다.
                     bool isHair = category == AvatarPartCategory.Hair || lowerName.Contains("hair");
                     var hairShader = isHair ? Shader.Find("Festa/Avatar/HairTint") : null;
 
