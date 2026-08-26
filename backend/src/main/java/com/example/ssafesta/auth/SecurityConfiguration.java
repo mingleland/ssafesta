@@ -77,6 +77,11 @@ class SecurityConfiguration {
                         // The same layout keyed by room instead of by booth — Unity's anchors are
                         // slots (#62, contract §11). Open for the same reason as the line above.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots/*/layouts/published").permitAll()
+                        // A published game is playable by guests (spec 019 FR-023). Only this exact
+                        // suffix is open — the draft, publish and lifecycle paths under the same
+                        // prefix stay authenticated, and Authoring refuses guests separately with
+                        // MEMBER_ONLY rather than with a 401.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/games/*/published").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an

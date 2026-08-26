@@ -38,6 +38,13 @@ public class AccountDeletionService {
         jdbc.update("DELETE FROM staff_invitations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM minigame_sessions WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM coin_ledger_entries WHERE wallet_id IN (SELECT id FROM wallets WHERE user_id = ?)", userId);
+        // spec 019 — 탈퇴는 Game, Draft, Published Version 을 모두 제거한다 (FR-040).
+        // games.owner_user_id 가 users(id) 를 참조하므로 이 세 줄이 없으면 게임을 가진 회원의
+        // 탈퇴가 FK 위반으로 실패한다. published version 이 games 보다 먼저 지워지는데,
+        // 복합 FK 의 ON DELETE SET NULL (published_version) 이 포인터를 대신 비워 준다 (V13).
+        jdbc.update("DELETE FROM game_published_versions WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR published_by_user_id = ?", userId, userId);
+        jdbc.update("DELETE FROM game_drafts WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR updated_by_user_id = ?", userId, userId);
+        jdbc.update("DELETE FROM games WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM booth_leases WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR lessee_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM booths WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM oauth_identities WHERE user_id = ?", userId);
