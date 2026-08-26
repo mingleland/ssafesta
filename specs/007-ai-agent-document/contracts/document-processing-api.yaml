@@ -72,7 +72,7 @@ components:
     ProcessDocumentRequest:
       type: object
       additionalProperties: false
-      required: [documentId, boothId, agentId, s3Key, sourceHash]
+      required: [documentId, boothId, agentId, objectKey, sourceHash]
       properties:
         documentId:
           type: integer
@@ -83,7 +83,7 @@ components:
         agentId:
           type: integer
           format: int64
-        s3Key:
+        objectKey:
           type: string
           minLength: 1
         sourceHash:

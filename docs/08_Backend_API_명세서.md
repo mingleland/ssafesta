@@ -72,6 +72,9 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 
 - `field`는 `objectId`와 같이 **없으면 키 자체가 빠진다**(`@JsonInclude(NON_NULL)`). 둘은 가리키는 대상이 달라 합치지 않는다 — `objectId`는 배치된 오브젝트, `field`는 요청 필드 경로다.
 - `rule`은 **항상 규칙 어휘**다. 필드명·식별자를 `rule`에 넣으면 클라이언트의 화이트리스트 분기가 깨진다 (#58 §3).
+- **`errors[].message`의 모양은 `rule`이 정한다.** 사용자에게 보여줄 문장은 봉투 최상위 `message`가 담고, `errors[].message`는 대개 그 항목의 사유 문장이지만 **rule이 기계값을 정의했으면 기계값이 온다.** 클라이언트는 `rule`로 분기한 뒤 그 rule의 계약대로 읽는다 — 문장에서 값을 정규식으로 캐내지 않는다.
+  - `CURRENT_REVISION`은 **spec별로 모양이 다르다** — 005(Layout)는 문장(값 소비자 없음), 019(Game Studio)는 **십진수 문자열**이다. 각 spec 계약 문서가 자기 모양을 소유한다.
+  - `ApiErrorDetail`에 타입 있는 값 필드는 **추가하지 않는다.** 전 endpoint 공유 스키마인데 값이 필요한 rule이 아직 하나뿐이다. **기계값이 둘 이상 필요한 rule이 나오면 그때 필드로 올린다** (#58 §5 재확정, 2026-08-24).
 
 ### 1.4 Idempotency
 
@@ -103,7 +106,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 
 ### GET `/users/me`
 
-내 기본 정보 조회.
+내 기본 정보 조회. 회원 전용(게스트 `403 MEMBER_ONLY`).
 
 #### Response 예시
 
@@ -111,12 +114,39 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 {
   "userId": 12,
   "nickname": "FESTA_USER",
-  "wallet": {
-    "balance": 250
-  },
-  "boothId": 7
+  "status": "ACTIVE",
+  "providers": ["GOOGLE"],
+  "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
 }
 ```
+
+> **예시 정정 (2026-08-24)** — 이전 예시의 `wallet.balance`·`boothId`는 이 응답에 **없다.** 잔액은 `GET /wallets/me`(§8), 부스는 `GET /booths/{id}`(§3)가 소유한다. 구현(`MyAccountController.MyAccountResponse`)에 맞춰 고쳤다.
+
+`avatarCode`는 아직 저장하지 않은 사용자에게 **`null`** 이다(키는 존재). 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫이다(spec 013 FR-010).
+
+### PUT `/users/me/avatar`
+
+아바타 외형 저장 (spec 013a, #24 확정). 회원 전용.
+
+```json
+// 요청
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+
+// 200 — 저장한 값을 그대로 echo
+{ "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800" }
+```
+
+| 항목 | 규칙 |
+|---|---|
+| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
+| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
+| 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
+
+상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
+
+정본 계약: `specs/013-avatar-customization/contracts/avatar-profile-api.md`
 
 ---
 
@@ -200,7 +230,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
   "entryAvailable": true,
   "facade": {
     "themeCode": "SSAFY_BLUE",
-    "primaryColor": "#1677C8",
+    "primaryColor": "#3B82F6",
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   },
@@ -334,7 +364,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 ```json
 {
   "themeCode": "SSAFY_BLUE",
-  "primaryColor": "#1677C8",
+  "primaryColor": "#3B82F6",
   "signText": "AI 프로젝트 전시관",
   "logoUrl": null
 }
@@ -438,7 +468,7 @@ S3 Presigned Upload URL 발급 구조를 권장한다.
 {
   "documentId": 152,
   "uploadUrl": "<presigned-url>",
-  "s3Key": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
 }
 ```
 
@@ -714,6 +744,7 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+- 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
 상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
 #21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
@@ -738,12 +769,17 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
 | `VALIDATION_FAILED` | 요청 값 오류 (400) |
-| `GAME_NOT_FOUND` *(P2 후보)* | GameProject 없음 또는 접근 불가 |
-| `GAME_REVISION_CONFLICT` *(P2 후보)* | Draft revision 충돌 |
-| `GAME_PROJECT_VALIDATION_FAILED` *(P2 후보)* | Schema 또는 의미 검증 실패 |
-| `GAME_NOT_PUBLISHED` *(P2 후보)* | 실행 가능한 Published Version 없음 |
-| `GAME_PORTAL_UNAVAILABLE` *(P2 후보)* | Portal 연결 해제·비활성·접근 불가 |
-| `GAME_SCHEMA_UNSUPPORTED` *(P2 후보)* | Runtime이 지원하지 않는 schemaVersion |
+| `GAME_NOT_FOUND` *(019)* | Game 없음 |
+| `GAME_DELETED` *(019)* | soft delete된 Game |
+| `GAME_FORBIDDEN` *(019)* | 소유자 아님 — Authoring·비공개 접근 |
+| `GAME_LIMIT_EXCEEDED` *(019)* | 계정당 활성 Game 상한(기본 20) 초과 — `message`가 상한과 해결 방법을 담는다 |
+| `GAME_REVISION_CONFLICT` *(019)* | Draft revision 충돌. `errors[0].rule=CURRENT_REVISION`의 `message`는 **십진수**다 (§1.3) |
+| `GAME_VALIDATION_FAILED` *(019 제안)* | GameProject 검증 실패 (`errors` 배열 동반) — rule 표는 019 계약이 소유 |
+| `GAME_NOT_PUBLISHED` *(019)* | 실행 가능한 Published Version 없음 |
+| `GAME_NOT_PUBLIC` *(019)* | Game이 `PRIVATE` |
+| `GAME_SCHEMA_UNSUPPORTED` *(019)* | 서버·Runtime이 지원하지 않는 schemaVersion |
+| `GAME_PROJECT_INVALID` *(019)* | **저장된** snapshot이 재검증 실패 — 500, 서버 결함 |
+| `CONFIG_NOT_FOUND` *(019)* | Portal `configId`의 Binding 없음. 실행 불가 사유는 오류가 아니라 200 응답의 `unavailableReason`이다 |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

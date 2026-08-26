@@ -31,5 +31,5 @@
 
 ## 참고
 
-- `S3`, `Spring`, `FastAPI`, `pgvector`, 1536차원, 파트별 소유권은 이번 계획에서 새로 선택한 구현안이 아니라 기존 헌법·아키텍처 계약이므로 명세에 유지했다.
+- `Cloudflare R2(S3-compatible)`, `Spring`, `FastAPI`, `pgvector`, 1536차원, 파트별 소유권은 이번 계획에서 새로 선택한 구현안이 아니라 기존 헌법·아키텍처 계약이므로 명세에 유지했다.
 - Issue #11에서 마지막 C-04 서버 재시작 복구 Clarification을 확정했다.

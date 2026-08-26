@@ -37,10 +37,10 @@
 **⚠️ 중요**: 이 단계가 끝나기 전에는 사용자 스토리 구현을 시작하지 않는다.
 
 - [ ] T006 [P] 환경 매니페스트 스키마 검증기와 유효하지 않은 픽스처 사례를 `infra/environments/tests/contract/environment-manifest.sh`에 작성한다
-- [ ] T007 [P] R2 사용량 보호 스키마 검증기와 임계값 픽스처 사례를 `infra/environments/tests/contract/usage-guard.sh`에 작성한다
+- [ ] T007 [P] R2 Usage Admission과 Storage Failover Control 스키마를 분리 검증하고 active provider가 usage snapshot에 들어가는 사례, 상태별 uploadEnabled/activeWriteProvider 불일치 사례와 79%/80%/90%/61분 픽스처를 `infra/environments/tests/contract/usage-guard.sh`에 작성한다
 - [ ] T008 도구·버전 검사, C-01/C-02 지연 확정 입력, SG 준비 상태, Secret Reference 존재 여부와 단계별 조기 실패 동작을 `infra/environments/scripts/preflight.sh`에 구현한다
 - [ ] T009 [P] dev용 변수 이름과 안전한 로컬 자리표시자만 `infra/environments/config/environments/dev.env.example`에 추가한다
-- [ ] T010 [P] demo/R2/TLS 자격증명은 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
+- [ ] T010 [P] demo/R2/MinIO/TLS 자격증명 reference, Spring 전용 upload-enabled·active-write-provider와 R2·MinIO reader registry 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
 - [ ] T011 추정 수치 없이 EC2 용량 참조, 서비스별 demo 제한, 빌드 에이전트 제한과 `heavyBuildMaxConcurrency: 1`을 `infra/environments/config/resource-limits.example.yaml`에 정의한다
 - [ ] T012 공통 레이블, 상태 확인 앵커, 내부 네트워크 규약과 공개 포트 없음 기본값을 `infra/environments/compose/common.yaml`에 작성한다
 - [ ] T013 고정 이미지, 영속 볼륨과 호스트 포트 비공개 설정을 갖춘 별도 관리 PostgreSQL/Redis 데이터 프로젝트를 `infra/environments/compose/data/compose.yaml`에 작성한다
@@ -111,7 +111,7 @@
 
 **목표**: 애플리케이션 재배포 뒤 PostgreSQL/R2 원본을 유지하고, 브라우저 직접 업로드를 검증하며, PostgreSQL 백업·Redis 손실·R2 장애에서 명시된 복구 경로를 제공한다.
 
-**독립 테스트**: 테스트 비즈니스·벡터 메타데이터와 비공개 문서를 저장한 후 앱 컨테이너와 Redis를 재생성하고, PostgreSQL/R2 원본 손실 0, 재생성 결과 일치, R2 백업 복원과 수동 MinIO 상태 전이를 검증한다.
+**독립 테스트**: 테스트 비즈니스·벡터 메타데이터와 비공개 문서를 저장한 후 앱 컨테이너와 Redis를 재생성하고, PostgreSQL/R2 원본 손실 0, 재생성 결과 일치, R2 백업 복원, 운영자 승인 수동 MinIO 상태 전이, mixed-provider 읽기와 upload-blocked reconcile을 검증한다.
 
 ### 사용자 스토리 3 테스트
 
@@ -119,20 +119,20 @@
 - [ ] T041 [P] [US3] Redis 익명·기본 사용자, 환경 간 키, 금지 명령, TTL과 공개 포트 없음을 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/redis-acl.sh`에 작성한다
 - [ ] T042 [P] [US3] 정상, 잘못된 Content-Type, 만료, 다른 객체, 크기 불일치, 위조 MIME, SHA 불일치와 중복 완료 업로드 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/object-upload.sh`에 작성한다
 - [ ] T043 [P] [US3] 현재·예상 저장량, Class A와 Class B에 대한 79%/80%/90% 및 61분 경과 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/r2-usage-guard.sh`에 작성한다
-- [ ] T044 [P] [US3] 정확한 수동 상태 머신, 운영자 승인, MinIO 포트 차단, 체크섬 불일치와 R2 복귀를 검증하는 실패 우선 R2 장애 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
+- [ ] T044 [P] [US3] Usage Admission/Storage Failover 상태 분리, Spring 전용 active write provider, 운영자 승인, MinIO 포트 차단, 기존 R2·신규 MinIO 객체별 읽기, reconcile 중 신규 grant 차단, 크기·감지 형식·SHA-256 불일치와 원복 거부를 검증하는 실패 우선 R2 장애 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
 - [ ] T045 [P] [US3] 스키마, 행, 벡터, 릴리스, 체크섬, 보존 기간과 문서 목록 검증 근거를 포함하는 실패 우선 R2 전용 PostgreSQL 덤프·복원 테스트를 `infra/environments/tests/failure/postgres-restore.sh`에 작성한다
 - [ ] T046 [P] [US3] 재인증, 영구 데이터 손실 0, RAG 범위·리비전 재구축과 설문 집계 일치를 검증하는 실패 우선 Redis 전체 손실 테스트를 `infra/environments/tests/failure/redis-total-loss.sh`에 작성한다
 
 ### 사용자 스토리 3 구현
 
-- [ ] T047 [P] [US3] 비공개 R2 Standard 버킷 2개, 분리된 문서·백업 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
+- [ ] T047 [P] [US3] 비공개 R2 Standard 버킷 2개와 `R2`·`MINIO_LOCAL` 문서 provider registry, 분리된 signer·reader·backup 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
 - [ ] T048 [P] [US3] 정확한 허용 출처, PUT 전용 메서드, 필수 Content-Type·체크섬 헤더, 노출 ETag와 와일드카드 금지를 `infra/environments/storage/r2/documents-cors.json`에 정의한다
 - [ ] T049 [US3] URL을 영속 저장하지 않는 S3 호환 사전 서명·PUT·HEAD·본문 매직 바이트·SHA-256·멱등 완료 검사를 `infra/environments/storage/r2/presign-probe.sh`에 구현한다
 - [ ] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
 - [ ] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
 - [ ] T052 [P] [US3] 영속 로컬 볼륨을 사용하고 9000/9001 호스트 포트를 공개하지 않는 내부 전용 단일 노드 MinIO 긴급 Compose 프로필을 `infra/environments/compose/emergency/minio.yaml`에 작성한다
-- [ ] T053 [US3] 운영자 전용 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 전이와 검증 근거 요구사항을 `infra/environments/storage/fallback/transition.sh`에 구현한다
-- [ ] T054 [US3] MinIO 대기 객체 목록과 크기·형식·SHA-256 검증 후 R2 복사를 구현하고 불일치 시 메타데이터를 전환하지 않도록 `infra/environments/storage/fallback/reconcile.sh`에 작성한다
+- [ ] T053 [US3] `storage-failover-state.schema.json`에 따라 운영자 전용 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 전이, 상태별 Spring 설정 렌더링, 승인·검증 근거, 배포 smoke 실패 시 안전 rollback을 `infra/environments/storage/fallback/transition.sh`에 구현한다
+- [ ] T054 [US3] `R2_RECONCILING` 진입 시 신규 grant 차단과 MinIO backlog 고정, 동일 key R2 복사, 크기·감지 형식·SHA-256 검증, run/item별 `VERIFIED`·`UNRESOLVED` 및 metadata SoT handoff를 `infra/environments/storage/fallback/reconcile.sh`에 구현한다
 - [ ] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
 - [ ] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
 - [ ] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
@@ -141,7 +141,7 @@
 - [ ] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정한다
 - [ ] T061 [US3] 합성 RAG `boothId+agentId+sourceRevision` 및 설문 `surveyId+sourceRevision` 캐시 검사, 원본 대체 경로 비교와 과대 항목 거부를 `infra/environments/storage/usage-guard/cache-recovery-probe.sh`에 구현한다
 
-**완료 확인**: T040~T046이 통과한다. 객체 본문은 HEAD 메타데이터만으로 유효하다고 취급하지 않고, PostgreSQL을 R2에서 복원할 수 있으며, Redis는 원본 데이터 저장소가 아니고, MinIO는 동일 호스트의 임시 가용성으로만 보고한다.
+**완료 확인**: T040~T046이 통과한다. 객체 본문은 HEAD 메타데이터만으로 유효하다고 취급하지 않고, 현재 active write provider와 관계없이 문서별 provider에서 읽으며, reconcile 미해결 객체를 기록하고 자동 원복하지 않는다. PostgreSQL을 R2에서 복원할 수 있고 Redis는 원본 데이터 저장소가 아니며 MinIO는 동일 호스트의 임시 가용성으로만 보고한다.
 
 ---
 
@@ -201,11 +201,11 @@
 **목적**: 전체 빠른 시작 절차, 운영 문서, 기준선 동결과 최종 검증 근거의 정합성을 맞춘다.
 
 - [ ] T081 `specs/infra-002-environments/quickstart.md`의 실행 가능한 모든 시나리오를 수행하는 단일 엄격 실행기를 `infra/environments/tests/quickstart.sh`에 구현한다
-- [ ] T082 [P] 오래된 pgvector 스키마 전용, 단일 버킷 접두사, R2 2차 백업 미정과 demo 동결 설명을 기준 spec·plan에 맞게 `docs/15_Infra_AWS_설계서.md`에서 정리한다
+- [ ] T082 [P] 오래된 pgvector 스키마 전용, 단일 버킷 접두사, R2 2차 백업 미정과 demo 동결 설명을 정리하고 Usage Admission/Storage Failover 분리, Spring 전용 active write provider, mixed-provider 읽기와 수동 reconcile 계약을 `docs/15_Infra_AWS_설계서.md`에 반영한다
 - [ ] T083 [P] ALB/NLB를 다시 도입하지 않고 현재 단일 EC2 소유권, C-01/C-02 입력과 확정된 C-07 정책을 `docs/26_팀_결정_필요사항.md`에 반영한다
-- [ ] T084 [P] 네트워크 보안, R2 대체 경로, PostgreSQL 복원, Redis 복구와 원본 서버 접근 절차를 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
+- [ ] T084 [P] 네트워크 보안, R2 차단·MinIO 승인 전환·설정 배포/rollback·upload-blocked reconcile·미해결 객체 handoff, PostgreSQL 복원, Redis 복구와 원본 서버 접근 절차를 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
 - [ ] T085 [P] 구현 작업이 동결된 기준선 경로를 수정하지 않았는지 확인하고 검사 경로와 결과를 `infra/environments/tests/evidence/baseline-freeze.md`에 기록한다
-- [ ] T086 모든 계약·통합·보안·장애·자원 테스트 모음을 실행하고 SC-001~SC-014 매핑과 민감정보가 제거된 검증 근거를 `infra/environments/tests/evidence/final-verification.md`에 기록한다
+- [ ] T086 모든 계약·통합·보안·장애·자원 테스트 모음을 실행하고 SC-001~SC-018 매핑과 민감정보가 제거된 검증 근거를 `infra/environments/tests/evidence/final-verification.md`에 기록한다
 - [ ] T087 완료한 INFRA 구현, 검증 결과와 관련 INFRA-T 참조를 실행 날짜 아래 `docs/JSW/24_작업일지.md`에 기록한다
 
 ---
@@ -311,5 +311,7 @@ US1만으로 첫 번째 독립 시연 가능 증분이 된다. 그러나 spec의
 - `[P]`는 파일 수준 병렬 처리만 의미한다. 공용 EC2/R2 변경은 여전히 운영자가 순차 처리해야 한다.
 - C-01/C-02 값이 사전 점검을 통과할 때까지 실제 DNS/TLS/자원 제한 활성화는 차단된다.
 - R2 원본 문서에는 2차 백업이 없으며 MinIO도 이 사실을 바꾸지 않는다.
+- Usage Guard는 active provider를 소유하지 않고, active write provider는 Spring 배포 설정으로만 제공하며 FastAPI는 문서별 provider를 따른다.
+- P0 `R2_RECONCILING`에서는 신규 upload grant를 차단하고 미해결 객체가 있으면 자동 원복하지 않는다.
 - WSS heartbeat·유휴 시간 초과 수치 조정은 infra-003 범위이므로 여기서 도입하지 않는다.
 - Secret 값, Secret이 포함된 렌더링 Compose 출력, 서명 URL이나 개인 키를 커밋하지 않는다.

@@ -6,6 +6,113 @@
 > 새 문제는 `GS-T001`, `GS-T002` 순서로 번호를 올리고 증상/원인/해결/예방을 모두 기록한다.
 > 기존 일반 일지의 T-162~T-168은 아래 `GS-T001~GS-T007`로 이동했다.
 
+## 2026-08-25
+
+### GS-T064. GitLab Issue 목록 API에 지원하지 않는 `order_by=iid`를 사용함 (해결)
+
+- **증상** — 병합 전 논의 이슈의 중복 여부를 조회하는 GitLab API가 `order_by does not have a valid value`를 반환해 issue 목록만 비어 있고 같은 명령의 member 조회만 성공했다.
+- **원인** — Merge Request 응답의 IID 정렬 관행을 Issue 목록 API에도 그대로 적용해, 해당 GitLab 버전이 허용하지 않는 `order_by=iid`를 전달했다. 서로 독립인 두 REST 결과를 한 출력에 묶어 부분 성공도 함께 나타났다.
+- **해결** — 서버 `order_by`를 제거하고 `state=opened&per_page=100`으로 조회한 뒤 PowerShell에서 `Sort-Object iid`를 적용했다. 기존 #48·#55·#56·#69·#73·#78·#81·#101을 확인해 중복 신규 이슈 대신 통합 #104와 기존 이슈별 연결 댓글 구조를 선택했다.
+- **예방** — GitLab API resource별 허용 정렬 필드를 동일하다고 가정하지 않는다. 목록 조회 실패를 다른 API 결과와 섞지 않고 즉시 실패 처리하며, 작은 프로젝트에서는 정렬 없는 전체 페이지를 받아 client-side IID 정렬로 검증한다.
+
+### GS-T063. Atlassian API token을 Bearer로 사용해 Jira 조회가 403으로 거부됨 (해결)
+
+- **증상** — `JIRA_API_TOKEN`과 `ATLASSIAN_API_TOKEN`을 Bearer header로 사용한 `/rest/api/3/myself` 요청이 모두 403을 반환했다. 첫 진단 명령은 PowerShell `foreach` 결과를 직접 pipe하면서 parser 오류도 발생했다.
+- **원인** — 현재 제공된 Atlassian token은 OAuth access token이 아니라 Atlassian API token이라 Jira Cloud Basic 인증의 `email:token` 조합이 필요했다. loop statement 결과도 현재 PowerShell에서는 변수에 먼저 수집해야 한다.
+- **해결** — 저장소 Git 사용자 이메일과 `ATLASSIAN_API_TOKEN`을 Basic 인증으로 조합하고 `/myself`에서 활성 강형순 계정과 accountId를 확인했다. loop 결과는 `$rows`에 수집했다. 이후 15건 담당자 PUT이 모두 성공했고 `assignee=currentUser()` JQL 재조회로 검증했다.
+- **예방** — Atlassian API token과 OAuth Bearer token을 구분한다. 계정 변경 전 `/myself`로 displayName·accountId·active를 확인하고, 변경 뒤 동일 JQL로 대상 수와 담당자를 재검증한다. Secret 값은 출력하거나 파일에 기록하지 않는다.
+
+### GS-T062. 활성 Game Studio 사양의 이슈 링크 일부가 이전 GitHub를 계속 가리킴 (해결)
+
+- **증상** — GitLab 이관 후에도 현재 계약·계획·미완료 task의 #69·#73·#78 링크가 이전 GitHub 저장소를 열었다. 작업일지의 과거 GitHub 활동 기록과 활성 추적 링크가 구분되지 않았다.
+- **원인** — 구현·검증 기준을 갱신하면서 이슈 번호와 상태는 유지했지만 문서 URL의 호스트 이관 여부를 별도 검사하지 않았다.
+- **해결** — GitLab API로 #69·#73·#78·#81의 동일 IID와 제목·OPEN 상태를 확인했다. 현재 사양의 계약·계획·task 링크만 GitLab work item으로 교체하고, 당시 작업 사실을 기록한 과거 일지의 GitHub PR/Issue 링크는 역사적 증거로 보존했다.
+- **예방** — 저장소 이관 뒤 문서 링크 검사는 현재 정본 문서와 역사 일지를 나눠 수행한다. 현재 사양은 새 tracker를 사용하고, 과거 기록은 대상과 시점을 왜곡하지 않도록 원래 링크를 유지한다.
+
+### GS-T061. PowerShell URI 보간이 MR IID와 query 구분자를 합쳐 상태 재검증이 실패함 (해결)
+
+- **증상** — GitLab MR의 최종 merge status를 다시 조회하는 명령이 코드·문서 MR 모두 `merge_request_iid is invalid`를 반환했다. URI를 고친 뒤에는 `foreach` statement 바로 뒤에 pipe를 연결한 출력 구문이 `empty pipe element` parser 오류를 냈다.
+- **원인** — PowerShell expandable string에서 `$iid?with_merge_status_recheck=true`를 사용해 `?` 앞의 loop 변수를 명시적으로 닫지 않았다. 생성된 URI에 정상 IID가 들어가지 않았고, statement 결과를 괄호나 변수로 수집하지 않은 채 바로 pipe하려 한 구문도 현재 PowerShell parser에서 유효하지 않았다.
+- **해결** — query string 직전 변수를 `${iid}`로 감싼 `merge_requests/${iid}?with_merge_status_recheck=true` 형식으로 바꿨다. `foreach` 결과는 `$rows`에 먼저 수집한 뒤 출력하고, REST 오류는 즉시 실패 처리했다. 최종 확인에서 MR !8·!9 모두 `mergeable`, 충돌 없음, Draft 아님을 반환했다.
+- **예방** — PowerShell에서 변수 바로 뒤에 URL query 또는 식별 문자가 오면 `${variable}` 문법을 사용한다. 여러 MR을 검사할 때는 loop 출력을 변수에 수집한 뒤 pipe하고, HTTP 실패 응답을 null 결과로 계속 출력하지 않고 해당 URI와 오류를 바로 확인한다.
+
+### GS-T060. 테스트·빌드 병렬 경쟁에서 100ms 편집 gate가 일시 초과함 (측정 경계 확정)
+
+- **증상** — 전체 Vitest, TypeScript/Vite build, lint를 동시에 실행한 검증에서 최대 fixture Object 이동 최악값이 120.25ms로 100ms gate를 한 차례 넘었다. 같은 test file 단독 실행과 build 종료 뒤 전체 suite는 통과했다.
+- **원인** — 500 Object·10,000 Tile·실제 Sprite Component를 가진 fixture의 immutable parse 검증이 CPU를 쓰는 동안 별도 `tsc`와 Vite transform을 같은 장비에서 동시에 수행해 wall-clock 시간이 늘었다. 제품 편집 동작과 CI 빌드 경합을 같은 표본으로 섞었다.
+- **해결** — 100ms 기준이나 assertion을 완화하지 않았다. 성능 test file을 단독 재실행한 뒤 CPU 경쟁이 없는 전체 `npm test`에서도 통과함을 확인하고, build·lint는 각각 성공시켰다. 활성 브라우저 FPS는 기존 T065 사람 QA로 분리된 상태를 유지했다.
+- **예방** — wall-clock 성능 gate는 같은 장비의 대형 build와 병렬 실행하지 않는다. 기능 회귀는 병렬화할 수 있지만 100ms 기준과 활성 탭 FPS는 측정 조건·foreground·동시 프로세스를 기록하고 격리해서 판정한다.
+
+### GS-T059. 전체 맵 맞춤에서 10,000 Tile DOM이 다시 생기고 Canvas가 폭보다 커짐 (해결)
+
+- **증상** — 100×100 맵에서 `전체`를 누르면 zoom 표시는 15%였지만 map child의 min-content가 stage 폭을 밀어내 viewport가 전체를 담지 못했다. 폭을 100%로 고정하자 이번에는 전체 Tile이 화면 안으로 판정되어 span 10,000개가 생성됐다.
+- **원인** — `.gss-map-canvas`에 명시적인 `width:100%`가 없었고, 기존 viewport culling은 화면에 실제로 보이는 모든 Tile을 렌더하는 규칙이라 전체 맞춤에서는 자연스럽게 상한 전체가 visible이 됐다. 편집 배율 가상화와 전체 overview가 같은 렌더 경로를 사용했다.
+- **해결** — map child 폭을 stage에 고정했다. zoom 25% 이하에서는 TileLayer를 최대 1,000px의 단일 Canvas에 pixelated 합성하고 Tile span은 0개로 유지한다. 1:1로 돌아오면 기존 viewport/2칸 overscan span 경로로 자동 전환한다. 브라우저 실측은 전체 15%에서 Tile DOM 0/10,000 합성, 1:1에서 640/10,000이었다.
+- **예방** — 가상화 완료 조건은 스크롤 상태뿐 아니라 “전체 보기”처럼 모든 데이터가 viewport에 들어오는 상태를 포함한다. DOM 편집 표현과 저배율 overview 표현을 분리하고 badge/data attribute로 어느 경로인지 관찰 가능하게 한다.
+
+### GS-T058. 검증 도구의 명령·locator 가정을 그대로 사용해 첫 실행이 실패함 (해결)
+
+- **증상** — Vitest에 Jest 전용 `--runInBand`를 넘겨 unknown option으로 종료됐고, 첫 JSX wrapper에는 scroll div 닫기 하나가 빠져 build가 실패했다. 브라우저의 `전체` 버튼도 팔레트와 toolbar에 둘 존재해 exact role locator가 strict mode로 거부됐으며 해당 runtime에는 `getByTitle` helper가 없었다.
+- **원인** — 다른 test runner와 일반 Playwright API를 현재 프로젝트·인앱 브라우저 wrapper에도 동일하게 사용할 수 있다고 가정했다. UI wrapper 구조 변경은 unit test만 먼저 실행해 TypeScript JSX parse를 뒤에서 발견했다.
+- **해결** — 표준 `npm test`로 전환하고 JSX closing tag와 hook dependency를 build/lint 결과에 맞춰 수정했다. 브라우저는 `캔버스 보기` role group 안의 `전체` 버튼으로 범위를 좁혔다. 이후 49 files/269 tests, build, lint와 실제 클릭 여정을 모두 통과했다.
+- **예방** — 검증 명령은 `package.json` script를 정본으로 사용한다. UI 구조 변경은 unit test만이 아니라 `tsc -b`와 lint를 같은 묶음에서 확인하고, 중복 한국어 label은 상위 landmark/group으로 locator 범위를 좁힌다.
+
+### GS-T057. PLATFORMER 최대 크기와 TileLayer 저장 상한이 달라 레이어 추가 시 계약 오류가 발생함 (FE 차단, 계약 결정 대기)
+
+- **증상** — PLATFORMER width/height는 각각 200×100까지 허용하지만 JSON Schema와 Frontend validator의 TileLayer `data`는 10,000개가 상한이다. 200×100 빈 Scene은 만들어지지만 Tile Layer 추가 순간 20,000개 배열이 생성되어 저장·검증이 실패한다.
+- **원인** — Scene 축별 크기 상한과 row-major TileLayer 배열 상한을 서로 독립적으로 정했고 `width×height` 조합 제약을 Authoring에 두지 않았다.
+- **해결** — Backend wire/schema 상한을 일방적으로 20,000으로 늘리지 않았다. 공통 `maxTileCellsPerLayer=10,000`을 validator와 Authoring command가 함께 사용하고 Inspector는 초과 cell 수를 한국어로 표시하며 적용을 비활성화한다. imported large Scene의 레이어 추가도 같은 설명으로 거부한다. 200×50 유효 경계와 200×100 거부를 unit test로 고정했다.
+- **예방** — 축별 크기, 직렬화 배열 크기, JSON byte, DB 저장 비용은 하나의 limit matrix로 검토한다. 20,000칸을 지원하려면 FE만 바꾸지 않고 shared schema·Backend validator·부하 기준을 [GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101)에서 승인한다.
+
+### GS-T056. 큰 맵을 작은 카드에 압축하고 모든 Object·Tile DOM을 동시에 생성함 (해결)
+
+- **증상** — Scene width가 커져도 Canvas 폭은 610~1240px에 머물러 한 칸이 몇 px로 줄었고, 최대 500 Object button과 최대 10,000 Tile span을 화면 밖까지 한 번에 만들었다. 배치 위치를 읽기 어렵고 scroll·선택 render 비용도 맵 전체에 비례했다.
+- **원인** — zoom을 실제 cell 크기가 아니라 고정 stage의 백분율로 적용했고, Canvas가 scroll viewport의 grid 범위를 알지 못했다. Object layer도 검색 결과 500개 article을 즉시 렌더했다.
+- **해결** — stage 폭을 `Scene width×32px×zoom`으로 계산하고 작은 맵만 480px 최소 폭을 사용한다. `ResizeObserver`와 scroll frame에서 visible grid를 계산해 2칸 overscan Object/Tile만 렌더하고, 레이어 선택으로 원거리 Object를 중앙 탐색한다. 레이어 목록은 검색 정합성을 유지하며 80개 단위로 표시한다. 100×50/5,000 Tile 브라우저 실측에서 전체 5,000개 대신 위치별 460~598개 span만 생성됐다.
+- **예방** — 대형 편집기 성능 테스트는 reducer 시간뿐 아니라 Canvas pixel 크기, viewport/scroll 범위, 실제 Object/Tile DOM 수, 화면 밖 선택 복귀를 함께 측정한다.
+
+### GS-T055. 광범위한 `Reference/` ignore 규칙이 신규 Runtime 성능 파일을 첫 커밋에서 숨김 (해결)
+
+- **증상** — 성능 요약 테스트와 수정된 Runtime은 커밋됐지만 새 `runtime/reference/framePerformance.ts`가 commit stat에 없었다. 일반 `git status`에도 ignored untracked 파일이라 나타나지 않아 그대로 push하면 import 대상이 누락될 상태였다.
+- **원인** — 저장소 루트 `.gitignore`의 `Reference/` 패턴이 대소문자 구분 없이 모든 하위 `reference` 디렉터리에 적용됐다. 기존 Runtime reference 파일은 이미 tracked라 수정이 들어갔지만 신규 파일만 무시됐다.
+- **해결** — `git check-ignore -v`로 정확한 규칙과 경로를 확인하고 신규 파일 하나만 `git add -f -- <exact-path>`로 포함했다. push 전 커밋을 amend해 9개 파일과 신규 module 4개가 모두 들어간 것을 `git show --stat`으로 재확인했다.
+- **예방** — ignored 경로 아래 tracked code에 신규 파일을 만들면 일반 status만 보지 않고 `git check-ignore -v`와 commit stat을 확인한다. 강제 추가는 확인된 단일 파일에만 사용하며 광범위한 `-f`나 ignore 규칙 변경으로 우회하지 않는다.
+
+### GS-T054. PowerShell cmdlet 뒤 `$LASTEXITCODE` 검사로 문서 검증이 조용히 조기 종료됨 (해결)
+
+- **증상** — JSON schema parse, fixture, Runtime trace, task 집계를 한 명령에서 실행했지만 exit 0과 빈 출력만 남고 뒤 검증 결과가 표시되지 않았다.
+- **원인** — `ConvertFrom-Json`은 PowerShell cmdlet이라 native process용 `$LASTEXITCODE`를 새로 설정하지 않는다. 직후 `$LASTEXITCODE -ne 0`을 검사해 null/이전 값으로 분기했다.
+- **해결** — cmdlet 성공은 `$?`, 이어지는 `node` 프로세스는 각각 `$LASTEXITCODE`로 구분해 검사했다. fixture 7/7, Runtime trace 6/6, task 94/86/8을 실제 출력으로 재확인했다.
+- **예방** — PowerShell cmdlet과 native executable을 연속 검증할 때 같은 exit 변수로 묶지 않는다. cmdlet은 `$?` 또는 `try/catch`, native command는 호출 직후 `$LASTEXITCODE`를 사용한다.
+
+### GS-T053. 로컬 안전 복구 보조 버튼의 글자가 밝은 기본 배경에서 보이지 않음 (해결)
+
+- **증상** — DOM과 기능 테스트에서는 `JSON 보관`, `임시본 버리기`가 정상 존재했지만 실제 screenshot에서 두 버튼이 흰 사각형처럼 보여 문구를 식별하기 어려웠다. 기본 동작 버튼만 녹색 배경이라 정상으로 보였다.
+- **원인** — 복구 dock이 기존 충돌 dock의 크기·배치를 재사용하면서 보조 버튼의 background/border/text color를 명시하지 않았다. 상위 전역 button 스타일의 밝은 배경과 낮은 대비가 적용됐다.
+- **해결** — 복구 dock의 보조 버튼을 짙은 녹색 계열 배경·테두리와 밝은 문자로 고정하고 primary 버튼도 흰 문자 대비를 명시했다. 동일 화면을 다시 캡처해 세 버튼 문구가 모두 보이는지 확인했다.
+- **예방** — 새 dialog/dock은 DOM snapshot만으로 완료하지 않고 실제 screenshot에서 기본·보조·위험 버튼의 문자 대비, toast 겹침, 작은 창 배치를 함께 확인한다.
+
+### GS-T052. 브라우저 QA를 실 API 모드로 띄우고 종료 중인 Port를 즉시 재사용함 (해결)
+
+- **증상** — 첫 5175 서버에서 게스트 입장이 편집 route로 이어지지 않았고, Mock 모드로 재시작할 때 5175가 사용 중이라 Vite가 5176으로 이동했다.
+- **원인** — Game Studio 편집 route는 회원 전용인데 첫 서버에 `VITE_USE_MOCK=true`를 주지 않았다. 기존 PTY에 Ctrl+C를 보낸 직후 프로세스 종료가 확정되기 전에 같은 Port를 재사용했다.
+- **해결** — 임의 인증 주입이나 route guard 변경 없이 공식 Mock selector로 5176 서버를 띄우고 Google mock callback·테스트 닉네임으로 회원 세션을 만들었다. 실제 선택 Port에서 Scene/Clipboard/Tile/Collider UI를 검증했다.
+- **예방** — 브라우저 QA 명령은 처음부터 quickstart의 Mock 환경변수와 명시 Port를 사용한다. 종료 요청 뒤 session exit 또는 Port 해제를 확인하고, Vite가 대체 Port를 선택하면 브라우저 URL도 출력값 기준으로 바꾼다.
+
+### GS-T051. Vitest 단일 파일 filter에 Frontend workdir 경로를 중복 지정함 (해결)
+
+- **증상** — `festa-frontend`를 작업 디렉터리로 둔 상태에서 `festa-frontend/src/.../authoringCommands.test.ts`를 filter로 넘겨 `No test files found`가 발생했다.
+- **원인** — 저장소 root 기준 파일 경로와 npm 실행 workdir 기준 경로를 혼용했다. Vitest include는 `src/**/*.test.ts`라 앞의 `festa-frontend/`가 중복됐다.
+- **해결** — filter를 `src/game-studio/__tests__/unit/authoringCommands.test.ts`로 수정해 11개를 통과시키고, 이후 전체 44 files / 252 tests를 다시 실행했다.
+- **예방** — npm script를 하위 workdir에서 실행할 때 filter와 fixture 경로는 그 workdir 상대 경로로 표기한다. 단일 테스트 성공 뒤 반드시 filter 없는 전체 suite를 실행한다.
+
+### GS-T050. 최신 GitLab fetch에서 저장소 단위 safe.directory를 첫 호출에 누락함 (해결)
+
+- **증상** — 최신 `front` 확인을 위한 승인된 `git fetch gitlab --prune`이 `detected dubious ownership`으로 중단됐다.
+- **원인** — 기존 GS-T046의 재발 방지 규칙을 알고 있었지만 첫 승인 명령에 명령 단위 `safe.directory`를 포함하지 않았다. Sandbox 소유 worktree와 승인 명령 사용자가 달랐다.
+- **해결** — 전역 Git 설정을 바꾸지 않고 `git -c safe.directory=<현재 Game Studio worktree> fetch gitlab --prune`으로 다시 실행해 최신 ref를 회수했다.
+- **예방** — 이 두 Game Studio worktree의 escalated Git 호출은 처음부터 저장소 절대경로를 포함한 `git -c safe.directory=...` 형태로만 실행한다. 재시도 절차가 아니라 기본 명령 템플릿으로 고정한다.
+
 ## 2026-08-24
 
 ### GS-T047. 공유 worktree object store의 임시 객체를 이관 원본으로 오인할 위험 (해결)

@@ -109,7 +109,7 @@ Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ─
 - Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
 - `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
 - Unity 7777은 외부에 공개하지 않는다.
-- `world.<domain>`의 Nginx `proxy_read_timeout`은 초기값 `180s`를 명시하고, heartbeat·무입력 연결 실측 결과에 따라 조정한다.
+- WebSocket read timeout은 초기값을 두고 heartbeat·무입력 연결 실측 후 확정한다.
 - AI SSE 경로는 `proxy_buffering off`, cache off, 충분한 read timeout을 적용한다.
 - API·AI·World는 Cloudflare 정적 캐시 대상에서 제외한다.
 
@@ -273,21 +273,22 @@ Redis는 유실 가능한 임시 상태만 저장한다.
 
 ## 11. Cloudflare R2 / S3-compatible Object Storage
 
-R2의 우선 용도는 비공개 AI 원본 문서이며, PostgreSQL 외부 백업도 별도 Prefix에 보관한다.
+R2의 우선 용도는 비공개 AI 원본 문서이며, PostgreSQL 외부 백업은 문서 저장소와 credential·CORS 경계를 분리한 별도 private bucket에 보관한다.
 
 ```text
-documents/booths/{boothId}/agents/{agentId}/...
-backups/postgresql/...
+R2 document bucket: documents/booths/{boothId}/agents/{agentId}/...
+R2 backup bucket:   postgresql/{env}/{database}/{tier}/...
 ```
 
 문서 업로드 흐름:
 
 ```text
 Client → Spring에 업로드 권한 요청
-Spring → 짧은 Presigned URL 발급
-Client → R2 직접 업로드
+Spring → Usage Admission과 active write provider 확인
+Spring → grant에 provider·Object Key를 고정하고 짧은 Presigned URL 발급
+Client → grant가 지정한 R2 또는 MinIO에 직접 업로드
 Client → 업로드 완료 통지
-Spring → HEAD로 존재·크기·형식 검증
+Spring → grant에 고정된 provider에서 HEAD·본문 크기·감지 형식·SHA-256 검증
 Spring → 후속 AI 처리 허용
 ```
 
@@ -299,8 +300,28 @@ Spring → 후속 AI 처리 허용
 - Object Key는 서버가 결정하며 클라이언트 입력을 그대로 신뢰하지 않는다.
 - 파일 타입·크기·요청량과 총 사용량에 무과금 안전 한도를 둔다.
 - API·로그에 Presigned URL과 R2 Secret 원문을 남기지 않는다.
-- R2를 사용할 수 없을 때도 S3-compatible 계약을 유지하는 fallback을 준비한다.
-- R2 원본 문서의 별도 외부 백업 위치는 §25의 확정 필요 사항으로 남긴다.
+- R2를 사용할 수 없을 때도 S3-compatible 계약을 유지하며 단일 노드 MinIO로만 수동 fallback한다.
+- 한 시점에는 신규 업로드용 active write provider 하나만 허용한다. 기존 객체 읽기는 문서별 `storageProvider`를 따르므로 R2·MinIO reader 설정을 함께 유지한다.
+- Usage Guard snapshot은 R2 사용량·freshness 기반 업로드 허용만 판정하고 active provider를 소유하지 않는다.
+- active write provider와 upload-enabled는 Spring 배포 설정으로 주입한다. FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
+- R2 원본 문서는 P0에서 별도 2차 외부 백업을 두지 않는다. MinIO는 같은 EC2의 임시 가용성 수단이며 backup·복제본으로 계산하지 않는다.
+
+수동 전환·원복 상태:
+
+```text
+R2_ACTIVE
+→ UPLOAD_BLOCKED
+→ FALLBACK_VALIDATING
+→ LOCAL_ACTIVE
+→ R2_RECONCILING
+→ R2_ACTIVE
+```
+
+- 자동 failover·이중 쓰기·자동 복제·자동 원복은 금지한다.
+- `FALLBACK_VALIDATING`은 운영자 승인과 disk·credential·PUT·HEAD·CORS·9000/9001 외부 차단 근거를 요구한다.
+- `UPLOAD_BLOCKED`, `FALLBACK_VALIDATING`, `R2_RECONCILING`에서는 신규 upload grant를 발급하지 않는다.
+- R2 복구 후 MinIO backlog를 고정하고 동일 Object Key의 크기·감지 형식·SHA-256을 대조한다. 성공 객체만 R2 metadata로 전환하고 누락·불일치 객체는 영속적인 미해결 기록으로 남긴다.
+- 미해결 객체가 1건이라도 있으면 `R2_RECONCILING`을 완료하거나 R2 쓰기를 재개하지 않는다.
 
 ---
 
@@ -599,9 +620,9 @@ Web 접속 → Login → World 입장 → AI 응답
 
 ### AI 원본 문서
 
-- R2 객체와 PostgreSQL의 Object Key·문서 상태 대응 관계를 복구할 수 있어야 한다.
+- R2/MinIO 객체와 PostgreSQL의 storage provider·Object Key·문서 상태 대응 관계를 복구할 수 있어야 한다.
 - 정기 Object Inventory/Manifest를 백업 세트와 연결한다.
-- R2 자체 장애·계정 상실에 대비한 두 번째 외부 보관 위치는 확정 후 반영한다.
+- R2 원본 문서의 두 번째 외부 보관 위치는 P0에서 도입하지 않는다. R2 자체 장애·계정 상실 시 복구할 수 없는 제한을 운영 근거에 명시한다.
 
 ### 배포 산출물
 
@@ -653,6 +674,12 @@ Web 접속 → Login → World 입장 → AI 응답
 
 - Cloudflare 장애 시 문서화된 Nginx Origin 접근 경로를 사용한다.
 - R2 장애는 문서 업로드·AI 문서 처리로 격리하고 비AI 기능 전체 장애로 전파하지 않는다.
+- P0에서는 timeout, 연속 5xx 횟수와 관측 시간의 자동 장애 판정 수치를 하드코딩하지 않는다. R2 probe의 timeout·5xx·latency를 관측·알림 evidence로 수집하고 Infra 운영자가 검증한 뒤 `UPLOAD_BLOCKED`를 수동 적용한다.
+- 자동 판정 수치는 P0 모니터링 자료가 확보된 뒤 Infra·BE 별도 이슈에서 확정하고 장애 주입으로 검증한다. 후속 자동 판정을 도입해도 자동 상태 변경은 신규 upload grant를 막는 `UPLOAD_BLOCKED`까지만 허용한다.
+- `FALLBACK_VALIDATING`, `LOCAL_ACTIVE`, `R2_RECONCILING`, `R2_ACTIVE` 전환은 자동화하지 않으며 MinIO 전환·R2 원복은 Infra 운영자가 검증·승인한다.
+- MinIO 전환 배포가 실패하면 R2가 복구되지 않은 상태에서 임의 원복하지 않고 `UPLOAD_BLOCKED`로 rollback한다.
+- R2 복구 후 `R2_RECONCILING`에서 신규 업로드를 차단하고 객체별 크기·감지 형식·SHA-256과 metadata를 검증한다.
+- reconcile 실행 결과는 run/item 단위로 남기며 검증 성공 객체만 Spring metadata 변경 대상으로 전달한다.
 
 ---
 
@@ -685,11 +712,12 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 | C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra + 팀 | DNS/TLS 적용 전 |
 | C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra + 팀 리드 | Cloudflare/R2 적용 전 |
 | C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | 문서 업로드 적용 전 |
-| C-05 | R2 장애 시 S3-compatible fallback과 원본 문서의 두 번째 외부 백업 위치 | Infra + BE + AI | 복구 계획 확정 전 |
+| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님), 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** 원본 문서의 두 번째 외부 백업 위치는 미확정 ([spec 007 C-10](../specs/007-ai-agent-document/spec.md), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 | C-06 | PostgreSQL/pgvector Database·Schema·Role 분리와 최종 백업 보관 정책 | Infra + BE + AI | 데이터 환경 구성 전 |
 | C-07 | 시연 시간대·빌드/배포 동결 시간과 긴급 배포 승인 절차 | Infra + 팀 | 서버 부하 실측 후 |
 | C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | 관측 설계 전 |
 | C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | 외부 실측 후 |
+| C-10 | R2 가용성 자동 판정 수치(timeout·연속 5xx 횟수·관측 시간) | Infra + BE | P0 모니터링 자료 확보 후 별도 이슈에서 확정·장애 주입 검증 |
 
 이미 확정된 사항:
 

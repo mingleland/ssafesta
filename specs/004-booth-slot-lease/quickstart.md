@@ -71,7 +71,7 @@ cd backend && ./mvnw spring-boot:run
 
 1. `01-auth` — 로그인해 Access Token 확보
 2. `03-wallet/내 지갑 조회` → 신규 계정이면 **250**
-3. `04-booth-lease/슬롯 목록 조회` → 7개, 전부 `AVAILABLE`
+3. `04-booth-lease/슬롯 목록 조회` → 12개, 전부 `AVAILABLE`
 4. `04-booth-lease/부스 임대` → `201`, `chargedCoin: 100`, `balanceAfter: 150`
 5. `03-wallet/내 거래 내역 조회` → `LEASE_PAYMENT` `-100` 1행
 6. `04-booth-lease/슬롯 목록 조회` → 그 슬롯이 `OCCUPIED`, `remainingSeconds`가 줄어든다

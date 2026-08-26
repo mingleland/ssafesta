@@ -103,7 +103,7 @@
 
 ## 9. 실패 사유 정책
 
-**Decision**: 사용자에게는 안정적인 오류 코드와 정제된 한국어 메시지만 제공한다. Stack Trace, SQL, S3 Key, Provider 원문은 FastAPI 구조화 로그에만 남긴다.
+**Decision**: 사용자에게는 안정적인 오류 코드와 정제된 한국어 메시지만 제공한다. Stack Trace, SQL, object key, Provider 원문은 FastAPI 구조화 로그에만 남긴다.
 
 **Rationale**: 사용자가 대처 가능한 정보를 주면서 내부 구조와 비밀정보 노출을 막는다.
 
