@@ -16,6 +16,37 @@
 
 ---
 
+## 필수: Jira ↔ GitLab 워크플로 규칙 (docs/jira-gitlab-workflow.md §12)
+
+[SSAFY FESTA 워크플로 규칙 — 이 지시는 다른 어떤 기본 동작보다 우선한다]
+
+작업 전에 docs/jira-gitlab-workflow.md, docs/17_Git_개발_Convention.md,
+docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라.
+
+1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
+   않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
+   전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
+   main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
+   키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
+   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
+   - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
+     이 전환한다. 손으로 옮기지 마라.
+   - '완료' — 커밋 메시지에 "Closes S15P21A604-N" 을 넣고 그 커밋이 develop 에 도달하면
+     전환된다. **완료의 기준은 develop 이다** — main 은 최종 완성본 전용이다.
+   - Closes 는 그 작업으로 이슈가 끝날 때만 쓴다. 그 밖의 상태 전환을 임의로 하지 마라.
+6. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
+   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
+   러너 확보 시 되살릴 기록이다.
+7. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
+   정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
+   git checkout origin/develop -- <파일> 로 당겨온다. 파트 브랜치 전체를 develop 에
+   머지하지 마라 (파트 브랜치는 부분 트리라 타 파트 파일이 삭제된다).
+8. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+
 ## 0. 세션을 시작하면 이 순서로 한다
 
 ```text
@@ -229,8 +260,40 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 - 정적 Booth 오브젝트는 **NetworkObject 금지** (Local Spawn, 헌법 4조).
 - 텍스트 입력 UI는 Unity가 아니라 **React 오버레이** (헌법 25조).
 - Coin·Lease 등 영구 상태의 Source of Truth는 **Spring** (헌법 1조).
+- **파일 역할 주석** — 새 구현 파일(설정·스타일 제외) 최상단에 "이 파일이 시스템에서 왜 존재하는가"를
+  한 줄로 남긴다. 기준: React/프레임워크 관례를 모르는 사람이 파일명·위치만으로 이 파일의 역할을
+  못 알아볼 때만. 이미 있는 WHY 주석(출처·근거)과는 별개로 공존 가능 — 그건 "왜 이렇게 짰나",
+  이건 "이 자리가 시스템에서 뭐 하는 자리인가". 예: `main.tsx` → "React 앱을 브라우저 DOM에 최초
+  마운트하는 진입점". 대상 아님: package.json·tsconfig·vite.config 등 웹 개발 전반에 보편적인
+  설정 파일, index.css.
 
 ---
+
+
+### Unity 작업 상시 규칙 (game 파트에서 실전으로 확정 — 전 파트 공통 적용)
+
+- **씬·프리팹·.meta 파일은 텍스트로 직접 편집하지 않는다.** `.unity`·`.prefab`·`.asset`·`.meta` 는
+  GUID 참조가 얽힌 YAML 이다. 텍스트로 고치면 참조가 끊기고 씬이 열리지 않는다.
+  씬/오브젝트/컴포넌트 변경은 **Unity MCP 도구로만** 한다. MCP 가 응답하지 않으면(에디터 꺼짐)
+  멈추고 사용자에게 에디터를 켜달라고 요청한다.
+- **에셋 미사용 판정은 GUID 검색으로 끝내지 않는다.** 다음 셋은 GUID 참조가 없어도 사용 중이다:
+  ① `Resources/` (코드가 경로로 로드 — 옮기면 컴파일은 통과하고 런타임에 조용히 null)
+  ② 이름으로 찾는 셰이더 (`Shader.Find("Festa/Avatar/GarmentTint")` 등)
+  ③ `ProjectSettings/` 참조 (URP 파이프라인·QualitySettings·Input Actions).
+  판정은 `AssetDatabase.GetDependencies` 로 하고, 모델에 임베드된 머티리얼→텍스처 링크는
+  텍스트 검색에 안 보이므로 Unity 로 확인한다.
+- 에셋 이동은 `AssetDatabase.MoveAsset` 으로만 한다. 탐색기·`mv` 로 옮기면 참조가 끊긴다.
+- `Assets/Plugins/WebGL/` 은 Unity 규약 폴더다 — `.jslib` 는 여기 있어야 WebGL 빌드에 포함된다.
+- **기준선 동결 준수** — `docs/23_기준선_동결_워크플로.md`. 동결된 기준선 코드를 재구현·리팩터링하지
+  않는다. 현재 기준선: `v0.0.1-poc`.
+- Unity 변경 후에는 Editor Refresh/Compile 과 Console Error 를 먼저 확인한다. 사용자가 명시하지
+  않은 Play Mode 전환·WebGL/Linux 빌드는 실행하지 않는다.
+- 로컬 시각 QA 산출물(`festa-unity/Assets/Screenshots/`)은 소스 에셋이 아니며 커밋하지 않는다.
+  근거로 남길 스크린샷은 `docs/<이니셜>/verify/` 에 커밋한다.
+- `festa-unity/Library/`·`Temp/`·`Obj/`·`Build/`·`Logs/` 는 생성물이다 — 읽지도 쓰지도 않는다.
+- **에디터에서 통과해도 빌드에서 깨지는 부류가 있다** (`docs/KHS/28` §0-5): 런타임 메시 조작
+  (`isReadable` 필요), 셰이더 변형, `Resources.Load`, IMGUI, `ProfilerRecorder`. 이 목록에
+  걸리는 변경은 반드시 빌드로 확인한다.
 
 ## 7. 검증된 실행 명령
 
