@@ -34,11 +34,10 @@ export function LoginPage() {
     setGuestPending(true);
     setGuestError(null);
     try {
+      // 성공 판정은 "예외 없음"이다 — BE 게스트 응답에는 status 가 없다. 실패는 catch 로 온다.
       const result = await authApi.guestEnter();
-      if (result.status === 'AUTHENTICATED') {
-        setGuestSession(result.accessToken, result.expiresAt);
-        navigate(consumeReturnTo(), { replace: true });
-      }
+      setGuestSession(result.accessToken, result.expiresAt);
+      navigate(consumeReturnTo(), { replace: true });
     } catch (err) {
       // FR-007 — 원인 범주(서버 message)·재시도 방법(버튼 재클릭) 표시
       setGuestError(isApiError(err) ? err.message : '게스트 입장에 실패했습니다. 잠시 후 다시 시도해 주세요.');

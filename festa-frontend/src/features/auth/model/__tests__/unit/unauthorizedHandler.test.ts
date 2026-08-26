@@ -18,7 +18,7 @@ beforeEach(() => {
 describe('member', () => {
   it('refresh 성공 시 세션을 갱신하고 true를 반환한다(client.ts가 원요청을 재시도)', async () => {
     setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
-    refreshMock.mockResolvedValue({ status: 'AUTHENTICATED', accessToken: 'at-new', expiresAt: '2026-01-01T01:00:00.000Z' });
+    refreshMock.mockResolvedValue({ accessToken: 'at-new', expiresAt: '2026-01-01T01:00:00.000Z' });
 
     const recovered = await handleUnauthorized();
 
@@ -38,7 +38,7 @@ describe('member', () => {
 
   it('동시에 여러 번 불려도 refresh는 1회만 나간다(single-flight)', async () => {
     setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
-    refreshMock.mockResolvedValue({ status: 'AUTHENTICATED', accessToken: 'at-new', expiresAt: '2026-01-01T01:00:00.000Z' });
+    refreshMock.mockResolvedValue({ accessToken: 'at-new', expiresAt: '2026-01-01T01:00:00.000Z' });
 
     const [a, b] = await Promise.all([handleUnauthorized(), handleUnauthorized()]);
 
