@@ -24,6 +24,7 @@ final class GameSchemaRuleMap {
     private static final Pattern SCENE_GRAVITY = Pattern.compile("^/scenes/\\d+/gravity$");
     private static final Pattern OBJECTIVE_TARGET =
             Pattern.compile("^/rules/completion/objectives/\\d+/target$");
+    private static final Pattern SCENE_PRESENTATION = Pattern.compile("^/scenes/\\d+/presentation$");
 
     private GameSchemaRuleMap() {
     }
@@ -52,6 +53,13 @@ final class GameSchemaRuleMap {
         }
         if ("enum".equals(keyword) && "/rules/playerDefeat".equals(location)) {
             return "PLAYER_DEFEAT_INVALID";
+        }
+        // The contract's own validator raises DIALOGUE_PRESENTATION_INVALID for this
+        // (validate-fixtures.mjs:200) while the schema catches it here first. Letting it fall through
+        // to MALFORMED_PROJECT would give one project two different rule names depending on which
+        // validator ran — the exact divergence §rule 표 exists to prevent.
+        if ("enum".equals(keyword) && SCENE_PRESENTATION.matcher(location).matches()) {
+            return "DIALOGUE_PRESENTATION_INVALID";
         }
         if (isRulesPresence(keyword, location)) {
             return "RULES_PRESENCE_INVALID";
