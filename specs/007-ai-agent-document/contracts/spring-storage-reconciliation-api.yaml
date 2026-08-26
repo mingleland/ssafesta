@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA Spring Internal Storage Reconciliation API
+  version: 0.1.0
+  description: Infra가 실행한 R2/MinIO reconcile 검증 결과를 Spring 소유 storage_reconciliation_log와 문서 storageProvider에 반영하는 내부 계약이다 (GitLab Work Item #100).
+servers:
+  - url: /internal/storage
+security:
+  - infraServiceToken: []
+paths:
+  /reconciliation-runs:
+    post:
+      operationId: submitReconciliationResult
+      summary: reconcile 실행 결과 1건 반영
+      description: 동일 runId + documentId 재전송은 상태를 다시 반영하지 않고 멱등하게 성공한다. VERIFIED 상태만 문서 storageProvider를 변경한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReconciliationResultRequest'
+      responses:
+        '204':
+          description: 신규 또는 중복 결과 반영 성공
+        '404':
+          description: documentId에 해당하는 문서가 없음
+        '422':
+          description: 요청 형식 검증 실패
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Infra→Spring Service Token 누락·오류 또는 AI 방향 토큰 재사용
+components:
+  securitySchemes:
+    infraServiceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+      description: INTERNAL_INFRA_TO_SPRING_TOKENS의 첫 값을 Infra가 송신하고 Spring이 목록 전체를 상수 시간으로 검증한다. AI→Spring 토큰(INTERNAL_AI_TO_SPRING_TOKENS)과 credential·scope를 분리한다.
+  schemas:
+    ReconciliationStatus:
+      type: string
+      enum: [VERIFIED, MISMATCH, MISSING]
+    ReconciliationResultRequest:
+      type: object
+      additionalProperties: false
+      required: [runId, documentId, objectKey, sourceProvider, targetProvider, status, attemptCount, checkedAt]
+      properties:
+        runId:
+          type: string
+          minLength: 1
+        documentId:
+          type: integer
+          format: int64
+        objectKey:
+          type: string
+          minLength: 1
+        sourceProvider:
+          type: string
+          enum: [R2, MINIO_LOCAL]
+        targetProvider:
+          type: string
+          enum: [R2, MINIO_LOCAL]
+        status:
+          $ref: '#/components/schemas/ReconciliationStatus'
+        expectedSize:
+          type: [integer, 'null']
+          minimum: 0
+        actualSize:
+          type: [integer, 'null']
+          minimum: 0
+        expectedContentType:
+          type: [string, 'null']
+        actualContentType:
+          type: [string, 'null']
+        expectedSha256:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+        actualSha256:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+        attemptCount:
+          type: integer
+          minimum: 1
+        failureReason:
+          type: [string, 'null']
+          maxLength: 500
+        checkedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: [string, 'null']
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
