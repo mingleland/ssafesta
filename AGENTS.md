@@ -26,27 +26,35 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
    않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
    전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
-2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
-   main·develop 에서 직접 작업하거나 직접 push 하지 마라.
-3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식이며 develop/main 대상 MR 은 CI 가 키를 검증한다.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, develop 에서 분기한다
+   (2026-08-26 개정 — 완료 경로는 develop 하나다). 파트 브랜치(ai/back/front/game)는
+   파트 내부 통합·실험용으로만 쓴다. main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+   과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
+3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
+   키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
    MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
-5. Jira 상태 규칙 (2026-08-25 개정 — GitLab 내장 Jira 연동).
-   - **'완료'는 자동이다** — 커밋 메시지에 `Closes S15P21A604-N` 을 넣고 그 커밋이 `main` 에
-     도달하면 전환된다. 손으로 옮기지 않는다.
-   - **'진행 중'만 사람이 옮긴다** — 자동화가 없다. 작업 착수 시 담당자가 직접 전환한다.
-   - 그 밖의 상태를 임의로 전환하지 않는다.
-   - **모든 커밋에 이슈 키를 넣는다** (`type(scope): 요약 (S15P21A604-N)`) — 키가 있어야
-     Jira 에 커밋 링크·코멘트가 남는다. `Closes` 는 그 작업으로 이슈가 끝날 때만 쓴다.
-   - CI 파이프라인은 **러너가 없어 돌지 않는다.** pending 파이프라인은 무시한다 —
-     Jira 연동과 무관하다 (`docs/jira-gitlab-workflow.md` §5·§6).
-6. `.gitlab-ci.yml` — **현재 파이프라인 생성은 정지돼 있다** (러너 없음, 2026-08-25).
-   `workflow.rules` 맨 앞의 `when: never` 한 줄이 그것이다. Jira 동기화는 GitLab 내장
-   연동이 담당하므로 `jira-sync-*` 잡은 지금 필요 없다 — 러너가 붙으면 내장 연동과
-   **이중 전환**이 되므로 그때 함께 정리한다 (파일 상단 주석에 절차가 있다).
-   **stage 구조와 잡 정의는 삭제하지 않는다** — 러너 확보 시 되살릴 자산이다.
-   CI 잡 추가는 예약된 test/build stage 에 한다.
-7. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
+   - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
+     이 전환한다. 손으로 옮기지 마라.
+   - '완료' — 커밋 메시지에 "Closes S15P21A604-N" 을 넣고 그 커밋이 develop 에 도달하면
+     전환된다. 완료의 기준은 develop 이다 — main 은 최종 완성본 전용이다.
+   - Closes 는 그 작업으로 이슈가 끝날 때만, develop 행 MR 에서만 쓴다 —
+     파트 브랜치행 MR 커밋에는 넣지 마라. 그 밖의 상태 전환을 임의로 하지 마라.
+6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
+   완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
+   전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
+7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
+   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
+   러너 확보 시 되살릴 기록이다.
+8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
+   정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
+   git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에
+   git diff --quiet origin/develop -- <파일> 로 로컬 고유 변경을 확인하고, 고유 변경이
+   있으면 checkout 하지 말고 보고하라. 동기화 후에는 규약 변경분(diff)을 다시 읽어라 —
+   AGENTS.md·CLAUDE.md 는 코드 merge 에는 영향이 없지만 이후 AI 행동을 바꾼다.
+   파트 브랜치 전체를 develop 에 머지하지 마라 (부분 트리라 타 파트 파일이 삭제된다).
+9. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
 
 ## 0. 세션을 시작하면 이 순서로 한다
 
@@ -269,6 +277,32 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
   설정 파일, index.css.
 
 ---
+
+
+### Unity 작업 상시 규칙 (game 파트에서 실전으로 확정 — 전 파트 공통 적용)
+
+- **씬·프리팹·.meta 파일은 텍스트로 직접 편집하지 않는다.** `.unity`·`.prefab`·`.asset`·`.meta` 는
+  GUID 참조가 얽힌 YAML 이다. 텍스트로 고치면 참조가 끊기고 씬이 열리지 않는다.
+  씬/오브젝트/컴포넌트 변경은 **Unity MCP 도구로만** 한다. MCP 가 응답하지 않으면(에디터 꺼짐)
+  멈추고 사용자에게 에디터를 켜달라고 요청한다.
+- **에셋 미사용 판정은 GUID 검색으로 끝내지 않는다.** 다음 셋은 GUID 참조가 없어도 사용 중이다:
+  ① `Resources/` (코드가 경로로 로드 — 옮기면 컴파일은 통과하고 런타임에 조용히 null)
+  ② 이름으로 찾는 셰이더 (`Shader.Find("Festa/Avatar/GarmentTint")` 등)
+  ③ `ProjectSettings/` 참조 (URP 파이프라인·QualitySettings·Input Actions).
+  판정은 `AssetDatabase.GetDependencies` 로 하고, 모델에 임베드된 머티리얼→텍스처 링크는
+  텍스트 검색에 안 보이므로 Unity 로 확인한다.
+- 에셋 이동은 `AssetDatabase.MoveAsset` 으로만 한다. 탐색기·`mv` 로 옮기면 참조가 끊긴다.
+- `Assets/Plugins/WebGL/` 은 Unity 규약 폴더다 — `.jslib` 는 여기 있어야 WebGL 빌드에 포함된다.
+- **기준선 동결 준수** — `docs/23_기준선_동결_워크플로.md`. 동결된 기준선 코드를 재구현·리팩터링하지
+  않는다. 현재 기준선: `v0.0.1-poc`.
+- Unity 변경 후에는 Editor Refresh/Compile 과 Console Error 를 먼저 확인한다. 사용자가 명시하지
+  않은 Play Mode 전환·WebGL/Linux 빌드는 실행하지 않는다.
+- 로컬 시각 QA 산출물(`festa-unity/Assets/Screenshots/`)은 소스 에셋이 아니며 커밋하지 않는다.
+  근거로 남길 스크린샷은 `docs/<이니셜>/verify/` 에 커밋한다.
+- `festa-unity/Library/`·`Temp/`·`Obj/`·`Build/`·`Logs/` 는 생성물이다 — 읽지도 쓰지도 않는다.
+- **에디터에서 통과해도 빌드에서 깨지는 부류가 있다** (`docs/KHS/28` §0-5): 런타임 메시 조작
+  (`isReadable` 필요), 셰이더 변형, `Resources.Load`, IMGUI, `ProfilerRecorder`. 이 목록에
+  걸리는 변경은 반드시 빌드로 확인한다.
 
 ## 7. 검증된 실행 명령
 
