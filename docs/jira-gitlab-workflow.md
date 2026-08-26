@@ -10,17 +10,19 @@
 
 ```text
 Jira 이슈 (스프린트 편성)                          [수동] 상태: 해야 할 일
-  └─ 브랜치 생성·push  feat/S15P21A604-123-...     [자동] 상태: 진행 중
-       └─ 개발·커밋
-            └─ develop 대상 MR 생성                [자동] 라벨 +in-review (상태 유지)
-                 └─ 리뷰 → Merge (Squash)          [자동] 라벨 in-review → ready-for-deploy
-                      └─ 주간 배포 (월 13:00, production 성공)
-                                                   [현재 수동] 상태: 완료 + 라벨 정리
+  └─ 작업 브랜치 첫 push  feat/S15P21A604-123-...  [자동] 상태: 진행 중  (Webhook → Jira Automation)
+       └─ 개발·커밋 (모든 커밋에 이슈 키)          [자동] 이슈에 커밋 링크·코멘트 (내장 연동)
+            └─ 파트 브랜치 통합 → develop 대상 MR  [상태 유지] 리뷰는 GitLab MR 이 정본
+                 └─ Merge (Squash) → develop 도달  [자동] `Closes` 커밋이면 상태: 완료
+                      └─ main                       최종 완성본 전용 — 상태 전이와 무관
 ```
 
-- **Pipeline/배포 실패 시 Jira 상태는 절대 변경하지 않는다.** 자동화는 전부 전진 방향만 있다.
-- **단순 commit push 로는 상태를 바꾸지 않는다** (작업 브랜치 첫 push 의 '진행 중' 전환만 존재하며 멱등).
-
+- **완료의 기준은 `develop` 이다** (2026-08-26 팀장 확정). `main` 은 최종 완성본만 받고,
+  배포의 마지막 단위도 `develop` 이다.
+- Jira 전환 주체는 **① Webhook→Jira Automation(진행 중) ② GitLab 내장 연동(완료)** 둘뿐이다.
+  GitLab Runner 와 CI job 은 상태를 바꾸지 않는다.
+- 작업 브랜치의 반복 push 는 `진행 중` 을 유지하는 멱등 동작이다.
+- Pipeline/배포 실패 시 Jira 상태는 절대 변경하지 않는다. 자동화는 전부 전진 방향만 있다.
 ## 2. Jira 상태 정의와 매핑
 
 이상형 6단계(Backlog→To Do→In Progress→In Review→Ready for Deploy→Done) 중,
@@ -31,13 +33,11 @@ Jira 이슈 (스프린트 편성)                          [수동] 상태: 해�
 |---|---|---|
 | Backlog | 백로그 (스프린트 미편성) | 사람 (플래닝) |
 | To Do | 해야 할 일 + 스프린트 편성 | 사람 (플래닝) |
-| In Progress | **진행 중** | 자동 (브랜치 push) |
-| In Review | 진행 중 + 라벨 `in-review` | 자동 (MR 생성) |
-| Ready for Deploy | 진행 중 + 라벨 `ready-for-deploy` | 자동 (MR merge) |
-| Done | **완료** | **production 배포 성공 시** — 배포 파이프라인 구축 전까지 배포 담당자가 배포일(월 13:00) 배포 검증 후 수동 일괄 전환 |
+| In Progress | **진행 중** | **자동** — 작업 브랜치(`{type}/S15P21A604-N-…`) **최초 push** 시 (GitLab Project Webhook → Jira Automation). 반복 push 는 멱등 |
+| In Review | **진행 중** 유지 | 리뷰 상태는 GitLab MR 이 정본이다 — Jira 라벨로 복제하지 않는다 |
+| Done | **완료** | **자동** — 커밋 메시지에 `Closes S15P21A604-N` 이 있고 그 커밋이 **`develop`** 에 도달할 때 (내장 연동, transition 31). **`develop` 이 완료의 기준이다** — `main` 은 최종 완성본 전용이고 완료 전이 조건이 아니다 (2026-08-26 팀장 확정) |
 
-보드에서 라벨 단계를 보려면 JQL: `labels = in-review` / `labels = ready-for-deploy`.
-관리자에게 4단계 워크플로(검토 중 상태 추가)를 요청할 수 있게 되면 라벨을 상태로 승격한다.
+라벨 단계(in-review·ready-for-deploy)는 폐지했다 — CI sync 가 돌지 않아 한 번도 붙은 적이 없고, 리뷰·배포 대기는 GitLab MR 화면이 이미 보여준다.
 
 ## 3. Jira Issue Key 규칙
 
@@ -54,21 +54,88 @@ Jira 이슈 (스프린트 편성)                          [수동] 상태: 해�
 - MR 제목: `[S15P21A604-123][BE] 로그인 API 구현` — **키 필수** (CI가 검증).
 - MR 설명: `.gitlab/merge_request_templates/Default.md` 템플릿 사용 (MR 작성 화면에서 Description → Choose a template → Default).
 
-## 5. 연동 원리 (Case B — Self-Managed 확정)
+## 5. 연동 원리 (2026-08-25 개정 — 내장 연동 채택)
 
-lab.ssafy.com 은 Self-Managed 이고 인스턴스 관리자 권한이 없어 **GitLab for Jira Cloud 앱(Case A)은
-사용 불가**하다. 대안 두 가지 중 **CI job 에서 Jira REST 를 직접 호출하는 방식을 채택**했다.
+> **개정 이력** — 최초에는 CI job 방식을 채택했으나, **러너가 없어 한 번도 실행되지 않았다.**
+> 2026-08-25 실측: 활성 러너 0개 · pending 파이프라인 10건 · Jira 동기화 실행 0회.
+> 아래 3안 비교에 **누락돼 있던 선택지(프로젝트 Integrations → Jira)** 를 추가하고 그것으로 옮겼다.
 
-채택 근거:
-1. Jira Automation Incoming Webhook 방식은 GitLab payload 에서 브랜치명·제목을 smart value 로
-   파싱해야 해 취약하고, ssafy.atlassian.net 은 공유 사이트라 Automation 실행 한도를 나눠 쓴다.
-2. CI 방식은 필요한 Secret 이 GitLab CI Variables 2개뿐이고, 모든 동작이 파이프라인 로그로 감사 가능하다.
-3. 상태 전환 로직(대상 상태에 해당하는 transition 이 없으면 아무것도 하지 않음)이 코드로 명시된다.
+lab.ssafy.com 은 Self-Managed 다. 선택지는 넷이고, 넷째를 채택했다.
 
-Key 추출 우선순위: ① MR 제목 → ② source branch → ③ (merge 시) merge commit 메시지.
-어디에서도 못 찾으면 **Jira 를 건드리지 않는다.**
+| 방식 | 러너 | 권한 | 판정 |
+|---|---|---|---|
+| ① GitLab for Jira Cloud 앱 | 불필요 | 인스턴스 관리자 | **이미 그룹에서 Active** (2026-08-25 확인). 단 Jira 이슈의 Development 패널에 브랜치·커밋·MR 을 **보여줄 뿐 상태 전환은 하지 않는다** |
+| ② Jira Automation Incoming Webhook | 불필요 | 프로젝트 Maintainer | 비권장 — GitLab payload 를 smart value 로 파싱해야 해 취약하고, ssafy.atlassian.net 은 공유 사이트라 실행 한도를 나눠 쓴다 |
+| ③ CI job 에서 Jira REST 호출 | **필수** | Maintainer + CI 변수 | 최초 채택 → **러너가 없어 휴면**. §6 참조 |
+| ④ **프로젝트 Integrations → Jira (내장)** | **불필요** | 프로젝트 Maintainer | **채택.** GitLab 서버가 직접 Jira REST 를 호출한다 |
 
-## 6. CI 구성 (.gitlab-ci.yml)
+④를 채택한 근거:
+1. **러너에 의존하지 않는다.** ③이 실패한 이유가 그대로 ④의 채택 이유다.
+2. 설정이 프로젝트에 **하나만** 존재한다 — 한 사람이 켜면 팀 전원의 커밋·MR 에 적용되고, 팀원은 아무것도 설치·설정하지 않는다.
+3. Key 파싱이 GitLab 기본 구현이라 ②의 취약함이 없다.
+
+**주의 — ①과 ④는 다른 물건이다.** Settings → Integrations 목록에 `GitLab for Jira Cloud app`(①)과
+`Jira issues`(④)가 따로 있다. ①만 켜면 상태는 영원히 바뀌지 않는다.
+
+### 설정값 (2026-08-25 적용 완료, API 확인)
+
+| 항목 | 값 |
+|---|---|
+| Web URL | `https://ssafy.atlassian.net` |
+| Authentication | Basic (Atlassian 계정 이메일 + API 토큰) |
+| Trigger | Commit · Merge request |
+| Jira issue transition | Custom transitions → **`31`** (= 완료) |
+| Enable Jira issues (이슈 탭 대체) | **끈다** — 켜면 GitLab 이슈 탭이 Jira 목록으로 바뀐다 |
+
+전환 ID 실측: `11` 해야 할 일 · `21` 진행 중 · `31` 완료. 세 상태 어디에서든 31 로 직행 가능해
+**단일 ID 하나면 충분하다** — 여러 개를 적으면 순서대로 모두 실행돼 이력이 지저분해진다.
+
+### 동작
+
+| 커밋 메시지 | 결과 |
+|---|---|
+| `type(scope): 요약 (S15P21A604-N)` | Jira 이슈에 커밋 링크 + 코멘트 |
+| `Closes S15P21A604-N` | 위 + **`develop` 도달 시 '완료' 전환** (transition 31) |
+
+- 전환은 **기본 브랜치에 도달할 때** 일어난다 — 2026-08-26 프로젝트 기본 브랜치를 `main` → **`develop`** 으로 변경해 "완료 = develop 반입" 이 되게 했다. 파트 브랜치 push 만으로는 바뀌지 않는다.
+- **'진행 중' 은 아래 ⑤ 웹훅 자동화가 담당한다** — 작업 브랜치 최초 push 로 자동 전환된다.
+- Jira 코멘트는 **연동에 등록한 토큰 주인 명의**로 달린다 (현재 강형순). 기능 문제는 없다.
+
+Key 추출: 커밋 메시지·MR 제목의 `[A-Z][A-Z0-9]+-[0-9]+`. 어디에서도 못 찾으면 Jira 를 건드리지 않는다.
+
+### ⑤ '진행 중' 자동화 — GitLab Webhook → Jira Automation (2026-08-26 적용, 실물 확인)
+
+내장 연동(④)은 브랜치 생성·push 로는 상태를 바꾸지 못한다. 그래서 '진행 중' 만 별도 경로를 쓴다.
+
+```text
+작업 브랜치 최초 push → GitLab Project Webhook (push events)
+  → Jira Automation Incoming Webhook → 브랜치명에서 키 추출 → '해야 할 일' 이면 '진행 중' 전환
+```
+
+| 구성 | 값 (API 실측) |
+|---|---|
+| GitLab Webhook | Settings → Webhooks, Push events 만 (`mr=false`) |
+| 브랜치 필터 (regex) | `^(feat|feature|fix|docs|refactor|test|chore|perf|ci)/S15P21A604-[0-9]+([/-].*)?$` |
+| 수신처 | Jira Automation Incoming Webhook (Secret 은 커스텀 헤더로 — 저장소에 넣지 않는다) |
+| 멱등성 | Jira 규칙이 '해야 할 일' 일 때만 전환 — 반복 push·이미 진행 중/완료면 no-op |
+
+- 파트 브랜치(`game`·`front`·`back`·`ai`)와 `develop`·`main` 은 필터에 걸리지 않는다 — 의도된 것.
+- 설정 주체: GitLab Webhook 은 Maintainer 1명, Jira Automation 은 프로젝트 관리자 1명. **팀원은 설정할 것이 없다.**
+- ④와 ⑤는 겹치지 않는다: ⑤는 '진행 중' 만, ④는 링크·코멘트·'완료' 만 담당한다.
+## 6. CI 구성 (.gitlab-ci.yml) — sync 잡은 휴면, 러너 확보 시 보조 경로
+
+> ⚠️ **파이프라인 생성 자체가 정지돼 있다 (2026-08-25).** `.gitlab-ci.yml` 의
+> `workflow.rules` 맨 앞에 `when: never` 를 두어 커밋마다 pending 파이프라인이
+> 쌓이지 않게 했다. Jira 상태 동기화는 §5 의 내장 연동이 담당한다.
+> **잡 정의는 삭제하지 않고 그대로 보존한다** — 러너를 확보하면 되살릴 자산이다.
+> 아래는 러너를 확보했을 때의 참고 구성이다.
+>
+> 🚨 **러너를 붙일 때 반드시 먼저 정리할 것 — 이중 전환.** 러너가 생기면 sync 잡이 깨어나
+> 내장 연동과 **같은 이슈를 두 번 전환**한다. 러너 등록과 동시에 아래 중 하나를 택한다:
+> ① `.gitlab-ci.yml` 에서 `jira-sync-*` 잡 삭제 (권장) 또는
+> ② 내장 연동의 Jira issue transition 값을 비운다.
+> `jira-key-check`(MR 제목 키 검증)는 전환을 하지 않으므로 겹치지 않는다 — 그대로 둔다.
+
 
 | Job | 트리거 | 동작 | 실패 시 |
 |---|---|---|---|
@@ -144,6 +211,9 @@ Rule → Trigger 'Incoming webhook' 생성 → 발급 URL 을 GitLab Settings �
 | 증상 | 원인·조치 |
 |---|---|
 | `jira-key-check` 실패 | MR 제목 또는 브랜치에 `S15P21A604-N` 추가. 예: `[S15P21A604-123][BE] ...` |
+| 이슈 상태가 안 바뀜 | **먼저 러너 유무를 확인한다.** 활성 러너가 없으면 CI sync 잡은 영영 돌지 않는다(§6). 상태 전환은 §5 내장 연동이 담당하며, `Closes KEY` 가 **`main` 에 도달해야** 전환된다 — 파트 브랜치 push 로는 바뀌지 않는다 |
+| Jira 에 커밋 링크·코멘트가 안 붙음 | Settings → Integrations 에서 **`Jira issues`(내장)** 가 켜져 있는지 확인. `GitLab for Jira Cloud app` 만 Active 인 경우가 흔한데, 그것은 Development 패널 표시만 하고 코멘트·전환을 하지 않는다 (§5 ①·④ 구분) |
+| 전환 이력이 3번씩 찍힘 | 내장 연동의 transition 값에 `11,21,31` 처럼 여러 개가 들어간 경우. `31` 하나만 남긴다 |
 | sync 잡이 "미설정 — 건너뜁니다" | Maintainer 가 `JIRA_SYNC_EMAIL`/`JIRA_SYNC_TOKEN` 변수를 등록해야 함 (§6) |
 | 이슈가 '진행 중'이 안 됨 | 브랜치명이 `{type}/{KEY}-` 패턴인지 확인. 이미 완료 상태 이슈는 전환 후보가 없어 no-op (의도된 동작) |
 | 라벨이 안 붙음 | sync 잡 로그 확인 — 401 이면 토큰 만료(재발급), 404 면 키 오타 |
@@ -167,14 +237,23 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
    main·develop 에서 직접 작업하거나 직접 push 하지 마라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식이며 develop/main 대상 MR 은 CI 가 키를 검증한다.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
    MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
-5. Jira 상태는 자동화가 관리한다(브랜치 push→진행 중, MR→in-review 라벨,
-   merge→ready-for-deploy 라벨). 네가 임의로 이슈 상태를 전환하지 마라.
-   '완료' 전환은 production 배포 검증 후에만 한다.
-6. .gitlab-ci.yml 의 stage 구조와 jira-* 잡을 삭제·우회하지 마라. CI 잡 추가는
-   예약된 test/build stage 에 한다.
-7. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+5. Jira 상태 규칙 (2026-08-26 개정):
+   - '진행 중' 은 자동이다 — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시
+     Webhook→Jira Automation 이 전환한다. 손으로 옮기지 마라.
+   - '완료' 도 자동이다 — 커밋 메시지에 "Closes S15P21A604-N" 을 넣고 그 커밋이
+     develop 에 도달하면 전환된다 (완료의 기준은 develop, main 은 최종본 전용).
+   - Closes 는 그 작업으로 이슈가 끝날 때만 쓴다. 그 밖의 상태 전환을 임의로 하지 마라.
+   - 커밋마다 이슈 키를 넣어라 — 키가 있어야 Jira 에 커밋 링크·코멘트가 남는다.
+6. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never).
+   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
+   러너 확보 시 되살릴 기록이다.
+7. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
+   정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
+   git checkout origin/develop -- <파일> 로 당겨온다. 파트 브랜치 전체를 develop 에
+   머지하지 마라 (파트 브랜치는 부분 트리라 타 파트 파일이 삭제된다).
+8. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
 ```
 
 ## 13. 이 워크플로가 만들어진 근거
