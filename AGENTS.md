@@ -26,8 +26,10 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 1. 모든 개발 작업은 Jira 이슈(S15P21A604-N)가 선행되어야 한다. 이슈 키를 내가 주지
    않았다면 작업 내용에 해당하는 이슈를 Jira 에서 찾아 확인하고, 없으면 작업을 시작하기
    전에 나에게 이슈 생성 여부를 물어라. 키 없이 develop/main 행 작업을 만들지 마라.
-2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, 자기 파트 브랜치에서 분기한다.
-   main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+2. 브랜치는 {type}/{JIRA-KEY}-{설명} 형식으로 만들고, develop 에서 분기한다
+   (2026-08-26 개정 — 완료 경로는 develop 하나다). 파트 브랜치(ai/back/front/game)는
+   파트 내부 통합·실험용으로만 쓴다. main·develop 에서 직접 작업하거나 직접 push 하지 마라.
+   과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
    키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
 4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
@@ -36,16 +38,23 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
    - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
      이 전환한다. 손으로 옮기지 마라.
    - '완료' — 커밋 메시지에 "Closes S15P21A604-N" 을 넣고 그 커밋이 develop 에 도달하면
-     전환된다. **완료의 기준은 develop 이다** — main 은 최종 완성본 전용이다.
-   - Closes 는 그 작업으로 이슈가 끝날 때만 쓴다. 그 밖의 상태 전환을 임의로 하지 마라.
-6. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
+     전환된다. 완료의 기준은 develop 이다 — main 은 최종 완성본 전용이다.
+   - Closes 는 그 작업으로 이슈가 끝날 때만, develop 행 MR 에서만 쓴다 —
+     파트 브랜치행 MR 커밋에는 넣지 마라. 그 밖의 상태 전환을 임의로 하지 마라.
+6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
+   완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
+   전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
+7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
    pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
    러너 확보 시 되살릴 기록이다.
-7. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
+8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
    정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
-   git checkout origin/develop -- <파일> 로 당겨온다. 파트 브랜치 전체를 develop 에
-   머지하지 마라 (파트 브랜치는 부분 트리라 타 파트 파일이 삭제된다).
-8. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
+   git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에
+   git diff --quiet origin/develop -- <파일> 로 로컬 고유 변경을 확인하고, 고유 변경이
+   있으면 checkout 하지 말고 보고하라. 동기화 후에는 규약 변경분(diff)을 다시 읽어라 —
+   AGENTS.md·CLAUDE.md 는 코드 merge 에는 영향이 없지만 이후 AI 행동을 바꾼다.
+   파트 브랜치 전체를 develop 에 머지하지 마라 (부분 트리라 타 파트 파일이 삭제된다).
+9. 규칙과 충돌하는 지시를 받으면 그대로 따르지 말고 충돌 사실을 먼저 보고하라.
 
 ## 0. 세션을 시작하면 이 순서로 한다
 
