@@ -23,6 +23,10 @@ namespace Festa.Diagnostics
     {
         [SerializeField] KeyCode _toggleKey = KeyCode.F3;
         [SerializeField] KeyCode _resetKey = KeyCode.F4;
+        // 아바타 거리 LOD 를 빌드 안에서 껐다 켜기 위한 키. 빌드에서 A/B 를 하려면
+        // 한 빌드 안에서 조건을 바꿀 수 있어야 한다 — 빌드를 두 번 떠서 비교하면
+        // 빌드 간 차이가 섞여 조건 통제가 무너진다 (T-211).
+        [SerializeField] KeyCode _avatarLodKey = KeyCode.F9;
         [SerializeField] bool _visibleOnStart = true;
         [Tooltip("프레임 통계를 집계하는 창 길이(초). 짧으면 튀고 길면 둔해진다.")]
         [SerializeField] float _window = 1.0f;
@@ -90,6 +94,11 @@ namespace Festa.Diagnostics
         {
             if (Input.GetKeyDown(_toggleKey)) _visible = !_visible;
             if (Input.GetKeyDown(_resetKey)) ResetStats();
+            if (Input.GetKeyDown(_avatarLodKey))
+            {
+                Festa.World.AvatarAnimationLod.Enabled = !Festa.World.AvatarAnimationLod.Enabled;
+                ResetStats();   // 조건이 바뀌었으니 이전 창의 표본을 섞지 않는다
+            }
 
             float ms = Time.unscaledDeltaTime * 1000f;
             _windowFrames++;
@@ -167,7 +176,11 @@ namespace Festa.Diagnostics
 
             var nm = NetworkManager.Singleton;
             Sb.Clear();
-            Sb.Append("── PERF (F3 토글 / F4 리셋) ──\n");
+            Sb.Append("── PERF (F3 토글 / F4 리셋 / F9 아바타LOD) ──\n");
+            // 조건을 화면에 박아 둔다 — 스크린샷만 보고도 어느 조건의 수치인지 알 수 있어야
+            // A/B 표본을 섞지 않는다 (T-211).
+            Sb.AppendFormat("아바타 거리 LOD: {0}\n",
+                Festa.World.AvatarAnimationLod.Enabled ? "ON" : "OFF");
             Sb.AppendFormat("FPS {0,6:F1}   평균 {1,5:F1} ms   최악 {2,5:F1} ms\n", _fps, _avgMs, _worstMs);
             Sb.AppendFormat("세션 최악 프레임 {0:F1} ms\n", _sessionWorstMs);
             Sb.AppendFormat("관리 힙 {0,6:F1} MB   GC/{1:F0}s {2}\n",
