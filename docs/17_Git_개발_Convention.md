@@ -94,20 +94,26 @@ main
    ├─ back
    ├─ front
    ├─ game
-   │    └─ feature/FESTA-xxx-...   ← 작업 브랜치는 자기 파트 브랜치에서 분기
+   │    └─ (파트 내부 통합·실험용 브랜치)   ← 2026-08-26부터 작업 브랜치는 develop 발
 ```
 
 규칙:
 
 1. **파트 브랜치(ai/back/front/game)는 각각 CI/CD를 가진다** — push 시 자체 빌드·테스트 후 해당 파트의 개발환경에 자동 배포된다. 파트끼리 서로의 배포를 기다리지 않는다.
 2. **develop은 실제 사용 환경 기준으로 CI/CD한다** — 완료된 상태만 파트 브랜치에서 develop으로 병합하며, develop을 일상 작업장으로 쓰지 않는다.
-3. feature/fix 브랜치는 자기 파트 브랜치에서 분기하고 자기 파트 브랜치로 MR한다.
+3. **✅ 2026-08-26 개정**: 작업 브랜치는 **develop에서 분기**하고 develop행 MR로 완료한다.
+   파트 브랜치는 파트 내부 통합·실험용(대용량 에셋 통합 등)으로 유지할 수 있으나 완료 경로가
+   아니다. 과도기(기존 파트행 MR 소진·Closes 규칙·소급 없음)와 파트 브랜치 구현의 지위는
+   `docs/jira-gitlab-workflow.md` §4-1이 정본이다.
 4. 파이프라인 상세 사양은 `docs/sdd/parts/INFRA.md` (infra-001)에서 spec으로 관리한다.
 5. **공유 문서·spec 통합 (#24·#59, 2026-08-23 채택)**
    - **쓰기**: 각 파트가 **자기 변경분만** develop PR로 올려 누적한다. 한 사람이 남의 변경분을
      해석해 옮기지 않는다.
    - **읽기 기준**: develop이 정본이며, 파트 브랜치가 develop을 따라간다.
    - **파트 경계를 넘는 결정**은 이슈에서 **반영 owner 1명**을 지정해 그 사람이 develop에 쓴다.
+6. **공용 개발환경 Docker 소유권 (✅ 2026-08-26)**: 루트 compose(Frontend+Backend+PostgreSQL+Redis)는
+   **Infra 소유**다. 변경 제안은 어느 파트나 할 수 있으나 develop행 MR에 Infra 리뷰를 필수로
+   붙인다. `festa-frontend/Dockerfile.dev` 등 파트 디렉터리 내부의 Docker 파일은 그 파트 소관이다.
 
 ---
 
