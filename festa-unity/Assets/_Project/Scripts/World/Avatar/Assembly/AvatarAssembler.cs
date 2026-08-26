@@ -449,8 +449,31 @@ namespace Festa.Avatar
                         converted[i] = material;
                         continue;
                     }
-                    var targetShader = isEye ? Shader.Find("Festa/Avatar/IrisTint") : isFace ? Shader.Find("Festa/Avatar/FaceTint") : isBody ? Shader.Find("Festa/Avatar/SkinTint") : isMouth ? Shader.Find("Festa/Avatar/MouthTint") : isEyeHighlight ? Shader.Find("Universal Render Pipeline/Unlit") : shader;
-                    material = new Material(targetShader) { name = source.name + "_RuntimeURP" };
+                    // URP Lit 폴백(헤어·액세서리)은 Shader.Find 로 만들면 안 된다 — 빌드
+                    // 셰이더 스트리핑이 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이
+                    // 된다 (T-212, 빌드에서 헤어·피부가 사라진 원인). 카탈로그의 템플릿
+                    // 재질을 복제하면 그 키워드 상태의 배리언트 포함이 보장된다.
+                    // 헤어는 전용 셰이더로 간다 (T-212). URP Lit 런타임 생성은 빌드
+                    // 스트리핑에 좌우되는 잠재 결함이라, Skin/Face/Garment 와 같은
+                    // Always Included 패턴의 HairTint 를 쓴다.
+                    bool isHair = category == AvatarPartCategory.Hair || lowerName.Contains("hair");
+                    var hairShader = isHair ? Shader.Find("Festa/Avatar/HairTint") : null;
+
+                    bool useLitFallback = !isEye && !isFace && !isBody && !isMouth && !isEyeHighlight && !isHair;
+                    bool sourceHasNormal = source.HasProperty("_Normal") && source.GetTexture("_Normal")
+                        || source.HasProperty("_BumpMap") && source.GetTexture("_BumpMap");
+                    Material litTemplate = _catalog
+                        ? (sourceHasNormal && _catalog.litOpaqueNormalTemplate ? _catalog.litOpaqueNormalTemplate : _catalog.litOpaqueTemplate)
+                        : null;
+                    if (isHair && hairShader)
+                        material = new Material(hairShader) { name = source.name + "_RuntimeURP" };
+                    else if (useLitFallback && litTemplate)
+                        material = new Material(litTemplate) { name = source.name + "_RuntimeURP" };
+                    else
+                    {
+                        var targetShader = isEye ? Shader.Find("Festa/Avatar/IrisTint") : isFace ? Shader.Find("Festa/Avatar/FaceTint") : isBody ? Shader.Find("Festa/Avatar/SkinTint") : isMouth ? Shader.Find("Festa/Avatar/MouthTint") : isEyeHighlight ? Shader.Find("Universal Render Pipeline/Unlit") : shader;
+                        material = new Material(targetShader) { name = source.name + "_RuntimeURP" };
+                    }
                     // Body의 BaseMap은 단순 Albedo가 아니라 피부/속옷 영역을
                     // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
                     bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");
