@@ -28,15 +28,63 @@ FastAPI는 처리 요청의 `booth_id`, `agent_id` 조합이 실제 소유 관�
 | `booth_id`, `agent_id` | 검색 격리 범위, NOT NULL |
 | `original_filename` | 사용자 표시용 파일명 |
 | `object_key` | Spring이 생성·관리하는 저장소 중립 object key, 클라이언트 임의 지정 금지 |
+| `storage_provider` | `R2/MINIO_LOCAL`, 업로드 grant 발급 시점의 쓰기 Provider |
+| `storage_bucket` | 해당 문서 원본이 저장된 bucket. 전역 활성 Provider와 독립적으로 읽기 대상 결정 |
 | `content_sha256` | 동일 Agent 중복 판정 및 개정본 경쟁 방지 |
 | `file_size_bytes` | 파일당 20MB 및 Agent 총 100MB 검증 |
-| `processing_status` | `QUEUED/PROCESSING/READY/FAILED/DISABLED` |
+| `processing_status` | `QUEUED/PROCESSING/READY/FAILED/DISABLED/EXPIRED` |
 | `failure_reason` | 사용자 노출용 정제 메시지, nullable |
 | `chunk_count` | 마지막 성공 처리 청크 수, nullable |
 | `processed_at` | 마지막 성공 처리 시각, nullable |
 | `created_at`, `updated_at` | 감사 시각 |
 
-Backend migration은 실제 `origin/back`의 다음 사용 가능한 Flyway 버전으로 추가한다. 기존 migration 번호를 재사용하거나 수정하지 않는다.
+Backend migration은 `develop` 기준 최신 Flyway migration의 다음 사용 가능한 버전으로 추가한다. 현재 기준은 V12 다음 V13이며, 기존 migration 번호를 재사용하거나 수정하지 않는다.
+
+### 업로드 만료 상태 전이
+
+| 현재 | 이벤트 | 다음 | 부가 동작 |
+|---|---|---|---|
+| `QUEUED` | 생성 후 1시간 동안 업로드 미완료 | `EXPIRED` | 사용자에게 업로드 만료 표시, 처리·검색 제외 |
+| `EXPIRED` | 24시간 유예 중 완료 요청, R2 원본 존재 | `QUEUED` | 동일 `document_id`로 정상 처리 재개 |
+| `EXPIRED` | 완료 요청 시 R2 원본 없음 | `EXPIRED` | 410 응답, 새 업로드 권한 발급 필요 |
+| `EXPIRED` | 전환 후 24시간 경과 | `EXPIRED` | Spring이 R2 원본 삭제. 실패 시 `object_key`를 유지하고 재시도 |
+
+`EXPIRED`는 Spring만 전환하는 사용자 문서 상태이며 FastAPI Job 상태나 callback enum에 추가하지 않는다. 활성 SHA-256 중복 판정 인덱스에서도 제외한다.
+
+업로드 재개 시 활성 쓰기 Provider가 기존 `storage_provider`와 같으면 같은 `document_id`로 presigned URL을 재발급할 수 있다. 다르면 기존 행을 `EXPIRED`로 전환하고 새 `document_id + object_key`를 생성한다. 기존 객체는 해당 Provider의 만료·정리 또는 reconcile 경로로 남긴다.
+
+### 저장소 Provider 불변식
+
+- 신규 업로드 grant는 Spring의 `active-write-provider`를 사용해 `storage_provider`, `storage_bucket`, `object_key`를 함께 기록한다.
+- FastAPI와 Spring의 기존 객체 읽기·HEAD·삭제는 전역 활성 Provider가 아니라 문서 행의 세 필드를 따른다.
+- `LOCAL_ACTIVE` 이후 생성된 문서는 `MINIO_LOCAL`, 전환 전 문서는 계속 `R2`를 가리킨다.
+- reconcile에서 size·감지 MIME·SHA-256 검증을 통과한 객체만 `storage_provider=R2`와 대상 bucket으로 변경한다.
+- MinIO는 단일 노드 임시 가용성 수단이며 백업·복제본·고가용성 저장소가 아니다.
+- 저장소 장애로 `DEAD → FAILED`가 된 문서는 저장소 복구 후에도 자동으로 재처리하지 않는다. reconcile 완료 확인 후 명시적 재처리 요청만 새 Job을 만든다.
+
+## Storage Reconciliation Log — Spring 소유
+
+테이블: `public.storage_reconciliation_log`
+
+| 필드 | 규칙 |
+|---|---|
+| `run_id` | Infra reconcile 실행 식별자 |
+| `document_id` | Document FK |
+| `object_key` | 검증 대상 object key |
+| `source_provider` | 검증 시작 시점 Provider (`R2`/`MINIO_LOCAL`) |
+| `target_provider` | 검증 통과 시 전환할 Provider |
+| `expected_size`, `actual_size` | 원본과 실측 크기 |
+| `expected_content_type`, `actual_content_type` | 원본과 실측 감지 MIME |
+| `expected_sha256`, `actual_sha256` | 원본과 실측 SHA-256 |
+| `status` | `VERIFIED` / `MISMATCH` / `MISSING` |
+| `attempt_count` | 검증 재시도 횟수 |
+| `failure_reason` | 불일치·누락 사유, nullable |
+| `checked_at` | 검증 수행 시각 |
+| `resolved_at` | Provider 반영 시각, nullable |
+
+`(run_id, document_id)`에 `UNIQUE` 제약을 두어 재전송을 멱등하게 만든다. `status = VERIFIED`인 행만 대상 Document의 `storage_provider`를 `target_provider`로 변경하며, `MISMATCH`·`MISSING`은 로그만 남기고 Document Provider를 바꾸지 않는다. Infra는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 인증하며 이 토큰은 `INTERNAL_AI_TO_SPRING_TOKENS`와 credential·scope가 분리된다.
+
+계약: [spring-storage-reconciliation-api.yaml](./contracts/spring-storage-reconciliation-api.yaml)
 
 ## Processing Job — FastAPI 소유
 
@@ -60,7 +108,9 @@ Backend migration은 실제 `origin/back`의 다음 사용 가능한 Flyway 버�
 | `chunk_count` | `INTEGER` | 성공 처리된 청크 수 |
 | `callback_attempt_no` | `INTEGER` | Spring 상태 콜백 시도 횟수 |
 | `callback_next_retry_at` | `TIMESTAMPTZ` | 다음 콜백 재시도 시각 |
-| `callback_delivered_at` | `TIMESTAMPTZ` | Spring이 터미널 상태를 수락한 시각 |
+| `callback_delivered_at` | `TIMESTAMPTZ` | Spring이 수락했거나 stale 409로 전달이 해소된 시각 |
+| `callback_terminated_at` | `TIMESTAMPTZ` | 재시도 불가 응답 또는 재시도 소진으로 callback을 종료한 시각. 정상 전달과 분리 |
+| `callback_terminal_code` | `VARCHAR(50)` | 종료 원인(`DOCUMENT_NOT_FOUND`, `JOB_DOCUMENT_MISMATCH`, `JOB_NOT_REGISTERED_RETRY_EXHAUSTED`) |
 | `created_at`, `updated_at` | `TIMESTAMPTZ` | 감사 시각 |
 | `finished_at` | `TIMESTAMPTZ` | 터미널 상태 도달 시각 |
 
@@ -73,7 +123,7 @@ WHERE status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
 
 - `ix_document_jobs_pickup(status, next_retry_at)`: Worker의 대기 작업 획득
 - `ix_document_jobs_lease(lease_expires_at) WHERE status = 'RUNNING'`: sweeper의 만료 작업 회수
-- `ix_document_jobs_callback(callback_next_retry_at) WHERE callback_delivered_at IS NULL AND status IN ('SUCCEEDED', 'DEAD', 'CANCELLED')`: 미전달 콜백 복구
+- `ix_document_jobs_callback(callback_next_retry_at) WHERE callback_delivered_at IS NULL AND callback_terminated_at IS NULL AND status IN ('SUCCEEDED', 'DEAD', 'CANCELLED')`: 미전달·미종료 콜백 복구
 - `status`와 상태별 nullable 필드 조합은 CHECK 제약 또는 migration 테스트로 검증한다.
 
 ### Job 상태 전이
@@ -115,6 +165,8 @@ WHERE status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
 ## 상태 콜백 정합성
 
 - 콜백은 `jobId`, `documentId`, `sourceHash`, 목표 `DocumentStatus`를 포함한다.
+- Spring은 FastAPI 처리 요청 응답의 `jobId`와 `documentId` 대응 관계를 다른 후속 처리보다 먼저 저장한다.
+- Spring의 callback 404는 `JOB_NOT_REGISTERED`, `DOCUMENT_NOT_FOUND`, `JOB_DOCUMENT_MISMATCH`를 구분한다. FastAPI는 첫 코드만 1초·3초·10초 간격으로 최대 3회 재시도하고, 나머지는 즉시 `callback_terminated_at`과 `callback_terminal_code`를 기록한다. Spring은 mismatch를 계약 오류로 경고 기록한다.
 - Spring은 동일 `jobId + status` 요청을 여러 번 받아도 같은 결과를 반환한다.
 - `sourceHash`가 현재 문서와 다르면 Spring은 오래된 완료 콜백을 적용하지 않고 충돌 응답을 반환한다.
-- FastAPI reconciliation은 터미널 Job 중 `callback_delivered_at IS NULL`인 행을 계속 재전송한다.
+- FastAPI reconciliation은 터미널 Job 중 `callback_delivered_at IS NULL AND callback_terminated_at IS NULL`인 행만 재전송한다.

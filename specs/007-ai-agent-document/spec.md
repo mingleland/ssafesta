@@ -54,7 +54,7 @@
 
 ### Edge Cases
 
-- MVP는 PDF만 허용하며 파일당 20MB를 초과하면 명확한 사유와 함께 거부한다.
+- MVP는 PDF·MD·TXT를 허용하며 파일당 20MB를 초과하면 명확한 사유와 함께 거부한다.
 - 텍스트를 추출할 수 없는 스캔 이미지 PDF는 OCR 지원 범위 밖이므로 `FAILED`와 구체적인 실패 사유를 제공한다.
 - 같은 문서를 두 번 올린 경우 동일 AI 직원에 등록된 활성 문서와 파일 SHA-256이 같으면 중복으로 판정하고 재처리하지 않는다. 수정본 교체는 기존 문서를 지정하는 별도 교체 요청으로 처리한다.
 - 업로드 URL은 발급 후 15분간 유효하다. 문서 생성 후 1시간 동안 업로드가 완료되지 않으면 `EXPIRED`로 전환하고, 전환 후 24시간 동안 늦은 완료 요청을 복구할 수 있도록 원본을 보존한다. 이후에도 미완료면 Spring이 원본 삭제를 재시도한다.
@@ -65,6 +65,7 @@
 - 내부 Service Token 교체 중에는 수신자가 기존·신규 토큰을 먼저 함께 허용한 뒤 송신 토큰을 전환하고, 안정화 확인 후 기존 토큰을 제거해 배포 순서 차이로 `401`이 발생하지 않게 한다.
 - R2 장애 시 자동으로 MinIO로 전환하거나 양쪽에 동시에 쓰지 않는다. 운영자가 검증·승인한 뒤 활성 **쓰기** Provider만 바꾸며, 기존 문서는 문서별 `storageProvider + bucket + objectKey`가 가리키는 저장소에서 계속 읽는다.
 - 업로드를 재개하려는 동안 활성 쓰기 Provider가 바뀌었으면 기존 미완료 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 업로드를 시작한다.
+- 저장소 장애로 `FAILED`가 된 문서는 저장소가 복구돼도 자동으로 다시 처리되지 않는다. reconcile이 끝난 뒤 명시적 재처리 요청을 받아야 새 Job이 시작된다.
 
 ---
 
@@ -82,7 +83,7 @@
 - **FR-008**: 처리된 문서 조각에는 **boothId, agentId, 임베딩 모델 식별자**가 기록되어야 한다 (헌법 18조).
 - **FR-009**: 임베딩 차원은 **1536으로 고정**한다 (헌법 18조).
 - **FR-010**: 문서 원본은 **Cloudflare R2(S3-compatible)** 를 기본으로 사용하고 장기 장애 시 운영자 승인 기반의 단일 노드 MinIO fallback을 적용한다. 자동 failover·이중 쓰기·자동 원복은 금지하며, 문서 메타데이터의 Source of Truth는 **Spring**이 소유하고 처리·검색은 FastAPI가 담당한다 (헌법 1조).
-- **FR-011**: MVP는 PDF만 허용하며 파일당 최대 크기는 20MB다. 허용 형식과 크기를 초과하면 명확한 사유와 함께 거부해야 한다.
+- **FR-011**: MVP는 PDF·MD·TXT를 허용하며 파일당 최대 크기는 20MB다. 허용 형식과 크기를 초과하면 명확한 사유와 함께 거부해야 한다.
 - **FR-012**: 소유자는 문서를 삭제할 수 있어야 하며, 삭제 후 답변에 사용되지 않아야 한다.
 - **FR-013**: 처리 실패나 중단이 **월드·부스·비AI 기능을 중단시켜서는 안 된다** (헌법 3조).
 - **FR-014**: LLM/Embedding 호출은 **어댑터 뒤에** 두어 제공자 교체가 구현 교체로 끝나야 한다 (헌법 15조).
@@ -102,9 +103,12 @@
 - **FR-028**: Spring은 `EXPIRED` 전환 후 24시간이 지난 미완료 원본을 R2에서 삭제해야 한다. 삭제 실패 시 `EXPIRED` 상태와 object key를 유지하고 성공할 때까지 재시도해야 한다.
 - **FR-029**: Spring↔FastAPI 내부 호출은 방향별로 분리된 Bearer Service Token을 사용해야 한다. 수신자는 네트워크 차단 설정과 독립적으로 토큰을 항상 검증하고, 누락·오류·반대 방향 토큰은 `401`로 거부해야 한다. Secret은 해당 방향의 송신자와 수신자에만 주입하고 저장소·로그에 기록해서는 안 된다.
 - **FR-030**: 각 문서는 `storageProvider(R2/MINIO_LOCAL) + bucket + objectKey`를 가져야 한다. 신규 업로드는 Spring의 활성 쓰기 Provider를 사용하고, FastAPI는 전역 활성 Provider가 아니라 문서 메타데이터의 저장소 식별자로 원본을 읽어야 한다.
-- **FR-031**: R2 장애 감지는 신규 업로드를 `UPLOAD_BLOCKED`까지만 자동 전환할 수 있다. MinIO 전환과 R2 원복은 운영자의 검증·승인이 있어야 하며, 검증된 객체만 reconcile 후 Provider를 R2로 변경해야 한다.
+- **FR-031**: P0의 R2 장애 probe는 운영 판단을 위한 evidence만 수집하며 `UPLOAD_BLOCKED` 전환은 운영자가 수동으로 수행해야 한다. 자동 장애 판정과 자동 상태 전환은 후속 이슈에서 기준이 확정될 때까지 구현하지 않는다. MinIO 전환과 R2 원복은 운영자의 검증·승인이 있어야 하며, 검증된 객체만 reconcile 후 Provider를 R2로 변경해야 한다.
 - **FR-032**: 업로드 미완료 문서를 재개할 때 활성 쓰기 Provider가 기존 문서의 Provider와 다르면 기존 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 시작해야 한다.
 - **FR-033**: 저장소 일시 장애는 기존 1·5·15분 정책으로 최대 3회 재시도하고, 이후 Job을 `DEAD`, 문서를 `FAILED`로 종료해야 한다. 원본 유실 방지나 MinIO 고가용성을 보장하는 것으로 표현해서는 안 된다.
+- **FR-034**: 저장소 장애로 `DEAD → FAILED`가 된 문서는 저장소 복구 후 자동으로 재처리해서는 안 된다. 재처리는 reconcile 완료 확인 후 명시적 요청으로만 새 Job을 만들어야 하며, `DEAD`는 Spring 콜백 경계로 노출하지 않고 AI 내부 상태로만 유지해야 한다.
+- **FR-035**: Infra가 실행한 reconcile 결과는 Spring이 소유하는 `storage_reconciliation_log`에 `runId + documentId` 기준 멱등으로 적재해야 하며, size·감지 MIME·SHA-256이 모두 일치해 `VERIFIED`로 판정된 객체만 문서의 `storageProvider`를 변경해야 한다. 전달 경로는 Infra 전용 Bearer Service Token으로 인증하고 AI 방향 토큰과 credential·scope를 분리해야 한다.
+- **FR-036**: Spring 상태 callback의 `404`는 원인 코드로 구분해야 한다. `JOB_NOT_REGISTERED`는 Spring이 처리 요청 응답의 `jobId`를 먼저 저장한 뒤에도 발생할 수 있는 짧은 경합으로 보고 FastAPI가 1초·3초·10초 간격으로 최대 3회 재시도한다. `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 재시도하지 않고 종료하며, Spring은 `JOB_DOCUMENT_MISMATCH`를 계약 오류로 경고 기록해야 한다. FastAPI는 정상 전달 시각과 재시도 종료 시각·사유를 별도로 영속화해야 한다.
 
 ### State Model
 
@@ -148,6 +152,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - **Document**: 업로드된 문서. 부스, 에이전트, 파일명, 크기, SHA-256, object key, 상태, 실패 사유, 업로드 시각
 - **Processing Job**: 문서 처리 실행 단위. 문서, 작업 상태, 재시도 횟수, Worker 소유권과 heartbeat 만료 시각, 다음 재시도 시각, 시작·종료 시각, 내부 실패 정보
 - **Chunk**: 문서 조각. 문서, boothId, agentId, 텍스트, 임베딩 벡터, `embedding_model_id`
+- **Storage Reconciliation Log**: R2 복구 검증 기록. runId, documentId, objectKey, sourceProvider, targetProvider, 기대/실측 size·type·sha256, status, attemptCount, failureReason, checkedAt, resolvedAt
 
 ---
 
@@ -172,7 +177,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 | # | 질문 | 담당 | 메모 |
 |---|---|---|---|
-| C-01 | 허용 형식과 최대 크기는? | AI + 기획 | **확정: MVP PDF만, 파일당 최대 20MB** |
+| C-01 | 허용 형식과 최대 크기는? | AI + 기획 | **확정: MVP PDF·MD·TXT, 파일당 최대 20MB** (2026-08-26 후속 합의로 MD·TXT 추가, 스캔 이미지 PDF 텍스트 없음 처리는 PDF에만 적용) |
 | C-02 | 청킹 파라미터(크기·겹침)는? | AI | **확정: 배포 설정으로 조정하는 튜닝 값, spec 미고정** |
 | C-03 | 동일 문서 재업로드 정책은? | AI + 기획 | **확정: 동일 Agent의 SHA-256 중복은 재처리하지 않고, 수정본은 기존 `documentId`를 지정해 명시적으로 교체** |
 | C-04 | 처리 큐를 도입하는가? | AI + Infra | **확정: P0 인프로세스 Worker + 영속 Job 저장소. heartbeat 30초, Worker lease 90초, sweeper 60초, 최대 3회 재시도(1·5·15분 대기). 부하 실측 후 SQS 검토. 세부 계약은 [Issue #11](https://github.com/kanghyunsoon/ssafesta/issues/11) 참조** |
@@ -181,7 +186,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-07 | 문서 원본 저장 위치는? | BE + Infra | **확정: Cloudflare R2(S3-compatible) 우선, 장기 장애 시 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님, C-10 참조). 메타데이터 Source of Truth는 Spring** ([Issue #51](https://github.com/kanghyunsoon/ssafesta/issues/51), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 | C-08 | 업로드 미완료 문서의 만료·정리 정책은? | BE + Infra + FE | **확정: 업로드 URL 15분, 생성 후 1시간에 `EXPIRED`, 전환 후 24시간 보존 뒤 Spring이 R2 원본 삭제·실패 재시도. `EXPIRED`는 업로드 만료로 표시** ([GitLab Work Item #84](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/84)) |
 | C-09 | Spring↔FastAPI 내부 API를 어떻게 인증하고 회전하는가? | AI + BE + Infra | **확정: 방향별 Bearer Token 2종, Security Group과 독립적인 애플리케이션 검증, 콤마 목록 최대 2개, 첫 값 송신·전체 값 상수 시간 검증, 단계적 무중단 회전. mTLS는 P2** ([GitLab Work Item #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/102)) |
-| C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도. 미확정: `R2_RECONCILING` 중 신규 업로드, R2 API 장애 판정 수치, reconcile 영속 기록 위치·스키마, quota 오류 HTTP 코드** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도(`DEAD`는 AI 내부 상태로만 유지), 저장소 복구 후 자동 재처리 없음(명시적 재처리 요청으로 새 Job), reconcile 결과는 Spring DB `storage_reconciliation_log`에 `runId + documentId` 멱등으로 적재하고 `VERIFIED` 객체만 문서 Provider 반영, 전달 경로는 #102 Service Token 방식을 재사용하되 Infra 전용 credential·scope로 분리, `STORAGE_UNAVAILABLE=503`(재시도 가능)·`STORAGE_QUOTA_EXCEEDED=507`(재시도 불가)로 분리. P0에서는 probe evidence만 수집하고 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 미확정 2건(`R2_RECONCILING` 중 신규 업로드 허용 여부, R2 API 장애 자동 판정 수치)은 `docs/26_팀_결정_필요사항.md`에 등록하고 후속 이슈로 분리** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 
 ### Session 2026-08-20
 
@@ -196,6 +201,10 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: 업로드 미완료 문서는 어떻게 정리하는가? → A: 업로드 URL은 15분, 미완료 문서는 생성 후 1시간에 `EXPIRED`, 24시간 보존 후 Spring이 R2 원본을 삭제한다. 보존 기간 내 늦은 완료는 원본이 있으면 `QUEUED`로 복구한다.
 - Q: Spring↔FastAPI 내부 API 인증과 토큰 회전은 어떻게 하는가? → A: 방향별 토큰을 콤마 목록으로 주입하고 첫 값만 송신하며 수신자는 최대 2개 값을 상수 시간으로 검증한다. 회전은 `[old] → [old,new] → [new,old] → [new]` 순서로 수행하고 mTLS는 P2로 둔다.
 - Q: R2 장애 시 저장소를 어떻게 전환하는가? → A: 자동 failover·이중 쓰기·자동 원복 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로 전환한다. 신규 쓰기는 Spring 설정을 따르고 기존 읽기는 문서별 Provider를 따른다. C-10의 잔여 항목은 추가 합의 전 구현자가 정하지 않는다.
+- Q: 저장소 장애로 `DEAD`가 된 Job을 저장소 복구 후 자동으로 재처리하는가? → A: 하지 않는다. `DEAD`는 AI 내부 Job 상태로만 유지하고 Spring 콜백 경계(`FAILED` + `failureCode`)는 그대로 둔다. 복구 후에는 reconcile 완료를 확인한 뒤 명시적 재처리 요청으로 새 Job을 만든다.
+- Q: reconcile 결과는 어디에 어떻게 기록하는가? → A: 메타데이터 SoT인 Spring의 DB에 `storage_reconciliation_log`(`runId·documentId·objectKey·sourceProvider·targetProvider·expected/actual size·type·sha256·status·attemptCount·failureReason·checkedAt·resolvedAt`)로 적재한다. Infra가 결과를 Infra 전용 Spring 내부 endpoint로 전달하며 #102 Service Token 방식을 재사용하되 AI 방향과 credential·scope를 분리한다. `runId + documentId`로 멱등성을 보장하고 `VERIFIED` 객체만 문서 Provider를 변경한다.
+- Q: 저장소 장애·quota 초과 시 오류 HTTP 상태는? → A: `STORAGE_UNAVAILABLE`은 503(재시도 가능), `STORAGE_QUOTA_EXCEEDED`는 507(재시도해도 해소되지 않음)로 분리한다. 두 코드 모두 필드 오류가 아니므로 `errors[]`는 비운다.
+- Q: Spring 상태 callback의 404는 모두 같은 방식으로 재시도하는가? → A: 아니다. `JOB_NOT_REGISTERED`만 1초·3초·10초 간격으로 최대 3회 재시도하고, `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 즉시 종료한다. 종료 기록은 정상 전달 기록과 분리하며 Spring은 mismatch를 계약 오류로 경고한다.
 
 ---
 
@@ -214,7 +223,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 | 항목 | 내용 | 완료 |
 |---|---|---|
-| ① Clarification 답변 (C-01~C-10) | C-01~C-09 확정. C-10 수동 fallback의 핵심 방향은 반영했으나 reconcile 중 업로드·장애 판정 수치·reconcile 기록·quota 오류 코드는 미확정 | ☐ |
+| ① Clarification 답변 (C-01~C-10) | C-01~C-09 확정. C-10의 P0 범위·reconcile 기록·quota 오류 코드는 확정했고, reconcile 중 신규 업로드와 장애 자동 판정 수치는 후속 이슈로 명시적으로 분리 | ☑ |
 | ② 틀렸거나 과한 요구사항 지적 | | ☑ |
 | ③ 빠진 요구사항 추가 | | ☑ |
 
