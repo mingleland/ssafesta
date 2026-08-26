@@ -23,9 +23,9 @@
 - **프로토콜: WebSocket over TCP, 포트 7777** (NGO UnityTransport, 코드에서 `UseWebSockets=true` 강제)
 - 서버는 `0.0.0.0:7777` 바인딩 (컨테이너 친화)
 - 브라우저 클라이언트는 UDP 불가 → WebSocket 전용. 배포 시 `wss://` 필수 (HTTPS 페이지에서 `ws://`는 mixed content로 차단됨)
-- **목표 구조: 브라우저 → wss(443) → LB(ACM TLS 종료) → ws(7777) → 컨테이너**
-  - LB는 ALB / NLB 둘 다 성립 (아래 §4 비교) — AWS 단계에서 확정
-- idle timeout: 기본 60초는 짧을 가능성이 높음 → **초기 권장값 180초** (필수값 아님 — WebSocket/Transport heartbeat 실측 후 최종 확정)
+- **확정 구조 (2026-08-21, Issue #30): 브라우저 → wss(443) → Cloudflare Edge → EC2 Nginx → ws(7777) → 컨테이너**
+  - **TLS 는 두 번 종료된다** — 사용자↔Cloudflare Edge, Cloudflare↔EC2 Nginx. **ALB 는 사용하지 않는다** (IAM 없음 → ACM 불가). 도메인은 `world.<domain>` (Cloudflare DNS)
+- idle timeout: **Nginx `proxy_read_timeout` 을 180초 이상**으로 올려야 한다. 기본 60초는 NGO 무트래픽 연결을 끊는다 — ALB 시절 지적된 문제가 Nginx 기본값에도 동일하게 있다. Cloudflare 는 WebSocket 을 프록시하며 `Upgrade`/`Connection` 헤더 통과 설정이 필요하다
 
 ### 기동 성공 판정 로그 (stdout)
 
@@ -37,19 +37,19 @@
 ### 로그 방식
 
 - 전부 **stdout/stderr** (Unity Debug.Log → 컨테이너 로그)
-- ECS에서는 awslogs 드라이버로 CloudWatch 수집하면 됨. 파일 로그 없음
+- 수집 방식 **미정** — ECS 를 쓰지 않으므로 awslogs 드라이버가 전제가 아니다. EC2 Docker 에서 `docker logs` / awslogs(IAM 필요) / 별도 스택 중 선택 대기 (#30 ④). 파일 로그는 없다
 - 셰이더 관련 경고("Dedicated Server Optimizations") 다수 출력 — 무해, 필터 대상
 
 ## 2. 서버 파라미터 (현재 CLI 인자, 향후 ENV 연동 예정)
 
-| 현재 CLI | 향후 ECS ENV 후보 (doc 15 §8) | 기본값 |
+| 현재 CLI | 향후 ENV 후보 (컨테이너 환경변수) | 기본값 |
 |---|---|---|
 | `-port <n>` | — | 7777 |
 | `-maxPlayers <n>` | `MAX_PLAYERS` | 40 |
 | (미구현) | `INSTANCE_ID` / `WORLD_ID` / `CHANNEL_ID` | — |
 | (미구현) | `SPRING_INTERNAL_URL` | — |
 
-ENV → CLI 매핑은 ECS Task Definition에서 command 인자로 주입하거나, 추후 NetworkBootstrap에 ENV 파싱 추가 (작은 작업, 필요 시 요청).
+ENV → CLI 매핑은 `docker run`/Compose 의 command 인자로 주입하거나
 
 ## 3. 클라이언트가 서버 주소를 받는 방식
 
@@ -85,35 +85,37 @@ UnityTransport 매핑:
 | scheme == ws | `UseWebSockets=true`만 (로컬 개발) |
 | ~~path~~ | **계약에서 제외** — UnityTransport WebSocket은 경로를 사실상 지원하지 않음(기본 `/`). LB 라우팅은 host 기반으로 |
 
-- ⚠️ **AWS 착수 전 Unity 코드 수정 1건 필요**: ConnectionManager에 위 scheme 분기(wss 시 secure client parameters) 추가 + `WorldSessionDto`를 위 구조로 갱신. AWS 작업 시작 시점에 진행
+- ✅ **완료 (문서가 낡아 있었다).** `ConnectionManager` 의 scheme 분기와 `WorldSessionDto` 구조 갱신은 **이미 구현돼 있다** — `ConnectionManager.cs:57-73` 이 `scheme == "wss"` 일 때 `UseEncryption` + `SetClientSecrets(host)` 를 설정하고, `WorldSessionDto.endpoint` 도 위 구조다. **wss 실측을 위한 Unity 사전 작업은 0건이며 `world.<domain>` 이 서면 바로 붙는다** (2026-08-21 확인, #30)
 
-## 4. Load Balancer 선택 + Health Check — AWS 단계에서 결정
+## 4. ~~Load Balancer 선택 + Health Check~~ — ⛔ 무효 (2026-08-21, #30)
 
-두 구성 모두 성립한다. Health Check 방식이 핵심 차이다.
+**ALB vs NLB 비교는 무효다.** AWS IAM 이 없어 ACM 을 쓸 수 없고, LB 대신 **Cloudflare + EC2 Nginx** 로 확정됐다.
 
-| | **ALB** (HTTPS Listener) | **NLB** (TLS Listener) |
-|---|---|---|
-| TLS 종료 | ACM에서 종료 → 백엔드 평문 ws | **ACM에서 종료 가능 (TLS Listener + TCP Target Group)** → 백엔드 평문 ws. 서버가 인증서를 직접 관리할 필요 없음 |
-| Health Check | **HTTP(S)만 지원** → Unity 서버에 HTTP 엔드포인트 없음 → 경량 `/healthz` HTTP listener 추가 필요 (C# HttpListener, 별도 포트) | **TCP 체크 지원** → 7777 포트 열림만 확인, Unity 코드 수정 불필요 |
-| WebSocket | Upgrade 네이티브 지원, L7 라우팅 가능 | L4 통과 — WebSocket을 그냥 TCP로 흘림, 문제 없음 |
-| idle timeout | 기본 60초 (조정 가능) | TCP idle timeout 조정 가능 (2024+부터 configurable) |
-| 기타 | 향후 path/host 기반 라우팅·Spring API 공유 용이 | 구성 단순, 채널별 포트 분리 시 자연스러움 |
+대신 확인해야 하는 것:
 
-→ **둘 다 열어두고 AWS 단계에서 실측으로 확정.** NLB를 쓰면 Health Check 문제가 코드 수정 없이 풀리고, ALB를 쓰면 `/healthz` HTTP listener 추가(반나절)가 필요하다는 트레이드오프.
+| 항목 | 요구 |
+|---|---|
+| Nginx WebSocket 프록시 | `proxy_set_header Upgrade $http_upgrade` · `Connection "upgrade"` · HTTP/1.1 |
+| Nginx idle timeout | `proxy_read_timeout` **180초 이상** (기본 60초 → NGO 연결 끊김) |
+| Cloudflare | WebSocket 프록시 허용, `world` 서브도메인 |
+| Health Check | **LB 가 없으므로 요구가 사라졌다.** `/healthz` 추가도 불필요 — 컨테이너 재시작 정책으로 대체 |
 
-## 5. ECR / ECS 배포 시 필요한 것 (Infra 작업 목록)
+~~ALB `/healthz` 추가 반나절 vs NLB TCP 체크 코드수정 0~~ 트레이드오프는 성립하지 않는다.
 
-- [ ] ECR 리포지토리 생성 → `docker tag` + `push`
-- [ ] ECS Task Definition: 포트 매핑 7777, awslogs, (필요 시 CPU/MEM — 로컬 관측치: 유휴 시 경량, 부하 테스트 후 확정)
-- [ ] Task당 World Instance 1개 원칙 (doc 15 §7): `11F-01` = Task 1개
-- [ ] LB(ALB 또는 NLB, §4에서 확정): 443 Listener + ACM 인증서, Target → 7777, idle timeout 초기 180s(권장값, 실측 후 확정)
-- [ ] Route53: `world.festa.example.com` → ALB (도메인 규칙은 팀 확정)
-- [ ] Security Group: ALB만 7777 접근 허용
-- [ ] Web 정적 배포: S3 + CloudFront(HTTPS). Unity Web 빌드 압축 설정과 CloudFront `Content-Encoding` 헤더 정합 확인 (현재 로컬은 Compression Disabled 상태)
+## 5. 배포 시 필요한 것 (Infra 작업 목록) — 2026-08-21 갱신 (#30)
+
+ECR/ECS 를 쓰지 않는다. 단일 EC2 + Jenkins + 자체 이미지 저장소 구조다.
+
+- [ ] 이미지 빌드 → Jenkins 이미지 저장소에 **커밋 SHA 태그**로 push
+- [ ] 컨테이너 실행: 포트 매핑 7777, 재시작 정책, (CPU/MEM — 로컬 관측치: 유휴 시 경량, 부하 테스트 후 확정)
+- [ ] **Nginx**: `world.<domain>` 443 → `ws://127.0.0.1:7777`, Upgrade 헤더 통과, `proxy_read_timeout` 180s+
+- [ ] **Cloudflare DNS**: `world.<domain>` → EC2, WebSocket 프록시 허용
+- [ ] Security Group: 외부에 **443 만** 열고 7777 은 노출하지 않는다 (Nginx 가 loopback 으로 접근)
+- [ ] 롤백: `current` / `known-good` 태그 전환 (Jenkins 파이프라인)
 
 ## 6. 최종 검증 시나리오 (AWS)
 
-1. ECS(또는 EC2 Docker)에서 Task 실행 → CloudWatch에 기동 로그 확인
+1. EC2 Docker 에서 컨테이너 실행 → 컨테이너 로그에서 기동 로그 확인
 2. CloudFront의 HTTPS 페이지에서 Web 클라이언트 로드
 3. **`wss://world.<domain>`으로 Connect → Approved 로그 + 캡슐 스폰**
 4. 브라우저 2개에서 상호 이동 확인

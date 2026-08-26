@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 3c36ae3455f67594987f140c29eec89a
+timeCreated: 1507773848
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Prefabs/Furniture/Counter01b.prefab
+  uploadId: 237227

@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e06607204b4f4c41abcc8535d022981, type: 3}
+  m_Name: Shared_Shoes.07
+  m_EditorClassIdentifier: 
+  itemId: 762260482
+  displayName: "\uCCBC\uC2DC \uBD80\uCE20"
+  category: 7
+  gender: 2
+  meshes:
+  - {fileID: -7158203851736023673, guid: 6444592506003c24abfb87962dfc80a3, type: 3}
+  objectPrefabs: []
+  targetBones: 
+  hiddenBodyParts: 21000000
+  forcedVisibleBodyParts: []
+  garmentColorAreaMask: 1
+  thumbnail: {fileID: 21300000, guid: ecaf28de9389f104391ab29a923f2e30, type: 3}
+  isDefault: 0
+  hairGroup: 0
+  familyId: 0
+  requiredHairGroup: 0

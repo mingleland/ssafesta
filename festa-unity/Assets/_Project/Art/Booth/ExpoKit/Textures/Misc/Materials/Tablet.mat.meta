@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 26064f3a33239db459850cb484234372
+timeCreated: 1507780897
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Textures/Misc/Materials/Tablet.mat
+  uploadId: 237227
