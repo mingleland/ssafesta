@@ -36,6 +36,11 @@
       "name": "invalid-dialogue-close-context",
       "file": "invalid/invalid-dialogue-close-context.json",
       "expectedCode": "DIALOGUE_CLOSE_CONTEXT_INVALID"
+    },
+    {
+      "name": "variable-value-type",
+      "file": "invalid/variable-value-type.json",
+      "expectedCode": "VARIABLE_VALUE_TYPE_INVALID"
     }
   ]
 }

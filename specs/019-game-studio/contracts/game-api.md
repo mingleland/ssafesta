@@ -109,6 +109,7 @@ quickstart가 "같은 manifest의 positive/negative fixture와 오류 코드를 
 | `SCENE_REFERENCE_NOT_FOUND` | `GO_TO_SCENE` 대상 Scene 없음 |
 | `OBJECT_REFERENCE_NOT_FOUND` · `TRIGGER_TARGET_NOT_FOUND` | Event가 없는 Object를 가리킴 |
 | `VARIABLE_REFERENCE_NOT_FOUND` · `ITEM_REFERENCE_NOT_FOUND` | 없는 변수·아이템 참조 |
+| `VARIABLE_VALUE_TYPE_INVALID` | `SET_VARIABLE`·`VARIABLE_EQUALS`의 `value`가 변수 선언 타입과 불일치. `event-runtime-semantics`가 **변환 없는 strict equality**를 규정하므로 타입이 어긋난 비교는 영원히 참이 되지 않고, 대입은 그 뒤의 모든 비교를 함께 어긋나게 한다. 변수가 아예 없으면 `VARIABLE_REFERENCE_NOT_FOUND` 하나만 낸다 — 대조할 선언 타입이 없는데 두 이름을 겹쳐 보내면 편집기가 문제 아닌 칸으로 커서를 옮긴다. `initialValue`에 대한 같은 검사는 `VARIABLE_INITIAL_VALUE_INVALID`(§구조)다 |
 | `PICKUP_ITEM_NOT_FOUND` | `PICKUP` Component가 없는 아이템을 가리킴 |
 | `ITEM_ASSET_NOT_FOUND` · `SPRITE_ASSET_INVALID` · `TILESET_ASSET_INVALID` · `BACKGROUND_ASSET_INVALID` · `PORTRAIT_ASSET_INVALID` · `PROJECTILE_ASSET_INVALID` · `SPAWNER_ASSET_INVALID` | Asset 참조가 `assets[]`에 없거나 `kind`가 쓰임과 맞지 않음 |
 

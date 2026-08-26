@@ -1,0 +1,11 @@
+{
+  "description": "BOOLEAN 변수를 문자열과 비교하면 거부한다 — 변환 없는 strict equality라 영원히 참이 되지 않는다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/scenes/0/events/1/conditions/1/value",
+      "value": "false"
+    }
+  ]
+}
