@@ -41,6 +41,10 @@ export interface BoothFacade {
 // PUT /booths/{boothId}/facade 요청 본문 — 4필드 전부 nullable(§6)
 export type FacadePutRequest = BoothFacade;
 
+// 1일 임대료. 서버가 실제 차감액의 권위이고(LeaseResponse.chargedCoin) 이 값은 **요청 전 안내용**이다 —
+// 확인 모달과 버튼 라벨이 같은 숫자를 말하게 하려고 한 곳에 둔다. 계약 예시도 100(lease-api.md §응답).
+export const LEASE_COIN_COST = 100;
+
 // 004 소유 상태값 — 만료 판정은 서버 읽기 시점이 권위(C-02), FE는 이 값을 만들지 않는다
 export type LeaseStatus = 'ACTIVE' | 'EXPIRED';
 
