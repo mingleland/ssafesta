@@ -44,9 +44,11 @@ namespace Festa.World
         struct Entry
         {
             public Animator Animator;
-            public Renderer Probe;     // 가시성 판정용 대표 렌더러
-            public float Pending;      // 아직 애니메이터에 넘기지 않은 시간
-            public int Phase;          // 프레임 분산용 위상
+            public Renderer Probe;                 // 가시성 판정용 대표 렌더러
+            public SkinnedMeshRenderer[] Skins;    // 본 가중치를 낮출 대상
+            public float Pending;                  // 아직 애니메이터에 넘기지 않은 시간
+            public int Phase;                      // 프레임 분산용 위상
+            public int Band;                       // 0 근 / 1 중 / 2 원 — 전환 시에만 품질을 바꾼다
         }
 
         readonly List<Entry> _entries = new();
@@ -58,12 +60,15 @@ namespace Festa.World
             for (var i = 0; i < _instance._entries.Count; i++)
                 if (_instance._entries[i].Animator == animator) return;
 
+            var skins = animator.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             _instance._entries.Add(new Entry
             {
                 Animator = animator,
-                Probe = animator.GetComponentInChildren<SkinnedMeshRenderer>(),
+                Probe = skins.Length > 0 ? skins[0] : null,
+                Skins = skins,
                 Pending = 0f,
                 Phase = _instance._entries.Count,
+                Band = -1,   // 첫 프레임에 반드시 한 번 적용되도록
             });
         }
 
@@ -100,20 +105,27 @@ namespace Festa.World
                 // 스위치가 꺼져 있거나 카메라가 없으면 Unity 기본 동작으로 되돌린다.
                 if (!Enabled || camera == null)
                 {
-                    if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; _entries[i] = e; }
+                    if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; }
+                    if (e.Band != 0) { ApplySkinQuality(e, 0); e.Band = 0; }
+                    _entries[i] = e;
                     continue;
                 }
 
                 float sqrDistance = (e.Animator.transform.position - camera.transform.position).sqrMagnitude;
 
-                if (sqrDistance <= _nearDistance * _nearDistance)
+                int band = sqrDistance <= _nearDistance * _nearDistance ? 0
+                         : sqrDistance <= _midDistance * _midDistance ? 1 : 2;
+                if (band != e.Band) { ApplySkinQuality(e, band); e.Band = band; }
+
+                if (band == 0)
                 {
                     // 근거리는 Unity 에 맡긴다 — cullingMode 가 화면 밖을 알아서 걸러 준다.
-                    if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; _entries[i] = e; }
+                    if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; }
+                    _entries[i] = e;
                     continue;
                 }
 
-                int interval = sqrDistance <= _midDistance * _midDistance ? _midInterval : _farInterval;
+                int interval = band == 1 ? _midInterval : _farInterval;
                 if (interval < 2) interval = 2;
 
                 if (e.Animator.enabled) e.Animator.enabled = false;
@@ -132,10 +144,29 @@ namespace Festa.World
             }
         }
 
+        /// <summary>
+        /// 거리에 따라 **본 가중치**를 낮춘다. 스키닝 비용은 정점 수 x 정점당 본 수로 결정되므로,
+        /// 정점을 줄이는 LOD 메시를 만들지 않고도 절반으로 내릴 수 있다 — 에셋 작업이 0이다.
+        ///
+        /// 근거리 Auto(품질 설정을 따름) / 중거리 2본 / 원거리 1본. 1본은 관절이 접히는 곳에서
+        /// 뾰족해지지만 그 거리에서는 몇 픽셀이라 보이지 않는다.
+        /// 밴드가 **바뀔 때만** 호출한다 — 매 프레임 대입하면 그 자체가 비용이다.
+        /// </summary>
+        static void ApplySkinQuality(Entry e, int band)
+        {
+            if (e.Skins == null) return;
+            var q = band == 0 ? SkinQuality.Auto : band == 1 ? SkinQuality.Bone2 : SkinQuality.Bone1;
+            for (var i = 0; i < e.Skins.Length; i++)
+                if (e.Skins[i]) e.Skins[i].quality = q;
+        }
+
         void OnDestroy()
         {
             foreach (var e in _entries)
+            {
                 if (e.Animator) e.Animator.enabled = true;
+                ApplySkinQuality(e, 0);
+            }
             if (_instance == this) _instance = null;
         }
 
