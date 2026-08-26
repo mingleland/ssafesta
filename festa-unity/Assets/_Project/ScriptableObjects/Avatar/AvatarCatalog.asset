@@ -15,6 +15,8 @@ MonoBehaviour:
   maleBody: {fileID: 2386072306460862909, guid: 523766db6b0690f438f44f3b74dc8a4a, type: 3}
   femaleBody: {fileID: 7641884959998874389, guid: b7fc19c62e160294aa7bd620e4449001, type: 3}
   animatorController: {fileID: 9100000, guid: f8d5fa92a218de346b05c7a59e31aa67, type: 2}
+  litOpaqueTemplate: {fileID: 2100000, guid: ade7cc01d43956642aed597ab225f43f, type: 2}
+  litOpaqueNormalTemplate: {fileID: 2100000, guid: cfda741973b49b7418d83b02a085b16d, type: 2}
   items:
   - {fileID: 11400000, guid: 314efb30ac82dfa418196a2c8285f928, type: 2}
   - {fileID: 11400000, guid: cc75a1a406104844ba09d05e29d2fdaf, type: 2}
