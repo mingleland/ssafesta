@@ -21,11 +21,16 @@ namespace Festa.Booth
     [Serializable]
     public class BoothObjectDto
     {
-        public string id;
+        public string objectId;  // canonical 계약 필드
+        public string id;        // 구 Mock/저장 데이터 읽기 호환 전용
         public string type;      // BoothObjectType 문자열 (예: "VIDEO_SCREEN")
+        public string assetCode; // FURNITURE/DECORATION의 구체 Unity 자산 식별자
         public PositionDto position;
         public float rotationY;
         public int configId;     // Spring 측 콘텐츠 설정 ID (AI Agent, Video 등)
+
+        public string ResolvedObjectId =>
+            !string.IsNullOrEmpty(objectId) ? objectId : id;
     }
 
     [Serializable]

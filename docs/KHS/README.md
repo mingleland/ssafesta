@@ -1,13 +1,14 @@
-# KHS Game Studio 문서
+# KHS 문서
 
-KHS가 Game Studio(spec 019)를 설계·검증하면서 남기는 전용 기록 폴더다. Unity 월드·Booth Runtime 작업과 섞지 않으며, 다른 팀원의 구현 내용을 대신 정리하지 않는다.
+KHS 개인 작업 기록과 KHS가 직접 구현·설계한 기술 공유 자료를 모아 둔 폴더다. 다른 팀원의 구현 내용을 대신 정리하는 공간이 아니다.
 
-## Game Studio 전용 기록
+## 개인 기록
 
-- [Game Studio 작업일지](./27_Game_Studio_작업일지.md): spec 019, Web Studio/Runtime, Game API 작업
-- [Game Studio 트러블슈팅](./28_Game_Studio_트러블슈팅.md): Game Studio 문제를 `GS-T###`로 관리
-- [Game Studio GitLab 이관 준비](./29_Game_Studio_GitLab_이관_준비.md): 실제 이관 전 ref·PR·Issue·CI·검증 인수인계 기준
+- [작업일지](./24_작업일지.md): 날짜별 작업 내용과 결과
+- [트러블슈팅](./25_트러블슈팅.md): 증상·원인·해결·예방 기록
 
-Game Studio 작업 기록과 문제는 27/28에만 남기고, 저장소 이관 인수인계는 29에서 관리한다.
-Unity Booth Portal의 C# 진입 트리거처럼 경계 작업이 있더라도 작업 목적이 spec 019 통합이면
-작업 내용은 27, 문제는 28, 이관 상태만 29에 기록한다.
+## KHS 기술 공유
+
+- [컨퍼런스 인덱스](./conference/00_컨퍼런스_인덱스.md)
+
+컨퍼런스 문서는 KHS가 직접 작업한 범위만 대상으로, **해결하려던 프로젝트 문제 → 사용한 기술 개념 → SSAFESTA에 적용한 방식 → 현재 구현 상태 → 검증 포인트** 순서로 설명한다.

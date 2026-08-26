@@ -1,0 +1,186 @@
+[
+  { "key": "S15P21A604-24", "title": "[BE] Coin Wallet·Ledger API 구현 (idempotency key)" },
+  { "key": "S15P21A604-25", "title": "[BE] 일일 접속 Coin 자동 지급 구현 (KST 1일 1회)" },
+  { "key": "S15P21A604-26", "title": "[BE] Coin Ledger-잔액 대사(Reconciliation) 구현" },
+  { "key": "S15P21A604-27", "title": "[TEST] Wallet 동시성 무결성 검증 테스트 작성" },
+  { "key": "S15P21A604-29", "title": "[BE] Booth Lease 생성 API 구현 — Coin 차감+Lease 단일 트랜잭션" },
+  { "key": "S15P21A604-30", "title": "[BE] Lease 만료 판정·만료 Booth 차단 구현 (D03)" },
+  { "key": "S15P21A604-31", "title": "[TEST] Booth Lease 동시성·스트레스 테스트 작성" },
+  { "key": "S15P21A604-32", "title": "[BE] BoothSlot 시드 12개 확장 (앵커 고정)" },
+  { "key": "S15P21A604-37", "title": "[BE] Booth Facade API 구현 — 12색 팔레트 검증 (#17)" },
+  { "key": "S15P21A604-44", "title": "[FE] Booth Studio 편집 캔버스·Draft 저장/Publish 플로우 구현" },
+  { "key": "S15P21A604-47", "title": "[FE] Booth Facade 편집 폼 구현 (4필드)" },
+  { "key": "S15P21A604-17", "title": "[UNITY] 모듈형 Avatar 조립·외형 동기화 구현 (FixedString4096)" },
+  { "key": "S15P21A604-18", "title": "[UNITY] CharacterLobby Avatar 커스터마이징 UI 구현" },
+  { "key": "S15P21A604-40", "title": "[FE] Auth 소셜 로그인·콜백·닉네임 등록 흐름 구현" },
+  { "key": "S15P21A604-42", "title": "[TEST] Auth 수동 검증 시나리오 8종 작성·통과" },
+
+  {
+    "key": "S15P21A604-75",
+    "title": "[UNITY] HttpUserApiClient 구현·Access Token 주입",
+    "sp": 3, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nMockUserApiClient 를 실서버 클라이언트로 교체해 Avatar 외형을 Spring 에 영구 저장한다.\n\nh3. 작업 내용\n* HttpUserApiClient 구현 — GET /api/v1/users/me 의 avatarCode 소비, PUT /users/me/avatar 저장\n* WebGL 호스트의 Access Token 을 IAccessTokenProvider 로 주입 (Refresh Token 은 Unity 전달 금지)\n* ApiServices.Init 의 Mock 교체 스위치\n\nh3. 완료 조건\n* [ ] 로그인 사용자의 avatarCode 가 월드 입장 시 조회된다\n* [ ] 외형 변경 시 PUT 저장이 2xx 로 완료된다\n* [ ] 401 시 Mock 폴백 없이 명시적 오류 표면화\n\nh3. 선행 작업 / Dependency\n* BE Avatar API 완료 (S15P21A604-38) · FE Token wiring (S15P21A604-91)\n\nh3. 참고\n* Spec: specs/013a, docs/KHS/26 P0-1 · 커밋 c1342fa(BE)\n\nh3. 테스트 방법\n# 에디터에서 실서버 URL 로 로그인 계정 접속\n# 외형 변경 → 저장 로그 확인 → 재접속 시 동일 외형"
+  },
+  {
+    "key": "S15P21A604-76",
+    "title": "[TEST] 멀티클라이언트 Avatar 외형 E2E 실측 (2클라)",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n외형 동기화가 실제 2클라이언트 환경에서 성립하는지 실측으로 확정한다.\n\nh3. 작업 내용\n* 브라우저 2개(A·B) 동시 접속, A 외형 변경 → B 갱신 지연 측정\n* 크롭 자켓·서스펜더 반바지·한벌옷·모자·안경 조합별 파츠 결함 재검사\n* A 재접속 후 B 화면 복원 일치 확인\n\nh3. 완료 조건\n* [ ] 외형 변경이 1초 이내 원격 반영\n* [ ] 몸통 누락·피부 관통·중복 얼굴 0건\n* [ ] 재접속 복원 일치\n\nh3. 선행 작업 / Dependency\n* S15P21A604-75\n\nh3. 참고\n* docs/KHS/26 P0-2, festa-unity/Docs/avatar-setup-checklist.md\n\nh3. 테스트 방법\n# 같은 빌드로 서버+클라 2개 기동\n# 조합 5종 변경·관찰 기록 (스크린샷 첨부)"
+  },
+  {
+    "key": "S15P21A604-77",
+    "title": "[UNITY] AI_AGENT_INTERACT 송신부 구현 — Bridge 일반화·Mock 제거",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAI NPC 클릭이 React 오버레이로 전달되도록 WebGL Bridge 송신 계약을 완성한다.\n\nh3. 작업 내용\n* BoothInteractBridge 를 type 인자화 (LAPTOP 전용 → 범용)\n* AiNpcInteractable 의 Unity 내부 Mock AI 호출 제거 → Bridge 송신 { boothId, objectId, configId }\n* 클릭 감지는 BoothInteractionInput 재사용 (T-166 패턴)\n\nh3. 완료 조건\n* [ ] AI NPC 클릭 시 AI_AGENT_INTERACT 이벤트가 호스트로 송신\n* [ ] payload 3필드가 계약과 일치 (configId→agentId 매핑은 FE)\n* [ ] LAPTOP 상호작용 회귀 없음\n\nh3. 선행 작업 / Dependency\n* 없음 (계약 확정: Issue #2)\n\nh3. 참고\n* docs/KHS/26, specs/016, T-166\n\nh3. 테스트 방법\n# WebGL 빌드에서 NPC 클릭 → 브라우저 콘솔 이벤트 payload 검증\n# 노트북 클릭 회귀 확인"
+  },
+  {
+    "key": "S15P21A604-78",
+    "title": "[UNITY] BoothSlot_7 위치 확정·스폰 검증 실기",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n월드 밖(z=-405)에 미커밋 상태로 놓인 BoothSlot_7 을 확정하고 스폰 안정성을 실기로 검증한다.\n\nh3. 작업 내용\n* BoothSlot_7 위치 결정(방 내부 복귀 또는 미사용 명문화) 후 씬 커밋\n* T-177 스폰 강제 로직을 같은 빌드 서버+클라로 실기 검증\n\nh3. 완료 조건\n* [ ] 슬롯 위치가 커밋·문서화됨\n* [ ] 10회 접속 중 허공 스폰 0회\n* [ ] '스폰 경합 감지' 로그 경로 확인\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* docs/KHS/26 P0-0, T-177\n\nh3. 테스트 방법\n# 서버·클라 동일 빌드 기동 → 반복 접속 → 스폰 좌표 로그 수집"
+  },
+  {
+    "key": "S15P21A604-79",
+    "title": "[TEST] 이동 애니메이션·상태 동기화 마감 검증",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAvatar 파츠 재조립 이후에도 애니메이션 체계가 깨지지 않음을 보증한다.\n\nh3. 작업 내용\n* 전 파츠 Humanoid Avatar/Animator 연결 확인\n* Idle/Walk/Run/Jump 원격 전환 확인\n* 재조립 후 Animator 참조 유지 확인\n\nh3. 완료 조건\n* [ ] 원격 클라이언트에서 상태 전환 누락 0건\n* [ ] avatar-setup-checklist.md 미완료 항목 갱신\n\nh3. 선행 작업 / Dependency\n* S15P21A604-76 과 병행 가능\n\nh3. 참고\n* docs/KHS/26 P0-3\n\nh3. 테스트 방법\n# 2클라 접속 → 이동·달리기·점프·이모트 각 10회 관찰"
+  },
+  {
+    "key": "S15P21A604-80",
+    "title": "[INFRA] Linux Dedicated Server 빌드·Docker 이미지 생성",
+    "sp": 3, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nUnity Dedicated Server 를 컨테이너로 표준화해 EC2 배포 전제를 만든다.\n\nh3. 작업 내용\n* Build Profiles → Linux Server 프로파일 생성·빌드\n* Dockerfile 작성·이미지 빌드 (-port 7777)\n* 로컬 컨테이너 서버에 Web 빌드 접속 확인\n\nh3. 완료 조건\n* [ ] docker run 만으로 서버 기동\n* [ ] 로컬 브라우저 클라이언트 접속 성공\n* [ ] 이미지 크기·기동 시간 기록\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* docs/22 §1, docs/15\n\nh3. 테스트 방법\n# docker build → run → 브라우저 접속 → 2클라 이동 동기화 확인"
+  },
+  {
+    "key": "S15P21A604-81",
+    "title": "[INFRA] Nginx WebSocket 리버스 프록시 구성 (#52)",
+    "sp": 2, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nEC2 Nginx 가 wss 를 Unity 서버(7777)로 안정 중계하도록 구성한다.\n\nh3. 작업 내용\n* Upgrade/Connection 헤더 통과 설정\n* proxy_read_timeout 180초 이상 (기본 60초 → NGO 끊김 방지)\n* 443 only, 7777 미노출\n\nh3. 완료 조건\n* [ ] wss 핸드셰이크가 프록시 경유로 성립\n* [ ] 설정 파일이 저장소/문서에 기록됨\n\nh3. 선행 작업 / Dependency\n* S15P21A604-80\n\nh3. 참고\n* GitLab #52, docs/22 §2\n\nh3. 테스트 방법\n# wscat 또는 Web 빌드로 프록시 경유 접속 → 3분 유지 확인"
+  },
+  {
+    "key": "S15P21A604-82",
+    "title": "[INFRA] Web 빌드 정적 서빙 구성 — demo 도메인·wasm MIME",
+    "sp": 2, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nWebGL 클라이언트를 HTTPS 로 서빙해 wss 실측의 전제(HTTPS 페이지)를 만든다.\n\nh3. 작업 내용\n* Cloudflare CDN → EC2 정적 오리진 구성 (demo.<domain>)\n* Nginx .wasm → application/wasm MIME\n* 압축(브로틀리/gzip) 확인\n\nh3. 완료 조건\n* [ ] HTTPS 로 Unity Web 빌드 로드 성공\n* [ ] wasm MIME 경고 0건\n\nh3. 선행 작업 / Dependency\n* 없음 (#30 결정 반영)\n\nh3. 참고\n* docs/22 §2\n\nh3. 테스트 방법\n# 시크릿 창에서 demo 도메인 접속 → 로딩·콘솔 오류 확인"
+  },
+  {
+    "key": "S15P21A604-83",
+    "title": "[INFRA] wss 종단 접속 실측·유휴 유지 판정 (#52)",
+    "sp": 1, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nADR 결정 1(Transport)의 실측 확정 — HTTPS 페이지에서 wss 접속 성공이 판정 기준이다.\n\nh3. 작업 내용\n* demo 도메인(HTTPS)에서 world 도메인 wss 접속\n* 60초 이상 무입력 유휴 상태 연결 유지 확인\n\nh3. 완료 조건\n* [ ] wss:// 접속 성공 (판정 기준)\n* [ ] 60초 무입력 연결 유지\n* [ ] 결과를 docs/21 ADR 에 기록\n\nh3. 선행 작업 / Dependency\n* S15P21A604-81, S15P21A604-82, DNS·TLS 구성\n\nh3. 참고\n* GitLab #52 · 타임박스 5일, 실패 시 Transport 대안 전환 판단\n\nh3. 테스트 방법\n# 2브라우저 접속 → 이동 동기화 → 60초 방치 → 재이동 확인"
+  },
+  {
+    "key": "S15P21A604-84",
+    "title": "[BE] World Session 발급 API 구현 (GET /world-sessions)",
+    "sp": 3, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nUnity 클라이언트의 서버 주소 하드코딩을 제거하고 입장 경로를 서버 권위로 만든다.\n\nh3. 작업 내용\n* world 패키지 신설 — WorldSession 도메인\n* GET /api/v1/world-sessions → { endpoint(wss), connectionToken } 응답\n* 게스트/회원 권한 분기\n\nh3. 완료 조건\n* [ ] 응답 스키마가 specs/002 계약과 일치\n* [ ] 통합 테스트 (권한·스키마)\n* [ ] OpenAPI 반영\n\nh3. 선행 작업 / Dependency\n* 없음 — 002 는 Unity 통합의 블로커\n\nh3. 참고\n* Spec: specs/002-world-session\n\nh3. 테스트 방법\n# 회원/게스트 토큰으로 각각 호출 → 응답 검증"
+  },
+  {
+    "key": "S15P21A604-85",
+    "title": "[BE/UNITY] Connection Token 검증 연동 (Unity Approval)",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n1회용 Connection Token 으로 Unity 서버 접속 승인을 검증해 무단 접속을 차단한다.\n\nh3. 작업 내용\n* 검증 방식 확정 (Spring 콜백 vs 서명 검증) — specs/002 C-01\n* Unity ConnectionApproval 에서 토큰 검증 연동\n* 실패 시 거부 사유 로깅\n\nh3. 완료 조건\n* [ ] 유효 토큰만 접속 승인\n* [ ] 재사용 토큰 거부\n* [ ] 방식 결정이 spec 에 기록됨\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-84\n\nh3. 참고\n* specs/002 C-01, specs/001 T015\n\nh3. 테스트 방법\n# 정상 토큰/변조 토큰/재사용 토큰 3케이스 접속 시도"
+  },
+  {
+    "key": "S15P21A604-86",
+    "title": "[FE] Booth Facade 팔레트 12색 스와치·field 오류 대응",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nFacade 대표색 입력을 서버 팔레트 계약(12색)과 일치시키고 검증 오류를 필드 단위로 안내한다.\n\nh3. 작업 내용\n* 자유 색 입력 → 12색 스와치 선택 UI 교체\n* ApiError field 분기 처리 (#58 계약)\n* 팔레트 밖 저장값 하이드레이션 안내\n\nh3. 완료 조건\n* [ ] 팔레트 외 색 전송 경로 없음\n* [ ] field 오류가 해당 입력 옆에 표기\n* [ ] 팔레트 밖 기존값 로드 시 안내 노출\n\nh3. 선행 작업 / Dependency\n* 없음 (BE PR #71 머지 완료)\n\nh3. 참고\n* specs/005 layout-api.md §6, GitLab #17·#58\n\nh3. 테스트 방법\n# mock 409/422 fixture 로 오류 표기 확인 → 실서버 저장 왕복"
+  },
+  {
+    "key": "S15P21A604-87",
+    "title": "[FE] BoothSlot 목록·상태 조회 화면 구현",
+    "sp": 2, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n사용자가 임대 가능한 BoothSlot 을 한눈에 확인할 수 있게 한다.\n\nh3. 작업 내용\n* GET /booth-slots 소비 화면 (12슬롯 상태: 빈/임대중/내 부스)\n* 내 Booth 조회(GET /booths/mine) 연동\n\nh3. 완료 조건\n* [ ] 슬롯 상태 3종이 구분 표기\n* [ ] 만료 임박(leaseEndsAt) 표시\n* [ ] 로딩·오류 상태 처리\n\nh3. 선행 작업 / Dependency\n* 없음 (BE 완료: specs/004 34/34)\n\nh3. 참고\n* Spec: specs/004, lease-api.md\n\nh3. 테스트 방법\n# mock 슬롯 상태 fixture 3종 렌더 → 실서버 조회 확인"
+  },
+  {
+    "key": "S15P21A604-88",
+    "title": "[FE] Coin Wallet 잔액·거래내역 화면 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n사용자가 Coin 잔액과 Ledger 거래내역을 확인할 수 있게 한다.\n\nh3. 작업 내용\n* GET /wallets/me 잔액 표시\n* GET /wallets/me/transactions 목록·페이지네이션\n* 거래 유형(지급/차감/보상) 구분 표기\n\nh3. 완료 조건\n* [ ] 잔액·내역이 서버 값과 일치\n* [ ] 빈 내역·오류 상태 처리\n* [ ] 일일 지급 반영 확인\n\nh3. 선행 작업 / Dependency\n* 없음 (BE 완료: specs/003 39/39)\n\nh3. 참고\n* wallet-api.md (develop 정본)\n\nh3. 테스트 방법\n# 신규 계정 접속(일일 지급) → 잔액 50 확인 → 내역 1건 확인"
+  },
+  {
+    "key": "S15P21A604-89",
+    "title": "[FE] Owner/Staff 라우트 가드 구현 (booths/mine 3등급)",
+    "sp": 2, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n/app/studio 등 Owner 전용 경로가 일반 회원에게 노출되지 않게 한다.\n\nh3. 작업 내용\n* booths/mine 기반 guest/member/owner 3등급 가드\n* 권한 없음 시 안내·리다이렉트\n\nh3. 완료 조건\n* [ ] 비Owner 의 /app/studio 직접 진입 차단\n* [ ] Lease 성립 직후 가드 통과 (재조회)\n\nh3. 선행 작업 / Dependency\n* 없음 (G-1 트리거 충족)\n\nh3. 참고\n* FE backlog G-1, specs/004\n\nh3. 테스트 방법\n# guest/member/owner 각 계정으로 라우트 진입 매트릭스 검증"
+  },
+  {
+    "key": "S15P21A604-90",
+    "title": "[FE] Auth 실서버 엔드포인트 결선 (T016)",
+    "sp": 2, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAuth 흐름의 placeholder 경로를 실서버로 교체해 mock 없이 로그인 전 구간을 성립시킨다.\n\nh3. 작업 내용\n* 게스트 발급·refresh·logout 실경로 교체\n* VITE_USE_MOCK=false 전 시나리오 검증\n\nh3. 완료 조건\n* [ ] 소셜 로그인→닉네임→입장 실서버 관통\n* [ ] refresh 만료·로그아웃 시나리오 통과\n\nh3. 선행 작업 / Dependency\n* 없음 (BE 계약 3종 회수 완료)\n\nh3. 참고\n* specs/001 FE tasks T016 (유일 잔여)\n\nh3. 테스트 방법\n# quickstart 8시나리오를 실서버 모드로 재수행"
+  },
+  {
+    "key": "S15P21A604-91",
+    "title": "[FE] 013a Access Token 전달 wiring (#60)",
+    "sp": 2, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nUnity WebGL 호스트에 Access Token 을 전달해 Unity 의 REST 호출(Avatar 저장 등)을 성립시킨다.\n\nh3. 작업 내용\n* getAccessToken 을 UnityHost lifecycle 에 연결 (MEMBER only)\n* avatarCode 타입 필드 추가\n* 게스트는 토큰 미전달 (열람 전용)\n\nh3. 완료 조건\n* [ ] Unity 가 유효 토큰으로 /users/me 호출 성공\n* [ ] 게스트 진입 시 토큰 미노출\n\nh3. 선행 작업 / Dependency\n* 없음 (계약 develop 도달)\n\nh3. 참고\n* GitLab #60, specs/013a\n\nh3. 테스트 방법\n# 회원/게스트 각각 월드 진입 → Unity 쪽 토큰 수신 로그 확인"
+  },
+  {
+    "key": "S15P21A604-92",
+    "title": "[AI] 미니 스파이크 — PDF→Embedding→검색 로컬 관통",
+    "sp": 3, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nRAG 파이프라인 전 구간을 1회 관통해 청킹·Top-K·비용 실측값을 확보한다 (ADR 결정 2 근거).\n\nh3. 작업 내용\n* PDF 1개 파싱→청킹→Embedding→pgvector 저장\n* WHERE booth_id AND agent_id 필터 검색 동작 확인\n* 벡터 차원·처리 시간·비용 기록\n\nh3. 완료 조건\n* [ ] 관통 성공 (검색 결과에 원문 chunk 포함)\n* [ ] 실측값이 ADR 문서에 기록\n\nh3. 선행 작업 / Dependency\n* Embedding API 키 (개인 키 허용)\n\nh3. 참고\n* docs/sdd/파트별_할일 §4, docs/21 결정 2\n\nh3. 테스트 방법\n# 스파이크 스크립트 실행 → 필터 검색 쿼리 2종 결과 확인"
+  },
+  {
+    "key": "S15P21A604-93",
+    "title": "[AI] festa-ai FastAPI 스캐폴드 구축",
+    "sp": 3, "priority": "Highest", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAI 서버 코드베이스를 신설한다 (현재 festa-ai/ 미생성 — 전부 스펙 산출물만 존재).\n\nh3. 작업 내용\n* pyproject·패키지 구조·설정 로더 (plan.md 구조 준수)\n* 부팅 시 설정 검증 (lease>heartbeat 등)\n* Dockerfile·health 엔드포인트\n\nh3. 완료 조건\n* [ ] uvicorn 기동·/health 200\n* [ ] docker run 기동\n* [ ] 설정 오류 시 부팅 실패(fail-fast)\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* specs/007 plan.md 프로젝트 구조·§10\n\nh3. 테스트 방법\n# 로컬·컨테이너 각각 기동 → health·설정 검증 케이스"
+  },
+  {
+    "key": "S15P21A604-94",
+    "title": "[AI] LLM·Embedding 어댑터 인터페이스·Mock Provider 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nGMS 키 부재에도 개발이 진행되도록 Provider 를 어댑터로 격리한다 (헌법 15·18조).\n\nh3. 작업 내용\n* LLM/Embedding 인터페이스 정의\n* Mock Provider (결정적 출력·1536차원)\n* 차원 검증 (설정 불일치 시 거부)\n\nh3. 완료 조건\n* [ ] Mock 으로 파이프라인 단위 테스트 가능\n* [ ] 1536 외 차원 입력 거부\n\nh3. 선행 작업 / Dependency\n* S15P21A604-93\n\nh3. 참고\n* specs/007 FR-009/014, AI.md 공통 비기능\n\nh3. 테스트 방법\n# Mock 어댑터 주입 테스트 → 차원 검증 실패 케이스"
+  },
+  {
+    "key": "S15P21A604-95",
+    "title": "[AI] ai 스키마·Alembic·document_jobs 마이그레이션",
+    "sp": 3, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAI 파트 소유 테이블을 ai 스키마로 분리하고 Job 큐 기반을 만든다.\n\nh3. 작업 내용\n* RDS ai 스키마·runtime role 최소 권한\n* Alembic 초기화·document_jobs 마이그레이션\n* 활성 Job 부분 유니크 인덱스\n\nh3. 완료 조건\n* [ ] alembic upgrade head 성공\n* [ ] 동일 문서 활성 Job 중복 삽입 거부\n\nh3. 선행 작업 / Dependency\n* S15P21A604-93 · BE/Infra: RDS role 생성 협의\n\nh3. 참고\n* specs/007 plan Migration 1·4, data-model.md\n\nh3. 테스트 방법\n# 로컬 PG 에 마이그레이션 → 중복 Job 삽입 시도 → 제약 위반 확인"
+  },
+  {
+    "key": "S15P21A604-96",
+    "title": "[AI] spec 007 tasks 생성 (speckit)",
+    "sp": 1, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nspec 007 의 구현 착수 전 의존성 순서 작업 목록을 확정한다 (tasks.md 부재 상태).\n\nh3. 작업 내용\n* speckit tasks 실행 → specs/007 tasks.md 생성\n* 스파이크 실측값 반영 (청킹 파라미터)\n\nh3. 완료 조건\n* [ ] tasks.md 가 ai 브랜치에 커밋\n* [ ] Jira 이슈와 태스크 대응 표기\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-92 (실측값)\n\nh3. 참고\n* specs/007\n\nh3. 테스트 방법\n# tasks.md 리뷰 — 의존 순서·병렬 표기 확인"
+  },
+  {
+    "key": "S15P21A604-97",
+    "title": "[AI] spec 008 plan·tasks 생성",
+    "sp": 2, "priority": "High", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n확정된 spec 008(Conversation·RAG) 의 구현 설계와 작업 분해를 만든다 (plan 부재).\n\nh3. 작업 내용\n* speckit plan → plan.md (저장소·타임아웃·envelope 반영)\n* speckit tasks → tasks.md\n\nh3. 완료 조건\n* [ ] plan·tasks 가 ai 브랜치에 커밋\n* [ ] C-01~C-09 확정 사항이 plan 에 반영\n\nh3. 선행 작업 / Dependency\n* 없음 (spec 확정 완료)\n\nh3. 참고\n* specs/008 Clarifications (C-08 #32, C-09 #14)\n\nh3. 테스트 방법\n# plan 리뷰 — FR 커버리지 체크"
+  },
+  {
+    "key": "S15P21A604-98",
+    "title": "[DOCS] spec 상태 서술 정본화 규칙 확정 (#59)",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nspec 상태 서술이 여러 문서에 복제되어 어긋나는 구조적 문제를 규칙으로 막는다 (#45·#51 동일 원인).\n\nh3. 작업 내용\n* docs/17 §21-2 에 2층 grep 규칙(저장소 전체/같은 파일) 반영\n* 정본(SSOT) 지정 원칙 명문화\n\nh3. 완료 조건\n* [ ] 규칙이 docs/17 에 머지\n* [ ] GitLab #59 닫힘\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* GitLab #59\n\nh3. 테스트 방법\n# 규칙 적용 예시 1건(#51) 으로 검증"
+  },
+  {
+    "key": "S15P21A604-99",
+    "title": "[DOCS] spec 007 저장소 표기 R2 정정 (#51)",
+    "sp": 1, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nspec 007 의 S3 확정 표기를 인프라 R2 전환(#30) 결정과 일치시킨다.\n\nh3. 작업 내용\n* specs/007 내 S3 표기 전수 grep → R2(S3-compatible) 로 정정\n\nh3. 완료 조건\n* [ ] specs/007 내 S3 단독 표기 0건\n* [ ] GitLab #51 닫힘\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* GitLab #51, #30\n\nh3. 테스트 방법\n# grep -ri \"s3\" specs/007 결과 검토"
+  },
+  {
+    "key": "S15P21A604-100",
+    "title": "[DOCS] specs/001 tasks.md 완료 상태 정합화",
+    "sp": 1, "priority": "Low", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n구현·문서 불일치 해소 — 코드는 완료인데 tasks 체크가 2/17 인 상태를 정리한다.\n\nh3. 작업 내용\n* 구현 완료된 T003~T012 체크 반영 (커밋 75dae82 근거)\n* Deferred(T013/T014)·잔여(T012a·T015·T016) 명시\n\nh3. 완료 조건\n* [ ] tasks.md 체크 상태가 코드 실상과 일치\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* specs/001, back 브랜치 auth/ 패키지\n\nh3. 테스트 방법\n# 체크 항목별 대응 코드·테스트 존재 확인"
+  },
+  {
+    "key": "S15P21A604-101",
+    "title": "[DOCS] constitution 확정본 전환",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n팀 개발 원칙(constitution) 초안을 확정본으로 전환해 spec 게이트의 기준을 고정한다.\n\nh3. 작업 내용\n* docs/28 초안 → 팀 결정 회의 결과 반영\n* wss 단일·차원 고정·텍스트 입력 React·Docker 전 컴포넌트 등 원칙 확정\n\nh3. 완료 조건\n* [ ] .specify/memory/constitution.md 확정 커밋\n* [ ] 전 파트 브랜치 전파\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-102 (회의)\n\nh3. 참고\n* docs/28, docs/22 §5\n\nh3. 테스트 방법\n# speckit constitution 검증 통과"
+  },
+  {
+    "key": "S15P21A604-102",
+    "title": "[DOCS] ADR 6건 확정 회의·문서 반영",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 3", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n착수 전 기술 결정(docs/21) 의 빈칸을 실측 데이터로 채워 확정한다.\n\nh3. 작업 내용\n* 결정 1 Transport (wss 실측 결과) · 결정 2 Embedding (스파이크)\n* 결정 3 LLM Provider·timeout · 결정 4 SSE+React 오버레이 · 결정 5 Token 4계층\n* 회의 후 docs/21 확정본 전환\n\nh3. 완료 조건\n* [ ] 6건 전부 결정·기록\n* [ ] docs/12 POC 체크리스트에 wss 반영\n\nh3. 선행 작업 / Dependency\n* S15P21A604-83, S15P21A604-92 결과 필요\n\nh3. 참고\n* docs/21, docs/22 §4\n\nh3. 테스트 방법\n# 결정별 근거 실측값 링크 확인"
+  }
+]
