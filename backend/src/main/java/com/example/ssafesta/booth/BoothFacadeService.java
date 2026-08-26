@@ -44,17 +44,41 @@ public class BoothFacadeService {
         if (!THEME_CODES.contains(themeCode)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "지원하지 않는 테마입니다: " + themeCode);
         }
-        if (command.primaryColor() != null && !HEX_COLOR.matcher(command.primaryColor()).matches()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "대표색은 #RRGGBB 형식이어야 합니다.");
-        }
+        String primaryColor = paletteColor(command.primaryColor());
         if (command.signText() != null && command.signText().length() > MAX_SIGN_TEXT) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "간판 문구는 " + MAX_SIGN_TEXT + "자까지입니다.");
         }
         validateLogoUrl(command.logoUrl());
 
-        booth.changeFacade(themeCode, command.primaryColor(), command.signText(), command.logoUrl());
+        booth.changeFacade(themeCode, primaryColor, command.signText(), command.logoUrl());
         return FacadeView.of(booth);
+    }
+
+    /**
+     * Format, then spelling, then membership — the twelve-colour palette (contracts/layout-api.md §6).
+     *
+     * <p>The order is what keeps the message useful. {@code "파랑"} is not a colour at all and is
+     * told so; {@code "#123456"} is a perfectly well-formed colour that simply is not on the
+     * palette, and gets a different sentence. Checking membership first would answer both with the
+     * palette message and the owner would never learn which mistake they made.
+     *
+     * <p>Only values arriving <i>now</i> are checked. Colours stored before the whitelist existed
+     * keep rendering and are validated on their next save — the contract chose that over a forced
+     * migration.
+     */
+    private String paletteColor(String primaryColor) {
+        if (primaryColor == null) {
+            return null;
+        }
+        if (!HEX_COLOR.matcher(primaryColor).matches()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "대표색은 #RRGGBB 형식이어야 합니다.");
+        }
+        String normalized = FacadePalette.normalize(primaryColor);
+        if (!FacadePalette.contains(normalized)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "팔레트에 없는 색입니다.");
+        }
+        return normalized;
     }
 
     /**

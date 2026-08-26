@@ -55,8 +55,26 @@ public class User {
     public String getNickname() { return nickname; }
     public AccountStatus getStatus() { return status; }
 
+    /** The stored appearance encoding, or {@code null} for a user who has never saved one. */
+    public String getAvatarCode() { return avatarCode; }
+
     public void changeNickname(String nickname) {
         this.nickname = nickname;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * Stores the appearance encoding <em>verbatim</em>.
+     *
+     * <p>No trim, no case change, no default substitution. The string is opaque to the server —
+     * spec 013 hands appearance interpretation to the client and asks Spring for length and
+     * charset only, so anything this method "fixed" would be a silent divergence from what the
+     * client sent. That is the shape T-24 took: a value quietly rewritten on the way in, and a
+     * user left wondering why the button did nothing. Callers validate first
+     * ({@link AvatarCodePolicy}) and reject loudly.
+     */
+    public void changeAvatarCode(String avatarCode) {
+        this.avatarCode = avatarCode;
         this.updatedAt = Instant.now();
     }
 
