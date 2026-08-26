@@ -178,6 +178,14 @@ namespace Festa.Avatar
 
         void CombineSameMaterialParts()
         {
+            // ⚠ WebGL 플레이어에서는 병합을 하지 않는다 (T-214).
+            // 런타임에 만든 병합 스킨메시가 에디터·데스크톱에서는 정상인데 **WebGL 빌드에서만**
+            // 그려지지 않아 목·손·종아리가 사라졌다. 병합 데이터 자체는 빌드 안 실측으로
+            // 정상임을 확인했으므로(정점·본·가중치·바운즈) WebGL 런타임의 스킨메시 처리와의
+            // 상성 문제다. 원본 파츠는 개별로 정상 렌더되므로 병합만 끄면 몸이 복구된다.
+            // 드로우콜 이득(아바타당 약 −4)은 원인을 확정할 때까지 포기한다 — 정확성이 먼저다.
+            if (Application.platform == RuntimePlatform.WebGLPlayer) return;
+
             foreach (var go in _merged) if (go) DestroySafe(go);
             _merged.Clear();
 
@@ -449,8 +457,35 @@ namespace Festa.Avatar
                         converted[i] = material;
                         continue;
                     }
-                    var targetShader = isEye ? Shader.Find("Festa/Avatar/IrisTint") : isFace ? Shader.Find("Festa/Avatar/FaceTint") : isBody ? Shader.Find("Festa/Avatar/SkinTint") : isMouth ? Shader.Find("Festa/Avatar/MouthTint") : isEyeHighlight ? Shader.Find("Universal Render Pipeline/Unlit") : shader;
-                    material = new Material(targetShader) { name = source.name + "_RuntimeURP" };
+                    // URP Lit 을 런타임 Shader.Find 로 만들면 안 된다 — 빌드 셰이더 스트리핑이
+                    // 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이 된다 (T-213).
+                    //
+                    // 헤어는 **전용 HairTint 셰이더**로 간다. Skin/Face/Garment 틴트와 같은
+                    // Always Included Shaders 패턴이라 빌드 포함이 보장된다 — 이것이 실제로
+                    // 헤어를 되살린 해법이다.
+                    //
+                    // 나머지 액세서리는 카탈로그의 URP Lit 템플릿 재질을 복제한다. 다만
+                    // **템플릿 참조만으로는 헤어가 살아나지 않았다** — Lit 의 패스 구성까지
+                    // 복원되지는 않는다. 템플릿은 어디까지나 차선책이고, 안 그려지는 파츠가
+                    // 또 나오면 그 파츠도 전용 셰이더로 옮기는 것이 정답이다.
+                    bool isHair = category == AvatarPartCategory.Hair || lowerName.Contains("hair");
+                    var hairShader = isHair ? Shader.Find("Festa/Avatar/HairTint") : null;
+
+                    bool useLitFallback = !isEye && !isFace && !isBody && !isMouth && !isEyeHighlight && !isHair;
+                    bool sourceHasNormal = source.HasProperty("_Normal") && source.GetTexture("_Normal")
+                        || source.HasProperty("_BumpMap") && source.GetTexture("_BumpMap");
+                    Material litTemplate = _catalog
+                        ? (sourceHasNormal && _catalog.litOpaqueNormalTemplate ? _catalog.litOpaqueNormalTemplate : _catalog.litOpaqueTemplate)
+                        : null;
+                    if (isHair && hairShader)
+                        material = new Material(hairShader) { name = source.name + "_RuntimeURP" };
+                    else if (useLitFallback && litTemplate)
+                        material = new Material(litTemplate) { name = source.name + "_RuntimeURP" };
+                    else
+                    {
+                        var targetShader = isEye ? Shader.Find("Festa/Avatar/IrisTint") : isFace ? Shader.Find("Festa/Avatar/FaceTint") : isBody ? Shader.Find("Festa/Avatar/SkinTint") : isMouth ? Shader.Find("Festa/Avatar/MouthTint") : isEyeHighlight ? Shader.Find("Universal Render Pipeline/Unlit") : shader;
+                        material = new Material(targetShader) { name = source.name + "_RuntimeURP" };
+                    }
                     // Body의 BaseMap은 단순 Albedo가 아니라 피부/속옷 영역을
                     // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
                     bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");

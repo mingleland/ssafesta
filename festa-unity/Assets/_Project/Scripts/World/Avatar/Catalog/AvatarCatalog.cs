@@ -13,6 +13,17 @@ namespace Festa.Avatar
         public GameObject maleBody;
         public GameObject femaleBody;
         public RuntimeAnimatorController animatorController;
+
+        // ── 런타임 재질 템플릿 (T-213) ──────────────────────────────
+        // 조립기는 헤어·액세서리 재질을 런타임에 만든다. 이전에는 Shader.Find("URP/Lit") 로
+        // 만들었는데, 빌드 셰이더 스트리핑이 그 셰이더를 잘라내면 재질이 "존재하지만
+        // 그려지지 않는" 상태가 된다 — 에디터에서는 전 셰이더가 살아 있어 절대 재현되지 않는다.
+        // 에셋으로 참조된 재질은 그 키워드 상태의 배리언트가 빌드에 반드시 포함되므로,
+        // 템플릿을 복제하는 방식으로 바꿨다. 비어 있으면 Shader.Find 로 폴백한다(에디터 안전망).
+        [Tooltip("URP Lit 불투명 — 노멀맵 없는 헤어·액세서리용")]
+        public Material litOpaqueTemplate;
+        [Tooltip("URP Lit 불투명 + _NORMALMAP — 노멀맵 있는 헤어·액세서리용")]
+        public Material litOpaqueNormalTemplate;
         public AvatarItemDefinition[] items = Array.Empty<AvatarItemDefinition>();
         public AvatarPaletteColor[] palette = Array.Empty<AvatarPaletteColor>();
 
