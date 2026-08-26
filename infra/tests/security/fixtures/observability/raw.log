@@ -1,0 +1,5 @@
+authorization: Bearer FESTA_OBSERVABILITY_CANARY
+password=FESTA_PASSWORD_CANARY token=FESTA_TOKEN_CANARY
+cookie: session=FESTA_COOKIE_CANARY
+webhook=https://mattermost.invalid/hooks/FESTA_WEBHOOK_CANARY
+contact=infra@example.invalid phone=010-1234-5678

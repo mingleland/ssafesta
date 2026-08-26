@@ -1,0 +1,15 @@
+name: festa-dev-game
+services:
+  game:
+    image: ${COMPONENT_IMAGE_REF:?}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${GAME_HOST_PORT:-7777}:7777"]
+    networks: [game]
+    mem_limit: ${GAME_MEMORY_LIMIT:-2g}
+    cpus: ${GAME_CPU_LIMIT:-1.5}
+    healthcheck:
+      test: ["CMD-SHELL", "test -x /app/festa-unity.x86_64 && pgrep -f festa-unity.x86_64 >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+networks: { game: {} }

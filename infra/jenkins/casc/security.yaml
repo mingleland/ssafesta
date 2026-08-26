@@ -1,0 +1,52 @@
+credentials:
+  system:
+    domainCredentials:
+      - domain:
+          name: github-scm
+          description: GitHub checkout credentials only
+          specifications:
+            - hostnameSpecification:
+                includes: github.com
+        credentials: []
+      - domain:
+          name: gitlab-scm
+          description: GitLab checkout credentials only
+          specifications:
+            - hostnameSpecification:
+                includes: "${GITLAB_HOST:-gitlab.com}"
+        credentials: []
+      - domain:
+          name: mattermost
+          description: Mattermost webhook credentials only
+          specifications:
+            - hostnameSpecification:
+                includes: "${MATTERMOST_HOST}"
+        credentials: []
+
+jenkins:
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: GITHUB_CREDENTIALS_ID
+            value: "${GITHUB_CREDENTIALS_ID}"
+          - key: GITLAB_CREDENTIALS_ID
+            value: "${GITLAB_CREDENTIALS_ID}"
+          - key: GITLAB_API_CREDENTIALS_ID
+            value: "${GITLAB_API_CREDENTIALS_ID}"
+          - key: GITLAB_CHECKOUT_CREDENTIALS_ID
+            value: "${GITLAB_CHECKOUT_CREDENTIALS_ID}"
+          - key: DEPLOY_CREDENTIALS_ID
+            value: "${DEPLOY_CREDENTIALS_ID}"
+          - key: MATTERMOST_CREDENTIALS_ID
+            value: "${MATTERMOST_CREDENTIALS_ID}"
+          - key: CI_CONSOLE_MASKING_REQUIRED
+            value: "true"
+          - key: CI_SANITIZED_SUMMARY_REQUIRED
+            value: "true"
+          - key: CI_SECRET_SCAN_REQUIRED
+            value: "true"
+          - key: CI_ARTIFACT_RETENTION_BUILDS
+            value: "30"
+
+# Console masking is provided by credentials-binding and with-credentials.sh.
+# Artifact retention and sanitized summaries are enforced by Jenkinsfile and secret-scan.sh.

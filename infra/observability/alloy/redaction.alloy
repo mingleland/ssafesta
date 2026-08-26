@@ -1,0 +1,16 @@
+declare "sanitize" {
+  argument "forward_to" { optional = false }
+
+  loki.process "redact" {
+    forward_to = argument.forward_to.value
+    stage.replace { expression = "(?i)(authorization\\s*[:=]\\s*(?:bearer|basic)\\s+)[^\\s,;]+"; replace = "$1[REDACTED]" }
+    stage.replace { expression = "(?i)((?:password|passwd|api[_-]?key|access[_-]?token|refresh[_-]?token|token)\\s*[:=]\\s*)[^\\s,;]+"; replace = "$1[REDACTED]" }
+    stage.replace { expression = "(?i)((?:cookie|set-cookie)\\s*[:=]\\s*)[^\\r\\n]+"; replace = "$1[REDACTED]" }
+    stage.replace { expression = "https?://[^\\s/]+/(?:hooks|webhooks)/[^\\s]+"; replace = "[REDACTED]" }
+    // email PII
+    stage.replace { expression = "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"; replace = "[REDACTED]" }
+    // phone PII
+    stage.replace { expression = "(?:\\+?82[- ]?)?0?1[016789][- ]?[0-9]{3,4}[- ]?[0-9]{4}"; replace = "[REDACTED]" }
+  }
+  export "receiver" { value = loki.process.redact.receiver }
+}

@@ -1,0 +1,47 @@
+jenkins:
+  authorizationStrategy:
+    globalMatrix:
+      entries:
+        - user:
+            name: "${JENKINS_ADMIN_ID}"
+            permissions:
+              - Overall/Administer
+        - group:
+            name: infra-viewers
+            permissions:
+              - Overall/Read
+              - Job/Discover
+              - Job/Read
+        - group:
+            name: component-builders
+            permissions:
+              - Overall/Read
+              - Job/Discover
+              - Job/Read
+              - Job/Build
+              - Job/Cancel
+        - group:
+            name: develop-deployers
+            permissions:
+              - Overall/Read
+              - Job/Discover
+              - Job/Read
+              - Job/Build
+              - Job/Cancel
+              - Job/Workspace
+        - group:
+            name: recovery-approvers
+            permissions:
+              - Overall/Read
+              - Job/Discover
+              - Job/Read
+              - Job/Build
+        - group:
+            name: credential-managers
+            permissions:
+              - Overall/Read
+              - Credentials/View
+              - Credentials/Create
+              - Credentials/Update
+              - Credentials/Delete
+              - Credentials/ManageDomains

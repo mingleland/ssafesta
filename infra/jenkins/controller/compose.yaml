@@ -1,0 +1,54 @@
+name: festa-jenkins-controller
+
+services:
+  jenkins-controller:
+    build:
+      context: ..
+      dockerfile: controller/Dockerfile
+      args:
+        JENKINS_IMAGE: ${JENKINS_IMAGE:?load infra/versions.env}
+    image: festa/jenkins-controller:${JENKINS_CONTROLLER_TAG:-local}
+    container_name: festa-jenkins-controller
+    restart: unless-stopped
+    environment:
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:?set in infra/.env}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?set in infra/.env}
+      JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:?set in infra/.env}
+      GITHUB_CREDENTIALS_ID: ${GITHUB_CREDENTIALS_ID:-github-scm}
+      GITLAB_CREDENTIALS_ID: ${GITLAB_CREDENTIALS_ID:-gitlab-scm}
+      GITLAB_API_CREDENTIALS_ID: ${GITLAB_API_CREDENTIALS_ID:-gitlab-api}
+      GITLAB_CHECKOUT_CREDENTIALS_ID: ${GITLAB_CHECKOUT_CREDENTIALS_ID:-gitlab-checkout}
+      DEPLOY_CREDENTIALS_ID: ${DEPLOY_CREDENTIALS_ID:-deploy-host}
+      MATTERMOST_CREDENTIALS_ID: ${MATTERMOST_CREDENTIALS_ID:-mattermost-webhook}
+      MATTERMOST_HOST: ${MATTERMOST_HOST:-mattermost.invalid}
+      GITLAB_HOST: ${GITLAB_HOST:-gitlab.com}
+      GITLAB_SERVER_NAME: ${GITLAB_SERVER_NAME:-festa-gitlab}
+      GITLAB_SERVER_URL: ${GITLAB_SERVER_URL:-https://gitlab.com}
+      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
+    ports:
+      - 127.0.0.1:8080:8080
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ../casc:/var/jenkins_home/casc_configs:ro
+    networks:
+      jenkins-control:
+        aliases:
+          - jenkins-controller
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:8080/login >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  jenkins_home:
+
+networks:
+  jenkins-control:
+    name: festa-jenkins-control
+    driver: bridge

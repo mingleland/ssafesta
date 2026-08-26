@@ -1,0 +1,11 @@
+{
+  "uid":"festa-component-overview","title":"FESTA Component Overview","schemaVersion":41,"version":1,"refresh":"30s",
+  "tags":["festa","components"],"time":{"from":"now-6h","to":"now"},
+  "templating":{"list":[{"name":"service","type":"query","datasource":{"uid":"festa-loki"},"query":"label_values(service)","includeAll":true}]},
+  "panels":[
+    {"id":1,"type":"logs","title":"Sanitized component logs","datasource":{"uid":"festa-loki"},"targets":[{"expr":"{service=~\"$service\"}","refId":"A"}],"gridPos":{"h":12,"w":24,"x":0,"y":0}},
+    {"id":2,"type":"timeseries","title":"Container CPU","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"sum by (container_label_com_docker_compose_service) (rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=~\"$service\"}[5m]))","refId":"A"}],"gridPos":{"h":8,"w":12,"x":0,"y":12}},
+    {"id":3,"type":"timeseries","title":"Container memory","datasource":{"uid":"festa-prometheus"},"targets":[{"expr":"sum by (container_label_com_docker_compose_service) (container_memory_working_set_bytes{container_label_com_docker_compose_service=~\"$service\"})","refId":"A"}],"gridPos":{"h":8,"w":12,"x":12,"y":12}},
+    {"id":4,"type":"timeseries","title":"Container restart signals","datasource":{"uid":"festa-loki"},"targets":[{"expr":"sum by (service) (count_over_time({service=~\"$service\"} |= \"restart\" [5m]))","refId":"A"}],"gridPos":{"h":8,"w":24,"x":0,"y":20}}
+  ]
+}
