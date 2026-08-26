@@ -178,6 +178,14 @@ namespace Festa.Avatar
 
         void CombineSameMaterialParts()
         {
+            // ⚠ WebGL 플레이어에서는 병합을 하지 않는다 (T-214).
+            // 런타임에 만든 병합 스킨메시가 에디터·데스크톱에서는 정상인데 **WebGL 빌드에서만**
+            // 그려지지 않아 목·손·종아리가 사라졌다. 병합 데이터 자체는 빌드 안 실측으로
+            // 정상임을 확인했으므로(정점·본·가중치·바운즈) WebGL 런타임의 스킨메시 처리와의
+            // 상성 문제다. 원본 파츠는 개별로 정상 렌더되므로 병합만 끄면 몸이 복구된다.
+            // 드로우콜 이득(아바타당 약 −4)은 원인을 확정할 때까지 포기한다 — 정확성이 먼저다.
+            if (Application.platform == RuntimePlatform.WebGLPlayer) return;
+
             foreach (var go in _merged) if (go) DestroySafe(go);
             _merged.Clear();
 
