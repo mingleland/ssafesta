@@ -59,6 +59,16 @@ app:
     daily-grant: 50
     daily-grant-zone: Asia/Seoul
 
+  # Unity 월드 접속 정보 (spec 002 FR-010). 배포 환경은 wss / world.<domain> / 443 이며
+  # 그 값은 infra-003 의 application-infra.yml 이 소유한다 — 여기 값을 쓰지 않는다.
+  world:
+    scheme: ${WORLD_SCHEME:ws}
+    host: ${WORLD_HOST:127.0.0.1}
+    port: ${WORLD_PORT:7777}
+    # Access Token 키(jwt-secret)와 분리된 전용 키. 게임 서버가 이 키로 서명을 자체 검증한다
+    # (헌법 14조). jwt-secret 과 같이 기본값을 두지 않는다 — 없으면 기동이 실패해야 한다.
+    connection-token-secret: ${CONNECTION_TOKEN_SECRET}
+
   lease:
     price-coin: 100
     duration: PT24H
