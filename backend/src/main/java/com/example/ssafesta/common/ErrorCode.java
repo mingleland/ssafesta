@@ -58,6 +58,28 @@ public enum ErrorCode {
     LAYOUT_REVISION_CONFLICT(HttpStatus.CONFLICT, "다른 편집자가 먼저 저장했습니다."),
     LAYOUT_NOT_PUBLISHED(HttpStatus.NOT_FOUND, "공개된 배치가 없습니다."),
 
+    // ── Game Studio (spec 019) ──────────────────────────────────────────────
+    // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
+    // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —
+    // 새 이름을 만들면 같은 사건이 두 이름을 갖는다.
+    GAME_VALIDATION_FAILED(HttpStatus.CONFLICT, "게임을 저장할 수 없습니다."),
+    GAME_REVISION_CONFLICT(HttpStatus.CONFLICT, "다른 편집 내용이 먼저 저장되었습니다."),
+    GAME_NOT_FOUND(HttpStatus.NOT_FOUND, "게임을 찾을 수 없습니다."),
+    GAME_DELETED(HttpStatus.NOT_FOUND, "삭제된 게임입니다."),
+    GAME_NOT_PUBLISHED(HttpStatus.NOT_FOUND, "아직 게시되지 않은 게임입니다."),
+    GAME_NOT_PUBLIC(HttpStatus.FORBIDDEN, "현재 비공개 상태인 게임입니다."),
+    GAME_FORBIDDEN(HttpStatus.FORBIDDEN, "이 게임을 편집할 권한이 없습니다."),
+    GAME_SCHEMA_UNSUPPORTED(HttpStatus.CONFLICT, "지원하지 않는 게임 데이터 버전입니다."),
+    /**
+     * 500인 것은 이것뿐이다. 나머지는 클라이언트가 고칠 수 있는 사건이지만, 이것은 <b>서버가 저장을
+     * 허용했던 데이터가 지금 검증을 통과하지 못한다</b>는 뜻이라 서버 결함이다. 조용히 200으로 빈
+     * 프로젝트를 돌려주지 않는다 (T-24).
+     */
+    GAME_PROJECT_INVALID(HttpStatus.INTERNAL_SERVER_ERROR, "저장된 게임 데이터가 손상되었습니다."),
+    /** 사용자가 스스로 풀 수 있는 상태다 — thrower 가 상한값과 해결 방법을 message 에 담는다. */
+    GAME_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "만들 수 있는 게임 수를 초과했습니다."),
+    CONFIG_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 포털 연결을 찾을 수 없습니다."),
+
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),

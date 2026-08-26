@@ -1,0 +1,11 @@
+{
+  "description": "Dialogue Choice는 nextNodeId와 flow terminal Action을 함께 가질 수 없다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/scenes/1/nodes/0/choices/0/nextNodeId",
+      "value": "opened"
+    }
+  ]
+}

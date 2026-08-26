@@ -62,3 +62,10 @@ app:
   lease:
     price-coin: 100
     duration: PT24H
+
+  # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
+  # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.
+  # 개수로 유계이므로 보관 기간과 sweeper가 필요 없다 — 밀어내기가 삭제 트랜잭션 안에서 끝난다.
+  game:
+    live-limit: 20
+    deleted-limit: 5
