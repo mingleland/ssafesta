@@ -226,6 +226,9 @@ namespace Festa.Diagnostics
             // 화면 밖 아바타를 어떻게 처리하느냐가 #90 의 핵심 변수다. 기본값(AlwaysAnimate)으로
             // 두어야 "최적화 전" 비용이 정직하게 찍힌다.
             animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            // 프로덕션과 같은 거리별 갱신 조절을 받게 한다 — 그러지 않으면 측정이
+            // 프로덕션과 다른 것을 재게 된다.
+            Festa.World.AvatarAnimationLod.Register(animator);
             animator.SetBool(IsWalkingHash, true);
             animator.SetFloat(SpeedHash, 1f);
             // 같은 프레임에 모두 같은 포즈면 비현실적이다 — 재생 위상을 흩는다.
