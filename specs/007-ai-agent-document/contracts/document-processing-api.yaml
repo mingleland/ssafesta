@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA AI Document Processing API
-  version: 0.1.0
+  version: 0.2.0
   description: Spring이 업로드를 확정한 문서를 FastAPI 처리 Job으로 접수하고 내부 진단 상태를 조회하는 계약이다.
 servers:
   - url: /ai/v1
@@ -38,6 +38,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
   /documents/{documentId}/status:
     get:
       operationId: getInternalDocumentJobStatus
@@ -59,12 +61,15 @@ paths:
                 $ref: '#/components/schemas/DocumentJobStatusResponse'
         '404':
           description: Job 없음
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
 components:
   securitySchemes:
     serviceToken:
       type: http
       scheme: bearer
       bearerFormat: opaque-service-token
+      description: INTERNAL_SPRING_TO_AI_TOKENS의 첫 값을 Spring이 송신하고 FastAPI가 목록 전체를 상수 시간으로 검증한다.
   schemas:
     JobStatus:
       type: string

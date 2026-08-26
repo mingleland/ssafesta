@@ -2,10 +2,10 @@
 
 > **서버**: FastAPI  
 > **기본 통신**: REST(JSON)  
-> **실시간 응답**: SSE 우선 검토  
+> **실시간 응답**: SSE
 > **문서 저장**: Cloudflare R2(S3-compatible) 우선, S3-compatible fallback
 > **Vector DB**: PostgreSQL + pgvector  
-> **인증**: Spring 발급 JWT 기반, 검증 방식 세부 TBD
+> **인증**: 사용자 API는 Spring 발급 JWT, Spring↔FastAPI 내부 API는 방향별 Bearer Service Token
 
 ---
 
@@ -25,6 +25,8 @@
 
 ## 2. 공통 Header
 
+사용자 API:
+
 ```http
 Authorization: Bearer <access-token>
 Content-Type: application/json
@@ -35,6 +37,18 @@ Streaming:
 ```http
 Accept: text/event-stream
 ```
+
+내부 API:
+
+```http
+# Spring → FastAPI
+Authorization: Bearer <INTERNAL_SPRING_TO_AI_TOKENS의 첫 값>
+
+# FastAPI/Worker → Spring
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS의 첫 값>
+```
+
+수신자는 해당 방향 목록의 모든 값을 상수 시간으로 검증하고 누락·오류·반대 방향 토큰은 `401`로 거부한다. 상세 정본은 spec 007의 OpenAPI 계약 2종을 따른다.
 
 ---
 
@@ -211,7 +225,7 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
 
 ## 7. Document Processing
 
-파일 업로드 자체는 Spring/R2 object storage가 담당하고 FastAPI는 업로드된 문서를 처리한다.
+파일 업로드 자체는 Spring과 S3-compatible object storage가 담당하고 FastAPI는 업로드된 문서를 처리한다. 기본 Provider는 R2이며 수동 fallback 이후의 문서는 MinIO일 수 있다. FastAPI는 문서별 `storageProvider + bucket + objectKey`를 기준으로 원본을 읽는다.
 
 ### POST `/ai/v1/documents/process`
 
@@ -222,7 +236,8 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
   "documentId": 152,
   "boothId": 7,
   "agentId": 78,
-  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/152/project.pdf",
+  "sourceHash": "7f83b1657ff1fc53b92dc18148a1d65dfa13514b4b1fa3d677284addd200126d"
 }
 ```
 
@@ -230,16 +245,18 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
 
 ```json
 {
-  "jobId": "job_doc_152",
+  "jobId": "job_152",
   "documentId": 152,
-  "status": "QUEUED"
+  "status": "QUEUED",
+  "existing": false
 }
 ```
 
 ### 처리
 
 ```text
-R2 Download (S3-compatible API)
+Document storageProvider 조회
+→ R2 또는 MinIO Download (S3-compatible API)
 → Parsing
 → Normalization
 → Chunking
@@ -258,10 +275,16 @@ R2 Download (S3-compatible API)
 
 ```json
 {
+  "jobId": "job_152",
   "documentId": 152,
-  "status": "READY",
+  "status": "SUCCEEDED",
+  "attemptNo": 1,
+  "maxRetries": 3,
+  "leaseExpiresAt": null,
+  "nextRetryAt": null,
   "chunkCount": 42,
-  "processedAt": "2026-08-08T16:10:00+09:00"
+  "lastErrorCode": null,
+  "updatedAt": "2026-08-08T16:10:00+09:00"
 }
 ```
 
@@ -269,11 +292,42 @@ R2 Download (S3-compatible API)
 
 | Status | 설명 |
 |---|---|
-| `QUEUED` | 대기 |
-| `PROCESSING` | 처리 중 |
-| `READY` | 검색 가능 |
-| `FAILED` | 처리 실패 |
-| `DISABLED` | 검색 제외 |
+| `QUEUED` | 실행 대기 |
+| `RUNNING` | Worker 처리 중 |
+| `RETRY_WAIT` | 재시도 대기 |
+| `SUCCEEDED` | 처리 성공 |
+| `DEAD` | 재시도 상한을 초과한 최종 실패 |
+| `CANCELLED` | 임대 만료 등 정책에 따른 취소 |
+
+이 endpoint는 내부 진단 전용이다. 사용자 문서 상태(`QUEUED/PROCESSING/READY/FAILED/DISABLED/EXPIRED`)는 Spring API에서 조회한다.
+
+### PATCH `/internal/ai/documents/{documentId}/status`
+
+FastAPI/Worker가 Spring 소유 문서 상태를 갱신하는 내부 callback이다.
+
+```json
+{
+  "jobId": "job_152",
+  "status": "READY",
+  "sourceHash": "7f83b1657ff1fc53b92dc18148a1d65dfa13514b4b1fa3d677284addd200126d",
+  "chunkCount": 42,
+  "failureCode": null,
+  "failureReason": null,
+  "processedAt": "2026-08-08T16:10:00+09:00",
+  "occurredAt": "2026-08-08T16:10:00+09:00"
+}
+```
+
+| 응답 | 의미 |
+|---|---|
+| `204` | 신규 반영 또는 동일 `jobId + status` 중복 요청의 멱등 성공 |
+| `401` | AI→Spring Service Token 누락·오류·반대 방향 사용 |
+| `404 / JOB_NOT_REGISTERED` | Spring이 처리 요청 응답의 `jobId`를 아직 저장하지 않음. FastAPI가 1초·3초·10초 간격으로 최대 3회 재시도 |
+| `404 / DOCUMENT_NOT_FOUND` | 문서가 삭제됨. FastAPI는 재시도하지 않고 별도 종료 기록 |
+| `404 / JOB_DOCUMENT_MISMATCH` | `jobId`와 `documentId` 대응 불일치. FastAPI는 재시도하지 않고 종료하며 Spring은 계약 오류 경고 기록 |
+| `409` | `sourceHash`가 현재 문서와 다른 stale callback. 현재 상태를 덮지 않음 |
+
+Spring은 FastAPI 처리 요청에서 반환받은 `jobId`를 다른 후속 처리보다 먼저 저장한다. FastAPI의 callback 종료 시각·사유는 정상 전달 시각과 별도 필드로 보존하며, 위 짧은 404 재시도는 문서 처리 Job의 1분·5분·15분 재시도와 별개다.
 
 ---
 
@@ -390,6 +444,8 @@ Codec, Streaming, Provider는 TBD다.
 | `BOOTH_LEASE_EXPIRED` | Booth 임대 만료 — 신규 Conversation·질문 차단 | `false` |
 | `CONVERSATION_NOT_FOUND` | Conversation 없음 | `false` |
 | `DOCUMENT_NOT_FOUND` | 문서 없음 | `false` |
+| `JOB_NOT_REGISTERED` | Spring에 처리 Job 대응 관계가 아직 등록되지 않음 | `true` |
+| `JOB_DOCUMENT_MISMATCH` | 처리 Job과 문서 식별자 불일치 | `false` |
 | `DOCUMENT_NOT_READY` | 문서 미처리 | `true` |
 | `DOCUMENT_PROCESSING_FAILED` | 처리 실패 | `false` |
 | `RAG_SEARCH_FAILED` | 검색 실패 | `true` |
@@ -476,6 +532,7 @@ Spring → Visitor Connected
 | POST | `/ai/v1/conversations/{id}/stream` | P0 |
 | POST | `/ai/v1/documents/process` | P0 |
 | GET | `/ai/v1/documents/{id}/status` | P0 |
+| PATCH | `/internal/ai/documents/{id}/status` | P0 |
 | POST | `/ai/v1/conversations/{id}/handoff-summary` | P1 |
 | POST | `/ai/v1/agents/{id}/test` | P2 |
 | GET | `/ai/health` | P0 |
@@ -488,12 +545,8 @@ Spring → Visitor Connected
 
 - API Domain
 - JWT 검증 방식
-- Spring ↔ FastAPI 내부 인증
 - LLM Provider
 - Embedding Model
 - Chunk 크기
 - Top-K
-- 최대 문서 크기
-- 지원 파일 형식
-- SSE / WebSocket 최종 선택
 - STT/TTS Provider
