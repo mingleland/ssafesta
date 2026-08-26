@@ -92,7 +92,7 @@ quickstart가 "같은 manifest의 positive/negative fixture와 오류 코드를 
 | `PLATFORMER_GRAVITY_INVALID` | PLATFORMER `gravity`가 `1~30` 정수 밖 (validator `:144`) |
 | `VARIABLE_INITIAL_VALUE_INVALID` | 변수 초기값이 선언 타입과 불일치 |
 | `TILE_COUNT_INVALID` | Tile 배열 길이가 Scene 크기와 불일치 (또는 10,000 초과) |
-| `DIALOGUE_PRESENTATION_INVALID` | `presentation`이 `OVERLAY`/`FULL_SCREEN` 밖 |
+| `DIALOGUE_PRESENTATION_INVALID` | `presentation`이 `OVERLAY`/`FULL_SCREEN` 밖. **이 이름은 네 자리에서 쓰인다** — 여기(enum) 외에 §참조 무결성 2건, §Dialogue 의미 1건. 아래 표들을 함께 본다 |
 
 **중복 id**
 
@@ -109,14 +109,17 @@ quickstart가 "같은 manifest의 positive/negative fixture와 오류 코드를 
 | `SCENE_REFERENCE_NOT_FOUND` | `GO_TO_SCENE` 대상 Scene 없음 |
 | `OBJECT_REFERENCE_NOT_FOUND` · `TRIGGER_TARGET_NOT_FOUND` | Event가 없는 Object를 가리킴 |
 | `VARIABLE_REFERENCE_NOT_FOUND` · `ITEM_REFERENCE_NOT_FOUND` | 없는 변수·아이템 참조 |
+| `VARIABLE_VALUE_TYPE_INVALID` | `SET_VARIABLE`·`VARIABLE_EQUALS`의 `value`가 변수 선언 타입과 불일치. `event-runtime-semantics`가 **변환 없는 strict equality**를 규정하므로 타입이 어긋난 비교는 영원히 참이 되지 않고, 대입은 그 뒤의 모든 비교를 함께 어긋나게 한다. 변수가 아예 없으면 `VARIABLE_REFERENCE_NOT_FOUND` 하나만 낸다 — 대조할 선언 타입이 없는데 두 이름을 겹쳐 보내면 편집기가 문제 아닌 칸으로 커서를 옮긴다. `initialValue`에 대한 같은 검사는 `VARIABLE_INITIAL_VALUE_INVALID`(§구조)다 |
 | `PICKUP_ITEM_NOT_FOUND` | `PICKUP` Component가 없는 아이템을 가리킴 |
+| `DIALOGUE_PRESENTATION_INVALID` | **`OVERLAY` DIALOGUE를 시작 Scene(`startSceneId`)이나 `GO_TO_SCENE` 대상으로 쓴 것.** `OVERLAY`는 자기를 연 Scene 위에 겹쳐 그려지고 `CLOSE_DIALOGUE`가 그 아래로 돌아가므로, 거기서 시작하면 밑에 아무것도 없고 `GO_TO_SCENE`은 현재 Scene을 교체하므로 설 자리가 없다 (`README.md`·`event-runtime-semantics.md`가 함께 금지). §구조·§Dialogue 의미의 같은 이름과 한 어휘다 |
 | `ITEM_ASSET_NOT_FOUND` · `SPRITE_ASSET_INVALID` · `TILESET_ASSET_INVALID` · `BACKGROUND_ASSET_INVALID` · `PORTRAIT_ASSET_INVALID` · `PROJECTILE_ASSET_INVALID` · `SPAWNER_ASSET_INVALID` | Asset 참조가 `assets[]`에 없거나 `kind`가 쓰임과 맞지 않음 |
 
 **Dialogue 의미** — **Publish가 추가로 보는 "Dialogue 정책"**이다 (§Publish 재검증 목록, #48 2026-08-23 13:19 — *"차이는 Publish가 소유권·Dialogue·Asset 정책을 더 본다"*). 편집기가 같은 규칙을 매 편집마다 검증하므로 정상 흐름의 Draft에는 이 위반이 실리지 않는다. 상세는 `event-runtime-semantics.md`
 
 | rule | 뜻 |
 |---|---|
-| `DIALOGUE_TARGET_INVALID` | `SHOW_DIALOGUE` 대상이 `OVERLAY` DIALOGUE Scene이 아님 |
+| `DIALOGUE_TARGET_INVALID` | `SHOW_DIALOGUE` 대상이 **DIALOGUE Scene이 아님** |
+| `DIALOGUE_PRESENTATION_INVALID` | `SHOW_DIALOGUE` 대상이 DIALOGUE Scene이긴 하나 `presentation`이 `OVERLAY`가 아님. **위 행과 갈라 쓴다** — 고칠 자리가 다르다. 앞은 `sceneId`를 바꿔야 하고 이것은 그 Scene의 `presentation`을 바꿔야 한다. 한 이름으로 합치면 편집기가 어느 칸으로 커서를 보낼지 고를 수 없다 (`validate-fixtures.mjs:108·111`·`gameProject.ts:693`이 이미 갈라 쓴다) |
 | `DIALOGUE_START_NODE_NOT_FOUND` · `NEXT_DIALOGUE_NODE_NOT_FOUND` | 대화 노드 참조 없음 |
 | `DIALOGUE_NEXT_WITH_TERMINAL_ACTION` | 선택지에 `nextNodeId`와 terminal Action이 함께 있음 |
 | `DIALOGUE_CLOSE_CONTEXT_INVALID` | Overlay 없는 상태 또는 `FULL_SCREEN`에서의 `CLOSE_DIALOGUE` |

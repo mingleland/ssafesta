@@ -77,9 +77,32 @@ export function validateProject(project) {
     "DUPLICATE_EVENT_ID",
   );
 
+  /**
+   * 선언 타입과 scalar 를 대조한다.
+   *
+   * event-runtime-semantics 가 "변환하지 않고 strict equality" 를 규정하므로, BOOLEAN 변수를
+   * "false" 와 비교하는 조건은 **영원히 참이 되지 않는다** — 플레이어가 만족시킬 수 없는 규칙이
+   * 정상처럼 저장된다. 대입은 더 나쁘다: 한 번 들어가면 그 뒤의 모든 비교가 같이 어긋난다.
+   *
+   * initialValue 에 대한 같은 검사는 위에 이미 있었다. 대입·비교에만 없던 것이 구멍이었다.
+   */
+  const expectValueType = (variableId, value, where) => {
+    const variable = variables.get(variableId);
+    if (!variable) {
+      return; // VARIABLE_REFERENCE_NOT_FOUND 가 이미 보고했다 — 대조할 선언 타입이 없다
+    }
+    const expected = { BOOLEAN: "boolean", INTEGER: "number", STRING: "string" }[variable.type];
+    expect(
+      typeof value === expected && (variable.type !== "INTEGER" || Number.isInteger(value)),
+      "VARIABLE_VALUE_TYPE_INVALID",
+      `${variableId} ${where} type mismatch`,
+    );
+  };
+
   const validateCondition = (condition) => {
     if (condition.type === "VARIABLE_EQUALS") {
       expect(variables.has(condition.variableId), "VARIABLE_REFERENCE_NOT_FOUND", `unknown variable: ${condition.variableId}`);
+      expectValueType(condition.variableId, condition.value, "comparison");
     }
     if (condition.type === "HAS_ITEM") {
       expect(items.has(condition.itemId), "ITEM_REFERENCE_NOT_FOUND", `unknown item: ${condition.itemId}`);
@@ -89,6 +112,7 @@ export function validateProject(project) {
   const validateAction = (action, context) => {
     if (action.type === "SET_VARIABLE") {
       expect(variables.has(action.variableId), "VARIABLE_REFERENCE_NOT_FOUND", `unknown variable: ${action.variableId}`);
+      expectValueType(action.variableId, action.value, "assignment");
     }
     if (action.type === "GIVE_ITEM" || action.type === "REMOVE_ITEM") {
       expect(items.has(action.itemId), "ITEM_REFERENCE_NOT_FOUND", `unknown item: ${action.itemId}`);
