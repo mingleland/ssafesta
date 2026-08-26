@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA Spring Internal AI Document Status API
-  version: 0.1.0
+  version: 0.3.0
   description: FastAPI가 처리 결과를 Spring 소유 DocumentStatus에 반영하는 내부 콜백 계약이다.
 servers:
   - url: /internal/ai
@@ -12,7 +12,7 @@ paths:
     patch:
       operationId: updateDocumentProcessingStatus
       summary: AI 문서 상태 결과 반영
-      description: 동일 jobId와 status의 반복 요청은 멱등하게 성공해야 한다.
+      description: Spring이 처리 요청 응답으로 저장한 jobId만 허용하며, 동일 jobId와 status의 반복 요청은 멱등하게 성공해야 한다.
       parameters:
         - name: documentId
           in: path
@@ -36,13 +36,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: 문서 없음
+          description: 원인 코드에 따라 미등록 Job, 삭제된 문서, Job-문서 불일치를 구분함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: AI→Spring Service Token 누락·오류 또는 반대 방향 토큰 사용
 components:
   securitySchemes:
     serviceToken:
       type: http
       scheme: bearer
       bearerFormat: opaque-service-token
+      description: INTERNAL_AI_TO_SPRING_TOKENS의 첫 값을 FastAPI/Worker가 송신하고 Spring이 목록 전체를 상수 시간으로 검증한다.
   schemas:
     DocumentStatus:
       type: string
@@ -83,5 +90,7 @@ components:
       properties:
         code:
           type: string
+          enum: [JOB_NOT_REGISTERED, DOCUMENT_NOT_FOUND, JOB_DOCUMENT_MISMATCH, STALE_SOURCE_HASH]
+          description: JOB_NOT_REGISTERED만 1초·3초·10초 최대 3회 재시도하며, 나머지 404는 재시도하지 않는다.
         message:
           type: string
