@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **FE tasks**: [../FE/tasks.md](../FE/tasks.md)
 
-BE가 소유하는 21개 작업이다. #48에서 `strdeok`가 구현을 진행하므로 이 문서는 계약과 완료 조건만 소유한다.
+BE가 소유하는 26개 작업이다. #48에서 `strdeok`가 구현을 진행하므로 이 문서는 계약과 완료 조건만 소유한다.
 
 ## Setup
 
@@ -32,6 +32,14 @@ BE가 소유하는 21개 작업이다. #48에서 `strdeok`가 구현을 진행�
 - [ ] T054 Implement no-store Portal resolution endpoint
 - [ ] T079 Implement persisted Asset source allow-list validation
 
+## Game lifecycle (2026-08-25 #48 승인 — ②④⑤)
+
+- [ ] T089 Implement `GET /games/mine` — soft-delete 포함, `deletedAt`, 활성 우선 + `updatedAt` 내림차순, 6필드
+- [ ] T090 Implement `PATCH /games/{gameId}` visibility — `publishedVersion` null 이어도 PUBLIC 허용
+- [ ] T091 Implement `DELETE /games/{gameId}` soft delete — 삭제본 5개 초과 시 최고령 1건 FIFO hard delete
+- [ ] T092 Implement `POST /games/{gameId}/restore` — 활성 상한 게이트, 미삭제 대상은 멱등 200
+- [ ] T093 Add limit tests — 활성 20 / 삭제본 5 경계, `GAME_LIMIT_EXCEEDED` 문구가 상한과 해결 방법을 담는지
+
 ## Policy and security verification
 
 - [ ] T084 Implement/test `config_id` INTEGER mapping, Int32 boundaries, and whitelist deployment order
@@ -42,7 +50,7 @@ BE가 소유하는 21개 작업이다. #48에서 `strdeok`가 구현을 진행�
 
 ## Summary
 
-- Total: 21
+- Total: 26
 - Completed: 0
-- Remaining: 21
+- Remaining: 26
 - Coordination: implementation is tracked by GitHub #48; do not duplicate it from FE/docs branches

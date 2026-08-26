@@ -3,7 +3,7 @@
 > **서버**: FastAPI  
 > **기본 통신**: REST(JSON)  
 > **실시간 응답**: SSE 우선 검토  
-> **문서 저장**: S3  
+> **문서 저장**: Cloudflare R2(S3-compatible) 우선, S3-compatible fallback
 > **Vector DB**: PostgreSQL + pgvector  
 > **인증**: Spring 발급 JWT 기반, 검증 방식 세부 TBD
 
@@ -93,6 +93,15 @@ requestId
 - 검증 호출 timeout은 1초이며 1회 재시도해 총 2초를 넘기지 않는다. 최종 실패 시 Conversation을 생성하지 않는 Fail Closed를 적용한다.
 - FastAPI는 이후 질문마다 자체 UTC 시각과 저장된 `leaseEndsAt`을 비교한다. 만료됐으면 검색·LLM 호출 전에 HTTP `409`와 `BOOTH_LEASE_EXPIRED`를 반환한다.
 
+### DELETE `/ai/v1/conversations/{conversationId}`
+
+React AI Chat Overlay가 정상적으로 닫힐 때 호출한다.
+
+- 성공 응답은 `204 No Content`다.
+- FastAPI는 Conversation과 휘발성 Message·요약 원문을 즉시 삭제한다.
+- 연결 종료 등으로 호출이 유실되면 마지막 활동 시각 기준 30분 TTL이 삭제를 보장한다.
+- 이미 삭제됐거나 만료된 Conversation에 대한 반복 호출은 멱등하게 처리한다.
+
 ---
 
 ## 5. 일반 Chat
@@ -147,36 +156,50 @@ Streaming을 사용할 수 없는 환경의 기본 REST 방식.
 
 ```text
 event: start
-data: {"messageId":"msg_124"}
+data: {"type":"start","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":0}
 ```
 
 ### Event: token
 
 ```text
 event: token
-data: {"delta":"이 프로젝트의 "}
+data: {"type":"token","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":1,"delta":"이 프로젝트의 "}
 ```
 
 ### Event: source
 
 ```text
 event: source
-data: {"documentId":152,"title":"프로젝트_기획서.pdf","chunkId":"chunk_152_03"}
+data: {"type":"source","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":8,"documentId":152,"title":"프로젝트_기획서.pdf","chunkId":"chunk_152_03"}
 ```
+
+`sourceUrl`은 선택 필드로 예약한다. P0에서는 원문 접근 계약이 없으므로 생략하고 문서명만 표시한다. 향후 제공할 때는 인증·권한 검증이 적용된 URL만 허용하며 object key나 무제한 공개 URL을 전달하지 않는다.
 
 ### Event: done
 
 ```text
 event: done
-data: {"messageId":"msg_124","handoffRecommended":false}
+data: {"type":"done","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":10,"handoffRecommended":false}
 ```
+
+P0에서 `handoffRecommended`는 타입에 유지하지만 별도 FE 동작은 하지 않는다. 사람 상담 전환 UI는 spec 011(P1)에서 구현한다.
 
 ### Event: error
 
 ```text
 event: error
-data: {"code":"LLM_TIMEOUT","message":"AI 응답이 지연되고 있습니다."}
+data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ","messageId":"msg_124","sequence":4,"code":"LLM_TIMEOUT","message":"AI 응답이 지연되고 있습니다.","retryable":true,"timeoutPhase":"FIRST_TOKEN"}
 ```
+
+`LLM_TIMEOUT`은 코드 하나를 유지하고 `timeoutPhase`로 `FIRST_TOKEN`(첫 token 15초 초과)과 `TOTAL_RESPONSE`(전체 60초 초과)를 구분한다. `retryAfterSeconds`는 재시도 시점을 계산할 수 있을 때만 포함한다.
+
+#### 이벤트 순서·재시도
+
+- 모든 `data`는 `type`, `requestId`, `conversationId`, `messageId`, `sequence`를 포함하며 `type`은 SSE `event`와 같아야 한다.
+- 정상 순서는 `start → token 0..N → source 0..N → done`, 실패 순서는 `start → token/source 0..N → error`다.
+- `sequence`는 `start=0`부터 1씩 증가하는 무결성 검증 값이며 재개 offset이 아니다.
+- 자동 재연결은 지원하지 않는다. 재시도는 같은 `conversationId`와 새 `requestId`·`messageId`를 사용한다.
+- `done`에 도달하지 못한 사용자 질문과 부분 AI 응답은 대화 이력에 확정 저장하지 않는다.
 
 #### Stream 중 Lease 만료
 
@@ -188,7 +211,7 @@ data: {"code":"LLM_TIMEOUT","message":"AI 응답이 지연되고 있습니다."}
 
 ## 7. Document Processing
 
-파일 업로드 자체는 Spring/S3가 담당하고 FastAPI는 업로드된 문서를 처리한다.
+파일 업로드 자체는 Spring/R2 object storage가 담당하고 FastAPI는 업로드된 문서를 처리한다.
 
 ### POST `/ai/v1/documents/process`
 
@@ -199,7 +222,7 @@ data: {"code":"LLM_TIMEOUT","message":"AI 응답이 지연되고 있습니다."}
   "documentId": 152,
   "boothId": 7,
   "agentId": 78,
-  "s3Key": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
 }
 ```
 
@@ -216,7 +239,7 @@ data: {"code":"LLM_TIMEOUT","message":"AI 응답이 지연되고 있습니다."}
 ### 처리
 
 ```text
-S3 Download
+R2 Download (S3-compatible API)
 → Parsing
 → Normalization
 → Chunking
@@ -356,39 +379,40 @@ Codec, Streaming, Provider는 TBD다.
 
 ### Error Code
 
-| Code | 설명 |
-|---|---|
-| `INVALID_REQUEST` | 요청 형식 오류 |
-| `UNAUTHORIZED` | 인증 실패 |
-| `FORBIDDEN` | 권한 없음 |
-| `BOOTH_NOT_FOUND` | Booth 없음 |
-| `AGENT_NOT_FOUND` | Agent 없음 |
-| `AGENT_DISABLED` | Agent 비활성 |
-| `BOOTH_LEASE_EXPIRED` | Booth 임대 만료 — 신규 Conversation·질문 차단 |
-| `CONVERSATION_NOT_FOUND` | Conversation 없음 |
-| `DOCUMENT_NOT_FOUND` | 문서 없음 |
-| `DOCUMENT_NOT_READY` | 문서 미처리 |
-| `DOCUMENT_PROCESSING_FAILED` | 처리 실패 |
-| `RAG_SEARCH_FAILED` | 검색 실패 |
-| `LLM_TIMEOUT` | LLM Timeout |
-| `LLM_PROVIDER_ERROR` | Provider 오류 |
-| `STREAM_CLOSED` | Streaming 종료 |
-| `RATE_LIMITED` | 요청 제한 |
-| `INTERNAL_ERROR` | 내부 오류 |
+| Code | 설명 | 기본 `retryable` |
+|---|---|---|
+| `INVALID_REQUEST` | 요청 형식 오류 | `false` |
+| `UNAUTHORIZED` | 인증 실패 | `false` |
+| `FORBIDDEN` | 권한 없음 | `false` |
+| `BOOTH_NOT_FOUND` | Booth 없음 | `false` |
+| `AGENT_NOT_FOUND` | Agent 없음 | `false` |
+| `AGENT_DISABLED` | Agent 비활성 | `false` |
+| `BOOTH_LEASE_EXPIRED` | Booth 임대 만료 — 신규 Conversation·질문 차단 | `false` |
+| `CONVERSATION_NOT_FOUND` | Conversation 없음 | `false` |
+| `DOCUMENT_NOT_FOUND` | 문서 없음 | `false` |
+| `DOCUMENT_NOT_READY` | 문서 미처리 | `true` |
+| `DOCUMENT_PROCESSING_FAILED` | 처리 실패 | `false` |
+| `RAG_SEARCH_FAILED` | 검색 실패 | `true` |
+| `LLM_TIMEOUT` | LLM Timeout — `timeoutPhase`로 첫 token/전체 응답 구분 | `true` |
+| `LLM_PROVIDER_ERROR` | Provider 오류 | `true` |
+| `STREAM_CLOSED` | Streaming 비정상 종료 | `true` |
+| `RATE_LIMITED` | 요청 제한 — `Retry-After` 또는 `retryAfterSeconds` 제공 | `true` |
+| `INTERNAL_ERROR` | 내부 오류 | `true` |
 
 ---
 
 ## 14. Rate Limit
 
-기준 후보:
+초기값은 환경 설정으로 조정할 수 있으며 다음 계약을 적용한다.
 
-- 사용자별
-- Agent별
-- Booth별
-- 시간당 요청
-- 동시 Streaming
+| 범위 | 한도 | 초과 처리 |
+|---|---|---|
+| 사용자 | 활성 Stream 1개, 슬라이딩 60초간 유효 질문 5회 | 대기열 없이 즉시 `429 + Retry-After` |
+| AI Agent | 활성 Stream 5개 | 대기열 없이 즉시 `429 + Retry-After` |
+| 서비스 전체 | 활성 Stream 20개 | FIFO 대기열 진입 |
+| 전체 대기열 | 최대 30개, 최대 10초 | 가득 찼거나 10초 초과 시 `429 + Retry-After` |
 
-정확한 값은 비용·부하 테스트 후 결정한다.
+입력 검증에서 거부되어 LLM을 호출하지 않은 요청은 사용자 질문 횟수에 포함하지 않는다.
 
 ---
 
@@ -447,6 +471,7 @@ Spring → Visitor Connected
 | Method | Endpoint | Priority |
 |---|---|---|
 | POST | `/ai/v1/conversations` | P0 |
+| DELETE | `/ai/v1/conversations/{id}` | P0 |
 | POST | `/ai/v1/conversations/{id}/messages` | P0 |
 | POST | `/ai/v1/conversations/{id}/stream` | P0 |
 | POST | `/ai/v1/documents/process` | P0 |
@@ -464,13 +489,11 @@ Spring → Visitor Connected
 - API Domain
 - JWT 검증 방식
 - Spring ↔ FastAPI 내부 인증
-- Conversation 저장 위치/보존
 - LLM Provider
 - Embedding Model
 - Chunk 크기
 - Top-K
 - 최대 문서 크기
 - 지원 파일 형식
-- Rate Limit
 - SSE / WebSocket 최종 선택
 - STT/TTS Provider

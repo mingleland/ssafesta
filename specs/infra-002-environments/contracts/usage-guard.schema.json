@@ -1,7 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ssafy-festa.local/contracts/r2-usage-guard.schema.json",
-  "title": "SSAFY FESTA R2 Usage Guard Snapshot",
+  "title": "SSAFY FESTA R2 Usage Admission Snapshot",
+  "description": "R2 quota and metric-freshness admission result only. It does not represent R2 availability, timeout/5xx outage thresholds, or the active write provider; storage failover uses storage-failover-state.schema.json.",
+  "$comment": "R2 availability timeout, consecutive 5xx count, and observation-window thresholds are deferred to a separate Infra/BE decision after P0 monitoring. They must not be inferred from this schema.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -55,7 +57,10 @@
         "max": { "type": "number", "minimum": 0 }
       }
     },
-    "state": { "enum": ["NORMAL", "WARNING", "UPLOAD_BLOCKED", "STALE_BLOCKED"] },
+    "state": {
+      "description": "UsageAdmissionState. UPLOAD_BLOCKED here means quota admission denial, not an R2 availability verdict, and is distinct from StorageFailoverState.UPLOAD_BLOCKED.",
+      "enum": ["NORMAL", "WARNING", "UPLOAD_BLOCKED", "STALE_BLOCKED"]
+    },
     "existingReadsAllowed": { "const": true },
     "reason": { "type": "string", "minLength": 1 },
     "evidenceRef": { "type": "string", "minLength": 1 }

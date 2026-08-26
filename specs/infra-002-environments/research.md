@@ -79,7 +79,7 @@
 
 ## R-07. S3-compatible 수동 emergency fallback
 
-**Decision**: 단일 node/single drive MinIO를 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태로 수동 운영한다. validation은 disk·credential·PUT·HEAD·CORS·외부 port 차단을 확인한다. local object에는 provider를 기록하고 R2 복귀 시 같은 key의 size/type/SHA-256을 검증한 뒤 metadata를 전환한다. 9000/9001은 host public port로 publish하지 않는다.
+**Decision**: 단일 node/single drive MinIO를 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태로 수동 운영한다. validation은 disk·credential·PUT·HEAD·CORS·외부 port 차단을 확인한다. `LOCAL_ACTIVE`에서만 MinIO 신규 쓰기를 허용하고, R2 복구 후 `R2_RECONCILING`에서는 신규 upload grant를 차단해 backlog를 고정한다. 같은 key의 size/detected type/SHA-256을 검증한 객체만 metadata를 R2로 전환하며 미해결 객체가 있으면 원복하지 않는다. 9000/9001은 host public port로 publish하지 않는다.
 
 **Rationale**: S3-compatible adapter를 유지하면서 R2 장애 중 제한적 신규 업로드만 복구할 수 있다. MinIO 공식 single-node/single-drive 안내도 이를 개발·평가 또는 availability 요구가 낮은 용도로 설명하므로 같은 EC2의 backup이나 durability 수단으로 간주할 수 없다. [MinIO container deployment](https://min.io/docs/minio/container/index.html)
 
@@ -88,6 +88,7 @@
 - 자동 failover: split-brain·누락 객체 위험이 있고 FR-017을 위반한다.
 - local directory 직접 저장: S3-compatible 계약을 깨뜨린다.
 - MinIO를 상시 backup으로 간주: EC2와 장애 영역이 같아 FR-018을 충족하지 못한다.
+- reconcile 중 MinIO 쓰기 계속 허용: 검사 대상이 계속 증가하고 안전한 최종 delta cutover 상태가 추가로 필요해 P0 상태 머신을 복잡하게 만든다.
 
 ## R-08. PostgreSQL database/role 격리와 backup
 
@@ -136,6 +137,18 @@
 
 - stale 문서를 그대로 두고 plan만 사용: 운영자가 잘못된 backup/배포 절차를 선택할 수 있다.
 - Unity 인수인계 문서의 WSS 수치까지 함께 확정: infra-003 실측 소유권을 침범한다.
+
+## R-12. Usage admission과 active write provider 분리
+
+**Decision**: `usage-guard.schema.json`은 R2 사용량·지표 freshness에 따른 `UsageAdmissionState`만 제공한다. 별도 `storage-failover-state.schema.json`이 운영자 승인, `uploadEnabled`, `activeWriteProvider`, provider config reference와 reconcile 진행 상태를 제공한다. Spring만 active write provider를 소비하고 FastAPI는 문서별 `storageProvider`와 R2·MinIO reader registry를 사용한다.
+
+**Rationale**: 15분 주기의 usage snapshot을 provider control plane으로 사용하면 stale 값으로 잘못 전환할 수 있다. 반대로 active write provider를 모든 읽기에 적용하면 전환 전 R2 객체를 MinIO에서 찾는 오류가 난다. 쓰기 선택과 객체별 읽기 위치를 분리하면 자동 failover 없이도 전환 전후 객체를 동시에 읽을 수 있다.
+
+**Alternatives considered**:
+
+- Usage Guard에 `activeProvider` 추가: 관측 snapshot과 운영자 승인 control plane을 혼합한다.
+- Spring·FastAPI 모두 active provider 소비: FastAPI가 기존 객체의 실제 provider 대신 현재 쓰기 provider를 선택할 위험이 있다.
+- provider endpoint 하나만 배포: 전환 후 기존 provider 객체를 읽을 수 없다.
 
 ## Resolved Inputs and Deferred Values
 
