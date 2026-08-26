@@ -156,11 +156,19 @@ final class GameDialogueRules {
                     at + "/sceneId 가 없는 Scene 을 가리킵니다: " + sceneId));
             return;
         }
-        boolean overlayDialogue = "DIALOGUE".equals(GameProjectJson.textAt(target, "type"))
-                && "OVERLAY".equals(GameProjectJson.textAt(target, "presentation"));
-        if (!overlayDialogue) {
+        // Two failures, two names. The reference validator splits them and so does the editor
+        // (validate-fixtures.mjs:108·111, gameProject.ts:693): "이 Scene 은 대화가 아니다" 와
+        // "대화인데 겹쳐 뜨지 않는다" 는 고칠 자리가 다르다 — 앞은 sceneId 를 바꿔야 하고 뒤는 그
+        // Scene 의 presentation 을 바꿔야 한다. 한 이름으로 합치면 편집기가 어느 칸으로 커서를
+        // 보낼지 고를 수 없고, FE 가 내는 이름과도 갈린다.
+        if (!"DIALOGUE".equals(GameProjectJson.textAt(target, "type"))) {
             errors.add(ApiErrorDetail.of("DIALOGUE_TARGET_INVALID",
-                    at + "/sceneId 는 OVERLAY DIALOGUE Scene 이어야 합니다: " + sceneId));
+                    at + "/sceneId 는 DIALOGUE Scene 이어야 합니다: " + sceneId));
+            return;
+        }
+        if (!"OVERLAY".equals(GameProjectJson.textAt(target, "presentation"))) {
+            errors.add(ApiErrorDetail.of("DIALOGUE_PRESENTATION_INVALID",
+                    at + "/sceneId 의 presentation 은 OVERLAY 여야 합니다: " + sceneId));
         }
     }
 
