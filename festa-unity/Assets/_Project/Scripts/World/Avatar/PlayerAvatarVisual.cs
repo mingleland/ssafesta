@@ -97,6 +97,7 @@ namespace Festa.World
 
             if (string.IsNullOrEmpty(encoded)) return;
 
+            if (_animator != null) AvatarAnimationLod.Unregister(_animator);
             if (_currentVisual != null) Destroy(_currentVisual);
 
             var appearance = AvatarAppearance.Decode(encoded);
@@ -108,7 +109,10 @@ namespace Festa.World
             FitVisualToWorld();
             ConfigureAvatarShadows();
 
+            // 이전 조립분이 남아 있으면 먼저 뺀다 — 목록에 죽은 애니메이터가 쌓이지 않게.
+            if (_animator != null) AvatarAnimationLod.Unregister(_animator);
             _animator = _currentVisual.GetComponentInChildren<Animator>();
+            AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
 
             ApplyAnimState(_player.AnimState.Value);
@@ -134,25 +138,79 @@ namespace Festa.World
                 }
             }
 
-            // SkinnedMeshRenderer.bounds는 Sidekick 골격 전체 범위를 반환해
-            // 실제 신발이 바닥 아래로 들어가도 감지하지 못한다. 현재 포즈의
-            // 활성 스킨 메시를 한 번 베이크해 실제 보이는 최하단을 사용한다.
-            if (TryGetVisibleGeometryBounds(out var fittedBounds) &&
-                TryFindGroundHeight(out var groundY))
+            // ── 발을 루트 높이에 맞춘다 (측정 기반) ─────────────────────
+            // 이전에는 바닥 레이캐스트로 맞춘 뒤 `position.y = 12.5` 로 **덮어썼다.**
+            // 그 상수는 스케일업(×1.25) 때 10 → 12.5 로 비례만 맞춘 값이라 실제 발 위치와
+            // 무관했고, 결과적으로 아바타가 **1.10 m 떠 있었다.**
+            //
+            // 이제는 루트 기준으로 실제 최하단을 재서 그만큼 내린다. 레이캐스트가 필요 없어
+            // 스폰 직후(방 밖 허공)에도 어긋나지 않고, 목표 높이를 바꿔도 자동으로 따라온다.
+            // 스킨 메시는 BakeMesh 로 현재 포즈를 굽는다 — SkinnedMeshRenderer.bounds 는
+            // 바인드포즈 골격 범위라 실제 신발 위치를 주지 않는다 (T-201).
+            if (!GroundToCurrentPose())
             {
-                var desiredBottom = groundY + _groundClearance;
-                visualTransform.position += Vector3.up * (desiredBottom - fittedBounds.min.y);
+                // 측정 실패 시에만 상수 폴백 — 조립이 비었을 때뿐이다.
+                var p = visualTransform.localPosition;
+                p.y = 0f;
+                visualTransform.localPosition = p;
+                Debug.LogWarning("[AvatarVisual] 발 위치를 측정하지 못했다 — 루트 높이로 둔다");
             }
 
-            // 월드 플레이어 루트(스폰)는 Y=0을 유지하고, 조립된 외형만 위로 올려 둔다.
-            // 바닥 탐색 성공 여부와 무관하게 항상 같은 높이가 적용되어야 한다.
-            // 이 오프셋은 모델 피벗 보정이라 외형 스케일에 비례한다 —
-            // 목표 높이 17.9 에서 10 이었고, 실측 기준 스케일업(×1.25, 22.375)에서 12.5 다.
-            // _targetVisualHeight 를 바꾸면 이 값도 같은 비율로 바꿔야 발이 안 뜨거나 안 묻힌다.
-            var position = visualTransform.localPosition;
-            position.y = 12.5f;
-            visualTransform.localPosition = position;
+            // 선 자세 기준값. 이모트로 접지를 고쳤다가 되돌릴 때 쓴다.
+            _baseVisualLocalY = visualTransform.localPosition.y;
+        }
 
+        // ── 포즈별 접지 보정 ────────────────────────────────────────
+        // 접지는 조립 시점 포즈(선 자세)에서 **한 번 재고 고정**한다. 그래서 포즈가 크게
+        // 바뀌는 이모트에서는 어긋난다. 실측(F_FullBody 에 클립을 샘플해 최하단 정점):
+        //     Idle01           최하단 = -0.0844
+        //     SitGround01-Loop 최하단 = -0.2009   → 선 자세보다 0.117 낮다
+        // 선 자세 기준 오프셋을 그대로 쓰면 앉은 자세가 바닥과 맞지 않는다.
+        //
+        // **걷기·달리기·점프에는 이 보정을 하지 않는다.** 발이 번갈아 뜨는 동작에서 매 프레임
+        // 최하단을 바닥에 붙이면 몸이 위아래로 펌프질한다. 접지가 바뀌는 포즈만 골라 한 번씩
+        // 다시 잰다.
+        float _baseVisualLocalY;
+        float _regroundAt;
+
+        // 크로스페이드(0.2초)가 끝나 포즈가 자리잡은 뒤에 재야 한다. 섞이는 중에 재면
+        // 선 자세와 앉은 자세의 **중간값**이 나온다.
+        const float RegroundSettle = 0.32f;
+
+        /// <summary>
+        /// 접지가 선 자세와 다른 이모트. 새 이모트를 추가할 때 **추측하지 말고 재서** 넣는다 —
+        /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
+        /// 몸이 떠오른다.
+        /// </summary>
+        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround;
+
+        /// <summary>
+        /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
+        /// 지금 재생 중인 자세가 그대로 반영된다 (T-201).
+        /// </summary>
+        bool GroundToCurrentPose()
+        {
+            if (_currentVisual == null) return false;
+            if (!TryGetVisibleGeometryBounds(out var fitted)) return false;
+
+            var visualTransform = _currentVisual.transform;
+            float bottomRelativeToRoot = fitted.min.y - transform.position.y;
+            var p = visualTransform.localPosition;
+            p.y -= bottomRelativeToRoot - _groundClearance;
+            visualTransform.localPosition = p;
+            return true;
+        }
+
+        /// <summary>이모트가 끝나면 선 자세 기준으로 되돌린다.</summary>
+        void RestoreBaseGrounding()
+        {
+            _regroundAt = 0f;
+            if (_currentVisual == null) return;
+            var visualTransform = _currentVisual.transform;
+            var p = visualTransform.localPosition;
+            if (Mathf.Approximately(p.y, _baseVisualLocalY)) return;
+            p.y = _baseVisualLocalY;
+            visualTransform.localPosition = p;
         }
 
         bool TryGetVisibleGeometryBounds(out Bounds bounds)
@@ -318,6 +376,12 @@ namespace Festa.World
         void LateUpdate()
         {
             UpdateRemoteMoveParams();
+
+            if (_regroundAt > 0f && Time.time >= _regroundAt)
+            {
+                _regroundAt = 0f;
+                GroundToCurrentPose();
+            }
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
             if (!TryFindGroundHeight(out var groundY))
@@ -508,9 +572,15 @@ namespace Festa.World
             if (_animator == null || _animator.runtimeAnimatorController == null) return;
             if (emote == PlayerEmoteId.None)
             {
+                RestoreBaseGrounding();
                 CrossFadeLocomotion(_player.AnimState.Value);
                 return;
             }
+
+            // 접지가 바뀌는 포즈면 크로스페이드가 끝난 뒤 다시 잰다. 그렇지 않은 이모트는
+            // 선 자세 기준으로 되돌린다(앉기 → 다른 이모트로 바로 넘어가는 경우).
+            if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
+            else RestoreBaseGrounding();
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
@@ -522,33 +592,51 @@ namespace Festa.World
         // 나올 때의 블렌드 길이를 정하려면 직전 상태를 알아야 한다 (착지 처리).
         PlayerAnimState _lastLocomotion = PlayerAnimState.Idle;
 
+        // `HumanF@Jump01 - Land` 에서 발이 땅에 닿는 시점(초). 루트 Y 실측:
+        // 0.00=1.057 → 0.10=0.893 → 0.15=0.653 → 0.20=0.581 → 0.25=0.555(최저).
+        // 0.15 까지는 자유낙하로 떨어지고 그 뒤부터 감속(=접지 후 흡수)한다.
+        const float LandClipContactTime = 0.15f;
+
         void CrossFadeLocomotion(PlayerAnimState state)
         {
             var stateName = state switch
             {
                 PlayerAnimState.JumpLaunch => "Jump_Launch",
                 PlayerAnimState.Jump => "Jump_Air",
+                PlayerAnimState.JumpLand => "Jump_Land",
                 PlayerAnimState.Run => "Run",
                 PlayerAnimState.Walk => "Walk",
                 _ => "Idle",
             };
+            // ── 점프 3단 블렌드 (2026-08-25 실측 기반) ──────────────────
+            // Launch(Begin) → Air(Fall01 루프) → Land 로 나뉜다. 이어지는 지점의 포즈가
+            // 실제로 맞는지 루트 Y 로 확인했으므로 블렌드를 짧게 줄 수 있다:
+            //   · Begin 0.45초 지점 = 엉덩이 1.056, Fall01 시작 = 1.056 → **같다.**
+            //     그래서 Launch → Air 는 거의 스냅해도 튀지 않는다.
+            //   · Land 시작(1.057)도 Fall01 과 같다. 다만 Land 앞 0.15초는 **아직 하강**
+            //     이므로 그 구간을 건너뛰고 들어가야 접지 순간과 발이 맞는다.
             // 들어갈 때: 점프는 짧아서 0.2초 블렌드면 도약 순간을 놓친다.
-            // 나올 때: 착지를 짧게 끊으면 급정지처럼 보인다. Jump 클립의 무릎 접기
-            // (착지 흡수) 앞부분이 블렌드 동안 재생되도록 길게 준다 — 별도 착지
-            // 상태를 만들지 않고 클립이 이어 재생되는 것을 그대로 쓴다.
-            // 0.03초로 스냅해 넣었더니 선 자세에서 웅크린 자세로 **뚝 끊겼다**.
-            // 발 구르기는 이완돼 보여야 하므로 들어가는 구간을 준다.
-            // Launch → Air 는 인접 프레임이지만 루트 Y 베이크가 반대라 3 cm 단차가
-            // 있어 조금 섞는다. 착지는 더 길게 — 그 동안 착지 흡수가 재생된다.
-            // Jump_Air 진입: 발 구르기(Launch)에서 이어질 때는 인접 프레임이라 짧게,
             // 이동 중 즉시 도약(Run/Walk → Air 직행)은 포즈 차이가 커서 조금 길게 섞는다.
             float fade = state switch
             {
                 PlayerAnimState.JumpLaunch => 0.10f,
                 PlayerAnimState.Jump => _lastLocomotion == PlayerAnimState.JumpLaunch ? 0.06f : 0.12f,
-                _ => _lastLocomotion == PlayerAnimState.Jump ? 0.25f : 0.2f,
+                PlayerAnimState.JumpLand => 0.06f,
+                // 착지에서 로코모션으로 나올 때는 Land 의 복귀 구간이 블렌드 동안
+                // 이어지도록 길게 준다 — 무릎을 굽힌 채 뚝 끊기지 않는다.
+                _ => _lastLocomotion == PlayerAnimState.JumpLand ? 0.22f
+                   : _lastLocomotion == PlayerAnimState.Jump ? 0.25f : 0.2f,
             };
             _lastLocomotion = state;
+
+            if (state == PlayerAnimState.JumpLand)
+            {
+                // 클립 앞 0.15초(공중 하강)를 건너뛰고 **접지 프레임부터** 재생한다.
+                // 이 값이 없으면 이미 땅에 닿은 뒤에 낙하 포즈를 0.15초 더 보여준다.
+                _animator.CrossFadeInFixedTime(stateName, fade, 0, LandClipContactTime);
+                return;
+            }
+
             _animator.CrossFadeInFixedTime(stateName, fade, 0);
         }
     }

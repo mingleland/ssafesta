@@ -109,7 +109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1901812825
+  GlobalObjectIdHash: 2993748127
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -336,12 +336,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
-  _maxHeadYaw: 70
-  _maxHeadPitchUp: 40
-  _maxHeadPitchDown: 30
+  _maxYaw: 55
+  _maxPitchUp: 22
+  _maxPitchDown: 20
+  _releaseBand: 45
+  _headShare: 0.5
+  _neckShare: 0.32
+  _chestShare: 0.18
+  _idleWeight: 1
+  _walkWeight: 0.55
+  _runWeight: 0.3
   _followLerp: 10
-  _lookWeight: 0.65
-  _bodyWeight: 0.25
-  _headWeight: 0.9
+  _weightLerp: 7
   LookAngles:
     m_InternalValue: {x: 0, y: 0}

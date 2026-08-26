@@ -52,8 +52,11 @@ namespace Festa.Network
         //
         // 이후 "점프가 길어 답답하다" 피드백으로 체공을 0.75초로 줄였다:
         // v = 56, g = 149.33 → 체공 2v/g = 0.75초, 높이 v²/2g = 10.5 unit = 1.05 m.
-        // 체공이 바뀌면 Jump_Air 재생 속도도 같이 바꿔야 착지 순간 포즈가 유지된다
-        // (착지 시점 클립 위치 = speed × 체공 = 0.633초 고정 → speed 0.844).
+        //
+        // 2026-08-25 점프 3단 재구성 — 공중 클립을 **루프(Fall01)** 로 바꿨다. 이전에는
+        // 비루프 클립이라 체공을 바꿀 때마다 재생 속도를 다시 계산해야 했다(착지 시점
+        // 클립 위치 = speed × 체공). 루프는 체공이 얼마든 버티므로 **그 연동이 사라졌다** —
+        // 낙하가 길어지는 지형에서도 공중 포즈가 끝나 버리지 않는다.
         [SerializeField] float _jumpSpeed = 56f;
         [SerializeField] float _jumpGravity = 149.33f;
 
@@ -80,25 +83,38 @@ namespace Festa.Network
         bool _jumped;
         float _airborneSince;
         const float AirborneAnimGrace = 0.12f;
+        bool _wasShowingAirborne;
+        float _landHoldUntil;
 
         bool _jumpPending;
         float _jumpPressedAt;
-        // Jump_Launch 클립(f6~f15 = 0.300초)을 재생하는 시간. 애니메이터의
-        // Jump_Launch 상태 speed 와 한 쌍이다 (speed = 0.300 / JumpAnticipation).
-        // 이 값이 그 재생 시간과 어긋나면 도약 순간이 다시 어긋난다 — 같이 바꿔야 한다.
+        // 발 구르기(Jump_Launch)를 바닥에서 재생하는 시간. 애니메이터의 Jump_Launch
+        // 상태 speed 와 한 쌍이다 — 어긋나면 도약 순간이 어긋난다.
         //
-        // 0.13초(speed 2.05)는 선 자세에서 깊은 웅크림으로 뚝 끊겼고,
-        // 0.24초(speed 1.25)는 "점프가 길어 답답하다" — 0.18초(speed 1.667)로 절충.
+        // 2026-08-25 실측 기반 재계산. 클립 `HumanF@Jump01 - Begin`(0.667초)의 루트 Y 는
+        // 0.603 → 1.079 로 오른다. **서 있는 엉덩이 높이 1.056 을 통과하는 0.45초가
+        // 발이 땅을 떠나는 순간**이다(그 뒤 0.22초는 이미 공중에서 몸을 뻗는 구간).
+        // 즉 클립의 접지 구간은 0.45초다. 이것을 이 시간 안에 재생해야 도약과 맞는다:
+        //     speed = 0.45 / JumpAnticipation = 0.45 / 0.22 = 2.05
+        // 0.22초는 절충값이다 — 더 짧으면(0.13초) 선 자세에서 깊은 웅크림으로 뚝 끊기고,
+        // 더 길면(0.30초) "점프가 길어 답답하다" 는 체감이 돌아온다.
         // **제자리 점프에만 적용된다.** 이동 중 점프는 발 구르기를 생략하고 즉시
         // 도약한다 — 몸은 전진하는데 발은 제자리를 딛는 모션이라 미끄러져 보였다.
-        const float JumpAnticipation = 0.18f;
+        const float JumpAnticipation = 0.22f;
+
+        // 착지 유지 시간 — `HumanF@Jump01 - Land`(0.600초)의 흡수·복귀를 보여준다.
+        // 클립 앞 0.15초는 **아직 하강 중**(루트 Y 1.057 → 0.653)이므로 재생을 그 지점부터
+        // 시작한다(PlayerAvatarVisual). 남는 0.45초 중 앞부분을 이 시간만큼 보여주고
+        // 나머지는 로코모션으로 크로스페이드하며 흘린다.
+        // 이동 중에는 짧게 끊는다 — 달리다 착지해 무릎을 오래 굽히면 급정지처럼 보인다.
+        const float LandHoldIdle = 0.30f;
+        const float LandHoldMoving = 0.10f;
 
 
         // ── 마인크래프트식 조작 보조 ────────────────────────────────
         static readonly int MoveXHash = Animator.StringToHash("MoveX");
         static readonly int MoveYHash = Animator.StringToHash("MoveY");
 
-        AvatarLook _look;
         PlayerAvatarVisual _visual;
 
         /// <summary>카메라 궤도 yaw. 시선과 몸 정렬의 단일 기준이다.</summary>
@@ -148,7 +164,6 @@ namespace Festa.Network
             _cameraFollow = GetComponent<PlayerCameraFollow>();
             _controller = GetComponent<CharacterController>();
             _networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
-            _look = GetComponent<AvatarLook>();
             _visual = GetComponent<PlayerAvatarVisual>();
             enabled = IsOwner; // 원격 플레이어는 NetworkTransform 수신만
 
@@ -333,8 +348,8 @@ namespace Festa.Network
             // 바꾼 규칙:
             //   · 이동 중에는 몸을 **카메라 정면**으로 정렬한다. 다리는 8방향 블렌드 트리가
             //     실제 이동 방향을 재생하므로, 옆·뒤로 가도 시선을 유지한 채 걷는다.
-            //   · 서 있을 때는 몸을 돌리지 않는다. 고개만 따라간다(AvatarLook).
-            //     고개 한계(±70°)를 넘으면 그때 몸이 따라 돈다.
+            //   · 서 있을 때는 몸을 **아예 돌리지 않는다.** 고개·상체만 따라간다(AvatarLook).
+            //     그래야 카메라를 돌려 자기 캐릭터의 정면·측면 애니메이션을 볼 수 있다.
             if (moving)
             {
                 var dir = CameraRelativeDirection(input);
@@ -346,8 +361,9 @@ namespace Festa.Network
             {
                 _turnVelocity = 0f;
                 MoveWithCollision(Vector3.zero);   // 정지 중에도 중력은 적용한다
-                // 고개가 돌아갈 수 있는 한계를 넘었을 때만 몸이 따라 돈다.
-                if (_look != null && _look.NeedsBodyTurn) AlignBodyTo(CameraYaw());
+                // 서 있을 때는 몸을 **전혀** 돌리지 않는다. 카메라를 돌려도 캐릭터가
+                // 그 자리 자세를 유지해야 자기 애니메이션을 정면·측면에서 볼 수 있다.
+                // 고개만 따라간다 (AvatarLook, ±90°).
             }
 
             // 다리가 재생할 방향 — 몸 기준 지역 좌표계로 넘긴다.
@@ -359,10 +375,19 @@ namespace Festa.Network
             // 포즈가 번쩍이지 않도록 **의도한 도약이 아니면** 짧은 유예를 둔다.
             bool showAirborne = _airborne &&
                 (_jumped || Time.time - _airborneSince > AirborneAnimGrace);
+            // 착지 순간 — **공중 포즈가 실제로 화면에 나왔을 때만** 착지 모션을 낸다.
+            // 바닥 이음새에서 한두 프레임 뜨는 것에까지 착지를 재생하면 그냥 걷는 동안
+            // 계속 무릎을 굽힌다. showAirborne 은 이미 그 유예를 통과한 값이다.
+            if (_wasShowingAirborne && !showAirborne)
+                _landHoldUntil = Time.time + (moving ? LandHoldMoving : LandHoldIdle);
+            _wasShowingAirborne = showAirborne;
+
             var next = _jumpPending
                 ? PlayerAnimState.JumpLaunch
                 : showAirborne
                 ? PlayerAnimState.Jump
+                : Time.time < _landHoldUntil
+                ? PlayerAnimState.JumpLand
                 : !moving ? PlayerAnimState.Idle
                 : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
             if (_player.AnimState.Value != next)
