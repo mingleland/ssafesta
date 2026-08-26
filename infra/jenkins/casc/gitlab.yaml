@@ -1,0 +1,10 @@
+unclassified:
+  gitLabServers:
+    servers:
+      - name: ${GITLAB_SERVER_NAME}
+        serverUrl: ${GITLAB_SERVER_URL}
+        credentialsId: ${GITLAB_API_CREDENTIALS_ID}
+        manageWebHooks: true
+        manageSystemHooks: false
+        hooksRootUrl: ${JENKINS_PUBLIC_URL}
+        secretToken: ${GITLAB_WEBHOOK_SECRET}

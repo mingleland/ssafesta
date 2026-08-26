@@ -1,0 +1,64 @@
+jenkins:
+  systemMessage: "SSAFY FESTA Jenkins - configuration managed by JCasC"
+  numExecutors: 0
+  mode: EXCLUSIVE
+  slaveAgentPort: -1
+  disableRememberMe: true
+  markupFormatter:
+    plainText
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  nodes:
+    - permanent:
+        name: linux-docker
+        remoteFS: /home/jenkins/agent/linux-docker
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux docker linux-docker"
+        launcher:
+          inbound:
+            workDirSettings:
+              disabled: false
+              internalDir: remoting
+              failIfWorkDirIsMissing: false
+        retentionStrategy: always
+    - permanent:
+        name: deploy
+        remoteFS: /home/jenkins/agent/deploy
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux docker deploy"
+        launcher:
+          inbound:
+            workDirSettings:
+              disabled: false
+              internalDir: remoting
+              failIfWorkDirIsMissing: false
+        retentionStrategy: always
+    - permanent:
+        name: unity
+        remoteFS: /home/jenkins/agent/unity
+        numExecutors: 1
+        mode: EXCLUSIVE
+        labelString: "linux unity unity-6000.0.78f1"
+        launcher:
+          inbound:
+            workDirSettings:
+              disabled: false
+              internalDir: remoting
+              failIfWorkDirIsMissing: false
+        retentionStrategy: always
+unclassified:
+  location:
+    url: "${JENKINS_PUBLIC_URL}"
+  lockableResourcesManager:
+    declaredResources:
+      - name: deploy-dev-ai
+      - name: deploy-dev-back
+      - name: deploy-dev-front
+      - name: deploy-dev-game
+      - name: deploy-integration-develop

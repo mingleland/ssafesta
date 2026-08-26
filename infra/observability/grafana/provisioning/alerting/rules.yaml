@@ -1,0 +1,36 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: festa-approved-anomalies
+    folder: FESTA Managed Alerts
+    interval: 1m
+    rules:
+      - uid: festa-host-resource-pressure
+        title: Host resource pressure
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: festa-prometheus
+            model: {expr: "max(100 * (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes))", refId: A}
+          - refId: C
+            datasourceUid: __expr__
+            model: {type: threshold, expression: A, conditions: [{evaluator: {type: gt, params: [90]}, operator: {type: and}, reducer: {type: last}, type: query}], refId: C}
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: EC2 resource pressure detected
+          description: A reviewed host threshold remained exceeded.
+          runbook_url: https://docs.example.invalid/runbooks/host-resource-pressure
+          dashboardUid: festa-host-overview
+          panelId: "3"
+        # 실제 임계치와 승인자가 확정될 때까지 알림 평가·전달을 시작하지 않는다.
+        labels:
+          managed_by: infra
+          approval_status: pending
+          notify: dashboard_only
+          domain: host
+          environment: integration
+          service: host
+          severity: warning
+        isPaused: true

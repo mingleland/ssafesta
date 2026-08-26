@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: FESTA Infrastructure
+    orgId: 1
+    folder: FESTA
+    type: file
+    disableDeletion: true
+    editable: false
+    options: {path: /var/lib/grafana/dashboards}
