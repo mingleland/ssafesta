@@ -1,0 +1,11 @@
+{
+  "description": "SHOW_DIALOGUE가 TOP_DOWN Scene을 가리키면 거부한다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/scenes/0/events/1/actions/1/sceneId",
+      "value": "room"
+    }
+  ]
+}

@@ -1,0 +1,727 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafesta.example/contracts/game-project-v1.schema.json",
+  "title": "FESTA GameProject v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gameId",
+    "revision",
+    "title",
+    "startSceneId",
+    "variables",
+    "items",
+    "assets",
+    "scenes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "enum": ["1.0.0", "1.1.0"]
+    },
+    "gameId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "startSceneId": {
+      "$ref": "#/$defs/stableId"
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/variable"
+      },
+      "maxItems": 100
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      },
+      "maxItems": 100
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/assetReference"
+      },
+      "maxItems": 300
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/topDownScene"
+          },
+          {
+            "$ref": "#/$defs/platformerScene"
+          },
+          {
+            "$ref": "#/$defs/dialogueScene"
+          }
+        ]
+      }
+    },
+    "rules": {
+      "$ref": "#/$defs/gameRules"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.1.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "required": ["rules"] }
+    },
+    {
+      "if": {
+        "properties": { "schemaVersion": { "const": "1.0.0" } },
+        "required": ["schemaVersion"]
+      },
+      "then": { "not": { "required": ["rules"] } }
+    }
+  ],
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+    },
+    "gameRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completion", "playerDefeat"],
+      "properties": {
+        "completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "objectives"],
+          "properties": {
+            "mode": { "enum": ["ALL", "ANY"] },
+            "objectives": {
+              "type": "array",
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "target"],
+                "properties": {
+                  "type": { "enum": ["SCORE_AT_LEAST", "DEFEAT_ENEMIES", "SURVIVE_SECONDS"] },
+                  "target": { "type": "integer", "minimum": 1, "maximum": 999999999 }
+                }
+              }
+            }
+          }
+        },
+        "playerDefeat": { "enum": ["RESPAWN", "END_GAME"] }
+      }
+    },
+    "scalar": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "string",
+          "maxLength": 500
+        }
+      ]
+    },
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "initialValue"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "type": {
+          "enum": ["BOOLEAN", "INTEGER", "STRING"]
+        },
+        "initialValue": {
+          "$ref": "#/$defs/scalar"
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "assetId": {
+          "$ref": "#/$defs/stableId"
+        }
+      }
+    },
+    "assetReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "source"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "kind": {
+          "enum": ["IMAGE", "TILESET", "AUDIO"]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "integrity": {
+          "type": "string",
+          "maxLength": 128
+        }
+      }
+    },
+    "position2d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "component": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "assetId"],
+          "properties": {
+            "type": { "const": "SPRITE" },
+            "assetId": { "$ref": "#/$defs/stableId" },
+            "scale": { "type": "integer", "minimum": 25, "maximum": 400 },
+            "zIndex": { "type": "integer", "minimum": 0, "maximum": 20 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "solid"],
+          "properties": {
+            "type": { "const": "COLLIDER" },
+            "solid": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "prompt"],
+          "properties": {
+            "type": { "const": "INTERACTABLE" },
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 80 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "itemId"],
+          "properties": {
+            "type": { "const": "PICKUP" },
+            "itemId": { "$ref": "#/$defs/stableId" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "amount"],
+          "properties": {
+            "type": { "const": "DAMAGE" },
+            "amount": { "type": "integer", "minimum": 1, "maximum": 999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "max"],
+          "properties": {
+            "type": { "const": "HEALTH" },
+            "max": { "type": "integer", "minimum": 1, "maximum": 9999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "SCORE_VALUE" },
+            "value": { "type": "integer", "minimum": -999999, "maximum": 999999 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "CHECKPOINT" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "axis", "speed", "range"],
+          "properties": {
+            "type": { "const": "AUTO_MOVE" },
+            "axis": { "enum": ["HORIZONTAL", "VERTICAL"] },
+            "speed": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "range": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "projectileAssetId", "damage", "cooldownMs"],
+          "properties": {
+            "type": { "const": "SHOOTER" },
+            "projectileAssetId": { "$ref": "#/$defs/stableId" },
+            "damage": { "type": "integer", "minimum": 1, "maximum": 999 },
+            "cooldownMs": { "type": "integer", "minimum": 100, "maximum": 10000 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "enemyAssetId", "intervalMs", "maxAlive"],
+          "properties": {
+            "type": { "const": "SPAWNER" },
+            "enemyAssetId": { "$ref": "#/$defs/stableId" },
+            "intervalMs": { "type": "integer", "minimum": 250, "maximum": 60000 },
+            "maxAlive": { "type": "integer", "minimum": 1, "maximum": 100 }
+          }
+        }
+      ]
+    },
+    "tileLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "tilesetAssetId", "data"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "tilesetAssetId": { "$ref": "#/$defs/stableId" },
+        "data": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": -1 },
+          "maxItems": 10000
+        }
+      }
+    },
+    "gameObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "preset", "position", "visible", "components"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "preset": {
+          "enum": [
+            "PLAYER_SPAWN",
+            "WALL",
+            "NPC",
+            "INTERACTABLE",
+            "ITEM",
+            "DOOR",
+            "GOAL",
+            "PLATFORM",
+            "HAZARD",
+            "ENEMY",
+            "TURRET",
+            "CHECKPOINT",
+            "SPAWNER",
+            "DECORATION"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/position2d"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" },
+          "maxItems": 10
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "variableId", "value"],
+          "properties": {
+            "type": {
+              "const": "VARIABLE_EQUALS"
+            },
+            "variableId": {
+              "$ref": "#/$defs/stableId"
+            },
+            "value": {
+              "$ref": "#/$defs/scalar"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "itemId"],
+          "properties": {
+            "type": {
+              "const": "HAS_ITEM"
+            },
+            "itemId": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        }
+      ]
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "sceneId"],
+          "properties": {
+            "type": {
+              "const": "SHOW_DIALOGUE"
+            },
+            "sceneId": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "variableId", "value"],
+          "properties": {
+            "type": {
+              "const": "SET_VARIABLE"
+            },
+            "variableId": {
+              "$ref": "#/$defs/stableId"
+            },
+            "value": {
+              "$ref": "#/$defs/scalar"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "itemId"],
+          "properties": {
+            "type": {
+              "enum": ["GIVE_ITEM", "REMOVE_ITEM"]
+            },
+            "itemId": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "objectId"],
+          "properties": {
+            "type": {
+              "enum": ["SHOW_OBJECT", "HIDE_OBJECT"]
+            },
+            "objectId": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "sceneId"],
+          "properties": {
+            "type": {
+              "const": "GO_TO_SCENE"
+            },
+            "sceneId": {
+              "$ref": "#/$defs/stableId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "const": "COMPLETE_GAME"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "const": "CLOSE_DIALOGUE"
+            }
+          }
+        }
+      ]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "trigger", "conditions", "actions"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "trigger": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type"],
+              "properties": {
+                "type": { "const": "ON_SCENE_START" }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type", "targetId"],
+              "properties": {
+                "type": { "enum": ["ON_INTERACT", "ON_ENTER"] },
+                "targetId": { "$ref": "#/$defs/stableId" }
+              }
+            }
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "maxItems": 10
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "dialogueChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "actions"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          },
+          "maxItems": 10
+        },
+        "nextNodeId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          },
+          "maxItems": 20
+        }
+      }
+    },
+    "dialogueNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "speaker", "text", "choices"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "speaker": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "portraitAssetId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dialogueChoice"
+          },
+          "maxItems": 6
+        }
+      }
+    },
+    "topDownScene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "width", "height", "tileLayers", "objects", "events"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "type": {
+          "const": "TOP_DOWN"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 100
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 100
+        },
+        "backgroundAssetId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "tileLayers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tileLayer" },
+          "maxItems": 10
+        },
+        "objects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gameObject"
+          },
+          "maxItems": 500
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          },
+          "maxItems": 300
+        }
+      }
+    },
+    "platformerScene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "width", "height", "gravity", "tileLayers", "objects", "events"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "type": { "const": "PLATFORMER" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "width": { "type": "integer", "minimum": 8, "maximum": 200 },
+        "height": { "type": "integer", "minimum": 6, "maximum": 100 },
+        "gravity": { "type": "integer", "minimum": 1, "maximum": 30 },
+        "backgroundAssetId": { "$ref": "#/$defs/stableId" },
+        "tileLayers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/tileLayer" },
+          "maxItems": 10
+        },
+        "objects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/gameObject" },
+          "maxItems": 500
+        },
+        "events": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/event" },
+          "maxItems": 300
+        }
+      }
+    },
+    "dialogueScene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "presentation", "startNodeId", "nodes"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/stableId"
+        },
+        "type": {
+          "const": "DIALOGUE"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "presentation": {
+          "enum": ["OVERLAY", "FULL_SCREEN"]
+        },
+        "backgroundAssetId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "startNodeId": {
+          "$ref": "#/$defs/stableId"
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 300,
+          "items": {
+            "$ref": "#/$defs/dialogueNode"
+          }
+        }
+      }
+    }
+  }
+}
