@@ -68,7 +68,7 @@ feature/S15P21A604-75-avatar-persist
 ```
 
 > **✅ 개정 (2026-08-24)**: develop/main 으로 향하는 작업 브랜치에는 **Jira Key 가 필수**다.
-> develop/main 대상 MR 파이프라인이 제목·브랜치의 키를 검증한다(`.gitlab-ci.yml` `jira-key-check`).
+> develop/main 대상 MR 의 제목·브랜치 키는 MR 리뷰에서 사람이 검증한다 (CI 러너 없음). Jira 상태 전이는 Webhook→Jira Automation('진행 중')과 내장 연동('완료')이 담당한다.
 > 상세: `docs/jira-gitlab-workflow.md`
 
 ### fix
@@ -157,9 +157,28 @@ test(wallet): add duplicate reward test
 docs(api): update consultation contract
 ```
 
-> **✅ 개정 (2026-08-24)**: Jira 연동 추적을 위해 요약 끝에 이슈 키를 붙이는 것을 권장한다 —
-> `feat(auth): 로그인 API 연동 (S15P21A604-123)`. 커밋 언어는 기존대로 **한국어**를 유지한다.
-> 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+> **✅ 개정 (2026-08-25)**: GitLab 내장 Jira 연동이 켜져 **커밋 메시지가 Jira 를 직접 움직인다.**
+> 이전 권장이 **필수**로 바뀌었다.
+>
+> | 커밋 메시지 | 결과 |
+> |---|---|
+> | `feat(auth): 로그인 API 연동 (S15P21A604-123)` | Jira 이슈에 **커밋 링크 + 코멘트** 자동 추가 |
+> | `Closes S15P21A604-123` (본문 아무 줄) | 위 + 그 커밋이 **`develop` 에 도달할 때 '완료' 전환** |
+>
+> - **모든 커밋에 이슈 키를 넣는다.** 키가 없으면 Jira 에 아무 기록도 남지 않는다.
+> - **`Closes` 는 그 작업으로 이슈가 끝날 때만** 쓴다. 중간 커밋에 쓰면 머지 시 미완료 이슈가 닫힌다.
+> - `Closes` 를 파트 브랜치에 적어도 그 순간에는 전환되지 않는다 — **`develop` 도달 시점**이다.
+> - 커밋 언어는 기존대로 **한국어**를 유지한다.
+> - 키의 **필수** 지점은 브랜치명과 develop/main 대상 MR 제목이다 (`docs/jira-gitlab-workflow.md` §4).
+>
+> 예:
+> ```text
+> perf(unity): 아바타 스킨메시 결합 — 렌더러 11→7 (S15P21A604-236)
+>
+> 신체 파츠 5개가 같은 재질·같은 골격이라 무손실 결합.
+>
+> Closes S15P21A604-236
+> ```
 
 ### type
 
@@ -195,7 +214,7 @@ docs(api): update consultation contract
 ```
 
 Jira Title Prefix와 유사하게 맞춘다.
-**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 없으면 파이프라인이 실패한다** (2026-08-24 적용).
+**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 반드시 있어야 한다.** GitLab CI 가 아니라 MR 리뷰 규칙으로 확인한다 (러너 없음, 2026-08-26).
 
 ---
 
