@@ -306,6 +306,22 @@ Spring → 후속 AI 처리 허용
 - active write provider와 upload-enabled는 Spring 배포 설정으로 주입한다. FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
 - R2 원본 문서는 P0에서 별도 2차 외부 백업을 두지 않는다. MinIO는 같은 EC2의 임시 가용성 수단이며 backup·복제본으로 계산하지 않는다.
 
+Credential과 삭제 권한 경계:
+
+| Credential / grant | 허용 범위 |
+|---|---|
+| Spring document manager | AI 원본 document bucket의 서버 생성 prefix에 한해 PUT presign·HEAD/제한된 GET·`DeleteObject` |
+| Browser presigned grant | Spring이 생성한 단일 Object Key에 `PutObject`만, 15분 |
+| AI reader | Job에 기록된 provider와 Object Key의 `GetObject`만 |
+| Backup writer / restore reader | PostgreSQL backup bucket의 쓰기 또는 읽기만, `DeleteObject` 금지 |
+
+- P0에서는 삭제 전용 Credential을 별도로 만들지 않는다. Spring document manager에 부여한 `DeleteObject`를 AI 원본 document bucket과 서버 생성 document prefix로 제한한다.
+- Spring은 `EXPIRED` 전환 후 24시간이 지난 업로드 미완료 문서만 삭제하며, 실행 직전에 DB 상태를 다시 확인한다.
+- 삭제 대상은 client 입력이나 현재 active write provider가 아니라 DB의 `storageProvider`와 `objectKey`로 정한다. `R2`는 R2 adapter, `MINIO_LOCAL`은 MinIO adapter에서 삭제한다.
+- 삭제 실패 시 `EXPIRED` 상태와 Object Key를 유지하고 오류를 기록한 뒤 다음 정리 주기에 재시도한다.
+- 정상 문서와 미완료 문서를 Object Key prefix로 구분하지 않으므로 R2 lifecycle rule로 삭제를 위임하지 않는다.
+- PostgreSQL backup bucket에는 Spring 문서 관리 Credential의 삭제 권한을 부여하지 않는다.
+
 수동 전환·원복 상태:
 
 ```text
