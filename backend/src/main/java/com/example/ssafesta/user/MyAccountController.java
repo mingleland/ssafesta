@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,22 +25,22 @@ public class MyAccountController {
     private final UserRepository users;
     private final OAuthIdentityRepository identities;
     private final NicknamePolicy nicknamePolicy;
+    private final AvatarCodePolicy avatarCodePolicy;
 
     public MyAccountController(AccountLifecycleService lifecycle, UserRepository users, OAuthIdentityRepository identities,
-                               NicknamePolicy nicknamePolicy) {
+                               NicknamePolicy nicknamePolicy, AvatarCodePolicy avatarCodePolicy) {
         this.lifecycle = lifecycle;
         this.users = users;
         this.identities = identities;
         this.nicknamePolicy = nicknamePolicy;
+        this.avatarCodePolicy = avatarCodePolicy;
     }
 
     @GetMapping
     @Transactional(readOnly = true)
     public MyAccountResponse me(@AuthenticationPrincipal Jwt jwt) {
         User user = activeMember(jwt);
-        List<String> providers = identities.findAllByUser_Id(user.getId()).stream()
-                .map(identity -> identity.getProvider().name()).toList();
-        return new MyAccountResponse(user.getId(), user.getNickname(), user.getStatus().name(), providers);
+        return accountOf(user);
     }
 
     @PatchMapping
@@ -51,8 +52,40 @@ public class MyAccountController {
             throw new ApiException(ErrorCode.NICKNAME_DUPLICATED);
         }
         user.changeNickname(request.nickname());
-        return new MyAccountResponse(user.getId(), user.getNickname(), user.getStatus().name(),
-                identities.findAllByUser_Id(user.getId()).stream().map(identity -> identity.getProvider().name()).toList());
+        return accountOf(user);
+    }
+
+    /**
+     * Stores the avatar appearance encoding (spec 013a FR-013, #24 contract).
+     *
+     * <p>{@code PUT} rather than {@code PATCH}: the body is the whole value, not a delta. The
+     * response echoes what was stored so the client can confirm the server changed nothing — the
+     * string is opaque here and {@link AvatarCodePolicy} only checks length and charset.
+     *
+     * <p>Guests are refused outright (헌법 12조). The contract has Unity skip the call for them,
+     * but a client-side decision is not a control (헌법 16조).
+     */
+    @PutMapping("/avatar")
+    @Transactional
+    public AvatarResponse changeAvatar(@AuthenticationPrincipal Jwt jwt, @RequestBody AvatarChangeRequest request) {
+        User user = activeMember(jwt);
+        avatarCodePolicy.validate(request.avatarCode());
+        user.changeAvatarCode(request.avatarCode());
+        return new AvatarResponse(user.getAvatarCode());
+    }
+
+    /**
+     * One place builds this response.
+     *
+     * <p>It was assembled inline in two handlers before, which is how a field lands in one and not
+     * the other: adding {@code avatarCode} to {@code me()} alone would have dropped it from the
+     * nickname response with nothing failing to say so.
+     */
+    private MyAccountResponse accountOf(User user) {
+        List<String> providers = identities.findAllByUser_Id(user.getId()).stream()
+                .map(identity -> identity.getProvider().name()).toList();
+        return new MyAccountResponse(user.getId(), user.getNickname(), user.getStatus().name(), providers,
+                user.getAvatarCode());
     }
 
     @DeleteMapping
@@ -76,5 +109,17 @@ public class MyAccountController {
 
     public record WithdrawalRequest(boolean confirmed) { }
     public record NicknameChangeRequest(String nickname) { }
-    public record MyAccountResponse(Long userId, String nickname, String status, List<String> providers) { }
+    public record AvatarChangeRequest(String avatarCode) { }
+    public record AvatarResponse(String avatarCode) { }
+
+    /**
+     * @param avatarCode the stored appearance encoding, {@code null} for a user who has never saved
+     *                   one. Null and not a preset: picking a default is the client's job (FR-010),
+     *                   and a server-invented one would be indistinguishable from a real choice on
+     *                   the next read. The key stays present — unlike {@code ApiErrorDetail}, where
+     *                   an absent field means "this rule has no field", here the field always
+     *                   exists and is merely empty.
+     */
+    public record MyAccountResponse(Long userId, String nickname, String status, List<String> providers,
+                                    String avatarCode) { }
 }

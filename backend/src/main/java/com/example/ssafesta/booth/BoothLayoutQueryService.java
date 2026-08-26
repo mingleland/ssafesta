@@ -24,16 +24,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class BoothLayoutQueryService {
 
     private final BoothRepository booths;
+    private final BoothSlotRepository slots;
     private final BoothLeaseRepository leases;
     private final BoothLayoutDraftRepository drafts;
     private final BoothLayoutPublishedVersionRepository published;
     private final BoothEditorGuard editorGuard;
 
-    public BoothLayoutQueryService(BoothRepository booths, BoothLeaseRepository leases,
+    public BoothLayoutQueryService(BoothRepository booths, BoothSlotRepository slots,
+                                   BoothLeaseRepository leases,
                                    BoothLayoutDraftRepository drafts,
                                    BoothLayoutPublishedVersionRepository published,
                                    BoothEditorGuard editorGuard) {
         this.booths = booths;
+        this.slots = slots;
         this.leases = leases;
         this.drafts = drafts;
         this.published = published;
@@ -75,6 +78,47 @@ public class BoothLayoutQueryService {
         BoothLayoutPublishedVersion snapshot = published.findByBoothIdAndVersionNo(boothId, version)
                 .orElseThrow(LayoutNotPublishedException::new);
         return PublishedView.of(snapshot);
+    }
+
+    /**
+     * The same layout, asked for by <b>room</b> rather than by booth (#62, contract §11).
+     *
+     * <p>Unity's anchors are slots, not booths. A slot outlives the booths that pass through it,
+     * so the caller cannot resolve {@code boothId} itself: after a re-lease the same room holds a
+     * different one, and calling {@link #findPublished} with an anchor number would draw
+     * <b>someone else's</b> booth with no error to notice (#62 §1). The resolution therefore lives
+     * here, on the side that owns the lease table.
+     *
+     * <p>An empty slot and an unpublished booth deliberately answer the same 404: both mean
+     * "nothing to build here", which is what Unity's graceful skip already does. Only an expired
+     * lease is distinguished, because the visitor is owed the reason (FR-015).
+     *
+     * @throws SlotNotFoundException        no such slot
+     * @throws BoothExpiredException        the room's lease has run out (409)
+     * @throws LayoutNotPublishedException  the room is empty, or its booth has published nothing
+     */
+    @Transactional(readOnly = true)
+    public PublishedView findPublishedBySlot(Long slotId) {
+        if (!slots.existsById(slotId)) {
+            throw new SlotNotFoundException(slotId);
+        }
+        Instant now = Instant.now();
+
+        Optional<BoothLease> valid = leases.findValidBySlotId(slotId, now);
+        if (valid.isPresent()) {
+            // Delegate rather than re-query: FR-015's expiry check and the version lookup stay
+            // written once, and §5 and §11 cannot drift into serving different bodies.
+            return findPublished(valid.get().getBoothId());
+        }
+
+        // A lease row still marked ACTIVE with its time passed is an expiry, not an empty room —
+        // the sweep that flips it to EXPIRED runs on the next lease attempt, not on a clock
+        // (FR-017). Reading it as "empty" would tell a visitor the booth never existed.
+        List<BoothLease> stale = leases.findStaleActiveBySlotId(slotId, now);
+        if (!stale.isEmpty()) {
+            throw new BoothExpiredException(stale.get(0).getBoothId());
+        }
+        throw new LayoutNotPublishedException();
     }
 
     /** Editor-facing draft. Carries {@code publishedVersion} so the editor can show "공개본과 다름". */
