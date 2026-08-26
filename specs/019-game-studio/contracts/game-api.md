@@ -516,7 +516,8 @@ GET /api/v1/games/{gameId}/published
 - MVP는 Game Studio가 소유하는 versioned `builtin://` Asset catalog를 사용한다.
 - 서버가 관리하는 `asset://` reference를 추가하더라도 metadata/resolver와 binary 저장소는
   Draft/Published JSONB와 분리한다.
-- MVP에 사용자 upload endpoint를 포함하지 않는다. 업로드·용량·검사·보존·탈퇴 삭제와 `asset://local`→stable `asset://` 승격은 [Issue #69](https://github.com/kanghyunsoon/ssafesta/issues/69)에서 추적한다.
+- ~~MVP에 사용자 upload endpoint를 포함하지 않는다.~~ → **`game-asset-upload.md`가 이 항목을 대체한다** (2026-08-26, `S15P21A604-255`·#69). 업로드·용량·검사·보존·탈퇴 삭제와 `asset://local`→stable `asset://` 승격은 그 문서가 소유한다.
+  > **그 문서가 머지되기 전까지 서버는 `builtin://`만 받는다.** `asset://`는 authority를 불문하고 `ASSET_SOURCE_INVALID`로 거부된다 — 발급하는 endpoint가 없는 상태에서 통과시키면 **존재할 수 없는 참조**가 저장되고, 그것은 저장 시점 오류가 아니라 플레이 시점의 깨진 이미지로 드러난다. 완화는 발급을 추가하는 같은 커밋에서 한다.
 - Preview/Runtime이 실제 전달 URL을 얻어도 blob/file/data/서명 URL을 Draft나 Published JSON에 저장하지 않는다.
 
 ## Booth Portal Resolution
