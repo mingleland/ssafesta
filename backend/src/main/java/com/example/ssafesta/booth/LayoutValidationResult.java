@@ -28,6 +28,11 @@ public final class LayoutValidationResult {
         warnings.add(ApiErrorDetail.of(rule, objectId, message));
     }
 
+    /** 배치 전체에 대한 경고 — 특정 오브젝트 탓이 아닐 때 (예: 고립 공간). */
+    void addWarning(String rule, String message) {
+        warnings.add(ApiErrorDetail.of(rule, message));
+    }
+
     public boolean hasErrors() {
         return !errors.isEmpty();
     }

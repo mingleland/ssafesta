@@ -24,7 +24,7 @@ final class BoothTestSupport {
     }
 
     /**
-     * Frees every slot. There are only seven of them and leases run for 24 hours, so tests sharing
+     * Frees every slot. There are only twelve of them and leases run for 24 hours, so tests sharing
      * one database would otherwise run out after the first few. Call this before each test rather
      * than after, so a class is unaffected by whatever another class left behind.
      */

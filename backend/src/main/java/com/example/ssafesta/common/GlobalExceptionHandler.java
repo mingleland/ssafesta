@@ -67,9 +67,14 @@ public class GlobalExceptionHandler {
     /**
      * Bean Validation failures.
      *
+     * <p>Every one of them reports the same rule, {@code FIELD_INVALID}, and carries the offending
+     * field name in {@code field} (docs/08 §1.3-1). The field name used to go into {@code rule}
+     * itself, which made the rule vocabulary grow with every DTO field and broke the client's
+     * whitelist branch (#58).
+     *
      * <p>A constraint's default message is English ("must not be blank"), so any annotation we add
-     * has to carry its own Korean {@code message}. Until one does, the field name is reported with a
-     * Korean fallback rather than the framework's text.
+     * has to carry its own Korean {@code message}. Until one does, the client gets a Korean fallback
+     * rather than the framework's text.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> handleBeanValidation(MethodArgumentNotValidException exception) {
@@ -77,7 +82,8 @@ public class GlobalExceptionHandler {
                 ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultMessage(),
                 RequestIdFilter.current(),
                 exception.getBindingResult().getFieldErrors().stream()
-                        .map(error -> ApiErrorDetail.of(error.getField(), koreanOrFallback(error.getDefaultMessage())))
+                        .map(error -> ApiErrorDetail.field(error.getField(),
+                                koreanOrFallback(error.getDefaultMessage())))
                         .toList(),
                 null));
     }
