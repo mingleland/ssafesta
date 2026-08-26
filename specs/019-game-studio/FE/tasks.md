@@ -2,7 +2,7 @@
 
 **Shared spec**: [../spec.md](../spec.md) | **BE tasks**: [../BE/tasks.md](../BE/tasks.md)
 
-FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
+FE가 소유하는 100개 작업이다. ID는 기존 통합 목록과의 추적성을 위해 유지한다.
 
 ## Contract foundation
 
@@ -58,7 +58,7 @@ FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T097 Add behavior-preserving Object duplication, reference-aware batch deletion, and Scene resize commands
 - [x] T098 Replace title-only STORY/ESCAPE variants and same-shape action samples with structurally distinct playable blueprints
 - [x] T099 Add template-profile, authoring-command, browser multi-select/duplicate/move, and 800/1024px regression verification
-- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
+- [ ] T090 Run first-time-user key→door→dialogue authoring test within 20 minutes ([GitLab #73](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/73))
 
 ## Preview and Publish UI
 
@@ -97,7 +97,7 @@ FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적�
 ## Cross-cutting verification
 
 - [x] T064 Verify create/save/publish/play with FastAPI unavailable
-- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([#73](https://github.com/kanghyunsoon/ssafesta/issues/73))
+- [ ] T065 Verify max project limits, 60fps target, and 100ms editor response target ([GitLab #73](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/73))
 - [x] T066 Document schema migration policy and supported-major matrix
 - [x] T067 Run all FE quickstart commands and record final results
 - [x] T068 Update implementation status and KHS worklog
@@ -105,17 +105,32 @@ FE가 소유하는 85개 작업이다. ID는 기존 통합 목록과의 추적�
 - [x] T070 Implement renderer-free reference Runtime
 - [x] T071 Verify and document Runtime trace command
 - [x] T089 Verify production build emits separate Edit and Play lazy chunks
-- [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([#78](https://github.com/kanghyunsoon/ssafesta/issues/78))
+- [ ] T100 Define and implement versioned timer/score/defeat-count victory contract after FE/BE/AI agreement ([GitLab #78](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/78))
 - [x] T101 Implement the backward-readable GameProject v1.1 Frontend candidate and explicit v1.0 authoring upgrade
 - [x] T102 Implement deterministic score/defeat/survival objectives, progress HUD, and respawn/end-game behavior
 - [x] T103 Implement Mock immutable publication ports and block projects with no completion path
 - [x] T104 Run browser template→save→publish→public `/play` verification with visible objective parity
 - [ ] T105 Implement the server-authoritative Published GameSession/Coin adapter after #81 agreement
 - [x] T106 Record GitLab pre-migration ref/PR/Issue/CI handoff without creating a GitLab remote or changing product contracts
+- [x] T107 Align Portal resolution response ownership with #56: keep `objectId` request-local and validate server-owned `configId + boothId`
+- [x] T108 Record an explicitly unapproved Published Session/Coin candidate contract and decision checklist for #81
+- [x] T109 Add full Scene duplication and ordering while remapping copied Object/Event/Dialogue references
+- [x] T110 Add cross-Scene Object clipboard with behavior-preserving ID remapping and size/limit guards
+- [x] T111 Add Tile rectangle, connected flood fill, eyedropper, and keyboard-selectable drawing modes
+- [x] T112 Add opt-in Collider visualization without changing the GameProject wire contract
+- [x] T113 Verify the authoring quality pass with command tests, full FE regression, build/lint, and browser gestures
+- [x] T114 Add an editor-only local recovery journal, dirty-exit guard, and explicit restore/discard/JSON backup UX
+- [x] T115 Add an active-tab performance check with FPS, p95 frame time, slow-frame ratio, and visibility pause semantics
+- [x] T116 Render large maps at an editable cell scale and cull off-screen Object/Tile DOM with layer-to-object focus navigation
+- [x] T117 Keep authoring map area within the current 10,000-cell TileLayer contract and surface the limit before applying an invalid size ([GitLab #101](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/101))
+- [x] T118 Add minimap navigation, whole-map fit, 1:1, selected-object focus, and low-zoom Tile Canvas composition
+- [x] T119 Add Dialogue reachability and incomplete-outcome flow overview without changing GameProject JSON
+- [x] T120 Add six-axis Korean project playability checks while preserving Backend publish authority
+- [x] T121 Add selectable Sprite Sheet clip/fps playback preview and a reproducible 500 Object/10,000 Tile development fixture
 
 ## Summary
 
-- Total: 85
-- Completed: 77
+- Total: 100
+- Completed: 92
 - Remaining: 8
-- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다. GitLab 이관은 [KHS 29](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의 준비 문서만 작성했으며 실제 Import·remote 변경·push는 수행하지 않았다.
+- Active blockers: #48 서버 endpoint, #56 서버 Portal resolver, #69 stable user Asset upload/resolver, #78 v1.1 API/BE/AI 최종 합의, #81 서버 권위 Published Session/Coin. 자동화로 대체할 수 없는 사람 대상 20분·활성 PC 탭 성능 증거는 GitLab #73에서 추적한다. Mock에서는 제작·저장·불변 게시·일반 `/play`와 v1.1 목표 HUD까지 검증 완료했다. GitLab 이관은 완료됐으며 [KHS 29](../../../docs/KHS/29_Game_Studio_GitLab_이관_준비.md)의 이관 기록과 Jira 기반 브랜치 규칙을 따른다.

@@ -62,7 +62,8 @@ cd backend && ./mvnw test
 | 10 | `GET …/published` | **여전히 오브젝트 2개** — 공개본은 스냅샷이다 (FR-006, I-7) |
 | 11 | `PUT …/draft` (오브젝트 13개) | **409 `LAYOUT_VALIDATION_FAILED`**, `errors[].rule = OBJECT_LIMIT` |
 | 12 | 다른 계정 토큰으로 `PUT …/draft` | **403 `BOOTH_EDITOR_FORBIDDEN`** |
-| 13 | `PUT /booths/{id}/facade` | 200, 저장된 facade 반환 |
+| 13 | `PUT /booths/{id}/facade` (`primaryColor: "#3b82f6"` — **소문자로**) | 200, 응답의 `primaryColor`가 **`#3B82F6`**(대문자 정규화, #17) |
+| 13-1 | 같은 요청을 `primaryColor: "#123456"`으로 | **400 `VALIDATION_FAILED`**, 메시지가 형식 오류가 아니라 `팔레트에 없는 색입니다.` |
 | 14 | `GET /booths/{id}` | `facade` 4필드 + `publishedLayoutVersion: 1` |
 
 ### 만료 경로

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssafy-festa.local/contracts/storage-failover-state.schema.json",
+  "title": "SSAFY FESTA Storage Failover Control State",
+  "description": "Operator-approved control-plane state for document writes. This is separate from the R2 usage admission snapshot and never selects the provider for existing object reads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "environmentId",
+    "state",
+    "uploadEnabled",
+    "activeWriteProvider",
+    "providerConfigRefs",
+    "changedBy",
+    "changedAt",
+    "reason",
+    "approvalRef",
+    "validationEvidenceRefs",
+    "backlogObjectCount",
+    "reconciliationRunId",
+    "reconciliationCursor",
+    "lastVerifiedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "environmentId": { "enum": ["dev", "demo"] },
+    "state": {
+      "enum": [
+        "R2_ACTIVE",
+        "UPLOAD_BLOCKED",
+        "FALLBACK_VALIDATING",
+        "LOCAL_ACTIVE",
+        "R2_RECONCILING"
+      ]
+    },
+    "uploadEnabled": { "type": "boolean" },
+    "activeWriteProvider": {
+      "oneOf": [
+        { "enum": ["R2", "MINIO_LOCAL"] },
+        { "type": "null" }
+      ]
+    },
+    "providerConfigRefs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["R2", "MINIO_LOCAL"],
+      "properties": {
+        "R2": { "type": "string", "minLength": 1 },
+        "MINIO_LOCAL": { "type": "string", "minLength": 1 }
+      }
+    },
+    "changedBy": { "type": "string", "minLength": 1 },
+    "changedAt": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1 },
+    "approvalRef": { "type": "string", "minLength": 1 },
+    "validationEvidenceRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "backlogObjectCount": { "type": "integer", "minimum": 0 },
+    "reconciliationRunId": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "reconciliationCursor": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "lastVerifiedAt": { "type": "string", "format": "date-time" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "state": { "const": "R2_ACTIVE" } },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "uploadEnabled": { "const": true },
+          "activeWriteProvider": { "const": "R2" },
+          "backlogObjectCount": { "const": 0 },
+          "reconciliationRunId": { "type": "null" },
+          "reconciliationCursor": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "LOCAL_ACTIVE" } },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "uploadEnabled": { "const": true },
+          "activeWriteProvider": { "const": "MINIO_LOCAL" },
+          "reconciliationRunId": { "type": "null" },
+          "reconciliationCursor": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": ["UPLOAD_BLOCKED", "FALLBACK_VALIDATING"]
+          }
+        },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "uploadEnabled": { "const": false },
+          "activeWriteProvider": { "type": "null" },
+          "reconciliationRunId": { "type": "null" },
+          "reconciliationCursor": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "state": { "const": "R2_RECONCILING" } },
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "uploadEnabled": { "const": false },
+          "activeWriteProvider": { "type": "null" },
+          "reconciliationRunId": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  ]
+}
