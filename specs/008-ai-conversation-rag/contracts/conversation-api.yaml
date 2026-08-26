@@ -1,0 +1,104 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA AI Conversation API
+  version: 0.1.0
+servers:
+  - url: /ai/v1
+security:
+  - userAccessToken: []
+paths:
+  /conversations:
+    post:
+      operationId: createConversation
+      summary: 로그인 사용자의 AI Conversation 생성
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConversationRequest'
+      responses:
+        '201':
+          description: 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResponse'
+        '401': { description: 게스트 또는 인증 실패 }
+        '403': { description: Lease·Agent 소속·ACTIVE 검증 실패 }
+        '503': { description: Spring 검증 최종 실패, Fail Closed }
+  /conversations/{conversationId}:
+    delete:
+      operationId: closeConversation
+      summary: Conversation 원문 즉시 삭제
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      responses:
+        '204': { description: 삭제 완료 또는 이미 없음 }
+        '403': { description: 다른 사용자 Conversation }
+  /conversations/{conversationId}/messages:
+    post:
+      operationId: streamConversationMessage
+      summary: 질문을 보내고 정규화 SSE를 수신
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+      responses:
+        '200':
+          description: C-07 SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400': { description: 2,000자 초과 또는 잘못된 입력 }
+        '403': { description: 소유권 오류 또는 BOOTH_LEASE_EXPIRED }
+        '404': { description: Conversation 없음/TTL 만료 }
+        '429': { description: 사용자·Agent·전역 용량 제한, Retry-After 포함 }
+components:
+  securitySchemes:
+    userAccessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+  schemas:
+    CreateConversationRequest:
+      type: object
+      additionalProperties: false
+      required: [boothId, agentId]
+      properties:
+        boothId: { type: integer, format: int64 }
+        agentId: { type: integer, format: int64 }
+    ConversationResponse:
+      type: object
+      additionalProperties: false
+      required: [conversationId, expiresAt]
+      properties:
+        conversationId: { type: string }
+        expiresAt: { type: string, format: date-time }
+    MessageRequest:
+      type: object
+      additionalProperties: false
+      required: [question]
+      properties:
+        question: { type: string, minLength: 1, maxLength: 2000 }
+    SseEnvelope:
+      type: object
+      additionalProperties: true
+      required: [type, requestId, conversationId, messageId, sequence]
+      properties:
+        type: { type: string, enum: [start, token, source, done, error] }
+        requestId: { type: string }
+        conversationId: { type: string }
+        messageId: { type: string }
+        sequence: { type: integer, minimum: 0 }

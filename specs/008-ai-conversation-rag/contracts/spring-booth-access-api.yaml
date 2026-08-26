@@ -1,0 +1,46 @@
+openapi: 3.1.0
+info:
+  title: Spring Booth Access Validation API for AI
+  version: 0.1.0
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /booth-access:
+    get:
+      operationId: validateAiBoothAccess
+      summary: Lease와 Agent 소속·상태 검증
+      parameters:
+        - { name: boothId, in: query, required: true, schema: { type: integer, format: int64 } }
+        - { name: agentId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: 검증 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoothAccessResponse'
+        '401': { description: Service Token 실패 }
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    BoothAccessResponse:
+      type: object
+      additionalProperties: false
+      required: [allowed, boothId, agentId, serverTime]
+      properties:
+        allowed: { type: boolean }
+        boothId: { type: integer, format: int64 }
+        agentId: { type: integer, format: int64 }
+        agentStatus: { type: string, enum: [ACTIVE, INACTIVE] }
+        leaseEndsAt: { type: [string, 'null'], format: date-time }
+        remainingSeconds: { type: integer, minimum: 0 }
+        serverTime: { type: string, format: date-time }
+        denialCode:
+          type: [string, 'null']
+          enum: [BOOTH_LEASE_EXPIRED, AGENT_NOT_IN_BOOTH, AGENT_INACTIVE, null]
