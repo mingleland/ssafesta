@@ -1,6 +1,7 @@
 // Spring 서버와 통신하는 단일 창구 — 인증 헤더·타임아웃·에러 형식을 여기서 통일
 // API Client — docs/10_Frontend_설계서.md §5 + docs/08_Backend_API_명세서.md §1.3
 // 오류 봉투는 전 endpoint 공통 (specs/005 contracts/layout-api.md §0, #17·#36 — 401/403 포함)
+import { apiBaseUrl } from '../config/runtime';
 
 // errors·warnings 원소. objectId·field는 서버가 값 없으면 키 자체를 생략한다(@JsonInclude(NON_NULL)).
 // objectId는 배치된 오브젝트, field는 요청 필드 경로 — 가리키는 대상이 달라 합치지 않는다(docs/08 §1.3, #58 C안).
@@ -49,7 +50,6 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 // 401 인터셉트(spec 001, docs/26 AT/RT 확정분) — 등록 지점만 여기 둔다. 실 refresh 로직은
@@ -72,7 +72,7 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (rest.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...rest,
     headers,
     signal: rest.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),

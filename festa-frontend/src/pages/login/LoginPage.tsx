@@ -9,8 +9,8 @@ import { authApi } from '../../entities/auth/api.select';
 import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
+import { apiBaseUrl } from '../../shared/config/runtime';
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 type Provider = 'google' | 'kakao';
@@ -27,7 +27,7 @@ export function LoginPage() {
       navigate('/auth/callback');
       return;
     }
-    window.location.href = `${BASE_URL}/api/v1/auth/oauth/${provider}`;
+    window.location.href = `${apiBaseUrl()}/api/v1/auth/oauth/${provider}`;
   }
 
   async function handleGuestEnter() {

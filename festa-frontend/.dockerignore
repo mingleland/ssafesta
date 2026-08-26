@@ -1,0 +1,7 @@
+# 빌드 컨텍스트가 festa-frontend/ 라 저장소 루트의 .dockerignore 는 적용되지 않는다 — 여기 따로 둔다.
+node_modules
+dist
+coverage
+.env*
+!.env.example
+*.log
