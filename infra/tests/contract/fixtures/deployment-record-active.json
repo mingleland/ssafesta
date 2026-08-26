@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordId": "integration-develop-release-42",
+  "targetId": "integration-develop",
+  "candidateReleaseId": "release-42",
+  "previousKnownGoodReleaseId": "release-41",
+  "runId": "festa-develop-42",
+  "state": "ACTIVE",
+  "stages": [{"name": "verify", "status": "SUCCEEDED", "evidenceRef": "verification-result.json"}],
+  "recovery": {"decision": "NONE", "result": "NOT_RUN", "reason": "all required checks passed"},
+  "currentReleaseId": "release-42",
+  "startedAt": "2026-08-20T00:00:00Z",
+  "finishedAt": "2026-08-20T00:02:00Z"
+}

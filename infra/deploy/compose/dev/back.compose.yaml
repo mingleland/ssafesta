@@ -1,0 +1,17 @@
+name: festa-dev-back
+services:
+  back:
+    image: ${COMPONENT_IMAGE_REF:?}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${BACK_HOST_PORT:-8081}:8080"]
+    networks: [back]
+    volumes: [back_data:/app/data]
+    mem_limit: ${BACK_MEMORY_LIMIT:-1g}
+    cpus: ${BACK_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+networks: { back: {} }
+volumes: { back_data: {} }
