@@ -1,7 +1,10 @@
 package com.example.ssafesta.auth;
 
-public class DuplicateNicknameException extends RuntimeException {
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
+
+public class DuplicateNicknameException extends ApiException {
     public DuplicateNicknameException() {
-        super("이미 사용 중인 닉네임입니다.");
+        super(ErrorCode.NICKNAME_DUPLICATED, "이미 사용 중인 닉네임입니다.");
     }
 }

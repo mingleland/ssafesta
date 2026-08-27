@@ -76,6 +76,35 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
   - `CURRENT_REVISION`은 **spec별로 모양이 다르다** — 005(Layout)는 문장(값 소비자 없음), 019(Game Studio)는 **십진수 문자열**이다. 각 spec 계약 문서가 자기 모양을 소유한다.
   - `ApiErrorDetail`에 타입 있는 값 필드는 **추가하지 않는다.** 전 endpoint 공유 스키마인데 값이 필요한 rule이 아직 하나뿐이다. **기계값이 둘 이상 필요한 rule이 나오면 그때 필드로 올린다** (#58 §5 재확정, 2026-08-24).
 
+### 1.3-2 프레임워크 거부의 code (#113, 2026-08-27 확정)
+
+컨트롤러에 닿기 전에 Spring 이 거부한 요청도 같은 봉투로 나온다. **클라이언트 잘못은 전부 4xx 다** —
+여기 있는 어느 것도 `INTERNAL_ERROR` 가 아니다.
+
+| 상황 | status | code |
+|---|---|---|
+| 매핑되지 않은 경로 (미구현 endpoint 포함) | 404 | `NOT_FOUND` |
+| 그 경로가 지원하지 않는 method | 405 | `METHOD_NOT_ALLOWED` |
+| 필수 쿠키·헤더·파라미터 누락, 타입 불일치 | 400 | `VALIDATION_FAILED` |
+| 지원하지 않는 `Content-Type` | 415 | `UNSUPPORTED_MEDIA_TYPE` |
+> **`Accept` 가 JSON 을 허용하지 않으면 이 봉투 자체를 보낼 수 없다.** 예: `Accept: application/xml` 로
+> 부르면 서버는 오류 봉투를 만들어 놓고도 그것을 기록하지 못해 `HttpMediaTypeNotAcceptableException` 이
+> advice 밖으로 새어 나간다. 이 경우 응답 본문은 **우리 계약이 아니다.** 클라이언트는 `application/json` 을
+> 받을 수 있어야 한다. (2026-08-27 최초 작성 시 `406 NOT_ACCEPTABLE` 행을 적었으나 실측에서 성립하지
+> 않아 걷어냈다 — !56 7차 리뷰.)
+
+- **미구현 endpoint 는 404 다.** 서버 장애(`INTERNAL_ERROR`)와 구분되지 않으면 클라이언트가 재시도할지
+  포기할지 정할 수 없다 — `INTERNAL_ERROR` 는 재시도 가능 코드로 정렬돼 있으므로(#104·#48) 미구현 경로를
+  500 으로 답하면 클라이언트가 그것을 재시도한다.
+- 2026-08-27 이전에는 위 표의 네 줄이 **모두 500 `INTERNAL_ERROR`** 였다. `GlobalExceptionHandler` 가 프레임워크
+  거부를 `ResponseStatusException` 으로 매칭했는데, Spring 7 의 프레임워크 예외는 그 클래스가 아니라
+  `ErrorResponse` **인터페이스**로 상태를 싣기 때문이다. Breaking Change 가 아니라 정합 회복이다.
+- 5xx 는 종전대로 `INTERNAL_ERROR` 이고 서버 로그에 error 레벨로 크게 남는다 (T-24).
+- **`code` 가 선언한 status 와 응답 status 는 항상 같다.** `ErrorCode` 는 코드마다 status 를 들고 있고
+  클라이언트는 `code` 로 분기하므로, 둘이 어긋나면 `ErrorCode.status()` 가 그 응답에 대해 거짓이 된다.
+  그래서 서버는 **코드가 선언한 status 로** 답한다. 계약에 코드가 없는 status 는 일반 코드
+  (`VALIDATION_FAILED`)로 답하며, 원래 status 는 debug 로그에 남는다.
+
 ### 1.4 Idempotency
 
 금전·보상·임대 등 중복 위험 요청은 다음 Header 사용을 권장한다.
@@ -98,7 +127,17 @@ Idempotency-Key: <client-generated-uuid>
 
 ### POST `/auth/refresh`
 
-Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
+Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh 정책은 보안 설계에서 확정한다.
+
+**세션이 없으면 `401 INVALID_MEMBER_TOKEN` 이다** (#113, 2026-08-27 확정). 쿠키가 **없는 경우·만료된 경우·
+이미 쓰인 경우**가 전부 같은 코드다 — 사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 두 이름을 주지 않는다.
+
+- 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
+  FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
+  받으며, 이것을 서버 오류로 취급하면 안 된다.
+- 2026-08-27 이전에는 이 세 경우가 모두 **500** 이었다. 방문자 전원이 페이지를 열 때마다 서버 오류 로그를
+  하나씩 남겼다.
+- Origin 이 신뢰 목록과 다르면 쿠키를 보기 전에 `403 UNTRUSTED_ORIGIN` 으로 먼저 거절한다.
 
 ### POST `/auth/logout`
 
