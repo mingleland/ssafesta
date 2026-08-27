@@ -13,7 +13,7 @@
 
 **08-26 계약 라운드로 대기 5건이 한꺼번에 닫혔다** — [#48](https://github.com/kanghyunsoon/ssafesta/issues/48)·[#59](https://github.com/kanghyunsoon/ssafesta/issues/59)·[#60](https://github.com/kanghyunsoon/ssafesta/issues/60)·[#78](https://github.com/kanghyunsoon/ssafesta/issues/78)·[#81](https://github.com/kanghyunsoon/ssafesta/issues/81). 각 결론은 아래 해당 절로 옮겼고 대기 표에서는 뺐다.
 
-**Asset 업로드 계약 도달** — MR !44(`S15P21A604-255`) 08-26 17:34 머지, develop `3d97dd9`. `-116`·`-187` 잠금 해제.
+⚠️ **Asset 업로드 계약이 develop 에 없다.** MR !44(`S15P21A604-255`)가 08-26 17:34 머지(`3d97dd9`)됐으나 **9분 뒤 `81bdf39`(AI `-93` sync 커밋 revert)가 `game-asset-upload.md` 242줄과 `game-api.md` §Asset Boundary 포인터를 함께 되감았다.** 원격 어느 브랜치에도 이 파일이 없다(전 origin 브랜치 `cat-file -e` 전수 확인). 내용은 커밋 `3d97dd9` 안에 온전하다. #69 에 보고했고 복구는 계약 소유자 몫으로 뒀다 — **`-116`·`-187` 은 선행 미충족으로 대기 유지**.
 
 **P0 코드 몫** — 004 Lease·003 Wallet·G-1 완료(완료 표). 남은 P0 블로킹은 009(BE)·016 C-01·008 UI(AI 서버)·인프라(#30 실빌드·실서버). 즉시 착수 가능은 `-116`·`-187`·010 Survey(P1).
 
@@ -37,9 +37,18 @@
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-- [ ] **(P0) `-116` GameAssetRepository 업로드 어댑터 교체** — #69 계약 도달로 해제. ⚠️ develop `GameProjectValidator` 는 현재 **`asset://` 를 전부 거부**하고 `builtin://` 만 통과시킨다(서버 발급이 0개라 의도된 상태). 완화는 발급을 넣는 `-107` 과 같은 커밋이고, **지금 FE 대응은 불요**라는 것이 BE 판단 — PR #72 preflight 가 `local`/`blob`/`data`/`file` 을 Publish 전에 막고 에디터는 `builtin://` 만 보낸다
-- [ ] **(P0) `-187` `asset://` 참조 해석·회귀 테스트** — `-116` 과 한 라운드. 오류 어휘는 `ASSET_SOURCE_INVALID`(Draft·Publish 양쪽)·`ASSET_KIND_UNSUPPORTED`(AUDIO 거부, v1 미지원 확정)·`ITEM_/SPRITE_/TILESET_/BACKGROUND_/PORTRAIT_/PROJECTILE_/SPAWNER_ASSET_INVALID`. `PROJECTILE_`·`SPAWNER_` 는 SHOOTER 가 이미지 참조를 둘 가져 `SPRITE_ASSET_INVALID` 에서 갈라낸 것
-- [ ] **(P1) 010 Survey 결과 화면** — `SSAFY_FESTA_내부설문_관련_업데이트.md` §2.5 확정 자료를 입력으로. **응답 UI 제외**(C-05 게스트 응답 등 미결)
+**현재 없다.** 08-27 실측으로 이 절에 있던 후보가 전부 계약 미비로 내려갔다. 새 코드를 만들 자리가 없다는 뜻이 아니라, **만들면 근거 없는 구현이 된다**는 뜻이다(헌법 30조).
+
+| 후보 | 왜 아닌가 |
+|---|---|
+| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다(위 현재 상태) |
+| `-91` 013a AT wiring | `client.ts:38` `TODO(013a-AT)` 가 미결 축을 4개로 적어 뒀고 **[#60](https://github.com/kanghyunsoon/ssafesta/issues/60) 이 푼 것은 token type 하나**(= Access Token 원본)다. **receiver**(Unity 수신 GameObject·메서드)·**timing**·**refresh 반영**이 남아 있고, receiver 는 #56 T057 `receiverObjectName` 과 같은 미결이다 |
+| `-133`·`-194` Survey | `docs/08` §9 `GET /surveys/{surveyId}/results` 가 **제목 한 줄짜리 stub** 이다 — 응답 DTO 가 없다. 집계 화면을 만들려면 내가 형식을 지어내야 한다 |
+| `-195` YouTube 임베드 | 016 C-01(주소 저장 위치)이 **3파트 합동 미결** |
+| `-134` Project 전시 | 009 BE 계약도 endpoint 제목만 있다 |
+| `-86`·`-87`·`-88`·`-89` 실 API 결선 | real adapter(`facadeApi.ts`·`leaseApi.ts`·`wallet/api.ts`·`layout/api.ts`)는 **이미 구현돼 있다.** 남은 것은 실서버 왕복 검증인데 그 경로가 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46)(`TokenResponse`·`status` 의존 제거)에 들어 있고 아직 머지 전이다 |
+
+**즉, FE 병목은 코드가 아니라 ① 계약 stub ② 내 MR 6건이 머지되지 않고 쌓인 것이다.**
 
 ## 대기
 
