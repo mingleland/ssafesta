@@ -214,4 +214,29 @@ describe('Game Studio authoring commands', () => {
     expect(resized?.type === 'PLATFORMER' ? [resized.width, resized.height] : null).toEqual([200, 50]);
     expect(parseGameProject(valid)).toBe(valid);
   });
+
+  // 상한 guard가 addTileLayer가 아니라 removeObjects에 붙어 있던 회귀를 잠근다(#101).
+  // 편집기 경로는 resizeWorldScene이 막으므로, 로드된 프로젝트처럼 상한을 넘는 scene을 직접 만들어 확인한다.
+  it('blocks tile layers on oversized scenes and leaves object removal untouched', () => {
+    let project = createStarterProject(48);
+    project = addPlatformerScene(project);
+    const platformer = project.scenes.at(-1);
+    if (platformer?.type !== 'PLATFORMER') throw new Error('expected platformer');
+
+    const oversized = {
+      ...project,
+      scenes: project.scenes.map((scene) => (
+        scene.id === platformer.id && scene.type === 'PLATFORMER'
+          ? { ...scene, width: 200, height: 100, tileLayers: [] }
+          : scene
+      )),
+    };
+
+    expect(() => addTileLayer(oversized, platformer.id)).toThrow('10,000칸');
+
+    // 오브젝트 삭제는 타일 한도와 무관하다 — 같은 scene에서 막히지 않아야 한다.
+    const spawn = platformer.objects.find((object) => object.preset === 'PLAYER_SPAWN');
+    if (spawn === undefined) throw new Error('expected player spawn');
+    expect(() => removeObjects(oversized, platformer.id, [spawn.id])).not.toThrow();
+  });
 });
