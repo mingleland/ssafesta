@@ -517,7 +517,7 @@ AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 S
 
 ### POST `/agents/{agentId}/documents/upload-url`
 
-S3 Presigned Upload URL 발급 구조를 권장한다.
+Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트 합의).
 
 #### Request
 
@@ -525,19 +525,40 @@ S3 Presigned Upload URL 발급 구조를 권장한다.
 {
   "fileName": "project.pdf",
   "contentType": "application/pdf",
-  "size": 1048576
+  "size": 1048576,
+  "contentSha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 }
 ```
 
-#### Response
+`contentSha256` 은 **필수**이며 `^[a-f0-9]{64}$` 를 만족해야 한다. 프론트가 업로드 전 파일 바이트로
+계산해 보낸다. 이 값은 **사전 중복 확인에만** 쓰고, 최종 검증은 FastAPI 가 R2 원본을 다시 해싱해서 한다
+(FR-019, spec 007 C-08). 형식 위반은 `400 VALIDATION_FAILED` 다.
+
+#### Response — 신규
 
 ```json
 {
-  "documentId": 152,
+  "duplicate": false,
+  "documentId": 153,
   "uploadUrl": "<presigned-url>",
-  "objectKey": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/153/project.pdf"
 }
 ```
+
+#### Response — 중복
+
+```json
+{ "duplicate": true, "documentId": 152 }
+```
+
+- **중복은 오류가 아니다.** 200 으로 답하고 `duplicate` 로 갈린다 — `DOCUMENT_DUPLICATE` 오류 코드는
+  만들지 않는다. 요청 목적(그 파일을 등록하는 것)이 **이미 달성돼 있는** 상태이고, 같은 spec 의 FR-025
+  (중복 처리 요청은 기존 활성 작업을 반환)와 019 Portal 의 `unavailableReason`(#33)이 같은 결이다.
+- 중복일 때 `uploadUrl`·`objectKey` 는 **없다**(키 자체가 빠진다). 프론트는 `duplicate` 로 분기해
+  "이미 등록된 문서입니다" 를 띄우고 기존 `documentId` 를 쓴다.
+- **판정 대상은 같은 Agent 의 `QUEUED`·`PROCESSING`·`READY` 문서뿐**이다. `FAILED`·`DISABLED` 는 제외라
+  실패한 문서와 같은 파일을 다시 올리는 것은 **허용**된다 — 막으면 사용자가 빠져나갈 길이 없다.
+  따라서 같은 (agent, hash) 행이 복수 존재할 수 있고 유일성은 활성 상태 안에서만 성립한다.
 
 ### POST `/documents/{documentId}/complete`
 
