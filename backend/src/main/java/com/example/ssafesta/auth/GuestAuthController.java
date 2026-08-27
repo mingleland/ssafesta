@@ -35,7 +35,8 @@ public class GuestAuthController {
         return ResponseEntity.ok(new GuestTokenResponse(issued.token(), issued.expiresAt()));
     }
 
-    // required=false 라야 쿠키 부재가 Spring 의 500 이 아니라 우리의 401 이 된다 (#113).
+    // required=false 라야 쿠키 부재가 Spring 의 400 이 아니라 우리의 401 이 된다 — 세션이 없는 것은
+    // 요청이 잘못된 것이 아니다. (#113 당시에는 500 이었고, 그건 ErrorResponse 매칭으로 따로 고쳤다.)
     @PostMapping("/refresh")
     public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token", required = false) String refreshToken,
                                                         @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {

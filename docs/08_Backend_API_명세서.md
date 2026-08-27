@@ -96,7 +96,7 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 - **미구현 endpoint 는 404 다.** 서버 장애(`INTERNAL_ERROR`)와 구분되지 않으면 클라이언트가 재시도할지
   포기할지 정할 수 없다 — `INTERNAL_ERROR` 는 재시도 가능 코드로 정렬돼 있으므로(#104·#48) 미구현 경로를
   500 으로 답하면 클라이언트가 그것을 재시도한다.
-- 2026-08-27 이전에는 위 세 줄이 **모두 500 `INTERNAL_ERROR`** 였다. `GlobalExceptionHandler` 가 프레임워크
+- 2026-08-27 이전에는 위 표의 네 줄이 **모두 500 `INTERNAL_ERROR`** 였다. `GlobalExceptionHandler` 가 프레임워크
   거부를 `ResponseStatusException` 으로 매칭했는데, Spring 7 의 프레임워크 예외는 그 클래스가 아니라
   `ErrorResponse` **인터페이스**로 상태를 싣기 때문이다. Breaking Change 가 아니라 정합 회복이다.
 - 5xx 는 종전대로 `INTERNAL_ERROR` 이고 서버 로그에 error 레벨로 크게 남는다 (T-24).

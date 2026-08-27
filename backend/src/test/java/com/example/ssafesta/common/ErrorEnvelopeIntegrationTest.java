@@ -121,7 +121,6 @@ class ErrorEnvelopeIntegrationTest {
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
-    /** The other row §1.3-2 adds. A contracted status with no test is how a wrong row survives. */
     /**
      * Every code declares an error status — nothing here claims it was <i>sent</i> with one.
      *
