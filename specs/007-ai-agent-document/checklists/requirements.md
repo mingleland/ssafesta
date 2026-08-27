@@ -23,6 +23,8 @@
 - [x] Edge Case를 식별했다
 - [x] 기능 범위의 경계가 명확하다
 - [x] 의존성과 가정을 식별했다
+- [x] C-11에 Business DB/AI DB 소유권, CONNECT 격리, cross-DB FK 금지가 명시됐다
+- [x] 처리 snapshot, 멱등 cleanup, inventory reconciliation의 관찰 가능한 결과가 정의됐다
 
 ## 기능 준비도
 
@@ -39,3 +41,4 @@
 - GitLab Work Item #102의 방향별 Service Token, 상수 시간 검증, callback `jobId`·멱등·`sourceHash` 검증, 단계적 토큰 회전 및 mTLS P2 결정을 반영했다.
 - GitLab Work Item #100의 수동 MinIO fallback·문서별 Provider·운영자 승인 reconcile·유한 Job 재시도·`DEAD`는 AI 내부 상태로만 유지·저장소 복구 후 자동 재처리 없음·reconcile 결과 저장 구조와 전달 경로(#102 방식 재사용, Infra 전용 credential·scope 분리)·quota 오류 HTTP 코드(`STORAGE_UNAVAILABLE=503`/`STORAGE_QUOTA_EXCEEDED=507`) 결정을 반영했다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치 두 항목만 후속 이슈로 남겨 체크리스트와 spec C-10에 명시했다.
 - GitLab Work Item #106의 callback 404 원인 코드, `JOB_NOT_REGISTERED` 1초·3초·10초 최대 3회 재시도, 영구 404 즉시 종료와 별도 종료 기록을 반영했다.
+- S15P21A604-262에서 Infra PostgreSQL Isolation and Backup Contract v1을 채택해 동일 인스턴스의 별도 Business/AI database와 login role 경계를 C-11로 확정했다. FastAPI Business DB 직접 조회, cross-DB FK·cascade 전제를 제거하고 Spring snapshot·cleanup·reconciliation 계약으로 대체했다.
