@@ -9,46 +9,38 @@
 
 **front = origin/front, clean.** spec 005·Block A·013a·016·001 Auth·D-1·D-2·B·C·G-2 완료. 상세는 완료 표.
 
-**원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황` 표.
+**원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**08-26 계약 라운드로 대기 5건이 한꺼번에 닫혔다** — [#48](https://github.com/kanghyunsoon/ssafesta/issues/48)·[#59](https://github.com/kanghyunsoon/ssafesta/issues/59)·[#60](https://github.com/kanghyunsoon/ssafesta/issues/60)·[#78](https://github.com/kanghyunsoon/ssafesta/issues/78)·[#81](https://github.com/kanghyunsoon/ssafesta/issues/81). 각 결론은 아래 해당 절로 옮겼고 대기 표에서는 뺐다.
+**develop 행 4건 전부 머지 완료**(08-27 10:19~10:20, squash) — `!46`(`-90`) · `!37`(`-153`) · `!42`(`-254`) · `!43`(`-247`). 이어서 `!52`(`-87`)도 머지(10:35). `Closes` 는 `-153`·`-254` 에만 넣었다.
 
-⚠️ **Asset 업로드 계약이 develop 에 없다.** MR !44(`S15P21A604-255`)가 08-26 17:34 머지(`3d97dd9`)됐으나 **9분 뒤 `81bdf39`(AI `-93` sync 커밋 revert)가 `game-asset-upload.md` 242줄과 `game-api.md` §Asset Boundary 포인터를 함께 되감았다.** 원격 어느 브랜치에도 이 파일이 없다(전 origin 브랜치 `cat-file -e` 전수 확인). 내용은 커밋 `3d97dd9` 안에 온전하다. #69 에 보고했고 복구는 계약 소유자 몫으로 뒀다 — **`-116`·`-187` 은 선행 미충족으로 대기 유지**.
+**왜 그동안 안 머지됐나 — 내가 만든 규칙 때문이었다.** `docs/17` §8:269 원문은 **"최소 1명 Review 권장"**(필수 아님)인데 필수로 읽어 셀프 머지 금지를 스스로 만들었다. 실측: 머지된 MR 34건 중 **author == merged_by 가 33/34**, reviewers 지정은 6/34. 보호 브랜치는 `main` 하나, 내 권한은 **Maintainer(40)**. `approved_by=[]` 는 승인 대기가 아니라 GitLab Free 에서 그 버튼이 안 쓰인다는 뜻이다.
 
-**P0 코드 몫** — 004 Lease·003 Wallet·G-1 완료(완료 표). 남은 P0 블로킹은 009(BE)·016 C-01·008 UI(AI 서버)·인프라(#30 실빌드·실서버). 즉시 착수 가능은 `-116`·`-187`·010 Survey(P1).
-
-## MR 현황
-
-08-27 09:06 강형순(게임 파트)이 **열린 6건 전부에 리뷰**를 남겼다. GitLab approval 은 0건(`approved_by=[]`)이고, 본인이 **범위를 한정**했다 — *"게임 파트에 영향이 없고 반입이 안전하다"* 는 뜻이지 FE 구현 품질 승인이 아니며, FE 내부 로직·React 관용구·상태 관리 설계는 판정하지 않았다. **FE 로직 리뷰는 여전히 공백**이고, FE 담당자 간 리뷰로 봐 달라는 요청이 붙어 있다.
-
-| MR | 대상 | 상태 |
+| 남은 MR | 대상 | 상태 |
 |---|---|---|
-| !46 `-90` Auth 실서버 결선 | develop | mergeable. `Closes` 없음(D4 미확정) |
-| !43 `-247` LJH 기록 develop 정합 | develop | mergeable |
-| !42 `-254` FE Docker·runtime config | develop | mergeable |
-| !37 `-153` 컴포넌트 테스트 환경 | develop | mergeable |
-| !20 `-171` Lease 확인 모달 | **front** | **conflict** — 완료 경로 개정으로 대상 브랜치 재조준 필요 |
-| !13 `-179` 상한 guard 이관 | **front** | mergeable이나 대상이 구 경로 |
+| !20 `-171` Lease 확인 모달 | **front** | mergeable. 08-26 개정 이전 part-target MR — retarget 없이 보존, develop 반입은 별도 라운드 |
+| !13 `-179` 상한 guard 이관 | **front** | 동일 |
 
 ## 내 액션 필요
 
-- [ ] **[#69](https://github.com/kanghyunsoon/ssafesta/issues/69) §3① presigned URL 정책 — BE가 내 판단을 지명 요청**(08-26 17:30). 019는 서버가 302로 대신 열어 주고(`<img src="/api/v1/games/{g}/assets/{a}/content">`) FE resolver는 문자열 치환 하나다. 007은 presigned URL 을 FE 로 내보내 만료·재발급을 FE 가 다룬다. **007 쪽으로 통일하면 만료 관리가 FE 몫이 된다** — 유지/통일 중 택해 회신
-- [ ] **!20 conflict 해소 + !13·!20 대상 브랜치 재조준** — 완료 경로가 `develop` 하나로 개정됐는데 이 둘만 `front` 행이다
+- [ ] **`!13`·`!20` part-target 소진** — `front` 로 머지한 뒤 develop 반입 라운드를 따로 잡을지, 브랜치를 develop 기준으로 다시 딸지 결정
+- [ ] **FE 결함 2건**(각각 이슈 필요) — ① `/` 에 라우트가 없어 도메인 루트 진입 시 React Router 기본 ErrorBoundary 가 영어 404 를 그린다 ② `RequireAuth` 헤더가 `회원로 이용 중` 으로 렌더된다(조사 결함)
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-**현재 없다.** 08-27 실측으로 이 절에 있던 후보가 전부 계약 미비로 내려갔다. 새 코드를 만들 자리가 없다는 뜻이 아니라, **만들면 근거 없는 구현이 된다**는 뜻이다(헌법 30조).
+**08-27 실측 기준 여전히 없다.** `-87` 은 게스트 범위까지 닫았고(MR !52), 나머지는 아래 이유로 막혀 있다.
 
 | 후보 | 왜 아닌가 |
 |---|---|
-| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다(위 현재 상태) |
-| `-91` 013a AT wiring | `client.ts:38` `TODO(013a-AT)` 가 미결 축을 4개로 적어 뒀고 **[#60](https://github.com/kanghyunsoon/ssafesta/issues/60) 이 푼 것은 token type 하나**(= Access Token 원본)다. **receiver**(Unity 수신 GameObject·메서드)·**timing**·**refresh 반영**이 남아 있고, receiver 는 #56 T057 `receiverObjectName` 과 같은 미결이다 |
-| `-133`·`-194` Survey | `docs/08` §9 `GET /surveys/{surveyId}/results` 가 **제목 한 줄짜리 stub** 이다 — 응답 DTO 가 없다. 집계 화면을 만들려면 내가 형식을 지어내야 한다 |
-| `-195` YouTube 임베드 | 016 C-01(주소 저장 위치)이 **3파트 합동 미결** |
-| `-134` Project 전시 | 009 BE 계약도 endpoint 제목만 있다 |
-| `-86`·`-87`·`-88`·`-89` 실 API 결선 | real adapter(`facadeApi.ts`·`leaseApi.ts`·`wallet/api.ts`·`layout/api.ts`)는 **이미 구현돼 있다.** 남은 것은 실서버 왕복 검증인데 그 경로가 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46)(`TokenResponse`·`status` 의존 제거)에 들어 있고 아직 머지 전이다 |
+| `-86` Facade | **부스가 하나도 없다** — `GET /booths/1` → 404 `BOOTH_NOT_FOUND`. 부스는 회원 임대로만 생기고 회원 세션은 D5 대기 |
+| `-88` Wallet | `GET /wallets/me`·`/transactions` 게스트 403 `MEMBER_ONLY`. D5 대기 |
+| `-89` Owner/Staff | member-only 경로 전부. D5 대기 |
+| `-87` 잔여 | `OCCUPIED`·`mine`·오류 3상태는 컴포넌트 테스트로 고정했고 **실서버 확인은 D5 대기** |
+| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다(위 현재 상태). #69 보고 완료 |
+| `-91` 013a AT wiring | receiver(Unity 수신 GameObject·메서드)·timing·refresh 반영 미결. #60 이 푼 것은 token type 하나 |
+| `-133`·`-194` Survey | `docs/08` §9 `GET /surveys/{surveyId}/results` 가 제목 한 줄짜리 stub |
+| `-195` YouTube · `-134` Project | 016 C-01 3파트 합동 미결 / 009 계약도 endpoint 제목만 |
 
-**즉, FE 병목은 코드가 아니라 ① 계약 stub ② 내 MR 6건이 머지되지 않고 쌓인 것이다.**
+**D5(OAuth 자격증명 6종)가 단일 최대 blocker다** — `-86`·`-88`·`-89` 와 `-87` 잔여가 전부 여기 걸려 있다.
 
 ## 대기
 
@@ -57,7 +49,7 @@
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T056 Portal resolver·overlay adapter / T058 E2E | **계약은 완결**(#48 종료 — `contracts/game-api.md` v1.0 MR !1 머지). 남은 것은 **BE 구현 배포** — Jira `-111`(스키마·패키지)·`-112`(Draft API)·`-157`(Publish·Published 조회). 경계 2건도 확정: **Draft 없음 = 204 No Content**, 재시도 코드는 서버 `INTERNAL_ERROR` 유지(FE 판정만 정렬). T054 `objectId` 미계약은 [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)가 답 | strdeok |
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T057 `OnOverlayStateChanged` 송신부 | 수신 GameObject명(`receiverObjectName`) 확정 | Unity |
 | [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) 잔여 E2E | **서버 비의존 FE 범위는 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드)가 선구현**(Published loader·schema guard·상태별 오류 UI·error boundary). 잔여 = BE 구현 배포 후 실 endpoint + `-116` stable resolver 연결 뒤 browser E2E | strdeok·리드 |
-| 001 T016 회원 refresh 실서버 왕복 | **D5 OAuth 자격증명 6종.** 게스트·logout 구간은 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46)으로 결선 완료. 회원 `refresh_token` 최초 발급처가 `OAuthCompletionController` 하나뿐이라 성공·만료·재사용 탐지를 실행하지 못했다 | BE·리드 |
+| 001 T016 회원 refresh 실서버 왕복 | **D5 OAuth 자격증명 6종.** 게스트·logout 구간은 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46) 머지로 완료(08-27). 회원 `refresh_token` 최초 발급처가 `OAuthCompletionController` 하나뿐이라 성공·만료·재사용 탐지를 실행하지 못했다 | BE·리드 |
 | `assetCode` 목록 | Unity 레지스트리 실측값(#6·#18 — 둘 다 이걸 기다리다 닫힘) | Unity |
 | `-117` Published 게임 세션 포트 실 API 교체 | **Jira 담당자 미배정.** 규약은 확정([#81](https://github.com/kanghyunsoon/ssafesta/issues/81) 종료) — 019는 idempotency·잔액·동시성을 직접 구현하지 않고 **spec 003 `WalletService.spend()` 에 위임**, 게스트는 FR-023대로 무료 플레이 가능, 서버 권위 adapter 전까지 **무료·무보상 유지**, 교체 지점은 `GameSessionPort` seam 3개(start/complete/exit) | 리드(배정) |
 
@@ -73,6 +65,7 @@
 
 ## 추적 — 내 액션 없음
 
+- [#113](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/113) BE `GlobalExceptionHandler` 미처리 예외 2종 → 500. `MissingRequestCookieException`(refresh 무쿠키 — 비로그인·게스트가 매 로드마다 밟는다)·`NoResourceFoundException`(미매핑 경로 전부). **FE 우회 불가** — RT 는 HttpOnly 라 존재 여부를 FE 가 읽을 수 없다(헌법 13조). 화면은 정상 동작하며 문제는 서버 로그의 신호 대 잡음
 - [#78](https://github.com/kanghyunsoon/ssafesta/issues/78) GameProject v1.1 **확정·종료**(08-26): schemaVersion **1.1.0**(1.0 읽기 유지·편집 시 명시 승격), `completion.mode ALL|ANY`, objectives **0~5개·type 중복 금지**(`SCORE_AT_LEAST`|`DEFEAT_ENEMIES`|`SURVIVE_SECONDS`), `playerDefeat RESPAWN|END_GAME`. **objectives 빈 배열 = completion 판정 비활성**(거부가 아니라 의미 정의 — golden path 테스트에 포함), **target 상한 정본은 FE type별 상한**(`gameProject.ts:326`). 활성화 게이트 유지(#104 C절). FE 구현은 Jira `-155`(박준우), 성능 실측 `-156`(박준우)
 - 013·016의 game발 spec 갱신 develop 미반영 / FE.md 인용 `game de38269` 커밋이 로컬·원격에 없음(016 E2E는 계약 텍스트만 필요해 무관) — Unity 확인 필요
 - 013 spec.md C-01이 docs/26(V10 TEXT)로 해소됐는데 리뷰 표는 미결 표기 — Unity 소유, 임의 수정 안 함
