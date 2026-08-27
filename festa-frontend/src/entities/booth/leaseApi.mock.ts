@@ -4,10 +4,11 @@
 // 출처: specs/004-booth-slot-lease/contracts/lease-api.md, V5__booth_slot_seed.sql
 import type { ApiError } from '../../shared/api/client';
 import { debitForLease, getWallet } from '../wallet/api.mock';
+import { LEASE_COIN_COST } from './types';
 import type { LeaseResponse, MyBooth, SlotView } from './types';
 
 const STORAGE_KEY = 'festa-mock-booth-leases';
-const LEASE_COIN = 100; // 1일 임대료(C 확정 수치)
+const LEASE_COIN = LEASE_COIN_COST; // 1일 임대료(C 확정 수치) — 안내 문구와 같은 출처를 쓴다
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // sentinel — facade mock의 999 관용구 계승. 실 BE에 없는 시나리오 재현용.
