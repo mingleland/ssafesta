@@ -188,7 +188,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-09 | Spring↔FastAPI 내부 API를 어떻게 인증하고 회전하는가? | AI + BE + Infra | **확정: 방향별 Bearer Token 2종, Security Group과 독립적인 애플리케이션 검증, 콤마 목록 최대 2개, 첫 값 송신·전체 값 상수 시간 검증, 단계적 무중단 회전. mTLS는 P2** ([GitLab Work Item #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/102)) |
 | C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도(`DEAD`는 AI 내부 상태로만 유지), 저장소 복구 후 자동 재처리 없음(명시적 재처리 요청으로 새 Job), reconcile 결과는 Spring DB `storage_reconciliation_log`에 `runId + documentId` 멱등으로 적재하고 `VERIFIED` 객체만 문서 Provider 반영, 전달 경로는 #102 Service Token 방식을 재사용하되 Infra 전용 credential·scope로 분리, `STORAGE_UNAVAILABLE=503`(재시도 가능)·`STORAGE_QUOTA_EXCEEDED=507`(재시도 불가)로 분리. P0에서는 probe evidence만 수집하고 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 미확정 2건(`R2_RECONCILING` 중 신규 업로드 허용 여부, R2 API 장애 자동 판정 수치)은 `docs/26_팀_결정_필요사항.md`에 등록하고 후속 이슈로 분리** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
 | C-12 | AI 직원의 `role_code`·`tone_code`·`response_length` 허용값은? | AI + BE | **확정: role 2종(`PROJECT_DOCENT`·`GUIDE`), tone 3종(`FRIENDLY` 기본·`PROFESSIONAL`·`ENTHUSIASTIC`), responseLength 3종(`SHORT` 1~3문장·`MEDIUM` 4~6문장 기본·`LONG` 7~12문장). 저장과 검증은 Spring, 해석은 FastAPI가 한다. `responseLength → max_tokens` 매핑은 AI 파트 소유이며 `SHORT` 200·`MEDIUM` 400·`LONG` 800을 제안값으로 두되 모델 확정 후 재검증한다 — Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다** ([GitLab Issue #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112)) |
-| C-13 | 부스당 AI 직원 수 상한은? | BE + 기획 | **확정: 1명.** 서버 설정값으로 두어 조정 가능하게 한다. Agent가 하나뿐이므로 C-05의 Agent당 문서 10개·100MB가 사실상 부스당 상한이 된다 |
+| C-13 | 부스당 AI 직원 수 상한은? | BE + 기획 | **잠정 1명 — 팀 합의가 아니라 BE가 임의로 넣은 값이다 (2026-08-27).** spec 어디에도 수치가 없어 `S15P21A604-105` 착수가 막혀 있었고 값이 지금 필요했다. 합의가 나오면 대체된다 — 서버 설정값이라 교체 비용은 낮다. 잠정값 기준으로 Agent가 하나뿐이므로 C-05의 Agent당 문서 10개·100MB가 사실상 부스당 상한이 된다 |
 
 *C-11은 AI 파트가 채운다 (#112 협의) — 번호 구멍은 의도된 것이다.*
 
@@ -216,7 +216,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: `tone_code`는 무엇을 두는가? → A: `FRIENDLY`(기본)·`PROFESSIONAL`·`ENTHUSIASTIC` 3종. **길이를 뜻하는 값(`CONCISE` 등)은 두지 않는다** — `response_length`와 같은 것을 두 번 말하게 되고, 둘이 어긋났을 때 어느 쪽을 따를지 답이 없어진다.
 - Q: `response_length`의 기준은 무엇인가? → A: `SHORT` 1~3문장, `MEDIUM` 4~6문장(기본, V1 스키마의 `DEFAULT 'MEDIUM'`과 일치), `LONG` 7~12문장. **문단이 아니라 문장 수로 적는다** — 문단은 길이가 정해지지 않아 기준이 되지 못한다.
 - Q: `response_length`를 LLM 호출에 어떻게 반영하는가? → A: `max_tokens` 매핑은 **AI 파트가 소유한다.** `SHORT` 200·`MEDIUM` 400·`LONG` 800을 제안값으로 두고 실제 모델 확정 후 재검증한다. Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다 — 모델이 바뀔 때 DB 마이그레이션이 따라오지 않아야 한다.
-- Q: 부스당 AI 직원을 몇 명까지 두는가? → A: **1명.** 값은 서버 설정으로 두어 조정 가능하게 한다. spec은 상한만 정하고 수치를 코드에 하드코딩하지 않는다.
+- Q: 부스당 AI 직원을 몇 명까지 두는가? → A: **잠정 1명. 팀 합의가 아니라 BE가 임의로 넣은 값이다.** `S15P21A604-105`가 "Booth 당 상한 정책 포함"을 요구하는데 수치가 spec 어디에도 없어 착수가 막혀 있었고, 값 없이는 구현이 진행되지 않아 지금 넣었다. 합의가 나오면 그 값으로 대체한다 — 서버 설정으로 두므로 코드 변경 없이 바뀐다. spec은 상한의 **존재**를 정하고 수치를 코드에 하드코딩하지 않는다.
 
 ---
 
