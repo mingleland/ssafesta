@@ -90,6 +90,10 @@ namespace Festa.Booth
 
         public void Rebuild(BoothLayoutDto layout)
         {
+            // 외부 진입점 널가드 (S15P21A604-172) — 슬롯 오케스트레이터는 LoadAndBuildAsync 를
+            // 거치지 않고 Rebuild 를 직접 부른다. 동결 기준선의 재설계가 아니라 public 메서드의
+            // 초기화 순서 결함 수정 1줄이다.
+            _factory ??= new BoothObjectFactory(_registry);
             Clear();
 
             foreach (var dto in layout.objects)
