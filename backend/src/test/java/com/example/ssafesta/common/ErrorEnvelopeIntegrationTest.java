@@ -121,12 +121,18 @@ class ErrorEnvelopeIntegrationTest {
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
-    /** Every code the envelope can answer with declares the status it is sent as. */
+    /**
+     * Every code declares an error status — nothing here claims it was <i>sent</i> with one.
+     *
+     * <p>The name used to say {@code …IsTheStatusItIsSentWith}, which this does not check: it never
+     * makes a request. Send-consistency is covered where it is actually observable — the 404, 405 and
+     * 415 tests above each assert a status and the code that came with it (raised in review of !56).
+     */
     @Test
-    void everyErrorCodeStatusIsTheStatusItIsSentWith() {
+    void everyErrorCodeDeclaresAnErrorStatus() {
         for (ErrorCode code : ErrorCode.values()) {
             assertNotNull(code.status(), code + "에 status가 없습니다.");
-            assertTrue(code.status().value() >= 400, code + "는 오류 코드인데 " + code.status() + "입니다.");
+            assertTrue(code.status().isError(), code + "는 오류 코드인데 " + code.status() + "입니다.");
         }
     }
 

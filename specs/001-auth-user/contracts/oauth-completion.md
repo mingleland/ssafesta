@@ -52,7 +52,9 @@ Request body는 선택 사항이다.
   이 코드를 싣지 않은 맨 `RuntimeException` 이라 `handleUnexpected` 로 떨어졌다. 닉네임을 고르던 사람은
   "이미 사용 중입니다" 대신 "서버 오류가 발생했습니다"를 봤다. 계약 변경이 아니라 공백을 메운 것이다.
 - 두 409를 **한 코드로 합치지 않는다.** 발견 시점이 다르다 — 중복은 사전 검사가, 경합은 DB 가 잡는다.
-  서버는 **DB 가 이름을 댄 제약**으로만 경합을 판정한다(`users_nickname_key`, `oauth_identities_*` 셋).
+  서버는 **DB 가 이름을 댄 제약 둘**로만 경합을 판정한다 — `users_nickname_key` 와
+  `oauth_identities_provider_provider_subject_key`. (`oauth_identities_user_id_provider_key` 는 방금 만든
+  회원에 identity 를 하나 넣는 경로라 **발화할 수 없어 제외**한다 — 발화하면 서버 결함이다.)
   **그 밖의 무결성 위반은 이름을 아는 unique 든 아니든 전부 500 이다** — FK·NOT NULL·CHECK 는 물론이고,
   나중에 추가될 unique index 도 마찬가지다. 409 로 덮으면 서버 결함이 아무도 안 보는 상태에 묻히고
   사용자는 낫지 않을 재시도를 반복한다.

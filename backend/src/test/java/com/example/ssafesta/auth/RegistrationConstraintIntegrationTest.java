@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -45,17 +47,31 @@ class RegistrationConstraintIntegrationTest {
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private RegistrationService registrations;
-    @Autowired private UserRepository users;
+    @MockitoSpyBean private UserRepository users;
     @MockitoSpyBean private OAuthIdentityRepository identities;
 
     @Test
     void theConstraintNamesTheServiceBranchesOnStillExist() {
         assertTrue(uniqueConstraintsOf("users").contains("users_nickname_key"),
                 "닉네임 경합 판정이 이 이름에 걸려 있습니다: " + uniqueConstraintsOf("users"));
-        assertTrue(uniqueConstraintsOf("oauth_identities").containsAll(List.of(
-                        "oauth_identities_provider_provider_subject_key",
-                        "oauth_identities_user_id_provider_key")),
-                "가입 경합 판정이 이 이름들에 걸려 있습니다: " + uniqueConstraintsOf("oauth_identities"));
+        assertTrue(uniqueConstraintsOf("oauth_identities").contains("oauth_identities_provider_provider_subject_key"),
+                "가입 경합 판정이 이 이름에 걸려 있습니다: " + uniqueConstraintsOf("oauth_identities"));
+    }
+
+    /**
+     * The identity constraint the service deliberately leaves out still exists.
+     *
+     * <p>Separate from the test above because it means the opposite thing: this one is <b>not</b> a
+     * name the service branches on. It is checked because it is the stand-in an unknown constraint
+     * uses in {@link #aUniqueViolationTheServiceCannotNameIsNotReadAsARace} — if a migration dropped
+     * it, that test would still pass while proving nothing. Asserting it beside the two the service
+     * does branch on would have said the service treats three constraints as races, which it no
+     * longer does (raised in review of !56).
+     */
+    @Test
+    void theIdentityConstraintTheServiceExcludesStillExists() {
+        assertTrue(uniqueConstraintsOf("oauth_identities").contains("oauth_identities_user_id_provider_key"),
+                "제외 판단의 전제이자 미지 제약 대역입니다: " + uniqueConstraintsOf("oauth_identities"));
     }
 
     /**
@@ -101,17 +117,25 @@ class RegistrationConstraintIntegrationTest {
                 "duplicate key", new SQLException("duplicate key", "23505"), constraint));
     }
 
-    /** The nickname race answers with the same code the pre-check does — the caller needs another name. */
+    /**
+     * The nickname race — the one the database catches, not the one the pre-check catches.
+     *
+     * <p>The first version committed a user with the nickname and called {@code complete}. That
+     * never reached the insert: {@code existsByNickname} sees the row and throws from the pre-check,
+     * so the test proved the pre-check works and left the {@code users_nickname_key} mapping
+     * unexercised — it asserted the right code by the wrong route (raised in review of !56).
+     *
+     * <p>Stubbing the pre-check to pass is what forces the race path: the only way this exception can
+     * arrive now is the translation under test.
+     */
     @Test
-    void aNicknameLostToAnotherSignupAnswersAsADuplicate() {
-        String nickname = "선점" + UUID.randomUUID().toString().substring(0, 6);
-        users.save(new User(nickname));
+    void aNicknameLostBetweenTheCheckAndTheInsertAnswersAsADuplicate() {
+        doReturn(false).when(users).existsByNickname(anyString());
+        doThrow(violationOf("users_nickname_key")).when(users).save(any(User.class));
 
-        // Bypasses the pre-check the way a concurrent signup would: the row appears between the
-        // check and the insert. Committing it first is the closest a single thread gets to that.
-        DuplicateNicknameException thrown = org.junit.jupiter.api.Assertions.assertThrows(
-                DuplicateNicknameException.class,
-                () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(), nickname));
+        DuplicateNicknameException thrown = assertThrows(DuplicateNicknameException.class,
+                () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(),
+                        "경합닉" + UUID.randomUUID().toString().substring(0, 6)));
 
         assertEquals(ErrorCode.NICKNAME_DUPLICATED, thrown.errorCode());
     }
