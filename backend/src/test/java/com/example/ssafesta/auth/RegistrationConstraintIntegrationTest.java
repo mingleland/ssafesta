@@ -51,51 +51,13 @@ class RegistrationConstraintIntegrationTest {
     @MockitoSpyBean private OAuthIdentityRepository identities;
 
     @Test
-    void theConstraintNamesTheServiceBranchesOnStillExist() {
+    void theConstraintNamesTheServiceDependsOnStillExist() {
         assertTrue(uniqueConstraintsOf("users").contains("users_nickname_key"),
-                "닉네임 경합 판정이 이 이름에 걸려 있습니다: " + uniqueConstraintsOf("users"));
+                "닉네임 경합으로 번역하는 이름입니다: " + uniqueConstraintsOf("users"));
         assertTrue(uniqueConstraintsOf("oauth_identities").contains("oauth_identities_provider_provider_subject_key"),
-                "가입 경합 판정이 이 이름에 걸려 있습니다: " + uniqueConstraintsOf("oauth_identities"));
-    }
-
-    /**
-     * The identity constraint the service deliberately leaves out still exists.
-     *
-     * <p>Separate from the test above because it means the opposite thing: this one is <b>not</b> a
-     * name the service branches on. It is checked because it is the stand-in an unknown constraint
-     * uses in {@link #aUniqueViolationTheServiceCannotNameIsNotReadAsARace} — if a migration dropped
-     * it, that test would still pass while proving nothing. Asserting it beside the two the service
-     * does branch on would have said the service treats three constraints as races, which it no
-     * longer does (raised in review of !56).
-     */
-    @Test
-    void theIdentityConstraintTheServiceExcludesStillExists() {
+                "가입 경합으로 번역하는 이름입니다: " + uniqueConstraintsOf("oauth_identities"));
         assertTrue(uniqueConstraintsOf("oauth_identities").contains("oauth_identities_user_id_provider_key"),
-                "제외 판단의 전제이자 미지 제약 대역입니다: " + uniqueConstraintsOf("oauth_identities"));
-    }
-
-    /**
-     * A unique violation the service cannot name must not be excused as a race.
-     *
-     * <p>This goes through {@code RegistrationService} rather than round the side of it. The first
-     * version inserted a duplicate wallet row with {@code JdbcTemplate} and asserted the database
-     * refused it — which proves the database has a constraint, and nothing at all about the
-     * translation the test is named after (raised in review of !56).
-     *
-     * <p>{@code oauth_identities_user_id_provider_key} is the stand-in: a real constraint on a table
-     * the signup writes to, and one the service deliberately does not list because it cannot fire on
-     * this path. If it somehow did, that is our bug and has to come out as a fault.
-     */
-    @Test
-    void aUniqueViolationTheServiceCannotNameIsNotReadAsARace() {
-        DataIntegrityViolationException unknown = violationOf("oauth_identities_user_id_provider_key");
-        doThrow(unknown).when(identities).save(any(OAuthIdentity.class));
-
-        DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
-                () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(),
-                        "모르는제약" + UUID.randomUUID().toString().substring(0, 6)));
-
-        assertSame(unknown, thrown, "서비스가 이름을 모르는 unique 위반은 409 가 아니라 그대로 올라가야 합니다.");
+                "번역하지 않는 이름 — 미지 제약 테스트의 대역입니다: " + uniqueConstraintsOf("oauth_identities"));
     }
 
     /** The one identity constraint that <i>can</i> fire is still translated. */

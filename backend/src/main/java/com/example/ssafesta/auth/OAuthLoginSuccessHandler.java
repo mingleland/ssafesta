@@ -64,20 +64,9 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     }
 
     /**
-     * A suspended account authenticated with the provider, and must not get a session (FR-021).
-     *
-     * <p>It used to throw. Nothing catches a plain {@code RuntimeException} here — this runs inside
-     * the security filter chain, which {@code @RestControllerAdvice} never sees — so the browser was
-     * left on the backend's own callback URL looking at a raw error instead of returning to the app.
-     *
-     * <p>Two things have to happen, not one. The redirect carries <b>why</b>, and any handoff left
-     * over from an earlier attempt is <b>deleted</b>: it lives up to five minutes, and the frontend
-     * calls {@code complete} unconditionally on arrival, so a stale one would let a suspended visitor
-     * ride someone else's — or their own earlier — login through.
-     *
-     * <p>The frontend does not read the parameter yet, so today this ends at the ordinary restart
-     * screen. Telling the person their account is suspended (spec 001 AS-5) is the frontend's half
-     * and is not done here — this only makes it possible (docs/26).
+     * Refuse without a session (FR-021): redirect with the reason and clear any handoff left from
+     * an earlier attempt — it lives five minutes and the frontend calls complete on arrival.
+     * Throwing here reached nobody; the filter chain never passes {@code @RestControllerAdvice}.
      */
     private void refuseSuspended(HttpServletResponse response, Long userId) throws IOException {
         log.warn("정지된 계정의 소셜 로그인을 거부했습니다 — userId={}", userId);
@@ -87,7 +76,7 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private void redirectWithHandoff(HttpServletResponse response, String handoff) throws IOException {
         ResponseCookie cookie = ResponseCookie.from(OAuthCompletionController.HANDOFF_COOKIE, handoff)
-                .httpOnly(true).secure(properties.cookieSecure()).sameSite("Lax").path("/api/v1/auth/oauth/complete")
+                .httpOnly(true).secure(properties.cookieSecure()).sameSite("Lax").path(OAuthCompletionController.HANDOFF_COOKIE_PATH)
                 .maxAge(properties.oauthStateTtl()).build();
         response.addHeader("Set-Cookie", cookie.toString());
         response.sendRedirect(properties.frontendBaseUrl() + "/auth/callback");

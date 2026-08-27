@@ -62,7 +62,7 @@ public class OAuthCompletionController {
             }
             session = sessions.issue(registered.userId());
         }
-        return ResponseEntity.ok().header("Set-Cookie", clearHandoffCookie().toString())
+        return ResponseEntity.ok().header("Set-Cookie", clearHandoffCookie(properties).toString())
                 .header("Set-Cookie", refreshCookie(session.refreshToken()).toString())
                 .body(OAuthCompletionResponse.authenticated(session.accessToken(), session.expiresAt()));
     }
@@ -72,15 +72,7 @@ public class OAuthCompletionController {
                 .path(properties.refreshCookiePath()).maxAge(properties.refreshTokenTtl()).build();
     }
 
-    private ResponseCookie clearHandoffCookie() {
-        return clearHandoffCookie(properties);
-    }
-
-    /**
-     * The deletion has to match the cookie's own attributes or the browser keeps it, so the one
-     * definition is shared rather than copied: {@code OAuthLoginSuccessHandler} clears it too, on the
-     * path where a suspended account is turned away before any handoff is issued.
-     */
+    /** Deletion must match the cookie's own attributes; the suspended-account path clears it too. */
     static ResponseCookie clearHandoffCookie(AuthProperties properties) {
         return ResponseCookie.from(HANDOFF_COOKIE, "").httpOnly(true).secure(properties.cookieSecure()).sameSite("Lax")
                 .path(HANDOFF_COOKIE_PATH).maxAge(0).build();

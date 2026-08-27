@@ -46,45 +46,15 @@ public class OAuthHandoffService {
         return new MemberSessionService.MemberSession(fields[1], Instant.parse(fields[3]), fields[2]);
     }
 
-    /**
-     * Reads the pending signup <b>without</b> spending it — {@link #discard} does that, once the
-     * member actually exists.
-     *
-     * <p>Deleting on read is right for the member handoff, where nothing after it can fail. Signup
-     * can: the nickname may be taken or refused, and FR-021c says the handoff is spent only on a
-     * valid submission. Reading it destructively meant a rejected nickname burned it, so the very
-     * retry the 409 invites came back {@code OAUTH_HANDOFF_EXPIRED} and the person had to start the
-     * whole OAuth round trip over (raised in review of !56).
-     *
-     * <p>Reading without deleting is only half of it — {@link #discard} has to carry the
-     * one-use guarantee that {@code getAndDelete} used to, or two callers holding the same handoff
-     * both get a session.
-     */
+    /** Reads without spending — {@link #discard} spends it, once the member exists (FR-021c). */
     public PendingRegistration peekRegistration(String handoff) {
         String[] fields = read(handoff, Kind.REGISTRATION, 3);
         return new PendingRegistration(OAuthProvider.valueOf(fields[1]), decode(fields[2]));
     }
 
-    /**
-     * Spends a handoff that {@link #peekRegistration} read, and reports whether this caller is the
-     * one that spent it.
-     *
-     * <p>{@code DEL} is atomic and answers how many keys it removed, so among callers racing on the
-     * same handoff exactly one sees {@code true}. That single bit is what keeps a handoff worth one
-     * session: the caller must not issue one unless it won, because
-     * {@link MemberSessionService#issue} <b>revokes the account's previous session</b> — a replay
-     * would not merely mint a second session, it would cut the first one off.
-     *
-     * <p>Returning void here was how the read-then-delete split first went in, and it silently
-     * dropped the one-use guarantee that {@code getAndDelete} had been providing (raised in review
-     * of !56).
-     */
+    /** Spends the handoff; {@code true} only for the caller whose DEL removed it — one session per handoff. */
     public boolean discard(String handoff) {
-        boolean spent = Boolean.TRUE.equals(redis.delete(key(handoff)));
-        if (spent) {
-            log.info("Consumed OAuth handoff type={}", Kind.REGISTRATION);
-        }
-        return spent;
+        return Boolean.TRUE.equals(redis.delete(key(handoff)));
     }
 
     private String store(String... fields) {

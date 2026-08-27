@@ -102,39 +102,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * The funnel everything unhandled reaches — which makes it the only place Spring's own
-     * rejections can be caught.
-     *
-     * <p>They carry their status on the {@link ErrorResponse} <i>interface</i>. Only the hand-thrown
-     * {@code ResponseStatusException} extends a class an {@code @ExceptionHandler} could name; the
-     * framework's own — a missing handler (404), an unsupported method (405), a missing cookie (400)
-     * — extend {@code ServletException} instead. Matching on {@code ResponseStatusException} missed
-     * every one of them, so client mistakes were reported as server faults, and the
-     * {@code METHOD_NOT_ALLOWED} arm of {@link #codeFor} was unreachable (#113).
-     *
-     * <p>Only 4xx is answered quietly. A 5xx arriving here is still an unknown failure and is still
-     * logged loudly — a 500 that nobody notices is how a silent fallback starts (T-24).
+     * Spring's own rejections carry their status on {@link ErrorResponse}, not by extending
+     * {@code ResponseStatusException} — matching on that class missed every one of them (#113).
+     * Only 4xx is answered quietly; a 5xx here is still an unknown failure (T-24).
      */
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
         if (exception instanceof ErrorResponse rejection && rejection.getStatusCode().is4xxClientError()) {
             ErrorCode code = codeFor(HttpStatus.resolve(rejection.getStatusCode().value()));
-            if (code == null) {
-                // A status the envelope has no code for. Borrowing another code would put one status
-                // in the body and a different one on the wire, so the generic client-error code
-                // answers — and says so, because a status we never contracted is worth seeing.
-                log.warn("계약에 없는 프레임워크 거부입니다 — status={} 를 일반 코드로 답합니다.",
-                        rejection.getStatusCode());
-                code = ErrorCode.VALIDATION_FAILED;
-            }
-            // Spring writes its own reason in English ("No static resource api/v1/...", "Request
-            // method 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes
-            // to the log and the client gets the code's message.
             log.debug("프레임워크 거부 — status={} reason={}", rejection.getStatusCode(), exception.getMessage());
-            // The code's own status, never the exception's. ErrorCode declares a status per code and
-            // the client branches on the code, so the two disagreeing makes ErrorCode.status() a lie:
-            // a 415 answered with VALIDATION_FAILED said 400 in the body and 415 on the wire
-            // (raised in review of !56).
+            // The code's status, never the exception's — the client branches on the code.
             return ResponseEntity.status(code.status())
                     .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
         }
@@ -150,10 +127,9 @@ public class GlobalExceptionHandler {
                 RequestIdFilter.current()));
     }
 
-    /** The code contracted for this status, or {@code null} when the envelope has none. */
     private ErrorCode codeFor(HttpStatus status) {
         if (status == null) {
-            return null;
+            return ErrorCode.VALIDATION_FAILED;
         }
         return switch (status) {
             case UNAUTHORIZED -> ErrorCode.UNAUTHORIZED;
@@ -162,7 +138,7 @@ public class GlobalExceptionHandler {
             case METHOD_NOT_ALLOWED -> ErrorCode.METHOD_NOT_ALLOWED;
             case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
             case UNSUPPORTED_MEDIA_TYPE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
-            default -> null;
+            default -> ErrorCode.VALIDATION_FAILED;
         };
     }
 }

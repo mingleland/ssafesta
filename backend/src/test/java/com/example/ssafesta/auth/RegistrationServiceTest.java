@@ -15,7 +15,9 @@ import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import java.sql.SQLException;
 import java.util.Optional;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
@@ -55,6 +57,17 @@ class RegistrationServiceTest {
                 () -> signupFailingWith(notARace));
 
         assertSame(notARace, thrown, "이름 없는 무결성 오류는 그대로 올라가 500 으로 크게 남아야 합니다.");
+    }
+
+    /** A name we do not translate is a fault too — same arm, different input class. */
+    @Test
+    void aUniqueViolationTheServiceCannotNameIsNotDisguisedAsARace() {
+        DataIntegrityViolationException unknown = new DataIntegrityViolationException("dup",
+                new ConstraintViolationException("dup", new SQLException("dup", "23505"),
+                        "oauth_identities_user_id_provider_key"));
+
+        assertSame(unknown, assertThrows(DataIntegrityViolationException.class, () -> signupFailingWith(unknown)),
+                "서비스가 번역하지 않는 제약도 그대로 올라가야 합니다.");
     }
 
     private void signupFailingWith(DataIntegrityViolationException failure) {

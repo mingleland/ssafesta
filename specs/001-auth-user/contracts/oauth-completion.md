@@ -111,7 +111,7 @@ Set-Cookie: oauth_handoff=; Max-Age=0; Path=/api/v1/auth/oauth/complete
 
 | 판정 자리 | 예상 입력 | 예상 출력 | 미지 입력 | fail-closed |
 |---|---|---|---|---|
-| `GlobalExceptionHandler#handleUnexpected` 의 `ErrorResponse` 분기 | 프레임워크가 던진 4xx (404·405·400·415) | 그 status + 계약 code | 계약에 code 가 없는 status | ✅ 일반 code + **`log.warn`** — 도달 사실이 로그에 남는다 |
+| `GlobalExceptionHandler#handleUnexpected` 의 `ErrorResponse` 분기 | 프레임워크가 던진 4xx (404·405·400·415) | 그 status + 계약 code | 계약에 code 가 없는 status | ✅ 일반 code(`VALIDATION_FAILED`) — status 는 debug 로그에 남는다 |
 | `RegistrationService#asSignupRaceOrRethrow` | `users_nickname_key` · `oauth_identities_provider_provider_subject_key` | 409 `NICKNAME_DUPLICATED` · 409 `REGISTRATION_CONFLICT` | 그 밖의 제약, 이름 없는 위반 | ✅ **그대로 되던짐 → 500 + `log.error`** |
 | `OAuthCompletionController` 의 handoff 소비 | `discard` 가 `true` (이 호출이 소비함) | 세션 발급 | `discard` 가 `false` (남이 먼저 씀) | ✅ **410, 세션 미발급** |
 

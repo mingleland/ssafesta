@@ -33,16 +33,6 @@ public enum ErrorCode {
     // ── 회원 (spec 001) ─────────────────────────────────────────────────────
     NICKNAME_INVALID(HttpStatus.BAD_REQUEST, "사용할 수 없는 닉네임입니다."),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
-    /**
-     * Distinguished from {@link #NICKNAME_DUPLICATED} on purpose — the two are found at different
-     * moments. This one comes from the database refusing an insert that the duplicate check had
-     * already allowed, so the thrower cannot say which value collided.
-     *
-     * <p>It does not promise that the identical request succeeds. Resubmitting is safe and is what
-     * the message asks for, but where the collision was the nickname it comes back as
-     * {@link #NICKNAME_DUPLICATED} — the retry converges on the accurate answer rather than on
-     * success.
-     */
     REGISTRATION_CONFLICT(HttpStatus.CONFLICT, "가입 처리 중 충돌이 발생했습니다. 다시 시도해 주세요."),
     WITHDRAWAL_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "탈퇴 내용을 확인한 뒤 확정해야 합니다."),
 
