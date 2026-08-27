@@ -18,7 +18,7 @@
 
 **Purpose**: infra-003가 소유하는 코드·테스트·배포 경계와 실행 규약을 준비한다.
 
-- [ ] T001 infra-001/002 재사용 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
+- [ ] T001 infra-001/002 재사용 경계, Unity 6000.0.78f1의 x86_64 서버 대상·OCI Unity 검증 취소 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
 - [ ] T002 [P] 실제 값을 포함하지 않는 game image·도메인·토큰 Secret·TLS·network·volume 환경 변수 예시를 `infra/unity-server/.env.example`에 작성한다
 - [ ] T003 [P] ShellCheck 대상 엄격 모드, 정리 trap, 민감정보 제거와 공통 assertion을 `infra/unity-server/tests/lib/assert.sh`에 작성한다
 - [ ] T004 [P] Unity 보안 코드와 EditMode 테스트를 분리하는 assembly definition을 `festa-unity/Assets/_Project/Scripts/Network/Security/Festa.Network.Security.asmdef`와 `festa-unity/Assets/_Project/Tests/EditMode/Festa.Network.Security.Tests.asmdef`에 구성한다
@@ -91,7 +91,7 @@
 ### Implementation for User Story 2
 
 - [ ] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
-- [ ] T031 [P] [US2] image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
+- [ ] T031 [P] [US2] host·game image의 x86_64 일치와 에뮬레이션 미사용, image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
 - [ ] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
 - [ ] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
 - [ ] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
@@ -281,6 +281,7 @@ Task: T053 P0 evidence schema 테스트
 
 - `[P]`는 다른 파일에서 병렬 가능한 작업이며 같은 파일 수정은 순차 실행한다.
 - 실제 도메인·EC2·상위 80/443 권한은 infra-002 C-01/C-02 입력을 기다리되 로컬 코드·정적 테스트를 먼저 완료할 수 있다.
+- Dedicated Server 실측 대상은 x86_64 EC2로 한정한다. OCI ARM64의 Unity 검증은 WebGL 정적 배포를 포함해 취소했으며 완료 근거로 사용하지 않는다.
 - 외부 WSS·10분 idle·40명 결과는 실제 실측 없이 완료 처리하지 않는다.
 - `festa-unity/Docker/Dockerfile`, 이동·스폰·Booth Runtime 기준선은 재구현하거나 리팩터링하지 않는다.
 - 자동 재접속, 다중 채널, 고가용성, ALB/NLB/ACM/ECS는 이 작업 목록에 추가하지 않는다.
