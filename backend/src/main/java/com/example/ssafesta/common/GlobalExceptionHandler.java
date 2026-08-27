@@ -7,10 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Turns every exception that escapes a controller into the one error shape (docs/08 §1.3).
@@ -39,22 +39,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(
                 code, exception.getMessage(), RequestIdFilter.current(),
                 exception.errors(), exception.warnings()));
-    }
-
-    /**
-     * Spring's own rejections — a missing handler (404), an unsupported method (405) — plus any
-     * remaining hand-thrown ones. They already know their status; all they lack is a code.
-     */
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception) {
-        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-        ErrorCode code = codeFor(status);
-        // Spring writes its own reason in English ("No static resource api/v1/...", "Request method
-        // 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes to the log
-        // and the client gets the code's message.
-        log.debug("프레임워크 거부 — status={} reason={}", status, exception.getReason());
-        return ResponseEntity.status(exception.getStatusCode())
-                .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
     }
 
     /** A body that could not be parsed at all — malformed JSON, wrong type in a field. */
@@ -117,8 +101,31 @@ public class GlobalExceptionHandler {
                 ErrorCode.UNAUTHORIZED, ErrorCode.UNAUTHORIZED.defaultMessage(), RequestIdFilter.current()));
     }
 
+    /**
+     * The funnel everything unhandled reaches — which makes it the only place Spring's own
+     * rejections can be caught.
+     *
+     * <p>They carry their status on the {@link ErrorResponse} <i>interface</i>. Only the hand-thrown
+     * {@code ResponseStatusException} extends a class an {@code @ExceptionHandler} could name; the
+     * framework's own — a missing handler (404), an unsupported method (405), a missing cookie (400)
+     * — extend {@code ServletException} instead. Matching on {@code ResponseStatusException} missed
+     * every one of them, so client mistakes were reported as server faults, and the
+     * {@code METHOD_NOT_ALLOWED} arm of {@link #codeFor} was unreachable (#113).
+     *
+     * <p>Only 4xx is answered quietly. A 5xx arriving here is still an unknown failure and is still
+     * logged loudly — a 500 that nobody notices is how a silent fallback starts (T-24).
+     */
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
+        if (exception instanceof ErrorResponse rejection && rejection.getStatusCode().is4xxClientError()) {
+            ErrorCode code = codeFor(HttpStatus.resolve(rejection.getStatusCode().value()));
+            // Spring writes its own reason in English ("No static resource api/v1/...", "Request
+            // method 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes
+            // to the log and the client gets the code's message.
+            log.debug("프레임워크 거부 — status={} reason={}", rejection.getStatusCode(), exception.getMessage());
+            return ResponseEntity.status(rejection.getStatusCode())
+                    .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
+        }
         log.error("처리되지 않은 예외 — requestId={}", RequestIdFilter.current(), exception);
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.status()).body(ApiErrorResponse.of(
                 ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(),

@@ -35,10 +35,20 @@ public class GuestAuthController {
         return ResponseEntity.ok(new GuestTokenResponse(issued.token(), issued.expiresAt()));
     }
 
+    /**
+     * The cookie is optional <i>here</i> so that its absence is our rejection rather than Spring's:
+     * a visitor with no session is the ordinary case — the frontend calls this once on every page
+     * load and cannot check for the cookie itself, since it is HttpOnly by design (헌법 13조). Let
+     * Spring raise {@code MissingRequestCookieException} and every guest's first page load leaves a
+     * server error behind (#113).
+     */
     @PostMapping("/refresh")
-    public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token") String refreshToken,
+    public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token", required = false) String refreshToken,
                                                         @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {
         requireTrustedOrigin(origin, properties);
+        if (refreshToken == null) {
+            throw new InvalidRefreshTokenException();
+        }
         MemberSessionService.MemberSession session = memberSessionService.refresh(refreshToken);
         ResponseCookie cookie = ResponseCookie.from("refresh_token", session.refreshToken())
                 .httpOnly(true).secure(properties.cookieSecure()).sameSite("Lax").path(properties.refreshCookiePath())
