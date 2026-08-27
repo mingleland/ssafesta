@@ -546,6 +546,20 @@ export const GameStudioShell = ({
     }
   }, [gameId, hasUnsavedChanges, navigate, previewRepository, save, store]);
 
+  const placeObject = useCallback((preset: GameObject['preset'], x: number, y: number) => {
+    if (selectedScene.type === 'DIALOGUE') return;
+    try {
+      const result = addObject(project, selectedScene.id, preset, { x, y });
+      apply(result.project);
+      setSelectedObjectId(result.objectId);
+      setSelectedObjectIds(new Set([result.objectId]));
+      setRightPanel('PROPERTIES');
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '오브젝트를 배치하지 못했습니다.');
+    }
+  }, [apply, project, selectedScene]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
@@ -587,6 +601,17 @@ export const GameStudioShell = ({
       if (event.altKey && event.key.toLowerCase() === 'l' && !editingText) {
         event.preventDefault();
         setShowLayers((current) => !current);
+        return;
+      }
+      if (!editingText && (event.key === 'Enter' || event.key === ' ') && placementPreset !== null) {
+        // 팔레트 버튼은 캔버스에 tabIndex가 없어 활성화 후에도 포커스가 버튼에 남는다 —
+        // keyboardCanvasContext(캔버스/body 포커스) 요건을 걸면 키보드로는 절대 확정할 수 없다.
+        event.preventDefault();
+        const scene = store.getState().project.scenes.find((candidate) => candidate.id === selectedSceneId);
+        if (scene !== undefined && scene.type !== 'DIALOGUE') {
+          placeObject(placementPreset, Math.floor(scene.width / 2), Math.floor(scene.height / 2));
+        }
+        setPlacementPreset(null);
         return;
       }
       const keyboardCanvasContext = target === document.body || (target instanceof HTMLElement && (
@@ -680,7 +705,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
+  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
 
   const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -758,20 +783,6 @@ export const GameStudioShell = ({
     setSelectedSceneId(next.scenes.at(-1)?.id ?? next.startSceneId);
     setSelectedObjectId(null);
     setSelectedObjectIds(new Set());
-  };
-
-  const placeObject = (preset: GameObject['preset'], x: number, y: number) => {
-    if (selectedScene.type === 'DIALOGUE') return;
-    try {
-      const result = addObject(project, selectedScene.id, preset, { x, y });
-      apply(result.project);
-      setSelectedObjectId(result.objectId);
-      setSelectedObjectIds(new Set([result.objectId]));
-      setRightPanel('PROPERTIES');
-    } catch (error) {
-      setSaveStatus('error');
-      setNotice(error instanceof Error ? error.message : '오브젝트를 배치하지 못했습니다.');
-    }
   };
 
   return (
