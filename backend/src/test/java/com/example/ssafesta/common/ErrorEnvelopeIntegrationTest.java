@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -12,11 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.ssafesta.TestcontainersConfiguration;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -37,6 +41,8 @@ class ErrorEnvelopeIntegrationTest {
     @Autowired private MockMvc mockMvc;
     /** The application's own mapper — a hand-built one would not prove the shipped shape. */
     @Autowired private JsonMapper json;
+    /** {@code GuestAuthController} refuses any other Origin before it ever looks at the cookie. */
+    @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
     @Test
     void anUnauthenticatedRequestIsRefusedInTheEnvelope() throws Exception {
@@ -71,6 +77,86 @@ class ErrorEnvelopeIntegrationTest {
         mockMvc.perform(get("/api/v1/no-such-endpoint"))
                 .andExpect(status().is4xxClientError())
                 .andExpect(jsonPath("$.code").isString());
+    }
+
+    /**
+     * The same unknown path, but past the security filter — which is where the fault was.
+     *
+     * <p>{@link #anUnknownPathIsStillAnEnvelope} sends this unauthenticated, so the filter chain
+     * answers 401 and the assertion passes without the advice ever running. That blind spot is why
+     * #113 shipped with these tests green. Authenticated, the request reaches
+     * {@code NoResourceFoundException} and came back 500 — every endpoint not yet written looked
+     * like a broken server, and INTERNAL_ERROR is a code the client is told it may retry (#104).
+     */
+    @Test
+    void anUnknownPathUnderAuthenticationIsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/booths/{id}/staff", 1L).with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.requestId").isString());
+    }
+
+    /** 405 had a code in {@code codeFor} from the start, but nothing could reach it (#113). */
+    @Test
+    void anUnsupportedMethodIsRefusedWithItsOwnCode() throws Exception {
+        mockMvc.perform(delete(BeanValidationProbeController.PATH).with(jwt()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+    }
+
+    /**
+     * The status on the wire and the status the code declares are the same thing.
+     *
+     * <p>The client branches on {@code code}, and every {@code ErrorCode} carries a status. Answering
+     * 415 with {@code VALIDATION_FAILED} would put 400 in the body's meaning and 415 on the response,
+     * which makes {@code ErrorCode.status()} a lie for that call. The handler now answers with the
+     * code's own status, so the two cannot drift apart (raised in review of !56).
+     */
+    @Test
+    void anUnsupportedContentTypeCarriesACodeThatAgreesWithTheStatus() throws Exception {
+        mockMvc.perform(post(BeanValidationProbeController.PATH).with(jwt())
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("본문 형식이 계약과 다르다"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    /**
+     * Every code declares an error status — nothing here claims it was <i>sent</i> with one.
+     *
+     * <p>The name used to say {@code …IsTheStatusItIsSentWith}, which this does not check: it never
+     * makes a request. Send-consistency is covered where it is actually observable — the 404, 405 and
+     * 415 tests above each assert a status and the code that came with it (raised in review of !56).
+     */
+    @Test
+    void everyErrorCodeDeclaresAnErrorStatus() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertNotNull(code.status(), code + "에 status가 없습니다.");
+            assertTrue(code.status().isError(), code + "는 오류 코드인데 " + code.status() + "입니다.");
+        }
+    }
+
+    /**
+     * A visitor with no session is the ordinary case, not a server fault.
+     *
+     * <p>The frontend calls refresh once on every page load and cannot skip it: the cookie is
+     * HttpOnly, so it has no way to learn whether a session exists (헌법 13조). Answering 500 meant
+     * every guest's page load left a server error behind for a real one to hide in.
+     */
+    @Test
+    void refreshWithoutItsCookieIsRefusedNotAnInternalError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh").header(HttpHeaders.ORIGIN, trustedOrigin))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /** Present but spent is the same event to the user, so it carries the same code. */
+    @Test
+    void refreshWithASpentCookieIsRefusedNotAnInternalError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh").header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .cookie(new Cookie("refresh_token", "no-longer-a-session")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
     }
 
     @Test
