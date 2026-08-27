@@ -8,6 +8,8 @@ the fail-fast behavior spec 007 plan.md Section 10 requires.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,7 +65,6 @@ class Settings(BaseSettings):
         "chunk_size",
         "chunk_overlap",
         "embedding_model_id",
-        "embedding_provider",
         "embedding_api_base_url",
         "embedding_api_key",
         mode="before",
@@ -82,16 +83,44 @@ class Settings(BaseSettings):
         (including a real `None` from a non-dotenv source, or a non-blank
         string like "512" or "text-embedding-3-small") passes through
         unchanged for normal coercion.
+
+        NOTE: `embedding_provider` and `embedding_api_path` are NOT in this
+        list — their types (`Literal["mock", "gms"]`, `str`) have no `None`
+        option, so mapping blank to `None` here would make them fail type
+        validation instead of falling back to their default. They get their
+        own blank-to-*default* validators below instead.
         """
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
 
+    @field_validator("embedding_provider", mode="before")
+    @classmethod
+    def _blank_embedding_provider_to_default(cls, value: object) -> object:
+        """Blank `EMBEDDING_PROVIDER` falls back to the `"mock"` default.
+
+        Unlike the `str | None` fields above, this field has no `None`
+        member in its `Literal["mock", "gms"]` type — passing `None` through
+        would fail type validation instead of resolving to the default.
+        """
+        if isinstance(value, str) and value.strip() == "":
+            return "mock"
+        return value
+
+    @field_validator("embedding_api_path", mode="before")
+    @classmethod
+    def _blank_embedding_api_path_to_default(cls, value: object) -> object:
+        """Blank `EMBEDDING_API_PATH` falls back to the `/v1/embeddings` default."""
+        if isinstance(value, str) and value.strip() == "":
+            return "/v1/embeddings"
+        return value
+
     # Embedding provider — spec 007 FR-009 / 헌법 18조
     embedding_dimension: int = 1536
     embedding_model_id: str | None = None
-    embedding_provider: str | None = None
+    embedding_provider: Literal["mock", "gms"] = "mock"
     embedding_api_base_url: str | None = None
+    embedding_api_path: str = "/v1/embeddings"
     embedding_api_key: SecretStr | None = None
 
     # Spring internal callback — spec 007 plan.md Section 9
@@ -151,6 +180,23 @@ class Settings(BaseSettings):
             raise ValueError(
                 "EMBEDDING_DIMENSION is fixed at 1536 (헌법 18조 / spec 007 FR-009), "
                 f"got {self.embedding_dimension}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_embedding_provider(self) -> "Settings":
+        if self.embedding_provider != "gms":
+            return self
+
+        required = {
+            "EMBEDDING_MODEL_ID": self.embedding_model_id,
+            "EMBEDDING_API_BASE_URL": self.embedding_api_base_url,
+            "EMBEDDING_API_KEY": self.embedding_api_key,
+        }
+        missing = [env_name for env_name, value in required.items() if value is None]
+        if missing:
+            raise ValueError(
+                "GMS embedding provider requires: " + ", ".join(sorted(missing))
             )
         return self
 

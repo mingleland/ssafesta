@@ -59,6 +59,7 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.job_sweeper_seconds == 60
     assert config.settings.job_max_retries == 3
     assert config.settings.job_retry_backoff_seconds == [60, 300, 900]
+    assert config.settings.embedding_provider == "mock"
     assert config.settings.embedding_dimension == 1536
     assert config.settings.internal_spring_to_ai_tokens == ["spring-to-ai-token-1"]
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
@@ -105,6 +106,47 @@ def test_embedding_dimension_is_locked_to_1536(
 ) -> None:
     _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_DIMENSION": "768"})
     with pytest.raises(ValidationError, match="1536"):
+        _fresh_settings_module()
+
+
+def test_gms_embedding_provider_requires_all_provider_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_PROVIDER": "gms"})
+
+    with pytest.raises(ValidationError, match="GMS embedding provider requires"):
+        _fresh_settings_module()
+
+
+def test_gms_embedding_provider_loads_complete_settings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "EMBEDDING_PROVIDER": "gms",
+            "EMBEDDING_MODEL_ID": "gms-embedding-v1",
+            "EMBEDDING_API_BASE_URL": "https://gms.example.test",
+            "EMBEDDING_API_PATH": "/v1/embeddings",
+            "EMBEDDING_API_KEY": "gms-secret-key",
+        },
+    )
+
+    config = _fresh_settings_module()
+
+    assert config.settings.embedding_provider == "gms"
+    assert config.settings.embedding_model_id == "gms-embedding-v1"
+    assert config.settings.embedding_api_path == "/v1/embeddings"
+    assert "gms-secret-key" not in repr(config.settings)
+
+
+def test_unknown_embedding_provider_fails_fast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_PROVIDER": "unknown"})
+
+    with pytest.raises(ValidationError, match="embedding_provider"):
         _fresh_settings_module()
 
 
@@ -167,15 +209,48 @@ def test_blank_embedding_model_id_resolves_to_none(
     """Regression: `.env.example` ships EMBEDDING_MODEL_ID= (blank) too.
 
     Finding 4 — the blank-to-None validator originally only covered
-    chunk_size/chunk_overlap; extend the same coverage check to the four
-    other blank-shipped optional string fields (embedding_model_id here is
-    representative of embedding_provider / embedding_api_base_url /
-    embedding_api_key, which share the same validator).
+    chunk_size/chunk_overlap; extend the same coverage check to the other
+    blank-shipped `str | None` fields (embedding_model_id here is
+    representative of embedding_api_base_url / embedding_api_key, which
+    share the same validator). `embedding_provider` and `embedding_api_path`
+    are NOT representative of this group — see the two tests below, they
+    have their own blank-to-*default* validators instead.
     """
     _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_MODEL_ID": ""})
     config = _fresh_settings_module()
 
     assert config.settings.embedding_model_id is None
+
+
+def test_blank_embedding_provider_resolves_to_mock_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Regression: a pre-this-diff `.env` still ships EMBEDDING_PROVIDER= (blank).
+
+    `embedding_provider` is `Literal["mock", "gms"]`, not `str | None`, so a
+    blank value must resolve to the `"mock"` default rather than `None`
+    (`None` fails Literal validation and crashes boot).
+    """
+    _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_PROVIDER": ""})
+    config = _fresh_settings_module()
+
+    assert config.settings.embedding_provider == "mock"
+
+
+def test_blank_embedding_api_path_resolves_to_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """A blank EMBEDDING_API_PATH must fall back to `/v1/embeddings`, not `""`.
+
+    `embedding_api_path` is plain `str`, not `str | None`; without its own
+    blank-to-default validator, a blank value silently loads as `""` and
+    ManagedEmbeddingProvider ends up calling the GMS base URL root instead
+    of the embeddings endpoint.
+    """
+    _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_API_PATH": ""})
+    config = _fresh_settings_module()
+
+    assert config.settings.embedding_api_path == "/v1/embeddings"
 
 
 def test_sweeper_seconds_zero_fails_fast(

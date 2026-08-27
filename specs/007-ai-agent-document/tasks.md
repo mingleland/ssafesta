@@ -60,6 +60,7 @@
 - [ ] T016 [P] [AI] Job 생성·상태 전이·조건부 heartbeat와 `callback_delivered_at`·`callback_terminated_at`·`callback_terminal_code` 전달/종료 상태 repository를 `festa-ai/app/repositories/document_job_repository.py`에 구현한다
 - [ ] T017 [P] [AI] `booth_id + agent_id + searchable = true` 필터를 강제하고 검색 불가 상태의 청크 전체 교체·callback 승인 후 활성화를 지원하는 repository를 `festa-ai/app/repositories/chunk_repository.py`에 구현한다
 - [ ] T018 [P] [AI] 문서별 Provider로 R2·MinIO adapter를 선택할 수 있는 object storage protocol과 PDF parser·Embedding Provider protocol을 `festa-ai/app/providers/storage.py`, `festa-ai/app/providers/document_parser.py`, `festa-ai/app/providers/embedding.py`에 정의한다
+- [X] T018a [P] [AI] LLM Provider protocol과 결정적 LLM·Embedding Mock Provider를 `festa-ai/app/providers/llm.py` 및 `festa-ai/app/providers/mock.py`에 구현한다 (`S15P21A604-94`)
 - [ ] T019 [P] [AI] 모든 Spring→FastAPI 내부 요청에서 `INTERNAL_SPRING_TO_AI_TOKENS` 전체를 `secrets.compare_digest`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하도록 `festa-ai/app/api/dependencies/internal_auth.py` 및 `festa-ai/app/api/errors.py`에 구현한다
 - [ ] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다
 - [ ] T021 [P] [AI] 안정적인 실패 코드와 사용자용 한국어 사유 매핑을 `festa-ai/app/services/failure_policy.py`에 구현한다
@@ -120,7 +121,7 @@
 - [ ] T044 [US2] [BE] 처리 요청 응답의 `jobId + documentId`를 다른 후속 처리보다 먼저 저장하고, callback에서 `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH`를 구분하며 mismatch를 계약 오류로 경고하고, `jobId + status` 멱등성과 `sourceHash` 최신성을 검증하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusController.java` 및 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusService.java`에 구현한다
 - [ ] T045 [P] [US2] [AI] Provider별 endpoint·bucket을 사용하는 boto3 기반 R2·MinIO storage adapter와 문서별 원본 metadata 검증을 `festa-ai/app/providers/s3_compatible_storage.py`에 구현한다
 - [ ] T046 [P] [US2] [AI] PDF 텍스트·페이지 추출·텍스트 없음 판정과 MD·TXT의 UTF-8 디코딩을 확장자 기준으로 분기해 `festa-ai/app/providers/document_parser.py`에 구현한다
-- [ ] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
+- [X] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
 - [ ] T048 [P] [US2] [AI] `S15P21A604-92`의 실측값을 초기 배포 설정에 반영하고 설정 기반 chunk size·overlap과 page/section 추적을 `festa-ai/app/services/text_chunker.py`에 구현한다
 - [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata·SHA-256을 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드하며, 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하는 파이프라인을 `festa-ai/app/services/document_processing_service.py`에 구현한다
 - [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다
