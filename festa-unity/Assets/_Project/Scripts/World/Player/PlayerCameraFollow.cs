@@ -181,12 +181,49 @@ namespace Festa.World
             }
 
             var obstructed = desiredDistance < _distance - 0.001f;
-            _cam.transform.position = obstructed
+            var candidate = obstructed
                 ? targetPos
                 : Vector3.Lerp(_cam.transform.position, targetPos, _followLerp * Time.deltaTime);
+
+            // 최종 위치에도 시야선 클램프를 건다 (T-217). 위의 SphereCast 는 "목표 위치"의
+            // 방향만 검사하는데, 실제 카메라는 보간(_followLerp) 경로 위에 있다 — 벽에 붙어
+            // 회전하거나 급히 방향을 바꾸면 보간 경로가 벽을 가로질러, 단면 벽 밖에서
+            // 실내가 통째로 컬링된 화면(하늘+바닥 판)이 나온다. 목표가 아니라
+            // **오늘 프레임에 실제로 놓을 위치**가 검사 대상이어야 한다.
+            _cam.transform.position = ClampLineOfSight(lookTarget, candidate, radius);
             _cam.transform.LookAt(lookTarget);
 
-            UpdateSelfVisibility();
+            UpdateSelfVisibility(Vector3.Distance(_cam.transform.position, lookTarget));
+        }
+
+        /// <summary>
+        /// lookTarget 에서 pos 까지 시야선이 막혀 있으면 장애물 앞으로 당긴 위치를 반환한다.
+        /// SphereCast 는 시작 구가 이미 콜라이더와 겹치면 그 콜라이더를 보고하지 않으므로
+        /// (벽에 딱 붙은 경우), 점 Linecast 를 백스톱으로 함께 건다.
+        /// </summary>
+        Vector3 ClampLineOfSight(Vector3 lookTarget, Vector3 pos, float radius)
+        {
+            var offset = pos - lookTarget;
+            float dist = offset.magnitude;
+            if (dist < 0.001f) return pos;
+            var dir = offset / dist;
+
+            float clamped = dist;
+            var hitCount = Physics.SphereCastNonAlloc(
+                lookTarget, radius, dir, _collisionHits, dist,
+                _collisionMask, QueryTriggerInteraction.Ignore);
+            for (var i = 0; i < hitCount; i++)
+            {
+                var hit = _collisionHits[i];
+                if (IsPlayerCollider(hit.collider)) continue;
+                clamped = Mathf.Min(clamped, Mathf.Max(radius, hit.distance - _collisionPadding));
+            }
+
+            if (Physics.Linecast(lookTarget, pos, out var lineHit, _collisionMask, QueryTriggerInteraction.Ignore)
+                && !IsPlayerCollider(lineHit.collider))
+                clamped = Mathf.Min(clamped, Mathf.Max(radius, lineHit.distance - _collisionPadding));
+
+            return lookTarget + dir * clamped;
         }
 
         /// <summary>근평면 모서리까지의 거리. 이보다 작은 반경으로 캐스트하면 벽이 뚫린다.</summary>
@@ -205,11 +242,14 @@ namespace Festa.World
         /// 다시 조립하므로 캐시는 곧 낡는다. 전환 순간에만 훑으므로 비용이 없다
         /// (매 프레임이 아니라 임계값을 넘을 때 한 번).
         /// </summary>
-        void UpdateSelfVisibility()
+        void UpdateSelfVisibility(float actualDistance)
         {
+            // 판정 기준은 궤도 축의 _resolvedDistance 가 아니라 **실제 카메라-시선 거리**다.
+            // 시야선 클램프(T-217)가 카메라를 더 당겼을 수 있다 — 그때도 몸통이 화면을
+            // 채우면 숨겨야 한다.
             bool shouldHide = _selfHidden
-                ? _resolvedDistance < _selfShowDistance   // 숨은 상태면 더 멀어져야 다시 보인다
-                : _resolvedDistance < _selfHideDistance;
+                ? actualDistance < _selfShowDistance   // 숨은 상태면 더 멀어져야 다시 보인다
+                : actualDistance < _selfHideDistance;
             if (shouldHide == _selfHidden) return;
 
             _selfHidden = shouldHide;
