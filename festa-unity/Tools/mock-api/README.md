@@ -2,6 +2,9 @@
 
 Spring 없이 `HttpBoothApiClient`를 검증하기 위한 정적 endpoint.
 `api/v1/booths/7/layouts/published` 파일이 실제 API 경로 모양 그대로 배치되어 있다.
+`api/v1/booth-slots/5/layouts/published` 는 visitor 경로(slot 기준, S15P21A604-103) 검증용 —
+슬롯 5 를 부스 7 이 임차 중인 상황이다 (MockBoothApiClient 의 MockDetailJson 과 동일 설정).
+다른 슬롯은 파일이 없으므로 404 = 미게시 경로를 그대로 재현한다.
 
 ## 사용법 — 같은 오리진 서빙 (CORS 회피)
 
