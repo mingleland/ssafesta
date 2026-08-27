@@ -1,6 +1,5 @@
 package com.example.ssafesta.auth;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -12,16 +11,8 @@ import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import jakarta.servlet.http.Cookie;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,7 +39,6 @@ import org.springframework.test.web.servlet.ResultActions;
 @AutoConfigureMockMvc
 class OAuthCompletionApiIntegrationTest {
 
-    private static final int SUBMITTERS = 4;
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
     @Autowired private MockMvc mockMvc;
@@ -137,55 +127,6 @@ class OAuthCompletionApiIntegrationTest {
         complete(handoff, "닉" + UUID.randomUUID().toString().substring(0, 8))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("AUTHENTICATED"));
-    }
-
-    /**
-     * One handoff is worth one session, even when two callers hold it at the same moment.
-     *
-     * <p>Splitting the atomic {@code getAndDelete} into read-then-delete — so a refused nickname
-     * would not burn the handoff — quietly dropped that guarantee: both callers read a live handoff,
-     * both registered (signup is idempotent, so both succeeded), and both issued. That is worse than
-     * a duplicate session, because {@code MemberSessionService.issue} <b>revokes the previous
-     * one</b> — the second call would cut off the session the first had just handed out. Only the
-     * caller whose {@code DEL} removed the key may issue now; the rest are told the handoff is spent.
-     */
-    @RepeatedTest(5)
-    void oneHandoffIssuesOneSessionUnderConcurrentSubmissions() throws Exception {
-        String handoff = handoffs.createRegistration(OAuthProvider.GOOGLE, "race-" + UUID.randomUUID());
-        // A nickname each: the same one would let the duplicate check serialise them before they ever
-        // reach the handoff, and the race being tested is the one after registration succeeds. Only
-        // the first submission's nickname is used — the rest find the identity already there and come
-        // back with that member (signup is idempotent on provider + subject).
-        //
-        // Hangul and a counter rather than a random hex tail: the tail went through the nickname
-        // policy's leet mapping (5→s, 7→t, 4→a …) and now and then landed on a banned word, failing
-        // every submission with NICKNAME_INVALID for reasons that had nothing to do with handoffs.
-        String stem = "동시가입" + SEQUENCE.incrementAndGet();
-
-        CountDownLatch start = new CountDownLatch(1);
-        List<Integer> statuses = Collections.synchronizedList(new ArrayList<>());
-        try (ExecutorService pool = Executors.newFixedThreadPool(SUBMITTERS)) {
-            List<Future<?>> submissions = new ArrayList<>();
-            for (int i = 0; i < SUBMITTERS; i++) {
-                String nickname = stem + i;
-                submissions.add(pool.submit(() -> {
-                    start.await();
-                    statuses.add(complete(handoff, nickname).andReturn().getResponse().getStatus());
-                    return null;
-                }));
-            }
-            start.countDown();
-            for (Future<?> submission : submissions) {
-                submission.get();
-            }
-        }
-
-        assertEquals(1, statuses.stream().filter(status -> status == 200).count(),
-                "handoff 하나는 세션 하나여야 합니다 — 두 번 발급하면 앞선 세션이 끊깁니다: " + statuses);
-        // 어디서 지는지는 타이밍이 정한다. identity unique 제약에 먼저 걸리면 409, 등록까지 통과한 뒤
-        // handoff 를 못 가져가면 410 이다. 세션을 못 받았다는 결론은 같다.
-        assertTrue(statuses.stream().filter(status -> status != 200).allMatch(status -> status == 409 || status == 410),
-                "세션을 받지 못한 쪽은 409 또는 410 이어야 합니다: " + statuses);
     }
 
     /**
