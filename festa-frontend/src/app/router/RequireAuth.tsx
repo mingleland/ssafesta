@@ -26,7 +26,10 @@ function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
 
   return (
     <header>
-      <span>{kind === 'member' ? '회원' : '게스트'}로 이용 중</span>
+      {/* 조사까지 함께 분기한다 — '회원'은 받침이 있어 '으로', '게스트'는 모음으로 끝나 '로'다.
+          명사만 갈아 끼우고 조사를 고정하면 '회원로'가 된다(-272). 값이 둘뿐이라 조사 유틸을
+          따로 두지 않는다. */}
+      <span>{kind === 'member' ? '회원으로' : '게스트로'} 이용 중</span>
       <button type="button" onClick={handleLogout}>
         로그아웃
       </button>
