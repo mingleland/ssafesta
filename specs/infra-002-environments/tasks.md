@@ -4,7 +4,7 @@
 
 **선행 문서**: [plan.md](./plan.md), [spec.md](./spec.md), [research.md](./research.md), [data-model.md](./data-model.md), [contracts/](./contracts/), [quickstart.md](./quickstart.md)
 
-**테스트**: spec의 독립 테스트·인수 시나리오·SC-001~SC-014가 검증을 명시하므로 각 사용자 스토리에 계약·통합·장애 테스트 작업을 포함한다. 각 테스트 작업은 해당 구현보다 먼저 작성하고 실패를 확인한다.
+**테스트**: spec의 독립 테스트·인수 시나리오·SC-001~SC-018이 검증을 명시하므로 각 사용자 스토리에 계약·통합·장애 테스트 작업을 포함한다. 각 테스트 작업은 해당 구현보다 먼저 작성하고 실패를 확인한다.
 
 **구성**: 1·2단계는 모든 스토리가 공유하는 환경 골격과 차단 조건이다. 3~7단계는 spec의 US1~US5 순서이며 각 단계는 독립 검증 완료 지점을 가진다. 기존 infra-001의 Jenkins·릴리스·롤백 스키마는 참조만 하고 재구현하지 않는다.
 
@@ -23,7 +23,7 @@
 - [ ] T001 계획된 환경 디렉터리의 소유권, 공급자 경계, infra-001 재사용 규칙과 명령 규약을 `infra/environments/README.md`에 작성한다
 - [ ] T002 [P] 런타임 전용 Secret 주입과 `.env.example` 규칙을 `infra/environments/config/README.md`에 문서화한다
 - [ ] T003 [P] 재사용 가능한 엄격 셸 검증문, 정리 트랩과 민감정보 제거 명령 도우미를 `infra/environments/tests/lib/assert.sh`에 작성한다
-- [ ] T004 [P] 계약·통합·보안·장애·자원 테스트 모음 실행기를 `infra/environments/tests/run.sh`에 작성한다
+- [ ] T004 [P] 계약 전용 실행기와 계약·통합·보안·장애·자원 전체 실행기를 `infra/environments/tests/contract/run.sh`와 `infra/environments/tests/run.sh`에 작성한다
 - [ ] T005 [P] 민감정보가 제거된 검증 근거 디렉터리 이름 규칙과 필수 메타데이터 필드를 `infra/environments/tests/evidence/README.md`에 정의한다
 
 **완료 확인**: 신규 구현은 `infra/environments/` 안에 위치하며 동결된 `festa-unity/Docker/`와 infra-001 파이프라인을 수정하지 않는다.
@@ -37,7 +37,7 @@
 **⚠️ 중요**: 이 단계가 끝나기 전에는 사용자 스토리 구현을 시작하지 않는다.
 
 - [ ] T006 [P] 환경 매니페스트 스키마 검증기와 유효하지 않은 픽스처 사례를 `infra/environments/tests/contract/environment-manifest.sh`에 작성한다
-- [ ] T007 [P] R2 사용량 보호 스키마 검증기와 임계값 픽스처 사례를 `infra/environments/tests/contract/usage-guard.sh`에 작성한다
+- [ ] T007 [P] R2 Usage Admission의 79%/80%/90%/61분·active provider 혼입 사례와 Storage Failover Control의 상태별 uploadEnabled/activeWriteProvider 불일치 사례를 각각 `infra/environments/tests/contract/usage-guard.sh`와 `infra/environments/tests/contract/storage-failover-state.sh`에서 분리 검증한다
 - [ ] T008 도구·버전 검사, C-01/C-02 지연 확정 입력, SG 준비 상태, Secret Reference 존재 여부와 단계별 조기 실패 동작을 `infra/environments/scripts/preflight.sh`에 구현한다
 - [ ] T009 [P] dev용 변수 이름과 안전한 로컬 자리표시자만 `infra/environments/config/environments/dev.env.example`에 추가한다
 - [ ] T010 [P] demo/R2/TLS 자격증명은 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
@@ -68,7 +68,7 @@
 ### 사용자 스토리 1 구현
 
 - [ ] T021 [US1] `dev-ai`, `dev-back`, `dev-front`, `dev-game` 대상을 포함한 `festa-dev` 환경 매니페스트를 `infra/environments/config/manifests/dev.json`에 작성한다
-- [ ] T022 [US1] 공용 dev 프로젝트, 내부 네트워크 별칭, Mock 선택 입력과 컴포넌트 프로필을 `infra/environments/compose/dev/base.yaml`에 작성한다
+- [ ] T022 [US1] 공용 dev 프로젝트, 내부 네트워크 별칭, Mock 선택 입력과 컴포넌트 프로필을 `infra/environments/compose/dev/base.yaml`에 작성하고 승인된 IP 기반 `__dev/{front|api|ai|world}` 라우팅을 `infra/environments/nginx/sites/dev.conf`에 정의한다
 - [ ] T023 [P] [US1] 환경에서 주입되는 엔드포인트와 자원 참조를 사용하는 FastAPI dev 서비스 오버레이를 `infra/environments/compose/dev/ai.yaml`에 추가한다
 - [ ] T024 [P] [US1] 환경 범위 PostgreSQL/Redis 연결을 사용하는 Spring dev 서비스 오버레이를 `infra/environments/compose/dev/back.yaml`에 추가한다
 - [ ] T025 [P] [US1] 환경 호스트 이름을 내장하지 않은 React·정적 dev 서비스 오버레이를 `infra/environments/compose/dev/front.yaml`에 추가한다
@@ -89,21 +89,21 @@
 ### 사용자 스토리 2 테스트
 
 - [ ] T029 [P] [US2] `integration` 대상, 모든 필수 컴포넌트, infra-001 릴리스 참조, 공개 진입점 참조와 demo 자원 우선순위를 검증하는 실패 우선 demo 매니페스트 테스트를 `infra/environments/tests/contract/demo-manifest.sh`에 작성한다
-- [ ] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 실패 우선 종단 간 검증기를 `infra/environments/tests/integration/demo-journey.sh`에 작성한다
+- [ ] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 실패 우선 종단 간 검증기를 `infra/environments/tests/integration/demo-journey.sh`에 작성하고 AI·R2 장애가 정상 비AI 경로와 CI/CD를 중단시키지 않는지 `infra/environments/tests/failure/isolation.sh`에서 검증한다
 - [ ] T031 [P] [US2] 동시 실행 수 ≤1, 두 번째 빌드 대기, 정상 demo 여정과 demo 재시작 횟수 0을 검증하는 실패 우선 2요청 고부하 빌드 테스트를 `infra/environments/tests/resource/demo-with-heavy-build.sh`에 작성한다
+- [ ] T032 [P] [US2] 호스트 라우팅, TLS 준비 상태, SSE·WebSocket 핸드셰이크와 내부 포트 비공개를 검증하되 infra-003의 시간 초과 값을 확정하지 않는 실패 우선 검사를 `infra/environments/tests/integration/public-entry.sh`에 작성한다
 
 ### 사용자 스토리 2 구현
 
-- [ ] T032 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 환경 매니페스트를 `infra/environments/config/manifests/demo.json`에 작성한다
-- [ ] T033 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-demo` Compose 프로젝트를 `infra/environments/compose/demo/compose.yaml`에 작성한다
-- [ ] T034 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/environments/nginx/nginx.conf`에 작성한다
-- [ ] T035 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/demo.conf`에 작성한다
-- [ ] T036 [P] [US2] 전역 고부하 빌드 세마포어, 승인 전 demo 상태 게이트와 대기열 검증 근거 출력을 `infra/environments/scripts/admit-heavy-build.sh`에 구현한다
-- [ ] T037 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/environments/scripts/deploy-environment.sh`의 demo 배포를 확장한다
-- [ ] T038 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/environments/scripts/verify-environment.sh`의 demo 검증을 확장한다
-- [ ] T039 [US2] infra-003의 시간 초과 값을 확정하지 않고 호스트 라우팅, TLS 준비 상태, SSE와 WebSocket 핸드셰이크 검사를 `infra/environments/tests/integration/public-entry.sh`에 구현한다
+- [ ] T033 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 환경 매니페스트를 `infra/environments/config/manifests/demo.json`에 작성한다
+- [ ] T034 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-demo` Compose 프로젝트를 `infra/environments/compose/demo/compose.yaml`에 작성한다
+- [ ] T035 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/environments/nginx/nginx.conf`에 작성한다
+- [ ] T036 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/demo.conf`에 작성한다
+- [ ] T037 [P] [US2] 전역 고부하 빌드 세마포어, 승인 전 demo 상태 게이트와 대기열 검증 근거 출력을 `infra/environments/scripts/admit-heavy-build.sh`에 구현한다
+- [ ] T038 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/environments/scripts/deploy-environment.sh`의 demo 배포를 확장한다
+- [ ] T039 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/environments/scripts/verify-environment.sh`의 demo 검증을 확장한다
 
-**완료 확인**: T029~T031과 T039가 통과한다. US3가 연결되기 전까지 US2는 승인된 Mock 문서·AI 어댑터를 사용할 수 있지만, 완전한 운영 준비 상태로 보고하지 않고 검증 결과에 Mock임을 표시해야 한다.
+**완료 확인**: T029~T032가 통과한다. US3가 연결되기 전까지 US2는 승인된 Mock 문서·AI 어댑터를 사용할 수 있지만, 완전한 운영 준비 상태로 보고하지 않고 검증 결과에 Mock임을 표시해야 한다.
 
 ---
 
@@ -185,7 +185,7 @@
 
 ### 사용자 스토리 5 구현
 
-- [ ] T075 [P] [US5] React와 Unity Web 산출물의 HTML 재검증 및 콘텐츠 해시 불변 cache-control 매핑을 `infra/environments/nginx/snippets/cache.conf`에 구현한다
+- [ ] T075 [P] [US5] React와 Unity Web 산출물의 HTML 재검증·콘텐츠 해시 불변 cache-control을 `infra/environments/nginx/snippets/cache.conf`에 구현하고 API·인증·SSE·업로드·WebSocket 우선 우회를 `infra/environments/nginx/snippets/dynamic-bypass.conf`에 정의한다
 - [ ] T076 [P] [US5] 버전이 지정된 정적 자산만 캐시하고 API·인증·SSE·업로드·WebSocket을 우회하는 Cloudflare 호스트·프록시·캐시 규칙을 `infra/environments/storage/r2/cloudflare-cache-rules.example.yaml`에 정의한다
 - [ ] T077 [P] [US5] 롤백 이력을 소유하지 않으면서 infra-001 릴리스 ID에 연결되는 정적 `current`/`known-good` 원자적 전환을 `infra/environments/scripts/switch-static-release.sh`에 구현한다
 - [ ] T078 [P] [US5] 인증서를 검증하는 원본 서버 접근, DNS/CDN 장애 검증 근거와 운영자 전용이라는 사실을 `infra/environments/runbooks/origin-access.md`에 문서화한다
@@ -203,7 +203,7 @@
 - [ ] T081 `specs/infra-002-environments/quickstart.md`의 실행 가능한 모든 시나리오를 수행하는 단일 엄격 실행기를 `infra/environments/tests/quickstart.sh`에 구현한다
 - [ ] T082 [P] 오래된 pgvector 스키마 전용, 단일 버킷 접두사, R2 2차 백업 미정과 demo 동결 설명을 기준 spec·plan에 맞게 `docs/15_Infra_AWS_설계서.md`에서 정리한다
 - [ ] T083 [P] ALB/NLB를 다시 도입하지 않고 현재 단일 EC2 소유권, C-01/C-02 입력과 확정된 C-07 정책을 `docs/26_팀_결정_필요사항.md`에 반영한다
-- [ ] T084 [P] 네트워크 보안, R2 대체 경로, PostgreSQL 복원, Redis 복구와 원본 서버 접근 절차를 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
+- [ ] T084 [P] R2 차단·MinIO 승인 전환·rollback·reconcile을 `infra/environments/runbooks/r2-fallback.md`, PostgreSQL 복원을 `infra/environments/runbooks/postgres-restore.md`, Redis 전체 손실 복구를 `infra/environments/runbooks/redis-recovery.md`에 문서화하고 네트워크 보안·원본 서버 절차까지 연결하는 운영 색인을 `infra/environments/runbooks/README.md`에 작성한다
 - [ ] T085 [P] 구현 작업이 동결된 기준선 경로를 수정하지 않았는지 확인하고 검사 경로와 결과를 `infra/environments/tests/evidence/baseline-freeze.md`에 기록한다
 - [ ] T086 모든 계약·통합·보안·장애·자원 테스트 모음을 실행하고 SC-001~SC-014 매핑과 민감정보가 제거된 검증 근거를 `infra/environments/tests/evidence/final-verification.md`에 기록한다
 - [ ] T087 완료한 INFRA 구현, 검증 결과와 관련 INFRA-T 참조를 실행 날짜 아래 `docs/JSW/24_작업일지.md`에 기록한다
@@ -221,7 +221,7 @@
 - **US3 / 5단계**: 2단계 이후 시작한다. 영구 데이터, R2, Redis 복구와 백업 작업은 US1/US2 런타임 라우팅과 독립적으로 진행할 수 있다.
 - **US4 / 6단계**: 2단계 이후 시작한다. 최종 외부 검사에는 최소 실행 ingress·데이터 스택이 필요하지만 테스트 픽스처는 독립적으로 실행할 수 있다.
 - **US5 / 7단계**: US2 Nginx demo 사이트와 정적 릴리스 라우팅에 의존하며 US3에는 의존하지 않는다.
-- **8단계 마무리**: 릴리스 대상으로 선택한 모든 스토리에 의존한다. T086의 전체 SC-001~SC-014 검증 근거에는 US1~US5가 필요하다.
+- **8단계 마무리**: 릴리스 대상으로 선택한 모든 스토리에 의존한다. T086의 전체 SC-001~SC-018 검증 근거에는 US1~US5가 필요하다.
 
 ### 사용자 스토리 의존성 그래프
 
@@ -254,7 +254,7 @@ T023 AI 오버레이 || T024 백엔드 오버레이 || T025 프론트엔드 오�
 
 ```text
 T029 demo 매니페스트 테스트 || T030 demo 여정 테스트 || T031 자원 경합 테스트
-T032 demo 매니페스트 || T033 demo Compose || T036 빌드 승인
+T033 demo 매니페스트 || T034 demo Compose || T037 빌드 승인
 ```
 
 ### 사용자 스토리 3
