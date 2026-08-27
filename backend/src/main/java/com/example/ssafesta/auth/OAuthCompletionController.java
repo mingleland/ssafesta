@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth/oauth")
 public class OAuthCompletionController {
     static final String HANDOFF_COOKIE = "oauth_handoff";
+    /** Scoping the cookie to the one endpoint that consumes it — it must not ride on any other call. */
+    static final String HANDOFF_COOKIE_PATH = "/api/v1/auth/oauth/complete";
     private final OAuthHandoffService handoffs;
     private final RegistrationService registrations;
     private final MemberSessionService sessions;
@@ -61,8 +63,17 @@ public class OAuthCompletionController {
     }
 
     private ResponseCookie clearHandoffCookie() {
+        return clearHandoffCookie(properties);
+    }
+
+    /**
+     * The deletion has to match the cookie's own attributes or the browser keeps it, so the one
+     * definition is shared rather than copied: {@code OAuthLoginSuccessHandler} clears it too, on the
+     * path where a suspended account is turned away before any handoff is issued.
+     */
+    static ResponseCookie clearHandoffCookie(AuthProperties properties) {
         return ResponseCookie.from(HANDOFF_COOKIE, "").httpOnly(true).secure(properties.cookieSecure()).sameSite("Lax")
-                .path("/api/v1/auth/oauth/complete").maxAge(0).build();
+                .path(HANDOFF_COOKIE_PATH).maxAge(0).build();
     }
 
     public record CompleteOAuthRequest(String nickname) { }

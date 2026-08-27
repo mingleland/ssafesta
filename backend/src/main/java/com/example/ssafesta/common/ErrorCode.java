@@ -33,6 +33,12 @@ public enum ErrorCode {
     // ── 회원 (spec 001) ─────────────────────────────────────────────────────
     NICKNAME_INVALID(HttpStatus.BAD_REQUEST, "사용할 수 없는 닉네임입니다."),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
+    /**
+     * Distinguished from {@link #NICKNAME_DUPLICATED} on purpose — the two ask for different things.
+     * A taken nickname means "pick another one"; this one means "the same request again will work",
+     * because it comes from a race between the duplicate check and the insert, not from the value.
+     */
+    REGISTRATION_CONFLICT(HttpStatus.CONFLICT, "가입 처리 중 충돌이 발생했습니다. 다시 시도해 주세요."),
     WITHDRAWAL_NOT_CONFIRMED(HttpStatus.BAD_REQUEST, "탈퇴 내용을 확인한 뒤 확정해야 합니다."),
 
     // ── 지갑 (spec 003) ─────────────────────────────────────────────────────

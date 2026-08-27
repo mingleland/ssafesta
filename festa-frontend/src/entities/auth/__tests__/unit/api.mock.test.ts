@@ -31,7 +31,7 @@ describe('신규 회원 흐름', () => {
 
   it('금칙 케이스 제출은 일반 안내 오류만 던지고 handoff는 보존한다(재제출 가능)', async () => {
     mockStartOAuth('google');
-    await expect(complete({ nickname: 'admin' })).rejects.toMatchObject({ code: 'NICKNAME_REJECTED' });
+    await expect(complete({ nickname: 'admin' })).rejects.toMatchObject({ code: 'NICKNAME_INVALID' });
     // 재제출 — 여전히 가능해야 한다
     const res = await complete({ nickname: '정상닉네임' });
     expect(res.status).toBe('AUTHENTICATED');
@@ -39,9 +39,9 @@ describe('신규 회원 흐름', () => {
 
   it('정규화 우회(기호·공백 삽입)도 대표 케이스와 동일하게 차단한다', async () => {
     mockStartOAuth('google');
-    await expect(complete({ nickname: 'a-d-m-i-n' })).rejects.toMatchObject({ code: 'NICKNAME_REJECTED' });
+    await expect(complete({ nickname: 'a-d-m-i-n' })).rejects.toMatchObject({ code: 'NICKNAME_INVALID' });
     mockStartOAuth('kakao');
-    await expect(complete({ nickname: '관 리 자' })).rejects.toMatchObject({ code: 'NICKNAME_REJECTED' });
+    await expect(complete({ nickname: '관 리 자' })).rejects.toMatchObject({ code: 'NICKNAME_INVALID' });
   });
 
   it('유효한 닉네임 제출 시 가입 기록 후 AUTHENTICATED, handoff 소비 → 재호출은 410 상당', async () => {

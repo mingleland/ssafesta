@@ -105,7 +105,7 @@ export async function complete(body?: { nickname: string }): Promise<OAuthComple
     }
     if (isForbiddenNicknameSample(body.nickname)) {
       // 이유 비특정 일반 안내만(nickname-policy.md 검사 규칙 4) — handoff 보존, 재제출 가능
-      throw apiError('NICKNAME_REJECTED', '사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해 주세요.');
+      throw apiError('NICKNAME_INVALID', '사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해 주세요.');
     }
     state.members.add(handoff.providerId);
   }
