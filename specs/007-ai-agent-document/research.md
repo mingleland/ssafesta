@@ -14,16 +14,17 @@
 - FastAPI 단독 상태 소유: 단순하지만 AI 장애가 사용자 문서 관리 화면으로 전파된다.
 - 하나의 공통 상태 집합: 로그와 코드에서 사용자 상태와 실행 상태를 구분하기 어렵다.
 
-## 2. Processing Job 저장 위치
+## 2. Processing Job과 Chunk 저장 위치
 
-**Decision**: 별도 AI DB 인스턴스를 만들지 않고 기존 PostgreSQL RDS의 FastAPI 전용 `ai` 스키마에 `document_jobs`를 둔다. Spring은 `public` 스키마, FastAPI는 `ai` 스키마의 migration을 각각 소유한다.
+**Decision (C-11)**: Infra의 [PostgreSQL Isolation and Backup Contract v1](../infra-002-environments/contracts/postgres-boundary-contract.md)을 정본으로 채택한다. 하나의 PostgreSQL 17 + pgvector 인스턴스를 공유하되 환경별 Business DB(`festa_{env}_business`)와 AI DB(`festa_{env}_ai`)를 분리한다. Spring은 Business DB의 `ai_agents`·`ai_documents`를, FastAPI는 AI DB의 `document_jobs`·`document_chunks`를 소유한다.
 
-**Rationale**: `public.ai_document_chunks`의 전체 교체와 Job 성공 전환을 하나의 DB 트랜잭션으로 묶을 수 있다. 별도 인스턴스 비용과 분산 트랜잭션을 피하면서 migration 소유권은 분리한다.
+**Rationale**: database·login role 경계로 AI 장애와 권한을 격리하면서 인스턴스 비용은 공유한다. Job과 Chunk를 같은 AI DB에 두면 기존 Chunk 전체 교체와 Job 성공 전환을 하나의 로컬 트랜잭션으로 유지할 수 있다.
 
 **Alternatives considered**:
 
-- 별도 AI RDS: 격리는 강하지만 P0 비용과 운영 복잡도가 크고 원자적 청크 교체가 어렵다.
-- Spring 스키마에 Job 저장: AI 재시도 필드 변경이 BE migration과 배포에 종속된다.
+- 같은 DB의 `public`·`ai` schema 분리: cross-schema FK와 FastAPI의 Business 테이블 직접 조회를 허용해 Infra 권한 불변식을 위반한다.
+- 별도 AI PostgreSQL 인스턴스: 격리는 강하지만 P0 비용과 운영 복잡도가 커진다. 별도 database로도 필요한 login role 격리를 달성한다.
+- Business DB에 Job 저장: AI 재시도 필드 변경이 BE migration과 배포에 종속된다.
 - SQS만 사용: 메시지 수신 여부와 사용자 문서 상태를 연결할 영속 Job이 여전히 필요하다.
 
 ## 3. Queue와 Worker
@@ -79,6 +80,8 @@
 - `(document_id, chunk_no)` UPSERT만 사용: 줄어든 청크 뒤의 오래된 행이 남는다.
 - 처리 중 청크를 점진적으로 공개: 부분 결과가 RAG 검색에 노출될 수 있다.
 
+DB가 분리되어 있으므로 Spring의 `DocumentStatus.READY` 전환은 같은 트랜잭션에 포함하지 않는다. AI DB에서 Chunk 교체와 Job `SUCCEEDED`를 커밋한 뒤 멱등 callback으로 Business DB 상태를 전환한다.
+
 ## 7. 상태 콜백과 장애 복구
 
 **Decision**: FastAPI는 Spring 내부 API로 사용자 문서 상태를 비동기 갱신한다. 터미널 Job에는 콜백 전달 시각과 재시도 정보를 영속화한다. 콜백 실패는 Job 결과를 되돌리지 않고 재시도하며, 주기적 reconciliation이 미전달 터미널 Job을 다시 전송한다. Spring은 처리 요청에서 반환받은 `jobId`를 다른 처리보다 먼저 저장한다. callback `404`는 `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH`로 구분하며, FastAPI는 `JOB_NOT_REGISTERED`만 1초·3초·10초 간격으로 최대 3회 재시도한다. 나머지 두 코드는 즉시 종료하고, mismatch는 Spring이 계약 오류로 경고 기록한다. 정상 전달 시각과 재시도 종료 시각·사유는 서로 다른 필드에 기록한다. ([GitLab Work Item #106](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/106))
@@ -98,7 +101,7 @@
 
 무중단 회전은 `[old] → [old,new] → [new,old] → [new]` 순서로 진행한다. 먼저 양쪽 수신자가 신규 토큰도 허용하게 한 뒤 첫 값을 신규 토큰으로 승격하고, 정상 호출을 확인한 후 기존 토큰을 제거한다. 단일 목록도 배포 순서에 따른 `401`을 막기 위해 이 승격 절차가 필요하다.
 
-FastAPI runtime role은 `ai.document_jobs` DML, `public.ai_documents`·`public.ai_agents` SELECT, `public.ai_document_chunks` DELETE/INSERT 권한만 가진다.
+FastAPI migration/runtime role은 AI DB에만 CONNECT할 수 있고 Business DB에는 연결할 수 없다. migration role은 AI schema DDL과 `vector` 사용 스키마 migration을, runtime role은 `document_jobs`·`document_chunks` 최소 DML/sequence 권한만 가진다. Spring role은 반대로 AI DB에 CONNECT할 수 없다.
 
 **Rationale**: 방향별 토큰은 한 방향의 자격증명이 유출돼도 반대 방향 호출에 재사용되는 것을 막는다. 같은 VPC와 Security Group은 노출 위험을 낮추지만 애플리케이션 인증을 대체하지 않는다. 콤마 목록은 Spring의 기본 목록 바인딩을 활용하고 FastAPI에서 명시적으로 분리·검증할 수 있다.
 
@@ -109,6 +112,20 @@ FastAPI runtime role은 `ai.document_jobs` DML, `public.ai_documents`·`public.a
 - JSON 배열: Pydantic은 기본 지원하지만 Spring에서 별도 변환이 필요해 공통 주입 형식으로 채택하지 않았다.
 - `_CURRENT`/`_PREVIOUS` 개별 변수: 의미는 명확하지만 방향별 변수 수가 늘어난다. 콤마 목록을 사용하되 승격 절차와 최대 2개 제한은 동일하게 유지한다.
 - P0 mTLS: 보안은 강하지만 인증서 발급·회전 운영 범위가 커진다.
+
+## 8-1. Business snapshot과 cleanup 정합성
+
+**Decision**: Spring은 문서 소유권·임대·상태를 Business DB에서 검증하고, 처리에 필요한 immutable snapshot(`documentId`, `boothId`, `agentId`, 파일명·형식·크기·SHA-256, `storageProvider`, `bucket`, `objectKey`)을 FastAPI 처리 요청에 전달한다. FastAPI는 snapshot을 Job에 영속화하며 처리 중 Business DB를 조회하지 않는다.
+
+문서 삭제·비활성화 시 Spring은 멱등 cleanup 요청을 발행하고 성공할 때까지 재시도한다. FastAPI는 활성 Job을 `CANCELLED`로 전환하고 해당 문서 Chunk를 제거한다. 주기적 reconciliation은 Spring의 활성 문서 inventory와 AI DB의 Job/Chunk inventory를 비교해 고아 AI 데이터를 cleanup하고 누락·불일치는 운영 경고로 남긴다.
+
+**Rationale**: PostgreSQL database 간 FK·cascade·직접 query 없이도 검증된 입력과 명시적 보상 작업으로 eventual consistency를 달성한다. 삭제 전에 cleanup이 실패해도 재전송과 inventory reconciliation이 고아 데이터를 수렴시킨다.
+
+**Alternatives considered**:
+
+- FastAPI가 Business DB를 읽기 전용 조회: Infra CONNECT matrix와 서비스 데이터 소유권을 위반한다.
+- DB 간 FK 또는 외부 데이터 wrapper: 애플리케이션 경계를 DB 결합으로 되돌리고 장애 전파 범위를 넓힌다.
+- 삭제 시 best-effort 1회 호출: 일시 장애 뒤 Chunk가 영구 잔존할 수 있다.
 
 ## 9. 실패 사유 정책
 
