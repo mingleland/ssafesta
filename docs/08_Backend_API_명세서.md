@@ -86,6 +86,8 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 | 매핑되지 않은 경로 (미구현 endpoint 포함) | 404 | `NOT_FOUND` |
 | 그 경로가 지원하지 않는 method | 405 | `METHOD_NOT_ALLOWED` |
 | 필수 쿠키·헤더·파라미터 누락, 타입 불일치 | 400 | `VALIDATION_FAILED` |
+| 지원하지 않는 `Content-Type` | 415 | `UNSUPPORTED_MEDIA_TYPE` |
+| 제공할 수 없는 `Accept` | 406 | `NOT_ACCEPTABLE` |
 
 - **미구현 endpoint 는 404 다.** 서버 장애(`INTERNAL_ERROR`)와 구분되지 않으면 클라이언트가 재시도할지
   포기할지 정할 수 없다 — `INTERNAL_ERROR` 는 재시도 가능 코드로 정렬돼 있으므로(#104·#48) 미구현 경로를
@@ -94,6 +96,10 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
   거부를 `ResponseStatusException` 으로 매칭했는데, Spring 7 의 프레임워크 예외는 그 클래스가 아니라
   `ErrorResponse` **인터페이스**로 상태를 싣기 때문이다. Breaking Change 가 아니라 정합 회복이다.
 - 5xx 는 종전대로 `INTERNAL_ERROR` 이고 서버 로그에 error 레벨로 크게 남는다 (T-24).
+- **`code` 가 선언한 status 와 응답 status 는 항상 같다.** `ErrorCode` 는 코드마다 status 를 들고 있고
+  클라이언트는 `code` 로 분기하므로, 둘이 어긋나면 `ErrorCode.status()` 가 그 응답에 대해 거짓이 된다.
+  그래서 서버는 **코드가 선언한 status 로** 답한다. 계약에 코드가 없는 status 가 오면 일반 코드로 답하고
+  서버 로그에 warn 을 남긴다 — 계약에 없는 status 가 도달했다는 사실 자체가 봐야 할 신호다.
 
 ### 1.4 Idempotency
 

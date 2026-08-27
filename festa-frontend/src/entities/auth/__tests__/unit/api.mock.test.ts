@@ -81,7 +81,7 @@ describe('게스트 입장(FR-009a)', () => {
 
 describe('refresh — 다른 브라우저 로그인 트리거(US3 AS4)', () => {
   it('로그인 이력이 없으면 실패한다', async () => {
-    await expect(refresh()).rejects.toMatchObject({ code: 'REFRESH_FAILED' });
+    await expect(refresh()).rejects.toMatchObject({ code: 'INVALID_MEMBER_TOKEN' });
   });
 
   it('member 로그인 후에는 성공한다', async () => {
@@ -94,14 +94,14 @@ describe('refresh — 다른 브라우저 로그인 트리거(US3 AS4)', () => {
 
   it('게스트는 refresh 대상이 아니다', async () => {
     await guestEnter();
-    await expect(refresh()).rejects.toMatchObject({ code: 'REFRESH_FAILED' });
+    await expect(refresh()).rejects.toMatchObject({ code: 'INVALID_MEMBER_TOKEN' });
   });
 
   it('다른 브라우저 로그인 트리거 후에는 refresh가 실패한다', async () => {
     mockStartOAuth('google');
     await complete({ nickname: '테스트유저' });
     __triggerOtherBrowserLoginForTests();
-    await expect(refresh()).rejects.toMatchObject({ code: 'REFRESH_FAILED' });
+    await expect(refresh()).rejects.toMatchObject({ code: 'INVALID_MEMBER_TOKEN' });
   });
 });
 

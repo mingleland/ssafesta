@@ -105,6 +105,32 @@ class ErrorEnvelopeIntegrationTest {
     }
 
     /**
+     * The status on the wire and the status the code declares are the same thing.
+     *
+     * <p>The client branches on {@code code}, and every {@code ErrorCode} carries a status. Answering
+     * 415 with {@code VALIDATION_FAILED} would put 400 in the body's meaning and 415 on the response,
+     * which makes {@code ErrorCode.status()} a lie for that call. The handler now answers with the
+     * code's own status, so the two cannot drift apart (raised in review of !56).
+     */
+    @Test
+    void anUnsupportedContentTypeCarriesACodeThatAgreesWithTheStatus() throws Exception {
+        mockMvc.perform(post(BeanValidationProbeController.PATH).with(jwt())
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("본문 형식이 계약과 다르다"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    /** Every code the envelope can answer with declares the status it is sent as. */
+    @Test
+    void everyErrorCodeStatusIsTheStatusItIsSentWith() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertNotNull(code.status(), code + "에 status가 없습니다.");
+            assertTrue(code.status().value() >= 400, code + "는 오류 코드인데 " + code.status() + "입니다.");
+        }
+    }
+
+    /**
      * A visitor with no session is the ordinary case, not a server fault.
      *
      * <p>The frontend calls refresh once on every page load and cannot skip it: the cookie is

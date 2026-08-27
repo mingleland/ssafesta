@@ -45,6 +45,18 @@ export function NicknameForm({
         onHandoffExpired();
         return;
       }
+      // 닉네임 값이 원인이 아닌 오류까지 GENERIC_REJECTION_MESSAGE로 뭉뚱그리면 안 된다.
+      // 특히 REGISTRATION_CONFLICT는 동시 가입 경합이라 닉네임을 바꿀 이유가 없는데, 바꾸라고
+      // 안내하고 있었다(oauth-completion.md 오류 표, !56 리뷰 지적).
+      if (isApiError(err) && err.code === 'NICKNAME_DUPLICATED') {
+        setNotice('이미 사용 중인 닉네임입니다. 다른 닉네임을 입력해 주세요.');
+        return;
+      }
+      if (isApiError(err) && err.code === 'REGISTRATION_CONFLICT') {
+        // 같은 handoff를 쥔 중복 제출이 이겼다면 재제출은 410이고, 그때는 위 분기가 재시작으로 보낸다.
+        setNotice('가입 처리가 겹쳤습니다. 잠시 후 다시 시도해 주세요.');
+        return;
+      }
       setNotice(GENERIC_REJECTION_MESSAGE);
     } finally {
       setSubmitting(false);

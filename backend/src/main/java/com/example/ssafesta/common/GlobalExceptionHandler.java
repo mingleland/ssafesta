@@ -119,11 +119,23 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
         if (exception instanceof ErrorResponse rejection && rejection.getStatusCode().is4xxClientError()) {
             ErrorCode code = codeFor(HttpStatus.resolve(rejection.getStatusCode().value()));
+            if (code == null) {
+                // A status the envelope has no code for. Borrowing another code would put one status
+                // in the body and a different one on the wire, so the generic client-error code
+                // answers — and says so, because a status we never contracted is worth seeing.
+                log.warn("계약에 없는 프레임워크 거부입니다 — status={} 를 일반 코드로 답합니다.",
+                        rejection.getStatusCode());
+                code = ErrorCode.VALIDATION_FAILED;
+            }
             // Spring writes its own reason in English ("No static resource api/v1/...", "Request
             // method 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes
             // to the log and the client gets the code's message.
             log.debug("프레임워크 거부 — status={} reason={}", rejection.getStatusCode(), exception.getMessage());
-            return ResponseEntity.status(rejection.getStatusCode())
+            // The code's own status, never the exception's. ErrorCode declares a status per code and
+            // the client branches on the code, so the two disagreeing makes ErrorCode.status() a lie:
+            // a 415 answered with VALIDATION_FAILED said 400 in the body and 415 on the wire
+            // (raised in review of !56).
+            return ResponseEntity.status(code.status())
                     .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
         }
         log.error("처리되지 않은 예외 — requestId={}", RequestIdFilter.current(), exception);
@@ -138,9 +150,10 @@ public class GlobalExceptionHandler {
                 RequestIdFilter.current()));
     }
 
+    /** The code contracted for this status, or {@code null} when the envelope has none. */
     private ErrorCode codeFor(HttpStatus status) {
         if (status == null) {
-            return ErrorCode.INTERNAL_ERROR;
+            return null;
         }
         return switch (status) {
             case UNAUTHORIZED -> ErrorCode.UNAUTHORIZED;
@@ -148,7 +161,9 @@ public class GlobalExceptionHandler {
             case NOT_FOUND -> ErrorCode.NOT_FOUND;
             case METHOD_NOT_ALLOWED -> ErrorCode.METHOD_NOT_ALLOWED;
             case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
-            default -> status.is4xxClientError() ? ErrorCode.VALIDATION_FAILED : ErrorCode.INTERNAL_ERROR;
+            case UNSUPPORTED_MEDIA_TYPE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            case NOT_ACCEPTABLE -> ErrorCode.NOT_ACCEPTABLE;
+            default -> null;
         };
     }
 }

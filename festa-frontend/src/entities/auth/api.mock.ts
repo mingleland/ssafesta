@@ -133,7 +133,7 @@ export async function refresh(): Promise<TokenResponse> {
   const meta = state.sessionMeta;
   // 게스트는 재발급 대상이 아니다(FR-009a) — member가 아니거나 다른 브라우저 로그인 트리거가 서면 실패
   if (!meta || meta.kind !== 'member' || meta.otherBrowserLogin) {
-    throw apiError('REFRESH_FAILED', '세션을 갱신할 수 없습니다. 다시 로그인해 주세요.');
+    throw apiError('INVALID_MEMBER_TOKEN', '유효하지 않거나 만료된 로그인 세션입니다.');
   }
   const accessToken = `mock-at-member-refreshed-${Date.now()}`;
   const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();

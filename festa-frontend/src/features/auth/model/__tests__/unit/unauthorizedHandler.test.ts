@@ -28,7 +28,7 @@ describe('member', () => {
 
   it('refresh 실패 시 세션을 클리어하고 false를 반환한다(FR-020b)', async () => {
     setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
-    refreshMock.mockRejectedValue({ code: 'REFRESH_FAILED', message: 'x', errors: [], warnings: [] });
+    refreshMock.mockRejectedValue({ code: 'INVALID_MEMBER_TOKEN', message: 'x', errors: [], warnings: [] });
 
     const recovered = await handleUnauthorized();
 
