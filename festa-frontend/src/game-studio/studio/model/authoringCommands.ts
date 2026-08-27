@@ -587,9 +587,6 @@ export const removeObjects = (
 ): { readonly project: GameProject; readonly removedObjectIds: readonly string[]; readonly blocked: readonly { readonly objectId: string; readonly reason: string }[] } => {
   const scene = project.scenes.find((candidate) => candidate.id === sceneId);
   if (scene?.type === 'DIALOGUE' || scene === undefined) throw new Error(`${sceneId} is not a world scene`);
-  if (scene.width * scene.height > GAME_PROJECT_LIMITS.maxTileCellsPerLayer) {
-    throw new Error(`Tile Layer는 맵 크기를 ${GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸 이하로 줄인 뒤 추가할 수 있습니다.`);
-  }
   const requestedIds = new Set(objectIds);
   const blocked = scene.objects.flatMap((object) => {
     if (!requestedIds.has(object.id)) return [];
@@ -1048,6 +1045,11 @@ export const addTileLayer = (
   const tileset = project.assets.find((asset) => asset.kind === 'TILESET' && asset.source === preferredSource)
     ?? project.assets.find((asset) => asset.kind === 'TILESET');
   if (tileset === undefined) throw new Error('Tile Layer를 만들려면 TILESET 자산이 필요합니다.');
+  // 레이어 하나가 width*height 칸을 만들므로, 상한을 넘는 맵에서는 계약 파싱이 죽기 전에 여기서 막는다.
+  // resizeWorldScene이 편집기 내 생성 경로를 이미 막지만, 로드된 프로젝트는 이 경로로 들어온다.
+  if (scene.width * scene.height > GAME_PROJECT_LIMITS.maxTileCellsPerLayer) {
+    throw new Error(`Tile Layer는 맵 크기를 ${GAME_PROJECT_LIMITS.maxTileCellsPerLayer.toLocaleString('ko-KR')}칸 이하로 줄인 뒤 추가할 수 있습니다.`);
+  }
   let suffix = 1;
   while (scene.tileLayers.some((layer) => layer.id === `layer${suffix}`)) suffix += 1;
   const layerId = `layer${suffix}`;
