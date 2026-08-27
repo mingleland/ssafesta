@@ -1,5 +1,6 @@
 package com.example.ssafesta.auth;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,6 +60,28 @@ class OAuthCompletionApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("NICKNAME_DUPLICATED"))
                 .andExpect(jsonPath("$.requestId").isString());
+    }
+
+    /**
+     * A call from anywhere but the app is refused, and <b>not</b> in the error envelope.
+     *
+     * <p>This endpoint has no Origin check of its own — unlike {@code /auth/refresh} and
+     * {@code /auth/logout}, which throw {@code UNTRUSTED_ORIGIN}. Here the CORS layer refuses the
+     * request before any controller is chosen, so nothing gives it a {@code code}. The contract
+     * document said otherwise until review of !56 caught it; this test is what the document is now
+     * written against.
+     */
+    @Test
+    void aCallFromAnotherOriginIsRefusedOutsideTheEnvelope() throws Exception {
+        String body = mockMvc.perform(post("/api/v1/auth/oauth/complete")
+                        .header(HttpHeaders.ORIGIN, "http://not-the-app.example")
+                        .cookie(new Cookie("oauth_handoff", "irrelevant"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"아무개\"}"))
+                .andExpect(status().isForbidden())
+                .andReturn().getResponse().getContentAsString();
+
+        assertFalse(body.contains("\"code\""), "CORS 거절은 오류 봉투가 아니다 — 계약에 code 를 약속하면 안 된다: " + body);
     }
 
     /**

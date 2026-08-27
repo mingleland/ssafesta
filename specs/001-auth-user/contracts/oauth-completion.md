@@ -44,7 +44,6 @@ Request body는 선택 사항이다.
 |---|---|---|
 | handoff cookie 누락 | 400 | `OAUTH_HANDOFF_MISSING` |
 | handoff 만료·재사용·미발급 | 410 | `OAUTH_HANDOFF_EXPIRED` |
-| Origin 불일치 | 403 | `UNTRUSTED_ORIGIN` |
 | 닉네임 형식·금칙 위반 | 400 | `NICKNAME_INVALID` |
 | **닉네임 중복** | **409** | **`NICKNAME_DUPLICATED`** |
 | **가입 경합** (중복 검사와 INSERT 사이) | **409** | **`REGISTRATION_CONFLICT`** |
@@ -53,7 +52,19 @@ Request body는 선택 사항이다.
   이 코드를 싣지 않은 맨 `RuntimeException` 이라 `handleUnexpected` 로 떨어졌다. 닉네임을 고르던 사람은
   "이미 사용 중입니다" 대신 "서버 오류가 발생했습니다"를 봤다. 계약 변경이 아니라 공백을 메운 것이다.
 - 두 409를 **한 코드로 합치지 않는다.** 요구하는 행동이 다르다 — 중복은 "다른 닉네임을 고르라",
-  경합은 "같은 요청을 다시 보내라"다.
+  경합은 "같은 요청을 다시 보내라"다. 경합은 **unique 위반(SQLState 23505)일 때만** 이다. FK·NOT NULL·CHECK
+  위반은 서버 결함이라 재시도로 낫지 않으므로 **500 으로 크게 남긴다** — 409 로 덮으면 아무도 안 보는 상태에
+  묻히고 사용자는 영원히 재시도한다.
+
+### Origin — 이 endpoint 는 자체 검사를 하지 않는다
+
+`/auth/refresh`·`/auth/logout` 과 달리 **`UNTRUSTED_ORIGIN` 을 던지지 않는다.** 다른 origin 에서의 호출은
+컨트롤러에 닿기 전에 **CORS 계층이 403 으로 거절**하며, 그 응답은 **오류 봉투가 아니다**(`code` 없음).
+허용 origin 은 `FRONTEND_BASE_URL` 하나이고 `allowCredentials=true` 다.
+
+> 2026-08-27 최초 작성 시 이 자리에 `403 UNTRUSTED_ORIGIN` 행을 적었는데 **구현에 없는 계약이었다**
+> (!56 리뷰 지적). `OAuthCompletionController` 에는 Origin 검사가 없다. 실동작은
+> `OAuthCompletionApiIntegrationTest.aCallFromAnotherOriginIsRefusedOutsideTheEnvelope` 로 고정했다.
 
 ## 정지 계정 redirect (2026-08-27 신설)
 
