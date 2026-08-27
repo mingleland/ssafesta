@@ -187,6 +187,10 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-08 | 업로드 미완료 문서의 만료·정리 정책은? | BE + Infra + FE | **확정: 업로드 URL 15분, 생성 후 1시간에 `EXPIRED`, 전환 후 24시간 보존 뒤 Spring이 R2 원본 삭제·실패 재시도. `EXPIRED`는 업로드 만료로 표시** ([GitLab Work Item #84](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/84)) |
 | C-09 | Spring↔FastAPI 내부 API를 어떻게 인증하고 회전하는가? | AI + BE + Infra | **확정: 방향별 Bearer Token 2종, Security Group과 독립적인 애플리케이션 검증, 콤마 목록 최대 2개, 첫 값 송신·전체 값 상수 시간 검증, 단계적 무중단 회전. mTLS는 P2** ([GitLab Work Item #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/102)) |
 | C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도(`DEAD`는 AI 내부 상태로만 유지), 저장소 복구 후 자동 재처리 없음(명시적 재처리 요청으로 새 Job), reconcile 결과는 Spring DB `storage_reconciliation_log`에 `runId + documentId` 멱등으로 적재하고 `VERIFIED` 객체만 문서 Provider 반영, 전달 경로는 #102 Service Token 방식을 재사용하되 Infra 전용 credential·scope로 분리, `STORAGE_UNAVAILABLE=503`(재시도 가능)·`STORAGE_QUOTA_EXCEEDED=507`(재시도 불가)로 분리. P0에서는 probe evidence만 수집하고 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 미확정 2건(`R2_RECONCILING` 중 신규 업로드 허용 여부, R2 API 장애 자동 판정 수치)은 `docs/26_팀_결정_필요사항.md`에 등록하고 후속 이슈로 분리** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-12 | AI 직원의 `role_code`·`tone_code`·`response_length` 허용값은? | AI + BE | **확정: role 2종(`PROJECT_DOCENT`·`GUIDE`), tone 3종(`FRIENDLY` 기본·`PROFESSIONAL`·`ENTHUSIASTIC`), responseLength 3종(`SHORT` 1~3문장·`MEDIUM` 4~6문장 기본·`LONG` 7~12문장). 저장과 검증은 Spring, 해석은 FastAPI가 한다. `responseLength → max_tokens` 매핑은 AI 파트 소유이며 `SHORT` 200·`MEDIUM` 400·`LONG` 800을 제안값으로 두되 모델 확정 후 재검증한다 — Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다** ([GitLab Issue #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112)) |
+| C-13 | 부스당 AI 직원 수 상한은? | BE + 기획 | **확정: 1명.** 서버 설정값으로 두어 조정 가능하게 한다. Agent가 하나뿐이므로 C-05의 Agent당 문서 10개·100MB가 사실상 부스당 상한이 된다 |
+
+*C-11은 AI 파트가 채운다 (#112 협의) — 번호 구멍은 의도된 것이다.*
 
 ### Session 2026-08-20
 
@@ -205,6 +209,14 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: reconcile 결과는 어디에 어떻게 기록하는가? → A: 메타데이터 SoT인 Spring의 DB에 `storage_reconciliation_log`(`runId·documentId·objectKey·sourceProvider·targetProvider·expected/actual size·type·sha256·status·attemptCount·failureReason·checkedAt·resolvedAt`)로 적재한다. Infra가 결과를 Infra 전용 Spring 내부 endpoint로 전달하며 #102 Service Token 방식을 재사용하되 AI 방향과 credential·scope를 분리한다. `runId + documentId`로 멱등성을 보장하고 `VERIFIED` 객체만 문서 Provider를 변경한다.
 - Q: 저장소 장애·quota 초과 시 오류 HTTP 상태는? → A: `STORAGE_UNAVAILABLE`은 503(재시도 가능), `STORAGE_QUOTA_EXCEEDED`는 507(재시도해도 해소되지 않음)로 분리한다. 두 코드 모두 필드 오류가 아니므로 `errors[]`는 비운다.
 - Q: Spring 상태 callback의 404는 모두 같은 방식으로 재시도하는가? → A: 아니다. `JOB_NOT_REGISTERED`만 1초·3초·10초 간격으로 최대 3회 재시도하고, `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 즉시 종료한다. 종료 기록은 정상 전달 기록과 분리하며 Spring은 mismatch를 계약 오류로 경고한다.
+
+### Session 2026-08-27
+
+- Q: 저장소에 `PROJECT_DOCENT`(docs/08 §6 예시)와 `GUIDE`(레이아웃 연결 테스트의 INSERT) 두 어휘가 갈려 있는데 어느 쪽이 유효한가? → A: **둘 다 유효값으로 받는다.** 한쪽만 화이트리스트로 만들면 다른 쪽이 깨진다. `role_code`는 이 2종으로 확정하며, 요구한 곳이 없는 후보(`TECH_SUPPORT` 등)는 넣지 않는다 — 값 추가는 가산적이지만 삭제는 저장된 데이터를 무효로 만든다.
+- Q: `tone_code`는 무엇을 두는가? → A: `FRIENDLY`(기본)·`PROFESSIONAL`·`ENTHUSIASTIC` 3종. **길이를 뜻하는 값(`CONCISE` 등)은 두지 않는다** — `response_length`와 같은 것을 두 번 말하게 되고, 둘이 어긋났을 때 어느 쪽을 따를지 답이 없어진다.
+- Q: `response_length`의 기준은 무엇인가? → A: `SHORT` 1~3문장, `MEDIUM` 4~6문장(기본, V1 스키마의 `DEFAULT 'MEDIUM'`과 일치), `LONG` 7~12문장. **문단이 아니라 문장 수로 적는다** — 문단은 길이가 정해지지 않아 기준이 되지 못한다.
+- Q: `response_length`를 LLM 호출에 어떻게 반영하는가? → A: `max_tokens` 매핑은 **AI 파트가 소유한다.** `SHORT` 200·`MEDIUM` 400·`LONG` 800을 제안값으로 두고 실제 모델 확정 후 재검증한다. Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다 — 모델이 바뀔 때 DB 마이그레이션이 따라오지 않아야 한다.
+- Q: 부스당 AI 직원을 몇 명까지 두는가? → A: **1명.** 값은 서버 설정으로 두어 조정 가능하게 한다. spec은 상한만 정하고 수치를 코드에 하드코딩하지 않는다.
 
 ---
 

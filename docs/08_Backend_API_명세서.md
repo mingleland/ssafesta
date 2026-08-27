@@ -444,6 +444,29 @@ AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 S
 }
 ```
 
+#### 설정 허용값 (2026-08-27 확정 — spec 007 C-12, [GitLab #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112))
+
+세 필드는 자유 문자열이 아니라 **화이트리스트**다. 저장·검증은 Spring이 하고, 값을 해석해 프롬프트를 만드는 것은 FastAPI다.
+
+| 필드 | 허용값 | 뜻 |
+|---|---|---|
+| `role` | `PROJECT_DOCENT` | 전시 프로젝트를 해설한다 |
+| | `GUIDE` | 부스 운영·이용을 안내한다 |
+| `tone` | `FRIENDLY` **(기본)** | 친근한 존댓말 |
+| | `PROFESSIONAL` | 격식체. 정확·중립 |
+| | `ENTHUSIASTIC` | 활기찬 어조 |
+| `responseLength` | `SHORT` | 1~3문장 |
+| | `MEDIUM` **(기본)** | 4~6문장 |
+| | `LONG` | 7~12문장 |
+
+- `responseLength`는 **문장 수** 기준이다. 문단은 길이가 정해지지 않아 기준이 되지 못한다.
+- `responseLength → max_tokens` 매핑은 **AI 파트 소유**다 (제안값 200/400/800, 모델 확정 후 재검증). Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다.
+- `tone`에 길이를 뜻하는 값을 두지 않는다 — `responseLength`와 어긋났을 때 우선순위가 없어진다.
+
+#### 부스당 AI 직원 수
+
+**부스당 1명이다** (spec 007 C-13). 서버 설정값이라 조정될 수 있으나, FE는 이 전제에서 편집 UI를 만든다 — 목록·다중 선택 UI가 필요 없다.
+
 ---
 
 ## 7. AI Document Metadata / Upload
