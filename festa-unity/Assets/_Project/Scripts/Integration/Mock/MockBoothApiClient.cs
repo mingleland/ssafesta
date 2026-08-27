@@ -71,6 +71,18 @@ namespace Festa.Integration
             return layout;
         }
 
+        public async Task<BoothLayoutDto> GetPublishedLayoutBySlotAsync(int slotId)
+        {
+            // Mock 은 slot→booth 임차 해석이 없으니 boothId = slotId 로 둔다.
+            // 홀수 슬롯만 게시된 것으로 취급 — 12실 병렬 조회에서 "게시/미게시 혼재" 경로를
+            // 에디터에서도 지나가게 하기 위해서다 (미게시 = null, S15P21A604-103 완료 조건).
+            await Awaitable.WaitForSecondsAsync(0.1f);
+            if (slotId % 2 == 0) return null;
+            var layout = BoothLayoutParser.Parse(MockLayoutJson);
+            if (layout != null) layout.boothId = slotId;
+            return layout;
+        }
+
         public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
         {
             await Awaitable.WaitForSecondsAsync(0.05f);
