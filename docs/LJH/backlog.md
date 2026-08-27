@@ -28,8 +28,9 @@
 
 **Asset 계약이 develop 에 복구돼 2건이 열렸다.** 황덕이 [MR !53](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/53)(`-269`)로 `game-asset-upload.md` 를 재반입했다(08-27 10:41 머지, 파일 존재 확인).
 
-- [ ] **(P0) `-187` `asset://` 참조 해석·회귀 테스트** — 순수 FE. resolver 는 `asset://game/{g}/{a}` → `/api/v1/games/{g}/assets/{a}/content` **문자열 치환 하나**(§3.4 확정 — 서버가 302 로 대신 연다, 만료 관리 FE 몫 아님). 오류 어휘는 §6 참조
-- [ ] **(P0) `-116` GameAssetRepository 원격 어댑터** — 계약 §3 endpoint 6종 확정. ⚠️ **서버 구현은 아직 없다**(`-107`·`-176`) — 어댑터는 계약 기준으로 만들고 실서버 왕복은 BE 구현 후. develop `GameProjectValidator` 는 여전히 `builtin://` 만 통과시키며 완화는 발급을 넣는 같은 커밋에서 한다(BE 판단: 지금 FE 대응 불요)
+**`-116` 계약 기준 구현 완료** — [MR !67](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/67)(리뷰어 rammerg, `Closes` 없음). 완료 조건 4개가 전부 서버 왕복을 요구해 `-107`·`-176` 대기로 남는다.
+
+- [ ] **`-187` `asset://` 참조 해석·회귀** — Jira 상 `BLOCKED BY -107·116·176`. 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 서버가 필요하다. resolver 단위 테스트분은 `-116` 구현과 함께 들어갔다(17건)
 
 **D5(OAuth 자격증명 6종)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
 
@@ -63,6 +64,7 @@
 
 ## 추적 — 내 액션 없음
 
+- 계약 §3.4 빈틈 — `<img src>` 는 Authorization 을 싣지 못해 **편집기의 자기 Draft Asset 조회가 401** 이 된다(익명 공개 Published 는 무관). FE 가 인증 fetch → object URL 로 닫았고 계약 변경 0. `-107` 이 알아야 할 것 2개(`/content` 가 Bearer 를 받아야 함·fetch 라 CORS 가 걸림)를 #69 에 통보했다
 - [#113](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/113) BE `GlobalExceptionHandler` 미처리 예외 2종 → 500. `MissingRequestCookieException`(refresh 무쿠키 — 비로그인·게스트가 매 로드마다 밟는다)·`NoResourceFoundException`(미매핑 경로 전부). **FE 우회 불가** — RT 는 HttpOnly 라 존재 여부를 FE 가 읽을 수 없다(헌법 13조). 화면은 정상 동작하며 문제는 서버 로그의 신호 대 잡음
 - [#78](https://github.com/kanghyunsoon/ssafesta/issues/78) GameProject v1.1 **확정·종료**(08-26): schemaVersion **1.1.0**(1.0 읽기 유지·편집 시 명시 승격), `completion.mode ALL|ANY`, objectives **0~5개·type 중복 금지**(`SCORE_AT_LEAST`|`DEFEAT_ENEMIES`|`SURVIVE_SECONDS`), `playerDefeat RESPAWN|END_GAME`. **objectives 빈 배열 = completion 판정 비활성**(거부가 아니라 의미 정의 — golden path 테스트에 포함), **target 상한 정본은 FE type별 상한**(`gameProject.ts:326`). 활성화 게이트 유지(#104 C절). FE 구현은 Jira `-155`(박준우), 성능 실측 `-156`(박준우)
 - 013·016의 game발 spec 갱신 develop 미반영 / FE.md 인용 `game de38269` 커밋이 로컬·원격에 없음(016 E2E는 계약 텍스트만 필요해 무관) — Unity 확인 필요
