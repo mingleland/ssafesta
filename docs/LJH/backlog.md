@@ -26,20 +26,19 @@
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-**없다.** 남은 FE 티켓은 전부 D5 또는 계약 미비에 걸린다.
+**Asset 계약이 develop 에 복구돼 2건이 열렸다.** 황덕이 [MR !53](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/53)(`-269`)로 `game-asset-upload.md` 를 재반입했다(08-27 10:41 머지, 파일 존재 확인).
 
-**D5(OAuth 자격증명 6종)가 단일 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274) 로 추적 티켓을 만들었다. 실측 근거: 게스트는 `wallets/me`·`wallets/me/transactions`·`booths/mine` 전부 403 `MEMBER_ONLY`, 부스는 0건(`GET /booths/1` → 404 — 부스는 회원 임대로만 생긴다).
+- [ ] **(P0) `-187` `asset://` 참조 해석·회귀 테스트** — 순수 FE. resolver 는 `asset://game/{g}/{a}` → `/api/v1/games/{g}/assets/{a}/content` **문자열 치환 하나**(§3.4 확정 — 서버가 302 로 대신 연다, 만료 관리 FE 몫 아님). 오류 어휘는 §6 참조
+- [ ] **(P0) `-116` GameAssetRepository 원격 어댑터** — 계약 §3 endpoint 6종 확정. ⚠️ **서버 구현은 아직 없다**(`-107`·`-176`) — 어댑터는 계약 기준으로 만들고 실서버 왕복은 BE 구현 후. develop `GameProjectValidator` 는 여전히 `builtin://` 만 통과시키며 완화는 발급을 넣는 같은 커밋에서 한다(BE 판단: 지금 FE 대응 불요)
 
-| 티켓 | 막힌 것 |
+**D5(OAuth 자격증명 6종)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
+
+| 남은 대기 | 왜 |
 |---|---|
-| `-86` Facade · `-88` Wallet · `-89` Owner/Staff | D5 — real adapter 는 이미 구현돼 있고 실측만 남았다 |
-| `-87` 잔여 · `-90` 잔여 · `-171` 실서버 | D5 |
-| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다. #69 보고 완료 |
 | `-91` 013a AT wiring | receiver·timing·refresh 반영 미결(#60 이 푼 것은 token type 하나) |
 | `-133`·`-194` Survey | `docs/08` §9 results 가 제목 한 줄짜리 stub |
-| `-195` YouTube · `-134` Project | 016 C-01 3파트 합동 미결 / 009 계약도 endpoint 제목만 |
-
-**D5 가 오면 `-86` → `-88` → `-89` 순으로 실측만 하고 짧게 소진한다.** 새 설계를 만들지 않는다.
+| `-134` Project 전시 | spec 009 C-01~C-04 미결. [#110](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/110) 에 **FE 몫 회신 완료**(C-03 URL 참조 동의, C-02 는 제공자 목록이 기획 몫). C-01·C-03 이 닫히면 FE plan·tasks 착수 |
+| `-195` YouTube 임베드 | 016 C-01 3파트 합동 미결 + 009 C-02 |
 
 ## 대기
 
