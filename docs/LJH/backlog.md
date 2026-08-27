@@ -11,36 +11,34 @@
 
 **원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**develop 행 4건 전부 머지 완료**(08-27 10:19~10:20, squash) — `!46`(`-90`) · `!37`(`-153`) · `!42`(`-254`) · `!43`(`-247`). 이어서 `!52`(`-87`)도 머지(10:35). `Closes` 는 `-153`·`-254` 에만 넣었다.
+**열린 내 MR 은 `!61` 하나다.** 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를 develop 에 머지했고, part-target `!13`·`!20` 은 `front` 로 소진했다.
 
-**왜 그동안 안 머지됐나 — 내가 만든 규칙 때문이었다.** `docs/17` §8:269 원문은 **"최소 1명 Review 권장"**(필수 아님)인데 필수로 읽어 셀프 머지 금지를 스스로 만들었다. 실측: 머지된 MR 34건 중 **author == merged_by 가 33/34**, reviewers 지정은 6/34. 보호 브랜치는 `main` 하나, 내 권한은 **Maintainer(40)**. `approved_by=[]` 는 승인 대기가 아니라 GitLab Free 에서 그 버튼이 안 쓰인다는 뜻이다.
-
-| 남은 MR | 대상 | 상태 |
+| MR | 대상 | 상태 |
 |---|---|---|
-| !20 `-171` Lease 확인 모달 | **front** | mergeable. 08-26 개정 이전 part-target MR — retarget 없이 보존, develop 반입은 별도 라운드 |
-| !13 `-179` 상한 guard 이관 | **front** | 동일 |
+| !61 `-179` develop 반입 | develop | **열림** — `festa-frontend/src/game-studio/` 가 #109 로 박준우 범위가 됐다. `-179` 는 이관 목록 8건에 없어 내 티켓이지만 파일 소유가 겹쳐 확인 요청 중 |
+
+**셀프 머지는 이 팀의 관행이다** — `docs/17` §8:269 는 "최소 1명 Review **권장**", 머지된 MR 34건 중 author == merged_by 가 33/34, 보호 브랜치는 `main` 하나, 내 권한은 Maintainer(40). `approved_by=[]` 는 승인 대기가 아니다.
 
 ## 내 액션 필요
 
-- [ ] **`!13`·`!20` part-target 소진** — `front` 로 머지한 뒤 develop 반입 라운드를 따로 잡을지, 브랜치를 develop 기준으로 다시 딸지 결정
-- [ ] **FE 결함 2건**(각각 이슈 필요) — ① `/` 에 라우트가 없어 도메인 루트 진입 시 React Router 기본 ErrorBoundary 가 영어 404 를 그린다 ② `RequireAuth` 헤더가 `회원로 이용 중` 으로 렌더된다(조사 결함)
+- [ ] **`!61` 확인 대기** — 박준우 응답 후 머지. develop 에 **죽은 재시도 분기**(`INTERNAL_SERVER_ERROR`, 서버는 `INTERNAL_ERROR`)가 그때까지 남는다
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
-**08-27 실측 기준 여전히 없다.** `-87` 은 게스트 범위까지 닫았고(MR !52), 나머지는 아래 이유로 막혀 있다.
+**없다.** 남은 FE 티켓은 전부 D5 또는 계약 미비에 걸린다.
 
-| 후보 | 왜 아닌가 |
+**D5(OAuth 자격증명 6종)가 단일 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274) 로 추적 티켓을 만들었다. 실측 근거: 게스트는 `wallets/me`·`wallets/me/transactions`·`booths/mine` 전부 403 `MEMBER_ONLY`, 부스는 0건(`GET /booths/1` → 404 — 부스는 회원 임대로만 생긴다).
+
+| 티켓 | 막힌 것 |
 |---|---|
-| `-86` Facade | **부스가 하나도 없다** — `GET /booths/1` → 404 `BOOTH_NOT_FOUND`. 부스는 회원 임대로만 생기고 회원 세션은 D5 대기 |
-| `-88` Wallet | `GET /wallets/me`·`/transactions` 게스트 403 `MEMBER_ONLY`. D5 대기 |
-| `-89` Owner/Staff | member-only 경로 전부. D5 대기 |
-| `-87` 잔여 | `OCCUPIED`·`mine`·오류 3상태는 컴포넌트 테스트로 고정했고 **실서버 확인은 D5 대기** |
-| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다(위 현재 상태). #69 보고 완료 |
-| `-91` 013a AT wiring | receiver(Unity 수신 GameObject·메서드)·timing·refresh 반영 미결. #60 이 푼 것은 token type 하나 |
-| `-133`·`-194` Survey | `docs/08` §9 `GET /surveys/{surveyId}/results` 가 제목 한 줄짜리 stub |
+| `-86` Facade · `-88` Wallet · `-89` Owner/Staff | D5 — real adapter 는 이미 구현돼 있고 실측만 남았다 |
+| `-87` 잔여 · `-90` 잔여 · `-171` 실서버 | D5 |
+| `-116`·`-187` Asset | 계약이 develop 에서 revert 로 사라졌다. #69 보고 완료 |
+| `-91` 013a AT wiring | receiver·timing·refresh 반영 미결(#60 이 푼 것은 token type 하나) |
+| `-133`·`-194` Survey | `docs/08` §9 results 가 제목 한 줄짜리 stub |
 | `-195` YouTube · `-134` Project | 016 C-01 3파트 합동 미결 / 009 계약도 endpoint 제목만 |
 
-**D5(OAuth 자격증명 6종)가 단일 최대 blocker다** — `-86`·`-88`·`-89` 와 `-87` 잔여가 전부 여기 걸려 있다.
+**D5 가 오면 `-86` → `-88` → `-89` 순으로 실측만 하고 짧게 소진한다.** 새 설계를 만들지 않는다.
 
 ## 대기
 
