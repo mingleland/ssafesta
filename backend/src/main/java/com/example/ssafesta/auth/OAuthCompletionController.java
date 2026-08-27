@@ -53,7 +53,13 @@ public class OAuthCompletionController {
             OAuthHandoffService.PendingRegistration pending = handoffs.peekRegistration(handoff);
             RegistrationService.RegistrationResult registered = registrations.complete(
                     pending.provider(), pending.providerSubject(), request.nickname());
-            handoffs.discard(handoff);
+            // The handoff is still worth exactly one session. Two callers holding the same one can
+            // both get this far — registration is idempotent, so both succeed — but only the one
+            // whose DELETE actually removed the key may issue, because issuing revokes whatever
+            // session the account already had.
+            if (!handoffs.discard(handoff)) {
+                throw new InvalidOAuthHandoffException();
+            }
             session = sessions.issue(registered.userId());
         }
         return ResponseEntity.ok().header("Set-Cookie", clearHandoffCookie().toString())

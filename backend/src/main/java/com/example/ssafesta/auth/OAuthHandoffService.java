@@ -56,20 +56,35 @@ public class OAuthHandoffService {
      * retry the 409 invites came back {@code OAUTH_HANDOFF_EXPIRED} and the person had to start the
      * whole OAuth round trip over (raised in review of !56).
      *
-     * <p>The window this opens is a replay of the same handoff within its five minutes. Signup is
-     * idempotent on {@code (provider, providerSubject)} — {@code RegistrationService.complete}
-     * returns the existing member rather than creating a second — so a replay ends where the first
-     * call ended.
+     * <p>Reading without deleting is only half of it — {@link #discard} has to carry the
+     * one-use guarantee that {@code getAndDelete} used to, or two callers holding the same handoff
+     * both get a session.
      */
     public PendingRegistration peekRegistration(String handoff) {
         String[] fields = read(handoff, Kind.REGISTRATION, 3);
         return new PendingRegistration(OAuthProvider.valueOf(fields[1]), decode(fields[2]));
     }
 
-    /** Spends a handoff that {@link #peekRegistration} read, after the work it authorised succeeded. */
-    public void discard(String handoff) {
-        redis.delete(key(handoff));
-        log.info("Consumed OAuth handoff type={}", Kind.REGISTRATION);
+    /**
+     * Spends a handoff that {@link #peekRegistration} read, and reports whether this caller is the
+     * one that spent it.
+     *
+     * <p>{@code DEL} is atomic and answers how many keys it removed, so among callers racing on the
+     * same handoff exactly one sees {@code true}. That single bit is what keeps a handoff worth one
+     * session: the caller must not issue one unless it won, because
+     * {@link MemberSessionService#issue} <b>revokes the account's previous session</b> — a replay
+     * would not merely mint a second session, it would cut the first one off.
+     *
+     * <p>Returning void here was how the read-then-delete split first went in, and it silently
+     * dropped the one-use guarantee that {@code getAndDelete} had been providing (raised in review
+     * of !56).
+     */
+    public boolean discard(String handoff) {
+        boolean spent = Boolean.TRUE.equals(redis.delete(key(handoff)));
+        if (spent) {
+            log.info("Consumed OAuth handoff type={}", Kind.REGISTRATION);
+        }
+        return spent;
     }
 
     private String store(String... fields) {
