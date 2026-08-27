@@ -1,13 +1,13 @@
 # Data Model: AI 직원 / 문서 파이프라인
 
-## 소유권과 스키마
+## 소유권과 database 경계
 
-| 스키마 | 소유 파트 | 주요 테이블 |
+| Database | 소유 파트 | 주요 테이블 |
 |---|---|---|
-| `public` | Spring / Backend | `ai_agents`, `ai_documents`, `ai_document_chunks` |
-| `ai` | FastAPI / AI | `document_jobs` |
+| `festa_{env}_business` | Spring / Backend | `ai_agents`, `ai_documents`, `storage_reconciliation_log` |
+| `festa_{env}_ai` | FastAPI / AI | `document_jobs`, `document_chunks` |
 
-FastAPI migration role은 `ai` 스키마 DDL을 수행한다. runtime role은 Job DML과 필요한 `public` 테이블의 최소 권한만 가진다. FastAPI는 `public.ai_documents`를 직접 갱신하지 않는다.
+두 database는 같은 PostgreSQL 17 + pgvector 인스턴스를 공유하지만 login role과 CONNECT 권한을 분리한다. FastAPI migration/runtime role은 AI DB에만 접속하며 Business DB를 직접 조회하거나 갱신하지 않는다. Spring role도 AI DB에 접속하지 않는다. database 간 FK·cascade·cross-database query는 사용하지 않는다.
 
 ## AI Agent — Spring 소유
 
@@ -18,7 +18,7 @@ FastAPI migration role은 `ai` 스키마 DDL을 수행한다. runtime role은 Jo
 | `name`, `role`, `tone`, `system_prompt` | Agent 설정 |
 | `created_at`, `updated_at` | 감사 시각 |
 
-FastAPI는 처리 요청의 `booth_id`, `agent_id` 조합이 실제 소유 관계와 일치하는지 읽기 검증한다.
+Spring은 처리 요청 전에 `booth_id`, `agent_id` 조합과 문서 소유권·임대·상태를 Business DB에서 검증한다. FastAPI는 Spring이 전달한 snapshot을 Job에 저장한다.
 
 ## Document — Spring 소유
 
@@ -64,7 +64,7 @@ Backend migration은 `develop` 기준 최신 Flyway migration의 다음 사용 �
 
 ## Storage Reconciliation Log — Spring 소유
 
-테이블: `public.storage_reconciliation_log`
+테이블: Business DB `storage_reconciliation_log`
 
 | 필드 | 규칙 |
 |---|---|
@@ -88,15 +88,21 @@ Backend migration은 `develop` 기준 최신 Flyway migration의 다음 사용 �
 
 ## Processing Job — FastAPI 소유
 
-테이블: `ai.document_jobs`
+테이블: AI DB `document_jobs`
 
 | 필드 | 타입 예시 | 규칙 |
 |---|---|---|
 | `id` | `BIGINT IDENTITY` | PK. 외부 응답은 `job_{id}` 문자열로 직렬화 |
-| `document_id` | `BIGINT` | `public.ai_documents(id) ON DELETE CASCADE` |
+| `document_id` | `BIGINT` | Business DB 문서의 논리 참조. FK 없음 |
 | `booth_id` | `BIGINT` | NOT NULL, 요청 snapshot |
 | `agent_id` | `BIGINT` | NOT NULL, 요청 snapshot |
 | `source_hash` | `CHAR(64)` | 접수 시 문서 SHA-256 snapshot |
+| `original_filename` | `TEXT` | Spring 검증 snapshot |
+| `content_type` | `VARCHAR(100)` | PDF·MD·TXT parser 선택 및 검증 snapshot |
+| `file_size_bytes` | `BIGINT` | 원본 크기 snapshot |
+| `storage_provider` | `VARCHAR(20)` | `R2/MINIO_LOCAL` snapshot |
+| `storage_bucket` | `TEXT` | 원본 bucket snapshot |
+| `object_key` | `TEXT` | 원본 object key snapshot |
 | `status` | `VARCHAR(20)` | JobStatus CHECK 제약 |
 | `attempt_no` | `INTEGER` | 최초 실행 1, 실행 횟수. 0 이상 |
 | `max_retries` | `INTEGER` | 기본 3, 0 이상. 최대 실행은 `1 + max_retries` |
@@ -141,26 +147,39 @@ WHERE status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
 
 터미널 상태는 `SUCCEEDED`, `DEAD`, `CANCELLED`다. 터미널 Job은 다시 실행하지 않으며 Spring 콜백만 독립적으로 재시도한다.
 
-## Document Chunk — FastAPI 데이터, Spring 스키마
+## Document Chunk — FastAPI 소유
+
+테이블: AI DB `document_chunks`
 
 | 필드 | 규칙 |
 |---|---|
 | `id` | PK |
-| `document_id` | Document FK |
+| `document_id` | Business DB 문서의 논리 참조. FK 없음 |
 | `booth_id`, `agent_id` | NOT NULL, RAG 필수 필터 |
 | `chunk_no` | 문서 내 0 기반 순서 |
 | `content` | 정규화된 텍스트 |
 | `embedding` | `vector(1536)` |
 | `embedding_model_id` | 임베딩 모델 식별자 |
 | `page_number` / `section` | 추적 가능한 경우 저장 |
+| `searchable` | 기본 `FALSE`. Spring이 `READY` callback을 수락한 뒤에만 `TRUE` |
 
 `UNIQUE(document_id, chunk_no)`를 유지한다. 성공 커밋은 아래 원자적 순서를 따른다.
 
-1. 현재 Document가 `DISABLED`가 아니며 `source_hash`가 최신 값인지 확인한다.
+1. Job이 현재 Worker 소유의 `RUNNING`이며 cleanup으로 취소되지 않았는지 확인한다.
 2. `document_id`의 기존 Chunk를 모두 삭제한다.
-3. 새 Chunk를 전량 삽입한다.
+3. 새 Chunk를 `searchable = FALSE`로 전량 삽입한다.
 4. Job을 `SUCCEEDED`로 전환하고 `chunk_count`, `finished_at`을 기록한다.
-5. 트랜잭션 커밋 후 Spring 상태 콜백을 예약한다.
+5. AI DB 트랜잭션 커밋 후 Spring 상태 콜백을 예약한다.
+
+Business DB의 Document 상태는 이 트랜잭션에 포함하지 않는다. Spring은 callback의 `jobId`, `documentId`, `sourceHash`를 현재 Business DB 행과 비교한 뒤 `READY`를 반영한다. FastAPI는 `READY` callback 204를 받은 뒤 별도 AI DB 트랜잭션으로 해당 Job의 Chunk를 `searchable = TRUE`로 바꾼다. RAG 쿼리는 `booth_id + agent_id + searchable = TRUE`를 강제한다.
+
+## Cleanup과 database 간 reconciliation
+
+- Spring은 문서 삭제·`DISABLED` 전환 시 `document_id` 기반 cleanup을 FastAPI에 발행하고 성공할 때까지 재시도한다.
+- FastAPI cleanup은 AI DB 트랜잭션에서 활성 Job을 `CANCELLED`로 전환하고 해당 문서 Chunk를 삭제한다. Job/Chunk가 이미 없으면 성공으로 처리한다.
+- cleanup과 성공 커밋은 같은 AI DB의 Job/Chunk 행 잠금으로 직렬화한다.
+- 주기적 reconciliation 입력은 Spring이 Business DB의 단일 snapshot에서 생성한 전체 활성 문서 inventory(`runId`, `documentId`, `boothId`, `agentId`, `sourceHash`, `status`)다. FastAPI는 같은 `runId` 재전송을 멱등하게 처리하고 AI DB와 비교해 Business DB에 없는 문서 및 `READY`가 아닌 문서의 Chunk를 cleanup한다.
+- scope/sourceHash 불일치는 자동으로 문서 내용을 추정·수정하지 않고 운영 경고와 명시적 재처리 대상으로 남긴다.
 
 ## 상태 콜백 정합성
 

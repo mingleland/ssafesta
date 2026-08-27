@@ -6,8 +6,8 @@
 
 - Docker 및 Docker Compose
 - Python 3.12 이상
-- PostgreSQL + pgvector 테스트 인스턴스
-- AI migration role과 runtime role
+- PostgreSQL 17 + pgvector 테스트 인스턴스
+- 테스트 인스턴스 안의 Business DB·AI DB와 서비스별 migration/runtime role
 - 테스트용 S3-compatible object storage adapter 또는 격리된 R2 bucket
 - deterministic Embedding fake: 입력별 고정 1536차원 vector 반환
 - Spring callback fake 또는 Backend 로컬 인스턴스
@@ -25,14 +25,16 @@ alembic upgrade head
 
 확인 결과:
 
-- `ai.document_jobs`와 세 인덱스(pickup, lease, callback)가 존재한다.
-- `document_id` FK가 `ON DELETE CASCADE`다.
-- runtime role은 `public.ai_documents`를 SELECT할 수 있지만 UPDATE할 수 없다.
+- AI DB `document_jobs`와 세 인덱스(pickup, lease, callback)가 존재한다.
+- AI DB에 `document_jobs`·`document_chunks`가 있고 AI DB에만 `vector` extension이 존재한다.
+- `document_id`에는 Business DB FK나 `ON DELETE CASCADE`가 없다.
+- 4개 runtime role × 4개 database CONNECT matrix에서 환경·서비스가 일치하는 대각선만 성공한다.
+- FastAPI runtime role은 Business DB에, Spring runtime role은 AI DB에 CONNECT할 수 없다.
 
 ## 2. 기본 처리 성공
 
-1. Spring Fixture에 `QUEUED` Document와 R2 PDF를 준비한다.
-2. `POST /ai/v1/documents/process`를 호출한다.
+1. Business DB Fixture에 `QUEUED` Document와 R2 PDF를 준비한다.
+2. Spring이 검증한 전체 snapshot으로 `POST /ai/v1/documents/process`를 호출한다.
 3. Worker가 처리할 때까지 기다린다.
 
 기대 결과:
@@ -42,6 +44,7 @@ alembic upgrade head
 - Document는 `QUEUED → PROCESSING → READY`로 전이한다.
 - Chunk는 모두 같은 `document_id`, `booth_id`, `agent_id`, `embedding_model_id`를 가진다.
 - `chunk_count`와 `processed_at`이 Spring 상태에 반영된다.
+- 처리 중 FastAPI가 Business DB에 연결하거나 조회한 기록은 0건이다.
 
 ## 3. 중복 요청 멱등성
 
@@ -92,17 +95,18 @@ alembic upgrade head
 - 이전 `chunk_no=25..39`는 남지 않는다.
 - 실패를 주입하면 40개 기존 Chunk가 그대로 유지되고 부분적인 새 Chunk는 없다.
 
-## 7. 부스 임대 만료
+## 7. 삭제·비활성화 cleanup
 
 1. Job을 `RUNNING`으로 만든다.
 2. Spring Document를 부스 임대 만료 정책에 따라 `DISABLED`로 전환한다.
-3. Worker가 성공 commit 직전 검증을 수행하게 한다.
+3. 첫 cleanup 호출 직전에 FastAPI 또는 네트워크 장애를 주입한 뒤 같은 `DELETE /documents/{documentId}/artifacts?reason=DOCUMENT_DISABLED` 요청을 재전송한다.
 
 기대 결과:
 
 - Job은 `CANCELLED`다.
 - Document는 `DISABLED`를 유지한다.
-- 새 Chunk는 공개되지 않으며 `READY` callback이 발생하지 않는다.
+- 해당 문서 Chunk는 0건이며 cleanup 반복 호출도 204다.
+- cleanup 뒤 늦은 `READY` callback은 Spring 최신 상태 검증에서 반영되지 않는다.
 - 이 동작은 Worker heartbeat lease 만료의 `RETRY_WAIT`와 구분된다.
 
 ## 8. 오래된 개정본 완료 경쟁
@@ -123,7 +127,7 @@ Booth A/Agent A와 Booth B/Agent B에 서로 다른 표식 문서를 등록하�
 
 기대 결과:
 
-- 모든 검색 쿼리에 `booth_id + agent_id + READY` 필터가 적용된다.
+- 모든 검색 쿼리에 `booth_id + agent_id + searchable = true` 필터가 적용된다.
 - 다른 Booth 또는 Agent Chunk 반환은 0건이다.
 - 1건이라도 유출되면 CI와 배포를 차단한다.
 
@@ -176,7 +180,19 @@ Booth A/Agent A와 Booth B/Agent B에 서로 다른 표식 문서를 등록하�
 - 삭제 실패 시 `EXPIRED`와 `objectKey`가 유지되고 다음 실행에서 재시도된다.
 - Spring 자격증명은 테스트 bucket/prefix 밖의 객체를 삭제할 수 없다.
 
-## 13. 자동 테스트
+## 13. Business/AI DB reconciliation
+
+1. Business DB에는 없는 `documentId`의 Job·Chunk와 `DISABLED` 문서의 Chunk를 AI DB에 주입한다.
+2. Spring이 활성 문서 inventory를 생성하고 FastAPI reconciliation에 전달한다.
+3. 같은 inventory/run을 재전송한다.
+
+기대 결과:
+
+- Business DB에 없는 문서 및 `READY`가 아닌 문서의 Chunk가 0건으로 수렴한다.
+- 반복 reconciliation은 추가 삭제나 오류 없이 멱등 성공한다.
+- scope/sourceHash 불일치는 임의 보정하지 않고 운영 경고와 명시적 재처리 대상으로 기록한다.
+
+## 14. 자동 테스트
 
 ```bash
 cd festa-ai
@@ -191,6 +207,8 @@ pytest -m isolation
 
 - OpenAPI 계약 검증 성공
 - 상태 전이와 DB 제약 검증 성공
+- database CONNECT matrix와 FastAPI Business DB 무접근 검증 성공
+- cleanup 재전송·inventory reconciliation 후 고아 Chunk 0건
 - 강제 종료·callback 실패 복구 성공
 - 다른 Booth/Agent Chunk 유출 0건
 - 사용자 오류 응답과 로그 검사에서 Secret·Stack Trace 노출 0건
