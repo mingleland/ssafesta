@@ -1,6 +1,10 @@
 package com.example.ssafesta.auth;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -42,7 +47,8 @@ class OAuthCompletionApiIntegrationTest {
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private OAuthHandoffService handoffs;
+    @MockitoSpyBean private OAuthHandoffService handoffs;
+    @MockitoSpyBean private MemberSessionService sessions;
     @Autowired private UserRepository users;
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
@@ -144,6 +150,32 @@ class OAuthCompletionApiIntegrationTest {
         assertTrue(handoffs.discard(handoff), "처음 소비는 성공해야 합니다.");
         assertFalse(handoffs.discard(handoff),
                 "두 번째 소비는 실패해야 합니다 — 이 한 비트가 세션 이중 발급을 막습니다.");
+    }
+
+    /**
+     * Losing the handoff mid-flight must cost the session, not just the handoff.
+     *
+     * <p>{@link #aHandoffCanOnlyBeSpentOnce} pins the primitive; this pins that the controller acts
+     * on it. Between them sits the only line that matters — the caller registers successfully and
+     * then finds the handoff already spent, and must <b>not</b> issue anyway, because issuing revokes
+     * whatever session the winner just received.
+     *
+     * <p>Forcing {@code discard} to report a loss is the only way in: the window is real but too
+     * narrow to hit on purpose, and a concurrent test cannot reach it — registration collides on the
+     * identity constraint first. I had called the gate untestable for that reason. It is not; the
+     * seam was a spy away (raised in review of !56).
+     */
+    @Test
+    void aHandoffLostBetweenReadAndSpendIssuesNoSession() throws Exception {
+        String subject = "lost-" + UUID.randomUUID();
+        String handoff = handoffs.createRegistration(OAuthProvider.GOOGLE, subject);
+        doReturn(false).when(handoffs).discard(handoff);
+
+        complete(handoff, "놓친" + UUID.randomUUID().toString().substring(0, 6))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("OAUTH_HANDOFF_EXPIRED"));
+
+        verify(sessions, never()).issue(anyLong());
     }
 
     private ResultActions complete(String handoff, String nickname) throws Exception {

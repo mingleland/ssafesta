@@ -1,20 +1,30 @@
 package com.example.ssafesta.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.user.OAuthIdentity;
+import com.example.ssafesta.user.OAuthIdentityRepository;
 import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /**
  * {@code RegistrationService} decides between a race and a fault by the constraint the database
@@ -36,6 +46,7 @@ class RegistrationConstraintIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private RegistrationService registrations;
     @Autowired private UserRepository users;
+    @MockitoSpyBean private OAuthIdentityRepository identities;
 
     @Test
     void theConstraintNamesTheServiceBranchesOnStillExist() {
@@ -48,20 +59,46 @@ class RegistrationConstraintIntegrationTest {
     }
 
     /**
-     * A unique constraint the service does not know about must not be read as a race.
+     * A unique violation the service cannot name must not be excused as a race.
      *
-     * <p>{@code wallets_user_id_key} stands in for one: it is a real unique constraint on a table the
-     * signup transaction writes to, and a violation of it means a brand-new user already had a
-     * wallet — our bug, not a second signup. The service has to let it through as a fault.
+     * <p>This goes through {@code RegistrationService} rather than round the side of it. The first
+     * version inserted a duplicate wallet row with {@code JdbcTemplate} and asserted the database
+     * refused it — which proves the database has a constraint, and nothing at all about the
+     * translation the test is named after (raised in review of !56).
+     *
+     * <p>{@code oauth_identities_user_id_provider_key} is the stand-in: a real constraint on a table
+     * the signup writes to, and one the service deliberately does not list because it cannot fire on
+     * this path. If it somehow did, that is our bug and has to come out as a fault.
      */
     @Test
-    void anUnexpectedUniqueViolationIsNotReadAsARace() {
-        Long userId = users.save(new User("지갑충돌" + UUID.randomUUID().toString().substring(0, 6))).getId();
-        jdbc.update("insert into wallets (user_id, balance) values (?, 0)", userId);
+    void aUniqueViolationTheServiceCannotNameIsNotReadAsARace() {
+        DataIntegrityViolationException unknown = violationOf("oauth_identities_user_id_provider_key");
+        doThrow(unknown).when(identities).save(any(OAuthIdentity.class));
 
-        // The same wallet again — a unique violation, but not one the signup path may excuse.
-        assertTrue(assertThrowsIntegrityViolation(userId),
-                "모르는 unique 위반은 409 로 번역되지 않고 그대로 올라가야 합니다.");
+        DataIntegrityViolationException thrown = assertThrows(DataIntegrityViolationException.class,
+                () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(),
+                        "모르는제약" + UUID.randomUUID().toString().substring(0, 6)));
+
+        assertSame(unknown, thrown, "서비스가 이름을 모르는 unique 위반은 409 가 아니라 그대로 올라가야 합니다.");
+    }
+
+    /** The one identity constraint that <i>can</i> fire is still translated. */
+    @Test
+    void theIdentityRaceTheServiceKnowsAboutIsTranslated() {
+        doThrow(violationOf("oauth_identities_provider_provider_subject_key"))
+                .when(identities).save(any(OAuthIdentity.class));
+
+        RegistrationConflictException thrown = assertThrows(RegistrationConflictException.class,
+                () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(),
+                        "아는제약" + UUID.randomUUID().toString().substring(0, 6)));
+
+        assertEquals(ErrorCode.REGISTRATION_CONFLICT, thrown.errorCode());
+    }
+
+    /** Shaped the way the driver and Hibernate hand it over — the name rides on the nested cause. */
+    private DataIntegrityViolationException violationOf(String constraint) {
+        return new DataIntegrityViolationException(constraint, new ConstraintViolationException(
+                "duplicate key", new SQLException("duplicate key", "23505"), constraint));
     }
 
     /** The nickname race answers with the same code the pre-check does — the caller needs another name. */
@@ -77,15 +114,6 @@ class RegistrationConstraintIntegrationTest {
                 () -> registrations.complete(OAuthProvider.GOOGLE, "subject-" + UUID.randomUUID(), nickname));
 
         assertEquals(ErrorCode.NICKNAME_DUPLICATED, thrown.errorCode());
-    }
-
-    private boolean assertThrowsIntegrityViolation(Long userId) {
-        try {
-            jdbc.update("insert into wallets (user_id, balance) values (?, 0)", userId);
-            return false;
-        } catch (org.springframework.dao.DataIntegrityViolationException expected) {
-            return true;
-        }
     }
 
     private List<String> uniqueConstraintsOf(String table) {
