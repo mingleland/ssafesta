@@ -7,6 +7,11 @@ SketchUpImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: ssafy-sofa
+    second: {fileID: 2100000, guid: 57b5688e7d0ee7c4ebdd46ea5e885b4a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: ssafy_blue
     second: {fileID: 2100000, guid: 0fdc23714277a5644a09d969d41d85b0, type: 2}
   - first:
