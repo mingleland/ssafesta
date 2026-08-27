@@ -66,15 +66,21 @@ curl -i -X PUT localhost:8080/api/v1/booths/7/homepage \
 | **공개 부스**: public view에 저장값 노출 | US1-1, R-05 |
 | 공개 부스라도 `GET /booths/mine`은 항상 저장값 (프리필) | R-06 |
 | Published Layout 응답에 URL 없음 (Layout 계약 불변) | R-01, data-model §4 |
+| **LAPTOP 있음 + URL 미등록 → Publish warning `CONFIG_NOT_LINKED`** ("홈페이지 주소가 등록되지 않았습니다.") | **R-10**, 계약 §3-1 |
+| LAPTOP 있음 + URL 등록 → 경고 없음 (기존 `configId` 기준 오탐이 사라진다) | R-10 |
+| LAPTOP 없음 + URL 미등록 → 경고 없음 | R-10 |
+| `requiresConfig`는 `true` 유지 — `LayoutPassageChecker` 시야 확보 검사 회귀 없음 | R-10 실측 정정 |
 
 ## 4. 완료 후 절차 (헌법 24조·29조·30조)
 
 > ⚠️ 아래 중 밖으로 나가는 것(이슈·코멘트·docs 정본 기입·push)은 **전부 초안까지만 만들고 사용자 승인 후 게시한다.**
 
-- [ ] **C-01·C-02 확정 요청** — 추적 이슈 신설(현재 없음): 계약 초안 링크 + [contracts §6](../contracts/homepage-api.md) 확인 항목 5개. docs/26 "LAPTOP 홈페이지 주소 저장 위치" 행은 확정 회신 후 결정값 기입
-- [ ] `contracts/homepage-api.md` 상태줄 갱신 (제안 → 확정/구현)
+- [x] **C-01·C-02 확정 요청** — [#97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/97) 게시 → **2026-08-26 종료.** 물은 7건 전부 회신, 결과는 [contracts §6](../contracts/homepage-api.md)
+- [x] `contracts/homepage-api.md` 상태줄 갱신 (제안 → **확정**, 2026-08-27)
+- [ ] `docs/26` "LAPTOP 홈페이지 주소 저장 위치" 행에 확정값 기입 — **FE(행 작성자)가 정정 담당**(오기 자인). stale 행 1건(`BOOTH_LAPTOP_INTERACT` 미검증 표기)도 같이. BE는 미착수 시 상기만 한다
 - [ ] 파트 통보 — FE: `PUT /booths/{id}/homepage` 신설 + `homepageUrl` 필드 2곳(public·mine) 추가(가산적) + published 게이트·null 의미. Unity: 변경 없음(브리지·Layout 그대로) — 참고 통보만
 - [ ] `docs/08` §3(Booth)에 endpoint·응답 필드 반영
 - [ ] spec 016 리뷰칸(①C-01·C-02 답 ③빠진 요구 ④계약 위치 합의)의 BE 몫 기입
-- [ ] **구현(코드) 착수는 C-01·C-02 확정 후에만** — 문서는 `제안` 표기로 먼저 머지한다 (research §머지 정책 정정)
+- [x] ~~구현(코드) 착수는 C-01·C-02 확정 후에만~~ — **게이트 해제 (2026-08-26 확정).** 구현 착수 가능
+- [ ] FE 통보 추가분 — 스튜디오 2건(`LAPTOP`에 `configId` 미전송 · `objectTypes.ts:36` `warnOnMissingConfig` → `false`) + 오버레이 조회 전환 3건 (계약 §3-1·§4)
 - [ ] `docs/HDD/작업일지.md` 기록, 문제 발생 시 트러블슈팅 T-번호
