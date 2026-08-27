@@ -65,6 +65,7 @@ curl -i -X PUT localhost:8080/api/v1/booths/7/homepage \
 | 미인증 401 / 비편집자 403 `BOOTH_EDITOR_FORBIDDEN` / 없는 부스 404 | R-07 |
 | 임대 만료 부스 `PUT` → 409 `BOOTH_LEASE_EXPIRED` | R-03, Edge Case(만료 직후), facade와 동일 규칙 |
 | **미공개 부스**(publishedLayoutVersion null): 등록돼 있어도 public view `homepageUrl: null` | **FR-003**, R-05 게이트 |
+| `null` 응답 3곳(해제 echo·`/mine`·공개 조회)에서 **키 존재 + 값 null 을 따로** 단언 — `doesNotExist()` 금지 | 계약 §3 주의, T-97 |
 | **공개 부스**: public view에 저장값 노출 | US1-1, R-05 |
 | 공개 부스라도 `GET /booths/mine`은 항상 저장값 (프리필) | R-06 |
 | Published Layout 응답에 URL 없음 (Layout 계약 불변) | R-01, data-model §4 |
@@ -81,8 +82,8 @@ curl -i -X PUT localhost:8080/api/v1/booths/7/homepage \
 - [x] `contracts/homepage-api.md` 상태줄 갱신 (제안 → **확정**, 2026-08-27)
 - [ ] `docs/26` "LAPTOP 홈페이지 주소 저장 위치" 행에 확정값 기입 — **FE(행 작성자)가 정정 담당**(오기 자인). stale 행 1건(`BOOTH_LAPTOP_INTERACT` 미검증 표기)도 같이. BE는 미착수 시 상기만 한다
 - [ ] 파트 통보 — FE: `PUT /booths/{id}/homepage` 신설 + `homepageUrl` 필드 2곳(public·mine) 추가(가산적) + published 게이트·null 의미. Unity: 변경 없음(브리지·Layout 그대로) — 참고 통보만
-- [ ] `docs/08` §3(Booth)에 endpoint·응답 필드 반영
+- [x] `docs/08` §3·§4 에 endpoint·응답 필드 반영 (2026-08-28)
 - [ ] spec 016 리뷰칸(①C-01·C-02 답 ③빠진 요구 ④계약 위치 합의)의 BE 몫 기입
 - [x] ~~구현(코드) 착수는 C-01·C-02 확정 후에만~~ — **게이트 해제 (2026-08-26 확정).** 구현 착수 가능
 - [ ] FE 통보 추가분 — 스튜디오 2건(`LAPTOP`에 `configId` 미전송 · `objectTypes.ts:36` `warnOnMissingConfig` → `false`) + 오버레이 조회 전환 3건 (계약 §3-1·§4)
-- [ ] `docs/HDD/작업일지.md` 기록, 문제 발생 시 트러블슈팅 T-번호
+- [x] 기록 (2026-08-28) — `docs/24_작업일지.md` · `docs/HDD/작업일지.md` · 트러블슈팅 **T-96·T-97**(공용) / **T-128·T-129**(개인)

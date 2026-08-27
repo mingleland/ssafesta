@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -13,6 +14,8 @@ import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** 부스 홈페이지 URL (spec 016 FR-001~FR-003, contracts/homepage-api.md). */
 @Import(TestcontainersConfiguration.class)
@@ -38,6 +42,7 @@ class BoothHomepageApiIntegrationTest {
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private JsonMapper jsonMapper;
 
     @BeforeEach
     void freeSlots() {
@@ -192,12 +197,11 @@ class BoothHomepageApiIntegrationTest {
         mockMvc.perform(homepageRequest(owner, body("https://going.example.com")))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(homepageRequest(owner, "{\"homepageUrl\":null}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.homepageUrl").doesNotExist());
+        assertPresentAndNull(mockMvc.perform(homepageRequest(owner, "{\"homepageUrl\":null}"))
+                .andExpect(status().isOk()), "homepageUrl");
 
-        mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearerFor(owner.userId())))
-                .andExpect(jsonPath("$.homepageUrl").doesNotExist());
+        assertPresentAndNull(mockMvc.perform(get("/api/v1/booths/mine")
+                .header("Authorization", bearerFor(owner.userId()))), "homepageUrl");
     }
 
     /** #58's five-field envelope: the field name goes in {@code field}, never in {@code rule}. */
@@ -274,10 +278,10 @@ class BoothHomepageApiIntegrationTest {
         mockMvc.perform(homepageRequest(owner, body("https://hidden.example.com")))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.publishedLayoutVersion").doesNotExist())
-                .andExpect(jsonPath("$.homepageUrl").doesNotExist());
+        ResultActions visitorView = mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk());
+        assertPresentAndNull(visitorView, "publishedLayoutVersion"); // 게이트의 입력
+        assertPresentAndNull(visitorView, "homepageUrl");
     }
 
     @Test
@@ -298,9 +302,8 @@ class BoothHomepageApiIntegrationTest {
         Owner owner = leasedOwner("미등록공개");
         publishLayout(owner);
 
-        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.homepageUrl").doesNotExist());
+        assertPresentAndNull(mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(status().isOk()), "homepageUrl");
     }
 
     /** The owner's own surface ignores the gate — otherwise the studio form cannot prefill (R-06). */
@@ -340,6 +343,22 @@ class BoothHomepageApiIntegrationTest {
 
     private static String body(String url) {
         return "{\"homepageUrl\":\"%s\"}".formatted(url);
+    }
+
+    /**
+     * The key is there and its value is {@code null} — two assertions, deliberately.
+     *
+     * <p>{@code jsonPath(…).doesNotExist()} cannot express this: it is satisfied both by a missing
+     * key and by an explicit {@code null}, so it would keep passing if the field ever stopped being
+     * serialised. The contract says the key is always present and {@code null} carries the meaning
+     * (homepage-api.md §3 — FE branches on one value), which makes the distinction the whole point.
+     */
+    private void assertPresentAndNull(ResultActions performed, String field) throws Exception {
+        JsonNode body = jsonMapper.readTree(performed.andReturn().getResponse().getContentAsString());
+        assertTrue(body.has(field),
+                "%s 필드가 응답에 없습니다 — 값이 null 이어도 키는 있어야 합니다: %s".formatted(field, body));
+        assertTrue(body.get(field).isNull(),
+                "%s 는 null 이어야 합니다: %s".formatted(field, body.get(field)));
     }
 
     private RequestBuilder homepageRequest(Owner owner, String body) {

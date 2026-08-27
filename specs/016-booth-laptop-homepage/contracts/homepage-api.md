@@ -66,6 +66,9 @@ Content-Type: application/json
 
 **노출 게이트 (FR-003)**: `publishedLayoutVersion`이 `null`이면 `homepageUrl`도 **`null`** 로 내려간다 — "공개 상태" = **공개된 Layout이 있는 상태**로 해석한다(노트북은 공개 Layout 안에만 존재하므로 방문자가 URL을 쓰는 순간과 일치). 미등록이어도 `null`이다 — FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다(FR-009).
 
+> **`null`은 키를 생략하는 것이 아니다** — `homepageUrl` 키는 **항상 응답에 존재**하고 값이 `null`로 의미를 전달한다(`PUT` 해제 응답·`/mine`·공개 조회 모두). FE가 `null` 하나로 분기하는 계약이 성립하려면 키가 사라지지 않아야 한다. 서버 전역 JSON 설정에 null 제외(`default-property-inclusion=non_null`)를 걸면 이 계약이 깨진다.
+> 검증도 이 구분을 표현해야 한다 — `jsonPath(…).doesNotExist()`는 **키 부재와 명시적 `null`을 똑같이 통과시켜** 계약을 지키지 못하고, `exists()`는 반대로 명시적 `null`에서 실패한다. 응답 본문을 파싱해 **키 존재와 `null`을 따로** 단언한다 (`BoothHomepageApiIntegrationTest.assertPresentAndNull`, T-97).
+
 임대 만료 부스는 이 조회 자체가 `409 BOOTH_LEASE_EXPIRED`다 (기존 동작 — "만료 직후 노트북 클릭" Edge Case 커버).
 
 **소유자 프리필**: `GET /api/v1/booths/mine` 응답(MyBoothView)에도 `homepageUrl`이 추가되며, 이쪽은 게이트 없이 **항상** 저장값이다 (미공개 상태의 스튜디오 폼 프리필용).
