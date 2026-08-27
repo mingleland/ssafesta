@@ -31,3 +31,11 @@
 **Rationale**: P0가 브라우저 호환성을 증명하고 P1 runner는 브라우저 렌더링 부하가 서버 측 수용량 측정을 왜곡하는 일을 줄인다.
 
 **Alternatives considered**: 브라우저 40개는 최종 경로와 같지만 runner host GPU/renderer가 병목이 될 가능성이 높다.
+
+## R-05. Dedicated Server CPU architecture
+
+**Decision**: Unity 6000.0.78f1 Dedicated Server는 x86_64 EC2에서만 실행하고 OCI Ampere A1 ARM64는 WebGL 정적 배포 검증에만 사용한다.
+
+**Rationale**: Unity 6000.0.78f1 모듈 카탈로그의 Linux 모듈과 설치된 `LinuxStandaloneSupport/Variations`는 x86_64 서버 경로만 제공한다. `com.unity.sdk.linux-arm64` sysroot는 이 버전에서 Embedded Linux 전용이라 데스크톱 Linux Dedicated Server 타깃으로 사용할 수 없다.
+
+**Alternatives considered**: Unity 6000.2+ 업그레이드는 프로젝트 전체 호환성 검증이 필요한 범위 확장이며 임시 OCI 검증을 위해 수행하지 않는다. x86_64 에뮬레이션은 성능·운영 결과를 왜곡하므로 사용하지 않는다.

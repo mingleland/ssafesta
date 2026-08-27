@@ -4,7 +4,7 @@
 
 ## Summary
 
-단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다.
+x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다. OCI Ampere A1 ARM64는 WebGL 정적 배포 검증에만 사용한다.
 
 ## Technical Context
 
@@ -16,13 +16,13 @@
 
 **Testing**: Maven/Spring integration tests, Unity EditMode tests, Compose/Nginx 정적 검사, 외부 WSS 브라우저·Unity runner 실측
 
-**Target Platform**: Ubuntu 단일 EC2, Linux Dedicated Server container, Unity WebGL browser client
+**Target Platform**: Ubuntu x86_64 단일 EC2, Linux x86_64 Dedicated Server container, Unity WebGL browser client
 
 **Project Type**: Spring API + Unity client/server + single-host infrastructure
 
 **Performance Goals**: P0 외부 브라우저 2개 10분 무입력 유지, P1 단일 채널 목표 40명
 
-**Constraints**: 공개 포트는 80/443만, game 7777 내부 전용, ALB/NLB/ACM/ECS 없음, game-only 배포, Secret/토큰 원문 기록 금지
+**Constraints**: 공개 포트는 80/443만, game 7777 내부 전용, ALB/NLB/ACM/ECS 없음, game-only 배포, Secret/토큰 원문 기록 금지, Unity 6000.0.78f1 Linux Server는 x86_64 전용, ARM64 에뮬레이션·임시 엔진 업그레이드 금지
 
 **Scale/Scope**: `11F` 단일 채널 `11F-01`, Dedicated Server 1개, 최대 40명
 
@@ -56,6 +56,7 @@ Phase 1 설계 후에도 위 판정은 변하지 않는다.
 ### Runtime and ingress
 
 - game 서비스는 비관리자 container, 내부 `7777`, `maxPlayers=40`, 전용 replay volume과 Secret Reference를 가진다.
+- 배포 전 host와 game image가 모두 x86_64인지 확인하고 아키텍처 불일치나 에뮬레이션 경로는 실패 처리한다.
 - Nginx `world` host는 WebSocket Upgrade, cache/buffering off와 초기 read/send timeout 180초를 사용한다.
 - 배포는 `--no-deps`로 game만 갱신하고 외부 승인 접속 실패 시 known-good으로 복구한다.
 
@@ -81,7 +82,7 @@ infra/unity-server/
 2. Unity 검증기와 영속 replay ledger
 3. game-only Compose/Nginx 및 검증 스크립트
 4. 로컬 자동 테스트
-5. 실제 도메인·EC2에서 P0 10분 WSS 및 P1 40명 실측
+5. 실제 도메인·x86_64 EC2에서 P0 10분 WSS 및 P1 40명 실측
 
 ## Complexity Tracking
 
