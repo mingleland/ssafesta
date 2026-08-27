@@ -1,5 +1,5 @@
 // URL 경로와 화면을 연결하는 라우팅 규칙 정의
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { StudioPage } from '../../pages/studio/StudioPage';
 import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { LoginPage } from '../../pages/login/LoginPage';
@@ -11,7 +11,16 @@ import { RequireAuth } from './RequireAuth';
 // 월드 둘러보기). 회원 전용 = /app/studio/:boothId 등 상태 변경 기능.
 // /app/games/*는 plan.md 표에 명시가 없다 — 상태 변경(edit)·플레이(play) 모두 보수적으로
 // member-only로 묶었다(모호성, 001 FE 구현 보고 참조). BE 계약·spec 확정 시 재분류.
-export const router = createBrowserRouter([
+// 라우트 정의를 배열로 분리해 둔다 — createMemoryRouter 로 같은 정의를 테스트에서 쓴다.
+export const routes = [
+  {
+    // 도메인 루트 진입점. 목적지를 새로 정하는 것이 아니라 기존 가드에 위임한다 —
+    // /app/home 은 guest-allowed 라 비로그인이면 RequireAuth 가 /login 으로 보내고
+    // returnTo 도 저장한다. 여기서 곧바로 /login 으로 보내면 이미 로그인한 사용자가
+    // 로그인 화면을 한 번 보고 튕긴다.
+    path: '/',
+    element: <Navigate to="/app/home" replace />,
+  },
   {
     path: '/login',
     element: <LoginPage />,
@@ -85,4 +94,6 @@ export const router = createBrowserRouter([
       };
     },
   },
-]);
+];
+
+export const router = createBrowserRouter(routes);
