@@ -84,14 +84,6 @@ function isForbiddenNicknameSample(nickname: string): boolean {
   return RESERVED_SAMPLE.has(normalizeForCheck(nickname));
 }
 
-// 이미 쓰이는 닉네임 대표 케이스. 서버는 DB로 판정하므로 mock이 재현할 수 있는 건 "코드가 나온다"는
-// 사실뿐이다 — 그거면 NicknameForm의 NICKNAME_DUPLICATED 분기를 mock 개발에서도 밟을 수 있다.
-// 이게 없어서 그 분기는 실서버에서만 도달 가능했다(!56 7차 리뷰).
-const TAKEN_NICKNAME_SAMPLE = new Set(['festa_user', '이미쓰는닉']);
-function isTakenNicknameSample(nickname: string): boolean {
-  return TAKEN_NICKNAME_SAMPLE.has(normalizeForCheck(nickname));
-}
-
 export async function complete(body?: { nickname: string }): Promise<OAuthCompleteResponse> {
   const handoff = state.handoff;
   if (!handoff) {
@@ -100,8 +92,7 @@ export async function complete(body?: { nickname: string }): Promise<OAuthComple
   }
   if (handoff.consumed) {
     // 410 상당 — handoff 만료·재사용(oauth-completion.md FE 의무 3). client.ts의 오류 봉투에는
-    // HTTP status가 없어(§0) code로만 구분한다. code 값은 2026-08-27 계약 표로 확정됐다 —
-    // 더 이상 관례가 아니라 서버가 실제로 보내는 값이다(oauth-completion.md §오류 응답).
+    // HTTP status가 없어(§0) code로만 구분한다 — 정확한 code 값은 계약 미정(§미결), 명명은 관례일 뿐이다.
     throw apiError('OAUTH_HANDOFF_EXPIRED', 'OAuth 인증이 만료되었습니다. 다시 로그인해 주세요.');
   }
 
@@ -114,11 +105,7 @@ export async function complete(body?: { nickname: string }): Promise<OAuthComple
     }
     if (isForbiddenNicknameSample(body.nickname)) {
       // 이유 비특정 일반 안내만(nickname-policy.md 검사 규칙 4) — handoff 보존, 재제출 가능
-      throw apiError('NICKNAME_INVALID', '사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해 주세요.');
-    }
-    if (isTakenNicknameSample(body.nickname)) {
-      // 이쪽은 이유를 특정해도 된다 — 금칙어와 달리 숨길 것이 없다. handoff 보존, 재제출 가능
-      throw apiError('NICKNAME_DUPLICATED', '이미 사용 중인 닉네임입니다.');
+      throw apiError('NICKNAME_REJECTED', '사용할 수 없는 닉네임입니다. 다른 닉네임을 입력해 주세요.');
     }
     state.members.add(handoff.providerId);
   }
@@ -146,7 +133,7 @@ export async function refresh(): Promise<TokenResponse> {
   const meta = state.sessionMeta;
   // 게스트는 재발급 대상이 아니다(FR-009a) — member가 아니거나 다른 브라우저 로그인 트리거가 서면 실패
   if (!meta || meta.kind !== 'member' || meta.otherBrowserLogin) {
-    throw apiError('INVALID_MEMBER_TOKEN', '유효하지 않거나 만료된 로그인 세션입니다.');
+    throw apiError('REFRESH_FAILED', '세션을 갱신할 수 없습니다. 다시 로그인해 주세요.');
   }
   const accessToken = `mock-at-member-refreshed-${Date.now()}`;
   const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
