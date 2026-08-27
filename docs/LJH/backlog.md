@@ -21,6 +21,7 @@
 
 ## 내 액션 필요
 
+- [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
 - [ ] **`!63` 확인 대기** — 박준우 응답 후 머지. develop 에 **죽은 재시도 분기**(`INTERNAL_SERVER_ERROR`, 서버는 `INTERNAL_ERROR`)가 그때까지 남는다
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
@@ -32,7 +33,7 @@
 
 - [ ] **`-187` `asset://` 참조 해석·회귀** — Jira 상 `BLOCKED BY -107·116·176`. 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 서버가 필요하다. resolver 단위 테스트분은 `-116` 구현과 함께 들어갔다(17건)
 
-**D5(OAuth 자격증명 6종)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
+**D5(OAuth 자격증명, Google·Kakao·SSAFY)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
 
 | 남은 대기 | 왜 |
 |---|---|
