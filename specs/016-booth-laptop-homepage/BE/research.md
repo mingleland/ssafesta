@@ -32,7 +32,9 @@
 
 ## R-04. 검증 = 스킴 화이트리스트(http/https) + 절대 URL + 길이 ≤ 2048
 
-- **Decision**: `null`은 검증 없이 통과(해제). 그 외에는 순서대로 검사하고 **첫 위반의 사유 문장**으로 400을 낸다 — ① blank 거부 ② 길이 ≤ **2048** ③ `java.net.URI` 파싱 성공 + 절대 URI + host 존재 ④ scheme ∈ {http, https}(대소문자 무시 비교). trim·정규화 없이 **원문 그대로 저장**한다.
+- **Decision**: 필드가 있고 `null`이면 검증 없이 통과(해제). 그 외에는 순서대로 검사하고 **첫 위반의 사유 문장**으로 400을 낸다 — ⓪ `homepageUrl` 키 부재(`{}`) 거부 ① blank 거부 ② 길이 ≤ **2048** ③ `java.net.URI` 파싱 성공 + 절대 URI ④ scheme ∈ {http, https}(대소문자 무시 비교) ⑤ host 존재. trim·정규화 없이 **원문 그대로 저장**한다.
+- **순서 정정 (2026-08-28, 구현 착수 시)**: 초안은 ③에 host 검사를 묶고 scheme을 뒤에 뒀는데, 그러면 `javascript:`·`data:`가 **host 부재로 먼저 걸려 "형식 오류" 문장으로 끝난다** — 스킴 위반이라는 실제 사유가 사용자에게 전달되지 않는다. scheme(④)을 host(⑤)보다 앞으로 옮겼다. 차단 결과는 동일하고 달라지는 것은 알려주는 이유뿐이다(T-24).
+- **⓪을 추가한 이유 (2026-08-28)**: 해제를 "명시적 `null`만"으로 정한 이상(data-model §5) 구현이 **필드 부재와 명시적 null을 구분**해야 한다. Java `record`는 둘을 똑같이 `null`로 읽으므로 FE 직렬화 실수(키 누락) 하나가 등록된 URL을 조용히 지운다 — presence 추적 DTO로 막고 `{}`는 400으로 거부한다.
 - **Rationale**: FR-002·`BE.md` §016("http/https 형식만 허용, 길이 제한")이 위임한 검증이 정확히 이 둘이다. 2048은 V1 컬럼 폭이자 facade `logoUrl` 상한(`MAX_URL`)과 같은 값. 스킴 화이트리스트는 `javascript:`·`data:` 주입을 자동 차단한다(헌법 16조). 정규화 금지는 왕복 무손실 원칙(005 `layout_json`·013a R-05와 동일) — 저장한 바이트열과 돌려주는 바이트열이 같음을 테스트로 고정한다.
 - **http를 허용하는 이유 (facade와 의도적 비대칭)**: facade `logoUrl`은 https 전용이다 — 로고는 우리 페이지 안에 **리소스로 임베드**되어 mixed content로 조용히 죽기 때문(`BoothFacadeService.validateLogoUrl` 주석). 홈페이지 URL은 임베드가 아니라 **이동 대상**이고, iframe이 막혀도 새 탭 열기가 1급 기능(US3, SC-003 "새 창 포함 성공률 100%")이라 http여도 도달할 수 있다. spec Edge Case가 http 차단을 브라우저 몫으로 명시했고, FR-002가 http를 허용 목록에 넣었다. 혼합콘텐츠 경고 UX는 FE 예상 clarify에 이미 등록돼 있다(FE.md §016).
 - **Alternatives**: ① https 전용 — FR-002 위반(계약이 http를 허용한다). ② 등록 시점 도달성(DNS/HEAD) 검증 — 네트워크 의존 실패·지연의 원인이고 spec이 요구하지 않는다(응답하지 않는 사이트 처리는 US3의 런타임 몫). ③ 정규식 검증 — URI 파서보다 구멍이 많다.

@@ -19,7 +19,7 @@ cd backend && ./mvnw test -Dtest=BoothHomepageApiIntegrationTest
 cd backend && ./mvnw test
 ```
 
-**기대**: 전부 green. 기존 테스트가 하나도 깨지지 않아야 한다 — `PublicBoothView`·`MyBoothView` 필드 추가와 endpoint 신설은 전부 가산적 변경이다. (착수 시 origin/back 기준선 개수를 먼저 실측해 tasks.md에 기록한다.)
+**기대**: 전부 green. 기존 테스트가 하나도 깨지지 않아야 한다 — `PublicBoothView`·`MyBoothView` 필드 추가와 endpoint 신설은 전부 가산적 변경이다. (착수 시 **origin/develop** 기준선 개수를 먼저 실측해 tasks.md에 기록한다 — 작업 브랜치가 develop발이므로 회귀 기준선도 develop이다.)
 
 ## 2. 수동 확인 (선택)
 
@@ -56,9 +56,11 @@ curl -i -X PUT localhost:8080/api/v1/booths/7/homepage \
 | 소유자 `PUT` 200 + echo → `GET /booths/mine` 왕복 **바이트 동일** | US2-1, data-model §2 불변식 |
 | 스태프 `PUT` 200 (편집자 범위 = facade·layout과 동일) | R-03, spec 005 FR-012 |
 | `http://` 통과 · `https://` 통과 | FR-002, R-04 (http 허용은 의도) |
-| `javascript:`·`ftp:`·상대경로·host 없음 → 400, 사유별 다른 문장 | US2-2, R-04, 헌법 16조 |
+| `javascript:`·`data:`·`ftp:` → **스킴 문장**으로 400 (host 부재로 형식 문장이 되지 않는다) | US2-2, R-04 순서 정정, 헌법 16조 |
+| 상대경로·host 없는 `http:///` → 형식 문장으로 400 | R-04 ③·⑤ |
 | 경계: 2048자 통과 / 2049자 400 | data-model §3 #2 |
 | `""` 400 / `null` 200 해제 → 미등록 상태 복귀 | data-model §5 |
+| **`{}`(필드 부재) 400** — 조용한 해제가 되지 않는다 | data-model §3 #0, R-04 ⓪ |
 | 400 봉투: `VALIDATION_FAILED` + `FIELD_INVALID`/`field: "homepageUrl"` | R-07, docs/08 §1.3-1 |
 | 미인증 401 / 비편집자 403 `BOOTH_EDITOR_FORBIDDEN` / 없는 부스 404 | R-07 |
 | 임대 만료 부스 `PUT` → 409 `BOOTH_LEASE_EXPIRED` | R-03, Edge Case(만료 직후), facade와 동일 규칙 |
