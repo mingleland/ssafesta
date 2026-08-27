@@ -47,9 +47,13 @@ public class OAuthCompletionController {
         if (handoffs.kind(handoff) == OAuthHandoffService.Kind.MEMBER) {
             session = handoffs.consumeMember(handoff);
         } else {
-            OAuthHandoffService.PendingRegistration pending = handoffs.consumeRegistration(handoff);
+            // Read, then register, then spend. A refused nickname leaves the handoff alive so the
+            // person can submit another one — spending it first turned every 409 into a dead end
+            // (FR-021c, review of !56).
+            OAuthHandoffService.PendingRegistration pending = handoffs.peekRegistration(handoff);
             RegistrationService.RegistrationResult registered = registrations.complete(
                     pending.provider(), pending.providerSubject(), request.nickname());
+            handoffs.discard(handoff);
             session = sessions.issue(registered.userId());
         }
         return ResponseEntity.ok().header("Set-Cookie", clearHandoffCookie().toString())

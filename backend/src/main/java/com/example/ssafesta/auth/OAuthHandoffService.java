@@ -46,9 +46,30 @@ public class OAuthHandoffService {
         return new MemberSessionService.MemberSession(fields[1], Instant.parse(fields[3]), fields[2]);
     }
 
-    public PendingRegistration consumeRegistration(String handoff) {
-        String[] fields = consume(handoff, Kind.REGISTRATION, 3);
+    /**
+     * Reads the pending signup <b>without</b> spending it — {@link #discard} does that, once the
+     * member actually exists.
+     *
+     * <p>Deleting on read is right for the member handoff, where nothing after it can fail. Signup
+     * can: the nickname may be taken or refused, and FR-021c says the handoff is spent only on a
+     * valid submission. Reading it destructively meant a rejected nickname burned it, so the very
+     * retry the 409 invites came back {@code OAUTH_HANDOFF_EXPIRED} and the person had to start the
+     * whole OAuth round trip over (raised in review of !56).
+     *
+     * <p>The window this opens is a replay of the same handoff within its five minutes. Signup is
+     * idempotent on {@code (provider, providerSubject)} — {@code RegistrationService.complete}
+     * returns the existing member rather than creating a second — so a replay ends where the first
+     * call ended.
+     */
+    public PendingRegistration peekRegistration(String handoff) {
+        String[] fields = read(handoff, Kind.REGISTRATION, 3);
         return new PendingRegistration(OAuthProvider.valueOf(fields[1]), decode(fields[2]));
+    }
+
+    /** Spends a handoff that {@link #peekRegistration} read, after the work it authorised succeeded. */
+    public void discard(String handoff) {
+        redis.delete(key(handoff));
+        log.info("Consumed OAuth handoff type={}", Kind.REGISTRATION);
     }
 
     private String store(String... fields) {
@@ -63,14 +84,22 @@ public class OAuthHandoffService {
     }
 
     private String[] consume(String handoff, Kind expected, int fieldCount) {
-        String value = redis.opsForValue().getAndDelete(key(handoff));
+        String[] fields = parse(redis.opsForValue().getAndDelete(key(handoff)), expected, fieldCount);
+        log.info("Consumed OAuth handoff type={}", expected);
+        return fields;
+    }
+
+    private String[] read(String handoff, Kind expected, int fieldCount) {
+        return parse(redis.opsForValue().get(key(handoff)), expected, fieldCount);
+    }
+
+    private String[] parse(String value, Kind expected, int fieldCount) {
         if (value == null) {
             log.warn("OAuth handoff was absent when completion tried to consume it");
             throw new InvalidOAuthHandoffException();
         }
         String[] fields = value.split("\\|", fieldCount);
         if (fields.length != fieldCount || !expected.name().equals(fields[0])) throw new InvalidOAuthHandoffException();
-        log.info("Consumed OAuth handoff type={}", expected);
         return fields;
     }
 

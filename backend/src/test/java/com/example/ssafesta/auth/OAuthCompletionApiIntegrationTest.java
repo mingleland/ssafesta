@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * The signup endpoint, over HTTP.
@@ -27,8 +28,9 @@ import org.springframework.test.web.servlet.MockMvc;
  * <p>Nothing tested {@code POST /auth/oauth/complete} through the web layer at all, which is how a
  * taken nickname came to answer 500: {@code RegistrationService} throws exceptions that carry no
  * {@link com.example.ssafesta.common.ErrorCode}, and {@code OAuthCompletionController} does not
- * catch them, so they reached {@code handleUnexpected}. Service-level tests could not see it — they
- * assert the exception type, which is thrown correctly; the loss happens on the way out.
+ * catch them, so they reached {@code handleUnexpected}. The one service-level test there was covered
+ * the opposite case — an existing member being returned — so no test ever ran a signup failure at
+ * all, at either layer.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -100,5 +102,34 @@ class OAuthCompletionApiIntegrationTest {
                         .content("{\"nickname\":\"아무개\"}"))
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("OAUTH_HANDOFF_EXPIRED"));
+    }
+
+    /**
+     * A refused nickname must leave the handoff alive, or the 409 above is a dead end.
+     *
+     * <p>The frontend keeps its form open and asks for another nickname, which is the right thing to
+     * do — but the handoff was spent on read, before the nickname was ever checked, so that second
+     * submission came back {@code OAUTH_HANDOFF_EXPIRED} and the person had to redo the whole OAuth
+     * round trip. Measured before the fix: {@code 409} then {@code 410}. FR-021c spends the handoff
+     * only on a valid submission.
+     */
+    @Test
+    void aRefusedNicknameLeavesTheHandoffUsable() throws Exception {
+        String taken = users.save(new User("점유_" + UUID.randomUUID().toString().substring(0, 6))).getNickname();
+        String handoff = handoffs.createRegistration(OAuthProvider.GOOGLE, "sub-" + UUID.randomUUID());
+
+        complete(handoff, taken).andExpect(status().isConflict());
+
+        complete(handoff, "닉" + UUID.randomUUID().toString().substring(0, 8))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("AUTHENTICATED"));
+    }
+
+    private ResultActions complete(String handoff, String nickname) throws Exception {
+        return mockMvc.perform(post("/api/v1/auth/oauth/complete")
+                .header(HttpHeaders.ORIGIN, trustedOrigin)
+                .cookie(new Cookie("oauth_handoff", handoff))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"" + nickname + "\"}"));
     }
 }
