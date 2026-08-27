@@ -2,14 +2,21 @@ from logging.config import fileConfig
 import os
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy import engine_from_config, pool
+
+from app.db.base import Base
+from app.db.models import DocumentChunk, DocumentJob  # noqa: F401 — populate Base.metadata
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+# Tables live directly in the AI database (`festa_{env}_ai`), not in a
+# shared-schema namespace (S15P21A604-262 replaced the earlier single-DB
+# `ai` schema design with a separate database — Infra owns creating that
+# database and its `vector` extension; this migration only manages tables).
+target_metadata = Base.metadata
 
 database_url = os.getenv("MIGRATION_DATABASE_URL") or os.getenv("DATABASE_URL")
 if database_url:
@@ -23,12 +30,9 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        version_table_schema="ai",
-        include_schemas=True,
     )
 
     with context.begin_transaction():
-        context.execute("CREATE SCHEMA IF NOT EXISTS ai")
         context.run_migrations()
 
 
@@ -40,13 +44,9 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        connection.execute(text("CREATE SCHEMA IF NOT EXISTS ai"))
-        connection.commit()
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            version_table_schema="ai",
-            include_schemas=True,
         )
 
         with context.begin_transaction():
