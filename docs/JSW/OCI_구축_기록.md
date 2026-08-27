@@ -431,7 +431,7 @@ Unity Dedicated Server는 예외이며 OCI ARM64에서 빌드·실행하지 않�
 | React 빌드 | ✅ | 결과물은 정적 파일 |
 | FastAPI | ✅ | arm64 wheel 확인 필요 |
 | PostgreSQL / Redis | ✅ | 공식 멀티아치 |
-| **Unity Dedicated Server** | ❌ | 현재 프로젝트의 Unity 6000.0.78f1에는 Linux ARM64 서버 빌드 경로가 없다. OCI에서는 WebGL 정적 배포만 검증하고 서버는 x86_64 EC2에서 검증한다 |
+| **Unity Dedicated Server** | ❌ | 현재 프로젝트의 Unity 6000.0.78f1에는 Linux ARM64 서버 빌드 경로가 없다. OCI Unity 검증 계획은 취소하고 서버는 x86_64 EC2에서 검증한다 |
 
 ### Unity 6000.0.78f1 확인 결과
 
@@ -445,8 +445,10 @@ Jira `S15P21A604-267`에서 Unity 담당자가 아래 근거를 확인했다.
 - Linux ARM64 Dedicated Server를 사용하려면 Unity 6000.2+ 업그레이드가 필요하지만,
   임시 OCI 검증을 위해 기준 엔진을 올리거나 x86_64 에뮬레이션을 사용하지 않는다.
 
-따라서 OCI 완료 범위는 `/unity/` 하위의 WebGL 정적 파일 로딩까지다. 서버 기동,
-WSS 연결, 브라우저 2개의 스폰·상호 이동 검증은 x86_64 EC2 확보 후 수행한다.
+처음에는 OCI 범위를 `/unity/` 하위 WebGL 정적 파일 로딩까지로 축소하는 방안을
+검토했다. 하지만 원래 목적은 서버 기동, WSS 연결과 브라우저 2개의 스폰·상호 이동
+검증이며 정적 파일 로딩만으로는 이를 달성하지 못한다. x86_64 EC2 확보 후 전체 경로를
+함께 검증해도 일정상 충분하다고 판단해 **OCI Unity 검증 계획 전체를 취소했다.**
 
 ### OS 차이
 
@@ -683,7 +685,7 @@ free -h
 - [ ] Spring Boot 컨테이너화 → `/actuator/health` 도달 확인
 - [ ] FastAPI 컨테이너화
 - [ ] React 정적 배포 (버전별 릴리스 + 심볼릭 링크 전환)
-- [ ] Unity WebGL 배포 (`.br`/`.gz` Content-Encoding 처리)
+- ~~Unity WebGL 배포 (`.br`/`.gz` Content-Encoding 처리)~~ — 취소: Dedicated Server 없이 정적 파일만 배포해서는 원래 검증 목적을 달성하지 못함
 
 ### EC2 확보 후
 

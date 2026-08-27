@@ -12,8 +12,9 @@
 
 ### Session 2026-08-27
 
-- Q: 현재 프로젝트의 Unity 6000.0.78f1 Dedicated Server를 OCI Ampere A1 ARM64에서 실행할 수 있는가? → A: 불가능하다. 해당 버전의 Linux Server 모듈과 설치 variation은 x86_64 전용이며 ARM64 sysroot는 Embedded Linux 전용이다. OCI는 WebGL 정적 배포까지만 검증하고 Dedicated Server는 x86_64 EC2에서 검증한다.
+- Q: 현재 프로젝트의 Unity 6000.0.78f1 Dedicated Server를 OCI Ampere A1 ARM64에서 실행할 수 있는가? → A: 불가능하다. 해당 버전의 Linux Server 모듈과 설치 variation은 x86_64 전용이며 ARM64 sysroot는 Embedded Linux 전용이다.
 - Q: OCI 임시 검증을 위해 Unity 엔진을 6000.2+로 올리거나 x86_64 에뮬레이션을 사용할 것인가? → A: 사용하지 않는다. 기준선 동결과 임시 환경의 목적을 지키기 위해 엔진 업그레이드·에뮬레이션을 범위에서 제외한다.
+- Q: Dedicated Server 없이 OCI에서 WebGL 정적 배포만 검증할 것인가? → A: 진행하지 않는다. 원래 목적은 실제 서버 기동·WSS·브라우저 동기화 검증이며 정적 파일 로딩만으로는 이를 달성하지 못한다. OCI Unity 검증 계획은 취소하고 x86_64 EC2 확보 후 전체 경로를 함께 검증한다.
 
 ### Session 2026-08-24
 
@@ -31,7 +32,7 @@
 | D-02 | 네트워크 단절 후 재접속 방식 | ✅ 연결 종료 안내 후 사용자가 새 권한으로 직접 재접속 |
 | D-03 | 새 배포·재시작 후 사용된 접속 권한 재사용 차단 | ✅ 원래 만료 시각까지 차단 기록 유지 |
 | D-04 | P0 사용자 무입력 연결 유지 시험 | ✅ 로그인 회원·게스트 모두 10분 |
-| D-05 | Unity Dedicated Server 대상 CPU 아키텍처 | ✅ Unity 6000.0.78f1과 호환되는 x86_64 EC2; OCI ARM64는 WebGL 정적 배포만 허용 |
+| D-05 | Unity Dedicated Server 대상 CPU 아키텍처와 OCI 계획 | ✅ Unity 6000.0.78f1과 호환되는 x86_64 EC2에서만 검증; OCI Unity 검증은 WebGL 정적 배포를 포함해 취소 |
 | O-01 | WSS heartbeat와 Nginx 최종 유휴 시간 | 외부 WSS 실측 후 확정; 초기 후보 180초 |
 | O-02 | 실제 도메인·EC2 용량·상위 네트워크 권한 | CPU 아키텍처는 x86_64로 고정하고, 나머지 EC2 사양·권한은 infra-002 C-01, 도메인은 C-02를 상속 |
 
@@ -199,7 +200,7 @@
 - `v0.0.1-poc` 기준선에서 WebSocket 기반 Unity 멀티플레이, Linux Dedicated Server 컨테이너와 로컬 브라우저 다중 접속은 이미 검증되었다. 이 기능은 해당 코드를 재구현하지 않고 외부 배포에 필요한 최소 변경과 검증만 수행한다.
 - `infra-001-ci-cd-pipelines`가 Unity 빌드, 불변 이미지 식별자, 릴리스 매니페스트, 현재·마지막 정상 릴리스와 복구 절차를 제공한다.
 - `infra-002-environments`가 단일 EC2의 demo 환경, Cloudflare DNS/Proxy, Nginx 공개 진입점, TLS·네트워크·자원 격리의 공통 경계를 제공한다. 이 기능은 게임 경로의 최종 연결과 실측 결과를 소유한다.
-- 현재 프로젝트의 Unity 6000.0.78f1 Linux Dedicated Server 산출물은 x86_64 전용이다. OCI Ampere A1 ARM64는 WebGL 정적 배포 검증에만 사용하며 게임 서버 실행·WSS·브라우저 간 동기화 완료 근거로 사용하지 않는다.
+- 현재 프로젝트의 Unity 6000.0.78f1 Linux Dedicated Server 산출물은 x86_64 전용이다. OCI Ampere A1 ARM64에서 계획했던 Unity 검증은 WebGL 정적 배포를 포함해 취소했으며, x86_64 EC2 확보 후 클라이언트와 서버 전체 경로를 함께 검증한다.
 - 초기 MVP의 월드는 11층·단일 채널 `11F-01`이며 Unity Dedicated Server 실행 단위는 하나다.
 - 실제 루트 도메인, EC2 사양과 80/443 상위 네트워크 권한은 infra-002의 C-01/C-02 입력이 배포 전 제공된다.
 - 현재 공개 진입점은 Nginx이며 Caddy 전환은 이 명세의 결정 사항이 아니다.
@@ -228,7 +229,7 @@
 - 자동 재접속·세션 복원 UX 정책 자체의 확정 (`002-world-session` 후속 결정)
 - 거리 기반 음성채팅, SFU와 TURN 배포 (`017-proximity-voice` 소유)
 - Cloudflare 전체 장애 중 게임 연결을 유지하기 위한 별도 공개 우회 호스트 또는 보조 서버 제공
-- OCI ARM64에서의 Unity Dedicated Server 실행, x86_64 에뮬레이션과 이를 위한 Unity 6000.2+ 엔진 업그레이드
+- OCI ARM64에서의 Unity Dedicated Server 실행·WebGL 정적 배포, x86_64 에뮬레이션과 이를 위한 Unity 6000.2+ 엔진 업그레이드
 
 ## 리뷰 (Infra 담당이 채운다 — 3칸 모두 채워야 확정)
 
@@ -240,4 +241,4 @@
 
 **검토자**: Infra 담당 / **검토일**: 2026-08-24
 
-**2026-08-27 추가 정합화**: Jira `S15P21A604-267`의 Unity 6000.0.78f1 모듈·variation 검증 결과를 반영해 Dedicated Server 대상은 x86_64 EC2로 고정하고 OCI ARM64는 WebGL 정적 배포까지만 허용했다.
+**2026-08-27 추가 정합화**: Jira `S15P21A604-267`의 Unity 6000.0.78f1 모듈·variation 검증 결과를 반영해 Dedicated Server 대상은 x86_64 EC2로 고정했다. WebGL 정적 배포만으로는 원래 서버 검증 목적을 달성하지 못하므로 OCI Unity 검증 계획은 전체 취소하고 근거와 결정 이력만 보존한다.

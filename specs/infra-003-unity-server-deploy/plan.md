@@ -4,7 +4,7 @@
 
 ## Summary
 
-x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다. OCI Ampere A1 ARM64는 WebGL 정적 배포 검증에만 사용한다.
+x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 배포하고 `Cloudflare → Nginx:443 → demo-game:7777` 외부 WSS 경로를 검증한다. Backend는 120초 HS256 월드 입장 JWT를 전용 Secret으로 발급하고 Unity 서버는 이를 자체 검증한다. 사용된 토큰은 game 전용 영속 볼륨에 만료까지 기록해 컨테이너 교체 뒤에도 재사용을 차단한다. OCI Ampere A1 ARM64에서 계획했던 Unity 검증은 WebGL 정적 배포를 포함해 취소한다.
 
 ## Technical Context
 
@@ -22,7 +22,7 @@ x86_64 단일 EC2의 demo 환경에 `11F-01` Unity Dedicated Server 하나를 �
 
 **Performance Goals**: P0 외부 브라우저 2개 10분 무입력 유지, P1 단일 채널 목표 40명
 
-**Constraints**: 공개 포트는 80/443만, game 7777 내부 전용, ALB/NLB/ACM/ECS 없음, game-only 배포, Secret/토큰 원문 기록 금지, Unity 6000.0.78f1 Linux Server는 x86_64 전용, ARM64 에뮬레이션·임시 엔진 업그레이드 금지
+**Constraints**: 공개 포트는 80/443만, game 7777 내부 전용, ALB/NLB/ACM/ECS 없음, game-only 배포, Secret/토큰 원문 기록 금지, Unity 6000.0.78f1 Linux Server는 x86_64 전용, OCI Unity 검증·ARM64 에뮬레이션·임시 엔진 업그레이드 제외
 
 **Scale/Scope**: `11F` 단일 채널 `11F-01`, Dedicated Server 1개, 최대 40명
 

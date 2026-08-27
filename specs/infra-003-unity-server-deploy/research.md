@@ -34,8 +34,8 @@
 
 ## R-05. Dedicated Server CPU architecture
 
-**Decision**: Unity 6000.0.78f1 Dedicated Server는 x86_64 EC2에서만 실행하고 OCI Ampere A1 ARM64는 WebGL 정적 배포 검증에만 사용한다.
+**Decision**: Unity 6000.0.78f1 Dedicated Server는 x86_64 EC2에서만 실행한다. OCI Ampere A1 ARM64에서의 Unity 검증은 WebGL 정적 배포를 포함해 취소한다.
 
 **Rationale**: Unity 6000.0.78f1 모듈 카탈로그의 Linux 모듈과 설치된 `LinuxStandaloneSupport/Variations`는 x86_64 서버 경로만 제공한다. `com.unity.sdk.linux-arm64` sysroot는 이 버전에서 Embedded Linux 전용이라 데스크톱 Linux Dedicated Server 타깃으로 사용할 수 없다.
 
-**Alternatives considered**: Unity 6000.2+ 업그레이드는 프로젝트 전체 호환성 검증이 필요한 범위 확장이며 임시 OCI 검증을 위해 수행하지 않는다. x86_64 에뮬레이션은 성능·운영 결과를 왜곡하므로 사용하지 않는다.
+**Alternatives considered**: Unity 6000.2+ 업그레이드는 프로젝트 전체 호환성 검증이 필요한 범위 확장이며 임시 OCI 검증을 위해 수행하지 않는다. x86_64 에뮬레이션은 성능·운영 결과를 왜곡하므로 사용하지 않는다. WebGL 정적 배포만 수행하는 대안은 실제 서버 기동·WSS·브라우저 동기화라는 원래 목적을 달성하지 못하며 x86_64 EC2 확보 후 함께 검증해도 일정상 충분해 제외했다.
