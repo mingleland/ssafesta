@@ -71,8 +71,8 @@ describe('게스트 입장(FR-009a)', () => {
   it('fake AT 발급 + expiresAt이 약 30분 뒤다', async () => {
     const before = Date.now();
     const res = await guestEnter();
-    expect(res.status).toBe('AUTHENTICATED');
-    if (res.status !== 'AUTHENTICATED') throw new Error('unreachable');
+    // status 가 없는 것이 계약이다 — BE GuestTokenResponse 전사(S15P21A604-90)
+    expect(res.accessToken).toBeTruthy();
     const expiresAtMs = new Date(res.expiresAt).getTime();
     expect(expiresAtMs - before).toBeGreaterThan(29 * 60_000);
     expect(expiresAtMs - before).toBeLessThan(31 * 60_000);
@@ -88,7 +88,8 @@ describe('refresh — 다른 브라우저 로그인 트리거(US3 AS4)', () => {
     mockStartOAuth('google');
     await complete({ nickname: '테스트유저' });
     const res = await refresh();
-    expect(res.status).toBe('AUTHENTICATED');
+    expect(res.accessToken).toBeTruthy();
+    expect(new Date(res.expiresAt).getTime()).toBeGreaterThan(Date.now());
   });
 
   it('게스트는 refresh 대상이 아니다', async () => {

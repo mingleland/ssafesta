@@ -13,8 +13,9 @@ async function attemptRefresh(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     try {
+      // 성공 판정은 "예외 없음"이다 — BE GuestTokenResponse 에는 status 가 없고, 실패는
+      // mock(apiError throw)도 real(4xx → api() throw)도 예외로 알린다.
       const result = await authApi.refresh();
-      if (result.status !== 'AUTHENTICATED') return false;
       setMemberSession(result.accessToken, result.expiresAt);
       return true;
     } catch {
