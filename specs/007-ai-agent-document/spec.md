@@ -59,13 +59,15 @@
 - 같은 문서를 두 번 올린 경우 동일 AI 직원에 등록된 활성 문서와 파일 SHA-256이 같으면 중복으로 판정하고 재처리하지 않는다. 수정본 교체는 기존 문서를 지정하는 별도 교체 요청으로 처리한다.
 - 업로드 URL은 발급 후 15분간 유효하다. 문서 생성 후 1시간 동안 업로드가 완료되지 않으면 `EXPIRED`로 전환하고, 전환 후 24시간 동안 늦은 완료 요청을 복구할 수 있도록 원본을 보존한다. 이후에도 미완료면 Spring이 원본 삭제를 재시도한다.
 - `EXPIRED` 문서의 늦은 완료 요청에서 원본이 남아 있으면 `QUEUED`로 복구하고, 이미 삭제되었으면 새 업로드 권한을 받도록 안내한다.
-- 처리 중 임대가 만료되면 문서 원본·메타데이터는 보존하고 `DocumentStatus`를 `DISABLED`, 실행 중인 `JobStatus`를 `CANCELLED`로 전환한다. 완료 직전에도 Lease를 다시 확인해 만료된 문서가 `READY`가 되지 않도록 하며, 재임대 후 활성화할 때는 `QUEUED`부터 다시 처리한다.
+- 처리 중 임대가 만료되면 문서 원본·메타데이터는 보존하고 Spring은 `DocumentStatus`를 `DISABLED`로 전환한 뒤 멱등 cleanup을 발행한다. FastAPI는 실행 중인 `JobStatus`를 `CANCELLED`로 전환하고 Chunk를 제거하며, 늦은 `READY` callback은 Spring의 최신 상태 검증에서 거부한다. 재임대 후 활성화할 때는 `QUEUED`부터 다시 처리한다.
 - 처리 도중 서버가 재시작되거나 Worker heartbeat가 끊기면 만료된 실행 작업을 회수해 재시도한다. 최대 3회의 재시도 후에도 완료하지 못하면 실행 작업은 `DEAD`, 문서는 정제된 실패 사유와 함께 `FAILED`가 되며 영원히 `PROCESSING`에 머물지 않는다.
 - 문서가 많은 경우에도 검색 전에 `boothId + agentId + READY`로 범위를 제한한다. AI 직원당 문서는 최대 10개·총 100MB로 제한하고, 최대 허용량에서 검색 응답 P95 1초 이하 및 정답 근거 문서의 Top-K 포함률 95% 이상을 검증한다.
 - 내부 Service Token 교체 중에는 수신자가 기존·신규 토큰을 먼저 함께 허용한 뒤 송신 토큰을 전환하고, 안정화 확인 후 기존 토큰을 제거해 배포 순서 차이로 `401`이 발생하지 않게 한다.
 - R2 장애 시 자동으로 MinIO로 전환하거나 양쪽에 동시에 쓰지 않는다. 운영자가 검증·승인한 뒤 활성 **쓰기** Provider만 바꾸며, 기존 문서는 문서별 `storageProvider + bucket + objectKey`가 가리키는 저장소에서 계속 읽는다.
 - 업로드를 재개하려는 동안 활성 쓰기 Provider가 바뀌었으면 기존 미완료 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 업로드를 시작한다.
 - 저장소 장애로 `FAILED`가 된 문서는 저장소가 복구돼도 자동으로 다시 처리되지 않는다. reconcile이 끝난 뒤 명시적 재처리 요청을 받아야 새 Job이 시작된다.
+- Business DB의 문서가 삭제되거나 비활성화될 때 AI DB가 일시적으로 응답하지 않으면 Spring은 cleanup 요청을 재시도하며, FastAPI는 같은 요청을 여러 번 받아도 동일한 정리 결과를 반환한다.
+- Business DB와 AI DB 사이에는 FK·cascade가 없으므로 주기적 reconciliation이 Business DB에 없는 AI Job·Chunk와 `READY` 문서에 대응하지 않는 Chunk를 찾아 정리 또는 경고해야 한다.
 
 ---
 
@@ -89,7 +91,7 @@
 - **FR-014**: LLM/Embedding 호출은 **어댑터 뒤에** 두어 제공자 교체가 구현 교체로 끝나야 한다 (헌법 15조).
 - **FR-015**: 임대 만료 시 문서 원본·메타데이터는 보존하되 문서를 `DISABLED`, 실행 중인 처리 작업을 `CANCELLED`로 전환해야 하며, 만료된 문서가 `READY`로 전환되어서는 안 된다.
 - **FR-016**: 문서 처리 작업은 **`JobStatus`(`QUEUED`/`RUNNING`/`RETRY_WAIT`/`SUCCEEDED`/`DEAD`/`CANCELLED`)** 를 가져야 한다.
-- **FR-017**: RAG 검색은 `boothId + agentId + DocumentStatus.READY`로 범위를 제한한 후 수행해야 한다.
+- **FR-017**: RAG 검색은 `boothId + agentId`와 AI DB의 검색 가능 projection으로 범위를 제한해야 한다. projection은 Spring이 `READY` callback을 수락한 뒤에만 활성화되고 cleanup 시 제거되어 Business DB `DocumentStatus.READY`와 같은 검색 경계를 보장해야 한다.
 - **FR-018**: AI 직원 한 명이 등록할 수 있는 문서는 최대 10개, 총 원본 크기는 100MB로 제한해야 한다.
 - **FR-019**: 동일 AI 직원의 활성 문서 중 파일 SHA-256이 같은 문서가 있으면 중복으로 판정하고 재처리하지 않아야 한다. 수정본 교체는 기존 `documentId`를 지정하는 명시적 요청으로 처리해야 한다.
 - **FR-020**: 청킹 크기와 overlap은 배포 설정으로 조정 가능한 튜닝 값이어야 하며 spec에 고정하거나 코드에 하드코딩하지 않아야 한다.
@@ -109,6 +111,12 @@
 - **FR-034**: 저장소 장애로 `DEAD → FAILED`가 된 문서는 저장소 복구 후 자동으로 재처리해서는 안 된다. 재처리는 reconcile 완료 확인 후 명시적 요청으로만 새 Job을 만들어야 하며, `DEAD`는 Spring 콜백 경계로 노출하지 않고 AI 내부 상태로만 유지해야 한다.
 - **FR-035**: Infra가 실행한 reconcile 결과는 Spring이 소유하는 `storage_reconciliation_log`에 `runId + documentId` 기준 멱등으로 적재해야 하며, size·감지 MIME·SHA-256이 모두 일치해 `VERIFIED`로 판정된 객체만 문서의 `storageProvider`를 변경해야 한다. 전달 경로는 Infra 전용 Bearer Service Token으로 인증하고 AI 방향 토큰과 credential·scope를 분리해야 한다.
 - **FR-036**: Spring 상태 callback의 `404`는 원인 코드로 구분해야 한다. `JOB_NOT_REGISTERED`는 Spring이 처리 요청 응답의 `jobId`를 먼저 저장한 뒤에도 발생할 수 있는 짧은 경합으로 보고 FastAPI가 1초·3초·10초 간격으로 최대 3회 재시도한다. `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 재시도하지 않고 종료하며, Spring은 `JOB_DOCUMENT_MISMATCH`를 계약 오류로 경고 기록해야 한다. FastAPI는 정상 전달 시각과 재시도 종료 시각·사유를 별도로 영속화해야 한다.
+- **FR-037**: PostgreSQL은 환경별로 하나의 인스턴스를 공유하되 Business DB(`festa_{env}_business`)와 AI DB(`festa_{env}_ai`)를 분리해야 한다. `ai_agents`·`ai_documents`·`storage_reconciliation_log`는 Business DB, `document_jobs`·`document_chunks`는 AI DB가 소유한다.
+- **FR-038**: Spring runtime/migration role은 AI DB에, FastAPI runtime/migration role은 Business DB에 접속할 수 없어야 한다. DB 간 FK·cross-database query·`ON DELETE CASCADE`에 의존해서는 안 된다.
+- **FR-039**: Spring은 소유권·임대·문서 상태를 검증한 뒤 FastAPI 처리 요청에 `documentId`, `boothId`, `agentId`, 파일명·형식·크기·SHA-256, `storageProvider + bucket + objectKey` snapshot을 전달해야 한다. FastAPI는 Business DB를 직접 조회하지 않고 이 snapshot을 Job에 영속화해 처리해야 한다.
+- **FR-040**: 기존 Chunk 전량 교체와 Job `SUCCEEDED` 전환은 AI DB의 단일 트랜잭션으로 처리해야 한다. Spring `READY` 전환은 커밋 이후 멱등 callback으로 수행하며 분산 트랜잭션으로 묶지 않는다.
+- **FR-041**: Spring은 문서 삭제·비활성화 시 FastAPI에 멱등 cleanup을 발행하고 전달 실패를 재시도해야 한다. FastAPI는 해당 문서의 활성 Job을 취소하고 Chunk를 제거해야 하며, 주기적 reconciliation은 양 DB의 고아·누락 상태를 탐지해 cleanup 재발행 또는 운영 경고로 수렴시켜야 한다.
+- **FR-042**: 새 Chunk는 AI DB 트랜잭션에서 검색 불가 상태로 저장해야 한다. Spring이 `READY` callback을 수락한 뒤에만 해당 Chunk를 검색 가능으로 전환하고, callback 미전달·실패·삭제·비활성화 상태의 Chunk는 검색 결과에 포함해서는 안 된다.
 
 ### State Model
 
@@ -170,6 +178,8 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - **SC-010**: 업로드 미완료 문서는 생성 후 1시간과 다음 5분 판정 주기 안에 100% `EXPIRED`로 전환되고, 보존 기한이 지난 원본은 삭제되거나 재시도 대상으로 남는다.
 - **SC-011**: 두 내부 API에서 유효한 방향 토큰만 허용하고 누락·오류·반대 방향 토큰은 100% `401`로 거부하며, `[old] → [old,new] → [new,old] → [new]` 회전 검증 중 정상 호출 실패는 0건이다.
 - **SC-012**: R2 차단→운영자 승인→MinIO 전환→문서별 Provider 읽기→R2 reconcile→승인 원복 시험에서 자동 Provider 변경과 이중 쓰기는 0건이고, 검증되지 않은 객체의 Provider 변경은 0건이다.
+- **SC-013**: 4개 runtime role × 4개 database CONNECT matrix에서 환경·서비스가 일치하는 대각선 연결만 성공하고, FastAPI가 Business DB를 조회한 호출은 0건이다.
+- **SC-014**: 문서 삭제·비활성화 cleanup 재전송과 reconciliation 시험 후 Business DB에 없는 AI Chunk 및 비활성 문서의 검색 가능 Chunk가 0건이다.
 
 ---
 
@@ -187,6 +197,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-08 | 업로드 미완료 문서의 만료·정리 정책은? | BE + Infra + FE | **확정: 업로드 URL 15분, 생성 후 1시간에 `EXPIRED`, 전환 후 24시간 보존 뒤 Spring이 R2 원본 삭제·실패 재시도. `EXPIRED`는 업로드 만료로 표시** ([GitLab Work Item #84](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/84)) |
 | C-09 | Spring↔FastAPI 내부 API를 어떻게 인증하고 회전하는가? | AI + BE + Infra | **확정: 방향별 Bearer Token 2종, Security Group과 독립적인 애플리케이션 검증, 콤마 목록 최대 2개, 첫 값 송신·전체 값 상수 시간 검증, 단계적 무중단 회전. mTLS는 P2** ([GitLab Work Item #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/102)) |
 | C-10 | R2 장애 시 fallback·reconcile을 어떻게 운영하는가? | AI + BE + Infra | **부분 확정: 자동 failover·이중 쓰기·자동 원복 금지, 운영자 승인 수동 MinIO 전환, 문서별 Provider 읽기, 유한 Job 재시도(`DEAD`는 AI 내부 상태로만 유지), 저장소 복구 후 자동 재처리 없음(명시적 재처리 요청으로 새 Job), reconcile 결과는 Spring DB `storage_reconciliation_log`에 `runId + documentId` 멱등으로 적재하고 `VERIFIED` 객체만 문서 Provider 반영, 전달 경로는 #102 Service Token 방식을 재사용하되 Infra 전용 credential·scope로 분리, `STORAGE_UNAVAILABLE=503`(재시도 가능)·`STORAGE_QUOTA_EXCEEDED=507`(재시도 불가)로 분리. P0에서는 probe evidence만 수집하고 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 미확정 2건(`R2_RECONCILING` 중 신규 업로드 허용 여부, R2 API 장애 자동 판정 수치)은 `docs/26_팀_결정_필요사항.md`에 등록하고 후속 이슈로 분리** ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-11 | PostgreSQL의 Business/AI 경계를 어떻게 나누는가? | AI + BE + Infra | **확정: Infra PostgreSQL Isolation and Backup Contract v1 채택. 환경별 단일 PostgreSQL 인스턴스 안에서 `festa_{env}_business`와 `festa_{env}_ai`를 별도 database·login role로 분리한다. Business DB는 `ai_agents`·`ai_documents`, AI DB는 `document_jobs`·`document_chunks`를 소유한다. 교차 DB FK·직접 조회는 금지하고 Spring이 검증한 처리 snapshot 및 멱등 cleanup/reconciliation API로 정합성을 맞춘다.** (S15P21A604-262) |
 
 ### Session 2026-08-20
 
@@ -206,6 +217,11 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: 저장소 장애·quota 초과 시 오류 HTTP 상태는? → A: `STORAGE_UNAVAILABLE`은 503(재시도 가능), `STORAGE_QUOTA_EXCEEDED`는 507(재시도해도 해소되지 않음)로 분리한다. 두 코드 모두 필드 오류가 아니므로 `errors[]`는 비운다.
 - Q: Spring 상태 callback의 404는 모두 같은 방식으로 재시도하는가? → A: 아니다. `JOB_NOT_REGISTERED`만 1초·3초·10초 간격으로 최대 3회 재시도하고, `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 즉시 종료한다. 종료 기록은 정상 전달 기록과 분리하며 Spring은 mismatch를 계약 오류로 경고한다.
 
+### Session 2026-08-27
+
+- Q: pgvector와 AI Job/Chunk는 Business DB의 별도 schema에 두는가? → A: 아니다. Infra 정본에 따라 같은 PostgreSQL 인스턴스 안의 별도 AI DB에 둔다. FastAPI role은 Business DB에 접속하지 않는다.
+- Q: DB 간 FK와 직접 조회 없이 문서 처리 입력·삭제 정합성을 어떻게 보장하는가? → A: Spring이 검증한 문서·저장소 snapshot을 처리 요청으로 전달하고, 삭제·비활성화는 멱등 cleanup과 주기적 reconciliation으로 수렴시킨다.
+
 ---
 
 ## Out of Scope
@@ -223,7 +239,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 | 항목 | 내용 | 완료 |
 |---|---|---|
-| ① Clarification 답변 (C-01~C-10) | C-01~C-09 확정. C-10의 P0 범위·reconcile 기록·quota 오류 코드는 확정했고, reconcile 중 신규 업로드와 장애 자동 판정 수치는 후속 이슈로 명시적으로 분리 | ☑ |
+| ① Clarification 답변 (C-01~C-11) | C-01~C-09·C-11 확정. C-10의 P0 범위·reconcile 기록·quota 오류 코드는 확정했고, reconcile 중 신규 업로드와 장애 자동 판정 수치는 후속 이슈로 명시적으로 분리 | ☑ |
 | ② 틀렸거나 과한 요구사항 지적 | | ☑ |
 | ③ 빠진 요구사항 추가 | | ☑ |
 
