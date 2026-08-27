@@ -104,6 +104,20 @@ Set-Cookie: oauth_handoff=; Max-Age=0; Path=/api/v1/auth/oauth/complete
   재시작 화면("로그인 정보가 만료되었습니다")이다 — 사실과 다른 안내다. **spec 001 AS-5**(상태와 가능한
   후속 행동 안내)는 프론트가 이 값을 소비할 때 충족되며, 그 결정은 `docs/26`에 올라가 있다.
 
+## 좁힌 판정 세 곳 — 미지 입력은 fail-closed 인가
+
+서버가 "이건 클라이언트 잘못"이라고 판정하는 자리는 셋뿐이다. 셋 다 **모르는 입력은 조용한 4xx 가 아니라
+시끄러운 500 으로 떨어지는 쪽**을 기본값으로 삼는다 — 반대로 두면 서버 결함이 아무도 안 보는 상태에 묻힌다.
+
+| 판정 자리 | 예상 입력 | 예상 출력 | 미지 입력 | fail-closed |
+|---|---|---|---|---|
+| `GlobalExceptionHandler#handleUnexpected` 의 `ErrorResponse` 분기 | 프레임워크가 던진 4xx (404·405·400·415) | 그 status + 계약 code | 계약에 code 가 없는 status | ✅ 일반 code + **`log.warn`** — 도달 사실이 로그에 남는다 |
+| `RegistrationService#asSignupRaceOrRethrow` | `users_nickname_key` · `oauth_identities_provider_provider_subject_key` | 409 `NICKNAME_DUPLICATED` · 409 `REGISTRATION_CONFLICT` | 그 밖의 제약, 이름 없는 위반 | ✅ **그대로 되던짐 → 500 + `log.error`** |
+| `OAuthCompletionController` 의 handoff 소비 | `discard` 가 `true` (이 호출이 소비함) | 세션 발급 | `discard` 가 `false` (남이 먼저 씀) | ✅ **410, 세션 미발급** |
+
+5xx 는 어느 자리에서도 4xx 로 바뀌지 않는다. `handleUnexpected` 의 분기는 `is4xxClientError()` 일 때만 타므로,
+프레임워크가 5xx 를 던지면 종전대로 `INTERNAL_ERROR` + `log.error` 다.
+
 ## 프론트엔드 의무
 
 - 모든 완료 호출에 `credentials: 'include'`를 사용한다.

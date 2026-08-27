@@ -162,7 +162,6 @@ public class GlobalExceptionHandler {
             case METHOD_NOT_ALLOWED -> ErrorCode.METHOD_NOT_ALLOWED;
             case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
             case UNSUPPORTED_MEDIA_TYPE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
-            case NOT_ACCEPTABLE -> ErrorCode.NOT_ACCEPTABLE;
             default -> null;
         };
     }

@@ -178,6 +178,38 @@ class OAuthCompletionApiIntegrationTest {
         verify(sessions, never()).issue(anyLong());
     }
 
+    /** The contract promises 400 here and the frontend restart branch is written against it. */
+    @Test
+    void aMissingHandoffCookieIsRefusedWithItsOwnCode() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/oauth/complete")
+                        .header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"아무개\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("OAUTH_HANDOFF_MISSING"));
+    }
+
+    /**
+     * A nickname the policy refuses is the other half of "a refused nickname keeps the handoff".
+     *
+     * <p>{@link #aRefusedNicknameLeavesTheHandoffUsable} covers the duplicate; this covers the policy
+     * rejection, which the contract lists beside it. Both are refused before the handoff is touched,
+     * and the contract tells the frontend it may keep its form open — so both need pinning, not just
+     * the one that happened to be convenient.
+     */
+    @Test
+    void aRefusedNicknameFormatLeavesTheHandoffUsable() throws Exception {
+        String handoff = handoffs.createRegistration(OAuthProvider.GOOGLE, "policy-" + UUID.randomUUID());
+
+        complete(handoff, "admin")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("NICKNAME_INVALID"));
+
+        complete(handoff, "정상닉" + UUID.randomUUID().toString().substring(0, 6))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("AUTHENTICATED"));
+    }
+
     private ResultActions complete(String handoff, String nickname) throws Exception {
         return mockMvc.perform(post("/api/v1/auth/oauth/complete")
                 .header(HttpHeaders.ORIGIN, trustedOrigin)

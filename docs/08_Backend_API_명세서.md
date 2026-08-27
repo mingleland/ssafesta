@@ -87,7 +87,11 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
 | 그 경로가 지원하지 않는 method | 405 | `METHOD_NOT_ALLOWED` |
 | 필수 쿠키·헤더·파라미터 누락, 타입 불일치 | 400 | `VALIDATION_FAILED` |
 | 지원하지 않는 `Content-Type` | 415 | `UNSUPPORTED_MEDIA_TYPE` |
-| 제공할 수 없는 `Accept` | 406 | `NOT_ACCEPTABLE` |
+> **`Accept` 가 JSON 을 허용하지 않으면 이 봉투 자체를 보낼 수 없다.** 예: `Accept: application/xml` 로
+> 부르면 서버는 오류 봉투를 만들어 놓고도 그것을 기록하지 못해 `HttpMediaTypeNotAcceptableException` 이
+> advice 밖으로 새어 나간다. 이 경우 응답 본문은 **우리 계약이 아니다.** 클라이언트는 `application/json` 을
+> 받을 수 있어야 한다. (2026-08-27 최초 작성 시 `406 NOT_ACCEPTABLE` 행을 적었으나 실측에서 성립하지
+> 않아 걷어냈다 — !56 7차 리뷰.)
 
 - **미구현 endpoint 는 404 다.** 서버 장애(`INTERNAL_ERROR`)와 구분되지 않으면 클라이언트가 재시도할지
   포기할지 정할 수 없다 — `INTERNAL_ERROR` 는 재시도 가능 코드로 정렬돼 있으므로(#104·#48) 미구현 경로를
