@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_GAME_RULES, findScene, type GameObjective, type GameProject } from '../../contracts/gameProject.ts';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { DEFAULT_GAME_RULES, findScene, type AssetReference, type GameObjective, type GameProject, type TileLayer } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
 import { findPresetDefinition } from '../../studio/model/authoringRegistry.ts';
@@ -36,6 +36,40 @@ const keyDirection = (key: string): MoveDirection | null => {
   if (key === 'ArrowRight' || key.toLowerCase() === 'd') return 'RIGHT';
   return null;
 };
+
+interface TileLayersProps {
+  readonly layers: readonly TileLayer[];
+  readonly sceneWidth: number;
+  readonly assets: readonly AssetReference[];
+  readonly assetUrls: Readonly<Record<string, string>>;
+}
+
+// scene.tileLayers는 project와 함께만 바뀌므로 memo로 감싸 runtime tick(120ms)마다 최대 10,000개
+// 타일 span을 다시 그리지 않게 한다 (S15P21A604-263). tileset도 레이어당 한 번만 resolve —
+// 타일마다 project.assets.find를 반복하면 fixture=max에서 그 자체가 재조정 비용의 큰 비중을 차지했다.
+const TileLayers = memo(({ layers, sceneWidth, assets, assetUrls }: TileLayersProps) => (
+  <>
+    {layers.map((layer) => {
+      const visual = resolveTilesetVisual(assets.find((asset) => asset.id === layer.tilesetAssetId), assetUrls);
+      return (
+        <div className="grp-tile-layer" key={layer.id}>
+          {layer.data.map((tile, index) => tile < 0 ? null : (
+            <span
+              className={`is-tile-${tile % 8}`}
+              key={`${layer.id}-${index}`}
+              style={{
+                gridColumn: (index % sceneWidth) + 1,
+                gridRow: Math.floor(index / sceneWidth) + 1,
+                ...(visual === null ? {} : tileBackgroundStyle(visual, tile)),
+              }}
+            />
+          ))}
+        </div>
+      );
+    })}
+  </>
+));
+TileLayers.displayName = 'TileLayers';
 
 const objectiveCopy = (objective: GameObjective): string => {
   if (objective.type === 'SCORE_AT_LEAST') return `${objective.target.toLocaleString('ko-KR')}점 달성`;
@@ -237,27 +271,7 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
               '--grp-rows': scene.height,
             } as React.CSSProperties}
           >
-            {scene.tileLayers.map((layer) => (
-              <div className="grp-tile-layer" key={layer.id}>
-                {layer.data.map((tile, index) => tile < 0 ? null : (
-                  <span
-                    className={`is-tile-${tile % 8}`}
-                    key={`${layer.id}-${index}`}
-                    style={{
-                      gridColumn: (index % scene.width) + 1,
-                      gridRow: Math.floor(index / scene.width) + 1,
-                      ...(() => {
-                        const visual = resolveTilesetVisual(
-                          project.assets.find((asset) => asset.id === layer.tilesetAssetId),
-                          assetUrls,
-                        );
-                        return visual === null ? {} : tileBackgroundStyle(visual, tile);
-                      })(),
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
+            <TileLayers assetUrls={assetUrls} assets={project.assets} layers={scene.tileLayers} sceneWidth={scene.width} />
             {scene.objects.filter((object) => (
               object.preset !== 'PLAYER_SPAWN' && runtime.session.objectVisibility[object.id] !== false
             )).map((object) => {
