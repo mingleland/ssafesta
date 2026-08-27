@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA Spring Internal AI Document Status API
-  version: 0.3.0
-  description: FastAPI가 처리 결과를 Spring 소유 DocumentStatus에 반영하는 내부 콜백 계약이다.
+  version: 0.4.0
+  description: FastAPI가 AI DB 커밋 이후 처리 결과를 Spring 소유 Business DB의 DocumentStatus에 반영하는 내부 콜백 계약이다. 두 DB를 분산 트랜잭션으로 묶지 않으며 callback 멱등성으로 수렴한다.
 servers:
   - url: /internal/ai
 security:

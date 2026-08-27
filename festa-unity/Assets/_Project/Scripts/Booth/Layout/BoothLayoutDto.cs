@@ -14,7 +14,8 @@ namespace Festa.Booth
     {
         public int boothId;
         public string template;
-        public int version;      // Published Layout 버전 (Spring Layout Version과 연동 예정)
+        public int version;       // Published Layout 버전 = 게시 횟수 (BE PublishedView.version)
+        public int schemaVersion;  // Layout JSON 구조 버전 (R-10). 0 = 필드 없던 구버전 응답
         public BoothObjectDto[] objects;
     }
 
@@ -45,6 +46,9 @@ namespace Festa.Booth
 
     public static class BoothLayoutParser
     {
+        /// <summary>이 클라이언트가 아는 Layout JSON 구조 버전 (R-10).</summary>
+        public const int SupportedSchemaVersion = 1;
+
         /// <summary>JSON → DTO. 실패 시 null 반환(예외를 삼키지 않고 로그).</summary>
         public static BoothLayoutDto Parse(string json)
         {
@@ -57,6 +61,13 @@ namespace Festa.Booth
                     Debug.LogError("[BoothLayoutParser] Parsed layout has no objects");
                     return null;
                 }
+
+                // 구조 버전이 앞서 있어도 렌더는 시도한다 — 모르는 type/필드는 어차피
+                // 스킵된다(BoothObjectFactory forward-compat). 다만 조용히 지나가면
+                // "일부만 그려지는" 원인을 못 찾으니 경고는 남긴다.
+                if (dto.schemaVersion > SupportedSchemaVersion)
+                    Debug.LogWarning($"[BoothLayoutParser] schemaVersion {dto.schemaVersion} > 지원 {SupportedSchemaVersion} — 모르는 요소는 스킵된다 (booth {dto.boothId})");
+
                 return dto;
             }
             catch (Exception e)

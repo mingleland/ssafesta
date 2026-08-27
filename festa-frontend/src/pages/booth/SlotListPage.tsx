@@ -9,8 +9,10 @@ import { isApiError } from '../../shared/api/client';
 import { leaseApi } from '../../entities/booth/leaseApi.select';
 import { formatRemaining, remainingMs } from '../../entities/booth/remaining';
 import { useLeaseSlot } from '../../features/booth/model/useLeaseSlot';
+import { LeaseConfirmDialog } from '../../features/booth/ui/LeaseConfirmDialog';
 import { WalletBadge } from '../../features/wallet/ui/WalletBadge';
 import { TransactionsSection } from '../../features/wallet/ui/TransactionsSection';
+import { LEASE_COIN_COST } from '../../entities/booth/types';
 import type { SlotView } from '../../entities/booth/types';
 
 // 임대 실패를 사용자 언어로 — code로만 분기한다(INSUFFICIENT_COIN의 부족액 숫자는 message에만
@@ -72,6 +74,8 @@ export function SlotListPage() {
     enabled: isMember, // 게스트는 403 — 요청 자체를 만들지 않는다
   });
   const leaseMutation = useLeaseSlot();
+  // 확인 중인 슬롯 — 100코인 차감은 환불이 없으므로(FR-013) 버튼이 곧바로 요청하지 않는다
+  const [confirming, setConfirming] = useState<SlotView | null>(null);
 
   const invalidateSlots = () => {
     queryClient.invalidateQueries({ queryKey: ['booth-slots'] });
@@ -115,10 +119,10 @@ export function SlotListPage() {
                 {' '}
                 <button
                   type="button"
-                  onClick={() => leaseMutation.mutate(slot.slotId)}
+                  onClick={() => setConfirming(slot)}
                   disabled={leaseMutation.isPending}
                 >
-                  1일 임대 (100코인)
+                  1일 임대 ({LEASE_COIN_COST}코인)
                 </button>
               </>
             )}
@@ -133,6 +137,18 @@ export function SlotListPage() {
           </li>
         ))}
       </ul>
+
+      {confirming && (
+        <LeaseConfirmDialog
+          slot={confirming}
+          pending={leaseMutation.isPending}
+          onConfirm={() =>
+            // 성공이든 실패든 닫는다 — 실패 사유는 아래 alert가 목록 맥락에서 보여준다
+            leaseMutation.mutate(confirming.slotId, { onSettled: () => setConfirming(null) })
+          }
+          onCancel={() => setConfirming(null)}
+        />
+      )}
 
       {leaseMutation.isError && <p role="alert">{leaseErrorText(leaseMutation.error)}</p>}
 

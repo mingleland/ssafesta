@@ -1,12 +1,12 @@
 # Implementation Plan: AI 직원 / 문서 파이프라인
 
-**Branch**: `ai` | **Date**: 2026-08-20 | **Spec**: [spec.md](./spec.md)
+**Branch**: `docs/S15P21A604-262-spec007-db-boundary` | **Date**: 2026-08-27 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `specs/007-ai-agent-document/spec.md`
 **Decision record**: [research.md](./research.md), [GitHub Issue #11](https://github.com/kanghyunsoon/ssafesta/issues/11)
 
 ## Summary
 
-부스 소유자가 등록한 PDF를 비동기로 파싱·청킹·임베딩하고 `boothId + agentId`로 격리된 pgvector 청크로 저장한다. 처리 요청은 실행 전에 동일 RDS의 FastAPI 전용 `ai.document_jobs`에 영속화한다. Worker는 DB lease와 heartbeat로 작업을 소유하고, 재시작 후 sweeper가 만료된 Job을 회수한다. 사용자 문서 상태는 Spring이, 내부 Job 상태는 FastAPI가 소유하며 FastAPI가 Spring 내부 API로 결과를 비동기 전달한다.
+부스 소유자가 등록한 문서를 비동기로 파싱·청킹·임베딩하고 `boothId + agentId`로 격리된 pgvector 청크로 저장한다. Spring은 Business DB에서 문서와 권한을 검증한 뒤 저장소 snapshot을 전달하고, FastAPI는 별도 AI DB의 Job과 Chunk만 사용한다. Worker는 DB lease와 heartbeat로 작업을 소유하고, 재시작 후 sweeper가 만료된 Job을 회수한다. 사용자 문서 상태는 Spring이, 내부 Job·Chunk는 FastAPI가 소유하며 두 DB의 정합성은 callback·cleanup·reconciliation으로 수렴시킨다.
 
 spec 007의 완료 경계는 문서가 `READY`가 되고 해당 `boothId + agentId` 범위의 RAG 검색에서 사용 가능한 상태까지다. 실제 질문·LLM 답변 생성과 SSE 전달은 spec 008에서 구현한다.
 
@@ -14,7 +14,7 @@ spec 007의 완료 경계는 문서가 `READY`가 되고 해당 `boothId + agent
 
 **Language/Version**: Python 3.12 이상
 **Primary Dependencies**: FastAPI, Uvicorn, SQLAlchemy 2.x async, psycopg 3, Alembic, Pydantic Settings, boto3, PDF parser(MD·TXT는 UTF-8 디코딩만 사용), 관리형 Embedding Provider adapter
-**Storage**: 동일 PostgreSQL RDS + pgvector. Spring `public` 스키마와 FastAPI `ai` 스키마 분리. 원본은 Cloudflare R2가 기본이며 장기 장애 시 운영자 승인 기반 단일 노드 MinIO fallback을 사용하고, 기존 읽기는 문서별 Provider를 따른다.
+**Storage**: 동일 PostgreSQL 17 + pgvector 인스턴스 안의 환경별 Business DB(`festa_{env}_business`)와 AI DB(`festa_{env}_ai`) 분리. `vector` extension은 AI DB에만 설치한다. 원본은 Cloudflare R2가 기본이며 장기 장애 시 운영자 승인 기반 단일 노드 MinIO fallback을 사용하고, 기존 읽기는 문서별 Provider를 따른다.
 **Testing**: pytest, pytest-asyncio, HTTPX ASGI client, PostgreSQL+pgvector 통합 Fixture/Testcontainers, object storage·Embedding adapter fake
 **Target Platform**: Linux Docker container, 개발환경 EC2/ECS 후보
 **Project Type**: FastAPI web service + process-internal background Worker
@@ -39,9 +39,9 @@ spec 007의 완료 경계는 문서가 `READY`가 되고 해당 `boothId + agent
 
 ### 설계 후 재검증
 
-- `public.ai_documents` 직접 UPDATE를 FastAPI 권한에서 제외해 Spring SoT를 유지한다.
+- FastAPI role의 Business DB CONNECT 자체를 차단해 Spring SoT를 유지한다.
 - terminal Job callback을 영속 재시도해 FastAPI 재시작이 Spring 문서 상태를 고착시키지 않는다.
-- 같은 RDS를 사용하지만 schema·migration role·runtime role을 분리해 배포 독립성과 최소 권한을 유지한다.
+- 같은 PostgreSQL 인스턴스를 사용하지만 database·login role·migration 소유권을 분리하고 cross-DB query/FK를 금지한다.
 - Constitution 위반 없음. Complexity Tracking 항목 없음.
 
 ## Project Structure
@@ -77,7 +77,6 @@ festa-ai/
 │   │   └── models/document_job.py
 │   ├── repositories/
 │   │   ├── document_job_repository.py
-│   │   ├── document_repository.py
 │   │   └── chunk_repository.py
 │   ├── services/
 │   │   ├── document_processing_service.py
@@ -121,9 +120,9 @@ backend/src/main/
 ### 2. 처리 요청 접수
 
 1. Spring이 활성 쓰기 Provider에 object storage 업로드를 완료하고 Document에 `storageProvider + bucket + objectKey`를 저장한다.
-2. Spring이 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
-3. FastAPI는 DB에서 `documentId + boothId + agentId + sourceHash`를 다시 검증한다. 요청의 `objectKey`만 신뢰하지 않는다.
-4. `ai.document_jobs`에 `QUEUED`를 INSERT한 뒤 202를 반환한다.
+2. Spring이 Business DB에서 문서 소유권·임대·상태를 검증하고 전체 문서·저장소 snapshot을 구성해 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
+3. FastAPI는 요청 schema와 원본 metadata·SHA-256을 검증하되 Business DB를 조회하지 않는다.
+4. AI DB `document_jobs`에 snapshot과 `QUEUED`를 INSERT한 뒤 202를 반환한다.
 5. 활성 Job 부분 유니크 인덱스 충돌은 오류로 노출하지 않고 기존 Job을 조회해 `existing: true`로 반환한다.
 
 계약: [document-processing-api.yaml](./contracts/document-processing-api.yaml)
@@ -164,29 +163,29 @@ backend/src/main/
 - heartbeat UPDATE가 0행이면 Worker는 소유권을 잃은 것으로 판단하고 결과를 커밋하지 않는다.
 - 여러 Uvicorn Worker가 loop를 실행해도 row lock과 lease 조건으로 한 Job만 소유한다.
 
-### 4. 파싱·청킹·임베딩
+### 4. 처리 snapshot·파싱·청킹·임베딩
 
-- Document snapshot의 `storage_provider + storage_bucket + object_key`를 검증하고 해당 S3-compatible adapter(R2 또는 MinIO)에서 metadata/크기 확인 후 원본(PDF·MD·TXT)을 내려받는다.
+- Spring은 Business DB에서 소유권·임대·`DocumentStatus`를 검증하고 `document_id`, `booth_id`, `agent_id`, 파일명·형식·크기·SHA-256, `storage_provider + storage_bucket + object_key` snapshot을 처리 요청으로 보낸다.
+- FastAPI는 Business DB를 조회하지 않고 snapshot 전체를 Job에 영속화한다. Worker는 영속 snapshot으로 해당 S3-compatible adapter(R2 또는 MinIO)에서 metadata/크기/SHA-256을 다시 확인한 뒤 원본(PDF·MD·TXT)을 내려받는다.
 - PDF는 페이지별 텍스트를 추출하고, MD·TXT는 UTF-8로 디코딩해 그대로 사용한다.
 - 스캔 PDF처럼 추출 텍스트가 없으면 `UNSUPPORTED_SCAN_PDF`로 실패 처리한다. MD·TXT가 UTF-8로 디코딩되지 않으면 `PARSE_FAILED`로 처리한다.
 - chunk size와 overlap은 환경 설정으로 주입하며 코드에 고정하지 않는다.
 - Embedding adapter는 batch 입력을 사용하고 모든 결과가 1536차원인지 저장 전에 검증한다.
-- 각 Chunk는 `document_id`, `booth_id`, `agent_id`, `chunk_no`, `embedding_model_id`를 필수로 가진다.
+- 각 Chunk는 `document_id`, `booth_id`, `agent_id`, `chunk_no`, `embedding_model_id`, `searchable`을 필수로 가진다. 새 Chunk는 `searchable = false`다.
 - 중간 청크는 검색 테이블에 부분 저장하지 않고 메모리 또는 작업 임시 영역에 유지한 뒤 마지막 트랜잭션에서 전량 반영한다.
 
 ### 5. 성공 커밋의 원자성
 
-하나의 PostgreSQL 트랜잭션에서 다음 순서로 처리한다.
+하나의 AI DB 트랜잭션에서 다음 순서로 처리한다.
 
 1. Job 행을 `FOR UPDATE`하고 현재 Worker 소유권·`RUNNING`·유효 lease를 확인한다.
-2. Spring 소유 Document를 읽어 `DISABLED` 여부와 `source_hash` 최신성을 확인한다.
-3. 정책상 취소되었으면 Job을 `CANCELLED`로 종료하고 새 Chunk를 버린다.
-4. 기존 `document_id` Chunk 전량 DELETE.
-5. 새 Chunk 전량 INSERT.
-6. Job을 `SUCCEEDED`, `chunk_count`, `finished_at`으로 갱신.
-7. 커밋 후 `READY` callback을 시도한다.
+2. Job의 취소 상태와 처리 snapshot의 `source_hash`를 확인한다.
+3. 기존 `document_id` Chunk 전량 DELETE.
+4. 새 Chunk 전량 INSERT.
+5. Job을 `SUCCEEDED`, `chunk_count`, `finished_at`으로 갱신.
+6. 커밋 후 `READY` callback을 시도한다.
 
-트랜잭션이 실패하면 기존 Chunk 집합이 그대로 남고 새 결과는 노출되지 않는다.
+트랜잭션이 실패하면 기존 Chunk 집합이 그대로 남고 새 결과는 노출되지 않는다. Business DB의 `DocumentStatus` 전환은 이 트랜잭션에 포함하지 않는다.
 
 ### 6. 재시작 복구와 재시도
 
@@ -207,16 +206,20 @@ backend/src/main/
 - Spring은 처리 요청 응답으로 받은 `jobId`를 다른 후속 처리보다 먼저 저장하고 `jobId`와 `documentId` 대응 관계를 확인한다. 404 응답은 `JOB_NOT_REGISTERED`, `DOCUMENT_NOT_FOUND`, `JOB_DOCUMENT_MISMATCH`로 구분한다.
 - FastAPI는 `JOB_NOT_REGISTERED`만 1초·3초·10초 간격으로 최대 3회 재시도한다. `DOCUMENT_NOT_FOUND`와 `JOB_DOCUMENT_MISMATCH`는 즉시 종료하며, Spring은 mismatch를 계약 오류로 경고 기록한다. 이 짧은 callback 재시도는 문서 처리 Job의 1분·5분·15분 재시도와 별개다.
 - Spring은 `jobId + status` 멱등성을 보장하고 `sourceHash`가 현재 Document와 다르면 409로 거부한다. 중복 callback은 상태를 다시 반영하지 않고 멱등 성공하며, 409 stale 결과는 전달 완료로 기록하되 현재 문서 상태를 덮지 않는다.
+- FastAPI는 Spring의 `READY` callback 204 이후 별도 AI DB 트랜잭션으로 해당 Job의 Chunk만 `searchable = true`로 전환한다. callback 미전달·실패 중인 Chunk는 RAG 검색에 노출하지 않는다.
 
 계약: [spring-document-status-api.yaml](./contracts/spring-document-status-api.yaml)
 
 ### 8. 부스 임대 만료
 
 - Spring이 부스 임대 만료에 따라 Document를 `DISABLED`로 전환한다.
-- FastAPI Worker는 처리 시작과 성공 커밋 직전에 Document 상태를 확인한다.
-- `DISABLED`를 확인하면 Job을 `CANCELLED`로 종료하고 새 Chunk를 공개하지 않는다.
+- Spring은 Document 삭제·비활성화 시 `DELETE /documents/{documentId}/artifacts` cleanup을 발행하고 성공할 때까지 재시도한다.
+- FastAPI cleanup은 멱등하게 활성 Job을 `CANCELLED`로 전환하고 해당 `document_id` Chunk를 삭제한다. 이미 정리된 문서는 다시 요청해도 성공한다.
+- 처리와 cleanup이 경쟁하면 Job/Chunk 행 잠금으로 한쪽만 커밋하며, cleanup 이후 늦은 성공 callback은 Spring의 최신 Document 상태·sourceHash 검증에서 거부된다.
 - 재임대 후 Spring이 문서를 `QUEUED`로 활성화하고 새 처리 요청을 보내면 신규 Job으로 처음부터 처리한다.
 - Worker heartbeat lease 만료는 이 흐름과 무관하며 `RETRY_WAIT` 복구 대상이다.
+
+주기적 reconciliation은 Spring이 한 시점의 전체 활성 문서 inventory(`documentId`, `boothId`, `agentId`, `sourceHash`, status)를 `POST /documents/reconciliation`으로 전달하고 FastAPI가 AI DB와 비교하는 방식으로 수행한다. 같은 `runId` 재전송은 멱등하며, Business DB에 없는 문서 또는 `READY`가 아닌 문서의 Chunk는 cleanup 대상으로 수렴시키고 sourceHash·scope 불일치는 운영 경고 후 재처리를 요구한다.
 
 ### 9. 인증과 권한
 
@@ -228,7 +231,7 @@ backend/src/main/
 - 토큰 검증은 Security Group·ALB 설정과 독립적으로 모든 내부 요청에 항상 적용한다.
 - Service Token과 DB/Provider 자격증명은 Secrets Manager 또는 CI secret으로 주입한다.
 - 로그는 Authorization header, object key 전체, 원문 문서 내용, Provider raw 오류를 마스킹한다.
-- DB migration role과 runtime role을 분리한다. runtime role은 `public.ai_documents` UPDATE 권한을 갖지 않는다.
+- 환경별 Spring role은 Business DB에만, FastAPI role은 AI DB에만 CONNECT할 수 있다. runtime role은 자기 DB의 최소 DML/sequence 권한만 가지며 database/role/extension 생성 권한은 없다.
 - mTLS는 인증서 발급·주입·갱신·폐기 자동화를 준비한 뒤 적용하는 P2 보안 강화 항목으로 남긴다.
 
 ### 10. 설정
@@ -250,7 +253,7 @@ backend/src/main/
 | `INTERNAL_SPRING_TO_AI_TOKENS` | 콤마 구분 1~2개, 첫 값 송신·전체 값 검증, secret 주입, 기본값 없음 |
 | `INTERNAL_AI_TO_SPRING_TOKENS` | 콤마 구분 1~2개, 첫 값 송신·전체 값 검증, secret 주입, 기본값 없음 |
 | `INTERNAL_INFRA_TO_SPRING_TOKENS` | 콤마 구분 1~2개, reconcile 결과 전달 전용, AI→Spring 토큰과 별도 credential·scope, secret 주입, 기본값 없음 |
-| `DATABASE_URL` | secret 주입, 기본값 없음 |
+| `DATABASE_URL` | 환경별 AI DB(`festa_{env}_ai`) 전용 URL, secret 주입, 기본값 없음 |
 | `R2_ENDPOINT`, `R2_BUCKET` | R2 S3-compatible endpoint와 문서 bucket |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | R2 secret 주입, 기본값 없음 |
 | `MINIO_ENDPOINT`, `MINIO_BUCKET` | MinIO endpoint와 문서 bucket. 외부 직접 노출 금지 |
@@ -279,13 +282,13 @@ Spring의 업로드·삭제 설정은 Presigned URL 15분, 미완료 만료 1시
 
 ## Migration and Deployment Order
 
-1. **BE/Infra**: 동일 RDS에 `ai` 스키마와 AI migration/runtime role을 생성하고 최소 권한을 부여한다. Spring R2 자격증명에는 문서 버킷 또는 지정 prefix의 `DeleteObject` 권한을 제공한다.
+1. **Infra**: 환경별 `festa_{env}_business`·`festa_{env}_ai` database와 분리된 login/migration/runtime role을 생성하고 4×4 CONNECT matrix를 검증한다. AI DB에만 `vector` extension을 설치한다.
 2. **BE**: `ai_documents`의 누락 필드(`failure_reason`, `content_sha256`, `storage_provider`, `storage_bucket`, `chunk_count`, `processed_at` 등)와 신규 `storage_reconciliation_log` 테이블을 현재 schema와 비교해 다음 사용 가능한 Flyway migration으로 추가한다.
 3. **BE/AI/Infra**: 방향별 Service Token 세 목록(Spring↔FastAPI 양방향, Infra→Spring)을 송신자와 수신자에 주입하고 Security Group·public route 차단을 적용한다. Secret 값은 배포 설정과 로그에 노출하지 않는다.
 4. **BE**: Spring 내부 상태 callback, reconcile 결과 수신 endpoint, 사용자용 문서 상태 조회를 배포한다. 세 endpoint 모두 기존 클라이언트에 영향 없는 신규 내부 API다.
-5. **AI**: Alembic으로 `ai.document_jobs`와 인덱스를 배포한다.
-6. **AI**: Job 접수 API를 배포하되 Worker 시작 feature flag는 끈다.
-7. **통합 검증**: DB 권한, 방향별 Service Token의 정상·누락·오류·반대 방향 401, callback 404 원인별 처리(`JOB_NOT_REGISTERED` 1/3/10초 재시도, 나머지 즉시 종료)·멱등성·stale sourceHash 409를 확인한다.
+5. **AI**: Alembic으로 AI DB의 `document_jobs`·`document_chunks`와 인덱스를 배포한다.
+6. **AI/BE**: snapshot 처리 요청과 멱등 cleanup endpoint를 배포하되 Worker 시작 feature flag는 끈다.
+7. **통합 검증**: DB CONNECT 격리, snapshot 완결성, cleanup 멱등성, 방향별 Service Token의 정상·누락·오류·반대 방향 401, callback 404 원인별 처리(`JOB_NOT_REGISTERED` 1/3/10초 재시도, 나머지 즉시 종료)·멱등성·stale sourceHash 409를 확인한다.
 8. **AI**: Worker와 sweeper를 활성화한다.
 9. **운영 확인**: 강제 종료 복구와 callback 재전송 시험 통과 후 기존 임시 처리 경로를 제거한다.
 
@@ -307,12 +310,15 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 - lease 만료 회수와 attempt 증가
 - Chunk DELETE+INSERT+SUCCEEDED 원자성, 중간 오류 rollback
 - 청크 수 감소 재처리 시 오래된 꼬리 청크 0건
-- `ON DELETE CASCADE` 후 고아 Job 0건
-- runtime role의 `ai_documents` UPDATE 거부
+- AI DB 내부 Chunk DELETE+INSERT+SUCCEEDED 단일 트랜잭션
+- 4개 runtime role × 4개 database CONNECT matrix의 대각선만 성공
+- Business DB 직접 조회 없이 snapshot만으로 처리 성공
+- cleanup 재전송과 inventory reconciliation 후 고아 Chunk 0건
 
 ### Contract
 
 - 세 OpenAPI schema에 대한 요청·응답 검증
+- 처리 요청 snapshot 필수 필드와 멱등 cleanup의 반복 204
 - 방향별 Service Token 정상 승인과 누락·오류·반대 방향 토큰 401
 - `[old] → [old,new] → [new,old] → [new]` 회전 중 정상 호출 성공
 - callback 404의 `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH` 구분과 원인별 재시도·종료 정책
@@ -336,11 +342,14 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 - reconcile 결과 전달의 `runId + documentId` 중복 요청이 멱등 성공하고 로그가 중복 적재되지 않는지 검증
 - Infra→Spring 토큰 누락·오류·AI 방향 토큰 재사용이 401로 거부되는지 검증
 - 처리 중 Spring Document가 `DISABLED`가 될 때 `CANCELLED` 및 READY 미전환
+- cleanup 전달 전·후 FastAPI 강제 종료와 재전송 후 Chunk 0건
+- Business/AI inventory 불일치 주입 후 reconciliation 수렴 또는 운영 경고
 
 ### Security/Isolation
 
 - 요청 boothId/agentId 위조 거부
 - 다른 Booth/Agent Chunk 검색 0건
+- FastAPI role의 Business DB CONNECT 및 Spring role의 AI DB CONNECT 거부
 - 로그와 사용자 failureReason에 token, Stack Trace, object key, Provider raw 오류가 없는지 검사
 
 검증 절차는 [quickstart.md](./quickstart.md)를 따른다.
@@ -351,13 +360,13 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 
 - Issue #11 합의와 본 contracts를 BE/Infra가 확인한다.
 - 실제 back schema와 다음 Flyway 번호를 확인한다.
-- `ai` schema, DB roles, Service Token 전달 경로를 준비한다.
+- 환경별 Business/AI database, 분리 role, AI DB의 `vector` extension, Service Token 전달 경로를 준비한다.
 
 ### Phase 1 — Job 기반 처리 골격
 
 - FastAPI scaffold, 설정 검증, DB session, Alembic 구성.
-- `document_jobs` migration과 repository 구현.
-- 멱등 `POST /documents/process` 및 내부 status API 구현.
+- `document_jobs`·`document_chunks` migration과 repository 구현.
+- snapshot 기반 멱등 `POST /documents/process`, cleanup 및 내부 status API 구현.
 
 ### Phase 2 — Worker와 문서 처리
 
@@ -369,7 +378,7 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 
 - Spring callback client와 영속 재전송/reconciliation 구현.
 - BE 내부 callback, 사용자 상태 조회, Flyway 변경과 통합.
-- 부스 임대 만료·개정본 sourceHash 경쟁 처리.
+- 삭제·비활성화 cleanup, inventory reconciliation, 개정본 sourceHash 경쟁 처리.
 
 ### Phase 4 — 검증과 운영화
 
@@ -385,7 +394,7 @@ Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 le
 | Worker 중복 처리 | 부분 유니크 인덱스 + row lock + worker_id 조건부 heartbeat |
 | 재처리 후 오래된 Chunk 잔존 | DELETE+전량 INSERT+Job 성공을 단일 트랜잭션으로 처리 |
 | 개정본보다 오래된 Job이 늦게 완료 | Job sourceHash snapshot + Spring stale callback 거부 |
-| 같은 RDS의 파트 간 결합 | schema/migration/role 분리, 계약 기반 callback |
+| 같은 PostgreSQL 인스턴스의 파트 간 결합 | database/login role/CONNECT 분리, snapshot·callback·cleanup 계약 |
 | 인프로세스 Worker 부하가 API에 영향 | 동시성 제한, CPU-heavy parsing 격리, 실측 후 SQS/별도 Worker 전환 |
 | 내부 API 토큰 노출 | Secrets Manager, 로그 마스킹, SG 제한, 최소 권한 |
 
