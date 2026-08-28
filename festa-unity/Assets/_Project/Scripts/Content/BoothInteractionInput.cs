@@ -72,7 +72,13 @@ namespace Festa.Content
             if (laptop != null) { laptop.Interact(); return; }
 
             var ai = hit.collider.GetComponentInParent<AiNpcInteractable>();
-            if (ai != null) ai.Interact();
+            if (ai != null) { ai.Interact(); return; }
+
+            // spec 014 미니게임 진입. 기존 두 분기와 같은 형태로 붙인다 —
+            // 타입별 분기를 일반화하는 건 S15P21A604-303 의 몫이고, 여기서 같이 하면
+            // 미니게임 변경과 리팩터링이 한 커밋에 섞인다.
+            var minigame = hit.collider.GetComponentInParent<Festa.Minigame.MinigameInteractable>();
+            if (minigame != null) minigame.Interact();
         }
 
         void UpdateHover(Festa.Booth.BoothInteractionTarget next)
