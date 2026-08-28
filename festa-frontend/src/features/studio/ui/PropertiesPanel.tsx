@@ -105,7 +105,7 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
             onChange={(e) => onSetAssetCode(e.target.value.trim() === '' ? undefined : e.target.value)}
           />
         </label>
-      ) : (
+      ) : info.linksConfigId ? (
         <label>
           연결 콘텐츠 ID
           <input
@@ -118,7 +118,7 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
             onBlur={() => commitConfigId(configText)}
           />
         </label>
-      )}
+      ) : null}
 
       <button type="button" onClick={onRemove}>
         삭제
