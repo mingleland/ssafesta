@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 396abb32ad9012c4c923407a450e5fac
+timeCreated: 1507766331
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Textures/Surfaces/Materials/PlasticWhite.mat
+  uploadId: 237227

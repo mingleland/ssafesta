@@ -24,16 +24,38 @@ public class BoothSlotController {
 
     private final BoothQueryService queries;
     private final BoothLeaseService leases;
+    private final BoothLayoutQueryService layouts;
 
-    public BoothSlotController(BoothQueryService queries, BoothLeaseService leases) {
+    public BoothSlotController(BoothQueryService queries, BoothLeaseService leases,
+                               BoothLayoutQueryService layouts) {
         this.queries = queries;
         this.leases = leases;
+        this.layouts = layouts;
     }
 
     /** Open to guests: browsing the world is what a guest session is for (헌법 12조). */
     @GetMapping
     public List<BoothQueryService.SlotView> slots(@AuthenticationPrincipal Jwt jwt) {
         return queries.listSlots(BoothPrincipal.optionalMemberId(jwt));
+    }
+
+    /**
+     * The published layout of whatever booth currently holds this room (spec 005 contract §11,
+     * #62). Unauthenticated, exactly like the booth-keyed path — every visitor reads it.
+     *
+     * <p>Unity calls this one because its anchors are rooms; the editor calls
+     * {@code /booths/{boothId}/layouts/published} because it edits a booth. Same resource, two
+     * natural keys, identical body.
+     */
+    @GetMapping("/{slotId}/layouts/published")
+    public BoothLayoutQueryService.PublishedView published(@PathVariable Long slotId) {
+        try {
+            return layouts.findPublishedBySlot(slotId);
+        } catch (SlotNotFoundException exception) {
+            // Not an ApiException — 004 threw it before the error envelope existed, and the two
+            // other call sites translate it here as well rather than in a handler.
+            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_FOUND);
+        }
     }
 
     @PostMapping("/{slotId}/leases")

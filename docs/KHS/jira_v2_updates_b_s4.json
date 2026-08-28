@@ -1,0 +1,128 @@
+[
+  {
+    "key": "S15P21A604-103",
+    "title": "[UNITY] Published Layout API 클라이언트·DTO 검증 구현",
+    "sp": 2, "priority": "Highest", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nUnity 가 BE 의 Published Layout 을 실서버에서 조회·역직렬화할 수 있게 한다.\n\nh3. 작업 내용\n* GET /booth-slots/{slotId}/layouts/published 클라이언트 구현\n* DTO 역직렬화·스키마 불일치 방어 (미지원 type 스킵)\n* 실패 시 해당 Booth 만 비우고 월드는 계속 동작\n\nh3. 완료 조건\n* [ ] 12슬롯 조회가 병렬로 완료\n* [ ] 미지원 type 이 전체 Booth 를 중단시키지 않음\n* [ ] 오류 Booth 격리 로그\n\nh3. 선행 작업 / Dependency\n* 없음 (BE 완료: 커밋 c064133)\n\nh3. 참고\n* Spec: specs/006, GitLab #62 계약 (boothId 1~12·앵커 40)\n\nh3. 테스트 방법\n# published 1건 게시 후 Unity 에서 조회 로그·객체 수 확인"
+  },
+  {
+    "key": "S15P21A604-104",
+    "title": "[UNITY] 카탈로그 기본 자산 정책 구현 (T-148)",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nassetCode 미지정·오타 시 어떤 자산이 나올지가 Registry 배열 순서에 좌우되는 last-wins 함정을 제거한다.\n\nh3. 작업 내용\n* 타입별 기본 자산 명시 필드 도입 (또는 assetCode 빈 엔트리만 기본 인정)\n* BuildMap() 충돌 시 경고 로그\n\nh3. 완료 조건\n* [ ] 타입당 기본 자산이 결정적\n* [ ] 오타 assetCode → 기본 자산 + 경고\n* [ ] FE 계약 무변경\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* T-148, docs/KHS/26\n\nh3. 테스트 방법\n# 프리팹 2개 등록 상태에서 미지정/오타/정상 3케이스 스폰 확인"
+  },
+  {
+    "key": "S15P21A604-105",
+    "title": "[BE] AI Agent 도메인·CRUD API 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nBooth 별 AI Agent(직원) 메타데이터를 생성·관리하는 기반 API 를 만든다 (ai_agents 테이블만 존재, 코드 0).\n\nh3. 작업 내용\n* AiAgent 도메인·엔티티·리포지토리\n* 생성/수정/조회/삭제 API (Booth 당 상한 정책 포함)\n* 이름·페르소나 설정 필드 검증\n\nh3. 완료 조건\n* [ ] CRUD 통합 테스트 통과\n* [ ] OpenAPI 반영\n* [ ] Agent 당 Document 10개/100MB 상한 필드 준비\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* Spec: specs/007 (BE 분), V1 ai_agents\n\nh3. 테스트 방법\n# Owner 계정으로 생성→수정→삭제 왕복 + 검증 실패 케이스"
+  },
+  {
+    "key": "S15P21A604-106",
+    "title": "[BE] Document 업로드 API 구현 — R2 저장·검증",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAI Agent 학습용 PDF 업로드 경로를 만든다 (원본은 Cloudflare R2 저장).\n\nh3. 작업 내용\n* POST 문서 업로드 — PDF 단독·20MB·Agent 당 10개/100MB 검증\n* R2 (S3-compatible) 저장·키 규칙\n* ai_documents 레코드 생성 (초기 상태 대기)\n\nh3. 완료 조건\n* [ ] 형식·크기·상한 위반 4xx 계약 준수\n* [ ] R2 객체·DB 레코드 정합\n* [ ] 타 Booth Owner 업로드 차단\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-105\n\nh3. 참고\n* specs/007 US2, 커밋 54bd0f4 (R2 계약)\n\nh3. 테스트 방법\n# 정상 PDF / 21MB / 11번째 문서 / 타인 Booth 4케이스"
+  },
+  {
+    "key": "S15P21A604-107",
+    "title": "[BE] Game Asset 업로드·R2 저장 API 구현 (#69)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nGame Studio 의 사용자 Asset 을 서버에 보관해 stable asset:// 참조를 성립시킨다.\n\nh3. 작업 내용\n* Asset 업로드 API — 이미지 allow-list·5MiB 상한(#69 협의값)\n* R2 저장·게임 스코프 키 규칙\n* 메타 레코드 (gameId·assetId·type·size)\n\nh3. 완료 조건\n* [ ] 상한·형식 위반 거부\n* [ ] Owner 외 업로드 차단\n* [ ] 업로드 응답에 assetId 반환\n\nh3. 선행 작업 / Dependency\n* GitLab #69 경계 확정 반영\n\nh3. 참고\n* specs/019, GitLab #69\n\nh3. 테스트 방법\n# png/svg/6MiB/게스트 4케이스 업로드"
+  },
+  {
+    "key": "S15P21A604-108",
+    "title": "[BE] Published 게임 세션·Coin 차감 규약 확정·구현 (#81)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nPublished 게임 플레이 시작 시 Coin 차감이 멱등하게 일어나는 세션 계약을 확정·구현한다.\n\nh3. 작업 내용\n* 세션 생성 API — 차감 금액·idempotency key·재입장 규칙 (#81 의 7개 질의 확정)\n* 003 Ledger 연동 (단일 트랜잭션)\n\nh3. 완료 조건\n* [ ] 동일 세션 재요청 시 이중 차감 0건\n* [ ] 잔액 부족 409 계약\n* [ ] FE 인수조건(#81 명시) 충족\n\nh3. 선행 작업 / Dependency\n* 규약 확정 코멘트 합의 (GitLab #81)\n\nh3. 참고\n* GitLab #81, specs/003·019\n\nh3. 테스트 방법\n# 2계정 동시 시작·재시도·부족 잔액 3시나리오"
+  },
+  {
+    "key": "S15P21A604-109",
+    "title": "[BE] Booth 홈페이지 URL 등록·검증 API 노출 (016)",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nBooth 노트북 오버레이가 열 홈페이지 URL 을 Owner 가 등록할 수 있게 한다 (DB 필드는 기존재).\n\nh3. 작업 내용\n* homepageUrl 등록/수정 API — http/https·길이 검증\n* Published 상태에서만 방문자 노출\n\nh3. 완료 조건\n* [ ] javascript: 등 비허용 스킴 거부\n* [ ] 미Publish Booth 는 방문자 응답에서 제외\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* specs/016 BE 분, Booth.java homepage 필드\n\nh3. 테스트 방법\n# 등록→Publish→방문자 조회 왕복, 비허용 스킴 4xx"
+  },
+  {
+    "key": "S15P21A604-110",
+    "title": "[BE] Project 등록·수정 API 구현 (D09 URL 검증)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nBooth 의 프로젝트 전시 정보(소개·영상·링크)를 관리하는 API 를 만든다.\n\nh3. 작업 내용\n* Project 등록/수정 — 제목·설명·영상 URL·링크 목록\n* D09 URL 검증 (YouTube·GitHub 등 allow 정책)\n* Booth 소유권 검사\n\nh3. 완료 조건\n* [ ] URL 검증 실패 field 오류 계약\n* [ ] 타 Booth 수정 차단\n* [ ] 통합 테스트\n\nh3. 선행 작업 / Dependency\n* 없음 (projects 테이블 기존재)\n\nh3. 참고\n* specs/009, V1 projects\n\nh3. 테스트 방법\n# 정상/비허용 URL/타인 Booth 3케이스"
+  },
+  {
+    "key": "S15P21A604-111",
+    "title": "[BE] Game Studio 스키마·패키지 기반 구축 (#48)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nGame Studio BE 의 저장 구조를 신설한다 (specs/019 BE 0/21 미착수).\n\nh3. 작업 내용\n* games/game_drafts/game_published_versions 마이그레이션\n* game 패키지·오류 코드 정의\n\nh3. 완료 조건\n* [ ] Flyway 마이그레이션 통과\n* [ ] 오류 코드가 공통 봉투 규격과 일치\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* specs/019 BE T014~T016, GitLab #48\n\nh3. 테스트 방법\n# 마이그레이션 적용·롤백 검증"
+  },
+  {
+    "key": "S15P21A604-112",
+    "title": "[BE] Game Draft 저장 API 구현 — revision 낙관 잠금 (#48)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nGame Studio 편집 결과(Draft)를 revision 충돌 감지와 함께 저장한다.\n\nh3. 작업 내용\n* Draft 저장 API — revision 조건부 UPDATE (005 Layout 패턴 재사용)\n* Draft 조회 API\n\nh3. 완료 조건\n* [ ] revision 불일치 409 계약\n* [ ] 동시 저장 경합 테스트 통과\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-111\n\nh3. 참고\n* specs/019 BE T035~T037, BoothLayoutService 패턴\n\nh3. 테스트 방법\n# 두 세션 동시 저장 → 한쪽 409 확인"
+  },
+  {
+    "key": "S15P21A604-113",
+    "title": "[FE] Game Studio PR #72·#79 리뷰·머지",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n미머지 Game Studio PR 스택 전반부(실사용 Authoring 보강·Maker 캔버스)를 front 에 반입한다.\n\nh3. 작업 내용\n* PR #72 (Authoring·Published Runtime 연결 보강) 리뷰·머지\n* PR #79 (Maker 자유 편집 캔버스·실제 템플릿) 리뷰·머지\n\nh3. 완료 조건\n* [ ] vitest·build 기준선 유지 (머지 후 재실측)\n* [ ] 스택 후속(#80·#82) 리베이스 충돌 없음\n\nh3. 선행 작업 / Dependency\n* 리드 승인 (PR 소유자)\n\nh3. 참고\n* GitLab #72·#79\n\nh3. 테스트 방법\n# 머지 후 npm ci·vitest·build 실측 기록"
+  },
+  {
+    "key": "S15P21A604-114",
+    "title": "[FE] GAME_PORTAL resolver·오버레이 어댑터 구현 (#56)",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nUnity 의 BOOTH_GAME_INTERACT 이벤트를 받아 해당 게임 오버레이를 여는 경로를 완성한다.\n\nh3. 작업 내용\n* 포털 resolver (T056) — configId → 게임 식별\n* 게임 오버레이 어댑터 연결\n\nh3. 완료 조건\n* [ ] 유효 포털 클릭 시 게임 오버레이 오픈\n* [ ] 미Publish 게임 안내 처리\n\nh3. 선행 작업 / Dependency\n* BLOCKED BY: S15P21A604-113 · BE 배포(#48)·Unity GameObject 명 확정 대기\n\nh3. 참고\n* GitLab #56 T056\n\nh3. 테스트 방법\n# mock 이벤트 주입 → 오버레이 라우팅 확인"
+  },
+  {
+    "key": "S15P21A604-118",
+    "title": "[FE] AI Chat 대화 UI·상태 모델 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nAI Agent 대화 오버레이의 화면·상태 기반을 만든다 (타입·파서·mock 은 완료 상태).\n\nh3. 작업 내용\n* 대화 오버레이 레이아웃 (메시지 목록·입력·전송)\n* Conversation 상태 모델 (진행중/대기/오류/종료)\n* AI_AGENT_INTERACT 수신 → 오버레이 오픈 라우팅\n\nh3. 완료 조건\n* [ ] mock 스트림으로 대화 왕복 렌더\n* [ ] 게스트 진입 시 로그인 유도 (008 게스트 차단)\n\nh3. 선행 작업 / Dependency\n* 없음 (mock 기반 선행 가능)\n\nh3. 참고\n* specs/008 FR-011, 커밋 081b5cb\n\nh3. 테스트 방법\n# mock fixture 3종(정상/오류/타임아웃) 렌더 확인"
+  },
+  {
+    "key": "S15P21A604-119",
+    "title": "[FE] 게스트 만료 실관측 UX 결선 (G-3)",
+    "sp": 1, "priority": "Low", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n게스트 토큰 만료를 사용자에게 자연스럽게 안내한다.\n\nh3. 작업 내용\n* expiresAt 소비·만료 임박 안내\n* 401 반응형 재입장 유도 실경로 연결\n\nh3. 완료 조건\n* [ ] 만료 시 데이터 손실 없는 안내 흐름\n\nh3. 선행 작업 / Dependency\n* S15P21A604-90 (실서버 결선)\n\nh3. 참고\n* FE backlog G-3\n\nh3. 테스트 방법\n# 짧은 만료 토큰으로 만료 시나리오 재현"
+  },
+  {
+    "key": "S15P21A604-120",
+    "title": "[AI] R2 Object Storage 어댑터 구현",
+    "sp": 2, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n문서 원본을 R2 에서 읽는 저장소 어댑터를 만든다.\n\nh3. 작업 내용\n* S3-compatible 클라이언트 (R2 endpoint·fallback 지원)\n* 객체 metadata 검증 (크기·타입)\n\nh3. 완료 조건\n* [ ] 로컬 MinIO/R2 대상 통합 테스트\n* [ ] endpoint 전환이 설정만으로 가능\n\nh3. 선행 작업 / Dependency\n* S15P21A604-93\n\nh3. 참고\n* specs/007 plan §4, FR-010\n\nh3. 테스트 방법\n# put→get 왕복·metadata 불일치 거부 케이스"
+  },
+  {
+    "key": "S15P21A604-121",
+    "title": "[AI] Document 처리 접수 API 구현 (POST /ai/v1/documents/process)",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nSpring 이 위임한 문서 처리를 멱등하게 접수한다.\n\nh3. 작업 내용\n* 접수 API — DB 재검증 후 202\n* 기존 활성 Job 존재 시 existing:true 반환 (멱등)\n\nh3. 완료 조건\n* [ ] OpenAPI 계약(document-processing-api.yaml) 일치\n* [ ] 중복 접수 시 새 Job 미생성\n\nh3. 선행 작업 / Dependency\n* S15P21A604-95 (document_jobs)\n\nh3. 참고\n* specs/007 plan §2\n\nh3. 테스트 방법\n# 동일 요청 2회 → Job 1개·existing:true 확인"
+  },
+  {
+    "key": "S15P21A604-122",
+    "title": "[AI] Worker pickup·lease·heartbeat 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n문서 처리 Job 을 DB lease 기반으로 안전하게 집는 Worker 루프를 만든다.\n\nh3. 작업 내용\n* SKIP LOCKED pickup·90s lease\n* 처리 중 heartbeat 갱신\n\nh3. 완료 조건\n* [ ] 다중 Worker 에서 중복 pickup 0건\n* [ ] heartbeat 중단 Job 이 회수 대상化\n\nh3. 선행 작업 / Dependency\n* S15P21A604-121\n\nh3. 참고\n* specs/007 plan §3\n\nh3. 테스트 방법\n# Worker 2개 동시 기동 → 분배·중복 검사"
+  },
+  {
+    "key": "S15P21A604-123",
+    "title": "[AI] PDF 파싱·청킹 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\nPDF 원문을 검색 가능한 chunk 로 만든다.\n\nh3. 작업 내용\n* PDF 텍스트 추출 (스캔 PDF = 명시적 실패 처리)\n* 설정 기반 청킹 (스파이크 실측 파라미터)\n\nh3. 완료 조건\n* [ ] 정상 PDF chunk 생성\n* [ ] 스캔 PDF 실패 사유가 상태 콜백에 전달\n\nh3. 선행 작업 / Dependency\n* S15P21A604-122, S15P21A604-92 (파라미터)\n\nh3. 참고\n* specs/007 plan §4, FR-011/020\n\nh3. 테스트 방법\n# 텍스트 PDF·스캔 PDF·빈 PDF 3케이스"
+  },
+  {
+    "key": "S15P21A604-124",
+    "title": "[AI] Chunk 전량 교체 원자 트랜잭션 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n재처리 시 이전 chunk 가 섞이지 않도록 교체를 단일 커밋으로 보장한다.\n\nh3. 작업 내용\n* 소유권 확인→DELETE→INSERT→SUCCEEDED 단일 트랜잭션\n\nh3. 완료 조건\n* [ ] 재처리 후 잔존 구 chunk 0건 (FR-024)\n* [ ] 중간 실패 시 전체 롤백\n\nh3. 선행 작업 / Dependency\n* S15P21A604-123\n\nh3. 참고\n* specs/007 plan §5\n\nh3. 테스트 방법\n# 같은 문서 2회 처리 → chunk 수·내용 검증, 강제 실패 주입"
+  },
+  {
+    "key": "S15P21A604-125",
+    "title": "[AI] Spring 상태 콜백 클라이언트·reconciliation 구현",
+    "sp": 3, "priority": "High", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\n처리 결과(terminal 상태)를 Spring 에 유실 없이 전달한다.\n\nh3. 작업 내용\n* terminal 콜백 영속 재시도·jobId 멱등\n* sourceHash 불일치 409 stale 처리\n\nh3. 완료 조건\n* [ ] 콜백 유실 시 재전송으로 최종 일관\n* [ ] OpenAPI(spring-document-status-api.yaml) 일치\n\nh3. 선행 작업 / Dependency\n* BE 콜백 수신 API (분할 신규) 와 계약 맞물림\n\nh3. 참고\n* specs/007 plan §7\n\nh3. 테스트 방법\n# 콜백 수신측 다운 상태에서 처리 → 복구 후 상태 일치 확인"
+  },
+  {
+    "key": "S15P21A604-154",
+    "title": "[INFRA] BE·FE CI 파이프라인 구축 (GitLab CI)",
+    "sp": 3, "priority": "Medium", "sprint": "Sprint 4", "version": "v0.1.0-mvp1",
+    "desc": "h3. 작업 목적\ndev/main 머지 품질 게이트를 자동화한다 (이관 후 CI 부재).\n\nh3. 작업 내용\n* .gitlab-ci.yml — BE 테스트(mvn verify)·FE vitest/build\n* 브랜치별 트리거 규칙 (MR 필수)\n\nh3. 완료 조건\n* [ ] MR 에 파이프라인 상태 표시\n* [ ] 실패 시 머지 차단 설정\n\nh3. 선행 작업 / Dependency\n* 없음\n\nh3. 참고\n* docs/17 브랜치 전략\n\nh3. 테스트 방법\n# 의도적 실패 커밋 MR → 차단 확인"
+  }
+]

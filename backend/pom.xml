@@ -141,6 +141,17 @@
             <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          spec 019 GameProject 검증. 계약이 상한·형식·enum을 JSON Schema 2020-12로 정의하고
+          (contracts/game-project-v1.schema.json) quickstart가 fixture manifest 재현을 요구하므로,
+          같은 스키마를 서버가 그대로 읽는 것이 규칙을 손으로 옮겨 적는 것보다 어긋날 여지가 적다.
+          손 순회 층은 스키마가 표현할 수 없는 의미 규칙(참조 무결성·Dialogue)만 담당한다.
+        -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.6</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -54,7 +54,7 @@ devtools Application 탭에서 확인:
 
 ## 알려진 미결 (검증 대상 아님)
 
-- 게스트·refresh·logout endpoint 실경로: BE 계약 미회수 — real api는 명시 오류 placeholder (tasks.md T016).
+- 게스트·refresh·logout endpoint 실경로: 기입 완료(`/api/v1/auth/guest`·`/refresh`·`/logout`, `S15P21A604-90`). 계약 문서는 없고 backend `GuestAuthController` 가 정본이다. 실서버 왕복 검증은 OAuth 자격증명(`-274`) 대기.
 - 게임 라우트(`/app/games/:gameId/edit|play`) 가드 등급: plan 미명시로 보수적 member-only — 재분류 가능성 `router/index.tsx` 주석 참조.
 - 오류 code 값(`OAUTH_HANDOFF_*`, `NICKNAME_REJECTED`)은 관례 명명 — BE 확정 시 mock과 함께 갱신.
 

@@ -22,7 +22,7 @@
 
 **Storage**: Access Token은 JS 메모리만(`shared/api/client.ts:31~36` 기존 구현, docs/26 2026-08-14 결정). **Refresh Token·`oauth_handoff` cookie는 읽지도 저장하지도 않는다**(oauth-completion.md FE 의무 4) — `document.cookie` 접근·`localStorage` 토큰 저장 금지
 
-**Testing**: vitest(`package.json` `test` 스크립트, `entities/layout/__tests__/unit/` 기존 패턴). 컴포넌트 테스트 라이브러리는 미설치 — 순수 모듈·mock 단위 테스트 + quickstart 수동 시나리오로 검증
+**Testing**: vitest(`package.json` `test` 스크립트, `entities/layout/__tests__/unit/` 기존 패턴). 컴포넌트 테스트는 `@testing-library/react`+`jsdom` 으로 가능하다 — `vite.config.ts` 의 기본 환경이 `node` 이므로 `.tsx` 파일 최상단에 `// @vitest-environment jsdom` docblock 을 붙여 개별 전환한다(G-4). 화면 흐름 중 자동화가 어려운 것만 quickstart 수동 시나리오로 검증
 
 **Mock**: `VITE_USE_MOCK=true` + `*.select.ts` 분기(`entities/layout/api.select.ts` 기존 패턴 재사용)
 
@@ -119,7 +119,7 @@ completing ── AUTHENTICATED ──────────→ 토큰 저장 
 
 | 항목 | 현황 | 처리 |
 |---|---|---|
-| 게스트 입장·refresh·logout endpoint 경로 | 확정 계약 3종에 없음. docs/08 §2(`/auth/refresh`·`/auth/logout`)는 spec 충돌 기록 표에서 "계약 재작성 대상" | mock으로 선개발. real `api.ts`의 해당 함수는 경로 미확정 명시 오류로 두고, BE 계약 회수 후 경로만 기입(tasks T016) |
+| 게스트 입장·refresh·logout endpoint 경로 | ✅ 확정 — `POST /api/v1/auth/guest`·`/api/v1/auth/refresh`·`/api/v1/auth/logout`. **계약 문서는 여전히 없고 backend `GuestAuthController` 구현이 정본이다** | `entities/auth/api.ts` 에 기입 완료(`S15P21A604-90`, MR !46). 남은 것은 실서버 수동 검증뿐이고 그것은 OAuth 자격증명(`-274`) 대기다 |
 | 세션 종료 사유별 오류 코드(다른 브라우저 로그인 등) | 계약에 코드 미정의 | 서버 `message` 표시로 시작, 코드 확정 시 분기 추가 |
 | 닉네임 길이·문자 제한 | nickname-policy.md에 없음 | FE 사전 검사는 공백/빈 값만. 서버 응답으로 처리 |
 | US4 마이페이지·닉네임 변경·탈퇴, US5 관리자 | backlog A항목 범위 외, BE 관리자 이연 | 별도 backlog 항목으로 |

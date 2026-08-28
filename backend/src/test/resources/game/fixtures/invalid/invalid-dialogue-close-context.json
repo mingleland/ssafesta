@@ -1,0 +1,11 @@
+{
+  "description": "FULL_SCREEN Dialogue Choice에서 CLOSE_DIALOGUE를 사용하면 거부한다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/scenes/2/nodes/0/choices/0/actions/0/type",
+      "value": "CLOSE_DIALOGUE"
+    }
+  ]
+}

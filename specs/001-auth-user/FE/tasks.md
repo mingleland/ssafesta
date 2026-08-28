@@ -2,7 +2,7 @@
 
 **Input**: [plan.md](plan.md) · [../spec.md](../spec.md) · [../contracts/oauth-completion.md](../contracts/oauth-completion.md) · [../contracts/nickname-policy.md](../contracts/nickname-policy.md)
 
-**Tests**: vitest(기존 `package.json` `test` 스크립트, `entities/layout/__tests__/unit/` 패턴). 컴포넌트 테스트 라이브러리 미설치 — 순수 모듈·mock은 vitest, 화면 흐름은 quickstart 수동 시나리오(Phase 7)로 검증.
+**Tests**: vitest(기존 `package.json` `test` 스크립트, `entities/layout/__tests__/unit/` 패턴). 컴포넌트 테스트는 `@testing-library/react`+`jsdom` 으로 쓴다 — `.tsx` 최상단 `// @vitest-environment jsdom` docblock 으로 개별 전환한다(G-4). 자동화가 어려운 화면 흐름만 quickstart 수동 시나리오(Phase 7)로 검증.
 
 **Organization**: US1(소셜 가입·로그인)·US2(게스트)·US3(세션 유지·종료)는 ../spec.md User Story 번호. US4·US5·US6은 범위 외(plan.md §Summary).
 
@@ -29,7 +29,7 @@
 
 **Purpose**: 모든 US가 딛는 기반. US 착수 전 완료 필수.
 
-- [x] T002 `entities/auth/api.ts` — `complete(body?: {nickname:string})` = `POST /api/v1/auth/oauth/complete`, **`credentials:'include'` 명시**(oauth-completion.md FE 의무 1), `client.ts`의 `api<T>()` 재사용. `guestEnter`·`refresh`·`logout`은 경로 미확정(plan.md §미결) — 호출 시 명시적 오류를 던지는 placeholder로 두고 `// TODO(001-BE): 계약 회수 후 경로 기입` 주석.
+- [x] T002 `entities/auth/api.ts` — `complete(body?: {nickname:string})` = `POST /api/v1/auth/oauth/complete`, **`credentials:'include'` 명시**(oauth-completion.md FE 의무 1), `client.ts`의 `api<T>()` 재사용. `guestEnter`·`refresh`·`logout` 은 착수 시점에 경로가 없어 명시적 오류 placeholder 로 두었고, `S15P21A604-90`(MR !46)에서 실경로(`/api/v1/auth/guest`·`/refresh`·`/logout`)로 교체됐다 — 정본은 backend `GuestAuthController` 구현이다(계약 문서 부재).
   **완료조건**: `complete` 요청에 `credentials:'include'` 포함(코드 리뷰 + T014 테스트). placeholder 3종이 침묵 실패 아닌 명시 오류.
 - [x] T003 `entities/auth/api.mock.ts` — plan.md §Mock 전략 전체: sessionStorage 기반 handoff·가입 계정 집합, 최초 로그인 `NICKNAME_REQUIRED`→닉네임 제출 성공 시 가입 기록+`AUTHENTICATED`(handoff 소비), 기존 회원 즉시 `AUTHENTICATED`(소비), `NICKNAME_REQUIRED` 응답은 handoff 보존(FR-021c), handoff 없음→400·소비 후 재호출→410(`ApiError` 봉투로 throw, `client.ts` 형식), 게스트 fake AT+`expiresAt` 30분(FR-009a), 닉네임 대표 금칙 케이스 소수만(`관리자`·`admin`·정규화 우회 1건 — 전체 목록 전사 금지, plan.md 헌법 16조 판정), "다른 브라우저 로그인" 트리거로 이후 refresh 실패 재현.
   **완료조건**: T014 mock 단위 테스트 전부 green.
@@ -104,7 +104,7 @@
   **완료조건**: `npm test` green, 위 시나리오 각 1개 이상 assert.
 - [x] T015 `FE/quickstart.md` 작성 — 수동 검증 시나리오: ①최초 가입 전 과정 ②재로그인 ③닉네임 실패→재제출 ④400/410→재시작 ⑤게스트 입장·만료·제한 라우트 ⑥새로고침 복원 ⑦다른 브라우저 로그인 종료 안내 ⑧`document.cookie`·storage에 토큰·handoff 부재 확인(FE 의무 4 — devtools 확인 절차 포함).
   **완료조건**: 시나리오 전부 mock 모드 브라우저에서 1회 통과 기록.
-- [ ] T016 **[Blocked-on-BE]** real `api.ts` 경로 기입 — 게스트·refresh·logout endpoint 계약 회수 후 placeholder 교체 + 실서버 수동 검증.
+- [ ] T016 real `api.ts` 경로 기입 + 실서버 수동 검증 — **경로 기입은 완료**(`S15P21A604-90`, MR !46). 남은 것은 실서버 왕복이고 OAuth 자격증명(`S15P21A604-274`) 대기다.
   **완료조건**: BE 계약 문서 인용과 함께 경로 기입, `VITE_USE_MOCK=false`로 ①②⑤ 시나리오 통과.
 
 ---

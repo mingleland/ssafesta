@@ -12,6 +12,7 @@
 | `02-users` | 내 정보·닉네임·탈퇴 | 회원 Access Token |
 | `03-wallet` | 코인 잔액·거래 내역 조회 | 회원 Access Token |
 | `04-booth-lease` | 슬롯 목록·부스 임대·내 부스 | 회원 Access Token, `slotId`/`boothId` 환경변수 |
+| `06-world-session` | 월드 접속 주소·1회용 입장 토큰 발급 | 회원 **또는 게스트** Access Token, 서버에 `CONNECTION_TOKEN_SECRET` |
 | 이후 `03-world`, `04-booth`, `05-wallet` | 도메인 구현 시 추가 | 각 도메인별 값 |
 | `06-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
 
@@ -100,6 +101,7 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 | `부스 임대` | 빈 슬롯을 100코인으로 임대 | `201` + 차감액·잔액. 코인 차감과 임대는 한 트랜잭션 |
 | `내 부스 조회` | 내 부스와 남은 시간 | 임대 이력이 없으면 `204` |
 | `부스 상세 조회` | 방문자 관점 부스 정보 | 만료 시 `409 BOOTH_LEASE_EXPIRED` |
+| `월드 세션 발급` | 접속 주소 + 120초 1회용 입장 토큰 | `endpoint`는 객체(`scheme`/`host`/`port`). 매 호출 새 토큰 — 멱등이 아니다 |
 
 ## 주의
 

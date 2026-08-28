@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordId": "integration-develop-release-43",
+  "targetId": "integration-develop",
+  "candidateReleaseId": "release-43",
+  "previousKnownGoodReleaseId": "release-42",
+  "runId": "festa-develop-43",
+  "state": "ROLLED_BACK",
+  "stages": [{"name": "verify", "status": "FAILED", "failureCode": "VERIFY_NON_AI", "evidenceRef": "verification-result.json"}],
+  "recovery": {"decision": "AUTO_ROLLBACK", "fromReleaseId": "release-43", "toReleaseId": "release-42", "result": "SUCCEEDED", "reason": "safe reversible runtime failure"},
+  "currentReleaseId": "release-42",
+  "startedAt": "2026-08-20T00:00:00Z",
+  "finishedAt": "2026-08-20T00:03:00Z"
+}

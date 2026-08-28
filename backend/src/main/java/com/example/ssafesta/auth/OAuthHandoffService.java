@@ -46,9 +46,15 @@ public class OAuthHandoffService {
         return new MemberSessionService.MemberSession(fields[1], Instant.parse(fields[3]), fields[2]);
     }
 
-    public PendingRegistration consumeRegistration(String handoff) {
-        String[] fields = consume(handoff, Kind.REGISTRATION, 3);
+    /** Reads without spending — {@link #discard} spends it, once the member exists (FR-021c). */
+    public PendingRegistration peekRegistration(String handoff) {
+        String[] fields = read(handoff, Kind.REGISTRATION, 3);
         return new PendingRegistration(OAuthProvider.valueOf(fields[1]), decode(fields[2]));
+    }
+
+    /** Spends the handoff; {@code true} only for the caller whose DEL removed it — one session per handoff. */
+    public boolean discard(String handoff) {
+        return Boolean.TRUE.equals(redis.delete(key(handoff)));
     }
 
     private String store(String... fields) {
@@ -63,14 +69,22 @@ public class OAuthHandoffService {
     }
 
     private String[] consume(String handoff, Kind expected, int fieldCount) {
-        String value = redis.opsForValue().getAndDelete(key(handoff));
+        String[] fields = parse(redis.opsForValue().getAndDelete(key(handoff)), expected, fieldCount);
+        log.info("Consumed OAuth handoff type={}", expected);
+        return fields;
+    }
+
+    private String[] read(String handoff, Kind expected, int fieldCount) {
+        return parse(redis.opsForValue().get(key(handoff)), expected, fieldCount);
+    }
+
+    private String[] parse(String value, Kind expected, int fieldCount) {
         if (value == null) {
             log.warn("OAuth handoff was absent when completion tried to consume it");
             throw new InvalidOAuthHandoffException();
         }
         String[] fields = value.split("\\|", fieldCount);
         if (fields.length != fieldCount || !expected.name().equals(fields[0])) throw new InvalidOAuthHandoffException();
-        log.info("Consumed OAuth handoff type={}", expected);
         return fields;
     }
 

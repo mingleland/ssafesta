@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail; source "$(dirname "$0")/lib.sh"
+: "${DEPLOY_TARGET:?}" "${RELEASE_ID:?}" "${RELEASE_MANIFEST_PATH:?}"
+verify_project() { if [[ "${CI_COMPONENT}" == game && -f festa-unity/ci/verify ]]; then bash festa-unity/ci/verify; else bash infra/deploy/scripts/verify-component.sh; fi; }
+ci_run verify VERIFY_NON_AI ci_dispatch_or verify verify_project

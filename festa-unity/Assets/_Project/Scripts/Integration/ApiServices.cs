@@ -28,7 +28,9 @@ namespace Festa.Integration
         public static void Init(bool useMock, string springBaseUrl, string aiBaseUrl)
         {
             IsMock = useMock;
-            TokenProvider = new EmptyAccessTokenProvider(); // Auth spec 확정 시 실제 구현으로 교체
+            // 실서버 경로는 WebGL 호스트가 SendMessage 로 밀어 넣은 Access Token 을 쓴다 (AuthBridge).
+            // Mock 경로는 헤더를 붙이지 않는다 — Mock 서버는 인증을 요구하지 않는다.
+            TokenProvider = useMock ? new EmptyAccessTokenProvider() : new HostAccessTokenProvider();
 
             if (useMock)
             {
@@ -39,10 +41,10 @@ namespace Festa.Integration
             else
             {
                 Booth = new HttpBoothApiClient(springBaseUrl, TokenProvider);
-                // TODO: HttpUserApiClient / SseAiAgentClient — 해당 기능 spec 작성 후 구현
-                User = new MockUserApiClient();
+                User = new HttpUserApiClient(springBaseUrl, TokenProvider);
+                // TODO: SseAiAgentClient — spec 008 SSE 계약 확정 후 구현
                 Ai = new MockAiAgentClient();
-                Debug.LogWarning("[ApiServices] User/Ai HTTP 구현 전 — Mock으로 대체 중");
+                Debug.LogWarning("[ApiServices] Ai HTTP 구현 전 — Mock으로 대체 중");
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");

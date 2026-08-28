@@ -1,0 +1,60 @@
+meta {
+  name: 월드 세션 발급
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/world-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "worldId": "11F"
+  }
+}
+
+docs {
+  ## 월드 세션 발급 (spec 002 FR-005)
+
+  Unity가 월드에 접속하기 직전에 호출한다. 접속 주소와 **120초 1회용 입장 토큰**을 받는다.
+  Unity는 서버 주소를 하드코딩하지 않고 이 응답의 `endpoint`만 쓴다 (헌법 8조).
+
+  - 인증: **회원 또는 게스트** Access Token (게스트도 둘러보기로 입장한다)
+  - Request body: 전체 생략 가능. `worldId`는 `11F`만 유효하고, `preferredPartyId`는 받되 무시한다
+  - 성공: `200 OK`
+
+  ```json
+  {
+    "sessionId": "ws_...",
+    "worldId": "11F",
+    "channelId": "11F-01",
+    "endpoint": { "scheme": "ws", "host": "127.0.0.1", "port": 7777 },
+    "connectionToken": "<HS256 JWS, 120초>",
+    "expiresAt": "..."
+  }
+  ```
+
+  | 응답 | 뜻 |
+  |---|---|
+  | `400 VALIDATION_FAILED` | `worldId`가 `11F`가 아니다. `errors[0].field`가 `worldId`다 |
+  | `401` | Access Token이 없거나 만료됐다 |
+  | `403` | 정지된 계정이다 |
+
+  ### 확인할 것
+
+  - `endpoint`는 **객체**다. 문자열 하나(`serverEndpoint`)로 오면 안 된다 — Unity가 `scheme`으로 암호화 여부를, `host`로 인증서 검증 대상을 결정한다.
+  - 같은 요청을 두 번 하면 `sessionId`·`connectionToken`이 **매번 다르다.** 1회용이라 멱등이 아니다.
+  - `expiresAt`은 토큰의 `exp`와 같은 시각이다.
+  - 배포 환경에서는 `wss` / `world.<domain>` / `443`이 나온다 (값은 infra가 주입).
+
+  ### 실행 전 필요한 것
+
+  서버에 `CONNECTION_TOKEN_SECRET`(Base64, 32바이트 이상)이 설정돼 있어야 한다. 없으면 **서버가 기동되지 않는다** — 조용히 기본 키로 서명하는 경로를 두지 않았다.
+}

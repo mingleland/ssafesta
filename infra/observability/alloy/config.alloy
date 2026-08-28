@@ -1,0 +1,45 @@
+import.file "redaction" {
+  filename = "/etc/alloy/redaction.alloy"
+}
+
+prometheus.exporter.unix "host" {
+  rootfs_path = "/host/root"
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+}
+
+prometheus.scrape "host" {
+  targets         = prometheus.exporter.unix.host.targets
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.local.receiver]
+}
+
+prometheus.remote_write "local" {
+  endpoint { url = "http://prometheus:9090/api/v1/write" }
+}
+
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "container_logs" {
+  targets = discovery.docker.containers.targets
+  rule { source_labels = ["__meta_docker_container_name"]; regex = "/(.*)"; target_label = "container" }
+  rule { source_labels = ["__meta_docker_container_label_com_docker_compose_service"]; target_label = "service" }
+  rule { source_labels = ["__meta_docker_container_label_com_docker_compose_project"]; target_label = "environment" }
+  rule { replacement = "single-ec2"; target_label = "host" }
+}
+
+redaction.sanitize "before_storage" {
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.container_logs.output
+  forward_to = [redaction.sanitize.before_storage.receiver]
+}
+
+loki.write "local" {
+  endpoint { url = "http://loki:3100/loki/api/v1/push" }
+}

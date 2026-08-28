@@ -23,11 +23,56 @@ namespace Festa.Integration
             _tokenProvider = tokenProvider ?? new EmptyAccessTokenProvider();
         }
 
+        public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
+        {
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}";
+            var body = await GetAsync(url, $"Booth {boothId}", "booth detail");
+            if (body == null) return null;
+
+            var detail = BoothFacadeParser.Parse(body);
+            if (detail == null)
+            {
+                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 상세 응답 JSON 파싱 실패");
+                return null;
+            }
+            return detail;
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
-            // Draft endpoint — doc 08 확정 시 조정
-            var url = $"{_baseUrl}/api/v1/booths/{boothId}/layout/published";
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";
+            return await GetLayoutAsync(url, $"Booth {boothId}");
+        }
 
+        public async Task<BoothLayoutDto> GetPublishedLayoutBySlotAsync(int slotId)
+        {
+            // visitor 경로 — 슬롯을 임차 중인 부스의 공개본을 서버가 풀어서 준다.
+            // 응답 스키마는 booths 경로와 동일 (BE PublishedView 가 BoothLayoutDto 필드명에 맞춰져 있다).
+            var url = $"{_baseUrl}/api/v1/booth-slots/{slotId}/layouts/published";
+            return await GetLayoutAsync(url, $"Slot {slotId}");
+        }
+
+        async Task<BoothLayoutDto> GetLayoutAsync(string url, string who)
+        {
+            var body = await GetAsync(url, who, "published layout");
+            if (body == null) return null;
+
+            var layout = BoothLayoutParser.Parse(body);
+            if (layout == null)
+            {
+                Debug.LogError($"[HttpBoothApiClient] {who}: 응답 JSON 파싱 실패");
+                return null;
+            }
+
+            if (layout.objects.Length == 0)
+                Debug.LogWarning($"[HttpBoothApiClient] {who}: 빈 layout (objects 0개)");
+
+            return layout;
+        }
+
+        /// <summary>GET 공통부. 실패는 예외 대신 null + 로그 (부스 로딩 실패가 클라이언트를 깨지 않게).</summary>
+        async Task<string> GetAsync(string url, string who, string what)
+        {
             using var request = UnityWebRequest.Get(url);
             request.timeout = TimeoutSeconds;
 
@@ -50,7 +95,8 @@ namespace Festa.Integration
                     break;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404:
-                    Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: published layout 없음 (404)");
+                    // 미게시(LAYOUT_NOT_PUBLISHED)도 404 로 온다 — 정상 경로라 warning 이면 충분하다.
+                    Debug.LogWarning($"[HttpBoothApiClient] {who}: {what} 없음 (404)");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError:
@@ -62,17 +108,7 @@ namespace Festa.Integration
                     return null;
             }
 
-            var layout = BoothLayoutParser.Parse(request.downloadHandler.text);
-            if (layout == null)
-            {
-                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 응답 JSON 파싱 실패");
-                return null;
-            }
-
-            if (layout.objects.Length == 0)
-                Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: 빈 layout (objects 0개)");
-
-            return layout;
+            return request.downloadHandler.text;
         }
     }
 }

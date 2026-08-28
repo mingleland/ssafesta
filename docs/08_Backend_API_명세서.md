@@ -76,6 +76,35 @@ Public Endpoint를 제외한 모든 API는 JWT 인증을 기본으로 한다.
   - `CURRENT_REVISION`은 **spec별로 모양이 다르다** — 005(Layout)는 문장(값 소비자 없음), 019(Game Studio)는 **십진수 문자열**이다. 각 spec 계약 문서가 자기 모양을 소유한다.
   - `ApiErrorDetail`에 타입 있는 값 필드는 **추가하지 않는다.** 전 endpoint 공유 스키마인데 값이 필요한 rule이 아직 하나뿐이다. **기계값이 둘 이상 필요한 rule이 나오면 그때 필드로 올린다** (#58 §5 재확정, 2026-08-24).
 
+### 1.3-2 프레임워크 거부의 code (#113, 2026-08-27 확정)
+
+컨트롤러에 닿기 전에 Spring 이 거부한 요청도 같은 봉투로 나온다. **클라이언트 잘못은 전부 4xx 다** —
+여기 있는 어느 것도 `INTERNAL_ERROR` 가 아니다.
+
+| 상황 | status | code |
+|---|---|---|
+| 매핑되지 않은 경로 (미구현 endpoint 포함) | 404 | `NOT_FOUND` |
+| 그 경로가 지원하지 않는 method | 405 | `METHOD_NOT_ALLOWED` |
+| 필수 쿠키·헤더·파라미터 누락, 타입 불일치 | 400 | `VALIDATION_FAILED` |
+| 지원하지 않는 `Content-Type` | 415 | `UNSUPPORTED_MEDIA_TYPE` |
+> **`Accept` 가 JSON 을 허용하지 않으면 이 봉투 자체를 보낼 수 없다.** 예: `Accept: application/xml` 로
+> 부르면 서버는 오류 봉투를 만들어 놓고도 그것을 기록하지 못해 `HttpMediaTypeNotAcceptableException` 이
+> advice 밖으로 새어 나간다. 이 경우 응답 본문은 **우리 계약이 아니다.** 클라이언트는 `application/json` 을
+> 받을 수 있어야 한다. (2026-08-27 최초 작성 시 `406 NOT_ACCEPTABLE` 행을 적었으나 실측에서 성립하지
+> 않아 걷어냈다 — !56 7차 리뷰.)
+
+- **미구현 endpoint 는 404 다.** 서버 장애(`INTERNAL_ERROR`)와 구분되지 않으면 클라이언트가 재시도할지
+  포기할지 정할 수 없다 — `INTERNAL_ERROR` 는 재시도 가능 코드로 정렬돼 있으므로(#104·#48) 미구현 경로를
+  500 으로 답하면 클라이언트가 그것을 재시도한다.
+- 2026-08-27 이전에는 위 표의 네 줄이 **모두 500 `INTERNAL_ERROR`** 였다. `GlobalExceptionHandler` 가 프레임워크
+  거부를 `ResponseStatusException` 으로 매칭했는데, Spring 7 의 프레임워크 예외는 그 클래스가 아니라
+  `ErrorResponse` **인터페이스**로 상태를 싣기 때문이다. Breaking Change 가 아니라 정합 회복이다.
+- 5xx 는 종전대로 `INTERNAL_ERROR` 이고 서버 로그에 error 레벨로 크게 남는다 (T-24).
+- **`code` 가 선언한 status 와 응답 status 는 항상 같다.** `ErrorCode` 는 코드마다 status 를 들고 있고
+  클라이언트는 `code` 로 분기하므로, 둘이 어긋나면 `ErrorCode.status()` 가 그 응답에 대해 거짓이 된다.
+  그래서 서버는 **코드가 선언한 status 로** 답한다. 계약에 코드가 없는 status 는 일반 코드
+  (`VALIDATION_FAILED`)로 답하며, 원래 status 는 debug 로그에 남는다.
+
 ### 1.4 Idempotency
 
 금전·보상·임대 등 중복 위험 요청은 다음 Header 사용을 권장한다.
@@ -98,7 +127,17 @@ Idempotency-Key: <client-generated-uuid>
 
 ### POST `/auth/refresh`
 
-Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
+Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh 정책은 보안 설계에서 확정한다.
+
+**세션이 없으면 `401 INVALID_MEMBER_TOKEN` 이다** (#113, 2026-08-27 확정). 쿠키가 **없는 경우·만료된 경우·
+이미 쓰인 경우**가 전부 같은 코드다 — 사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 두 이름을 주지 않는다.
+
+- 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
+  FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
+  받으며, 이것을 서버 오류로 취급하면 안 된다.
+- 2026-08-27 이전에는 이 세 경우가 모두 **500** 이었다. 방문자 전원이 페이지를 열 때마다 서버 오류 로그를
+  하나씩 남겼다.
+- Origin 이 신뢰 목록과 다르면 쿠키를 보기 전에 `403 UNTRUSTED_ORIGIN` 으로 먼저 거절한다.
 
 ### POST `/auth/logout`
 
@@ -215,7 +254,7 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
 
 ### GET `/booths/mine`
 
-내 Booth와 현재 Lease 조회.
+내 Booth와 현재 Lease 조회. 응답에 **`homepageUrl`**(spec 016 신설)이 포함되며, 이쪽은 공개 여부와 무관하게 **항상 저장값**이다 — 미공개 상태에서도 스튜디오 폼을 프리필해야 하기 때문이다. 미등록이면 `null`.
 
 ### GET `/booths/{boothId}`
 
@@ -234,9 +273,13 @@ Access Token 갱신. Refresh 정책은 보안 설계에서 확정한다.
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   },
-  "publishedLayoutVersion": 4
+  "publishedLayoutVersion": 4,
+  "homepageUrl": "https://my-team-project.example.com"
 }
 ```
+
+- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치). 미등록도 `null`이라 FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+- ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### POST `/booths/{boothId}/leases/extend` — P1
 
@@ -381,6 +424,26 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
 
+### PUT `/booths/{boothId}/homepage` — spec 016 신설
+
+부스 노트북이 여는 홈페이지 주소 등록·수정·해제. **부스당 1개**이며 `booths.homepage_url`에 저장한다 — **Layout JSON에는 넣지 않는다**(C-01·C-02, 2026-08-26 확정 #97). facade와 같이 Draft/Publish를 타지 않고 즉시 반영되며, 방문자 **노출**은 위 `GET /booths/{boothId}`의 게이트가 따로 건다.
+
+```json
+{
+  "homepageUrl": "https://my-team-project.example.com"
+}
+```
+
+→ `200 { "homepageUrl": "https://my-team-project.example.com" }` (저장한 그대로 echo)
+
+- 저장은 **원문 그대로** — trim·정규화·대소문자 변경이 없다(왕복 무손실).
+- `{ "homepageUrl": null }` = **등록 해제**. 빈 문자열 `""`은 해제가 아니라 400이고, **필드가 없는 `{}`도 400**이다 — 해제는 명시적 `null`만 인정한다(직렬화 실수로 URL이 조용히 지워지는 것을 막는다).
+- 검증은 순서대로 첫 위반에서 거부하고 **사유별 다른 문장**을 준다: 필드 부재 → blank → 길이 ≤ 2048 → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. **scheme을 host보다 먼저 본다** — `javascript:`·`data:`는 host가 없어 순서가 뒤바뀌면 스킴 위반이라는 실제 사유가 전달되지 않는다.
+- **`http`를 허용한다**(facade `logoUrl`과 의도적 비대칭) — 로고는 페이지 안에 임베드되어 mixed content로 조용히 죽지만, 홈페이지는 이동 대상이고 iframe이 막히면 새 탭으로 연다. 혼합콘텐츠 경고 UX는 React 몫.
+- 소유자·Staff만 호출할 수 있다(facade·layout과 동일한 편집자 범위). 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 코드·rule 없음.**
+- 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
+- **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
+
 ---
 
 ## 5. Project
@@ -444,13 +507,41 @@ AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 S
 }
 ```
 
+#### 설정 허용값 (2026-08-27 확정 — spec 007 C-12, [GitLab #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112))
+
+세 필드는 자유 문자열이 아니라 **화이트리스트**다. 저장·검증은 Spring이 하고, 값을 해석해 프롬프트를 만드는 것은 FastAPI다.
+
+| 필드 | 허용값 | 뜻 |
+|---|---|---|
+| `role` | `PROJECT_DOCENT` | 전시 프로젝트를 해설한다 |
+| | `GUIDE` | 부스 운영·이용을 안내한다 |
+| `tone` | `FRIENDLY` **(기본)** | 친근한 존댓말 |
+| | `PROFESSIONAL` | 격식체. 정확·중립 |
+| | `ENTHUSIASTIC` | 활기찬 어조 |
+| `responseLength` | `SHORT` | 1~3문장 |
+| | `MEDIUM` **(기본)** | 4~6문장 |
+| | `LONG` | 7~12문장 |
+
+- `responseLength`는 **문장 수** 기준이다. 문단은 길이가 정해지지 않아 기준이 되지 못한다.
+- `responseLength → max_tokens` 매핑은 **AI 파트 소유**다 (제안값 200/400/800, 모델 확정 후 재검증). Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다.
+- `tone`에 길이를 뜻하는 값을 두지 않는다 — `responseLength`와 어긋났을 때 우선순위가 없어진다.
+- **`tone` 값은 고정이 아니다.** 구현 후 튜닝 대상이며, AI 파트가 프롬프트 템플릿 수정으로 먼저 흡수하되 불가피하면 값이 바뀔 수 있다 (#112 AI 회신). 지금은 증감 근거가 없어 3종이다. **값 추가는 가산적이라 안전하지만 삭제·변경은 저장된 데이터를 무효로 만들므로 마이그레이션을 동반한다** — 클라이언트는 이 목록을 하드코딩하지 말고 서버 응답 스키마를 따르는 편이 안전하다.
+
+#### 부스당 AI 직원 수
+
+**1명이다** (spec 007 C-13, 2026-08-27 팀 합의). FE는 목록·다중 선택 없이 **단일 편집 폼**으로 만든다.
+
+부스는 직원을 하나만 두고, 대신 **그 직원의 `role`이 부스 종류에서 갈린다** — 프로젝트 부스면 `PROJECT_DOCENT`, 이벤트 부스면 `GUIDE`. 위 표의 `role`이 정확히 2종인 이유가 이것이다.
+
+> **다만 지금은 `role`을 클라이언트가 보낸다.** 부스 종류가 아직 코드에 없어서(`LayoutTemplate` 값이 `PROJECT_EXHIBITION` 하나) 서버가 파생시키면 `GUIDE`가 도달 불가능한 값이 된다. 부스 종류가 생기면 서버가 종류별 허용 `role`로 좁히며, **값 집합은 그대로라 그때 클라이언트 코드는 바뀌지 않는다** — 고를 수 있는 선택지만 줄어든다.
+
 ---
 
 ## 7. AI Document Metadata / Upload
 
 ### POST `/agents/{agentId}/documents/upload-url`
 
-S3 Presigned Upload URL 발급 구조를 권장한다.
+Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트 합의).
 
 #### Request
 
@@ -458,19 +549,40 @@ S3 Presigned Upload URL 발급 구조를 권장한다.
 {
   "fileName": "project.pdf",
   "contentType": "application/pdf",
-  "size": 1048576
+  "size": 1048576,
+  "contentSha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 }
 ```
 
-#### Response
+`contentSha256` 은 **필수**이며 `^[a-f0-9]{64}$` 를 만족해야 한다. 프론트가 업로드 전 파일 바이트로
+계산해 보낸다. 이 값은 **사전 중복 확인에만** 쓰고, 최종 검증은 FastAPI 가 R2 원본을 다시 해싱해서 한다
+(FR-019, spec 007 C-08). 형식 위반은 `400 VALIDATION_FAILED` 다.
+
+#### Response — 신규
 
 ```json
 {
-  "documentId": 152,
+  "duplicate": false,
+  "documentId": 153,
   "uploadUrl": "<presigned-url>",
-  "s3Key": "booths/7/agents/78/documents/152/project.pdf"
+  "objectKey": "booths/7/agents/78/documents/153/project.pdf"
 }
 ```
+
+#### Response — 중복
+
+```json
+{ "duplicate": true, "documentId": 152 }
+```
+
+- **중복은 오류가 아니다.** 200 으로 답하고 `duplicate` 로 갈린다 — `DOCUMENT_DUPLICATE` 오류 코드는
+  만들지 않는다. 요청 목적(그 파일을 등록하는 것)이 **이미 달성돼 있는** 상태이고, 같은 spec 의 FR-025
+  (중복 처리 요청은 기존 활성 작업을 반환)와 019 Portal 의 `unavailableReason`(#33)이 같은 결이다.
+- 중복일 때 `uploadUrl`·`objectKey` 는 **없다**(키 자체가 빠진다). 프론트는 `duplicate` 로 분기해
+  "이미 등록된 문서입니다" 를 띄우고 기존 `documentId` 를 쓴다.
+- **판정 대상은 같은 Agent 의 `QUEUED`·`PROCESSING`·`READY` 문서뿐**이다. `FAILED`·`DISABLED` 는 제외라
+  실패한 문서와 같은 파일을 다시 올리는 것은 **허용**된다 — 막으면 사용자가 빠져나갈 길이 없다.
+  따라서 같은 (agent, hash) 행이 복수 존재할 수 있고 유일성은 활성 상태 안에서만 성립한다.
 
 ### POST `/documents/{documentId}/complete`
 
@@ -744,6 +856,7 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
+- 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
 상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
 #21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
@@ -768,12 +881,17 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
 | `VALIDATION_FAILED` | 요청 값 오류 (400) |
-| `GAME_NOT_FOUND` *(P2 후보)* | GameProject 없음 또는 접근 불가 |
-| `GAME_REVISION_CONFLICT` *(P2 후보)* | Draft revision 충돌 |
-| `GAME_PROJECT_VALIDATION_FAILED` *(P2 후보)* | Schema 또는 의미 검증 실패 |
-| `GAME_NOT_PUBLISHED` *(P2 후보)* | 실행 가능한 Published Version 없음 |
-| `GAME_PORTAL_UNAVAILABLE` *(P2 후보)* | Portal 연결 해제·비활성·접근 불가 |
-| `GAME_SCHEMA_UNSUPPORTED` *(P2 후보)* | Runtime이 지원하지 않는 schemaVersion |
+| `GAME_NOT_FOUND` *(019)* | Game 없음 |
+| `GAME_DELETED` *(019)* | soft delete된 Game |
+| `GAME_FORBIDDEN` *(019)* | 소유자 아님 — Authoring·비공개 접근 |
+| `GAME_LIMIT_EXCEEDED` *(019)* | 계정당 활성 Game 상한(기본 20) 초과 — `message`가 상한과 해결 방법을 담는다 |
+| `GAME_REVISION_CONFLICT` *(019)* | Draft revision 충돌. `errors[0].rule=CURRENT_REVISION`의 `message`는 **십진수**다 (§1.3) |
+| `GAME_VALIDATION_FAILED` *(019 제안)* | GameProject 검증 실패 (`errors` 배열 동반) — rule 표는 019 계약이 소유 |
+| `GAME_NOT_PUBLISHED` *(019)* | 실행 가능한 Published Version 없음 |
+| `GAME_NOT_PUBLIC` *(019)* | Game이 `PRIVATE` |
+| `GAME_SCHEMA_UNSUPPORTED` *(019)* | 서버·Runtime이 지원하지 않는 schemaVersion |
+| `GAME_PROJECT_INVALID` *(019)* | **저장된** snapshot이 재검증 실패 — 500, 서버 결함 |
+| `CONFIG_NOT_FOUND` *(019)* | Portal `configId`의 Binding 없음. 실행 불가 사유는 오류가 아니라 200 응답의 `unavailableReason`이다 |
 | `AGENT_NOT_FOUND` | Agent 없음 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |

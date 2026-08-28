@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0.0",
+  "releaseId": "broken-release",
+  "scm": {
+    "provider": "github",
+    "repository": "ssafy/festa",
+    "branch": "back",
+    "commit": "short-sha"
+  },
+  "jenkins": {
+    "job": "festa/back",
+    "buildNumber": 0
+  },
+  "components": [
+    {
+      "name": "back",
+      "storageMode": "local-docker",
+      "imageRef": "festa-back:latest",
+      "sourceCommit": "short-sha"
+    }
+  ],
+  "rollbackSafety": {
+    "classification": "SAFE",
+    "dataChange": "none",
+    "dbSchemaChanged": false,
+    "secretOrConfigChanged": false
+  },
+  "createdAt": "not-a-date"
+}

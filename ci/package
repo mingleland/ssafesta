@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail; source "$(dirname "$0")/lib.sh"
+package_project() {
+  if [[ "${CI_COMPONENT}" == game ]]; then bash festa-unity/ci/package; return; fi
+  local dockerfile="${COMPONENT_DOCKERFILE:-Dockerfile}" context="${COMPONENT_BUILD_CONTEXT:-.}"
+  IMAGE_NAME="${IMAGE_NAME:-festa-${CI_COMPONENT}}" IMAGE_TAG="${CI_COMMIT_SHA}" DOCKERFILE="${dockerfile}" BUILD_CONTEXT="${context}" \
+    bash infra/deploy/scripts/package-local-image.sh
+}
+ci_run package PACKAGE_FAILED ci_dispatch_or package package_project

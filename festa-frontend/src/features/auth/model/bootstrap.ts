@@ -15,10 +15,10 @@ export async function bootstrapAuth(): Promise<void> {
   started = true;
   installUnauthorizedHandler();
   try {
+    // 성공 판정은 "예외 없음"이다(BE GuestTokenResponse 에 status 가 없다).
+    // 게스트·비로그인은 refresh_token 쿠키가 없어 여기서 실패하고 조용히 anonymous 로 남는다.
     const result = await authApi.refresh();
-    if (result.status === 'AUTHENTICATED') {
-      setMemberSession(result.accessToken, result.expiresAt);
-    }
+    setMemberSession(result.accessToken, result.expiresAt);
   } catch {
     // RT 부재·만료·게스트 등 — 조용히 anonymous로 남는다
   } finally {

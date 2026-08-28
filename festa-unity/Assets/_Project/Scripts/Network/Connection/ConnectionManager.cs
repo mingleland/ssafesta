@@ -80,6 +80,32 @@ namespace Festa.Network
             return ok;
         }
 
+        /// <summary>
+        /// 개발용 Host — 서버와 클라이언트를 한 인스턴스에서 띄운다.
+        ///
+        /// 배포 구조는 Dedicated Server 이고 Host 는 쓰지 않는다. 다만 스폰·이동·상호작용을
+        /// 에디터 하나로 검증할 때는 인스턴스 두 개를 띄우는 것보다 빠르고, 승인 콜백과
+        /// 스폰 슬롯 배정이 클라이언트와 **같은 경로**를 타므로 검증 가치가 유지된다.
+        /// 원격 표현(다른 사람 아바타)까지 보려면 인스턴스가 둘 필요하다 — 그때는
+        /// Server + Client 를 쓴다.
+        /// </summary>
+        public bool StartHost(ConnectionPayload payload)
+        {
+            var nm = NetworkManager.Singleton;
+            var transport = nm.GetComponent<UnityTransport>();
+
+            transport.UseWebSockets = true;
+            transport.UseEncryption = false;
+            transport.SetConnectionData("127.0.0.1", _hostPort, "0.0.0.0");
+            nm.NetworkConfig.ConnectionData = Encoding.UTF8.GetBytes(JsonUtility.ToJson(payload));
+
+            bool ok = nm.StartHost();
+            Debug.Log($"[ConnectionManager] StartHost ws://127.0.0.1:{_hostPort} → {ok}");
+            return ok;
+        }
+
+        const ushort _hostPort = 7777;
+
         public void Shutdown()
         {
             NetworkManager.Singleton.Shutdown();
@@ -135,11 +161,13 @@ namespace Festa.Network
                             ulong clientId, ConnectionPayload payload)
         {
             SessionDataStore.Set(clientId, payload);
+            int slot = AcquireSpawnSlot(clientId);
             response.Approved = true;
             response.CreatePlayerObject = true;
-            response.Position = GetSpawnPosition(clientId);
+            response.Position = GetSpawnPosition(slot);
             response.Rotation = Quaternion.identity;
-            Debug.Log($"[ConnectionManager] Approved client={clientId} nickname={payload.nickname}");
+            Debug.Log($"[ConnectionManager] Approved client={clientId} slot={slot} " +
+                      $"pos={response.Position} nickname={payload.nickname}");
         }
 
         static void Deny(NetworkManager.ConnectionApprovalResponse response, string reason)
@@ -149,12 +177,64 @@ namespace Festa.Network
             Debug.LogWarning($"[ConnectionManager] Denied: {reason}");
         }
 
-        static Vector3 GetSpawnPosition(ulong clientId)
+        // ---------- 스폰 ----------
+        //
+        // 슬롯을 `clientId` 로 계산하면 안 된다. clientId 는 서버 프로세스가 사는 동안
+        // 접속마다 증가하므로(1, 2, 3 …) **재접속할 때마다 스폰 자리가 옮겨간다.**
+        // 그래서 비어 있는 가장 낮은 슬롯을 배정하고 끊길 때 반납한다 — 혼자 테스트하면
+        // 항상 0번, 같은 자리다. 40명이 함께 있어도 슬롯은 겹치지 않는다.
+
+        const int SpawnColumns = 8;
+        const int SpawnRows = 5;
+        // 아바타 지름이 4.4 unit(반지름 2.2) 이므로 간격이 그보다 커야 겹치지 않는다.
+        // 이전 값 2.25 는 지름의 절반이어서 스폰 순간 서로 파묻혔다 — Player↔Player 충돌을
+        // 꺼 둔 덕에 통과했을 뿐이다.
+        const float SpawnSpacing = 5f;
+        // 중심을 (-75, -235) 에서 (-85, -234) 로 1 m 옮겼다. 간격을 2.25 → 5 로 넓히자
+        // 격자 동쪽 열이 `SSAFY-center` 구조물을 물었고, 일부 슬롯은 그 **위에** 접지해
+        // y 13.7 로 잡혔다. 바닥 전체를 훑어 40 슬롯이 모두 바닥에 닿고 아무것도 물지 않는
+        // 중심을 찾은 결과다 (조건 충족 후보 630곳 중 원래 자리에 가장 가까운 곳).
+        // 2026-08-28 (S15P21A604-283): 입장 게이트가 생기면서 (-85,-234) → (-12,-238) 로 옮겼다.
+        // 게이트는 엘리베이터 안에서 문이 열리는 연출로 끝나는데, 스폰이 로비 한복판이면
+        // 「엘리베이터에서 내렸다」가 성립하지 않는다. 격자 동쪽 열이 x=5.5 로 엘리베이터
+        // 문(x=17)에서 11.5 unit(1.15 m) 앞, Seal_East_02(x=9.02) 와도 겹치지 않는다.
+        // 위 원칙(40 슬롯 전부 바닥 접지·아바타 반경 무간섭)은 같은 스캔으로 재검증했다.
+        static readonly Vector3 SpawnCenter = new Vector3(-12f, 0f, -238f);
+        const float SpawnProbeHeight = 30f;   // 바닥 탐색 레이 시작 높이
+        const float SpawnGroundOffset = 0.1f; // 바닥에 살짝 띄운다 — 첫 프레임 파묻힘 방지
+        const float SpawnFallbackY = 0.5f;
+
+        static readonly System.Collections.Generic.Dictionary<ulong, int> SpawnSlots = new();
+
+        static int AcquireSpawnSlot(ulong clientId)
         {
-            // 스폰 겹침 방지용 간단 분산. 월드 스폰 존 확정 시 교체.
-            // Y=1: 캡슐 피벗이 중심이므로 바닥(Y=0) 위에 서려면 1m 올려야 한다.
-            float angle = clientId * 0.618034f * Mathf.PI * 2f;
-            return new Vector3(Mathf.Cos(angle) * 2f, 1f, Mathf.Sin(angle) * 2f);
+            if (SpawnSlots.TryGetValue(clientId, out int existing)) return existing;
+
+            var used = new System.Collections.Generic.HashSet<int>(SpawnSlots.Values);
+            int slot = 0;
+            while (used.Contains(slot)) slot++;
+            SpawnSlots[clientId] = slot;
+            return slot;
+        }
+
+        static Vector3 GetSpawnPosition(int slot)
+        {
+            // 슬롯 수를 넘으면 감싼다 — 정원(MaxPlayers)이 격자보다 커지는 경우의 안전장치.
+            slot %= SpawnColumns * SpawnRows;
+            int column = slot % SpawnColumns;
+            int row = slot / SpawnColumns;
+            float x = SpawnCenter.x + (column - (SpawnColumns - 1) * 0.5f) * SpawnSpacing;
+            float z = SpawnCenter.z + (row - (SpawnRows - 1) * 0.5f) * SpawnSpacing;
+
+            // 바닥 y 를 물리로 찾는다. 상수로 박으면 모델·임포트 설정이 바뀔 때 조용히 어긋난다 —
+            // 실제로 메시 압축 도입에서 바닥이 0.0822 → 0.0855 로 움직였다.
+            var probe = new Vector3(x, SpawnCenter.y + SpawnProbeHeight, z);
+            if (Physics.Raycast(probe, Vector3.down, out var hit, SpawnProbeHeight * 2f))
+                return new Vector3(x, hit.point.y + SpawnGroundOffset, z);
+
+            Debug.LogWarning($"[ConnectionManager] 스폰 슬롯 {slot} 아래에 바닥이 없다 — 폴백 y 사용. " +
+                             "월드 콜라이더가 로드됐는지 확인해라.");
+            return new Vector3(x, SpawnFallbackY, z);
         }
 
         void OnConnectionEvent(NetworkManager nm, ConnectionEventData data)
@@ -162,6 +242,7 @@ namespace Festa.Network
             if (data.EventType == ConnectionEvent.ClientDisconnected && nm.IsServer)
             {
                 SessionDataStore.Remove(data.ClientId);
+                SpawnSlots.Remove(data.ClientId); // 반납 — 다음 접속이 같은 자리를 다시 쓴다
                 Debug.Log($"[ConnectionManager] Client {data.ClientId} disconnected, session cleaned");
             }
         }

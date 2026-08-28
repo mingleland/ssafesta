@@ -1,0 +1,17 @@
+name: festa-dev-ai
+services:
+  ai:
+    image: ${COMPONENT_IMAGE_REF:?}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${AI_HOST_PORT:-8000}:8000"]
+    networks: [ai]
+    volumes: [ai_data:/app/data]
+    mem_limit: ${AI_MEMORY_LIMIT:-1g}
+    cpus: ${AI_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+networks: { ai: {} }
+volumes: { ai_data: {} }

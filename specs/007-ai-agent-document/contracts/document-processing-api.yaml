@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA AI Document Processing API
-  version: 0.1.0
-  description: Spring이 업로드를 확정한 문서를 FastAPI 처리 Job으로 접수하고 내부 진단 상태를 조회하는 계약이다.
+  version: 0.3.0
+  description: Spring이 Business DB에서 검증한 문서·저장소 snapshot을 FastAPI Job으로 접수하고, 삭제·비활성화 artifact를 멱등 정리하며 내부 진단 상태를 조회하는 계약이다. FastAPI는 Business DB를 직접 조회하지 않는다.
 servers:
   - url: /ai/v1
 security:
@@ -38,6 +38,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
   /documents/{documentId}/status:
     get:
       operationId: getInternalDocumentJobStatus
@@ -59,12 +61,58 @@ paths:
                 $ref: '#/components/schemas/DocumentJobStatusResponse'
         '404':
           description: Job 없음
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
+  /documents/{documentId}/artifacts:
+    delete:
+      operationId: cleanupDocumentArtifacts
+      summary: 삭제·비활성화 문서의 AI Job·Chunk 정리
+      description: 같은 documentId를 반복 호출해도 204를 반환한다. 활성 Job은 CANCELLED로 전환하고 Chunk를 제거한다.
+      parameters:
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: reason
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [DOCUMENT_DELETED, DOCUMENT_DISABLED]
+      responses:
+        '204':
+          description: 신규 또는 이미 완료된 cleanup 성공
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
+  /documents/reconciliation:
+    post:
+      operationId: reconcileDocumentInventory
+      summary: Business DB 활성 문서 inventory와 AI DB artifact 정합화
+      description: Spring이 한 시점의 전체 활성 문서 inventory를 전달한다. 같은 runId를 반복 전송해도 멱등하며, FastAPI는 전체 집합과 비교한 뒤 cleanup과 불일치 경고를 수행한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentInventoryRequest'
+      responses:
+        '200':
+          description: 멱등 reconciliation 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentInventoryResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류 또는 반대 방향 토큰 사용
 components:
   securitySchemes:
     serviceToken:
       type: http
       scheme: bearer
       bearerFormat: opaque-service-token
+      description: INTERNAL_SPRING_TO_AI_TOKENS의 첫 값을 Spring이 송신하고 FastAPI가 목록 전체를 상수 시간으로 검증한다.
   schemas:
     JobStatus:
       type: string
@@ -72,7 +120,7 @@ components:
     ProcessDocumentRequest:
       type: object
       additionalProperties: false
-      required: [documentId, boothId, agentId, s3Key, sourceHash]
+      required: [documentId, boothId, agentId, originalFilename, contentType, fileSizeBytes, storageProvider, storageBucket, objectKey, sourceHash]
       properties:
         documentId:
           type: integer
@@ -83,7 +131,24 @@ components:
         agentId:
           type: integer
           format: int64
-        s3Key:
+        originalFilename:
+          type: string
+          minLength: 1
+          maxLength: 255
+        contentType:
+          type: string
+          enum: [application/pdf, text/markdown, text/plain]
+        fileSizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 20971520
+        storageProvider:
+          type: string
+          enum: [R2, MINIO_LOCAL]
+        storageBucket:
+          type: string
+          minLength: 1
+        objectKey:
           type: string
           minLength: 1
         sourceHash:
@@ -105,6 +170,53 @@ components:
         existing:
           type: boolean
           description: 활성 Job을 재사용했으면 true
+    DocumentInventoryItem:
+      type: object
+      additionalProperties: false
+      required: [documentId, boothId, agentId, sourceHash, status]
+      properties:
+        documentId:
+          type: integer
+          format: int64
+        boothId:
+          type: integer
+          format: int64
+        agentId:
+          type: integer
+          format: int64
+        sourceHash:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        status:
+          type: string
+          enum: [QUEUED, PROCESSING, READY]
+    DocumentInventoryRequest:
+      type: object
+      additionalProperties: false
+      required: [runId, documents]
+      properties:
+        runId:
+          type: string
+          minLength: 1
+          maxLength: 100
+        documents:
+          type: array
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/DocumentInventoryItem'
+    DocumentInventoryResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, cleanedDocumentCount, mismatchCount]
+      properties:
+        runId:
+          type: string
+        cleanedDocumentCount:
+          type: integer
+          minimum: 0
+        mismatchCount:
+          type: integer
+          minimum: 0
     DocumentJobStatusResponse:
       type: object
       additionalProperties: false

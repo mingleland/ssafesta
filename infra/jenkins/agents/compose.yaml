@@ -1,0 +1,91 @@
+name: festa-jenkins-agents
+
+x-agent: &agent
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      JENKINS_INBOUND_AGENT_IMAGE: ${JENKINS_INBOUND_AGENT_IMAGE:?load infra/versions.env}
+      DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:?load infra/versions.env}
+  image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
+  restart: unless-stopped
+  user: jenkins
+  networks:
+    - jenkins-control
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  linux-docker-agent:
+    <<: *agent
+    profiles: [linux-docker]
+    container_name: festa-jenkins-agent-linux-docker
+    command:
+      - -url
+      - http://jenkins-controller:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_LINUX_DOCKER:?set in infra/.env}
+      - -name
+      - linux-docker
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/linux-docker
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - linux_docker_workspace:/home/jenkins/agent/linux-docker
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+
+  deploy-agent:
+    <<: *agent
+    profiles: [deploy]
+    container_name: festa-jenkins-agent-deploy
+    command:
+      - -url
+      - http://jenkins-controller:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_DEPLOY:?set in infra/.env}
+      - -name
+      - deploy
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/deploy
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+    volumes:
+      - deploy_workspace:/home/jenkins/agent/deploy
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+
+  unity-agent:
+    <<: *agent
+    profiles: [unity]
+    container_name: festa-jenkins-agent-unity
+    command:
+      - -url
+      - http://jenkins-controller:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_UNITY:?set in infra/.env}
+      - -name
+      - unity
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/unity
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      UNITY_EDITOR_ROOT: /opt/unity
+    volumes:
+      - unity_workspace:/home/jenkins/agent/unity
+      - unity_home:/home/jenkins
+      - ${UNITY_EDITOR_ROOT:-/opt/unity}:/opt/unity:ro
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+
+volumes:
+  linux_docker_workspace:
+  deploy_workspace:
+  unity_workspace:
+  unity_home:
+
+networks:
+  jenkins-control:
+    name: festa-jenkins-control
+    external: true

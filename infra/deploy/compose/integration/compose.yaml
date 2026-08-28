@@ -1,0 +1,41 @@
+name: festa-integration
+services:
+  ai:
+    image: ${AI_IMAGE_REF:?AI_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: integration
+      BACK_BASE_URL: ${BACK_BASE_URL:?BACK_BASE_URL is required}
+    volumes: [ai-data:/app/data]
+  back:
+    image: ${BACK_IMAGE_REF:?BACK_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: integration
+      AI_BASE_URL: ${AI_BASE_URL:?AI_BASE_URL is required}
+    volumes: [back-data:/app/data]
+  front:
+    image: ${FRONT_IMAGE_REF:?FRONT_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: integration
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required}
+    ports: ["127.0.0.1:${FRONT_LOOPBACK_PORT:-18080}:8080"]
+  game:
+    image: ${GAME_IMAGE_REF:?GAME_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: integration
+      WORLD_SESSION_ENDPOINT_MODE: dynamic
+    volumes: [game-data:/app/data]
+networks:
+  integration-private:
+    name: festa-integration-private
+volumes:
+  ai-data: {name: festa-integration-ai-data}
+  back-data: {name: festa-integration-back-data}
+  game-data: {name: festa-integration-game-data}

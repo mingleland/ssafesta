@@ -77,7 +77,24 @@ public class BoothQueryService {
                 .orElseThrow(() -> new BoothExpiredException(boothId));
         return new PublicBoothView(booth.getId(), lease.getSlotId(), booth.getName(),
                 lease.getStatus().name(), true, lease.getEndsAt(),
-                BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion());
+                BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion(),
+                visibleHomepageUrl(booth));
+    }
+
+    /**
+     * "Only while the booth is public" (spec 016 FR-003), read as <b>only while a published layout
+     * exists</b>.
+     *
+     * <p>The laptop is an object inside the published layout, so that predicate lines up exactly
+     * with the moment a visitor could click it — there is no window where the URL is readable but
+     * unreachable. An unregistered URL is {@code null} too, which lets the overlay decide
+     * "unregistered or unpublished" from one value instead of two (FR-009, research R-05).
+     *
+     * <p>Expiry needs no branch here: {@link #findPublicBooth} has already refused with
+     * {@code BOOTH_LEASE_EXPIRED} by this point.
+     */
+    private String visibleHomepageUrl(Booth booth) {
+        return booth.getPublishedLayoutVersion() == null ? null : booth.getHomepageUrl();
     }
 
     public record SlotView(Long slotId, String slotCode, short floorNo, String type, String status,
@@ -96,13 +113,20 @@ public class BoothQueryService {
         }
     }
 
-    public record MyBoothView(Long boothId, String name, String status, LeaseView lease) {
+    /**
+     * @param homepageUrl the stored value, <b>never gated</b> — unlike {@link PublicBoothView}. The
+     *        owner of an unpublished booth still has to see their own URL to edit it, and this
+     *        surface is already theirs alone (spec 016 research R-06)
+     */
+    public record MyBoothView(Long boothId, String name, String status, LeaseView lease,
+                              String homepageUrl) {
 
         static MyBoothView of(Booth booth, BoothLease lease, BoothSlot slot, Instant now) {
             // The booth stays even when the lease is over — its content is preserved (FR-010).
             return new MyBoothView(booth.getId(), booth.getName(),
                     lease == null ? BoothStatus.INACTIVE.name() : BoothStatus.ACTIVE.name(),
-                    lease == null ? null : LeaseView.of(lease, slot, now));
+                    lease == null ? null : LeaseView.of(lease, slot, now),
+                    booth.getHomepageUrl());
         }
     }
 
@@ -121,6 +145,7 @@ public class BoothQueryService {
      */
     public record PublicBoothView(Long boothId, Long slotId, String name, String leaseStatus,
                                   boolean entryAvailable, Instant endsAt,
-                                  BoothFacadeService.FacadeView facade, Integer publishedLayoutVersion) {
+                                  BoothFacadeService.FacadeView facade, Integer publishedLayoutVersion,
+                                  String homepageUrl) {
     }
 }

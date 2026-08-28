@@ -8,7 +8,7 @@
 // 정상 동작한다.
 
 import type { ApiError } from '../../shared/api/client';
-import type { OAuthCompleteResponse } from './types';
+import type { OAuthCompleteResponse, TokenResponse } from './types';
 
 function apiError(code: string, message: string): ApiError {
   return { code, message, requestId: `mock_${Date.now()}`, errors: [], warnings: [] };
@@ -121,15 +121,15 @@ export async function complete(body?: { nickname: string }): Promise<OAuthComple
 
 const GUEST_TTL_MS = 30 * 60_000; // FR-009a
 
-export async function guestEnter(): Promise<OAuthCompleteResponse> {
+export async function guestEnter(): Promise<TokenResponse> {
   state.sessionMeta = { kind: 'guest', otherBrowserLogin: false };
   persistState();
   const accessToken = `mock-at-guest-${Date.now()}`;
   const expiresAt = new Date(Date.now() + GUEST_TTL_MS).toISOString();
-  return { status: 'AUTHENTICATED', accessToken, expiresAt };
+  return { accessToken, expiresAt };
 }
 
-export async function refresh(): Promise<OAuthCompleteResponse> {
+export async function refresh(): Promise<TokenResponse> {
   const meta = state.sessionMeta;
   // 게스트는 재발급 대상이 아니다(FR-009a) — member가 아니거나 다른 브라우저 로그인 트리거가 서면 실패
   if (!meta || meta.kind !== 'member' || meta.otherBrowserLogin) {
@@ -137,7 +137,7 @@ export async function refresh(): Promise<OAuthCompleteResponse> {
   }
   const accessToken = `mock-at-member-refreshed-${Date.now()}`;
   const expiresAt = new Date(Date.now() + 30 * 60_000).toISOString();
-  return { status: 'AUTHENTICATED', accessToken, expiresAt };
+  return { accessToken, expiresAt };
 }
 
 export async function logout(): Promise<void> {
