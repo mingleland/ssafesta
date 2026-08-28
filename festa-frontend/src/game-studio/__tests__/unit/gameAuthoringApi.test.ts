@@ -3,6 +3,7 @@ import type { GameApiRequest } from '../../runtime/ports/publishedGameRepository
 import {
   createApiGameDraftRepository,
   createApiGamePublisher,
+  normalizeGameAuthoringError,
 } from '../../studio/ports/gameAuthoringApi.ts';
 import { cloneMinimalGameProject } from '../fixtures/minimalGameProject.ts';
 
@@ -10,6 +11,16 @@ describe('Game authoring API adapter', () => {
   it('normalizes a 204 Draft response to null', async () => {
     const request: GameApiRequest = async <T>() => undefined as T;
     await expect(createApiGameDraftRepository(request).load(123)).resolves.toBeNull();
+  });
+
+  // 서버 공통 코드는 INTERNAL_ERROR다(#104 BE 확정). INTERNAL_SERVER_ERROR로 적혀 있던 동안
+  // 재시도 분기가 죽어 있었으므로, 이름이 다시 어긋나면 이 테스트가 잡는다.
+  it('marks the server internal error code as retryable', () => {
+    const envelope = (code: string) => ({ code, message: '서버 오류', errors: [], warnings: [] });
+
+    expect(normalizeGameAuthoringError(envelope('INTERNAL_ERROR')).retryable).toBe(true);
+    expect(normalizeGameAuthoringError(envelope('UNKNOWN')).retryable).toBe(true);
+    expect(normalizeGameAuthoringError(envelope('GAME_FORBIDDEN')).retryable).toBe(false);
   });
 
   it('sends expectedRevision and returns the server revision', async () => {
