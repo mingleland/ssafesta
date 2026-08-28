@@ -42,8 +42,11 @@
 **Acceptance Scenarios**:
 
 1. **Given** 부스 Owner, **When** 다른 사용자를 직원으로 초대하면, **Then** 그 사용자가 부스 운영에 참여할 수 있다.
-2. **Given** 직원, **When** 권한을 벗어난 작업을 시도하면, **Then** 거부된다.
+2. **Given** `CONSULTANT` 직원, **When** Booth Studio의 Layout·Facade 편집을 시도하면, **Then** 거부된다.
 3. **Given** Owner가 아닌 직원, **When** 임대 결제·취소·양도를 시도하면, **Then** 거부된다 (D10).
+4. **Given** 초대받은 사용자, **When** 본인의 직원 초대 목록을 조회하면, **Then** 수락에 필요한 대기 중 초대 ID를 확인할 수 있다.
+5. **Given** 대기 중인 직원 초대, **When** 부스 Owner가 취소하면, **Then** 해당 초대는 더 이상 수락할 수 없다.
+6. **Given** Owner 또는 직원, **When** 부스 직원 목록을 조회하면, **Then** 변경·삭제할 수 없는 `OWNER` 행과 등록된 직원 목록을 함께 확인할 수 있다.
 
 ### Edge Cases
 
@@ -60,7 +63,7 @@
 ### Functional Requirements
 
 - **FR-001**: Owner는 다른 사용자를 직원으로 초대할 수 있어야 한다.
-- **FR-002**: 직원은 역할별 권한(`ADMIN / CONTENT_EDITOR / CONSULTANT`)을 가져야 한다.
+- **FR-002**: 직원은 역할별 권한(`ADMIN / CONTENT_EDITOR / CONSULTANT`)을 가져야 한다. Booth Studio의 Layout·Facade 편집은 `ADMIN`과 `CONTENT_EDITOR`만 가능하며, `CONSULTANT`는 편집할 수 없다.
 - **FR-003**: **Lease 결제·취소·양도는 Owner만** 가능해야 한다 (D10). 공동 소유권은 제공하지 않는다.
 - **FR-004**: 직원은 상담 상태(`AVAILABLE / BUSY / AWAY / OFFLINE`)를 가져야 한다.
 - **FR-005**: 방문자는 AI 대화 중 사람 상담을 요청할 수 있어야 한다.
@@ -73,10 +76,14 @@
 - **FR-012**: 상담방·Presence·실시간 연결은 **Spring/Realtime**이 소유한다. AI 요약 생성은 FastAPI가 담당한다 (헌법 1조).
 - **FR-013**: 상담 원문 저장은 최소화하고 보존 기간을 정해야 한다 (D11).
 - **FR-014**: 게스트는 사람 상담을 요청할 수 없어야 한다 [NEEDS CLARIFICATION: 허용할지].
+- **FR-015**: 직원 초대는 생성 시점부터 **48시간** 동안 유효하며, 만료 후에는 수락할 수 없어야 한다.
+- **FR-016**: 회원은 `GET /staff-invitations/mine`으로 **본인에게 온 대기 중 직원 초대만** 조회할 수 있어야 한다.
+- **FR-017**: 부스 Owner는 대기 중인 직원 초대를 취소할 수 있어야 한다. 초대받은 사용자의 거절 API는 제공하지 않으며, 수락하지 않은 초대는 48시간 후 만료된다.
+- **FR-018**: `GET /booths/{boothId}/staff`는 부스 Owner를 역할 `OWNER`의 읽기 전용 행으로 포함해야 한다. Owner는 `booth_staffs`에 저장하지 않으며 역할 변경·삭제 대상이 아니다.
 
 ### Key Entities
 
-- **Staff**: 부스 직원. 부스, 사용자, 역할, 상담 상태
+- **Staff**: 부스 직원. 부스, 사용자, 역할, 상담 상태. Owner는 Staff 저장 행이 아니며 직원 목록 응답에서만 읽기 전용 `OWNER`로 표현한다.
 - **Consultation Request**: 상담 요청. 방문자, 부스, 요청 시각, 상태(요청/수락/거절/만료)
 - **Consultation**: 진행 중/완료된 상담. 방문자, 직원, 시작·종료 시각, 요약 참조
 - **Handoff Summary**: AI 대화 요약. 대화 참조, 요약 텍스트
@@ -95,6 +102,14 @@
 
 ## Clarifications
 
+### Session 2026-08-28
+
+- Q: 직원 초대는 생성 후 얼마 동안 수락 가능해야 하는가? → A: 48시간
+- Q: 초대받은 사용자가 수락에 필요한 invitationId를 어떻게 확인해야 하는가? → A: `GET /staff-invitations/mine` 신설
+- Q: 직원 역할별 Booth Studio 편집 권한을 어떻게 적용해야 하는가? → A: `ADMIN`, `CONTENT_EDITOR`만 편집 가능
+- Q: 대기 중인 직원 초대의 취소·거절 기능을 어디까지 포함해야 하는가? → A: Owner 취소만 제공
+- Q: 부스 직원 목록 응답에 Owner도 포함해야 하는가? → A: 역할 `OWNER`의 변경·삭제 불가 행으로 포함
+
 | # | 질문 | 담당 | 메모 |
 |---|---|---|---|
 | C-01 | 상담 요청 만료 시간은? | 기획 | 무한 대기 방지 |
@@ -103,6 +118,11 @@
 | C-04 | 게스트의 사람 상담 허용 여부 | 기획 | |
 | C-05 | 실시간 연결 방식은? | BE | 헌법상 게임 서버와 분리 |
 | C-06 | 한 직원이 동시에 몇 건까지 상담하는가? | 기획 | |
+| C-07 | 직원 초대 만료 시간은? | BE | **48시간으로 확정** |
+| C-08 | 초대받은 사용자의 초대 조회 경로는? | BE | **`GET /staff-invitations/mine` 신설** |
+| C-09 | 역할별 Booth Studio 편집 권한은? | BE | **`ADMIN`, `CONTENT_EDITOR`만 가능. `CONSULTANT`는 불가** |
+| C-10 | 대기 중 초대의 취소·거절 범위는? | BE | **Owner 취소만 제공. 초대받은 사용자 거절 API는 제외** |
+| C-11 | 부스 직원 목록에 Owner를 포함하는가? | BE | **읽기 전용 `OWNER` 행으로 포함. 변경·삭제 불가** |
 
 ---
 
