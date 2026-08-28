@@ -67,7 +67,7 @@ S15P21A604-177(방문자 조회) 몫이다.
 
 | 본문 | 뜻 |
 |---|---|
-| `{"description": "새 설명"}` | `description`만 교체, 나머지 8필드 유지 |
+| `{"description": "새 설명"}` | `description`만 교체, 나머지 6필드 유지 |
 | `{"description": null}` | `description` 삭제, 나머지 유지 |
 | `{}` | **400** — 조용한 no-op을 만들지 않는다 |
 

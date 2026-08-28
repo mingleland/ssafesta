@@ -18,6 +18,12 @@
 | `GET /api/v1/booths/{boothId}/projects` (편집자) | -110 | §3 |
 | `PATCH /api/v1/projects/{projectId}` | -110 | §4 |
 | 방문자 조회 (published 게이트 + 좋아요 수) | **-177** | 범위 밖 |
+| ~~`GET /api/v1/projects/{projectId}`~~ | — | **만들지 않는다** (아래) |
+
+> **`docs/08` §5에 있던 `GET /projects/{projectId}`(상세 조회)는 신설하지 않는다.**
+> 부스당 프로젝트가 1개이므로(C-01) `GET /booths/{boothId}/projects`가 같은 값을 이미 준다 —
+> 소유자는 자기 부스 번호를 알고, 방문자 경로는 -177이 부스 기준으로 설계한다. `projectId`로
+> 직접 여는 화면이 생기면 그때 가산적으로 추가한다. `docs/08` §5를 갱신할 때 이 줄을 함께 옮긴다.
 
 **부스당 프로젝트는 1개다** (C-01). 목록 endpoint는 그래도 **배열**을 돌려준다 — 0개 또는 1개.
 
@@ -26,7 +32,18 @@
 ## 1. 공통
 
 - 인증: `Authorization: Bearer <Access Token>`. **회원만** — 게스트는 `403 MEMBER_ONLY` (헌법 12조)
-- 편집 권한: 부스 **소유자 또는 스태프** (facade·layout과 같은 편집자 범위)
+- 편집 권한: 부스 **소유자 또는 스태프** — `BoothEditorGuard.requireEditor`가 판정하며
+  facade·layout과 **정확히 같은 범위**다
+
+> ⚠️ **직원 역할 게이트는 이 계약이 걸지 않는다.** spec 011 C-09(2026-08-28 확정)가
+> *"Booth Studio의 Layout·Facade 편집은 `ADMIN`·`CONTENT_EDITOR`만, `CONSULTANT`는 불가"* 로
+> 정했는데, 현재 `BoothEditorGuard`는 `booth_staffs`에 행이 있는지만 보고 **`role`을 읽지 않는다.**
+> 005·016도 같은 상태다.
+>
+> **역할 게이트는 011 구현 시 `BoothEditorGuard` 한 곳에서 일괄로 닫는다.** 009만 따로 걸면
+> 같은 "편집자"가 endpoint마다 다른 뜻이 되고, 가드를 한 곳에 둔 이유가 사라진다.
+> 그때까지 `CONSULTANT`도 프로젝트를 편집할 수 있다 — **알고 여는 창이다.**
+> 011 C-09가 Layout·Facade만 뜻하는지 Booth Studio 전체인지는 011 담당에게 확인 요청했다.
 - 오류 봉투는 5필드 단일 (`docs/08` §1.3). 필드 오류의 `rule`은 항상 `FIELD_INVALID`이고
   문제 필드는 `field`에 담는다
 - **응답의 모든 키는 항상 존재한다.** 값이 없으면 `null`이며 서버가 기본값을 채우지 않는다
@@ -59,6 +76,8 @@
   좁히면 정상 배포·포트폴리오 URL이 거부돼 SC-002(링크 도달률 100%)를 스스로 깬다
 - 저장 바이트 = 반환 바이트. **trim·소문자화·정규화 없음**
 - `null` 허용. `PATCH`에서 명시적 `null`은 **삭제**다
+- **빈 문자열 `""`는 `400`이다.** 지우려면 `null`을 보내라 — `""`를 통과시키면 형식이 깨진 값이
+  저장되고, 그건 "지웠다"고 믿는 화면과 어긋난다
 
 > ⚠️ **`videoUrl`의 제공자 범위는 아직 미결이다** (C-02, 기획 대기). 목록이 정해지면 서버가
 > **등록 시점에 `400 VALIDATION_FAILED`로 거부**하도록 이 문서를 갱신한다. 그 전까지는 형식
@@ -164,7 +183,7 @@
 { "videoUrl": null, "deployUrl": "https://new.example.com" }
 ```
 
-→ 영상 주소 삭제, 배포 주소 교체, 나머지 6필드 유지.
+→ 영상 주소 삭제, 배포 주소 교체, 나머지 5필드 유지.
 
 ### 응답 — `200`
 

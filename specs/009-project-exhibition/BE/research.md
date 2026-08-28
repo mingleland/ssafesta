@@ -214,6 +214,44 @@ C-04(원 소유자 귀속)와도 맞는다 — 재임대자는 **자기 부스**
 
 ---
 
+## R-11 — 직원 역할 게이트는 009가 걸지 않는다 (011 구현 때 가드 한 곳에서)
+
+**Decision**: `BoothEditorGuard.requireEditor`를 **그대로** 쓴다 — 소유자이거나 `booth_staffs`에
+행이 있으면 편집자다. 역할(`ADMIN`/`CONTENT_EDITOR`/`CONSULTANT`)로 거르지 않는다.
+
+**충돌 사실**: spec 011 C-09가 **2026-08-28 확정**됐다(`cd1523e`, S15P21A604-136) —
+*"Booth Studio의 Layout·Facade 편집은 `ADMIN`·`CONTENT_EDITOR`만 가능하며 `CONSULTANT`는 편집할 수
+없다."* 그런데 현재 가드는 `staffs.existsByBoothIdAndUserId`만 보고 **`role`을 읽지 않는다.**
+`booth_staffs.role VARCHAR(30) NOT NULL`은 V1부터 있으므로 **구현이 불가능해서가 아니다.**
+
+**Rationale**:
+
+1. **같은 구멍이 005·016에도 열려 있다.** 009만 역할을 보게 하면 같은 "편집자"가 endpoint마다
+   다른 뜻이 된다 — Layout은 `CONSULTANT`가 고치는데 Project는 못 고치는 상태가 된다.
+   그건 011 C-09가 의도한 것의 반대다
+2. **가드가 한 곳에 있는 이유가 이것이다.** `BoothEditorGuard` 주석이 직접 적고 있다 —
+   *"Spreading the same two-line check across three services is how one of them eventually forgets
+   the staff branch."* 역할 분기를 서비스마다 붙이면 그 경고를 그대로 재현한다
+3. **011은 아직 미구현이다.** `StaffInvitation*` 코드가 develop에 없다. 초대·수락·역할 배정
+   경로가 서기 전에 역할 게이트만 먼저 걸면 검증할 데이터가 없다
+4. **범위**: 가드를 고치면 005·016 회귀가 따라온다 — 110 티켓의 크기가 아니다 (헌법 28조)
+
+**대가는 정직하게 적는다**: 011 구현 전까지 **`CONSULTANT`도 프로젝트를 편집할 수 있다.**
+알고 여는 창이고, 011 구현 task가 닫는다.
+
+**미확인 1건**: 011 C-09의 문면은 **`Layout·Facade`를 명시**하고 Project는 적지 않았다.
+"Booth Studio 전체"를 뜻한 것인지 두 화면만인지는 011 담당(@정승욱)에게 **통보 이슈로 올려
+확인 요청**했다. 어느 쪽이든 009의 결론(가드 한 곳에서 일괄)은 바뀌지 않는다 — 바뀌는 것은
+011 구현 때 Project endpoint가 그 게이트에 포함되는지뿐이다.
+
+**Alternatives considered**:
+- 009에서 `ADMIN`/`CONTENT_EDITOR`만 허용 — 011 취지에 맞지만 005·016과 어긋나고, 011이 명시하지
+  않은 화면에 BE가 역할 정책을 **임의 확정**하는 것이 된다 (헌법 30조)
+- `BoothEditorGuard`에 역할 인자를 지금 추가 — 005·016 호출부와 테스트가 따라 움직인다.
+  011 구현과 같이 해야 할 작업을 미리 쪼개는 것
+
+---
+
 ## R-10 — `docs/sdd/parts/BE.md`의 "CRUD + S3"는 낡았다
 
 **Observation**: `docs/sdd/parts/BE.md:18`이 009를 `CRUD + S3`로 적고 있다. C-03이 **업로드

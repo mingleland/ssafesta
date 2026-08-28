@@ -6,7 +6,7 @@
 [data-model.md](data-model.md) · [../contracts/project-api.md](../contracts/project-api.md) ·
 [quickstart.md](quickstart.md)
 
-**Tests**: 포함한다. Jira 완료 조건 3개가 테스트를 명시하고, quickstart §3-1이 10 케이스를 지정한다.
+**Tests**: 포함한다. Jira 완료 조건 3개가 테스트를 명시하고, quickstart §3-1이 12 케이스를 지정한다.
 
 ---
 
@@ -25,6 +25,7 @@
 | `videoUrl` 제공자 제한 | **C-02 미결(기획).** 지금은 형식 검증만. 소급 삭제·숨김도 하지 않는다 (R-08) |
 | `specs/009` 리뷰 서명 채우기 | C-02가 아직 열려 있다 |
 | `BE/spec.md` 스텁 생성 | #43 — 정본 2벌은 drift. 명세는 상위 `../spec.md`를 읽는다 |
+| **직원 역할 게이트** (`ADMIN`/`CONTENT_EDITOR`만 편집) | spec 011 C-09가 2026-08-28 확정됐지만 **`BoothEditorGuard` 한 곳에서 011 구현 때 일괄로 닫는다.** 009만 걸면 같은 "편집자"가 endpoint마다 다른 뜻이 되고 005·016과 어긋난다. 그때까지 `CONSULTANT`도 편집 가능 — **알고 여는 창**이다 (R-11) |
 
 > ⚠️ `setup-tasks.sh`·`setup-plan.sh`·`check-prerequisites.sh`는 `FEATURE_SPEC=BE/spec.md`를
 > 조립하므로 **`BE/spec.md`가 없으면 에러로 멈춘다.** 스텁을 만들어 우회하지 말고, 명세 경로를
@@ -85,7 +86,7 @@
 
 ### 구현
 
-- [ ] T011 [US1] `project/ProjectService.java`에 **presence 추적 명령 클래스**를 둔다 — `record` 금지. 9필드(`name`·`description`·URL 5종) 각각 값과 `present` 비트를 세우는 `@JsonProperty` setter. Jackson은 키가 있을 때만 setter를 부르므로 **키 누락 = 유지, 명시적 `null` = 삭제**가 성립한다 (C-06, R-03). `BoothHomepageService.HomepageCommand`를 9필드로 넓힌 형태
+- [ ] T011 [US1] `project/ProjectService.java`에 **presence 추적 명령 클래스**를 둔다 — `record` 금지. 7필드(`name`·`description`·URL 5종) 각각 값과 `present` 비트를 세우는 `@JsonProperty` setter. Jackson은 키가 있을 때만 setter를 부르므로 **키 누락 = 유지, 명시적 `null` = 삭제**가 성립한다 (C-06, R-03). `BoothHomepageService.HomepageCommand`를 7필드로 넓힌 형태
 - [ ] T012 [US1] `ProjectService.create(boothId, userId, command)` — `BoothEditorGuard.requireEditor` → `BoothLeaseRepository.findValidByBoothId`(없으면 `BoothExpiredException`) → `name` 제약 → URL 5종 검증 → `findByBoothId` 사전 검사(있으면 `ProjectAlreadyExistsException`) → **`saveAndFlush()`를 `try/catch` 안에서** 호출하고 `DataIntegrityViolationException`을 같은 예외로 번역. `save()`만 감싸면 유니크 위반이 커밋 시점에 터져 번역을 우회하고 500이 나간다 (`BoothLeaseService.java:97-106` 선례, R-02)
 - [ ] T013 [US1] `ProjectService.update(projectId, userId, command)` — `findById`(없으면 `ProjectNotFoundException`) → 그 행의 `boothId`로 `requireEditor`(**타 부스 차단**) → 유효 임대 확인 → **본문이 `{}`면 400** → presence별 적용(`name: null`은 400) → 값이 하나라도 바뀌면 `updatedAt` 갱신
 - [ ] T014 [US1] `ProjectService.findByBooth(boothId, userId)` — `requireEditor`만 통과하면 **published 게이트 없이** 저장값 반환. **만료 부스도 읽을 수 있다**(FR-008). 결과는 0~1개 **배열**(C-01 파생 ⑵)
@@ -106,7 +107,7 @@
 - [ ] T022 [P] [US1] 타 부스 차단 — A 부스 소유자 토큰으로 B 부스 프로젝트에 `PATCH` → `403 BOOTH_EDITOR_FORBIDDEN` **(Jira 완료 조건)**
 - [ ] T023 [P] [US1] 만료 부스 — 임대 만료 후 `PATCH` → `409 BOOTH_LEASE_EXPIRED`, 그러나 **`GET`은 값을 돌려준다** (FR-008, R-06)
 - [ ] T024 [P] [US1] 게스트 거부 — 게스트 토큰으로 세 endpoint 전부 → `403 MEMBER_ONLY` (헌법 12조)
-- [ ] T025 [US1] `project/ProjectConcurrencyIntegrationTest.java` — 같은 부스에 `POST` 2건 동시 → 하나만 `201`, 나머지 `409 PROJECT_ALREADY_EXISTS`. **유니크 제약과 `saveAndFlush` 번역이 실제로 도는지** 본다. `BoothLeaseConcurrencyIntegrationTest` 형태
+- [ ] T025 [P] [US1] `project/ProjectConcurrencyIntegrationTest.java` — 같은 부스에 `POST` 2건 동시 → 하나만 `201`, 나머지 `409 PROJECT_ALREADY_EXISTS`. **유니크 제약과 `saveAndFlush` 번역이 실제로 도는지** 본다. `BoothLeaseConcurrencyIntegrationTest` 형태
 
 **Checkpoint**: US1 단독으로 배포 가능. FE가 등록·수정 폼을 만들 수 있다.
 

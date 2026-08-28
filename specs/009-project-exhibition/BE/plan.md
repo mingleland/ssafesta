@@ -153,7 +153,7 @@ backend/src/test/java/com/example/ssafesta/project/
 | 5 | `Project` 엔티티 + `ProjectRepository` | 컴파일 통과 | |
 | 6 | `ProjectService` — presence 명령 클래스·검증·`saveAndFlush` 번역 | 단위 수준 동작 | 계약의 핵심이 전부 여기 |
 | 7 | `ProjectController` endpoint 3개 | MockMvc 왕복 | |
-| 8 | `ProjectApiIntegrationTest` 10 케이스 | 실패 0 | quickstart §3-1 |
+| 8 | `ProjectApiIntegrationTest` 12 케이스 | 실패 0 | quickstart §3-1 |
 | 9 | `ProjectConcurrencyIntegrationTest` | 실패 0 | 유니크 제약과 번역이 실제로 도는지 |
 | 10 | 문서 — `docs/08` §5·§18, `docs/sdd/parts/BE.md` S3 제거, 작업일지 | — | 구현과 **같은 커밋** (016 선례) |
 
@@ -183,3 +183,5 @@ backend/src/test/java/com/example/ssafesta/project/
 | 방문자 조회 · published 게이트 · 좋아요 수 | **S15P21A604-177** |
 | `videoUrl` 제공자 제한 | **C-02 미결(기획).** 목록 확정 후 후속. 소급 삭제·숨김 안 함 (R-08) |
 | `specs/009` 리뷰 서명 | C-02가 아직 열려 있다 |
+| **직원 역할 게이트** (011 C-09) | `BoothEditorGuard`가 `role`을 안 읽는다. 005·016도 같다. **011 구현 때 가드 한 곳에서 일괄** — 009만 걸면 "편집자"가 endpoint마다 다른 뜻이 된다 (R-11) |
+| `GET /projects/{projectId}` | 부스당 1개라 `GET /booths/{boothId}/projects`가 같은 값을 준다. 필요해지면 가산적으로 추가 (contracts §0) |
