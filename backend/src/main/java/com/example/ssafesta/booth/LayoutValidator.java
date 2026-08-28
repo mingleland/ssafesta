@@ -221,17 +221,13 @@ public class LayoutValidator {
         if (document.objects() == null) {
             return;
         }
-        Boolean homepageRegistered = null; // Asked at most once per document.
         for (LayoutJson.LayoutObject object : document.objects()) {
             LayoutObjectType type = LayoutObjectType.from(object.type()).orElse(null);
             if (type == null) {
                 continue; // Already reported as UNKNOWN_OBJECT_TYPE.
             }
             if (type == LayoutObjectType.LAPTOP) {
-                if (homepageRegistered == null) {
-                    homepageRegistered = configResolver.boothHomepageRegistered(boothId);
-                }
-                if (!homepageRegistered) {
+                if (!configResolver.boothHomepageRegistered(boothId)) {
                     result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
                             "홈페이지 주소가 등록되지 않았습니다.");
                 }

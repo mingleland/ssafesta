@@ -8,8 +8,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class BoothHomepageService {
-
-    /**
-     * {@code http} is allowed on purpose, unlike the facade logo.
-     *
-     * <p>A logo is embedded in our own page, so an {@code http} one dies silently as mixed content.
-     * A homepage is a destination: when the iframe is refused the overlay opens a new tab instead
-     * (US3), and that works over {@code http}. FR-002 lists both schemes; the mixed-content warning
-     * is the React layer's (research R-04).
-     */
-    private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
     /** The V1 column width, and the same ceiling the facade logo uses. */
     private static final int MAX_URL = 2048;
@@ -99,16 +87,28 @@ public class BoothHomepageService {
         } catch (URISyntaxException e) {
             throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
         }
-        if (!uri.isAbsolute() || uri.getScheme() == null) {
+        if (!uri.isAbsolute()) { // URI.isAbsolute() 가 곧 scheme != null 이다
             throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
         }
-        if (!ALLOWED_SCHEMES.contains(uri.getScheme().toLowerCase(Locale.ROOT))) {
+        if (!isAllowedScheme(uri.getScheme())) {
             throw reject("홈페이지 주소는 http 또는 https로 시작해야 합니다.");
         }
-        if (uri.getHost() == null || uri.getHost().isBlank()) {
+        if (uri.getHost() == null) {
             throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
         }
         return url; // 원문 그대로 — trim·정규화 없음 (data-model §2 왕복 무손실)
+    }
+
+    /**
+     * {@code http} is allowed on purpose, unlike the facade logo.
+     *
+     * <p>A logo is embedded in our own page, so an {@code http} one dies silently as mixed content.
+     * A homepage is a destination: when the iframe is refused the overlay opens a new tab instead
+     * (US3), and that works over {@code http}. FR-002 lists both schemes; the mixed-content warning
+     * is the React layer's (research R-04).
+     */
+    private static boolean isAllowedScheme(String scheme) {
+        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
     }
 
     /** One field broke its constraint, so the rule stays {@code FIELD_INVALID} (#58 §3). */
