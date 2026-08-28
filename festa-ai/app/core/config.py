@@ -212,6 +212,11 @@ class Settings(BaseSettings):
                 )
             if len(set(tokens)) != len(tokens):
                 raise ValueError(f"{env_name} must not contain duplicate tokens")
+        if set(self.internal_spring_to_ai_tokens) & set(self.internal_ai_to_spring_tokens):
+            raise ValueError(
+                "INTERNAL_SPRING_TO_AI_TOKENS and INTERNAL_AI_TO_SPRING_TOKENS "
+                "must not share tokens"
+            )
         return self
 
 

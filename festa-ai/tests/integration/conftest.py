@@ -8,8 +8,10 @@ at a throwaway local database only.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import pathlib
+import sys
 
 import pytest
 import sqlalchemy as sa
@@ -24,6 +26,14 @@ pytestmark = pytest.mark.skipif(
     not TEST_DATABASE_URL,
     reason="TEST_MIGRATION_DATABASE_URL not set — skipping tests that need a real Postgres instance",
 )
+
+
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """Use the Windows loop implementation supported by psycopg async."""
+    if sys.platform == "win32":
+        return asyncio.WindowsSelectorEventLoopPolicy()
+    return asyncio.DefaultEventLoopPolicy()
 
 
 @pytest.fixture(scope="session")
