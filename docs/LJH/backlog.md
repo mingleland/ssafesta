@@ -11,25 +11,25 @@
 
 **원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**열린 내 MR 은 `!63` 하나다.** 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를 develop 에 머지했고, part-target `!13`·`!20` 은 `front` 로 소진했다.
+**열린 내 MR 은 `!93` 하나다.** 08-28 에 `!67`·`!63` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
 
 | MR | 대상 | 상태 |
 |---|---|---|
-| !63 `-275` 재시도 판정 코드 정렬 | develop | **열림** — `festa-frontend/src/game-studio/` 가 #109 로 박준우 범위라 파일 소유가 겹쳐 확인 요청 중 |
+| !93 `-315` spec 016 정합 (docs/26 2건 + LAPTOP configId) | develop | **열림** — 리뷰어 ejraks1548, `Closes S15P21A604-315` |
 
 **셀프 머지는 이 팀의 관행이다** — `docs/17` §8:269 는 "최소 1명 Review **권장**", 머지된 MR 34건 중 author == merged_by 가 33/34, 보호 브랜치는 `main` 하나, 내 권한은 Maintainer(40). `approved_by=[]` 는 승인 대기가 아니다.
 
 ## 내 액션 필요
 
 - [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
-- [ ] **`!63` 확인 대기** — 박준우 응답 후 머지. develop 에 **죽은 재시도 분기**(`INTERNAL_SERVER_ERROR`, 서버는 `INTERNAL_ERROR`)가 그때까지 남는다
+- [ ] **`#110`·`#115` 회신 게시** — 초안 2건 작성 완료, 승인 대기. `#110` 은 "목록 응답 0~1개가 FE 화면에 영향 있나"에 **영향 없음**(projects 목록 소비 화면 0건, `-134` 미착수)을, `#115` 는 FE 몫 4건 처리 결과(MR !93)와 §3 은 리드 몫임을 회신한다
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
 ## 착수 가능 — 협의 불요, 권장 순서순
 
 **Asset 계약이 develop 에 복구돼 2건이 열렸다.** 황덕이 [MR !53](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/53)(`-269`)로 `game-asset-upload.md` 를 재반입했다(08-27 10:41 머지, 파일 존재 확인).
 
-**`-116` 계약 기준 구현 완료** — [MR !67](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/67)(리뷰어 rammerg, `Closes` 없음). 완료 조건 4개가 전부 서버 왕복을 요구해 `-107`·`-176` 대기로 남는다.
+**`-116` 계약 기준 구현이 develop 에 있다** — [MR !67](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/67) 08-28 머지(`Closes` 없음). 완료 조건 4개가 전부 서버 왕복을 요구해 `-107`·`-176` 대기로 남는다.
 
 - [ ] **`-187` `asset://` 참조 해석·회귀** — Jira 상 `BLOCKED BY -107·116·176`. 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 서버가 필요하다. resolver 단위 테스트분은 `-116` 구현과 함께 들어갔다(17건)
 
@@ -66,7 +66,7 @@
 ## 추적 — 내 액션 없음
 
 - 계약 §3.4 빈틈 — `<img src>` 는 Authorization 을 싣지 못해 **편집기의 자기 Draft Asset 조회가 401** 이 된다(익명 공개 Published 는 무관). FE 가 인증 fetch → object URL 로 닫았고 계약 변경 0. `-107` 이 알아야 할 것 2개(`/content` 가 Bearer 를 받아야 함·fetch 라 CORS 가 걸림)를 #69 에 통보했다
-- [#113](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/113) BE `GlobalExceptionHandler` 미처리 예외 2종 → 500. `MissingRequestCookieException`(refresh 무쿠키 — 비로그인·게스트가 매 로드마다 밟는다)·`NoResourceFoundException`(미매핑 경로 전부). **FE 우회 불가** — RT 는 HttpOnly 라 존재 여부를 FE 가 읽을 수 없다(헌법 13조). 화면은 정상 동작하며 문제는 서버 로그의 신호 대 잡음
+- [#113](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/113) **CLOSED 2026-08-27** — BE `GlobalExceptionHandler` 미처리 예외 2종 → 500. `MissingRequestCookieException`(refresh 무쿠키 — 비로그인·게스트가 매 로드마다 밟는다)·`NoResourceFoundException`(미매핑 경로 전부). **FE 우회 불가** — RT 는 HttpOnly 라 존재 여부를 FE 가 읽을 수 없다(헌법 13조). 화면은 정상 동작하며 문제는 서버 로그의 신호 대 잡음
 - [#78](https://github.com/kanghyunsoon/ssafesta/issues/78) GameProject v1.1 **확정·종료**(08-26): schemaVersion **1.1.0**(1.0 읽기 유지·편집 시 명시 승격), `completion.mode ALL|ANY`, objectives **0~5개·type 중복 금지**(`SCORE_AT_LEAST`|`DEFEAT_ENEMIES`|`SURVIVE_SECONDS`), `playerDefeat RESPAWN|END_GAME`. **objectives 빈 배열 = completion 판정 비활성**(거부가 아니라 의미 정의 — golden path 테스트에 포함), **target 상한 정본은 FE type별 상한**(`gameProject.ts:326`). 활성화 게이트 유지(#104 C절). FE 구현은 Jira `-155`(박준우), 성능 실측 `-156`(박준우)
 - 013·016의 game발 spec 갱신 develop 미반영 / FE.md 인용 `game de38269` 커밋이 로컬·원격에 없음(016 E2E는 계약 텍스트만 필요해 무관) — Unity 확인 필요
 - 013 spec.md C-01이 docs/26(V10 TEXT)로 해소됐는데 리뷰 표는 미결 표기 — Unity 소유, 임의 수정 안 함
