@@ -45,6 +45,22 @@ public class LayoutConfigResolver {
         return type == LayoutObjectType.AI_AGENT;
     }
 
+    /**
+     * Whether the booth has a homepage registered — what a {@code LAPTOP} is linked to (spec 016
+     * C-01, contracts/homepage-api.md §3-1).
+     *
+     * <p>Counted rather than fetched so a boothId with no row answers {@code false} instead of
+     * throwing. Validation has to be able to report warnings for a document whose booth is not
+     * there (a unit test passes a bare id, and a booth can be deleted between edit and publish);
+     * an exception would replace the warning list with a 500.
+     */
+    boolean boothHomepageRegistered(Long boothId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM booths WHERE id = ? AND homepage_url IS NOT NULL",
+                Integer.class, boothId);
+        return count != null && count > 0;
+    }
+
     private int countAgents(Integer agentId, Long boothId) {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM ai_agents WHERE id = ? AND booth_id = ? AND status = 'ACTIVE'",

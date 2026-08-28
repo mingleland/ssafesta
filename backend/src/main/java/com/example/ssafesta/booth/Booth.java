@@ -106,6 +106,7 @@ public class Booth {
     public String getFacadeSignText() { return facadeSignText; }
     public String getFacadeLogoUrl() { return facadeLogoUrl; }
     public Integer getPublishedLayoutVersion() { return publishedLayoutVersion; }
+    public String getHomepageUrl() { return homepageUrl; }
 
     /** Points visitors at a newly published version — only ever called from the publish transaction. */
     void publishLayoutVersion(int versionNo) {
@@ -127,6 +128,21 @@ public class Booth {
         this.facadePrimaryColor = primaryColor;
         this.facadeSignText = signText;
         this.facadeLogoUrl = logoUrl;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * The page the booth's laptop opens (spec 016 FR-001, contracts/homepage-api.md §2).
+     *
+     * <p>{@code null} means unregistered, which is a visitor-facing <i>notice</i> rather than an
+     * error (FR-009) — the server never substitutes a placeholder.
+     *
+     * <p>Stored verbatim. No trim, no case folding, no normalisation: the bytes a client saves are
+     * the bytes it reads back (data-model §2). Format is the caller's to check — that decision lives
+     * in {@link BoothHomepageService} where the rejection message can say which rule was broken.
+     */
+    void changeHomepageUrl(String homepageUrl) {
+        this.homepageUrl = homepageUrl;
         this.updatedAt = Instant.now();
     }
 

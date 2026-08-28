@@ -115,6 +115,86 @@ class BoothLayoutConfigLinkIntegrationTest {
                 "확인할 수 없다는 사실이 조용해지면 안 됩니다: " + outcome.warnings());
     }
 
+    /**
+     * {@code LAPTOP} answers a different question for the same warning (spec 016 계약 §3-1).
+     *
+     * <p>C-01 fixed the homepage URL onto {@code booths.homepage_url}, so a laptop has no
+     * {@code configId} to be missing — judging it by one flagged every correctly configured booth.
+     * The code and envelope are unchanged; only the predicate moved.
+     */
+    @Test
+    void aLaptopWithoutAHomepageUrlWarns() {
+        Owner owner = leasedOwner("노트북미등록");
+        layouts.saveDraft(owner.boothId(), owner.userId(), laptopLayout(null));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertEquals(1, outcome.publishedVersion());
+        assertTrue(outcome.warnings().stream().anyMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())
+                        && "홈페이지 주소가 등록되지 않았습니다.".equals(w.message())),
+                "URL 미등록 노트북은 경고해야 합니다: " + outcome.warnings());
+    }
+
+    /** The false positive this change exists to remove. */
+    @Test
+    void aLaptopWithAHomepageUrlDoesNotWarn() {
+        Owner owner = leasedOwner("노트북등록");
+        registerHomepage(owner.boothId(), "https://team.example.com");
+        layouts.saveDraft(owner.boothId(), owner.userId(), laptopLayout(null));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "URL 이 등록된 부스에 미연결 경고가 남으면 상시 오탐입니다: " + outcome.warnings());
+    }
+
+    /** Nothing to click, nothing to warn about — the warning exists to protect a visitor's click. */
+    @Test
+    void aBoothWithNoLaptopIsNotWarnedAboutItsMissingHomepage() {
+        Owner owner = leasedOwner("노트북없음");
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"deco-1","type":"DECORATION","position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """);
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "노트북이 없으면 홈페이지 경고를 낼 일이 없습니다: " + outcome.warnings());
+    }
+
+    /**
+     * FE was told not to send one (계약 §3-1 통보 1), and this is what happens if it does.
+     *
+     * <p>The laptop branch falls through to the {@code configId} chain on purpose, so an id that
+     * should not be there is reported rather than ignored.
+     */
+    @Test
+    void aLaptopCarryingAConfigIdIsReportedAsUnverified() {
+        Owner owner = leasedOwner("노트북configId");
+        registerHomepage(owner.boothId(), "https://team.example.com");
+        layouts.saveDraft(owner.boothId(), owner.userId(), laptopLayout(4242));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().anyMatch(w -> "CONFIG_UNVERIFIED".equals(w.rule())),
+                "LAPTOP 은 연결 대상을 서버가 확인할 수 없습니다: " + outcome.warnings());
+    }
+
+    /** Written straight to the column — spec 016's endpoint has its own test for the write path. */
+    private void registerHomepage(Long boothId, String url) {
+        jdbc.update("UPDATE booths SET homepage_url = ? WHERE id = ?", url, boothId);
+    }
+
+    private String laptopLayout(Integer configId) {
+        String config = configId == null ? "" : "\"configId\":%d,".formatted(configId);
+        return """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"laptop-1","type":"LAPTOP",%s
+                   "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """.formatted(config);
+    }
+
     private String aiLayout(long agentId) {
         return """
                 {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
