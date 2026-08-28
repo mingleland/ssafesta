@@ -6,6 +6,7 @@ import { ReferenceGamePlayer } from '../../runtime/reference/ReferenceGamePlayer
 import { PublishedGameSurface } from '../../runtime/ui/PublishedGameSurface.tsx';
 import { createBrowserDraftRepository } from '../../studio/ports/draftRepository.ts';
 import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepository.ts';
+import { createApiGameAssetRepository } from '../../studio/assets/remoteAssetRepository.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { useResolvedAssetUrls } from '../../studio/assets/useResolvedAssetUrls.ts';
 
@@ -13,6 +14,12 @@ const NO_ASSETS = [] as const;
 const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true'
   && import.meta.env.VITE_GAME_STUDIO_API_ENABLED !== 'true';
 const browserPublicationPorts = browserPublicationEnabled ? createBrowserPublicationPorts() : null;
+
+// 익명 Published 플레이의 자산 해석기. 컴포넌트 밖에 두는 이유는 PlayGamePage 가 gameId 검증·
+// source=local 분기로 조기 return 하는 구조라 훅을 쓸 수 없어서다. 생성자가 상태를 만들지 않고
+// (모듈 참조만 묶는다) 참조가 고정돼야 useResolvedAssetUrls 의 useEffect 가 재해석 루프에 빠지지 않는다.
+// local 을 주지 않는다 — 공개된 게임이 보는 것은 서버 Asset 뿐이고, asset://local 은 여기서 null 이 맞다.
+const publishedAssetResolver = createApiGameAssetRepository();
 
 interface LocalPreviewSurfaceProps {
   readonly gameId: number;
@@ -23,7 +30,12 @@ interface LocalPreviewSurfaceProps {
 const LocalPreviewSurface = ({ gameId, onExit, showPerformanceMonitor }: LocalPreviewSurfaceProps) => {
   const repository = useMemo(() => createBrowserDraftRepository(), []);
   const sessionPort = useMemo(() => createPreviewGameSessionPort(), []);
-  const assetRepository = useMemo(() => createBrowserAssetRepository(), []);
+  // 편집기 미리보기는 두 참조가 섞인다 — 아직 업로드 안 한 asset://local 과 업로드된 asset://game.
+  // 합성은 어댑터 안에 있다: resolve 가 local prefix 면 위임하고 stable 이면 서버로 간다.
+  const assetRepository = useMemo(
+    () => createApiGameAssetRepository({ local: createBrowserAssetRepository() }),
+    [],
+  );
   const [project, setProject] = useState<GameProject | null>(null);
   const [error, setError] = useState<string | null>(null);
   const assetUrls = useResolvedAssetUrls(project?.assets ?? NO_ASSETS, assetRepository);
@@ -81,6 +93,7 @@ export const PlayGamePage = () => {
   }
   return (
     <PublishedGameSurface
+      assetResolver={publishedAssetResolver}
       gameId={parsedGameId}
       onExit={() => void navigate('/app/world')}
       repository={browserPublicationPorts?.repository}
