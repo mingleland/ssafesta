@@ -19,7 +19,7 @@
 | 005 | booth-studio-layout | P0 | FE + BE | ✅ **BE 검토 완료** (FE 대기) | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 006 | booth-runtime | P0 | Unity | ✅ | ✅ | ✅ |
 | 007 | ai-agent-document | P0 | AI | ✅ | — | — |
-| 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |
+| 008 | ai-conversation-rag | P0 | AI + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
 | 013 | avatar-customization | **P0** | Unity + FE + BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 016 | booth-laptop-homepage | **P0** | FE + Unity + BE | ✅ | — | — |
