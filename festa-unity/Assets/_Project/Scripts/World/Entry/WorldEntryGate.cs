@@ -26,6 +26,7 @@ namespace Festa.World
         [SerializeField] float _standaloneGraceSeconds = 3f;
 
         const float DoorSlideSeconds = 1.1f;
+        const float DoorHoldSeconds = 2.5f;   // 열린 채 두는 시간 — 플레이어가 내릴 틈
 
 #if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
         [DllImport("__Internal")]
@@ -40,13 +41,17 @@ namespace Festa.World
 
         float _elapsed;
         bool _opening;
+        bool _handedOver;           // 화면을 월드로 넘겼다 (카메라·조명 철거 완료)
+        float _holdUntil;           // 이 시각까지 문을 열어 둔다
+        float _closeProgress;
         float _openProgress;
 
         GateFloorIndicator _floorIndicator;
-        float _floor = 1f;          // 표시 중인 층 (실수 — 부드럽게 올라간다)
+        float _floor = StartFloor;  // 표시 중인 층 (실수 — 부드럽게 올라간다)
         bool _arrivalRequested;     // 도착 예약 — 표시가 11 에 닿으면 연다
         string _openReason = "";
         const int TopFloor = 11;    // 도착층. 준비되기 전에는 절대 여기 닿지 않는다.
+        const int StartFloor = 5;   // 1층부터 세면 숫자가 정신없이 굴러간다. 중간에서 시작해 몇 층만 올린다.
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoStart()
@@ -84,7 +89,8 @@ namespace Festa.World
 
             if (_opening)
             {
-                AdvanceOpening();
+                if (_handedOver) AdvanceClosing();
+                else AdvanceOpening();
                 return;
             }
 
@@ -139,7 +145,7 @@ namespace Festa.World
             float target = TargetFloor();
             // 초당 약 3층씩 — 멈춰 보이지도, 순간이동하지도 않는 속도.
             // 도착이 예약되면 빠르게 올린다 — 대기 시간을 늘리려고 만든 연출이 아니다.
-            float speed = _arrivalRequested ? 9f : 3f;
+            float speed = _arrivalRequested ? 6f : 2.5f;
             _floor = Mathf.MoveTowards(_floor, target, speed * Time.deltaTime);
             _floorIndicator.SetNumber(Mathf.Clamp(Mathf.FloorToInt(_floor), 1, TopFloor));
         }
@@ -149,8 +155,8 @@ namespace Festa.World
             if (_opening || _arrivalRequested) return TopFloor;
 
             var nm = NetworkManager.Singleton;
-            if (nm == null || !nm.IsClient) return 3f;        // 아직 접속 시작 전
-            if (!nm.IsConnectedClient) return 6f;             // 전송 계층 연결·승인 대기
+            if (nm == null || !nm.IsClient) return StartFloor + 1f;   // 아직 접속 시작 전
+            if (!nm.IsConnectedClient) return StartFloor + 3f;       // 전송 계층 연결·승인 대기
             return TopFloor - 1f;                             // 승인됨 — 스폰만 남았다
         }
 
@@ -251,22 +257,52 @@ namespace Festa.World
         {
             _openProgress += Time.deltaTime / DoorSlideSeconds;
             var t = Mathf.Clamp01(_openProgress);
-            var eased = t * t * (3f - 2f * t);   // smoothstep — 문이 급출발하지 않는다
+            SetDoorOpenAmount(Smoothstep(t));
 
-            if (_doorLeft != null && _doorRight != null)
-            {
-                _doorLeft.position = _doorLeftClosed + new Vector3(0f, 0f, _doorTravel * eased);
-                _doorRight.position = _doorRightClosed - new Vector3(0f, 0f, _doorTravel * eased);
-            }
+            if (t < 1f) return;
 
-            if (t >= 1f) Finish();
+            // 문이 다 열린 순간 게이트 화면을 걷는다. 여기서부터 플레이어가 월드를 본다.
+            HandOverToWorld();
         }
 
-        void Finish()
+        /// <summary>
+        /// 카메라·조명·표시기를 걷어 월드를 드러낸다. 컴포넌트는 남겨 둔다 —
+        /// 플레이어가 내린 뒤 **문을 다시 닫아야** 11층에 문 열린 엘리베이터가 방치되지 않는다.
+        /// </summary>
+        void HandOverToWorld()
         {
-            // 문은 열린 자리에 그대로 둔다 — 되돌리면 플레이어가 나가는 순간 닫힌 문이 보인다.
-            Destroy(gameObject);
+            if (_handedOver) return;
+            _handedOver = true;
+            _holdUntil = Time.time + DoorHoldSeconds;
+
+            if (_gateCam != null) Destroy(_gateCam.gameObject);
+            if (_gateLight != null) Destroy(_gateLight.gameObject);
+            if (_floorIndicator != null) Destroy(_floorIndicator.gameObject);
         }
+
+        void AdvanceClosing()
+        {
+            if (Time.time < _holdUntil) return;
+
+            _closeProgress += Time.deltaTime / DoorSlideSeconds;
+            var t = Mathf.Clamp01(_closeProgress);
+            SetDoorOpenAmount(1f - Smoothstep(t));
+
+            if (t >= 1f)
+            {
+                SetDoorOpenAmount(0f);   // 정확히 닫힌 자리로 스냅 — 실틈이 남지 않게
+                Destroy(gameObject);
+            }
+        }
+
+        void SetDoorOpenAmount(float amount)
+        {
+            if (_doorLeft == null || _doorRight == null) return;
+            _doorLeft.position = _doorLeftClosed + new Vector3(0f, 0f, _doorTravel * amount);
+            _doorRight.position = _doorRightClosed - new Vector3(0f, 0f, _doorTravel * amount);
+        }
+
+        static float Smoothstep(float t) => t * t * (3f - 2f * t);   // 문이 급출발하지 않는다
 
         static void NotifyGateReady()
         {
