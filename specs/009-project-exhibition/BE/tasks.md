@@ -51,27 +51,35 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 `cd backend && ./mvnw test`로 **회귀 기준선을 실측**하고 아래 표에 적는다. 참고값은 2026-08-28 016 머지 시점의 43 클래스 / 393 테스트지만 **그대로 믿지 말고 다시 잰다** — T007이 기존 코드를 건드리므로 이 숫자가 없으면 나중 실패가 내 것인지 원래 것인지 판정할 수 없다
+- [x] T001 `cd backend && ./mvnw test`로 **회귀 기준선을 실측**하고 아래 표에 적는다. 참고값은 2026-08-28 016 머지 시점의 43 클래스 / 393 테스트지만 **그대로 믿지 말고 다시 잰다** — T007이 기존 코드를 건드리므로 이 숫자가 없으면 나중 실패가 내 것인지 원래 것인지 판정할 수 없다
 
-  | | 클래스 | 테스트 | 실패 |
-  |---|---:|---:|---:|
-  | 착수 시 `origin/develop` | (기입) | (기입) | (기입) |
-  | 완료 시 | (기입) | (기입) | 0 |
+  | | 클래스 | 테스트 | 실패 | 오류 | 스킵 |
+  |---|---:|---:|---:|---:|---:|
+  | 착수 시 `origin/develop` (`502fefc`, 2026-08-28 15:38) | **43** | **393** | **0** | 0 | 0 |
+  | 완료 시 (2026-08-28 16:0x) | **46** | **431** | **0** | 0 | 0 |
 
-- [ ] T002 `backend/src/main/resources/db/migration/`에 **V14가 이미 없는지** 확인한다 (현재 V13까지). 다른 브랜치가 V14를 선점했으면 번호를 올리고 `data-model.md` §4와 plan의 파일명을 함께 고친다
+  > 참고값과 일치했다. surefire-reports 43개 파일 집계, `mvnw` exit 0.
+
+- [x] T002 `backend/src/main/resources/db/migration/`에 **V14가 이미 없는지** 확인한다 (현재 V13까지). 다른 브랜치가 V14를 선점했으면 번호를 올리고 `data-model.md` §4와 plan의 파일명을 함께 고친다
+
+  > 확인: `V1`~`V13`만 존재. **V14 비어 있음** — 계획대로 진행.
 
 ---
 
 ## Phase 2: Foundational (US1·US2 공통 선행 — 여기가 끝나야 스토리 시작)
 
-- [ ] T003 `common/ErrorCode.java`에 `PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다.")` · `PROJECT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이 부스에는 이미 프로젝트가 있습니다. 수정으로 변경해 주세요.")` 2건 추가. 기존 도메인 코드(`BOOTH_NOT_FOUND`·`GAME_NOT_FOUND`) 근처에 배치
-- [ ] T004 [P] `project/ProjectNotFoundException.java` 생성 — `projectId`를 담고 `ErrorCode.PROJECT_NOT_FOUND`로 매핑. `BoothNotFoundException` 형태를 따른다
-- [ ] T005 [P] `project/ProjectAlreadyExistsException.java` 생성 — `boothId`와 기존 `projectId`를 담고 `ErrorCode.PROJECT_ALREADY_EXISTS`로 매핑. `ActiveLeaseLimitException` 형태를 따른다
-- [ ] T006 `common/HttpUrlValidator.java` 신규 — 시그니처 `String validate(String value, String jsonField, String displayName)`. **`null`은 검사 없이 그대로 반환**하고 빈 문자열만 거부한다. 순서는 빈문자열 → 길이 2048 → `new URI` → `isAbsolute()` → **scheme(`http`/`https`, 대소문자 무시)** → host. **scheme이 host보다 반드시 먼저** — `javascript:`는 host가 없어 순서가 뒤바뀌면 스킴 위반 사유가 사라진다. 값은 trim·정규화 없이 원문 반환. 거부는 `ApiException(VALIDATION_FAILED, message, List.of(ApiErrorDetail.field(jsonField, message)))`. 문장 표는 `data-model.md` §3 #2
-- [ ] T007 `booth/BoothHomepageService.java`가 T006의 검증기를 쓰도록 바꾼다 — `validate(url, "homepageUrl", "홈페이지")`. **완료 조건: 기존 `BoothHomepageApiIntegrationTest` 19개가 그대로 통과한다.** 홈페이지 한국어 문구를 **바이트 단위로 보존**해야 하며, 한 글자라도 달라지면 그 테스트가 잡는다. `presence`(`{}` 거부) 판정은 서비스에 남기고 검증기로 옮기지 않는다
-- [ ] T008 `backend/src/main/resources/db/migration/V14__project_one_per_booth.sql` 생성 — `CREATE UNIQUE INDEX ux_projects_booth ON projects(booth_id);` 한 줄 + 근거 주석. **중복 정리 단계 없음**(`projects`는 쓰기 경로 0건이라 행이 없다). 부분 인덱스 아님. V7 주석 형식을 따른다
-- [ ] T009 `project/Project.java` 엔티티 — `data-model.md` §1의 11칼럼 매핑. FK는 `@ManyToOne`이 아니라 `Long boothId` + `updatable = false` (`BoothLease.java:33` 스타일). `createdAt`은 `updatable = false`, `updatedAt`은 애플리케이션이 갱신(§5)
-- [ ] T010 [P] `project/ProjectRepository.java` — `Optional<Project> findByBoothId(Long boothId)`
+- [x] T003 `common/ErrorCode.java`에 `PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다.")` · `PROJECT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이 부스에는 이미 프로젝트가 있습니다. 수정으로 변경해 주세요.")` 2건 추가. 기존 도메인 코드(`BOOTH_NOT_FOUND`·`GAME_NOT_FOUND`) 근처에 배치
+- [x] T004 [P] `project/ProjectNotFoundException.java` 생성 — `projectId`를 담고 `ErrorCode.PROJECT_NOT_FOUND`로 매핑. `BoothNotFoundException` 형태를 따른다
+- [x] T005 [P] `project/ProjectAlreadyExistsException.java` 생성 — `boothId`와 기존 `projectId`를 담고 `ErrorCode.PROJECT_ALREADY_EXISTS`로 매핑. `ActiveLeaseLimitException` 형태를 따른다
+- [x] T006 `common/HttpUrlValidator.java` 신규 — 시그니처 `String validate(String value, String jsonField, String displayName)`. **`null`은 검사 없이 그대로 반환**하고 빈 문자열만 거부한다. 순서는 빈문자열 → 길이 2048 → `new URI` → `isAbsolute()` → **scheme(`http`/`https`, 대소문자 무시)** → host. **scheme이 host보다 반드시 먼저** — `javascript:`는 host가 없어 순서가 뒤바뀌면 스킴 위반 사유가 사라진다. 값은 trim·정규화 없이 원문 반환. 거부는 `ApiException(VALIDATION_FAILED, message, List.of(ApiErrorDetail.field(jsonField, message)))`. 문장 표는 `data-model.md` §3 #2
+- [x] T007 `booth/BoothHomepageService.java`가 T006의 검증기를 쓰도록 바꾼다 — `validate(url, "homepageUrl", "홈페이지")`. **완료 조건: 기존 `BoothHomepageApiIntegrationTest` 19개가 그대로 통과한다.** 홈페이지 한국어 문구를 **바이트 단위로 보존**해야 하며, 한 글자라도 달라지면 그 테스트가 잡는다. `presence`(`{}` 거부) 판정은 서비스에 남기고 검증기로 옮기지 않는다
+
+  > **게이트 통과** — `BoothHomepageApiIntegrationTest` **19/19, 실패 0** (2026-08-28 15:42).
+  > `displayName="홈페이지"` 가 기존 네 문장을 바이트 그대로 만든다. 안 쓰게 된
+  > `MAX_URL`·`URI` import·`isAllowedScheme` 는 제거했다.
+- [x] T008 `backend/src/main/resources/db/migration/V14__project_one_per_booth.sql` 생성 — `CREATE UNIQUE INDEX ux_projects_booth ON projects(booth_id);` 한 줄 + 근거 주석. **중복 정리 단계 없음**(`projects`는 쓰기 경로 0건이라 행이 없다). 부분 인덱스 아님. V7 주석 형식을 따른다
+- [x] T009 `project/Project.java` 엔티티 — `data-model.md` §1의 11칼럼 매핑. FK는 `@ManyToOne`이 아니라 `Long boothId` + `updatable = false` (`BoothLease.java:33` 스타일). `createdAt`은 `updatable = false`, `updatedAt`은 애플리케이션이 갱신(§5)
+- [x] T010 [P] `project/ProjectRepository.java` — `Optional<Project> findByBoothId(Long boothId)`
 
 **Checkpoint**: 여기까지 `./mvnw test`가 T001 기준선과 **같은 결과**여야 한다. 늘어난 실패가 있으면 T007이 원인이다.
 
@@ -86,11 +94,11 @@
 
 ### 구현
 
-- [ ] T011 [US1] `project/ProjectService.java`에 **presence 추적 명령 클래스**를 둔다 — `record` 금지. 7필드(`name`·`description`·URL 5종) 각각 값과 `present` 비트를 세우는 `@JsonProperty` setter. Jackson은 키가 있을 때만 setter를 부르므로 **키 누락 = 유지, 명시적 `null` = 삭제**가 성립한다 (C-06, R-03). `BoothHomepageService.HomepageCommand`를 7필드로 넓힌 형태
-- [ ] T012 [US1] `ProjectService.create(boothId, userId, command)` — `BoothEditorGuard.requireEditor` → `BoothLeaseRepository.findValidByBoothId`(없으면 `BoothExpiredException`) → `name` 제약 → URL 5종 검증 → `findByBoothId` 사전 검사(있으면 `ProjectAlreadyExistsException`) → **`saveAndFlush()`를 `try/catch` 안에서** 호출하고 `DataIntegrityViolationException`을 같은 예외로 번역. `save()`만 감싸면 유니크 위반이 커밋 시점에 터져 번역을 우회하고 500이 나간다 (`BoothLeaseService.java:97-106` 선례, R-02)
-- [ ] T013 [US1] `ProjectService.update(projectId, userId, command)` — `findById`(없으면 `ProjectNotFoundException`) → 그 행의 `boothId`로 `requireEditor`(**타 부스 차단**) → 유효 임대 확인 → **본문이 `{}`면 400** → presence별 적용(`name: null`은 400) → 값이 하나라도 바뀌면 `updatedAt` 갱신
-- [ ] T014 [US1] `ProjectService.findByBooth(boothId, userId)` — `requireEditor`만 통과하면 **published 게이트 없이** 저장값 반환. **만료 부스도 읽을 수 있다**(FR-008). 결과는 0~1개 **배열**(C-01 파생 ⑵)
-- [ ] T015 [US1] `project/ProjectController.java` — `POST`·`GET /api/v1/booths/{boothId}/projects`, `PATCH /api/v1/projects/{projectId}`. 인증 주체는 **`MemberPrincipal.requireMemberId(jwt, "회원 계정만 프로젝트를 편집할 수 있습니다.")`** — `booth/BoothPrincipal`은 package-private라 이 패키지에서 못 쓴다. `POST`는 `201`, 나머지 `200`. 응답 DTO는 `record`(키가 조건부로 사라지지 않게)
+- [x] T011 [US1] `project/ProjectService.java`에 **presence 추적 명령 클래스**를 둔다 — `record` 금지. 7필드(`name`·`description`·URL 5종) 각각 값과 `present` 비트를 세우는 `@JsonProperty` setter. Jackson은 키가 있을 때만 setter를 부르므로 **키 누락 = 유지, 명시적 `null` = 삭제**가 성립한다 (C-06, R-03). `BoothHomepageService.HomepageCommand`를 7필드로 넓힌 형태
+- [x] T012 [US1] `ProjectService.create(boothId, userId, command)` — `BoothEditorGuard.requireEditor` → `BoothLeaseRepository.findValidByBoothId`(없으면 `BoothExpiredException`) → `name` 제약 → URL 5종 검증 → `findByBoothId` 사전 검사(있으면 `ProjectAlreadyExistsException`) → **`saveAndFlush()`를 `try/catch` 안에서** 호출하고 `DataIntegrityViolationException`을 같은 예외로 번역. `save()`만 감싸면 유니크 위반이 커밋 시점에 터져 번역을 우회하고 500이 나간다 (`BoothLeaseService.java:97-106` 선례, R-02)
+- [x] T013 [US1] `ProjectService.update(projectId, userId, command)` — `findById`(없으면 `ProjectNotFoundException`) → 그 행의 `boothId`로 `requireEditor`(**타 부스 차단**) → 유효 임대 확인 → **본문이 `{}`면 400** → presence별 적용(`name: null`은 400) → 값이 하나라도 바뀌면 `updatedAt` 갱신
+- [x] T014 [US1] `ProjectService.findByBooth(boothId, userId)` — `requireEditor`만 통과하면 **published 게이트 없이** 저장값 반환. **만료 부스도 읽을 수 있다**(FR-008). 결과는 0~1개 **배열**(C-01 파생 ⑵)
+- [x] T015 [US1] `project/ProjectController.java` — `POST`·`GET /api/v1/booths/{boothId}/projects`, `PATCH /api/v1/projects/{projectId}`. 인증 주체는 **`MemberPrincipal.requireMemberId(jwt, "회원 계정만 프로젝트를 편집할 수 있습니다.")`** — `booth/BoothPrincipal`은 package-private라 이 패키지에서 못 쓴다. `POST`는 `201`, 나머지 `200`. 응답 DTO는 `record`(키가 조건부로 사라지지 않게)
 
 ### 테스트 — `backend/src/test/java/com/example/ssafesta/project/ProjectApiIntegrationTest.java`
 
@@ -98,18 +106,30 @@
 + `MockMvc`, `BoothTestSupport.createMemberWithWallet`, `BoothLayoutTestSupport.grantLease`,
 `@BeforeEach releaseAllSlots`).
 
-- [ ] T016 [P] [US1] 등록 성공 — `name`만 보낸 `POST` → `201`, URL 5필드가 **키는 있고 값은 `null`**. 키 존재를 함께 단언한다 (C-03, I-4)
-- [ ] T017 [P] [US1] 빈 목록 — 프로젝트 없는 부스의 `GET` → `200 {"projects": []}`. **404가 아니다**
-- [ ] T018 [P] [US1] 왕복 무손실 — 스킴을 `HtTpS`로 저장하고 바이트 그대로 반환되는지. 정규화가 끼어들면 이 케이스만 잡는다 (I-3)
-- [ ] T019 [P] [US1] C-06 세 갈래 — `{"description": null}` 삭제 / 키 누락 유지 / `{}` → 400. ⚠️ **`jsonPath().doesNotExist()`를 쓰지 마라** — 명시적 `null`도 통과한다(T-97). `value(nullValue())` + 키 존재를 함께 단언한다
-- [ ] T020 [P] [US1] URL 5필드 삭제 — **`@ParameterizedTest`로 5개 필드**를 돌려, 값이 있는 상태에서 `{"<필드>": null}` `PATCH` → 그 필드만 `null`이 되고 나머지 4개는 그대로
-- [ ] T021 [P] [US1] 부스당 1개 — 같은 부스에 `POST` 두 번 → 두 번째 `409 PROJECT_ALREADY_EXISTS` **(Jira 완료 조건)**
-- [ ] T022 [P] [US1] 타 부스 차단 — A 부스 소유자 토큰으로 B 부스 프로젝트에 `PATCH` → `403 BOOTH_EDITOR_FORBIDDEN` **(Jira 완료 조건)**
-- [ ] T023 [P] [US1] 만료 부스 — 임대 만료 후 `PATCH` → `409 BOOTH_LEASE_EXPIRED`, 그러나 **`GET`은 값을 돌려준다** (FR-008, R-06)
-- [ ] T024 [P] [US1] 게스트 거부 — 게스트 토큰으로 세 endpoint 전부 → `403 MEMBER_ONLY` (헌법 12조)
-- [ ] T025 [P] [US1] `project/ProjectConcurrencyIntegrationTest.java` — 같은 부스에 `POST` 2건 동시 → 하나만 `201`, 나머지 `409 PROJECT_ALREADY_EXISTS`. **유니크 제약과 `saveAndFlush` 번역이 실제로 도는지** 본다. `BoothLeaseConcurrencyIntegrationTest` 형태
+- [x] T016 [P] [US1] 등록 성공 — `name`만 보낸 `POST` → `201`, URL 5필드가 **키는 있고 값은 `null`**. 키 존재를 함께 단언한다 (C-03, I-4)
+- [x] T017 [P] [US1] 빈 목록 — 프로젝트 없는 부스의 `GET` → `200 {"projects": []}`. **404가 아니다**
+- [x] T018 [P] [US1] 왕복 무손실 — 스킴을 `HtTpS`로 저장하고 바이트 그대로 반환되는지. 정규화가 끼어들면 이 케이스만 잡는다 (I-3)
+- [x] T019 [P] [US1] C-06 세 갈래 — `{"description": null}` 삭제 / 키 누락 유지 / `{}` → 400. ⚠️ **`jsonPath().doesNotExist()`를 쓰지 마라** — 명시적 `null`도 통과한다(T-97). `value(nullValue())` + 키 존재를 함께 단언한다
+- [x] T020 [P] [US1] URL 5필드 삭제 — **`@ParameterizedTest`로 5개 필드**를 돌려, 값이 있는 상태에서 `{"<필드>": null}` `PATCH` → 그 필드만 `null`이 되고 나머지 4개는 그대로
+- [x] T021 [P] [US1] 부스당 1개 — 같은 부스에 `POST` 두 번 → 두 번째 `409 PROJECT_ALREADY_EXISTS` **(Jira 완료 조건)**
+- [x] T022 [P] [US1] 타 부스 차단 — A 부스 소유자 토큰으로 B 부스 프로젝트에 `PATCH` → `403 BOOTH_EDITOR_FORBIDDEN` **(Jira 완료 조건)**
+- [x] T023 [P] [US1] 만료 부스 — 임대 만료 후 `PATCH` → `409 BOOTH_LEASE_EXPIRED`, 그러나 **`GET`은 값을 돌려준다** (FR-008, R-06)
+- [x] T024 [P] [US1] 게스트 거부 — 게스트 토큰으로 세 endpoint 전부 → `403 MEMBER_ONLY` (헌법 12조)
+- [x] T025 [P] [US1] `project/ProjectConcurrencyIntegrationTest.java` — 같은 부스에 `POST` 2건 동시 → 하나만 `201`, 나머지 `409 PROJECT_ALREADY_EXISTS`. **유니크 제약과 `saveAndFlush` 번역이 실제로 도는지** 본다. `BoothLeaseConcurrencyIntegrationTest` 형태
 
 **Checkpoint**: US1 단독으로 배포 가능. FE가 등록·수정 폼을 만들 수 있다.
+
+> **구현 중 계획과 달라진 것 3가지** (전부 테스트 쪽이고 계약은 안 바뀌었다)
+>
+> 1. **US2 를 별도 클래스로 뺐다** — `ProjectValidationApiIntegrationTest`. 계획은 한 클래스였는데
+>    검증 케이스가 커졌다. 그래서 신규 **3 클래스**(계획 2), 기준선 43 → 46.
+> 2. **`BoothTestSupport`·`BoothLayoutTestSupport` 를 `public` 으로 열었다** — package-private 라
+>    `project` 테스트에서 못 부른다. 클래스 + 쓰는 메서드 4 개만. 프로덕션 영향 0.
+> 3. **닉네임 prefix 예산은 7 자다** — `nickname VARCHAR(30)` 인데 헬퍼가
+>    `prefix + seq + "_" + nanoTime` 을 쓴다. 파라미터화 테스트에서 필드명을 prefix 에 붙이면 터진다.
+>
+> 덤으로: 이 저장소 Jackson 은 **3(`tools.jackson`)** 이라 `com.fasterxml…ObjectMapper` 는 빈이 아니다.
+> `JsonMapper` 를 주입한다 — 애너테이션(`@JsonProperty`)만 `com.fasterxml` 이라 헷갈린다.
 
 ---
 
@@ -120,9 +140,9 @@
 **Independent Test**: 5개 URL 필드 각각에 `javascript:alert(1)`을 넣으면 `400`이 나오고,
 `errors[0].field`가 그 필드이며, 메시지가 "형식 오류"가 아니라 **스킴 위반**을 말한다.
 
-- [ ] T026 [P] [US2] URL 검증 거부 계약 — **`@ParameterizedTest`로 5개 URL 필드**에 `javascript:alert(1)` 투입 → `400 VALIDATION_FAILED` + `errors[0].rule == "FIELD_INVALID"` + `errors[0].field == <그 필드명>`. **메시지가 `형식이 올바르지 않습니다`가 아니라 `http 또는 https로 시작해야 합니다`인지까지 단언한다** — 검증 순서(scheme > host)가 살아 있는지 잡는 **유일한 자리**다 **(Jira 완료 조건)**
-- [ ] T027 [P] [US2] `name` 경계 — 100자 통과 / 101자 `400` / `null` `400` / 공백만 `400`. 각각 `field == "name"`
-- [ ] T028 [P] [US2] URL 길이·형식 나머지 — 2049자 `400`, `not a url` `400`, `data:text/html,x` `400`(스킴 사유). 5필드 중 대표 1개로만 확인해도 된다 (T026이 필드 매핑을 이미 덮는다)
+- [x] T026 [P] [US2] URL 검증 거부 계약 — **`@ParameterizedTest`로 5개 URL 필드**에 `javascript:alert(1)` 투입 → `400 VALIDATION_FAILED` + `errors[0].rule == "FIELD_INVALID"` + `errors[0].field == <그 필드명>`. **메시지가 `형식이 올바르지 않습니다`가 아니라 `http 또는 https로 시작해야 합니다`인지까지 단언한다** — 검증 순서(scheme > host)가 살아 있는지 잡는 **유일한 자리**다 **(Jira 완료 조건)**
+- [x] T027 [P] [US2] `name` 경계 — 100자 통과 / 101자 `400` / `null` `400` / 공백만 `400`. 각각 `field == "name"`
+- [x] T028 [P] [US2] URL 길이·형식 나머지 — 2049자 `400`, `not a url` `400`, `data:text/html,x` `400`(스킴 사유). 5필드 중 대표 1개로만 확인해도 된다 (T026이 필드 매핑을 이미 덮는다)
 
 **Checkpoint**: SC-004(형식이 잘못된 링크 등록 0건)의 서버 몫이 성립한다.
 
@@ -132,11 +152,11 @@
 
 문서 반영은 **구현과 같은 커밋**이다 (016 선례 `fa50d91`).
 
-- [ ] T029 [P] `docs/08_Backend_API_명세서.md` **§5 Project** — endpoint 4개의 이름뿐인 서술을 실제 shape·오류·게이트로 교체. homepage 절(`:443`)처럼 **endpoint별 실패 목록**을 적는다. 내용은 `../contracts/project-api.md`에서 가져온다
-- [ ] T030 [P] `docs/08_Backend_API_명세서.md` **§18 주요 오류 코드**(`:867` 표)에 `PROJECT_NOT_FOUND` · `PROJECT_ALREADY_EXISTS` 추가. ⚠️ **§1.3-1 전역 `rule` 목록에는 넣지 마라** — 그 표는 `errors[].rule` 전용이고 이 둘은 봉투 **최상위 `code`**다. 이 API가 내는 rule은 기존 `FIELD_INVALID` 하나뿐이라 전역 표에 추가할 것이 없다 (R-07)
-- [ ] T031 [P] `docs/sdd/parts/BE.md:18` — 009 행의 `CRUD + S3`에서 **S3를 지운다.** C-03이 업로드 미지원으로 닫았고, 이 낡은 한 줄이 "S3 업로드" task를 다시 만들어 낸다 (R-10)
-- [ ] T032 `docs/24_작업일지.md`에 2026-08-28 항목 기록. 문제가 생겼으면 **해결 여부와 무관하게** `docs/25_트러블슈팅.md`에 T-번호로 등록하고 일지에서는 번호로 링크 (헌법 29조)
-- [ ] T033 전체 회귀 — `cd backend && ./mvnw test`. **T001 기준선 + 2 클래스, 실패 0.** 특히 `BoothHomepageApiIntegrationTest` 19개가 살아 있는지 확인하고 T001 표의 "완료 시" 행을 채운다
+- [x] T029 [P] `docs/08_Backend_API_명세서.md` **§5 Project** — endpoint 4개의 이름뿐인 서술을 실제 shape·오류·게이트로 교체. homepage 절(`:443`)처럼 **endpoint별 실패 목록**을 적는다. 내용은 `../contracts/project-api.md`에서 가져온다
+- [x] T030 [P] `docs/08_Backend_API_명세서.md` **§18 주요 오류 코드**(`:867` 표)에 `PROJECT_NOT_FOUND` · `PROJECT_ALREADY_EXISTS` 추가. ⚠️ **§1.3-1 전역 `rule` 목록에는 넣지 마라** — 그 표는 `errors[].rule` 전용이고 이 둘은 봉투 **최상위 `code`**다. 이 API가 내는 rule은 기존 `FIELD_INVALID` 하나뿐이라 전역 표에 추가할 것이 없다 (R-07)
+- [x] T031 [P] `docs/sdd/parts/BE.md:18` — 009 행의 `CRUD + S3`에서 **S3를 지운다.** C-03이 업로드 미지원으로 닫았고, 이 낡은 한 줄이 "S3 업로드" task를 다시 만들어 낸다 (R-10)
+- [x] T032 `docs/24_작업일지.md`에 2026-08-28 항목 기록. 문제가 생겼으면 **해결 여부와 무관하게** `docs/25_트러블슈팅.md`에 T-번호로 등록하고 일지에서는 번호로 링크 (헌법 29조)
+- [x] T033 전체 회귀 — `cd backend && ./mvnw test`. **T001 기준선 + 2 클래스, 실패 0.** 특히 `BoothHomepageApiIntegrationTest` 19개가 살아 있는지 확인하고 T001 표의 "완료 시" 행을 채운다
 - [ ] T034 quickstart §4의 **손 왕복 8단계**를 실제 스택으로 한 번 돌린다. 4번(스킴 사유 문장)이 사용자에게 어떻게 보이는지 사람이 한 번 읽는 것이 이 task의 목적이다
 - [ ] T035 MR `[S15P21A604-110][BE] 프로젝트 전시 등록·수정 API` → `develop`, Default 템플릿. **`Closes S15P21A604-110`이 develop에 도달하는 커밋 메시지에 있는지 머지 시점에 눈으로 확인한다** — MR 설명에만 있으면 전환이 발화하지 않는다. squash 커밋과 merge 커밋 메시지를 **둘 다** 본다 (109 실측: squash `2545eb3`에는 없었고 merge `4169e79` 본문에 있어 발화)
 

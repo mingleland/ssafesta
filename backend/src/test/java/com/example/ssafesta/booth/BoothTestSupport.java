@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Shared helpers for booth lease tests. */
-final class BoothTestSupport {
+public final class BoothTestSupport {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
@@ -17,7 +17,7 @@ final class BoothTestSupport {
     }
 
     /** Creates a member with a wallet and the signup grant, as registration would. */
-    static Long createMemberWithWallet(UserRepository users, WalletService wallets, String prefix) {
+    public static Long createMemberWithWallet(UserRepository users, WalletService wallets, String prefix) {
         Long userId = users.save(new User(prefix + SEQUENCE.incrementAndGet() + "_" + System.nanoTime())).getId();
         wallets.openWallet(userId);
         return userId;
@@ -28,7 +28,7 @@ final class BoothTestSupport {
      * one database would otherwise run out after the first few. Call this before each test rather
      * than after, so a class is unaffected by whatever another class left behind.
      */
-    static void releaseAllSlots(JdbcTemplate jdbc) {
+    public static void releaseAllSlots(JdbcTemplate jdbc) {
         jdbc.update("UPDATE booth_leases SET status = 'EXPIRED' WHERE status = 'ACTIVE'");
         jdbc.update("UPDATE booths SET current_slot_id = NULL, status = 'INACTIVE' WHERE current_slot_id IS NOT NULL");
     }

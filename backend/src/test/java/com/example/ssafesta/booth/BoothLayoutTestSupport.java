@@ -3,7 +3,7 @@ package com.example.ssafesta.booth;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Layout JSON builders and lease fixtures shared by the spec 005 tests. */
-final class BoothLayoutTestSupport {
+public final class BoothLayoutTestSupport {
 
     private BoothLayoutTestSupport() {
     }
@@ -17,7 +17,7 @@ final class BoothLayoutTestSupport {
      *
      * @return the slot the lease landed on — the slot-keyed path (#62) has to know which room
      */
-    static Long grantLease(JdbcTemplate jdbc, Long boothId, Long userId) {
+    public static Long grantLease(JdbcTemplate jdbc, Long boothId, Long userId) {
         Long slotId = jdbc.queryForObject("""
                 SELECT id FROM booth_slots
                  WHERE slot_type = 'USER_RENTAL'
@@ -48,7 +48,7 @@ final class BoothLayoutTestSupport {
     }
 
     /** Pushes a booth's lease into the past, both ends — {@code CHECK(ends_at > starts_at)} forbids one. */
-    static void expireLease(JdbcTemplate jdbc, Long boothId) {
+    public static void expireLease(JdbcTemplate jdbc, Long boothId) {
         jdbc.update("""
                 UPDATE booth_leases
                    SET starts_at = now() - interval '25 hours', ends_at = now() - interval '1 hour'
