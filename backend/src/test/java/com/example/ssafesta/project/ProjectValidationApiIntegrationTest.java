@@ -122,6 +122,40 @@ class ProjectValidationApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("저장소 주소 형식이 올바르지 않습니다."));
     }
 
+    /**
+     * 도달할 수 없는 포트는 거부한다.
+     *
+     * <p>{@code java.net.URI} 는 포트를 {@code *DIGIT} 로만 보므로 {@code :99999} 가 host 까지
+     * 멀쩡히 파싱된다 — 검증기가 포트를 안 보면 <b>연결 불가능한 주소가 저장</b>되고 방문자는
+     * 죽은 링크를 만난다 (SC-002). {@code :0} 도 클라이언트에게는 목적지가 아니다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"https://example.com:99999", "https://example.com:0",
+                            "https://example.com:65536"})
+    void anUnreachablePortIsRefusedAsAPort(String url) throws Exception {
+        Owner owner = leasedOwner("포트" + url.length());
+
+        mockMvc.perform(create(owner, """
+                        {"name": "포트", "deployUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("deployUrl"))
+                .andExpect(jsonPath("$.message")
+                        .value("배포 주소의 포트 번호가 올바르지 않습니다. (1~65535)"));
+    }
+
+    /** 정상 포트와 포트 없는 주소는 그대로 통과한다 — 위 규칙이 과하게 걸리지 않는지. */
+    @ParameterizedTest
+    @ValueSource(strings = {"https://example.com", "https://example.com:1",
+                            "https://example.com:8080", "https://example.com:65535"})
+    void usablePortsPass(String url) throws Exception {
+        Owner owner = leasedOwner("포통" + url.length());
+
+        mockMvc.perform(create(owner, """
+                        {"name": "포트", "deployUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deployUrl").value(url));
+    }
+
     /** 빈 문자열은 "지우기"가 아니다. 지우려면 null 을 보내야 한다 (계약 §1). */
     @Test
     void anEmptyStringIsRefusedRatherThanTreatedAsClearing() throws Exception {

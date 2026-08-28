@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProjectService {
 
     private static final int MAX_NAME = 100;
+
+    /** V14 가 만든 유니크 인덱스. 이 이름의 위반만 409 다 (아래 {@code translate}). */
+    private static final String PROJECT_BOOTH_INDEX = "ux_projects_booth";
 
     private final ProjectRepository projects;
     private final BoothEditorGuard editorGuard;
@@ -67,7 +71,7 @@ public class ProjectService {
             // try 바깥에서 터지고, 번역을 우회해 500 이 나간다 (BoothLeaseService 와 같은 이유).
             project = projects.saveAndFlush(project);
         } catch (DataIntegrityViolationException exception) {
-            throw new ProjectAlreadyExistsException(boothId);
+            throw translate(exception, boothId);
         }
         return ProjectView.of(project);
     }
@@ -179,6 +183,36 @@ public class ProjectService {
         if (field.present) {
             HttpUrlValidator.validate(field.value, jsonField, displayName);
         }
+    }
+
+    /**
+     * 이 INSERT 가 깨뜨릴 수 있는 제약은 하나가 아니다.
+     *
+     * <p>{@code ux_projects_booth} 는 경쟁에서 진 것이고 409 가 맞다. 그러나 {@code booth_id} 의
+     * 외래키도 같은 예외 타입으로 온다 — 등록하는 사이에 부스가 사라진 경우다. 그것까지
+     * "이미 프로젝트가 있습니다"로 답하면 사용자는 있지도 않은 프로젝트를 찾으러 간다.
+     *
+     * <p>그래서 <b>제약 이름을 보고</b>, 모르는 위반은 삼키지 않고 그대로 올린다
+     * ({@code GlobalExceptionHandler} 가 500 으로 낸다 — 서버가 설명하지 못하는 사건이라
+     * 그게 정직하다). {@code BoothLeaseService.translateRace} 와 같은 판별 방식이다.
+     */
+    RuntimeException translate(DataIntegrityViolationException exception, Long boothId) {
+        String constraint = constraintNameOf(exception);
+        if (constraint != null && constraint.toLowerCase().contains(PROJECT_BOOTH_INDEX)) {
+            return new ProjectAlreadyExistsException(boothId);
+        }
+        return exception;
+    }
+
+    /** The database's name for the violated constraint, or {@code null} when the driver omits it. */
+    private static String constraintNameOf(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null && cause != cause.getCause();
+                cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+        }
+        return null;
     }
 
     private ApiException rejectField(String jsonField, String message) {

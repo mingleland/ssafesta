@@ -78,7 +78,30 @@ public final class HttpUrlValidator {
         if (uri.getHost() == null) {
             throw reject(jsonField, displayName + " 주소 형식이 올바르지 않습니다.");
         }
+        if (!isUsablePort(uri.getPort())) {
+            throw reject(jsonField, displayName + " 주소의 포트 번호가 올바르지 않습니다. (1~65535)");
+        }
         return value;
+    }
+
+    /**
+     * {@code java.net.URI} does not bound the port — RFC 3986 defines it as {@code *DIGIT}, so
+     * {@code https://example.com:99999} parses cleanly with a host and a port of 99999.
+     *
+     * <p>That address can never be connected to. Letting it through would put a dead link in front
+     * of a visitor and quietly break SC-002, while the owner sees a saved value and no reason to
+     * doubt it. Port {@code 0} is refused for the same reason: it means "any free port" to a
+     * listener and nothing at all to a client.
+     *
+     * <p>Malformed ports never reach here — {@code :abc}, {@code :-1} and anything overflowing an
+     * {@code int} make the authority registry-based, so {@code getHost()} returns {@code null} and
+     * the previous rule already refused them as malformed. This rule exists for the narrow case the
+     * parser accepts: digits that fit an {@code int} but not a port.
+     *
+     * @param port {@code -1} when the URL carries no port, which is the normal case
+     */
+    private static boolean isUsablePort(int port) {
+        return port == -1 || (port >= 1 && port <= 65535);
     }
 
     /**
