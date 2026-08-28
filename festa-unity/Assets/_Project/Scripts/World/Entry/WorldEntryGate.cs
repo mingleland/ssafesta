@@ -42,6 +42,10 @@ namespace Festa.World
         bool _opening;
         float _openProgress;
 
+        GateFloorIndicator _floorIndicator;
+        float _floor = 1f;          // 표시 중인 층 (실수 — 부드럽게 올라간다)
+        const int TopFloor = 11;    // 도착층. 준비되기 전에는 절대 여기 닿지 않는다.
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoStart()
         {
@@ -76,6 +80,8 @@ namespace Festa.World
         {
             _elapsed += Time.deltaTime;
 
+            AdvanceFloorDisplay();
+
             if (_opening)
             {
                 AdvanceOpening();
@@ -104,6 +110,32 @@ namespace Festa.World
                                $"PlayerObject={(nm != null && nm.LocalClient != null && nm.LocalClient.PlayerObject != null)}");
                 BeginOpen("타임아웃 강제 개방");
             }
+        }
+
+        // ── 진행 표시 (FR-013) ────────────────────────────────────
+
+        /// <summary>
+        /// 접속 단계를 층수로 보여준다. 단계별 목표 층까지 올라가되,
+        /// **실제로 준비되기 전에는 도착층(11)에 닿지 않는다** — 다 온 것처럼 속이지 않는다.
+        /// </summary>
+        void AdvanceFloorDisplay()
+        {
+            if (_floorIndicator == null) return;
+
+            float target = TargetFloor();
+            // 초당 약 3층씩 — 멈춰 보이지도, 순간이동하지도 않는 속도.
+            _floor = Mathf.MoveTowards(_floor, target, 3f * Time.deltaTime);
+            _floorIndicator.SetNumber(Mathf.Clamp(Mathf.FloorToInt(_floor), 1, TopFloor));
+        }
+
+        float TargetFloor()
+        {
+            if (_opening) return TopFloor;
+
+            var nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsClient) return 3f;        // 아직 접속 시작 전
+            if (!nm.IsConnectedClient) return 6f;             // 전송 계층 연결·승인 대기
+            return TopFloor - 1f;                             // 승인됨 — 스폰만 남았다
         }
 
         // ── 준비 판정 ─────────────────────────────────────────────
@@ -137,12 +169,13 @@ namespace Festa.World
             var bounds = CalculateBounds(car);
 
             // 문 쪽(-x)을 바라보는 시점. 카메라는 칸 안쪽에 두고 문에서 조금 떨어뜨린다.
-            var eye = new Vector3(bounds.center.x + bounds.extents.x * 0.35f, bounds.min.y + 22f, bounds.center.z);
+            // 층수판이 문 위 높이(≈y56)에 있고 칸이 6m 높이라, 뒤쪽에서 올려다봐야 표시가 화면에 든다.
+            var eye = new Vector3(bounds.max.x - 2.5f, bounds.min.y + 26f, bounds.center.z);
 
             _gateCam = new GameObject("GateCamera").AddComponent<Camera>();
             _gateCam.transform.SetParent(transform, false);
-            _gateCam.transform.SetPositionAndRotation(eye, Quaternion.Euler(0f, 270f, 0f));
-            _gateCam.fieldOfView = 70f;
+            _gateCam.transform.SetPositionAndRotation(eye, Quaternion.Euler(-44f, 270f, 0f));
+            _gateCam.fieldOfView = 52f;   // 좁은 칸에 70도는 어안처럼 왜곡된다
             _gateCam.nearClipPlane = 0.3f;
             _gateCam.farClipPlane = 3000f;
             // 메인 카메라를 끄지 않고 위에 덮는다 — Camera.main 이 살아 있어야 PlayerCameraFollow 가 안 깨진다.
@@ -152,12 +185,22 @@ namespace Festa.World
             // (WebGL 화면당 광원 상한 32 — 현재 24 라 1개 추가는 안전하다. T-216)
             _gateLight = new GameObject("GateLight").AddComponent<Light>();
             _gateLight.transform.SetParent(transform, false);
-            _gateLight.transform.position = new Vector3(bounds.center.x, bounds.min.y + 46f, bounds.center.z);
-            _gateLight.type = LightType.Point;
-            _gateLight.range = 70f;
-            _gateLight.intensity = 260f;   // 실측으로 고른 값 — 900 은 완전 과노출, 260 이 문·트림이 보이는 지점
+            // 칸 중앙에 두면 문에 흰 스페큘러가 박힌다. 카메라 쪽으로 6 물리면 과노출 0% (실측).
+            _gateLight.transform.position = new Vector3(bounds.center.x + 6f, bounds.min.y + 57f, bounds.center.z);
+            _gateLight.transform.rotation = Quaternion.Euler(90f, 0f, 0f);   // 천장에서 아래로
+            _gateLight.type = LightType.Spot;      // 포인트광은 문에 흰 핫스팟을 만든다
+            _gateLight.spotAngle = 100f;
+            _gateLight.range = 90f;
+            _gateLight.intensity = 480f;
             _gateLight.color = new Color(1f, 0.94f, 0.86f);
             _gateLight.shadows = LightShadows.None;
+
+            // 층수 표시기 — 문 위 벽(실측 x≈18.5)과 천장(y≈59) 사이.
+            _floorIndicator = GateFloorIndicator.Build(
+                transform,
+                new Vector3(bounds.min.x + 3.6f, bounds.min.y + 56f, bounds.center.z),
+                4f);   // 문 상단(y≈53)과 천장(y≈59) 사이 6유닛에 들어가는 크기
+            if (_floorIndicator != null) _floorIndicator.SetNumber(1);
         }
 
         void CacheDoors(Transform car)
