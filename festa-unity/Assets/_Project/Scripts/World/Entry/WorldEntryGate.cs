@@ -44,6 +44,8 @@ namespace Festa.World
 
         GateFloorIndicator _floorIndicator;
         float _floor = 1f;          // 표시 중인 층 (실수 — 부드럽게 올라간다)
+        bool _arrivalRequested;     // 도착 예약 — 표시가 11 에 닿으면 연다
+        string _openReason = "";
         const int TopFloor = 11;    // 도착층. 준비되기 전에는 절대 여기 닿지 않는다.
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -80,24 +82,26 @@ namespace Festa.World
         {
             _elapsed += Time.deltaTime;
 
-            AdvanceFloorDisplay();
-
             if (_opening)
             {
                 AdvanceOpening();
                 return;
             }
 
-            if (IsPlayerReady())
-            {
-                BeginOpen("준비 완료");
-                return;
-            }
+            AdvanceFloorDisplay();
+
+            // 준비가 끝났다고 바로 열지 않는다. **11층 표시에 도착해야 연다** —
+            // 5층에서 문이 열리면 엘리베이터라는 연출 자체가 깨진다.
+            if (!_arrivalRequested && IsPlayerReady())
+                RequestArrival("준비 완료");
 
             // 접속 시도조차 없으면 개발자가 월드 씬을 단독 실행한 것 — 가릴 이유가 없다.
-            if (_elapsed >= _standaloneGraceSeconds && !IsConnectingOrConnected())
+            if (!_arrivalRequested && _elapsed >= _standaloneGraceSeconds && !IsConnectingOrConnected())
+                RequestArrival("접속 시도 없음(단독 실행)");
+
+            if (_arrivalRequested && _floor >= TopFloor)
             {
-                BeginOpen("접속 시도 없음(단독 실행)");
+                BeginOpen(_openReason);
                 return;
             }
 
@@ -108,8 +112,18 @@ namespace Festa.World
                 Debug.LogError($"[WorldEntryGate] {_forceOpenSeconds}초 안에 월드 준비가 끝나지 않아 강제로 연다. " +
                                $"IsClient={(nm != null && nm.IsClient)} " +
                                $"PlayerObject={(nm != null && nm.LocalClient != null && nm.LocalClient.PlayerObject != null)}");
+                // 도착 표시를 맞춰 두고 연다 — 문이 열리는데 5층이 떠 있으면 더 이상하다.
+                _floor = TopFloor;
+                if (_floorIndicator != null) _floorIndicator.SetNumber(TopFloor);
                 BeginOpen("타임아웃 강제 개방");
             }
+        }
+
+        /// <summary>도착을 예약한다. 실제 개방은 층수 표시가 11 에 닿은 뒤다.</summary>
+        void RequestArrival(string reason)
+        {
+            _arrivalRequested = true;
+            _openReason = reason;
         }
 
         // ── 진행 표시 (FR-013) ────────────────────────────────────
@@ -124,13 +138,15 @@ namespace Festa.World
 
             float target = TargetFloor();
             // 초당 약 3층씩 — 멈춰 보이지도, 순간이동하지도 않는 속도.
-            _floor = Mathf.MoveTowards(_floor, target, 3f * Time.deltaTime);
+            // 도착이 예약되면 빠르게 올린다 — 대기 시간을 늘리려고 만든 연출이 아니다.
+            float speed = _arrivalRequested ? 9f : 3f;
+            _floor = Mathf.MoveTowards(_floor, target, speed * Time.deltaTime);
             _floorIndicator.SetNumber(Mathf.Clamp(Mathf.FloorToInt(_floor), 1, TopFloor));
         }
 
         float TargetFloor()
         {
-            if (_opening) return TopFloor;
+            if (_opening || _arrivalRequested) return TopFloor;
 
             var nm = NetworkManager.Singleton;
             if (nm == null || !nm.IsClient) return 3f;        // 아직 접속 시작 전
