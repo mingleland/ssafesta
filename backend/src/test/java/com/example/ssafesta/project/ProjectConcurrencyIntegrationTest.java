@@ -98,7 +98,9 @@ class ProjectConcurrencyIntegrationTest {
             pool.awaitTermination(30, TimeUnit.SECONDS);
             List<Outcome> outcomes = new ArrayList<>();
             for (Future<Outcome> future : futures) {
-                outcomes.add(future.get());
+                // 시한을 건다. 인자 없는 get() 은 작업이 걸리면 영원히 기다리고, 그러면 실패한
+                // 테스트 하나가 스위트 전체를 세운다 — CI 에서는 무엇이 멈췄는지도 안 보인다.
+                outcomes.add(future.get(30, TimeUnit.SECONDS));
             }
             return outcomes;
         } finally {

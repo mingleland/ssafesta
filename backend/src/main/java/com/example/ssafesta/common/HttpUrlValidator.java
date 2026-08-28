@@ -1,17 +1,23 @@
 package com.example.ssafesta.common;
 
+import java.net.IDN;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.List;
 
 /**
- * The one place that decides whether a stored URL is acceptable (spec 004 §D09, 009 FR-004,
+ * Whether a URL a user typed is acceptable as a <b>destination</b> (spec 004 §D09, 009 FR-004,
  * 016 FR-002).
  *
  * <p>Extracted from {@code BoothHomepageService} when spec 009 arrived with <b>five</b> URL fields
- * of its own. Six copies of the same six-step check is how one of them eventually loses a step —
- * and the step most likely to be lost is the ordering below, which is invisible until someone reads
- * the rejection message.
+ * of its own. Six copies of the same check is how one of them eventually loses a step — and the
+ * step most likely to be lost is the ordering below, which is invisible until someone reads the
+ * rejection message.
+ *
+ * <p><b>Not every URL in this codebase comes here.</b> {@code BoothFacadeService} keeps its own
+ * rule for the logo, and deliberately: a logo is embedded in our page so it is https-only, while
+ * these fields are places the user is sent to and {@code http} works for that. Folding the two
+ * together would mean one of them silently loosening. Moving the facade here is a separate change
+ * that first has to decide which rule wins.
  *
  * <h2>What this class does not do</h2>
  *
@@ -75,10 +81,11 @@ public final class HttpUrlValidator {
         if (!isAllowedScheme(uri.getScheme())) {
             throw reject(jsonField, displayName + " 주소는 http 또는 https로 시작해야 합니다.");
         }
-        if (uri.getHost() == null) {
+        URI resolved = serverParsed(uri);
+        if (resolved == null) {
             throw reject(jsonField, displayName + " 주소 형식이 올바르지 않습니다.");
         }
-        if (!isUsablePort(uri.getPort())) {
+        if (!isUsablePort(resolved.getPort())) {
             throw reject(jsonField, displayName + " 주소의 포트 번호가 올바르지 않습니다. (1~65535)");
         }
         return value;
@@ -116,9 +123,38 @@ public final class HttpUrlValidator {
         return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
     }
 
+    /**
+     * {@code java.net.URI} parses the authority by RFC 2396, which predates internationalised
+     * domains — {@code https://한글도메인.com} comes back with a {@code null} host and would be
+     * refused as malformed. This is a Korean product; a Korean domain is not a malformed one.
+     *
+     * <p>The ASCII form is used only to <b>ask the question</b>. The stored value stays exactly what
+     * the user sent (invariant I-3), so the browser still receives the Unicode form it resolves.
+     *
+     * <p>An underscore host ({@code https://my_host.example.com}) stays refused. It is invalid under
+     * RFC 1123 and appears only on internal names, which are not destinations a visitor can reach —
+     * the case this validator exists for.
+     */
+    private static URI serverParsed(URI uri) {
+        if (uri.getHost() != null) {
+            return uri;
+        }
+        String authority = uri.getAuthority();
+        if (authority == null) {
+            return null;
+        }
+        try {
+            // 포트 판정도 이 결과로 한다 — 원본은 authority 가 registry-based 라 getPort() 가
+            // 항상 -1 이고, 그러면 한글 도메인만 포트 규칙을 빠져나간다.
+            URI ascii = new URI(uri.getScheme() + "://" + IDN.toASCII(authority));
+            return ascii.getHost() == null ? null : ascii;
+        } catch (IllegalArgumentException | URISyntaxException retryFailed) {
+            return null;
+        }
+    }
+
     /** One field broke its constraint, so the rule stays {@code FIELD_INVALID} (#58 §3). */
     private static ApiException reject(String jsonField, String message) {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, message,
-                List.of(ApiErrorDetail.field(jsonField, message)), null);
+        return ApiException.fieldInvalid(jsonField, message);
     }
 }

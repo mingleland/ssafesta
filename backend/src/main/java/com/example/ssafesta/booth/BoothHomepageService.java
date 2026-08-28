@@ -1,12 +1,10 @@
 package com.example.ssafesta.booth;
 
-import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
-import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.HttpUrlValidator;
+import com.example.ssafesta.common.PresenceField;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +54,7 @@ public class BoothHomepageService {
      * {@link HttpUrlValidator#validate}, which spec 009 shares across five more URL fields.
      */
     private String validated(HomepageCommand command) {
-        if (command == null || !command.present) {
+        if (command == null || !command.homepageUrl.isPresent()) {
             throw reject("homepageUrl 필드가 필요합니다.");
         }
         // 값의 형식 판정은 HttpUrlValidator 가 소유한다 (spec 009 가 URL 필드 5 개를 들고 오면서
@@ -64,13 +62,12 @@ public class BoothHomepageService {
         // 의 구분이고, 그것만은 endpoint 마다 뜻이 달라 옮길 수 없다.
         //
         // 문구는 바이트 단위로 이전과 같다. displayName "홈페이지" 가 기존 네 문장을 그대로 만든다.
-        return HttpUrlValidator.validate(command.homepageUrl, "homepageUrl", "홈페이지");
+        return HttpUrlValidator.validate(command.homepageUrl.value(), "homepageUrl", "홈페이지");
     }
 
     /** One field broke its constraint, so the rule stays {@code FIELD_INVALID} (#58 §3). */
     private ApiException reject(String message) {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, message,
-                List.of(ApiErrorDetail.field("homepageUrl", message)), null);
+        return ApiException.fieldInvalid("homepageUrl", message);
     }
 
     /**
@@ -84,13 +81,11 @@ public class BoothHomepageService {
      */
     public static final class HomepageCommand {
 
-        private String homepageUrl;
-        private boolean present;
+        private final PresenceField homepageUrl = new PresenceField();
 
         @JsonProperty("homepageUrl")
-        void setHomepageUrl(String homepageUrl) {
-            this.homepageUrl = homepageUrl;
-            this.present = true;
+        void setHomepageUrl(String value) {
+            homepageUrl.set(value);
         }
     }
 

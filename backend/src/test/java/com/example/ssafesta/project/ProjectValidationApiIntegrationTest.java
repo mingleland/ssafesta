@@ -109,6 +109,63 @@ class ProjectValidationApiIntegrationTest {
                 .andExpect(jsonPath("$.deployUrl").value("http://plain.example.com"));
     }
 
+    /**
+     * 한글 도메인은 형식 오류가 아니다.
+     *
+     * <p>`java.net.URI` 는 authority 를 RFC 2396 으로 읽어 `한글도메인.com` 의 host 를 `null` 로
+     * 준다. 그걸 그대로 믿으면 <b>한국 서비스가 한국 도메인을 거부</b>한다. punycode 로 바꿔
+     * 물어보되 저장은 사용자가 보낸 그대로다 (불변식 I-3).
+     */
+    @Test
+    void aKoreanDomainIsAcceptedAndStoredVerbatim() throws Exception {
+        Owner owner = leasedOwner("한글도");
+        String url = "https://한글도메인.com/작품";
+
+        mockMvc.perform(create(owner, """
+                        {"name": "한글", "portfolioUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.portfolioUrl").value(url));
+    }
+
+    /** punycode 로 직접 보내도 같다 — 브라우저 주소창에서 복사하면 보통 이 모양이다. */
+    @Test
+    void thePunycodeFormAlsoPasses() throws Exception {
+        Owner owner = leasedOwner("퓨니");
+
+        mockMvc.perform(create(owner, """
+                        {"name": "퓨니", "portfolioUrl": "https://xn--hq1bm8jm9l.com/x"}"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.portfolioUrl").value("https://xn--hq1bm8jm9l.com/x"));
+    }
+
+    /**
+     * 한글 도메인이라고 포트 규칙을 빠져나가면 안 된다.
+     *
+     * <p>원본 URI 는 authority 가 registry-based 라 `getPort()` 가 항상 -1 이다. 포트 판정을
+     * 원본으로 하면 이 한 줄만 규칙 밖에 놓인다.
+     */
+    @Test
+    void aKoreanDomainStillObeysThePortRule() throws Exception {
+        Owner owner = leasedOwner("한글포");
+
+        mockMvc.perform(create(owner, """
+                        {"name": "한글", "portfolioUrl": "https://한글도메인.com:99999/x"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("포트폴리오 주소의 포트 번호가 올바르지 않습니다. (1~65535)"));
+    }
+
+    /** 언더스코어 호스트는 계속 거부한다 — RFC 1123 위반이고 내부 이름에만 쓰인다. */
+    @Test
+    void anUnderscoreHostStaysRefused() throws Exception {
+        Owner owner = leasedOwner("언더");
+
+        mockMvc.perform(create(owner, """
+                        {"name": "언더", "gitUrl": "https://my_host.example.com/x"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("저장소 주소 형식이 올바르지 않습니다."));
+    }
+
     /** 형식 문제는 형식 문제라고 말한다 — 스킴 사유와 섞이지 않는다. */
     @ParameterizedTest
     @ValueSource(strings = {"not a url", "/relative/path", "https://"})

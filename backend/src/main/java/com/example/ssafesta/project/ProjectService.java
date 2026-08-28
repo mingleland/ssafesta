@@ -3,15 +3,16 @@ package com.example.ssafesta.project;
 import com.example.ssafesta.booth.BoothEditorGuard;
 import com.example.ssafesta.booth.BoothExpiredException;
 import com.example.ssafesta.booth.BoothLeaseRepository;
-import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.HttpUrlValidator;
+import com.example.ssafesta.common.PresenceField;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import org.hibernate.exception.ConstraintViolationException;
+import java.util.function.Consumer;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +54,7 @@ public class ProjectService {
         editorGuard.requireEditor(boothId, userId);
         requireValidLease(boothId);
 
-        String name = validatedName(command, true);
+        String name = validatedName(command);
         validateUrls(command);
 
         // 사전 검사와 제약 번역을 둘 다 둔다. 사전 검사는 흔한 중복에 제대로 된 문장을 주고,
@@ -63,12 +64,14 @@ public class ProjectService {
         }
 
         Instant now = Instant.now();
-        Project project = new Project(boothId, name, command.description.value,
-                command.thumbnailUrl.value, command.videoUrl.value, command.deployUrl.value,
-                command.gitUrl.value, command.portfolioUrl.value, now);
+        Project project = new Project(boothId, name, command.description.value(),
+                command.thumbnailUrl.value(), command.videoUrl.value(), command.deployUrl.value(),
+                command.gitUrl.value(), command.portfolioUrl.value(), now);
         try {
-            // saveAndFlush 다. save 만 쓰면 INSERT 가 커밋 시점으로 밀려 유니크 위반이 이
-            // try 바깥에서 터지고, 번역을 우회해 500 이 나간다 (BoothLeaseService 와 같은 이유).
+            // id 가 IDENTITY 라 save() 만으로도 INSERT 가 지금 나가고 위반도 여기서 잡힌다.
+            // 그래도 saveAndFlush 로 못박아 두는 것은, 생성 전략을 SEQUENCE 로 바꾸는 순간
+            // INSERT 가 커밋 시점으로 밀려 이 catch 가 조용히 무력해지기 때문이다 — 그때
+            // 깨지는 것은 이 줄이 아니라 사용자가 받는 500 이다.
             project = projects.saveAndFlush(project);
         } catch (DataIntegrityViolationException exception) {
             throw translate(exception, boothId);
@@ -93,30 +96,21 @@ public class ProjectService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "수정할 내용이 없습니다.");
         }
 
-        if (command.name.present) {
-            project.changeName(validatedName(command, false));
+        if (command.name.isPresent()) {
+            validatedName(command);
         }
         validateUrls(command);
 
-        if (command.description.present) {
-            project.changeDescription(command.description.value);
+        boolean changed = apply(command.name, project.getName(), project::changeName);
+        changed |= apply(command.description, project.getDescription(), project::changeDescription);
+        changed |= apply(command.thumbnailUrl, project.getThumbnailUrl(), project::changeThumbnailUrl);
+        changed |= apply(command.videoUrl, project.getVideoUrl(), project::changeVideoUrl);
+        changed |= apply(command.deployUrl, project.getDeployUrl(), project::changeDeployUrl);
+        changed |= apply(command.gitUrl, project.getGitUrl(), project::changeGitUrl);
+        changed |= apply(command.portfolioUrl, project.getPortfolioUrl(), project::changePortfolioUrl);
+        if (changed) {
+            project.touch(Instant.now());
         }
-        if (command.thumbnailUrl.present) {
-            project.changeThumbnailUrl(command.thumbnailUrl.value);
-        }
-        if (command.videoUrl.present) {
-            project.changeVideoUrl(command.videoUrl.value);
-        }
-        if (command.deployUrl.present) {
-            project.changeDeployUrl(command.deployUrl.value);
-        }
-        if (command.gitUrl.present) {
-            project.changeGitUrl(command.gitUrl.value);
-        }
-        if (command.portfolioUrl.present) {
-            project.changePortfolioUrl(command.portfolioUrl.value);
-        }
-        project.touch(Instant.now());
         return ProjectView.of(project);
     }
 
@@ -147,14 +141,16 @@ public class ProjectService {
                 .orElseThrow(() -> new BoothExpiredException(boothId));
     }
 
-    private String validatedName(ProjectCommand command, boolean required) {
-        if (command == null || !command.name.present) {
-            if (required) {
-                throw rejectField("name", "프로젝트 이름을 입력해 주세요.");
-            }
-            return null;
-        }
-        String name = command.name.value;
+    /**
+     * 통과하면 값을 돌려주고, 아니면 던진다. <b>{@code null} 을 돌려주는 경로가 없다</b> — 있으면
+     * 호출자가 그것을 {@code changeName(null)} 로 흘려 NOT NULL 컬럼을 깨뜨릴 수 있고, 그건
+     * 검증기가 만든 구멍이 된다.
+     *
+     * <p>키가 없는 경우는 호출자가 먼저 갈라야 한다. {@code POST} 는 필수라 여기 오면 오류이고,
+     * {@code PATCH} 는 "안 건드림"이라 애초에 이 함수를 부르지 않는다.
+     */
+    private String validatedName(ProjectCommand command) {
+        String name = command == null || !command.name.isPresent() ? null : command.name.value();
         if (name == null || name.isBlank()) {
             // NOT NULL 컬럼이라 명시적 null 도 삭제가 아니라 오류다.
             throw rejectField("name", "프로젝트 이름을 입력해 주세요.");
@@ -163,6 +159,19 @@ public class ProjectService {
             throw rejectField("name", "프로젝트 이름이 너무 깁니다. (최대 " + MAX_NAME + "자)");
         }
         return name;
+    }
+
+    /**
+     * 보낸 필드만, 그리고 <b>값이 실제로 달라졌을 때만</b> 적용한다.
+     *
+     * @return 이 필드가 행을 바꿨는지 — {@code updated_at} 을 흔들지 말지를 호출자가 이것으로 정한다
+     */
+    private static boolean apply(PresenceField field, String current, Consumer<String> setter) {
+        if (!field.isPresent() || Objects.equals(current, field.value())) {
+            return false;
+        }
+        setter.accept(field.value());
+        return true;
     }
 
     /**
@@ -179,9 +188,9 @@ public class ProjectService {
         validateUrl(command.portfolioUrl, "portfolioUrl", "포트폴리오");
     }
 
-    private void validateUrl(Field field, String jsonField, String displayName) {
-        if (field.present) {
-            HttpUrlValidator.validate(field.value, jsonField, displayName);
+    private void validateUrl(PresenceField field, String jsonField, String displayName) {
+        if (field.isPresent()) {
+            HttpUrlValidator.validate(field.value(), jsonField, displayName);
         }
     }
 
@@ -196,60 +205,28 @@ public class ProjectService {
      * ({@code GlobalExceptionHandler} 가 500 으로 낸다 — 서버가 설명하지 못하는 사건이라
      * 그게 정직하다). {@code BoothLeaseService.translateRace} 와 같은 판별 방식이다.
      */
-    RuntimeException translate(DataIntegrityViolationException exception, Long boothId) {
-        String constraint = constraintNameOf(exception);
-        if (constraint != null && constraint.toLowerCase().contains(PROJECT_BOOTH_INDEX)) {
-            return new ProjectAlreadyExistsException(boothId);
-        }
-        return exception;
-    }
-
-    /** The database's name for the violated constraint, or {@code null} when the driver omits it. */
-    private static String constraintNameOf(Throwable throwable) {
-        for (Throwable cause = throwable; cause != null && cause != cause.getCause();
-                cause = cause.getCause()) {
-            if (cause instanceof ConstraintViolationException violation) {
-                return violation.getConstraintName();
-            }
-        }
-        return null;
+    static RuntimeException translate(DataIntegrityViolationException exception, Long boothId) {
+        return ConstraintViolations.isViolationOf(exception, PROJECT_BOOTH_INDEX)
+                ? new ProjectAlreadyExistsException(boothId)
+                : exception;
     }
 
     private ApiException rejectField(String jsonField, String message) {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, message,
-                List.of(ApiErrorDetail.field(jsonField, message)), null);
+        return ApiException.fieldInvalid(jsonField, message);
     }
 
     // ── 요청·응답 ───────────────────────────────────────────────────────────
 
-    /**
-     * One field of a request, and whether the client actually sent it.
-     *
-     * <p>Jackson only calls a setter when the key is present, so {@code present} is the difference
-     * between "leave it alone" and "clear it" — a distinction a {@code record} cannot carry, because
-     * both arrive as {@code null}. 016 shipped that collapse once and {@code {}} became a silent
-     * unregister (T-97).
-     */
-    static final class Field {
-        private String value;
-        private boolean present;
-
-        void set(String value) {
-            this.value = value;
-            this.present = true;
-        }
-    }
-
     /** Not a {@code record} — see {@link Field}. */
     public static final class ProjectCommand {
 
-        private final Field name = new Field();
-        private final Field description = new Field();
-        private final Field thumbnailUrl = new Field();
-        private final Field videoUrl = new Field();
-        private final Field deployUrl = new Field();
-        private final Field gitUrl = new Field();
-        private final Field portfolioUrl = new Field();
+        private final PresenceField name = new PresenceField();
+        private final PresenceField description = new PresenceField();
+        private final PresenceField thumbnailUrl = new PresenceField();
+        private final PresenceField videoUrl = new PresenceField();
+        private final PresenceField deployUrl = new PresenceField();
+        private final PresenceField gitUrl = new PresenceField();
+        private final PresenceField portfolioUrl = new PresenceField();
 
         @JsonProperty("name")
         void setName(String value) { name.set(value); }
@@ -273,8 +250,8 @@ public class ProjectService {
         void setPortfolioUrl(String value) { portfolioUrl.set(value); }
 
         boolean hasAnyKey() {
-            return name.present || description.present || thumbnailUrl.present || videoUrl.present
-                    || deployUrl.present || gitUrl.present || portfolioUrl.present;
+            return name.isPresent() || description.isPresent() || thumbnailUrl.isPresent() || videoUrl.isPresent()
+                    || deployUrl.isPresent() || gitUrl.isPresent() || portfolioUrl.isPresent();
         }
     }
 

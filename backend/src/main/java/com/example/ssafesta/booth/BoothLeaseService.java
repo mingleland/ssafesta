@@ -1,12 +1,12 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.hibernate.exception.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -172,23 +172,13 @@ public class BoothLeaseService {
      * different fixes for the member, and after V6 either index can be the one that fires.
      */
     private RuntimeException translateRace(DataIntegrityViolationException exception, Long userId, Long slotId) {
-        String constraint = constraintNameOf(exception);
+        String constraint = ConstraintViolations.nameOf(exception);
         if (constraint != null && constraint.toLowerCase().contains(ACTIVE_LESSEE_INDEX)) {
             log.info("동시 임대 경합 — 이미 임대를 보유한 회원입니다, userId={}, slotId={}", userId, slotId);
             return new ActiveLeaseLimitException(null);
         }
         log.info("동시 임대 경합에서 밀렸습니다 — userId={}, slotId={}, constraint={}", userId, slotId, constraint);
         return new SlotAlreadyLeasedException(slotId);
-    }
-
-    /** The database's name for the violated constraint, or {@code null} when the driver omits it. */
-    private static String constraintNameOf(Throwable throwable) {
-        for (Throwable cause = throwable; cause != null && cause != cause.getCause(); cause = cause.getCause()) {
-            if (cause instanceof ConstraintViolationException violation) {
-                return violation.getConstraintName();
-            }
-        }
-        return null;
     }
 
     /**

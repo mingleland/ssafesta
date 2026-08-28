@@ -34,6 +34,23 @@ public class ApiException extends RuntimeException {
         this.warnings = warnings == null ? List.of() : List.copyOf(warnings);
     }
 
+    /**
+     * One request field violated its constraint — the shape eight throw sites were assembling by
+     * hand.
+     *
+     * <p>The envelope is fixed: {@code 400 VALIDATION_FAILED}, one detail whose {@code rule} is
+     * {@code FIELD_INVALID} and whose {@code field} names the offender. Spelling that out per call
+     * site is how one of them eventually puts the field name in {@code rule} and breaks a client's
+     * whitelist branch (#58 §3) — the very thing T058 was opened to fix.
+     *
+     * <p>The top-level {@code message} repeats the detail's on purpose: it is what the user is
+     * shown, and a field-level rejection has nothing more general to say.
+     */
+    public static ApiException fieldInvalid(String field, String message) {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, message,
+                List.of(ApiErrorDetail.field(field, message)), null);
+    }
+
     public ErrorCode errorCode() {
         return errorCode;
     }

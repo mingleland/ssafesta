@@ -17,13 +17,11 @@ import org.springframework.dao.DataIntegrityViolationException;
  */
 class ProjectConstraintTranslationTest {
 
-    private final ProjectService service = new ProjectService(null, null, null);
-
     @Test
     void theUniqueIndexOnBoothIdMeansTheBoothAlreadyHasOne() {
         DataIntegrityViolationException violation = violationOf("ux_projects_booth");
 
-        assertInstanceOf(ProjectAlreadyExistsException.class, service.translate(violation, 7L));
+        assertInstanceOf(ProjectAlreadyExistsException.class, ProjectService.translate(violation, 7L));
     }
 
     /** 대소문자는 드라이버·DB 마다 다르게 온다. 판정이 그것에 걸리면 안 된다. */
@@ -31,7 +29,7 @@ class ProjectConstraintTranslationTest {
     void theIndexNameIsMatchedCaseInsensitively() {
         DataIntegrityViolationException violation = violationOf("UX_PROJECTS_BOOTH");
 
-        assertInstanceOf(ProjectAlreadyExistsException.class, service.translate(violation, 7L));
+        assertInstanceOf(ProjectAlreadyExistsException.class, ProjectService.translate(violation, 7L));
     }
 
     /**
@@ -44,7 +42,7 @@ class ProjectConstraintTranslationTest {
     void aForeignKeyViolationIsNotTranslated() {
         DataIntegrityViolationException violation = violationOf("fk_projects_booth_id");
 
-        assertSame(violation, service.translate(violation, 7L));
+        assertSame(violation, ProjectService.translate(violation, 7L));
     }
 
     /** 드라이버가 제약 이름을 안 주면 추측하지 않는다. */
@@ -53,7 +51,7 @@ class ProjectConstraintTranslationTest {
         DataIntegrityViolationException violation =
                 new DataIntegrityViolationException("이름 없는 위반");
 
-        assertSame(violation, service.translate(violation, 7L));
+        assertSame(violation, ProjectService.translate(violation, 7L));
     }
 
     private static DataIntegrityViolationException violationOf(String constraint) {

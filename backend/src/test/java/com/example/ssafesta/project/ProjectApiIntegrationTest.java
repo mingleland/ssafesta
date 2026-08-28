@@ -30,6 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
+import tools.jackson.databind.json.JsonMapper;
 
 /** 프로젝트 전시 등록·수정·조회 (spec 009 FR-001~FR-004·FR-008, contracts/project-api.md). */
 @Import(TestcontainersConfiguration.class)
@@ -48,6 +49,7 @@ class ProjectApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private AccessTokenService accessTokens;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private JsonMapper jsonMapper;
 
     @BeforeEach
     void freeSlots() {
@@ -100,16 +102,59 @@ class ProjectApiIntegrationTest {
     @Test
     void storedUrlsRoundTripVerbatim() throws Exception {
         Owner owner = leasedOwner("왕복");
-        String url = "HtTpS://My-Team.Example.COM/Path?q=1&r=2#frag";
-
+        // 다섯 값이 서로 달라야 한다. 하나만 넣으면 생성자에서 인자 두 개가 뒤바뀌어도
+        // (thumbnailUrl <-> videoUrl) 아무 단언도 깨지지 않는다 — 7 개를 순서대로 받는
+        // 생성자에서 가장 흔한 실수가 그것이다.
         mockMvc.perform(create(owner, """
-                        {"name": "왕복", "deployUrl": "%s"}""".formatted(url)))
+                        {"name": "왕복",
+                         "thumbnailUrl": "HtTpS://Thumb.Example.COM/t?q=1#f",
+                         "videoUrl": "https://video.example.com/v",
+                         "deployUrl": "http://deploy.example.com/d",
+                         "gitUrl": "https://git.example.com/g",
+                         "portfolioUrl": "https://folio.example.com/p"}"""))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.deployUrl").value(url));
+                .andExpect(jsonPath("$.thumbnailUrl").value("HtTpS://Thumb.Example.COM/t?q=1#f"))
+                .andExpect(jsonPath("$.videoUrl").value("https://video.example.com/v"))
+                .andExpect(jsonPath("$.deployUrl").value("http://deploy.example.com/d"))
+                .andExpect(jsonPath("$.gitUrl").value("https://git.example.com/g"))
+                .andExpect(jsonPath("$.portfolioUrl").value("https://folio.example.com/p"));
 
+        // 저장을 거쳐 다시 읽어도 같은 자리에 있어야 한다 — 위는 echo 라 매핑만 맞아도 통과한다.
         mockMvc.perform(list(owner))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.projects[0].deployUrl").value(url));
+                .andExpect(jsonPath("$.projects[0].thumbnailUrl")
+                        .value("HtTpS://Thumb.Example.COM/t?q=1#f"))
+                .andExpect(jsonPath("$.projects[0].videoUrl").value("https://video.example.com/v"))
+                .andExpect(jsonPath("$.projects[0].deployUrl").value("http://deploy.example.com/d"))
+                .andExpect(jsonPath("$.projects[0].gitUrl").value("https://git.example.com/g"))
+                .andExpect(jsonPath("$.projects[0].portfolioUrl")
+                        .value("https://folio.example.com/p"));
+    }
+
+    /**
+     * 편집자 가드는 <b>세 endpoint 전부</b>에 걸려 있다.
+     *
+     * <p>`PATCH` 만 검증하면 `POST`·`GET` 에서 가드를 빼먹어도 아무도 모른다 — 남의 부스에
+     * 프로젝트를 만들어 넣거나 남의 저장값을 읽는 구멍이 조용히 열린다.
+     */
+    @Test
+    void everyEndpointRefusesSomeoneElsesBooth() throws Exception {
+        Owner mine = leasedOwner("내부스2");
+        Owner stranger = leasedOwner("남부스2");
+        String strangerToken = bearerFor(stranger.userId());
+
+        mockMvc.perform(post("/api/v1/booths/{id}/projects", mine.boothId())
+                        .header("Authorization", strangerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "남의 부스에 등록"}"""))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+
+        mockMvc.perform(get("/api/v1/booths/{id}/projects", mine.boothId())
+                        .header("Authorization", strangerToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
     }
 
     // ── 조회 (US1) ──────────────────────────────────────────────────────────
@@ -255,12 +300,17 @@ class ProjectApiIntegrationTest {
 
     // ── 헬퍼 ────────────────────────────────────────────────────────────────
 
+    /**
+     * 응답에서 id 를 꺼낸다.
+     *
+     * <p>문자열을 손으로 자르지 않는다 — 그렇게 하면 {@code projectId} 가 마지막 필드로 옮겨가는
+     * 순간(뒤에 쉼표가 없다) 테스트가 파싱 오류로 죽고, 원인은 필드 순서라는 무관한 사실이 된다.
+     */
     private Long createProject(Owner owner, String body) throws Exception {
         String json = mockMvc.perform(create(owner, body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        int at = json.indexOf("\"projectId\":");
-        return Long.parseLong(json.substring(at + 12, json.indexOf(',', at)).trim());
+        return jsonMapper.readTree(json).get("projectId").asLong();
     }
 
     private RequestBuilder create(Owner owner, String body) {
