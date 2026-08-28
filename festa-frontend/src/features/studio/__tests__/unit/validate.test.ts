@@ -19,6 +19,11 @@ describe('precheckWarnings — CONFIG_NOT_LINKED', () => {
     expect(precheckWarnings([obj({ objectId: 'a', type: 'AI_AGENT', configId: 1 })])).toEqual([]);
   });
 
+  // 016 확정(#97) 회귀 — LAPTOP을 다시 경고 대상으로 되돌리면 여기서 깨진다.
+  it('LAPTOP은 주소를 booths.homepage_url이 소유하므로 configId 없어도 경고하지 않는다', () => {
+    expect(precheckWarnings([obj({ objectId: 'a', type: 'LAPTOP' })])).toEqual([]);
+  });
+
   it('장식형(FURNITURE·DECORATION)은 연결 요건이 없어 경고하지 않는다', () => {
     expect(precheckWarnings([obj({ objectId: 'a', type: 'FURNITURE' })])).toEqual([]);
   });
