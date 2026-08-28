@@ -53,32 +53,72 @@ namespace Festa.Content
             if (cam == null) return;
 
             bool pressed = TryReadPress(out var pressPosition);
+            bool interactKey = InteractKeyPressedThisFrame();
             if (!TryReadPointer(out var pointerPosition)) { UpdateHover(null); return; }
 
             // 호버는 매 프레임, 클릭은 눌린 프레임에만. 레이는 한 번만 쏜다.
             bool hasHit = Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance);
 
             // 콜라이더가 자식에 있어도 루트의 상호작용 컴포넌트를 찾는다.
-            UpdateHover(hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null);
+            var aimed = hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null;
 
-            if (!pressed) return;
+            // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
+            // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다. MaxDistance 를 두고도
+            // 디스패처가 검사하지 않았던 탓이다.
+            bool inRange = aimed != null && IsInRange(aimed);
+            UpdateHover(inRange ? aimed : null);
+            ShowHint(inRange ? aimed : null);
+
+            if (!pressed && !interactKey) return;
 
             // 누른 좌표가 호버 좌표와 다를 수 있으므로(터치) 클릭은 따로 쏜다.
-            if (pressPosition != pointerPosition)
+            // F 키는 지금 보고 있는 대상에 그대로 건다.
+            if (pressed && pressPosition != pointerPosition)
+            {
                 hasHit = Physics.Raycast(cam.ScreenPointToRay(pressPosition), out hit, MaxRayDistance);
-            if (!hasHit) return;
+                var pressAimed = hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null;
+                if (pressAimed == null || !IsInRange(pressAimed)) return;
+            }
+            else if (!inRange) return;
 
-            var laptop = hit.collider.GetComponentInParent<LaptopInteractable>();
+            if (!hasHit) return;
+            Dispatch(hit.collider);
+        }
+
+        /// <summary>타입별 상호작용으로 넘긴다. 클릭·F 키가 같은 경로를 쓴다.</summary>
+        static void Dispatch(Collider collider)
+        {
+            var laptop = collider.GetComponentInParent<LaptopInteractable>();
             if (laptop != null) { laptop.Interact(); return; }
 
-            var ai = hit.collider.GetComponentInParent<AiNpcInteractable>();
+            var ai = collider.GetComponentInParent<AiNpcInteractable>();
             if (ai != null) { ai.Interact(); return; }
 
-            // spec 014 미니게임 진입. 기존 두 분기와 같은 형태로 붙인다 —
-            // 타입별 분기를 일반화하는 건 S15P21A604-303 의 몫이고, 여기서 같이 하면
-            // 미니게임 변경과 리팩터링이 한 커밋에 섞인다.
-            var minigame = hit.collider.GetComponentInParent<Festa.Minigame.MinigameInteractable>();
+            // spec 014 미니게임. 타입 분기 일반화는 S15P21A604-303 의 몫이라 여기서 섞지 않는다.
+            var minigame = collider.GetComponentInParent<Festa.Minigame.MinigameInteractable>();
             if (minigame != null) minigame.Interact();
+        }
+
+        /// <summary>
+        /// 상호작용 사거리 안인가. **카메라가 아니라 플레이어 기준으로 잰다** —
+        /// 3인칭이라 카메라는 플레이어보다 몇 m 뒤에 있어서, 카메라 거리로 재면
+        /// 눈앞의 대상도 사거리 밖으로 판정된다. 플레이어를 못 찾으면 카메라로 떨어진다.
+        /// </summary>
+        static bool IsInRange(Festa.Booth.BoothInteractionTarget target)
+        {
+            var origin = InteractionOrigin();
+            if (origin == null) return true;   // 기준을 못 잡으면 막지 않는다 (조용히 잠그지 않는다)
+            return Vector3.Distance(origin.Value, target.transform.position) <= target.MaxDistance;
+        }
+
+        static Vector3? InteractionOrigin()
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            var player = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+            if (player != null) return player.transform.position;
+
+            var cam = ResolveCamera();
+            return cam != null ? cam.transform.position : (Vector3?)null;
         }
 
         void UpdateHover(Festa.Booth.BoothInteractionTarget next)
@@ -145,6 +185,80 @@ namespace Festa.Content
             }
 #endif
             return false;
+        }
+
+        /// <summary>
+        /// 상호작용 키(F)가 이번 프레임에 눌렸는가.
+        ///
+        /// 클릭을 없애지 않고 **F 를 함께 받는다.** docs/02 RUNTIME-06 과 spec 016 이
+        /// "노트북을 클릭하면" 으로 적혀 있어 클릭을 빼면 문서·FE 계약과 어긋난다.
+        /// 클릭만 두면 3인칭에서 카메라·UI 조작과 경쟁해 오조작이 난다 — 둘 다 받는 게
+        /// 지금 시점의 안전한 답이다. 클릭 제거 여부는 팀 결정 사항으로 올려 뒀다.
+        /// </summary>
+        static bool InteractKeyPressedThisFrame()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            if (keyboard != null) return keyboard.fKey.wasPressedThisFrame;
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetKeyDown(KeyCode.F);
+#else
+            return false;
+#endif
+        }
+
+        // ── 근접 힌트 ────────────────────────────────────────
+        // 사거리 안에 상호작용 대상이 들어오면 "F — 상호작용" 을 띄운다.
+        // 키가 있다는 걸 알려주지 않으면 F 조작은 없는 기능이나 마찬가지다.
+        static UnityEngine.UI.Text s_hint;
+
+        static void ShowHint(Festa.Booth.BoothInteractionTarget target)
+        {
+            if (target == null)
+            {
+                if (s_hint != null) s_hint.enabled = false;
+                return;
+            }
+            EnsureHint();
+            if (s_hint == null) return;
+            s_hint.enabled = true;
+        }
+
+        static void EnsureHint()
+        {
+            if (s_hint != null) return;
+
+            var canvasGo = new GameObject("@InteractHint",
+                typeof(Canvas), typeof(UnityEngine.UI.CanvasScaler));
+            var canvas = canvasGo.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            // 게임 화면(500)보다 아래 — 모달이 떠 있으면 힌트가 그 위로 올라오면 안 된다.
+            canvas.sortingOrder = 100;
+            var scaler = canvasGo.GetComponent<UnityEngine.UI.CanvasScaler>();
+            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            var go = new GameObject("Hint", typeof(RectTransform), typeof(UnityEngine.UI.Text));
+            go.transform.SetParent(canvasGo.transform, false);
+            s_hint = go.GetComponent<UnityEngine.UI.Text>();
+            // 로비·미니게임과 같은 폰트라야 한글이 깨지지 않는다 (T-22 는 IMGUI 한정).
+            var font = Resources.Load<Font>("Fonts/MalgunGothicLight");
+            s_hint.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            s_hint.text = "F — 상호작용";
+            s_hint.fontSize = 30;
+            s_hint.fontStyle = FontStyle.Bold;
+            s_hint.color = new Color(1f, 0.86f, 0.5f, 1f);
+            s_hint.alignment = TextAnchor.MiddleCenter;
+            s_hint.horizontalOverflow = HorizontalWrapMode.Overflow;
+            s_hint.raycastTarget = false;   // 힌트가 클릭을 먹으면 안 된다
+
+            var rect = s_hint.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.sizeDelta = new Vector2(600, 48);
+            rect.anchoredPosition = new Vector2(0f, 150f);
         }
 
         /// <summary>
