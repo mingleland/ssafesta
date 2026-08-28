@@ -11,12 +11,15 @@
 
 **원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**열린 내 MR 은 0건이다.** 08-28 에 `!67`·`!63`·`!93` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
+**열린 내 MR 은 0건이다.** 08-28 에 `!67`·`!63`·`!93`·`!94`·`!95` 를 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
+
+**`front` 는 develop 과 0 behind 다**(2026-08-28, 머지 `3578e9c`). front 가 develop 에 대해 고유하게 갖는 것은 `docs/LJH/` 와 `.claude/launch.json` 둘뿐이고, 그 밖의 경로는 `git diff origin/develop front` 가 빈 출력이다. 다음 동기화는 fast-forward 에 가깝다.
 
 **셀프 머지는 이 팀의 관행이다** — `docs/17` §8:269 는 "최소 1명 Review **권장**", 머지된 MR 34건 중 author == merged_by 가 33/34, 보호 브랜치는 `main` 하나, 내 권한은 Maintainer(40). `approved_by=[]` 는 승인 대기가 아니다.
 
 ## 내 액션 필요
 
+- [ ] **`specs/016` spec.md 29줄 반입 제안 — #115 스레드 게시 대기.** Unity→React `BOOTH_LAPTOP_INTERACT` 계약 블록이 front 에만 있다(develop 의 이 파일은 최초 spec-kit 커밋 이후 무변경 = 미반입). **리드 문서라 별도 MR 로 밀지 않는다** — #115 §2 가 이미 같은 파일의 3건을 리드 몫으로 걸어 뒀으니 그 스레드에서 함께 승인받는다
 - [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
@@ -26,7 +29,7 @@
 
 **`-116` 계약 기준 구현이 develop 에 있다** — [MR !67](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/67) 08-28 머지(`Closes` 없음). 완료 조건 4개가 전부 서버 왕복을 요구해 `-107`·`-176` 대기로 남는다.
 
-- [ ] **`-187` `asset://` 참조 해석·회귀** — Jira 상 `BLOCKED BY -107·116·176`. 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 서버가 필요하다. resolver 단위 테스트분은 `-116` 구현과 함께 들어갔다(17건)
+- [ ] **`-187` `asset://` 참조 해석·회귀 — 단위 몫 완료, 실서버 대기.** 페이지 배선 회귀 4건을 `-317`([MR !94](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/94)) 와 함께 넣었다(`playGamePageAssetWiring.test.tsx` — 익명·object URL 도달·`asset://local` 미유출·404 격리). 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 실서버가 필요하고 `-107`·`-176` 대기다
 
 **D5(OAuth 자격증명, Google·Kakao·SSAFY)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
 
