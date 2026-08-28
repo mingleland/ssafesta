@@ -23,7 +23,7 @@ namespace Festa.Minigame
     /// </summary>
     public sealed class TimerStopGameHud : MonoBehaviour
     {
-        static readonly Color Backdrop = new(0.03f, 0.035f, 0.05f, 0.86f);
+        static readonly Color Backdrop = new(0.03f, 0.035f, 0.05f, 0.93f);
         static readonly Color Panel = new(0.075f, 0.08f, 0.10f, 0.99f);
         static readonly Color Card = new(0.145f, 0.155f, 0.185f, 0.99f);
         static readonly Color Border = new(0.34f, 0.35f, 0.39f, 0.94f);
@@ -85,26 +85,30 @@ namespace Festa.Minigame
             var pr = panel.rectTransform;
             pr.anchorMin = pr.anchorMax = new Vector2(0.5f, 0.5f);
             pr.pivot = new Vector2(0.5f, 0.5f);
-            pr.sizeDelta = new Vector2(720, 560);
+            pr.sizeDelta = new Vector2(720, 620);
             AddOutline(panel.gameObject);
 
-            Label(pr, "타이밍 스톱", 44, new Vector2(0, -54), 64, FontStyle.Bold, TextMain);
-            _target = Label(pr, "", 30, new Vector2(0, -132), 46, FontStyle.Normal, TextMuted);
+            Label(pr, "타이밍 스톱", 44, new Vector2(0, -56), 60, FontStyle.Bold, TextMain, 520f);
+            _target = Label(pr, "", 30, new Vector2(0, -128), 42, FontStyle.Normal, TextMuted);
 
             // 타이머는 이 화면의 주인공이라 제일 크게.
-            _timer = Label(pr, "0.00", 132, new Vector2(0, -222), 160, FontStyle.Bold, Accent);
+            _timer = Label(pr, "0.00", 132, new Vector2(0, -196), 150, FontStyle.Bold, Accent);
 
-            _result = Label(pr, "", 34, new Vector2(0, -382), 52, FontStyle.Bold, TextMain);
-            _verdict = Label(pr, "", 22, new Vector2(0, -430), 36, FontStyle.Normal, TextMuted);
+            _result = Label(pr, "", 34, new Vector2(0, -358), 50, FontStyle.Bold, TextMain);
+            _verdict = Label(pr, "", 22, new Vector2(0, -408), 34, FontStyle.Normal, TextMuted);
 
-            _action = MakeButton(pr, "시작", new Vector2(0, -486), new Vector2(300, 62), OnAction);
+            _action = MakeButton(pr, "시작", new Vector2(0, -462), new Vector2(300, 62), OnAction);
             _actionLabel = _action.GetComponentInChildren<Text>();
 
             _hint = Label(pr, "Space 로도 시작·정지할 수 있습니다 · Esc 로 나가기", 18,
-                          new Vector2(0, -546), 30, FontStyle.Normal, TextMuted);
+                          new Vector2(0, -534), 28, FontStyle.Normal, TextMuted);
 
-            var close = MakeButton(pr, "나가기", new Vector2(286, -34), new Vector2(120, 44), Close);
-            close.GetComponentInChildren<Text>().fontSize = 18;
+            var close = MakeButton(pr, "나가기", Vector2.zero, new Vector2(96, 40), Close);
+            close.GetComponentInChildren<Text>().fontSize = 17;
+            // 패널 우상단 고정. 좌표를 직접 주면 패널 크기가 바뀔 때마다 다시 맞춰야 한다.
+            var cr = close.GetComponent<RectTransform>();
+            cr.anchorMin = cr.anchorMax = cr.pivot = new Vector2(1f, 1f);
+            cr.anchoredPosition = new Vector2(-18f, -18f);
 
             Redraw();
         }
@@ -262,7 +266,7 @@ namespace Festa.Minigame
         }
 
         static Text Label(Transform parent, string text, int size, Vector2 anchoredPos,
-                          float height, FontStyle style, Color color)
+                          float height, FontStyle style, Color color, float width = 660f)
         {
             var label = new GameObject("Label", typeof(RectTransform), typeof(Text)).GetComponent<Text>();
             label.transform.SetParent(parent, false);
@@ -280,7 +284,7 @@ namespace Festa.Minigame
             var rect = label.rectTransform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.sizeDelta = new Vector2(660, height);
+            rect.sizeDelta = new Vector2(width, height);
             rect.anchoredPosition = anchoredPos;
             return label;
         }
