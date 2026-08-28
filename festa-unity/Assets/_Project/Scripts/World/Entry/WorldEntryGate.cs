@@ -1,0 +1,238 @@
+using System.Runtime.InteropServices;
+using Unity.Netcode;
+using UnityEngine;
+
+namespace Festa.World
+{
+    /// <summary>
+    /// 입장 게이트 (spec 002 FR-013·014, 폐기된 018 에서 이전).
+    ///
+    /// 월드 씬을 열고 접속·스폰이 끝나기까지의 대기를 **11층 엘리베이터 내부**가 가린다.
+    /// 흰 화면이나 텅 빈 월드를 보여주지 않는다.
+    ///
+    /// **갇히지 않는다(FR-014).** 준비가 끝나지 않아도 30초면 강제로 연다. 그때 원인을
+    /// 조용히 삼키지 않고 에러로 남긴다 — 조용한 폴백이 T-24 의 원인이었다.
+    ///
+    /// 씬을 고치지 않는다. 자동 등록이라 프리팹·씬 편집 없이 붙고,
+    /// 메인 카메라를 끄지 않고 **더 높은 depth 로 위에 덮어** Camera.main 이 null 이 되는 일이 없다
+    /// (PlayerCameraFollow 가 Camera.main 을 참조한다).
+    /// </summary>
+    public class WorldEntryGate : MonoBehaviour
+    {
+        /// <summary>준비 실패해도 이 시간이면 무조건 연다 (FR-014).</summary>
+        [SerializeField] float _forceOpenSeconds = 30f;
+
+        /// <summary>이 시간 안에 접속 시도가 안 보이면 개발자가 월드 씬을 단독 실행한 것으로 본다.</summary>
+        [SerializeField] float _standaloneGraceSeconds = 3f;
+
+        const float DoorSlideSeconds = 1.1f;
+
+#if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
+        [DllImport("__Internal")]
+        static extern void FestaNotifyWorldGateReady();
+#endif
+
+        Camera _gateCam;
+        Light _gateLight;
+        Transform _doorLeft, _doorRight;
+        Vector3 _doorLeftClosed, _doorRightClosed;
+        float _doorTravel;
+
+        float _elapsed;
+        bool _opening;
+        float _openProgress;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void AutoStart()
+        {
+#if UNITY_SERVER
+            return;   // Dedicated Server 는 가릴 화면이 없다.
+#else
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != AvatarSceneHandoff.WorldSceneName)
+                return;
+            if (FindFirstObjectByType<WorldEntryGate>() != null) return;
+
+            var go = new GameObject("@WorldEntryGate");
+            go.AddComponent<WorldEntryGate>();
+#endif
+        }
+
+        void Start()
+        {
+            var car = FindGateElevator();
+            if (car == null)
+            {
+                // 엘리베이터를 못 찾으면 가릴 방법이 없다. 조용히 막지 말고 알린 뒤 통과시킨다.
+                Debug.LogError("[WorldEntryGate] 엘리베이터를 찾지 못해 입장 게이트를 건너뛴다");
+                Destroy(gameObject);
+                return;
+            }
+
+            BuildGateView(car);
+            CacheDoors(car);
+        }
+
+        void Update()
+        {
+            _elapsed += Time.deltaTime;
+
+            if (_opening)
+            {
+                AdvanceOpening();
+                return;
+            }
+
+            if (IsPlayerReady())
+            {
+                BeginOpen("준비 완료");
+                return;
+            }
+
+            // 접속 시도조차 없으면 개발자가 월드 씬을 단독 실행한 것 — 가릴 이유가 없다.
+            if (_elapsed >= _standaloneGraceSeconds && !IsConnectingOrConnected())
+            {
+                BeginOpen("접속 시도 없음(단독 실행)");
+                return;
+            }
+
+            if (_elapsed >= _forceOpenSeconds)
+            {
+                // 여기까지 왔다는 것은 접속·스폰이 실패했다는 뜻이다. 반드시 드러낸다.
+                var nm = NetworkManager.Singleton;
+                Debug.LogError($"[WorldEntryGate] {_forceOpenSeconds}초 안에 월드 준비가 끝나지 않아 강제로 연다. " +
+                               $"IsClient={(nm != null && nm.IsClient)} " +
+                               $"PlayerObject={(nm != null && nm.LocalClient != null && nm.LocalClient.PlayerObject != null)}");
+                BeginOpen("타임아웃 강제 개방");
+            }
+        }
+
+        // ── 준비 판정 ─────────────────────────────────────────────
+
+        /// <summary>씬 로드·접속 승인·오너 플레이어 스폰이 모두 끝난 상태.</summary>
+        static bool IsPlayerReady()
+        {
+            var nm = NetworkManager.Singleton;
+            return nm != null && nm.IsClient && nm.LocalClient != null && nm.LocalClient.PlayerObject != null;
+        }
+
+        static bool IsConnectingOrConnected()
+        {
+            var nm = NetworkManager.Singleton;
+            return nm != null && (nm.IsClient || nm.IsListening);
+        }
+
+        // ── 게이트 화면 ───────────────────────────────────────────
+
+        /// <summary>로비에 붙은 엘리베이터 칸 하나를 고른다.</summary>
+        static Transform FindGateElevator()
+        {
+            var root = GameObject.Find("@Elevators");
+            if (root == null || root.transform.childCount == 0) return null;
+            // 가운데 칸이 가장 무난하다 — 좌우가 대칭이라 화면이 안정적이다.
+            return root.transform.GetChild(root.transform.childCount / 2);
+        }
+
+        void BuildGateView(Transform car)
+        {
+            var bounds = CalculateBounds(car);
+
+            // 문 쪽(-x)을 바라보는 시점. 카메라는 칸 안쪽에 두고 문에서 조금 떨어뜨린다.
+            var eye = new Vector3(bounds.center.x + bounds.extents.x * 0.35f, bounds.min.y + 22f, bounds.center.z);
+
+            _gateCam = new GameObject("GateCamera").AddComponent<Camera>();
+            _gateCam.transform.SetParent(transform, false);
+            _gateCam.transform.SetPositionAndRotation(eye, Quaternion.Euler(0f, 270f, 0f));
+            _gateCam.fieldOfView = 70f;
+            _gateCam.nearClipPlane = 0.3f;
+            _gateCam.farClipPlane = 3000f;
+            // 메인 카메라를 끄지 않고 위에 덮는다 — Camera.main 이 살아 있어야 PlayerCameraFollow 가 안 깨진다.
+            _gateCam.depth = 100f;
+
+            // 칸 안은 조명이 없어 캄캄하다. 게이트 동안만 쓰는 광원이라 열 때 같이 지운다.
+            // (WebGL 화면당 광원 상한 32 — 현재 24 라 1개 추가는 안전하다. T-216)
+            _gateLight = new GameObject("GateLight").AddComponent<Light>();
+            _gateLight.transform.SetParent(transform, false);
+            _gateLight.transform.position = new Vector3(bounds.center.x, bounds.min.y + 46f, bounds.center.z);
+            _gateLight.type = LightType.Point;
+            _gateLight.range = 70f;
+            _gateLight.intensity = 260f;   // 실측으로 고른 값 — 900 은 완전 과노출, 260 이 문·트림이 보이는 지점
+            _gateLight.color = new Color(1f, 0.94f, 0.86f);
+            _gateLight.shadows = LightShadows.None;
+        }
+
+        void CacheDoors(Transform car)
+        {
+            _doorLeft = car.Find("elevator-door-left");
+            _doorRight = car.Find("elevator-door-right");
+            if (_doorLeft == null || _doorRight == null)
+            {
+                Debug.LogWarning("[WorldEntryGate] 문 오브젝트를 찾지 못해 개방 연출 없이 전환한다");
+                return;
+            }
+
+            _doorLeftClosed = _doorLeft.position;
+            _doorRightClosed = _doorRight.position;
+
+            // 문은 z 축으로 갈라진다. 각 문의 z 폭만큼 물러나면 통로가 열린다.
+            var leftRenderer = _doorLeft.GetComponentInChildren<Renderer>();
+            _doorTravel = leftRenderer != null ? leftRenderer.bounds.size.z : 9f;
+        }
+
+        // ── 개방 ──────────────────────────────────────────────────
+
+        void BeginOpen(string reason)
+        {
+            _opening = true;
+            _openProgress = 0f;
+            Debug.Log($"[WorldEntryGate] 개방 — {reason} ({_elapsed:F1}s)");
+            NotifyGateReady();
+        }
+
+        void AdvanceOpening()
+        {
+            _openProgress += Time.deltaTime / DoorSlideSeconds;
+            var t = Mathf.Clamp01(_openProgress);
+            var eased = t * t * (3f - 2f * t);   // smoothstep — 문이 급출발하지 않는다
+
+            if (_doorLeft != null && _doorRight != null)
+            {
+                _doorLeft.position = _doorLeftClosed + new Vector3(0f, 0f, _doorTravel * eased);
+                _doorRight.position = _doorRightClosed - new Vector3(0f, 0f, _doorTravel * eased);
+            }
+
+            if (t >= 1f) Finish();
+        }
+
+        void Finish()
+        {
+            // 문은 열린 자리에 그대로 둔다 — 되돌리면 플레이어가 나가는 순간 닫힌 문이 보인다.
+            Destroy(gameObject);
+        }
+
+        static void NotifyGateReady()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
+            try
+            {
+                FestaNotifyWorldGateReady();
+            }
+            catch (System.Exception ex)
+            {
+                // 호스트 알림 실패가 게이트 개방을 막으면 안 된다 (FR-014).
+                Debug.LogError($"[WorldEntryGate] onWorldGateReady 송신 실패: {ex.Message}");
+            }
+#else
+            Debug.Log("[WorldEntryGate] onWorldGateReady → (에디터: 송신 생략)");
+#endif
+        }
+
+        static Bounds CalculateBounds(Transform root)
+        {
+            var renderers = root.GetComponentsInChildren<Renderer>();
+            if (renderers.Length == 0) return new Bounds(root.position, Vector3.one);
+            var b = renderers[0].bounds;
+            foreach (var r in renderers) b.Encapsulate(r.bounds);
+            return b;
+        }
+    }
+}
