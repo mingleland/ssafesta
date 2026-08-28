@@ -428,7 +428,11 @@ docker compose up -d --build
 | React 빌드 | ✅ | 결과물은 정적 파일 |
 | FastAPI | ✅ | arm64 wheel 확인 필요 |
 | PostgreSQL / Redis | ✅ | 공식 멀티아치 |
-| **Unity Dedicated Server** | ⚠️ | **Unity 6부터 Linux ARM64 지원**. IL2CPP + ARM64 sysroot 패키지 별도 설치 필요. Unity 2022 이하는 불가 |
+| **Unity Dedicated Server** | ❌ | 현재 고정 버전 Unity 6000.0.78f1에는 Linux ARM64 Dedicated Server 빌드 variation이 없다. OCI에서는 WebGL 정적 배포만 검증하고 서버는 x86_64 EC2에서 검증한다 |
+
+Unity 버전 임시 업그레이드나 amd64 에뮬레이션으로 우회하지 않는다. 현재
+프로젝트와 동일한 서버 빌드를 실행할 수 있는 x86_64 EC2가 제공될 때까지
+WSS·10분 idle·재접속·40명 시험은 중단한다.
 
 ### OS 차이
 
@@ -625,6 +629,46 @@ OCI Security List와 서버 내부 방화벽에서 80번 포트를 허용한 뒤
 `http://129.213.24.228` 접속을 확인했다. Backend·Frontend가 아직 없으므로
 현재는 Nginx 공개 진입점까지 검증한 상태다.
 
+### Cloudflare DNS·원본 TLS 사전 검증 (2026-08-27)
+
+x86_64 EC2 수령 전에 OCI를 임시 원본으로 사용해 DNS·TLS·Nginx 경계만
+사전 검증했다. 이 결과는 최종 WSS 완료 근거가 아니다.
+
+| 항목 | 적용·검증 결과 |
+|---|---|
+| 루트 도메인 | `ssafesta.world` |
+| 권위 DNS | 가비아 nameserver에서 `carol.ns.cloudflare.com`, `west.ns.cloudflare.com`으로 위임 |
+| 공개 host | `demo`, `api`, `ai`, `world` A 레코드를 OCI `129.213.24.228`로 지정하고 Cloudflare Proxy 활성화 |
+| HTTP 경로 | 로컬 PC에서 `http://demo.ssafesta.world/healthz` 호출 시 Cloudflare 경유 `200 OK` |
+| Cloudflare TLS mode | 원본 인증서 발급·Nginx 443 구성 후 `Full (strict)` 적용 |
+| 원본 인증서 | Let's Encrypt에서 4개 host 인증서 발급, 만료일 2026-11-25 |
+| 인증서 경계 | 호스트 `~/festa/nginx/certbot/conf/`에 보관하고 Nginx에 `/etc/letsencrypt:ro`로 mount. 개인 키 내용은 저장소·문서에 기록하지 않음 |
+| Nginx | Docker Compose에 443 publish와 인증서 read-only mount 추가, `nginx -t` 통과, host 80/443 LISTEN, container `healthy` 확인 |
+| 미지원 host | Backend·FastAPI·Unity Server가 없으므로 `api`·`ai`·`world` HTTPS는 임시 `503` 반환 |
+
+Nginx healthcheck는 `localhost`가 컨테이너 내에서 IPv6로 해석돼 IPv4 listener와
+어긋났다. `http://127.0.0.1/healthz`로 고정했고, default server의 `return 404`는
+server 레벨이 아닌 `location /` 안으로 옮겨 `/healthz` 정상 응답을 보존했다.
+
+중단 시점에 아래는 아직 검증하지 않았다.
+
+- Cloudflare `Full (strict)` 적용 후 외부 `https://demo.ssafesta.world/healthz` 최종 검증
+- Certbot 자동 갱신과 Nginx reload
+- `world.ssafesta.world` WebSocket Upgrade, 내부 `ws://unity:7777`, 180초 timeout
+- 회원·게스트 2브라우저, 10분 idle, 수동 재접속, 1→40명 수용량
+
+### x86_64 EC2 수령 후 재적용 순서
+
+1. EC2 Security Group과 호스트 방화벽에 80/443만 공개하고 5432/6379/7777은 차단한다.
+2. Docker network, PostgreSQL, Redis, Nginx Compose 설정을 소스에서 재생성한다. ARM에서 빌드한 이미지를 복사하지 않는다.
+3. Cloudflare A 레코드를 바꾸기 전, `ssafesta.world` DNS 편집만 허용한 최소 권한 API Token과 DNS-01을 사용해 EC2에서 Let's Encrypt 인증서를 새로 발급한다. Token은 Secret으로 주입하고 저장소·명령 기록에 남기지 않는다.
+4. A 레코드 전환 전에 `curl --resolve demo.ssafesta.world:443:<EC2_IP>`로 EC2 원본의 인증서·Nginx·health를 검증한다.
+5. Cloudflare nameserver와 `Full (strict)`는 유지하고 4개 Proxied A 레코드의 원본 IP만 EC2로 변경한다.
+6. `demo`는 정적 Web, `api`는 Spring, `ai`는 FastAPI, `world`는 Unity 내부 upstream으로 교체한다.
+7. `world` Nginx에 WebSocket Upgrade·cache/buffering off·`proxy_read_timeout 180s`를 적용하고 7777을 publish하지 않는다.
+8. Cloudflare 경유 HTTP→HTTPS, HTTPS, WSS를 순서대로 검증하고, 실패하면 A 레코드를 OCI IP로 rollback한다.
+9. Certbot 자동 갱신·Nginx reload를 dry-run으로 검증한 뒤 OCI를 운영 경로에서 제외한다.
+
 ---
 
 ## 10. 실측 결과 — 추정하지 말 것
@@ -662,6 +706,10 @@ free -h
 
 - [x] Redis 기동 및 통신 확인
 - [x] Nginx 리버스 프록시 기본 진입점 (HTTP 80)
+- [x] Cloudflare DNS 위임·`demo/api/ai/world` Proxy A 레코드 (OCI 사전 검증)
+- [x] Let's Encrypt 4-host 인증서 발급·Nginx 443 listener (OCI 사전 구성)
+- [x] Cloudflare `Full (strict)` 적용
+- [ ] 외부 HTTPS·자동 갱신 최종 검증
 - [ ] Spring Boot 컨테이너화 → `/actuator/health` 도달 확인
 - [ ] FastAPI 컨테이너화
 - [ ] React 정적 배포 (버전별 릴리스 + 심볼릭 링크 전환)
@@ -672,14 +720,14 @@ free -h
 - [ ] Jenkins CI/CD — **수동 배포를 먼저 성공시킨 뒤 자동화한다.**
       자동화할 대상이 없는 상태에서 세우면 실패 원인이 Jenkins인지
       Docker인지 애플리케이션인지 구분되지 않는다
-- [ ] 도메인 + Let's Encrypt TLS
-- [ ] Cloudflare DNS/CDN
+- [ ] Cloudflare A 레코드를 EC2 IP로 전환·Let's Encrypt 재발급·`Full (strict)` 검증
+- [ ] Unity Dedicated Server x86_64 이미지 기동·`world` 내부 upstream 연결
 - [ ] Unity Dedicated Server 부하 시험
 
 ### 이 서버에서 하기 어려운 것
 
-- **Unity 빌드** — 권장 RAM 8GB 이상, Library 캐시만 수십 GB.
-  로컬 PC에서 빌드하고 산출물만 업로드하는 방식이 현실적이다
+- **Unity Dedicated Server** — 자원 문제가 아니라 Unity 6000.0.78f1의 Linux ARM64
+  빌드 미지원이 차단 사유다. x86_64 EC2에서 빌드·실행한다
 - **Jenkins Unity Agent** — 위와 같은 이유
 
 ---
