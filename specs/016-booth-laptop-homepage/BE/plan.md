@@ -12,7 +12,7 @@
 
 1. **Layout 계약을 건드리지 않는다** (C-01 — **2026-08-26 확정**, #97). URL은 부스 단위 1개(C-02, 같이 확정)로 `booths` 컬럼에 산다. `LAPTOP` 타입·`BOOTH_LAPTOP_INTERACT{boothId, objectId, url?}` 브리지는 이미 확정·검증된 계약이라 **Unity 쪽 변경이 0**이다. FE는 브리지로 받은 `boothId`로 공개 조회를 호출하게 되는데, **그 조회 경로는 지금 FE에 없어 신설 대상**이다(계약 §4 정정). C-01 확정으로 **구현(코드) 착수 게이트가 풀렸다** — 아래 §Phase 2 참조.
 2. **facade 선례의 반복이다.** `PUT /booths/{id}/facade`가 확정해 둔 규칙(에디터 가드 + 유효 임대 + 검증 + `booths` 직접·즉시 반영 + `BOOTH_LEASE_EXPIRED`)을 그대로 탄다. 스키마 작업 0(V1 컬럼 기존), 신규 오류 어휘 0(#58 봉투 + `FIELD_INVALID`).
-3. **노출은 published 게이트로 건다** (FR-003). `publishedLayoutVersion == null`이면 방문자 응답에서 `homepageUrl`도 null — 노트북이 공개 Layout 안에만 존재하므로 게이트와 실사용 순간이 일치한다. 검증은 위임받은 두 가지(http/https 스킴 + 길이 2048)이고 사유별 다른 문장으로 거부한다(T-24: 실패를 조용히 삼키지 않는다).
+3. **노출은 published 게이트로 건다** (FR-003). `publishedLayoutVersion == null`이면 방문자 응답에서 `homepageUrl`도 null — 노트북이 공개 Layout 안에만 존재하므로 게이트와 실사용 순간이 일치한다. 검증은 위임받은 두 가지(http/https 스킴 + 길이 2048)이고 사유별 다른 문장으로 거부한다(T-24: 실패를 조용히 삼키지 않는다). **요청 DTO는 `homepageUrl` 키의 존재 여부를 추적한다** — `record`는 `{}`와 `{"homepageUrl":null}`을 구분하지 못해 FE 직렬화 실수가 조용한 해제가 된다(research R-04 ⓪, data-model §3 #0). 검증 순서에서 **scheme을 host보다 먼저** 본다 — `javascript:`가 host 부재로 먼저 걸리면 스킴 위반 사유가 전달되지 않는다.
 
 결정 근거 전체: [research.md](research.md) R-01~R-10.
 

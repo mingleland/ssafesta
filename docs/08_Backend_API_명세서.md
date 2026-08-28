@@ -254,7 +254,7 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 ### GET `/booths/mine`
 
-내 Booth와 현재 Lease 조회.
+내 Booth와 현재 Lease 조회. 응답에 **`homepageUrl`**(spec 016 신설)이 포함되며, 이쪽은 공개 여부와 무관하게 **항상 저장값**이다 — 미공개 상태에서도 스튜디오 폼을 프리필해야 하기 때문이다. 미등록이면 `null`.
 
 ### GET `/booths/{boothId}`
 
@@ -273,9 +273,13 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
     "signText": "AI 프로젝트 전시관",
     "logoUrl": null
   },
-  "publishedLayoutVersion": 4
+  "publishedLayoutVersion": 4,
+  "homepageUrl": "https://my-team-project.example.com"
 }
 ```
+
+- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치). 미등록도 `null`이라 FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+- ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### POST `/booths/{boothId}/leases/extend` — P1
 
@@ -419,6 +423,26 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 `GET /booths/{boothId}`의 `facade` 필드를 쓴다.
 
 활성 Lease가 없거나 입장이 닫힌 Booth는 일반 Unity Client에 Published Layout을 제공하지 않는다. Layout Object 식별자는 `objectId`, 장식·가구 자산 식별자는 `assetCode`를 사용한다. 신규 `type` 값은 기능 명세의 canonical 문자열을 사용하며 `SURVEY_KIOSK`, `CONSULTATION_DESK`, `LAPTOP`을 포함한다.
+
+### PUT `/booths/{boothId}/homepage` — spec 016 신설
+
+부스 노트북이 여는 홈페이지 주소 등록·수정·해제. **부스당 1개**이며 `booths.homepage_url`에 저장한다 — **Layout JSON에는 넣지 않는다**(C-01·C-02, 2026-08-26 확정 #97). facade와 같이 Draft/Publish를 타지 않고 즉시 반영되며, 방문자 **노출**은 위 `GET /booths/{boothId}`의 게이트가 따로 건다.
+
+```json
+{
+  "homepageUrl": "https://my-team-project.example.com"
+}
+```
+
+→ `200 { "homepageUrl": "https://my-team-project.example.com" }` (저장한 그대로 echo)
+
+- 저장은 **원문 그대로** — trim·정규화·대소문자 변경이 없다(왕복 무손실).
+- `{ "homepageUrl": null }` = **등록 해제**. 빈 문자열 `""`은 해제가 아니라 400이고, **필드가 없는 `{}`도 400**이다 — 해제는 명시적 `null`만 인정한다(직렬화 실수로 URL이 조용히 지워지는 것을 막는다).
+- 검증은 순서대로 첫 위반에서 거부하고 **사유별 다른 문장**을 준다: 필드 부재 → blank → 길이 ≤ 2048 → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. **scheme을 host보다 먼저 본다** — `javascript:`·`data:`는 host가 없어 순서가 뒤바뀌면 스킴 위반이라는 실제 사유가 전달되지 않는다.
+- **`http`를 허용한다**(facade `logoUrl`과 의도적 비대칭) — 로고는 페이지 안에 임베드되어 mixed content로 조용히 죽지만, 홈페이지는 이동 대상이고 iframe이 막히면 새 탭으로 연다. 혼합콘텐츠 경고 UX는 React 몫.
+- 소유자·Staff만 호출할 수 있다(facade·layout과 동일한 편집자 범위). 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 코드·rule 없음.**
+- 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
+- **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
 
 ---
 

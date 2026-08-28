@@ -32,7 +32,9 @@ Content-Type: application/json
 - 소유자와 등록된 스태프가 호출할 수 있다 (facade·layout과 동일한 `BoothEditorGuard`).
 - Draft/Publish를 타지 않는다 — 저장 즉시 `booths` 컬럼에 반영 (facade와 동일). 방문자 **노출**은 §3 게이트가 따로 건다.
 - `{ "homepageUrl": null }` = **등록 해제** → 방문자에게 미등록(안내) 상태로 돌아간다. 빈 문자열 `""`은 해제가 아니라 400이다.
-- 검증(문자열일 때, 순서대로 첫 위반으로 거부): blank 금지 → 길이 ≤ **2048** → URI 파싱·host 존재 → scheme ∈ {`http`, `https`}. trim·정규화 없이 원문 그대로 저장한다.
+- **필드 자체가 없는 `{}`도 400이다** — 해제는 `homepageUrl`을 **명시적 `null`로 보낸 요청**만 인정한다. 필드 부재와 명시적 null을 같게 처리하면 FE 직렬화 실수(필드 누락) 하나로 등록된 URL이 조용히 지워진다. 서버는 요청 본문에 키가 있었는지를 구분해 읽는다.
+- 검증(필드가 있고 문자열일 때, 순서대로 첫 위반으로 거부): blank 금지 → 길이 ≤ **2048** → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. trim·정규화 없이 원문 그대로 저장한다.
+  > **scheme을 host보다 먼저 본다** — `javascript:alert(1)`·`data:text/html,…`는 host가 없으므로 host를 먼저 검사하면 "형식이 올바르지 않다"로 끝나고, 실제 거부 사유인 **스킴 위반이 사용자에게 전달되지 않는다.** 차단 결과는 어느 순서든 같지만 알려주는 이유가 달라진다(T-24: 실패를 뭉개지 않는다).
 
 | 실패 | 응답 |
 |---|---|
@@ -63,6 +65,9 @@ Content-Type: application/json
 ```
 
 **노출 게이트 (FR-003)**: `publishedLayoutVersion`이 `null`이면 `homepageUrl`도 **`null`** 로 내려간다 — "공개 상태" = **공개된 Layout이 있는 상태**로 해석한다(노트북은 공개 Layout 안에만 존재하므로 방문자가 URL을 쓰는 순간과 일치). 미등록이어도 `null`이다 — FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다(FR-009).
+
+> **`null`은 키를 생략하는 것이 아니다** — `homepageUrl` 키는 **항상 응답에 존재**하고 값이 `null`로 의미를 전달한다(`PUT` 해제 응답·`/mine`·공개 조회 모두). FE가 `null` 하나로 분기하는 계약이 성립하려면 키가 사라지지 않아야 한다. 서버 전역 JSON 설정에 null 제외(`default-property-inclusion=non_null`)를 걸면 이 계약이 깨진다.
+> 검증도 이 구분을 표현해야 한다 — `jsonPath(…).doesNotExist()`는 **키 부재와 명시적 `null`을 똑같이 통과시켜** 계약을 지키지 못하고, `exists()`는 반대로 명시적 `null`에서 실패한다. 응답 본문을 파싱해 **키 존재와 `null`을 따로** 단언한다 (`BoothHomepageApiIntegrationTest.assertPresentAndNull`, T-97).
 
 임대 만료 부스는 이 조회 자체가 `409 BOOTH_LEASE_EXPIRED`다 (기존 동작 — "만료 직후 노트북 클릭" Edge Case 커버).
 

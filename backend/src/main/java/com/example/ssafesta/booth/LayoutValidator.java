@@ -201,8 +201,16 @@ public class LayoutValidator {
      *   <li><b>error</b> — the reference belongs to another booth. Client claims are not trusted
      *       (헌법 16·17조).
      *   <li><b>warning</b> {@code CONFIG_NOT_LINKED} — a functional object points at nothing.
-     *       Whether that should block publishing is C-04, still 기획·FE's to decide; when they do,
-     *       this one call becomes {@code addError} and nothing else changes.
+     *       C-04 settled this as warn-and-allow (2026-08-21, #45); if it is ever reopened, these
+     *       calls become {@code addError} and nothing else changes.
+     *       <p>{@code LAPTOP} asks a different question for the same warning: since C-01 fixed the
+     *       homepage URL onto {@code booths.homepage_url}, a laptop never carries a {@code configId}
+     *       at all, and judging it by one would flag every correctly configured booth forever. The
+     *       code and the envelope stay put; only the predicate moves to "does this booth have a URL"
+     *       (spec 016 contracts/homepage-api.md §3-1).
+     *       <p>{@code requiresConfig} is deliberately left {@code true} for it —
+     *       {@link LayoutPassageChecker} reads the same flag to decide which objects need a viewing
+     *       band, and clearing it would drop laptops out of that check entirely (research R-10).
      *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the kind of content cannot be checked yet
      *       because the spec that owns it does not exist. Said out loud so "no error" is not
      *       mistaken for "verified".
@@ -218,7 +226,14 @@ public class LayoutValidator {
             if (type == null) {
                 continue; // Already reported as UNKNOWN_OBJECT_TYPE.
             }
-            if (type.requiresConfig() && object.configId() == null) {
+            if (type == LayoutObjectType.LAPTOP) {
+                if (!configResolver.boothHomepageRegistered(boothId)) {
+                    result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
+                            "홈페이지 주소가 등록되지 않았습니다.");
+                }
+                // Falls through to the configId chain on purpose: a LAPTOP should not carry one, and
+                // if it does, CONFIG_UNVERIFIED is how FE hears about it (계약 §3-1 통보 1).
+            } else if (type.requiresConfig() && object.configId() == null) {
                 result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
                         type.name() + "에 연결된 콘텐츠가 없습니다.");
                 continue;
