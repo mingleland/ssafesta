@@ -194,7 +194,12 @@ namespace Festa.Network
         // 격자 동쪽 열이 `SSAFY-center` 구조물을 물었고, 일부 슬롯은 그 **위에** 접지해
         // y 13.7 로 잡혔다. 바닥 전체를 훑어 40 슬롯이 모두 바닥에 닿고 아무것도 물지 않는
         // 중심을 찾은 결과다 (조건 충족 후보 630곳 중 원래 자리에 가장 가까운 곳).
-        static readonly Vector3 SpawnCenter = new Vector3(-85f, 0f, -234f);
+        // 2026-08-28 (S15P21A604-283): 입장 게이트가 생기면서 (-85,-234) → (-12,-238) 로 옮겼다.
+        // 게이트는 엘리베이터 안에서 문이 열리는 연출로 끝나는데, 스폰이 로비 한복판이면
+        // 「엘리베이터에서 내렸다」가 성립하지 않는다. 격자 동쪽 열이 x=5.5 로 엘리베이터
+        // 문(x=17)에서 11.5 unit(1.15 m) 앞, Seal_East_02(x=9.02) 와도 겹치지 않는다.
+        // 위 원칙(40 슬롯 전부 바닥 접지·아바타 반경 무간섭)은 같은 스캔으로 재검증했다.
+        static readonly Vector3 SpawnCenter = new Vector3(-12f, 0f, -238f);
         const float SpawnProbeHeight = 30f;   // 바닥 탐색 레이 시작 높이
         const float SpawnGroundOffset = 0.1f; // 바닥에 살짝 띄운다 — 첫 프레임 파묻힘 방지
         const float SpawnFallbackY = 0.5f;
