@@ -53,19 +53,40 @@ namespace Festa.World
         const int TopFloor = 11;    // 도착층. 준비되기 전에는 절대 여기 닿지 않는다.
         const int StartFloor = 5;   // 1층부터 세면 숫자가 정신없이 굴러간다. 중간에서 시작해 몇 층만 올린다.
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        static void AutoStart()
+        // 등록 훅은 **씬이 로드될 때마다** 돌아야 한다.
+        // 처음엔 RuntimeInitializeOnLoadMethod(AfterSceneLoad) 를 썼는데, 그 훅은
+        // 앱 기동 시 첫 씬 직후 딱 한 번만 돈다. 빌드의 첫 씬은 CharacterLobby 라
+        // 아래 이름 검사에서 걸러지고, 이후 main 으로 넘어가도 다시 돌지 않아
+        // **게이트가 영원히 생성되지 않았다** (S15P21A604-312).
+        //
+        // main 씬에서 직접 Play 를 누를 때만 활성 씬이 main 이라 게이트가 생겼다 —
+        // 실사용자가 절대 타지 않는 경로다. 진입 흐름이 있는 기능은 진입점부터 검증해야 한다.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void InstallHook()
         {
-#if UNITY_SERVER
-            return;   // Dedicated Server 는 가릴 화면이 없다.
-#else
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != AvatarSceneHandoff.WorldSceneName)
-                return;
+            // 도메인 리로드를 끈 설정에서는 static 구독이 살아남는다 — 중복 구독을 막는다.
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene,
+                                  UnityEngine.SceneManagement.LoadSceneMode mode)
+        {
+            // 데디케이티드 서버는 가릴 화면이 없다. 그런데 **`#if UNITY_SERVER` 로 막으면 안 된다** —
+            // 그 심볼은 빌드 타깃을 Dedicated Server 로 둔 **에디터에도 정의된다** (T-182).
+            // 이 프로젝트의 에디터 타깃이 평소 Linux Server 라, 그렇게 막아 두면 게이트가
+            // 통째로 컴파일에서 빠져 **에디터에서는 검증 자체가 불가능**해진다.
+            // 컨테이너 서버는 -batchmode 로 뜨므로 런타임 검사가 정확하고 타깃과 무관하다
+            // (DevConnectionHud 의 OnGUI 가드와 같은 기준이다).
+            if (Application.isBatchMode) return;
+
+            // Additive 로 얹히는 씬은 월드 진입이 아니다.
+            if (mode != UnityEngine.SceneManagement.LoadSceneMode.Single) return;
+            if (scene.name != AvatarSceneHandoff.WorldSceneName) return;
             if (FindFirstObjectByType<WorldEntryGate>() != null) return;
 
             var go = new GameObject("@WorldEntryGate");
             go.AddComponent<WorldEntryGate>();
-#endif
         }
 
         void Start()
