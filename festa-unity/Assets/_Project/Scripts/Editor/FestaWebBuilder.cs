@@ -48,6 +48,22 @@ namespace Festa.EditorTools
             // 로컬 정적 서버로 바로 열려면 Disabled 가 편하다. 배포 때는 다시 켜는 게 맞다.
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
 
+            // **BuildPlayer 에 타깃을 넘기기 전에 활성 타깃부터 WebGL 로 바꿔야 한다.**
+            // URP 전처리기가 활성 타깃 기준으로 품질 레벨을 걸러 RP 에셋을 정하는데,
+            // Mobile 레벨은 Standalone 에서 제외돼 있어 평소 타깃(Linux Server) 그대로
+            // 빌드하면 Mobile_RPAsset 이 빠진다. WebGL 기본 품질이 0=Mobile 이라
+            // 그 산출물은 월드가 평평하게 렌더링된다 (S15P21A604-316).
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
+            {
+                Debug.Log("[WebBuilder] 활성 타깃을 WebGL 로 먼저 전환한다 (S15P21A604-316)");
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL))
+                {
+                    Debug.LogError("[WebBuilder] WebGL 타깃 전환 실패 — 중단한다.");
+                    PlayerSettings.WebGL.compressionFormat = prevCompression;
+                    return;
+                }
+            }
+
             Directory.CreateDirectory(OutDir);
             var options = new BuildPlayerOptions
             {
