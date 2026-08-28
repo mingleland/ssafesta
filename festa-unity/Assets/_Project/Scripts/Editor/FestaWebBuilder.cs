@@ -94,7 +94,8 @@ namespace Festa.EditorTools
         [MenuItem("Festa/부하테스트/manifest.json 재생성 (기존 빌드)")]
         public static void RegenerateManifest() => WriteManifest(OutDir);
 
-        static void WriteManifest(string outDir)
+        /// <summary>배포 빌더(FestaReleaseBuilder)도 자기 출력 디렉터리로 이걸 부른다.</summary>
+        internal static void WriteManifest(string outDir)
         {
             var buildDir = Path.Combine(outDir, "Build");
             if (!Directory.Exists(buildDir))
@@ -118,7 +119,8 @@ namespace Festa.EditorTools
                 return hit == null ? null : "Build/" + hit;
             }
 
-            var loader    = Find("loader",    f => f.EndsWith(".loader.js"));
+            // 압축 빌드에서 로더에 .br 접미사가 붙는 구성이 있어 EndsWith 로는 놓친다.
+            var loader    = Find("loader",    f => f.Contains(".loader.js"));
             var data      = Find("data",      f => f.Contains(".data"));
             var framework = Find("framework", f => f.Contains(".framework.js"));
             var code      = Find("code",      f => f.Contains(".wasm"));
