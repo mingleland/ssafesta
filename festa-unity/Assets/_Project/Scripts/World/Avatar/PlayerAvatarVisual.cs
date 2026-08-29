@@ -95,6 +95,12 @@ namespace Festa.World
             // 띄울 수 있는 봇 수가 줄어든다. 봇의 목적은 대역폭 생성이지 렌더가 아니다.
             if (Festa.Diagnostics.LoadTestBot.IsBotProcess) return;
 
+            // 데디케이티드 서버도 같은 이유로 만들지 않는다 (S15P21A604-314). 화면이 없는데
+            // 스킨 메시·머티리얼을 올리면 접속자 수만큼 곱해져 40인 목표에서 값이 붙고,
+            // 셰이더가 스트립된 빌드라 만들 때마다 경고가 로그를 덮어 진짜 로그를 밀어낸다.
+            // 플레이어의 충돌·위치 권위는 NetworkPlayer 쪽이라 외형을 빼도 영향이 없다.
+            if (Festa.Core.HeadlessRuntime.IsHeadless) return;
+
             if (string.IsNullOrEmpty(encoded)) return;
 
             if (_animator != null) AvatarAnimationLod.Unregister(_animator);
