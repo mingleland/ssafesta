@@ -28,13 +28,13 @@
 | Hair | 31 | 11658 | 376 |
 | Hat | 11 | 2101 | 191 |
 | Glasses | 2 | 1118 | 559 |
-| Top | 26 | 7102 | 273 |
-| Bottom | 12 | 3028 | 252 |
-| Outfit | 8 | 3426 | 428 |
+| Top | 26 | 6616 | 254 |
+| Bottom | 12 | 2891 | 240 |
+| Outfit | 8 | 3344 | 418 |
 | Shoes | 7 | 3149 | 449 |
-| **고유 합계** | 105 | **39219** | |
+| **고유 합계** | 105 | **38515** | |
 
-- 공유 에셋 합계: **74497 KB** (항목 수와 무관하게 한 번만 든다)
+- 공유 에셋 합계: **75201 KB** (항목 수와 무관하게 한 번만 든다)
 - 아바타 소계: **111.1 MB**
 
 ### 고유 용량 상위 10개
@@ -54,14 +54,11 @@
 
 ## C-05 — 썸네일 보유 현황
 
-- 보유 43 / 105
-- **누락 62개** — 이 항목들은 이름 텍스트로만 고르게 된다
+- 필드 보유 66 / 105
 
-  - Head: Head.01, Head.01, Head.02, Head.02, Head.03, Head.03, Head.04, Head.04
-  - Hair: Hairstyle.01, Hairstyle.02, Hairstyle.03, Hairstyle.04, Hairstyle.05, Hairstyle.06, Hairstyle.07, Hairstyle.08-1, Hairstyle.08-2, Hairstyle.08-3, Hairstyle.09-1, Hairstyle.09-2, Hairstyle.09-3, Hairstyle.10-1, Hairstyle.10-2, Hairstyle.10-3, Hairstyle.11-1, Hairstyle.11-2, Hairstyle.11-3, Hairstyle.12-1, Hairstyle.12-2, Hairstyle.12-3, Hairstyle.13-1, Hairstyle.13-2, Hairstyle.13-3, Hairstyle.14-1, Hairstyle.14-2, Hairstyle.14-3, Hairstyle.15, Hairstyle.16, Hairstyle.17
-  - Top: Top.01, Top.02, Top.03, Top.04, Top.05, Top.06, Top.07-A, Top.07-B, Top.08-A, Top.08-B, Top.09, Top.10, Top.11
-  - Bottom: Bot.01, Bot.02, Bot.03, Bot.04, Bot.05, Bot.06
-  - Outfit: Outfit.01, Outfit.02, Outfit.03, Outfit.04
+- **화면에 영향 있는 누락: 없음**
+
+- 필드는 비었지만 **화면 영향 없음: 39개** (Head 8, Hair 31) — UI 가 `Resources` 에서 인덱스로 불러온다
 
 ## 공유 에셋 상위 10개
 
