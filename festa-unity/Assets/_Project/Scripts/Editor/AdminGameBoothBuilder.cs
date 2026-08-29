@@ -153,7 +153,7 @@ namespace Festa.EditorTools
             if (font == null) Debug.LogError("[GameBooth] Resources/Fonts/MalgunGothicLight 를 못 찾아 간판 한글이 깨진다.");
 
             Text(rect, font, "타이밍 스톱", 44, FontStyle.Bold, new Color(1f, 0.82f, 0.42f), new Vector2(0f, 16f));
-            Text(rect, font, "클릭해서 시작", 26, FontStyle.Normal, new Color(0.86f, 0.86f, 0.9f), new Vector2(0f, -22f));
+            Text(rect, font, "F 키로 시작", 26, FontStyle.Normal, new Color(0.86f, 0.86f, 0.9f), new Vector2(0f, -22f));
         }
 
         static void Text(RectTransform parent, Font font, string text, int size, FontStyle style, Color color, Vector2 pos)

@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace Festa.Content
 {
     /// <summary>
-    /// 부스 오브젝트 클릭을 한 곳에서 감지해 대상에게 전달한다.
+    /// 부스 오브젝트 상호작용(F 키)을 한 곳에서 감지해 대상에게 전달한다.
     ///
     /// 왜 `OnMouseDown` 을 쓰지 않는가 (T-166) —
     /// WebGL 빌드에서 레거시 마우스 메시지가 디스패치되지 않는다. 콜라이더·배선·시야를
@@ -52,11 +52,10 @@ namespace Festa.Content
             var cam = ResolveCamera();
             if (cam == null) return;
 
-            bool pressed = TryReadPress(out var pressPosition);
             bool interactKey = InteractKeyPressedThisFrame();
             if (!TryReadPointer(out var pointerPosition)) { UpdateHover(null); return; }
 
-            // 호버는 매 프레임, 클릭은 눌린 프레임에만. 레이는 한 번만 쏜다.
+            // 호버·조준용 레이는 매 프레임 한 번만 쏜다.
             bool hasHit = Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance);
 
             // 콜라이더가 자식에 있어도 루트의 상호작용 컴포넌트를 찾는다.
@@ -69,23 +68,14 @@ namespace Festa.Content
             UpdateHover(inRange ? aimed : null);
             ShowHint(inRange ? aimed : null);
 
-            if (!pressed && !interactKey) return;
-
-            // 누른 좌표가 호버 좌표와 다를 수 있으므로(터치) 클릭은 따로 쏜다.
-            // F 키는 지금 보고 있는 대상에 그대로 건다.
-            if (pressed && pressPosition != pointerPosition)
-            {
-                hasHit = Physics.Raycast(cam.ScreenPointToRay(pressPosition), out hit, MaxRayDistance);
-                var pressAimed = hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null;
-                if (pressAimed == null || !IsInRange(pressAimed)) return;
-            }
-            else if (!inRange) return;
-
-            if (!hasHit) return;
+            // 실행은 F 키로만 한다 (S15P21A604-323). 포인터는 조준·호버에만 쓴다 —
+            // 클릭을 실행에 쓰면 3인칭 카메라 조작·UI 클릭과 경쟁해 오조작이 난다.
+            if (!interactKey) return;
+            if (!inRange || !hasHit) return;
             Dispatch(hit.collider);
         }
 
-        /// <summary>타입별 상호작용으로 넘긴다. 클릭·F 키가 같은 경로를 쓴다.</summary>
+        /// <summary>타입별 상호작용으로 넘긴다.</summary>
         static void Dispatch(Collider collider)
         {
             var laptop = collider.GetComponentInParent<LaptopInteractable>();
@@ -150,50 +140,14 @@ namespace Festa.Content
         }
 
         /// <summary>
-        /// 이번 프레임에 눌렸는지와 화면 좌표를 읽는다.
-        /// Input System 이 켜져 있으면 그쪽을 먼저 쓰고, 없으면 레거시로 떨어진다.
-        /// </summary>
-        static bool TryReadPress(out Vector2 screenPosition)
-        {
-            screenPosition = default;
-
-#if ENABLE_INPUT_SYSTEM
-            var mouse = Mouse.current;
-            if (mouse != null && mouse.leftButton.wasPressedThisFrame)
-            {
-                screenPosition = mouse.position.ReadValue();
-                return true;
-            }
-
-            var touch = Touchscreen.current;
-            if (touch != null && touch.primaryTouch.press.wasPressedThisFrame)
-            {
-                screenPosition = touch.primaryTouch.position.ReadValue();
-                return true;
-            }
-
-            // Input System 이 활성인데 장치가 잡히면 레거시로 내려가지 않는다 —
-            // 두 백엔드가 함께 켜진 경우(Both) 같은 클릭이 두 번 처리되는 것을 막는다.
-            if (mouse != null || touch != null) return false;
-#endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            if (Input.GetMouseButtonDown(0))
-            {
-                screenPosition = Input.mousePosition;
-                return true;
-            }
-#endif
-            return false;
-        }
-
-        /// <summary>
         /// 상호작용 키(F)가 이번 프레임에 눌렸는가.
         ///
-        /// 클릭을 없애지 않고 **F 를 함께 받는다.** docs/02 RUNTIME-06 과 spec 016 이
-        /// "노트북을 클릭하면" 으로 적혀 있어 클릭을 빼면 문서·FE 계약과 어긋난다.
-        /// 클릭만 두면 3인칭에서 카메라·UI 조작과 경쟁해 오조작이 난다 — 둘 다 받는 게
-        /// 지금 시점의 안전한 답이다. 클릭 제거 여부는 팀 결정 사항으로 올려 뒀다.
+        /// **실행 입력은 F 키 하나다** (S15P21A604-323). 클릭은 조준·호버에만 쓴다.
+        /// 클릭을 실행에 쓰면 3인칭 카메라 조작·UI 클릭과 경쟁해 오조작이 난다 —
+        /// 미니게임 화면에서 "정지" 를 누르면 뒤 월드가 반응하던 것이 그 예다.
+        ///
+        /// docs/02 RUNTIME-06 과 spec 016 은 "클릭하면" 으로 적혀 있다.
+        /// 이 변경은 그 문서와 어긋나므로 계약 문서 갱신·FE 통지가 함께 가야 한다 (헌법 24조).
         /// </summary>
         static bool InteractKeyPressedThisFrame()
         {

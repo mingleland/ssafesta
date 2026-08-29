@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Festa.Content
 {
     /// <summary>
-    /// AI NPC 상호작용 POC. 클릭하면 Mock AI에 질문을 보내고 스트리밍 응답을 로그로 받는다.
+    /// AI NPC 상호작용 POC. F 키로 상호작용하면 Mock AI에 질문을 보내고 스트리밍 응답을 로그로 받는다.
     /// 정식 구현에서는 상호작용 시 React 오버레이(AI 채팅 UI)로 이벤트를 넘긴다 —
     /// 한글 IME 문제로 텍스트 입력 UI는 Unity 내부에 만들지 않는다 (ADR 결정 4).
     /// </summary>
