@@ -60,8 +60,11 @@ namespace Festa.Diagnostics
         ProfilerRecorder _drawCalls, _setPass, _batches, _tris, _sysMemory;
         const string FmtNet = "송신 {0,7:F1} KB/s   수신 {1,7:F1} KB/s";
         static readonly StringBuilder Sb = new StringBuilder(512);
+        // IMGUI 전용 자원. OnGUI 와 함께 서버 빌드에서 빠진다 (S15P21A604-314).
+#if UNITY_EDITOR || !UNITY_SERVER
         static Texture2D _bg;
         static GUIStyle _style;
+#endif
 
         /// <summary>
         /// 개발 도구는 **개발 빌드·에디터에서만** 살아 있어야 한다.
@@ -169,6 +172,11 @@ namespace Festa.Diagnostics
             _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f;
         }
 
+        // 서버 빌드는 IMGUI 모듈이 스트립돼, 이 메서드가 **존재하기만 해도** 유니티가
+        // "OnGUI function detected on MonoBehaviour, but not called" 경고를 띄운다
+        // (S15P21A604-314). 내부 가드로는 못 막으므로 서버 빌드에서 컴파일 제외한다.
+        // UNITY_EDITOR 를 함께 두는 이유는 DevConnectionHud 쪽 주석 참조 (T-182).
+#if UNITY_EDITOR || !UNITY_SERVER
         void OnGUI()
         {
             if (!_visible) return;
@@ -216,6 +224,8 @@ namespace Festa.Diagnostics
             GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width - 20f, rect.height - 16f), Sb.ToString(), _style);
         }
 
+        // 아래 둘은 OnGUI 에서만 쓰인다. 같이 배제해야 서버 빌드에 IMGUI 참조가 남지 않는다.
+
         void EnsureStyle()
         {
             if (_style != null) return;
@@ -239,5 +249,6 @@ namespace Festa.Diagnostics
             _bg.Apply();
             return _bg;
         }
+#endif
     }
 }
