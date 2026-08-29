@@ -154,24 +154,46 @@ namespace Festa.EditorTools
 
         // ---------- 썸네일 (C-05) ----------
 
+        /// <summary>
+        /// `thumbnail` 필드가 비어도 **화면에는 그림이 나오는** 카테고리.
+        ///
+        /// `CharacterLobbyController` 가 이 둘만 `Resources` 에서 인덱스로 따로 불러온다
+        /// (`FaceThumbnail(index) ?? captured.thumbnail`). 필드는 폴백일 뿐이다.
+        /// 이걸 구분하지 않으면 "누락 62개" 같은 과장된 숫자가 나온다 — 실제로 화면이
+        /// 깨지는 것은 필드에만 의존하는 카테고리뿐이다.
+        /// </summary>
+        static bool HasResourceFallback(AvatarPartCategory category) =>
+            category == AvatarPartCategory.Head || category == AvatarPartCategory.Hair;
+
         static void AppendThumbnailGap(StringBuilder report, AvatarItemDefinition[] items)
         {
             var missing = items.Where(x => x.thumbnail == null).ToArray();
+            var blocking = missing.Where(x => !HasResourceFallback(x.category)).ToArray();
+            var covered = missing.Where(x => HasResourceFallback(x.category)).ToArray();
+
             report.AppendLine("## C-05 — 썸네일 보유 현황");
             report.AppendLine();
-            report.AppendLine($"- 보유 {items.Length - missing.Length} / {items.Length}");
+            report.AppendLine($"- 필드 보유 {items.Length - missing.Length} / {items.Length}");
+            report.AppendLine();
 
-            if (missing.Length == 0)
+            if (blocking.Length == 0)
             {
-                report.AppendLine("- 누락 없음");
+                report.AppendLine("- **화면에 영향 있는 누락: 없음**");
             }
             else
             {
-                // 썸네일이 없으면 사용자는 이름 텍스트만 보고 골라야 한다 (spec 013 C-05).
-                report.AppendLine($"- **누락 {missing.Length}개** — 이 항목들은 이름 텍스트로만 고르게 된다");
+                report.AppendLine($"- ⚠ **화면에 영향 있는 누락 {blocking.Length}개** — 이름 텍스트로만 고르게 된다");
                 report.AppendLine();
-                foreach (var group in missing.GroupBy(x => x.category))
+                foreach (var group in blocking.GroupBy(x => x.category))
                     report.AppendLine($"  - {group.Key}: {string.Join(", ", group.Select(x => x.displayName))}");
+            }
+
+            if (covered.Length > 0)
+            {
+                report.AppendLine();
+                report.AppendLine($"- 필드는 비었지만 **화면 영향 없음: {covered.Length}개** " +
+                                  $"({string.Join(", ", covered.GroupBy(x => x.category).Select(g => $"{g.Key} {g.Count()}"))}) " +
+                                  "— UI 가 `Resources` 에서 인덱스로 불러온다");
             }
             report.AppendLine();
         }

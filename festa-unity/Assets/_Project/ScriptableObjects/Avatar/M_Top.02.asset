@@ -21,7 +21,7 @@ MonoBehaviour:
   objectPrefabs: []
   targetBones: 
   hiddenBodyParts: 02000000030000001500000014000000
-  thumbnail: {fileID: 21300000, guid: d939703eb6611c84da7fc5667760a30b, type: 3}
+  thumbnail: {fileID: 21300000, guid: 14c2c6746e4e10c439ba4f19ef3e70cf, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0
