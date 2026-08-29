@@ -20,6 +20,9 @@ namespace Festa.EditorTools
         const int MinTriangles = 150;
         const int SearchIterations = 20;
 
+        /// <summary>면적이 이보다 작은 삼각형은 축퇴로 본다 — 노멀이 NaN 이 된다.</summary>
+        const float DegenerateAreaEpsilon = 1e-16f;
+
         public static Mesh Decimate(Mesh src, float ratio)
         {
             var srcVerts = src.vertices;
@@ -152,7 +155,14 @@ namespace Festa.EditorTools
             for (int i = 0; i + 2 < tris.Length; i += 3)
             {
                 int a = local[tris[i]], b = local[tris[i + 1]], c = local[tris[i + 2]];
-                if (a == b || b == c || a == c) continue;   // 병합으로 찌그러진 삼각형은 버린다
+                if (a == b || b == c || a == c) continue;   // 병합으로 인덱스가 겹친 것
+
+                // 인덱스가 달라도 위치가 같으면 면적이 0 이다. 이런 삼각형은 노멀이
+                // 정의되지 않아 셰이더의 normalize 가 NaN 을 뱉고, 그 NaN 이 후처리의
+                // 다운샘플·블러를 타고 화면 넓은 영역으로 번진다 (T-224).
+                var pa = outVerts[a]; var pb = outVerts[b]; var pc = outVerts[c];
+                if (Vector3.Cross(pb - pa, pc - pa).sqrMagnitude < DegenerateAreaEpsilon) continue;
+
                 keep.Add(a); keep.Add(b); keep.Add(c);
             }
             outTris = keep.ToArray();
