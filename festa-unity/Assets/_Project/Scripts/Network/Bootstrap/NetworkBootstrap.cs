@@ -61,6 +61,12 @@ namespace Festa.Network
 
         void StartDedicatedServer(UnityTransport transport)
         {
+            // 소켓을 열기 **전에** 입장 검증 준비를 확인한다 (spec infra-003 world-entry-token.md).
+            // 키가 없으면 여기서 프로세스를 끝낸다 — 검증 없이 뜬 서버는 아무나 들어온다.
+            // 원장을 못 쓰면 뜨긴 하되 모든 입장이 fail-closed 로 거부되고, 그 사실을 로그로 드러낸다.
+            WorldEntryTokenSecret.EnforceOrQuit();
+            GrantReplayLedger.Warmup();
+
             ushort port = GetArgValue("-port", _defaultPort);
             _maxPlayers = (int)GetArgValue("-maxPlayers", (ushort)_maxPlayers);
 
