@@ -82,9 +82,23 @@ namespace Festa.EditorTools
             {
                 EditorUserBuildSettings.development = prevDev;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
-                if (prevTarget != BuildTarget.WebGL)
+
+                // 서버 타깃으로는 되돌리지 않는다 (T-228, T-219 의 방아쇠).
+                // 그 상태면 에디터에 UNITY_SERVER 가 정의돼 캐릭터 로비가 월드로 넘어가고,
+                // 다음 WebGL 빌드에서 Mobile_RPAsset 이 빠진다. 자세한 근거는
+                // FestaReleaseBuilder 의 같은 지점 주석 참조.
+                bool restingOnServer =
+                    BuildPipeline.GetBuildTargetGroup(prevTarget) == BuildTargetGroup.Standalone &&
+                    EditorUserBuildSettings.standaloneBuildSubtarget == StandaloneBuildSubtarget.Server;
+
+                if (restingOnServer)
+                    Debug.LogWarning($"[WebBuilder] 빌드 전 타깃이 {prevTarget}(Server) 였지만 " +
+                                     "WebGL 로 둔다 — 서버 타깃은 에디터 플레이를 깨뜨린다 (T-228).");
+                else if (prevTarget != BuildTarget.WebGL)
                     EditorUserBuildSettings.SwitchActiveBuildTarget(prevGroup, prevTarget);
-                Debug.Log($"[WebBuilder] 설정 복원 — development={prevDev}, 압축={prevCompression}, 타깃={prevTarget}");
+
+                Debug.Log($"[WebBuilder] 설정 복원 — development={prevDev}, 압축={prevCompression}, " +
+                          $"타깃={(restingOnServer ? BuildTarget.WebGL : prevTarget)}");
             }
 
             var s = report.summary;

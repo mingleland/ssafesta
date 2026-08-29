@@ -158,9 +158,33 @@ namespace Festa.EditorTools
                 EditorUserBuildSettings.standaloneBuildSubtarget = prevSubtarget;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
                 PlayerSettings.WebGL.decompressionFallback = prevFallback;
-                if (EditorUserBuildSettings.activeBuildTarget != prevTarget)
-                    EditorUserBuildSettings.SwitchActiveBuildTarget(prevGroup, prevTarget);
-                Debug.Log($"[Release] 설정 복원 — 타깃={prevTarget}({prevSubtarget}), development={prevDev}, " +
+
+                // **"원래대로" 가 고장난 상태면 복원이 고장을 보존한다** (T-228).
+                //
+                // 데디케이티드 서버 타깃은 에디터에 `UNITY_SERVER` 를 정의한다. 그 상태에서는
+                //   · `CharacterLobbyController.Awake()` 가 곧장 main 으로 넘겨
+                //     **커스터마이징 화면을 아예 볼 수 없고**
+                //   · 거기서 WebGL 을 빌드하면 `Mobile_RPAsset` 이 통째로 빠진다 (T-219)
+                // T-219 는 이 복원 자체를 "방아쇠" 로 지목해 뒀는데, 복원 대상만 그대로 뒀다.
+                //
+                // 이 프로젝트의 클라이언트는 WebGL 이다. 쉬는 상태도 WebGL 이어야 한다.
+                bool restingOnServer =
+                    BuildPipeline.GetBuildTargetGroup(prevTarget) == BuildTargetGroup.Standalone &&
+                    prevSubtarget == StandaloneBuildSubtarget.Server;
+
+                var restoreTarget = restingOnServer ? BuildTarget.WebGL : prevTarget;
+                var restoreGroup = restingOnServer ? BuildTargetGroup.WebGL : prevGroup;
+
+                if (EditorUserBuildSettings.activeBuildTarget != restoreTarget)
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(restoreGroup, restoreTarget);
+
+                if (restingOnServer)
+                    Debug.LogWarning(
+                        $"[Release] 빌드 전 타깃이 {prevTarget}(Server) 였지만 **WebGL 로 되돌린다** — " +
+                        "서버 타깃으로 두면 에디터에 UNITY_SERVER 가 정의돼 캐릭터 로비가 월드로 " +
+                        "넘어가고(T-228), 그 상태에서 WebGL 을 빌드하면 Mobile_RPAsset 이 빠진다(T-219).");
+
+                Debug.Log($"[Release] 설정 복원 — 타깃={restoreTarget}({prevSubtarget}), development={prevDev}, " +
                           $"WebGL 압축={prevCompression}/fallback={prevFallback}");
             }
         }
