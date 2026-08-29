@@ -141,21 +141,34 @@ namespace Festa.Network
             }
             catch { /* malformed payload → deny below */ }
 
-            if (payload == null || !ValidateToken(payload))
+            // payload 가 null 이면 단락 평가로 ValidateToken 이 호출되지 않으므로 사유를 미리 둔다.
+            var grant = default(WorldEntryToken);
+            var why = "payload 파싱 실패";
+            if (payload == null || !ValidateToken(payload, out grant, out why))
             {
+                // 사유는 서버 로그에만 남긴다. 클라이언트에게 세분해서 알려주면 위조를 돕는다.
+                Debug.LogWarning($"[Connection] 입장 거부 — {why}");
                 Deny(response, ReasonInvalidToken);
                 return;
             }
 
-            Approve(response, request.ClientNetworkId, payload);
+            // **신원은 토큰 클레임이 정본이다** (헌법 16조). 클라이언트가 보낸 userId·nickname·
+            // avatarCode 는 쓰지 않는다 — 그건 접속자가 마음대로 적어 보낼 수 있는 값이다.
+            Approve(response, request.ClientNetworkId, grant.ToPayload(payload.connectionToken));
         }
 
         /// <summary>
-        /// POC: 비어있지 않으면 통과.
-        /// TODO(P0 후속): Spring 내부 API 또는 서명 검증으로 교체 (doc 12 §7).
+        /// 월드 입장 grant 를 Spring 을 부르지 않고 자체 검증한다 (헌법 14조, spec 002 FR-013·014).
+        /// 서명·iss·aud·exp·worldId·channelId 를 보고, 마지막으로 jti 를 원장에서 소비한다.
         /// </summary>
-        static bool ValidateToken(ConnectionPayload payload) =>
-            !string.IsNullOrEmpty(payload.connectionToken);
+        static bool ValidateToken(ConnectionPayload payload, out WorldEntryToken grant, out string reason)
+        {
+            if (!WorldEntryTokenVerifier.Verify(payload.connectionToken, out grant, out reason))
+                return false;
+
+            // 서명이 맞아도 이미 쓴 grant 면 거부한다. 원장 기록에 실패해도 거부한다(fail-closed).
+            return GrantReplayLedger.TryConsume(grant.Jti, grant.ExpiresAtUnix, out reason);
+        }
 
         static void Approve(NetworkManager.ConnectionApprovalResponse response,
                             ulong clientId, ConnectionPayload payload)
