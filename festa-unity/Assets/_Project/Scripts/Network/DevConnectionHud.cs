@@ -34,6 +34,15 @@ namespace Festa.Network
                 ConnectViaSessionApi();
         }
 
+        // 데디케이티드 서버 빌드는 IMGUI 모듈이 스트립된다. 그러면 유니티가 기동 시
+        // "OnGUI function detected on MonoBehaviour, but not called" 경고를 띄우는데,
+        // 이건 **메서드가 존재한다는 사실만으로** 뜨므로 아래의 isBatchMode 가드로는 못 막는다.
+        // 메서드 자체를 서버 빌드에서 컴파일 제외해야 한다 (S15P21A604-314).
+        //
+        // UNITY_EDITOR 를 함께 두는 이유: UNITY_SERVER 는 빌드 타깃이 Dedicated Server 이면
+        // 에디터에도 정의된다 (T-182). 그 조건만 쓰면 타깃을 서버로 둔 순간 에디터에서
+        // 이 HUD 가 사라진다 — 개발 중에 접속 수단을 잃는다.
+#if UNITY_EDITOR || !UNITY_SERVER
         void OnGUI()
         {
             if (Application.isBatchMode) return;
@@ -108,6 +117,7 @@ namespace Festa.Network
 
             GUILayout.EndArea();
         }
+#endif
 
         /// <summary>
         /// 정식 접속 흐름 검증: world-sessions API(현재 Mock) → endpoint/token → StartClient.
