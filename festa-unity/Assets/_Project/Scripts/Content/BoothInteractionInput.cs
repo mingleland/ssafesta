@@ -78,15 +78,11 @@ namespace Festa.Content
         /// <summary>타입별 상호작용으로 넘긴다.</summary>
         static void Dispatch(Collider collider)
         {
-            var laptop = collider.GetComponentInParent<LaptopInteractable>();
-            if (laptop != null) { laptop.Interact(); return; }
-
-            var ai = collider.GetComponentInParent<AiNpcInteractable>();
-            if (ai != null) { ai.Interact(); return; }
-
-            // spec 014 미니게임. 타입 분기 일반화는 S15P21A604-303 의 몫이라 여기서 섞지 않는다.
-            var minigame = collider.GetComponentInParent<Festa.Minigame.MinigameInteractable>();
-            if (minigame != null) minigame.Interact();
+            // 구현 타입을 나열하지 않는다 (S15P21A604-303). 예전에는 노트북·AI·미니게임을
+            // 하나씩 적어 분기했는데, 종류가 늘 때마다 여기를 고쳐야 했고 **고치는 걸 잊으면
+            // 컴포넌트는 붙었는데 아무 반응이 없다** — 조용해서 원인을 찾기 어려운 형태다.
+            var target = collider.GetComponentInParent<IBoothInteractable>();
+            target?.Interact();
         }
 
         /// <summary>
