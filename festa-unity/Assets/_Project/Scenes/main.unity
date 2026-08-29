@@ -8,8 +8,8 @@ OcclusionCullingSettings:
     smallestOccluder: 20
     smallestHole: 5
     backfaceThreshold: 100
-  m_SceneGUID: 00000000000000000000000000000000
-  m_OcclusionCullingData: {fileID: 0}
+  m_SceneGUID: 867cdf102f4c92743b1b0de0c135dfa9
+  m_OcclusionCullingData: {fileID: 36300000, guid: d3b30d56d6c08234194f696c173cd1f9, type: 2}
 --- !u!104 &2
 RenderSettings:
   m_ObjectHideFlags: 0
@@ -10906,8 +10906,10 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses:
+  - MOTIONVECTORS
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -11003,7 +11005,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.1, g: 0.11, b: 0.14, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.09999997, g: 0.10999996, b: 0.13999996, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
@@ -35845,7 +35847,7 @@ MeshCollider:
   serializedVersion: 5
   m_Convex: 0
   m_CookingOptions: 30
-  m_Mesh: {fileID: -2432090755550338912, guid: 7cb3a611650c39b49b370f47d6c2553d, type: 3}
+  m_Mesh: {fileID: 4300000, guid: bcb366690d9d17640b0bef57d582b5de, type: 2}
 --- !u!1 &415523976
 GameObject:
   m_ObjectHideFlags: 0
@@ -63867,8 +63869,10 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses:
+  - MOTIONVECTORS
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -63964,7 +63968,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.06, g: 0.065, b: 0.08, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.059999965, g: 0.064999975, b: 0.079999976, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
@@ -67038,7 +67042,7 @@ PrefabInstance:
     - target: {fileID: -7464038072181080870, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -2432090755550338912, guid: 5e7d2ee846a15f64792ba2a23578af06, type: 3}
+      objectReference: {fileID: 4300000, guid: 70d38e2b7a373274aa6985a48250bac9, type: 2}
     - target: {fileID: -7390262026624940595, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
@@ -67942,7 +67946,7 @@ PrefabInstance:
     - target: {fileID: 4531077739650389207, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: m_Mesh
       value: 
-      objectReference: {fileID: -2432090755550338912, guid: 7cb3a611650c39b49b370f47d6c2553d, type: 3}
+      objectReference: {fileID: 4300000, guid: bcb366690d9d17640b0bef57d582b5de, type: 2}
     - target: {fileID: 4532463605436914397, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 22
@@ -119190,8 +119194,10 @@ Material:
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Opaque
+  disabledShaderPasses:
+  - MOTIONVECTORS
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -119287,7 +119293,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 0.24, g: 0.31, b: 0.77, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.23999995, g: 0.30999997, b: 0.77, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
@@ -137874,7 +137880,7 @@ MeshCollider:
   serializedVersion: 5
   m_Convex: 0
   m_CookingOptions: 30
-  m_Mesh: {fileID: -2432090755550338912, guid: 5e7d2ee846a15f64792ba2a23578af06, type: 3}
+  m_Mesh: {fileID: 4300000, guid: 70d38e2b7a373274aa6985a48250bac9, type: 2}
 --- !u!1 &1774734435
 GameObject:
   m_ObjectHideFlags: 0
