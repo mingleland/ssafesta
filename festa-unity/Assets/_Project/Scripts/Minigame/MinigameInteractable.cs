@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Festa.Minigame
 {
     /// <summary>
-    /// 게임 부스 오브젝트를 클릭하면 미니게임을 연다 (spec 014 FR-001, T010).
+    /// 게임 부스 오브젝트에 F 키로 상호작용하면 미니게임을 연다 (spec 014 FR-001, T010).
     ///
     /// <see cref="LaptopInteractable"/>·<see cref="Festa.Content.AI.AiNpcInteractable"/> 와 같은 형태다 —
     /// 클릭 감지는 중앙 디스패처(<see cref="BoothInteractionInput"/>)가 하고 여기서는 열기만 한다.
