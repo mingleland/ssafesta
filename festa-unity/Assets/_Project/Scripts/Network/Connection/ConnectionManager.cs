@@ -16,8 +16,11 @@ namespace Festa.Network
     [RequireComponent(typeof(NetworkManager))]
     public class ConnectionManager : MonoBehaviour
     {
-        public const string ReasonInvalidToken = "INVALID_TOKEN";
-        public const string ReasonServerFull = "SERVER_FULL";
+        public const string ReasonInvalidToken = WorldDisconnectReason.InvalidToken;
+        public const string ReasonServerFull = WorldDisconnectReason.ServerFull;
+
+        /// <summary>같은 계정이 새로 접속해 밀려났을 때. 클라이언트가 "다른 곳에서 접속했다"고 안내한다.</summary>
+        public const string ReasonReplacedBySameUser = WorldDisconnectReason.ReplacedBySameUser;
 
         NetworkBootstrap _bootstrap;
 
@@ -155,6 +158,16 @@ namespace Festa.Network
             // **신원은 토큰 클레임이 정본이다** (헌법 16조). 클라이언트가 보낸 userId·nickname·
             // avatarCode 는 쓰지 않는다 — 그건 접속자가 마음대로 적어 보낼 수 있는 값이다.
             Approve(response, request.ClientNetworkId, grant.ToPayload(payload.connectionToken));
+
+            // 같은 신원의 이전 접속이 남아 있으면 끊는다 — 한 사람이 둘로 스폰되면 안 된다
+            // (docs/12 §9). 나중 접속이 이긴다: 반대로 하면 클라이언트가 죽은 뒤 전송 타임아웃
+            // 전까지 본인이 자기 계정에 못 들어온다 (S15P21A604-231).
+            if (WorldSessionRegistry.TryRegister(grant.Subject, request.ClientNetworkId, out var stale))
+            {
+                Debug.LogWarning($"[ConnectionManager] 같은 신원의 이전 접속을 끊는다 " +
+                                 $"sub={grant.Subject} stale={stale} → new={request.ClientNetworkId}");
+                NetworkManager.Singleton.DisconnectClient(stale, ReasonReplacedBySameUser);
+            }
         }
 
         /// <summary>
@@ -252,11 +265,22 @@ namespace Festa.Network
 
         void OnConnectionEvent(NetworkManager nm, ConnectionEventData data)
         {
+            // 클라이언트 쪽: 끊긴 게 나 자신이면 사유를 드러낸다 (S15P21A604-231).
+            // 서버가 REASON 을 실어 보내는데 읽는 곳이 없어 사용자 눈에는 이유 없이 튕겼다.
+            if (data.EventType == ConnectionEvent.ClientDisconnected && !nm.IsServer &&
+                data.ClientId == nm.LocalClientId)
+            {
+                WorldDisconnectReporter.ReportLocalDisconnect(nm.DisconnectReason);
+                return;
+            }
+
             if (data.EventType == ConnectionEvent.ClientDisconnected && nm.IsServer)
             {
                 SessionDataStore.Remove(data.ClientId);
                 SpawnSlots.Remove(data.ClientId); // 반납 — 다음 접속이 같은 자리를 다시 쓴다
-                Debug.Log($"[ConnectionManager] Client {data.ClientId} disconnected, session cleaned");
+                WorldSessionRegistry.Remove(data.ClientId);
+                Debug.Log($"[ConnectionManager] Client {data.ClientId} disconnected, session cleaned " +
+                          $"(남은 접속 {WorldSessionRegistry.Count})");
             }
         }
     }
