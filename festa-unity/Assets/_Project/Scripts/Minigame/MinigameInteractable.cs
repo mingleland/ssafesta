@@ -15,7 +15,7 @@ namespace Festa.Minigame
     /// 실패하거나 중간에 나가도 월드 접속·플레이어 상태에 영향이 없다.
     /// </summary>
     [DisallowMultipleComponent]
-    public sealed class MinigameInteractable : MonoBehaviour
+    public sealed class MinigameInteractable : MonoBehaviour, Festa.Content.IBoothInteractable
     {
         void Awake()
         {
