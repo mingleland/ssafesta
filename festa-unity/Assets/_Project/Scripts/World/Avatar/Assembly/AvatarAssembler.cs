@@ -186,6 +186,19 @@ namespace Festa.Avatar
             // 드로우콜 이득(아바타당 약 −4)은 원인을 확정할 때까지 포기한다 — 정확성이 먼저다.
             if (Application.platform == RuntimePlatform.WebGLPlayer) return;
 
+            // 이전 병합에서 꺼둔 원본을 **먼저 되살린다** (T-228).
+            //
+            // 아래에서 병합 대상을 고를 때 `r.enabled` 로 거른다. 그런데 원본은 병합될 때
+            // `enabled = false` 로 꺼지고 아무도 다시 켜지 않았다. 그래서 옷을 바꿔 두 번째
+            // 호출이 들어오면 — 이미 꺼진 원본이 후보에서 빠져 새 병합체가 만들어지지 않는데
+            // 옛 병합체는 바로 아래에서 파괴된다. **그리는 것이 아무것도 남지 않아 몸이 통째로
+            // 사라진다.** 처음 조립할 때는 멀쩡하고 옷을 갈아입는 순간 없어지는 형태다.
+            //
+            // 파괴보다 먼저 켜야 한다 — 플레이 모드의 `Destroy` 는 프레임 끝에 처리되므로
+            // 파괴 후에 훑으면 아직 살아 있는 병합체까지 다시 켜서 원본과 겹쳐 그린다.
+            foreach (var renderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (renderer && !_merged.Contains(renderer.gameObject)) renderer.enabled = true;
+
             foreach (var go in _merged) if (go) DestroySafe(go);
             _merged.Clear();
 
