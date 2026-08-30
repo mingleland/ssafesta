@@ -255,6 +255,44 @@ class ProjectValidationApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("저장소 주소에 사용자 정보(@)를 넣을 수 없습니다."));
     }
 
+    /**
+     * <b>전각 구분자</b>가 IDN 매핑을 거쳐 authority 구조를 바꾸는 것을 막는다.
+     *
+     * <p>{@code ＠}(U+FF20)·{@code ／}(U+FF0F)·{@code ？}·{@code ＃} 는 입력 시점에는 ASCII 구분자가
+     * <b>아니라서</b> raw 검사를 통과하지만, {@code IDN.toASCII} 가 그것들을 {@code @}·{@code /}·
+     * {@code ?}·{@code #} 로 바꾼다. 그 결과를 그대로 믿으면 {@code https://한글.com＠evil.com} 이
+     * {@code evil.com} 으로 해석되고 — <b>검증한 목적지와 저장·표시되는 문자열이 갈린다.</b>
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"https://한글도메인.com＠evil.example.com", "https://한글도메인.com／evil.example.com/x",
+                            "https://한글도메인.com？q=1", "https://한글도메인.com＃f"})
+    void aFullWidthSeparatorCannotSmuggleStructureThroughIdn(String url) throws Exception {
+        Owner owner = leasedOwner("전각" + url.length());
+
+        mockMvc.perform(create(owner, """
+                        {"name": "전각", "deployUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("deployUrl"));
+    }
+
+    /**
+     * 반대로 <b>이건 통과해야 한다.</b>
+     *
+     * <p>{@code 。}(U+3002)는 IDN 이 {@code .} 로 매핑하는 <b>정당한 라벨 구분자</b>이고 브라우저도
+     * 같게 해석한다. 구조를 밀반입하는 것이 아니라 도메인을 쓰는 또 다른 방법이라, 전각 구분자를
+     * 막는다고 이것까지 막으면 멀쩡한 주소를 거부하게 된다.
+     */
+    @Test
+    void anIdeographicFullStopIsAValidLabelSeparator() throws Exception {
+        Owner owner = leasedOwner("표점");
+        String url = "https://한글도메인。com/x";
+
+        mockMvc.perform(create(owner, """
+                        {"name": "표점", "deployUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.deployUrl").value(url));
+    }
+
     /** 한글 도메인도 포트 규칙을 빠져나가지 못한다 — 판정을 해석된 URI 로 하기 때문이다. */
     @Test
     void aKoreanDomainWithAnUnreachablePortIsStillRefused() throws Exception {

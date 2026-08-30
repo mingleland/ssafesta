@@ -91,6 +91,12 @@ public final class HttpUrlValidator {
         if (resolved == null) {
             throw reject(jsonField, displayName + " 주소 형식이 올바르지 않습니다.");
         }
+        // 해석된 URI 에서 한 번 더 본다. 위 raw 검사는 ASCII '@' 만 잡는데, 전각 '＠'(U+FF20)은
+        // IDN 매핑을 거치며 '@' 가 되어 그때서야 userinfo 가 생긴다 — https://한글.com＠evil.com 이
+        // evil.com 으로 해석되는 자리다.
+        if (resolved.getUserInfo() != null) {
+            throw reject(jsonField, displayName + " 주소에 사용자 정보(@)를 넣을 수 없습니다.");
+        }
         if (!isUsablePort(resolved.getPort())) {
             throw reject(jsonField, displayName + " 주소의 포트 번호가 올바르지 않습니다. (1~65535)");
         }
@@ -148,10 +154,16 @@ public final class HttpUrlValidator {
      * rather than validated, because the URI we checked would no longer be the string we store
      * (invariant I-3 cuts both ways).
      *
-     * <p>Userinfo never reaches here — {@link #validate} refuses it on every path. It used to be
-     * guarded only inside this method, which let {@code https://한글도메인.com@evil.example.com}
-     * through: its host is ASCII, so the early return above fired and the guard never ran. One rule
-     * enforced on one of two paths is not a rule.
+     * <p>Userinfo is checked <b>twice</b>, and both are needed. {@link #validate} looks at the raw
+     * authority before this method runs, which catches an ASCII {@code @} that the registry-based
+     * parse hides. It then looks at the resolved URI afterwards, because a full-width {@code ＠}
+     * (U+FF20) is not an {@code @} until IDN mapping makes it one — {@code https://한글.com＠evil.com}
+     * resolves to {@code evil.com} and would otherwise pass as a plain host.
+     *
+     * <p>Separators that map to a real structure ({@code ／} → {@code /}, {@code ？} → {@code ?})
+     * are caught by {@link #isPlainAuthority}. An ideographic full stop ({@code 。} → {@code .}) is
+     * <b>not</b> caught, and should not be: browsers apply the same mapping, so it is a genuine
+     * label separator rather than a smuggled one.
      */
     private static URI serverParsed(URI uri) {
         if (uri.getHost() != null) {
