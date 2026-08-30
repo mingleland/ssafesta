@@ -178,13 +178,11 @@ namespace Festa.Avatar
 
         void CombineSameMaterialParts()
         {
-            // ⚠ WebGL 플레이어에서는 병합을 하지 않는다 (T-214).
-            // 런타임에 만든 병합 스킨메시가 에디터·데스크톱에서는 정상인데 **WebGL 빌드에서만**
-            // 그려지지 않아 목·손·종아리가 사라졌다. 병합 데이터 자체는 빌드 안 실측으로
-            // 정상임을 확인했으므로(정점·본·가중치·바운즈) WebGL 런타임의 스킨메시 처리와의
-            // 상성 문제다. 원본 파츠는 개별로 정상 렌더되므로 병합만 끄면 몸이 복구된다.
-            // 드로우콜 이득(아바타당 약 −4)은 원인을 확정할 때까지 포기한다 — 정확성이 먼저다.
-            if (Application.platform == RuntimePlatform.WebGLPlayer) return;
+            // 병합은 이제 모든 플랫폼에서 켜져 있다 (S15P21A604-258).
+            // 2026-08-26 부터 WebGL 에서만 꺼져 있었는데(T-214), 그 근거였던 "WebGL 에서만
+            // 안 그려진다" 가 2026-08-30 실측으로 틀렸음이 확인됐다. 경위는 AvatarMeshMerge 주석.
+            // 스위치는 A/B 계측용으로 남긴다(F10) — 값을 다시 재려면 조건을 바꿀 수 있어야 한다.
+            if (!AvatarMeshMerge.Enabled) return;
 
             // 이전 병합에서 꺼둔 원본을 **먼저 되살린다** (T-228).
             //
@@ -222,6 +220,12 @@ namespace Festa.Avatar
                 if (mergedGo == null) continue;
                 foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
                 _merged.Add(mergedGo);
+
+                // 병합 결과를 남긴다 (S15P21A604-258). WebGL 빌드에는 HUD 가 닿지 않는 화면이
+                // 있어서, 화면을 못 봐도 로그만으로 "병합체가 만들어졌는지" 를 판정할 수 있어야 한다.
+                if (Debug.isDebugBuild || Application.isEditor)
+                    Debug.Log($"[AvatarMeshMerge] 병합 생성 {mergedGo.name} " +
+                              $"— 원본 {parts.Count}개 → 1개");
             }
         }
 
