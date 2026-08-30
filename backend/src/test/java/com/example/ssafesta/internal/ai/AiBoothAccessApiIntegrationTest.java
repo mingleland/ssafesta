@@ -237,6 +237,26 @@ class AiBoothAccessApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
     }
 
+    /**
+     * 내부 endpoint 가 <b>공개 OpenAPI 문서에 실리지 않는지</b>.
+     *
+     * <p>{@code /v3/api-docs} 는 누구나 열 수 있다({@code SecurityConfiguration} 이 Swagger UI 를
+     * 위해 permitAll 한다). springdoc 은 모든 {@code @RestController} 를 훑으므로 {@code @Hidden}
+     * 이 없으면 이 경로와 그것이 요구하는 토큰 헤더의 모양이 그대로 공개된다.
+     *
+     * <p>주석으로 "문서에 없다"고 적는 것만으로는 아무것도 막지 못한다 — 그렇게 적어 두고 코드가
+     * 하지 않던 것이 T-99 였다. 여기서 실제 문서를 읽어 확인한다.
+     */
+    @Test
+    void theInternalPathIsNotPublishedInThePublicApiDocument() throws Exception {
+        String document = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertFalse(document.contains("/internal/"),
+                "내부 경로가 공개 OpenAPI 문서에 실렸다");
+    }
+
     // ── 헬퍼 ────────────────────────────────────────────────────────────────
 
     private JsonNode bodyOf(Long boothId, long agentId) throws Exception {
