@@ -17,13 +17,12 @@ namespace Festa.Tests
     /// </summary>
     public class BoothInteractBridgeTests
     {
-        static string BuildJson(string type, int boothId, string objectId,
-                                string url = null, int? configId = null)
+        static string BuildJson(string type, int boothId, string objectId, int? configId = null)
         {
             var method = typeof(BoothInteractBridge).GetMethod(
                 "BuildJson", BindingFlags.NonPublic | BindingFlags.Static);
             Assert.IsNotNull(method, "BuildJson 을 찾지 못했다 — 이름이 바뀌었으면 테스트도 갱신해라.");
-            return (string)method.Invoke(null, new object[] { type, boothId, objectId, url, configId });
+            return (string)method.Invoke(null, new object[] { type, boothId, objectId, configId });
         }
 
         [Test]
@@ -37,24 +36,30 @@ namespace Festa.Tests
         }
 
         [Test]
-        public void 노트북_payload_는_url_이_있을_때만_url_을_넣는다()
+        public void 노트북_payload_는_boothId_와_objectId_뿐이다()
         {
             Assert.AreEqual(
                 "{\"type\":\"BOOTH_LAPTOP_INTERACT\",\"boothId\":3,\"objectId\":\"lap\"}",
                 BuildJson(BoothInteractBridge.LaptopInteract, 3, "lap"));
+        }
 
-            Assert.AreEqual(
-                "{\"type\":\"BOOTH_LAPTOP_INTERACT\",\"boothId\":3,\"objectId\":\"lap\",\"url\":\"https://a.b\"}",
-                BuildJson(BoothInteractBridge.LaptopInteract, 3, "lap", url: "https://a.b"));
+        [Test]
+        public void 노트북_payload_에_URL_은_절대_들어가지_않는다()
+        {
+            // 홈페이지 주소는 `booths.homepage_url` 에 있고 Layout 에는 없다 — Unity 는 그 값을
+            // 알 수 없다 (헌법 25조). 예전에 있던 `url?` 선택 필드는 채울 출처가 없어
+            // **한 번도 값이 실린 적이 없었고**, 남겨 두면 "Unity 가 URL 을 보낼 수도 있다" 로
+            // 읽힌다. 되살아나면 이 테스트가 잡는다 (S15P21A604-297).
+            StringAssert.DoesNotContain("url",
+                BuildJson(BoothInteractBridge.LaptopInteract, 3, "lap"));
         }
 
         [Test]
         public void 값이_없는_선택_필드는_키_자체를_넣지_않는다()
         {
-            // 빈 문자열이나 0 을 보내면 받는 쪽이 "값이 있다" 로 읽는다.
-            var json = BuildJson(BoothInteractBridge.LaptopInteract, 1, "o", url: "   ");
-            StringAssert.DoesNotContain("url", json);
-            StringAssert.DoesNotContain("configId", json);
+            // 0 을 보내면 받는 쪽이 "값이 있다" 로 읽는다.
+            StringAssert.DoesNotContain("configId",
+                BuildJson(BoothInteractBridge.LaptopInteract, 1, "o"));
         }
 
         [Test]
@@ -78,8 +83,9 @@ namespace Festa.Tests
         [Test]
         public void 줄바꿈이_섞여도_이스케이프된다()
         {
-            // 부스 이름·URL 이 붙여넣기로 들어오면 개행이 섞일 수 있다.
-            var json = BuildJson(BoothInteractBridge.LaptopInteract, 1, "o", url: "a\nb\tc");
+            // objectId 는 Layout JSON 에서 오는 문자열이다. 스튜디오에서 붙여넣기로 들어오면
+            // 개행·탭이 섞일 수 있고, 생으로 나가면 받는 쪽 JSON 파싱이 깨진다.
+            var json = BuildJson(BoothInteractBridge.LaptopInteract, 1, "a\nb\tc");
             StringAssert.Contains("\\n", json);
             StringAssert.Contains("\\t", json);
             Assert.IsFalse(json.Contains("\n"), "생 개행이 JSON 에 남으면 파싱이 깨진다");
