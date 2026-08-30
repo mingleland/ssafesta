@@ -15,7 +15,7 @@
 | 004 | booth-slot-lease | 주담당 | 001, 003 |
 | 002 | world-session-multiplayer | world-sessions API + connection token 발급 | 001 |
 | 005 | booth-studio-layout | Layout 저장·Publish API | 004 |
-| 009 | project-exhibition | CRUD + S3 | 004, 005 |
+| 009 | project-exhibition | 프로젝트 등록·수정·조회 API (부스당 1개). **업로드 없음 — URL 참조**(C-03) | 004, 005 |
 | 013a | avatar-customization | 아바타 저장 API | 001 |
 | 016 | booth-laptop-homepage | 홈페이지 URL 필드 + 검증 | 004, 005 |
 
