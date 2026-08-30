@@ -61,6 +61,9 @@ namespace Festa.Diagnostics
             if (Input.GetKeyDown(_clearKey)) Remove(_spawned.Count);
         }
 
+        /// <summary>병합 무결성 검사가 같은 카탈로그를 쓰게 한다 (S15P21A604-236).</summary>
+        public AvatarCatalog Catalog => ResolveCatalog();
+
         AvatarCatalog ResolveCatalog()
         {
             if (_catalog != null) return _catalog;
