@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Reflection;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
@@ -108,6 +109,46 @@ namespace Festa.Tests
             Assert.IsEmpty(offenders,
                 "씬에 Missing Script 가 있다. 참조가 끊긴 컴포넌트다.\n" +
                 string.Join("\n", offenders));
+        }
+
+        /// <summary>
+        /// T-148 회귀 방지 — **실제 배포되는 레지스트리**가 모호하지 않은지 본다.
+        ///
+        /// `BoothObjectRegistryTests` 는 정책을 고정하고, 이 검사는 **데이터**를 본다.
+        /// 지금은 타입당 자산이 하나뿐이라 모호함이 없지만, FE 가 `assetCode` 목록을 주면
+        /// 타입당 2개 이상이 되는 순간 기본이 배열 순서로 갈린다. 그때 여기서 걸린다.
+        /// </summary>
+        [Test]
+        public void 부스_오브젝트_레지스트리에_모호한_타입_기본이_없다()
+        {
+            var guids = AssetDatabase.FindAssets("t:" + nameof(Festa.Booth.BoothObjectRegistry));
+            Assert.IsNotEmpty(guids, "BoothObjectRegistry 에셋을 찾지 못했다.");
+
+            var offenders = new List<string>();
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var registry = AssetDatabase.LoadAssetAtPath<Festa.Booth.BoothObjectRegistry>(path);
+                if (registry == null) continue;
+
+                var entries = (List<Festa.Booth.BoothObjectRegistry.Entry>)typeof(Festa.Booth.BoothObjectRegistry)
+                    .GetField("_entries", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(registry);
+
+                foreach (var group in entries.Where(e => e?.prefab != null).GroupBy(e => e.type))
+                {
+                    int blanks = group.Count(e => string.IsNullOrEmpty(e.assetCode));
+                    if (blanks > 1)
+                        offenders.Add($"{path} — {group.Key}: 기본(빈 assetCode) 엔트리가 {blanks}개");
+                    else if (blanks == 0 && group.Count() > 1)
+                        offenders.Add($"{path} — {group.Key}: 기본 미선언인데 후보가 {group.Count()}개 " +
+                                      "(배열 순서로 갈린다)");
+                }
+            }
+
+            Assert.IsEmpty(offenders,
+                "타입 기본 자산이 배열 순서에 좌우되는 항목이 있다. 기본으로 쓸 엔트리의 " +
+                "assetCode 를 비워라 (T-148).\n" + string.Join("\n", offenders));
         }
 
         static void OpenMainScene()
