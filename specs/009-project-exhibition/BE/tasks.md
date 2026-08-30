@@ -171,7 +171,12 @@
   > 곁다리: `ddl-auto: validate` 부팅 성공 = 엔티티 매핑 일치, `flyway_schema_history` 최신
   > `14 | project one per booth | t`, `pg_indexes` 에 `ux_projects_booth` — **Testcontainers
   > 밖에서 V14 를 처음 확인**했다.
-- [ ] T035 MR `[S15P21A604-110][BE] 프로젝트 전시 등록·수정 API` → `develop`, Default 템플릿. **`Closes S15P21A604-110`이 develop에 도달하는 커밋 메시지에 있는지 머지 시점에 눈으로 확인한다** — MR 설명에만 있으면 전환이 발화하지 않는다. squash 커밋과 merge 커밋 메시지를 **둘 다** 본다 (109 실측: squash `2545eb3`에는 없었고 merge `4169e79` 본문에 있어 발화)
+- [x] T035 MR `[S15P21A604-110][BE] 프로젝트 전시 등록·수정 API` → `develop`, Default 템플릿. **`Closes S15P21A604-110`이 develop에 도달하는 커밋 메시지에 있는지 머지 시점에 눈으로 확인한다** — MR 설명에만 있으면 전환이 발화하지 않는다. squash 커밋과 merge 커밋 메시지를 **둘 다** 본다 (109 실측: squash `2545eb3`에는 없었고 merge `4169e79` 본문에 있어 발화)
+
+  > **2026-08-28 게시 — [MR !120](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/120)**.
+  > 커밋 10개, `origin/develop` 리베이스 후 회귀 재확인(47 클래스 / 459 테스트, 실패 0).
+  > **`Closes S15P21A604-110` 은 아직 어느 커밋에도 없다** — 머지 다이얼로그에서 squash·merge
+  > 메시지에 넣어야 전이가 발화한다. MR 본문 "머지 시 확인" 절에 그 사실을 적어 뒀다.
 
 ---
 
