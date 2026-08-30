@@ -30,8 +30,48 @@ namespace Festa.Network
         {
             // Only the lobby entry path starts a session automatically. Running
             // the world scene directly still leaves the development controls usable.
-            if (AvatarSceneHandoff.ConsumeWorldConnectionRequest())
-                ConnectViaSessionApi();
+            TryConsumeEntryRequest();
+        }
+
+        // ── 재진입 (S15P21A604-332) ────────────────────────────────
+        //
+        // **`Start()` 한 번으로는 두 번째 월드 진입을 못 잡는다.**
+        //
+        // 이 오브젝트(`@Network`)는 `NetworkManager`·`ConnectionManager`·이 HUD 를 한 몸으로
+        // 갖고 있고, 첫 `main` 로드에서 `DontDestroyOnLoad` 로 옮겨진다. 로비로 돌아갔다가
+        // 다시 월드로 들어오면 새 `main` 씬에도 `@Network` 가 있지만 **NGO 의 NetworkManager
+        // 싱글턴 중복 제거가 그 오브젝트를 통째로 파괴한다** — 새 HUD 도 같이 사라진다.
+        // 살아남는 것은 **옛** 인스턴스이고, 그 `Start()` 는 이미 돌았으므로 다시 돌지 않는다.
+        // 그 결과 접속 요청이 영영 소비되지 않아 **두 번째 진입은 조용히 접속되지 않았다**
+        // (요청 플래그가 `1` 로 남아 있는 것이 그 증거였다).
+        //
+        // 그래서 진입 판단을 **씬 로드마다** 한다. `WorldEntryGate` 가 같은 함정을
+        // 같은 방식으로 이미 고쳤다 (S15P21A604-312) — 한 번만 도는 진입 훅이 이 코드베이스에서
+        // 두 번째로 낸 같은 사고다.
+        void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
+        void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (mode != LoadSceneMode.Single) return;
+            if (scene.name != AvatarSceneHandoff.WorldSceneName) return;
+            TryConsumeEntryRequest();
+        }
+
+        void TryConsumeEntryRequest()
+        {
+            if (!AvatarSceneHandoff.ConsumeWorldConnectionRequest()) return;
+
+            // 이미 붙어 있으면 요청만 비우고 끝낸다 — 겹쳐 걸면 전송 계층이 원인을
+            // 알려주지 않는 실패만 남긴다 (T-182).
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (nm != null && (nm.IsListening || nm.IsClient))
+            {
+                Debug.Log("[DevConnectionHud] 이미 접속 상태라 진입 요청만 소비한다.");
+                return;
+            }
+
+            ConnectViaSessionApi();
         }
 
         // 데디케이티드 서버 빌드는 IMGUI 모듈이 스트립된다. 그러면 유니티가 기동 시
