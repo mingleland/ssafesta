@@ -8,16 +8,18 @@ package com.example.ssafesta.common;
  * forgot a field silently deletes a saved value. 016 shipped that collapse once (T-97).
  *
  * <p>Jackson calls a setter only when the key is present, so {@code set} being called <i>at all</i>
- * is the signal. Both 016 and 009 need it, which is why it is here rather than a second private
- * copy.
+ * is the signal. 016·009·007 all need it, which is why it is here rather than a third private copy.
+ *
+ * <p>Generic because 007 patches an {@code Integer}, a {@code Boolean} and a {@code List<String>}
+ * alongside the strings.
  */
-public final class PresenceField {
+public final class PresenceField<T> {
 
-    private String value;
+    private T value;
     private boolean present;
 
     /** Call from the {@code @JsonProperty} setter — being called is the presence signal. */
-    public void set(String value) {
+    public void set(T value) {
         this.value = value;
         this.present = true;
     }
@@ -28,7 +30,7 @@ public final class PresenceField {
     }
 
     /** {@code null} when the client sent an explicit {@code null}, or when the key was absent. */
-    public String value() {
+    public T value() {
         return value;
     }
 }

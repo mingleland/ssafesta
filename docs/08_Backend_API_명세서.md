@@ -541,19 +541,23 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 ## 6. AI Agent Config 관리
 
 AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 Spring을 기본으로 한다.
+정본 계약은 `specs/007-ai-agent-document/spec.md`(C-12·C-13·C-14·C-15).
 
-### POST `/booths/{boothId}/agents`
+편집 권한은 **소유자 또는 스태프**(`BoothEditorGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15).
+회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
+(007 FR-015 — 만료돼도 설정은 보존된다).
 
-### GET `/booths/{boothId}/agents`
+> ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
+> `BoothEditorGuard`가 `role`을 읽지 않으며 005·009·016도 같은 상태다 — 011 구현 시 가드 한
+> 곳에서 일괄로 닫는다
+> ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 
-### GET `/agents/{agentId}`
-
-### PATCH `/agents/{agentId}`
-
-#### Agent 예시
+### 공통 표현
 
 ```json
 {
+  "agentId": 1,
+  "boothId": 7,
   "name": "FESTA 프로젝트 도슨트",
   "role": "PROJECT_DOCENT",
   "tone": "FRIENDLY",
@@ -564,6 +568,107 @@ AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 S
   "forbiddenTopics": ["PERSONAL_INFORMATION"]
 }
 ```
+
+**키는 항상 있다.** `name`·`role`·`systemPrompt` 외에는 클라이언트가 안 보내도 **서버가 기본값을
+채운다** — `null`로 두지 않는다. `forbiddenTopics`만 기본값이 빈 배열이고, 없어도 키가 사라지지
+않는다 (조건부로 사라지면 클라이언트가 `undefined`와 `[]`를 둘 다 다뤄야 한다).
+
+`boothId`를 응답에 넣는 것은 `/agents/{agentId}` 경로에 부스 좌표가 없기 때문이다.
+`status`와 시각 필드는 **내보내지 않는다** — 소비자가 없고, 나중에 추가하는 것은 가산적이다.
+
+**필드 규칙**
+
+| 필드 | 규칙 |
+|---|---|
+| `name` | 필수. 1~100자 |
+| `role` | 필수. 아래 화이트리스트 |
+| `systemPrompt` | 필수. 공백만은 안 된다 |
+| `tone` · `responseLength` | 선택. 아래 화이트리스트, 기본 `FRIENDLY`·`MEDIUM` |
+| `servicePrice` | 선택. **0 이상 정수**, 기본 `0`. 상한은 정의된 바 없어 두지 않았다 |
+| `handoffEnabled` | 선택. boolean, 기본 `false` |
+| `forbiddenTopics` | 선택. 문자열 배열, 기본 `[]`. **화이트리스트 없음** — 항목이 공백만 아니면 된다 |
+
+> `forbiddenTopics`의 **개수·길이 상한은 미정**이다 (docs/26 등록). 근거 없는 수치를 서버가
+> 정하면 그것이 사실상의 계약이 된다. 정해지면 `400 VALIDATION_FAILED`로 거부하도록 갱신한다.
+> 위 예시의 `PERSONAL_INFORMATION`은 **예시일 뿐 열거형이 아니다** — 자유 문자열이다.
+
+### POST `/booths/{boothId}/agents`
+
+AI 직원 등록. 성공 `201` + 공통 표현.
+
+실패: `400 VALIDATION_FAILED`(`errors[0] = { rule: "FIELD_INVALID", field, message }`) ·
+`401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 AGENT_LIMIT_EXCEEDED`**(이미 있음 — 수정은 `PATCH`).
+동시 요청에서도 같은 코드가 나온다(유니크 제약 위반을 같은 코드로 번역).
+
+### GET `/booths/{boothId}/agents`
+
+**편집자용** 조회. 만료된 부스도 200이다.
+
+```json
+{ "agents": [ { "agentId": 1, "boothId": 7, "…": "…" } ] }
+```
+
+**0개 또는 1개 배열이고, 없으면 `{ "agents": [] }`다 — 404가 아니다.** 배열 형태를 유지하는 것은
+상한이 오르더라도 계약 모양이 바뀌지 않게 하기 위함이다 (§5와 같은 판단).
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
+
+### GET `/agents/{agentId}`
+
+단건 조회. 성공 `200` + 공통 표현.
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND`.
+
+### PATCH `/agents/{agentId}`
+
+보낸 필드만 바꾼다 (spec 007 C-06 — §5 프로젝트와 같은 규칙).
+
+| 본문 | 뜻 |
+|---|---|
+| 키 **누락** | 그 필드는 손대지 않는다 |
+| `{}` | **400** — 조용한 no-op을 만들지 않는다 |
+| `"forbiddenTopics": null` | **비운다** (`[]`와 같다) |
+| 그 밖의 키에 `null` | **400**, `errors[0].field`가 그 필드를 지목한다 — 전부 `NOT NULL`이라 지울 수 있는 필드가 아니다 |
+
+`handoffEnabled: null`도 예외가 아니다 — `false`로 읽지 않는다. 끄려면 `false`를 명시한다.
+등록(`POST`)에서도 같다: 명시적 `null`은 "기본값을 달라"가 아니라 400이다.
+
+**같은 값을 다시 보내면 `updatedAt`을 흔들지 않는다.** 전체 폼을 매번 보내는 FE가 "방금 수정됨"을
+만들어 내지 않게 하기 위함이다.
+
+성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
+`403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 직원 수정 차단**) · **`404 AGENT_NOT_FOUND`** ·
+`409 BOOTH_LEASE_EXPIRED`.
+
+### DELETE `/agents/{agentId}`
+
+AI 직원 삭제. 성공 `204`(본문 없음). **하드 삭제라 같은 부스에 다시 등록할 수 있다.**
+
+> 이 엔드포인트는 spec 007 본문에는 없었고 **Jira S15P21A604-105 완료 조건 문면**에서 왔다.
+> 2026-08-30 확정하며 참조 거부 정책과 함께 spec 007 **C-14**로 적었다.
+
+**참조가 하나라도 있으면 `409 AGENT_DELETE_CONFLICT`다.** `message`가 **무엇이 막는지** 말한다 —
+다음 행동이 셋 다 다르기 때문이다(배치에서 빼기 / 문서 지우기 / 상담 끝나기를 기다리기).
+
+| 막는 것 | 근거 |
+|---|---|
+| Draft 배치 또는 **현재 공개 중인** 배치가 이 직원을 배치해 둠 | JSON 참조 — 외래키 없음 |
+| `ai_documents`에 등록된 문서가 있음 | 외래키 |
+| `consultations`에 상담 기록이 있음 | 외래키 |
+
+- "현재 공개 중"은 **`booths.published_layout_version` 포인터** 기준이다. 최고 버전 번호가 아니다 —
+  재임대 뒤에는 최신 행이 옛 임차인의 것일 수 있고, 아무도 볼 수 없는 과거 버전 때문에 삭제를
+  막는 것은 틀렸다. **과거 버전에만 있는 참조는 삭제를 막지 않는다.**
+- Draft 검사는 **기존 편집 중인 작업의 보호**일 뿐 강한 불변식이 아니다. Draft는 원래 존재하지
+  않는 `configId`도 허용하므로(미완성 허용이 Draft의 정의) 삭제 후 옛 ID를 Draft에 다시 넣는 것은
+  막지 않는다. 그건 공개 시점 검증(`CONFIG_NOT_OWNED`)이 잡는다. **강한 불변식은 "공개된 배치는
+  존재하는 직원만 가리킨다" 하나다.**
+- 그 불변식에는 외래키가 없다. 그래서 **삭제와 배치 공개가 같은 잠금**(부스 행)을 잡는다 — 검사를
+  마친 직후 상대가 끼어드는 경쟁을 직렬화한다. 어느 쪽이 먼저 끝나든 공개된 배치가 사라진 직원을
+  가리키는 상태는 나오지 않는다.
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 AGENT_DELETE_CONFLICT`**.
 
 #### 설정 허용값 (2026-08-27 확정 — spec 007 C-12, [GitLab #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112))
 
@@ -952,7 +1057,9 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `GAME_SCHEMA_UNSUPPORTED` *(019)* | 서버·Runtime이 지원하지 않는 schemaVersion |
 | `GAME_PROJECT_INVALID` *(019)* | **저장된** snapshot이 재검증 실패 — 500, 서버 결함 |
 | `CONFIG_NOT_FOUND` *(019)* | Portal `configId`의 Binding 없음. 실행 불가 사유는 오류가 아니라 200 응답의 `unavailableReason`이다 |
-| `AGENT_NOT_FOUND` | Agent 없음 |
+| `AGENT_NOT_FOUND` *(007)* | Agent 없음 |
+| `AGENT_LIMIT_EXCEEDED` *(007)* | 이 부스에는 이미 AI 직원이 있다 — 부스당 1명(C-13). 수정은 `PATCH`. `message`가 상한을 담는다 |
+| `AGENT_DELETE_CONFLICT` *(007)* | 배치·문서·상담 중 하나가 아직 이 직원을 가리킨다 (C-14). `message`가 무엇이 막는지 말한다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |

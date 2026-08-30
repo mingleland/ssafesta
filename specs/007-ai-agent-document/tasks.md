@@ -77,15 +77,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] [BE] Agent 생성·조회·수정과 타 부스 접근 거부 통합 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiAgentApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+- [ ] T022 [P] [US1] [BE] Agent 생성·조회·수정·**삭제**, 부스당 1명 거부, **참조 있는 삭제 거부**, 같은 부스 스태프 성공 경로, 타 부스 접근 거부 통합 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiAgentApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (C-14·C-15, 2026-08-30 확대)
 - [ ] T023 [P] [US1] [FE] Agent 편집 폼의 생성·수정·오류 표시 컴포넌트 테스트를 `festa-frontend/src/features/ai-agent/components/AiAgentEditor.test.tsx`에 먼저 작성하고 실패를 확인한다
 
 ### Implementation for User Story 1
 
 - [ ] T024 [P] [US1] [BE] `ai_agents` 상태와 이름·역할·말투·지시문 매핑 entity를 `backend/src/main/java/com/example/ssafesta/ai/AiAgent.java`에 구현한다
 - [ ] T025 [P] [US1] [BE] Agent 영속 조회와 booth 범위 쿼리를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentRepository.java`에 구현한다
-- [ ] T026 [US1] [BE] Booth 소유권을 검증하는 Agent 생성·조회·수정 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다
-- [ ] T027 [US1] [BE] Agent 생성·조회·수정 REST API와 요청·응답 DTO를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentController.java`에 구현한다
+- [ ] T026 [US1] [BE] `BoothEditorGuard`(소유자·스태프, C-15)로 권한을 검증하는 Agent 생성·조회·수정·**삭제** 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다. 삭제는 참조 3종 사전검사 + FK 번역 + booth 잠금 (C-14)
+- [ ] T027 [US1] [BE] Agent 생성·조회·수정·**삭제**(`DELETE /agents/{agentId}` → 204) REST API와 요청·응답 DTO를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentController.java`에 구현한다
+- [ ] T027a [US1] [BE] `V15__agent_one_per_booth.sql`(유니크 인덱스)과 `AiAgentProperties`(perBoothLimit==1·documentCountLimit>0·documentTotalBytes>0 부팅 검증), `ErrorCode` 3종(`AGENT_NOT_FOUND`·`AGENT_LIMIT_EXCEEDED`·`AGENT_DELETE_CONFLICT`)을 구현한다 (C-13, 2026-08-30 추가)
+- [ ] T027b [US1] [BE] booth 패키지에 `agentReferencedInLayouts`(Draft + `published_layout_version` 포인터 기준 현재 Published) 헬퍼와 `BoothRepository.findWithLockById`를 추가하고, `BoothLayoutService` publish가 검증 전에 같은 잠금을 잡도록 한다 (불변식 A-3, 2026-08-30 추가)
+- [ ] T027c [P] [US1] [BE] 동시 생성 1건만 성공, **Publish↔삭제 잠금 순서 2종 latch 재현**을 `backend/src/test/java/com/example/ssafesta/ai/AiAgentConcurrencyIntegrationTest.java`에, Properties 부팅 검증·바인딩을 `AiAgentPropertiesTest`에, FK 번역을 `AiAgentDeleteTranslationTest`에 구현한다 (2026-08-30 추가)
 - [ ] T028 [P] [US1] [FE] Spring Agent API client와 DTO를 `festa-frontend/src/features/ai-agent/api/aiAgentApi.ts`에 구현한다
 - [ ] T029 [US1] [FE] Agent 생성·수정 폼과 저장 후 재조회 흐름을 `festa-frontend/src/features/ai-agent/components/AiAgentEditor.tsx`에 구현한다
 

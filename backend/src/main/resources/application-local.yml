@@ -79,3 +79,11 @@ app:
   game:
     live-limit: 20
     deleted-limit: 5
+
+  # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
+  # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
+  # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비할 자리다.
+  agent:
+    per-booth-limit: 1
+    document-count-limit: 10
+    document-total-bytes: 100MB
