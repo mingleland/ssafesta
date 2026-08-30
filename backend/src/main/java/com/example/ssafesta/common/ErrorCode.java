@@ -69,6 +69,16 @@ public enum ErrorCode {
      */
     PROJECT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이 부스에는 이미 프로젝트가 있습니다. 수정으로 변경해 주세요."),
 
+    // ── AI 직원 (spec 007) ──────────────────────────────────────────────────
+    AGENT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 직원을 찾을 수 없습니다."),
+    /** 부스당 1명 (C-13). 상한이 설정값이라 message 가 숫자와 해결 방법을 담는다. */
+    AGENT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "이 부스에는 이미 AI 직원이 있습니다. 수정으로 변경해 주세요."),
+    /**
+     * 그 직원을 가리키는 것이 남아 있다 (C-14). 무엇이 막는지는 thrower 가 message 에 담는다 —
+     * 문서인지 상담인지 배치인지에 따라 사용자가 할 일이 다르다.
+     */
+    AGENT_DELETE_CONFLICT(HttpStatus.CONFLICT, "사용 중인 AI 직원은 삭제할 수 없습니다."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —

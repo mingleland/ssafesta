@@ -166,7 +166,7 @@ public class ProjectService {
      *
      * @return 이 필드가 행을 바꿨는지 — {@code updated_at} 을 흔들지 말지를 호출자가 이것으로 정한다
      */
-    private static boolean apply(PresenceField field, String current, Consumer<String> setter) {
+    private static boolean apply(PresenceField<String> field, String current, Consumer<String> setter) {
         if (!field.isPresent() || Objects.equals(current, field.value())) {
             return false;
         }
@@ -188,7 +188,7 @@ public class ProjectService {
         validateUrl(command.portfolioUrl, "portfolioUrl", "포트폴리오");
     }
 
-    private void validateUrl(PresenceField field, String jsonField, String displayName) {
+    private void validateUrl(PresenceField<String> field, String jsonField, String displayName) {
         if (field.isPresent()) {
             HttpUrlValidator.validate(field.value(), jsonField, displayName);
         }
@@ -220,13 +220,13 @@ public class ProjectService {
     /** Not a {@code record} — see {@link Field}. */
     public static final class ProjectCommand {
 
-        private final PresenceField name = new PresenceField();
-        private final PresenceField description = new PresenceField();
-        private final PresenceField thumbnailUrl = new PresenceField();
-        private final PresenceField videoUrl = new PresenceField();
-        private final PresenceField deployUrl = new PresenceField();
-        private final PresenceField gitUrl = new PresenceField();
-        private final PresenceField portfolioUrl = new PresenceField();
+        private final PresenceField<String> name = new PresenceField<>();
+        private final PresenceField<String> description = new PresenceField<>();
+        private final PresenceField<String> thumbnailUrl = new PresenceField<>();
+        private final PresenceField<String> videoUrl = new PresenceField<>();
+        private final PresenceField<String> deployUrl = new PresenceField<>();
+        private final PresenceField<String> gitUrl = new PresenceField<>();
+        private final PresenceField<String> portfolioUrl = new PresenceField<>();
 
         @JsonProperty("name")
         void setName(String value) { name.set(value); }
