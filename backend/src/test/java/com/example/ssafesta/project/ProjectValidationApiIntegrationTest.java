@@ -213,6 +213,60 @@ class ProjectValidationApiIntegrationTest {
                 .andExpect(jsonPath("$.deployUrl").value(url));
     }
 
+    /**
+     * 한글 도메인은 통과하고, <b>저장은 원문 그대로</b>다 (불변식 I-3).
+     *
+     * <p>판정만 punycode 로 한다. 값을 바꿔 저장하면 사용자가 넣은 주소와 다른 것이 화면에 뜬다.
+     */
+    @Test
+    void aKoreanDomainPassesAndIsStoredVerbatim() throws Exception {
+        Owner owner = leasedOwner("한글");
+        String url = "https://한글도메인.com/내포트폴리오";
+
+        mockMvc.perform(create(owner, """
+                        {"name": "한글", "portfolioUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.portfolioUrl").value(url));
+    }
+
+    /**
+     * {@code userinfo} 는 <b>ASCII 든 IDN 이든</b> 거부한다.
+     *
+     * <p>규칙을 IDN 경로에만 걸었던 초판은 {@code https://한글도메인.com@evil.example.com} 을
+     * 통과시켰다 — host 가 ASCII({@code evil.example.com})라 원본이 그대로 파싱되고 조기 반환에
+     * 걸려 검사가 아예 실행되지 않았다. <b>두 경로 중 하나에만 걸린 규칙은 규칙이 아니다.</b>
+     *
+     * <p>거부하는 이유는 두 가지다. ⑴ 이 필드들은 <b>공개 전시</b>되므로
+     * {@code https://oauth2:token@gitlab.com/...} 을 붙여넣으면 자격증명이 그대로 저장·노출된다
+     * ⑵ 눈에는 {@code @} 앞이 먼저 보여 목적지를 오인하게 만든다. 목적지가 악의적인지를 판정하는
+     * 악성 링크 정책(spec 004 C-05 · U-01)과는 다른 문제이고, 이건 주소 자체의 형식 문제다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"https://user@한글도메인.com", "https://관리자@한글도메인.com",
+                            "https://한글도메인.com@evil.example.com",
+                            "https://oauth2:token@gitlab.example.com/team/repo"})
+    void aUrlCarryingUserInfoIsRefusedOnEveryPath(String url) throws Exception {
+        Owner owner = leasedOwner("유저" + url.length());
+
+        mockMvc.perform(create(owner, """
+                        {"name": "구조", "gitUrl": "%s"}""".formatted(url)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("gitUrl"))
+                .andExpect(jsonPath("$.message").value("저장소 주소에 사용자 정보(@)를 넣을 수 없습니다."));
+    }
+
+    /** 한글 도메인도 포트 규칙을 빠져나가지 못한다 — 판정을 해석된 URI 로 하기 때문이다. */
+    @Test
+    void aKoreanDomainWithAnUnreachablePortIsStillRefused() throws Exception {
+        Owner owner = leasedOwner("한포트");
+
+        mockMvc.perform(create(owner, """
+                        {"name": "한글포트", "videoUrl": "https://한글도메인.com:99999/v"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("영상 주소의 포트 번호가 올바르지 않습니다. (1~65535)"));
+    }
+
     /** 빈 문자열은 "지우기"가 아니다. 지우려면 null 을 보내야 한다 (계약 §1). */
     @Test
     void anEmptyStringIsRefusedRatherThanTreatedAsClearing() throws Exception {

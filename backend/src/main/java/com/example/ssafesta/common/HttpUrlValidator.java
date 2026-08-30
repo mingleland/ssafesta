@@ -81,6 +81,12 @@ public final class HttpUrlValidator {
         if (!isAllowedScheme(uri.getScheme())) {
             throw reject(jsonField, displayName + " 주소는 http 또는 https로 시작해야 합니다.");
         }
+        // userinfo 는 어느 경로에서도 거부한다 — ASCII 든 IDN 이든 규칙은 하나여야 한다.
+        // 초판은 IDN 경로에만 걸어 두어 https://한글도메인.com@evil.example.com 이 통과했다.
+        if (uri.getUserInfo() != null || uri.getRawAuthority() != null
+                && uri.getRawAuthority().indexOf('@') >= 0) {
+            throw reject(jsonField, displayName + " 주소에 사용자 정보(@)를 넣을 수 없습니다.");
+        }
         URI resolved = serverParsed(uri);
         if (resolved == null) {
             throw reject(jsonField, displayName + " 주소 형식이 올바르지 않습니다.");
@@ -134,6 +140,18 @@ public final class HttpUrlValidator {
      * <p>An underscore host ({@code https://my_host.example.com}) stays refused. It is invalid under
      * RFC 1123 and appears only on internal names, which are not destinations a visitor can reach —
      * the case this validator exists for.
+     *
+     * <p><b>Only the host is converted, and the result must still be a bare authority.</b> Handing
+     * {@code IDN.toASCII} the whole authority looked simpler and was wrong: it treats its argument
+     * as a domain name, so {@code user@한글.com} came back as {@code xn--user@-lt1tk15s.com} — a
+     * different name entirely. Anything that re-parses into a path, query or fragment is refused
+     * rather than validated, because the URI we checked would no longer be the string we store
+     * (invariant I-3 cuts both ways).
+     *
+     * <p>Userinfo never reaches here — {@link #validate} refuses it on every path. It used to be
+     * guarded only inside this method, which let {@code https://한글도메인.com@evil.example.com}
+     * through: its host is ASCII, so the early return above fired and the guard never ran. One rule
+     * enforced on one of two paths is not a rule.
      */
     private static URI serverParsed(URI uri) {
         if (uri.getHost() != null) {
@@ -143,14 +161,39 @@ public final class HttpUrlValidator {
         if (authority == null) {
             return null;
         }
+        // '@' 는 validate 가 이미 걸렀다 — 여기 오는 authority 에는 userinfo 가 없다.
+        String host = authority;
+        String port = "";
+        int lastColon = authority.lastIndexOf(':');
+        if (lastColon >= 0) {
+            host = authority.substring(0, lastColon);
+            port = authority.substring(lastColon); // ":8080" — 숫자 판정은 아래 재파싱이 한다
+        }
         try {
-            // 포트 판정도 이 결과로 한다 — 원본은 authority 가 registry-based 라 getPort() 가
-            // 항상 -1 이고, 그러면 한글 도메인만 포트 규칙을 빠져나간다.
-            URI ascii = new URI(uri.getScheme() + "://" + IDN.toASCII(authority));
-            return ascii.getHost() == null ? null : ascii;
+            // host 만 변환한다. authority 를 통째로 넘기면 변환 결과가 다른 구조로 재파싱될 수
+            // 있고, 그러면 검증한 URI 와 저장하는 문자열이 다른 곳을 가리킨다.
+            //
+            // 포트 판정도 이 결과로 해야 한다 — 원본은 authority 가 registry-based 라
+            // getPort() 가 항상 -1 이고, 그러면 한글 도메인만 포트 규칙을 빠져나간다.
+            URI ascii = new URI(uri.getScheme() + "://" + IDN.toASCII(host) + port);
+            return isPlainAuthority(ascii) ? ascii : null;
         } catch (IllegalArgumentException | URISyntaxException retryFailed) {
             return null;
         }
+    }
+
+    /**
+     * 재조립한 URI 가 <b>host(+port) 하나로만</b> 이뤄졌는지 확인한다.
+     *
+     * <p>변환 결과에 {@code /}·{@code ?}·{@code #} 가 섞여 들어오면 {@code new URI} 가 그것을
+     * 경로·질의·조각으로 갈라 읽는다. 그러면 우리가 host 라고 판정한 것이 원본 authority 의
+     * 일부에 지나지 않게 되고, 검증을 통과한 주소와 저장되는 주소가 갈린다.
+     */
+    private static boolean isPlainAuthority(URI ascii) {
+        return ascii.getHost() != null
+                && (ascii.getPath() == null || ascii.getPath().isEmpty())
+                && ascii.getQuery() == null
+                && ascii.getFragment() == null;
     }
 
     /** One field broke its constraint, so the rule stays {@code FIELD_INVALID} (#58 §3). */

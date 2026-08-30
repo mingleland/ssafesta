@@ -282,6 +282,8 @@ class ProjectApiIntegrationTest {
     @Test
     void guestsAreRefusedAtTheDoor() throws Exception {
         Owner owner = leasedOwner("게스트");
+        Long projectId = createProject(owner, """
+                {"name": "게스트가 못 건드릴 것"}""");
         String guest = "Bearer " + accessTokens.issueGuestToken().token();
 
         mockMvc.perform(post("/api/v1/booths/{id}/projects", owner.boothId())
@@ -294,6 +296,17 @@ class ProjectApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/booths/{id}/projects", owner.boothId())
                         .header("Authorization", guest))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_ONLY"));
+
+        // 셋 다 봐야 한다. PATCH 가 빠져 있으면 남의 프로젝트를 고칠 수 있는 구멍이 나도
+        // 이 테스트는 여전히 초록이다 — 게스트가 영속 자산을 못 갖는다는 헌법 12조는
+        // endpoint 하나만 막아서는 성립하지 않는다.
+        mockMvc.perform(patch("/api/v1/projects/{id}", projectId)
+                        .header("Authorization", guest)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "게스트가 고침"}"""))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("MEMBER_ONLY"));
     }
