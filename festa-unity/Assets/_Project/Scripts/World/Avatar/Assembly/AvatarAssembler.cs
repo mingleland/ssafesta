@@ -225,6 +225,12 @@ namespace Festa.Avatar
                 if (mergedGo == null) continue;
                 foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
                 _merged.Add(mergedGo);
+
+                // 병합 결과를 남긴다 (S15P21A604-258). WebGL 빌드에는 HUD 가 닿지 않는 화면이
+                // 있어서, 화면을 못 봐도 로그만으로 "병합체가 만들어졌는지" 를 판정할 수 있어야 한다.
+                if (Debug.isDebugBuild || Application.isEditor)
+                    Debug.Log($"[AvatarMeshMerge] 병합 생성 {mergedGo.name} " +
+                              $"— 원본 {parts.Count}개 → 1개");
             }
         }
 
