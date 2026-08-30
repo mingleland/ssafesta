@@ -15,7 +15,7 @@ namespace Festa.Integration
     ///
     /// payload 는 종류마다 다르다.
     /// <list type="bullet">
-    /// <item><c>BOOTH_LAPTOP_INTERACT</c> — <c>{type, boothId, objectId, url?}</c></item>
+    /// <item><c>BOOTH_LAPTOP_INTERACT</c> — <c>{type, boothId, objectId}</c></item>
     /// <item><c>AI_AGENT_INTERACT</c> — <c>{type, boothId, objectId, configId}</c></item>
     /// </list>
     ///
@@ -36,11 +36,23 @@ namespace Festa.Integration
         static extern void FestaNotifyBoothInteract(string json);
 #endif
 
-        /// <summary>노트북 → 홈페이지 열기. <paramref name="url"/> 이 비면 필드를 넣지 않는다.</summary>
-        public static void SendLaptopInteract(int boothId, string objectId, string url = null)
+        /// <summary>
+        /// 노트북 → 홈페이지 열기.
+        ///
+        /// **URL 은 보내지 않는다** (S15P21A604-297). 홈페이지 주소는 `booths.homepage_url` 에
+        /// 있고 Layout 에는 없다 — **Unity 는 그 값을 알 수 없다**(헌법 25조). FE 가 `boothId` 로
+        /// 조회한다. 주소가 미등록이면 FE 가 안내를 띄운다 (FR-009) — Unity 는 등록 여부와
+        /// 무관하게 트리거만 발생시킨다 (FR-005).
+        ///
+        /// 예전에는 `url?` 선택 필드가 있었지만 **값이 실린 적이 한 번도 없다.** 채울 출처가
+        /// 없는데 남겨 두면 "Unity 가 URL 을 보낼 수도 있다" 고 읽힌다. FE 도 제거에 동의했고
+        /// (`homepage-api.md` §4, #97) 실제 전송 JSON 은 바뀌지 않는다 — 비어 있으면 원래
+        /// 키를 넣지 않았기 때문이다.
+        /// </summary>
+        public static void SendLaptopInteract(int boothId, string objectId)
         {
             if (!HasObjectId(LaptopInteract, objectId)) return;
-            Send(BuildJson(LaptopInteract, boothId, objectId, url: url));
+            Send(BuildJson(LaptopInteract, boothId, objectId));
         }
 
         /// <summary>
@@ -90,16 +102,12 @@ namespace Festa.Integration
         /// 종류별 payload 를 만든다. 값이 없는 선택 필드는 **키 자체를 넣지 않는다** —
         /// 빈 문자열이나 0 을 보내면 받는 쪽이 "값이 있다" 로 읽는다.
         /// </summary>
-        static string BuildJson(string type, int boothId, string objectId,
-                                string url = null, int? configId = null)
+        static string BuildJson(string type, int boothId, string objectId, int? configId = null)
         {
             var json = new StringBuilder(128)
                 .Append("{\"type\":\"").Append(type)
                 .Append("\",\"boothId\":").Append(boothId)
                 .Append(",\"objectId\":\"").Append(EscapeJson(objectId)).Append('"');
-
-            if (!string.IsNullOrWhiteSpace(url))
-                json.Append(",\"url\":\"").Append(EscapeJson(url)).Append('"');
 
             if (configId.HasValue)
                 json.Append(",\"configId\":").Append(configId.Value);
