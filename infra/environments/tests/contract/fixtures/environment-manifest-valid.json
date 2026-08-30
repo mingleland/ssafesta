@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "environmentId": "dev",
+  "kind": "part-dev",
+  "composeProject": "festa-dev",
+  "deploymentTargetIds": {
+    "ai": "dev-ai",
+    "back": "dev-back",
+    "front": "dev-front",
+    "game": "dev-game"
+  },
+  "releaseManifestRef": "infra/tests/contract/fixtures/release-valid.json",
+  "runtimeServices": [
+    {
+      "serviceId": "dev-back",
+      "component": "back",
+      "imageRef": "festa-back@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "networkRefs": ["dev-back-private"],
+      "internalEndpoint": "http://back:8080",
+      "healthCheckRef": "back-readiness",
+      "cpuLimitRef": "DEV_BACK_CPU_LIMIT",
+      "memoryLimitRef": "DEV_BACK_MEMORY_LIMIT",
+      "persistentVolumeRefs": [],
+      "releaseId": null
+    }
+  ],
+  "publicEntryRefs": [],
+  "dataBindings": [
+    {
+      "bindingId": "dev-business",
+      "type": "postgres-business",
+      "environmentId": "dev",
+      "databaseName": "festa_dev_business",
+      "serviceRole": "festa_dev_back_app",
+      "credentialRef": "POSTGRES_DEV_BACK_CREDENTIAL_REF"
+    }
+  ],
+  "secretRefs": ["POSTGRES_DEV_BACK_CREDENTIAL_REF"],
+  "resourcePolicy": {
+    "heavyBuildMaxConcurrency": 1,
+    "demoPriority": true,
+    "ec2CapacityRefs": ["EC2_VCPU", "EC2_RAM_MB", "EC2_DISK_GB", "EC2_OS"],
+    "demoServiceLimitRefs": {"cpu": "DEMO_CPU_LIMIT"},
+    "buildAgentLimitRefs": {"cpu": "BUILD_AGENT_CPU_LIMIT"},
+    "admissionHealthRefs": ["demo-web-health"]
+  }
+}
