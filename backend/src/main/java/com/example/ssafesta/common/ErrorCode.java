@@ -59,6 +59,16 @@ public enum ErrorCode {
     LAYOUT_REVISION_CONFLICT(HttpStatus.CONFLICT, "다른 편집자가 먼저 저장했습니다."),
     LAYOUT_NOT_PUBLISHED(HttpStatus.NOT_FOUND, "공개된 배치가 없습니다."),
 
+    // ── Project 전시 (spec 009) ─────────────────────────────────────────────
+    // 최상위 code 두 개뿐이고 신규 rule 은 없다 — 필드 위반은 기존 FIELD_INVALID 를 쓴다 (C-07, BE/research.md R-07).
+    PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다."),
+    /**
+     * 부스당 프로젝트는 1개다 (spec 009 C-01). 두 번째 등록은 덮어쓰지 않고 거절한다 — 조용한
+     * 덮어쓰기는 사고를 만들고, 수정 경로는 {@code PATCH} 로 따로 있다. {@code ACTIVE_LEASE_LIMIT}
+     * (1인 1임대)와 같은 결이다.
+     */
+    PROJECT_ALREADY_EXISTS(HttpStatus.CONFLICT, "이 부스에는 이미 프로젝트가 있습니다. 수정으로 변경해 주세요."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —

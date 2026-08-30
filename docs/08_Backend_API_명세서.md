@@ -437,6 +437,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 → `200 { "homepageUrl": "https://my-team-project.example.com" }` (저장한 그대로 echo)
 
 - 저장은 **원문 그대로** — trim·정규화·대소문자 변경이 없다(왕복 무손실).
+- 검증은 009 프로젝트 URL 5 종과 **같은 검증기**(`common/HttpUrlValidator`)를 탄다 — `http`/`https` · ≤2048자 · **포트가 있으면 1~65535** · 한글 도메인 허용(판정만 punycode, 저장은 원문). 2026-08-28 공용화 때 포트 규칙이 016 에도 함께 걸렸다.
 - `{ "homepageUrl": null }` = **등록 해제**. 빈 문자열 `""`은 해제가 아니라 400이고, **필드가 없는 `{}`도 400**이다 — 해제는 명시적 `null`만 인정한다(직렬화 실수로 URL이 조용히 지워지는 것을 막는다).
 - 검증은 순서대로 첫 위반에서 거부하고 **사유별 다른 문장**을 준다: 필드 부재 → blank → 길이 ≤ 2048 → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. **scheme을 host보다 먼저 본다** — `javascript:`·`data:`는 host가 없어 순서가 뒤바뀌면 스킴 위반이라는 실제 사유가 전달되지 않는다.
 - **`http`를 허용한다**(facade `logoUrl`과 의도적 비대칭) — 로고는 페이지 안에 임베드되어 mixed content로 조용히 죽지만, 홈페이지는 이동 대상이고 iframe이 막히면 새 탭으로 연다. 혼합콘텐츠 경고 UX는 React 몫.
@@ -448,35 +449,92 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 ## 5. Project
 
-### POST `/booths/{boothId}/projects`
+부스가 전시하는 프로젝트. **부스당 1개**다 (spec 009 C-01, 2026-08-28 확정). 정본 계약은
+`specs/009-project-exhibition/contracts/project-api.md`.
 
-프로젝트 정보 등록.
+편집 권한은 **소유자 또는 스태프**(facade·layout과 같은 편집자 범위, `BoothEditorGuard`).
+회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
+(009 FR-008 — 만료돼도 데이터는 보존된다).
 
-### GET `/booths/{boothId}/projects`
+> ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
+> `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
+> 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 
-부스 프로젝트 목록 조회.
-
-### GET `/projects/{projectId}`
-
-프로젝트 상세 조회.
-
-### PATCH `/projects/{projectId}`
-
-Owner/Editor가 프로젝트 정보 수정.
-
-#### 필드 후보
+### 공통 표현
 
 ```json
 {
+  "projectId": 1,
   "name": "SSAFY FESTA",
-  "description": "...",
-  "thumbnailUrl": "...",
-  "videoUrl": "...",
-  "deployUrl": "...",
-  "gitUrl": "...",
-  "portfolioUrl": "..."
+  "description": "메타버스 축제 플랫폼",
+  "thumbnailUrl": "https://cdn.example.com/thumb.png",
+  "videoUrl": "https://youtu.be/xxxx",
+  "deployUrl": "https://festa.example.com",
+  "gitUrl": "https://lab.ssafy.com/team/festa",
+  "portfolioUrl": null
 }
 ```
+
+`name` 외 전부 `null` 가능. **키는 항상 있고 값이 없으면 `null`이다** — 서버가 기본값을 채우지
+않는다 (`avatarCode`와 같은 규칙, §2).
+
+**URL 5종 규칙** (`thumbnailUrl`·`videoUrl`·`deployUrl`·`gitUrl`·`portfolioUrl`):
+
+- `http`/`https`만, 최대 2048자. **형식 검증만 하고 제공자 allowlist는 없다** — 좁히면 정상
+  배포·포트폴리오 URL을 거부해 009 SC-002(링크 도달률 100%)를 깬다
+- 저장 바이트 = 반환 바이트. trim·소문자화·정규화 없음
+- **`@`(userinfo) 금지** — `https://oauth2:token@host` 는 400. 공개 전시 필드라 자격증명이 노출되고 목적지를 오인하게 만든다
+- **한글 도메인 허용** — 판정만 punycode, 저장은 원문 그대로
+- 포트를 붙이려면 **`1~65535`** — `:99999`는 파서가 받아주지만 연결이 안 되므로 400
+- 빈 문자열 `""`는 400. **지우려면 `null`을 보낸다**
+- 대표 이미지는 **업로드가 아니라 URL 참조**다 (009 C-03)
+
+> `videoUrl`의 제공자 범위(009 C-02)는 **기획 미결**이다. 정해지면 서버가 등록 시점에
+> `400 VALIDATION_FAILED`로 거부하도록 이 절을 갱신한다. 그 전에 저장된 URL은 보존하고
+> 조회에서 숨기지 않는다.
+
+### POST `/booths/{boothId}/projects`
+
+프로젝트 등록. `name`만 필수이고 **생략한 필드는 `null`로 저장**된다. 성공 `201` + 공통 표현.
+
+실패: `400 VALIDATION_FAILED`(`errors[0] = { rule: "FIELD_INVALID", field, message }`) ·
+`401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 PROJECT_ALREADY_EXISTS`**(이미 있음 — 수정은 `PATCH`).
+동시 요청에서도 같은 코드가 나온다(유니크 제약 위반을 같은 코드로 번역).
+
+### GET `/booths/{boothId}/projects`
+
+**편집자용** 조회. published 게이트를 걸지 않는다 — 미게시 부스의 소유자도 자기 값을 봐야
+수정 폼을 채운다(`GET /booths/mine`과 같은 이유).
+
+```json
+{ "projects": [ { "projectId": 1, "name": "SSAFY FESTA", "…": "…" } ] }
+```
+
+**0개 또는 1개 배열이고, 없으면 `{ "projects": [] }`다 — 404가 아니다.** 배열 형태를 유지하는
+것은 상한이 오르더라도 계약 모양이 바뀌지 않게 하기 위함이다.
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
+
+> 방문자용 조회(published 게이트 + 좋아요 수)는 **S15P21A604-177**이다. 아직 없다.
+> `GET /projects/{projectId}`는 **신설하지 않았다** — 부스당 1개라 이 목록이 같은 값을 준다.
+
+### PATCH `/projects/{projectId}`
+
+보낸 필드만 바꾼다 (009 C-06).
+
+| 본문 | 뜻 |
+|---|---|
+| 키 **누락** | 그 필드는 손대지 않는다 |
+| 키 있고 값 `null` | 그 필드를 **삭제**한다 |
+| `{}` | **400** — 조용한 no-op을 만들지 않는다 |
+
+**FE를 제약하지 않는다** — 바뀐 필드만 보내도, 전체를 보내도 의도대로 동작한다. 다만 "지운다"는
+키를 빼지 말고 `null`을 명시해야 한다. `name`은 `NOT NULL`이라 `null`이면 400이다.
+
+성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
+`403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
+`409 BOOTH_LEASE_EXPIRED`.
 
 ---
 
@@ -877,6 +935,8 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
 | `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
+| `PROJECT_NOT_FOUND` *(009)* | 프로젝트 없음 |
+| `PROJECT_ALREADY_EXISTS` *(009)* | 이 부스에는 이미 프로젝트가 있다 — 부스당 1개(C-01). 수정은 `PATCH` |
 | `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·Staff 아님) |
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
