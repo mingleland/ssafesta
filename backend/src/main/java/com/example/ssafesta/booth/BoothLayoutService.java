@@ -22,16 +22,18 @@ public class BoothLayoutService {
     private final BoothLeaseRepository leases;
     private final BoothEditorGuard editorGuard;
     private final LayoutValidator validator;
+    private final BoothRepository booths;
 
     public BoothLayoutService(BoothLayoutDraftRepository drafts,
                               BoothLayoutPublishedVersionRepository published,
                               BoothLeaseRepository leases, BoothEditorGuard editorGuard,
-                              LayoutValidator validator) {
+                              LayoutValidator validator, BoothRepository booths) {
         this.drafts = drafts;
         this.published = published;
         this.leases = leases;
         this.editorGuard = editorGuard;
         this.validator = validator;
+        this.booths = booths;
     }
 
     /**
@@ -75,7 +77,14 @@ public class BoothLayoutService {
      */
     @Transactional
     public PublishOutcome publish(Long boothId, Long userId) {
-        Booth booth = editorGuard.requireEditor(boothId, userId);
+        editorGuard.requireEditor(boothId, userId);
+
+        // Locked before validating, not after: the agents this publish is about to approve can be
+        // deleted concurrently, and the layout's reference to them is JSON with no foreign key to
+        // catch it. Agent deletion takes the same lock, so one of the two waits (spec 007 C-14,
+        // invariant A-3).
+        Booth booth = booths.findWithLockById(boothId)
+                .orElseThrow(() -> new BoothNotFoundException(boothId));
 
         // Same predicate as every other occupancy question (research R-06).
         leases.findValidByBoothId(boothId, Instant.now())

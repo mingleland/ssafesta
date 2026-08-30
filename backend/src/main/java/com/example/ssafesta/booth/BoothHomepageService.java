@@ -81,7 +81,7 @@ public class BoothHomepageService {
      */
     public static final class HomepageCommand {
 
-        private final PresenceField homepageUrl = new PresenceField();
+        private final PresenceField<String> homepageUrl = new PresenceField<>();
 
         @JsonProperty("homepageUrl")
         void setHomepageUrl(String value) {
