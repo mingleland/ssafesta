@@ -38,12 +38,14 @@ cd backend && ./mvnw test
 cd backend && ./mvnw test
 ```
 
-기대: **기준선 + 2 클래스, 실패 0.**
+기대: **기준선 + 4 클래스, 실패 0** — 47 클래스 / 447 테스트 (2026-08-28 실측).
 
 | 테스트 | 무엇을 지키나 |
 |---|---|
 | `project/ProjectApiIntegrationTest` | 계약 전부 — 아래 §3-1 |
+| `project/ProjectValidationApiIntegrationTest` | US2 — 거부 사유가 전달되는지 |
 | `project/ProjectConcurrencyIntegrationTest` | 동시 `POST`에서도 부스당 1개 (I-1) |
+| `project/ProjectConstraintTranslationTest` | 제약 이름별 번역 (컨테이너 없음) |
 | `booth/BoothHomepageApiIntegrationTest` (기존 19개) | **검증기 추출이 016 문구를 안 깼는지** |
 
 마지막 줄이 핵심이다. 문구가 한 글자만 달라져도 이 19개가 잡는다 — 그게 추출을 안전하게 만드는
@@ -81,44 +83,110 @@ Jira 완료 조건 3개:
 
 ---
 
-## 4. 손으로 한 번 — API 왕복
+## 4. 손으로 한 번 — API 왕복 (2026-08-28 실행 완료 ✅)
 
-Testcontainers가 아니라 실제 스택으로 한 번 돌려 본다. `docker compose -f backend/compose.yaml up -d`
-로 DB를 띄우고 앱을 실행한 뒤, 회원 토큰과 임대된 부스를 준비한다(`bruno/` 컬렉션 재사용).
+Testcontainers 가 아니라 **실제 스택**으로 돌린다. MockMvc 가 안 덮는 것이 여기서 확인된다 —
+앱 부팅, Flyway 실전 적용, 서블릿 컨테이너, 보안 필터 체인 전체.
 
-| # | 요청 | 기대 |
-|:--:|---|---|
-| 1 | `POST /api/v1/booths/{boothId}/projects` — `name`만 | `201`, URL 5필드가 **키는 있고 값은 `null`** |
-| 2 | 같은 요청 다시 | `409 PROJECT_ALREADY_EXISTS` |
-| 3 | `GET /api/v1/booths/{boothId}/projects` | `200`, `projects` 배열 길이 1 |
-| 4 | `PATCH /api/v1/projects/{id}` — `{"videoUrl": "javascript:alert(1)"}` | `400`, `field: "videoUrl"`, **스킴 사유 문장** |
-| 5 | `PATCH` — `{"videoUrl": "https://youtu.be/x"}` | `200`, 저장됨 |
-| 6 | `PATCH` — `{"videoUrl": null}` | `200`, `videoUrl`이 `null`, 나머지 유지 |
-| 7 | `PATCH` — `{}` | `400` |
-| 8 | 게스트 토큰으로 1 | `403 MEMBER_ONLY` |
+### 4-1. 준비 — 처음 쓰는 사람이 막히는 자리 셋
 
-4번이 통과하는지 눈으로 확인하는 것이 이 절의 목적이다 — 자동 테스트가 같은 것을 보지만,
-사용자에게 실제로 도달하는 문장을 한 번은 사람이 읽어야 한다.
+초판은 *"앱을 실행한 뒤 회원 토큰과 임대된 부스를 준비한다"* 한 줄이었는데, 실제로 해 보니
+그 한 줄에 막히는 지점이 셋 있었다. 그대로 적는다.
+
+**⑴ `JWT_SECRET` 은 base64 다.** `JwtConfiguration` 이 `Base64.getDecoder().decode()` 한 뒤
+64바이트 이상을 요구한다. 평문을 주면 `Illegal base64 character` 로 **기동 자체가 실패**한다.
+
+```bash
+docker compose -f backend/compose.yaml up -d          # postgres + redis
+cd backend
+JWT_SECRET='<base64, 디코드 후 64바이트 이상>' \
+CONNECTION_TOKEN_SECRET='<같은 형식>' \
+GOOGLE_CLIENT_ID=dummy GOOGLE_CLIENT_SECRET=dummy \
+GOOGLE_REDIRECT_URI=http://localhost:18080/login/oauth2/code/google \
+KAKAO_REST_API_KEY=dummy KAKAO_CLIENT_SECRET=dummy \
+KAKAO_REDIRECT_URI=http://localhost:18080/login/oauth2/code/kakao \
+./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=18080
+```
+
+OAuth 값은 **기본값이 없어** 넷 다 채워야 부팅한다. 로컬 스모크에는 더미로 충분하다.
+
+**⑵ 회원 Access Token 을 HTTP 로 얻을 경로가 없다.** 발급은 OAuth 핸드셰이크뿐이라 로컬에서는
+직접 발행해야 한다 — `sub`=userId, `role`=`MEMBER`, `sid`, `jti`, `iat`, `exp` 를 담아
+**HS512** 로 서명한다(키는 위 base64 를 디코드한 원본 바이트).
+
+**⑶ `SessionRevocationFilter` 가 `sid` 를 Redis 와 대조한다.** 토큰만 위조하면 401 이다.
+키 이름은 **`auth:session:{userId}`** 다(`session:{userId}` 아님).
+
+```bash
+docker exec ssafesta-local-redis-1 redis-cli SET "auth:session:4" "<sid>" EX 3600
+```
+
+부스·임대는 psql 로 넣는다 — `booths` 한 행, `booth_leases` 에 `status='ACTIVE'` 이고
+`ends_at` 이 미래인 행, `booths.current_slot_id` 갱신.
+
+> ⚠️ **Git Bash 에서 `curl -d` 에 한글을 직접 쓰지 마라.** 본문이 깨져
+> `400 요청 본문을 읽을 수 없습니다` 가 나온다 — 제품 결함으로 오인하기 딱 좋다.
+> UTF-8 파일로 저장해 `--data-binary @body.json` 로 보낸다.
+
+### 4-2. 결과 — 12건 전부 통과
+
+| # | 요청 | 기대 | 실측 |
+|:--:|---|---|:--:|
+| 1 | `POST /booths/{id}/projects` — `name`만 | `201`, URL 5필드 키 존재 + `null` | ✅ |
+| 2 | 같은 요청 다시 | `409 PROJECT_ALREADY_EXISTS` | ✅ |
+| 3 | `GET /booths/{id}/projects` | `200`, 배열 길이 1 | ✅ |
+| 4 | `PATCH` — `{"videoUrl": "javascript:alert(1)"}` | `400` + **스킴 사유 문장** | ✅ |
+| 5 | `PATCH` — `{"videoUrl": "https://youtu.be/abc123"}` | `200` 저장 | ✅ |
+| 6 | `PATCH` — `{"videoUrl": null}` | `200`, 그 필드만 `null` | ✅ |
+| 7 | `PATCH` — `{}` | `400 수정할 내용이 없습니다.` | ✅ |
+| 8 | 게스트 토큰으로 `POST`·`GET` | `403 MEMBER_ONLY` | ✅ |
+| 9 | `PATCH` — `{"deployUrl": "https://example.com:99999"}` | `400` 포트 사유 | ✅ |
+| 10 | `PATCH` — `{"portfolioUrl": "https://한글도메인.com/내포트폴리오"}` | `200`, **원문 그대로** | ✅ |
+| 11 | 토큰 없이 `GET` | `401` | ✅ |
+| 12 | `PATCH /projects/99999` | `404 PROJECT_NOT_FOUND` | ✅ |
+
+**4번이 이 절의 목적이다.** 실제 HTTP 로 사용자에게 도달한 문장:
+
+```json
+{ "code": "VALIDATION_FAILED",
+  "message": "영상 주소는 http 또는 https로 시작해야 합니다.",
+  "errors": [ { "rule": "FIELD_INVALID", "field": "videoUrl",
+                "message": "영상 주소는 http 또는 https로 시작해야 합니다." } ] }
+```
+
+"형식이 올바르지 않습니다"가 **아니다** — scheme 을 host 보다 먼저 보는 순서가 실전에서 지켜졌다.
+
+10번도 실전에서만 보이는 것이었다. 한글 도메인이 **punycode 로 바뀌지 않고 원문 그대로**
+저장·반환된다 — 판정만 `IDN.toASCII` 로 하고 값은 건드리지 않는다는 불변식 I-3 이 성립한다.
+
+### 4-3. 곁다리로 확인된 것
+
+`ddl-auto: validate` 로 부팅에 성공했다는 것은 **엔티티 매핑이 실제 스키마와 일치**한다는 뜻이다.
+Flyway 도 실측했다 — `flyway_schema_history` 최신 행이 `14 | project one per booth | t`,
+`pg_indexes` 에 `ux_projects_booth` 존재. Testcontainers 밖에서 V14 가 도는 것을 처음 본 자리다.
+
+**끝나면 치운다** — 스모크용 user·booth·lease·project 행과 `auth:session:{id}` 키를 지우고
+앱을 내린다. 컨테이너는 두어도 된다.
 
 ---
 
 ## 5. 문서 반영 확인 (구현과 같은 커밋)
 
-- [ ] `docs/08` §5 — endpoint 4개 이름뿐인 서술 → 실제 shape·오류·게이트. homepage 절(`:443`) 형식
-- [ ] `docs/08` §18 — `PROJECT_NOT_FOUND` · `PROJECT_ALREADY_EXISTS` 추가.
+- [x] `docs/08` §5 — endpoint 4개 이름뿐인 서술 → 실제 shape·오류·게이트. homepage 절(`:443`) 형식
+- [x] `docs/08` §18 — `PROJECT_NOT_FOUND` · `PROJECT_ALREADY_EXISTS` 추가.
       **§1.3-1 전역 rule 표에는 넣지 않는다** (최상위 code이지 rule이 아니다)
-- [ ] `docs/sdd/parts/BE.md:18` — 009의 `CRUD + S3`에서 **S3 제거** (C-03으로 업로드 미지원 확정)
-- [ ] `docs/24_작업일지.md` 기록. 문제 생기면 `docs/25_트러블슈팅.md`에 T-번호
-- [ ] `specs/009` 리뷰 서명은 **하지 않는다** — C-02가 아직 열려 있다
+- [x] `docs/sdd/parts/BE.md:18` — 009의 `CRUD + S3`에서 **S3 제거** (C-03으로 업로드 미지원 확정)
+- [x] `docs/24_작업일지.md` 기록. 문제 생기면 `docs/25_트러블슈팅.md`에 T-번호
+- [x] `specs/009` 리뷰 서명은 **하지 않았다** — C-02가 아직 열려 있다
 
 ---
 
 ## 6. 완료 기준
 
-- [ ] `cd backend && ./mvnw test` — 기준선 + 2 클래스, **실패 0**
-- [ ] §3-1의 12개 케이스가 전부 있다
-- [ ] §4를 손으로 한 번 돌렸다
-- [ ] §5 문서 5줄 반영
+- [x] `cd backend && ./mvnw test` — **47 클래스 / 447 테스트, 실패 0**
+- [x] §3-1의 12개 케이스가 전부 있다
+- [x] §4를 손으로 한 번 돌렸다 — 12건 전부 통과 (2026-08-28)
+- [x] §5 문서 5줄 반영
 - [ ] `Closes S15P21A604-110`이 **develop에 도달하는 커밋 메시지**에 있다 — MR 설명만으로는
       전환이 발화하지 않는다. 머지 시 squash·merge 두 메시지를 눈으로 확인한다
       (109 실측: merge 커밋 본문에 들어가 발화)
