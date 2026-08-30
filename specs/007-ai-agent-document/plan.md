@@ -109,6 +109,35 @@ backend/src/main/
 
 ## Detailed Design
 
+### 0. AI Agent CRUD — Spring 단독 (S15P21A604-105, 2026-08-30 추가)
+
+문서 파이프라인의 **선행**이다. 이 절만 FastAPI 가 관여하지 않는다 — Business DB `ai_agents` 의
+저장·검증·편집 API 까지가 범위이고, 설정을 FastAPI 로 전달하는 경로는 spec 008 의
+access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`leaseEndsAt` 만 나른다).
+
+**권한** — `BoothEditorGuard`(소유자·스태프, C-15). 005·016·009 와 같은 편집자 범위다. 쓰기는
+유효 임대를 요구하고(만료 부스는 아무에게도 보이지 않으므로 편집이 무의미하다) 읽기는 만료돼도
+허용한다. 직원 역할별 제한(011 C-09)은 011 구현 때 가드 한 곳에서 일괄로 닫는다.
+
+**부스당 1명(C-13)** — 설정값 + `ux_ai_agents_booth` 유니크 인덱스. 사전 조회만 두면 동시 요청
+둘이 각각 "없음"을 보고 둘 다 만든다(V7·V14 와 같은 사고). 설정만 2 로 바꾸면 인덱스와 모순되므로
+**부팅 시 `perBoothLimit == 1` 을 검증해 기동을 실패**시킨다.
+
+**삭제와 참조(C-14)** — 검사 3종은 `ai_documents`·`consultations`·**Draft/현재 Published Layout 의
+`AI_AGENT.configId`**. `ai_document_chunks` 는 **검사하지 않는다**(C-11 — AI DB 소유라 Spring 이
+접근할 수 없고, Business `ai_documents` 가 이미 막는다). "현재 Published" 는
+`booths.published_layout_version` 포인터로 판정한다.
+
+**경쟁 방어 2종**
+
+1. 사전검사 통과 후 문서·상담이 생기는 경우 — `delete + flush` 를 감싸고 알려진 FK 제약
+   (`ai_documents_agent_id_fkey`·`consultations_agent_id_fkey`)만 같은 409 로 번역한다. 모르는
+   위반은 삼키지 않고 그대로 올린다.
+2. **Layout 은 FK 가 없어 최후 방어가 없다** — Publish 가 Agent 검증을 마친 직후 삭제가 끼면
+   공개 배치가 사라진 직원을 가리킨다. Agent 삭제와 Layout Publish 가 `booths` 행 잠금을 공유해
+   직렬화한다(불변식 A-3).
+
+
 ### 1. 상태와 소유권
 
 - Spring `DocumentStatus`: `QUEUED / PROCESSING / READY / FAILED / DISABLED / EXPIRED`

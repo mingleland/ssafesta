@@ -13,17 +13,23 @@
 
 ### User Story 1 — AI 직원을 만든다 (Priority: P0)
 
-부스 소유자가 AI 직원의 이름·역할·말투·지시문을 설정해 저장한다.
+부스 **편집자(소유자·스태프)** 가 AI 직원의 이름·역할·말투·지시문을 설정해 저장하고, 필요하면
+지운다.
 
 **Why this priority**: 008(AI 상담)의 전제. 이게 없으면 대화할 대상이 없다.
 
-**Independent Test**: AI 직원 생성 → 설정 저장 → 다시 열었을 때 설정이 유지됨.
+**Independent Test**: AI 직원 생성 → 설정 저장 → 다시 열었을 때 설정이 유지됨 → 삭제 후 재등록됨.
+배치에서 쓰고 있는 직원은 삭제가 거부됨.
 
 **Acceptance Scenarios**:
 
-1. **Given** 부스 소유자, **When** AI 직원을 만들면, **Then** 이름·역할·지시문이 저장된다.
+1. **Given** 부스 편집자, **When** AI 직원을 만들면, **Then** 이름·역할·지시문이 저장된다.
 2. **Given** 저장된 AI 직원, **When** 설정을 수정하면, **Then** 변경이 반영된다.
-3. **Given** 다른 부스의 소유자, **When** 남의 AI 직원에 접근하면, **Then** 거부된다.
+3. **Given** 다른 부스의 편집자, **When** 남의 AI 직원에 접근하면, **Then** 거부된다.
+4. **Given** 이미 AI 직원이 있는 부스, **When** 또 만들면, **Then** 거부된다 (C-13 — 부스당 1명).
+5. **Given** 아무것도 참조하지 않는 AI 직원, **When** 삭제하면, **Then** 지워지고 다시 만들 수 있다.
+6. **Given** 문서·상담이 딸렸거나 **공개된 배치가 가리키는** AI 직원, **When** 삭제하면,
+   **Then** 무엇이 막는지와 함께 거부된다 (C-14).
 
 ### User Story 2 — 문서를 올리면 AI가 검색에 사용할 수 있다 (Priority: P0)
 
@@ -54,6 +60,9 @@
 
 ### Edge Cases
 
+- 이미 AI 직원이 있는 부스에 또 만들면 거부한다 (C-13 — 부스당 1명). 덮어쓰지 않는다 — 수정은 별도 경로다.
+- 문서·상담이 딸렸거나 **Draft·현재 공개된 배치가 가리키는** AI 직원은 삭제를 거부한다 (C-14).
+  참조가 없어진 뒤에는 삭제되고, 재등록도 된다.
 - MVP는 PDF·MD·TXT를 허용하며 파일당 20MB를 초과하면 명확한 사유와 함께 거부한다.
 - 텍스트를 추출할 수 없는 스캔 이미지 PDF는 OCR 지원 범위 밖이므로 `FAILED`와 구체적인 실패 사유를 제공한다.
 - 같은 문서를 두 번 올린 경우 동일 AI 직원에 등록된 활성 문서와 파일 SHA-256이 같으면 중복으로 판정하고 재처리하지 않는다. 수정본 교체는 기존 문서를 지정하는 별도 교체 요청으로 처리한다.
@@ -75,7 +84,9 @@
 
 ### Functional Requirements
 
-- **FR-001**: 부스 소유자는 AI 직원을 생성·수정할 수 있어야 한다.
+- **FR-001**: 부스 **편집자(소유자·스태프)** 는 AI 직원을 생성·조회·수정·**삭제**할 수 있어야 한다.
+  삭제는 그 직원을 참조하는 것이 하나도 없을 때만 허용하고, 있으면 **무엇이 막는지와 함께 거부**한다
+  (C-14).
 - **FR-002**: AI 직원은 이름·역할·말투·지시문을 가져야 한다.
 - **FR-003**: 다른 부스의 AI 직원에 접근할 수 없어야 한다.
 - **FR-004**: 소유자는 AI 직원에 문서를 업로드할 수 있어야 한다.
@@ -209,6 +220,8 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-11 | PostgreSQL의 Business/AI 경계를 어떻게 나누는가? | AI + BE + Infra | **확정: Infra PostgreSQL Isolation and Backup Contract v1 채택. 환경별 단일 PostgreSQL 인스턴스 안에서 `festa_{env}_business`와 `festa_{env}_ai`를 별도 database·login role로 분리한다. Business DB는 `ai_agents`·`ai_documents`, AI DB는 `document_jobs`·`document_chunks`를 소유한다. 교차 DB FK·직접 조회는 금지하고 Spring이 검증한 처리 snapshot 및 멱등 cleanup/reconciliation API로 정합성을 맞춘다.** (S15P21A604-262) |
 | C-12 | AI 직원의 `role_code`·`tone_code`·`response_length` 허용값은? | AI + BE | **확정: role 2종(`PROJECT_DOCENT`·`GUIDE`), tone 3종(`FRIENDLY` 기본·`PROFESSIONAL`·`ENTHUSIASTIC`), responseLength 3종(`SHORT` 1~3문장·`MEDIUM` 4~6문장 기본·`LONG` 7~12문장). 저장과 검증은 Spring, 해석은 FastAPI가 한다. **`tone`은 구현 후 튜닝 대상이다** — AI 파트가 프롬프트 템플릿 수정으로 먼저 흡수하되 불가피하면 값 자체가 바뀔 수 있고(#112 AI 회신), 지금은 3개를 증감시킬 근거가 없어 3종으로 간다. 값 **추가**는 가산적이라 언제든 되지만 **삭제·변경**은 저장된 row를 무효로 만드므로 그때는 마이그레이션을 함께 낸다. `responseLength → max_tokens` 매핑은 AI 파트 소유이며 `SHORT` 200·`MEDIUM` 400·`LONG` 800을 제안값으로 두되 모델 확정 후 재검증한다 — Spring은 어휘만 저장하고 토큰 수를 저장하지 않는다** ([GitLab Issue #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112)) |
 | C-13 | 부스당 AI 직원 수 상한은? | BE + 기획 | **확정: 1명** (2026-08-27 팀 합의). 부스는 AI 직원을 하나만 두고, **직원의 `role`은 부스 종류에서 갈린다** — 프로젝트 부스면 `PROJECT_DOCENT`, 이벤트 부스면 `GUIDE`. C-12의 role이 정확히 2종인 이유가 이것이다. 다만 이벤트 부스는 아직 구현이 없어(`LayoutTemplate`의 값은 `PROJECT_EXHIBITION` 하나) **당분간 `role`을 서버가 파생하지 않고 소유자가 고른 값을 화이트리스트로 검증한다.** 부스 종류가 코드에 생기면 그때 서버가 종류별 허용 role로 좁힌다. 수치는 서버 설정으로 두고 코드에 하드코딩하지 않는다 |
+| C-14 | AI 직원 삭제를 지원하는가, 참조가 있으면 어떻게 하는가? | BE | **확정: 지원한다. 참조가 하나라도 있으면 `409 AGENT_DELETE_CONFLICT`로 거부하고 무엇이 막는지 message 에 담는다** (2026-08-30). **경로**: 정본(FR-001)에는 삭제가 없었으나 Jira `S15P21A604-105` 완료 조건이 삭제를 명시했고, 사용자가 포함으로 확정해 여기 적는다. **검사 대상 3종** — ⑴ `ai_documents.agent_id` ⑵ `consultations.agent_id` ⑶ **Draft·현재 Published Layout 의 `AI_AGENT.configId`**(JSON 참조라 FK 가 없다). `ai_document_chunks`는 **검사하지 않는다** — C-11 로 chunk 는 AI DB 소유라 Spring 이 접근할 수 없고, Business 의 `ai_documents`가 있으면 이미 거부되므로 충분하다. AI DB chunk 는 Agent 삭제 판단이 아니라 문서 cleanup·reconciliation 대상이다. **"현재 Published"는 `booths.published_layout_version` 포인터로 판정**한다 — `MAX(version)`을 쓰면 재임대 등에서 방문자에게 보이지 않는 과거 버전까지 삭제를 막는다. 과거 버전만 참조하면 삭제된다. **Draft 검사의 한계를 명시한다** — Draft 저장은 원래 존재하지 않는 `configId`도 허용하므로(미완성 상태 허용이 Draft 의 정의다) 이 검사는 **기존 Draft 데이터 보호**일 뿐이고, 삭제 후 옛 id 를 Draft 에 다시 넣는 것은 막지 않는다. 그건 Publish 시점 검증이 잡는다 — **강한 불변식은 Published 무결성 하나다.** **경쟁 방어 2종** — ① 사전검사 통과 후 문서·상담이 생기는 경우를 위해 `delete + flush` 를 감싸고 알려진 FK 제약(`ai_documents_agent_id_fkey`·`consultations_agent_id_fkey`)만 같은 409 로 번역한다(모르는 위반은 그대로 올린다) ② Layout 은 FK 가 없어 최후 방어가 없으므로 **Agent 삭제와 Layout Publish 가 `booths` 행 잠금을 공유**한다 — Publish 가 검증을 마친 직후 삭제가 끼어 공개 배치가 사라진 직원을 가리키는 것을 막는다 |
+| C-15 | AI 직원 편집 권한 범위는? | BE | **확정: 소유자 + 스태프**(`BoothEditorGuard`, 2026-08-30). 005·016·009 와 **정확히 같은 편집자 범위**다 — 같은 "편집자"가 기능마다 다른 뜻이 되지 않게 한다. 직원 역할별 제한(011 C-09 `ADMIN`·`CONTENT_EDITOR`)은 **011 구현 때 가드 한 곳에서 일괄**로 닫는다([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)) — 그때까지 `CONSULTANT`도 편집할 수 있고, 이는 알고 여는 창이다 |
 
 ### Session 2026-08-20
 

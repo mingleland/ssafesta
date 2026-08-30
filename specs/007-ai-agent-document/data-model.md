@@ -9,14 +9,35 @@
 
 두 database는 같은 PostgreSQL 17 + pgvector 인스턴스를 공유하지만 login role과 CONNECT 권한을 분리한다. FastAPI migration/runtime role은 AI DB에만 접속하며 Business DB를 직접 조회하거나 갱신하지 않는다. Spring role도 AI DB에 접속하지 않는다. database 간 FK·cascade·cross-database query는 사용하지 않는다.
 
-## AI Agent — Spring 소유
+## AI Agent — Spring 소유 (Business DB `ai_agents`, V1부터 존재)
 
-| 필드 | 규칙 |
-|---|---|
-| `id` | PK |
-| `booth_id` | 부스 범위 식별자 |
-| `name`, `role`, `tone`, `system_prompt` | Agent 설정 |
-| `created_at`, `updated_at` | 감사 시각 |
+| 컬럼 (V1) | 타입 | 규칙 |
+|---|---|---|
+| `id` | `BIGINT IDENTITY PK` | |
+| `booth_id` | `BIGINT NOT NULL REFERENCES booths(id)` | `updatable=false`. **부스당 1행** (C-13) |
+| `name` | `VARCHAR(100) NOT NULL` | 필수, 1~100자 |
+| `role_code` | `VARCHAR(50) NOT NULL` | 화이트리스트 `PROJECT_DOCENT`·`GUIDE` (C-12) |
+| `tone_code` | `VARCHAR(30) NOT NULL` | `FRIENDLY`(기본)·`PROFESSIONAL`·`ENTHUSIASTIC` |
+| `system_prompt` | `TEXT NOT NULL` | 필수 non-blank |
+| `response_length` | `VARCHAR(20) NOT NULL DEFAULT 'MEDIUM'` | `SHORT`·`MEDIUM`·`LONG`. 문장 수 기준 |
+| `service_price` | `INTEGER NOT NULL DEFAULT 0 CHECK(>=0)` | 상한 정의 없음 |
+| `handoff_enabled` | `BOOLEAN NOT NULL DEFAULT FALSE` | |
+| `forbidden_topics` | `JSONB` | 문자열 배열. 어휘 화이트리스트 없음(항목 non-blank 만). **저장 전 빈 배열은 `null` 로 정규화**한다 — 응답에서는 둘 다 `[]` 인데 DB 표현이 갈리면 "같은 값 수정"이 변경으로 오판된다. 개수·항목 길이 상한은 미결(`docs/26`) |
+| `status` | `VARCHAR(20) NOT NULL DEFAULT 'ACTIVE'` | 생명주기 미구현. `LayoutConfigResolver` 가 `ACTIVE` 만 센다 |
+| `created_at` | `TIMESTAMPTZ NOT NULL` | `updatable=false` |
+| `updated_at` | `TIMESTAMPTZ NOT NULL` | **애플리케이션이 갱신**(DB 기본값은 INSERT 때만 먹는다). 값이 실제로 바뀐 수정에서만 |
+
+응답에는 `agent_id`·`booth_id` + 위 설정 8필드를 싣고 `status`·감사 시각은 내보내지 않는다
+(소비자 없음, 추가는 가산적).
+
+### 불변식
+
+| # | 불변식 | 무엇이 지키나 |
+|:--:|---|---|
+| A-1 | **부스당 AI 직원은 최대 1명** (C-13) | `ux_ai_agents_booth` 유니크 인덱스 + 사전 조회 + 제약 번역 |
+| A-2 | 참조가 있는 직원은 삭제되지 않는다 (C-14) | 사전검사 3종(`ai_documents`·`consultations`·Draft/현재 Published Layout) + `delete+flush` 의 FK 번역 |
+| A-3 | **공개된 배치는 존재하지 않는 직원을 가리키지 않는다** | Agent 삭제와 Layout Publish 가 `booths` 행 잠금을 공유 — Layout 은 JSON 참조라 FK 최후 방어가 없다 |
+| A-4 | 저장된 `system_prompt`·`forbidden_topics` 바이트 = 반환 바이트 | 검증기가 정규화하지 않는다(빈 배열→null 은 저장 표현 통일이지 값 변형이 아니다) |
 
 Spring은 처리 요청 전에 `booth_id`, `agent_id` 조합과 문서 소유권·임대·상태를 Business DB에서 검증한다. FastAPI는 Spring이 전달한 snapshot을 Job에 저장한다.
 
