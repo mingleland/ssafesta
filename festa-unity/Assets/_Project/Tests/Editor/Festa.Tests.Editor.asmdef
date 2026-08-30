@@ -5,7 +5,8 @@
         "UnityEditor.TestRunner",
         "UnityEngine.TestRunner",
         "Festa.Network.Auth",
-        "Festa.Integration.Bridge"
+        "Festa.Integration.Bridge",
+        "Festa.Booth.Catalog"
     ],
     "includePlatforms": [
         "Editor"
