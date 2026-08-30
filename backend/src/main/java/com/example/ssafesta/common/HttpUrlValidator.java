@@ -187,11 +187,48 @@ public final class HttpUrlValidator {
             //
             // 포트 판정도 이 결과로 해야 한다 — 원본은 authority 가 registry-based 라
             // getPort() 가 항상 -1 이고, 그러면 한글 도메인만 포트 규칙을 빠져나간다.
-            URI ascii = new URI(uri.getScheme() + "://" + IDN.toASCII(host) + port);
+            String asciiHost = IDN.toASCII(host);
+            if (!isHostLabels(asciiHost)) {
+                return null;
+            }
+            URI ascii = new URI(uri.getScheme() + "://" + asciiHost + port);
             return isPlainAuthority(ascii) ? ascii : null;
         } catch (IllegalArgumentException | URISyntaxException retryFailed) {
             return null;
         }
+    }
+
+    /**
+     * IDN 이 내놓은 host 가 <b>이름표들</b>로만 이뤄졌는지 — 구조 문자가 섞이지 않았는지 본다.
+     *
+     * <p>이 한 줄이 전각 구분자 전부를 한꺼번에 막는다. 그 전에는 문자를 하나씩 쫓아다녔고
+     * 그때마다 새로운 것이 나왔다 — {@code ＠}(U+FF20) 다음이 {@code ：}(U+FF1A)였다.
+     * {@code IDN.toASCII} 는 이름표를 정규화하는 함수이므로 <b>구조 문자를 만들어 내면 그것은
+     * 이미 이름이 아니다.</b> 어떤 코드포인트가 무엇으로 매핑되는지 열거하는 대신 결과가
+     * 이름의 모양인지 묻는다.
+     *
+     * <ul>
+     *   <li>{@code 。}(U+3002) → {@code .} 는 통과한다. 점은 이름표 구분자이고 브라우저도 같게 읽는다
+     *   <li>{@code ：} → {@code :} 는 거부한다. 원본에는 포트가 없는데 재조립하면 포트가 생겨,
+     *       검증한 구조와 저장되는 문자열이 갈린다 ({@code https://한글.com：8080/x})
+     *   <li>밑줄({@code _})도 여기서 걸린다. RFC 1123 위반이라 그대로 거부를 유지한다
+     * </ul>
+     *
+     * <p>IPv6 는 대괄호를 쓰지만 이 경로에 오지 않는다 — {@code getHost()} 가 이미 값을 준다.
+     */
+    private static boolean isHostLabels(String asciiHost) {
+        if (asciiHost.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < asciiHost.length(); i++) {
+            char c = asciiHost.charAt(i);
+            boolean allowed = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '-';
+            if (!allowed) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

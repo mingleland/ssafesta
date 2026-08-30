@@ -265,7 +265,10 @@ class ProjectValidationApiIntegrationTest {
      */
     @ParameterizedTest
     @ValueSource(strings = {"https://한글도메인.com＠evil.example.com", "https://한글도메인.com／evil.example.com/x",
-                            "https://한글도메인.com？q=1", "https://한글도메인.com＃f"})
+                            "https://한글도메인.com？q=1", "https://한글도메인.com＃f",
+                            // ：8080 은 원본에 포트가 없는데 변환 후 포트가 생긴다. 값이 정상 범위라
+                            // 포트 규칙에는 걸리지 않아, 구조 검사가 없으면 조용히 통과한다.
+                            "https://한글도메인.com：8080/x"})
     void aFullWidthSeparatorCannotSmuggleStructureThroughIdn(String url) throws Exception {
         Owner owner = leasedOwner("전각" + url.length());
 
