@@ -69,7 +69,26 @@ namespace Festa.Network
         public NetworkVariable<Vector3> ServerSpawnPosition = new(
             Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-        const float SpawnWaitTimeout = 3f; // 값 미수신(버전 불일치 등) 시 현재 위치로 진행
+        // 값 미수신(버전 불일치 등) 시 현재 위치로 진행하는 한계선 (S15P21A604-259).
+        //
+        // **시간만으로 재면 가려진 탭에서 너무 일찍 포기한다.** 백그라운드 탭은 rAF 스로틀링으로
+        // 약 1 FPS 로 도는데, NetworkVariable 수신도 Update 를 타므로 **기다린 시간이 아니라
+        // 기다린 프레임 수**가 실제 기회 횟수다. 3초면 60 FPS 에서 180번 시도하지만 1 FPS 에서는
+        // 몇 번에 그친다.
+        //
+        // 그래서 **둘 다** 넘겨야 포기한다 — 실시간 3초 그리고 최소 시도 횟수.
+        // 시간은 `realtimeSinceStartup` 으로 잰다. `Time.time` 은 쓸 수 없다 — 유니티 문서가
+        // `Time.maximumDeltaTime` 을 "limits the increase of Time.time between two frames" 라고
+        // 규정하고 이 프로젝트 설정값이 0.333s 다. 즉 1 FPS 에서 Time.time 은 프레임당 0.333s 만
+        // 흘러 실제 경과와 3배 어긋난다 — 타임아웃 기준으로 삼을 수 없는 시계다.
+        const float SpawnWaitTimeout = 3f;
+        const int SpawnWaitMinFrames = 180;   // 60 FPS 기준 3초에 해당하는 시도 횟수
+
+        // 다만 시도 횟수만 믿으면 **얼어붙을 수 있다.** 가려진 탭은 포그라운드로 오면 프레임이
+        // 금방 채워지지만, 포그라운드인데도 계속 저프레임인 클라이언트는 180프레임을 채우는 데
+        // 수십 초가 걸린다. 그동안 플레이어는 이유도 모른 채 움직이지 못한다.
+        // 그래서 실시간 상한을 따로 둔다 — 여기까지 오면 시도 횟수와 무관하게 포기하고 알린다.
+        const float SpawnWaitHardTimeout = 30f;
 
         NetworkPlayer _player;
         PlayerCameraFollow _cameraFollow;
@@ -79,6 +98,8 @@ namespace Festa.Network
         float _verticalSpeed;
         bool _spawnPlaced;
         float _spawnWaitStart;
+        int _spawnWaitFrames;          // 실제로 시도한 횟수 — 스로틀 탭에서는 시간보다 이쪽이 진실이다
+        bool _spawnValueEverChanged;   // 값이 오긴 왔는지 (미수신과 늦은 수신을 로그에서 구분한다)
         bool _airborne;
         bool _jumped;
         float _airborneSince;
@@ -176,7 +197,8 @@ namespace Festa.Network
 
             if (IsOwner)
             {
-                _spawnWaitStart = Time.time;
+                _spawnWaitStart = Time.realtimeSinceStartup;
+                _spawnWaitFrames = 0;
                 ServerSpawnPosition.OnValueChanged += OnServerSpawnPositionChanged;
                 TryPlaceAtServerSpawn(); // 초기 동기화로 이미 와 있으면 즉시
             }
@@ -193,6 +215,7 @@ namespace Festa.Network
 
         void OnServerSpawnPositionChanged(Vector3 _, Vector3 next)
         {
+            _spawnValueEverChanged = true;
             if (!_spawnPlaced) PlaceAt(next);
         }
 
@@ -260,11 +283,27 @@ namespace Festa.Network
             // 중력으로 떨어지기 시작하면 배정 위치가 와도 이미 이탈해 있다.
             if (!_spawnPlaced)
             {
+                _spawnWaitFrames++;
                 TryPlaceAtServerSpawn();
-                if (!_spawnPlaced && Time.time - _spawnWaitStart > SpawnWaitTimeout)
+
+                // 시간과 시도 횟수를 **둘 다** 넘겨야 포기한다 (S15P21A604-259).
+                // 하나만 보면 가려진 탭에서 몇 번 시도해 보지도 못하고 원점에서 출발한다.
+                float waited = Time.realtimeSinceStartup - _spawnWaitStart;
+                bool waitedLongEnough = waited > SpawnWaitTimeout;
+                bool triedOftenEnough = _spawnWaitFrames >= SpawnWaitMinFrames;
+                bool gaveUp = (waitedLongEnough && triedOftenEnough) || waited > SpawnWaitHardTimeout;
+                if (!_spawnPlaced && gaveUp)
                 {
-                    Debug.LogWarning("[PlayerMovement] 서버 스폰 위치를 받지 못했다 — 현재 위치로 진행 " +
-                                     "(서버/클라이언트 빌드 버전이 같은지 확인해라)");
+                    // **재발했을 때 추측하지 않아도 되게 실측값을 남긴다.** 이 경로는 재현이
+                    // 어려워(가려진 탭·버전 불일치) 로그가 유일한 증거다. 값이 오긴 왔는지,
+                    // 몇 번 시도했는지, 실제로 몇 초였는지가 없으면 다음에도 원인을 추정만 하게 된다.
+                    Debug.LogError(
+                        "[PlayerMovement] 서버 스폰 위치를 받지 못해 현재 위치에서 시작한다 — " +
+                        "원점 근처면 허공에서 떨어진다. " +
+                        $"시도 {_spawnWaitFrames}프레임 / {waited:F1}초, " +
+                        $"변경 이벤트 {(_spawnValueEverChanged ? "수신" : "없음")}, " +
+                        $"ServerSpawnPosition={ServerSpawnPosition.Value}, 현재 위치={transform.position}. " +
+                        "서버/클라이언트 빌드 버전이 같은지 확인해라.");
                     _spawnPlaced = true;
                 }
                 if (!_spawnPlaced) return;
