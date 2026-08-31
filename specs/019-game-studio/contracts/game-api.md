@@ -187,7 +187,7 @@ endpoint)의 warning이라 이 계약의 몫이 아니다. 필요해지면 그�
 |---|---|
 | `RULES_PRESENCE_INVALID` ★ | `1.1.0`인데 `rules`가 없음, 또는 `1.0.0`인데 `rules`가 있음 (schema `allOf`) |
 | `DUPLICATE_OBJECTIVE_TYPE` ★ | 같은 목표 유형을 두 번 사용 (#78 — BE 검증 요청분) |
-| `OBJECTIVE_TARGET_INVALID` ★ | `target`이 `1~999,999,999` 정수 밖 (schema `gameRules`. objectives **5개 초과는 이 rule이 아니라 `MALFORMED_PROJECT`**다 — §상한 절 말미 참조. 유형 불문 필드는 `target` 하나 — `event-runtime-semantics.md`의 `targetSeconds` 표기는 schema와 다른 오기다) |
+| `OBJECTIVE_TARGET_INVALID` ★ | `target`이 하한 1 미만이거나 타입별 상한(`SCORE_AT_LEAST` 999,999,999 · `DEFEAT_ENEMIES` 10,000 · `SURVIVE_SECONDS` 3,600) 초과 (schema `gameRules`, type별 `allOf`/`if`/`then`. objectives **5개 초과는 이 rule이 아니라 `MALFORMED_PROJECT`**다 — §상한 절 말미 참조. 유형 불문 필드는 `target` 하나 — `event-runtime-semantics.md`도 동일하게 `target`으로 통일) |
 | `PLAYER_DEFEAT_INVALID` ★ | `playerDefeat`이 `RESPAWN`/`END_GAME` 밖 |
 
 `rules`는 Draft·Published snapshot에 **그대로 보존**한다(#78 요청분). MAJOR가 다른 값

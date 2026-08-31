@@ -66,7 +66,7 @@ v1.1은 기존 Trigger·Condition·Action 의미를 바꾸지 않고 프로젝�
 
 - `SCORE_AT_LEAST`: Runtime score가 `target` 이상이면 달성한다.
 - `DEFEAT_ENEMIES`: session의 적 처치 수가 `target` 이상이면 달성한다.
-- `SURVIVE_SECONDS`: 결정적 Runtime 경과 시간이 `targetSeconds` 이상이면 달성한다.
+- `SURVIVE_SECONDS`: 결정적 Runtime 경과 시간(초)이 `target` 이상이면 달성한다.
 - `completion.mode=ALL`은 모든 목표, `ANY`는 하나 이상의 목표 달성 시 session을 `COMPLETED`로 바꾼다.
 - reference Runtime은 활성 session에서 120ms tick을 누적한다. wall clock이나 background tab frame rate를
   저장 계약으로 사용하지 않는다.
