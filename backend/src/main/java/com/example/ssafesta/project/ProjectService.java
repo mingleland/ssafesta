@@ -152,6 +152,12 @@ public class ProjectService {
      * 열렸고 전시가 아직 없다"는 다른 사실이라, 하나로 뭉치면 클라이언트가 둘을 구분할 수단을
      * 잃는다. 빈 배열은 계속 후자 하나만 뜻한다 (§3 과 같은 규칙).
      *
+     * <p>쿼리는 회원 방문자 기준 5개다 (부스·임대·프로젝트·좋아요 수·본인 좋아요). 부스당
+     * 프로젝트가 1개라 N+1 이 되지 않으므로 그대로 둔다 — 합칠 곳은 뒤의 둘이고,
+     * {@code COUNT(*) FILTER (WHERE user_id = ...)} 한 줄로 4개가 되지만 반환이
+     * {@code Object[]} 가 돼 호출부에 캐스팅이 생긴다. <b>부스 진입 지연이 실제로 문제가 되면</b>
+     * 그때 합친다.
+     *
      * @param viewerUserId the member behind the request, or {@code null} for a guest — a guest is a
      *        normal caller here, not a refusal (헌법 12조는 소유를 금지하는 것이고 열람이 아니다)
      */
@@ -161,8 +167,8 @@ public class ProjectService {
         requireValidLease(boothId);
         // 게시 게이트는 배치의 게시 여부다 — 프로젝트에 별도의 게시 상태를 만들지 않는다.
         // 프로젝트 패널이 게시된 배치 안의 오브젝트라서, 방문자가 그것을 누를 수 있는 순간과
-        // 이 술어가 정확히 겹친다 (016 BoothQueryService.visibleHomepageUrl 과 같은 판정).
-        if (booth.getPublishedLayoutVersion() == null) {
+        // 이 술어가 정확히 겹친다. Booth.isPublished 가 016 홈페이지와 공유하는 그 술어다.
+        if (!booth.isPublished()) {
             throw new LayoutNotPublishedException();
         }
         return new VisitorProjectListView(projects.findByBoothId(boothId)
@@ -178,6 +184,16 @@ public class ProjectService {
 
     // ── 검증 ────────────────────────────────────────────────────────────────
 
+    /**
+     * 만료 부스에서 막는 것은 <b>쓰기와 방문자 읽기 둘</b>이고, 예외는 편집자 읽기(§3) 하나다.
+     *
+     * <p>이 함수를 지우거나 조건을 느슨하게 만들면 만료 부스의 전시가 방문자에게 계속 보이고,
+     * "방문자는 여기서 만료를 안다"(004 FR-019)가 조용히 깨진다 — 정상 경로는 전부 초록인 채로
+     * {@code expiredBoothIsConflictEvenWhenItWasPublished} 하나만 빨개진다.
+     *
+     * <p>편집자 읽기가 예외인 이유는 {@code findByBooth} 에 적어 두었다 (FR-008 — 보존은 소유자가
+     * 읽을 수 있어야 관측된다).
+     */
     private void requireValidLease(Long boothId) {
         // facade·homepage 와 같은 결이다: 만료된 부스는 아무에게도 보이지 않으므로 편집은
         // 보이지 않는 것을 고치는 일이 된다 (spec 004 만료 계약).

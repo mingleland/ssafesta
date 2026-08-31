@@ -15,14 +15,17 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Project exhibition — owner-side write and read-back (spec 009, contracts/project-api.md).
+ * Project exhibition — owner-side write and read-back, plus the visitor read (spec 009,
+ * contracts/project-api.md).
  *
- * <p>Additive: three new endpoints, no existing consumer changes. {@code docs/08} §5 and §18 are
- * updated in the same commit (헌법 24조).
+ * <p><b>Three of the four endpoints require a member; the fourth answers guests.</b>
+ * {@code GET /booths/{boothId}/projects/published} (S15P21A604-177, 계약 §6) is behind the published
+ * gate instead of the editor guard, and it lives on its own URL suffix so that identity never turns
+ * the same path from 200 into 403. It is registered {@code permitAll} in
+ * {@code SecurityConfiguration} — a change there can widen or close it without touching this file.
  *
- * <p>The visitor-facing read — published gate, like counts — is the fourth endpoint here
- * (S15P21A604-177, 계약 §6). It is the only one that answers a guest, and it lives on its own URL
- * suffix so that identity never turns the same path from 200 into 403.
+ * <p>Additive: no existing consumer changes. {@code docs/08} §5 and §18 are updated in the same
+ * commit (헌법 24조).
  */
 @RestController
 @RequestMapping("/api/v1")

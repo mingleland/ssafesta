@@ -135,6 +135,29 @@ class ProjectVisitorApiIntegrationTest {
     }
 
     /**
+     * <b>헤더가 없으면 200 이지만, 만료·손상된 토큰을 실으면 401 이다.</b>
+     *
+     * <p>인증 필터가 인가({@code permitAll})보다 먼저 돌아 거기서 응답을 끝낸다. 계약 §6 이 이
+     * 예외를 명시하는데, 명시만 하고 테스트가 없으면 다음 사람이 "게스트 경로니까 401 이 나오면
+     * 안 된다"고 읽고 필터 설정을 고치러 간다. 여기서 못박는다.
+     */
+    @Test
+    void aStaleTokenIsUnauthorizedEvenThoughTheAnonymousCallSucceeds() throws Exception {
+        Owner owner = publishedOwner("만료토큰");
+        project(owner, "토큰 없이는 보이는 전시");
+
+        mockMvc.perform(get(published(owner.boothId()))
+                        .header("Authorization", "Bearer not-a-real-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        // 같은 부스를 헤더 없이 부르면 읽힌다 — FE 의 우회 경로가 실제로 있는지까지 본다.
+        mockMvc.perform(get(published(owner.boothId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects[0].name").value("토큰 없이는 보이는 전시"));
+    }
+
+    /**
      * 이 변경에서 가장 조용히 깨질 자리다.
      *
      * <p>{@code permitAll} 이 한 세그먼트를 넘어 편집자 경로까지 열면, 남의 부스의 미게시 전시가

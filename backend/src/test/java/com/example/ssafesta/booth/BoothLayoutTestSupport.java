@@ -8,7 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Layout JSON builders and lease fixtures shared by the spec 005 tests. */
+/**
+ * Layout JSON builders, lease fixtures and the publish fixture.
+ *
+ * <p>Shared by spec 005 (layout), 016 (homepage) and 009 (project exhibition) — the last two read
+ * the same published gate, so a change to {@link #publishLayout} or {@link #grantLease} moves what
+ * three specs' tests mean by "published" and "leased".
+ */
 public final class BoothLayoutTestSupport {
 
     private BoothLayoutTestSupport() {
