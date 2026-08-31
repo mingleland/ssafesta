@@ -15,6 +15,8 @@ bash "${script_dir}/static/contracts.sh"
 bash "${script_dir}/static/preflight.sh"
 bash "${script_dir}/integration/idle-timeout.sh"
 bash "${script_dir}/integration/game-compose.sh"
+bash "${script_dir}/integration/public-wss.sh"
+bash "${script_dir}/security/tls-strict.sh"
 bash "${script_dir}/security/secret-scan.sh"
 
 echo 'infra-003 server-independent static checks completed.'

@@ -9,6 +9,8 @@
 - `festa-unity/Docker/`, `NetworkPlayer.cs`, `ConnectionManager.cs`, `BoothRuntime.cs`를 이 경로에서 수정하거나 재구현하지 않는다.
 - Backend world-session 발급기와 Unity 토큰 검증기는 각 파트가 구현한다. Infra는 환경 변수·Secret 파일·network·volume·ingress만 연결한다.
 - 실제 Secret, 토큰, 인증서 개인 키와 운영 evidence는 커밋하지 않는다.
+- Unity 6000.0.78f1 Linux Dedicated Server는 x86_64 host와 x86_64 image에서만 실행한다. OCI Ampere A1 ARM64, x86_64 에뮬레이션과 임시 엔진 업그레이드는 검증 경로로 사용하지 않는다.
+- OCI에서 WebGL 정적 파일만 배포한 결과는 서버 기동·WSS·브라우저 동기화를 증명하지 못하므로 완료 근거로 사용하지 않는다.
 
 ## 서버 없이 실행
 

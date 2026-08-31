@@ -93,7 +93,7 @@ namespace Festa.Network
 
             // --- 클레임 ---
             if (!TryBase64Url(parts[1], out var payloadBytes)) { reason = "payload 디코딩 실패"; return false; }
-            var c = JsonUtility.FromJson<Claims>(Encoding.UTF8.GetString(payloadBytes));
+            var c = JsonUtility.FromJson<Claims>(NormalizeAudience(Encoding.UTF8.GetString(payloadBytes)));
             if (c == null) { reason = "payload 파싱 실패"; return false; }
 
             if (c.iss != ExpectedIssuer) { reason = $"iss 불일치"; return false; }
@@ -134,12 +134,43 @@ namespace Festa.Network
 
         static bool HasAudience(Claims c)
         {
-            // Nimbus 는 List.of(...) 를 배열로 직렬화한다. 다른 인코더가 단일 문자열로 줄 수도 있어
-            // 둘 다 받는다 — JsonUtility 는 타입이 어긋난 쪽을 조용히 비워둔다.
             if (c.aud != null)
                 foreach (var a in c.aud)
                     if (a == ExpectedAudience) return true;
             return false;
+        }
+
+        /// <summary>
+        /// RFC 7519 §4.1.3 — <c>aud</c> 는 배열일 수도, 단일 문자열일 수도 있다.
+        /// 실제 백엔드(Spring)는 <b>단일 문자열</b>로 보내고 Nimbus·목 서버·에디터 서명기는
+        /// 배열로 보낸다. <c>Claims.aud</c> 는 <c>string[]</c> 라 JsonUtility 가 문자열형을
+        /// <b>조용히 null 로 두고</b>, 그대로면 "aud 불일치" 로 접속이 거부된다 —
+        /// 실제 백엔드에는 영원히 못 붙는 상태였다 (S15P21A604-340 실측).
+        /// 파싱 전에 문자열형만 배열형으로 고쳐 쓴다. 값 안의 이스케이프(\")를 건너뛰며
+        /// 문자열 끝을 찾으므로 값에 따옴표가 들어 있어도 안전하다.
+        /// </summary>
+        public static string NormalizeAudience(string payloadJson)
+        {
+            int key = payloadJson.IndexOf("\"aud\"", StringComparison.Ordinal);
+            if (key < 0) return payloadJson;
+
+            int i = key + 5;
+            while (i < payloadJson.Length && (payloadJson[i] == ' ' || payloadJson[i] == ':')) i++;
+            if (i >= payloadJson.Length || payloadJson[i] != '"') return payloadJson; // 이미 배열이거나 형식 밖 — 손대지 않는다
+
+            int start = i;
+            i++;
+            while (i < payloadJson.Length)
+            {
+                if (payloadJson[i] == '\\') { i += 2; continue; }
+                if (payloadJson[i] == '"') break;
+                i++;
+            }
+            if (i >= payloadJson.Length) return payloadJson; // 닫는 따옴표가 없다 — 어차피 파싱이 실패한다
+
+            return payloadJson.Substring(0, start) + "[" +
+                   payloadJson.Substring(start, i - start + 1) + "]" +
+                   payloadJson.Substring(i + 1);
         }
 
         /// <summary>JWT 는 padding 없는 base64url 을 쓴다.</summary>

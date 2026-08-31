@@ -1,11 +1,48 @@
 package com.example.ssafesta.booth;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Layout JSON builders and lease fixtures shared by the spec 005 tests. */
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+
+/**
+ * Layout JSON builders, lease fixtures and the publish fixture.
+ *
+ * <p>Shared by spec 005 (layout), 016 (homepage) and 009 (project exhibition) — the last two read
+ * the same published gate, so a change to {@link #publishLayout} or {@link #grantLease} moves what
+ * three specs' tests mean by "published" and "leased".
+ */
 public final class BoothLayoutTestSupport {
 
     private BoothLayoutTestSupport() {
+    }
+
+    /**
+     * Opens the visitor gate the only way the schema allows: a real publish.
+     *
+     * <p>Setting {@code booths.published_layout_version} directly is not an option —
+     * {@code fk_booths_published_layout_version} points it at a row in
+     * {@code booth_layout_published_versions}, so a fabricated pointer is rejected. That constraint
+     * is the reason the gate can trust the column at all.
+     *
+     * <p>Shared rather than copied because the gate is not spec 005's alone: 016 homepage and 009
+     * project exhibition both read the same column, and a fixture that drifts between them would
+     * have them testing different definitions of "published".
+     *
+     * @param bearer the owner's {@code Authorization} header value — publishing is an editor action
+     */
+    public static void publishLayout(MockMvc mockMvc, Long boothId, String bearer) throws Exception {
+        mockMvc.perform(put("/api/v1/booths/{id}/layouts/draft", boothId)
+                        .header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(saveRequest(0)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/booths/{id}/layouts/publish", boothId)
+                        .header("Authorization", bearer))
+                .andExpect(status().isOk());
     }
 
     /**
