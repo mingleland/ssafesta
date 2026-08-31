@@ -100,11 +100,14 @@ app:
   #
   # active-write-provider 는 신규 업로드가 갈 곳일 뿐이다. 기존 객체의 읽기·HEAD·삭제는
   # 문서 행의 storage_provider 를 따른다 (FR-030) — 전환 전에 올라간 파일은 옛 provider 에 있다.
-  # upload-enabled 는 운영자 kill switch 다 (FR-031, #100). 끄면 행을 만들지 않고 503 이다.
+  # upload-block 은 운영자 게이트다 (FR-031, #100). NONE 이 아니면 행을 만들지 않고 거절한다 —
+  # QUOTA_EXCEEDED(usage guard 90%)는 507, UNAVAILABLE(장애·STALE_BLOCKED)은 503 이다.
+  # 성격이 달라 코드를 가른다: 한쪽은 "이번 달은 안 된다", 다른 쪽은 "몇 분 뒤 다시" 다.
+  # P0 은 자동 판정을 하지 않는다 — 운영자가 손으로 넣는다.
   # secret 은 jwt-secret 과 같이 기본값을 두지 않는다.
   ai:
     storage:
-      upload-enabled: true
+      upload-block: NONE
       active-write-provider: R2
       presign-ttl: 15m
       providers:

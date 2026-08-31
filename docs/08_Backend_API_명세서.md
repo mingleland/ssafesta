@@ -1112,7 +1112,8 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `DOCUMENT_LIMIT_EXCEEDED` *(007)* | AI 직원당 10개·100MB 상한 (FR-018). 둘 다 설정값이라 `message`가 숫자를 담는다 |
 | `DOCUMENT_UPLOAD_INCOMPLETE` *(007)* | 발급한 URL 로 올린 것이 저장소에 없거나 크기가 다르다 — 다시 올리면 되는 상태다 |
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
-| `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소가 답하지 못했다 (C-10). **재시도 가능**하다. C-10 이 짝으로 확정한 `STORAGE_QUOTA_EXCEEDED`(507) 는 **아직 없다** — 용량 초과는 브라우저→저장소 직행 PUT 에서 나므로 Spring 을 통과하지 않는다 (docs/26 미결정) |
+| `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
+| `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |

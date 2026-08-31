@@ -26,7 +26,7 @@ class AiStoragePropertiesTest {
     void theShippedSettingsBind() {
         AiStorageProperties properties = bind(baseSettings());
 
-        assertTrue(properties.uploadEnabled());
+        assertEquals(AiStorageProperties.UploadBlock.NONE, properties.uploadBlock());
         assertEquals("R2", properties.activeWriteProvider());
         assertEquals(Duration.ofMinutes(15), properties.presignTtl());
         assertEquals("test-ai-documents", properties.providers().get("R2").bucket());
@@ -39,10 +39,36 @@ class AiStoragePropertiesTest {
                 .contains("active-write-provider"));
     }
 
+    /** 차단 사유가 둘로 갈려야 507 과 503 을 가를 수 있다 (#100). */
+    @Test
+    void bothBlockReasonsBind() {
+        assertEquals(AiStorageProperties.UploadBlock.QUOTA_EXCEEDED,
+                bind(settingsWith("app.ai.storage.upload-block", "QUOTA_EXCEEDED")).uploadBlock());
+        assertEquals(AiStorageProperties.UploadBlock.UNAVAILABLE,
+                bind(settingsWith("app.ai.storage.upload-block", "UNAVAILABLE")).uploadBlock());
+    }
+
     @Test
     void aNonPositiveTtlRefusesToStart() {
         assertTrue(failureOf(settingsWith("app.ai.storage.presign-ttl", "0s"))
                 .contains("presign-ttl"));
+    }
+
+    /**
+     * SigV4 는 7일을 넘는 URL 에 서명하지 않는다 — 통과시키면 기동은 멀쩡하고 <b>첫 업로드 요청이
+     * 500</b> 이 된다. 설정 오류가 런타임까지 숨는 모양이라 기동에서 잡는다.
+     */
+    @Test
+    void aTtlBeyondTheSigV4CeilingRefusesToStart() {
+        assertTrue(failureOf(settingsWith("app.ai.storage.presign-ttl", "8d"))
+                .contains("presign-ttl"));
+    }
+
+    /** 상한 자체는 허용된다 — 경계에서 잘못 막으면 정상 설정이 기동을 못 한다. */
+    @Test
+    void aTtlExactlyAtTheCeilingBinds() {
+        assertEquals(Duration.ofDays(7),
+                bind(settingsWith("app.ai.storage.presign-ttl", "7d")).presignTtl());
     }
 
     /** 배포에서 env 를 빠뜨리면 서명할 수 없는 URL 을 나눠 주기 전에 죽어야 한다. */
@@ -78,7 +104,7 @@ class AiStoragePropertiesTest {
 
     private static Map<String, String> baseSettings() {
         Map<String, String> settings = new LinkedHashMap<>();
-        settings.put("app.ai.storage.upload-enabled", "true");
+        settings.put("app.ai.storage.upload-block", "NONE");
         settings.put("app.ai.storage.active-write-provider", "R2");
         settings.put("app.ai.storage.presign-ttl", "15m");
         settings.put("app.ai.storage.providers.R2.endpoint", "http://localhost:9");

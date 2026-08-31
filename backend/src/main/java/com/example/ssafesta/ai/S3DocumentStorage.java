@@ -14,6 +14,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchBucketException;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -31,7 +32,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
  * endpoint and header detail. Callers get the document id and the provider name, which is enough to
  * find the row (spec 007 plan.md 로깅 정책).
  */
-class S3DocumentStorage implements AiDocumentStorage {
+class S3DocumentStorage implements AiDocumentStorage, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(S3DocumentStorage.class);
 
@@ -78,11 +79,8 @@ class S3DocumentStorage implements AiDocumentStorage {
             HeadObjectResponse response = endpoint(provider).client.headObject(
                     HeadObjectRequest.builder().bucket(bucket).key(objectKey).build());
             return Optional.ofNullable(response.contentLength());
-        } catch (NoSuchKeyException absent) {
-            return Optional.empty();
         } catch (S3Exception exception) {
-            // 404 without a typed exception happens on HEAD, where there is no body to parse.
-            if (exception.statusCode() == 404) {
+            if (meansObjectAbsent(exception)) {
                 return Optional.empty();
             }
             // Deliberately no branch for a full bucket here: HEAD is a read, and a quota is a
@@ -92,6 +90,28 @@ class S3DocumentStorage implements AiDocumentStorage {
         } catch (SdkException exception) {
             throw unavailable(provider, 0, exception.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Whether a failed HEAD means "there is no such object" rather than "storage cannot answer".
+     *
+     * <p>The distinction decides between telling the owner to upload again and telling them to
+     * retry later, so a wrong guess sends them down a road that cannot work.
+     *
+     * <p><b>A missing bucket is also a 404</b>, and it is not a missing upload — it is a deleted or
+     * mistyped bucket, which no amount of re-uploading fixes. HEAD carries no response body, so the
+     * SDK cannot always name the error; when it can, this uses it, and when it cannot the remaining
+     * ambiguous 404 is read as an absent object because that is the case that actually happens in
+     * normal use (a grant nobody finished).
+     */
+    static boolean meansObjectAbsent(S3Exception exception) {
+        if (exception instanceof NoSuchBucketException) {
+            return false;
+        }
+        if (exception instanceof NoSuchKeyException) {
+            return true;
+        }
+        return exception.statusCode() == 404 && !"NoSuchBucket".equals(errorCodeOf(exception));
     }
 
     /** The provider's own short code ({@code AccessDenied}, …) — never its message. */
@@ -150,5 +170,22 @@ class S3DocumentStorage implements AiDocumentStorage {
                     .build();
             return new Endpoint(client, presigner, provider.bucket());
         }
+
+        void close() {
+            client.close();
+            presigner.close();
+        }
+    }
+
+    /**
+     * Releases every provider's HTTP pool when the context shuts down.
+     *
+     * <p>Spring calls this on its own — an {@code AutoCloseable} bean gets its {@code close} wired
+     * as the destroy method. Without it each context that builds this bean leaks a connection pool
+     * and its threads, which a test suite notices long before production does.
+     */
+    @Override
+    public void close() {
+        endpoints.values().forEach(Endpoint::close);
     }
 }
