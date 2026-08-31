@@ -1,6 +1,7 @@
 package com.example.ssafesta.ai;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -11,46 +12,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * fallback: both are S3-compatible, so adding one is configuration, not code. {@code R2} is the only
  * entry P0 configures.
  *
- * @param uploadGate          operator gate (FR-031, #100). Anything but {@code NORMAL} refuses new
- *                            grants and <b>writes no row</b> — a row created while uploads are
- *                            blocked would eat one of the ten slots forever. <b>Required</b>: see
- *                            {@link UploadGate}
+ * <p><b>Two admission states, not one.</b> The contract has two separate machines answering
+ * different questions — {@link UsageState} is how full the bucket is, {@link StorageState} is
+ * whether the provider is usable at all. They also share the token {@code UPLOAD_BLOCKED} while
+ * meaning different things by it: a spent quota (507) in one, an outage (503) in the other. A single
+ * setting could not say which was meant, so there are two.
+ *
+ * @param usageState          usage-guard snapshot state (object-storage-contract §Usage admission)
+ * @param storageState        provider failover state (object-storage-contract §Manual fallback)
  * @param activeWriteProvider where new uploads go. Existing objects are read by the provider on
  *                            their own row, never by this value (FR-030)
  * @param presignTtl          how long an upload URL lives (FR-026, 기본 15분)
  */
 @ConfigurationProperties("app.ai.storage")
-public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvider,
-                                  Duration presignTtl, Map<String, Provider> providers) {
-
-    /**
-     * Whether new upload grants are admitted, in the storage contract's own words.
-     *
-     * <p>The names are taken from {@code usage-guard.schema.json}, not invented here: an operator
-     * following the storage runbook reads a state off that snapshot and writes it into this
-     * setting. A private vocabulary would make them translate, and a translation done at 3am is a
-     * translation done wrong.
-     *
-     * <p>Two blocked states rather than one flag, because they do not mean the same thing to the
-     * person holding the file — the guard blocks both at 90% of quota and when its own measurement
-     * has gone stale, and a single code would have the user retrying a request that cannot succeed
-     * (#100).
-     *
-     * <p>Set by hand. P0 collects probe evidence only and an operator applies the block; automatic
-     * detection stays out until the thresholds are agreed (FR-031).
-     */
-    public enum UploadGate {
-
-        /** Uploads are admitted. The guard's {@code WARNING} is this too — it only warns. */
-        NORMAL,
-        /** Guard {@code UPLOAD_BLOCKED} — 90% of quota. Retrying does not help, so 507. */
-        UPLOAD_BLOCKED,
-        /**
-         * Guard {@code STALE_BLOCKED}, and the state to use for a provider outage: #100 groups
-         * "R2 장애·STALE_BLOCKED" together as the temporary block. 503.
-         */
-        STALE_BLOCKED
-    }
+public record AiStorageProperties(UsageState usageState, StorageState storageState,
+                                  String activeWriteProvider, Duration presignTtl,
+                                  Map<String, Provider> providers) {
 
     /**
      * SigV4 refuses to sign a URL that outlives this, so a larger value is not a long-lived link —
@@ -59,14 +36,66 @@ public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvi
      */
     private static final Duration MAX_PRESIGN_TTL = Duration.ofDays(7);
 
+    /**
+     * How much of the quota is used, straight from {@code usage-guard.schema.json}.
+     *
+     * <p>The names are the schema's, not ours: an operator reads a state off that snapshot and
+     * copies it here. All four bind — including {@code WARNING}, which admits. An enum missing one
+     * of them would reject a state the contract says can occur, forcing a translation at exactly
+     * the moment translations go wrong.
+     */
+    public enum UsageState {
+
+        /** Under the warning threshold. */
+        NORMAL,
+        /** 80%. The contract admits uploads here and warns, so admission matches {@link #NORMAL}. */
+        WARNING,
+        /** 90% of quota. Retrying does not help, so 507 (#100). */
+        UPLOAD_BLOCKED,
+        /** The measurement itself went stale, so admission fails closed. Temporary: 503. */
+        STALE_BLOCKED
+    }
+
+    /**
+     * Where the provider failover machine stands (object-storage-contract §Manual fallback).
+     *
+     * <p>Every blocked value here is <b>503</b>: an outage or a validation window is something to
+     * wait out, unlike a spent quota. Transitions are operator-driven — P0 has no automatic
+     * detection (FR-031).
+     */
+    public enum StorageState {
+
+        /** Normal operation on R2. */
+        R2_ACTIVE,
+        /**
+         * R2 refused for new grants. Shares its name with {@link UsageState#UPLOAD_BLOCKED} and
+         * means something else — which is why the two live in separate settings.
+         */
+        UPLOAD_BLOCKED,
+        /** Proving the fallback before switching to it. No new grants until it is proven. */
+        FALLBACK_VALIDATING,
+        /** Running on MinIO. Uploads are admitted and land in the configured provider. */
+        LOCAL_ACTIVE,
+        /**
+         * Copying objects back to R2. <b>New uploads stay blocked</b> — docs/26 records that P0
+         * operates this state blocked and that an implementer must not open it. Whether it can be
+         * opened at all is a later decision, not this one.
+         */
+        R2_RECONCILING
+    }
+
     public AiStorageProperties {
-        // No default, and that is the point. Spring ignores a property it does not recognise, so a
-        // renamed or misspelled key would otherwise leave this null, fall back to "admit", and
-        // reopen uploads during a block that someone believed was in force. A safety control must
-        // not be able to fail open through a typo — say it or do not start.
-        if (uploadGate == null) {
-            throw new IllegalStateException("app.ai.storage.upload-gate 를 지정해야 합니다. "
-                    + "허용값: " + java.util.Arrays.toString(UploadGate.values()));
+        // No defaults on either state, and that is the point. Spring ignores a property it does not
+        // recognise, so a renamed or misspelled key would leave one null, fall back to "admit", and
+        // reopen uploads during a block someone believed was in force. A safety control must not be
+        // able to fail open through a typo — say it or do not start.
+        if (usageState == null) {
+            throw new IllegalStateException("app.ai.storage.usage-state 를 지정해야 합니다. 허용값: "
+                    + Arrays.toString(UsageState.values()));
+        }
+        if (storageState == null) {
+            throw new IllegalStateException("app.ai.storage.storage-state 를 지정해야 합니다. 허용값: "
+                    + Arrays.toString(StorageState.values()));
         }
         providers = providers == null ? Map.of() : Map.copyOf(providers);
         if (activeWriteProvider == null || activeWriteProvider.isBlank()) {

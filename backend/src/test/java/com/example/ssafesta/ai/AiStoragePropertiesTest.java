@@ -8,6 +8,9 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.context.properties.bind.BindException;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
@@ -26,7 +29,8 @@ class AiStoragePropertiesTest {
     void theShippedSettingsBind() {
         AiStorageProperties properties = bind(baseSettings());
 
-        assertEquals(AiStorageProperties.UploadGate.NORMAL, properties.uploadGate());
+        assertEquals(AiStorageProperties.UsageState.NORMAL, properties.usageState());
+        assertEquals(AiStorageProperties.StorageState.R2_ACTIVE, properties.storageState());
         assertEquals("R2", properties.activeWriteProvider());
         assertEquals(Duration.ofMinutes(15), properties.presignTtl());
         assertEquals("test-ai-documents", properties.providers().get("R2").bucket());
@@ -39,13 +43,39 @@ class AiStoragePropertiesTest {
                 .contains("active-write-provider"));
     }
 
-    /** 차단 상태가 둘로 갈려야 507 과 503 을 가를 수 있다 (#100). 이름은 usage-guard 계약 그대로다. */
+    /**
+     * 계약이 정의한 usage-guard state 네 개가 <b>전부</b> 바인딩돼야 한다.
+     *
+     * <p>{@code WARNING} 은 허용이라 코드 분기가 같지만, enum 에서 빼면 계약이 "일어난다" 고 적어 둔
+     * 상태를 운영자가 그대로 옮겨 적을 수 없다 — 그 순간 번역이 생기고 번역은 틀린다.
+     */
+    @ParameterizedTest
+    @EnumSource(AiStorageProperties.UsageState.class)
+    void everyUsageStateInTheContractBinds(AiStorageProperties.UsageState state) {
+        assertEquals(state, bind(settingsWith("app.ai.storage.usage-state", state.name()))
+                .usageState());
+    }
+
+    /** 장애 상태 기계도 마찬가지다 — 다섯 상태가 계약에 있고 다섯이 다 들어와야 한다. */
+    @ParameterizedTest
+    @EnumSource(AiStorageProperties.StorageState.class)
+    void everyStorageStateInTheContractBinds(AiStorageProperties.StorageState state) {
+        assertEquals(state, bind(settingsWith("app.ai.storage.storage-state", state.name()))
+                .storageState());
+    }
+
+    /**
+     * 두 축이 같은 이름을 쓰지만 뜻이 다르다 — 한 칸에 뭉쳐 있으면 507 인지 503 인지 알 수 없다.
+     *
+     * <p>따로 설정되는지를 고정해 둔다. 다시 합치면 이 테스트가 컴파일되지 않는다.
+     */
     @Test
-    void bothBlockedStatesBind() {
-        assertEquals(AiStorageProperties.UploadGate.UPLOAD_BLOCKED,
-                bind(settingsWith("app.ai.storage.upload-gate", "UPLOAD_BLOCKED")).uploadGate());
-        assertEquals(AiStorageProperties.UploadGate.STALE_BLOCKED,
-                bind(settingsWith("app.ai.storage.upload-gate", "STALE_BLOCKED")).uploadGate());
+    void theTwoAxesCarryTheSameTokenIndependently() {
+        AiStorageProperties properties = bind(settingsWith(
+                "app.ai.storage.usage-state", "UPLOAD_BLOCKED"));
+
+        assertEquals(AiStorageProperties.UsageState.UPLOAD_BLOCKED, properties.usageState());
+        assertEquals(AiStorageProperties.StorageState.R2_ACTIVE, properties.storageState());
     }
 
     /**
@@ -55,22 +85,23 @@ class AiStoragePropertiesTest {
      * 이 되고 기본값이 "허용" 이면 <b>차단이 열린 채로 기동한다.</b> 안전 장치가 오타로 열리는
      * 모양이라, 말하지 않으면 뜨지 않게 한다.
      */
-    @Test
-    void aMissingGateRefusesToStart() {
+    @ParameterizedTest
+    @ValueSource(strings = {"app.ai.storage.usage-state", "app.ai.storage.storage-state"})
+    void aMissingGateRefusesToStart(String key) {
         Map<String, String> settings = new LinkedHashMap<>(baseSettings());
-        settings.remove("app.ai.storage.upload-gate");
+        settings.remove(key);
 
-        assertTrue(failureOf(settings).contains("upload-gate"));
+        assertTrue(failureOf(settings).contains(key.substring(key.lastIndexOf('.') + 1)));
     }
 
-    /** 옛 키(`upload-enabled`)만 남은 설정도 같은 이유로 기동을 막는다. */
+    /** 옛 키만 남은 설정도 같은 이유로 기동을 막는다 — Spring 은 모르는 키를 조용히 무시한다. */
     @Test
-    void theRemovedEnabledFlagAloneRefusesToStart() {
+    void aRemovedKeyAloneRefusesToStart() {
         Map<String, String> settings = new LinkedHashMap<>(baseSettings());
-        settings.remove("app.ai.storage.upload-gate");
+        settings.remove("app.ai.storage.usage-state");
         settings.put("app.ai.storage.upload-enabled", "false");
 
-        assertTrue(failureOf(settings).contains("upload-gate"));
+        assertTrue(failureOf(settings).contains("usage-state"));
     }
 
     @Test
@@ -129,7 +160,8 @@ class AiStoragePropertiesTest {
 
     private static Map<String, String> baseSettings() {
         Map<String, String> settings = new LinkedHashMap<>();
-        settings.put("app.ai.storage.upload-gate", "NORMAL");
+        settings.put("app.ai.storage.usage-state", "NORMAL");
+        settings.put("app.ai.storage.storage-state", "R2_ACTIVE");
         settings.put("app.ai.storage.active-write-provider", "R2");
         settings.put("app.ai.storage.presign-ttl", "15m");
         settings.put("app.ai.storage.providers.R2.endpoint", "http://localhost:9");
