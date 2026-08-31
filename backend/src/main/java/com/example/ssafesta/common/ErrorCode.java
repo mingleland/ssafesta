@@ -92,10 +92,15 @@ public enum ErrorCode {
      * 재시도가 아니라 <b>새 업로드 권한</b>이 필요하다는 뜻이라 409 와 구분한다.
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
-    /** 저장소가 답하지 못했다 (C-10). <b>재시도 가능</b>하다는 것이 507 과의 차이다. */
+    /**
+     * 저장소가 답하지 못했다 (C-10). <b>재시도 가능</b>하다.
+     *
+     * <p>C-10 이 짝으로 확정한 {@code STORAGE_QUOTA_EXCEEDED}(507) 는 <b>아직 여기 없다.</b> 용량
+     * 초과는 쓰기에서 나는데 P0 의 업로드는 브라우저→저장소 직행이라 그 실패가 Spring 을 통과하지
+     * 않는다. 낼 수 없는 코드를 선언하면 클라이언트가 오지 않는 분기를 만든다 — 직접 업로드 실패의
+     * 계약은 미정이고 docs/26 에 올려 두었다.
+     */
     STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
-    /** 저장소 용량이 찼다 (C-10). 재시도로 풀리지 않으므로 503 과 갈라 놓는다. */
-    STORAGE_QUOTA_EXCEEDED(HttpStatus.INSUFFICIENT_STORAGE, "저장소 용량이 부족합니다. 관리자에게 문의해 주세요."),
 
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면

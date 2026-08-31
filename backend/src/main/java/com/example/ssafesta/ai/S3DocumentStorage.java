@@ -38,9 +38,6 @@ class S3DocumentStorage implements AiDocumentStorage {
     /** R2 has no regions; the SDK still requires one for SigV4, and {@code auto} is R2's answer. */
     private static final Region SIGNING_REGION = Region.of("auto");
 
-    /** What S3 calls "the bucket is full". Not retryable, unlike everything else here (C-10). */
-    private static final String QUOTA_EXCEEDED = "QuotaExceeded";
-
     private final Map<String, Endpoint> endpoints;
     private final String activeProvider;
     private final Duration presignTtl;
@@ -88,23 +85,30 @@ class S3DocumentStorage implements AiDocumentStorage {
             if (exception.statusCode() == 404) {
                 return Optional.empty();
             }
-            if (isQuotaExceeded(exception)) {
-                throw new StorageQuotaExceededException();
-            }
-            throw unavailable(provider, exception);
+            // Deliberately no branch for a full bucket here: HEAD is a read, and a quota is a
+            // write-side limit. The upload it would break goes browser → storage without passing
+            // through this process, so Spring never sees that failure (docs/26 미결정 항목).
+            throw unavailable(provider, exception.statusCode(), errorCodeOf(exception));
         } catch (SdkException exception) {
-            throw unavailable(provider, exception);
+            throw unavailable(provider, 0, exception.getClass().getSimpleName());
         }
     }
 
-    private static boolean isQuotaExceeded(S3Exception exception) {
-        return exception.awsErrorDetails() != null
-                && QUOTA_EXCEEDED.equals(exception.awsErrorDetails().errorCode());
+    /** The provider's own short code ({@code AccessDenied}, …) — never its message. */
+    private static String errorCodeOf(S3Exception exception) {
+        return exception.awsErrorDetails() == null ? "UNKNOWN"
+                : String.valueOf(exception.awsErrorDetails().errorCode());
     }
 
-    private StorageUnavailableException unavailable(String provider, SdkException exception) {
-        // The SDK message is logged, never returned: it names the endpoint and can echo headers.
-        log.warn("저장소 요청 실패 provider={}", provider, exception);
+    /**
+     * Logs enough to find the failure and nothing the provider wrote.
+     *
+     * <p>Not {@code log.warn(…, exception)}: that prints the SDK message and stack trace, which
+     * carry the endpoint, the signed URL and response headers. spec 007 forbids exactly that, and
+     * the earlier version of this method did it anyway one line under a comment saying not to.
+     */
+    private StorageUnavailableException unavailable(String provider, int status, String errorCode) {
+        log.warn("저장소 요청 실패 provider={} status={} code={}", provider, status, errorCode);
         return new StorageUnavailableException("저장소에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.");
     }
 

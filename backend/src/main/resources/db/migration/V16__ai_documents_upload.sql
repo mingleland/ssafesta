@@ -27,8 +27,13 @@ ALTER TABLE ai_documents
 -- NULLs, so it does not stand in the way.
 ALTER TABLE ai_documents ALTER COLUMN s3_key DROP NOT NULL;
 
--- Last line of defence for the duplicate race (FR-019b, #84). The application checks first and
--- answers politely; this catches two requests that both read "no duplicate" and both insert.
+-- The schema's own statement of FR-019b, and a backstop (#84).
+--
+-- The upload path does not rely on it: it locks the agent row, so two inserts for one agent cannot
+-- be concurrent and the duplicate check answers before any violation could happen. This index is
+-- what protects the rule from a future writer that forgets that lock — and the service deliberately
+-- does not translate a violation into a success, because at that point the lock has been bypassed
+-- and that is worth seeing.
 --
 -- Partial on purpose: FAILED and DISABLED are excluded so re-uploading a file that failed is
 -- allowed, and EXPIRED is excluded so an abandoned grant does not block the next attempt. That

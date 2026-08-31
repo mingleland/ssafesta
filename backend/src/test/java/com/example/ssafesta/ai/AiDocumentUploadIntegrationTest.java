@@ -252,6 +252,27 @@ class AiDocumentUploadIntegrationTest {
         assertEquals("fallback-bucket", fresh.getStorageBucket());
     }
 
+    /**
+     * bucket 만 바뀌어도 마찬가지다 — provider 이름은 그대로 {@code R2} 인데 쓰는 자리가 옮겨졌다.
+     *
+     * <p>이름만 비교하면 아무도 읽지 않는 옛 bucket 으로 URL 을 계속 발급한다.
+     */
+    @Test
+    void aBucketSwitchWithinTheSameProviderAlsoStartsANewDocument() throws Exception {
+        Owner owner = agentOwner("버킷전환");
+        String request = body("project.pdf", "application/pdf", ONE_MB, SHA_A);
+        long before = idOf(grantJson(owner, request));
+
+        storage.switchActiveProvider("R2", "moved-bucket");
+        String after = grantJson(owner, request);
+
+        assertNotEquals(before, idOf(after), "bucket 이 바뀌었는데 옛 행을 재사용했다");
+        assertEquals("EXPIRED", documentRepository.findById(before).orElseThrow()
+                .getProcessingStatus());
+        assertEquals("moved-bucket", documentRepository.findById(idOf(after)).orElseThrow()
+                .getStorageBucket());
+    }
+
     // ── 권한 ────────────────────────────────────────────────────────────────
 
     @Test

@@ -5,7 +5,6 @@ import com.example.ssafesta.booth.BoothEditorGuard;
 import com.example.ssafesta.booth.BoothExpiredException;
 import com.example.ssafesta.booth.BoothLeaseRepository;
 import com.example.ssafesta.common.ApiException;
-import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,7 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.unit.DataSize;
@@ -83,10 +81,17 @@ public class AiDocumentService {
     /**
      * Issues a presigned upload URL, or reports that the file is already registered.
      *
-     * <p>Not {@code @Transactional}: the unique-index race has to be caught <i>after</i> the losing
-     * transaction rolls back, and the winner's row can only be read in a new one. A
-     * {@link TransactionTemplate} makes that boundary explicit instead of hiding it behind a proxy
-     * that self-invocation would bypass anyway.
+     * <p><b>There is no translation of {@code ux_ai_documents_agent_active_sha} here.</b> The
+     * pattern next door in {@code AiAgentService.create} needs one because it has no lock and two
+     * requests really can both insert; this path takes the agent row first, so every insert for one
+     * agent is serialised and the loser sees the committed row in its own pre-check. A violation
+     * would mean something wrote {@code ai_documents} without that lock — a defect, and turning it
+     * into a cheerful 200 would hide it. The index stays as the schema's own backstop.
+     *
+     * <p>The write itself runs through a {@link TransactionTemplate} rather than
+     * {@code @Transactional}: the URL is signed after the transaction commits, and a boundary that
+     * matters is better read in the code than inferred from an annotation a self-invocation would
+     * bypass.
      */
     public UploadGrantView issueUploadUrl(Long agentId, Long userId, UploadCommand command) {
         AiAgent agent = agents.findById(agentId)
@@ -104,22 +109,7 @@ public class AiDocumentService {
             throw new StorageUnavailableException("현재 문서 업로드를 받을 수 없습니다. 잠시 후 다시 시도해 주세요.");
         }
 
-        AiDocumentStorage.WriteTarget target = storage.activeWriteTarget();
-        try {
-            return grant(agent, userId, request, target);
-        } catch (DataIntegrityViolationException exception) {
-            if (!ConstraintViolations.isViolationOf(exception, ACTIVE_SHA_INDEX)) {
-                throw exception;
-            }
-            // Lost the race. The winner has committed, so re-running the same decision against
-            // their row gives this caller the answer they would have got had they arrived second —
-            // which is not always "duplicate": if the winner is still awaiting its upload, both
-            // clients are entitled to a URL for the same document.
-            return transactions.execute(status -> documents
-                    .findActiveByAgentAndSha(agent.getId(), request.contentSha256())
-                    .map(existing -> resolveExisting(existing, request, target))
-                    .orElseThrow(() -> exception));
-        }
+        return grant(agent, userId, request, storage.activeWriteTarget());
     }
 
     private UploadGrantView grant(AiAgent agent, Long userId, UploadRequest request,
@@ -138,9 +128,9 @@ public class AiDocumentService {
                     return Prepared.reissue(existing, request);
                 }
                 if (existing.isAwaitingUpload()) {
-                    // Provider changed under an unfinished grant: the old object would be written
-                    // to a storage we no longer write to, so it is abandoned and a new row starts
-                    // in the current provider (FR-032).
+                    // The write target moved under an unfinished grant: the old object would land
+                    // in a storage we no longer write to, so it is abandoned and a new row starts
+                    // in the current one (FR-032).
                     existing.expire(Instant.now());
                 } else {
                     return Prepared.duplicate(existing);
@@ -153,8 +143,9 @@ public class AiDocumentService {
             AiDocument document = new AiDocument(agent.getBoothId(), agent.getId(), userId,
                     request.fileName(), request.contentType(), request.size(),
                     request.contentSha256(), target, now);
-            // saveAndFlush so the index violation surfaces here, where the caller can translate it,
-            // rather than at commit time outside the transaction template.
+            // saveAndFlush, not save: the id has to exist before the object key can be built, and
+            // flushing here also means an index violation surfaces inside this transaction instead
+            // of at commit time, where the stack trace no longer says which insert caused it.
             document = documents.saveAndFlush(document);
             document.assignObjectKey(objectKeyOf(document));
             return Prepared.issued(document);
@@ -162,23 +153,19 @@ public class AiDocumentService {
         return present(Objects.requireNonNull(prepared));
     }
 
-    /** Re-running the grant decision against a row that already exists. */
-    private UploadGrantView resolveExisting(AiDocument existing, UploadRequest request,
-                                            AiDocumentStorage.WriteTarget target) {
-        if (isResumable(existing, target)) {
-            return present(Prepared.reissue(existing, request));
-        }
-        return present(Prepared.duplicate(existing));
-    }
-
     /**
      * Whether a fresh URL for this same row is the right answer (#84 멱등 재발급).
      *
-     * <p>Only while the grant is still outstanding and still points at the provider we write to. A
+     * <p>Only while the grant is still outstanding and still points at where we write today. A
      * document that has been uploaded is a duplicate, not a resume.
+     *
+     * <p>Bucket counts, not just the provider name: one provider can be repointed at a new bucket,
+     * and reissuing on the old row would keep signing URLs for a bucket nothing reads any more.
      */
     private boolean isResumable(AiDocument existing, AiDocumentStorage.WriteTarget target) {
-        return existing.isAwaitingUpload() && existing.getStorageProvider().equals(target.provider());
+        return existing.isAwaitingUpload()
+                && existing.getStorageProvider().equals(target.provider())
+                && existing.getStorageBucket().equals(target.bucket());
     }
 
     private UploadGrantView present(Prepared prepared) {
@@ -418,8 +405,6 @@ public class AiDocumentService {
         }
         return sha;
     }
-
-    static final String ACTIVE_SHA_INDEX = "ux_ai_documents_agent_active_sha";
 
     // ── 요청·응답 ───────────────────────────────────────────────────────────
 
