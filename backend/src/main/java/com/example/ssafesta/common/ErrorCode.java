@@ -79,6 +79,24 @@ public enum ErrorCode {
      */
     AGENT_DELETE_CONFLICT(HttpStatus.CONFLICT, "사용 중인 AI 직원은 삭제할 수 없습니다."),
 
+    // ── AI 문서 · 저장소 (spec 007 US2) ─────────────────────────────────────
+    // 중복은 여기 없다. FR-019c 가 "중복은 오류가 아니다" 로 못박았고 응답은 200 + duplicate 판별자다 —
+    // DOCUMENT_DUPLICATE 를 만들면 계약 위반이다.
+    DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다."),
+    /** 10개·100MB (FR-018). 둘 다 설정값이라 thrower 가 숫자와 해결 방법을 message 에 담는다. */
+    DOCUMENT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "AI 직원의 문서 상한을 초과했습니다."),
+    /** 발급한 URL 로 올린 것이 저장소에 없거나 크기가 다르다 — 다시 올리면 되는 상태다. */
+    DOCUMENT_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "업로드가 완료되지 않았습니다. 다시 올려 주세요."),
+    /**
+     * 만료된 업로드의 원본이 이미 없다 (FR-027). {@link #OAUTH_HANDOFF_EXPIRED} 와 같은 결로 410 이다 —
+     * 재시도가 아니라 <b>새 업로드 권한</b>이 필요하다는 뜻이라 409 와 구분한다.
+     */
+    DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
+    /** 저장소가 답하지 못했다 (C-10). <b>재시도 가능</b>하다는 것이 507 과의 차이다. */
+    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    /** 저장소 용량이 찼다 (C-10). 재시도로 풀리지 않으므로 503 과 갈라 놓는다. */
+    STORAGE_QUOTA_EXCEEDED(HttpStatus.INSUFFICIENT_STORAGE, "저장소 용량이 부족합니다. 관리자에게 문의해 주세요."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —
