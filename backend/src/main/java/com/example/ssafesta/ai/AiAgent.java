@@ -67,8 +67,13 @@ public class AiAgent {
     private List<String> forbiddenTopics;
 
     /**
-     * Always {@code ACTIVE}. There is no lifecycle here — no vocabulary defines the other values,
-     * and {@code LayoutConfigResolver} only ever counts {@code ACTIVE} rows. Deletion is a delete.
+     * {@code ACTIVE} on every row this class writes. There is no lifecycle here — no vocabulary
+     * defines the other values, and deletion is a delete.
+     *
+     * <p><b>Read defensively anyway.</b> Other values do reach this column (a test writes
+     * {@code DISABLED} through JDBC, and spec 011·106 may define a lifecycle later), so callers ask
+     * {@link #isActive()} rather than comparing the stored string. {@code LayoutConfigResolver}
+     * counts only {@code ACTIVE} rows for the same reason.
      */
     @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
@@ -108,6 +113,17 @@ public class AiAgent {
     }
 
     public Long getId() { return id; }
+
+    /**
+     * Whether the agent may be used, normalising every non-{@code ACTIVE} stored value to "no".
+     *
+     * <p>Returned as a boolean rather than the raw string so the vocabulary stays inside this class:
+     * spec 008's contract only knows {@code ACTIVE}/{@code INACTIVE}, and handing out
+     * {@code DISABLED} would break it.
+     */
+    public boolean isActive() {
+        return "ACTIVE".equals(status);
+    }
 
     public Long getBoothId() { return boothId; }
 
