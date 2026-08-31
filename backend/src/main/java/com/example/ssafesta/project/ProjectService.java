@@ -1,8 +1,12 @@
 package com.example.ssafesta.project;
 
+import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothEditorGuard;
 import com.example.ssafesta.booth.BoothExpiredException;
 import com.example.ssafesta.booth.BoothLeaseRepository;
+import com.example.ssafesta.booth.BoothNotFoundException;
+import com.example.ssafesta.booth.BoothRepository;
+import com.example.ssafesta.booth.LayoutNotPublishedException;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.common.ErrorCode;
@@ -39,12 +43,14 @@ public class ProjectService {
     private final ProjectRepository projects;
     private final BoothEditorGuard editorGuard;
     private final BoothLeaseRepository leases;
+    private final BoothRepository booths;
 
     public ProjectService(ProjectRepository projects, BoothEditorGuard editorGuard,
-                          BoothLeaseRepository leases) {
+                          BoothLeaseRepository leases, BoothRepository booths) {
         this.projects = projects;
         this.editorGuard = editorGuard;
         this.leases = leases;
+        this.booths = booths;
     }
 
     // ── 등록 ────────────────────────────────────────────────────────────────
@@ -130,6 +136,44 @@ public class ProjectService {
     public List<ProjectView> findByBooth(Long boothId, Long userId) {
         editorGuard.requireEditor(boothId, userId);
         return projects.findByBoothId(boothId).map(ProjectView::of).map(List::of).orElseGet(List::of);
+    }
+
+    // ── 조회 (방문자) ───────────────────────────────────────────────────────
+
+    /**
+     * What a visitor sees on a public booth (계약 §6, FR-005·SC-002).
+     *
+     * <p>Three gates in this order, and the order is the contract: a booth that does not exist, one
+     * whose lease has run out, and one that has never been published each get their own answer. The
+     * order is copied from {@code BoothQueryService.findPublicBooth} so the same booth cannot report
+     * different reasons depending on which endpoint asked.
+     *
+     * <p><b>미게시는 404 이고 빈 배열이 아니다.</b> "이 부스는 방문자에게 열려 있지 않다"와 "부스는
+     * 열렸고 전시가 아직 없다"는 다른 사실이라, 하나로 뭉치면 클라이언트가 둘을 구분할 수단을
+     * 잃는다. 빈 배열은 계속 후자 하나만 뜻한다 (§3 과 같은 규칙).
+     *
+     * @param viewerUserId the member behind the request, or {@code null} for a guest — a guest is a
+     *        normal caller here, not a refusal (헌법 12조는 소유를 금지하는 것이고 열람이 아니다)
+     */
+    @Transactional(readOnly = true)
+    public VisitorProjectListView findPublishedByBooth(Long boothId, Long viewerUserId) {
+        Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        requireValidLease(boothId);
+        // 게시 게이트는 배치의 게시 여부다 — 프로젝트에 별도의 게시 상태를 만들지 않는다.
+        // 프로젝트 패널이 게시된 배치 안의 오브젝트라서, 방문자가 그것을 누를 수 있는 순간과
+        // 이 술어가 정확히 겹친다 (016 BoothQueryService.visibleHomepageUrl 과 같은 판정).
+        if (booth.getPublishedLayoutVersion() == null) {
+            throw new LayoutNotPublishedException();
+        }
+        return new VisitorProjectListView(projects.findByBoothId(boothId)
+                .map(project -> VisitorProjectView.of(project, projects.countLikes(project.getId()),
+                        likedBy(project.getId(), viewerUserId)))
+                .map(List::of).orElseGet(List::of));
+    }
+
+    /** 게스트는 좋아요 행을 가질 수 없으므로 묻지 않는다 — 계약 §6 이 정한 {@code false} 다. */
+    private boolean likedBy(Long projectId, Long viewerUserId) {
+        return viewerUserId != null && projects.isLikedBy(projectId, viewerUserId);
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
@@ -275,6 +319,34 @@ public class ProjectService {
     public record ProjectListView(List<ProjectView> projects) {
 
         public ProjectListView {
+            projects = List.copyOf(Objects.requireNonNull(projects));
+        }
+    }
+
+    /**
+     * {@link ProjectView} 의 여덟 필드 + 좋아요 둘 (계약 §6).
+     *
+     * <p>필드를 더하지 않고 {@code ProjectView} 를 쓰지 않는 이유: 그러면 편집자 응답(§3)의 모양이
+     * 같이 바뀐다. 반대로 이름·타입은 §3 과 똑같이 두었다 — 클라이언트가 파서를 하나로 쓴다.
+     *
+     * <p>{@code likeCount} 는 {@code null} 이 되지 않는다. {@code -135} 가 붙기 전에는 항상 {@code 0}
+     * 이지만 키는 지금부터 있다 — 나중에 키를 더하면 소비자가 그 시점에 파서를 또 고쳐야 한다.
+     */
+    public record VisitorProjectView(Long projectId, String name, String description, String thumbnailUrl,
+                                     String videoUrl, String deployUrl, String gitUrl, String portfolioUrl,
+                                     long likeCount, boolean likedByMe) {
+
+        static VisitorProjectView of(Project project, long likeCount, boolean likedByMe) {
+            return new VisitorProjectView(project.getId(), project.getName(), project.getDescription(),
+                    project.getThumbnailUrl(), project.getVideoUrl(), project.getDeployUrl(),
+                    project.getGitUrl(), project.getPortfolioUrl(), likeCount, likedByMe);
+        }
+    }
+
+    /** {@code { "projects": [...] }} — §3 과 같은 모양이다. 부스당 1개라도 배열을 유지한다 (C-01). */
+    public record VisitorProjectListView(List<VisitorProjectView> projects) {
+
+        public VisitorProjectListView {
             projects = List.copyOf(Objects.requireNonNull(projects));
         }
     }

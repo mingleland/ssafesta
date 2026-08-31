@@ -20,8 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Additive: three new endpoints, no existing consumer changes. {@code docs/08} §5 and §18 are
  * updated in the same commit (헌법 24조).
  *
- * <p>The visitor-facing read — published gate, like counts — is S15P21A604-177 and deliberately
- * absent here. What this controller exposes is the editor's own view of their own values.
+ * <p>The visitor-facing read — published gate, like counts — is the fourth endpoint here
+ * (S15P21A604-177, 계약 §6). It is the only one that answers a guest, and it lives on its own URL
+ * suffix so that identity never turns the same path from 200 into 403.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -58,6 +59,19 @@ public class ProjectController {
                                                @PathVariable Long boothId) {
         Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
         return new ProjectService.ProjectListView(projects.findByBooth(boothId, userId));
+    }
+
+    /**
+     * 방문자용 조회 (계약 §6). <b>토큰이 없어도 200 이다</b> — 그래서
+     * {@code @SecurityRequirement} 도 붙이지 않는다.
+     *
+     * <p>토큰은 {@code likedByMe} 판정에만 쓴다. {@code optionalMemberId} 는 게스트와 비회원 토큰에
+     * {@code null} 을 준다 ({@code BoothSlotController.slots} 와 같은 방식).
+     */
+    @GetMapping("/booths/{boothId}/projects/published")
+    public ProjectService.VisitorProjectListView published(@AuthenticationPrincipal Jwt jwt,
+                                                           @PathVariable Long boothId) {
+        return projects.findPublishedByBooth(boothId, MemberPrincipal.optionalMemberId(jwt));
     }
 
     @PatchMapping("/projects/{projectId}")

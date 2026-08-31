@@ -82,6 +82,11 @@ class SecurityConfiguration {
                         // prefix stay authenticated, and Authoring refuses guests separately with
                         // MEMBER_ONLY rather than with a 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/games/*/published").permitAll()
+                        // A published booth's project exhibition is what the visitor came to read
+                        // (spec 009 FR-005, 계약 §6). Only this exact suffix is open — the editor
+                        // read at /booths/*/projects stays authenticated, and "*" spans one segment
+                        // so it cannot reach it.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/booths/*/projects/published").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(oauth -> oauth.successHandler(successHandler))
                 // The resource server installs its own entry point for bearer-token failures, so an
