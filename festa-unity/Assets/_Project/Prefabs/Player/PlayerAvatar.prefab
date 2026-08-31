@@ -217,15 +217,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
-  _offset: {x: 0, y: 5, z: -22.5}
+  _offset: {x: 0, y: 3.7709498, z: -16.969275}
   _followLerp: 8
   _collisionRadius: 0.8
   _collisionPadding: 2.5
   _collisionMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  _minDistance: 11.25
-  _maxDistance: 45
+  _minDistance: 8.484637
+  _maxDistance: 33.93855
   _zoomStep: 1.5
   _orbitSensitivity: 0.12
   _minPitch: -12

@@ -40,6 +40,9 @@ namespace Festa.Content
             // 씬 전환에도 남기지 않는다 — 부스 오브젝트와 생애를 맞춘다.
         }
 
+        void OnEnable() => Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        void OnDisable() => Festa.Integration.BoothInteractBridge.OnSent -= OnBridgeSent;
+
         void OnDestroy()
         {
             if (_instance == this) _instance = null;
@@ -227,6 +230,46 @@ namespace Festa.Content
             rect.pivot = new Vector2(0.5f, 0f);
             rect.sizeDelta = new Vector2(600, 48);
             rect.anchoredPosition = new Vector2(0f, 150f);
+
+            // 송신 피드백 토스트 — 힌트 바로 위. 노트북 F 의 가시 결과(홈페이지 열기)는
+            // FE 몫이라, FE 가 없는 단독 실행에서는 발동해도 화면 변화가 없어 "안 된다" 로
+            // 보인다 (S15P21A604-348 실측). 브리지가 실제로 보냈을 때만 잠깐 띄운다.
+            var toastGo = new GameObject("Toast", typeof(RectTransform), typeof(UnityEngine.UI.Text));
+            toastGo.transform.SetParent(s_hint.canvas.transform, false);
+            s_toast = toastGo.GetComponent<UnityEngine.UI.Text>();
+            s_toast.font = s_hint.font;
+            s_toast.fontSize = 26;
+            s_toast.fontStyle = FontStyle.Bold;
+            s_toast.color = new Color(0.55f, 1f, 0.65f, 1f);
+            s_toast.alignment = TextAnchor.MiddleCenter;
+            s_toast.horizontalOverflow = HorizontalWrapMode.Overflow;
+            s_toast.raycastTarget = false;
+            var trect = s_toast.rectTransform;
+            trect.anchorMin = trect.anchorMax = new Vector2(0.5f, 0f);
+            trect.pivot = new Vector2(0.5f, 0f);
+            trect.sizeDelta = new Vector2(700, 42);
+            trect.anchoredPosition = new Vector2(0f, 200f);
+            s_toast.enabled = false;
+        }
+
+        static UnityEngine.UI.Text s_toast;
+        float _toastUntil;
+
+        void OnBridgeSent(string type)
+        {
+            EnsureHint();
+            if (s_toast == null) return;
+            s_toast.text = type == Festa.Integration.BoothInteractBridge.AiAgentInteract
+                ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다"
+                : "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
+            s_toast.enabled = true;
+            _toastUntil = Time.unscaledTime + 2.5f;
+        }
+
+        void LateUpdate()
+        {
+            if (s_toast != null && s_toast.enabled && Time.unscaledTime > _toastUntil)
+                s_toast.enabled = false;
         }
 
         /// <summary>
