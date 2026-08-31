@@ -456,6 +456,9 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (009 FR-008 — 만료돼도 데이터는 보존된다).
 
+**예외는 방문자 조회 하나다** — `GET /booths/{boothId}/projects/published`는 게스트가 정상
+경로이고 토큰 없이 `200`이다. 편집·편집자 조회는 위 규칙 그대로다.
+
 > ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
 > `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
 > 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
@@ -516,8 +519,42 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
 
-> 방문자용 조회(published 게이트 + 좋아요 수)는 **S15P21A604-177**이다. 아직 없다.
+> 방문자용 조회는 이 endpoint가 아니라 아래 `GET /booths/{boothId}/projects/published`다.
 > `GET /projects/{projectId}`는 **신설하지 않았다** — 부스당 1개라 이 목록이 같은 값을 준다.
+
+### GET `/booths/{boothId}/projects/published`
+
+**방문자용** 조회 (009 FR-005). **토큰이 없어도 `200`이다** — 게스트가 정상 경로라 `403`이 없다.
+토큰이 있으면 `likedByMe` 판정에만 쓴다.
+
+> ⚠️ **토큰을 실었는데 만료·손상됐으면 `401`이다** — 헤더가 없을 때만 `200`이다. 이유와 FE 우회는
+> [계약 §6](../specs/009-project-exhibition/contracts/project-api.md)에 있다.
+
+편집자 경로와 URL을 나눈 것은 같은 URL에서 신원에 따라 200과 403이 갈리지 않게 하기
+위함이다. `/published` 접미사는 `GET /booths/{boothId}/layouts/published`(005) ·
+`GET /games/{gameId}/published`(019)와 같은 뜻이다.
+
+```json
+{ "projects": [ { "projectId": 1, "name": "SSAFY FESTA", "…": "…",
+                  "likeCount": 12, "likedByMe": false } ] }
+```
+
+편집자 응답의 8필드 + `likeCount`(int, 없으면 `0`) + `likedByMe`(boolean, 게스트는 `false`).
+**두 키는 항상 있다.** 좋아요 **토글**은 `S15P21A604-135`이고 아직 없다 — 그때까지 `likeCount`는
+항상 `0`이다.
+
+**게이트 순서가 계약이다.**
+
+| 순서 | 조건 | 응답 |
+|---|---|---|
+| 1 | 부스 없음 | `404 BOOTH_NOT_FOUND` |
+| 2 | 유효 임대 없음 | `409 BOOTH_LEASE_EXPIRED` (004 FR-019) |
+| 3 | 미게시 (`published_layout_version IS NULL`) | `404 LAYOUT_NOT_PUBLISHED` |
+| 4 | 통과·프로젝트 없음 | `200 { "projects": [] }` |
+
+**미게시는 404이고 빈 배열이 아니다** — "부스가 방문자에게 열려 있지 않다"와 "부스는 열렸고
+전시가 없다"는 다른 사실이라, 뭉치면 클라이언트가 구분할 수단을 잃는다. 게시 게이트는
+배치의 게시 여부이고, 프로젝트에 별도 게시 상태는 없다(016 홈페이지와 같은 술어).
 
 ### PATCH `/projects/{projectId}`
 
