@@ -57,6 +57,18 @@ alembic upgrade head
 - 한 응답 이상은 `existing=true`다.
 - Embedding Provider 호출과 Chunk 교체는 한 번만 수행된다.
 
+## 3-1. 원본 SHA-256 불일치 차단
+
+1. 처리 요청의 `sourceHash`와 다른 바이트를 같은 object key에 저장한다.
+2. Worker가 원본을 다운로드해 처리하도록 실행한다.
+
+기대 결과:
+
+- FastAPI가 다운로드한 바이트의 SHA-256을 다시 계산해 불일치를 감지한다.
+- Job은 재시도 없이 `DEAD`, `lastErrorCode=SOURCE_HASH_MISMATCH`로 종료된다.
+- Parser·Embedding Provider 호출과 Chunk 저장은 0건이다.
+- Spring callback은 `status=FAILED`, `failureCode=SOURCE_HASH_MISMATCH`이며 계약 enum 검증을 통과한다.
+
 ## 4. Worker 강제 종료 복구
 
 1. Job이 `RUNNING`이고 heartbeat가 기록된 것을 확인한다.

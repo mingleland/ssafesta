@@ -163,6 +163,7 @@ WHERE status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
 | `RUNNING` | heartbeat | `RUNNING` | `lease_expires_at = now + 90s` |
 | `RUNNING` | 성공 | `SUCCEEDED` | 청크 전체 교체와 같은 트랜잭션 |
 | `RUNNING` | 재시도 가능 오류 또는 lease 만료 | `RETRY_WAIT` | 1·5·15분 중 해당 backoff 설정 |
+| `RUNNING` | 원본 SHA-256 불일치 | `DEAD` | Chunk를 저장하지 않고 `SOURCE_HASH_MISMATCH` 실패 콜백 예약 |
 | `RUNNING` | 재시도 상한 초과 | `DEAD` | 정제된 실패 콜백 예약 |
 | 활성 상태 | 부스 임대 만료 또는 문서 비활성화 | `CANCELLED` | 생성 중 결과 폐기, 비활성화 콜백 예약 |
 

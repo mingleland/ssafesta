@@ -257,6 +257,7 @@ data: {"type":"error","requestId":"req_01JABC","conversationId":"conv_01JABCXYZ"
 ```text
 Document storageProvider 조회
 → R2 또는 MinIO Download (S3-compatible API)
+→ 다운로드 원본 SHA-256 재계산 및 sourceHash 대조
 → Parsing
 → Normalization
 → Chunking
@@ -264,6 +265,8 @@ Document storageProvider 조회
 → pgvector 저장
 → READY
 ```
+
+원본 SHA-256이 `sourceHash`와 다르면 재시도하지 않고 Job을 `DEAD`, `lastErrorCode=SOURCE_HASH_MISMATCH`로 종료한다. Parser·Embedding·Chunk 저장은 실행하지 않고 Spring에 `status=FAILED`, `failureCode=SOURCE_HASH_MISMATCH`를 callback한다.
 
 ---
 
@@ -298,6 +301,8 @@ Document storageProvider 조회
 | `SUCCEEDED` | 처리 성공 |
 | `DEAD` | 재시도 상한을 초과한 최종 실패 |
 | `CANCELLED` | 임대 만료 등 정책에 따른 취소 |
+
+`lastErrorCode`와 callback `failureCode`는 `PARSE_FAILED`, `UNSUPPORTED_SCAN_PDF`, `EMBEDDING_TIMEOUT`, `SOURCE_NOT_FOUND`, `SOURCE_HASH_MISMATCH`, `PROCESSING_INTERRUPTED`, `INTERNAL_ERROR` 중 하나다.
 
 이 endpoint는 내부 진단 전용이다. 사용자 문서 상태(`QUEUED/PROCESSING/READY/FAILED/DISABLED/EXPIRED`)는 Spring API에서 조회한다.
 
