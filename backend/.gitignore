@@ -1,6 +1,7 @@
 HELP.md
 .env
-.env.example
+# .env.example 은 추적한다 — 필요한 키 목록을 팀원에게 전달하는 유일한 경로다.
+# 값은 비워 두고 이름과 형식만 적는다.
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

@@ -174,6 +174,22 @@ def test_internal_tokens_reject_duplicates(
         _fresh_settings_module()
 
 
+def test_internal_tokens_reject_cross_direction_reuse(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "INTERNAL_SPRING_TO_AI_TOKENS": "shared-token",
+            "INTERNAL_AI_TO_SPRING_TOKENS": "shared-token",
+        },
+    )
+
+    with pytest.raises(ValidationError, match="must not share tokens"):
+        _fresh_settings_module()
+
+
 def test_blank_chunk_tuning_env_vars_resolve_to_none(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:

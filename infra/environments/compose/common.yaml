@@ -1,0 +1,22 @@
+name: festa-runtime-common
+
+x-runtime-labels: &runtime-labels
+  com.ssafy-festa.owner: infra-002
+  com.ssafy-festa.managed-by: compose
+
+x-runtime-healthcheck: &runtime-healthcheck
+  interval: 15s
+  timeout: 5s
+  retries: 5
+  start_period: 20s
+
+x-runtime-defaults:
+  labels: *runtime-labels
+  healthcheck: *runtime-healthcheck
+  restart: unless-stopped
+
+services: {}
+
+networks:
+  runtime-private:
+    internal: true

@@ -12,6 +12,7 @@ namespace Festa.Integration
         public static IBoothApiClient Booth { get; private set; }
         public static IUserApiClient User { get; private set; }
         public static IAiAgentClient Ai { get; private set; }
+        public static IGameResultClient Game { get; private set; }
         public static IAccessTokenProvider TokenProvider { get; private set; }
 
         public static bool IsMock { get; private set; }
@@ -37,6 +38,7 @@ namespace Festa.Integration
                 Booth = new MockBoothApiClient();
                 User = new MockUserApiClient();
                 Ai = new MockAiAgentClient();
+                Game = new MockGameResultClient();
             }
             else
             {
@@ -45,6 +47,10 @@ namespace Festa.Integration
                 // TODO: SseAiAgentClient — spec 008 SSE 계약 확정 후 구현
                 Ai = new MockAiAgentClient();
                 Debug.LogWarning("[ApiServices] Ai HTTP 구현 전 — Mock으로 대체 중");
+                // spec 003(wallet-coin) 지급 경로가 붙어야 실서버 구현이 의미를 갖는다.
+                // 그전까지 Mock 을 쓰되, 그 사실을 경고로 드러낸다 — 조용한 대체 금지 (T-24).
+                Game = new MockGameResultClient();
+                Debug.LogWarning("[ApiServices] Game HTTP 구현 전 — Mock으로 대체 중 (spec 014, FR-008 미성립)");
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");

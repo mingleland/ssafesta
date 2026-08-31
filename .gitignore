@@ -11,6 +11,7 @@ Reference/
 *.pem
 *.p12
 *.key
+infra/environments/**/secrets/
 
 # OS
 .DS_Store

@@ -158,9 +158,33 @@ namespace Festa.EditorTools
                 EditorUserBuildSettings.standaloneBuildSubtarget = prevSubtarget;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
                 PlayerSettings.WebGL.decompressionFallback = prevFallback;
-                if (EditorUserBuildSettings.activeBuildTarget != prevTarget)
-                    EditorUserBuildSettings.SwitchActiveBuildTarget(prevGroup, prevTarget);
-                Debug.Log($"[Release] 설정 복원 — 타깃={prevTarget}({prevSubtarget}), development={prevDev}, " +
+
+                // **"원래대로" 가 고장난 상태면 복원이 고장을 보존한다** (T-228).
+                //
+                // 데디케이티드 서버 타깃은 에디터에 `UNITY_SERVER` 를 정의한다. 그 상태에서는
+                //   · `CharacterLobbyController.Awake()` 가 곧장 main 으로 넘겨
+                //     **커스터마이징 화면을 아예 볼 수 없고**
+                //   · 거기서 WebGL 을 빌드하면 `Mobile_RPAsset` 이 통째로 빠진다 (T-219)
+                // T-219 는 이 복원 자체를 "방아쇠" 로 지목해 뒀는데, 복원 대상만 그대로 뒀다.
+                //
+                // 이 프로젝트의 클라이언트는 WebGL 이다. 쉬는 상태도 WebGL 이어야 한다.
+                bool restingOnServer =
+                    BuildPipeline.GetBuildTargetGroup(prevTarget) == BuildTargetGroup.Standalone &&
+                    prevSubtarget == StandaloneBuildSubtarget.Server;
+
+                var restoreTarget = restingOnServer ? BuildTarget.WebGL : prevTarget;
+                var restoreGroup = restingOnServer ? BuildTargetGroup.WebGL : prevGroup;
+
+                if (EditorUserBuildSettings.activeBuildTarget != restoreTarget)
+                    EditorUserBuildSettings.SwitchActiveBuildTarget(restoreGroup, restoreTarget);
+
+                if (restingOnServer)
+                    Debug.LogWarning(
+                        $"[Release] 빌드 전 타깃이 {prevTarget}(Server) 였지만 **WebGL 로 되돌린다** — " +
+                        "서버 타깃으로 두면 에디터에 UNITY_SERVER 가 정의돼 캐릭터 로비가 월드로 " +
+                        "넘어가고(T-228), 그 상태에서 WebGL 을 빌드하면 Mobile_RPAsset 이 빠진다(T-219).");
+
+                Debug.Log($"[Release] 설정 복원 — 타깃={restoreTarget}({prevSubtarget}), development={prevDev}, " +
                           $"WebGL 압축={prevCompression}/fallback={prevFallback}");
             }
         }
@@ -258,6 +282,31 @@ namespace Festa.EditorTools
             }
             Directory.CreateDirectory(WebOutDir);
 
+            // **BuildPlayer 에 타깃을 넘기는 것만으로는 늦다 — 먼저 전환해야 한다.**
+            //
+            // URP 빌드 전처리기는 **에디터의 현재 활성 타깃** 기준으로 품질 레벨을 걸러
+            // 빌드에 포함할 RP 에셋을 정한다. 이 프로젝트의 Mobile 품질 레벨은
+            // excludedTargetPlatforms 에 Standalone 이 들어 있어서, 활성 타깃이
+            // Standalone(=이 프로젝트의 평소 상태, Linux Server) 인 채로 WebGL 을 빌드하면
+            // Mobile 레벨이 통째로 제외되고 **Mobile_RPAsset 이 빌드에서 빠진다.**
+            //
+            // 그런데 WebGL 의 기본 품질 레벨은 0 = Mobile 이다. 즉 런타임이 쓸 파이프라인
+            // 에셋이 빌드에 없는 상태가 되고, 월드 머티리얼이 평평하게 렌더링된다
+            // (실측: 셰이더 6.7MB → 5.7MB, "2 URP assets" → "1 URP asset". S15P21A604-316).
+            //
+            // 에디터에서는 재현되지 않는다 — 빌드에서만 드러나는 함정이다.
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
+            {
+                Debug.Log("[Release] 활성 타깃을 WebGL 로 먼저 전환한다 " +
+                          "(URP 가 포함할 RP 에셋을 이 시점에 결정한다 — S15P21A604-316)");
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL))
+                {
+                    Debug.LogError("[Release] WebGL 타깃 전환 실패 — 여기서 멈춘다. " +
+                                   "그대로 빌드하면 Mobile_RPAsset 이 빠진 산출물이 나온다.");
+                    return false;
+                }
+            }
+
             PlayerSettings.WebGL.compressionFormat = WebCompression;
             PlayerSettings.WebGL.decompressionFallback = WebDecompressionFallback;
 
@@ -272,11 +321,36 @@ namespace Festa.EditorTools
 
             Debug.Log($"[Release] 2/3 WebGL 빌드 시작 → {WebOutDir} " +
                       $"(Development OFF, 압축 {WebCompression}, fallback {WebDecompressionFallback})");
-            if (!Succeeded("WebGL", BuildPipeline.BuildPlayer(options))) return false;
+            var report = BuildPipeline.BuildPlayer(options);
+            if (!Succeeded("WebGL", report)) return false;
+            if (!VerifyRenderPipelineAssetsPacked(report)) return false;
 
             // FE 는 해시 파일명을 알 수 없어 manifest.json 으로만 빌드 URL 을 찾는다.
             FestaWebBuilder.WriteManifest(WebOutDir);
             return true;
+        }
+
+        /// <summary>
+        /// WebGL 산출물에 **Mobile_RPAsset 이 실제로 들어갔는지** 확인한다.
+        ///
+        /// 이게 빠지면 빌드는 성공으로 끝나고 월드만 평평하게 렌더링된다 — 조용한 실패라
+        /// 원인 추적에 빌드를 여러 번 태웠다 (S15P21A604-316). 활성 타깃을 먼저 WebGL 로
+        /// 바꾸는 것으로 막았지만, 경로가 하나 더 생기면 또 조용히 재발할 수 있다.
+        /// **성공했다고 보고하기 전에 실제로 들어갔는지 본다** (T-24: 조용한 실패 금지).
+        /// </summary>
+        static bool VerifyRenderPipelineAssetsPacked(BuildReport report)
+        {
+            const string required = "Mobile_RPAsset";
+            foreach (var packed in report.packedAssets)
+                foreach (var info in packed.contents)
+                    if (info.sourceAssetPath != null && info.sourceAssetPath.Contains(required))
+                        return true;
+
+            Debug.LogError(
+                $"[Release] {required} 가 빌드 산출물에 없다 — 이대로 배포하면 월드가 평평하게 렌더링된다.\n" +
+                "WebGL 기본 품질 레벨은 0(Mobile) 이고 그 레벨의 렌더 파이프라인이 이 에셋이다.\n" +
+                "원인은 대개 빌드 시작 시점의 활성 타깃이 WebGL 이 아닌 것이다 (S15P21A604-316).");
+            return false;
         }
 
         static bool Succeeded(string what, BuildReport report)

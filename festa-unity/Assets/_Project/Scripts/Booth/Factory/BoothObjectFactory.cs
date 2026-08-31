@@ -78,6 +78,14 @@ namespace Festa.Booth
             // (Capsule 기본 높이 2 → 절반 = scale.y, Cube/Sphere 기본 높이 1 → 절반 = scale.y * 0.5)
             groundLift = primitive == PrimitiveType.Capsule ? scale.y : scale.y * 0.5f;
 
+            // 서버는 그리지 않는다 (S15P21A604-314). 여기서부터는 전부 시각 요소다 —
+            // 머티리얼·셰이더·폰트. 셰이더가 스트립된 서버 빌드에서는 만들 때마다
+            // "Trying to access a shader…" 경고가 부스 수만큼 반복돼 실제 로그를 덮는다.
+            //
+            // **콜라이더와 트랜스폼은 그대로 둔다.** CreatePrimitive 가 붙여준 콜라이더가
+            // 서버의 충돌 권위다 — 이걸 같이 걷어내면 벽 뚫림이 서버 쪽에서 재발한다.
+            if (Festa.Core.HeadlessRuntime.IsHeadless) return go;
+
             var renderer = go.GetComponent<Renderer>();
             if (renderer != null)
             {

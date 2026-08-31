@@ -81,13 +81,29 @@ namespace Festa.Diagnostics
             ushort port = (ushort)GetArgInt("-port", 7777);
             string name = GetArg("-botName", "bot");
 
+            long userId = Math.Abs(name.GetHashCode()) % 1000000;
+
+            // 입장 검증이 켜진 뒤로(S15P21A604-85) 고정 문자열 토큰은 거부된다.
+            // 서버에 "봇은 봐준다" 예외를 두면 그 예외가 곧 우회로가 되므로, 봇이 서버와 같은
+            // 키로 진짜 grant 를 서명한다 — 부하 테스트가 실제 승인 경로를 그대로 탄다.
+            // jti 는 매번 달라야 한다. 같은 값을 다시 쓰면 재사용 원장이 거부한다.
+            var jti = $"{name}-{Guid.NewGuid():N}";
+            if (!WorldEntryTokenSigner.TryIssue(jti, userId.ToString(), name, "sk_01",
+                                                out var token, out var failure))
+            {
+                Debug.LogError(
+                    $"[LoadTestBot] grant 를 발급하지 못해 접속하지 않는다 — {failure}. " +
+                    "서버와 같은 CONNECTION_TOKEN_SECRET(_FILE) 을 봇에도 주입하라.");
+                _requested = true;   // 재시도 폭주 방지
+                return;
+            }
+
             var payload = new ConnectionPayload
             {
-                userId = Math.Abs(name.GetHashCode()) % 1000000,
+                userId = userId,
                 nickname = name,
                 avatarCode = "sk_01",
-                // POC 승인 규칙은 "비어 있지 않으면 통과" 다 — 부하 테스트도 같은 경로를 탄다.
-                connectionToken = "loadtest",
+                connectionToken = token,
             };
             bool ok = _connection.StartClient(addr, port, payload);
             Debug.Log($"[LoadTestBot] {name} → ws://{addr}:{port} 접속 시도 = {ok}");

@@ -16,8 +16,11 @@ namespace Festa.Network
     [RequireComponent(typeof(NetworkManager))]
     public class ConnectionManager : MonoBehaviour
     {
-        public const string ReasonInvalidToken = "INVALID_TOKEN";
-        public const string ReasonServerFull = "SERVER_FULL";
+        public const string ReasonInvalidToken = WorldDisconnectReason.InvalidToken;
+        public const string ReasonServerFull = WorldDisconnectReason.ServerFull;
+
+        /// <summary>같은 계정이 새로 접속해 밀려났을 때. 클라이언트가 "다른 곳에서 접속했다"고 안내한다.</summary>
+        public const string ReasonReplacedBySameUser = WorldDisconnectReason.ReplacedBySameUser;
 
         NetworkBootstrap _bootstrap;
 
@@ -141,21 +144,44 @@ namespace Festa.Network
             }
             catch { /* malformed payload → deny below */ }
 
-            if (payload == null || !ValidateToken(payload))
+            // payload 가 null 이면 단락 평가로 ValidateToken 이 호출되지 않으므로 사유를 미리 둔다.
+            var grant = default(WorldEntryToken);
+            var why = "payload 파싱 실패";
+            if (payload == null || !ValidateToken(payload, out grant, out why))
             {
+                // 사유는 서버 로그에만 남긴다. 클라이언트에게 세분해서 알려주면 위조를 돕는다.
+                Debug.LogWarning($"[Connection] 입장 거부 — {why}");
                 Deny(response, ReasonInvalidToken);
                 return;
             }
 
-            Approve(response, request.ClientNetworkId, payload);
+            // **신원은 토큰 클레임이 정본이다** (헌법 16조). 클라이언트가 보낸 userId·nickname·
+            // avatarCode 는 쓰지 않는다 — 그건 접속자가 마음대로 적어 보낼 수 있는 값이다.
+            Approve(response, request.ClientNetworkId, grant.ToPayload(payload.connectionToken));
+
+            // 같은 신원의 이전 접속이 남아 있으면 끊는다 — 한 사람이 둘로 스폰되면 안 된다
+            // (docs/12 §9). 나중 접속이 이긴다: 반대로 하면 클라이언트가 죽은 뒤 전송 타임아웃
+            // 전까지 본인이 자기 계정에 못 들어온다 (S15P21A604-231).
+            if (WorldSessionRegistry.TryRegister(grant.Subject, request.ClientNetworkId, out var stale))
+            {
+                Debug.LogWarning($"[ConnectionManager] 같은 신원의 이전 접속을 끊는다 " +
+                                 $"sub={grant.Subject} stale={stale} → new={request.ClientNetworkId}");
+                NetworkManager.Singleton.DisconnectClient(stale, ReasonReplacedBySameUser);
+            }
         }
 
         /// <summary>
-        /// POC: 비어있지 않으면 통과.
-        /// TODO(P0 후속): Spring 내부 API 또는 서명 검증으로 교체 (doc 12 §7).
+        /// 월드 입장 grant 를 Spring 을 부르지 않고 자체 검증한다 (헌법 14조, spec 002 FR-013·014).
+        /// 서명·iss·aud·exp·worldId·channelId 를 보고, 마지막으로 jti 를 원장에서 소비한다.
         /// </summary>
-        static bool ValidateToken(ConnectionPayload payload) =>
-            !string.IsNullOrEmpty(payload.connectionToken);
+        static bool ValidateToken(ConnectionPayload payload, out WorldEntryToken grant, out string reason)
+        {
+            if (!WorldEntryTokenVerifier.Verify(payload.connectionToken, out grant, out reason))
+                return false;
+
+            // 서명이 맞아도 이미 쓴 grant 면 거부한다. 원장 기록에 실패해도 거부한다(fail-closed).
+            return GrantReplayLedger.TryConsume(grant.Jti, grant.ExpiresAtUnix, out reason);
+        }
 
         static void Approve(NetworkManager.ConnectionApprovalResponse response,
                             ulong clientId, ConnectionPayload payload)
@@ -239,11 +265,22 @@ namespace Festa.Network
 
         void OnConnectionEvent(NetworkManager nm, ConnectionEventData data)
         {
+            // 클라이언트 쪽: 끊긴 게 나 자신이면 사유를 드러낸다 (S15P21A604-231).
+            // 서버가 REASON 을 실어 보내는데 읽는 곳이 없어 사용자 눈에는 이유 없이 튕겼다.
+            if (data.EventType == ConnectionEvent.ClientDisconnected && !nm.IsServer &&
+                data.ClientId == nm.LocalClientId)
+            {
+                WorldDisconnectReporter.ReportLocalDisconnect(nm.DisconnectReason);
+                return;
+            }
+
             if (data.EventType == ConnectionEvent.ClientDisconnected && nm.IsServer)
             {
                 SessionDataStore.Remove(data.ClientId);
                 SpawnSlots.Remove(data.ClientId); // 반납 — 다음 접속이 같은 자리를 다시 쓴다
-                Debug.Log($"[ConnectionManager] Client {data.ClientId} disconnected, session cleaned");
+                WorldSessionRegistry.Remove(data.ClientId);
+                Debug.Log($"[ConnectionManager] Client {data.ClientId} disconnected, session cleaned " +
+                          $"(남은 접속 {WorldSessionRegistry.Count})");
             }
         }
     }

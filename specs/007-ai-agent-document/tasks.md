@@ -53,16 +53,16 @@
 - [ ] T084 [P] [INFRA] 환경별 Business/AI database·login role·CONNECT matrix와 AI DB 전용 vector extension을 Infra PostgreSQL 계약대로 구성하고 검증 증거를 남긴다
 - [ ] T010 [P] [AI] heartbeat·lease·backoff·용량·청킹·1536차원과 방향별 Service Token 콤마 목록(비어 있지 않은 고유 값 1~2개) 설정 및 부팅 검증을 `festa-ai/app/core/config.py`에 구현한다
 - [ ] T011 [P] [AI] 구조화 로그의 공통 식별자와 Authorization·object key·문서 원문·Provider 오류 마스킹을 `festa-ai/app/core/logging.py`에 구현한다
-- [ ] T012 [P] [AI] 환경별 AI DB 전용 async SQLAlchemy engine과 migration/runtime role 연결을 `festa-ai/app/db/session.py`에 구현하고 Business DB URL·credential은 설정에 두지 않는다
+- [X] T012 [P] [AI] 환경별 AI DB 전용 async SQLAlchemy engine과 migration/runtime role 연결을 `festa-ai/app/db/session.py`에 구현하고 Business DB URL·credential은 설정에 두지 않는다 (`S15P21A604-121`)
 - [ ] T013 [AI] `JobStatus`, callback 필드와 Spring 검증 snapshot(`document_id·booth_id·agent_id·original_filename·content_type·file_size_bytes·source_hash·storage_provider·storage_bucket·object_key`)을 포함한 `document_jobs` 모델 및 상태별 제약을 `festa-ai/app/db/models/document_job.py`에 구현한다
 - [ ] T014 [AI] AI DB에 `document_jobs`·`document_chunks(searchable 기본 false)` 테이블, 활성 Job 부분 유니크 인덱스와 pickup·lease·callback·`booth_id + agent_id + searchable` 인덱스를 `festa-ai/migrations/versions/001_create_document_pipeline.py`에 구현한다. Business DB FK와 `ON DELETE CASCADE`는 만들지 않는다
-- [ ] T015 [P] [AI] Spring이 전달한 처리 snapshot의 필수 필드·형식·크기·scope·SHA-256·저장소 식별자를 검증하고 Job 생성 입력으로 변환하는 validator를 `festa-ai/app/services/document_snapshot_validator.py`에 구현한다. Business DB repository는 만들지 않는다
-- [ ] T016 [P] [AI] Job 생성·상태 전이·조건부 heartbeat와 `callback_delivered_at`·`callback_terminated_at`·`callback_terminal_code` 전달/종료 상태 repository를 `festa-ai/app/repositories/document_job_repository.py`에 구현한다
+- [X] T015 [P] [AI] Spring이 전달한 처리 snapshot의 필수 필드·형식·크기·scope·SHA-256·저장소 식별자를 검증하고 Job 생성 입력으로 변환하는 validator를 `festa-ai/app/services/document_snapshot_validator.py`에 구현한다. Business DB repository는 만들지 않는다 (`S15P21A604-121`)
+- [ ] T016 [P] [AI] Job 생성·상태 전이·조건부 heartbeat와 `callback_delivered_at`·`callback_terminated_at`·`callback_terminal_code` 전달/종료 상태 repository를 `festa-ai/app/repositories/document_job_repository.py`에 구현한다 (`S15P21A604-121`: 활성 Job 조회·snapshot 비교·`QUEUED` 생성 완료, 나머지 상태 전이·callback 상태는 후속)
 - [ ] T017 [P] [AI] `booth_id + agent_id + searchable = true` 필터를 강제하고 검색 불가 상태의 청크 전체 교체·callback 승인 후 활성화를 지원하는 repository를 `festa-ai/app/repositories/chunk_repository.py`에 구현한다
 - [ ] T018 [P] [AI] 문서별 Provider로 R2·MinIO adapter를 선택할 수 있는 object storage protocol과 PDF parser·Embedding Provider protocol을 `festa-ai/app/providers/storage.py`, `festa-ai/app/providers/document_parser.py`, `festa-ai/app/providers/embedding.py`에 정의한다
 - [X] T018a [P] [AI] LLM Provider protocol과 결정적 LLM·Embedding Mock Provider를 `festa-ai/app/providers/llm.py` 및 `festa-ai/app/providers/mock.py`에 구현한다 (`S15P21A604-94`)
-- [ ] T019 [P] [AI] 모든 Spring→FastAPI 내부 요청에서 `INTERNAL_SPRING_TO_AI_TOKENS` 전체를 `secrets.compare_digest`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하도록 `festa-ai/app/api/dependencies/internal_auth.py` 및 `festa-ai/app/api/errors.py`에 구현한다
-- [ ] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다
+- [X] T019 [P] [AI] 모든 Spring→FastAPI 내부 요청에서 `INTERNAL_SPRING_TO_AI_TOKENS` 전체를 `secrets.compare_digest`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하도록 `festa-ai/app/api/dependencies/internal_auth.py` 및 `festa-ai/app/api/errors.py`에 구현한다 (`S15P21A604-121`)
+- [X] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다 — **`S15P21A604-327`(spec 008 booth-access)에서 완료.** 체인이 `/internal/**` 전체를 먼저 소비하고 규칙 없는 경로는 `denyAll`이므로, **T078은 별도 체인을 만들지 말고 이 체인에 `INTERNAL_INFRA_TO_SPRING_TOKENS` 필터와 `/internal/storage/**` 규칙을 더한다** (낮은 우선순위 체인은 요청이 도달하지 않는다)
 - [ ] T021 [P] [AI] 안정적인 실패 코드와 사용자용 한국어 사유 매핑을 `festa-ai/app/services/failure_policy.py`에 구현한다
 
 **Checkpoint**: FastAPI가 AI DB 전용 설정으로 기동하고, Business/AI database CONNECT matrix와 최소 권한을 지키며 테스트 DB를 사용할 수 있다.
@@ -77,15 +77,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] [BE] Agent 생성·조회·수정과 타 부스 접근 거부 통합 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiAgentApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+- [ ] T022 [P] [US1] [BE] Agent 생성·조회·수정·**삭제**, 부스당 1명 거부, **참조 있는 삭제 거부**, 같은 부스 스태프 성공 경로, 타 부스 접근 거부 통합 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiAgentApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (C-14·C-15, 2026-08-30 확대)
 - [ ] T023 [P] [US1] [FE] Agent 편집 폼의 생성·수정·오류 표시 컴포넌트 테스트를 `festa-frontend/src/features/ai-agent/components/AiAgentEditor.test.tsx`에 먼저 작성하고 실패를 확인한다
 
 ### Implementation for User Story 1
 
 - [ ] T024 [P] [US1] [BE] `ai_agents` 상태와 이름·역할·말투·지시문 매핑 entity를 `backend/src/main/java/com/example/ssafesta/ai/AiAgent.java`에 구현한다
 - [ ] T025 [P] [US1] [BE] Agent 영속 조회와 booth 범위 쿼리를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentRepository.java`에 구현한다
-- [ ] T026 [US1] [BE] Booth 소유권을 검증하는 Agent 생성·조회·수정 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다
-- [ ] T027 [US1] [BE] Agent 생성·조회·수정 REST API와 요청·응답 DTO를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentController.java`에 구현한다
+- [ ] T026 [US1] [BE] `BoothEditorGuard`(소유자·스태프, C-15)로 권한을 검증하는 Agent 생성·조회·수정·**삭제** 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다. 삭제는 참조 3종 사전검사 + FK 번역 + booth 잠금 (C-14)
+- [ ] T027 [US1] [BE] Agent 생성·조회·수정·**삭제**(`DELETE /agents/{agentId}` → 204) REST API와 요청·응답 DTO를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentController.java`에 구현한다
+- [ ] T027a [US1] [BE] `V15__agent_one_per_booth.sql`(유니크 인덱스)과 `AiAgentProperties`(perBoothLimit==1·documentCountLimit>0·documentTotalBytes>0 부팅 검증), `ErrorCode` 3종(`AGENT_NOT_FOUND`·`AGENT_LIMIT_EXCEEDED`·`AGENT_DELETE_CONFLICT`)을 구현한다 (C-13, 2026-08-30 추가)
+- [ ] T027b [US1] [BE] booth 패키지에 `agentReferencedInLayouts`(Draft + `published_layout_version` 포인터 기준 현재 Published) 헬퍼와 `BoothRepository.findWithLockById`를 추가하고, `BoothLayoutService` publish가 검증 전에 같은 잠금을 잡도록 한다 (불변식 A-3, 2026-08-30 추가)
+- [ ] T027c [P] [US1] [BE] 동시 생성 1건만 성공, **Publish↔삭제 잠금 순서 2종 latch 재현**을 `backend/src/test/java/com/example/ssafesta/ai/AiAgentConcurrencyIntegrationTest.java`에, Properties 부팅 검증·바인딩을 `AiAgentPropertiesTest`에, FK 번역을 `AiAgentDeleteTranslationTest`에 구현한다 (2026-08-30 추가)
 - [ ] T028 [P] [US1] [FE] Spring Agent API client와 DTO를 `festa-frontend/src/features/ai-agent/api/aiAgentApi.ts`에 구현한다
 - [ ] T029 [US1] [FE] Agent 생성·수정 폼과 저장 후 재조회 흐름을 `festa-frontend/src/features/ai-agent/components/AiAgentEditor.tsx`에 구현한다
 
@@ -103,8 +106,8 @@
 
 - [ ] T030 [P] [US2] [BE] PDF 20MB·Agent 10개/100MB·SHA-256 중복·명시적 교체, 15분 URL·1시간 `EXPIRED`·24시간 복구 유예, 활성 쓰기 Provider 기록과 Provider 변경 중 재개 시 기존 문서 `EXPIRED`·새 문서 생성 흐름을 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentUploadIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [ ] T031 [P] [US2] [BE] AI→Spring 방향 Service Token의 정상 승인과 누락·오류·반대 방향 401, `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH` 404 분리와 mismatch 경고, 중복 `jobId + status` 멱등 성공과 stale `sourceHash` 409 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentStatusCallbackIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
-- [ ] T032 [P] [US2] [AI] 세 OpenAPI 요청·응답 스키마를 `festa-ai/tests/contract/test_document_processing_api.py`, `festa-ai/tests/contract/test_spring_status_api.py`, `festa-ai/tests/contract/test_spring_storage_reconciliation_api.py`에서 검증한다. 처리 snapshot 필수 필드, cleanup 반복 204, callback 404 원인 코드와 방향별 Service Token 401, reconcile metadata를 먼저 검증하고 실패를 확인한다
-- [ ] T033 [P] [US2] [AI/INFRA] 활성 Job 멱등성·`SKIP LOCKED` 단일 소유·상태 전이와 4개 runtime role × 4개 database CONNECT matrix의 대각선만 성공하는 권한 테스트를 `festa-ai/tests/integration/test_document_job_repository.py` 및 Infra contract test에 먼저 작성하고 실패를 확인한다
+- [ ] T032 [P] [US2] [AI] 세 OpenAPI 요청·응답 스키마를 `festa-ai/tests/contract/test_document_processing_api.py`, `festa-ai/tests/contract/test_spring_status_api.py`, `festa-ai/tests/contract/test_spring_storage_reconciliation_api.py`에서 검증한다. 처리 snapshot 필수 필드, cleanup 반복 204, callback 404 원인 코드와 방향별 Service Token 401, reconcile metadata를 먼저 검증하고 실패를 확인한다 (`S15P21A604-121`: document-processing 접수 계약 자동 비교 완료, 나머지 두 계약은 후속)
+- [ ] T033 [P] [US2] [AI/INFRA] 활성 Job 멱등성·`SKIP LOCKED` 단일 소유·상태 전이와 4개 runtime role × 4개 database CONNECT matrix의 대각선만 성공하는 권한 테스트를 `festa-ai/tests/integration/test_document_job_repository.py` 및 Infra contract test에 먼저 작성하고 실패를 확인한다 (`S15P21A604-121`: 실제 HTTP→PostgreSQL 활성 Job 멱등·동시성 E2E 완료, `SKIP LOCKED`·상태 전이·CONNECT matrix는 후속)
 - [ ] T034 [P] [US2] [AI] Worker 강제 종료·lease 회수·1/5/15분 backoff·최대 3회 재시도 테스트를 `festa-ai/tests/integration/test_job_recovery.py`에 먼저 작성하고 실패를 확인한다
 - [ ] T035 [P] [US2] [AI] AI DB 안의 검색 불가 Chunk 전체 교체+Job `SUCCEEDED` 원자성·청크 감소·중간 실패 rollback과 READY callback 204 이후에만 `searchable=true`가 되는 테스트를 `festa-ai/tests/integration/test_chunk_replacement.py`에 먼저 작성하고 실패를 확인한다
 - [ ] T036 [P] [US2] [AI] 부스/Agent 위조와 교차 검색 누출 0건 Critical Test를 `festa-ai/tests/integration/test_vector_isolation.py`에 먼저 작성하고 실패를 확인한다
@@ -124,7 +127,7 @@
 - [X] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
 - [ ] T048 [P] [US2] [AI] `S15P21A604-92`의 실측값을 초기 배포 설정에 반영하고 설정 기반 chunk size·overlap과 page/section 추적을 `festa-ai/app/services/text_chunker.py`에 구현한다
 - [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata·SHA-256을 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드하며, 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하는 파이프라인을 `festa-ai/app/services/document_processing_service.py`에 구현한다
-- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다
+- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속)
 - [ ] T051 [US2] [AI] `FOR UPDATE SKIP LOCKED` pickup과 30초 heartbeat 및 소유권 상실 시 결과 폐기를 `festa-ai/app/workers/document_worker.py`에 구현한다
 - [ ] T052 [US2] [AI] 기동 즉시 및 60초 주기의 만료 Job 회수와 재시도 상한 처리를 `festa-ai/app/services/job_recovery_service.py`에 구현한다
 - [ ] T053 [P] [US2] [AI] `INTERNAL_AI_TO_SPRING_TOKENS` 첫 값을 Bearer로 부착하는 `PROCESSING/READY/FAILED/DISABLED` callback client와 401·409 및 404 원인 코드 처리·사용자 오류 정제, READY 204 이후 해당 Job Chunk의 `searchable=true` 전환을 `festa-ai/app/services/spring_status_callback.py`에 구현한다

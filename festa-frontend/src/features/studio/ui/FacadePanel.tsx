@@ -19,6 +19,14 @@ function isValidLogoUrl(text: string): boolean {
   return text === '' || (HTTPS_URL.test(text) && text.length <= 2048);
 }
 
+// 봉투의 errors[]는 field로 위반 지점을 가리킨다(docs/08 §1.3-1, contracts/layout-api.md §6).
+// message 하나를 폼 하단에 통째로 내면 4필드 중 무엇을 고쳐야 하는지 알 수 없다 — field를 읽어
+// 해당 입력 옆으로 내린다. errors는 서버도 이 파일의 fallback도 항상 배열이라 빈 배열만 확인하면 된다.
+function fieldMessage(error: unknown, field: string): string | null {
+  if (!isApiError(error)) return null;
+  return error.errors.find((detail) => detail.field === field)?.message ?? null;
+}
+
 interface Props {
   boothId: number;
 }
@@ -69,6 +77,15 @@ export function FacadePanel({ boothId }: Props) {
   const signTextValid = (form.signText ?? '').length <= 60;
   const canSave = colorValid && logoValid && signTextValid && !facadeMutation.isPending;
 
+  const themeCodeError = fieldMessage(saveError, 'themeCode');
+  const primaryColorError = fieldMessage(saveError, 'primaryColor');
+  const signTextError = fieldMessage(saveError, 'signText');
+  const logoUrlError = fieldMessage(saveError, 'logoUrl');
+  // field가 하나도 안 잡히는 오류(봉투 레벨, 또는 아직 폼에 없는 필드)는 잃으면 안 되므로
+  // 아래 전체 message는 남기고, 필드로 이미 표시된 경우에만 중복을 막는다.
+  const shownAsFieldError = themeCodeError !== null || primaryColorError !== null
+    || signTextError !== null || logoUrlError !== null;
+
   return (
     <div>
       <h3>외부 표현</h3>
@@ -83,6 +100,7 @@ export function FacadePanel({ boothId }: Props) {
           ))}
         </select>
       </label>
+      {themeCodeError !== null && <p role="alert">{themeCodeError}</p>}
 
       {/* 자유 입력을 두지 않는다 — 팔레트 밖 hex는 서버가 400으로 거부하므로(계약 §6, PR #71)
           스와치가 12색만 내면 그 경로가 애초에 닫힌다. 색 없음은 별도 라디오. */}
@@ -116,6 +134,7 @@ export function FacadePanel({ boothId }: Props) {
           저장할 수 있습니다.
         </p>
       )}
+      {primaryColorError !== null && <p role="alert">{primaryColorError}</p>}
 
       <label>
         간판 문구
@@ -126,6 +145,7 @@ export function FacadePanel({ boothId }: Props) {
           onChange={(e) => setForm({ ...form, signText: e.target.value.trim() === '' ? null : e.target.value })}
         />
       </label>
+      {signTextError !== null && <p role="alert">{signTextError}</p>}
 
       <label>
         로고 URL
@@ -137,9 +157,10 @@ export function FacadePanel({ boothId }: Props) {
         />
       </label>
       {!logoValid && <p>로고 URL은 https:// 형식 2048자 이하여야 합니다.</p>}
+      {logoUrlError !== null && <p role="alert">{logoUrlError}</p>}
 
       {leaseExpiredOnSave && <p>임대가 만료되어 이 부스의 외부 표현을 편집할 수 없습니다.</p>}
-      {isApiError(saveError) && !leaseExpiredOnSave && <p>{saveError.message}</p>}
+      {isApiError(saveError) && !leaseExpiredOnSave && !shownAsFieldError && <p>{saveError.message}</p>}
 
       <button type="button" onClick={() => facadeMutation.mutate(form)} disabled={!canSave}>
         저장

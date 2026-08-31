@@ -1,13 +1,10 @@
 package com.example.ssafesta.booth;
 
-import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
-import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.common.HttpUrlValidator;
+import com.example.ssafesta.common.PresenceField;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Instant;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,9 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class BoothHomepageService {
-
-    /** The V1 column width, and the same ceiling the facade logo uses. */
-    private static final int MAX_URL = 2048;
 
     private final BoothEditorGuard editorGuard;
     private final BoothLeaseRepository leases;
@@ -50,71 +44,30 @@ public class BoothHomepageService {
     }
 
     /**
-     * Rules in the order of data-model §3, rejecting on the first violation with <b>its own</b>
-     * sentence — the owner has to be able to tell which rule they broke (T-24: failures are not
-     * quietly flattened).
+     * <b>Presence before value.</b> A missing key and an explicit {@code null} are not the same
+     * request. Only the explicit one clears the URL; {@code {}} is refused. Treating them alike
+     * would let one serialisation slip on the client silently delete a registered page — which is
+     * why the command is not a {@code record} (data-model §3 #0, §5).
      *
-     * <p>Two orderings here are load-bearing:
-     *
-     * <ul>
-     *   <li><b>Presence before null.</b> A missing key and an explicit {@code null} are not the
-     *       same request. Only the explicit one clears the URL; {@code {}} is refused. Treating them
-     *       alike would let one serialisation slip on the client silently delete a registered page —
-     *       which is why the command is not a {@code record} (data-model §3 #0, §5).
-     *   <li><b>Scheme before host.</b> {@code javascript:alert(1)} and {@code data:text/html,…} have
-     *       no host, so checking the host first ends the story with "malformed address" and the
-     *       actual reason — a forbidden scheme — never reaches the user. Both orders block the same
-     *       inputs; only the explanation differs.
-     * </ul>
+     * <p>That distinction is the only thing left here. Everything about the <i>value</i> — length,
+     * parse, scheme-before-host, byte-for-byte round trip — moved to
+     * {@link HttpUrlValidator#validate}, which spec 009 shares across five more URL fields.
      */
     private String validated(HomepageCommand command) {
-        if (command == null || !command.present) {
+        if (command == null || !command.homepageUrl.isPresent()) {
             throw reject("homepageUrl 필드가 필요합니다.");
         }
-        String url = command.homepageUrl;
-        if (url == null) {
-            return null; // 등록 해제 (§5)
-        }
-        if (url.isBlank()) {
-            throw reject("홈페이지 주소를 입력해 주세요.");
-        }
-        if (url.length() > MAX_URL) {
-            throw reject("홈페이지 주소가 너무 깁니다. (최대 " + MAX_URL + "자)");
-        }
-        URI uri;
-        try {
-            uri = new URI(url);
-        } catch (URISyntaxException e) {
-            throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
-        }
-        if (!uri.isAbsolute()) { // URI.isAbsolute() 가 곧 scheme != null 이다
-            throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
-        }
-        if (!isAllowedScheme(uri.getScheme())) {
-            throw reject("홈페이지 주소는 http 또는 https로 시작해야 합니다.");
-        }
-        if (uri.getHost() == null) {
-            throw reject("홈페이지 주소 형식이 올바르지 않습니다.");
-        }
-        return url; // 원문 그대로 — trim·정규화 없음 (data-model §2 왕복 무손실)
-    }
-
-    /**
-     * {@code http} is allowed on purpose, unlike the facade logo.
-     *
-     * <p>A logo is embedded in our own page, so an {@code http} one dies silently as mixed content.
-     * A homepage is a destination: when the iframe is refused the overlay opens a new tab instead
-     * (US3), and that works over {@code http}. FR-002 lists both schemes; the mixed-content warning
-     * is the React layer's (research R-04).
-     */
-    private static boolean isAllowedScheme(String scheme) {
-        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        // 값의 형식 판정은 HttpUrlValidator 가 소유한다 (spec 009 가 URL 필드 5 개를 들고 오면서
+        // 같은 6 단계가 6 벌이 될 상황이었다). 여기 남은 것은 presence — {} 와 {"homepageUrl":null}
+        // 의 구분이고, 그것만은 endpoint 마다 뜻이 달라 옮길 수 없다.
+        //
+        // 문구는 바이트 단위로 이전과 같다. displayName "홈페이지" 가 기존 네 문장을 그대로 만든다.
+        return HttpUrlValidator.validate(command.homepageUrl.value(), "homepageUrl", "홈페이지");
     }
 
     /** One field broke its constraint, so the rule stays {@code FIELD_INVALID} (#58 §3). */
     private ApiException reject(String message) {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, message,
-                List.of(ApiErrorDetail.field("homepageUrl", message)), null);
+        return ApiException.fieldInvalid("homepageUrl", message);
     }
 
     /**
@@ -128,13 +81,11 @@ public class BoothHomepageService {
      */
     public static final class HomepageCommand {
 
-        private String homepageUrl;
-        private boolean present;
+        private final PresenceField<String> homepageUrl = new PresenceField<>();
 
         @JsonProperty("homepageUrl")
-        void setHomepageUrl(String homepageUrl) {
-            this.homepageUrl = homepageUrl;
-            this.present = true;
+        void setHomepageUrl(String value) {
+            homepageUrl.set(value);
         }
     }
 

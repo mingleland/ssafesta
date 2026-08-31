@@ -4,9 +4,9 @@ using UnityEngine;
 
 namespace Festa.Content
 {
-    /// <summary>LAPTOP 클릭을 Unity→React 부스 상호작용 이벤트로 변환한다.</summary>
+    /// <summary>LAPTOP 상호작용(F 키)을 Unity→React 부스 이벤트로 변환한다.</summary>
     [RequireComponent(typeof(BoothRuntimeObject))]
-    public sealed class LaptopInteractable : MonoBehaviour
+    public sealed class LaptopInteractable : MonoBehaviour, IBoothInteractable
     {
         BoothRuntimeObject _runtimeObject;
 
@@ -23,7 +23,15 @@ namespace Festa.Content
             BoothInteractionInput.Ensure();
         }
 
-        public void Interact(string url = null)
+        /// <summary>
+        /// 등록 여부와 **무관하게** 트리거만 발생시킨다 (FR-005). 주소가 미등록이면 FE 가
+        /// 안내를 띄운다 (FR-009) — 홈페이지 주소는 `booths.homepage_url` 에 있고 Layout 에는
+        /// 없어서 **Unity 는 그 값을 알 수 없다**(헌법 25조, `homepage-api.md` §4 "Unity 변경 0").
+        ///
+        /// 그래서 여기서 "주소가 있나" 를 확인하지 않는다. 확인하려면 Unity 가 부스를 조회해야
+        /// 하는데, 그건 표시 책임을 웹 레이어에 두기로 한 결정과 어긋난다.
+        /// </summary>
+        public void Interact()
         {
             if (_runtimeObject == null)
             {
@@ -31,10 +39,7 @@ namespace Festa.Content
                 return;
             }
 
-            BoothInteractBridge.SendLaptopInteract(
-                _runtimeObject.BoothId,
-                _runtimeObject.ObjectId,
-                url);
+            BoothInteractBridge.SendLaptopInteract(_runtimeObject.BoothId, _runtimeObject.ObjectId);
         }
     }
 }

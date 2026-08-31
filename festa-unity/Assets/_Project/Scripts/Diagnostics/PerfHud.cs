@@ -27,6 +27,9 @@ namespace Festa.Diagnostics
         // 한 빌드 안에서 조건을 바꿀 수 있어야 한다 — 빌드를 두 번 떠서 비교하면
         // 빌드 간 차이가 섞여 조건 통제가 무너진다 (T-211).
         [SerializeField] KeyCode _avatarLodKey = KeyCode.F9;
+        // 스킨메시 병합 A/B 키 (S15P21A604-258). 예전 F10 셰이더 판별 실험은 역할이 끝나
+        // 제거됐으므로 그 자리를 쓴다.
+        [SerializeField] KeyCode _meshMergeKey = KeyCode.F10;
         [SerializeField] bool _visibleOnStart = true;
         [Tooltip("프레임 통계를 집계하는 창 길이(초). 짧으면 튀고 길면 둔해진다.")]
         [SerializeField] float _window = 1.0f;
@@ -60,8 +63,11 @@ namespace Festa.Diagnostics
         ProfilerRecorder _drawCalls, _setPass, _batches, _tris, _sysMemory;
         const string FmtNet = "송신 {0,7:F1} KB/s   수신 {1,7:F1} KB/s";
         static readonly StringBuilder Sb = new StringBuilder(512);
+        // IMGUI 전용 자원. OnGUI 와 함께 서버 빌드에서 빠진다 (S15P21A604-314).
+#if UNITY_EDITOR || !UNITY_SERVER
         static Texture2D _bg;
         static GUIStyle _style;
+#endif
 
         /// <summary>
         /// 개발 도구는 **개발 빌드·에디터에서만** 살아 있어야 한다.
@@ -98,6 +104,14 @@ namespace Festa.Diagnostics
             {
                 Festa.World.AvatarAnimationLod.Enabled = !Festa.World.AvatarAnimationLod.Enabled;
                 ResetStats();   // 조건이 바뀌었으니 이전 창의 표본을 섞지 않는다
+            }
+            if (Input.GetKeyDown(_meshMergeKey))
+            {
+                // 스킨메시 병합 A/B (S15P21A604-258). **끄고 켠 뒤 아바타를 다시 조립해야**
+                // 반영된다 — 병합은 조립 시점에 일어난다. 로비에서 옷을 갈아입으면 된다.
+                // 그게 2026-08-26 에 몸이 사라졌던 바로 그 조작이다.
+                Festa.Avatar.AvatarMeshMerge.Enabled = !Festa.Avatar.AvatarMeshMerge.Enabled;
+                ResetStats();
             }
 
             float ms = Time.unscaledDeltaTime * 1000f;
@@ -169,6 +183,11 @@ namespace Festa.Diagnostics
             _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f;
         }
 
+        // 서버 빌드는 IMGUI 모듈이 스트립돼, 이 메서드가 **존재하기만 해도** 유니티가
+        // "OnGUI function detected on MonoBehaviour, but not called" 경고를 띄운다
+        // (S15P21A604-314). 내부 가드로는 못 막으므로 서버 빌드에서 컴파일 제외한다.
+        // UNITY_EDITOR 를 함께 두는 이유는 DevConnectionHud 쪽 주석 참조 (T-182).
+#if UNITY_EDITOR || !UNITY_SERVER
         void OnGUI()
         {
             if (!_visible) return;
@@ -176,11 +195,12 @@ namespace Festa.Diagnostics
 
             var nm = NetworkManager.Singleton;
             Sb.Clear();
-            Sb.Append("── PERF (F3 토글 / F4 리셋 / F9 아바타LOD) ──\n");
+            Sb.Append("── PERF (F3 토글 / F4 리셋 / F9 LOD / F10 병합) ──\n");
             // 조건을 화면에 박아 둔다 — 스크린샷만 보고도 어느 조건의 수치인지 알 수 있어야
             // A/B 표본을 섞지 않는다 (T-211).
             Sb.AppendFormat("아바타 거리 LOD: {0}\n",
                 Festa.World.AvatarAnimationLod.Enabled ? "ON" : "OFF");
+            Sb.Append(Festa.Avatar.AvatarMeshMerge.StateLabel).Append('\n');
             Sb.AppendFormat("FPS {0,6:F1}   평균 {1,5:F1} ms   최악 {2,5:F1} ms\n", _fps, _avgMs, _worstMs);
             Sb.AppendFormat("세션 최악 프레임 {0:F1} ms\n", _sessionWorstMs);
             Sb.AppendFormat("관리 힙 {0,6:F1} MB   GC/{1:F0}s {2}\n",
@@ -216,6 +236,8 @@ namespace Festa.Diagnostics
             GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width - 20f, rect.height - 16f), Sb.ToString(), _style);
         }
 
+        // 아래 둘은 OnGUI 에서만 쓰인다. 같이 배제해야 서버 빌드에 IMGUI 참조가 남지 않는다.
+
         void EnsureStyle()
         {
             if (_style != null) return;
@@ -239,5 +261,6 @@ namespace Festa.Diagnostics
             _bg.Apply();
             return _bg;
         }
+#endif
     }
 }

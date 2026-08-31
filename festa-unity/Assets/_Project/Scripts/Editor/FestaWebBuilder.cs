@@ -48,6 +48,22 @@ namespace Festa.EditorTools
             // 로컬 정적 서버로 바로 열려면 Disabled 가 편하다. 배포 때는 다시 켜는 게 맞다.
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
 
+            // **BuildPlayer 에 타깃을 넘기기 전에 활성 타깃부터 WebGL 로 바꿔야 한다.**
+            // URP 전처리기가 활성 타깃 기준으로 품질 레벨을 걸러 RP 에셋을 정하는데,
+            // Mobile 레벨은 Standalone 에서 제외돼 있어 평소 타깃(Linux Server) 그대로
+            // 빌드하면 Mobile_RPAsset 이 빠진다. WebGL 기본 품질이 0=Mobile 이라
+            // 그 산출물은 월드가 평평하게 렌더링된다 (S15P21A604-316).
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
+            {
+                Debug.Log("[WebBuilder] 활성 타깃을 WebGL 로 먼저 전환한다 (S15P21A604-316)");
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL))
+                {
+                    Debug.LogError("[WebBuilder] WebGL 타깃 전환 실패 — 중단한다.");
+                    PlayerSettings.WebGL.compressionFormat = prevCompression;
+                    return;
+                }
+            }
+
             Directory.CreateDirectory(OutDir);
             var options = new BuildPlayerOptions
             {
@@ -66,9 +82,23 @@ namespace Festa.EditorTools
             {
                 EditorUserBuildSettings.development = prevDev;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
-                if (prevTarget != BuildTarget.WebGL)
+
+                // 서버 타깃으로는 되돌리지 않는다 (T-228, T-219 의 방아쇠).
+                // 그 상태면 에디터에 UNITY_SERVER 가 정의돼 캐릭터 로비가 월드로 넘어가고,
+                // 다음 WebGL 빌드에서 Mobile_RPAsset 이 빠진다. 자세한 근거는
+                // FestaReleaseBuilder 의 같은 지점 주석 참조.
+                bool restingOnServer =
+                    BuildPipeline.GetBuildTargetGroup(prevTarget) == BuildTargetGroup.Standalone &&
+                    EditorUserBuildSettings.standaloneBuildSubtarget == StandaloneBuildSubtarget.Server;
+
+                if (restingOnServer)
+                    Debug.LogWarning($"[WebBuilder] 빌드 전 타깃이 {prevTarget}(Server) 였지만 " +
+                                     "WebGL 로 둔다 — 서버 타깃은 에디터 플레이를 깨뜨린다 (T-228).");
+                else if (prevTarget != BuildTarget.WebGL)
                     EditorUserBuildSettings.SwitchActiveBuildTarget(prevGroup, prevTarget);
-                Debug.Log($"[WebBuilder] 설정 복원 — development={prevDev}, 압축={prevCompression}, 타깃={prevTarget}");
+
+                Debug.Log($"[WebBuilder] 설정 복원 — development={prevDev}, 압축={prevCompression}, " +
+                          $"타깃={(restingOnServer ? BuildTarget.WebGL : prevTarget)}");
             }
 
             var s = report.summary;

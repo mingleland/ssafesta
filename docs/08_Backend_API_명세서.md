@@ -437,6 +437,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 → `200 { "homepageUrl": "https://my-team-project.example.com" }` (저장한 그대로 echo)
 
 - 저장은 **원문 그대로** — trim·정규화·대소문자 변경이 없다(왕복 무손실).
+- 검증은 009 프로젝트 URL 5 종과 **같은 검증기**(`common/HttpUrlValidator`)를 탄다 — `http`/`https` · ≤2048자 · **포트가 있으면 1~65535** · 한글 도메인 허용(판정만 punycode, 저장은 원문). 2026-08-28 공용화 때 포트 규칙이 016 에도 함께 걸렸다.
 - `{ "homepageUrl": null }` = **등록 해제**. 빈 문자열 `""`은 해제가 아니라 400이고, **필드가 없는 `{}`도 400**이다 — 해제는 명시적 `null`만 인정한다(직렬화 실수로 URL이 조용히 지워지는 것을 막는다).
 - 검증은 순서대로 첫 위반에서 거부하고 **사유별 다른 문장**을 준다: 필드 부재 → blank → 길이 ≤ 2048 → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. **scheme을 host보다 먼저 본다** — `javascript:`·`data:`는 host가 없어 순서가 뒤바뀌면 스킴 위반이라는 실제 사유가 전달되지 않는다.
 - **`http`를 허용한다**(facade `logoUrl`과 의도적 비대칭) — 로고는 페이지 안에 임베드되어 mixed content로 조용히 죽지만, 홈페이지는 이동 대상이고 iframe이 막히면 새 탭으로 연다. 혼합콘텐츠 경고 UX는 React 몫.
@@ -448,54 +449,115 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 ## 5. Project
 
-### POST `/booths/{boothId}/projects`
+부스가 전시하는 프로젝트. **부스당 1개**다 (spec 009 C-01, 2026-08-28 확정). 정본 계약은
+`specs/009-project-exhibition/contracts/project-api.md`.
 
-프로젝트 정보 등록.
+편집 권한은 **소유자 또는 스태프**(facade·layout과 같은 편집자 범위, `BoothEditorGuard`).
+회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
+(009 FR-008 — 만료돼도 데이터는 보존된다).
 
-### GET `/booths/{boothId}/projects`
+> ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
+> `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
+> 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 
-부스 프로젝트 목록 조회.
-
-### GET `/projects/{projectId}`
-
-프로젝트 상세 조회.
-
-### PATCH `/projects/{projectId}`
-
-Owner/Editor가 프로젝트 정보 수정.
-
-#### 필드 후보
+### 공통 표현
 
 ```json
 {
+  "projectId": 1,
   "name": "SSAFY FESTA",
-  "description": "...",
-  "thumbnailUrl": "...",
-  "videoUrl": "...",
-  "deployUrl": "...",
-  "gitUrl": "...",
-  "portfolioUrl": "..."
+  "description": "메타버스 축제 플랫폼",
+  "thumbnailUrl": "https://cdn.example.com/thumb.png",
+  "videoUrl": "https://youtu.be/xxxx",
+  "deployUrl": "https://festa.example.com",
+  "gitUrl": "https://lab.ssafy.com/team/festa",
+  "portfolioUrl": null
 }
 ```
+
+`name` 외 전부 `null` 가능. **키는 항상 있고 값이 없으면 `null`이다** — 서버가 기본값을 채우지
+않는다 (`avatarCode`와 같은 규칙, §2).
+
+**URL 5종 규칙** (`thumbnailUrl`·`videoUrl`·`deployUrl`·`gitUrl`·`portfolioUrl`):
+
+- `http`/`https`만, 최대 2048자. **형식 검증만 하고 제공자 allowlist는 없다** — 좁히면 정상
+  배포·포트폴리오 URL을 거부해 009 SC-002(링크 도달률 100%)를 깬다
+- 저장 바이트 = 반환 바이트. trim·소문자화·정규화 없음
+- **`@`(userinfo) 금지** — `https://oauth2:token@host` 는 400. 공개 전시 필드라 자격증명이 노출되고 목적지를 오인하게 만든다
+- **한글 도메인 허용** — 판정만 punycode, 저장은 원문 그대로
+- 포트를 붙이려면 **`1~65535`** — `:99999`는 파서가 받아주지만 연결이 안 되므로 400
+- 빈 문자열 `""`는 400. **지우려면 `null`을 보낸다**
+- 대표 이미지는 **업로드가 아니라 URL 참조**다 (009 C-03)
+
+> `videoUrl`의 제공자 범위(009 C-02)는 **기획 미결**이다. 정해지면 서버가 등록 시점에
+> `400 VALIDATION_FAILED`로 거부하도록 이 절을 갱신한다. 그 전에 저장된 URL은 보존하고
+> 조회에서 숨기지 않는다.
+
+### POST `/booths/{boothId}/projects`
+
+프로젝트 등록. `name`만 필수이고 **생략한 필드는 `null`로 저장**된다. 성공 `201` + 공통 표현.
+
+실패: `400 VALIDATION_FAILED`(`errors[0] = { rule: "FIELD_INVALID", field, message }`) ·
+`401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 PROJECT_ALREADY_EXISTS`**(이미 있음 — 수정은 `PATCH`).
+동시 요청에서도 같은 코드가 나온다(유니크 제약 위반을 같은 코드로 번역).
+
+### GET `/booths/{boothId}/projects`
+
+**편집자용** 조회. published 게이트를 걸지 않는다 — 미게시 부스의 소유자도 자기 값을 봐야
+수정 폼을 채운다(`GET /booths/mine`과 같은 이유).
+
+```json
+{ "projects": [ { "projectId": 1, "name": "SSAFY FESTA", "…": "…" } ] }
+```
+
+**0개 또는 1개 배열이고, 없으면 `{ "projects": [] }`다 — 404가 아니다.** 배열 형태를 유지하는
+것은 상한이 오르더라도 계약 모양이 바뀌지 않게 하기 위함이다.
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
+
+> 방문자용 조회(published 게이트 + 좋아요 수)는 **S15P21A604-177**이다. 아직 없다.
+> `GET /projects/{projectId}`는 **신설하지 않았다** — 부스당 1개라 이 목록이 같은 값을 준다.
+
+### PATCH `/projects/{projectId}`
+
+보낸 필드만 바꾼다 (009 C-06).
+
+| 본문 | 뜻 |
+|---|---|
+| 키 **누락** | 그 필드는 손대지 않는다 |
+| 키 있고 값 `null` | 그 필드를 **삭제**한다 |
+| `{}` | **400** — 조용한 no-op을 만들지 않는다 |
+
+**FE를 제약하지 않는다** — 바뀐 필드만 보내도, 전체를 보내도 의도대로 동작한다. 다만 "지운다"는
+키를 빼지 말고 `null`을 명시해야 한다. `name`은 `NOT NULL`이라 `null`이면 400이다.
+
+성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
+`403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
+`409 BOOTH_LEASE_EXPIRED`.
 
 ---
 
 ## 6. AI Agent Config 관리
 
 AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 Spring을 기본으로 한다.
+정본 계약은 `specs/007-ai-agent-document/spec.md`(C-12·C-13·C-14·C-15).
 
-### POST `/booths/{boothId}/agents`
+편집 권한은 **소유자 또는 스태프**(`BoothEditorGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15).
+회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
+(007 FR-015 — 만료돼도 설정은 보존된다).
 
-### GET `/booths/{boothId}/agents`
+> ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
+> `BoothEditorGuard`가 `role`을 읽지 않으며 005·009·016도 같은 상태다 — 011 구현 시 가드 한
+> 곳에서 일괄로 닫는다
+> ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 
-### GET `/agents/{agentId}`
-
-### PATCH `/agents/{agentId}`
-
-#### Agent 예시
+### 공통 표현
 
 ```json
 {
+  "agentId": 1,
+  "boothId": 7,
   "name": "FESTA 프로젝트 도슨트",
   "role": "PROJECT_DOCENT",
   "tone": "FRIENDLY",
@@ -506,6 +568,107 @@ AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 S
   "forbiddenTopics": ["PERSONAL_INFORMATION"]
 }
 ```
+
+**키는 항상 있다.** `name`·`role`·`systemPrompt` 외에는 클라이언트가 안 보내도 **서버가 기본값을
+채운다** — `null`로 두지 않는다. `forbiddenTopics`만 기본값이 빈 배열이고, 없어도 키가 사라지지
+않는다 (조건부로 사라지면 클라이언트가 `undefined`와 `[]`를 둘 다 다뤄야 한다).
+
+`boothId`를 응답에 넣는 것은 `/agents/{agentId}` 경로에 부스 좌표가 없기 때문이다.
+`status`와 시각 필드는 **내보내지 않는다** — 소비자가 없고, 나중에 추가하는 것은 가산적이다.
+
+**필드 규칙**
+
+| 필드 | 규칙 |
+|---|---|
+| `name` | 필수. 1~100자 |
+| `role` | 필수. 아래 화이트리스트 |
+| `systemPrompt` | 필수. 공백만은 안 된다 |
+| `tone` · `responseLength` | 선택. 아래 화이트리스트, 기본 `FRIENDLY`·`MEDIUM` |
+| `servicePrice` | 선택. **0 이상 정수**, 기본 `0`. 상한은 정의된 바 없어 두지 않았다 |
+| `handoffEnabled` | 선택. boolean, 기본 `false` |
+| `forbiddenTopics` | 선택. 문자열 배열, 기본 `[]`. **화이트리스트 없음** — 항목이 공백만 아니면 된다 |
+
+> `forbiddenTopics`의 **개수·길이 상한은 미정**이다 (docs/26 등록). 근거 없는 수치를 서버가
+> 정하면 그것이 사실상의 계약이 된다. 정해지면 `400 VALIDATION_FAILED`로 거부하도록 갱신한다.
+> 위 예시의 `PERSONAL_INFORMATION`은 **예시일 뿐 열거형이 아니다** — 자유 문자열이다.
+
+### POST `/booths/{boothId}/agents`
+
+AI 직원 등록. 성공 `201` + 공통 표현.
+
+실패: `400 VALIDATION_FAILED`(`errors[0] = { rule: "FIELD_INVALID", field, message }`) ·
+`401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 AGENT_LIMIT_EXCEEDED`**(이미 있음 — 수정은 `PATCH`).
+동시 요청에서도 같은 코드가 나온다(유니크 제약 위반을 같은 코드로 번역).
+
+### GET `/booths/{boothId}/agents`
+
+**편집자용** 조회. 만료된 부스도 200이다.
+
+```json
+{ "agents": [ { "agentId": 1, "boothId": 7, "…": "…" } ] }
+```
+
+**0개 또는 1개 배열이고, 없으면 `{ "agents": [] }`다 — 404가 아니다.** 배열 형태를 유지하는 것은
+상한이 오르더라도 계약 모양이 바뀌지 않게 하기 위함이다 (§5와 같은 판단).
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
+
+### GET `/agents/{agentId}`
+
+단건 조회. 성공 `200` + 공통 표현.
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND`.
+
+### PATCH `/agents/{agentId}`
+
+보낸 필드만 바꾼다 (spec 007 C-06 — §5 프로젝트와 같은 규칙).
+
+| 본문 | 뜻 |
+|---|---|
+| 키 **누락** | 그 필드는 손대지 않는다 |
+| `{}` | **400** — 조용한 no-op을 만들지 않는다 |
+| `"forbiddenTopics": null` | **비운다** (`[]`와 같다) |
+| 그 밖의 키에 `null` | **400**, `errors[0].field`가 그 필드를 지목한다 — 전부 `NOT NULL`이라 지울 수 있는 필드가 아니다 |
+
+`handoffEnabled: null`도 예외가 아니다 — `false`로 읽지 않는다. 끄려면 `false`를 명시한다.
+등록(`POST`)에서도 같다: 명시적 `null`은 "기본값을 달라"가 아니라 400이다.
+
+**같은 값을 다시 보내면 `updatedAt`을 흔들지 않는다.** 전체 폼을 매번 보내는 FE가 "방금 수정됨"을
+만들어 내지 않게 하기 위함이다.
+
+성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
+`403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 직원 수정 차단**) · **`404 AGENT_NOT_FOUND`** ·
+`409 BOOTH_LEASE_EXPIRED`.
+
+### DELETE `/agents/{agentId}`
+
+AI 직원 삭제. 성공 `204`(본문 없음). **하드 삭제라 같은 부스에 다시 등록할 수 있다.**
+
+> 이 엔드포인트는 spec 007 본문에는 없었고 **Jira S15P21A604-105 완료 조건 문면**에서 왔다.
+> 2026-08-30 확정하며 참조 거부 정책과 함께 spec 007 **C-14**로 적었다.
+
+**참조가 하나라도 있으면 `409 AGENT_DELETE_CONFLICT`다.** `message`가 **무엇이 막는지** 말한다 —
+다음 행동이 셋 다 다르기 때문이다(배치에서 빼기 / 문서 지우기 / 상담 끝나기를 기다리기).
+
+| 막는 것 | 근거 |
+|---|---|
+| Draft 배치 또는 **현재 공개 중인** 배치가 이 직원을 배치해 둠 | JSON 참조 — 외래키 없음 |
+| `ai_documents`에 등록된 문서가 있음 | 외래키 |
+| `consultations`에 상담 기록이 있음 | 외래키 |
+
+- "현재 공개 중"은 **`booths.published_layout_version` 포인터** 기준이다. 최고 버전 번호가 아니다 —
+  재임대 뒤에는 최신 행이 옛 임차인의 것일 수 있고, 아무도 볼 수 없는 과거 버전 때문에 삭제를
+  막는 것은 틀렸다. **과거 버전에만 있는 참조는 삭제를 막지 않는다.**
+- Draft 검사는 **기존 편집 중인 작업의 보호**일 뿐 강한 불변식이 아니다. Draft는 원래 존재하지
+  않는 `configId`도 허용하므로(미완성 허용이 Draft의 정의) 삭제 후 옛 ID를 Draft에 다시 넣는 것은
+  막지 않는다. 그건 공개 시점 검증(`CONFIG_NOT_OWNED`)이 잡는다. **강한 불변식은 "공개된 배치는
+  존재하는 직원만 가리킨다" 하나다.**
+- 그 불변식에는 외래키가 없다. 그래서 **삭제와 배치 공개가 같은 잠금**(부스 행)을 잡는다 — 검사를
+  마친 직후 상대가 끼어드는 경쟁을 직렬화한다. 어느 쪽이 먼저 끝나든 공개된 배치가 사라진 직원을
+  가리키는 상태는 나오지 않는다.
+
+실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND` ·
+`409 BOOTH_LEASE_EXPIRED` · **`409 AGENT_DELETE_CONFLICT`**.
 
 #### 설정 허용값 (2026-08-27 확정 — spec 007 C-12, [GitLab #112](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/112))
 
@@ -877,6 +1040,8 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
 | `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
+| `PROJECT_NOT_FOUND` *(009)* | 프로젝트 없음 |
+| `PROJECT_ALREADY_EXISTS` *(009)* | 이 부스에는 이미 프로젝트가 있다 — 부스당 1개(C-01). 수정은 `PATCH` |
 | `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·Staff 아님) |
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
@@ -892,7 +1057,9 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `GAME_SCHEMA_UNSUPPORTED` *(019)* | 서버·Runtime이 지원하지 않는 schemaVersion |
 | `GAME_PROJECT_INVALID` *(019)* | **저장된** snapshot이 재검증 실패 — 500, 서버 결함 |
 | `CONFIG_NOT_FOUND` *(019)* | Portal `configId`의 Binding 없음. 실행 불가 사유는 오류가 아니라 200 응답의 `unavailableReason`이다 |
-| `AGENT_NOT_FOUND` | Agent 없음 |
+| `AGENT_NOT_FOUND` *(007)* | Agent 없음 |
+| `AGENT_LIMIT_EXCEEDED` *(007)* | 이 부스에는 이미 AI 직원이 있다 — 부스당 1명(C-13). 수정은 `PATCH`. `message`가 상한을 담는다 |
+| `AGENT_DELETE_CONFLICT` *(007)* | 배치·문서·상담 중 하나가 아직 이 직원을 가리킨다 (C-14). `message`가 무엇이 막는지 말한다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -916,3 +1083,95 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 11. World Session 최소 계약
 
 P1은 Survey → Staff → Consultation → Inventory → Dashboard → Minigame 순으로 연결하는 것을 권장한다.
+
+---
+
+## 20. 내부 API — Spring ↔ FastAPI
+
+**사용자 API가 아니다.** `/api/v1` 아래가 아니라 **`/internal/*`** 이고, 사용자 Access Token으로는
+열리지 않는다. 인프라가 이 접두어를 공개 리스너에서 막고, 서버는 그것과 **독립적으로 항상**
+토큰을 검증한다 — SG 룰은 설정 한 줄로 조용히 깨지고 그 순간 토큰이 유일한 방어선이다.
+
+### 인증 (2026-08-25 확정 — [GitLab #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/102))
+
+`Authorization: Bearer <service-token>`이고 **토큰은 방향별로 분리**한다.
+
+| 변수 | 방향 | 송신 | 검증 |
+|---|---|---|---|
+| `INTERNAL_SPRING_TO_AI_TOKENS` | Spring → FastAPI | Spring | FastAPI |
+| `INTERNAL_AI_TO_SPRING_TOKENS` | FastAPI → Spring | FastAPI·Worker | **Spring** |
+
+합치지 않는 이유는 노출 표면이 다르기 때문이다 — AI→Spring 토큰은 **사용자가 올린 PDF를 파싱하는
+Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험이 좁은 쪽으로 그대로 전파된다.
+
+- **콤마 구분 1~2개.** 송신자는 첫 값을 쓰고 수신자는 목록 전체를 받아들인다 — "현재 토큰"이
+  값 자체로 표현되므로 승격 절차가 따로 필요 없다. 회전: `[old]` → `[old,new]` → `[new,old]` → `[new]`
+- 비교는 **상수 시간**(`MessageDigest.isEqual`)이고 목록 전체를 **조기 반환 없이** 돈다
+- 앞뒤 공백이 붙은 값·빈 항목·중복·3개 이상은 **기동을 실패**시킨다. Secret을 말없이 다듬으면
+  설정한 값과 비교하는 값이 달라지고 그 차이는 런타임 401로만 드러난다
+- 누락·오류·**반대 방향 토큰**은 전부 `401 UNAUTHORIZED`
+- mTLS는 P2다 — 두 서비스가 같은 VPC 안이라 mTLS가 막는 위협이 현 배치에 없다
+
+> ⚠️ **배포 조치 (Infra).** `INTERNAL_AI_TO_SPRING_TOKENS` 는 **기본값이 없어 주입하지 않으면
+> 애플리케이션이 기동하지 않는다.** 현재 `infra/deploy/compose/dev/back.compose.yaml` 은 환경변수를
+> 하나도 넘기지 않고 `integration/compose.yaml` 도 `FESTA_ENVIRONMENT`·`AI_BASE_URL` 둘뿐이라,
+> 이 값은 물론 아래 목록 전체가 아직 컨테이너에 도달하지 않는다. Jenkins credential →
+> `with-credentials.sh` → compose `environment` 경로로 함께 wire 해야 한다.
+>
+> | 변수 | 기본값 | 없으면 |
+> |---|---|---|
+> | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
+> | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
+> | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+>
+> `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
+> 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.
+
+> **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
+> `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지
+> 말고 이 체인에 자기 필터와 규칙을 더한다** — 우선순위가 낮은 체인을 새로 만들면 요청이 그곳까지
+> 가지 않는다. 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 그대로 분리된다.
+
+### GET `/internal/ai/booth-access`
+
+FastAPI가 Conversation을 만들기 전에 묻는다 (spec 008 FR-024·C-08).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-booth-access-api.yaml`.
+
+```
+GET /internal/ai/booth-access?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+**유효 임대 → Agent의 부스 소속 → Agent `ACTIVE`** 순으로 **단락 평가**한다.
+
+```json
+// 허용
+{ "allowed": true, "boothId": 7, "agentId": 3, "agentStatus": "ACTIVE",
+  "leaseEndsAt": "2026-08-31T09:00:00Z", "remainingSeconds": 57600,
+  "serverTime": "2026-08-30T17:00:00Z" }
+
+// 거부
+{ "allowed": false, "boothId": 7, "agentId": 3,
+  "leaseEndsAt": null, "remainingSeconds": 0,
+  "serverTime": "2026-08-30T17:00:00Z", "denialCode": "BOOTH_LEASE_EXPIRED" }
+```
+
+**거부는 오류가 아니라 `200 + allowed:false`다.** `401`은 서비스 토큰 실패에만 쓴다.
+
+| `denialCode` | 뜻 | `leaseEndsAt` | `agentStatus` |
+|---|---|---|---|
+| `BOOTH_LEASE_EXPIRED` | 유효 임대가 없다 | `null` | **없음** |
+| `AGENT_NOT_IN_BOOTH` | 그 부스의 직원이 아니다 | 종료 시각 | **없음** |
+| `AGENT_INACTIVE` | 직원이 비활성이다 | 종료 시각 | `INACTIVE` |
+
+- **존재하지 않는 `boothId`·`agentId`도 404가 아니라 각각 첫·두 번째 거부**다. 내부 API라도
+  존재 여부를 알려 줄 이유가 없다
+- **`leaseEndsAt == null` ⟺ `denialCode == BOOTH_LEASE_EXPIRED`.** 만료 임대의 종료 시각은
+  조회하지 않는다 — 과거 임대가 여럿일 때 어느 행인지 정할 근거가 없고, FastAPI가 저장하는 값은
+  성공 응답의 종료 시각뿐이다
+- **`agentStatus`가 있다 ⟺ 그 `agentId`가 그 `boothId`에 있다.** 저장값이 `ACTIVE`가 아니면 전부
+  `INACTIVE`로 정규화한다 — 계약 어휘는 두 값뿐이다
+- `serverTime`·유효성 판정·`remainingSeconds`는 **한 요청에서 같은 시각 하나**로 계산한다.
+  FastAPI는 이 쌍을 저장해 이후 모든 질문의 만료를 스스로 판정한다(FR-024) — 셋이 어긋나면
+  그 판정이 어긋난다

@@ -1,0 +1,14 @@
+{
+    "name": "Festa.Booth.Catalog",
+    "rootNamespace": "Festa.Booth",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
