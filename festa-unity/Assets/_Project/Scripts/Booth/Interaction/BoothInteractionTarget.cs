@@ -9,7 +9,8 @@ namespace Festa.Booth
     {
         static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
 
-        [SerializeField, Min(0.5f)] float _maxDistance = 3f;
+        /// <summary>판정 거리. **월드 유닛**이다 (1 m = 10 unit) — 30f 는 3 m 다.</summary>
+        [SerializeField, Min(0.5f)] float _maxDistance = 30f;
         [SerializeField] bool _highlightEnabled = true;
         [SerializeField] Color _highlightColor = new(0.25f, 0.7f, 1f, 1f);
 
