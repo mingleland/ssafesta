@@ -1,0 +1,162 @@
+# SSAFY FESTA — CI 파이프라인
+#
+# 현재 범위: Jira 연동 (키 검증 + 상태 동기화)만. 파트별 빌드·테스트 잡은
+# S15P21A604-154 에서 이 구조 위에 추가한다 (stages 의 test·build 자리 예약).
+#
+# 워크플로 문서: docs/jira-gitlab-workflow.md
+#
+# 필요한 CI/CD Variables (Settings → CI/CD → Variables, Masked):
+#   JIRA_SYNC_EMAIL — Jira 계정 이메일
+#   JIRA_SYNC_TOKEN — Atlassian API 토큰 (값은 절대 저장소에 넣지 않는다)
+# 두 변수가 없으면 sync 잡은 경고만 남기고 통과한다 (개발을 막지 않는다).
+
+workflow:
+  rules:
+    # ⛔ 러너 없음 · Jira 는 내장 연동으로 전환 — 파이프라인 생성 정지
+    # 러너 등록 시: ① 이 when: never 를 지우고
+    #              ② jira-sync-* 잡을 삭제하거나 내장 연동의 transition 값을 비운다
+    #                 (그러지 않으면 같은 이슈를 두 번 전환한다)
+    - when: never
+    # ↓ 러너 확보 후 사용할 원래 규칙
+    # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+stages:
+  - validate
+  # - test      # S15P21A604-154: BE(mvn verify)·FE(vitest/build) 잡 예정
+  # - build     # 이미지 빌드 잡 예정
+  - sync
+  # - deploy    # 배포 파이프라인 구축 시 (docs/jira-gitlab-workflow.md §9 TODO)
+
+variables:
+  JIRA_SITE: "https://ssafy.atlassian.net"
+  JIRA_KEY_REGEX: '[A-Z][A-Z0-9]+-[0-9]+'
+
+# ──────────────────────────────────────────────────────────────
+# validate: develop/main 을 향하는 MR 은 Jira Issue Key 가 필수다.
+#   검사 대상: MR 제목 또는 source branch 이름 중 하나.
+#   파트 브랜치(ai/back/front/game) 간 MR·직접 push 는 대상이 아니다.
+# ──────────────────────────────────────────────────────────────
+jira-key-check:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")'
+  script:
+    - |
+      echo "MR 제목: $CI_MERGE_REQUEST_TITLE"
+      echo "Source branch: $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME"
+      if echo "$CI_MERGE_REQUEST_TITLE" | grep -qE "$JIRA_KEY_REGEX"; then
+        echo "OK: MR 제목에서 Jira Issue Key 확인"
+      elif echo "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" | grep -qE "$JIRA_KEY_REGEX"; then
+        echo "OK: source branch 에서 Jira Issue Key 확인"
+      else
+        echo ""
+        echo "ERROR: Jira Issue Key가 존재하지 않습니다."
+        echo "develop/main 을 향하는 MR 은 제목 또는 source branch 에 Jira Key 가 있어야 합니다."
+        echo "  Branch 예: feat/S15P21A604-123-login"
+        echo "  MR 제목 예: [S15P21A604-123][BE] 로그인 기능 구현"
+        echo "규칙 문서: docs/jira-gitlab-workflow.md"
+        exit 1
+      fi
+
+# ──────────────────────────────────────────────────────────────
+# sync: GitLab 이벤트 → Jira 상태/라벨 동기화 (실패해도 파이프라인은 통과)
+#   보드가 3상태(해야 할 일/진행 중/완료)라 In Review·Ready for Deploy 는
+#   라벨(in-review / ready-for-deploy)로 표현한다. Done(완료) 자동 전환은
+#   production 배포 파이프라인이 생기기 전까지 수행하지 않는다.
+# ──────────────────────────────────────────────────────────────
+.jira_sync_base:
+  stage: sync
+  image:
+    name: curlimages/curl:8.10.1
+    entrypoint: [""]
+  allow_failure: true
+  before_script:
+    - |
+      if [ -z "$JIRA_SYNC_TOKEN" ] || [ -z "$JIRA_SYNC_EMAIL" ]; then
+        echo "WARN: JIRA_SYNC_EMAIL / JIRA_SYNC_TOKEN 미설정 — Jira 동기화를 건너뜁니다."
+        echo "설정 위치: Settings → CI/CD → Variables (docs/jira-gitlab-workflow.md §6)"
+        exit 0
+      fi
+    - |
+      jira() { # method path [json]
+        _m="$1"; _p="$2"; _d="$3"
+        if [ -n "$_d" ]; then
+          curl -sS -w "\n%{http_code}" -X "$_m" -u "$JIRA_SYNC_EMAIL:$JIRA_SYNC_TOKEN" \
+            -H "Content-Type: application/json" "$JIRA_SITE$_p" -d "$_d"
+        else
+          curl -sS -w "\n%{http_code}" -X "$_m" -u "$JIRA_SYNC_EMAIL:$JIRA_SYNC_TOKEN" \
+            -H "Content-Type: application/json" "$JIRA_SITE$_p"
+        fi
+      }
+    - |
+      transition_to() { # key status_name — 대상 상태로 전환 (이미 그 상태면 전환 후보에 없어 no-op)
+        _key="$1"; _status="$2"
+        _tid=$(jira GET "/rest/api/2/issue/$_key/transitions" | grep -oE "\"id\":\"[0-9]+\",\"name\":\"$_status\"" | grep -oE '[0-9]+' | head -1)
+        if [ -n "$_tid" ]; then
+          jira POST "/rest/api/2/issue/$_key/transitions" "{\"transition\":{\"id\":\"$_tid\"}}" > /dev/null
+          echo "Jira $_key → 상태 '$_status' 전환"
+        else
+          echo "Jira $_key: '$_status' 전환 불필요(이미 해당 상태) 또는 전환 없음 — 상태 변경 안 함"
+        fi
+      }
+    - |
+      label() { # key add|remove label_name
+        _key="$1"; _op="$2"; _name="$3"
+        jira PUT "/rest/api/2/issue/$_key" "{\"update\":{\"labels\":[{\"$_op\":\"$_name\"}]}}" > /dev/null
+        echo "Jira $_key: 라벨 $_op $_name"
+      }
+
+# 작업 브랜치 push → In Progress (상태 '진행 중')
+jira-sync-in-progress:
+  extends: .jira_sync_base
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^(feat|feature|fix|refactor|test|docs|chore|build|ci|hotfix|perf)\/[A-Z][A-Z0-9]+-[0-9]+/'
+  script:
+    - KEY=$(echo "$CI_COMMIT_BRANCH" | grep -oE "$JIRA_KEY_REGEX" | head -1)
+    - echo "브랜치 $CI_COMMIT_BRANCH → 이슈 $KEY"
+    - transition_to "$KEY" "진행 중"
+
+# develop/main 대상 MR 생성·갱신 → In Review (상태 '진행 중' + 라벨 in-review)
+jira-sync-in-review:
+  extends: .jira_sync_base
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")'
+  script:
+    - |
+      KEY=$(echo "$CI_MERGE_REQUEST_TITLE" | grep -oE "$JIRA_KEY_REGEX" | head -1)
+      [ -z "$KEY" ] && KEY=$(echo "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" | grep -oE "$JIRA_KEY_REGEX" | head -1)
+      if [ -z "$KEY" ]; then echo "Jira Key 없음 — 상태 변경 안 함"; exit 0; fi
+      echo "MR → 이슈 $KEY"
+      transition_to "$KEY" "진행 중"
+      label "$KEY" add in-review
+
+# develop/main 으로 merge 완료 → Ready for Deploy (라벨 교체)
+#   merge commit 메시지에 MR 제목(=Jira Key)이 포함되는 것을 이용한다.
+#   단순 커밋에는 반응하지 않도록 merge commit(부모 2개)일 때만 동작한다.
+jira-sync-ready-for-deploy:
+  extends: .jira_sync_base
+  image:
+    name: alpine/git:2.45.2
+    entrypoint: [""]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main")'
+  script:
+    - apk add --no-cache curl > /dev/null 2>&1 || true
+    - |
+      PARENTS=$(git cat-file -p "$CI_COMMIT_SHA" | grep -c '^parent ' || true)
+      if [ "$PARENTS" -lt 2 ]; then
+        echo "merge commit 아님(단순 push) — Jira 상태 변경 안 함"; exit 0
+      fi
+      KEYS=$(echo "$CI_COMMIT_MESSAGE" | grep -oE "$JIRA_KEY_REGEX" | sort -u)
+      if [ -z "$KEYS" ]; then echo "커밋 메시지에 Jira Key 없음 — 상태 변경 안 함"; exit 0; fi
+      for KEY in $KEYS; do
+        echo "merge → 이슈 $KEY"
+        label "$KEY" remove in-review
+        label "$KEY" add ready-for-deploy
+      done
+      echo "참고: Done(완료) 전환은 production 배포 성공에만 연결한다 — 배포 파이프라인 구축 후 활성화 (docs/jira-gitlab-workflow.md §9)"

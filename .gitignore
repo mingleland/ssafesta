@@ -16,6 +16,18 @@ Reference/
 .DS_Store
 Thumbs.db
 
+# Python / FastAPI — festa-ai/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
 # 개인 에디터 설정 — 사람마다 다르고 문서 서식을 임의로 바꾼다 (Obsidian이 표를 자동 정렬해 확정 spec에 diff를 낸 적 있음)
 .obsidian/
 
