@@ -1161,9 +1161,23 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+> | `ROOT_DOMAIN` | 없음 | `application-infra.yml` 의 `app.world.host` 가 `world.` 만 남는다 |
+> | `SPRING_PROFILES_ACTIVE` | `local` (`spring.profiles.default`) | 배포에서도 `local` 프로파일이 뜬다 — 아래 |
 >
-> `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
-> 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.
+> **프로파일은 `SPRING_PROFILES_ACTIVE=infra` 다.** `FESTA_ENVIRONMENT` 는 Spring 프로파일이
+> 아니다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
+> `specs/infra-002-environments/tasks.md` T059) 파일도 `a51f88a0`(`-170`, MR !150)로 들어왔다.
+>
+> ⚠️ **다만 지금 `infra` 로 띄우면 기동하지 않는다.** Spring 의 `application-{profile}.yml` 은
+> 프로파일 간에 누적되지 않는데, `spring.datasource`·`jpa`·`flyway`·`data.redis`·`security.oauth2`
+> 와 `app.*` 전체가 `application-local.yml` 96줄 안에만 있고 `application-infra.yml` 은 5줄
+> (`app.world.*`)뿐이다. `infra` 를 켜면 그 96줄이 로드되지 않아 `spring.datasource.url` 이
+> 사라지고 JPA·Flyway 자동설정이 실패한다. **환경변수를 전부 주입해도 읽을 설정이 없다.**
+> 공통 설정을 `application.yml` 로 승격하는 것이 BE 몫이며 `S15P21A604-347` 로 추적한다.
+>
+> `REDIS_USERNAME`·`REDIS_PASSWORD` 도 함께 필요해진다 — infra-002 T015 가 Redis 기본 사용자를
+> 비활성화하고 ACL 을 켜는데 현재 `spring.data.redis` 에는 host·port 만 있어 연결이 거부된다.
+> 주입 자리 신설도 `S15P21A604-347` 범위다.
 
 > **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
 > `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지
