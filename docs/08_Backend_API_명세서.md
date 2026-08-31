@@ -1176,8 +1176,32 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > |---|---|---|
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `AI_STORAGE_USAGE_STATE`·`AI_STORAGE_STATE` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+>
+> **문서 저장소 6종 (S15P21A604-106).** `R2_*` 는 Infra 가 소유하는 credential 로, 문서 bucket 과
+> 서버가 만드는 prefix 로 scope 를 좁힌 것을 받는다 (GitLab #84). 삭제 유예 정리(FR-028)까지 하려면
+> 그 prefix 에 대한 `DeleteObject` 가 필요하다.
+>
+> 뒤 둘은 **업로드 허용 게이트**이고 기본값을 두지 않은 것이 의도다 — 기본값이 "허용" 이면 키 이름을
+> 틀렸을 때 Spring 이 조용히 무시하고 **차단이 열린 채로 뜬다.** 값 이름은 저장소 계약 그대로다.
+>
+> | 변수 | 허용값 | 뜻 |
+> |---|---|---|
+> | `AI_STORAGE_USAGE_STATE` | `NORMAL`·`WARNING` | 발급 허용 |
+> | | `UPLOAD_BLOCKED` | 할당량 90% → `507 STORAGE_QUOTA_EXCEEDED` |
+> | | `STALE_BLOCKED` | 사용량 감시 불능 → `503 STORAGE_UNAVAILABLE` |
+> | `AI_STORAGE_STATE` | `R2_ACTIVE`·`LOCAL_ACTIVE` | 발급 허용 |
+> | | `UPLOAD_BLOCKED`·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `503 STORAGE_UNAVAILABLE` |
+>
+> ⚠️ **두 변수의 `UPLOAD_BLOCKED` 는 뜻이 다르다** — 앞은 할당량, 뒤는 R2 장애다. 그래서 507 과 503
+> 으로 갈리고, 한 변수로 합칠 수 없다.
+>
+> ⚠️ **`AI_STORAGE_STATE=LOCAL_ACTIVE` 로 옮길 때는 쓰기 provider 도 함께 옮겨야 기동한다**
+> (`app.ai.storage.active-write-provider=MINIO_LOCAL` + 해당 provider 설정). 상태만 바꾸면 방금 못
+> 쓴다고 선언한 R2 로 업로드가 계속 들어가므로, 어긋나면 기동을 거절한다.
 >
 > `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
 > 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.

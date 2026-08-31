@@ -3,6 +3,7 @@ package com.example.ssafesta.ai;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -35,6 +36,9 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
      * startup failure that names the setting.
      */
     private static final Duration MAX_PRESIGN_TTL = Duration.ofDays(7);
+
+    /** FR-030 · document-processing-api.yaml {@code storageProvider}. Not an open vocabulary. */
+    private static final Set<String> PROVIDER_NAMES = Set.of("R2", "MINIO_LOCAL");
 
     /**
      * How much of the quota is used, straight from {@code usage-guard.schema.json}.
@@ -107,6 +111,17 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
             throw new IllegalStateException("app.ai.storage.active-write-provider 가 providers 에 없습니다: "
                     + activeWriteProvider + " (설정된 provider: " + providers.keySet() + ")");
         }
+        // The name is written onto every document row and handed to FastAPI, whose contract types
+        // it as an enum of exactly these two. A third name would be stored happily here and then
+        // fail to parse there, one hop away from anything that could explain it (FR-030).
+        providers.keySet().stream()
+                .filter(name -> !PROVIDER_NAMES.contains(name))
+                .findFirst()
+                .ifPresent(name -> {
+                    throw new IllegalStateException("app.ai.storage.providers 의 이름은 " + PROVIDER_NAMES
+                            + " 중 하나여야 합니다 (문서 행과 FastAPI 계약에 그대로 실린다): " + name);
+                });
+        requireStateMatchesProvider(storageState, activeWriteProvider);
         if (presignTtl == null || presignTtl.isZero() || presignTtl.isNegative()) {
             throw new IllegalStateException("app.ai.storage.presign-ttl 은 0보다 커야 합니다: " + presignTtl);
         }
@@ -115,6 +130,31 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
                     + " 이하여야 합니다 (SigV4 상한): " + presignTtl);
         }
         providers.forEach((name, provider) -> provider.requireComplete(name));
+    }
+
+    /**
+     * The failover state and the provider being written to must agree.
+     *
+     * <p>Two places holding one fact, so refuse to start when they disagree — the same move
+     * {@code AiAgentProperties} makes for the per-booth limit and its unique index. An operator who
+     * moved the state to {@code LOCAL_ACTIVE} believes uploads now land in MinIO; if the provider
+     * were left at {@code R2} they would keep landing in the storage that was just declared
+     * unusable, and nothing would say so (object-storage-contract §Manual fallback:
+     * "{@code LOCAL_ACTIVE} 에서 생성한 metadata 는 provider {@code MINIO_LOCAL} 을 명시한다").
+     *
+     * <p>Only the two admitting states are constrained. The blocked ones issue no grants, so there
+     * is no write provider for them to disagree with.
+     */
+    private static void requireStateMatchesProvider(StorageState state, String provider) {
+        String expected = switch (state) {
+            case R2_ACTIVE -> "R2";
+            case LOCAL_ACTIVE -> "MINIO_LOCAL";
+            case UPLOAD_BLOCKED, FALLBACK_VALIDATING, R2_RECONCILING -> null;
+        };
+        if (expected != null && !expected.equals(provider)) {
+            throw new IllegalStateException("app.ai.storage.storage-state=" + state
+                    + " 이면 active-write-provider 는 " + expected + " 여야 합니다: " + provider);
+        }
     }
 
     /**

@@ -56,9 +56,16 @@ class AiStoragePropertiesTest {
                 .usageState());
     }
 
-    /** 장애 상태 기계도 마찬가지다 — 다섯 상태가 계약에 있고 다섯이 다 들어와야 한다. */
+    /**
+     * 장애 상태 기계도 마찬가지다.
+     *
+     * <p>{@code LOCAL_ACTIVE} 만 빠지는데, 그 상태는 쓰기 provider 도 함께 옮겨야 성립하는 조합이라
+     * R2 설정 위에 얹을 수 없다 — 아래 {@link #aFallbackStateWithItsOwnProviderBinds} 가 짝을 맞춰
+     * 검증한다. 여기서 억지로 통과시키려면 불변식을 풀어야 하고, 그러면 검사가 사라진다.
+     */
     @ParameterizedTest
-    @EnumSource(AiStorageProperties.StorageState.class)
+    @EnumSource(value = AiStorageProperties.StorageState.class,
+            mode = EnumSource.Mode.EXCLUDE, names = "LOCAL_ACTIVE")
     void everyStorageStateInTheContractBinds(AiStorageProperties.StorageState state) {
         assertEquals(state, bind(settingsWith("app.ai.storage.storage-state", state.name()))
                 .storageState());
@@ -125,6 +132,63 @@ class AiStoragePropertiesTest {
     void aTtlExactlyAtTheCeilingBinds() {
         assertEquals(Duration.ofDays(7),
                 bind(settingsWith("app.ai.storage.presign-ttl", "7d")).presignTtl());
+    }
+
+    /**
+     * 상태와 쓰기 provider 는 한 사실을 두 곳에 적은 것이라 어긋난 채로 뜨면 안 된다.
+     *
+     * <p>{@code LOCAL_ACTIVE} 로 옮긴 운영자는 업로드가 MinIO 로 간다고 믿는데, provider 가 R2 로
+     * 남아 있으면 방금 못 쓴다고 선언한 저장소로 계속 들어간다. 아무도 그 사실을 말해 주지 않는다.
+     */
+    @Test
+    void aFallbackStateWithTheOldWriteProviderRefusesToStart() {
+        String failure = failureOf(settingsWith("app.ai.storage.storage-state", "LOCAL_ACTIVE"));
+
+        assertTrue(failure.contains("MINIO_LOCAL"), failure);
+    }
+
+    @Test
+    void anR2StateWritingToTheFallbackRefusesToStart() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.put("app.ai.storage.active-write-provider", "MINIO_LOCAL");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "http://localhost:9");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.bucket", "fallback");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "k");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "s");
+
+        assertTrue(failureOf(settings).contains("R2"));
+    }
+
+    /** 짝이 맞으면 뜬다 — 경계에서 잘못 막으면 fallback 운영 자체가 불가능해진다. */
+    @Test
+    void aFallbackStateWithItsOwnProviderBinds() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.put("app.ai.storage.storage-state", "LOCAL_ACTIVE");
+        settings.put("app.ai.storage.active-write-provider", "MINIO_LOCAL");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "http://localhost:9");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.bucket", "fallback");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "k");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "s");
+
+        assertEquals("MINIO_LOCAL", bind(settings).activeWriteProvider());
+    }
+
+    /**
+     * provider 이름은 문서 행과 FastAPI 계약에 그대로 실린다 — 자유 문자열이 아니다.
+     *
+     * <p>세 번째 이름은 여기서는 멀쩡히 저장되고 FastAPI 에서 파싱에 실패한다. 원인에서 한 홉
+     * 떨어진 자리라 붙잡기 어렵다.
+     */
+    @Test
+    void aProviderNameOutsideTheContractRefusesToStart() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.put("app.ai.storage.active-write-provider", "S3");
+        settings.put("app.ai.storage.providers.S3.endpoint", "http://localhost:9");
+        settings.put("app.ai.storage.providers.S3.bucket", "b");
+        settings.put("app.ai.storage.providers.S3.access-key-id", "k");
+        settings.put("app.ai.storage.providers.S3.secret-access-key", "s");
+
+        assertTrue(failureOf(settings).contains("S3"));
     }
 
     /** 배포에서 env 를 빠뜨리면 서명할 수 없는 URL 을 나눠 주기 전에 죽어야 한다. */

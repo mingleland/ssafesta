@@ -123,10 +123,22 @@ class AiDocumentUploadBlockedIntegrationTest {
         }
     }
 
-    /** MinIO 로 넘어간 상태는 <b>허용</b>이다 — 막으면 fallback 이 아무 쓸모가 없다. */
+    /**
+     * MinIO 로 넘어간 상태는 <b>허용</b>이다 — 막으면 fallback 이 아무 쓸모가 없다.
+     *
+     * <p>쓰기 provider 도 함께 옮겨야 기동한다. 상태만 바꾸고 provider 를 R2 로 두면 계약이
+     * "LOCAL_ACTIVE 에서 만든 metadata 는 MINIO_LOCAL 을 명시한다" 고 한 것과 어긋나므로 거절된다 —
+     * 이 테스트가 그 짝을 실제로 맞춰야 하는 것 자체가 불변식의 증거다.
+     */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.storage-state=LOCAL_ACTIVE")
+    @SpringBootTest(properties = {
+            "app.ai.storage.storage-state=LOCAL_ACTIVE",
+            "app.ai.storage.active-write-provider=MINIO_LOCAL",
+            "app.ai.storage.providers.MINIO_LOCAL.endpoint=http://localhost:9",
+            "app.ai.storage.providers.MINIO_LOCAL.bucket=test-fallback",
+            "app.ai.storage.providers.MINIO_LOCAL.access-key-id=test-access-key",
+            "app.ai.storage.providers.MINIO_LOCAL.secret-access-key=test-secret-key"})
     @AutoConfigureMockMvc
     class WhenRunningOnTheFallback extends Fixture {
 
