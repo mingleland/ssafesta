@@ -53,36 +53,54 @@ namespace Festa.Content
             if (cam == null) return;
 
             bool interactKey = InteractKeyPressedThisFrame();
-            if (!TryReadPointer(out var pointerPosition)) { UpdateHover(null); return; }
 
-            // 호버·조준용 레이는 매 프레임 한 번만 쏜다.
-            bool hasHit = Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance);
+            // ── 1순위: 마우스 조준 ──────────────────────────────
+            // 조준 중인 대상이 사거리 안이면 그것이 타깃이다 — 여러 대상이 겹칠 때
+            // 플레이어가 명시적으로 고를 수 있는 유일한 수단이라 근접보다 우선한다.
+            Festa.Booth.BoothInteractionTarget targeted = null;
+            if (TryReadPointer(out var pointerPosition)
+                && Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance))
+            {
+                var aimed = hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>();
+                // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
+                // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다.
+                if (aimed != null && aimed.Interactive && IsInRange(aimed)) targeted = aimed;
+            }
 
-            // 콜라이더가 자식에 있어도 루트의 상호작용 컴포넌트를 찾는다.
-            var aimed = hasHit ? hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() : null;
+            // ── 2순위: 근접 자동 조준 (S15P21A604-346) ──────────
+            // 마우스를 올리지 않아도 사거리 안에 들어오면 자동으로 잡힌다 — 3인칭 걷기에서
+            // "가까이 가면 F" 가 기대 동작이고, 마우스 조준을 요구하면 상호작용이 없는 것처럼
+            // 보인다 (실 BE 첫 걷기에서 실측된 혼란). 조준이 없을 때만 근접으로 채운다.
+            targeted ??= NearestInteractableInRange();
 
-            // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
-            // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다. MaxDistance 를 두고도
-            // 디스패처가 검사하지 않았던 탓이다.
-            bool inRange = aimed != null && IsInRange(aimed);
-            UpdateHover(inRange ? aimed : null);
-            ShowHint(inRange ? aimed : null);
+            UpdateHover(targeted);
+            ShowHint(targeted);
 
-            // 실행은 F 키로만 한다 (S15P21A604-323). 포인터는 조준·호버에만 쓴다 —
+            // 실행은 F 키로만 한다 (S15P21A604-323). 포인터·근접은 조준에만 쓴다 —
             // 클릭을 실행에 쓰면 3인칭 카메라 조작·UI 클릭과 경쟁해 오조작이 난다.
-            if (!interactKey) return;
-            if (!inRange || !hasHit) return;
-            Dispatch(hit.collider);
+            if (!interactKey || targeted == null) return;
+            var interactable = targeted.GetComponentInParent<IBoothInteractable>()
+                            ?? targeted.GetComponentInChildren<IBoothInteractable>(true);
+            interactable?.Interact();
         }
 
-        /// <summary>타입별 상호작용으로 넘긴다.</summary>
-        static void Dispatch(Collider collider)
+        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null.</summary>
+        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange()
         {
-            // 구현 타입을 나열하지 않는다 (S15P21A604-303). 예전에는 노트북·AI·미니게임을
-            // 하나씩 적어 분기했는데, 종류가 늘 때마다 여기를 고쳐야 했고 **고치는 걸 잊으면
-            // 컴포넌트는 붙었는데 아무 반응이 없다** — 조용해서 원인을 찾기 어려운 형태다.
-            var target = collider.GetComponentInParent<IBoothInteractable>();
-            target?.Interact();
+            var origin = InteractionOrigin();
+            if (origin == null) return null;
+
+            Festa.Booth.BoothInteractionTarget best = null;
+            float bestSqr = float.MaxValue;
+            foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
+            {
+                if (t == null || !t.Interactive) continue;
+                float sqr = (t.transform.position - origin.Value).sqrMagnitude;
+                if (sqr > t.MaxDistance * t.MaxDistance || sqr >= bestSqr) continue;
+                best = t;
+                bestSqr = sqr;
+            }
+            return best;
         }
 
         /// <summary>
