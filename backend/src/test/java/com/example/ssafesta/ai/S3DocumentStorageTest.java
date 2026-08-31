@@ -109,7 +109,7 @@ class S3DocumentStorageTest {
     }
 
     private static AiStorageProperties properties(Duration ttl) {
-        return new AiStorageProperties(AiStorageProperties.UploadBlock.NONE, "R2", ttl, Map.of("R2",
+        return new AiStorageProperties(AiStorageProperties.UploadGate.NORMAL, "R2", ttl, Map.of("R2",
                 new AiStorageProperties.Provider("http://localhost:9", "test-ai-documents",
                         "test-access-key", "test-secret-key")));
     }

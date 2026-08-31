@@ -106,11 +106,11 @@ public class AiDocumentService {
         // Before the insert, deliberately. A row created while uploads are blocked would hold one
         // of the ten slots with no object behind it and nothing to clean it up (#100). The reason
         // travels with the refusal: a spent quota is not something the owner can wait out.
-        switch (storageProperties.uploadBlock()) {
-            case QUOTA_EXCEEDED -> throw new StorageQuotaExceededException();
-            case UNAVAILABLE -> throw new StorageUnavailableException(
+        switch (storageProperties.uploadGate()) {
+            case UPLOAD_BLOCKED -> throw new StorageQuotaExceededException();
+            case STALE_BLOCKED -> throw new StorageUnavailableException(
                     "현재 문서 업로드를 받을 수 없습니다. 잠시 후 다시 시도해 주세요.");
-            case NONE -> { }
+            case NORMAL -> { }
         }
 
         return grant(agent, userId, request, storage.activeWriteTarget());

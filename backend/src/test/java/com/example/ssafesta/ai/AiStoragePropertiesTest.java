@@ -26,7 +26,7 @@ class AiStoragePropertiesTest {
     void theShippedSettingsBind() {
         AiStorageProperties properties = bind(baseSettings());
 
-        assertEquals(AiStorageProperties.UploadBlock.NONE, properties.uploadBlock());
+        assertEquals(AiStorageProperties.UploadGate.NORMAL, properties.uploadGate());
         assertEquals("R2", properties.activeWriteProvider());
         assertEquals(Duration.ofMinutes(15), properties.presignTtl());
         assertEquals("test-ai-documents", properties.providers().get("R2").bucket());
@@ -39,13 +39,38 @@ class AiStoragePropertiesTest {
                 .contains("active-write-provider"));
     }
 
-    /** 차단 사유가 둘로 갈려야 507 과 503 을 가를 수 있다 (#100). */
+    /** 차단 상태가 둘로 갈려야 507 과 503 을 가를 수 있다 (#100). 이름은 usage-guard 계약 그대로다. */
     @Test
-    void bothBlockReasonsBind() {
-        assertEquals(AiStorageProperties.UploadBlock.QUOTA_EXCEEDED,
-                bind(settingsWith("app.ai.storage.upload-block", "QUOTA_EXCEEDED")).uploadBlock());
-        assertEquals(AiStorageProperties.UploadBlock.UNAVAILABLE,
-                bind(settingsWith("app.ai.storage.upload-block", "UNAVAILABLE")).uploadBlock());
+    void bothBlockedStatesBind() {
+        assertEquals(AiStorageProperties.UploadGate.UPLOAD_BLOCKED,
+                bind(settingsWith("app.ai.storage.upload-gate", "UPLOAD_BLOCKED")).uploadGate());
+        assertEquals(AiStorageProperties.UploadGate.STALE_BLOCKED,
+                bind(settingsWith("app.ai.storage.upload-gate", "STALE_BLOCKED")).uploadGate());
+    }
+
+    /**
+     * 게이트에 기본값이 없다 — 이것이 P1 이었다.
+     *
+     * <p>Spring 은 모르는 키를 조용히 무시하므로, 키 이름이 바뀌거나 오타가 나면 값이 {@code null}
+     * 이 되고 기본값이 "허용" 이면 <b>차단이 열린 채로 기동한다.</b> 안전 장치가 오타로 열리는
+     * 모양이라, 말하지 않으면 뜨지 않게 한다.
+     */
+    @Test
+    void aMissingGateRefusesToStart() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.remove("app.ai.storage.upload-gate");
+
+        assertTrue(failureOf(settings).contains("upload-gate"));
+    }
+
+    /** 옛 키(`upload-enabled`)만 남은 설정도 같은 이유로 기동을 막는다. */
+    @Test
+    void theRemovedEnabledFlagAloneRefusesToStart() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.remove("app.ai.storage.upload-gate");
+        settings.put("app.ai.storage.upload-enabled", "false");
+
+        assertTrue(failureOf(settings).contains("upload-gate"));
     }
 
     @Test
@@ -104,7 +129,7 @@ class AiStoragePropertiesTest {
 
     private static Map<String, String> baseSettings() {
         Map<String, String> settings = new LinkedHashMap<>();
-        settings.put("app.ai.storage.upload-block", "NONE");
+        settings.put("app.ai.storage.upload-gate", "NORMAL");
         settings.put("app.ai.storage.active-write-provider", "R2");
         settings.put("app.ai.storage.presign-ttl", "15m");
         settings.put("app.ai.storage.providers.R2.endpoint", "http://localhost:9");

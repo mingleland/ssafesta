@@ -11,37 +11,45 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * fallback: both are S3-compatible, so adding one is configuration, not code. {@code R2} is the only
  * entry P0 configures.
  *
- * @param uploadBlock         operator gate (FR-031, #100). Anything but {@code NONE} refuses new
+ * @param uploadGate          operator gate (FR-031, #100). Anything but {@code NORMAL} refuses new
  *                            grants and <b>writes no row</b> — a row created while uploads are
- *                            blocked would eat one of the ten slots forever
+ *                            blocked would eat one of the ten slots forever. <b>Required</b>: see
+ *                            {@link UploadGate}
  * @param activeWriteProvider where new uploads go. Existing objects are read by the provider on
  *                            their own row, never by this value (FR-030)
  * @param presignTtl          how long an upload URL lives (FR-026, 기본 15분)
  */
 @ConfigurationProperties("app.ai.storage")
-public record AiStorageProperties(UploadBlock uploadBlock, String activeWriteProvider,
+public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvider,
                                   Duration presignTtl, Map<String, Provider> providers) {
 
     /**
-     * Why new upload grants are refused, if they are.
+     * Whether new upload grants are admitted, in the storage contract's own words.
      *
-     * <p>Two reasons, not one flag, because they do not mean the same thing to the person holding
-     * the file. The usage guard blocks at 90% of quota <i>and</i> when its own measurement has gone
-     * stale (object-storage-contract "Usage admission"); one is "not this month" and the other is
-     * "try again shortly", and a single code would have the user retrying a request that cannot
-     * succeed (#100).
+     * <p>The names are taken from {@code usage-guard.schema.json}, not invented here: an operator
+     * following the storage runbook reads a state off that snapshot and writes it into this
+     * setting. A private vocabulary would make them translate, and a translation done at 3am is a
+     * translation done wrong.
      *
-     * <p>Set by hand. P0 collects probe evidence only and an operator applies the block — automatic
-     * detection is explicitly out of scope until the thresholds are agreed (FR-031).
+     * <p>Two blocked states rather than one flag, because they do not mean the same thing to the
+     * person holding the file — the guard blocks both at 90% of quota and when its own measurement
+     * has gone stale, and a single code would have the user retrying a request that cannot succeed
+     * (#100).
+     *
+     * <p>Set by hand. P0 collects probe evidence only and an operator applies the block; automatic
+     * detection stays out until the thresholds are agreed (FR-031).
      */
-    public enum UploadBlock {
+    public enum UploadGate {
 
-        /** Uploads are open. */
-        NONE,
-        /** Usage guard {@code UPLOAD_BLOCKED} — 90% of quota. Retrying does not help: 507. */
-        QUOTA_EXCEEDED,
-        /** Provider outage or {@code STALE_BLOCKED} — temporary, so 503. */
-        UNAVAILABLE
+        /** Uploads are admitted. The guard's {@code WARNING} is this too — it only warns. */
+        NORMAL,
+        /** Guard {@code UPLOAD_BLOCKED} — 90% of quota. Retrying does not help, so 507. */
+        UPLOAD_BLOCKED,
+        /**
+         * Guard {@code STALE_BLOCKED}, and the state to use for a provider outage: #100 groups
+         * "R2 장애·STALE_BLOCKED" together as the temporary block. 503.
+         */
+        STALE_BLOCKED
     }
 
     /**
@@ -52,7 +60,14 @@ public record AiStorageProperties(UploadBlock uploadBlock, String activeWritePro
     private static final Duration MAX_PRESIGN_TTL = Duration.ofDays(7);
 
     public AiStorageProperties {
-        uploadBlock = uploadBlock == null ? UploadBlock.NONE : uploadBlock;
+        // No default, and that is the point. Spring ignores a property it does not recognise, so a
+        // renamed or misspelled key would otherwise leave this null, fall back to "admit", and
+        // reopen uploads during a block that someone believed was in force. A safety control must
+        // not be able to fail open through a typo — say it or do not start.
+        if (uploadGate == null) {
+            throw new IllegalStateException("app.ai.storage.upload-gate 를 지정해야 합니다. "
+                    + "허용값: " + java.util.Arrays.toString(UploadGate.values()));
+        }
         providers = providers == null ? Map.of() : Map.copyOf(providers);
         if (activeWriteProvider == null || activeWriteProvider.isBlank()) {
             throw new IllegalStateException("app.ai.storage.active-write-provider 를 지정해야 합니다.");

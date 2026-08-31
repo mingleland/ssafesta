@@ -45,7 +45,7 @@ class AiDocumentUploadBlockedIntegrationTest {
     /** 할당량이 찼다 — usage guard 90% (#100). 기다린다고 풀리지 않으므로 507 이다. */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.upload-block=QUOTA_EXCEEDED")
+    @SpringBootTest(properties = "app.ai.storage.upload-gate=UPLOAD_BLOCKED")
     @AutoConfigureMockMvc
     class WhenTheQuotaIsSpent extends Fixture {
 
@@ -65,7 +65,7 @@ class AiDocumentUploadBlockedIntegrationTest {
     /** 장애·감시 불능 — 잠시 뒤 된다. 503 이다. */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.upload-block=UNAVAILABLE")
+    @SpringBootTest(properties = "app.ai.storage.upload-gate=STALE_BLOCKED")
     @AutoConfigureMockMvc
     class WhenStorageIsBlockedTemporarily extends Fixture {
 
