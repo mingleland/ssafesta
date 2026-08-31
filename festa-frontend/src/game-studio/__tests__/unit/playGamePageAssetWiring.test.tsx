@@ -49,7 +49,11 @@ const installFetch = (project: DeepMutable<GameProject>, contentOk = true): Fetc
       if (!contentOk) {
         return jsonResponse({ code: 'GAME_ASSET_NOT_FOUND', message: '없음', errors: [], warnings: [] }, 404);
       }
-      return new Response(new Blob(['fake-image-bytes']), { status: 200 });
+      // 본문을 Blob 으로 주지 않는다 — jsdom 의 Blob 에는 .stream() 이 없는데 undici Response 는
+      // body 소비 때 그것을 요구해서, new Response(new Blob(...)) 는 .blob() 에서
+      // "TypeError: object.stream is not a function" 으로 죽는다. 그 예외는 useResolvedAssetUrls 의
+      // catch 가 삼켜 화면에 안 드러나므로, 아래 object URL 케이스만 조용히 red 였다.
+      return new Response('fake-image-bytes', { status: 200 });
     }
     return jsonResponse({ code: 'UNKNOWN', message: 'unexpected', errors: [], warnings: [] }, 404);
   }));
