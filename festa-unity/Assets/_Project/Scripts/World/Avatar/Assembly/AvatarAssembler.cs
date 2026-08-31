@@ -21,20 +21,6 @@ namespace Festa.Avatar
         // 딕셔너리가 원본을 살려 두므로 ID 재사용 자체가 일어나지 않는다.
         static readonly Dictionary<(Material source, int category), Material> SharedMaterials = new();
         readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
-
-        /// <summary>
-        /// 이번 프레임에 <c>Destroy</c> 를 건 오브젝트 (S15P21A604-334).
-        ///
-        /// <para>플레이 모드의 <c>Destroy</c> 는 <b>프레임 끝까지 미뤄진다.</b> 그래서 같은
-        /// <see cref="Apply"/> 안에서 나중에 도는 <see cref="CombineSameMaterialParts"/> 가
-        /// <b>죽는 중인 렌더러를 아직 살아 있는 것으로 보고 병합에 구워 넣었다.</b>
-        /// 원본은 다음 프레임에 사라지지만 <b>병합 메시에는 그 형상이 영구히 남는다</b> —
-        /// 옷을 갈아입으면 가려져야 할 속옷이 셔츠를 뚫고 나오는 검은 얼룩이 그것이다.</para>
-        ///
-        /// <para>그래서 파괴를 건 대상을 여기 모아 두고 병합에서 제외한다. T-228 과 같은 뿌리
-        /// (지연 파괴)이지만 증상과 지점이 다르다.</para>
-        /// </summary>
-        readonly HashSet<GameObject> _dying = new();
         MaterialPropertyBlock _block;
         Animator _animator;
         SkinnedMeshRenderer _reference;
@@ -49,12 +35,6 @@ namespace Festa.Avatar
         {
             LastError = null;
             if (!_catalog) { Fail("AvatarCatalog이 지정되지 않았습니다."); return; }
-            // **비우지 말고, 실제로 파괴가 끝난 것만 지운다** (S15P21A604-334).
-            // 한 프레임 안에서 Apply 가 두 번 이상 불리면(연속 클릭·프로그램 호출) 앞선 호출이
-            // 파괴를 건 대상이 아직 살아 있다. 그때 통째로 비우면 뒤 호출이 그것을 다시 후보로
-            // 삼아 병합에 삼킨다 — 실제로 10회 연속 호출에서 병합 정점이 2,573 → 247,164 로 터졌다.
-            // Unity 의 파괴된 오브젝트는 `!go` 로 판별되므로 그것만 걷어낸다.
-            _dying.RemoveWhere(go => !go);
             bool rebuild = !_animator || _config.gender != config.gender;
             _config = config;
             if (rebuild) BuildBody();
@@ -96,7 +76,6 @@ namespace Festa.Avatar
             if (_spawned.TryGetValue(category, out var old)) foreach (var go in old) if (go)
             {
                 foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) _rendererCategories.Remove(renderer);
-                _dying.Add(go);   // 이번 프레임 병합에서 제외한다 (S15P21A604-334)
                 Destroy(go);
             }
             var spawned = new List<GameObject>(); _spawned[category] = spawned;
@@ -203,8 +182,8 @@ namespace Festa.Avatar
             // 2026-08-26 부터 WebGL 에서만 꺼져 있었는데(T-214), 그 근거였던 "WebGL 에서만
             // 안 그려진다" 가 2026-08-30 실측으로 틀렸음이 확인됐다. 경위는 AvatarMeshMerge 주석.
             // 스위치는 A/B 계측용으로 남긴다(F10) — 값을 다시 재려면 조건을 바꿀 수 있어야 한다.
-            // **정리는 병합을 꺼도 해야 한다** (S15P21A604-334). 전에는 여기서 바로 return 해
-            // 옛 병합체가 살아남고 원본은 꺼진 채로 남았다 — 토글을 끈 순간 화면이 옛 상태로 굳는다.
+            if (!AvatarMeshMerge.Enabled) return;
+
             // 이전 병합에서 꺼둔 원본을 **먼저 되살린다** (T-228).
             //
             // 아래에서 병합 대상을 고를 때 `r.enabled` 로 거른다. 그런데 원본은 병합될 때
@@ -216,23 +195,13 @@ namespace Festa.Avatar
             // 파괴보다 먼저 켜야 한다 — 플레이 모드의 `Destroy` 는 프레임 끝에 처리되므로
             // 파괴 후에 훑으면 아직 살아 있는 병합체까지 다시 켜서 원본과 겹쳐 그린다.
             foreach (var renderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
-                if (renderer && !_merged.Contains(renderer.gameObject) && !_dying.Contains(renderer.gameObject))
-                    renderer.enabled = true;
+                if (renderer && !_merged.Contains(renderer.gameObject)) renderer.enabled = true;
 
-            // **옛 병합체도 파괴 대기로 등록한다** (S15P21A604-334). DestroySafe 역시 플레이
-            // 모드에서는 프레임 끝까지 미뤄지므로, 아래 후보 선정 시점에 옛 병합체가 아직
-            // 살아 있고 enabled 다. `_merged` 는 방금 비웠으니 걸러지지도 않는다 —
-            // 그래서 **새 병합이 옛 병합체를 통째로 다시 삼켰다.** 정점이 회차마다 배로
-            // 늘고(3962 → 8508), 그때 보이던 속옷 형상이 병합 메시에 영구히 남아
-            // 옷을 갈아입으면 셔츠를 뚫고 검은 얼룩으로 나타났다.
-            foreach (var go in _merged) if (go) { _dying.Add(go); DestroySafe(go); }
+            foreach (var go in _merged) if (go) DestroySafe(go);
             _merged.Clear();
 
-            // 정리를 마친 뒤에 빠진다 — 위 주석 참조.
-            if (!AvatarMeshMerge.Enabled) return;
-
             var actives = GetComponentsInChildren<SkinnedMeshRenderer>(false)
-                .Where(r => r && r.enabled && r.sharedMesh && !_dying.Contains(r.gameObject) &&
+                .Where(r => r && r.enabled && r.sharedMesh &&
                             r.sharedMaterials.Length == 1 && r.sharedMaterials[0] &&
                             r.sharedMesh.subMeshCount == 1 && r.sharedMesh.blendShapeCount == 0 &&
                             r.bones != null && r.bones.Length > 0)

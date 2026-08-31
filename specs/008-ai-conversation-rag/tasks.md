@@ -18,8 +18,8 @@
 - [ ] T008 Implement TTL conversation storage, atomic completed-turn commit, and immediate deletion in festa-ai/app/repositories/conversation_repository.py
 - [ ] T009 Implement Redis atomic user/Agent/global capacity leases and FIFO queue in festa-ai/app/services/capacity_service.py
 - [ ] T010 [P] Implement Spring Booth Access contract DTO/client with 1-second timeout and one retry in festa-ai/app/clients/spring_booth_access.py
-- [X] T011 [P] [BE] Implement Spring internal Lease·Agent ownership·ACTIVE validation endpoint in backend/src/main/java/com/example/ssafesta/internal/ai/AiBoothAccessController.java and backend/src/main/java/com/example/ssafesta/internal/ai/AiBoothAccessService.java. FR-024 순서로 단락 평가하고 거부는 `200 + allowed:false + denialCode`다(404 없음). `leaseEndsAt == null` ⟺ `BOOTH_LEASE_EXPIRED`, `agentStatus` 존재 ⟺ 소속 확인이며 `ACTIVE` 외 저장값은 `INACTIVE`로 정규화한다. 한 요청은 시각을 한 번만 읽는다. `INTERNAL_AI_TO_SPRING_TOKENS` 상수 시간 검증과 `/internal/**` fail-closed 체인을 함께 넣는다 (`S15P21A604-327`, 2026-08-30 경로·범위 교정)
-- [X] T012 [P] [BE] Add Spring access validation integration tests in backend/src/test/java/com/example/ssafesta/internal/ai/AiBoothAccessApiIntegrationTest.java — 판정 매트릭스(없는 부스·없는 직원·타 부스 직원·`DISABLED`·단일 시각)와 토큰 4종(정상·누락·오류·반대 방향)·사용자 토큰 401·미정의 내부 경로 403. 설정 부팅 검증은 `InternalTokenPropertiesTest` (`S15P21A604-327`)
+- [ ] T011 [P] Implement Spring internal Lease·Agent ownership·ACTIVE validation endpoint in backend/src/main/java/com/example/ssafesta/booth/AiBoothAccessController.java and backend/src/main/java/com/example/ssafesta/booth/AiBoothAccessService.java
+- [ ] T012 [P] Add Spring access validation integration tests in backend/src/test/java/com/example/ssafesta/booth/AiBoothAccessApiIntegrationTest.java
 - [ ] T013 Add common sanitized error mapping and no-prompt logging policy in festa-ai/app/api/errors.py and festa-ai/app/core/logging.py
 - [ ] T014 Implement Access Token signature/claims validation and explicit guest rejection without accepting Refresh Tokens in festa-ai/app/core/auth.py and festa-ai/tests/unit/test_auth.py
 

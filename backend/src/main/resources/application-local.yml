@@ -80,13 +80,6 @@ app:
     live-limit: 20
     deleted-limit: 5
 
-  # 내부 API 인증 (GitLab #102, 2026-08-25 확정 — 방향별 2토큰). 콤마 구분 1~2개이고
-  # 송신은 첫 값, 검증은 목록 전체다. jwt-secret 과 같이 기본값을 두지 않는다 — 기본값이 있으면
-  # 배포에서 env 를 빠뜨렸을 때 공개된 토큰으로 조용히 뜬다.
-  # 여기는 FastAPI→Spring 수신분만 둔다. Spring→FastAPI 송신분은 S15P21A604-175 몫이다.
-  internal:
-    ai-to-spring-tokens: ${INTERNAL_AI_TO_SPRING_TOKENS}
-
   # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
   # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
   # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비할 자리다.

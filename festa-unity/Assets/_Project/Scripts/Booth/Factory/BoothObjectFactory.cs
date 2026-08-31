@@ -129,11 +129,7 @@ namespace Festa.Booth
             bool interactive = type is not BoothObjectType.Furniture and not BoothObjectType.Decoration;
             var target = go.GetComponent<BoothInteractionTarget>();
             if (target == null) target = go.AddComponent<BoothInteractionTarget>();
-            // 사거리는 **월드 유닛**이다 — 이 프로젝트는 1 m = 10 unit 이므로 3 m 는 30f 다.
-            // 3f·2.2f 는 미터로 읽히지만 실제로는 0.3 m·0.22 m 였다. 그 값이면 대상 표면에
-            // 몸이 닿아도 판정 기준점까지 4.3(NPC)~6.8(노트북) unit 이라 F 가 원리적으로
-            // 발동하지 않는다 — 부스 안에서 상호작용이 안 되던 진짜 원인이다 (S15P21A604-339 실측).
-            target.Configure(interactive ? 30f : 22f, interactive);
+            target.Configure(interactive ? 3f : 2.2f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)

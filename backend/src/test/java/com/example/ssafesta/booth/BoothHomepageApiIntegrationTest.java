@@ -368,9 +368,23 @@ class BoothHomepageApiIntegrationTest {
                 .content(body);
     }
 
-    /** 009 방문자 조회가 같은 게이트를 읽어서 {@code BoothLayoutTestSupport} 로 옮겼다. */
+    /**
+     * Opens the gate the only way the schema allows: a real publish.
+     *
+     * <p>Setting {@code booths.published_layout_version} directly is not an option —
+     * {@code fk_booths_published_layout_version} points it at a row in
+     * {@code booth_layout_published_versions}, so a fabricated pointer is rejected. That constraint
+     * is the reason the gate can trust the column at all.
+     */
     private void publishLayout(Owner owner) throws Exception {
-        BoothLayoutTestSupport.publishLayout(mockMvc, owner.boothId(), bearerFor(owner.userId()));
+        mockMvc.perform(put("/api/v1/booths/{id}/layouts/draft", owner.boothId())
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(BoothLayoutTestSupport.saveRequest(0)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/booths/{id}/layouts/publish", owner.boothId())
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isOk());
     }
 
     private Owner leasedOwner(String prefix) {

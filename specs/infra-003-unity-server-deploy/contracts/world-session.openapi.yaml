@@ -14,57 +14,19 @@ paths:
             schema:
               type: object
               properties:
-                worldId:
-                  type: [string, 'null']
-                  enum: [11F, null]
-                  description: Optional destination world. Omission or null defaults to the only P0 world, 11F.
-                preferredPartyId: { type: [string, 'null'] }
+                preferredPartyId: { type: string, nullable: true }
       responses:
         '200':
           description: One-time world entry grant
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorldSession' }
-        '400':
-          description: Unsupported worldId or malformed request
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorResponse' }
-              example:
-                code: VALIDATION_FAILED
-                message: 요청 값이 올바르지 않습니다.
-                requestId: req_example
-                errors:
-                  - rule: FIELD_INVALID
-                    field: worldId
-                    message: 지원하지 않는 월드입니다.
-                warnings: []
         '401': { description: Missing or invalid Access Token }
         '403': { description: Account cannot enter the world }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
-    ErrorDetail:
-      type: object
-      required: [rule, message]
-      properties:
-        rule: { type: string, const: FIELD_INVALID }
-        field: { type: string }
-        message: { type: string }
-    ErrorResponse:
-      type: object
-      required: [code, message, requestId, errors, warnings]
-      properties:
-        code: { type: string, const: VALIDATION_FAILED }
-        message: { type: string }
-        requestId: { type: string }
-        errors:
-          type: array
-          items: { $ref: '#/components/schemas/ErrorDetail' }
-        warnings:
-          type: array
-          items: { type: object }
     WorldSession:
       type: object
       required: [sessionId, worldId, channelId, endpoint, connectionToken, expiresAt]

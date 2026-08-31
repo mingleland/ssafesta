@@ -15,17 +15,13 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Project exhibition — owner-side write and read-back, plus the visitor read (spec 009,
- * contracts/project-api.md).
+ * Project exhibition — owner-side write and read-back (spec 009, contracts/project-api.md).
  *
- * <p><b>Three of the four endpoints require a member; the fourth answers guests.</b>
- * {@code GET /booths/{boothId}/projects/published} (S15P21A604-177, 계약 §6) is behind the published
- * gate instead of the editor guard, and it lives on its own URL suffix so that identity never turns
- * the same path from 200 into 403. It is registered {@code permitAll} in
- * {@code SecurityConfiguration} — a change there can widen or close it without touching this file.
+ * <p>Additive: three new endpoints, no existing consumer changes. {@code docs/08} §5 and §18 are
+ * updated in the same commit (헌법 24조).
  *
- * <p>Additive: no existing consumer changes. {@code docs/08} §5 and §18 are updated in the same
- * commit (헌법 24조).
+ * <p>The visitor-facing read — published gate, like counts — is S15P21A604-177 and deliberately
+ * absent here. What this controller exposes is the editor's own view of their own values.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -62,19 +58,6 @@ public class ProjectController {
                                                @PathVariable Long boothId) {
         Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
         return new ProjectService.ProjectListView(projects.findByBooth(boothId, userId));
-    }
-
-    /**
-     * 방문자용 조회 (계약 §6). <b>토큰이 없어도 200 이다</b> — 그래서
-     * {@code @SecurityRequirement} 도 붙이지 않는다.
-     *
-     * <p>토큰은 {@code likedByMe} 판정에만 쓴다. {@code optionalMemberId} 는 게스트와 비회원 토큰에
-     * {@code null} 을 준다 ({@code BoothSlotController.slots} 와 같은 방식).
-     */
-    @GetMapping("/booths/{boothId}/projects/published")
-    public ProjectService.VisitorProjectListView published(@AuthenticationPrincipal Jwt jwt,
-                                                           @PathVariable Long boothId) {
-        return projects.findPublishedByBooth(boothId, MemberPrincipal.optionalMemberId(jwt));
     }
 
     @PatchMapping("/projects/{projectId}")

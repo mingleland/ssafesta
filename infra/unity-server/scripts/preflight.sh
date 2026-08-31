@@ -43,16 +43,7 @@ if (( config_only == 1 )); then
   exit 0
 fi
 
-host_arch="$(uname -m)"
-[[ "${host_arch}" == 'x86_64' || "${host_arch}" == 'amd64' ]] \
-  || fail "Unity 6000.0.78f1 Dedicated Server requires x86_64 host; got ${host_arch}"
-[[ -z "${DOCKER_DEFAULT_PLATFORM:-}" || "${DOCKER_DEFAULT_PLATFORM}" == 'linux/amd64' ]] \
-  || fail 'DOCKER_DEFAULT_PLATFORM must not enable a non-amd64 or emulated deployment path'
-
 docker image inspect "${GAME_IMAGE_REF}" >/dev/null 2>&1 || fail 'immutable game image is not available locally'
-image_arch="$(docker image inspect --format '{{.Architecture}}' "${GAME_IMAGE_REF}")"
-[[ "${image_arch}" == 'amd64' ]] || fail "Unity server image must be amd64; got ${image_arch}"
-pass 'host and game image are native x86_64'
 docker network inspect "${DEMO_NETWORK_NAME:-festa-demo}" >/dev/null 2>&1 || fail 'demo network does not exist'
 pass 'runtime image and demo network exist'
 

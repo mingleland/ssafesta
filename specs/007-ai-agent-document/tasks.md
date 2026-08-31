@@ -62,7 +62,7 @@
 - [ ] T018 [P] [AI] 문서별 Provider로 R2·MinIO adapter를 선택할 수 있는 object storage protocol과 PDF parser·Embedding Provider protocol을 `festa-ai/app/providers/storage.py`, `festa-ai/app/providers/document_parser.py`, `festa-ai/app/providers/embedding.py`에 정의한다
 - [X] T018a [P] [AI] LLM Provider protocol과 결정적 LLM·Embedding Mock Provider를 `festa-ai/app/providers/llm.py` 및 `festa-ai/app/providers/mock.py`에 구현한다 (`S15P21A604-94`)
 - [X] T019 [P] [AI] 모든 Spring→FastAPI 내부 요청에서 `INTERNAL_SPRING_TO_AI_TOKENS` 전체를 `secrets.compare_digest`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하도록 `festa-ai/app/api/dependencies/internal_auth.py` 및 `festa-ai/app/api/errors.py`에 구현한다 (`S15P21A604-121`)
-- [X] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다 — **`S15P21A604-327`(spec 008 booth-access)에서 완료.** 체인이 `/internal/**` 전체를 먼저 소비하고 규칙 없는 경로는 `denyAll`이므로, **T078은 별도 체인을 만들지 말고 이 체인에 `INTERNAL_INFRA_TO_SPRING_TOKENS` 필터와 `/internal/storage/**` 규칙을 더한다** (낮은 우선순위 체인은 요청이 도달하지 않는다)
+- [ ] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다
 - [ ] T021 [P] [AI] `SOURCE_HASH_MISMATCH`를 포함한 안정적인 실패 코드와 사용자용 한국어 사유 매핑을 `festa-ai/app/services/failure_policy.py`에 구현한다
 
 **Checkpoint**: FastAPI가 AI DB 전용 설정으로 기동하고, Business/AI database CONNECT matrix와 최소 권한을 지키며 테스트 DB를 사용할 수 있다.

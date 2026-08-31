@@ -94,7 +94,7 @@ public class BoothQueryService {
      * {@code BOOTH_LEASE_EXPIRED} by this point.
      */
     private String visibleHomepageUrl(Booth booth) {
-        return booth.isPublished() ? booth.getHomepageUrl() : null;
+        return booth.getPublishedLayoutVersion() == null ? null : booth.getHomepageUrl();
     }
 
     public record SlotView(Long slotId, String slotCode, short floorNo, String type, String status,

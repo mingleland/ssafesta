@@ -20,11 +20,11 @@
 
 **목적**: `infra/environments/` 작업 경계와 공통 테스트·검증 근거 구조를 만든다.
 
-- [X] T001 계획된 환경 디렉터리의 소유권, 공급자 경계, infra-001 재사용 규칙과 명령 규약을 `infra/environments/README.md`에 작성한다
-- [X] T002 [P] 런타임 전용 Secret 주입과 `.env.example` 규칙을 `infra/environments/config/README.md`에 문서화한다
-- [X] T003 [P] 재사용 가능한 엄격 셸 검증문, 정리 트랩과 민감정보 제거 명령 도우미를 `infra/environments/tests/lib/assert.sh`에 작성한다
-- [X] T004 [P] 계약 전용 실행기와 계약·통합·보안·장애·자원 전체 실행기를 `infra/environments/tests/contract/run.sh`와 `infra/environments/tests/run.sh`에 작성한다
-- [X] T005 [P] 민감정보가 제거된 검증 근거 디렉터리 이름 규칙과 필수 메타데이터 필드를 `infra/environments/tests/evidence/README.md`에 정의한다
+- [ ] T001 계획된 환경 디렉터리의 소유권, 공급자 경계, infra-001 재사용 규칙과 명령 규약을 `infra/environments/README.md`에 작성한다
+- [ ] T002 [P] 런타임 전용 Secret 주입과 `.env.example` 규칙을 `infra/environments/config/README.md`에 문서화한다
+- [ ] T003 [P] 재사용 가능한 엄격 셸 검증문, 정리 트랩과 민감정보 제거 명령 도우미를 `infra/environments/tests/lib/assert.sh`에 작성한다
+- [ ] T004 [P] 계약 전용 실행기와 계약·통합·보안·장애·자원 전체 실행기를 `infra/environments/tests/contract/run.sh`와 `infra/environments/tests/run.sh`에 작성한다
+- [ ] T005 [P] 민감정보가 제거된 검증 근거 디렉터리 이름 규칙과 필수 메타데이터 필드를 `infra/environments/tests/evidence/README.md`에 정의한다
 
 **완료 확인**: 신규 구현은 `infra/environments/` 안에 위치하며 동결된 `festa-unity/Docker/`와 infra-001 파이프라인을 수정하지 않는다.
 
@@ -36,18 +36,18 @@
 
 **⚠️ 중요**: 이 단계가 끝나기 전에는 사용자 스토리 구현을 시작하지 않는다.
 
-- [X] T006 [P] 환경 매니페스트 스키마 검증기와 유효하지 않은 픽스처 사례를 `infra/environments/tests/contract/environment-manifest.sh`에 작성한다
+- [ ] T006 [P] 환경 매니페스트 스키마 검증기와 유효하지 않은 픽스처 사례를 `infra/environments/tests/contract/environment-manifest.sh`에 작성한다
 - [ ] T007 [P] R2 Usage Admission의 79%/80%/90%/61분·active provider 혼입 사례와 Storage Failover Control의 상태별 uploadEnabled/activeWriteProvider 불일치 사례를 각각 `infra/environments/tests/contract/usage-guard.sh`와 `infra/environments/tests/contract/storage-failover-state.sh`에서 분리 검증한다
-- [X] T008 도구·버전 검사, C-01/C-02 지연 확정 입력, SG 준비 상태, Secret Reference 존재 여부와 단계별 조기 실패 동작을 `infra/environments/scripts/preflight.sh`에 구현한다
-- [X] T009 [P] dev용 변수 이름과 안전한 로컬 자리표시자만 `infra/environments/config/environments/dev.env.example`에 추가한다
-- [X] T010 [P] demo/R2/TLS 자격증명은 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
-- [X] T011 추정 수치 없이 EC2 용량 참조, 서비스별 demo 제한, 빌드 에이전트 제한과 `heavyBuildMaxConcurrency: 1`을 `infra/environments/config/resource-limits.example.yaml`에 정의한다
-- [X] T012 공통 레이블, 상태 확인 앵커, 내부 네트워크 규약과 공개 포트 없음 기본값을 `infra/environments/compose/common.yaml`에 작성한다
-- [X] T013 고정 이미지, 영속 볼륨과 호스트 포트 비공개 설정을 갖춘 별도 관리 PostgreSQL/Redis 데이터 프로젝트를 `infra/environments/compose/data/compose.yaml`에 작성한다
-- [X] T014 [P] `festa_dev_business`, `festa_dev_ai`, `festa_demo_business`, `festa_demo_ai`, 전용 역할, PUBLIC CONNECT 회수와 AI 전용 pgvector를 구성하는 멱등 부트스트랩 SQL을 `infra/environments/postgres/init/00-databases-and-roles.sql`에 작성한다
-- [X] T015 [P] Redis 기본 사용자를 비활성화하고 `noeviction`을 설정하며 외부 ACL 파일을 불러오고 환경·서비스 ACL 예시를 `infra/environments/redis/redis.conf`와 `infra/environments/redis/users.acl.example`에 정의한다
-- [X] T016 [P] infra-001의 스키마를 복제하지 않고 릴리스 매니페스트와 검증 대상 참조를 `infra/environments/scripts/validate-infra001-contracts.sh`에서 검증한다
-- [X] T017 자격증명, 쿠키, 서명 URL, 개인 키와 원본 환경 덤프를 거부하는 민감정보 제거 검증 근거 기록을 `infra/environments/scripts/write-evidence.sh`에 구현한다
+- [ ] T008 도구·버전 검사, C-01/C-02 지연 확정 입력, SG 준비 상태, Secret Reference 존재 여부와 단계별 조기 실패 동작을 `infra/environments/scripts/preflight.sh`에 구현한다
+- [ ] T009 [P] dev용 변수 이름과 안전한 로컬 자리표시자만 `infra/environments/config/environments/dev.env.example`에 추가한다
+- [ ] T010 [P] demo/R2/TLS 자격증명은 변수 이름만 두고 배포 가능한 기본값은 넣지 않도록 `infra/environments/config/environments/demo.env.example`에 작성한다
+- [ ] T011 추정 수치 없이 EC2 용량 참조, 서비스별 demo 제한, 빌드 에이전트 제한과 `heavyBuildMaxConcurrency: 1`을 `infra/environments/config/resource-limits.example.yaml`에 정의한다
+- [ ] T012 공통 레이블, 상태 확인 앵커, 내부 네트워크 규약과 공개 포트 없음 기본값을 `infra/environments/compose/common.yaml`에 작성한다
+- [ ] T013 고정 이미지, 영속 볼륨과 호스트 포트 비공개 설정을 갖춘 별도 관리 PostgreSQL/Redis 데이터 프로젝트를 `infra/environments/compose/data/compose.yaml`에 작성한다
+- [ ] T014 [P] `festa_dev_business`, `festa_dev_ai`, `festa_demo_business`, `festa_demo_ai`, 전용 역할, PUBLIC CONNECT 회수와 AI 전용 pgvector를 구성하는 멱등 부트스트랩 SQL을 `infra/environments/postgres/init/00-databases-and-roles.sql`에 작성한다
+- [ ] T015 [P] Redis 기본 사용자를 비활성화하고 `noeviction`을 설정하며 외부 ACL 파일을 불러오고 환경·서비스 ACL 예시를 `infra/environments/redis/redis.conf`와 `infra/environments/redis/users.acl.example`에 정의한다
+- [ ] T016 [P] infra-001의 스키마를 복제하지 않고 릴리스 매니페스트와 검증 대상 참조를 `infra/environments/scripts/validate-infra001-contracts.sh`에서 검증한다
+- [ ] T017 자격증명, 쿠키, 서명 URL, 개인 키와 원본 환경 덤프를 거부하는 민감정보 제거 검증 근거 기록을 `infra/environments/scripts/write-evidence.sh`에 구현한다
 
 **완료 확인**: 유효하지 않은 픽스처에서 스키마 테스트가 실패하고, 실제 배포 입력이 누락되면 사전 점검이 차단하며, 데이터 서비스는 내부 전용이고 검증 근거에는 Secret 원문을 포함할 수 없다.
 

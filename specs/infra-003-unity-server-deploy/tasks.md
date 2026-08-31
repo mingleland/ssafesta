@@ -18,11 +18,11 @@
 
 **Purpose**: infra-003가 소유하는 코드·테스트·배포 경계와 실행 규약을 준비한다.
 
-- [X] T001 infra-001/002 재사용 경계, Unity 6000.0.78f1의 x86_64 서버 대상·OCI Unity 검증 취소 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
-- [X] T002 [P] 실제 값을 포함하지 않는 game image·도메인·토큰 Secret·TLS·network·volume 환경 변수 예시를 `infra/unity-server/.env.example`에 작성한다
-- [X] T003 [P] ShellCheck 대상 엄격 모드, 정리 trap, 민감정보 제거와 공통 assertion을 `infra/unity-server/tests/lib/assert.sh`에 작성한다
-- [X] T004 [P] Unity 보안 코드와 EditMode 테스트를 기존 `festa-unity/Assets/_Project/Scripts/Network/Auth/Festa.Network.Auth.asmdef`와 `festa-unity/Assets/_Project/Tests/Editor/Festa.Tests.Editor.asmdef` 경계로 분리한다
-- [X] T005 [P] 릴리스·DNS/TLS·WSS·무입력·재접속·수용량 결과만 기록하고 token/Secret/개인정보 원문을 금지하는 양식을 `infra/unity-server/evidence/template.md`에 작성한다
+- [ ] T001 infra-001/002 재사용 경계, Unity 6000.0.78f1의 x86_64 서버 대상·OCI Unity 검증 취소 경계, 동결 기준선 금지 사항과 로컬·외부 검증 명령을 `infra/unity-server/README.md`에 작성한다
+- [ ] T002 [P] 실제 값을 포함하지 않는 game image·도메인·토큰 Secret·TLS·network·volume 환경 변수 예시를 `infra/unity-server/.env.example`에 작성한다
+- [ ] T003 [P] ShellCheck 대상 엄격 모드, 정리 trap, 민감정보 제거와 공통 assertion을 `infra/unity-server/tests/lib/assert.sh`에 작성한다
+- [ ] T004 [P] Unity 보안 코드와 EditMode 테스트를 분리하는 assembly definition을 `festa-unity/Assets/_Project/Scripts/Network/Security/Festa.Network.Security.asmdef`와 `festa-unity/Assets/_Project/Tests/EditMode/Festa.Network.Security.Tests.asmdef`에 구성한다
+- [ ] T005 [P] 릴리스·DNS/TLS·WSS·무입력·재접속·수용량 결과만 기록하고 token/Secret/개인정보 원문을 금지하는 양식을 `infra/unity-server/evidence/template.md`에 작성한다
 
 **Checkpoint**: infra-003 전용 경로와 테스트 실행 기반이 준비된다.
 
@@ -34,15 +34,15 @@
 
 **⚠️ CRITICAL**: 이 단계가 끝나기 전에는 사용자 스토리 구현을 시작하지 않는다.
 
-- [X] T006 `world-session.openapi.yaml`의 구조화 endpoint·인증·필수 필드·오류 응답을 `WorldSessionApiIntegrationTest`와 `infra/unity-server/tests/static/contracts.sh`에서 검사한다
-- [X] T007 [P] HS256 only, TTL 120초, issuer/audience, `11F/11F-01`과 전용 Base64 Secret을 기존 `backend/src/main/java/com/example/ssafesta/world/WorldProperties.java`에 바인딩·검증한다
-- [X] T008 [P] World Entry Grant의 검증된 신원·target·시간·JTI를 기존 `WorldEntryTokenIssuer` 내부 모델과 `festa-unity/Assets/_Project/Scripts/Network/Auth/WorldEntryToken.cs`로 표현한다
-- [X] T009 [P] game runtime·world entry token 계약의 고정값과 필수 환경 변수를 검사하는 정적 테스트를 `infra/unity-server/tests/static/contracts.sh`에 작성한다
-- [X] T010 [P] token·Secret·개인정보 원문을 제거하면서 release/client/channel/failure-layer만 남기는 로그 규약을 `infra/unity-server/contracts/logging.md`에 작성한다
-- [X] T011 [P] immutable image ref, current/known-good, game-only lock과 검증 상태를 infra-001 스키마에 매핑하는 배포 상태 계약을 `infra/unity-server/contracts/release-state.md`에 작성한다
-- [X] T012 Backend·Unity가 동일한 issuer/audience/world/channel/ledger 경로를 소비하도록 환경 변수 매핑을 `infra/unity-server/contracts/runtime-env.md`에 작성한다
-- [X] T013 OpenAPI YAML, Compose config, Nginx 구문과 shell strict-mode를 한 번에 검사하는 로컬 진입점을 `infra/unity-server/tests/run-static.sh`에 작성한다
-- [X] T014 Setup·Foundational 산출물이 계획 계약과 헌법 6·8·13~16·27조를 만족하는지 `specs/infra-003-unity-server-deploy/checklists/implementation.md`에 검증 항목으로 작성한다
+- [ ] T006 `world-session.openapi.yaml`의 구조화 endpoint·인증·필수 필드·오류 응답을 검사하는 계약 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionContractTest.java`에 작성한다
+- [ ] T007 [P] HS256 only, TTL 120초, issuer/audience, `11F/11F-01`과 전용 Base64 Secret을 바인딩·검증하는 설정 모델을 `backend/src/main/java/com/example/ssafesta/world/WorldSessionProperties.java`에 작성한다
+- [ ] T008 [P] World Entry Grant의 검증된 신원·target·시간·JTI를 표현하는 내부 모델을 `backend/src/main/java/com/example/ssafesta/world/WorldEntryGrant.java`와 `festa-unity/Assets/_Project/Scripts/Network/Security/VerifiedWorldEntryGrant.cs`에 작성한다
+- [ ] T009 [P] game runtime·world entry token 계약의 고정값과 필수 환경 변수를 검사하는 정적 테스트를 `infra/unity-server/tests/static/contracts.sh`에 작성한다
+- [ ] T010 [P] token·Secret·개인정보 원문을 제거하면서 release/client/channel/failure-layer만 남기는 로그 규약을 `infra/unity-server/contracts/logging.md`에 작성한다
+- [ ] T011 [P] immutable image ref, current/known-good, game-only lock과 검증 상태를 infra-001 스키마에 매핑하는 배포 상태 계약을 `infra/unity-server/contracts/release-state.md`에 작성한다
+- [ ] T012 Backend·Unity가 동일한 issuer/audience/world/channel/ledger 경로를 소비하도록 환경 변수 매핑을 `infra/unity-server/contracts/runtime-env.md`에 작성한다
+- [ ] T013 OpenAPI YAML, Compose config, Nginx 구문과 shell strict-mode를 한 번에 검사하는 로컬 진입점을 `infra/unity-server/tests/run-static.sh`에 작성한다
+- [ ] T014 Setup·Foundational 산출물이 계획 계약과 헌법 6·8·13~16·27조를 만족하는지 `specs/infra-003-unity-server-deploy/checklists/implementation.md`에 검증 항목으로 작성한다
 
 **Checkpoint**: API·token·runtime·release·로그 경계가 고정되어 스토리별 실패 우선 테스트를 작성할 수 있다.
 
@@ -56,20 +56,20 @@
 
 ### Tests for User Story 1 ⚠️
 
-- [X] T015 [P] [US1] 회원·게스트 인증, `wss/world/443`, `11F/11F-01`, 120초 token 응답과 비인가 거부를 검증하는 API 통합 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionApiIntegrationTest.java`에 작성한다
+- [ ] T015 [P] [US1] 회원·게스트 인증, `wss/world/443`, `11F/11F-01`, 120초 token 응답과 비인가 거부를 검증하는 API 통합 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionApiIntegrationTest.java`에 작성한다
 - [ ] T016 [P] [US1] `WorldSessionDto.endpoint`의 ws/wss 매핑, 호스트 검증과 하드코딩 주소 부재를 검사하는 Unity EditMode 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/WorldSessionEndpointTests.cs`에 작성한다
-- [X] T017 [P] [US1] host 443·Full(strict)·Upgrade·cache bypass와 public 7777 차단을 실패 우선 검증하는 테스트를 `infra/unity-server/tests/integration/public-wss.sh`에 작성한다
-- [X] T018 [P] [US1] 인증서 만료·호스트 불일치·신뢰 실패를 우회하지 않는 원본 TLS 검사를 `infra/unity-server/tests/security/tls-strict.sh`에 작성한다
+- [ ] T017 [P] [US1] host 443·Full(strict)·Upgrade·cache bypass와 public 7777 차단을 실패 우선 검증하는 테스트를 `infra/unity-server/tests/integration/public-wss.sh`에 작성한다
+- [ ] T018 [P] [US1] 인증서 만료·호스트 불일치·신뢰 실패를 우회하지 않는 원본 TLS 검사를 `infra/unity-server/tests/security/tls-strict.sh`에 작성한다
 
 ### Implementation for User Story 1
 
-- [X] T019 [US1] 인증된 회원·게스트 신원을 조회하고 `WorldSessionResponse`를 생성하는 controller/service 경계를 `backend/src/main/java/com/example/ssafesta/world/WorldSessionController.java`와 `backend/src/main/java/com/example/ssafesta/world/WorldSessionService.java`에 구현한다
-- [X] T020 [US1] 전용 HS256 Secret으로 120초 connection JWT를 발급하고 `world-session.openapi.yaml` 응답을 채우는 issuer를 `backend/src/main/java/com/example/ssafesta/world/WorldEntryTokenIssuer.java`에 구현한다
-- [X] T021 [US1] local/demo별 구조화 endpoint와 Secret Reference를 바인딩하고 잘못된 scheme·host·port·Secret에서 조기 실패하도록 `backend/src/main/resources/application-local.yml`과 `backend/src/main/resources/application-infra.yml`을 구성한다
-- [X] T022 [P] [US1] Access Token을 Authorization header로 사용해 로딩 완료 뒤 `POST /api/v1/world-sessions`를 호출하는 adapter를 `festa-unity/Assets/_Project/Scripts/Integration/Spring/HttpUserApiClient.cs`에 구현한다
-- [X] T023 [US1] mock/real 환경에서 올바른 user API adapter를 선택하고 응답 endpoint로만 접속하도록 기존 `ApiServices`·`ConnectionManager` 배선을 재사용한다
-- [X] T024 [P] [US1] `world.${ROOT_DOMAIN}`의 TLS·Upgrade·Host·cache bypass와 내부 `demo-game:7777` upstream을 `infra/unity-server/nginx/world.conf.template`에 작성한다
-- [X] T025 [US1] DNS→TLS→Cloudflare→Nginx→내부 listener→승인 접속과 public 7777 차단 결과를 수집하는 외부 실행기를 `infra/unity-server/scripts/verify-public-wss.sh`에 구현한다
+- [ ] T019 [US1] 인증된 회원·게스트 신원을 조회하고 `WorldSessionResponse`를 생성하는 controller/service 경계를 `backend/src/main/java/com/example/ssafesta/world/WorldSessionController.java`와 `backend/src/main/java/com/example/ssafesta/world/WorldSessionService.java`에 구현한다
+- [ ] T020 [US1] 전용 HS256 Secret으로 120초 connection JWT를 발급하고 `world-session.openapi.yaml` 응답을 채우는 issuer를 `backend/src/main/java/com/example/ssafesta/world/WorldEntryTokenIssuer.java`에 구현한다
+- [ ] T021 [US1] local/demo별 구조화 endpoint와 Secret Reference를 바인딩하고 잘못된 scheme·host·port·Secret에서 조기 실패하도록 `backend/src/main/resources/application-local.yml`과 `backend/src/main/resources/application-infra.yml`을 구성한다
+- [ ] T022 [P] [US1] Access Token을 Authorization header로 사용해 로딩 완료 뒤 `POST /api/v1/world-sessions`를 호출하는 adapter를 `festa-unity/Assets/_Project/Scripts/Integration/Spring/HttpUserApiClient.cs`에 구현한다
+- [ ] T023 [US1] mock/real 환경에서 올바른 user API adapter를 선택하고 응답 endpoint로만 접속하도록 `festa-unity/Assets/_Project/Scripts/Integration/ApiServices.cs`와 `festa-unity/Assets/_Project/Scripts/Network/Connection/ConnectionManager.cs`를 연결한다
+- [ ] T024 [P] [US1] `world.${ROOT_DOMAIN}`의 TLS·Upgrade·Host·cache bypass와 내부 `demo-game:7777` upstream을 `infra/unity-server/nginx/world.conf.template`에 작성한다
+- [ ] T025 [US1] DNS→TLS→Cloudflare→Nginx→내부 listener→승인 접속과 public 7777 차단 결과를 수집하는 외부 실행기를 `infra/unity-server/scripts/verify-public-wss.sh`에 구현한다
 
 **Checkpoint**: US3의 실제 승인 검증과 결합하면 외부 브라우저의 안전한 월드 입장을 독립 검증할 수 있다.
 
@@ -83,15 +83,15 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [X] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
+- [ ] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
 - [ ] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
 - [ ] T028 [P] [US2] 내부 listener 실패·외부 승인 실패 후보가 current/known-good으로 승격되지 않고 이전 ref로 복구되는 장애 테스트를 `infra/unity-server/tests/failure/deploy-rollback.sh`에 작성한다
 - [ ] T029 [P] [US2] process running·internal listening·external handshake·approved admission을 서로 다른 상태로 판정하는 테스트를 `infra/unity-server/tests/integration/game-readiness.sh`에 작성한다
 
 ### Implementation for User Story 2
 
-- [X] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
-- [X] T031 [P] [US2] host·game image의 x86_64 일치와 에뮬레이션 미사용, image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
+- [ ] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
+- [ ] T031 [P] [US2] host·game image의 x86_64 일치와 에뮬레이션 미사용, image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
 - [ ] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
 - [ ] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
 - [ ] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다

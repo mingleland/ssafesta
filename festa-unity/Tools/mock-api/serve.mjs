@@ -72,10 +72,7 @@ function issueGrant() {
   const header = { alg: 'HS256', typ: 'JWT' };
   const claims = {
     iss: ISSUER,
-    // 실제 백엔드(Spring)는 aud 를 **단일 문자열**로 보낸다 (RFC 7519 §4.1.3 이 허용).
-    // 여기서 배열로 보내면 이 목이 실물과 다른 형태를 검증기에 학습시킨다 — 검증기가
-    // 배열만 받는 결함(S15P21A604-340)을 이 목이 정확히 그렇게 가렸다. 실물을 따라간다.
-    aud: AUDIENCE,
+    aud: [AUDIENCE],
     sub: playerId,
     jti,
     iat: now,
