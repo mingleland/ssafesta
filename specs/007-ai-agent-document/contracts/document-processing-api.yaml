@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA AI Document Processing API
-  version: 0.3.0
+  version: 0.4.0
   description: Spring이 Business DB에서 검증한 문서·저장소 snapshot을 FastAPI Job으로 접수하고, 삭제·비활성화 artifact를 멱등 정리하며 내부 진단 상태를 조회하는 계약이다. FastAPI는 Business DB를 직접 조회하지 않는다.
 servers:
   - url: /ai/v1
@@ -246,6 +246,8 @@ components:
           minimum: 0
         lastErrorCode:
           type: [string, 'null']
+          enum: [PARSE_FAILED, UNSUPPORTED_SCAN_PDF, EMBEDDING_TIMEOUT, SOURCE_NOT_FOUND, SOURCE_HASH_MISMATCH, PROCESSING_INTERRUPTED, INTERNAL_ERROR, null]
+          description: SOURCE_HASH_MISMATCH는 다운로드한 원본 바이트의 SHA-256이 처리 요청 sourceHash와 다를 때 기록한다.
         updatedAt:
           type: string
           format: date-time

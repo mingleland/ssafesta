@@ -63,7 +63,7 @@
 - [X] T018a [P] [AI] LLM Provider protocol과 결정적 LLM·Embedding Mock Provider를 `festa-ai/app/providers/llm.py` 및 `festa-ai/app/providers/mock.py`에 구현한다 (`S15P21A604-94`)
 - [X] T019 [P] [AI] 모든 Spring→FastAPI 내부 요청에서 `INTERNAL_SPRING_TO_AI_TOKENS` 전체를 `secrets.compare_digest`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하도록 `festa-ai/app/api/dependencies/internal_auth.py` 및 `festa-ai/app/api/errors.py`에 구현한다 (`S15P21A604-121`)
 - [ ] T020 [P] [BE] 모든 AI→Spring callback에서 `INTERNAL_AI_TO_SPRING_TOKENS` 전체를 `MessageDigest.isEqual`로 검증하고 누락·오류·반대 방향 토큰을 401로 거부하며 `/internal/*` 공개 경로를 차단하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiInternalSecurityConfiguration.java`에 구현한다
-- [ ] T021 [P] [AI] 안정적인 실패 코드와 사용자용 한국어 사유 매핑을 `festa-ai/app/services/failure_policy.py`에 구현한다
+- [ ] T021 [P] [AI] `SOURCE_HASH_MISMATCH`를 포함한 안정적인 실패 코드와 사용자용 한국어 사유 매핑을 `festa-ai/app/services/failure_policy.py`에 구현한다
 
 **Checkpoint**: FastAPI가 AI DB 전용 설정으로 기동하고, Business/AI database CONNECT matrix와 최소 권한을 지키며 테스트 DB를 사용할 수 있다.
 
@@ -105,13 +105,13 @@
 ### Tests for User Story 2
 
 - [ ] T030 [P] [US2] [BE] PDF 20MB·Agent 10개/100MB·SHA-256 중복·명시적 교체, 15분 URL·1시간 `EXPIRED`·24시간 복구 유예, 활성 쓰기 Provider 기록과 Provider 변경 중 재개 시 기존 문서 `EXPIRED`·새 문서 생성 흐름을 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentUploadIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
-- [ ] T031 [P] [US2] [BE] AI→Spring 방향 Service Token의 정상 승인과 누락·오류·반대 방향 401, `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH` 404 분리와 mismatch 경고, 중복 `jobId + status` 멱등 성공과 stale `sourceHash` 409 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentStatusCallbackIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
-- [ ] T032 [P] [US2] [AI] 세 OpenAPI 요청·응답 스키마를 `festa-ai/tests/contract/test_document_processing_api.py`, `festa-ai/tests/contract/test_spring_status_api.py`, `festa-ai/tests/contract/test_spring_storage_reconciliation_api.py`에서 검증한다. 처리 snapshot 필수 필드, cleanup 반복 204, callback 404 원인 코드와 방향별 Service Token 401, reconcile metadata를 먼저 검증하고 실패를 확인한다 (`S15P21A604-121`: document-processing 접수 계약 자동 비교 완료, 나머지 두 계약은 후속)
+- [ ] T031 [P] [US2] [BE] AI→Spring 방향 Service Token의 정상 승인과 누락·오류·반대 방향 401, `FAILED + SOURCE_HASH_MISMATCH` callback 수락·저장, `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH` 404 분리와 mismatch 경고, 중복 `jobId + status` 멱등 성공과 stale `sourceHash` 409 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentStatusCallbackIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+- [ ] T032 [P] [US2] [AI] 세 OpenAPI 요청·응답 스키마를 `festa-ai/tests/contract/test_document_processing_api.py`, `festa-ai/tests/contract/test_spring_status_api.py`, `festa-ai/tests/contract/test_spring_storage_reconciliation_api.py`에서 검증한다. 처리 snapshot 필수 필드, 진단 `lastErrorCode`와 callback `failureCode`의 `SOURCE_HASH_MISMATCH`, cleanup 반복 204, callback 404 원인 코드와 방향별 Service Token 401, reconcile metadata를 먼저 검증하고 실패를 확인한다 (`S15P21A604-121`: document-processing 접수 계약 자동 비교 완료, 나머지는 후속)
 - [ ] T033 [P] [US2] [AI/INFRA] 활성 Job 멱등성·`SKIP LOCKED` 단일 소유·상태 전이와 4개 runtime role × 4개 database CONNECT matrix의 대각선만 성공하는 권한 테스트를 `festa-ai/tests/integration/test_document_job_repository.py` 및 Infra contract test에 먼저 작성하고 실패를 확인한다 (`S15P21A604-121`: 실제 HTTP→PostgreSQL 활성 Job 멱등·동시성 E2E 완료, `SKIP LOCKED`·상태 전이·CONNECT matrix는 후속)
 - [ ] T034 [P] [US2] [AI] Worker 강제 종료·lease 회수·1/5/15분 backoff·최대 3회 재시도 테스트를 `festa-ai/tests/integration/test_job_recovery.py`에 먼저 작성하고 실패를 확인한다
 - [ ] T035 [P] [US2] [AI] AI DB 안의 검색 불가 Chunk 전체 교체+Job `SUCCEEDED` 원자성·청크 감소·중간 실패 rollback과 READY callback 204 이후에만 `searchable=true`가 되는 테스트를 `festa-ai/tests/integration/test_chunk_replacement.py`에 먼저 작성하고 실패를 확인한다
 - [ ] T036 [P] [US2] [AI] 부스/Agent 위조와 교차 검색 누출 0건 Critical Test를 `festa-ai/tests/integration/test_vector_isolation.py`에 먼저 작성하고 실패를 확인한다
-- [ ] T037 [P] [US2] [AI] Spring snapshot만으로 문서별 R2/MinIO 읽기, 저장소·Embedding 일시 장애의 1·5·15분 유한 재시도, PDF 파싱·스캔 PDF 오류와 FastAPI Business DB 무접근 테스트를 `festa-ai/tests/unit/test_document_processing_service.py`에 먼저 작성하고 실패를 확인한다
+- [ ] T037 [P] [US2] [AI] Spring snapshot만으로 문서별 R2/MinIO 읽기, 다운로드 원본 SHA-256 일치 성공과 불일치 시 Parser·Embedding·Chunk 저장 0회 및 `DEAD + SOURCE_HASH_MISMATCH` 종료, 저장소·Embedding 일시 장애의 1·5·15분 유한 재시도, PDF 파싱·스캔 PDF 오류와 FastAPI Business DB 무접근 테스트를 `festa-ai/tests/unit/test_document_processing_service.py`에 먼저 작성하고 실패를 확인한다
 - [ ] T038 [P] [US2] [FE] 업로드 성공과 RAG 준비 완료를 구분하고 `EXPIRED`를 업로드 만료로 표시하는 문서 상태 UI 테스트를 `festa-frontend/src/features/ai-agent/components/DocumentManager.test.tsx`에 먼저 작성하고 실패를 확인한다
 
 ### Implementation for User Story 2
@@ -121,16 +121,16 @@
 - [ ] T041 [US2] [BE] PDF·MD·TXT 형식·20MB·10개/100MB·SHA-256 중복 및 `documentId` 교체 정책을 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentService.java`에 구현한다
 - [ ] T042 [P] [US2] [BE] Business DB에서 소유권·임대·상태를 검증한 뒤 전체 문서·저장소 snapshot을 구성하고 `INTERNAL_SPRING_TO_AI_TOKENS`를 부착해 FastAPI 처리 요청을 보내는 client와 202/401/409/422 처리를 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentProcessingClient.java`에 구현한다
 - [ ] T043 [US2] [BE] presigned 업로드 URL·업로드 완료·명시적 교체 API를 구현하고, 같은 Provider의 `EXPIRED` 완료 요청은 원본이 있으면 `QUEUED`로 복구하되 Provider가 바뀌었으면 기존 문서를 `EXPIRED`로 유지하고 새 문서·새 object key를 만들도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentController.java`에 연결한다
-- [ ] T044 [US2] [BE] 처리 요청 응답의 `jobId + documentId`를 다른 후속 처리보다 먼저 저장하고, callback에서 `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH`를 구분하며 mismatch를 계약 오류로 경고하고, `jobId + status` 멱등성과 `sourceHash` 최신성을 검증하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusController.java` 및 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusService.java`에 구현한다
+- [ ] T044 [US2] [BE] 처리 요청 응답의 `jobId + documentId`를 다른 후속 처리보다 먼저 저장하고, callback의 `SOURCE_HASH_MISMATCH`를 유효한 failureCode로 저장·노출하며, `JOB_NOT_REGISTERED`·`DOCUMENT_NOT_FOUND`·`JOB_DOCUMENT_MISMATCH`를 구분해 mismatch를 계약 오류로 경고하고, `jobId + status` 멱등성과 `sourceHash` 최신성을 검증하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusController.java` 및 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentStatusService.java`에 구현한다
 - [ ] T045 [P] [US2] [AI] Provider별 endpoint·bucket을 사용하는 boto3 기반 R2·MinIO storage adapter와 문서별 원본 metadata 검증을 `festa-ai/app/providers/s3_compatible_storage.py`에 구현한다
 - [ ] T046 [P] [US2] [AI] PDF 텍스트·페이지 추출·텍스트 없음 판정과 MD·TXT의 UTF-8 디코딩을 확장자 기준으로 분기해 `festa-ai/app/providers/document_parser.py`에 구현한다
 - [X] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
 - [ ] T048 [P] [US2] [AI] `S15P21A604-92`의 실측값을 초기 배포 설정에 반영하고 설정 기반 chunk size·overlap과 page/section 추적을 `festa-ai/app/services/text_chunker.py`에 구현한다
-- [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata·SHA-256을 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드하며, 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하는 파이프라인을 `festa-ai/app/services/document_processing_service.py`에 구현한다
+- [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata를 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드한 바이트의 SHA-256을 계산해 `sourceHash`와 대조한다. 불일치는 재시도 없이 `DEAD + SOURCE_HASH_MISMATCH`로 종료하고 Chunk를 저장하지 않으며, 일치할 때만 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하도록 `festa-ai/app/services/document_processing_service.py`에 구현한다
 - [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속)
 - [ ] T051 [US2] [AI] `FOR UPDATE SKIP LOCKED` pickup과 30초 heartbeat 및 소유권 상실 시 결과 폐기를 `festa-ai/app/workers/document_worker.py`에 구현한다
 - [ ] T052 [US2] [AI] 기동 즉시 및 60초 주기의 만료 Job 회수와 재시도 상한 처리를 `festa-ai/app/services/job_recovery_service.py`에 구현한다
-- [ ] T053 [P] [US2] [AI] `INTERNAL_AI_TO_SPRING_TOKENS` 첫 값을 Bearer로 부착하는 `PROCESSING/READY/FAILED/DISABLED` callback client와 401·409 및 404 원인 코드 처리·사용자 오류 정제, READY 204 이후 해당 Job Chunk의 `searchable=true` 전환을 `festa-ai/app/services/spring_status_callback.py`에 구현한다
+- [ ] T053 [P] [US2] [AI] `INTERNAL_AI_TO_SPRING_TOKENS` 첫 값을 Bearer로 부착하는 `PROCESSING/READY/FAILED/DISABLED` callback client와 `SOURCE_HASH_MISMATCH`를 포함한 failureCode 직렬화, 401·409 및 404 원인 코드 처리·사용자 오류 정제, READY 204 이후 해당 Job Chunk의 `searchable=true` 전환을 `festa-ai/app/services/spring_status_callback.py`에 구현한다
 - [ ] T054 [US2] [AI] 미전달 terminal callback 중 `callback_delivered_at`과 `callback_terminated_at`이 모두 비어 있는 Job만 재전송하고, `JOB_NOT_REGISTERED`를 1초·3초·10초 간격으로 최대 3회 재시도하며, 소진 및 영구 404는 별도 종료 시각·사유를 기록하고 stale 409는 기존 합의대로 종료하도록 `festa-ai/app/services/callback_reconciliation_service.py`에 구현한다
 - [ ] T055 [US2] [AI] API lifespan에서 Worker·sweeper·callback reconciliation을 시작하고 안전하게 종료하도록 `festa-ai/app/main.py`에 연결한다
 - [ ] T056 [P] [US2] [FE] `EXPIRED`를 포함한 Spring 업로드 URL·완료·교체·상태 조회 API client와 DTO를 `festa-frontend/src/features/ai-agent/api/aiDocumentApi.ts`에 구현한다
