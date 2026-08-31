@@ -17,12 +17,25 @@ namespace Festa.Booth
         readonly List<Renderer> _renderers = new();
         MaterialPropertyBlock _block;
 
+        // ── 근접 자동 조준용 레지스트리 ─────────────────────────
+        // 디스패처가 매 프레임 "사거리 안의 가장 가까운 대상" 을 찾는다 (S15P21A604-346).
+        // FindObjectsByType 을 매 프레임 돌리면 씬 전체를 훑으므로, 활성 대상이
+        // 스스로 등록·해제한다. 월드 전체 대상은 수십 개 규모라 선형 탐색로 충분하다.
+        public static readonly List<BoothInteractionTarget> Active = new();
+
+        void OnEnable() => Active.Add(this);
+        void OnDisable() => Active.Remove(this);
+
         public float MaxDistance => _maxDistance;
+
+        /// <summary>F 에 실제로 응답하는 대상인가 (IBoothInteractable 보유 — 팩토리가 판정해 넘긴다).</summary>
+        public bool Interactive { get; private set; }
 
         public void Configure(float maxDistance, bool highlightEnabled)
         {
             _maxDistance = Mathf.Max(0.5f, maxDistance);
             _highlightEnabled = highlightEnabled;
+            Interactive = highlightEnabled;
             EnsureCollider();
             CacheRenderers();
         }

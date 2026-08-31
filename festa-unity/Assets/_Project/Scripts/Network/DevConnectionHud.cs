@@ -86,6 +86,10 @@ namespace Festa.Network
         void OnGUI()
         {
             if (Application.isBatchMode) return;
+            // 패널은 개발 도구다 — 릴리즈(비 Development) 빌드에서는 그리지 않는다.
+            // 이 컴포넌트의 진입 소비(TryConsumeEntryRequest) 로직은 빌드와 무관하게 돌아야
+            // 하므로 컴포넌트가 아니라 **그리기만** 게이트한다 (S15P21A604-348).
+            if (!UnityEngine.Debug.isDebugBuild && !Application.isEditor) return;
 
             var nm = Unity.Netcode.NetworkManager.Singleton;
             if (nm == null) return;
