@@ -1083,3 +1083,95 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 11. World Session 최소 계약
 
 P1은 Survey → Staff → Consultation → Inventory → Dashboard → Minigame 순으로 연결하는 것을 권장한다.
+
+---
+
+## 20. 내부 API — Spring ↔ FastAPI
+
+**사용자 API가 아니다.** `/api/v1` 아래가 아니라 **`/internal/*`** 이고, 사용자 Access Token으로는
+열리지 않는다. 인프라가 이 접두어를 공개 리스너에서 막고, 서버는 그것과 **독립적으로 항상**
+토큰을 검증한다 — SG 룰은 설정 한 줄로 조용히 깨지고 그 순간 토큰이 유일한 방어선이다.
+
+### 인증 (2026-08-25 확정 — [GitLab #102](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/102))
+
+`Authorization: Bearer <service-token>`이고 **토큰은 방향별로 분리**한다.
+
+| 변수 | 방향 | 송신 | 검증 |
+|---|---|---|---|
+| `INTERNAL_SPRING_TO_AI_TOKENS` | Spring → FastAPI | Spring | FastAPI |
+| `INTERNAL_AI_TO_SPRING_TOKENS` | FastAPI → Spring | FastAPI·Worker | **Spring** |
+
+합치지 않는 이유는 노출 표면이 다르기 때문이다 — AI→Spring 토큰은 **사용자가 올린 PDF를 파싱하는
+Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험이 좁은 쪽으로 그대로 전파된다.
+
+- **콤마 구분 1~2개.** 송신자는 첫 값을 쓰고 수신자는 목록 전체를 받아들인다 — "현재 토큰"이
+  값 자체로 표현되므로 승격 절차가 따로 필요 없다. 회전: `[old]` → `[old,new]` → `[new,old]` → `[new]`
+- 비교는 **상수 시간**(`MessageDigest.isEqual`)이고 목록 전체를 **조기 반환 없이** 돈다
+- 앞뒤 공백이 붙은 값·빈 항목·중복·3개 이상은 **기동을 실패**시킨다. Secret을 말없이 다듬으면
+  설정한 값과 비교하는 값이 달라지고 그 차이는 런타임 401로만 드러난다
+- 누락·오류·**반대 방향 토큰**은 전부 `401 UNAUTHORIZED`
+- mTLS는 P2다 — 두 서비스가 같은 VPC 안이라 mTLS가 막는 위협이 현 배치에 없다
+
+> ⚠️ **배포 조치 (Infra).** `INTERNAL_AI_TO_SPRING_TOKENS` 는 **기본값이 없어 주입하지 않으면
+> 애플리케이션이 기동하지 않는다.** 현재 `infra/deploy/compose/dev/back.compose.yaml` 은 환경변수를
+> 하나도 넘기지 않고 `integration/compose.yaml` 도 `FESTA_ENVIRONMENT`·`AI_BASE_URL` 둘뿐이라,
+> 이 값은 물론 아래 목록 전체가 아직 컨테이너에 도달하지 않는다. Jenkins credential →
+> `with-credentials.sh` → compose `environment` 경로로 함께 wire 해야 한다.
+>
+> | 변수 | 기본값 | 없으면 |
+> |---|---|---|
+> | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
+> | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
+> | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+>
+> `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
+> 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.
+
+> **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
+> `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지
+> 말고 이 체인에 자기 필터와 규칙을 더한다** — 우선순위가 낮은 체인을 새로 만들면 요청이 그곳까지
+> 가지 않는다. 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 그대로 분리된다.
+
+### GET `/internal/ai/booth-access`
+
+FastAPI가 Conversation을 만들기 전에 묻는다 (spec 008 FR-024·C-08).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-booth-access-api.yaml`.
+
+```
+GET /internal/ai/booth-access?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+**유효 임대 → Agent의 부스 소속 → Agent `ACTIVE`** 순으로 **단락 평가**한다.
+
+```json
+// 허용
+{ "allowed": true, "boothId": 7, "agentId": 3, "agentStatus": "ACTIVE",
+  "leaseEndsAt": "2026-08-31T09:00:00Z", "remainingSeconds": 57600,
+  "serverTime": "2026-08-30T17:00:00Z" }
+
+// 거부
+{ "allowed": false, "boothId": 7, "agentId": 3,
+  "leaseEndsAt": null, "remainingSeconds": 0,
+  "serverTime": "2026-08-30T17:00:00Z", "denialCode": "BOOTH_LEASE_EXPIRED" }
+```
+
+**거부는 오류가 아니라 `200 + allowed:false`다.** `401`은 서비스 토큰 실패에만 쓴다.
+
+| `denialCode` | 뜻 | `leaseEndsAt` | `agentStatus` |
+|---|---|---|---|
+| `BOOTH_LEASE_EXPIRED` | 유효 임대가 없다 | `null` | **없음** |
+| `AGENT_NOT_IN_BOOTH` | 그 부스의 직원이 아니다 | 종료 시각 | **없음** |
+| `AGENT_INACTIVE` | 직원이 비활성이다 | 종료 시각 | `INACTIVE` |
+
+- **존재하지 않는 `boothId`·`agentId`도 404가 아니라 각각 첫·두 번째 거부**다. 내부 API라도
+  존재 여부를 알려 줄 이유가 없다
+- **`leaseEndsAt == null` ⟺ `denialCode == BOOTH_LEASE_EXPIRED`.** 만료 임대의 종료 시각은
+  조회하지 않는다 — 과거 임대가 여럿일 때 어느 행인지 정할 근거가 없고, FastAPI가 저장하는 값은
+  성공 응답의 종료 시각뿐이다
+- **`agentStatus`가 있다 ⟺ 그 `agentId`가 그 `boothId`에 있다.** 저장값이 `ACTIVE`가 아니면 전부
+  `INACTIVE`로 정규화한다 — 계약 어휘는 두 값뿐이다
+- `serverTime`·유효성 판정·`remainingSeconds`는 **한 요청에서 같은 시각 하나**로 계산한다.
+  FastAPI는 이 쌍을 저장해 이후 모든 질문의 만료를 스스로 판정한다(FR-024) — 셋이 어긋나면
+  그 판정이 어긋난다

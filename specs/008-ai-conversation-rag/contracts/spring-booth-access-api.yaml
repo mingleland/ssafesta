@@ -1,7 +1,22 @@
 openapi: 3.1.0
 info:
   title: Spring Booth Access Validation API for AI
-  version: 0.1.0
+  version: 0.2.0
+  description: |
+    FastAPI가 Conversation을 만들기 전에 Spring에 묻는 검증 경로다 (spec 008 FR-024·FR-025, C-08).
+    Lease 유효성 → Agent의 Booth 소속 → Agent ACTIVE 순으로 **단락 평가**한다.
+
+    거부는 오류가 아니라 `200 + allowed:false + denialCode`다. 존재하지 않는 boothId·agentId도
+    404가 아니라 각각 첫 번째·두 번째 거부로 답한다 — 내부 API라도 존재 여부를 알려 주지 않는다.
+
+    `leaseEndsAt`·`remainingSeconds`는 **유효 임대가 있을 때만** 그 값을 싣는다. 만료 임대의
+    종료 시각은 조회하지 않으므로 유효 임대가 없으면 `null`·`0`이고, 그때가 정확히
+    `BOOTH_LEASE_EXPIRED`인 경우다. 즉 `leaseEndsAt == null` ⟺ `denialCode == BOOTH_LEASE_EXPIRED`.
+
+    `agentStatus`는 **Agent를 그 Booth에서 찾았을 때만** 싣는다 — 있다는 것 자체가 소속 확인을
+    뜻한다. 저장값이 `ACTIVE`가 아니면 전부 `INACTIVE`로 정규화한다.
+
+    한 요청의 `serverTime`·유효성 판정·`remainingSeconds`는 모두 **같은 시각 하나**로 계산한다.
 servers:
   - url: /internal/ai
 security:
@@ -28,19 +43,79 @@ components:
       type: http
       scheme: bearer
       bearerFormat: opaque-service-token
+      description: |
+        FastAPI → Spring 방향이므로 `INTERNAL_AI_TO_SPRING_TOKENS`를 쓴다
+        (GitLab #102, 2026-08-25 확정 — 방향별 2토큰).
+        FastAPI/Worker가 목록의 첫 값을 송신하고 Spring이 목록 전체를 상수 시간으로 검증한다.
+        Spring → FastAPI 방향 토큰(`INTERNAL_SPRING_TO_AI_TOKENS`)을 여기 실으면 401이다.
   schemas:
+    # 네 분기로 나눈 이유: 하나의 열린 object로는 "allowed:true인데 leaseEndsAt 없음",
+    # "BOOTH_LEASE_EXPIRED인데 leaseEndsAt이 non-null", "AGENT_INACTIVE인데 agentStatus 생략"
+    # 같은 계약상 무효 응답이 전부 스키마를 통과한다. allowed와 denialCode의 const가 서로
+    # 배타적이라 항상 정확히 한 분기만 맞는다.
+    #
+    # 각 분기의 additionalProperties:false가 "그 분기에서 실리면 안 되는 필드"를 닫는다 —
+    # 금지를 별도 키워드로 쓰지 않고 properties에서 빼는 것으로 표현한다.
     BoothAccessResponse:
+      oneOf:
+        - $ref: '#/components/schemas/BoothAccessAllowed'
+        - $ref: '#/components/schemas/BoothAccessLeaseExpired'
+        - $ref: '#/components/schemas/BoothAccessAgentNotInBooth'
+        - $ref: '#/components/schemas/BoothAccessAgentInactive'
+
+    BoothAccessAllowed:
       type: object
       additionalProperties: false
-      required: [allowed, boothId, agentId, serverTime]
+      required: [allowed, boothId, agentId, agentStatus, leaseEndsAt, remainingSeconds, serverTime]
       properties:
-        allowed: { type: boolean }
+        allowed: { const: true }
         boothId: { type: integer, format: int64 }
         agentId: { type: integer, format: int64 }
-        agentStatus: { type: string, enum: [ACTIVE, INACTIVE] }
-        leaseEndsAt: { type: [string, 'null'], format: date-time }
+        agentStatus: { const: ACTIVE }
+        leaseEndsAt: { type: string, format: date-time }
         remainingSeconds: { type: integer, minimum: 0 }
         serverTime: { type: string, format: date-time }
-        denialCode:
-          type: [string, 'null']
-          enum: [BOOTH_LEASE_EXPIRED, AGENT_NOT_IN_BOOTH, AGENT_INACTIVE, null]
+
+    # 유효 임대가 없다. 만료 임대는 조회하지 않으므로 종료 시각을 실을 수 없고, 소속 판정에
+    # 이르기 전에 단락되므로 agentStatus 도 없다.
+    BoothAccessLeaseExpired:
+      type: object
+      additionalProperties: false
+      required: [allowed, boothId, agentId, leaseEndsAt, remainingSeconds, serverTime, denialCode]
+      properties:
+        allowed: { const: false }
+        boothId: { type: integer, format: int64 }
+        agentId: { type: integer, format: int64 }
+        leaseEndsAt: { const: null }
+        remainingSeconds: { const: 0 }
+        serverTime: { type: string, format: date-time }
+        denialCode: { const: BOOTH_LEASE_EXPIRED }
+
+    # 임대는 유효하므로 종료 시각을 싣는다. Agent 를 찾지 못했으므로 agentStatus 는 없다 —
+    # 그 부재가 "이 Booth 에 그 agentId 가 없다"는 답이고, 그 이상은 알려 주지 않는다.
+    BoothAccessAgentNotInBooth:
+      type: object
+      additionalProperties: false
+      required: [allowed, boothId, agentId, leaseEndsAt, remainingSeconds, serverTime, denialCode]
+      properties:
+        allowed: { const: false }
+        boothId: { type: integer, format: int64 }
+        agentId: { type: integer, format: int64 }
+        leaseEndsAt: { type: string, format: date-time }
+        remainingSeconds: { type: integer, minimum: 0 }
+        serverTime: { type: string, format: date-time }
+        denialCode: { const: AGENT_NOT_IN_BOOTH }
+
+    BoothAccessAgentInactive:
+      type: object
+      additionalProperties: false
+      required: [allowed, boothId, agentId, agentStatus, leaseEndsAt, remainingSeconds, serverTime, denialCode]
+      properties:
+        allowed: { const: false }
+        boothId: { type: integer, format: int64 }
+        agentId: { type: integer, format: int64 }
+        agentStatus: { const: INACTIVE }
+        leaseEndsAt: { type: string, format: date-time }
+        remainingSeconds: { type: integer, minimum: 0 }
+        serverTime: { type: string, format: date-time }
+        denialCode: { const: AGENT_INACTIVE }
