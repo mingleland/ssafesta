@@ -49,8 +49,9 @@ namespace Festa.Booth
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
             runtimeObject.Init(boothId, dto, type);
 
-            AttachCommonInteraction(go, type);
+            // 동작을 먼저 붙이고, 그 **존재 여부로** 힌트·사거리를 결정한다.
             AttachContentBehaviour(go, type);
+            AttachCommonInteraction(go, type);
             return go;
         }
 
@@ -126,7 +127,11 @@ namespace Festa.Booth
 
         static void AttachCommonInteraction(GameObject go, BoothObjectType type)
         {
-            bool interactive = type is not BoothObjectType.Furniture and not BoothObjectType.Decoration;
+            // "상호작용 가능" 은 타입 분류가 아니라 **실제로 F 에 응답하는 컴포넌트의 존재**다.
+            // 전에는 가구·장식만 빼고 전부 true 라서, 책상·키오스크처럼 동작이 아직 없는
+            // 오브젝트에도 "F — 상호작용" 힌트가 떴고 F 는 조용히 무시됐다 — 힌트가 거짓말을
+            // 하면 동작하는 오브젝트까지 의심받는다 (S15P21A604-345 실측).
+            bool interactive = go.GetComponentInChildren<Festa.Content.IBoothInteractable>(true) != null;
             var target = go.GetComponent<BoothInteractionTarget>();
             if (target == null) target = go.AddComponent<BoothInteractionTarget>();
             // 사거리는 **월드 유닛**이다 — 이 프로젝트는 1 m = 10 unit 이므로 3 m 는 30f 다.

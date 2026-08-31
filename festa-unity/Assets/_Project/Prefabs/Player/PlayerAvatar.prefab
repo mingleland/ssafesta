@@ -109,7 +109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2993748127
+  GlobalObjectIdHash: 1901812825
   InScenePlacedSourceGlobalObjectIdHash: 0
   DeferredDespawnTick: 0
   Ownership: 1
@@ -254,7 +254,7 @@ MonoBehaviour:
   _visualRoot: {fileID: 0}
   _visualOffset: {x: 0, y: 0, z: 0}
   _visualScale: 1
-  _targetVisualHeight: 22.375
+  _targetVisualHeight: 16.875
   _groundClearance: 0.03
   _groundShadowSize: {x: 12, y: 8.5}
   _animatorController: {fileID: 9100000, guid: f8d5fa92a218de346b05c7a59e31aa67, type: 2}
