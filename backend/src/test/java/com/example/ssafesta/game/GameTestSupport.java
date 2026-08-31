@@ -25,7 +25,8 @@ final class GameTestSupport {
     }
 
     static Long createMember(UserRepository users, String prefix) {
-        return users.save(new User(prefix + SEQUENCE.incrementAndGet() + "_" + System.nanoTime())).getId();
+        // nickname VARCHAR(30) 예산. 태그는 헬퍼 구분용이다 — T-103, BoothTestSupport 참고.
+        return users.save(new User(prefix + "g" + SEQUENCE.incrementAndGet())).getId();
     }
 
     /**
