@@ -1,0 +1,112 @@
+# 프로파일 중립 설정. local·infra 어느 프로파일로 뜨든 이 파일이 로드된다.
+#
+# Spring 의 application-{profile}.yml 은 프로파일 간에 누적되지 않는다. 그래서 공통 설정이
+# application-local.yml 에만 있으면 SPRING_PROFILES_ACTIVE=infra 로 띄우는 순간 datasource 부터
+# 사라져 기동이 실패한다 (S15P21A604-347, GitLab #117).
+#
+# 로컬 편의를 위한 기본값은 여기 두지 않는다 — 배포에서 env 를 빠뜨렸을 때 로컬 값으로 조용히
+# 뜨면 안 되는 것들이다. 그 기본값은 application-local.yml 이 같은 키를 덮어 제공한다.
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ssafesta}
+    username: ${POSTGRES_USER:ssafesta}
+    # 기본값 없음 — 커밋된 비밀번호로 배포가 뜨는 경로를 만들지 않는다.
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # infra-002 T015 가 Redis 기본 사용자를 비활성화하고 ACL 을 켠다. ACL 이 걸린 Redis 는
+      # 자격증명 없는 연결을 거부한다. 빈 값이면 Spring 이 AUTH 를 보내지 않아 로컬 무인증
+      # Redis 도 그대로 붙는다.
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid, profile, email
+            # 경로는 Spring 콜백 규약(/login/oauth2/code/{registrationId})에 묶여 있다.
+            # 콘솔 등록값과 한 글자라도 다르면 redirect_uri_mismatch 가 된다.
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
+          kakao:
+            client-id: ${KAKAO_REST_API_KEY}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${KAKAO_REDIRECT_URI}
+            scope: profile_nickname, account_email
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET}
+    access-token-ttl: PT30M
+    refresh-token-ttl: P7D
+    oauth-state-ttl: PT5M
+    refresh-cookie-path: /api/v1/auth/refresh
+    # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
+    # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
+    frontend-base-url: ${FRONTEND_BASE_URL}
+    # 기본값 없음 — false 로 조용히 뜨면 HTTPS 배포에서 Refresh 쿠키가 Secure 없이 나간다.
+    cookie-secure: ${AUTH_COOKIE_SECURE}
+
+  wallet:
+    initial-grant: 200
+    daily-grant: 50
+    daily-grant-zone: Asia/Seoul
+
+  # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
+  # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
+  world:
+    scheme: ${WORLD_SCHEME:ws}
+    host: ${WORLD_HOST:127.0.0.1}
+    port: ${WORLD_PORT:7777}
+    # Access Token 키(jwt-secret)와 분리된 전용 키. 게임 서버가 이 키로 서명을 자체 검증한다
+    # (헌법 14조). jwt-secret 과 같이 기본값을 두지 않는다 — 없으면 기동이 실패해야 한다.
+    connection-token-secret: ${CONNECTION_TOKEN_SECRET}
+
+  lease:
+    price-coin: 100
+    duration: PT24H
+
+  # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
+  # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.
+  # 개수로 유계이므로 보관 기간과 sweeper가 필요 없다 — 밀어내기가 삭제 트랜잭션 안에서 끝난다.
+  game:
+    live-limit: 20
+    deleted-limit: 5
+
+  # 내부 API 인증 (GitLab #102, 2026-08-25 확정 — 방향별 2토큰). 콤마 구분 1~2개이고
+  # 송신은 첫 값, 검증은 목록 전체다. jwt-secret 과 같이 기본값을 두지 않는다 — 기본값이 있으면
+  # 배포에서 env 를 빠뜨렸을 때 공개된 토큰으로 조용히 뜬다.
+  # 여기는 FastAPI→Spring 수신분만 둔다. Spring→FastAPI 송신분은 S15P21A604-175 몫이다.
+  internal:
+    ai-to-spring-tokens: ${INTERNAL_AI_TO_SPRING_TOKENS}
+
+  # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
+  # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
+  # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비할 자리다.
+  agent:
+    per-booth-limit: 1
+    document-count-limit: 10
+    document-total-bytes: 100MB
