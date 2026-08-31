@@ -1,0 +1,7 @@
+# 실제 비밀번호는 이 예시를 복사한 비추적 ACL 파일에 주입한다.
+user default off
+user health on >CHANGE_ME_HEALTH ~* +ping
+user dev_back on >CHANGE_ME_DEV_BACK ~dev:back:* +@read +@write -@dangerous
+user dev_ai on >CHANGE_ME_DEV_AI ~dev:ai:* +@read +@write -@dangerous
+user demo_back on >CHANGE_ME_DEMO_BACK ~demo:back:* +@read +@write -@dangerous
+user demo_ai on >CHANGE_ME_DEMO_AI ~demo:ai:* +@read +@write -@dangerous

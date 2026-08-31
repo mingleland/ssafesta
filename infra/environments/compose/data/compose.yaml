@@ -1,0 +1,69 @@
+name: festa-data
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.1-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: festa_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    secrets:
+      - postgres_admin_password
+      - postgres_dev_back_password
+      - postgres_dev_ai_password
+      - postgres_demo_back_password
+      - postgres_demo_ai_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../postgres/init/00-databases-and-roles.sql:/docker-entrypoint-initdb.d/00-databases-and-roles.sql:ro
+    networks:
+      - data-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U festa_admin -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2.10-alpine
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    environment:
+      REDIS_HEALTH_USER: ${REDIS_HEALTH_USER:-health}
+    secrets:
+      - redis_health_password
+    volumes:
+      - redis-data:/data
+      - ../../redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ${REDIS_ACL_FILE:?REDIS_ACL_FILE is required}:/usr/local/etc/redis/users.acl:ro
+    networks:
+      - data-private
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --user \"$${REDIS_HEALTH_USER}\" --pass \"$$(cat /run/secrets/redis_health_password)\" ping | grep -qx PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  data-private:
+    internal: true
+
+volumes:
+  postgres-data:
+    name: festa-data-postgres
+  redis-data:
+    name: festa-data-redis
+
+secrets:
+  postgres_admin_password:
+    file: ${POSTGRES_ADMIN_PASSWORD_FILE:?POSTGRES_ADMIN_PASSWORD_FILE is required}
+  postgres_dev_back_password:
+    file: ${POSTGRES_DEV_BACK_PASSWORD_FILE:?POSTGRES_DEV_BACK_PASSWORD_FILE is required}
+  postgres_dev_ai_password:
+    file: ${POSTGRES_DEV_AI_PASSWORD_FILE:?POSTGRES_DEV_AI_PASSWORD_FILE is required}
+  postgres_demo_back_password:
+    file: ${POSTGRES_DEMO_BACK_PASSWORD_FILE:?POSTGRES_DEMO_BACK_PASSWORD_FILE is required}
+  postgres_demo_ai_password:
+    file: ${POSTGRES_DEMO_AI_PASSWORD_FILE:?POSTGRES_DEMO_AI_PASSWORD_FILE is required}
+  redis_health_password:
+    file: ${REDIS_HEALTH_PASSWORD_FILE:?REDIS_HEALTH_PASSWORD_FILE is required}
