@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import logging
 
 import pytest
 from fpdf import FPDF
@@ -96,6 +97,13 @@ def test_parse_raises_scanned_document_error_when_no_page_has_text() -> None:
 def test_parse_raises_document_parse_error_for_invalid_pdf_bytes() -> None:
     with pytest.raises(DocumentParseError):
         PdfDocumentParser().parse(b"not a pdf")
+
+
+def test_pdfminer_warning_noise_is_suppressed_at_module_import() -> None:
+    """FontBBox 등 pdfminer 내부 WARNING은 문서마다 수십~수백 줄씩 찍혀 실제 서비스
+    로그를 도배한다 (실제 PDF로 확인). ERROR 미만은 조용히 시킨다."""
+
+    assert logging.getLogger("pdfminer").level >= logging.ERROR
 
 
 def test_parse_keeps_words_separated_when_pdf_encodes_spacing_via_position_only() -> None:
