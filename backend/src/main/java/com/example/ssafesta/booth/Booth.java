@@ -108,6 +108,22 @@ public class Booth {
     public Integer getPublishedLayoutVersion() { return publishedLayoutVersion; }
     public String getHomepageUrl() { return homepageUrl; }
 
+    /**
+     * Whether visitors can see anything of this booth at all — the one predicate every visitor gate
+     * asks (spec 005 R-02, invariant I-3).
+     *
+     * <p>Named here rather than repeated as {@code getPublishedLayoutVersion() == null} at each gate:
+     * 016 homepage ({@code BoothQueryService.visibleHomepageUrl}) and 009 project exhibition
+     * ({@code ProjectService.findPublishedByBooth}) both branch on it, and a third reading of the
+     * same column would be a third place to change when "public" is redefined.
+     *
+     * <p>Expiry is a <b>separate</b> question — a booth can be published and expired at once, and
+     * every gate asks the lease first (004 FR-019).
+     */
+    public boolean isPublished() {
+        return publishedLayoutVersion != null;
+    }
+
     /** Points visitors at a newly published version — only ever called from the publish transaction. */
     void publishLayoutVersion(int versionNo) {
         this.publishedLayoutVersion = versionNo;
