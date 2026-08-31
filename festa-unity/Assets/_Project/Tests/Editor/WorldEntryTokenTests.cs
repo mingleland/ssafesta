@@ -134,6 +134,39 @@ namespace Festa.Tests
         }
 
         [Test]
+        public void 단일_문자열_aud_grant_를_수락한다()
+        {
+            // 실제 백엔드(Spring)는 aud 를 배열이 아니라 **단일 문자열**로 보낸다 —
+            // RFC 7519 §4.1.3 이 허용하는 형태다. Claims.aud 가 string[] 라 JsonUtility 가
+            // 문자열형을 조용히 null 로 두어 접속이 전부 거부되던 결함의 회귀 방어다
+            // (S15P21A604-340 — 목 서버·테스트가 배열형만 만들어 실측 전까지 못 잡았다).
+            var token = Jws(Claims(jti: "scalar-aud", scalarAud: true));
+            Assert.IsTrue(WorldEntryTokenVerifier.VerifyWithKey(token, Key, out var entry, out var reason),
+                          $"실제 백엔드 형태의 grant 가 거부됐다: {reason}");
+            Assert.AreEqual("1", entry.PlayerId);
+        }
+
+        [Test]
+        public void 단일_문자열_aud_라도_대상이_다르면_거부한다()
+        {
+            // 형태를 받아 주는 것이지 검증을 약화하는 것이 아니다.
+            var token = Jws(Claims(jti: "scalar-bad-aud", audience: "ssafesta-api", scalarAud: true));
+            Assert.IsFalse(WorldEntryTokenVerifier.VerifyWithKey(token, Key, out _, out var reason));
+            StringAssert.Contains("aud", reason);
+        }
+
+        [Test]
+        public void 정규화는_aud_밖의_문자열을_건드리지_않는다()
+        {
+            // NormalizeAudience 는 문자열형 aud 만 감싼다 — 배열형·이스케이프가 있는 값·
+            // aud 가 없는 payload 는 원문 그대로여야 한다.
+            Assert.AreEqual("{\"aud\":[\"x\"]}", WorldEntryTokenVerifier.NormalizeAudience("{\"aud\":[\"x\"]}"));
+            Assert.AreEqual("{\"iss\":\"a\"}", WorldEntryTokenVerifier.NormalizeAudience("{\"iss\":\"a\"}"));
+            Assert.AreEqual("{\"aud\":[\"x\\\"y\"],\"iss\":\"a\"}",
+                            WorldEntryTokenVerifier.NormalizeAudience("{\"aud\":\"x\\\"y\",\"iss\":\"a\"}"));
+        }
+
+        [Test]
         public void 다른_채널의_grant_는_거부한다()
         {
             // Channel 이 늘어나면 11F-02 용 grant 로 11F-01 에 들어오는 걸 막아야 한다.
@@ -193,12 +226,15 @@ namespace Festa.Tests
                              string avatarCode = "sk_01", string role = "MEMBER",
                              string issuer = Issuer, string audience = Audience,
                              string worldId = WorldId, string channelId = ChannelId,
-                             long secondsFromNow = 120)
+                             long secondsFromNow = 120, bool scalarAud = false)
         {
             long now = WorldEntryToken.UnixNow();
             var sb = new StringBuilder();
             sb.Append("{\"iss\":\"").Append(issuer).Append("\",");
-            sb.Append("\"aud\":[\"").Append(audience).Append("\"],");
+            // RFC 7519 §4.1.3 — aud 는 배열·단일 문자열 둘 다 유효하다.
+            // 실제 백엔드(Spring)는 단일 문자열로 보낸다 (S15P21A604-340).
+            if (scalarAud) sb.Append("\"aud\":\"").Append(audience).Append("\",");
+            else sb.Append("\"aud\":[\"").Append(audience).Append("\"],");
             sb.Append("\"sub\":\"").Append(playerId).Append("\",");
             if (jti != null) sb.Append("\"jti\":\"").Append(jti).Append("\",");
             sb.Append("\"iat\":").Append(now).Append(',');
