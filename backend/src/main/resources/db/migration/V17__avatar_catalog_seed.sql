@@ -102,3 +102,15 @@ VALUES
     ('M_Top.09', 'Top.09', 'AVATAR_PART', 'TOP', '1136352877', 100, TRUE, FALSE),
     ('M_Top.10', 'Top.10', 'AVATAR_PART', 'TOP', '1195676708', 100, TRUE, FALSE),
     ('M_Top.11', 'Top.11', 'AVATAR_PART', 'TOP', '402795412', 100, TRUE, FALSE);
+
+-- 소유권 조회가 (item_type, asset_key) 로 품목을 하나 집는 것을 스키마의 사실로 만든다.
+-- InventoryService.requireOwned 는 이 조회 결과를 asset_key 로 Map 에 모으는데,
+-- 같은 키가 둘이면 Collectors.toMap 이 IllegalStateException 을 던진다 — 그 순간
+-- 그 파츠를 입은 모든 사용자의 아바타 저장이 500 이 된다. catalog_items 의 기존 UNIQUE 는
+-- item_code 하나뿐이라 지금은 seed 파일과 대조 테스트만이 이 가정을 지키고 있고,
+-- 나중에 다른 INSERT 가 들어오면 그 둘 다 통과한다.
+--
+-- item_type 으로 범위를 좁힌 이유: asset_key 는 Unity 식별자를 그대로 담는 칸이라
+-- 부스 파츠(assetCode 문자열)와 아바타 파츠(itemId·familyId 숫자)가 언젠가 같은 값을
+-- 가질 수 있다. 조회가 타입으로 먼저 거르므로 제약도 같은 범위여야 한다.
+CREATE UNIQUE INDEX ux_catalog_items_type_asset_key ON catalog_items(item_type, asset_key);

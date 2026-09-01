@@ -36,7 +36,7 @@ class AvatarCatalogSeedContractTest {
         }
 
         String migration;
-        try (var stream = getClass().getResourceAsStream("/db/migration/V16__avatar_catalog_seed.sql")) {
+        try (var stream = getClass().getResourceAsStream("/db/migration/V17__avatar_catalog_seed.sql")) {
             migration = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
         Set<String> seededKeys = new HashSet<>();
@@ -48,7 +48,7 @@ class AvatarCatalogSeedContractTest {
         assertEquals(105, assetCount, "Unity 정의 자산 수가 바뀌면 판매 단위 산출을 다시 검토해야 합니다");
         assertEquals(97, unityKeys.size(), "모자 11개가 family 3개로 접힌 판매 단위 수");
         assertEquals(unityKeys, seededKeys,
-                "V16 asset_key는 비모자 itemId + 모자 familyId의 정확한 집합이어야 합니다");
+                "V17 asset_key는 비모자 itemId + 모자 familyId의 정확한 집합이어야 합니다");
     }
 
     private static String field(String yaml, String name) {
