@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -104,7 +105,7 @@ class GameNamedRuleTest {
         nodes.add(nodes.get(0).deepCopy());
 
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID, Map.of()));
         assertTrue(ruleNames(thrown).contains("DUPLICATE_DIALOGUE_NODE_ID"),
                 () -> "Draft 에서도 잡혀야 하는데 " + ruleNames(thrown) + " 였다");
     }
@@ -124,7 +125,7 @@ class GameNamedRuleTest {
         ((ArrayNode) dialogues.get(1).path("nodes")).add(borrowed);
 
         assertDoesNotThrow(
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     // ── DIALOGUE_PRESENTATION_INVALID — FE·계약 검증기와 갈렸던 두 자리 ──
@@ -202,7 +203,7 @@ class GameNamedRuleTest {
         setVariableAction(project, "openDoor").put("value", 1);
 
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID, Map.of()));
         assertTrue(ruleNames(thrown).contains("VARIABLE_VALUE_TYPE_INVALID"),
                 () -> "Draft 에서도 잡혀야 하는데 " + ruleNames(thrown) + " 였다");
     }
@@ -220,7 +221,7 @@ class GameNamedRuleTest {
         action.put("value", 1);
 
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
         List<String> rules = ruleNames(thrown);
         assertTrue(rules.contains("VARIABLE_REFERENCE_NOT_FOUND"), () -> "참조 없음이어야 하는데 " + rules);
         assertTrue(!rules.contains("VARIABLE_VALUE_TYPE_INVALID"),
@@ -277,7 +278,7 @@ class GameNamedRuleTest {
         }
 
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
         List<String> rules = ruleNames(thrown);
         assertTrue(rules.contains("MALFORMED_PROJECT"), () -> "MALFORMED_PROJECT 여야 하는데 " + rules);
         assertTrue(!rules.contains("OBJECTIVE_TARGET_INVALID"),
@@ -402,7 +403,7 @@ class GameNamedRuleTest {
 
     private void assertRule(ObjectNode project, String expectedRule) {
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
 
         List<String> rules = ruleNames(thrown);
         assertTrue(rules.contains(expectedRule),

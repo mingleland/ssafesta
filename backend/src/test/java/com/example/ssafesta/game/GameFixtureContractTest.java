@@ -10,6 +10,7 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -34,8 +35,8 @@ class GameFixtureContractTest {
         ObjectNode project = GameTestSupport.loadFixture("/game/fixtures/minimal-top-down-dialogue.json");
         String body = GameTestSupport.write(project);
 
-        assertDoesNotThrow(() -> validator.validateForDraft(project, body, GAME_ID));
-        assertDoesNotThrow(() -> validator.validateForPublish(project, body, GAME_ID));
+        assertDoesNotThrow(() -> validator.validateForDraft(project, body, GAME_ID, Map.of()));
+        assertDoesNotThrow(() -> validator.validateForPublish(project, body, GAME_ID, Map.of()));
     }
 
     /**
@@ -92,6 +93,6 @@ class GameFixtureContractTest {
 
     private void validate(String fixture) {
         ObjectNode project = GameTestSupport.loadFixture("/game/fixtures/invalid/" + fixture + ".json");
-        validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID);
+        validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of());
     }
 }
