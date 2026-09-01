@@ -116,8 +116,12 @@ namespace Festa.World
 
             // 직원은 제자리에 선다. 루트 모션이 켜져 있으면 클립이 NPC 를 부스 밖으로 끌고 나간다.
             animator.applyRootMotion = false;
-            // 화면 밖 직원의 본 갱신을 멈춘다 — 부지에 12명이 상시 서 있어 이득이 크다.
-            animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            // **항상 애니메이션한다.** CullUpdateTransforms 를 쓰면 컬링 판정이 "안 보인다" 로
+            // 나온 순간 본 갱신이 멈춰 **바인드 포즈로 굳는다** — 팔다리를 벌린 채 서 있어
+            // "깡패처럼 서 있다" 는 보고를 받았다 (S15P21A604-355). 런타임 조립 직후에는
+            // 스킨메시 바운즈가 실제 자세를 따라가지 못해 이 오판이 쉽게 난다.
+            // 직원은 12명뿐이라 아끼는 비용보다 자세가 깨지는 손해가 크다.
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
 
             if (animator.runtimeAnimatorController == null && _animatorController != null)
                 animator.runtimeAnimatorController = _animatorController;
