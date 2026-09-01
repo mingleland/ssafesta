@@ -58,7 +58,34 @@ class EvaluationTest(unittest.TestCase):
         )
         self.assertEqual(metrics.recall_at_k, 1.0)
         self.assertEqual(metrics.mrr, 1.0)
+        self.assertEqual(metrics.mean_context_tokens, 4.0)
+        self.assertEqual(metrics.p95_context_tokens, 4)
+        self.assertEqual(metrics.missed_case_ids, ())
         self.assertEqual(metrics.leakage_count, 0)
+
+    def test_reports_missed_case_ids_and_context_tokens(self) -> None:
+        store = MemoryVectorStore()
+        store.replace(
+            run_id="run",
+            model_id="model",
+            booth_id=1,
+            agent_id=1,
+            chunks=[Chunk("noise", 3, 0, 7, "무관 문장")],
+            vectors=[vector(1, 0)],
+        )
+        metrics = evaluate_retrieval(
+            store=store,
+            run_id="run",
+            model_id="model",
+            booth_id=1,
+            agent_id=1,
+            cases=[EvalCase("q-missed", "질문", frozenset({2}))],
+            query_vectors=[vector(1, 0)],
+            top_k=1,
+        )
+        self.assertEqual(metrics.recall_at_k, 0.0)
+        self.assertEqual(metrics.mean_context_tokens, 7.0)
+        self.assertEqual(metrics.missed_case_ids, ("q-missed",))
 
 
 if __name__ == "__main__":

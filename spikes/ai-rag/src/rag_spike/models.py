@@ -61,6 +61,7 @@ class EvalCase:
 class SearchHit:
     chunk_id: str
     page: int
+    token_count: int
     content: str
     distance: float
     booth_id: int
