@@ -1,7 +1,7 @@
 # Contract: 아바타 프로필 저장 API
 
 **Spec**: 013 | **당사자**: Unity ↔ Spring
-**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T019, 회귀 232/232). 파트 통보 [#76](https://github.com/kanghyunsoon/ssafesta/issues/76) 완료 — Unity는 Mock을 실제 호출로 교체할 수 있다.
+**상태**: ✅ **구현 완료** (BE, 2026-08-24 — spec 013a `BE/tasks.md` T001~T019, 회귀 232/232). 2026-09-01 `S15P21A604-378`에서 spec 012 카탈로그·구매와 `i=` 8슬롯 소유권 검증을 추가했다. Unity는 Mock을 실제 호출로 교체할 수 있다.
 
 ---
 
@@ -16,7 +16,7 @@
 | 저장 전 값 | **`null`** (키는 존재, 값만 비어 있음) | 서버가 기본 프리셋을 만들어 넣지 않는다 — 폴백은 클라이언트 몫(FR-010) |
 | 길이 상한 | **3800자** | Unity `AvatarAppearance.MaxEncodedLength`와 동일. **하향 금지** (R-04, 헌법 23조) |
 | 문자셋 | **인쇄 가능 ASCII `0x20`–`0x7E`** | 인코더 알파벳에서 유도. ✅ **Unity 확인 완료**(#76) — 영숫자·밑줄·구분자만 남기는 좁은 문자셋으로 갔다면 의상 색 36칸이 늘 내는 콤마와 알파 0을 뜻하는 하이픈 때문에 **정상 아바타가 전부 400**이었다. 비ASCII 경로는 현재 없으나 `rt` 파츠 모드(현재 호출자 0)가 살아나면 에셋명이 그대로 실리므로 그때 재검토한다 (R-03) |
-| 오류 봉투 | `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "avatarCode", message }` | #58 C 확정 봉투 재사용. 새 code·rule 0개 (R-07) |
+| 오류 봉투 | 형식 위반은 `400 VALIDATION_FAILED`; 미보유 파츠는 `409 AVATAR_ITEM_NOT_OWNED` + 품목별 `{ rule: "ITEM_NOT_OWNED", objectId: "<assetKey>", message }` | #58 C 확정 봉투 재사용. 소유권 오류는 spec 012 계약 |
 | 게스트 | `403 MEMBER_ONLY` | 헌법 12조. 클라이언트가 호출을 건너뛰는 것과 별개로 서버가 막는다(헌법 16조) |
 
 **왕복 무손실**: 저장한 문자열이 그대로 돌아온다. trim·대소문자·정규화를 하지 않으며 통합 테스트로 고정했다(`MyAccountAvatarApiIntegrationTest`).
@@ -56,6 +56,8 @@ PUT /api/v1/users/me/avatar
        errors[0] = { rule: "FIELD_INVALID", field: "avatarCode", message: <사유> }
 → 401 미인증
 → 403 MEMBER_ONLY                                # 게스트
+→ 409 AVATAR_ITEM_NOT_OWNED                      # i= 슬롯에 미보유 파츠 포함
+       errors[] = { rule: "ITEM_NOT_OWNED", objectId: "<assetKey>", message: <사유> }
 ```
 
 거부 사유 세 가지는 **서로 다른 문장**을 받는다 — 무엇이 틀렸는지 사용자가 알 수 있어야 한다(FR-012·SC-005, T-24).
@@ -94,9 +96,10 @@ Unity가 Spring REST를 부를 때 실을 값이다. 새 결정이 아니라 202
 
 ## 서버 검증
 
-- 길이 상한(**3800**)과 허용 문자셋(**인쇄 가능 ASCII `0x20`–`0x7E`**)만 검증한다 — `AvatarCodePolicy`
-- **문자열 내용을 파싱하지 않는다** — 항목 해석은 클라이언트 책임이다. trim·대소문자·정규화도 하지 않는다
-- 항목 소유권 검증(미구매 항목 차단)은 상점 도입 시(spec 012) 이 지점에 추가한다
+- 형식 정책은 길이 상한(**3800**)과 허용 문자셋(**인쇄 가능 ASCII `0x20`–`0x7E`**)만 검증한다 — `AvatarCodePolicy`
+- 저장값은 계속 불투명 문자열로 취급해 trim·대소문자·정규화를 하지 않는다. 단, 소유권 판정은 별도 `AvatarWornItems`가 `fa|` 형식의 **`i=` 8슬롯만** 읽는다
+- `i=` 슬롯의 0은 미착용이라 검사하지 않는다. preset·legacy·`i=` 누락·8슬롯 불일치는 품목 주장이 없는 것으로 통과시켜 인코더 변경이 전체 저장을 막지 않게 한다
+- 판매·소유 단위는 비모자 `itemId`, 모자 `familyId`이며 `catalog_items.asset_key`가 그 값을 그대로 저장한다 (spec 012, S15P21A604-378)
 
 ## 게스트
 

@@ -19,6 +19,9 @@ public final class CoinReason {
     /** Manual administrator correction (spec 003 FR-013). */
     public static final String ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT";
 
+    /** Catalog item purchase (spec 012 FR-003). */
+    public static final String PURCHASE = "PURCHASE";
+
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";
 
