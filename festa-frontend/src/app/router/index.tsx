@@ -1,5 +1,6 @@
 // URL 경로와 화면을 연결하는 라우팅 규칙 정의
-import { Navigate, createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
+import { LandingPage } from '../../pages/landing/LandingPage';
 import { StudioPage } from '../../pages/studio/StudioPage';
 import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { LoginPage } from '../../pages/login/LoginPage';
@@ -14,12 +15,11 @@ import { RequireAuth } from './RequireAuth';
 // 라우트 정의를 배열로 분리해 둔다 — createMemoryRouter 로 같은 정의를 테스트에서 쓴다.
 export const routes = [
   {
-    // 도메인 루트 진입점. 목적지를 새로 정하는 것이 아니라 기존 가드에 위임한다 —
-    // /app/home 은 guest-allowed 라 비로그인이면 RequireAuth 가 /login 으로 보내고
-    // returnTo 도 저장한다. 여기서 곧바로 /login 으로 보내면 이미 로그인한 사용자가
-    // 로그인 화면을 한 번 보고 튕긴다.
+    // 도메인 루트 = 게임 타이틀 화면 (S15P21A604-379). 시작 클릭의 목적지는 새로 정하지 않고
+    // 기존 가드에 위임한다 — /app/home 은 guest-allowed 라 비로그인이면 RequireAuth 가
+    // /login 으로 보내고 returnTo 도 저장한다. 인증 semantics 는 기존과 동일하다.
     path: '/',
-    element: <Navigate to="/app/home" replace />,
+    element: <LandingPage />,
   },
   {
     path: '/login',
