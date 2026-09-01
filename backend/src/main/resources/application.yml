@@ -50,12 +50,27 @@ spring:
             authorization-grant-type: authorization_code
             redirect-uri: ${KAKAO_REDIRECT_URI}
             scope: profile_nickname, account_email
+          ssafy:
+            client-id: ${SSAFY_CLIENT_ID}
+            client-secret: ${SSAFY_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${SSAFY_REDIRECT_URI}
+            # scope 없음 — SSAFY 인가 요청은 client_id·redirect_uri·response_type 셋만 받는다.
+            # 빈 scope 를 적으면 Spring 이 빈 파라미터를 실어 보낸다.
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+          ssafy:
+            # 인가 경로만 /oauth 아래고 나머지는 /ssafy 아래다. 대칭이 아니니 옮겨 적을 때 주의한다.
+            authorization-uri: https://project.ssafy.com/oauth/sso-check
+            token-uri: https://project.ssafy.com/ssafy/oauth2/token
+            user-info-uri: https://project.ssafy.com/ssafy/resources/userInfo
+            # userInfo 응답이 {userId, email, name} 평면 구조다. Kakao 처럼 중첩되지 않는다.
+            user-name-attribute: userId
 
 app:
   auth:

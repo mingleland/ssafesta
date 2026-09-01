@@ -60,7 +60,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 ```text
 [1] 이 파일 전체를 읽는다                          ← Codex / Claude Code 공통
-[2] .specify/memory/constitution.md (헌법 v1.2)  ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.3)  ← 모든 결정의 최상위 근거
 [3] 작업할 spec 지정:  .specify/feature.json      ← §2-3. 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27          ← 최근에 실제로 터진 것들
@@ -88,7 +88,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 > ❌ `pip install specify-cli` / `specify init` 를 **다시 실행하지 마라.**
 > 재설치는 `.specify/memory/constitution.md`를 **빈 템플릿으로 덮어쓸 수 있다.**
-> 우리 헌법 v1.2가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
+> 우리 헌법 v1.3가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
 
 ### 필요한 것 (설치가 필요한 유일한 항목)
 
@@ -169,7 +169,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 ## 3. 헌법 — 반드시 걸리는 게이트
 
-전문: `.specify/memory/constitution.md` (v1.2). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
+전문: `.specify/memory/constitution.md` (v1.3). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
 
 | 조 | 내용 | 어기면 |
 |:---:|---|---|
@@ -178,7 +178,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 | 8 | **endpoint 하드코딩 금지.** 서버 주소는 world-sessions 응답으로만 | 배포에서 접속 불가 |
 | 9 | world-sessions는 **1차 MVP부터 목적 층 파라미터 포함** | 018에서 API를 다시 깬다 |
 | 10 | `ai`/`back`/`front`/`game` 파트 브랜치 개별 CI/CD, `develop`은 실사용 기준. **Merge는 Squash** | — |
-| 11·12 | 로그인은 **Google/Kakao 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
+| 11·12 | 로그인은 **Google/Kakao/SSAFY 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
 | 13·14 | Refresh Token은 Unity·게임서버에 **절대** 전달 금지. 접속 토큰은 **서명 자체 검증** + 사용 식별자 기록 | Spring 장애가 월드 입장을 막는다 |
 | 15 | **Secret 커밋 금지.** `.env.example`만 허용 | 즉시 사고 |
 | 17 | RAG 검색은 **boothId+agentId 필터 강제.** 1건이라도 새면 릴리스 불가 | Critical Test 실패 |
@@ -350,7 +350,7 @@ SSAFESTA/
 ├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처, 두 도구 공통)
 ├── CLAUDE.md                       ← 요약 + 이 파일로 안내 (Claude Code 진입점)
 ├── .specify/
-│   ├── memory/constitution.md      ★ 헌법 v1.2
+│   ├── memory/constitution.md      ★ 헌법 v1.3
 │   ├── templates/  scripts/bash/
 │   └── feature.json                ★ 작업 중인 spec 지정 (커밋 안 됨, 각자 생성)
 ├── .agents/skills/speckit-*/       Codex 명령      ($speckit-plan)

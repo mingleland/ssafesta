@@ -39,6 +39,9 @@ class SharedConfigProfileTest {
         "KAKAO_REST_API_KEY=kakao-key",
         "KAKAO_CLIENT_SECRET=kakao-secret",
         "KAKAO_REDIRECT_URI=https://api.example.test/login/oauth2/code/kakao",
+        "SSAFY_CLIENT_ID=ssafy-id",
+        "SSAFY_CLIENT_SECRET=ssafy-secret",
+        "SSAFY_REDIRECT_URI=https://api.example.test/login/oauth2/code/ssafy",
         "ROOT_DOMAIN=example.test",
         "FRONTEND_BASE_URL=https://example.test",
         "AUTH_COOKIE_SECURE=true",
@@ -65,6 +68,24 @@ class SharedConfigProfileTest {
             assertThat(env.getProperty("spring.flyway.locations")).isEqualTo("classpath:db/migration");
             assertThat(env.getProperty("spring.security.oauth2.client.registration.google.client-id"))
                     .isEqualTo("google-id");
+
+            // SSAFY is the only provider whose endpoints live in our own config rather than in
+            // Spring's built-ins, so a typo here would surface as a redirect_uri_mismatch or a 404
+            // from project.ssafy.com during a real login, not at boot. Pin the whole registration.
+            String ssafy = "spring.security.oauth2.client.";
+            assertThat(env.getProperty(ssafy + "registration.ssafy.client-id")).isEqualTo("ssafy-id");
+            assertThat(env.getProperty(ssafy + "registration.ssafy.client-authentication-method"))
+                    .isEqualTo("client_secret_post");
+            assertThat(env.getProperty(ssafy + "registration.ssafy.scope")).isNull();
+            assertThat(env.getProperty(ssafy + "provider.ssafy.authorization-uri"))
+                    .isEqualTo("https://project.ssafy.com/oauth/sso-check");
+            assertThat(env.getProperty(ssafy + "provider.ssafy.token-uri"))
+                    .isEqualTo("https://project.ssafy.com/ssafy/oauth2/token");
+            assertThat(env.getProperty(ssafy + "provider.ssafy.user-info-uri"))
+                    .isEqualTo("https://project.ssafy.com/ssafy/resources/userInfo");
+            // getName() reads this attribute, and OAuthLoginSuccessHandler stores it as the
+            // provider subject. Wrong value here means every login registers a new account.
+            assertThat(env.getProperty(ssafy + "provider.ssafy.user-name-attribute")).isEqualTo("userId");
 
             assertThat(env.getProperty("app.auth.jwt-secret")).isEqualTo("aW5qZWN0ZWQtand0LXNlY3JldA==");
             assertThat(env.getProperty("app.internal.ai-to-spring-tokens")).isEqualTo("injected-ai-token");

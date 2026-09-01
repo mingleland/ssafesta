@@ -69,7 +69,7 @@ SKILL.md 자체가 완전한 절차서다.
 `.specify/` · `.claude/skills/` · `.agents/skills/` · `specs/`가 **전부 커밋되어 있다.** `git pull`이면 끝이다.
 
 > ❌ `pip install specify-cli` / `specify init` **실행 금지.**
-> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.3)가 **빈 템플릿으로 덮인다.**
 
 필요한 것: **저장소 루트에서** 실행 + **bash**(Windows는 Git Bash / WSL — 스크립트가 `.sh`다).
 
@@ -81,7 +81,7 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only   # 정상
 
 ```text
 [1] AGENTS.md 전문                                ← 규칙 전문. 건너뛰지 마라
-[2] .specify/memory/constitution.md (헌법 v1.2)   ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.3)   ← 모든 결정의 최상위 근거
 [3] .specify/feature.json 에 작업할 spec 지정      ← 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27           ← 최근에 실제로 터진 것들

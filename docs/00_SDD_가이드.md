@@ -35,7 +35,7 @@
 `git pull` → **저장소 루트에서** 도구 실행 → 끝이다.
 
 > ❌ **`pip install specify-cli` / `specify init`을 실행하지 마라.**
-> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.3)가 **빈 템플릿으로 덮인다.**
 
 필요한 것은 두 가지뿐이다.
 
@@ -60,7 +60,7 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only
 ```text
 SSAFESTA/
 ├── .specify/
-│   ├── memory/constitution.md      ★ 프로젝트 헌법 v1.2 — 모든 결정의 최상위 근거
+│   ├── memory/constitution.md      ★ 프로젝트 헌법 v1.3 — 모든 결정의 최상위 근거
 │   ├── templates/                  spec/plan/tasks 템플릿
 │   ├── scripts/bash/               명령이 호출하는 스크립트
 │   └── feature.json                ★ "지금 작업 중인 spec" 지정 파일
@@ -309,7 +309,7 @@ AI 세션(Claude/Codex)에 시킨 작업도 동일하게 기록한다.
 | 실수 | 왜 문제인가 |
 |---|---|
 | `.specify/feature.json` 지정 안 하고 명령 실행 | 명령이 어느 spec인지 몰라 실패한다 |
-| **spec-kit을 새로 설치**(`specify init`) | **헌법 v1.2가 빈 템플릿으로 덮인다.** 이미 저장소에 있다 (§1-1) |
+| **spec-kit을 새로 설치**(`specify init`) | **헌법 v1.3가 빈 템플릿으로 덮인다.** 이미 저장소에 있다 (§1-1) |
 | 저장소 루트가 아닌 하위 폴더에서 실행 | `.specify/`를 못 찾아 명령이 실패한다 |
 | 리뷰 ②칸에 "좋아요"만 쓰기 | 검토가 아니다. 통합 시점에 터진다 |
 | 미정 항목을 혼자 정하고 구현 | 나중에 뒤집힐 때 비용이 크다 (헌법 30조) |
