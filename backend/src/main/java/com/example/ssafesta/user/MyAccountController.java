@@ -3,6 +3,7 @@ package com.example.ssafesta.user;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.MemberPrincipal;
+import com.example.ssafesta.inventory.InventoryService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -26,14 +27,17 @@ public class MyAccountController {
     private final OAuthIdentityRepository identities;
     private final NicknamePolicy nicknamePolicy;
     private final AvatarCodePolicy avatarCodePolicy;
+    private final InventoryService inventory;
 
     public MyAccountController(AccountLifecycleService lifecycle, UserRepository users, OAuthIdentityRepository identities,
-                               NicknamePolicy nicknamePolicy, AvatarCodePolicy avatarCodePolicy) {
+                               NicknamePolicy nicknamePolicy, AvatarCodePolicy avatarCodePolicy,
+                               InventoryService inventory) {
         this.lifecycle = lifecycle;
         this.users = users;
         this.identities = identities;
         this.nicknamePolicy = nicknamePolicy;
         this.avatarCodePolicy = avatarCodePolicy;
+        this.inventory = inventory;
     }
 
     @GetMapping
@@ -70,6 +74,7 @@ public class MyAccountController {
     public AvatarResponse changeAvatar(@AuthenticationPrincipal Jwt jwt, @RequestBody AvatarChangeRequest request) {
         User user = activeMember(jwt);
         avatarCodePolicy.validate(request.avatarCode());
+        inventory.requireOwned(user.getId(), AvatarWornItems.parse(request.avatarCode()));
         user.changeAvatarCode(request.avatarCode());
         return new AvatarResponse(user.getAvatarCode());
     }

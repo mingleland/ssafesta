@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component;
  * The only two things the server is allowed to say about an avatar encoding (spec 013a contract
  * §서버 검증): it is short enough, and it is made of characters the encoder can produce.
  *
- * <p><b>The string is never parsed.</b> Its internal shape — categories, item ids, the colour
- * suffix — belongs to the client, and spec 013 C-04 has not even fixed the separator yet. That is
- * deliberate: an opaque value lets Unity evolve the format without a server release. Validating
- * structure here would quietly couple the two.
+ * <p><b>This policy never parses the string.</b> Its structural validation remains length and
+ * charset only, so Unity can evolve colour and extension segments without a server release.
+ * Ownership is a separate concern: {@link AvatarWornItems} tolerantly reads only the modular
+ * encoding's {@code i=} segment, and treats an unknown shape as carrying no shop-item claim.
  *
  * <p>Nothing is repaired, either. No trim, no case fold, no default substitution — a rejected value
  * comes back as a refusal the user can read (FR-012), never as a different value they did not
