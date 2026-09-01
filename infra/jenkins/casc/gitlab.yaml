@@ -7,4 +7,4 @@ unclassified:
         manageWebHooks: true
         manageSystemHooks: false
         hooksRootUrl: ${JENKINS_PUBLIC_URL}
-        secretToken: ${GITLAB_WEBHOOK_SECRET}
+        webhookSecretCredentialsId: ${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}
