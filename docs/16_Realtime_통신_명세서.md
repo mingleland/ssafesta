@@ -303,6 +303,18 @@ Visitor
 }
 ```
 
+### `CONSULTATION_EXPIRED`
+
+`requested_at + 10분`(C-01, spec 011) 경과 후 아무도 Accept하지 않으면 Visitor에게 전송한다.
+
+```json
+{
+  "type": "CONSULTATION_EXPIRED",
+  "consultationId": 901,
+  "expiredAt": "..."
+}
+```
+
 ---
 
 ## 12. Consultation Message
@@ -334,6 +346,8 @@ Visitor
 
 `clientMessageId`는 UI 중복 표시 방지에 활용할 수 있다.
 
+원문 저장 여부·보존 기간은 P2 spec 착수 시 확정한다 (C-03, spec 011 — 2026-08-31 보류 확정, GitLab work_items#118).
+
 ---
 
 ## 13. 상담 상태 머신
@@ -342,7 +356,7 @@ Visitor
 REQUESTED
   ├─> ACCEPTED → ACTIVE → ENDED
   ├─> REJECTED
-  └─> EXPIRED
+  └─> EXPIRED   (requested_at + 10분, Accept 없을 시 — C-01)
 ```
 
 ### 동시 Accept

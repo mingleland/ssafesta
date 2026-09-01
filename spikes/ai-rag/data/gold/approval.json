@@ -1,0 +1,10 @@
+{
+  "approved_at": "2026-09-01",
+  "approval_status": "APPROVED",
+  "datasets": [
+    "pinlog-sol-gold.jsonl",
+    "ssafesta-sol-gold.jsonl",
+    "sudal-sol-gold.jsonl"
+  ],
+  "note": "사용자가 세 프로젝트의 Sol 골드 라벨을 수정·최종 승인함"
+}

@@ -37,7 +37,7 @@ function fieldError(field: string, message: string): ApiError {
 }
 
 function booth(facade: BoothDetail['facade']): BoothDetail {
-  return { boothId: BOOTH_ID, name: '테스트 부스', leaseStatus: 'ACTIVE', facade };
+  return { boothId: BOOTH_ID, name: '테스트 부스', leaseStatus: 'ACTIVE', facade, homepageUrl: null };
 }
 
 function renderPanel() {

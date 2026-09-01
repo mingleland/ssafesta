@@ -1,27 +1,5 @@
-credentials:
-  system:
-    domainCredentials:
-      - domain:
-          name: github-scm
-          description: GitHub checkout credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: github.com
-        credentials: []
-      - domain:
-          name: gitlab-scm
-          description: GitLab checkout credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: "${GITLAB_HOST:-gitlab.com}"
-        credentials: []
-      - domain:
-          name: mattermost
-          description: Mattermost webhook credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: "${MATTERMOST_HOST}"
-        credentials: []
+# Credentials are entered through the Jenkins UI and encrypted in JENKINS_HOME.
+# Do not declare empty credential lists here: JCasC reloads would erase UI entries.
 
 jenkins:
   globalNodeProperties:

@@ -18,6 +18,11 @@ grep -q '127.0.0.1:8080:8080' "${controller_compose}" || fail "Jenkins 8080 is n
 ! grep -Eq '(^|[^0-9])(3000|50000):' "${controller_compose}" || fail "controller publishes a forbidden port"
 pass "controller port and mount policy"
 
+for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
+  [[ -x "${entrypoint}" ]] || fail "Shell entrypoint is not executable: ${entrypoint#"${repo_root}/"}"
+done
+pass "Shell entrypoint executable policy"
+
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then
   if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys' >/dev/null 2>&1; then
@@ -52,14 +57,15 @@ import pathlib,sys,yaml
 security=yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 authorization=yaml.safe_load(pathlib.Path(sys.argv[2]).read_text(encoding='utf-8'))
 gitlab=yaml.safe_load(pathlib.Path(sys.argv[3]).read_text(encoding='utf-8'))
-domains=security['credentials']['system']['domainCredentials']
-assert {item['domain']['name'] for item in domains} == {'github-scm','gitlab-scm','mattermost'}
+assert 'credentials' not in security, 'JCasC must not overwrite UI-managed credentials'
 entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
+assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
+assert 'secretToken' not in server
 PY
-pass "JCasC credential domains, GitLab migration and least-privilege matrix"
+pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
 grep -q 'proxy_pass http://127.0.0.1:8080' "${nginx}" || fail "Nginx does not proxy to loopback Jenkins"
 ! grep -Eq 'listen[[:space:]]+(8080|3000|50000)' "${nginx}" || fail "Nginx publicly listens on a forbidden port"

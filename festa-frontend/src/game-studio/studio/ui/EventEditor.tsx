@@ -14,9 +14,11 @@ import {
   applyBehaviorRecipe,
   appendEventAction,
   appendEventCondition,
+  isTerminalActionType,
   removeEvent,
   removeEventAction,
   removeEventCondition,
+  reorderEventAction,
   replaceEventAction,
   replaceEventCondition,
   replaceEventTrigger,
@@ -191,6 +193,28 @@ const EventCard = ({
   readonly onApply: (project: GameProject) => void;
 }) => {
   const [actionToAdd, setActionToAdd] = useState<Action['type']>('SET_VARIABLE');
+  const [draggedActionIndex, setDraggedActionIndex] = useState<number | null>(null);
+  const [dragOverActionIndex, setDragOverActionIndex] = useState<number | null>(null);
+
+  // terminal Action(있다면 반드시 배열 마지막)은 자리를 바꿀 수 없다 — 그 앞쪽까지만 놓을 수
+  // 있게 드롭 가능 최대 인덱스를 미리 계산해 둔다. 이렇게 하면 애초에 규칙을 어기는 드롭 자체가
+  // 발생하지 않아 reorderEventAction 안쪽의 validated()가 예외를 던질 일이 없다
+  // (S15P21A604-360 초기 버전에서 이 clamp를 놓쳐 Uncaught 예외가 났던 것과 같은 종류의 버그를
+  // 여기서는 "애초에 불가능한 드롭을 만들지 않는" 방식으로 막는다).
+  const terminalActionIndex = event.actions.findIndex((action) => isTerminalActionType(action.type));
+  const maxDropIndex = terminalActionIndex === -1 ? event.actions.length - 1 : terminalActionIndex - 1;
+
+  const handleActionDrop = (targetIndex: number) => {
+    if (draggedActionIndex !== null) {
+      const clampedIndex = Math.min(targetIndex, maxDropIndex);
+      if (clampedIndex !== draggedActionIndex) {
+        onApply(reorderEventAction(project, scene.id, event.id, draggedActionIndex, clampedIndex));
+      }
+    }
+    setDraggedActionIndex(null);
+    setDragOverActionIndex(null);
+  };
+
   return (
     <article className="gss-event-card">
       <header>
@@ -243,27 +267,61 @@ const EventCard = ({
         >+ 변수 조건</button>
       </div>
 
-      <div className="gss-section-title"><span>ACTIONS</span><small>위에서 아래로</small></div>
-      {event.actions.map((action, index) => (
-        <div className="gss-rule-row gss-rule-row--action" key={`${event.id}-action-${index}`}>
-          <span className="gss-rule-index">{index + 1}</span>
-          <div className="gss-rule-content">
-            <strong>{ACTION_LABELS[action.type]}</strong>
-            <ActionFields
-              action={action}
-              onReplace={(next) => onApply(replaceEventAction(project, scene.id, event.id, index, next))}
-              project={project}
-            />
+      <div className="gss-section-title"><span>ACTIONS</span><small>드래그해서 순서 변경</small></div>
+      {event.actions.map((action, index) => {
+        const terminal = isTerminalActionType(action.type);
+        const rowClassName = ['gss-rule-row', 'gss-rule-row--action',
+          draggedActionIndex === index ? 'is-dragging' : '',
+          dragOverActionIndex === index && draggedActionIndex !== index ? 'is-drag-over' : '']
+          .filter(Boolean).join(' ');
+        return (
+          <div
+            className={rowClassName}
+            key={`${event.id}-action-${index}`}
+            onDragOver={(dragEvent) => {
+              if (draggedActionIndex === null) return;
+              dragEvent.preventDefault();
+              const clampedIndex = Math.min(index, maxDropIndex);
+              if (dragOverActionIndex !== clampedIndex) setDragOverActionIndex(clampedIndex);
+            }}
+            onDrop={(dragEvent) => {
+              dragEvent.preventDefault();
+              handleActionDrop(index);
+            }}
+          >
+            <div className="gss-rule-drag-cell">
+              <button
+                aria-label={`행동 순서 변경 핸들 (${index + 1}번째${terminal ? ' · 흐름 종료 동작이라 이동할 수 없습니다' : ''})`}
+                className="gss-icon-button gss-drag-handle"
+                disabled={terminal}
+                draggable={!terminal}
+                onDragEnd={() => { setDraggedActionIndex(null); setDragOverActionIndex(null); }}
+                onDragStart={(dragEvent) => {
+                  dragEvent.dataTransfer?.setData('text/plain', String(index));
+                  setDraggedActionIndex(index);
+                }}
+                type="button"
+              >☰</button>
+              <span className="gss-rule-index">{index + 1}</span>
+            </div>
+            <div className="gss-rule-content">
+              <strong>{ACTION_LABELS[action.type]}</strong>
+              <ActionFields
+                action={action}
+                onReplace={(next) => onApply(replaceEventAction(project, scene.id, event.id, index, next))}
+                project={project}
+              />
+            </div>
+            <button
+              aria-label="행동 제거"
+              className="gss-icon-button"
+              disabled={event.actions.length === 1}
+              onClick={() => onApply(removeEventAction(project, scene.id, event.id, index))}
+              type="button"
+            >×</button>
           </div>
-          <button
-            aria-label="행동 제거"
-            className="gss-icon-button"
-            disabled={event.actions.length === 1}
-            onClick={() => onApply(removeEventAction(project, scene.id, event.id, index))}
-            type="button"
-          >×</button>
-        </div>
-      ))}
+        );
+      })}
       <div className="gss-inline-actions">
         <select onChange={(changeEvent) => setActionToAdd(changeEvent.target.value as Action['type'])} value={actionToAdd}>
           {TOP_DOWN_ACTION_TYPES.map((type) => <option key={type} value={type}>{ACTION_LABELS[type]}</option>)}
