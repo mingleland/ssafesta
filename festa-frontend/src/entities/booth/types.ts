@@ -54,6 +54,14 @@ export interface BoothDetail {
   name: string;
   leaseStatus: LeaseStatus; // 'ACTIVE' 외 값이면 편집 진입 자체를 막는다(T021 이중 방어 ①)
   facade: BoothFacade | null;
+  // 016 확장(C-01 #97 확정) — 노트북 오버레이 URL 의 정본. 이벤트 payload 의 url 이 아니라 이 값이다.
+  // null = 미등록. 방문자에게는 published gate 뒤에서만 값이 온다(BoothQueryService).
+  homepageUrl: string | null;
+}
+
+// PUT /booths/{boothId}/homepage 응답 (spec 016 contracts/homepage-api.md §2, BoothHomepageService 구현 정본)
+export interface HomepageView {
+  homepageUrl: string | null;
 }
 
 // ── spec 004 booth-slot-lease — contracts/lease-api.md가 정본 ──
