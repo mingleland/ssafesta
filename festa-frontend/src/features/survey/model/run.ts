@@ -63,6 +63,8 @@ export async function loadSurveyRun(surveyId: string): Promise<void> {
 
 export function setAnswer(questionId: string, value: SurveyAnswerValue): void {
   if (state.status !== 'ready') return;
+  // 제출 중 답 변경은 submit.phase 리셋으로 이중 제출 가드를 해제한다 (-377 공통 패턴) — 차단
+  if (state.submit.phase === 'submitting') return;
   const answers = { ...state.answers, [questionId]: value };
   setState({
     answers,
@@ -71,9 +73,29 @@ export function setAnswer(questionId: string, value: SurveyAnswerValue): void {
   });
 }
 
+// 키 존재만으로는 required 를 채운 것이 아니다 — 빈 선택·공백 텍스트는 미응답이다 (-377)
+function isEmptyAnswer(value: SurveyAnswerValue): boolean {
+  switch (value.type) {
+    case 'multi':
+      return value.optionIds.length === 0;
+    case 'short_text':
+    case 'long_text':
+    case 'application':
+      return value.text.trim() === '';
+    default:
+      return false;
+  }
+}
+
 /** 미응답 required 질문 id — 비어야 제출 가능하다 */
 export function missingRequired(): string[] {
-  return state.questions.filter((q) => q.required && !(q.id in state.answers)).map((q) => q.id);
+  return state.questions
+    .filter((q) => {
+      if (!q.required) return false;
+      const answer = state.answers[q.id];
+      return answer === undefined || isEmptyAnswer(answer);
+    })
+    .map((q) => q.id);
 }
 
 export function canSubmit(): boolean {

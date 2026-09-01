@@ -5,6 +5,7 @@
 // 실시간 메시지 송수신은 P2(C-02) — 이 모델에 없다.
 import { useSyncExternalStore } from 'react';
 import { consultationChannel } from '../../../entities/consultation/channel.select';
+import type { VisitorChannelEvent } from '../../../entities/consultation/channel.port';
 
 export type VisitorConsultationPhase =
   | 'idle'
@@ -63,27 +64,42 @@ function detachChannel(): void {
   unsubscribeChannel = null;
 }
 
-function settle(phase: 'expired' | 'active' | 'ended', staffName: string | null = null): void {
-  stopCountdown();
-  detachChannel();
-  setState({ phase, remainingSeconds: null, staffName });
+// 채널 구독은 서버가 세션의 끝을 말할 때(ended, 서버 expired)까지 유지한다 (-377).
+// - accepted 에서 끊으면 이후 'ended' 가 유실돼 방문자가 active 에 갇힌다
+// - 로컬 카운트다운 만료에서 끊으면 직전에 전송된 'accepted' 가 유실된다 — 만료의 정본은
+//   서버(C-01)이고 로컬 0 도달은 표시 선반영일 뿐이므로, 그 뒤 도착한 서버 이벤트가 이긴다
+function onChannelEvent(event: VisitorChannelEvent): void {
+  if (event.type === 'accepted') {
+    stopCountdown();
+    setState({ phase: 'active', remainingSeconds: null, staffName: event.staffName });
+  } else if (event.type === 'expired') {
+    stopCountdown();
+    detachChannel();
+    setState({ phase: 'expired', remainingSeconds: null, staffName: null });
+  } else {
+    stopCountdown();
+    detachChannel();
+    setState({ phase: 'ended', remainingSeconds: null });
+  }
 }
 
 export async function requestConsultation(boothId: number): Promise<void> {
   if (state.phase === 'requesting' || state.phase === 'waiting' || state.phase === 'active') return;
+  detachChannel(); // 로컬 만료(expired) 상태에서 재요청하면 기존 구독을 먼저 정리한다
   setState({ phase: 'requesting', boothId, remainingSeconds: null, staffName: null });
   try {
     const { expiresInSeconds } = await consultationChannel.requestConsultation(boothId);
-    unsubscribeChannel = consultationChannel.onVisitorEvent((event) => {
-      if (event.type === 'accepted') settle('active', event.staffName);
-      else if (event.type === 'expired') settle('expired');
-      else settle('ended');
-    });
+    unsubscribeChannel = consultationChannel.onVisitorEvent(onChannelEvent);
     setState({ phase: 'waiting', remainingSeconds: expiresInSeconds });
     countdown = setInterval(() => {
       const remaining = (state.remainingSeconds ?? 0) - 1;
-      if (remaining <= 0) settle('expired');
-      else setState({ remainingSeconds: remaining });
+      if (remaining <= 0) {
+        // 로컬 만료 — 표시만 전환하고 구독은 유지한다(서버 accepted/expired 가 최종 판정)
+        stopCountdown();
+        setState({ phase: 'expired', remainingSeconds: null });
+      } else {
+        setState({ remainingSeconds: remaining });
+      }
     }, 1_000);
   } catch {
     setState({ phase: 'error' });

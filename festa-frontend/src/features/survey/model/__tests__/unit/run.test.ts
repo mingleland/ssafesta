@@ -24,16 +24,23 @@ beforeEach(() => {
 async function loadAndFillRequired(): Promise<void> {
   await loadSurveyRun('s1');
   setAnswer('q-single', { type: 'single', optionId: 'o1' });
+  setAnswer('q-multi', { type: 'multi', optionIds: ['o1', 'o2'] });
   setAnswer('q-rating', { type: 'rating', value: 5 });
-  setAnswer('q-boolean', { type: 'boolean', value: true });
 }
 
 describe('loadSurveyRun', () => {
-  it('normal — 6유형 전부 로드, progress 0/6', async () => {
+  it('normal — spec 010 FR-002 의 6유형 전부 로드, progress 0/6', async () => {
     await loadSurveyRun('s1');
     const s = getSurveyRunSnapshot();
     expect(s.status).toBe('ready');
-    expect(s.questions.map((q) => q.type)).toEqual(['single', 'multi', 'rating', 'boolean', 'short_text', 'long_text']);
+    expect(s.questions.map((q) => q.type)).toEqual([
+      'single',
+      'multi',
+      'rating',
+      'short_text',
+      'long_text',
+      'application',
+    ]);
     expect(s.progress).toEqual({ current: 0, total: 6 });
   });
 
@@ -48,10 +55,18 @@ describe('loadSurveyRun', () => {
 describe('answers·required', () => {
   it('답할 때마다 progress 가 오르고, required 3건이 비면 제출 불가', async () => {
     await loadSurveyRun('s1');
-    expect(missingRequired()).toEqual(['q-single', 'q-rating', 'q-boolean']);
+    expect(missingRequired()).toEqual(['q-single', 'q-multi', 'q-rating']);
     expect(canSubmit()).toBe(false);
     setAnswer('q-single', { type: 'single', optionId: 'o1' });
     expect(getSurveyRunSnapshot().progress.current).toBe(1);
+  });
+
+  it('빈 값은 required 를 채우지 못한다 — 빈 multi 선택 (-377)', async () => {
+    await loadAndFillRequired();
+    expect(canSubmit()).toBe(true);
+    setAnswer('q-multi', { type: 'multi', optionIds: [] });
+    expect(missingRequired()).toEqual(['q-multi']);
+    expect(canSubmit()).toBe(false);
   });
 
   it('required 전부 답하면 제출 가능 — optional 미응답은 막지 않는다', async () => {
@@ -86,8 +101,8 @@ describe('submitSurveyRun', () => {
   it('제출 실패는 error — 답은 유지되어 재시도 가능', async () => {
     await loadSurveyRun('submit-fail');
     setAnswer('q-single', { type: 'single', optionId: 'o1' });
+    setAnswer('q-multi', { type: 'multi', optionIds: ['o1'] });
     setAnswer('q-rating', { type: 'rating', value: 3 });
-    setAnswer('q-boolean', { type: 'boolean', value: false });
     await submitSurveyRun();
     const s = getSurveyRunSnapshot();
     expect(s.submit.phase).toBe('error');

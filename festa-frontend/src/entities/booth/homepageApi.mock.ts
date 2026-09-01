@@ -6,10 +6,11 @@ import type { HomepageView } from './types';
 // 기본 시나리오: booth 1 은 등록된 홈페이지가 있다(방문자 정상 경로), 나머지는 미등록(no_url 경로)
 const homepages = new Map<number, string>([[1, 'https://festa.example.com']]);
 
+// real 봉투와 동형: 최상위 code=VALIDATION_FAILED, 규칙 어휘는 errors[].rule (facadeApi.mock 과 동일 형태)
 function fieldError(message: string): ApiError {
   return {
-    code: 'FIELD_INVALID',
-    message,
+    code: 'VALIDATION_FAILED',
+    message: '요청 값이 올바르지 않습니다.',
     errors: [{ rule: 'FIELD_INVALID', field: 'homepageUrl', message }],
     warnings: [],
   };
@@ -20,9 +21,10 @@ export async function putHomepage(boothId: number, homepageUrl: string | null): 
     homepages.delete(boothId);
     return { homepageUrl: null };
   }
-  // BE HttpUrlValidator 대칭 최소 재현 — http/https·2048자. 완전성 검증은 서버 몫(헌법 16조)
-  if (!/^https?:\/\//.test(homepageUrl) || homepageUrl.length > 2048) {
-    throw fieldError('홈페이지 주소는 http:// 또는 https:// 로 시작해야 합니다.');
+  // BE HttpUrlValidator 대칭 최소 재현 — scheme 대소문자 무시(BE equalsIgnoreCase)·2048자.
+  // 완전성 검증은 서버 몫(헌법 16조). 문구는 BE 실물과 동일하게 유지한다.
+  if (!/^https?:\/\//i.test(homepageUrl) || homepageUrl.length > 2048) {
+    throw fieldError('홈페이지 주소는 http 또는 https로 시작해야 합니다.');
   }
   homepages.set(boothId, homepageUrl);
   return { homepageUrl };

@@ -40,6 +40,26 @@ describe('Staff 상담 (C-06 동시 1건)', () => {
     expect(getStaffConsultationSnapshot().active?.requestId).toBe('req-1');
   });
 
+  it('큐 새로고침 중에는 수락이 게이트된다 — 낡은 목록 복원 레이스의 1차 방어 (-377)', async () => {
+    await loadStaffQueue();
+    const reload = loadStaffQueue(); // status 가 loading 으로 전환된 동안
+    await acceptRequest('req-1'); // canAccept=false — no-op
+    expect(getStaffConsultationSnapshot().active).toBeNull();
+    await reload;
+    expect(getStaffConsultationSnapshot().status).toBe('ready');
+    await acceptRequest('req-1'); // 새 목록 위에서 정상 수락
+    expect(getStaffConsultationSnapshot().active?.requestId).toBe('req-1');
+  });
+
+  it('accept 실패는 actionError 로 드러난다 — 조용히 삼키지 않는다 (-377)', async () => {
+    await loadStaffQueue();
+    await acceptRequest('req-없음');
+    const s = getStaffConsultationSnapshot();
+    expect(s.actionError).toBe('accept');
+    expect(s.active).toBeNull();
+    expect(s.accepting).toBe(false);
+  });
+
   it('종료 후 다시 수락 가능', async () => {
     await loadStaffQueue();
     await acceptRequest('req-1');

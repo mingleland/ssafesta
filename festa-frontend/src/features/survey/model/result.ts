@@ -71,6 +71,7 @@ export async function loadNextTextPage(): Promise<void> {
   setState({ textAnswers: { ...textAnswers, loadingNext: true } });
   try {
     const next = await surveyApi.getTextAnswers(surveyId, textAnswers.page + 1);
+    if (state.surveyId !== surveyId) return; // 설문 전환 후 도착한 이전 설문 페이지를 버린다 (-377)
     setState({
       textAnswers: {
         items: [...state.textAnswers.items, ...next.items],
@@ -80,6 +81,7 @@ export async function loadNextTextPage(): Promise<void> {
       },
     });
   } catch {
+    if (state.surveyId !== surveyId) return;
     // 다음 페이지 실패는 화면 전체를 무너뜨리지 않는다 — 로딩 플래그만 풀고 재시도 가능하게
     setState({ textAnswers: { ...state.textAnswers, loadingNext: false } });
   }

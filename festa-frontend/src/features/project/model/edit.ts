@@ -75,6 +75,7 @@ export async function loadProjectEdit(boothId: number): Promise<void> {
   setState({ ...initialState, status: 'loading', boothId });
   try {
     const view = await projectApi.getMyProjects(boothId);
+    if (state.boothId !== boothId) return; // 늦은 응답이 다른 부스 편집 상태를 덮지 않는다 (-377)
     const project = view.projects[0] ?? null;
     setState({
       status: 'ready',
@@ -83,11 +84,15 @@ export async function loadProjectEdit(boothId: number): Promise<void> {
       dirty: new Set(),
     });
   } catch {
+    if (state.boothId !== boothId) return;
     setState({ status: 'error' });
   }
 }
 
 export function updateField(key: ProjectFieldKey, value: string | null): void {
+  // 저장 중 편집은 ① save.phase 리셋으로 이중 제출 가드를 해제하고(projectId null 이면 create 2회)
+  // ② 저장 성공 응답이 그 편집을 조용히 덮어 유실시킨다 (-377) — 저장 완료까지 입력을 막는다
+  if (state.save.phase === 'submitting') return;
   setState({
     draft: { ...state.draft, [key]: value },
     dirty: new Set(state.dirty).add(key),

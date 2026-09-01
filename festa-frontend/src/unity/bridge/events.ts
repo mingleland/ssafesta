@@ -59,7 +59,14 @@ export function initUnityBridge(): void {
       console.error('[unity-bridge] onBoothInteract JSON 파싱 실패', json, err);
       return;
     }
-    for (const listener of listeners) listener(event);
+    for (const listener of listeners) {
+      try {
+        listener(event);
+      } catch (err) {
+        // 리스너 하나의 오류가 나머지 전달과 Unity 콜백을 막지 않는다 (006 정신, -377)
+        console.error('[unity-bridge] onBoothInteract listener 오류', err);
+      }
+    }
   };
   window.FestaUnity.onWorldGateReady = () => {
     for (const listener of worldGateReadyListeners) listener();

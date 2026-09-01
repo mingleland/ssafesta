@@ -68,4 +68,20 @@ describe('방문자 상담 흐름 (C-01)', () => {
     await rerequestConsultation();
     expect(getVisitorConsultationSnapshot().phase).toBe('waiting');
   });
+
+  it('accepted 후에도 채널이 살아 있어 ended 가 도달한다 — active 감금 해소 (-377)', async () => {
+    await requestConsultation(1);
+    __simulateVisitorEvent({ type: 'accepted', staffName: '김직원' });
+    expect(getVisitorConsultationSnapshot().phase).toBe('active');
+    __simulateVisitorEvent({ type: 'ended' });
+    expect(getVisitorConsultationSnapshot().phase).toBe('ended');
+  });
+
+  it('로컬 만료 표시 후 도착한 서버 accepted 가 이긴다 — 만료 정본은 서버 (-377)', async () => {
+    await requestConsultation(1);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(getVisitorConsultationSnapshot().phase).toBe('expired');
+    __simulateVisitorEvent({ type: 'accepted', staffName: '김직원' });
+    expect(getVisitorConsultationSnapshot()).toMatchObject({ phase: 'active', staffName: '김직원' });
+  });
 });
