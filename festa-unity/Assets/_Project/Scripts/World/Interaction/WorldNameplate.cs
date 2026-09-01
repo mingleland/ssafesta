@@ -43,7 +43,7 @@ namespace Festa.World
         [SerializeField, Range(0.05f, 1f)] float _headroomRatio = 0.38f;
 
         [Tooltip("기준 거리에서의 글자 크기(월드 유닛).")]
-        [SerializeField] float _baseCharacterHeight = 2.4f;
+        [SerializeField] float _baseCharacterHeight = 1.7f;
 
         [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(0.6~3배).")]
         [SerializeField] float _referenceDistance = 55f;
@@ -69,6 +69,11 @@ namespace Festa.World
         readonly MeshRenderer[] _outlineRenderers = new MeshRenderer[8];
         float _topY;
         bool _measured;
+
+        // 머리 본과 정수리 사이의 거리. 한 번 재 두면 자세가 바뀌어도 유효하다 —
+        // 본이 움직이면 이름표도 따라 움직인다.
+        Transform _headBone;
+        float _headToTop;
 
         public string Label
         {
@@ -141,10 +146,17 @@ namespace Festa.World
         }
 
         /// <summary>
-        /// 대상의 렌더 높이를 잰다.
+        /// 정수리 높이를 재고, 가능하면 <b>머리 본</b>에 물린다.
         ///
-        /// <para><b>비활성 렌더러를 세면 안 된다.</b> 꺼진 렌더러의 bounds 는 실제 위치를
-        /// 반영하지 않아, 섞어 재면 이름표가 대상 안에 파묻힌다 (S15P21A604-355).</para>
+        /// <para><b>왜 본에 물리나.</b> 높이를 한 번만 재서 고정하면 앉는 순간 이름표가
+        /// 선 키 그대로 허공에 남는다 (S15P21A604-355 사용자 지적). 스킨메시의
+        /// <c>renderer.bounds</c> 는 바인드포즈 골격 범위라 자세가 바뀌어도 변하지 않아
+        /// 매 프레임 다시 재도 소용이 없다. 머리 본은 자세를 그대로 따라가고 읽는 비용이
+        /// 없다 — 정수리와의 거리만 한 번 재 두면 어떤 자세든 맞는다.</para>
+        ///
+        /// <para>정수리는 <c>BakeMesh</c> 로 현재 포즈를 구워서 잰다. 이때
+        /// <c>RecalculateBounds</c> 를 반드시 불러야 한다 — 굽기만 하면 bounds 가
+        /// 부풀린 바인드포즈 값 그대로다.</para>
         ///
         /// <para>측정은 <b>조립이 끝난 뒤</b>여야 한다 — 아바타는 런타임에 몸이 만들어져
         /// Start 시점엔 렌더러가 없다. 그래서 첫 LateUpdate 에서 한 번 잰다.</para>
@@ -155,12 +167,39 @@ namespace Festa.World
             foreach (var r in GetComponentsInChildren<Renderer>(false))   // 활성만
             {
                 if (r == null || r.transform.IsChildOf(_root)) continue;  // 자기 글자는 제외
+
+                if (r is SkinnedMeshRenderer skinned && skinned.sharedMesh != null)
+                {
+                    var baked = new Mesh();
+                    skinned.BakeMesh(baked);
+                    baked.RecalculateBounds();
+                    var b = baked.bounds;
+                    Destroy(baked);
+                    // BakeMesh 는 스케일까지 적용해 굽는다 — 위치와 회전만 더한다.
+                    var c = b.center; var e = b.extents;
+                    for (int x = -1; x <= 1; x += 2)
+                    for (int y = -1; y <= 1; y += 2)
+                    for (int z = -1; z <= 1; z += 2)
+                        top = Mathf.Max(top, (skinned.transform.position
+                            + skinned.transform.rotation * (c + Vector3.Scale(e, new Vector3(x, y, z)))).y);
+                    continue;
+                }
                 top = Mathf.Max(top, r.bounds.max.y);
             }
             // 렌더러가 하나도 없으면 사람 키를 기본값으로 쓴다.
             _topY = top > float.MinValue ? top : transform.position.y + 22.4f;
+
+            var animator = GetComponentInChildren<Animator>();
+            if (animator != null && animator.isHuman)
+            {
+                _headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+                if (_headBone != null) _headToTop = _topY - _headBone.position.y;
+            }
             _measured = true;
         }
+
+        /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
+        float CurrentTopY() => _headBone != null ? _headBone.position.y + _headToTop : _topY;
 
         void LateUpdate()
         {
@@ -181,7 +220,7 @@ namespace Festa.World
             // 박아 둬서 머리에서 한 뼘 넘게 떨어져 보였다 (S15P21A604-355 사용자 지적).
             // 이름표 자체 크기에 비례시켜 화면상 간격을 일정하게 만든다.
             _root.position = new Vector3(
-                transform.position.x, _topY + size * _headroomRatio, transform.position.z);
+                transform.position.x, CurrentTopY() + size * _headroomRatio, transform.position.z);
 
             var toCam = cam.transform.position - _root.position;
             float dist = toCam.magnitude;
