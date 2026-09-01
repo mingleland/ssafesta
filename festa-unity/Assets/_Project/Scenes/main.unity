@@ -413,7 +413,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &12826420
@@ -2608,6 +2612,7 @@ GameObject:
   - component: {fileID: 48200030}
   - component: {fileID: 48200032}
   - component: {fileID: 48200031}
+  - component: {fileID: 48200033}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -2710,6 +2715,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &48200033
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 48200029}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &49917298
 GameObject:
   m_ObjectHideFlags: 0
@@ -8154,7 +8182,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &70837999
@@ -10366,6 +10398,7 @@ GameObject:
   - component: {fileID: 122764594}
   - component: {fileID: 122764596}
   - component: {fileID: 122764595}
+  - component: {fileID: 122764597}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -10468,6 +10501,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &122764597
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 122764593}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &123591524
 GameObject:
   m_ObjectHideFlags: 0
@@ -10801,6 +10857,7 @@ GameObject:
   m_Component:
   - component: {fileID: 132848007}
   - component: {fileID: 132848008}
+  - component: {fileID: 132848009}
   m_Layer: 0
   m_Name: Light
   m_TagString: Untagged
@@ -10888,6 +10945,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &132848009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 132848006}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &134252898 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 9219559333794251449, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -11807,7 +11887,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &153561042
@@ -15071,6 +15155,7 @@ GameObject:
   - component: {fileID: 247305530}
   - component: {fileID: 247305532}
   - component: {fileID: 247305531}
+  - component: {fileID: 247305533}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -15173,6 +15258,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &247305533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 247305529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &247614191
 GameObject:
   m_ObjectHideFlags: 0
@@ -15340,6 +15448,7 @@ GameObject:
   m_Component:
   - component: {fileID: 251129274}
   - component: {fileID: 251129275}
+  - component: {fileID: 251129276}
   m_Layer: 0
   m_Name: Light
   m_TagString: Untagged
@@ -15427,6 +15536,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &251129276
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 251129273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &251501485
 GameObject:
   m_ObjectHideFlags: 0
@@ -21700,6 +21832,7 @@ GameObject:
   - component: {fileID: 288587395}
   - component: {fileID: 288587397}
   - component: {fileID: 288587396}
+  - component: {fileID: 288587398}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -21802,6 +21935,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &288587398
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 288587394}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &289478035
 GameObject:
   m_ObjectHideFlags: 0
@@ -34139,6 +34295,7 @@ GameObject:
   - component: {fileID: 387077482}
   - component: {fileID: 387077484}
   - component: {fileID: 387077483}
+  - component: {fileID: 387077485}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -34241,6 +34398,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &387077485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 387077481}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &387960618
 GameObject:
   m_ObjectHideFlags: 0
@@ -38788,6 +38968,7 @@ GameObject:
   - component: {fileID: 501215039}
   - component: {fileID: 501215041}
   - component: {fileID: 501215040}
+  - component: {fileID: 501215042}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -38890,6 +39071,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &501215042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 501215038}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &501421591
 GameObject:
   m_ObjectHideFlags: 0
@@ -42222,6 +42426,7 @@ GameObject:
   - component: {fileID: 600134676}
   - component: {fileID: 600134678}
   - component: {fileID: 600134677}
+  - component: {fileID: 600134679}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -42324,6 +42529,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &600134679
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 600134675}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &601432741
 GameObject:
   m_ObjectHideFlags: 0
@@ -50549,7 +50777,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &703548851
@@ -51807,7 +52039,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &755938325
@@ -58100,7 +58336,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &812310972
@@ -63544,6 +63784,7 @@ GameObject:
   m_Component:
   - component: {fileID: 831705930}
   - component: {fileID: 831705931}
+  - component: {fileID: 831705932}
   m_Layer: 0
   m_Name: Light
   m_TagString: Untagged
@@ -63631,6 +63872,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &831705932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 831705929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &832636133
 GameObject:
   m_ObjectHideFlags: 0
@@ -65396,7 +65660,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &869485257
@@ -77059,6 +77327,7 @@ GameObject:
   - component: {fileID: 999576663}
   - component: {fileID: 999576665}
   - component: {fileID: 999576664}
+  - component: {fileID: 999576666}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -77161,6 +77430,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &999576666
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 999576662}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1000569627
 GameObject:
   m_ObjectHideFlags: 0
@@ -88328,6 +88620,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1165341502}
   - component: {fileID: 1165341503}
+  - component: {fileID: 1165341504}
   m_Layer: 0
   m_Name: Light
   m_TagString: Untagged
@@ -88415,6 +88708,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1165341504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1165341501}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1165825506
 GameObject:
   m_ObjectHideFlags: 0
@@ -120815,7 +121131,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &1557036128
@@ -121073,7 +121393,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &1567015047
@@ -131750,6 +132074,7 @@ GameObject:
   - component: {fileID: 1613311037}
   - component: {fileID: 1613311039}
   - component: {fileID: 1613311038}
+  - component: {fileID: 1613311040}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -131852,6 +132177,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1613311040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1613311036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1617376098
 GameObject:
   m_ObjectHideFlags: 0
@@ -133830,7 +134178,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &1664660510
@@ -135449,6 +135801,7 @@ GameObject:
   - component: {fileID: 1704301819}
   - component: {fileID: 1704301821}
   - component: {fileID: 1704301820}
+  - component: {fileID: 1704301822}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -135551,6 +135904,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1704301822
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1704301818}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1706038576 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3437744339443665193, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -138049,6 +138425,7 @@ GameObject:
   - component: {fileID: 1761478394}
   - component: {fileID: 1761478396}
   - component: {fileID: 1761478395}
+  - component: {fileID: 1761478397}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -138151,6 +138528,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1761478397
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1761478393}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1001 &1763464304
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -141956,6 +142356,7 @@ GameObject:
   - component: {fileID: 1845132255}
   - component: {fileID: 1845132257}
   - component: {fileID: 1845132256}
+  - component: {fileID: 1845132258}
   m_Layer: 0
   m_Name: '@SlotInteriorLight'
   m_TagString: Untagged
@@ -142058,6 +142459,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1845132258
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1845132254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1001 &1846020433
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -147951,6 +148375,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1865615868}
   - component: {fileID: 1865615869}
+  - component: {fileID: 1865615870}
   m_Layer: 0
   m_Name: Light
   m_TagString: Untagged
@@ -148038,6 +148463,29 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &1865615870
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1865615867}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Version: 3
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_LightLayerMask: 1
+  m_RenderingLayers: 1
+  m_CustomShadowLayers: 0
+  m_ShadowLayerMask: 1
+  m_ShadowRenderingLayers: 1
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
 --- !u!1 &1866412948
 GameObject:
   m_ObjectHideFlags: 0
@@ -157582,7 +158030,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &1999456911
@@ -171645,7 +172097,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _catalog: {fileID: 11400000, guid: 6452be13e67494b4db5a93aed035163c, type: 2}
-  _outfitItemId: 415781343
+  _outfitItemId: 0
+  _topItemId: 402795412
+  _bottomItemId: 0
+  _fillLightIntensity: 220
+  _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
 --- !u!136 &2128608977

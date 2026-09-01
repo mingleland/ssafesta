@@ -20,8 +20,20 @@ namespace Festa.World
         [Tooltip("아바타 조립에 쓸 모듈 카탈로그")]
         [SerializeField] Festa.Avatar.AvatarCatalog _catalog;
 
-        [Tooltip("직원 복장(Outfit) 아이템 id. 0 이면 카탈로그 기본값.")]
+        [Tooltip("직원 복장(Outfit) 아이템 id. 0 이면 미적용.")]
         [SerializeField] int _outfitItemId;
+
+        [Tooltip("직원 상의(Top) 아이템 id. 정장은 Outfit 이 아니라 Top 에 있다. 0 이면 미적용.")]
+        [SerializeField] int _topItemId;
+
+        [Tooltip("직원 하의(Bottom) 아이템 id. 0 이면 카탈로그 기본값.")]
+        [SerializeField] int _bottomItemId;
+
+        [Tooltip("직원을 비추는 필 라이트 세기(월드). 0 이면 만들지 않는다.")]
+        [SerializeField] float _fillLightIntensity = 220f;
+
+        [Tooltip("필 라이트 도달 거리(월드).")]
+        [SerializeField] float _fillLightRange = 34f;
 
         [Tooltip("시각 높이(월드 유닛). 플레이어와 같은 값이라야 나란히 섰을 때 비례가 맞는다.")]
         [SerializeField] float _targetVisualHeight = 22.375f;
@@ -44,6 +56,8 @@ namespace Festa.World
 
             var config = _catalog.CreateDefault(Festa.Avatar.AvatarGender.Male);
             if (_outfitItemId != 0) config.SetItem(Festa.Avatar.AvatarPartCategory.Outfit, _outfitItemId);
+            if (_topItemId != 0) config.SetItem(Festa.Avatar.AvatarPartCategory.Top, _topItemId);
+            if (_bottomItemId != 0) config.SetItem(Festa.Avatar.AvatarPartCategory.Bottom, _bottomItemId);
 
             _visual = new GameObject("StaffVisual");
             _visual.transform.SetParent(transform, false);
@@ -55,6 +69,33 @@ namespace Festa.World
 
             FitHeight();
             SetupAnimator();
+            AddFillLight();
+        }
+
+        /// <summary>
+        /// 직원 얼굴·상체를 비추는 작은 필 라이트.
+        ///
+        /// <para>부스 조명은 천장 쪽에서 내려오므로 사람 얼굴에는 그늘이 진다 — 야간 축제존에서
+        /// 직원이 "잘 안 보인다" 는 보고의 원인이다 (S15P21A604-355). 앞·위에서 약하게 채운다.</para>
+        ///
+        /// <para>도달 거리를 작게 둔다. 렌더 경로가 Forward+ 라 광원 수 자체는 문제가 아니지만,
+        /// 범위가 넓으면 클러스터마다 계산 대상이 늘어 비용만 커진다.</para>
+        /// </summary>
+        void AddFillLight()
+        {
+            if (_fillLightIntensity <= 0f) return;
+
+            var go = new GameObject("StaffFillLight");
+            go.transform.SetParent(transform, false);
+            // 앞쪽 위 — 얼굴을 향한다
+            go.transform.localPosition = new Vector3(0f, _targetVisualHeight * 0.95f, _targetVisualHeight * 0.32f);
+
+            var light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.color = new Color(1f, 0.95f, 0.86f);
+            light.intensity = _fillLightIntensity;
+            light.range = _fillLightRange;
+            light.shadows = LightShadows.None;   // 필 라이트가 그림자를 만들면 이중 그림자가 생긴다
         }
 
         /// <summary>
