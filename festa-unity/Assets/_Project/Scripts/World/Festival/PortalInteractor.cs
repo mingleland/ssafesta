@@ -23,12 +23,10 @@ namespace Festa.World
         BoothPortal _nearest;
         float _lastTeleportTime = -10f;
 
-        // ── 하이라이트 링 (Owner 로컬 전용) ──
-        GameObject _ring;
-        Material _ringMat;
-        static Texture2D _ringTex;
-        static Texture2D _panelTex;
-        static Texture2D _capTex;
+        // 하이라이트 링·프롬프트는 InteractPromptUI / InteractRing 공용 구현을 쓴다 —
+        // 부스 오브젝트(노트북·AI) 상호작용과 **같은 화면 언어**를 유지하기 위해서다
+        // (S15P21A604-355). 여기서 따로 그리면 둘이 다시 어긋난다.
+        readonly InteractRing _ring = new InteractRing();
 
         public override void OnNetworkSpawn()
         {
@@ -40,8 +38,7 @@ namespace Festa.World
 
         public override void OnNetworkDespawn()
         {
-            if (_ring != null) Destroy(_ring);
-            if (_ringMat != null) Destroy(_ringMat);
+            _ring.Dispose();
         }
 
         void Update()
@@ -80,120 +77,16 @@ namespace Festa.World
         void UpdateHighlight()
         {
             bool show = _nearest != null && Time.time - _lastTeleportTime >= _cooldown;
-            if (!show)
-            {
-                if (_ring != null) _ring.SetActive(false);
-                return;
-            }
-            if (_ring == null) CreateRing();
+            if (!show) { _ring.Hide(); return; }
             var (pos, radius) = _nearest.HighlightFootprint();
-            _ring.SetActive(true);
-            _ring.transform.position = pos;
-            float pulse = 1f + 0.06f * Mathf.Sin(Time.time * 4.2f);
-            _ring.transform.localScale = new Vector3(radius * 2f * pulse, 1f, radius * 2f * pulse);
+            _ring.Show(pos, radius);
         }
 
-        void CreateRing()
-        {
-            _ring = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            Destroy(_ring.GetComponent<Collider>());
-            _ring.name = "InteractHighlight (local)";
-            _ring.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            _ringMat = new Material(Shader.Find("Mobile/Particles/Additive"));
-            _ringMat.mainTexture = RingTexture();
-            var r = _ring.GetComponent<Renderer>();
-            r.sharedMaterial = _ringMat;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        }
-
-        static Texture2D RingTexture()
-        {
-            if (_ringTex != null) return _ringTex;
-            const int S = 128;
-            _ringTex = new Texture2D(S, S, TextureFormat.RGBA32, false);
-            for (int y = 0; y < S; y++)
-            for (int x = 0; x < S; x++)
-            {
-                float d = Vector2.Distance(new Vector2(x, y), new Vector2(S / 2f, S / 2f)) / (S / 2f);
-                // 가장자리 링 + 안쪽 은은한 채움
-                float ring = Mathf.Exp(-Mathf.Pow((d - 0.82f) / 0.08f, 2f));
-                float fill = d < 0.82f ? 0.10f * (1f - d) : 0f;
-                float a = Mathf.Clamp01(ring * 0.85f + fill);
-                _ringTex.SetPixel(x, y, new Color(1f, 0.82f, 0.35f, 1f) * a);
-            }
-            _ringTex.Apply();
-            return _ringTex;
-        }
-
-        // ── 프롬프트: 대상 부스 위 화면 좌표에 키캡 스타일로 ──
-
-        static GUIStyle _labelStyle;
-        static GUIStyle _capStyle;
 
         void OnGUI()
         {
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
-            // 위치는 화면 중앙 약간 아래 고정 — 부스 높이·카메라 각도와 무관하게
-            // 항상 보인다 (부스 상단 월드 앵커 방식은 3인칭 하향 카메라에서 화면 밖으로 나갔다).
-            float ui = Screen.height / 1080f;
-
-            var label = _nearest.promptText;
-            // GUIStyle 을 매 프레임 new 하면 프롬프트가 떠 있는 내내 GC 쓰레기가 쌓여
-            // 주기적 GC 스파이크(끊김)에 일조한다 — 한 번 만들어 캐시한다.
-            if (_labelStyle == null)
-            {
-                _labelStyle = new GUIStyle(GUI.skin.label)
-                {
-                    alignment = TextAnchor.MiddleLeft,
-                    fontStyle = FontStyle.Bold,
-                };
-                _labelStyle.normal.textColor = Color.white;
-                _capStyle = new GUIStyle(GUI.skin.label)
-                {
-                    alignment = TextAnchor.MiddleCenter,
-                    fontStyle = FontStyle.Bold,
-                };
-                _capStyle.normal.textColor = new Color(0.12f, 0.12f, 0.12f);
-            }
-            var labelStyle = _labelStyle;
-            var capStyle = _capStyle;
-            labelStyle.fontSize = Mathf.RoundToInt(19f * ui);
-            capStyle.fontSize = Mathf.RoundToInt(18f * ui);
-
-            float cap = 30f * ui;                                    // 키캡 한 변
-            float labelW = labelStyle.CalcSize(new GUIContent(label)).x;
-            float pad = 10f * ui;
-            float w = cap + pad * 3f + labelW;
-            float h = cap + pad * 1.4f;
-            float x = (Screen.width - w) / 2f;
-            float y = Screen.height * 0.52f;   // 화면 중앙 살짝 아래 — 60% 는 너무 낮았다
-
-            GUI.DrawTexture(new Rect(x, y, w, h), PanelTexture(), ScaleMode.StretchToFill);
-            GUI.DrawTexture(new Rect(x + pad, y + (h - cap) / 2f, cap, cap), CapTexture(), ScaleMode.StretchToFill);
-            GUI.Label(new Rect(x + pad, y + (h - cap) / 2f, cap, cap), "F", capStyle);
-            GUI.Label(new Rect(x + pad * 2f + cap, y, labelW + pad, h), label, labelStyle);
-        }
-
-        static Texture2D PanelTexture()
-        {
-            if (_panelTex != null) return _panelTex;
-            _panelTex = Solid(new Color(0.07f, 0.07f, 0.09f, 0.82f));
-            return _panelTex;
-        }
-
-        static Texture2D CapTexture()
-        {
-            if (_capTex != null) return _capTex;
-            _capTex = Solid(new Color(0.93f, 0.93f, 0.9f, 0.98f));
-            return _capTex;
-        }
-
-        static Texture2D Solid(Color c)
-        {
-            var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-            t.SetPixels(new[] { c, c, c, c });
-            t.Apply();
-            return t;
+            InteractPromptUI.DrawPrompt(_nearest.promptText);
         }
     }
 }

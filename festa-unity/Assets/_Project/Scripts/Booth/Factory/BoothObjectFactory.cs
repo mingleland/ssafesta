@@ -134,11 +134,12 @@ namespace Festa.Booth
             bool interactive = go.GetComponentInChildren<Festa.Content.IBoothInteractable>(true) != null;
             var target = go.GetComponent<BoothInteractionTarget>();
             if (target == null) target = go.AddComponent<BoothInteractionTarget>();
-            // 사거리는 **월드 유닛**이다 — 부스 콘텐츠는 아저씨 기준 스케일(1 m ≈ 13.26 unit, S15P21A604-350)이므로 3 m 는 40f 다.
-            // 3f·2.2f 는 미터로 읽히지만 실제로는 0.3 m·0.22 m 였다. 그 값이면 대상 표면에
-            // 몸이 닿아도 판정 기준점까지 4.3(NPC)~6.8(노트북) unit 이라 F 가 원리적으로
-            // 발동하지 않는다 — 부스 안에서 상호작용이 안 되던 진짜 원인이다 (S15P21A604-339 실측).
-            target.Configure(interactive ? 40f : 29f, interactive);
+            // 사거리는 **월드 유닛**이고 판정은 콜라이더 **표면** 기준이다
+            // (BoothInteractionTarget.DistanceFrom). 표면 기준이라 값이 오브젝트 크기와
+            // 무관해져, "거의 붙어야 잡힌다" 를 크기가 제각각인 대상 전부에 한 숫자로 건다.
+            // 13f ≈ 1 m, 10f ≈ 0.75 m (부스 스케일 1 m ≈ 13.26 unit, S15P21A604-350).
+            // 전에는 피벗 기준 40f 라 3 m 밖에서도 잡혀 "범위가 너무 크다" 는 보고를 받았다.
+            target.Configure(interactive ? 13f : 10f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)

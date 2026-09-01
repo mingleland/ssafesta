@@ -45,6 +45,7 @@ namespace Festa.Content
 
         void OnDestroy()
         {
+            _ring.Dispose();
             if (_instance == this) _instance = null;
         }
 
@@ -94,14 +95,15 @@ namespace Festa.Content
             if (origin == null) return null;
 
             Festa.Booth.BoothInteractionTarget best = null;
-            float bestSqr = float.MaxValue;
+            float bestDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
                 if (t == null || !t.Interactive) continue;
-                float sqr = (t.transform.position - origin.Value).sqrMagnitude;
-                if (sqr > t.MaxDistance * t.MaxDistance || sqr >= bestSqr) continue;
+                // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
+                float d = t.DistanceFrom(origin.Value);
+                if (d > t.MaxDistance || d >= bestDist) continue;
                 best = t;
-                bestSqr = sqr;
+                bestDist = d;
             }
             return best;
         }
@@ -115,7 +117,7 @@ namespace Festa.Content
         {
             var origin = InteractionOrigin();
             if (origin == null) return true;   // 기준을 못 잡으면 막지 않는다 (조용히 잠그지 않는다)
-            return Vector3.Distance(origin.Value, target.transform.position) <= target.MaxDistance;
+            return target.DistanceFrom(origin.Value) <= target.MaxDistance;
         }
 
         static Vector3? InteractionOrigin()
@@ -179,97 +181,47 @@ namespace Festa.Content
 #endif
         }
 
-        // ── 근접 힌트 ────────────────────────────────────────
-        // 사거리 안에 상호작용 대상이 들어오면 "F — 상호작용" 을 띄운다.
-        // 키가 있다는 걸 알려주지 않으면 F 조작은 없는 기능이나 마찬가지다.
-        static UnityEngine.UI.Text s_hint;
-
-        static void ShowHint(Festa.Booth.BoothInteractionTarget target)
-        {
-            if (target == null)
-            {
-                if (s_hint != null) s_hint.enabled = false;
-                return;
-            }
-            EnsureHint();
-            if (s_hint == null) return;
-            s_hint.enabled = true;
-        }
-
-        static void EnsureHint()
-        {
-            if (s_hint != null) return;
-
-            var canvasGo = new GameObject("@InteractHint",
-                typeof(Canvas), typeof(UnityEngine.UI.CanvasScaler));
-            var canvas = canvasGo.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // 게임 화면(500)보다 아래 — 모달이 떠 있으면 힌트가 그 위로 올라오면 안 된다.
-            canvas.sortingOrder = 100;
-            var scaler = canvasGo.GetComponent<UnityEngine.UI.CanvasScaler>();
-            scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
-
-            var go = new GameObject("Hint", typeof(RectTransform), typeof(UnityEngine.UI.Text));
-            go.transform.SetParent(canvasGo.transform, false);
-            s_hint = go.GetComponent<UnityEngine.UI.Text>();
-            // 로비·미니게임과 같은 폰트라야 한글이 깨지지 않는다 (T-22 는 IMGUI 한정).
-            var font = Resources.Load<Font>("Fonts/MalgunGothicLight");
-            s_hint.font = font != null ? font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            s_hint.text = "F — 상호작용";
-            s_hint.fontSize = 30;
-            s_hint.fontStyle = FontStyle.Bold;
-            s_hint.color = new Color(1f, 0.86f, 0.5f, 1f);
-            s_hint.alignment = TextAnchor.MiddleCenter;
-            s_hint.horizontalOverflow = HorizontalWrapMode.Overflow;
-            s_hint.raycastTarget = false;   // 힌트가 클릭을 먹으면 안 된다
-
-            var rect = s_hint.rectTransform;
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.sizeDelta = new Vector2(600, 48);
-            rect.anchoredPosition = new Vector2(0f, 150f);
-
-            // 송신 피드백 토스트 — 힌트 바로 위. 노트북 F 의 가시 결과(홈페이지 열기)는
-            // FE 몫이라, FE 가 없는 단독 실행에서는 발동해도 화면 변화가 없어 "안 된다" 로
-            // 보인다 (S15P21A604-348 실측). 브리지가 실제로 보냈을 때만 잠깐 띄운다.
-            var toastGo = new GameObject("Toast", typeof(RectTransform), typeof(UnityEngine.UI.Text));
-            toastGo.transform.SetParent(s_hint.canvas.transform, false);
-            s_toast = toastGo.GetComponent<UnityEngine.UI.Text>();
-            s_toast.font = s_hint.font;
-            s_toast.fontSize = 26;
-            s_toast.fontStyle = FontStyle.Bold;
-            s_toast.color = new Color(0.55f, 1f, 0.65f, 1f);
-            s_toast.alignment = TextAnchor.MiddleCenter;
-            s_toast.horizontalOverflow = HorizontalWrapMode.Overflow;
-            s_toast.raycastTarget = false;
-            var trect = s_toast.rectTransform;
-            trect.anchorMin = trect.anchorMax = new Vector2(0.5f, 0f);
-            trect.pivot = new Vector2(0.5f, 0f);
-            trect.sizeDelta = new Vector2(700, 42);
-            trect.anchoredPosition = new Vector2(0f, 200f);
-            s_toast.enabled = false;
-        }
-
-        static UnityEngine.UI.Text s_toast;
+        // ── 프롬프트 ─────────────────────────────────────────
+        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널 + 발밑 링.
+        // 전에는 여기만 화면 하단 uGUI 텍스트라, 같은 F 조작인데 다른 기능처럼 보였다
+        // (S15P21A604-355 사용자 보고). 그리기는 InteractPromptUI 한 곳에만 있다.
+        readonly Festa.World.InteractRing _ring = new Festa.World.InteractRing();
+        string _toast;
         float _toastUntil;
+
+        void ShowHint(Festa.Booth.BoothInteractionTarget target)
+        {
+            if (target == null) { _ring.Hide(); return; }
+            var (pos, radius) = target.HighlightFootprint();
+            _ring.Show(pos, radius);
+        }
+
+        /// <summary>대상별 행동 문구. 포털이 "3번 부스 입장" 을 쓰듯 여기도 무엇을 하는지 적는다.</summary>
+        static string PromptFor(Festa.Booth.BoothInteractionTarget target)
+        {
+            var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
+            if (ro == null) return "상호작용";
+            switch (ro.Type)
+            {
+                case Festa.Booth.BoothObjectType.Laptop:  return "노트북으로 홈페이지 열기";
+                case Festa.Booth.BoothObjectType.AiAgent: return "AI 직원과 대화";
+                default: return "상호작용";
+            }
+        }
 
         void OnBridgeSent(string type)
         {
-            EnsureHint();
-            if (s_toast == null) return;
-            s_toast.text = type == Festa.Integration.BoothInteractBridge.AiAgentInteract
+            _toast = type == Festa.Integration.BoothInteractBridge.AiAgentInteract
                 ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다"
                 : "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
-            s_toast.enabled = true;
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 
-        void LateUpdate()
+        void OnGUI()
         {
-            if (s_toast != null && s_toast.enabled && Time.unscaledTime > _toastUntil)
-                s_toast.enabled = false;
+            if (_hovered != null) Festa.World.InteractPromptUI.DrawPrompt(PromptFor(_hovered));
+            if (_toast != null && Time.unscaledTime <= _toastUntil)
+                Festa.World.InteractPromptUI.DrawToast(_toast);
         }
 
         /// <summary>
