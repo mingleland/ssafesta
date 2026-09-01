@@ -24,6 +24,9 @@ import {
   removeObjects,
   reorderEventAction,
   resizeWorldScene,
+  sceneRemovalReason,
+  setStartScene,
+  startSceneChangeReason,
 } from '../../studio/model/authoringCommands.ts';
 import { createStarterProject } from '../../studio/model/createStarterProject.ts';
 
@@ -285,5 +288,34 @@ describe('Game Studio authoring commands', () => {
     expect((error as GameProjectContractError).code).toBe('TERMINAL_ACTION_NOT_LAST');
     expect(isTerminalActionType('GO_TO_SCENE')).toBe(true);
     expect(isTerminalActionType('SET_VARIABLE')).toBe(false);
+  });
+
+  // S15P21A604-361 — 편집기에서 시작 Scene을 지정/변경할 수 있게 한다.
+  it('changes the start scene to a valid non-OVERLAY target and updates the delete guard accordingly', () => {
+    const project = createStarterProject(54);
+    expect(project.startSceneId).toBe('library');
+    // 옮기기 전 'library'는 시작 Scene이라 지울 수 없다 — 삭제 가드가 여전히 startSceneId를 본다는
+    // 걸 대조하기 위한 기준선이다.
+    expect(sceneRemovalReason(project, 'library')).toBe('시작 Scene은 삭제할 수 없습니다.');
+
+    const moved = setStartScene(project, 'ending');
+    expect(moved.startSceneId).toBe('ending');
+    expect(parseGameProject(moved)).toBe(moved);
+    // 시작 Scene 삭제 가드는 startSceneId를 그대로 읽으므로, 옮기고 나면 이제 'ending'이 막히고
+    // 예전 시작 Scene이었던 'library'는(다른 사유가 없다면) 더 이상 이 사유로 막히지 않아야 한다.
+    expect(sceneRemovalReason(moved, 'ending')).toBe('시작 Scene은 삭제할 수 없습니다.');
+    expect(sceneRemovalReason(moved, 'library')).toBeNull();
+  });
+
+  it('rejects setting an OVERLAY dialogue as the start scene, and reports the reason for both cases', () => {
+    const project = createStarterProject(55);
+
+    expect(startSceneChangeReason(project, 'library')).toBe('이미 시작 Scene입니다.');
+    expect(startSceneChangeReason(project, 'librarianDialogue'))
+      .toBe('게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.');
+    expect(startSceneChangeReason(project, 'ending')).toBeNull();
+
+    expect(() => setStartScene(project, 'librarianDialogue'))
+      .toThrow('게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.');
   });
 });

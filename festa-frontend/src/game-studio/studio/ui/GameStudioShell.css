@@ -224,6 +224,7 @@
 .gss-scene-actions button { background: #151a22; border: 1px solid #303945; border-radius: 5px; color: #93a0b1; font-size: 8px; min-height: 27px; padding: 4px; }
 .gss-scene-actions button:disabled { cursor: not-allowed; opacity: .35; }
 .gss-scene-actions .gss-text-danger { border-color: rgba(228,112,112,.24); margin: 0; }
+.gss-scene-actions .gss-set-start-scene { border-color: rgba(111,215,165,.32); color: #6fd7a5; grid-column: 1 / -1; }
 .gss-text-danger { background: transparent; border: 0; color: var(--gss-red) !important; cursor: pointer; font-size: 10px; margin-top: 8px; padding: 5px; }
 
 .gss-sidebar-copy { color: var(--gss-muted); font-size: 10px; line-height: 1.5; margin: 8px 0 11px; }
