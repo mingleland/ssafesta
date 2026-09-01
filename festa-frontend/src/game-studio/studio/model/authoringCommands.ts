@@ -226,6 +226,25 @@ export const sceneRemovalReason = (project: GameProject, sceneId: string): strin
   return referenced ? '다른 Event가 이 Scene을 참조하고 있습니다.' : null;
 };
 
+// 계약(gameProject.ts validateSemantics)상 OVERLAY DIALOGUE는 시작 Scene이 될 수 없다 —
+// UI가 미리 이유를 보여주고 버튼을 막을 수 있도록 sceneRemovalReason과 같은 패턴으로 공개한다.
+// setStartScene 자체도 validated()를 거치므로, 이 판정을 우회해도 DIALOGUE_PRESENTATION_INVALID로 막힌다.
+export const startSceneChangeReason = (project: GameProject, sceneId: string): string | null => {
+  if (project.startSceneId === sceneId) return '이미 시작 Scene입니다.';
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene === undefined) return 'Scene을 찾을 수 없습니다.';
+  if (scene.type === 'DIALOGUE' && scene.presentation === 'OVERLAY') {
+    return '게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.';
+  }
+  return null;
+};
+
+export const setStartScene = (project: GameProject, sceneId: string): GameProject => {
+  const reason = startSceneChangeReason(project, sceneId);
+  if (reason !== null) throw new Error(reason);
+  return validated({ ...project, startSceneId: sceneId });
+};
+
 export const removeScene = (project: GameProject, sceneId: string): GameProject => {
   const reason = sceneRemovalReason(project, sceneId);
   if (reason !== null) throw new Error(reason);
