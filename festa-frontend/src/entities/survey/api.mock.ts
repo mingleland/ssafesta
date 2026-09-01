@@ -1,7 +1,7 @@
 // Survey mock 어댑터 — SurveyPort 의 유일한 구현 (real 은 BE -130 착수 후).
 // surveyId 시나리오: 'empty' = 문항 0, 'closed' = 마감, 'submit-fail' = 제출 오류, 그 외 = normal.
 import type { ApiError } from '../../shared/api/client';
-import type { SurveyAnswerValue } from '../../shared/contracts/survey';
+import type { SurveyAnswerValue, SurveyDraftVM } from '../../shared/contracts/survey';
 import type { SurveyPort, SurveyResultSnapshot, SurveyRunSnapshot, SurveyTextAnswerPage } from './api.port';
 import { RUN_QUESTIONS } from './fixtures/run';
 import { RESULT_AGGREGATES, TEXT_ANSWERS, TEXT_PAGE_SIZE } from './fixtures/result';
@@ -33,7 +33,23 @@ export const surveyMockPort: SurveyPort = {
   async getTextAnswers(_surveyId: string, page: number): Promise<SurveyTextAnswerPage> {
     return textPage(page);
   },
+
+  async getDraft(): Promise<SurveyDraftVM | null> {
+    return savedDraft ? structuredClone(savedDraft) : null;
+  },
+
+  // title 'FAIL' = 저장 실패 시나리오
+  async saveDraft(draft: SurveyDraftVM): Promise<void> {
+    if (draft.title === 'FAIL') throw apiError('UNKNOWN', '일시적인 오류입니다.');
+    savedDraft = structuredClone(draft);
+  },
 };
+
+let savedDraft: SurveyDraftVM | null = null;
+
+export function __savedDraftForTests(): SurveyDraftVM | null {
+  return savedDraft;
+}
 
 function textPage(page: number): SurveyTextAnswerPage {
   const start = page * TEXT_PAGE_SIZE;
@@ -50,4 +66,5 @@ export function __submittedAnswersForTests(): Record<string, SurveyAnswerValue> 
 
 export function __resetSurveyMockForTests(): void {
   submitted = null;
+  savedDraft = null;
 }
