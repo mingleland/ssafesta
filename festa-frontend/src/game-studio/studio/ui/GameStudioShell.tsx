@@ -30,6 +30,8 @@ import {
   replaceComponent,
   renameProject,
   sceneRemovalReason,
+  setStartScene,
+  startSceneChangeReason,
   withBuiltinAssetLibrary,
 } from '../model/authoringCommands.ts';
 import { PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
@@ -889,6 +891,16 @@ export const GameStudioShell = ({
               ))}
             </nav>
             <div className="gss-scene-actions">
+              <button
+                className="gss-set-start-scene"
+                disabled={startSceneChangeReason(project, selectedScene.id) !== null}
+                onClick={() => {
+                  apply(setStartScene(project, selectedScene.id));
+                  setNotice(`${selectedScene.name}을(를) 시작 Scene으로 설정했습니다.`);
+                }}
+                title={startSceneChangeReason(project, selectedScene.id) ?? '선택 Scene을 START로 설정'}
+                type="button"
+              >시작 Scene으로 설정</button>
               <button
                 disabled={project.scenes.length >= 50}
                 onClick={() => {
