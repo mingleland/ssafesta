@@ -337,7 +337,7 @@
 .gss-tile-overview { height: 100%; image-rendering: pixelated; inset: 0; opacity: .82; pointer-events: none; position: absolute; width: 100%; z-index: 1; }
 .gss-canvas-overlay { align-items: flex-end; bottom: 10px; display: flex; justify-content: space-between; left: 10px; pointer-events: none; position: absolute; right: 10px; z-index: 32; }
 .gss-render-budget { background: rgba(7,10,15,.84); border: 1px solid rgba(119,150,190,.3); border-radius: 5px; color: #91a1b5; font-family: ui-monospace,Consolas,monospace; font-size: 8px; padding: 4px 6px; pointer-events: none; }
-.gss-canvas-minimap { background: #090d12; border: 1px solid rgba(119,150,190,.38); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.42); cursor: crosshair; height: 116px; overflow: hidden; padding: 0; pointer-events: auto; transition: border-color .12s, transform .12s; width: 184px; }
+.gss-canvas-minimap { background: #090d12; border: 1px solid rgba(119,150,190,.38); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.42); cursor: crosshair; height: 116px; overflow: hidden; padding: 0; pointer-events: auto; touch-action: none; transition: border-color .12s, transform .12s; user-select: none; width: 184px; }
 .gss-canvas-minimap:hover { border-color: #5b9eff; transform: translateY(-1px); }
 .gss-canvas-minimap canvas { display: block; height: 116px; width: 184px; }
 .gss-map-canvas.is-placing { cursor: crosshair; box-shadow: 0 0 0 2px var(--gss-blue), 0 22px 60px rgba(0,0,0,.4); }
