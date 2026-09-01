@@ -15,9 +15,13 @@ from .store import VectorStore
 class RetrievalMetrics:
     recall_at_k: float
     mrr: float
+    p50_search_ms: float
     p95_search_ms: float
+    mean_context_tokens: float
+    p95_context_tokens: float
     leakage_count: int
     evaluated_queries: int
+    missed_case_ids: tuple[str, ...]
 
 
 def evaluate_retrieval(
@@ -39,6 +43,8 @@ def evaluate_retrieval(
         raise ValueError("평가 질문이 비어 있습니다.")
     reciprocal_ranks: list[float] = []
     latencies_ms: list[float] = []
+    context_tokens: list[int] = []
+    missed_case_ids: list[str] = []
     leakage_count = 0
     matched = 0
     for case, vector in zip(cases, query_vectors, strict=True):
@@ -52,6 +58,7 @@ def evaluate_retrieval(
             top_k=top_k,
         )
         latencies_ms.append((time.perf_counter() - started) * 1000)
+        context_tokens.append(sum(hit.token_count for hit in hits))
         leakage_count += sum(
             hit.booth_id != booth_id or hit.agent_id != agent_id for hit in hits
         )
@@ -81,12 +88,17 @@ def evaluate_retrieval(
             reciprocal_ranks.append(1.0 / rank)
         else:
             reciprocal_ranks.append(0.0)
+            missed_case_ids.append(case.case_id)
     return RetrievalMetrics(
         recall_at_k=matched / len(cases),
         mrr=sum(reciprocal_ranks) / len(reciprocal_ranks),
+        p50_search_ms=_percentile(latencies_ms, 0.50),
         p95_search_ms=_percentile(latencies_ms, 0.95),
+        mean_context_tokens=sum(context_tokens) / len(context_tokens),
+        p95_context_tokens=_percentile(context_tokens, 0.95),
         leakage_count=leakage_count,
         evaluated_queries=len(cases),
+        missed_case_ids=tuple(missed_case_ids),
     )
 
 

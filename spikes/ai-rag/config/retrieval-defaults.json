@@ -1,0 +1,24 @@
+{
+  "decision_ticket": "S15P21A604-370",
+  "embedding_model": "text-embedding-3-large",
+  "embedding_dimension": 1536,
+  "chunk_size_tokens": 900,
+  "chunk_overlap_ratio": 0.2,
+  "chunk_overlap_tokens": 180,
+  "retrieval_top_k": 10,
+  "quality_evidence": {
+    "weighted_recall": 1.0,
+    "weighted_mrr": 0.69,
+    "worst_document_recall": 1.0,
+    "weighted_mean_context_tokens": 5023.4857,
+    "quality_gate_passed": true
+  },
+  "cost_baseline": {
+    "embedding_model": "text-embedding-3-small",
+    "chunk_size_tokens": 900,
+    "chunk_overlap_ratio": 0.2,
+    "retrieval_top_k": 10,
+    "weighted_recall": 1.0,
+    "weighted_mrr": 0.5667
+  }
+}

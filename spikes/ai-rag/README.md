@@ -1,7 +1,8 @@
 # AI RAG Retrieval Spike (`S15P21A604-92`)
 
-PDF를 페이지별로 파싱하고, 세 Embedding 모델과 청킹·Top-K 조합을 같은 평가셋으로 비교한다.
-결과에는 `Recall@K`, MRR, 검색 P95, 임베딩 처리시간, 요청 수와 예상 GMS 크레딧이 기록된다.
+PDF를 페이지별로 파싱하고, Embedding 모델과 청킹·Top-K 조합을 같은 평가셋으로 비교한다.
+결과에는 `Recall@K`, MRR, 검색 P50/P95, Context token 추정, 실패 질문 ID,
+임베딩 처리시간, 요청 수와 예상 GMS 크레딧이 기록된다.
 
 ## 안전·계약 조건
 
@@ -72,10 +73,22 @@ rag-spike \
   --eval data/eval.jsonl \
   --output results/tuning.json \
   --models text-embedding-3-small,text-embedding-3-large \
-  --chunk-sizes 400,600,800 \
-  --overlap-ratios 0.10,0.15 \
-  --top-k 3,5,8
+  --chunk-sizes 300,600,900 \
+  --overlap-ratios 0.10,0.15,0.20 \
+  --top-k 3,5,8,10
 ```
+
+세 문서의 튜닝 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-tuning-summary \
+  --inputs results/pinlog.json results/ssafesta.json results/sudal.json \
+  --json-output results/chunk-topk-summary.json \
+  --markdown-output results/chunk-topk-summary.md
+```
+
+370번의 실험 그리드와 확정 기본값은 각각 `config/tuning-grid.json`,
+`config/retrieval-defaults.json`에서 확인할 수 있다.
 
 pgvector 없이 API·청킹을 빠르게 확인할 때만 `--store memory`를 쓸 수 있다. Jira 완료 근거는
 반드시 기본값인 pgvector 실행 결과를 사용한다.
