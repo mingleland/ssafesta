@@ -65,9 +65,27 @@ namespace Festa.World
             return Vector3.Angle(forward.normalized, toPlayer.normalized) <= facingHalfAngle;
         }
 
-        /// <summary>플레이어 위치에서 이 포털(부스 실물 우선)까지의 거리.</summary>
+        /// <summary>
+        /// 플레이어 위치에서 이 포털까지의 거리.
+        ///
+        /// <para><b>상대가 있으면 그 사람과의 거리를 잰다.</b> 부스 표면 기준으로 재면
+        /// 직원에게서 멀찍이 떨어져 부스 모서리에 다가가도 프롬프트가 뜬다 — 사람이 아니라
+        /// 구조물에 말을 거는 것처럼 보인다는 지적을 받았다 (S15P21A604-355).
+        /// 대화는 사람과 하는 것이므로 사람이 기준이어야 한다.</para>
+        ///
+        /// <para>수평 거리만 쓴다 — 직원이 카운터 뒤 단 위에 서 있으면 높이 차 때문에
+        /// 바로 앞에 서도 멀게 잡힌다.</para>
+        ///
+        /// <para>상대가 없는 포털(내부 출구 등)은 종전대로 부스 실물 표면 기준이다.</para>
+        /// </summary>
         public float DistanceFrom(Vector3 pos)
         {
+            if (facingSource != null)
+            {
+                var flat = pos - facingSource.position;
+                flat.y = 0f;
+                return flat.magnitude;
+            }
             if (boundsSource != null)
                 return Vector3.Distance(pos, boundsSource.bounds.ClosestPoint(pos));
             return Vector3.Distance(pos, transform.position);

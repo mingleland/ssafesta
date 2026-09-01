@@ -28,6 +28,9 @@ namespace Festa.World
         [SerializeField] Transform[] _cabins;
 
         Quaternion[] _cabinStartRotations;
+        Vector3[] _cabinStartOffsets;      // 축 기준 처음 위치 — 매 프레임 여기서 다시 계산한다
+        Quaternion _wheelStartRotation;
+        float _angle;                      // 누적 회전각(도)
 
         void Start()
         {
@@ -43,10 +46,19 @@ namespace Festa.World
                 _cabins = found.ToArray();
             }
 
-            // 캐빈의 처음 자세를 기억한다 — 매 프레임 여기로 되돌린다.
+            // 처음 자세와 **축 기준 처음 위치**를 기억한다. 매 프레임 여기서 절대각으로
+            // 다시 계산한다 — 증분 회전을 누적하면 부동소수 오차가 쌓여 캐빈이 서서히
+            // 축 쪽으로 빨려 들어간다 (실측: 몇 분 만에 궤도 반경 359 → 319).
             _cabinStartRotations = new Quaternion[_cabins.Length];
+            _cabinStartOffsets = new Vector3[_cabins.Length];
+            var hub0 = _wheel != null ? _wheel.position : transform.position;
             for (int i = 0; i < _cabins.Length; i++)
-                if (_cabins[i] != null) _cabinStartRotations[i] = _cabins[i].rotation;
+            {
+                if (_cabins[i] == null) continue;
+                _cabinStartRotations[i] = _cabins[i].rotation;
+                _cabinStartOffsets[i] = _cabins[i].position - hub0;
+            }
+            if (_wheel != null) _wheelStartRotation = _wheel.localRotation;
 
             if (_wheel == null)
                 Debug.LogWarning($"[FerrisWheelSpin] {name}: 바퀴를 찾지 못했다 — 회전하지 않는다.");
@@ -54,17 +66,25 @@ namespace Festa.World
 
         void Update()
         {
-            float degrees = 360f / _secondsPerTurn * Time.deltaTime;
+            if (_wheel == null) return;
+            _angle = Mathf.Repeat(_angle + 360f / _secondsPerTurn * Time.deltaTime, 360f);
 
             // 축은 이 오브젝트의 로컬 Z — 관람차 원판이 놓인 평면의 법선이다.
-            if (_wheel != null) _wheel.Rotate(Vector3.forward, degrees, Space.Self);
+            // 절대각으로 놓는다(증분 누적 금지 — 위 Start 주석 참조).
+            _wheel.localRotation = _wheelStartRotation * Quaternion.AngleAxis(_angle, Vector3.forward);
+
+            // **중심은 루트가 아니라 바퀴 축이다.** 루트는 지면(y=0)에 있고 축은 그보다
+            // 한참 위에 있어서, 루트를 중심으로 돌리면 캐빈이 관람차만 한 원을 따로 그린다
+            // (S15P21A604-355 — 처음에 이렇게 짜서 캐빈이 엉뚱하게 돌았다).
+            var hub = _wheel.position;
+            var spin = Quaternion.AngleAxis(_angle, transform.forward);
 
             for (int i = 0; i < _cabins.Length; i++)
             {
                 var cabin = _cabins[i];
                 if (cabin == null) continue;
-                // 캐빈은 바퀴를 따라 궤도만 돌고 자세는 그대로여야 한다.
-                cabin.RotateAround(transform.position, transform.forward, degrees);
+                cabin.position = hub + spin * _cabinStartOffsets[i];
+                // 궤도만 돌고 자세는 그대로 — 실제 관람차의 캐빈은 축에 매달려 수평을 지킨다.
                 cabin.rotation = _cabinStartRotations[i];
             }
         }
