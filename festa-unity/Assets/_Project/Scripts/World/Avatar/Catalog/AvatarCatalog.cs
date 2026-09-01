@@ -29,10 +29,38 @@ namespace Festa.Avatar
 
         public IEnumerable<AvatarItemDefinition> GetItems(AvatarPartCategory category, AvatarGender gender) =>
             items.Where(x => x && x.category == category && (x.gender == AvatarGender.Both || x.gender == gender));
+        /// <summary>
+        /// 지금 착용할 수 있는 것만 — 기본 제공이거나 소유한 항목이다 (S15P21A604-355).
+        ///
+        /// <para>목록 UI 는 <see cref="GetItems"/> 로 <b>잠긴 것까지</b> 받아 자물쇠를 붙여
+        /// 보여준다. 무엇을 얻을 수 있는지 보이지 않으면 잠금이 의미가 없기 때문이다.
+        /// 반대로 기본 아바타·무작위처럼 <b>대신 골라 주는</b> 자리에서는 이 목록을 써야 한다 —
+        /// 잠긴 옷을 입혀 놓고 저장하면 서버 검증에서 막힌다.</para>
+        /// </summary>
+        public IEnumerable<AvatarItemDefinition> GetUnlockedItems(AvatarPartCategory category, AvatarGender gender) =>
+            GetItems(category, gender).Where(AvatarOwnership.IsUnlocked);
+
         public AvatarItemDefinition Get(int id) => id == 0 ? null : items.FirstOrDefault(x => x && x.itemId == id);
         public Color GetColor(byte id) => palette.FirstOrDefault(x => x.id == id).color;
-        public AvatarItemDefinition Default(AvatarPartCategory category, AvatarGender gender) =>
-            GetItems(category, gender).FirstOrDefault(x => x.isDefault) ?? GetItems(category, gender).FirstOrDefault();
+
+        /// <summary>
+        /// 기본으로 입힐 항목. <b>잠긴 것을 고르지 않는다.</b>
+        ///
+        /// <para>해제된 것이 하나도 없으면 잠긴 것 중에서라도 고른다 — 아무것도 못 입혀
+        /// 알몸으로 두는 것보다는 낫고, 그 상태는 데이터가 잘못됐다는 뜻이라 로그로 드러낸다.</para>
+        /// </summary>
+        public AvatarItemDefinition Default(AvatarPartCategory category, AvatarGender gender)
+        {
+            var unlocked = GetUnlockedItems(category, gender).ToArray();
+            if (unlocked.Length > 0)
+                return unlocked.FirstOrDefault(x => x.isDefault) ?? unlocked[0];
+
+            var any = GetItems(category, gender).ToArray();
+            if (any.Length == 0) return null;
+            UnityEngine.Debug.LogWarning(
+                $"[AvatarCatalog] {category}/{gender} 에 기본 제공 항목이 하나도 없다 — 잠긴 항목으로 대체한다.");
+            return any.FirstOrDefault(x => x.isDefault) ?? any[0];
+        }
         public AvatarItemDefinition ResolveHat(int familyId, HairGroup group)
         {
             var variants = items.Where(x => x && x.category == AvatarPartCategory.Hat && x.familyId == familyId).ToArray();
@@ -45,7 +73,7 @@ namespace Festa.Avatar
         {
             var c = new AvatarConfig { gender = gender, skinColorId = 1, hairColorId = 6, irisColorId = 8, eyebrowColorId = 6, lipsColorId = 10, topColorId = 12, bottomColorId = 15, scleraColorId = 16, pupilColorId = 6, garmentColorVersion = 1 };
             c.SetItem(AvatarPartCategory.Head,Default(AvatarPartCategory.Head,gender)?.itemId??0);
-            var hair=GetItems(AvatarPartCategory.Hair,gender).FirstOrDefault(x=>x.hairGroup==HairGroup.Long)??Default(AvatarPartCategory.Hair,gender);
+            var hair=GetUnlockedItems(AvatarPartCategory.Hair,gender).FirstOrDefault(x=>x.hairGroup==HairGroup.Long)??Default(AvatarPartCategory.Hair,gender);
             c.SetItem(AvatarPartCategory.Hair,hair?hair.itemId:0);
             var top=Default(AvatarPartCategory.Top,gender);
             var bottom=Default(AvatarPartCategory.Bottom,gender);
