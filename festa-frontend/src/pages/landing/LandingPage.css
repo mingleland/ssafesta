@@ -1,0 +1,84 @@
+/* Landing — 게임 타이틀 화면 (S15P21A604-379).
+   세계관(야경·부스·조명)은 배경 이미지 자산이 소유하고, CSS 는 배치·인터랙션만 담당한다.
+   값들은 fidelity 실측(reference: docs/LJH/ui-design/00_context/sources/landing.png) 결과다. */
+.landing-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #141a52; /* 이미지 로드 전 하늘 톤 — 흰 플래시 방지 */
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  display: block;
+}
+
+.landing-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom; /* 광장 바닥·부스 하단이 잘리지 않게 */
+}
+
+.landing-logo {
+  position: absolute;
+  left: 50%;
+  top: 7vh;
+  transform: translateX(-50%);
+  width: min(46vw, 76vh);
+  max-width: 900px;
+  height: auto;
+  filter: drop-shadow(0 10px 30px rgba(6, 9, 40, 0.55));
+  pointer-events: none;
+}
+
+.landing-cta {
+  position: absolute;
+  left: 50%;
+  bottom: 7vh;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+  font-size: clamp(17px, 1.45vw, 26px);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-shadow: 0 2px 12px rgba(6, 9, 40, 0.9);
+  animation: landing-cta-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.landing-cta-star {
+  color: #ffd23e;
+  font-size: 0.85em;
+}
+
+@keyframes landing-cta-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.landing-root:focus-visible {
+  outline: none;
+}
+
+.landing-root:focus-visible .landing-cta {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 10px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-cta {
+    animation: none;
+  }
+}
