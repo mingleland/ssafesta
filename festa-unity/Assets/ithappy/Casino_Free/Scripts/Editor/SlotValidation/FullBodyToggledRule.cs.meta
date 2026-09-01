@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: e10c0dbc9ee44127b5e51f9d0e612c9c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Editor/SlotValidation/FullBodyToggledRule.cs
+  uploadId: 963832
