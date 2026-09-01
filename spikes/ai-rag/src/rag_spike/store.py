@@ -57,6 +57,7 @@ class MemoryVectorStore:
             SearchHit(
                 chunk_id=row[4].chunk_id,
                 page=row[4].page,
+                token_count=row[4].token_count,
                 content=row[4].content,
                 distance=_cosine_distance(row[5], query_vector),
                 booth_id=row[2],
@@ -89,6 +90,7 @@ class PgVectorStore:
                     agent_id bigint NOT NULL,
                     chunk_id text NOT NULL,
                     page integer NOT NULL,
+                    token_count integer NOT NULL,
                     content text NOT NULL,
                     embedding vector({TARGET_DIMENSION}) NOT NULL
                 ) ON COMMIT PRESERVE ROWS
@@ -116,11 +118,19 @@ class PgVectorStore:
             cursor.executemany(
                 """
                 INSERT INTO rag_spike_chunks
-                    (run_id, model_id, booth_id, agent_id, chunk_id, page, content, embedding)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s::vector)
+                    (run_id, model_id, booth_id, agent_id, chunk_id, page,
+                     token_count, content, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
                 """,
                 [
-                    (*keys, chunk.chunk_id, chunk.page, chunk.content, _vector_literal(vector))
+                    (
+                        *keys,
+                        chunk.chunk_id,
+                        chunk.page,
+                        chunk.token_count,
+                        chunk.content,
+                        _vector_literal(vector),
+                    )
                     for chunk, vector in zip(chunks, vectors, strict=True)
                 ],
             )
@@ -131,7 +141,8 @@ class PgVectorStore:
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT chunk_id, page, content, embedding <=> %s::vector AS distance,
+                SELECT chunk_id, page, token_count, content,
+                       embedding <=> %s::vector AS distance,
                        booth_id, agent_id
                   FROM rag_spike_chunks
                  WHERE run_id=%s AND model_id=%s AND booth_id=%s AND agent_id=%s

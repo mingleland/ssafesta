@@ -14,14 +14,14 @@ from .store import MemoryVectorStore, PgVectorStore
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="S15P21A604-92 RAG retrieval benchmark")
+    parser = argparse.ArgumentParser(description="RAG retrieval benchmark")
     parser.add_argument("--pdf", type=Path, required=True)
     parser.add_argument("--eval", dest="eval_path", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--models", default=",".join(MODEL_SPECS))
-    parser.add_argument("--chunk-sizes", default="400,600,800")
-    parser.add_argument("--overlap-ratios", default="0.10,0.15")
-    parser.add_argument("--top-k", default="3,5,8")
+    parser.add_argument("--chunk-sizes", default="300,600,900")
+    parser.add_argument("--overlap-ratios", default="0.10,0.15,0.20")
+    parser.add_argument("--top-k", default="3,5,8,10")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--store", choices=("pgvector", "memory"), default="pgvector")
     parser.add_argument("--booth-id", type=int, default=1)
