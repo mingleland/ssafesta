@@ -420,6 +420,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &12826420
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -8017,6 +8018,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &70837999
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -11843,6 +11845,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &153561042
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -36269,6 +36272,8 @@ GameObject:
   m_Component:
   - component: {fileID: 415523977}
   - component: {fileID: 415523978}
+  - component: {fileID: 415523979}
+  - component: {fileID: 415523980}
   m_Layer: 0
   m_Name: FestivalSlot_03
   m_TagString: Untagged
@@ -36315,6 +36320,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 45.33362, y: 42.74433, z: 39.25592}
   m_Center: {x: -3.65448, y: 21.372166, z: 0.0040283203}
+--- !u!114 &415523979
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 415523976}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &415523980
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 415523976}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 3
 --- !u!1 &417771027
 GameObject:
   m_ObjectHideFlags: 0
@@ -49945,6 +49981,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &703548851
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -50642,6 +50679,8 @@ GameObject:
   m_Component:
   - component: {fileID: 728925800}
   - component: {fileID: 728925801}
+  - component: {fileID: 728925802}
+  - component: {fileID: 728925803}
   m_Layer: 0
   m_Name: FestivalSlot_11
   m_TagString: Untagged
@@ -50688,6 +50727,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 33.981445, y: 29.366652, z: 34.538757}
   m_Center: {x: -0.049316406, y: 14.683326, z: -0.7401123}
+--- !u!114 &728925802
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 728925799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &728925803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 728925799}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 11
 --- !u!1 &740030004 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 9219559333794251449, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -51293,6 +51363,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &755938325
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -57205,6 +57276,7 @@ MonoBehaviour:
   _maxDistance: 35
   _highlightEnabled: 1
   _highlightColor: {r: 0.25, g: 0.7, b: 1, a: 1}
+  _highlightStrength: 0.9
 --- !u!4 &801130318
 Transform:
   m_ObjectHideFlags: 0
@@ -57625,6 +57697,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &812310972
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -64742,6 +64815,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &869485257
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -86759,6 +86833,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1142670347}
   - component: {fileID: 1142670348}
+  - component: {fileID: 1142670349}
+  - component: {fileID: 1142670350}
   m_Layer: 0
   m_Name: FestivalSlot_08
   m_TagString: Untagged
@@ -86805,6 +86881,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 14.748779, y: 21.793919, z: 9.278137}
   m_Center: {x: 0, y: 10.896959, z: 0}
+--- !u!114 &1142670349
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1142670346}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1142670350
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1142670346}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 8
 --- !u!1 &1143018122 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -3025113058634170507, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
@@ -90406,6 +90513,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1248403751}
   - component: {fileID: 1248403752}
+  - component: {fileID: 1248403753}
+  - component: {fileID: 1248403754}
   m_Layer: 0
   m_Name: FestivalSlot_04
   m_TagString: Untagged
@@ -90452,6 +90561,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 24.887695, y: 27.26041, z: 24.920914}
   m_Center: {x: 0, y: 13.630205, z: 0}
+--- !u!114 &1248403753
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1248403750}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1248403754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1248403750}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 4
 --- !u!1 &1249820328
 GameObject:
   m_ObjectHideFlags: 0
@@ -103781,6 +103921,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1355322530}
   - component: {fileID: 1355322531}
+  - component: {fileID: 1355322532}
+  - component: {fileID: 1355322533}
   m_Layer: 0
   m_Name: FestivalSlot_05
   m_TagString: Untagged
@@ -103827,6 +103969,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 44.53186, y: 50.88926, z: 35.749573}
   m_Center: {x: 1.2472534, y: 25.44463, z: 0}
+--- !u!114 &1355322532
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355322529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1355322533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1355322529}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 5
 --- !u!1 &1355782153
 GameObject:
   m_ObjectHideFlags: 0
@@ -118492,6 +118665,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1519937274}
   - component: {fileID: 1519937275}
+  - component: {fileID: 1519937276}
+  - component: {fileID: 1519937277}
   m_Layer: 0
   m_Name: FestivalSlot_10
   m_TagString: Untagged
@@ -118538,6 +118713,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 15.812256, y: 15.599579, z: 8.226074}
   m_Center: {x: 0, y: 7.7997894, z: 0}
+--- !u!114 &1519937276
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1519937273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1519937277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1519937273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 10
 --- !u!1 &1520840262
 GameObject:
   m_ObjectHideFlags: 0
@@ -119491,6 +119697,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &1557036128
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -119654,6 +119861,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1565392029}
   - component: {fileID: 1565392030}
+  - component: {fileID: 1565392031}
+  - component: {fileID: 1565392032}
   m_Layer: 0
   m_Name: FestivalSlot_09
   m_TagString: Untagged
@@ -119700,6 +119909,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 34.769775, y: 32.89762, z: 37.731567}
   m_Center: {x: -0.34887695, y: 16.44881, z: 2.838913}
+--- !u!114 &1565392031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1565392028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1565392032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1565392028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 9
 --- !u!1 &1567015044
 GameObject:
   m_ObjectHideFlags: 0
@@ -119753,6 +119993,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &1567015047
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -131707,6 +131948,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1649622380}
   - component: {fileID: 1649622381}
+  - component: {fileID: 1649622382}
+  - component: {fileID: 1649622383}
   m_Layer: 0
   m_Name: FestivalSlot_06
   m_TagString: Untagged
@@ -131753,6 +131996,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 24.887695, y: 27.26041, z: 24.920914}
   m_Center: {x: 0, y: 13.630205, z: 0}
+--- !u!114 &1649622382
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1649622379}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1649622383
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1649622379}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 6
 --- !u!1 &1650376103
 GameObject:
   m_ObjectHideFlags: 0
@@ -132320,6 +132594,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1661450911}
   - component: {fileID: 1661450912}
+  - component: {fileID: 1661450913}
+  - component: {fileID: 1661450914}
   m_Layer: 0
   m_Name: FestivalSlot_02
   m_TagString: Untagged
@@ -132366,6 +132642,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 13.893372, y: 24.256237, z: 13.904228}
   m_Center: {x: 0, y: 12.1281185, z: -0.0000038146973}
+--- !u!114 &1661450913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1661450910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1661450914
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1661450910}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 2
 --- !u!1 &1661473088
 GameObject:
   m_ObjectHideFlags: 0
@@ -132505,6 +132812,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &1664660510
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -148431,6 +148739,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1919771716}
   - component: {fileID: 1919771717}
+  - component: {fileID: 1919771718}
+  - component: {fileID: 1919771719}
   m_Layer: 0
   m_Name: FestivalSlot_12
   m_TagString: Untagged
@@ -148477,6 +148787,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 11.071899, y: 17.615398, z: 8.226074}
   m_Center: {x: 0, y: 8.807699, z: 0}
+--- !u!114 &1919771718
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1919771715}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &1919771719
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1919771715}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 12
 --- !u!1001 &1922427178
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -156504,6 +156845,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &1999456911
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -161867,6 +162209,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2013153220}
   - component: {fileID: 2013153221}
+  - component: {fileID: 2013153222}
+  - component: {fileID: 2013153223}
   m_Layer: 0
   m_Name: FestivalSlot_01
   m_TagString: Untagged
@@ -161913,6 +162257,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 71.46881, y: 47.47564, z: 51.609467}
   m_Center: {x: -0.000030517578, y: 23.73782, z: 0}
+--- !u!114 &2013153222
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2013153219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &2013153223
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2013153219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 1
 --- !u!1 &2013343548
 GameObject:
   m_ObjectHideFlags: 0
@@ -163920,6 +164295,8 @@ GameObject:
   m_Component:
   - component: {fileID: 2070229841}
   - component: {fileID: 2070229842}
+  - component: {fileID: 2070229843}
+  - component: {fileID: 2070229844}
   m_Layer: 0
   m_Name: FestivalSlot_07
   m_TagString: Untagged
@@ -163966,6 +164343,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 42.037354, y: 43.755207, z: 36.316284}
   m_Center: {x: 0, y: 21.877604, z: -0.2833557}
+--- !u!114 &2070229843
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2070229840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b492d8c5e9e8e9147ba8a952b0c76474, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _label: 
+  _visibleDistance: 420
+  _fadeStart: 0.7
+  _headroom: 12
+  _characterHeight: 8
+  _color: {r: 1, g: 0.97, b: 0.88, a: 1}
+--- !u!114 &2070229844
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2070229840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 745682d827d93a7478df4cfee863128d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _boothId: 7
 --- !u!1 &2070386908
 GameObject:
   m_ObjectHideFlags: 0
@@ -170452,6 +170860,7 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
+  _nameplateLabel: 
 --- !u!136 &2128608977
 CapsuleCollider:
   m_ObjectHideFlags: 0

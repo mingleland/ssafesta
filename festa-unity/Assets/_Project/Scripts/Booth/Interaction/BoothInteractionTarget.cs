@@ -12,10 +12,20 @@ namespace Festa.Booth
         /// <summary>판정 거리. **월드 유닛**이며 콜라이더 표면 기준이다 (20f ≈ 1.5 m).</summary>
         [SerializeField, Min(0.5f)] float _maxDistance = 20f;
         [SerializeField] bool _highlightEnabled = true;
-        [SerializeField] Color _highlightColor = new(0.25f, 0.7f, 1f, 1f);
+        [Tooltip("강조 색. 발밑 링(금색)과 같은 계열이라야 같은 기능으로 읽힌다.")]
+        [SerializeField] Color _highlightColor = new(1f, 0.82f, 0.35f, 1f);
+
+        [Tooltip("발광 세기 — 너무 높이면 재질 색이 날아가 형태를 알아볼 수 없다.")]
+        [SerializeField, Range(0.1f, 3f)] float _highlightStrength = 0.9f;
 
         readonly List<Renderer> _renderers = new();
-        MaterialPropertyBlock _block;
+        // 하이라이트는 **재질 인스턴스**로 건다. MaterialPropertyBlock 으로 _EmissionColor 만
+        // 써 넣던 이전 방식은 **셰이더 키워드를 켤 수 없어**, 재질에 _EMISSION 이 꺼져 있으면
+        // 아무 일도 일어나지 않았다 — 하이라이트가 조용히 죽어 있었다 (S15P21A604-355).
+        // 강조 대상은 항상 하나뿐이라 인스턴스 비용은 무시할 수 있다.
+        readonly List<Material[]> _originalMaterials = new();
+        readonly List<Material> _instanced = new();
+        bool _highlighted;
 
         // ── 근접 자동 조준용 레지스트리 ─────────────────────────
         // 디스패처가 매 프레임 "사거리 안의 가장 가까운 대상" 을 찾는다 (S15P21A604-346).
@@ -113,7 +123,6 @@ namespace Festa.Booth
         {
             _renderers.Clear();
             _renderers.AddRange(GetComponentsInChildren<Renderer>(true));
-            _block ??= new MaterialPropertyBlock();
         }
 
         void EnsureCollider()
@@ -140,14 +149,53 @@ namespace Festa.Booth
         {
             if (!_highlightEnabled) return;
             if (_renderers.Count == 0) CacheRenderers();
+            if (highlighted == _highlighted) return;
+            _highlighted = highlighted;
 
-            foreach (var targetRenderer in _renderers)
+            if (highlighted) ApplyHighlightMaterials();
+            else RestoreMaterials();
+        }
+
+        void ApplyHighlightMaterials()
+        {
+            _originalMaterials.Clear();
+            foreach (var r in _renderers)
             {
-                if (targetRenderer == null) continue;
-                targetRenderer.GetPropertyBlock(_block);
-                _block.SetColor(EmissionColor, highlighted ? _highlightColor * 0.65f : Color.black);
-                targetRenderer.SetPropertyBlock(_block);
+                if (r == null) { _originalMaterials.Add(null); continue; }
+                var originals = r.sharedMaterials;
+                _originalMaterials.Add(originals);
+
+                var copies = new Material[originals.Length];
+                for (int i = 0; i < originals.Length; i++)
+                {
+                    if (originals[i] == null) continue;
+                    var m = new Material(originals[i]);
+                    // 키워드까지 켜야 실제로 빛난다 — MPB 로는 못 하던 부분이다.
+                    m.EnableKeyword("_EMISSION");
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    if (m.HasProperty(EmissionColor))
+                        m.SetColor(EmissionColor, _highlightColor * _highlightStrength);
+                    copies[i] = m;
+                    _instanced.Add(m);
+                }
+                r.materials = copies;
             }
         }
+
+        void RestoreMaterials()
+        {
+            for (int i = 0; i < _renderers.Count && i < _originalMaterials.Count; i++)
+            {
+                var r = _renderers[i];
+                if (r == null || _originalMaterials[i] == null) continue;
+                r.sharedMaterials = _originalMaterials[i];
+            }
+            _originalMaterials.Clear();
+            // 만든 인스턴스는 반드시 지운다 — 강조할 때마다 새로 만들면 재질이 샌다.
+            foreach (var m in _instanced) if (m != null) Destroy(m);
+            _instanced.Clear();
+        }
+
+        void OnDestroy() => RestoreMaterials();
     }
 }
