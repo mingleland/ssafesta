@@ -5,9 +5,10 @@
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
 
 export const authProviders: readonly AuthProviderVM[] = [
-  { id: 'google', label: 'Google로 계속하기', availability: 'available', kind: 'oauth' },
-  { id: 'kakao', label: 'Kakao로 계속하기', availability: 'available', kind: 'oauth' },
-  { id: 'ssafy', label: 'SSAFY로 계속하기', availability: 'not_configured', kind: 'oauth' },
+  // label 은 확정 로그인 reference(login.png)의 버튼 문구를 그대로 따른다 (S15P21A604-379)
+  { id: 'google', label: 'Google 로그인', availability: 'available', kind: 'oauth' },
+  { id: 'kakao', label: 'Kakao 로그인', availability: 'available', kind: 'oauth' },
+  { id: 'ssafy', label: 'SSAFY 로그인', availability: 'not_configured', kind: 'oauth' },
   { id: 'guest', label: '게스트로 둘러보기', availability: 'available', kind: 'guest' },
 ];
 
