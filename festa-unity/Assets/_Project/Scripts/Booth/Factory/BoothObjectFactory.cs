@@ -137,9 +137,10 @@ namespace Festa.Booth
             // 사거리는 **월드 유닛**이고 판정은 콜라이더 **표면** 기준이다
             // (BoothInteractionTarget.DistanceFrom). 표면 기준이라 값이 오브젝트 크기와
             // 무관해져, "거의 붙어야 잡힌다" 를 크기가 제각각인 대상 전부에 한 숫자로 건다.
-            // 13f ≈ 1 m, 10f ≈ 0.75 m (부스 스케일 1 m ≈ 13.26 unit, S15P21A604-350).
+            // 20f ≈ 1.5 m, 15f ≈ 1.1 m (부스 스케일 1 m ≈ 13.26 unit). 13f 는 표면 기준이어도
+            // 큰 오브젝트 앞에서 닿지 않는다는 보고가 있어 올렸다.
             // 전에는 피벗 기준 40f 라 3 m 밖에서도 잡혀 "범위가 너무 크다" 는 보고를 받았다.
-            target.Configure(interactive ? 13f : 10f, interactive);
+            target.Configure(interactive ? 20f : 15f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)
