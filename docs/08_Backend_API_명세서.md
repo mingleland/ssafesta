@@ -901,7 +901,7 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ### POST `/booths/{boothId}/consultations`
 
-사람 상담 요청 생성.
+사람 상담 요청 생성. `requested_at + 10분`을 `expiresAt`으로 계산해 응답에 포함한다 (C-01, spec 011 — 2026-08-31 확정, GitLab work_items#118).
 
 ```json
 {
@@ -910,17 +910,32 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 }
 ```
 
+응답 예:
+
+```json
+{
+  "consultationId": 901,
+  "status": "REQUESTED",
+  "requestedAt": "...",
+  "expiresAt": "..."
+}
+```
+
+10분 내 Accept가 없으면 `REQUESTED → EXPIRED`로 전환하고 `CONSULTATION_EXPIRED` WebSocket 이벤트로 알린다(docs/16 §11). FE는 `expiresAt`으로 잔여 시간을 안내하고 만료 후 재요청 버튼을 노출한다.
+
 ### GET `/consultations/{consultationId}`
+
+응답 `status`에 `EXPIRED`가 포함된다.
 
 ### POST `/consultations/{consultationId}/accept`
 
-한 명의 Staff만 성공해야 한다.
+한 명의 Staff만 성공해야 한다. 이미 `EXPIRED`/`REJECTED`/다른 Staff가 `ACCEPTED`한 요청은 거부한다.
 
 ### POST `/consultations/{consultationId}/end`
 
 상담 종료.
 
-메시지는 WebSocket event 중심으로 처리하고, 기록 저장 정책에 따라 별도 REST History Endpoint를 둘 수 있다.
+메시지는 WebSocket event 중심으로 처리한다. 오프라인 시 메시지 남기기(비동기 문의)는 P1에서 제외하고 P2 후속 이슈로 분리했다(C-02, spec 011). 원문 History REST Endpoint 도입 여부·보존 기간은 P2 spec 착수 시 확정한다(C-03). P1 메타데이터·Handoff Summary(`consultations.summary`)는 프로젝트 종료 시 일괄 삭제한다(docs/09 §27).
 
 ---
 
