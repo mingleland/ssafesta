@@ -41,9 +41,6 @@ namespace Festa.World
         [Tooltip("아이들 애니메이터. 없으면 바인드 포즈로 굳어 '화난 듯 뻣뻣하게' 서 있는다.")]
         [SerializeField] RuntimeAnimatorController _animatorController;
 
-        [Tooltip("머리 위 이름표 문구. 비우면 이름표를 만들지 않는다.")]
-        [SerializeField] string _nameplateLabel;
-
         GameObject _visual;
 
         void Start() => Build();
@@ -73,14 +70,6 @@ namespace Festa.World
             FitHeight();
             SetupAnimator();
             AddFillLight();
-
-            // 이름표는 **조립 뒤**에 붙인다 — 머리 높이를 실제 렌더 바운즈에서 재기 때문이다.
-            if (!string.IsNullOrEmpty(_nameplateLabel))
-            {
-                var plate = gameObject.GetComponent<WorldNameplate>();
-                if (plate == null) plate = gameObject.AddComponent<WorldNameplate>();
-                plate.Label = _nameplateLabel;
-            }
         }
 
         /// <summary>
