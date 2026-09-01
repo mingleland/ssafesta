@@ -10,10 +10,10 @@ import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { apiBaseUrl } from '../../shared/config/runtime';
+import { oauthProviders, isConfiguredOAuth } from '../../entities/auth/providers';
+import type { AuthProviderId } from '../../shared/contracts/auth';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
-
-type Provider = 'google' | 'kakao';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -21,7 +21,9 @@ export function LoginPage() {
   const [guestError, setGuestError] = useState<string | null>(null);
   const [guestPending, setGuestPending] = useState(false);
 
-  function startOAuth(provider: Provider) {
+  function startOAuth(provider: AuthProviderId) {
+    // not_configured(ssafy) 는 여기 도달해도 아무 것도 하지 않는다 — 실 OAuth 계약(-357) 전 발명 금지
+    if (!isConfiguredOAuth(provider)) return;
     if (USE_MOCK) {
       mockStartOAuth(provider);
       navigate('/auth/callback');
@@ -52,12 +54,16 @@ export function LoginPage() {
       {notice === 'session-expired' && <p role="alert">세션이 종료되었습니다. 다시 로그인해 주세요.</p>}
       {notice === 'guest-reentry-required' && <p role="alert">게스트 이용 시간이 끝났습니다. 다시 입장해 주세요.</p>}
 
-      <button type="button" onClick={() => startOAuth('google')}>
-        Google로 계속하기
-      </button>
-      <button type="button" onClick={() => startOAuth('kakao')}>
-        Kakao로 계속하기
-      </button>
+      {oauthProviders.map((provider) => (
+        <button
+          key={provider.id}
+          type="button"
+          disabled={provider.availability !== 'available'}
+          onClick={() => startOAuth(provider.id)}
+        >
+          {provider.label}
+        </button>
+      ))}
 
       <button type="button" onClick={handleGuestEnter} disabled={guestPending}>
         게스트로 둘러보기
