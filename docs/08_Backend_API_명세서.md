@@ -177,10 +177,11 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 | 항목 | 규칙 |
 |---|---|
-| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
-| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 형식 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** |
+| 소유권 검증 | 저장 문자열은 변형하지 않되 `fa|` 형식의 `i=` 8슬롯만 읽는다. 0은 미착용. preset·legacy·형식 불일치는 호환을 위해 품목 주장 없음으로 통과 |
 | 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
 | 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 미보유 거부 | `409 AVATAR_ITEM_NOT_OWNED` + 미보유 품목마다 `{ "rule": "ITEM_NOT_OWNED", "objectId": "<assetKey>", "message": … }` |
 | 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
 
 상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
@@ -939,20 +940,34 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
-## 13. Inventory / Decoration — P1
+## 13. Inventory / Avatar Parts — P1
 
-### GET `/inventory/me`
+### GET `/catalog/items?type=AVATAR_PART`
 
-### GET `/catalog/items`
+회원·게스트 모두 Access Token으로 호출한다. 97판매 단위를 한 번에 반환하며 `owned`는 호출자 기준이다. 무료(`price=0`) 12종은 보유 행 없이도 항상 `true`다.
+
+```json
+{ "items": [
+  { "itemId": 1, "code": "F_Bot.01", "name": "일자 팬츠", "equipSlot": "BOTTOM",
+    "assetKey": "656603128", "price": 0, "onSale": true, "owned": true }
+] }
+```
+
+`assetKey`는 `avatarCode`의 `i=` 슬롯 값과 같다. 비모자는 Unity `itemId`, 모자는 UI 판매 단위인 `familyId`다. 성별 필터는 Unity 카탈로그가 담당한다.
 
 ### POST `/catalog/items/{itemId}/purchases`
 
-검증:
+회원 전용. 성공 시 `201`과 해당 품목(`owned: true`)을 반환한다. 지갑 잠금 → 보유 재확인 → `PURCHASE:{userId}:{itemId}` 멱등 차감 → `user_inventory_items` 지급을 한 트랜잭션으로 처리한다.
 
-- 판매 상태
-- 가격
-- 잔액
-- 중복 요청
+| 오류 | 의미 |
+|---|---|
+| `404 CATALOG_ITEM_NOT_FOUND` | 없는 품목 |
+| `409 ITEM_NOT_ON_SALE` | 판매 중지 |
+| `409 ITEM_ALREADY_OWNED` | 무료 품목 또는 이미 구매한 품목 |
+| `409 INSUFFICIENT_COIN` | 잔액 부족. 차감·지급 모두 롤백 |
+| `403 MEMBER_ONLY` | 게스트 구매 |
+
+별도 `GET /inventory/me`는 구현하지 않는다. 팔레트 소비자는 카탈로그 응답의 `owned`만으로 충분하다.
 
 ---
 
@@ -1089,6 +1104,9 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
+| `CATALOG_ITEM_NOT_FOUND` *(012)* | 카탈로그 품목 없음 |
+| `ITEM_NOT_ON_SALE` / `ITEM_ALREADY_OWNED` *(012)* | 판매 중지 / 이미 보유 |
+| `AVATAR_ITEM_NOT_OWNED` *(012·013)* | 아바타 저장값에 미보유 파츠 포함. `errors[].rule=ITEM_NOT_OWNED`, `objectId=assetKey` |
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
 | `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
