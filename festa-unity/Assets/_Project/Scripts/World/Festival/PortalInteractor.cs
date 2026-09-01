@@ -66,6 +66,9 @@ namespace Festa.World
             {
                 float d = p.DistanceFrom(pos);
                 if (d > p.interactRadius || d >= bestDist) continue;
+                // 상대가 있는 포털(직원)은 그 사람 시야 안에서만 열린다 — 등 뒤에서 말이
+                // 걸리면 어색하다 (S15P21A604-355).
+                if (!p.IsInFacingArc(pos)) continue;
                 bestDist = d;
                 best = p;
             }

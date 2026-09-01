@@ -34,8 +34,36 @@ namespace Festa.World
         [Tooltip("거리 판정·하이라이트 대상인 부스 실물 렌더러. 비우면 포털 위치 기준.")]
         public Renderer boundsSource;
 
+        [Tooltip("정면을 가진 상대(직원 등). 지정하면 그 시야 안에서만 상호작용된다. 비우면 전방향.")]
+        public Transform facingSource;
+
+        [Tooltip("정면 기준 좌우 허용 각도(도). 70 이면 앞쪽 140도 부채꼴.")]
+        [Range(15f, 180f)] public float facingHalfAngle = 70f;
+
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
+
+        /// <summary>
+        /// 상대의 <b>시야 안</b>에 있는가.
+        ///
+        /// <para><b>왜 방향을 보는가.</b> 거리만 보면 직원 등 뒤나 부스 안쪽에서도 말이 걸린다 —
+        /// 사람에게 말을 거는 행동인데 상대가 나를 보고 있지 않아도 되는 셈이라 어색하다
+        /// (S15P21A604-355 사용자 지적). 앞쪽 부채꼴로 좁히면 "마주 서야 대화가 열린다" 가
+        /// 되어 직원이 서 있는 이유도 분명해진다.</para>
+        ///
+        /// <para>수평면에서만 잰다 — 위아래 각도까지 따지면 계단·경사에서 이유 없이 끊긴다.
+        /// <see cref="facingSource"/> 가 없으면(내부 출구 등) 전방향 그대로다.</para>
+        /// </summary>
+        public bool IsInFacingArc(Vector3 pos)
+        {
+            if (facingSource == null) return true;
+
+            var forward = facingSource.forward; forward.y = 0f;
+            var toPlayer = pos - facingSource.position; toPlayer.y = 0f;
+            if (forward.sqrMagnitude < 1e-4f || toPlayer.sqrMagnitude < 1e-4f) return true;
+
+            return Vector3.Angle(forward.normalized, toPlayer.normalized) <= facingHalfAngle;
+        }
 
         /// <summary>플레이어 위치에서 이 포털(부스 실물 우선)까지의 거리.</summary>
         public float DistanceFrom(Vector3 pos)

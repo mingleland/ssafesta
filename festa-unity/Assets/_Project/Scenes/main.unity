@@ -420,7 +420,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &12826420
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -8018,7 +8017,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &70837999
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -8478,9 +8476,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 6
   destination: {fileID: 1038876710}
-  promptText: "6\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 47.88081
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 755938323}
+  facingHalfAngle: 70
 --- !u!1001 &82488329
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10808,9 +10808,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 10
   destination: {fileID: 35655130}
-  promptText: "10\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 33.18081
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 1999456909}
+  facingHalfAngle: 70
 --- !u!1 &131814479
 GameObject:
   m_ObjectHideFlags: 0
@@ -11226,9 +11228,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 5
   destination: {fileID: 289478036}
-  promptText: "5\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 49.502747
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 2128608975}
+  facingHalfAngle: 70
 --- !u!1 &141367986
 GameObject:
   m_ObjectHideFlags: 0
@@ -11845,7 +11849,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &153561042
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -14543,9 +14546,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 3
   destination: {fileID: 1403727377}
-  promptText: "3\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 61.9054
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 70837997}
+  facingHalfAngle: 70
 --- !u!1 &234451402 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3437744339443665193, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -15128,6 +15133,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &249198378
 GameObject:
   m_ObjectHideFlags: 0
@@ -38317,9 +38324,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 12
   destination: {fileID: 829351068}
-  promptText: "12\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 31.004955
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 869485255}
+  facingHalfAngle: 70
 --- !u!1 &484850830 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 9219559333794251449, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -39416,9 +39425,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 4
   destination: {fileID: 1446976010}
-  promptText: "4\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 47.880817
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 1664660508}
+  facingHalfAngle: 70
 --- !u!1001 &511402931
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -40511,6 +40522,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &560846095
 GameObject:
   m_ObjectHideFlags: 0
@@ -48581,9 +48594,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 1
   destination: {fileID: 1552041424}
-  promptText: "1\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 63.279484
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 1567015045}
+  facingHalfAngle: 70
 --- !u!1 &674656523
 GameObject:
   m_ObjectHideFlags: 0
@@ -48751,9 +48766,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 11
   destination: {fileID: 1007233438}
-  promptText: "11\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 47.65915
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 153561040}
+  facingHalfAngle: 70
 --- !u!1 &676159601 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 7547981600832603360, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
@@ -49948,7 +49965,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &703548851
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -51297,7 +51313,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &755938325
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -57631,7 +57646,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &812310972
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -63109,9 +63123,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 7
   destination: {fileID: 596047929}
-  promptText: "7\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 57.931377
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 812310970}
+  facingHalfAngle: 70
 --- !u!1 &833557280
 GameObject:
   m_ObjectHideFlags: 0
@@ -63416,6 +63432,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!21 &845939060
 Material:
   serializedVersion: 8
@@ -64749,7 +64767,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &869485257
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -68752,6 +68769,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &963047583
 GameObject:
   m_ObjectHideFlags: 0
@@ -87254,6 +87273,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1001 &1162129519
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -88379,6 +88400,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &1208679816
 GameObject:
   m_ObjectHideFlags: 0
@@ -90011,6 +90034,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &1237456543
 GameObject:
   m_ObjectHideFlags: 0
@@ -90377,6 +90402,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &1243931452 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4667139627191884111, guid: 489e6eb3efd000f4dbaf0111fc4efb80, type: 3}
@@ -115949,9 +115976,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 8
   destination: {fileID: 1475837449}
-  promptText: "8\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 32.478935
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 12826418}
+  facingHalfAngle: 70
 --- !u!1 &1441825511
 GameObject:
   m_ObjectHideFlags: 0
@@ -119499,7 +119528,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &1557036128
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -119762,7 +119790,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &1567015047
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -132515,7 +132542,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &1664660510
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -134840,9 +134866,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 9
   destination: {fileID: 615070628}
-  promptText: "9\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 55.45974
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 703548849}
+  facingHalfAngle: 70
 --- !u!1001 &1733217332
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -137817,9 +137845,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   boothId: 2
   destination: {fileID: 188986240}
-  promptText: "2\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
+  promptText: "\uB300\uD654"
   interactRadius: 33.35926
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 1557036126}
+  facingHalfAngle: 70
 --- !u!1 &1774425784 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -1925677261053162017, guid: 19ef14e6470c23d458096c8ca339707a, type: 3}
@@ -140240,6 +140270,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &1831510283
 GameObject:
   m_ObjectHideFlags: 0
@@ -140485,6 +140517,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &1843188778
 GameObject:
   m_ObjectHideFlags: 0
@@ -156515,7 +156549,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &1999456911
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -163548,6 +163581,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &2067651789 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 9219559333794251449, guid: 1f9036ec905b920479091aca9ba81305, type: 3}
@@ -164970,6 +165005,8 @@ MonoBehaviour:
   promptText: "\uCD95\uC81C\uB85C \uB098\uAC00\uAE30"
   interactRadius: 40
   boundsSource: {fileID: 0}
+  facingSource: {fileID: 0}
+  facingHalfAngle: 70
 --- !u!1 &2100473783
 GameObject:
   m_ObjectHideFlags: 0
@@ -170464,7 +170501,6 @@ MonoBehaviour:
   _fillLightRange: 34
   _targetVisualHeight: 22.375
   _animatorController: {fileID: 0}
-  _nameplateLabel: 
 --- !u!136 &2128608977
 CapsuleCollider:
   m_ObjectHideFlags: 0
