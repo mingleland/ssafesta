@@ -929,6 +929,36 @@ export const removeEventAction = (
   }),
 }));
 
+// terminal Action(SHOW_DIALOGUE 등)은 계약(event-runtime-semantics.md)상 배열의 마지막에만 올 수 있다 —
+// 드래그 UI가 놓을 수 있는 자리를 미리 계산(clamp)할 수 있도록 판정 함수를 공개한다.
+// reorderEventAction 자체도 replaceTopDownScene → validated()를 거치므로, 이 판정을 UI가
+// 우회해도(또는 놓치더라도) 최종적으로 TERMINAL_ACTION_NOT_LAST로 막힌다 — 다만 그 경우
+// 호출부에서 예외를 던지므로, UI는 애초에 유효한 자리로만 드롭시키는 쪽이 사용자 경험상 낫다.
+export const isTerminalActionType = (type: Action['type']): boolean => terminalActionTypes.has(type);
+
+// 드래그(햄버거 핸들)로 action을 임의의 자리로 옮긴다. 인접 swap이 아니라 fromIndex의 항목을
+// 배열에서 빼서 toIndex 자리에 다시 끼워 넣는 방식이라 한 번의 드래그로 여러 칸을 이동할 수 있다.
+export const reorderEventAction = (
+  project: GameProject,
+  sceneId: string,
+  eventId: string,
+  fromIndex: number,
+  toIndex: number,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => ({
+  ...scene,
+  events: scene.events.map((event) => {
+    if (event.id !== eventId) return event;
+    const { length } = event.actions;
+    if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= length || toIndex < 0 || toIndex >= length) {
+      return event;
+    }
+    const actions = [...event.actions];
+    const [moved] = actions.splice(fromIndex, 1);
+    actions.splice(toIndex, 0, moved);
+    return { ...event, actions };
+  }),
+}));
+
 export const updateDialogueNode = (
   project: GameProject,
   sceneId: string,
