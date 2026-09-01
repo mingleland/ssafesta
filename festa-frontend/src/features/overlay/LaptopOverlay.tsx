@@ -70,7 +70,14 @@ export function LaptopOverlay({ payload }: { payload: LaptopOverlayPayload }) {
           닫기
         </button>
       </div>
-      <iframe src={homepage.href} title={homepage.hostname} style={{ width: '100%', height: '100%', border: 0 }} />
+      {/* 소유자가 등록한 임의 URL — sandbox 로 top 탐색(frame-busting)을 차단한다 (-377).
+          allow-same-origin 은 외부 origin 콘텐츠라 sandbox 우회로 이어지지 않는다. */}
+      <iframe
+        src={homepage.href}
+        title={homepage.hostname}
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        style={{ width: '100%', height: '100%', border: 0 }}
+      />
       <p>표시되지 않는 경우 새 탭에서 열어주세요.</p>
     </div>
   );

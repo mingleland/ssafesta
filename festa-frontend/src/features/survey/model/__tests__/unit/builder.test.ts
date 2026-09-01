@@ -44,7 +44,7 @@ describe('draft 편집', () => {
   it('remove·reorder — 경계 밖 reorder 는 no-op', async () => {
     await readyBuilder();
     addQuestion('single');
-    addQuestion('boolean');
+    addQuestion('application');
     addQuestion('short_text');
     const ids = getSurveyBuilderSnapshot().draft.questions.map((q) => q.id);
     reorderQuestion(2, 0);
@@ -76,7 +76,7 @@ describe('validation', () => {
 describe('save', () => {
   it('validation 통과 시에만 저장 — 저장 후 dirty 해제·재로드 시 복원', async () => {
     await readyBuilder();
-    addQuestion('boolean');
+    addQuestion('application');
     const q = getSurveyBuilderSnapshot().draft.questions[0].id;
     await saveSurveyBuilder(); // prompt 비공백 위반 — no-op
     expect(__savedDraftForTests()).toBeNull();
@@ -88,6 +88,23 @@ describe('save', () => {
     __resetSurveyBuilderForTests();
     await loadSurveyBuilder();
     expect(getSurveyBuilderSnapshot().draft.questions).toHaveLength(1);
+  });
+
+  it('리로드 후 신규 문항 id 가 저장된 id 와 충돌하지 않는다 (-377)', async () => {
+    await readyBuilder();
+    addQuestion('single');
+    addQuestion('rating');
+    const [q1, q2] = getSurveyBuilderSnapshot().draft.questions.map((q) => q.id);
+    updateQuestion(q1, { prompt: '질문1', options: [{ id: 'o-1', label: 'A' }, { id: 'o-2', label: 'B' }] });
+    updateQuestion(q2, { prompt: '질문2' });
+    await saveSurveyBuilder();
+    // 새 세션 시뮬레이션 — questionSeq 는 0 부터지만 load 가 저장된 q-N 뒤로 시드한다
+    __resetSurveyBuilderForTests();
+    await loadSurveyBuilder();
+    addQuestion('short_text');
+    const ids = getSurveyBuilderSnapshot().draft.questions.map((q) => q.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual([q1, q2, 'q-3']);
   });
 
   it('저장 실패는 error — draft 유지', async () => {
