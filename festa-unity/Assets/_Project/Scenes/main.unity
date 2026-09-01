@@ -2891,6 +2891,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &48200032
 Light:
   m_ObjectHideFlags: 0
@@ -10915,6 +10917,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &122764596
 Light:
   m_ObjectHideFlags: 0
@@ -15881,6 +15885,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &247305532
 Light:
   m_ObjectHideFlags: 0
@@ -22732,6 +22738,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &288587397
 Light:
   m_ObjectHideFlags: 0
@@ -35627,6 +35635,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &387077484
 Light:
   m_ObjectHideFlags: 0
@@ -40649,6 +40659,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &501215041
 Light:
   m_ObjectHideFlags: 0
@@ -44512,6 +44524,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &600134678
 Light:
   m_ObjectHideFlags: 0
@@ -79996,6 +80010,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &999576665
 Light:
   m_ObjectHideFlags: 0
@@ -135606,6 +135622,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &1613311039
 Light:
   m_ObjectHideFlags: 0
@@ -139702,6 +139720,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &1704301821
 Light:
   m_ObjectHideFlags: 0
@@ -142363,6 +142383,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &1761478396
 Light:
   m_ObjectHideFlags: 0
@@ -146471,6 +146493,8 @@ MonoBehaviour:
   _rangeFactor: 1.15
   _intensityPerUnit: 14
   _heightRatio: 0.62
+  _maxStaffExposure: 1
+  _minStaffDistance: 9
 --- !u!108 &1845132257
 Light:
   m_ObjectHideFlags: 0

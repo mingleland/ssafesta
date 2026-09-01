@@ -42,7 +42,7 @@ namespace Festa.World
 
         [Tooltip("머리 위 간격 — 이름표 자체 크기의 배수다. 월드 고정값이 아니라 비율이라야 "
                + "거리가 변해도 화면상 간격이 유지된다.")]
-        [SerializeField, Range(0.05f, 1f)] float _headroomRatio = 0.85f;
+        [SerializeField, Range(0.05f, 2f)] float _headroomRatio = 1.5f;
 
         [Tooltip("기준 거리에서의 글자 크기(월드 유닛).")]
         [SerializeField] float _baseCharacterHeight = 1.35f;

@@ -28,7 +28,61 @@ namespace Festa.World
         [Tooltip("부스 높이 대비 조명을 매다는 위치 (0=바닥, 1=지붕)")]
         [SerializeField, Range(0.1f, 1f)] float _heightRatio = 0.62f;
 
+        [Tooltip("직원 머리에 닿는 세기 상한(intensity/거리²). 넘으면 세기를 낮춘다.")]
+        [SerializeField] float _maxStaffExposure = 1.0f;
+
+        [Tooltip("직원 머리와 이 거리 안으로 붙으면 조명을 위로 띄운다.")]
+        [SerializeField] float _minStaffDistance = 9f;
+
         void Start() => Fit();
+
+        /// <summary>
+        /// 직원 얼굴이 하얗게 타지 않게 노출을 제한한다.
+        ///
+        /// <para><b>왜 런타임에 해야 하나.</b> <see cref="Fit"/> 는 켜질 때마다 부스 크기로
+        /// 세기와 위치를 다시 계산한다. 그래서 에디터에서 값을 아무리 낮춰 놔도 플레이를
+        /// 누르는 순간 되돌아간다 — 실제로 세 번을 고쳤는데 화면은 그대로였고, 원인이
+        /// 이 덮어쓰기였다 (S15P21A604-355). 제한도 같은 자리에서 걸어야 살아남는다.</para>
+        ///
+        /// <para>부스마다 크기가 달라 같은 세기라도 사람에게 닿는 양이 수십 배 벌어진다.
+        /// 작은 매대는 조명이 사람 코앞에 앉기 때문이다. 그래서 세기가 아니라
+        /// <b>사람 머리에 닿는 양</b>(세기/거리²)을 기준으로 상한을 건다.</para>
+        /// </summary>
+        void LimitExposureOnStaff(Light light)
+        {
+            var staff = FindStaff();
+            if (staff == null) return;
+
+            var head = staff.position + Vector3.up * 19f;   // 사람 키 22.4 기준 얼굴 높이
+
+            // 코앞이면 세기를 낮춰도 얼굴만 탄다 — 먼저 띄운다.
+            float d = Vector3.Distance(transform.position, head);
+            if (d < _minStaffDistance)
+            {
+                var away = transform.position - head; away.y = 0f;
+                if (away.sqrMagnitude < 1f) away = staff.forward;
+                transform.position = head + Vector3.up * (_minStaffDistance * 0.8f)
+                                          + away.normalized * (_minStaffDistance * 0.6f);
+                d = Vector3.Distance(transform.position, head);
+            }
+
+            float cap = _maxStaffExposure * d * d;
+            if (light.intensity > cap) light.intensity = Mathf.Max(90f, cap);
+        }
+
+        /// <summary>
+        /// 이 부스의 직원. <c>FestivalSlot_07</c> ↔ <c>Staff_07</c> 처럼 번호로 짝을 짓는다.
+        /// 짝이 없으면(직원 없는 부스) 제한하지 않는다.
+        /// </summary>
+        Transform FindStaff()
+        {
+            var host = transform.parent != null ? transform.parent : transform;
+            int cut = host.name.LastIndexOf('_');
+            if (cut < 0) return null;
+            var staffRoot = GameObject.Find("Festival_Staff");
+            if (staffRoot == null) return null;
+            return staffRoot.transform.Find("Staff_" + host.name.Substring(cut + 1));
+        }
 
         /// <summary>부스(부모) 렌더러 월드 바운즈에 맞춰 위치·range·세기를 잡는다.</summary>
         public void Fit()
@@ -57,6 +111,8 @@ namespace Festa.World
                 bounds.center.x,
                 bounds.min.y + bounds.size.y * _heightRatio,
                 bounds.center.z);
+
+            LimitExposureOnStaff(light);
         }
     }
 }
