@@ -55,7 +55,7 @@ R2 자격증명은 아직 없다(Jira S15P21A604-232) — 어댑터 뒤에 두�
 
 ### 슬라이스 1 — FE가 실제로 호출하는 경로
 
-- [ ] T094 Add `game_assets` migration (V16) — 계약 §8 DDL 그대로, `UNIQUE(game_id, asset_id)`, `kind`·`status` CHECK
+- [ ] T094 Add `game_assets` migration (V17) — 계약 §8 DDL 그대로, `UNIQUE(game_id, asset_id)`, `kind`·`status` CHECK
 - [ ] T095 Define `GAME_ASSET_*` error codes — 계약 §6의 11종, `errors[].rule`에 위반 항목
 - [ ] T096 Add object storage port + S3-compatible adapter — presign PUT, HEAD, ranged GET, presign GET. `provider`는 `R2`·`MINIO_LOCAL`(infra-002). `compose.yaml`에 minio 서비스 추가
 - [ ] T097 Implement `POST /games/{gameId}/assets` — 추측 불가 26자 `assetId` 서버 발급, 서버 생성 `objectKey`, 10분 grant, `status`·`expiresAt` 포함. 선언 `contentType`·`byteSize`는 거절용으로만

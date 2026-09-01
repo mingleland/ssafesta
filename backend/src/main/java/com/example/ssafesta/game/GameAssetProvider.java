@@ -9,7 +9,7 @@ package com.example.ssafesta.game;
  * object store adds presigned URLs, CORS and immutable-key promotion without buying anything.
  *
  * <p>The other two exist so that moving to object storage later is additive — new rows are written
- * with the new provider and old rows are backfilled, with no schema change (V16 comment).
+ * with the new provider and old rows are backfilled, with no schema change (V17 comment).
  */
 public enum GameAssetProvider {
     DB,

@@ -11,7 +11,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * One uploaded image's metadata (contract §8, V16).
+ * One uploaded image's metadata (contract §8, V17).
  *
  * <p><b>The bytes are deliberately not a field here.</b> The column exists, but a 5 MiB {@code
  * byte[]} on the entity means every {@code findById} — the quota scan, the validator snapshot, the
