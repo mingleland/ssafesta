@@ -405,6 +405,24 @@ export const tickReferenceWorld = (
   return applyCompletionRules(project, enterPosition(project, { ...nextState, verticalVelocity: Math.min(3, nextState.verticalVelocity + 1) }, next));
 };
 
+// TOP_DOWN 이동의 실제 한 걸음 — 단일 방향(moveReferencePlayer)과 동시입력 대각선
+// (movePlayerFromHeldKeys) 양쪽이 공유한다. delta는 -1/0/1의 x/y 조합(대각선 포함).
+const moveTopDownByDelta = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+  scene: Extract<GameProject['scenes'][number], { type: 'TOP_DOWN' }>,
+  delta: Position2d,
+  facing: MoveDirection,
+): ReferenceRuntimeState => {
+  if (state.playerPosition === null) return state;
+  const next = { x: state.playerPosition.x + delta.x, y: state.playerPosition.y + delta.y };
+  const facingState = { ...state, facing, lastInteractionTargetId: null };
+  if (next.x < 0 || next.y < 0 || next.x >= scene.width || next.y >= scene.height) return facingState;
+  const occupants = visibleOccupantsAt(state, scene.objects, next);
+  if (occupants.some(isSolid)) return facingState;
+  return enterPosition(project, facingState, next);
+};
+
 export const moveReferencePlayer = (
   project: GameProject,
   state: ReferenceRuntimeState,
@@ -428,14 +446,46 @@ export const moveReferencePlayer = (
     if (horizontal.x < 0 || horizontal.x >= scene.width || visibleOccupantsAt(state, scene.objects, horizontal).some(isSolid)) return facingState;
     return enterPosition(project, facingState, horizontal);
   }
-  const delta = directionDelta[direction];
-  const next = { x: state.playerPosition.x + delta.x, y: state.playerPosition.y + delta.y };
-  const facingState = { ...state, facing: direction, lastInteractionTargetId: null };
-  if (next.x < 0 || next.y < 0 || next.x >= scene.width || next.y >= scene.height) return facingState;
-  const occupants = visibleOccupantsAt(state, scene.objects, next);
-  if (occupants.some(isSolid)) return facingState;
+  return moveTopDownByDelta(project, state, scene, directionDelta[direction], direction);
+};
 
-  return enterPosition(project, facingState, next);
+// S15P21A604-363 — 눌려 있는 방향키 집합으로 한 틱(REFERENCE_TICK_MS)당 정확히 한 걸음을 옮긴다.
+// keydown마다 즉시 이동하던 이전 방식은 OS/브라우저 키 auto-repeat 타이밍(초반 지연 → 빠른 반복)을
+// 그대로 따라가 "멈췄다가 급발진"했고, tickCount와 무관하게 이동이 몰아치면서
+// damagePlayer의 invulnerableUntilTick(틱 기준 무적)이 실제 경과 시간과 어긋나 함정을
+// "스킵"한 것처럼 보이게 했다(실제로는 죽고 즉시 리스폰된 뒤 무적 상태로 통과한 것).
+// 이동을 tickReferenceWorld와 같은 120ms 시계에 묶으면 두 증상이 함께 해결된다.
+// TOP_DOWN은 두 축을 합성해 진짜 대각선 이동을 지원하고, PLATFORMER는 점프(UP) > 좌우 > 아래
+// 우선순위로 기존 moveReferencePlayer를 그대로 재사용해 플랫포머 로직 자체는 바꾸지 않는다.
+export const movePlayerFromHeldKeys = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+  directions: ReadonlySet<MoveDirection>,
+): ReferenceRuntimeState => {
+  if (directions.size === 0) return state;
+  if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null) return state;
+  const scene = findScene(project, state.session.currentSceneId);
+  if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return state;
+
+  if (scene.type === 'PLATFORMER') {
+    if (directions.has('UP')) return moveReferencePlayer(project, state, 'UP');
+    const left = directions.has('LEFT');
+    const right = directions.has('RIGHT');
+    if (left && !right) return moveReferencePlayer(project, state, 'LEFT');
+    if (right && !left) return moveReferencePlayer(project, state, 'RIGHT');
+    if (directions.has('DOWN')) return moveReferencePlayer(project, state, 'DOWN');
+    return state;
+  }
+
+  let dx = 0;
+  let dy = 0;
+  if (directions.has('LEFT')) dx -= 1;
+  if (directions.has('RIGHT')) dx += 1;
+  if (directions.has('UP')) dy -= 1;
+  if (directions.has('DOWN')) dy += 1;
+  if (dx === 0 && dy === 0) return state; // 반대 방향 동시 입력은 상쇄되어 제자리
+  const facing: MoveDirection = dx !== 0 ? (dx < 0 ? 'LEFT' : 'RIGHT') : (dy < 0 ? 'UP' : 'DOWN');
+  return moveTopDownByDelta(project, state, scene, { x: dx, y: dy }, facing);
 };
 
 const interactionCandidates = (

@@ -12,6 +12,7 @@ import {
   chooseReferenceDialogue,
   interactReferencePlayer,
   moveReferencePlayer,
+  movePlayerFromHeldKeys,
   objectiveProgress,
   shootReferenceProjectile,
   startReferenceRuntime,
@@ -86,6 +87,9 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     typeof document === 'undefined' || document.visibilityState === 'visible'
   ));
   const completionReported = useRef(false);
+  // 현재 눌려 있는 방향키 집합 — keydown/keyup으로만 갱신하고, 실제 이동은 tick 이펙트가
+  // 매 REFERENCE_TICK_MS(120ms)마다 이 집합을 읽어 적용한다(S15P21A604-363).
+  const pressedDirectionsRef = useRef<Set<MoveDirection>>(new Set());
   const sessionTokenRef = useRef<string | null>(null);
   const sessionEndedRef = useRef(false);
   const scene = findScene(project, runtime.session.currentSceneId);
@@ -148,7 +152,14 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
       const direction = keyDirection(event.key);
       if (direction !== null) {
         event.preventDefault();
-        setRuntime((current) => moveReferencePlayer(project, current, direction));
+        // 이미 눌려 있는 키의 OS auto-repeat keydown은 여기서 걸러진다 — "멈췄다가 급발진"의
+        // 원인이던 auto-repeat 타이밍이 이동에 영향을 주지 않는다. 처음 눌린 순간에만 즉시
+        // 한 걸음 이동해 짧게 탭 했을 때의 반응성은 그대로 유지하고, 계속 누르고 있는 동안은
+        // 아래 tick 이펙트가 pressedDirectionsRef를 읽어 120ms마다 균일하게 이동시킨다.
+        if (!pressedDirectionsRef.current.has(direction)) {
+          pressedDirectionsRef.current.add(direction);
+          setRuntime((current) => movePlayerFromHeldKeys(project, current, pressedDirectionsRef.current));
+        }
         return;
       }
       if (event.key.toLowerCase() === 'f') {
@@ -162,14 +173,27 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
         setRuntime((current) => interactReferencePlayer(project, current));
       }
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const direction = keyDirection(event.key);
+      if (direction !== null) pressedDirectionsRef.current.delete(direction);
+    };
+    // 키를 누른 채로 창(탭)이 포커스를 잃으면 브라우저가 keyup을 보내지 않을 수 있다 —
+    // 방향키가 "눌린 채로 끼는" 것을 막기 위해 포커스를 잃으면 집합을 비운다.
+    const onBlur = () => pressedDirectionsRef.current.clear();
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
   }, [activeDialogue, project]);
 
   useEffect(() => {
     if (scene === undefined || scene.type === 'DIALOGUE' || activeDialogue !== null || runtime.session.status !== 'PLAYING') return undefined;
     const timer = window.setInterval(() => {
-      setRuntime((current) => tickReferenceWorld(project, current));
+      setRuntime((current) => tickReferenceWorld(project, movePlayerFromHeldKeys(project, current, pressedDirectionsRef.current)));
     }, 120);
     return () => window.clearInterval(timer);
   }, [activeDialogue, project, runtime.session.status, scene?.type]);
