@@ -1,7 +1,12 @@
 // Survey Port — FE 가 필요로 하는 데이터 요구의 표현이다 (S15P21A604-368).
 // BE Survey API(-130~-132·-190·-193)는 미착수 — 이 시그니처는 endpoint·DTO 가 아니며,
 // BE 계약 합의 시 real 어댑터 + Mapper 가 이 Port 를 구현한다. FE 가 외부 계약을 발명하지 않는다.
-import type { SurveyAnswerValue, SurveyQuestionAggregateVM, SurveyQuestionVM } from '../../shared/contracts/survey';
+import type {
+  SurveyAnswerValue,
+  SurveyDraftVM,
+  SurveyQuestionAggregateVM,
+  SurveyQuestionVM,
+} from '../../shared/contracts/survey';
 
 export interface SurveyRunSnapshot {
   /** closed = 마감 — 질문이 있어도 제출할 수 없다 */
@@ -26,4 +31,7 @@ export interface SurveyPort {
   submitAnswers(surveyId: string, answers: Record<string, SurveyAnswerValue>): Promise<void>;
   getResult(surveyId: string): Promise<SurveyResultSnapshot>;
   getTextAnswers(surveyId: string, page: number): Promise<SurveyTextAnswerPage>;
+  /** null = 아직 만든 설문이 없다 (Builder 는 빈 draft 로 시작) */
+  getDraft(): Promise<SurveyDraftVM | null>;
+  saveDraft(draft: SurveyDraftVM): Promise<void>;
 }
