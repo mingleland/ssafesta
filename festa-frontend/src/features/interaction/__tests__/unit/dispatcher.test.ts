@@ -21,22 +21,27 @@ describe('initInteractionDispatcher', () => {
     closeOverlay();
   });
 
-  it('BOOTH_LAPTOP_INTERACT를 payload 손실 없이 LAPTOP 오버레이로 연다', () => {
-    const unsubscribe = initInteractionDispatcher();
-    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://example.com' }));
-
-    expect(getCurrentOverlay()).toEqual({
-      type: 'LAPTOP',
-      payload: { boothId: 7, objectId: 'laptop-1', url: 'https://example.com' },
-    });
-    unsubscribe();
-  });
-
-  it('url 없는 BOOTH_LAPTOP_INTERACT도 그대로 연다(FR-009 — 미등록은 정상 경로)', () => {
+  it('BOOTH_LAPTOP_INTERACT를 LAPTOP 오버레이로 연다 — url 필드는 계약에서 제거됐다(-297, 정본은 booth 조회)', () => {
     const unsubscribe = initInteractionDispatcher();
     emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1' }));
 
-    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1', url: undefined } });
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('구버전 Unity가 url을 보내도 payload로 전달하지 않는다 — URL 정본은 GET /booths/{id}(016 C-01)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://stale.example.com' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('BOOTH_PROJECT_INTERACT를 PROJECT 오버레이로 연다 — 계약 #110 note 2754197 (boothId·objectId, configId 없음)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_PROJECT_INTERACT', boothId: 7, objectId: 'project-panel-1' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'PROJECT', payload: { boothId: 7, objectId: 'project-panel-1' } });
     unsubscribe();
   });
 

@@ -8,7 +8,13 @@ export type BoothInteractEvent =
       type: 'BOOTH_LAPTOP_INTERACT';
       boothId: number;
       objectId: string;
-      url?: string; // LAPTOP 전용, 선택 — 016 FR-009: 주소 미등록 노트북도 상호작용은 발생하고 "안내"를 띄운다
+      // url 필드는 -297 에서 계약에서 제거됐다("채울 출처가 없는데 남겨 두면 Unity 가 보낼 수도
+      // 있다고 읽힌다") — URL 의 정본은 GET /booths/{id} 의 homepageUrl 이다(016 C-01 #97, -374).
+    }
+  | {
+      type: 'BOOTH_PROJECT_INTERACT'; // 계약 확정: GitLab #110 note 2754197 (2026-08-31, -343 본문)
+      boothId: number; // C-01 — 부스당 프로젝트 1개라 boothId 만으로 조회가 끝난다. configId 없음
+      objectId: string;
     }
   | {
       type: 'AI_AGENT_INTERACT'; // Issue #2: FE·Unity·AI 3파트 확정 (2026-08-20)

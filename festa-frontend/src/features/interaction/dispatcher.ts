@@ -11,7 +11,12 @@ import { openOverlay } from '../../shared/types/overlay';
 function dispatch(event: BoothInteractEvent): void {
   switch (event.type) {
     case 'BOOTH_LAPTOP_INTERACT':
-      openOverlay('LAPTOP', { boothId: event.boothId, objectId: event.objectId, url: event.url });
+      openOverlay('LAPTOP', { boothId: event.boothId, objectId: event.objectId });
+      return;
+    case 'BOOTH_PROJECT_INTERACT':
+      // 계약 확정(#110 note 2754197) — Unity 송신부(-343)는 미구현이나 payload 는 고정됐다.
+      // 송신부가 오면 이 case 가 그대로 실경로가 된다 (mock intent 는 openOverlay 직접 호출).
+      openOverlay('PROJECT', { boothId: event.boothId, objectId: event.objectId });
       return;
     case 'AI_AGENT_INTERACT':
       openOverlay('AI_CHAT', toAiChatPayload(event));
