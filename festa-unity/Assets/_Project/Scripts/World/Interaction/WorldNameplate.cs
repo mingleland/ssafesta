@@ -11,13 +11,16 @@ namespace Festa.World
     ///
     /// <para><b>판 대신 외곽선과 그림자를 쓴다.</b> 어두운 판을 깔면 읽히기는 하지만 화면이
     /// 무거워지고 UI 를 월드에 억지로 붙인 티가 난다. 게임에서 쓰는 방식대로
-    /// <b>여덟 방향 외곽선 + 아래쪽 그림자 + 볼드 본문</b>으로 쌓는다 — 배경이 밝든 어둡든
-    /// 윤곽이 살고 글자에 무게가 생긴다.</para>
+    /// <b>여덟 방향 외곽선 + 아래쪽 그림자 + 본문</b>으로 쌓는다 — 배경이 밝든 어둡든
+    /// 윤곽이 산다.</para>
     ///
-    /// <para><b>볼드는 합성이다.</b> 프로젝트 폰트가 Light 한 벌뿐이라 그대로 쓰면 가늘어서
-    /// 야간 축제존 배경에 묻힌다 (S15P21A604-355 사용자 지적). 폰트가 Dynamic 으로
-    /// 임포트돼 있어 <see cref="FontStyle.Bold"/> 를 주면 Unity 가 굵기를 만들어 준다 —
-    /// 시스템 폰트를 저장소에 새로 들이지 않고 해결한다.</para>
+    /// <para><b>볼드를 합성하지 않는다.</b> 한때 <see cref="FontStyle.Bold"/> 로 굵기를
+    /// 만들었는데, 획이 뭉개져 글자가 딱딱해 보였다 (S15P21A604-355 사용자 지적).
+    /// 실제 게임 이름표는 가는 획에 얇은 외곽선을 두른 쪽에 가깝다 — 가독은 외곽선이
+    /// 담당하고 글자는 가볍게 둔다.</para>
+    ///
+    /// <para><b>본인과 남을 색으로 나눈다.</b> 이름을 읽어야 내 캐릭터를 찾을 수 있으면
+    /// 이름표가 제 역할을 못 한다. 색은 <see cref="PlayerNameplate"/> 가 정한다.</para>
     ///
     /// <para><b>화면 기준 크기를 유지한다.</b> 월드 크기로 고정하면 멀어질수록 못 읽는다.
     /// 거리에 비례해 키워(0.6~3배) 화면상 크기를 대체로 일정하게 만든다.</para>
@@ -43,7 +46,7 @@ namespace Festa.World
         [SerializeField, Range(0.05f, 1f)] float _headroomRatio = 0.38f;
 
         [Tooltip("기준 거리에서의 글자 크기(월드 유닛).")]
-        [SerializeField] float _baseCharacterHeight = 1.7f;
+        [SerializeField] float _baseCharacterHeight = 1.5f;
 
         [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(0.6~3배).")]
         [SerializeField] float _referenceDistance = 55f;
@@ -52,7 +55,7 @@ namespace Festa.World
         [SerializeField] Color _outlineColor = new(0.03f, 0.03f, 0.06f, 1f);
 
         [Tooltip("외곽선 두께 — 글자 크기 대비 비율")]
-        [SerializeField, Range(0.02f, 0.2f)] float _outlineWidth = 0.075f;
+        [SerializeField, Range(0.02f, 0.2f)] float _outlineWidth = 0.045f;
 
         // 여덟 방향이라야 윤곽이 둥글게 닫힌다. 네 방향만 쓰면 대각선 모서리가 비어
         // 글자가 배경에 물린 것처럼 보인다. 대각선은 0.72 배라야 반경이 고르다.
@@ -90,6 +93,16 @@ namespace Festa.World
 
         /// <summary>런타임에 붙이는 쪽(플레이어 등)이 표시 거리를 정할 수 있게 한다.</summary>
         public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(1f, distance);
+
+        /// <summary>
+        /// 글자 색을 바꾼다. <b>본인과 남을 색으로 구분</b>하는 데 쓴다 — 이름을 읽지 않고도
+        /// 어느 쪽이 나인지 한눈에 들어와야 한다 (S15P21A604-355).
+        /// </summary>
+        public void SetColor(Color color)
+        {
+            _color = color;
+            if (_main != null) _main.color = color;
+        }
 
         void Start() => Build();
 
@@ -131,7 +144,9 @@ namespace Festa.World
             tm.anchor = TextAnchor.LowerCenter;
             tm.alignment = TextAlignment.Center;
             tm.color = color;
-            tm.fontStyle = FontStyle.Bold;   // 합성 볼드 — 위 클래스 주석 참조
+            // 볼드를 합성하지 않는다 — 획이 뭉개져 글자가 딱딱해 보인다(사용자 지적).
+            // 가는 획 + 얇은 외곽선이 게임 이름표의 실제 인상에 가깝다.
+            tm.fontStyle = FontStyle.Normal;
             // fontSize 를 키우고 characterSize 를 줄이면 같은 크기에서 글자가 선명해진다.
             // 실제 크기는 _root 스케일이 정하므로 여기서는 1 유닛 기준으로 둔다.
             tm.fontSize = 128;

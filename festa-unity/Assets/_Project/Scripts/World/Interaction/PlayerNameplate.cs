@@ -22,6 +22,12 @@ namespace Festa.World
         [Tooltip("이 거리(월드 유닛) 안에서만 보인다. 사람은 많고 겹치기 쉬워 짧게 둔다.")]
         [SerializeField] float _visibleDistance = 190f;
 
+        [Tooltip("본인 이름표 색. 남들과 달라야 이름을 읽지 않고도 내 캐릭터를 찾는다.")]
+        [SerializeField] Color _ownColor = new(0.66f, 0.82f, 0.28f, 1f);      // 연둣빛
+
+        [Tooltip("다른 사용자 이름표 색.")]
+        [SerializeField] Color _otherColor = new(1f, 0.99f, 0.95f, 1f);       // 흰색
+
         Festa.Network.NetworkPlayer _player;
         WorldNameplate _plate;
 
@@ -32,6 +38,8 @@ namespace Festa.World
             _plate = gameObject.GetComponent<WorldNameplate>();
             if (_plate == null) _plate = gameObject.AddComponent<WorldNameplate>();
             _plate.SetVisibleDistance(_visibleDistance);
+            // 본인은 연두, 남은 흰색 — 이름을 읽기 전에 색으로 먼저 구분된다.
+            _plate.SetColor(IsOwner ? _ownColor : _otherColor);
 
             Apply(_player.Nickname.Value);
             _player.Nickname.OnValueChanged += OnNicknameChanged;
