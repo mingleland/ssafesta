@@ -21,8 +21,20 @@ function apiError(code: string, message: string): ApiError {
   return { code, message, errors: [], warnings: [] };
 }
 
+const EMPTY_PROJECT: ProjectView = {
+  projectId: 0,
+  name: '',
+  description: null,
+  thumbnailUrl: null,
+  videoUrl: null,
+  deployUrl: null,
+  gitUrl: null,
+  portfolioUrl: null,
+};
+
 export async function createProject(_boothId: number, patch: ProjectPatch): Promise<ProjectView> {
-  owned = { ...sample, projectId: 11, ...normalize(patch) };
+  // real BE 는 미전송 키를 null 로 만든다 — sample 잔재값을 유령처럼 남기지 않는다 (-377)
+  owned = { ...EMPTY_PROJECT, projectId: 11, ...normalize(patch) };
   return { ...owned };
 }
 

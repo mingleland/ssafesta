@@ -54,22 +54,27 @@ export async function loadHomepageForm(boothId: number): Promise<void> {
   setState({ ...initialState, status: 'loading', boothId });
   try {
     const booth = await facadeApi.getBooth(boothId);
+    if (state.boothId !== boothId) return; // 늦은 응답이 다른 부스 폼을 덮지 않는다 (-377)
     setState({ status: 'ready', saved: booth.homepageUrl, value: booth.homepageUrl ?? '' });
   } catch {
+    if (state.boothId !== boothId) return;
     setState({ status: 'error' });
   }
 }
 
 export function setHomepageValue(value: string): void {
+  // 제출 중 값 변경을 받으면 save.phase 리셋이 이중 제출 가드를 해제한다 (-377 공통 패턴) — 입력 차단
+  if (state.save.phase === 'submitting') return;
   setState({ value, save: { phase: 'idle' } });
 }
 
 function saveErrorOf(e: unknown): { errorKind: HomepageSaveErrorKind; errorMessage?: string } {
   if (isApiError(e)) {
-    if (e.code === 'FIELD_INVALID') {
-      // 서버 문구가 형식 규칙의 정본이다(HttpUrlValidator) — FE 가 문구를 재발명하지 않는다
-      return { errorKind: 'invalid', errorMessage: e.errors[0]?.message ?? e.message };
-    }
+    // 최상위 code 는 VALIDATION_FAILED 이고 FIELD_INVALID 는 errors[].rule 어휘다
+    // (BE ApiException.fieldInvalid — 독립 검증에서 오전사 발견, -377). 필드 규칙 위반의
+    // 문구 정본은 서버(HttpUrlValidator) — FE 가 재발명하지 않는다.
+    const fieldDetail = e.code === 'VALIDATION_FAILED' ? e.errors.find((d) => d.rule === 'FIELD_INVALID') : undefined;
+    if (fieldDetail) return { errorKind: 'invalid', errorMessage: fieldDetail.message };
     if (e.code === 'BOOTH_LEASE_EXPIRED') return { errorKind: 'expired', errorMessage: e.message };
   }
   return { errorKind: 'network' };
