@@ -1150,14 +1150,6 @@ export const GameStudioShell = ({
                   type="button"
                 >삭제</button>
                 <button
-                  aria-keyshortcuts="Shift+F"
-                  aria-pressed={focusMode}
-                  className={focusMode ? 'is-active' : ''}
-                  onClick={() => setFocusMode((current) => !current)}
-                  title="양쪽 패널을 숨기거나 다시 엽니다 (Shift+F)"
-                  type="button"
-                >{focusMode ? '패널 열기' : '화면 넓게'}</button>
-                <button
                   aria-expanded={showLayers}
                   aria-keyshortcuts="Alt+L"
                   className={showLayers ? 'is-active' : ''}
@@ -1175,6 +1167,31 @@ export const GameStudioShell = ({
                   <span>{zoom}%</span>
                   <button aria-label="확대" onClick={() => setZoom((current) => Math.min(200, current + 10))} type="button">+</button>
                 </div>
+                <button
+                  aria-keyshortcuts="Shift+F"
+                  aria-label={focusMode ? '패널 열기' : '화면 넓게'}
+                  className={`gss-focus-toggle${focusMode ? ' is-active' : ''}`}
+                  onClick={() => setFocusMode((current) => !current)}
+                  aria-pressed={focusMode}
+                  title={focusMode ? '패널 열기 (Shift+F)' : '화면 넓게 (Shift+F)'}
+                  type="button"
+                >
+                  {focusMode ? (
+                    <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="20">
+                      <polyline points="4 14 10 14 10 20" />
+                      <polyline points="20 10 14 10 14 4" />
+                      <line x1="14" x2="21" y1="10" y2="3" />
+                      <line x1="3" x2="10" y1="21" y2="14" />
+                    </svg>
+                  ) : (
+                    <svg aria-hidden="true" fill="none" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24" width="20">
+                      <polyline points="15 3 21 3 21 9" />
+                      <polyline points="9 21 3 21 3 15" />
+                      <line x1="21" x2="14" y1="3" y2="10" />
+                      <line x1="3" x2="10" y1="21" y2="14" />
+                    </svg>
+                  )}
+                </button>
               </div>
             )}
           </div>

@@ -693,6 +693,8 @@
 .gss-canvas-tools button.is-active { background: rgba(51,136,255,.14); border-color: #4f86d5; color: #9fc7ff; }
 .gss-canvas-tools button.is-danger:not(:disabled) { color: #f29a9a; }
 .gss-canvas-tools button:disabled { cursor: not-allowed; opacity: .35; }
+.gss-focus-toggle { align-items: center; display: flex; height: 28px; justify-content: center; margin-left: 2px; padding: 0; width: 30px; }
+.gss-focus-toggle svg { display: block; }
 .gss-tool-segment { display: flex; }
 .gss-tool-segment button { border-radius: 0; }
 .gss-tool-segment button:first-child { border-radius: 6px 0 0 6px; }
