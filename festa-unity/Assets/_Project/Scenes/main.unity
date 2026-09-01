@@ -394,7 +394,7 @@ Transform:
   m_GameObject: {fileID: 12826417}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -659.27795, y: -0.0000009536743, z: 59.999996}
+  m_LocalPosition: {x: -658.77795, y: -0.0000009536743, z: 59.999996}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10786,7 +10786,7 @@ Transform:
   m_GameObject: {fileID: 131637188}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -764.7173, y: 0, z: 59.454643}
+  m_LocalPosition: {x: -775.4829, y: 0, z: 60}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -10807,7 +10807,7 @@ MonoBehaviour:
   boothId: 10
   destination: {fileID: 35655130}
   promptText: "10\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
-  interactRadius: 30
+  interactRadius: 33.18081
   boundsSource: {fileID: 0}
 --- !u!1 &131814479
 GameObject:
@@ -38294,7 +38294,7 @@ Transform:
   m_GameObject: {fileID: 484530976}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -878.3031, y: 0, z: 59.454643}
+  m_LocalPosition: {x: -887.3403, y: 0, z: 60}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -38315,7 +38315,7 @@ MonoBehaviour:
   boothId: 12
   destination: {fileID: 829351068}
   promptText: "12\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
-  interactRadius: 30
+  interactRadius: 31.004955
   boundsSource: {fileID: 0}
 --- !u!1 &484850830 stripped
 GameObject:
@@ -49919,7 +49919,7 @@ Transform:
   m_GameObject: {fileID: 703548848}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
-  m_LocalPosition: {x: -732.9116, y: -0.0000019073486, z: 233.76419}
+  m_LocalPosition: {x: -733.4116, y: -0.0000019073486, z: 233.76419}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -57599,7 +57599,7 @@ Transform:
   m_GameObject: {fileID: 812310969}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: 1, z: -0, w: 0}
-  m_LocalPosition: {x: -612.6308, y: 0, z: 229.6243}
+  m_LocalPosition: {x: -613.1308, y: 0, z: 229.6243}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -63082,7 +63082,7 @@ Transform:
   m_GameObject: {fileID: 832636133}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -612.6308, y: 0, z: 229.6243}
+  m_LocalPosition: {x: -613.1308, y: 0, z: 229.6243}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -63103,7 +63103,7 @@ MonoBehaviour:
   boothId: 7
   destination: {fileID: 596047929}
   promptText: "7\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
-  interactRadius: 58.279697
+  interactRadius: 57.931377
   boundsSource: {fileID: 0}
 --- !u!1 &833557280
 GameObject:
@@ -64716,7 +64716,7 @@ Transform:
   m_GameObject: {fileID: 869485254}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -878.3031, y: 0, z: 59.454643}
+  m_LocalPosition: {x: -887.3403, y: 0, z: 60}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -115921,7 +115921,7 @@ Transform:
   m_GameObject: {fileID: 1439231926}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -659.27795, y: -0.0000009536743, z: 59.999996}
+  m_LocalPosition: {x: -658.77795, y: -0.0000009536743, z: 59.999996}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -115942,7 +115942,7 @@ MonoBehaviour:
   boothId: 8
   destination: {fileID: 1475837449}
   promptText: "8\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
-  interactRadius: 32.81862
+  interactRadius: 32.478935
   boundsSource: {fileID: 0}
 --- !u!1 &1441825511
 GameObject:
@@ -134809,7 +134809,7 @@ Transform:
   m_GameObject: {fileID: 1733082673}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -732.9116, y: -0.0000019073486, z: 233.76419}
+  m_LocalPosition: {x: -733.4116, y: -0.0000019073486, z: 233.76419}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -134830,7 +134830,7 @@ MonoBehaviour:
   boothId: 9
   destination: {fileID: 615070628}
   promptText: "9\uBC88 \uBD80\uC2A4 \uC9C1\uC6D0\uC5D0\uAC8C \uB9D0 \uAC78\uAE30"
-  interactRadius: 55.772705
+  interactRadius: 55.45974
   boundsSource: {fileID: 0}
 --- !u!1001 &1733217332
 PrefabInstance:
@@ -156478,7 +156478,7 @@ Transform:
   m_GameObject: {fileID: 1999456908}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -764.7173, y: 0, z: 59.454643}
+  m_LocalPosition: {x: -775.4829, y: 0, z: 60}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
