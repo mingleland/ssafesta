@@ -26,6 +26,9 @@ namespace Festa.World
         [Tooltip("시각 높이(월드 유닛). 플레이어와 같은 값이라야 나란히 섰을 때 비례가 맞는다.")]
         [SerializeField] float _targetVisualHeight = 22.375f;
 
+        [Tooltip("아이들 애니메이터. 없으면 바인드 포즈로 굳어 '화난 듯 뻣뻣하게' 서 있는다.")]
+        [SerializeField] RuntimeAnimatorController _animatorController;
+
         GameObject _visual;
 
         void Start() => Build();
@@ -51,6 +54,37 @@ namespace Festa.World
                 Debug.LogError($"[BoothStaff] {name}: {assembler.LastError}");
 
             FitHeight();
+            SetupAnimator();
+        }
+
+        /// <summary>
+        /// 조립된 외형에 애니메이터를 물린다.
+        ///
+        /// <para>컨트롤러가 없으면 휴머노이드가 **바인드 포즈로 굳는다** — 팔을 벌린 채 경직된
+        /// 자세라 "화난 것처럼 서 있다" 로 보인다 (S15P21A604-355 보고). 플레이어와 같은
+        /// 컨트롤러를 그대로 쓴다: 아이들 상태가 이미 있고, 따로 만들면 또 갈라진다.</para>
+        /// </summary>
+        void SetupAnimator()
+        {
+            var animator = _visual.GetComponentInChildren<Animator>();
+            if (animator == null)
+            {
+                Debug.LogWarning($"[BoothStaff] {name}: 조립 결과에 Animator 가 없다 — 포즈가 굳는다.");
+                return;
+            }
+
+            // 직원은 제자리에 선다. 루트 모션이 켜져 있으면 클립이 NPC 를 부스 밖으로 끌고 나간다.
+            animator.applyRootMotion = false;
+            // 화면 밖 직원의 본 갱신을 멈춘다 — 부지에 12명이 상시 서 있어 이득이 크다.
+            animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+
+            if (animator.runtimeAnimatorController == null && _animatorController != null)
+                animator.runtimeAnimatorController = _animatorController;
+
+            if (animator.runtimeAnimatorController == null)
+                Debug.LogWarning($"[BoothStaff] {name}: Animator Controller 미할당 — 바인드 포즈로 굳는다.");
+            else
+                animator.Rebind();
         }
 
         /// <summary>

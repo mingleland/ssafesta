@@ -67,6 +67,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5280233175991207502}
   - component: {fileID: 7189526169676270739}
+  - component: {fileID: 4423297053943073988}
   m_Layer: 0
   m_Name: '@BoothInteriorLight'
   m_TagString: Untagged
@@ -99,7 +100,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 2
-  m_Color: {r: 1, g: 0.9, b: 0.72, a: 1}
+  m_Color: {r: 1, g: 0.88, b: 0.66, a: 1}
   m_Intensity: 3
   m_Range: 5.5262027
   m_SpotAngle: 30
@@ -154,6 +155,21 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &4423297053943073988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7404193761842001395}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7296f72eeda73bd44ad9f407c545bad3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _rangeFactor: 1.15
+  _intensityPerUnit: 14
+  _heightRatio: 0.62
 --- !u!1001 &188576791818853627
 PrefabInstance:
   m_ObjectHideFlags: 0
