@@ -20,7 +20,7 @@ export function OverlayHost() {
   if (!request) return null;
 
   if (request.type === 'LAPTOP') {
-    return <LaptopOverlay payload={request.payload as { boothId: number; objectId: string; url?: string }} />;
+    return <LaptopOverlay payload={request.payload as { boothId: number; objectId: string }} />;
   }
 
   if (request.type === 'GAME') {

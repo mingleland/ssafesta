@@ -12,8 +12,6 @@ import { loadLaptopHomepage, resetLaptopHomepage, useLaptopHomepage } from './mo
 interface LaptopOverlayPayload {
   boothId: number;
   objectId: string;
-  /** Unity 가 보내지 않는 필드 — 남아 있어도 무시한다(정본은 booth 조회) */
-  url?: string;
 }
 
 function openInNewTab(href: string): void {
