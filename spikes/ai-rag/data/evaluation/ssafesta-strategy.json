@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "source_pdf_name": "01_프로젝트_기획서.md",
+  "page_count": 1,
+  "evaluation_case_count": 12,
+  "excluded_no_answer_count": 3,
+  "booth_id": 1,
+  "agent_id": 1,
+  "model": {
+    "model_id": "text-embedding-3-large",
+    "query_embedding_seconds": 2.238569799810648,
+    "embedding_request_count": 8,
+    "boundary_embedding_request_count": 2,
+    "boundary_embedding_seconds": 2.5669178999960423,
+    "estimated_gms_credits": 0.08,
+    "credit_assumption": "모델 카드 표시값 × HTTP 요청 수(의미 청킹 경계 탐지 요청 포함)"
+  },
+  "results": [
+    {
+      "strategy": "fixed",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 7,
+      "document_embedding_seconds": 2.3368597000371665,
+      "recall_at_k": 1.0,
+      "mrr": 0.8194444444444445,
+      "p50_search_ms": 48.04820008575916,
+      "p95_search_ms": 49.71090005710721,
+      "mean_context_tokens": 6242.0,
+      "p95_context_tokens": 6242,
+      "leakage_count": 0,
+      "evaluated_queries": 12,
+      "missed_case_ids": []
+    },
+    {
+      "strategy": "structural",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 7,
+      "document_embedding_seconds": 0.4520183999557048,
+      "recall_at_k": 1.0,
+      "mrr": 0.7111111111111111,
+      "p50_search_ms": 48.403399996459484,
+      "p95_search_ms": 49.30309997871518,
+      "mean_context_tokens": 5158.0,
+      "p95_context_tokens": 5158,
+      "leakage_count": 0,
+      "evaluated_queries": 12,
+      "missed_case_ids": []
+    },
+    {
+      "strategy": "semantic",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 88,
+      "document_embedding_seconds": 1.1578613999299705,
+      "recall_at_k": 0.9166666666666666,
+      "mrr": 0.4703703703703704,
+      "p50_search_ms": 49.22070004977286,
+      "p95_search_ms": 50.218400079756975,
+      "mean_context_tokens": 1071.6666666666667,
+      "p95_context_tokens": 1796,
+      "leakage_count": 0,
+      "evaluated_queries": 12,
+      "missed_case_ids": [
+        "ssafesta-q09"
+      ]
+    },
+    {
+      "strategy": "parent_child",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 21,
+      "document_embedding_seconds": 0.47404769994318485,
+      "recall_at_k": 1.0,
+      "mrr": 0.7986111111111112,
+      "p50_search_ms": 48.90900012105703,
+      "p95_search_ms": 50.19410001114011,
+      "mean_context_tokens": 17158.666666666668,
+      "p95_context_tokens": 17678,
+      "leakage_count": 0,
+      "evaluated_queries": 12,
+      "missed_case_ids": []
+    }
+  ]
+}

@@ -58,7 +58,7 @@ def evaluate_retrieval(
             top_k=top_k,
         )
         latencies_ms.append((time.perf_counter() - started) * 1000)
-        context_tokens.append(sum(hit.token_count for hit in hits))
+        context_tokens.append(sum(hit.context_token_count for hit in hits))
         leakage_count += sum(
             hit.booth_id != booth_id or hit.agent_id != agent_id for hit in hits
         )
@@ -105,7 +105,7 @@ def evaluate_retrieval(
 def _first_relevant_rank(case: EvalCase, hits: Sequence[SearchHit]) -> int | None:
     for rank, hit in enumerate(hits, 1):
         page_match = bool(case.relevant_pages) and hit.page in case.relevant_pages
-        content_match = any(marker in hit.content for marker in case.relevant_contains)
+        content_match = any(marker in hit.context_content for marker in case.relevant_contains)
         if page_match or content_match:
             return rank
     return None

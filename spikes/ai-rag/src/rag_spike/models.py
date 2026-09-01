@@ -47,6 +47,14 @@ class Chunk:
     chunk_no: int
     token_count: int
     content: str
+    context_content: str | None = None
+    context_token_count: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.context_content is None:
+            object.__setattr__(self, "context_content", self.content)
+        if self.context_token_count is None:
+            object.__setattr__(self, "context_token_count", self.token_count)
 
 
 @dataclass(frozen=True)
@@ -66,6 +74,14 @@ class SearchHit:
     distance: float
     booth_id: int
     agent_id: int
+    context_content: str | None = None
+    context_token_count: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.context_content is None:
+            object.__setattr__(self, "context_content", self.content)
+        if self.context_token_count is None:
+            object.__setattr__(self, "context_token_count", self.token_count)
 
 
 @dataclass(frozen=True)

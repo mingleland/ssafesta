@@ -93,6 +93,35 @@ rag-tuning-summary \
 pgvector 없이 API·청킹을 빠르게 확인할 때만 `--store memory`를 쓸 수 있다. Jira 완료 근거는
 반드시 기본값인 pgvector 실행 결과를 사용한다.
 
+## 청킹 전략 비교 (`S15P21A604-380`)
+
+370에서 확정한 model(`text-embedding-3-large`)과 top-k(10)을 고정하고, 청킹 전략만 변수로
+`fixed`(고정 토큰, 대조군)·`structural`(구조적)·`semantic`(의미적)·`parent_child` 4종을 비교한다.
+
+```bash
+rag-strategy-benchmark \
+  --pdf data/sample.pdf \
+  --eval data/eval.jsonl \
+  --output results/strategy-pinlog.json
+```
+
+세 문서 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-strategy-summary \
+  --inputs results/strategy-pinlog.json results/strategy-ssafesta.json results/strategy-sudal.json \
+  --json-output results/strategy-comparison-summary.json \
+  --markdown-output results/strategy-comparison-summary.md
+```
+
+- `semantic` 전략은 문장 경계 탐지에 추가 Embedding 요청이 든다. 결과 JSON의
+  `model.boundary_embedding_request_count`로 이 추가 비용을 따로 추적한다.
+- `parent_child` 전략은 작은 Child만 임베딩·검색하고, 검색 결과의 `context_content`/
+  `context_token_count`에 Child가 속한 Parent 전체 텍스트·토큰 수를 담아 Context 예산을 계산한다.
+- 각 전략의 확정 파라미터(청크 크기·임계값 등)는 `config/strategy-comparison-defaults.json`에서 확인한다.
+- 판정 기준은 370과 동일: Recall 0.95 이상 & 검색 P95 1,000ms 이하 게이트 통과 → MRR 높은 순 →
+  평균 Context 토큰 낮은 순.
+
 ## 단위 테스트
 
 ```bash
