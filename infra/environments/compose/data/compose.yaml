@@ -46,6 +46,7 @@ services:
 
 networks:
   data-private:
+    name: festa-data-private
     internal: true
 
 volumes:

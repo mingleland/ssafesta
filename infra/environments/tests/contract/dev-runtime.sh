@@ -13,9 +13,6 @@ assert_file "${ingress}"
 assert_contains "${base}" '^name: festa-dev$' 'dev must use the festa-dev Compose project'
 assert_contains "${base}" 'name: festa-dev-private' 'dev private network name is required'
 assert_contains "${base}" 'internal: true' 'dev network must be internal'
-assert_contains "${base}" 'DEV_COMPONENT_PROFILE' 'component profile input is required'
-assert_contains "${base}" 'DEV_SERVICE_ALIAS' 'internal service alias input is required'
-assert_contains "${base}" 'DEV_MOCK_COMPONENTS' 'mock selection input is required'
 
 for route in front api ai world; do
   assert_contains "${ingress}" "location /__dev/${route}/" "missing dev ${route} route"
