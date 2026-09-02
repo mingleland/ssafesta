@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -29,8 +30,7 @@ class AiStoragePropertiesTest {
     void theShippedSettingsBind() {
         AiStorageProperties properties = bind(baseSettings());
 
-        assertEquals(AiStorageProperties.UsageState.NORMAL, properties.usageState());
-        assertEquals(AiStorageProperties.StorageState.R2_ACTIVE, properties.storageState());
+        assertEquals(AiStorageProperties.UploadGate.OPEN, properties.uploadGate());
         assertEquals("R2", properties.activeWriteProvider());
         assertEquals(Duration.ofMinutes(15), properties.presignTtl());
         assertEquals("test-ai-documents", properties.providers().get("R2").bucket());
@@ -44,45 +44,15 @@ class AiStoragePropertiesTest {
     }
 
     /**
-     * 계약이 정의한 usage-guard state 네 개가 <b>전부</b> 바인딩돼야 한다.
+     * 게이트 세 값이 <b>전부</b> 바인딩돼야 한다.
      *
-     * <p>{@code WARNING} 은 허용이라 코드 분기가 같지만, enum 에서 빼면 계약이 "일어난다" 고 적어 둔
-     * 상태를 운영자가 그대로 옮겨 적을 수 없다 — 그 순간 번역이 생기고 번역은 틀린다.
+     * <p>운영자는 Usage Guard 와 저장소 전환 상태를 읽고 이 한 칸에 판정을 옮겨 적는다(#100).
+     * 값이 빠지면 옮겨 적을 자리가 없어 번역이 생기고, 번역은 틀린다.
      */
     @ParameterizedTest
-    @EnumSource(AiStorageProperties.UsageState.class)
-    void everyUsageStateInTheContractBinds(AiStorageProperties.UsageState state) {
-        assertEquals(state, bind(settingsWith("app.ai.storage.usage-state", state.name()))
-                .usageState());
-    }
-
-    /**
-     * 장애 상태 기계도 마찬가지다.
-     *
-     * <p>{@code LOCAL_ACTIVE} 만 빠지는데, 그 상태는 쓰기 provider 도 함께 옮겨야 성립하는 조합이라
-     * R2 설정 위에 얹을 수 없다 — 아래 {@link #aFallbackStateWithItsOwnProviderBinds} 가 짝을 맞춰
-     * 검증한다. 여기서 억지로 통과시키려면 불변식을 풀어야 하고, 그러면 검사가 사라진다.
-     */
-    @ParameterizedTest
-    @EnumSource(value = AiStorageProperties.StorageState.class,
-            mode = EnumSource.Mode.EXCLUDE, names = "LOCAL_ACTIVE")
-    void everyStorageStateInTheContractBinds(AiStorageProperties.StorageState state) {
-        assertEquals(state, bind(settingsWith("app.ai.storage.storage-state", state.name()))
-                .storageState());
-    }
-
-    /**
-     * 두 축이 같은 이름을 쓰지만 뜻이 다르다 — 한 칸에 뭉쳐 있으면 507 인지 503 인지 알 수 없다.
-     *
-     * <p>따로 설정되는지를 고정해 둔다. 다시 합치면 이 테스트가 컴파일되지 않는다.
-     */
-    @Test
-    void theTwoAxesCarryTheSameTokenIndependently() {
-        AiStorageProperties properties = bind(settingsWith(
-                "app.ai.storage.usage-state", "UPLOAD_BLOCKED"));
-
-        assertEquals(AiStorageProperties.UsageState.UPLOAD_BLOCKED, properties.usageState());
-        assertEquals(AiStorageProperties.StorageState.R2_ACTIVE, properties.storageState());
+    @EnumSource(AiStorageProperties.UploadGate.class)
+    void everyGateValueBinds(AiStorageProperties.UploadGate gate) {
+        assertEquals(gate, bind(settingsWith("app.ai.storage.upload-gate", gate.name())).uploadGate());
     }
 
     /**
@@ -92,23 +62,35 @@ class AiStoragePropertiesTest {
      * 이 되고 기본값이 "허용" 이면 <b>차단이 열린 채로 기동한다.</b> 안전 장치가 오타로 열리는
      * 모양이라, 말하지 않으면 뜨지 않게 한다.
      */
-    @ParameterizedTest
-    @ValueSource(strings = {"app.ai.storage.usage-state", "app.ai.storage.storage-state"})
-    void aMissingGateRefusesToStart(String key) {
+    @Test
+    void aMissingGateRefusesToStart() {
         Map<String, String> settings = new LinkedHashMap<>(baseSettings());
-        settings.remove(key);
+        settings.remove("app.ai.storage.upload-gate");
 
-        assertTrue(failureOf(settings).contains(key.substring(key.lastIndexOf('.') + 1)));
+        assertTrue(failureOf(settings).contains("upload-gate"));
     }
 
-    /** 옛 키만 남은 설정도 같은 이유로 기동을 막는다 — Spring 은 모르는 키를 조용히 무시한다. */
-    @Test
-    void aRemovedKeyAloneRefusesToStart() {
+    /**
+     * 옛 키만 남은 설정도 같은 이유로 기동을 막는다.
+     *
+     * <p>{@code upload-enabled}(#100 이전 초안)와 {@code usage-state}·{@code storage-state}(구현
+     * 중간 형태) 셋 다 Spring 이 조용히 무시한다 — 운영자는 차단을 걸었다고 믿고 서버는 열린 채 뜬다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"upload-enabled", "usage-state", "storage-state"})
+    void aRemovedKeyAloneRefusesToStart(String legacyKey) {
         Map<String, String> settings = new LinkedHashMap<>(baseSettings());
-        settings.remove("app.ai.storage.usage-state");
-        settings.put("app.ai.storage.upload-enabled", "false");
+        settings.remove("app.ai.storage.upload-gate");
+        settings.put("app.ai.storage." + legacyKey, "UPLOAD_BLOCKED");
 
-        assertTrue(failureOf(settings).contains("usage-state"));
+        assertTrue(failureOf(settings).contains("upload-gate"));
+    }
+
+    /** 계약에 없는 값은 바인딩 자체가 실패해야 한다 — 오타가 "허용" 으로 떨어지면 안 된다. */
+    @Test
+    void aGateValueOutsideTheContractRefusesToStart() {
+        assertThrows(BindException.class,
+                () -> bind(settingsWith("app.ai.storage.upload-gate", "OPENN")));
     }
 
     @Test
@@ -135,20 +117,45 @@ class AiStoragePropertiesTest {
     }
 
     /**
-     * 상태와 쓰기 provider 는 한 사실을 두 곳에 적은 것이라 어긋난 채로 뜨면 안 된다.
+     * R2 만 쓰는 배포는 MinIO 자격증명을 지어내지 않아도 된다.
      *
-     * <p>{@code LOCAL_ACTIVE} 로 옮긴 운영자는 업로드가 MinIO 로 간다고 믿는데, provider 가 R2 로
-     * 남아 있으면 방금 못 쓴다고 선언한 저장소로 계속 들어간다. 아무도 그 사실을 말해 주지 않는다.
+     * <p>{@code application.yml} 이 MinIO 를 목록에 적어 두는 것은 fallback 을 "설정 변경 + 재배포"
+     * 로 하기 위해서다(계약 §Manual fallback). 네 값이 전부 비면 미구성으로 보고 목록에서 뺀다 —
+     * 그러지 않으면 R2 전용 배포가 기동조차 못 한다.
      */
     @Test
-    void aFallbackStateWithTheOldWriteProviderRefusesToStart() {
-        String failure = failureOf(settingsWith("app.ai.storage.storage-state", "LOCAL_ACTIVE"));
+    void anEntirelyBlankProviderIsTreatedAsNotConfigured() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.bucket", "");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "");
 
+        assertEquals(Set.of("R2"), bind(settings).providers().keySet());
+    }
+
+    /** 절반만 채운 provider 는 선택이 아니라 오타다 — 미구성으로 봐주면 그 오타가 숨는다. */
+    @Test
+    void aPartiallyFilledProviderRefusesToStart() {
+        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "http://localhost:9");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.bucket", "");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "");
+        settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "");
+
+        String failure = failureOf(settings);
         assertTrue(failure.contains("MINIO_LOCAL"), failure);
     }
 
+    /**
+     * fallback 운영 조합이 뜬다 — 여기서 잘못 막으면 MinIO 전환 자체가 불가능해진다.
+     *
+     * <p>{@code storage-state} 가 사라지면서 "상태와 provider 가 어긋난다" 는 사건도 함께 사라졌다
+     * (#100): {@code (OPEN, MINIO_LOCAL)} 이 곧 {@code LOCAL_ACTIVE} 다. 한 곳에 적힌 한 사실은
+     * 스스로와 어긋날 수 없다.
+     */
     @Test
-    void anR2StateWritingToTheFallbackRefusesToStart() {
+    void theFallbackProviderBindsWhenItIsConfigured() {
         Map<String, String> settings = new LinkedHashMap<>(baseSettings());
         settings.put("app.ai.storage.active-write-provider", "MINIO_LOCAL");
         settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "http://localhost:9");
@@ -156,21 +163,10 @@ class AiStoragePropertiesTest {
         settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "k");
         settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "s");
 
-        assertTrue(failureOf(settings).contains("R2"));
-    }
+        AiStorageProperties properties = bind(settings);
 
-    /** 짝이 맞으면 뜬다 — 경계에서 잘못 막으면 fallback 운영 자체가 불가능해진다. */
-    @Test
-    void aFallbackStateWithItsOwnProviderBinds() {
-        Map<String, String> settings = new LinkedHashMap<>(baseSettings());
-        settings.put("app.ai.storage.storage-state", "LOCAL_ACTIVE");
-        settings.put("app.ai.storage.active-write-provider", "MINIO_LOCAL");
-        settings.put("app.ai.storage.providers.MINIO_LOCAL.endpoint", "http://localhost:9");
-        settings.put("app.ai.storage.providers.MINIO_LOCAL.bucket", "fallback");
-        settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "k");
-        settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "s");
-
-        assertEquals("MINIO_LOCAL", bind(settings).activeWriteProvider());
+        assertEquals("MINIO_LOCAL", properties.activeWriteProvider());
+        assertEquals(Set.of("R2", "MINIO_LOCAL"), properties.providers().keySet());
     }
 
     /**
@@ -224,8 +220,7 @@ class AiStoragePropertiesTest {
 
     private static Map<String, String> baseSettings() {
         Map<String, String> settings = new LinkedHashMap<>();
-        settings.put("app.ai.storage.usage-state", "NORMAL");
-        settings.put("app.ai.storage.storage-state", "R2_ACTIVE");
+        settings.put("app.ai.storage.upload-gate", "OPEN");
         settings.put("app.ai.storage.active-write-provider", "R2");
         settings.put("app.ai.storage.presign-ttl", "15m");
         settings.put("app.ai.storage.providers.R2.endpoint", "http://localhost:9");

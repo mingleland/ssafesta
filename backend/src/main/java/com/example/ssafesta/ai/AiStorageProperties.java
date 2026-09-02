@@ -2,6 +2,7 @@ package com.example.ssafesta.ai;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -13,22 +14,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * fallback: both are S3-compatible, so adding one is configuration, not code. {@code R2} is the only
  * entry P0 configures.
  *
- * <p><b>Two admission states, not one.</b> The contract has two separate machines answering
- * different questions — {@link UsageState} is how full the bucket is, {@link StorageState} is
- * whether the provider is usable at all. They also share the token {@code UPLOAD_BLOCKED} while
- * meaning different things by it: a spent quota (507) in one, an outage (503) in the other. A single
- * setting could not say which was meant, so there are two.
+ * <p><b>One admission setting, not two.</b> An earlier draft carried the two state machines of the
+ * contract verbatim ({@code usage-state} + {@code storage-state}) because both spell one of their
+ * values {@code UPLOAD_BLOCKED} while meaning different things by it — a spent quota (507) in one,
+ * an outage (503) in the other. GitLab #100 (2026-09-01) settled it the other way: the operator
+ * reads both machines and writes the <i>verdict</i> into a single {@link UploadGate}. The server
+ * does not model the state machines at all, and the two codes stay distinguishable because the enum
+ * names the cause rather than the state.
  *
- * @param usageState          usage-guard snapshot state (object-storage-contract §Usage admission)
- * @param storageState        provider failover state (object-storage-contract §Manual fallback)
+ * @param uploadGate          whether new grants may be issued, and why not (#100)
  * @param activeWriteProvider where new uploads go. Existing objects are read by the provider on
  *                            their own row, never by this value (FR-030)
  * @param presignTtl          how long an upload URL lives (FR-026, 기본 15분)
  */
 @ConfigurationProperties("app.ai.storage")
-public record AiStorageProperties(UsageState usageState, StorageState storageState,
-                                  String activeWriteProvider, Duration presignTtl,
-                                  Map<String, Provider> providers) {
+public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvider,
+                                  Duration presignTtl, Map<String, Provider> providers) {
 
     /**
      * SigV4 refuses to sign a URL that outlives this, so a larger value is not a long-lived link —
@@ -41,67 +42,37 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
     private static final Set<String> PROVIDER_NAMES = Set.of("R2", "MINIO_LOCAL");
 
     /**
-     * How much of the quota is used, straight from {@code usage-guard.schema.json}.
+     * Whether upload grants may be issued, and — when they may not — which of the two refusals the
+     * caller gets (#100, 2026-09-01).
      *
-     * <p>The names are the schema's, not ours: an operator reads a state off that snapshot and
-     * copies it here. All four bind — including {@code WARNING}, which admits. An enum missing one
-     * of them would reject a state the contract says can occur, forcing a translation at exactly
-     * the moment translations go wrong.
-     */
-    public enum UsageState {
-
-        /** Under the warning threshold. */
-        NORMAL,
-        /** 80%. The contract admits uploads here and warns, so admission matches {@link #NORMAL}. */
-        WARNING,
-        /** 90% of quota. Retrying does not help, so 507 (#100). */
-        UPLOAD_BLOCKED,
-        /** The measurement itself went stale, so admission fails closed. Temporary: 503. */
-        STALE_BLOCKED
-    }
-
-    /**
-     * Where the provider failover machine stands (object-storage-contract §Manual fallback).
+     * <p>The operator maps the observed state onto one of these: normal·warning and a validated
+     * {@code LOCAL_ACTIVE} are {@link #OPEN}; 90% of quota is {@link #QUOTA_BLOCKED}; a stale
+     * measurement, an R2 outage, {@code FALLBACK_VALIDATING} and {@code R2_RECONCILING} are all
+     * {@link #UNAVAILABLE}.
      *
-     * <p>Every blocked value here is <b>503</b>: an outage or a validation window is something to
-     * wait out, unlike a spent quota. Transitions are operator-driven — P0 has no automatic
-     * detection (FR-031).
+     * <p>Splitting the two refusals is the whole reason this is an enum and not a boolean: telling a
+     * user whose quota is spent to "try again shortly" makes them retry forever.
      */
-    public enum StorageState {
+    public enum UploadGate {
 
-        /** Normal operation on R2. */
-        R2_ACTIVE,
-        /**
-         * R2 refused for new grants. Shares its name with {@link UsageState#UPLOAD_BLOCKED} and
-         * means something else — which is why the two live in separate settings.
-         */
-        UPLOAD_BLOCKED,
-        /** Proving the fallback before switching to it. No new grants until it is proven. */
-        FALLBACK_VALIDATING,
-        /** Running on MinIO. Uploads are admitted and land in the configured provider. */
-        LOCAL_ACTIVE,
-        /**
-         * Copying objects back to R2. <b>New uploads stay blocked</b> — docs/26 records that P0
-         * operates this state blocked and that an implementer must not open it. Whether it can be
-         * opened at all is a later decision, not this one.
-         */
-        R2_RECONCILING
+        /** Grants are issued. */
+        OPEN,
+        /** Quota is spent. Retrying does not help, so 507. */
+        QUOTA_BLOCKED,
+        /** Outage, stale measurement or a transition window. Something to wait out, so 503. */
+        UNAVAILABLE
     }
 
     public AiStorageProperties {
-        // No defaults on either state, and that is the point. Spring ignores a property it does not
-        // recognise, so a renamed or misspelled key would leave one null, fall back to "admit", and
-        // reopen uploads during a block someone believed was in force. A safety control must not be
-        // able to fail open through a typo — say it or do not start.
-        if (usageState == null) {
-            throw new IllegalStateException("app.ai.storage.usage-state 를 지정해야 합니다. 허용값: "
-                    + Arrays.toString(UsageState.values()));
+        // No default, and that is the point. Spring ignores a property it does not recognise, so a
+        // renamed or misspelled key would leave this null, fall back to "admit", and reopen uploads
+        // during a block someone believed was in force. A safety control must not be able to fail
+        // open through a typo — say it or do not start.
+        if (uploadGate == null) {
+            throw new IllegalStateException("app.ai.storage.upload-gate 를 지정해야 합니다. 허용값: "
+                    + Arrays.toString(UploadGate.values()));
         }
-        if (storageState == null) {
-            throw new IllegalStateException("app.ai.storage.storage-state 를 지정해야 합니다. 허용값: "
-                    + Arrays.toString(StorageState.values()));
-        }
-        providers = providers == null ? Map.of() : Map.copyOf(providers);
+        providers = withoutUnconfigured(providers);
         if (activeWriteProvider == null || activeWriteProvider.isBlank()) {
             throw new IllegalStateException("app.ai.storage.active-write-provider 를 지정해야 합니다.");
         }
@@ -121,7 +92,6 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
                     throw new IllegalStateException("app.ai.storage.providers 의 이름은 " + PROVIDER_NAMES
                             + " 중 하나여야 합니다 (문서 행과 FastAPI 계약에 그대로 실린다): " + name);
                 });
-        requireStateMatchesProvider(storageState, activeWriteProvider);
         if (presignTtl == null || presignTtl.isZero() || presignTtl.isNegative()) {
             throw new IllegalStateException("app.ai.storage.presign-ttl 은 0보다 커야 합니다: " + presignTtl);
         }
@@ -133,28 +103,30 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
     }
 
     /**
-     * The failover state and the provider being written to must agree.
+     * Drops the entries a deployment left entirely empty.
      *
-     * <p>Two places holding one fact, so refuse to start when they disagree — the same move
-     * {@code AiAgentProperties} makes for the per-booth limit and its unique index. An operator who
-     * moved the state to {@code LOCAL_ACTIVE} believes uploads now land in MinIO; if the provider
-     * were left at {@code R2} they would keep landing in the storage that was just declared
-     * unusable, and nothing would say so (object-storage-contract §Manual fallback:
-     * "{@code LOCAL_ACTIVE} 에서 생성한 metadata 는 provider {@code MINIO_LOCAL} 을 명시한다").
+     * <p>{@code application.yml} lists MinIO so that a fallback is a value change rather than an
+     * image change (object-storage-contract §Manual fallback: 설정 변경 + 재배포). A deployment
+     * running on R2 alone has no MinIO credentials to give, and four blank-rejecting fields would
+     * force it to invent them. <b>All-blank means "not configured"; partially filled still fails</b>
+     * through {@link Provider#requireComplete} — a half-set provider is a typo, not a choice.
      *
-     * <p>Only the two admitting states are constrained. The blocked ones issue no grants, so there
-     * is no write provider for them to disagree with.
+     * <p>There is no separate state left to disagree with the write provider, so the old
+     * {@code storage-state} ↔ {@code active-write-provider} consistency check went with it (#100):
+     * the pair {@code (OPEN, R2)} <i>is</i> {@code R2_ACTIVE} and {@code (OPEN, MINIO_LOCAL)}
+     * <i>is</i> {@code LOCAL_ACTIVE}. One fact in one place cannot contradict itself.
      */
-    private static void requireStateMatchesProvider(StorageState state, String provider) {
-        String expected = switch (state) {
-            case R2_ACTIVE -> "R2";
-            case LOCAL_ACTIVE -> "MINIO_LOCAL";
-            case UPLOAD_BLOCKED, FALLBACK_VALIDATING, R2_RECONCILING -> null;
-        };
-        if (expected != null && !expected.equals(provider)) {
-            throw new IllegalStateException("app.ai.storage.storage-state=" + state
-                    + " 이면 active-write-provider 는 " + expected + " 여야 합니다: " + provider);
+    private static Map<String, Provider> withoutUnconfigured(Map<String, Provider> configured) {
+        if (configured == null) {
+            return Map.of();
         }
+        Map<String, Provider> kept = new LinkedHashMap<>();
+        configured.forEach((name, provider) -> {
+            if (provider != null && !provider.isUnconfigured()) {
+                kept.put(name, provider);
+            }
+        });
+        return Map.copyOf(kept);
     }
 
     /**
@@ -166,6 +138,11 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
     public record Provider(String endpoint, String bucket, String accessKeyId,
                            String secretAccessKey) {
 
+        /** Every field blank — the deployment did not configure this provider at all. */
+        boolean isUnconfigured() {
+            return blank(endpoint) && blank(bucket) && blank(accessKeyId) && blank(secretAccessKey);
+        }
+
         void requireComplete(String name) {
             require(endpoint, name, "endpoint");
             require(bucket, name, "bucket");
@@ -175,10 +152,22 @@ public record AiStorageProperties(UsageState usageState, StorageState storageSta
         }
 
         private static void require(String value, String provider, String field) {
-            if (value == null || value.isBlank()) {
+            if (blank(value)) {
                 throw new IllegalStateException(
                         "app.ai.storage.providers." + provider + "." + field + " 이(가) 비어 있습니다.");
             }
+            // 해석되지 않은 placeholder 는 "값이 있다" 로 통과한다. 그대로 두면 서명 키가
+            // "${R2_SECRET_ACCESS_KEY}" 인 채로 기동하고, 모든 업로드가 저장소에서 서명 오류로
+            // 죽는다 — 오설정이 장애처럼 보이는 바로 그 모양이다. 여기서 잡고 빠진 변수 이름을
+            // 그대로 알려 준다. 이때 출력하는 것은 secret 이 아니라 변수 이름이다.
+            if (value.startsWith("${") && value.endsWith("}")) {
+                throw new IllegalStateException("app.ai.storage.providers." + provider + "." + field
+                        + " 이(가) 해석되지 않았습니다 — 배포에서 " + value + " 를 주입해야 합니다.");
+            }
+        }
+
+        private static boolean blank(String value) {
+            return value == null || value.isBlank();
         }
     }
 }

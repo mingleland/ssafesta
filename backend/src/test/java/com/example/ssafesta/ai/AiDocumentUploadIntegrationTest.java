@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,6 +98,30 @@ class AiDocumentUploadIntegrationTest {
         assertEquals("test-ai-documents", stored.getStorageBucket());
         // 발급만으로 업로드가 된 것은 아니다 — 1시간 만료 판정이 이 칸을 본다.
         assertNull(stored.getUploadedAt(), "발급 시점에 uploaded_at 이 이미 차 있다");
+    }
+
+    /**
+     * 허용 형식은 셋인데 PDF 만 관통돼 있었다 (spec 007 T041).
+     *
+     * <p>확장자와 MIME 의 짝을 서버가 검사하므로(같은 절의 {@code fileName} 거부 케이스), 나머지 둘도
+     * 실제로 발급되는지 보지 않으면 "PDF 만 되는 서버" 가 형식 3종을 지원한다고 문서에 적히게 된다.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "notes.md, text/markdown",
+            "notes.txt, text/plain"})
+    void theOtherAcceptedFormatsAlsoGetAGrant(String fileName, String contentType) throws Exception {
+        Owner owner = agentOwner("형식" + fileName.substring(fileName.indexOf('.') + 1));
+
+        String json = mockMvc.perform(uploadUrl(owner, body(fileName, contentType, ONE_MB, SHA_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(false))
+                .andExpect(jsonPath("$.uploadUrl").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        AiDocument stored = documentRepository.findById(idOf(json)).orElseThrow();
+        assertEquals(contentType, stored.getContentType());
+        assertTrue(stored.getObjectKey().endsWith("/" + fileName), stored.getObjectKey());
     }
 
     /** 20MB 를 넘으면 <b>행을 만들지 않는다</b> — 만들면 10개 중 하나를 영영 먹는다. */

@@ -32,8 +32,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>사유가 <b>다른 코드로</b> 나가는지가 핵심이다. 할당량 초과는 재시도해도 안 되고 장애는 몇 분
  * 뒤 된다 — 한 코드로 뭉치면 FE 가 안내를 가르지 못하고 사용자는 계속 재시도한다.
  *
- * <p>두 축이 <b>같은 이름의 값</b>을 갖는 것도 여기서 고정한다: {@code usage-state=UPLOAD_BLOCKED}
- * 는 507 이고 {@code storage-state=UPLOAD_BLOCKED} 는 503 이다. 한 설정으로 합치면 구분이 사라진다.
+ * <p>게이트는 한 칸이지만 <b>값이 사유를 말한다</b>(#100, 2026-09-01): {@code QUOTA_BLOCKED} 는
+ * 507, {@code UNAVAILABLE} 은 503 이다. boolean 으로 되돌리면 그 구분이 사라진다.
  *
  * <p>설정이 클래스 단위라 사유마다 컨텍스트가 따로 뜬다. 그래서 본체 테스트와 파일을 나눴다.
  */
@@ -48,7 +48,7 @@ class AiDocumentUploadBlockedIntegrationTest {
     /** 할당량이 찼다 — usage guard 90% (#100). 기다린다고 풀리지 않으므로 507 이다. */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.usage-state=UPLOAD_BLOCKED")
+    @SpringBootTest(properties = "app.ai.storage.upload-gate=QUOTA_BLOCKED")
     @AutoConfigureMockMvc
     class WhenTheQuotaIsSpent extends Fixture {
 
@@ -65,38 +65,22 @@ class AiDocumentUploadBlockedIntegrationTest {
         }
     }
 
-    /** 사용량 감시가 끊겼다 — 판단 근거가 없어 fail-closed 다. 잠시 뒤 된다: 503. */
-    @Nested
-    @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.usage-state=STALE_BLOCKED")
-    @AutoConfigureMockMvc
-    class WhenTheUsageMeasurementIsStale extends Fixture {
-
-        @Test
-        void theGrantIsRefusedAsUnavailableAndNoRowIsCreated() throws Exception {
-            long agentId = agent("감시불능");
-
-            mockMvc.perform(uploadUrl(agentId))
-                    .andExpect(status().isServiceUnavailable())
-                    .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"));
-
-            assertEquals(0, documents.countActive(agentId), "차단인데 행이 생겼다");
-        }
-    }
-
     /**
-     * <b>같은 이름, 다른 축, 다른 코드.</b> 저장소 장애 기계의 {@code UPLOAD_BLOCKED} 는 할당량이
-     * 아니라 R2 를 못 쓴다는 뜻이라 503 이다 — 507 로 나가면 사용자에게 "용량을 비우라" 고 하게 된다.
+     * 감시 불능·R2 장애·전환 창 — 운영자가 전부 {@code UNAVAILABLE} 로 옮겨 적는다. 잠시 뒤 된다: 503.
+     *
+     * <p>같은 값 하나가 옛 두 축의 {@code STALE_BLOCKED}·{@code UPLOAD_BLOCKED}·
+     * {@code FALLBACK_VALIDATING}·{@code R2_RECONCILING} 를 모두 대신한다. 서버는 어느 상태였는지
+     * 알 필요가 없고, 알아야 할 것은 "기다리면 되는가" 뿐이다.
      */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.storage-state=UPLOAD_BLOCKED")
+    @SpringBootTest(properties = "app.ai.storage.upload-gate=UNAVAILABLE")
     @AutoConfigureMockMvc
-    class WhenTheProviderIsBlocked extends Fixture {
+    class WhenTheProviderCannotBeUsed extends Fixture {
 
         @Test
-        void theSameTokenOnTheOtherAxisIsUnavailableNotQuota() throws Exception {
-            long agentId = agent("장애차단");
+        void theGrantIsRefusedAsUnavailableAndNoRowIsCreated() throws Exception {
+            long agentId = agent("사용불가");
 
             mockMvc.perform(uploadUrl(agentId))
                     .andExpect(status().isServiceUnavailable())
@@ -106,34 +90,15 @@ class AiDocumentUploadBlockedIntegrationTest {
         }
     }
 
-    /** 되돌리는 중에도 신규 업로드는 막는다 — docs/26 이 P0 운영을 그렇게 적어 두었다. */
-    @Nested
-    @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
-    @SpringBootTest(properties = "app.ai.storage.storage-state=R2_RECONCILING")
-    @AutoConfigureMockMvc
-    class WhileReconciling extends Fixture {
-
-        @Test
-        void newGrantsStayBlocked() throws Exception {
-            long agentId = agent("복구중");
-
-            mockMvc.perform(uploadUrl(agentId))
-                    .andExpect(status().isServiceUnavailable())
-                    .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"));
-        }
-    }
-
     /**
-     * MinIO 로 넘어간 상태는 <b>허용</b>이다 — 막으면 fallback 이 아무 쓸모가 없다.
+     * MinIO 로 넘어간 운영은 <b>허용</b>이다 — 막으면 fallback 이 아무 쓸모가 없다.
      *
-     * <p>쓰기 provider 도 함께 옮겨야 기동한다. 상태만 바꾸고 provider 를 R2 로 두면 계약이
-     * "LOCAL_ACTIVE 에서 만든 metadata 는 MINIO_LOCAL 을 명시한다" 고 한 것과 어긋나므로 거절된다 —
-     * 이 테스트가 그 짝을 실제로 맞춰야 하는 것 자체가 불변식의 증거다.
+     * <p>{@code (OPEN, MINIO_LOCAL)} 이 곧 계약의 {@code LOCAL_ACTIVE} 다(#100). 상태를 담는 칸이
+     * 따로 없으므로 "상태만 옮기고 provider 를 안 옮겨 어긋난다" 는 사건 자체가 성립하지 않는다.
      */
     @Nested
     @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
     @SpringBootTest(properties = {
-            "app.ai.storage.storage-state=LOCAL_ACTIVE",
             "app.ai.storage.active-write-provider=MINIO_LOCAL",
             "app.ai.storage.providers.MINIO_LOCAL.endpoint=http://localhost:9",
             "app.ai.storage.providers.MINIO_LOCAL.bucket=test-fallback",
@@ -152,7 +117,7 @@ class AiDocumentUploadBlockedIntegrationTest {
         }
     }
 
-    /** 두 사유가 공유하는 준비 — 회원·부스·임대·직원. */
+    /** 사유마다 공유하는 준비 — 회원·부스·임대·직원. */
     abstract static class Fixture {
 
         @Autowired protected MockMvc mockMvc;

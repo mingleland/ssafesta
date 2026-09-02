@@ -104,24 +104,17 @@ public class AiDocumentService {
         UploadRequest request = validated(command);
 
         // Before the insert, deliberately. A row created while uploads are blocked would hold one
-        // of the ten slots with no object behind it and nothing to clean it up (#100). The reason
-        // travels with the refusal: a spent quota is not something the owner can wait out.
-        // Two questions, asked separately because they have different answers: how full is the
-        // bucket, and is the provider usable at all. Quota first — it is the one the owner cannot
-        // wait out, and saying "try later" to someone out of space sends them nowhere.
-        switch (storageProperties.usageState()) {
-            case UPLOAD_BLOCKED -> throw new StorageQuotaExceededException();
-            case STALE_BLOCKED -> throw new StorageUnavailableException(
+        // of the ten slots with no object behind it and nothing to clean it up (#100).
+        //
+        // One setting, two refusals. The operator has already read both state machines and written
+        // the verdict into upload-gate (#100, 2026-09-01) — the reason still travels with the
+        // refusal, because a spent quota is not something the owner can wait out and "try later"
+        // sends them nowhere.
+        switch (storageProperties.uploadGate()) {
+            case QUOTA_BLOCKED -> throw new StorageQuotaExceededException();
+            case UNAVAILABLE -> throw new StorageUnavailableException(
                     "현재 문서 업로드를 받을 수 없습니다. 잠시 후 다시 시도해 주세요.");
-            case NORMAL, WARNING -> { }
-        }
-        switch (storageProperties.storageState()) {
-            // R2_RECONCILING included: docs/26 records P0 as operating it blocked, and opening it
-            // is a decision that has not been made.
-            case UPLOAD_BLOCKED, FALLBACK_VALIDATING, R2_RECONCILING ->
-                    throw new StorageUnavailableException(
-                            "현재 문서 업로드를 받을 수 없습니다. 잠시 후 다시 시도해 주세요.");
-            case R2_ACTIVE, LOCAL_ACTIVE -> { }
+            case OPEN -> { }
         }
 
         return grant(agent, userId, request, storage.activeWriteTarget());
