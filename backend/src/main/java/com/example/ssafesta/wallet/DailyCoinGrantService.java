@@ -1,5 +1,6 @@
 package com.example.ssafesta.wallet;
 
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -30,11 +31,14 @@ public class DailyCoinGrantService {
     private final WalletService wallets;
     private final StringRedisTemplate redis;
     private final WalletProperties properties;
+    private final String keyspace;
 
-    public DailyCoinGrantService(WalletService wallets, StringRedisTemplate redis, WalletProperties properties) {
+    public DailyCoinGrantService(WalletService wallets, StringRedisTemplate redis, WalletProperties properties,
+            RedisKeyspaceProperties keyspace) {
         this.wallets = wallets;
         this.redis = redis;
         this.properties = properties;
+        this.keyspace = keyspace.prefix();
     }
 
     /**
@@ -100,7 +104,7 @@ public class DailyCoinGrantService {
     }
 
     private String cacheKey(Long userId, LocalDate date) {
-        return "wallet:daily:" + userId + ":" + date;
+        return keyspace + "wallet:daily:" + userId + ":" + date;
     }
 
     private Duration ttlUntilNextMidnight(LocalDate date) {

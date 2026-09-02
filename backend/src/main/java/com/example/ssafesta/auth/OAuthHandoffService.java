@@ -1,5 +1,6 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import com.example.ssafesta.user.OAuthProvider;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -18,10 +19,14 @@ public class OAuthHandoffService {
     private static final String PREFIX = "auth:oauth-handoff:";
     private final StringRedisTemplate redis;
     private final AuthProperties properties;
+    /** Not static — the namespace is configuration, so the prefix can only be built per instance. */
+    private final String prefix;
 
-    public OAuthHandoffService(StringRedisTemplate redis, AuthProperties properties) {
+    public OAuthHandoffService(StringRedisTemplate redis, AuthProperties properties,
+            RedisKeyspaceProperties keyspace) {
         this.redis = redis;
         this.properties = properties;
+        this.prefix = keyspace.prefix() + PREFIX;
     }
 
     public String createMember(MemberSessionService.MemberSession session) {
@@ -88,7 +93,7 @@ public class OAuthHandoffService {
         return fields;
     }
 
-    private String key(String handoff) { return PREFIX + handoff; }
+    private String key(String handoff) { return prefix + handoff; }
     private String encode(String value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8)); }
     private String decode(String value) { return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8); }
 

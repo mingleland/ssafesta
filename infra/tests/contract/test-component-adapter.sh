@@ -15,6 +15,10 @@ done
 grep -Fq 'pytest tests/unit tests/contract' "${repo_root}/ci/test" \
   || { echo 'AI default CI must exclude opt-in integration tests' >&2; exit 1; }
 
+for dockerfile in festa-ai/Dockerfile backend/Dockerfile festa-frontend/Dockerfile; do
+  [[ -f "${repo_root}/${dockerfile}" ]] || { echo "missing component Dockerfile: ${dockerfile}" >&2; exit 1; }
+done
+
 for adapter in validate test build package verify; do
   [[ -f "${repo_root}/ci/${adapter}" ]] || { echo "missing ci/${adapter}" >&2; exit 1; }
   [[ "$(git -C "${repo_root}" ls-files --stage "ci/${adapter}" | awk '{print $1}')" == 100755 ]] \

@@ -1,0 +1,36 @@
+meta {
+  name: 게임 삭제
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 게임 삭제 — 소프트 삭제이며 복원할 수 있다
+
+  - 인증: **필수** (소유자)
+  - 성공: `204 No Content`
+
+  데이터는 남아 있고 `게임 복원`으로 되돌릴 수 있다. 삭제된 게임은 `내 게임 목록`에 계속 나오고, 게시본 조회는 더 이상 제공되지 않는다.
+
+  ### 두 번 호출하면 `404 GAME_DELETED`다
+
+  실패가 아니라 **"이미 삭제됨"으로 읽으라는 것이 계약**이다 — 응답을 못 받아 재시도한 클라이언트가 정확히 이 분기로 들어온다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `204` | 삭제 완료 |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404 GAME_NOT_FOUND` | 그런 게임이 없다 |
+  | `404 GAME_DELETED` | 이미 삭제됨 — 재시도의 정상 응답 |
+  | `409 GAME_LIMIT_EXCEEDED` | 삭제본 보관 상한이 꽉 찼다 |
+}

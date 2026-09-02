@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type PointerEvent } from 'react';
-import type { AssetReference, GameObject, TileLayer, WorldScene } from '../../contracts/gameProject.ts';
+import type { AssetReference, GameObject, Position2d, TileLayer, WorldScene } from '../../contracts/gameProject.ts';
 import { findPresetDefinition } from '../model/authoringRegistry.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import type { TilesetDefinition } from '../assets/builtinAssetCatalog.ts';
@@ -47,6 +47,12 @@ interface TopDownCanvasProps {
   readonly onPickTile: (tileIndex: number) => void;
   readonly onPlacementComplete: () => void;
   readonly onZoomChange: (zoom: number) => void;
+  // S15P21A604-391 — Scene 전환 시 캔버스 팬(스크롤) 위치를 씬별로 기억/복원하기 위한
+  // 훅. onViewportSettle은 뷰포트가 바뀔 때마다(스크롤 포함) 그 중심 좌표를 알려주고,
+  // restoreViewportCenter는 부모가 "이 좌표로 스크롤해 달라"고 요청할 때(Scene 재진입
+  // 시) 쓴다 — fitRequestToken/focusRequestToken과 같은 scrollToGridPosition 경로를 탄다.
+  readonly onViewportSettle?: (center: Position2d) => void;
+  readonly restoreViewportCenter?: Position2d | null;
 }
 
 const pointerToGrid = (
@@ -113,6 +119,8 @@ export const TopDownCanvas = ({
   onPickTile,
   onPlacementComplete,
   onZoomChange,
+  onViewportSettle,
+  restoreViewportCenter,
 }: TopDownCanvasProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -246,6 +254,27 @@ export const TopDownCanvas = ({
     const selectedObject = scene.objects.find((object) => object.id === selectedObjectId);
     if (selectedObject !== undefined) scrollToGridPosition(selectedObject.position);
   }, [focusRequestToken, scene.objects, selectedObjectId, scrollToGridPosition]);
+
+  // S15P21A604-391 — 뷰포트가 바뀔 때마다(스크롤 포함) 현재 보이는 영역의 중심 좌표를
+  // 부모에게 알려준다. 부모는 이 값을 Scene을 떠나는 시점에 스냅샷으로만 저장해두고,
+  // 매 스크롤마다 리렌더를 일으키지 않도록(ref로 받음) onViewportSettle을 값이 실제로
+  // 바뀔 때만 호출한다.
+  useEffect(() => {
+    if (canvasViewport === null || onViewportSettle === undefined) return;
+    onViewportSettle({
+      x: (canvasViewport.minX + canvasViewport.maxX) / 2,
+      y: (canvasViewport.minY + canvasViewport.maxY) / 2,
+    });
+  }, [canvasViewport, onViewportSettle]);
+
+  // Scene을 다시 선택했을 때(scene.id가 바뀔 때) 그 Scene에서 마지막으로 보고 있던
+  // 위치로 되돌린다. TopDownCanvas는 key 없이 재사용되므로(TOP_DOWN↔PLATFORMER 전환)
+  // scene.id 변화만이 "다른 Scene으로 들어왔다"는 신호다.
+  useEffect(() => {
+    if (restoreViewportCenter === null || restoreViewportCenter === undefined) return;
+    const frame = window.requestAnimationFrame(() => scrollToGridPosition(restoreViewportCenter, 'auto'));
+    return () => window.cancelAnimationFrame(frame);
+  }, [scene.id, restoreViewportCenter, scrollToGridPosition]);
 
   const finishSelectionBox = () => {
     if (selectionBox === null) return;
