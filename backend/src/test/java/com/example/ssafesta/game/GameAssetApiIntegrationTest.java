@@ -24,7 +24,11 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import javax.imageio.ImageIO;
+import com.example.ssafesta.storage.FakeObjectStorage;
+import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -39,8 +43,13 @@ import org.springframework.test.web.servlet.MvcResult;
  * <p>Pinned at the HTTP boundary because that is where the FE meets it: {@code
  * remoteAssetRepository.ts} is already written against these three calls, and a field renamed or a
  * status changed here shows up as a broken editor rather than as a failing unit test.
+ *
+ * <p>The middle step is not an HTTP call any more — the browser {@code PUT}s straight into the
+ * bucket — so {@link FakeObjectStorage#putBytes} stands in for it. The object key is written out
+ * here rather than read from the service: its shape is in contract §8, and a key that quietly
+ * changed shape would still round-trip through a helper that asked the service for it.
  */
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
 @SpringBootTest
 @AutoConfigureMockMvc
 class GameAssetApiIntegrationTest {
@@ -51,6 +60,15 @@ class GameAssetApiIntegrationTest {
     @Autowired private GameRepository games;
     @Autowired private UserRepository users;
     @Autowired private MemberSessionService sessions;
+    @Autowired private FakeObjectStorage storage;
+    @Autowired private JdbcTemplate jdbc;
+    @Autowired private GameAssetDeleteQueue deleteQueue;
+
+    @BeforeEach
+    void resetStorage() {
+        storage.reset();
+        jdbc.update("DELETE FROM game_asset_delete_queue");
+    }
 
     @Test
     void startIssuesTheGrantShapeTheFrontendParses() throws Exception {
@@ -64,7 +82,10 @@ class GameAssetApiIntegrationTest {
                 // the id is part of the contract and not an implementation detail.
                 .andExpect(jsonPath("$.assetId").value(org.hamcrest.Matchers.matchesPattern(
                         "^[A-Za-z][A-Za-z0-9_-]{0,63}$")))
-                .andExpect(jsonPath("$.uploadUrl").isNotEmpty())
+                // Absolute and pointing at the bucket, not at this application. A relative URL
+                // would mean the presigned path silently regressed to a Spring endpoint.
+                .andExpect(jsonPath("$.uploadUrl").value(
+                        org.hamcrest.Matchers.startsWith("https://")))
                 .andExpect(jsonPath("$.requiredHeaders['Content-Type']").value("image/png"))
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty());
     }
@@ -104,36 +125,31 @@ class GameAssetApiIntegrationTest {
     }
 
     /**
-     * Once verified, the same upload URL cannot replace the bytes.
+     * A swapped object does not change what the row promises, and is refused rather than served.
      *
-     * <p>This is the hole the contract described for {@code FAILED} and left open for {@code READY}:
-     * a grant is not a one-time token, so without this the row's checksum and dimensions would
-     * describe one image while {@code /content} served another.
+     * <p>The presigned URL is a real permission to write that key until the grant expires, so Spring
+     * cannot stop a second {@code PUT} the way the old application-hosted endpoint could. What it can
+     * do is refuse to serve anything that is not the object it verified: {@code /content} is bounded
+     * by the recorded size, so a larger replacement is refused rather than handed over carrying a
+     * verified image's {@code Content-Type}.
+     *
+     * <p>ponytail: the size bound does not catch a replacement that is smaller. The window is the
+     * grant's ten minutes, needs the owner's own URL, and reaches only their own game's assets —
+     * verify {@code sha256} on read if that stops being acceptable.
      */
     @Test
-    void anUploadUrlCannotBeReusedAfterTheAssetIsReady() throws Exception {
+    void aSwappedObjectIsRefusedRatherThanServedAsTheVerifiedOne() throws Exception {
         Owner owner = owner("덮어쓰기");
         byte[] original = png(20, 20);
         Uploaded uploaded = upload(owner, original);
 
-        mockMvc.perform(put(uploaded.uploadUrl()).contentType(MediaType.IMAGE_PNG).content(png(30, 30)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("GAME_ASSET_FORBIDDEN"));
+        storage.putBytes(objectKey(owner.gameId(), uploaded.assetId()), png(300, 300));
 
         mockMvc.perform(get(contentPath(owner.gameId(), uploaded.assetId()))
                         .header("Authorization", bearerFor(owner.userId())))
-                .andExpect(content().bytes(original));
-    }
-
-    @Test
-    void aWrongTokenCannotUpload() throws Exception {
-        Owner owner = owner("토큰");
-        byte[] image = png(10, 10);
-        JsonNode grant = start(owner, image.length);
-
-        mockMvc.perform(put(grant.get("uploadUrl").asText().replaceAll("t=.*$", "t=forged"))
-                        .contentType(MediaType.IMAGE_PNG).content(image))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_NOT_READY"))
+                .andExpect(jsonPath("$.errors[0].rule").value("OBJECT_MISSING"));
     }
 
     /**
@@ -153,6 +169,44 @@ class GameAssetApiIntegrationTest {
                 .andExpect(jsonPath("$.failureRule").value("UPLOAD_MISSING"));
     }
 
+    /**
+     * A verified-and-rejected object is queued for deletion, and the sweep removes it.
+     *
+     * <p>Queued rather than deleted on the spot: the delete would be a network call inside the
+     * transaction that records {@code FAILED}, and its failure would either lose the record or leave
+     * a committed row whose delete did not happen (§7.1). The sweep is asserted in the same test
+     * because a queue nothing drains is a slower leak, not a fix.
+     */
+    @Test
+    void aFailedUploadsObjectIsQueuedAndThenSwept() throws Exception {
+        Owner owner = owner("실패정리");
+        JsonNode grant = start(owner, 64);
+        String assetId = grant.get("assetId").asText();
+        String key = objectKey(owner.gameId(), assetId);
+        storage.putBytes(key, new byte[64]);
+
+        mockMvc.perform(completeRequest(owner, assetId))
+                .andExpect(jsonPath("$.status").value("FAILED"));
+
+        assertEquals(1, queuedObjects(), "FAILED 는 객체 좌표를 큐에 남긴다");
+        assertTrue(storage.hasObject(key), "sweep 전에는 객체가 아직 있다");
+
+        deleteQueue.sweep();
+
+        assertEquals(0, queuedObjects(), "성공한 삭제는 큐에서 사라진다");
+        assertTrue(!storage.hasObject(key), "객체가 지워져야 한다");
+    }
+
+    /** Nothing to delete is a success, so the row is cleared instead of retried forever. */
+    @Test
+    void sweepingAnObjectThatIsAlreadyGoneClearsTheQueueRow() {
+        deleteQueue.enqueue("R2", "test-ai-documents", "games/1/assets/neverExisted");
+
+        deleteQueue.sweep();
+
+        assertEquals(0, queuedObjects());
+    }
+
     @Test
     void aDisguisedFileFailsVerificationAndIsNotServed() throws Exception {
         Owner owner = owner("위장");
@@ -162,8 +216,7 @@ class GameAssetApiIntegrationTest {
         JsonNode grant = start(owner, disguised.length);
         String assetId = grant.get("assetId").asText();
 
-        mockMvc.perform(put(grant.get("uploadUrl").asText())
-                .contentType(MediaType.IMAGE_PNG).content(disguised)).andExpect(status().isNoContent());
+        storage.putBytes(objectKey(owner.gameId(), assetId), disguised);
         mockMvc.perform(completeRequest(owner, assetId))
                 .andExpect(jsonPath("$.status").value("FAILED"))
                 .andExpect(jsonPath("$.failureRule").value("DECODE_FAILED"));
@@ -268,8 +321,7 @@ class GameAssetApiIntegrationTest {
         String assetId = grant.get("assetId").asText();
         String uploadUrl = grant.get("uploadUrl").asText();
 
-        mockMvc.perform(put(uploadUrl).contentType(MediaType.IMAGE_PNG).content(image))
-                .andExpect(status().isNoContent());
+        storage.putBytes(objectKey(owner.gameId(), assetId), image);
         MvcResult completed = mockMvc.perform(completeRequest(owner, assetId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY"))
@@ -314,6 +366,15 @@ class GameAssetApiIntegrationTest {
         ObjectNode project = GameTestSupport.validProjectFor(gameId);
         ((ObjectNode) project.withArray("assets").get(0)).put("source", source);
         return project;
+    }
+
+    /** Contract §8. Written out, not asked for — see the class comment. */
+    private String objectKey(Long gameId, String assetId) {
+        return "games/" + gameId + "/assets/" + assetId;
+    }
+
+    private long queuedObjects() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM game_asset_delete_queue", Long.class);
     }
 
     private String contentPath(Long gameId, String assetId) {

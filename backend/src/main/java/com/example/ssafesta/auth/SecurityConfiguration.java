@@ -82,14 +82,6 @@ class SecurityConfiguration {
                         // prefix stay authenticated, and Authoring refuses guests separately with
                         // MEMBER_ONLY rather than with a 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/games/*/published").permitAll()
-                        // The asset upload step carries no bearer token, by contract: #69 wrote it as
-                        // a PUT to somebody else's server, so the FE deliberately sends no
-                        // Authorization there (remoteAssetRepository.defaultUpload). The URL now
-                        // points here instead, and the one-shot grant token in the query string is
-                        // the credential — GameAssetService verifies it against the row's hash.
-                        // Only this exact suffix is open; issuing, completing and reading the bytes
-                        // under the same prefix stay authenticated.
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/games/*/assets/*/upload").permitAll()
                         // A published booth's project exhibition is what the visitor came to read
                         // (spec 009 FR-005, 계약 §6). Only this exact suffix is open — the editor
                         // read at /booths/*/projects stays authenticated, and "*" spans one segment

@@ -42,6 +42,11 @@ public class AccountDeletionService {
         // games.owner_user_id 가 users(id) 를 참조하므로 이 세 줄이 없으면 게임을 가진 회원의
         // 탈퇴가 FK 위반으로 실패한다. published version 이 games 보다 먼저 지워지는데,
         // 복합 FK 의 ON DELETE SET NULL (published_version) 이 포인터를 대신 비워 준다 (V13).
+        // spec 019 — asset 의 바이트는 DB 밖(객체 저장소)에 있다. 행을 지우면 좌표가 사라지므로
+        // 같은 트랜잭션에서 삭제 큐로 먼저 옮긴다 (game-asset-upload.md §7.1). 여기서 객체를 직접
+        // 지우면 저장소 실패가 탈퇴 전체를 되돌리거나 커밋 뒤에 조용히 유실된다.
+        jdbc.update("INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key) SELECT provider, storage_bucket, object_key FROM game_assets WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR created_by_user_id = ? ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING", userId, userId);
+        jdbc.update("DELETE FROM game_assets WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR created_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM game_published_versions WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR published_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM game_drafts WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR updated_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM games WHERE owner_user_id = ?", userId);

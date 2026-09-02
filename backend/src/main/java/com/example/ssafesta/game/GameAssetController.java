@@ -4,10 +4,6 @@ import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import jakarta.servlet.http.HttpServletRequest;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,10 +16,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,6 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Three of the contract's six endpoints — the three the FE actually calls
  * ({@code remoteAssetRepository.ts}). Listing, single-status polling and delete belong to the editor
  * UI that is not built yet, so they are not here.
+ *
+ * <p>There is no PUT endpoint. The bytes go from the browser to the bucket with a presigned URL, so
+ * this application never receives an upload body and never needs an unauthenticated route to accept
+ * one — which is also what removes the upload token from a query string (#69, 2026-08-28).
  */
 @RestController
 @RequestMapping("/api/v1/games/{gameId}/assets")
@@ -46,9 +44,9 @@ public class GameAssetController {
     /**
      * Starts an upload: issues the {@code assetId} and the grant (contract §3.1).
      *
-     * <p>{@code uploadUrl} is absolute-path relative, which is what the FE needs — it calls
-     * {@code fetch(uploadUrl, ...)} straight from the browser and its API base already resolves
-     * against this host.
+     * <p>{@code uploadUrl} is an absolute presigned URL into the bucket. The FE calls
+     * {@code fetch(uploadUrl, {method: 'PUT', headers: requiredHeaders, body: file})}, so it must
+     * send exactly the headers named here — the content type is part of the signature.
      */
     @PostMapping
     @SecurityRequirement(name = "bearerAuth")
@@ -58,28 +56,9 @@ public class GameAssetController {
         GameAssetKind kind = request.readKind();
         GameAssetService.IssuedGrant grant = assets.issue(gameId, userId, kind,
                 request.contentType(), request.byteSize() == null ? 0L : request.byteSize());
-        return new GrantResponse(grant.assetId(), GameAssetStatus.UPLOADING.name(),
-                uploadUrl(gameId, grant.assetId(), grant.rawToken()),
-                Map.of(HttpHeaders.CONTENT_TYPE, request.contentType()),
+        return new GrantResponse(grant.assetId(), GameAssetStatus.UPLOADING.name(), grant.uploadUrl(),
+                Map.of(HttpHeaders.CONTENT_TYPE, grant.requiredContentType()),
                 grant.expiresAt());
-    }
-
-    /**
-     * Receives the bytes (contract §3.1's PUT step, pointed at this application).
-     *
-     * <p>No bearer token: the FE's upload call sends none, because the contract described this step
-     * as a request to an object store. {@code t} is the credential and it is checked against the
-     * row's stored hash.
-     *
-     * <p>The body is read through a bounded stream rather than bound as a parameter. Letting the
-     * framework materialise it first would mean a caller can decide how much memory to allocate here
-     * — the whole point of a size limit is that it applies before that.
-     */
-    @PutMapping("/{assetId}/upload")
-    public ResponseEntity<Void> upload(@PathVariable Long gameId, @PathVariable String assetId,
-                                       @RequestParam("t") String token, HttpServletRequest request) {
-        assets.storeUpload(gameId, assetId, token, readBounded(request));
-        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -100,9 +79,9 @@ public class GameAssetController {
     /**
      * Delivers the image (contract §3.4).
      *
-     * <p>Served here rather than redirected: the FE fetches this with an {@code Authorization} header
-     * and reads the body as a blob, and a 302 into a bucket would need browser GET CORS that
-     * infra-002 does not grant.
+     * <p>Proxied rather than redirected: the FE fetches this with an {@code Authorization} header
+     * and reads the body as a blob, and a 302 into the bucket would need browser GET CORS that
+     * object-storage-contract.md does not grant.
      *
      * <p>{@code Content-Type} comes from verification, never from what the uploader declared, and
      * {@code nosniff} stops the browser from second-guessing it — the pair is what keeps a disguised
@@ -120,41 +99,6 @@ public class GameAssetController {
                 .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.maxAge(java.time.Duration.ofMinutes(5)).cachePrivate())
                 .body(asset.content());
-    }
-
-    private String uploadUrl(Long gameId, String assetId, String token) {
-        return "/api/v1/games/" + gameId + "/assets/" + assetId + "/upload?t=" + token;
-    }
-
-    /**
-     * Reads at most one byte past the limit, then refuses.
-     *
-     * <p>Reading the extra byte is how "exactly at the limit" stays acceptable while anything larger
-     * is refused without having been stored.
-     */
-    private byte[] readBounded(HttpServletRequest request) {
-        long limit = GameAssetImageValidator.MAX_BYTES;
-        try (InputStream input = request.getInputStream()) {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream(8192);
-            byte[] chunk = new byte[8192];
-            long total = 0;
-            int read;
-            while ((read = input.read(chunk)) != -1) {
-                total += read;
-                if (total > limit) {
-                    throw new ApiException(ErrorCode.GAME_ASSET_TOO_LARGE,
-                            "이미지는 " + (limit / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.",
-                            List.of(ApiErrorDetail.of("SIZE_EXCEEDED",
-                                    "이미지는 " + (limit / 1024 / 1024) + "MB 이하만 올릴 수 있습니다.")),
-                            null);
-                }
-                buffer.write(chunk, 0, read);
-            }
-            return buffer.toByteArray();
-        } catch (IOException exception) {
-            throw new ApiException(ErrorCode.GAME_ASSET_CORRUPTED, "업로드가 중단되었습니다.",
-                    List.of(ApiErrorDetail.of("UPLOAD_INTERRUPTED", "업로드가 중단되었습니다.")), null);
-        }
     }
 
     /**

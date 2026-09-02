@@ -10,13 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/**
- * Asset rows, and the only place that touches image bytes.
- *
- * <p>{@code content} is not mapped on {@link GameAsset}, so every read and write of it is one of the
- * statements below. That is the point: a 5 MiB column reachable from the entity would ride along on
- * the quota scan and the validator snapshot without anyone choosing it.
- */
+/** Asset metadata rows. The bytes are in object storage; nothing here carries them. */
 public interface GameAssetRepository extends JpaRepository<GameAsset, Long> {
 
     Optional<GameAsset> findByGameIdAndAssetId(Long gameId, String assetId);
@@ -54,11 +48,32 @@ public interface GameAssetRepository extends JpaRepository<GameAsset, Long> {
     long countChargeable(@Param("gameId") Long gameId, @Param("now") Instant now);
 
     /**
+     * Moves the objects of rows {@link #deleteUnusable} is about to drop into the delete queue.
+     *
+     * <p>Must run <b>immediately before</b> that delete, in the same transaction and with the same
+     * predicate. The bytes are no longer in the row, so dropping the row on its own leaves an object
+     * nothing points at — and an expired grant may well have received its {@code PUT}, since the
+     * browser uploads without telling us.
+     *
+     * <p>{@code ON CONFLICT DO NOTHING} because a coordinate already queued needs no second copy;
+     * deletion is idempotent.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+            SELECT provider, storage_bucket, object_key FROM game_assets
+             WHERE game_id = :gameId AND deleted_at IS NULL
+               AND ((status = 'FAILED' AND updated_at < :threshold)
+                 OR (status = 'UPLOADING' AND upload_expires_at < :threshold))
+            ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+            """, nativeQuery = true)
+    int enqueueUnusableObjects(@Param("gameId") Long gameId, @Param("threshold") Instant threshold);
+
+    /**
      * Drops rows that can never become usable, so the table does not grow without bound.
      *
      * <p>Runs inside the same transaction as issuance, under the {@code games} row lock, which is why
-     * no scheduler is needed and the work is bounded to one game. With the bytes in the same row, the
-     * delete reclaims the storage too.
+     * no scheduler is needed and the work is bounded to one game.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
@@ -80,51 +95,22 @@ public interface GameAssetRepository extends JpaRepository<GameAsset, Long> {
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-            INSERT INTO game_assets (game_id, asset_id, kind, status, provider,
+            INSERT INTO game_assets (game_id, asset_id, kind, status,
+                                     provider, storage_bucket, object_key,
                                      declared_content_type, declared_byte_size,
-                                     upload_token_hash, upload_expires_at, created_by_user_id)
-            VALUES (:gameId, :assetId, :kind, 'UPLOADING', 'DB',
+                                     upload_expires_at, created_by_user_id)
+            VALUES (:gameId, :assetId, :kind, 'UPLOADING',
+                    :provider, :storageBucket, :objectKey,
                     :declaredContentType, :declaredByteSize,
-                    :uploadTokenHash, :uploadExpiresAt, :createdByUserId)
+                    :uploadExpiresAt, :createdByUserId)
             ON CONFLICT (game_id, asset_id) DO NOTHING
             """, nativeQuery = true)
     int insertIssued(@Param("gameId") Long gameId, @Param("assetId") String assetId,
-                     @Param("kind") String kind, @Param("declaredContentType") String declaredContentType,
+                     @Param("kind") String kind, @Param("provider") String provider,
+                     @Param("storageBucket") String storageBucket, @Param("objectKey") String objectKey,
+                     @Param("declaredContentType") String declaredContentType,
                      @Param("declaredByteSize") long declaredByteSize,
-                     @Param("uploadTokenHash") String uploadTokenHash,
                      @Param("uploadExpiresAt") Instant uploadExpiresAt,
                      @Param("createdByUserId") Long createdByUserId);
 
-    /**
-     * Stores the uploaded bytes, but only into a row that is still waiting for them.
-     *
-     * <p>The {@code status} and expiry predicates are the whole overwrite defence. Once {@code
-     * complete} has moved the row to {@code READY}, this matches nothing and a second {@code PUT} to
-     * the same URL changes no bytes — so the metadata in the row and the object served by {@code
-     * /content} cannot drift apart, which is the hazard §3.2 names for {@code FAILED} and left open
-     * for {@code READY}.
-     *
-     * @return 1 when the bytes were stored, 0 when the row is gone, finished, or expired
-     */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = """
-            UPDATE game_assets
-               SET content = :content, updated_at = now()
-             WHERE game_id = :gameId AND asset_id = :assetId AND deleted_at IS NULL
-               AND status = 'UPLOADING' AND upload_expires_at > now()
-               AND upload_token_hash = :uploadTokenHash
-            """, nativeQuery = true)
-    int storeContent(@Param("gameId") Long gameId, @Param("assetId") String assetId,
-                     @Param("uploadTokenHash") String uploadTokenHash, @Param("content") byte[] content);
-
-    /** {@code null} when nothing has been uploaded yet — {@code complete} reads that as a missing PUT. */
-    @Query(value = "SELECT content FROM game_assets WHERE game_id = :gameId AND asset_id = :assetId",
-            nativeQuery = true)
-    byte[] readContent(@Param("gameId") Long gameId, @Param("assetId") String assetId);
-
-    /** Verification failed, so the bytes are not worth keeping — the row stays as the record of why. */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = "UPDATE game_assets SET content = NULL WHERE game_id = :gameId AND asset_id = :assetId",
-            nativeQuery = true)
-    int clearContent(@Param("gameId") Long gameId, @Param("assetId") String assetId);
 }

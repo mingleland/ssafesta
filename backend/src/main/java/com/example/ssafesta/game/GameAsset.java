@@ -11,14 +11,12 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * One uploaded image's metadata (contract §8, V17).
+ * One uploaded image's metadata (contract §8, V18).
  *
- * <p><b>The bytes are deliberately not a field here.</b> The column exists, but a 5 MiB {@code
- * byte[]} on the entity means every {@code findById} — the quota scan, the validator snapshot, the
- * status poll — drags the image through the heap. Hibernate's lazy basic mapping only works with
- * bytecode enhancement, so declaring it lazy would read as a fix while still loading eagerly.
- * {@link GameAssetRepository} reads and writes {@code content} with its own statements, which also
- * makes every place that touches image bytes visible in one file.
+ * <p>Metadata only — the bytes live in object storage, and this row records <b>where</b>. The
+ * {@code provider} and {@code storageBucket} written at issuance are the coordinates every later
+ * read and delete uses, never the currently active write target: a MinIO fallback moves where new
+ * uploads go and must not move where old ones are looked for (spec 007 FR-030, same invariant).
  */
 @Entity
 @Table(name = "game_assets")
@@ -57,11 +55,15 @@ public class GameAsset {
     @Column(name = "sha256", length = 64)
     private String sha256;
 
-    @Enumerated(EnumType.STRING)
+    // A String, not an enum: the set of providers is defined by app.ai.storage.providers, and an
+    // enum here would be a second list to keep in step with it for no gain.
     @Column(name = "provider", nullable = false, length = 20)
-    private GameAssetProvider provider = GameAssetProvider.DB;
+    private String provider;
 
-    @Column(name = "object_key")
+    @Column(name = "storage_bucket", nullable = false)
+    private String storageBucket;
+
+    @Column(name = "object_key", nullable = false)
     private String objectKey;
 
     @Column(name = "failure_rule", length = 60)
@@ -72,9 +74,6 @@ public class GameAsset {
 
     @Column(name = "declared_byte_size", nullable = false, updatable = false)
     private Long declaredByteSize;
-
-    @Column(name = "upload_token_hash", nullable = false, length = 64)
-    private String uploadTokenHash;
 
     @Column(name = "upload_expires_at", nullable = false)
     private Instant uploadExpiresAt;
@@ -101,15 +100,17 @@ public class GameAsset {
      * for tests that build a row directly.
      */
     GameAsset(Long gameId, String assetId, GameAssetKind kind, String declaredContentType,
-              long declaredByteSize, String uploadTokenHash, Instant uploadExpiresAt, Long createdByUserId) {
+              long declaredByteSize, String provider, String storageBucket, String objectKey,
+              Instant uploadExpiresAt, Long createdByUserId) {
         this.gameId = gameId;
         this.assetId = assetId;
         this.kind = kind;
         this.status = GameAssetStatus.UPLOADING;
-        this.provider = GameAssetProvider.DB;
+        this.provider = provider;
+        this.storageBucket = storageBucket;
+        this.objectKey = objectKey;
         this.declaredContentType = declaredContentType;
         this.declaredByteSize = declaredByteSize;
-        this.uploadTokenHash = uploadTokenHash;
         this.uploadExpiresAt = uploadExpiresAt;
         this.createdByUserId = createdByUserId;
         this.createdAt = Instant.now();
@@ -119,10 +120,11 @@ public class GameAsset {
     /**
      * Records what verification found and closes the grant.
      *
-     * <p>Clearing {@code uploadTokenHash} is what stops a second {@code PUT} to the same URL from
-     * replacing bytes that already passed (§3.2's warning, which the contract only wrote down for
-     * {@code FAILED}). The status check in the upload handler covers the same ground; both are here
-     * because either one alone is a single line away from being removed by accident.
+     * <p>Leaving {@code READY} is one-way. A second {@code PUT} against a presigned URL that has not
+     * expired yet can still replace the object in storage, and nothing in Spring sees it — so the
+     * grant's signature is issued for exactly {@code uploadExpiresAt} and {@code /content} answers
+     * from the {@code sha256} recorded here, which is how that drift becomes detectable rather than
+     * invisible (§3.2).
      */
     void markReady(GameAssetImageValidator.VerifiedImage verified) {
         this.contentType = verified.contentType();
@@ -132,7 +134,6 @@ public class GameAsset {
         this.sha256 = verified.sha256();
         this.status = GameAssetStatus.READY;
         this.failureRule = null;
-        this.uploadTokenHash = CONSUMED_TOKEN_HASH;
         this.updatedAt = Instant.now();
     }
 
@@ -143,16 +144,8 @@ public class GameAsset {
     void markFailed(String rule) {
         this.status = GameAssetStatus.FAILED;
         this.failureRule = rule;
-        this.uploadTokenHash = CONSUMED_TOKEN_HASH;
         this.updatedAt = Instant.now();
     }
-
-    /**
-     * A used-up token still has to satisfy {@code upload_token_hash NOT NULL}, and it must never
-     * match a real token. Sixty-four zeroes cannot be produced by hashing, so comparisons against it
-     * fail without a null branch at every call site.
-     */
-    static final String CONSUMED_TOKEN_HASH = "0".repeat(64);
 
     boolean isDeleted() {
         return deletedAt != null;
@@ -194,12 +187,12 @@ public class GameAsset {
     public Integer getWidth() { return width; }
     public Integer getHeight() { return height; }
     public String getSha256() { return sha256; }
-    public GameAssetProvider getProvider() { return provider; }
+    public String getProvider() { return provider; }
+    public String getStorageBucket() { return storageBucket; }
     public String getObjectKey() { return objectKey; }
     public String getFailureRule() { return failureRule; }
     public String getDeclaredContentType() { return declaredContentType; }
     public Long getDeclaredByteSize() { return declaredByteSize; }
-    String getUploadTokenHash() { return uploadTokenHash; }
     public Instant getUploadExpiresAt() { return uploadExpiresAt; }
     public Long getCreatedByUserId() { return createdByUserId; }
     public Instant getCreatedAt() { return createdAt; }

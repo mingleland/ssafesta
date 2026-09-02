@@ -3,16 +3,12 @@ package com.example.ssafesta.game;
 import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.storage.ObjectStorage;
 import com.fasterxml.jackson.databind.JsonNode;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -22,10 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
  * Uploading, verifying and serving a creator's own images (contract game-asset-upload.md).
  *
  * <p>The three-step shape — issue a grant, {@code PUT} the bytes, {@code complete} — is the FE's
- * committed contract and is kept exactly. The only departure is where {@code uploadUrl} points:
- * at this application rather than at an object store. The FE performs a plain {@code fetch} against
- * whatever URL it is handed, so that substitution is invisible to it, and it removes presigned URLs,
- * bucket CORS and immutable-key promotion from a path whose only consumer is the web runtime.
+ * committed contract. {@code uploadUrl} is a presigned {@code PUT} straight into the bucket, so the
+ * bytes never pass through this process on the way up; {@code GET /content} is the opposite and is
+ * proxied from here. That asymmetry is not a preference — object-storage-contract.md grants the
+ * bucket {@code AllowedMethods: PUT} only, so a browser GET against it (or a 302 into it) dies in
+ * CORS, while the FE reads assets with an authenticated {@code fetch} (remoteAssetRepository.ts).
+ *
+ * <p>Nothing here trusts what the browser says it uploaded. The presigned URL pins the content type
+ * and length the quota check approved, and {@code complete} reads the object back and verifies it
+ * (§5) — a signature is permission to write one object, not a statement about its contents.
  */
 @Service
 public class GameAssetService {
@@ -63,15 +64,20 @@ public class GameAssetService {
     private final GamePublishedVersionRepository publishedVersions;
     private final GameAccessGuard guard;
     private final GameAssetImageValidator imageValidator;
+    private final ObjectStorage storage;
+    private final GameAssetDeleteQueue deleteQueue;
 
     public GameAssetService(GameAssetRepository assets, GameRepository games,
                             GamePublishedVersionRepository publishedVersions, GameAccessGuard guard,
-                            GameAssetImageValidator imageValidator) {
+                            GameAssetImageValidator imageValidator, ObjectStorage storage,
+                            GameAssetDeleteQueue deleteQueue) {
         this.assets = assets;
         this.games = games;
         this.publishedVersions = publishedVersions;
         this.guard = guard;
         this.imageValidator = imageValidator;
+        this.storage = storage;
+        this.deleteQueue = deleteQueue;
     }
 
     /**
@@ -101,53 +107,36 @@ public class GameAssetService {
         }
 
         Instant now = Instant.now();
-        assets.deleteUnusable(gameId, now.minus(UNUSABLE_RETENTION));
+        Instant staleBefore = now.minus(UNUSABLE_RETENTION);
+        // Queue first, delete second, same predicate: after the delete there is nothing left to read
+        // the coordinates from.
+        assets.enqueueUnusableObjects(gameId, staleBefore);
+        assets.deleteUnusable(gameId, staleBefore);
         if (assets.countChargeable(gameId, now) >= MAX_ASSETS_PER_GAME) {
             throw refuse(ErrorCode.GAME_ASSET_QUOTA_EXCEEDED, "QUOTA_EXCEEDED",
                     "이 게임에는 이미지를 " + MAX_ASSETS_PER_GAME + "개까지 올릴 수 있습니다. "
                             + "쓰지 않는 이미지를 정리한 뒤 다시 시도해 주세요.");
         }
 
-        String rawToken = randomToken();
-        String tokenHash = sha256Hex(rawToken);
+        // Read once and store on the row. Reading it again at upload time would follow a fallback
+        // that moved in between, and the object would be signed for a bucket the row does not name.
+        ObjectStorage.WriteTarget target = storage.activeWriteTarget();
         Instant expiresAt = now.plus(GRANT_TTL);
 
         for (int attempt = 0; attempt < ID_ATTEMPTS; attempt++) {
             String assetId = randomAssetId();
-            if (assets.insertIssued(gameId, assetId, kind.name(), declaredContentType, declaredByteSize,
-                    tokenHash, expiresAt, userId) == 1) {
-                return new IssuedGrant(assetId, expiresAt, rawToken);
+            String objectKey = objectKey(gameId, assetId);
+            if (assets.insertIssued(gameId, assetId, kind.name(), target.provider(), target.bucket(),
+                    objectKey, declaredContentType, declaredByteSize, expiresAt, userId) == 1) {
+                // Signed for exactly the grant's lifetime — a longer signature would let bytes land
+                // after complete has already refused the row, leaving an object nothing points at.
+                String uploadUrl = storage.presignPut(target.provider(), target.bucket(), objectKey,
+                        declaredContentType, declaredByteSize, GRANT_TTL);
+                return new IssuedGrant(assetId, expiresAt, uploadUrl, declaredContentType);
             }
         }
         throw new ApiException(ErrorCode.INTERNAL_ERROR,
                 "자산 식별자를 발급하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-    }
-
-    /**
-     * Takes the bytes the client {@code PUT} against the grant URL.
-     *
-     * <p>The token is the only credential here — the FE's upload call carries no {@code
-     * Authorization}, because the contract wrote that step as a request to somebody else's server.
-     * So the grant is verified by the statement itself: the update matches only a row that is still
-     * {@code UPLOADING}, unexpired, and holding this exact token hash.
-     *
-     * <p>A miss is reported without probing the row. Any of "no such asset", "already finished",
-     * "expired", "wrong token" would otherwise answer a question the caller has not authenticated
-     * itself to ask, and the FE turns every failure here into the same retry prompt regardless.
-     */
-    @Transactional
-    public void storeUpload(Long gameId, String assetId, String rawToken, byte[] content) {
-        if (content == null || content.length == 0) {
-            throw refuse(ErrorCode.GAME_ASSET_CORRUPTED, "EMPTY_CONTENT", "이미지 파일이 비어 있습니다.");
-        }
-        if (rawToken == null || rawToken.isBlank()) {
-            throw refuse(ErrorCode.GAME_ASSET_FORBIDDEN, "UPLOAD_TOKEN_INVALID",
-                    "업로드 주소가 유효하지 않습니다. 처음부터 다시 올려 주세요.");
-        }
-        if (assets.storeContent(gameId, assetId, sha256Hex(rawToken), content) != 1) {
-            throw refuse(ErrorCode.GAME_ASSET_FORBIDDEN, "UPLOAD_TOKEN_INVALID",
-                    "업로드 주소가 만료되었거나 이미 사용되었습니다. 처음부터 다시 올려 주세요.");
-        }
     }
 
     /**
@@ -177,7 +166,9 @@ public class GameAssetService {
         if (asset.isGrantExpired(Instant.now())) {
             return fail(asset, "GRANT_EXPIRED");
         }
-        byte[] content = assets.readContent(gameId, assetId);
+        // Bounded by the contract's own limit, not by the declared size: a client that declared
+        // 1 KiB and uploaded 4 GiB is exactly the case a declared bound would not catch.
+        byte[] content = readObject(asset, GameAssetImageValidator.MAX_BYTES);
         if (content == null || content.length == 0) {
             return fail(asset, "UPLOAD_MISSING");
         }
@@ -192,18 +183,44 @@ public class GameAssetService {
         return AssetView.of(asset);
     }
 
+    /**
+     * Marks the row {@code FAILED} and hands the object to the delete queue.
+     *
+     * <p>Not a direct {@code deleteObject}: this runs inside the transaction that writes {@code
+     * FAILED}, and a storage call there either rolls the failure record back or leaves a committed
+     * row whose delete silently did not happen. The queue row is written by the same commit, so the
+     * two facts cannot disagree.
+     */
     private AssetView fail(GameAsset asset, String rule) {
         asset.markFailed(rule);
-        assets.clearContent(asset.getGameId(), asset.getAssetId());
+        deleteQueue.enqueue(asset.getProvider(), asset.getStorageBucket(), asset.getObjectKey());
         return AssetView.of(asset);
+    }
+
+    /**
+     * Reads the object this row names, or {@code null} when storage says it is not there.
+     *
+     * <p>An oversized object is a client that lied about its size — a validation failure, not an
+     * outage — so {@link ObjectStorage#getObject}'s refusal is caught here and turned into the same
+     * {@code null} a missing upload produces. A provider that cannot answer is left to propagate:
+     * 503, not {@code FAILED}, because that one may well work on retry.
+     */
+    private byte[] readObject(GameAsset asset, long maxBytes) {
+        try {
+            return storage.getObject(asset.getProvider(), asset.getStorageBucket(),
+                    asset.getObjectKey(), maxBytes).orElse(null);
+        } catch (IllegalStateException oversized) {
+            return null;
+        }
     }
 
     /**
      * Serves the bytes (contract §3.4, delivered by this application rather than by a redirect).
      *
-     * <p>Being served here and not from storage is what lets the FE keep using an authenticated
-     * {@code fetch}: a 302 into a bucket needs browser GET CORS on that bucket, and infra-002 grants
-     * {@code PUT} only. There is no redirect to get wrong.
+     * <p>Proxied, not redirected. A 302 into the bucket would need browser GET CORS there and
+     * object-storage-contract.md grants {@code PUT} only, so the FE's authenticated {@code fetch}
+     * would die on the redirect — and a presigned GET handed to the browser would be a URL that
+     * outlives the permission check that produced it.
      *
      * @param userId the caller, or {@code null} for a guest
      */
@@ -218,11 +235,16 @@ public class GameAssetService {
         if (!game.isOwnedBy(userId)) {
             requirePublishedReference(game, asset);
         }
-        byte[] content = assets.readContent(gameId, assetId);
+        // The verified size, not the contract limit: this row passed verification at that size, so
+        // anything larger now is not the object that was approved.
+        byte[] content = readObject(asset, asset.getByteSize());
         if (content == null) {
-            // ck_game_assets_ready_has_bytes makes this unreachable; if it ever fires, the data is
-            // wrong and saying so beats returning an empty image.
-            throw new ApiException(ErrorCode.INTERNAL_ERROR, "자산 데이터가 손상되었습니다.");
+            // The row says READY but storage does not back that up — the object is gone, or it is no
+            // longer the one that was verified. §6 says to answer with GAME_ASSET_NOT_READY and a
+            // rule rather than invent a code, and GAME_ASSET_DELETED would be a claim about a
+            // deletion that never happened.
+            throw refuse(ErrorCode.GAME_ASSET_NOT_READY, "OBJECT_MISSING",
+                    "이미지를 불러올 수 없습니다. 다시 올려 주세요.");
         }
         return new AssetContent(asset.getContentType(), content);
     }
@@ -297,27 +319,28 @@ public class GameAssetService {
         return id.toString();
     }
 
-    private String randomToken() {
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    static String sha256Hex(String value) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 을 쓸 수 없다", exception);
-        }
+    /**
+     * Where the object lives (contract §8).
+     *
+     * <p>Contains the game id and the server-issued asset id and nothing the uploader chose — a
+     * filename in the key would carry a path, a traversal or another tenant's name into the bucket.
+     * One asset id is used once, so the key never has to be reused or versioned.
+     */
+    private static String objectKey(Long gameId, String assetId) {
+        return "games/" + gameId + "/assets/" + assetId;
     }
 
     private ApiException refuse(ErrorCode code, String rule, String message) {
         return new ApiException(code, message, List.of(ApiErrorDetail.of(rule, message)), null);
     }
 
-    /** {@code rawToken} never leaves the issuing response — it is not stored and not logged (§3.1). */
-    public record IssuedGrant(String assetId, Instant expiresAt, String rawToken) { }
+    /**
+     * @param requiredContentType the {@code Content-Type} the browser's {@code PUT} must send. It is
+     *     signed into {@code uploadUrl}, so any other value fails the signature — the FE has to be
+     *     told which one, or every upload 403s with nothing to read.
+     */
+    public record IssuedGrant(String assetId, Instant expiresAt, String uploadUrl,
+                              String requiredContentType) { }
 
     public record AssetContent(String contentType, byte[] content) { }
 
