@@ -9,6 +9,8 @@ jcasc="${repo_root}/infra/jenkins/casc/jenkins.yaml"
 nginx="${repo_root}/infra/jenkins/reverse-proxy/nginx.conf"
 fixtures="${repo_root}/infra/tests/contract/fixtures"
 validator="${repo_root}/infra/jenkins/scripts/validate-contracts.sh"
+plugins="${repo_root}/infra/jenkins/plugins.txt"
+jenkinsfile="${repo_root}/Jenkinsfile"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -22,6 +24,10 @@ for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra
   [[ -x "${entrypoint}" ]] || fail "Shell entrypoint is not executable: ${entrypoint#"${repo_root}/"}"
 done
 pass "Shell entrypoint executable policy"
+
+grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinned"
+grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
+pass "controller plugin and agent capability gate"
 
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then
@@ -82,6 +88,7 @@ pass "contract schema fixtures"
 export JENKINS_IMAGE="jenkins/jenkins:foundation-test"
 export JENKINS_INBOUND_AGENT_IMAGE="jenkins/inbound-agent:foundation-test-jdk21"
 export DOCKER_CLI_IMAGE="docker:foundation-test-cli"
+export NODE_RUNTIME_IMAGE="node:foundation-test"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
