@@ -46,6 +46,42 @@ export interface ReferenceRuntimeState {
 
 export const REFERENCE_TICK_MS = 120;
 
+// S15P21A604-363 — 탭이 백그라운드/비활성 상태가 되면 브라우저가 setInterval을 초당 1회
+// 수준까지 강제로 늦춘다(정책이라 우리가 없앨 수 없음). 그 상태로 방향키를 계속 누르고
+// 있으면 tick 자체가 실제로는 ~1초에 한 번만 도는데, 사망 무적시간(REFERENCE_TICK_MS 기준
+// 8틱 ≈ 0.96초로 설계)이 그 늦어진 tick 단위 그대로 계산되면서 실측 무적시간이 8배 가까이
+// 늘어나 함정을 반복해서 무해하게 통과하는 버그로 이어졌다(문서: docs/25_트러블슈팅.md 예정).
+// 고치는 방법은 tick을 고정 setInterval 카운트가 아니라 performance.now() 기준 경과-실시간
+// 누적기로 돌려서, 늦게 발화한 콜백 안에서 밀린 만큼 여러 논리 tick을 몰아 처리하는 것이다
+// (ReferenceGamePlayer.tsx의 tick 이펙트 참고). 다만 아주 오래 백그라운드에 있었다면(수 분)
+// 그만큼을 전부 몰아치면 스포너가 몬스터를 대량 생성하는 등 부작용이 생기므로, 한 콜백에서
+// 처리할 논리 tick 수를 이 값으로 캡하고 남는 경과시간은 버린다(현재 시각으로 재동기화).
+export const MAX_CATCHUP_TICKS = 8;
+
+export interface CatchUpPlan {
+  // 이번에 몰아 처리할 논리 tick 수(0이면 아직 한 tick도 안 지남).
+  readonly steps: number;
+  // lastTickAt(기준 시각)에 더해야 할 값. 정상 범위(steps <= maxSteps)면 처리하지 못한
+  // 나머지 단수(< tickMs)는 버리지 않고 다음 호출로 이월시켜 드리프트를 막는다. 캡을
+  // 넘겨 밀렸던 경우엔 elapsedMs 전체를 반환해 남은 밀린 시간을 버리고 현재 시각으로
+  // 완전히 재동기화한다.
+  readonly consumedMs: number;
+}
+
+// 마지막 처리 이후 실제로 흐른 시간(elapsedMs)을 tickMs 단위 논리 tick 수로 환산한다.
+// ReferenceGamePlayer의 tick 이펙트가 이 계산 자체를 갖고 있으면 실제 setInterval 발화
+// 간격(브라우저 스로틀링 등)에 테스트가 종속되므로, 순수 함수로 뽑아 독립적으로 검증한다.
+export const planCatchUpTicks = (
+  elapsedMs: number,
+  tickMs: number = REFERENCE_TICK_MS,
+  maxSteps: number = MAX_CATCHUP_TICKS,
+): CatchUpPlan => {
+  const impliedSteps = Math.floor(elapsedMs / tickMs);
+  if (impliedSteps <= 0) return { steps: 0, consumedMs: 0 };
+  if (impliedSteps > maxSteps) return { steps: maxSteps, consumedMs: elapsedMs };
+  return { steps: impliedSteps, consumedMs: impliedSteps * tickMs };
+};
+
 export const objectiveProgress = (
   state: Pick<ReferenceRuntimeState, 'score' | 'defeatedEnemies' | 'elapsedMs'>,
   objective: GameObjective,
