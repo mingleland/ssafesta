@@ -14,6 +14,8 @@ done
 
 for adapter in validate test build package verify; do
   [[ -f "${repo_root}/ci/${adapter}" ]] || { echo "missing ci/${adapter}" >&2; exit 1; }
+  [[ "$(git -C "${repo_root}" ls-files --stage "ci/${adapter}" | awk '{print $1}')" == 100755 ]] \
+    || { echo "ci/${adapter}: Git mode must be 100755" >&2; exit 1; }
   run_dir="${tmp}/${adapter}"; mkdir -p "${run_dir}"
   CI_DRY_RUN=1 CI_COMPONENT=back CI_BRANCH=back CI_COMMIT_SHA="${sha}" \
     CI_RUN_ID=test-1 CI_ARTIFACT_DIR="${run_dir}" DEPLOY_TARGET=dev-back \
