@@ -459,6 +459,35 @@ const moveTopDownByDelta = (
   return enterPosition(project, facingState, next);
 };
 
+// 플랫포머 수평 한 걸음 — 벽/충돌 판정 포함, 막혔으면 위치는 그대로 두고 facing만 갱신한다.
+// moveReferencePlayer(LEFT/RIGHT)와 movePlayerFromHeldKeys의 PLATFORMER 대각선 이동이 공유한다.
+const platformerStepHorizontal = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+  scene: Extract<GameProject['scenes'][number], { type: 'PLATFORMER' }>,
+  dx: -1 | 1,
+): ReferenceRuntimeState => {
+  if (state.playerPosition === null) return state;
+  const facingState = { ...state, facing: dx < 0 ? 'LEFT' as const : 'RIGHT' as const, lastInteractionTargetId: null };
+  const horizontal = { x: state.playerPosition.x + dx, y: state.playerPosition.y };
+  if (horizontal.x < 0 || horizontal.x >= scene.width || visibleOccupantsAt(state, scene.objects, horizontal).some(isSolid)) return facingState;
+  return enterPosition(project, facingState, horizontal);
+};
+
+// 점프 물리 자체 — 접지 판정은 호출부 책임이다(대각선 점프는 이 틱이 "시작한" 접지 상태를
+// 기준으로 판정하고, 실제로 뛰어오르는 위치는 이미 반영된 수평 이동 이후의 x를 쓴다 — 발판
+// 가장자리에서 대각선으로 뛰어나가는 입력도 점프로 인정하기 위함).
+const platformerJumpFrom = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+  scene: Extract<GameProject['scenes'][number], { type: 'PLATFORMER' }>,
+): ReferenceRuntimeState => {
+  if (state.playerPosition === null) return state;
+  const jumpTarget = { x: state.playerPosition.x, y: Math.max(0, state.playerPosition.y - 1) };
+  if (visibleOccupantsAt(state, scene.objects, jumpTarget).some(isSolid)) return state;
+  return enterPosition(project, { ...state, verticalVelocity: -3 }, jumpTarget);
+};
+
 export const moveReferencePlayer = (
   project: GameProject,
   state: ReferenceRuntimeState,
@@ -468,19 +497,9 @@ export const moveReferencePlayer = (
   const scene = findScene(project, state.session.currentSceneId);
   if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return state;
   if (scene.type === 'PLATFORMER') {
-    const facingState = direction === 'LEFT' || direction === 'RIGHT'
-      ? { ...state, facing: direction, lastInteractionTargetId: null }
-      : state;
-    if (direction === 'UP') {
-      if (!isPlatformerGrounded(state, scene)) return state;
-      const jumpTarget = { x: state.playerPosition.x, y: Math.max(0, state.playerPosition.y - 1) };
-      if (visibleOccupantsAt(state, scene.objects, jumpTarget).some(isSolid)) return state;
-      return enterPosition(project, { ...facingState, verticalVelocity: -3 }, jumpTarget);
-    }
-    if (direction === 'DOWN') return { ...facingState, verticalVelocity: Math.max(1, state.verticalVelocity) };
-    const horizontal = { x: state.playerPosition.x + (direction === 'LEFT' ? -1 : 1), y: state.playerPosition.y };
-    if (horizontal.x < 0 || horizontal.x >= scene.width || visibleOccupantsAt(state, scene.objects, horizontal).some(isSolid)) return facingState;
-    return enterPosition(project, facingState, horizontal);
+    if (direction === 'UP') return isPlatformerGrounded(state, scene) ? platformerJumpFrom(project, state, scene) : state;
+    if (direction === 'DOWN') return { ...state, verticalVelocity: Math.max(1, state.verticalVelocity) };
+    return platformerStepHorizontal(project, state, scene, direction === 'LEFT' ? -1 : 1);
   }
   return moveTopDownByDelta(project, state, scene, directionDelta[direction], direction);
 };
@@ -491,8 +510,10 @@ export const moveReferencePlayer = (
 // damagePlayer의 invulnerableUntilTick(틱 기준 무적)이 실제 경과 시간과 어긋나 함정을
 // "스킵"한 것처럼 보이게 했다(실제로는 죽고 즉시 리스폰된 뒤 무적 상태로 통과한 것).
 // 이동을 tickReferenceWorld와 같은 120ms 시계에 묶으면 두 증상이 함께 해결된다.
-// TOP_DOWN은 두 축을 합성해 진짜 대각선 이동을 지원하고, PLATFORMER는 점프(UP) > 좌우 > 아래
-// 우선순위로 기존 moveReferencePlayer를 그대로 재사용해 플랫포머 로직 자체는 바꾸지 않는다.
+// TOP_DOWN은 두 축을 합성해 진짜 대각선 이동을 지원한다. PLATFORMER는 "점프(UP) > 좌우"
+// 배타적 우선순위로 처리하던 이전 버전이 UP이 눌려 있으면 좌우 입력을 통째로 버려서 대각선
+// 점프가 구조적으로 불가능했다 — 실제 횡스크롤 게임처럼 수평 이동(좌우)과 수직 상태(점프/
+// 낙하)를 독립된 축으로 매 틱 함께 적용하도록 바꿨다(S15P21A604-363 QA에서 발견).
 export const movePlayerFromHeldKeys = (
   project: GameProject,
   state: ReferenceRuntimeState,
@@ -504,13 +525,19 @@ export const movePlayerFromHeldKeys = (
   if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return state;
 
   if (scene.type === 'PLATFORMER') {
-    if (directions.has('UP')) return moveReferencePlayer(project, state, 'UP');
     const left = directions.has('LEFT');
     const right = directions.has('RIGHT');
-    if (left && !right) return moveReferencePlayer(project, state, 'LEFT');
-    if (right && !left) return moveReferencePlayer(project, state, 'RIGHT');
-    if (directions.has('DOWN')) return moveReferencePlayer(project, state, 'DOWN');
-    return state;
+    const up = directions.has('UP');
+    const down = directions.has('DOWN');
+    // 접지 판정은 이번 틱이 "시작한" 위치 기준 — 발판 가장자리에서 대각선으로 뛰어나가는
+    // 입력도 점프로 인정한다(수평 이동 이후 위치로 판정하면 그 프레임에 걸어 나간 순간
+    // 공중 판정이 되어 막혀버린다).
+    const canJump = up && !down && isPlatformerGrounded(state, scene);
+    let next = state;
+    if (left !== right) next = platformerStepHorizontal(project, next, scene, left ? -1 : 1);
+    if (canJump) next = platformerJumpFrom(project, next, scene);
+    else if (down && !up) next = { ...next, verticalVelocity: Math.max(1, next.verticalVelocity) };
+    return next;
   }
 
   let dx = 0;

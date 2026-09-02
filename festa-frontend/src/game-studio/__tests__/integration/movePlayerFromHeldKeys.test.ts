@@ -71,18 +71,39 @@ describe('movePlayerFromHeldKeys — PLATFORMER', () => {
     return { project: parseGameProject({ ...project, startSceneId: platform.id }), platform };
   };
 
-  it('점프(UP)가 좌우보다 우선한다 — 동시에 눌려도 기존 점프 로직 그대로 발동', () => {
+  it('UP+RIGHT를 동시에 누르면 한 틱에 대각선으로 점프한다(S15P21A604-363 QA에서 발견된 버그의 수정)', () => {
     const { project, platform } = platformerProject();
     const spawn = platform.objects.find((object) => object.preset === 'PLAYER_SPAWN');
     if (spawn === undefined) throw new Error('expected spawn');
-    let runtime = startReferenceRuntime(project);
+    const runtime = startReferenceRuntime(project);
 
-    const jumpOnly = moveReferencePlayer(project, runtime, 'UP');
-    runtime = movePlayerFromHeldKeys(project, runtime, heldSet('UP', 'RIGHT'));
+    const moved = movePlayerFromHeldKeys(project, runtime, heldSet('UP', 'RIGHT'));
 
-    // UP 우선 처리이므로 x는 그대로, y만 moveReferencePlayer('UP')과 동일하게 한 칸 위로.
-    expect(runtime.playerPosition).toEqual(jumpOnly.playerPosition);
-    expect(runtime.playerPosition).toEqual({ x: spawn.position.x, y: spawn.position.y - 1 });
+    // 좌우(x+1)와 점프(y-1)가 같은 틱에 함께 반영돼야 한다 — 예전엔 UP이 좌우를 통째로
+    // 버려서 x가 그대로였다(수직 이동만 되는 "대각선 아닌 점프").
+    expect(moved.playerPosition).toEqual({ x: spawn.position.x + 1, y: spawn.position.y - 1 });
+    expect(moved.facing).toBe('RIGHT');
+    expect(moved.verticalVelocity).toBe(-3);
+  });
+
+  it('공중에서 UP을 누르고 있어도(재점프 불가) 좌우 이동은 계속 적용된다', () => {
+    const { project } = platformerProject();
+    const runtime = startReferenceRuntime(project);
+    const jumped = movePlayerFromHeldKeys(project, runtime, heldSet('UP', 'RIGHT'));
+    // 이미 공중이므로(방금 뛰어오름) 같은 턴에 UP을 또 눌러도 재점프는 안 되지만, RIGHT는 무시되면 안 된다.
+    const midAir = movePlayerFromHeldKeys(project, jumped, heldSet('UP', 'RIGHT'));
+    expect(midAir.playerPosition).toEqual({ x: jumped.playerPosition!.x + 1, y: jumped.playerPosition!.y });
+    // 재점프가 아니므로 상승 속도(verticalVelocity)가 다시 -3으로 리셋되지 않는다.
+    expect(midAir.verticalVelocity).toBe(jumped.verticalVelocity);
+  });
+
+  it('DOWN+LEFT를 동시에 누르면 급낙하와 좌우 이동이 함께 적용된다', () => {
+    const { project } = platformerProject();
+    const runtime = startReferenceRuntime(project);
+    const moved = movePlayerFromHeldKeys(project, runtime, heldSet('DOWN', 'LEFT'));
+    expect(moved.playerPosition).toEqual({ x: runtime.playerPosition!.x - 1, y: runtime.playerPosition!.y });
+    expect(moved.facing).toBe('LEFT');
+    expect(moved.verticalVelocity).toBeGreaterThanOrEqual(1);
   });
 
   it('좌우가 동시에 눌리면 상쇄되어 수평 이동하지 않는다', () => {
