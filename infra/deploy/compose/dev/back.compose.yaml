@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     ports: ["127.0.0.1:${BACK_HOST_PORT:-8081}:8080"]
     networks: [back]
+    env_file:
+      - ${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: dev
+      SPRING_PROFILES_ACTIVE: infra
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
     volumes: [back_data:/app/data]
     mem_limit: ${BACK_MEMORY_LIMIT:-1g}
     cpus: ${BACK_CPU_LIMIT:-1.0}
