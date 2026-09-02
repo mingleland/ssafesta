@@ -17,11 +17,13 @@ beforeEach(() => {
 });
 
 describe('loadSurveyResult', () => {
-  it('집계 4건 + 주관식 첫 페이지 5건 로드', async () => {
+  it('집계 3건(rating 은 평균+분포, FR-006) + 주관식 첫 페이지 5건 로드', async () => {
     await loadSurveyResult('s1');
     const s = getSurveyResultSnapshot();
     expect(s.status).toBe('ready');
-    expect(s.perQuestion.map((a) => a.kind)).toEqual(['choice', 'choice', 'rating', 'boolean']);
+    expect(s.perQuestion.map((a) => a.kind)).toEqual(['choice', 'choice', 'rating']);
+    const rating = s.perQuestion[2];
+    expect(rating.kind === 'rating' && rating.distribution).toHaveLength(5);
     expect(s.textAnswers.items).toHaveLength(5);
     expect(s.textAnswers.hasNext).toBe(true);
   });
@@ -56,5 +58,16 @@ describe('loadNextTextPage (-194)', () => {
   it('ready 전에는 no-op', async () => {
     await loadNextTextPage();
     expect(getSurveyResultSnapshot().textAnswers.items).toHaveLength(0);
+  });
+
+  it('페이지 요청 중 설문을 전환하면 이전 설문 페이지가 새 상태를 오염시키지 않는다 (-377)', async () => {
+    await loadSurveyResult('s1');
+    const stale = loadNextTextPage(); // s1 의 page 1 요청 in-flight
+    await loadSurveyResult('empty'); // 다른 설문으로 전환
+    await stale;
+    const s = getSurveyResultSnapshot();
+    expect(s.surveyId).toBe('empty');
+    expect(s.status).toBe('empty');
+    expect(s.textAnswers.items).toHaveLength(0);
   });
 });

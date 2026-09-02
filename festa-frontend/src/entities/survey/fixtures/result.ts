@@ -20,8 +20,20 @@ export const RESULT_AGGREGATES: SurveyQuestionAggregateVM[] = [
       { optionId: 'o3', label: '보상', count: 8 },
     ],
   },
-  { questionId: 'q-rating', kind: 'rating', average: 4.2, count: 25 },
-  { questionId: 'q-boolean', kind: 'boolean', yes: 21, no: 4 },
+  {
+    questionId: 'q-rating',
+    kind: 'rating',
+    average: 4.2,
+    count: 25,
+    // FR-006 — 평균과 분포를 함께 제공
+    distribution: [
+      { value: 1, count: 1 },
+      { value: 2, count: 1 },
+      { value: 3, count: 3 },
+      { value: 4, count: 7 },
+      { value: 5, count: 13 },
+    ],
+  },
 ];
 
 /** 주관식 응답 12건 — 페이지 크기 5 로 3페이지 (-194 페이지네이션 경계 재현) */

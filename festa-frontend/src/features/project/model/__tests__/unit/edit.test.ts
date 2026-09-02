@@ -41,6 +41,19 @@ describe('project edit', () => {
     expect(s.draft.description).toBe('수정된 설명');
   });
 
+  it('저장 중 편집은 무시된다 — 이중 제출 가드 해제·입력 유실 방지 (-377)', async () => {
+    await loadProjectEdit(1);
+    updateField('description', '첫 수정');
+    const saving = saveProject();
+    updateField('description', '저장 중 입력'); // submitting 중 — 무시돼야 한다
+    expect(getProjectEditSnapshot().save.phase).toBe('submitting');
+    await saving;
+    const s = getProjectEditSnapshot();
+    expect(s.save.phase).toBe('success');
+    expect(s.draft.description).toBe('첫 수정');
+    expect(__lastUpdatePatchForTests()).toEqual({ description: '첫 수정' });
+  });
+
   it('저장 실패 시 error — draft·dirty 유지로 재시도 가능', async () => {
     await loadProjectEdit(1);
     updateField('name', 'FAIL');

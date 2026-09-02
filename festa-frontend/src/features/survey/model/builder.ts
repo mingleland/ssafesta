@@ -40,6 +40,8 @@ function setState(patch: Partial<SurveyBuilderState>): void {
 
 function editDraft(mutate: (draft: SurveyDraftVM) => SurveyDraftVM): void {
   if (state.status !== 'ready') return;
+  // 저장 중 편집은 save.phase 리셋으로 이중 저장 가드를 해제한다 (-377 공통 패턴) — 차단
+  if (state.save.phase === 'submitting') return;
   setState({ draft: mutate(state.draft), dirty: true, save: { phase: 'idle' } });
 }
 
@@ -60,6 +62,12 @@ export async function loadSurveyBuilder(): Promise<void> {
   setState({ ...initialState, status: 'loading' });
   try {
     const draft = await surveyApi.getDraft();
+    // 리로드 후 seq 가 0 부터 다시 시작하면 저장된 문항의 q-N 과 충돌한다 (-377) —
+    // 복원된 id 의 최댓값 뒤에서 이어 발급한다
+    questionSeq = Math.max(
+      questionSeq,
+      ...(draft?.questions ?? []).map((q) => Number(/^q-(\d+)$/.exec(q.id)?.[1] ?? 0)),
+    );
     setState({ status: 'ready', draft: draft ?? EMPTY_DRAFT, dirty: false });
   } catch {
     setState({ status: 'error' });
