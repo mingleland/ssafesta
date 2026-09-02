@@ -4,6 +4,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 sha=0123456789abcdef0123456789abcdef01234567
 tmp="$(mktemp -d)"; trap 'rm -rf "${tmp}"' EXIT
 
+source "${repo_root}/ci/lib.sh"
+declare -A expected_dirs=([ai]=festa-ai [back]=backend [front]=festa-frontend [game]=festa-unity)
+for component in "${!expected_dirs[@]}"; do
+  CI_COMPONENT="${component}"
+  [[ "$(ci_component_dir)" == "${repo_root}/${expected_dirs[${component}]}" ]] \
+    || { echo "${component}: wrong component directory" >&2; exit 1; }
+done
+
 for adapter in validate test build package verify; do
   [[ -f "${repo_root}/ci/${adapter}" ]] || { echo "missing ci/${adapter}" >&2; exit 1; }
   run_dir="${tmp}/${adapter}"; mkdir -p "${run_dir}"
