@@ -183,6 +183,7 @@ public class OpenApiConfiguration {
                 tag("AI Agent", "부스당 1명인 AI 직원의 인격 설정(이름·역할·말투·지시문)"),
                 tag("AI Document", "AI 직원이 답변 근거로 쓰는 문서의 업로드. presigned URL 로 저장소에 직접 올린다"),
                 tag("Game Studio", "브라우저 2D 게임의 제작·게시. 작업본과 게시본이 분리되어 있다"),
+                tag("Game Asset", "게임에 쓰는 이미지의 업로드·전달. 바이트는 저장소로 직접 올라가고 내려받기만 서버가 중계한다"),
                 tag("Inventory", "아바타 파츠 상점과 구매"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
     }
