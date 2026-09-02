@@ -36,6 +36,7 @@ public class FakeObjectStorage implements ObjectStorage {
     private volatile String bucket = "test-ai-documents";
     private volatile Consumer<String> onHead = key -> { };
     private volatile RuntimeException headFailure;
+    private volatile RuntimeException deleteFailure;
 
     @Override
     public WriteTarget activeWriteTarget() {
@@ -82,6 +83,9 @@ public class FakeObjectStorage implements ObjectStorage {
 
     @Override
     public void deleteObject(String provider, String bucket, String objectKey) {
+        if (deleteFailure != null) {
+            throw deleteFailure;
+        }
         objects.remove(slot(bucket, objectKey));
         contents.remove(slot(bucket, objectKey));
     }
@@ -119,6 +123,17 @@ public class FakeObjectStorage implements ObjectStorage {
         this.headFailure = failure;
     }
 
+    /**
+     * Makes every delete throw, for the sweeper's retry path.
+     *
+     * <p>An unreachable provider is the case that matters: the queue row must survive it and be
+     * pushed forward, because the alternative — dropping the row — leaves an object nobody will
+     * ever delete and nobody can find.
+     */
+    public void failDeleteWith(RuntimeException failure) {
+        this.deleteFailure = failure;
+    }
+
     public void reset() {
         objects.clear();
         contents.clear();
@@ -126,6 +141,7 @@ public class FakeObjectStorage implements ObjectStorage {
         bucket = "test-ai-documents";
         onHead = key -> { };
         headFailure = null;
+        deleteFailure = null;
     }
 
     private static String slot(String bucket, String objectKey) {

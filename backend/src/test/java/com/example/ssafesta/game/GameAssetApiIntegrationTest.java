@@ -27,9 +27,11 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import javax.imageio.ImageIO;
 import com.example.ssafesta.storage.FakeObjectStorage;
 import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
+import com.example.ssafesta.storage.StorageUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -473,6 +475,48 @@ class GameAssetApiIntegrationTest {
         deleteQueue.sweep();
 
         assertEquals(0, queuedObjects());
+    }
+
+    /**
+     * A provider that cannot answer keeps the row, records why, and waits.
+     *
+     * <p>Three things, and dropping any one of them breaks the queue in a different way. Losing the
+     * row leaves an object nobody will ever delete and nobody can find — the coordinates live only
+     * here once the asset row is gone. Not backing off turns a bucket outage into a delete call
+     * every minute per row. Not recording the reason is the T-24 shape: a queue that never drains
+     * and no column saying what is wrong.
+     *
+     * <p>The second sweep asserts the lease actually respects {@code next_attempt_at} — without it
+     * the first sweep's back-off would be decoration.
+     */
+    @Test
+    void aDeleteThatFailsKeepsTheRowRecordsWhyAndBacksOff() {
+        deleteQueue.enqueue("R2", "test-ai-documents", "games/1/assets/aStubbornObject");
+        storage.failDeleteWith(new StorageUnavailableException("저장소에 연결할 수 없습니다."));
+
+        deleteQueue.sweep();
+
+        Map<String, Object> row = jdbc.queryForMap("""
+                SELECT attempts, last_error, next_attempt_at > now() AS deferred
+                  FROM game_asset_delete_queue
+                """);
+        assertEquals(1, ((Number) row.get("attempts")).intValue());
+        // The exception's class, never its message — the adapter's messages carry the endpoint and
+        // the response detail, and this column is readable by anyone with the table.
+        assertEquals("StorageUnavailableException", row.get("last_error"));
+        assertEquals(Boolean.TRUE, row.get("deferred"), "실패한 행은 다음 시도를 미뤄야 한다");
+
+        deleteQueue.sweep();
+
+        assertEquals(1, ((Number) jdbc.queryForObject(
+                        "SELECT attempts FROM game_asset_delete_queue", Integer.class)).intValue(),
+                "아직 due 가 아닌 행을 다시 집으면 백오프가 장식이다");
+
+        storage.failDeleteWith(null);
+        jdbc.update("UPDATE game_asset_delete_queue SET next_attempt_at = now() - interval '1 minute'");
+        deleteQueue.sweep();
+
+        assertEquals(0, queuedObjects(), "저장소가 돌아오면 다음 sweep 이 비운다");
     }
 
     @Test

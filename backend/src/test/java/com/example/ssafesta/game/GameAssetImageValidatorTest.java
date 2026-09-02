@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.util.Iterator;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -46,6 +47,31 @@ class GameAssetImageValidatorTest {
 
         assertTrue(readers.hasNext(),
                 "imageio-webp 가 ServiceLoader 에 등록되지 않았다 — 정상 WebP 가 전부 손상으로 거부된다");
+    }
+
+    /**
+     * A real WebP all the way through — sniffed, measured and decoded.
+     *
+     * <p>{@link #aWebpReaderIsRegistered} says the plugin is on the classpath; this says the format
+     * survives our own path. The two fail differently: a missing plugin throws
+     * {@code IllegalStateException} out of {@code readerFor}, while a WebP that the sniffer or the
+     * animation check mishandles comes back as an ordinary refusal.
+     *
+     * <p>Written as bytes because <b>there is no WebP writer</b> — the library reads only, so the
+     * usual {@code ImageIO.write} trick the other helpers use is unavailable here. This is the
+     * canonical 34-byte lossless (VP8L) 1×1, which exercises the RIFF/WEBP sniff, the {@code VP8X}
+     * animation check on a file that has no {@code VP8X} chunk, and a real decode.
+     */
+    @Test
+    void aStillWebpIsSniffedMeasuredAndDecoded() {
+        byte[] webp = HexFormat.of().parseHex(
+                "524946461A000000574542505650384C0D0000002F00000010071011118888FE0700");
+
+        GameAssetImageValidator.VerifiedImage verified = validator.verify(webp, webp.length);
+
+        assertEquals("image/webp", verified.contentType());
+        assertEquals(1, verified.width());
+        assertEquals(1, verified.height());
     }
 
     @Test
