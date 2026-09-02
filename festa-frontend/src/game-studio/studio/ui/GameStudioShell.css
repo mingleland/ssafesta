@@ -210,27 +210,36 @@
 .gss-scene-add-row button { font-size: 10px; padding: 6px 3px; }
 
 .gss-scene-list { display: grid; gap: 4px; }
-.gss-scene-list > button {
+/* S15P21A604-389 — 행은 드래그 핸들(.gss-drag-handle) + Scene 선택 버튼 두 개로 구성된다.
+   드롭 타깃(onDragOver/onDrop)은 행 전체가 맡고, 실제로 draggable인 건 핸들 버튼뿐이다 —
+   EventEditor.tsx의 액션 드래그(.gss-rule-row--action) 구조와 동일한 원칙이다. */
+.gss-scene-row { align-items: center; display: flex; gap: 4px; }
+.gss-scene-row.is-drag-over { outline: 1px solid var(--gss-blue); outline-offset: -1px; border-radius: 8px; }
+.gss-scene-row.is-dragging { opacity: .4; }
+.gss-scene-row .gss-drag-handle { flex: 0 0 auto; }
+.gss-scene-row > button:last-child {
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
   cursor: pointer;
   display: grid;
+  flex: 1 1 auto;
   gap: 8px;
   grid-template-columns: 20px minmax(0, 1fr) auto;
+  min-width: 0;
   padding: 8px;
   text-align: left;
 }
-.gss-scene-list > button:hover { background: var(--gss-panel-2); }
-.gss-scene-list > button.is-active { background: var(--gss-blue-soft); border-color: rgba(37, 99, 235, .4); }
-.gss-scene-list > button > span { color: #5b6577; font-size: 15px; text-align: center; }
+.gss-scene-row > button:last-child:hover { background: var(--gss-panel-2); }
+.gss-scene-row > button:last-child.is-active { background: var(--gss-blue-soft); border-color: rgba(37, 99, 235, .4); }
+.gss-scene-row > button:last-child > span { color: #5b6577; font-size: 15px; text-align: center; }
 .gss-scene-list strong,
 .gss-scene-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gss-scene-list strong { font-size: 12px; }
 .gss-scene-list small { color: var(--gss-muted); font-size: 9px; margin-top: 3px; }
 .gss-scene-list em { background: rgba(22, 163, 74, .12); border-radius: 4px; color: var(--gss-green); font-size: 7px; font-style: normal; padding: 3px 4px; }
-.gss-scene-actions { display: grid; gap: 4px; grid-template-columns: minmax(0,1fr) 28px 28px 40px; margin-top: 8px; }
+.gss-scene-actions { display: grid; gap: 4px; grid-template-columns: minmax(0,1fr) 40px; margin-top: 8px; }
 .gss-scene-actions button { background: #f4f6f9; border: 1px solid #d7dce3; border-radius: 5px; color: #4b5563; font-size: 8px; min-height: 27px; padding: 4px; }
 .gss-scene-actions button:disabled { cursor: not-allowed; opacity: .35; }
 .gss-scene-actions .gss-text-danger { border-color: rgba(220,38,38,.28); margin: 0; }
