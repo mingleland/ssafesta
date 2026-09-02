@@ -4,7 +4,7 @@
 #   1. .env 읽기 — 로컬에서만 쓰는 경로다
 #   2. application.yml 이 기본값을 두지 않은 키의 로컬 기본값
 #
-# 2번의 세 키는 배포에서 로컬 값으로 조용히 뜨면 안 되는 것들이라 공통 위치에는 기본값이
+# 2번의 키들은 배포에서 로컬 값으로 조용히 뜨면 안 되는 것들이라 공통 위치에는 기본값이
 # 없다. 그래서 로컬 기본값을 이 파일이 같은 키를 덮어 제공한다 — 프로파일 파일이
 # application.yml 보다 우선하므로 여기 값이 이긴다.
 spring:
@@ -18,3 +18,16 @@ app:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
     # HTTP localhost test only. Set AUTH_COOKIE_SECURE=true in HTTPS deployment.
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+
+  # 문서 저장소 (spec 007 C-07·C-10). 로컬은 게이트를 열어 두고 R2 자리를 더미로 채운다 —
+  # 실제 저장은 통합 테스트에서 FakeDocumentStorage 가 대신하고, 로컬 실행은 .env 가 덮는다.
+  ai:
+    storage:
+      upload-gate: ${AI_STORAGE_UPLOAD_GATE:OPEN}
+      active-write-provider: ${AI_STORAGE_ACTIVE_WRITE_PROVIDER:R2}
+      providers:
+        R2:
+          endpoint: ${R2_ENDPOINT:http://localhost:9000}
+          bucket: ${R2_BUCKET:festa-local}
+          access-key-id: ${R2_ACCESS_KEY_ID:local-access-key}
+          secret-access-key: ${R2_SECRET_ACCESS_KEY:local-secret-key}
