@@ -10,7 +10,7 @@ from typing import Any
 
 from .chunking import TikTokenCodec, chunk_pages
 from .embedding import GmsEmbeddingClient
-from .generation import generate_answer, load_gold_cases
+from .generation import DEFAULT_PRESET, AgentPreset, generate_answer, load_gold_cases
 from .gms_chat import GmsChatClient
 from .models import ModelSpec
 from .pdf_loader import load_document_pages
@@ -31,6 +31,7 @@ def run_generation_benchmark(
     store: VectorStore,
     booth_id: int = 1,
     agent_id: int = 1,
+    preset: AgentPreset = DEFAULT_PRESET,
 ) -> dict[str, Any]:
     if overlap_ratio < 0 or overlap_ratio >= 1:
         raise ValueError("overlap ratio는 0 이상 1 미만이어야 합니다.")
@@ -86,6 +87,7 @@ def run_generation_benchmark(
                 case_id=case.case_id,
                 query=case.query,
                 hits=hits_by_case[case.case_id],
+                preset=preset,
             )
             request_count += 1
             if not result.success:
@@ -115,6 +117,11 @@ def run_generation_benchmark(
         "chunk_size": chunk_size,
         "overlap_ratio": overlap_ratio,
         "top_n": top_n,
+        "agent_preset": {
+            "role": preset.role,
+            "tone": preset.tone,
+            "response_length": preset.response_length,
+        },
         "models": model_summaries,
         "questions": list(questions.values()),
         "limitations": [

@@ -127,6 +127,8 @@ rag-generate-review --input results/generation.json --output results/generation-
 - 후보 풀·지연시간 스크리닝 결과(속도 미달로 제외한 모델)는 `config/generation-grid.json`
   참조. 채점·fallback 정책·컨텍스트 길이/스트리밍 비교표는 아직 미완료 — 같은 파일의
   `known_limitations`에 정리.
+- `--response-length SHORT|MEDIUM|LONG`(기본 `MEDIUM`)으로 `max_tokens` 캡을 바꿔 재실측할
+  수 있다. 출력 리포트의 `agent_preset` 필드에 실제 사용한 프리셋이 기록된다.
 
 ## 단위 테스트
 

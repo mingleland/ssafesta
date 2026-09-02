@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from .embedding import DEFAULT_GEMINI_URL, DEFAULT_OPENAI_URL, GmsEmbeddingClient
+from .generation import DEFAULT_PRESET, AgentPreset
 from .generation_benchmark import run_generation_benchmark
 from .gms_chat import GmsChatClient
 from .models import GENERATION_LLM_SPECS, MODEL_SPECS
@@ -30,6 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--store", choices=("pgvector", "memory"), default="pgvector")
     parser.add_argument("--booth-id", type=int, default=1)
     parser.add_argument("--agent-id", type=int, default=1)
+    parser.add_argument(
+        "--response-length",
+        choices=("SHORT", "MEDIUM", "LONG"),
+        default=DEFAULT_PRESET.response_length,
+    )
     parser.add_argument("--env-file", type=Path)
     return parser
 
@@ -75,6 +81,11 @@ def main() -> None:
             store=store,
             booth_id=args.booth_id,
             agent_id=args.agent_id,
+            preset=AgentPreset(
+                role=DEFAULT_PRESET.role,
+                tone=DEFAULT_PRESET.tone,
+                response_length=args.response_length,
+            ),
         )
     finally:
         store.close()
