@@ -70,6 +70,14 @@ app:
     # 기본값 없음 — false 로 조용히 뜨면 HTTPS 배포에서 Refresh 쿠키가 Secure 없이 나간다.
     cookie-secure: ${AUTH_COOKIE_SECURE}
 
+  # dev·demo 가 단일 EC2 의 Redis 한 인스턴스를 공유한다(infra-002 plan.md:59). 모든 키가
+  # 이 값을 맨 앞에 달아 환경끼리 덮어쓰지 않는다 — 맨 앞이라 SCAN {namespace}:* 하나로
+  # 환경 전체를 훑는다.
+  # 기본값 없음 — 빈 값으로 조용히 뜨면 두 환경이 세션과 일일 지급을 공유하고, 그 사실이
+  # 드러나는 곳이 없다. Infra 주입값은 dev|demo 다 (GitLab #117).
+  redis:
+    namespace: ${FESTA_ENVIRONMENT}
+
   wallet:
     initial-grant: 200
     daily-grant: 50

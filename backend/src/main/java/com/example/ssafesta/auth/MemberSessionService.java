@@ -1,5 +1,6 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,11 +18,14 @@ public class MemberSessionService {
     private final StringRedisTemplate redis;
     private final AccessTokenService accessTokens;
     private final AuthProperties properties;
+    private final String keyspace;
 
-    public MemberSessionService(StringRedisTemplate redis, AccessTokenService accessTokens, AuthProperties properties) {
+    public MemberSessionService(StringRedisTemplate redis, AccessTokenService accessTokens, AuthProperties properties,
+            RedisKeyspaceProperties keyspace) {
         this.redis = redis;
         this.accessTokens = accessTokens;
         this.properties = properties;
+        this.keyspace = keyspace.prefix();
     }
 
     public MemberSession issue(Long userId) {
@@ -74,10 +78,10 @@ public class MemberSessionService {
         return sessionId != null && sessionId.equals(redis.opsForValue().get(sessionKey(userId)));
     }
 
-    private String activeKey(Long userId) { return "auth:active:" + userId; }
-    private String refreshKey(String hash) { return "auth:refresh:" + hash; }
-    private String reusedKey(String hash) { return "auth:refresh:used:" + hash; }
-    private String sessionKey(Long userId) { return "auth:session:" + userId; }
+    private String activeKey(Long userId) { return keyspace + "auth:active:" + userId; }
+    private String refreshKey(String hash) { return keyspace + "auth:refresh:" + hash; }
+    private String reusedKey(String hash) { return keyspace + "auth:refresh:used:" + hash; }
+    private String sessionKey(Long userId) { return keyspace + "auth:session:" + userId; }
 
     private void markReused(String hash) {
         String session = redis.opsForValue().get(refreshKey(hash));

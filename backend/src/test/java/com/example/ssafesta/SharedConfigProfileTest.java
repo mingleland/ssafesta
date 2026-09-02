@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
 
 import com.example.ssafesta.ai.AiStorageProperties;
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 
 /**
  * The {@code infra} profile has to resolve every setting the application needs to boot.
@@ -47,6 +48,8 @@ class SharedConfigProfileTest {
         "ROOT_DOMAIN=example.test",
         "FRONTEND_BASE_URL=https://example.test",
         "AUTH_COOKIE_SECURE=true",
+        // Redis 키 네임스페이스 (S15P21A604-349). 기본값이 없어 배포가 반드시 주입한다.
+        "FESTA_ENVIRONMENT=dev",
         // 문서 저장소 (S15P21A604-106, GitLab #100). MinIO 4종은 일부러 빼 둔다 — R2 만 쓰는
         // 배포가 fallback 자격증명 없이 뜨는 것이 계약이고, 아래 R2-only 테스트가 그것을 고정한다.
         "AI_STORAGE_UPLOAD_GATE=OPEN",
@@ -187,6 +190,42 @@ class SharedConfigProfileTest {
         storageRunner(withoutEnv(variable)).run(context -> {
             assertThat(context).hasFailed();
             assertThat(rootCauseOf(context.getStartupFailure())).contains(variable);
+        });
+    }
+
+    // ── Redis 키 네임스페이스 (S15P21A604-349) ────────────────────────────────────────
+
+    @EnableConfigurationProperties(RedisKeyspaceProperties.class)
+    static class KeyspaceBinding {
+    }
+
+    private ApplicationContextRunner keyspaceRunner(String... propertyValues) {
+        return runner(propertyValues).withUserConfiguration(KeyspaceBinding.class);
+    }
+
+    @Test
+    @DisplayName("infra 프로파일이 FESTA_ENVIRONMENT 를 Redis 네임스페이스로 묶는다")
+    void infraProfileBindsTheRedisKeyspaceFromTheEnvironment() {
+        keyspaceRunner(DEPLOY_ENV).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(RedisKeyspaceProperties.class).prefix()).isEqualTo("dev:");
+        });
+    }
+
+    /**
+     * 환경 id 를 빠뜨리면 <b>기동이 실패한다</b>.
+     *
+     * <p>이 자리가 조용히 뚫려 있었다. 해석되지 않은 {@code ${FESTA_ENVIRONMENT}} 는 비어 있지
+     * 않고 앞뒤 공백도 없고 {@code ':'} 도 없어서 {@code RedisKeyspaceProperties} 의 검사를 전부
+     * 통과했다. 그러면 dev·demo 가 그 문자열 하나를 네임스페이스로 공유하고, 티켓이 막으려던
+     * 세션·일일 지급 충돌이 격리된 척하면서 그대로 돌아온다 — T-101 과 같은 모양이다.
+     */
+    @Test
+    @DisplayName("배포에서 FESTA_ENVIRONMENT 를 빠뜨리면 기동이 실패한다")
+    void missingEnvironmentNamespaceFailsToStart() {
+        keyspaceRunner(withoutEnv("FESTA_ENVIRONMENT")).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootCauseOf(context.getStartupFailure())).contains("FESTA_ENVIRONMENT");
         });
     }
 
