@@ -1,0 +1,42 @@
+meta {
+  name: 업로드 완료
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/documents/{{documentId}}/complete
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 문서 업로드 2단계 — 완료 통보
+
+  저장소에 올린 파일이 실제로 있는지 서버가 확인하고 문서를 처리 대기로 넘긴다.
+
+  - 인증: **필수** (그 부스 편집 권한)
+  - **요청 본문이 없다** — 필요한 정보는 1단계에서 이미 서버에 있고, 저장된 객체를 그 정보와 대조한다
+  - 실행 전: `documentId` 환경변수. `업로드 URL 발급`이 자동으로 넣어 준다
+
+  ### `QUEUED`는 "업로드 끝"이고 "RAG 준비 끝"이 아니다
+
+  성공 응답의 `processingStatus`가 `QUEUED`면 바이트가 저장소에 있다는 뜻이다. 그 문서로 답변할 수 있게 되는 것은 처리 파이프라인이 끝난 뒤이며, 그 상태는 별도로 확인한다.
+
+  ### 여러 번 불러도 안전하다
+
+  이미 완료된 문서는 같은 응답을 그대로 돌려준다 (멱등). 타임아웃 뒤 재시도가 실패로 보이지 않는다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 완료 처리됨 (`processingStatus: QUEUED`) |
+  | `403` | 게스트 또는 그 부스 편집 권한 없음 |
+  | `404 DOCUMENT_NOT_FOUND` | 그런 문서가 없다. **권한 검사보다 먼저** 판정된다 |
+  | `409 DOCUMENT_UPLOAD_INCOMPLETE` | 객체가 없거나 선언한 크기와 다르다 — 1단계부터 다시 |
+  | `410 DOCUMENT_UPLOAD_GONE` | 업로드 유효 시간이 지났다 — 1단계부터 다시 |
+  | `503 STORAGE_UNAVAILABLE` | 저장소 확인 실패 |
+}
