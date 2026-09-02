@@ -1,5 +1,9 @@
 package com.example.ssafesta.ai;
 
+import com.example.ssafesta.storage.ObjectStorage;
+import com.example.ssafesta.storage.ObjectStorageProperties;
+import com.example.ssafesta.storage.StorageQuotaExceededException;
+import com.example.ssafesta.storage.StorageUnavailableException;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.example.ssafesta.booth.BoothEditorGuard;
 import com.example.ssafesta.booth.BoothExpiredException;
@@ -65,14 +69,14 @@ public class AiDocumentService {
     private final BoothEditorGuard editorGuard;
     private final BoothLeaseRepository leases;
     private final AiAgentProperties agentProperties;
-    private final AiStorageProperties storageProperties;
-    private final AiDocumentStorage storage;
+    private final ObjectStorageProperties storageProperties;
+    private final ObjectStorage storage;
     private final TransactionTemplate transactions;
 
     public AiDocumentService(AiDocumentRepository documents, AiAgentRepository agents,
                              BoothEditorGuard editorGuard, BoothLeaseRepository leases,
                              AiAgentProperties agentProperties,
-                             AiStorageProperties storageProperties, AiDocumentStorage storage,
+                             ObjectStorageProperties storageProperties, ObjectStorage storage,
                              TransactionTemplate transactions) {
         this.documents = documents;
         this.agents = agents;
@@ -129,7 +133,7 @@ public class AiDocumentService {
     }
 
     private UploadGrantView grant(AiAgent agent, Long userId, UploadRequest request,
-                                  AiDocumentStorage.WriteTarget target) {
+                                  ObjectStorage.WriteTarget target) {
         Prepared prepared = transactions.execute(status -> {
             // Serialises quota checks for this agent. Without it two different files each read
             // "nine documents" and both insert; the unique index only catches the same file twice.
@@ -178,7 +182,7 @@ public class AiDocumentService {
      * <p>Bucket counts, not just the provider name: one provider can be repointed at a new bucket,
      * and reissuing on the old row would keep signing URLs for a bucket nothing reads any more.
      */
-    private boolean isResumable(AiDocument existing, AiDocumentStorage.WriteTarget target) {
+    private boolean isResumable(AiDocument existing, ObjectStorage.WriteTarget target) {
         return existing.isAwaitingUpload()
                 && existing.getStorageProvider().equals(target.provider())
                 && existing.getStorageBucket().equals(target.bucket());
@@ -197,7 +201,8 @@ public class AiDocumentService {
         }
         // Outside the transaction: signing is offline, and a lock held across it buys nothing.
         String url = storage.presignPut(document.getStorageProvider(), document.getStorageBucket(),
-                document.getObjectKey(), document.getContentType(), document.getSizeBytes());
+                document.getObjectKey(), document.getContentType(), document.getSizeBytes(),
+                storageProperties.presignTtl());
         return UploadGrantView.issued(document.getId(), url, document.getObjectKey());
     }
 

@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -28,7 +28,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param presignTtl          how long an upload URL lives (FR-026, 기본 15분)
  */
 @ConfigurationProperties("app.ai.storage")
-public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvider,
+public record ObjectStorageProperties(UploadGate uploadGate, String activeWriteProvider,
                                   Duration presignTtl, Map<String, Provider> providers) {
 
     /**
@@ -63,7 +63,7 @@ public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvi
         UNAVAILABLE
     }
 
-    public AiStorageProperties {
+    public ObjectStorageProperties {
         // No default, and that is the point. Spring ignores a property it does not recognise, so a
         // renamed or misspelled key would leave this null, fall back to "admit", and reopen uploads
         // during a block someone believed was in force. A safety control must not be able to fail

@@ -24,12 +24,14 @@ public class GameDraftService {
     private final GameDraftRepository drafts;
     private final GameAccessGuard guard;
     private final GameProjectValidator validator;
+    private final GameAssetService assets;
 
     public GameDraftService(GameDraftRepository drafts, GameAccessGuard guard,
-                            GameProjectValidator validator) {
+                            GameProjectValidator validator, GameAssetService assets) {
         this.drafts = drafts;
         this.guard = guard;
         this.validator = validator;
+        this.assets = assets;
     }
 
     /**
@@ -58,7 +60,10 @@ public class GameDraftService {
         guard.requireOwnedLive(gameId, userId);
 
         JsonNode parsed = GameProjectJson.parse(body);
-        validator.validateForDraft(parsed, body, gameId);
+        // The validator stays a function of its input, so the asset states it needs are read here
+        // and handed over. Read inside this transaction, so the states it judges are the states the
+        // save is committed against.
+        validator.validateForDraft(parsed, body, gameId, assets.stateSnapshot(gameId));
 
         // Deterministic, so it can be stamped before the write: expectedRevision has to equal the
         // stored value for the update to be accepted at all, and the first save is 0 → 1.

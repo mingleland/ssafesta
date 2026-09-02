@@ -1,5 +1,6 @@
 package com.example.ssafesta.ai;
 
+import com.example.ssafesta.storage.ObjectStorage;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -97,7 +98,7 @@ public class AiDocument {
 
     AiDocument(Long boothId, Long agentId, Long uploadedByUserId, String originalFilename,
                String contentType, long sizeBytes, String contentSha256,
-               AiDocumentStorage.WriteTarget target, Instant now) {
+               ObjectStorage.WriteTarget target, Instant now) {
         this.boothId = boothId;
         this.agentId = agentId;
         this.uploadedByUserId = uploadedByUserId;

@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
@@ -10,9 +10,9 @@ import com.example.ssafesta.common.ErrorCode;
  * behaviour: this one is worth retrying, a full bucket is not. Collapsing both into 503 would have
  * clients retry a request that can never succeed.
  */
-class StorageUnavailableException extends ApiException {
+public class StorageUnavailableException extends ApiException {
 
-    StorageUnavailableException(String message) {
+    public StorageUnavailableException(String message) {
         super(ErrorCode.STORAGE_UNAVAILABLE, message);
     }
 }

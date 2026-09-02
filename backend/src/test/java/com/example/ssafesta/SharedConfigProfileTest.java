@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
 
+import com.example.ssafesta.storage.ObjectStorageProperties;
 import com.example.ssafesta.ai.AiStorageProperties;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
 
@@ -124,7 +125,7 @@ class SharedConfigProfileTest {
     // 않은 placeholder 는 값을 읽을 때만 시끄럽고 컨텍스트는 멀쩡히 뜬다. 바인딩을 실제로 태워야
     // 한다. T-101 이 정확히 이 층에서 났다.
 
-    @EnableConfigurationProperties(AiStorageProperties.class)
+    @EnableConfigurationProperties(ObjectStorageProperties.class)
     static class StorageBinding {
     }
 
@@ -151,8 +152,8 @@ class SharedConfigProfileTest {
         storageRunner(DEPLOY_ENV).run(context -> {
             assertThat(context).hasNotFailed();
 
-            AiStorageProperties storage = context.getBean(AiStorageProperties.class);
-            assertThat(storage.uploadGate()).isEqualTo(AiStorageProperties.UploadGate.OPEN);
+            ObjectStorageProperties storage = context.getBean(ObjectStorageProperties.class);
+            assertThat(storage.uploadGate()).isEqualTo(ObjectStorageProperties.UploadGate.OPEN);
             assertThat(storage.activeWriteProvider()).isEqualTo("R2");
             assertThat(storage.providers()).containsOnlyKeys("R2");
             assertThat(storage.providers().get("R2").bucket()).isEqualTo("festa-documents");
@@ -181,7 +182,7 @@ class SharedConfigProfileTest {
      * <p>이 테스트가 처음 잡은 것이 그 반대였다. 해석되지 않은 {@code ${R2_ENDPOINT}} 는 <b>비어
      * 있지 않은 문자열</b>이라 완전성 검사를 그냥 통과했고, 서버는 서명 키가 그 문자열인 채로
      * 기동했다. 모든 업로드가 저장소에서 서명 오류로 죽는데 원인은 오타 하나다 — 오설정이
-     * 장애처럼 보이는 모양이라 {@code AiStorageProperties} 가 placeholder 를 따로 거절한다.
+     * 장애처럼 보이는 모양이라 {@code ObjectStorageProperties} 가 placeholder 를 따로 거절한다.
      */
     @ParameterizedTest
     @ValueSource(strings = {"AI_STORAGE_ACTIVE_WRITE_PROVIDER", "R2_ENDPOINT", "R2_BUCKET",

@@ -131,6 +131,22 @@ public enum ErrorCode {
     GAME_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "만들 수 있는 게임 수를 초과했습니다."),
     CONFIG_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 포털 연결을 찾을 수 없습니다."),
 
+    // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
+    // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에
+    // 나오면 계약 위반이다. 위반 항목의 구체값은 새 code 가 아니라 errors[].rule 로 나간다
+    // (§6) — grant 만료·PUT 누락도 그래서 GAME_ASSET_NOT_READY + rule 이고 새 code 가 아니다.
+    GAME_ASSET_KIND_UNSUPPORTED(HttpStatus.BAD_REQUEST, "지원하지 않는 자산 종류입니다."),
+    GAME_ASSET_TYPE_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다."),
+    GAME_ASSET_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 너무 큽니다."),
+    GAME_ASSET_DIMENSION_EXCEEDED(HttpStatus.BAD_REQUEST, "이미지 크기가 너무 큽니다."),
+    GAME_ASSET_QUOTA_EXCEEDED(HttpStatus.CONFLICT, "이 게임에 올릴 수 있는 이미지 수를 초과했습니다."),
+    GAME_ASSET_CORRUPTED(HttpStatus.BAD_REQUEST, "이미지 파일이 손상되었습니다."),
+    GAME_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "자산을 찾을 수 없습니다."),
+    GAME_ASSET_FORBIDDEN(HttpStatus.FORBIDDEN, "이 자산에 접근할 권한이 없습니다."),
+    GAME_ASSET_NOT_READY(HttpStatus.CONFLICT, "자산이 아직 사용할 수 없는 상태입니다."),
+    GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
+    GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
+
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
