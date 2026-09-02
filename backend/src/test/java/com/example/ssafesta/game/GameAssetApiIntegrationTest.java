@@ -306,6 +306,44 @@ class GameAssetApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("GAME_ASSET_FORBIDDEN"));
     }
 
+    /**
+     * A guest reads a published game's asset, and is refused a private one.
+     *
+     * <p>Both halves matter and neither is the other's contrapositive. The first fails if the path
+     * is missing from the security chain — the filter answers 401 before the service can judge
+     * anything, which is the state this branch was in. The second fails if opening the path were
+     * mistaken for making it public.
+     *
+     * <p>403 and not 401 for the refusal: the caller's identity is not the problem, so asking them
+     * to log in would send them to do something that changes nothing.
+     */
+    @Test
+    void aGuestReadsAPublishedAssetAndIsRefusedAPrivateOne() throws Exception {
+        Owner owner = owner("익명");
+        Uploaded shown = upload(owner, png(8, 8));
+        Uploaded hidden = upload(owner, png(9, 9));
+
+        mockMvc.perform(saveDraft(owner, 0, sourced(owner.gameId(), shown.source())))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/games/" + owner.gameId() + "/publish")
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(GameTestSupport.publishRequest(1)))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/v1/games/" + owner.gameId())
+                        .header("Authorization", bearerFor(owner.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"visibility\":\"PUBLIC\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get(contentPath(owner.gameId(), shown.assetId())))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG));
+        mockMvc.perform(get(contentPath(owner.gameId(), hidden.assetId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_FORBIDDEN"));
+    }
+
     @Test
     void everyIssuedAssetIdIsDifferent() throws Exception {
         Owner owner = owner("식별자");
