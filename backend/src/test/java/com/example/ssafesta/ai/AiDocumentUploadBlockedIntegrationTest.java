@@ -1,5 +1,7 @@
 package com.example.ssafesta.ai;
 
+import com.example.ssafesta.storage.FakeObjectStorage;
+import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
@@ -47,7 +49,7 @@ class AiDocumentUploadBlockedIntegrationTest {
 
     /** 할당량이 찼다 — usage guard 90% (#100). 기다린다고 풀리지 않으므로 507 이다. */
     @Nested
-    @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
+    @Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
     @SpringBootTest(properties = "app.ai.storage.upload-gate=QUOTA_BLOCKED")
     @AutoConfigureMockMvc
     class WhenTheQuotaIsSpent extends Fixture {
@@ -73,7 +75,7 @@ class AiDocumentUploadBlockedIntegrationTest {
      * 알 필요가 없고, 알아야 할 것은 "기다리면 되는가" 뿐이다.
      */
     @Nested
-    @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
+    @Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
     @SpringBootTest(properties = "app.ai.storage.upload-gate=UNAVAILABLE")
     @AutoConfigureMockMvc
     class WhenTheProviderCannotBeUsed extends Fixture {
@@ -97,7 +99,7 @@ class AiDocumentUploadBlockedIntegrationTest {
      * 따로 없으므로 "상태만 옮기고 provider 를 안 옮겨 어긋난다" 는 사건 자체가 성립하지 않는다.
      */
     @Nested
-    @Import({TestcontainersConfiguration.class, FakeDocumentStorageConfiguration.class})
+    @Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
     @SpringBootTest(properties = {
             "app.ai.storage.active-write-provider=MINIO_LOCAL",
             "app.ai.storage.providers.MINIO_LOCAL.endpoint=http://localhost:9",

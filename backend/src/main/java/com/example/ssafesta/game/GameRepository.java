@@ -1,9 +1,11 @@
 package com.example.ssafesta.game;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -48,4 +50,16 @@ public interface GameRepository extends JpaRepository<Game, Long> {
     /** Hard-delete support: withdrawal and recycle-bin overflow remove the row itself. */
     @Query("SELECT g.deletedAt FROM Game g WHERE g.id = :gameId")
     Optional<Instant> findDeletedAt(@Param("gameId") Long gameId);
+
+    /**
+     * Locks the game row for the rest of the transaction ({@code SELECT ... FOR UPDATE}).
+     *
+     * <p>Asset issuance counts against a per-game limit, and an application-side count cannot hold
+     * that on its own — two concurrent requests both read 299 and both insert. Same reason and same
+     * shape as {@code WalletRepository.findByUserIdForUpdate}. The unusable-row cleanup rides along
+     * inside the same lock, so it is bounded to one game and needs no scheduler.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT g FROM Game g WHERE g.id = :gameId")
+    Optional<Game> findByIdForUpdate(@Param("gameId") Long gameId);
 }

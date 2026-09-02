@@ -22,15 +22,17 @@ public class GamePublishService {
     private final GamePublishedVersionRepository published;
     private final GameAccessGuard guard;
     private final GameProjectValidator validator;
+    private final GameAssetService assets;
 
     public GamePublishService(GameRepository games, GameDraftRepository drafts,
                               GamePublishedVersionRepository published, GameAccessGuard guard,
-                              GameProjectValidator validator) {
+                              GameProjectValidator validator, GameAssetService assets) {
         this.games = games;
         this.drafts = drafts;
         this.published = published;
         this.guard = guard;
         this.validator = validator;
+        this.assets = assets;
     }
 
     /**
@@ -55,7 +57,11 @@ public class GamePublishService {
         // older server version has never been checked against today's rules.
         String storedJson = draft.getProjectJson();
         JsonNode project = GameProjectJson.parse(storedJson);
-        validator.validateForPublish(project, storedJson, gameId);
+        // Asset states are read inside this transaction, immediately before the version row is
+        // appended, so a Draft that referenced a usable asset cannot be frozen after that asset
+        // stopped being usable. Nothing can make one stop being usable yet — soft delete is not
+        // built — so no row lock is taken here; the delete endpoint adds it (contract §9).
+        validator.validateForPublish(project, storedJson, gameId, assets.stateSnapshot(gameId));
 
         int nextVersion = published.highestVersionNo(gameId) + 1;
 
