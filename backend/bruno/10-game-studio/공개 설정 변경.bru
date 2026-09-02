@@ -1,0 +1,45 @@
+meta {
+  name: 공개 설정 변경
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "visibility": "PUBLIC"
+  }
+}
+
+docs {
+  ## 공개 설정 변경 — PRIVATE ↔ PUBLIC
+
+  - 인증: **필수** (소유자)
+  - 성공: `200 OK`, 변경된 요약
+
+  ### 공개 설정과 게시는 별개 축이다
+
+  | 상태 | `게시본 조회` 결과 |
+  |---|---|
+  | `PUBLIC` + 게시본 있음 | `200` |
+  | `PUBLIC` + 게시본 없음 | `404 GAME_NOT_PUBLISHED` |
+  | `PRIVATE` + 게시본 있음 | `403 GAME_NOT_PUBLIC` |
+
+  `PRIVATE`로 되돌려도 **게시본은 지워지지 않는다.** 다시 `PUBLIC`으로 바꾸면 즉시 보인다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 변경 성공 |
+  | `400 VALIDATION_FAILED` | `visibility`가 `PRIVATE`·`PUBLIC`이 아니다 |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404` | `GAME_NOT_FOUND` 또는 `GAME_DELETED` |
+}
