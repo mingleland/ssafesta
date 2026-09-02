@@ -348,6 +348,21 @@ export const moveScene = (project: GameProject, sceneId: string, offset: -1 | 1)
   return validated({ ...project, scenes });
 };
 
+// 드래그(햄버거 핸들)로 Scene을 임의의 자리로 옮긴다. moveScene(인접 -1/+1 swap)과 달리
+// fromIndex의 Scene을 배열에서 빼서 toIndex 자리에 다시 끼워 넣는 방식이라, 한 번의
+// 드래그로 여러 칸을 이동할 수 있다 — reorderEventAction과 동일한 패턴이다(S15P21A604-389).
+export const reorderScene = (project: GameProject, sceneId: string, targetIndex: number): GameProject => {
+  const sourceIndex = project.scenes.findIndex((scene) => scene.id === sceneId);
+  if (sourceIndex < 0) throw new Error(`${sceneId} Scene을 찾을 수 없습니다.`);
+  const clampedTarget = Math.max(0, Math.min(project.scenes.length - 1, targetIndex));
+  if (clampedTarget === sourceIndex) return project;
+  const scenes = [...project.scenes];
+  const [scene] = scenes.splice(sourceIndex, 1);
+  if (scene === undefined) return project;
+  scenes.splice(clampedTarget, 0, scene);
+  return validated({ ...project, scenes });
+};
+
 export const addObject = (
   project: GameProject,
   sceneId: string,
