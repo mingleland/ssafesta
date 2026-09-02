@@ -164,10 +164,19 @@
 .gss-primary-actions .gss-publish-button { background: linear-gradient(135deg, #2f6fed, #4c78ed); border-color: #5688f1; color: white; }
 .gss-primary-actions .gss-guide-button { background: transparent; border-color: #c7cedb; color: #4b5563; }
 
-.gss-layout { display: grid; grid-template-columns: 226px minmax(500px, 1fr) 350px; min-height: 0; }
+/* S15P21A604-387 — 좌/우 폭은 GameStudioShell.tsx가 panelWidths state를 --gss-left-width/
+   --gss-right-width 커스텀 프로퍼티로 얹어서 제어한다(기본값은 var()의 fallback). 구분선
+   (.gss-panel-divider)도 실제 grid 열로 넣어서 별도 absolute 포지셔닝 계산 없이 항상 경계에
+   붙게 했다 — 반응형 브레이크포인트는 가운데 minmax만 바꾸고 좌/우 열은 그대로 var()를 쓴다. */
+.gss-layout { display: grid; grid-template-columns: var(--gss-left-width, 226px) 6px minmax(500px, 1fr) 6px var(--gss-right-width, 350px); min-height: 0; }
+.gss-panel-divider { background: transparent; cursor: col-resize; position: relative; touch-action: none; z-index: 25; }
+.gss-panel-divider::after { background: var(--gss-border); bottom: 0; content: ''; left: 50%; position: absolute; top: 0; transform: translateX(-50%); width: 1px; }
+.gss-panel-divider:hover::after,
+.gss-panel-divider:active::after { background: var(--gss-blue); width: 2px; }
 .gss-root.is-focus-mode .gss-layout { grid-template-columns: minmax(0,1fr); }
 .gss-root.is-focus-mode .gss-left-sidebar,
-.gss-root.is-focus-mode .gss-right-sidebar { display: none; }
+.gss-root.is-focus-mode .gss-right-sidebar,
+.gss-root.is-focus-mode .gss-panel-divider { display: none; }
 .gss-left-sidebar,
 .gss-right-sidebar {
   background: var(--gss-panel);
@@ -752,7 +761,7 @@
 .gss-recovery-dock button.is-primary { background: #16a34a; border-color: #4da879; color: #fff; }
 
 @media (max-width: 1250px) {
-  .gss-layout { grid-template-columns: 205px minmax(470px, 1fr) 310px; }
+  .gss-layout { grid-template-columns: var(--gss-left-width, 226px) 6px minmax(470px, 1fr) 6px var(--gss-right-width, 350px); }
   .gss-topbar { grid-template-columns: minmax(330px, 1fr) auto minmax(330px, 1fr); }
   .gss-save-state { display: none; }
 }
@@ -767,7 +776,7 @@
   .gss-title-input { max-width: 170px; min-width: 90px; padding-left: 7px; }
   .gss-primary-actions { gap: 4px; }
   .gss-primary-actions > button { font-size: 9px; padding: 7px 8px; }
-  .gss-layout { grid-template-columns: 170px minmax(0, 1fr) 260px; }
+  .gss-layout { grid-template-columns: var(--gss-left-width, 226px) 6px minmax(0, 1fr) 6px var(--gss-right-width, 350px); }
   .gss-sidebar-section { padding: 11px 9px; }
   .gss-object-palette { grid-template-columns: 1fr; }
   .gss-object-palette button { flex-direction: row; justify-content: flex-start; min-height: 42px; padding: 5px 7px; }
@@ -785,7 +794,7 @@
   .gss-logo strong,
   .gss-history-tools { display: none; }
   .gss-topbar { grid-template-columns: minmax(120px, 1fr) auto; }
-  .gss-layout { grid-template-columns: 150px minmax(0, 1fr) 230px; }
+  .gss-layout { grid-template-columns: var(--gss-left-width, 226px) 6px minmax(0, 1fr) 6px var(--gss-right-width, 350px); }
   .gss-primary-actions > .gss-guide-button { display: none; }
   .gss-map-stage { min-width: 0; }
 }

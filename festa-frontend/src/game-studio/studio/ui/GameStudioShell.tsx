@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   type ChangeEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { parseGameProject, type AssetReference, type GameObject, type GameProject } from '../../contracts/gameProject.ts';
@@ -107,6 +108,47 @@ const saveEditorSet = (gameId: number, kind: 'hidden' | 'locked', ids: ReadonlyS
   }
 };
 
+// S15P21A604-387 — 좌/우 패널 드래그 리사이즈. 최소값은 기존 반응형 브레이크포인트
+// (1250px/1039px/760px)들의 폭 중 가장 작은 값으로 고정하고, 최대값은 각 패널 기본폭
+// 대비 +25%로 고정한다(뷰포트에 따라 달라지지 않음 — QA id 5 결정 사항).
+const LEFT_PANEL_DEFAULT_WIDTH = 226;
+const LEFT_PANEL_MIN_WIDTH = 150;
+const LEFT_PANEL_MAX_WIDTH = Math.round(LEFT_PANEL_DEFAULT_WIDTH * 1.25);
+const RIGHT_PANEL_DEFAULT_WIDTH = 350;
+const RIGHT_PANEL_MIN_WIDTH = 230;
+const RIGHT_PANEL_MAX_WIDTH = Math.round(RIGHT_PANEL_DEFAULT_WIDTH * 1.25);
+const PANEL_WIDTHS_STORAGE_KEY = 'festa.game-studio.layout.panelWidths';
+
+interface PanelWidths {
+  readonly left: number;
+  readonly right: number;
+}
+
+const clampPanelWidth = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+// 패널 폭은 특정 게임 프로젝트가 아니라 에디터 자체에 대한 개인 UI 선호도라, 다른
+// 편집 보조 상태(editorSetStorageKey)와 달리 gameId 없이 전역 키로 저장한다 — 어느
+// 게임을 열어도 마지막으로 조절한 폭이 유지되는 편이 자연스럽다고 판단했다.
+const loadPanelWidths = (): PanelWidths => {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY) ?? 'null');
+    const raw = (parsed ?? {}) as { left?: unknown; right?: unknown };
+    const left = typeof raw.left === 'number' ? clampPanelWidth(raw.left, LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH) : LEFT_PANEL_DEFAULT_WIDTH;
+    const right = typeof raw.right === 'number' ? clampPanelWidth(raw.right, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH) : RIGHT_PANEL_DEFAULT_WIDTH;
+    return { left, right };
+  } catch {
+    return { left: LEFT_PANEL_DEFAULT_WIDTH, right: RIGHT_PANEL_DEFAULT_WIDTH };
+  }
+};
+
+const savePanelWidths = (widths: PanelWidths): void => {
+  try {
+    window.localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(widths));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 리사이즈 자체는 정상 동작한다.
+  }
+};
+
 interface GameStudioShellProps {
   readonly gameId: number;
   readonly initialProject?: GameProject;
@@ -188,6 +230,8 @@ export const GameStudioShell = ({
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths());
+  const panelResizeRef = useRef<{ readonly side: 'left' | 'right'; readonly startX: number; readonly startWidth: number } | null>(null);
   const [editorHiddenObjectIds, setEditorHiddenObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'hidden'));
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
   const [objectClipboard, setObjectClipboard] = useState<{ readonly sourceSceneId: string; readonly objectIds: readonly string[] } | null>(null);
@@ -195,6 +239,42 @@ export const GameStudioShell = ({
   const [recoveryCandidate, setRecoveryCandidate] = useState<RecoverySnapshot | null>(null);
   const [recoverySavedAt, setRecoverySavedAt] = useState<string | null>(null);
   const recoveryFailureReported = useRef(false);
+
+  // S15P21A604-387 — 좌/우 구분선 드래그 리사이즈. CanvasMinimap의 pointerdown~pointerup
+  // 패턴(setPointerCapture)을 그대로 따른다. pointerId를 캡처한 요소 자신에게 move/up을
+  // 걸어서, 커서가 구분선 밖으로 나가도 드래그가 끊기지 않게 한다.
+  const startPanelResize = (event: ReactPointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panelResizeRef.current = { side, startX: event.clientX, startWidth: side === 'left' ? panelWidths.left : panelWidths.right };
+  };
+
+  const handlePanelResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const resize = panelResizeRef.current;
+    if (resize === null) return;
+    const delta = event.clientX - resize.startX;
+    // 왼쪽 구분선은 오른쪽으로 끌수록(+delta) 넓어지고, 오른쪽 구분선은 왼쪽으로 끌수록(-delta) 넓어진다.
+    const rawWidth = resize.side === 'left' ? resize.startWidth + delta : resize.startWidth - delta;
+    const [min, max] = resize.side === 'left'
+      ? [LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH]
+      : [RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH];
+    const next = clampPanelWidth(rawWidth, min, max);
+    setPanelWidths((current) => (resize.side === 'left' ? { ...current, left: next } : { ...current, right: next }));
+  };
+
+  const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelResizeRef.current === null) return;
+    panelResizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    // 함수형 업데이터로 최신 상태를 읽어 저장한다 — 이 핸들러의 클로저가 잡은 panelWidths는
+    // 드래그 중 마지막 move 이후로 갱신되지 않았을 수 있다(비동기 state 업데이트).
+    setPanelWidths((current) => {
+      savePanelWidths(current);
+      return current;
+    });
+  };
 
   const selectedScene = project.scenes.find((scene) => scene.id === selectedSceneId) ?? project.scenes[0];
   const selectedObject = selectedScene !== undefined && selectedScene.type !== 'DIALOGUE'
@@ -859,7 +939,10 @@ export const GameStudioShell = ({
         </div>
       </header>
 
-      <section className="gss-layout">
+      <section
+        className="gss-layout"
+        style={{ '--gss-left-width': `${panelWidths.left}px`, '--gss-right-width': `${panelWidths.right}px` } as React.CSSProperties}
+      >
         <aside className="gss-left-sidebar">
           <div className="gss-sidebar-section gss-scene-section">
             <div className="gss-sidebar-heading"><span>장면</span><span>{project.scenes.length}/50</span></div>
@@ -1082,6 +1165,15 @@ export const GameStudioShell = ({
           </div>
         </aside>
 
+        <div
+          className="gss-panel-divider"
+          onPointerDown={(event) => startPanelResize(event, 'left')}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={stopPanelResize}
+          onPointerCancel={stopPanelResize}
+          title="드래그해서 패널 폭 조절"
+        />
+
         <section className="gss-workspace">
           <div className="gss-canvas-toolbar">
             <div><span className="gss-type-badge">{selectedScene.type}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
@@ -1264,6 +1356,15 @@ export const GameStudioShell = ({
             <span>Game #{gameId} · revision {project.revision}</span>
           </footer>
         </section>
+
+        <div
+          className="gss-panel-divider"
+          onPointerDown={(event) => startPanelResize(event, 'right')}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={stopPanelResize}
+          onPointerCancel={stopPanelResize}
+          title="드래그해서 패널 폭 조절"
+        />
 
         <aside className="gss-right-sidebar">
           <div className="gss-panel-tabs">
