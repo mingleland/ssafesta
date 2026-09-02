@@ -12,11 +12,15 @@ import {
   chooseReferenceDialogue,
   interactReferencePlayer,
   moveReferencePlayer,
+  movePlayerFromHeldKeys,
   objectiveProgress,
+  planCatchUpTicks,
+  REFERENCE_TICK_MS,
   shootReferenceProjectile,
   startReferenceRuntime,
   tickReferenceWorld,
   type MoveDirection,
+  type ReferenceRuntimeState,
 } from './referenceRuntime.ts';
 import './ReferenceGamePlayer.css';
 
@@ -86,6 +90,9 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
     typeof document === 'undefined' || document.visibilityState === 'visible'
   ));
   const completionReported = useRef(false);
+  // 현재 눌려 있는 방향키 집합 — keydown/keyup으로만 갱신하고, 실제 이동은 tick 이펙트가
+  // 매 REFERENCE_TICK_MS(120ms)마다 이 집합을 읽어 적용한다(S15P21A604-363).
+  const pressedDirectionsRef = useRef<Set<MoveDirection>>(new Set());
   const sessionTokenRef = useRef<string | null>(null);
   const sessionEndedRef = useRef(false);
   const scene = findScene(project, runtime.session.currentSceneId);
@@ -148,7 +155,14 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
       const direction = keyDirection(event.key);
       if (direction !== null) {
         event.preventDefault();
-        setRuntime((current) => moveReferencePlayer(project, current, direction));
+        // 이미 눌려 있는 키의 OS auto-repeat keydown은 여기서 걸러진다 — "멈췄다가 급발진"의
+        // 원인이던 auto-repeat 타이밍이 이동에 영향을 주지 않는다. 처음 눌린 순간에만 즉시
+        // 한 걸음 이동해 짧게 탭 했을 때의 반응성은 그대로 유지하고, 계속 누르고 있는 동안은
+        // 아래 tick 이펙트가 pressedDirectionsRef를 읽어 120ms마다 균일하게 이동시킨다.
+        if (!pressedDirectionsRef.current.has(direction)) {
+          pressedDirectionsRef.current.add(direction);
+          setRuntime((current) => movePlayerFromHeldKeys(project, current, pressedDirectionsRef.current));
+        }
         return;
       }
       if (event.key.toLowerCase() === 'f') {
@@ -162,15 +176,48 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
         setRuntime((current) => interactReferencePlayer(project, current));
       }
     };
+    const onKeyUp = (event: KeyboardEvent) => {
+      const direction = keyDirection(event.key);
+      if (direction !== null) pressedDirectionsRef.current.delete(direction);
+    };
+    // 키를 누른 채로 창(탭)이 포커스를 잃으면 브라우저가 keyup을 보내지 않을 수 있다 —
+    // 방향키가 "눌린 채로 끼는" 것을 막기 위해 포커스를 잃으면 집합을 비운다.
+    const onBlur = () => pressedDirectionsRef.current.clear();
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
   }, [activeDialogue, project]);
 
   useEffect(() => {
     if (scene === undefined || scene.type === 'DIALOGUE' || activeDialogue !== null || runtime.session.status !== 'PLAYING') return undefined;
+    // S15P21A604-363 — 탭이 백그라운드/비활성이면 브라우저가 이 setInterval 자체의 발화
+    // 주기를 초당 1회 수준까지 강제로 늦출 수 있다(브라우저 정책이라 우리가 막을 수 없음).
+    // 그래서 "콜백 한 번 = tick 한 번"으로 고정하지 않고, 콜백이 실제로 불릴 때마다
+    // performance.now()로 지난 실시간을 재서 그만큼의 논리 tick을 몰아 처리한다 — 늦게
+    // 불렸어도 tick 하나의 실제 길이는 항상 REFERENCE_TICK_MS에 가깝게 유지되고, 그 위에
+    // 얹힌 무적시간(REFERENCE_TICK_MS 기준 tick 수) 같은 계산도 다시 정확해진다.
+    // 아주 오래(수 분) 비활성이었다면 밀린 tick을 전부 몰아치지 않고 MAX_CATCHUP_TICKS까지만
+    // 처리하고 나머지 밀린 시간은 버린다(급증 스폰 등 부작용 방지) — 그만큼은 현재 시각으로
+    // 재동기화해 다음 콜백부터 다시 정상 페이스로 이어간다.
+    let lastTickAt = performance.now();
     const timer = window.setInterval(() => {
-      setRuntime((current) => tickReferenceWorld(project, current));
-    }, 120);
+      const now = performance.now();
+      const { steps, consumedMs } = planCatchUpTicks(now - lastTickAt);
+      if (steps <= 0) return;
+      lastTickAt += consumedMs;
+      setRuntime((current) => {
+        let next: ReferenceRuntimeState = current;
+        for (let step = 0; step < steps; step += 1) {
+          next = tickReferenceWorld(project, movePlayerFromHeldKeys(project, next, pressedDirectionsRef.current));
+        }
+        return next;
+      });
+    }, REFERENCE_TICK_MS);
     return () => window.clearInterval(timer);
   }, [activeDialogue, project, runtime.session.status, scene?.type]);
 

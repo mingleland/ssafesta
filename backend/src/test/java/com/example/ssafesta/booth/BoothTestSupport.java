@@ -16,25 +16,12 @@ public final class BoothTestSupport {
     private BoothTestSupport() {
     }
 
-    /** {@code users.nickname} 은 VARCHAR(30) 이다. 넘기면 INSERT 가 죽는다. */
-    private static final int MAX_NICKNAME = 30;
-
-    /**
-     * Creates a member with a wallet and the signup grant, as registration would.
-     *
-     * <p>The name has to be unique and it has to fit the column. Uniqueness lives in the tail, so
-     * the <b>prefix</b> is what gets trimmed — cutting the tail would let two tests collide. This
-     * used to be {@code prefix + sequence + nanoTime} with no bound, which fit only because the
-     * sequence stayed short; adding a test class pushed it one digit further and the insert failed
-     * in an unrelated suite.
-     */
+    /** Creates a member with a wallet and the signup grant, as registration would. */
     public static Long createMemberWithWallet(UserRepository users, WalletService wallets, String prefix) {
-        // 9 digits of nanoTime is sub-second entropy — enough between runs against one container.
-        String tail = SEQUENCE.incrementAndGet() + "_" + System.nanoTime() % 1_000_000_000L;
-        String head = prefix.length() > MAX_NICKNAME - tail.length()
-                ? prefix.substring(0, Math.max(0, MAX_NICKNAME - tail.length()))
-                : prefix;
-        Long userId = users.save(new User(head + tail)).getId();
+        // nickname 은 VARCHAR(30) 이다 (V1:6). nanoTime 을 붙이면 그것만으로 17자를 먹어 prefix 가
+        // 조금만 길어도 넘친다 (T-103). SEQUENCE 는 JVM 당 유일하고 컨테이너는 실행마다 새로 뜨므로
+        // 실행 간 충돌이 없다. 헬퍼마다 SEQUENCE 가 따로라 태그 한 글자로 서로를 가른다.
+        Long userId = users.save(new User(prefix + "b" + SEQUENCE.incrementAndGet())).getId();
         wallets.openWallet(userId);
         return userId;
     }

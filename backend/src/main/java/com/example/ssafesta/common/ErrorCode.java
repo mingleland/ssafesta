@@ -40,6 +40,12 @@ public enum ErrorCode {
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다."),
     INSUFFICIENT_COIN(HttpStatus.CONFLICT, "코인이 부족합니다."),
 
+    // ── 카탈로그 · 인벤토리 (spec 012) ──────────────────────────────────────
+    CATALOG_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "카탈로그 품목을 찾을 수 없습니다."),
+    ITEM_NOT_ON_SALE(HttpStatus.CONFLICT, "현재 판매 중인 품목이 아닙니다."),
+    ITEM_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 품목입니다."),
+    AVATAR_ITEM_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 파츠가 있습니다."),
+
     // ── 부스 · 임대 (spec 004) ──────────────────────────────────────────────
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, "부스를 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),

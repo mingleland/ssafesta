@@ -530,6 +530,7 @@ consultations
 - summary TEXT NULL
 - status
 - requested_at
+- expires_at
 - accepted_at NULL
 - ended_at NULL
 ```
@@ -547,11 +548,19 @@ EXPIRED
 
 동시 Accept 시 한 Staff만 성공하도록 Transaction 조건을 둔다.
 
+### 요청 만료 (C-01, spec 011)
+
+`expires_at = requested_at + 10분`으로 생성 시 고정한다. 스케줄러 또는 조회 시점 판정으로 `REQUESTED → EXPIRED` 전환하고, FE에는 `expires_at`을 내려 만료 전 잔여 시간 안내와 재요청 버튼에 사용한다 (2026-08-31, GitLab work_items#118).
+
+### 오프라인 비동기 문의 (C-02, spec 011)
+
+이 테이블은 "직원 오프라인 시 메시지 남기기" 컬럼을 의도적으로 포함하지 않는다 — P1에서 제외하고 P2 후속 이슈로 분리하기로 확정했다 (선택안 A, 2026-08-31, GitLab work_items#118). 도입 시 별도 테이블 또는 컬럼 추가로 다룬다.
+
 ---
 
 ## 22. consultation_messages
 
-대화 저장 정책이 허용되는 경우.
+대화 저장 정책이 허용되는 경우. P2 범위 — 실시간 메시지 송수신·저장이 P2로 하향된 상태와 함께 이 테이블도 P2에서 확정한다.
 
 ```text
 consultation_messages
@@ -562,7 +571,7 @@ consultation_messages
 - created_at
 ```
 
-원문 보존 기간은 정책 확정 전 장기 저장을 가정하지 않는다.
+원문 보존 기간은 정책 확정 전 장기 저장을 가정하지 않는다. C-03(spec 011)에서도 원문 메시지 보존은 P2 spec 착수 시 저장 여부부터 재검토하기로 보류했다 — `consultations.summary`(Handoff Summary)와 메타데이터는 §27 삭제/보존에서 먼저 확정 (2026-08-31, GitLab work_items#118).
 
 ---
 
@@ -655,6 +664,12 @@ TTL과 값 구조는 Realtime/Infra 설계에서 확정한다.
 ### 회원 탈퇴 삭제 정책
 
 회원 탈퇴 확정 즉시 User 및 직접·종속·참여 데이터를 hard delete한다. Coin Transaction·Lease를 포함한 이력도 이 회원 탈퇴 정책에서는 보존 예외가 아니다. 삭제 순서는 외부 공개 차단 → 파일/Vector → Redis → DB 종속 데이터 → OAuth revoke/unlink → User 순서이며 재실행 가능해야 한다.
+
+### Consultation 보존 정책 (C-03, spec 011)
+
+`consultations`의 P1 메타데이터(상태·`requested_at`/`accepted_at`/`ended_at`·`staff_user_id`)와 `summary`(Handoff Summary)는 **프로젝트 종료 시 일괄 삭제**한다 — docs/21 §Conversation 저장 정책과 동일선상으로 맞춘다. `consultation_messages`(P2 원문 메시지)의 보존 기간은 이번 결정 대상이 아니며 P2 spec 착수 시 저장 여부부터 다시 정한다.
+
+회원 탈퇴 시에는 위 프로젝트 종료 시점 규칙보다 우선해 즉시 hard delete로 앞당긴다 (2026-08-31, GitLab work_items#118).
 
 ---
 

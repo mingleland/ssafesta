@@ -177,10 +177,11 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 | 항목 | 규칙 |
 |---|---|
-| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
-| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 형식 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** |
+| 소유권 검증 | 저장 문자열은 변형하지 않되 `fa|` 형식의 `i=` 8슬롯만 읽는다. 0은 미착용. preset·legacy·형식 불일치는 호환을 위해 품목 주장 없음으로 통과 |
 | 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
 | 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 미보유 거부 | `409 AVATAR_ITEM_NOT_OWNED` + 미보유 품목마다 `{ "rule": "ITEM_NOT_OWNED", "objectId": "<assetKey>", "message": … }` |
 | 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
 
 상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
@@ -456,6 +457,9 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (009 FR-008 — 만료돼도 데이터는 보존된다).
 
+**예외는 방문자 조회 하나다** — `GET /booths/{boothId}/projects/published`는 게스트가 정상
+경로이고 토큰 없이 `200`이다. 편집·편집자 조회는 위 규칙 그대로다.
+
 > ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
 > `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
 > 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
@@ -516,8 +520,42 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
 
-> 방문자용 조회(published 게이트 + 좋아요 수)는 **S15P21A604-177**이다. 아직 없다.
+> 방문자용 조회는 이 endpoint가 아니라 아래 `GET /booths/{boothId}/projects/published`다.
 > `GET /projects/{projectId}`는 **신설하지 않았다** — 부스당 1개라 이 목록이 같은 값을 준다.
+
+### GET `/booths/{boothId}/projects/published`
+
+**방문자용** 조회 (009 FR-005). **토큰이 없어도 `200`이다** — 게스트가 정상 경로라 `403`이 없다.
+토큰이 있으면 `likedByMe` 판정에만 쓴다.
+
+> ⚠️ **토큰을 실었는데 만료·손상됐으면 `401`이다** — 헤더가 없을 때만 `200`이다. 이유와 FE 우회는
+> [계약 §6](../specs/009-project-exhibition/contracts/project-api.md)에 있다.
+
+편집자 경로와 URL을 나눈 것은 같은 URL에서 신원에 따라 200과 403이 갈리지 않게 하기
+위함이다. `/published` 접미사는 `GET /booths/{boothId}/layouts/published`(005) ·
+`GET /games/{gameId}/published`(019)와 같은 뜻이다.
+
+```json
+{ "projects": [ { "projectId": 1, "name": "SSAFY FESTA", "…": "…",
+                  "likeCount": 12, "likedByMe": false } ] }
+```
+
+편집자 응답의 8필드 + `likeCount`(int, 없으면 `0`) + `likedByMe`(boolean, 게스트는 `false`).
+**두 키는 항상 있다.** 좋아요 **토글**은 `S15P21A604-135`이고 아직 없다 — 그때까지 `likeCount`는
+항상 `0`이다.
+
+**게이트 순서가 계약이다.**
+
+| 순서 | 조건 | 응답 |
+|---|---|---|
+| 1 | 부스 없음 | `404 BOOTH_NOT_FOUND` |
+| 2 | 유효 임대 없음 | `409 BOOTH_LEASE_EXPIRED` (004 FR-019) |
+| 3 | 미게시 (`published_layout_version IS NULL`) | `404 LAYOUT_NOT_PUBLISHED` |
+| 4 | 통과·프로젝트 없음 | `200 { "projects": [] }` |
+
+**미게시는 404이고 빈 배열이 아니다** — "부스가 방문자에게 열려 있지 않다"와 "부스는 열렸고
+전시가 없다"는 다른 사실이라, 뭉치면 클라이언트가 구분할 수단을 잃는다. 게시 게이트는
+배치의 게시 여부이고, 프로젝트에 별도 게시 상태는 없다(016 홈페이지와 같은 술어).
 
 ### PATCH `/projects/{projectId}`
 
@@ -912,7 +950,7 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ### POST `/booths/{boothId}/consultations`
 
-사람 상담 요청 생성.
+사람 상담 요청 생성. `requested_at + 10분`을 `expiresAt`으로 계산해 응답에 포함한다 (C-01, spec 011 — 2026-08-31 확정, GitLab work_items#118).
 
 ```json
 {
@@ -921,34 +959,63 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 }
 ```
 
+응답 예:
+
+```json
+{
+  "consultationId": 901,
+  "status": "REQUESTED",
+  "requestedAt": "...",
+  "expiresAt": "..."
+}
+```
+
+10분 내 Accept가 없으면 `REQUESTED → EXPIRED`로 전환하고 `CONSULTATION_EXPIRED` WebSocket 이벤트로 알린다(docs/16 §11). FE는 `expiresAt`으로 잔여 시간을 안내하고 만료 후 재요청 버튼을 노출한다.
+
 ### GET `/consultations/{consultationId}`
+
+응답 `status`에 `EXPIRED`가 포함된다.
 
 ### POST `/consultations/{consultationId}/accept`
 
-한 명의 Staff만 성공해야 한다.
+한 명의 Staff만 성공해야 한다. 이미 `EXPIRED`/`REJECTED`/다른 Staff가 `ACCEPTED`한 요청은 거부한다.
 
 ### POST `/consultations/{consultationId}/end`
 
 상담 종료.
 
-메시지는 WebSocket event 중심으로 처리하고, 기록 저장 정책에 따라 별도 REST History Endpoint를 둘 수 있다.
+메시지는 WebSocket event 중심으로 처리한다. 오프라인 시 메시지 남기기(비동기 문의)는 P1에서 제외하고 P2 후속 이슈로 분리했다(C-02, spec 011). 원문 History REST Endpoint 도입 여부·보존 기간은 P2 spec 착수 시 확정한다(C-03). P1 메타데이터·Handoff Summary(`consultations.summary`)는 프로젝트 종료 시 일괄 삭제한다(docs/09 §27).
 
 ---
 
-## 13. Inventory / Decoration — P1
+## 13. Inventory / Avatar Parts — P1
 
-### GET `/inventory/me`
+### GET `/catalog/items?type=AVATAR_PART`
 
-### GET `/catalog/items`
+회원·게스트 모두 Access Token으로 호출한다. 97판매 단위를 한 번에 반환하며 `owned`는 호출자 기준이다. 무료(`price=0`) 12종은 보유 행 없이도 항상 `true`다.
+
+```json
+{ "items": [
+  { "itemId": 1, "code": "F_Bot.01", "name": "일자 팬츠", "equipSlot": "BOTTOM",
+    "assetKey": "656603128", "price": 0, "onSale": true, "owned": true }
+] }
+```
+
+`assetKey`는 `avatarCode`의 `i=` 슬롯 값과 같다. 비모자는 Unity `itemId`, 모자는 UI 판매 단위인 `familyId`다. 성별 필터는 Unity 카탈로그가 담당한다.
 
 ### POST `/catalog/items/{itemId}/purchases`
 
-검증:
+회원 전용. 성공 시 `201`과 해당 품목(`owned: true`)을 반환한다. 지갑 잠금 → 보유 재확인 → `PURCHASE:{userId}:{itemId}` 멱등 차감 → `user_inventory_items` 지급을 한 트랜잭션으로 처리한다.
 
-- 판매 상태
-- 가격
-- 잔액
-- 중복 요청
+| 오류 | 의미 |
+|---|---|
+| `404 CATALOG_ITEM_NOT_FOUND` | 없는 품목 |
+| `409 ITEM_NOT_ON_SALE` | 판매 중지 |
+| `409 ITEM_ALREADY_OWNED` | 무료 품목 또는 이미 구매한 품목 |
+| `409 INSUFFICIENT_COIN` | 잔액 부족. 차감·지급 모두 롤백 |
+| `403 MEMBER_ONLY` | 게스트 구매 |
+
+별도 `GET /inventory/me`는 구현하지 않는다. 팔레트 소비자는 카탈로그 응답의 `owned`만으로 충분하다.
 
 ---
 
@@ -1085,6 +1152,9 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
+| `CATALOG_ITEM_NOT_FOUND` *(012)* | 카탈로그 품목 없음 |
+| `ITEM_NOT_ON_SALE` / `ITEM_ALREADY_OWNED` *(012)* | 판매 중지 / 이미 보유 |
+| `AVATAR_ITEM_NOT_OWNED` *(012·013)* | 아바타 저장값에 미보유 파츠 포함. `errors[].rule=ITEM_NOT_OWNED`, `objectId=assetKey` |
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
 | `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
@@ -1177,34 +1247,49 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
 > | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
-> | `AI_STORAGE_USAGE_STATE`·`AI_STORAGE_STATE` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `AI_STORAGE_UPLOAD_GATE`·`AI_STORAGE_ACTIVE_WRITE_PROVIDER` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `MINIO_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` *(007, fallback 시)* | 빈 값 | 전부 비면 미구성으로 빠진다. **부분 입력이면 기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+> | `ROOT_DOMAIN` | 없음 | `application-infra.yml` 의 `app.world.host` 가 `world.` 만 남는다 |
+> | `SPRING_PROFILES_ACTIVE` | `local` (`spring.profiles.default`) | 배포에서도 `local` 프로파일이 뜬다 — 아래 |
 >
-> **문서 저장소 6종 (S15P21A604-106).** `R2_*` 는 Infra 가 소유하는 credential 로, 문서 bucket 과
+> **문서 저장소 (S15P21A604-106).** `R2_*` 는 Infra 가 소유하는 credential 로, 문서 bucket 과
 > 서버가 만드는 prefix 로 scope 를 좁힌 것을 받는다 (GitLab #84). 삭제 유예 정리(FR-028)까지 하려면
 > 그 prefix 에 대한 `DeleteObject` 가 필요하다.
 >
-> 뒤 둘은 **업로드 허용 게이트**이고 기본값을 두지 않은 것이 의도다 — 기본값이 "허용" 이면 키 이름을
-> 틀렸을 때 Spring 이 조용히 무시하고 **차단이 열린 채로 뜬다.** 값 이름은 저장소 계약 그대로다.
+> **업로드 허용 게이트는 한 칸이다** (GitLab #100, 2026-09-01 확정). 기본값을 두지 않은 것이 의도다 —
+> 기본값이 "허용" 이면 키 이름을 틀렸을 때 Spring 이 조용히 무시하고 **차단이 열린 채로 뜬다.**
 >
-> | 변수 | 허용값 | 뜻 |
+> | `AI_STORAGE_UPLOAD_GATE` | 뜻 | 응답 |
 > |---|---|---|
-> | `AI_STORAGE_USAGE_STATE` | `NORMAL`·`WARNING` | 발급 허용 |
-> | | `UPLOAD_BLOCKED` | 할당량 90% → `507 STORAGE_QUOTA_EXCEEDED` |
-> | | `STALE_BLOCKED` | 사용량 감시 불능 → `503 STORAGE_UNAVAILABLE` |
-> | `AI_STORAGE_STATE` | `R2_ACTIVE`·`LOCAL_ACTIVE` | 발급 허용 |
-> | | `UPLOAD_BLOCKED`·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `503 STORAGE_UNAVAILABLE` |
+> | `OPEN` | 정상·경고, `LOCAL_ACTIVE` 검증 완료 | 발급 |
+> | `QUOTA_BLOCKED` | 사용량 90% 초과 — 재시도해도 풀리지 않는다 | `507 STORAGE_QUOTA_EXCEEDED` |
+> | `UNAVAILABLE` | stale 지표·R2 장애·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `503 STORAGE_UNAVAILABLE` |
 >
-> ⚠️ **두 변수의 `UPLOAD_BLOCKED` 는 뜻이 다르다** — 앞은 할당량, 뒤는 R2 장애다. 그래서 507 과 503
-> 으로 갈리고, 한 변수로 합칠 수 없다.
+> 운영자가 Usage Guard(`usage-guard.schema.json`)와 저장소 전환 상태를 읽고 위 한 칸으로 옮겨 적는다 —
+> **서버는 상태 기계를 알지 못한다.** 507 과 503 을 가르는 것이 이 게이트를 boolean 이 아니라 enum 으로
+> 둔 이유다: 용량이 찬 사용자에게 "잠시 후 다시" 를 주면 영원히 재시도한다.
 >
-> ⚠️ **`AI_STORAGE_STATE=LOCAL_ACTIVE` 로 옮길 때는 쓰기 provider 도 함께 옮겨야 기동한다**
-> (`app.ai.storage.active-write-provider=MINIO_LOCAL` + 해당 provider 설정). 상태만 바꾸면 방금 못
-> 쓴다고 선언한 R2 로 업로드가 계속 들어가므로, 어긋나면 기동을 거절한다.
+> **`AI_STORAGE_ACTIVE_WRITE_PROVIDER` 는 신규 업로드가 갈 곳일 뿐이다.** 기존 객체의 읽기·HEAD·삭제는
+> 문서 행의 `storage_provider` 를 따른다(FR-030) — 전환 전에 올라간 파일은 옛 provider 에 남는다.
+> MinIO 로 옮길 때는 `MINIO_*` 4종을 채우고 이 값을 `MINIO_LOCAL` 로 바꾼다. MinIO 항목은 전 필드가
+> 비면 미구성으로 보고 목록에서 빠지므로, R2 만 쓰는 배포는 그 4종을 주지 않아도 된다 (부분 입력은 기동 실패).
 >
-> `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
-> 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.
+> **프로파일은 `SPRING_PROFILES_ACTIVE=infra` 다.** `FESTA_ENVIRONMENT` 는 Spring 프로파일이
+> 아니다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
+> `specs/infra-002-environments/tasks.md` T059) 파일도 `a51f88a0`(`-170`, MR !150)로 들어왔다.
+>
+> ⚠️ **다만 지금 `infra` 로 띄우면 기동하지 않는다.** Spring 의 `application-{profile}.yml` 은
+> 프로파일 간에 누적되지 않는데, `spring.datasource`·`jpa`·`flyway`·`data.redis`·`security.oauth2`
+> 와 `app.*` 전체가 `application-local.yml` 96줄 안에만 있고 `application-infra.yml` 은 5줄
+> (`app.world.*`)뿐이다. `infra` 를 켜면 그 96줄이 로드되지 않아 `spring.datasource.url` 이
+> 사라지고 JPA·Flyway 자동설정이 실패한다. **환경변수를 전부 주입해도 읽을 설정이 없다.**
+> 공통 설정을 `application.yml` 로 승격하는 것이 BE 몫이며 `S15P21A604-347` 로 추적한다.
+>
+> `REDIS_USERNAME`·`REDIS_PASSWORD` 도 함께 필요해진다 — infra-002 T015 가 Redis 기본 사용자를
+> 비활성화하고 ACL 을 켜는데 현재 `spring.data.redis` 에는 host·port 만 있어 연결이 거부된다.
+> 주입 자리 신설도 `S15P21A604-347` 범위다.
 
 > **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
 > `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지

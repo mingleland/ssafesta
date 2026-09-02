@@ -150,7 +150,7 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 
 1. Spring이 활성 쓰기 Provider에 object storage 업로드를 완료하고 Document에 `storageProvider + bucket + objectKey`를 저장한다.
 2. Spring이 Business DB에서 문서 소유권·임대·상태를 검증하고 전체 문서·저장소 snapshot을 구성해 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
-3. FastAPI는 요청 schema와 원본 metadata·SHA-256을 검증하되 Business DB를 조회하지 않는다.
+3. FastAPI는 요청 schema와 원본 metadata를 검증하고, 다운로드한 원본 바이트의 SHA-256을 다시 계산해 요청 `sourceHash`와 대조하되 Business DB를 조회하지 않는다. 불일치는 재시도 없이 Job을 `DEAD`로 종료하고 Chunk를 저장하지 않으며 Spring에 `FAILED + SOURCE_HASH_MISMATCH`를 callback한다.
 4. AI DB `document_jobs`에 snapshot과 `QUEUED`를 INSERT한 뒤 202를 반환한다.
 5. 활성 Job 부분 유니크 인덱스 충돌은 오류로 노출하지 않고 기존 Job을 조회해 `existing: true`로 반환한다.
 
@@ -224,7 +224,7 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 - 세 번의 재시도를 모두 사용하면 `DEAD`로 전환하고 `PROCESSING_INTERRUPTED` 또는 마지막 정제 오류를 Spring에 전달한다.
 - 최초 실행 1회 + 재시도 3회로 최대 실행 횟수는 4회다.
 - 재시도 가능한 오류: Worker 상실, 네트워크/object storage 일시 오류, Embedding timeout/5xx.
-- 즉시 `DEAD` 가능한 오류: 손상되거나 디코딩할 수 없는 문서, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음처럼 재시도로 해결되지 않는 입력 오류. 이 경우 사용하지 않은 재시도 횟수를 소모하지 않는다.
+- 즉시 `DEAD` 가능한 오류: 손상되거나 디코딩할 수 없는 문서, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음, 실제 원본 SHA-256과 요청 `sourceHash` 불일치처럼 재시도로 해결되지 않는 입력 오류. 해시 불일치는 `SOURCE_HASH_MISMATCH`로 기록하고 Chunk·Embedding을 생성하지 않으며, 사용하지 않은 재시도 횟수를 소모하지 않는다.
 
 ### 7. Spring 상태 callback
 

@@ -133,7 +133,9 @@ FastAPI migration/runtime role은 AI DB에만 CONNECT할 수 있고 Business DB�
 
 **Rationale**: 사용자가 대처 가능한 정보를 주면서 내부 구조와 비밀정보 노출을 막는다.
 
-**초기 오류 코드**: `PARSE_FAILED`, `UNSUPPORTED_SCAN_PDF`, `EMBEDDING_TIMEOUT`, `SOURCE_NOT_FOUND`, `PROCESSING_INTERRUPTED`, `INTERNAL_ERROR`.
+**초기 오류 코드**: `PARSE_FAILED`, `UNSUPPORTED_SCAN_PDF`, `EMBEDDING_TIMEOUT`, `SOURCE_NOT_FOUND`, `SOURCE_HASH_MISMATCH`, `PROCESSING_INTERRUPTED`, `INTERNAL_ERROR`.
+
+`SOURCE_HASH_MISMATCH`는 FastAPI가 저장소에서 내려받은 원본 바이트의 SHA-256을 다시 계산해 처리 요청의 `sourceHash`와 비교했을 때 사용한다. 데이터 무결성 오류이므로 재시도하지 않고 Job을 `DEAD`로 종료하며, Parser·Embedding·Chunk 저장을 실행하지 않은 채 Spring에 `FAILED` callback을 보낸다.
 
 ## 10. 문서 개정본 경쟁 방지
 

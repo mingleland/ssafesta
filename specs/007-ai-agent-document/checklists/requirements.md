@@ -38,6 +38,7 @@
 - `Cloudflare R2(S3-compatible)`, `Spring`, `FastAPI`, `pgvector`, 1536차원, 파트별 소유권은 이번 계획에서 새로 선택한 구현안이 아니라 기존 헌법·아키텍처 계약이므로 명세에 유지했다.
 - Issue #11에서 마지막 C-04 서버 재시작 복구 Clarification을 확정했다.
 - GitLab Work Item #84의 업로드 URL 15분, `EXPIRED` 1시간, R2 정리 유예 24시간 계약과 Spring `DeleteObject` 책임을 반영했다. 자격증명 분리 방식은 동작을 바꾸지 않는 Infra 배포 선택이다.
+- GitLab Work Item #84의 SHA-256 후속 확인에 따라 FastAPI 원본 재검증 실패를 `SOURCE_HASH_MISMATCH`로 두 OpenAPI 계약과 처리·callback 테스트 및 구현 작업에 반영했다.
 - GitLab Work Item #102의 방향별 Service Token, 상수 시간 검증, callback `jobId`·멱등·`sourceHash` 검증, 단계적 토큰 회전 및 mTLS P2 결정을 반영했다.
 - GitLab Work Item #100의 수동 MinIO fallback·문서별 Provider·운영자 승인 reconcile·유한 Job 재시도·`DEAD`는 AI 내부 상태로만 유지·저장소 복구 후 자동 재처리 없음·reconcile 결과 저장 구조와 전달 경로(#102 방식 재사용, Infra 전용 credential·scope 분리)·quota 오류 HTTP 코드(`STORAGE_UNAVAILABLE=503`/`STORAGE_QUOTA_EXCEEDED=507`) 결정을 반영했다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치 두 항목만 후속 이슈로 남겨 체크리스트와 spec C-10에 명시했다.
 - GitLab Work Item #106의 callback 404 원인 코드, `JOB_NOT_REGISTERED` 1초·3초·10초 최대 3회 재시도, 영구 404 즉시 종료와 별도 종료 기록을 반영했다.

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ssafesta-rag-spike"
+version = "0.1.0"
+description = "S15P21A604-92 embedding, chunking and Top-K benchmark"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.27,<1",
+  "psycopg[binary]>=3.2,<4",
+  "pypdf>=5,<7",
+  "tiktoken>=0.8,<1",
+]
+
+[project.scripts]
+rag-spike = "rag_spike.cli:main"
+rag-review = "rag_spike.review_cli:main"
+rag-tuning-summary = "rag_spike.tuning_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rag_spike"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

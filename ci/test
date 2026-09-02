@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail; source "$(dirname "$0")/lib.sh"
-test_project() { case "${CI_COMPONENT}" in ai) python -m pytest --junitxml="${CI_ARTIFACT_DIR}/tests.xml";; back) if [[ -x ./gradlew ]]; then ./gradlew test; else ./mvnw test; fi;; front) npm ci && npm test -- --run;; game) bash festa-unity/ci/test;; esac; }
+test_project() {
+  local component_dir
+  component_dir="$(ci_component_dir)"
+  case "${CI_COMPONENT}" in
+    ai)
+      (cd "${component_dir}" \
+        && python -m venv .venv \
+        && .venv/bin/python -m pip install --disable-pip-version-check --no-input '.[test]' \
+        && .venv/bin/python -m pytest --junitxml="${CI_ARTIFACT_DIR}/tests.xml") ;;
+    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew test; else ./mvnw test; fi) ;;
+    front) (cd "${component_dir}" && npm ci && npm test -- --run) ;;
+    game) bash festa-unity/ci/test ;;
+  esac
+}
 ci_run test TEST_FAILED ci_dispatch_or test test_project

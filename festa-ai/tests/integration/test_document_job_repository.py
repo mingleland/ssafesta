@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import datetime
 import os
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.schemas.documents import ProcessDocumentRequest
@@ -51,7 +53,9 @@ async def session_factory(migrated_engine):
         async with engine.begin() as connection:
             await connection.run_sync(
                 lambda sync_connection: sync_connection.execute(
-                    DocumentJob.__table__.delete().where(DocumentJob.document_id == 4201)
+                    DocumentJob.__table__.delete().where(
+                        DocumentJob.document_id.in_((4201, 4202, 4203))
+                    )
                 )
             )
         await engine.dispose()
@@ -108,3 +112,150 @@ async def test_concurrent_same_snapshot_creates_one_active_job(
 
     assert first.job.id == second.job.id
     assert sorted([first.existing, second.existing]) == [False, True]
+
+
+async def test_two_workers_never_pick_the_same_job(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    for document_id in (4201, 4202):
+        async with session_factory() as session:
+            await DocumentJobRepository(session).enqueue(
+                _snapshot(documentId=document_id), max_retries=3
+            )
+
+    async def pick(worker_id: str):
+        async with session_factory() as session:
+            return await DocumentJobRepository(session).pickup(
+                worker_id=worker_id, lease_seconds=90
+            )
+
+    first, second = await asyncio.gather(pick("worker-a"), pick("worker-b"))
+
+    assert first is not None
+    assert second is not None
+    assert first.id != second.id
+    assert {first.worker_id, second.worker_id} == {"worker-a", "worker-b"}
+    assert first.status == second.status == "RUNNING"
+    assert first.attempt_no == second.attempt_no == 1
+    assert first.lease_expires_at is not None
+    assert second.lease_expires_at is not None
+
+
+async def test_only_one_worker_picks_a_single_job(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        await DocumentJobRepository(session).enqueue(_snapshot(), max_retries=3)
+
+    async def pick(worker_id: str):
+        async with session_factory() as session:
+            return await DocumentJobRepository(session).pickup(
+                worker_id=worker_id, lease_seconds=90
+            )
+
+    results = await asyncio.gather(pick("worker-a"), pick("worker-b"))
+
+    assert sum(result is not None for result in results) == 1
+
+
+async def test_heartbeat_extends_only_the_current_workers_lease(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        await DocumentJobRepository(session).enqueue(_snapshot(), max_retries=3)
+    async with session_factory() as session:
+        job = await DocumentJobRepository(session).pickup(
+            worker_id="worker-a", lease_seconds=90
+        )
+    assert job is not None
+    original_lease = job.lease_expires_at
+
+    async with session_factory() as session:
+        wrong_owner = await DocumentJobRepository(session).heartbeat(
+            job_id=job.id, worker_id="worker-b", lease_seconds=180
+        )
+    async with session_factory() as session:
+        current_owner = await DocumentJobRepository(session).heartbeat(
+            job_id=job.id, worker_id="worker-a", lease_seconds=180
+        )
+
+    assert wrong_owner is False
+    assert current_owner is True
+    async with session_factory() as session:
+        refreshed = await session.get(DocumentJob, job.id)
+    assert refreshed is not None
+    assert refreshed.lease_expires_at is not None
+    assert original_lease is not None
+    assert refreshed.lease_expires_at > original_lease
+
+
+async def test_stopped_heartbeat_leaves_an_expired_running_job_for_recovery(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        await DocumentJobRepository(session).enqueue(_snapshot(), max_retries=3)
+    async with session_factory() as session:
+        job = await DocumentJobRepository(session).pickup(
+            worker_id="worker-a", lease_seconds=90
+        )
+    assert job is not None
+
+    expired_at = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=1)
+    async with session_factory() as session:
+        await session.execute(
+            update(DocumentJob)
+            .where(DocumentJob.id == job.id)
+            .values(lease_expires_at=expired_at)
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        expired = await session.scalar(
+            select(DocumentJob).where(
+                DocumentJob.id == job.id,
+                DocumentJob.status == "RUNNING",
+                DocumentJob.lease_expires_at < func.now(),
+            )
+        )
+
+    assert expired is not None
+    assert expired.worker_id == "worker-a"
+
+
+async def test_retry_wait_is_picked_only_after_next_retry_time(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        queued = await DocumentJobRepository(session).enqueue(_snapshot(), max_retries=3)
+
+    future_retry = datetime.datetime.now(datetime.UTC) + datetime.timedelta(minutes=5)
+    async with session_factory() as session:
+        await session.execute(
+            update(DocumentJob)
+            .where(DocumentJob.id == queued.job.id)
+            .values(status="RETRY_WAIT", next_retry_at=future_retry)
+        )
+        await session.commit()
+    async with session_factory() as session:
+        too_early = await DocumentJobRepository(session).pickup(
+            worker_id="worker-a", lease_seconds=90
+        )
+    assert too_early is None
+
+    due_retry = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=1)
+    async with session_factory() as session:
+        await session.execute(
+            update(DocumentJob)
+            .where(DocumentJob.id == queued.job.id)
+            .values(next_retry_at=due_retry)
+        )
+        await session.commit()
+    async with session_factory() as session:
+        picked = await DocumentJobRepository(session).pickup(
+            worker_id="worker-a", lease_seconds=90
+        )
+
+    assert picked is not None
+    assert picked.id == queued.job.id
+    assert picked.status == "RUNNING"
+    assert picked.next_retry_at is None

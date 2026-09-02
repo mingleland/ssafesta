@@ -479,7 +479,7 @@ class AiAgentApiIntegrationTest {
 
     private void seedReference(String table, Owner owner, long agentId) {
         if ("ai_documents".equals(table)) {
-            // content_sha256·storage_provider·storage_bucket 은 V16 이 NOT NULL 로 넣었다
+            // content_sha256·storage_provider·storage_bucket 은 V17 이 NOT NULL 로 넣었다
             // (S15P21A604-106). 여기는 참조가 있다는 것만 만들면 되므로 값은 아무거나면 된다.
             jdbc.update("""
                     INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
