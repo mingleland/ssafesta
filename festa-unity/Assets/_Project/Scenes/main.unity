@@ -11668,7 +11668,7 @@ MonoBehaviour:
   boothId: 5
   destination: {fileID: 289478036}
   promptText: "\uB300\uD654"
-  interactRadius: 23
+  interactRadius: 39
   boundsSource: {fileID: 0}
   facingSource: {fileID: 2128608975}
   facingHalfAngle: 70
@@ -51412,7 +51412,7 @@ MonoBehaviour:
   boothId: 1
   destination: {fileID: 1552041424}
   promptText: "\uB300\uD654"
-  interactRadius: 23
+  interactRadius: 41
   boundsSource: {fileID: 0}
   facingSource: {fileID: 1567015045}
   facingHalfAngle: 70
@@ -51584,7 +51584,7 @@ MonoBehaviour:
   boothId: 11
   destination: {fileID: 1007233438}
   promptText: "\uB300\uD654"
-  interactRadius: 23
+  interactRadius: 39
   boundsSource: {fileID: 0}
   facingSource: {fileID: 153561040}
   facingHalfAngle: 70
