@@ -76,4 +76,3 @@ async def test_run_sweeps_immediately_then_on_interval() -> None:
     await asyncio.wait_for(service.run(stop=stop), timeout=1)
 
     assert repository.calls == 2
-

@@ -71,4 +71,3 @@ class JobRecoveryService:
                 await asyncio.wait_for(stop.wait(), timeout=self._sweep_seconds)
             except TimeoutError:
                 pass
-
