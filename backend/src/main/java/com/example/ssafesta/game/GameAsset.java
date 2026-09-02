@@ -122,9 +122,14 @@ public class GameAsset {
      *
      * <p>Leaving {@code READY} is one-way. A second {@code PUT} against a presigned URL that has not
      * expired yet can still replace the object in storage, and nothing in Spring sees it — so the
-     * grant's signature is issued for exactly {@code uploadExpiresAt} and {@code /content} answers
-     * from the {@code sha256} recorded here, which is how that drift becomes detectable rather than
-     * invisible (§3.2).
+     * grant's signature is issued for exactly {@code uploadExpiresAt}, and {@code /content} serves
+     * only an object whose length still matches the {@code byteSize} recorded here (§3.4). A
+     * replacement of exactly the same length is the one case that gets through.
+     *
+     * <p><b>{@code sha256} is written here and read by nothing.</b> It records which bytes passed
+     * verification — enough to settle after the fact whether a stored object is the approved one,
+     * and the upgrade path that would close the same-length hole. Checking it would mean hashing on
+     * every read, and a play page pulls many assets, so that trade is not taken yet.
      */
     void markReady(GameAssetImageValidator.VerifiedImage verified) {
         this.contentType = verified.contentType();
