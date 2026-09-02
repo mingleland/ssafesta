@@ -785,9 +785,57 @@ Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트
   실패한 문서와 같은 파일을 다시 올리는 것은 **허용**된다 — 막으면 사용자가 빠져나갈 길이 없다.
   따라서 같은 (agent, hash) 행이 복수 존재할 수 있고 유일성은 활성 상태 안에서만 성립한다.
 
+#### 아직 안 올린 발급은 중복이 아니라 재발급이다
+
+같은 해시로 다시 요청했을 때 셋으로 갈린다 (#84 멱등 재발급 합의).
+
+| 기존 행 | 응답 |
+|---|---|
+| `QUEUED` 이고 **아직 업로드 확인 전**, `storageProvider` 가 현재 활성 쓰기 Provider 와 같음 | `duplicate:false` + **같은 `documentId`** + **새 `uploadUrl`** + 기존 `objectKey` |
+| `QUEUED` 이고 아직 업로드 확인 전인데 **Provider 가 바뀜** | 기존 행을 `EXPIRED` 로 전환하고 **새 `documentId`·새 `objectKey`** 로 발급 (FR-032) |
+| 업로드가 확인된 `QUEUED`, `PROCESSING`, `READY` | `duplicate:true` (URL·key 없음) |
+
+발급 URL 은 15분이고 만료 판정은 1시간이다. 그 사이에 다시 요청하는 것은 정상 경로라서, 중복으로
+막으면 **URL 이 만료된 사용자가 1시간을 기다려야 한다.**
+
+재발급의 `uploadUrl` 은 **기존 행의 `objectKey`·`contentType`·`size` 로 서명**한다. 요청의 값이 아니다 —
+상한 검사와 첫 서명이 그 값으로 이뤄졌고, 해시는 클라이언트의 주장일 뿐 서버가 확인한 값이 아니다(FR-019a).
+
+**해시가 같은데 `fileName`·`contentType`·`size` 중 하나라도 기존 행과 다르면 `400 VALIDATION_FAILED`**
+(`errors[0].field = contentSha256`) 다. 2026-08-31 확정 — #84 에 없던 자리이며 세 선택지(400 / 기존 값으로
+재발급 / 중복 처리) 중 가장 보수적인 쪽을 골랐다. 서로 다른 파일이 같은 해시를 주장하는 요청을 조용히
+통과시키면 서명한 것과 다른 파일이 올라간다.
+
 ### POST `/documents/{documentId}/complete`
 
-업로드 완료 후 AI 처리 요청을 시작하기 위한 Spring 측 상태 변경/연계 Endpoint 후보.
+브라우저가 presigned URL 로 업로드를 마친 뒤 부르는 확인 Endpoint. **요청 본문이 없다** — 판정에 필요한
+것은 전부 문서 행에 있다.
+
+HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다. 전역 활성 Provider 가 아니다
+(FR-030) — 전환 전에 올라간 파일은 옛 Provider 에 있고, 새 Provider 에 물으면 "없다" 는 엉뚱한 답이 온다.
+
+#### Response
+
+```json
+{ "documentId": 153, "processingStatus": "QUEUED" }
+```
+
+#### 상태별 판정 (spec 007 data-model 업로드 만료 상태 전이)
+
+| 문서 상태 | 저장소 | 결과 |
+|---|---|---|
+| `QUEUED`, 업로드 확인됨 | 확인 안 함 | `200` (멱등 — 재시도가 오류로 보이면 안 된다) |
+| `QUEUED`, 미확인 | 객체 있고 **크기 일치** | `200`, 업로드 확인 기록 |
+| `QUEUED`, 미확인 | 객체 없음 또는 크기 불일치 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
+| `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
+| `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
+| `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
+| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) |
+| `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
+| 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
+
+24시간 경과분을 객체 존재와 무관하게 `410` 으로 두는 것은 의도다 — 삭제는 sweeper 가 자기 주기로 하므로
+남아 있다고 받아 주면 유예 기간이 무의미해진다.
 
 ### GET `/agents/{agentId}/documents`
 
@@ -1130,6 +1178,12 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `AGENT_NOT_FOUND` *(007)* | Agent 없음 |
 | `AGENT_LIMIT_EXCEEDED` *(007)* | 이 부스에는 이미 AI 직원이 있다 — 부스당 1명(C-13). 수정은 `PATCH`. `message`가 상한을 담는다 |
 | `AGENT_DELETE_CONFLICT` *(007)* | 배치·문서·상담 중 하나가 아직 이 직원을 가리킨다 (C-14). `message`가 무엇이 막는지 말한다 |
+| `DOCUMENT_NOT_FOUND` *(007)* | 문서 없음 |
+| `DOCUMENT_LIMIT_EXCEEDED` *(007)* | AI 직원당 10개·100MB 상한 (FR-018). 둘 다 설정값이라 `message`가 숫자를 담는다 |
+| `DOCUMENT_UPLOAD_INCOMPLETE` *(007)* | 발급한 URL 로 올린 것이 저장소에 없거나 크기가 다르다 — 다시 올리면 되는 상태다 |
+| `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
+| `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
+| `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -1192,10 +1246,35 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > |---|---|---|
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `AI_STORAGE_UPLOAD_GATE`·`AI_STORAGE_ACTIVE_WRITE_PROVIDER` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `MINIO_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` *(007, fallback 시)* | 빈 값 | 전부 비면 미구성으로 빠진다. **부분 입력이면 기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
 > | `ROOT_DOMAIN` | 없음 | `application-infra.yml` 의 `app.world.host` 가 `world.` 만 남는다 |
 > | `SPRING_PROFILES_ACTIVE` | `local` (`spring.profiles.default`) | 배포에서도 `local` 프로파일이 뜬다 — 아래 |
+>
+> **문서 저장소 (S15P21A604-106).** `R2_*` 는 Infra 가 소유하는 credential 로, 문서 bucket 과
+> 서버가 만드는 prefix 로 scope 를 좁힌 것을 받는다 (GitLab #84). 삭제 유예 정리(FR-028)까지 하려면
+> 그 prefix 에 대한 `DeleteObject` 가 필요하다.
+>
+> **업로드 허용 게이트는 한 칸이다** (GitLab #100, 2026-09-01 확정). 기본값을 두지 않은 것이 의도다 —
+> 기본값이 "허용" 이면 키 이름을 틀렸을 때 Spring 이 조용히 무시하고 **차단이 열린 채로 뜬다.**
+>
+> | `AI_STORAGE_UPLOAD_GATE` | 뜻 | 응답 |
+> |---|---|---|
+> | `OPEN` | 정상·경고, `LOCAL_ACTIVE` 검증 완료 | 발급 |
+> | `QUOTA_BLOCKED` | 사용량 90% 초과 — 재시도해도 풀리지 않는다 | `507 STORAGE_QUOTA_EXCEEDED` |
+> | `UNAVAILABLE` | stale 지표·R2 장애·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `503 STORAGE_UNAVAILABLE` |
+>
+> 운영자가 Usage Guard(`usage-guard.schema.json`)와 저장소 전환 상태를 읽고 위 한 칸으로 옮겨 적는다 —
+> **서버는 상태 기계를 알지 못한다.** 507 과 503 을 가르는 것이 이 게이트를 boolean 이 아니라 enum 으로
+> 둔 이유다: 용량이 찬 사용자에게 "잠시 후 다시" 를 주면 영원히 재시도한다.
+>
+> **`AI_STORAGE_ACTIVE_WRITE_PROVIDER` 는 신규 업로드가 갈 곳일 뿐이다.** 기존 객체의 읽기·HEAD·삭제는
+> 문서 행의 `storage_provider` 를 따른다(FR-030) — 전환 전에 올라간 파일은 옛 provider 에 남는다.
+> MinIO 로 옮길 때는 `MINIO_*` 4종을 채우고 이 값을 `MINIO_LOCAL` 로 바꾼다. MinIO 항목은 전 필드가
+> 비면 미구성으로 보고 목록에서 빠지므로, R2 만 쓰는 배포는 그 4종을 주지 않아도 된다 (부분 입력은 기동 실패).
 >
 > **프로파일은 `SPRING_PROFILES_ACTIVE=infra` 다.** `FESTA_ENVIRONMENT` 는 Spring 프로파일이
 > 아니다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
