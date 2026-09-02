@@ -62,6 +62,36 @@ class GameAssetImageValidatorTest {
     }
 
     /**
+     * JPEG, the other still format the contract accepts and the one the sniffer reads shortest.
+     *
+     * <p>Three magic bytes, against PNG's eight — so a JPEG is the format most likely to be missed
+     * by a signature check that is subtly wrong, and nothing else here would notice.
+     */
+    @Test
+    void aPlainJpegIsAcceptedAsAJpeg() {
+        byte[] jpeg = jpeg(48, 24);
+
+        GameAssetImageValidator.VerifiedImage verified = validator.verify(jpeg, jpeg.length);
+
+        assertEquals("image/jpeg", verified.contentType());
+        assertEquals(48, verified.width());
+        assertEquals(24, verified.height());
+    }
+
+    /**
+     * Size is checked before anything is decoded, so nothing has to hold the file to refuse it.
+     *
+     * <p>The bytes here are not an image at all, which is the point: if this passed the size gate it
+     * would come back {@code DECODE_FAILED}, and the uploader would be told their 6 MB photo is
+     * corrupt rather than too big.
+     */
+    @Test
+    void aFileOverTheSizeLimitIsRefusedBeforeItIsDecoded() {
+        assertRefusal(new byte[(int) GameAssetImageValidator.MAX_BYTES + 1],
+                ErrorCode.GAME_ASSET_TOO_LARGE, "SIZE_EXCEEDED");
+    }
+
+    /**
      * The declared type is not consulted at all — the bytes decide.
      *
      * <p>This is the disguise case: a real GIF uploaded as {@code image/png} is stored as a GIF,
@@ -175,6 +205,16 @@ class GameAssetImageValidatorTest {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ImageIO.write(canvas(width, height, BufferedImage.TYPE_INT_RGB), "png", out);
+            return out.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private byte[] jpeg(int width, int height) {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(canvas(width, height, BufferedImage.TYPE_INT_RGB), "jpg", out);
             return out.toByteArray();
         } catch (IOException exception) {
             throw new IllegalStateException(exception);

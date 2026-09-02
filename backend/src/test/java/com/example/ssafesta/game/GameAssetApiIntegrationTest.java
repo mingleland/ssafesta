@@ -1,6 +1,7 @@
 package com.example.ssafesta.game;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +24,9 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import javax.imageio.ImageIO;
 import com.example.ssafesta.storage.FakeObjectStorage;
 import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
@@ -88,6 +92,202 @@ class GameAssetApiIntegrationTest {
                         org.hamcrest.Matchers.startsWith("https://")))
                 .andExpect(jsonPath("$.requiredHeaders['Content-Type']").value("image/png"))
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty());
+    }
+
+    /**
+     * The signature has to name the object the row names, for exactly as long as the row's grant.
+     *
+     * <p>Nothing else in this class looks at {@code uploadUrl} — the middle step is faked by writing
+     * to the key directly — so a {@code presignPut} handed the wrong key, the wrong bucket or a
+     * longer lifetime would round-trip perfectly and still be a grant to write somewhere else. A
+     * signature outliving {@code expiresAt} is the specific one that bites: bytes land after
+     * {@code complete} has already refused the row, and the object is left with nothing pointing at
+     * it (§3.1).
+     */
+    @Test
+    void theGrantSignsTheObjectTheRowNamesForTheGrantsOwnLifetime() throws Exception {
+        Owner owner = owner("서명대상");
+
+        JsonNode grant = start(owner, 4096);
+        String uploadUrl = grant.get("uploadUrl").asText();
+
+        assertTrue(uploadUrl.contains("/test-ai-documents/"
+                        + objectKey(owner.gameId(), grant.get("assetId").asText())),
+                "서명이 이 행의 bucket·key 를 가리키지 않는다: " + uploadUrl);
+        assertTrue(uploadUrl.contains("&len=4096"), "선언 크기가 서명에 실리지 않았다: " + uploadUrl);
+        assertTrue(uploadUrl.contains("&ttl=" + GameAssetService.GRANT_TTL.toSeconds()),
+                "서명 수명이 GRANT_TTL 과 다르다: " + uploadUrl);
+
+        Instant expiresAt = Instant.parse(grant.get("expiresAt").asText());
+        Duration drift = Duration.between(Instant.now().plus(GameAssetService.GRANT_TTL), expiresAt)
+                .abs();
+        assertTrue(drift.compareTo(Duration.ofMinutes(1)) < 0,
+                "expiresAt 이 GRANT_TTL 과 어긋난다: " + expiresAt);
+    }
+
+    // ── 발급 거절 (contract §3.1 · §6) ──────────────────────────────────────
+
+    /**
+     * {@code AUDIO} is refused rather than defaulted to {@code IMAGE} (§1).
+     *
+     * <p>The FE's port type carries {@code AUDIO} and v1 does not support it, so the enum's silence
+     * has to become an answer. Falling back to {@code IMAGE} would issue a grant, take the bytes and
+     * fail them at verification — a decode error for a file that was never wrong.
+     */
+    @Test
+    void aKindOutsideTheSupportedSetIsRefused() throws Exception {
+        Owner owner = owner("종류");
+
+        mockMvc.perform(startRequest(owner, "\"AUDIO\"", "\"audio/mpeg\"", "4096"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_KIND_UNSUPPORTED"))
+                .andExpect(jsonPath("$.errors[0].rule").value("KIND_UNSUPPORTED"));
+    }
+
+    /**
+     * The declared type is refused early when it is one we would never accept anyway.
+     *
+     * <p>Early, and only early: this decides nothing about what is stored — {@link
+     * GameAssetImageValidator} re-reads the bytes at {@code complete}. Refusing here saves the
+     * round trip for the cases that cannot possibly pass, and {@code image/svg+xml} is the one that
+     * matters because SVG carries script.
+     */
+    @Test
+    void aDeclaredTypeOutsideTheAllowlistIsRefused() throws Exception {
+        Owner owner = owner("선언타입");
+
+        for (String declared : List.of("\"image/svg+xml\"", "\"application/pdf\"", "null")) {
+            mockMvc.perform(startRequest(owner, "\"IMAGE\"", declared, "4096"))
+                    .andExpect(status().isUnsupportedMediaType())
+                    .andExpect(jsonPath("$.code").value("GAME_ASSET_TYPE_UNSUPPORTED"))
+                    .andExpect(jsonPath("$.errors[0].rule").value("MIME_NOT_ALLOWED"));
+        }
+    }
+
+    /**
+     * Both ends of the declared size, and the absent one.
+     *
+     * <p>A missing {@code byteSize} becomes {@code 0} in the controller, so it lands on the same
+     * refusal as a declared zero rather than on a {@code NullPointerException}. Zero matters on its
+     * own: a grant for an empty file is a signature nobody can use, issued against the quota.
+     */
+    @Test
+    void aDeclaredSizeOutsideTheBoundsIsRefused() throws Exception {
+        Owner owner = owner("선언크기");
+        String overLimit = String.valueOf(GameAssetImageValidator.MAX_BYTES + 1);
+
+        for (String declared : List.of("0", "-1", "null", overLimit)) {
+            mockMvc.perform(startRequest(owner, "\"IMAGE\"", "\"image/png\"", declared))
+                    .andExpect(status().isPayloadTooLarge())
+                    .andExpect(jsonPath("$.code").value("GAME_ASSET_TOO_LARGE"))
+                    .andExpect(jsonPath("$.errors[0].rule").value("SIZE_EXCEEDED"));
+        }
+    }
+
+    /**
+     * Only the owner writes. Reading is judged separately and is already covered below.
+     *
+     * <p>Both write calls, not just the first: {@code complete} is the one that would be reached by
+     * an id leaked out of a shared editor session, and it is a different method with its own guard
+     * call. 403 rather than 404 — the contract names {@code GAME_FORBIDDEN} for exactly this and the
+     * caller already knows the game id it asked for.
+     */
+    @Test
+    void aStrangerMayNeitherStartAnUploadNorCompleteOne() throws Exception {
+        Owner owner = owner("쓰기소유자");
+        Owner stranger = owner("쓰기남");
+        Uploaded uploaded = upload(owner, png(8, 8));
+
+        mockMvc.perform(post("/api/v1/games/" + owner.gameId() + "/assets")
+                        .header("Authorization", bearerFor(stranger.userId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(startBody("\"IMAGE\"", "\"image/png\"", "4096")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GAME_FORBIDDEN"));
+
+        mockMvc.perform(post("/api/v1/games/" + owner.gameId() + "/assets/"
+                        + uploaded.assetId() + "/complete")
+                        .header("Authorization", bearerFor(stranger.userId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GAME_FORBIDDEN"));
+    }
+
+    /** An id nobody issued is absent, not forbidden — the caller owns the game it asked about. */
+    @Test
+    void anAssetIdThatWasNeverIssuedIsNotFound() throws Exception {
+        Owner owner = owner("없는자산");
+
+        mockMvc.perform(completeRequest(owner, "aNeverIssuedAssetIdentifier"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_NOT_FOUND"));
+        mockMvc.perform(get(contentPath(owner.gameId(), "aNeverIssuedAssetIdentifier"))
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_NOT_FOUND"));
+    }
+
+    /**
+     * The quota counts what can still become an image, and an expired grant cannot.
+     *
+     * <p>Both halves are one test because the second is what stops the first from being a trap: a
+     * count of every row would let ten minutes of abandoned uploads lock a project out permanently,
+     * and the delete endpoint that would clear them is not built yet. The rows are inserted directly
+     * — three hundred round trips through the API would test the same predicate far more slowly.
+     *
+     * <p>The freed row is expired but not yet stale ({@code UNUSABLE_RETENTION} is an hour), so it
+     * is still on the table when the count runs. That keeps this about {@code countChargeable} and
+     * not about the cleanup, which has its own test.
+     */
+    @Test
+    void anExpiredGrantStopsCountingAgainstTheQuota() throws Exception {
+        Owner owner = owner("한도");
+        seedChargeableAssets(owner, GameAssetService.MAX_ASSETS_PER_GAME);
+
+        mockMvc.perform(startRequest(owner, png(8, 8).length))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_QUOTA_EXCEEDED"))
+                .andExpect(jsonPath("$.errors[0].rule").value("QUOTA_EXCEEDED"));
+
+        jdbc.update("""
+                UPDATE game_assets SET upload_expires_at = now() - interval '5 minutes'
+                 WHERE game_id = ? AND asset_id = ?
+                """, owner.gameId(), seededAssetId(1));
+
+        mockMvc.perform(startRequest(owner, png(8, 8).length))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * Rows that can never become usable are dropped on the next issue, and their objects queued.
+     *
+     * <p>Two native statements with the same three-part predicate, run one after the other inside
+     * issuance — the order is the whole point: after the delete there is nothing left to read the
+     * coordinates from, so a queue-second version leaks every object it drops. Both are invisible to
+     * the compiler, which is why this goes through real rows rather than a repository call.
+     *
+     * <p>The still-valid grant is here to fail the test if the predicate ever widens: sweeping a row
+     * whose ten minutes have not run out would delete an upload that is on its way.
+     */
+    @Test
+    void issuingAGrantSweepsTheRowsThatCanNeverBecomeUsable() throws Exception {
+        Owner owner = owner("청소");
+        insertAsset(owner, "aStaleFailedRowIdentifier", "FAILED",
+                "now() + interval '10 minutes'", "now() - interval '2 hours'", "'DECODE_FAILED'");
+        insertAsset(owner, "aStaleUploadingRowIdent01", "UPLOADING",
+                "now() - interval '2 hours'", "now() - interval '2 hours'", "NULL");
+        insertAsset(owner, "aLiveUploadingRowIdent001", "UPLOADING",
+                "now() + interval '10 minutes'", "now()", "NULL");
+
+        mockMvc.perform(startRequest(owner, png(8, 8).length)).andExpect(status().isOk());
+
+        assertEquals(0, assetRows(owner, "aStaleFailedRowIdentifier"), "만료된 FAILED 행이 남았다");
+        assertEquals(0, assetRows(owner, "aStaleUploadingRowIdent01"), "만료된 UPLOADING 행이 남았다");
+        assertEquals(1, assetRows(owner, "aLiveUploadingRowIdent001"), "유효한 grant 를 지웠다");
+        assertEquals(1, queuedObjects(objectKey(owner.gameId(), "aStaleFailedRowIdentifier")),
+                "행을 지우기 전에 객체 좌표를 큐로 옮겨야 한다");
+        assertEquals(1, queuedObjects(objectKey(owner.gameId(), "aStaleUploadingRowIdent01")),
+                "만료된 grant 도 PUT 을 받았을 수 있다 — 좌표를 버리면 고아 객체가 된다");
+        assertEquals(0, queuedObjects(objectKey(owner.gameId(), "aLiveUploadingRowIdent001")));
     }
 
     @Test
@@ -185,6 +385,59 @@ class GameAssetApiIntegrationTest {
     }
 
     /**
+     * Bytes that arrive after the grant ran out are not verified, however good they are.
+     *
+     * <p>The image here is a perfectly valid PNG, so nothing but the clock refuses it. Verifying it
+     * anyway would accept an object written under a signature this row had already stopped
+     * vouching for, and the row's own {@code upload_expires_at} would mean nothing.
+     *
+     * <p>The object is queued like any other failure: an expired grant may well have received its
+     * {@code PUT}, because the browser uploads without telling us.
+     */
+    @Test
+    void bytesThatLandAfterTheGrantExpiredAreRefusedWithoutVerifying() throws Exception {
+        Owner owner = owner("만료");
+        byte[] image = png(8, 8);
+        JsonNode grant = start(owner, image.length);
+        String assetId = grant.get("assetId").asText();
+        storage.putBytes(objectKey(owner.gameId(), assetId), image);
+        jdbc.update("""
+                UPDATE game_assets SET upload_expires_at = now() - interval '1 minute'
+                 WHERE game_id = ? AND asset_id = ?
+                """, owner.gameId(), assetId);
+
+        mockMvc.perform(completeRequest(owner, assetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureRule").value("GRANT_EXPIRED"));
+
+        assertEquals(1, queuedObjects(objectKey(owner.gameId(), assetId)));
+    }
+
+    /**
+     * A client that declared a kilobyte and uploaded six megabytes is told which rule refused it.
+     *
+     * <p>The read is bounded by the contract's limit and comes back one byte too long, which the
+     * validator turns into {@code SIZE_EXCEEDED} — the same rule a too-large <i>declared</i> size
+     * gets at issuance. Reporting {@code UPLOAD_MISSING} instead, which an exception swallowed at
+     * the read would produce, sends the uploader to re-upload a file that arrived perfectly well.
+     */
+    @Test
+    void anObjectPastTheLimitIsRefusedForItsSizeAndNotAsAMissingUpload() throws Exception {
+        Owner owner = owner("거대");
+        JsonNode grant = start(owner, 1024);
+        String assetId = grant.get("assetId").asText();
+
+        storage.putBytes(objectKey(owner.gameId(), assetId),
+                new byte[(int) GameAssetImageValidator.MAX_BYTES + 1]);
+
+        mockMvc.perform(completeRequest(owner, assetId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"))
+                .andExpect(jsonPath("$.failureRule").value("SIZE_EXCEEDED"));
+    }
+
+    /**
      * A verified-and-rejected object is queued for deletion, and the sweep removes it.
      *
      * <p>Queued rather than deleted on the spot: the delete would be a network call inside the
@@ -209,7 +462,7 @@ class GameAssetApiIntegrationTest {
         deleteQueue.sweep();
 
         assertEquals(0, queuedObjects(), "성공한 삭제는 큐에서 사라진다");
-        assertTrue(!storage.hasObject(key), "객체가 지워져야 한다");
+        assertFalse(storage.hasObject(key), "객체가 지워져야 한다");
     }
 
     /** Nothing to delete is a success, so the row is cleared instead of retried forever. */
@@ -372,7 +625,6 @@ class GameAssetApiIntegrationTest {
     private Uploaded upload(Owner owner, byte[] image) throws Exception {
         JsonNode grant = start(owner, image.length);
         String assetId = grant.get("assetId").asText();
-        String uploadUrl = grant.get("uploadUrl").asText();
 
         storage.putBytes(objectKey(owner.gameId(), assetId), image);
         MvcResult completed = mockMvc.perform(completeRequest(owner, assetId))
@@ -382,7 +634,7 @@ class GameAssetApiIntegrationTest {
         String body = completed.getResponse().getContentAsString();
         String source = MAPPER.readTree(body).get("source").asText();
         assertTrue(source.startsWith("asset://game/" + owner.gameId() + "/"), source);
-        return new Uploaded(assetId, uploadUrl, source, body);
+        return new Uploaded(assetId, source, body);
     }
 
     private JsonNode start(Owner owner, int byteSize) throws Exception {
@@ -394,11 +646,24 @@ class GameAssetApiIntegrationTest {
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder startRequest(
             Owner owner, int byteSize) {
+        return startRequest(owner, "\"IMAGE\"", "\"image/png\"", String.valueOf(byteSize));
+    }
+
+    /**
+     * Each field is written as raw JSON so a test can send {@code null} — or a type the record would
+     * not hold — the way a browser can. Binding a DTO in the test would only prove the DTO binds.
+     */
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder startRequest(
+            Owner owner, String kind, String contentType, String byteSize) {
         return post("/api/v1/games/" + owner.gameId() + "/assets")
                 .header("Authorization", bearerFor(owner.userId()))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"kind\":\"IMAGE\",\"contentType\":\"image/png\",\"byteSize\":" + byteSize
-                        + ",\"fileName\":\"sprite.png\"}");
+                .content(startBody(kind, contentType, byteSize));
+    }
+
+    private String startBody(String kind, String contentType, String byteSize) {
+        return "{\"kind\":" + kind + ",\"contentType\":" + contentType
+                + ",\"byteSize\":" + byteSize + ",\"fileName\":\"sprite.png\"}";
     }
 
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder completeRequest(
@@ -428,6 +693,62 @@ class GameAssetApiIntegrationTest {
 
     private long queuedObjects() {
         return jdbc.queryForObject("SELECT COUNT(*) FROM game_asset_delete_queue", Long.class);
+    }
+
+    private long queuedObjects(String objectKey) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM game_asset_delete_queue WHERE object_key = ?",
+                Long.class, objectKey);
+    }
+
+    private long assetRows(Owner owner, String assetId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM game_assets WHERE game_id = ? AND asset_id = ?",
+                Long.class, owner.gameId(), assetId);
+    }
+
+    /**
+     * One row in whatever state and age the caller needs.
+     *
+     * <p>The three timestamps are pasted in as SQL rather than bound, because they are expressions
+     * ({@code now() - interval '2 hours'}) and the point of every caller is the age. Nothing here
+     * comes from outside the test.
+     */
+    private void insertAsset(Owner owner, String assetId, String status, String expiresAt,
+                             String updatedAt, String failureRule) {
+        jdbc.update("""
+                INSERT INTO game_assets (game_id, asset_id, kind, status, provider, storage_bucket,
+                                         object_key, declared_content_type, declared_byte_size,
+                                         upload_expires_at, updated_at, failure_rule,
+                                         created_by_user_id)
+                VALUES (?, ?, 'IMAGE', '%s', 'R2', 'test-ai-documents', ?, 'image/png', 64,
+                        %s, %s, %s, ?)
+                """.formatted(status, expiresAt, updatedAt, failureRule),
+                owner.gameId(), assetId, objectKey(owner.gameId(), assetId), owner.userId());
+    }
+
+    /**
+     * Fills the quota straight through JDBC.
+     *
+     * <p>Three hundred issue calls would exercise the same {@code countChargeable} predicate three
+     * hundred times and take a minute to say so. The ids match the issued shape (26 characters,
+     * leading letter) so the rows are indistinguishable from real ones to every query under test.
+     */
+    private void seedChargeableAssets(Owner owner, int count) {
+        jdbc.update("""
+                INSERT INTO game_assets (game_id, asset_id, kind, status, provider, storage_bucket,
+                                         object_key, declared_content_type, declared_byte_size,
+                                         upload_expires_at, created_by_user_id)
+                SELECT ?, 'aSeeded' || lpad(n::text, 19, '0'), 'IMAGE', 'UPLOADING', 'R2',
+                       'test-ai-documents',
+                       'games/' || ? || '/assets/aSeeded' || lpad(n::text, 19, '0'),
+                       'image/png', 64, now() + interval '10 minutes', ?
+                  FROM generate_series(1, ?) AS n
+                """, owner.gameId(), owner.gameId(), owner.userId(), count);
+    }
+
+    private String seededAssetId(int index) {
+        return "aSeeded" + String.format("%019d", index);
     }
 
     private String contentPath(Long gameId, String assetId) {
@@ -461,5 +782,5 @@ class GameAssetApiIntegrationTest {
 
     private record Owner(Long userId, Long gameId) { }
 
-    private record Uploaded(String assetId, String uploadUrl, String source, String completeBody) { }
+    private record Uploaded(String assetId, String source, String completeBody) { }
 }
