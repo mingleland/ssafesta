@@ -1191,6 +1191,7 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | 변수 | 기본값 | 없으면 |
 > |---|---|---|
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
+> | `FESTA_ENVIRONMENT`(`dev`\|`demo`) | 없음 | **기동 실패** — Redis 키 네임스페이스다(`S15P21A604-349`). 조용히 빈 값으로 뜨면 dev·demo 가 세션과 일일 지급을 공유한다 |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
@@ -1198,7 +1199,9 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | `SPRING_PROFILES_ACTIVE` | `local` (`spring.profiles.default`) | 배포에서도 `local` 프로파일이 뜬다 — 아래 |
 >
 > **프로파일은 `SPRING_PROFILES_ACTIVE=infra` 다.** `FESTA_ENVIRONMENT` 는 Spring 프로파일이
-> 아니다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
+> 아니라 **Redis 키 네임스페이스**(`app.redis.namespace`)다 — dev·demo 가 단일 EC2 의 Redis 한
+> 인스턴스를 공유하므로 모든 키가 이 값을 맨 앞에 단다(`S15P21A604-349`, infra-002 T059·T060).
+> 둘은 각각 주입해야 한다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
 > `specs/infra-002-environments/tasks.md` T059) 파일도 `a51f88a0`(`-170`, MR !150)로 들어왔다.
 >
 > ⚠️ **다만 지금 `infra` 로 띄우면 기동하지 않는다.** Spring 의 `application-{profile}.yml` 은

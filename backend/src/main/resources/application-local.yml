@@ -4,7 +4,7 @@
 #   1. .env 읽기 — 로컬에서만 쓰는 경로다
 #   2. application.yml 이 기본값을 두지 않은 키의 로컬 기본값
 #
-# 2번의 세 키는 배포에서 로컬 값으로 조용히 뜨면 안 되는 것들이라 공통 위치에는 기본값이
+# 2번의 네 키는 배포에서 로컬 값으로 조용히 뜨면 안 되는 것들이라 공통 위치에는 기본값이
 # 없다. 그래서 로컬 기본값을 이 파일이 같은 키를 덮어 제공한다 — 프로파일 파일이
 # application.yml 보다 우선하므로 여기 값이 이긴다.
 spring:
@@ -14,6 +14,8 @@ spring:
     password: ${POSTGRES_PASSWORD:change-me-local-only}
 
 app:
+  redis:
+    namespace: ${FESTA_ENVIRONMENT:local}
   auth:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
     # HTTP localhost test only. Set AUTH_COOKIE_SECURE=true in HTTPS deployment.
