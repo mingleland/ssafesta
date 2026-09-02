@@ -14,6 +14,22 @@
 4. shell tracing은 켜지 않으며 URL query, command argument, filename에 값을 넣지 않는다.
 5. 보관 전 `secret-scan.sh`를 통과한 artifact만 archive한다.
 
+## 애플리케이션 런타임 credential
+
+Jenkins에 아래 ID를 등록하고 `infra/.env`에는 ID만 적는다.
+
+| ID 변수 | Jenkins 종류 | 내용 |
+|---|---|---|
+| `DEV_BACK_ENV_CREDENTIAL_ID` | Secret file | dev Spring 전용 dotenv |
+| `DEV_AI_ENV_CREDENTIAL_ID` | Secret file | dev FastAPI 전용 dotenv |
+| `DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID` | Secret text | dev FastAPI→Spring 토큰 1~2개 |
+| `DEMO_BACK_ENV_CREDENTIAL_ID` | Secret file | demo Spring 전용 dotenv |
+| `DEMO_AI_ENV_CREDENTIAL_ID` | Secret file | demo FastAPI 전용 dotenv |
+| `DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID` | Secret text | demo FastAPI→Spring 토큰 1~2개 |
+
+Spring과 FastAPI dotenv에는 각 서비스가 소비하는 값만 둔다. 공통 토큰은 dotenv에 복제하지 않고
+환경별 Secret text 하나를 두 컨테이너에 주입한다. dev와 demo credential은 공유하지 않는다.
+
 ## 회전
 
 1. 제공 시스템에서 새 값을 발급하되 기존 값을 즉시 폐기하지 않는다.

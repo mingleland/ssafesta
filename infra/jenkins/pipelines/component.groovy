@@ -17,7 +17,21 @@ def call(Map config = [:]) {
                 if (fresh != 0) { error('freshness check failed') }
                 def meta = readJSON file: "artifacts/${component}/image-metadata.json"
                 withEnv(["COMPOSE_FILE=infra/deploy/compose/dev/${component}.compose.yaml", "COMPOSE_PROJECT=festa-dev-${component}", "COMPOSE_SERVICE=${component}", "IMAGE_REF=${meta.imageRef}", "CONTENT_ID=${meta.contentId}"]) {
-                    sh 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/deploy-component.sh'
+                    if (component in ['ai', 'back']) {
+                        String envCredentialName = component == 'back' ? 'DEV_BACK_ENV_CREDENTIAL_ID' : 'DEV_AI_ENV_CREDENTIAL_ID'
+                        String envCredentialId = env[envCredentialName]?.trim()
+                        String tokenCredentialId = env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID?.trim()
+                        if (!envCredentialId) { error("필수 Jenkins credential ID 누락: ${envCredentialName}") }
+                        if (!tokenCredentialId) { error('필수 Jenkins credential ID 누락: DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID') }
+                        withCredentials([
+                            file(credentialsId: envCredentialId, variable: 'COMPONENT_ENV_FILE'),
+                            string(credentialsId: tokenCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                        ]) {
+                            sh 'infra/jenkins/scripts/with-credentials.sh COMPONENT_ENV_FILE INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-component.sh'
+                        }
+                    } else {
+                        sh 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/deploy-component.sh'
+                    }
                 }
             }
         }

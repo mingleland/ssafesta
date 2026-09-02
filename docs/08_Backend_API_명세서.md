@@ -1254,11 +1254,10 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 - 누락·오류·**반대 방향 토큰**은 전부 `401 UNAUTHORIZED`
 - mTLS는 P2다 — 두 서비스가 같은 VPC 안이라 mTLS가 막는 위협이 현 배치에 없다
 
-> ⚠️ **배포 조치 (Infra).** `INTERNAL_AI_TO_SPRING_TOKENS` 는 **기본값이 없어 주입하지 않으면
-> 애플리케이션이 기동하지 않는다.** 현재 `infra/deploy/compose/dev/back.compose.yaml` 은 환경변수를
-> 하나도 넘기지 않고 `integration/compose.yaml` 도 `FESTA_ENVIRONMENT`·`AI_BASE_URL` 둘뿐이라,
-> 이 값은 물론 아래 목록 전체가 아직 컨테이너에 도달하지 않는다. Jenkins credential →
-> `with-credentials.sh` → compose `environment` 경로로 함께 wire 해야 한다.
+> **배포 주입 (Infra, S15P21A604-356).** Backend·FastAPI 서비스별 Secret File과 환경별
+> `INTERNAL_AI_TO_SPRING_TOKENS` Secret Text를 Jenkins credential → Pipeline → Compose `env_file`·`environment`로
+> 주입한다. `SPRING_PROFILES_ACTIVE=infra`와 `FESTA_ENVIRONMENT=dev|demo`는 Compose가 명시한다.
+> 실제 Secret 값은 Jenkins Credentials에만 두며 저장소와 `infra/.env`에는 넣지 않는다.
 >
 > | 변수 | 기본값 | 없으면 |
 > |---|---|---|
