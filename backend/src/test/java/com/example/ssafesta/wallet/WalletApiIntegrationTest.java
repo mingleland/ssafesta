@@ -78,6 +78,23 @@ class WalletApiIntegrationTest {
         mockMvc.perform(get("/api/v1/wallets/me")).andExpect(status().isUnauthorized());
     }
 
+    /**
+     * A member with no wallet row is a broken signup, and says so with its own code.
+     *
+     * <p>Distinct from the guest case above on purpose: a guest is 403 (wallets are not for
+     * guests), while this is 404 (the wallet that should exist does not). The daily-grant
+     * interceptor fails first and only logs it — 헌법 3조 keeps that failure from taking over the
+     * response — so what the client sees is the controller's `WALLET_NOT_FOUND` (S15P21A604-388).
+     */
+    @Test
+    void aMemberWhoseWalletWasNeverOpenedIsNotFound() throws Exception {
+        Long userId = createMember(users, "API무지갑");
+
+        mockMvc.perform(get("/api/v1/wallets/me").header("Authorization", bearerFor(userId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WALLET_NOT_FOUND"));
+    }
+
     @Test
     void transactionsAreReturnedNewestFirstInPages() throws Exception {
         Long userId = createMember(users, "API내역");
