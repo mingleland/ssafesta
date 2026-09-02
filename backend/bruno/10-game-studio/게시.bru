@@ -1,0 +1,45 @@
+meta {
+  name: 게시
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}/publish
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "expectedRevision": 1
+  }
+}
+
+docs {
+  ## 게시 — 지금 작업본을 플레이 가능한 회차로 굳힌다
+
+  - 인증: **필수** (소유자)
+  - 성공: `200 OK`, `{ gameId, publishedVersion, publishedAt, warnings }`
+
+  본문의 `expectedRevision`은 **게시하려는 작업본의 회차를 확인하는 값**이다. 다르면 `409 GAME_REVISION_CONFLICT`로 거부한다 — 편집기가 화면에 들고 있는 것과 다른 내용이 게시되는 일을 막는다. `작업본 저장` 응답의 `revision`을 그대로 넣는다.
+
+  게시 후에도 작업본은 남아 계속 편집할 수 있다. 플레이되는 것은 **가장 최근 게시 회차**뿐이고, 다시 게시하면 회차가 하나 늘어난다.
+
+  ### 게시했어도 비공개면 남이 못 한다
+
+  공개 설정은 별개 축이다. `공개 설정 변경`으로 `PUBLIC`을 켜야 `게시본 조회`가 남에게 `200`을 준다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 게시 성공 |
+  | `400 VALIDATION_FAILED` | `expectedRevision` 누락·음수 |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404` | 게임이 없거나 삭제됐거나, 게시할 작업본이 없다 |
+  | `409 GAME_REVISION_CONFLICT` | 작업본 회차 불일치 |
+  | `409 GAME_VALIDATION_FAILED` | 완성 규칙 위반 |
+}

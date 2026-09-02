@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -99,8 +100,20 @@ public class BoothFacadeService {
         }
     }
 
-    public record FacadeCommand(String themeCode, String primaryColor, String signText, String logoUrl) { }
+    @Schema(description = "외관 값 전체. 보내지 않은 필드는 비워진다")
+    public record FacadeCommand(
+            @Schema(description = "외벽 테마. 생략하면 `DEFAULT`",
+                    allowableValues = {"DEFAULT", "SSAFY_BLUE", "WARM", "MONO"}, example = "SSAFY_BLUE")
+            String themeCode,
+            @Schema(description = "대표색. `#RRGGBB` 이면서 12색 팔레트 안의 값", example = "#3B82F6")
+            String primaryColor,
+            @Schema(description = "간판 문구. 최대 60자", maxLength = 60, example = "AI 프로젝트 전시관")
+            String signText,
+            @Schema(description = "로고 이미지 주소. **https 만** 허용, 최대 2048자", maxLength = 2048,
+                    example = "https://cdn.example.com/logo.png")
+            String logoUrl) { }
 
+    @Schema(description = "저장된 외관. 방문자용 부스 상세의 `facade` 와 같은 모양이다")
     public record FacadeView(String themeCode, String primaryColor, String signText, String logoUrl) {
 
         public static FacadeView of(Booth booth) {

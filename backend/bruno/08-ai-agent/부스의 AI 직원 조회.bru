@@ -1,0 +1,24 @@
+meta {
+  name: 부스의 AI 직원 조회
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/agents
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 부스의 AI 직원 조회 — 0개 또는 1개
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `200 OK`, `{ agents: [...] }` — 부스당 1명이라 길이는 **0 또는 1**
+
+  아직 만들지 않았으면 `404`가 아니라 **빈 배열**이다. 스튜디오는 그 응답으로 "AI 직원 만들기" 버튼을 띄운다.
+}

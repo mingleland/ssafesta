@@ -1,0 +1,51 @@
+meta {
+  name: 게임 생성
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/games
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "첫 번째 게임"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body.gameId) {
+    bru.setEnvVar("gameId", res.body.gameId);
+  }
+}
+
+docs {
+  ## 게임 생성 — 빈 슬롯 하나를 얻는다
+
+  브라우저 2D 게임을 만든다 (spec 019).
+
+  - 인증: **회원 필수.** 게스트는 게임을 만들 수 없다 (FR-023)
+  - 성공: `201 Created` + `Location` 헤더. response script가 `gameId`를 저장한다
+
+  ### 작업본은 만들어지지 않는다
+
+  편집기가 자기 시작 프로젝트를 갖고 있고, `작업본 저장`의 첫 호출(`expectedRevision: 0`)에서 그것이 서버로 넘어온다. 그래서 만든 직후 `작업본 조회`는 **`204`**다.
+
+  ### 개수 상한
+
+  살아 있는 게임 수가 상한이면 `409 GAME_LIMIT_EXCEEDED`이고 현재 상한 값이 `message`에 들어 있다. 삭제본 보관 상한은 **별개 예산**이라 라이브러리가 꽉 찼다고 삭제가 막히지는 않는다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `201` | 생성 성공 |
+  | `400 VALIDATION_FAILED` | `title` 누락·규칙 위반 |
+  | `403 MEMBER_ONLY` | 게스트 토큰이다 |
+  | `409 GAME_LIMIT_EXCEEDED` | 살아 있는 게임 상한 도달 |
+}

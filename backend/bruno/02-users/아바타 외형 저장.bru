@@ -1,0 +1,47 @@
+meta {
+  name: 아바타 외형 저장
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/users/me/avatar
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
+  }
+}
+
+docs {
+  ## 아바타 외형 저장 — 값 전체를 덮어쓴다
+
+  Unity가 만든 외형 인코딩 문자열을 그대로 저장한다. `PATCH`가 아니라 `PUT`인 이유는 본문이 부분 수정이 아니라 **값 전체**이기 때문이다.
+
+  - 인증: **회원 필수**. 게스트는 `403 MEMBER_ONLY` — 외형을 서버에 영속 저장하지 않는다 (헌법 12조)
+  - 성공: `200 OK`, 보낸 값을 **글자 그대로** echo
+
+  ### 서버는 이 문자열을 해석하지 않는다
+
+  길이(3800자)와 인쇄 가능 ASCII(`0x20`–`0x7E`)만 보고, 착용 품목 검사를 위해 `fa|` 형식의 슬롯만 읽는다. trim·대소문자 변환·기본값 치환을 하지 않으므로 **저장한 값이 그대로 돌아온다** — 응답으로 그 사실을 확인할 수 있다.
+
+  상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. 낮추면 모듈러 인코딩이 잘린다 (헌법 23조·T-24).
+
+  ### 응답 코드
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 저장 성공 |
+  | `400 VALIDATION_FAILED` | 빈 값·3800자 초과·허용 문자셋 위반. 세 경우가 **서로 다른 문장**을 받는다 |
+  | `403 MEMBER_ONLY` | 게스트 토큰이다 |
+  | `409 AVATAR_ITEM_NOT_OWNED` | 보유하지 않은 파츠를 착용했다. `errors[].objectId`가 미보유 품목이다 |
+
+  미보유 거절을 재현하려면 `11-inventory/상점 목록 조회`에서 `owned: false`인 파츠의 `assetKey`를 골라 `avatarCode`에 끼워 보낸다.
+}
