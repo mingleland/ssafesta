@@ -8,7 +8,7 @@ test_project() {
       (cd "${component_dir}" \
         && python -m venv .venv \
         && .venv/bin/python -m pip install --disable-pip-version-check --no-input '.[test]' \
-        && .venv/bin/python -m pytest --junitxml="${CI_ARTIFACT_DIR}/tests.xml") ;;
+        && .venv/bin/python -m pytest tests/unit tests/contract --junitxml="${CI_ARTIFACT_DIR}/tests.xml") ;;
     back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew test; else ./mvnw test; fi) ;;
     front) (cd "${component_dir}" && npm ci && npm test -- --run) ;;
     game) bash festa-unity/ci/test ;;

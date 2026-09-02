@@ -12,6 +12,9 @@ for component in "${!expected_dirs[@]}"; do
     || { echo "${component}: wrong component directory" >&2; exit 1; }
 done
 
+grep -Fq 'pytest tests/unit tests/contract' "${repo_root}/ci/test" \
+  || { echo 'AI default CI must exclude opt-in integration tests' >&2; exit 1; }
+
 for adapter in validate test build package verify; do
   [[ -f "${repo_root}/ci/${adapter}" ]] || { echo "missing ci/${adapter}" >&2; exit 1; }
   [[ "$(git -C "${repo_root}" ls-files --stage "ci/${adapter}" | awk '{print $1}')" == 100755 ]] \
