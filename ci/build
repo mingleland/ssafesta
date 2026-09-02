@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail; source "$(dirname "$0")/lib.sh"
-build_project() { case "${CI_COMPONENT}" in ai) python -m compileall -q .;; back) if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi;; front) npm ci && npm run build;; game) bash festa-unity/ci/build --target all;; esac; }
+build_project() {
+  local component_dir
+  component_dir="$(ci_component_dir)"
+  case "${CI_COMPONENT}" in
+    ai) (cd "${component_dir}" && python -m compileall -q .) ;;
+    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi) ;;
+    front) (cd "${component_dir}" && npm ci && npm run build) ;;
+    game) bash festa-unity/ci/build --target all ;;
+  esac
+}
 ci_run build BUILD_FAILED ci_dispatch_or build build_project

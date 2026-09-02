@@ -19,5 +19,20 @@ ci_run() {
   if [[ "${CI_DRY_RUN:-0}" != 1 ]]; then "$@" || { local rc=$?; ci_summary "${stage}" FAILED "${failure_code}" "${started}"; exit "${rc}"; }; fi
   ci_summary "${stage}" SUCCEEDED '' "${started}"
 }
-ci_component_script() { echo "${ci_root}/${CI_COMPONENT}/ci/$1"; }
-ci_dispatch_or() { local stage="$1"; shift; local part; part="$(ci_component_script "${stage}")"; if [[ -f "${part}" ]]; then bash "${part}"; else "$@"; fi; }
+ci_component_dir() {
+  case "${CI_COMPONENT}" in
+    ai) echo "${ci_root}/festa-ai" ;;
+    back) echo "${ci_root}/backend" ;;
+    front) echo "${ci_root}/festa-frontend" ;;
+    game) echo "${ci_root}/festa-unity" ;;
+    *) echo "invalid CI_COMPONENT: ${CI_COMPONENT}" >&2; return 64 ;;
+  esac
+}
+ci_component_script() { echo "$(ci_component_dir)/ci/$1"; }
+ci_dispatch_or() {
+  local stage="$1"; shift
+  local component_dir part
+  component_dir="$(ci_component_dir)"
+  part="${component_dir}/ci/${stage}"
+  if [[ -f "${part}" ]]; then (cd "${component_dir}" && bash "ci/${stage}"); else "$@"; fi
+}

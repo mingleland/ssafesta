@@ -9,6 +9,8 @@ jcasc="${repo_root}/infra/jenkins/casc/jenkins.yaml"
 nginx="${repo_root}/infra/jenkins/reverse-proxy/nginx.conf"
 fixtures="${repo_root}/infra/tests/contract/fixtures"
 validator="${repo_root}/infra/jenkins/scripts/validate-contracts.sh"
+plugins="${repo_root}/infra/jenkins/plugins.txt"
+jenkinsfile="${repo_root}/Jenkinsfile"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -18,10 +20,19 @@ grep -q '127.0.0.1:8080:8080' "${controller_compose}" || fail "Jenkins 8080 is n
 ! grep -Eq '(^|[^0-9])(3000|50000):' "${controller_compose}" || fail "controller publishes a forbidden port"
 pass "controller port and mount policy"
 
+grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must use host networking"
+grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
+grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
+pass "rootless Docker Testcontainers network policy"
+
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
   [[ -x "${entrypoint}" ]] || fail "Shell entrypoint is not executable: ${entrypoint#"${repo_root}/"}"
 done
 pass "Shell entrypoint executable policy"
+
+grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinned"
+grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
+pass "controller plugin and agent capability gate"
 
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then
@@ -82,6 +93,7 @@ pass "contract schema fixtures"
 export JENKINS_IMAGE="jenkins/jenkins:foundation-test"
 export JENKINS_INBOUND_AGENT_IMAGE="jenkins/inbound-agent:foundation-test-jdk21"
 export DOCKER_CLI_IMAGE="docker:foundation-test-cli"
+export NODE_RUNTIME_IMAGE="node:foundation-test"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
