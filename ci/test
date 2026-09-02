@@ -12,6 +12,13 @@ test_project() {
     back) (
       cd "${component_dir}"
       export TESTCONTAINERS_RYUK_DISABLED=true
+      # Test-only values prevent inherited deployment secrets from affecting CI.
+      export JWT_SECRET='YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQ=='
+      export CONNECTION_TOKEN_SECRET='YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYg=='
+      export GOOGLE_CLIENT_ID=test-google-client-id GOOGLE_CLIENT_SECRET=test-google-client-secret
+      export GOOGLE_REDIRECT_URI=http://localhost:8080/login/oauth2/code/google
+      export KAKAO_REST_API_KEY=test-kakao-rest-api-key KAKAO_CLIENT_SECRET=test-kakao-client-secret
+      export KAKAO_REDIRECT_URI=http://localhost:8080/login/oauth2/code/kakao
       if [[ -x ./gradlew ]]; then ./gradlew test; else ./mvnw test; fi
     ) ;;
     front) (cd "${component_dir}" && npm ci && npm test -- --run) ;;
