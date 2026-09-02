@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { parseGameProject, type AssetReference, type GameObject, type GameProject } from '../../contracts/gameProject.ts';
+import { parseGameProject, type AssetReference, type GameObject, type GameProject, type Position2d } from '../../contracts/gameProject.ts';
 import {
   addDialogueScene,
   addAssetReference,
@@ -203,6 +203,25 @@ export const GameStudioShell = ({
   const project = snapshot.project;
   const assetUrls = useResolvedAssetUrls(project.assets, assetRepository);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // S15P21A604-391 — Scene을 옮겼다가 돌아왔을 때 그 Scene에서 마지막으로 선택했던
+  // 오브젝트/레이어/캔버스 팬(뷰포트 중심)을 복원한다. 렌더링에 직접 관여하지 않는
+  // "떠날 때 적어두는" 용도라 useRef로 충분하다(줌은 이번 범위에서 제외 — 전역 공유 유지).
+  const sceneEditMemoryRef = useRef<Map<string, {
+    readonly selectedObjectId: string | null;
+    readonly selectedObjectIds: ReadonlySet<string>;
+    readonly selectedLayerId: string | null;
+    readonly placementPreset: GameObject['preset'] | null;
+    readonly tileBrush: number | null;
+    readonly viewportCenter: Position2d | null;
+    // 속성/이벤트/데이터 탭도 씬별로 기억한다 — 세 탭 다 구분 없이 동일하게 취급한다
+    // ("데이터" 탭이 사실 프로젝트 전체를 보여줘 씬 종속은 아니지만, 사용자가 명시적으로
+    // 구분 없이 기억하길 원해서 예외 없이 저장한다).
+    readonly rightPanel: RightPanel;
+  }>>(new Map());
+  // 현재 보고 있는 Scene의 캔버스 뷰포트 중심 — TopDownCanvas가 스크롤될 때마다 갱신해준다.
+  // Scene을 떠나는 순간 이 값을 sceneEditMemoryRef에 스냅샷으로 저장한다.
+  const currentViewportCenterRef = useRef<Position2d | null>(null);
+  const [restoreViewportCenter, setRestoreViewportCenter] = useState<Position2d | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState(project.startSceneId);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedObjectIds, setSelectedObjectIds] = useState<ReadonlySet<string>>(new Set());
@@ -992,12 +1011,27 @@ export const GameStudioShell = ({
                     <button
                       className={scene.id === selectedScene.id ? 'is-active' : ''}
                       onClick={() => {
+                        if (scene.id === selectedScene.id) return;
+                        // 떠나는 Scene의 현재 편집 상태를 스냅샷으로 남긴다.
+                        sceneEditMemoryRef.current.set(selectedScene.id, {
+                          selectedObjectId,
+                          selectedObjectIds,
+                          selectedLayerId,
+                          placementPreset,
+                          tileBrush,
+                          viewportCenter: currentViewportCenterRef.current,
+                          rightPanel,
+                        });
+                        const remembered = sceneEditMemoryRef.current.get(scene.id);
                         setSelectedSceneId(scene.id);
-                        setSelectedObjectId(null);
-                        setSelectedObjectIds(new Set());
-                        setPlacementPreset(null);
-                        setTileBrush(null);
-                        setSelectedLayerId(scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null);
+                        setSelectedObjectId(remembered?.selectedObjectId ?? null);
+                        setSelectedObjectIds(remembered?.selectedObjectIds ?? new Set());
+                        setPlacementPreset(remembered?.placementPreset ?? null);
+                        setTileBrush(remembered?.tileBrush ?? null);
+                        setSelectedLayerId(remembered?.selectedLayerId
+                          ?? (scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null));
+                        setRestoreViewportCenter(remembered?.viewportCenter ?? null);
+                        setRightPanel(remembered?.rightPanel ?? 'PROPERTIES');
                       }}
                       type="button"
                     >
@@ -1335,9 +1369,11 @@ export const GameStudioShell = ({
               }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
+              onViewportSettle={(center) => { currentViewportCenterRef.current = center; }}
               onZoomChange={setZoom}
               onSelectObjects={selectObjects}
               placementPreset={placementPreset}
+              restoreViewportCenter={restoreViewportCenter}
               scene={selectedScene}
               selectedObjectId={selectedObjectId}
               selectedObjectIds={selectedObjectIds}
