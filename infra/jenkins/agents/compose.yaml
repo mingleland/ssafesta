@@ -7,6 +7,7 @@ x-agent: &agent
     args:
       JENKINS_INBOUND_AGENT_IMAGE: ${JENKINS_INBOUND_AGENT_IMAGE:?load infra/versions.env}
       DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:?load infra/versions.env}
+      NODE_RUNTIME_IMAGE: ${NODE_RUNTIME_IMAGE:?load infra/versions.env}
   image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
   restart: unless-stopped
   user: jenkins

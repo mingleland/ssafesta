@@ -8,6 +8,11 @@ pipeline {
     }
 
     stages {
+        stage('Agent Preflight') {
+            steps {
+                sh 'infra/jenkins/scripts/check-agent-capabilities.sh'
+            }
+        }
         stage('Security Preflight') {
             steps {
                 sh 'infra/jenkins/scripts/secret-scan.sh --path .'
