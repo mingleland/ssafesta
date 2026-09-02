@@ -5,6 +5,10 @@ docker_bin="${DOCKER_BIN:-docker}"
 [[ "${CI_COMPONENT}" == "${COMPOSE_SERVICE}" ]] || { echo 'component/service mismatch' >&2; exit 64; }
 [[ "${COMPOSE_PROJECT}" == "festa-dev-${CI_COMPONENT}" ]] || { echo 'unexpected compose project' >&2; exit 64; }
 [[ -f "${COMPOSE_FILE}" ]] || { echo 'compose file missing' >&2; exit 66; }
+if [[ "${CI_COMPONENT}" == ai || "${CI_COMPONENT}" == back ]]; then
+  : "${COMPONENT_ENV_FILE:?}" "${INTERNAL_AI_TO_SPRING_TOKENS:?}"
+  [[ -f "${COMPONENT_ENV_FILE}" ]] || { echo 'component runtime env credential file missing' >&2; exit 66; }
+fi
 actual="$(${docker_bin} image inspect --format '{{.Id}}' "${IMAGE_REF}")"
 [[ "${actual}" == "${CONTENT_ID}" ]] || { echo 'image content ID mismatch' >&2; exit 65; }
 export COMPONENT_IMAGE_REF="${IMAGE_REF}"
