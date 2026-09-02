@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -12,11 +12,11 @@ import org.springframework.context.annotation.Primary;
  * tests too.
  */
 @TestConfiguration
-class FakeDocumentStorageConfiguration {
+public class FakeObjectStorageConfiguration {
 
     @Bean
     @Primary
-    FakeDocumentStorage fakeDocumentStorage() {
-        return new FakeDocumentStorage();
+    public FakeObjectStorage fakeObjectStorage() {
+        return new FakeObjectStorage();
     }
 }

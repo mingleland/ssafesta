@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,7 +19,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
  * 않는다.</b> 그래서 여기서 직접 본다 — presign 은 네트워크 없이 서명만 하므로 더미 credential 로
  * 진짜 동작을 확인할 수 있고, 예외 번역은 판정 함수를 직접 부른다.
  */
-class S3DocumentStorageTest {
+class S3ObjectStorageTest {
 
     private static final String KEY = "booths/7/agents/78/documents/153/project.pdf";
 
@@ -27,7 +27,7 @@ class S3DocumentStorageTest {
 
     @Test
     void aMissingKeyMeansTheObjectIsAbsent() {
-        assertTrue(S3DocumentStorage.meansObjectAbsent(
+        assertTrue(S3ObjectStorage.meansObjectAbsent(
                 NoSuchKeyException.builder().statusCode(404).build()));
     }
 
@@ -39,25 +39,25 @@ class S3DocumentStorageTest {
      */
     @Test
     void aMissingBucketIsNotAnAbsentObject() {
-        assertFalse(S3DocumentStorage.meansObjectAbsent(
+        assertFalse(S3ObjectStorage.meansObjectAbsent(
                 NoSuchBucketException.builder().statusCode(404).build()));
     }
 
     /** HEAD 는 본문이 없어 SDK 가 이름을 못 붙일 때가 있다. 이름이 실려 오면 그것을 쓴다. */
     @Test
     void anUntypedNoSuchBucketIsStillNotAbsent() {
-        assertFalse(S3DocumentStorage.meansObjectAbsent(s3Error(404, "NoSuchBucket")));
+        assertFalse(S3ObjectStorage.meansObjectAbsent(s3Error(404, "NoSuchBucket")));
     }
 
     /** 이름이 없는 404 는 정상적으로 일어나는 쪽, 즉 "아직 안 올린 객체" 로 읽는다. */
     @Test
     void anUnnamed404IsReadAsAbsent() {
-        assertTrue(S3DocumentStorage.meansObjectAbsent(s3Error(404, null)));
+        assertTrue(S3ObjectStorage.meansObjectAbsent(s3Error(404, null)));
     }
 
     @Test
     void aPermissionFailureIsNotAbsent() {
-        assertFalse(S3DocumentStorage.meansObjectAbsent(s3Error(403, "AccessDenied")));
+        assertFalse(S3ObjectStorage.meansObjectAbsent(s3Error(403, "AccessDenied")));
     }
 
     // ── 서명 ────────────────────────────────────────────────────────────────
@@ -70,9 +70,9 @@ class S3DocumentStorageTest {
      */
     @Test
     void aPresignedPutCarriesTheBucketKeyAndTtl() {
-        try (S3DocumentStorage storage = new S3DocumentStorage(properties(Duration.ofMinutes(15)))) {
+        try (S3ObjectStorage storage = new S3ObjectStorage(properties(Duration.ofMinutes(15)))) {
             String url = storage.presignPut("R2", "test-ai-documents", KEY,
-                    "application/pdf", 1024);
+                    "application/pdf", 1024, Duration.ofMinutes(15));
 
             assertTrue(url.contains("/test-ai-documents/" + KEY), "bucket·key 가 경로에 없다: " + url);
             assertTrue(url.contains("X-Amz-Expires=900"), "TTL 이 실리지 않았다: " + url);
@@ -82,8 +82,8 @@ class S3DocumentStorageTest {
 
     @Test
     void theActiveWriteTargetComesFromConfiguration() {
-        try (S3DocumentStorage storage = new S3DocumentStorage(properties(Duration.ofMinutes(15)))) {
-            assertEquals(new AiDocumentStorage.WriteTarget("R2", "test-ai-documents"),
+        try (S3ObjectStorage storage = new S3ObjectStorage(properties(Duration.ofMinutes(15)))) {
+            assertEquals(new ObjectStorage.WriteTarget("R2", "test-ai-documents"),
                     storage.activeWriteTarget());
         }
     }
@@ -95,7 +95,7 @@ class S3DocumentStorageTest {
      */
     @Test
     void anUnconfiguredProviderIsUnavailableRatherThanAbsent() {
-        try (S3DocumentStorage storage = new S3DocumentStorage(properties(Duration.ofMinutes(15)))) {
+        try (S3ObjectStorage storage = new S3ObjectStorage(properties(Duration.ofMinutes(15)))) {
             org.junit.jupiter.api.Assertions.assertThrows(StorageUnavailableException.class,
                     () -> storage.headSize("MINIO_LOCAL", "somewhere", KEY));
         }
@@ -108,9 +108,9 @@ class S3DocumentStorageTest {
                 .build();
     }
 
-    private static AiStorageProperties properties(Duration ttl) {
-        return new AiStorageProperties(AiStorageProperties.UploadGate.OPEN, "R2", ttl, Map.of("R2",
-                new AiStorageProperties.Provider("http://localhost:9", "test-ai-documents",
+    private static ObjectStorageProperties properties(Duration ttl) {
+        return new ObjectStorageProperties(ObjectStorageProperties.UploadGate.OPEN, "R2", ttl, Map.of("R2",
+                new ObjectStorageProperties.Provider("http://localhost:9", "test-ai-documents",
                         "test-access-key", "test-secret-key")));
     }
 }

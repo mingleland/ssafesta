@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
@@ -10,9 +10,9 @@ import com.example.ssafesta.common.ErrorCode;
  * the next period. The usage guard blocks at 90% and the two block reasons stay apart for exactly
  * this reason: "try again shortly" and "not this month" are different instructions.
  */
-class StorageQuotaExceededException extends ApiException {
+public class StorageQuotaExceededException extends ApiException {
 
-    StorageQuotaExceededException() {
+    public StorageQuotaExceededException() {
         super(ErrorCode.STORAGE_QUOTA_EXCEEDED);
     }
 }

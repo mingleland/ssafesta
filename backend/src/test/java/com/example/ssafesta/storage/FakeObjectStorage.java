@@ -1,5 +1,6 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,13 +17,19 @@ import java.util.function.Consumer;
  * lookup against the wrong bucket miss, which is the whole point of the reconcile race: a HEAD sent
  * before the object moved must not answer for where it moved to.
  *
+ * <p>Sizes and bytes are stored separately on purpose. 007 only ever asks for the size, so its
+ * tests keep declaring a size and no payload — a 5 MiB {@code putObject} must not allocate 5 MiB.
+ * 019 needs the bytes themselves (it validates magic numbers and dimensions in Spring), so those
+ * tests use {@link #putBytes}, which fills both.
+ *
  * <p>{@link #onHead} is the seam for the races: it runs while the service is between its read and
  * its write, which is exactly where the expiry sweeper and reconcile land in production. That makes
  * those tests deterministic instead of timing-dependent.
  */
-class FakeDocumentStorage implements AiDocumentStorage {
+public class FakeObjectStorage implements ObjectStorage {
 
     private final Map<String, Long> objects = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> contents = new ConcurrentHashMap<>();
 
     private volatile String provider = "R2";
     private volatile String bucket = "test-ai-documents";
@@ -36,10 +43,11 @@ class FakeDocumentStorage implements AiDocumentStorage {
 
     @Override
     public String presignPut(String provider, String bucket, String objectKey, String contentType,
-                             long contentLength) {
+                             long contentLength, Duration ttl) {
         // Shaped like a real presigned URL so a test can tell one issue from the next.
         return "https://fake.storage.test/" + bucket + "/" + objectKey
-                + "?sig=" + System.nanoTime() + "&len=" + contentLength;
+                + "?sig=" + System.nanoTime() + "&len=" + contentLength
+                + "&ttl=" + ttl.toSeconds();
     }
 
     @Override
@@ -55,31 +63,65 @@ class FakeDocumentStorage implements AiDocumentStorage {
         return Optional.ofNullable(objects.get(slot(bucket, objectKey)));
     }
 
+    @Override
+    public Optional<byte[]> getObject(String provider, String bucket, String objectKey, long maxBytes) {
+        if (!provider.equals(this.provider)) {
+            throw new StorageUnavailableException("설정되지 않은 저장소입니다.");
+        }
+        byte[] content = contents.get(slot(bucket, objectKey));
+        if (content == null) {
+            return Optional.empty();
+        }
+        if (content.length > maxBytes) {
+            // Same refusal as the real one: an oversized object is never truncated, because the
+            // validator would then reject a whole file as corrupt.
+            throw new IllegalStateException("저장된 객체가 허용 크기를 초과합니다: " + provider);
+        }
+        return Optional.of(content);
+    }
+
+    @Override
+    public void deleteObject(String provider, String bucket, String objectKey) {
+        objects.remove(slot(bucket, objectKey));
+        contents.remove(slot(bucket, objectKey));
+    }
+
     /** The upload the browser would have done, into the currently active bucket. */
-    void putObject(String objectKey, long size) {
+    public void putObject(String objectKey, long size) {
         putObject(bucket, objectKey, size);
     }
 
-    void putObject(String bucket, String objectKey, long size) {
+    public void putObject(String bucket, String objectKey, long size) {
         objects.put(slot(bucket, objectKey), size);
     }
 
-    void switchActiveProvider(String provider, String bucket) {
+    /** An upload with a payload, for the callers that read the bytes back. */
+    public void putBytes(String objectKey, byte[] content) {
+        objects.put(slot(bucket, objectKey), (long) content.length);
+        contents.put(slot(bucket, objectKey), content);
+    }
+
+    public boolean hasObject(String objectKey) {
+        return objects.containsKey(slot(bucket, objectKey));
+    }
+
+    public void switchActiveProvider(String provider, String bucket) {
         this.provider = provider;
         this.bucket = bucket;
     }
 
     /** Runs inside {@link #headSize}, before it answers. */
-    void onHead(Consumer<String> hook) {
+    public void onHead(Consumer<String> hook) {
         this.onHead = hook;
     }
 
-    void failHeadWith(RuntimeException failure) {
+    public void failHeadWith(RuntimeException failure) {
         this.headFailure = failure;
     }
 
-    void reset() {
+    public void reset() {
         objects.clear();
+        contents.clear();
         provider = "R2";
         bucket = "test-ai-documents";
         onHead = key -> { };

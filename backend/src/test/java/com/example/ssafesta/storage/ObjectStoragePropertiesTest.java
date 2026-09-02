@@ -1,4 +1,4 @@
-package com.example.ssafesta.ai;
+package com.example.ssafesta.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -24,13 +24,13 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
  * <p>{@code "15m"} 같은 문자열 바인딩은 생성자를 직접 부르는 것으로 검증되지 않으므로
  * {@link Binder} 로 실제로 묶는다. 컨테이너 없이 도는 단위 테스트다.
  */
-class AiStoragePropertiesTest {
+class ObjectStoragePropertiesTest {
 
     @Test
     void theShippedSettingsBind() {
-        AiStorageProperties properties = bind(baseSettings());
+        ObjectStorageProperties properties = bind(baseSettings());
 
-        assertEquals(AiStorageProperties.UploadGate.OPEN, properties.uploadGate());
+        assertEquals(ObjectStorageProperties.UploadGate.OPEN, properties.uploadGate());
         assertEquals("R2", properties.activeWriteProvider());
         assertEquals(Duration.ofMinutes(15), properties.presignTtl());
         assertEquals("test-ai-documents", properties.providers().get("R2").bucket());
@@ -50,8 +50,8 @@ class AiStoragePropertiesTest {
      * 값이 빠지면 옮겨 적을 자리가 없어 번역이 생기고, 번역은 틀린다.
      */
     @ParameterizedTest
-    @EnumSource(AiStorageProperties.UploadGate.class)
-    void everyGateValueBinds(AiStorageProperties.UploadGate gate) {
+    @EnumSource(ObjectStorageProperties.UploadGate.class)
+    void everyGateValueBinds(ObjectStorageProperties.UploadGate gate) {
         assertEquals(gate, bind(settingsWith("app.ai.storage.upload-gate", gate.name())).uploadGate());
     }
 
@@ -163,7 +163,7 @@ class AiStoragePropertiesTest {
         settings.put("app.ai.storage.providers.MINIO_LOCAL.access-key-id", "k");
         settings.put("app.ai.storage.providers.MINIO_LOCAL.secret-access-key", "s");
 
-        AiStorageProperties properties = bind(settings);
+        ObjectStorageProperties properties = bind(settings);
 
         assertEquals("MINIO_LOCAL", properties.activeWriteProvider());
         assertEquals(Set.of("R2", "MINIO_LOCAL"), properties.providers().keySet());
@@ -230,8 +230,8 @@ class AiStoragePropertiesTest {
         return settings;
     }
 
-    private static AiStorageProperties bind(Map<String, String> settings) {
+    private static ObjectStorageProperties bind(Map<String, String> settings) {
         return new Binder(new MapConfigurationPropertySource(settings))
-                .bind("app.ai.storage", AiStorageProperties.class).get();
+                .bind("app.ai.storage", ObjectStorageProperties.class).get();
     }
 }
