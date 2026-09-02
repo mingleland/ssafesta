@@ -36,7 +36,20 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
   const selectedNode = scene.nodes.find((node) => node.id === selectedNodeId) ?? scene.nodes[0];
   const dialogueFlow = useMemo(() => analyzeDialogueFlow(scene), [scene]);
 
+  // 커밋 전(blur/Enter 이전) 실시간 입력값 — LIVE PREVIEW·좌측 노드 요약을 즉시 갱신하기 위함.
+  // 실제 project 상태(undo 히스토리)는 여전히 CommitInput의 onCommit(blur/Enter)에서만 바뀐다.
+  const [speakerDraft, setSpeakerDraft] = useState<string | null>(null);
+  const [textDraft, setTextDraft] = useState<string | null>(null);
+  const [choiceDrafts, setChoiceDrafts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setSpeakerDraft(null);
+    setTextDraft(null);
+    setChoiceDrafts({});
+  }, [selectedNodeId, scene.id]);
+
   if (selectedNode === undefined) return null;
+  const previewSpeaker = speakerDraft ?? selectedNode.speaker;
+  const previewText = textDraft ?? selectedNode.text;
   const backgroundVisual = resolveStaticImageVisual(
     project.assets.find((asset) => asset.id === scene.backgroundAssetId),
     assetUrls,
@@ -83,7 +96,10 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
             type="button"
           >
             <span>{index + 1}</span>
-            <div><strong>{node.speaker || '내레이션'}</strong><small>{node.text}</small></div>
+            <div>
+              <strong>{(node.id === selectedNode.id ? previewSpeaker : node.speaker) || '내레이션'}</strong>
+              <small>{node.id === selectedNode.id ? previewText : node.text}</small>
+            </div>
             {node.id === scene.startNodeId && <em>START</em>}
           </button>
         ))}
@@ -143,9 +159,15 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
             <div className="gss-dialogue-preview-portrait" style={staticImageBackgroundStyle(portraitVisual)} />
           )}
           <div className="gss-dialogue-preview-box">
-            <strong>{selectedNode.speaker || '내레이션'}</strong>
-            <p>{selectedNode.text}</p>
-            {selectedNode.choices.length > 0 && <div>{selectedNode.choices.map((choice, index) => <span key={choice.id}>{index + 1}. {choice.text}</span>)}</div>}
+            <strong>{previewSpeaker || '내레이션'}</strong>
+            <p>{previewText}</p>
+            {selectedNode.choices.length > 0 && (
+              <div>
+                {selectedNode.choices.map((choice, index) => (
+                  <span key={choice.id}>{index + 1}. {choiceDrafts[choice.id] ?? choice.text}</span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
         <section className="gss-dialogue-node-card">
@@ -181,6 +203,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               ...node,
               speaker,
             })))}
+            onDraftChange={setSpeakerDraft}
             value={selectedNode.speaker || '내레이션'}
           />
           <CommitInput
@@ -190,6 +213,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               ...node,
               text,
             })))}
+            onDraftChange={setTextDraft}
             value={selectedNode.text}
           />
         </section>
@@ -222,6 +246,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
                 choice.id,
                 (current) => ({ ...current, text }),
               ))}
+              onDraftChange={(text) => setChoiceDrafts((prev) => ({ ...prev, [choice.id]: text }))}
               value={choice.text}
             />
             <label className="gss-field">
