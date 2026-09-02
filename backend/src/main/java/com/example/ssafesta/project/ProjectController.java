@@ -10,10 +10,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -43,6 +45,9 @@ public class ProjectController {
      * package-private to {@code booth} — this is the shared entry point it wraps.
      */
     private static final String MEMBER_ONLY = "회원 계정만 프로젝트를 편집할 수 있습니다.";
+
+    /** 좋아요는 편집이 아니다 — 게스트에게 "편집" 이라고 답하면 남의 부스라서 막혔다고 읽힌다. */
+    private static final String MEMBER_ONLY_LIKE = "회원 계정만 좋아요를 누를 수 있습니다.";
 
     private final ProjectService projects;
 
@@ -152,4 +157,63 @@ public class ProjectController {
         Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
         return projects.update(projectId, userId, command);
     }
+
+    /**
+     * 좋아요 누르기 (계약 §8, S15P21A604-135). <b>{@code PUT} 이고 토글이 아니다</b> — 더블탭이나
+     * 재시도로 같은 요청이 두 번 와도 결과가 같아야 하고, 토글이면 두 번째가 방금 누른 것을
+     * 취소한다.
+     *
+     * <p>편집자 가드가 없다. 좋아요는 방문자의 행위이고 남의 부스에서 누르는 것이 정상 경로다 —
+     * 게이트는 "그 부스가 방문자에게 열려 있는가" 하나이며 §6 조회와 같은 함수를 쓴다.
+     */
+    @Operation(summary = "프로젝트 좋아요 누르기 — 1인 1좋아요",
+            description = """
+                    방문 중인 부스의 프로젝트에 좋아요를 누른다. **한 회원이 한 프로젝트에 하나**다.
+
+                    **여러 번 불러도 안전하다.** 이미 누른 상태에서 다시 부르면 좋아요 수는 그대로이고
+                    응답도 같다 — 취소되지 않는다. 취소는 같은 경로의 `DELETE` 다.
+
+                    응답은 방문자 조회(`GET /api/v1/booths/{boothId}/projects/published`)의 좋아요 두 필드와
+                    같은 이름·같은 타입이라 파서를 하나로 쓴다. 프로젝트의 나머지 필드는 바뀌지 않으므로 보내지 않는다.
+
+                    게이트는 방문자 조회와 같다 — 임대가 끝났거나 게시되지 않은 부스에서는 누를 수 없다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "누른 뒤의 좋아요 수와 내 좋아요 여부 (`likedByMe` 는 항상 `true`)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트는 좋아요를 누를 수 없다"),
+            @ApiResponse(responseCode = "404", description = "`PROJECT_NOT_FOUND`(그런 프로젝트가 없다) 또는 `BOOTH_NOT_FOUND`·`LAYOUT_NOT_PUBLISHED`(방문자에게 열리지 않은 부스다)"),
+            @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스다")})
+    @PutMapping("/projects/{projectId}/like")
+    @SecurityRequirement(name = "bearerAuth")
+    public ProjectService.LikeView like(@AuthenticationPrincipal Jwt jwt,
+                                        @Parameter(description = "좋아요를 누를 프로젝트 식별자", example = "301")
+                                        @PathVariable Long projectId) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY_LIKE);
+        return projects.like(projectId, userId);
+    }
+
+    /** 취소도 멱등이다 — 누른 적 없는 회원이 불러도 오류가 아니다 (계약 §8). */
+    @Operation(summary = "프로젝트 좋아요 취소",
+            description = """
+                    누른 좋아요를 되돌린다.
+
+                    **여러 번 불러도 안전하다.** 누른 적이 없는 상태에서 불러도 `404` 가 아니라 `200` 이다 —
+                    "좋아요가 없다"는 결과가 이미 같으므로 답도 같다.
+
+                    응답 모양과 게이트는 `PUT` 과 같다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "취소한 뒤의 좋아요 수와 내 좋아요 여부 (`likedByMe` 는 항상 `false`)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트는 좋아요를 가질 수 없다"),
+            @ApiResponse(responseCode = "404", description = "`PROJECT_NOT_FOUND`(그런 프로젝트가 없다) 또는 `BOOTH_NOT_FOUND`·`LAYOUT_NOT_PUBLISHED`(방문자에게 열리지 않은 부스다)"),
+            @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스다")})
+    @DeleteMapping("/projects/{projectId}/like")
+    @SecurityRequirement(name = "bearerAuth")
+    public ProjectService.LikeView unlike(@AuthenticationPrincipal Jwt jwt,
+                                          @Parameter(description = "좋아요를 취소할 프로젝트 식별자", example = "301")
+                                          @PathVariable Long projectId) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY_LIKE);
+        return projects.unlike(projectId, userId);
+    }
 }
+

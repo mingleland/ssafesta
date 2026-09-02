@@ -1,0 +1,45 @@
+meta {
+  name: 좋아요 취소
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/projects/{{projectId}}/like
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 프로젝트 좋아요 취소
+
+  누른 좋아요를 되돌린다.
+
+  - 인증: **필수** (회원. 게스트는 `403 MEMBER_ONLY`)
+  - 실행 전: `projectId` 환경변수
+  - 본문 없음
+
+  ### 누른 적 없어도 200이다
+
+  `DELETE`도 멱등이다. 좋아요가 없는 상태에서 보내도 `404`가 아니라 `200`이다 — "좋아요가 없다"는 결과가 이미 같으므로 답도 같다.
+
+  ### 응답
+
+  ```json
+  { "likeCount": 12, "likedByMe": false }
+  ```
+
+  모양과 게이트는 `좋아요 누르기`와 같다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 취소 (`likedByMe`는 항상 `false`) |
+  | `403 MEMBER_ONLY` | 게스트 |
+  | `404 PROJECT_NOT_FOUND` | 그런 프로젝트가 없다 |
+  | `404 BOOTH_NOT_FOUND`·`LAYOUT_NOT_PUBLISHED` | 방문자에게 열리지 않은 부스다 |
+  | `409 BOOTH_LEASE_EXPIRED` | 임대가 끝난 부스다 |
+}
