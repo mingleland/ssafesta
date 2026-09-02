@@ -34,6 +34,25 @@ MODEL_SPECS: dict[str, ModelSpec] = {
 }
 
 
+GENERATION_LLM_SPECS: dict[str, ModelSpec] = {
+    "gpt-5-nano": ModelSpec(model_id="gpt-5-nano", provider="openai", credit_per_request=1.0),
+    "gpt-4.1-nano": ModelSpec(
+        model_id="gpt-4.1-nano", provider="openai", credit_per_request=1.0
+    ),
+    "gemini-2.5-flash-lite": ModelSpec(
+        model_id="gemini-2.5-flash-lite", provider="gemini", credit_per_request=1.0
+    ),
+    "gpt-4o-mini": ModelSpec(model_id="gpt-4o-mini", provider="openai", credit_per_request=2.0),
+    "gpt-4.1-mini": ModelSpec(
+        model_id="gpt-4.1-mini", provider="openai", credit_per_request=4.0
+    ),
+    "gpt-5.4-nano": ModelSpec(
+        model_id="gpt-5.4-nano", provider="openai", credit_per_request=4.0
+    ),
+    "gpt-5-mini": ModelSpec(model_id="gpt-5-mini", provider="openai", credit_per_request=5.0),
+}
+
+
 @dataclass(frozen=True)
 class PageText:
     page: int

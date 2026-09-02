@@ -1,0 +1,36 @@
+{
+  "decision_ticket": "S15P21A604-372",
+  "status": "in_progress",
+  "candidate_pool": [
+    "gpt-5-nano", "gpt-4.1-nano", "gemini-2.5-flash-lite",
+    "gpt-4o-mini", "gpt-4.1-mini", "gpt-5.4-nano", "gpt-5-mini"
+  ],
+  "latency_screening": {
+    "criterion": "NPC 실시간 대화 목적상 질문당 3초를 크게 넘기면 배제 후보",
+    "eliminated": {
+      "gpt-5-nano": "질문당 약 8~10초 (35~45문항 실측 평균)",
+      "gpt-5-mini": "질문당 약 6~9초"
+    },
+    "surviving": [
+      "gpt-4.1-nano", "gemini-2.5-flash-lite", "gpt-4o-mini",
+      "gpt-4.1-mini", "gpt-5.4-nano"
+    ]
+  },
+  "prompt_spec_reference": "docs/13_AI_시스템_설계서.md §11 (System Instruction + Role/Tone + Safety/Forbidden + Context + Question)",
+  "agent_preset_source": "docs/08_Backend_API_명세서.md §6 설정 허용값 화이트리스트 (2026-08-27 확정, spec 007 C-12)",
+  "default_preset": {"role": "GUIDE", "tone": "FRIENDLY", "response_length": "MEDIUM"},
+  "response_length_to_max_tokens": {
+    "SHORT": 200, "MEDIUM": 400, "LONG": 800,
+    "note": "docs/08 §6 제안값. 이번 실측으로 gpt-4.1-nano/gpt-4o-mini/gpt-4.1-mini/gpt-5.4-nano에서는 정상 동작 확인. gpt-5.4-nano는 OpenAI 파라미터명이 max_tokens가 아니라 max_completion_tokens여야 함(구형 모델에서도 호환 확인, gms_chat.py가 통일 적용)."
+  },
+  "generation_parameters": {"temperature": 0.0, "note": "고정하지 않으면 동일 모델·동일 입력도 매 호출 답변이 달라짐(초기 실측에서 gpt-4.1-nano가 같은 질문에 정답↔거절을 오간 사례로 확인)."},
+  "known_limitations": [
+    "TTFT 미측정 — 스트리밍 미사용, 전체 응답시간만 기록. 실사용 시 스트리밍 적용 후 별도 실측 필요",
+    "현재 실측은 ssafesta 문서 1개(15문항)뿐 — pinlog·수달 확장은 5개 후보 압축 후 필요시 진행",
+    "Agent Role/Tone 조합(role 2종×tone 3종×responseLength 3종=18가지) 중 기본값(GUIDE/FRIENDLY/MEDIUM) 1가지만 실측 — '설정과 무관하게 범용적으로 높은 정확도' 요구사항의 강건성 검증은 아직 안 함",
+    "컨텍스트 길이 한도·스트리밍 지원 여부는 모델별 스펙 비교표로 별도 정리 필요(API 호출 불필요)",
+    "사람 채점 미완료 — data/evaluation/ssafesta-generation-review.md 체크박스 비어 있음",
+    "timeout·오류 시 fallback 정책 미결정 — 코드는 실패를 success=False/error로 드러내고 계속 진행하지만, 실사용 정책(재시도 횟수, 대체 모델, 사용자 노출 메시지)은 아직 결정 안 함",
+    "S15P21A604-140(SSE 스트리밍)·141(응답 타임아웃 처리)·148(실제 Provider 교체·회귀) 반영사항 미검토"
+  ]
+}
