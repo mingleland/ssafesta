@@ -1,6 +1,7 @@
 package com.example.ssafesta.storage;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,12 +73,11 @@ public class FakeObjectStorage implements ObjectStorage {
         if (content == null) {
             return Optional.empty();
         }
-        if (content.length > maxBytes) {
-            // Same refusal as the real one: an oversized object is never truncated, because the
-            // validator would then reject a whole file as corrupt.
-            throw new IllegalStateException("저장된 객체가 허용 크기를 초과합니다: " + provider);
-        }
-        return Optional.of(content);
+        // Same bound as the real one: at most maxBytes + 1, so the caller can tell "at the limit"
+        // from "over" without this deciding anything.
+        return Optional.of(content.length > maxBytes
+                ? Arrays.copyOf(content, (int) maxBytes + 1)
+                : content);
     }
 
     @Override

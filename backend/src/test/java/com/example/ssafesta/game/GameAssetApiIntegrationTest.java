@@ -129,13 +129,14 @@ class GameAssetApiIntegrationTest {
      *
      * <p>The presigned URL is a real permission to write that key until the grant expires, so Spring
      * cannot stop a second {@code PUT} the way the old application-hosted endpoint could. What it can
-     * do is refuse to serve anything that is not the object it verified: {@code /content} is bounded
-     * by the recorded size, so a larger replacement is refused rather than handed over carrying a
-     * verified image's {@code Content-Type}.
+     * do is refuse to serve anything that is not the object it verified: {@code /content} requires
+     * the length to match what verification recorded, so a replacement is refused rather than handed
+     * over carrying a verified image's {@code Content-Type}.
      *
-     * <p>ponytail: the size bound does not catch a replacement that is smaller. The window is the
-     * grant's ten minutes, needs the owner's own URL, and reaches only their own game's assets —
-     * verify {@code sha256} on read if that stops being acceptable.
+     * <p>ponytail: a replacement of exactly the same byte length is not caught. Any other length is,
+     * larger or smaller. The window is the grant's ten minutes, needs the owner's own signed URL,
+     * and reaches only their own game's assets — verify {@code sha256} on read if that stops being
+     * acceptable.
      */
     @Test
     void aSwappedObjectIsRefusedRatherThanServedAsTheVerifiedOne() throws Exception {
@@ -150,6 +151,20 @@ class GameAssetApiIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GAME_ASSET_NOT_READY"))
                 .andExpect(jsonPath("$.errors[0].rule").value("OBJECT_MISSING"));
+
+        // Smaller too, not only larger — the check is a length match, not an upper bound.
+        storage.putBytes(objectKey(owner.gameId(), uploaded.assetId()), png(4, 4));
+        mockMvc.perform(get(contentPath(owner.gameId(), uploaded.assetId()))
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errors[0].rule").value("OBJECT_MISSING"));
+
+        // And the untouched object still comes back, so the check is not refusing everything.
+        storage.putBytes(objectKey(owner.gameId(), uploaded.assetId()), original);
+        mockMvc.perform(get(contentPath(owner.gameId(), uploaded.assetId()))
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(original));
     }
 
     /**

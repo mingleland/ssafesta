@@ -97,22 +97,19 @@ public class S3ObjectStorage implements ObjectStorage, AutoCloseable {
     }
 
     /**
-     * Reads the whole object, refusing anything over {@code maxBytes}.
+     * Reads the object, at most {@code maxBytes + 1} bytes of it.
      *
-     * <p>Reads one byte past the limit and fails on it. Stopping exactly at the limit cannot tell a
-     * file that is exactly {@code maxBytes} from one that is larger, and truncating would hand the
-     * validator bytes that are not the object — a decode of a cut PNG fails as "corrupted", which
-     * is the wrong reason and sends the uploader to fix the wrong thing.
+     * <p>The extra byte is how the caller can tell "exactly at the limit" from "larger". Nothing is
+     * refused here: an over-long read is not this class's decision, and it used to throw an
+     * {@code IllegalStateException} that the caller caught — which also swallowed every other
+     * {@code IllegalStateException} on this path (a closed SDK client during shutdown, say) and
+     * turned a good upload into a terminal failure whose object was then queued for deletion.
      */
     @Override
     public Optional<byte[]> getObject(String provider, String bucket, String objectKey, long maxBytes) {
         try (InputStream body = endpoint(provider).client.getObject(
                 GetObjectRequest.builder().bucket(bucket).key(objectKey).build())) {
-            byte[] bytes = body.readNBytes((int) Math.min(maxBytes + 1, Integer.MAX_VALUE));
-            if (bytes.length > maxBytes) {
-                throw new IllegalStateException("저장된 객체가 허용 크기를 초과합니다: " + provider);
-            }
-            return Optional.of(bytes);
+            return Optional.of(body.readNBytes((int) Math.min(maxBytes + 1, Integer.MAX_VALUE)));
         } catch (S3Exception exception) {
             if (meansObjectAbsent(exception)) {
                 return Optional.empty();

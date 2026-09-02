@@ -54,10 +54,16 @@ public interface ObjectStorage {
      * <p>Bounded on purpose. 019 verifies magic bytes, pixel dimensions and SHA-256 in Spring
      * (game-asset-upload.md §5), so the bytes have to come back here — unlike 007, which hands that
      * job to FastAPI. A caller that trusted the declared size would let a lying uploader stream
-     * until the heap gave out, so the limit is passed in and one byte past it is a failure rather
-     * than a truncation.
+     * until the heap gave out, so the limit is passed in.
      *
-     * @param maxBytes refuse (do not truncate) an object larger than this
+     * <p>Reads one byte <b>past</b> the limit and returns it. Stopping exactly at the limit cannot
+     * tell an object that is exactly {@code maxBytes} from a larger one, and truncating silently
+     * would hand the caller bytes that are not the object. Deciding what an over-long read means is
+     * the caller's — for 019 the image validator already refuses it with the right rule
+     * ({@code SIZE_EXCEEDED}), which an exception thrown from here would have replaced with a
+     * worse one.
+     *
+     * @param maxBytes read at most this many bytes plus one; never truncate silently
      */
     Optional<byte[]> getObject(String provider, String bucket, String objectKey, long maxBytes);
 

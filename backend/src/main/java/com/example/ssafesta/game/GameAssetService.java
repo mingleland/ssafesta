@@ -4,6 +4,7 @@ import com.example.ssafesta.common.ApiErrorDetail;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.storage.ObjectStorage;
+import com.example.ssafesta.storage.StorageUnavailableException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -167,7 +168,9 @@ public class GameAssetService {
             return fail(asset, "GRANT_EXPIRED");
         }
         // Bounded by the contract's own limit, not by the declared size: a client that declared
-        // 1 KiB and uploaded 4 GiB is exactly the case a declared bound would not catch.
+        // 1 KiB and uploaded 4 GiB is exactly the case a declared bound would not catch. An object
+        // over the limit arrives one byte too long and the validator refuses it below with
+        // SIZE_EXCEEDED — the same rule a too-large declared size gets.
         byte[] content = readObject(asset, GameAssetImageValidator.MAX_BYTES);
         if (content == null || content.length == 0) {
             return fail(asset, "UPLOAD_MISSING");
@@ -200,18 +203,14 @@ public class GameAssetService {
     /**
      * Reads the object this row names, or {@code null} when storage says it is not there.
      *
-     * <p>An oversized object is a client that lied about its size — a validation failure, not an
-     * outage — so {@link ObjectStorage#getObject}'s refusal is caught here and turned into the same
-     * {@code null} a missing upload produces. A provider that cannot answer is left to propagate:
-     * 503, not {@code FAILED}, because that one may well work on retry.
+     * <p>Comes back with at most {@code maxBytes + 1} bytes and no judgement attached. A provider
+     * that cannot answer throws {@link StorageUnavailableException} and it is left to propagate:
+     * 503, not {@code FAILED}, because a row marked terminally failed by an outage cannot be
+     * retried and its object is queued for deletion.
      */
     private byte[] readObject(GameAsset asset, long maxBytes) {
-        try {
-            return storage.getObject(asset.getProvider(), asset.getStorageBucket(),
-                    asset.getObjectKey(), maxBytes).orElse(null);
-        } catch (IllegalStateException oversized) {
-            return null;
-        }
+        return storage.getObject(asset.getProvider(), asset.getStorageBucket(),
+                asset.getObjectKey(), maxBytes).orElse(null);
     }
 
     /**
@@ -236,9 +235,10 @@ public class GameAssetService {
             requirePublishedReference(game, asset);
         }
         // The verified size, not the contract limit: this row passed verification at that size, so
-        // anything larger now is not the object that was approved.
+        // a different length now is not the object that was approved. The read is one byte longer
+        // than the recorded size for exactly this comparison.
         byte[] content = readObject(asset, asset.getByteSize());
-        if (content == null) {
+        if (content == null || content.length != asset.getByteSize()) {
             // The row says READY but storage does not back that up — the object is gone, or it is no
             // longer the one that was verified. §6 says to answer with GAME_ASSET_NOT_READY and a
             // rule rather than invent a code, and GAME_ASSET_DELETED would be a claim about a
