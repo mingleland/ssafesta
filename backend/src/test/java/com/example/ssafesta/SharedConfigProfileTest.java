@@ -12,7 +12,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
 
 import com.example.ssafesta.storage.ObjectStorageProperties;
-import com.example.ssafesta.ai.AiStorageProperties;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
 
 /**

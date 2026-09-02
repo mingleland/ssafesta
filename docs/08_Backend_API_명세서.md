@@ -574,6 +574,29 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 `403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
 `409 BOOTH_LEASE_EXPIRED`.
 
+### PUT `/projects/{projectId}/like` · DELETE `/projects/{projectId}/like`
+
+방문자가 전시에 좋아요를 누르고 취소한다 (009 §8, `S15P21A604-135`). **회원만** — 게스트는
+`403 MEMBER_ONLY`다. 편집자 가드는 없다 — 남의 부스에서 누르는 것이 정상 경로다.
+
+```json
+{ "likeCount": 13, "likedByMe": true }
+```
+
+**토글 하나가 아니라 멱등 둘이다.** `PUT`을 두 번 보내도 좋아요는 하나이고, `DELETE`를 누른 적
+없이 보내도 `200`이다 — 더블탭이나 재시도가 방금 누른 것을 취소하면 안 되기 때문이다. FE는
+`likedByMe`를 보고 메서드를 고른다.
+
+`likedByMe`는 `PUT` 뒤 항상 `true`, `DELETE` 뒤 항상 `false`다 — 성공 반환이 곧 행의 유무다.
+1인 1좋아요는 `project_likes PRIMARY KEY(project_id, user_id)`(V1)가 보장한다.
+
+응답은 `GET /booths/{boothId}/projects/published`의 좋아요 두 필드와 같은 이름·같은 타입이고,
+프로젝트의 나머지 필드는 담지 않는다 — 좋아요가 그것들을 바꾸지 않는다.
+
+게이트는 방문자 조회와 **같은 함수**다: `404 PROJECT_NOT_FOUND` → `409 BOOTH_LEASE_EXPIRED` →
+`404 LAYOUT_NOT_PUBLISHED`. 실패는 이 셋과 `401` · `403 MEMBER_ONLY` · `404 BOOTH_NOT_FOUND`.
+**신규 오류 코드는 없다** — §18에 추가할 행이 없다.
+
 ---
 
 ## 6. AI Agent Config 관리
