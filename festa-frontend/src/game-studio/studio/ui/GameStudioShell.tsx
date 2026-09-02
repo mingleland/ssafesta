@@ -22,12 +22,12 @@ import {
   duplicateObjects,
   fillTileLayer,
   floodFillTiles,
-  moveScene,
   moveObjects,
   nextStableId,
   paintTiles,
   removeObjects,
   removeScene,
+  reorderScene,
   replaceComponent,
   renameProject,
   sceneRemovalReason,
@@ -231,6 +231,8 @@ export const GameStudioShell = ({
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths());
+  const [draggedSceneIndex, setDraggedSceneIndex] = useState<number | null>(null);
+  const [dragOverSceneIndex, setDragOverSceneIndex] = useState<number | null>(null);
   const panelResizeRef = useRef<{ readonly side: 'left' | 'right'; readonly startX: number; readonly startWidth: number } | null>(null);
   const [editorHiddenObjectIds, setEditorHiddenObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'hidden'));
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
@@ -953,25 +955,59 @@ export const GameStudioShell = ({
               <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 연출</button>
             </div>
             <nav className="gss-scene-list">
-              {project.scenes.map((scene, index) => (
-                <button
-                  className={scene.id === selectedScene.id ? 'is-active' : ''}
-                  key={scene.id}
-                  onClick={() => {
-                    setSelectedSceneId(scene.id);
-                    setSelectedObjectId(null);
-                    setSelectedObjectIds(new Set());
-                    setPlacementPreset(null);
-                    setTileBrush(null);
-                    setSelectedLayerId(scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null);
-                  }}
-                  type="button"
-                >
-                  <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : '☰'}</span>
-                  <div><strong>{scene.name}</strong><small>{index + 1} · {scene.type}</small></div>
-                  {scene.id === project.startSceneId && <em>START</em>}
-                </button>
-              ))}
+              {project.scenes.map((scene, index) => {
+                const rowClassName = ['gss-scene-row',
+                  draggedSceneIndex === index ? 'is-dragging' : '',
+                  dragOverSceneIndex === index && draggedSceneIndex !== index ? 'is-drag-over' : '']
+                  .filter(Boolean).join(' ');
+                return (
+                  <div
+                    className={rowClassName}
+                    key={scene.id}
+                    onDragOver={(dragEvent) => {
+                      if (draggedSceneIndex === null) return;
+                      dragEvent.preventDefault();
+                      if (dragOverSceneIndex !== index) setDragOverSceneIndex(index);
+                    }}
+                    onDrop={(dragEvent) => {
+                      dragEvent.preventDefault();
+                      if (draggedSceneIndex !== null && draggedSceneIndex !== index) {
+                        apply(reorderScene(project, project.scenes[draggedSceneIndex]!.id, index));
+                      }
+                      setDraggedSceneIndex(null);
+                      setDragOverSceneIndex(null);
+                    }}
+                  >
+                    <button
+                      aria-label={`${scene.name} 순서 변경 핸들 (${index + 1}번째)`}
+                      className="gss-icon-button gss-drag-handle"
+                      draggable
+                      onDragEnd={() => { setDraggedSceneIndex(null); setDragOverSceneIndex(null); }}
+                      onDragStart={(dragEvent) => {
+                        dragEvent.dataTransfer?.setData('text/plain', String(index));
+                        setDraggedSceneIndex(index);
+                      }}
+                      type="button"
+                    >☰</button>
+                    <button
+                      className={scene.id === selectedScene.id ? 'is-active' : ''}
+                      onClick={() => {
+                        setSelectedSceneId(scene.id);
+                        setSelectedObjectId(null);
+                        setSelectedObjectIds(new Set());
+                        setPlacementPreset(null);
+                        setTileBrush(null);
+                        setSelectedLayerId(scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null);
+                      }}
+                      type="button"
+                    >
+                      <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : 'Ⓣ'}</span>
+                      <div><strong>{scene.name}</strong><small>{index + 1} · {scene.type}</small></div>
+                      {scene.id === project.startSceneId && <em>START</em>}
+                    </button>
+                  </div>
+                );
+              })}
             </nav>
             <div className="gss-scene-actions">
               <button
@@ -1001,20 +1037,6 @@ export const GameStudioShell = ({
                 title="배치·타일·이벤트·대화를 모두 복제"
                 type="button"
               >Scene 복제</button>
-              <button
-                aria-label="Scene 위로 이동"
-                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === 0}
-                onClick={() => apply(moveScene(project, selectedScene.id, -1))}
-                title="Scene 순서를 위로 이동"
-                type="button"
-              >↑</button>
-              <button
-                aria-label="Scene 아래로 이동"
-                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === project.scenes.length - 1}
-                onClick={() => apply(moveScene(project, selectedScene.id, 1))}
-                title="Scene 순서를 아래로 이동"
-                type="button"
-              >↓</button>
               <button
                 className="gss-text-danger"
                 disabled={sceneRemovalReason(project, selectedScene.id) !== null}
