@@ -9,12 +9,22 @@
 | 폴더 | 용도 | 실행 전 필요한 값 |
 |---|---|---|
 | `01-auth` | 게스트·소셜 OAuth·refresh·logout | OAuth 완료는 임시 handoff 필요 |
-| `02-users` | 내 정보·닉네임·탈퇴 | 회원 Access Token |
+| `02-users` | 내 정보·닉네임·아바타 외형·탈퇴 | 회원 Access Token |
 | `03-wallet` | 코인 잔액·거래 내역 조회 | 회원 Access Token |
-| `04-booth-lease` | 슬롯 목록·부스 임대·내 부스 | 회원 Access Token, `slotId`/`boothId` 환경변수 |
+| `04-booth-lease` | 슬롯 목록·부스 임대·내 부스·부스 상세 | 회원 Access Token, `slotId` 환경변수 |
+| `05-booth-layout` | 템플릿 카탈로그·배치 작업본·공개·외관·홈페이지 | 회원 Access Token, `boothId` |
 | `06-world-session` | 월드 접속 주소·1회용 입장 토큰 발급 | 회원 **또는 게스트** Access Token, 서버에 `CONNECTION_TOKEN_SECRET` |
-| 이후 `03-world`, `04-booth`, `05-wallet` | 도메인 구현 시 추가 | 각 도메인별 값 |
-| `06-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
+| `07-projects` | 프로젝트 카드 생성·수정·공개·방문자 조회 | 회원 Access Token, `boothId`. `projectId`는 생성 요청이 자동 저장 |
+| `08-ai-agent` | AI 직원 인격 설정 (부스당 1명) | 회원 Access Token, `boothId`. `agentId`는 생성 요청이 자동 저장 |
+| `09-ai-document` | AI 직원 문서 업로드 2단계 | `agentId`, 실제 파일과 그 SHA-256. `documentId`는 1단계가 자동 저장 |
+| `10-game-studio` | 게임 생성·작업본·게시·공개 설정·삭제·복원 | 회원 Access Token. `gameId`는 생성 요청이 자동 저장 |
+| `11-inventory` | 아바타 파츠 상점·구매 | 회원 Access Token, `itemId` |
+| `12-internal` | 내부 서비스(FastAPI) 전용 판정 API | **서비스 토큰을 헤더에 손으로** 넣는다. 환경 파일에 커밋하지 않는다 |
+| `13-admin` | 관리자 role·권한 모델 확정 후 추가 | 현재 추후 작업 |
+
+컬렉션은 **endpoint 47개를 전부 덮는다.** 요청마다 `docs` 블록에 무엇을 하는 API인지, 선행 요청과 필요한 환경변수, 응답 코드별 사유, 주의할 부수효과가 적혀 있다 — 실행 전에 그 문서를 먼저 읽는 것이 이 컬렉션을 쓰는 방법이다.
+
+`local` 환경의 `projectId`·`agentId`·`documentId`·`gameId`는 비워 두면 된다. 각 도메인의 **생성 요청이 성공하면 response script가 자동으로 채운다.**
 
 ## 회원 API 테스트 순서
 
@@ -102,6 +112,20 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 | `내 부스 조회` | 내 부스와 남은 시간 | 임대 이력이 없으면 `204` |
 | `부스 상세 조회` | 방문자 관점 부스 정보 | 만료 시 `409 BOOTH_LEASE_EXPIRED` |
 | `월드 세션 발급` | 접속 주소 + 120초 1회용 입장 토큰 | `endpoint`는 객체(`scheme`/`host`/`port`). 매 호출 새 토큰 — 멱등이 아니다 |
+| `아바타 외형 저장` | Unity 인코딩 문자열 저장 | 보낸 값을 **글자 그대로** echo. 미보유 파츠는 `409` |
+| `템플릿 카탈로그 조회` | 바닥 크기·오브젝트 상한 | 편집기가 가장 먼저 읽는다. 값을 하드코딩하지 않는다 |
+| `홈페이지 주소 등록` | 부스 노트북이 열 외부 주소 | 해제는 **명시적 `null`**. `{}`는 거부 |
+| `프로젝트 생성`·`수정` | 전시 프로젝트 카드 | 공개는 수정에서 켠다. URL 필드는 원문 그대로 저장 |
+| `공개 프로젝트 조회` | 방문자가 보는 목록 | **토큰 없이 200.** 편집용과 경로가 다르다 |
+| `AI 직원 생성`·`수정`·`삭제` | 부스당 1명인 AI 직원 | 두 번째 생성은 `409`. 참조 중이면 삭제 거부 |
+| `업로드 URL 발급` → `업로드 완료` | 문서 업로드 2단계 | 파일은 서버를 거치지 않는다. 중복은 오류가 아니다 |
+| `게임 생성` → `작업본 저장` → `게시` | Game Studio 기본 흐름 | `expectedRevision` 필수, 첫 저장은 0 |
+| `게시본 조회` | 플레이할 프로젝트 | `ETag` + `If-None-Match`로 `304`. 게스트도 가능 |
+| `공개 설정 변경` | `PRIVATE` ↔ `PUBLIC` | 게시와 **별개 축**이다 |
+| `게임 삭제`·`복원` | 소프트 삭제와 되살리기 | 두 번 삭제하면 `404 GAME_DELETED`(= 이미 완료) |
+| `상점 목록 조회` | 아이템 + 보유 여부 | `type=AVATAR_PART` 필수 |
+| `아이템 구매` | 코인 차감 + 보유 기록 | 한 트랜잭션. 중복 구매·잔액 부족은 차감 없음 |
+| `AI 부스 접근 판정` | FastAPI가 부르는 내부 API | 서비스 토큰을 헤더에 손으로 넣는다. Swagger에는 없다 |
 
 ## 주의
 
