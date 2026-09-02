@@ -5,7 +5,9 @@ import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,7 +29,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * 방문자 Project 조회 (spec 009 FR-005·SC-002, contracts/project-api.md §6, S15P21A604-177).
+ * 방문자 Project 조회와 좋아요 (spec 009 FR-005·SC-002, contracts/project-api.md §6·§8,
+ * S15P21A604-177·-135).
+ *
+ * <p>좋아요 쓰기가 같은 클래스에 있는 이유: §8 이 바꾸는 것은 §6 응답의 두 필드뿐이고,
+ * 픽스처(임대·게시·회원)도 전부 같다. 클래스를 나누면 {@code leasedOwner}·{@code publishedOwner}·
+ * {@code bearerFor} 를 복사하게 된다.
  *
  * <p>게시는 {@code BoothLayoutTestSupport.publishLayout} 으로 실제 발행을 태운다. 컬럼을 손으로
  * 세우는 길은 없다 — {@code fk_booths_published_layout_version} 이 그것을 거부하고, 그 제약이
@@ -172,7 +179,7 @@ class ProjectVisitorApiIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── 좋아요 (계약 §6 — 읽기만. 토글은 -135) ──────────────────────────────
+    // ── 좋아요 (계약 §6 읽기 · §8 쓰기) ─────────────────────────────────────
 
     @Test
     void likeCountIsTheNumberOfRowsAndLikedByMeIsAboutTheViewer() throws Exception {
@@ -180,8 +187,8 @@ class ProjectVisitorApiIntegrationTest {
         Long projectId = project(owner, "인기 전시");
         Long liker = createMemberWithWallet(users, wallets, "누른사람");
         Long other = createMemberWithWallet(users, wallets, "안누른사람");
-        like(projectId, liker);
-        like(projectId, other);
+        likeAs(projectId, liker);
+        likeAs(projectId, other);
 
         mockMvc.perform(get(published(owner.boothId())).header("Authorization", bearerFor(liker)))
                 .andExpect(status().isOk())
@@ -192,6 +199,80 @@ class ProjectVisitorApiIntegrationTest {
         mockMvc.perform(get(published(owner.boothId())).header("Authorization", bearerFor(neverLiked)))
                 .andExpect(jsonPath("$.projects[0].likeCount").value(2))
                 .andExpect(jsonPath("$.projects[0].likedByMe").value(false));
+    }
+
+    /**
+     * 완료 조건 두 줄이 여기 있다 — 중복 방지와 취소 후 재좋아요 (Jira 테스트 방법: 왕복 3회).
+     *
+     * <p>방문자 조회를 다시 부르지 않는다. 응답의 두 필드만 보고 화면을 갱신할 수 있다는 것이
+     * §8 의 약속이고, 여기서 조회를 태우면 그 약속을 검증하지 않은 채 통과한다.
+     */
+    @Test
+    void likeAndUnlikeRoundTripThreeTimes() throws Exception {
+        Owner owner = publishedOwner("왕복");
+        Long projectId = project(owner, "왕복 전시");
+        String liker = bearerFor(createMemberWithWallet(users, wallets, "왕복회원"));
+
+        for (int round = 1; round <= 3; round++) {
+            mockMvc.perform(put(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(1))
+                    .andExpect(jsonPath("$.likedByMe").value(true));
+
+            mockMvc.perform(delete(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(0))
+                    .andExpect(jsonPath("$.likedByMe").value(false));
+        }
+    }
+
+    /**
+     * 멱등이 {@code PUT}·{@code DELETE} 를 고른 이유다 — 토글이면 두 번째 호출이 방금 누른 것을
+     * 취소하고, 사용자는 누른 적 없는 취소를 본다.
+     *
+     * <p>취소도 같이 본다. 누른 적 없는 {@code DELETE} 가 404 를 내면 더블탭이 오류로 보이고,
+     * 그건 "결과가 같으면 답도 같다"(§8)가 깨진 것이다.
+     */
+    @Test
+    void repeatedCallsDoNotFlipTheLike() throws Exception {
+        Owner owner = publishedOwner("멱등");
+        Long projectId = project(owner, "멱등 전시");
+        String liker = bearerFor(createMemberWithWallet(users, wallets, "멱등회원"));
+
+        // 두 번을 똑같이 단정한다. 첫 호출을 단정하지 않으면 그것이 깨져도 두 번째가 첫
+        // 성공이 되어 이 테스트가 초록으로 통과한다 — 멱등을 본다면서 아무것도 못 보는 것이다.
+        for (int call = 1; call <= 2; call++) {
+            mockMvc.perform(put(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(1))
+                    .andExpect(jsonPath("$.likedByMe").value(true));
+        }
+
+        for (int call = 1; call <= 2; call++) {
+            mockMvc.perform(delete(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(0))
+                    .andExpect(jsonPath("$.likedByMe").value(false));
+        }
+    }
+
+    /**
+     * 쓰기 경로가 방문자 게이트를 <b>실제로 부르는지</b>만 본다 — 게이트 세 갈래는 위쪽 세
+     * 테스트가 이미 같은 함수({@code requireVisitorVisible})에서 검증한다.
+     *
+     * <p>이 한 줄이 없으면 호출이 빠져도 전부 초록이고, 임대가 끝난 부스의 전시에 좋아요가
+     * 계속 쌓인다.
+     */
+    @Test
+    void likingAnExpiredBoothIsConflict() throws Exception {
+        Owner owner = publishedOwner("만료좋아요");
+        Long projectId = project(owner, "만료된 전시");
+        String liker = bearerFor(createMemberWithWallet(users, wallets, "만료회원"));
+        expireLease(jdbc, owner.boothId());
+
+        mockMvc.perform(put(likePath(projectId)).header("Authorization", liker))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
     }
 
     // ── 응답 모양 (§1 불변식 I-4 가 방문자 응답에도 유지된다) ───────────────
@@ -224,8 +305,17 @@ class ProjectVisitorApiIntegrationTest {
                 java.time.Instant.now())).getId();
     }
 
-    private void like(Long projectId, Long userId) {
-        jdbc.update("INSERT INTO project_likes(project_id, user_id) VALUES (?, ?)", projectId, userId);
+    private static String likePath(Long projectId) {
+        return "/api/v1/projects/" + projectId + "/like";
+    }
+
+    /**
+     * 좋아요를 실제 경로로 넣는다. 전에는 {@code jdbc.update} 로 행을 직접 세웠는데, 쓰기
+     * endpoint 가 없어서 그랬을 뿐이다 — 이제 있으니 픽스처가 계약을 우회할 이유가 없다.
+     */
+    private void likeAs(Long projectId, Long userId) throws Exception {
+        mockMvc.perform(put(likePath(projectId)).header("Authorization", bearerFor(userId)))
+                .andExpect(status().isOk());
     }
 
     private Owner leasedOwner(String prefix) {
