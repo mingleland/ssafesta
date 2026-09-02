@@ -14,6 +14,8 @@ spring:
     password: ${POSTGRES_PASSWORD:change-me-local-only}
 
 app:
+  redis:
+    namespace: ${FESTA_ENVIRONMENT:local}
   auth:
     frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
     # HTTP localhost test only. Set AUTH_COOKIE_SECURE=true in HTTPS deployment.
