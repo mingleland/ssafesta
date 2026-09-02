@@ -20,6 +20,11 @@ grep -q '127.0.0.1:8080:8080' "${controller_compose}" || fail "Jenkins 8080 is n
 ! grep -Eq '(^|[^0-9])(3000|50000):' "${controller_compose}" || fail "controller publishes a forbidden port"
 pass "controller port and mount policy"
 
+grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must use host networking"
+grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
+grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
+pass "rootless Docker Testcontainers network policy"
+
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
   [[ -x "${entrypoint}" ]] || fail "Shell entrypoint is not executable: ${entrypoint#"${repo_root}/"}"
 done
