@@ -377,6 +377,23 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_INCOMPLETE"));
     }
 
+    /**
+     * 없는 문서는 404 이고, 권한 검사보다 앞선다.
+     *
+     * <p>{@code readSnapshot} 이 행을 먼저 찾고 그 다음에 editor guard 를 부르므로, 남의 부스
+     * 문서인지 아닌지와 무관하게 <b>존재하지 않는 id</b> 는 {@code DOCUMENT_NOT_FOUND} 로 끝난다.
+     * 순서가 뒤집히면 있는지 없는지를 403 으로 알려주게 되고, 이 테스트가 그때 깨진다
+     * (S15P21A604-388).
+     */
+    @Test
+    void anUnknownDocumentIsNotFound() throws Exception {
+        Owner owner = agentOwner("없는문서");
+
+        mockMvc.perform(complete(owner, 999_999_999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
+    }
+
     // ── 만료 복구 (FR-027) ──────────────────────────────────────────────────
 
     @Test
