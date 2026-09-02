@@ -27,6 +27,14 @@ public record RedisKeyspaceProperties(String namespace) {
             throw new IllegalStateException(
                     "app.redis.namespace 가 비어 있습니다. 환경 id(dev·demo 등)를 설정해 주세요.");
         }
+        // 해석되지 않은 placeholder 는 위 검사를 전부 통과한다 — "${FESTA_ENVIRONMENT}" 는 비어
+        // 있지 않고, 앞뒤 공백도 없고, ':' 도 없다. 그대로 두면 dev·demo 가 그 문자열 하나를
+        // 네임스페이스로 공유해 이 클래스가 막으려던 키 충돌이 그대로 돌아온다. T-101 이 저장소
+        // 설정에서 낸 것과 같은 모양이라 여기서도 따로 거절하고 빠진 변수 이름을 알려 준다.
+        if (namespace.startsWith("${") && namespace.endsWith("}")) {
+            throw new IllegalStateException("app.redis.namespace 가 해석되지 않았습니다 — 배포에서 "
+                    + namespace + " 를 주입해야 합니다.");
+        }
         // Refused rather than trimmed: a trimmed value differs from what the operator wrote, and
         // the two environments would still be isolated, so nobody would ever find out the config
         // was wrong. A boot failure says it at deploy time.

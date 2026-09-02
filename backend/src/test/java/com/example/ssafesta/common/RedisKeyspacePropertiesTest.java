@@ -30,6 +30,16 @@ class RedisKeyspacePropertiesTest {
     }
 
     @Test
+    void anUnresolvedPlaceholderIsRefused() {
+        // It passes every other check — non-empty, no surrounding whitespace, no ':' — so without
+        // this branch a deployment missing FESTA_ENVIRONMENT boots with both environments sharing
+        // the literal "${FESTA_ENVIRONMENT}" as their namespace, which is no isolation at all.
+        assertThrows(
+                IllegalStateException.class,
+                () -> new RedisKeyspaceProperties("${FESTA_ENVIRONMENT}"));
+    }
+
+    @Test
     void thePrefixCarriesTheSeparator() {
         assertEquals("demo:", new RedisKeyspaceProperties("demo").prefix());
     }
