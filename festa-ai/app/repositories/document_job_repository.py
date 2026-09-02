@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +35,61 @@ class DocumentJobRepository:
             .limit(1)
         )
         return await self._session.scalar(statement)
+
+    async def pickup(self, *, worker_id: str, lease_seconds: int) -> DocumentJob | None:
+        """Atomically claim one runnable Job without waiting on another Worker."""
+        statement = (
+            select(DocumentJob)
+            .where(
+                or_(
+                    DocumentJob.status == "QUEUED",
+                    and_(
+                        DocumentJob.status == "RETRY_WAIT",
+                        DocumentJob.next_retry_at <= func.now(),
+                    ),
+                )
+            )
+            .order_by(DocumentJob.created_at, DocumentJob.id)
+            .with_for_update(skip_locked=True)
+            .limit(1)
+        )
+        job = await self._session.scalar(statement)
+        if job is None:
+            return None
+
+        database_now = await self._session.scalar(select(func.clock_timestamp()))
+        if database_now is None:  # pragma: no cover - PostgreSQL always returns a timestamp
+            raise RuntimeError("PostgreSQL did not return clock_timestamp()")
+
+        job.status = "RUNNING"
+        job.worker_id = worker_id
+        job.attempt_no += 1
+        job.next_retry_at = None
+        job.lease_expires_at = database_now + datetime.timedelta(seconds=lease_seconds)
+        job.updated_at = database_now
+        await self._session.commit()
+        await self._session.refresh(job)
+        return job
+
+    async def heartbeat(self, *, job_id: int, worker_id: str, lease_seconds: int) -> bool:
+        """Extend a lease only while this Worker still owns the RUNNING Job."""
+        statement = (
+            update(DocumentJob)
+            .where(
+                DocumentJob.id == job_id,
+                DocumentJob.status == "RUNNING",
+                DocumentJob.worker_id == worker_id,
+            )
+            .values(
+                lease_expires_at=func.clock_timestamp()
+                + datetime.timedelta(seconds=lease_seconds),
+                updated_at=func.clock_timestamp(),
+            )
+            .returning(DocumentJob.id)
+        )
+        renewed_job_id = await self._session.scalar(statement)
+        await self._session.commit()
+        return renewed_job_id is not None
 
     async def enqueue(
         self,
