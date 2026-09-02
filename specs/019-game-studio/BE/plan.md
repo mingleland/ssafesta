@@ -181,7 +181,7 @@ FE 가 강제하는 두 가지를 어기면 그쪽 코드가 즉시 거부한다
 
 | 순서 | Task | 산출 |
 |---|---|---|
-| 1 | T094 | `V17__game_assets.sql` — 계약 §8 DDL, `UNIQUE(game_id, asset_id)` |
+| 1 | T094 | `V18__game_assets.sql` — 계약 §8 DDL, `UNIQUE(game_id, asset_id)` |
 | 2 | T095 | `ErrorCode` 에 `GAME_ASSET_*` 11종 (계약 §6) |
 | 3 | T096 | 저장소 포트 + S3-compatible 어댑터, `compose.yaml` 에 minio |
 | 4 | **T097 + T100 한 커밋** | 발급 endpoint 와 `isPersistableSource()` 완화 |

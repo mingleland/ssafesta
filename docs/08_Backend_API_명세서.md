@@ -1126,17 +1126,35 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
 - Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
-- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
-  builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. builtin Asset catalog(`builtin://`)
+  외에 **사용자 업로드(`asset://`)를 지원한다** — 아래 Asset Upload 절이 그 계약이다.
+- 사용자 Asset 업로드: `POST /api/v1/games/{gameId}/assets` (grant 발급) →
+  브라우저가 `uploadUrl`로 직접 `PUT` → `POST /api/v1/games/{gameId}/assets/{assetId}/complete` (검증) →
+  `GET /api/v1/games/{gameId}/assets/{assetId}/content` (전달).
+  - `uploadUrl`은 **R2 버킷으로 가는 presigned PUT**이고 응답의 `requiredHeaders`를 그대로 보내야 한다
+    (`Content-Type`이 서명에 포함된다). grant와 서명 수명은 모두 10분이다.
+  - `/content`는 **Spring이 R2에서 읽어 바이트를 중계한다** — 302도, presigned GET도 FE로 내보내지 않는다.
+    버킷 CORS가 `PUT`만 허용하고(`object-storage-contract.md` §CORS), FE는 `Authorization`을 붙인
+    `fetch`로 받기 때문이다. `Content-Type`은 검증으로 확정된 실제 타입이고 `X-Content-Type-Options: nosniff`,
+    `Cache-Control: private, max-age=300`이다.
+  - 상한: 5 MiB · 4096×4096 · 게임당 300개 · PNG·JPEG·GIF·WebP (SVG 거부). 검증은 선언값이 아니라
+    올라온 바이트로 한다. 실패는 `200` + `status: FAILED` + `failureRule`이며 행이 사유를 보관한다.
+  - 인증되지 않은 경로는 하나도 없다. 업로드 `PUT`이 버킷으로 직접 가므로 Spring에 무인증 수신 endpoint가
+    필요하지 않고, grant 토큰이 쿼리 문자열에 실리는 일도 없다.
+  - 저장 좌표(`provider`·`storage_bucket`)는 발급 시점에 행에 박는다. 읽기·삭제는 그 행을 따르며
+    지금 활성인 write provider를 따르지 않는다 (spec 007 FR-030과 같은 불변식).
+  - 객체 삭제는 DB 트랜잭션에서 분리한다 — 행을 지우는 트랜잭션이 `game_asset_delete_queue`에 좌표를
+    남기고 `@Scheduled` sweeper(1분)가 비운다. 탈퇴·검증 실패·죽은 행 청소 세 지점이 모두 이 경로다.
 - 현재 공개 포인터를 따라가는 `GET /games/{gameId}/published`는 `Cache-Control: no-cache` + ETag 재검증이다 — 재공개하면 같은 URL이 다른 본문을 가리키므로 장기 cache를 걸면 옛 version이 나온다. 긴 `max-age`·`immutable`은 후속 version 고정 URL에만 붙인다. Portal 실행 가능 여부는 `Cache-Control: no-store`다.
 - 독립 play route와 Portal overlay open 시 REST 조회로 신규 진입을 판정하며 Game Studio 전용 socket은 만들지 않는다.
 - 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
-- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
+- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다. Asset은 행을 지우고 객체는 삭제 큐로 넘긴다 — 저장소 장애가 탈퇴를 막지 않는다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
 - 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
-상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
+상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)이고,
+Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/contracts/game-asset-upload.md)다.
 #21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)의 교차 계약을 반영했다.
 
