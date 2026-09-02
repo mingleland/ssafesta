@@ -77,11 +77,11 @@ namespace Festa.World
         Transform FindStaff()
         {
             var host = transform.parent != null ? transform.parent : transform;
-            int cut = host.name.LastIndexOf('_');
-            if (cut < 0) return null;
-            var staffRoot = GameObject.Find("Festival_Staff");
-            if (staffRoot == null) return null;
-            return staffRoot.transform.Find("Staff_" + host.name.Substring(cut + 1));
+            // 직원은 **부스 슬롯의 자식**이다 — 부스가 사용자별로 바뀌어도 직원이 따라가야
+            // 하므로 별도 묶음에 두지 않는다. 같은 슬롯 아래 Staff_* 를 찾는다.
+            foreach (Transform c in host)
+                if (c.name.StartsWith("Staff_")) return c;
+            return null;
         }
 
         /// <summary>부스(부모) 렌더러 월드 바운즈에 맞춰 위치·range·세기를 잡는다.</summary>
