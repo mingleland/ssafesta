@@ -239,17 +239,21 @@ class ProjectVisitorApiIntegrationTest {
         Long projectId = project(owner, "멱등 전시");
         String liker = bearerFor(createMemberWithWallet(users, wallets, "멱등회원"));
 
-        mockMvc.perform(put(likePath(projectId)).header("Authorization", liker));
-        mockMvc.perform(put(likePath(projectId)).header("Authorization", liker))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.likeCount").value(1))
-                .andExpect(jsonPath("$.likedByMe").value(true));
+        // 두 번을 똑같이 단정한다. 첫 호출을 단정하지 않으면 그것이 깨져도 두 번째가 첫
+        // 성공이 되어 이 테스트가 초록으로 통과한다 — 멱등을 본다면서 아무것도 못 보는 것이다.
+        for (int call = 1; call <= 2; call++) {
+            mockMvc.perform(put(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(1))
+                    .andExpect(jsonPath("$.likedByMe").value(true));
+        }
 
-        mockMvc.perform(delete(likePath(projectId)).header("Authorization", liker));
-        mockMvc.perform(delete(likePath(projectId)).header("Authorization", liker))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.likeCount").value(0))
-                .andExpect(jsonPath("$.likedByMe").value(false));
+        for (int call = 1; call <= 2; call++) {
+            mockMvc.perform(delete(likePath(projectId)).header("Authorization", liker))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.likeCount").value(0))
+                    .andExpect(jsonPath("$.likedByMe").value(false));
+        }
     }
 
     /**

@@ -207,17 +207,17 @@ public class ProjectService {
      */
     @Transactional
     public LikeView like(Long projectId, Long userId) {
-        Long likeable = requireLikeableProject(projectId);
-        projects.insertLike(likeable, userId);
-        return new LikeView(projects.countLikes(likeable), true);
+        requireLikeableProject(projectId);
+        projects.insertLike(projectId, userId);
+        return new LikeView(projects.countLikes(projectId), true);
     }
 
     /** 취소. 누른 적 없는 회원이 불러도 오류가 아니다 — 결과가 같으므로 답도 같다. */
     @Transactional
     public LikeView unlike(Long projectId, Long userId) {
-        Long likeable = requireLikeableProject(projectId);
-        projects.deleteLike(likeable, userId);
-        return new LikeView(projects.countLikes(likeable), false);
+        requireLikeableProject(projectId);
+        projects.deleteLike(projectId, userId);
+        return new LikeView(projects.countLikes(projectId), false);
     }
 
     /**
@@ -227,11 +227,10 @@ public class ProjectService {
      * <p>편집자 가드는 걸지 않는다. 좋아요는 방문자의 행위이므로 <b>남의 부스에서 누르는 것이
      * 정상 경로다</b> — 여기에 {@code requireEditor} 를 넣으면 기능이 자기 부스 전용이 된다.
      */
-    private Long requireLikeableProject(Long projectId) {
+    private void requireLikeableProject(Long projectId) {
         Project project = projects.findById(projectId)
                 .orElseThrow(() -> new ProjectNotFoundException(projectId));
         requireVisitorVisible(project.getBoothId());
-        return project.getId();
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
