@@ -472,28 +472,34 @@ class AiDocumentUploadIntegrationTest {
     }
 
     /**
-     * reconcile 이 저장 위치를 옮기면 옛 bucket 에 대한 HEAD 결과를 쓰지 않고 <b>다시 묻는다</b>.
+     * reconcile 이 저장 위치를 옮기면 옛 bucket 에 대한 HEAD 결과를 <b>쓰지 않는다</b>.
      *
-     * <p>객체는 옮겨간 bucket 에만 있다 — 첫 HEAD 는 옛 bucket 을 보고 "없음"으로 답한다.
-     * 그 답을 그대로 믿으면 409 다.
+     * <p>객체는 옮겨간 bucket 에만 있어 첫 HEAD 는 옛 bucket 을 보고 "없음" 으로 답한다. 그 답을
+     * 그대로 믿으면 409 로 "다시 올려 주세요" 가 나가는데, 파일은 멀쩡히 있다.
+     *
+     * <p>재시도는 서버가 하지 않고 클라이언트가 한다 — 문서를 저장소 간에 옮기는 것은 reconcile
+     * 이고, reconcile 은 업로드가 차단된 상태에서 운영자 승인과 재배포로만 일어난다. 한 요청 안에
+     * 재배포가 끝나야 성립하는 경합이라 루프를 두지 않는다. 왕복 한 번이 아무도 못 밟는 루프보다
+     * 싸다.
      */
     @Test
-    void aStorageMoveDuringTheHeadForcesASecondLook() throws Exception {
+    void aStorageMoveDuringTheHeadIsNotTrusted() throws Exception {
         Owner owner = agentOwner("이동경합");
         String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
         long documentId = idOf(grant);
         storage.putObject("moved-bucket", keyOf(grant), ONE_MB);
 
-        storage.onHead(key -> {
-            storage.onHead(k -> { });   // 한 번만
-            jdbc.update("UPDATE ai_documents SET storage_bucket = 'moved-bucket' WHERE id = ?",
-                    documentId);
-        });
+        storage.onHead(key -> jdbc.update(
+                "UPDATE ai_documents SET storage_bucket = 'moved-bucket' WHERE id = ?", documentId));
 
         mockMvc.perform(complete(owner, documentId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.processingStatus").value("QUEUED"));
-        assertNotNull(documentRepository.findById(documentId).orElseThrow().getUploadedAt());
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"));
+
+        // 낡은 HEAD 로 결론내지 않았다는 증거 — 실패로도 성공으로도 표시하지 않고 그대로 둔다.
+        AiDocument untouched = documentRepository.findById(documentId).orElseThrow();
+        assertNull(untouched.getUploadedAt());
+        assertEquals("QUEUED", untouched.getProcessingStatus());
     }
 
     // ── 도우미 ──────────────────────────────────────────────────────────────

@@ -2,9 +2,9 @@ package com.example.ssafesta.ai;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -120,13 +120,9 @@ public record AiStorageProperties(UploadGate uploadGate, String activeWriteProvi
         if (configured == null) {
             return Map.of();
         }
-        Map<String, Provider> kept = new LinkedHashMap<>();
-        configured.forEach((name, provider) -> {
-            if (provider != null && !provider.isUnconfigured()) {
-                kept.put(name, provider);
-            }
-        });
-        return Map.copyOf(kept);
+        return configured.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && !entry.getValue().isUnconfigured())
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     /**

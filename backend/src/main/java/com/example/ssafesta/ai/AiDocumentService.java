@@ -25,6 +25,14 @@ import org.springframework.util.unit.DataSize;
  *
  * <p>Handing the document to FastAPI is S15P21A604-175, and expiring abandoned grants is
  * S15P21A604-174. A completed document sits in {@code QUEUED} until the first of those lands.
+ *
+ * <p><b>Until S15P21A604-174 lands, an abandoned grant holds its slot forever.</b> {@code QUEUED}
+ * counts toward the ten of FR-018 ({@code AiDocumentRepository#countActive}) and nothing here moves
+ * it to {@code EXPIRED} except a provider switch — there is no sweeper, and no delete endpoint. Ten
+ * grants that were issued and never uploaded therefore block that agent with no way out: completing
+ * answers {@code DOCUMENT_UPLOAD_INCOMPLETE} because the object is not there, and re-requesting the
+ * same file reissues on the same row rather than freeing one. -174 is itself waiting on the AI
+ * document DB redesign (GitLab #119), so this is a live operational limit, not a short gap.
  */
 @Service
 public class AiDocumentService {
@@ -202,9 +210,6 @@ public class AiDocumentService {
      * 2026-08-31 and announced to the team for comment.
      */
     private void requireSameFile(AiDocument document, UploadRequest request) {
-        if (request == null) {
-            return;
-        }
         if (!document.getOriginalFilename().equals(request.fileName())
                 || !document.getContentType().equals(request.contentType())
                 || document.getSizeBytes() != request.size()) {
@@ -239,26 +244,22 @@ public class AiDocumentService {
      * the network call</b>. The expiry sweeper and reconcile both write these rows, so the state
      * seen in step one may be stale by step three; the write transaction re-reads under a lock and
      * decides again. When storage identifiers changed in between, the HEAD answered about a
-     * different bucket and has to be repeated rather than trusted.
+     * different bucket and cannot be trusted — the client asks again.
+     *
+     * <p>Retrying in-process was written first and then removed. Moving a document between storages
+     * is reconcile, and reconcile is operator-approved settings plus a redeploy while uploads are
+     * blocked — a race that needs a redeploy to land inside one request. One extra round trip is
+     * cheaper than a loop nobody can trigger.
      */
     public CompleteView complete(Long documentId, Long userId) {
-        Snapshot next = transactions.execute(status -> readSnapshot(documentId, userId));
-        for (int attempt = 0; attempt < 2; attempt++) {
-            Snapshot snapshot = Objects.requireNonNull(next);
-            if (snapshot.decided() != null) {
-                return snapshot.decided();
-            }
-            Optional<Long> storedSize = storage.headSize(snapshot.provider(), snapshot.bucket(),
-                    snapshot.objectKey());
-            Outcome outcome = transactions.execute(status -> settle(documentId, snapshot, storedSize));
-            if (Objects.requireNonNull(outcome).view() != null) {
-                return outcome.view();
-            }
-            next = outcome.retryWith();
+        Snapshot snapshot = Objects.requireNonNull(
+                transactions.execute(status -> readSnapshot(documentId, userId)));
+        if (snapshot.decided() != null) {
+            return snapshot.decided();
         }
-        // Storage identifiers moved twice while we were asking about them. Rare enough that the
-        // honest answer is "ask again later" rather than a third round.
-        throw new StorageUnavailableException("문서 저장 위치가 변경되는 중입니다. 잠시 후 다시 시도해 주세요.");
+        Optional<Long> storedSize = storage.headSize(snapshot.provider(), snapshot.bucket(),
+                snapshot.objectKey());
+        return transactions.execute(status -> settle(documentId, snapshot, storedSize));
     }
 
     private Snapshot readSnapshot(Long documentId, Long userId) {
@@ -290,17 +291,19 @@ public class AiDocumentService {
         return null;
     }
 
-    private Outcome settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
+    private CompleteView settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
         AiDocument document = documents.findWithLockById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
 
         CompleteView settled = decideWithoutStorage(document);
         if (settled != null) {
-            return Outcome.done(settled);
+            return settled;
         }
         if (!snapshot.sameStorage(document)) {
-            // Reconcile moved the object while we were asking the old provider about it.
-            return Outcome.retry(Snapshot.of(document, null));
+            // Reconcile moved the object while we were asking the old provider about it. The HEAD
+            // answered about a bucket this row no longer points at, so it decides nothing.
+            throw new StorageUnavailableException(
+                    "문서 저장 위치가 변경되는 중입니다. 잠시 후 다시 시도해 주세요.");
         }
 
         Instant now = Instant.now();
@@ -316,7 +319,7 @@ public class AiDocumentService {
                 throw gone();
             }
             document.recover(now);
-            return Outcome.done(CompleteView.of(document));
+            return CompleteView.of(document);
         }
 
         if (!present) {
@@ -326,7 +329,7 @@ public class AiDocumentService {
                             : "업로드된 파일 크기가 요청과 다릅니다. 다시 올려 주세요.");
         }
         document.markUploaded(now);
-        return Outcome.done(CompleteView.of(document));
+        return CompleteView.of(document);
     }
 
     private static boolean withinRecoveryWindow(AiDocument document, Instant now) {
@@ -480,18 +483,6 @@ public class AiDocumentService {
                     && bucket.equals(document.getStorageBucket())
                     && Objects.equals(objectKey, document.getObjectKey())
                     && sizeBytes == document.getSizeBytes();
-        }
-    }
-
-    /** Either the answer, or a fresh snapshot to ask storage about again. */
-    private record Outcome(CompleteView view, Snapshot retryWith) {
-
-        static Outcome done(CompleteView view) {
-            return new Outcome(view, null);
-        }
-
-        static Outcome retry(Snapshot snapshot) {
-            return new Outcome(null, snapshot);
         }
     }
 }
