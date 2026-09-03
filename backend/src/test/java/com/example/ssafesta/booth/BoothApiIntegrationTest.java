@@ -126,6 +126,24 @@ class BoothApiIntegrationTest {
      * well as in the two tests below so that swapping the three codes breaks the build
      * (S15P21A604-388).
      */
+    /**
+     * A member whose wallet is missing gets the same answer here as from {@code GET /wallets/me}.
+     *
+     * <p>The wallet is opened inside the member-creation transaction, so this is a broken state
+     * rather than an expected one — but broken states still have to arrive as an answer the client
+     * can read. Translating it in {@code WalletController} alone left this path reporting the
+     * member's problem as the server's (T-113: a translation that lives in one controller is right
+     * only in that controller).
+     */
+    @Test
+    void leaseWithoutAWalletIsRefusedNotAnInternalError() throws Exception {
+        Long userId = BoothTestSupport.createMember(users, "API임대무지갑");
+
+        mockMvc.perform(leaseRequest(freeSlotId(), bearerFor(userId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WALLET_NOT_FOUND"));
+    }
+
     @Test
     void leasingAnOccupiedSlotConflicts() throws Exception {
         Long owner = createMemberWithWallet(users, wallets, "API선점");

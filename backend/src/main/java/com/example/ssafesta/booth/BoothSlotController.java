@@ -2,7 +2,6 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
-import com.example.ssafesta.wallet.InsufficientCoinException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -85,13 +84,7 @@ public class BoothSlotController {
     public BoothLayoutQueryService.PublishedView published(
             @Parameter(description = "슬롯 식별자. `GET /api/v1/booth-slots` 의 `slotId`", example = "5")
             @PathVariable Long slotId) {
-        try {
-            return layouts.findPublishedBySlot(slotId);
-        } catch (SlotNotFoundException exception) {
-            // Not an ApiException — 004 threw it before the error envelope existed, and the two
-            // other call sites translate it here as well rather than in a handler.
-            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_FOUND);
-        }
+        return layouts.findPublishedBySlot(slotId);
     }
 
     @Operation(summary = "부스 임대 — 코인을 내고 빈 자리를 24시간 차지한다",
@@ -122,7 +115,7 @@ public class BoothSlotController {
             @ApiResponse(responseCode = "200", description = "**내가 이미 그 슬롯의 임차인이다.** 기존 임대를 그대로 돌려주고 추가 차감하지 않는다"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `durationDays` 가 1이 아니다"),
             @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다"),
-            @ApiResponse(responseCode = "404", description = "`BOOTH_SLOT_NOT_FOUND` — 그런 슬롯이 없다"),
+            @ApiResponse(responseCode = "404", description = "`BOOTH_SLOT_NOT_FOUND`(그런 슬롯이 없다) 또는 `WALLET_NOT_FOUND`(회원인데 지갑 행이 없다 — 정상 상태가 아니며 서버 로그에 근거가 남는다)"),
             @ApiResponse(responseCode = "409", description = """
                     사유가 네 가지이고 **`code` 로만 구분된다** — 상태 코드로 분기하면 안 된다.
 
@@ -146,20 +139,10 @@ public class BoothSlotController {
             HttpStatus status = outcome.alreadyHeld() ? HttpStatus.OK : HttpStatus.CREATED;
             return ResponseEntity.status(status).body(LeaseResponse.of(outcome));
         } catch (IllegalArgumentException exception) {
+            // The only refusal still translated here. It is an argument check, not a domain event:
+            // there is no ErrorCode for "durationDays was not 1" and no second caller to share one
+            // with. Every domain refusal below it now carries its own code (S15P21A604-402).
             throw new ApiException(ErrorCode.VALIDATION_FAILED, exception.getMessage());
-        } catch (SlotNotFoundException exception) {
-            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_FOUND);
-        } catch (SlotNotRentableException exception) {
-            throw new ApiException(ErrorCode.BOOTH_SLOT_NOT_RENTABLE);
-        } catch (SlotAlreadyLeasedException exception) {
-            throw new ApiException(ErrorCode.BOOTH_SLOT_ALREADY_LEASED);
-        } catch (ActiveLeaseLimitException exception) {
-            throw new ApiException(ErrorCode.ACTIVE_LEASE_LIMIT);
-        } catch (InsufficientCoinException exception) {
-            // Surfaced with the concrete shortfall — a silent fallback would leave the user
-            // guessing why the booth was not rented (spec 003 FR-009).
-            throw new ApiException(ErrorCode.INSUFFICIENT_COIN,
-                    "코인이 부족합니다. 필요: " + exception.getRequired() + ", 잔액: " + exception.getBalance());
         }
     }
 
