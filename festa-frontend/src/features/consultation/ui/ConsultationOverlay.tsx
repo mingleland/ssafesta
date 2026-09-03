@@ -1,6 +1,11 @@
 // Consultation 방문자 Overlay — Overlay Family 재사용 (S15P21A604-406).
 // 데이터는 features/consultation/model/visitor 상태 기계를 그대로 소비한다(-375, 확정 정책 C-01·C-06).
 // STOMP destination·payload schema 는 미확정이라 UI 가 만들지 않는다 — channel port 뒤에 있다.
+//
+// **Close ≠ Cancel** (user-flow-decisions §11.4). 창을 닫아도 상담 요청은 살아 있고, World HUD 의
+// 상담 아이콘으로 같은 상태에 다시 들어온다. 상태·카운트다운·채널 구독이 전부 module-level 이라
+// 이 컴포넌트가 unmount 돼도 유지된다 — 그래서 cleanup 에서 취소하지 않는다.
+// 취소는 [상담 요청 취소] 명시적 액션 하나뿐이다.
 import { useEffect } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
 import {
@@ -32,11 +37,9 @@ export function ConsultationOverlay({ payload }: Props) {
   const state = useVisitorConsultation();
 
   useEffect(() => {
+    // idle 일 때만 새로 요청한다 — 이미 대기·진행 중이면 HUD 로 되돌아온 것이므로 그 상태를 그대로 보여준다
     if (state.phase === 'idle') void requestConsultation(payload.boothId);
-    return () => {
-      // 오버레이를 닫으면 대기 중이던 요청도 정리한다 — 월드로 돌아간 뒤 유령 대기를 남기지 않는다
-      if (state.phase === 'waiting' || state.phase === 'requesting') void cancelConsultation();
-    };
+    // cleanup 없음: 닫기는 취소가 아니다(§11.4)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload.boothId]);
 
@@ -50,12 +53,17 @@ export function ConsultationOverlay({ payload }: Props) {
       size="m"
       icon={IcDesk}
       onClose={closeOverlay}
-      status={<span className="ov-note">Esc 또는 바깥을 눌러 월드로 돌아갑니다</span>}
+      status={<span className="ov-note">닫아도 상담 요청은 유지됩니다</span>}
       footer={
         state.phase === 'waiting' ? (
-          <button type="button" className="ov-btn" onClick={() => void cancelConsultation()}>
-            대기 취소
-          </button>
+          <>
+            <button type="button" className="ov-btn" onClick={closeOverlay}>
+              닫기
+            </button>
+            <button type="button" className="ov-btn" onClick={() => void cancelConsultation()}>
+              상담 요청 취소
+            </button>
+          </>
         ) : state.phase === 'expired' || state.phase === 'error' ? (
           <>
             <button type="button" className="ov-btn" onClick={closeOverlay}>
@@ -79,7 +87,7 @@ export function ConsultationOverlay({ payload }: Props) {
           <span className="festa-overlay-spinner" />
           <strong>직원 연결을 기다리는 중입니다</strong>
           {state.remainingSeconds !== null && <span className="cs-timer">{mmss(state.remainingSeconds)} 남음</span>}
-          <p className="ov-note">직원이 수락하면 바로 대화가 시작됩니다. 창을 닫아도 요청은 취소됩니다.</p>
+          <p className="ov-note">직원이 수락하면 바로 대화가 시작됩니다. 창을 닫아도 요청은 유지되며, 월드 우상단 상담 아이콘으로 돌아올 수 있습니다.</p>
         </div>
       )}
 

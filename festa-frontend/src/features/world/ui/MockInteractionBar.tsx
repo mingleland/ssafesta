@@ -1,10 +1,17 @@
-// Mock Interaction Bar — Unity F 상호작용의 임시 대역 (S15P21A604-406).
-// 월드가 목업 정지 화면일 때만 뜬다. 실제 Unity 가 붙으면 이 컴포넌트는 사라지고
-// dispatcher 가 BOOTH_*_INTERACT 이벤트로 같은 openOverlay 를 호출한다 — 오버레이 쪽은 그대로다.
+// Mock Interaction Bar — **DEV_ONLY**. Unity F 상호작용의 개발용 대역 (S15P21A604-406).
+//
+// 제품 HUD 가 아니다(D-08 · hud-decisions: 기능 Launcher 금지). Unity 송신부가 없는 환경에서
+// dispatcher 하류(Overlay Bus → OverlayHost → 각 Overlay)를 손으로 검증하기 위한 장치다.
+// 노출 조건은 `IS_DEV_INTERACTION_BAR` 하나이며 dev 빌드 + 명시적 플래그를 동시에 요구한다 —
+// 프로덕션 번들에서는 조건이 상수 false 라 트리셰이킹으로 사라진다.
 // 새 계약을 만들지 않는다: 여기서 여는 payload 는 dispatcher 가 만드는 것과 같은 모양이다.
 import { openOverlay } from '../../../shared/types/overlay';
 import type { OverlayType } from '../../../shared/types/overlay';
 import './mockInteractionBar.css';
+
+/** dev 빌드에서 `VITE_DEV_INTERACTION_BAR=true` 일 때만 켠다 — mock 월드라는 사실만으로 켜지 않는다 */
+export const IS_DEV_INTERACTION_BAR =
+  import.meta.env.DEV && import.meta.env.VITE_DEV_INTERACTION_BAR === 'true';
 
 const MOCK_BOOTH_ID = 1;
 
@@ -25,9 +32,9 @@ const ENTRIES: Entry[] = [
 
 export function MockInteractionBar() {
   return (
-    <div className="mock-bar" role="group" aria-label="목업 상호작용">
+    <div className="mock-bar" role="group" aria-label="개발용 상호작용 트리거">
       <span className="mock-bar-key">F</span>
-      <span className="mock-bar-label">상호작용 (목업)</span>
+      <span className="mock-bar-label">DEV 상호작용</span>
       <span className="mock-bar-sep" />
       {ENTRIES.map((e) => (
         <button key={e.type} type="button" className="mock-bar-btn" onClick={() => openOverlay(e.type, e.payload)}>

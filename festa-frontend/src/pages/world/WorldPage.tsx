@@ -1,36 +1,85 @@
-// /app/world가 마운트하는 화면 — Unity WebGL Host(013a) + Overlay 렌더러 + Interaction
-// Dispatcher를 조립한다(016 E2E). Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역
-// 상시 구독이면 월드 밖에서도 Unity 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
+// /app/world 가 마운트하는 화면 — 로그인 후 사용자가 상주하는 기본 상태다(D-08).
+// Unity WebGL Host(013a) + Overlay 렌더러 + Interaction Dispatcher 를 조립한다(016 E2E).
+//
+// 화면 계층은 서로 분리돼 있다:
+//   WorldSurface   Unity(또는 mock 정지 화면)
+//   WorldHud       허용 HUD 만 — 조작 안내 · 상담 Quick Access
+//   OverlayHost    Unity 상호작용이 여는 Visitor Overlay (Overlay Bus)
+//   GameMenu       사용자가 ESC 로 여는 개인/시스템 레이어 (features/world/model/gameClientUi)
+//
+// Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
+// 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { IS_MOCK_WORLD, WorldSurface } from '../../features/world/ui/WorldSurface.select';
 import { WorldHud } from '../../features/world/ui/WorldHud';
-import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
+import { IS_DEV_INTERACTION_BAR, MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
+import { GameMenu } from '../../features/world/ui/GameMenu';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
-import { closeOverlay } from '../../shared/types/overlay';
+import { closeOverlay, getCurrentOverlay } from '../../shared/types/overlay';
+import {
+  closeGameMenu,
+  getGameClientUiSnapshot,
+  openGameMenu,
+  resetGameClientUi,
+  useGameClientUi,
+} from '../../features/world/model/gameClientUi';
 import './worldPage.css';
 
 export function WorldPage() {
+  const ui = useGameClientUi();
+  const navigate = useNavigate();
+
   useEffect(() => {
     const unsubscribe = initInteractionDispatcher();
     return () => {
       unsubscribe();
-      // Overlay Bus는 module-level 상태라 OverlayHost가 unmount돼도 current가 남는다 —
-      // 이 화면을 벗어나면 명시적으로 닫아 재진입 시 과거 오버레이가 즉시 떠 있지 않게 한다.
+      // Overlay Bus·클라이언트 UI 는 module-level 상태라 이 화면이 unmount 돼도 남는다 —
+      // 벗어날 때 명시적으로 닫아 재진입 시 과거 레이어가 즉시 떠 있지 않게 한다.
       closeOverlay();
+      resetGameClientUi();
     };
+  }, []);
+
+  // ESC 계층: 열린 Visitor Overlay 가 있으면 그쪽이 먼저 닫는다(OverlayFrame 자체 핸들러).
+  // 아무 레이어도 없을 때만 Game Menu 를 연다 — 그것이 "ESC = 나/시스템"의 의미다(D-08).
+  // 장기 Input Router(game-client-experience-draft §4)는 여기서 구현하지 않는다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      const { gameMenu, managementOverlay } = getGameClientUiSnapshot();
+      if (gameMenu) {
+        closeGameMenu();
+        return;
+      }
+      if (managementOverlay || getCurrentOverlay() !== null) return; // 그 레이어가 자기 Esc 를 처리한다
+      openGameMenu();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   return (
     <div className="world-scene">
       {/* World Layer — 교체 경계. 목업은 최신 Unity 캡처 정지 화면, 실제는 UnityHost */}
       <WorldSurface />
-      {/* React Screen Layer — hud-decisions 가 허용한 최소 HUD 만 */}
+      {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
       <WorldHud mock={IS_MOCK_WORLD} />
-      {/* Unity F 상호작용 대역 — 목업 월드에서만. 실제 Unity 는 dispatcher 로 같은 openOverlay 를 부른다 */}
-      {IS_MOCK_WORLD && <MockInteractionBar />}
-      {/* React Overlay Layer */}
+      {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
+      {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
+      {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}
       <OverlayHost />
+      {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
+      {ui.gameMenu && (
+        <GameMenu
+          onClose={closeGameMenu}
+          onOpenMyInfo={() => {
+            closeGameMenu();
+            navigate('/app/profile');
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -56,25 +56,23 @@ describe('RequireAuth — bootstrapped 분기', () => {
     expect(screen.queryByText('보호된 내용')).toBeNull();
   });
 
-  it('부트스트랩 후 member면 헤더와 함께 children을 그린다', () => {
+  it('부트스트랩 후 member면 children만 그린다 — 계정 UI 를 덧그리지 않는다', () => {
     setMemberSession('at', new Date(Date.now() + 60_000).toISOString());
     markBootstrapped();
     renderAt('member-only');
     expect(screen.queryByText('보호된 내용')).not.toBeNull();
-    expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeNull();
-    // -272 회귀 방어 — 조사까지 맞아야 한다. `{kind}` 보간으로 텍스트 노드가 쪼개져 있어
-    // queryByText 로는 못 잡고 textContent 로 본다.
-    expect(document.body.textContent).toContain('회원으로 이용 중');
-    expect(document.body.textContent).not.toContain('회원로 이용 중');
+    // D-08 — 가드는 인증 판정만 한다. 계정 표시·로그아웃은 ESC Game Menu 소관이라
+    // 여기서 그리면 World 같은 상주 화면 위에 계정 칩이 박힌다.
+    expect(screen.queryByRole('button', { name: '로그아웃' })).toBeNull();
+    expect(document.body.textContent).not.toContain('이용 중');
   });
 
-  it('게스트가 허용 화면에 들어가면 게스트 문구로 헤더를 그린다', () => {
+  it('게스트가 허용 화면에 들어가도 children만 그린다', () => {
     setGuestSession('at', new Date(Date.now() + 60_000).toISOString());
     markBootstrapped();
     renderAt('guest-allowed');
     expect(screen.queryByText('보호된 내용')).not.toBeNull();
-    // -272 의 반대편 — '게스트'는 모음으로 끝나 '로'가 맞다. 조사를 한쪽만 고치면 여기가 깨진다.
-    expect(document.body.textContent).toContain('게스트로 이용 중');
+    expect(document.body.textContent).not.toContain('이용 중');
   });
 
   it('부트스트랩 후 guest가 member-only에 들어가면 차단하고 로그인 진입점을 준다', () => {

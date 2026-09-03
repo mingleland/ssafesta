@@ -54,14 +54,14 @@ export function ProfilePage() {
 
   if (state.status === 'loading' || state.status === 'idle') {
     return (
-      <PageShell title="내 정보" backTo="/app/home">
+      <PageShell title="내 정보" backTo="/app/world">
         <ScreenLoading label="계정을 불러오는 중..." />
       </PageShell>
     );
   }
   if (state.status === 'error' || state.account === null) {
     return (
-      <PageShell title="내 정보" backTo="/app/home">
+      <PageShell title="내 정보" backTo="/app/world">
         <ScreenError title="계정을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadProfile()} />
       </PageShell>
     );
@@ -71,7 +71,7 @@ export function ProfilePage() {
   const submitting = state.nicknameEdit.phase === 'submitting';
 
   return (
-    <PageShell title="내 정보" subtitle="축제에서 쓰는 내 프로필과 보유 자산" backTo="/app/home">
+    <PageShell title="내 정보" subtitle="축제에서 쓰는 내 프로필과 보유 자산" backTo="/app/world">
       <div className="pf-grid">
         <section className="sc-card pf-identity">
           <span className="pf-avatar">{account.nickname.slice(0, 1)}</span>

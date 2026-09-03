@@ -93,14 +93,14 @@ export function SlotListPage() {
 
   if (slotsQuery.isLoading) {
     return (
-      <PageShell title="부스 슬롯" backTo="/app/home">
+      <PageShell title="부스 슬롯" backTo="/app/world">
         <ScreenLoading label="슬롯을 불러오는 중..." />
       </PageShell>
     );
   }
   if (slotsQuery.isError) {
     return (
-      <PageShell title="부스 슬롯" backTo="/app/home">
+      <PageShell title="부스 슬롯" backTo="/app/world">
         <ScreenError title="슬롯 목록을 불러오지 못했습니다" onRetry={() => void slotsQuery.refetch()} />
       </PageShell>
     );
@@ -114,7 +114,7 @@ export function SlotListPage() {
     <PageShell
       title="부스 슬롯"
       subtitle={`축제 광장에서 내 부스를 열 자리를 고르세요 · 임대 가능 ${availableCount}곳`}
-      backTo="/app/home"
+      backTo="/app/world"
       actions={<WalletBadge />}
     >
       {myBooth && myBooth.lease && (

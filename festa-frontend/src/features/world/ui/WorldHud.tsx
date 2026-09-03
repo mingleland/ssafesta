@@ -1,8 +1,10 @@
 // World 위 React HUD — hud-decisions.md 가 허용한 것만 그린다 (S15P21A604-406).
-// 허용: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification.
-// 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel.
+// 허용 4종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
+//          Consultation Quick Access(우상단, 상시 — 상담만의 예외).
+// 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel · 기능 launcher.
 // F 상호작용 prompt·하이라이트·이름표는 Unity 소관이라 여기서 만들지 않는다.
 import { useState } from 'react';
+import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import './worldHud.css';
 
 interface Props {
@@ -15,6 +17,9 @@ export function WorldHud({ mock = false }: Props) {
 
   return (
     <div className="world-hud">
+      {/* 허용 4번 — 상담 상태 즉시 접근 */}
+      <ConsultationQuickAccess />
+
       {guideOpen && (
         <section className="world-hud-guide" aria-label="조작 안내">
           <header className="world-hud-guide-head">
@@ -39,7 +44,7 @@ export function WorldHud({ mock = false }: Props) {
             </li>
             <li>
               <span className="world-key">Esc</span>
-              열린 창 닫기
+              열린 창 닫기 · 메뉴 열기
             </li>
           </ul>
           {mock && <p className="world-hud-note">월드는 목업 정지 화면입니다 — 실제 이동은 Unity 연결 후 동작합니다.</p>}
