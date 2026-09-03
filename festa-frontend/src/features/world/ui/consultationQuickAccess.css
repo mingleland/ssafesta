@@ -15,8 +15,8 @@
   display: grid;
   place-items: center;
   border-radius: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(12, 16, 34, 0.72);
+  border: 1px solid var(--festa-line);
+  background: var(--festa-surface);
   backdrop-filter: blur(8px);
   color: rgba(234, 238, 251, 0.86);
   cursor: pointer;
@@ -26,7 +26,7 @@
 }
 .cqa-btn:disabled { cursor: default; color: rgba(234, 238, 251, 0.5); }
 .cqa-btn:hover:not(:disabled) { background: rgba(24, 32, 66, 0.9); }
-.cqa-btn-on { border-color: rgba(120, 170, 255, 0.5); color: #eaeefb; }
+.cqa-btn-on { border-color: rgba(120, 170, 255, 0.5); color: var(--festa-ink); }
 .cqa-dot {
   position: absolute;
   top: 7px;
@@ -40,7 +40,7 @@
 .cqa-label {
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(12, 16, 34, 0.72);
+  background: var(--festa-surface);
   border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 12px;
   color: rgba(234, 238, 251, 0.82);

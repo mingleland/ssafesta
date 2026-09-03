@@ -10,6 +10,14 @@
 // 상태 분리만 한다. Overlay Bus 와 같은 module-level store + useSyncExternalStore 관례를 따른다.
 import { useSyncExternalStore } from 'react';
 
+/**
+ * World 하단 개발용 상호작용 트리거(DEV_ONLY)를 켤지 — dev 빌드 + 명시적 플래그를 동시에 요구한다.
+ * 제품 HUD 가 아니라서(hud-decisions: 기능 Launcher 금지) 프로덕션에서는 상수 false 가 되어
+ * 번들에서 사라진다.
+ */
+export const IS_DEV_INTERACTION_BAR =
+  import.meta.env.DEV && import.meta.env.VITE_DEV_INTERACTION_BAR === 'true';
+
 export interface GameClientUiState {
   gameMenu: boolean;
   managementOverlay: boolean;

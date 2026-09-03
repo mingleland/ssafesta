@@ -22,9 +22,9 @@
   height: 38px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--festa-line);
   background: rgba(255, 255, 255, 0.05);
-  color: #eaeefb;
+  color: var(--festa-ink);
   font: inherit;
   font-size: 13.5px;
 }
@@ -81,12 +81,12 @@
   font-weight: 600;
   cursor: pointer;
 }
-.mg-tab-on { background: rgba(255, 255, 255, 0.14); color: #eaeefb; }
+.mg-tab-on { background: var(--festa-fill-strong); color: var(--festa-ink); }
 
 /* Survey Result */
 .mg-result { display: flex; flex-direction: column; gap: 14px; }
 .mg-agg { display: flex; flex-direction: column; }
-.mg-avg { margin: 0 0 10px; font-size: 24px; font-weight: 700; color: #eaeefb; }
+.mg-avg { margin: 0 0 10px; font-size: 24px; font-weight: 700; color: var(--festa-ink); }
 .mg-avg span { font-size: 12.5px; font-weight: 400; }
 .mg-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .mg-bars li { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 10px; }

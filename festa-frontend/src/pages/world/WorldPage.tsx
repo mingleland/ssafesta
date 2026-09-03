@@ -13,13 +13,14 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD, WorldSurface } from '../../features/world/ui/WorldSurface.select';
 import { WorldHud } from '../../features/world/ui/WorldHud';
-import { IS_DEV_INTERACTION_BAR, MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
+import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
 import { closeOverlay, getCurrentOverlay } from '../../shared/types/overlay';
 import {
+  IS_DEV_INTERACTION_BAR,
   closeBoothManagement,
   closeGameMenu,
   getGameClientUiSnapshot,

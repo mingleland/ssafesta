@@ -10,10 +10,6 @@ import type { OverlayType } from '../../../shared/types/overlay';
 import { openBoothManagement } from '../model/gameClientUi';
 import './mockInteractionBar.css';
 
-/** dev 빌드에서 `VITE_DEV_INTERACTION_BAR=true` 일 때만 켠다 — mock 월드라는 사실만으로 켜지 않는다 */
-export const IS_DEV_INTERACTION_BAR =
-  import.meta.env.DEV && import.meta.env.VITE_DEV_INTERACTION_BAR === 'true';
-
 const MOCK_BOOTH_ID = 1;
 
 interface Entry {

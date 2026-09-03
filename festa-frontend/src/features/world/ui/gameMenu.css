@@ -5,7 +5,7 @@
   z-index: 80;
   display: grid;
   place-items: center;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  font-family: var(--festa-font);
 }
 .gm-dim {
   position: absolute;
@@ -22,7 +22,7 @@
   background: rgba(14, 18, 40, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.13);
   box-shadow: 0 28px 70px rgba(3, 5, 18, 0.6);
-  color: #eaeefb;
+  color: var(--festa-ink);
   overflow: hidden;
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -38,12 +38,12 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--festa-line);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(234, 238, 251, 0.8);
   cursor: pointer;
 }
-.gm-close:hover { background: rgba(255, 255, 255, 0.14); }
+.gm-close:hover { background: var(--festa-fill-strong); }
 
 .gm-summary {
   display: grid;
@@ -82,7 +82,7 @@
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.07);
-  color: #eaeefb;
+  color: var(--festa-ink);
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;
@@ -109,7 +109,7 @@
   border: 0;
   border-radius: 11px;
   background: transparent;
-  color: #eaeefb;
+  color: var(--festa-ink);
   font: inherit;
   font-size: 14px;
   text-align: left;

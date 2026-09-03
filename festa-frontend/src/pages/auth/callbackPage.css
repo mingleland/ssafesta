@@ -7,8 +7,8 @@
   place-items: center;
   overflow: hidden;
   background: #0b0f28;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
-  color: #eaeefb;
+  font-family: var(--festa-font);
+  color: var(--festa-ink);
 }
 .boot-bg {
   position: absolute;
@@ -28,7 +28,7 @@
   padding: 34px 40px 36px;
   min-width: min(400px, calc(100vw - 40px));
   border-radius: 20px;
-  background: rgba(12, 16, 34, 0.72);
+  background: var(--festa-surface);
   border: 1px solid rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
   text-align: center;
@@ -72,7 +72,7 @@
   border-radius: 11px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
-  color: #eaeefb;
+  color: var(--festa-ink);
   font: inherit;
   font-size: 13.5px;
   font-weight: 600;
@@ -95,7 +95,7 @@
   border-radius: 11px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
-  color: #eaeefb;
+  color: var(--festa-ink);
   font: inherit;
   font-size: 14px;
 }
