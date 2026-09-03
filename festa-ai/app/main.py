@@ -1,5 +1,6 @@
 import logging
 
+import httpx
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 
@@ -10,6 +11,7 @@ from app.api.errors import (
 )
 from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
+from app.core.redis import create_redis_client
 from app.db.session import create_ai_db_session_factory
 
 
@@ -23,6 +25,13 @@ def create_app() -> FastAPI:
     app.state.settings = settings
     app.state.ai_db_session_factory = create_ai_db_session_factory(
         settings.database_url.get_secret_value()
+    )
+    app.state.redis = create_redis_client(settings.redis_url)
+    app.state.spring_http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            settings.spring_booth_access_timeout_seconds,
+            connect=settings.spring_booth_access_timeout_seconds,
+        )
     )
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)

@@ -1,3 +1,4 @@
+import base64
 import importlib
 import pathlib
 import sys
@@ -5,8 +6,12 @@ import sys
 import pytest
 from pydantic import ValidationError
 
+_VALID_JWT_SECRET = base64.b64encode(b"0" * 64).decode()
+
 VALID_ENV = {
     "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/festa",
+    "JWT_SECRET": _VALID_JWT_SECRET,
+    "REDIS_URL": "redis://localhost:6379/0",
     "SPRING_INTERNAL_BASE_URL": "http://spring.internal:8080",
     "INTERNAL_SPRING_TO_AI_TOKENS": "spring-to-ai-token-1",
     "INTERNAL_AI_TO_SPRING_TOKENS": "ai-to-spring-token-1",
@@ -63,6 +68,9 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.embedding_dimension == 1536
     assert config.settings.internal_spring_to_ai_tokens == ["spring-to-ai-token-1"]
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
+    assert config.settings.conversation_ttl_seconds == 1800
+    assert config.settings.spring_booth_access_timeout_seconds == 1.0
+    assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
 
 
 def test_missing_required_field_fails_fast(
@@ -98,6 +106,23 @@ def test_backoff_count_must_match_max_retries(
 ) -> None:
     _set_env(monkeypatch, tmp_path, overrides={"JOB_RETRY_BACKOFF_SECONDS": "60,300"})
     with pytest.raises(ValidationError, match="JOB_RETRY_BACKOFF_SECONDS"):
+        _fresh_settings_module()
+
+
+def test_jwt_secret_must_be_valid_base64(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"JWT_SECRET": "not-base64!!"})
+    with pytest.raises(ValidationError, match="JWT_SECRET must be valid base64"):
+        _fresh_settings_module()
+
+
+def test_jwt_secret_must_be_at_least_64_bytes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    short_secret = base64.b64encode(b"0" * 32).decode()
+    _set_env(monkeypatch, tmp_path, overrides={"JWT_SECRET": short_secret})
+    with pytest.raises(ValidationError, match="at least 64 random bytes"):
         _fresh_settings_module()
 
 

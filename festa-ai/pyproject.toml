@@ -17,6 +17,8 @@ dependencies = [
   "pydantic>=2.10,<3",
   "pydantic-settings>=2.7,<3",
   "psycopg[binary]>=3.2,<4",
+  "pyjwt>=2.9,<3",
+  "redis>=5,<6",
   "sqlalchemy[asyncio]>=2.0,<3",
   "tiktoken>=0.8,<1",
   "uvicorn[standard]>=0.34,<1",
@@ -24,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
+  "fakeredis>=2.23,<3",
   "fpdf2>=2.8,<3",
   "moto[s3]>=5.0,<6",
   "pytest>=8,<10",
