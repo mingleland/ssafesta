@@ -96,6 +96,11 @@ class AgentPresetPromptTest(unittest.TestCase):
         self.assertIn("1~3문장", prompt)
         self.assertIn("확인할 수 없습니다", prompt)
 
+    def test_safety_instruction_requires_context_citation(self) -> None:
+        prompt = build_system_prompt(DEFAULT_PRESET)
+        self.assertIn("근거로 사용한 context 원문을 그대로 인용", prompt)
+        self.assertIn("인용할 문장이 없으면", prompt)
+
     def test_forbidden_topics_are_included_when_present(self) -> None:
         preset = AgentPreset("GUIDE", "FRIENDLY", "MEDIUM", forbidden_topics=("개인정보",))
         prompt = build_system_prompt(preset)
