@@ -1,5 +1,10 @@
 # Role D — 의존성·계약·Blocker 전수조사 (ASC S-20260831-05)
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - 조사일: 2026-08-31 | 기준: 로컬 `front` 브랜치 working tree + `origin/develop` 대조 (read-only)
 - 원칙: Jira Done ≠ 구현 완료 — 모든 판정은 코드 실물(파일:라인) 근거. 실측 예: S15P21A604-137은 Jira '완료'이나 커밋 실물은 명세 문서 확정뿐, BE 상담 코드 0줄.
 - FE↔develop 차이: `git diff HEAD origin/develop -- festa-frontend` = 0. BE는 develop이 앞섬(-177 방문자 Project API, -347 shared-config) — **front 로컬 backend 스냅샷에는 `GET /booths/{boothId}/projects/published`가 없고 origin/develop에는 있다** (commit 7d7f1c4).

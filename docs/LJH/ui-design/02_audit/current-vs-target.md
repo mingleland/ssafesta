@@ -1,5 +1,10 @@
 # Current → Target 매핑 (Persistent GameShell 재편)
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - 문서 종류: AUDIT(실측 baseline origin/develop 9c0db7a, 2026-08-31) + DECISION 갱신(2026-09-01, implementation-decisions.md D-01·D-04 반영)
 - 목표 구조 = SSAFY_FESTA_최종_UI_구조_종합정리.md. 결정 충돌 시 00_context/implementation-decisions.md 가 우선.
 

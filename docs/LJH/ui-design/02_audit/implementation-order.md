@@ -1,5 +1,10 @@
 # UI 통합 구현 순서 (최신 확정본)
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - 문서 종류: DECISION 반영본 (2026-09-01, `00_context/implementation-decisions.md` D-01~D-06 반영)
 - 이전 초안(2026-08-31, baseline 9c0db7a 실측 기반)을 대체한다. Game Studio Creator 작업·gss/grp 토큰 원천 항목은 D-01 로 제거됐다.
 - 전제: 디자인 blocker 전 도메인 0. game-studio 밖 전 화면 무스타일 → Foundation 신규 적용에 스타일 충돌 없음.

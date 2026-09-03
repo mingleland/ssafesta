@@ -1,6 +1,6 @@
 # Implementation Decisions — 사용자 후속 확정 정본
 
-- 문서 종류: **DECISION** (사용자 확정, 2026-09-01 정본화)
+- 문서 종류: **DECISION** (사용자 확정, 2026-09-01 정본화 / D-08 추가 2026-09-03)
 - 이 문서는 02_audit 실측·HUD 보고서·EXECUTION_PLAN 과 충돌할 때 **우선**한다 (우선순위는 README.md).
 
 ## D-01 — Game Studio 는 이번 UI 통합 범위 밖
@@ -80,3 +80,22 @@ SSAFY / Google / Kakao / Guest
 **현재 구현 상태: SSAFY 실제 BE/FE 계약 = 아직 없음 / NO_PROGRESS** — UI 목표에서는 정식 provider 지만 구현 완료로 기술하지 않는다.
 UI 디자인에서 SSAFY 버튼은 정식 슬롯으로 표현하되, 실 wiring 전에는 disabled/not-configured 등 계약에 맞는 상태로 처리한다.
 실제 OAuth URL·DTO·redirect 계약은 디자인 단계에서 발명하지 않는다.
+
+## D-08 — World-centered User Flow
+
+사용자 흐름·진입 구조를 확정한다. **상세 정본은 `00_context/user-flow-decisions.md`** 이며 여기에는 요약과 포인터만 둔다(내용을 두 곳에 복제하지 않는다).
+
+```text
+authenticated default state = World          로그인 후 기본 상주 상태. /app/home 대시보드는 제품 구조가 아니다
+default returnTo            = World          명시적 deep-link returnTo 는 그대로 존중한다
+First Setup                 = nickname only  신규 판정은 서버 NICKNAME_REQUIRED 단독
+일반 World interaction      = Unity F        React 기능 Launcher 를 만들지 않는다
+ESC Game Menu               = Profile Summary + Settings + Logout  (개인·시스템 전용)
+Booth owner 관리            = Booth Management NPC → 통합 Management Overlay
+Consultation                = HUD 우상단 Quick Access 예외 (시간 지속성)
+Booth Studio                = 독립 Creator Workspace (공간 디자인 전용)
+Visitor 기능 / Owner 관리   = 같은 UI 에 섞지 않는다
+```
+
+canonical detail: `00_context/user-flow-decisions.md`
+HUD 허용 범위: `00_context/hud-decisions.md`

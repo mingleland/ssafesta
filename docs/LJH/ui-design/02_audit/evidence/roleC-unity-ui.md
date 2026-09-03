@@ -1,5 +1,10 @@
 # ASC S-20260831-04 / Role C — festa-unity 사용자-facing UI·Feedback 전수조사
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - 감사 기준: **origin/develop (9c0db7a)**. 경로는 `festa-unity/Assets/_Project/` 기준 상대 표기.
 - 읽기 전용 조사. 파일 수정 없음.
 - **기준선 주의**: 지시받은 8개 상이 파일 외에 실측으로 3개가 더 develop 과 다르다 —

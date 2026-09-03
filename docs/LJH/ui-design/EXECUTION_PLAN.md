@@ -735,12 +735,12 @@ Frontend Design의 실제 READY smoke는 구현 착수 직전에 수행한다.
 ├─ overlay.md
 └─ creator-workspace.md
 
-05_visual-review/
+06_visual-review/
 ├─ taste-review.md
 ├─ playwright-review.md
 └─ consistency-audit.md
 
-06_handoff/
+07_handoff/
 ├─ implementation-plan.md
 ├─ unresolved-decisions.md
 └─ design-repo-migration.md

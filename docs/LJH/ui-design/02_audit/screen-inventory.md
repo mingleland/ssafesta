@@ -1,5 +1,10 @@
 # Screen Inventory — SSAFY FESTA UI 전수조사
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - Audit baseline: origin/develop = 9c0db7a (festa-frontend 는 front 와 완전 동일)
 - ASC: S-20260831-01 (통합) / -02(A React) -03(B Style) -04(C Unity) -05(D 의존·계약)
 - 상세 근거: roleA-react-surface.md / roleB-style-foundation.md / roleC-unity-ui.md / roleD-dependency-contract.md

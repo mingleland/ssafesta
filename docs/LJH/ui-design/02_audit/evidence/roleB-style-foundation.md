@@ -1,5 +1,10 @@
 # festa-frontend 스타일·디자인 기반 전수조사 (ASC S-20260831-03 / roleB)
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 조사일 2026-08-31 · 브랜치 front · 대상 `C:\colosair\projects\ssafesta\festa-frontend` (read-only)
 
 ## 0. 요약

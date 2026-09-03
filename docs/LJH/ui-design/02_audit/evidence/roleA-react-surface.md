@@ -1,9 +1,14 @@
 # Role A — festa-frontend React UI Surface 전수조사
 
+> **STATUS: HISTORICAL AUDIT — BASELINE origin/develop 9c0db7a (2026-08-31)**
+> 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
+> (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
+> 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+
 - 세션: ASC S-20260831-02 / 조사일 2026-08-31 / read-only
 - 기준 트리: 현재 체크아웃 front (= origin/develop 9c0db7a 동일 확인됨)
 - 루트: `C:\colosair\projects\ssafesta\festa-frontend`
-- 목표 구조 문서: `docs/LJH/ui-design/00_context/references/SSAFY_FESTA_최종_UI_구조_종합정리.md`
+- 목표 구조 문서: `docs/LJH/ui-design/00_context/source-docs/SSAFY_FESTA_최종_UI_구조_종합정리.md`
 
 ## ① Route Inventory
 
