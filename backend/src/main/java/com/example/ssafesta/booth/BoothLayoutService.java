@@ -19,18 +19,16 @@ public class BoothLayoutService {
 
     private final BoothLayoutDraftRepository drafts;
     private final BoothLayoutPublishedVersionRepository published;
-    private final BoothLeaseRepository leases;
     private final BoothEditorGuard editorGuard;
     private final LayoutValidator validator;
     private final BoothRepository booths;
 
     public BoothLayoutService(BoothLayoutDraftRepository drafts,
                               BoothLayoutPublishedVersionRepository published,
-                              BoothLeaseRepository leases, BoothEditorGuard editorGuard,
+                              BoothEditorGuard editorGuard,
                               LayoutValidator validator, BoothRepository booths) {
         this.drafts = drafts;
         this.published = published;
-        this.leases = leases;
         this.editorGuard = editorGuard;
         this.validator = validator;
         this.booths = booths;
@@ -86,9 +84,9 @@ public class BoothLayoutService {
         Booth booth = booths.findWithLockById(boothId)
                 .orElseThrow(() -> new BoothNotFoundException(boothId));
 
-        // Same predicate as every other occupancy question (research R-06).
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        // Same predicate as every other occupancy question (research R-06). Kept apart from the
+        // editor check above because the booth lock has to be taken between the two.
+        editorGuard.requireActiveLease(boothId);
 
         BoothLayoutDraft draft = drafts.findById(boothId).orElseThrow(() -> validationFailure(
                 "공개할 배치가 없습니다.", "NO_DRAFT", "먼저 배치를 저장해야 공개할 수 있습니다."));

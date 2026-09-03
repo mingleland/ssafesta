@@ -21,11 +21,14 @@ public class BoothQueryService {
     private final BoothSlotRepository slots;
     private final BoothRepository booths;
     private final BoothLeaseRepository leases;
+    private final BoothEditorGuard editorGuard;
 
-    public BoothQueryService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases) {
+    public BoothQueryService(BoothSlotRepository slots, BoothRepository booths,
+                             BoothLeaseRepository leases, BoothEditorGuard editorGuard) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
+        this.editorGuard = editorGuard;
     }
 
     /**
@@ -71,10 +74,8 @@ public class BoothQueryService {
      */
     @Transactional(readOnly = true)
     public PublicBoothView findPublicBooth(Long boothId) {
-        Instant now = Instant.now();
         Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
-        BoothLease lease = leases.findValidByBoothId(boothId, now)
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        BoothLease lease = editorGuard.requireActiveLease(boothId);
         return new PublicBoothView(booth.getId(), lease.getSlotId(), booth.getName(),
                 lease.getStatus().name(), true, lease.getEndsAt(),
                 BoothFacadeService.FacadeView.of(booth), booth.getPublishedLayoutVersion(),

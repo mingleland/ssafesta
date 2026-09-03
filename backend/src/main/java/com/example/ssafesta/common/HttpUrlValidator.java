@@ -13,11 +13,11 @@ import java.net.URISyntaxException;
  * step most likely to be lost is the ordering below, which is invisible until someone reads the
  * rejection message.
  *
- * <p><b>Not every URL in this codebase comes here.</b> {@code BoothFacadeService} keeps its own
- * rule for the logo, and deliberately: a logo is embedded in our page so it is https-only, while
- * these fields are places the user is sent to and {@code http} works for that. Folding the two
- * together would mean one of them silently loosening. Moving the facade here is a separate change
- * that first has to decide which rule wins.
+ * <p><b>Two rules, one implementation.</b> Destinations take {@code http} or {@code https}
+ * ({@link #validate}); assets embedded in our page take https only ({@link #validateHttpsOnly} —
+ * the booth logo). The facade used to hold its own eight-character copy of the second rule and it
+ * had already drifted: {@code "https://"} with no host behind it passed, and got stored. Only the
+ * scheme differs between the two, so only the scheme is a parameter.
  *
  * <h2>What this class does not do</h2>
  *
@@ -58,6 +58,23 @@ public final class HttpUrlValidator {
      * @throws ApiException {@code VALIDATION_FAILED} with one field-level detail
      */
     public static String validate(String value, String jsonField, String displayName) {
+        return check(value, jsonField, displayName, false);
+    }
+
+    /**
+     * Same rules, minus {@code http} — for a URL <b>we</b> load rather than send the user to.
+     *
+     * <p>The booth logo is rendered inside a page served over TLS, so an {@code http} logo is
+     * blocked as mixed content and the booth simply shows nothing: a failure the owner cannot
+     * diagnose from the outside. Every other rule here applies unchanged, which is the reason this
+     * is a parameter and not a second validator.
+     */
+    public static String validateHttpsOnly(String value, String jsonField, String displayName) {
+        return check(value, jsonField, displayName, true);
+    }
+
+    private static String check(String value, String jsonField, String displayName,
+                                boolean httpsOnly) {
         if (value == null) {
             return null; // 미등록이거나 해제 — 판정은 호출자 몫이다
         }
@@ -78,8 +95,10 @@ public final class HttpUrlValidator {
         if (!uri.isAbsolute()) { // URI.isAbsolute() 가 곧 scheme != null 이다
             throw reject(jsonField, displayName + " 주소 형식이 올바르지 않습니다.");
         }
-        if (!isAllowedScheme(uri.getScheme())) {
-            throw reject(jsonField, displayName + " 주소는 http 또는 https로 시작해야 합니다.");
+        if (!isAllowedScheme(uri.getScheme(), httpsOnly)) {
+            throw reject(jsonField, displayName + (httpsOnly
+                    ? " 주소는 https로 시작해야 합니다."
+                    : " 주소는 http 또는 https로 시작해야 합니다."));
         }
         // userinfo 는 어느 경로에서도 거부한다 — ASCII 든 IDN 이든 규칙은 하나여야 한다.
         // 초판은 IDN 경로에만 걸어 두어 https://한글도메인.com@evil.example.com 이 통과했다.
@@ -124,15 +143,15 @@ public final class HttpUrlValidator {
     }
 
     /**
-     * {@code http} is allowed, and that is deliberate.
+     * {@code http} is allowed for destinations, and that is deliberate.
      *
-     * <p>These are destinations the user is sent to, not assets embedded in our page. An
-     * {@code http} asset dies silently as mixed content; an {@code http} destination opens fine in
-     * a new tab. Narrowing to https here would reject working links to prove a point the browser
+     * <p>These are places the user is sent to, not assets embedded in our page. An {@code http}
+     * asset dies silently as mixed content; an {@code http} destination opens fine in a new tab.
+     * Narrowing to https for destinations would reject working links to prove a point the browser
      * already makes — and 009 SC-002 asks for the opposite (every registered link reachable).
      */
-    private static boolean isAllowedScheme(String scheme) {
-        return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+    private static boolean isAllowedScheme(String scheme, boolean httpsOnly) {
+        return "https".equalsIgnoreCase(scheme) || (!httpsOnly && "http".equalsIgnoreCase(scheme));
     }
 
     /**

@@ -46,10 +46,8 @@ public class CatalogItem {
     public Long getId() { return id; }
     public String getItemCode() { return itemCode; }
     public String getName() { return name; }
-    public String getItemType() { return itemType; }
     public String getEquipSlot() { return equipSlot; }
     public int getPrice() { return price; }
     public String getAssetKey() { return assetKey; }
-    public boolean isStackable() { return stackable; }
     public boolean isOnSale() { return onSale; }
 }

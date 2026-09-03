@@ -149,6 +149,25 @@ class BoothFacadeApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * The eight characters {@code "https://"} — a scheme and nothing behind it.
+     *
+     * <p>The facade's own {@code startsWith("https://")} accepted this and stored it, while every
+     * other URL field in the product refused it. That gap is why the rule moved into
+     * {@link com.example.ssafesta.common.HttpUrlValidator}.
+     */
+    @Test
+    void aLogoUrlWithoutAHostIsRejected() throws Exception {
+        Owner owner = leasedOwner("호스트없는로고");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"DEFAULT","logoUrl":"https://"}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("logoUrl"));
+    }
+
     @Test
     void anUnknownThemeIsRefused() throws Exception {
         Owner owner = leasedOwner("테마");

@@ -65,11 +65,10 @@ public class BoothLayoutQueryService {
     public PublishedView findPublished(Long boothId) {
         Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
 
-        // The expiry predicate lives in one place — spec 004's repository. A second copy here would
-        // be the fourth place it is written, and the one that eventually forgets the time condition
-        // (research R-06).
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        // The expiry predicate lives in one place — the guard. A second copy here would be the
+        // one that eventually forgets the time condition (research R-06). No editor check: this is
+        // the visitor's path.
+        editorGuard.requireActiveLease(boothId);
 
         Integer version = booth.getPublishedLayoutVersion();
         if (version == null) {

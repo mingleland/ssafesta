@@ -1,8 +1,6 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.booth.BoothEditorGuard;
-import com.example.ssafesta.booth.BoothExpiredException;
-import com.example.ssafesta.booth.BoothLeaseRepository;
 import com.example.ssafesta.booth.BoothNotFoundException;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.booth.LayoutAgentReferences;
@@ -56,17 +54,15 @@ public class AiAgentService {
 
     private final AiAgentRepository agents;
     private final BoothEditorGuard editorGuard;
-    private final BoothLeaseRepository leases;
     private final LayoutAgentReferences layoutReferences;
     private final BoothRepository booths;
     private final AiAgentProperties properties;
 
     public AiAgentService(AiAgentRepository agents, BoothEditorGuard editorGuard,
-                          BoothLeaseRepository leases, LayoutAgentReferences layoutReferences,
+                          LayoutAgentReferences layoutReferences,
                           BoothRepository booths, AiAgentProperties properties) {
         this.agents = agents;
         this.editorGuard = editorGuard;
-        this.leases = leases;
         this.layoutReferences = layoutReferences;
         this.booths = booths;
         this.properties = properties;
@@ -76,8 +72,7 @@ public class AiAgentService {
 
     @Transactional
     public AgentView create(Long boothId, Long userId, AgentCommand command) {
-        editorGuard.requireEditor(boothId, userId);
-        requireValidLease(boothId);
+        editorGuard.requireActiveEditor(boothId, userId);
 
         String name = validatedName(command, true);
         String role = validatedChoice(command == null ? null : command.role, "role", ROLES, null, true);
@@ -115,8 +110,7 @@ public class AiAgentService {
     public AgentView update(Long agentId, Long userId, AgentCommand command) {
         AiAgent agent = agents.findById(agentId)
                 .orElseThrow(() -> new AiAgentNotFoundException(agentId));
-        editorGuard.requireEditor(agent.getBoothId(), userId);
-        requireValidLease(agent.getBoothId());
+        editorGuard.requireActiveEditor(agent.getBoothId(), userId);
 
         if (command == null || !command.hasAnyKey()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "수정할 내용이 없습니다.");
@@ -166,8 +160,7 @@ public class AiAgentService {
     public void delete(Long agentId, Long userId) {
         AiAgent agent = agents.findById(agentId)
                 .orElseThrow(() -> new AiAgentNotFoundException(agentId));
-        editorGuard.requireEditor(agent.getBoothId(), userId);
-        requireValidLease(agent.getBoothId());
+        editorGuard.requireActiveEditor(agent.getBoothId(), userId);
 
         // The same lock publish takes, and taken before the reference check rather than after: the
         // check reads the layout, and a publish that commits between the read and the delete would
@@ -233,11 +226,6 @@ public class AiAgentService {
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
-
-    private void requireValidLease(Long boothId) {
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
-    }
 
     private String validatedName(AgentCommand command, boolean required) {
         if (command == null || !command.name.isPresent()) {

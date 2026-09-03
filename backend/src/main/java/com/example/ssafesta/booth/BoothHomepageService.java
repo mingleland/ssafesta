@@ -4,7 +4,6 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.HttpUrlValidator;
 import com.example.ssafesta.common.PresenceField;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,21 +22,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class BoothHomepageService {
 
     private final BoothEditorGuard editorGuard;
-    private final BoothLeaseRepository leases;
 
-    public BoothHomepageService(BoothEditorGuard editorGuard, BoothLeaseRepository leases) {
+    public BoothHomepageService(BoothEditorGuard editorGuard) {
         this.editorGuard = editorGuard;
-        this.leases = leases;
     }
 
     @Transactional
     public HomepageView update(Long boothId, Long userId, HomepageCommand command) {
-        Booth booth = editorGuard.requireEditor(boothId, userId);
-
         // Same reasoning as the facade: an expired booth shows nothing to anyone, so editing it
         // would be changing something invisible (spec 004 만료 계약).
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        Booth booth = editorGuard.requireActiveEditor(boothId, userId);
 
         booth.changeHomepageUrl(validated(command));
         return new HomepageView(booth.getHomepageUrl());
