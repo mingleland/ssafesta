@@ -1,6 +1,8 @@
 // URL 경로와 화면을 연결하는 라우팅 규칙 정의
 import { createBrowserRouter } from 'react-router-dom';
 import { LandingPage } from '../../pages/landing/LandingPage';
+import { HomePage } from '../../pages/home/HomePage';
+import { ProfilePage } from '../../pages/profile/ProfilePage';
 import { StudioPage } from '../../pages/studio/StudioPage';
 import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { LoginPage } from '../../pages/login/LoginPage';
@@ -33,7 +35,16 @@ export const routes = [
     path: '/app/home',
     element: (
       <RequireAuth level="guest-allowed">
-        <div>home</div>
+        <HomePage />
+      </RequireAuth>
+    ),
+  },
+  {
+    // 내 정보 — 계정 조회(users/me)는 회원 전용이다
+    path: '/app/profile',
+    element: (
+      <RequireAuth level="member-only">
+        <ProfilePage />
       </RequireAuth>
     ),
   },

@@ -9,6 +9,7 @@ import { saveReturnTo } from '../../features/auth/model/returnTo';
 import { authApi } from '../../entities/auth/api.select';
 import type { SessionKind } from '../../entities/auth/types';
 import { evaluateGuard, type GuardLevel } from './guard';
+import './authBar.css';
 
 function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
   const navigate = useNavigate();
@@ -25,12 +26,12 @@ function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
   }
 
   return (
-    <header>
+    <header className="festa-authbar">
       {/* 조사까지 함께 분기한다 — '회원'은 받침이 있어 '으로', '게스트'는 모음으로 끝나 '로'다.
           명사만 갈아 끼우고 조사를 고정하면 '회원로'가 된다(-272). 값이 둘뿐이라 조사 유틸을
           따로 두지 않는다. */}
-      <span>{kind === 'member' ? '회원으로' : '게스트로'} 이용 중</span>
-      <button type="button" onClick={handleLogout}>
+      <span className="festa-authbar-who">{kind === 'member' ? '회원으로' : '게스트로'} 이용 중</span>
+      <button type="button" className="festa-authbar-out" onClick={handleLogout}>
         로그아웃
       </button>
     </header>
@@ -43,7 +44,7 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
 
   // 부트스트랩(새로고침 복원) 완료 전의 anonymous는 "미확인"이다 — 여기서 redirect를 확정하면
   // refresh가 이길 수 없는 레이스가 돼 로그인 유지가 항상 깨진다(T012, quickstart §6 실측 발견)
-  if (!bootstrapped) return <p>세션 확인 중...</p>;
+  if (!bootstrapped) return <p className="festa-boot">세션 확인 중...</p>;
 
   const decision = evaluateGuard(kind, level);
 
@@ -54,7 +55,7 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
   }
   if (decision === 'block-member-only') {
     return (
-      <div>
+      <div className="festa-blocked">
         <p>소셜 로그인이 필요한 기능입니다.</p>
         <Link to="/login">로그인하러 가기</Link>
       </div>

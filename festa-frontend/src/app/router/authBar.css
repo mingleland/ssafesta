@@ -1,0 +1,53 @@
+/* 가드 화면 공통 상단 바 — 화면마다 헤더를 새로 만들지 않는다(RequireAuth 주석 참조).
+   World 처럼 풀스크린 화면 위에도 얹히므로 떠 있는 칩 형태로 둔다. */
+.festa-authbar {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  background: rgba(12, 16, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  font-size: 12.5px;
+  color: rgba(234, 238, 251, 0.82);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .festa-authbar { background: #10142a; backdrop-filter: none; }
+}
+.festa-authbar-who { white-space: nowrap; }
+.festa-authbar-out {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: #eaeefb;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.festa-authbar-out:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* 부트스트랩·차단 화면도 흰 페이지로 떨어지지 않게 최소 정리 */
+.festa-boot,
+.festa-blocked {
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0f1430;
+  color: #eaeefb;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  font-size: 14px;
+}
+.festa-blocked a { color: #4d8dff; }

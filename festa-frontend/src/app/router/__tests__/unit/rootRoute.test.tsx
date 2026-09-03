@@ -5,6 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { routes } from '../../index';
 import {
   __resetSessionForTests,
@@ -20,7 +21,13 @@ afterEach(() => {
 function renderAtRoot() {
   // 실제 라우터와 같은 정의를 쓴다 — 테스트용으로 별도 라우트를 다시 적으면 결함이
   // 그대로 남은 채 테스트만 통과한다
-  return render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />);
+  // 실제 앱과 같은 provider 구성 — /app/home 허브가 React Query 를 쓴다(S15P21A604-406)
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/'] })} />
+    </QueryClientProvider>,
+  );
 }
 
 describe('루트 경로 `/`', () => {
@@ -43,8 +50,8 @@ describe('루트 경로 `/`', () => {
     markBootstrapped();
     renderAtRoot();
     fireEvent.click(screen.getByRole('button', { name: '화면을 클릭해 시작하기' }));
-    // /app/home 은 자리표시자 'home' 을 그린다 — 그것과 가드 헤더로 도착을 판정한다
-    expect(await screen.findByText('home')).not.toBeNull();
+    // /app/home 은 진입 허브다 — 월드 입장 링크와 가드 헤더로 도착을 판정한다
+    expect(await screen.findByText('축제 월드 입장')).not.toBeNull();
     expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeNull();
   });
 });
