@@ -10,7 +10,14 @@ import { cloneMinimalGameProject } from '../fixtures/minimalGameProject.ts';
 
 // 컴포넌트 내부 상수(WIDTH=184/HEIGHT=116/PADDING=8/LABEL_HEIGHT=18)와 fixture의 4×4 Scene으로
 // mapRect가 만드는 사각형은 [51,133]×[8,90]이다 — 아래 기대값은 이 계산에서 나왔다.
-const SCENE = cloneMinimalGameProject().scenes[0];
+// scenes 는 GameScene(World | Dialogue) 유니온이라 [0] 을 그대로 쓰면 WorldScene prop 에 안 맞는다 —
+// gameProject.contract.test 와 같은 방식으로 TOP_DOWN 을 골라 좁힌다 (S15P21A604-392, CI tsc red).
+const topDownScene = () => {
+  const scene = cloneMinimalGameProject().scenes.find((candidate) => candidate.type === 'TOP_DOWN');
+  if (scene?.type !== 'TOP_DOWN') throw new Error('TOP_DOWN fixture scene missing');
+  return scene;
+};
+const SCENE = topDownScene();
 
 beforeAll(() => {
   // jsdom에는 Pointer Capture API가 없다 — 실제 브라우저 동작(포인터가 요소 밖으로 나가도
