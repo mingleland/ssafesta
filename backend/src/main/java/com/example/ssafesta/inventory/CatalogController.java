@@ -68,7 +68,7 @@ public class CatalogController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "구매 성공. 구매한 아이템 정보"),
             @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트는 구매할 수 없다"),
-            @ApiResponse(responseCode = "404", description = "그런 아이템이 없다"),
+            @ApiResponse(responseCode = "404", description = "`CATALOG_ITEM_NOT_FOUND`(그런 아이템이 없다) 또는 `WALLET_NOT_FOUND`(회원인데 지갑 행이 없다 — 정상 상태가 아니며 서버 로그에 근거가 남는다)"),
             @ApiResponse(responseCode = "409", description = "이미 보유한 아이템이거나 `INSUFFICIENT_COIN`(잔액 부족). 어느 경우든 코인은 차감되지 않는다")})
     @PostMapping("/{itemId}/purchases")
     public ResponseEntity<InventoryService.CatalogItemView> purchase(@AuthenticationPrincipal Jwt jwt,

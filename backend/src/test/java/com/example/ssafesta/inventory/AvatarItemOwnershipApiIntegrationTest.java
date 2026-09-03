@@ -179,6 +179,20 @@ class AvatarItemOwnershipApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CATALOG_ITEM_NOT_FOUND"));
     }
 
+    /**
+     * Same broken state, same answer as the booth-lease path and {@code GET /wallets/me}: a missing
+     * wallet is the member's problem, reported as such, not as a server fault (T-113).
+     */
+    @Test
+    void purchaseWithoutAWalletIsRefusedNotAnInternalError() throws Exception {
+        Long userId = users.save(new User("소유권무지갑" + SEQUENCE.incrementAndGet())).getId();
+
+        mockMvc.perform(post("/api/v1/catalog/items/{itemId}/purchases", itemId(PAID_ASSET))
+                        .header("Authorization", bearerFor(userId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WALLET_NOT_FOUND"));
+    }
+
     @Test
     void unequippedOrOwnedPartsCanBeSavedButUnownedPartCannot() throws Exception {
         Long userId = newMemberWithWallet();
