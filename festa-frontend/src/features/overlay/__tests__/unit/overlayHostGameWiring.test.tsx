@@ -81,10 +81,13 @@ describe('OverlayHost — GAME 배선', () => {
     expect(calls.filter((url) => url.includes(PORTAL_PATH))).toHaveLength(0);
   });
 
-  it('UI 가 아직 없는 타입은 준비 중 화면을 유지한다', () => {
-    openOverlay('SURVEY', { boothId: BOOTH_ID, objectId: 'survey-1' });
+  it('이 편집기가 모르는 미래 타입만 준비 중 화면으로 떨어진다', async () => {
+    // SURVEY·CONSULTATION·AI_CHAT 은 UI 가 생겼다(S15P21A604-406) — 이제 placeholder 는
+    // dispatcher 가 앞서가서 보낸 미지 타입의 안전망일 뿐이다.
+    openOverlay('FUTURE_TYPE' as never, { boothId: BOOTH_ID });
     render(<OverlayHost />);
-
-    expect(screen.getByText(NOT_READY_TEXT)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByText(NOT_READY_TEXT)).not.toBeNull();
+    });
   });
 });

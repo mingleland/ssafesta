@@ -1,0 +1,28 @@
+/* Consultation Overlay 콘텐츠 */
+.cs-wait { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 12px; text-align: center; }
+.cs-wait strong { font-size: 15px; }
+.cs-timer { font-size: 22px; font-weight: 800; color: var(--ov-accent); font-variant-numeric: tabular-nums; }
+
+.cs-active { display: flex; flex-direction: column; gap: 12px; padding: 6px 0; }
+.cs-staff {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--ov-surface-sunken);
+  border: 1px solid var(--ov-border);
+}
+.cs-staff > span:nth-child(2) { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; }
+.cs-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2f9e6b, #4d8dff);
+  color: #fff;
+  font-weight: 800;
+}
+.cs-live { background: rgba(45, 190, 120, 0.18); color: #6fe0a8; }

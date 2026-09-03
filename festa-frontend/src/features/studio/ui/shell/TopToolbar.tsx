@@ -32,7 +32,7 @@ function statusChip(s: SaveStatus, dirty: boolean, conflict: boolean, leaseExpir
 export function TopToolbar(p: Props) {
   return (
     <header className="studio-panel studio-toolbar">
-      <button type="button" className="studio-toolbar-back" onClick={p.onBack} aria-label="부스 목록으로">
+      <button type="button" className="studio-toolbar-back" onClick={p.onBack} aria-label="부스 관리로 돌아가기">
         <IcBack size={20} />
       </button>
       <span className="studio-toolbar-title">Booth Studio</span>

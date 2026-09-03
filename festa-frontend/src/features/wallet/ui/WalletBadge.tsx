@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from '../../auth/model/session';
 import { walletApi } from '../../../entities/wallet/api.select';
+import './transactions.css';
 
 export function WalletBadge() {
   const { kind } = useSession();
@@ -13,5 +14,13 @@ export function WalletBadge() {
   });
 
   if (kind !== 'member' || walletQuery.data === undefined) return null;
-  return <span>보유 코인: {walletQuery.data.balance}</span>;
+  return (
+    <span className="wallet-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v8M9.5 10h5M9.5 14h5" />
+      </svg>
+      {walletQuery.data.balance.toLocaleString()}
+    </span>
+  );
 }

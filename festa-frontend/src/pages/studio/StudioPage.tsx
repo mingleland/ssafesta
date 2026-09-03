@@ -16,6 +16,7 @@ import { useOwnerGate } from '../../features/booth/model/useOwnerGate';
 import type { StudioMode, TransformTool } from '../../features/studio/model/studioMode';
 import type { PaletteItem, TemplatePreset } from '../../features/studio/model/visualAssets';
 import { BoothStudioShell, StudioGate } from '../../features/studio/ui/shell/BoothStudioShell';
+import { WORLD_RETURN_TO_MANAGEMENT } from '../../features/world/model/gameClientUi';
 import { TopToolbar } from '../../features/studio/ui/shell/TopToolbar';
 import { ModeRail } from '../../features/studio/ui/shell/ModeRail';
 import { AssetPalette } from '../../features/studio/ui/shell/AssetPalette';
@@ -226,7 +227,7 @@ export function StudioPage() {
           publishing={publishMutation.isPending}
           publishedVersion={state.publishedVersion ?? null}
           zoomPercent={Math.round(ZOOM_STEPS[zoomIdx] * 100)}
-          onBack={() => navigate('/app/booths')}
+          onBack={() => navigate(WORLD_RETURN_TO_MANAGEMENT)}
           onSave={handleSave}
           onPublish={() => publishMutation.mutate(boothIdNum)}
           onZoomToggle={() => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length)}
