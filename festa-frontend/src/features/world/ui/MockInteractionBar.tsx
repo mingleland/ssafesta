@@ -7,6 +7,7 @@
 // 새 계약을 만들지 않는다: 여기서 여는 payload 는 dispatcher 가 만드는 것과 같은 모양이다.
 import { openOverlay } from '../../../shared/types/overlay';
 import type { OverlayType } from '../../../shared/types/overlay';
+import { openBoothManagement } from '../model/gameClientUi';
 import './mockInteractionBar.css';
 
 /** dev 빌드에서 `VITE_DEV_INTERACTION_BAR=true` 일 때만 켠다 — mock 월드라는 사실만으로 켜지 않는다 */
@@ -41,6 +42,10 @@ export function MockInteractionBar() {
           {e.label}
         </button>
       ))}
+      {/* Booth Management NPC 대역 — Unity 이벤트 계약(G-1) 이 오면 dispatcher 가 같은 함수를 부른다 */}
+      <button type="button" className="mock-bar-btn" onClick={openBoothManagement}>
+        내 부스 관리
+      </button>
     </div>
   );
 }

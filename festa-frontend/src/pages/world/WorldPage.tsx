@@ -10,17 +10,20 @@
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD, WorldSurface } from '../../features/world/ui/WorldSurface.select';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { IS_DEV_INTERACTION_BAR, MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
+import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
 import { closeOverlay, getCurrentOverlay } from '../../shared/types/overlay';
 import {
+  closeBoothManagement,
   closeGameMenu,
   getGameClientUiSnapshot,
+  openBoothManagement,
   openGameMenu,
   resetGameClientUi,
   useGameClientUi,
@@ -30,6 +33,17 @@ import './worldPage.css';
 export function WorldPage() {
   const ui = useGameClientUi();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+
+  // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
+  // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서
+  // 같은 결과가 나오는 유일한 방법이다.
+  useEffect(() => {
+    if (params.get('panel') !== 'management') return;
+    openBoothManagement();
+    // 한 번 열고 나면 쿼리는 지운다 — 이후 새로고침이 같은 화면을 강제로 다시 열지 않게
+    setParams({}, { replace: true });
+  }, [params, setParams]);
 
   useEffect(() => {
     const unsubscribe = initInteractionDispatcher();
@@ -70,6 +84,8 @@ export function WorldPage() {
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}
       <OverlayHost />
+      {/* Booth Management Layer — World 의 관리 NPC 가 연다(계약 G-1 전까지 dev trigger) */}
+      {ui.managementOverlay && <BoothManagementOverlay onClose={closeBoothManagement} />}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
       {ui.gameMenu && (
         <GameMenu

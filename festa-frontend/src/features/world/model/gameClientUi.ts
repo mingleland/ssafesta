@@ -62,6 +62,15 @@ export function closeBoothManagement(): void {
   setState({ managementOverlay: false });
 }
 
+/**
+ * Booth Studio·관리 상세처럼 World 를 떠나는 화면에서 돌아올 때 쓰는 경로.
+ * 그 화면들은 `/app/world?panel=management` 로 돌아오고 WorldPage 가 이 값을 읽어 관리 화면을
+ * 다시 연다 — 모듈 상태에 "복귀 예약"을 남기지 않는 이유는 StrictMode 의 mount→cleanup→mount
+ * 사이에 그 예약이 소비된 뒤 cleanup 이 화면을 다시 닫아 버리기 때문이다(실측). URL 로 표현하면
+ * 새로고침·뒤로가기에도 같은 결과가 된다.
+ */
+export const WORLD_RETURN_TO_MANAGEMENT = '/app/world?panel=management';
+
 /** World 를 벗어날 때 — 남은 레이어가 다음 진입에 그대로 떠 있지 않게 한다 */
 export function resetGameClientUi(): void {
   setState(initialState);
