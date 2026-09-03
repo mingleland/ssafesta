@@ -191,15 +191,11 @@ public class GameAsset {
     public Long getByteSize() { return byteSize; }
     public Integer getWidth() { return width; }
     public Integer getHeight() { return height; }
-    public String getSha256() { return sha256; }
     public String getProvider() { return provider; }
     public String getStorageBucket() { return storageBucket; }
     public String getObjectKey() { return objectKey; }
     public String getFailureRule() { return failureRule; }
-    public String getDeclaredContentType() { return declaredContentType; }
     public Long getDeclaredByteSize() { return declaredByteSize; }
-    public Instant getUploadExpiresAt() { return uploadExpiresAt; }
-    public Long getCreatedByUserId() { return createdByUserId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getDeletedAt() { return deletedAt; }

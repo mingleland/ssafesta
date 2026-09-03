@@ -21,7 +21,7 @@
    호출해 제약 위반을 `409 PROJECT_ALREADY_EXISTS`로 번역한다 — `V7__booth_one_per_owner.sql`과
    `BoothLeaseService:97`이 같은 이유로 만들어진 선례다 (research R-02).
 2. **016의 반복이다.** 편집자 가드 + 유효 임대 + 검증 + `booths` 아닌 자기 행에 즉시 반영.
-   Draft/Publish를 타지 않는다. `BoothEditorGuard`·`findValidByBoothId`·`ApiException` 봉투를
+   Draft/Publish를 타지 않는다. `BoothAccessGuard`·`findValidByBoothId`·`ApiException` 봉투를
    그대로 재사용하므로 **새로 만드는 공통 부품이 없다** — 단 하나, URL 검증기를 꺼낸다.
 3. **URL 검증기를 `common/HttpUrlValidator`로 추출한다.** URL 필드가 5개라 붙여넣으면 같은
    규칙이 6벌(홈페이지 포함)이 되고 언젠가 한 벌만 고쳐진다. **`null`은 그대로 통과**시키고
@@ -44,7 +44,7 @@
 **Language/Version**: Java 21
 
 **Primary Dependencies**: Spring Boot 4.1, Spring Data JPA, Spring Security(Resource Server), Jackson.
-재사용: `BoothEditorGuard`(소유자+스태프) · `MemberPrincipal.requireMemberId(jwt, 문구)`(게스트 차단) ·
+재사용: `BoothAccessGuard`(소유자+스태프) · `MemberPrincipal.requireMemberId(jwt, 문구)`(게스트 차단) ·
 `BoothLeaseRepository.findValidByBoothId`(만료 판정) · `ApiException`/`ErrorCode`/`ApiErrorDetail.field()`(#58 봉투) ·
 `java.net.URI`(형식 검증)
 
@@ -82,7 +82,7 @@ MockMvc — 003·004·005·013a·016과 동일 패턴. 신규 통합 테스트 2
 | 1 | 영구 비즈니스 상태의 SoT는 Spring | 프로젝트 데이터는 `projects` 단일 지점. Unity·React는 조회만 |
 | 4 | Booth는 데이터로 생성 — 재빌드 금지 | 프로젝트는 순수 데이터. Unity 변경 0, Layout JSON 무관 |
 | 12 | 게스트는 영속 자산을 갖지 않는다 | 모든 endpoint가 `MemberPrincipal.requireMemberId`로 게스트를 `403 MEMBER_ONLY` |
-| 16 | 클라이언트 주장 불신 | 편집 권한은 JWT + `BoothEditorGuard`로 서버가 판정. 값은 스킴 화이트리스트(`javascript:` 차단) · 길이 게이트 · `name` 제약 |
+| 16 | 클라이언트 주장 불신 | 편집 권한은 JWT + `BoothAccessGuard`로 서버가 판정. 값은 스킴 화이트리스트(`javascript:` 차단) · 길이 게이트 · `name` 제약 |
 | 24 | 계약 변경은 합의로만 | 전부 **가산적**(endpoint 신설 + 오류 code 2개) — Breaking 0. C-05·C-06·C-07은 BE 결정이지만 **#110에서 FE에 통보 완료** |
 | 25 | 텍스트 입력·외부 콘텐츠는 React | 등록 폼·링크 이동 안내·영상 임베드·새 탭 fallback 전부 FE 몫(FR-006·FR-007·FR-009). BE는 저장·검증·노출만 |
 | 27 | 기준선 동결 코드 재구현 금지 | 동결 대상(`NetworkPlayer`·`ConnectionManager`·`BoothRuntime`) 미접촉. `BoothHomepageService`는 동결 대상이 아니고 **문구 보존 + 기존 테스트 19개 통과**를 조건으로 검증기만 위임 |
@@ -183,5 +183,5 @@ backend/src/test/java/com/example/ssafesta/project/
 | 방문자 조회 · published 게이트 · 좋아요 수 | **S15P21A604-177** |
 | `videoUrl` 제공자 제한 | **C-02 미결(기획).** 목록 확정 후 후속. 소급 삭제·숨김 안 함 (R-08) |
 | `specs/009` 리뷰 서명 | C-02가 아직 열려 있다 |
-| **직원 역할 게이트** (011 C-09) | `BoothEditorGuard`가 `role`을 안 읽는다. 005·016도 같다. **011 구현 때 가드 한 곳에서 일괄** — 009만 걸면 "편집자"가 endpoint마다 다른 뜻이 된다 (R-11) |
+| **직원 역할 게이트** (011 C-09) | `BoothAccessGuard`가 `role`을 안 읽는다. 005·016도 같다. **011 구현 때 가드 한 곳에서 일괄** — 009만 걸면 "편집자"가 endpoint마다 다른 뜻이 된다 (R-11) |
 | `GET /projects/{projectId}` | 부스당 1개라 `GET /booths/{boothId}/projects`가 같은 값을 준다. 필요해지면 가산적으로 추가 (contracts §0) |

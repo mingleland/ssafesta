@@ -70,13 +70,11 @@ public class CoinReconciliationRun {
     }
 
     public Long getId() { return id; }
-    public Instant getStartedAt() { return startedAt; }
     public Instant getFinishedAt() { return finishedAt; }
     public Status getStatus() { return status; }
     public int getCheckedWalletCount() { return checkedWalletCount; }
     public int getMismatchedWalletCount() { return mismatchedWalletCount; }
     public String getMismatches() { return mismatches; }
-    public String getFailureReason() { return failureReason; }
 
     public boolean isConsistent() {
         return status == Status.COMPLETED && mismatchedWalletCount == 0;

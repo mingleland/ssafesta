@@ -45,8 +45,4 @@ public class UserInventoryItem {
 
     public Long getId() { return id; }
     public Long getUserId() { return userId; }
-    public Long getCatalogItemId() { return catalogItemId; }
-    public int getQuantity() { return quantity; }
-    public String getAcquiredVia() { return acquiredVia; }
-    public Instant getAcquiredAt() { return acquiredAt; }
 }
