@@ -17,7 +17,7 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
 
   // 부트스트랩(새로고침 복원) 완료 전의 anonymous는 "미확인"이다 — 여기서 redirect를 확정하면
   // refresh가 이길 수 없는 레이스가 돼 로그인 유지가 항상 깨진다(T012, quickstart §6 실측 발견)
-  if (!bootstrapped) return <p className="festa-boot">세션 확인 중...</p>;
+  if (!bootstrapped) return <p className="festa-boot">입장 정보를 확인하고 있어요...</p>;
 
   const decision = evaluateGuard(kind, level);
 
@@ -29,7 +29,7 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
   if (decision === 'block-member-only') {
     return (
       <div className="festa-blocked">
-        <p>소셜 로그인이 필요한 기능입니다.</p>
+        <p>소셜 로그인 회원만 이용할 수 있는 기능입니다.</p>
         <Link to="/login">로그인하러 가기</Link>
       </div>
     );

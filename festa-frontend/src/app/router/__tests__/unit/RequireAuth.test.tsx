@@ -42,7 +42,7 @@ function renderAt(level: GuardLevel) {
 describe('RequireAuth — bootstrapped 분기', () => {
   it('부트스트랩 전에는 redirect하지 않고 확인 중 상태를 보여준다', () => {
     renderAt('guest-allowed');
-    expect(screen.queryByText('세션 확인 중...')).not.toBeNull();
+    expect(screen.queryByText('입장 정보를 확인하고 있어요...')).not.toBeNull();
     // 이 줄이 T-17의 회귀 방어다 — 부트스트랩 전 anonymous를 비로그인으로 확정하면
     // 새로고침 복원(refresh)이 이길 수 없는 레이스가 된다.
     expect(screen.queryByText('로그인 화면')).toBeNull();
@@ -79,7 +79,7 @@ describe('RequireAuth — bootstrapped 분기', () => {
     setGuestSession('at', new Date(Date.now() + 60_000).toISOString());
     markBootstrapped();
     renderAt('member-only');
-    expect(screen.queryByText('소셜 로그인이 필요한 기능입니다.')).not.toBeNull();
+    expect(screen.queryByText('소셜 로그인 회원만 이용할 수 있는 기능입니다.')).not.toBeNull();
     expect(screen.queryByText('보호된 내용')).toBeNull();
     // 차단은 막다른 길이 아니어야 한다(FR-011) — 로그인으로 가는 링크가 함께 있다.
     expect(screen.queryByText('로그인하러 가기')).not.toBeNull();

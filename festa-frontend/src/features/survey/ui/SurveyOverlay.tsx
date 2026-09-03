@@ -128,7 +128,8 @@ export function SurveyOverlay({ payload }: Props) {
         ) : missing.length > 0 ? (
           <span className="ov-note">필수 문항 {missing.length}개가 남았습니다</span>
         ) : (
-          <span className="ov-note">Esc 또는 바깥을 눌러 월드로 돌아갑니다</span>
+          // 설문 BE(-130·-190)는 미착수다 — mock adapter 로 도는 상태를 실제인 것처럼 보이게 하지 않는다
+          <span className="ov-note">응답 저장은 준비 중입니다 · Esc 로 월드로 돌아갑니다</span>
         )
       }
       footer={
