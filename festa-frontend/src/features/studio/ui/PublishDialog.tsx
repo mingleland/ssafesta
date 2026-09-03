@@ -9,12 +9,10 @@ interface Props {
   onClose: () => void;
 }
 
-// StudioPage의 공개 전 미리보기(precheckErrors/precheckWarnings)도 같은 렌더링을 쓴다 —
-// 요청 전 미리보기와 요청 후 서버 결과가 다른 컴포넌트로 보이면 사용자가 다른 것으로 오해한다.
+// StudioPage의 공개 전 미리보기(precheckErrors/precheckWarnings)도 같은 렌더링을 쓴다.
 export function DetailList({ items }: { items: ApiErrorDetail[] }) {
   if (items.length === 0) return null;
-  // rule+objectId 조합 key는 구분자가 모호해 충돌할 수 있었다(예: rule="a-b",objectId="c"와
-  // rule="a",objectId="b-c"가 같은 문자열) — 이 목록은 재정렬·부분 삭제가 없어 인덱스로 충분하다(#58, T026)
+  // 이 목록은 재정렬·부분 삭제가 없어 인덱스 key로 충분하다(#58, T026)
   return (
     <ul>
       {items.map((d, i) => (
@@ -26,22 +24,26 @@ export function DetailList({ items }: { items: ApiErrorDetail[] }) {
 
 export function PublishDialog({ errors, warnings, published, onClose }: Props) {
   return (
-    <div role="dialog">
-      {!published && errors.length > 0 && (
-        <div>
-          <strong>공개하지 못했습니다</strong>
-          <DetailList items={errors} />
+    <div className="studio-dialog-backdrop">
+      <div role="dialog" className="studio-dialog" aria-modal="true">
+        {!published && errors.length > 0 && (
+          <div>
+            <h2>공개하지 못했습니다</h2>
+            <DetailList items={errors} />
+          </div>
+        )}
+        {published && (
+          <div>
+            <h2>공개되었습니다</h2>
+            <DetailList items={warnings} />
+          </div>
+        )}
+        <div className="studio-dialog-actions">
+          <button type="button" className="studio-btn studio-btn-primary" onClick={onClose}>
+            확인
+          </button>
         </div>
-      )}
-      {published && (
-        <div>
-          <strong>공개되었습니다</strong>
-          <DetailList items={warnings} />
-        </div>
-      )}
-      <button type="button" onClick={onClose}>
-        확인
-      </button>
+      </div>
     </div>
   );
 }
