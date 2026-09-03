@@ -1,4 +1,6 @@
-// 내 정보 화면 — /app/profile (S15P21A604-406).
+// My Info — /app/profile (S15P21A604-406). ESC Game Menu 의 Profile Summary 에서 진입한다.
+// Profile(닉네임·provider·탈퇴)과 Wallet(잔액·거래내역)을 하나의 개인 Context 로 묶는다(D-08) —
+// Wallet 은 독립 최상위 화면이 아니고, 전체 거래내역이 있는 유일한 자리다.
 // 데이터는 features/profile/model/profile 상태 기계(-367)와 wallet 쿼리를 그대로 소비한다.
 // 관리 콘솔이 아니라 "게임 속 내 정보"다 — 통계·대시보드를 만들지 않는다.
 import { useEffect, useState } from 'react';

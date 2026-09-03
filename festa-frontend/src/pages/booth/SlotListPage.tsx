@@ -2,6 +2,7 @@
 // 슬롯 조회는 공개(guest-allowed), 임대는 member만(FR-016 — 게스트에겐 목록을 보여준 뒤 안내).
 // 출처: specs/004-booth-slot-lease/contracts/lease-api.md
 // 표현은 Screen Local Baseline(PageShell) — 기능·에러 매핑·카운트다운 권위는 그대로다(S15P21A604-406).
+// 이 화면은 결제 맥락이라 잔액(WalletBadge)만 보여준다. 전체 거래내역은 My Info 한 곳이 정본이다(D-08).
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,6 @@ import { formatRemaining, remainingMs } from '../../entities/booth/remaining';
 import { useLeaseSlot } from '../../features/booth/model/useLeaseSlot';
 import { LeaseConfirmDialog } from '../../features/booth/ui/LeaseConfirmDialog';
 import { WalletBadge } from '../../features/wallet/ui/WalletBadge';
-import { TransactionsSection } from '../../features/wallet/ui/TransactionsSection';
 import { PageShell, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
 import { LEASE_COIN_COST } from '../../entities/booth/types';
 import type { SlotView } from '../../entities/booth/types';
@@ -184,12 +184,6 @@ export function SlotListPage() {
         />
       )}
 
-      {isMember && (
-        <section className="sc-card slot-tx">
-          <h2 className="sc-section-title">코인 사용 내역</h2>
-          <TransactionsSection />
-        </section>
-      )}
     </PageShell>
   );
 }

@@ -4,6 +4,9 @@ import { LandingPage } from '../../pages/landing/LandingPage';
 import { ProfilePage } from '../../pages/profile/ProfilePage';
 import { StudioPage } from '../../pages/studio/StudioPage';
 import { SlotListPage } from '../../pages/booth/SlotListPage';
+import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
+import { SurveyManagementPage } from '../../pages/management/SurveyManagementPage';
+import { ConsultationStaffPage } from '../../pages/management/ConsultationStaffPage';
 import { LoginPage } from '../../pages/login/LoginPage';
 import { CallbackPage } from '../../pages/auth/CallbackPage';
 import { RequireAuth } from './RequireAuth';
@@ -54,6 +57,32 @@ export const routes = [
     element: (
       <RequireAuth level="guest-allowed">
         <SlotListPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    // Booth Management 하위 상세 화면 3종 — 전부 소유자 전용 상태 변경 기능이라 member-only.
+    // Booth 소유자 판정은 각 화면의 데이터 호출에서 서버가 최종 결정한다(가드는 UX 보조).
+    path: '/app/booths/:boothId/project',
+    element: (
+      <RequireAuth level="member-only">
+        <ProjectManagementPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/app/booths/:boothId/survey',
+    element: (
+      <RequireAuth level="member-only">
+        <SurveyManagementPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/app/booths/:boothId/consultation',
+    element: (
+      <RequireAuth level="member-only">
+        <ConsultationStaffPage />
       </RequireAuth>
     ),
   },
