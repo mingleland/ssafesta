@@ -58,14 +58,10 @@ class Settings(BaseSettings):
     document_max_bytes: int = Field(default=20_971_520, gt=0)
     agent_document_max_count: int = Field(default=10, gt=0)
     agent_document_max_total_bytes: int = Field(default=104_857_600, gt=0)
-    chunk_size: int | None = None
-    chunk_overlap: int | None = None
+    chunk_size: int = Field(default=900, gt=0)
+    chunk_overlap: int = Field(default=180, ge=0)
 
     @field_validator(
-        "chunk_size",
-        "chunk_overlap",
-        "embedding_model_id",
-        "embedding_api_base_url",
         "embedding_api_key",
         mode="before",
     )
@@ -73,10 +69,8 @@ class Settings(BaseSettings):
     def _blank_to_none(cls, value: object) -> object:
         """Treat a blank/whitespace-only value as absent.
 
-        `.env.example` ships these keys blank (e.g. `CHUNK_SIZE=`,
-        `EMBEDDING_MODEL_ID=`) as documented "optional, no fixed default"
-        values (spec 007). python-dotenv parses `KEY=` as the env var being
-        present with value `""`, not absent — so without this coercion
+        `.env.example` may leave optional Secret values blank. python-dotenv parses
+        `KEY=` as the env var being present with value `""`, not absent — so without this coercion
         pydantic tries to parse `""` as the declared type (int, or
         `SecretStr` for `embedding_api_key`) and crashes uvicorn on boot
         with an unmodified `.env.example`-derived `.env`. Any other value
@@ -84,15 +78,39 @@ class Settings(BaseSettings):
         string like "512" or "text-embedding-3-small") passes through
         unchanged for normal coercion.
 
-        NOTE: `embedding_provider` and `embedding_api_path` are NOT in this
-        list — their types (`Literal["mock", "gms"]`, `str`) have no `None`
-        option, so mapping blank to `None` here would make them fail type
-        validation instead of falling back to their default. They get their
-        own blank-to-*default* validators below instead.
+        Non-Secret tuning fields get their own blank-to-default validators below.
         """
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    @field_validator("chunk_size", mode="before")
+    @classmethod
+    def _blank_chunk_size_to_spike_default(cls, value: object) -> object:
+        return 900 if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("chunk_overlap", mode="before")
+    @classmethod
+    def _blank_chunk_overlap_to_spike_default(cls, value: object) -> object:
+        return 180 if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("embedding_model_id", mode="before")
+    @classmethod
+    def _blank_embedding_model_to_spike_default(cls, value: object) -> object:
+        return (
+            "text-embedding-3-large"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
+    @field_validator("embedding_api_base_url", mode="before")
+    @classmethod
+    def _blank_embedding_url_to_gms_default(cls, value: object) -> object:
+        return (
+            "https://gms.ssafy.io/gmsapi/api.openai.com"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
 
     @field_validator("embedding_provider", mode="before")
     @classmethod
@@ -117,11 +135,19 @@ class Settings(BaseSettings):
 
     # Embedding provider — spec 007 FR-009 / 헌법 18조
     embedding_dimension: int = 1536
-    embedding_model_id: str | None = None
+    embedding_model_id: str = "text-embedding-3-large"
     embedding_provider: Literal["mock", "gms"] = "mock"
-    embedding_api_base_url: str | None = None
+    embedding_api_base_url: str = "https://gms.ssafy.io/gmsapi/api.openai.com"
     embedding_api_path: str = "/v1/embeddings"
     embedding_api_key: SecretStr | None = None
+
+    # RAG generation defaults — S15P21A604-370..372 spike decisions
+    retrieval_top_k: int = Field(default=10, gt=0)
+    rag_context_top_n: int = Field(default=5, gt=0)
+    rag_input_token_budget: int = Field(default=8_000, gt=0)
+    rag_tokenizer_encoding: str = Field(default="cl100k_base", min_length=1)
+    llm_model_id: str = Field(default="gpt-4.1-mini", min_length=1)
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
@@ -184,13 +210,25 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _validate_rag_tuning(self) -> "Settings":
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                "CHUNK_OVERLAP must be smaller than CHUNK_SIZE "
+                f"(overlap={self.chunk_overlap}, size={self.chunk_size})"
+            )
+        if self.rag_context_top_n > self.retrieval_top_k:
+            raise ValueError(
+                "RAG_CONTEXT_TOP_N must not exceed RETRIEVAL_TOP_K "
+                f"(top_n={self.rag_context_top_n}, top_k={self.retrieval_top_k})"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_embedding_provider(self) -> "Settings":
         if self.embedding_provider != "gms":
             return self
 
         required = {
-            "EMBEDDING_MODEL_ID": self.embedding_model_id,
-            "EMBEDDING_API_BASE_URL": self.embedding_api_base_url,
             "EMBEDDING_API_KEY": self.embedding_api_key,
         }
         missing = [env_name for env_name, value in required.items() if value is None]
