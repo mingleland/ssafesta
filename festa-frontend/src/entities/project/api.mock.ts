@@ -1,7 +1,7 @@
 // Project mock — real 과 같은 시그니처. 방문자 시나리오: boothId 1 = 전시 1건, 2 = 0건(empty),
 // 99 = 오류. 테스트가 PATCH 직렬화를 검증할 수 있게 마지막 patch 를 노출한다.
 import type { ApiError } from '../../shared/api/client';
-import type { ProjectListView, ProjectPatch, ProjectView, VisitorProjectListView } from './types';
+import type { LikeView, ProjectListView, ProjectPatch, ProjectView, VisitorProjectListView } from './types';
 
 const sample: ProjectView = {
   projectId: 10,
@@ -16,6 +16,10 @@ const sample: ProjectView = {
 
 let owned: ProjectView | null = { ...sample };
 let lastUpdatePatch: ProjectPatch | null = null;
+// 좋아요 상태 — 멱등 PUT/DELETE 재현(#122). 이미 누른 PUT 도 200·count 불변
+let likeCount = 7;
+let likedByMe = false;
+let failNextLike = false;
 
 function apiError(code: string, message: string): ApiError {
   return { code, message, errors: [], warnings: [] };
@@ -45,7 +49,37 @@ export async function getMyProjects(_boothId: number): Promise<ProjectListView> 
 export async function getPublishedProjects(boothId: number): Promise<VisitorProjectListView> {
   if (boothId === 99) throw apiError('UNKNOWN', '일시적인 오류입니다.');
   if (boothId === 2) return { projects: [] };
-  return { projects: [{ ...sample, likeCount: 7, likedByMe: false }] };
+  return { projects: [{ ...sample, likeCount, likedByMe }] };
+}
+
+export async function likeProject(projectId: number): Promise<LikeView> {
+  if (failNextLike) {
+    failNextLike = false;
+    throw apiError('UNKNOWN', '일시적인 오류입니다.');
+  }
+  if (projectId !== sample.projectId) throw apiError('PROJECT_NOT_FOUND', '프로젝트가 없습니다.');
+  if (!likedByMe) {
+    likedByMe = true;
+    likeCount += 1;
+  }
+  return { likeCount, likedByMe: true };
+}
+
+export async function unlikeProject(projectId: number): Promise<LikeView> {
+  if (failNextLike) {
+    failNextLike = false;
+    throw apiError('UNKNOWN', '일시적인 오류입니다.');
+  }
+  if (projectId !== sample.projectId) throw apiError('PROJECT_NOT_FOUND', '프로젝트가 없습니다.');
+  if (likedByMe) {
+    likedByMe = false;
+    likeCount -= 1;
+  }
+  return { likeCount, likedByMe: false };
+}
+
+export function __failNextLikeForTests(): void {
+  failNextLike = true;
 }
 
 export async function updateProject(projectId: number, patch: ProjectPatch): Promise<ProjectView> {
@@ -68,4 +102,7 @@ export function __lastUpdatePatchForTests(): ProjectPatch | null {
 export function __resetProjectMockForTests(): void {
   owned = { ...sample };
   lastUpdatePatch = null;
+  likeCount = 7;
+  likedByMe = false;
+  failNextLike = false;
 }
