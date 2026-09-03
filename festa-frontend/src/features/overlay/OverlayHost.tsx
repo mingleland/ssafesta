@@ -3,6 +3,7 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react';
 import { closeOverlay, getCurrentOverlay, subscribeOverlay } from '../../shared/types/overlay';
 import { LaptopOverlay } from './LaptopOverlay';
+import { ProjectOverlay } from '../project/ui/ProjectOverlay';
 import type { GameOverlayPayload } from '../../game-studio/host/GameOverlay';
 
 // lazy 로 가른다 — GameOverlay 는 PublishedGameSurface·ReferenceGamePlayer 를 통해 게임 런타임 전체를
@@ -21,6 +22,10 @@ export function OverlayHost() {
 
   if (request.type === 'LAPTOP') {
     return <LaptopOverlay payload={request.payload as { boothId: number; objectId: string }} />;
+  }
+
+  if (request.type === 'PROJECT') {
+    return <ProjectOverlay payload={request.payload as { boothId: number }} />;
   }
 
   if (request.type === 'GAME') {
