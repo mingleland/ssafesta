@@ -27,7 +27,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  *
  * <p>Each spec already tests its own path, and that is exactly how the check drifted: the rule was
  * copied into eight services and each test only ever proved its own copy. This one names the paths
- * side by side, so a new editing endpoint that forgets {@code BoothEditorGuard.requireActiveLease}
+ * side by side, so a new editing endpoint that forgets {@code BoothAccessGuard.requireActiveLease}
  * fails here rather than shipping — the failure a per-spec suite structurally cannot produce.
  *
  * <p>The editor's <b>read</b> is deliberately absent: an expired owner must still open their own

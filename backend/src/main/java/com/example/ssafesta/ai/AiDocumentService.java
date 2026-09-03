@@ -5,7 +5,7 @@ import com.example.ssafesta.storage.ObjectStorageProperties;
 import com.example.ssafesta.storage.StorageQuotaExceededException;
 import com.example.ssafesta.storage.StorageUnavailableException;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.example.ssafesta.booth.BoothEditorGuard;
+import com.example.ssafesta.booth.BoothAccessGuard;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
@@ -64,20 +64,20 @@ public class AiDocumentService {
 
     private final AiDocumentRepository documents;
     private final AiAgentRepository agents;
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
     private final AiAgentProperties agentProperties;
     private final ObjectStorageProperties storageProperties;
     private final ObjectStorage storage;
     private final TransactionTemplate transactions;
 
     public AiDocumentService(AiDocumentRepository documents, AiAgentRepository agents,
-                             BoothEditorGuard editorGuard,
+                             BoothAccessGuard accessGuard,
                              AiAgentProperties agentProperties,
                              ObjectStorageProperties storageProperties, ObjectStorage storage,
                              TransactionTemplate transactions) {
         this.documents = documents;
         this.agents = agents;
-        this.editorGuard = editorGuard;
+        this.accessGuard = accessGuard;
         this.agentProperties = agentProperties;
         this.storageProperties = storageProperties;
         this.storage = storage;
@@ -106,7 +106,7 @@ public class AiDocumentService {
                 .orElseThrow(() -> new AiAgentNotFoundException(agentId));
         // Permission first, availability second: a member with no claim on this booth should be
         // told they cannot edit it, not that our storage is down.
-        editorGuard.requireActiveEditor(agent.getBoothId(), userId);
+        accessGuard.requireActiveEditor(agent.getBoothId(), userId);
 
         UploadRequest request = validated(command);
 
@@ -265,7 +265,7 @@ public class AiDocumentService {
     private Snapshot readSnapshot(Long documentId, Long userId) {
         AiDocument document = documents.findById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
-        editorGuard.requireActiveEditor(document.getBoothId(), userId);
+        accessGuard.requireActiveEditor(document.getBoothId(), userId);
         return Snapshot.of(document, decideWithoutStorage(document));
     }
 

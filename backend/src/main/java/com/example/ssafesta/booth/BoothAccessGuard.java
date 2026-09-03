@@ -5,25 +5,30 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Answers "may this member edit this booth?" in one place (spec 005 FR-012).
+ * The two questions every booth path has to ask first: <b>may this member edit it</b> (spec 005
+ * FR-012) and <b>is it still leased</b> (spec 004 만료 계약).
  *
- * <p>Every editing path goes through here — draft save, publish, facade. Spreading the same
- * two-line check across three services is how one of them eventually forgets the staff branch, or
- * worse, forgets the owner check entirely.
+ * <p>The editor check was here from the start. Spreading those two lines across three services is
+ * how one of them eventually forgets the staff branch, or worse, forgets the owner check entirely.
  *
- * <p>Expiry lives here too, for the same reason and after it had already happened: the lease check
- * had been copied into eight services, three of them behind a private {@code requireValidLease},
- * and a new editing path had nothing to inherit it from. The predicate itself still belongs to
- * spec 004's repository — this class only decides <b>who has to pass it</b>.
+ * <p>Expiry joined for the same reason, but after it had already happened: the lease check had
+ * been copied into eight services, three of them behind a private {@code requireValidLease}, and a
+ * new path had nothing to inherit it from. The predicate itself still belongs to spec 004's
+ * repository — this class only decides <b>who has to pass it</b>.
+ *
+ * <p><b>Access, not editing.</b> The name says so because three callers are visitor reads with no
+ * editor in sight ({@code BoothQueryService.findPublicBooth}, {@code
+ * BoothLayoutQueryService.findPublished}, {@code ProjectService.requireVisitorVisible}) — expiry
+ * blocks the visitor too, and a guard named for editors would have read as the wrong check there.
  */
 @Component
-public class BoothEditorGuard {
+public class BoothAccessGuard {
 
     private final BoothRepository booths;
     private final BoothStaffRepository staffs;
     private final BoothLeaseRepository leases;
 
-    public BoothEditorGuard(BoothRepository booths, BoothStaffRepository staffs,
+    public BoothAccessGuard(BoothRepository booths, BoothStaffRepository staffs,
                             BoothLeaseRepository leases) {
         this.booths = booths;
         this.staffs = staffs;

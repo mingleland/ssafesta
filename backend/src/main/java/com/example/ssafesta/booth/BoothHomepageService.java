@@ -21,17 +21,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BoothHomepageService {
 
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
 
-    public BoothHomepageService(BoothEditorGuard editorGuard) {
-        this.editorGuard = editorGuard;
+    public BoothHomepageService(BoothAccessGuard accessGuard) {
+        this.accessGuard = accessGuard;
     }
 
     @Transactional
     public HomepageView update(Long boothId, Long userId, HomepageCommand command) {
         // Same reasoning as the facade: an expired booth shows nothing to anyone, so editing it
         // would be changing something invisible (spec 004 만료 계약).
-        Booth booth = editorGuard.requireActiveEditor(boothId, userId);
+        Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
         booth.changeHomepageUrl(validated(command));
         return new HomepageView(booth.getHomepageUrl());

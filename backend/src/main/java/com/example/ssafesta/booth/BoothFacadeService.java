@@ -23,17 +23,17 @@ public class BoothFacadeService {
     private static final Pattern HEX_COLOR = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final int MAX_SIGN_TEXT = 60;
 
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
 
-    public BoothFacadeService(BoothEditorGuard editorGuard) {
-        this.editorGuard = editorGuard;
+    public BoothFacadeService(BoothAccessGuard accessGuard) {
+        this.accessGuard = accessGuard;
     }
 
     @Transactional
     public FacadeView update(Long boothId, Long userId, FacadeCommand command) {
         // An expired booth shows no facade at all (spec 004 만료 계약), so editing one would be
         // changing something nobody can see — and the same predicate decides both.
-        Booth booth = editorGuard.requireActiveEditor(boothId, userId);
+        Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
         String themeCode = command.themeCode() == null ? "DEFAULT" : command.themeCode();
         if (!THEME_CODES.contains(themeCode)) {

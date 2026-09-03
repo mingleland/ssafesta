@@ -54,7 +54,7 @@
 | **I-1** | 부스당 작업본은 정확히 0 또는 1개 | `booth_layout_drafts` **PK = `booth_id`** | 편집기가 어느 작업본을 여는지 비결정적이 된다 |
 | **I-2** | 공개 회차는 한 부스 안에서 유일 | `UNIQUE(booth_id, version_no)` | 같은 회차 번호가 둘 — Unity가 캐시를 못 믿는다 |
 | **I-3** | `booths.published_layout_version`은 **실재하는 회차이거나 NULL** | **V8 복합 FK**: `(id, published_layout_version) → booth_layout_published_versions(booth_id, version_no)`. NULL이면 MATCH SIMPLE로 검사 자체가 면제된다 | 포인터가 없는 버전을 가리켜 공개본 조회가 500이 된다 |
-| **I-4** | 작업본은 방문자에게 도달하지 않는다 | 조회 경로 분리 — `GET /layouts/draft`는 `BoothEditorGuard` 통과 필수, `GET /layouts/published`는 **published 테이블만** 읽는다 | SC-003 위반. "작업 중인 것이 보였다"는 되돌릴 수 없다 |
+| **I-4** | 작업본은 방문자에게 도달하지 않는다 | 조회 경로 분리 — `GET /layouts/draft`는 `BoothAccessGuard` 통과 필수, `GET /layouts/published`는 **published 테이블만** 읽는다 | SC-003 위반. "작업 중인 것이 보였다"는 되돌릴 수 없다 |
 | **I-5** | 임대가 유효하지 않은 부스의 공개본은 제공되지 않는다 | 004 `BoothLeaseRepository.findValidByBoothId` **재사용** (R-06) | 만료 부스가 월드에 계속 보인다 (FR-015) |
 | **I-6** | 저장은 앞선 저장을 덮어쓰지 않는다 | `revision` 비교 후 `UPDATE … WHERE revision = :expected` (영향 행 0이면 충돌) | 남의 편집이 조용히 사라진다 (FR-014) |
 | **I-7** | 공개본은 공개 시점 스냅샷이며 이후 Draft 수정에 영향받지 않는다 | 공개 = **복사**. 공개 후 `layout_json` 갱신 경로 없음 | 저장만 했는데 방문자 화면이 바뀐다 (FR-006, SC-003) |

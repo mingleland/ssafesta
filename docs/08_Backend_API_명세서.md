@@ -453,7 +453,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 부스가 전시하는 프로젝트. **부스당 1개**다 (spec 009 C-01, 2026-08-28 확정). 정본 계약은
 `specs/009-project-exhibition/contracts/project-api.md`.
 
-편집 권한은 **소유자 또는 스태프**(facade·layout과 같은 편집자 범위, `BoothEditorGuard`).
+편집 권한은 **소유자 또는 스태프**(facade·layout과 같은 편집자 범위, `BoothAccessGuard`).
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (009 FR-008 — 만료돼도 데이터는 보존된다).
 
@@ -461,7 +461,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 경로이고 토큰 없이 `200`이다. 편집·편집자 조회는 위 규칙 그대로다.
 
 > ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
-> `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
+> `BoothAccessGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
 > 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 
 ### 공통 표현
@@ -604,12 +604,12 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 Spring을 기본으로 한다.
 정본 계약은 `specs/007-ai-agent-document/spec.md`(C-12·C-13·C-14·C-15).
 
-편집 권한은 **소유자 또는 스태프**(`BoothEditorGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15).
+편집 권한은 **소유자 또는 스태프**(`BoothAccessGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15).
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (007 FR-015 — 만료돼도 설정은 보존된다).
 
 > ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
-> `BoothEditorGuard`가 `role`을 읽지 않으며 005·009·016도 같은 상태다 — 011 구현 시 가드 한
+> `BoothAccessGuard`가 `role`을 읽지 않으며 005·009·016도 같은 상태다 — 011 구현 시 가드 한
 > 곳에서 일괄로 닫는다
 > ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
 

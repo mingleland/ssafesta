@@ -1,7 +1,7 @@
 package com.example.ssafesta.project;
 
 import com.example.ssafesta.booth.Booth;
-import com.example.ssafesta.booth.BoothEditorGuard;
+import com.example.ssafesta.booth.BoothAccessGuard;
 import com.example.ssafesta.booth.BoothNotFoundException;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.booth.LayoutNotPublishedException;
@@ -39,13 +39,13 @@ public class ProjectService {
     private static final String PROJECT_BOOTH_INDEX = "ux_projects_booth";
 
     private final ProjectRepository projects;
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
     private final BoothRepository booths;
 
-    public ProjectService(ProjectRepository projects, BoothEditorGuard editorGuard,
+    public ProjectService(ProjectRepository projects, BoothAccessGuard accessGuard,
                           BoothRepository booths) {
         this.projects = projects;
-        this.editorGuard = editorGuard;
+        this.accessGuard = accessGuard;
         this.booths = booths;
     }
 
@@ -53,7 +53,7 @@ public class ProjectService {
 
     @Transactional
     public ProjectView create(Long boothId, Long userId, ProjectCommand command) {
-        editorGuard.requireActiveEditor(boothId, userId);
+        accessGuard.requireActiveEditor(boothId, userId);
 
         String name = validatedName(command);
         validateUrls(command);
@@ -89,7 +89,7 @@ public class ProjectService {
 
         // 권한은 프로젝트가 아니라 그것이 붙은 부스에 딸린다 — 이 한 줄이 타 부스 프로젝트
         // 수정을 막는다.
-        editorGuard.requireActiveEditor(project.getBoothId(), userId);
+        accessGuard.requireActiveEditor(project.getBoothId(), userId);
 
         if (command == null || !command.hasAnyKey()) {
             // 빈 본문을 조용한 no-op 으로 통과시키면 "저장했다"는 200 을 받고 아무 일도 안 일어난다.
@@ -128,7 +128,7 @@ public class ProjectService {
      */
     @Transactional(readOnly = true)
     public List<ProjectView> findByBooth(Long boothId, Long userId) {
-        editorGuard.requireEditor(boothId, userId);
+        accessGuard.requireEditor(boothId, userId);
         return projects.findByBoothId(boothId).map(ProjectView::of).map(List::of).orElseGet(List::of);
     }
 
@@ -182,7 +182,7 @@ public class ProjectService {
         // 방문자 읽기도 만료에서 막힌다 (004 FR-019). 이 줄을 지우면 정상 경로가 전부 초록인 채로
         // expiredBoothIsConflictEvenWhenItWasPublished 하나만 빨개진다. 편집자 읽기가 예외인
         // 이유는 findByBooth 에 적어 두었다 (FR-008).
-        editorGuard.requireActiveLease(boothId);
+        accessGuard.requireActiveLease(boothId);
         // 게시 게이트는 배치의 게시 여부다 — 프로젝트에 별도의 게시 상태를 만들지 않는다.
         // 프로젝트 패널이 게시된 배치 안의 오브젝트라서, 방문자가 그것을 누를 수 있는 순간과
         // 이 술어가 정확히 겹친다. Booth.isPublished 가 016 홈페이지와 공유하는 그 술어다.

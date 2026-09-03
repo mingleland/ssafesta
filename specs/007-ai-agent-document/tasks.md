@@ -84,7 +84,7 @@
 
 - [ ] T024 [P] [US1] [BE] `ai_agents` 상태와 이름·역할·말투·지시문 매핑 entity를 `backend/src/main/java/com/example/ssafesta/ai/AiAgent.java`에 구현한다
 - [ ] T025 [P] [US1] [BE] Agent 영속 조회와 booth 범위 쿼리를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentRepository.java`에 구현한다
-- [ ] T026 [US1] [BE] `BoothEditorGuard`(소유자·스태프, C-15)로 권한을 검증하는 Agent 생성·조회·수정·**삭제** 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다. 삭제는 참조 3종 사전검사 + FK 번역 + booth 잠금 (C-14)
+- [ ] T026 [US1] [BE] `BoothAccessGuard`(소유자·스태프, C-15)로 권한을 검증하는 Agent 생성·조회·수정·**삭제** 서비스를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentService.java`에 구현한다. 삭제는 참조 3종 사전검사 + FK 번역 + booth 잠금 (C-14)
 - [ ] T027 [US1] [BE] Agent 생성·조회·수정·**삭제**(`DELETE /agents/{agentId}` → 204) REST API와 요청·응답 DTO를 `backend/src/main/java/com/example/ssafesta/ai/AiAgentController.java`에 구현한다
 - [ ] T027a [US1] [BE] `V15__agent_one_per_booth.sql`(유니크 인덱스)과 `AiAgentProperties`(perBoothLimit==1·documentCountLimit>0·documentTotalBytes>0 부팅 검증), `ErrorCode` 3종(`AGENT_NOT_FOUND`·`AGENT_LIMIT_EXCEEDED`·`AGENT_DELETE_CONFLICT`)을 구현한다 (C-13, 2026-08-30 추가)
 - [ ] T027b [US1] [BE] booth 패키지에 `agentReferencedInLayouts`(Draft + `published_layout_version` 포인터 기준 현재 Published) 헬퍼와 `BoothRepository.findWithLockById`를 추가하고, `BoothLayoutService` publish가 검증 전에 같은 잠금을 잡도록 한다 (불변식 A-3, 2026-08-30 추가)
