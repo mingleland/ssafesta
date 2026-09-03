@@ -1,5 +1,8 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
+
 /**
  * Someone else holds a valid lease on the slot
  * (spec 004 contracts: {@code BOOTH_SLOT_ALREADY_LEASED}).
@@ -8,9 +11,10 @@ package com.example.ssafesta.booth;
  * case the whole transaction rolls back, which is exactly right here: the losing request must
  * leave nothing behind, coins included (SC-002).
  */
-public class SlotAlreadyLeasedException extends RuntimeException {
+public class SlotAlreadyLeasedException extends ApiException {
 
     public SlotAlreadyLeasedException(Long slotId) {
-        super("이미 임대 중인 슬롯입니다 — slotId=" + slotId);
+        // No id in the message — see BoothNotFoundException.
+        super(ErrorCode.BOOTH_SLOT_ALREADY_LEASED);
     }
 }

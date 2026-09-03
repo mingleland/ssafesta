@@ -6,7 +6,6 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
-import com.example.ssafesta.wallet.InsufficientCoinException;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,13 +69,8 @@ public class InventoryService {
         if (item.getPrice() == 0 || inventory.existsByUserIdAndCatalogItemId(userId, itemId)) {
             throw new ApiException(ErrorCode.ITEM_ALREADY_OWNED);
         }
-        try {
-            wallets.spend(new CoinSpendCommand(userId, item.getPrice(), CoinReason.PURCHASE,
-                    PURCHASE_REFERENCE_TYPE, itemId.toString(), purchaseKey(userId, itemId)));
-        } catch (InsufficientCoinException exception) {
-            throw new ApiException(ErrorCode.INSUFFICIENT_COIN,
-                    "코인이 부족합니다. 필요: " + exception.getRequired() + ", 잔액: " + exception.getBalance());
-        }
+        wallets.spend(new CoinSpendCommand(userId, item.getPrice(), CoinReason.PURCHASE,
+                PURCHASE_REFERENCE_TYPE, itemId.toString(), purchaseKey(userId, itemId)));
         inventory.save(new UserInventoryItem(userId, itemId));
         return CatalogItemView.of(item, true);
     }
