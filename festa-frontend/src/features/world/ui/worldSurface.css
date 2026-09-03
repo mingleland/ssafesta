@@ -1,0 +1,16 @@
+/* World Surface — Unity World Layer 의 임시 시각 대체물 (S15P21A604-406).
+   이미지에 dim·blur 를 굽지 않는다. Dim 은 Overlay Layer 가 상태에 따라 얹는다. */
+.world-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #0e1430; /* 이미지 로드 전 야간 하늘 톤 */
+}
+.world-surface-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 캡처의 시선 중심(플레이어·광장)이 잘리지 않게 — 하단 자갈 바닥보다 중앙을 남긴다 */
+  object-position: center 42%;
+  display: block;
+}
