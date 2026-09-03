@@ -150,7 +150,7 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 
 1. Spring이 활성 쓰기 Provider에 object storage 업로드를 완료하고 Document에 `storageProvider + bucket + objectKey`를 저장한다.
 2. Spring이 Business DB에서 문서 소유권·임대·상태를 검증하고 전체 문서·저장소 snapshot을 구성해 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
-3. FastAPI는 요청 schema와 원본 metadata·SHA-256을 검증하되 Business DB를 조회하지 않는다.
+3. FastAPI는 요청 schema와 원본 metadata를 검증하고, 다운로드한 원본 바이트의 SHA-256을 다시 계산해 요청 `sourceHash`와 대조하되 Business DB를 조회하지 않는다. 불일치는 재시도 없이 Job을 `DEAD`로 종료하고 Chunk를 저장하지 않으며 Spring에 `FAILED + SOURCE_HASH_MISMATCH`를 callback한다.
 4. AI DB `document_jobs`에 snapshot과 `QUEUED`를 INSERT한 뒤 202를 반환한다.
 5. 활성 Job 부분 유니크 인덱스 충돌은 오류로 노출하지 않고 기존 Job을 조회해 `existing: true`로 반환한다.
 
@@ -168,7 +168,8 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 
 - 자동 failover·이중 쓰기·자동 원복은 구현하지 않는다. P0에서는 probe timeout·5xx·latency를 운영 판단 evidence로만 수집하고, 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 자동 장애 판정과 자동 상태 전환은 후속 이슈에서 기준이 확정될 때까지 구현하지 않는다.
 - 운영 상태는 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`이며, `LOCAL_ACTIVE` 전환과 `R2_ACTIVE` 복귀에는 운영자 승인과 검증 근거가 필요하다.
-- Spring의 `upload-enabled`와 `active-write-provider`는 신규 upload grant만 제어한다. Usage Guard의 용량·stale 상태와 저장소 전환 상태 머신은 별도 개념이다.
+- Spring의 `upload-gate`와 `active-write-provider`는 신규 upload grant만 제어한다. Usage Guard의 용량·stale 상태와 저장소 전환 상태 머신은 별도 개념이며 **Spring은 그 상태 머신을 모른다** — 운영자가 두 기계를 읽고 판정 하나를 `upload-gate`에 적는다 (GitLab #100, 2026-09-01 확정).
+- `upload-gate`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이고 기본값이 없다. 정상·경고와 검증 완료된 `LOCAL_ACTIVE`는 `OPEN`, 사용량 90% 초과는 `QUOTA_BLOCKED`(507), stale 지표·R2 장애·`FALLBACK_VALIDATING`·`R2_RECONCILING`은 `UNAVAILABLE`(503)이다. 두 차단을 한 값으로 뭉치지 않는 이유는 재시도 안내가 갈리기 때문이다 — 용량이 찬 사용자에게 "잠시 후 다시"를 주면 영원히 재시도한다.
 - Spring과 FastAPI에는 R2·MinIO의 endpoint·bucket·credential을 모두 주입한다. FastAPI는 활성 쓰기 Provider를 선택하지 않고 문서 행의 `storage_provider + storage_bucket + object_key`로 다운로드 adapter를 고른다.
 - 활성 쓰기 Provider가 바뀐 뒤 미완료 업로드를 재개하면 기존 행을 `EXPIRED`로 전환하고 새 문서·새 object key를 만든다. 같은 Provider일 때만 같은 문서로 presigned URL을 재발급한다.
 - 저장소 일시 장애는 1·5·15분 backoff로 최대 3회 재시도한 뒤 `DEAD → FAILED`로 종료한다. MinIO를 백업·복제본·고가용성 저장소로 간주하지 않는다.
@@ -224,7 +225,7 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 - 세 번의 재시도를 모두 사용하면 `DEAD`로 전환하고 `PROCESSING_INTERRUPTED` 또는 마지막 정제 오류를 Spring에 전달한다.
 - 최초 실행 1회 + 재시도 3회로 최대 실행 횟수는 4회다.
 - 재시도 가능한 오류: Worker 상실, 네트워크/object storage 일시 오류, Embedding timeout/5xx.
-- 즉시 `DEAD` 가능한 오류: 손상되거나 디코딩할 수 없는 문서, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음처럼 재시도로 해결되지 않는 입력 오류. 이 경우 사용하지 않은 재시도 횟수를 소모하지 않는다.
+- 즉시 `DEAD` 가능한 오류: 손상되거나 디코딩할 수 없는 문서, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음, 실제 원본 SHA-256과 요청 `sourceHash` 불일치처럼 재시도로 해결되지 않는 입력 오류. 해시 불일치는 `SOURCE_HASH_MISMATCH`로 기록하고 Chunk·Embedding을 생성하지 않으며, 사용하지 않은 재시도 횟수를 소모하지 않는다.
 
 ### 7. Spring 상태 callback
 
@@ -287,8 +288,8 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | R2 secret 주입, 기본값 없음 |
 | `MINIO_ENDPOINT`, `MINIO_BUCKET` | MinIO endpoint와 문서 bucket. 외부 직접 노출 금지 |
 | `MINIO_ACCESS_KEY_ID`, `MINIO_SECRET_ACCESS_KEY` | MinIO secret 주입, 기본값 없음 |
-| Spring `app.ai.storage.upload-enabled` | `false`면 신규 upload grant 차단 |
-| Spring `app.ai.storage.active-write-provider` | `R2/MINIO_LOCAL`, 신규 업로드에만 사용 |
+| Spring `app.ai.storage.upload-gate` | `OPEN`/`QUOTA_BLOCKED`(507)/`UNAVAILABLE`(503). 기본값 없음 — 빠지면 기동 실패 |
+| Spring `app.ai.storage.active-write-provider` | `R2/MINIO_LOCAL`, 신규 업로드에만 사용. 기본값 없음 |
 
 Spring의 업로드·삭제 설정은 Presigned URL 15분, 미완료 만료 1시간, 정리 유예 24시간, sweeper 5분을 기본값으로 두며 환경 설정으로 조정한다. Spring에 주입되는 R2 자격증명의 `DeleteObject` 범위는 문서 버킷 또는 지정 prefix로 제한한다.
 

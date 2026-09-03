@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail; source "$(dirname "$0")/lib.sh"
 validate_project() {
+  local component_dir
+  component_dir="$(ci_component_dir)"
   case "${CI_COMPONENT}" in
-    ai) [[ -f pyproject.toml || -f requirements.txt ]] || { echo 'AI Python project descriptor missing' >&2; return 66; } ;;
-    back) [[ -x ./gradlew || -f pom.xml || -x ./mvnw ]] || { echo 'Back build wrapper missing' >&2; return 66; } ;;
-    front) [[ -f package.json ]] || { echo 'Front package.json missing' >&2; return 66; } ;;
-    game) grep -q '6000.0.78f1' festa-unity/ProjectSettings/ProjectVersion.txt ;;
+    ai) [[ -f "${component_dir}/pyproject.toml" || -f "${component_dir}/requirements.txt" ]] || { echo 'AI Python project descriptor missing' >&2; return 66; } ;;
+    back) [[ -x "${component_dir}/gradlew" || -f "${component_dir}/pom.xml" || -x "${component_dir}/mvnw" ]] || { echo 'Back build wrapper missing' >&2; return 66; } ;;
+    front) [[ -f "${component_dir}/package.json" ]] || { echo 'Front package.json missing' >&2; return 66; } ;;
+    game) grep -q '6000.0.78f1' "${component_dir}/ProjectSettings/ProjectVersion.txt" ;;
   esac
 }
 ci_run validate VALIDATION_FAILED ci_dispatch_or validate validate_project

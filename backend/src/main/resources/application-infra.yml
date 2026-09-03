@@ -1,0 +1,7 @@
+# 배포 환경의 월드 접속 주소와 전용 connection token Secret을 Spring에 주입한다.
+app:
+  world:
+    scheme: wss
+    host: world.${ROOT_DOMAIN}
+    port: 443
+    connection-token-secret: ${CONNECTION_TOKEN_SECRET}

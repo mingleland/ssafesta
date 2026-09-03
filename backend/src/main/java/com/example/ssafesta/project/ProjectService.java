@@ -1,8 +1,12 @@
 package com.example.ssafesta.project;
 
+import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothEditorGuard;
 import com.example.ssafesta.booth.BoothExpiredException;
 import com.example.ssafesta.booth.BoothLeaseRepository;
+import com.example.ssafesta.booth.BoothNotFoundException;
+import com.example.ssafesta.booth.BoothRepository;
+import com.example.ssafesta.booth.LayoutNotPublishedException;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.common.ErrorCode;
@@ -39,12 +43,14 @@ public class ProjectService {
     private final ProjectRepository projects;
     private final BoothEditorGuard editorGuard;
     private final BoothLeaseRepository leases;
+    private final BoothRepository booths;
 
     public ProjectService(ProjectRepository projects, BoothEditorGuard editorGuard,
-                          BoothLeaseRepository leases) {
+                          BoothLeaseRepository leases, BoothRepository booths) {
         this.projects = projects;
         this.editorGuard = editorGuard;
         this.leases = leases;
+        this.booths = booths;
     }
 
     // ── 등록 ────────────────────────────────────────────────────────────────
@@ -132,8 +138,113 @@ public class ProjectService {
         return projects.findByBoothId(boothId).map(ProjectView::of).map(List::of).orElseGet(List::of);
     }
 
+    // ── 조회 (방문자) ───────────────────────────────────────────────────────
+
+    /**
+     * What a visitor sees on a public booth (계약 §6, FR-005·SC-002).
+     *
+     * <p>Three gates in this order, and the order is the contract: a booth that does not exist, one
+     * whose lease has run out, and one that has never been published each get their own answer. The
+     * order is copied from {@code BoothQueryService.findPublicBooth} so the same booth cannot report
+     * different reasons depending on which endpoint asked.
+     *
+     * <p><b>미게시는 404 이고 빈 배열이 아니다.</b> "이 부스는 방문자에게 열려 있지 않다"와 "부스는
+     * 열렸고 전시가 아직 없다"는 다른 사실이라, 하나로 뭉치면 클라이언트가 둘을 구분할 수단을
+     * 잃는다. 빈 배열은 계속 후자 하나만 뜻한다 (§3 과 같은 규칙).
+     *
+     * <p>쿼리는 회원 방문자 기준 5개다 (부스·임대·프로젝트·좋아요 수·본인 좋아요). 부스당
+     * 프로젝트가 1개라 N+1 이 되지 않으므로 그대로 둔다 — 합칠 곳은 뒤의 둘이고,
+     * {@code COUNT(*) FILTER (WHERE user_id = ...)} 한 줄로 4개가 되지만 반환이
+     * {@code Object[]} 가 돼 호출부에 캐스팅이 생긴다. <b>부스 진입 지연이 실제로 문제가 되면</b>
+     * 그때 합친다.
+     *
+     * @param viewerUserId the member behind the request, or {@code null} for a guest — a guest is a
+     *        normal caller here, not a refusal (헌법 12조는 소유를 금지하는 것이고 열람이 아니다)
+     */
+    @Transactional(readOnly = true)
+    public VisitorProjectListView findPublishedByBooth(Long boothId, Long viewerUserId) {
+        requireVisitorVisible(boothId);
+        return new VisitorProjectListView(projects.findByBoothId(boothId)
+                .map(project -> VisitorProjectView.of(project, projects.countLikes(project.getId()),
+                        likedBy(project.getId(), viewerUserId)))
+                .map(List::of).orElseGet(List::of));
+    }
+
+    /** 게스트는 좋아요 행을 가질 수 없으므로 묻지 않는다 — 계약 §6 이 정한 {@code false} 다. */
+    private boolean likedBy(Long projectId, Long viewerUserId) {
+        return viewerUserId != null && projects.isLikedBy(projectId, viewerUserId);
+    }
+
+    /**
+     * 방문자에게 이 부스가 열려 있는가 — 세 게이트이고 <b>순서가 계약이다</b> (§6). 없는 부스,
+     * 임대가 끝난 부스, 한 번도 게시되지 않은 부스가 각각 자기 답을 받는다. 순서는
+     * {@code BoothQueryService.findPublicBooth} 에서 그대로 가져왔다.
+     *
+     * <p>읽기(§6)와 좋아요(§8)가 <b>같은 함수를 부른다.</b> 나누면 같은 부스가 무엇을 물었는지에
+     * 따라 다른 사유를 답할 수 있고, 그때 틀린 쪽이 어느 쪽인지 응답만 보고는 알 수 없다.
+     */
+    private void requireVisitorVisible(Long boothId) {
+        Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        requireValidLease(boothId);
+        // 게시 게이트는 배치의 게시 여부다 — 프로젝트에 별도의 게시 상태를 만들지 않는다.
+        // 프로젝트 패널이 게시된 배치 안의 오브젝트라서, 방문자가 그것을 누를 수 있는 순간과
+        // 이 술어가 정확히 겹친다. Booth.isPublished 가 016 홈페이지와 공유하는 그 술어다.
+        if (!booth.isPublished()) {
+            throw new LayoutNotPublishedException();
+        }
+    }
+
+    // ── 좋아요 (계약 §8) ────────────────────────────────────────────────────
+
+    /**
+     * 누르기. <b>멱등이다</b> — 이미 누른 회원이 다시 불러도 좋아요는 하나이고 응답도 같다.
+     *
+     * <p>토글 하나로 만들지 않은 이유가 여기다. 더블탭과 네트워크 재시도가 같은 요청을 두 번
+     * 보내는데, 토글이면 두 번째가 방금 누른 것을 취소한다 — 사용자는 누른 적 없는 취소를 본다.
+     *
+     * <p>{@code likedByMe} 를 다시 묻지 않는다. 이 함수가 정상 반환했다는 것이 곧 행이 있다는
+     * 뜻이다 (§8).
+     */
+    @Transactional
+    public LikeView like(Long projectId, Long userId) {
+        requireLikeableProject(projectId);
+        projects.insertLike(projectId, userId);
+        return new LikeView(projects.countLikes(projectId), true);
+    }
+
+    /** 취소. 누른 적 없는 회원이 불러도 오류가 아니다 — 결과가 같으므로 답도 같다. */
+    @Transactional
+    public LikeView unlike(Long projectId, Long userId) {
+        requireLikeableProject(projectId);
+        projects.deleteLike(projectId, userId);
+        return new LikeView(projects.countLikes(projectId), false);
+    }
+
+    /**
+     * 프로젝트 먼저, 그 다음 부스 게이트. {@code update} 와 같은 순서다 — 프로젝트가 없으면
+     * 어느 부스를 물어야 할지도 모르기 때문이고, 그래서 이 순서에는 선택의 여지가 없다.
+     *
+     * <p>편집자 가드는 걸지 않는다. 좋아요는 방문자의 행위이므로 <b>남의 부스에서 누르는 것이
+     * 정상 경로다</b> — 여기에 {@code requireEditor} 를 넣으면 기능이 자기 부스 전용이 된다.
+     */
+    private void requireLikeableProject(Long projectId) {
+        Project project = projects.findById(projectId)
+                .orElseThrow(() -> new ProjectNotFoundException(projectId));
+        requireVisitorVisible(project.getBoothId());
+    }
+
     // ── 검증 ────────────────────────────────────────────────────────────────
 
+    /**
+     * 만료 부스에서 막는 것은 <b>쓰기와 방문자 읽기 둘</b>이고, 예외는 편집자 읽기(§3) 하나다.
+     *
+     * <p>이 함수를 지우거나 조건을 느슨하게 만들면 만료 부스의 전시가 방문자에게 계속 보이고,
+     * "방문자는 여기서 만료를 안다"(004 FR-019)가 조용히 깨진다 — 정상 경로는 전부 초록인 채로
+     * {@code expiredBoothIsConflictEvenWhenItWasPublished} 하나만 빨개진다.
+     *
+     * <p>편집자 읽기가 예외인 이유는 {@code findByBooth} 에 적어 두었다 (FR-008 — 보존은 소유자가
+     * 읽을 수 있어야 관측된다).
+     */
     private void requireValidLease(Long boothId) {
         // facade·homepage 와 같은 결이다: 만료된 부스는 아무에게도 보이지 않으므로 편집은
         // 보이지 않는 것을 고치는 일이 된다 (spec 004 만료 계약).
@@ -277,5 +388,43 @@ public class ProjectService {
         public ProjectListView {
             projects = List.copyOf(Objects.requireNonNull(projects));
         }
+    }
+
+    /**
+     * {@link ProjectView} 의 여덟 필드 + 좋아요 둘 (계약 §6).
+     *
+     * <p>필드를 더하지 않고 {@code ProjectView} 를 쓰지 않는 이유: 그러면 편집자 응답(§3)의 모양이
+     * 같이 바뀐다. 반대로 이름·타입은 §3 과 똑같이 두었다 — 클라이언트가 파서를 하나로 쓴다.
+     *
+     * <p>{@code likeCount} 는 {@code null} 이 되지 않는다. {@code -135} 가 붙기 전에는 항상 {@code 0}
+     * 이지만 키는 지금부터 있다 — 나중에 키를 더하면 소비자가 그 시점에 파서를 또 고쳐야 한다.
+     */
+    public record VisitorProjectView(Long projectId, String name, String description, String thumbnailUrl,
+                                     String videoUrl, String deployUrl, String gitUrl, String portfolioUrl,
+                                     long likeCount, boolean likedByMe) {
+
+        static VisitorProjectView of(Project project, long likeCount, boolean likedByMe) {
+            return new VisitorProjectView(project.getId(), project.getName(), project.getDescription(),
+                    project.getThumbnailUrl(), project.getVideoUrl(), project.getDeployUrl(),
+                    project.getGitUrl(), project.getPortfolioUrl(), likeCount, likedByMe);
+        }
+    }
+
+    /** {@code { "projects": [...] }} — §3 과 같은 모양이다. 부스당 1개라도 배열을 유지한다 (C-01). */
+    public record VisitorProjectListView(List<VisitorProjectView> projects) {
+
+        public VisitorProjectListView {
+            projects = List.copyOf(Objects.requireNonNull(projects));
+        }
+    }
+
+    /**
+     * 좋아요 응답 (계약 §8) — {@link VisitorProjectView} 의 좋아요 두 필드와 같은 이름·같은
+     * 타입이다. 클라이언트가 방문자 조회에 쓰던 파서를 그대로 쓴다.
+     *
+     * <p>프로젝트 전체를 돌려주지 않는다. 좋아요는 나머지 여덟 필드를 바꾸지 않으므로 같이 보내면
+     * 소비자가 "이 응답으로 화면을 다시 그려야 하나"를 매번 판단해야 한다.
+     */
+    public record LikeView(long likeCount, boolean likedByMe) {
     }
 }

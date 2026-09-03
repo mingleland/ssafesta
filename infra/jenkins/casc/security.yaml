@@ -1,27 +1,5 @@
-credentials:
-  system:
-    domainCredentials:
-      - domain:
-          name: github-scm
-          description: GitHub checkout credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: github.com
-        credentials: []
-      - domain:
-          name: gitlab-scm
-          description: GitLab checkout credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: "${GITLAB_HOST:-gitlab.com}"
-        credentials: []
-      - domain:
-          name: mattermost
-          description: Mattermost webhook credentials only
-          specifications:
-            - hostnameSpecification:
-                includes: "${MATTERMOST_HOST}"
-        credentials: []
+# Credentials are entered through the Jenkins UI and encrypted in JENKINS_HOME.
+# Do not declare empty credential lists here: JCasC reloads would erase UI entries.
 
 jenkins:
   globalNodeProperties:
@@ -39,6 +17,18 @@ jenkins:
             value: "${DEPLOY_CREDENTIALS_ID}"
           - key: MATTERMOST_CREDENTIALS_ID
             value: "${MATTERMOST_CREDENTIALS_ID}"
+          - key: DEV_BACK_ENV_CREDENTIAL_ID
+            value: "${DEV_BACK_ENV_CREDENTIAL_ID}"
+          - key: DEV_AI_ENV_CREDENTIAL_ID
+            value: "${DEV_AI_ENV_CREDENTIAL_ID}"
+          - key: DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID}"
+          - key: DEMO_BACK_ENV_CREDENTIAL_ID
+            value: "${DEMO_BACK_ENV_CREDENTIAL_ID}"
+          - key: DEMO_AI_ENV_CREDENTIAL_ID
+            value: "${DEMO_AI_ENV_CREDENTIAL_ID}"
+          - key: DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID
+            value: "${DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID}"
           - key: CI_CONSOLE_MASKING_REQUIRED
             value: "true"
           - key: CI_SANITIZED_SUMMARY_REQUIRED

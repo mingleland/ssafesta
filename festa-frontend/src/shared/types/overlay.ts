@@ -1,7 +1,8 @@
 // Unity 3D 화면 위에 React 창을 띄우는 계약 — 어떤 타입에 어떤 데이터가 실리는지
 // React 오버레이 계약 — 헌법 25조(텍스트 입력·외부 콘텐츠는 웹 레이어)
-// 소비 spec: 008(AI_CHAT)·016(LAPTOP)·020(GAME, #35 busypark)은 P0, 010(SURVEY)·011(CONSULTATION)은 P1
-export type OverlayType = 'AI_CHAT' | 'LAPTOP' | 'GAME' | 'SURVEY' | 'CONSULTATION';
+// 소비 spec: 008(AI_CHAT)·016(LAPTOP)·020(GAME, #35 busypark)은 P0, 010(SURVEY)·011(CONSULTATION)은 P1,
+// 009(PROJECT)는 방문자 전시 — Unity 송신부(-343) 확정 전에는 mock intent(openOverlay 직접 호출)로만 열린다
+export type OverlayType = 'AI_CHAT' | 'LAPTOP' | 'GAME' | 'SURVEY' | 'CONSULTATION' | 'PROJECT';
 
 export interface OverlayRequest {
   type: OverlayType;

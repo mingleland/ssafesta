@@ -1,0 +1,56 @@
+meta {
+  name: 프로젝트 생성
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/projects
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "title": "SSAFESTA 메타버스",
+    "summary": "브라우저에서 도는 3D 전시 월드",
+    "portfolioUrl": "https://github.com/example/ssafesta",
+    "videoUrl": "https://www.youtube.com/watch?v=example"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body.projectId) {
+    bru.setEnvVar("projectId", res.body.projectId);
+  }
+}
+
+docs {
+  ## 프로젝트 카드 생성 — 부스당 1개
+
+  부스에 전시할 프로젝트 카드를 만든다 (spec 009).
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `201 Created`. response script가 `projectId`를 환경변수에 저장한다
+
+  ### 만든 직후에는 방문자에게 보이지 않는다
+
+  공개는 별도 상태다. `프로젝트 수정`으로 공개 상태를 켜야 `공개 프로젝트 조회`에 나타난다.
+
+  ### URL 필드 규칙은 전부 같다
+
+  `http`·`https`만 허용하고, 사용자 정보(`@`)가 들어간 주소와 쓸 수 없는 포트를 거부한다. **저장은 보낸 문자열 그대로**다 — 한글 도메인(`https://한글도메인.com`)도 퓨니코드로 바꾸지 않고 원문을 보관한다.
+
+  ### 응답 코드
+
+  | 코드 | 상황 |
+  |---|---|
+  | `201` | 생성 성공 |
+  | `400 VALIDATION_FAILED` | 필수 누락·길이 초과·URL 규칙 위반. `errors[0].field`가 문제 필드다 |
+  | `403` | 게스트(`MEMBER_ONLY`) 또는 남의 부스(`BOOTH_FORBIDDEN`) |
+  | `409` | 이미 프로젝트가 있거나 임대가 만료됐다 |
+}

@@ -177,10 +177,11 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 | 항목 | 규칙 |
 |---|---|
-| 서버 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** 두 가지뿐 |
-| 파싱 | **하지 않는다.** 문자열은 서버에게 불투명하며 trim·대소문자·정규화도 하지 않는다 — 저장한 바이트열이 그대로 돌아온다 |
+| 형식 검증 | **길이 ≤ 3800자**, **인쇄 가능 ASCII `0x20`–`0x7E`** |
+| 소유권 검증 | 저장 문자열은 변형하지 않되 `fa|` 형식의 `i=` 8슬롯만 읽는다. 0은 미착용. preset·legacy·형식 불일치는 호환을 위해 품목 주장 없음으로 통과 |
 | 저장 컬럼 | `users.avatar_code` **`TEXT`** (헌법 23조 — `VARCHAR(32)` 금지, T-24) |
 | 거부 | `400 VALIDATION_FAILED` + `errors[0] = { "rule": "FIELD_INVALID", "field": "avatarCode", "message": … }`. 빈 값·길이 초과·문자셋 위반이 **서로 다른 문장**을 받는다 |
+| 미보유 거부 | `409 AVATAR_ITEM_NOT_OWNED` + 미보유 품목마다 `{ "rule": "ITEM_NOT_OWNED", "objectId": "<assetKey>", "message": … }` |
 | 게스트 | `403 MEMBER_ONLY` (헌법 12조 — 외형을 영속 저장하지 않는다) |
 
 상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
@@ -456,6 +457,9 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (009 FR-008 — 만료돼도 데이터는 보존된다).
 
+**예외는 방문자 조회 하나다** — `GET /booths/{boothId}/projects/published`는 게스트가 정상
+경로이고 토큰 없이 `200`이다. 편집·편집자 조회는 위 규칙 그대로다.
+
 > ⚠️ 직원 역할 게이트(011 C-09 `ADMIN`·`CONTENT_EDITOR`)는 **아직 걸려 있지 않다.**
 > `BoothEditorGuard`가 `role`을 읽지 않으며 005·016도 같은 상태다 — 011 구현 시 가드 한 곳에서
 > 일괄로 닫는다 ([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)).
@@ -516,8 +520,42 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 실패: `401` · `403 MEMBER_ONLY` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`.
 
-> 방문자용 조회(published 게이트 + 좋아요 수)는 **S15P21A604-177**이다. 아직 없다.
+> 방문자용 조회는 이 endpoint가 아니라 아래 `GET /booths/{boothId}/projects/published`다.
 > `GET /projects/{projectId}`는 **신설하지 않았다** — 부스당 1개라 이 목록이 같은 값을 준다.
+
+### GET `/booths/{boothId}/projects/published`
+
+**방문자용** 조회 (009 FR-005). **토큰이 없어도 `200`이다** — 게스트가 정상 경로라 `403`이 없다.
+토큰이 있으면 `likedByMe` 판정에만 쓴다.
+
+> ⚠️ **토큰을 실었는데 만료·손상됐으면 `401`이다** — 헤더가 없을 때만 `200`이다. 이유와 FE 우회는
+> [계약 §6](../specs/009-project-exhibition/contracts/project-api.md)에 있다.
+
+편집자 경로와 URL을 나눈 것은 같은 URL에서 신원에 따라 200과 403이 갈리지 않게 하기
+위함이다. `/published` 접미사는 `GET /booths/{boothId}/layouts/published`(005) ·
+`GET /games/{gameId}/published`(019)와 같은 뜻이다.
+
+```json
+{ "projects": [ { "projectId": 1, "name": "SSAFY FESTA", "…": "…",
+                  "likeCount": 12, "likedByMe": false } ] }
+```
+
+편집자 응답의 8필드 + `likeCount`(int, 없으면 `0`) + `likedByMe`(boolean, 게스트는 `false`).
+**두 키는 항상 있다.** 좋아요 **토글**은 `S15P21A604-135`이고 아직 없다 — 그때까지 `likeCount`는
+항상 `0`이다.
+
+**게이트 순서가 계약이다.**
+
+| 순서 | 조건 | 응답 |
+|---|---|---|
+| 1 | 부스 없음 | `404 BOOTH_NOT_FOUND` |
+| 2 | 유효 임대 없음 | `409 BOOTH_LEASE_EXPIRED` (004 FR-019) |
+| 3 | 미게시 (`published_layout_version IS NULL`) | `404 LAYOUT_NOT_PUBLISHED` |
+| 4 | 통과·프로젝트 없음 | `200 { "projects": [] }` |
+
+**미게시는 404이고 빈 배열이 아니다** — "부스가 방문자에게 열려 있지 않다"와 "부스는 열렸고
+전시가 없다"는 다른 사실이라, 뭉치면 클라이언트가 구분할 수단을 잃는다. 게시 게이트는
+배치의 게시 여부이고, 프로젝트에 별도 게시 상태는 없다(016 홈페이지와 같은 술어).
 
 ### PATCH `/projects/{projectId}`
 
@@ -535,6 +573,29 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 성공 `200` + 변경 후 공통 표현. 실패: `400 VALIDATION_FAILED` · `401` · `403 MEMBER_ONLY` ·
 `403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
 `409 BOOTH_LEASE_EXPIRED`.
+
+### PUT `/projects/{projectId}/like` · DELETE `/projects/{projectId}/like`
+
+방문자가 전시에 좋아요를 누르고 취소한다 (009 §8, `S15P21A604-135`). **회원만** — 게스트는
+`403 MEMBER_ONLY`다. 편집자 가드는 없다 — 남의 부스에서 누르는 것이 정상 경로다.
+
+```json
+{ "likeCount": 13, "likedByMe": true }
+```
+
+**토글 하나가 아니라 멱등 둘이다.** `PUT`을 두 번 보내도 좋아요는 하나이고, `DELETE`를 누른 적
+없이 보내도 `200`이다 — 더블탭이나 재시도가 방금 누른 것을 취소하면 안 되기 때문이다. FE는
+`likedByMe`를 보고 메서드를 고른다.
+
+`likedByMe`는 `PUT` 뒤 항상 `true`, `DELETE` 뒤 항상 `false`다 — 성공 반환이 곧 행의 유무다.
+1인 1좋아요는 `project_likes PRIMARY KEY(project_id, user_id)`(V1)가 보장한다.
+
+응답은 `GET /booths/{boothId}/projects/published`의 좋아요 두 필드와 같은 이름·같은 타입이고,
+프로젝트의 나머지 필드는 담지 않는다 — 좋아요가 그것들을 바꾸지 않는다.
+
+게이트는 방문자 조회와 **같은 함수**다: `404 PROJECT_NOT_FOUND` → `409 BOOTH_LEASE_EXPIRED` →
+`404 LAYOUT_NOT_PUBLISHED`. 실패는 이 셋과 `401` · `403 MEMBER_ONLY` · `404 BOOTH_NOT_FOUND`.
+**신규 오류 코드는 없다** — §18에 추가할 행이 없다.
 
 ---
 
@@ -747,9 +808,57 @@ Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트
   실패한 문서와 같은 파일을 다시 올리는 것은 **허용**된다 — 막으면 사용자가 빠져나갈 길이 없다.
   따라서 같은 (agent, hash) 행이 복수 존재할 수 있고 유일성은 활성 상태 안에서만 성립한다.
 
+#### 아직 안 올린 발급은 중복이 아니라 재발급이다
+
+같은 해시로 다시 요청했을 때 셋으로 갈린다 (#84 멱등 재발급 합의).
+
+| 기존 행 | 응답 |
+|---|---|
+| `QUEUED` 이고 **아직 업로드 확인 전**, `storageProvider` 가 현재 활성 쓰기 Provider 와 같음 | `duplicate:false` + **같은 `documentId`** + **새 `uploadUrl`** + 기존 `objectKey` |
+| `QUEUED` 이고 아직 업로드 확인 전인데 **Provider 가 바뀜** | 기존 행을 `EXPIRED` 로 전환하고 **새 `documentId`·새 `objectKey`** 로 발급 (FR-032) |
+| 업로드가 확인된 `QUEUED`, `PROCESSING`, `READY` | `duplicate:true` (URL·key 없음) |
+
+발급 URL 은 15분이고 만료 판정은 1시간이다. 그 사이에 다시 요청하는 것은 정상 경로라서, 중복으로
+막으면 **URL 이 만료된 사용자가 1시간을 기다려야 한다.**
+
+재발급의 `uploadUrl` 은 **기존 행의 `objectKey`·`contentType`·`size` 로 서명**한다. 요청의 값이 아니다 —
+상한 검사와 첫 서명이 그 값으로 이뤄졌고, 해시는 클라이언트의 주장일 뿐 서버가 확인한 값이 아니다(FR-019a).
+
+**해시가 같은데 `fileName`·`contentType`·`size` 중 하나라도 기존 행과 다르면 `400 VALIDATION_FAILED`**
+(`errors[0].field = contentSha256`) 다. 2026-08-31 확정 — #84 에 없던 자리이며 세 선택지(400 / 기존 값으로
+재발급 / 중복 처리) 중 가장 보수적인 쪽을 골랐다. 서로 다른 파일이 같은 해시를 주장하는 요청을 조용히
+통과시키면 서명한 것과 다른 파일이 올라간다.
+
 ### POST `/documents/{documentId}/complete`
 
-업로드 완료 후 AI 처리 요청을 시작하기 위한 Spring 측 상태 변경/연계 Endpoint 후보.
+브라우저가 presigned URL 로 업로드를 마친 뒤 부르는 확인 Endpoint. **요청 본문이 없다** — 판정에 필요한
+것은 전부 문서 행에 있다.
+
+HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다. 전역 활성 Provider 가 아니다
+(FR-030) — 전환 전에 올라간 파일은 옛 Provider 에 있고, 새 Provider 에 물으면 "없다" 는 엉뚱한 답이 온다.
+
+#### Response
+
+```json
+{ "documentId": 153, "processingStatus": "QUEUED" }
+```
+
+#### 상태별 판정 (spec 007 data-model 업로드 만료 상태 전이)
+
+| 문서 상태 | 저장소 | 결과 |
+|---|---|---|
+| `QUEUED`, 업로드 확인됨 | 확인 안 함 | `200` (멱등 — 재시도가 오류로 보이면 안 된다) |
+| `QUEUED`, 미확인 | 객체 있고 **크기 일치** | `200`, 업로드 확인 기록 |
+| `QUEUED`, 미확인 | 객체 없음 또는 크기 불일치 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
+| `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
+| `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
+| `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
+| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) |
+| `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
+| 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
+
+24시간 경과분을 객체 존재와 무관하게 `410` 으로 두는 것은 의도다 — 삭제는 sweeper 가 자기 주기로 하므로
+남아 있다고 받아 주면 유예 기간이 무의미해진다.
 
 ### GET `/agents/{agentId}/documents`
 
@@ -864,7 +973,7 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ### POST `/booths/{boothId}/consultations`
 
-사람 상담 요청 생성.
+사람 상담 요청 생성. `requested_at + 10분`을 `expiresAt`으로 계산해 응답에 포함한다 (C-01, spec 011 — 2026-08-31 확정, GitLab work_items#118).
 
 ```json
 {
@@ -873,34 +982,63 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 }
 ```
 
+응답 예:
+
+```json
+{
+  "consultationId": 901,
+  "status": "REQUESTED",
+  "requestedAt": "...",
+  "expiresAt": "..."
+}
+```
+
+10분 내 Accept가 없으면 `REQUESTED → EXPIRED`로 전환하고 `CONSULTATION_EXPIRED` WebSocket 이벤트로 알린다(docs/16 §11). FE는 `expiresAt`으로 잔여 시간을 안내하고 만료 후 재요청 버튼을 노출한다.
+
 ### GET `/consultations/{consultationId}`
+
+응답 `status`에 `EXPIRED`가 포함된다.
 
 ### POST `/consultations/{consultationId}/accept`
 
-한 명의 Staff만 성공해야 한다.
+한 명의 Staff만 성공해야 한다. 이미 `EXPIRED`/`REJECTED`/다른 Staff가 `ACCEPTED`한 요청은 거부한다.
 
 ### POST `/consultations/{consultationId}/end`
 
 상담 종료.
 
-메시지는 WebSocket event 중심으로 처리하고, 기록 저장 정책에 따라 별도 REST History Endpoint를 둘 수 있다.
+메시지는 WebSocket event 중심으로 처리한다. 오프라인 시 메시지 남기기(비동기 문의)는 P1에서 제외하고 P2 후속 이슈로 분리했다(C-02, spec 011). 원문 History REST Endpoint 도입 여부·보존 기간은 P2 spec 착수 시 확정한다(C-03). P1 메타데이터·Handoff Summary(`consultations.summary`)는 프로젝트 종료 시 일괄 삭제한다(docs/09 §27).
 
 ---
 
-## 13. Inventory / Decoration — P1
+## 13. Inventory / Avatar Parts — P1
 
-### GET `/inventory/me`
+### GET `/catalog/items?type=AVATAR_PART`
 
-### GET `/catalog/items`
+회원·게스트 모두 Access Token으로 호출한다. 97판매 단위를 한 번에 반환하며 `owned`는 호출자 기준이다. 무료(`price=0`) 12종은 보유 행 없이도 항상 `true`다.
+
+```json
+{ "items": [
+  { "itemId": 1, "code": "F_Bot.01", "name": "일자 팬츠", "equipSlot": "BOTTOM",
+    "assetKey": "656603128", "price": 0, "onSale": true, "owned": true }
+] }
+```
+
+`assetKey`는 `avatarCode`의 `i=` 슬롯 값과 같다. 비모자는 Unity `itemId`, 모자는 UI 판매 단위인 `familyId`다. 성별 필터는 Unity 카탈로그가 담당한다.
 
 ### POST `/catalog/items/{itemId}/purchases`
 
-검증:
+회원 전용. 성공 시 `201`과 해당 품목(`owned: true`)을 반환한다. 지갑 잠금 → 보유 재확인 → `PURCHASE:{userId}:{itemId}` 멱등 차감 → `user_inventory_items` 지급을 한 트랜잭션으로 처리한다.
 
-- 판매 상태
-- 가격
-- 잔액
-- 중복 요청
+| 오류 | 의미 |
+|---|---|
+| `404 CATALOG_ITEM_NOT_FOUND` | 없는 품목 |
+| `409 ITEM_NOT_ON_SALE` | 판매 중지 |
+| `409 ITEM_ALREADY_OWNED` | 무료 품목 또는 이미 구매한 품목 |
+| `409 INSUFFICIENT_COIN` | 잔액 부족. 차감·지급 모두 롤백 |
+| `403 MEMBER_ONLY` | 게스트 구매 |
+
+별도 `GET /inventory/me`는 구현하지 않는다. 팔레트 소비자는 카탈로그 응답의 `owned`만으로 충분하다.
 
 ---
 
@@ -1011,17 +1149,35 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 - Draft 저장은 구조·schema·상한을 검증하고, Publish는 참조·소유권·Asset·Dialogue 의미를 다시 검증한다.
 - Publish는 Draft read→검증→`game_published_versions` append→`games.published_version` 갱신을
   단일 트랜잭션으로 처리하며 Draft와 기존 발행본은 유지한다.
-- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. MVP는 Game Studio의 versioned
-  builtin Asset catalog를 사용하고 사용자 업로드는 별도 Asset spec으로 분리한다.
+- GameProject에는 Asset binary·브라우저 임시 URL을 저장하지 않는다. builtin Asset catalog(`builtin://`)
+  외에 **사용자 업로드(`asset://`)를 지원한다** — 아래 Asset Upload 절이 그 계약이다.
+- 사용자 Asset 업로드: `POST /api/v1/games/{gameId}/assets` (grant 발급) →
+  브라우저가 `uploadUrl`로 직접 `PUT` → `POST /api/v1/games/{gameId}/assets/{assetId}/complete` (검증) →
+  `GET /api/v1/games/{gameId}/assets/{assetId}/content` (전달).
+  - `uploadUrl`은 **R2 버킷으로 가는 presigned PUT**이고 응답의 `requiredHeaders`를 그대로 보내야 한다
+    (`Content-Type`이 서명에 포함된다). grant와 서명 수명은 모두 10분이다.
+  - `/content`는 **Spring이 R2에서 읽어 바이트를 중계한다** — 302도, presigned GET도 FE로 내보내지 않는다.
+    버킷 CORS가 `PUT`만 허용하고(`object-storage-contract.md` §CORS), FE는 `Authorization`을 붙인
+    `fetch`로 받기 때문이다. `Content-Type`은 검증으로 확정된 실제 타입이고 `X-Content-Type-Options: nosniff`,
+    `Cache-Control: private, max-age=300`이다.
+  - 상한: 5 MiB · 4096×4096 · 게임당 300개 · PNG·JPEG·GIF·WebP (SVG 거부). 검증은 선언값이 아니라
+    올라온 바이트로 한다. 실패는 `200` + `status: FAILED` + `failureRule`이며 행이 사유를 보관한다.
+  - 인증되지 않은 경로는 하나도 없다. 업로드 `PUT`이 버킷으로 직접 가므로 Spring에 무인증 수신 endpoint가
+    필요하지 않고, grant 토큰이 쿼리 문자열에 실리는 일도 없다.
+  - 저장 좌표(`provider`·`storage_bucket`)는 발급 시점에 행에 박는다. 읽기·삭제는 그 행을 따르며
+    지금 활성인 write provider를 따르지 않는다 (spec 007 FR-030과 같은 불변식).
+  - 객체 삭제는 DB 트랜잭션에서 분리한다 — 행을 지우는 트랜잭션이 `game_asset_delete_queue`에 좌표를
+    남기고 `@Scheduled` sweeper(1분)가 비운다. 탈퇴·검증 실패·죽은 행 청소 세 지점이 모두 이 경로다.
 - 현재 공개 포인터를 따라가는 `GET /games/{gameId}/published`는 `Cache-Control: no-cache` + ETag 재검증이다 — 재공개하면 같은 URL이 다른 본문을 가리키므로 장기 cache를 걸면 옛 version이 나온다. 긴 `max-age`·`immutable`은 후속 version 고정 URL에만 붙인다. Portal 실행 가능 여부는 `Cache-Control: no-store`다.
 - 독립 play route와 Portal overlay open 시 REST 조회로 신규 진입을 판정하며 Game Studio 전용 socket은 만들지 않는다.
 - 공개 중단 전에 이미 GameProject를 로드한 무보상 로컬 세션은 완료까지 허용한다.
-- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다.
+- 일반 삭제는 soft delete, 회원 탈퇴는 Game·Draft·Published·Asset·Score hard delete다. Published 이력은 Game 존속 중 유지한다. Asset은 행을 지우고 객체는 삭제 큐로 넘긴다 — 저장소 장애가 탈퇴를 막지 않는다.
 - Portal 공개 `configId`는 signed Int32 `1..2147483647`; DB는 별도 `INTEGER UNIQUE NOT NULL CHECK (>0)`를 사용한다.
 - MVP 플레이 결과·보상·랭킹 API는 만들지 않는다.
 - 오류 코드·`rule` 어휘와 생성·버전 목록 shape은 019 계약 문서가 소유한다 (`game-api.md` §오류 코드와 rule). `rule` 이름은 `contracts/fixtures/`의 reference validator가 정한 것을 그대로 쓰고, 서버가 새 어휘를 만들 때만 계약에 추가한다.
 
-상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)다.
+상세 계약은 [`specs/019-game-studio/contracts/game-api.md`](../specs/019-game-studio/contracts/game-api.md)이고,
+Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/contracts/game-asset-upload.md)다.
 #21의 기술 답변과 [#33](https://github.com/kanghyunsoon/ssafesta/issues/33)·
 [#34](https://github.com/kanghyunsoon/ssafesta/issues/34)의 교차 계약을 반영했다.
 
@@ -1037,6 +1193,9 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
 | `INSUFFICIENT_COIN` | Coin 부족 |
+| `CATALOG_ITEM_NOT_FOUND` *(012)* | 카탈로그 품목 없음 |
+| `ITEM_NOT_ON_SALE` / `ITEM_ALREADY_OWNED` *(012)* | 판매 중지 / 이미 보유 |
+| `AVATAR_ITEM_NOT_OWNED` *(012·013)* | 아바타 저장값에 미보유 파츠 포함. `errors[].rule=ITEM_NOT_OWNED`, `objectId=assetKey` |
 | `LAYOUT_VALIDATION_FAILED` | Layout 검증 실패 (`errors` 배열 동반) |
 | `LAYOUT_REVISION_CONFLICT` | 다른 편집자가 먼저 저장 (Draft 낙관적 잠금) |
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
@@ -1060,6 +1219,12 @@ Game Studio는 Unity 미니게임 API와 분리한다. Spring은 GameProject의 
 | `AGENT_NOT_FOUND` *(007)* | Agent 없음 |
 | `AGENT_LIMIT_EXCEEDED` *(007)* | 이 부스에는 이미 AI 직원이 있다 — 부스당 1명(C-13). 수정은 `PATCH`. `message`가 상한을 담는다 |
 | `AGENT_DELETE_CONFLICT` *(007)* | 배치·문서·상담 중 하나가 아직 이 직원을 가리킨다 (C-14). `message`가 무엇이 막는지 말한다 |
+| `DOCUMENT_NOT_FOUND` *(007)* | 문서 없음 |
+| `DOCUMENT_LIMIT_EXCEEDED` *(007)* | AI 직원당 10개·100MB 상한 (FR-018). 둘 다 설정값이라 `message`가 숫자를 담는다 |
+| `DOCUMENT_UPLOAD_INCOMPLETE` *(007)* | 발급한 URL 로 올린 것이 저장소에 없거나 크기가 다르다 — 다시 올리면 되는 상태다 |
+| `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
+| `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
+| `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -1112,21 +1277,62 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 - 누락·오류·**반대 방향 토큰**은 전부 `401 UNAUTHORIZED`
 - mTLS는 P2다 — 두 서비스가 같은 VPC 안이라 mTLS가 막는 위협이 현 배치에 없다
 
-> ⚠️ **배포 조치 (Infra).** `INTERNAL_AI_TO_SPRING_TOKENS` 는 **기본값이 없어 주입하지 않으면
-> 애플리케이션이 기동하지 않는다.** 현재 `infra/deploy/compose/dev/back.compose.yaml` 은 환경변수를
-> 하나도 넘기지 않고 `integration/compose.yaml` 도 `FESTA_ENVIRONMENT`·`AI_BASE_URL` 둘뿐이라,
-> 이 값은 물론 아래 목록 전체가 아직 컨테이너에 도달하지 않는다. Jenkins credential →
-> `with-credentials.sh` → compose `environment` 경로로 함께 wire 해야 한다.
+> **배포 주입 (Infra, S15P21A604-356).** Backend·FastAPI 서비스별 Secret File과 환경별
+> `INTERNAL_AI_TO_SPRING_TOKENS` Secret Text를 Jenkins credential → Pipeline → Compose `env_file`·`environment`로
+> 주입한다. `SPRING_PROFILES_ACTIVE=infra`와 `FESTA_ENVIRONMENT=dev|demo`는 Compose가 명시한다.
+> 실제 Secret 값은 Jenkins Credentials에만 두며 저장소와 `infra/.env`에는 넣지 않는다.
 >
 > | 변수 | 기본값 | 없으면 |
 > |---|---|---|
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
+> | `FESTA_ENVIRONMENT`(`dev`\|`demo`) | 없음 | **기동 실패** — Redis 키 네임스페이스다(`S15P21A604-349`). 조용히 빈 값으로 뜨면 dev·demo 가 세션과 일일 지급을 공유한다 |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `AI_STORAGE_UPLOAD_GATE`·`AI_STORAGE_ACTIVE_WRITE_PROVIDER` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
+> | `MINIO_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` *(007, fallback 시)* | 빈 값 | 전부 비면 미구성으로 빠진다. **부분 입력이면 기동 실패** |
 > | `POSTGRES_HOST/PORT/DB/USER/PASSWORD`·`REDIS_HOST/PORT` | localhost 기본값 | 컨테이너 안 localhost 를 본다 |
 > | `FRONTEND_BASE_URL`·`AUTH_COOKIE_SECURE`·`WORLD_SCHEME/HOST/PORT` | 로컬 기본값 | CORS·쿠키·월드 접속이 로컬 값으로 뜬다 |
+> | `ROOT_DOMAIN` | 없음 | `application-infra.yml` 의 `app.world.host` 가 `world.` 만 남는다 |
+> | `SPRING_PROFILES_ACTIVE` | `local` (`spring.profiles.default`) | 배포에서도 `local` 프로파일이 뜬다 — 아래 |
 >
-> `FESTA_ENVIRONMENT` 는 Spring 프로파일이 아니다 — 프로파일은 `SPRING_PROFILES_ACTIVE` 다.
-> 지금 `spring.profiles.default=local` 이라 아무것도 안 주면 배포에서도 `local` 이 뜬다.
+> **문서 저장소 (S15P21A604-106).** `R2_*` 는 Infra 가 소유하는 credential 로, 문서 bucket 과
+> 서버가 만드는 prefix 로 scope 를 좁힌 것을 받는다 (GitLab #84). 삭제 유예 정리(FR-028)까지 하려면
+> 그 prefix 에 대한 `DeleteObject` 가 필요하다.
+>
+> **업로드 허용 게이트는 한 칸이다** (GitLab #100, 2026-09-01 확정). 기본값을 두지 않은 것이 의도다 —
+> 기본값이 "허용" 이면 키 이름을 틀렸을 때 Spring 이 조용히 무시하고 **차단이 열린 채로 뜬다.**
+>
+> | `AI_STORAGE_UPLOAD_GATE` | 뜻 | 응답 |
+> |---|---|---|
+> | `OPEN` | 정상·경고, `LOCAL_ACTIVE` 검증 완료 | 발급 |
+> | `QUOTA_BLOCKED` | 사용량 90% 초과 — 재시도해도 풀리지 않는다 | `507 STORAGE_QUOTA_EXCEEDED` |
+> | `UNAVAILABLE` | stale 지표·R2 장애·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `503 STORAGE_UNAVAILABLE` |
+>
+> 운영자가 Usage Guard(`usage-guard.schema.json`)와 저장소 전환 상태를 읽고 위 한 칸으로 옮겨 적는다 —
+> **서버는 상태 기계를 알지 못한다.** 507 과 503 을 가르는 것이 이 게이트를 boolean 이 아니라 enum 으로
+> 둔 이유다: 용량이 찬 사용자에게 "잠시 후 다시" 를 주면 영원히 재시도한다.
+>
+> **`AI_STORAGE_ACTIVE_WRITE_PROVIDER` 는 신규 업로드가 갈 곳일 뿐이다.** 기존 객체의 읽기·HEAD·삭제는
+> 문서 행의 `storage_provider` 를 따른다(FR-030) — 전환 전에 올라간 파일은 옛 provider 에 남는다.
+> MinIO 로 옮길 때는 `MINIO_*` 4종을 채우고 이 값을 `MINIO_LOCAL` 로 바꾼다. MinIO 항목은 전 필드가
+> 비면 미구성으로 보고 목록에서 빠지므로, R2 만 쓰는 배포는 그 4종을 주지 않아도 된다 (부분 입력은 기동 실패).
+>
+> **프로파일은 `SPRING_PROFILES_ACTIVE=infra` 다.** `FESTA_ENVIRONMENT` 는 Spring 프로파일이
+> 아니라 **Redis 키 네임스페이스**(`app.redis.namespace`)다 — dev·demo 가 단일 EC2 의 Redis 한
+> 인스턴스를 공유하므로 모든 키가 이 값을 맨 앞에 단다(`S15P21A604-349`, infra-002 T059·T060).
+> 둘은 각각 주입해야 한다. 배포 프로파일을 `application-infra.yml` 로 두는 것은 확정됐고(GitLab #117,
+> `specs/infra-002-environments/tasks.md` T059) 파일도 `a51f88a0`(`-170`, MR !150)로 들어왔다.
+>
+> ⚠️ **다만 지금 `infra` 로 띄우면 기동하지 않는다.** Spring 의 `application-{profile}.yml` 은
+> 프로파일 간에 누적되지 않는데, `spring.datasource`·`jpa`·`flyway`·`data.redis`·`security.oauth2`
+> 와 `app.*` 전체가 `application-local.yml` 96줄 안에만 있고 `application-infra.yml` 은 5줄
+> (`app.world.*`)뿐이다. `infra` 를 켜면 그 96줄이 로드되지 않아 `spring.datasource.url` 이
+> 사라지고 JPA·Flyway 자동설정이 실패한다. **환경변수를 전부 주입해도 읽을 설정이 없다.**
+> 공통 설정을 `application.yml` 로 승격하는 것이 BE 몫이며 `S15P21A604-347` 로 추적한다.
+>
+> `REDIS_USERNAME`·`REDIS_PASSWORD` 도 함께 필요해진다 — infra-002 T015 가 Redis 기본 사용자를
+> 비활성화하고 ACL 을 켜는데 현재 `spring.data.redis` 에는 host·port 만 있어 연결이 거부된다.
+> 주입 자리 신설도 `S15P21A604-347` 범위다.
 
 > **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
 > `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지

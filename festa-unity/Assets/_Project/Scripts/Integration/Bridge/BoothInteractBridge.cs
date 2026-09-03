@@ -31,6 +31,15 @@ namespace Festa.Integration
         /// <summary>2026-08-20 FE·Unity·AI 3파트 확정 (Issue #2).</summary>
         public const string AiAgentInteract = "AI_AGENT_INTERACT";
 
+        /// <summary>
+        /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
+        /// 노트북 F 의 가시 결과(홈페이지 열기)는 FE 몫이라, FE 가 없는 단독 실행에서는
+        /// 발동해도 화면 변화가 없어 "안 된다" 로 보인다 — 월드 쪽이 최소한의 피드백을
+        /// 띄울 수 있게 훅을 연다. configId 0 등으로 **건너뛴 경우에는 발화하지 않는다**
+        /// (보내지 않았는데 보냈다고 표시하면 거짓 피드백이다).
+        /// </summary>
+        public static event System.Action<string> OnSent;
+
 #if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
         [DllImport("__Internal")]
         static extern void FestaNotifyBoothInteract(string json);
@@ -53,6 +62,7 @@ namespace Festa.Integration
         {
             if (!HasObjectId(LaptopInteract, objectId)) return;
             Send(BuildJson(LaptopInteract, boothId, objectId));
+            OnSent?.Invoke(LaptopInteract);
         }
 
         /// <summary>
@@ -72,6 +82,7 @@ namespace Festa.Integration
                 return;
             }
             Send(BuildJson(AiAgentInteract, boothId, objectId, configId: configId));
+            OnSent?.Invoke(AiAgentInteract);
         }
 
         static bool HasObjectId(string type, string objectId)

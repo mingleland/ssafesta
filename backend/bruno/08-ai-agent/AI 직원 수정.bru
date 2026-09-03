@@ -1,0 +1,43 @@
+meta {
+  name: AI 직원 수정
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/v1/agents/{{agentId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "tone": "PROFESSIONAL",
+    "servicePrice": 10
+  }
+}
+
+docs {
+  ## AI 직원 수정 — 보낸 필드만 바뀐다
+
+  - 인증: **필수** (그 부스 편집 권한)
+  - 성공: `200 OK`, 수정된 전체
+
+  빈 본문이나 `{}`는 `400`이다 — 바꿀 것이 없는 요청은 실수로 본다.
+
+  보낸 값은 **전부 먼저 검증한 뒤** 적용한다. 절반만 반영된 상태로 남지 않는다.
+
+  `null`을 명시하면 지우기다. 다만 `name`·`role`·`systemPrompt`는 비울 수 없어 `null`을 보내면 그 필드 이름과 함께 `400`이 된다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 수정 성공 |
+  | `400 VALIDATION_FAILED` | 바꿀 내용 없음·허용값 위반·비울 수 없는 필드에 `null` |
+  | `403` | 게스트 또는 그 부스 편집 권한 없음 |
+  | `404 AGENT_NOT_FOUND` | 그런 AI 직원이 없다 |
+  | `409 BOOTH_LEASE_EXPIRED` | 임대가 끝난 부스다 |
+}

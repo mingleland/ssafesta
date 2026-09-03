@@ -21,15 +21,25 @@ script:post-response {
 }
 
 docs {
-  ## Access Token 갱신
+  ## Access Token 재발급 — refresh 쿠키로 회원 세션 연장
 
-  브라우저/Bruno cookie jar의 `refresh_token`으로 새 Access Token과 새 Refresh Token을 발급한다.
+  HttpOnly `refresh_token` 쿠키를 근거로 새 Access Token을 발급하고 쿠키도 새 값으로 교체한다(rotation).
 
-  - 인증: Authorization 헤더 불필요
-  - Header: `Origin: {{baseUrl}}` 필수
-  - Cookie: Bruno cookie jar가 `refresh_token`을 자동 전송
-  - Request body: 없음
-  - 성공: `200 OK`, 새 `{ accessToken, expiresAt }`와 교체된 Refresh Token cookie
+  - 인증: **Access Token을 보내지 않는다.** 만료된 토큰으로도 호출하는 endpoint다
+  - 쿠키: Bruno cookie jar에 저장된 `refresh_token`이 자동 전송된다. **본문이나 환경변수에 수동으로 넣지 않는다**
+  - 성공: `200 OK`, 새 `{ accessToken, expiresAt }`. response script가 환경변수를 덮어쓴다
 
-  기존 Refresh Token은 즉시 폐기된다. 이미 교체된 Token을 재사용하면 서버가 세션을 종료하고 재로그인을 요구한다. Refresh Token을 body, Params, 환경변수에 넣지 않는다.
+  ### 비로그인 방문자의 `401`은 정상이다
+
+  FE는 페이지 로드마다 이 요청을 1회 호출한다. Refresh Token은 HttpOnly라 FE가 존재 여부를 읽을 수 없고 **그것이 설계 의도**다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 `401`을 받으며, 이것을 서버 오류로 취급하면 안 된다.
+
+  쿠키가 **없는 경우·만료된 경우·이미 쓰인 경우**가 모두 같은 `401 INVALID_MEMBER_TOKEN`이다. 사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 이름을 나누지 않았다.
+
+  > 2026-08-27 이전에는 이 세 경우가 모두 **500**이었다. 방문자 전원이 페이지를 열 때마다 서버 오류 로그를 남겼다 (#113).
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 새 Access Token 발급 + refresh 쿠키 교체 |
+  | `401 INVALID_MEMBER_TOKEN` | 쿠키 없음·만료·이미 사용됨 |
+  | `403 UNTRUSTED_ORIGIN` | `Origin`이 허용된 프론트 주소가 아니다. **쿠키를 보기 전에** 먼저 거절한다 |
 }

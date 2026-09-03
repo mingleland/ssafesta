@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "1.0.0",
+  "environmentId": "dev",
+  "kind": "part-dev",
+  "composeProject": "festa-dev",
+  "deploymentTargetIds": {
+    "ai": "dev-ai",
+    "back": "dev-back",
+    "front": "dev-front",
+    "game": "dev-game"
+  },
+  "releaseManifestRef": "infra/deploy/state/runtime/dev/releases/${RELEASE_ID}/release-manifest.json",
+  "runtimeServices": [
+    {
+      "serviceId": "dev-ai",
+      "component": "ai",
+      "imageRef": "release-manifest://ai",
+      "networkRefs": ["festa-dev-ai-private"],
+      "internalEndpoint": "http://ai:8000",
+      "healthCheckRef": "ai-readiness",
+      "cpuLimitRef": "DEV_AI_CPU_LIMIT",
+      "memoryLimitRef": "DEV_AI_MEMORY_LIMIT",
+      "persistentVolumeRefs": ["festa-dev-ai-data"],
+      "releaseId": "${RELEASE_ID}"
+    },
+    {
+      "serviceId": "dev-back",
+      "component": "back",
+      "imageRef": "release-manifest://back",
+      "networkRefs": ["festa-dev-back-private"],
+      "internalEndpoint": "http://back:8080",
+      "healthCheckRef": "back-readiness",
+      "cpuLimitRef": "DEV_BACK_CPU_LIMIT",
+      "memoryLimitRef": "DEV_BACK_MEMORY_LIMIT",
+      "persistentVolumeRefs": [],
+      "releaseId": "${RELEASE_ID}"
+    },
+    {
+      "serviceId": "dev-front",
+      "component": "front",
+      "imageRef": "release-manifest://front",
+      "networkRefs": ["festa-dev-front-private"],
+      "internalEndpoint": "http://front:80",
+      "healthCheckRef": "front-readiness",
+      "cpuLimitRef": "DEV_FRONT_CPU_LIMIT",
+      "memoryLimitRef": "DEV_FRONT_MEMORY_LIMIT",
+      "persistentVolumeRefs": [],
+      "releaseId": "${RELEASE_ID}"
+    },
+    {
+      "serviceId": "dev-game",
+      "component": "game",
+      "imageRef": "release-manifest://game",
+      "networkRefs": ["festa-dev-game-private"],
+      "internalEndpoint": "ws://game:7777",
+      "healthCheckRef": "game-readiness",
+      "cpuLimitRef": "DEV_GAME_CPU_LIMIT",
+      "memoryLimitRef": "DEV_GAME_MEMORY_LIMIT",
+      "persistentVolumeRefs": ["festa-dev-game-data"],
+      "releaseId": "${RELEASE_ID}"
+    }
+  ],
+  "publicEntryRefs": ["dev-front", "dev-api", "dev-ai", "dev-world"],
+  "dataBindings": [
+    {
+      "bindingId": "dev-business",
+      "type": "postgres-business",
+      "environmentId": "dev",
+      "databaseName": "festa_dev_business",
+      "serviceRole": "festa_dev_back_app",
+      "credentialRef": "POSTGRES_DEV_BACK_CREDENTIAL_REF"
+    },
+    {
+      "bindingId": "dev-ai-vector",
+      "type": "postgres-ai",
+      "environmentId": "dev",
+      "databaseName": "festa_dev_ai",
+      "serviceRole": "festa_dev_ai_app",
+      "credentialRef": "POSTGRES_DEV_AI_CREDENTIAL_REF"
+    },
+    {
+      "bindingId": "dev-redis",
+      "type": "redis",
+      "environmentId": "dev",
+      "keyPatterns": ["dev:*"],
+      "credentialRef": "REDIS_DEV_CREDENTIAL_REF"
+    }
+  ],
+  "secretRefs": [
+    "POSTGRES_DEV_BACK_CREDENTIAL_REF",
+    "POSTGRES_DEV_AI_CREDENTIAL_REF",
+    "REDIS_DEV_CREDENTIAL_REF"
+  ],
+  "mockAdapters": [],
+  "resourcePolicy": {
+    "heavyBuildMaxConcurrency": 1,
+    "demoPriority": true,
+    "ec2CapacityRefs": ["EC2_VCPU", "EC2_RAM_MB", "EC2_DISK_GB", "EC2_OS"],
+    "demoServiceLimitRefs": { "cpu": "DEMO_CPU_LIMIT" },
+    "buildAgentLimitRefs": { "cpu": "BUILD_AGENT_CPU_LIMIT" },
+    "admissionHealthRefs": ["DEMO_WEB_HEALTH_URL"]
+  }
+}
