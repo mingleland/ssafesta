@@ -46,5 +46,4 @@ public class OAuthIdentity {
 
     public User getUser() { return user; }
     public OAuthProvider getProvider() { return provider; }
-    public String getProviderSubject() { return providerSubject; }
 }

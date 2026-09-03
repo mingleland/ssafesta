@@ -2,8 +2,8 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.common.HttpUrlValidator;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.Instant;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -22,24 +22,18 @@ public class BoothFacadeService {
     private static final Set<String> THEME_CODES = Set.of("DEFAULT", "SSAFY_BLUE", "WARM", "MONO");
     private static final Pattern HEX_COLOR = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final int MAX_SIGN_TEXT = 60;
-    private static final int MAX_URL = 2048;
 
-    private final BoothEditorGuard editorGuard;
-    private final BoothLeaseRepository leases;
+    private final BoothAccessGuard accessGuard;
 
-    public BoothFacadeService(BoothEditorGuard editorGuard, BoothLeaseRepository leases) {
-        this.editorGuard = editorGuard;
-        this.leases = leases;
+    public BoothFacadeService(BoothAccessGuard accessGuard) {
+        this.accessGuard = accessGuard;
     }
 
     @Transactional
     public FacadeView update(Long boothId, Long userId, FacadeCommand command) {
-        Booth booth = editorGuard.requireEditor(boothId, userId);
-
         // An expired booth shows no facade at all (spec 004 만료 계약), so editing one would be
         // changing something nobody can see — and the same predicate decides both.
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
         String themeCode = command.themeCode() == null ? "DEFAULT" : command.themeCode();
         if (!THEME_CODES.contains(themeCode)) {
@@ -50,7 +44,7 @@ public class BoothFacadeService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "간판 문구는 " + MAX_SIGN_TEXT + "자까지입니다.");
         }
-        validateLogoUrl(command.logoUrl());
+        HttpUrlValidator.validateHttpsOnly(command.logoUrl(), "logoUrl", "로고");
 
         booth.changeFacade(themeCode, primaryColor, command.signText(), command.logoUrl());
         return FacadeView.of(booth);
@@ -80,24 +74,6 @@ public class BoothFacadeService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "팔레트에 없는 색입니다.");
         }
         return normalized;
-    }
-
-    /**
-     * Only {@code https}.
-     *
-     * <p>The world is served over TLS, so an {@code http} logo would be blocked as mixed content and
-     * the booth would simply show nothing — a failure the owner could not diagnose from the outside.
-     */
-    private void validateLogoUrl(String logoUrl) {
-        if (logoUrl == null) {
-            return;
-        }
-        if (logoUrl.length() > MAX_URL) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "로고 URL이 너무 깁니다.");
-        }
-        if (!logoUrl.startsWith("https://")) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "로고 URL은 https로 시작해야 합니다.");
-        }
     }
 
     @Schema(description = "외관 값 전체. 보내지 않은 필드는 비워진다")

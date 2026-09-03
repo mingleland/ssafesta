@@ -50,7 +50,7 @@
 - [ ] T028 [P] [US2] Write repository Scope and READY-state isolation tests in festa-ai/tests/isolation/test_chunk_repository_scope.py
 - [ ] T029 [P] [US2] Write forged Scope and prompt-injection zero-call tests in festa-ai/tests/isolation/test_scope_forgery.py
 - [ ] T030 [P] [US2] Write LLM-input, SSE-source, answer-leak, and 50-request mixed concurrency tests in festa-ai/tests/isolation/test_rag_boundaries.py
-- [ ] T031 [US2] Implement the only public scoped READY search entry point in festa-ai/app/repositories/chunk_repository.py
+- [X] T031 [US2] Implement the only public scoped READY search entry point in festa-ai/app/repositories/chunk_repository.py (`S15P21A604-128`)
 - [ ] T032 [US2] Add RetrievedChunk Scope revalidation and fail-closed security metric in festa-ai/app/services/rag_service.py
 - [ ] T033 [US2] Add pytest -m isolation as a release-blocking stage in infra/jenkins/pipelines/component.groovy and infra/jenkins/pipelines/develop.groovy while preserving disabled .gitlab-ci.yml job definitions
 

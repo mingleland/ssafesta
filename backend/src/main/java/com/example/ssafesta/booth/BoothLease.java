@@ -82,10 +82,6 @@ public class BoothLease {
         this.status = LeaseStatus.EXPIRED;
     }
 
-    public boolean isValidAt(Instant moment) {
-        return status == LeaseStatus.ACTIVE && endsAt.isAfter(moment);
-    }
-
     /** Seconds left, or 0 once expired (spec 004 FR-007, SC-005). */
     public long remainingSecondsAt(Instant moment) {
         long remaining = Duration.between(moment, endsAt).toSeconds();

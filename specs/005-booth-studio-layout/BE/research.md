@@ -78,7 +78,7 @@ Draft 저장에도 상한 12개를 거는 이유는 따로 있다 — 공개 시
 
 ## R-07. 편집 권한 — owner + `booth_staffs` 조회, 초대 흐름은 011
 
-**결정**: `BoothEditorGuard`가 `Booth.isOwnedBy(userId) || boothStaffs.exists(boothId, userId)`로 판정한다. `booth_staffs`는 **읽기만** 한다.
+**결정**: `BoothAccessGuard`가 `Booth.isOwnedBy(userId) || boothStaffs.exists(boothId, userId)`로 판정한다. `booth_staffs`는 **읽기만** 한다.
 
 **근거**: FR-012가 "소유자·권한 있는 Staff"를 요구하고 `booth_staffs(booth_id, user_id, role)`가 V1에 이미 있다. 초대·수락·역할 부여는 spec 011(staff-consultation) 소유이므로 005가 그 흐름을 만들면 나중에 두 번 만든다. 지금은 **행이 있으면 편집 가능**으로 충분하다 — 011이 행을 만드는 방법을 정하면 005는 그대로 동작한다.
 

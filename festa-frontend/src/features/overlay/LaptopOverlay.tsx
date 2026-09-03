@@ -8,6 +8,15 @@
 import { useEffect } from 'react';
 import { closeOverlay } from '../../shared/types/overlay';
 import { loadLaptopHomepage, resetLaptopHomepage, useLaptopHomepage } from './model/laptopHomepage';
+import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from './ui/OverlayFrame';
+import './ui/laptopOverlay.css';
+
+const IcLaptop = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="4" y="5" width="16" height="11" rx="2" />
+    <path d="M2 20h20" />
+  </svg>
+);
 
 interface LaptopOverlayPayload {
   boothId: number;
@@ -26,59 +35,54 @@ export function LaptopOverlay({ payload }: { payload: LaptopOverlayPayload }) {
     return () => resetLaptopHomepage();
   }, [payload.boothId]);
 
-  if (homepage.kind === 'idle' || homepage.kind === 'loading') {
-    return (
-      <div>
-        <p>홈페이지를 불러오는 중입니다.</p>
-        <button type="button" onClick={closeOverlay}>
-          닫기
-        </button>
-      </div>
-    );
-  }
-
-  if (homepage.kind === 'no_url') {
-    return (
-      <div>
-        <p>아직 홈페이지가 준비되지 않았습니다.</p>
-        <button type="button" onClick={closeOverlay}>
-          닫기
-        </button>
-      </div>
-    );
-  }
-
-  if (homepage.kind === 'invalid' || homepage.kind === 'error') {
-    return (
-      <div>
-        <p>{homepage.kind === 'invalid' ? '유효하지 않은 주소입니다.' : '홈페이지를 불러오지 못했습니다.'}</p>
-        <button type="button" onClick={closeOverlay}>
-          닫기
-        </button>
-      </div>
-    );
-  }
+  const ready = homepage.kind === 'valid';
 
   return (
-    <div>
-      <div>
-        <span>{homepage.hostname}</span>
-        <button type="button" onClick={() => openInNewTab(homepage.href)}>
-          새 탭에서 열기
-        </button>
-        <button type="button" onClick={closeOverlay}>
-          닫기
-        </button>
-      </div>
-      {/* 소유자가 등록한 임의 URL — sandbox 로 top 탐색(frame-busting)을 차단한다 (-377).
-          allow-same-origin 은 외부 origin 콘텐츠라 sandbox 우회로 이어지지 않는다. */}
-      <iframe
-        src={homepage.href}
-        title={homepage.hostname}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        style={{ width: '100%', height: '100%', border: 0 }}
-      />
-      <p>표시되지 않는 경우 새 탭에서 열어주세요.</p>
-    </div>
+    <OverlayFrame
+      title="부스 홈페이지"
+      subtitle={ready ? homepage.hostname : '노트북'}
+      size="xl"
+      icon={IcLaptop}
+      onClose={closeOverlay}
+      status={<span className="ov-note">Esc 또는 바깥을 눌러 월드로 돌아갑니다</span>}
+      footer={
+        <>
+          {ready && (
+            <button type="button" className="ov-btn ov-btn-primary" onClick={() => openInNewTab(homepage.href)}>
+              새 탭에서 열기
+            </button>
+          )}
+          <button type="button" className="ov-btn" onClick={closeOverlay}>
+            닫기
+          </button>
+        </>
+      }
+    >
+      {(homepage.kind === 'idle' || homepage.kind === 'loading') && <OverlayLoading label="홈페이지를 불러오는 중..." />}
+      {homepage.kind === 'no_url' && (
+        <OverlayEmpty title="아직 홈페이지가 준비되지 않았습니다" hint="부스 주인이 홈페이지를 등록하면 여기에서 열립니다." />
+      )}
+      {homepage.kind === 'invalid' && <OverlayError title="유효하지 않은 주소입니다" message="등록된 홈페이지 주소를 열 수 없습니다." />}
+      {homepage.kind === 'error' && (
+        <OverlayError
+          title="홈페이지를 불러오지 못했습니다"
+          message="잠시 후 다시 시도해 주세요."
+          onRetry={() => void loadLaptopHomepage(payload.boothId)}
+        />
+      )}
+      {ready && (
+        <div className="laptop-view">
+          {/* 소유자가 등록한 임의 URL — sandbox 로 top 탐색(frame-busting)을 차단한다 (-377).
+              allow-same-origin 은 외부 origin 콘텐츠라 sandbox 우회로 이어지지 않는다. */}
+          <iframe
+            className="laptop-iframe"
+            src={homepage.href}
+            title={homepage.hostname}
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          />
+          <p className="ov-note">사이트 정책에 따라 여기 표시되지 않을 수 있습니다 — 그때는 새 탭으로 열어 주세요.</p>
+        </div>
+      )}
+    </OverlayFrame>
   );
 }

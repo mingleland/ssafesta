@@ -47,7 +47,7 @@
 - [X] T017 [P] `booth/BoothStaff.java` + `booth/BoothStaffRepository.java` — `@IdClass`로 복합 PK. **읽기 전용** — 초대·수락은 spec 011 (research R-07)
 - [X] T018 [P] `booth/BoothLayoutDraftRepository.java` · `booth/BoothLayoutPublishedVersionRepository.java` — 부스별 Draft 조회, `(boothId, versionNo)` 조회, `MAX(version_no)` 조회, **`revision` 조건부 UPDATE**(영향 행 0이면 충돌 — I-6)
 - [X] T019 [P] `booth/LayoutValidationResult.java` + `booth/LayoutValidator.java` — [data-model.md](data-model.md) §3 규칙표대로 `errors`·`warnings` 두 목록 생성. **Draft 저장용과 공개용 진입점을 분리**해 같은 규칙집합을 다른 강도로 적용한다 (research R-05)
-- [X] T020 [P] `booth/BoothEditorGuard.java` — `Booth.isOwnedBy(userId) || boothStaffs.existsById(boothId, userId)` (FR-012)
+- [X] T020 [P] `booth/BoothAccessGuard.java` — `Booth.isOwnedBy(userId) || boothStaffs.existsById(boothId, userId)` (FR-012)
 - [X] T021 [P] 예외 3종 — `LayoutValidationFailedException`(errors·warnings 첨부) · `LayoutRevisionConflictException`(현재 revision 첨부) · `BoothEditorForbiddenException`. 전부 `ApiException` 상속
 - [X] T052 `test/.../booth/BoothLayoutSchemaIntegrationTest.java` — **구현 중 추가.** Phase 2는 "스키마가 준비됐다"고 선언하는데 그걸 확인하는 것이 하나도 없었다. jsonb 정밀도 왕복 / Draft PK가 곧 I-1 / 포인터 FK가 없는 회차를 막음 / NULL 포인터 허용 / **공개한 소유자의 탈퇴가 성공** / facade 4컬럼 / 회차 카운트가 부스별. 다섯 번째가 핵심 — `AccountDeletionService`에 테스트가 0건이라 V8 FK가 탈퇴를 깨도 아무도 몰랐다
 
@@ -112,7 +112,7 @@
 
 **Independent Test**: facade 수정 → `GET /booths/{id}` 응답의 `facade` 4필드가 바뀐다
 
-- [X] T040 [US4] `booth/BoothFacadeService.java` — 수정·조회. 권한은 `BoothEditorGuard` 재사용. 만료 부스는 수정 거부
+- [X] T040 [US4] `booth/BoothFacadeService.java` — 수정·조회. 권한은 `BoothAccessGuard` 재사용. 만료 부스는 수정 거부
 - [X] T041 [US4] `booth/BoothFacadeController.java` — `PUT /api/v1/booths/{boothId}/facade`. 검증: `themeCode` 화이트리스트 · `primaryColor`는 `#RRGGBB` · `signText` 60자 · `logoUrl`은 `https://` 2048자 ([contracts/layout-api.md](../contracts/layout-api.md) §6)
 - [X] T042 [US4] `booth/BoothQueryService.java` — `PublicBoothView`에 `facade` 4필드와 `publishedLayoutVersion` 추가. **기존 필드는 그대로 둔다** (추가만, 헌법 24조 / contracts §7)
 - [X] T043 [P] [US4] `test/.../booth/BoothFacadeApiIntegrationTest.java` — 수정 후 공개 조회 반영 / 잘못된 색 형식 400 / `http://` 로고 거부 / 비소유자 403 / 만료 부스 409
@@ -176,7 +176,7 @@
 동시에 가능 (서로 다른 파일):
   T012 LayoutObjectType   T013 LayoutTemplate   T015 BoothLayoutDraft
   T016 BoothLayoutPublishedVersion   T017 BoothStaff   T018 Repositories
-  T019 LayoutValidator    T020 BoothEditorGuard   T021 예외 3종
+  T019 LayoutValidator    T020 BoothAccessGuard   T021 예외 3종
 
 먼저 끝나야 하는 것: T010·T011(마이그레이션) → 엔티티가 그 컬럼을 매핑한다
 ```
