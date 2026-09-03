@@ -30,8 +30,10 @@ glab auth status --hostname lab.ssafy.com
 가장 중요하다. 내가 **참여한 적 없는 스레드에서 나를 호명한 것**은 이것으로만 잡힌다.
 
 ```bash
-glab api "todos?state=pending&per_page=100" --paginate
+glab api "todos?state=pending&per_page=100" --paginate | jq -s 'add'
 ```
+
+**`--paginate` 의 출력은 페이지별 JSON 배열이 개행 없이 이어 붙은 것**(`[...][...]`)이라 `json.load` 한 번으로는 `Extra data` 로 죽는다 — 그래서 첫 페이지 100건만 보고 "전수"라고 오판한 사고가 있었다(2026-09-03, 실제 pending 214건). `jq -s 'add'` 가 페이지 배열들을 하나로 합친다. 합친 뒤 **`length` 가 `X-Total` 헤더와 같은지** 한 번 대조한다(`glab api "todos?state=pending&per_page=1" -i | grep -i x-total`). 다르면 "확인 불가"다.
 
 `action_name`이 판정에 직결된다: `directly_addressed`(직접 호명) · `mentioned`(멘션) · `assigned`(배정) · `review_requested`(리뷰 요청) · `approval_required`.
 
