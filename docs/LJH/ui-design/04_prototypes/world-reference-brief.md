@@ -1,8 +1,11 @@
 # World Reference Brief — LLM 이미지 생성 입력 정본
 
-- 문서 종류: **PROPOSAL / VISUAL REFERENCE 사양** (2026-09-01, baseline origin/develop=18542ee 실측 기반)
-- 목적: 실제 Unity 미연동 상태에서 최종 World + React UI 화면 구조를 확인할 기준 이미지 2장(`world.png`·`world-project-overlay.png`)의 생성 사양. **production background asset 이 아니다.**
-- 교체 계약: `world.png + MockUnitySurface → 시각 검증` → 실제 Unity 도달 시 `Unity WebGL + 동일 React Layer` 로 치환 가능해야 한다.
+- 문서 종류: **PROPOSAL / VISUAL REFERENCE 사양** (2026-09-01 작성, baseline origin/develop=18542ee 실측 기반)
+- **현재 지위(2026-09-03 갱신)**: 여기 적힌 생성형 이미지 2장(`world.png`·`world-project-overlay.png`)은 만들지 않았다.
+  최신 실제 Unity 인게임 캡처(`00_context/sources/world-ingame-reference.png`)를 World 시각 정본으로 채택했고,
+  그것을 가공한 `festa-frontend/src/assets/festa/world/world-mock-background.png` 를 `StaticMockWorldSurface` 가 깐다(-406).
+  이 문서는 **카메라·구도·HUD 허용 범위·Unity/React 소유 경계의 근거**로 계속 유효하며, 생성형 이미지는 이후 visual polish 용도로만 필요 시 쓴다.
+- 교체 계약: `world-mock-background + StaticMockWorldSurface → 시각 검증` → 실제 Unity 도달 시 `UnityHost + 동일 React Layer` 로 치환(WorldSurface.select seam).
 
 ## Product
 

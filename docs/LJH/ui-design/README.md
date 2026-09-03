@@ -21,7 +21,7 @@ UI 통합 작업의 정본 구조. 원본(SOURCE)·확정(DECISION)·실측(AUDI
 |---|---|---|
 | `EXECUTION_PLAN.md` | SOURCE | 사람/에이전트 역할 분리·전체 실행 절차 |
 | `00_context/references/` | SOURCE | 사람이 제공한 문서 원본 (수정 금지) |
-| `00_context/sources/` | SOURCE | 시각 reference 원본 — landing.png·login.png·booth-2_5d-reference.png (3종 확보 완료) |
+| `00_context/sources/` | SOURCE | 시각 reference 원본 — landing.png·login.png·booth-2_5d-reference.png(Booth Studio 시안)·world-ingame-reference.png(2026-09-03 Unity 인게임 캡처) |
 | `00_context/implementation-decisions.md` | DECISION | D-01~D-07 (Game Studio 제외·Desktop-first·모바일 확장·Booth 2.5D·R3F 후보·Layout 계약 보존·SSAFY OAuth 도입) |
 | `00_context/hud-decisions.md` | DECISION | Unity/React HUD 경계 최종 |
 | `01_tooling/` | 기록 | 도구 운용 (추후 생성) |
@@ -35,8 +35,14 @@ UI 통합 작업의 정본 구조. 원본(SOURCE)·확정(DECISION)·실측(AUDI
 ## 현재 단계
 
 ```text
-완료: Gate A(Control Plane)·B(Design Tooling)·C(UI Audit) PASS / 구조 정본화·후속 결정 반영 (2026-09-01)
-다음: Frontend Design READY smoke → Foundation Draft → /design 대표 4축 → 사용자 Visual Direction 선택
+TEMPORARY PRIORITY OVERRIDE — URGENT MOCK COMPLETION (2026-09-03)
+전체 서비스 UI 목업을 먼저 완성한다. 장기 설계(Persistent GameShell·Game Client Experience·
+Foundation Freeze·Real Integration)는 보존하고 구현 순서만 일시적으로 뒤집었다.
+
+완료: Landing/Login(-379) · Booth Studio 3모드(-405, !238) ·
+      World Mock·Overlay Family(Project/LAPTOP/Survey/Consultation/AI)·Screen Family(Home/Booth/Profile) (-406, !240)
+남음: Survey Result·Builder · Consultation Staff · 전역 Consistency Pass
+복귀: 목업 완료 후 Persistent GameShell → Game Client Experience → Foundation Extraction
 ```
 
 ## `/design` 대표 4축 (최신)
@@ -45,7 +51,7 @@ UI 통합 작업의 정본 구조. 원본(SOURCE)·확정(DECISION)·실측(AUDI
 1. Landing / Login
 2. World + Minimal Screen UI
 3. World + React Overlay
-4. Booth Studio 2.5D Creator Workspace   ← booth-2_5d-reference.png 을 visual anchor 로 사용 (확보 완료)
+4. Booth Studio 2.5D Creator Workspace   ← booth-2_5d-reference.png 이 구현 목표(Visual/Layout Target)
 ```
 
 ## 도구 (전부 검증 완료 — 재설치 금지)
