@@ -35,8 +35,10 @@ export function ConsultationQuickAccess() {
   const state = useVisitorConsultation();
   const { label, active } = describe(state.phase);
 
-  // 진행 중인 상담이 있으면 그 부스로 되돌아간다. 없으면 대상 부스를 FE 가 정할 수 없다 —
-  // 새 상담의 대상 Booth 결정은 Unity/BE 계약 대기(G-3)라 여기서 부스 목록을 발명하지 않는다.
+  // 진행 중인 상담이 있으면 그 부스로 되돌아간다. 없으면 비활성이다 — **여기는 신규 상담
+  // Launcher 가 아니다.** 새 상담의 시작 지점은 AI 대화 에스컬레이션 하나이고(spec 011
+  // FR-005, S15P21A604-416), 그 자리에서만 대상 부스가 정해진다. HUD 는 이미 시작된 상담으로
+  // 돌아가는 문이지 부스를 고르는 자리가 아니라, idle 에서는 어디서 시작하는지만 알려 준다.
   const boothId = state.boothId;
   const canReopen = active && boothId !== null;
 
@@ -46,7 +48,7 @@ export function ConsultationQuickAccess() {
         type="button"
         className={'cqa-btn' + (active ? ' cqa-btn-on' : '')}
         aria-label={label}
-        title={canReopen ? label : '상담은 부스의 상담 데스크에서 시작합니다'}
+        title={canReopen ? label : '부스의 AI 직원과 대화하다 사람 상담을 요청할 수 있습니다'}
         disabled={!canReopen}
         onClick={() => {
           if (boothId !== null) openOverlay('CONSULTATION', { boothId });
