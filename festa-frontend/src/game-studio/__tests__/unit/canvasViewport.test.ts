@@ -19,9 +19,10 @@ const rect = (left: number, top: number, width: number, height: number) => ({
 
 describe('Game Studio large-map viewport culling', () => {
   it('calculates a bounded zoom that fits the whole map', () => {
-    expect(calculateFitZoom(1_000, 700, 100, 50)).toBe(25);
+    // S15P21A604-394 — 줌 범위가 10~200%에서 30~300%로 넓어지면서 하한 클램프 값도 같이 바뀜
+    expect(calculateFitZoom(1_000, 700, 100, 50)).toBe(30);
     expect(calculateFitZoom(1_000, 700, 16, 10)).toBe(180);
-    expect(calculateFitZoom(200, 120, 200, 100)).toBe(10);
+    expect(calculateFitZoom(200, 120, 200, 100)).toBe(30);
   });
 
   it('converts the visible canvas intersection to grid coordinates', () => {
