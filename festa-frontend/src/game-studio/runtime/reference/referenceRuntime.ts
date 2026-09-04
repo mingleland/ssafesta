@@ -27,6 +27,11 @@ export interface ReferenceRuntimeState {
   readonly facing: MoveDirection;
   readonly lastInteractionTargetId: string | null;
   readonly verticalVelocity: number;
+  // S15P21A604-408 — 마리오 스타일 가변 점프의 "홀드 유지 틱 수"(0이면 점프 중 아님).
+  // UP이 계속 눌려 있는 동안(최대 JUMP_HOLD_MAX_TICKS까지) 이 값이 매 틱 늘어나며 그만큼
+  // 계속 상승시킨다 — 놓거나 상한에 닿으면 0으로 리셋되고 tickReferenceWorld의 기존 중력
+  // 감속 하강이 이어받는다.
+  readonly jumpHoldTicks: number;
   readonly playerHealth: number;
   readonly maxPlayerHealth: number;
   readonly invulnerableUntilTick: number;
@@ -126,6 +131,7 @@ const syncAfterSessionChange = (
     playerPosition: changedScene ? spawn : previous.playerPosition,
     checkpointPosition: changedScene ? spawn : previous.checkpointPosition,
     verticalVelocity: changedScene ? 0 : previous.verticalVelocity,
+    jumpHoldTicks: changedScene ? 0 : previous.jumpHoldTicks,
     projectiles: changedScene ? [] : previous.projectiles,
     spawnedEnemies: changedScene ? [] : previous.spawnedEnemies,
   };
@@ -139,6 +145,7 @@ export const startReferenceRuntime = (project: GameProject): ReferenceRuntimeSta
     facing: 'DOWN',
     lastInteractionTargetId: null,
     verticalVelocity: 0,
+    jumpHoldTicks: 0,
     playerHealth: 3,
     maxPlayerHealth: 3,
     invulnerableUntilTick: -1,
@@ -208,6 +215,7 @@ const damagePlayer = (
     playerHealth: state.maxPlayerHealth,
     playerPosition: state.checkpointPosition ?? topDownSpawn(project, state.session.currentSceneId),
     verticalVelocity: 0,
+    jumpHoldTicks: 0,
     invulnerableUntilTick: state.tickCount + 8,
   };
 };
@@ -431,6 +439,11 @@ export const tickReferenceWorld = (
   }
   if (nextState.playerPosition === null) return applyCompletionRules(project, nextState);
   if (scene.type !== 'PLATFORMER') return applyCompletionRules(project, nextState);
+  // S15P21A604-408 — jumpHoldTicks > 0이면 이번 틱의 상승(또는 유지 종료)은 이미
+  // movePlayerFromHeldKeys(platformerJumpFrom/platformerContinueJump)가 처리했다. 여기서
+  // 또 자동 중력 적분을 돌리면 같은 틱에 두 번 움직이게 되므로 건너뛴다 — 예전(고정
+  // 임펄스) 물리가 정확히 그렇게 동작했던 것이라, 지금은 홀드 로직이 그 자리를 대신한다.
+  if (nextState.jumpHoldTicks > 0) return applyCompletionRules(project, nextState);
   const grounded = isPlatformerGrounded(nextState, scene);
   if (grounded && nextState.verticalVelocity >= 0) return applyCompletionRules(project, nextState.verticalVelocity === 0 ? nextState : { ...nextState, verticalVelocity: 0 });
   const direction = nextState.verticalVelocity < 0 ? -1 : 1;
@@ -474,9 +487,18 @@ const platformerStepHorizontal = (
   return enterPosition(project, facingState, horizontal);
 };
 
+// S15P21A604-408 — 마리오 스타일 가변 점프의 홀드 유지 상한(틱). 이만큼 UP을 누르고
+// 있으면 예전 고정 임펄스(verticalVelocity: -3) 시절과 같은 높이(4칸)에 도달하고, 더 짧게
+// 누르면 유지한 틱 수만큼만(선형 비례) 낮게 점프한다.
+const JUMP_HOLD_MAX_TICKS = 4;
+
 // 점프 물리 자체 — 접지 판정은 호출부 책임이다(대각선 점프는 이 틱이 "시작한" 접지 상태를
 // 기준으로 판정하고, 실제로 뛰어오르는 위치는 이미 반영된 수평 이동 이후의 x를 쓴다 — 발판
 // 가장자리에서 대각선으로 뛰어나가는 입력도 점프로 인정하기 위함).
+// S15P21A604-408 — 예전엔 여기서 verticalVelocity: -3을 한 번 주면 tickReferenceWorld의
+// 자동 감속 적분이 알아서 4칸까지 올려보냈다(홀드 시간과 무관). 이제는 "1칸 상승 + 홀드
+// 시작"만 하고, 계속 상승할지는 매 틱 movePlayerFromHeldKeys가 UP이 눌려 있는지 보고
+// platformerContinueJump로 이어간다.
 const platformerJumpFrom = (
   project: GameProject,
   state: ReferenceRuntimeState,
@@ -485,7 +507,23 @@ const platformerJumpFrom = (
   if (state.playerPosition === null) return state;
   const jumpTarget = { x: state.playerPosition.x, y: Math.max(0, state.playerPosition.y - 1) };
   if (visibleOccupantsAt(state, scene.objects, jumpTarget).some(isSolid)) return state;
-  return enterPosition(project, { ...state, verticalVelocity: -3 }, jumpTarget);
+  return enterPosition(project, { ...state, verticalVelocity: -1, jumpHoldTicks: 1 }, jumpTarget);
+};
+
+// 점프 홀드 유지 중(jumpHoldTicks > 0, < JUMP_HOLD_MAX_TICKS)이고 UP이 여전히 눌려 있을 때
+// 매 틱 호출 — 1칸 더 상승시키고 유지 틱 수를 늘린다. platformerJumpFrom과 같은 이유로
+// 위가 막혀 있으면(천장) 더 못 올라가고 그 자리에서 홀드가 끝난다(하강 전환).
+const platformerContinueJump = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+  scene: Extract<GameProject['scenes'][number], { type: 'PLATFORMER' }>,
+): ReferenceRuntimeState => {
+  if (state.playerPosition === null) return state;
+  const nextTarget = { x: state.playerPosition.x, y: Math.max(0, state.playerPosition.y - 1) };
+  if (visibleOccupantsAt(state, scene.objects, nextTarget).some(isSolid)) {
+    return { ...state, verticalVelocity: 0, jumpHoldTicks: 0 };
+  }
+  return enterPosition(project, { ...state, verticalVelocity: -1, jumpHoldTicks: state.jumpHoldTicks + 1 }, nextTarget);
 };
 
 export const moveReferencePlayer = (
@@ -497,6 +535,10 @@ export const moveReferencePlayer = (
   const scene = findScene(project, state.session.currentSceneId);
   if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return state;
   if (scene.type === 'PLATFORMER') {
+    // S15P21A604-408 — 이 경로(화면 ↑ 버튼 클릭 등 단발성 호출)는 movePlayerFromHeldKeys의
+    // 매 틱 held-key 루프에 안 잡히므로 홀드를 이어갈 수 없다 — platformerJumpFrom이 홀드를
+    // 시작해도 다음 틱에 movePlayerFromHeldKeys가 "UP 없음"으로 보고 바로 끝내버려서,
+    // 결과적으로 최소 높이(1칸) 점프가 된다. 의도된 동작이다.
     if (direction === 'UP') return isPlatformerGrounded(state, scene) ? platformerJumpFrom(project, state, scene) : state;
     if (direction === 'DOWN') return { ...state, verticalVelocity: Math.max(1, state.verticalVelocity) };
     return platformerStepHorizontal(project, state, scene, direction === 'LEFT' ? -1 : 1);
@@ -519,10 +561,20 @@ export const movePlayerFromHeldKeys = (
   state: ReferenceRuntimeState,
   directions: ReadonlySet<MoveDirection>,
 ): ReferenceRuntimeState => {
-  if (directions.size === 0) return state;
   if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null) return state;
   const scene = findScene(project, state.session.currentSceneId);
   if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return state;
+  if (directions.size === 0) {
+    // S15P21A604-408 — 아무 키도 안 잡혀 있어도(다 뗐거나, moveReferencePlayer의 화면 ↑
+    // 버튼 클릭처럼 애초에 이 held-key tick 루프 밖에서 시작된 점프라 이번 틱에 아무것도
+    // 안 잡히는 경우) 홀드 중이던 점프는 끝내야 한다 — 안 그러면(예전 코드처럼 여기서 바로
+    // return state) tickReferenceWorld가 jumpHoldTicks>0인 동안 계속 중력 처리를 건너뛰어
+    // 공중에 영원히 멈춰버린다.
+    if (scene.type === 'PLATFORMER' && state.jumpHoldTicks > 0) {
+      return { ...state, jumpHoldTicks: 0, verticalVelocity: 0 };
+    }
+    return state;
+  }
 
   if (scene.type === 'PLATFORMER') {
     const left = directions.has('LEFT');
@@ -533,10 +585,24 @@ export const movePlayerFromHeldKeys = (
     // 입력도 점프로 인정한다(수평 이동 이후 위치로 판정하면 그 프레임에 걸어 나간 순간
     // 공중 판정이 되어 막혀버린다).
     const canJump = up && !down && isPlatformerGrounded(state, scene);
+    // S15P21A604-408 — 이전 틱에 시작한 점프를 이번 틱에도 UP이 눌려 있는 동안
+    // (JUMP_HOLD_MAX_TICKS까지) 이어서 유지한다. canJump과는 배타적이다(그라운드에서 새로
+    // 시작하는 tick과 이미 공중에서 유지 중인 tick은 겹치지 않는다).
+    const holdingJump = !canJump && up && state.jumpHoldTicks > 0 && state.jumpHoldTicks < JUMP_HOLD_MAX_TICKS;
     let next = state;
     if (left !== right) next = platformerStepHorizontal(project, next, scene, left ? -1 : 1);
-    if (canJump) next = platformerJumpFrom(project, next, scene);
-    else if (down && !up) next = { ...next, verticalVelocity: Math.max(1, next.verticalVelocity) };
+    if (canJump) {
+      next = platformerJumpFrom(project, next, scene);
+    } else if (holdingJump) {
+      next = platformerContinueJump(project, next, scene);
+    } else if (next.jumpHoldTicks > 0) {
+      // holdingJump가 false인데도 jumpHoldTicks가 남아있다는 건 UP을 놓았거나(다른 키만
+      // held) 상한(JUMP_HOLD_MAX_TICKS)에 닿았다는 뜻 — 홀드 종료, 다음 tickReferenceWorld
+      // 부터 중력이 이어받는다. (위에서 이미 좌우 이동은 반영된 뒤라 여기선 수직만 정리한다.)
+      next = { ...next, jumpHoldTicks: 0, verticalVelocity: 0 };
+    } else if (down && !up) {
+      next = { ...next, verticalVelocity: Math.max(1, next.verticalVelocity) };
+    }
     return next;
   }
 
