@@ -11,9 +11,6 @@ import { createBrowserPublicationPorts } from '../../studio/ports/localPublicati
 import { useResolvedAssetUrls } from '../../studio/assets/useResolvedAssetUrls.ts';
 
 const NO_ASSETS = [] as const;
-const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true'
-  && import.meta.env.VITE_GAME_STUDIO_API_ENABLED !== 'true';
-const browserPublicationPorts = browserPublicationEnabled ? createBrowserPublicationPorts() : null;
 
 // 익명 Published 플레이의 자산 해석기. 컴포넌트 밖에 두는 이유는 PlayGamePage 가 gameId 검증·
 // source=local 분기로 조기 return 하는 구조라 훅을 쓸 수 없어서다. 생성자가 상태를 만들지 않고
@@ -78,6 +75,16 @@ export const PlayGamePage = () => {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // S15P21A604-409 — 예전엔 모듈 최상단 상수였다. import 시점에 딱 한 번만 env를 읽어서
+  // playGamePageAssetWiring.test.tsx가 vi.stubEnv로 이 값을 통제할 수 없었다(모듈이 이미
+  // import된 뒤라 stub이 반영 안 됨). useMemo([])로 "컴포넌트 마운트 시점"에 읽게 바꾸되,
+  // 참조는 마운트 동안 그대로 안정적으로 유지된다(원래 의도와 동일). 아래 이른 return들보다
+  // 먼저, 다른 hook들과 같은 자리에서 무조건 호출해야 한다(React Hooks 규칙).
+  const browserPublicationPorts = useMemo(() => {
+    const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true'
+      && import.meta.env.VITE_GAME_STUDIO_API_ENABLED !== 'true';
+    return browserPublicationEnabled ? createBrowserPublicationPorts() : null;
+  }, []);
   const parsedGameId = Number(gameId);
   if (!Number.isSafeInteger(parsedGameId) || parsedGameId < 1) {
     return <main className="grp-loading"><strong>FESTA Game Player</strong><p>올바르지 않은 게임 ID입니다.</p><button onClick={() => void navigate('/app/world')} type="button">월드로 돌아가기</button></main>;
