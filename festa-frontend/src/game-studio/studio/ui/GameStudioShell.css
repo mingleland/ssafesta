@@ -617,7 +617,12 @@
 .gss-dialogue-live-preview { aspect-ratio: 16 / 9; background: radial-gradient(circle at 50% 30%,#33445e,#101521); background-position: center; background-size: cover; border: 1px solid #c7cedb; border-radius: 10px; box-shadow: 0 18px 45px rgba(20,25,35,.18); margin-bottom: 16px; overflow: hidden; position: relative; }
 .gss-dialogue-live-preview::after { background: linear-gradient(transparent 35%,rgba(4,6,10,.28) 70%,rgba(4,6,10,.64)); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 1; }
 .gss-preview-badge { background: rgba(8,11,16,.76); border: 1px solid rgba(255,255,255,.18); border-radius: 4px; color: #d6e3f7; font-size: 7px; font-weight: 850; left: 10px; letter-spacing: .08em; padding: 4px 6px; position: absolute; top: 10px; z-index: 4; }
-.gss-dialogue-preview-portrait { background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); height: 92%; left: 50%; position: absolute; transform: translateX(-50%); width: 42%; z-index: 2; }
+/* S15P21A604-406 — width:42%를 고정으로 두면 부모(.gss-dialogue-live-preview, 16:9 고정)
+   비율과 맞물려 실측 약 0.81:1이 되어, 원본 스프라이트 셀(dialogue-portrait-pack-4x3.webp,
+   256×512 = 1:2) 비율과 어긋나 그림이 가로로 늘어나 보였다. width를 지우고
+   aspect-ratio:1/2를 줘서 height(92%, 그대로 유지)에 맞춰 폭이 항상 정확한 비율로
+   계산되게 한다. */
+.gss-dialogue-preview-portrait { aspect-ratio: 1 / 2; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); height: 92%; left: 50%; position: absolute; transform: translateX(-50%); z-index: 2; }
 .gss-dialogue-preview-box { background: linear-gradient(90deg,rgba(22,17,38,.94),rgba(20,24,37,.91)); border: 1px solid rgba(174,155,222,.5); border-radius: 9px; bottom: 10px; left: 3%; padding: 11px 14px; position: absolute; right: 3%; z-index: 3; color: #f0f3f7; }
 .gss-dialogue-preview-box strong { color: #cbb6ff; font-size: 10px; letter-spacing: .06em; }
 .gss-dialogue-preview-box p { font-size: 11px; line-height: 1.55; margin: 5px 0 0; }
