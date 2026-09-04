@@ -34,3 +34,7 @@ Thumbs.db
 # Unity Performance Testing 패키지 자동 생성물 (커밋 불필요)
 [Aa]ssets/Resources/PerformanceTestRun*.json
 [Aa]ssets/Resources/PerformanceTestRun*.json.meta
+
+# 벤더 에셋의 다른 렌더 파이프라인 설치 패키지 (59 MB).
+# 우리는 URP 로 쓰고 있어 런타임에 전혀 필요 없다 — 디스크에는 남기고 저장소에만 넣지 않는다.
+[Aa]ssets/ithappy/**/Render_Pipeline_Convert/*.unitypackage
