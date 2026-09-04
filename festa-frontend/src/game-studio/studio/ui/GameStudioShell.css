@@ -325,6 +325,11 @@
 .gss-canvas-scroll { align-items: flex-start; display: flex; height: 100%; justify-content: flex-start; min-height: 0; overflow: auto; padding: 28px; touch-action: none; }
 .gss-canvas-scroll.is-panning { cursor: grabbing; user-select: none; }
 .gss-map-stage { flex: 0 0 auto; margin: auto; transition: width .16s ease; }
+/* S15P21A604-394 — 휠로 연속 확대/축소하는 동안은 폭 변화를 즉시 반영(트랜지션 없음).
+   커서 중심 스크롤 보정이 최종 폭 기준으로 즉시 적용되는데 트랜지션이 켜져 있으면
+   실제 폭이 뒤늦게 따라오면서 화면이 흔들려 보인다. +/- 버튼·1:1·맞춤 등 다른 경로의
+   줌은 이 클래스가 안 붙으므로 기존처럼 부드럽게 움직인다. */
+.gss-map-stage.is-wheel-zooming { transition: none; }
 .gss-map-canvas {
   background-color: #17140f;
   background-position: center;
@@ -369,22 +374,30 @@
   box-shadow: none;
   cursor: grab;
   display: flex;
-  height: 34px;
+  /* S15P21A604-394 — 원래 34px 고정이라 배경 타일(.gss-tile-layer, 1fr 그리드라
+     zoom에 비례해 커짐)과 달리 확대/축소해도 오브젝트 크기가 그대로였다. .gss-map-canvas
+     에 심어둔 --gss-grid-columns/--gss-grid-rows(칸 수)를 이용해 "칸 하나 크기"로
+     바꿔서 타일과 같은 비율로 커지고 줄어들게 한다. */
+  height: calc(100% / var(--gss-grid-rows));
   justify-content: center;
   padding: 0;
   position: absolute;
   transform: translate(-50%, -50%);
   transition: border-color .1s, box-shadow .1s;
-  width: 34px;
+  width: calc(100% / var(--gss-grid-columns));
   z-index: 2;
+  /* 아이콘(이모지) 폴백의 font-size(.gss-map-object > span)도 이 박스 크기에 비례하게 하기 위한 컨테이너 */
+  container-type: inline-size;
 }
 .gss-map-object:hover,
 .gss-map-object.is-selected { background: rgba(255, 255, 255, .82); border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.24), 0 4px 12px rgba(20,25,35,.22); z-index: 3; }
 .gss-map-object.is-primary { box-shadow: 0 0 0 3px rgba(37,99,235,.38), 0 4px 14px rgba(20,25,35,.24); }
 .gss-map-object.is-editor-locked { cursor: not-allowed; }
-.gss-map-object > span { color: #a8791f; font-size: 17px; pointer-events: none; }
-.gss-map-object > img { height: 30px; image-rendering: pixelated; object-fit: contain; pointer-events: none; width: 30px; }
-.gss-map-object .gss-static-sprite { background-color: transparent; display: block; height: 30px; image-rendering: pixelated; pointer-events: none; width: 30px; }
+/* S15P21A604-394 — 34px 고정 대신 .gss-map-object(칸 하나 크기로 스케일됨) 대비 비율로 —
+   기존 34px 박스에서 아이콘 17px(약 50%)·스프라이트 30px(약 88%)이던 비례를 유지 */
+.gss-map-object > span { color: #a8791f; font-size: 50cqw; pointer-events: none; }
+.gss-map-object > img { height: 88%; image-rendering: pixelated; object-fit: contain; pointer-events: none; width: 88%; }
+.gss-map-object .gss-static-sprite { background-color: transparent; display: block; height: 88%; image-rendering: pixelated; pointer-events: none; width: 88%; }
 .gss-map-object small { background: rgba(255,255,255,.96); border: 1px solid rgba(20,25,35,.12); border-radius: 3px; bottom: -16px; color: #2a303c; display: none; font-size: 7px; left: 50%; padding: 2px 4px; pointer-events: none; position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .gss-map-object:hover small,
 .gss-map-object.is-selected small { display: block; }
