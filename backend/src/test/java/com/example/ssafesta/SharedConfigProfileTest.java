@@ -4,9 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.Environment;
+
+import com.example.ssafesta.storage.ObjectStorageProperties;
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 
 /**
  * The {@code infra} profile has to resolve every setting the application needs to boot.
@@ -42,6 +48,16 @@ class SharedConfigProfileTest {
         "ROOT_DOMAIN=example.test",
         "FRONTEND_BASE_URL=https://example.test",
         "AUTH_COOKIE_SECURE=true",
+        // Redis 키 네임스페이스 (S15P21A604-349). 기본값이 없어 배포가 반드시 주입한다.
+        "FESTA_ENVIRONMENT=dev",
+        // 문서 저장소 (S15P21A604-106, GitLab #100). MinIO 4종은 일부러 빼 둔다 — R2 만 쓰는
+        // 배포가 fallback 자격증명 없이 뜨는 것이 계약이고, 아래 R2-only 테스트가 그것을 고정한다.
+        "AI_STORAGE_UPLOAD_GATE=OPEN",
+        "AI_STORAGE_ACTIVE_WRITE_PROVIDER=R2",
+        "R2_ENDPOINT=https://account.r2.cloudflarestorage.test",
+        "R2_BUCKET=festa-documents",
+        "R2_ACCESS_KEY_ID=r2-access-key",
+        "R2_SECRET_ACCESS_KEY=r2-secret-key",
     };
 
     private ApplicationContextRunner runner(String... propertyValues) {
@@ -100,5 +116,124 @@ class SharedConfigProfileTest {
             assertThat(resolved).isNotEqualTo("false");
             assertThat(resolved).contains("${");
         });
+    }
+
+    // ── 문서 저장소 설정이 배포 계층에서 실제로 묶이는가 (S15P21A604-106) ──────────────
+    //
+    // 위 두 테스트는 Environment 만 본다. 그것만으로는 "기동 실패" 를 검증할 수 없다 — 해석되지
+    // 않은 placeholder 는 값을 읽을 때만 시끄럽고 컨텍스트는 멀쩡히 뜬다. 바인딩을 실제로 태워야
+    // 한다. T-101 이 정확히 이 층에서 났다.
+
+    @EnableConfigurationProperties(ObjectStorageProperties.class)
+    static class StorageBinding {
+    }
+
+    private ApplicationContextRunner storageRunner(String... propertyValues) {
+        return runner(propertyValues).withUserConfiguration(StorageBinding.class);
+    }
+
+    private static String[] withoutEnv(String prefix) {
+        return java.util.Arrays.stream(DEPLOY_ENV)
+                .filter(value -> !value.startsWith(prefix + "="))
+                .toArray(String[]::new);
+    }
+
+    /**
+     * R2 만 주입한 배포가 뜬다.
+     *
+     * <p>{@code application.yml} 이 MinIO 를 목록에 적어 두는 것은 fallback 을 설정 변경으로 하기
+     * 위해서다. 네 값이 전부 비면 미구성으로 보고 목록에서 빠져야 한다 — 그러지 않으면 R2 전용
+     * 배포가 있지도 않은 자격증명을 요구받는다.
+     */
+    @Test
+    @DisplayName("infra 프로파일이 R2 만으로 문서 저장소를 묶는다")
+    void infraProfileBindsTheDocumentStorageWithR2Alone() {
+        storageRunner(DEPLOY_ENV).run(context -> {
+            assertThat(context).hasNotFailed();
+
+            ObjectStorageProperties storage = context.getBean(ObjectStorageProperties.class);
+            assertThat(storage.uploadGate()).isEqualTo(ObjectStorageProperties.UploadGate.OPEN);
+            assertThat(storage.activeWriteProvider()).isEqualTo("R2");
+            assertThat(storage.providers()).containsOnlyKeys("R2");
+            assertThat(storage.providers().get("R2").bucket()).isEqualTo("festa-documents");
+        });
+    }
+
+    /**
+     * 게이트를 빠뜨리면 <b>기동이 실패한다</b>.
+     *
+     * <p>기본값이 "허용" 이었다면 배포에서 키를 빠뜨렸을 때 차단이 열린 채로 떴을 것이다. 안전
+     * 장치는 오타로 열려서는 안 된다.
+     */
+    @Test
+    @DisplayName("배포에서 AI_STORAGE_UPLOAD_GATE 를 빠뜨리면 기동이 실패한다")
+    void missingUploadGateFailsToStart() {
+        storageRunner(withoutEnv("AI_STORAGE_UPLOAD_GATE")).run(context -> {
+            assertThat(context).hasFailed();
+            // 해석되지 않은 placeholder 가 enum 변환에서 죽는다 — 메시지가 빠진 변수를 그대로 든다.
+            assertThat(rootCauseOf(context.getStartupFailure())).contains("AI_STORAGE_UPLOAD_GATE");
+        });
+    }
+
+    /**
+     * 쓰기 provider 와 R2 자격증명도 같은 취급이다 — 하나라도 빠지면 뜨지 않는다.
+     *
+     * <p>이 테스트가 처음 잡은 것이 그 반대였다. 해석되지 않은 {@code ${R2_ENDPOINT}} 는 <b>비어
+     * 있지 않은 문자열</b>이라 완전성 검사를 그냥 통과했고, 서버는 서명 키가 그 문자열인 채로
+     * 기동했다. 모든 업로드가 저장소에서 서명 오류로 죽는데 원인은 오타 하나다 — 오설정이
+     * 장애처럼 보이는 모양이라 {@code ObjectStorageProperties} 가 placeholder 를 따로 거절한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"AI_STORAGE_ACTIVE_WRITE_PROVIDER", "R2_ENDPOINT", "R2_BUCKET",
+            "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"})
+    void everyRequiredStorageVariableFailsToStartWhenMissing(String variable) {
+        storageRunner(withoutEnv(variable)).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootCauseOf(context.getStartupFailure())).contains(variable);
+        });
+    }
+
+    // ── Redis 키 네임스페이스 (S15P21A604-349) ────────────────────────────────────────
+
+    @EnableConfigurationProperties(RedisKeyspaceProperties.class)
+    static class KeyspaceBinding {
+    }
+
+    private ApplicationContextRunner keyspaceRunner(String... propertyValues) {
+        return runner(propertyValues).withUserConfiguration(KeyspaceBinding.class);
+    }
+
+    @Test
+    @DisplayName("infra 프로파일이 FESTA_ENVIRONMENT 를 Redis 네임스페이스로 묶는다")
+    void infraProfileBindsTheRedisKeyspaceFromTheEnvironment() {
+        keyspaceRunner(DEPLOY_ENV).run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(RedisKeyspaceProperties.class).prefix()).isEqualTo("dev:");
+        });
+    }
+
+    /**
+     * 환경 id 를 빠뜨리면 <b>기동이 실패한다</b>.
+     *
+     * <p>이 자리가 조용히 뚫려 있었다. 해석되지 않은 {@code ${FESTA_ENVIRONMENT}} 는 비어 있지
+     * 않고 앞뒤 공백도 없고 {@code ':'} 도 없어서 {@code RedisKeyspaceProperties} 의 검사를 전부
+     * 통과했다. 그러면 dev·demo 가 그 문자열 하나를 네임스페이스로 공유하고, 티켓이 막으려던
+     * 세션·일일 지급 충돌이 격리된 척하면서 그대로 돌아온다 — T-101 과 같은 모양이다.
+     */
+    @Test
+    @DisplayName("배포에서 FESTA_ENVIRONMENT 를 빠뜨리면 기동이 실패한다")
+    void missingEnvironmentNamespaceFailsToStart() {
+        keyspaceRunner(withoutEnv("FESTA_ENVIRONMENT")).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootCauseOf(context.getStartupFailure())).contains("FESTA_ENVIRONMENT");
+        });
+    }
+
+    private static String rootCauseOf(Throwable failure) {
+        Throwable cause = failure;
+        while (cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return String.valueOf(cause.getMessage());
     }
 }

@@ -1,0 +1,53 @@
+meta {
+  name: 작업본 저장
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}/draft
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "expectedRevision": 0,
+    "project": {
+      "schemaVersion": "1.0",
+      "title": "첫 번째 게임",
+      "scenes": []
+    }
+  }
+}
+
+docs {
+  ## 게임 작업본 저장 — 게시와 무관하다
+
+  - 인증: **필수** (소유자)
+  - 성공: `200 OK`, 새 `revision`
+
+  저장은 **게시가 아니다.** 플레이하는 사람에게는 아무 변화가 없다.
+
+  ### `expectedRevision`은 필수이고 첫 저장은 0이다
+
+  서버의 현재 값과 다르면 `409 GAME_REVISION_CONFLICT`로 거부하고 **아무것도 쓰지 않는다.** 이때 `errors[]`의 `CURRENT_REVISION`이 서버의 현재 회차를 **십진수 문자열**로 담고 있어, 클라이언트가 문장을 파싱하지 않고 그 값으로 재동기화할 수 있다.
+
+  ### 모르는 필드는 거부한다
+
+  조용히 버리면 오타 난 필드가 저장된 것처럼 보인다. `project` 안에 계약에 없는 키를 넣으면 `MALFORMED_PROJECT`로 거절된다 — 위 본문의 `project`는 최소 골격이며, 실제 필드 구성은 `specs/019-game-studio/contracts/game-api.md`가 소유한다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 저장 성공 |
+  | `400 VALIDATION_FAILED` | `expectedRevision` 누락·음수, `project`가 객체가 아니다 |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404` | `GAME_NOT_FOUND` 또는 `GAME_DELETED` |
+  | `409 GAME_REVISION_CONFLICT` | 다른 편집 내용이 먼저 저장됐다 |
+  | `409 GAME_VALIDATION_FAILED` | 프로젝트 규칙 위반. `errors[].rule` 참조 |
+  | `409 GAME_SCHEMA_UNSUPPORTED` | 지원하지 않는 `schemaVersion` |
+}

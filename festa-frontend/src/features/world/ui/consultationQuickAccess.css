@@ -1,0 +1,48 @@
+/* World HUD 우상단 — 상담 즉시 접근. 숫자 badge 를 쓰지 않는다(실제 데이터에 없다). */
+.cqa {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row-reverse;
+}
+.cqa-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  border: 1px solid var(--festa-line);
+  background: var(--festa-surface);
+  backdrop-filter: blur(8px);
+  color: rgba(234, 238, 251, 0.86);
+  cursor: pointer;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cqa-btn { background: #10142a; backdrop-filter: none; }
+}
+.cqa-btn:disabled { cursor: default; color: rgba(234, 238, 251, 0.5); }
+.cqa-btn:hover:not(:disabled) { background: rgba(24, 32, 66, 0.9); }
+.cqa-btn-on { border-color: rgba(120, 170, 255, 0.5); color: var(--festa-ink); }
+.cqa-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56d364;
+  box-shadow: 0 0 0 2px rgba(12, 16, 34, 0.9);
+}
+.cqa-label {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--festa-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  color: rgba(234, 238, 251, 0.82);
+  white-space: nowrap;
+}

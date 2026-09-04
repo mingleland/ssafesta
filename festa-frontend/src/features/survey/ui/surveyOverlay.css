@@ -1,0 +1,77 @@
+/* Survey Overlay 콘텐츠 — 프레임 토큰(--ov-*)만 쓴다 */
+.sv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.sv-item {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--ov-surface-sunken);
+  border: 1px solid var(--ov-border);
+}
+.sv-prompt { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.sv-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: rgba(77, 141, 255, 0.22);
+  color: #9dc0ff;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.sv-required {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ff9aa5;
+  background: rgba(239, 93, 108, 0.16);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.sv-options { display: flex; flex-direction: column; gap: 7px; }
+.sv-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ov-border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.sv-option:hover { background: rgba(255, 255, 255, 0.08); }
+.sv-option-on { border-color: var(--ov-accent); background: rgba(77, 141, 255, 0.16); }
+.sv-option input { accent-color: var(--ov-accent); }
+
+.sv-rating { display: flex; gap: 6px; }
+.sv-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--ov-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ov-text-muted);
+  cursor: pointer;
+}
+.sv-star:hover { background: rgba(255, 255, 255, 0.09); }
+.sv-star-on { color: #ffd05a; border-color: rgba(255, 208, 90, 0.5); background: rgba(255, 208, 90, 0.12); }
+.sv-star:focus-visible { outline: 2px solid var(--ov-accent); outline-offset: 2px; }
+
+.sv-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ov-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ov-text);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.sv-input:focus { outline: none; border-color: var(--ov-accent); }
+.sv-textarea { resize: vertical; line-height: 1.55; }

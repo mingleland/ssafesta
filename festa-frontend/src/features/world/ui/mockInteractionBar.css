@@ -1,0 +1,53 @@
+/* Mock Interaction Bar — Unity F 상호작용 대역. 실제 Unity 연결 시 사라진다. */
+.mock-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(12, 16, 34, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 14px 38px rgba(4, 6, 20, 0.5);
+  backdrop-filter: blur(8px);
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  color: #eaeefb;
+  max-width: calc(100vw - 48px);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mock-bar { background: #10142a; backdrop-filter: none; }
+}
+.mock-bar-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  font-size: 12px;
+  font-weight: 800;
+}
+.mock-bar-label { font-size: 12.5px; color: rgba(234, 238, 251, 0.72); }
+.mock-bar-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.18); }
+.mock-bar-btn {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: #eaeefb;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mock-bar-btn:hover { background: rgba(77, 141, 255, 0.28); border-color: rgba(77, 141, 255, 0.6); }
+.mock-bar-btn:focus-visible { outline: 2px solid #4d8dff; outline-offset: 2px; }

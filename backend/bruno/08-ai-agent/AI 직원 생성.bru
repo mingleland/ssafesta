@@ -1,0 +1,68 @@
+meta {
+  name: AI 직원 생성
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/booths/{{boothId}}/agents
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "페스타 도우미",
+    "role": "PROJECT_DOCENT",
+    "systemPrompt": "이 부스의 프로젝트를 소개하는 도슨트다. 모르는 것은 모른다고 답한다.",
+    "tone": "FRIENDLY",
+    "responseLength": "MEDIUM",
+    "servicePrice": 0,
+    "handoffEnabled": false,
+    "forbiddenTopics": ["정치", "개인정보"]
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body.agentId) {
+    bru.setEnvVar("agentId", res.body.agentId);
+  }
+}
+
+docs {
+  ## AI 직원 생성 — 부스당 1명
+
+  부스의 AI 직원 인격을 설정한다 (spec 007, docs/08 §6).
+
+  - 인증: **필수** (소유자 또는 직원)
+  - 성공: `201 Created`. response script가 `agentId`를 환경변수에 저장한다
+
+  **이미 있으면 `409 AGENT_LIMIT_EXCEEDED`다.** 바꾸려면 만들지 말고 `AI 직원 수정`을 쓴다.
+
+  ### 필드
+
+  | 필드 | 값 | 기본 |
+  |---|---|---|
+  | `name` | 최대 100자 | **필수** |
+  | `role` | `PROJECT_DOCENT`·`GUIDE` | **필수** |
+  | `systemPrompt` | 답변 지침 원문. **글자 그대로 저장되고 그대로 돌아온다** | **필수** |
+  | `tone` | `FRIENDLY`·`PROFESSIONAL`·`ENTHUSIASTIC` | `FRIENDLY` |
+  | `responseLength` | `SHORT`·`MEDIUM`·`LONG` | `MEDIUM` |
+  | `servicePrice` | 상담 1회 코인 가격(0 이상) | `0` |
+  | `handoffEnabled` | 사람 상담 연결 허용 | `false` |
+  | `forbiddenTopics` | 금지 주제 문자열 배열 | 빈 배열 |
+
+  ### 응답 코드
+
+  | 코드 | 상황 |
+  |---|---|
+  | `201` | 생성 성공 |
+  | `400 VALIDATION_FAILED` | 필수 누락·허용값 위반. `errors[0].field`가 문제 필드다 |
+  | `403` | 게스트(`MEMBER_ONLY`) 또는 남의 부스(`BOOTH_FORBIDDEN`) |
+  | `409 AGENT_LIMIT_EXCEEDED` | 이 부스에 이미 1명 있다 |
+  | `409 BOOTH_LEASE_EXPIRED` | 임대가 끝난 부스다 |
+}

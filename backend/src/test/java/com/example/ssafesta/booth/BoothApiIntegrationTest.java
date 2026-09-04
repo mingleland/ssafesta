@@ -119,6 +119,31 @@ class BoothApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * The three ways a lease is refused all answer {@code 409}, so the status alone does not say
+     * which rule fired. The code does, and the FE branches on it — "someone else has this room"
+     * sends the visitor to another slot, "you already have a booth" does not. Asserted here as
+     * well as in the two tests below so that swapping the three codes breaks the build
+     * (S15P21A604-388).
+     */
+    /**
+     * A member whose wallet is missing gets the same answer here as from {@code GET /wallets/me}.
+     *
+     * <p>The wallet is opened inside the member-creation transaction, so this is a broken state
+     * rather than an expected one — but broken states still have to arrive as an answer the client
+     * can read. Translating it in {@code WalletController} alone left this path reporting the
+     * member's problem as the server's (T-113: a translation that lives in one controller is right
+     * only in that controller).
+     */
+    @Test
+    void leaseWithoutAWalletIsRefusedNotAnInternalError() throws Exception {
+        Long userId = BoothTestSupport.createMember(users, "API임대무지갑");
+
+        mockMvc.perform(leaseRequest(freeSlotId(), bearerFor(userId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WALLET_NOT_FOUND"));
+    }
+
     @Test
     void leasingAnOccupiedSlotConflicts() throws Exception {
         Long owner = createMemberWithWallet(users, wallets, "API선점");
@@ -127,7 +152,48 @@ class BoothApiIntegrationTest {
         leaseService.lease(owner, slotId, 1);
 
         mockMvc.perform(leaseRequest(slotId, bearerFor(other)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_SLOT_ALREADY_LEASED"));
+    }
+
+    /**
+     * A second booth for the same member is refused, and refused with <b>its own</b> code — not the
+     * occupied-slot one. The slot asked for here is free, so a test that only read the status could
+     * not tell the two rules apart (spec 004 FR-017, T-110).
+     */
+    @Test
+    void aSecondBoothIsRefusedWithTheLeaseLimitCode() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API두번째");
+        String bearer = bearerFor(userId);
+        mockMvc.perform(leaseRequest(freeSlotId(), bearer)).andExpect(status().isCreated());
+
+        mockMvc.perform(leaseRequest(freeSlotId(), bearer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACTIVE_LEASE_LIMIT"));
+    }
+
+    /**
+     * The {@code status} column is an operational switch — a room taken out of service is refused
+     * before anything else is read, and the wallet is never touched.
+     *
+     * <p>The switch is put back in a {@code finally}: {@code releaseAllSlots} resets leases, not
+     * slot status, and {@code freeSlotId()} filters on {@code slotType} only. A slot left off
+     * would be handed to a later test as free and then refused.
+     */
+    @Test
+    void aSlotTakenOutOfServiceIsRefusedAsNotRentable() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "API점검중");
+        Long slotId = freeSlotId();
+        long leasesBefore = leases.count();
+        jdbc.update("UPDATE booth_slots SET status = 'MAINTENANCE' WHERE id = ?", slotId);
+        try {
+            mockMvc.perform(leaseRequest(slotId, bearerFor(userId)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
+        } finally {
+            jdbc.update("UPDATE booth_slots SET status = 'AVAILABLE' WHERE id = ?", slotId);
+        }
+        assertEquals(leasesBefore, leases.count(), "거부된 요청은 임대를 남기지 않습니다.");
     }
 
     @Test

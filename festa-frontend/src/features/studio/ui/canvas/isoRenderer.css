@@ -1,0 +1,61 @@
+/* Temporary Iso Renderer — SVG 아이소메트릭 투영 스타일 (S15P21A604-405).
+   실제 렌더러(R3F 등)로 교체되면 이 파일은 통째로 사라진다. BoothCanvasViewport 밖으로 새지 않는다. */
+.iso-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+}
+.iso-floor-face { fill: var(--iso-floor, #1d4ed8); stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; }
+.iso-floor-sheen { fill: url(#isoFloorSheen); pointer-events: none; }
+.iso-grid { stroke: rgba(255, 255, 255, 0.13); stroke-width: 1; pointer-events: none; }
+.iso-wall-face { fill: var(--iso-wall, #f3f5fa); stroke: rgba(90, 100, 120, 0.55); stroke-width: 1.5; }
+.iso-wall-face-side { fill: var(--iso-wall-side, #dfe4ee); }
+.iso-wall-graphic { pointer-events: none; }
+.iso-wall-sign {
+  font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+  font-weight: 800;
+  fill: #1b2130;
+  pointer-events: none;
+}
+.iso-truss-bar { stroke: #c3cad8; stroke-width: 4; stroke-linecap: round; }
+.iso-truss-web { stroke: rgba(195, 202, 216, 0.5); stroke-width: 1.5; }
+.iso-lamp-glow { fill: #ffe9a8; opacity: 0.85; }
+.iso-lamp-cone { fill: url(#isoLampCone); pointer-events: none; }
+
+.iso-object { cursor: grab; }
+.iso-object[data-dragging='true'] { cursor: grabbing; }
+.iso-obj-top { fill: var(--iso-obj-top); stroke: rgba(0, 0, 0, 0.28); stroke-width: 1; }
+.iso-obj-left { fill: var(--iso-obj-left); stroke: rgba(0, 0, 0, 0.28); stroke-width: 1; }
+.iso-obj-right { fill: var(--iso-obj-right); stroke: rgba(0, 0, 0, 0.28); stroke-width: 1; }
+.iso-obj-shadow { fill: rgba(0, 0, 0, 0.28); pointer-events: none; }
+.iso-obj-label {
+  font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  fill: #f2f5fa;
+  paint-order: stroke;
+  stroke: rgba(10, 14, 22, 0.85);
+  stroke-width: 3;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.iso-object[data-selected='true'] .iso-obj-top,
+.iso-object[data-selected='true'] .iso-obj-left,
+.iso-object[data-selected='true'] .iso-obj-right { stroke: var(--studio-accent, #b8ff3b); stroke-width: 1.6; }
+
+.iso-footprint { fill: rgba(184, 255, 59, 0.14); stroke: var(--studio-accent, #b8ff3b); stroke-width: 2; }
+.iso-footprint-oob { fill: rgba(255, 93, 108, 0.16); stroke: #ff5d6c; }
+.iso-guide { stroke: rgba(184, 255, 59, 0.45); stroke-width: 1.5; stroke-dasharray: 6 6; pointer-events: none; }
+
+.iso-ring { fill: none; stroke: rgba(184, 255, 59, 0.9); stroke-width: 3; cursor: grab; }
+.iso-ring-hit { fill: none; stroke: transparent; stroke-width: 18; cursor: grab; }
+.iso-ring-handle { fill: #b8ff3b; stroke: #14210a; stroke-width: 1.5; cursor: grab; }
+.iso-axis-x { stroke: #ff5d5d; stroke-width: 3; marker-end: url(#isoArrowX); }
+.iso-axis-z { stroke: #4d8dff; stroke-width: 3; marker-end: url(#isoArrowZ); }
+.iso-center { fill: #ffffff; stroke: #b8ff3b; stroke-width: 3; }
+
+/* rev2 */

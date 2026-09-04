@@ -64,6 +64,39 @@ class EvaluationTest(unittest.TestCase):
         self.assertEqual(metrics.missed_case_ids, ())
         self.assertEqual(metrics.leakage_count, 0)
 
+    def test_uses_context_content_and_context_token_count_when_present(self) -> None:
+        store = MemoryVectorStore()
+        store.replace(
+            run_id="run",
+            model_id="model",
+            booth_id=1,
+            agent_id=1,
+            chunks=[
+                Chunk(
+                    "child",
+                    2,
+                    0,
+                    4,
+                    "child 검색용 조각",
+                    context_content="parent 전체 문맥 안에 정답 표식이 있다",
+                    context_token_count=40,
+                ),
+            ],
+            vectors=[vector(1, 0)],
+        )
+        metrics = evaluate_retrieval(
+            store=store,
+            run_id="run",
+            model_id="model",
+            booth_id=1,
+            agent_id=1,
+            cases=[EvalCase("q1", "질문", frozenset(), ("정답 표식",))],
+            query_vectors=[vector(1, 0)],
+            top_k=1,
+        )
+        self.assertEqual(metrics.recall_at_k, 1.0)
+        self.assertEqual(metrics.mean_context_tokens, 40.0)
+
     def test_reports_missed_case_ids_and_context_tokens(self) -> None:
         store = MemoryVectorStore()
         store.replace(

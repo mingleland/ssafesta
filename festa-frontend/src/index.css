@@ -1,4 +1,34 @@
+/* 앱 전역 최소 기반 + **Foundation 후보** 토큰.
+ *
+ * 주의: 이것은 Foundation Freeze 가 아니다(README 우선순위 · visual-dna.md 는 여전히 PROPOSAL).
+ * 여러 화면에서 실제로 반복되는 값만 관찰해 이름을 붙여 둔 것이고, 기존 화면을 일괄 마이그레이션
+ * 하지 않는다. Booth Studio(gss/grp·studio-*)의 시각 규칙은 보호 대상이라 여기로 끌어오지 않는다.
+ * 값 확정은 Visual Direction 선택 후 별도 단계에서 한다.
+ */
 :root {
+  /* 실측: 16개 CSS 파일이 같은 스택을 각자 적어 두고 있었다 — 후보 토큰 1순위 */
+  --festa-font: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+
+  /* World 위 어두운 표면 계열 — Overlay·HUD·Game Menu 가 공유하는 값 */
+  --festa-ink: #eaeefb;
+  --festa-ink-dim: rgba(234, 238, 251, 0.66);
+  --festa-surface: rgba(12, 16, 34, 0.72);
+  --festa-surface-solid: #10142a;
+  --festa-line: rgba(255, 255, 255, 0.14);
+  --festa-fill: rgba(255, 255, 255, 0.06);
+  --festa-fill-strong: rgba(255, 255, 255, 0.14);
+
+  --festa-accent: #4d6bff;
+  --festa-accent-2: #7b4dff;
+  --festa-ok: #5fd39b;
+  --festa-warn: #ffd66b;
+  --festa-danger: #ff8f8f;
+
+  --festa-r-chip: 999px;
+  --festa-r-input: 11px;
+  --festa-r-card: 14px;
+  --festa-r-panel: 18px;
+
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light dark;
 }

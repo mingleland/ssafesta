@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -51,6 +52,22 @@ class OAuthCompletionApiIntegrationTest {
     @MockitoSpyBean private MemberSessionService sessions;
     @Autowired private UserRepository users;
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
+
+    /**
+     * The flow's other public entrypoint — {@code GET /auth/oauth/{provider}} — refuses a provider
+     * it does not know, rather than redirecting into a Spring Security path that does not exist
+     * (S15P21A604-388).
+     *
+     * <p>The provider name here is deliberately nonsense. Using a plausible one ({@code naver},
+     * {@code ssafy}) would turn this test red the day that provider is actually added, which is a
+     * false alarm about a different change.
+     */
+    @Test
+    void anUnknownOAuthProviderIsRefusedWithItsOwnCode() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/oauth/{provider}", "not-a-provider"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("OAUTH_PROVIDER_NOT_SUPPORTED"));
+    }
 
     /**
      * A nickname someone already has is the ordinary collision the signup screen exists to report.

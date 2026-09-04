@@ -152,6 +152,79 @@ backend/src/test/resources/game/fixtures/                     # 계약 fixture �
 | 구현 PR-3 = #69 | Asset 업로드 (계약 이어쓰기 → R2 연동) | PR-1 계약 확정 + FE assetId 답 |
 | 잔여 | T085(공개 중단·삭제 endpoint — 결정 ②) · T086(P1) · #78 E2E · #81(spec 개정 선행) | 각 결정 |
 
+## 구현 PR-3 = #69 Asset 업로드 — 실행 계획 (Jira S15P21A604-107)
+
+계약 [`../contracts/game-asset-upload.md`](../contracts/game-asset-upload.md) v1.0 이 정본이다.
+FE 는 그 계약대로 `festa-frontend/src/game-studio/studio/assets/remoteAssetRepository.ts` 를 이미
+구현해 develop 에 넣었다. **BE 는 계약과 그 클라이언트에 맞추기만 한다 — 형태를 다시 정하지 않는다.**
+
+브랜치: `feat/S15P21A604-107-game-asset-upload` (develop 6f58846c 기점).
+
+### FE 가 실제로 호출하는 표면
+
+`remoteAssetRepository.ts` 가 부르는 것은 6개 endpoint 중 3개다. 슬라이스 1 은 이 3개로 끊는다.
+
+| 호출 | 요청 | FE 가 파싱하는 응답 필드 |
+|---|---|---|
+| `POST /api/v1/games/{gameId}/assets` | `{kind, contentType, byteSize, fileName}` | `assetId` · `uploadUrl` · `requiredHeaders` |
+| presigned `PUT {uploadUrl}` | 파일 본문 + `requiredHeaders` | — (우리 서버 아님) |
+| `POST /api/v1/games/{gameId}/assets/{assetId}/complete` | 본문 없음 | `status` · `source` · `kind` |
+| `GET /api/v1/games/{gameId}/assets/{assetId}/content` | — | 바이트 |
+
+FE 가 강제하는 두 가지를 어기면 그쪽 코드가 즉시 거부한다.
+
+- `assetId` 는 `^[A-Za-z][A-Za-z0-9_-]{0,63}$` 를 만족해야 한다 (`STABLE_ID`). 계약 §2 의 26자를 쓴다.
+- `complete` 의 `source` 는 서버가 문자열을 만들어 내려준다. FE 는 조립하지 않고 `gameId`·`assetId`
+  일치까지 대조한다 — 형식을 바꾸면 저장은 되고 표시만 깨지는 실패가 된다.
+
+### 단계
+
+| 순서 | Task | 산출 |
+|---|---|---|
+| 1 | T094 | `V18__game_assets.sql` — 계약 §8 DDL, `UNIQUE(game_id, asset_id)` |
+| 2 | T095 | `ErrorCode` 에 `GAME_ASSET_*` 11종 (계약 §6) |
+| 3 | T096 | 저장소 포트 + S3-compatible 어댑터, `compose.yaml` 에 minio |
+| 4 | **T097 + T100 한 커밋** | 발급 endpoint 와 `isPersistableSource()` 완화 |
+| 5 | T098 | `complete` — 검증·상태 전이·멱등 |
+| 6 | T099 | `/content` 302 |
+| 7 | T101 · T102 | E2E 1개 + 거부 7종 |
+
+### 결정 4개
+
+**① 저장소는 어댑터 뒤에 둔다. R2 없이 진행한다.**
+R2 자격증명은 infra Jira S15P21A604-232 대기지만 R2·MinIO 가 같은 S3 프로토콜이라 바뀌는 것은
+endpoint·credential·`provider` 값뿐이다. 로컬은 `compose.yaml` 의 minio, 테스트는 MinIO
+Testcontainer 로 돌린다. 계약 형태는 저장소 종류와 무관하다.
+
+**② T097 과 T100 은 반드시 같은 커밋이다.**
+계약 §9 가 명문화했고 `GameProjectValidator` 주석에도 이미 적혀 있다. 갈리면 존재할 수 없는
+reference 를 저장할 수 있게 된다 — 발급 없이 완화하면 유령 참조가, 완화 없이 발급하면 업로드한
+Asset 을 Draft 에 못 넣는다.
+
+**③ 검증은 전부 `complete` 시점이다.**
+presigned PUT 이라 서버는 업로드 본문을 보지 못한다. 시작 요청의 `contentType`·`byteSize` 는
+거절용으로만 쓰고, 통과 판정은 `complete` 의 HEAD + magic number + 실제 디코드가 한다.
+디코드는 JDK `ImageIO` 라 저장소와 무관하다.
+
+**④ 검증기는 순수하게 둔다.**
+§9 는 `(game_id, asset_id)` 존재와 `status=READY` 조회를 요구하지만 `GameProjectValidator` 에
+리포지토리를 넣지 않는다. 호출부(`GameDraftService`·`GamePublishService`)가 그 Game 의 READY
+`assetId` 집합을 읽어 `validateForDraft`/`validateForPublish` 에 넘긴다. 검증기는 지금처럼
+입력만 보고 판정한다.
+
+### 슬라이스 2 — 뒤로 미루는 것과 이유
+
+T103~T107 (목록·단건·삭제·탈퇴 hard delete·sweeper). FE 편집기 UI(#69 ①~④)가 미착수라
+소비자가 없고, T107 은 `@Scheduled` 가 코드에 0개라 007 미완료 문서 sweeper 가 선행이다
+(계약 §7.1 — "019 는 그 주기에 얹고 스케줄러를 새로 만들지 않는다").
+
+### 검증
+
+- E2E 1개: 시작 → presigned PUT → `complete` → `READY` → `/content` 302 (MinIO Testcontainer)
+- 거부 7종: 위장 MIME · 디코드 실패 · SVG · 5 MiB 초과 · 4096px 초과 · 타 Game asset 참조 ·
+  `UPLOADING` 참조 Draft 저장
+- 회귀: 기존 통합 테스트 전량
+
 ## Verification
 
 권한, revision conflict, invalid reference, immutable Published, transaction rollback, soft/hard delete,

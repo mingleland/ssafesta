@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -81,7 +82,7 @@ class GameSemanticScopeRuleTest {
         ((ArrayNode) overlayChoiceActions(project)).insert(0, hide);
 
         assertDoesNotThrow(() -> validator.validateForPublish(
-                project, GameTestSupport.write(project), GAME_ID));
+                project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     /**
@@ -223,7 +224,7 @@ class GameSemanticScopeRuleTest {
 
     private void assertRule(ObjectNode project, String expectedRule) {
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
 
         List<String> rules = thrown.errors().stream().map(ApiErrorDetail::rule).toList();
         assertTrue(rules.contains(expectedRule),

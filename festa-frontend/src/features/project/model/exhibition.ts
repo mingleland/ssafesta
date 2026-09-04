@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import { projectApi } from '../../../entities/project/api.select';
 import { parseVideoEmbed, type VideoEmbed } from '../../../entities/project/videoEmbed';
+import { getSessionSnapshot } from '../../auth/model/session';
 import type { ProjectLikeVM, ProjectLinksVM } from '../../../shared/contracts/project';
 
 export interface ExhibitionProjectVM {
@@ -61,13 +62,45 @@ export async function loadExhibition(boothId: number): Promise<void> {
       thumbnailUrl: p.thumbnailUrl,
       video: p.videoUrl === null ? null : parseVideoEmbed(p.videoUrl),
       links: { deployUrl: p.deployUrl, gitUrl: p.gitUrl, portfolioUrl: p.portfolioUrl },
-      // -135(좋아요 쓰기 API) 부재 — 표시 전용, 가짜 토글 금지
-      like: { count: p.likeCount, likedByMe: p.likedByMe, canToggle: false as const },
+      // -135(#122) 회원 전용 — 게스트·비로그인은 서버가 403 MEMBER_ONLY 라 토글을 열지 않는다
+      like: {
+        count: p.likeCount,
+        likedByMe: p.likedByMe,
+        canToggle: getSessionSnapshot().kind === 'member',
+        pending: false,
+        error: false,
+      },
     }));
     setState({ status: projects.length === 0 ? 'empty' : 'ready', boothId, projects });
   } catch {
     if (state.boothId !== boothId) return;
     setState({ status: 'error', boothId, projects: [] });
+  }
+}
+
+function patchLike(projectId: number, patch: Partial<ProjectLikeVM>): void {
+  setState({
+    ...state,
+    projects: state.projects.map((p) => (p.projectId === projectId ? { ...p, like: { ...p.like, ...patch } } : p)),
+  });
+}
+
+// 토글 endpoint 가 아니라 멱등 PUT/DELETE — 현재 likedByMe 로 메서드를 고른다(#122).
+// 낙관적으로 먼저 바꾸고 응답의 두 값으로 확정한다. 실패하면 되돌리고 error 를 켠다 —
+// 멱등이라 재시도를 그냥 걸어도 안전하다. pending 동안 재클릭은 무시(이중 요청 방지).
+export async function toggleLike(projectId: number): Promise<void> {
+  const project = state.projects.find((p) => p.projectId === projectId);
+  if (!project || !project.like.canToggle || project.like.pending) return;
+  const before = project.like;
+  const next = !before.likedByMe;
+  patchLike(projectId, { likedByMe: next, count: before.count + (next ? 1 : -1), pending: true, error: false });
+  try {
+    const view = next ? await projectApi.likeProject(projectId) : await projectApi.unlikeProject(projectId);
+    if (!state.projects.some((p) => p.projectId === projectId)) return; // 부스 전환 후 도착
+    patchLike(projectId, { likedByMe: view.likedByMe, count: view.likeCount, pending: false });
+  } catch {
+    if (!state.projects.some((p) => p.projectId === projectId)) return;
+    patchLike(projectId, { likedByMe: before.likedByMe, count: before.count, pending: false, error: true });
   }
 }
 

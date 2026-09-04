@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { walletApi } from '../../../entities/wallet/api.select';
 import { labelForReason } from '../../../entities/wallet/types';
+import './transactions.css';
 
 export function TransactionsSection() {
   const [page, setPage] = useState(0);
@@ -12,14 +13,14 @@ export function TransactionsSection() {
     queryFn: () => walletApi.getTransactions(page),
   });
 
-  if (txQuery.isLoading) return <p>불러오는 중...</p>;
-  if (txQuery.isError || !txQuery.data) return <p>거래 내역을 불러오지 못했습니다.</p>;
+  if (txQuery.isLoading) return <p className="tx-note">불러오는 중...</p>;
+  if (txQuery.isError || !txQuery.data) return <p className="tx-alert">거래 내역을 불러오지 못했습니다.</p>;
 
   const { content, totalPages } = txQuery.data;
 
   return (
-    <div>
-      <table>
+    <div className="tx-wrap">
+      <table className="tx-table">
         <thead>
           <tr>
             <th>일시</th>
@@ -39,22 +40,21 @@ export function TransactionsSection() {
                 }).format(new Date(t.createdAt))}
               </td>
               <td>{labelForReason(t.reasonType)}</td>
-              <td>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
+              <td className={t.amount > 0 ? 'tx-plus' : 'tx-minus'}>{t.amount > 0 ? `+${t.amount}` : t.amount}</td>
               <td>{t.balanceAfter}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
-        이전
-      </button>
-      <button
-        type="button"
-        onClick={() => setPage((p) => p + 1)}
-        disabled={page >= totalPages - 1}
-      >
-        다음
-      </button>
+      <div className="tx-pager">
+        <button type="button" className="tx-btn" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+          이전
+        </button>
+        <span className="tx-page">{page + 1} / {Math.max(totalPages, 1)}</span>
+        <button type="button" className="tx-btn" onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages - 1}>
+          다음
+        </button>
+      </div>
     </div>
   );
 }
