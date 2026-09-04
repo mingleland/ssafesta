@@ -159,7 +159,17 @@ namespace Festa.Booth
                     if (go.GetComponent<LaptopInteractable>() == null)
                         go.AddComponent<LaptopInteractable>();
                     break;
+                case BoothObjectType.ProjectPanel:
+                    if (go.GetComponent<ProjectPanelInteractable>() == null)
+                        go.AddComponent<ProjectPanelInteractable>();
+                    break;
+                case BoothObjectType.SurveyKiosk:
+                    if (go.GetComponent<SurveyKioskInteractable>() == null)
+                        go.AddComponent<SurveyKioskInteractable>();
+                    break;
                 // 이후 타입별 컴포넌트는 해당 기능 spec 작성 후 추가한다.
+                // CONSULTATION_DESK 는 아직 붙이지 않는다 — 사람 상담의 시작점은 AI 대화
+                // 에스컬레이션이다(spec 011 FR-005, S15P21A604-416). 데스크 진입은 후속.
             }
         }
     }
