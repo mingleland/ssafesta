@@ -1,0 +1,19 @@
+{
+  "decision_ticket": "S15P21A604-371",
+  "decision": "reranker_not_applied",
+  "rationale": "Baseline(재정렬 없음)이 top_n=5 기준 recall 0.9143·NDCG 0.7340으로 이미 충분하고 추가 지연·비용·실패 리스크가 0이다. 가장 높은 품질(gemini-2.5-flash-lite, recall 0.9429/NDCG 0.7718)도 35문항 중 3건 재정렬 실패가 있어 fallback 경로가 필요하고, 이득 대비 운영 복잡도가 크다고 판단했다.",
+  "compared_candidates": {
+    "none_top5": {"recall": 0.9143, "mrr": 0.6795, "ndcg": 0.7340, "failures": 0, "elapsed_seconds": 0.0},
+    "gms_llm_gemini-2.5-flash-lite_top5": {"recall": 0.9429, "mrr": 0.7114, "ndcg": 0.7718, "failures": 3, "elapsed_seconds": 94.097},
+    "gms_llm_gpt-5-nano_top5": {"recall": 0.9429, "mrr": 0.7071, "ndcg": 0.7609, "failures": 0, "elapsed_seconds": 428.827},
+    "cross_encoder_top5": {"recall": 0.8571, "mrr": 0.4557, "ndcg": 0.5584, "failures": 0, "elapsed_seconds": 10.725}
+  },
+  "known_limitations": [
+    "similarity_cutoff(0.3, 0.5)는 임계값이 text-embedding-3-large 실제 거리 스케일에 맞지 않아 3문서 전부 recall 0 — 이 축은 비교에서 제외, 재보정 전에는 재검토 대상 아님",
+    "Cross-Encoder(cross-encoder/ms-marco-MiniLM-L-6-v2)는 영어 학습 모델이라 한국어 문서 도메인에서 baseline보다 계속 낮게 나옴 — 한국어 cross-encoder로 재시도하면 결과가 달라질 수 있음",
+    "gpt-5-nano는 품질은 동률이나 질문당 12초 이상 걸려 실사용에는 부적합"
+  ],
+  "reevaluation_trigger": "GMS LLM reranker의 JSON 파싱 실패율(현재 gpt-4.1-nano 기준 최대 17%)을 낮추는 프롬프트/스키마 개선이 나오거나, 한국어 특화 Cross-Encoder를 시도할 때 재평가",
+  "evidence": "spikes/ai-rag/data/evaluation/reranker-summary.md, reranker-summary.json (pgvector 실측, pinlog/ssafesta/수달 3문서 35문항)",
+  "decided_at": "2026-09-02"
+}

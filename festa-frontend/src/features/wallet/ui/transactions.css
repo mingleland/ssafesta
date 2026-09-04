@@ -1,0 +1,49 @@
+/* 지갑 배지·거래 내역 — 화면 토큰(--sc-*)이 있으면 그걸 쓰고, 없으면(오버레이 밖) 기본값으로 떨어진다 */
+.wallet-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: rgba(255, 206, 77, 0.14);
+  border: 1px solid rgba(255, 206, 77, 0.4);
+  color: var(--sc-gold, #ffce4d);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-wrap { display: flex; flex-direction: column; gap: 10px; }
+.tx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tx-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--sc-text-muted, #98a0c0);
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 1px solid var(--sc-border, rgba(255, 255, 255, 0.11));
+}
+.tx-table td { padding: 9px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.tx-table td:nth-child(3), .tx-table td:nth-child(4) { text-align: right; font-variant-numeric: tabular-nums; }
+.tx-table th:nth-child(3), .tx-table th:nth-child(4) { text-align: right; }
+.tx-plus { color: #5fd39b; font-weight: 700; }
+.tx-minus { color: #ff9aa5; font-weight: 700; }
+
+.tx-pager { display: flex; align-items: center; gap: 10px; }
+.tx-page { font-size: 12.5px; color: var(--sc-text-muted, #98a0c0); }
+.tx-btn {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid var(--sc-border-strong, rgba(255, 255, 255, 0.2));
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tx-btn:disabled { opacity: 0.45; cursor: default; }
+.tx-note { margin: 0; color: var(--sc-text-muted, #98a0c0); font-size: 13px; }
+.tx-alert { margin: 0; color: #ff9aa5; font-size: 13px; }

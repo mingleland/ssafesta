@@ -1,0 +1,131 @@
+/* Booth Management — 크고 관리성이 있으나 SaaS Dashboard 가 아니다. Booth 가 주인공. */
+.bm-body { display: flex; flex-direction: column; gap: 16px; }
+
+.bm-hero {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 22px;
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.bm-preview { min-width: 0; }
+.bm-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.bm-name {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--festa-ink);
+}
+.bm-slot {
+  font-size: 13px;
+  color: rgba(234, 238, 251, 0.66);
+  letter-spacing: 0.02em;
+}
+.bm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7ee08a;
+}
+.bm-status-off { color: rgba(234, 238, 251, 0.55); }
+.bm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.bm-remaining { font-size: 12.5px; }
+.bm-studio { margin-top: auto; align-self: flex-start; }
+
+.bm-rows {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.bm-row {
+  display: grid;
+  grid-template-columns: 132px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 16px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--festa-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bm-row:last-child { border-bottom: 0; }
+.bm-row:hover { background: rgba(255, 255, 255, 0.07); }
+.bm-row-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(234, 238, 251, 0.62);
+}
+.bm-row-summary { font-size: 13.5px; color: rgba(234, 238, 251, 0.9); }
+.bm-row-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(234, 238, 251, 0.7);
+  white-space: nowrap;
+}
+
+.bm-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.bm-info-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(234, 238, 251, 0.6);
+}
+
+.bm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 20px;
+  text-align: center;
+}
+.bm-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 238, 251, 0.7);
+}
+.bm-empty strong { font-size: 16px; color: var(--festa-ink); }
+.bm-empty .ov-btn { margin-top: 6px; }
+
+@media (max-width: 900px) {
+  .bm-hero { grid-template-columns: 1fr; }
+  .bm-row { grid-template-columns: 1fr auto; }
+  .bm-row-summary { grid-column: 1 / -1; }
+}

@@ -1,0 +1,81 @@
+/* AI 대화 Overlay 콘텐츠 — 프레임 토큰(--ov-*)만 쓴다 */
+.ai-intro { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 30px 12px; text-align: center; }
+.ai-intro strong { font-size: 15px; }
+.ai-intro-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2f6bff, #7a5cff);
+  color: #fff;
+}
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.ai-suggestion {
+  height: 30px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 141, 255, 0.45);
+  background: rgba(77, 141, 255, 0.14);
+  color: #9dc0ff;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.ai-suggestion:hover { background: rgba(77, 141, 255, 0.26); }
+
+.ai-thread { display: flex; flex-direction: column; gap: 12px; }
+.ai-turn { display: flex; gap: 9px; max-width: 82%; }
+.ai-turn-user { align-self: flex-end; }
+.ai-turn-agent { align-self: flex-start; }
+.ai-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2f6bff, #7a5cff);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.ai-bubble {
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  background: var(--ov-surface-sunken);
+  border: 1px solid var(--ov-border);
+  white-space: pre-wrap;
+}
+.ai-turn-user .ai-bubble { background: var(--ov-accent); border-color: var(--ov-accent); color: #fff; border-bottom-right-radius: 4px; }
+.ai-turn-agent .ai-bubble { border-bottom-left-radius: 4px; }
+.ai-caret {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  margin-left: 3px;
+  background: var(--ov-accent);
+  vertical-align: text-bottom;
+  animation: ai-blink 0.9s steps(1) infinite;
+}
+@keyframes ai-blink { 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) { .ai-caret { animation: none; } }
+.ai-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+.ai-composer { display: flex; gap: 8px; width: 100%; }
+.ai-input {
+  flex-grow: 1;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--ov-radius-control);
+  border: 1px solid var(--ov-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ov-text);
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.ai-input:focus { outline: none; border-color: var(--ov-accent); }
