@@ -2,13 +2,14 @@
 // 역할분담 §2.3·§5.2. Bridge(수신·JSON 파싱)와 Overlay Bus(렌더링용 상태) 사이에서
 // type별 라우팅만 한다 — Unity 계약도 Overlay 계약도 여기 밖에서 재해석하지 않는다.
 import { subscribeBoothInteract } from '../../unity/bridge/events';
-import type { BoothInteractEvent } from '../../unity/bridge/events';
+import type { UnityInteractEvent } from '../../unity/bridge/events';
 import { toAiChatPayload } from '../../unity/bridge/events';
 import { openOverlay } from '../../shared/types/overlay';
+import { openBoothManagement } from '../world/model/gameClientUi';
 
 // events.ts의 onBoothInteract는 JSON.parse 결과를 타입 단언만 하고 런타임 검증을 안 한다 —
 // 여기 없는 type이 실제로 올 수 있다(신규 상호작용 추가·구버전 Unity). 조용히 무시해 전방 호환한다.
-function dispatch(event: BoothInteractEvent): void {
+function dispatch(event: UnityInteractEvent): void {
   switch (event.type) {
     case 'BOOTH_LAPTOP_INTERACT':
       openOverlay('LAPTOP', { boothId: event.boothId, objectId: event.objectId });
@@ -23,6 +24,17 @@ function dispatch(event: BoothInteractEvent): void {
       return;
     case 'BOOTH_GAME_INTERACT':
       openOverlay('GAME', { boothId: event.boothId, objectId: event.objectId, configId: event.configId });
+      return;
+    case 'BOOTH_SURVEY_INTERACT':
+      // surveyId 는 싣지 않는다 — boothId 는 설문을 resolve 하기 위한 context 이고,
+      // 실제 식별자 해석은 adapter 몫이다 (S15P21A604-415).
+      openOverlay('SURVEY', { boothId: event.boothId, objectId: event.objectId });
+      return;
+    case 'WORLD_MANAGEMENT_INTERACT':
+      // Overlay Bus 가 아니다. Bus 는 "부스 오브젝트를 열어 본다" 는 Visitor 층이고,
+      // 관리 화면은 사용자가 직접 여는 별도 레이어다(gameClientUi) — !240 설계 그대로.
+      // 대상 부스는 이 화면이 GET /booths/mine 으로 resolve 한다.
+      openBoothManagement();
       return;
     default:
       return;
