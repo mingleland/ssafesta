@@ -61,6 +61,15 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.job_retry_backoff_seconds == [60, 300, 900]
     assert config.settings.embedding_provider == "mock"
     assert config.settings.embedding_dimension == 1536
+    assert config.settings.embedding_model_id == "text-embedding-3-large"
+    assert config.settings.chunk_size == 900
+    assert config.settings.chunk_overlap == 180
+    assert config.settings.retrieval_top_k == 10
+    assert config.settings.rag_context_top_n == 5
+    assert config.settings.rag_input_token_budget == 8_000
+    assert config.settings.rag_tokenizer_encoding == "cl100k_base"
+    assert config.settings.llm_model_id == "gpt-4.1-mini"
+    assert config.settings.llm_temperature == 0.0
     assert config.settings.internal_spring_to_ai_tokens == ["spring-to-ai-token-1"]
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
 
@@ -190,7 +199,7 @@ def test_internal_tokens_reject_cross_direction_reuse(
         _fresh_settings_module()
 
 
-def test_blank_chunk_tuning_env_vars_resolve_to_none(
+def test_blank_chunk_tuning_env_vars_resolve_to_spike_defaults(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """Regression: `.env.example` ships CHUNK_SIZE= / CHUNK_OVERLAP= (blank).
@@ -204,8 +213,8 @@ def test_blank_chunk_tuning_env_vars_resolve_to_none(
     _set_env(monkeypatch, tmp_path, overrides={"CHUNK_SIZE": "", "CHUNK_OVERLAP": ""})
     config = _fresh_settings_module()
 
-    assert config.settings.chunk_size is None
-    assert config.settings.chunk_overlap is None
+    assert config.settings.chunk_size == 900
+    assert config.settings.chunk_overlap == 180
 
 
 def test_real_chunk_tuning_values_still_coerce_to_int(
@@ -219,7 +228,7 @@ def test_real_chunk_tuning_values_still_coerce_to_int(
     assert config.settings.chunk_overlap == 64
 
 
-def test_blank_embedding_model_id_resolves_to_none(
+def test_blank_embedding_model_id_resolves_to_spike_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """Regression: `.env.example` ships EMBEDDING_MODEL_ID= (blank) too.
@@ -235,7 +244,31 @@ def test_blank_embedding_model_id_resolves_to_none(
     _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_MODEL_ID": ""})
     config = _fresh_settings_module()
 
-    assert config.settings.embedding_model_id is None
+    assert config.settings.embedding_model_id == "text-embedding-3-large"
+
+
+def test_chunk_overlap_must_be_smaller_than_chunk_size(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"CHUNK_SIZE": "900", "CHUNK_OVERLAP": "900"},
+    )
+    with pytest.raises(ValidationError, match="CHUNK_OVERLAP"):
+        _fresh_settings_module()
+
+
+def test_context_top_n_must_not_exceed_retrieval_top_k(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"RETRIEVAL_TOP_K": "5", "RAG_CONTEXT_TOP_N": "6"},
+    )
+    with pytest.raises(ValidationError, match="RAG_CONTEXT_TOP_N"):
+        _fresh_settings_module()
 
 
 def test_blank_embedding_provider_resolves_to_mock_default(
