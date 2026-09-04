@@ -34,6 +34,17 @@ MODEL_SPECS: dict[str, ModelSpec] = {
 }
 
 
+RERANK_LLM_SPECS: dict[str, ModelSpec] = {
+    "gpt-5-nano": ModelSpec(model_id="gpt-5-nano", provider="openai", credit_per_request=1.0),
+    "gpt-4.1-nano": ModelSpec(
+        model_id="gpt-4.1-nano", provider="openai", credit_per_request=1.0
+    ),
+    "gemini-2.5-flash-lite": ModelSpec(
+        model_id="gemini-2.5-flash-lite", provider="gemini", credit_per_request=1.0
+    ),
+}
+
+
 @dataclass(frozen=True)
 class PageText:
     page: int
