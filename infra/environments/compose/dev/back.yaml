@@ -1,0 +1,41 @@
+services:
+  back:
+    image: ${COMPONENT_IMAGE_REF:?COMPONENT_IMAGE_REF is required}
+    restart: unless-stopped
+    profiles: [back]
+    labels:
+      com.ssafy-festa.environment: dev
+      com.ssafy-festa.owner: infra-002
+    ports:
+      - "127.0.0.1:${BACK_HOST_PORT:-8081}:8080"
+    env_file:
+      - ${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: dev
+      SPRING_PROFILES_ACTIVE: infra
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?ROOT_DOMAIN is required}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: festa_dev_business
+      POSTGRES_USER: festa_dev_back_app
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: dev_back
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+      DEV_MOCK_COMPONENTS: ${DEV_MOCK_COMPONENTS:-}
+    networks:
+      dev-private:
+        aliases: [back]
+      data-private: {}
+    mem_limit: ${DEV_BACK_MEMORY_LIMIT:-1g}
+    cpus: ${DEV_BACK_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  data-private:
+    external: true
+    name: festa-data-private

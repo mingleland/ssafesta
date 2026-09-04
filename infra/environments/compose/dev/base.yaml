@@ -1,21 +1,8 @@
 name: festa-dev
 
-# Component overlays inherit this anchor.  Deploy one overlay with its own
-# DEV_COMPONENT_PROFILE and DEV_SERVICE_ALIAS; do not start the whole project.
-x-dev-component: &dev-component
-  restart: unless-stopped
-  labels:
-    com.ssafy-festa.environment: dev
-    com.ssafy-festa.owner: infra-002
-  profiles: ["${DEV_COMPONENT_PROFILE:?DEV_COMPONENT_PROFILE is required}"]
-  environment:
-    FESTA_ENVIRONMENT: dev
-    DEV_MOCK_COMPONENTS: ${DEV_MOCK_COMPONENTS:-}
-  networks:
-    dev-private:
-      aliases:
-        - ${DEV_SERVICE_ALIAS:?DEV_SERVICE_ALIAS is required}
-
+# Compose merges this project/network definition with exactly one component
+# overlay. Profiles and aliases belong to each overlay because YAML anchors do
+# not cross Compose files.
 services: {}
 
 networks:
