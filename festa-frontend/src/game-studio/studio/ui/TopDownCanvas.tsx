@@ -89,8 +89,20 @@ interface PanningState {
 }
 
 const BASE_CELL_SIZE_PX = 32;
-const MIN_CANVAS_WIDTH_PX = 480;
+// S15P21A604-394 — 원래 480(보기 좋은 최소 크기)이었는데, 30~300% 범위와 맞지 않아
+// scene 폭이 넉넉하지 않으면 낮은 zoom%에서 캔버스 크기가 전혀 안 바뀌는 데드존이 생겼다
+// (예: 16칸 scene은 93.75% 밑으로 전부 무반응). "타일이 아예 안 보일 정도로 쪼그라드는
+// 것만 막는" 최소한의 방어값으로 의미를 바꿔 셀 하나 크기(BASE_CELL_SIZE_PX)로 낮춘다 —
+// 가장 좁은 scene(4칸)·최저 zoom(30%)에서도 이 floor가 걸리지 않는다.
+const MIN_CANVAS_WIDTH_PX = BASE_CELL_SIZE_PX;
 const VIEWPORT_OVERSCAN_CELLS = 2;
+// S15P21A604-394 — +/- 버튼과 같은 30~300% 범위, 휠은 한 틱에 5%씩(버튼보다 세밀하게)
+const MIN_ZOOM = 30;
+const MAX_ZOOM = 300;
+const WHEEL_ZOOM_STEP = 5;
+// 휠로 연속 확대/축소하는 동안만 .gss-map-stage의 width 전환 애니메이션을 꺼서(즉시 반영)
+// 커서 중심 스크롤 보정과 폭 변화가 어긋나며 화면이 흔들리는 것을 막는다.
+const WHEEL_ZOOM_IDLE_MS = 200;
 
 export const TopDownCanvas = ({
   scene,
@@ -123,6 +135,7 @@ export const TopDownCanvas = ({
   restoreViewportCenter,
 }: TopDownCanvasProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const viewportFrameRef = useRef<number | null>(null);
   const [canvasViewport, setCanvasViewport] = useState<GridViewport | null>(null);
@@ -201,7 +214,10 @@ export const TopDownCanvas = ({
   const renderViewport = useMemo(() => canvasViewport === null
     ? null
     : expandGridViewport(canvasViewport, scene.width, scene.height, VIEWPORT_OVERSCAN_CELLS), [canvasViewport, scene.height, scene.width]);
-  const usingTileOverview = tileLayer !== null && zoom <= 25;
+  // S15P21A604-394 — 줌 하한이 10→30이 되면서 원래 임계값(25)은 이제 절대 안 걸림
+  // (zoom이 30 밑으로 안 내려가므로). 큰 맵을 낮은 zoom%로 볼 때 개별 DOM 타일 대신
+  // 캔버스로 합성해 그리는 이 최적화가 새 하한 근처에서도 계속 동작하도록 값을 올렸다.
+  const usingTileOverview = tileLayer !== null && zoom <= 50;
   const renderedObjects = useMemo(() => objectsInViewport(
     scene.objects.filter((object) => !editorHiddenObjectIds.has(object.id)),
     renderViewport,
@@ -240,6 +256,106 @@ export const TopDownCanvas = ({
       || gridViewportContains(canvasViewport, selectedObject.position)) return;
     scrollToGridPosition(selectedObject.position);
   }, [canvasViewport, scene.objects, selectedObjectId, scrollToGridPosition]);
+
+  // S15P21A604-394 — 휠로 확대/축소할 때 커서 아래 지점이 화면상 같은 위치에 남도록.
+  // onZoomChange는 zoom을 상위 state로 올려보낼 뿐이라 여기서 스크롤까지 동기로 맞출 수
+  // 없다(zoom prop이 갱신되어 canvasWidth가 다시 그려진 뒤에야 최종 크기가 정해짐). 그래서
+  // 휠 시점에는 "캔버스 안에서 커서가 가리키는 상대 위치(fraction)"와 "커서의 스크롤
+  // 뷰포트 기준 화면 좌표(viewport)"만 기록해 두고, zoom prop이 실제로 바뀐 뒤(effect)
+  // 새로 그려진 canvasRect를 다시 읽어서 그 fraction 지점이 같은 화면 좌표에 오도록
+  // scrollLeft/Top을 계산한다.
+  //
+  // 처음엔 "scrollLeft + viewport 오프셋"에 확대 비율만 곱하는 단순한 식을 썼는데,
+  // .gss-map-stage에 margin:auto가 있어서 캔버스가 스크롤 뷰포트보다 작을 때는 브라우저가
+  // 가운데 정렬시켜버려(스크롤은 0인 채로) 그 전제가 깨졌다 — 30~300%로 범위를 넓히면서
+  // "캔버스가 뷰포트보다 작은" 상황을 훨씬 자주 만나게 됐고, 그때마다 계산이 어긋나며
+  // 화면이 다른 위치로 튀었다 돌아오는 것처럼 보였다. canvasRect.left를 매번 다시 읽는
+  // scrollToGridPosition과 같은 방식으로 바꿔서, 가운데 정렬 여부와 무관하게 항상
+  // "지금 실제로 캔버스가 어디 있는지"를 기준으로 계산하도록 고쳤다.
+  const wheelZoomAnchorRef = useRef<{
+    readonly fractionX: number;
+    readonly fractionY: number;
+    readonly viewportX: number;
+    readonly viewportY: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const anchor = wheelZoomAnchorRef.current;
+    const scroll = scrollRef.current;
+    const canvas = canvasRef.current;
+    if (anchor === null || scroll === null || canvas === null) return;
+    wheelZoomAnchorRef.current = null;
+    const scrollRect = scroll.getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const contentX = scroll.scrollLeft + (canvasRect.left - scrollRect.left) + anchor.fractionX * canvasRect.width;
+    const contentY = scroll.scrollTop + (canvasRect.top - scrollRect.top) + anchor.fractionY * canvasRect.height;
+    scroll.scrollTo({
+      left: Math.max(0, contentX - anchor.viewportX),
+      top: Math.max(0, contentY - anchor.viewportY),
+      behavior: 'auto',
+    });
+  }, [zoom]);
+
+  // React의 onWheel(JSX) 핸들러는 wheel 리스너를 passive로 등록하므로 그 안에서는
+  // preventDefault()가 동작하지 않는다(브라우저 기본 스크롤을 막을 수 없음). 그래서
+  // 네이티브 addEventListener를 { passive: false }로 직접 붙인다.
+  //
+  // pendingZoomRef는 zoom prop이 아니라 "다음 렌더 전까지 우리가 요청해 둔 zoom"을
+  // 담는다. 트랙패드/정밀 마우스는 wheel 이벤트를 같은 프레임 안에서 연속으로 여러 번
+  // 쏘는데, 그때마다 zoom prop(state)은 아직 갱신 전이라 매번 같은 값에서 계산하면
+  // onZoomChange가 같은 값으로만 반복 호출되어(React가 동일 값 setState는 리렌더를
+  // 건너뜀) 줌이 안 먹는 것처럼 보인다. pendingZoomRef는 핸들러 안에서 즉시(동기) 갱신해
+  // 같은 프레임 안의 연속 이벤트도 누적되게 하고, zoom prop이 실제로 바뀌면 그 값으로
+  // 다시 맞춘다(버튼/1:1/맞춤 등 다른 경로로 바뀐 경우도 포함).
+  const pendingZoomRef = useRef(zoom);
+  useEffect(() => {
+    pendingZoomRef.current = zoom;
+  }, [zoom]);
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+
+  // 휠이 계속 굴러가는 동안은 .gss-map-stage의 width 전환 애니메이션을 꺼서(즉시 반영)
+  // 커서 중심 스크롤 보정이 매 틱 최종 폭 기준으로 즉시 적용되게 한다 — 애니메이션이 켜져
+  // 있으면 스크롤은 이미 최종 폭 기준으로 점프했는데 실제 폭은 160ms에 걸쳐 뒤늦게
+  // 따라오면서 화면이 좌우로 흔들려 보인다. 휠이 멈추고 WHEEL_ZOOM_IDLE_MS 동안 잠잠하면
+  // 다시 켜서, +/- 버튼·1:1·맞춤 등 다른 경로의 줌은 기존처럼 부드럽게 움직인다.
+  const wheelZoomIdleTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (scroll === null) return;
+    const handleWheelZoom = (event: globalThis.WheelEvent) => {
+      if (event.deltaY === 0) return;
+      event.preventDefault();
+      const canvas = canvasRef.current;
+      if (canvas === null) return;
+      const currentZoom = pendingZoomRef.current;
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const nextZoom = Math.round(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom + direction * WHEEL_ZOOM_STEP)));
+      if (nextZoom === currentZoom) return;
+      const scrollRect = scroll.getBoundingClientRect();
+      const canvasRect = canvas.getBoundingClientRect();
+      wheelZoomAnchorRef.current = {
+        fractionX: (event.clientX - canvasRect.left) / canvasRect.width,
+        fractionY: (event.clientY - canvasRect.top) / canvasRect.height,
+        viewportX: event.clientX - scrollRect.left,
+        viewportY: event.clientY - scrollRect.top,
+      };
+      pendingZoomRef.current = nextZoom;
+      stageRef.current?.classList.add('is-wheel-zooming');
+      if (wheelZoomIdleTimeoutRef.current !== null) window.clearTimeout(wheelZoomIdleTimeoutRef.current);
+      wheelZoomIdleTimeoutRef.current = window.setTimeout(() => {
+        wheelZoomIdleTimeoutRef.current = null;
+        stageRef.current?.classList.remove('is-wheel-zooming');
+      }, WHEEL_ZOOM_IDLE_MS);
+      onZoomChangeRef.current(nextZoom);
+    };
+    scroll.addEventListener('wheel', handleWheelZoom, { passive: false });
+    return () => {
+      scroll.removeEventListener('wheel', handleWheelZoom);
+      if (wheelZoomIdleTimeoutRef.current !== null) window.clearTimeout(wheelZoomIdleTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (fitRequestToken === 0) return;
@@ -368,7 +484,7 @@ export const TopDownCanvas = ({
       }}
       ref={scrollRef}
     >
-      <div className="gss-map-stage" style={{ width: `${canvasWidth}px` }}>
+      <div className="gss-map-stage" ref={stageRef} style={{ width: `${canvasWidth}px` }}>
         <div
           aria-label={`${scene.name} 맵 편집 캔버스`}
           className={`gss-map-canvas${placementPreset === null && !tileEditing ? '' : ' is-placing'}${showGrid ? '' : ' is-grid-hidden'}${canvasTool === 'PAN' ? ' is-pan-tool' : ''}${tileEditing ? ' is-tile-editing' : ''}${showCollisions ? ' is-showing-collisions' : ''}`}
