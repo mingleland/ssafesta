@@ -85,6 +85,30 @@ public enum ErrorCode {
      */
     AGENT_DELETE_CONFLICT(HttpStatus.CONFLICT, "사용 중인 AI 직원은 삭제할 수 없습니다."),
 
+    // ── AI 문서 · 저장소 (spec 007 US2) ─────────────────────────────────────
+    // 중복은 여기 없다. FR-019c 가 "중복은 오류가 아니다" 로 못박았고 응답은 200 + duplicate 판별자다 —
+    // DOCUMENT_DUPLICATE 를 만들면 계약 위반이다.
+    DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "문서를 찾을 수 없습니다."),
+    /** 10개·100MB (FR-018). 둘 다 설정값이라 thrower 가 숫자와 해결 방법을 message 에 담는다. */
+    DOCUMENT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "AI 직원의 문서 상한을 초과했습니다."),
+    /** 발급한 URL 로 올린 것이 저장소에 없거나 크기가 다르다 — 다시 올리면 되는 상태다. */
+    DOCUMENT_UPLOAD_INCOMPLETE(HttpStatus.CONFLICT, "업로드가 완료되지 않았습니다. 다시 올려 주세요."),
+    /**
+     * 만료된 업로드의 원본이 이미 없다 (FR-027). {@link #OAUTH_HANDOFF_EXPIRED} 와 같은 결로 410 이다 —
+     * 재시도가 아니라 <b>새 업로드 권한</b>이 필요하다는 뜻이라 409 와 구분한다.
+     */
+    DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
+    /** 저장소가 답하지 못했거나 감시가 끊겼다 (C-10). <b>재시도 가능</b>하다는 것이 507 과의 차이다. */
+    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    /**
+     * 저장소 할당량이 찼다 (C-10, #100 — usage guard 90%). <b>재시도로 풀리지 않아</b> 503 과 가른다.
+     *
+     * <p>업로드 실패가 아니라 <b>발급 거부</b>다. 브라우저가 저장소로 직행하는 PUT 은 Spring 을
+     * 통과하지 않으므로, 용량은 grant 를 내주기 전에 막는 것이 유일한 자리다 — 그래서 행도 만들지
+     * 않는다(차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다).
+     */
+    STORAGE_QUOTA_EXCEEDED(HttpStatus.INSUFFICIENT_STORAGE, "저장소 용량이 부족합니다. 관리자에게 문의해 주세요."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —
@@ -106,6 +130,22 @@ public enum ErrorCode {
     /** 사용자가 스스로 풀 수 있는 상태다 — thrower 가 상한값과 해결 방법을 message 에 담는다. */
     GAME_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "만들 수 있는 게임 수를 초과했습니다."),
     CONFIG_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 포털 연결을 찾을 수 없습니다."),
+
+    // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
+    // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에
+    // 나오면 계약 위반이다. 위반 항목의 구체값은 새 code 가 아니라 errors[].rule 로 나간다
+    // (§6) — grant 만료·PUT 누락도 그래서 GAME_ASSET_NOT_READY + rule 이고 새 code 가 아니다.
+    GAME_ASSET_KIND_UNSUPPORTED(HttpStatus.BAD_REQUEST, "지원하지 않는 자산 종류입니다."),
+    GAME_ASSET_TYPE_UNSUPPORTED(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 이미지 형식입니다."),
+    GAME_ASSET_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "이미지 용량이 너무 큽니다."),
+    GAME_ASSET_DIMENSION_EXCEEDED(HttpStatus.BAD_REQUEST, "이미지 크기가 너무 큽니다."),
+    GAME_ASSET_QUOTA_EXCEEDED(HttpStatus.CONFLICT, "이 게임에 올릴 수 있는 이미지 수를 초과했습니다."),
+    GAME_ASSET_CORRUPTED(HttpStatus.BAD_REQUEST, "이미지 파일이 손상되었습니다."),
+    GAME_ASSET_NOT_FOUND(HttpStatus.NOT_FOUND, "자산을 찾을 수 없습니다."),
+    GAME_ASSET_FORBIDDEN(HttpStatus.FORBIDDEN, "이 자산에 접근할 권한이 없습니다."),
+    GAME_ASSET_NOT_READY(HttpStatus.CONFLICT, "자산이 아직 사용할 수 없는 상태입니다."),
+    GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
+    GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

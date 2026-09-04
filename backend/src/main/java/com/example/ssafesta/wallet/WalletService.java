@@ -1,6 +1,8 @@
 package com.example.ssafesta.wallet;
 
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class WalletService {
+
+    private static final Logger log = LoggerFactory.getLogger(WalletService.class);
 
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
     private static final int MAX_REFERENCE_ID_LENGTH = 100;
@@ -67,7 +71,20 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public Wallet requireWallet(Long userId) {
-        return wallets.findByUserId(userId).orElseThrow(() -> new WalletNotFoundException(userId));
+        return wallets.findByUserId(userId).orElseThrow(() -> missingWallet(userId));
+    }
+
+    /**
+     * A member without a wallet is a broken state, not an expected 404: the wallet is created in
+     * the member-creation transaction. Report it, and leave a trace to investigate with.
+     *
+     * <p>The log lives here rather than at the callers because there are three throw sites and, for
+     * a while, only the one behind {@code GET /wallets/me} logged anything — booth lease and
+     * catalog purchase hit the same state and left nothing behind but a 500 (S15P21A604-402).
+     */
+    private WalletNotFoundException missingWallet(Long userId) {
+        log.error("회원에게 지갑이 없습니다 — 가입 트랜잭션을 확인해야 합니다. userId={}", userId);
+        return new WalletNotFoundException();
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +105,7 @@ public class WalletService {
      */
     @Transactional
     public void lockOwner(Long userId) {
-        wallets.findByUserIdForUpdate(userId).orElseThrow(() -> new WalletNotFoundException(userId));
+        wallets.findByUserIdForUpdate(userId).orElseThrow(() -> missingWallet(userId));
     }
 
     /** Grants coins — {@code CHARGE}, {@code REWARD} or {@code REFUND}. */
@@ -153,7 +170,7 @@ public class WalletService {
         CoinReason.validate(reasonType);
 
         Wallet wallet = wallets.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new WalletNotFoundException(userId));
+                .orElseThrow(() -> missingWallet(userId));
 
         Optional<CoinLedgerEntry> recorded = ledger.findByIdempotencyKey(idempotencyKey);
         if (recorded.isPresent()) {

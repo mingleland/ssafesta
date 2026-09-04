@@ -28,6 +28,7 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <aws.sdk.version>2.32.14</aws.sdk.version>
     </properties>
     <dependencies>
         <dependency>
@@ -70,6 +71,20 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>3.0.3</version>
+        </dependency>
+        <!--
+            WebP reader. 계약(game-asset-upload.md §5)이 image/webp 를 허용 MIME 에 넣었지만
+            Java 21 ImageIO 에는 WebP reader 가 없다 (JPEG·PNG·GIF·BMP·WBMP·TIFF 뿐) —
+            없으면 정상 WebP 가 전부 GAME_ASSET_CORRUPTED 로 거부된다.
+            ServiceLoader 로 등록되므로 호출부 코드는 없다. 그래서 등록 실패가 조용하고,
+            증상이 "정상 파일이 손상으로 거부"라 원인이 보이지 않는다 —
+            GameAssetImageValidatorTest 가 reader 존재를 직접 단언한다.
+            애니메이션 WebP 는 이 라이브러리가 읽지 못한다. 그래서 RIFF 헤더에서 걸러 거부한다.
+        -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.12.0</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -152,7 +167,28 @@
             <artifactId>json-schema-validator</artifactId>
             <version>1.5.6</version>
         </dependency>
+        <!--
+          spec 007 US2 문서 원본 저장. Cloudflare R2 는 S3 호환이므로 전용 SDK 가 없고 AWS SDK v2 로
+          붙는다 (C-07). S3Presigner 는 s3 아티팩트 안에 있어 모듈이 하나면 된다.
+          MinIO fallback(C-10)도 같은 SDK 로 붙으므로 어댑터가 하나로 끝난다.
+        -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
     </dependencies>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>

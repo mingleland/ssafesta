@@ -38,3 +38,28 @@ export function normalizeRotation(deg: number): number {
   const r = deg % 360;
   return r < 0 ? r + 360 : r;
 }
+
+// 새 오브젝트를 놓을 빈 자리 — 같은 지점에 쌓이면 선택도 드래그도 불가능해진다.
+// 부스 중앙에서 바깥으로 나선형으로 훑어 이미 놓인 것과 최소 간격이 확보되는 첫 칸을 고른다.
+export function findFreeSpot(
+  taken: ReadonlyArray<{ x: number; z: number }>,
+  bounds: { width: number; depth: number },
+  minGap: number = 0.9,
+): { x: number; z: number } {
+  const step = 0.75;
+  const halfW = bounds.width / 2 - 0.4;
+  const halfD = bounds.depth / 2 - 0.4;
+  const free = (x: number, z: number) => taken.every((t) => Math.hypot(t.x - x, t.z - z) >= minGap);
+  for (let ring = 0; ring <= Math.ceil(Math.max(halfW, halfD) / step); ring += 1) {
+    for (let ix = -ring; ix <= ring; ix += 1) {
+      for (let iz = -ring; iz <= ring; iz += 1) {
+        if (ring > 0 && Math.abs(ix) !== ring && Math.abs(iz) !== ring) continue;
+        const x = clamp(ix * step, -halfW, halfW);
+        const z = clamp(iz * step, -halfD, halfD);
+        // +0 을 더해 -0 을 없앤다 — 계약 JSON 에 -0 이 들어가면 서버·Unity 쪽 비교가 흔들린다
+        if (free(x, z)) return { x: snap(x) + 0, z: snap(z) + 0 };
+      }
+    }
+  }
+  return { x: 0, z: 0 };
+}

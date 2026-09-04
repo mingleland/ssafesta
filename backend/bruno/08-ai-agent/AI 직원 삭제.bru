@@ -1,0 +1,33 @@
+meta {
+  name: AI 직원 삭제
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/v1/agents/{{agentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## AI 직원 삭제 — 참조 중이면 거부한다
+
+  - 인증: **필수** (그 부스 편집 권한)
+  - 성공: `204 No Content`
+
+  **어딘가에서 쓰고 있으면 지워지지 않는다** (`409 AGENT_DELETE_CONFLICT`). 검사 대상은 작업본 배치, **현재** 공개된 배치, 그리고 그 직원을 가리키는 데이터다. 지우려면 먼저 `05-booth-layout/작업본 저장`에서 연결을 끊고 `공개`를 다시 실행한다.
+
+  지난 공개 회차에만 남아 있는 참조는 삭제를 막지 않는다 — 방문자가 보는 것은 현재 공개본뿐이다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `204` | 삭제 완료 |
+  | `403` | 게스트 또는 그 부스 편집 권한 없음 |
+  | `404 AGENT_NOT_FOUND` | 그런 AI 직원이 없다 |
+  | `409 AGENT_DELETE_CONFLICT` | 작업본·현재 공개본이 참조 중이다 |
+}

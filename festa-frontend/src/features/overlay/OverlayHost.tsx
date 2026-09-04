@@ -3,6 +3,10 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react';
 import { closeOverlay, getCurrentOverlay, subscribeOverlay } from '../../shared/types/overlay';
 import { LaptopOverlay } from './LaptopOverlay';
+import { ProjectOverlay } from '../project/ui/ProjectOverlay';
+import { SurveyOverlay } from '../survey/ui/SurveyOverlay';
+import { ConsultationOverlay } from '../consultation/ui/ConsultationOverlay';
+import { AiChatOverlay } from '../ai/ui/AiChatOverlay';
 import type { GameOverlayPayload } from '../../game-studio/host/GameOverlay';
 
 // lazy 로 가른다 — GameOverlay 는 PublishedGameSurface·ReferenceGamePlayer 를 통해 게임 런타임 전체를
@@ -23,6 +27,22 @@ export function OverlayHost() {
     return <LaptopOverlay payload={request.payload as { boothId: number; objectId: string }} />;
   }
 
+  if (request.type === 'PROJECT') {
+    return <ProjectOverlay payload={request.payload as { boothId: number }} />;
+  }
+
+  if (request.type === 'SURVEY') {
+    return <SurveyOverlay payload={request.payload as { boothId: number; surveyId?: string }} />;
+  }
+
+  if (request.type === 'CONSULTATION') {
+    return <ConsultationOverlay payload={request.payload as { boothId: number }} />;
+  }
+
+  if (request.type === 'AI_CHAT') {
+    return <AiChatOverlay payload={request.payload as { boothId: number; agentId?: number }} />;
+  }
+
   if (request.type === 'GAME') {
     return (
       <Suspense fallback={<p>게임을 여는 중입니다.</p>}>
@@ -31,8 +51,7 @@ export function OverlayHost() {
     );
   }
 
-  // AI_CHAT·SURVEY·CONSULTATION — 각 소비 spec(008·010·011)의 UI가 아직 없다.
-  // 이벤트가 Dispatcher를 거쳐 여기까지 도달하는지 확인하기 위한 임시 플랫폼 동작일 뿐이다.
+  // 여기 남는 것은 이 편집기가 모르는 미래 타입뿐이다 — 조용히 무시하지 않고 알린다.
   return (
     <div>
       <p>이 기능은 준비 중입니다.</p>

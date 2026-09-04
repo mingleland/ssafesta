@@ -89,7 +89,7 @@ backend/src/main/java/com/example/ssafesta/booth/
 ├── BoothLayoutController.java         # /booths/{id}/layouts/{draft,publish,published}
 ├── BoothFacadeService.java            # facade 조회·수정
 ├── BoothFacadeController.java         # PUT /booths/{id}/facade
-├── BoothEditorGuard.java              # owner + booth_staffs 권한 판정 (FR-012)
+├── BoothAccessGuard.java              # owner + booth_staffs 권한 판정 (FR-012)
 ├── BoothStaff.java / BoothStaffRepository.java   # 읽기 전용 — 초대 흐름은 011
 ├── LayoutRevisionConflictException.java
 ├── LayoutValidationFailedException.java

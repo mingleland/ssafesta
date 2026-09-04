@@ -23,7 +23,7 @@ export interface EditorState {
 
 export type EditorAction =
   | { type: 'LOAD_DRAFT'; boothId: number; template: string; objects: LayoutObject[]; revision: number; publishedVersion: number | null }
-  | { type: 'ADD_OBJECT'; objectType: ObjectType; x: number; z: number }
+  | { type: 'ADD_OBJECT'; objectType: ObjectType; x: number; z: number; assetCode?: string }
   | { type: 'MOVE_OBJECT'; objectId: string; x: number; z: number }
   | { type: 'ROTATE_OBJECT'; objectId: string; rotationY: number }
   | { type: 'REMOVE_OBJECT'; objectId: string }
@@ -76,6 +76,8 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         type: action.objectType,
         position: { x: action.x, y: 0, z: action.z },
         rotationY: 0,
+        // 팔레트가 고른 장식 외형 코드 — 계약 필드 assetCode 그대로. 없으면 필드 자체를 생략한다(서버 NON_NULL)
+        ...(action.assetCode !== undefined ? { assetCode: action.assetCode } : {}),
       };
       return {
         ...state,

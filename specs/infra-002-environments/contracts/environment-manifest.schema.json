@@ -64,6 +64,10 @@
       },
       "uniqueItems": true
     },
+    "mockAdapters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/mockAdapter" }
+    },
     "resourcePolicy": { "$ref": "#/$defs/resourcePolicy" }
   },
   "allOf": [
@@ -190,6 +194,15 @@
           "minItems": 1,
           "items": { "type": "string" }
         }
+      }
+    },
+    "mockAdapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "approvalRef"],
+      "properties": {
+        "component": { "enum": ["ai", "back", "front", "game"] },
+        "approvalRef": { "type": "string", "minLength": 1 }
       }
     }
   }

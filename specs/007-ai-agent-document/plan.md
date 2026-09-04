@@ -115,7 +115,7 @@ backend/src/main/
 저장·검증·편집 API 까지가 범위이고, 설정을 FastAPI 로 전달하는 경로는 spec 008 의
 access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`leaseEndsAt` 만 나른다).
 
-**권한** — `BoothEditorGuard`(소유자·스태프, C-15). 005·016·009 와 같은 편집자 범위다. 쓰기는
+**권한** — `BoothAccessGuard`(소유자·스태프, C-15). 005·016·009 와 같은 편집자 범위다. 쓰기는
 유효 임대를 요구하고(만료 부스는 아무에게도 보이지 않으므로 편집이 무의미하다) 읽기는 만료돼도
 허용한다. 직원 역할별 제한(011 C-09)은 011 구현 때 가드 한 곳에서 일괄로 닫는다.
 
@@ -168,7 +168,8 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 
 - 자동 failover·이중 쓰기·자동 원복은 구현하지 않는다. P0에서는 probe timeout·5xx·latency를 운영 판단 evidence로만 수집하고, 운영자가 `UPLOAD_BLOCKED`를 수동 적용한다. 자동 장애 판정과 자동 상태 전환은 후속 이슈에서 기준이 확정될 때까지 구현하지 않는다.
 - 운영 상태는 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`이며, `LOCAL_ACTIVE` 전환과 `R2_ACTIVE` 복귀에는 운영자 승인과 검증 근거가 필요하다.
-- Spring의 `upload-enabled`와 `active-write-provider`는 신규 upload grant만 제어한다. Usage Guard의 용량·stale 상태와 저장소 전환 상태 머신은 별도 개념이다.
+- Spring의 `upload-gate`와 `active-write-provider`는 신규 upload grant만 제어한다. Usage Guard의 용량·stale 상태와 저장소 전환 상태 머신은 별도 개념이며 **Spring은 그 상태 머신을 모른다** — 운영자가 두 기계를 읽고 판정 하나를 `upload-gate`에 적는다 (GitLab #100, 2026-09-01 확정).
+- `upload-gate`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이고 기본값이 없다. 정상·경고와 검증 완료된 `LOCAL_ACTIVE`는 `OPEN`, 사용량 90% 초과는 `QUOTA_BLOCKED`(507), stale 지표·R2 장애·`FALLBACK_VALIDATING`·`R2_RECONCILING`은 `UNAVAILABLE`(503)이다. 두 차단을 한 값으로 뭉치지 않는 이유는 재시도 안내가 갈리기 때문이다 — 용량이 찬 사용자에게 "잠시 후 다시"를 주면 영원히 재시도한다.
 - Spring과 FastAPI에는 R2·MinIO의 endpoint·bucket·credential을 모두 주입한다. FastAPI는 활성 쓰기 Provider를 선택하지 않고 문서 행의 `storage_provider + storage_bucket + object_key`로 다운로드 adapter를 고른다.
 - 활성 쓰기 Provider가 바뀐 뒤 미완료 업로드를 재개하면 기존 행을 `EXPIRED`로 전환하고 새 문서·새 object key를 만든다. 같은 Provider일 때만 같은 문서로 presigned URL을 재발급한다.
 - 저장소 일시 장애는 1·5·15분 backoff로 최대 3회 재시도한 뒤 `DEAD → FAILED`로 종료한다. MinIO를 백업·복제본·고가용성 저장소로 간주하지 않는다.
@@ -287,8 +288,8 @@ access/Conversation 계약이 소유한다(현 계약은 `agentId`·`status`·`l
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | R2 secret 주입, 기본값 없음 |
 | `MINIO_ENDPOINT`, `MINIO_BUCKET` | MinIO endpoint와 문서 bucket. 외부 직접 노출 금지 |
 | `MINIO_ACCESS_KEY_ID`, `MINIO_SECRET_ACCESS_KEY` | MinIO secret 주입, 기본값 없음 |
-| Spring `app.ai.storage.upload-enabled` | `false`면 신규 upload grant 차단 |
-| Spring `app.ai.storage.active-write-provider` | `R2/MINIO_LOCAL`, 신규 업로드에만 사용 |
+| Spring `app.ai.storage.upload-gate` | `OPEN`/`QUOTA_BLOCKED`(507)/`UNAVAILABLE`(503). 기본값 없음 — 빠지면 기동 실패 |
+| Spring `app.ai.storage.active-write-provider` | `R2/MINIO_LOCAL`, 신규 업로드에만 사용. 기본값 없음 |
 
 Spring의 업로드·삭제 설정은 Presigned URL 15분, 미완료 만료 1시간, 정리 유예 24시간, sweeper 5분을 기본값으로 두며 환경 설정으로 조정한다. Spring에 주입되는 R2 자격증명의 `DeleteObject` 범위는 문서 버킷 또는 지정 prefix로 제한한다.
 

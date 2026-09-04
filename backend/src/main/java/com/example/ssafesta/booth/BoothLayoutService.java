@@ -19,19 +19,17 @@ public class BoothLayoutService {
 
     private final BoothLayoutDraftRepository drafts;
     private final BoothLayoutPublishedVersionRepository published;
-    private final BoothLeaseRepository leases;
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
     private final LayoutValidator validator;
     private final BoothRepository booths;
 
     public BoothLayoutService(BoothLayoutDraftRepository drafts,
                               BoothLayoutPublishedVersionRepository published,
-                              BoothLeaseRepository leases, BoothEditorGuard editorGuard,
+                              BoothAccessGuard accessGuard,
                               LayoutValidator validator, BoothRepository booths) {
         this.drafts = drafts;
         this.published = published;
-        this.leases = leases;
-        this.editorGuard = editorGuard;
+        this.accessGuard = accessGuard;
         this.validator = validator;
         this.booths = booths;
     }
@@ -44,7 +42,7 @@ public class BoothLayoutService {
      */
     @Transactional
     public SaveOutcome saveDraft(Long boothId, Long userId, String requestBody) {
-        editorGuard.requireEditor(boothId, userId);
+        accessGuard.requireEditor(boothId, userId);
 
         LayoutJson.SaveRequest request = readRequest(requestBody);
         if (request.expectedRevision() == null) {
@@ -77,7 +75,7 @@ public class BoothLayoutService {
      */
     @Transactional
     public PublishOutcome publish(Long boothId, Long userId) {
-        editorGuard.requireEditor(boothId, userId);
+        accessGuard.requireEditor(boothId, userId);
 
         // Locked before validating, not after: the agents this publish is about to approve can be
         // deleted concurrently, and the layout's reference to them is JSON with no foreign key to
@@ -86,9 +84,9 @@ public class BoothLayoutService {
         Booth booth = booths.findWithLockById(boothId)
                 .orElseThrow(() -> new BoothNotFoundException(boothId));
 
-        // Same predicate as every other occupancy question (research R-06).
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        // Same predicate as every other occupancy question (research R-06). Kept apart from the
+        // editor check above because the booth lock has to be taken between the two.
+        accessGuard.requireActiveLease(boothId);
 
         BoothLayoutDraft draft = drafts.findById(boothId).orElseThrow(() -> validationFailure(
                 "공개할 배치가 없습니다.", "NO_DRAFT", "먼저 배치를 저장해야 공개할 수 있습니다."));

@@ -165,7 +165,7 @@ FastAPI migration/runtime role은 AI DB에만 CONNECT할 수 있고 Business DB�
 
 **Decision**: P0에서는 자동 failover·이중 쓰기·자동 복제·자동 원복을 구현하지 않는다. 저장소 전환은 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태 머신을 따르며, `UPLOAD_BLOCKED` 이후 전환과 원복에는 운영자의 검증·승인이 필요하다. ([GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100))
 
-Spring은 `upload-enabled`와 `active-write-provider(R2/MINIO_LOCAL)`로 신규 업로드를 결정한다. Provider별 endpoint·bucket·credential은 Secret Reference로 따로 주입한다. FastAPI는 활성 쓰기 Provider를 선택하지 않고 문서의 `storage_provider + storage_bucket + object_key`를 읽어 해당 저장소 adapter를 사용한다. 전환 전 R2 문서는 계속 R2에서 읽고, 전환 후 신규 문서만 MinIO에 쓴다.
+Spring은 `upload-gate`와 `active-write-provider(R2/MINIO_LOCAL)`로 신규 업로드를 결정한다. `upload-gate`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이며, 위 상태 머신을 Spring이 아니라 **운영자가 읽어 한 값으로 옮겨 적는다** (GitLab #100, 2026-09-01 확정). 할당량 초과는 507, 장애·전환 창은 503으로 갈리므로 boolean 한 칸으로는 표현되지 않는다. Provider별 endpoint·bucket·credential은 Secret Reference로 따로 주입하며, 항목이 전부 비면 미구성으로 보고 목록에서 빠진다(부분 입력은 기동 실패). FastAPI는 활성 쓰기 Provider를 선택하지 않고 문서의 `storage_provider + storage_bucket + object_key`를 읽어 해당 저장소 adapter를 사용한다. 전환 전 R2 문서는 계속 R2에서 읽고, 전환 후 신규 문서만 MinIO에 쓴다.
 
 업로드 재개 시 Provider가 같으면 같은 문서로 재발급하고, 다르면 기존 미완료 문서를 `EXPIRED`로 전환한 뒤 새 문서와 object key로 시작한다. 저장소 일시 장애는 최대 3회(1·5·15분) 재시도 후 `DEAD → FAILED`로 종료하며 무한 재시도하지 않는다.
 

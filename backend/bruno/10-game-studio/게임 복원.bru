@@ -1,0 +1,34 @@
+meta {
+  name: 게임 복원
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}/restore
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 삭제한 게임 복원
+
+  - 인증: **필수** (소유자)
+  - 요청 본문 없음
+  - 성공: `200 OK`, 복원된 요약
+
+  복원은 **살아 있는 칸을 하나 차지**하므로 생성과 같은 상한을 통과해야 한다. 라이브러리가 꽉 차 있으면 `409 GAME_LIMIT_EXCEEDED`이고, 다른 게임을 지운 뒤 다시 시도한다.
+
+  작업본·게시본·공개 설정은 삭제 시점 그대로 돌아온다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 복원 성공 |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404 GAME_NOT_FOUND` | 그런 게임이 없다 |
+  | `409 GAME_LIMIT_EXCEEDED` | 살아 있는 게임 상한이 꽉 찼다 |
+}

@@ -2,7 +2,8 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
-import java.time.Instant;
+import com.example.ssafesta.common.HttpUrlValidator;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -21,24 +22,18 @@ public class BoothFacadeService {
     private static final Set<String> THEME_CODES = Set.of("DEFAULT", "SSAFY_BLUE", "WARM", "MONO");
     private static final Pattern HEX_COLOR = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final int MAX_SIGN_TEXT = 60;
-    private static final int MAX_URL = 2048;
 
-    private final BoothEditorGuard editorGuard;
-    private final BoothLeaseRepository leases;
+    private final BoothAccessGuard accessGuard;
 
-    public BoothFacadeService(BoothEditorGuard editorGuard, BoothLeaseRepository leases) {
-        this.editorGuard = editorGuard;
-        this.leases = leases;
+    public BoothFacadeService(BoothAccessGuard accessGuard) {
+        this.accessGuard = accessGuard;
     }
 
     @Transactional
     public FacadeView update(Long boothId, Long userId, FacadeCommand command) {
-        Booth booth = editorGuard.requireEditor(boothId, userId);
-
         // An expired booth shows no facade at all (spec 004 만료 계약), so editing one would be
         // changing something nobody can see — and the same predicate decides both.
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
         String themeCode = command.themeCode() == null ? "DEFAULT" : command.themeCode();
         if (!THEME_CODES.contains(themeCode)) {
@@ -49,7 +44,7 @@ public class BoothFacadeService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "간판 문구는 " + MAX_SIGN_TEXT + "자까지입니다.");
         }
-        validateLogoUrl(command.logoUrl());
+        HttpUrlValidator.validateHttpsOnly(command.logoUrl(), "logoUrl", "로고");
 
         booth.changeFacade(themeCode, primaryColor, command.signText(), command.logoUrl());
         return FacadeView.of(booth);
@@ -81,26 +76,20 @@ public class BoothFacadeService {
         return normalized;
     }
 
-    /**
-     * Only {@code https}.
-     *
-     * <p>The world is served over TLS, so an {@code http} logo would be blocked as mixed content and
-     * the booth would simply show nothing — a failure the owner could not diagnose from the outside.
-     */
-    private void validateLogoUrl(String logoUrl) {
-        if (logoUrl == null) {
-            return;
-        }
-        if (logoUrl.length() > MAX_URL) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "로고 URL이 너무 깁니다.");
-        }
-        if (!logoUrl.startsWith("https://")) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "로고 URL은 https로 시작해야 합니다.");
-        }
-    }
+    @Schema(description = "외관 값 전체. 보내지 않은 필드는 비워진다")
+    public record FacadeCommand(
+            @Schema(description = "외벽 테마. 생략하면 `DEFAULT`",
+                    allowableValues = {"DEFAULT", "SSAFY_BLUE", "WARM", "MONO"}, example = "SSAFY_BLUE")
+            String themeCode,
+            @Schema(description = "대표색. `#RRGGBB` 이면서 12색 팔레트 안의 값", example = "#3B82F6")
+            String primaryColor,
+            @Schema(description = "간판 문구. 최대 60자", maxLength = 60, example = "AI 프로젝트 전시관")
+            String signText,
+            @Schema(description = "로고 이미지 주소. **https 만** 허용, 최대 2048자", maxLength = 2048,
+                    example = "https://cdn.example.com/logo.png")
+            String logoUrl) { }
 
-    public record FacadeCommand(String themeCode, String primaryColor, String signText, String logoUrl) { }
-
+    @Schema(description = "저장된 외관. 방문자용 부스 상세의 `facade` 와 같은 모양이다")
     public record FacadeView(String themeCode, String primaryColor, String signText, String logoUrl) {
 
         public static FacadeView of(Booth booth) {

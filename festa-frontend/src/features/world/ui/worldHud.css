@@ -1,0 +1,94 @@
+/* World HUD — 화면 고정 최소 안내. World 를 가리지 않는 것이 1원칙(hud-decisions §11). */
+.world-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  color: #eaeefb;
+  z-index: 20;
+}
+.world-hud > * { pointer-events: auto; }
+
+.world-hud-guide {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  width: 246px;
+  padding: 12px 14px 13px;
+  border-radius: 14px;
+  background: rgba(12, 16, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 34px rgba(4, 6, 20, 0.45);
+  backdrop-filter: blur(8px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .world-hud-guide { background: #10142a; backdrop-filter: none; }
+}
+.world-hud-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.world-hud-guide-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(234, 238, 251, 0.7);
+  cursor: pointer;
+}
+.world-hud-guide-head button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+.world-hud-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.world-hud-keys li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: rgba(234, 238, 251, 0.82);
+}
+.world-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+}
+.world-hud-note {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: rgba(234, 238, 251, 0.6);
+}
+
+.world-hud-guide-open {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(12, 16, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #eaeefb;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.world-hud-guide-open:hover { background: rgba(20, 26, 52, 0.85); }

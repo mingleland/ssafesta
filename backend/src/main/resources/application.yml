@@ -70,6 +70,14 @@ app:
     # 기본값 없음 — false 로 조용히 뜨면 HTTPS 배포에서 Refresh 쿠키가 Secure 없이 나간다.
     cookie-secure: ${AUTH_COOKIE_SECURE}
 
+  # dev·demo 가 단일 EC2 의 Redis 한 인스턴스를 공유한다(infra-002 plan.md:59). 모든 키가
+  # 이 값을 맨 앞에 달아 환경끼리 덮어쓰지 않는다 — 맨 앞이라 SCAN {namespace}:* 하나로
+  # 환경 전체를 훑는다.
+  # 기본값 없음 — 빈 값으로 조용히 뜨면 두 환경이 세션과 일일 지급을 공유하고, 그 사실이
+  # 드러나는 곳이 없다. Infra 주입값은 dev|demo 다 (GitLab #117).
+  redis:
+    namespace: ${FESTA_ENVIRONMENT}
+
   wallet:
     initial-grant: 200
     daily-grant: 50
@@ -105,8 +113,39 @@ app:
 
   # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
   # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
-  # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비할 자리다.
+  # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비한다.
   agent:
     per-booth-limit: 1
     document-count-limit: 10
     document-total-bytes: 100MB
+
+  # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
+  ai:
+    storage:
+      # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환
+      # 상태를 읽고 한 칸으로 옮겨 적는다 — 서버는 상태 기계를 알지 못한다.
+      #   OPEN           정상·경고, LOCAL_ACTIVE 검증 완료
+      #   QUOTA_BLOCKED  사용량 90% 초과 → 507. 재시도해도 풀리지 않는다
+      #   UNAVAILABLE    stale 지표·R2 장애·FALLBACK_VALIDATING·R2_RECONCILING → 503. 재시도 가능
+      # 기본값을 두지 않는다. Spring 은 모르는 키를 조용히 무시하므로 오타가 "허용"으로 떨어지면
+      # 막아 뒀다고 믿는 동안 발급이 계속된다 — 안전 장치는 오타로 열려서는 안 된다.
+      upload-gate: ${AI_STORAGE_UPLOAD_GATE}
+      # 신규 업로드가 갈 곳일 뿐이다. 기존 객체의 읽기·HEAD·삭제는 문서 행의 storage_provider 를
+      # 따른다 (FR-030) — 전환 전에 올라간 파일은 옛 provider 에 남아 있다.
+      # env 인 이유: MinIO fallback 이 "설정 변경 + 재배포"라서 값이 이미지에 박히면 전환할 수 없다.
+      active-write-provider: ${AI_STORAGE_ACTIVE_WRITE_PROVIDER}
+      presign-ttl: 15m
+      providers:
+        R2:
+          endpoint: ${R2_ENDPOINT}
+          bucket: ${R2_BUCKET}
+          access-key-id: ${R2_ACCESS_KEY_ID}
+          secret-access-key: ${R2_SECRET_ACCESS_KEY}
+        # 전 필드가 비면 미구성으로 보고 목록에서 빠진다(AiStorageProperties). R2 만 쓰는 배포가
+        # MinIO 자격증명을 억지로 채우지 않아도 되고, fallback 시 Infra 가 값을 넣고
+        # active-write-provider 만 MINIO_LOCAL 로 바꾸면 된다. 부분 입력은 기동 실패다.
+        MINIO_LOCAL:
+          endpoint: ${MINIO_ENDPOINT:}
+          bucket: ${MINIO_BUCKET:}
+          access-key-id: ${MINIO_ACCESS_KEY_ID:}
+          secret-access-key: ${MINIO_SECRET_ACCESS_KEY:}

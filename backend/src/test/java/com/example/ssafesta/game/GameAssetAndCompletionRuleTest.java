@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -27,13 +28,71 @@ class GameAssetAndCompletionRuleTest {
     // ── ASSET_SOURCE_INVALID ───────────────────────────────────────────────
 
     /**
-     * The server issues no {@code asset://} at all — user upload is outside the MVP (§Asset Boundary)
-     * and the endpoint that would mint an id has no contract yet (#69). Accepting one stores a
-     * reference to something that cannot exist.
+     * The server issues {@code asset://game/{gameId}/{assetId}} and nothing else (§2). Any other
+     * authority is a reference to something that cannot be resolved, so it is refused whatever it
+     * looks like.
      */
     @Test
-    void anArbitraryAssetUriIsRefusedBecauseNothingIssuesOne() {
+    void anAssetUriWithAnotherAuthorityIsRefused() {
         assertRule(withAssetSource("asset://uploads/7/whatever.png"), "ASSET_SOURCE_INVALID");
+    }
+
+    // ── the server now issues asset://, so state decides (#69, contract §9) ─
+
+    @Test
+    void aReadyAssetOfThisGameIsAccepted() {
+        ObjectNode project = withAssetSource("asset://game/" + GAME_ID + "/aB7kQ2mZ9xR4tL6vN0wY3sJ8pc");
+
+        assertDoesNotThrow(() -> validator.validateForPublish(project, GameTestSupport.write(project),
+                GAME_ID, Map.of("aB7kQ2mZ9xR4tL6vN0wY3sJ8pc", GameAssetState.READY)));
+    }
+
+    /**
+     * Every not-usable state is refused, and refused at Draft too.
+     *
+     * <p>Saving a reference to an upload that has not finished is the case that looks harmless: the
+     * editor would store it, the upload would fail, and the picture would go missing on another
+     * device with nothing having reported an error.
+     */
+    @Test
+    void anAssetThatIsNotReadyIsRefusedAtDraftAndPublish() {
+        String assetId = "aB7kQ2mZ9xR4tL6vN0wY3sJ8pc";
+        ObjectNode project = withAssetSource("asset://game/" + GAME_ID + "/" + assetId);
+
+        for (GameAssetState state : List.of(GameAssetState.UPLOADING, GameAssetState.FAILED,
+                GameAssetState.DELETED, GameAssetState.MISSING)) {
+            Map<String, GameAssetState> snapshot = Map.of(assetId, state);
+            assertRule(project, snapshot, "ASSET_SOURCE_INVALID");
+            GameValidationFailedException draftRefusal = assertThrows(GameValidationFailedException.class,
+                    () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID,
+                            snapshot));
+            assertTrue(draftRefusal.errors().stream().map(ApiErrorDetail::rule)
+                            .anyMatch("ASSET_SOURCE_INVALID"::equals),
+                    () -> state + " 는 Draft 에서도 거부되어야 한다");
+        }
+    }
+
+    /**
+     * Another game's asset, even one that is {@code READY} there.
+     *
+     * <p>The authority is compared on the string before any lookup, so this is refused without
+     * asking the database whether that asset exists — the answer to that question is not ours to
+     * give (contract §2).
+     */
+    @Test
+    void anAssetOfAnotherGameIsRefusedWithoutLookup() {
+        String assetId = "aB7kQ2mZ9xR4tL6vN0wY3sJ8pc";
+        ObjectNode project = withAssetSource("asset://game/" + (GAME_ID + 1) + "/" + assetId);
+
+        assertRule(project, Map.of(assetId, GameAssetState.READY), "ASSET_SOURCE_INVALID");
+    }
+
+    /** A nested path is not the issued form — {@code assetId} is one segment (§2). */
+    @Test
+    void anAssetUriWithExtraPathSegmentsIsRefused() {
+        ObjectNode project = withAssetSource("asset://game/" + GAME_ID + "/nested/sprite.png");
+
+        assertRule(project, Map.of("nested", GameAssetState.READY), "ASSET_SOURCE_INVALID");
     }
 
     /** The editor's local preview scheme, refused for the same reason it always was. */
@@ -53,7 +112,7 @@ class GameAssetAndCompletionRuleTest {
         ObjectNode project = GameTestSupport.validProjectFor(GAME_ID);
 
         assertDoesNotThrow(() -> validator.validateForPublish(
-                project, GameTestSupport.write(project), GAME_ID));
+                project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     // ── COMPLETION_PATH_MISSING ────────────────────────────────────────────
@@ -81,7 +140,7 @@ class GameAssetAndCompletionRuleTest {
         ObjectNode project = withoutCompleteGame();
 
         assertDoesNotThrow(() -> validator.validateForDraft(
-                project, GameTestSupport.write(project), GAME_ID));
+                project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
@@ -117,8 +176,13 @@ class GameAssetAndCompletionRuleTest {
     }
 
     private void assertRule(ObjectNode project, String expectedRule) {
+        assertRule(project, Map.of(), expectedRule);
+    }
+
+    private void assertRule(ObjectNode project, Map<String, GameAssetState> assetStates, String expectedRule) {
         GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID,
+                        assetStates));
 
         List<String> rules = thrown.errors().stream().map(ApiErrorDetail::rule).toList();
         assertTrue(rules.contains(expectedRule),
