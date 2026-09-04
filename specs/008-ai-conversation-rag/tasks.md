@@ -31,7 +31,7 @@
 - [ ] T015 [P] [US1] Write Conversation API and C-07 SSE contract tests in festa-ai/tests/contract/test_conversation_api.py and festa-ai/tests/contract/test_sse_contract.py
 - [ ] T016 [P] [US1] Write context budget and completed-turn-only unit tests in festa-ai/tests/unit/test_context_service.py and festa-ai/tests/unit/test_conversation_repository.py
 - [ ] T017 [US1] Implement authenticated Conversation create/get/close lifecycle with 30-minute TTL in festa-ai/app/services/conversation_service.py
-- [ ] T018 [US1] Implement token counting and low-priority truncation order in festa-ai/app/services/context_service.py
+- [X] T018 [US1] Implement token counting and low-priority truncation order in festa-ai/app/services/context_service.py (`S15P21A604-129`)
 - [ ] T019 [US1] Implement question validation, READY-empty fixed response, retrieval, context assembly, and LLM orchestration in festa-ai/app/services/rag_service.py
 - [ ] T020 [US1] Implement C-07 sequence, source deduplication, terminal exclusivity, and completed-turn commit in festa-ai/app/services/stream_service.py
 - [ ] T021 [US1] Implement create, message SSE, and idempotent close endpoints in festa-ai/app/api/v1/conversations.py

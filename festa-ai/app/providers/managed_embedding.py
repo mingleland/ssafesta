@@ -73,7 +73,11 @@ class ManagedEmbeddingProvider:
         headers = {
             "Authorization": f"Bearer {self._api_key.get_secret_value()}"
         }
-        payload = {"model": self.model_id, "input": list(texts)}
+        payload = {
+            "model": self.model_id,
+            "input": list(texts),
+            "dimensions": self.dimension,
+        }
 
         try:
             response = await self._client.post(
