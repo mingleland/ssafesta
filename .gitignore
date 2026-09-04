@@ -22,3 +22,8 @@ Thumbs.db
 
 # 원격 세션이 파일을 지울 수 없을 때 임시로 옮겨두는 폴더 (수동 삭제 대상)
 _to_delete/
+
+# RAG 스파이크 평가용 원본 기획서·PDF — 결과 JSON에 원문을 넣지 않는 정책과 동일하게
+# 소스 자체도 커밋하지 않는다 (spikes/ai-rag/README.md 안전 조건)
+기획서 문서/
+festa-ai/*.pdf

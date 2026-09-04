@@ -122,6 +122,45 @@ rag-strategy-summary \
 - 판정 기준은 370과 동일: Recall 0.95 이상 & 검색 P95 1,000ms 이하 게이트 통과 → MRR 높은 순 →
   평균 Context 토큰 낮은 순.
 
+## Reranker 비교 (`S15P21A604-371`)
+
+370에서 확정한 청킹·모델·Top-K(`config/retrieval-defaults.json`) 위에서 4가지 방식을
+비교한다: Baseline(재정렬 없음) · 벡터 유사도 절단 · Cross-Encoder(로컬
+`sentence-transformers`) · GMS LLM(프롬프트 기반 listwise reranking). 각 방식 실패는
+조용히 기본값으로 되돌리지 않고 `rerank_failure_count`로 드러내며, 실패한 질문만
+bi-encoder 원 순서로 대체해 나머지 평가가 계속되게 한다.
+
+```bash
+rag-rerank \
+  --pdf data/sample.pdf \
+  --eval data/gold.jsonl \
+  --output results/pinlog-rerank.json \
+  --top-n 3,5 \
+  --similarity-max-distance 0.3,0.5 \
+  --llm-models gpt-5-nano,gpt-4.1-nano,gemini-2.5-flash-lite
+```
+
+세 문서 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-rerank-summary \
+  --inputs results/pinlog-rerank.json results/ssafesta-rerank.json results/sudal-rerank.json \
+  --json-output data/evaluation/reranker-summary.json \
+  --markdown-output data/evaluation/reranker-summary.md
+```
+
+- 실험 그리드는 `config/rerank-grid.json`에서 확인한다. `similarity_max_distance`는
+  임시값이다 — 실측 거리 분포를 보고 다시 조정해야 한다(스모크 실행에서 0.3 기준으로
+  전부 걸러져 recall 0이 나온 사례가 있다).
+- Cross-Encoder는 `sentence-transformers/ms-marco-MiniLM-L-6-v2`(영어 학습 모델)를
+  기본값으로 쓴다. 한국어 문서 도메인 특성상 baseline보다 낮게 나올 수 있어, 실측
+  결과를 그대로 신뢰하지 말고 실패 건수·지연·NDCG를 같이 봐야 한다.
+- GMS LLM reranker는 `GMS_API_KEY`로 실제 크레딧을 소비한다. 세 후보 모델 모두 1
+  Credit이지만 지연시간은 다르다(스모크 기준 gemini-2.5-flash-lite ≈ gpt-4.1-nano <
+  gpt-5-nano).
+- Jira 완료 근거는 다른 실험과 동일하게 `--store pgvector` 실행 결과여야 한다.
+  `--store memory`는 코드 동작 확인용으로만 쓴다.
+
 ## 단위 테스트
 
 ```bash

@@ -15,11 +15,23 @@ from .store import VectorStore
 class RetrievalMetrics:
     recall_at_k: float
     mrr: float
+    ndcg: float
     p50_search_ms: float
     p95_search_ms: float
     mean_context_tokens: float
     p95_context_tokens: float
     leakage_count: int
+    evaluated_queries: int
+    missed_case_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RerankQualityMetrics:
+    recall_at_n: float
+    mrr: float
+    ndcg: float
+    mean_context_tokens: float
+    p95_context_tokens: float
     evaluated_queries: int
     missed_case_ids: tuple[str, ...]
 
@@ -42,6 +54,7 @@ def evaluate_retrieval(
     if not cases:
         raise ValueError("평가 질문이 비어 있습니다.")
     reciprocal_ranks: list[float] = []
+    ndcgs: list[float] = []
     latencies_ms: list[float] = []
     context_tokens: list[int] = []
     missed_case_ids: list[str] = []
@@ -83,6 +96,7 @@ def evaluate_retrieval(
             )
         )
         rank = _first_relevant_rank(case, hits)
+        ndcgs.append(_ndcg(case, hits))
         if rank is not None:
             matched += 1
             reciprocal_ranks.append(1.0 / rank)
@@ -92,6 +106,7 @@ def evaluate_retrieval(
     return RetrievalMetrics(
         recall_at_k=matched / len(cases),
         mrr=sum(reciprocal_ranks) / len(reciprocal_ranks),
+        ndcg=sum(ndcgs) / len(ndcgs),
         p50_search_ms=_percentile(latencies_ms, 0.50),
         p95_search_ms=_percentile(latencies_ms, 0.95),
         mean_context_tokens=sum(context_tokens) / len(context_tokens),
@@ -102,13 +117,62 @@ def evaluate_retrieval(
     )
 
 
+def evaluate_reranked_hits(
+    cases: Sequence[EvalCase], hit_lists: Sequence[Sequence[SearchHit]]
+) -> RerankQualityMetrics:
+    if len(cases) != len(hit_lists):
+        raise ValueError("평가 질문 수와 재정렬된 후보 목록 수가 다릅니다.")
+    if not cases:
+        raise ValueError("평가 질문이 비어 있습니다.")
+    reciprocal_ranks: list[float] = []
+    ndcgs: list[float] = []
+    context_tokens: list[int] = []
+    missed_case_ids: list[str] = []
+    matched = 0
+    for case, hits in zip(cases, hit_lists, strict=True):
+        context_tokens.append(sum(hit.token_count for hit in hits))
+        rank = _first_relevant_rank(case, hits)
+        ndcgs.append(_ndcg(case, hits))
+        if rank is not None:
+            matched += 1
+            reciprocal_ranks.append(1.0 / rank)
+        else:
+            reciprocal_ranks.append(0.0)
+            missed_case_ids.append(case.case_id)
+    return RerankQualityMetrics(
+        recall_at_n=matched / len(cases),
+        mrr=sum(reciprocal_ranks) / len(reciprocal_ranks),
+        ndcg=sum(ndcgs) / len(ndcgs),
+        mean_context_tokens=sum(context_tokens) / len(context_tokens),
+        p95_context_tokens=_percentile(context_tokens, 0.95),
+        evaluated_queries=len(cases),
+        missed_case_ids=tuple(missed_case_ids),
+    )
+
+
+def _relevance(case: EvalCase, hit: SearchHit) -> int:
+    page_match = bool(case.relevant_pages) and hit.page in case.relevant_pages
+    content_match = any(marker in hit.context_content for marker in case.relevant_contains)
+    return 1 if page_match or content_match else 0
+
+
 def _first_relevant_rank(case: EvalCase, hits: Sequence[SearchHit]) -> int | None:
     for rank, hit in enumerate(hits, 1):
-        page_match = bool(case.relevant_pages) and hit.page in case.relevant_pages
-        content_match = any(marker in hit.context_content for marker in case.relevant_contains)
-        if page_match or content_match:
+        if _relevance(case, hit):
             return rank
     return None
+
+
+def _dcg(relevances: Sequence[int]) -> float:
+    return sum(rel / math.log2(index + 2) for index, rel in enumerate(relevances))
+
+
+def _ndcg(case: EvalCase, hits: Sequence[SearchHit]) -> float:
+    relevances = [_relevance(case, hit) for hit in hits]
+    ideal_dcg = _dcg(sorted(relevances, reverse=True))
+    if ideal_dcg == 0:
+        return 0.0
+    return _dcg(relevances) / ideal_dcg
 
 
 def _percentile(values: Sequence[float], percentile: float) -> float:
