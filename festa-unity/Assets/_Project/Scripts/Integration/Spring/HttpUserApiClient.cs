@@ -85,6 +85,29 @@ namespace Festa.Integration
         }
 
         /// <summary>
+        /// GET /api/v1/catalog/items?type=AVATAR_PART — 파츠 목록과 보유 여부 (GitLab #120 §2).
+        ///
+        /// <para>실패는 <c>null</c> 로 돌려주고 <b>빈 목록으로 위장하지 않는다.</b> 빈 목록은
+        /// "카탈로그가 비었다" 는 정상 응답으로 읽히는데, 그러면 호출자가 잠금을 전부 풀거나
+        /// 전부 잠그는 판단을 오류인지 모르고 하게 된다 (T-24).</para>
+        /// </summary>
+        public async Task<CatalogItemsDto> GetAvatarPartCatalogAsync()
+        {
+            using var request = UnityWebRequest.Get($"{_baseUrl}/api/v1/catalog/items?type=AVATAR_PART");
+            var body = await SendAsync(request, "GET /catalog/items");
+            if (body == null) return null;
+
+            var catalog = ParseOrNull<CatalogItemsDto>(body, "catalog/items");
+            if (catalog?.items == null)
+            {
+                Debug.LogError("[HttpUserApi] 카탈로그 응답에 items 배열이 없다 — 계약 위반이라 실패로 처리한다.");
+                return null;
+            }
+
+            return catalog;
+        }
+
+        /// <summary>
         /// POST /api/v1/world-sessions — 구조화 endpoint + 120초 1회용 connection token.
         /// Unity 는 endpoint 를 하드코딩하지 않고 항상 이 응답만 쓴다 (헌법 8조).
         /// 본문은 전체 optional 이지만 worldId 를 명시해 서버 기본값에 의존하지 않는다.

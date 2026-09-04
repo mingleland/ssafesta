@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -115,9 +116,30 @@ namespace Festa.Avatar
         /// </summary>
         static readonly int[] SkinToneWeights = {32,30,24,10,4};
 
-        // 잠긴 항목을 눌렀을 때. 해제 경로(구매·보상)는 아직 서버 계약이 없어 안내만 한다 —
-        // 없는 기능을 있는 것처럼 적지 않는다.
-        const string LockedMessage = "잠긴 항목입니다. 아직 사용할 수 없어요.";
+        /// <summary>
+        /// 잠긴 항목을 눌렀을 때의 안내 (GitLab #120 §2-1).
+        ///
+        /// <para><b>게스트는 구매로 보내지 않는다.</b> 게스트에게는 유료 품목이 전부 미보유로
+        /// 오고 구매는 서버가 <c>MEMBER_ONLY</c> 로 거부하므로, 구매를 권하면 눌러도 실패하는
+        /// 버튼을 권하는 셈이 된다. 로그인으로 안내한다.</para>
+        ///
+        /// <para>보유 정보를 못 받은 상태(<see cref="AvatarOwnershipState.Failed"/>)에서는
+        /// "안 가진 항목" 이 아니라 <b>불러오기 실패</b>라고 말한다 — 원인이 다르고, 사용자가
+        /// 할 수 있는 행동도 다르다(구매가 아니라 새로고침).</para>
+        /// </summary>
+        void ShowLockedNotice()
+        {
+            if (AvatarOwnership.State == AvatarOwnershipState.Failed)
+            {
+                SetStatus("보유 정보를 불러오지 못해 잠겨 있습니다. 새로고침 후 다시 시도해 주세요.");
+                return;
+            }
+
+            bool guest = !Festa.Integration.ApiServices.IsMock && !Festa.Integration.AuthBridge.HasToken;
+            SetStatus(guest
+                ? "로그인하면 상점에서 구매해 사용할 수 있어요."
+                : "아직 보유하지 않은 항목입니다. 상점에서 구매할 수 있어요.");
+        }
         static readonly Color[] NaturalHairColors = {new(.08f,.065f,.06f),new(.16f,.105f,.08f),new(.28f,.17f,.11f),new(.42f,.25f,.15f),new(.34f,.17f,.12f),new(.62f,.49f,.33f)};
         static readonly Color[] NaturalIrisColors = {new(.20f,.12f,.08f),new(.34f,.23f,.12f),new(.17f,.29f,.39f),new(.24f,.35f,.29f),new(.29f,.31f,.33f)};
         static readonly Color[] NaturalLipColors = {new(.62f,.31f,.31f),new(.70f,.39f,.36f),new(.55f,.27f,.29f),new(.72f,.44f,.40f),new(.48f,.23f,.22f)};
@@ -161,7 +183,79 @@ namespace Festa.Avatar
             SanitizeLocked(ref _config);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
-            if (!_restoredExistingAppearance) LoadPersistedAppearanceAsync();
+            InitializeFromServerAsync();
+        }
+
+        /// <summary>
+        /// 서버에서 <b>보유 정보를 먼저</b> 받고, 그 다음 저장 외형을 받는다 (S15P21A604-412).
+        ///
+        /// <para>순서가 중요하다. 저장 외형에 지금 기준으로 잠긴 옷이 섞였는지 판정하려면
+        /// 보유 정보가 먼저 있어야 한다 — 뒤바뀌면 <see cref="SanitizeLocked"/> 가 판정 없이
+        /// 돌아 아무것도 걸러내지 못하고, 사용자는 못 가진 옷을 입은 채로 월드에 들어가
+        /// 저장 시점에야 거부당한다.</para>
+        /// </summary>
+        async void InitializeFromServerAsync()
+        {
+            await LoadOwnershipAsync();
+
+            // 방금 도착한 판정으로 현재 외형을 다시 검사한다 — Awake 에서 만든 추천 외형은
+            // 판정이 없던 시점에 전체 목록에서 골랐으므로 잠긴 것이 섞여 있을 수 있다.
+            SanitizeLocked(ref _config);
+            Apply(); RefreshAll();
+
+            if (!_restoredExistingAppearance) await LoadPersistedAppearanceAsync();
+        }
+
+        /// <summary>
+        /// 파츠 보유 정보를 받아 온다 (GitLab #120 §8-1).
+        ///
+        /// <para><b>실패를 개방으로 바꾸지 않는다.</b> 못 받으면 전부 잠긴 채로 두고 화면에
+        /// 오류를 띄운다 — 조용히 열어 버리면 잠금이 깨진 것을 아무도 모른 채로 나간다(T-24).
+        /// Mock 경로만 예외이고, 그것도 <b>명시적으로</b> 개발 모드라고 로그·상태에 적는다.</para>
+        /// </summary>
+        async Task LoadOwnershipAsync()
+        {
+            try
+            {
+                Festa.Integration.ApiServices.EnsureInitialized();
+
+                if (Festa.Integration.ApiServices.IsMock)
+                {
+                    AvatarOwnership.UnlockAllForDevelopment("ApiConfig.useMockApi = true");
+                    return;
+                }
+
+                var catalog = await Festa.Integration.ApiServices.User.GetAvatarPartCatalogAsync();
+                if (catalog?.items == null)
+                {
+                    AvatarOwnership.MarkFailed("GET /catalog/items 응답을 받지 못했다");
+                    SetStatus("파츠 보유 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+                    return;
+                }
+
+                var cataloged = new List<int>(catalog.items.Length);
+                var owned = new List<int>();
+                foreach (var item in catalog.items)
+                {
+                    // assetKey 는 서버가 문자열로 내려주지만 avatar_code 의 i= 칸은 정수다.
+                    // 파싱에 실패한 항목은 조인할 수 없으므로 건너뛰고 드러낸다.
+                    if (!int.TryParse(item?.assetKey, out var key) || key == 0)
+                    {
+                        Debug.LogWarning($"[CharacterLobby] 카탈로그 항목의 assetKey 를 읽을 수 없어 건너뛴다 — code={item?.code} assetKey={item?.assetKey}");
+                        continue;
+                    }
+                    cataloged.Add(key);
+                    if (item.owned) owned.Add(key);
+                }
+
+                AvatarOwnership.SetFromServer(cataloged, owned);
+                Debug.Log($"[CharacterLobby] 파츠 보유 정보 적용 — 카탈로그 {cataloged.Count}종 중 보유 {owned.Count}종");
+            }
+            catch (Exception exception)
+            {
+                AvatarOwnership.MarkFailed(exception.Message);
+                SetStatus("파츠 보유 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+            }
         }
 
         bool TryGetLiveAppearance(out AvatarConfig config)
@@ -190,7 +284,7 @@ namespace Festa.Avatar
             return true;
         }
 
-        async void LoadPersistedAppearanceAsync()
+        async Task LoadPersistedAppearanceAsync()
         {
             try
             {
@@ -363,14 +457,15 @@ namespace Festa.Avatar
             _wardrobeScrollFor=_wardrobeCategory;
             foreach(Transform child in _wardrobeGrid)Destroy(child.gameObject);
             ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
-            var wardrobeItems=_catalog.GetItems(_wardrobeCategory,_config.gender).ToArray();
+            // 서버 카탈로그에 있는 것만 그린다 — 미등록 파츠는 고를 수 있어도 저장이 거부된다 (#120 §2-1).
+            var wardrobeItems=_catalog.GetCatalogedItems(_wardrobeCategory,_config.gender).ToArray();
             for(int index=0;index<wardrobeItems.Length;index++)
             {
                 var captured=wardrobeItems[index];
                 var presentation=WardrobePresentation(_wardrobeCategory,captured);
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 ImageButton(_wardrobeGrid,PrettyName(presentation.displayName),presentation.thumbnail,
-                    locked?()=>SetStatus(LockedMessage):()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),
+                    locked?ShowLockedNotice:()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),
                     158,148,IsSelected(_wardrobeCategory,captured),null,locked);
             }
             _wardrobeGrid.anchoredPosition=new Vector2(_wardrobeGrid.anchoredPosition.x,keepWardrobeScroll?_wardrobeScrollY:0f);
@@ -483,7 +578,9 @@ namespace Festa.Avatar
             if(keepItemScroll)_itemScrollY=_itemGrid.anchoredPosition.y;
             _itemScrollFor=_category;
             foreach(Transform c in _itemGrid) Destroy(c.gameObject);
-            IEnumerable<AvatarItemDefinition> defs = _catalog.GetItems(_category,_config.gender);
+            // 서버 카탈로그에 있는 것만 그린다 (#120 §2-1). 잠긴 것은 자물쇠를 달아 보여준다 —
+            // 무엇을 얻을 수 있는지 보이지 않으면 잠금이 의미가 없다.
+            IEnumerable<AvatarItemDefinition> defs = _catalog.GetCatalogedItems(_category,_config.gender);
             if(_category==AvatarPartCategory.Hat) defs=defs.GroupBy(x=>x.familyId).Select(x=>x.First());
             if(_category!=AvatarPartCategory.Head) ImageButton(_itemGrid,"없음",null,()=>{_config.SetItem(_category,0);Apply();RefreshItems();},188,150,CurrentItemId(_category)==0);
             var definitions=defs.ToArray();
@@ -492,7 +589,7 @@ namespace Festa.Avatar
                 var captured=definitions[index];
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 var select=locked
-                    ?new UnityEngine.Events.UnityAction(()=>SetStatus(LockedMessage))
+                    ?new UnityEngine.Events.UnityAction(ShowLockedNotice)
                     :new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
                 if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured),locked);
                 else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured),locked);
@@ -676,6 +773,12 @@ namespace Festa.Avatar
         /// </summary>
         void SanitizeLocked(ref AvatarConfig config)
         {
+            // **판정이 준비되기 전에는 아무것도 걸러내지 않는다** (S15P21A604-412).
+            // 조회 전에는 보유가 비어 있어 모든 항목이 잠긴 것으로 나온다 — 그 상태로 돌리면
+            // 정상 외형을 전부 "잠김" 으로 보고 기본값으로 밀어 버리고, 그 기본값 후보마저
+            // 0개라 알몸이 된다. 판정은 InitializeFromServerAsync 가 받아온 뒤 다시 부른다.
+            if (!AvatarOwnership.JudgementReady) return;
+
             var replaced=new List<string>();
             foreach(var category in new[]{AvatarPartCategory.Head,AvatarPartCategory.Hair,AvatarPartCategory.Hat,
                                           AvatarPartCategory.Glasses,AvatarPartCategory.Top,AvatarPartCategory.Bottom,
@@ -720,7 +823,9 @@ namespace Festa.Avatar
         {
             // 무작위는 **해제된 것 중에서만** 고른다. 잠긴 옷을 입혀 놓으면 저장 시 서버
             // 검증에서 막히고, 사용자는 왜 막혔는지 알 수 없다 (S15P21A604-355).
-            var items=_catalog.GetUnlockedItems(category,config.gender).ToArray();
+            // 보유 정보가 아직 없으면 전체에서 고른다 — 후보 0개로 알몸이 되는 것을 막고,
+            // 판정이 도착하면 SanitizeLocked 가 잠긴 것을 교체한다 (S15P21A604-412).
+            var items=_catalog.GetSelectableItems(category,config.gender).ToArray();
             if(items.Length==0){config.SetItem(category,0);return;}
             var item=items[rng.Next(items.Length)];
             config.SetItem(category,category==AvatarPartCategory.Hat?item.familyId:item.itemId);
