@@ -57,7 +57,11 @@
 .grp-dialogue-layer { inset: 0; pointer-events: none; position: absolute; z-index: 100; }
 .grp-dialogue-full-background { background-position: center; background-size: cover; inset: 0; position: absolute; }
 .grp-dialogue-layer::after { background: linear-gradient(transparent 30%,rgba(5,7,11,.15) 55%,rgba(5,7,11,.55)); content: ''; inset: 0; position: absolute; z-index: 1; }
-.grp-dialogue-portrait { background-position: center; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 14px 24px rgba(0,0,0,.72)); height: 88%; left: 50%; position: absolute; transform: translateX(-50%); width: 38%; z-index: 2; }
+/* S15P21A604-406 — GameStudioShell.css의 .gss-dialogue-preview-portrait와 같은 이유로
+   width:38% 고정을 aspect-ratio:1/2(원본 스프라이트 셀 256×512 비율)로 교체. 자기 자신의
+   aspect-ratio라 부모(.grp-dialogue-layer 등)의 비율이 창 크기에 따라 달라져도 항상
+   height(88%, 그대로 유지)에 맞춰 폭이 정확하게 계산된다. */
+.grp-dialogue-portrait { aspect-ratio: 1 / 2; background-position: center; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 14px 24px rgba(0,0,0,.72)); height: 88%; left: 50%; position: absolute; transform: translateX(-50%); z-index: 2; }
 .grp-dialogue { background: linear-gradient(90deg,rgba(28,20,44,.95),rgba(14,18,28,.94)); border: 1px solid rgba(174,155,222,.58); border-radius: 10px; bottom: 28px; box-shadow: 0 16px 45px rgba(0,0,0,.65); left: 6%; padding: 18px 22px; pointer-events: auto; position: absolute; right: 6%; z-index: 3; }
 .grp-speaker { color: #6fa7f8; font-size: 11px; font-weight: 850; letter-spacing: .06em; margin-bottom: 7px; }
 .grp-dialogue p { font-size: 15px; line-height: 1.65; margin: 0 0 15px; }
