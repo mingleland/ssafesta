@@ -40,4 +40,5 @@ asyncio_mode = "auto"
 markers = [
   "failure_injection: tests that simulate process, storage, provider, or callback failure",
   "isolation: tests that verify booth and agent scoped vector isolation",
+  "live_provider: opt-in tests that consume real GMS credits",
 ]

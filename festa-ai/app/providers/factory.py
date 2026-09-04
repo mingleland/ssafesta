@@ -8,8 +8,10 @@ import httpx
 
 from app.api.schemas.documents import StorageProvider
 from app.providers.embedding import EmbeddingProvider
+from app.providers.llm import LLMProvider
 from app.providers.managed_embedding import ManagedEmbeddingProvider
-from app.providers.mock import MockEmbeddingProvider
+from app.providers.managed_llm import ManagedLLMProvider
+from app.providers.mock import MockEmbeddingProvider, MockLLMProvider
 from app.providers.s3_compatible_storage import S3CompatibleObjectStorage
 from app.providers.storage import ObjectStorage
 
@@ -29,15 +31,37 @@ def create_embedding_provider(
     if (
         settings.embedding_model_id is None
         or settings.embedding_api_base_url is None
-        or settings.embedding_api_key is None
+        or (settings.embedding_api_key is None and settings.gms_api_key is None)
     ):
         raise ValueError("GMS embedding provider settings are incomplete")
 
     return ManagedEmbeddingProvider(
         api_base_url=settings.embedding_api_base_url,
         api_path=settings.embedding_api_path,
-        api_key=settings.embedding_api_key,
+        api_key=settings.embedding_api_key or settings.gms_api_key,
         model_id=settings.embedding_model_id,
+        client=client,
+    )
+
+
+def create_llm_provider(
+    settings: Settings,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> LLMProvider:
+    """`mock` 또는 OpenAI 호환 `gms` LLM 구현체를 선택한다."""
+    if settings.llm_provider == "mock":
+        return MockLLMProvider()
+    if settings.gms_api_key is None:
+        raise ValueError("GMS LLM provider settings are incomplete")
+    return ManagedLLMProvider(
+        api_base_url=settings.llm_api_base_url,
+        api_path=settings.llm_api_path,
+        api_key=settings.gms_api_key,
+        model_id=settings.llm_model_id,
+        temperature=settings.llm_temperature,
+        connect_timeout_seconds=settings.llm_connect_timeout_seconds,
+        read_timeout_seconds=settings.llm_read_timeout_seconds,
         client=client,
     )
 
