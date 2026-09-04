@@ -6,6 +6,10 @@ import { closeOverlay } from '../../../shared/types/overlay';
 import { mockStreamSuccess } from '../../../entities/conversation/stream.mock';
 import { createSseParser } from '../../../entities/conversation/stream.parser';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
+import { openOverlay } from '../../../shared/types/overlay';
+import { useSession } from '../../auth/model/session';
+import { aiHandoffContext } from '../../consultation/model/startContext';
+import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
 
 interface Props {
@@ -42,6 +46,8 @@ function mockAnswerFor(question: string): string[] {
 }
 
 export function AiChatOverlay({ payload }: Props) {
+  const { kind } = useSession();
+  const consultation = useVisitorConsultation();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -87,6 +93,24 @@ export function AiChatOverlay({ payload }: Props) {
     }
   }
 
+  // 사람 상담 에스컬레이션 (spec 011 FR-005 · S15P21A604-416).
+  // 대상 부스는 이 대화의 boothId 다 — AI_AGENT_INTERACT 가 준 값이라 FE 가 추측하지 않는다.
+  // 게스트는 요청할 수 없다(FR-014) — 진입점에서 막는 것이 이 기능의 정책이다.
+  const isMember = kind === 'member';
+  const consultationInProgress =
+    consultation.phase === 'requesting' ||
+    consultation.phase === 'waiting' ||
+    consultation.phase === 'active';
+
+  function escalateToHuman() {
+    // 마지막 AI 답변을 Handoff Summary 로 넘긴다. 실 요약 생성은 AI 서버 몫이라(spec 011),
+    // 여기서는 대화 맥락이 실제로 이어진다는 것만 계약으로 보인다 — 없으면 넘기지 않는다.
+    const lastAgentTurn = [...turns].reverse().find((t) => t.role === 'agent' && !t.streaming);
+    void requestConsultation(aiHandoffContext(payload.boothId, lastAgentTurn?.text));
+    // 상담 화면으로 바꾼다. 같은 부스라 Overlay Bus 슬롯을 그대로 넘겨받는다.
+    openOverlay('CONSULTATION', { boothId: payload.boothId });
+  }
+
   return (
     <OverlayFrame
       title="AI 직원"
@@ -94,8 +118,26 @@ export function AiChatOverlay({ payload }: Props) {
       size="l"
       icon={IcAgent}
       onClose={closeOverlay}
-      status={<span className="ov-note">부스 자료를 근거로 답합니다 · 준비 중인 기능입니다</span>}
+      status={
+        <span className="ov-note">
+          {isMember
+            ? '원하는 답을 못 찾으면 사람 상담을 요청할 수 있습니다'
+            : '부스 자료를 근거로 답합니다 · 사람 상담은 회원만 요청할 수 있습니다'}
+        </span>
+      }
       footer={
+        <>
+          {isMember && (
+            <button
+              type="button"
+              className="ov-btn ai-escalate"
+              disabled={consultationInProgress}
+              title={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : undefined}
+              onClick={escalateToHuman}
+            >
+              사람 상담 요청
+            </button>
+          )}
         <form
           className="ai-composer"
           onSubmit={(e) => {
@@ -115,6 +157,7 @@ export function AiChatOverlay({ payload }: Props) {
             보내기
           </button>
         </form>
+        </>
       }
     >
       {turns.length === 0 ? (

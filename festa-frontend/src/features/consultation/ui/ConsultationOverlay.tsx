@@ -6,11 +6,9 @@
 // 상담 아이콘으로 같은 상태에 다시 들어온다. 상태·카운트다운·채널 구독이 전부 module-level 이라
 // 이 컴포넌트가 unmount 돼도 유지된다 — 그래서 cleanup 에서 취소하지 않는다.
 // 취소는 [상담 요청 취소] 명시적 액션 하나뿐이다.
-import { useEffect } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
 import {
   cancelConsultation,
-  requestConsultation,
   rerequestConsultation,
   useVisitorConsultation,
 } from '../model/visitor';
@@ -18,7 +16,12 @@ import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../
 import './consultationOverlay.css';
 
 interface Props {
-  payload: { boothId: number };
+  /**
+   * Overlay Bus 계약상 payload 는 오지만 이 화면은 쓰지 않는다 — 표시 대상은 "지금 진행 중인
+   * 상담" 이고 그 boothId 는 상태 기계가 들고 있다(S15P21A604-416). HUD 재진입과 새 요청이
+   * 같은 화면을 열기 때문에, 열 때 받은 payload 를 신뢰하면 둘이 어긋난다.
+   */
+  payload?: { boothId: number };
 }
 
 const IcDesk = (
@@ -33,15 +36,12 @@ function mmss(total: number): string {
   return m + ':' + String(s).padStart(2, '0');
 }
 
-export function ConsultationOverlay({ payload }: Props) {
+export function ConsultationOverlay(_props: Props) {
   const state = useVisitorConsultation();
-
-  useEffect(() => {
-    // idle 일 때만 새로 요청한다 — 이미 대기·진행 중이면 HUD 로 되돌아온 것이므로 그 상태를 그대로 보여준다
-    if (state.phase === 'idle') void requestConsultation(payload.boothId);
-    // cleanup 없음: 닫기는 취소가 아니다(§11.4)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload.boothId]);
+  // 이 화면은 상담을 **시작하지 않는다**. 시작점은 AI 대화 에스컬레이션이고(spec 011 FR-005,
+  // S15P21A604-416) 여기는 그 결과 상태를 보여주고 조작하는 자리다. 예전에는 열리자마자
+  // requestConsultation 을 불렀는데, 그러면 HUD 로 되돌아오는 것과 새 요청이 구분되지 않는다.
+  // cleanup 도 없다: 닫기는 취소가 아니다(§11.4).
 
   const subtitle =
     state.phase === 'active' ? (state.staffName ?? '직원') + ' 연결됨' : state.phase === 'waiting' ? '대기 중' : '부스 상담';
@@ -80,6 +80,13 @@ export function ConsultationOverlay({ payload }: Props) {
         )
       }
     >
+      {state.phase === 'idle' && (
+        <OverlayEmpty
+          title="진행 중인 상담이 없습니다"
+          hint="부스의 AI 직원과 대화하다 '사람 상담 요청' 을 누르면 담당자에게 연결됩니다."
+        />
+      )}
+
       {state.phase === 'requesting' && <OverlayLoading label="상담을 요청하는 중..." />}
 
       {state.phase === 'waiting' && (
