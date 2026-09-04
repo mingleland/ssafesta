@@ -13,6 +13,7 @@ services:
     environment:
       FESTA_ENVIRONMENT: dev
       SPRING_PROFILES_ACTIVE: infra
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?ROOT_DOMAIN is required}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: festa_dev_business
