@@ -7,3 +7,8 @@
 // 없다. 게이트 쪽 상한은 Unity WorldEntryGate 의 30초 강제 개방(FR-014)이 갖고 있고 개방 시 onWorldGateReady
 // 를 보내므로 호스트가 따로 재지 않는다. p95 실측치 없음 — demo 환경 후 조정, 잠정값 그대로 사용.
 export const UNITY_BOOT_STALL_TIMEOUT_MS = 60_000;
+
+// 월드 로딩 안내가 "축제장을 불러오고 있어요"에서 "잠시만 기다려 주세요"로 넘어가는 시점(ms) —
+// 실측 50~84초(#128)의 절반쯤에서 한 번 더 말을 걸어 사용자가 멈춘 것으로 오인하지 않게 한다.
+// 이 값은 실패 판정이 아니다. 지나도 안내 문구만 바뀌고 대기는 계속된다(-429).
+export const WORLD_PREPARING_LONG_WAIT_MS = 20_000;
