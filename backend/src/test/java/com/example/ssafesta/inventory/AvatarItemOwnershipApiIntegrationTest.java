@@ -17,6 +17,7 @@ import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.WalletService;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -148,6 +149,26 @@ class AvatarItemOwnershipApiIntegrationTest {
 
         assertEquals(0, wallets.balanceOf(userId));
         assertEquals(0, inventoryCount(userId, itemId));
+    }
+
+    /**
+     * Unity 팔레트에서 빠진 3종은 <b>시드가 이미 판매 중지</b>여야 한다 (V20, GitLab #120).
+     *
+     * <p>이 셋은 {@code AvatarCatalog.asset} 의 {@code items} 배열에서 참조가 빠졌지만
+     * {@code .asset} 파일은 디스크에 남아 있다. 그래서 {@code AvatarCatalogSeedContractTest} 가
+     * 잡지 못한다 — 그 테스트는 파일 105개를 세고 {@code AvatarCatalog.asset} 은 제외한다.
+     * 판매 여부를 정하는 것은 파일의 존재가 아니라 배열인데 세는 것은 파일 쪽이다.
+     *
+     * <p>거절 동작 자체는 {@link #stoppedSaleAndGuestPurchaseAreRejected} 가 이미 덮는다. 여기서
+     * 고정하는 것은 <b>시드 상태</b>다 — 되돌려지면 코인이 빠지고 입을 수 없는 상품이 돌아온다.
+     */
+    @Test
+    void partsMissingFromTheUnityPaletteAreNotOnSale() {
+        for (String assetKey : List.of("1814256283", "356384796", "415781343")) {
+            Boolean onSale = jdbc.queryForObject(
+                    "SELECT is_on_sale FROM catalog_items WHERE asset_key = ?", Boolean.class, assetKey);
+            assertFalse(onSale, assetKey + " 는 Unity 팔레트에 없으므로 판매 중지여야 한다");
+        }
     }
 
     @Test
