@@ -29,6 +29,9 @@ namespace Festa.Integration
         /// <summary>true 면 월드 입력(이동·상호작용·이모트)을 읽지 않는다.</summary>
         public static bool IsLocked { get; private set; }
 
+        /// <summary>잠금 상태가 바뀔 때(true=잠김). 초점 카메라가 호스트의 해제를 따라 풀리는 데 쓴다 (-439·-440).</summary>
+        public static event System.Action<bool> LockedChanged;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void AutoRegister()
         {
@@ -54,6 +57,7 @@ namespace Festa.Integration
             if (locked == IsLocked) return;
             IsLocked = locked;
             Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")}");
+            LockedChanged?.Invoke(locked);
         }
 
         /// <summary>
@@ -65,6 +69,7 @@ namespace Festa.Integration
             if (locked == IsLocked) return;
             IsLocked = locked;
             Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")} (Unity 내부)");
+            LockedChanged?.Invoke(locked);
         }
 
         /// <summary>에디터·테스트용 별칭.</summary>

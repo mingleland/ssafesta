@@ -13,6 +13,10 @@ namespace Festa.Integration
         public static IUserApiClient User { get; private set; }
         public static IAiAgentClient Ai { get; private set; }
         public static IGameResultClient Game { get; private set; }
+        /// <summary>코인 잔액 (spec 003). 실서버는 GET /wallets/me, Mock 은 100 고정.</summary>
+        public static IWalletClient Wallet { get; private set; }
+        /// <summary>slot machine 판정 (S15P21A604-439). BE 계약 전이라 두 모드 모두 Mock — 결과 DTO 의 simulated 가 그 사실을 실어 나른다.</summary>
+        public static ISlotMachineClient Slot { get; private set; }
         public static IAccessTokenProvider TokenProvider { get; private set; }
 
         public static bool IsMock { get; private set; }
@@ -39,6 +43,8 @@ namespace Festa.Integration
                 User = new MockUserApiClient();
                 Ai = new MockAiAgentClient();
                 Game = new MockGameResultClient();
+                Wallet = new MockWalletClient();
+                Slot = new MockSlotMachineClient();
             }
             else
             {
@@ -51,6 +57,10 @@ namespace Festa.Integration
                 // 그전까지 Mock 을 쓰되, 그 사실을 경고로 드러낸다 — 조용한 대체 금지 (T-24).
                 Game = new MockGameResultClient();
                 Debug.LogWarning("[ApiServices] Game HTTP 구현 전 — Mock으로 대체 중 (spec 014, FR-008 미성립)");
+                Wallet = new HttpWalletClient(springBaseUrl, TokenProvider);
+                // slot machine 판정 엔드포인트는 BE 미구현(docs/26 ③). 판정은 Mock, 잔액 표시만 실서버에서 시드한다.
+                Slot = new MockSlotMachineClient();
+                Debug.LogWarning("[ApiServices] Slot HTTP 구현 전 — Mock 판정, 코인 원장 미반영 (S15P21A604-439)");
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");
