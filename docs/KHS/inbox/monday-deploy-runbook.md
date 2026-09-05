@@ -8,9 +8,9 @@
 |---|---|---|---|
 | — | ~~릴리스 WebGL 클라이언트가 게임 서버에 승인되지 않는다~~ → **빌드 결함 아님.** 자동화 브라우저 탭이 hidden 상태라 Chrome 이 rAF 를 멈춰 Unity 루프가 정지했던 것. 보이는 탭에서는 Docker 서버(`festa-world:dev`=60b8cd42)에 승인·스폰·이동 정상 | ✅ 해결(환경 요인) — 단, **실사용자도 탭을 30초 뒤로 보내면 끊긴다**(T-120, 재접속 UX 미결) | docs/25 **T-115**·**T-120**, Jira -420 |
 | ☆ | 스태프 NPC 2기에 벤더 데모 컨트롤러 잔존(매 프레임 경고·입력 가로채기) | ✅ 씬에서 제거 (Jira -425, MR) | T-119 |
-| ☆ | 로비 → main 씬 전환 50~84초(WebGL) — 로딩 표시 없음 | 🟡 FE 안내(-429, !273)는 Unity 신호 `onWorldLoadStart`(!280) 로 켜짐 — develop head 빌드에서 확인. 단계별 소요는 `[WorldLoadTimeline] 요약` 콘솔 한 줄(!291)로 읽는다 | #129, -431 |
-| ★ | 씬 배치 상호작용(관리 데스크·오락기) F 무반응 | ✅ !281 (T-122) — develop head 빌드로 F 확인 필요 | -435 |
-| ☆ | 회전 감도·앉기 이름표·벽 조명 팝인 | ✅ !282 / 걷기 끊김은 계측 대기(F3 최대 프레임) | -436 |
+| ☆ | ~~로비 → main 씬 전환 50~84초(WebGL)~~ → **보이는 탭에서 3.0초**(00:00 실측 `총 3.0s : main_loaded 1.2s … gate_open 0.7s`). 50~84초는 hidden 탭(T-115) 산물 | ✅ 진입 자체는 문제 없음. 실사용자 대기는 로비 *앞* .data 초기 다운로드(129 MB) — FE 안내(-429)의 중심이 그쪽. 월요일 실브라우저에서 `[WorldLoadTimeline] 요약` 한 줄 재확인 | #129, -431 |
+| ★ | 씬 배치 상호작용(관리 데스크·오락기) F 무반응 | ✅ !281 (T-122) — 사용자 2차 실테스트(22:30)·00:00 dev 빌드에서 데스크 프롬프트·오락기 HUD 확인 | -435 |
+| ☆ | 회전 감도·앉기 이름표·벽 조명 팝인 | ✅ !282 / 걷기 끊김은 아래 -437 ⑤ 로 원인 확정 | -436 |
 | ☆ | Overlay 열림 중 월드 입력·React 입력창 타이핑 | ✅ Unity 측 !279(`InputBridge`, `captureAllKeyboardInput=false`) — FE `OverlayHost` 배선 대기 | #132, -434 |
 | ☆ | 백그라운드 복귀 재접속 | ✅ Unity `WorldReconnector`(!284·!288, 5회 ~67초) — 서버 재기동 실측으로 루프 확인. FE 안내 UI·수신부는 FE(#131) | #131, -432 |
 | ☆ | 실테스트 2차(23:00): 오락기 중 조작 잠금·게스트 로비 생략·외곽선 하이라이트(부위 한정)·조명 히스테리시스 | ✅ !286 — 게스트 즉시 입장·NPC 외곽선·F→관리 화면 패널 실측 확인 | -437 |
@@ -18,11 +18,11 @@
 | ★ | 캔버스 초기 포커스 — `captureAllKeyboardInput=false` 이후 첫 키 입력이 무시됨(클릭 후 정상) | 🟡 FE 가 인스턴스 준비 시 `canvas.focus()` (#132 요청) | #132 |
 | ☆ | 게스트 데스크 F → "부스 정보를 불러오지 못했습니다"(로그인 안내여야 함) | 🟡 FE 결함 보고 | #128 |
 | ☆ | 설문 키오스크 E2E(-415) | 🟡 슬롯 1 게시본에 SURVEY_KIOSK 없음 — 스튜디오에서 배치·게시 후 확인 | -415 |
-| ★ | FE `UnityHost.tsx` canvas 에 `id` 없음 → Unity `_main` 크래시 | 🟡 MR !259 (FE 리뷰 머지 필요) | #128 §1, T-114 |
-| ★ | FE 가 게스트에게 AT 를 안 넘김 → 배포에서 게스트 Unity 는 카탈로그·world-sessions 401 | 🟡 FE 판단 필요 (권장: guest 도 전달) | #128 §2, T-116, docs/26 ③ |
-| ☆ | FE 60초 게이트 타임아웃이 로비 체류 중 만료 | 🟡 FE 판단 | #128 §3, T-117 |
-| ☆ | manifest 상대 URL 을 FE 가 해석하지 않음 | 🟡 FE 판단 (권장: `new URL(v, BUILD_BASE+'/')`) | #127 코멘트, #128 §4, T-118 |
-| ☆ | 배포 빌드 ApiConfig 복원 누락 | ✅ !257 머지 — 다음 빌드에서 `[Release] ApiConfig 복원` 로그 확인 | T-113 |
+| ★ | FE `UnityHost.tsx` canvas 에 `id` 없음 → Unity `_main` 크래시 | ✅ !259 머지(develop) — 00:00 임베드 재실측 정상 | #128 §1, T-114 |
+| ★ | FE 가 게스트에게 AT 를 안 넘김 → 배포에서 게스트 Unity 는 카탈로그·world-sessions 401 | ✅ FE !266 — 게스트 AT 로 Docker 서버 `Approved … 게스트-4c3d` 확인(18:20) | #128 §2, T-116, docs/26 ③ |
+| ☆ | FE 60초 게이트 타임아웃이 로비 체류 중 만료 | ✅ FE !267 — watchdog 을 boot attempt 에만(docs/26 ③ 확정) | #128 §3, T-117 |
+| ☆ | manifest 상대 URL 을 FE 가 해석하지 않음 | ✅ FE !268 — base 기준 해석, 18:20 재실측 로드 확인 | #127 코멘트, #128 §4, T-118 |
+| ☆ | 배포 빌드 ApiConfig 복원 누락 | ✅ !257 — 17:29 빌드 #2 로그에 `[Release] ApiConfig 복원 — env=Local` 확인 | T-113 |
 
 **★ 셋이 닫히지 않으면 월요일 게스트 사용자 테스트는 불가능하다.** 첫 항목은 게임 파트가 계속 본다.
 
@@ -61,9 +61,14 @@ cd festa-frontend && npm run dev -- --port 5173 --strictPort     # .env: VITE_AP
 
 ## 1. 빌드 (로컬, develop head)
 
+> **2026-09-06 00:40 산출물 준비됨** — develop `cf83e396` 클린 트리: `Builds/web-release`(138 MB, Brotli+fallback, manifest 4종 일치) + `festa-world:cf83e396`(= `festa-world:dev`, 430 MB). 월요일에 develop 이 더 바뀌지 않으면 이걸 그대로 쓴다. 바뀌면 아래 절차로 재빌드(40분).
+
 ```bash
 cd festa-unity && git fetch origin develop && git checkout origin/develop --detach
+git status --porcelain | grep -v "^??"     # 비어야 한다. 남으면 `git stash push -- <파일들>` 로 치우고 빌드 뒤 `git stash pop`
 ```
+
+에디터가 건드리는 잡변경(SDF 폰트·RP 에셋·GraphicsSettings·ProjectSettings·`ApiConfig` 로컬 토글)이 있으면 태그에 `-dirty` 가 붙는다. 스탬프는 빌드 **시작 시점**의 트리로 정해진다(-438, !293) — 빌드 중 에디터가 파일을 다시 더럽혀도 태그는 그대로다.
 
 에디터 메뉴 **`Festa/배포/배포 빌드 (Linux 서버 + WebGL + Docker 이미지)`** — 다이얼로그에서 "빌드만" 선택. 산출물:
 
@@ -145,6 +150,8 @@ Nginx `location /unity/` 에 `.wasm → application/wasm`, 해시 파일 `immuta
 FE 이미지는 `VITE_UNITY_BUILD_BASE=<E 의 URL>` 로 **빌드 시점**에 박아야 한다(런타임 주입은 `apiBaseUrl` 만). FE 가 런타임 주입으로 바꾸면 재빌드 없이 된다.
 
 ## 7. 게임 파트 실측 (오후 사용자 테스트 전)
+
+> **빌드는 몰아서 한 번** (사용자 지시 09-06 00:25). 에디터에서 확인할 수 있는 것은 에디터 Play 로 먼저, 빌드로만 확인 가능한 항목은 [`build-verify-checklist.md`](./build-verify-checklist.md) 에 쌓아 두고 빌드 한 번에 전부 확인한다 — Development 13~16분·릴리스 36~44분을 매 수정마다 쓰지 않는다.
 
 | 도구 | 키 | 재는 것 |
 |---|---|---|
