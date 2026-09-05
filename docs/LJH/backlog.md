@@ -11,7 +11,7 @@
 
 **원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**열린 내 MR 은 0건이다.** `!250`(World Interaction Integration, Unity 3건 `-343`·`-415`·`-414`)은 09-05 12:59 에 develop 에 머지됐고, 같은 라운드의 `-416`(Consultation, Unity 변경 0)은 `!251` 로 갈라 09-04 에 머지했다. `!262`(T-111 문서, `-247`)도 09-05 에 머지했다. 그 전 08-28 에 `!67`·`!63`·`!93`·`!94`·`!95`·`!97` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
+**열린 내 MR 은 0건, MR 대기 브랜치 3개다** — `feat/S15P21A604-91-guest-access-token`(게스트 AT 전달, `56b398ac`) · `fix/S15P21A604-426-unity-boot-watchdog`(boot watchdog, `8b81d6dc`) · `feat/S15P21A604-427-runtime-unity-build-base`(런타임 base·manifest 해석, `fb76d156`). 전부 develop 발, push 완료, MR 본문 초안 작성됨 — 게시 승인 대기. 게임 파트의 `!259`(-421 canvas id)는 FE 리뷰 완료·승인 가능 판정. `!250`(World Interaction Integration, Unity 3건 `-343`·`-415`·`-414`)은 09-05 12:59 에 develop 에 머지됐고, 같은 라운드의 `-416`(Consultation, Unity 변경 0)은 `!251` 로 갈라 09-04 에 머지했다. `!262`(T-111 문서, `-247`)도 09-05 에 머지했다. 그 전 08-28 에 `!67`·`!63`·`!93`·`!94`·`!95`·`!97` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
 
 **`front` 는 develop 과 0 behind 다**(2026-09-05, 머지 `39641e0b`). front 가 develop 에 대해 고유하게 갖는 것은 `docs/LJH/` 와 `.claude/launch.json` 둘뿐이다. 09-05 fresh clone 교체([T-111](../25_트러블슈팅.md)) 뒤 git 밖 로컬 환경(`CLAUDE.local.md` 3절·메모리 1건·`festa-*` 스킬 3종)을 `26_로컬_규약_스냅샷.md` 에서 복원했다.
 
@@ -19,9 +19,10 @@
 
 ## 내 액션 필요
 
-- [ ] **`specs/016` spec.md 29줄 반입 제안 — #115 스레드 게시 대기.** Unity→React `BOOTH_LAPTOP_INTERACT` 계약 블록이 front 에만 있다(develop 의 이 파일은 최초 spec-kit 커밋 이후 무변경 = 미반입). **리드 문서라 별도 MR 로 밀지 않는다** — #115 §2 가 이미 같은 파일의 3건을 리드 몫으로 걸어 뒀으니 그 스레드에서 함께 승인받는다
+- [ ] **#128 FE 결함 3건 + #127 서빙 URL — 코드 완료, MR 게시·인프라 주입 대기.** 게스트 AT(-91)·boot watchdog(-426)·런타임 base + manifest 해석(-427) 브랜치 3개 push 됨. 남은 것: MR 3건 게시 → 머지 순서 -91 → -426 → -427(-91·-426 은 같은 파일), `!259` 승인·머지, 인프라 compose 에 `PUBLIC_UNITY_BUILD_BASE` 주입(#127 통보), 월요일 develop head 통합 실측. 실 WebGL 왕복은 전부 미실행
+- [ ] **외부 코멘트 게시 대기 5건** — `!259` 리뷰 · #128 회신 · #127 FE 몫(런타임 주입·안 A 지지·인프라 1건) · #125 동의(재현 확인, accessor 제안 비차단) · #56 ⓐ(안 1 수용, `{machineId}` 는 Unity canonical id 조건) · #110 회신(-343 코드 완료·Unity 검증 대기). 초안은 세션 scratchpad `drafts-2026-09-05.md`
 - [ ] **`-114` 완료 판정 대기** — GAME 오버레이 호스트 배선을 [MR !97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/97) 로 넣었다. `Closes` 는 안 넣었다 — BE 에 `GAME_PORTAL` 지원이 **전무**해서(타입·테이블·endpoint 전부 0건) 실서버 왕복을 못 한다. 같은 이유로 이 경로는 현재 **도달 불가**라 사용자 영향도 없다
-- [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
+- [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). BE 가 09-01 "SSAFY 로그인 오늘 실시" 후 결과 미게시(#114). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
 - [ ] **World 상호작용 Unity 잔여 검증 — `!250` 머지됨(09-05), Unity 파트 확인 대기.** 계약 확정·양쪽 구현·FE 검증(E2E·tsc·build·lint·vitest 83/83)은 끝났다. 남은 것은 Unity Editor 컴파일 · F 런타임 3종 · `ManagementDeskInteractable` 의 월드 NPC 프리팹 부착(나머지 둘은 `BoothObjectFactory` 가 런타임에 붙인다) · `BoothInteractBridgeTests` 보강(`-343` 작업 내용 4번). 선행 의존 `-336`(부스 내부 스케일)은 develop 머지됨(`b6322bc`). **네 티켓 모두 `Closes` 미사용**: 완료조건에 런타임 검증이 남아 있다
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
@@ -33,7 +34,7 @@
 
 - [ ] **`-187` `asset://` 참조 해석·회귀 — 단위 몫 완료, 실서버 대기.** 페이지 배선 회귀 4건을 `-317`([MR !94](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/94)) 와 함께 넣었다(`playGamePageAssetWiring.test.tsx` — 익명·object URL 도달·`asset://local` 미유출·404 격리). 완료 조건이 *"업로드된 Asset 이 새 세션과 익명 Published 플레이에서 표시된다"* 라 실서버가 필요하고 `-107`·`-176` 대기다
 
-**D5(OAuth 자격증명, Google·Kakao·SSAFY)는 여전히 최대 blocker** — [`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274). `-86`·`-88`·`-89`·`-87` 잔여·`-90` 잔여·`-171` 실서버가 걸려 있다.
+**OAuth 자격증명([`-274`](https://ssafy.atlassian.net/browse/S15P21A604-274))은 provider 별로 상태가 다르다 — 전체 BLOCKED 가 아니다.** Google·Kakao 는 BE 가 08-31 값 6종을 Mattermost 1:1 로 전달했고(#114, Kakao 실계정 관통 근거 있음) → **회원 실서버 검증(`-87`~`-90` 잔여·`-171`)은 이 두 provider 로 착수 가능**(값 수령·`.env` 반영은 사용자 몫). SSAFY 만 provider-level 잔여(BE 09-01 실시 예정, 결과 미게시). Jira `-274` 는 '해야 할 일' 그대로 — 상태 정리는 BE·리드 몫.
 
 | 남은 대기 | 왜 |
 |---|---|
@@ -49,7 +50,7 @@
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T056 Portal resolver·overlay adapter / T058 E2E | **계약은 완결**(#48 종료 — `contracts/game-api.md` v1.0 MR !1 머지). 남은 것은 **BE 구현 배포** — Jira `-111`(스키마·패키지)·`-112`(Draft API)·`-157`(Publish·Published 조회). 경계 2건도 확정: **Draft 없음 = 204 No Content**, 재시도 코드는 서버 `INTERNAL_ERROR` 유지(FE 판정만 정렬). T054 `objectId` 미계약은 [PR #82](https://github.com/kanghyunsoon/ssafesta/pull/82)가 답 | strdeok |
 | [#56](https://github.com/kanghyunsoon/ssafesta/issues/56) T057 `OnOverlayStateChanged` 송신부 | 수신 GameObject명(`receiverObjectName`) 확정 | Unity |
 | [#55](https://github.com/kanghyunsoon/ssafesta/issues/55) 잔여 E2E | **서버 비의존 FE 범위는 [PR #72](https://github.com/kanghyunsoon/ssafesta/pull/72)(리드)가 선구현**(Published loader·schema guard·상태별 오류 UI·error boundary). 잔여 = BE 구현 배포 후 실 endpoint + `-116` stable resolver 연결 뒤 browser E2E | strdeok·리드 |
-| 001 T016 회원 refresh 실서버 왕복 | **D5 OAuth 자격증명 6종.** 게스트·logout 구간은 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46) 머지로 완료(08-27). 회원 `refresh_token` 최초 발급처가 `OAuthCompletionController` 하나뿐이라 성공·만료·재사용 탐지를 실행하지 못했다 | BE·리드 |
+| 001 T016 회원 refresh 실서버 왕복 | **Google·Kakao 값 6종 수령됨(08-31, Mattermost) — 착수 가능. SSAFY 만 미확보.** 게스트·logout 구간은 [MR !46](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/46) 머지로 완료(08-27). 회원 `refresh_token` 최초 발급처가 `OAuthCompletionController` 하나뿐이라 성공·만료·재사용 탐지를 실행하지 못했다 | BE·리드 |
 | `assetCode` 목록 | Unity 레지스트리 실측값(#6·#18 — 둘 다 이걸 기다리다 닫힘) | Unity |
 | `-117` Published 게임 세션 포트 실 API 교체 | **Jira 담당자 미배정.** 규약은 확정([#81](https://github.com/kanghyunsoon/ssafesta/issues/81) 종료) — 019는 idempotency·잔액·동시성을 직접 구현하지 않고 **spec 003 `WalletService.spend()` 에 위임**, 게스트는 FR-023대로 무료 플레이 가능, 서버 권위 adapter 전까지 **무료·무보상 유지**, 교체 지점은 `GameSessionPort` seam 3개(start/complete/exit) | 리드(배정) |
 
