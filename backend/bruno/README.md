@@ -91,6 +91,46 @@ window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/google`;
 
 `05-refresh`는 Bruno cookie jar에 저장된 `refresh_token`을 자동 전송하고, 새 Access Token을 `accessToken` 환경변수에 덮어쓴다. Refresh Token을 body나 환경변수에 수동으로 넣지 않는다.
 
+## dev 배포 서버로 돌리기 (S15P21A604-423)
+
+좌측 상단 Environment 를 `dev` 로 바꾼다. 요청은 그대로다 — 바뀌는 것은 주소뿐이다.
+
+### 실행 전 확인할 값 2개
+
+| 값 | 확인할 것 |
+|---|---|
+| `baseUrl` | `https://api.ssafesta.world`. **OAuth 콘솔에 등록된 redirect URI 와 짝이 되는 호스트다** (GitLab #117). 다른 호스트로 겨누면 앞의 요청은 다 되는데 OAuth 마지막 단계만 `redirect_uri_mismatch` 로 깨진다. EC2 경로 진입(`/__dev/api/`)은 allowlist 뒤에 있고 그 호스트로는 콜백이 등록돼 있지 않다 |
+| `frontendOrigin` | **비어 있다. 직접 채운다.** 서버에 주입된 `FRONTEND_BASE_URL` 과 **같은 값**이어야 한다 — refresh 요청의 Origin 검증에 쓰이므로 다르면 토큰 재발급이 거부된다 |
+
+Access Token · Refresh Token · handoff · 서비스 토큰은 환경 파일에 넣지 않는다. 로컬과 같은 규칙이다.
+
+### E2E happy path 실행 순서
+
+배포 직후 이 순서로 누른다. 앞 단계가 뒤 단계의 선행이라 **순서를 바꾸면 실패가 원인을 가린다.**
+
+```text
+1.  04-booth-lease/슬롯 목록 조회      ← 토큰 없이. 서버 도달 + DB 연결 확인
+2.  01-auth/게스트 로그인               ← 토큰 발급 경로 확인 (JWT_SECRET 주입 확인)
+3.  브라우저에서 OAuth → oauthHandoff 복사
+4.  01-auth/OAuth 완료 - 기존 유저      ← Redis 첫 접촉 (handoff 소비 + 세션 생성)
+5.  02-users/내 정보 조회               ← 회원 보호 API. 매 요청 Redis 세션 조회를 지난다
+6.  03-wallet/내 지갑 조회              ← 신규 계정이면 250. 두 번 눌러도 안 변해야 한다
+7.  11-inventory/상점 목록 조회 → 아이템 구매
+8.  02-users/아바타 외형 저장           ← 미보유 파츠면 409 AVATAR_ITEM_NOT_OWNED
+9.  04-booth-lease/부스 임대 → 내 부스 조회
+10. 05-booth-layout/템플릿 카탈로그 조회 → 작업본 저장 → 공개 → 외관 수정 → 홈페이지 주소 등록
+11. 07-projects/프로젝트 생성 → 수정 → 공개 프로젝트 조회(토큰 없이) → 좋아요 누르기 → 좋아요 취소
+12. 06-world-session/월드 세션 발급     ← endpoint 가 wss / world.<도메인> / 443 으로 나오는지
+13. 01-auth/액세스 토큰 재발급 → 로그아웃
+```
+
+### 로컬과 달라지는 지점
+
+- **Redis 는 4번에서 처음 닿는다.** handoff 를 소비하고 세션을 만드는 자리이고, 5번부터는 `SessionRevocationFilter` 가 요청마다 세션을 조회한다. 이 구간이 `WRONGPASS`·`NOAUTH` 계열로 실패하면 `REDIS_USERNAME`·`REDIS_PASSWORD` 미주입이다. 다만 `S15P21A604-422` 이후로는 그 상태면 애초에 기동이 실패하므로, 서버가 떠 있는데 여기서 죽으면 **값이 틀린 것**이지 빠진 것이 아니다.
+- **6번의 250 은 그 계정의 당일 첫 조회일 때다.** 같은 계정으로 다음날 다시 돌리면 300 이 정상이다.
+- **12번은 `application-infra.yml` 이 덮은 값이 나와야 한다.** `ws` / `127.0.0.1` / `7777` 이 나오면 `infra` 프로파일이 아니라 로컬 기본값으로 뜬 것이다 — `SPRING_PROFILES_ACTIVE=infra` 를 확인한다.
+- Refresh 쿠키는 HTTPS 배포에서 `Secure` 가 붙는다(`AUTH_COOKIE_SECURE=true`). Bruno cookie jar 는 그대로 동작하지만, `http://` 로 겨누면 13번의 재발급이 쿠키를 못 받아 실패한다.
+
 ## 각 요청 설명
 
 | 요청 | 하는 일 | 성공 시 |
