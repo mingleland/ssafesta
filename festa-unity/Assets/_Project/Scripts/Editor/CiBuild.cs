@@ -68,6 +68,22 @@ namespace Festa.EditorTools
                     Fail("WebGL 타깃 전환 실패");
             }
 
+            // 배포본이 부를 API. 기본 prod — 에셋 커밋값(Mock+Local)이 그대로 나가면 사용자 WebGL 이
+            // Mock 으로 동작한다 (S15P21A604-419). -festaEnv dev|local 로 바꿀 수 있다. Mock 은 CI 에서 항상 끈다.
+            var envArg = (ArgValue("-festaEnv") ?? "prod").ToLowerInvariant();
+            var env = envArg switch
+            {
+                "prod" => Festa.Integration.ApiEnvironment.Prod,
+                "dev" => Festa.Integration.ApiEnvironment.Dev,
+                "local" => Festa.Integration.ApiEnvironment.Local,
+                _ => throw new Exception($"알 수 없는 -festaEnv: {envArg} (prod|dev|local)"),
+            };
+            var apiConfig = FestaReleaseBuilder.LoadApiConfig();
+            bool prevMock = apiConfig != null && apiConfig.useMockApi;
+            var prevEnv = apiConfig != null ? apiConfig.activeEnvironment : Festa.Integration.ApiEnvironment.Local;
+            if (!FestaReleaseBuilder.ForceApiEnvironment(apiConfig, env))
+                Fail($"ApiConfig 를 {env} 로 강제하지 못했다");
+
             var options = new BuildPlayerOptions
             {
                 scenes = scenes,
@@ -75,7 +91,8 @@ namespace Festa.EditorTools
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None,   // Development OFF — 배포 설정
             };
-            RunBuild(options, "WebGL");
+            try { RunBuild(options, "WebGL"); }
+            finally { FestaReleaseBuilder.RestoreApiEnvironment(apiConfig, prevMock, prevEnv); }
 
             // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
             // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는
