@@ -5,3 +5,16 @@ app:
     host: world.${ROOT_DOMAIN}
     port: 443
     connection-token-secret: ${CONNECTION_TOKEN_SECRET}
+
+# Redis 는 ACL 로 dev_back·dev_ai·demo_back·demo_ai 를 나누고 default 사용자를 끈다
+# (infra-002 T015, GitLab #123). 자격증명 없이는 연결이 거부된다.
+#
+# 기본값을 두지 않는다. application.yml 의 빈 기본값이 배포까지 내려오면 Spring 이 AUTH 를 보내지
+# 않는데, Lettuce 는 지연 연결이라 기동은 성공하고 첫 사용(로그인·Refresh·일일 지급)에서 NOAUTH 로
+# 죽는다. health 는 DOWN 이 되지만 show-details 기본값이 never 라 본문에 원인이 없다 — 배포는
+# 통과했는데 로그인만 안 되는 모양이 된다 (S15P21A604-422).
+spring:
+  data:
+    redis:
+      username: ${REDIS_USERNAME}
+      password: ${REDIS_PASSWORD}
