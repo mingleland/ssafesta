@@ -475,6 +475,8 @@ namespace Festa.Network
 
         static Vector2 ReadKeyboardInput()
         {
+            // 호스트 Overlay 가 열려 있으면 월드 입력을 읽지 않는다 (G-8, InputBridge).
+            if (Festa.Integration.InputBridge.IsLocked) return Vector2.zero;
             var kb = Keyboard.current;
             if (kb == null) return Vector2.zero;
 
@@ -488,6 +490,7 @@ namespace Festa.Network
 
         static bool IsRunKeyPressed()
         {
+            if (Festa.Integration.InputBridge.IsLocked) return false;
             var kb = Keyboard.current;
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
         }
@@ -498,6 +501,7 @@ namespace Festa.Network
         /// </summary>
         static bool IsJumpPressed()
         {
+            if (Festa.Integration.InputBridge.IsLocked) return false;
             var kb = Keyboard.current;
             return kb != null && kb.spaceKey.wasPressedThisFrame;
         }

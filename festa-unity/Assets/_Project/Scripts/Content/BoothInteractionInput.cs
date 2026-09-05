@@ -171,6 +171,9 @@ namespace Festa.Content
         /// </summary>
         static bool InteractKeyPressedThisFrame()
         {
+            // 호스트 Overlay 가 열려 있으면 F 를 읽지 않는다 (G-8, InputBridge) — 오버레이 입력창에 'f' 를
+            // 치는 것이 뒤의 부스를 열면 안 된다.
+            if (Festa.Integration.InputBridge.IsLocked) return false;
 #if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;
             if (keyboard != null) return keyboard.fKey.wasPressedThisFrame;
