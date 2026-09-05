@@ -70,7 +70,9 @@ OAuth 없이 로컬 Spring 에서 회원 API(`users/me`·`wallets/me`·아바타
 
 ## 1. 빌드 (로컬, develop head)
 
-> **2026-09-06 00:40 산출물 준비됨** — develop `cf83e396` 클린 트리: `Builds/web-release`(138 MB, Brotli+fallback, manifest 4종 일치) + `festa-world:cf83e396`(= `festa-world:dev`, 430 MB). 월요일에 develop 이 더 바뀌지 않으면 이걸 그대로 쓴다. 바뀌면 아래 절차로 재빌드(40분).
+> **2026-09-06 00:40 산출물 준비됨** — develop `cf83e396` 클린 트리: `Builds/web-release`(138 MB, Brotli+fallback, manifest 4종 일치) + `festa-world:cf83e396`(= `festa-world:dev`, 430 MB).
+>
+> **⚠ 06:40 갱신 — develop 이 그 뒤 5건 더 나갔다**(!300 @Festival 프리팹·포털 규약, !301 로비 외형 저장 결함 수정, !302 초점 구도, !303 미니게임 서버 우선 판정, !304 실패 사유·QA 체크리스트). 전부 사용자 테스트에 걸리는 변경이라 **월요일 배포본은 head 로 재빌드해야 한다(40분)**. `cf83e396` 산출물은 재빌드가 실패했을 때의 대체본으로만 남긴다. 게임 서버 이미지도 같이 새로 뽑는다 — 씬이 바뀌었다(in-scene NetworkObject 해시 대조 결과는 docs/24 09-06 참조).
 
 ```bash
 cd festa-unity && git fetch origin develop && git checkout origin/develop --detach
