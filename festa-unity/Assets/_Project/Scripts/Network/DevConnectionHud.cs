@@ -153,7 +153,10 @@ namespace Festa.Network
                 GUILayout.Label(nm.IsServer ? $"SERVER — clients: {nm.ConnectedClientsIds.Count}"
                                             : "CLIENT — connected");
                 if (GUILayout.Button("Disconnect"))
+                {
+                    WorldReconnector.MarkUserInitiatedShutdown();   // 사용자가 끊는 것 — 자동 재접속 대상 아님 (-432)
                     _connection.Shutdown();
+                }
 
                 if (nm.IsClient && !nm.IsServer && GUILayout.Button("커스터마이징으로 돌아가기"))
                     ReturnToCustomization(nm);
@@ -207,6 +210,7 @@ namespace Festa.Network
             var appearance = player ? player.GetComponent<PlayerAppearanceController>() : null;
             if (appearance != null) AvatarSceneHandoff.Save(appearance.Current);
 
+            WorldReconnector.MarkUserInitiatedShutdown();   // 사용자가 끊는 것 — 자동 재접속 대상 아님 (-432)
             _connection.Shutdown();
             SceneManager.LoadScene(AvatarSceneHandoff.LobbySceneName);
         }
