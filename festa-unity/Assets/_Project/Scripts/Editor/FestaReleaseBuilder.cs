@@ -261,7 +261,16 @@ namespace Festa.EditorTools
 
         internal static void RestoreApiEnvironment(Festa.Integration.ApiConfig cfg, bool prevMock, Festa.Integration.ApiEnvironment prevEnv)
         {
-            if (cfg == null) return;
+            // 빌드 전에 잡아 둔 참조를 믿지 않는다. 빌드 타깃 전환·리임포트를 거치면 그 참조는
+            // 파괴된 오브젝트(가짜 null)가 되고, 2026-09-05 Prod 빌드에서 바로 그 경로로 복원이
+            // **조용히 빠져** 작업본 에셋이 Prod 로 남았다. 경로로 다시 읽고, 못 읽으면 소리 낸다.
+            cfg = LoadApiConfig();
+            if (cfg == null)
+            {
+                Debug.LogError($"[Release] ApiConfig 복원 실패 — {ApiConfigPath} 를 다시 읽지 못했다. " +
+                               $"에셋이 env={prevEnv} mock={prevMock} 로 돌아가지 않았을 수 있다 — 손으로 확인해라.");
+                return;
+            }
             cfg.useMockApi = prevMock;
             cfg.activeEnvironment = prevEnv;
             EditorUtility.SetDirty(cfg);
