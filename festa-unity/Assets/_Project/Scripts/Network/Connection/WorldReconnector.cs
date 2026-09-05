@@ -15,9 +15,9 @@ namespace Festa.Network
     /// 동작:
     ///   1. 로컬 클라이언트 끊김 감지 → 호스트에 <c>onWorldConnectionState('disconnected', 사유)</c>
     ///   2. 사유가 재시도해도 소용없는 것(정원 초과·다른 곳에서 같은 계정 접속)이면 <c>'failed'</c> 로 끝
-    ///   3. 그 외는 2·5·10초 뒤 최대 3회 — 매번 <b>새 world-session</b> 을 받아(grant 는 jti 1회용, -85)
+    ///   3. 그 외는 2·5·10·20·30초 뒤 최대 5회 — 매번 <b>새 world-session</b> 을 받아(grant 는 jti 1회용, -85)
     ///      <see cref="ConnectionManager.StartClient(Festa.Integration.WorldSessionDto, ConnectionPayload)"/>
-    ///   4. 붙으면 <c>'connected'</c>, 3회 다 실패하면 <c>'failed'</c>
+    ///   4. 붙으면 <c>'connected'</c>, 5회 다 실패하면 <c>'failed'</c>
     ///
     /// 사용자가 직접 끊은 것(Disconnect 버튼·로비로 돌아가기)은 재시도하지 않는다 —
     /// 끊기 전에 <see cref="MarkUserInitiatedShutdown"/> 을 부른다.
@@ -28,7 +28,7 @@ namespace Festa.Network
     public sealed class WorldReconnector : MonoBehaviour
     {
         public const string ObjectName = "WorldReconnector";
-        static readonly float[] BackoffSeconds = { 2f, 5f, 10f };
+        static readonly float[] BackoffSeconds = { 2f, 5f, 10f, 20f, 30f };   // 합계 ~67초 — 서버 재시작(20초 안팎)도 넘긴다. 2026-09-05 실측: 3회(17초)는 서버 재기동 중에 다 소진됐다
 
         static bool s_userInitiated;
 
