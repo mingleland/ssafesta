@@ -40,6 +40,7 @@ namespace Festa.Content
                 return;
             }
 
+            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 1.6f);
             BoothInteractBridge.SendProjectInteract(_runtimeObject.BoothId, _runtimeObject.ObjectId);
         }
     }

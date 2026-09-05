@@ -72,6 +72,11 @@ namespace Festa.World
         Transform _headBone;
         float _headToTop;
 
+        // 몸 렌더러 — 오클루전 컬링·프러스텀 밖·초점 모드 숨김으로 몸이 안 보이면 이름표도 끈다
+        // (벽 너머로 이름표만 떠다니던 것, 사용자 지적 2026-09-06).
+        Renderer[] _bodyRenderers;
+        int _bodyRefreshFrame;
+
         public string Label
         {
             get => _label;
@@ -277,7 +282,7 @@ namespace Festa.World
             float dist = toCam.magnitude;
 
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label);
+            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label) && IsBodyVisible();
             _renderer.enabled = show;
             if (!show) return;
 
@@ -292,6 +297,26 @@ namespace Festa.World
             flat.y = 0f;
             if (flat.sqrMagnitude > 0.0001f)
                 _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
+        }
+
+        /// <summary>
+        /// 몸 렌더러 중 하나라도 이번 프레임에 그려졌는가(<see cref="Renderer.isVisible"/> 는 프러스텀·오클루전 컬링 결과를 반영한다).
+        /// 전부 비활성(초점 모드 자기 숨김)이거나 컬링됐으면 false.
+        /// </summary>
+        bool IsBodyVisible()
+        {
+            if (_bodyRenderers == null || Time.frameCount - _bodyRefreshFrame > 120)
+            {
+                var list = new System.Collections.Generic.List<Renderer>();
+                foreach (var r in GetComponentsInChildren<Renderer>(true))
+                    if (r != null && !(r is TMPro.TMP_SubMesh) && !r.transform.IsChildOf(_root) && r.gameObject.name != "__FestaOutline") list.Add(r);
+                _bodyRenderers = list.ToArray();
+                _bodyRefreshFrame = Time.frameCount;
+            }
+            if (_bodyRenderers.Length == 0) return true;   // 몸을 모르면 종전대로 보인다
+            foreach (var r in _bodyRenderers)
+                if (r != null && r.enabled && r.gameObject.activeInHierarchy && r.isVisible) return true;
+            return false;
         }
 
         void OnDestroy()
