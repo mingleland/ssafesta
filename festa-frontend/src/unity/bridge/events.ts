@@ -27,9 +27,35 @@ export type BoothInteractEvent =
       boothId: number;
       objectId: string;
       configId: number; // Spring 소유 Game Portal Binding 식별자(signed Int32, #34). gameId 해석은 React가 서버 조회로 한다 — AI와 달리 이름 변환 함수가 없다
+    }
+  | {
+      type: 'BOOTH_SURVEY_INTERACT'; // 계약 확정: S15P21A604-415 (2026-09-04)
+      // boothId 는 설문의 ID 가 아니라 설문을 resolve 하기 위한 **context** 다. 부스당 활성
+      // 설문 1개를 boothId == surveyId 로 모델링하지 않는다 — 부스에 설문이 여럿이 되면
+      // objectId 로 특정 설문에 binding 하고, 그때 Unity 계약은 바뀌지 않는다.
+      boothId: number;
+      objectId: string;
     };
 
-type BoothInteractListener = (event: BoothInteractEvent) => void;
+/**
+ * 부스에 속하지 않는 월드 상호작용 — 관리 데스크/NPC (S15P21A604-414).
+ *
+ * `BoothInteractEvent` 와 **다른 union 으로 가른다.** 그쪽은 전부 `boothId`·`objectId` 를
+ * 가지며 그것이 계약의 핵심이다. 관리 진입점은 특정 부스에 종속되지 않아 필드가 없는데,
+ * 같은 union 에 넣으려면 두 필드를 optional 로 낮춰야 하고 그러면 나머지 5종에서 "있을 수도
+ * 있다" 가 돼 discriminated union 의 타입 안전성이 통째로 약해진다.
+ *
+ * 관리 대상 부스는 FE 가 `GET /booths/mine` 으로 resolve 한다 — Unity 는 세션 사용자의
+ * 임대 정보를 모르고 알 필요도 없다(헌법 1조).
+ */
+export type WorldInteractEvent = {
+  type: 'WORLD_MANAGEMENT_INTERACT';
+};
+
+/** onBoothInteract 채널로 들어오는 모든 이벤트 */
+export type UnityInteractEvent = BoothInteractEvent | WorldInteractEvent;
+
+type BoothInteractListener = (event: UnityInteractEvent) => void;
 
 const listeners = new Set<BoothInteractListener>();
 
@@ -51,7 +77,7 @@ declare global {
 export function initUnityBridge(): void {
   window.FestaUnity = window.FestaUnity || {};
   window.FestaUnity.onBoothInteract = (json: string) => {
-    let event: BoothInteractEvent;
+    let event: UnityInteractEvent;
     try {
       event = JSON.parse(json);
     } catch (err) {
