@@ -183,7 +183,23 @@ namespace Festa.Avatar
             SanitizeLocked(ref _config);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
+            // 게스트는 커스터마이징을 쓰지 않는다 — 바로 월드로 (S15P21A604-437). 토큰은 호스트가
+            // 인스턴스 생성 뒤에 밀어 넣으므로 지금 없을 수 있다 → 들어오는 순간에도 다시 본다.
+            Festa.Integration.AuthBridge.TokenChanged += OnAuthTokenChanged;
+            if (TryEnterWorldAsGuest()) return;
             InitializeFromServerAsync();
+        }
+        void OnDestroy() => Festa.Integration.AuthBridge.TokenChanged -= OnAuthTokenChanged;
+        bool _guestEntered;
+        void OnAuthTokenChanged() => TryEnterWorldAsGuest();
+        bool TryEnterWorldAsGuest()
+        {
+            if (_guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
+            _guestEntered = true;
+            SetStatus("게스트는 기본 외형으로 바로 입장합니다.");
+            Debug.Log("[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장");
+            EnterWorld();
+            return true;
         }
 
         /// <summary>

@@ -49,14 +49,23 @@ namespace Festa.Minigame
             var go = new GameObject("@TimerStopGameHud");
             var hud = go.AddComponent<TimerStopGameHud>();
             hud.Build(client);
+            // 게임 화면이 열린 동안 월드 조작(이동·점프·F)을 멈춘다 — 열린 채 캐릭터가 뛰어다니고
+            // 상호작용 프롬프트가 겹쳐 있던 것이 사용자 테스트 지적(S15P21A604-437).
+            Festa.Integration.InputBridge.SetLocked(true);
             return hud;
         }
 
         public void Close()
         {
             _game?.Abort();
+            Festa.Integration.InputBridge.SetLocked(false);
             Destroy(gameObject);
         }
+            void OnDestroy()
+            {
+                // 씬 전환 등으로 Close 없이 사라져도 잠금이 남지 않게.
+                Festa.Integration.InputBridge.SetLocked(false);
+            }
 
         void Build(IGameResultClient client)
         {

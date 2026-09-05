@@ -56,7 +56,18 @@ namespace Festa.Integration
             Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")}");
         }
 
-        /// <summary>에디터·테스트용. 호스트 없이 잠금 상태를 바꿀 때만 쓴다.</summary>
-        public static void SetLockedForTesting(bool locked) => IsLocked = locked;
+        /// <summary>
+        /// Unity 안에서 여는 화면(미니게임 HUD 등)이 직접 잠근다. 호스트 Overlay 와 같은 규칙 —
+        /// 열릴 때 true, 닫힐 때 false. 여러 곳이 겹쳐 잠그는 경우는 없다(화면은 동시에 하나).
+        /// </summary>
+        public static void SetLocked(bool locked)
+        {
+            if (locked == IsLocked) return;
+            IsLocked = locked;
+            Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")} (Unity 내부)");
+        }
+
+        /// <summary>에디터·테스트용 별칭.</summary>
+        public static void SetLockedForTesting(bool locked) => SetLocked(locked);
     }
 }
