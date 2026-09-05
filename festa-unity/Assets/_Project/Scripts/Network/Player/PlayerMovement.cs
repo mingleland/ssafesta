@@ -107,6 +107,14 @@ namespace Festa.Network
         bool _wasShowingAirborne;
         float _landHoldUntil;
 
+        // ── 낙하 안전장치 (2026-09-06) ──────────────────────────────
+        // 바닥이 없는 곳(콜라이더 틈·포털 밖)으로 떨어지면 끝없이 추락한다 — 실측 y=-111,829.
+        // 일반적인 3인칭 게임의 kill-plane: 한계선 아래로 가면 마지막 접지 위치(없으면 서버 스폰)로 되돌린다.
+        const float FallLimitY = -150f;
+        const float GroundedRecordInterval = 0.5f;
+        Vector3? _lastGroundedPosition;
+        float _nextGroundedRecordAt;
+
         bool _jumpPending;
         float _jumpPressedAt;
         // 발 구르기(Jump_Launch)를 바닥에서 재생하는 시간. 애니메이터의 Jump_Launch
@@ -251,6 +259,8 @@ namespace Festa.Network
             _airborne = false;
             _jumped = false;
             _jumpPending = false;
+            // 텔레포트 직후 한 프레임은 CC 가 접지로 보고할 수 있다 — 바닥 없는 자리를 "마지막 접지" 로 기록하지 않게 잠시 미룬다 (2026-09-06 실측).
+            _nextGroundedRecordAt = Time.time + 1f;
         }
 
         void PlaceAt(Vector3 pos)
@@ -309,6 +319,16 @@ namespace Festa.Network
                 if (!_spawnPlaced) return;
             }
 
+            if (transform.position.y < FallLimitY)
+            {
+                var back = _lastGroundedPosition ?? (ServerSpawnPosition.Value != Vector3.zero ? ServerSpawnPosition.Value : transform.position);
+                back.y = Mathf.Max(back.y, 0f) + 0.5f;
+                Debug.LogWarning($"[PlayerMovement] 낙하 한계 초과(y={transform.position.y:F0}) — 마지막 접지 위치 {back} 로 복귀");
+                _lastGroundedPosition = null;   // 같은 자리에서 또 떨어지면 다음엔 서버 스폰으로
+                TeleportTo(back);
+                return;
+            }
+
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
@@ -321,6 +341,11 @@ namespace Festa.Network
             if (_controller != null && _controller.enabled)
             {
                 grounded = _controller.isGrounded;
+                if (grounded && Time.time >= _nextGroundedRecordAt)
+                {
+                    _lastGroundedPosition = transform.position;
+                    _nextGroundedRecordAt = Time.time + GroundedRecordInterval;
+                }
                 // 의도한 도약 중에는 낮춘 중력을 쓴다 (위 주석). 그냥 떨어지는 것은 현실 중력.
                 float gravity = _jumped ? _jumpGravity : _gravity;
                 _verticalSpeed = grounded

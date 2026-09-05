@@ -54,7 +54,10 @@ namespace Festa.World
             if (dest == null) return;
 
             _movement.TeleportTo(dest.position);
-            if (_camera != null) _camera.SnapBehind();   // 카메라가 맵을 가로질러 날아오지 않게
+            // 목적지가 바라보는 방향으로 몸을 돌린다 — 부스 안 SpawnPoint 는 부스를(-z), ReturnPoint 는 축제를 향한다.
+            // 전에는 들어오기 전 방향 그대로라 문 안에서 벽을 보고 서는 일이 있었다 (2026-09-06 v3 실측).
+            _movement.transform.rotation = Quaternion.Euler(0f, dest.eulerAngles.y, 0f);
+            if (_camera != null) _camera.SnapBehind(dest.eulerAngles.y);   // 카메라도 같은 방향 — 맵을 가로질러 날아오지 않게
             _lastTeleportTime = Time.time;
         }
 
