@@ -82,7 +82,7 @@ namespace Festa.Network
             {
                 if (_reconnecting)
                 {
-                    Debug.Log($"[WorldReconnector] 재접속 성공 ({_attempt}회차)");
+                    Debug.Log($"[WorldReconnector] 재접속 성공 ({_attempt + 1}회차)");   // _attempt 는 0부터 — 시도 로그(N회차)와 맞춘다
                     _reconnecting = false;
                     _attempt = 0;
                 }
