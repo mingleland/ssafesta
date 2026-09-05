@@ -6,6 +6,11 @@
 
 ## 다음 Development 빌드에서 확인할 것
 
+> **빌드 준비됨 — 2026-09-06 05:43, `Builds/web`, develop `7f964d28`(!303·!304 포함, !305 `_MainTex` 수정은 미포함), 301 MB, 10.4분.** 프록시 `:8000` 이 그대로 서빙한다.
+> 실측은 **창이 보일 때** 진행 — 06:50 시점 데스크톱 앱 Browser 패널과 사용자 Chrome 탭이 모두 `visibilityState === "hidden"` 이라(화면 잠김/최소화 추정) 보류. 숨은 상태에서 잰 진입 55.1s 는 무효.
+> 걸어가지 않고 보는 법: `http://localhost:8000/probe.html`(FE 없이 빌드를 열어 `window.unityInstance` 노출, 빌드 폴더라 git 무시) →
+> `unityInstance.SendMessage('Character Lobby Flow','EnterWorld')` 로 입장 → `SendMessage('Arcade_01_Slot_Machine_01','Interact')`·`SendMessage('Arcade_03_Cabinet_01','Interact')` 로 #1·#3·#4·#5·#6·#7(자기 아바타 숨김) 확인, Esc 는 `canvas.focus()` 뒤 키 이벤트. #2 는 게임기 토스트(같은 IMGUI 9-slice 경로)로 갈음, #8 은 에디터에서 확인된 씬 데이터라 배치 자체는 동일.
+
 | # | 항목 | 어떻게 | 기대 | 근거 |
 |---|---|---|---|---|
 | 1 | UI 킷 스프라이트·TMP 외곽선 글자 | 슬롯머신 F → HUD / 타이밍 스톱 HUD / 로비 | 파란 패널·주황 버튼·아이콘이 깨지지 않고 보인다(런타임 Sprite.Create 9-slice, 아틀라스 2048). 한글 외곽선 정상 | !TBD (-439·-440 UI 킷) |
@@ -27,6 +32,7 @@
 
 | 날짜 | 빌드 | 항목 | 결과 |
 |---|---|---|---|
+| 2026-09-06 06:10 | dev (develop 7f964d28, `Builds/web`, probe.html + SendMessage) | #1 UI v3 카드·TMP / #3 초점+Esc / #5 `WORLD_ARCADE_INTERACT` / #6 v3 / #7 자기 아바타 숨김 / #2 프롬프트 알약 | ✅ 전부 렌더·동작. Esc 는 `canvas.focus()` 뒤 `KeyboardEvent` 로 전달됨. ❌ **팝업 자리에 회색 반투명 사각형 상주**(비활성 팝업의 형제 그림자, -442) / ❌ 재접속 재스폰 시 초점 잔류(-442) → 둘 다 수정, 다음 빌드에서 #4(게스트 팝업 문구·그림자 없음) 재확인. #8 배치는 에디터와 동일 씬 데이터. 진입 시간은 패널 stall 로 무효 — 월요일 사용자 Chrome 에서 잰다 |
 | 2026-09-06 01:10 | dev #6 + 에디터 클라 (Docker `festa-world:cf83e396`) | 게스트 즉시 입장 / 2클라 외형 동기화(-76) | ✅ `guest=True` → `[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장` → 총 7.9s. 2클라 상호 표시·외형 변경 전파 확인 |
 | 2026-09-06 00:50 | 에디터 Play(클라이언트 → Docker `festa-world:cf83e396`) | F2 토글(!294) | ✅ `s_panelVisible` False → F2 주입(InputSystem QueueEvent) → True. 빌드 없이 에디터로 확인 — 새 규칙 첫 적용. 릴리스 이미지 서버에 승인·스폰(총 7.0s) |
 | 2026-09-06 00:00 | dev #6 (develop 1353abe3) | 접속 패널·PerfHud 기본 숨김 / F3 / GC/1s / 외곽선·프롬프트 / `[WorldLoadTimeline]` | ✅ 숨김 확인, F3 동작, GC/1s 0~1, NPC 외곽선·`F · 내 부스 관리` 정상, 총 3.0s (main_loaded 1.2s). ❌ F2 안 켜짐 → !294 |
