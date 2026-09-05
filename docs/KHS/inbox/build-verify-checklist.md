@@ -33,6 +33,7 @@
 
 | 날짜 | 빌드 | 항목 | 결과 |
 |---|---|---|---|
+| 2026-09-06 07:35 | dev (develop fd024fff, `Builds/web`, probe.html manifest 기반) | #9 글꼴 / #4 팝업 그림자 / -441 콘솔 / 진입 시간 | ✅ 이름표 Noto Bold·HUD 주아·토스트 주아 렌더, `_MainTex` 에러 0(화면 콘솔 사라짐), 팝업 자리 회색 사각형 없음, **진입 3.1s**(보이는 탭). ⚠ 게스트 팝업 클릭은 패널·JS 주입 모두 uGUI 에 안 닿아 미확인(에디터 확인으로 갈음). ❌ 게임기 01 앞 풍선 겹침 → -444 z=161 이동(에디터 확인, 다음 빌드에서 시각 확인) |
 | 2026-09-06 06:10 | dev (develop 7f964d28, `Builds/web`, probe.html + SendMessage) | #1 UI v3 카드·TMP / #3 초점+Esc / #5 `WORLD_ARCADE_INTERACT` / #6 v3 / #7 자기 아바타 숨김 / #2 프롬프트 알약 | ✅ 전부 렌더·동작. Esc 는 `canvas.focus()` 뒤 `KeyboardEvent` 로 전달됨. ❌ **팝업 자리에 회색 반투명 사각형 상주**(비활성 팝업의 형제 그림자, -442) / ❌ 재접속 재스폰 시 초점 잔류(-442) → 둘 다 수정, 다음 빌드에서 #4(게스트 팝업 문구·그림자 없음) 재확인. #8 배치는 에디터와 동일 씬 데이터. 진입 시간은 패널 stall 로 무효 — 월요일 사용자 Chrome 에서 잰다 |
 | 2026-09-06 01:10 | dev #6 + 에디터 클라 (Docker `festa-world:cf83e396`) | 게스트 즉시 입장 / 2클라 외형 동기화(-76) | ✅ `guest=True` → `[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장` → 총 7.9s. 2클라 상호 표시·외형 변경 전파 확인 |
 | 2026-09-06 00:50 | 에디터 Play(클라이언트 → Docker `festa-world:cf83e396`) | F2 토글(!294) | ✅ `s_panelVisible` False → F2 주입(InputSystem QueueEvent) → True. 빌드 없이 에디터로 확인 — 새 규칙 첫 적용. 릴리스 이미지 서버에 승인·스폰(총 7.0s) |
