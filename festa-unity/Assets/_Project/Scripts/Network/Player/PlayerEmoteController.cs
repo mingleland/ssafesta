@@ -195,7 +195,7 @@ namespace Festa.Network
         void EnsureGuiAssets()
         {
             if (_labelStyle != null) return;
-            var font = Resources.Load<Font>("Fonts/MalgunGothicLight");
+            var font = Resources.Load<Font>("Fonts/Jua-Regular") ?? Resources.Load<Font>("Fonts/MalgunGothicLight");   // 2026-09-06 디스플레이 글꼴(주아)
             _labelStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,

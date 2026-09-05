@@ -128,7 +128,8 @@ namespace Festa.World
         static void EnsureStyles()
         {
             if (_labelStyle != null) return;
-            var font = Resources.Load<Font>("Fonts/MalgunGothicLight");
+            // 주아(디스플레이 글꼴) — 카드 UI 의 제목·버튼과 같은 글꼴 (2026-09-06). 없으면 맑은고딕.
+            var font = Resources.Load<Font>("Fonts/Jua-Regular") ?? Resources.Load<Font>("Fonts/MalgunGothicLight");
             _labelStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Normal, wordWrap = false, richText = false };
             _capStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Normal, wordWrap = false, richText = false };
             _toastStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Normal, wordWrap = false, richText = false };

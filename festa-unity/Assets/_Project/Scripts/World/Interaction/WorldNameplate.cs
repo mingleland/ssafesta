@@ -31,7 +31,7 @@ namespace Festa.World
     public sealed class WorldNameplate : MonoBehaviour
     {
         /// <summary>SDF 폰트 경로. 한글이라 프로젝트 폰트로 구운 것을 쓴다.</summary>
-        const string FontResourcePath = "Fonts/MalgunGothic_SDF";
+        const string FontResourcePath = "Fonts/NotoSansKRBold_SDF";   // 2026-09-06 이름표는 굵은 본문 글꼴(Noto Sans KR Bold) — 멀리서도 읽힌다
 
         [Tooltip("표시할 이름. 비어 있으면 그리지 않는다.")]
         [SerializeField] string _label;
