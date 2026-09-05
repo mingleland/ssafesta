@@ -3,7 +3,7 @@
 // callback·302 redirect가 브라우저 내비게이션으로 일어나기 때문. mock 모드만 예외적으로 provider
 // 왕복을 SPA 내비게이션으로 흉내낸다(plan.md §Mock 전략).
 // 표시 순서는 reference(login.png) 기준 SSAFY→Google→Kakao→게스트 — 데이터는 provider registry 가 정본이다.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { authApi } from '../../entities/auth/api.select';
@@ -11,6 +11,7 @@ import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { apiBaseUrl } from '../../shared/config/runtime';
+import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
 import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.png';
@@ -58,6 +59,11 @@ export function LoginPage() {
   const { notice } = useSession();
   const [guestError, setGuestError] = useState<string | null>(null);
   const [guestPending, setGuestPending] = useState(false);
+
+  // warm-up 2단계 (S15P21A604-430). 로그인 화면에 도달했다는 것은 월드 진입 의도가 드러난 것이라
+  // framework 까지 넓힌다. 소셜 로그인은 전체 페이지 이동이라 그 순간 요청이 끊기지만, 받아 둔 만큼은
+  // HTTP 캐시에 남아 복귀 후 다시 쓰인다. 게스트 입장은 SPA 이동이라 그대로 이어진다.
+  useEffect(() => warmUpUnityAssets('intent'), []);
 
   const orderedOAuth = OAUTH_DISPLAY_ORDER.map((id) => authProviders.find((p) => p.id === id)).filter(
     (p): p is AuthProviderVM => p !== undefined,
