@@ -9,7 +9,7 @@
 | — | ~~릴리스 WebGL 클라이언트가 게임 서버에 승인되지 않는다~~ → **빌드 결함 아님.** 자동화 브라우저 탭이 hidden 상태라 Chrome 이 rAF 를 멈춰 Unity 루프가 정지했던 것. 보이는 탭에서는 Docker 서버(`festa-world:dev`=60b8cd42)에 승인·스폰·이동 정상 | ✅ 해결(환경 요인) — 단, **실사용자도 탭을 30초 뒤로 보내면 끊긴다**(T-120, 재접속 UX 미결) | docs/25 **T-115**·**T-120**, Jira -420 |
 | ☆ | 스태프 NPC 2기에 벤더 데모 컨트롤러 잔존(매 프레임 경고·입력 가로채기) | ✅ 씬에서 제거 (Jira -425, MR) | T-119 |
 | ☆ | ~~로비 → main 씬 전환 50~84초(WebGL)~~ → **보이는 탭에서 3.0초**(00:00 실측 `총 3.0s : main_loaded 1.2s … gate_open 0.7s`). 50~84초는 hidden 탭(T-115) 산물 | ✅ 진입 자체는 문제 없음. 실사용자 대기는 로비 *앞* .data 초기 다운로드(129 MB) — FE 안내(-429)의 중심이 그쪽. 월요일 실브라우저에서 `[WorldLoadTimeline] 요약` 한 줄 재확인 | #129, -431 |
-| ★ | 씬 배치 상호작용(관리 데스크·오락기) F 무반응 | ✅ !281 (T-122) — 사용자 2차 실테스트(22:30)·00:00 dev 빌드에서 데스크 프롬프트·오락기 HUD 확인 | -435 |
+| ★ | 씬 배치 상호작용(관리 데스크·오락기) F 무반응 | ✅ !281 (T-123) — 사용자 2차 실테스트(22:30)·00:00 dev 빌드에서 데스크 프롬프트·오락기 HUD 확인 | -435 |
 | ☆ | 회전 감도·앉기 이름표·벽 조명 팝인 | ✅ !282 / 걷기 끊김은 아래 -437 ⑤ 로 원인 확정 | -436 |
 | ☆ | Overlay 열림 중 월드 입력·React 입력창 타이핑 | ✅ Unity 측 !279(`InputBridge`, `captureAllKeyboardInput=false`) — FE `OverlayHost` 배선 대기 | #132, -434 |
 | ☆ | 백그라운드 복귀 재접속 | ✅ Unity `WorldReconnector`(!284·!288, 5회 ~67초) — 서버 재기동 실측으로 루프 확인. FE 안내 UI·수신부는 FE(#131) | #131, -432 |
@@ -47,6 +47,15 @@ cd festa-frontend && npm run dev -- --port 5173 --strictPort     # .env: VITE_AP
 ```
 
 브라우저는 **`http://localhost:5173`** 으로(Spring CORS 허용 오리진). 확인: `docker logs festa-world-01 | grep Approved`.
+
+### 로컬 회원 토큰 만들기 (회원 전용 경로 검증용, 2026-09-06)
+
+OAuth 없이 로컬 Spring 에서 회원 API(`users/me`·`wallets/me`·아바타 저장)를 시험할 때. **로컬 전용** — 시크릿은 `backend/.env` 의 `JWT_SECRET`(base64) 을 그대로 쓰고 값은 어디에도 적지 않는다.
+
+1. 회원 행 확인: `select id from users where account_type='MEMBER'` (로컬 DB 에 id 1 존재).
+2. 세션 등록(Spring `SessionRevocationFilter` 가 `sid` 를 Redis 와 대조): `redis-cli SET local:auth:session:<id> <uuid> EX 28800` (키스페이스 prefix 는 `local:` — 없이도 하나 더 넣어 둔다).
+3. JWT 민팅(HS512): header `{alg:HS512,typ:JWT}`, payload `{sub:"<id>", role:"MEMBER", sid:"<uuid>", iat, exp, jti}` — node `crypto.createHmac("sha512", Buffer.from(JWT_SECRET,"base64"))`. 스크립트는 세션 scratchpad `member1.jwt` 생성 절차 참고(토큰 파일은 커밋 금지).
+4. 확인: `GET /api/v1/users/me` → 200. 에디터 로비에서는 `AuthBridge.SetAccessToken(token)` 뒤 `InitializeFromServerAsync` 재호출로 회원 흐름을 탄다.
 
 ## 0. 주말 중 받아야 하는 것 (없으면 월요일 진행 불가)
 
