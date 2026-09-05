@@ -49,7 +49,8 @@ SOURCE    — 사람이 제공한 입력 원본. 수정 금지
 | `04_prototypes/` | PROPOSAL | UX 재배치·화면 사양·장기 Game Client 설계·World 시각 사양 |
 | `05_technical-spikes/` | SPIKE PLAN | `booth-studio-r3f-asset-pipeline-plan.md` — Booth Studio 실제 Unity 에셋 근사 렌더링(R3F + GLB + FE Asset Pipeline). **상태: DEFERRED / Spike 미착수.** R3F 는 여전히 D-05 의 후보이며 채택 결정이 아니다 |
 | `06_visual-review/` | 기록 | Taste·Playwright·consistency (미생성) |
-| `07_handoff/decision-queue.md` | DECISION 대기 | Unity 합의 4건 |
+| `07_handoff/decision-queue.md` | DECISION 대기 | Unity 합의 4건 (4번은 FE 층 확정 후 Unity 몫 3건으로 축소) |
+| `07_handoff/fe-contract-boundary.md` | DECISION + 요청 | G-6·G-7·G-8 에서 FE 가 확정한 계약과 타 파트 요청(owner·완료조건 명시) |
 
 ## 현재 단계
 
