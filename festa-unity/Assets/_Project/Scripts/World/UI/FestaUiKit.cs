@@ -34,16 +34,21 @@ namespace Festa.World.UI
         public static readonly Color Bad      = new(0.88f, 0.32f, 0.29f, 1f);
         public static readonly Color Dim      = new(0.05f, 0.05f, 0.08f, 0.42f);     // 뒤 월드 암막
 
-        const string FontResourcePath = "Fonts/MalgunGothic_SDF";
-        static TMP_FontAsset s_font;
+        // 글꼴 두 벌 (2026-09-06, OFL — Resources/Fonts 에 라이선스 동봉). 본문은 Noto Sans KR Bold(가독), 제목·버튼·배지는 주아(Jua, 둥근 디스플레이).
+        // 둘 다 Malgun 과 같은 Dynamic SDF(1024, 90pt) 라 WebGL 에서 런타임에 글리프를 채운다. 로비(캐릭터 커스터마이징)는 이 킷을 쓰지 않는다.
+        const string FontResourcePath = "Fonts/NotoSansKRBold_SDF";
+        const string DisplayFontResourcePath = "Fonts/Jua_SDF";
+        const string LegacyFontResourcePath = "Fonts/MalgunGothic_SDF";
+        static TMP_FontAsset s_font, s_displayFont;
         static readonly Dictionary<int, Sprite> s_rounded = new();
 
         public enum Card { Cream, Paper, Charcoal }
 
+        /// <summary>본문 글꼴 — Noto Sans KR Bold. 없으면 맑은고딕 SDF, 그것도 없으면 TMP 기본.</summary>
         public static TMP_FontAsset Font()
         {
             if (s_font != null) return s_font;
-            s_font = Resources.Load<TMP_FontAsset>(FontResourcePath);
+            s_font = LoadFont(FontResourcePath) ?? LoadFont(LegacyFontResourcePath);
             if (s_font == null)
             {
                 Debug.LogError($"[FestaUiKit] Resources/{FontResourcePath} 를 찾지 못했다 — TMP 기본 폰트로 떨어진다(한글이 깨질 수 있다).");
@@ -51,6 +56,26 @@ namespace Festa.World.UI
             }
             return s_font;
         }
+
+        /// <summary>제목·버튼·배지 글꼴 — 주아. 없으면 본문 글꼴.</summary>
+        public static TMP_FontAsset DisplayFont()
+        {
+            if (s_displayFont != null) return s_displayFont;
+            s_displayFont = LoadFont(DisplayFontResourcePath) ?? Font();
+            return s_displayFont;
+        }
+
+        static TMP_FontAsset LoadFont(string path)
+        {
+            var f = Resources.Load<TMP_FontAsset>(path);
+            if (f == null) Debug.LogWarning($"[FestaUiKit] Resources/{path} 없음.");
+            return f;
+        }
+
+        /// <summary>
+        /// 글꼴 자체가 Bold 인 페이스(Noto Bold·주아)에 TMP 가짜 굵기까지 얹으면 글자가 뭉친다 — Bold 플래그는 떼고 나머지 스타일만 남긴다.
+        /// </summary>
+        static FontStyles Normalize(FontStyles style) => style & ~FontStyles.Bold;
 
         // ── 캔버스 ─────────────────────────────────────────────────
 
@@ -168,7 +193,7 @@ namespace Festa.World.UI
             var t = go.GetComponent<TextMeshProUGUI>();
             t.font = Font();
             t.fontSize = size;
-            t.fontStyle = style;
+            t.fontStyle = Normalize(style);
             t.alignment = align;
             t.color = color;
             t.text = text;
@@ -185,7 +210,10 @@ namespace Festa.World.UI
 
         /// <summary>제목 — 어두운 굵은 글자.</summary>
         public static TMP_Text Title(RectTransform parent, string text, float size, Vector2 pos, Vector2 box, Vector2? anchor = null, Vector2? pivot = null)
-            => Label(parent, text, size, pos, box, Text, FontStyles.Bold, TextAlignmentOptions.Center, anchor, pivot);
+            => Display(Label(parent, text, size, pos, box, Text, FontStyles.Bold, TextAlignmentOptions.Center, anchor, pivot));
+
+        /// <summary>라벨을 디스플레이 글꼴(주아)로 바꾼다 — 제목·버튼·배지에만.</summary>
+        public static TMP_Text Display(TMP_Text t) { t.font = DisplayFont(); return t; }
 
         /// <summary>
         /// 카드 위쪽에 얹는 제목 태그 — 코랄 알약에 흰 굵은 글자. 카드 테두리에 반쯤 걸치게 두면 "이름표" 처럼 읽힌다.
@@ -195,7 +223,7 @@ namespace Festa.World.UI
             var pill = Rect(parent, "TitleTag", Accent, Mathf.RoundToInt(size.y / 2f));
             var a = anchor ?? new Vector2(0.5f, 1f);
             Place(pill.rectTransform, a, a, pos, size);
-            var t = Label(pill.rectTransform, text, fontSize, Vector2.zero, Vector2.zero, OnAccent, FontStyles.Bold);
+            var t = Display(Label(pill.rectTransform, text, fontSize, Vector2.zero, Vector2.zero, OnAccent, FontStyles.Bold));
             Stretch(t.rectTransform);
             return pill;
         }
@@ -207,7 +235,7 @@ namespace Festa.World.UI
             float w = Mathf.Max(56f, text.Length * 13f + 28f);
             var a = anchor ?? new Vector2(0.5f, 1f);
             Place(img.rectTransform, a, a, pos, new Vector2(w, 26f));
-            var t = Label(img.rectTransform, text, 13f, Vector2.zero, Vector2.zero, fg ?? Muted, FontStyles.Bold);
+            var t = Display(Label(img.rectTransform, text, 13f, Vector2.zero, Vector2.zero, fg ?? Muted, FontStyles.Bold));
             Stretch(t.rectTransform);
             return img;
         }
@@ -263,7 +291,7 @@ namespace Festa.World.UI
                 br.offsetMin = Vector2.zero; br.offsetMax = Vector2.zero;
             }
 
-            var t = Label(go.GetComponent<RectTransform>(), label, fontSize, Vector2.zero, Vector2.zero, primary ? OnAccent : Text, FontStyles.Bold);
+            var t = Display(Label(go.GetComponent<RectTransform>(), label, fontSize, Vector2.zero, Vector2.zero, primary ? OnAccent : Text, FontStyles.Bold));
             Stretch(t.rectTransform);
             t.rectTransform.offsetMin = new Vector2(0f, 2f);
             return btn;
@@ -273,7 +301,8 @@ namespace Festa.World.UI
         public static Button CloseButton(RectTransform parent, Vector2 pos, float size, UnityEngine.Events.UnityAction onClick,
                                          Vector2? anchor = null, Vector2? pivot = null)
         {
-            var btn = PillButton(parent, "✕", pos, new Vector2(size, size), onClick, false, size * 0.46f, anchor ?? new Vector2(1f, 1f), pivot ?? new Vector2(1f, 1f));
+            // "×"(U+00D7) — 주아·Noto 모두 가진 글리프. "✕"(U+2715) 는 한글 글꼴에 없어 대체 글꼴로 빠질 수 있다.
+            var btn = PillButton(parent, "×", pos, new Vector2(size, size), onClick, false, size * 0.6f, anchor ?? new Vector2(1f, 1f), pivot ?? new Vector2(1f, 1f));
             btn.name = "Close";
             return btn;
         }
