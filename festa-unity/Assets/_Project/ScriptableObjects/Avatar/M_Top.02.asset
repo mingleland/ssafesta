@@ -21,8 +21,11 @@ MonoBehaviour:
   objectPrefabs: []
   targetBones: 
   hiddenBodyParts: 02000000030000001500000014000000
+  forcedVisibleBodyParts: 
+  garmentColorAreaMask: 7
   thumbnail: {fileID: 21300000, guid: 14c2c6746e4e10c439ba4f19ef3e70cf, type: 3}
   isDefault: 0
+  isDefaultUnlocked: 1
   hairGroup: 0
   familyId: 0
   requiredHairGroup: 0

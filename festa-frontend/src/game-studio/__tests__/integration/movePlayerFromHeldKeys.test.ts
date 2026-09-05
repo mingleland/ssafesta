@@ -83,18 +83,53 @@ describe('movePlayerFromHeldKeys — PLATFORMER', () => {
     // 버려서 x가 그대로였다(수직 이동만 되는 "대각선 아닌 점프").
     expect(moved.playerPosition).toEqual({ x: spawn.position.x + 1, y: spawn.position.y - 1 });
     expect(moved.facing).toBe('RIGHT');
-    expect(moved.verticalVelocity).toBe(-3);
+    // S15P21A604-408 — 마리오 스타일 가변 점프 도입 후, 그라운드 이탈 시점엔 고정 임펄스
+    // (-3)가 아니라 "홀드 1틱째" 상태(verticalVelocity: -1, jumpHoldTicks: 1)로 시작한다.
+    expect(moved.verticalVelocity).toBe(-1);
+    expect(moved.jumpHoldTicks).toBe(1);
   });
 
-  it('공중에서 UP을 누르고 있어도(재점프 불가) 좌우 이동은 계속 적용된다', () => {
+  it('공중에서도 UP을 계속 누르고 있으면 홀드로 점프를 이어가면서 좌우 이동도 함께 적용된다(S15P21A604-408)', () => {
     const { project } = platformerProject();
     const runtime = startReferenceRuntime(project);
     const jumped = movePlayerFromHeldKeys(project, runtime, heldSet('UP', 'RIGHT'));
-    // 이미 공중이므로(방금 뛰어오름) 같은 턴에 UP을 또 눌러도 재점프는 안 되지만, RIGHT는 무시되면 안 된다.
-    const midAir = movePlayerFromHeldKeys(project, jumped, heldSet('UP', 'RIGHT'));
-    expect(midAir.playerPosition).toEqual({ x: jumped.playerPosition!.x + 1, y: jumped.playerPosition!.y });
-    // 재점프가 아니므로 상승 속도(verticalVelocity)가 다시 -3으로 리셋되지 않는다.
-    expect(midAir.verticalVelocity).toBe(jumped.verticalVelocity);
+    // 그라운드에서 새로 뛰어오르는 재점프는 아니지만(이미 공중), UP을 계속 누르고 있으면
+    // 홀드가 이어져서 1칸 더 상승한다(JUMP_HOLD_MAX_TICKS까지) — RIGHT도 계속 반영된다.
+    const stillHolding = movePlayerFromHeldKeys(project, jumped, heldSet('UP', 'RIGHT'));
+    expect(stillHolding.playerPosition).toEqual({
+      x: jumped.playerPosition!.x + 1,
+      y: jumped.playerPosition!.y - 1,
+    });
+    expect(stillHolding.jumpHoldTicks).toBe(2);
+  });
+
+  it('상승 도중 UP을 놓으면 홀드가 끝나고 다음 tick부터 중력이 이어받는다(S15P21A604-408)', () => {
+    const { project } = platformerProject();
+    const runtime = startReferenceRuntime(project);
+    const jumped = movePlayerFromHeldKeys(project, runtime, heldSet('UP'));
+    expect(jumped.jumpHoldTicks).toBe(1);
+
+    // UP을 놓고 RIGHT만 누른 상태로 다음 held-key 평가가 들어오면 홀드가 즉시 끝난다.
+    const released = movePlayerFromHeldKeys(project, jumped, heldSet('RIGHT'));
+    expect(released.jumpHoldTicks).toBe(0);
+    expect(released.verticalVelocity).toBe(0);
+    // 놓은 그 틱 자체는 더 안 올라가고(수평만 반영), 다음 tickReferenceWorld부터 하강한다.
+    expect(released.playerPosition).toEqual({ x: jumped.playerPosition!.x + 1, y: jumped.playerPosition!.y });
+    const fallen = tickReferenceWorld(project, released);
+    expect(fallen.playerPosition!.y).toBe(released.playerPosition!.y + 1);
+  });
+
+  it('UP을 4틱 넘게 유지해도 그 이상 높이 안 올라간다(선형비례 상한, S15P21A604-408)', () => {
+    const { project } = platformerProject();
+    const runtime = startReferenceRuntime(project);
+    let next = movePlayerFromHeldKeys(project, runtime, heldSet('UP'));
+    expect(next.jumpHoldTicks).toBe(1);
+    for (let i = 0; i < 5; i += 1) {
+      next = movePlayerFromHeldKeys(project, next, heldSet('UP'));
+    }
+    // 4틱(JUMP_HOLD_MAX_TICKS)에서 홀드가 끝나 더 이상 안 올라간다.
+    expect(next.jumpHoldTicks).toBe(0);
+    expect(next.playerPosition).toEqual({ x: runtime.playerPosition!.x, y: runtime.playerPosition!.y - 4 });
   });
 
   it('DOWN+LEFT를 동시에 누르면 급낙하와 좌우 이동이 함께 적용된다', () => {

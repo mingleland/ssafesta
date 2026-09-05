@@ -9,13 +9,23 @@ namespace Festa.Booth
     {
         static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
 
-        /// <summary>판정 거리. **월드 유닛**이다 (1 m = 10 unit) — 30f 는 3 m 다.</summary>
-        [SerializeField, Min(0.5f)] float _maxDistance = 30f;
+        /// <summary>판정 거리. **월드 유닛**이며 콜라이더 표면 기준이다 (20f ≈ 1.5 m).</summary>
+        [SerializeField, Min(0.5f)] float _maxDistance = 20f;
         [SerializeField] bool _highlightEnabled = true;
-        [SerializeField] Color _highlightColor = new(0.25f, 0.7f, 1f, 1f);
+        [Tooltip("강조 색. 발밑 링(금색)과 같은 계열이라야 같은 기능으로 읽힌다.")]
+        [SerializeField] Color _highlightColor = new(1f, 0.82f, 0.35f, 1f);
+
+        [Tooltip("발광 세기 — 너무 높이면 재질 색이 날아가 형태를 알아볼 수 없다.")]
+        [SerializeField, Range(0.1f, 3f)] float _highlightStrength = 0.9f;
 
         readonly List<Renderer> _renderers = new();
-        MaterialPropertyBlock _block;
+        // 하이라이트는 **재질 인스턴스**로 건다. MaterialPropertyBlock 으로 _EmissionColor 만
+        // 써 넣던 이전 방식은 **셰이더 키워드를 켤 수 없어**, 재질에 _EMISSION 이 꺼져 있으면
+        // 아무 일도 일어나지 않았다 — 하이라이트가 조용히 죽어 있었다 (S15P21A604-355).
+        // 강조 대상은 항상 하나뿐이라 인스턴스 비용은 무시할 수 있다.
+        readonly List<Material[]> _originalMaterials = new();
+        readonly List<Material> _instanced = new();
+        bool _highlighted;
 
         // ── 근접 자동 조준용 레지스트리 ─────────────────────────
         // 디스패처가 매 프레임 "사거리 안의 가장 가까운 대상" 을 찾는다 (S15P21A604-346).
@@ -27,6 +37,54 @@ namespace Festa.Booth
         void OnDisable() => Active.Remove(this);
 
         public float MaxDistance => _maxDistance;
+
+        /// <summary>
+        /// 플레이어 위치에서 이 대상까지의 거리 — **콜라이더 표면 기준**이다.
+        ///
+        /// <para>전에는 <c>transform.position</c>(피벗)까지 쟀다. 그러면 큰 오브젝트일수록
+        /// 표면에 몸이 닿아도 피벗은 멀어서, 사거리를 오브젝트 크기에 맞춰 크게 잡아야 했다
+        /// (노트북은 피벗이 테이블 높이에 있어 표면에서 6.8 unit 이었다 — T-232).
+        /// 사거리가 커지면 이번엔 **멀리서도 잡히는** 반대 문제가 생긴다.</para>
+        ///
+        /// <para>표면 기준으로 재면 사거리 값이 오브젝트 크기와 무관해져, "거의 붙어야 잡힌다"
+        /// 를 크기가 제각각인 부스 오브젝트 전부에 한 숫자로 걸 수 있다 (S15P21A604-355).
+        /// 포털(<see cref="Festa.World.BoothPortal"/>)이 쓰던 방식과 같다.</para>
+        /// </summary>
+        public float DistanceFrom(Vector3 pos)
+        {
+            var b = WorldBounds();
+            return b.HasValue ? Vector3.Distance(pos, b.Value.ClosestPoint(pos))
+                              : Vector3.Distance(pos, transform.position);
+        }
+
+        /// <summary>하이라이트 링을 놓을 바닥 지점과 반경 — 포털과 같은 표현을 쓴다.</summary>
+        public (Vector3 pos, float radius) HighlightFootprint()
+        {
+            var b = WorldBounds();
+            if (!b.HasValue)
+                return (new Vector3(transform.position.x, transform.position.y + 0.6f, transform.position.z), 6f);
+            var v = b.Value;
+            return (new Vector3(v.center.x, v.min.y + 0.6f, v.center.z),
+                    Mathf.Max(v.extents.x, v.extents.z) * 1.25f);
+        }
+
+        /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈.</summary>
+        Bounds? WorldBounds()
+        {
+            Bounds? acc = null;
+            foreach (var c in GetComponentsInChildren<Collider>(true))
+            {
+                if (c == null || c.isTrigger) continue;
+                if (acc == null) acc = c.bounds; else { var v = acc.Value; v.Encapsulate(c.bounds); acc = v; }
+            }
+            if (acc != null) return acc;
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null) continue;
+                if (acc == null) acc = r.bounds; else { var v = acc.Value; v.Encapsulate(r.bounds); acc = v; }
+            }
+            return acc;
+        }
 
         /// <summary>F 에 실제로 응답하는 대상인가 (IBoothInteractable 보유 — 팩토리가 판정해 넘긴다).</summary>
         public bool Interactive { get; private set; }
@@ -65,7 +123,6 @@ namespace Festa.Booth
         {
             _renderers.Clear();
             _renderers.AddRange(GetComponentsInChildren<Renderer>(true));
-            _block ??= new MaterialPropertyBlock();
         }
 
         void EnsureCollider()
@@ -92,14 +149,53 @@ namespace Festa.Booth
         {
             if (!_highlightEnabled) return;
             if (_renderers.Count == 0) CacheRenderers();
+            if (highlighted == _highlighted) return;
+            _highlighted = highlighted;
 
-            foreach (var targetRenderer in _renderers)
+            if (highlighted) ApplyHighlightMaterials();
+            else RestoreMaterials();
+        }
+
+        void ApplyHighlightMaterials()
+        {
+            _originalMaterials.Clear();
+            foreach (var r in _renderers)
             {
-                if (targetRenderer == null) continue;
-                targetRenderer.GetPropertyBlock(_block);
-                _block.SetColor(EmissionColor, highlighted ? _highlightColor * 0.65f : Color.black);
-                targetRenderer.SetPropertyBlock(_block);
+                if (r == null) { _originalMaterials.Add(null); continue; }
+                var originals = r.sharedMaterials;
+                _originalMaterials.Add(originals);
+
+                var copies = new Material[originals.Length];
+                for (int i = 0; i < originals.Length; i++)
+                {
+                    if (originals[i] == null) continue;
+                    var m = new Material(originals[i]);
+                    // 키워드까지 켜야 실제로 빛난다 — MPB 로는 못 하던 부분이다.
+                    m.EnableKeyword("_EMISSION");
+                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
+                    if (m.HasProperty(EmissionColor))
+                        m.SetColor(EmissionColor, _highlightColor * _highlightStrength);
+                    copies[i] = m;
+                    _instanced.Add(m);
+                }
+                r.materials = copies;
             }
         }
+
+        void RestoreMaterials()
+        {
+            for (int i = 0; i < _renderers.Count && i < _originalMaterials.Count; i++)
+            {
+                var r = _renderers[i];
+                if (r == null || _originalMaterials[i] == null) continue;
+                r.sharedMaterials = _originalMaterials[i];
+            }
+            _originalMaterials.Clear();
+            // 만든 인스턴스는 반드시 지운다 — 강조할 때마다 새로 만들면 재질이 샌다.
+            foreach (var m in _instanced) if (m != null) Destroy(m);
+            _instanced.Clear();
+        }
+
+        void OnDestroy() => RestoreMaterials();
     }
 }

@@ -79,3 +79,10 @@
   font-size: 13.5px;
 }
 .ai-input:focus { outline: none; border-color: var(--ov-accent); }
+
+/* 사람 상담 에스컬레이션 — 대화의 마지막 수단이라 입력줄보다 약하게 둔다 (S15P21A604-416) */
+.ai-escalate {
+  align-self: flex-start;
+  margin-right: auto;
+  white-space: nowrap;
+}

@@ -1,8 +1,6 @@
-"""페이지 메타데이터를 보존하며 토큰 단위 청크를 만든다 (T048).
+"""페이지 메타데이터를 보존하며 spike 확정값으로 토큰 단위 청크를 만든다 (T048).
 
-chunk_size·overlap은 `S15P21A604-92` 스파이크 실측값이 research.md에 반영되기
-전까지 코드에 기본값을 고정하지 않는다. 호출자가 설정(`Settings.chunk_size`,
-`Settings.chunk_overlap`)에서 읽어 명시적으로 전달한다.
+호출자는 `Settings`의 기본값 900 tokens·overlap 180 tokens를 명시적으로 전달한다.
 """
 
 from __future__ import annotations
@@ -31,6 +29,28 @@ class TikTokenCodec:
     def decode(self, tokens: Sequence[int]) -> str:
         return self._encoding.decode(list(tokens))
 
+    def split_windows(
+        self, text: str, *, chunk_size: int, overlap: int
+    ) -> list[tuple[str, int]]:
+        """멀티바이트 문자의 토큰 중간을 잘라도 원문에 대체 문자를 만들지 않는다."""
+        tokens = self._encoding.encode(text)
+        decoded, offsets = self._encoding.decode_with_offsets(tokens)
+        if decoded != text:
+            raise ValueError("토큰 offset을 원문 문자 위치로 변환하지 못했습니다.")
+
+        step = chunk_size - overlap
+        windows: list[tuple[str, int]] = []
+        for start in range(0, len(tokens), step):
+            end = min(start + chunk_size, len(tokens))
+            char_start = offsets[start]
+            char_end = offsets[end] if end < len(offsets) else len(text)
+            content = text[char_start:char_end].strip()
+            if content:
+                windows.append((content, end - start))
+            if end >= len(tokens):
+                break
+        return windows
+
 
 @dataclass(frozen=True, slots=True)
 class TextChunk:
@@ -57,14 +77,24 @@ def chunk_pages(
     chunks: list[TextChunk] = []
     chunk_no = 0
     for page in pages:
-        tokens = list(codec.encode(page.text.strip()))
+        page_text = page.text.strip()
+        tokens = list(codec.encode(page_text))
         if not tokens:
             continue
-        for start in range(0, len(tokens), step):
-            window = tokens[start : start + chunk_size]
-            if not window:
-                break
-            content = codec.decode(window).strip()
+        splitter = getattr(codec, "split_windows", None)
+        if splitter is not None:
+            windows = splitter(page_text, chunk_size=chunk_size, overlap=overlap)
+        else:
+            windows = []
+            for start in range(0, len(tokens), step):
+                window = tokens[start : start + chunk_size]
+                if not window:
+                    break
+                windows.append((codec.decode(window).strip(), len(window)))
+                if start + chunk_size >= len(tokens):
+                    break
+
+        for content, token_count in windows:
             if content:
                 chunks.append(
                     TextChunk(
@@ -72,12 +102,10 @@ def chunk_pages(
                         page_number=page.page_number,
                         section=None,
                         content=content,
-                        token_count=len(window),
+                        token_count=token_count,
                     )
                 )
                 chunk_no += 1
-            if start + chunk_size >= len(tokens):
-                break
 
     if not chunks:
         raise ValueError("문서에서 임베딩할 텍스트 청크를 만들지 못했습니다.")

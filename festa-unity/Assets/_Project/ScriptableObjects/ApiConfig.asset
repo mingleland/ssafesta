@@ -19,8 +19,8 @@ MonoBehaviour:
     springBaseUrl: http://localhost:8000
     aiBaseUrl: http://localhost:8000
   - environment: 1
-    springBaseUrl: https://dev-api.example.com
-    aiBaseUrl: https://dev-ai.example.com
+    springBaseUrl: https://ci.ssafesta.world/__dev/api
+    aiBaseUrl: https://ci.ssafesta.world/__dev/ai
   - environment: 2
-    springBaseUrl: https://api.example.com
-    aiBaseUrl: https://ai.example.com
+    springBaseUrl: https://api.ssafesta.world
+    aiBaseUrl: https://ai.ssafesta.world

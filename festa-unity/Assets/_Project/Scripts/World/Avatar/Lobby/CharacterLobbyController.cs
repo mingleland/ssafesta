@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -54,6 +55,18 @@ namespace Festa.Avatar
         Text _wardrobeTitle;
         Text _wardrobeColorTitle;
         RectTransform _itemScroll;
+
+        // ── 스크롤 위치 보존 ────────────────────────────────────────
+        // 옷을 고르면 목록 전체를 다시 그리는데, 그때마다 맨 위로 튀어 올라 아래쪽 항목을
+        // 고르는 순간 방금 보던 자리를 잃었다 (S15P21A604-355 사용자 지적).
+        // **정규화 값이 아니라 절대 위치를 기억한다** — 같은 목록을 다시 그리는 것이라
+        // 콘텐츠 높이가 같고, 절대 위치로 되돌리면 픽셀 단위로 정확히 제자리다.
+        // 카테고리가 바뀔 때는 목록 자체가 달라지므로 맨 위에서 시작하는 게 맞다.
+        AvatarPartCategory? _wardrobeScrollFor;
+        float _wardrobeScrollY;
+        AvatarPartCategory? _itemScrollFor;
+        float _itemScrollY;
+
         Text _colorTitle;
         CanvasScaler _uiScaler;
         RectTransform _responsiveFrame;
@@ -91,6 +104,42 @@ namespace Festa.Avatar
 
         static readonly Color[] Palette = { new(1,.8f,.69f), new(.73f,.48f,.34f), new(.42f,.23f,.16f), new(.18f,.12f,.1f), new(.95f,.78f,.55f), new(.12f,.08f,.06f), new(.35f,.18f,.08f), new(.12f,.28f,.45f), new(.2f,.45f,.28f), new(.55f,.18f,.22f), new(.9f,.35f,.45f), new(.1f,.18f,.38f), new(.7f,.12f,.18f), new(.12f,.42f,.48f), new(.15f,.15f,.18f), Color.white };
         static readonly Color[] NaturalSkinColors = {new(.96f,.78f,.67f),new(.88f,.64f,.52f),new(.73f,.46f,.34f),new(.55f,.32f,.23f),new(.36f,.21f,.16f)};
+
+        /// <summary>
+        /// 무작위 생성에서 피부톤을 뽑는 가중치. <see cref="NaturalSkinColors"/> 와 같은 순서다.
+        ///
+        /// <para><b>균등 추첨이면 안 된다.</b> 다섯 톤을 고르게 뽑으면 어두운 두 톤이 40% 를
+        /// 차지하는데, 축제존이 야간이라 어두운 피부는 화면에서 잘 보이지 않는다 — 우리가
+        /// 먼저 보여주는 예시가 안 보이는 쪽에 몰릴 이유가 없다 (S15P21A604-355 사용자 지적).
+        /// 밝은 쪽에 무게를 싣고 어두운 톤은 가끔 나오게 한다(합 100 중 14).
+        /// 선택 팔레트에서는 다섯 톤을 그대로 다 고를 수 있다 — 무작위 분포만 조정한 것이다.</para>
+        /// </summary>
+        static readonly int[] SkinToneWeights = {32,30,24,10,4};
+
+        /// <summary>
+        /// 잠긴 항목을 눌렀을 때의 안내 (GitLab #120 §2-1).
+        ///
+        /// <para><b>게스트는 구매로 보내지 않는다.</b> 게스트에게는 유료 품목이 전부 미보유로
+        /// 오고 구매는 서버가 <c>MEMBER_ONLY</c> 로 거부하므로, 구매를 권하면 눌러도 실패하는
+        /// 버튼을 권하는 셈이 된다. 로그인으로 안내한다.</para>
+        ///
+        /// <para>보유 정보를 못 받은 상태(<see cref="AvatarOwnershipState.Failed"/>)에서는
+        /// "안 가진 항목" 이 아니라 <b>불러오기 실패</b>라고 말한다 — 원인이 다르고, 사용자가
+        /// 할 수 있는 행동도 다르다(구매가 아니라 새로고침).</para>
+        /// </summary>
+        void ShowLockedNotice()
+        {
+            if (AvatarOwnership.State == AvatarOwnershipState.Failed)
+            {
+                SetStatus("보유 정보를 불러오지 못해 잠겨 있습니다. 새로고침 후 다시 시도해 주세요.");
+                return;
+            }
+
+            bool guest = !Festa.Integration.ApiServices.IsMock && !Festa.Integration.AuthBridge.HasToken;
+            SetStatus(guest
+                ? "로그인하면 상점에서 구매해 사용할 수 있어요."
+                : "아직 보유하지 않은 항목입니다. 상점에서 구매할 수 있어요.");
+        }
         static readonly Color[] NaturalHairColors = {new(.08f,.065f,.06f),new(.16f,.105f,.08f),new(.28f,.17f,.11f),new(.42f,.25f,.15f),new(.34f,.17f,.12f),new(.62f,.49f,.33f)};
         static readonly Color[] NaturalIrisColors = {new(.20f,.12f,.08f),new(.34f,.23f,.12f),new(.17f,.29f,.39f),new(.24f,.35f,.29f),new(.29f,.31f,.33f)};
         static readonly Color[] NaturalLipColors = {new(.62f,.31f,.31f),new(.70f,.39f,.36f),new(.55f,.27f,.29f),new(.72f,.44f,.40f),new(.48f,.23f,.22f)};
@@ -131,9 +180,82 @@ namespace Festa.Avatar
                 : TryGetSceneHandoffAppearance(out var handoffConfig)
                     ? handoffConfig
                     : CreateRecommendedRandomConfig(AvatarGender.Female, false);
+            SanitizeLocked(ref _config);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
-            if (!_restoredExistingAppearance) LoadPersistedAppearanceAsync();
+            InitializeFromServerAsync();
+        }
+
+        /// <summary>
+        /// 서버에서 <b>보유 정보를 먼저</b> 받고, 그 다음 저장 외형을 받는다 (S15P21A604-412).
+        ///
+        /// <para>순서가 중요하다. 저장 외형에 지금 기준으로 잠긴 옷이 섞였는지 판정하려면
+        /// 보유 정보가 먼저 있어야 한다 — 뒤바뀌면 <see cref="SanitizeLocked"/> 가 판정 없이
+        /// 돌아 아무것도 걸러내지 못하고, 사용자는 못 가진 옷을 입은 채로 월드에 들어가
+        /// 저장 시점에야 거부당한다.</para>
+        /// </summary>
+        async void InitializeFromServerAsync()
+        {
+            await LoadOwnershipAsync();
+
+            // 방금 도착한 판정으로 현재 외형을 다시 검사한다 — Awake 에서 만든 추천 외형은
+            // 판정이 없던 시점에 전체 목록에서 골랐으므로 잠긴 것이 섞여 있을 수 있다.
+            SanitizeLocked(ref _config);
+            Apply(); RefreshAll();
+
+            if (!_restoredExistingAppearance) await LoadPersistedAppearanceAsync();
+        }
+
+        /// <summary>
+        /// 파츠 보유 정보를 받아 온다 (GitLab #120 §8-1).
+        ///
+        /// <para><b>실패를 개방으로 바꾸지 않는다.</b> 못 받으면 전부 잠긴 채로 두고 화면에
+        /// 오류를 띄운다 — 조용히 열어 버리면 잠금이 깨진 것을 아무도 모른 채로 나간다(T-24).
+        /// Mock 경로만 예외이고, 그것도 <b>명시적으로</b> 개발 모드라고 로그·상태에 적는다.</para>
+        /// </summary>
+        async Task LoadOwnershipAsync()
+        {
+            try
+            {
+                Festa.Integration.ApiServices.EnsureInitialized();
+
+                if (Festa.Integration.ApiServices.IsMock)
+                {
+                    AvatarOwnership.UnlockAllForDevelopment("ApiConfig.useMockApi = true");
+                    return;
+                }
+
+                var catalog = await Festa.Integration.ApiServices.User.GetAvatarPartCatalogAsync();
+                if (catalog?.items == null)
+                {
+                    AvatarOwnership.MarkFailed("GET /catalog/items 응답을 받지 못했다");
+                    SetStatus("파츠 보유 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+                    return;
+                }
+
+                var cataloged = new List<int>(catalog.items.Length);
+                var owned = new List<int>();
+                foreach (var item in catalog.items)
+                {
+                    // assetKey 는 서버가 문자열로 내려주지만 avatar_code 의 i= 칸은 정수다.
+                    // 파싱에 실패한 항목은 조인할 수 없으므로 건너뛰고 드러낸다.
+                    if (!int.TryParse(item?.assetKey, out var key) || key == 0)
+                    {
+                        Debug.LogWarning($"[CharacterLobby] 카탈로그 항목의 assetKey 를 읽을 수 없어 건너뛴다 — code={item?.code} assetKey={item?.assetKey}");
+                        continue;
+                    }
+                    cataloged.Add(key);
+                    if (item.owned) owned.Add(key);
+                }
+
+                AvatarOwnership.SetFromServer(cataloged, owned);
+                Debug.Log($"[CharacterLobby] 파츠 보유 정보 적용 — 카탈로그 {cataloged.Count}종 중 보유 {owned.Count}종");
+            }
+            catch (Exception exception)
+            {
+                AvatarOwnership.MarkFailed(exception.Message);
+                SetStatus("파츠 보유 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+            }
         }
 
         bool TryGetLiveAppearance(out AvatarConfig config)
@@ -162,7 +284,7 @@ namespace Festa.Avatar
             return true;
         }
 
-        async void LoadPersistedAppearanceAsync()
+        async Task LoadPersistedAppearanceAsync()
         {
             try
             {
@@ -171,6 +293,7 @@ namespace Festa.Avatar
                 var appearance = Festa.World.AvatarAppearance.Decode(profile?.avatarCode);
                 if (!appearance.IsModular || !IsUsableAppearance(appearance.ModularConfig)) return;
                 _config = appearance.ModularConfig;
+                SanitizeLocked(ref _config);
                 _restoredExistingAppearance = true;
                 _wardrobeCategory = _config.outfitId != 0 ? AvatarPartCategory.Outfit : AvatarPartCategory.Top;
                 _garmentColorCategory = _wardrobeCategory;
@@ -266,6 +389,10 @@ namespace Festa.Avatar
             Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
             var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
             Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            // 상태 줄 — SetStatus 가 여기에 쓴다. 이 라벨이 없던 동안 잠금 안내·조회 실패 메시지가
+            // 전부 로그에만 남고 화면에는 아무것도 안 떴다 (S15P21A604-412 검증에서 발견).
+            _status=Label(_responsiveFrame,"",17,34,new Vector2(.22f,.006f),new Vector2(.78f,.05f));
+            _status.fontStyle=FontStyle.Normal;_status.color=new Color(1f,.86f,.6f,1f);_status.raycastTarget=false;
 
 
             var right=Panel(_responsiveFrame,"Detail Inspector",new Vector2(.715f,0),Vector2.one,UiPanel);
@@ -328,16 +455,24 @@ namespace Festa.Avatar
                 WardrobeCategoryButton(_wardrobeTabs,CategoryName(category),CategoryIcon(category),()=>{_wardrobeCategory=captured;_editingGarmentColor=false;SetCamera(CategoryCameraPreset(captured));RefreshWardrobe();},83,120,_wardrobeCategory==category);
             }
             if(_wardrobeTitle)_wardrobeTitle.text=CategoryName(_wardrobeCategory)+" 선택";
+            // 다시 그리기 전에 지금 보고 있던 위치를 붙잡는다 (위 필드 주석 참조).
+            bool keepWardrobeScroll=_wardrobeScrollFor==_wardrobeCategory;
+            if(keepWardrobeScroll)_wardrobeScrollY=_wardrobeGrid.anchoredPosition.y;
+            _wardrobeScrollFor=_wardrobeCategory;
             foreach(Transform child in _wardrobeGrid)Destroy(child.gameObject);
-            if(_wardrobeItemScroll)_wardrobeItemScroll.GetComponent<ScrollRect>().verticalNormalizedPosition=1f;
             ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
-            var wardrobeItems=_catalog.GetItems(_wardrobeCategory,_config.gender).ToArray();
+            // 서버 카탈로그에 있는 것만 그린다 — 미등록 파츠는 고를 수 있어도 저장이 거부된다 (#120 §2-1).
+            var wardrobeItems=_catalog.GetCatalogedItems(_wardrobeCategory,_config.gender).ToArray();
             for(int index=0;index<wardrobeItems.Length;index++)
             {
                 var captured=wardrobeItems[index];
                 var presentation=WardrobePresentation(_wardrobeCategory,captured);
-                ImageButton(_wardrobeGrid,PrettyName(presentation.displayName),presentation.thumbnail,()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),158,148,IsSelected(_wardrobeCategory,captured));
+                bool locked=!AvatarOwnership.IsUnlocked(captured);
+                ImageButton(_wardrobeGrid,PrettyName(presentation.displayName),presentation.thumbnail,
+                    locked?ShowLockedNotice:()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),
+                    158,148,IsSelected(_wardrobeCategory,captured),null,locked);
             }
+            _wardrobeGrid.anchoredPosition=new Vector2(_wardrobeGrid.anchoredPosition.x,keepWardrobeScroll?_wardrobeScrollY:0f);
             RefreshWardrobeColors();
         }
 
@@ -443,19 +578,28 @@ namespace Festa.Avatar
                     face?new Vector2(.945f,.669f):new Vector2(.945f,.669f));
             }
             if(_categoryTitle)_categoryTitle.text=face?"얼굴형 선택":CategoryName(_category)+" 설정";
+            bool keepItemScroll=_itemScrollFor==_category;
+            if(keepItemScroll)_itemScrollY=_itemGrid.anchoredPosition.y;
+            _itemScrollFor=_category;
             foreach(Transform c in _itemGrid) Destroy(c.gameObject);
-            if(_itemScroll)_itemScroll.GetComponent<ScrollRect>().verticalNormalizedPosition=1f;
-            IEnumerable<AvatarItemDefinition> defs = _catalog.GetItems(_category,_config.gender);
+            // 서버 카탈로그에 있는 것만 그린다 (#120 §2-1). 잠긴 것은 자물쇠를 달아 보여준다 —
+            // 무엇을 얻을 수 있는지 보이지 않으면 잠금이 의미가 없다.
+            IEnumerable<AvatarItemDefinition> defs = _catalog.GetCatalogedItems(_category,_config.gender);
             if(_category==AvatarPartCategory.Hat) defs=defs.GroupBy(x=>x.familyId).Select(x=>x.First());
             if(_category!=AvatarPartCategory.Head) ImageButton(_itemGrid,"없음",null,()=>{_config.SetItem(_category,0);Apply();RefreshItems();},188,150,CurrentItemId(_category)==0);
             var definitions=defs.ToArray();
             for(int index=0;index<definitions.Length;index++)
             {
-                var captured=definitions[index];var select=new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
-                if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured));
-                else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured));
-                else ImageButton(_itemGrid,PrettyName(captured.displayName),captured.thumbnail,select,188,150,IsSelected(_category,captured));
+                var captured=definitions[index];
+                bool locked=!AvatarOwnership.IsUnlocked(captured);
+                var select=locked
+                    ?new UnityEngine.Events.UnityAction(ShowLockedNotice)
+                    :new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
+                if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured),locked);
+                else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured),locked);
+                else ImageButton(_itemGrid,PrettyName(captured.displayName),captured.thumbnail,select,188,150,IsSelected(_category,captured),null,locked);
             }
+            _itemGrid.anchoredPosition=new Vector2(_itemGrid.anchoredPosition.x,keepItemScroll?_itemScrollY:0f);
         }
 
         void Apply()
@@ -597,7 +741,7 @@ namespace Festa.Avatar
             if(rng.NextDouble()<.12)SetRandomItem(ref next,AvatarPartCategory.Hat,rng);
             else if(rng.NextDouble()<.18)SetRandomItem(ref next,AvatarPartCategory.Glasses,rng);
 
-            Color skin=NaturalSkinColors[rng.Next(NaturalSkinColors.Length)];
+            Color skin=NaturalSkinColors[WeightedIndex(SkinToneWeights,rng)];
             Color hair=NaturalHairColors[rng.Next(NaturalHairColors.Length)];
             Color iris=NaturalIrisColors[rng.Next(NaturalIrisColors.Length)];
             next.SetColor(AvatarColorSlot.Skin,skin);
@@ -621,9 +765,71 @@ namespace Festa.Avatar
             return next;
         }
 
+        /// <summary>
+        /// 불러온 외형에 잠긴 항목이 섞여 있으면 기본 제공 항목으로 바꾼다.
+        ///
+        /// <para><b>왜 필요한가.</b> 잠금이 생기기 전에 저장된 외형에는 지금 기준으로 잠긴 옷이
+        /// 들어 있다. 그대로 두면 "입고는 있는데 목록에서는 잠김" 이라는 앞뒤가 안 맞는 상태가
+        /// 되고, 나중에 서버 검증이 붙으면 저장에서 막힌다.</para>
+        ///
+        /// <para><b>조용히 바꾸지 않는다.</b> 무엇이 왜 바뀌었는지 로그로 남긴다 — 기본값으로
+        /// 슬쩍 되돌리는 것이 T-24 의 원인이었다.</para>
+        /// </summary>
+        void SanitizeLocked(ref AvatarConfig config)
+        {
+            // **판정이 준비되기 전에는 아무것도 걸러내지 않는다** (S15P21A604-412).
+            // 조회 전에는 보유가 비어 있어 모든 항목이 잠긴 것으로 나온다 — 그 상태로 돌리면
+            // 정상 외형을 전부 "잠김" 으로 보고 기본값으로 밀어 버리고, 그 기본값 후보마저
+            // 0개라 알몸이 된다. 판정은 InitializeFromServerAsync 가 받아온 뒤 다시 부른다.
+            if (!AvatarOwnership.JudgementReady) return;
+
+            var replaced=new List<string>();
+            foreach(var category in new[]{AvatarPartCategory.Head,AvatarPartCategory.Hair,AvatarPartCategory.Hat,
+                                          AvatarPartCategory.Glasses,AvatarPartCategory.Top,AvatarPartCategory.Bottom,
+                                          AvatarPartCategory.Outfit,AvatarPartCategory.Shoes})
+            {
+                int id=category switch{AvatarPartCategory.Head=>config.headId,AvatarPartCategory.Hair=>config.hairId,
+                    AvatarPartCategory.Hat=>config.hatId,AvatarPartCategory.Glasses=>config.glassesId,
+                    AvatarPartCategory.Top=>config.topId,AvatarPartCategory.Bottom=>config.bottomId,
+                    AvatarPartCategory.Outfit=>config.outfitId,AvatarPartCategory.Shoes=>config.shoesId,_=>0};
+                if(id==0) continue;
+                // 모자는 familyId 로 저장되므로 변형 하나를 찾아 판정한다.
+                var item=category==AvatarPartCategory.Hat?_catalog.ResolveHat(id,HairGroup.None):_catalog.Get(id);
+                if(item==null||AvatarOwnership.IsUnlocked(item)) continue;
+
+                // 액세서리는 굳이 대체하지 않는다 — 없는 편이 엉뚱한 것을 씌우는 것보다 낫다.
+                bool accessory=category==AvatarPartCategory.Hat||category==AvatarPartCategory.Glasses||category==AvatarPartCategory.Outfit;
+                var fallback=accessory?null:_catalog.Default(category,config.gender);
+                config.SetItem(category,fallback?fallback.itemId:0);
+                replaced.Add($"{category}: {item.name} → {(fallback?fallback.name:"없음")}");
+            }
+            if(replaced.Count>0)
+                Debug.LogWarning("[CharacterLobby] 잠긴 항목이 포함된 외형을 불러와 기본 제공 항목으로 교체했다 — "
+                               + string.Join(", ",replaced));
+        }
+
+        /// <summary>가중치에 비례해 인덱스를 하나 뽑는다. 가중치가 비면 균등으로 떨어진다.</summary>
+        static int WeightedIndex(int[] weights,System.Random rng)
+        {
+            int total=0;
+            foreach(var w in weights) total+=Mathf.Max(0,w);
+            if(total<=0) return rng.Next(weights.Length);
+            int roll=rng.Next(total);
+            for(int i=0;i<weights.Length;i++)
+            {
+                roll-=Mathf.Max(0,weights[i]);
+                if(roll<0) return i;
+            }
+            return weights.Length-1;
+        }
+
         void SetRandomItem(ref AvatarConfig config,AvatarPartCategory category,System.Random rng)
         {
-            var items=_catalog.GetItems(category,config.gender).ToArray();
+            // 무작위는 **해제된 것 중에서만** 고른다. 잠긴 옷을 입혀 놓으면 저장 시 서버
+            // 검증에서 막히고, 사용자는 왜 막혔는지 알 수 없다 (S15P21A604-355).
+            // 보유 정보가 아직 없으면 전체에서 고른다 — 후보 0개로 알몸이 되는 것을 막고,
+            // 판정이 도착하면 SanitizeLocked 가 잠긴 것을 교체한다 (S15P21A604-412).
+            var items=_catalog.GetSelectableItems(category,config.gender).ToArray();
             if(items.Length==0){config.SetItem(category,0);return;}
             var item=items[rng.Next(items.Length)];
             config.SetItem(category,category==AvatarPartCategory.Hat?item.familyId:item.itemId);
@@ -860,7 +1066,14 @@ namespace Festa.Avatar
             s_roundedSprite=Sprite.Create(texture,new Rect(0,0,size,size),new Vector2(.5f,.5f),100f,0,SpriteMeshType.FullRect,new Vector4(16,16,16,16));s_roundedSprite.name="Runtime Rounded UI Sprite";return s_roundedSprite;
         }
         static void Round(Image image){if(!image)return;image.sprite=RoundedSprite();image.type=Image.Type.Sliced;}
-        static Button ImageButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected=false,Color? swatch=null)
+        /// <summary>
+        /// 목록 카드 하나. <paramref name="locked"/> 면 <b>흐리게 + 잠김 표시</b>로 그린다.
+        ///
+        /// <para><b>숨기지 않고 보여준다.</b> 잠긴 항목을 목록에서 빼 버리면 무엇을 얻을 수
+        /// 있는지 알 수 없어 잠금이 의미를 잃는다 — 게임에서 잠긴 스킨을 회색으로 보여주는
+        /// 이유와 같다 (S15P21A604-355). 누르면 착용 대신 안내 문구가 뜬다.</para>
+        /// </summary>
+        static Button ImageButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected=false,Color? swatch=null,bool locked=false)
         {
             var b=new GameObject(string.IsNullOrEmpty(label)?"Preview":label,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement),typeof(Outline)).GetComponent<Button>();b.transform.SetParent(p,false);
             b.image.color=selected?UiCardSelected:UiCard;Round(b.image);var le=b.GetComponent<LayoutElement>();le.preferredWidth=w;le.preferredHeight=h;
@@ -868,7 +1081,11 @@ namespace Festa.Avatar
             if(sprite)
             {
                 var surface=ImageLayer(b.transform,"Preview Surface",new Vector2(.05f,.30f),new Vector2(.95f,.95f),UiPreview);Round(surface);surface.raycastTarget=false;
-                var preview=new GameObject("Preview",typeof(RectTransform),typeof(Image)).GetComponent<Image>();preview.transform.SetParent(surface.transform,false);preview.sprite=sprite;preview.preserveAspect=true;preview.color=Color.white;Anchor(preview.rectTransform,new Vector2(.025f,.025f),new Vector2(.975f,.975f));preview.raycastTarget=false;
+                var preview=new GameObject("Preview",typeof(RectTransform),typeof(Image)).GetComponent<Image>();preview.transform.SetParent(surface.transform,false);preview.sprite=sprite;preview.preserveAspect=true;
+                // 잠긴 항목은 형태만 남기고 눌러 놓는다 — 회색으로 완전히 지우면 무엇인지
+                // 알아볼 수 없어 "얻고 싶다" 는 판단을 할 수 없다.
+                preview.color=locked?new Color(.46f,.46f,.5f,.85f):Color.white;
+                Anchor(preview.rectTransform,new Vector2(.025f,.025f),new Vector2(.975f,.975f));preview.raycastTarget=false;
             }
             else if(swatch.HasValue)ColorSwatch(b.transform,swatch.Value,38);
             else
@@ -879,22 +1096,30 @@ namespace Festa.Avatar
             if(!string.IsNullOrEmpty(label))
             {
                 var labelSurface=ImageLayer(b.transform,"Label Surface",new Vector2(.05f,.035f),new Vector2(.95f,.255f),new Color(.065f,.06f,.07f,.92f));Round(labelSurface);labelSurface.raycastTarget=false;
-                var text=Label(labelSurface.transform,label,16,h*.22f);Anchor(text.rectTransform,new Vector2(.04f,0),new Vector2(.96f,1));text.color=selected?new Color(1f,.84f,.52f):UiText;text.alignment=TextAnchor.MiddleCenter;
+                var text=Label(labelSurface.transform,label,16,h*.22f);Anchor(text.rectTransform,new Vector2(.04f,0),new Vector2(.96f,1));text.color=locked?UiTextMuted:selected?new Color(1f,.84f,.52f):UiText;text.alignment=TextAnchor.MiddleCenter;
+            }
+            if(locked)
+            {
+                // 카드 전체를 살짝 덮어 잠금을 한눈에 알리고, 오른쪽 위에 표식을 얹는다.
+                var veil=ImageLayer(b.transform,"Lock Veil",Vector2.zero,Vector2.one,new Color(.04f,.045f,.06f,.45f));Round(veil);veil.raycastTarget=false;
+                var badge=ImageLayer(b.transform,"Lock Badge",new Vector2(.60f,.80f),new Vector2(.95f,.96f),new Color(.09f,.09f,.12f,.95f));Round(badge);badge.raycastTarget=false;
+                var badgeText=Label(badge.transform,"잠김",14,h*.14f);Anchor(badgeText.rectTransform,Vector2.zero,Vector2.one);
+                badgeText.color=new Color(1f,.80f,.42f);badgeText.alignment=TextAnchor.MiddleCenter;badgeText.raycastTarget=false;
             }
             b.onClick.AddListener(click);return b;
         }
-        static Button FaceCardButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected)
+        static Button FaceCardButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected,bool locked=false)
         {
-            var button=ImageButton(p,label,sprite,click,w,h,selected);
+            var button=ImageButton(p,label,sprite,click,w,h,selected,null,locked);
             var surface=button.transform.Find("Preview Surface")?.GetComponent<Image>();if(surface)surface.color=UiPreview;
-            var text=button.transform.Find("Label Surface")?.GetComponentInChildren<Text>();if(text){text.fontSize=17;text.color=selected?new Color(1f,.84f,.52f):UiText;}
+            var text=button.transform.Find("Label Surface")?.GetComponentInChildren<Text>();if(text){text.fontSize=17;text.color=locked?UiTextMuted:selected?new Color(1f,.84f,.52f):UiText;}
             return button;
         }
-        static Button HairCardButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected)
+        static Button HairCardButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected,bool locked=false)
         {
-            var button=ImageButton(p,label,sprite,click,w,h,selected);
+            var button=ImageButton(p,label,sprite,click,w,h,selected,null,locked);
             var surface=button.transform.Find("Preview Surface")?.GetComponent<Image>();if(surface)surface.color=new Color(.68f,.71f,.75f,1);
-            var text=button.transform.Find("Label Surface")?.GetComponentInChildren<Text>();if(text){text.fontSize=16;text.resizeTextForBestFit=false;text.color=selected?new Color(1f,.84f,.52f):UiText;}
+            var text=button.transform.Find("Label Surface")?.GetComponentInChildren<Text>();if(text){text.fontSize=16;text.resizeTextForBestFit=false;text.color=locked?UiTextMuted:selected?new Color(1f,.84f,.52f):UiText;}
             return button;
         }
         static Image ColorSwatch(Transform parent,Color value,float size)

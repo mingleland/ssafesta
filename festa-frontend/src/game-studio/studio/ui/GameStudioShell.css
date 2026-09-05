@@ -325,6 +325,11 @@
 .gss-canvas-scroll { align-items: flex-start; display: flex; height: 100%; justify-content: flex-start; min-height: 0; overflow: auto; padding: 28px; touch-action: none; }
 .gss-canvas-scroll.is-panning { cursor: grabbing; user-select: none; }
 .gss-map-stage { flex: 0 0 auto; margin: auto; transition: width .16s ease; }
+/* S15P21A604-394 — 휠로 연속 확대/축소하는 동안은 폭 변화를 즉시 반영(트랜지션 없음).
+   커서 중심 스크롤 보정이 최종 폭 기준으로 즉시 적용되는데 트랜지션이 켜져 있으면
+   실제 폭이 뒤늦게 따라오면서 화면이 흔들려 보인다. +/- 버튼·1:1·맞춤 등 다른 경로의
+   줌은 이 클래스가 안 붙으므로 기존처럼 부드럽게 움직인다. */
+.gss-map-stage.is-wheel-zooming { transition: none; }
 .gss-map-canvas {
   background-color: #17140f;
   background-position: center;
@@ -369,22 +374,30 @@
   box-shadow: none;
   cursor: grab;
   display: flex;
-  height: 34px;
+  /* S15P21A604-394 — 원래 34px 고정이라 배경 타일(.gss-tile-layer, 1fr 그리드라
+     zoom에 비례해 커짐)과 달리 확대/축소해도 오브젝트 크기가 그대로였다. .gss-map-canvas
+     에 심어둔 --gss-grid-columns/--gss-grid-rows(칸 수)를 이용해 "칸 하나 크기"로
+     바꿔서 타일과 같은 비율로 커지고 줄어들게 한다. */
+  height: calc(100% / var(--gss-grid-rows));
   justify-content: center;
   padding: 0;
   position: absolute;
   transform: translate(-50%, -50%);
   transition: border-color .1s, box-shadow .1s;
-  width: 34px;
+  width: calc(100% / var(--gss-grid-columns));
   z-index: 2;
+  /* 아이콘(이모지) 폴백의 font-size(.gss-map-object > span)도 이 박스 크기에 비례하게 하기 위한 컨테이너 */
+  container-type: inline-size;
 }
 .gss-map-object:hover,
 .gss-map-object.is-selected { background: rgba(255, 255, 255, .82); border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,.24), 0 4px 12px rgba(20,25,35,.22); z-index: 3; }
 .gss-map-object.is-primary { box-shadow: 0 0 0 3px rgba(37,99,235,.38), 0 4px 14px rgba(20,25,35,.24); }
 .gss-map-object.is-editor-locked { cursor: not-allowed; }
-.gss-map-object > span { color: #a8791f; font-size: 17px; pointer-events: none; }
-.gss-map-object > img { height: 30px; image-rendering: pixelated; object-fit: contain; pointer-events: none; width: 30px; }
-.gss-map-object .gss-static-sprite { background-color: transparent; display: block; height: 30px; image-rendering: pixelated; pointer-events: none; width: 30px; }
+/* S15P21A604-394 — 34px 고정 대신 .gss-map-object(칸 하나 크기로 스케일됨) 대비 비율로 —
+   기존 34px 박스에서 아이콘 17px(약 50%)·스프라이트 30px(약 88%)이던 비례를 유지 */
+.gss-map-object > span { color: #a8791f; font-size: 50cqw; pointer-events: none; }
+.gss-map-object > img { height: 88%; image-rendering: pixelated; object-fit: contain; pointer-events: none; width: 88%; }
+.gss-map-object .gss-static-sprite { background-color: transparent; display: block; height: 88%; image-rendering: pixelated; pointer-events: none; width: 88%; }
 .gss-map-object small { background: rgba(255,255,255,.96); border: 1px solid rgba(20,25,35,.12); border-radius: 3px; bottom: -16px; color: #2a303c; display: none; font-size: 7px; left: 50%; padding: 2px 4px; pointer-events: none; position: absolute; transform: translateX(-50%); white-space: nowrap; }
 .gss-map-object:hover small,
 .gss-map-object.is-selected small { display: block; }
@@ -604,7 +617,12 @@
 .gss-dialogue-live-preview { aspect-ratio: 16 / 9; background: radial-gradient(circle at 50% 30%,#33445e,#101521); background-position: center; background-size: cover; border: 1px solid #c7cedb; border-radius: 10px; box-shadow: 0 18px 45px rgba(20,25,35,.18); margin-bottom: 16px; overflow: hidden; position: relative; }
 .gss-dialogue-live-preview::after { background: linear-gradient(transparent 35%,rgba(4,6,10,.28) 70%,rgba(4,6,10,.64)); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 1; }
 .gss-preview-badge { background: rgba(8,11,16,.76); border: 1px solid rgba(255,255,255,.18); border-radius: 4px; color: #d6e3f7; font-size: 7px; font-weight: 850; left: 10px; letter-spacing: .08em; padding: 4px 6px; position: absolute; top: 10px; z-index: 4; }
-.gss-dialogue-preview-portrait { background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); height: 92%; left: 50%; position: absolute; transform: translateX(-50%); width: 42%; z-index: 2; }
+/* S15P21A604-406 — width:42%를 고정으로 두면 부모(.gss-dialogue-live-preview, 16:9 고정)
+   비율과 맞물려 실측 약 0.81:1이 되어, 원본 스프라이트 셀(dialogue-portrait-pack-4x3.webp,
+   256×512 = 1:2) 비율과 어긋나 그림이 가로로 늘어나 보였다. width를 지우고
+   aspect-ratio:1/2를 줘서 height(92%, 그대로 유지)에 맞춰 폭이 항상 정확한 비율로
+   계산되게 한다. */
+.gss-dialogue-preview-portrait { aspect-ratio: 1 / 2; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 10px 18px rgba(0,0,0,.5)); height: 92%; left: 50%; position: absolute; transform: translateX(-50%); z-index: 2; }
 .gss-dialogue-preview-box { background: linear-gradient(90deg,rgba(22,17,38,.94),rgba(20,24,37,.91)); border: 1px solid rgba(174,155,222,.5); border-radius: 9px; bottom: 10px; left: 3%; padding: 11px 14px; position: absolute; right: 3%; z-index: 3; color: #f0f3f7; }
 .gss-dialogue-preview-box strong { color: #cbb6ff; font-size: 10px; letter-spacing: .06em; }
 .gss-dialogue-preview-box p { font-size: 11px; line-height: 1.55; margin: 5px 0 0; }
@@ -620,11 +638,13 @@
 .gss-choice-card > header strong { font-family: ui-monospace, Consolas, monospace; font-size: 9px; margin-left: 7px; }
 .gss-choice-card > header .gss-icon-button { margin-left: auto; }
 
-.gss-toast { align-items: center; background: #1f2430; border: 1px solid #333d4b; border-radius: 9px; bottom: 42px; box-shadow: 0 14px 40px rgba(20,25,35,.3); cursor: pointer; display: flex; font-size: 11px; gap: 9px; left: 50%; max-width: 540px; padding: 11px 13px; position: fixed; transform: translateX(-50%); z-index: 50; color: #f0f3f7; }
-.gss-toast > span { align-items: center; background: rgba(22,163,74,.2); border-radius: 50%; color: #4ade80; display: inline-flex; height: 22px; justify-content: center; width: 22px; }
-.gss-toast.is-error { border-color: rgba(220,38,38,.5); }
-.gss-toast.is-error > span { background: rgba(220,38,38,.2); color: #f87171; }
-.gss-toast em { color: #9aa5b4; font-style: normal; margin-left: auto; }
+/* S15P21A604-410 — -384 에디터 다크→라이트 전환 때 이 토스트만 누락돼서 여전히 다크였다.
+   저장 완료/에러 등 모든 알림이 이 컴포넌트 하나를 공유하므로, 여기만 고치면 전체가 같이 라이트로 바뀐다. */
+.gss-toast { align-items: center; background: var(--gss-panel); border: 1px solid var(--gss-border); border-radius: 9px; bottom: 42px; box-shadow: 0 14px 40px rgba(20,25,35,.14); cursor: pointer; display: flex; font-size: 11px; gap: 9px; left: 50%; max-width: 540px; padding: 11px 13px; position: fixed; transform: translateX(-50%); z-index: 50; color: var(--gss-text); }
+.gss-toast > span { align-items: center; background: rgba(22,163,74,.14); border-radius: 50%; color: var(--gss-green); display: inline-flex; height: 22px; justify-content: center; width: 22px; }
+.gss-toast.is-error { border-color: rgba(220,38,38,.4); }
+.gss-toast.is-error > span { background: rgba(220,38,38,.14); color: var(--gss-red); }
+.gss-toast em { color: var(--gss-muted); font-style: normal; margin-left: auto; }
 .gss-guide-backdrop { align-items: center; background: rgba(15,18,24,.6); display: flex; inset: 0; justify-content: center; padding: 30px; position: fixed; z-index: 100; }
 .gss-guide-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 14px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 620px; padding: 24px; width: 100%; }
 .gss-guide-modal > header { align-items: flex-start; display: flex; justify-content: space-between; }

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: b629d32a3a0b4f4390de029fc883db05
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Character_Controller/Moving/AnimationHandler.cs
+  uploadId: 963832

@@ -122,10 +122,16 @@ namespace Festa.EditorTools
             bool prevDev = EditorUserBuildSettings.development;
             var prevCompression = PlayerSettings.WebGL.compressionFormat;
             bool prevFallback = PlayerSettings.WebGL.decompressionFallback;
+            var apiConfig = LoadApiConfig();
+            bool prevMock = apiConfig != null && apiConfig.useMockApi;
+            var prevEnv = apiConfig != null ? apiConfig.activeEnvironment : Festa.Integration.ApiEnvironment.Local;
 
             try
             {
                 EditorUserBuildSettings.development = false;
+                // 배포본은 실서버·Prod 다. 에셋의 커밋 기본값은 에디터 편의를 위한 Mock+Local 이라,
+                // 강제하지 않으면 깨끗한 체크아웃에서 뽑은 WebGL 이 Mock 으로 나간다 (S15P21A604-419).
+                if (!ForceApiEnvironment(apiConfig, Festa.Integration.ApiEnvironment.Prod)) return;
 
                 if (!BuildLinuxServer()) return;
                 if (!BuildWebGL()) return;
@@ -158,6 +164,7 @@ namespace Festa.EditorTools
                 EditorUserBuildSettings.standaloneBuildSubtarget = prevSubtarget;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
                 PlayerSettings.WebGL.decompressionFallback = prevFallback;
+                RestoreApiEnvironment(apiConfig, prevMock, prevEnv);
 
                 // **"원래대로" 가 고장난 상태면 복원이 고장을 보존한다** (T-228).
                 //
@@ -220,6 +227,56 @@ namespace Festa.EditorTools
             EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
 
         // ── Linux 데디케이티드 서버 ────────────────────────────
+
+        const string ApiConfigPath = "Assets/_Project/ScriptableObjects/ApiConfig.asset";
+
+        internal static Festa.Integration.ApiConfig LoadApiConfig() =>
+            AssetDatabase.LoadAssetAtPath<Festa.Integration.ApiConfig>(ApiConfigPath);
+
+        /// <summary>
+        /// 빌드에 들어갈 API 환경을 강제한다. 에셋을 실제로 저장한다 — BuildPlayer 는 디스크의
+        /// 직렬화 상태를 읽으므로 메모리만 바꾸면 반영이 보장되지 않는다. 무엇으로 뽑았는지는
+        /// 로그에 반드시 남긴다 — 산출물만 보고는 알 수 없기 때문이다 (S15P21A604-419).
+        /// </summary>
+        internal static bool ForceApiEnvironment(Festa.Integration.ApiConfig cfg, Festa.Integration.ApiEnvironment env)
+        {
+            if (cfg == null)
+            {
+                Debug.LogError($"[Release] {ApiConfigPath} 를 찾지 못했다 — 어떤 API 를 부를지 정할 수 없어 멈춘다.");
+                return false;
+            }
+            cfg.useMockApi = false;
+            cfg.activeEnvironment = env;
+            var entry = cfg.Active;
+            if (entry == null || string.IsNullOrEmpty(entry.springBaseUrl) || entry.springBaseUrl.Contains("example.com"))
+            {
+                Debug.LogError($"[Release] ApiConfig {env} 항목의 springBaseUrl 이 비었거나 자리표시다: '{entry?.springBaseUrl}' — 이대로 뽑으면 아무 서버에도 붙지 않는다.");
+                return false;
+            }
+            EditorUtility.SetDirty(cfg);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Release] 이 빌드의 API — env={env} mock=false spring={entry.springBaseUrl} ai={entry.aiBaseUrl}");
+            return true;
+        }
+
+        internal static void RestoreApiEnvironment(Festa.Integration.ApiConfig cfg, bool prevMock, Festa.Integration.ApiEnvironment prevEnv)
+        {
+            // 빌드 전에 잡아 둔 참조를 믿지 않는다. 빌드 타깃 전환·리임포트를 거치면 그 참조는
+            // 파괴된 오브젝트(가짜 null)가 되고, 2026-09-05 Prod 빌드에서 바로 그 경로로 복원이
+            // **조용히 빠져** 작업본 에셋이 Prod 로 남았다. 경로로 다시 읽고, 못 읽으면 소리 낸다.
+            cfg = LoadApiConfig();
+            if (cfg == null)
+            {
+                Debug.LogError($"[Release] ApiConfig 복원 실패 — {ApiConfigPath} 를 다시 읽지 못했다. " +
+                               $"에셋이 env={prevEnv} mock={prevMock} 로 돌아가지 않았을 수 있다 — 손으로 확인해라.");
+                return;
+            }
+            cfg.useMockApi = prevMock;
+            cfg.activeEnvironment = prevEnv;
+            EditorUtility.SetDirty(cfg);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Release] ApiConfig 복원 — env={prevEnv} mock={prevMock}");
+        }
 
         static bool BuildLinuxServer()
         {

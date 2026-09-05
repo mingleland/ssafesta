@@ -1,5 +1,6 @@
 """Managed Embedding이 GMS 응답을 안전한 1536차원 batch로 변환하는지 검증한다."""
 
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -31,6 +32,8 @@ async def test_managed_embedding_returns_vectors_in_input_index_order() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == "Bearer never-log-this-key"
+        payload = json.loads(request.content)
+        assert payload["dimensions"] == 1536
         return httpx.Response(
             200,
             json={

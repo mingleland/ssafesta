@@ -55,6 +55,24 @@ const WORLD_SCHEME = argOf('--world-scheme', 'ws');
 // 업스트림 401 이면 한 번 재발급해 재시도한다.
 const SPRING = argOf('--spring', process.env.SPRING_BASE_URL || '');
 
+// ── 허용 오리진(CORS) ───────────────────────────────────
+// FE(:5173)가 Unity 를 임베드하면 로더·데이터 파일 fetch 와 Authorization 을 든 /api/v1 호출이
+// 모두 교차 오리진이 된다. 기본은 **허용하지 않는다** — 단독 페이지(같은 오리진) 검증에는
+// 필요 없고, 와일드카드로 열어 두면 어떤 페이지가 이 프록시를 통해 실 Spring 에 닿는지
+// 알 수 없어진다. `--allow-origin http://localhost:5173` 처럼 하나를 명시했을 때만 켠다.
+// (Spring 이 FRONTEND_BASE_URL 하나만 허용하는 정책과 같은 결이다.)
+const ALLOW_ORIGIN = argOf('--allow-origin', '');
+function corsHeaders(req) {
+  if (!ALLOW_ORIGIN || req.headers.origin !== ALLOW_ORIGIN) return {};
+  return {
+    'Access-Control-Allow-Origin': ALLOW_ORIGIN,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Max-Age': '600',
+    Vary: 'Origin',
+  };
+}
+
 let cachedGuest = null;
 async function guestToken(refresh = false) {
   if (cachedGuest && !refresh) return cachedGuest;
@@ -199,6 +217,14 @@ async function serveStatic(req, res, urlPath) {
 // ── 라우팅 ──────────────────────────────────────────────
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+
+  // 허용 오리진이면 모든 응답에 CORS 헤더를 얹는다 (writeHead 는 setHeader 값과 합쳐진다).
+  // 프리플라이트(OPTIONS)는 여기서 끝낸다 — Authorization 을 든 /api/v1 호출 앞에 반드시 온다.
+  for (const [k, v] of Object.entries(corsHeaders(req))) res.setHeader(k, v);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(ALLOW_ORIGIN && req.headers.origin === ALLOW_ORIGIN ? 204 : 403).end();
+    return;
+  }
 
   // 프록시 모드: /api/v1/* 전부 실 Spring 으로. 자체 서명 라우트보다 먼저 본다.
   if (SPRING && url.pathname.startsWith('/api/v1/')) {
