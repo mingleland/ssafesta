@@ -36,6 +36,7 @@ namespace Festa.World
         }
 
         readonly List<Entry> _entries = new();
+        static readonly System.Comparison<Entry> s_bySortKey = (a, b) => a.SortKey.CompareTo(b.SortKey);
         float _nextSort;
         bool _suspended;
 
@@ -102,8 +103,12 @@ namespace Festa.World
                 float r = e.Light.range;
                 bool inView = GeometryUtility.TestPlanesAABB(planes, new Bounds(t.position, Vector3.one * (r * 2f)));
                 e.SortKey = (t.position - origin).sqrMagnitude + (inView ? 0f : OutsidePenalty);
+                // **히스테리시스** — 지금 켜져 있는 광원은 거리를 30% 깎아 순위 경쟁에서 유리하게 둔다.
+                // 경계에 걸린 광원이 카메라가 조금 움직일 때마다 켜졌다 꺼졌다 하던 깜빡임을 없앤다
+                // (2026-09-05 사용자 테스트, S15P21A604-437). 새로 들어오는 광원은 확실히 가까워져야 자리를 뺏는다.
+                if (e.Target > 0f) e.SortKey *= 0.7f;
             }
-            _entries.Sort((a, b) => a.SortKey.CompareTo(b.SortKey));
+            _entries.Sort(s_bySortKey);   // 캡처 없는 정적 비교자 — 매 정렬마다 델리게이트를 새로 만들지 않는다(GC)
 
             for (int i = 0; i < _entries.Count; i++)
             {

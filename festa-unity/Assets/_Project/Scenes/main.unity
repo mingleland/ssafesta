@@ -60527,6 +60527,8 @@ MonoBehaviour:
   _highlightEnabled: 1
   _highlightColor: {r: 0.25, g: 0.7, b: 1, a: 1}
   _highlightStrength: 0.9
+  _highlightRoot: {fileID: 0}
+  _outlineWidth: 0.35
 --- !u!4 &801130318
 Transform:
   m_ObjectHideFlags: 0
@@ -121969,6 +121971,8 @@ MonoBehaviour:
   _highlightEnabled: 1
   _highlightColor: {r: 1, g: 0.82, b: 0.35, a: 1}
   _highlightStrength: 0.9
+  _highlightRoot: {fileID: 1506161993}
+  _outlineWidth: 0.35
 --- !u!136 &1469696861
 CapsuleCollider:
   m_ObjectHideFlags: 0

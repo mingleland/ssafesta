@@ -57,6 +57,15 @@ namespace Festa.Content
             var cam = ResolveCamera();
             if (cam == null) return;
 
+            // 화면(미니게임 HUD·호스트 Overlay)이 열려 있으면 조준·프롬프트도 멈춘다 — 잠금 중에 프롬프트가
+            // 겹쳐 떠 있으면 "눌러도 안 된다" 로 보인다 (S15P21A604-437).
+            if (Festa.Integration.InputBridge.IsLocked)
+            {
+                UpdateHover(null);
+                ShowHint(null);
+                return;
+            }
+
             bool interactKey = InteractKeyPressedThisFrame();
 
             // ── 1순위: 마우스 조준 ──────────────────────────────
