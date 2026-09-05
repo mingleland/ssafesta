@@ -59,13 +59,13 @@ export function UnityHost() {
     };
   }, [attempt]);
 
-  // 013a-AT(-91): 인스턴스가 서면 현재 세션을 Unity 에 반영하고, 세션 종류·만료(refresh)가 바뀔 때마다
-  // 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을 때의
-  // 보험(멱등). 게스트는 Clear 라 토큰이 노출되지 않는다.
+  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, 세션 종류·만료(refresh)가
+  // 바뀔 때마다 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
+  // 때의 보험(멱등). 회원·게스트 모두 전달하고 비로그인만 Clear 다(#128 §2).
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
-    syncAccessToken(instance, session);
+    syncAccessToken(instance);
   }, [instanceReady, status, session.kind, session.expiresAt]);
 
   // 진짜 언마운트에서만 세션을 정리한다 — sessionManager의 예약 지연이 StrictMode의
