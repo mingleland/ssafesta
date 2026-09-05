@@ -216,6 +216,12 @@ namespace Festa.Content
             // 없어서(부스 종속이 아니다, S15P21A604-414) 아래 Type 분기로는 잡히지 않는다.
             if (target.GetComponentInParent<Festa.World.ManagementDeskInteractable>() != null)
                 return "내 부스 관리";
+            if (target.GetComponentInParent<Festa.Minigame.Slot.SlotMachineInteractable>() != null)
+                return "슬롯머신 (10코인)";
+            if (target.GetComponentInParent<Festa.Content.Arcade.ArcadeMachineInteractable>() != null)
+                return "게임기 플레이";
+            if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
+                return "타이밍 스톱 게임";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
@@ -225,6 +231,7 @@ namespace Festa.Content
                 case Festa.Booth.BoothObjectType.AiAgent:      return "AI 직원과 대화";
                 case Festa.Booth.BoothObjectType.ProjectPanel: return "프로젝트 전시 보기";
                 case Festa.Booth.BoothObjectType.SurveyKiosk:  return "설문 참여하기";
+                case Festa.Booth.BoothObjectType.GamePortal:   return "게임기 플레이";
                 default: return "상호작용";
             }
         }
@@ -238,6 +245,8 @@ namespace Festa.Content
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.ArcadeInteract     ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
+                type == Bridge.GameInteract       ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                                                     "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
             _toastUntil = Time.unscaledTime + 2.5f;
         }
