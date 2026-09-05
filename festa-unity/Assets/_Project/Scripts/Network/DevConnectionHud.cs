@@ -91,6 +91,14 @@ namespace Festa.Network
             return kb != null && kb.f2Key.wasPressedThisFrame;
         }
 
+        // 토글 판정은 Update 에서 한다. OnGUI 는 한 프레임에 Layout·Repaint 로 **두 번 이상** 불려서
+        // wasPressedThisFrame 을 거기서 읽으면 같은 프레임에 두 번 뒤집혀 결국 바뀌지 않는다.
+        void Update()
+        {
+            if (Application.isBatchMode) return;
+            if (!Festa.Integration.InputBridge.IsLocked && WasToggleKeyPressedThisFrame()) s_panelVisible = !s_panelVisible;
+        }
+
         void OnGUI()
         {
             if (Application.isBatchMode) return;
@@ -106,7 +114,6 @@ namespace Festa.Network
             // 에디터 Host 계측(2026-09-05)에서 이 패널 + PerfHud 가 켜진 상태의 할당이 ≈1.3 MB/s, 끄면 ≈0.3 MB/s.
             // WebGL 힙(8 MB)에서는 그 차이가 "초당 GC 1회" 로 나타나 걷기 끊김으로 느껴졌다(-437 ⑤).
             // 로비에서 넘어온 클라이언트는 이 패널이 필요 없다 — 개발자가 필요할 때만 F2 로 꺼낸다.
-            if (Festa.Integration.InputBridge.IsLocked == false && WasToggleKeyPressedThisFrame()) s_panelVisible = !s_panelVisible;
             if (!s_panelVisible && nm.IsClient && !nm.IsServer) return;
 
             GUILayout.BeginArea(new Rect(10, 10, 260, 260), GUI.skin.box);
