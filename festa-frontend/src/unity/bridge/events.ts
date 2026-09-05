@@ -65,11 +65,20 @@ type WorldGateReadyListener = () => void;
 
 const worldGateReadyListeners = new Set<WorldGateReadyListener>();
 
+// 월드 로드 시작 — 로비에서 사용자가 월드 입장을 눌러 main 씬 로드가 시작되는 순간 1회 (S15P21A604-429).
+// onWorldGateReady 하나만으로는 "로비에 머무는 중"과 "월드를 불러오는 중"이 구분되지 않는다. 앞은 사용자
+// 시간이라 안내가 없어야 하고 뒤는 50~84초 대기라 안내가 있어야 한다(#128). Unity 가 아직 이 신호를 보내지
+// 않으면 호스트는 지금과 똑같이 동작한다 — 신호가 도착하면 그때부터 안내가 켜진다.
+type WorldLoadStartListener = () => void;
+
+const worldLoadStartListeners = new Set<WorldLoadStartListener>();
+
 declare global {
   interface Window {
     FestaUnity?: {
       onBoothInteract?: (json: string) => void;
       onWorldGateReady?: () => void;
+      onWorldLoadStart?: () => void;
     };
   }
 }
@@ -97,6 +106,9 @@ export function initUnityBridge(): void {
   window.FestaUnity.onWorldGateReady = () => {
     for (const listener of worldGateReadyListeners) listener();
   };
+  window.FestaUnity.onWorldLoadStart = () => {
+    for (const listener of worldLoadStartListeners) listener();
+  };
 }
 
 export function subscribeBoothInteract(listener: BoothInteractListener): () => void {
@@ -110,6 +122,13 @@ export function subscribeWorldGateReady(listener: WorldGateReadyListener): () =>
   worldGateReadyListeners.add(listener);
   return () => {
     worldGateReadyListeners.delete(listener);
+  };
+}
+
+export function subscribeWorldLoadStart(listener: WorldLoadStartListener): () => void {
+  worldLoadStartListeners.add(listener);
+  return () => {
+    worldLoadStartListeners.delete(listener);
   };
 }
 
