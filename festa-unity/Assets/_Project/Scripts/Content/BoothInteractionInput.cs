@@ -1,4 +1,5 @@
 using UnityEngine;
+using Bridge = Festa.Integration.BoothInteractBridge;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -199,21 +200,33 @@ namespace Festa.Content
         /// <summary>대상별 행동 문구. 포털이 "3번 부스 입장" 을 쓰듯 여기도 무엇을 하는지 적는다.</summary>
         static string PromptFor(Festa.Booth.BoothInteractionTarget target)
         {
+            // 부스 오브젝트가 아닌 월드 상호작용이 먼저다 — 관리 데스크는 BoothRuntimeObject 가
+            // 없어서(부스 종속이 아니다, S15P21A604-414) 아래 Type 분기로는 잡히지 않는다.
+            if (target.GetComponentInParent<Festa.World.ManagementDeskInteractable>() != null)
+                return "내 부스 관리";
+
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
             switch (ro.Type)
             {
-                case Festa.Booth.BoothObjectType.Laptop:  return "노트북으로 홈페이지 열기";
-                case Festa.Booth.BoothObjectType.AiAgent: return "AI 직원과 대화";
+                case Festa.Booth.BoothObjectType.Laptop:       return "노트북으로 홈페이지 열기";
+                case Festa.Booth.BoothObjectType.AiAgent:      return "AI 직원과 대화";
+                case Festa.Booth.BoothObjectType.ProjectPanel: return "프로젝트 전시 보기";
+                case Festa.Booth.BoothObjectType.SurveyKiosk:  return "설문 참여하기";
                 default: return "상호작용";
             }
         }
 
         void OnBridgeSent(string type)
         {
-            _toast = type == Festa.Integration.BoothInteractBridge.AiAgentInteract
-                ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다"
-                : "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
+            // 가시 결과는 전부 웹 화면 몫이라, 단독 실행에서는 "반응이 없다" 로 보인다.
+            // 종류별로 무엇을 보냈는지 알려 준다 (S15P21A604-348).
+            _toast =
+                type == Bridge.AiAgentInteract    ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다" :
+                type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                                                    "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 

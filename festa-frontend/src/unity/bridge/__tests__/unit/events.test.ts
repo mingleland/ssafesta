@@ -3,7 +3,7 @@
 // 즉 신규 이벤트(BOOTH_GAME_INTERACT, #20)가 bridge를 손실 없이 통과함과 잘못된 JSON의 격리를 잠근다.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { initUnityBridge, subscribeBoothInteract } from '../../events.ts';
-import type { BoothInteractEvent } from '../../events.ts';
+import type { UnityInteractEvent } from '../../events.ts';
 
 // vitest 환경이 'node'라 jsdom 없이는 window가 없다 — dispatcher.test.ts와 같은 최소 폴리필.
 (globalThis as unknown as { window: typeof globalThis }).window ??= globalThis;
@@ -19,7 +19,7 @@ describe('unity bridge — onBoothInteract', () => {
   });
 
   it('BOOTH_GAME_INTERACT를 4필드 손실 없이 구독자에게 전달한다', () => {
-    const received: BoothInteractEvent[] = [];
+    const received: UnityInteractEvent[] = [];
     const unsubscribe = subscribeBoothInteract((event) => received.push(event));
 
     emit(JSON.stringify({ type: 'BOOTH_GAME_INTERACT', boothId: 7, objectId: 'game-npc-01', configId: 42 }));
@@ -31,7 +31,7 @@ describe('unity bridge — onBoothInteract', () => {
   });
 
   it('잘못된 JSON은 구독자를 호출하지 않고 크래시하지 않는다(부스 하나의 오류가 전체를 막지 않음)', () => {
-    const received: BoothInteractEvent[] = [];
+    const received: UnityInteractEvent[] = [];
     const unsubscribe = subscribeBoothInteract((event) => received.push(event));
 
     expect(() => emit('{not valid json')).not.toThrow();
