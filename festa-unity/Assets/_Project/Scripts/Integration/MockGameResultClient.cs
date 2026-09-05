@@ -31,6 +31,9 @@ namespace Festa.Integration
         // 실제 중복 방지는 서버가 한다. Mock 은 클라이언트 재전송 버그를 잡아 주는 정도다.
         readonly HashSet<string> _reported = new();
 
+        /// <summary>Mock 은 실패하지 않는다.</summary>
+        public string LastError => null;
+
         public Task<GameSessionDto> StartAsync(string gameId)
         {
             var target = UnityEngine.Random.Range(MinTarget, MaxTarget);
