@@ -77,8 +77,14 @@ namespace Festa.EditorTools
             };
             RunBuild(options, "WebGL");
 
-            // 파이프라인이 이 세 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
-            foreach (var required in new[] { "index.html", "Build", "TemplateData" })
+            // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
+            // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는
+            // 성공했는데 월드 진입이 404 로 실패했다 (S15P21A604-417). 파일명이 해시라
+            // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
+            FestaWebBuilder.WriteManifest(WebOutDir);
+
+            // 파이프라인이 이 네 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
+            foreach (var required in new[] { "index.html", "Build", "TemplateData", "manifest.json" })
             {
                 var path = Path.Combine(WebOutDir, required);
                 if (!File.Exists(path) && !Directory.Exists(path))
