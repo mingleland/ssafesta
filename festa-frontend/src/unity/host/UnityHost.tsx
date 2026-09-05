@@ -105,7 +105,10 @@ export function UnityHost() {
 
   return (
     <div>
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
+      {/* id·tabIndex 는 Unity 기본 템플릿(unity-canvas)과 같게 둔다 — Unity 6 WebGL 은 키보드 이벤트
+          타깃을 `"#" + canvas.id` 선택자로 찾아서, id 가 없으면 `querySelector("#")` SyntaxError 로
+          _main 직후 죽는다(2026-09-05 통합 실측에서 확인). tabIndex=-1 은 캔버스가 키 입력을 받게 한다. */}
+      <canvas id="unity-canvas" tabIndex={-1} ref={canvasRef} style={{ width: '100%', height: '100%' }} />
       {status === 'booting' && <p>불러오는 중... {Math.round(progress * 100)}%</p>}
       {status === 'failed' && (
         <div>

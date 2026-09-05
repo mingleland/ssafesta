@@ -14,8 +14,10 @@ import { RequireAuth } from './RequireAuth';
 // 경로 목록: docs/10_Frontend_설계서.md §3. 각 spec 착수 시 해당 경로 추가.
 // 가드 등급(spec 001 plan.md §라우트 설계): 게스트 허용 = /app/world(허용된 월드 둘러보기).
 // 회원 전용 = /app/studio/:boothId 등 상태 변경 기능.
-// /app/games/*는 plan.md 표에 명시가 없다 — 상태 변경(edit)·플레이(play) 모두 보수적으로
-// member-only로 묶었다(모호성, 001 FE 구현 보고 참조). BE 계약·spec 확정 시 재분류.
+// /app/games/*는 plan.md 표에 명시가 없어 초기엔 edit·play 모두 보수적으로 member-only로
+// 묶었다(모호성, 001 FE 구현 보고 참조). play는 spec 019 BE 계약(T087: Guest authoring
+// 거부·Published play 허용)이 확정되며 guest-allowed로 재분류했다(S15P21A604-115).
+// edit(저작)은 T087 그대로 member-only 유지.
 // 라우트 정의를 배열로 분리해 둔다 — createMemoryRouter 로 같은 정의를 테스트에서 쓴다.
 export const routes = [
   {
@@ -127,7 +129,7 @@ export const routes = [
       const { PlayGamePage } = await import('../../game-studio/app/routes/PlayGamePage.tsx');
       return {
         Component: () => (
-          <RequireAuth level="member-only">
+          <RequireAuth level="guest-allowed">
             <PlayGamePage />
           </RequireAuth>
         ),
