@@ -83,6 +83,7 @@ namespace Festa.World
             // Additive 로 얹히는 씬은 월드 진입이 아니다.
             if (mode != UnityEngine.SceneManagement.LoadSceneMode.Single) return;
             if (scene.name != AvatarSceneHandoff.WorldSceneName) return;
+            Festa.Integration.WorldLoadTimeline.Record(Festa.Integration.WorldLoadTimeline.MainLoaded);
             if (FindFirstObjectByType<WorldEntryGate>() != null) return;
 
             var go = new GameObject("@WorldEntryGate");
@@ -120,7 +121,10 @@ namespace Festa.World
             // 준비가 끝났다고 바로 열지 않는다. **11층 표시에 도착해야 연다** —
             // 5층에서 문이 열리면 엘리베이터라는 연출 자체가 깨진다.
             if (!_arrivalRequested && IsPlayerReady())
+            {
+                Festa.Integration.WorldLoadTimeline.Record(Festa.Integration.WorldLoadTimeline.PlayerReady);
                 RequestArrival("준비 완료");
+            }
 
             // 접속 시도조차 없으면 개발자가 월드 씬을 단독 실행한 것 — 가릴 이유가 없다.
             if (!_arrivalRequested && _elapsed >= _standaloneGraceSeconds && !IsConnectingOrConnected())
@@ -271,6 +275,7 @@ namespace Festa.World
             _opening = true;
             _openProgress = 0f;
             Debug.Log($"[WorldEntryGate] 개방 — {reason} ({_elapsed:F1}s)");
+            Festa.Integration.WorldLoadTimeline.Finish(reason);
             NotifyGateReady();
         }
 
