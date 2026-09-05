@@ -94538,7 +94538,7 @@ MonoBehaviour:
   _resetKey: 285
   _avatarLodKey: 290
   _meshMergeKey: 291
-  _visibleOnStart: 1
+  _visibleOnStart: 0
   _window: 1
 --- !u!4 &1237456547
 Transform:
