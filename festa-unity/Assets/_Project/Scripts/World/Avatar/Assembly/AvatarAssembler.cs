@@ -481,7 +481,7 @@ namespace Festa.Avatar
                         material = new Material(garmentShader ? garmentShader : shader) { name = source.name + "_RuntimeGarment" };
                         Texture garmentMask = source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap")
                             : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap")
-                            : source.mainTexture;
+                            : MainTextureOrNull(source);
                         if (!garmentMask)
                             foreach (var property in source.GetTexturePropertyNames())
                                 if (source.GetTexture(property)) { garmentMask = source.GetTexture(property); break; }
@@ -537,7 +537,7 @@ namespace Festa.Avatar
                     // Body의 BaseMap은 단순 Albedo가 아니라 피부/속옷 영역을
                     // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
                     bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");
-                    Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : source.mainTexture) : null;
+                    Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : MainTextureOrNull(source)) : null;
                     // The vendor materials do not all expose their visible map
                     // as _BaseMap.  WebGL then used a newly-created material
                     // with no source map, which made some assembled parts look
@@ -598,6 +598,14 @@ namespace Festa.Avatar
             }
             renderer.sharedMaterials = converted;
         }
+
+        /// <summary>
+        /// <c>Material.mainTexture</c> 는 셰이더에 <c>_MainTex</c> 가 없으면 **읽기만 해도 에러 로그**를 남긴다
+        /// (벤더 눈썹 <c>Unlit/Color</c>, 눈 하이라이트 ToonBasic). 아바타 한 기당 4줄이 WebGL 콘솔과 Development 빌드
+        /// 화면 콘솔을 채워 로비 입장 버튼까지 가렸다(2026-09-06). 속성이 있을 때만 읽고, 없으면 null.
+        /// </summary>
+        static Texture MainTextureOrNull(Material source) =>
+            source != null && source.HasProperty("_MainTex") ? source.GetTexture("_MainTex") : null;
 
         static bool IsGarment(AvatarPartCategory category) => category == AvatarPartCategory.Top || category == AvatarPartCategory.Bottom || category == AvatarPartCategory.Outfit || category == AvatarPartCategory.Shoes || category == AvatarPartCategory.Hat || category == AvatarPartCategory.Glasses;
 
