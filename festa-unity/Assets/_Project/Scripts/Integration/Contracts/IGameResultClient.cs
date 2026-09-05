@@ -34,6 +34,12 @@ namespace Festa.Integration
         /// 실패하면 null — 보상 여부를 알 수 없다는 뜻이므로 "지급됨" 으로 표시하면 안 된다.
         /// </summary>
         Task<GameResultAckDto> ReportAsync(GameResultDto result);
+
+        /// <summary>
+        /// 마지막 실패의 **사람이 읽는** 사유. 성공 뒤에는 null. 게스트(403)·로그인 만료(401)·네트워크를 구분해
+        /// HUD 가 "서버 응답 없음" 하나로 뭉뚱그리지 않게 한다 — 일반적인 게임의 "로그인하면 참여할 수 있어요" 안내.
+        /// </summary>
+        string LastError { get; }
     }
 
     /// <summary>서버가 발급한 한 판. 목표 시간과 멱등성 키를 담는다.</summary>
