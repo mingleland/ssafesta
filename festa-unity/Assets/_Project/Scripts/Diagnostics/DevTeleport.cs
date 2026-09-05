@@ -54,8 +54,20 @@ namespace Festa.Diagnostics
             var target = GameObject.Find(objectName);
             if (target == null) { Debug.LogWarning($"[DevTeleport] 오브젝트 없음: '{objectName}'"); return; }
             var t = target.transform;
-            var pos = t.position + t.forward * 20f;   // 1 m ≈ 13.26 유닛
-            pos.y = t.position.y + 0.2f;
+            // 포털은 상대(직원 facingSource)의 시야 안에 서야 프롬프트가 뜬다 — 그 사람 정면 1.5 m 로. (Portal_Ext_01: 포털 forward 는 +Z 인데 직원은 -Z 를 본다)
+            var portal = target.GetComponent<Festa.World.BoothPortal>();
+            Vector3 pos;
+            if (portal != null && portal.facingSource == null)
+            {
+                // 상대가 없는 포털(부스 내부 출구)은 forward 가 벽 밖을 향할 수 있어 앞으로 나가면 바닥이 없다 — 포털 위에 그대로 선다(반경 안).
+                pos = t.position;
+            }
+            else
+            {
+                if (portal != null) t = portal.facingSource;
+                pos = t.position + t.forward * 20f;   // 1 m ≈ 13.26 유닛
+            }
+            pos.y = target.transform.position.y + 0.2f;
             Move(pos, objectName);
         }
 

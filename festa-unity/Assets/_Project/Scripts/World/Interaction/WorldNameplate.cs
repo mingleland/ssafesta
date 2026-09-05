@@ -108,6 +108,9 @@ namespace Festa.World
             _text = rootGo.AddComponent<TextMeshPro>();
             _root = _text.rectTransform;
             _root.SetParent(transform, false);
+            // 글자 크기는 월드 유닛 기준이다 — 부스 앵커(13.26배) 아래의 NPC 처럼 부모가 스케일돼 있으면 그만큼 되돌린다 (2026-09-06, AI 도우미 이름표 8 m).
+            var ls = transform.lossyScale;
+            _root.localScale = new Vector3(1f / Mathf.Max(ls.x, 1e-4f), 1f / Mathf.Max(ls.y, 1e-4f), 1f / Mathf.Max(ls.z, 1e-4f));
             _root.position = transform.position;   // 정확한 높이는 LateUpdate 가 잡는다
 
             var font = Resources.Load<TMP_FontAsset>(FontResourcePath);
@@ -270,7 +273,9 @@ namespace Festa.World
             float camDist = Vector3.Distance(cam.transform.position, transform.position);
             float scale = Mathf.Clamp(camDist / Mathf.Max(1f, _referenceDistance), 0.6f, 3f);
             float size = _baseCharacterHeight * scale;
-            _root.localScale = Vector3.one * size;
+            // 부모가 스케일된 NPC(부스 앵커 13.26배)에서는 그만큼 되돌린다 — 플레이어(lossy 1)는 종전과 같다.
+            var ls = transform.lossyScale;
+            _root.localScale = new Vector3(size / Mathf.Max(ls.x, 1e-4f), size / Mathf.Max(ls.y, 1e-4f), size / Mathf.Max(ls.z, 1e-4f));
 
             // pivot 이 바닥이라 글자는 이 지점 위로 그려진다. 간격을 월드 고정값으로 두면
             // 이름표가 커질수록 공백이 벌어져 머리 위에 붕 뜬다 — 크기에 비례시켜 화면상
