@@ -40,6 +40,28 @@ namespace Festa.Avatar
         public IEnumerable<AvatarItemDefinition> GetUnlockedItems(AvatarPartCategory category, AvatarGender gender) =>
             GetItems(category, gender).Where(AvatarOwnership.IsUnlocked);
 
+        /// <summary>
+        /// 목록 UI 에 그릴 항목 — <b>서버 카탈로그에 있는 것만</b> (GitLab #120 §2-1).
+        ///
+        /// <para>응답에 없는 파츠는 서버 시드 미등록이라, 그려 두면 고를 수는 있어도 저장이
+        /// <c>409 AVATAR_ITEM_NOT_OWNED</c> 로 거부된다. 고를 수 있는데 저장이 안 되는 것이
+        /// 애초에 안 보이는 것보다 나쁘다. 보유 정보를 받기 전에는 숨기지 않는다 —
+        /// 무엇이 등록됐는지 모르는 상태에서 감추면 목록이 통째로 비어 보인다.</para>
+        /// </summary>
+        public IEnumerable<AvatarItemDefinition> GetCatalogedItems(AvatarPartCategory category, AvatarGender gender) =>
+            GetItems(category, gender).Where(AvatarOwnership.IsInCatalog);
+
+        /// <summary>
+        /// <b>대신 골라 줄 때</b> 쓰는 후보 — 기본 아바타·무작위가 이것을 쓴다.
+        ///
+        /// <para>판정이 준비되면 해제된 것만, 아직이면 전체다
+        /// (<see cref="AvatarOwnership.JudgementReady"/> 주석 참조). 잠금으로 후보를 좁히는
+        /// 것은 판정을 신뢰할 수 있을 때만 의미가 있고, 그 전에 좁히면 후보가 0개가 되어
+        /// 알몸이 된다.</para>
+        /// </summary>
+        public IEnumerable<AvatarItemDefinition> GetSelectableItems(AvatarPartCategory category, AvatarGender gender) =>
+            AvatarOwnership.JudgementReady ? GetUnlockedItems(category, gender) : GetItems(category, gender);
+
         public AvatarItemDefinition Get(int id) => id == 0 ? null : items.FirstOrDefault(x => x && x.itemId == id);
         public Color GetColor(byte id) => palette.FirstOrDefault(x => x.id == id).color;
 
@@ -51,7 +73,7 @@ namespace Festa.Avatar
         /// </summary>
         public AvatarItemDefinition Default(AvatarPartCategory category, AvatarGender gender)
         {
-            var unlocked = GetUnlockedItems(category, gender).ToArray();
+            var unlocked = GetSelectableItems(category, gender).ToArray();
             if (unlocked.Length > 0)
                 return unlocked.FirstOrDefault(x => x.isDefault) ?? unlocked[0];
 
@@ -73,7 +95,7 @@ namespace Festa.Avatar
         {
             var c = new AvatarConfig { gender = gender, skinColorId = 1, hairColorId = 6, irisColorId = 8, eyebrowColorId = 6, lipsColorId = 10, topColorId = 12, bottomColorId = 15, scleraColorId = 16, pupilColorId = 6, garmentColorVersion = 1 };
             c.SetItem(AvatarPartCategory.Head,Default(AvatarPartCategory.Head,gender)?.itemId??0);
-            var hair=GetUnlockedItems(AvatarPartCategory.Hair,gender).FirstOrDefault(x=>x.hairGroup==HairGroup.Long)??Default(AvatarPartCategory.Hair,gender);
+            var hair=GetSelectableItems(AvatarPartCategory.Hair,gender).FirstOrDefault(x=>x.hairGroup==HairGroup.Long)??Default(AvatarPartCategory.Hair,gender);
             c.SetItem(AvatarPartCategory.Hair,hair?hair.itemId:0);
             var top=Default(AvatarPartCategory.Top,gender);
             var bottom=Default(AvatarPartCategory.Bottom,gender);
