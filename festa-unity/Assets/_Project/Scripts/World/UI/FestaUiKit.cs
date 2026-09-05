@@ -326,10 +326,16 @@ namespace Festa.World.UI
             public Vector2 Grow;
             RectTransform _self;
 
+            Image _image;
+
             void LateUpdate()
             {
                 if (Target == null) return;
                 _self ??= GetComponent<RectTransform>();
+                // 그림자는 카드의 **형제**라(자식이면 카드 위에 그려진다) 카드를 SetActive(false) 해도 혼자 남는다 —
+                // 슬롯머신 팝업 자리에 회색 반투명 사각형이 항상 떠 있던 원인(2026-09-06 WebGL 실측). 대상 상태를 따라간다.
+                _image ??= GetComponent<Image>();
+                if (_image != null) _image.enabled = Target.gameObject.activeInHierarchy;
                 _self.anchorMin = Target.anchorMin;
                 _self.anchorMax = Target.anchorMax;
                 _self.pivot = Target.pivot;

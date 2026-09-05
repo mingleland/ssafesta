@@ -35,6 +35,7 @@ namespace Festa.World
         bool _active;
         bool _lockedByUs;
         bool _releasing;
+        bool _hadFollow;
         readonly System.Collections.Generic.List<Renderer> _hiddenSelf = new();
 
         /// <summary>
@@ -125,6 +126,7 @@ namespace Festa.World
             if (!_active)
             {
                 _follow = FindLocalFollow();
+                _hadFollow = _follow != null;
                 if (_follow != null) { _follow.enabled = false; HideSelf(_follow.gameObject); }
                 _active = true;
 
@@ -145,6 +147,7 @@ namespace Festa.World
 
             if (_follow != null) _follow.enabled = true;   // 다음 LateUpdate 부터 추적 카메라가 보간으로 되돌아간다
             _follow = null;
+            _hadFollow = false;
             ShowSelf();
 
             if (_lockedByUs)
@@ -167,6 +170,16 @@ namespace Festa.World
         void LateUpdate()
         {
             if (!_active || _cam == null) return;
+
+            // 초점 중에 로컬 플레이어가 사라졌다(재접속으로 새 플레이어가 스폰됨, 2026-09-06 WebGL 실측 — 탭이 숨겨져 끊긴 뒤
+            // 자동 재접속). 새 플레이어의 추적 카메라가 켜져 화면은 돌아갔는데 초점 모드·잠금·HUD 만 남는 어중간한 상태가 되므로
+            // 초점을 끝내 HUD 도 함께 닫는다(Released). 원래 추적 카메라가 없던 경우(서버 단독)는 해당 없음.
+            if (_hadFollow && _follow == null)
+            {
+                Debug.Log("[InteractionFocusCamera] 로컬 플레이어가 바뀌어(재스폰) 초점을 끝낸다.");
+                EndFocus();
+                return;
+            }
 
             var kb = Keyboard.current;
             if (kb != null && kb.escapeKey.wasPressedThisFrame)
