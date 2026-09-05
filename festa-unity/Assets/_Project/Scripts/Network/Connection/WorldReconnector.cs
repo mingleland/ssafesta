@@ -86,6 +86,7 @@ namespace Festa.Network
                     _reconnecting = false;
                     _attempt = 0;
                 }
+                Festa.Integration.WorldLoadTimeline.Record(Festa.Integration.WorldLoadTimeline.Connected);
                 Notify("connected", "");
                 return;
             }

@@ -210,6 +210,7 @@ namespace Festa.Network
 
             Debug.Log($"[DevConnectionHud] session={session.sessionId} channel={session.channelId} " +
                       $"→ {session.endpoint.scheme}://{session.endpoint.host}:{session.endpoint.port}");
+            WorldLoadTimeline.Record(WorldLoadTimeline.SessionIssued);
 
             _connection.StartClient(session, new ConnectionPayload
             {
@@ -217,6 +218,7 @@ namespace Festa.Network
                 nickname = _nickname,
                 avatarCode = AvatarAppearance.DefaultPreset
             });
+            WorldLoadTimeline.Record(WorldLoadTimeline.StartClient);
         }
 
         void ReturnToCustomization(Unity.Netcode.NetworkManager networkManager)

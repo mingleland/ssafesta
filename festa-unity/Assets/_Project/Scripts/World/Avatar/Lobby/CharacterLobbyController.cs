@@ -724,6 +724,7 @@ namespace Festa.Avatar
         {
             Festa.World.AvatarSceneHandoff.Save(Festa.World.AvatarAppearance.FromModularConfig(_config));
             Festa.World.AvatarSceneHandoff.RequestWorldConnection();
+            Festa.Integration.WorldLoadTimeline.Begin();   // 진입 구간 계측 시작 (-431)
             // 호스트에 "월드 로드 시작" 을 알린다 — main 씬 로드가 WebGL 에서 50~84초라 이 신호가 없으면
             // 호스트가 로딩 안내를 띄울 시점을 모른다 (GitLab #129, S15P21A604-431). LoadScene 직전 1회.
             Festa.Integration.WorldLoadSignal.NotifyWorldLoadStart();
