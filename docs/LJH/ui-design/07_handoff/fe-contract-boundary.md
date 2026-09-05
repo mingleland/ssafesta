@@ -1,6 +1,7 @@
 # FE 계약 경계 — G-6 · G-7 · G-8
 
 - 문서 종류: **FE 확정 계약 + Cross-part 요청**. 작성 2026-09-05 (`S15P21A604-413`), 기준 `origin/develop` `c0a468a4`.
+- **이 문서는 내 작업용 정리이고 팀 공유 정본이 아니다.** 타 파트 요청은 GitLab Issue 로 나가야 한다 — G-6·G-7 은 #133, G-8 은 #132.
 - 목적: "G-6·G-7·G-8 전체가 미정" 이라는 뭉뚱그린 상태를 없앤다. **FE 가 혼자 정할 수 있는 것은 여기서 확정하고**, 타 파트 합의가 필요한 것만 남겨 owner 를 붙인다.
 - `decision-queue.md` 는 Unity 합의 대기 목록이고, 이 문서는 그중 FE 가 먼저 닫은 부분을 담는다.
 
@@ -30,7 +31,7 @@ FE 가 확정한 것
 
 **BE 에 필요한 것 (endpoint·DTO)** — 위 6개 호출에 대응하는 실 endpoint. 도착하면 FE 는 `api.select.ts` 에서 mock → real 어댑터 교체만 한다. FE 는 endpoint 를 발명하지 않는다.
 
-> Assignee: **황덕(@ejraks1548)** · Jira `-130`·`-131`·`-132`·`-190`·`-192`·`-193`
+> **팀 공유 정본: GitLab #133** (2026-09-05 게시). Assignee: 황덕(@ejraks1548) · Jira `-130`·`-131`·`-132`·`-190`·`-192`·`-193`
 > 완료조건: 위 6개 호출에 대응하는 endpoint·DTO 확정 + `specs/010` 계약 문서 반영
 
 ---
@@ -73,7 +74,7 @@ STOMP destination (요청 / 방문자 이벤트 / 직원 대기열)
 
 도착하면 FE 는 real 어댑터가 Port 를 구현하는 것으로 끝난다(STOMP 는 어댑터 내부 상세). **현재 close 정책 판정은 mock adapter 기준이라 transport 도달 시 재확인이 필요하다.**
 
-> Assignee: **황덕(@ejraks1548)** · Jira `-137`(WS 채널·WS Token) · 관련 `-416`
+> **팀 공유 정본: GitLab #133** (2026-09-05 게시). Assignee: 황덕(@ejraks1548) · Jira `-137`(WS 채널·WS Token) · 관련 `-416`
 > 완료조건: 위 4항 확정 + `specs/011` 계약 반영
 
 ---
@@ -130,7 +131,7 @@ STOMP destination (요청 / 방문자 이벤트 / 직원 대기열)
 
 FE 는 ①②③ 없이도 §G-8-1 을 먼저 구현할 수 있다(ESC·focus 복구·계층). ②가 오면 `OverlayHost` 의 open/close 지점에서 부르는 것으로 끝난다.
 
-> Assignee: **강형순(@gudtnslwkd)** · `decision-queue.md` Unity 항목 4번
+> **팀 공유 정본: GitLab #132** (2026-09-05 게시 — 그 전까지 이 문서에만 있어 Unity 파트가 몰랐다). Assignee: 강형순(@gudtnslwkd) · `decision-queue.md` Unity 항목 4번
 > 완료조건: ①의 설정 주체 확정 · ②의 함수 이름·시그니처 확정 · ③의 경계 서술
 
 ---

@@ -15,10 +15,13 @@
 
 **`front` 는 develop 과 0 behind 다**(2026-09-05, 머지 `39641e0b`). front 가 develop 에 대해 고유하게 갖는 것은 `docs/LJH/` 와 `.claude/launch.json` 둘뿐이다. 09-05 fresh clone 교체([T-111](../25_트러블슈팅.md)) 뒤 git 밖 로컬 환경(`CLAUDE.local.md` 3절·메모리 1건·`festa-*` 스킬 3종)을 `26_로컬_규약_스냅샷.md` 에서 복원했다.
 
+**Jira 와 GitLab Issue 의 경계** — Jira 는 Task(목적·담당·범위·완료조건·구현 상태·MR·검증), GitLab Issue 는 타 파트를 향한 조율 표면(`[part,part] … 확정 요청 / 구현 통보 / 결함 N건`). 조사 기록·중간 실측은 Jira 코멘트에 두는 것이 팀 관행이다(강형순 `-419`·`-420`). 판정 기준은 "타 파트가 읽고 답해야 하는가" 하나다 — 그렇다면 GitLab Issue 에도 있어야 한다. 상세는 `CLAUDE.local.md`.
+
 **셀프 머지는 이 팀의 관행이다** — `docs/17` §8:269 는 "최소 1명 Review **권장**", 머지된 MR 34건 중 author == merged_by 가 33/34, 보호 브랜치는 `main` 하나, 내 권한은 Maintainer(40). `approved_by=[]` 는 승인 대기가 아니다.
 
 ## 내 액션 필요
 
+- [ ] **GitLab 이슈 4건 회신 대기 — 09-05 신규.** [#129](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/129) WebGL 50~84초(강형순·정승욱 · Unity 신호 `FestaNotifyWorldLoadStart` 요청) · [#131](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/131) 백그라운드 재접속(강형순·황덕) · [#132](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/132) G-8 Input Lock(강형순 · **①captureAllKeyboardInput 이 09-08 걸림돌 후보**) · [#133](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/133) G-6·G-7 BE 계약(황덕). 전부 내 몫 완료·타 파트 답 대기
 - [x] **#128 회신 3건 처리 완료(09-05).** 게스트 관리 화면은 `/booths/mine` 403 → 로그인 필요 안내(FE 추가 작업 없음, 즉답), 로비→main 50~84초는 트랙 4개로 분리(`-429` FE UX·`-430` FE warm-up 둘 다 머지 / `-431` Unity 계측 / #127 Infra), 백그라운드 rAF 끊김은 `-432` 로 분리. 원 기록: **#128 게임 파트 회신 3건 (09-05 18:24) — 내 답·판단 필요.** ① 게스트에게 부스 관리 화면이 어떻게 보이는가(`GET /booths/mine` 403) 한 줄 회신 — Management F 실측 판정에 쓰인다 ② **탭 백그라운드 30초 → Chrome rAF 정지 → Unity 접속 끊김**(T-120), 복귀 시 재접속·안내는 FE·게임 공동 후속 ③ **로비→main 씬 전환이 WebGL 에서 50~84초인데 그 구간 로딩 표시가 없다** — 게이트(엘리베이터)는 씬 로드 *뒤* 시작이라 boot watchdog 진행률과 별개 구간이다. FE 오버레이 "월드 준비 중…" 요청. 09-08 사용자 테스트에서 "멈췄다" 로 읽힐 위험
 - [ ] **Google·Kakao 실서버 회원 검증 (`-87`~`-90`) — 값 반영만 하면 착수 가능.** BE 가 08-31 에 값 6종을 Mattermost 1:1 로 전달했다(#114). 로컬 `.env` 반영은 내 몫이고 그 뒤 `-90` T016 회원 refresh 왕복(성공·만료·재사용 탐지)이 본체다. **SSAFY 미확보는 이 검증을 막지 않는다**
 - [ ] **#56 ⓐ 게시 완료(09-05) — 3파트 안 1 일치.** 남은 것은 기획 ⓑⓒ 확정·`GAME_PORTAL` 프리팹(`Festival_Arcade`) 확정·BE endpoint. FE 액션 없음. 확정되면 광장용 어댑터 1개 추가
