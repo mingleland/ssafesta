@@ -94,7 +94,7 @@ namespace Festa.Minigame.Slot
             var pr = popup.rectTransform;
             FestaUiKit.Place(pr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-110f, 40f), new Vector2(520f, 240f));
             _popupTitle = FestaUiKit.Title(pr, "알림", 26f, new Vector2(0f, -40f), new Vector2(460f, 40f));
-            _popupText = FestaUiKit.Label(pr, "", 19f, new Vector2(0f, -92f), new Vector2(440f, 60f), FestaUiKit.Muted);
+            _popupText = FestaUiKit.Label(pr, "", 18f, new Vector2(0f, -92f), new Vector2(476f, 60f), FestaUiKit.Muted);   // 게스트 안내 한 문장이 두 줄 안에 들어오게
             FestaUiKit.PillButton(pr, "확인", new Vector2(0f, -168f), new Vector2(180f, 52f), () => _session.DismissPopup(), true, 19f);
             _popup = popup.gameObject;
             _popup.SetActive(false);
