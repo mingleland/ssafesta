@@ -14,6 +14,7 @@ import { authApi } from '../../entities/auth/api.select';
 import { setMemberSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { NicknameForm } from '../../features/auth/ui/NicknameForm';
+import { warmUpUnityAssets } from '../../unity/host/warmup';
 import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.png';
 import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.png';
 import './callbackPage.css';
@@ -40,6 +41,11 @@ function scheduleReset(): void {
 export function CallbackPage() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('completing');
+
+  // warm-up 3단계 (S15P21A604-430). 여기까지 왔으면 기본 목적지가 /app/world 라 진입이 사실상 확정이다.
+  // 큰 파일(wasm·data)까지 넓힌다 — 이 화면은 서버 왕복을 기다리는 구간이라 대역폭이 놀고 있다.
+  // Unity 인스턴스는 여전히 만들지 않는다. 닉네임 입력이 남아 있어도 다운로드는 계속되는 편이 낫다.
+  useEffect(() => warmUpUnityAssets('authenticated'), []);
 
   useEffect(() => {
     cancelPendingReset();
