@@ -7,11 +7,11 @@ using UnityEngine.UI;
 namespace Festa.Minigame.Slot
 {
     /// <summary>
-    /// slot machine 조작 화면 (S15P21A604-439). <see cref="FestaUiKit"/>(2D Game UI Kit) 로 그린다.
+    /// slot machine 조작 화면 (S15P21A604-439). <see cref="FestaUiKit"/> v3(밝은 카드)로 그린다.
     ///
-    /// <para>초점 카메라가 화면 가운데에 게임 화면을 크게 잡으므로 HUD 는 <b>오른쪽 세로 패널</b> 하나다:
-    /// 제목 배너 → 코인 잔액(크게) → 결과 → 주황 버튼 → 안내. 코인 부족 등은 가운데 팝업.
-    /// Esc(초점 해제)나 X 로 닫히며 닫힐 때 <c>onClosed</c> 를 한 번 부른다.</para>
+    /// <para>초점 카메라가 화면 가운데에 게임 화면을 크게 잡으므로 HUD 는 <b>오른쪽 세로 카드</b> 하나다:
+    /// 제목 태그 → 코인 잔액(어두운 표시창, 크게) → 결과 → 코랄 버튼 → 안내. 코인 부족 등은 가운데 카드 팝업.
+    /// Esc(초점 해제)나 ✕ 로 닫히며 닫힐 때 <c>onClosed</c> 를 한 번 부른다.</para>
     ///
     /// <para>판정이 Mock(<see cref="SlotMachineSession.Simulated"/>)이면 "체험판 · 코인 미반영" 배지를 항상 단다 — 실서버인 척하지 않는다.</para>
     /// </summary>
@@ -63,40 +63,39 @@ namespace Festa.Minigame.Slot
             var canvas = FestaUiKit.OverlayCanvas(transform, "Canvas", 500);
             var root = canvas.transform;
 
-            // 오른쪽 세로 패널 — 가운데 게임 화면을 가리지 않는다.
-            var panel = FestaUiKit.Panel(root, "Panel", UiSprite.PanelBlue);
-            var pr = panel.rectTransform;
-            FestaUiKit.Place(pr, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(400f, 560f));
+            var card = FestaUiKit.Panel(root, "Card");
+            var cr = card.rectTransform;
+            FestaUiKit.Place(cr, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-48f, 0f), new Vector2(380f, 520f));
 
-            FestaUiKit.TitleBanner(pr, "슬롯머신", new Vector2(0f, 30f), new Vector2(280f, 64f), 30f);
-            FestaUiKit.IconButton(pr, UiSprite.IconClose, new Vector2(16f, 16f), 52f, Close);
+            FestaUiKit.TitleBanner(cr, "슬롯머신", new Vector2(0f, 22f), new Vector2(200f, 46f), 22f);
+            FestaUiKit.CloseButton(cr, new Vector2(-14f, -14f), 40f, Close);
 
-            _badge = FestaUiKit.Chip(pr, "체험판 · 코인 미반영", new Vector2(0f, -70f)).gameObject;
+            _badge = FestaUiKit.Chip(cr, "체험판 · 코인 미반영", new Vector2(0f, -54f)).gameObject;
 
             // 잔액 — 어두운 표시창에 코인 아이콘 + 큰 숫자
-            var display = FestaUiKit.Panel(pr, "Balance", UiSprite.BarNavy);
-            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -112f), new Vector2(330f, 110f));
-            FestaUiKit.Icon(display.rectTransform, UiSprite.IconCoin, new Vector2(-105f, -22f), 64f);
-            _balance = FestaUiKit.Label(display.rectTransform, "…", 52f, new Vector2(30f, -14f), new Vector2(200f, 70f), FestaUiKit.Gold,
-                                        FontStyles.Bold, TextAlignmentOptions.MidlineLeft, outline: 0.18f);
-            _balanceNote = FestaUiKit.Label(display.rectTransform, "보유 코인", 15f, new Vector2(30f, -78f), new Vector2(260f, 24f), FestaUiKit.Muted,
-                                            FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
+            var display = FestaUiKit.Panel(cr, "Balance", FestaUiKit.Card.Charcoal, 20);
+            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(316f, 104f));
+            FestaUiKit.Icon(display.rectTransform, UiSprite.IconCoin, new Vector2(-104f, -22f), 58f);
+            _balance = FestaUiKit.Label(display.rectTransform, "…", 46f, new Vector2(26f, -14f), new Vector2(200f, 62f), FestaUiKit.Gold,
+                                        FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            _balanceNote = FestaUiKit.Label(display.rectTransform, "보유 코인", 14f, new Vector2(26f, -74f), new Vector2(240f, 22f),
+                                            new Color(0.75f, 0.76f, 0.82f, 1f), FontStyles.Normal, TextAlignmentOptions.MidlineLeft);
 
-            _result = FestaUiKit.Title(pr, "", 30f, new Vector2(0f, -250f), new Vector2(340f, 80f));
+            _result = FestaUiKit.Label(cr, "", 26f, new Vector2(0f, -222f), new Vector2(320f, 80f), FestaUiKit.Text, FontStyles.Bold);
 
-            _spin = FestaUiKit.SpriteButton(pr, $"{SlotMachineSession.Bet}코인 넣고 돌리기", new Vector2(0f, -352f), new Vector2(320f, 84f),
-                                            () => _session.Spin(), UiSprite.ButtonOrange, 24f);
+            _spin = FestaUiKit.PillButton(cr, $"{SlotMachineSession.Bet}코인 넣고 돌리기", new Vector2(0f, -324f), new Vector2(300f, 66f),
+                                          () => _session.Spin(), true, 22f);
 
-            FestaUiKit.Label(pr, "최대 50코인 · 결과는 서버가 판정", 14f, new Vector2(0f, -452f), new Vector2(340f, 24f), FestaUiKit.Muted);
-            FestaUiKit.Label(pr, "Esc 로 나가기", 15f, new Vector2(0f, -500f), new Vector2(340f, 24f), FestaUiKit.Muted);
+            FestaUiKit.Label(cr, "최대 50코인 · 결과는 서버가 판정합니다", 13f, new Vector2(0f, -410f), new Vector2(320f, 22f), FestaUiKit.Muted);
+            FestaUiKit.Label(cr, "Esc  나가기", 14f, new Vector2(0f, -470f), new Vector2(320f, 22f), FestaUiKit.Muted);
 
             // 팝업 — 코인 부족 등. 필요할 때만.
-            var popup = FestaUiKit.Panel(root, "Popup", UiSprite.PanelBlue);
-            var ppr = popup.rectTransform;
-            FestaUiKit.Place(ppr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-120f, 40f), new Vector2(560f, 260f));
-            _popupTitle = FestaUiKit.Title(ppr, "알림", 30f, new Vector2(0f, -36f), new Vector2(480f, 44f));
-            _popupText = FestaUiKit.Label(ppr, "", 22f, new Vector2(0f, -92f), new Vector2(480f, 70f), FestaUiKit.Text);
-            FestaUiKit.SpriteButton(ppr, "확인", new Vector2(0f, -178f), new Vector2(200f, 64f), () => _session.DismissPopup(), UiSprite.ButtonNavy, 22f);
+            var popup = FestaUiKit.Panel(root, "Popup");
+            var pr = popup.rectTransform;
+            FestaUiKit.Place(pr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-110f, 40f), new Vector2(520f, 240f));
+            _popupTitle = FestaUiKit.Title(pr, "알림", 26f, new Vector2(0f, -40f), new Vector2(460f, 40f));
+            _popupText = FestaUiKit.Label(pr, "", 19f, new Vector2(0f, -92f), new Vector2(440f, 60f), FestaUiKit.Muted);
+            FestaUiKit.PillButton(pr, "확인", new Vector2(0f, -168f), new Vector2(180f, 52f), () => _session.DismissPopup(), true, 19f);
             _popup = popup.gameObject;
             _popup.SetActive(false);
         }

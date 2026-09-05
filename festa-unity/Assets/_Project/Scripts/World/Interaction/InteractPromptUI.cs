@@ -7,7 +7,7 @@ namespace Festa.World
     /// 상호작용 화면 표현의 **단일 구현**. 부스 입장(포털)과 부스 오브젝트(노트북·AI 직원·슬롯머신·게임기)가
     /// 같은 화면 언어를 쓴다 (S15P21A604-355).
     ///
-    /// <para>2026-09-06 UI 킷 적용: 키캡은 킷의 주황 버튼, 문구 판은 남색 알약(3조각 9-slice 로 그려 모서리가 늘어나지 않는다).
+    /// <para>2026-09-06 v3: 흰 알약 판 + 코랄 키캡 + 어두운 글자(다른 화면과 같은 카드 문법). 판은 코드 생성 둥근 텍스처를 3×3 조각으로 그려 모서리가 늘어나지 않는다.
     /// IMGUI 를 유지하는 이유 — 호출 계약이 "매 프레임 그린다"(<c>OnGUI</c> 에서 <see cref="DrawPrompt"/>) 라 uGUI 로 바꾸면
     /// 호출자 둘(BoothInteractionInput·PortalInteractor)을 함께 바꿔야 하고, 지금 필요한 것은 생김새다.</para>
     ///
@@ -41,11 +41,11 @@ namespace Festa.World
             float x = Mathf.Round((Screen.width - w) / 2f);
             float y = Mathf.Round(Screen.height * 0.52f);
 
-            DrawSliced(UiSprite.PillDark, Snap(x, y, w, h), new Color(1f, 1f, 1f, 0.94f));
+            DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.96f));
             var capRect = Snap(x + padX, y + (h - cap) / 2f, cap, cap);
-            DrawSliced(UiSprite.ButtonOrange, capRect, Color.white);
-            ShadowedLabel(capRect, "F", _capStyle, Color.white);
-            ShadowedLabel(Snap(capRect.xMax + 12f * ui, y, labelW + 4f, h), label, _labelStyle, Color.white);
+            DrawRounded(capRect, Mathf.RoundToInt(cap * 0.3f), FestaUiKit.Accent);
+            PlainLabel(capRect, "F", _capStyle, Color.white);
+            PlainLabel(Snap(capRect.xMax + 12f * ui, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Text);
         }
 
         /// <summary>짧은 알림 — 프롬프트 바로 위, 같은 남색 알약. 월드 단독 실행에서 "보냈다" 를 알리는 유일한 신호 (S15P21A604-348).</summary>
@@ -60,8 +60,16 @@ namespace Festa.World
             float h = Mathf.Round(40f * ui);
             float x = Mathf.Round((Screen.width - w) / 2f);
             float y = Mathf.Round(Screen.height * 0.52f - h - 10f * ui);
-            DrawSliced(UiSprite.PillDark, Snap(x, y, w, h), new Color(1f, 1f, 1f, 0.9f));
-            ShadowedLabel(Snap(x, y, w, h), text, _toastStyle, new Color(1f, 0.9f, 0.55f, 1f));
+            DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(0.12f, 0.13f, 0.18f, 0.92f));
+            PlainLabel(Snap(x, y, w, h), text, _toastStyle, Color.white);
+        }
+
+        static void PlainLabel(Rect rect, string text, GUIStyle style, Color color)
+        {
+            var prev = style.normal.textColor;
+            style.normal.textColor = color;
+            GUI.Label(rect, text, style);
+            style.normal.textColor = prev;
         }
 
         /// <summary>어두운 그림자 한 겹 위에 글자. 오프셋은 정수 1픽셀.</summary>
@@ -79,23 +87,15 @@ namespace Festa.World
         }
 
         /// <summary>
-        /// 킷 조각을 IMGUI 로 3×3 9-slice 그리기. 경계(픽셀)는 화면 높이에 비례해 줄인다.
-        /// 테마가 없으면 반투명 검은 판으로 떨어진다.
+        /// 코드 생성 둥근 사각형 텍스처를 IMGUI 로 3×3 9-slice 그리기 — 모서리 반지름은 화면 픽셀 그대로.
         /// </summary>
-        static void DrawSliced(UiSprite id, Rect dst, Color tint)
+        static void DrawRounded(Rect dst, int radius, Color tint)
         {
-            var theme = FestaUiTheme.Instance;
-            if (theme == null || !theme.TryGetPiece(id, out var tex, out var px, out var border))
-            {
-                var prev = GUI.color; GUI.color = new Color(0f, 0f, 0f, 0.55f);
-                GUI.DrawTexture(dst, Texture2D.whiteTexture);
-                GUI.color = prev;
-                return;
-            }
-
-            float scale = Mathf.Min(0.62f * Screen.height / 1080f, dst.height / (border.y + border.w + 1f), dst.width / (border.x + border.z + 1f));
-            float l = Mathf.Round(border.x * scale), r = Mathf.Round(border.z * scale);
-            float b = Mathf.Round(border.y * scale), t = Mathf.Round(border.w * scale);
+            radius = Mathf.Clamp(radius, 2, Mathf.FloorToInt(Mathf.Min(dst.width, dst.height) / 2f));
+            var tex = FestaUiKit.RoundedTexture(radius, out int bpx);
+            var px = new Rect(0f, 0f, tex.width, tex.height);
+            var border = new Vector4(bpx, bpx, bpx, bpx);
+            float l = bpx, r = bpx, b = bpx, t = bpx;
 
             // 텍스처 UV (원점 좌하단). px 는 아틀라스 픽셀 rect.
             float tw = tex.width, th = tex.height;

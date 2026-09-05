@@ -38,6 +38,7 @@ namespace Festa.Content
                 return;
             }
 
+            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 1.8f);
             BoothInteractBridge.SendSurveyInteract(_runtimeObject.BoothId, _runtimeObject.ObjectId);
         }
     }

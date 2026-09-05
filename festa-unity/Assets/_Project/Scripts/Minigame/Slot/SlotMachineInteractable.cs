@@ -25,8 +25,8 @@ namespace Festa.Minigame.Slot
 
         [Header("초점 카메라 (기계 로컬 좌표 — 스케일 포함)")]
         // 게임 화면(제목·잭팟·릴, 세로 약 12 unit)만 거의 가득 차게 — 화면 중심(로컬 y≈1.74)에서 정면 12 unit(0.9 m). 사용자 지시 2026-09-06.
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.90f, 1.10f);
-        [SerializeField] Vector3 _lookLocal = new(0f, 1.86f, 0.12f);
+        [SerializeField] Vector3 _cameraLocal = new(0f, 1.84f, 1.10f);
+        [SerializeField] Vector3 _lookLocal = new(0f, 1.80f, 0.12f);
 
         [Header("릴 연출 프리셋 (PresetUVSlotMachine.presets 인덱스)")]
         [Tooltip("약한 당첨 → 강한 당첨 순. tier 1..N 에 대응.")]
