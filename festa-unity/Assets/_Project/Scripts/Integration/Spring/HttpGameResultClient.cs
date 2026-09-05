@@ -28,6 +28,9 @@ namespace Festa.Integration
         /// <summary>직전 호출이 404/405(경로 없음)로 끝났는가.</summary>
         public bool LastEndpointMissing { get; private set; }
 
+        /// <summary>마지막 실패 사유(사용자 문구). 성공 뒤 null.</summary>
+        public string LastError { get; private set; }
+
         public HttpGameResultClient(string baseUrl, IAccessTokenProvider tokenProvider)
         {
             _baseUrl = (baseUrl ?? string.Empty).TrimEnd('/');
@@ -105,20 +108,30 @@ namespace Festa.Integration
             switch (request.result)
             {
                 case UnityWebRequest.Result.Success:
+                    LastError = null;
                     return request.downloadHandler.text;
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404 || request.responseCode == 405:
                     LastEndpointMissing = true;
+                    LastError = "게임 서버가 아직 준비되지 않았어요";
                     return null;
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 401:
+                    LastError = "로그인이 필요해요. 다시 로그인해 주세요.";
                     Debug.LogWarning($"[HttpGameResult] {what} → 401. 로그인이 필요하거나 만료됐다.");
                     return null;
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 403:
+                    LastError = "게스트는 보상 게임에 참여할 수 없어요 — 로그인하면 참여할 수 있어요";
                     Debug.Log($"[HttpGameResult] {what} → 403 (게스트는 보상 대상이 아니다).");
                     return null;
+                case UnityWebRequest.Result.ProtocolError when request.responseCode == 429:
+                    LastError = "오늘은 더 참여할 수 없어요. 내일 다시 와 주세요.";
+                    Debug.Log($"[HttpGameResult] {what} → 429 (일일 한도).");
+                    return null;
                 case UnityWebRequest.Result.ProtocolError:
+                    LastError = $"서버 오류 {request.responseCode}";
                     Debug.LogError($"[HttpGameResult] {what} → HTTP {request.responseCode}: {request.downloadHandler?.text}");
                     return null;
                 default:
+                    LastError = "네트워크 오류";
                     Debug.LogError($"[HttpGameResult] {what} 실패: {request.error}");
                     return null;
             }
@@ -138,6 +151,10 @@ namespace Festa.Integration
         readonly HashSet<string> _mockSessions = new();
         bool _warned;
 
+        /// <summary>서버 실패 사유. Mock 으로 넘어간 경우는 실패가 아니므로 null.</summary>
+        public string LastError => _lastWasMock ? null : _server.LastError;
+        bool _lastWasMock;
+
         public ServerFirstGameResultClient(HttpGameResultClient server, IGameResultClient mock)
         {
             _server = server ?? throw new System.ArgumentNullException(nameof(server));
@@ -147,8 +164,10 @@ namespace Festa.Integration
         public async Task<GameSessionDto> StartAsync(string gameId)
         {
             var session = await _server.StartAsync(gameId);
+            _lastWasMock = false;
             if (session != null || !_server.LastEndpointMissing) return session;
 
+            _lastWasMock = true;
             if (!_warned)
             {
                 _warned = true;
