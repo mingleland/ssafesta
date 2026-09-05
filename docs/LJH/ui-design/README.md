@@ -54,9 +54,9 @@ SOURCE    — 사람이 제공한 입력 원본. 수정 금지
 ## 현재 단계
 
 ```text
-UI 재설계 완료 · develop 반입 (2026-09-03)
+UI 재설계 완료 · develop 반입 (2026-09-03) → Unity 진입 계약 3건 develop 반입 (2026-09-05, !250)
 User Flow 정본화 → 문서 정합 → !240 재분류 → 화면별 사양 → R1~R9 구현 →
-회귀 검증 → merge. develop = e961adda (squash 4c843928).
+회귀 검증 → merge → World 상호작용 배선(-343·-414·-415·-416). front = develop 39641e0b.
 
 기능층은 24종 전부 보존했고 제거는 0이다. Presentation 과 진입 구조만 바뀌었다.
 Presentation 추가 개발은 중단 상태다 — 다음은 계약 대기 항목이 풀리는 순서로 진행한다.
@@ -65,7 +65,7 @@ Presentation 추가 개발은 중단 상태다 — 다음은 계약 대기 항�
 ### 후속 우선순위 (착수는 별도 승인)
 
 ```text
-P1  Unity 실제 진입 계약        G-1 Booth Management NPC · G-2 Survey · G-4 Project 송신부
+P1  Unity 진입 런타임 검증      G-1·G-2·G-4 계약·구현 도달(!250) — Editor 컴파일·F 3종·NPC 프리팹 부착·BridgeTests 잔여
 P2  Consultation Target Context G-3 — 새 상담의 대상 부스 결정(제품·계약 결정)
 P3  Survey / Consultation 실 BE·Transport   G-6 · G-7
 P4  Game Client Input Lock      G-8 (Overlay Stack·Input Router 와 묶어 설계)

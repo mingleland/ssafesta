@@ -11,9 +11,9 @@
 
 **원격은 GitLab이고 완료 경로는 `develop` 하나다**(2026-08-26 개정). 이 문서의 `github.com` 링크는 이관 전 GitHub PR 번호이며, 이슈 번호는 GitLab에서 보존됐다. 내 MR 현황은 `## MR 현황
 
-**열린 내 MR 은 `!250` 1건이다** — World Interaction Integration(`-343`·`-415`·`-414`). Unity Editor 컴파일·런타임·씬 배치가 미실행이라 Unity 파트 확인 후 머지한다. 같은 라운드의 `-416`(Consultation, Unity 변경 0)은 `!251` 로 갈라 09-04 에 develop 에 머지했다. 그 전 08-28 에 `!67`·`!63`·`!93`·`!94`·`!95`·`!97` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
+**열린 내 MR 은 0건이다.** `!250`(World Interaction Integration, Unity 3건 `-343`·`-415`·`-414`)은 09-05 12:59 에 develop 에 머지됐고, 같은 라운드의 `-416`(Consultation, Unity 변경 0)은 `!251` 로 갈라 09-04 에 머지했다. `!262`(T-111 문서, `-247`)도 09-05 에 머지했다. 그 전 08-28 에 `!67`·`!63`·`!93`·`!94`·`!95`·`!97` 을 develop 에 머지했고, 08-27 오전에 `!46`·`!37`·`!42`·`!43`·`!52`·`!59`·`!60`·`!62` 를, part-target `!13`·`!20` 은 `front` 로 소진했다.
 
-**`front` 는 develop 과 0 behind 다**(2026-08-28, 머지 `3578e9c`). front 가 develop 에 대해 고유하게 갖는 것은 `docs/LJH/` 와 `.claude/launch.json` 둘뿐이고, 그 밖의 경로는 `git diff origin/develop front` 가 빈 출력이다. 다음 동기화는 fast-forward 에 가깝다.
+**`front` 는 develop 과 0 behind 다**(2026-09-05, 머지 `39641e0b`). front 가 develop 에 대해 고유하게 갖는 것은 `docs/LJH/` 와 `.claude/launch.json` 둘뿐이다. 09-05 fresh clone 교체([T-111](../25_트러블슈팅.md)) 뒤 git 밖 로컬 환경(`CLAUDE.local.md` 3절·메모리 1건·`festa-*` 스킬 3종)을 `26_로컬_규약_스냅샷.md` 에서 복원했다.
 
 **셀프 머지는 이 팀의 관행이다** — `docs/17` §8:269 는 "최소 1명 Review **권장**", 머지된 MR 34건 중 author == merged_by 가 33/34, 보호 브랜치는 `main` 하나, 내 권한은 Maintainer(40). `approved_by=[]` 는 승인 대기가 아니다.
 
@@ -22,7 +22,7 @@
 - [ ] **`specs/016` spec.md 29줄 반입 제안 — #115 스레드 게시 대기.** Unity→React `BOOTH_LAPTOP_INTERACT` 계약 블록이 front 에만 있다(develop 의 이 파일은 최초 spec-kit 커밋 이후 무변경 = 미반입). **리드 문서라 별도 MR 로 밀지 않는다** — #115 §2 가 이미 같은 파일의 3건을 리드 몫으로 걸어 뒀으니 그 스레드에서 함께 승인받는다
 - [ ] **`-114` 완료 판정 대기** — GAME 오버레이 호스트 배선을 [MR !97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/97) 로 넣었다. `Closes` 는 안 넣었다 — BE 에 `GAME_PORTAL` 지원이 **전무**해서(타입·테이블·endpoint 전부 0건) 실서버 왕복을 못 한다. 같은 이유로 이 경로는 현재 **도달 불가**라 사용자 영향도 없다
 - [ ] **SSAFY 소셜 로그인 FE 반영** — 합의 수신(2026-08-27). **provider wire 값 하나 대기**([#114](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/114) §4). 정해지면 `LoginPage` 버튼·`Provider` union·`mockStartOAuth` 확장 + spec 001·계약·`docs/08` 정합. ⚠️ 헌법 11조·FR-001 개정이 선행이다(개정문은 리드 몫)
-- [ ] **`!250` 머지 대기 — Unity 검증 선행.** World 상호작용 3건(Project·Survey·Management NPC)의 계약 확정과 양쪽 구현은 끝났다. FE 는 E2E·tsc·build·lint·vitest(83/83 파일) 전부 통과했고, 남은 것은 Unity Editor 컴파일 · `BoothInteractBridgeTests` 보강(`-343` 작업 내용 4번) · F 런타임 3종 · `ManagementDeskInteractable` 의 월드 NPC 프리팹 부착이다(나머지 둘은 `BoothObjectFactory` 가 런타임에 붙인다). ⚠️ 선행 의존 `-336`(부스 내부 4배 과대)이 진행 중이라 F 자체가 안 발동할 수 있다 — 티켓에 통보했다. **네 티켓 모두 `Closes` 미사용**: 완료조건에 런타임 검증이 남아 있다
+- [ ] **World 상호작용 Unity 잔여 검증 — `!250` 머지됨(09-05), Unity 파트 확인 대기.** 계약 확정·양쪽 구현·FE 검증(E2E·tsc·build·lint·vitest 83/83)은 끝났다. 남은 것은 Unity Editor 컴파일 · F 런타임 3종 · `ManagementDeskInteractable` 의 월드 NPC 프리팹 부착(나머지 둘은 `BoothObjectFactory` 가 런타임에 붙인다) · `BoothInteractBridgeTests` 보강(`-343` 작업 내용 4번). 선행 의존 `-336`(부스 내부 스케일)은 develop 머지됨(`b6322bc`). **네 티켓 모두 `Closes` 미사용**: 완료조건에 런타임 검증이 남아 있다
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
 ## 착수 가능 — 협의 불요, 권장 순서순

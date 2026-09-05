@@ -311,16 +311,16 @@ Detail      Project Editor / Survey Builder / Survey Result / Consultation Staff
 
 | # | Gap | 영향 | 소관 |
 |---|---|---|---|
-| G-1 | **Booth Management NPC 상호작용 이벤트가 없다** | Booth Management Overlay 의 유일한 제품 진입점 — 계약 전에는 dev trigger 로만 열린다 | Unity + FE (신규) |
-| G-2 | Survey Unity 이벤트 계약 없음 | Survey Run 의 제품 진입 불가 | Unity + FE + BE |
+| G-1 | Booth Management NPC 상호작용 — `WORLD_MANAGEMENT_INTERACT` 계약·양측 구현 develop 도달(-414·-415, !250 2026-09-05) | 잔여: Unity Editor 런타임 검증, `ManagementDeskInteractable` 월드 NPC 프리팹 부착 | Unity 검증 |
+| G-2 | Survey Unity 이벤트 — 계약·양측 구현 develop 도달(-415, !250) | 잔여: 런타임 검증, 다중 설문 `objectId → surveyId` binding(BE) | Unity 검증 + BE |
 | G-3 | Consultation Target Context — 새 상담의 대상 Booth 결정 방식 미정 | HUD 에서 새 상담 시작 경로 미정. **Booth Directory UI 를 발명하지 않는다** | Unity + FE + BE |
-| G-4 | Project Unity 송신부 미구현(-343) | Project Overlay 제품 진입 불가 | Unity |
+| G-4 | Project Unity 송신부 `ProjectPanelInteractable` develop 도달(-343, !250) | 잔여: 런타임 검증, `BoothInteractBridgeTests` 보강 | Unity 검증 |
 | G-5 | GAME — BE game-portals + Unity 송신 + 소유권 | GAME BLOCKED 유지 | BE + Unity + 박준우 |
 | G-6 | Survey·Consultation BE endpoint·DTO 미확정 | mock adapter 유지 | BE |
 | G-7 | Consultation 실 transport(STOMP) 미확정 | §2 의 close 정책은 mock 기준 판정 — transport 도달 시 재확인 | BE |
 | G-8 | Unity Input Lock 계약 (decision-queue #4) | Overlay 중 월드 입력 차단 불가 | Unity + FE |
 
-G-1 은 이번 Flow 확정으로 **새로 생긴** Gap 이다. 나머지는 기존 항목.
+G-1·G-2·G-4 는 `!250`(2026-09-05) 으로 계약·구현이 닫혔고 Unity 런타임 검증만 남았다. G-1 은 Flow 확정으로 새로 생겼던 항목이고 나머지는 기존 항목.
 
 ### 후속 작업군 분류 (2026-09-03, `!240` merge 후)
 
@@ -329,7 +329,7 @@ G-1 은 이번 Flow 확정으로 **새로 생긴** Gap 이다. 나머지는 기�
 
 | 작업군 | 항목 | FE 준비 상태 | 필요한 것 |
 |---|---|---|---|
-| **Unity Integration** | G-1 · G-2 · G-4 | consumer·seam 완비 (`openBoothManagement()`, Overlay·모델) | Unity producer + 이벤트 계약. 도착 시 dispatcher 에 case 추가로 끝난다 |
+| **Unity Integration** | G-1 · G-2 · G-4 | dispatcher case·consumer 완비, Unity producer 도달(!250) | Unity Editor 런타임 검증(F 3종·NPC 프리팹 부착·BridgeTests) |
 | **Product / Contract Decision** | G-3 | HUD idle 비활성 — 임의 Booth picker 없음 | "새 상담의 대상 부스를 어떤 World context 로 정하는가"의 제품 결정 |
 | **Backend / Transport** | G-6 · G-7 | Port 경계 유지, mock adapter | 실 endpoint·DTO / STOMP transport. 도착 시 adapter 교체만 |
 | **Blocked** | G-5 | GameOverlay 오류·재시도 표시 | BE game-portals + Unity 송신 + ownership 결정 |
