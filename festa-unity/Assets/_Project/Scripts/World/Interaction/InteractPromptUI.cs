@@ -66,7 +66,7 @@ namespace Festa.World
             _capStyle.fontSize = Mathf.RoundToInt(26f * ui);
 
             float cap = Mathf.Round(46f * ui);          // 키캡 한 변
-            float labelW = Mathf.Round(_labelStyle.CalcSize(new GUIContent(label)).x);
+            float labelW = Mathf.Round(_labelStyle.CalcSize(Measure(label)).x);
             float gap = Mathf.Round(12f * ui);
             float w = cap + gap + labelW;
             float h = cap;
@@ -96,7 +96,7 @@ namespace Festa.World
             _toastStyle.fontSize = Mathf.RoundToInt(22f * ui);
 
             float pad = Mathf.Round(11f * ui);
-            float w = Mathf.Round(_toastStyle.CalcSize(new GUIContent(text)).x) + pad * 2f;
+            float w = Mathf.Round(_toastStyle.CalcSize(Measure(text)).x) + pad * 2f;
             float h = Mathf.Round(30f * ui) + pad;
             float x = Mathf.Round((Screen.width - w) / 2f);
             float y = Mathf.Round(Screen.height * 0.52f - h - 8f * ui);   // 프롬프트 위
@@ -105,6 +105,13 @@ namespace Festa.World
             // 화면이 달라 보이던 문제로 되돌아간다 (위 클래스 주석).
             ShadowedLabel(Snap(x, y, w, h), text, _toastStyle, new Color(0.62f, 1f, 0.72f));
         }
+
+        // 폭 측정용 GUIContent 하나를 재사용한다 — 프롬프트가 떠 있는 동안 매 프레임 new 하면 GC/1s 가 올라간다(-437 ⑤).
+
+        static readonly GUIContent s_measure = new GUIContent();
+
+        static GUIContent Measure(string text) { s_measure.text = text; return s_measure; }
+
 
         static void EnsureStyles()
         {
