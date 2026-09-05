@@ -8,13 +8,13 @@
 |---|---|---|---|
 | — | ~~릴리스 WebGL 클라이언트가 게임 서버에 승인되지 않는다~~ → **빌드 결함 아님.** 자동화 브라우저 탭이 hidden 상태라 Chrome 이 rAF 를 멈춰 Unity 루프가 정지했던 것. 보이는 탭에서는 Docker 서버(`festa-world:dev`=60b8cd42)에 승인·스폰·이동 정상 | ✅ 해결(환경 요인) — 단, **실사용자도 탭을 30초 뒤로 보내면 끊긴다**(T-120, 재접속 UX 미결) | docs/25 **T-115**·**T-120**, Jira -420 |
 | ☆ | 스태프 NPC 2기에 벤더 데모 컨트롤러 잔존(매 프레임 경고·입력 가로채기) | ✅ 씬에서 제거 (Jira -425, MR) | T-119 |
-| ☆ | 로비 → main 씬 전환 50~84초(WebGL) — 로딩 표시 없음 | 🟡 FE 안내(-429, !273)는 Unity 신호 `onWorldLoadStart`(!280) 로 켜짐 — develop head 빌드에서 확인 | #129, -431 |
+| ☆ | 로비 → main 씬 전환 50~84초(WebGL) — 로딩 표시 없음 | 🟡 FE 안내(-429, !273)는 Unity 신호 `onWorldLoadStart`(!280) 로 켜짐 — develop head 빌드에서 확인. 단계별 소요는 `[WorldLoadTimeline] 요약` 콘솔 한 줄(!291)로 읽는다 | #129, -431 |
 | ★ | 씬 배치 상호작용(관리 데스크·오락기) F 무반응 | ✅ !281 (T-122) — develop head 빌드로 F 확인 필요 | -435 |
 | ☆ | 회전 감도·앉기 이름표·벽 조명 팝인 | ✅ !282 / 걷기 끊김은 계측 대기(F3 최대 프레임) | -436 |
 | ☆ | Overlay 열림 중 월드 입력·React 입력창 타이핑 | ✅ Unity 측 !279(`InputBridge`, `captureAllKeyboardInput=false`) — FE `OverlayHost` 배선 대기 | #132, -434 |
 | ☆ | 백그라운드 복귀 재접속 | ✅ Unity `WorldReconnector`(!284·!288, 5회 ~67초) — 서버 재기동 실측으로 루프 확인. FE 안내 UI·수신부는 FE(#131) | #131, -432 |
 | ☆ | 실테스트 2차(23:00): 오락기 중 조작 잠금·게스트 로비 생략·외곽선 하이라이트(부위 한정)·조명 히스테리시스 | ✅ !286 — 게스트 즉시 입장·NPC 외곽선·F→관리 화면 패널 실측 확인 | -437 |
-| ☆ | 걷기 끊김 (최대 프레임 14~52 ms, GC/1s 1) | 🟡 원인 미확정 — 정렬 델리게이트·프롬프트 GUIContent 할당 제거. 다음 실테스트에서 PerfHud 수치로 재판정 | -437 ⑤ |
+| ☆ | 걷기 끊김 (최대 프레임 14~52 ms, GC/1s 1) | ✅ 원인 확정 — **Development 빌드의 IMGUI 개발 도구**(접속 패널·PerfHud)가 ≈1.3 MB/s 할당 → 8 MB 힙에서 초당 GC 1회. 릴리스에는 없는 비용. !290 으로 접속 후 패널 숨김(F2)·PerfHud 기본 숨김(F3). 재빌드에서 GC/1s 0 확인 | -437 ⑤ |
 | ★ | 캔버스 초기 포커스 — `captureAllKeyboardInput=false` 이후 첫 키 입력이 무시됨(클릭 후 정상) | 🟡 FE 가 인스턴스 준비 시 `canvas.focus()` (#132 요청) | #132 |
 | ☆ | 게스트 데스크 F → "부스 정보를 불러오지 못했습니다"(로그인 안내여야 함) | 🟡 FE 결함 보고 | #128 |
 | ☆ | 설문 키오스크 E2E(-415) | 🟡 슬롯 1 게시본에 SURVEY_KIOSK 없음 — 스튜디오에서 배치·게시 후 확인 | -415 |
@@ -148,7 +148,9 @@ FE 이미지는 `VITE_UNITY_BUILD_BASE=<E 의 URL>` 로 **빌드 시점**에 박
 
 | 도구 | 키 | 재는 것 |
 |---|---|---|
-| `PerfHud` | F3 토글 / F4 리셋 / F9 아바타 LOD | 프레임 ms·힙·GC·드로우콜·접속 인원 |
+| `PerfHud` | F3 토글(기본 숨김) / F4 리셋 / F9 아바타 LOD | 프레임 ms·힙·GC·드로우콜·접속 인원 — **접속 패널(F2)은 꺼둔 채 잰다**(둘 다 켜면 IMGUI 할당으로 GC/1s 1 이 계측 오염) |
+| `DevConnectionHud` | F2 토글(접속 후 기본 숨김) | Host/Server/Client 직접 접속·Disconnect (Development 빌드·에디터만) |
+| `WorldLoadTimeline` | 없음 — 브라우저 콘솔 `[WorldLoadTimeline] 요약` | 로비 입장 클릭 → main 로드 → 세션 → StartClient → 승인 → 스폰 → 게이트 개방 단계별 초 |
 | `AvatarStressSpawner` | F6 +1 / F7 −1 / F8 전체 제거 | 내 화면의 원격 아바타 N기 비용 (접속 없이) |
 | `LoadTestBot` | `festa.exe -batchmode -nographics -bot -addr world.ssafesta.world -port 443 -botName botNN` | 인원수별 수신 bytes/s (RNSM 과 함께) — 1→10→20→30→40 (-206) |
 
@@ -158,4 +160,4 @@ FE 이미지는 `VITE_UNITY_BUILD_BASE=<E 의 URL>` 로 **빌드 시점**에 박
 
 발표 흐름 중 지금 돌아가는 것: 로그인 → 월드 입장·이동 → 임대 → 스튜디오 → 퍼블리시 → 부스 방문·프로젝트 패널·AI NPC 진입·설문 키오스크 진입·관리 데스크. **AI 상담 답변·설문 제출·사람 상담은 담당 파트 진척에 따른다.**
 
-수집: `PerfHud` 스크린샷, 브라우저 콘솔 에러, 접속 실패 사례, 로비→월드 진입 시간.
+수집: `PerfHud` 스크린샷, 브라우저 콘솔 에러, 접속 실패 사례, 로비→월드 진입 시간(콘솔 `[WorldLoadTimeline] 요약` 줄 복사).
