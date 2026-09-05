@@ -17,7 +17,7 @@
 | ☆ | 걷기 끊김 (최대 프레임 14~52 ms, GC/1s 1) | ✅ 원인 확정 — **Development 빌드의 IMGUI 개발 도구**(접속 패널·PerfHud)가 ≈1.3 MB/s 할당 → 8 MB 힙에서 초당 GC 1회. 릴리스에는 없는 비용. !290 으로 접속 후 패널 숨김(F2)·PerfHud 기본 숨김(F3). 재빌드에서 GC/1s 0 확인 | -437 ⑤ |
 | ★ | 캔버스 초기 포커스 — `captureAllKeyboardInput=false` 이후 첫 키 입력이 무시됨(클릭 후 정상) | 🟡 FE 가 인스턴스 준비 시 `canvas.focus()` (#132 요청) | #132 |
 | ☆ | 게스트 데스크 F → "부스 정보를 불러오지 못했습니다"(로그인 안내여야 함) | 🟡 FE 결함 보고 | #128 |
-| ☆ | 설문 키오스크 E2E(-415) | 🟡 슬롯 1 게시본에 SURVEY_KIOSK 없음 — 스튜디오에서 배치·게시 후 확인 | -415 |
+| ☆ | 설문 키오스크 E2E(-415) | ✅ 회원 토큰으로 BE API 게시(rev 6, SURVEY_KIOSK#1) → 에디터에서 스폰·프롬프트·`BOOTH_SURVEY_INTERACT` 송신 확인. 설문 API(BE)·오버레이(FE)는 각 파트 | -415 |
 | ★ | FE `UnityHost.tsx` canvas 에 `id` 없음 → Unity `_main` 크래시 | ✅ !259 머지(develop) — 00:00 임베드 재실측 정상 | #128 §1, T-114 |
 | ★ | FE 가 게스트에게 AT 를 안 넘김 → 배포에서 게스트 Unity 는 카탈로그·world-sessions 401 | ✅ FE !266 — 게스트 AT 로 Docker 서버 `Approved … 게스트-4c3d` 확인(18:20) | #128 §2, T-116, docs/26 ③ |
 | ☆ | FE 60초 게이트 타임아웃이 로비 체류 중 만료 | ✅ FE !267 — watchdog 을 boot attempt 에만(docs/26 ③ 확정) | #128 §3, T-117 |

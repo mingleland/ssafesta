@@ -54,7 +54,7 @@ namespace Festa.World
         /// 크기·정면이 다른 대상용. 로컬 플레이어 → 대상 방향 선 위, 대상 크기의 <paramref name="distanceScale"/> 배 거리에서
         /// 대상 중심(조금 위)을 본다. 일반적인 3인칭 게임의 "대화/조사 카메라" 와 같은 방식.
         /// </summary>
-        public static void FocusOn(GameObject target, float distanceScale = 2.2f, float heightBias = 0.2f, bool lockInput = true)
+        public static void FocusOn(GameObject target, float distanceScale = 2.2f, float heightBias = 0.5f, bool lockInput = true)
         {
             if (target == null) return;
             var renderers = target.GetComponentsInChildren<Renderer>();
@@ -76,15 +76,12 @@ namespace Festa.World
             dir.Normalize();
 
             float size = Mathf.Max(b.extents.x, b.extents.y, b.extents.z);
+            // 거리는 대상 크기에서만 정한다. 플레이어 뒤로 넘어가도 초점 중에는 자기 아바타를 숨기므로 뒤통수가 화면을 가리지 않는다.
+            // (한때 플레이어 앞으로 당겨 붙였더니 카운터형 오브젝트의 앞판만 가득 잡혔다 — 2026-09-06 키오스크 실측.)
             float distance = Mathf.Max(size * distanceScale, 8f);
-            // 카메라는 플레이어와 대상 사이에 있어야 한다 — 플레이어 뒤로 넘어가면 자기 뒤통수를 본다(2026-09-06 실측).
-            if (local != null)
-            {
-                float playerDist = Vector3.Distance(new Vector3(local.transform.position.x, 0f, local.transform.position.z), new Vector3(b.center.x, 0f, b.center.z));
-                distance = Mathf.Min(distance, Mathf.Max(playerDist - 6f, 6f));
-            }
+            // 시선은 경계의 위쪽(heightBias 0.5 = 중심과 꼭대기의 중간)으로 — 카운터·키오스크·노트북은 볼거리가 위에 있다.
             Vector3 lookAt = b.center + Vector3.up * b.extents.y * heightBias;
-            Vector3 camPos = lookAt + dir * distance + Vector3.up * size * 0.35f;
+            Vector3 camPos = lookAt + dir * distance + Vector3.up * size * 0.45f;
 
             var inst = Ensure();
             inst.BeginFocusWorld(target.transform, camPos, lookAt, lockInput);
