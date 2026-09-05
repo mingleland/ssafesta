@@ -25,5 +25,20 @@ mergeInto(LibraryManager.library, {
     } catch (error) {
       console.error('[FestaUnityBridge] onWorldGateReady callback failed', error);
     }
+  },
+
+  // 로비에서 "월드 입장" 직후, main 씬 LoadScene 직전에 1회 (GitLab #129, S15P21A604-431).
+  // 호스트는 이 신호로 "축제장을 불러오고 있어요" 안내를 띄우고 onWorldGateReady 에서 내린다.
+  // 수신부가 없으면 경고만 — 신호 유무에 호스트 동작이 묶이지 않는다.
+  FestaNotifyWorldLoadStart: function () {
+    try {
+      if (window.FestaUnity && typeof window.FestaUnity.onWorldLoadStart === 'function') {
+        window.FestaUnity.onWorldLoadStart();
+        return;
+      }
+      console.warn('[FestaUnityBridge] window.FestaUnity.onWorldLoadStart is not ready');
+    } catch (error) {
+      console.error('[FestaUnityBridge] onWorldLoadStart callback failed', error);
+    }
   }
 });
