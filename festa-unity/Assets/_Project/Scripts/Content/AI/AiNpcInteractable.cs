@@ -45,6 +45,8 @@ namespace Festa.Content
 
             // 콘텐츠 미연결(configId 0) 판정은 브리지가 한다 — 같은 규칙을 두 곳에 두면
             // 한쪽만 고치게 된다. 여기서는 값을 그대로 넘긴다.
+            // 대화 카메라 — NPC 를 가슴 높이에서 바라보는 일반적인 대화 구도.
+            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 2.4f, 0.45f);
             BoothInteractBridge.SendAiAgentInteract(
                 _runtimeObject.BoothId, _runtimeObject.ObjectId, _runtimeObject.ConfigId);
         }

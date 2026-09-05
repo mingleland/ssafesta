@@ -41,6 +41,11 @@ namespace Festa.World
         /// 인증 여부를 판정하지 않는다 — 게스트가 눌러도 이벤트는 나가고 회원 전용 안내는
         /// FE 가 띄운다. 다른 상호작용이 "등록 여부와 무관하게 트리거만" 인 것과 같은 원칙이다.
         /// </summary>
-        public void Interact() => BoothInteractBridge.SendManagementInteract();
+        public void Interact()
+        {
+            // 대화 카메라 — 티켓 부스 창구의 NPC 를 가슴 높이에서 바라본다(2026-09-06 배치 이동).
+            InteractionFocusCamera.FocusOn(gameObject, 2.4f, 0.45f);
+            BoothInteractBridge.SendManagementInteract();
+        }
     }
 }

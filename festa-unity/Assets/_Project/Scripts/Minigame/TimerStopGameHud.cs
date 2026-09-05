@@ -69,28 +69,28 @@ namespace Festa.Minigame
             var root = canvas.transform;
             FestaUiKit.Backdrop(root);
 
-            var panel = FestaUiKit.Panel(root, "Panel", UiSprite.PanelBlue);
+            var panel = FestaUiKit.Panel(root, "Card");
             var pr = panel.rectTransform;
-            FestaUiKit.Place(pr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(720f, 600f));
+            FestaUiKit.Place(pr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(640f, 560f));
 
-            FestaUiKit.TitleBanner(pr, "타이밍 스톱", new Vector2(0f, 30f), new Vector2(320f, 66f), 30f);
-            FestaUiKit.IconButton(pr, UiSprite.IconClose, new Vector2(14f, 14f), 52f, Close);
+            FestaUiKit.TitleBanner(pr, "타이밍 스톱", new Vector2(0f, 22f), new Vector2(220f, 46f), 22f);
+            FestaUiKit.CloseButton(pr, new Vector2(-14f, -14f), 40f, Close);
 
-            _target = FestaUiKit.Label(pr, "", 22f, new Vector2(0f, -78f), new Vector2(560f, 34f), FestaUiKit.Muted);
+            _target = FestaUiKit.Label(pr, "", 19f, new Vector2(0f, -66f), new Vector2(520f, 30f), FestaUiKit.Muted);
 
             // 타이머 — 어두운 표시창에 금색 숫자. 이 화면의 주인공.
-            var display = FestaUiKit.Panel(pr, "Display", UiSprite.BarNavy);
-            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -120f), new Vector2(440f, 170f));
-            _timer = FestaUiKit.Label(display.rectTransform, "0.00", 118f, Vector2.zero, Vector2.zero, FestaUiKit.Gold, FontStyles.Bold, outline: 0.18f);
+            var display = FestaUiKit.Panel(pr, "Display", FestaUiKit.Card.Charcoal, 22);
+            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -108f), new Vector2(420f, 160f));
+            _timer = FestaUiKit.Label(display.rectTransform, "0.00", 110f, Vector2.zero, Vector2.zero, FestaUiKit.Gold, FontStyles.Bold);
             FestaUiKit.Stretch(_timer.rectTransform);
 
-            _result = FestaUiKit.Title(pr, "", 32f, new Vector2(0f, -312f), new Vector2(600f, 46f));
-            _verdict = FestaUiKit.Label(pr, "", 19f, new Vector2(0f, -360f), new Vector2(600f, 30f), FestaUiKit.Muted);
+            _result = FestaUiKit.Title(pr, "", 28f, new Vector2(0f, -292f), new Vector2(560f, 44f));
+            _verdict = FestaUiKit.Label(pr, "", 17f, new Vector2(0f, -338f), new Vector2(560f, 28f), FestaUiKit.Muted);
 
-            _action = FestaUiKit.SpriteButton(pr, "시작", new Vector2(0f, -412f), new Vector2(300f, 78f), OnAction, UiSprite.ButtonOrange, 26f);
+            _action = FestaUiKit.PillButton(pr, "시작", new Vector2(0f, -392f), new Vector2(280f, 66f), OnAction, true, 24f);
             _actionLabel = FestaUiKit.ButtonLabel(_action);
 
-            FestaUiKit.Label(pr, "Space 로도 시작·정지  ·  Esc 로 나가기", 16f, new Vector2(0f, -520f), new Vector2(600f, 26f), FestaUiKit.Muted);
+            FestaUiKit.Label(pr, "Space  시작·정지   ·   Esc  나가기", 14f, new Vector2(0f, -496f), new Vector2(560f, 24f), FestaUiKit.Muted);
 
             Redraw();
         }
