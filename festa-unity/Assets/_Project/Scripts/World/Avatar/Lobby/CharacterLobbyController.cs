@@ -389,6 +389,10 @@ namespace Festa.Avatar
             Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
             var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
             Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            // 상태 줄 — SetStatus 가 여기에 쓴다. 이 라벨이 없던 동안 잠금 안내·조회 실패 메시지가
+            // 전부 로그에만 남고 화면에는 아무것도 안 떴다 (S15P21A604-412 검증에서 발견).
+            _status=Label(_responsiveFrame,"",17,34,new Vector2(.22f,.006f),new Vector2(.78f,.05f));
+            _status.fontStyle=FontStyle.Normal;_status.color=new Color(1f,.86f,.6f,1f);_status.raycastTarget=false;
 
 
             var right=Panel(_responsiveFrame,"Detail Inspector",new Vector2(.715f,0),Vector2.one,UiPanel);
