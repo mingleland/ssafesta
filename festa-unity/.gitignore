@@ -38,3 +38,13 @@ Thumbs.db
 # 벤더 에셋의 다른 렌더 파이프라인 설치 패키지 (59 MB).
 # 우리는 URP 로 쓰고 있어 런타임에 전혀 필요 없다 — 디스크에는 남기고 저장소에만 넣지 않는다.
 [Aa]ssets/ithappy/**/Render_Pipeline_Convert/*.unitypackage
+
+# 벤더 UI/모델 팩의 원본 소스(PSD·AI)는 저장소에 넣지 않는다 — 76 MB, 런타임 미사용 (2026-09-06)
+Assets/300Mind/2D Game UI Kit/Sprite Source File/
+Assets/300Mind/2D Game UI Kit/Sprite Source File.meta
+Assets/danthaigames/DS Arcade Pack 01/PSDs/
+Assets/danthaigames/DS Arcade Pack 01/PSDs.meta
+Assets/300Mind/2D Game UI Kit/Scene/
+Assets/300Mind/2D Game UI Kit/Scene.meta
+Assets/danthaigames/DS Arcade Pack 01/Scenes/
+Assets/danthaigames/DS Arcade Pack 01/Scenes.meta

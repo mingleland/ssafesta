@@ -1010,7 +1010,7 @@ namespace Festa.Avatar
         static int CountGarmentAreas(int mask)=>(mask&1)+((mask>>1)&1)+((mask>>2)&1);
         bool IsSelected(AvatarPartCategory category,AvatarItemDefinition item)=>CurrentItemId(category)==(category==AvatarPartCategory.Hat?item.familyId:item.itemId);
 
-        static RectTransform Panel(Transform p,string n,Vector2 min,Vector2 max,Color c){var r=new GameObject(n,typeof(RectTransform),typeof(Image),typeof(Outline)).GetComponent<RectTransform>();r.SetParent(p,false);r.anchorMin=min;r.anchorMax=max;r.offsetMin=r.offsetMax=Vector2.zero;var image=r.GetComponent<Image>();image.color=c;Round(image);var o=r.GetComponent<Outline>();o.effectColor=UiBorder;o.effectDistance=new Vector2(1,-1);return r;}
+        static RectTransform Panel(Transform p,string n,Vector2 min,Vector2 max,Color c){var r=new GameObject(n,typeof(RectTransform),typeof(Image),typeof(Outline)).GetComponent<RectTransform>();r.SetParent(p,false);r.anchorMin=min;r.anchorMax=max;r.offsetMin=r.offsetMax=Vector2.zero;var image=r.GetComponent<Image>();KitSkin(image,Festa.World.UI.UiSprite.PanelBlue);var o=r.GetComponent<Outline>();o.effectColor=Color.clear;o.effectDistance=new Vector2(1,-1);return r;}
         static Image ImageLayer(Transform p,string n,Vector2 min,Vector2 max,Color c){var image=new GameObject(n,typeof(RectTransform),typeof(Image)).GetComponent<Image>();image.transform.SetParent(p,false);Anchor(image.rectTransform,min,max);image.color=c;return image;}
         static void DecorativeDivider(Transform parent,float y)
         {
@@ -1037,13 +1037,13 @@ namespace Festa.Avatar
         static InputField HexInput(Transform parent,float width,float height)
         {
             var input=new GameObject("HEX 색상 코드",typeof(RectTransform),typeof(Image),typeof(InputField),typeof(LayoutElement),typeof(Outline)).GetComponent<InputField>();input.transform.SetParent(parent,false);
-            input.image.color=UiSurface;Round(input.image);var le=input.GetComponent<LayoutElement>();le.preferredWidth=width;le.preferredHeight=height;
+            KitSkin(input.image,Festa.World.UI.UiSprite.FieldLight);var le=input.GetComponent<LayoutElement>();le.preferredWidth=width;le.preferredHeight=height;
             var outline=input.GetComponent<Outline>();outline.effectColor=UiBorder;outline.effectDistance=new Vector2(1,-1);
             var text=Label(input.transform,"#FFFFFF",23,height);Anchor(text.rectTransform,new Vector2(.08f,0),new Vector2(.95f,1));text.alignment=TextAnchor.MiddleLeft;
-            input.textComponent=text;input.characterLimit=7;input.lineType=InputField.LineType.SingleLine;input.contentType=InputField.ContentType.Standard;
+            text.color=UiPanel;input.textComponent=text;input.characterLimit=7;input.lineType=InputField.LineType.SingleLine;input.contentType=InputField.ContentType.Standard;
             return input;
         }
-        static Button Button(Transform p,string s,UnityEngine.Events.UnityAction click,float w=250,float h=44,Color? color=null){var b=new GameObject(s,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement),typeof(Outline)).GetComponent<Button>();b.transform.SetParent(p,false);b.image.color=color??UiCard;Round(b.image);var le=b.GetComponent<LayoutElement>();le.preferredWidth=w;le.preferredHeight=h;var colors=b.colors;colors.normalColor=Color.white;colors.highlightedColor=new Color(1.08f,1.08f,1.08f,1);colors.pressedColor=new Color(.82f,.86f,.92f,1);colors.selectedColor=Color.white;colors.fadeDuration=.10f;b.colors=colors;var o=b.GetComponent<Outline>();o.effectColor=UiBorder;o.effectDistance=new Vector2(1,-1);var t=Label(b.transform,s,17,h);t.rectTransform.anchorMin=Vector2.zero;t.rectTransform.anchorMax=Vector2.one;t.rectTransform.offsetMin=t.rectTransform.offsetMax=Vector2.zero;b.onClick.AddListener(click);return b;}
+        static Button Button(Transform p,string s,UnityEngine.Events.UnityAction click,float w=250,float h=44,Color? color=null){var b=new GameObject(s,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement),typeof(Outline)).GetComponent<Button>();b.transform.SetParent(p,false);KitSkin(b.image,(color.HasValue&&(color.Value==UiCardSelected||color.Value==UiAccent))?Festa.World.UI.UiSprite.ButtonOrange:Festa.World.UI.UiSprite.ButtonNavy);var le=b.GetComponent<LayoutElement>();le.preferredWidth=w;le.preferredHeight=h;var colors=b.colors;colors.normalColor=Color.white;colors.highlightedColor=new Color(1.08f,1.08f,1.08f,1);colors.pressedColor=new Color(.82f,.86f,.92f,1);colors.selectedColor=Color.white;colors.fadeDuration=.10f;b.colors=colors;var o=b.GetComponent<Outline>();o.effectColor=UiBorder;o.effectDistance=new Vector2(1,-1);var t=Label(b.transform,s,17,h);t.rectTransform.anchorMin=Vector2.zero;t.rectTransform.anchorMax=Vector2.one;t.rectTransform.offsetMin=t.rectTransform.offsetMax=Vector2.zero;b.onClick.AddListener(click);return b;}
         static Button CategoryButton(Transform parent,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float width,float height,bool selected)
         {
             var root=new GameObject(label,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement)).GetComponent<Button>();root.transform.SetParent(parent,false);root.image.color=Color.clear;
@@ -1086,6 +1086,8 @@ namespace Festa.Avatar
             s_roundedSprite=Sprite.Create(texture,new Rect(0,0,size,size),new Vector2(.5f,.5f),100f,0,SpriteMeshType.FullRect,new Vector4(16,16,16,16));s_roundedSprite.name="Runtime Rounded UI Sprite";return s_roundedSprite;
         }
         static void Round(Image image){if(!image)return;image.sprite=RoundedSprite();image.type=Image.Type.Sliced;}
+        /// <summary>2D Game UI Kit 조각으로 입힌다 (2026-09-06 UI 킷 적용). 테마가 없으면 기존 둥근 사각형으로.</summary>
+        static void KitSkin(Image image,Festa.World.UI.UiSprite id){if(!image)return;var theme=Festa.World.UI.FestaUiTheme.Instance;var sp=theme?theme.Get(id):null;if(sp==null){Round(image);return;}image.sprite=sp;image.type=Image.Type.Sliced;image.pixelsPerUnitMultiplier=1.6f;image.color=Color.white;}
         /// <summary>
         /// 목록 카드 하나. <paramref name="locked"/> 면 <b>흐리게 + 잠김 표시</b>로 그린다.
         ///
@@ -1096,7 +1098,7 @@ namespace Festa.Avatar
         static Button ImageButton(Transform p,string label,Sprite sprite,UnityEngine.Events.UnityAction click,float w,float h,bool selected=false,Color? swatch=null,bool locked=false)
         {
             var b=new GameObject(string.IsNullOrEmpty(label)?"Preview":label,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement),typeof(Outline)).GetComponent<Button>();b.transform.SetParent(p,false);
-            b.image.color=selected?UiCardSelected:UiCard;Round(b.image);var le=b.GetComponent<LayoutElement>();le.preferredWidth=w;le.preferredHeight=h;
+            KitSkin(b.image,selected?Festa.World.UI.UiSprite.ButtonOrange:Festa.World.UI.UiSprite.FrameDarkSquare);var le=b.GetComponent<LayoutElement>();le.preferredWidth=w;le.preferredHeight=h;
             var o=b.GetComponent<Outline>();o.effectColor=selected?UiAccent:UiBorder;o.effectDistance=selected?new Vector2(2,-2):new Vector2(1,-1);
             if(sprite)
             {
@@ -1149,7 +1151,7 @@ namespace Festa.Avatar
         static Button ColorRow(Transform p,string label,Color swatch,UnityEngine.Events.UnityAction click,bool selected)
         {
             var b=new GameObject(label,typeof(RectTransform),typeof(Image),typeof(Button),typeof(LayoutElement),typeof(Outline)).GetComponent<Button>();b.transform.SetParent(p,false);b.image.color=selected?new Color(.24f,.18f,.07f,.98f):new Color(.025f,.045f,.07f,.98f);var le=b.GetComponent<LayoutElement>();le.preferredHeight=35;le.minHeight=33;
-            b.image.color=selected?UiCardSelected:UiCard;Round(b.image);var outline=b.GetComponent<Outline>();outline.effectColor=selected?UiAccent:UiBorder;outline.effectDistance=selected?new Vector2(2,-2):new Vector2(1,-1);
+            KitSkin(b.image,selected?Festa.World.UI.UiSprite.ButtonOrange:Festa.World.UI.UiSprite.FrameDarkSquare);var outline=b.GetComponent<Outline>();outline.effectColor=selected?UiAccent:UiBorder;outline.effectDistance=selected?new Vector2(2,-2):new Vector2(1,-1);
             le.preferredHeight=42;le.minHeight=42;
             var marker=new GameObject(label+" Marker",typeof(RectTransform),typeof(Image),typeof(Outline)).GetComponent<Image>();marker.transform.SetParent(b.transform,false);marker.rectTransform.anchorMin=marker.rectTransform.anchorMax=new Vector2(.075f,.5f);marker.rectTransform.pivot=new Vector2(.5f,.5f);marker.rectTransform.sizeDelta=new Vector2(18,18);marker.sprite=CircleSprite();marker.color=GlyphColor(label);marker.raycastTarget=false;var markerOutline=marker.GetComponent<Outline>();markerOutline.effectColor=new Color(.03f,.035f,.045f,.9f);markerOutline.effectDistance=new Vector2(1,-1);
             var text=Label(b.transform,label,17,42);Anchor(text.rectTransform,new Vector2(.125f,0),new Vector2(.76f,1));text.alignment=TextAnchor.MiddleLeft;text.color=UiText;

@@ -15,6 +15,8 @@ namespace Festa.Booth
         LikeVote,
         Furniture,
         Decoration,
+        /// <summary>Game Studio 게임 포털(게임기). configId = Portal Binding 공개 ID (spec 019).</summary>
+        GamePortal,
     }
 
     public static class BoothObjectTypes
@@ -32,6 +34,7 @@ namespace Festa.Booth
             { "LIKE_VOTE", BoothObjectType.LikeVote },
             { "FURNITURE", BoothObjectType.Furniture },
             { "DECORATION", BoothObjectType.Decoration },
+            { "GAME_PORTAL", BoothObjectType.GamePortal },
             { "SURVEY", BoothObjectType.SurveyKiosk },
             { "CONSULT_DESK", BoothObjectType.ConsultationDesk },
         };
