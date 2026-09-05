@@ -71,7 +71,8 @@ namespace Festa.Minigame.Slot
                 Balance = wallet.balance;
                 BalanceNote = null;
                 // 체험판(Mock 판정)이라도 시작 잔액은 실제 지갑과 맞춰 보여 준다.
-                if (_slot is MockSlotMachineClient mock) mock.SeedBalance(wallet.balance);
+                if (_slot is IBalanceSeedable seedable) seedable.SeedBalance(wallet.balance);
+                else if (_slot is MockSlotMachineClient mock) mock.SeedBalance(wallet.balance);
             }
             else
             {
@@ -81,6 +82,26 @@ namespace Festa.Minigame.Slot
 
             Current = Phase.Ready;
             Changed?.Invoke();
+        }
+
+        /// <summary>서버 거절 사유 → 사용자 문구. 실서버(HttpSlotMachineClient) 오류 코드와 Mock 코드를 함께 다룬다.</summary>
+        string PopupFor(SlotSpinResultDto result)
+        {
+            switch (result?.error)
+            {
+                case "INSUFFICIENT_COIN":
+                    return result.balanceAfter >= 0
+                        ? $"코인이 부족합니다 — 잔액 {result.balanceAfter}, 필요 {Bet}"
+                        : $"코인이 부족합니다 — 필요 {Bet}";
+                case "FORBIDDEN":
+                    return "게스트는 코인을 쓸 수 없어요 — 로그인하면 코인을 받아요";
+                case "UNAUTHORIZED":
+                    return "로그인이 필요해요. 다시 로그인해 주세요.";
+                case "DAILY_LIMIT":
+                    return "오늘은 더 돌릴 수 없어요. 내일 다시 와 주세요.";
+                default:
+                    return "판정을 받지 못했어요. 잠시 후 다시 시도해 주세요.";
+            }
         }
 
         public void DismissPopup()
@@ -117,10 +138,8 @@ namespace Festa.Minigame.Slot
 
             if (result == null || !result.accepted)
             {
-                Popup = result?.error == "INSUFFICIENT_COIN"
-                    ? $"코인이 부족합니다 — 잔액 {result.balanceAfter}, 필요 {Bet}"
-                    : "판정을 받지 못했어요. 잠시 후 다시 시도해 주세요.";
-                if (result != null) Balance = result.balanceAfter;
+                Popup = PopupFor(result);
+                if (result != null && result.balanceAfter >= 0) Balance = result.balanceAfter;
                 Current = Phase.Ready;
                 Changed?.Invoke();
                 return;
