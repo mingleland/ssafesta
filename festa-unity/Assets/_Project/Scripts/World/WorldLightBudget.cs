@@ -32,6 +32,7 @@ namespace Festa.World
             public float BaseIntensity;
             public float Current;   // 현재 멀티플라이어
             public float Target;    // 목표 멀티플라이어
+            public float SortKey;   // 이번 재정렬의 우선순위 키 (절두체 안: 거리², 밖: 거리² + 큰 벌점)
         }
 
         readonly List<Entry> _entries = new();
@@ -87,9 +88,22 @@ namespace Festa.World
             var origin = cam.transform.position;
 
             _entries.RemoveAll(e => e.Light == null);
-            _entries.Sort((a, b) =>
-                (a.Light.transform.position - origin).sqrMagnitude
-                    .CompareTo((b.Light.transform.position - origin).sqrMagnitude));
+
+            // **보이는 광원부터 예산을 쓴다.** 순수 거리순으로 자르면 카메라 뒤·옆의 광원이 예산을 먹어
+            // 정면 벽의 조명이 꺼진 채로 보이고, 걸어가야 켜진다 — "한 화면 안인데 저쪽만 어둡다"
+            // (2026-09-05 사용자 테스트). WebGL 32개 캡은 **절두체 안 광원** 수에 걸리므로 절두체 밖은
+            // 애초에 캡을 소모하지 않는다. 그래서 절두체 안을 먼저(거리순), 밖은 뒤로 보낸다.
+            // 판정은 광원 범위 구를 감싸는 AABB 로 한다 — 광원 중심이 화면 밖이어도 빛이 닿는 면은 보일 수 있다.
+            var planes = GeometryUtility.CalculateFrustumPlanes(cam);
+            const float OutsidePenalty = 1e9f;
+            foreach (var e in _entries)
+            {
+                var t = e.Light.transform;
+                float r = e.Light.range;
+                bool inView = GeometryUtility.TestPlanesAABB(planes, new Bounds(t.position, Vector3.one * (r * 2f)));
+                e.SortKey = (t.position - origin).sqrMagnitude + (inView ? 0f : OutsidePenalty);
+            }
+            _entries.Sort((a, b) => a.SortKey.CompareTo(b.SortKey));
 
             for (int i = 0; i < _entries.Count; i++)
             {

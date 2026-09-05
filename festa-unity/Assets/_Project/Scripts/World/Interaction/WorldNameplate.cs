@@ -208,6 +208,23 @@ namespace Festa.World
         /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
         float RawTopY() => _headBone != null ? _headBone.position.y + _headToTop : _topY;
 
+        // 머리 본을 못 잡았으면 주기적으로 다시 시도한다. 첫 측정은 아바타 파츠가 조립되기 전에 돌 수
+        // 있어 Animator 가 아직 없고, 그러면 이름표가 **고정 높이**로 굳어 앉기(SitGround)·마시기 이모트에
+        // 몸이 내려가도 허공에 남는다 (2026-09-05 사용자 테스트). 본이 잡히면 높이도 다시 잰다.
+        int _rebindAttempts;
+        const int RebindEveryFrames = 30, RebindMaxAttempts = 200;   // 약 0.5초 간격, 최대 ~100초
+        void TryRebindHead()
+        {
+            if (_headBone != null || _rebindAttempts >= RebindMaxAttempts) return;
+            if (Time.frameCount % RebindEveryFrames != 0) return;
+            _rebindAttempts++;
+            var animator = GetComponentInChildren<Animator>();
+            if (animator == null || !animator.isHuman) return;
+            var head = animator.GetBoneTransform(HumanBodyBones.Head);
+            if (head == null) return;
+            MeasureTop();   // 파츠가 다 붙은 지금 기준으로 정점·머리 오프셋을 다시 잰다
+        }
+
         /// <summary>
         /// 머리 높이를 <b>부드럽게</b> 따라간다.
         ///
@@ -239,6 +256,7 @@ namespace Festa.World
         {
             if (_text == null) return;
             if (!_measured) MeasureTop();
+            TryRebindHead();
 
             var cam = Camera.main;
             if (cam == null) { if (_renderer != null) _renderer.enabled = false; return; }

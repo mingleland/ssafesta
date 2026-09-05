@@ -228,7 +228,7 @@ MonoBehaviour:
   _minDistance: 11.25
   _maxDistance: 45
   _zoomStep: 1.5
-  _orbitSensitivity: 0.12
+  _orbitSensitivity: 0.25
   _minPitch: -12
   _maxPitch: 65
   _collisionReturnLerp: 5
