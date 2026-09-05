@@ -56,10 +56,21 @@ namespace Festa.Integration
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");
         }
 
-        /// <summary>Bootstrap 없이 씬을 단독 실행할 때의 안전장치.</summary>
+        /// <summary>
+        /// Bootstrap 없이 씬을 단독 실행할 때의 안전장치.
+        ///
+        /// <para><b>여기로 떨어지면 소리를 낸다.</b> 이 폴백은 에디터에서 씬 하나만 띄워 볼 때를
+        /// 위한 것인데, 실제로는 CharacterLobby(빌드 첫 씬)에 GameBootstrap 이 없어서 WebGL 도
+        /// 이 경로로 시작했다 — 로비가 Mock 프로필·Mock 카탈로그로 돌고, main 에 들어가서야
+        /// 실서버로 바뀌었다 (S15P21A604-418). 조용히 Mock 이 되면 아무도 모른다(T-24 와 같은
+        /// 실패 양상). 경고가 아니라 에러로 남겨 콘솔에서 바로 보이게 한다.</para>
+        /// </summary>
         public static void EnsureInitialized()
         {
-            if (Booth == null) Init(true, "", "");
+            if (Booth != null) return;
+            Debug.LogError("[ApiServices] GameBootstrap 없이 시작됐다 — Mock API 로 동작한다. " +
+                           "첫 씬에 @GameBootstrap(ApiConfig) 이 있어야 실서버에 붙는다 (S15P21A604-418).");
+            Init(true, "", "");
         }
     }
 }
