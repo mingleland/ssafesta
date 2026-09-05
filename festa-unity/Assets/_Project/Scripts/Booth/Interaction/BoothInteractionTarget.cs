@@ -111,7 +111,7 @@ namespace Festa.Booth
 
             // **씬에 직접 놓인 대상은 여기서 Interactive 를 켠다.** 전에는 팩토리의 Configure() 만 켰기
             // 때문에 관리 데스크(-414)·Festival_Arcade 처럼 씬에 배치된 대상은 런타임에 Interactive=false 로
-            // 남아 디스패처가 조준·근접 대상에서 제외했다 — F 를 눌러도 아무 일이 없었다(T-122).
+            // 남아 디스패처가 조준·근접 대상에서 제외했다 — F 를 눌러도 아무 일이 없었다(T-123).
             // 판정 기준은 디스패처가 Interact 대상을 고르는 것과 같다: IBoothInteractable 이 자기/부모/자식에 있는가.
             // 팩토리는 이 뒤에 Configure() 로 덮어쓰므로 부스 오브젝트 동작은 바뀌지 않는다.
             if (!Interactive &&
