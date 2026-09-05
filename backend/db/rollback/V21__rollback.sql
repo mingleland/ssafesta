@@ -1,14 +1,14 @@
--- V19 되돌리기 — 적용 후 스키마를 V18 상태로 복구한다 (S15P21A604-397).
+-- V21 되돌리기 — 적용 후 스키마를 V18 상태로 복구한다 (S15P21A604-397).
 --
 -- Flyway Community 에는 undo 가 없다. 이 파일은 손으로 실행하는 스크립트이고, 실행 후
--- flyway_schema_history 에서 V19 행을 지워야 다음 migrate 가 다시 적용한다:
+-- flyway_schema_history 에서 V21 행을 지워야 다음 migrate 가 다시 적용한다:
 --
---   psql "$DATABASE_URL" -f backend/db/rollback/V19__rollback.sql
---   psql "$DATABASE_URL" -c "DELETE FROM flyway_schema_history WHERE version = '19'"
+--   psql "$DATABASE_URL" -f backend/db/rollback/V21__rollback.sql
+--   psql "$DATABASE_URL" -c "DELETE FROM flyway_schema_history WHERE version = '21'"
 --
 -- ⚠️ 되돌리면 Job·staging 행이 사라진다. 처리 중이던 문서는 이력 없이 사라지고,
 -- searchable 로 나간 청크의 출처(job_id)도 함께 없어진다. 청크 본문과 임베딩은 남는다.
--- V19 가 metadata 컬럼을 드롭했으므로 그 값은 복구되지 않는다 — 애초에 쓰는 코드가 없어
+-- V21 가 metadata 컬럼을 드롭했으므로 그 값은 복구되지 않는다 — 애초에 쓰는 코드가 없어
 -- 비어 있었다는 전제 위에 있다.
 
 BEGIN;

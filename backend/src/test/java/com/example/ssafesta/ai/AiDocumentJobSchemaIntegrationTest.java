@@ -23,11 +23,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * V19 가 실제로 보장해야 하는 것 (S15P21A604-397, GitLab #119).
+ * V21 가 실제로 보장해야 하는 것 (S15P21A604-397, GitLab #119).
  *
  * <p>컬럼이 생겼는지가 아니라 <b>삭제가 뚫리는지</b>를 본다. AI 파트 초안 그대로 적용했다면
  * 문서 삭제와 회원 탈퇴가 FK 에서 막혔을 자리다 — 청크 FK 가 NO ACTION 이라 문서를 잡고,
- * Job 과 staging 이 생기면 탈퇴 경로에 삭제가 빠진다. 그 셋을 확정해 반영한 것이 V19 이고
+ * Job 과 staging 이 생기면 탈퇴 경로에 삭제가 빠진다. 그 셋을 확정해 반영한 것이 V21 이고
  * 이 테스트가 그 확정을 고정한다.
  */
 @Import(TestcontainersConfiguration.class)
