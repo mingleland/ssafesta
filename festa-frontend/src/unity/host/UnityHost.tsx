@@ -1,20 +1,24 @@
 // spec 013a WebGL Host — Unity 인스턴스를 안전하게 생성·종료하고 입장 게이트 신호(#31)·
-// 60초 타임아웃까지만 책임진다. 오버레이 렌더러(OverlayHost)·Interaction Dispatcher·016 E2E는
+// boot watchdog(-426)까지만 책임진다. 오버레이 렌더러(OverlayHost)·Interaction Dispatcher·016 E2E는
 // 범위 밖 — 이 컴포넌트는 그 위에서 동작할 기반이다.
+//
+// 상태 수명주기 (#128 §3): booting(watchdog 감시) → instance 확보 → waiting-gate(타임아웃 없음 — 로비 체류·
+// 입장 게이트 대기는 사용자 시간이다) → ready. 실패는 boot 구간에서만 판정한다. 재시도는 새 boot attempt 로
+// 새 watchdog 을 건다.
 import { useEffect, useRef, useState } from 'react';
 import { initUnityBridge, subscribeWorldGateReady } from '../bridge/events';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { useSession } from '../../features/auth/model/session';
-import { WORLD_GATE_TIMEOUT_MS } from '../../shared/config/unity';
+import { UNITY_BOOT_STALL_TIMEOUT_MS } from '../../shared/config/unity';
 import type { UnityInstance } from './types';
 
-type HostStatus = 'loading' | 'ready' | 'failed';
+type HostStatus = 'booting' | 'waiting-gate' | 'ready' | 'failed';
 
 export function UnityHost() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const instanceRef = useRef<UnityInstance | null>(null);
-  const [status, setStatus] = useState<HostStatus>('loading');
+  const [status, setStatus] = useState<HostStatus>('booting');
   const [progress, setProgress] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [instanceReady, setInstanceReady] = useState(false);
@@ -27,35 +31,54 @@ export function UnityHost() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    setStatus('loading');
+    setStatus('booting');
     setProgress(0);
     setInstanceReady(false);
     instanceRef.current = null;
 
+    // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
+    // 인스턴스가 서면 해제한다. 이 타이머는 boot attempt 의 시간이지 사용자의 페이지 체류 시간이 아니다.
+    let watchdogId: ReturnType<typeof setTimeout> | null = null;
+    const clearWatchdog = () => {
+      if (watchdogId !== null) clearTimeout(watchdogId);
+      watchdogId = null;
+    };
+    const armWatchdog = () => {
+      clearWatchdog();
+      watchdogId = setTimeout(() => {
+        if (!cancelled) setStatus('failed');
+      }, UNITY_BOOT_STALL_TIMEOUT_MS);
+    };
+    armWatchdog();
+
     // 첫 시도는 단순 획득, 재시도는 기존 인스턴스 종료를 기다린 뒤 새로 만든다(B-3).
     const start = attempt === 0 ? acquireUnitySession : restartUnitySession;
     start(canvas, (p) => {
-      if (!cancelled) setProgress(p);
+      if (cancelled) return;
+      setProgress(p);
+      armWatchdog();
     }).then((instance) => {
       if (cancelled) return;
+      clearWatchdog();
       instanceRef.current = instance;
       setInstanceReady(true);
+      // 인스턴스가 섰으면 boot 는 끝이다 — 이후 로비·게이트 대기는 Unity 가 그린다. 게이트 신호가 boot 보다
+      // 먼저 왔다면(mock 로더) ready 를 덮어쓰지 않는다.
+      setStatus((current) => (current === 'ready' ? current : 'waiting-gate'));
     }).catch(() => {
-      if (!cancelled) setStatus('failed');
+      if (cancelled) return;
+      clearWatchdog();
+      setStatus('failed');
     });
 
     const unsubscribe = subscribeWorldGateReady(() => {
       if (!cancelled) setStatus('ready');
     });
 
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) setStatus((current) => (current === 'ready' ? current : 'failed'));
-    }, WORLD_GATE_TIMEOUT_MS);
-
     return () => {
       cancelled = true;
       unsubscribe();
-      clearTimeout(timeoutId);
+      clearWatchdog();
     };
   }, [attempt]);
 
@@ -83,7 +106,7 @@ export function UnityHost() {
   return (
     <div>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%' }} />
-      {status === 'loading' && <p>불러오는 중... {Math.round(progress * 100)}%</p>}
+      {status === 'booting' && <p>불러오는 중... {Math.round(progress * 100)}%</p>}
       {status === 'failed' && (
         <div>
           <p>월드를 불러오지 못했습니다.</p>
