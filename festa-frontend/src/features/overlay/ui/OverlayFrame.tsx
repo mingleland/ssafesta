@@ -21,15 +21,32 @@ interface Props {
 export function OverlayFrame({ title, subtitle, size = 'l', icon, children, footer, status, onClose }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
 
-  // Esc 로 닫는다. 전역 Input Router·Unity Input Lock 은 후속(Game Client Experience) — 여기서는 화면 닫기만.
+  // Esc 로 닫는다. Unity Input Lock 계약(G-8-2)은 Unity 합의 대기 — 여기서는 화면 닫기와 focus 소유권만.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     window.addEventListener('keydown', onKey);
-    frameRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // focus 소유권 (S15P21A604-428, G-8-1). 열릴 때 프레임이 가져가고, 닫힐 때 돌려준다.
+  // 돌려주지 않으면 focus 가 body 에 남고, Unity 6 WebGL 은 키보드 이벤트를 canvas 타깃으로 받으므로
+  // 오버레이를 닫은 뒤 WASD·F 가 월드로 가지 않는다. 월드에서 F 로 연 경우 이전 요소가 곧 canvas 다.
+  useEffect(() => {
+    const previous = document.activeElement;
+    frameRef.current?.focus();
+    return () => {
+      // 이전 요소가 아직 문서에 있고 focus 를 받을 수 있으면 그쪽이 우선 — a11y 기본 동작이다.
+      if (previous instanceof HTMLElement && previous.isConnected && previous !== document.body) {
+        previous.focus();
+        return;
+      }
+      // dev 트리거처럼 body 에서 연 경우엔 돌려줄 곳이 없다 — 월드 화면이면 canvas 로 돌린다.
+      // canvas 가 없는 화면(Game Studio 등)에서는 아무것도 하지 않는다.
+      document.querySelector('canvas')?.focus();
+    };
+  }, []);
 
   return (
     <div className="festa-overlay" role="presentation">
