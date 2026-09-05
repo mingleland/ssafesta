@@ -50,9 +50,10 @@ namespace Festa.World
 
             var kb = Keyboard.current;
             if (kb == null || !kb.fKey.wasPressedThisFrame) return;
-            if (_nearest.destination == null) return;
+            var dest = _nearest.ResolveDestination();
+            if (dest == null) return;
 
-            _movement.TeleportTo(_nearest.destination.position);
+            _movement.TeleportTo(dest.position);
             if (_camera != null) _camera.SnapBehind();   // 카메라가 맵을 가로질러 날아오지 않게
             _lastTeleportTime = Time.time;
         }

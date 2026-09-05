@@ -43,6 +43,45 @@ namespace Festa.World
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
 
+        Transform _resolved;
+        bool _resolveFailed;
+
+        /// <summary>
+        /// 이동 목적지. 직렬화된 <see cref="destination"/> 가 있으면 그것, 없으면 <b>이름 규약으로 런타임 해결</b>한다 (S15P21A604-330).
+        ///
+        /// <para>왜 필요한가 — 외부 포털의 목적지는 <c>@BoothInteriors/Interior_NN/SpawnPoint</c> 로 <c>@Festival</c> 서브트리 밖이라,
+        /// <c>@Festival</c> 을 프리팹으로 빼면 프리팹 에셋 안에서는 그 참조가 null 이 된다(씬 인스턴스 오버라이드로만 살아 있고,
+        /// Revert·재인스턴스화 한 번에 12개가 조용히 끊긴다). 규약: 외부 포털(<c>Portal_Ext_NN</c>) → <c>Interior_NN/SpawnPoint</c>,
+        /// 내부 출구(<c>Portal_Int_NN</c>) → <c>ReturnPoint_NN</c>. 실패하면 로그로 드러낸다 (T-24 원칙).</para>
+        /// </summary>
+        public Transform ResolveDestination()
+        {
+            if (destination != null) return destination;
+            if (_resolved != null) return _resolved;
+            if (_resolveFailed) return null;
+
+            string nn = boothId.ToString("00");
+            bool isInterior = transform.root.name == "@BoothInteriors";
+            if (!isInterior)
+            {
+                var interior = GameObject.Find("Interior_" + nn);
+                if (interior != null) { var sp = interior.transform.Find("SpawnPoint"); if (sp != null) _resolved = sp; }
+            }
+            else
+            {
+                var rp = GameObject.Find("ReturnPoint_" + nn);
+                if (rp != null) _resolved = rp.transform;
+            }
+
+            if (_resolved == null)
+            {
+                _resolveFailed = true;
+                Debug.LogError($"[BoothPortal] {name}(booth {boothId}) 목적지를 해결하지 못했다 — " +
+                               (isInterior ? $"ReturnPoint_{nn}" : $"Interior_{nn}/SpawnPoint") + " 가 씬에 없다. 포털이 동작하지 않는다.", this);
+            }
+            return _resolved;
+        }
+
         /// <summary>
         /// 상대의 <b>시야 안</b>에 있는가.
         ///
