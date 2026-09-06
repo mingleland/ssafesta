@@ -1427,6 +1427,33 @@ Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에
 - **`pageNumber`·`section`은 null일 수 있다.** V21이 nullable이고 계약도 같게 잡았다
 - `originalFilename`은 `ai_documents`에서 조인해 가져온다. `ai_document_jobs`에도 같은 이름의
   컬럼이 있지만 검색 응답은 문서 기준이다
-- **벡터 인덱스에 기대지 않는다.** 이 필터·조인과 함께라면 HNSW는 후필터라 조건에 맞는 chunk가
-  있어도 `topK`보다 적게 돌려줄 수 있다(over-filtering) — 오류 없이 인용이 사라지는 실패라
-  순차 스캔의 정확성을 택했다. 규모가 커지면 `hnsw.iterative_scan` 또는 partial index로 올린다
+- **벡터 인덱스를 쓰지 않는다.** 이 필터·조인과 함께라면 HNSW는 후필터라 조건에 맞는 chunk가
+  있어도 `topK`보다 적게 돌려줄 수 있다(over-filtering) — 오류 없이 인용이 사라지는 실패다.
+  검색 트랜잭션에 `SET LOCAL enable_indexscan = off`를 걸어 **정확 스캔을 강제한다.** HNSW는
+  ordered index scan으로만 닿으므로 그 노드만 막으면 되고, bitmap scan은 남아 있어
+  `ix_ai_document_chunks_scope`와 `ai_documents` PK는 계속 쓰인다.
+  `SET LOCAL`은 statement가 아니라 트랜잭션 끝까지 살기 때문에 **검색이 끝나면 곧바로 원래
+  값으로 되돌린다** — 되돌리지 않으면 같은 트랜잭션의 이후 쿼리가 전부 index scan 없이
+  계획된다. 끄기 전에 `current_setting`으로 읽어 둔 값을 `set_config(..., true)`로 되돌리며,
+  `= DEFAULT`를 쓰지 않는다 — `DEFAULT`는 세션 값으로 되돌리므로 호출자가 같은 트랜잭션에서
+  이미 걸어 둔 `SET LOCAL`을 지워 버린다. 복원이 실패해도 원래 예외를 덮지 않는다(경고 로그만
+  남긴다): 3초 초과로 트랜잭션이 중단된 경우 복원 자체가 불가능하고, 그때는 롤백이 `SET LOCAL`을
+  어차피 되돌린다. 현재 규모에서는 계획기가 어차피 scope 인덱스 + 정렬을 고르므로 이 설정은 보험이다.
+  규모가 커져 느려지면 `hnsw.iterative_scan = strict_order`(pgvector 0.8+)가 후필터 손실을
+  **줄여 주지만 recall을 보장하지는 않는다** — `hnsw.max_scan_tuples`·`scan_mem_multiplier`에서
+  멈추므로 여전히 `topK`보다 적게 올 수 있다. 정확성이 계약인 동안 보장 수단은 이 GUC뿐이다
+- **거리가 `NaN`인 chunk는 응답에서 배제한다.** V21은 `embedding`을 `NOT NULL`로만 두고 영벡터를
+  금지하지 않는데, 값은 FastAPI가 계산해 보낸 것이다. 노름 0인 행과의 코사인 거리는 `NaN`이고,
+  Jackson은 그것을 **문자열** `"NaN"`으로 쓴다 — 오류 없이 `{"distance":"NaN"}`이 200으로 나가고,
+  `number` 타입을 지키는 소비자는 응답 전체를 버린다. 이 필터가 덮는 것은 **노름이 0인 저장
+  벡터**(전부 0인 행과, `float`로 누적하면 0이 되는 행)다. 노름이 `float` 범위를 넘어 `Infinity`가
+  되는 저장 벡터는 거리가 `NaN`으로 떨어질 때만 함께 걸러지고, 유한값이 되면 뜻 없는 거리로 순위에
+  낀다 — **저장 벡터 자체의 검증은 chunk를 쓰는 쪽(S15P21A604-400) 몫이며 이 필터는 그 대체물이
+  아니다**
+- **`queryEmbedding`은 `float32`(`float4`)로 좁혀 저장된다.** 원소별로 `1e300`처럼 double로는
+  유한한 값도 `float4` 범위를 넘으면 400이고, **제곱합이 `float32` 범위를 넘어도 400**이다 —
+  pgvector가 노름을 `float`에 누적하므로 원소가 각자 멀쩡해도 1536개를 더하는 사이에 넘칠 수
+  있다. **노름이 `float32`에서 0이 되는 벡터도 400**이다: 코사인 거리가 노름으로 나누므로 전부 위와
+  같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
+  원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
+  구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다

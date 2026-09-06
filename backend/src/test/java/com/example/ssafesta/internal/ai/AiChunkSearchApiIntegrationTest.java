@@ -4,7 +4,6 @@ import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -15,6 +14,7 @@ import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +26,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * {@code POST /internal/ai/chunk-search} — FastAPI 가 질의 임베딩만 계산해 넘기고 Spring 이 scope 를
@@ -59,6 +61,7 @@ class AiChunkSearchApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private AiChunkSearchRepository chunkSearch;
+    @Autowired private PlatformTransactionManager transactions;
 
     @BeforeEach
     void freeSlots() {
@@ -185,6 +188,28 @@ class AiChunkSearchApiIntegrationTest {
     }
 
     /**
+     * 저장된 영벡터도 배제한다.
+     *
+     * <p>질의 쪽은 서비스가 400 으로 막지만 <b>저장 쪽은 V21 이 금지하지 않는다</b> — embedding 은
+     * NOT NULL 일 뿐이고 값은 FastAPI 가 계산해 보낸 것이다. 노름 0 인 행과의 코사인 거리는
+     * {@code NaN} 이고, Jackson 은 그것을 <b>문자열 {@code "NaN"}</b> 으로 쓴다. 오류가 나지 않는
+     * 것이 문제다 — 계약이 {@code number} 로 선언한 자리에 문자열이 실려
+     * {@code {"distance":"NaN"}} 이 200 으로 나가고, 타입을 지키는 소비자는 응답 전체를 버린다.
+     */
+    @Test
+    @DisplayName("저장된 영벡터 chunk 는 응답에서 배제된다")
+    void aStoredZeroVectorChunkIsExcluded() throws Exception {
+        Scope scope = seedScope("저장영벡터", "READY");
+        insertChunk(scope, 0, "정상 조각", NEAR, true, null, null);
+        insertChunk(scope, 1, "영벡터 조각", vector(DIMENSIONS, "0"), true, null, null);
+
+        mockMvc.perform(search(scope, NEAR, 20))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].content").value("정상 조각"));
+    }
+
+    /**
      * chunk 의 scope 만 보면 뚫리는 자리다 (분석 I5).
      *
      * <p>{@code ai_document_chunks} 의 {@code booth_id}·{@code agent_id} 와 {@code document_id} 사이에
@@ -275,6 +300,68 @@ class AiChunkSearchApiIntegrationTest {
         }
     }
 
+    /**
+     * {@code vector} 는 {@code float4} 다.
+     *
+     * <p>{@code 1e300} 은 double 로는 멀쩡한 유한값이라 유한성 검사만으로는 통과한다 — 그대로
+     * 보내면 pgvector 입력에서 overflow 로 죽어 400 이어야 할 것이 500 이 된다.
+     */
+    @Test
+    @DisplayName("float32 범위를 넘는 값은 거부된다")
+    void valuesOutsideFloat32AreRejected() throws Exception {
+        Scope scope = seedScope("float32", "READY");
+
+        mockMvc.perform(search(scope, vector(DIMENSIONS, "1e300"), 20))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("queryEmbedding"));
+    }
+
+    /**
+     * 원소가 각자 멀쩡해도 노름이 넘칠 수 있다.
+     *
+     * <p>{@code 1e19} 는 {@code float4} 안에 들어가므로 원소별 검사를 통과한다. 그런데 pgvector 는
+     * 노름을 {@code float} 에 누적하고 제곱합이 {@code 1.5e41} 이라 누산기가 {@code Infinity} 가
+     * 된다 — 나눗셈 결과는 {@code NaN} 이거나 아무 뜻 없는 거리다. 원소별 유한성만으로는 코사인
+     * 계산이 안전하지 않다.
+     */
+    @Test
+    @DisplayName("노름이 float32 범위를 넘으면 거부된다")
+    void anEmbeddingWhoseNormOverflowsFloat32IsRejected() throws Exception {
+        Scope scope = seedScope("노름", "READY");
+        String overflowingNorm = "[" + String.join(",", Collections.nCopies(DIMENSIONS, "1e19")) + "]";
+
+        mockMvc.perform(search(scope, overflowingNorm, 20))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("queryEmbedding"));
+    }
+
+    /**
+     * 노름이 0 이면 코사인 거리를 정의할 수 없다.
+     *
+     * <p>{@code <=>} 가 노름으로 나누므로 모든 행의 거리가 {@code NaN} 이 된다. 실패하지 않는다는
+     * 것이 문제다 — 정렬이 임의가 되고, Jackson 은 {@code NaN} 을 <b>문자열</b> {@code "NaN"} 으로
+     * 쓴다. 응답은 깨진 JSON 이 아니라 <b>타입이 틀린 유효한 JSON</b> 이라서 파서가 아니라 계약을
+     * 지키는 소비자 쪽에서 터진다.
+     *
+     * <p>세 값이 같은 상태로 들어간다. {@code 0} 은 그 자체로 0 이고, {@code 1e-50} 은 {@code float4}
+     * 로 좁히는 순간 0 이 된다. {@code 1e-23} 은 <b>정상 float4 원소</b>라 원소별 검사를 통과하는데,
+     * 제곱이 {@code float} 에서 언더플로해 노름 누산기가 0 이 된다 — {@code double} 로 제곱합을 재면
+     * {@code 1.5e-43} 이라 놓치는 구간이고, Postgres 가 나누는 값은 {@code float} 쪽이다.
+     */
+    @Test
+    @DisplayName("노름이 float32 에서 0 이 되는 벡터는 거부된다")
+    void theZeroVectorIsRejected() throws Exception {
+        Scope scope = seedScope("영벡터", "READY");
+
+        for (String element : new String[] {"0", "1e-50", "1e-23"}) {
+            mockMvc.perform(search(scope, vector(DIMENSIONS, element), 20))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("queryEmbedding"));
+        }
+    }
+
     @Test
     @DisplayName("boothId·agentId 는 양수여야 한다")
     void scopeIdentifiersMustBePositive() throws Exception {
@@ -330,6 +417,39 @@ class AiChunkSearchApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(scope, NEAR, 5)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ── 정확 스캔 강제 ───────────────────────────────────────────────────────
+
+    /**
+     * 강제가 검색 이후 쿼리로 새지 않고, <b>호출자가 걸어 둔 값이 그대로 돌아오는지</b> 본다.
+     *
+     * <p>{@code SET LOCAL} 은 statement 가 아니라 트랜잭션 끝까지 산다. 되돌리지 않으면 같은
+     * 트랜잭션의 이후 쿼리가 전부 index scan 없이 계획된다 — 오류 없이 느려지는 종류다.
+     *
+     * <p>되돌리는 방식도 중요하다. 여기서는 호출자가 먼저 {@code off} 를 걸어 둔 상태로 검색을
+     * 부른다. {@code SET LOCAL … = DEFAULT} 로 되돌리면 세션 기본값인 {@code on} 이 되어 호출자의
+     * 선택이 사라지므로, 이 단정이 그 방식을 걸러낸다.
+     */
+    @Test
+    @DisplayName("호출자가 걸어 둔 index scan 설정이 검색 뒤에도 그대로다")
+    void theSearchRestoresWhateverTheCallerHadSet() {
+        Scope scope = seedScope("누출", "READY");
+        insertChunk(scope, 0, "본문", NEAR, true, null, null);
+
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            jdbc.execute("SET LOCAL enable_indexscan = off");
+            String before = indexScanSetting();
+
+            chunkSearch.search(scope.boothId(), scope.agentId(), NEAR, 5);
+
+            assertEquals(before, indexScanSetting(),
+                    "검색이 호출자의 설정을 바꿔 놓았다");
+        });
+    }
+
+    private String indexScanSetting() {
+        return jdbc.queryForObject("SELECT current_setting('enable_indexscan')", String.class);
     }
 
     // ── 타임아웃 ────────────────────────────────────────────────────────────
