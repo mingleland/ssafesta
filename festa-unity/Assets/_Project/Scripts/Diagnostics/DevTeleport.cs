@@ -65,10 +65,57 @@ namespace Festa.Diagnostics
             else
             {
                 if (portal != null) t = portal.facingSource;
-                pos = t.position + t.forward * 20f;   // 1 m ≈ 13.26 유닛
+                // 직원 앞 1.5 m 는 부스 구조물 BoxCollider(FestivalSlot_NN, 7 m 깊이) 안쪽이라 CC 가 아래로 밀려 바닥을 뚫는다
+                // (2026-09-06 클라이언트 모드 실측 — 첫 프레임에 y -17). 앞으로 나가며 겹치는 구조물이 없는 첫 자리에 선다.
+                pos = FirstFreeSpotAlong(t.position, t.forward, target.transform.position.y + 0.2f);
             }
             pos.y = target.transform.position.y + 0.2f;
             Move(pos, objectName);
+        }
+
+        /// <summary>플레이어 좌표를 콘솔에 남긴다 — WebGL 검증에서 이동·입장 결과를 읽는 유일한 창구.</summary>
+        public void LogPosition(string _ = null)
+        {
+            PlayerMovement owner = null;
+            foreach (var pm in FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None))
+                if (pm.IsOwner) { owner = pm; break; }
+            Debug.Log(owner == null ? "[DevTeleport] 로컬 플레이어 없음" : $"[DevTeleport] pos={owner.transform.position:F1} yaw={owner.transform.eulerAngles.y:F0}");
+        }
+
+        static readonly Collider[] s_overlap = new Collider[16];
+
+        /// <summary>origin 에서 forward 로 1.2 m 부터 6 m 까지 0.25 m 씩 나가며, 플레이어 캡슐이 바닥 외의 콜라이더와 겹치지 않는 첫 자리.</summary>
+        static Vector3 FirstFreeSpotAlong(Vector3 origin, Vector3 forward, float footY)
+        {
+            forward.y = 0f; forward.Normalize();
+            const float M = 13.26f;
+            System.Func<Vector3, bool> blockedAt = (p) =>
+            {
+                // 플레이어 CC: 높이 16.9, 반지름 2.75 (center y 8.44)
+                var a = p + Vector3.up * (8.44f - (16.88f / 2f - 2.75f)); var b = p + Vector3.up * (8.44f + (16.88f / 2f - 2.75f));
+                int n = Physics.OverlapCapsuleNonAlloc(a, b, 2.75f + 0.05f, s_overlap);
+                for (int i = 0; i < n; i++)
+                {
+                    var c = s_overlap[i];
+                    if (c.isTrigger || c.bounds.size.y < 1f * M) continue;   // 바닥판은 얇다
+                    if (c.GetComponentInParent<PlayerMovement>() != null) continue;
+                    return true;
+                }
+                return false;
+            };
+            for (float d = 1.2f; d <= 6f; d += 0.25f)
+            {
+                var p = origin + forward * (d * M); p.y = footY;
+                if (blockedAt(p)) continue;
+                // 빈 자리를 찾았으면 구조물에 닿을 때까지 되돌아와 **가장 가까운** 빈 자리에 선다 — 상호작용 반경(직원 기준 3.1 m) 안에 들어야 한다.
+                float dd = d;
+                while (dd - 0.05f >= 0.5f) { var q = origin + forward * ((dd - 0.05f) * M); q.y = footY; if (blockedAt(q)) break; dd -= 0.05f; }
+                var best = origin + forward * (dd * M); best.y = footY;
+                return best;
+            }
+            var fallback = origin + forward * (6f * M); fallback.y = footY;
+            Debug.LogWarning("[DevTeleport] 6 m 안에 빈 자리가 없다 — 6 m 지점으로");
+            return fallback;
         }
 
         static void Move(Vector3 pos, string what)
