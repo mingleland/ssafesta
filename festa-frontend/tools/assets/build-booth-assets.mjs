@@ -23,7 +23,8 @@ import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import { BOOTH_ASSETS, UNITY_ASSET_ROOT } from './booth-assets.config.mjs';
+import { BOOTH_ASSETS, UNITY_ASSET_ROOT, UNITY_ASSETS_ROOT, UNITY_PREFAB_ROOT } from './booth-assets.config.mjs';
+import { buildGuidIndex, loadPrefab } from './unity-prefab.mjs';
 
 // GLTFExporter 의 binary 경로가 Blob→ArrayBuffer 에 FileReader 를 쓴다. Node 에는 없다.
 if (typeof globalThis.FileReader === 'undefined') {
@@ -41,11 +42,23 @@ const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '../..');
 const outDir = resolve(projectRoot, 'public/assets/booth');
 
-/** FBX 안의 텍스처 참조를 무시한다 — 없는 파일을 찾다가 파싱이 통째로 죽는다(Tablet.FBX 사례) */
+/**
+ * FBX 안의 텍스처 참조를 빈 텍스처로 받아 넘긴다.
+ *
+ * 텍스처는 이번 범위가 아니지만, 없다고 무시할 수는 없다 — FBXLoader 가 참조를 만나면
+ * 로더를 찾아 setPath 까지 부르기 때문에 평범한 객체를 주면 파싱이 통째로 죽는다(Tablet.FBX).
+ * 그래서 Loader 흉내를 제대로 내는 것을 준다.
+ */
+class NullTextureLoader extends THREE.Loader {
+  load(_url, onLoad) {
+    const texture = new THREE.Texture();
+    onLoad?.(texture);
+    return texture;
+  }
+}
+
 function silenceTextures(manager) {
-  manager.addHandler(/\.(png|jpe?g|tga|psd|bmp|dds)$/i, {
-    load: () => new THREE.Texture(),
-  });
+  manager.addHandler(/\.(png|jpe?g|tga|psd|bmp|dds|tif|tiff)$/i, new NullTextureLoader(manager));
 }
 
 function loadFbx(absPath) {
@@ -68,9 +81,29 @@ function boundsOf(object3d) {
 const round = (n) => Number(n.toFixed(4));
 const roundAll = (b) => ({ min: b.min.map(round), max: b.max.map(round) });
 
+// guid 역인덱스는 한 번만 만든다 — Assets 전 트리를 훑는 일이라 두 번 할 이유가 없다
+let guidIndex = null;
+const warnings = [];
+const warn = (message) => {
+  warnings.push(message);
+  console.warn(`  ! ${message}`);
+};
+
+function sourceObject(source) {
+  if (source.kind === 'prefab') {
+    guidIndex ??= buildGuidIndex(resolve(projectRoot, UNITY_ASSETS_ROOT));
+    return loadPrefab(resolve(projectRoot, UNITY_PREFAB_ROOT, source.prefab), {
+      guidIndex,
+      unitScale: source.unitScale,
+      loadFbx,
+      warn,
+    });
+  }
+  return loadFbx(resolve(projectRoot, UNITY_ASSET_ROOT, source.fbx));
+}
+
 function convert(source) {
-  const fbxPath = resolve(projectRoot, UNITY_ASSET_ROOT, source.fbx);
-  const raw = loadFbx(fbxPath);
+  const raw = sourceObject(source);
   const rawBounds = boundsOf(raw);
 
   // 텍스처를 안 가져오므로 재질도 원본을 쓸 이유가 없다. 색은 런타임이 계약 표에서 준다.
@@ -87,7 +120,9 @@ function convert(source) {
   const inner = new THREE.Group();
   inner.add(raw);
   if (source.upAxis === 'zUp') inner.rotation.x = -Math.PI / 2;
-  inner.scale.setScalar(source.unitScale);
+  // prefab 은 Transform 이 이미 미터로 되어 있고 메시 스케일은 로더가 각 메시에 걸었다.
+  // 여기서 또 곱하면 두 번 줄어든다 — 단일 FBX 만 여기서 단위를 맞춘다.
+  if (source.kind !== 'prefab') inner.scale.setScalar(source.unitScale);
   root.add(inner);
 
   // 피벗 — 바닥 중앙. 계약(헌법 21조)이 원점을 바닥 중앙으로 못박고 있고, 편집기의 이동·회전이
@@ -97,7 +132,7 @@ function convert(source) {
   const cz = (fitted.min[2] + fitted.max[2]) / 2;
   inner.position.set(-cx, -fitted.min[1], -cz);
 
-  return { root, rawBounds, normalizedBounds: boundsOf(root), triangles: Math.round(triangles), fbxPath };
+  return { root, rawBounds, normalizedBounds: boundsOf(root), triangles: Math.round(triangles) };
 }
 
 async function main() {
@@ -121,7 +156,8 @@ async function main() {
       /** 정규화 후 실측 bbox(m). 런타임이 계약 AABB 와 대조해 어긋나면 드러낸다 */
       bounds: roundAll(normalizedBounds),
       source: {
-        fbx: source.fbx,
+        kind: source.kind,
+        fbx: source.fbx ?? source.prefab,
         unitScale: source.unitScale,
         upAxis: source.upAxis,
         rawBounds: roundAll(rawBounds),
@@ -144,6 +180,7 @@ async function main() {
   };
   writeFileSync(resolve(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`\nmanifest: ${resolve(outDir, 'manifest.json')} (${entries.length} assets)`);
+  if (warnings.length > 0) console.log(`경고 ${warnings.length}건 — 위 목록 참조`);
 }
 
 await main();
