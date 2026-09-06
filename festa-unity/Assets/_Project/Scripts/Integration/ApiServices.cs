@@ -21,13 +21,27 @@ namespace Festa.Integration
 
         public static bool IsMock { get; private set; }
 
-        /// <summary>ApiConfig(SO) 기반 초기화 — 권장 경로.</summary>
+        /// <summary>
+        /// ApiConfig(SO) 기반 초기화 — 권장 경로.
+        ///
+        /// <para>호스트가 <c>window.__FESTA_CONFIG__.apiBaseUrl</c> 를 주입했으면 그 값이 **빌드 타임 값을 이긴다**
+        /// (S15P21A604-459). 같은 릴리스 산출물을 local·dev·demo 에 그대로 올리기 위해서다 — FE 가 이미 같은 값으로
+        /// 자기 API base 를 정한다. Mock 모드에서는 무시한다(네트워크를 쓰지 않는다).</para>
+        /// </summary>
         public static void Init(ApiConfig config)
         {
             var entry = config != null ? config.Active : null;
-            Init(config == null || config.useMockApi,
-                 entry?.springBaseUrl ?? "",
-                 entry?.aiBaseUrl ?? "");
+            bool useMock = config == null || config.useMockApi;
+            var spring = entry?.springBaseUrl ?? "";
+
+            var injected = useMock ? null : HostRuntimeConfig.ApiBaseUrl;
+            if (!string.IsNullOrEmpty(injected) && injected != spring)
+            {
+                Debug.Log($"[ApiServices] 호스트 주입 apiBaseUrl 사용 — 빌드 타임 '{spring}' → '{injected}'");
+                spring = injected;
+            }
+
+            Init(useMock, spring, entry?.aiBaseUrl ?? "");
         }
 
         public static void Init(bool useMock, string springBaseUrl, string aiBaseUrl)

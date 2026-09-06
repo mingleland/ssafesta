@@ -1,9 +1,9 @@
 # 배포 환경의 월드 접속 주소와 전용 connection token Secret을 Spring에 주입한다.
 app:
   world:
-    scheme: wss
-    host: world.${ROOT_DOMAIN}
-    port: 443
+    scheme: ${WORLD_SCHEME:wss}
+    host: ${WORLD_HOST:world.${ROOT_DOMAIN}}
+    port: ${WORLD_PORT:443}
     connection-token-secret: ${CONNECTION_TOKEN_SECRET}
 
 # Redis 는 ACL 로 dev_back·dev_ai·demo_back·demo_ai 를 나누고 default 사용자를 끈다

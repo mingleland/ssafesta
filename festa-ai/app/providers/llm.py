@@ -23,6 +23,11 @@ class LLMRequest:
     """Provider와 무관한 하나의 LLM 생성 요청이다."""
 
     messages: tuple[LLMMessage, ...]
+    max_output_tokens: int = 400
+
+    def __post_init__(self) -> None:
+        if self.max_output_tokens <= 0:
+            raise ValueError("max_output_tokens must be greater than zero")
 
 
 @dataclass(frozen=True, slots=True)

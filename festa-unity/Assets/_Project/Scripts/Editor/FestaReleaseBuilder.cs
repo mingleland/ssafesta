@@ -401,16 +401,73 @@ namespace Festa.EditorTools
         static bool VerifyRenderPipelineAssetsPacked(BuildReport report)
         {
             const string required = "Mobile_RPAsset";
+
+            int entries = 0;
             foreach (var packed in report.packedAssets)
                 foreach (var info in packed.contents)
+                {
+                    entries++;
                     if (info.sourceAssetPath != null && info.sourceAssetPath.Contains(required))
                         return true;
+                }
+
+            // **리포트가 비어 있는 것은 "에셋이 없다" 가 아니다.** 증분 빌드에서 Unity 가 데이터를 다시
+            // 패킹하지 않으면 packedAssets 가 통째로 비어 온다. 그걸 실패로 단정해서 2026-09-06 에
+            // 정상 산출물을 세 번 연속 반려했다 (T-126). 실제로 압축 전 산출물 안에는 들어 있었다.
+            // 그래서 리포트가 비었을 때만 산출물을 직접 뒤져 한 번 더 본다 — 확인 경로를 로그에 남긴다.
+            if (entries == 0 && StagedPlayerDataContains(required))
+            {
+                Debug.LogWarning(
+                    $"[Release] 빌드 리포트에 패킹 목록이 없다(증분 빌드) — 압축 전 산출물에서 {required} 를 직접 확인했다. 통과시킨다.");
+                return true;
+            }
 
             Debug.LogError(
                 $"[Release] {required} 가 빌드 산출물에 없다 — 이대로 배포하면 월드가 평평하게 렌더링된다.\n" +
-                "WebGL 기본 품질 레벨은 0(Mobile) 이고 그 레벨의 렌더 파이프라인이 이 에셋이다.\n" +
+                $"리포트 패킹 항목 {entries}건. WebGL 기본 품질 레벨은 0(Mobile) 이고 그 레벨의 렌더 파이프라인이 이 에셋이다.\n" +
                 "원인은 대개 빌드 시작 시점의 활성 타깃이 WebGL 이 아닌 것이다 (S15P21A604-316).");
             return false;
+        }
+
+        /// <summary>
+        /// 압축 전 WebGL 플레이어 데이터에서 이름 문자열을 찾는다 (리포트가 빈 증분 빌드용 2차 확인).
+        /// 200 MB 를 통째로 올리지 않고 겹치는 버퍼로 흘려 읽는다. 파일이 없으면 <c>false</c> — 확인 못 한 것은 통과가 아니다.
+        /// </summary>
+        static bool StagedPlayerDataContains(string needle)
+        {
+            var staged = Path.Combine(ProjectRoot(), "Library/Bee/artifacts/WebGL/webgl.data");
+            try
+            {
+                if (!File.Exists(staged))
+                {
+                    Debug.LogWarning($"[Release] 압축 전 산출물을 찾지 못했다 ({staged}) — 2차 확인 생략.");
+                    return false;
+                }
+
+                var pattern = Encoding.ASCII.GetBytes(needle);
+                using var fs = File.OpenRead(staged);
+                var buffer = new byte[1 << 20];
+                int carry = 0;
+                while (true)
+                {
+                    int read = fs.Read(buffer, carry, buffer.Length - carry);
+                    if (read <= 0) return false;
+                    int len = carry + read;
+                    for (int i = 0; i + pattern.Length <= len; i++)
+                    {
+                        int j = 0;
+                        while (j < pattern.Length && buffer[i + j] == pattern[j]) j++;
+                        if (j == pattern.Length) return true;
+                    }
+                    carry = Math.Min(pattern.Length - 1, len);
+                    Array.Copy(buffer, len - carry, buffer, 0, carry);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Release] 압축 전 산출물 스캔 실패: {ex.Message}");
+                return false;
+            }
         }
 
         static bool Succeeded(string what, BuildReport report)

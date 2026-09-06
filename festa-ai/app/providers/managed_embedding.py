@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import logging
+import time
 from collections.abc import Sequence
 from urllib.parse import urljoin
 
@@ -10,6 +12,9 @@ import httpx
 from pydantic import SecretStr
 
 from app.providers.embedding import EmbeddingBatch, EmbeddingVector
+
+
+logger = logging.getLogger(__name__)
 
 
 class ManagedEmbeddingError(RuntimeError):
@@ -60,8 +65,15 @@ class ManagedEmbeddingProvider:
         if not normalized_texts:
             return EmbeddingBatch(model_id=self.model_id, vectors=())
 
+        started = time.perf_counter()
         response_data = await self._request_embeddings(normalized_texts)
         vectors = self._parse_vectors(response_data, expected_count=len(normalized_texts))
+        logger.info(
+            "gms_embedding_usage model_id=%s request_count=1 input_count=%d elapsed_ms=%s",
+            self.model_id,
+            len(normalized_texts),
+            round((time.perf_counter() - started) * 1_000, 2),
+        )
         return EmbeddingBatch(model_id=self.model_id, vectors=vectors)
 
     async def aclose(self) -> None:
