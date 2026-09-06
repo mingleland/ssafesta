@@ -44,6 +44,11 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** 훅 밖에서 이 store 의 변화를 듣는 길 — worldScreen 이 두 store 를 합쳐 구독할 때 쓴다 */
+export function subscribeGameClientUi(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
 export function getGameClientUiSnapshot(): GameClientUiState {
   return state;
 }
