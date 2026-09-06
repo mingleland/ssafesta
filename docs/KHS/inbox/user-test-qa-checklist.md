@@ -26,7 +26,7 @@
 | 5 | A·B 상호 표시·이동 동기화 (MP-01~04) | Game | 서로 보이고 닉네임·걷기/뛰기 애니메이션 일치, 지연 체감 없음 | 09-06 -79 2클라 ✅ | | |
 | 6 | 부스 임대 — 티켓 부스 창구 NPC `F` → 관리 오버레이 | Game·FE·BE | 근접 프롬프트 `F · 내 부스 관리`, 대화 카메라, `WORLD_MANAGEMENT_INTERACT` → FE 오버레이. 오버레이 중 WASD 정지, 닫으면 재개 | Unity 09-06 ✅ / FE 잠금 배선 #132 대기 | | |
 | 7 | Studio 배치 → Publish | FE·BE | published rev 증가 | 09-06 API 로 rev 6 ✅ | | |
-| 8 | B 가 A 부스 외부 슬롯 포털 `F` → 내부 | Game | 문 안쪽에 스폰해 부스(6×6 m 셸)를 바라봄, Published 오브젝트(AI 도우미 캐릭터·패널·키오스크·노트북) 셸 안에 겹침 없이, 밝음(휘도 0.4), 뒤돌면 문틀·EXIT 사인 | 09-06 v3 에디터 ✅(-445) / WebGL 체크리스트 #10 | | |
+| 8 | B 가 A 부스 외부 슬롯 포털 `F` → 내부 | Game | 문 안쪽에 스폰해 부스(6×6 m 셸)를 바라봄, Published 오브젝트(AI 도우미 캐릭터·패널·키오스크·노트북) 셸 안에 겹침 없이, 밝음(휘도 0.4), 뒤돌면 문틀·EXIT 사인 | 09-06 v3 에디터 ✅(-445) · 에디터 **클라이언트 모드**(Docker 서버) F 입장 ✅ · 게시 v10 좌표 반영 ✅ / WebGL 시각 확인 체크리스트 #10 | | |
 | 9 | 프로젝트 패널 `F` | Game·FE | 초점 카메라 → `BOOTH_PROJECT_INTERACT` → 프로젝트 오버레이 | Unity ✅ / FE 09-04 | | |
 | 10 | AI NPC `F` → RAG 상담 | Game·FE·AI | 초점 카메라 → `BOOTH_AI_INTERACT {configId}` → 스트리밍 답변 | Unity ✅ / AI 답변은 AI 파트 | | |
 | 11 | 설문 키오스크 `F` → 설문 → 제출 | Game·FE·BE | `BOOTH_SURVEY_INTERACT` → 설문 오버레이. **BE Survey API 없음 → 제출은 mock 고지** | Unity 09-06 ✅ / BE #133 | | |
