@@ -73,12 +73,25 @@ type WorldLoadStartListener = () => void;
 
 const worldLoadStartListeners = new Set<WorldLoadStartListener>();
 
+// 월드 접속 상태 (S15P21A604-432, #131). Unity 가 끊김 감지·재접속·포기까지 스스로 하고 그 상태만 밀어 준다 —
+// FE 는 표시와 복구 동선만 맡고 재시도 타이머·소켓 재연결을 다시 구현하지 않는다(중복 lifecycle 금지).
+//
+// detail 의 의미가 state 마다 다르다(Unity WorldReconnector.cs 실물 기준):
+//   'reconnecting' → 시도 회차 문자열("1".."5"). 회차 상한은 Unity 가 정하므로 FE 가 개수를 가정하지 않는다
+//   그 밖         → 서버 사유 문자열. 빈 문자열은 무응답이고, 목록에 없는 값이 올 수 있다(fallback 필수)
+export type WorldConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
+
+type WorldConnectionStateListener = (state: WorldConnectionState, detail: string) => void;
+
+const worldConnectionStateListeners = new Set<WorldConnectionStateListener>();
+
 declare global {
   interface Window {
     FestaUnity?: {
       onBoothInteract?: (json: string) => void;
       onWorldGateReady?: () => void;
       onWorldLoadStart?: () => void;
+      onWorldConnectionState?: (state: string, detail: string) => void;
     };
   }
 }
@@ -109,6 +122,26 @@ export function initUnityBridge(): void {
   window.FestaUnity.onWorldLoadStart = () => {
     for (const listener of worldLoadStartListeners) listener();
   };
+  window.FestaUnity.onWorldConnectionState = (state: string, detail: string) => {
+    // Unity 가 보낸 문자열을 그대로 신뢰하지 않는다 — 계약 밖 값이 오면 무시하고 로그로 드러낸다(T-24 정신)
+    if (!isWorldConnectionState(state)) {
+      console.error('[unity-bridge] 알 수 없는 onWorldConnectionState state', state, detail);
+      return;
+    }
+    for (const listener of worldConnectionStateListeners) {
+      try {
+        listener(state, detail ?? '');
+      } catch (err) {
+        console.error('[unity-bridge] onWorldConnectionState listener 오류', err);
+      }
+    }
+  };
+}
+
+const WORLD_CONNECTION_STATES: readonly string[] = ['connected', 'disconnected', 'reconnecting', 'failed'];
+
+function isWorldConnectionState(value: string): value is WorldConnectionState {
+  return WORLD_CONNECTION_STATES.includes(value);
 }
 
 export function subscribeBoothInteract(listener: BoothInteractListener): () => void {
@@ -129,6 +162,13 @@ export function subscribeWorldLoadStart(listener: WorldLoadStartListener): () =>
   worldLoadStartListeners.add(listener);
   return () => {
     worldLoadStartListeners.delete(listener);
+  };
+}
+
+export function subscribeWorldConnectionState(listener: WorldConnectionStateListener): () => void {
+  worldConnectionStateListeners.add(listener);
+  return () => {
+    worldConnectionStateListeners.delete(listener);
   };
 }
 
