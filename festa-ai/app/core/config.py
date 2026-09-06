@@ -63,6 +63,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "embedding_api_key",
+        "gms_api_key",
         mode="before",
     )
     @classmethod
@@ -133,6 +134,29 @@ class Settings(BaseSettings):
             return "/v1/embeddings"
         return value
 
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def _blank_llm_provider_to_default(cls, value: object) -> object:
+        return "mock" if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("llm_api_base_url", mode="before")
+    @classmethod
+    def _blank_llm_url_to_gms_default(cls, value: object) -> object:
+        return (
+            "https://gms.ssafy.io/gmsapi/api.openai.com"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
+    @field_validator("llm_api_path", mode="before")
+    @classmethod
+    def _blank_llm_api_path_to_default(cls, value: object) -> object:
+        return (
+            "/v1/chat/completions"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
     # Embedding provider — spec 007 FR-009 / 헌법 18조
     embedding_dimension: int = 1536
     embedding_model_id: str = "text-embedding-3-large"
@@ -148,6 +172,12 @@ class Settings(BaseSettings):
     rag_tokenizer_encoding: str = Field(default="cl100k_base", min_length=1)
     llm_model_id: str = Field(default="gpt-4.1-mini", min_length=1)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    llm_provider: Literal["mock", "gms"] = "mock"
+    llm_api_base_url: str = "https://gms.ssafy.io/gmsapi/api.openai.com"
+    llm_api_path: str = "/v1/chat/completions"
+    llm_connect_timeout_seconds: float = Field(default=10.0, gt=0)
+    llm_read_timeout_seconds: float = Field(default=15.0, gt=0)
+    gms_api_key: SecretStr | None = None
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
@@ -229,13 +259,21 @@ class Settings(BaseSettings):
             return self
 
         required = {
-            "EMBEDDING_API_KEY": self.embedding_api_key,
+            "EMBEDDING_API_KEY or GMS_API_KEY": (
+                self.embedding_api_key or self.gms_api_key
+            ),
         }
         missing = [env_name for env_name, value in required.items() if value is None]
         if missing:
             raise ValueError(
                 "GMS embedding provider requires: " + ", ".join(sorted(missing))
             )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_llm_provider(self) -> "Settings":
+        if self.llm_provider == "gms" and self.gms_api_key is None:
+            raise ValueError("GMS LLM provider requires: GMS_API_KEY")
         return self
 
     @model_validator(mode="after")

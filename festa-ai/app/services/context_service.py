@@ -315,7 +315,12 @@ class PromptBuilder:
                 ),
             )
         )
-        return LLMRequest(messages=tuple(messages))
+        return LLMRequest(
+            messages=tuple(messages),
+            max_output_tokens=RESPONSE_LENGTH_MAX_OUTPUT_TOKENS[
+                agent.response_length
+            ],
+        )
 
 
 def _render_agent_instruction(agent: AgentPromptConfig) -> str:
