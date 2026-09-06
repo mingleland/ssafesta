@@ -13,7 +13,8 @@ import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
-import { OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
+import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
+import { useSession } from '../../auth/model/session';
 import { BoothMiniPreview } from './BoothMiniPreview';
 import './boothManagement.css';
 
@@ -58,7 +59,15 @@ function SectionRow({
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
 
-  const myBoothQuery = useQuery({ queryKey: ['my-booth'], queryFn: leaseApi.getMyBooth });
+  // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
+  // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
+  const { kind } = useSession();
+  const isMember = kind === 'member';
+  const myBoothQuery = useQuery({
+    queryKey: ['my-booth'],
+    queryFn: leaseApi.getMyBooth,
+    enabled: isMember,
+  });
   const myBooth = myBoothQuery.data ?? null;
   const boothId = myBooth?.boothId ?? null;
 
@@ -77,6 +86,15 @@ export function BoothManagementOverlay({ onClose }: Props) {
   }
 
   const body = (() => {
+    // 게스트에게는 오류가 아니라 사실을 말한다 — 다시 시도해도 결과가 같으므로 재시도 버튼도 주지 않는다
+    if (!isMember) {
+      return (
+        <OverlayEmpty
+          title="로그인하면 부스를 빌릴 수 있어요"
+          hint="게스트는 축제장을 둘러볼 수 있고, 부스 운영은 회원 계정에서 할 수 있습니다."
+        />
+      );
+    }
     if (myBoothQuery.isLoading) return <OverlayLoading label="부스 정보를 불러오는 중..." />;
     if (myBoothQuery.isError) {
       return (
@@ -112,7 +130,15 @@ export function BoothManagementOverlay({ onClose }: Props) {
         {/* D — Booth 자체가 주인공 */}
         <section className="bm-hero">
           <div className="bm-preview">
-            <BoothMiniPreview facade={boothQuery.data?.facade ?? null} boothName={myBooth.name} />
+            {/* facade 실패를 조용히 빈 미리보기로 만들지 않는다 — 없는 것과 못 불러온 것은 다르다 */}
+            {boothQuery.isError ? (
+              <OverlayError
+                title="미리보기를 불러오지 못했습니다"
+                onRetry={() => void boothQuery.refetch()}
+              />
+            ) : (
+              <BoothMiniPreview facade={boothQuery.data?.facade ?? null} boothName={myBooth.name} />
+            )}
           </div>
           <div className="bm-identity">
             <h3 className="bm-name">{myBooth.name}</h3>
