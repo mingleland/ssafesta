@@ -25,6 +25,12 @@ namespace Festa.Booth
         /// <summary>비주얼 검증·부하 측정에서 끄고 비교할 수 있게 (PerfHud 패턴).</summary>
         public static bool Enabled = true;
 
+        /// <summary>
+        /// 첫 조회가 끝났는가(성공·실패 무관). 포털이 "미게시 부스" 를 판정할 때 쓴다 — 조회 전에는 모든 방이
+        /// <see cref="BoothRuntime.IsLoaded"/> false 라 게시된 부스까지 막게 되므로, 끝나기 전에는 판정하지 않는다 (S15P21A604-453).
+        /// </summary>
+        public static bool Completed { get; private set; }
+
         static bool s_Loading;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -79,6 +85,7 @@ namespace Festa.Booth
             finally
             {
                 s_Loading = false;
+                Completed = true;
             }
         }
     }
