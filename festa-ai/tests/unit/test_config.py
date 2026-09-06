@@ -70,6 +70,8 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.rag_tokenizer_encoding == "cl100k_base"
     assert config.settings.llm_model_id == "gpt-4.1-mini"
     assert config.settings.llm_temperature == 0.0
+    assert config.settings.llm_provider == "mock"
+    assert config.settings.llm_api_path == "/v1/chat/completions"
     assert config.settings.internal_spring_to_ai_tokens == ["spring-to-ai-token-1"]
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
 
@@ -256,6 +258,44 @@ def test_chunk_overlap_must_be_smaller_than_chunk_size(
         overrides={"CHUNK_SIZE": "900", "CHUNK_OVERLAP": "900"},
     )
     with pytest.raises(ValidationError, match="CHUNK_OVERLAP"):
+        _fresh_settings_module()
+
+
+def test_gms_llm_provider_requires_common_secret(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"LLM_PROVIDER": "gms"})
+
+    with pytest.raises(ValidationError, match="GMS_API_KEY"):
+        _fresh_settings_module()
+
+
+def test_gms_llm_and_embedding_share_injected_secret(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "LLM_PROVIDER": "gms",
+            "EMBEDDING_PROVIDER": "gms",
+            "GMS_API_KEY": "shared-gms-secret",
+        },
+    )
+
+    config = _fresh_settings_module()
+
+    assert config.settings.llm_provider == "gms"
+    assert config.settings.embedding_provider == "gms"
+    assert "shared-gms-secret" not in repr(config.settings)
+
+
+def test_unknown_llm_provider_fails_fast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"LLM_PROVIDER": "unknown"})
+
+    with pytest.raises(ValidationError, match="llm_provider"):
         _fresh_settings_module()
 
 

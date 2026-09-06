@@ -16,7 +16,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 비루트 실행 (보안 기본기)
-RUN useradd -m -d /app unity
+RUN useradd -m -d /app unity \
+    && install -d -o unity -g unity /var/lib/festa-world
 WORKDIR /app
 
 COPY --chown=unity:unity . /app
