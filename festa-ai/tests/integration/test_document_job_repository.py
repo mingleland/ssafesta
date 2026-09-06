@@ -54,7 +54,7 @@ async def session_factory(migrated_engine):
             await connection.run_sync(
                 lambda sync_connection: sync_connection.execute(
                     DocumentJob.__table__.delete().where(
-                        DocumentJob.document_id.in_((4201, 4202, 4203))
+                        DocumentJob.document_id.in_((4201, 4202, 4203, 4301, 4302))
                     )
                 )
             )
@@ -259,3 +259,30 @@ async def test_retry_wait_is_picked_only_after_next_retry_time(
     assert picked.id == queued.job.id
     assert picked.status == "RUNNING"
     assert picked.next_retry_at is None
+
+
+async def test_find_titles_returns_latest_filename_per_document_id(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        await DocumentJobRepository(session).enqueue(
+            _snapshot(documentId=4301, originalFilename="v1.pdf"), max_retries=3
+        )
+    async with session_factory() as session:
+        await DocumentJobRepository(session).enqueue(
+            _snapshot(documentId=4302, originalFilename="other.pdf"), max_retries=3
+        )
+
+    async with session_factory() as session:
+        titles = await DocumentJobRepository(session).find_titles([4301, 4302, 4999])
+
+    assert titles == {4301: "v1.pdf", 4302: "other.pdf"}
+
+
+async def test_find_titles_returns_empty_dict_for_empty_input(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with session_factory() as session:
+        titles = await DocumentJobRepository(session).find_titles([])
+
+    assert titles == {}
