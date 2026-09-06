@@ -9,6 +9,28 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  // 호스트가 런타임에 주입한 API base URL — FE 의 window.__FESTA_CONFIG__(=/runtime-config.js) 와 **같은 값**을 읽는다
+  // (S15P21A604-459). 없으면 0 을 돌려 Unity 가 빌드 타임 값으로 내려가게 한다. 버퍼는 호출자(C#)가 준다.
+  // stringToUTF8·lengthBytesUTF8 은 Unity 의 jslib 문자열 예제가 그대로 쓰는 런타임 헬퍼다 — __deps 로 따로 걸지 않는다
+  // (심볼명이 Emscripten 버전마다 달라 링크가 깨질 수 있다).
+  FestaHostApiBaseUrl: function (buffer, bufferLength) {
+    try {
+      var cfg = window.__FESTA_CONFIG__;
+      var url = (cfg && cfg.apiBaseUrl) ? String(cfg.apiBaseUrl) : '';
+      if (!url) return 0;
+      var needed = lengthBytesUTF8(url);
+      if (needed + 1 > bufferLength) {
+        console.warn('[FestaUnityBridge] apiBaseUrl 이 버퍼보다 길다 — 무시한다', needed, bufferLength);
+        return 0;
+      }
+      stringToUTF8(url, buffer, bufferLength);
+      return needed;
+    } catch (error) {
+      console.error('[FestaUnityBridge] apiBaseUrl 주입 읽기 실패', error);
+      return 0;
+    }
+  },
+
   FestaNotifyBoothInteract: function (jsonPtr) {
     var json = UTF8ToString(jsonPtr);
     try {
