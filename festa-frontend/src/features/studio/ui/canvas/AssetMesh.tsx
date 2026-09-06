@@ -6,38 +6,14 @@
 // 것이 T-24 의 원인이었다.
 import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
 import { assetUrl } from '../../model/boothAssetManifest';
+import { loadGlb } from './boothAssetCache';
 
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'ready'; scene: THREE.Group }
   | { kind: 'error'; reason: string };
-
-/** GLB 는 한 번만 받는다 — 같은 assetCode 오브젝트가 여럿이면 clone 으로 나눠 쓴다 */
-const cache = new Map<string, Promise<THREE.Group>>();
-
-function loadGlb(url: string): Promise<THREE.Group> {
-  const hit = cache.get(url);
-  if (hit !== undefined) return hit;
-  const pending = new Promise<THREE.Group>((resolve, reject) => {
-    new GLTFLoader().load(
-      url,
-      (gltf) => resolve(gltf.scene),
-      undefined,
-      (error) => reject(error instanceof Error ? error : new Error(String(error))),
-    );
-  });
-  cache.set(url, pending);
-  // 실패한 약속을 캐시에 남기면 다시 시도할 길이 없어진다
-  pending.catch(() => cache.delete(url));
-  return pending;
-}
-
-export function __clearBoothAssetCache(): void {
-  cache.clear();
-}
 
 interface Props {
   entry: BoothAssetEntry;
