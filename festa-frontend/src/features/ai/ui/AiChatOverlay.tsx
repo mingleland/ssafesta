@@ -6,11 +6,11 @@ import { closeOverlay } from '../../../shared/types/overlay';
 import { mockStreamSuccess } from '../../../entities/conversation/stream.mock';
 import { createSseParser } from '../../../entities/conversation/stream.parser';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
-import { openOverlay } from '../../../shared/types/overlay';
 import { useSession } from '../../auth/model/session';
 import { aiHandoffContext } from '../../consultation/model/startContext';
 import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
+import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
   payload: { boothId: number; agentId?: number };
@@ -107,8 +107,8 @@ export function AiChatOverlay({ payload }: Props) {
     // 여기서는 대화 맥락이 실제로 이어진다는 것만 계약으로 보인다 — 없으면 넘기지 않는다.
     const lastAgentTurn = [...turns].reverse().find((t) => t.role === 'agent' && !t.streaming);
     void requestConsultation(aiHandoffContext(payload.boothId, lastAgentTurn?.text));
-    // 상담 화면으로 바꾼다. 같은 부스라 Overlay Bus 슬롯을 그대로 넘겨받는다.
-    openOverlay('CONSULTATION', { boothId: payload.boothId });
+    // 상담 화면으로 바꾼다. 같은 부스라 Visitor 슬롯을 그대로 넘겨받는다.
+    openVisitorOverlay('CONSULTATION', { boothId: payload.boothId });
   }
 
   return (

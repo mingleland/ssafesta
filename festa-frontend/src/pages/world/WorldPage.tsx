@@ -7,6 +7,9 @@
 //   OverlayHost    Unity 상호작용이 여는 Visitor Overlay (Overlay Bus)
 //   GameMenu       사용자가 ESC 로 여는 개인/시스템 레이어 (features/world/model/gameClientUi)
 //
+// 셋 중 무엇이 주인인지는 features/world/model/worldScreen 이 판정한다 — 배타·ESC·Unity 입력
+// 잠금이 모두 그 한 곳을 쓴다. 이 화면은 판정하지 않고 렌더와 생명주기만 맡는다.
+//
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useEffect } from 'react';
@@ -18,17 +21,15 @@ import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
-import { closeOverlay, getCurrentOverlay } from '../../shared/types/overlay';
+import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
   closeBoothManagement,
   closeGameMenu,
-  getGameClientUiSnapshot,
-  openBoothManagement,
-  openGameMenu,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
+import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
 import './worldPage.css';
 
 export function WorldPage() {
@@ -41,7 +42,7 @@ export function WorldPage() {
   // 같은 결과가 나오는 유일한 방법이다.
   useEffect(() => {
     if (params.get('panel') !== 'management') return;
-    openBoothManagement();
+    openManagement();
     // 한 번 열고 나면 쿼리는 지운다 — 이후 새로고침이 같은 화면을 강제로 다시 열지 않게
     setParams({}, { replace: true });
   }, [params, setParams]);
@@ -57,19 +58,17 @@ export function WorldPage() {
     };
   }, []);
 
-  // ESC 계층: 열린 Visitor Overlay 가 있으면 그쪽이 먼저 닫는다(OverlayFrame 자체 핸들러).
-  // 아무 레이어도 없을 때만 Game Menu 를 연다 — 그것이 "ESC = 나/시스템"의 의미다(D-08).
-  // 장기 Input Router(game-client-experience-draft §4)는 여기서 구현하지 않는다.
+  // ESC 계층: 떠 있는 것이 있으면 그 하나를 닫고, 아무것도 없을 때만 Game Menu 를 연다 —
+  // 그것이 "ESC = 나/시스템"의 의미다(D-08). 무엇이 떠 있는지는 여기서 판정하지 않는다.
+  // 우선순위는 worldScreen 이 소유한다(-450) — 두 store 를 여기서 손으로 합성하던 것을 걷어냈다.
+  //
+  // OverlayFrame·GameOverlay 의 자체 ESC 핸들러는 그대로 둔다. 그쪽도 결국 같은 레이어를 닫으므로
+  // 중복 실행돼도 결과가 같고(멱등), 걷어내면 focus 복구(-428) 회귀 위험만 커진다.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
-      const { gameMenu, managementOverlay } = getGameClientUiSnapshot();
-      if (gameMenu) {
-        closeGameMenu();
-        return;
-      }
-      if (managementOverlay || getCurrentOverlay() !== null) return; // 그 레이어가 자기 Esc 를 처리한다
-      openGameMenu();
+      if (closeTopScreen()) return;
+      openMenu();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);

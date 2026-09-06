@@ -7,6 +7,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render } from '@testing-library/react';
 import type { UnityInstance, UnityProgressListener } from '../../types';
 import { closeOverlay, openOverlay } from '../../../../shared/types/overlay';
+import {
+  __resetGameClientUiForTests,
+  closeBoothManagement,
+  closeGameMenu,
+} from '../../../../features/world/model/gameClientUi';
+import { openManagement, openMenu } from '../../../../features/world/model/worldScreen';
 
 type Boot = { resolve: (i: UnityInstance) => void };
 const boots: Boot[] = [];
@@ -23,8 +29,8 @@ const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi
 const lockCalls = (i: UnityInstance) =>
   (i.SendMessage as ReturnType<typeof vi.fn>).mock.calls.filter((c) => c[1] === 'SetInputLocked');
 
-beforeEach(() => { boots.length = 0; closeOverlay(); });
-afterEach(() => { cleanup(); closeOverlay(); });
+beforeEach(() => { boots.length = 0; closeOverlay(); __resetGameClientUiForTests(); });
+afterEach(() => { cleanup(); closeOverlay(); __resetGameClientUiForTests(); });
 
 async function renderBooted() {
   const { UnityHost } = await import('../../UnityHost');
@@ -82,5 +88,45 @@ describe('입력 소유권 배선 (-450)', () => {
       (inst.SendMessage as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1] as string),
     );
     expect([...methods]).toEqual(['SetInputLocked']);
+  });
+});
+
+// -450 2차(GitLab #132 09-06 실측): 잠금 판정을 Overlay Bus 가 아니라 화면 소유권으로 넓혔다.
+// Esc 계정 메뉴·관리 화면은 Overlay Bus 밖이라 예전에는 떠 있어도 월드가 키를 계속 먹었다.
+describe('입력 소유권 — Overlay Bus 밖 레이어 (-450 2차)', () => {
+  it('Esc 계정 메뉴가 열려도 월드 입력이 잠긴다 (#132 회귀)', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openMenu(); });
+    expect(lockCalls(inst).at(-1)).toEqual(['InputBridge', 'SetInputLocked', '1']);
+  });
+
+  it('Esc 메뉴를 닫으면 잠금이 풀린다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openMenu(); });
+    act(() => { closeGameMenu(); });
+    expect(lockCalls(inst).at(-1)).toEqual(['InputBridge', 'SetInputLocked', '0']);
+  });
+
+  it('관리 화면이 열려도 월드 입력이 잠긴다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openManagement(); });
+    expect(lockCalls(inst).at(-1)).toEqual(['InputBridge', 'SetInputLocked', '1']);
+    act(() => { closeBoothManagement(); });
+    expect(lockCalls(inst).at(-1)).toEqual(['InputBridge', 'SetInputLocked', '0']);
+  });
+
+  it('레이어가 바뀌어도 잠금을 풀었다 걸지 않는다 — 계속 잠긴 상태다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { openOverlay('AI_CHAT', { boothId: 1 }); });
+    const afterOpen = lockCalls(inst).length;
+    act(() => { openManagement(); });   // visitor -> management 전환
+    expect(lockCalls(inst).slice(afterOpen).every((c) => c[2] === '1')).toBe(true);
+  });
+
+  it('메뉴가 열린 채로 인스턴스가 서면 focus 를 뺏지 않는다', async () => {
+    openMenu();
+    const { view } = await renderBooted();
+    const canvas = view.container.querySelector('canvas');
+    expect(document.activeElement).not.toBe(canvas);
   });
 });
