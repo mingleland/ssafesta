@@ -30,7 +30,7 @@
 
 ## R-03. 공개 ingress·TLS·CDN
 
-**Decision**: Nginx만 80/443을 공개한다. dev는 EC2 IP의 제한된 Nginx 경로, demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
+**Decision**: Nginx만 80/443을 공개한다. dev front·api·ai는 EC2 IP의 제한된 Nginx 경로를 사용하고, URL path를 지원하지 않는 UnityTransport는 `world-dev.${ROOT_DOMAIN}` 전용 WSS host를 사용한다. demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
 
 **Rationale**: 헌법 6·7조의 단일 EC2 경계를 구현하고 ALB/NLB 없이 TLS와 static offload를 제공한다. host별 cache 정책이 동적 응답 혼입을 막는다.
 

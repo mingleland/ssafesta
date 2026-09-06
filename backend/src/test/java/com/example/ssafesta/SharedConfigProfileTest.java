@@ -53,6 +53,9 @@ class SharedConfigProfileTest {
         "KAKAO_CLIENT_SECRET=kakao-secret",
         "KAKAO_REDIRECT_URI=https://api.example.test/login/oauth2/code/kakao",
         "ROOT_DOMAIN=example.test",
+        "WORLD_SCHEME=wss",
+        "WORLD_HOST=world-dev.example.test",
+        "WORLD_PORT=443",
         "FRONTEND_BASE_URL=https://example.test",
         "AUTH_COOKIE_SECURE=true",
         // Redis 키 네임스페이스 (S15P21A604-349). 기본값이 없어 배포가 반드시 주입한다.
@@ -97,9 +100,10 @@ class SharedConfigProfileTest {
             assertThat(env.getProperty("app.auth.frontend-base-url")).isEqualTo("https://example.test");
             assertThat(env.getProperty("app.auth.cookie-secure")).isEqualTo("true");
 
-            // application-infra.yml owns the world address and overrides the ws/127.0.0.1 defaults.
+            // application-infra.yml keeps secure defaults while allowing the dev dedicated host.
             assertThat(env.getProperty("app.world.scheme")).isEqualTo("wss");
-            assertThat(env.getProperty("app.world.host")).isEqualTo("world.example.test");
+            assertThat(env.getProperty("app.world.host")).isEqualTo("world-dev.example.test");
+            assertThat(env.getProperty("app.world.port")).isEqualTo("443");
         });
     }
 

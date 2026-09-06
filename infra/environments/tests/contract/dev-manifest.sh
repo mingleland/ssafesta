@@ -42,6 +42,12 @@ if not release_ref.startswith("infra/deploy/state/runtime/") or "${RELEASE_ID}" 
 for mock in manifest.get("mockAdapters", []):
     if not mock["approvalRef"]:
         raise SystemExit("mock adapters require an approval reference")
+
+game = next(service for service in services if service["serviceId"] == "dev-game")
+if game["persistentVolumeRefs"] != ["festa-dev-world-replay"]:
+    raise SystemExit("dev game must declare its persistent replay ledger volume")
+if "DEV_CONNECTION_TOKEN_SECRET_REF" not in manifest["secretRefs"]:
+    raise SystemExit("dev manifest must declare the shared game connection token Secret")
 PY
 
 pass 'dev manifest keeps targets, service resources, immutable releases, and mocks explicit'

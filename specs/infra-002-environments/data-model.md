@@ -50,7 +50,7 @@
 | `entryId` | string | manifest에서 참조 |
 | `environmentId` | enum | `dev`, `demo` |
 | `scheme` | enum | dev 임시 `http`; demo `https`/`wss` |
-| `hostTemplate` | string | demo는 `${ROOT_DOMAIN}` template, dev는 `${EC2_PUBLIC_IP}` |
+| `hostTemplate` | string | demo와 dev world는 `${ROOT_DOMAIN}` template, dev HTTP 경로는 `${EC2_PUBLIC_IP}` |
 | `pathPrefix` | string | dev 제한 경로 또는 `/` |
 | `upstreamServiceId` | ref | Runtime Service |
 | `cacheMode` | enum | `static-immutable`, `html-revalidate`, `bypass` |
