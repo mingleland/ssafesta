@@ -12,6 +12,7 @@ import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { apiBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
+import { ScreenControls } from '../../features/audio/ui/ScreenControls';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
 import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.png';
@@ -123,6 +124,7 @@ export function LoginPage() {
 
   return (
     <div className="login-root">
+      <ScreenControls />
       <img className="login-bg" src={loginBackgroundUrl} alt="" />
       <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
       <h1 className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>

@@ -2,6 +2,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { bootstrapAuth } from '../../features/auth/model/bootstrap';
+import { ScreenAudioController } from '../../features/audio/ui/ScreenAudioController';
 import { queryClient } from './queryClient';
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -10,5 +11,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
     void bootstrapAuth();
   }, []);
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* 화면 BGM 은 라우터 밖에 산다 — / → /login → /app/world 에서 끊기지 않게 (S15P21A604-463) */}
+      <ScreenAudioController />
+      {children}
+    </QueryClientProvider>
+  );
 }
