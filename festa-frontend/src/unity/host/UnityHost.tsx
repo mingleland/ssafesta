@@ -6,12 +6,22 @@
 // 로비 체류는 사용자 시간이다) → [Unity 가 월드 로드 시작을 알리면] preparing-world → ready.
 // 실패는 boot 구간에서만 판정한다. 재시도는 새 boot attempt 로 새 watchdog 을 건다.
 //
+// 접속 상태(-432, #131)는 위 수명주기와 **다른 층**이다. 위는 "Unity 를 띄우는 중" 이고 이쪽은 "월드에
+// 붙어 있는가" 라, ready 이후에도 백그라운드 복귀 등으로 끊길 수 있다. 재시도·백오프는 Unity 가 소유하고
+// (WorldReconnector) 호스트는 상태 표시와 실패 후 복구 동선만 맡는다 — FE 에 재접속 타이머를 두지 않는다.
+//
 // waiting-gate 와 preparing-world 를 가르는 이유: 둘 다 "게이트 신호를 기다리는 중" 이지만 사용자에게는
 // 전혀 다른 시간이다. 앞은 로비에서 아바타를 고르는 자기 시간이라 안내가 뜨면 방해고, 뒤는 main 씬 로드
 // 50~84초 대기라 안내가 없으면 멈춘 것으로 오인한다. Unity 가 아직 시작 신호를 안 보내면 preparing-world
 // 에 들어가지 않으므로 이 컴포넌트는 예전과 똑같이 동작한다.
 import { useEffect, useRef, useState } from 'react';
-import { initUnityBridge, subscribeWorldGateReady, subscribeWorldLoadStart } from '../bridge/events';
+import {
+  initUnityBridge,
+  subscribeWorldConnectionState,
+  subscribeWorldGateReady,
+  subscribeWorldLoadStart,
+} from '../bridge/events';
+import type { WorldConnectionState } from '../bridge/events';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { useSession } from '../../features/auth/model/session';
@@ -20,6 +30,19 @@ import './unityHostStatus.css';
 import type { UnityInstance } from './types';
 
 type HostStatus = 'booting' | 'waiting-gate' | 'preparing-world' | 'ready' | 'failed';
+
+// Unity WorldReconnector 가 보내는 사유 문자열 → 사용자 문구. 목록에 없는 값·빈 문자열(무응답)이 올 수 있고
+// Unity 쪽이 사유를 늘려도 화면이 비지 않아야 하므로 fallback 을 반드시 둔다.
+const DISCONNECT_REASONS: Record<string, string> = {
+  INVALID_TOKEN: '로그인이 만료되었습니다. 다시 로그인해 주세요.',
+  SERVER_FULL: '월드가 가득 찼습니다. 잠시 후 다시 시도해 주세요.',
+  REPLACED_BY_SAME_USER: '다른 기기에서 접속해 이 연결이 종료되었습니다.',
+  WORLD_SESSION_UNAVAILABLE: '월드 입장 정보를 받지 못했습니다.',
+};
+
+function disconnectReason(detail: string): string {
+  return DISCONNECT_REASONS[detail] ?? '연결을 다시 세우지 못했습니다.';
+}
 
 export function UnityHost() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +53,8 @@ export function UnityHost() {
   const [instanceReady, setInstanceReady] = useState(false);
   // 월드 로딩이 길어졌을 때 문구를 한 번 더 바꾼다 — 실패 판정이 아니다
   const [longWait, setLongWait] = useState(false);
+  // Unity 가 밀어 주는 접속 상태. null = 아직 아무 신호도 오지 않았다(신호 없이도 예전과 똑같이 동작한다)
+  const [connection, setConnection] = useState<{ state: WorldConnectionState; detail: string } | null>(null);
   const session = useSession();
 
   useEffect(() => {
@@ -43,6 +68,7 @@ export function UnityHost() {
     setProgress(0);
     setInstanceReady(false);
     setLongWait(false);
+    setConnection(null);
     instanceRef.current = null;
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
@@ -90,10 +116,16 @@ export function UnityHost() {
       setStatus((current) => (current === 'waiting-gate' ? 'preparing-world' : current));
     });
 
+    // 접속 상태는 boot 성공 여부와 무관하게 들어올 수 있다 — 별도 구독으로 받고 여기서 판정하지 않는다.
+    const unsubscribeConnection = subscribeWorldConnectionState((state, detail) => {
+      if (!cancelled) setConnection({ state, detail });
+    });
+
     return () => {
       cancelled = true;
       unsubscribeGate();
       unsubscribeLoad();
+      unsubscribeConnection();
       clearWatchdog();
     };
   }, [attempt]);
@@ -129,6 +161,14 @@ export function UnityHost() {
     setAttempt((n) => n + 1);
   }
 
+  // 'disconnected' 를 곧바로 실패로 읽지 않는다 — Unity 가 곧 재시도에 들어가므로 같은 "재접속 중" 구간이다.
+  // 사용자가 직접 끊은 경우(detail 'USER')만 예외로, 되돌릴 것이 없으니 아무 안내도 띄우지 않는다.
+  const reconnecting =
+    connection?.state === 'reconnecting' ||
+    (connection?.state === 'disconnected' && connection.detail !== 'USER');
+  // 접속 안내가 떠 있는 동안에는 boot 계열 안내를 겹쳐 띄우지 않는다
+  const connectionNotice = reconnecting || connection?.state === 'failed';
+
   return (
     // 상태 층이 캔버스 위에 겹치려면 이 컨테이너가 위치 기준이어야 한다(.uh-status 는 absolute inset:0)
     <div className="uh-root">
@@ -136,7 +176,23 @@ export function UnityHost() {
           타깃을 `"#" + canvas.id` 선택자로 찾아서, id 가 없으면 `querySelector("#")` SyntaxError 로
           _main 직후 죽는다(2026-09-05 통합 실측에서 확인). tabIndex=-1 은 캔버스가 키 입력을 받게 한다. */}
       <canvas id="unity-canvas" tabIndex={-1} ref={canvasRef} style={{ width: '100%', height: '100%' }} />
-      {status === 'booting' && (
+      {reconnecting && (
+        <div className="uh-status" role="status" aria-live="polite">
+          <span className="uh-status-spinner" aria-hidden="true" />
+          <strong className="uh-status-title">재접속 중…</strong>
+          <span className="uh-status-hint">연결이 끊어져 다시 연결하고 있습니다.</span>
+        </div>
+      )}
+      {connection?.state === 'failed' && (
+        <div className="uh-status" role="alert">
+          <strong className="uh-status-title">월드 연결이 끊어졌습니다</strong>
+          <span className="uh-status-hint">{disconnectReason(connection.detail)}</span>
+          <button type="button" onClick={handleRetry}>
+            로비로 돌아가기
+          </button>
+        </div>
+      )}
+      {!connectionNotice && status === 'booting' && (
         <div className="uh-status" role="status" aria-live="polite">
           <span className="uh-status-spinner" aria-hidden="true" />
           <strong className="uh-status-title">게임을 준비하고 있어요</strong>
@@ -144,7 +200,7 @@ export function UnityHost() {
           <span className="uh-status-progress">{Math.round(progress * 100)}%</span>
         </div>
       )}
-      {status === 'preparing-world' && (
+      {!connectionNotice && status === 'preparing-world' && (
         <div className="uh-status" role="status" aria-live="polite">
           {/* 진행률 신호가 없는 구간이다 — indeterminate 로 두고 가짜 백분율을 만들지 않는다 */}
           <span className="uh-status-spinner" aria-hidden="true" />
