@@ -40,4 +40,27 @@
 body {
   margin: 0;
   min-height: 100vh;
+  /* 게임 화면이다. 드래그하면 배경 이미지가 유령처럼 따라오고 라벨이 파랗게 잡히는 것은
+     웹 문서의 기본값일 뿐 여기서 원하는 동작이 아니다 — 끄고, 필요한 곳만 아래에서 연다. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.
+   Firefox 는 이 속성을 모르므로 dragstart 가드(app/providers)가 함께 막는다. */
+img {
+  -webkit-user-drag: none;
+}
+
+/* 여는 곳 — 사용자가 실제로 글자를 다뤄야 하는 자리.
+   설문 응답·닉네임 같은 입력은 물론, 오류 안내는 문의할 때 복사해야 한다.
+   그 밖에 본문을 선택하게 하고 싶으면 요소에 `selectable` 클래스를 준다. */
+input,
+textarea,
+select,
+[contenteditable]:not([contenteditable='false']),
+[role='alert'],
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
 }
