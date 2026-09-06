@@ -4,9 +4,9 @@
 // ② 사용자가 직접 끊은 경우를 재접속으로 오인하지 않는지 ③ 실패 시 복구 동선이 있는지를 잠근다.
 // FE 가 재시도 타이머를 갖지 않는다는 경계도 함께 지킨다 — 타이머를 돌려도 상태가 저절로 바뀌지 않아야 한다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { UnityInstance, UnityProgressListener } from '../../types';
-import { WORLD_PREPARING_LONG_WAIT_MS } from '../../../../shared/config/unity';
+import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../../../shared/config/unity';
 
 type Boot = { resolve: (i: UnityInstance) => void };
 const boots: Boot[] = [];
@@ -109,5 +109,37 @@ describe('월드 접속 상태 UX (-432)', () => {
     const view = await renderInWorld();
     view.unmount();
     expect(() => connection('failed', 'SERVER_FULL')).not.toThrow();
+  });
+});
+
+// 상태 층은 pointer-events:none 이라 월드 클릭을 가로채지 않는다. 그 안의 복구 버튼만 예외로
+// 되살려야 하는데, 클래스가 빠져 있어 **버튼이 보이기만 하고 눌리지 않았다**(2026-09-06 실브라우저 실측).
+// jsdom 은 pointer-events 를 계산하지 않으므로 클래스 부착과 동작 두 가지로 잠근다.
+describe('복구 동선 버튼 (-432)', () => {
+  it('failed 버튼이 상태 층 조작 클래스를 단다 — 부모의 pointer-events:none 을 되돌리는 유일한 지점', async () => {
+    await renderInWorld();
+    connection('failed', 'SERVER_FULL');
+    const button = screen.getByRole('button', { name: '로비로 돌아가기' });
+    expect(button.className).toContain('uh-status-action');
+  });
+
+  it('누르면 새 boot attempt 가 시작된다 — 화면만 바뀌고 끝나지 않는다', async () => {
+    await renderInWorld();
+    connection('failed', 'SERVER_FULL');
+    const before = boots.length;
+
+    fireEvent.click(screen.getByRole('button', { name: '로비로 돌아가기' }));
+
+    expect(boots.length).toBe(before + 1);
+    expect(screen.queryByRole('alert')).toBeNull(); // 재시도하면 실패 화면이 걷힌다
+  });
+
+  it('boot 실패 화면도 같은 상태 층 어휘를 쓴다 — 맨 div 로 월드 위에 글자만 뜨지 않는다', async () => {
+    const { UnityHost } = await import('../../UnityHost');
+    render(<UnityHost />);
+    advance(UNITY_BOOT_STALL_TIMEOUT_MS + 1000);
+    const alert = screen.getByRole('alert');
+    expect(alert.className).toContain('uh-status');
+    expect(screen.getByRole('button', { name: '다시 시도' }).className).toContain('uh-status-action');
   });
 });
