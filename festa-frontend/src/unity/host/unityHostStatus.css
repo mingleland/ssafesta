@@ -17,6 +17,8 @@
   background: rgba(10, 14, 28, 0.72);
   color: #f4f6ff;
   font-size: 14px;
+  /* 진행 표시는 월드 클릭을 가로채지 않는다. 다만 안에 조작 요소가 있으면 그것만 되살린다
+     — 아래 .uh-status-action 이 pointer-events 를 다시 켠다(-432 로비 복귀 버튼이 죽어 있었다). */
   pointer-events: none;
 }
 
@@ -47,4 +49,34 @@
 
 @media (prefers-reduced-motion: reduce) {
   .uh-status-spinner { animation-duration: 2.4s; }
+}
+
+/* 상태 층 안의 유일한 조작 요소 — 복구 동선 버튼(-432 failed / boot 재시도).
+   부모가 pointer-events:none 이라 여기서 auto 로 되돌리지 않으면 눌리지 않는다. */
+.uh-status-action {
+  pointer-events: auto;
+  margin-top: 4px;
+  padding: 9px 18px;
+  border: 1px solid rgba(244, 246, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(244, 246, 255, 0.1);
+  color: #f4f6ff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.uh-status-action:hover {
+  background: rgba(244, 246, 255, 0.18);
+  border-color: rgba(244, 246, 255, 0.45);
+}
+
+.uh-status-action:focus-visible {
+  outline: 2px solid #f4f6ff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uh-status-action { transition: none; }
 }

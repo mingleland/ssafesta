@@ -213,7 +213,7 @@ export function UnityHost() {
         <div className="uh-status" role="alert">
           <strong className="uh-status-title">월드 연결이 끊어졌습니다</strong>
           <span className="uh-status-hint">{disconnectReason(connection.detail)}</span>
-          <button type="button" onClick={handleRetry}>
+          <button type="button" className="uh-status-action" onClick={handleRetry}>
             로비로 돌아가기
           </button>
         </div>
@@ -237,9 +237,9 @@ export function UnityHost() {
         </div>
       )}
       {status === 'failed' && (
-        <div>
-          <p>월드를 불러오지 못했습니다.</p>
-          <button type="button" onClick={handleRetry}>
+        <div className="uh-status" role="alert">
+          <strong className="uh-status-title">월드를 불러오지 못했습니다.</strong>
+          <button type="button" className="uh-status-action" onClick={handleRetry}>
             다시 시도
           </button>
         </div>
