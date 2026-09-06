@@ -30,6 +30,7 @@ assert_contains "${ingress}" '127\.0\.0\.1:3001' 'front must proxy through loopb
 assert_contains "${ingress}" '127\.0\.0\.1:8081' 'api must proxy through loopback'
 assert_contains "${ingress}" '127\.0\.0\.1:8000' 'ai must proxy through loopback'
 assert_contains "${world_ingress}" 'server_name world-dev\.\$\{ROOT_DOMAIN\};' 'world must use the dedicated dev host'
+assert_not_contains "${world_ingress}" '^[[:space:]]*http2 on;' 'dev world must remain compatible with the deployed Nginx version'
 assert_contains "${world_ingress}" 'real_ip_header CF-Connecting-IP;' 'dev world must restore the client IP supplied by Cloudflare'
 assert_contains "${world_ingress}" 'real_ip_recursive on;' 'dev world must recursively resolve the trusted proxy chain'
 assert_contains "${world_ingress}" 'set_real_ip_from 173\.245\.48\.0/20;' 'dev world must trust Cloudflare proxy ranges'
