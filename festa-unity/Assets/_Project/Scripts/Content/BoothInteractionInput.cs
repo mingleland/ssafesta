@@ -72,10 +72,11 @@ namespace Festa.Content
             // 조준 중인 대상이 사거리 안이면 그것이 타깃이다 — 여러 대상이 겹칠 때
             // 플레이어가 명시적으로 고를 수 있는 유일한 수단이라 근접보다 우선한다.
             Festa.Booth.BoothInteractionTarget targeted = null;
+            Festa.Booth.BoothInteractionTarget aimed = null;
             if (TryReadPointer(out var pointerPosition)
                 && Physics.Raycast(cam.ScreenPointToRay(pointerPosition), out var hit, MaxRayDistance))
             {
-                var aimed = hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>();
+                aimed = hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>();
                 // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
                 // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다.
                 if (aimed != null && aimed.Interactive && IsInRange(aimed)) targeted = aimed;
@@ -89,6 +90,11 @@ namespace Festa.Content
 
             UpdateHover(targeted);
             ShowHint(targeted);
+
+            // F 응답이 없는 부스 오브젝트(영상 화면·좋아요·상담 데스크 등)를 **조준**했을 때만 "준비 중" 을 알린다 (S15P21A604-455).
+            // 근접 자동 조준은 쓰지 않는다 — 옆을 지나갈 때마다 뜨면 소음이다. 키캡이 없으니 -345 의 거짓 힌트 금지와도 맞는다.
+            _passive = targeted == null && aimed != null && !aimed.Interactive && IsInRange(aimed)
+                       && aimed.GetComponentInParent<Festa.Booth.BoothRuntimeObject>() != null ? aimed : null;
 
             // 실행은 F 키로만 한다 (S15P21A604-323). 포인터·근접은 조준에만 쓴다 —
             // 클릭을 실행에 쓰면 3인칭 카메라 조작·UI 클릭과 경쟁해 오조작이 난다.
@@ -263,9 +269,29 @@ namespace Festa.Content
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 
+        Festa.Booth.BoothInteractionTarget _passive;
+
+        /// <summary>F 응답이 없는 오브젝트의 안내 문구 — 무엇인지 + 준비 중.</summary>
+        static string PassiveLabelFor(Festa.Booth.BoothInteractionTarget target)
+        {
+            var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
+            if (ro == null) return "전시물 · 준비 중";
+            switch (ro.Type)
+            {
+                case Festa.Booth.BoothObjectType.VideoScreen:      return "영상 화면 · 준비 중";
+                case Festa.Booth.BoothObjectType.LikeVote:         return "좋아요 투표 · 준비 중";
+                case Festa.Booth.BoothObjectType.ConsultationDesk: return "상담 데스크 · 준비 중";
+                case Festa.Booth.BoothObjectType.RecruitmentBoard: return "채용 게시판 · 준비 중";
+                case Festa.Booth.BoothObjectType.Furniture:
+                case Festa.Booth.BoothObjectType.Decoration:       return null;   // 가구·장식은 원래 아무 반응이 없어야 한다
+                default: return "전시물 · 준비 중";
+            }
+        }
+
         void OnGUI()
         {
             if (_hovered != null) Festa.World.InteractPromptUI.DrawPrompt(PromptFor(_hovered));
+            else if (_passive != null) Festa.World.InteractPromptUI.DrawPassivePrompt(PassiveLabelFor(_passive));
             if (_toast != null && Time.unscaledTime <= _toastUntil)
                 Festa.World.InteractPromptUI.DrawToast(_toast);
         }

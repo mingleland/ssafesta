@@ -48,6 +48,26 @@ namespace Festa.World
             PlainLabel(Snap(capRect.xMax + 12f * ui, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Text);
         }
 
+        /// <summary>
+        /// 키캡 없는 안내 알약 — 조준한 대상이 **F 에 응답하지 않을 때**(전시용·준비 중 오브젝트, S15P21A604-455).
+        /// 프롬프트 자리에 뜨되 키캡이 없고 글자가 흐려서 "누르면 된다" 로 읽히지 않는다 (-345 의 거짓 힌트 금지와 양립).
+        /// </summary>
+        public static void DrawPassivePrompt(string label)
+        {
+            if (string.IsNullOrEmpty(label)) return;
+            EnsureStyles();
+            float ui = Screen.height / 1080f;
+            _labelStyle.fontSize = Mathf.RoundToInt(22f * ui);
+            float padX = Mathf.Round(20f * ui);
+            float labelW = Mathf.Round(_labelStyle.CalcSize(Measure(label)).x);
+            float h = Mathf.Round(48f * ui);
+            float w = padX + labelW + padX;
+            float x = Mathf.Round((Screen.width - w) / 2f);
+            float y = Mathf.Round(Screen.height * 0.52f);
+            DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.82f));
+            PlainLabel(Snap(x + padX, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Muted);
+        }
+
         /// <summary>짧은 알림 — 프롬프트 바로 위, 같은 남색 알약. 월드 단독 실행에서 "보냈다" 를 알리는 유일한 신호 (S15P21A604-348).</summary>
         public static void DrawToast(string text)
         {
