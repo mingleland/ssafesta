@@ -13,6 +13,9 @@ export type ApiErrorDetail = { rule: string; objectId?: string; field?: string; 
 export type ApiError = {
   code: string;
   message: string;
+  // HTTP 상태. 재시도 판정에 쓴다 — 서버가 정확히 거절한 것(4xx)은 다시 물어도 답이 같다.
+  // 네트워크 단계 실패나 mock 이 만든 봉투에는 없을 수 있어 optional 이다.
+  status?: number;
   requestId?: string; // 서버 응답에는 항상 있으나(X-Request-Id 헤더와 동일) 네트워크 단계 실패 시 없을 수 있다
   errors: ApiErrorDetail[];
   warnings: ApiErrorDetail[];
@@ -92,17 +95,43 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
       error = {
         code: body.code ?? 'UNKNOWN',
         message: body.message ?? response.statusText,
+        status: response.status,
         requestId: body.requestId ?? requestId,
         // 비계약 응답(프록시 오류 등)이 errors.length를 터뜨리지 않도록 배열 보정
         errors: Array.isArray(body.errors) ? body.errors : [],
         warnings: Array.isArray(body.warnings) ? body.warnings : [],
       };
     } catch {
-      error = { code: 'UNKNOWN', message: response.statusText, requestId, errors: [], warnings: [] };
+      error = {
+        code: 'UNKNOWN',
+        message: response.statusText,
+        status: response.status,
+        requestId,
+        errors: [],
+        warnings: [],
+      };
     }
     throw error;
   }
 
   if (response.status === 204) return undefined as T;
   return response.json();
+}
+
+/**
+ * 다시 물어도 답이 같은 오류인가 — 재시도해서는 안 되는 것.
+ *
+ * 서버가 정확히 거절한 것(4xx)은 재요청이 같은 답을 받는다. 그런데도 재시도하면 요청 폭풍만
+ * 남는다 — 게스트가 관리 데스크를 한 번 눌러 20초에 40건이 나간 것이 그 경우다(GitLab #139).
+ *
+ * 예외 둘은 4xx 지만 시간이 답을 바꾼다:
+ *   408 Request Timeout · 429 Too Many Requests
+ * 상태를 모르는 오류(네트워크 단절·mock 봉투)는 판정하지 않는다 — 그쪽은 재시도가 맞다.
+ */
+export function isDeterministicRejection(error: unknown): boolean {
+  if (!isApiError(error)) return false;
+  const { status } = error;
+  if (status === undefined) return false;
+  if (status === 408 || status === 429) return false;
+  return status >= 400 && status < 500;
 }
