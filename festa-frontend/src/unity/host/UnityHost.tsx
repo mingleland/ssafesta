@@ -14,7 +14,7 @@
 // 전혀 다른 시간이다. 앞은 로비에서 아바타를 고르는 자기 시간이라 안내가 뜨면 방해고, 뒤는 main 씬 로드
 // 50~84초 대기라 안내가 없으면 멈춘 것으로 오인한다. Unity 가 아직 시작 신호를 안 보내면 preparing-world
 // 에 들어가지 않으므로 이 컴포넌트는 예전과 똑같이 동작한다.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   initUnityBridge,
   subscribeWorldConnectionState,
@@ -24,6 +24,8 @@ import {
 import type { WorldConnectionState } from '../bridge/events';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
+import { syncInputLock } from './inputBridge';
+import { getCurrentOverlay, subscribeOverlay } from '../../shared/types/overlay';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import './unityHostStatus.css';
@@ -56,6 +58,10 @@ export function UnityHost() {
   // Unity 가 밀어 주는 접속 상태. null = 아직 아무 신호도 오지 않았다(신호 없이도 예전과 똑같이 동작한다)
   const [connection, setConnection] = useState<{ state: WorldConnectionState; detail: string } | null>(null);
   const session = useSession();
+  // 입력 소유권 판정의 유일한 입력값 — 오버레이가 하나라도 열려 있으면 월드 입력을 잠근다(-450, #132).
+  // OverlayHost(렌더러)가 아니라 Overlay Bus 를 직접 본다: 잠금은 무엇이 그려지는가가 아니라
+  // 무엇이 키보드를 갖는가의 문제라, 렌더 트리와 무관하게 store 하나로 판정하는 것이 맞다.
+  const overlay = useSyncExternalStore(subscribeOverlay, getCurrentOverlay);
 
   useEffect(() => {
     initUnityBridge(); // 멱등 — 재호출해도 window.FestaUnity를 다시 잇기만 한다
@@ -148,6 +154,26 @@ export function UnityHost() {
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
   }, [instanceReady, status, session.kind, session.expiresAt]);
+
+  // G-8 입력 소유권 (-450, #132): 오버레이 개폐를 Unity 잠금에 반영한다. 인스턴스가 선 직후에도 한 번 —
+  // 재시도 boot 로 새 인스턴스가 서면 그 인스턴스는 잠금 상태를 모르기 때문이다(상태는 인스턴스마다 새로 시작).
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncInputLock(instance, overlay !== null);
+  }, [instanceReady, overlay]);
+
+  // 최초 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
+  // canvas 에 focus 가 없으면 WASD·F 가 Unity 에 들어가지 않는다 — 진입 직후 activeElement 가 SECTION 이라
+  // 첫 키가 무시되는 것을 게임 파트가 실측했다(2026-09-05 23:00). tabIndex=-1 이라 프로그램 focus 가 된다(-421).
+  // 오버레이가 열려 있는 채로 들어왔다면 뺏지 않는다 — 그쪽이 키보드 주인이다.
+  useEffect(() => {
+    if (!instanceReady || overlay !== null) return;
+    canvasRef.current?.focus();
+    // overlay 를 의존성에 넣지 않는다: 오버레이를 닫을 때의 focus 복구는 -428(OverlayFrame)이 이미 하고 있고,
+    // 여기서 또 하면 두 곳이 같은 일을 다투게 된다. 이 효과는 boot attempt 당 1회다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instanceReady]);
 
   // 진짜 언마운트에서만 세션을 정리한다 — sessionManager의 예약 지연이 StrictMode의
   // mount→cleanup→mount 사이에서 다음 마운트의 acquire 호출로 취소된다(B-2).
