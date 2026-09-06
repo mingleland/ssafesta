@@ -188,6 +188,6 @@ docker run --rm -e PUBLIC_API_BASE_URL=http://localhost:8080 -p 3001:80 festa-fr
 
 | 항목 | 상태 |
 |---|---|
-| FE Docker용 Jira 이슈 | 원격 재개 후 생성. 없으면 구현 불가 |
+| FE Docker용 Jira 이슈 | `S15P21A604-254` 발급 · MR !42 머지(2026-08-27)로 완료 |
 | Infra 의 "루트 compose" 신설 시점 | Infra 소관. 생기면 §6 절차가 대체될 수 있다 |
-| `VITE_UNITY_BUILD_BASE` 런타임화 | 범위 밖. 필요해지면 같은 accessor 확장 |
+| `VITE_UNITY_BUILD_BASE` 런타임화 | `S15P21A604-427` 로 구현 — `PUBLIC_UNITY_BUILD_BASE` → `window.__FESTA_CONFIG__.unityBuildBase`, 같은 accessor 패턴(`shared/config/runtime.ts unityBuildBase()`). 인프라 compose 주입은 #127 통보 |
