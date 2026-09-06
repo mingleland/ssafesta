@@ -11,7 +11,9 @@
 | 항목 | 값 | 확인 |
 |---|---|---|
 | 계정 | Owner A(회원, 코인 ≥ 100) · Visitor B(회원) · Guest C(비로그인) | |
-| 부스 | A 가 임대한 슬롯 1개 — Studio 에서 AI NPC·프로젝트 패널·설문 키오스크·게임기(GAME_PORTAL) 배치 후 Publish. **AI NPC·게임기는 콘텐츠(configId) 를 연결해야 한다** — 미연결(0)이면 F 에 "아직 준비 중" 토스트만 뜬다(-448). 로컬 게시본 v10 은 AI configId 0 | |
+| 부스 | A 가 임대한 슬롯 1개 — Studio 에서 AI NPC·프로젝트 패널·설문 키오스크·게임기(GAME_PORTAL) 배치 후 Publish. **AI NPC·게임기는 콘텐츠(configId) 를 연결해야 한다** — 미연결(0)이면 F 에 "아직 준비 중" 토스트만 뜬다(-448) | |
+| 부스 데이터 (로컬, 09-06 17:00 구성 완료 — 배포 DB 에서도 같은 절차 필요) | AI 직원 `agentId 1`(`POST /booths/1/agents`) · 프로젝트 `projectId 1` · 홈페이지 URL(`PUT /booths/1/homepage`) · AI·설문·프로젝트 패널·영상에 `configId=1` → **게시 v14**. GAME_PORTAL 은 publish 된 게임이 없어 미연결(#137) | |
+| 배치 주의 | 게시 시 BE 가 `FRONT_BLOCKED` 를 낸다 — **오브젝트 앞을 다른 오브젝트로 막으면 방문자가 다가갈 수 없다.** 09-06 첫 게시본이 그랬다(상담 데스크가 AI 앞) | |
 | 브라우저 | Chrome 데스크톱 2개 프로필(A/B) + 시크릿(C). 각각 `document.visibilityState === "visible"` | |
 | 관측 | F3 PerfHud(게임 파트) · 브라우저 콘솔 `[WorldLoadTimeline] 요약` · 서버 `docker logs -f festa-world-01` | |
 
@@ -24,12 +26,12 @@
 | 3 | 월드 진입 시간 | Game·FE·Infra | 로비 클릭 → 게이트 개방 **10초 내**(로컬 3.0s). FE 로딩 안내(`onWorldLoadStart`) 표시 | 09-06 dev #6 3.0s ✅ · FE 임베드 게스트 15:40 **8.5s**(콜드, main_loaded 4.9s) ✅, 진입 직후 canvas focus ✅ | | |
 | 4 | 게스트(C) 입장 | Game·FE·BE | "게스트로 둘러보기" → 커스터마이징 생략 → 즉시 월드 | 09-06 7.9s ✅ | | |
 | 5 | A·B 상호 표시·이동 동기화 (MP-01~04) | Game | 서로 보이고 닉네임·걷기/뛰기 애니메이션 일치, 지연 체감 없음 | 09-06 -79 2클라 ✅ · 16:20 부스 1 안 회원(에디터)+게스트(WebGL) 상호 표시·이름표 정확 ✅ | | |
-| 6 | 부스 임대 — 티켓 부스 창구 NPC `F` → 관리 오버레이 | Game·FE·BE | 근접 프롬프트 `F · 내 부스 관리`, 대화 카메라, `WORLD_MANAGEMENT_INTERACT` → FE 오버레이. 오버레이 중 WASD 정지, 닫으면 재개 | Unity 09-06 ✅ / FE 잠금 배선 #132 대기 | | |
+| 6 | 부스 임대 — 티켓 부스 창구 NPC `F` → 관리 오버레이 | Game·FE·BE | 근접 프롬프트 `F · 내 부스 관리`, 대화 카메라, `WORLD_MANAGEMENT_INTERACT` → FE 오버레이. 오버레이 중 WASD 정지, 닫으면 재개 | Unity 09-06 ✅ · FE 잠금 배선 !320 도달 ✅ / ❌ **게스트는 무한 로딩 + 403 무한 재시도 (-458, #139)** — 회원으로만 진행 | | |
 | 7 | Studio 배치 → Publish | FE·BE | published rev 증가 | 09-06 API 로 rev 6 ✅ | | |
 | 8 | B 가 A 부스 외부 슬롯 포털 `F` → 내부 | Game | 문 안쪽에 스폰해 부스(6×6 m 셸)를 바라봄, Published 오브젝트(AI 도우미 캐릭터·패널·키오스크·노트북) 셸 안에 겹침 없이, 밝음(휘도 0.4), 뒤돌면 문틀·EXIT 사인 | 09-06 v3 에디터 ✅(-445) · 에디터 **클라이언트 모드**(Docker 서버) F 입장 ✅ · 게시 v10 좌표 반영 ✅ · **WebGL dev 빌드(09:40) 포털 F 입장 → (700, 0.2, 51.7) yaw 180, 스폰 시점 화면 ✅** / 뒤돌아본 문·EXIT·노트북 하이라이트는 월요일 손 확인(체크리스트 #10) | | |
-| 9 | 프로젝트 패널 `F` | Game·FE | 초점 카메라 → `BOOTH_PROJECT_INTERACT` → 프로젝트 오버레이 | Unity ✅ / FE 09-04 | | |
-| 10 | AI NPC `F` → RAG 상담 | Game·FE·AI | 초점 카메라 → `BOOTH_AI_INTERACT {configId}` → 스트리밍 답변 | Unity ✅ / AI 답변은 AI 파트 | | |
-| 11 | 설문 키오스크 `F` → 설문 → 제출 | Game·FE·BE | `BOOTH_SURVEY_INTERACT` → 설문 오버레이. **BE Survey API 없음 → 제출은 mock 고지** | Unity 09-06 ✅ / BE #133 | | |
+| 9 | 프로젝트 패널 `F` | Game·FE | 초점 카메라 → `BOOTH_PROJECT_INTERACT` → 프로젝트 오버레이 | Unity ✅ · 09-06 17:10 FE 오버레이 **실 BE 데이터**(제목·영상·좋아요) ✅ · 게시본에 PROJECT_PANEL 추가·`configId=1` 연결 | | |
+| 10 | AI NPC `F` → RAG 상담 | Game·FE·AI | 초점 카메라 → `AI_AGENT_INTERACT {boothId, objectId, configId}` → 스트리밍 답변 | Unity ✅ · AI 직원 생성(`agentId 1`)·`configId=1` 게시 ✅ · 17:05 FE AI 채팅 오버레이·추천 질문·스트리밍 ✅ / ⚠ **답변은 FE mock**(`stream.mock.ts`) — AI 서비스로 나가는 요청 0건 (#137) | | |
+| 11 | 설문 키오스크 `F` → 설문 → 제출 | Game·FE·BE | `BOOTH_SURVEY_INTERACT` → 설문 오버레이. **BE Survey API 없음 → 제출은 mock 고지** | Unity 09-06 ✅ · 17:15 FE 6문항 → 제출 → "응답을 제출했습니다" + "응답 저장은 준비 중입니다" 고지 ✅ / BE #133 | | |
 | 12 | 광장 미니게임 — 타이밍 스톱 `F` | Game·BE | 카드 HUD, 목표 시간 → 정지 → 오차 표시. BE 없으면 "보상 연동 전" 문구(체험판) | 09-06 ✅ (Mock 세션) | | |
 | 13 | 광장 슬롯머신 `F` (회원) | Game·BE | 줌인·자기 아바타 숨김, 잔액 표시, 10코인 → 릴 → 결과. BE 없으면 "체험판 · 코인 미반영" 배지 | 09-06 ✅ (404→Mock) | | |
 | 14 | 슬롯머신 `F` (게스트 C) | Game | 잔액 "—", 돌리기 → 팝업 "게스트는 코인을 쓸 수 없어요" | 에디터 ✅ / WebGL 체크리스트 #4 | | |
@@ -76,7 +78,9 @@
 | -453 | 미게시 부스 포털 — 안내만, 빈 방 입장 차단 | 슬롯 2~12 는 게시본이 없어 빈 셸에 들어간다 | 진행 예정 |
 | -454 | 부스 내부·축제 구역 FPS 실측, 2인 부스 동기화 | 12실 조명 60개 추가 이후 성능 미실측 | 화면 보일 때 |
 | -455 | VIDEO_SCREEN·LIKE_VOTE·CONSULTATION_DESK 근접 반응 | 게시본에 있는데 F 무반응 | 결정 필요(docs/26) |
-| GitLab #137 | 테스트용 AI configId·GAME_PORTAL 바인딩·PROJECT_PANEL 게시 (AI·FE·BE) | 없으면 상담·게임 단계가 토스트로 끝난다 | 이슈 발행 |
+| GitLab #137 | 테스트용 AI configId·GAME_PORTAL 바인딩·PROJECT_PANEL 게시 (AI·FE·BE) | 없으면 상담·게임 단계가 토스트로 끝난다 | ✅ 게임 파트가 BE API 로 직접 구성(게시 v14) — **GAME_PORTAL(게임 publish)·실 AI 답변만 타 파트 대기** |
+| **-458** | **[FE] 게스트 관리 데스크 → `/booths/mine` 403 무한 재시도·무한 로딩** | 게스트가 F 한 번에 요청 폭풍 + 죽은 오버레이 | GitLab #139 발행, FE 수정 대기 |
+| AI 답변 | FE `stream.mock.ts` 가 답을 만든다 — AI 서비스 호출 0건 | 발표에서 "AI 상담" 을 보이려면 실 스트리밍 필요 | #137 로 AI·FE 앞 요청 |
 | -456 | FE 임베드에서 Unity 조작 카드 숨김 (FE WorldHud 와 중복) | 배포에서는 조작 안내가 두 장 뜬다 | 수정 |
 | **-457** | **회원 월드 접속 실패 — grant 1,094자 + payload 가 Netcode 연결 요청 한도 초과 (T-125)** | 외형을 저장한 회원은 월드에 못 들어온다 — 회원 시나리오(1·2·6·7) 전부 막힘 | Unity MTU 4096 으로 수정 · BE 에 avatarCode 클레임 제거 요청(GitLab #138) |
 | GitLab #132 메모 | FE 조작 카드에 Shift·Space·우클릭·Alt+클릭 줄 / Esc 메뉴 중 입력 잠금 | 임베드 실측에서 발견 | FE 회신 대기 |
