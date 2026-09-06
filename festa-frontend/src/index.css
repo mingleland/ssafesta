@@ -24,6 +24,23 @@
   --festa-warn: #ffd66b;
   --festa-danger: #ff8f8f;
 
+  /* z-index 계층 (visual-dna §3) — world < screen-ui < overlay-dim < overlay < toast < system.
+     이번에는 토큰을 세우고 Toast 만 쓴다. 기존 값 14곳의 치환은 다음 작업이 점진 이행한다 —
+     지금 일괄로 바꾸면 이 변경의 회귀 범위가 Toast 와 무관한 화면 전체로 번진다.
+     실측 현황: WorldHud 20 · MockInteractionBar 30 · ScreenControls 40 · GameMenu 80 ·
+     OverlayFrame 100 · GameOverlay 10000(계층상 system 자리를 쓰고 있다 — 별건). */
+  /* 토스트 시작 높이. 우상단에는 화면마다 다른 주민이 있다 —
+     Landing·Login 은 ScreenControls(top 3vh + clamp(48px,4vh,72px)),
+     World 는 Consultation Quick Access(top 20px + 40px). 둘 다 피하는 하나의 값을 쓴다.
+     ToastHost 는 라우터 밖(#root 직속)이라 화면 요소가 정의한 변수는 상속되지 않는다 —
+     화면별로 갈라야 할 이유가 생기면 그때 body 속성 등으로 나눈다. */
+  --festa-toast-top: calc(3vh + clamp(48px, 4vh, 72px) + 10px);
+
+  --festa-z-screen-ui: 40;
+  --festa-z-overlay: 100;
+  --festa-z-toast: 200;
+  --festa-z-system: 10000;
+
   --festa-r-chip: 999px;
   --festa-r-input: 11px;
   --festa-r-card: 14px;

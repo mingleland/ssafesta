@@ -13,6 +13,7 @@ import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { apiBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
+import { showToast } from '../../shared/ui/toast/toastStore';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
 import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.png';
@@ -83,13 +84,19 @@ const footerLinks = [
 export function LoginPage() {
   const navigate = useNavigate();
   const { notice } = useSession();
-  const [guestError, setGuestError] = useState<string | null>(null);
   const [guestPending, setGuestPending] = useState(false);
 
   // warm-up 2단계 (S15P21A604-430). 로그인 화면에 도달했다는 것은 월드 진입 의도가 드러난 것이라
   // framework 까지 넓힌다. 소셜 로그인은 전체 페이지 이동이라 그 순간 요청이 끊기지만, 받아 둔 만큼은
   // HTTP 캐시에 남아 복귀 후 다시 쓰인다. 게스트 입장은 SPA 이동이라 그대로 이어진다.
   useEffect(() => warmUpUnityAssets('intent'), []);
+
+  // 진입 맥락 안내(세션 만료·게스트 재입장)를 패널 안에 두면 버튼이 아래로 밀린다 —
+  // 낮은 화면에서는 그것만으로 푸터를 뚫는다. 알림은 레이아웃 밖으로 보낸다 (S15P21A604-465).
+  useEffect(() => {
+    if (notice === 'session-expired') showToast('세션이 종료되었습니다. 다시 로그인해 주세요.', 'info');
+    if (notice === 'guest-reentry-required') showToast('게스트 이용 시간이 끝났습니다. 다시 입장해 주세요.', 'info');
+  }, [notice]);
 
   const orderedOAuth = OAUTH_DISPLAY_ORDER.map((id) => authProviders.find((p) => p.id === id)).filter(
     (p): p is AuthProviderVM => p !== undefined,
@@ -108,15 +115,18 @@ export function LoginPage() {
 
   async function handleGuestEnter() {
     setGuestPending(true);
-    setGuestError(null);
     try {
       // 성공 판정은 "예외 없음"이다 — BE 게스트 응답에는 status 가 없다. 실패는 catch 로 온다.
       const result = await authApi.guestEnter();
       setGuestSession(result.accessToken, result.expiresAt);
       navigate(consumeReturnTo(), { replace: true });
     } catch (err) {
-      // FR-007 — 원인 범주(서버 message)·재시도 방법(버튼 재클릭) 표시
-      setGuestError(isApiError(err) ? err.message : '게스트 입장에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      // FR-007 — 원인 범주(서버 message)·재시도 방법(버튼 재클릭) 표시.
+      // 토스트로 띄우되 포커스는 버튼에 남는다 — 읽고 그 자리에서 다시 누를 수 있다.
+      showToast(
+        isApiError(err) ? err.message : '게스트 입장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        'error',
+      );
     } finally {
       setGuestPending(false);
     }
@@ -132,17 +142,6 @@ export function LoginPage() {
       </h1>
 
       <div className="login-panel">
-        {notice === 'session-expired' && (
-          <p className="login-alert" role="alert">
-            세션이 종료되었습니다. 다시 로그인해 주세요.
-          </p>
-        )}
-        {notice === 'guest-reentry-required' && (
-          <p className="login-alert" role="alert">
-            게스트 이용 시간이 끝났습니다. 다시 입장해 주세요.
-          </p>
-        )}
-
         {orderedOAuth.map((provider) => (
           <button
             key={provider.id}
@@ -166,11 +165,6 @@ export function LoginPage() {
           </span>
           <span className="login-btn-label">{guestProvider.label}</span>
         </button>
-        {guestError && (
-          <p className="login-alert" role="alert">
-            {guestError}
-          </p>
-        )}
       </div>
 
       <footer className="login-footer">
