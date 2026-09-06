@@ -59,6 +59,9 @@ OAuth 없이 로컬 Spring 에서 회원 API(`users/me`·`wallets/me`·아바타
 
 ## 0. 주말 중 받아야 하는 것 (없으면 월요일 진행 불가)
 
+> **2026-09-06 17:00 상태 — A~E 중 회신이 온 것이 없다.** #52(wss·DNS)·#126(dev 진입 경로)·#127(정적 서빙 경로)의 마지막 코멘트는 전부 09-05 의 내 글이다. 즉 **§2~§6(이미지 전달·EC2 기동·Nginx·wss 실측·WebGL 서빙)은 게임 파트만으로 진행할 수 없다.** 산출물(서버 이미지·WebGL·런북)은 로컬에 준비해 두고 전달만 남긴 상태다.
+> 게임 파트가 월요일 오전에 대신 할 수 있는 것은 §1(재빌드)·§7(로컬 실측)·§8 준비뿐이다.
+
 | # | 항목 | 누가 | 확인 방법 |
 |---|---|---|---|
 | A | Cloudflare A 레코드 `world`·`demo`·`api.ssafesta.world` → EC2 | 도메인 소유자 | `nslookup world.ssafesta.world 1.1.1.1` 이 EC2 IP 를 돌려준다 (사내 리졸버는 캐치올이라 믿지 않는다 — T-110) |
@@ -82,6 +85,9 @@ git status --porcelain | grep -v "^??"     # 비어야 한다. 남으면 `git st
 에디터가 건드리는 잡변경(SDF 폰트·RP 에셋·GraphicsSettings·ProjectSettings·`ApiConfig` 로컬 토글)이 있으면 태그에 `-dirty` 가 붙는다. 스탬프는 빌드 **시작 시점**의 트리로 정해진다(-438, !293) — 빌드 중 에디터가 파일을 다시 더럽혀도 태그는 그대로다.
 
 에디터 메뉴 **`Festa/배포/배포 빌드 (Linux 서버 + WebGL + Docker 이미지)`** — 다이얼로그에서 "빌드만" 선택. 산출물:
+
+> 무인으로 돌릴 때(다이얼로그 없이)는 `FestaReleaseBuilder.Run(restartContainer)` 를 리플렉션으로 부르면 된다 — 2026-09-06 에 이 경로로 돌렸다. `EditorApplication.delayCall` 에 걸어야 MCP 호출이 빌드 시간만큼 잡히지 않는다.
+> 소요(2026-09-06 실측, 이 PC): Linux 서버 **1.7분/192 MB**, WebGL 빌드+Brotli 압축 **약 30분**(`.data` Brotli 가 대부분). 진행 확인은 `Builds/web-release/manifest.json` 생성 여부로 — `Editor.log` 는 누적 파일이라 이전 실행의 "완료" 줄에 걸린다.
 
 - `Builds/linux-server/festa-unity.x86_64` (+ `.dockerignore`)
 - `Builds/web-release/` — `index.html`, `Build/`, `TemplateData/`, **`manifest.json`** (Brotli + Decompression Fallback ON)
@@ -159,6 +165,10 @@ rsync -av --delete festa-unity/Builds/web-release/ <ec2>:/srv/festa/webgl/curren
 Nginx `location /unity/` 에 `.wasm → application/wasm`, 해시 파일 `immutable`, `manifest.json`·`index.html` `no-cache`. Brotli 산출물(`.br`)은 `Content-Encoding: br` 이 있으면 빠르고, 없어도 Fallback 으로 뜬다(느림).
 
 FE 이미지는 `VITE_UNITY_BUILD_BASE=<E 의 URL>` 로 **빌드 시점**에 박아야 한다(런타임 주입은 `apiBaseUrl` 만). FE 가 런타임 주입으로 바꾸면 재빌드 없이 된다.
+
+> **⚠ Unity 쪽도 같은 문제가 있었다 (2026-09-06 확인, S15P21A604-459).** 릴리스 WebGL 산출물은 `ApiConfig` 의 활성 환경을 **빌드 타임에** 박는다 — 이번 빌드 로그: `env=Prod spring=https://api.ssafesta.world`. 그래서 ① 그 호스트가 없는 로컬에서는 **배포할 산출물 자체를 검증할 수 없고** ② API 호스트가 바뀌면 40분 재빌드다.
+> 09-06 에 Unity 도 FE 와 **같은 값**(`window.__FESTA_CONFIG__.apiBaseUrl`, 컨테이너 entrypoint 가 `/runtime-config.js` 로 채우는 그 값)을 읽도록 고쳤다. 배포 이미지에 `PUBLIC_API_BASE_URL` 만 넣으면 Unity 도 따라간다. 주입이 없으면 종전대로 빌드 타임 값이다.
+> **이 수정이 들어간 빌드 전에는** 로컬 검증은 Local env 빌드(`Builds/web`)로만 가능하다 — 배포본과 코드는 같고 URL·Development 플래그만 다르다.
 
 ## 7. 게임 파트 실측 (오후 사용자 테스트 전)
 
