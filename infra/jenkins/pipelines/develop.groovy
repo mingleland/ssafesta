@@ -58,7 +58,7 @@ def call(Map config = [:]) {
                     file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE'),
                     string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
                 ]) {
-                    withEnv(['FESTA_ENVIRONMENT=demo']) {
+                    withEnv(['FESTA_ENVIRONMENT=demo', 'PUBLIC_UNITY_BUILD_BASE=/unity/']) {
                         sh 'infra/jenkins/scripts/with-credentials.sh BACK_ENV_FILE AI_ENV_FILE INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-release.sh'
                     }
                 }
