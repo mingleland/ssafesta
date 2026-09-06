@@ -20,7 +20,8 @@ namespace Festa.Network
     /// </summary>
     public static class GrantReplayLedger
     {
-        const string PathEnv = "WORLD_REPLAY_LEDGER";
+        const string PathEnv = "WORLD_LEDGER_PATH";
+        const string LegacyPathEnv = "WORLD_REPLAY_LEDGER";
         const string DefaultPath = "/var/lib/festa-world/used-grants.log";
 
         static readonly Dictionary<string, long> s_used = new Dictionary<string, long>();
@@ -74,6 +75,8 @@ namespace Festa.Network
         {
             s_loaded = true;
             s_path = Environment.GetEnvironmentVariable(PathEnv);
+            if (string.IsNullOrEmpty(s_path))
+                s_path = Environment.GetEnvironmentVariable(LegacyPathEnv);
             if (string.IsNullOrEmpty(s_path))
             {
                 // 에디터에서 `/var/lib/...` 는 존재하지도, 만들 수도 없다.

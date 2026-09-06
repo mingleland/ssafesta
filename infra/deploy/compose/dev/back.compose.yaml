@@ -10,6 +10,9 @@ services:
     environment:
       FESTA_ENVIRONMENT: dev
       SPRING_PROFILES_ACTIVE: infra
+      WORLD_SCHEME: wss
+      WORLD_HOST: world-dev.${ROOT_DOMAIN:?ROOT_DOMAIN is required}
+      WORLD_PORT: "443"
       INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
     volumes: [back_data:/app/data]
     mem_limit: ${BACK_MEMORY_LIMIT:-1g}

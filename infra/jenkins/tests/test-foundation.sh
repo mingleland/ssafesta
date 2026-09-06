@@ -92,6 +92,8 @@ grep -q "file(credentialsId: envCredentialId, variable: 'COMPONENT_ENV_FILE')" "
   || fail "dev component pipeline does not bind runtime env file"
 grep -q "string(credentialsId: tokenCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')" "${component_pipeline}" \
   || fail "dev component pipeline does not bind shared AI-to-Spring token"
+grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
+  || fail "dev game pipeline does not require the connection token Secret file reference"
 grep -q "file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'BACK_ENV_FILE')" "${develop_pipeline}" \
   || fail "demo pipeline does not bind backend runtime env file"
 grep -q "file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE')" "${develop_pipeline}" \
@@ -126,6 +128,7 @@ export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
 export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
 export JENKINS_AGENT_SECRET_UNITY="foundation-unity-agent-value"
+export ROOT_DOMAIN="example.invalid"
 
 if command -v docker >/dev/null 2>&1; then
   runtime_env_dir="$(mktemp -d)"
@@ -137,6 +140,8 @@ if command -v docker >/dev/null 2>&1; then
   docker compose --profile linux-docker --profile deploy --profile unity -f "${agent_compose}" config --quiet
   export COMPONENT_IMAGE_REF="festa-test:0123456789abcdef0123456789abcdef01234567"
   export COMPONENT_ENV_FILE="${runtime_env_dir}/component.env"
+  export CONNECTION_TOKEN_SECRET_FILE="${runtime_env_dir}/connection-token-secret"
+  printf '%s\n' 'Zm91bmRhdGlvbi1vbmx5LWNvbm5lY3Rpb24tdG9rZW4tc2VjcmV0' >"${CONNECTION_TOKEN_SECRET_FILE}"
   export INTERNAL_AI_TO_SPRING_TOKENS=foundation-ai-to-spring-token
   for component in ai back front game; do
     docker compose -f "${repo_root}/infra/deploy/compose/dev/${component}.compose.yaml" config --quiet
