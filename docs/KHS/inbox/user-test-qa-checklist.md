@@ -78,4 +78,5 @@
 | -455 | VIDEO_SCREEN·LIKE_VOTE·CONSULTATION_DESK 근접 반응 | 게시본에 있는데 F 무반응 | 결정 필요(docs/26) |
 | GitLab #137 | 테스트용 AI configId·GAME_PORTAL 바인딩·PROJECT_PANEL 게시 (AI·FE·BE) | 없으면 상담·게임 단계가 토스트로 끝난다 | 이슈 발행 |
 | -456 | FE 임베드에서 Unity 조작 카드 숨김 (FE WorldHud 와 중복) | 배포에서는 조작 안내가 두 장 뜬다 | 수정 |
+| **-457** | **회원 월드 접속 실패 — grant 1,094자 + payload 가 Netcode 연결 요청 한도 초과 (T-125)** | 외형을 저장한 회원은 월드에 못 들어온다 — 회원 시나리오(1·2·6·7) 전부 막힘 | Unity MTU 4096 으로 수정 · BE 에 avatarCode 클레임 제거 요청(GitLab #138) |
 | GitLab #132 메모 | FE 조작 카드에 Shift·Space·우클릭·Alt+클릭 줄 / Esc 메뉴 중 입력 잠금 | 임베드 실측에서 발견 | FE 회신 대기 |
