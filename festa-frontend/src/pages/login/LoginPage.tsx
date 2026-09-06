@@ -54,6 +54,31 @@ function providerIcon(provider: AuthProviderVM) {
   }
 }
 
+/* 푸터 좌측 그룹 아이콘 — 레퍼런스(login.png)의 안내·이벤트·문의 3종.
+   링크 대상이 아직 없어 span 그대로 두고 표시만 맞춘다(대상이 생기면 a 로 바꾼다). */
+const footerIcon = (path: string) => (
+  <svg
+    className="login-footer-icon"
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d={path} />
+  </svg>
+);
+
+const footerLinks = [
+  { label: '축제 안내', icon: footerIcon('M12 3a9 9 0 100 18 9 9 0 000-18M12 8h.01M11 12h1v5h1') },
+  { label: '이벤트', icon: footerIcon('M12 3l2.1 5.4L20 9.3l-4 3.9 1 5.8-5-2.7-5 2.7 1-5.8-4-3.9 5.9-.9z') },
+  { label: '고객센터', icon: footerIcon('M11 4a7 7 0 100 14 7 7 0 000-14M20 21l-4.2-4.2') },
+];
+
 export function LoginPage() {
   const navigate = useNavigate();
   const { notice } = useSession();
@@ -148,9 +173,12 @@ export function LoginPage() {
 
       <footer className="login-footer">
         <div className="login-footer-group">
-          <span>축제 안내</span>
-          <span>이벤트</span>
-          <span>고객센터</span>
+          {footerLinks.map((link) => (
+            <span key={link.label} className="login-footer-item">
+              {link.icon}
+              {link.label}
+            </span>
+          ))}
         </div>
         <div>
           <span>개인정보처리방침</span>
