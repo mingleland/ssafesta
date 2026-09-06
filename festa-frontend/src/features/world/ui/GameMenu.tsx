@@ -43,7 +43,9 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
   }
 
   const account = state.account;
-  const nickname = account?.nickname ?? (isMember ? '불러오는 중...' : '게스트');
+  // 실패를 '불러오는 중...' 으로 위장하지 않는다 — 영원히 로딩처럼 보이던 자리다(T-24 정신).
+  const memberNickname = state.status === 'error' ? '이름을 불러오지 못했습니다' : '불러오는 중...';
+  const nickname = account?.nickname ?? (isMember ? memberNickname : '게스트');
   const provider = account?.providers[0];
 
   return (
@@ -66,6 +68,8 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
             <span className="gm-sub">
               {isMember ? (provider !== undefined ? PROVIDER_LABEL[provider] ?? provider : '회원') : '게스트로 둘러보는 중'}
             </span>
+            {/* 잔액 실패를 침묵하지 않는다 — 0 코인처럼 보이거나 아무것도 없는 것이 더 나쁘다 */}
+            {isMember && walletQuery.isError && <span className="gm-coin">잔액을 불러오지 못했습니다</span>}
             {isMember && walletQuery.data !== undefined && (
               <span className="gm-coin">{walletQuery.data.balance.toLocaleString('ko-KR')} 코인</span>
             )}

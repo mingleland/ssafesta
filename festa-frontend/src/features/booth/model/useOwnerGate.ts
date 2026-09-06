@@ -3,6 +3,7 @@
 // 데이터(GET /booths/mine)에 의존하므로 라우트 가드(guard.ts — 순수 세션 함수)에 넣지 않는다.
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
+import { useSession } from '../../auth/model/session';
 import type { MyBooth } from '../../../entities/booth/types';
 
 export type OwnerGateStatus = 'loading' | 'owner' | 'not-owner' | 'error';
@@ -21,11 +22,17 @@ export function judgeOwner(
 }
 
 export function useOwnerGate(boothId: number): { status: OwnerGateStatus } {
+  const { kind } = useSession();
+  const isMember = kind === 'member';
   const myBoothQuery = useQuery({
     queryKey: ['my-booth'], // SlotListPage와 키 공유 — 캐시 재사용
     queryFn: leaseApi.getMyBooth,
-    enabled: Number.isFinite(boothId),
+    // 게스트는 403 — 요청 자체를 만들지 않는다. 이 라우트는 member-only 라 지금은 도달하지
+    // 않지만, 훅이 그 가정에 기대면 라우트 등급이 바뀔 때 조용히 깨진다(S15P21A604-458).
+    enabled: isMember && Number.isFinite(boothId),
   });
+  // 회원이 아니면 소유자가 아니다 — 서버에 묻지 않고도 판정이 선다
+  if (!isMember) return { status: 'not-owner' };
   return {
     status: judgeOwner(myBoothQuery.data, myBoothQuery.isLoading, myBoothQuery.isError, boothId),
   };
