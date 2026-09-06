@@ -34,6 +34,11 @@
      World 는 Consultation Quick Access(top 20px + 40px). 둘 다 피하는 하나의 값을 쓴다.
      ToastHost 는 라우터 밖(#root 직속)이라 화면 요소가 정의한 변수는 상속되지 않는다 —
      화면별로 갈라야 할 이유가 생기면 그때 body 속성 등으로 나눈다. */
+  /* 화면 모서리 컨트롤의 공통 치수. 우상단 사용자 액션(사운드·향후 그래픽)과
+     좌상단 개발 진입구가 같은 크기를 쓴다 — 두 모서리가 한 벌로 보이게 (S15P21A604-467) */
+  --festa-control-size: clamp(48px, 4vh, 72px);
+  --festa-control-radius: clamp(12px, 1.3vh, 20px);
+
   --festa-toast-top: calc(3vh + clamp(48px, 4vh, 72px) + 10px);
 
   --festa-z-screen-ui: 40;

@@ -13,6 +13,7 @@ import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { apiBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
+import { DevEntryButton } from '../../features/devEntry/ui/DevEntryButton';
 import { showToast } from '../../shared/ui/toast/toastStore';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
@@ -135,6 +136,8 @@ export function LoginPage() {
   return (
     <div className="login-root">
       <ScreenControls />
+      {/* 개발자 입장구 — 제품 로그인 버튼을 빌려 쓰지 않는다. 패널 밖이라 버튼 좌표를 밀지 않는다 */}
+      <DevEntryButton />
       <img className="login-bg" src={loginBackgroundUrl} alt="" />
       <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
       <h1 className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
