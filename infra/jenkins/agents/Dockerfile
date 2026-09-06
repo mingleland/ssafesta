@@ -16,6 +16,7 @@ RUN apt-get update \
         libgl1 \
         libglu1-mesa \
         libgtk-3-0t64 \
+        libicu76 \
         libnss3 \
         libxss1 \
         libxtst6 \
