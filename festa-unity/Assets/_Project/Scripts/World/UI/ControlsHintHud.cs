@@ -45,6 +45,29 @@ namespace Festa.World.UI
         public bool IsOpen => _open;
         public static ControlsHintHud Instance { get; private set; }
 
+#if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
+        [System.Runtime.InteropServices.DllImport("__Internal")] static extern int FestaHostHasUi();
+#endif
+        static bool? s_hostUi;
+
+        /// <summary>
+        /// FE(React) 임베드인가 — <c>window.FestaUnity.onBoothInteract</c> 수신부가 있으면 FE 가 자기 조작 안내(WorldHud)를 그리므로
+        /// Unity 카드는 중복이다 (2026-09-06 임베드 실측, S15P21A604-456). 단독 실행·에디터·probe 에서는 false.
+        /// </summary>
+        public static bool HostProvidesUi
+        {
+            get
+            {
+                if (s_hostUi.HasValue) return s_hostUi.Value;
+#if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
+                try { s_hostUi = FestaHostHasUi() == 1; } catch (System.Exception) { s_hostUi = false; }
+#else
+                s_hostUi = false;
+#endif
+                return s_hostUi.Value;
+            }
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
@@ -63,6 +86,7 @@ namespace Festa.World.UI
 
         void Update()
         {
+            if (HostProvidesUi) return;   // FE 임베드 — 조작 안내는 FE WorldHud 몫
             if (_owner == null || !_owner.IsSpawned)
             {
                 _owner = null;
@@ -93,7 +117,7 @@ namespace Festa.World.UI
 
         void OnGUI()
         {
-            if (_owner == null) return;
+            if (HostProvidesUi || _owner == null) return;
             if (InputBridge.IsLocked || InteractionFocusCamera.IsFocused) return;
 
             float ui = Screen.height / 1080f;
