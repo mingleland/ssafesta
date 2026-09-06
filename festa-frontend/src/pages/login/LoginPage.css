@@ -25,7 +25,11 @@
   --login-pad-y: clamp(14px, 2.3vh, 26px);
   --login-pad-x: clamp(18px, 2.8vw, 56px);
   /* 첫 버튼(SSAFY) 상단이 여기 오면 나머지는 pitch 로 따라온다 — acceptance 기준점 */
-  --login-first-btn-top: 58.8%;
+  /* 레퍼런스(login.png) 비율은 58.8% 다. 다만 그 아래 패널·푸터가 들어갈 높이가 없으면
+     패널이 푸터를 뚫는다(실측: vh 500 에서 67px 겹침). min() 으로 "레퍼런스 비율" 과
+     "아래 공간을 300px 남긴다" 중 작은 쪽을 택한다 — vh 728 이상에서는 58.8% 그대로라
+     1920x1080·1440x900·1280x800 의 확정 좌표가 바뀌지 않는다. */
+  --login-first-btn-top: min(58.8%, calc(100% - 300px));
 }
 
 .login-bg {
@@ -107,6 +111,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.12s ease, filter 0.12s ease;
+  position: relative; /* 배지를 흐름 밖으로 띄우기 위한 기준 */
 }
 
 .login-btn:hover:not(:disabled) {
@@ -170,8 +175,13 @@
   font-weight: 500;
 }
 
+/* 배지는 레이아웃 흐름에서 뺀다. flex 항목으로 두면 SSAFY 버튼의 라벨 가용 폭만 줄어들어
+   그 버튼의 글자만 왼쪽으로 밀린다 — Google·Kakao 와 중앙이 어긋난다. */
 .login-badge {
-  flex-shrink: 0;
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   font-size: 11px;
   font-weight: 700;
   color: #ffffff;
