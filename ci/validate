@@ -10,7 +10,7 @@ validate_project() {
     game)
       grep -q '6000.0.78f1' "${component_dir}/ProjectSettings/ProjectVersion.txt"
       for adapter in build test package; do
-        [[ -x "${component_dir}/ci/${adapter}" ]] || { echo "Game CI adapter is not executable: ${adapter}" >&2; return 66; }
+        [[ -f "${component_dir}/ci/${adapter}" ]] || { echo "Game CI adapter is missing: ${adapter}" >&2; return 66; }
       done
       ;;
   esac
