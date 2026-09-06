@@ -57,6 +57,15 @@ namespace Festa.Content
             var cam = ResolveCamera();
             if (cam == null) return;
 
+            // 화면(미니게임 HUD·호스트 Overlay)이 열려 있으면 조준·프롬프트도 멈춘다 — 잠금 중에 프롬프트가
+            // 겹쳐 떠 있으면 "눌러도 안 된다" 로 보인다 (S15P21A604-437).
+            if (Festa.Integration.InputBridge.IsLocked)
+            {
+                UpdateHover(null);
+                ShowHint(null);
+                return;
+            }
+
             bool interactKey = InteractKeyPressedThisFrame();
 
             // ── 1순위: 마우스 조준 ──────────────────────────────
@@ -171,6 +180,9 @@ namespace Festa.Content
         /// </summary>
         static bool InteractKeyPressedThisFrame()
         {
+            // 호스트 Overlay 가 열려 있으면 F 를 읽지 않는다 (G-8, InputBridge) — 오버레이 입력창에 'f' 를
+            // 치는 것이 뒤의 부스를 열면 안 된다.
+            if (Festa.Integration.InputBridge.IsLocked) return false;
 #if ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;
             if (keyboard != null) return keyboard.fKey.wasPressedThisFrame;
@@ -204,6 +216,12 @@ namespace Festa.Content
             // 없어서(부스 종속이 아니다, S15P21A604-414) 아래 Type 분기로는 잡히지 않는다.
             if (target.GetComponentInParent<Festa.World.ManagementDeskInteractable>() != null)
                 return "내 부스 관리";
+            if (target.GetComponentInParent<Festa.Minigame.Slot.SlotMachineInteractable>() != null)
+                return "슬롯머신 (10코인)";
+            if (target.GetComponentInParent<Festa.Content.Arcade.ArcadeMachineInteractable>() != null)
+                return "게임기 플레이";
+            if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
+                return "타이밍 스톱 게임";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
@@ -213,8 +231,21 @@ namespace Festa.Content
                 case Festa.Booth.BoothObjectType.AiAgent:      return "AI 직원과 대화";
                 case Festa.Booth.BoothObjectType.ProjectPanel: return "프로젝트 전시 보기";
                 case Festa.Booth.BoothObjectType.SurveyKiosk:  return "설문 참여하기";
+                case Festa.Booth.BoothObjectType.GamePortal:   return "게임기 플레이";
                 default: return "상호작용";
             }
+        }
+
+        /// <summary>
+        /// 상호작용 대상이 직접 띄우는 짧은 안내 — 콘텐츠 미연결(configId 0) 처럼 브리지 이벤트가 나가지 않아
+        /// <see cref="OnBridgeSent"/> 토스트가 뜨지 않는 경우에 쓴다. 아무 반응 없이 끝나면 "고장" 으로 보인다 (S15P21A604-448).
+        /// </summary>
+        public static void Toast(string text, float seconds = 2.5f)
+        {
+            Ensure();
+            if (_instance == null || string.IsNullOrEmpty(text)) return;
+            _instance._toast = text;
+            _instance._toastUntil = Time.unscaledTime + seconds;
         }
 
         void OnBridgeSent(string type)
@@ -226,6 +257,8 @@ namespace Festa.Content
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.ArcadeInteract     ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
+                type == Bridge.GameInteract       ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                                                     "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
             _toastUntil = Time.unscaledTime + 2.5f;
         }

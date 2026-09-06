@@ -49,6 +49,16 @@ namespace Festa.Integration
         public const string ManagementInteract = "WORLD_MANAGEMENT_INTERACT";
 
         /// <summary>
+        /// 광장 게임기 (S15P21A604-440, GitLab #56 안 1). <c>{type, machineId}</c> — machineId 는 씬이 정한 canonical id 이고
+        /// FE 가 <c>GET /api/v1/arcade-machines/{machineId}</c> 로 어떤 게임이 걸렸는지 resolve 한다. Unity 는 gameId 를 모른다.
+        /// 이벤트 이름은 게임 파트 제안(docs/26 ③) — FE 수신부 확정 전.
+        /// </summary>
+        public const string ArcadeInteract = "WORLD_ARCADE_INTERACT";
+
+        /// <summary>부스 배치 GAME_PORTAL (spec 019 contracts/game-portal-bridge.md). <c>{type, boothId, objectId, configId}</c>, configId 는 1 이상.</summary>
+        public const string GameInteract = "BOOTH_GAME_INTERACT";
+
+        /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
         /// 노트북 F 의 가시 결과(홈페이지 열기)는 FE 몫이라, FE 가 없는 단독 실행에서는
         /// 발동해도 화면 변화가 없어 "안 된다" 로 보인다 — 월드 쪽이 최소한의 피드백을
@@ -149,6 +159,31 @@ namespace Festa.Integration
         {
             Send(BuildTypeOnlyJson(ManagementInteract));
             OnSent?.Invoke(ManagementInteract);
+        }
+
+        /// <summary>광장 게임기 — <see cref="ArcadeInteract"/>.</summary>
+        public static void SendArcadeInteract(string machineId)
+        {
+            if (string.IsNullOrEmpty(machineId))
+            {
+                Debug.LogWarning($"[BoothInteractBridge] machineId 가 없어 {ArcadeInteract} 이벤트를 건너뜁니다.");
+                return;
+            }
+            Send("{\"type\":\"" + ArcadeInteract + "\",\"machineId\":\"" + EscapeJson(machineId) + "\"}");
+            OnSent?.Invoke(ArcadeInteract);
+        }
+
+        /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>
+        public static void SendGameInteract(int boothId, string objectId, int configId)
+        {
+            if (!HasObjectId(GameInteract, objectId)) return;
+            if (configId <= 0)
+            {
+                Debug.LogWarning($"[BoothInteractBridge] configId={configId} 는 미연결이라 {GameInteract} 이벤트를 건너뜁니다 (booth={boothId}, object={objectId}).");
+                return;
+            }
+            Send(BuildJson(GameInteract, boothId, objectId, configId: configId));
+            OnSent?.Invoke(GameInteract);
         }
 
         static bool HasObjectId(string type, string objectId)

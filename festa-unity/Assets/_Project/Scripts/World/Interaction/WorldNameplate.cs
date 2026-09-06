@@ -31,7 +31,7 @@ namespace Festa.World
     public sealed class WorldNameplate : MonoBehaviour
     {
         /// <summary>SDF 폰트 경로. 한글이라 프로젝트 폰트로 구운 것을 쓴다.</summary>
-        const string FontResourcePath = "Fonts/MalgunGothic_SDF";
+        const string FontResourcePath = "Fonts/NotoSansKRBold_SDF";   // 2026-09-06 이름표는 굵은 본문 글꼴(Noto Sans KR Bold) — 멀리서도 읽힌다
 
         [Tooltip("표시할 이름. 비어 있으면 그리지 않는다.")]
         [SerializeField] string _label;
@@ -72,6 +72,11 @@ namespace Festa.World
         Transform _headBone;
         float _headToTop;
 
+        // 몸 렌더러 — 오클루전 컬링·프러스텀 밖·초점 모드 숨김으로 몸이 안 보이면 이름표도 끈다
+        // (벽 너머로 이름표만 떠다니던 것, 사용자 지적 2026-09-06).
+        Renderer[] _bodyRenderers;
+        int _bodyRefreshFrame;
+
         public string Label
         {
             get => _label;
@@ -103,6 +108,9 @@ namespace Festa.World
             _text = rootGo.AddComponent<TextMeshPro>();
             _root = _text.rectTransform;
             _root.SetParent(transform, false);
+            // 글자 크기는 월드 유닛 기준이다 — 부스 앵커(13.26배) 아래의 NPC 처럼 부모가 스케일돼 있으면 그만큼 되돌린다 (2026-09-06, AI 도우미 이름표 8 m).
+            var ls = transform.lossyScale;
+            _root.localScale = new Vector3(1f / Mathf.Max(ls.x, 1e-4f), 1f / Mathf.Max(ls.y, 1e-4f), 1f / Mathf.Max(ls.z, 1e-4f));
             _root.position = transform.position;   // 정확한 높이는 LateUpdate 가 잡는다
 
             var font = Resources.Load<TMP_FontAsset>(FontResourcePath);
@@ -208,6 +216,23 @@ namespace Festa.World
         /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
         float RawTopY() => _headBone != null ? _headBone.position.y + _headToTop : _topY;
 
+        // 머리 본을 못 잡았으면 주기적으로 다시 시도한다. 첫 측정은 아바타 파츠가 조립되기 전에 돌 수
+        // 있어 Animator 가 아직 없고, 그러면 이름표가 **고정 높이**로 굳어 앉기(SitGround)·마시기 이모트에
+        // 몸이 내려가도 허공에 남는다 (2026-09-05 사용자 테스트). 본이 잡히면 높이도 다시 잰다.
+        int _rebindAttempts;
+        const int RebindEveryFrames = 30, RebindMaxAttempts = 200;   // 약 0.5초 간격, 최대 ~100초
+        void TryRebindHead()
+        {
+            if (_headBone != null || _rebindAttempts >= RebindMaxAttempts) return;
+            if (Time.frameCount % RebindEveryFrames != 0) return;
+            _rebindAttempts++;
+            var animator = GetComponentInChildren<Animator>();
+            if (animator == null || !animator.isHuman) return;
+            var head = animator.GetBoneTransform(HumanBodyBones.Head);
+            if (head == null) return;
+            MeasureTop();   // 파츠가 다 붙은 지금 기준으로 정점·머리 오프셋을 다시 잰다
+        }
+
         /// <summary>
         /// 머리 높이를 <b>부드럽게</b> 따라간다.
         ///
@@ -239,6 +264,7 @@ namespace Festa.World
         {
             if (_text == null) return;
             if (!_measured) MeasureTop();
+            TryRebindHead();
 
             var cam = Camera.main;
             if (cam == null) { if (_renderer != null) _renderer.enabled = false; return; }
@@ -247,7 +273,9 @@ namespace Festa.World
             float camDist = Vector3.Distance(cam.transform.position, transform.position);
             float scale = Mathf.Clamp(camDist / Mathf.Max(1f, _referenceDistance), 0.6f, 3f);
             float size = _baseCharacterHeight * scale;
-            _root.localScale = Vector3.one * size;
+            // 부모가 스케일된 NPC(부스 앵커 13.26배)에서는 그만큼 되돌린다 — 플레이어(lossy 1)는 종전과 같다.
+            var ls = transform.lossyScale;
+            _root.localScale = new Vector3(size / Mathf.Max(ls.x, 1e-4f), size / Mathf.Max(ls.y, 1e-4f), size / Mathf.Max(ls.z, 1e-4f));
 
             // pivot 이 바닥이라 글자는 이 지점 위로 그려진다. 간격을 월드 고정값으로 두면
             // 이름표가 커질수록 공백이 벌어져 머리 위에 붕 뜬다 — 크기에 비례시켜 화면상
@@ -259,7 +287,7 @@ namespace Festa.World
             float dist = toCam.magnitude;
 
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label);
+            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label) && IsBodyVisible();
             _renderer.enabled = show;
             if (!show) return;
 
@@ -274,6 +302,26 @@ namespace Festa.World
             flat.y = 0f;
             if (flat.sqrMagnitude > 0.0001f)
                 _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
+        }
+
+        /// <summary>
+        /// 몸 렌더러 중 하나라도 이번 프레임에 그려졌는가(<see cref="Renderer.isVisible"/> 는 프러스텀·오클루전 컬링 결과를 반영한다).
+        /// 전부 비활성(초점 모드 자기 숨김)이거나 컬링됐으면 false.
+        /// </summary>
+        bool IsBodyVisible()
+        {
+            if (_bodyRenderers == null || Time.frameCount - _bodyRefreshFrame > 120)
+            {
+                var list = new System.Collections.Generic.List<Renderer>();
+                foreach (var r in GetComponentsInChildren<Renderer>(true))
+                    if (r != null && !(r is TMPro.TMP_SubMesh) && !r.transform.IsChildOf(_root) && r.gameObject.name != "__FestaOutline") list.Add(r);
+                _bodyRenderers = list.ToArray();
+                _bodyRefreshFrame = Time.frameCount;
+            }
+            if (_bodyRenderers.Length == 0) return true;   // 몸을 모르면 종전대로 보인다
+            foreach (var r in _bodyRenderers)
+                if (r != null && r.enabled && r.gameObject.activeInHierarchy && r.isVisible) return true;
+            return false;
         }
 
         void OnDestroy()

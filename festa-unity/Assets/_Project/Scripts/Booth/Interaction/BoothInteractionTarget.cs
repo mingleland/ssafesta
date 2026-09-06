@@ -109,6 +109,19 @@ namespace Festa.Booth
             EnsureCollider();
             CacheRenderers();
 
+            // **씬에 직접 놓인 대상은 여기서 Interactive 를 켠다.** 전에는 팩토리의 Configure() 만 켰기
+            // 때문에 관리 데스크(-414)·Festival_Arcade 처럼 씬에 배치된 대상은 런타임에 Interactive=false 로
+            // 남아 디스패처가 조준·근접 대상에서 제외했다 — F 를 눌러도 아무 일이 없었다(T-123).
+            // 판정 기준은 디스패처가 Interact 대상을 고르는 것과 같다: IBoothInteractable 이 자기/부모/자식에 있는가.
+            // 팩토리는 이 뒤에 Configure() 로 덮어쓰므로 부스 오브젝트 동작은 바뀌지 않는다.
+            if (!Interactive &&
+                (GetComponentInParent<Festa.Content.IBoothInteractable>() != null ||
+                 GetComponentInChildren<Festa.Content.IBoothInteractable>(true) != null))
+            {
+                Interactive = true;
+                _highlightEnabled = true;
+            }
+
             // 호버 감지는 중앙 디스패처가 한다. `OnMouseEnter/Exit` 은 Unity 6 WebGL 에서
             // 발생하지 않는다 (T-166) — 배포 환경에서 하이라이트가 아예 동작하지 않았고,
             // 이 메서드들이 존재하는 것만으로 Unity 가 매 프레임 레거시 마우스 디스패처를
@@ -156,44 +169,99 @@ namespace Festa.Booth
             else RestoreMaterials();
         }
 
+        // ── 외곽선 하이라이트 (S15P21A604-437) ──────────────────────
+        // 전에는 렌더러 재질을 인스턴스로 바꿔 에미션을 켰다 — prefab 전체(관리 데스크의 NPC+테이블)가
+        // 노랗게 빛나 "선택" 이 아니라 "발광" 으로 보였다. 이제는 대상 부위 렌더러마다 같은 메시를
+        // 노멀 방향으로 밀어 낸 **앞면 컬링 복제 렌더러**를 자식으로 붙여 테두리만 그린다(Festa/Outline).
+        // 원본 재질은 건드리지 않으므로 재질 누수·복원 실패 계열의 문제가 사라진다.
+        [Tooltip("이 트랜스폼 아래 렌더러에만 외곽선을 건다. 비우면 대상 전체 — 관리 데스크처럼 NPC+테이블이 " +
+                 "한 대상이면 NPC 쪽 트랜스폼을 지정한다.")]
+        [SerializeField] Transform _highlightRoot;
+        [SerializeField, Range(0.05f, 2f)] float _outlineWidth = 0.35f;   // 월드 유닛 (1 m = 13.26)
+        static Material s_outlineMaterialTemplate;
+        Material _outlineMaterial;
+        readonly List<GameObject> _outlineObjects = new();
+        const string OutlineObjectName = "__FestaOutline";
+
+        /// <summary>외곽선을 걸 트랜스폼을 코드에서 정한다(팩토리·씬 배치 양쪽).</summary>
+        public void SetHighlightRoot(Transform root) => _highlightRoot = root;
+
         void ApplyHighlightMaterials()
         {
-            _originalMaterials.Clear();
-            foreach (var r in _renderers)
+            if (_outlineMaterial == null)
             {
-                if (r == null) { _originalMaterials.Add(null); continue; }
-                var originals = r.sharedMaterials;
-                _originalMaterials.Add(originals);
-
-                var copies = new Material[originals.Length];
-                for (int i = 0; i < originals.Length; i++)
+                if (s_outlineMaterialTemplate == null)
                 {
-                    if (originals[i] == null) continue;
-                    var m = new Material(originals[i]);
-                    // 키워드까지 켜야 실제로 빛난다 — MPB 로는 못 하던 부분이다.
-                    m.EnableKeyword("_EMISSION");
-                    m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
-                    if (m.HasProperty(EmissionColor))
-                        m.SetColor(EmissionColor, _highlightColor * _highlightStrength);
-                    copies[i] = m;
-                    _instanced.Add(m);
+                    var shader = Shader.Find("Festa/Outline");
+                    if (shader == null)
+                    {
+                        Debug.LogError("[BoothInteractionTarget] Festa/Outline 셰이더를 찾지 못했다 — Resources/Shaders 에 있어야 빌드에 포함된다. 하이라이트 없이 진행한다.");
+                        return;
+                    }
+                    s_outlineMaterialTemplate = new Material(shader);
                 }
-                r.materials = copies;
+                _outlineMaterial = new Material(s_outlineMaterialTemplate);
+                _outlineMaterial.SetColor("_Color", _highlightColor);
+                _outlineMaterial.SetFloat("_Width", _outlineWidth);
+                _instanced.Add(_outlineMaterial);
             }
+
+            var root = _highlightRoot != null ? _highlightRoot : transform;
+            foreach (var r in root.GetComponentsInChildren<Renderer>(false))
+            {
+                if (r == null || r.gameObject.name == OutlineObjectName) continue;
+                if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) continue;
+
+                var go = new GameObject(OutlineObjectName);
+                go.transform.SetParent(r.transform, false);
+                go.layer = r.gameObject.layer;
+
+                if (r is SkinnedMeshRenderer skinned)
+                {
+                    var copy = go.AddComponent<SkinnedMeshRenderer>();
+                    copy.sharedMesh = skinned.sharedMesh;
+                    copy.bones = skinned.bones;
+                    copy.rootBone = skinned.rootBone;
+                    copy.localBounds = skinned.localBounds;
+                    copy.quality = skinned.quality;
+                    copy.updateWhenOffscreen = skinned.updateWhenOffscreen;
+                    copy.sharedMaterials = Repeat(_outlineMaterial, skinned.sharedMaterials.Length);
+                    copy.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    copy.receiveShadows = false;
+                }
+                else if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var filter) && filter.sharedMesh != null)
+                {
+                    go.AddComponent<MeshFilter>().sharedMesh = filter.sharedMesh;
+                    var copy = go.AddComponent<MeshRenderer>();
+                    copy.sharedMaterials = Repeat(_outlineMaterial, r.sharedMaterials.Length);
+                    copy.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    copy.receiveShadows = false;
+                }
+                else
+                {
+                    Destroy(go);
+                    continue;
+                }
+                _outlineObjects.Add(go);
+            }
+        }
+
+        static Material[] Repeat(Material m, int count)
+        {
+            var arr = new Material[Mathf.Max(1, count)];
+            for (int i = 0; i < arr.Length; i++) arr[i] = m;
+            return arr;
         }
 
         void RestoreMaterials()
         {
-            for (int i = 0; i < _renderers.Count && i < _originalMaterials.Count; i++)
-            {
-                var r = _renderers[i];
-                if (r == null || _originalMaterials[i] == null) continue;
-                r.sharedMaterials = _originalMaterials[i];
-            }
+            foreach (var go in _outlineObjects) if (go != null) Destroy(go);
+            _outlineObjects.Clear();
             _originalMaterials.Clear();
             // 만든 인스턴스는 반드시 지운다 — 강조할 때마다 새로 만들면 재질이 샌다.
             foreach (var m in _instanced) if (m != null) Destroy(m);
             _instanced.Clear();
+            _outlineMaterial = null;
         }
 
         void OnDestroy() => RestoreMaterials();

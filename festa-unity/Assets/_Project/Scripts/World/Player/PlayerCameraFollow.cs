@@ -103,6 +103,13 @@ namespace Festa.World
         /// 텔레포트 직후 카메라를 플레이어 뒤로 즉시 스냅한다. 보간에 맡기면
         /// 카메라가 맵을 가로질러 날아오며 오클루전이 셀마다 번쩍인다.
         /// </summary>
+        /// <summary>목적지가 정한 방향(yaw)으로 궤도를 돌리고 뒤로 스냅한다 — 포털 입장 뒤 부스를 바라보게 (2026-09-06).</summary>
+        public void SnapBehind(float yaw)
+        {
+            _yaw = yaw;
+            SnapBehind();
+        }
+
         public void SnapBehind()
         {
             if (_cam == null) return;

@@ -39,6 +39,8 @@ namespace Festa.Content
                 return;
             }
 
+            // C-04(노트북 연출): 화면이 켜지는 3D 연출 대신 **초점 카메라 줌**으로 통일 — 노트북에 다가가 화면을 들여다보는 구도(-299).
+            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 2.0f);
             BoothInteractBridge.SendLaptopInteract(_runtimeObject.BoothId, _runtimeObject.ObjectId);
         }
     }

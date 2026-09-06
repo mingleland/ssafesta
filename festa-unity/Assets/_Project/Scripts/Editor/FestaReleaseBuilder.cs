@@ -114,6 +114,9 @@ namespace Festa.EditorTools
         static void Run(bool restartContainer)
         {
             var started = DateTime.Now;
+            // 이미지 태그(소스 스탬프)는 **어떤 에셋도 건드리기 전**에 읽는다. 아래 ForceApiEnvironment 가
+            // ApiConfig.asset 을 디스크에 저장하므로, 3/3 단계에서 읽으면 깨끗한 체크아웃도 항상 -dirty 가 된다.
+            var sourceStamp = SourceStamp(ProjectRoot());
 
             // 되돌릴 것들. 여기서 놓치면 이후 에디터 작업이 조용히 어긋난다.
             var prevTarget = EditorUserBuildSettings.activeBuildTarget;
@@ -143,7 +146,7 @@ namespace Festa.EditorTools
                     return;
                 }
 
-                var tags = BuildImage();
+                var tags = BuildImage(sourceStamp);
                 if (tags == null) return;
 
                 if (restartContainer && !RecreateContainer(tags[0])) return;
@@ -443,8 +446,11 @@ namespace Festa.EditorTools
             return false;
         }
 
-        /// <summary>이미지를 빌드하고 붙인 태그를 돌려준다. 실패면 null.</summary>
-        static string[] BuildImage()
+        /// <summary>이미지를 빌드하고 붙인 태그를 돌려준다. 실패면 null. 스탬프는 호출 시점의 트리 상태.</summary>
+        static string[] BuildImage() => BuildImage(SourceStamp(ProjectRoot()));
+
+        /// <param name="sourceStamp">이미지 태그에 쓸 소스 스탬프 — 배포 빌드는 에셋을 강제 저장하기 전에 읽은 값을 넘긴다.</param>
+        static string[] BuildImage(string sourceStamp)
         {
             var root = ProjectRoot();
             if (!File.Exists(Path.Combine(root, DockerfilePath)))
@@ -455,7 +461,7 @@ namespace Festa.EditorTools
 
             // 커밋 해시를 태그로 남긴다 — "지금 도는 컨테이너가 어느 코드냐"에 답할 수 있어야 한다.
             // 커밋되지 않은 변경이 섞였으면 -dirty 를 붙인다. 재현 불가를 숨기지 않기 위해서다.
-            var tags = new[] { $"{ImageName}:dev", $"{ImageName}:{SourceStamp(root)}" };
+            var tags = new[] { $"{ImageName}:dev", $"{ImageName}:{sourceStamp}" };
             var args = new StringBuilder("build");
             foreach (var tag in tags) args.Append($" -t {tag}");
             args.Append($" -f {DockerfilePath} {ServerOutDir}");
