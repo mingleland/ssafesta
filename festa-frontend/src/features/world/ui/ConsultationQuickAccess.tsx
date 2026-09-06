@@ -5,9 +5,9 @@
 // 다른 기능이 "자주 쓴다"는 이유로 여기 붙지 않는다.
 //
 // 표기는 상태 유무를 점(●)으로만 나타낸다 — 실제 데이터에 없는 unread count·숫자를 만들지 않는다.
-import { openOverlay } from '../../../shared/types/overlay';
 import { useVisitorConsultation } from '../../consultation/model/visitor';
 import './consultationQuickAccess.css';
+import { openVisitorOverlay } from '../model/worldScreen';
 
 const IcBubble = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -31,6 +31,7 @@ function describe(phase: string): { label: string; active: boolean } {
   }
 }
 
+// 진입은 소유권 계층을 통과한다 — 다른 레이어가 떠 있으면 그것이 먼저 닫힌다
 export function ConsultationQuickAccess() {
   const state = useVisitorConsultation();
   const { label, active } = describe(state.phase);
@@ -51,7 +52,7 @@ export function ConsultationQuickAccess() {
         title={canReopen ? label : '부스의 AI 직원과 대화하다 사람 상담을 요청할 수 있습니다'}
         disabled={!canReopen}
         onClick={() => {
-          if (boothId !== null) openOverlay('CONSULTATION', { boothId });
+          if (boothId !== null) openVisitorOverlay('CONSULTATION', { boothId });
         }}
       >
         {IcBubble}
