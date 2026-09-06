@@ -36,7 +36,7 @@ fi
 SH
 chmod +x "${work_dir}/docker"; export FAKE_DOCKER_LOG="${work_dir}/docker.log"
 export DOCKER_BIN="${work_dir}/docker" COMPOSE_FILE="${repo_root}/infra/deploy/compose/integration/compose.yaml" COMPOSE_PROJECT=festa-integration
-export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid/api
+export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
 bash "${repo_root}/infra/deploy/scripts/deploy-release.sh"
 grep -q 'up -d --wait ai back front game' "${FAKE_DOCKER_LOG}"
 [[ ! -e "${work_dir}/target-state.json" ]]
