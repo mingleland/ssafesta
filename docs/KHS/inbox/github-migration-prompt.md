@@ -39,7 +39,7 @@ git filter-repo --prune-empty never --prune-degenerate never --invert-paths --pa
 ```
 
 - `--prune-empty never` — 에셋만 건드린 커밋(예: 벤더 패키지 임포트)은 경로를 빼면 빈 커밋이 된다. 기본값 `auto` 는 그걸 지운다. 지우면 커밋 수가 원본과 달라지고, "언제 무엇을 넣었는가" 라는 기록이 사라진다.
-- `--prune-degenerate never` — MR 341건이 남긴 머지 커밋 중 한쪽 부모가 비게 된 것들이 접히지 않게 한다. 접히면 브랜치 그래프가 직선이 되어 MR 단위 작업 흐름이 안 보인다.
+- `--prune-degenerate never` — MR 343건이 남긴 머지 커밋 중 한쪽 부모가 비게 된 것들이 접히지 않게 한다. 접히면 브랜치 그래프가 직선이 되어 MR 단위 작업 흐름이 안 보인다.
 - 작성자·커밋 시각은 filter-repo 가 그대로 보존한다. 날짜를 다시 쓰지 마라.
 - push 는 `git push --mirror` 로 모든 ref 를 한 번에 올린다. GitLab mirror clone 에는 `refs/merge-requests/*` 가 들어 있어 MR 별 커밋까지 따라간다. GitHub 이 특정 ref 네임스페이스를 거부하면 **조용히 빼지 말고 무엇이 거부됐는지 보고**한다.
 
