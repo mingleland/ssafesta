@@ -22,7 +22,10 @@ class FakeAudio {
   volume = 1;
   currentTime = 0;
   paused = true;
-  constructor(public src: string) {}
+  src: string;
+  constructor(src: string) {
+    this.src = src;
+  }
   play(): Promise<void> {
     if (FakeAudio.rejectPlay) return Promise.reject(new DOMException('blocked', 'NotAllowedError'));
     this.paused = false;
