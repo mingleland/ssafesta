@@ -11,11 +11,13 @@ openapi="${repo_root}/specs/infra-003-unity-server-deploy/contracts/world-sessio
 token_contract="${repo_root}/specs/infra-003-unity-server-deploy/contracts/world-entry-token.md"
 runtime_contract="${unity_server_dir}/contracts/runtime-env.md"
 env_example="${unity_server_dir}/.env.example"
+ledger_source="${repo_root}/festa-unity/Assets/_Project/Scripts/Network/Auth/GrantReplayLedger.cs"
 
 assert_file "${openapi}"
 assert_file "${token_contract}"
 assert_file "${runtime_contract}"
 assert_file "${env_example}"
+assert_file "${ledger_source}"
 
 assert_contains "${openapi}" '^openapi:[[:space:]]+3\.1\.0$' 'OpenAPI version must remain 3.1.0'
 assert_contains "${openapi}" '^[[:space:]]+required:[[:space:]]+false$' 'request body must remain optional'
@@ -40,6 +42,7 @@ for key in GAME_IMAGE_REF ROOT_DOMAIN CONNECTION_TOKEN_SECRET_FILE WORLD_ENTRY_T
   grep -Eq "^${key}=" "${env_example}" || fail ".env.example missing ${key}"
 done
 assert_not_contains "${env_example}" '^(CONNECTION_TOKEN_SECRET|CONNECTION_TOKEN_SECRET_FILE)=.+' 'Secret values must not be committed'
+assert_contains "${ledger_source}" 'PathEnv = "WORLD_LEDGER_PATH"' 'game runtime must consume the documented ledger path variable'
 pass 'runtime environment reference names'
 
 assert_contains "${runtime_contract}" '동일 Secret reference' 'Backend and game must consume one Secret reference'

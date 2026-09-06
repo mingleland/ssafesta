@@ -42,7 +42,7 @@ IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반
 | 3조 AI 장애 격리 | AI·R2 장애 시 문서 기능만 제한하고 로그인·부스·월드와 CI/CD는 유지한다. | PASS |
 | 6조 WebSocket 경계 | `Cloudflare → Nginx:443 → ws://unity:7777` 경계만 정의하며 7777을 공개하지 않는다. ALB·NLB·ACM은 사용하지 않고 최종 timeout은 infra-003에 위임한다. | PASS |
 | 7조 Docker·단일 EC2 | 서버 컴포넌트는 Docker image로 실행하고 관리형 AWS나 IAM을 선행조건으로 두지 않는다. | PASS |
-| 8조 endpoint 주입 | `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`과 dev IP 경로는 manifest·환경 설정·world-sessions 응답으로 주입한다. | PASS |
+| 8조 endpoint 주입 | `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`, dev HTTP IP 경로와 `world-dev.${ROOT_DOMAIN}`은 manifest·환경 설정·world-sessions 응답으로 주입한다. | PASS |
 | 10조 파트별 CI/CD | dev target은 서비스 단위로 배포하고 전역 `compose down`을 금지한다. demo는 infra-001 release manifest를 소비한다. | PASS |
 | 13·15조 인증·Secret | Redis/R2/TLS credential과 presigned URL은 Secret Reference 또는 휘발성 응답으로만 다루며 로그·artifact에 남기지 않는다. | PASS |
 | 19·24조 SSE·계약 변경 | API·SSE·인증·upload grant·game 연결은 CDN cache bypass하며 기존 API payload와 infra-001 schema를 변경하지 않는다. | PASS |
@@ -62,7 +62,7 @@ IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반
 
 ### Public ingress and static delivery
 
-- Nginx만 host 80/443에 bind한다. dev는 도메인 구매 전 `http://${EC2_PUBLIC_IP}/__dev/{front|api|ai|world}`의 승인된 제한 경로를 사용하며 내부 service port를 공개하지 않는다.
+- Nginx만 host 80/443에 bind한다. dev front·api·ai는 `http://${EC2_PUBLIC_IP}/__dev/{front|api|ai}`의 승인된 제한 경로를 사용한다. URL path를 지원하지 않는 UnityTransport는 `wss://world-dev.${ROOT_DOMAIN}:443` 전용 host를 사용하며 내부 service port는 공개하지 않는다.
 - 최종 demo host 계약은 `demo.${ROOT_DOMAIN}`, `api.${ROOT_DOMAIN}`, `ai.${ROOT_DOMAIN}`, `world.${ROOT_DOMAIN}`이다. Cloudflare proxy와 origin은 Full (strict) TLS를 사용한다.
 - `demo`의 content-hash 정적 asset만 장기 immutable cache를 허용하고 HTML은 재검증 가능한 짧은 정책을 사용한다. API·인증·SSE·presigned URL·game WebSocket은 항상 bypass/no-store다.
 - CDN 장애 점검은 운영자용 `curl --resolve` origin 경로로 수행한다. 인증서 검증을 끄지 않으며 일반 사용자용 별도 우회 host를 만들지 않는다.

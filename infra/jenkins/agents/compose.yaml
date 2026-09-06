@@ -34,6 +34,7 @@ services:
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
     volumes:
       - linux_docker_workspace:/home/jenkins/agent/linux-docker
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
@@ -79,10 +80,13 @@ services:
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
       UNITY_EDITOR_ROOT: /opt/unity
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
     volumes:
       - unity_workspace:/home/jenkins/agent/unity
       - unity_home:/home/jenkins
       - ${UNITY_EDITOR_ROOT:-/opt/unity}:/opt/unity:ro
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
 
 volumes:

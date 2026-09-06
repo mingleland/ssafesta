@@ -30,6 +30,12 @@ Jenkins에 아래 ID를 등록하고 `infra/.env`에는 ID만 적는다.
 Spring과 FastAPI dotenv에는 각 서비스가 소비하는 값만 둔다. 공통 토큰은 dotenv에 복제하지 않고
 환경별 Secret text 하나를 두 컨테이너에 주입한다. dev와 demo credential은 공유하지 않는다.
 
+dev 게임 서버의 `CONNECTION_TOKEN_SECRET_FILE`은 EC2 비공개 경로
+`/opt/festa/secrets/dev-game-connection-token-secret`을 가리킨다. 파일 내용은 dev Backend의
+`CONNECTION_TOKEN_SECRET`과 동일한 Base64 문자열이어야 한다. Unity 컨테이너 UID 1000이 읽도록
+소유자는 `1000:1000`, mode는 `0400`으로 두고 Unity Agent에는 이 파일 하나만 같은 절대 경로로
+read-only mount한다.
+
 ## 회전
 
 1. 제공 시스템에서 새 값을 발급하되 기존 값을 즉시 폐기하지 않는다.
