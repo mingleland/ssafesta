@@ -3,6 +3,19 @@
 **Input**: `specs/008-ai-conversation-rag/`의 spec·plan·research·data-model·contracts·quickstart
 **Tests**: FR-003 격리와 계약·timeout·삭제 검증은 필수다.
 
+## S15P21A604-449 Search Ownership Migration — 최우선 선행 작업
+
+> 아래 기존 항목 중 FastAPI `ChunkRepository` 또는 FastAPI의 pgvector 직접 조회를 요구하는 내용은 이 절로 대체되며 실행하지 않는다. 완료 이력은 삭제하지 않는다.
+
+- [X] T052 [DOCS] 문서 세트를 Spring Business DB/pgvector 단독 소유로 정합화한다 (S15P21A604-449)
+- [X] T053 [DOCS] `contracts/spring-chunk-search-api.yaml`에 검색 요청·응답과 격리 조건을 정의한다 (S15P21A604-449)
+- [ ] T048 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다 (S15P21A604-398)
+- [ ] T049 [AI] 직접 pgvector repository를 제거하고 질의 Embedding 후 Spring 검색 client를 호출하도록 변경한다
+- [ ] T050 [BE/AI] 실제 Business DB fixture로 topK, 3초 timeout, distance 정렬, threshold 없음과 scope 누출 0건을 검증한다
+- [ ] T051 [AI] 검색 응답을 Context에 넣기 전 Conversation scope를 재검증하고 위반 시 Fail Closed 처리한다
+
+**Dependency**: T048과 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
+
 ## Phase 1: Setup
 
 - [ ] T001 Add Redis, tokenizer, SSE test dependencies and pytest markers in festa-ai/pyproject.toml

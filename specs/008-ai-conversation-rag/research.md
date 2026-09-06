@@ -26,11 +26,11 @@
 
 ## 4. 검색 격리
 
-**Decision**: typed `ConversationScope`를 받는 단일 repository 메서드에서 `booth_id + agent_id + READY`를 SQL 필수 조건으로 강제하고 결과를 Context 조립 전에 재검증한다.
+**Decision**: FastAPI는 질의 Embedding만 생성하고 Spring의 `POST /internal/ai/chunk-search`를 호출한다. Spring은 `boothId + agentId + searchable=true + Document READY`를 SQL에서 강제하며 FastAPI가 결과를 Context 조립 전에 재검증한다. `topK`는 최대 20, timeout은 3초, cosine `distance` 오름차순이고 threshold는 적용하지 않는다.
 
-**Rationale**: prompt filtering이나 사후 탐지로는 데이터 유출을 막을 수 없다. 저장소 경계와 조립 경계의 이중 검증이 FR-003의 네 경계 테스트를 가능하게 한다.
+**Rationale**: DB 소유자인 Spring과 Context 소비자인 FastAPI의 이중 검증이 FR-003의 네 경계 테스트를 가능하게 한다. FastAPI에는 문서 DB 자격증명·ORM·migration을 두지 않는다.
 
-**Alternatives considered**: 호출자가 동적 filter를 조립하는 API는 누락 가능성이 있다. LLM prompt만으로 격리하는 방식은 릴리스 차단 요구를 만족하지 못한다.
+**Alternatives considered**: FastAPI의 직접 DB 검색은 단일 소유권을 깨고, 호출자가 동적 filter를 조립하는 API는 누락 가능성이 있다. LLM prompt만으로 격리하는 방식도 릴리스 차단 요구를 만족하지 못한다.
 
 ## 5. LLM·SSE Adapter
 
