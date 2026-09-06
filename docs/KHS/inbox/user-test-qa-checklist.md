@@ -11,7 +11,7 @@
 | 항목 | 값 | 확인 |
 |---|---|---|
 | 계정 | Owner A(회원, 코인 ≥ 100) · Visitor B(회원) · Guest C(비로그인) | |
-| 부스 | A 가 임대한 슬롯 1개 — Studio 에서 AI NPC·프로젝트 패널·설문 키오스크·게임기(GAME_PORTAL) 배치 후 Publish | |
+| 부스 | A 가 임대한 슬롯 1개 — Studio 에서 AI NPC·프로젝트 패널·설문 키오스크·게임기(GAME_PORTAL) 배치 후 Publish. **AI NPC·게임기는 콘텐츠(configId) 를 연결해야 한다** — 미연결(0)이면 F 에 "아직 준비 중" 토스트만 뜬다(-448). 로컬 게시본 v10 은 AI configId 0 | |
 | 브라우저 | Chrome 데스크톱 2개 프로필(A/B) + 시크릿(C). 각각 `document.visibilityState === "visible"` | |
 | 관측 | F3 PerfHud(게임 파트) · 브라우저 콘솔 `[WorldLoadTimeline] 요약` · 서버 `docker logs -f festa-world-01` | |
 
@@ -35,7 +35,7 @@
 | 14 | 슬롯머신 `F` (게스트 C) | Game | 잔액 "—", 돌리기 → 팝업 "게스트는 코인을 쓸 수 없어요" | 에디터 ✅ / WebGL 체크리스트 #4 | | |
 | 15 | 광장 게임기 `F` | Game·FE | 줌인·잠금 → `WORLD_ARCADE_INTERACT` (FE 수신부 #135 전이면 Esc 로 복귀만) | Unity ✅ | | |
 | 16 | Esc / 오버레이 닫기 후 이동 재개 | Game·FE | 초점 해제·카메라 복귀·WASD 즉시 동작(canvas focus) | Unity ✅ / FE -428 | | |
-| 17 | 부스 퇴장 → 외부 | Game | 외부 슬롯 앞 복귀, 내부 로컬 오브젝트 정리 | ✅ | | |
+| 17 | 부스 퇴장 → 외부 | Game | 외부 슬롯 앞 복귀, 내부 로컬 오브젝트 정리 | ✅ · WebGL 09:45 문 매트 위 F → `(-300.0, 0.2, 176.0) yaw 0`(슬롯 1 앞, 부스를 바라봄) ✅ | | |
 | 18 | A 탭 백그라운드 30초 → 복귀 | Game·FE | 복귀 후 수 초 내 자동 재접속(Unity `WorldReconnector`), FE 가 "재접속 중" 안내 | Unity 자동 재접속 ✅ WebGL 09-06 실측(끊김→1회차→성공, 같은 자리 재스폰) / FE 안내 UI ❌ (#131) — 안내 없이 잠깐 멈춘 뒤 돌아오므로 진행자가 "탭 바꾸면 몇 초 멈춥니다" 고지 | | |
 | 19 | A 브라우저 종료 → B 화면 | Game | A 디스폰, B 유지 (MP-06) | 09-05 ✅ | | |
 | 20 | 대시보드(A) | FE·BE | 방문·이용 집계 | FE·BE | | |
