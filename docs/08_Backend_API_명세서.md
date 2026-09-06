@@ -1381,3 +1381,52 @@ Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
 - `serverTime`·유효성 판정·`remainingSeconds`는 **한 요청에서 같은 시각 하나**로 계산한다.
   FastAPI는 이 쌍을 저장해 이후 모든 질문의 만료를 스스로 판정한다(FR-024) — 셋이 어긋나면
   그 판정이 어긋난다
+
+### POST `/internal/ai/chunk-search`
+
+FastAPI가 질의 Embedding을 만든 뒤 **유일한 검색 진입점**으로 쓴다 (spec 008, `S15P21A604-398`).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-chunk-search-api.yaml`.
+
+```
+POST /internal/ai/chunk-search
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+Content-Type: application/json
+
+{ "boothId": 7, "agentId": 3, "queryEmbedding": [0.0123, ...], "topK": 5 }
+```
+
+```json
+{ "items": [
+  { "content": "부스 운영 시간은 …", "chunkNo": 0, "pageNumber": 3, "section": "운영 안내",
+    "documentId": 41, "originalFilename": "부스안내.pdf", "distance": 0.1832 }
+] }
+```
+
+**요청에 필터 필드가 없다.** `boothId` + `agentId` + `searchable = true` + 부모 Document `READY`는
+서버 상수이고, 요청으로 넓힐 수 없다 (GitLab 이슈 #119). `boothId`·`agentId`는 **chunk와 부모
+Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에 제약이 없어(V21) 값이 어긋난 행이
+생기면 chunk 쪽만 보는 쿼리가 남의 문서 본문을 실어 준다.
+
+| 항목 | 값 |
+|---|---|
+| `queryEmbedding` | **정확히 1536개.** 헌법 18조·FR-009 고정. null 원소·비유한 수 거부 |
+| `topK` | 1~20 |
+| 정렬 | `distance` 오름차순, 동률은 `documentId` → `chunkNo` |
+| `distance` | pgvector 코사인 거리(`<=>`) 그대로. **낮을수록 유사**하고 서버가 뒤집거나 정규화하지 않는다 |
+| 최소 유사도 임계값 | **없다** (2026-09-03 확정). 무엇을 버릴지는 답변을 만드는 쪽이 정한다 |
+| 타임아웃 | 검색 statement에만 3초 |
+
+- **결과 0건은 `404`가 아니라 `200` + `items: []`다.** scope에 chunk가 없는 것과 문서가 아직
+  `READY`가 아닌 것을 **구분해 알려 주지 않는다**
+- **계약에 없는 필드는 버리지 않고 `400` `VALIDATION_FAILED`로 거부한다.** 문제 필드 이름은
+  `errors[].field`에 담고 `rule`은 전역 `FIELD_INVALID`다 — 조용히 버리면 보내는 쪽이 필터가
+  먹었다고 믿는다(T-24의 모양). 전역 `FAIL_ON_UNKNOWN_PROPERTIES`는 켜지 않고 이 경로 전용
+  strict parser로 읽는다
+- 오류는 전역 봉투를 쓴다 — `400` `VALIDATION_FAILED` · `401` `UNAUTHORIZED` ·
+  `500` `INTERNAL_ERROR`(3초 초과 포함, `504`를 쓰지 않는다)
+- **`pageNumber`·`section`은 null일 수 있다.** V21이 nullable이고 계약도 같게 잡았다
+- `originalFilename`은 `ai_documents`에서 조인해 가져온다. `ai_document_jobs`에도 같은 이름의
+  컬럼이 있지만 검색 응답은 문서 기준이다
+- **벡터 인덱스에 기대지 않는다.** 이 필터·조인과 함께라면 HNSW는 후필터라 조건에 맞는 chunk가
+  있어도 `topK`보다 적게 돌려줄 수 있다(over-filtering) — 오류 없이 인용이 사라지는 실패라
+  순차 스캔의 정확성을 택했다. 규모가 커지면 `hnsw.iterative_scan` 또는 partial index로 올린다
