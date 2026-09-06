@@ -64,6 +64,37 @@ namespace Festa.World
             PlainLabel(Snap(x, y, w, h), text, _toastStyle, Color.white);
         }
 
+        // ── 다른 IMGUI 화면(조작 안내 등)이 같은 카드·키캡 문법을 쓰기 위한 공개 조각 (S15P21A604-451) ──
+
+        /// <summary>둥근 카드 한 장. 색은 <see cref="FestaUiKit.Cream"/>·<see cref="FestaUiKit.Charcoal"/> 등 킷 색을 쓴다.</summary>
+        public static void DrawCard(Rect rect, int radius, Color color) => DrawRounded(Snap(rect.x, rect.y, rect.width, rect.height), radius, color);
+
+        /// <summary>코랄 키캡 + 흰 글자. <paramref name="fontSize"/> 는 화면 픽셀.</summary>
+        public static void DrawKeycap(Rect rect, string key, int fontSize, Color? bg = null)
+        {
+            EnsureStyles();
+            _capStyle.fontSize = fontSize;
+            var r = Snap(rect.x, rect.y, rect.width, rect.height);
+            DrawRounded(r, Mathf.RoundToInt(r.height * 0.3f), bg ?? FestaUiKit.Accent);
+            PlainLabel(r, key, _capStyle, Color.white);
+        }
+
+        /// <summary>카드 위 본문 글자(왼쪽 정렬, 주아 글꼴).</summary>
+        public static void DrawLabel(Rect rect, string text, int fontSize, Color color)
+        {
+            EnsureStyles();
+            _labelStyle.fontSize = fontSize;
+            PlainLabel(Snap(rect.x, rect.y, rect.width, rect.height), text, _labelStyle, color);
+        }
+
+        /// <summary>글자 폭 측정(주아 글꼴, 해당 크기).</summary>
+        public static float MeasureLabel(string text, int fontSize)
+        {
+            EnsureStyles();
+            _labelStyle.fontSize = fontSize;
+            return Mathf.Round(_labelStyle.CalcSize(Measure(text)).x);
+        }
+
         static void PlainLabel(Rect rect, string text, GUIStyle style, Color color)
         {
             var prev = style.normal.textColor;
