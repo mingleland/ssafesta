@@ -7,9 +7,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { PlayGamePage } from '../../app/routes/PlayGamePage.tsx';
 import { cloneMinimalGameProject, type DeepMutable } from '../fixtures/minimalGameProject.ts';
 import type { GameProject } from '../../contracts/gameProject.ts';
+
+// 이 파일이 보는 것은 "서버 경로" 다. PlayGamePage 는 모듈 로드 시점에 VITE_USE_MOCK 을 읽어
+// 브라우저 publication 경로로 갈지 정하므로(PlayGamePage.tsx:14), 개발자 .env.local 에 mock 이
+// 켜져 있으면 서버 fetch 가 아예 일어나지 않아 3건이 통째로 붉어졌다 (S15P21A604-475).
+// 전제는 테스트가 고정한다 — stubEnv 를 먼저 두고, 그 다음에 페이지를 불러온다.
+// 정적 import 로는 안 된다: import 가 hoist 되어 stub 보다 먼저 평가된다.
+vi.stubEnv('VITE_USE_MOCK', 'false');
+vi.stubEnv('VITE_GAME_STUDIO_API_ENABLED', 'false');
+const { PlayGamePage } = await import('../../app/routes/PlayGamePage.tsx');
 
 const GAME_ID = 123; // minimalGameProject.gameId — 응답과 프로젝트의 gameId 가 어긋나면 파서가 거부한다
 const PUBLISHED_PATH = `/api/v1/games/${GAME_ID}/published`;

@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-06T22:23:54.293Z",
+  "note": "Unity 원본에서 생성된 로컬 산출물. 벤더 에셋 재배포 확인 전까지 저장소·정적 배포에 넣지 않는다.",
+  "assets": [
+    {
+      "assetCode": "DECORATION_DEFAULT",
+      "objectType": "DECORATION",
+      "typeDefault": true,
+      "url": "assets/booth/DECORATION_DEFAULT.glb",
+      "bytes": 26140,
+      "triangles": 240,
+      "bounds": {
+        "min": [
+          -0.3,
+          0,
+          -0.3
+        ],
+        "max": [
+          0.3,
+          1.6085,
+          0.3
+        ]
+      },
+      "source": {
+        "fbx": "Stands/DisplayBox01.FBX",
+        "unitScale": 0.0254,
+        "upAxis": "zUp",
+        "rawBounds": {
+          "min": [
+            -11.811,
+            -11.811,
+            0
+          ],
+          "max": [
+            11.811,
+            11.811,
+            63.3274
+          ]
+        }
+      }
+    },
+    {
+      "assetCode": "FURNITURE_CHAIR01",
+      "objectType": "FURNITURE",
+      "typeDefault": true,
+      "url": "assets/booth/FURNITURE_CHAIR01.glb",
+      "bytes": 118164,
+      "triangles": 1212,
+      "bounds": {
+        "min": [
+          -0.1887,
+          0,
+          -0.1887
+        ],
+        "max": [
+          0.1887,
+          0.45,
+          0.1887
+        ]
+      },
+      "source": {
+        "fbx": "Furniture/Chair01.FBX",
+        "unitScale": 0.0254,
+        "upAxis": "zUp",
+        "rawBounds": {
+          "min": [
+            -7.4284,
+            -7.4284,
+            0
+          ],
+          "max": [
+            7.4284,
+            7.4284,
+            17.7165
+          ]
+        }
+      }
+    }
+  ]
+}
