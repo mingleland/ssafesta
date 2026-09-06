@@ -1,0 +1,52 @@
+/* Landing·Login 우상단 컨트롤 줄 (S15P21A604-463).
+   fixed 라 어느 화면에 놓여도 같은 자리다 — 로고(13.3vh)·패널(56.4~91%)·푸터(96~98%)와
+   겹치지 않는 유일한 여백이 여기다. z-index 는 Visitor Overlay(100)보다 낮게 둔다. */
+.screen-controls {
+  position: fixed;
+  top: 3vh;
+  right: 2vw;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  /* 고해상도에서 눈에 들어오는 크기까지 자란다 — -379 에서 정한 clamp 기반 반응형 관례를 따른다 */
+  --screen-control-size: clamp(48px, 4vh, 72px);
+  gap: calc(var(--screen-control-size) * 0.2);
+}
+
+.screen-control-btn {
+  width: var(--screen-control-size);
+  height: var(--screen-control-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  /* 원형이 아니라 모서리가 둥근 네모 — 로그인 버튼(radius clamp(12px,1.5vh,18px))과 같은 계열 */
+  border-radius: clamp(12px, 1.3vh, 20px);
+  background: rgba(20, 22, 46, 0.42);
+  backdrop-filter: blur(6px);
+  color: #f4f6ff;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+/* 아이콘은 버튼과 함께 자란다 — 고정 20px 이면 커진 버튼 안에서 점처럼 보인다 */
+.screen-control-btn svg {
+  width: 52%;
+  height: 52%;
+}
+
+.screen-control-btn:hover {
+  background: rgba(20, 22, 46, 0.66);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.screen-control-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+
+/* 꺼짐 상태는 색으로도 드러낸다 — 아이콘 모양만으로는 작은 크기에서 구분이 어렵다 */
+.screen-control-btn[aria-pressed='true'] {
+  color: rgba(244, 246, 255, 0.55);
+}

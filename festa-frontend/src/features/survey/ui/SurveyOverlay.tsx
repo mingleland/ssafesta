@@ -159,7 +159,7 @@ export function SurveyOverlay({ payload }: Props) {
         <ol className="sv-list">
           {run.questions.map((q, i) => (
             <li key={q.id} className="sv-item">
-              <p className="sv-prompt">
+              <p className="sv-prompt selectable">
                 <span className="sv-index">{i + 1}</span>
                 {q.prompt}
                 {q.required && <span className="sv-required">필수</span>}

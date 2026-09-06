@@ -6,6 +6,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
+import { unlockAndPlay } from '../../features/audio/model/screenAudio';
+import { ScreenControls } from '../../features/audio/ui/ScreenControls';
 import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.png';
 import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.png';
 import './LandingPage.css';
@@ -28,15 +30,25 @@ export function LandingPage() {
     };
   }, []);
 
+  // 시작 클릭이 곧 브라우저의 오디오 제스처다 — 자동재생 정책이 요구하는 유일한 unlock 지점이다.
+  function start() {
+    unlockAndPlay();
+    navigate('/app/world');
+  }
+
   return (
-    <button type="button" className="landing-root" onClick={() => navigate('/app/world')} aria-label="화면을 클릭해 시작하기">
-      <img className="landing-bg" src={landingBackgroundUrl} alt="" />
-      <img className="landing-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
-      <span className="landing-cta" aria-hidden="true">
-        <span className="landing-cta-star">✦</span>
-        화면을 클릭해 시작하기
-        <span className="landing-cta-star">✦</span>
-      </span>
-    </button>
+    <>
+      {/* 전체화면 <button> 의 형제로 둔다 — 안에 넣으면 중첩 버튼이 되어 무효 마크업이다 */}
+      <ScreenControls />
+      <button type="button" className="landing-root" onClick={start} aria-label="화면을 클릭해 시작하기">
+        <img className="landing-bg" src={landingBackgroundUrl} alt="" />
+        <img className="landing-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
+        <span className="landing-cta" aria-hidden="true">
+          <span className="landing-cta-star">✦</span>
+          화면을 클릭해 시작하기
+          <span className="landing-cta-star">✦</span>
+        </span>
+      </button>
+    </>
   );
 }
