@@ -39,7 +39,8 @@ namespace Festa.Content.Arcade
             }
             if (!_runtimeObject.HasConfig)
             {
-                // 미연결 게임기 — 계약상 이벤트 금지. 조용히 넘기지 않고 로그로 드러낸다.
+                // 미연결 게임기 — 계약상 이벤트 금지. 조용히 넘기지 않고 방문자에게 한 줄 안내 + 로그로 드러낸다 (S15P21A604-448).
+                BoothInteractionInput.Toast("이 게임기는 아직 게임이 연결되지 않았어요");
                 Debug.LogWarning($"[GamePortal] configId 가 0 이라 실행 요청을 보내지 않는다 (booth={_runtimeObject.BoothId}, object={_runtimeObject.ObjectId}). 스튜디오에서 게임을 연결해야 한다.");
                 return;
             }

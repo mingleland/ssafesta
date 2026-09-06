@@ -236,6 +236,18 @@ namespace Festa.Content
             }
         }
 
+        /// <summary>
+        /// 상호작용 대상이 직접 띄우는 짧은 안내 — 콘텐츠 미연결(configId 0) 처럼 브리지 이벤트가 나가지 않아
+        /// <see cref="OnBridgeSent"/> 토스트가 뜨지 않는 경우에 쓴다. 아무 반응 없이 끝나면 "고장" 으로 보인다 (S15P21A604-448).
+        /// </summary>
+        public static void Toast(string text, float seconds = 2.5f)
+        {
+            Ensure();
+            if (_instance == null || string.IsNullOrEmpty(text)) return;
+            _instance._toast = text;
+            _instance._toastUntil = Time.unscaledTime + seconds;
+        }
+
         void OnBridgeSent(string type)
         {
             // 가시 결과는 전부 웹 화면 몫이라, 단독 실행에서는 "반응이 없다" 로 보인다.
