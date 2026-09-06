@@ -103,6 +103,8 @@ grep -q "file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FI
   || fail "demo pipeline does not bind AI runtime env file"
 grep -q "string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')" "${develop_pipeline}" \
   || fail "demo pipeline does not bind shared AI-to-Spring token"
+grep -q "'PUBLIC_UNITY_BUILD_BASE=/unity/'" "${develop_pipeline}" \
+  || fail "demo pipeline does not provide the same-origin Unity WebGL base"
 grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo backend does not use infra profile"
 [[ "$(grep -c 'INTERNAL_AI_TO_SPRING_TOKENS:' "${integration_compose}")" -eq 2 ]] \
   || fail "shared AI-to-Spring token must reach exactly AI and backend"
@@ -152,7 +154,7 @@ if command -v docker >/dev/null 2>&1; then
   docker compose -f "${repo_root}/infra/deploy/compose/dev/back.compose.yaml" config | grep -q 'FESTA_ENVIRONMENT: dev' || fail "dev backend lacks Redis environment namespace"
   docker compose -f "${repo_root}/infra/deploy/compose/dev/ai.compose.yaml" config | grep -q 'FESTA_ENVIRONMENT: dev' || fail "dev FastAPI lacks environment namespace"
   export AI_IMAGE_REF=festa-ai:test BACK_IMAGE_REF=festa-back:test FRONT_IMAGE_REF=festa-front:test GAME_IMAGE_REF=festa-game:test
-  export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid/api
+  export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
   export BACK_ENV_FILE="${runtime_env_dir}/back.env" AI_ENV_FILE="${runtime_env_dir}/ai.env" FESTA_ENVIRONMENT=demo
   docker compose -f "${integration_compose}" config | grep -c 'FESTA_ENVIRONMENT: demo' | grep -qx '4' || fail "demo Compose lacks four environment namespaces"
   if (unset BACK_ENV_FILE; docker compose -f "${integration_compose}" config --quiet >/dev/null 2>&1); then
