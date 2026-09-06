@@ -38,7 +38,10 @@ grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinn
 grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
 grep -q 'jsonschema==' "${agent_dockerfile}" || fail "Agent image does not pin jsonschema"
 grep -q 'PYTHON_JSONSCHEMA_VERSION' "${agent_compose}" || fail "Agent Compose omits the jsonschema version pin"
-pass "controller plugin and agent capability gate"
+for package in libasound2t64 libgl1 libglu1-mesa libgtk-3-0t64 libnss3 libxss1 libxtst6; do
+  grep -q "^[[:space:]]*${package}[[:space:]\\]*$" "${agent_dockerfile}" || fail "Agent image omits Unity runtime package: ${package}"
+done
+pass "controller plugin, agent capability gate and Unity runtime packages"
 
 python_bin="${PYTHON_BIN:-}"
 if [[ -z "${python_bin}" ]]; then

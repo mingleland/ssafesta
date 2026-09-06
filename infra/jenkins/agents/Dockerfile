@@ -12,6 +12,13 @@ USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         jq \
+        libasound2t64 \
+        libgl1 \
+        libglu1-mesa \
+        libgtk-3-0t64 \
+        libnss3 \
+        libxss1 \
+        libxtst6 \
         postgresql-client \
         python-is-python3 \
         python3-pip \
