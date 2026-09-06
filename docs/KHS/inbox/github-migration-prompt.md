@@ -21,7 +21,9 @@ SSAFY 2학기 공통 프로젝트 **SSAFY FESTA** 를 포트폴리오용 GitHub 
 ## 반드시 지킬 것
 
 1. **GitLab 원본을 건드리지 않는다.** 읽기만 한다. push·삭제·이슈 수정 금지.
-2. **시크릿을 옮기지 않는다.** 이관 전에 전체 이력을 스캔하고, 발견되면 멈추고 보고한다. 확인된 현황: 추적 중인 `.env` 는 `*.env.example` 뿐이고 문서에는 변수명만 있다(값 노출 없음). `.gltok`, `backend/.env`, `festa-ai/.env`, `*.jwt` 는 이미 gitignore 대상이다.
+2. **시크릿을 옮기지 않는다.** 이관 전에 전체 이력을 스캔하고, 새로 발견되면 멈추고 보고한다.
+   - 확인된 현황(2026-09-06 스캔): 추적 중인 `.env` 는 `*.env.example` 뿐, 문서에는 변수명만 있고 값은 없다. `.gltok`, `backend/.env`, `festa-ai/.env`, `*.jwt` 는 gitignore 대상이고 추적되지 않는다. `backend/target/` 도 추적되지 않는다.
+   - **이미 확인한 오탐 — 여기서 멈추지 마라**: `backend/src/test/java/com/example/ssafesta/SharedConfigProfileTest.java` 의 `JWT_SECRET=aW5qZWN0ZWQtand0LXNlY3JldA==` 는 base64 로 `injected-jwt-secret` 인 테스트 픽스처다. 실제 시크릿이 아니다.
 3. **라이선스 에셋을 공개 저장소에 올리지 않는다.** 아래 목록은 유료·제3자 에셋이라 재배포하면 안 된다. 이력에서도 제거한다.
 4. 이관 결과를 push 하기 전에 **검증 결과를 먼저 보고**한다. 내가 확인한 뒤 push 한다.
 
@@ -67,6 +69,8 @@ festa-unity/Docker/  festa-unity/Tools/  festa-unity/ProjectSettings/
 backend/  festa-frontend/  festa-ai/  infra/  ci/
 docs/  specs/
 ```
+
+`docs/` 안의 이미지 15개(스크린샷·다이어그램)와 `festa-frontend/src/assets/` 의 브랜드 이미지 4개는 **지우지 않는다** — 포트폴리오에 쓸 자료다. `festa-unity/Assets/TextMesh Pro/` 는 Unity 패키지 동봉물이라 남겨도 된다.
 
 에셋을 뺀 뒤 씬·프리팹의 참조가 깨지는 것은 **의도된 상태**다. 루트 README 에 "실행에는 별도 라이선스 에셋이 필요하다"고 한 줄 적고, 어떤 에셋인지 이름과 출처만 표로 남긴다.
 
