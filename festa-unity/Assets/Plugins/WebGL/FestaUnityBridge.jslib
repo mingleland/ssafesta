@@ -1,4 +1,14 @@
 mergeInto(LibraryManager.library, {
+  // 호스트(React) UI 가 있는가 — window.FestaUnity 수신부가 있으면 FE 임베드다. Unity 는 FE 가 이미 그리는
+  // 화면(조작 안내 카드 등)을 중복해서 그리지 않는다 (S15P21A604-456). 단독 실행·probe 에서는 0.
+  FestaHostHasUi: function () {
+    try {
+      return (window.FestaUnity && typeof window.FestaUnity.onBoothInteract === 'function') ? 1 : 0;
+    } catch (error) {
+      return 0;
+    }
+  },
+
   FestaNotifyBoothInteract: function (jsonPtr) {
     var json = UTF8ToString(jsonPtr);
     try {

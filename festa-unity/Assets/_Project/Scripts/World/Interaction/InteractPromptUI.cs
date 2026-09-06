@@ -48,6 +48,26 @@ namespace Festa.World
             PlainLabel(Snap(capRect.xMax + 12f * ui, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Text);
         }
 
+        /// <summary>
+        /// 키캡 없는 안내 알약 — 조준한 대상이 **F 에 응답하지 않을 때**(전시용·준비 중 오브젝트, S15P21A604-455).
+        /// 프롬프트 자리에 뜨되 키캡이 없고 글자가 흐려서 "누르면 된다" 로 읽히지 않는다 (-345 의 거짓 힌트 금지와 양립).
+        /// </summary>
+        public static void DrawPassivePrompt(string label)
+        {
+            if (string.IsNullOrEmpty(label)) return;
+            EnsureStyles();
+            float ui = Screen.height / 1080f;
+            _labelStyle.fontSize = Mathf.RoundToInt(22f * ui);
+            float padX = Mathf.Round(20f * ui);
+            float labelW = Mathf.Round(_labelStyle.CalcSize(Measure(label)).x);
+            float h = Mathf.Round(48f * ui);
+            float w = padX + labelW + padX;
+            float x = Mathf.Round((Screen.width - w) / 2f);
+            float y = Mathf.Round(Screen.height * 0.52f);
+            DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.82f));
+            PlainLabel(Snap(x + padX, y, labelW + 4f, h), label, _labelStyle, FestaUiKit.Muted);
+        }
+
         /// <summary>짧은 알림 — 프롬프트 바로 위, 같은 남색 알약. 월드 단독 실행에서 "보냈다" 를 알리는 유일한 신호 (S15P21A604-348).</summary>
         public static void DrawToast(string text)
         {
@@ -62,6 +82,37 @@ namespace Festa.World
             float y = Mathf.Round(Screen.height * 0.52f - h - 10f * ui);
             DrawRounded(Snap(x, y, w, h), Mathf.RoundToInt(h / 2f), new Color(0.12f, 0.13f, 0.18f, 0.92f));
             PlainLabel(Snap(x, y, w, h), text, _toastStyle, Color.white);
+        }
+
+        // ── 다른 IMGUI 화면(조작 안내 등)이 같은 카드·키캡 문법을 쓰기 위한 공개 조각 (S15P21A604-451) ──
+
+        /// <summary>둥근 카드 한 장. 색은 <see cref="FestaUiKit.Cream"/>·<see cref="FestaUiKit.Charcoal"/> 등 킷 색을 쓴다.</summary>
+        public static void DrawCard(Rect rect, int radius, Color color) => DrawRounded(Snap(rect.x, rect.y, rect.width, rect.height), radius, color);
+
+        /// <summary>코랄 키캡 + 흰 글자. <paramref name="fontSize"/> 는 화면 픽셀.</summary>
+        public static void DrawKeycap(Rect rect, string key, int fontSize, Color? bg = null)
+        {
+            EnsureStyles();
+            _capStyle.fontSize = fontSize;
+            var r = Snap(rect.x, rect.y, rect.width, rect.height);
+            DrawRounded(r, Mathf.RoundToInt(r.height * 0.3f), bg ?? FestaUiKit.Accent);
+            PlainLabel(r, key, _capStyle, Color.white);
+        }
+
+        /// <summary>카드 위 본문 글자(왼쪽 정렬, 주아 글꼴).</summary>
+        public static void DrawLabel(Rect rect, string text, int fontSize, Color color)
+        {
+            EnsureStyles();
+            _labelStyle.fontSize = fontSize;
+            PlainLabel(Snap(rect.x, rect.y, rect.width, rect.height), text, _labelStyle, color);
+        }
+
+        /// <summary>글자 폭 측정(주아 글꼴, 해당 크기).</summary>
+        public static float MeasureLabel(string text, int fontSize)
+        {
+            EnsureStyles();
+            _labelStyle.fontSize = fontSize;
+            return Mathf.Round(_labelStyle.CalcSize(Measure(text)).x);
         }
 
         static void PlainLabel(Rect rect, string text, GUIStyle style, Color color)
