@@ -1,6 +1,6 @@
 ---
-name: "festa-inbox"
-description: "파트 간에 물어 놓고 답을 못 받은 것을 한 화면에 모은다. 상태는 ASC 가 증거에서 파생한 값을 그대로 쓰고 여기서 다시 계산하지 않는다."
+name: "festa-outbox"
+description: "내가 밖에 물어 놓고 답을 못 받은 것을 모은다. `festa-inbox` 의 반대 방향이다 — 그쪽은 나를 기다리는 것을, 이쪽은 내가 기다리는 것을 본다. 상태는 ASC 가 증거에서 파생한 값을 그대로 쓰고 여기서 다시 계산하지 않는다."
 argument-hint: "선택: 파트 이름 (front|back|ai|game|infra)"
 metadata:
   author: "이정헌"
@@ -10,7 +10,9 @@ user-invocable: true
 disable-model-invocation: false
 ---
 
-# festa-inbox
+# festa-outbox
+
+**방향이 다른 두 skill 이다.** `festa-inbox` 는 GitLab 을 훑어 **나를 기다리는 것**(호명·리뷰 요청·배정)을 가린다. 이 skill 은 그 반대다 — **내가 밖에 물어 놓고 답을 못 받은 것**을 본다. 원본을 다시 훑지 않고 ASC 가 증거에서 파생한 값을 그대로 쓴다.
 
 이 프로젝트에서 같은 일이 반복됐다. 의존이 **문서에 적혀 있다**는 것과, 그 질문이 상대
 파트에 **닿았다**는 것과, 상대가 **답했다**는 것이 한 덩어리로 다뤄졌다. 그래서 아무도
