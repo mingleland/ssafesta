@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { bootstrapAuth } from '../../features/auth/model/bootstrap';
 import { ScreenAudioController } from '../../features/audio/ui/ScreenAudioController';
+import { installImageDragGuard } from '../../shared/ui/imageDragGuard';
 import { queryClient } from './queryClient';
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -10,6 +11,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     void bootstrapAuth();
   }, []);
+
+  // 이미지 유령 드래그 차단 — 근거와 Game Studio 예외는 imageDragGuard 에 있다
+  useEffect(() => installImageDragGuard(), []);
 
   return (
     <QueryClientProvider client={queryClient}>
