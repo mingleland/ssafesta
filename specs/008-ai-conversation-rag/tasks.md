@@ -76,6 +76,7 @@
 - [ ] T045 [P] Add executable local validation commands and expected outputs to festa-ai/README.md
 - [ ] T046 Run all commands in specs/008-ai-conversation-rag/quickstart.md and record results in specs/008-ai-conversation-rag/quickstart.md
 - [ ] T047 Verify no secrets or Conversation raw text are committed or emitted by tests using festa-ai/.env.example and festa-ai/tests/
+- [X] T048 [P] Implement OpenAI-compatible GMS LLM streaming adapter, shared Secret-based Provider switching, real Embedding/LLM regression, and sanitized usage cost logs in festa-ai/app/providers/, festa-ai/app/core/config.py, and festa-ai/tests/ (`S15P21A604-148`)
 
 ## Dependencies & Execution Order
 
