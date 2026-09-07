@@ -1,226 +1,35 @@
-# Quickstart Validation: AI 직원 / 문서 파이프라인
+# Quickstart: AI 문서 처리 계약 검증
 
-이 문서는 구현 완료 후 spec 007의 핵심 계약을 로컬·CI에서 검증하는 실행 가이드다. 구현 코드는 [plan.md](./plan.md), 상태와 DB 규칙은 [data-model.md](./data-model.md), HTTP payload는 [contracts/](./contracts/)를 따른다.
+## 1. 준비
 
-## Prerequisites
+- Spring Business DB에 V21을 적용한다.
+- FastAPI 환경에 Business/AI DB URL이나 DB credential이 없음을 확인한다.
+- 방향별 내부 Service Token은 Secret으로 주입한다.
 
-- Docker 및 Docker Compose
-- Python 3.12 이상
-- PostgreSQL 17 + pgvector 테스트 인스턴스
-- 테스트 인스턴스 안의 Business DB·AI DB와 서비스별 migration/runtime role
-- 테스트용 S3-compatible object storage adapter 또는 격리된 R2 bucket
-- deterministic Embedding fake: 입력별 고정 1536차원 vector 반환
-- Spring callback fake 또는 Backend 로컬 인스턴스
+## 2. 정상 처리
 
-실제 Service Token, DB 비밀번호, Provider Key를 저장소에 기록하지 않는다.
+1. Spring이 Document와 Job(`QUEUED`)을 먼저 저장한다.
+2. `jobId + attemptNo + snapshot`을 FastAPI에 보내고 `202`를 확인한다.
+3. FastAPI가 30초 heartbeat와 최대 200 Chunk/8 MiB 배치를 전송한다.
+4. finalize 후 기존 Chunk 교체, Job=`SUCCEEDED`, Document=`READY`, 새 Chunk=`searchable=true`가 한 번에 반영되는지 확인한다.
 
-## 1. 환경과 migration
+## 3. 멱등·fencing·실패
 
-```bash
-cd festa-ai
-python -m venv .venv
-python -m pip install -e ".[test]"
-alembic upgrade head
-```
+- 같은 batch를 재전송해 결과가 변하지 않는지 확인한다.
+- lease 만료 후 attempt를 증가시키고 이전 attempt 결과가 `409`인지 확인한다.
+- 삭제·취소 후 결과가 `410`이며 상태를 되살리지 않는지 확인한다.
+- 1·5·15분 최대 3회 재시도와 소진 시 Job=`DEAD`, Document=`FAILED`, staging=0을 확인한다.
+- finalize 실패 시 기존 검색 Chunk가 유지되고 부분 결과가 노출되지 않아야 한다.
 
-확인 결과:
+## 4. 검색 격리
 
-- AI DB `document_jobs`와 세 인덱스(pickup, lease, callback)가 존재한다.
-- AI DB에 `document_jobs`·`document_chunks`가 있고 AI DB에만 `vector` extension이 존재한다.
-- `document_id`에는 Business DB FK나 `ON DELETE CASCADE`가 없다.
-- 4개 runtime role × 4개 database CONNECT matrix에서 환경·서비스가 일치하는 대각선만 성공한다.
-- FastAPI runtime role은 Business DB에, Spring runtime role은 AI DB에 CONNECT할 수 없다.
+`POST /internal/ai/chunk-search`로 다음을 검증한다.
 
-## 2. 기본 처리 성공
+- `boothId + agentId + searchable=true + READY`가 모두 강제된다.
+- 다른 Booth/Agent, 비READY, 비검색 Chunk는 0건이다.
+- `topK>20`은 거부되고 timeout은 3초다.
+- 결과는 코사인 `distance` 오름차순이며 threshold로 탈락시키지 않는다.
 
-1. Business DB Fixture에 `QUEUED` Document와 R2 PDF를 준비한다.
-2. Spring이 검증한 전체 snapshot으로 `POST /ai/v1/documents/process`를 호출한다.
-3. Worker가 처리할 때까지 기다린다.
+## 5. 미결정
 
-기대 결과:
-
-- 응답은 202, `jobId`, `status=QUEUED`, `existing=false`다.
-- Job은 `QUEUED → RUNNING → SUCCEEDED`로 전이한다.
-- Document는 `QUEUED → PROCESSING → READY`로 전이한다.
-- Chunk는 모두 같은 `document_id`, `booth_id`, `agent_id`, `embedding_model_id`를 가진다.
-- `chunk_count`와 `processed_at`이 Spring 상태에 반영된다.
-- 처리 중 FastAPI가 Business DB에 연결하거나 조회한 기록은 0건이다.
-
-## 3. 중복 요청 멱등성
-
-같은 `documentId`와 `sourceHash`로 처리 요청을 동시에 두 번 보낸다.
-
-기대 결과:
-
-- 활성 Job은 정확히 한 개다.
-- 두 응답의 `jobId`가 같다.
-- 한 응답 이상은 `existing=true`다.
-- Embedding Provider 호출과 Chunk 교체는 한 번만 수행된다.
-
-## 3-1. 원본 SHA-256 불일치 차단
-
-1. 처리 요청의 `sourceHash`와 다른 바이트를 같은 object key에 저장한다.
-2. Worker가 원본을 다운로드해 처리하도록 실행한다.
-
-기대 결과:
-
-- FastAPI가 다운로드한 바이트의 SHA-256을 다시 계산해 불일치를 감지한다.
-- Job은 재시도 없이 `DEAD`, `lastErrorCode=SOURCE_HASH_MISMATCH`로 종료된다.
-- Parser·Embedding Provider 호출과 Chunk 저장은 0건이다.
-- Spring callback은 `status=FAILED`, `failureCode=SOURCE_HASH_MISMATCH`이며 계약 enum 검증을 통과한다.
-
-## 4. Worker 강제 종료 복구
-
-1. Job이 `RUNNING`이고 heartbeat가 기록된 것을 확인한다.
-2. Worker 프로세스를 강제 종료한다.
-3. 90초 lease와 다음 60초 sweeper 주기까지 기다리거나 테스트 clock을 전진시킨다.
-4. Worker를 다시 시작한다.
-
-기대 결과:
-
-- 만료 Job은 `RETRY_WAIT`로 회수된다.
-- 1분 backoff 후 다시 `RUNNING`이 된다.
-- 재시도 성공 시 `SUCCEEDED → READY`다.
-- 실패가 계속되면 1·5·15분의 세 번 재시도 후 `DEAD → FAILED`다.
-- 영구 `PROCESSING` Document는 0건이다.
-
-## 5. callback 중간 종료 복구
-
-1. Chunk commit과 Job `SUCCEEDED` 직후 Spring callback을 실패시키거나 FastAPI를 종료한다.
-2. FastAPI를 다시 시작한다.
-
-기대 결과:
-
-- Chunk와 `SUCCEEDED` Job은 유지된다.
-- `callback_delivered_at`과 `callback_terminated_at`이 모두 비어 있는 Job을 reconciliation이 찾는다.
-- callback을 재전송해 Document가 `READY`가 된다.
-- 같은 callback을 두 번 전송해도 Spring 결과는 한 번 적용한 것과 같다.
-
-## 6. 청크 수가 줄어드는 재처리
-
-1. 첫 처리에서 40개 Chunk를 만든다.
-2. 같은 Document 개정본을 25개 Chunk가 되도록 재처리한다.
-
-기대 결과:
-
-- 최종 Chunk는 25개뿐이다.
-- 이전 `chunk_no=25..39`는 남지 않는다.
-- 실패를 주입하면 40개 기존 Chunk가 그대로 유지되고 부분적인 새 Chunk는 없다.
-
-## 7. 삭제·비활성화 cleanup
-
-1. Job을 `RUNNING`으로 만든다.
-2. Spring Document를 부스 임대 만료 정책에 따라 `DISABLED`로 전환한다.
-3. 첫 cleanup 호출 직전에 FastAPI 또는 네트워크 장애를 주입한 뒤 같은 `DELETE /documents/{documentId}/artifacts?reason=DOCUMENT_DISABLED` 요청을 재전송한다.
-
-기대 결과:
-
-- Job은 `CANCELLED`다.
-- Document는 `DISABLED`를 유지한다.
-- 해당 문서 Chunk는 0건이며 cleanup 반복 호출도 204다.
-- cleanup 뒤 늦은 `READY` callback은 Spring 최신 상태 검증에서 반영되지 않는다.
-- 이 동작은 Worker heartbeat lease 만료의 `RETRY_WAIT`와 구분된다.
-
-## 8. 오래된 개정본 완료 경쟁
-
-1. hash A Job을 `RUNNING`으로 둔다.
-2. 같은 Document를 hash B 개정본으로 교체한다.
-3. hash A Job의 완료 callback을 늦게 보낸다.
-
-기대 결과:
-
-- Spring은 409 stale revision을 반환한다.
-- hash B의 상태를 hash A 결과가 덮지 않는다.
-- FastAPI는 해당 stale callback을 재시도 무한 루프에 넣지 않는다.
-
-## 9. 격리 Critical Test
-
-Booth A/Agent A와 Booth B/Agent B에 서로 다른 표식 문서를 등록하고 혼합 검색을 수행한다.
-
-기대 결과:
-
-- 모든 검색 쿼리에 `booth_id + agent_id + searchable = true` 필터가 적용된다.
-- 다른 Booth 또는 Agent Chunk 반환은 0건이다.
-- 1건이라도 유출되면 CI와 배포를 차단한다.
-
-## 10. 내부 API 인증과 토큰 회전
-
-1. Spring→FastAPI와 AI→Spring에 서로 다른 테스트 토큰을 주입한다.
-2. 각 내부 API를 정상·누락·오류·반대 방향 토큰으로 호출한다.
-3. 두 방향 모두 `[old] → [old,new] → [new,old] → [new]` 순서로 설정을 바꾸며 정상 호출을 반복한다.
-4. Spring callback에는 아직 등록되지 않은 `jobId`, 삭제된 문서, `documentId`가 다른 `jobId`, 중복된 `jobId + status`, 오래된 `sourceHash`를 각각 보낸다.
-
-기대 결과:
-
-- 정상 방향 토큰만 성공하고 누락·오류·반대 방향 토큰은 401이다.
-- 회전 전 과정에서 정상 호출 실패가 없다.
-- 404는 각각 `JOB_NOT_REGISTERED`, `DOCUMENT_NOT_FOUND`, `JOB_DOCUMENT_MISMATCH`로 구분된다.
-- `JOB_NOT_REGISTERED`는 1초·3초·10초 간격으로 최대 3회 재시도하고, 삭제된 문서와 mismatch는 재시도하지 않는다. 재시도 소진·즉시 종료는 `callback_terminated_at`과 `callback_terminal_code`에 기록되고 mismatch는 Spring 경고 로그에 남는다.
-- 중복 callback은 상태를 다시 반영하지 않고 멱등 성공하며, 오래된 `sourceHash`는 409이고 현재 상태를 덮지 않는다.
-- Authorization 값은 애플리케이션·프록시 로그 어디에도 남지 않는다.
-
-## 11. R2 장애와 수동 MinIO fallback
-
-1. R2 문서를 하나 준비한 뒤 신규 업로드를 차단하고 기존 R2 문서 읽기가 유지되는지 확인한다.
-2. 운영자 검증 후 `LOCAL_ACTIVE`로 전환해 신규 문서를 MinIO에 업로드한다.
-3. R2 문서와 MinIO 문서를 연속 처리하고, 각 문서의 `storageProvider + bucket + objectKey`와 실제 읽기 대상이 일치하는지 확인한다.
-4. Provider 전환 전에 만든 미완료 문서의 업로드를 재개한다.
-5. MinIO 객체를 R2로 복사한 뒤 size·MIME·SHA-256 불일치를 각각 주입하고 reconcile을 실행한다.
-6. reconcile 결과를 같은 `runId + documentId`로 두 번 전송하고, R2가 여전히 막힌 상태에서 `DEAD → FAILED`로 끝난 문서에 대해 재처리 요청 없이 시간을 흘려본다.
-
-기대 결과:
-
-- 자동 MinIO 전환·이중 쓰기·자동 원복이 발생하지 않는다.
-- 기존 R2 문서는 계속 R2에서, 신규 MinIO 문서는 MinIO에서 읽는다.
-- Provider가 바뀐 미완료 문서는 `EXPIRED`가 되고 새 문서·새 object key로 시작한다.
-- 세 검증을 모두 통과한 객체만 R2 Provider로 변경되고 불일치 객체는 `R2_RECONCILING`에 남는다.
-- 저장소 장애 Job은 1·5·15분 재시도 후 `DEAD → FAILED`로 종료하고, 저장소가 복구돼도 자동으로 재처리되지 않는다.
-- `storage_reconciliation_log`에 결과가 남고, 같은 `runId + documentId` 재전송은 로그를 중복 적재하지 않으며 멱등 성공한다.
-
-## 12. 업로드 미완료 만료와 R2 정리
-
-1. 15분 TTL의 업로드 URL을 발급하고 업로드 완료 없이 테스트 시각을 생성 후 1시간 이상으로 전진시킨다.
-2. Spring 만료 sweeper를 실행한다.
-3. `EXPIRED` 전환 후 24시간 이내에는 원본 존재/부재 조건으로 완료 요청을 각각 보낸다.
-4. 별도 문서는 `EXPIRED` 전환 후 24시간 이상으로 전진시키고 R2 삭제 실패를 한 번 주입한다.
-
-기대 결과:
-
-- 미완료 문서는 `EXPIRED`이며 사용자 화면에는 업로드 만료로 표시된다.
-- 원본이 남은 늦은 완료는 `QUEUED`로 복구되고, 원본이 없으면 410이다.
-- 24시간이 지난 원본은 Spring이 `DeleteObject`로 삭제한다.
-- 삭제 실패 시 `EXPIRED`와 `objectKey`가 유지되고 다음 실행에서 재시도된다.
-- Spring 자격증명은 테스트 bucket/prefix 밖의 객체를 삭제할 수 없다.
-
-## 13. Business/AI DB reconciliation
-
-1. Business DB에는 없는 `documentId`의 Job·Chunk와 `DISABLED` 문서의 Chunk를 AI DB에 주입한다.
-2. Spring이 활성 문서 inventory를 생성하고 FastAPI reconciliation에 전달한다.
-3. 같은 inventory/run을 재전송한다.
-
-기대 결과:
-
-- Business DB에 없는 문서 및 `READY`가 아닌 문서의 Chunk가 0건으로 수렴한다.
-- 반복 reconciliation은 추가 삭제나 오류 없이 멱등 성공한다.
-- scope/sourceHash 불일치는 임의 보정하지 않고 운영 경고와 명시적 재처리 대상으로 기록한다.
-
-## 14. 자동 테스트
-
-```bash
-cd festa-ai
-pytest tests/unit
-pytest tests/contract
-pytest tests/integration
-pytest -m failure_injection
-pytest -m isolation
-```
-
-전체 통과 조건:
-
-- OpenAPI 계약 검증 성공
-- 상태 전이와 DB 제약 검증 성공
-- database CONNECT matrix와 FastAPI Business DB 무접근 검증 성공
-- cleanup 재전송·inventory reconciliation 후 고아 Chunk 0건
-- 강제 종료·callback 실패 복구 성공
-- 다른 Booth/Agent Chunk 유출 0건
-- 사용자 오류 응답과 로그 검사에서 Secret·Stack Trace 노출 0건
+Agent 설정 API는 Jira S15P21A604-399에서 endpoint·DTO·호출 시점·캐시 정책이 합의되기 전 구현하지 않는다.
