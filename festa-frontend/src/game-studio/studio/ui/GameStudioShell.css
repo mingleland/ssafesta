@@ -723,6 +723,30 @@
 .gss-template-modal h2 { font-size: 22px; margin: 5px 0; }
 .gss-template-modal > header p { color: #4b5563; font-size: 10px; margin: 0 0 18px; }
 .gss-template-modal > header button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 22px; }
+/* 실험(정식 티켓 아님) — 게임 흐름 그래프 모달. .gss-template-modal과 같은 톤의 오버레이
+   패널 껍데기를 재사용하고, 안쪽 내용(그래프)만 새로 정의한다. */
+.gss-flow-graph-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 15px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-height: calc(100vh - 48px); max-width: 1200px; overflow: hidden; padding: 24px; width: 100%; }
+.gss-flow-graph-modal > header { align-items: flex-start; display: flex; justify-content: space-between; }
+.gss-flow-graph-modal > header span { color: #1d4ed8; font-size: 9px; font-weight: 850; letter-spacing: .08em; }
+.gss-flow-graph-modal h2 { font-size: 22px; margin: 5px 0; }
+.gss-flow-graph-modal > header p { color: #4b5563; font-size: 10px; margin: 0 0 18px; }
+.gss-flow-graph-modal > header button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 22px; }
+.gss-flow-graph-scroll { max-height: calc(100vh - 160px); overflow: auto; }
+.gss-flow-graph { position: relative; }
+.gss-flow-graph-edges { left: 0; pointer-events: none; position: absolute; top: 0; }
+.gss-flow-edge { stroke: #9aa5b4; stroke-width: 1.6; }
+.gss-flow-edge.is-complete_game { stroke: var(--gss-green); }
+.gss-flow-graph-edges marker path { fill: #9aa5b4; }
+.gss-flow-node { background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; cursor: pointer; padding: 8px 10px; position: absolute; text-align: left; width: 168px; }
+.gss-flow-node:hover:not(:disabled) { border-color: rgba(37,99,235,.4); box-shadow: 0 4px 14px rgba(37,99,235,.15); }
+.gss-flow-node:disabled { cursor: default; opacity: .85; }
+.gss-flow-node.is-start { border-color: var(--gss-blue); border-width: 2px; }
+.gss-flow-node.is-endpoint { background: #eefaf1; border-color: var(--gss-green); }
+.gss-flow-node.is-unreachable { border-style: dashed; opacity: .6; }
+.gss-flow-node strong { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gss-flow-node small { color: var(--gss-muted); display: block; font-size: 9px; margin-top: 2px; }
+.gss-flow-node em { color: var(--gss-blue); font-size: 8px; font-style: normal; margin-top: 3px; display: block; }
+.gss-flow-node em.is-warning { color: #b45309; }
 .gss-template-grid { display: grid; gap: 10px; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .gss-template-grid > button { align-items: flex-start; background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; display: block; overflow: hidden; padding: 0; text-align: left; }
 .gss-template-grid > button:hover { background: rgba(37,99,235,.05); border-color: #4f82cd; transform: translateY(-1px); }

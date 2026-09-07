@@ -54,6 +54,7 @@ import { findPublishBlockers } from '../ports/publishValidation.ts';
 import { createGameProjectStore } from '../store/gameProjectStore.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { DialogueEditor } from './DialogueEditor.tsx';
+import { SceneFlowGraph } from './SceneFlowGraph.tsx';
 import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
 import { ObjectLayerPanel } from './ObjectLayerPanel.tsx';
@@ -251,6 +252,8 @@ export const GameStudioShell = ({
   // 템플릿/JSON 가져오기·내보내기)와, "게임 초기화"의 파괴적 액션 확인 단계.
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // 실험(정식 티켓 아님) — 씬 단위 게임 흐름을 그래프로 보여주는 모달.
+  const [showFlowGraph, setShowFlowGraph] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -677,6 +680,10 @@ export const GameStudioShell = ({
         || (target instanceof HTMLElement && target.isContentEditable);
       const insideDialog = target instanceof Element && target.closest('[role="dialog"]') !== null;
       if (event.key === 'Escape') {
+        if (showFlowGraph) {
+          setShowFlowGraph(false);
+          return;
+        }
         if (showResetConfirm) {
           setShowResetConfirm(false);
           return;
@@ -821,7 +828,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showFileMenu, showGuide, showResetConfirm, showTemplates, store]);
+  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showFileMenu, showFlowGraph, showGuide, showResetConfirm, showTemplates, store]);
 
   // S15P21A604-481 — "게임 초기화"(확인 다이얼로그를 거친 뒤에만 호출된다). 새 gameId 발급
   // 진입점 자체가 없어서(Notion QA id=25) "새 게임 생성"이 아니라 현재 gameId를 완전히 빈
@@ -1003,6 +1010,7 @@ export const GameStudioShell = ({
         </div>
         <div className="gss-primary-actions">
           <button className="gss-guide-button" onClick={() => setShowGuide(true)} type="button">? 사용 안내</button>
+          <button className="gss-guide-button" onClick={() => setShowFlowGraph(true)} type="button">🔀 게임 흐름</button>
           <button
             className="gss-preview-button"
             disabled={saveStatus === 'loading' || saveStatus === 'saving'}
@@ -1625,6 +1633,27 @@ export const GameStudioShell = ({
                 </footer>
               );
             })()}
+          </section>
+        </div>
+      )}
+      {showFlowGraph && (
+        <div className="gss-guide-backdrop" onMouseDown={() => setShowFlowGraph(false)} role="presentation">
+          <section aria-modal="true" className="gss-flow-graph-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <header>
+              <div><span>실험 · 정식 기능 아님</span><h2>게임 흐름</h2><p>씬을 눌러 바로 이동합니다. 화살표는 Scene 이동/대화 표시/게임 완료 연결입니다.</p></div>
+              <button aria-label="게임 흐름 닫기" onClick={() => setShowFlowGraph(false)} type="button">×</button>
+            </header>
+            <div className="gss-flow-graph-scroll">
+              <SceneFlowGraph
+                onSelectScene={(sceneId) => {
+                  setSelectedSceneId(sceneId);
+                  setSelectedObjectId(null);
+                  setSelectedObjectIds(new Set());
+                  setShowFlowGraph(false);
+                }}
+                project={project}
+              />
+            </div>
           </section>
         </div>
       )}
