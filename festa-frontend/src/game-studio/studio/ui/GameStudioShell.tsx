@@ -1644,16 +1644,14 @@ export const GameStudioShell = ({
       )}
       {showFlowGraph && (
         <FloatingPanel initialSize={{ height: 480, width: 760 }} onClose={() => setShowFlowGraph(false)} title="게임 흐름">
-          <div className="gss-flow-graph-scroll">
-            <SceneFlowGraph
-              onSelectScene={(sceneId) => {
-                setSelectedSceneId(sceneId);
-                setSelectedObjectId(null);
-                setSelectedObjectIds(new Set());
-              }}
-              project={project}
-            />
-          </div>
+          <SceneFlowGraph
+            onSelectScene={(sceneId) => {
+              setSelectedSceneId(sceneId);
+              setSelectedObjectId(null);
+              setSelectedObjectIds(new Set());
+            }}
+            project={project}
+          />
         </FloatingPanel>
       )}
       {tutorialStep !== null && (
