@@ -8,7 +8,7 @@
 
 ## Summary
 
-Google/Kakao 소셜 로그인, 비영속 게스트, 단일 브라우저 세션, 탈퇴 확정 즉시 관련 데이터 전체 hard delete Workflow, 닉네임 정책을 구현한다. OAuth callback은 기존·신규 사용자를 단일 React `/auth/callback`으로 보내며, 1회성 HttpOnly handoff cookie와 단일 완료 API로 토큰 발급·닉네임 보완을 처리한다. PostgreSQL·Redis·파일·Vector·OAuth 삭제를 재실행 가능하게 조율하고 User row는 마지막에 삭제한다.
+Google/Kakao/SSAFY 소셜 로그인, 비영속 게스트, 단일 브라우저 세션, 탈퇴 확정 즉시 관련 데이터 전체 hard delete Workflow, 닉네임 정책을 구현한다. OAuth callback은 기존·신규 사용자를 단일 React `/auth/callback`으로 보내며, 1회성 HttpOnly handoff cookie와 단일 완료 API로 토큰 발급·닉네임 보완을 처리한다. PostgreSQL·Redis·파일·Vector·OAuth 삭제를 재실행 가능하게 조율하고 User row는 마지막에 삭제한다.
 
 ## Technical Context
 
@@ -34,7 +34,7 @@ Google/Kakao 소셜 로그인, 비영속 게스트, 단일 브라우저 세션, 
 
 **Constraints**: Refresh Token은 Unity·게임 서버에 전달 금지, 게스트 비영속, secret 커밋 금지
 
-**Scale/Scope**: Google/Kakao/Guest, 단일 활성 브라우저 세션, 계정·관리자 API
+**Scale/Scope**: Google/Kakao/SSAFY/Guest, 단일 활성 브라우저 세션, 계정·관리자 API
 
 ## Constitution Check
 
