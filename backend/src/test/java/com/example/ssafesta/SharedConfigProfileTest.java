@@ -13,6 +13,8 @@ import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 
+import com.example.ssafesta.ai.AiProcessingProperties;
+import com.example.ssafesta.internal.ai.InternalTokenProperties;
 import com.example.ssafesta.storage.ObjectStorageProperties;
 import com.example.ssafesta.common.RedisCredentialCheck;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
@@ -46,6 +48,10 @@ class SharedConfigProfileTest {
         "JWT_SECRET=aW5qZWN0ZWQtand0LXNlY3JldA==",
         "CONNECTION_TOKEN_SECRET=injected-connection-secret",
         "INTERNAL_AI_TO_SPRING_TOKENS=injected-ai-token",
+        // Spring→FastAPI 송신분과 그 주소 (S15P21A604-175). 두 방향 토큰은 서로 달라야 한다 —
+        // AI 쪽이 겹치는 설정으로는 기동하지 않는다.
+        "INTERNAL_SPRING_TO_AI_TOKENS=injected-spring-token",
+        "AI_INTERNAL_BASE_URL=http://ai:8000",
         "GOOGLE_CLIENT_ID=google-id",
         "GOOGLE_CLIENT_SECRET=google-secret",
         "GOOGLE_REDIRECT_URI=https://api.example.test/login/oauth2/code/google",
@@ -220,6 +226,49 @@ class SharedConfigProfileTest {
             "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"})
     void everyRequiredStorageVariableFailsToStartWhenMissing(String variable) {
         storageRunner(withoutEnv(variable)).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootCauseOf(context.getStartupFailure())).contains(variable);
+        });
+    }
+
+    // ── FastAPI 위임 설정 (S15P21A604-175) ───────────────────────────────────────────
+
+    @EnableConfigurationProperties({AiProcessingProperties.class, InternalTokenProperties.class})
+    static class DelegationBinding {
+    }
+
+    private ApplicationContextRunner delegationRunner(String... propertyValues) {
+        return runner(propertyValues).withUserConfiguration(DelegationBinding.class);
+    }
+
+    /** 주소와 두 방향 토큰이 배포 계층에서 실제로 묶인다. */
+    @Test
+    @DisplayName("infra 프로파일이 FastAPI 주소와 송신 토큰을 묶는다")
+    void infraProfileBindsTheDelegationSettings() {
+        delegationRunner(DEPLOY_ENV).run(context -> {
+            assertThat(context).hasNotFailed();
+
+            assertThat(context.getBean(AiProcessingProperties.class).baseUrl())
+                    .isEqualTo("http://ai:8000");
+            InternalTokenProperties tokens = context.getBean(InternalTokenProperties.class);
+            assertThat(tokens.springToAiToken()).isEqualTo("injected-spring-token");
+            // 방향이 섞이면 넓은 쪽 노출이 좁은 쪽에 닿는다 (GitLab #102).
+            assertThat(tokens.aiToSpringTokenList()).doesNotContainAnyElementsOf(
+                    tokens.springToAiTokenList());
+        });
+    }
+
+    /**
+     * 둘 중 하나라도 빠지면 <b>기동이 실패한다</b>.
+     *
+     * <p>주소에 기본값을 뒀다면 배포가 변수를 빠뜨렸을 때 localhost 로 조용히 떠서 모든 위임이
+     * 연결 실패로 떨어진다 — FastAPI 가 죽은 것처럼 보이는데 원인은 빠진 변수 하나다. 저장소
+     * 쪽에서 T-101 이 낸 것과 같은 모양이라 같은 취급을 한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"INTERNAL_SPRING_TO_AI_TOKENS", "AI_INTERNAL_BASE_URL"})
+    void everyRequiredDelegationVariableFailsToStartWhenMissing(String variable) {
+        delegationRunner(withoutEnv(variable)).run(context -> {
             assertThat(context).hasFailed();
             assertThat(rootCauseOf(context.getStartupFailure())).contains(variable);
         });
