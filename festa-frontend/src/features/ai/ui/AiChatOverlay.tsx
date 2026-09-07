@@ -175,10 +175,11 @@ export function AiChatOverlay({ payload }: Props) {
     consultation.phase === 'active';
 
   function escalateToHuman() {
-    // 마지막 AI 답변을 Handoff Summary 로 넘긴다. 실 요약 생성은 AI 서버 몫이라(spec 011),
-    // 여기서는 대화 맥락이 실제로 이어진다는 것만 계약으로 보인다 — 없으면 넘기지 않는다.
-    const lastAgentTurn = [...turns].reverse().find((t) => t.role === 'agent' && !t.streaming);
-    void requestConsultation(aiHandoffContext(payload.boothId, lastAgentTurn?.text));
+    // 대화 id 만 넘긴다 (#133 확정 계약, S15P21A604-519). 요약은 서버가 이 id 로 FastAPI 에
+    // 청해 만든다 — 마지막 AI 답변을 잘라 보내던 방식은 폐기했다. 그 텍스트는 요약이 아니라
+    // 요약의 재료 한 조각이었고, 직원이 보는 요약의 정본은 서버여야 한다(FR-012).
+    // 대화를 아직 시작하지 않았으면 undefined 이고, 그때 요약은 null 이 된다.
+    void requestConsultation(aiHandoffContext(payload.boothId, conversationIdRef.current ?? undefined));
     // 상담 화면으로 바꾼다. 같은 부스라 Visitor 슬롯을 그대로 넘겨받는다.
     openVisitorOverlay('CONSULTATION', { boothId: payload.boothId });
   }
