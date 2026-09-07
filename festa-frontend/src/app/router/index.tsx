@@ -2,7 +2,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { LandingPage } from '../../pages/landing/LandingPage';
 import { ProfilePage } from '../../pages/profile/ProfilePage';
-import { StudioPage } from '../../pages/studio/StudioPage';
 import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
 import { SurveyManagementPage } from '../../pages/management/SurveyManagementPage';
@@ -89,12 +88,19 @@ export const routes = [
     ),
   },
   {
+    // Booth Studio — WorldPage 와 같은 이유로 lazy 다. 2.5D 렌더러(three)가 이 아래에 달리므로
+    // static import 로 두면 Studio 를 열지 않는 사용자도 3D 런타임을 받는다 (S15P21A604-470)
     path: '/app/studio/:boothId',
-    element: (
-      <RequireAuth level="member-only">
-        <StudioPage />
-      </RequireAuth>
-    ),
+    lazy: async () => {
+      const { StudioPage } = await import('../../pages/studio/StudioPage.tsx');
+      return {
+        Component: () => (
+          <RequireAuth level="member-only">
+            <StudioPage />
+          </RequireAuth>
+        ),
+      };
+    },
   },
   {
     // spec 013a — Unity WebGL Host. 무거운 로더 코드를 메인 번들에서 뺀다(lazy)
