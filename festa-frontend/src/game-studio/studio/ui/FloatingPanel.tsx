@@ -47,6 +47,10 @@ export const FloatingPanel = ({
   const resizeRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number } | null>(null);
 
   const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // S15P21A604-511 — 제목 표시줄 안의 버튼(닫기 ×)에서 시작된 pointerdown까지 잡아버리면
+    // preventDefault/setPointerCapture가 그 버튼의 이후 click을 가로막는다(SceneFlowGraph.
+    // startPan이 노드 위에서 하는 것과 같은 방어).
+    if (event.target instanceof Element && event.target.closest('button') !== null) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = { startX: event.clientX, startY: event.clientY, startLeft: position.x, startTop: position.y };

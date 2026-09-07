@@ -74,9 +74,24 @@ describe('FloatingPanel', () => {
     expect(panel.style.height).toBe('240px');
   });
 
-  it('닫기 버튼을 누르면 onClose가 호출된다', () => {
-    const { onClose } = setup();
-    fireEvent.click(screen.getByRole('button', { name: '게임 흐름 닫기' }));
+  // S15P21A604-511 — 제목 표시줄의 창 이동 드래그(startDrag)가 자식 버튼(닫기 ×)에서
+  // 시작된 pointerdown까지 구분 없이 잡아버리면, 그 버튼 위에서 살짝이라도 손이 흔들리는
+  // 순간(pointerdown~pointermove) 클릭이 아니라 "창 이동"으로 처리돼 버린다. click 이벤트만
+  // 직접 쏘면(fireEvent.click) jsdom은 pointerdown→click 사이의 실제 브라우저 동작(캡처·
+  // preventDefault로 인한 클릭 억제)을 재현하지 않아 이 버그를 못 잡는다 — 대신 "버튼 위
+  // pointerdown+move가 실제로 창을 옮기는지"를 직접 확인해야 방어가 되는지 알 수 있다.
+  it('닫기 버튼 위에서 시작된 드래그는 창을 이동시키지 않고, 클릭은 정상 동작한다', () => {
+    const { onClose, panel, titlebar } = setup();
+    const closeButton = screen.getByRole('button', { name: '게임 흐름 닫기' });
+
+    fireEvent.pointerDown(closeButton, { clientX: 200, clientY: 150, pointerId: 9 });
+    fireEvent.pointerMove(titlebar, { clientX: 260, clientY: 190, pointerId: 9 });
+    fireEvent.pointerUp(closeButton, { clientX: 260, clientY: 190, pointerId: 9 });
+
+    expect(panel.style.left).toBe('100px');
+    expect(panel.style.top).toBe('80px');
+
+    fireEvent.click(closeButton);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
