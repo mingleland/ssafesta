@@ -959,6 +959,32 @@ Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답�
 
 응답자 식별 정보는 어떤 필드에도 없다(FR-009). 주관식 항목의 `responseId` 는 같은 사람의 답을 묶는 열쇠일 뿐이다.
 
+```json
+{
+  "surveyId": 12, "totalResponses": 20,
+  "firstRespondedAt": "2026-09-08T04:11:02Z", "lastRespondedAt": "2026-09-08T07:55:40Z",
+  "perQuestion": [
+    {"questionId": 101, "type": "SINGLE_CHOICE", "answeredCount": 18,
+     "counts": [{"optionId": 1001, "label": "월드를 돌아다니다가", "count": 11}],
+     "average": null, "distribution": []},
+    {"questionId": 102, "type": "RATING", "answeredCount": 20, "counts": [],
+     "average": 4.2, "distribution": [{"value": 1, "count": 0}, {"value": 2, "count": 1}]}
+  ],
+  "textAnswers": {"content": [{"responseId": 55, "questionId": 103, "text": "무대 일정 안내가…"}],
+                  "page": 0, "size": 20, "totalElements": 12, "totalPages": 1}
+}
+```
+
+`counts`·`average`·`distribution` 은 **유형과 무관하게 항상 있다** — 값이 없으면 `[]`·`null` 이다. `answeredCount` 는 그 문항에 답한 응답 수이므로 선택 문항을 건너뛴 사람이 있으면 `totalResponses` 보다 작다.
+
+### `GET /surveys/{surveyId}/text-answers?questionId&page&size`
+
+주관식 답변 페이지. 결과 조회의 `textAnswers` 가 첫 페이지이고 그 다음을 이 endpoint 로 넘긴다(FR-008). `page`(0부터, 기본 0) · `size`(1~100, 기본 20) · `questionId`(선택 — 없으면 텍스트 3유형 전체).
+
+**정렬은 답변 id 오름차순으로 고정**이다. 새 답변은 항상 뒤에 붙으므로 페이지를 넘기는 중에 제출이 들어와도 경계에서 중복·누락이 없다(C-09). 페이지 모양은 전역 규약(`content`·`page`·`size`·`totalElements`·`totalPages`)이고 `hasNext` 는 `page + 1 < totalPages` 로 판단한다.
+
+`page` 음수 · `size` 범위 밖 · 이 설문의 문항이 아닌 `questionId` 는 `400 VALIDATION_FAILED` 이고 `errors[0].field` 가 문제 필드다.
+
 ## 10. Staff / Permission
 
 ### POST `/booths/{boothId}/staff-invitations`

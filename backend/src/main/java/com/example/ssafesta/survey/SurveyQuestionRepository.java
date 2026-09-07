@@ -12,6 +12,15 @@ public interface SurveyQuestionRepository extends JpaRepository<SurveyQuestion, 
     List<SurveyQuestion> findBySurveyIdOrderByDisplayOrderAsc(Long surveyId);
 
     /**
+     * Whether this question belongs to this survey — the guard on the {@code questionId} filter of
+     * {@code GET /surveys/{id}/text-answers}.
+     *
+     * <p>Without it the filter would silently return an empty page for another booth's question,
+     * which reads as "nobody answered" rather than "wrong question" (계약 §8).
+     */
+    boolean existsByIdAndSurveyId(Long id, Long surveyId);
+
+    /**
      * Clears the question set so a new one can take the same {@code display_order} values.
      *
      * <p>{@code flushAutomatically} sends the DELETE before the caller's INSERTs, and

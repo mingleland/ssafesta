@@ -1,5 +1,6 @@
 package com.example.ssafesta.survey;
 
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -23,4 +24,49 @@ public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long
     @Query(value = "INSERT INTO survey_answer_options (answer_id, option_id) VALUES (:answerId, :optionId)",
             nativeQuery = true)
     void insertSelectedOption(@Param("answerId") Long answerId, @Param("optionId") Long optionId);
+
+    /**
+     * One page of free-text answers, oldest first (FR-008, C-09).
+     *
+     * <p><b>Ordered by answer id ascending, and that is the contract.</b> New answers only ever get
+     * larger ids, so a submission arriving while someone pages through cannot shift a row onto a
+     * page they already read — which is what makes "경계 중복·누락 0건" true rather than hopeful.
+     * Ordering by {@code submitted_at} would not: two answers can share a timestamp.
+     *
+     * <p>{@code responseId} rides along so the answers of one submitter can be grouped later. That
+     * is the key spec C-03 (지원서 제출자별 상세 조회) will need, and it is not an identity — no
+     * respondent field leaves this API (FR-009).
+     *
+     * @param questionId narrows to one question; {@code null} returns all three text types
+     */
+    @Query(value = """
+            SELECT a.response_id AS response_id, a.question_id AS question_id, a.text_answer AS text
+            FROM survey_answers a
+            JOIN survey_responses r ON r.id = a.response_id
+            WHERE r.survey_id = :surveyId AND a.text_answer IS NOT NULL
+              AND (:questionId IS NULL OR a.question_id = :questionId)
+            ORDER BY a.id ASC
+            LIMIT :size OFFSET :offset
+            """, nativeQuery = true)
+    List<TextAnswerRow> findTextAnswers(@Param("surveyId") Long surveyId,
+                                        @Param("questionId") Long questionId,
+                                        @Param("size") int size,
+                                        @Param("offset") int offset);
+
+    @Query(value = """
+            SELECT count(*)
+            FROM survey_answers a
+            JOIN survey_responses r ON r.id = a.response_id
+            WHERE r.survey_id = :surveyId AND a.text_answer IS NOT NULL
+              AND (:questionId IS NULL OR a.question_id = :questionId)
+            """, nativeQuery = true)
+    long countTextAnswers(@Param("surveyId") Long surveyId, @Param("questionId") Long questionId);
+
+    interface TextAnswerRow {
+        Long getResponseId();
+
+        Long getQuestionId();
+
+        String getText();
+    }
 }
