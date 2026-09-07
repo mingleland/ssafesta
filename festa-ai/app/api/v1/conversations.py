@@ -11,7 +11,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ApiError
 from app.api.schemas.conversations import (
@@ -21,11 +20,9 @@ from app.api.schemas.conversations import (
 )
 from app.api.schemas.documents import ErrorResponse
 from app.clients.spring_booth_access import SpringBoothAccessClient
+from app.clients.spring_chunk_search import SpringChunkSearchClient
 from app.core.auth import AuthenticatedMember, require_member
-from app.db.session import get_ai_db_session
-from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.conversation_repository import ConversationRepository
-from app.repositories.document_job_repository import DocumentJobRepository
 from app.services.conversation_service import (
     BoothAccessDenied,
     ConversationCreationFailed,
@@ -62,17 +59,20 @@ async def get_conversation_service(request: Request) -> ConversationService:
     )
 
 
-async def get_stream_service(
-    request: Request,
-    session: Annotated[AsyncSession, Depends(get_ai_db_session)],
-) -> ConversationStreamService:
+async def get_stream_service(request: Request) -> ConversationStreamService:
     settings = request.app.state.settings
     repository = ConversationRepository(
         request.app.state.redis, ttl_seconds=settings.conversation_ttl_seconds
     )
+    chunk_search_client = SpringChunkSearchClient(
+        base_url=settings.spring_internal_base_url,
+        service_token=settings.internal_ai_to_spring_tokens[0],
+        timeout_seconds=settings.spring_chunk_search_timeout_seconds,
+        client=request.app.state.spring_http_client,
+    )
     vector_search = VectorSearchService(
         embedding_provider=request.app.state.embedding_provider,
-        chunk_repository=ChunkRepository(session),
+        chunk_search_client=chunk_search_client,
     )
     rag_context_service = RagContextService(
         vector_search=vector_search,
@@ -84,7 +84,6 @@ async def get_stream_service(
         repository=repository,
         rag_context_service=rag_context_service,
         llm_provider=request.app.state.llm_provider,
-        document_job_repository=DocumentJobRepository(session),
         ttl_seconds=settings.conversation_ttl_seconds,
     )
 

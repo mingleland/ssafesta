@@ -9,9 +9,9 @@ already steer toward "문서에서 확인할 수 없습니다" (FR-009).
 
 from __future__ import annotations
 
+from app.clients.spring_chunk_search import ChunkScope
 from app.models.conversation import Conversation
 from app.providers.agent_config import AgentConfigProvider
-from app.repositories.chunk_repository import ChunkScope
 from app.services.context_service import CompletedTurn, ContextBuildResult, PromptBuilder
 from app.services.vector_search_service import VectorSearchService
 

@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.clients.spring_chunk_search import RetrievedChunk
 from app.providers.llm import LLMRequest
-from app.repositories.chunk_repository import RetrievedChunk
 from app.services.context_service import (
     AgentPromptConfig,
     CompletedTurn,
@@ -29,13 +29,10 @@ def _chunk(index: int, content: str) -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=1000 + index,
         document_id=2000 + index,
-        booth_id=10,
-        agent_id=20,
-        chunk_no=index,
         content=content,
-        embedding_model_id="text-embedding-3-large",
         page_number=index + 1,
         section=f"section-{index}",
+        original_filename=f"doc-{index}.pdf",
         distance=index / 10,
     )
 

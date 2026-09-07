@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import and_, func, or_, select, update
@@ -44,25 +43,6 @@ class DocumentJobRepository:
             .limit(1)
         )
         return await self._session.scalar(statement)
-
-    async def find_titles(self, document_ids: Sequence[int]) -> dict[int, str]:
-        """Map each `document_id` to its most recently recorded `original_filename`.
-
-        A SSE `source` event's `title` is display-only (C-07) — this reads the
-        latest Job row per id regardless of status rather than joining against
-        chunk retrieval, since the filename does not change across reprocessing.
-        """
-        if not document_ids:
-            return {}
-        statement = (
-            select(DocumentJob.document_id, DocumentJob.original_filename)
-            .where(DocumentJob.document_id.in_(document_ids))
-            .order_by(DocumentJob.document_id, DocumentJob.id.desc())
-        )
-        titles: dict[int, str] = {}
-        for document_id, original_filename in await self._session.execute(statement):
-            titles.setdefault(document_id, original_filename)
-        return titles
 
     async def pickup(self, *, worker_id: str, lease_seconds: int) -> DocumentJob | None:
         """Atomically claim one runnable Job without waiting on another Worker."""

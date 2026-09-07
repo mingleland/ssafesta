@@ -23,7 +23,6 @@ from app.models.conversation import (
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
-from app.repositories.document_job_repository import DocumentJobRepository
 from app.services.rag_service import RagContextService
 
 logger = logging.getLogger(__name__)
@@ -56,14 +55,12 @@ class ConversationStreamService:
         repository: ConversationRepository,
         rag_context_service: RagContextService,
         llm_provider: LLMProvider,
-        document_job_repository: DocumentJobRepository,
         ttl_seconds: int,
         clock: Callable[[], datetime] = _default_clock,
     ) -> None:
         self._repository = repository
         self._rag_context_service = rag_context_service
         self._llm_provider = llm_provider
-        self._document_job_repository = document_job_repository
         self._ttl_seconds = ttl_seconds
         self._clock = clock
 
@@ -150,9 +147,6 @@ class ConversationStreamService:
             )
             return
 
-        titles = await self._document_job_repository.find_titles(
-            [chunk.document_id for chunk in context.included_chunks]
-        )
         seen: set[tuple[int, int]] = set()
         citations: list[SourceCitation] = []
         for chunk in context.included_chunks:
@@ -160,13 +154,20 @@ class ConversationStreamService:
             if key in seen:
                 continue
             seen.add(key)
-            title = titles.get(chunk.document_id, f"문서 {chunk.document_id}")
             citations.append(
-                SourceCitation(document_id=chunk.document_id, chunk_id=chunk.chunk_id, title=title)
+                SourceCitation(
+                    document_id=chunk.document_id,
+                    chunk_id=chunk.chunk_id,
+                    title=chunk.original_filename,
+                )
             )
             yield render(
                 "source",
-                {"documentId": chunk.document_id, "chunkId": chunk.chunk_id, "title": title},
+                {
+                    "documentId": chunk.document_id,
+                    "chunkId": chunk.chunk_id,
+                    "title": chunk.original_filename,
+                },
             )
 
         yield render("done", {"handoffRecommended": False})

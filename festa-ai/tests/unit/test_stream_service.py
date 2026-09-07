@@ -7,10 +7,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.clients.spring_chunk_search import RetrievedChunk
 from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest
 from app.providers.managed_llm import ManagedLLMError
-from app.repositories.chunk_repository import RetrievedChunk
 from app.services.context_service import ContextBuildResult
 from app.services.stream_service import (
     BoothLeaseExpired,
@@ -35,17 +35,14 @@ def _conversation(*, user_id: int = 1, lease_ends_at: datetime | None = None) ->
     )
 
 
-def _chunk(document_id: int, chunk_id: int) -> RetrievedChunk:
+def _chunk(document_id: int, chunk_id: int, *, original_filename: str = "문서.pdf") -> RetrievedChunk:
     return RetrievedChunk(
         chunk_id=chunk_id,
         document_id=document_id,
-        booth_id=10,
-        agent_id=20,
-        chunk_no=0,
         content="본문",
-        embedding_model_id="text-embedding-3-large",
         page_number=1,
         section=None,
+        original_filename=original_filename,
         distance=0.1,
     )
 
@@ -86,20 +83,11 @@ class _RagContextService:
         return self._result
 
 
-class _DocumentJobRepository:
-    def __init__(self, titles: dict[int, str] | None = None) -> None:
-        self._titles = titles or {}
-
-    async def find_titles(self, document_ids):
-        return {doc_id: self._titles[doc_id] for doc_id in document_ids if doc_id in self._titles}
-
-
 def _service(
     *,
     conversation: Conversation | None,
     rag: _RagContextService,
     llm,
-    titles: dict[int, str] | None = None,
     clock=lambda: NOW,
 ) -> tuple[ConversationStreamService, _ConversationRepository]:
     repository = _ConversationRepository(conversation)
@@ -107,7 +95,6 @@ def _service(
         repository=repository,
         rag_context_service=rag,
         llm_provider=llm,
-        document_job_repository=_DocumentJobRepository(titles),
         ttl_seconds=1800,
         clock=clock,
     )
@@ -151,14 +138,16 @@ async def test_authorize_raises_lease_expired_when_past_lease_ends_at() -> None:
 
 @pytest.mark.asyncio
 async def test_successful_stream_emits_start_token_source_done_in_order() -> None:
-    chunks = (_chunk(2001, 5001), _chunk(2002, 5002))
+    chunks = (
+        _chunk(2001, 5001, original_filename="문서1.pdf"),
+        _chunk(2002, 5002, original_filename="문서2.pdf"),
+    )
     rag = _RagContextService(result=_context_result(chunks))
     llm = FakeLLMProvider(tokens=("안녕", "하세요"))
     service, repository = _service(
         conversation=_conversation(),
         rag=rag,
         llm=llm,
-        titles={2001: "문서1.pdf", 2002: "문서2.pdf"},
     )
 
     raw = [event async for event in service.stream(conversation=_conversation(), question="질문")]
