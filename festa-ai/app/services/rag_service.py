@@ -1,19 +1,29 @@
 """Build one LLM-ready context for a Conversation question (spec 008 FR-008/FR-017).
 
-`S15P21A604-140` slice of T019: scope-safe retrieval + prompt assembly only.
-The READY-document-count-zero fixed response (FR edge case, no LLM call) is
-`S15P21A604-145`'s scope and is not implemented here — with zero `READY`
-chunks this still calls the LLM, which the platform/safety instructions
-already steer toward "문서에서 확인할 수 없습니다" (FR-009).
+`S15P21A604-140` slice of T019: scope-safe retrieval + prompt assembly.
+`S15P21A604-145`: READY 문서가 0개라 검색 결과가 0건이면 LLM을 호출하지 않고
+`NoReadyContextResult`를 돌려준다 (SC-008 — Spring 검색 호출 1건, LLM 호출 0건,
+자료 미준비 안내).
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 from app.clients.spring_chunk_search import ChunkScope
 from app.models.conversation import Conversation
 from app.providers.agent_config import AgentConfigProvider
 from app.services.context_service import CompletedTurn, ContextBuildResult, PromptBuilder
 from app.services.vector_search_service import VectorSearchService
+
+NO_READY_CONTEXT_MESSAGE = "아직 검색 가능한 자료가 준비되지 않았습니다. 잠시 후 다시 시도해 주세요."
+
+
+@dataclass(frozen=True, slots=True)
+class NoReadyContextResult:
+    """READY Chunk가 0건일 때의 고정 응답 — LLM을 호출하지 않는다 (SC-008)."""
+
+    message: str = NO_READY_CONTEXT_MESSAGE
 
 
 class RagContextService:
@@ -32,13 +42,18 @@ class RagContextService:
         self._prompt_builder = prompt_builder
         self._retrieval_top_k = retrieval_top_k
 
-    async def build(self, *, conversation: Conversation, question: str) -> ContextBuildResult:
+    async def build(
+        self, *, conversation: Conversation, question: str
+    ) -> ContextBuildResult | NoReadyContextResult:
         scope = ChunkScope(
             booth_id=conversation.scope.booth_id, agent_id=conversation.scope.agent_id
         )
         chunks = await self._vector_search.search(
             question=question, scope=scope, top_k=self._retrieval_top_k
         )
+        if not chunks:
+            return NoReadyContextResult()
+
         agent = await self._agent_config_provider.get(
             booth_id=conversation.scope.booth_id, agent_id=conversation.scope.agent_id
         )
