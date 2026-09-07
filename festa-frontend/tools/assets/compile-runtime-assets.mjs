@@ -63,8 +63,10 @@ async function main() {
     const texture = planTextureOptimization(material.textures);
     probes.push({ id: probe.id, license: license.emission, runtime: material.runtime, texture });
     const channels = material.textures.map((t) => t.channel).join(', ') || '없음';
+    // 런타임 변환 결과는 위 에셋별 `texture` 줄이 말한다. 여기서 `미적용` 이라고 찍으면
+    // 같은 실행 안에서 두 줄이 서로를 부정한다 — probe 는 원본 실측까지만 말한다.
     console.log(
-      `  ${probe.id.padEnd(14)} 채널 [${channels}] · 원본 ${texture.sourceBytes} B → runtime ${texture.runtimeBytes ?? '미적용'}`,
+      `  ${probe.id.padEnd(14)} 채널 [${channels}] · 원본 ${texture.sourceBytes} B (런타임 변환은 emit 단계)`,
     );
   }
 
