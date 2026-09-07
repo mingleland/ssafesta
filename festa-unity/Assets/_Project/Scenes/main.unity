@@ -1898,7 +1898,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -15419,7 +15419,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -16022,7 +16022,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -16710,7 +16710,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -21893,7 +21893,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -23150,7 +23150,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -31967,7 +31967,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -33722,7 +33722,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -37511,6 +37511,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _thresholdMs: 33.3
   _minInterval: 0.15
+  _pauseMs: 1000
   _toggleKey: 289
 --- !u!114 &1237456550
 MonoBehaviour:
@@ -37528,6 +37529,7 @@ MonoBehaviour:
   _lightAbKey: 288
   _settle: 0.7
   _measure: 3.3
+  _adoptedMultiplier: 2
 --- !u!1 &1238070860
 GameObject:
   m_ObjectHideFlags: 0
@@ -38433,7 +38435,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -40414,7 +40416,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -40906,7 +40908,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -45199,7 +45201,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -49178,7 +49180,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -51777,7 +51779,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -55461,7 +55463,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -57200,7 +57202,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -59036,6 +59038,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1988012999}
+  - component: {fileID: 1988013000}
   m_Layer: 0
   m_Name: '@BoothInteriors'
   m_TagString: Untagged
@@ -59070,6 +59073,20 @@ Transform:
   - {fileID: 2014086892}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1988013000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1988012998}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c8bbd3ed5b815704fbb012539defcf0a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _showDistance: 250
+  _checkInterval: 0
 --- !u!1 &1990468011
 GameObject:
   m_ObjectHideFlags: 0
@@ -60272,7 +60289,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208
@@ -61259,7 +61276,7 @@ Light:
   serializedVersion: 11
   m_Type: 0
   m_Color: {r: 1, g: 0.945, b: 0.855, a: 1}
-  m_Intensity: 1260
+  m_Intensity: 840
   m_Range: 120
   m_SpotAngle: 70
   m_InnerSpotAngle: 21.80208

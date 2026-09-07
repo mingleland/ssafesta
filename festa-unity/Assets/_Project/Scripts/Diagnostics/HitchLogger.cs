@@ -30,11 +30,20 @@ namespace Festa.Diagnostics
         [SerializeField] float _thresholdMs = 33.3f;
         [Tooltip("연속으로 쏟아지는 것을 막는 최소 간격(초). 0 이면 전부 찍는다.")]
         [SerializeField] float _minInterval = 0.15f;
+        [Tooltip("이 시간을 넘긴 프레임 간격은 끊김이 아니라 **정지**로 본다(ms). 탭 전환·창 최소화.")]
+        [SerializeField] float _pauseMs = 1000f;
         [SerializeField] KeyCode _toggleKey = KeyCode.F8;
 
         bool _enabled = true;
         float _lastLogTime;
         int _count;
+
+        // 브라우저가 탭을 백그라운드로 돌리면 rAF 가 멈춘다. 다시 앞으로 오면 그 공백이 통째로
+        // 한 프레임의 deltaTime 으로 들어와 "42초 끊김" 같은 값이 찍힌다 — 실측에서 42,583ms 와
+        // 15,903ms 가 그렇게 잡혔고, 둘 다 draws·tris 증분이 0 이었다(아무것도 그리지 않았다는 뜻).
+        // 이걸 끊김으로 세면 통계가 통째로 망가지므로 정지로 분류하고 카운트에서 뺀다.
+        bool _skipNextFrame;
+        int _pauseCount;
 
         // 직전 프레임 값 — 증분을 내려면 이전 값을 들고 있어야 한다.
         long _prevDraws, _prevTris, _prevHeap;
@@ -50,12 +59,20 @@ namespace Festa.Diagnostics
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
             _prevGc = System.GC.CollectionCount(0);
             _prevHeap = System.GC.GetTotalMemory(false);
-            Debug.Log($"[HitchLogger] 준비 — 임계 {_thresholdMs:F0}ms, F8 로 토글");
+            Application.focusChanged += OnFocusChanged;
+            Debug.Log($"[HitchLogger] 준비 — 임계 {_thresholdMs:F0}ms, 정지 임계 {_pauseMs:F0}ms, F8 로 토글");
         }
 
         void OnDisable()
         {
+            Application.focusChanged -= OnFocusChanged;
             _draws.Dispose(); _tris.Dispose();
+        }
+
+        /// <summary>포커스가 돌아온 직후 한 프레임은 버린다 — 그 프레임의 간격은 자리를 비운 시간이다.</summary>
+        void OnFocusChanged(bool focused)
+        {
+            if (focused) _skipNextFrame = true;
         }
 
         void LateUpdate()
@@ -72,6 +89,22 @@ namespace Festa.Diagnostics
             long heap = System.GC.GetTotalMemory(false);
 
             float ms = Time.unscaledDeltaTime * 1000f;
+
+            // 포커스 복귀 직후 프레임, 그리고 정지 임계를 넘긴 간격은 끊김이 아니다.
+            // 정지도 로그로는 남긴다 — 측정 구간에 자리를 비웠다는 사실 자체가 해석에 필요하다.
+            if (_skipNextFrame || ms > _pauseMs)
+            {
+                if (ms > _pauseMs)
+                {
+                    _pauseCount++;
+                    Debug.Log($"[HitchLogger][정지#{_pauseCount}] {ms / 1000f:F1}초 — 끊김 아님" +
+                              $"(탭 전환·최소화 추정, draws 증분 {draws - _prevDraws}, tris 증분 {tris - _prevTris})");
+                }
+                _skipNextFrame = false;
+                _prevDraws = draws; _prevTris = tris; _prevGc = gc; _prevHeap = heap;
+                return;
+            }
+
             bool hitch = _enabled && ms > _thresholdMs
                          && (_minInterval <= 0f || Time.unscaledTime - _lastLogTime >= _minInterval);
 
