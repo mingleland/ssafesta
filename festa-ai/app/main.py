@@ -1,5 +1,6 @@
 import logging
 
+import httpx
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 
@@ -10,7 +11,10 @@ from app.api.errors import (
 )
 from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
+from app.core.redis import create_redis_client
 from app.db.session import create_ai_db_session_factory
+from app.providers.agent_config import MockAgentConfigProvider
+from app.providers.factory import create_embedding_provider, create_llm_provider
 
 
 def create_app() -> FastAPI:
@@ -24,6 +28,18 @@ def create_app() -> FastAPI:
     app.state.ai_db_session_factory = create_ai_db_session_factory(
         settings.database_url.get_secret_value()
     )
+    app.state.redis = create_redis_client(settings.redis_url)
+    app.state.spring_http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            settings.spring_booth_access_timeout_seconds,
+            connect=settings.spring_booth_access_timeout_seconds,
+        )
+    )
+    app.state.embedding_provider = create_embedding_provider(settings)
+    app.state.llm_provider = create_llm_provider(settings)
+    # Placeholder pending S15P21A604-399 (Spring Agent 추론 설정 조회 내부 API) —
+    # see app/providers/agent_config.py.
+    app.state.agent_config_provider = MockAgentConfigProvider()
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.include_router(api_v1_router, prefix="/ai/v1")

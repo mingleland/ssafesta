@@ -45,9 +45,18 @@ public class MemberSessionService {
         return new MemberSession(access.token(), access.expiresAt(), rawRefreshToken);
     }
 
+    /**
+     * Trades one refresh token for a new pair.
+     *
+     * <p>The read <b>consumes</b> the key. A plain {@code get} followed by a {@code delete} let two
+     * requests holding the same token both pass the checks below and both issue — which is exactly
+     * the replay the reuse detection exists to catch, walking straight past it. Only the caller whose
+     * {@code GETDEL} returned the value may continue; the loser sees {@code null} and takes the
+     * reuse branch. {@link OAuthHandoffService} consumes its handoff the same way (S15P21A604-485).
+     */
     public MemberSession refresh(String rawRefreshToken) {
         String hash = sha256(rawRefreshToken);
-        String session = redis.opsForValue().get(refreshKey(hash));
+        String session = redis.opsForValue().getAndDelete(refreshKey(hash));
         if (session == null) {
             String reusedBy = redis.opsForValue().get(reusedKey(hash));
             if (reusedBy != null) {
@@ -59,7 +68,6 @@ public class MemberSessionService {
         if (values.length != 2 || !isActive(Long.parseLong(values[0]), values[1])) {
             throw new InvalidRefreshTokenException();
         }
-        redis.delete(refreshKey(hash));
         redis.opsForValue().set(reusedKey(hash), values[0], properties.refreshTokenTtl());
         return issue(Long.parseLong(values[0]));
     }

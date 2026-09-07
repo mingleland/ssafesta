@@ -3,7 +3,7 @@ set -euo pipefail
 
 docker_bin="${DOCKER_BIN:-docker}"
 : "${RELEASE_MANIFEST_PATH:?}"
-: "${BACK_ENV_FILE:?}" "${AI_ENV_FILE:?}" "${INTERNAL_AI_TO_SPRING_TOKENS:?}" "${FESTA_ENVIRONMENT:?}"
+: "${BACK_ENV_FILE:?}" "${AI_ENV_FILE:?}" "${INTERNAL_AI_TO_SPRING_TOKENS:?}" "${FESTA_ENVIRONMENT:?}" "${PUBLIC_UNITY_BUILD_BASE:?}"
 COMPOSE_FILE="${COMPOSE_FILE:-infra/deploy/compose/integration/compose.yaml}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-festa-integration}"
 [[ "${COMPOSE_PROJECT}" == festa-integration ]] || { echo 'unexpected integration compose project' >&2; exit 64; }
@@ -31,6 +31,6 @@ PY
 )
 for required in AI_IMAGE_REF BACK_IMAGE_REF FRONT_IMAGE_REF GAME_IMAGE_REF; do [[ -n "${!required:-}" ]] || { echo "release missing ${required}" >&2; exit 65; }; done
 
-export BACK_BASE_URL="${BACK_BASE_URL:?}" AI_BASE_URL="${AI_BASE_URL:?}" PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:?}"
+export BACK_BASE_URL="${BACK_BASE_URL:?}" AI_BASE_URL="${AI_BASE_URL:?}" PUBLIC_API_BASE_URL="${PUBLIC_API_BASE_URL:?}" PUBLIC_UNITY_BUILD_BASE
 "${docker_bin}" compose --project-name "${COMPOSE_PROJECT}" --file "${COMPOSE_FILE}" up -d --wait ai back front game
 echo "candidate deployed without current pointer mutation"

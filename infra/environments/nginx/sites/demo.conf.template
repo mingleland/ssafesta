@@ -1,0 +1,77 @@
+server {
+    listen 80;
+    server_name demo.${ROOT_DOMAIN};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name demo.${ROOT_DOMAIN};
+
+    ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
+    ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
+
+    location = /unity {
+        return 301 /unity/;
+    }
+
+    location = /unity/manifest.json {
+        alias /srv/festa/webgl/current/manifest.json;
+        default_type application/json;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location = /unity/index.html {
+        alias /srv/festa/webgl/current/index.html;
+        default_type text/html;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location ~ ^/unity/Build/([^/]+\.wasm)$ {
+        alias /srv/festa/webgl/current/Build/$1;
+        default_type application/wasm;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location ~ ^/unity/Build/([^/]+\.wasm)\.br$ {
+        alias /srv/festa/webgl/current/Build/$1.br;
+        default_type application/wasm;
+        add_header Content-Encoding br always;
+        add_header Vary Accept-Encoding always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location ~ ^/unity/Build/([^/]+\.js)\.br$ {
+        alias /srv/festa/webgl/current/Build/$1.br;
+        default_type application/javascript;
+        add_header Content-Encoding br always;
+        add_header Vary Accept-Encoding always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location ~ ^/unity/Build/([^/]+\.data)\.br$ {
+        alias /srv/festa/webgl/current/Build/$1.br;
+        default_type application/octet-stream;
+        add_header Content-Encoding br always;
+        add_header Vary Accept-Encoding always;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location /unity/Build/ {
+        alias /srv/festa/webgl/current/Build/;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    location /unity/ {
+        alias /srv/festa/webgl/current/;
+        add_header Cache-Control "no-cache" always;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:18080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}

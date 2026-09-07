@@ -154,7 +154,7 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
   "userId": 12,
   "nickname": "FESTA_USER",
   "status": "ACTIVE",
-  "providers": ["GOOGLE"],
+  "providers": ["GOOGLE", "SSAFY"],
   "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
 }
 ```
@@ -1225,6 +1225,8 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
+| `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
+| `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -1287,6 +1289,7 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
 > | `FESTA_ENVIRONMENT`(`dev`\|`demo`) | 없음 | **기동 실패** — Redis 키 네임스페이스다(`S15P21A604-349`). 조용히 빈 값으로 뜨면 dev·demo 가 세션과 일일 지급을 공유한다 |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `SSAFY_CLIENT_ID/CLIENT_SECRET/REDIRECT_URI` | 없음 | SSAFY 로그인이 실패한다 (`S15P21A604-357`) |
 > | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
 > | `AI_STORAGE_UPLOAD_GATE`·`AI_STORAGE_ACTIVE_WRITE_PROVIDER` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
 > | `MINIO_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` *(007, fallback 시)* | 빈 값 | 전부 비면 미구성으로 빠진다. **부분 입력이면 기동 실패** |
@@ -1381,3 +1384,186 @@ Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
 - `serverTime`·유효성 판정·`remainingSeconds`는 **한 요청에서 같은 시각 하나**로 계산한다.
   FastAPI는 이 쌍을 저장해 이후 모든 질문의 만료를 스스로 판정한다(FR-024) — 셋이 어긋나면
   그 판정이 어긋난다
+
+### POST `/internal/ai/chunk-search`
+
+FastAPI가 질의 Embedding을 만든 뒤 **유일한 검색 진입점**으로 쓴다 (spec 008, `S15P21A604-398`).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-chunk-search-api.yaml`.
+
+```
+POST /internal/ai/chunk-search
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+Content-Type: application/json
+
+{ "boothId": 7, "agentId": 3, "queryEmbedding": [0.0123, ...], "topK": 5 }
+```
+
+```json
+{ "items": [
+  { "content": "부스 운영 시간은 …", "chunkNo": 0, "pageNumber": 3, "section": "운영 안내",
+    "documentId": 41, "originalFilename": "부스안내.pdf", "distance": 0.1832 }
+] }
+```
+
+**요청에 필터 필드가 없다.** `boothId` + `agentId` + `searchable = true` + 부모 Document `READY`는
+서버 상수이고, 요청으로 넓힐 수 없다 (GitLab 이슈 #119). `boothId`·`agentId`는 **chunk와 부모
+Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에 제약이 없어(V21) 값이 어긋난 행이
+생기면 chunk 쪽만 보는 쿼리가 남의 문서 본문을 실어 준다.
+
+| 항목 | 값 |
+|---|---|
+| `queryEmbedding` | **정확히 1536개.** 헌법 18조·FR-009 고정. null 원소·비유한 수 거부 |
+| `topK` | 1~20 |
+| 정렬 | `distance` 오름차순, 동률은 `documentId` → `chunkNo` |
+| `distance` | pgvector 코사인 거리(`<=>`) 그대로. **낮을수록 유사**하고 서버가 뒤집거나 정규화하지 않는다 |
+| 최소 유사도 임계값 | **없다** (2026-09-03 확정). 무엇을 버릴지는 답변을 만드는 쪽이 정한다 |
+| 타임아웃 | 검색 statement에만 3초 |
+
+- **결과 0건은 `404`가 아니라 `200` + `items: []`다.** scope에 chunk가 없는 것과 문서가 아직
+  `READY`가 아닌 것을 **구분해 알려 주지 않는다**
+- **계약에 없는 필드는 버리지 않고 `400` `VALIDATION_FAILED`로 거부한다.** 문제 필드 이름은
+  `errors[].field`에 담고 `rule`은 전역 `FIELD_INVALID`다 — 조용히 버리면 보내는 쪽이 필터가
+  먹었다고 믿는다(T-24의 모양). 전역 `FAIL_ON_UNKNOWN_PROPERTIES`는 켜지 않고 이 경로 전용
+  strict parser로 읽는다
+- 오류는 전역 봉투를 쓴다 — `400` `VALIDATION_FAILED` · `401` `UNAUTHORIZED` ·
+  `500` `INTERNAL_ERROR`(3초 초과 포함, `504`를 쓰지 않는다)
+- **`pageNumber`·`section`은 null일 수 있다.** V21이 nullable이고 계약도 같게 잡았다
+- `originalFilename`은 `ai_documents`에서 조인해 가져온다. `ai_document_jobs`에도 같은 이름의
+  컬럼이 있지만 검색 응답은 문서 기준이다
+- **벡터 인덱스를 쓰지 않는다.** 이 필터·조인과 함께라면 HNSW는 후필터라 조건에 맞는 chunk가
+  있어도 `topK`보다 적게 돌려줄 수 있다(over-filtering) — 오류 없이 인용이 사라지는 실패다.
+  검색 트랜잭션에 `SET LOCAL enable_indexscan = off`를 걸어 **정확 스캔을 강제한다.** HNSW는
+  ordered index scan으로만 닿으므로 그 노드만 막으면 되고, bitmap scan은 남아 있어
+  `ix_ai_document_chunks_scope`와 `ai_documents` PK는 계속 쓰인다.
+  `SET LOCAL`은 statement가 아니라 트랜잭션 끝까지 살기 때문에 **검색이 끝나면 곧바로 원래
+  값으로 되돌린다** — 되돌리지 않으면 같은 트랜잭션의 이후 쿼리가 전부 index scan 없이
+  계획된다. 끄기 전에 `current_setting`으로 읽어 둔 값을 `set_config(..., true)`로 되돌리며,
+  `= DEFAULT`를 쓰지 않는다 — `DEFAULT`는 세션 값으로 되돌리므로 호출자가 같은 트랜잭션에서
+  이미 걸어 둔 `SET LOCAL`을 지워 버린다. 복원이 실패해도 원래 예외를 덮지 않는다(경고 로그만
+  남긴다): 3초 초과로 트랜잭션이 중단된 경우 복원 자체가 불가능하고, 그때는 롤백이 `SET LOCAL`을
+  어차피 되돌린다. 현재 규모에서는 계획기가 어차피 scope 인덱스 + 정렬을 고르므로 이 설정은 보험이다.
+  규모가 커져 느려지면 `hnsw.iterative_scan = strict_order`(pgvector 0.8+)가 후필터 손실을
+  **줄여 주지만 recall을 보장하지는 않는다** — `hnsw.max_scan_tuples`·`scan_mem_multiplier`에서
+  멈추므로 여전히 `topK`보다 적게 올 수 있다. 정확성이 계약인 동안 보장 수단은 이 GUC뿐이다
+- **거리가 `NaN`인 chunk는 응답에서 배제한다.** V21은 `embedding`을 `NOT NULL`로만 두고 영벡터를
+  금지하지 않는데, 값은 FastAPI가 계산해 보낸 것이다. 노름 0인 행과의 코사인 거리는 `NaN`이고,
+  Jackson은 그것을 **문자열** `"NaN"`으로 쓴다 — 오류 없이 `{"distance":"NaN"}`이 200으로 나가고,
+  `number` 타입을 지키는 소비자는 응답 전체를 버린다. 이 필터가 덮는 것은 **노름이 0인 저장
+  벡터**(전부 0인 행과, `float`로 누적하면 0이 되는 행)다. 노름이 `float` 범위를 넘어 `Infinity`가
+  되는 저장 벡터는 거리가 `NaN`으로 떨어질 때만 함께 걸러지고, 유한값이 되면 뜻 없는 거리로 순위에
+  낀다 — **저장 벡터 자체의 검증은 chunk를 쓰는 쪽(S15P21A604-400) 몫이며 이 필터는 그 대체물이
+  아니다**
+- **`queryEmbedding`은 `float32`(`float4`)로 좁혀 저장된다.** 원소별로 `1e300`처럼 double로는
+  유한한 값도 `float4` 범위를 넘으면 400이고, **제곱합이 `float32` 범위를 넘어도 400**이다 —
+  pgvector가 노름을 `float`에 누적하므로 원소가 각자 멀쩡해도 1536개를 더하는 사이에 넘칠 수
+  있다. **노름이 `float32`에서 0이 되는 벡터도 400**이다: 코사인 거리가 노름으로 나누므로 전부 위와
+  같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
+  원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
+  구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다
+
+### GET `/internal/ai/agent-config`
+
+FastAPI의 프롬프트 빌더가 **질문마다** 호출한다 (spec 008, `S15P21A604-399`, GitLab #119 §5).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-agent-config-api.yaml`.
+
+```
+GET /internal/ai/agent-config?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+```json
+{ "found": true, "role": "PROJECT_DOCENT", "tone": "FRIENDLY", "responseLength": "MEDIUM",
+  "systemPrompt": "문서를 근거로 답한다.", "forbiddenTopics": ["가격 협상"] }
+```
+
+- **거부는 오류가 아니라 `200` + `found: false` + `denialCode`다** — `/internal/ai/booth-access`와
+  같은 관례. 다른 booth 소속 `agentId`와 존재하지 않는 `agentId`는 **구분해 알려주지 않는다**
+  (둘 다 `AGENT_NOT_IN_BOOTH`). `status`가 `ACTIVE`가 아니면 `AGENT_INACTIVE`이며, **이 경우
+  프롬프트 필드를 전혀 싣지 않는다** — 쓸 수 없는 값을 흘려 봐야 계약(`additionalProperties: false`
+  분기)만 어긴다
+- `forbiddenTopics`가 비어 있으면 `null`이 아니라 **빈 배열**이다(`AiAgent.getForbiddenTopics()`가
+  이미 그렇게 정규화한다)
+- **캐싱하지 않는다** (2026-09-07 확정, GitLab #119) — `system_prompt`가 길어도 매 요청 그대로
+  싣는다. 버전·해시로 무효화만 알리는 방식은 필요해지면 그때 계약을 바꾼다
+- 인증은 벡터 검색 API와 동일한 `/internal/**` 체인·`INTERNAL_AI_TO_SPRING_TOKENS` 재사용
+### POST `/internal/ai/document-jobs/{jobId}/` — `chunk-batches` · `finalize` · `heartbeat` · `failed`
+
+FastAPI 워커가 만든 결과를 Spring이 받는 경로 (spec 007, `S15P21A604-400`, GitLab #119 §3).
+정본 계약은 `specs/007-ai-agent-document/contracts/document-result-api.yaml`.
+cancel은 Spring→FastAPI 방향이라 여기 없다(#119 §4 — `S15P21A604-175`).
+
+```
+POST /internal/ai/document-jobs/41/chunk-batches
+{ "attemptNo": 0, "batchSeq": 0, "chunks": [
+  { "chunkNo": 0, "content": "...", "embedding": [0.01, ...1536개],
+    "embeddingModelId": "text-embedding-3-small", "pageNumber": 3, "section": "운영 안내" } ] }
+→ 204
+
+POST /internal/ai/document-jobs/41/finalize
+{ "attemptNo": 0, "sourceHash": "<64 hex>", "totalChunkCount": 128,
+  "embeddingModelId": "text-embedding-3-small" }
+→ 204
+```
+
+두 경로 모두 같은 관문 두 개를 먼저 지난다.
+
+| 상황 | 응답 |
+|---|---|
+| `attemptNo`가 Job의 현재 값과 다름 | **`409` `JOB_ATTEMPT_STALE`** |
+| Job이 `SUCCEEDED`·`DEAD`·`CANCELLED`이거나 없음 | **`410` `JOB_GONE`** |
+
+- **`409`가 있는 이유**: lease가 만료돼 Job을 회수하고 `attempt_no`를 올린 뒤, 죽은 줄 알았던 이전
+  워커가 결과를 보내오는 경우다. 받아 주면 **두 attempt의 chunk가 한 문서에 섞인다.** 보내는 쪽은
+  자기가 밀려났다는 사실을 이 응답으로만 안다
+- **없는 Job과 끝난 Job을 구분하지 않는다** — 문서가 지워지면 Job도 `ON DELETE CASCADE`로 사라지고,
+  어느 쪽이든 결과를 보낼 attempt가 없다는 답은 같다
+- **finalize 재전송은 `410`이 아니라 `204`다.** 같은 attempt가 같은 `sourceHash`·`totalChunkCount`로
+  이미 끝낸 Job이면 아무것도 하지 않고 답한다 — 마지막 호출의 응답이 유실되는 것은 흔한 경우이고,
+  여기서 `410`을 주면 워커가 **성공한 작업을 실패로 보고한다**(#119 §3의 멱등 요구). 숫자가 다르면
+  그 Job이 한 일과 다른 주장이라 `410`이다
+- **batch는 멱등하다.** staging PK가 `(job_id, batch_seq, chunk_no)`라 같은 batch 재전송이 아무것도
+  바꾸지 않는다 — 워커가 응답을 못 받고 다시 보내는 것이 정상 경로다
+- **첫 batch가 `QUEUED` Job을 `RUNNING`으로 올린다.** 워커가 실제로 시작했다는 증거가 이것뿐이다
+- **finalize는 검증에서 걸리면 아무것도 바꾸지 않는다.** 기존 chunk도 문서 상태도 그대로이고
+  staging도 남아 같은 attempt로 다시 finalize할 수 있다. 검증 4종은 전부 `400` `VALIDATION_FAILED`이고
+  `errors[].field`가 지점을 가리킨다
+
+  | 검증 | `field` | 막는 것 |
+  |---|---|---|
+  | 적재 개수 ≠ `totalChunkCount` | `totalChunkCount` | batch 유실 — 잘린 문서가 조용히 READY가 되는 것 |
+  | batch 간 `chunkNo` 중복 | `chunks` | `UNIQUE(document_id, chunk_no)` 위반으로 500이 되는 것 |
+  | 임베딩 모델 혼합 | `embeddingModelId` | 한 문서 안에서 거리 비교가 뜻을 잃는 것 |
+  | `sourceHash` ≠ Job의 값 | `sourceHash` | 같은 jobId로 다른 파일이 실려 본문이 바뀌는 것 |
+
+- **finalize 성공은 한 트랜잭션이다** — 기존 chunk 삭제 → staging 반영(`searchable = TRUE`) →
+  staging 정리 → Job `SUCCEEDED`·`chunk_count` → Document `READY`. 읽는 쪽은 이전 판 전체 아니면
+  새 판 전체만 본다
+- **같은 batch 안의 `chunkNo` 중복도 `400`이다.** staging PK가 조용히 흡수하면 보낸 쪽은 N개를
+  넣었다고 믿고 finalize에서 개수가 어긋난다 — 원인을 말할 수 있는 자리에서 막는다
+- 저장 embedding도 `queryEmbedding`과 **같은 검증**을 받는다(1536차원, `float32` 범위, 노름
+  overflow·underflow). #119에서 "저장 벡터 검증은 chunk를 쓰는 쪽 몫"이라고 넘긴 것이 이 자리다
+- 계약에 없는 필드는 버리지 않고 `400`으로 거부한다 — 검색 API와 같은 strict parser
+
+**heartbeat · failed · lease 회수**
+
+```
+POST /internal/ai/document-jobs/41/heartbeat   { "attemptNo": 0 }                        → 204
+POST /internal/ai/document-jobs/41/failed
+{ "attemptNo": 0, "failureCode": "PARSE_TIMEOUT", "retryable": true, "message": null }   → 204
+```
+
+- **워커는 보고만 하고, 다음에 무엇을 할지는 Spring이 정한다.** `retryable`은 워커의 판단이고
+  재시도 예산(`max_retries` 기본 3)은 Job이 들고 있다
+  - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다
+  - 여지가 있으면 `RETRY_WAIT` + `next_retry_at` — backoff **1 · 5 · 15분**(#119, 2026-09-03)
+  - `attempt_no + 1 > max_retries` → `DEAD`
+- **어느 쪽이든 `attempt_no`는 오른다.** 방금 실패한 워커의 늦은 결과를 `409`로 막는 것이 그 값이다.
+  그 attempt의 staging도 함께 지운다 — 남기면 다음 attempt의 batch와 섞여 finalize 개수 검증이
+  엉뚱한 곳에서 걸린다
+- **lease는 90초, heartbeat는 30초 주기**다(#119). 두 번까지 유실돼도 Job을 뺏기지 않는다.
+  `QUEUED` Job은 heartbeat로도 `RUNNING`이 된다
+- **lease가 만료되면 Spring의 sweeper(30초 주기)가 Job을 회수한다.** FastAPI는 DB 자격증명이 없어
+  죽은 워커가 스스로 반납할 수 없고, 회수가 없으면 문서는 영원히 READY가 되지 않는다. 회수가
+  `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
+  `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
+- `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다

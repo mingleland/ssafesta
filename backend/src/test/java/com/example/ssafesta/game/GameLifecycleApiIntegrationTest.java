@@ -20,6 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -40,6 +41,7 @@ class GameLifecycleApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private AccessTokenService accessTokens;
     @Autowired private GameProperties properties;
+    @Autowired private JdbcTemplate jdbc;
 
     /**
      * Guests may play, not author (헌법 12조 · FR-023 · T087).
@@ -156,6 +158,51 @@ class GameLifecycleApiIntegrationTest {
 
         assertTrue(games.findById(oldest).isEmpty(), "가장 오래된 삭제본은 영구 삭제된다");
         assertEquals(properties.deletedLimit(), games.countDeletedByOwner(userId));
+    }
+
+    /**
+     * 밀려나는 게임이 에셋을 들고 있어도 삭제가 끝나고, 객체 좌표는 삭제 큐에 남는다.
+     *
+     * <p>{@code game_assets.game_id} 에는 {@code ON DELETE CASCADE} 가 없고(V18) 엔티티에도 JPA
+     * cascade 가 없다. 그래서 밀어내기가 에셋 행을 지우지 않던 동안은 이미지를 한 번이라도 올린
+     * 게임이 삭제본 목록의 맨 앞에 있으면, 그 계정은 다른 게임을 버리려 할 때마다 FK 위반으로 500 을
+     * 받았다 — 삭제 요청 전체가 실패한다 (S15P21A604-485).
+     *
+     * <p>바이트는 DB 밖에 있으므로 행만 지우면 안 된다. 좌표가 큐로 옮겨졌는지까지 본다.
+     */
+    @Test
+    void evictingAGameWithAssetsSucceedsAndQueuesItsObjects() throws Exception {
+        Long userId = GameTestSupport.createMember(users, "휴지통자산");
+        Long oldest = null;
+        String objectKey = null;
+        for (int i = 0; i <= properties.deletedLimit(); i++) {
+            Long gameId = games.save(new Game(userId, "버릴자산게임" + i)).getId();
+            if (i == 0) {
+                oldest = gameId;
+                objectKey = "games/" + gameId + "/assets/aEvicted";
+                jdbc.update("""
+                        INSERT INTO game_assets (game_id, asset_id, kind, status, provider,
+                                                 storage_bucket, object_key, declared_content_type,
+                                                 declared_byte_size, upload_expires_at,
+                                                 created_by_user_id)
+                        VALUES (?, 'aEvicted', 'IMAGE', 'UPLOADING', 'R2', 'test-bucket',
+                                ?, 'image/png', 64, now() + interval '10 minutes', ?)
+                        """, gameId, objectKey, userId);
+            }
+            mockMvc.perform(delete("/api/v1/games/" + gameId).header("Authorization", bearerFor(userId)))
+                    .andExpect(status().isNoContent());
+        }
+
+        assertTrue(games.findById(oldest).isEmpty(), "에셋 있는 삭제본도 밀려나야 한다");
+        assertEquals(0, count("SELECT count(*) FROM game_assets WHERE game_id = ?", oldest),
+                "행이 남으면 games 삭제가 FK 로 막힌다");
+        assertEquals(1, count("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?",
+                objectKey), "객체 좌표는 큐에 남아야 한다");
+    }
+
+    private int count(String sql, Object argument) {
+        Integer found = jdbc.queryForObject(sql, Integer.class, argument);
+        return found == null ? 0 : found;
     }
 
     /** Restore keeps the visibility it had — deletion was never a visibility change. */

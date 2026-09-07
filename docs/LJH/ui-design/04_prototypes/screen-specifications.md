@@ -480,7 +480,14 @@ signText     → 간판 문구 (최대 60자, 잘림 처리)
 logoUrl      → 로고 이미지 (없으면 이니셜 또는 기본 도형)
 ```
 
-**R3F Preview 를 구현하지 않는다.** 3D 렌더링은 `05_technical-spikes/booth-studio-r3f-asset-pipeline-plan.md` 의 DEFERRED 범위다. 여기서는 CSS/SVG 로 충분하다.
+**이 Mini Preview 는 CSS/SVG 로 그린다.** Booth Management 카드의 작은 미리보기라 3D 런타임을 끌어올 자리가 아니다.
+
+Booth Studio **중앙 캔버스**는 별개다 — R3F Preview Spike 구현이 존재하며(`-470`·`-473`·`-476`),
+SVG 렌더러(`TemporaryIsoRenderer`)는 fallback / reference renderer 로 남아 있다(`VITE_R3F_CANVAS=false`).
+다만 R3F 는 D-05 `PASS_CANDIDATE` 이고 **제품 정식 renderer 채택은 아직 결정되지 않았다** —
+결정 정본은 [`00_context/implementation-decisions.md`](../00_context/implementation-decisions.md) D-05,
+현황은 [`05_technical-spikes/booth-studio-2_5d/README.md`](../05_technical-spikes/booth-studio-2_5d/README.md) 다.
+이 문서(PROPOSAL)가 그 결정을 대신하지 않는다.
 
 미결 시각 변수(사용자 판단 — §Q):
 

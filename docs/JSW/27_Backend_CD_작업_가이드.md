@@ -1,10 +1,10 @@
-# Backend dev CD 작업 가이드
+# Backend dev·demo CD 작업 가이드
 
 > 관련 Jira: `S15P21A604-228`
 >
-> 기준일: 2026-09-04
+> 기준일: 2026-09-07
 >
-> 대상 환경: 단일 EC2의 `dev` Backend
+> 대상 환경: 단일 EC2의 `dev`·`demo` Backend
 
 이 문서는 SSAFY FESTA Backend를 EC2에 처음 배포하면서 실제로 수행한 작업을 처음 보는 사람도 따라갈 수 있도록 정리한 기록이다. 명령은 별도 표시가 없으면 **MobaXterm으로 접속한 EC2 터미널**에서 실행한다.
 
@@ -209,13 +209,15 @@ Backend는 시작할 때 Flyway `V1`부터 현재 버전까지 직접 실행한�
 ```text
 user default off
 user health on >CHANGE_ME_HEALTH ~* +ping
-user dev_back on >CHANGE_ME_DEV_BACK ~dev:* +@read +@write -@dangerous
+user dev_back on >CHANGE_ME_DEV_BACK ~dev:* +@read +@write +@keyspace +@connection -@dangerous +info
 user dev_ai on >CHANGE_ME_DEV_AI ~dev:ai:* +@read +@write -@dangerous
-user demo_back on >CHANGE_ME_DEMO_BACK ~demo:* +@read +@write -@dangerous
+user demo_back on >CHANGE_ME_DEMO_BACK ~demo:* +@read +@write +@keyspace +@connection -@dangerous +info
 user demo_ai on >CHANGE_ME_DEMO_AI ~demo:ai:* +@read +@write -@dangerous
 ```
 
 `dev_back`은 `dev:`로 시작하는 키만 읽고 쓸 수 있다. Spring이 현재 사용하는 `dev:auth:*`, `dev:wallet:*`를 포함하며, demo의 `demo:*`에는 접근할 수 없다.
+
+Backend Role의 `+info`는 애플리케이션 기능 권한이 아니라 Spring Data Redis Health Indicator가 사용하는 권한이다. `INFO`는 `@dangerous`에도 포함되므로 `-@dangerous` 뒤에서 `+info` 하나만 다시 허용한다. 순서를 바꾸면 `INFO`가 다시 차단되어 Backend는 실행 중이어도 Health가 `DOWN`이 된다.
 
 ---
 
@@ -232,6 +234,7 @@ infra/.env
 
 /opt/festa/secrets/
   ├─ dev-back.env
+  ├─ demo-back.env
   ├─ postgres-admin-password
   ├─ postgres-dev-back-password
   ├─ postgres-dev-ai-password
@@ -275,6 +278,44 @@ MINIO_SECRET_ACCESS_KEY=
 ```
 
 dev에서 OAuth 로그인을 검증하지 않더라도 OAuth 변수 6개는 빈값으로 두면 안 된다. Backend 설정에 기본값이 없어서 기동 자체가 실패한다. 실제 Secret을 dev에 배포할 필요가 없다면 dummy 문자열을 넣고, OAuth 최종 검증은 demo HTTPS에서 수행한다.
+
+### `/opt/festa/secrets/demo-back.env`의 환경 고정값
+
+demo 파일은 dev 파일을 그대로 실행하지 않는다. 다음 값은 반드시 demo 기준이어야 한다.
+
+```dotenv
+FESTA_ENVIRONMENT=demo
+SPRING_PROFILES_ACTIVE=infra
+ROOT_DOMAIN=ssafesta.world
+
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=festa_demo_business
+POSTGRES_USER=festa_demo_back_app
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_USERNAME=demo_back
+
+FRONTEND_BASE_URL=https://demo.ssafesta.world
+AUTH_COOKIE_SECURE=true
+GOOGLE_REDIRECT_URI=https://api.ssafesta.world/login/oauth2/code/google
+KAKAO_REDIRECT_URI=https://api.ssafesta.world/login/oauth2/code/kakao
+```
+
+`POSTGRES_PASSWORD`는 `/opt/festa/secrets/postgres-demo-back-password`와 같아야 하고, `REDIS_PASSWORD`는 `redis-users.acl`의 `demo_back` 값과 같아야 한다. 값이 다르면 코드 문제가 아니라 각각 PostgreSQL `password authentication failed`, Redis `WRONGPASS`로 실패한다.
+
+JWT와 월드 접속 토큰은 서로 다른 키다.
+
+```bash
+# HS512 JWT: Base64 디코딩 결과가 최소 64바이트여야 한다.
+openssl rand -base64 64 | tr -d '\r\n'
+
+# Dedicated Server와 공유하는 HS256 월드 토큰: 최소 32바이트다.
+openssl rand -base64 32 | tr -d '\r\n'
+```
+
+표시 문자열 길이로 판단하지 않는다. `openssl rand -base64 48`은 화면에는 64자로 보이지만 디코딩하면 48바이트라 JWT 기동 검사를 통과하지 못한다.
 
 ### `infra/.env`에 연결하는 파일 경로
 
@@ -451,12 +492,19 @@ ROLLBACK
 ### 7-6. Redis ACL 검증
 
 ```bash
-sudo docker exec festa-data-redis-1 sh -c 'password=$(sed -n "s/^user dev_back on >\([^ ]*\).*/\1/p" /usr/local/etc/redis/users.acl); redis-cli --user dev_back --pass "$password" SET dev:infra:probe ok EX 60; redis-cli --user dev_back --pass "$password" DEL dev:infra:probe'
+sudo docker exec festa-data-redis-1 sh -c '
+password=$(sed -n "s/^user dev_back on >\([^ ]*\).*/\1/p" /usr/local/etc/redis/users.acl)
+redis-cli --user dev_back --pass "$password" PING
+redis-cli --user dev_back --pass "$password" INFO server >/dev/null
+redis-cli --user dev_back --pass "$password" SET dev:infra:probe ok EX 60
+redis-cli --user dev_back --pass "$password" DEL dev:infra:probe
+'
 ```
 
 기대 결과:
 
 ```text
+PONG
 OK
 1
 ```
@@ -500,9 +548,11 @@ sudo docker image inspect \
 
 ---
 
-## 8. 다음 단계: Backend 컨테이너 기동
+## 8. Backend 컨테이너 기동
 
-> 아래 단계는 2026-09-04 현재 아직 실환경 검증 전이다. 실행 후 결과를 이 문서에 갱신한다.
+### 8-1. dev Backend Compose 기동
+
+> 이 절은 기존 dev Overlay 경로다. 2026-09-07에 실측한 demo 수동 경로는 8-2절을 따른다.
 
 먼저 Compose가 만들어 낼 최종 설정을 검사한다.
 
@@ -552,6 +602,140 @@ curl -fsS http://127.0.0.1:8081/actuator/health
 - PostgreSQL 인증 오류가 없다.
 - Redis ACL 인증 오류가 없다.
 - R2 설정 검증 오류가 없다.
+
+### 8-2. 자동 CD 전 demo Backend 수동 기동
+
+2026-09-07에는 MVP 종단 확인을 위해 demo Backend를 수동으로 먼저 기동했다. 이 절차는 자동 CD를 대신하지 않는다. Jenkins가 성공한 뒤에는 동일 조건을 Deploy Agent와 통합 Compose가 제공해야 한다.
+
+먼저 최신 CI 이미지를 rootless Docker에서 rootful 배포 Docker로 전달한다.
+
+```bash
+BACKEND_IMAGE='festa-back:여기에_develop_40자리_SHA_입력'
+
+DOCKER_HOST=unix:///run/user/1000/docker.sock \
+docker save "$BACKEND_IMAGE" \
+| sudo docker load
+
+sudo docker image inspect "$BACKEND_IMAGE" --format '{{.Id}}'
+```
+
+데이터망 `festa-data-private`는 `internal: true`라서 이것만 연결하면 PostgreSQL·Redis에는 닿지만 호스트 포트와 OAuth·R2 인터넷 통신 경로가 없다. Backend에는 두 네트워크가 필요하다.
+
+```text
+festa-demo-runtime  → Nginx loopback 포트와 인터넷 통신
+festa-data-private  → PostgreSQL·Redis 전용
+```
+
+비밀값을 명령에 출력하지 않고 컨테이너를 먼저 생성한다.
+
+```bash
+sudo docker network inspect festa-demo-runtime >/dev/null 2>&1 \
+  || sudo docker network create festa-demo-runtime
+
+token="$(sudo sed -n \
+  's/^INTERNAL_AI_TO_SPRING_TOKENS=//p' \
+  infra/.env | tail -n 1)"
+
+sudo docker create \
+  --name festa-demo-back \
+  --restart unless-stopped \
+  --network festa-demo-runtime \
+  --publish=127.0.0.1:18081:8080 \
+  --env-file /opt/festa/secrets/demo-back.env \
+  -e INTERNAL_AI_TO_SPRING_TOKENS="$token" \
+  -e WORLD_HOST=world-dev.ssafesta.world \
+  "$BACKEND_IMAGE"
+
+unset token
+
+sudo docker network connect festa-data-private festa-demo-back
+sudo docker start festa-demo-back
+```
+
+`docker create → data network connect → docker start` 순서를 지킨다. 실행부터 하면 Spring이 `postgres`를 찾기 전에 시작되어 불필요한 재시작이 발생한다.
+
+기동 결과를 확인한다.
+
+```bash
+sudo docker port festa-demo-back
+sudo docker inspect festa-demo-back \
+  --format 'status={{.State.Status}} restarts={{.RestartCount}}'
+sudo docker logs --since 2m festa-demo-back 2>&1 \
+  | grep -E 'Started SsafestaApplication|APPLICATION FAILED|ERROR|Caused by:' \
+  | tail -n 30
+curl -fsS http://127.0.0.1:18081/actuator/health
+```
+
+완료 기준:
+
+```text
+8080/tcp -> 127.0.0.1:18081
+status=running restarts=0
+Started SsafestaApplication
+{"status":"UP"}
+```
+
+Health가 `DOWN`인데 애플리케이션은 시작됐다면 Redis를 직접 검사한다.
+
+```bash
+sudo docker run --rm \
+  --network festa-data-private \
+  --env-file /opt/festa/secrets/demo-back.env \
+  redis:7.2.10-alpine \
+  sh -c '
+    redis-cli -h redis --user "$REDIS_USERNAME" --pass "$REDIS_PASSWORD" ping
+    redis-cli -h redis --user "$REDIS_USERNAME" --pass "$REDIS_PASSWORD" info server >/dev/null
+  '
+```
+
+둘 중 `NOPERM`이 나오면 비밀번호 문제가 아니라 ACL 명령 권한 문제다.
+
+### 8-3. `api.ssafesta.world` Nginx 연결
+
+경로: `infra/environments/nginx/sites/api.conf.template`
+
+Backend는 `127.0.0.1:18081`에만 두고 Nginx의 TLS vhost를 통해 공개한다. wildcard Origin Certificate에 `DNS:*.ssafesta.world`가 있는지 먼저 확인한다.
+
+```bash
+sudo openssl x509 \
+  -in /etc/nginx/tls/world-dev-origin.pem \
+  -noout -subject -ext subjectAltName
+```
+
+MR 병합본을 pull한 뒤 template을 렌더링한다.
+
+```bash
+sudo env \
+  ROOT_DOMAIN=ssafesta.world \
+  NGINX_ORIGIN_CERTIFICATE_FILE=/etc/nginx/tls/world-dev-origin.pem \
+  NGINX_ORIGIN_PRIVATE_KEY_FILE=/etc/nginx/tls/world-dev-origin.key \
+  envsubst \
+  < infra/environments/nginx/sites/api.conf.template \
+  | sudo tee /etc/nginx/sites-available/api.conf >/dev/null
+
+sudo ln -sfn \
+  /etc/nginx/sites-available/api.conf \
+  /etc/nginx/sites-enabled/api.conf
+
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Cloudflare를 우회해 EC2 origin부터 검사한다.
+
+```bash
+curl --noproxy '*' -sk -i \
+  --resolve api.ssafesta.world:443:127.0.0.1 \
+  https://api.ssafesta.world/actuator/health
+```
+
+여기서 API JSON과 HTTP 200이 확인된 뒤 Cloudflare `api` A 레코드를 현재 EC2 Public IPv4로 바꾸고 Proxy를 켠다. 마지막으로 외부 경로를 확인한다.
+
+```bash
+curl -i https://api.ssafesta.world/actuator/health
+```
+
+EC2 직접 요청이 Front HTML을 반환하면 Backend 문제가 아니라 `api`의 `server_name` vhost가 적용되지 않은 것이다. 외부 응답만 503이면 Cloudflare DNS가 다른 origin을 가리키는지 확인한다.
 
 ---
 
@@ -625,7 +809,7 @@ sudo docker exec festa-jenkins-agent-linux-docker \
 
 ## 10. 현재 완료 상태
 
-2026-09-04 기준:
+2026-09-07 기준:
 
 | 항목 | 상태 |
 |---|---|
@@ -636,13 +820,15 @@ sudo docker exec festa-jenkins-agent-linux-docker \
 | Redis 7.2 ACL | healthy·`dev_back` 쓰기/삭제 검증 완료 |
 | Cloudflare R2 문서 버킷·dev 토큰 | 생성·EC2 주입 완료 |
 | CI Backend 이미지 | rootful Docker 전달 완료 |
-| Backend 컨테이너 | 기동 전 |
-| Backend health/Flyway/R2 실연결 | 검증 전 |
+| Backend demo 컨테이너 | 수동 기동 완료 |
+| Backend health·Flyway·DB·Redis | `UP`·실연결 확인 완료 |
+| R2 기능 실연결 | 문서 업로드 검증 전 |
 | Nginx dev API 경로 | 실제 적용·외부 검증 전 |
+| Nginx demo API vhost | 정본 작성·MR/EC2 적용 전 |
 | Jenkins Deploy Agent | Online·권한 검증 전 |
 | Jenkins 자동 배포·롤백 | 검증 전 |
 
-즉, **Backend dev 수동 첫 배포 준비는 약 70%**이며, 실제 Backend 기동과 health 검증이 다음 작업이다. 수동 배포가 성공해도 Jenkins 자동 CD가 완료된 것은 아니다.
+즉, **Backend demo 수동 기동과 내부 Health는 완료**됐고 public API ingress·OAuth·R2 기능 검증이 남았다. 수동 배포가 성공해도 Jenkins 자동 CD가 완료된 것은 아니다.
 
 ---
 
