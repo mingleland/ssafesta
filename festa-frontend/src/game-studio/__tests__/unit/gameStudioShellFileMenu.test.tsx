@@ -135,6 +135,47 @@ describe('GameStudioShell — 좌상단 팝업 메뉴(S15P21A604-481)', () => {
     expect(panelHeadingText(container)).toBe('새 맵');
   });
 
+  // S15P21A604-483 — 파일에 박힌 gameId가 현재 화면과 다르면 하드 에러로 막던 것을
+  // 제거하고, "게임 초기화"/"시작 템플릿"과 동일하게 항상 현재 화면의 gameId로
+  // 맞춰서(coerce) 적용하도록 바꾼다. 에러 없이 로드되는 것뿐 아니라, 가져온
+  // 프로젝트의 gameId가 실제로 현재 화면 기준으로 바뀌었는지까지 확인해야 하므로
+  // "JSON 내보내기"가 파일명에 project.gameId를 그대로 박는다는 점(festa-game-
+  // ${project.gameId}-r${project.revision}.json)을 이용해 간접 검증한다.
+  it('gameId가 화면과 다른 JSON을 가져와도 에러 없이 로드되고, 프로젝트 gameId는 현재 화면 기준으로 맞춰진다(S15P21A604-483)', async () => {
+    const { container } = setup();
+    openFileMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'JSON 가져오기' }));
+
+    const input = container.querySelector('input[type="file"]');
+    if (input === null) throw new Error('파일 input을 찾을 수 없다');
+
+    const OTHER_GAME_ID = GAME_ID + 1;
+    const imported = createBlankProject(OTHER_GAME_ID);
+    const file = new File([JSON.stringify(imported)], 'other-game.json', { type: 'application/json' });
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    fireEvent.change(input);
+
+    await screen.findByText('other-game.json을 가져왔습니다. 저장 전 플레이 테스트를 권장합니다.');
+    // gameId 불일치를 이유로 한 에러 알림이 뜨지 않아야 한다(하드 블록이 실제로 사라졌는지).
+    expect(screen.queryByText(/gameId가 .*인 프로젝트만/)).toBeNull();
+    expect(panelHeadingText(container)).toBe('새 맵');
+
+    let downloadedFilename: string | null = null;
+    const createObjectURL = vi.fn(() => 'blob:festa-test');
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloadedFilename = this.download;
+    });
+
+    openFileMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'JSON 내보내기' }));
+
+    // 파일에는 gameId 900이 박혀 있었지만, 실제로 내보내진 프로젝트의 gameId는
+    // 현재 화면(GAME_ID)이어야 한다 — 파일 값이 그대로 살아남아 있으면 회귀.
+    expect(downloadedFilename).toBe(`festa-game-${GAME_ID}-r0.json`);
+    vi.unstubAllGlobals();
+  });
+
   it('"JSON 내보내기" 메뉴 항목을 누르면 다운로드가 트리거되고 메뉴가 닫힌다', () => {
     const createObjectURL = vi.fn(() => 'blob:festa-test');
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));

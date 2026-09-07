@@ -845,9 +845,14 @@ export const GameStudioShell = ({
     if (file === undefined) return;
     try {
       const imported = withBuiltinAssetLibrary(parseGameProject(JSON.parse(await file.text())));
-      if (imported.gameId !== gameId) throw new Error(`gameId가 ${gameId}인 프로젝트만 가져올 수 있습니다.`);
-      store.reset(imported);
-      setSelectedSceneId(imported.startSceneId);
+      // S15P21A604-483 — 파일에 박힌 gameId는 "어느 게임에서 내보내졌는지"를 나타내는
+      // 출처 메타데이터일 뿐 콘텐츠 유효성과 무관하다. 사용자는 파일을 열어보지 않는 한
+      // 그 값을 알 방법이 없어 gameId 불일치를 하드 에러로 막는 건 실질적으로 쓸 수 없는
+      // 검증이었다 — "게임 초기화"/"시작 템플릿"과 동일하게 항상 현재 화면의 gameId로
+      // 맞춰서(coerce) 적용한다.
+      const next = imported.gameId === gameId ? imported : { ...imported, gameId };
+      store.reset(next);
+      setSelectedSceneId(next.startSceneId);
       setSelectedObjectId(null);
       setSelectedObjectIds(new Set());
       setHasUnsavedChanges(true);
