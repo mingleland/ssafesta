@@ -23,6 +23,8 @@ assert_contains "${overlay}" 'COMPONENT_ENV_FILE' 'backend runtime secrets must 
 assert_contains "${overlay}" 'name: festa-data-private' 'backend must use the named private data network'
 assert_contains "${data_compose}" 'name: festa-data-private' 'data project must create the named private data network'
 assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user dev_back .*~dev:\*' 'dev backend ACL must cover its namespaced Redis keys'
+assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user dev_back .*\+@connection .*\+info' 'backend ACL must permit Spring Redis health checks'
+assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user demo_back .*\+@connection .*\+info' 'demo backend ACL must permit Spring Redis health checks'
 assert_not_contains "${overlay}" '^\s*POSTGRES_PASSWORD:' 'backend password must not be committed'
 assert_not_contains "${overlay}" '^\s*REDIS_PASSWORD:' 'Redis password must not be committed'
 pass 'dev backend uses scoped data credentials and loopback-only ingress'

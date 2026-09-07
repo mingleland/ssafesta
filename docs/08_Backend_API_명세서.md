@@ -1225,6 +1225,8 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
+| `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
+| `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -1458,3 +1460,110 @@ Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에
   같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
   원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
   구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다
+
+### GET `/internal/ai/agent-config`
+
+FastAPI의 프롬프트 빌더가 **질문마다** 호출한다 (spec 008, `S15P21A604-399`, GitLab #119 §5).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-agent-config-api.yaml`.
+
+```
+GET /internal/ai/agent-config?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+```json
+{ "found": true, "role": "PROJECT_DOCENT", "tone": "FRIENDLY", "responseLength": "MEDIUM",
+  "systemPrompt": "문서를 근거로 답한다.", "forbiddenTopics": ["가격 협상"] }
+```
+
+- **거부는 오류가 아니라 `200` + `found: false` + `denialCode`다** — `/internal/ai/booth-access`와
+  같은 관례. 다른 booth 소속 `agentId`와 존재하지 않는 `agentId`는 **구분해 알려주지 않는다**
+  (둘 다 `AGENT_NOT_IN_BOOTH`). `status`가 `ACTIVE`가 아니면 `AGENT_INACTIVE`이며, **이 경우
+  프롬프트 필드를 전혀 싣지 않는다** — 쓸 수 없는 값을 흘려 봐야 계약(`additionalProperties: false`
+  분기)만 어긴다
+- `forbiddenTopics`가 비어 있으면 `null`이 아니라 **빈 배열**이다(`AiAgent.getForbiddenTopics()`가
+  이미 그렇게 정규화한다)
+- **캐싱하지 않는다** (2026-09-07 확정, GitLab #119) — `system_prompt`가 길어도 매 요청 그대로
+  싣는다. 버전·해시로 무효화만 알리는 방식은 필요해지면 그때 계약을 바꾼다
+- 인증은 벡터 검색 API와 동일한 `/internal/**` 체인·`INTERNAL_AI_TO_SPRING_TOKENS` 재사용
+### POST `/internal/ai/document-jobs/{jobId}/` — `chunk-batches` · `finalize` · `heartbeat` · `failed`
+
+FastAPI 워커가 만든 결과를 Spring이 받는 경로 (spec 007, `S15P21A604-400`, GitLab #119 §3).
+정본 계약은 `specs/007-ai-agent-document/contracts/document-result-api.yaml`.
+cancel은 Spring→FastAPI 방향이라 여기 없다(#119 §4 — `S15P21A604-175`).
+
+```
+POST /internal/ai/document-jobs/41/chunk-batches
+{ "attemptNo": 0, "batchSeq": 0, "chunks": [
+  { "chunkNo": 0, "content": "...", "embedding": [0.01, ...1536개],
+    "embeddingModelId": "text-embedding-3-small", "pageNumber": 3, "section": "운영 안내" } ] }
+→ 204
+
+POST /internal/ai/document-jobs/41/finalize
+{ "attemptNo": 0, "sourceHash": "<64 hex>", "totalChunkCount": 128,
+  "embeddingModelId": "text-embedding-3-small" }
+→ 204
+```
+
+두 경로 모두 같은 관문 두 개를 먼저 지난다.
+
+| 상황 | 응답 |
+|---|---|
+| `attemptNo`가 Job의 현재 값과 다름 | **`409` `JOB_ATTEMPT_STALE`** |
+| Job이 `SUCCEEDED`·`DEAD`·`CANCELLED`이거나 없음 | **`410` `JOB_GONE`** |
+
+- **`409`가 있는 이유**: lease가 만료돼 Job을 회수하고 `attempt_no`를 올린 뒤, 죽은 줄 알았던 이전
+  워커가 결과를 보내오는 경우다. 받아 주면 **두 attempt의 chunk가 한 문서에 섞인다.** 보내는 쪽은
+  자기가 밀려났다는 사실을 이 응답으로만 안다
+- **없는 Job과 끝난 Job을 구분하지 않는다** — 문서가 지워지면 Job도 `ON DELETE CASCADE`로 사라지고,
+  어느 쪽이든 결과를 보낼 attempt가 없다는 답은 같다
+- **finalize 재전송은 `410`이 아니라 `204`다.** 같은 attempt가 같은 `sourceHash`·`totalChunkCount`로
+  이미 끝낸 Job이면 아무것도 하지 않고 답한다 — 마지막 호출의 응답이 유실되는 것은 흔한 경우이고,
+  여기서 `410`을 주면 워커가 **성공한 작업을 실패로 보고한다**(#119 §3의 멱등 요구). 숫자가 다르면
+  그 Job이 한 일과 다른 주장이라 `410`이다
+- **batch는 멱등하다.** staging PK가 `(job_id, batch_seq, chunk_no)`라 같은 batch 재전송이 아무것도
+  바꾸지 않는다 — 워커가 응답을 못 받고 다시 보내는 것이 정상 경로다
+- **첫 batch가 `QUEUED` Job을 `RUNNING`으로 올린다.** 워커가 실제로 시작했다는 증거가 이것뿐이다
+- **finalize는 검증에서 걸리면 아무것도 바꾸지 않는다.** 기존 chunk도 문서 상태도 그대로이고
+  staging도 남아 같은 attempt로 다시 finalize할 수 있다. 검증 4종은 전부 `400` `VALIDATION_FAILED`이고
+  `errors[].field`가 지점을 가리킨다
+
+  | 검증 | `field` | 막는 것 |
+  |---|---|---|
+  | 적재 개수 ≠ `totalChunkCount` | `totalChunkCount` | batch 유실 — 잘린 문서가 조용히 READY가 되는 것 |
+  | batch 간 `chunkNo` 중복 | `chunks` | `UNIQUE(document_id, chunk_no)` 위반으로 500이 되는 것 |
+  | 임베딩 모델 혼합 | `embeddingModelId` | 한 문서 안에서 거리 비교가 뜻을 잃는 것 |
+  | `sourceHash` ≠ Job의 값 | `sourceHash` | 같은 jobId로 다른 파일이 실려 본문이 바뀌는 것 |
+
+- **finalize 성공은 한 트랜잭션이다** — 기존 chunk 삭제 → staging 반영(`searchable = TRUE`) →
+  staging 정리 → Job `SUCCEEDED`·`chunk_count` → Document `READY`. 읽는 쪽은 이전 판 전체 아니면
+  새 판 전체만 본다
+- **같은 batch 안의 `chunkNo` 중복도 `400`이다.** staging PK가 조용히 흡수하면 보낸 쪽은 N개를
+  넣었다고 믿고 finalize에서 개수가 어긋난다 — 원인을 말할 수 있는 자리에서 막는다
+- 저장 embedding도 `queryEmbedding`과 **같은 검증**을 받는다(1536차원, `float32` 범위, 노름
+  overflow·underflow). #119에서 "저장 벡터 검증은 chunk를 쓰는 쪽 몫"이라고 넘긴 것이 이 자리다
+- 계약에 없는 필드는 버리지 않고 `400`으로 거부한다 — 검색 API와 같은 strict parser
+
+**heartbeat · failed · lease 회수**
+
+```
+POST /internal/ai/document-jobs/41/heartbeat   { "attemptNo": 0 }                        → 204
+POST /internal/ai/document-jobs/41/failed
+{ "attemptNo": 0, "failureCode": "PARSE_TIMEOUT", "retryable": true, "message": null }   → 204
+```
+
+- **워커는 보고만 하고, 다음에 무엇을 할지는 Spring이 정한다.** `retryable`은 워커의 판단이고
+  재시도 예산(`max_retries` 기본 3)은 Job이 들고 있다
+  - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다
+  - 여지가 있으면 `RETRY_WAIT` + `next_retry_at` — backoff **1 · 5 · 15분**(#119, 2026-09-03)
+  - `attempt_no + 1 > max_retries` → `DEAD`
+- **어느 쪽이든 `attempt_no`는 오른다.** 방금 실패한 워커의 늦은 결과를 `409`로 막는 것이 그 값이다.
+  그 attempt의 staging도 함께 지운다 — 남기면 다음 attempt의 batch와 섞여 finalize 개수 검증이
+  엉뚱한 곳에서 걸린다
+- **lease는 90초, heartbeat는 30초 주기**다(#119). 두 번까지 유실돼도 Job을 뺏기지 않는다.
+  `QUEUED` Job은 heartbeat로도 `RUNNING`이 된다
+- **lease가 만료되면 Spring의 sweeper(30초 주기)가 Job을 회수한다.** FastAPI는 DB 자격증명이 없어
+  죽은 워커가 스스로 반납할 수 없고, 회수가 없으면 문서는 영원히 READY가 되지 않는다. 회수가
+  `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
+  `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
+- `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다
