@@ -56,6 +56,10 @@ class SourceHashMismatchError(Exception):
     """다운로드한 원본의 SHA-256이 Spring이 전달한 sourceHash와 다르다."""
 
 
+class BoothLeaseExpiredError(Exception):
+    """처리 시작 직전 또는 finalize 직전 확인한 Booth Lease가 만료됐다 (S15P21A604-149)."""
+
+
 class DocumentEmbeddingService:
     """한 문서 원본을 검증된 Embedding 결과 목록으로 바꾼다."""
 
