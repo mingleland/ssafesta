@@ -25,13 +25,18 @@ export interface ConsultationStartContext {
   boothId: number;
   source: ConsultationStartSource;
   /**
-   * AI 대화 요약(Handoff Summary, spec 011). 직원 대기열 카드에 그대로 노출된다.
-   * **required 로 만들지 않는다** — 데스크 진입에는 선행 대화가 없어 이 값이 존재할 수 없다.
+   * 요약을 만들 재료가 되는 AI 대화 id (#133 확정 계약, S15P21A604-519).
+   *
+   * **요약 텍스트가 아니다.** 서버가 이 id 로 FastAPI 에 요약을 요청한다(FR-012) — FE 가 마지막
+   * 답변을 잘라 보내던 방식은 계약 확정과 함께 폐기했다. 직원이 보는 요약의 정본은 서버다.
+   *
+   * **required 로 만들지 않는다** — 데스크 진입에는 선행 대화가 없어 이 값이 존재할 수 없고,
+   * 그때 요약은 `null` 이 된다.
    */
-  handoffSummary?: string;
+  conversationId?: string;
 }
 
 /** AI 대화 오버레이가 쓰는 producer. 대상 부스는 AI_AGENT_INTERACT 가 준 boothId 다 */
-export function aiHandoffContext(boothId: number, handoffSummary?: string): ConsultationStartContext {
-  return { boothId, source: 'AI_HANDOFF', handoffSummary };
+export function aiHandoffContext(boothId: number, conversationId?: string): ConsultationStartContext {
+  return { boothId, source: 'AI_HANDOFF', conversationId };
 }
