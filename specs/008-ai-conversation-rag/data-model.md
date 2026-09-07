@@ -4,8 +4,7 @@
 
 | 저장소 | 소유 데이터 | 원문 허용 |
 |---|---|---|
-| Spring/PostgreSQL | Lease, AI Agent, 사용자 인증 | 대화 원문 금지 |
-| FastAPI/pgvector | 문서 Chunk·Embedding·Scope | 문서 Chunk만 허용 |
+| Spring/PostgreSQL+pgvector | Lease, AI Agent, 문서 Chunk·Embedding·검색 Scope | 대화 원문 금지 |
 | FastAPI/Redis | Conversation·완료 turn·요약·용량 제어 | 30분 TTL 동안만 허용 |
 
 ## Conversation — Redis
@@ -37,11 +36,11 @@
 
 ## ConversationScope — 값 객체
 
-`boothId`, `agentId`, `documentStatus=READY`를 한 묶음으로 전달한다. 클라이언트 요청·질문·Agent 지시문에서 재구성할 수 없고 Conversation에서만 생성한다.
+`boothId`, `agentId`, `documentStatus=READY`, `searchable=true`를 한 묶음으로 전달한다. 클라이언트 질문·Agent 지시문에서 재구성할 수 없고 Conversation에서만 생성한다. FastAPI가 질의 Embedding과 함께 Spring 검색 API에 전달한다.
 
-## RetrievedChunk — PostgreSQL 조회 결과
+## RetrievedChunk — Spring 검색 API 결과
 
-`documentId`, `chunkId`, `boothId`, `agentId`, `documentStatus`, `title`, `content`, `score`를 가진다. Repository와 Context Builder가 Scope 일치를 각각 확인한다. `content`는 로그·SSE source에 기록하지 않는다.
+`documentId`, `chunkNo`, `pageNumber`, `section`, `originalFilename`, `content`, cosine `distance`를 가진다. Spring query와 FastAPI Context Builder가 Scope 일치를 각각 확인한다. `content`는 로그·SSE source에 기록하지 않는다.
 
 ## StreamAttempt — 요청 수명 객체
 
