@@ -29,6 +29,7 @@ from app.services.conversation_service import ConversationService
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.providers.llm import LLMRequest
 from app.services.context_service import ContextBuildResult
+from app.services.rag_service import NoReadyContextResult
 from app.services.stream_service import ConversationStreamService
 from tests.fakes.llm import FakeLLMProvider
 from tests.fakes.spring_booth_access import FakeSpringBoothAccessClient
@@ -42,7 +43,12 @@ _CHUNK_TEXT = "공연 일정 원문"
 
 
 class _RagContextService:
-    async def build(self, *, conversation, question) -> ContextBuildResult:
+    def __init__(self, *, no_ready: bool = False) -> None:
+        self._no_ready = no_ready
+
+    async def build(self, *, conversation, question):
+        if self._no_ready:
+            return NoReadyContextResult()
         return ContextBuildResult(
             request=LLMRequest(messages=()),
             included_chunks=(
@@ -65,7 +71,7 @@ class _RagContextService:
         )
 
 
-def _harness(*, ttl_seconds: int = 1800):
+def _harness(*, ttl_seconds: int = 1800, no_ready: bool = False):
     redis = fakeredis.FakeAsyncRedis(decode_responses=True)
     repository = ConversationRepository(redis, ttl_seconds=ttl_seconds)
 
@@ -83,7 +89,7 @@ def _harness(*, ttl_seconds: int = 1800):
     )
     stream_service = ConversationStreamService(
         repository=repository,
-        rag_context_service=_RagContextService(),
+        rag_context_service=_RagContextService(no_ready=no_ready),
         llm_provider=FakeLLMProvider(tokens=_ANSWER_TOKENS),
         ttl_seconds=ttl_seconds,
         clock=lambda: _NOW,
@@ -178,7 +184,9 @@ def test_no_raw_question_or_answer_reaches_the_application_log(
         assert json.dumps(secret.strip())[1:-1] not in logged
 
 
+@pytest.mark.parametrize("no_ready", [False, True], ids=["answer", "no_ready_docs"])
 def test_close_mid_stream_keeps_raw_text_out_of_redis_and_the_log(
+    no_ready: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The drop path itself must not log the text it refused to store.
@@ -187,7 +195,7 @@ def test_close_mid_stream_keeps_raw_text_out_of_redis_and_the_log(
     running — which is the real flow: the FE keeps draining the SSE body after
     the overlay unmounts, so this generator reaches its commit either way.
     """
-    client, repository, redis, stream_service = _harness()
+    client, repository, redis, stream_service = _harness(no_ready=no_ready)
     conversation_id = _create(client)
     conversation = asyncio.run(repository.get(conversation_id))
     assert conversation is not None

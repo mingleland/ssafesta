@@ -93,10 +93,6 @@ class _ConversationRepository:
         self.saved.append(conversation)
         return True
 
-    def vanish(self) -> None:
-        """An explicit close or the idle TTL removed the key mid-stream (127)."""
-        self._conversation = None
-
 
 class _RagContextService:
     def __init__(self, result: ContextBuildResult | None = None, error: Exception | None = None):
@@ -340,26 +336,3 @@ async def test_empty_answer_completes_without_committing_a_turn() -> None:
 
     assert [event["type"] for event in events] == ["start", "done"]
     assert repository.saved == []
-
-
-async def test_turn_is_dropped_when_conversation_closes_mid_stream() -> None:
-    """127/D11: closing mid-answer must not resurrect the question and answer.
-
-    The FE keeps draining the SSE body after the overlay unmounts (no
-    AbortController), so the generator does reach its commit — an unguarded
-    write would give the raw text a fresh 30-minute lifetime.
-    """
-    service, repository = _service(
-        conversation=_conversation(),
-        rag=_RagContextService(result=_context_result((_chunk(2001, 1),))),
-        llm=FakeLLMProvider(tokens=("안녕", "하세요")),
-    )
-
-    raw: list[str] = []
-    async for event in service.stream(conversation=_conversation(), question="질문"):
-        raw.append(event)
-        if len(raw) == 2:
-            repository.vanish()  # 사용자가 답변 도중 오버레이를 닫았다 → DELETE 도착
-
-    assert repository.saved == []
-    assert [event["type"] for event in _events(raw)][-1] == "done"

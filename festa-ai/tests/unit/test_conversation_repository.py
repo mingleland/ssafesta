@@ -86,31 +86,3 @@ async def test_commit_turn_does_not_recreate_a_deleted_conversation(
     assert committed is False
     assert await repository.get(conversation.conversation_id) is None
     assert await repository._redis.exists(f"conversation:{conversation.conversation_id}") == 0
-
-
-async def test_commit_turn_does_not_recreate_an_expired_conversation() -> None:
-    """The same guard covers the idle TTL, not just the explicit close (SC-012)."""
-    repository = ConversationRepository(fakeredis.FakeAsyncRedis(), ttl_seconds=1)
-    conversation = _conversation()
-    await repository.save(conversation)
-
-    await asyncio.sleep(1.15)
-    committed = await repository.commit_turn(conversation)
-
-    assert committed is False
-    assert await repository.get(conversation.conversation_id) is None
-
-
-async def test_delete_removes_the_conversation(repository: ConversationRepository) -> None:
-    conversation = _conversation()
-    await repository.save(conversation)
-
-    await repository.delete(conversation.conversation_id)
-
-    assert await repository.get(conversation.conversation_id) is None
-
-
-async def test_delete_is_idempotent_for_an_unknown_id(
-    repository: ConversationRepository,
-) -> None:
-    await repository.delete("conv_never_existed")

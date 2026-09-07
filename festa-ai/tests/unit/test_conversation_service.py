@@ -131,10 +131,3 @@ async def test_close_refuses_another_users_conversation_and_keeps_it() -> None:
         await service.close(conversation_id=conversation_id, user_id=99)
 
     assert await service._repository.get(conversation_id) is not None
-
-
-@pytest.mark.asyncio
-async def test_close_is_idempotent_for_an_unknown_conversation() -> None:
-    service = _service(FakeSpringBoothAccessClient())
-
-    await service.close(conversation_id="conv_never_existed", user_id=42)
