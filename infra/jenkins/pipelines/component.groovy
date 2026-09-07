@@ -20,14 +20,17 @@ def call(Map config = [:]) {
                     if (component in ['ai', 'back']) {
                         String envCredentialName = component == 'back' ? 'DEV_BACK_ENV_CREDENTIAL_ID' : 'DEV_AI_ENV_CREDENTIAL_ID'
                         String envCredentialId = env[envCredentialName]?.trim()
-                        String tokenCredentialId = env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID?.trim()
+                        String springToAiCredentialId = env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID?.trim()
+                        String aiToSpringCredentialId = env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID?.trim()
                         if (!envCredentialId) { error("필수 Jenkins credential ID 누락: ${envCredentialName}") }
-                        if (!tokenCredentialId) { error('필수 Jenkins credential ID 누락: DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID') }
+                        if (!springToAiCredentialId) { error('필수 Jenkins credential ID 누락: DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID') }
+                        if (!aiToSpringCredentialId) { error('필수 Jenkins credential ID 누락: DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID') }
                         withCredentials([
                             file(credentialsId: envCredentialId, variable: 'COMPONENT_ENV_FILE'),
-                            string(credentialsId: tokenCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                            string(credentialsId: springToAiCredentialId, variable: 'INTERNAL_SPRING_TO_AI_TOKENS'),
+                            string(credentialsId: aiToSpringCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
                         ]) {
-                            sh 'infra/jenkins/scripts/with-credentials.sh COMPONENT_ENV_FILE INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-component.sh'
+                            sh 'infra/jenkins/scripts/with-credentials.sh COMPONENT_ENV_FILE INTERNAL_SPRING_TO_AI_TOKENS INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-component.sh'
                         }
                     } else {
                         sh 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/deploy-component.sh'
