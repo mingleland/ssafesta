@@ -62,21 +62,21 @@
 
 ## Phase 1: Setup (MR ①)
 
-- [ ] T007 `db/migration/V22__survey_guest_and_rating_scale.sql` — data-model §2 그대로. V21 헤더 관례(무엇·왜·되돌리기 경로) (S15P21A604-130)
-- [ ] T008 `backend/db/rollback/V22__rollback.sql` + `README.md` 표 행 — 게스트 응답 자식부터 삭제 후 복원 (S15P21A604-130)
-- [ ] T009 [P] `survey/SurveyProperties.java` — `record` `@ConfigurationProperties("app.survey")`, compact ctor에서 `maxQuestions`·`maxOptions`·`maxRewardCoin` 양수 검증. `survey/SurveyConfiguration.java`로 등록 (S15P21A604-130)
-- [ ] T010 [P] `application.yml` `app.survey` 블록 + 주석(C-01·C-02 미결이라 설정으로 둔다는 근거) (S15P21A604-130)
-- [ ] T011 [P] `common/ErrorCode.java` — `SURVEY_NOT_FOUND`(404) · `SURVEY_CLOSED`(409) · `SURVEY_ALREADY_RESPONDED`(409) · `SURVEY_LOCKED`(409), 한글 기본 메시지 (S15P21A604-130)
-- [ ] T012 [P] `common/OpenApiConfiguration.java` `tags()`에 `tag("Survey", …)` — Project 뒤. **빠뜨리면 `OpenApiDocumentationTest`가 실패한다** (S15P21A604-130)
+- [x] T007 `db/migration/V22__survey_guest_and_rating_scale.sql` — data-model §2 그대로. V21 헤더 관례(무엇·왜·되돌리기 경로) (S15P21A604-130)
+- [x] T008 `backend/db/rollback/V22__rollback.sql` + `README.md` 표 행 — 게스트 응답 자식부터 삭제 후 복원 (S15P21A604-130)
+- [x] T009 [P] `survey/SurveyProperties.java` — `record` `@ConfigurationProperties("app.survey")`, compact ctor에서 `maxQuestions`·`maxOptions`·`maxRewardCoin` 양수 검증. `survey/SurveyConfiguration.java`로 등록 (S15P21A604-130)
+- [x] T010 [P] `application.yml` `app.survey` 블록 + 주석(C-01·C-02 미결이라 설정으로 둔다는 근거) (S15P21A604-130)
+- [x] T011 [P] `common/ErrorCode.java` — `SURVEY_NOT_FOUND`(404) · `SURVEY_CLOSED`(409) · `SURVEY_ALREADY_RESPONDED`(409) · `SURVEY_LOCKED`(409), 한글 기본 메시지 (S15P21A604-130)
+- [x] T012 [P] `common/OpenApiConfiguration.java` `tags()`에 `tag("Survey", …)` — Project 뒤. **빠뜨리면 `OpenApiDocumentationTest`가 실패한다** (S15P21A604-130)
 
 ## Phase 2: Foundational (MR ①) — 여기가 선행이다
 
-- [ ] T013 `booth/BoothAccessGuard.java` — `public Booth requireVisitorVisible(Long boothId)` 추가(부스 → `requireActiveLease` → `isPublished` 아니면 `LayoutNotPublishedException`). 기존 세 복제본은 건드리지 않는다 (R-07) (S15P21A604-130)
-- [ ] T014 [P] `booth/BoothRepository.java` — `@Lock(PESSIMISTIC_READ) Optional<Booth> findWithSharedLockById(Long id)` + 왜 공유 락인지 주석 (R-08) (S15P21A604-130)
-- [ ] T015 **`user/AccountDeletionService.java` 설문 6줄 키 수정** — `created_by_user_id` → `booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)`, 응답은 `OR respondent_user_id = ?` 유지. **지금 스태프가 만든 설문이 있으면 소유자 탈퇴가 FK 위반으로 실패한다** (R-09) (S15P21A604-130)
-- [ ] T016 [P] `survey/SurveyQuestionType.java` — enum 6종 + `isChoice()`·`isText()`·`isRating()` (S15P21A604-130)
-- [ ] T017 `survey/Survey.java`·`SurveyQuestion.java`·`SurveyOption.java` — 평면 `Long` 참조, SMALLINT는 `short`/`Short`, `createdByUserId`는 항상 부스 소유자 (data-model §3) (S15P21A604-130)
-- [ ] T018 `survey/SurveyRepository.java`(`findByBoothId`) · `SurveyQuestionRepository.java`(`findBySurveyIdOrderByDisplayOrder`, `@Modifying(clearAutomatically, flushAutomatically) deleteBySurveyId`) · `SurveyOptionRepository.java`(`findByQuestionIdInOrderByDisplayOrder`, 벌크 `deleteByQuestionIdIn`) — `GameAssetRepository:110` 모양 (R-03) (S15P21A604-130)
+- [x] T013 `booth/BoothAccessGuard.java` — `public Booth requireVisitorVisible(Long boothId)` 추가(부스 → `requireActiveLease` → `isPublished` 아니면 `LayoutNotPublishedException`). 기존 세 복제본은 건드리지 않는다 (R-07) (S15P21A604-130)
+- [x] T014 [P] `booth/BoothRepository.java` — `@Lock(PESSIMISTIC_READ) Optional<Booth> findWithSharedLockById(Long id)` + 왜 공유 락인지 주석 (R-08) (S15P21A604-130)
+- [x] T015 **`user/AccountDeletionService.java` 설문 6줄 키 수정** — `created_by_user_id` → `booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)`, 응답은 `OR respondent_user_id = ?` 유지. **지금 스태프가 만든 설문이 있으면 소유자 탈퇴가 FK 위반으로 실패한다** (R-09) (S15P21A604-130)
+- [x] T016 [P] `survey/SurveyQuestionType.java` — enum 6종 + `isChoice()`·`isText()`·`isRating()` (S15P21A604-130)
+- [x] T017 `survey/Survey.java`·`SurveyQuestion.java`·`SurveyOption.java` — 평면 `Long` 참조, SMALLINT는 `short`/`Short`, `createdByUserId`는 항상 부스 소유자 (data-model §3) (S15P21A604-130)
+- [x] T018 `survey/SurveyRepository.java`(`findByBoothId`) · `SurveyQuestionRepository.java`(`findBySurveyIdOrderByDisplayOrder`, `@Modifying(clearAutomatically, flushAutomatically) deleteBySurveyId`) · `SurveyOptionRepository.java`(`findByQuestionIdInOrderByDisplayOrder`, 벌크 `deleteByQuestionIdIn`) — `GameAssetRepository:110` 모양 (R-03) (S15P21A604-130)
 
 ## Phase 3: US1 — 부스 운영자가 설문을 만들고 방문자가 답한다
 
@@ -85,42 +85,42 @@
 
 ### MR ① — 편집·조회 (-130 · -190)
 
-- [ ] T019 [US1] `survey/SurveyService.java` — `findForEditor(boothId, userId)`(`requireEditor`만, 임대 무관) (S15P21A604-130)
-- [ ] T020 [US1] `SurveyService.upsert(boothId, userId, command)` — data-model §4 순서: 게스트 → `requireActiveEditor` → `findWithLockById` → 기존 조회·응답 수 → 구조 비교 잠금 → 필드 검증 → 저장. 문항은 옵션·문항 벌크 삭제 후 `saveAll` (S15P21A604-130 · S15P21A604-190)
-- [ ] T021 [US1] `SurveyService` nested DTO — `SurveyCommand`(**클래스**, `description`·`rewardCoin`·`closesAt`은 `PresenceField`) · `SurveyView` · `RunView`(record). `PresenceField` 없으면 FE 저장마다 보상이 0으로 지워진다 (R-05) (S15P21A604-130)
-- [ ] T022 [US1] `SurveyService.findRun(boothId, now)` — `requireVisitorVisible`, `closed = endsAt != null && !endsAt.isAfter(now)`, `rewardCoin` 포함(게스트 사전 안내용) (S15P21A604-130)
-- [ ] T023 [US1] `survey/SurveyController.java` — endpoint 3개(§3·§4·§5). `@Tag("Survey")`·`@Operation(summary, description)`·`@ApiResponses` 4xx 전부·`@SecurityRequirement`. `run`에도 `@SecurityRequirement`(401 자동 문서화 조건) (S15P21A604-130)
-- [ ] T024 [US1] `survey/SurveyApiIntegrationTest.java` — quickstart §3-1 케이스 31개. 픽스처 `BoothTestSupport.createMemberWithWallet`·`BoothLayoutTestSupport.grantLease/publishLayout/expireLease`, 토큰 `MemberSessionService.issue`·`AccessTokenService.issueGuestToken` (S15P21A604-130 · S15P21A604-190)
+- [x] T019 [US1] `survey/SurveyService.java` — `findForEditor(boothId, userId)`(`requireEditor`만, 임대 무관) (S15P21A604-130)
+- [x] T020 [US1] `SurveyService.upsert(boothId, userId, command)` — data-model §4 순서: 게스트 → `requireActiveEditor` → `findWithLockById` → 기존 조회·응답 수 → 구조 비교 잠금 → 필드 검증 → 저장. 문항은 옵션·문항 벌크 삭제 후 `saveAll` (S15P21A604-130 · S15P21A604-190)
+- [x] T021 [US1] `SurveyService` nested DTO — `SurveyCommand`(**클래스**, `description`·`rewardCoin`·`closesAt`은 `PresenceField`) · `SurveyView` · `RunView`(record). `PresenceField` 없으면 FE 저장마다 보상이 0으로 지워진다 (R-05) (S15P21A604-130)
+- [x] T022 [US1] `SurveyService.findRun(boothId, now)` — `requireVisitorVisible`, `closed = endsAt != null && !endsAt.isAfter(now)`, `rewardCoin` 포함(게스트 사전 안내용) (S15P21A604-130)
+- [x] T023 [US1] `survey/SurveyController.java` — endpoint 3개(§3·§4·§5). `@Tag("Survey")`·`@Operation(summary, description)`·`@ApiResponses` 4xx 전부·`@SecurityRequirement`. `run`에도 `@SecurityRequirement`(401 자동 문서화 조건) (S15P21A604-130)
+- [x] T024 [US1] `survey/SurveyApiIntegrationTest.java` — quickstart §3-1 케이스 31개. 픽스처 `BoothTestSupport.createMemberWithWallet`·`BoothLayoutTestSupport.grantLease/publishLayout/expireLease`, 토큰 `MemberSessionService.issue`·`AccessTokenService.issueGuestToken` (S15P21A604-130 · S15P21A604-190)
 
 ### MR ② — 제출·보상 (-131 · -192)
 
-- [ ] T025 [US1] `wallet/CoinReason.java` — `SURVEY_REWARD` 상수 + javadoc(spec 010). 그 클래스가 그러라고 만들어졌다 (S15P21A604-192)
-- [ ] T026 [US1] `survey/SurveyResponse.java`·`SurveyAnswer.java` — 응답자 회원 xor 게스트, `rewardLedgerEntryId` (S15P21A604-131)
-- [ ] T027 [US1] `survey/SurveyResponseRepository.java`(`existsBySurveyIdAndRespondentUserId`·`…GuestKey`, `countBySurveyId`) · `SurveyAnswerRepository.java` + `survey_answer_options` native insert (`ProjectRepository` 모양) (S15P21A604-131)
-- [ ] T028 [US1] `survey/SurveyResponseService.submit` — data-model §4 순서. 토큰 주체 판정은 `WorldSessionService.identityOf` 모양(MEMBER→id / GUEST→subject / 그 외 401). **`saveAndFlush` catch 뒤에는 아무 쿼리도 두지 않는다** (R-04) (S15P21A604-131)
-- [ ] T029 [US1] 보상 — 회원 && `rewardCoin > 0`이면 `wallets.credit(...)`, 멱등키 `SURVEY_REWARD:{surveyId}:{userId}`, `reward_ledger_entry_id` 연결. **응답 flush 뒤, 같은 트랜잭션** (S15P21A604-192)
-- [ ] T030 [US1] `SurveyController` — `POST /surveys/{surveyId}/responses` (§6). 201 `{responseId, rewardedCoin}`, 보상 없으면 `0` (S15P21A604-131)
-- [ ] T031 [US1] `survey/SurveyResponseApiIntegrationTest.java` — quickstart §3-2 케이스 21개. `BoothTestSupport.assertBalanceMatchesLedger` 포함 (S15P21A604-131 · S15P21A604-192)
+- [x] T025 [US1] `wallet/CoinReason.java` — `SURVEY_REWARD` 상수 + javadoc(spec 010). 그 클래스가 그러라고 만들어졌다 (S15P21A604-192)
+- [x] T026 [US1] `survey/SurveyResponse.java`·`SurveyAnswer.java` — 응답자 회원 xor 게스트, `rewardLedgerEntryId` (S15P21A604-131)
+- [x] T027 [US1] `survey/SurveyResponseRepository.java`(`existsBySurveyIdAndRespondentUserId`·`…GuestKey`, `countBySurveyId`) · `SurveyAnswerRepository.java` + `survey_answer_options` native insert (`ProjectRepository` 모양) (S15P21A604-131)
+- [x] T028 [US1] `survey/SurveyResponseService.submit` — data-model §4 순서. 토큰 주체 판정은 `WorldSessionService.identityOf` 모양(MEMBER→id / GUEST→subject / 그 외 401). **`saveAndFlush` catch 뒤에는 아무 쿼리도 두지 않는다** (R-04) (S15P21A604-131)
+- [x] T029 [US1] 보상 — 회원 && `rewardCoin > 0`이면 `wallets.credit(...)`, 멱등키 `SURVEY_REWARD:{surveyId}:{userId}`, `reward_ledger_entry_id` 연결. **응답 flush 뒤, 같은 트랜잭션** (S15P21A604-192)
+- [x] T030 [US1] `SurveyController` — `POST /surveys/{surveyId}/responses` (§6). 201 `{responseId, rewardedCoin}`, 보상 없으면 `0` (S15P21A604-131)
+- [x] T031 [US1] `survey/SurveyResponseApiIntegrationTest.java` — quickstart §3-2 케이스 21개. `BoothTestSupport.assertBalanceMatchesLedger` 포함 (S15P21A604-131 · S15P21A604-192)
 
 ## Phase 4: US2 — 운영자가 결과를 수치로 확인한다 (MR ③)
 
 **Goal**: 응답 수·선택지별 수·별점 평균·분포·주관식 목록을 서버가 계산해 준다.
 **Independent Test**: 20응답 fixture의 집계값이 손으로 센 값과 일치한다.
 
-- [ ] T032 [US2] `survey/SurveyResultService.results(surveyId, userId)` — `requireEditor`(임대 무관). 집계 5쿼리(data-model §5). **문항 목록을 기준으로 조립**해 응답 0건에도 모든 문항이 실린다 (S15P21A604-132)
-- [ ] T033 [US2] `SurveyResultService.textAnswers(surveyId, userId, questionId?, page, size)` — `id ASC` 고정, `page`/`size` 검증(0 이상 / 1~100) (S15P21A604-193)
-- [ ] T034 [US2] `ResultsView`·`QuestionAggregateView`·`TextAnswerPage` records — `counts`·`average`·`distribution` 키가 유형과 무관하게 항상 존재(값 없으면 `[]`·`null`). 비율은 싣지 않는다 (S15P21A604-132)
-- [ ] T035 [US2] `SurveyController` — endpoint 2개(§7·§8) (S15P21A604-132 · S15P21A604-193)
-- [ ] T036 [US2] `survey/SurveyResultApiIntegrationTest.java` — quickstart §3-3 케이스 13개. **20응답 수기 대조**와 **응답 본문에 `respondent`·`userId`·`nickname` 문자열 0건**(SC-003) 포함 (S15P21A604-132 · S15P21A604-193 · S15P21A604-191)
+- [x] T032 [US2] `survey/SurveyResultService.results(surveyId, userId)` — `requireEditor`(임대 무관). 집계 5쿼리(data-model §5). **문항 목록을 기준으로 조립**해 응답 0건에도 모든 문항이 실린다 (S15P21A604-132)
+- [x] T033 [US2] `SurveyResultService.textAnswers(surveyId, userId, questionId?, page, size)` — `id ASC` 고정, `page`/`size` 검증(0 이상 / 1~100) (S15P21A604-193)
+- [x] T034 [US2] `ResultsView`·`QuestionAggregateView`·`TextAnswerPage` records — `counts`·`average`·`distribution` 키가 유형과 무관하게 항상 존재(값 없으면 `[]`·`null`). 비율은 싣지 않는다 (S15P21A604-132)
+- [x] T035 [US2] `SurveyController` — endpoint 2개(§7·§8) (S15P21A604-132 · S15P21A604-193)
+- [x] T036 [US2] `survey/SurveyResultApiIntegrationTest.java` — quickstart §3-3 케이스 13개. **20응답 수기 대조**와 **응답 본문에 `respondent`·`userId`·`nickname` 문자열 0건**(SC-003) 포함 (S15P21A604-132 · S15P21A604-193 · S15P21A604-191)
 
 ## Phase 5: Polish & Cross-Cutting (MR ③)
 
-- [ ] T037 [P] `docs/08_Backend_API_명세서.md` §9 — stub 6줄을 실제 endpoint 6개로 교체. §18에 `SURVEY_NOT_FOUND`·`SURVEY_LOCKED` 행 추가(`SURVEY_CLOSED`·`SURVEY_ALREADY_RESPONDED`는 이미 있다) (S15P21A604-191)
-- [ ] T038 [P] `specs/README.md:26` — 010 행의 plan·tasks 열을 `✅ BE분`으로 (S15P21A604-130)
-- [ ] T039 [P] `docs/26_팀_결정_필요사항.md` row 20·21 — 구현 기본값 기록(게스트 허용·보상 설문 차단 / 상한 10), 결정 로그에 2026-09-07 행 (S15P21A604-130)
-- [ ] T040 [P] `docs/HDD/작업일지.md` — 010 BE 착수·완료 기록. 문제 발생 시 `docs/HDD/트러블슈팅.md` T-135부터 (헌법 29조) (S15P21A604-191)
-- [ ] T041 변이 확인 — quickstail §5 표 14개를 각 MR 머지 전에 돌린다 (S15P21A604-191)
-- [ ] T042 quickstart §4 손 왕복 실행 후 §4-3에 결과 기록 (S15P21A604-191)
+- [x] T037 [P] `docs/08_Backend_API_명세서.md` §9 — stub 6줄을 실제 endpoint 6개로 교체. §18에 `SURVEY_NOT_FOUND`·`SURVEY_LOCKED` 행 추가(`SURVEY_CLOSED`·`SURVEY_ALREADY_RESPONDED`는 이미 있다) (S15P21A604-191)
+- [x] T038 [P] `specs/README.md:26` — 010 행의 plan·tasks 열을 `✅ BE분`으로 (S15P21A604-130)
+- [x] T039 [P] `docs/26_팀_결정_필요사항.md` row 20·21 — 구현 기본값 기록(게스트 허용·보상 설문 차단 / 상한 10), 결정 로그에 2026-09-07 행 (S15P21A604-130)
+- [x] T040 [P] `docs/HDD/작업일지.md` — 010 BE 착수·완료 기록. 문제 발생 시 `docs/HDD/트러블슈팅.md` T-135부터 (헌법 29조) (S15P21A604-191)
+- [x] T041 변이 확인 — quickstail §5 표 14개를 각 MR 머지 전에 돌린다 (S15P21A604-191)
+- [x] T042 quickstart §4 손 왕복 실행 후 §4-3에 결과 기록 (S15P21A604-191) — **부분 실행.** V22 를 살아 있는 로컬 V21 DB 에 적용 + `validate` 통과 + 롤백 스크립트 실행 + 무인증 401 · 게스트 403 을 실제 HTTP 로 확인했다. **회원 curl 왕복은 못 돌렸다** — 회원 토큰이 소셜 로그인 경로밖에 없다(§4-1 이 예고한 그대로, 그 경로는 통합 테스트 75건이 덮는다). 돌린 것과 못 돌린 것을 §4-3 에 나눠 적었다
 
 ---
 

@@ -186,7 +186,23 @@ curl -s -X POST "$API/surveys/$S/responses" -H "Authorization: Bearer $GUEST" \
 
 ### 4-3. 결과
 
-> 실행 후 이 자리에 결과를 적는다 (009 quickstart 관례 — "2026-08-28 실행 완료 ✅ / 12건 전부 통과").
+**2026-09-07 실행 — 부분 통과. 아래가 돌린 것과 돌리지 못한 것의 전부다.**
+
+돌린 것 (로컬 postgres `ssafesta-local-postgres-1`, V21 + 실제 데이터 위에서):
+
+| # | 확인 | 결과 |
+|---|---|---|
+| 1 | V22 를 **살아 있는 V21 DB에** Flyway 로 적용 | ✅ `Successfully applied 1 migration … now at version v22` |
+| 2 | 적용된 스키마에 대해 `ddl-auto: validate` | ✅ `Initialized JPA EntityManagerFactory` — SMALLINT↔`short` 가 틀렸으면 여기서 죽는다 |
+| 3 | `backend/db/rollback/V22__rollback.sql` 실행 | ✅ 14문장 전부 성공. 게스트 응답 자식부터 삭제 → `SET NOT NULL` 복구 순서가 실제로 통한다 |
+| 4 | 기동 후 `GET /surveys/12/results` 무인증 | ✅ `401 UNAUTHORIZED` |
+| 5 | 게스트 토큰(`POST /auth/guest`)으로 `results` · `text-answers` | ✅ 둘 다 `403 MEMBER_ONLY`, message `회원 계정만 설문 결과를 조회할 수 있습니다.` |
+| 6 | `text-answers?page=-1` 을 게스트로 | ✅ `403` — **권한이 필드 검증보다 먼저**다(계약 순서), 400 이 아니다 |
+| 7 | `/v3/api-docs` 에 두 endpoint 등재 | ✅ summary·tag `Survey`·4xx 문서화. 전체 operation 57개 |
+
+**돌리지 못한 것 — ④~⑦의 회원 curl 왕복.** 회원 Access Token 은 소셜 로그인(OAuth) 경로밖에 없다 — `auth` 에 로컬 전용 발급 endpoint 가 없고(`GuestAuthController` 는 게스트만, 나머지는 `/oauth/{provider}` + `/complete`) §4-1 이 예고한 그대로다. 그 경로는 `SurveyApiIntegrationTest`(35) · `SurveyResponseApiIntegrationTest`(25) · `SurveyResultApiIntegrationTest`(15) 가 실제 Postgres(Testcontainers)에서 덮는다. 게스트 제출 왕복도 부스 게시·임대·설문 픽스처를 SQL 로 심어야 하는데 같은 경로를 통합 테스트가 이미 지나므로, 그 대신 위 4~7을 돌렸다.
+
+**중간에 나온 것 하나** — 첫 기동이 `ERROR: relation "ux_surveys_booth" already exists` 로 실패했다. MR ① 개발 중 V22 SQL 을 `psql` 로 손으로 밀어 넣은 자리에 Flyway 이력만 없었기 때문이고 마이그레이션 결함이 아니다(`ux_surveys_booth` 를 만드는 곳은 V22 한 곳뿐임을 확인). 롤백 스크립트로 되돌린 뒤 Flyway 가 정상 적용했다 — 그 덕에 3번이 검증됐다.
 
 ---
 
@@ -210,6 +226,45 @@ curl -s -X POST "$API/surveys/$S/responses" -H "Authorization: Bearer $GUEST" \
 | 문항 목록 기준 조립 → 응답 기준 조립 | 3-3 #2 (0건 빈 집계) |
 | `AccountDeletionService` 원복 | 3-1 #31 (탈퇴 성공) |
 | `short` → `Integer` 매핑 | **기동 실패** — `ddl-auto: validate` |
+
+### 5-1. 실행 결과
+
+- **MR ①** (2026-09-07): 7종 전부 잡혔다.
+- **MR ②** (2026-09-07): 11종. 처음엔 9종만 잡혀 **멱등키에 `nanoTime` 추가**와 **제약 번역 제거**가 통과했다 — 사전 중복 검사가 순차 요청을 다 막아 두 방어가 테스트에서 실행되지 않는 코드였다. `SurveyResponseConcurrencyIntegrationTest` 를 추가해 11/11.
+- **MR ③** (2026-09-07): 12종 중 **11종 잡힘**. 각 변이가 깨뜨린 테스트까지 남긴다.
+
+| 변이 | 결과 | 깨진 테스트 |
+|---|---|---|
+| `requireEditor` 호출 제거 | ✅ | `anotherMembersSurveyResultsAreForbidden` |
+| 주관식 `ORDER BY a.id ASC` → `DESC` | ✅ | `fiftyFiveTextAnswersPageWithoutDuplicateOrGap`, `aSubmissionDuringPagingDoesNotShiftPagesAlreadyRead` |
+| 문항 목록 기준 → 집계 행 기준 조립 | ✅ | `aSurveyWithNoResponsesReportsEveryQuestionAtZero` |
+| `average` 의 0건 `null` 가드 제거 | ✅ | 같은 테스트 (`average` 가 `0.0` 이 된다) |
+| 선택지 0 채움 제거 | ✅ | 같은 테스트 |
+| 별점 눈금 0 채움 제거 | ✅ | 위 + `theAggregateOfTwentyResponsesMatchesTheHandCount` |
+| offset `page * size` → `page` | ✅ | 페이지 테스트 2종 |
+| `size` 상한 검증 제거 | ✅ | `pageAndSizeOutOfRangeAreRejected` |
+| `questionId` 소유 검증 제거 | ✅ | `aQuestionFromAnotherSurveyIsRejected` |
+| `totalPages` `ceil` → `floor` | ✅ | 페이지 + 수기대조 |
+| `answeredCount` → `totalResponses` | ✅ | `theAggregateOfTwentyResponsesMatchesTheHandCount` |
+| projection alias `question_id` → `questionId` | ❌ **안 잡힘** | 없음 — 아래 |
+
+**안 잡힌 것의 정체**: 통과한 것이 맞고, 그게 정보다. native projection 의 alias 를 snake_case 로 맞추면서 나는 "camelCase alias 는 아무것도 바인딩하지 못한다"고 주석에 썼다 — PostgreSQL 이 `AS questionId` 를 `questionid` 로 접고 Spring Data 의 fallback(`TupleBackedMap.FallbackTupleWrapper`)은 property → `under_score` 한 방향만 시도한다는 추론이었다. 이 변이가 통과함으로써 **그 주장이 틀렸다**는 것이 확인됐다(tuple 조회가 대소문자를 가리지 않는다). alias 는 컬럼명과 같아서 읽기 좋으므로 snake_case 로 두되 **주석의 거짓 주장을 지우고 "규칙이 아니라 표기 선택이며 변이로 확인했다"로 고쳤다.** 잡히지 않는 변이는 테스트 구멍일 때도 있지만 이번처럼 내 주장이 틀렸다는 신호일 때도 있다.
+
+**표의 마지막 두 줄은 MR ①~② 에서 빠져 있어 MR ③ 때 따로 돌렸다.**
+
+| 변이 | 결과 | 관찰 |
+|---|---|---|
+| `AccountDeletionService` 원복 (`booth_id IN (owner)` → `created_by_user_id`) | ✅ 잡힘 | `ownerWithdrawalRemovesASurveyCreatedByStaff` 가 **1 error** — 스태프가 만든 설문이 남아 `surveys_booth_id_fkey` 로 탈퇴가 깨진다 |
+| `short` → `Integer` 매핑 | ⚠️ **다른 자리에서 잡혔다** | 필드만 `Integer` 로 바꾸면 생성자·getter 가 안 맞아 **컴파일**에서 죽는다 — 기동까지 가지 않는다. 그래서 아래처럼 DB 쪽에서 확인했다 |
+
+**`ddl-auto: validate` 를 직접 확인했고, 한쪽 방향만 잡는다.**
+
+- DB `smallint` + Java `int` → **기동 실패**. 로컬에서 `surveys.reward_coin`(INTEGER, Java `int`)을 SMALLINT 로 좁혀 보았다:
+  `Schema validation: wrong column type encountered in column [reward_coin] in table [surveys]; found [int2 (Types#SMALLINT)], but expecting [integer (Types#INTEGER)]`.
+  V22 가 만든 `rating_min`·`rating_max`(SMALLINT)를 `Integer` 로 매핑하면 정확히 이 실패다 — 표의 주장이 성립한다.
+- **반대 방향은 잡히지 않는다.** `survey_questions.rating_min` 을 INTEGER 로 넓히고 엔티티는 `Short` 그대로 두면 **정상 기동한다.** 즉 나중에 누가 마이그레이션으로 SMALLINT 컬럼을 넓혀도 `validate` 는 말해 주지 않는다. 좁히는 쪽만 지켜 준다는 뜻이고, 넓히는 변경은 엔티티 수정을 사람이 기억해야 한다.
+
+**변이 실행 자체에서 두 번 헛돌았다** (T-135·T-136 참조): `cmd /c mvnw.cmd` 가 인자를 못 받아 12종이 전부 "compile/boot failure = 잡힘" 으로 보였고, 다음 시도에서는 revert 용 pristine 경로(`/tmp`)가 MSYS 와 Windows Python 사이에서 다른 곳을 가리켜 **변이가 누적**됐다(실패 수가 1→3→4→…7 로 늘어난 것이 그 흔적이다). 둘 다 결과를 버리고 revert 를 매 회 `diff` 로 확인하는 방식으로 다시 돌렸다. 자동 변이 스크립트는 **되돌림을 단정하지 않으면 결과 전체가 무의미하다.**
 
 ---
 
