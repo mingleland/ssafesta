@@ -4,7 +4,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { mockStreamSuccess } from '../../../entities/conversation/stream.mock';
-import { createSseParser } from '../../../entities/conversation/stream.parser';
+import { consumeSseStream } from '../../../entities/conversation/stream.consumer';
+import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
 import { aiHandoffContext } from '../../consultation/model/startContext';
@@ -14,6 +15,7 @@ import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
   payload: { boothId: number; agentId?: number };
+  streamFactory?: (tokens: string[]) => AsyncIterable<string>;
 }
 
 interface Turn {
@@ -21,6 +23,10 @@ interface Turn {
   text: string;
   streaming?: boolean;
   sources?: string[];
+  status?: SseConsumptionStatus;
+  errorMessage?: string;
+  retryable?: boolean;
+  retryQuestion?: string;
 }
 
 const IcAgent = (
@@ -45,7 +51,15 @@ function mockAnswerFor(question: string): string[] {
   return ['부스에 등록된 자료를 찾아봤어요. ', '"', question, '"에 대해서는 ', '전시 중인 프로젝트 소개에서 확인하실 수 있습니다.'];
 }
 
-export function AiChatOverlay({ payload }: Props) {
+async function* paceMockStream(stream: AsyncIterable<string>): AsyncGenerator<string> {
+  for await (const chunk of stream) {
+    yield chunk;
+    // 실제 네트워크와 달리 mock 프레임은 즉시 끝나므로 토큰 누적을 눈으로 확인할 수 있게만 늦춘다.
+    await new Promise((resolve) => setTimeout(resolve, 45));
+  }
+}
+
+export function AiChatOverlay({ payload, streamFactory = mockStreamSuccess }: Props) {
   const { kind } = useSession();
   const consultation = useVisitorConsultation();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -63,31 +77,40 @@ export function AiChatOverlay({ payload }: Props) {
     setDraft('');
     setTurns((t) => [...t, { role: 'user', text: question }, { role: 'agent', text: '', streaming: true }]);
     try {
-      // mock SSE 와이어 → 실제 파서(stream.parser)로 읽는다 — 실 서버가 오면 이 소스만 교체된다
-      const parser = createSseParser();
-      let acc = '';
-      const sources: string[] = [];
-      const apply = (done: boolean) => {
+      // mock SSE 와이어 → 계약 consumer로 누적한다. 실 서버가 오면 streamFactory만 교체한다.
+      const stream = streamFactory(mockAnswerFor(question));
+      const displayStream = streamFactory === mockStreamSuccess ? paceMockStream(stream) : stream;
+      await consumeSseStream(displayStream, (snapshot) => {
         setTurns((t) => {
           const next = [...t];
-          next[next.length - 1] = { role: 'agent', text: acc, streaming: !done, sources: [...sources] };
+          next[next.length - 1] = {
+            role: 'agent',
+            text: snapshot.text,
+            streaming: snapshot.status === 'streaming',
+            sources: snapshot.sources,
+            status: snapshot.status,
+            errorMessage: snapshot.errorMessage,
+            retryable: snapshot.retryable,
+            retryQuestion: question,
+          };
           return next;
         });
-      };
-      for await (const chunk of mockStreamSuccess(mockAnswerFor(question))) {
-        for (const ev of parser.push(chunk)) {
-          if (ev.type === 'token') acc += ev.delta;
-          if (ev.type === 'source') sources.push(ev.title);
-          apply(ev.type === 'done');
-          // 토큰이 한 번에 쏟아지면 스트리밍처럼 보이지 않는다 — 목업에서만 살짝 늦춘다
-          if (ev.type === 'token') await new Promise((r) => setTimeout(r, 45));
-        }
-      }
-      for (const ev of parser.flush()) {
-        if (ev.type === 'token') acc += ev.delta;
-        apply(true);
-      }
-      apply(true);
+      });
+    } catch (error) {
+      console.warn('[AI SSE] 스트림 처리 실패', error instanceof Error ? error.name : 'UnknownError');
+      setTurns((t) => {
+        const next = [...t];
+        next[next.length - 1] = {
+          role: 'agent',
+          text: '',
+          streaming: false,
+          status: 'error',
+          errorMessage: '응답을 처리하지 못했습니다. 다시 시도해 주세요.',
+          retryable: true,
+          retryQuestion: question,
+        };
+        return next;
+      });
     } finally {
       setBusy(false);
     }
@@ -188,6 +211,21 @@ export function AiChatOverlay({ payload }: Props) {
                         {s}
                       </span>
                     ))}
+                  </span>
+                )}
+                {(t.status === 'error' || t.status === 'truncated') && (
+                  <span className="ai-stream-error" role="alert">
+                    {t.errorMessage}
+                    {t.retryable && t.retryQuestion !== undefined && (
+                      <button
+                        type="button"
+                        className="ov-btn ai-retry"
+                        disabled={busy}
+                        onClick={() => void ask(t.retryQuestion!)}
+                      >
+                        다시 시도
+                      </button>
+                    )}
                   </span>
                 )}
               </div>
