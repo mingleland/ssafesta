@@ -35,11 +35,17 @@ namespace Festa.Diagnostics
     /// F7 — 조명 A/B(정지 상태로 본다). 천장 다운라이트를 원본 90개 / 구역병합 18개(밝기 배율별)로
     ///      바꿔가며 멈춰 세운다. 프레임 수치가 아니라 **눈으로 보는 밝기·얼룩**을 판정하기 위한 것이다.
     ///
-    /// 구역병합이 왜 품질을 해치지 않는가: 원본 90개는 8m 간격인데 조명 하나의 바닥 반경이 35m 라
-    /// 한 점을 수십 개가 덮는다. 그런데 AdditionalLightsPerObjectLimit 이 4 라 오브젝트마다 그중
-    /// 4개만 뽑아 쓴다 — **어느 4개가 뽑히는지가 오브젝트마다 달라 원래도 들쭉날쭉했다.**
-    /// 바닥 직교 렌더로 잰 결과 병합 후 얼룩(휘도 표준편차)은 원본과 사실상 같았고(0.162→0.169),
-    /// 밝기만 배율 3배로 맞추면 원본 대비 10% 안쪽이었다.
+    /// 구역병합이 왜 품질을 해치지 않는가: 바닥 직교 렌더로 잰 결과 병합 후 얼룩(휘도 표준편차)이
+    /// 원본과 사실상 같았다(0.162→0.169). 편차는 조명이 아니라 바닥 무늬·부스가 만든다.
+    /// 밝기는 배율로 맞춘다.
+    ///
+    /// ⚠️ 정정: 이 병합을 처음 정당화할 때 "AdditionalLightsPerObjectLimit 이 4 라 오브젝트마다
+    /// 4개만 뽑혀 원래도 들쭉날쭉했다" 고 적었는데 **틀렸다.** 이 프로젝트의 Mobile_Renderer 는
+    /// `m_RenderingMode: 2` = **Forward+** 이고, Forward+ 에서는 PerObjectLimit 과 PerVertex 설정이
+    /// 모두 무효다(ForwardLights 가 타일/클러스터로 광원을 배분한다). 따라서 그 논거는 폐기한다.
+    /// 병합의 실제 이득은 광원 개수 자체가 줄어 타일별 광원 목록이 짧아지는 것이고, 그 크기는
+    /// **아직 위치 통제된 재측정으로 확인되지 않았다** — F7 A/B 는 같은 자리에서 90 ↔ 18 을
+    /// 바꾸므로 그 검증에 쓸 수 있다. F9 스윕은 구간마다 걷는 위치가 달라 이 비교에는 못 쓴다.
     ///
     /// 측정이 끝나면 **들어올 때의 상태로** 원복한다. 기본값을 하드코딩하지 않는다 —
     /// 그렇게 두면 기본값을 바꾼 날 프로브가 씬을 옛 상태로 되돌려 놓는다.
@@ -98,8 +104,11 @@ namespace Festa.Diagnostics
             // 채택안이 씬에 반영돼 있어야 정상이다. 아니면 누가 되돌려 놓은 것이니 눈에 띄게 알린다.
             if (!_origMergedActive || _origDownActive)
                 Debug.LogWarning("[Probe] 조명이 채택안(구역병합 18등)과 다르다 — 회귀했는지 확인하라");
-            if (_rp != null && (_origShadowDistance > 100f || _origCascades > 1))
-                Debug.LogWarning($"[Probe] 그림자가 채택안(60m/캐스1)과 다르다 — 지금 {_origShadowDistance}m/캐스{_origCascades}");
+            // 채택안은 거리 200 유닛 / 캐스케이드 1 이다. 거리를 더 줄이면 T-215(웹에서만 조명이
+            // 깜빡임 — 그림자 경계가 방을 훑고 지나간다)가 재발하므로 **아래로 벗어나는 것도** 경고한다.
+            if (_rp != null && (_origShadowDistance < 150f || _origShadowDistance > 250f || _origCascades > 1))
+                Debug.LogWarning($"[Probe] 그림자가 채택안(200유닛/캐스1)과 다르다 — 지금 " +
+                                 $"{_origShadowDistance}/캐스{_origCascades}. 150 미만은 T-215 재발 위험.");
         }
 
         void OnDisable()
@@ -173,10 +182,10 @@ namespace Festa.Diagnostics
             _report.Clear();
             Debug.Log("[Probe] 결정 스윕 시작 — 16초. 끝날 때까지 **계속 걸어다녀라**.");
 
-            yield return Run("0 되돌린 상태(원본90+그림자400)", () => { SetShadow(400f, 2); SetLighting(0f); });
-            yield return Run("1 그림자만 60m/캐스1", () => { SetShadow(60f, 1); SetLighting(0f); });
+            yield return Run("0 되돌린 상태(원본90+400/캐스2)", () => { SetShadow(400f, 2); SetLighting(0f); });
+            yield return Run("1 그림자만 200/캐스1", () => { SetShadow(200f, 1); SetLighting(0f); });
             yield return Run("2 구역병합만 18등", () => { SetShadow(400f, 2); SetLighting(_adoptedMultiplier); });
-            yield return Run("3 채택안(둘 다)", () => { SetShadow(60f, 1); SetLighting(_adoptedMultiplier); });
+            yield return Run("3 채택안(둘 다)", () => { SetShadow(200f, 1); SetLighting(_adoptedMultiplier); });
 
             Sb.Clear();
             Sb.AppendLine("[Probe] ===== 결정 스윕 결과 =====");
