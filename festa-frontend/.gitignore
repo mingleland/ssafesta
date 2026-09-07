@@ -27,3 +27,9 @@ dist-ssr
 # 벤더 에셋(ExpoKit·ithappy·Synty·Rukha93) 웹 재배포 가부가 확인되지 않았다.
 # 확인 전까지 저장소·정적 배포에 넣지 않는다. 만들려면: node tools/assets/build-booth-assets.mjs
 public/assets/booth/
+
+# Runtime Asset Compiler 산출물 (S15P21A604-480).
+# intermediate = Unity source 변환본(원본 구조에 가깝다) · runtime = Compiler 결과.
+# 둘 다 build-time 생성물이고 벤더 에셋 재배포 확인 전까지 저장소에 넣지 않는다.
+# 만들려면: node tools/assets/build-booth-assets.mjs · node tools/assets/compile-runtime-assets.mjs
+.generated/

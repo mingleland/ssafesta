@@ -54,5 +54,7 @@ export function unityBuildBase(): string {
 export function boothAssetBase(): string {
   const configured = runtimeValue('boothAssetBase');
   if (configured) return configured;
-  return import.meta.env.BASE_URL || '/';
+  // dev 서버가 .generated/runtime 을 이 경로로 내보낸다(vite.config 의 ssafesta-runtime-assets).
+  // 프로덕션 이미지에는 이 디렉터리가 없다 — 벤더 라이선스가 REVIEW_REQUIRED 인 동안의 경계다.
+  return `${import.meta.env.BASE_URL || '/'}assets/booth-runtime/`;
 }
