@@ -12,6 +12,7 @@ from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest
 from app.providers.managed_llm import ManagedLLMError
 from app.services.context_service import ContextBuildResult
+from app.services.rag_service import NoReadyContextResult
 from app.services.stream_service import (
     BoothLeaseExpired,
     ConversationNotFound,
@@ -226,6 +227,27 @@ async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -
     assert events[-1]["code"] == "LLM_TIMEOUT"
     assert events[-1]["retryable"] is True
     assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_no_ready_context_skips_llm_and_streams_fixed_message() -> None:
+    """SC-008: READY 0건이면 LLM 호출 0건이고 자료 미준비 안내를 낸다."""
+    rag = _RagContextService(result=NoReadyContextResult())
+    llm = FakeLLMProvider(tokens=("절대", "호출되면", "안됨"))
+    service, repository = _service(conversation=_conversation(), rag=rag, llm=llm)
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "token", "done"]
+    assert events[1]["delta"] == NoReadyContextResult().message
+    assert llm.calls == []
+
+    assert len(repository.saved) == 1
+    saved_turn = repository.saved[0].turns[-1]
+    assert saved_turn.answer == NoReadyContextResult().message
+    assert saved_turn.sources == ()
 
 
 @pytest.mark.asyncio
