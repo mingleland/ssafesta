@@ -23,15 +23,17 @@ public class GameLifecycleService {
     private final GameRepository games;
     private final GameDraftRepository drafts;
     private final GamePublishedVersionRepository published;
+    private final GameAssetRepository assets;
     private final GameAccessGuard guard;
     private final GameProperties properties;
 
     public GameLifecycleService(GameRepository games, GameDraftRepository drafts,
-                                GamePublishedVersionRepository published, GameAccessGuard guard,
-                                GameProperties properties) {
+                                GamePublishedVersionRepository published, GameAssetRepository assets,
+                                GameAccessGuard guard, GameProperties properties) {
         this.games = games;
         this.drafts = drafts;
         this.published = published;
+        this.assets = assets;
         this.guard = guard;
         this.properties = properties;
     }
@@ -132,9 +134,16 @@ public class GameLifecycleService {
      *
      * <p>Order matters: the published rows go before the game, and the composite foreign key's
      * {@code ON DELETE SET NULL (published_version)} clears the pointer on the way rather than
-     * blocking the delete. Member withdrawal reuses this path.
+     * blocking the delete. Member withdrawal deletes the same graph with its own SQL.
+     *
+     * <p>The assets go first and in two steps, because their bytes are outside the database: the
+     * coordinates move to the delete queue in this transaction, then the rows go. Skipping them made
+     * {@code games.delete} fail on the {@code game_id} foreign key — a creator whose oldest deleted
+     * game had ever held an image could not delete another game at all (S15P21A604-485).
      */
     private void hardDelete(Game game) {
+        assets.enqueueAllObjects(game.getId());
+        assets.deleteAllByGameId(game.getId());
         drafts.findById(game.getId()).ifPresent(drafts::delete);
         published.deleteAll(published.findAllByGameIdOrderByVersionNoDesc(game.getId()));
         games.flush();

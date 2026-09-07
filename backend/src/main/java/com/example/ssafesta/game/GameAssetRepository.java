@@ -85,6 +85,33 @@ public interface GameAssetRepository extends JpaRepository<GameAsset, Long> {
     int deleteUnusable(@Param("gameId") Long gameId, @Param("threshold") Instant threshold);
 
     /**
+     * Moves <b>every</b> object of one game into the delete queue, for the hard delete that drops the
+     * game itself. Pair with {@link #deleteAllByGameId} in that order, same transaction.
+     *
+     * <p>No {@code deleted_at IS NULL} filter, unlike {@link #enqueueUnusableObjects}: a soft-deleted
+     * asset keeps its object so the row can be undeleted (V18), but the game is going away and
+     * nothing will ever point at those bytes again.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = """
+            INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+            SELECT provider, storage_bucket, object_key FROM game_assets WHERE game_id = :gameId
+            ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+            """, nativeQuery = true)
+    int enqueueAllObjects(@Param("gameId") Long gameId);
+
+    /**
+     * Drops the asset rows of one game, so the {@code game_id} foreign key stops blocking its delete.
+     *
+     * <p>{@code game_assets.game_id} has no {@code ON DELETE CASCADE} (V18) and the entity declares no
+     * JPA cascade, which is deliberate — the bytes live outside the database, so the rows may only be
+     * dropped by a caller that has queued their coordinates first.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM GameAsset a WHERE a.gameId = :gameId")
+    int deleteAllByGameId(@Param("gameId") Long gameId);
+
+    /**
      * Inserts the issued row, or reports the collision instead of throwing.
      *
      * <p>{@code ON CONFLICT DO NOTHING} rather than catching the unique-violation: in PostgreSQL that

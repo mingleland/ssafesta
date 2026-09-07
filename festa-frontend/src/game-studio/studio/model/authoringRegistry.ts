@@ -4,6 +4,7 @@ import type {
   Condition,
   GameObject,
   GameProject,
+  GameScene,
 } from '../../contracts/gameProject.ts';
 
 export interface PresetDefinition {
@@ -221,6 +222,19 @@ export const TOP_DOWN_ACTION_TYPES: readonly Action['type'][] = [
   'GO_TO_SCENE',
   'COMPLETE_GAME',
 ];
+
+// S15P21A604-488 — 씬 타입 라벨을 부르는 곳이 여러 군데(씬 목록 행, 캔버스 툴바, 시작
+// 템플릿 모달, InspectorPanel 뱃지)라서 매핑을 한곳에 모은다. 시작 템플릿은 TOP_DOWN/
+// PLATFORMER 둘 중 하나(runtimeMode)뿐이라 그 부분만 따로 뽑아 재사용한다.
+export const describeSceneRuntimeMode = (runtimeMode: 'TOP_DOWN' | 'PLATFORMER'): string => (
+  runtimeMode === 'TOP_DOWN' ? '맵-TopDown' : '맵-SideScroll'
+);
+
+// DIALOGUE는 type만으로는 Overlay/Fullscreen을 구분 못 하므로 presentation까지 같이 본다.
+export const describeSceneType = (scene: GameScene): string => {
+  if (scene.type !== 'DIALOGUE') return describeSceneRuntimeMode(scene.type);
+  return scene.presentation === 'OVERLAY' ? '대화-Overlay' : '대화-Fullscreen';
+};
 
 export const findPresetDefinition = (
   preset: GameObject['preset'],

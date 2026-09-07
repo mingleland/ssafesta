@@ -3,7 +3,6 @@ package com.example.ssafesta.world;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,9 +30,9 @@ class WorldEntryTokenIssuerTest {
     private static final String AUTH_SECRET = base64Of("access-token-signing-key-for-tests-only-32b+");
 
     private static final WorldEntryTokenIssuer.WorldIdentity MEMBER =
-            new WorldEntryTokenIssuer.WorldIdentity("7", "MEMBER", "7", "덕", "fa|3=SK_Hair_Long_01|c=FF8800");
+            new WorldEntryTokenIssuer.WorldIdentity("7", "MEMBER", "7", "덕");
     private static final WorldEntryTokenIssuer.WorldIdentity GUEST =
-            new WorldEntryTokenIssuer.WorldIdentity("guest:ab12cd34", "GUEST", "guest:ab12cd34", "게스트-ab12", null);
+            new WorldEntryTokenIssuer.WorldIdentity("guest:ab12cd34", "GUEST", "guest:ab12cd34", "게스트-ab12");
 
     private final WorldEntryTokenIssuer issuer = new WorldEntryTokenIssuer(worldProperties(WORLD_SECRET));
 
@@ -49,22 +48,27 @@ class WorldEntryTokenIssuerTest {
         assertEquals("MEMBER", grant.getClaimAsString("role"));
         assertEquals("7", grant.getClaimAsString("playerId"));
         assertEquals("덕", grant.getClaimAsString("nickname"));
-        assertEquals(MEMBER.avatarCode(), grant.getClaimAsString("avatarCode"));
         assertEquals("ws_fixed", grant.getClaimAsString("sessionId"));
         assertEquals("11F", grant.getClaimAsString("worldId"));
         assertEquals("11F-01", grant.getClaimAsString("channelId"));
         assertFalse(grant.getId().isBlank(), "jti is what the game server consumes to block reuse");
     }
 
+    /**
+     * A guest's name is derived here, not stored anywhere (헌법 12조).
+     *
+     * <p>The appearance is not asserted in this class. {@link WorldEntryTokenIssuer.WorldIdentity}
+     * has no appearance field since S15P21A604-468, so nothing this test can pass in could put the
+     * claim back — the assertion would hold no matter what the issuer did. The regression it would
+     * pretend to guard (the service reading {@code user.getAvatarCode()} again) is caught where a
+     * real member with a saved appearance exists: {@code WorldSessionApiIntegrationTest}.
+     */
     @Test
-    void aGuestGrantOmitsTheAppearanceInsteadOfInventingOne() {
-        // Absent, not "" — an empty appearance code is not something Unity can decode, whereas a
-        // missing claim already means "use the default" on that side.
+    void aGuestGrantCarriesTheDerivedName() {
         Jwt grant = decodeWithWorldKey(issuer.issue(GUEST, "ws_guest").token());
 
         assertEquals("GUEST", grant.getClaimAsString("role"));
         assertEquals("게스트-ab12", grant.getClaimAsString("nickname"));
-        assertNull(grant.getClaim("avatarCode"));
     }
 
     @Test

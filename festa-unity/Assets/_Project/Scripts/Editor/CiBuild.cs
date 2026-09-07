@@ -84,6 +84,19 @@ namespace Festa.EditorTools
             if (!FestaReleaseBuilder.ForceApiEnvironment(apiConfig, env))
                 Fail($"ApiConfig 를 {env} 로 강제하지 못했다");
 
+            // 압축도 **여기서 강제한다.** 지정하지 않으면 커밋된 ProjectSettings 값이 그대로
+            // 배포본이 된다 — 그 값은 Disabled/폴백 OFF 라서 CI 산출물이 비압축으로 나갔다
+            // (S15P21A604-474, GitLab #127 에서 인프라가 반려한 사유 중 하나).
+            //
+            // Brotli 만으로는 부족하다. 서버가 `Content-Encoding: br` 를 붙여 줘야 로드되는데
+            // 헤더 없는 정적 경로에서는 폴백이 있어야 산다 — 그래서 둘을 함께 켠다
+            // (메뉴 빌더 FestaReleaseBuilder 와 같은 결정, 28~35행).
+            var prevCompression = PlayerSettings.WebGL.compressionFormat;
+            bool prevFallback = PlayerSettings.WebGL.decompressionFallback;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
+            PlayerSettings.WebGL.decompressionFallback = true;
+            Log("WebGL 압축 = Brotli + Decompression Fallback (배포 설정)");
+
             var options = new BuildPlayerOptions
             {
                 scenes = scenes,
@@ -92,7 +105,12 @@ namespace Festa.EditorTools
                 options = BuildOptions.None,   // Development OFF — 배포 설정
             };
             try { RunBuild(options, "WebGL"); }
-            finally { FestaReleaseBuilder.RestoreApiEnvironment(apiConfig, prevMock, prevEnv); }
+            finally
+            {
+                FestaReleaseBuilder.RestoreApiEnvironment(apiConfig, prevMock, prevEnv);
+                PlayerSettings.WebGL.compressionFormat = prevCompression;
+                PlayerSettings.WebGL.decompressionFallback = prevFallback;
+            }
 
             // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
             // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는

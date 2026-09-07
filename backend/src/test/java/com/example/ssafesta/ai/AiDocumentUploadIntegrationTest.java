@@ -20,6 +20,7 @@ import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
+import com.example.ssafesta.user.AccountDeletionService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Duration;
@@ -69,6 +70,7 @@ class AiDocumentUploadIntegrationTest {
     @Autowired private FakeObjectStorage storage;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private AccountDeletionService deletions;
 
     @BeforeEach
     void reset() {
@@ -577,6 +579,37 @@ class AiDocumentUploadIntegrationTest {
         jdbc.update("UPDATE ai_documents SET processing_status = 'EXPIRED', expired_at = ? "
                         + "WHERE id = ?",
                 java.sql.Timestamp.from(Instant.now().minus(ago)), documentId);
+    }
+
+    /**
+     * 탈퇴가 문서 객체 좌표를 삭제 큐에 남긴다 (docs/26 2026-08-19 · S15P21A604-485).
+     *
+     * <p>바이트는 저장소에 있고 좌표는 행에만 있다. 행을 먼저 지우면 객체를 다시 찾을 방법이 없어
+     * 영구히 남는다 — 탈퇴 즉시 전체 하드삭제라는 결정과 정면으로 어긋난다.
+     *
+     * <p>여기서 객체를 직접 지우지 않는 이유는 게임 에셋과 같다. 저장소 실패가 탈퇴를 되돌리거나
+     * 커밋 뒤에 조용히 유실되기 때문에, 같은 커밋이 큐 행을 쓰고 sweeper 가 재시도한다.
+     */
+    @Test
+    void withdrawingHandsTheDocumentObjectsToTheDeleteQueue() throws Exception {
+        Owner owner = agentOwner("탈퇴문서");
+        String json = mockMvc.perform(uploadUrl(owner, body("project.pdf", "application/pdf",
+                        ONE_MB, SHA_A)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String objectKey = jsonMapper.readTree(json).get("objectKey").asString();
+
+        deletions.deleteUserGraph(owner.userId());
+
+        assertEquals(0, countBy("SELECT count(*) FROM ai_documents WHERE s3_key = ?", objectKey),
+                "문서 행은 탈퇴와 함께 사라진다");
+        assertEquals(1, countBy("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?",
+                objectKey), "객체 좌표가 큐에 없으면 저장소에 영구히 남는다");
+    }
+
+    private int countBy(String sql, Object argument) {
+        Integer found = jdbc.queryForObject(sql, Integer.class, argument);
+        return found == null ? 0 : found;
     }
 
     private static String shaOf(int index) {

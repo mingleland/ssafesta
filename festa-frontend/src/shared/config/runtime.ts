@@ -4,10 +4,12 @@
 
 // 런타임 주입 값의 전체 목록 — entrypoint(docker/40-runtime-config.sh)가 쓰는 키와 1:1 이다.
 // unityBuildBase: Unity WebGL 산출물 base URL(-427, #127).
+// aiApiBaseUrl: AI(FastAPI) 서버 base URL(spec 008). Spring 과 별도 배포라 키가 따로다.
 // boothAssetBase: Booth 2.5D 에셋 base URL(-473). Unity 빌드와 base 를 공유하지 않으므로 키가 따로다.
 export interface RuntimeAssetConfig {
   apiBaseUrl?: string;
   unityBuildBase?: string;
+  aiApiBaseUrl?: string;
   boothAssetBase?: string;
 }
 
@@ -30,6 +32,13 @@ export function resolveApiBaseUrl(runtimeValue: string | undefined, buildValue: 
 
 export function apiBaseUrl(): string {
   return resolveApiBaseUrl(runtimeValue('apiBaseUrl'), import.meta.env.VITE_API_BASE_URL);
+}
+
+// AI(FastAPI) 서버 base URL — Spring과 별도 배포다(spec 008 plan.md). 인프라가 same-origin
+// 경로 분기(nginx)로 합칠지 별도 호스트로 둘지 아직 미정이라 unityBuildBase와 같은 방식으로
+// 런타임 주입값을 정본으로 둔다 — 값이 정해지면 이 accessor는 그대로, 배포 설정만 바뀐다.
+export function aiApiBaseUrl(): string {
+  return resolveApiBaseUrl(runtimeValue('aiApiBaseUrl'), import.meta.env.VITE_AI_API_BASE_URL);
 }
 
 // Unity WebGL 빌드 base URL — 정본은 런타임 주입(PUBLIC_UNITY_BUILD_BASE)이고, VITE_UNITY_BUILD_BASE 는

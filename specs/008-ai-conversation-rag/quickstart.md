@@ -3,8 +3,8 @@
 ## 전제
 
 - Python 3.12, `festa-ai` test 의존성
-- PostgreSQL 17 + pgvector와 Redis 7.2 테스트 인스턴스
-- Spring Booth Access fake 또는 계약 구현
+- Spring Business PostgreSQL 17 + pgvector와 Redis 7.2 테스트 인스턴스
+- Spring Booth Access·Chunk Search 계약 구현
 - 원문을 기록하지 않는 LLM Test Adapter
 
 ## 실행
@@ -27,7 +27,11 @@ Conversation 생성 후 질문을 보낸다. `start(sequence=0) → token* → s
 
 ### 2. Release Gate 격리
 
-spec의 A/A1·A/A2·B/B1·DISABLED fixture를 실제 pgvector에 적재하고 검색 결과, LLM 입력, SSE source, 누적 답변을 검사한다. 금지 Scope가 한 건이라도 보이면 실패한다. Scope 위조 요청은 검색·LLM 호출 0건이어야 한다.
+spec의 A/A1·A/A2·B/B1·DISABLED fixture를 Spring Business DB pgvector에 적재하고 `POST /internal/ai/chunk-search` 결과, LLM 입력, SSE source, 누적 답변을 검사한다. `searchable=false` fixture도 포함하며 금지 Scope가 한 건이라도 보이면 실패한다. FastAPI에 문서 DB credential이 없어야 하고 Scope 위조 요청은 검색·LLM 호출 0건이어야 한다.
+
+### 2-1. 검색 파라미터
+
+`topK=1/20` 성공, `topK=21` 거부, 1536차원 검증, 3초 timeout을 확인한다. 결과는 cosine `distance` 오름차순이고 threshold로 임의 제외되지 않아야 한다.
 
 ### 3. 50개 혼합 동시성
 
