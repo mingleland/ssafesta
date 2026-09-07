@@ -52,8 +52,8 @@ namespace Festa.World
         {
             // 사람이 어디에 서 있는지 모르는 동안에는 **양쪽 다 침묵**이다. 예전에는
             // Camera.main 을 바로 읽었는데, 플레이어가 스폰되기 전의 카메라는 원점에
-            // 있고 원점은 구역 판정상 복도(z 0 → t 0.52)라 축제 트랙이 켜졌다.
-            // 11F 진입 첫 0.3초에 축제 음악이 새어 나온 원인이다 (GitLab #140).
+            // 있고 원점은 구역 판정상 복도(z 0 → t 0.52 → circus 0.1022)라 축제 트랙이
+            // 켜졌다. 11F 진입 첫 0.3초에 축제 음악이 새어 나온 원인이다 (GitLab #140).
             float m = 0f, c = 0f;
             if (TryGetEarPosition(out var p)) (m, c) = ZoneWeights(p);
 
@@ -63,20 +63,28 @@ namespace Festa.World
         }
 
         /// <summary>
-        /// 구역 판정에 쓸 "귀"의 위치. 접속 중에는 로컬 플레이어 — 카메라와 달리 스폰 전에는
-        /// 아예 없으므로 잘못된 좌표를 읽을 수가 없다. 네트워크가 없는 씬 미리보기(에디터)에서만
-        /// 카메라로 물러난다.
+        /// 구역 판정에 쓸 "귀"의 위치 — **로컬 플레이어뿐이다.** 카메라와 달리 플레이어는
+        /// 스폰 전에 존재하지 않으므로 잘못된 좌표를 읽을 수가 없다. 플레이어가 없는 동안은
+        /// 접속 전이든 스폰 전이든 접속 실패든 전부 침묵한다. 카메라로 물러나는 것은
+        /// 에디터 씬 미리보기뿐이다.
         /// </summary>
         static bool TryGetEarPosition(out Vector3 p)
         {
             var nm = Unity.Netcode.NetworkManager.Singleton;
-            if (nm != null && nm.IsClient)
-            {
-                var obj = nm.LocalClient?.PlayerObject;
-                if (obj == null) { p = default; return false; }   // 접속했지만 아직 스폰 전
-                p = obj.transform.position;
-                return true;
-            }
+            var obj = (nm != null && nm.IsClient) ? nm.LocalClient?.PlayerObject : null;
+            if (obj != null) { p = obj.transform.position; return true; }
+
+            // 로컬 플레이어가 없다 = 월드에 아직 사람이 없다. **침묵이 맞다.**
+            //
+            // 처음 고칠 때는 `IsClient` 일 때만 침묵하고 아니면 카메라로 물러났는데,
+            // 그것으로는 부족했다. 접속을 **시작하기 전** 구간(EnterWorld 직후,
+            // grant 발급 지연, 발급 실패)에서는 `IsClient` 가 false 라 그대로
+            // 카메라를 읽었고, 스폰 전 카메라는 원점에 있어 축제 트랙이 다시 샜다.
+            // 릴리스 빌드 실측에서 circus 가 0.0562 로 수렴하는 것으로 확인했다
+            // (GitLab #140 에서 프런트가 보고한 값과 같다).
+            //
+            // 에디터 씬 미리보기에서는 접속 없이 소리를 들어봐야 하므로 그때만 카메라로 본다.
+            if (!Application.isEditor) { p = default; return false; }
 
             var cam = Camera.main;
             if (cam == null) { p = default; return false; }
