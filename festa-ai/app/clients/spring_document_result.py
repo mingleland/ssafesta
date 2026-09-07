@@ -13,6 +13,7 @@ chunk-batches/finalize/heartbeat/failed 호출이 처리 결과의 유일한 전
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -59,7 +60,11 @@ class SpringDocumentResultClient:
         service_token: str,
         timeout_seconds: float,
         client: httpx.AsyncClient | None = None,
+        max_attempts: int = 3,
+        retry_backoff_seconds: float = 0.5,
     ) -> None:
+        if max_attempts < 1:
+            raise ValueError("max_attempts는 1 이상이어야 합니다.")
         self._base_url = base_url.rstrip("/")
         self._service_token = service_token
         self._owns_client = client is None
@@ -67,6 +72,8 @@ class SpringDocumentResultClient:
             timeout=httpx.Timeout(timeout_seconds, connect=timeout_seconds)
         )
         self._timeout_seconds = timeout_seconds
+        self._max_attempts = max_attempts
+        self._retry_backoff_seconds = retry_backoff_seconds
 
     async def aclose(self) -> None:
         if self._owns_client:
@@ -142,29 +149,49 @@ class SpringDocumentResultClient:
         await self._post(f"/document-jobs/{job_id}/failed", body)
 
     async def _post(self, path: str, json_body: dict[str, object]) -> None:
-        try:
-            response = await self._client.post(
-                f"{self._base_url}/internal/ai{path}",
-                json=json_body,
-                headers={"Authorization": f"Bearer {self._service_token}"},
-                timeout=httpx.Timeout(self._timeout_seconds, connect=self._timeout_seconds),
-            )
-        except httpx.HTTPError as exc:
-            raise SpringDocumentResultUnavailable(
-                f"document-result request failed: {path}"
-            ) from exc
+        """`400`/`409`/`410`은 재시도해도 결과가 같아 즉시 올린다.
 
-        if response.status_code == 204:
-            return
-        if response.status_code == 400:
-            raise SpringDocumentResultValidationFailed(_safe_json(response))
-        if response.status_code == 409:
-            raise SpringDocumentResultStaleAttempt(path)
-        if response.status_code == 410:
-            raise SpringDocumentResultJobGone(path)
+        timeout·connect 실패와 `5xx`만 일시적 장애로 보고 `max_attempts`까지
+        재시도한다 — Embedding까지 끝낸 결과를 네트워크 한 번 실패로 버리지
+        않기 위해서다 (S15P21A604-125).
+        """
+        last_error: Exception | None = None
+        for attempt in range(1, self._max_attempts + 1):
+            try:
+                response = await self._client.post(
+                    f"{self._base_url}/internal/ai{path}",
+                    json=json_body,
+                    headers={"Authorization": f"Bearer {self._service_token}"},
+                    timeout=httpx.Timeout(
+                        self._timeout_seconds, connect=self._timeout_seconds
+                    ),
+                )
+            except httpx.HTTPError as exc:
+                last_error = exc
+            else:
+                if response.status_code == 204:
+                    return
+                if response.status_code == 400:
+                    raise SpringDocumentResultValidationFailed(_safe_json(response))
+                if response.status_code == 409:
+                    raise SpringDocumentResultStaleAttempt(path)
+                if response.status_code == 410:
+                    raise SpringDocumentResultJobGone(path)
+                if response.status_code < 500:
+                    raise SpringDocumentResultUnavailable(
+                        f"document-result returned unexpected status "
+                        f"{response.status_code}: {path}"
+                    )
+                last_error = SpringDocumentResultUnavailable(
+                    f"document-result returned status {response.status_code}: {path}"
+                )
+
+            if attempt < self._max_attempts:
+                await asyncio.sleep(self._retry_backoff_seconds)
+
         raise SpringDocumentResultUnavailable(
-            f"document-result returned unexpected status {response.status_code}: {path}"
-        )
+            f"document-result request failed after {self._max_attempts} attempts: {path}"
+        ) from last_error
 
 
 def _safe_json(response: httpx.Response) -> object:
