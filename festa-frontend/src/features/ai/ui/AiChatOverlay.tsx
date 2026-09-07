@@ -1,9 +1,11 @@
 // AI 직원 대화 Overlay — Overlay Family 재사용 (S15P21A604-406).
-// AI 서버 conversation API(SSE)는 미구현이라 여기서는 기존 mock 스트림(entities/conversation)만
-// 소비한다. 워커·계약 로직은 AI 파트 소관이라 건드리지 않는다 — 시각 정합과 상태 표현 범위.
+// SSE 렌더링(S15P21A604-182)의 token/source 누적·error/sequence 결번 처리는
+// entities/conversation/stream.consumer(consumeSseStream)에 위임한다. 이 파일(S15P21A604-189)은
+// 실서버 결선만 담당 — Conversation 생성 → streamMessage로 얻은 SSE 본문을 그 consumer에 넘긴다.
 import { useEffect, useRef, useState } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
-import { mockStreamSuccess } from '../../../entities/conversation/stream.mock';
+import { createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
+import { describeHttpError, shouldResetConversation } from '../../../entities/conversation/errorMessages';
 import { consumeSseStream } from '../../../entities/conversation/stream.consumer';
 import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
@@ -15,7 +17,6 @@ import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
   payload: { boothId: number; agentId?: number };
-  streamFactory?: (tokens: string[]) => AsyncIterable<string>;
 }
 
 interface Turn {
@@ -40,77 +41,96 @@ const IcAgent = (
 
 const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요'];
 
-// 목업 답변 토큰 — 실제 답변은 AI 서버가 만든다(008). 여기서는 스트리밍 표현만 보여 준다.
-function mockAnswerFor(question: string): string[] {
-  if (question.includes('기술')) {
-    return ['이 부스는 ', 'React 와 Unity WebGL 을 ', '함께 쓰는 구조로 만들었어요. ', '자세한 내용은 전시 자료에 정리돼 있습니다.'];
-  }
-  if (question.includes('팀')) {
-    return ['다섯 명이 ', '프론트엔드·백엔드·Unity·AI 로 나눠 ', '만들고 있습니다.'];
-  }
-  return ['부스에 등록된 자료를 찾아봤어요. ', '"', question, '"에 대해서는 ', '전시 중인 프로젝트 소개에서 확인하실 수 있습니다.'];
-}
-
-async function* paceMockStream(stream: AsyncIterable<string>): AsyncGenerator<string> {
-  for await (const chunk of stream) {
-    yield chunk;
-    // 실제 네트워크와 달리 mock 프레임은 즉시 끝나므로 토큰 누적을 눈으로 확인할 수 있게만 늦춘다.
-    await new Promise((resolve) => setTimeout(resolve, 45));
-  }
-}
-
-export function AiChatOverlay({ payload, streamFactory = mockStreamSuccess }: Props) {
+export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
   const consultation = useVisitorConsultation();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  // null = 아직 Conversation 없음(첫 질문에서 생성) — 403/404 오류 후에도 null로 되돌려
+  // 다음 질문이 새 Conversation을 만들게 한다(entities/conversation/errorMessages 참고)
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [turns]);
 
+  function setLastAgentTurn(update: Partial<Turn>) {
+    setTurns((t) => {
+      const next = [...t];
+      const last = next[next.length - 1];
+      next[next.length - 1] = { ...last, streaming: false, ...update };
+      return next;
+    });
+  }
+
+  function showHttpError(e: unknown, question: string, fallbackHeadline: string) {
+    if (isAiHttpError(e)) {
+      if (shouldResetConversation(e)) setConversationId(null);
+      const description = describeHttpError(e);
+      setLastAgentTurn({
+        status: 'error',
+        errorMessage:
+          description.headline +
+          (description.retryAfterSeconds !== undefined ? ` (${description.retryAfterSeconds}초 후)` : ''),
+        retryable: description.retryable,
+        retryQuestion: question,
+      });
+      return;
+    }
+    console.warn('[AI SSE] 스트림 처리 실패', e instanceof Error ? e.name : 'UnknownError');
+    setLastAgentTurn({ status: 'error', errorMessage: fallbackHeadline, retryable: true, retryQuestion: question });
+  }
+
   async function ask(question: string) {
     if (busy || question.trim() === '') return;
+    if (payload.agentId === undefined) {
+      setTurns((t) => [
+        ...t,
+        { role: 'user', text: question },
+        { role: 'agent', text: '', status: 'error', errorMessage: 'AI 직원 정보를 확인할 수 없습니다.', retryable: false },
+      ]);
+      return;
+    }
+    const agentId = payload.agentId;
+
     setBusy(true);
     setDraft('');
     setTurns((t) => [...t, { role: 'user', text: question }, { role: 'agent', text: '', streaming: true }]);
     try {
-      // mock SSE 와이어 → 계약 consumer로 누적한다. 실 서버가 오면 streamFactory만 교체한다.
-      const stream = streamFactory(mockAnswerFor(question));
-      const displayStream = streamFactory === mockStreamSuccess ? paceMockStream(stream) : stream;
-      await consumeSseStream(displayStream, (snapshot) => {
-        setTurns((t) => {
-          const next = [...t];
-          next[next.length - 1] = {
-            role: 'agent',
-            text: snapshot.text,
-            streaming: snapshot.status === 'streaming',
-            sources: snapshot.sources,
-            status: snapshot.status,
-            errorMessage: snapshot.errorMessage,
-            retryable: snapshot.retryable,
-            retryQuestion: question,
-          };
-          return next;
+      let activeConversationId = conversationId;
+      if (activeConversationId === null) {
+        try {
+          const handle = await createConversation(payload.boothId, agentId);
+          activeConversationId = handle.conversationId;
+          setConversationId(activeConversationId);
+        } catch (e) {
+          showHttpError(e, question, '대화를 시작할 수 없습니다.');
+          return;
+        }
+      }
+
+      try {
+        await consumeSseStream(streamMessage(activeConversationId, question), (snapshot) => {
+          setTurns((t) => {
+            const next = [...t];
+            next[next.length - 1] = {
+              role: 'agent',
+              text: snapshot.text,
+              streaming: snapshot.status === 'streaming',
+              sources: snapshot.sources,
+              status: snapshot.status,
+              errorMessage: snapshot.errorMessage,
+              retryable: snapshot.retryable,
+              retryQuestion: question,
+            };
+            return next;
+          });
         });
-      });
-    } catch (error) {
-      console.warn('[AI SSE] 스트림 처리 실패', error instanceof Error ? error.name : 'UnknownError');
-      setTurns((t) => {
-        const next = [...t];
-        next[next.length - 1] = {
-          role: 'agent',
-          text: '',
-          streaming: false,
-          status: 'error',
-          errorMessage: '응답을 처리하지 못했습니다. 다시 시도해 주세요.',
-          retryable: true,
-          retryQuestion: question,
-        };
-        return next;
-      });
+      } catch (e) {
+        showHttpError(e, question, '응답을 처리하지 못했습니다. 다시 시도해 주세요.');
+      }
     } finally {
       setBusy(false);
     }
