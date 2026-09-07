@@ -9,7 +9,7 @@
 //
 // default export 인 이유: BoothCanvasViewport 가 React.lazy 로 부른다. three 를 static import
 // 하면 Studio 를 열지 않는 사용자도 받게 된다.
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -19,6 +19,7 @@ import type { LayoutObject } from '../../../../entities/layout/types';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
 import type { BoothRendererProps } from './canvasTypes';
 import { boxPlacement, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
+import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
 import { AssetMesh } from './AssetMesh';
 import { pickAsset } from '../../model/boothAssetManifest';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
@@ -35,6 +36,26 @@ interface DragState {
   origin: { x: number; z: number };
   grab: { x: number; z: number };
   startRotation: number;
+}
+
+/**
+ * 검증 모드에서만 프레임을 타이머로 민다. rAF 가 멈춘 환경(숨겨진 pane)에서도 3D 가 갱신된다.
+ * 제품 경로에서는 이 컴포넌트가 아예 렌더되지 않는다.
+ */
+function TimerDrivenFrames() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    // R3F 의 advance() 를 먼저 써 봤는데 이 환경에서 프레임이 나오지 않았다.
+    // 렌더러를 직접 부르면 루프 구현과 무관하게 그려진다 — 검증 모드에서만 쓰는 길이다.
+    const id = setInterval(() => {
+      scene.updateMatrixWorld();
+      gl.render(scene, camera);
+    }, VISUAL_ACCEPTANCE_FRAME_MS);
+    return () => clearInterval(id);
+  }, [gl, scene, camera]);
+  return null;
 }
 
 // ── 카메라 ─────────────────────────────────────────────────────────
@@ -426,12 +447,15 @@ export default function R3FBoothRenderer(p: BoothRendererProps) {
       orthographic
       dpr={[1, 2]}
       camera={{ position: isoCameraPosition(), zoom: 60, near: 0.1, far: 200 }}
-      gl={{ antialias: true, powerPreference: 'low-power' }}
+      // preserveDrawingBuffer: 합성 뒤에도 드로잉 버퍼를 남긴다. 없으면 canvas.toDataURL() 이
+      // 빈 이미지를 돌려줘 QA 캡처가 조용히 백지가 된다(S15P21A604-480 에서 실제로 그랬다).
+      gl={{ antialias: true, powerPreference: 'low-power', preserveDrawingBuffer: true }}
       // Unity WebGL 과 컨텍스트를 나눠 쓴다 — Studio 를 벗어나면 R3F 쪽은 dispose 되어야 한다.
       // frameloop='demand' 는 편집 조작이 없을 때 GPU 를 놀린다(공존 부담을 줄이는 값싼 수단).
-      frameloop="demand"
+      frameloop={IS_VISUAL_ACCEPTANCE ? 'never' : 'demand'}
     >
       <Suspense fallback={null}>
+        {IS_VISUAL_ACCEPTANCE && <TimerDrivenFrames />}
         <Scene {...p} assets={assets} />
       </Suspense>
     </Canvas>

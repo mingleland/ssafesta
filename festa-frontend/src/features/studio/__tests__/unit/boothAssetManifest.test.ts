@@ -12,7 +12,7 @@ const entry = (over: Partial<BoothAssetEntry>): BoothAssetEntry => ({
   assetCode: 'DECORATION_DEFAULT',
   objectType: 'DECORATION',
   typeDefault: true,
-  url: 'assets/booth/DECORATION_DEFAULT.glb',
+  url: 'DECORATION_DEFAULT.glb',
   bytes: 26140,
   triangles: 240,
   bounds: { min: [-0.3, 0, -0.3], max: [0.3, 1.6085, 0.3] },

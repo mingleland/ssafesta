@@ -20,8 +20,10 @@ export interface BoothAssetEntry {
   objectType: ObjectType;
   /** assetCode 없이 그 타입으로 놓였을 때 쓸 자산인가 (Unity BoothObjectRegistry 의 "타입 기본" 과 같은 뜻) */
   typeDefault: boolean;
-  /** manifest 기준 상대 경로. BASE_URL 로 푼다 */
+  /** manifest 기준 상대 경로 */
   url: string;
+  /** 자동 생성 썸네일 (없으면 null) */
+  thumbnail?: string | null;
   bytes: number;
   triangles: number;
   /** 정규화 후 실측 bbox(m) — 계약 AABB 와 대조하는 근거 */
@@ -40,7 +42,7 @@ export interface BoothAssetManifest {
   assets: BoothAssetEntry[];
 }
 
-export const BOOTH_ASSET_MANIFEST_URL = 'assets/booth/manifest.json';
+export const BOOTH_ASSET_MANIFEST_URL = 'manifest.json';
 const SUPPORTED_VERSION = 1;
 
 /**

@@ -14,8 +14,8 @@ afterEach(() => {
 });
 
 describe('boothAssetBase', () => {
-  it('런타임 주입이 없으면 앱 base 로 내려간다 — 에셋이 FE 정적 자원으로 나가는 현재 배치', () => {
-    expect(boothAssetBase()).toBe(import.meta.env.BASE_URL || '/');
+  it('런타임 주입이 없으면 dev 서버가 내보내는 runtime 경로로 내려간다', () => {
+    expect(boothAssetBase()).toBe(`${import.meta.env.BASE_URL || '/'}assets/booth-runtime/`);
   });
 
   it('런타임 주입이 있으면 그것을 쓴다 — CDN 으로 옮길 때 코드가 아니라 주입만 바뀐다', () => {
@@ -25,7 +25,7 @@ describe('boothAssetBase', () => {
 
   it('Unity base 와 섞이지 않는다 — 둘은 base 를 공유하지 않는다', () => {
     window.__FESTA_CONFIG__ = { unityBuildBase: 'https://cdn.example.test/unity/' };
-    expect(boothAssetBase()).toBe(import.meta.env.BASE_URL || '/');
+    expect(boothAssetBase()).toBe(`${import.meta.env.BASE_URL || '/'}assets/booth-runtime/`);
   });
 });
 
@@ -37,9 +37,7 @@ describe('URL 해석 — shared seam 하나만 쓴다', () => {
 
   it('CDN base 에서도 이중 슬래시가 생기지 않는다 — 문자열 이어붙이기가 깨지던 지점이다', () => {
     window.__FESTA_CONFIG__ = { boothAssetBase: 'https://cdn.example.test/booth' };
-    expect(resolveAssetUrl('assets/booth/A.glb', boothAssetBaseUrl())).toBe(
-      'https://cdn.example.test/booth/assets/booth/A.glb',
-    );
+    expect(resolveAssetUrl('A.glb', boothAssetBaseUrl())).toBe('https://cdn.example.test/booth/A.glb');
   });
 
   it('manifest 가 절대 URL 을 담아도 그대로 통과한다 — 생성자가 형식을 바꿔도 소비처는 안 바뀐다', () => {
@@ -49,9 +47,9 @@ describe('URL 해석 — shared seam 하나만 쓴다', () => {
 
   it('base 끝 슬래시 유무가 결과를 바꾸지 않는다', () => {
     window.__FESTA_CONFIG__ = { boothAssetBase: 'https://cdn.example.test/booth' };
-    const withoutSlash = resolveAssetUrl('assets/booth/A.glb', boothAssetBaseUrl());
+    const withoutSlash = resolveAssetUrl('A.glb', boothAssetBaseUrl());
     window.__FESTA_CONFIG__ = { boothAssetBase: 'https://cdn.example.test/booth/' };
-    const withSlash = resolveAssetUrl('assets/booth/A.glb', boothAssetBaseUrl());
+    const withSlash = resolveAssetUrl('A.glb', boothAssetBaseUrl());
     expect(withoutSlash).toBe(withSlash);
   });
 });
