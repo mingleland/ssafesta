@@ -15,6 +15,7 @@ import com.example.ssafesta.user.OAuthIdentityRepository;
 import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.User;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,40 @@ class OAuthLoginSuccessHandlerTest {
         return response;
     }
 
+    /**
+     * The subject attribute is named per provider — "sub" on Google, "id" on Kakao, "userId" on
+     * SSAFY — and the handler used to pick between them with {@code provider == GOOGLE ? "sub" : "id"}.
+     *
+     * <p>SSAFY has no "id" attribute, so under that branch the subject came back {@code null},
+     * {@code findByProviderAndProviderSubject} missed, and every login registered a new account.
+     * Nothing threw. These two tests pin the value that reaches the repository and the handoff, so
+     * the ternary cannot come back for whichever provider is added next.
+     */
+    @Test
+    void aFirstSsafyLoginCarriesTheUserIdAttributeIntoRegistration() throws Exception {
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.SSAFY, "1234567"))
+                .thenReturn(Optional.empty());
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), new MockHttpServletResponse(), ssafyToken());
+
+        verify(handoffs).createRegistration(OAuthProvider.SSAFY, "1234567");
+        verify(sessions, never()).issue(anyLong());
+    }
+
+    @Test
+    void aReturningSsafyAccountIsFoundByItsUserIdAndGetsASession() throws Exception {
+        User member = new User("싸피회원");
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.SSAFY, "1234567"))
+                .thenReturn(Optional.of(new OAuthIdentity(member, OAuthProvider.SSAFY, "1234567")));
+        when(sessions.issue(any())).thenReturn(
+                new MemberSessionService.MemberSession("access", Instant.EPOCH, "refresh"));
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), new MockHttpServletResponse(), ssafyToken());
+
+        verify(sessions).issue(member.getId());
+        verify(handoffs, never()).createRegistration(any(), any());
+    }
+
     private User suspended() {
         User user = new User("정지된회원");
         user.suspend("ADMIN_SUSPEND");
@@ -92,5 +127,16 @@ class OAuthLoginSuccessHandlerTest {
         DefaultOAuth2User principal = new DefaultOAuth2User(
                 AuthorityUtils.createAuthorityList("ROLE_USER"), Map.of("sub", "subject"), "sub");
         return new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
+    }
+
+    /**
+     * Shaped like the real SSAFY userInfo response — {@code userId}, {@code email}, {@code name} at
+     * the top level, and deliberately no {@code sub} or {@code id} to fall back on.
+     */
+    private OAuth2AuthenticationToken ssafyToken() {
+        DefaultOAuth2User principal = new DefaultOAuth2User(
+                AuthorityUtils.createAuthorityList("ROLE_USER"),
+                Map.of("userId", "1234567", "email", "member@ssafy.com", "name", "황덕"), "userId");
+        return new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "ssafy");
     }
 }

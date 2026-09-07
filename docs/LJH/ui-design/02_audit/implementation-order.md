@@ -4,6 +4,13 @@
 > 이 관측은 -405·-406 이전 상태다. 현재 구현 상태는 `02_audit/function-truth-inventory.md`
 > (baseline develop=0bf878c6, 2026-09-03)가, 흐름 결정은 `00_context/user-flow-decisions.md` 가 정본이다.
 > 당시 기록이므로 최신 내용으로 덮어쓰지 않는다.
+>
+> **주석 (2026-09-07, S15P21A604-479) — 아래 순서 원문은 그대로 두고 진행 상태만 가리킨다.**
+> 14번(2.5D feasibility spike)은 착수됐다 — evidence `-470`(renderer) · `-473`(Unity FBX→GLB) ·
+> `-476`(nested prefab). canonical 15 Gate reconciliation 은 진행 중이다(PASS 11 · PARTIAL 4).
+> 15번(Creator Workspace / R3F 정식 채택)은 **아직 미진입**이다 — D-05 는 `PASS_CANDIDATE` 이지
+> `ADOPTED` 가 아니다. "실험 성공" 과 "정식 채택" 은 다른 사건이다.
+> 상태 판정은 이 AUDIT 이 아니라 `05_technical-spikes/booth-studio-2_5d/README.md` 가 한다.
 
 - 문서 종류: DECISION 반영본 (2026-09-01, `00_context/implementation-decisions.md` D-01~D-06 반영)
 - 이전 초안(2026-08-31, baseline 9c0db7a 실측 기반)을 대체한다. Game Studio Creator 작업·gss/grp 토큰 원천 항목은 D-01 로 제거됐다.

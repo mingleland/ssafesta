@@ -31763,7 +31763,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _morning: {fileID: 8300000, guid: 22912cb7d46fe4541a9aaf49cfc0a63f, type: 3}
   _circus: {fileID: 8300000, guid: 9e6f9fd7b248e4f42a97d4fc4c2d8464, type: 3}
-  _morningVolume: 0.1
+  _morningVolume: 0.5
   _circusVolume: 0.55
   _fadeSpeed: 1.4
 --- !u!4 &1066131235
