@@ -53,7 +53,7 @@ def build_document_processing_orchestrator(
         base_url=settings.spring_internal_base_url,
         service_token=settings.internal_ai_to_spring_tokens[0],
         timeout_seconds=settings.spring_booth_access_timeout_seconds,
-        client=request.app.state.spring_http_client,
+        client=spring_http_client,
     )
     embedding_service = DocumentEmbeddingService(
         storage_factory=lambda provider: create_object_storage(settings, provider),
