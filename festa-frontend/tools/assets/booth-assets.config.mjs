@@ -1,0 +1,54 @@
+// 반입 대상 목록 — Unity 원본 FBX ↔ 계약 assetCode (S15P21A604-473).
+//
+// 여기 있는 것만 변환한다. 전 타입 일괄 변환은 금지다 — 라이선스 확인 전이고, 파이프라인이
+// 맞는지부터 소수로 판정해야 한다.
+//
+// 원본은 BoothObjectRegistry.asset(타입 10종 + GamePortal → prefab 11개)이 정본이다.
+// 이 표는 그 중 "단일 메시로 끝나는" 것만 골라 낸 부분집합이다. Counter01·SurveyKiosk 처럼
+// prefab 조립체인 것은 여기 없다 — 조립은 별도 단계다.
+
+/** 인치 → 미터. ExpoKit FBX 의 단위다(DisplayBox01 실측으로 확인, 아래 주석 참조) */
+export const INCH_TO_M = 0.0254;
+
+export const UNITY_ASSET_ROOT = '../festa-unity/Assets/_Project/Art/Booth/ExpoKit/Models';
+
+/**
+ * @typedef {object} BoothAssetSource
+ * @property {string} assetCode   계약의 assetCode. LayoutObject.assetCode 와 같은 값이다
+ * @property {string} objectType  계약 ObjectType — 도메인 AABB 를 어디서 가져올지 정한다
+ * @property {string} fbx         UNITY_ASSET_ROOT 기준 상대 경로
+ * @property {number} unitScale   원본 단위 → 미터
+ * @property {'zUp'|'yUp'} upAxis 원본의 위 방향
+ * @property {boolean} typeDefault assetCode 없이 그 타입으로 놓였을 때 쓸 자산인가
+ * @property {string} note        왜 이걸 골랐는지
+ */
+
+/** @type {BoothAssetSource[]} */
+export const BOOTH_ASSETS = [
+  {
+    assetCode: 'DECORATION_DEFAULT',
+    objectType: 'DECORATION',
+    fbx: 'Stands/DisplayBox01.FBX',
+    unitScale: INCH_TO_M,
+    upAxis: 'zUp',
+    typeDefault: true,
+    // 원본 bbox ±11.811 × ±11.811 × 63.327 에 0.0254 를 곱하면 ±0.3 × ±0.3 × 1.608 이 되고,
+    // 이는 계약 OBJECT_LOCAL_BOUNDS.DECORATION(±0.3, max.y 1.61)과 그대로 맞는다.
+    // 스케일·축·피벗이 맞는지를 숫자로 판정할 수 있는 유일한 후보라 대표로 넣었다.
+    note: '계약 AABB 와 1:1 로 대조 가능 — 파이프라인 정확도의 기준점',
+  },
+  {
+    assetCode: 'FURNITURE_CHAIR01',
+    objectType: 'FURNITURE',
+    fbx: 'Furniture/Chair01.FBX',
+    unitScale: INCH_TO_M,
+    upAxis: 'zUp',
+    // Unity 레지스트리의 FURNITURE 기본은 Furniture.prefab(조립체)이고 의자 단품이 아니다.
+    // 그 조립 경로가 아직 없어 이번 검증 동안만 기본 자리를 대신 채운다 — 조립이 들어오면 false 로 내린다.
+    typeDefault: true,
+    // 주의: FURNITURE 타입의 기본 자산은 Furniture.prefab(테이블 1 + 의자 3의 조립체)이라
+    // 계약 AABB(1.5 × 0.75 × 1.72)는 그 세트의 것이다. 의자 하나는 당연히 그보다 작다 —
+    // 이 어긋남은 결함이 아니라 "assetCode 가 타입 기본과 다르다" 는 뜻이다.
+    note: '의자 단품 — 타입 기본(조립체)과 다른 assetCode 라 계약 AABB 보다 작은 것이 정상',
+  },
+];

@@ -3,12 +3,14 @@
 // 출처: docs/LJH/27_FE_Docker_설계.md §2 (S15P21A604-254)
 
 // 런타임 주입 값의 전체 목록 — entrypoint(docker/40-runtime-config.sh)가 쓰는 키와 1:1 이다.
-// unityBuildBase: Unity WebGL 산출물 base URL(-427, #127). 향후 booth 에셋 base 를 추가할 때도 이 객체에
-// 키를 늘리고 아래 accessor 를 하나 더 두는 것으로 끝난다 — Unity 빌드와 Booth 에셋은 base 를 공유하지 않는다.
+// unityBuildBase: Unity WebGL 산출물 base URL(-427, #127).
+// aiApiBaseUrl: AI(FastAPI) 서버 base URL(spec 008). Spring 과 별도 배포라 키가 따로다.
+// boothAssetBase: Booth 2.5D 에셋 base URL(-473). Unity 빌드와 base 를 공유하지 않으므로 키가 따로다.
 export interface RuntimeAssetConfig {
   apiBaseUrl?: string;
   unityBuildBase?: string;
   aiApiBaseUrl?: string;
+  boothAssetBase?: string;
 }
 
 declare global {
@@ -44,4 +46,13 @@ export function aiApiBaseUrl(): string {
 // 값에 정본을 고착시키지 않는다(#127). 비어 있으면 '' — 소비처(unity/host/resolver.ts)가 이름으로 실패를 말한다.
 export function unityBuildBase(): string {
   return resolveApiBaseUrl(runtimeValue('unityBuildBase'), import.meta.env.VITE_UNITY_BUILD_BASE);
+}
+
+// Booth 2.5D 에셋 base URL. 지금은 에셋이 FE 정적 자원으로 나가므로 앱 base(BASE_URL)가 기본이고,
+// CDN 으로 옮기면 런타임 주입(PUBLIC_BOOTH_ASSET_BASE)만 채우면 된다 — 소비처 코드는 그대로다.
+// 문서(fe-contract-boundary)가 오래 "seam 이 열려 있다" 고 적어 온 자리를 실제로 연 것이다.
+export function boothAssetBase(): string {
+  const configured = runtimeValue('boothAssetBase');
+  if (configured) return configured;
+  return import.meta.env.BASE_URL || '/';
 }
