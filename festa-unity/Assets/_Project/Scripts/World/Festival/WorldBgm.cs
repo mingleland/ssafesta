@@ -4,7 +4,7 @@ namespace Festa.World
 {
     /// <summary>
     /// 구역 BGM 크로스페이드. 두 트랙을 항상 함께 재생하고(2D, 루프)
-    /// 카메라(=Owner 플레이어) 위치로 볼륨만 섞는다 — 복도를 걷는 동안
+    /// 로컬 플레이어 위치로 볼륨만 섞는다 — 복도를 걷는 동안
     /// 11층의 아침이 잦아들고 축제의 밤이 차오르는 "이세계 진입" 연출.
     ///
     /// 구역 판정 (월드 좌표, 1 m = 10 unit):
@@ -13,8 +13,9 @@ namespace Festa.World
     ///   축제(x &lt; -228)        Circus 100%
     ///   내부 부스(x &gt; 500)     Circus 35% — 홀 안까지 축제가 은은히 새어 든다
     ///
-    /// 카메라 위치를 쓰는 이유: 카메라는 Owner 플레이어만 따라간다. 텔레포트 시
-    /// SnapBehind 로 즉시 이동하므로 BGM 도 즉시 구역을 갈아탄다 (볼륨은 페이드).
+    /// 로컬 플레이어 위치를 쓰는 이유: 구역은 "사람이 어디에 서 있는가" 이고, 텔레포트 시
+    /// 즉시 이동하므로 BGM 도 즉시 구역을 갈아탄다 (볼륨은 페이드). 스폰 전에는 위치가
+    /// 존재하지 않아 잘못된 구역으로 판정될 수가 없다 — 그동안은 양쪽 다 침묵이다.
     /// 로컬 연출 전용 — NetworkObject 없음.
     /// </summary>
     public class WorldBgm : MonoBehaviour
@@ -49,13 +50,38 @@ namespace Festa.World
 
         void Update()
         {
-            var cam = Camera.main;
-            if (cam == null) return;
+            // 사람이 어디에 서 있는지 모르는 동안에는 **양쪽 다 침묵**이다. 예전에는
+            // Camera.main 을 바로 읽었는데, 플레이어가 스폰되기 전의 카메라는 원점에
+            // 있고 원점은 구역 판정상 복도(z 0 → t 0.52)라 축제 트랙이 켜졌다.
+            // 11F 진입 첫 0.3초에 축제 음악이 새어 나온 원인이다 (GitLab #140).
+            float m = 0f, c = 0f;
+            if (TryGetEarPosition(out var p)) (m, c) = ZoneWeights(p);
 
-            var (m, c) = ZoneWeights(cam.transform.position);
             float dt = _fadeSpeed * Time.deltaTime;
             _morningSrc.volume = Mathf.MoveTowards(_morningSrc.volume, m * _morningVolume, dt);
             _circusSrc.volume = Mathf.MoveTowards(_circusSrc.volume, c * _circusVolume, dt);
+        }
+
+        /// <summary>
+        /// 구역 판정에 쓸 "귀"의 위치. 접속 중에는 로컬 플레이어 — 카메라와 달리 스폰 전에는
+        /// 아예 없으므로 잘못된 좌표를 읽을 수가 없다. 네트워크가 없는 씬 미리보기(에디터)에서만
+        /// 카메라로 물러난다.
+        /// </summary>
+        static bool TryGetEarPosition(out Vector3 p)
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (nm != null && nm.IsClient)
+            {
+                var obj = nm.LocalClient?.PlayerObject;
+                if (obj == null) { p = default; return false; }   // 접속했지만 아직 스폰 전
+                p = obj.transform.position;
+                return true;
+            }
+
+            var cam = Camera.main;
+            if (cam == null) { p = default; return false; }
+            p = cam.transform.position;
+            return true;
         }
 
         static (float morning, float circus) ZoneWeights(Vector3 p)
