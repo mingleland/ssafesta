@@ -1,7 +1,8 @@
-"""Verify the C-07 SSE envelope sequence and terminal exclusivity (S15P21A604-140)."""
+"""Verify the C-07 SSE envelope sequence and terminal exclusivity (S15P21A604-140/141)."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -9,7 +10,7 @@ import pytest
 
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.models.conversation import Conversation
-from app.providers.llm import LLMRequest
+from app.providers.llm import LLMRequest, LLMToken
 from app.providers.managed_llm import ManagedLLMError
 from app.services.context_service import ContextBuildResult
 from app.services.rag_service import NoReadyContextResult
@@ -20,6 +21,20 @@ from app.services.stream_service import (
     ConversationStreamService,
 )
 from tests.fakes.llm import FakeLLMProvider
+
+
+class _DelayedLLMProvider:
+    """지정한 간격만큼 기다렸다 token을 내보내는 가짜 LLM Provider (S15P21A604-141)."""
+
+    model_id = "fake-llm-delayed"
+
+    def __init__(self, delays_and_tokens: list[tuple[float, str]]) -> None:
+        self._plan = delays_and_tokens
+
+    async def stream(self, request: LLMRequest):
+        for delay, text in self._plan:
+            await asyncio.sleep(delay)
+            yield LLMToken(text=text)
 
 NOW = datetime(2026, 9, 6, tzinfo=timezone.utc)
 
@@ -90,6 +105,8 @@ def _service(
     rag: _RagContextService,
     llm,
     clock=lambda: NOW,
+    ttft_timeout_seconds: float = 15.0,
+    total_timeout_seconds: float = 60.0,
 ) -> tuple[ConversationStreamService, _ConversationRepository]:
     repository = _ConversationRepository(conversation)
     service = ConversationStreamService(
@@ -98,6 +115,8 @@ def _service(
         llm_provider=llm,
         ttl_seconds=1800,
         clock=clock,
+        ttft_timeout_seconds=ttft_timeout_seconds,
+        total_timeout_seconds=total_timeout_seconds,
     )
     return service, repository
 
@@ -225,6 +244,54 @@ async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -
     types = [event["type"] for event in events]
     assert types == ["start", "token", "error"]
     assert events[-1]["code"] == "LLM_TIMEOUT"
+    assert events[-1]["retryable"] is True
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_ttft_timeout_before_first_token_emits_first_token_phase() -> None:
+    """FR-007: 첫 토큰이 TTFT 예산 안에 오지 않으면 FIRST_TOKEN phase로 종료한다."""
+    rag = _RagContextService(result=_context_result())
+    llm = _DelayedLLMProvider([(0.05, "늦은토큰")])
+    service, repository = _service(
+        conversation=_conversation(),
+        rag=rag,
+        llm=llm,
+        ttft_timeout_seconds=0.01,
+        total_timeout_seconds=1.0,
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == "LLM_TIMEOUT"
+    assert events[-1]["timeoutPhase"] == "FIRST_TOKEN"
+    assert events[-1]["retryable"] is True
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_total_timeout_after_first_token_emits_total_response_phase() -> None:
+    """FR-007: 첫 토큰 이후라도 전체 60초를 넘기면 TOTAL_RESPONSE phase로 종료한다."""
+    rag = _RagContextService(result=_context_result())
+    llm = _DelayedLLMProvider([(0.0, "빠른"), (0.05, "느린")])
+    service, repository = _service(
+        conversation=_conversation(),
+        rag=rag,
+        llm=llm,
+        ttft_timeout_seconds=1.0,
+        total_timeout_seconds=0.02,
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "token", "error"]
+    assert events[-1]["code"] == "LLM_TIMEOUT"
+    assert events[-1]["timeoutPhase"] == "TOTAL_RESPONSE"
     assert events[-1]["retryable"] is True
     assert repository.saved == []
 
