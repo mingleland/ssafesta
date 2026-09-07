@@ -16,8 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Receives a worker's results and decides whether they still count (S15P21A604-400, GitLab #119 §3,
  * {@code specs/007-ai-agent-document/contracts/document-result-contract.md}).
  *
- * <p>Two operations in this slice — staged batches and the finalize that publishes them. FastAPI
- * holds no database credential, so everything a result changes happens here.
+ * <p>Four operations — staged batches, the finalize that publishes them, the heartbeat that keeps
+ * an attempt alive, and the failure that ends one. FastAPI holds no database credential, so
+ * everything a result changes happens here.
  *
  * <p>Every entry point passes the same two gates first: the {@code attemptNo} must be the one that
  * owns the Job ({@code 409} otherwise), and the Job must not be finished ({@code 410} otherwise).
@@ -34,6 +35,9 @@ public class AiDocumentResultService {
 
     /** GitLab #119 §3-2, 2026-09-02 합의. 8 MiB 쪽은 본문 크기라 서버가 본다. */
     private static final int MAX_CHUNKS_PER_BATCH = 200;
+
+    /** {@code last_error_code} 컬럼이 VARCHAR(50) 이다. */
+    private static final int MAX_FAILURE_CODE_LENGTH = 50;
 
     private static final String SUCCEEDED = "SUCCEEDED";
 
@@ -109,6 +113,43 @@ public class AiDocumentResultService {
         jobs.clearStaging(job.id());
         jobs.markSucceeded(job.id(), staging.total());
         jobs.markDocumentReady(job.documentId());
+    }
+
+    /**
+     * Extends the lease so the reclaim sweeper leaves this attempt alone.
+     *
+     * <p>The worker sends one every 30 seconds and the lease is 90 (GitLab #119) — two may be lost
+     * before the Job is taken back.
+     */
+    @Transactional
+    public void heartbeat(long jobId, String rawBody) {
+        HeartbeatRequest request = StrictJsonReader.read(rawBody, HeartbeatRequest.class);
+        JobRow job = live(jobId, request.attemptNo());
+        jobs.extendLease(job.id());
+    }
+
+    /**
+     * Ends the attempt the worker says it cannot finish.
+     *
+     * <p>Spring decides what happens next, not the worker: it reports <i>what</i> broke and whether
+     * another attempt could help, and the retry budget lives here with the Job.
+     */
+    @Transactional
+    public void reportFailure(long jobId, String rawBody) {
+        FailedRequest request = StrictJsonReader.read(rawBody, FailedRequest.class);
+        String failureCode = required(request.failureCode(), "failureCode");
+        if (failureCode.length() > MAX_FAILURE_CODE_LENGTH) {
+            // last_error_code 는 VARCHAR(50) 이다. 넘겨서 보내면 여기서 400 이 아니라 저장에서
+            // 500 이 된다 — 보내는 쪽이 고칠 수 있는 실수라 400 으로 답한다.
+            throw ApiException.fieldInvalid("failureCode",
+                    MAX_FAILURE_CODE_LENGTH + "자 이하여야 합니다.");
+        }
+        if (request.retryable() == null) {
+            throw ApiException.fieldInvalid("retryable", "값이 필요합니다.");
+        }
+
+        JobRow job = live(jobId, request.attemptNo());
+        jobs.failAttempt(job.id(), failureCode, request.message(), request.retryable());
     }
 
     /**
@@ -204,4 +245,10 @@ public class AiDocumentResultService {
 
     public record FinalizeRequest(Integer attemptNo, String sourceHash, Integer totalChunkCount,
                                   String embeddingModelId) { }
+
+    public record HeartbeatRequest(Integer attemptNo) { }
+
+    /** {@code message} 는 선택이다 — 코드가 분기의 근거이고 문장은 사람이 읽을 것이다. */
+    public record FailedRequest(Integer attemptNo, String failureCode, Boolean retryable,
+                                String message) { }
 }

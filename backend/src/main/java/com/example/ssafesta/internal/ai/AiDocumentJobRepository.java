@@ -113,6 +113,98 @@ class AiDocumentJobRepository {
                         "agentId", job.agentId(), "jobId", job.id()));
     }
 
+    /**
+     * The retry schedule, as one definition used by both failure paths.
+     *
+     * <p>1 · 5 · 15 minutes (GitLab #119, 2026-09-03 — the AI part's existing worker values). The
+     * argument is the SQL expression for the <b>new</b> attempt number, because a failure of attempt
+     * {@code k} schedules attempt {@code k + 1}. Only internal literals are ever interpolated.
+     */
+    private static final String BACKOFF = """
+            CASE %s WHEN 1 THEN INTERVAL '1 minute'
+                    WHEN 2 THEN INTERVAL '5 minutes'
+                    ELSE INTERVAL '15 minutes' END""";
+
+    /** 90초 (GitLab #119). heartbeat 주기(30초)보다 커야 한다는 제약은 보내는 쪽 몫이다. */
+    private static final int LEASE_SECONDS = 90;
+
+    /** Pushes the lease out. A heartbeat is also the first evidence a worker started. */
+    void extendLease(long jobId) {
+        jdbc.update("""
+                UPDATE ai_document_jobs
+                   SET lease_expires_at = now() + make_interval(secs => ?),
+                       status = CASE WHEN status = 'QUEUED' THEN 'RUNNING' ELSE status END,
+                       updated_at = now()
+                 WHERE id = ?
+                """, LEASE_SECONDS, jobId);
+    }
+
+    /**
+     * Ends the attempt: another one is scheduled, or the Job dies.
+     *
+     * <p>{@code attempt_no} always advances, even into {@code DEAD} — that is what fences the worker
+     * that just failed. A late result from it then meets {@code 409} instead of being applied.
+     *
+     * @param retryable whether the worker says another attempt could succeed. {@code false} skips
+     *                  straight to {@code DEAD} — retrying a corrupt file only wastes the retries.
+     */
+    void failAttempt(long jobId, String failureCode, String message, boolean retryable) {
+        jdbc.update("""
+                UPDATE ai_document_jobs
+                   SET attempt_no = attempt_no + 1,
+                       status = CASE WHEN NOT ? OR attempt_no + 1 > max_retries
+                                     THEN 'DEAD' ELSE 'RETRY_WAIT' END,
+                       next_retry_at = CASE WHEN ? AND attempt_no + 1 <= max_retries
+                                            THEN now() + %s END,
+                       finished_at = CASE WHEN NOT ? OR attempt_no + 1 > max_retries
+                                          THEN now() END,
+                       last_error_code = ?, last_error = ?,
+                       worker_id = NULL, lease_expires_at = NULL, updated_at = now()
+                 WHERE id = ?
+                """.formatted(BACKOFF.formatted("attempt_no + 1")),
+                retryable, retryable, retryable, failureCode, message, jobId);
+        clearStaging(jobId);
+    }
+
+    /**
+     * Takes back the Jobs whose worker stopped reporting.
+     *
+     * <p>The reclaim is the only thing that makes a dead worker recoverable — and the only thing
+     * that stops one: without the {@code attempt_no} bump, a process that froze past its lease and
+     * woke up later would still be accepted as the current attempt.
+     *
+     * <p>{@code SKIP LOCKED} so a second instance takes different rows instead of waiting.
+     *
+     * @return how many Jobs were reclaimed
+     */
+    int reclaimExpiredLeases(int limit) {
+        List<Long> reclaimed = jdbc.queryForList("""
+                UPDATE ai_document_jobs j
+                   SET attempt_no = s.attempt_no + 1,
+                       status = CASE WHEN s.attempt_no + 1 > s.max_retries
+                                     THEN 'DEAD' ELSE 'RETRY_WAIT' END,
+                       next_retry_at = CASE WHEN s.attempt_no + 1 <= s.max_retries
+                                            THEN now() + %s END,
+                       finished_at = CASE WHEN s.attempt_no + 1 > s.max_retries THEN now() END,
+                       last_error_code = 'LEASE_EXPIRED',
+                       last_error = 'heartbeat 가 끊겨 Job 을 회수했습니다.',
+                       worker_id = NULL, lease_expires_at = NULL, updated_at = now()
+                  FROM (SELECT id, attempt_no, max_retries
+                          FROM ai_document_jobs
+                         WHERE status = 'RUNNING' AND lease_expires_at < now()
+                         LIMIT ?
+                           FOR UPDATE SKIP LOCKED) s
+                 WHERE j.id = s.id
+                RETURNING j.id
+                """.formatted(BACKOFF.formatted("s.attempt_no + 1")), Long.class, limit);
+        // 죽은 attempt 가 남긴 staging 은 지운다. 남기면 다음 attempt 의 batch 와 섞여
+        // finalize 개수 검증이 엉뚱한 곳에서 걸린다.
+        for (Long jobId : reclaimed) {
+            clearStaging(jobId);
+        }
+        return reclaimed.size();
+    }
+
     /** No TTL sweeper: staging is cleared here and on the terminal Job transitions (V21). */
     void clearStaging(long jobId) {
         jdbc.update("DELETE FROM ai_document_chunk_staging WHERE job_id = ?", jobId);

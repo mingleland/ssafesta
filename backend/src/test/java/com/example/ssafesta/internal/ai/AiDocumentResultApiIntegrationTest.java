@@ -3,6 +3,7 @@ package com.example.ssafesta.internal.ai;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -50,6 +51,7 @@ class AiDocumentResultApiIntegrationTest {
     @Autowired private UserRepository users;
     @Autowired private WalletService wallets;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private AiDocumentJobLeaseSweeper sweeper;
 
     @BeforeEach
     void freeSlots() {
@@ -359,6 +361,198 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(jsonPath("$.errors[0].field").value("chunks"));
     }
 
+    // ── heartbeat ───────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("heartbeat 가 lease 를 90초 뒤로 밀고 QUEUED 를 RUNNING 으로 올린다")
+    void aHeartbeatExtendsTheLease() throws Exception {
+        Job job = seedJob("하트비트");
+
+        mockMvc.perform(heartbeat(job, 0)).andExpect(status().isNoContent());
+
+        assertEquals("RUNNING", jobStatus(job));
+        long seconds = secondsUntilLeaseExpiry(job);
+        assertTrue(seconds > 60 && seconds <= 90, "lease 가 90초 근처여야 한다: " + seconds);
+    }
+
+    @Test
+    @DisplayName("지난 attempt 의 heartbeat 는 409 다")
+    void aHeartbeatFromAStaleAttemptIsRejected() throws Exception {
+        Job job = seedJob("하트비트지난");
+        jdbc.update("UPDATE ai_document_jobs SET attempt_no = 1 WHERE id = ?", job.id());
+
+        mockMvc.perform(heartbeat(job, 0))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("JOB_ATTEMPT_STALE"));
+    }
+
+    @Test
+    @DisplayName("끝난 Job 의 heartbeat 는 410 이다")
+    void aHeartbeatForAFinishedJobIsGone() throws Exception {
+        Job job = seedJob("하트비트종료");
+        jdbc.update("UPDATE ai_document_jobs SET status = 'DEAD' WHERE id = ?", job.id());
+
+        mockMvc.perform(heartbeat(job, 0))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+    }
+
+    // ── failed ──────────────────────────────────────────────────────────────
+
+    /** 재시도 여지가 남아 있으면 다음 attempt 를 예약한다 — 1분 뒤(#119 backoff 1·5·15분). */
+    @Test
+    @DisplayName("재시도 가능한 실패는 RETRY_WAIT 로 가고 attempt 가 오른다")
+    void aRetryableFailureSchedulesTheNextAttempt() throws Exception {
+        Job job = seedJob("재시도가능");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+
+        mockMvc.perform(failed(job, 0, "PARSE_TIMEOUT", true, "10분 안에 못 끝냈습니다."))
+                .andExpect(status().isNoContent());
+
+        assertEquals("RETRY_WAIT", jobStatus(job));
+        assertEquals(1, attemptNo(job));
+        assertEquals("PARSE_TIMEOUT", lastErrorCode(job));
+        assertEquals(0, stagingCount(job), "죽은 attempt 의 staging 은 남으면 안 된다");
+        long seconds = secondsUntilNextRetry(job);
+        assertTrue(seconds > 30 && seconds <= 60, "backoff 가 1분 근처여야 한다: " + seconds);
+    }
+
+    /** 손상된 파일은 세 번 더 해 봐야 똑같이 깨진다. */
+    @Test
+    @DisplayName("재시도 불가 실패는 남은 횟수와 무관하게 DEAD 다")
+    void aNonRetryableFailureGoesStraightToDead() throws Exception {
+        Job job = seedJob("재시도불가");
+
+        mockMvc.perform(failed(job, 0, "CORRUPT_PDF", false, null))
+                .andExpect(status().isNoContent());
+
+        assertEquals("DEAD", jobStatus(job));
+        assertEquals(1, attemptNo(job), "DEAD 여도 attempt 는 올라야 늦은 결과가 막힌다");
+    }
+
+    @Test
+    @DisplayName("재시도 횟수를 다 쓰면 DEAD 다")
+    void anExhaustedRetryBudgetEndsInDead() throws Exception {
+        Job job = seedJob("횟수소진");
+        jdbc.update("UPDATE ai_document_jobs SET attempt_no = 3, max_retries = 3 WHERE id = ?",
+                job.id());
+
+        mockMvc.perform(failed(job, 3, "PARSE_TIMEOUT", true, null))
+                .andExpect(status().isNoContent());
+
+        assertEquals("DEAD", jobStatus(job));
+        assertEquals(4, attemptNo(job));
+    }
+
+    /** {@code last_error_code} 가 VARCHAR(50) 이다 — 넘기면 400 이지 500 이 아니다. */
+    @Test
+    @DisplayName("50자를 넘는 failureCode 는 400 이다")
+    void anOverlongFailureCodeIsRejected() throws Exception {
+        Job job = seedJob("긴코드");
+
+        mockMvc.perform(failed(job, 0, "X".repeat(51), true, null))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("failureCode"));
+
+        assertEquals("QUEUED", jobStatus(job));
+    }
+
+    @Test
+    @DisplayName("retryable 이 없으면 400 이다")
+    void aFailureWithoutRetryableIsRejected() throws Exception {
+        Job job = seedJob("판단없음");
+
+        mockMvc.perform(post("/internal/ai/document-jobs/" + job.id() + "/failed")
+                        .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"attemptNo":0,"failureCode":"PARSE_TIMEOUT","message":null}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("retryable"));
+    }
+
+    /** 실패 보고가 attempt 를 올렸으므로, 그 워커가 뒤늦게 보내는 결과는 이제 남의 것이다. */
+    @Test
+    @DisplayName("실패 보고 뒤 같은 워커의 batch 는 409 다")
+    void aBatchAfterTheAttemptFailedIsRejected() throws Exception {
+        Job job = seedJob("실패후배치");
+        mockMvc.perform(failed(job, 0, "PARSE_TIMEOUT", true, null))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(batch(job, 0, chunk(0, "늦은 조각")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("JOB_ATTEMPT_STALE"));
+    }
+
+    // ── lease 회수 ───────────────────────────────────────────────────────────
+
+    /**
+     * 워커가 죽으면 아무도 Job 을 놓아 주지 않는다.
+     *
+     * <p>FastAPI 는 DB 자격증명이 없어 스스로 반납할 수 없고, 회수가 없으면 문서는 영원히
+     * READY 가 되지 않는다. 그리고 회수가 {@code attempt_no} 를 올리는 것이 <b>얼어 있다 깨어난
+     * 워커</b>를 막는 유일한 수단이다.
+     */
+    @Test
+    @DisplayName("lease 가 만료된 RUNNING Job 을 회수한다")
+    void anExpiredLeaseIsReclaimed() throws Exception {
+        Job job = seedJob("회수");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        expireLease(job);
+
+        sweeper.reclaimExpiredLeases();
+
+        assertEquals("RETRY_WAIT", jobStatus(job));
+        assertEquals(1, attemptNo(job));
+        assertEquals("LEASE_EXPIRED", lastErrorCode(job));
+        assertEquals(0, stagingCount(job), "죽은 attempt 의 staging 은 남으면 안 된다");
+    }
+
+    @Test
+    @DisplayName("lease 가 살아 있는 Job 은 건드리지 않는다")
+    void aLiveLeaseIsLeftAlone() throws Exception {
+        Job job = seedJob("살아있음");
+        mockMvc.perform(heartbeat(job, 0)).andExpect(status().isNoContent());
+
+        sweeper.reclaimExpiredLeases();
+
+        assertEquals("RUNNING", jobStatus(job));
+        assertEquals(0, attemptNo(job));
+    }
+
+    @Test
+    @DisplayName("재시도 횟수를 다 쓴 Job 의 회수는 DEAD 로 끝난다")
+    void reclaimingAJobWithNoRetriesLeftKillsIt() throws Exception {
+        Job job = seedJob("회수DEAD");
+        jdbc.update("""
+                UPDATE ai_document_jobs SET status = 'RUNNING', attempt_no = 3, max_retries = 3
+                 WHERE id = ?
+                """, job.id());
+        expireLease(job);
+
+        sweeper.reclaimExpiredLeases();
+
+        assertEquals("DEAD", jobStatus(job));
+        assertEquals(4, attemptNo(job));
+    }
+
+    /** 회수된 뒤 깨어난 워커의 finalize 는 이제 남의 attempt 다. */
+    @Test
+    @DisplayName("회수 뒤 이전 attempt 의 finalize 는 409 다")
+    void aFinalizeFromAReclaimedAttemptIsRejected() throws Exception {
+        Job job = seedJob("회수후finalize");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        expireLease(job);
+        sweeper.reclaimExpiredLeases();
+
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("JOB_ATTEMPT_STALE"));
+
+        assertEquals("PROCESSING", documentStatus(job));
+    }
+
     // ── 인증 ────────────────────────────────────────────────────────────────
 
     @Test
@@ -404,6 +598,56 @@ class AiDocumentResultApiIntegrationTest {
                 .header("Authorization", "Bearer " + SERVICE_TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(finalizeBody(totalChunkCount, sourceHash, model));
+    }
+
+    private RequestBuilder heartbeat(Job job, int attemptNo) {
+        return post("/internal/ai/document-jobs/" + job.id() + "/heartbeat")
+                .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"attemptNo\":%d}".formatted(attemptNo));
+    }
+
+    private RequestBuilder failed(Job job, int attemptNo, String failureCode, Boolean retryable,
+                                  String message) {
+        String body = """
+                {"attemptNo":%d,"failureCode":"%s","retryable":%s,"message":%s}
+                """.formatted(attemptNo, failureCode, retryable,
+                        message == null ? "null" : "\"" + message + "\"");
+        return post("/internal/ai/document-jobs/" + job.id() + "/failed")
+                .header("Authorization", "Bearer " + SERVICE_TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body);
+    }
+
+    private void expireLease(Job job) {
+        jdbc.update("""
+                UPDATE ai_document_jobs SET lease_expires_at = now() - INTERVAL '1 minute'
+                 WHERE id = ?
+                """, job.id());
+    }
+
+    private int attemptNo(Job job) {
+        return jdbc.queryForObject("SELECT attempt_no FROM ai_document_jobs WHERE id = ?",
+                Integer.class, job.id());
+    }
+
+    private String lastErrorCode(Job job) {
+        return jdbc.queryForObject("SELECT last_error_code FROM ai_document_jobs WHERE id = ?",
+                String.class, job.id());
+    }
+
+    private long secondsUntilLeaseExpiry(Job job) {
+        return jdbc.queryForObject("""
+                SELECT EXTRACT(EPOCH FROM (lease_expires_at - now()))::bigint
+                  FROM ai_document_jobs WHERE id = ?
+                """, Long.class, job.id());
+    }
+
+    private long secondsUntilNextRetry(Job job) {
+        return jdbc.queryForObject("""
+                SELECT EXTRACT(EPOCH FROM (next_retry_at - now()))::bigint
+                  FROM ai_document_jobs WHERE id = ?
+                """, Long.class, job.id());
     }
 
     private static String batchBody(int batchSeq, String... chunks) {

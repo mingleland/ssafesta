@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link AiInternalSecurityConfiguration} already matches {@code /internal/ai/**} and requires the
  * FastAPI→Spring service token.
  *
- * <p>Both operations answer {@code 204}: the caller sent the state, and there is nothing to tell it
- * back that it does not already know. What it must branch on is the status — {@code 409} for a
+ * <p>Every operation answers {@code 204}: the caller sent the state, and there is nothing to tell
+ * it back that it does not already know. What it must branch on is the status — {@code 409} for a
  * stale attempt, {@code 410} for a Job that no longer exists.
  *
  * <p>Bodies arrive as text, not bound records: they are parsed by {@link StrictJsonReader} so a
@@ -45,5 +45,17 @@ class AiDocumentResultController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void finalizeJob(@PathVariable long jobId, @RequestBody(required = false) String body) {
         results.finalizeJob(jobId, body);
+    }
+
+    @PostMapping(path = "/{jobId}/heartbeat", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void heartbeat(@PathVariable long jobId, @RequestBody(required = false) String body) {
+        results.heartbeat(jobId, body);
+    }
+
+    @PostMapping(path = "/{jobId}/failed", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void failed(@PathVariable long jobId, @RequestBody(required = false) String body) {
+        results.reportFailure(jobId, body);
     }
 }
