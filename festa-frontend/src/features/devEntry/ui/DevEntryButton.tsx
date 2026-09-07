@@ -16,8 +16,22 @@
 // 게임 화면에 상시 표식을 두면 HUD 예산(총 점유 15% 미만)만 잠식한다.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isApiError } from '../../../shared/api/client';
 import { IS_DEV_ENTRY, enterAsDeveloper } from '../model/devEntry';
 import './devEntry.css';
+
+/**
+ * 오류를 사람이 읽을 한 줄로.
+ *
+ * `api()` 는 `Error` 가 아니라 **오류 봉투 객체**를 던진다(`isApiError`). `String(error)` 로
+ * 떨어뜨리면 `[object Object]` 가 화면에 뜬다 — 실제로 그렇게 나왔다. 봉투면 `code` 와
+ * `message` 를 함께 보여 준다. 이유를 드러내려고 만든 배너가 이유를 가리면 안 된다.
+ */
+function describe(error: unknown): string {
+  if (isApiError(error)) return `${error.code} — ${error.message}`;
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export function DevEntryButton() {
   const navigate = useNavigate();
@@ -38,7 +52,7 @@ export function DevEntryButton() {
         setFailure(null);
         enterAsDeveloper().then(
           () => navigate('/app/world', { replace: true }),
-          (error: unknown) => setFailure(error instanceof Error ? error.message : String(error)),
+          (error: unknown) => setFailure(describe(error)),
         );
       }}
     >
