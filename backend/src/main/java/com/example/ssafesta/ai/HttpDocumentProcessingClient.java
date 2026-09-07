@@ -1,14 +1,10 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.internal.ai.InternalTokenProperties;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -19,6 +15,10 @@ import org.springframework.web.client.RestClientException;
  * classpath through {@code spring-boot-starter-webmvc}, and this is the process's only outbound
  * HTTP call. {@code WebClient} would need {@code spring-webflux} for nothing: one request, no
  * streaming, no reactive caller.
+ *
+ * <p>The builder arrives configured rather than being built here, so a test can hand in one bound
+ * to {@code MockRestServiceServer} and assert the path, the header and every status branch without
+ * a socket. Transport settings belong to {@link AiProcessingConfiguration} for the same reason.
  */
 class HttpDocumentProcessingClient implements DocumentProcessingClient {
 
@@ -29,24 +29,12 @@ class HttpDocumentProcessingClient implements DocumentProcessingClient {
 
     private static final int ACCEPTED = 202;
 
-    /**
-     * Short on purpose. The call only has to be <i>accepted</i> — FastAPI answers 202 before it
-     * parses anything — so a slow answer means the network or the process is unhealthy, and waiting
-     * longer only holds the request thread of somebody's upload-complete. A missed delivery is cheap
-     * here: the sweeper resends within 30 seconds.
-     */
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
-
     private final RestClient http;
     private final InternalTokenProperties tokens;
 
-    HttpDocumentProcessingClient(AiProcessingProperties properties, InternalTokenProperties tokens) {
+    HttpDocumentProcessingClient(RestClient.Builder builder, InternalTokenProperties tokens) {
         this.tokens = tokens;
-        this.http = RestClient.builder()
-                .baseUrl(properties.baseUrl())
-                .requestFactory(requestFactory())
-                .build();
+        this.http = builder.build();
     }
 
     @Override
@@ -82,19 +70,5 @@ class HttpDocumentProcessingClient implements DocumentProcessingClient {
             throw new DocumentProcessingUnavailableException(
                     "문서 처리 서버가 요청을 받지 못했습니다. 잠시 후 다시 시도됩니다.");
         }
-    }
-
-    /**
-     * The JDK client, configured explicitly.
-     *
-     * <p>Boot 4 moved {@code RestClient.Builder} autoconfiguration and {@code spring.http.client.*}
-     * into a module {@code spring-boot-starter-webmvc} does not bring, so there is no ambient
-     * builder to inherit timeouts from. Without this the read would have no timeout at all.
-     */
-    private static ClientHttpRequestFactory requestFactory() {
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
-        factory.setReadTimeout(READ_TIMEOUT);
-        return factory;
     }
 }
