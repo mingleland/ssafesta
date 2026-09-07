@@ -30,7 +30,8 @@ services:
     environment:
       FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required}
-    ports: ["127.0.0.1:${FRONT_LOOPBACK_PORT:-18080}:8080"]
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:?PUBLIC_UNITY_BUILD_BASE is required}
+    ports: ["127.0.0.1:${FRONT_LOOPBACK_PORT:-18080}:80"]
   game:
     image: ${GAME_IMAGE_REF:?GAME_IMAGE_REF is required}
     restart: unless-stopped

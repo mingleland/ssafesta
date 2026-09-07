@@ -23,7 +23,9 @@ class FakeAudio {
   volume = 1;
   currentTime = 0;
   paused = true;
-  constructor(public src: string) {
+  src: string;
+  constructor(src: string) {
+    this.src = src;
     FakeAudio.instances.push(this);
   }
   play(): Promise<void> {

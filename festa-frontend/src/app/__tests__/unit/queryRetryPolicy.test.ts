@@ -19,7 +19,7 @@ const envelope = (code: string, status?: number): ApiError => ({
 const retry = queryClient.getDefaultOptions().queries?.retry;
 const shouldRetry = (error: unknown, failureCount = 0): boolean => {
   if (typeof retry !== 'function') throw new Error('retry 가 함수가 아니다 — 정책이 사라졌다');
-  return retry(failureCount, error) as boolean;
+  return retry(failureCount, error as Error) as boolean;
 };
 
 describe('전역 재시도 정책 (-458)', () => {
