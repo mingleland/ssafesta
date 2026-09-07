@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,6 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
  * addresses it that way. Answering and results are survey-scoped, and the id a client needs comes
  * back from {@code GET .../survey/run} — Unity sends only {@code {boothId, objectId}}, never a
  * survey id (S15P21A604-415).
+ *
+ * <p>Results are editor-only and, like the editor read, do not require a live lease — the operator
+ * looks at them after the festival, when the lease is gone (FR-011).
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -35,15 +39,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class SurveyController {
 
     private static final String MEMBER_ONLY = "회원 계정만 설문을 편집할 수 있습니다.";
+    private static final String MEMBER_ONLY_RESULTS = "회원 계정만 설문 결과를 조회할 수 있습니다.";
     private static final String MEMBER_ROLE = "MEMBER";
     private static final String GUEST_ROLE = "GUEST";
 
     private final SurveyService surveys;
     private final SurveyResponseService submissions;
+    private final SurveyResultService results;
 
-    public SurveyController(SurveyService surveys, SurveyResponseService submissions) {
+    public SurveyController(SurveyService surveys, SurveyResponseService submissions,
+                            SurveyResultService results) {
         this.surveys = surveys;
         this.submissions = submissions;
+        this.results = results;
     }
 
     @Operation(summary = "내 부스 설문 조회 — 편집자용",
@@ -169,6 +177,80 @@ public class SurveyController {
                                                      @RequestBody(required = false)
                                                      SurveyResponseService.SubmitCommand command) {
         return submissions.submit(surveyId, respondentOf(jwt), command);
+    }
+
+    @Operation(summary = "설문 결과 집계 조회 — 편집자용",
+            description = """
+                    응답 수·선택지별 수·별점 평균과 분포를 **서버가 계산해** 돌려준다 (FR-007).
+                    원본 응답은 나가지 않으므로 화면이 다시 셀 일이 없고, 집계가 실제 데이터와
+                    어긋날 자리도 한 곳뿐이다.
+
+                    **임대가 만료돼도 조회된다** — 축제가 끝난 뒤 결과를 읽는 것이 이 화면의 주 용도다
+                    (FR-011).
+
+                    `perQuestion` 은 **모든 문항을 싣는다.** 텍스트 유형도 `answeredCount` 만 채워
+                    들어가고, 아무도 고르지 않은 선택지도 `count: 0` 으로 들어간다. 빠뜨리면 화면이
+                    "3문항 중 2개"만 그리게 되고 그게 응답 0인지 문항 삭제인지 알 수 없다.
+
+                    **비율은 싣지 않는다.** `count / answeredCount` 는 화면이 계산한다 — 복수선택은
+                    합이 100%를 넘고 그 사실이 수치에 그대로 드러나는 편이 옳다.
+
+                    `answeredCount` 는 **그 문항에 답한 응답 수**이므로 `totalResponses` 보다 작을 수
+                    있다. 선택 문항을 건너뛴 사람이 있기 때문이다.
+
+                    **응답이 0건이면** `totalResponses: 0`, 두 시각은 `null`, 모든 문항이
+                    `answeredCount: 0` · `average: null` 이다. 0으로 나누는 자리가 없다.
+
+                    **응답자를 식별하는 필드는 어디에도 없다** (FR-009). 주관식의 `responseId` 는
+                    같은 사람의 답을 묶는 열쇠이지 사람의 이름이 아니다.
+
+                    `textAnswers` 는 주관식 **첫 페이지**(20건)다. 그 다음은
+                    `GET /api/v1/surveys/{surveyId}/text-answers` 로 넘긴다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "집계 전체 — 문항별 수치와 주관식 첫 페이지"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스 설문이 아니다)"),
+            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` 또는 `BOOTH_NOT_FOUND`")})
+    @GetMapping("/surveys/{surveyId}/results")
+    @SecurityRequirement(name = "bearerAuth")
+    public SurveyResultService.ResultsView results(@AuthenticationPrincipal Jwt jwt,
+                                                   @Parameter(description = "설문 식별자", example = "12")
+                                                   @PathVariable Long surveyId) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY_RESULTS);
+        return results.results(surveyId, userId);
+    }
+
+    @Operation(summary = "설문 주관식 답변 페이지 조회 — 편집자용",
+            description = """
+                    단답·장문·지원서 답변을 페이지로 돌려준다. 결과 조회의 `textAnswers` 가 첫
+                    페이지이고 그 다음을 이 endpoint 로 넘긴다 (FR-008).
+
+                    **정렬은 답변 id 오름차순으로 고정**이고 바꿀 수 없다. 새 답변은 항상 뒤에 붙으므로
+                    페이지를 넘기는 중에 누가 제출해도 이미 읽은 페이지가 밀리지 않는다 — 경계에서
+                    중복도 누락도 없다. 제출 시각으로 정렬하면 같은 시각이 겹칠 수 있어 그 보장이 깨진다.
+
+                    `questionId` 를 주면 그 문항만, 주지 않으면 텍스트 3유형 전체다.
+
+                    `hasNext` 는 없다 — `page + 1 < totalPages` 로 판단한다 (전역 페이지 규약).
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "한 페이지와 전체 개수. 답변이 없으면 `content: []`·`totalPages: 0`"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `page` 가 음수이거나 `size` 가 1~100 밖이거나 `questionId` 가 이 설문의 문항이 아니다. `errors[0].field` 가 문제 필드다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`"),
+            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` 또는 `BOOTH_NOT_FOUND`")})
+    @GetMapping("/surveys/{surveyId}/text-answers")
+    @SecurityRequirement(name = "bearerAuth")
+    public SurveyResultService.TextAnswerPage textAnswers(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "설문 식별자", example = "12") @PathVariable Long surveyId,
+            @Parameter(description = "이 문항의 답변만. 없으면 텍스트 3유형 전체", example = "103")
+            @RequestParam(required = false) Long questionId,
+            @Parameter(description = "0부터 시작하는 페이지 번호", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "한 페이지 크기. 1~100", example = "20")
+            @RequestParam(defaultValue = "20") int size) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY_RESULTS);
+        return results.textAnswers(surveyId, userId, questionId, page, size);
     }
 
     /**
