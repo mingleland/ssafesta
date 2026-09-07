@@ -1,0 +1,75 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA Spring Chunk Search API
+  version: 1.0.0
+  description: FastAPI가 만든 질의 embedding으로 Spring 소유 Business DB/pgvector를 검색하는 내부 계약이다.
+x-contract-status: response envelope와 오류 봉투는 S15P21A604-398에서 최종 확인 필요
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /chunk-search:
+    post:
+      operationId: searchAiDocumentChunks
+      summary: Booth·Agent 범위의 READY Chunk 검색
+      description: Spring이 boothId, agentId, searchable=true, 부모 Document READY를 모두 강제한다. timeout은 3초이며 threshold를 적용하지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkSearchRequest'
+      responses:
+        '200':
+          description: cosine distance 오름차순 검색 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkSearchResponse'
+        '400': {description: embedding 차원 또는 topK 검증 실패}
+        '401': {description: AI→Spring Service Token 누락·오류}
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    ChunkSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [boothId, agentId, queryEmbedding, topK]
+      properties:
+        boothId: {type: integer, format: int64, minimum: 1}
+        agentId: {type: integer, format: int64, minimum: 1}
+        queryEmbedding:
+          type: array
+          minItems: 1536
+          maxItems: 1536
+          items: {type: number, format: float}
+        topK: {type: integer, minimum: 1, maximum: 20}
+    ChunkSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: {$ref: '#/components/schemas/ChunkSearchItem'}
+    ChunkSearchItem:
+      type: object
+      additionalProperties: false
+      required: [content, chunkNo, documentId, originalFilename, distance]
+      properties:
+        content: {type: string}
+        chunkNo: {type: integer, minimum: 0}
+        pageNumber: {type: [integer, 'null'], minimum: 1}
+        section: {type: [string, 'null']}
+        documentId: {type: integer, format: int64}
+        originalFilename: {type: string}
+        distance:
+          type: number
+          format: float
+          description: Cosine distance. 값이 작을수록 질의와 가깝다.

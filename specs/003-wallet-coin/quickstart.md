@@ -67,7 +67,7 @@ cd backend && ./mvnw spring-boot:run
 
 Bruno 컬렉션 `backend/bruno`:
 
-1. `01-auth` — Google 또는 Kakao로 로그인해 Access Token을 환경변수에 채운다 (신규 계정이면 닉네임 입력까지)
+1. `01-auth` — Google·Kakao·SSAFY 중 하나로 로그인해 Access Token을 환경변수에 채운다 (신규 계정이면 닉네임 입력까지)
 2. `03-wallet/내 지갑 조회` → **신규 계정이면 `balance: 250`** (초기 200 + 당일 첫 접속 50)
 3. `03-wallet/내 거래 내역 조회` → `INITIAL_GRANT`와 `DAILY_GRANT` 2행이 최신순으로 보인다
 4. 같은 두 요청을 여러 번 반복 → **`balance`와 내역이 변하지 않는다** (SC-004 육안 확인)

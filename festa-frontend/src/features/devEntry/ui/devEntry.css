@@ -1,0 +1,41 @@
+/* 개발자 입장구 (S15P21A604-467).
+   흐름 밖(fixed)이라 제품 콘텐츠가 이 요소 때문에 자리를 옮기지 않는다 —
+   특히 로그인 패널의 버튼 좌표(-379 acceptance).
+
+   좌상단 = 개발 환경. 우상단 = 사용자 사운드·그래픽 액션.
+   치수는 :root 의 공통 토큰을 써서 우상단 컨트롤과 같은 크기·모서리를 갖는다. */
+.dev-entry-btn {
+  position: fixed;
+  top: 3vh;
+  left: 2vw;
+  z-index: var(--festa-z-toast);
+  width: var(--festa-control-size);
+  height: var(--festa-control-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px dashed rgba(255, 209, 102, 0.55);
+  border-radius: var(--festa-control-radius);
+  background: rgba(46, 34, 10, 0.72);
+  backdrop-filter: blur(6px);
+  color: #ffd166;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+/* 아이콘은 버튼과 함께 자란다 — 고정 크기면 커진 버튼 안에서 점처럼 보인다 */
+.dev-entry-btn svg {
+  width: 45%;
+  height: 45%;
+}
+
+.dev-entry-btn:hover {
+  background: rgba(66, 49, 14, 0.86);
+  border-color: rgba(255, 209, 102, 0.9);
+}
+
+.dev-entry-btn:focus-visible {
+  outline: 2px solid rgba(255, 209, 102, 0.9);
+  outline-offset: 3px;
+}

@@ -8,6 +8,8 @@ the fail-fast behavior spec 007 plan.md Section 10 requires.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -179,6 +181,12 @@ class Settings(BaseSettings):
     llm_read_timeout_seconds: float = Field(default=15.0, gt=0)
     gms_api_key: SecretStr | None = None
 
+    # Conversation (spec 008) — Redis-backed, 30-minute sliding TTL
+    jwt_secret: SecretStr = Field(min_length=1, validation_alias="JWT_SECRET")
+    redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
+    conversation_ttl_seconds: int = Field(default=1800, gt=0)
+    spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
     internal_spring_to_ai_tokens_csv: SecretStr = Field(
@@ -206,6 +214,10 @@ class Settings(BaseSettings):
     @property
     def job_retry_backoff_seconds(self) -> list[int]:
         return [int(part) for part in _parse_csv(self.job_retry_backoff_seconds_csv)]
+
+    @property
+    def jwt_secret_key(self) -> bytes:
+        return base64.b64decode(self.jwt_secret.get_secret_value())
 
     @property
     def internal_spring_to_ai_tokens(self) -> list[str]:
@@ -274,6 +286,20 @@ class Settings(BaseSettings):
     def _validate_llm_provider(self) -> "Settings":
         if self.llm_provider == "gms" and self.gms_api_key is None:
             raise ValueError("GMS LLM provider requires: GMS_API_KEY")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_jwt_secret(self) -> "Settings":
+        try:
+            decoded = base64.b64decode(
+                self.jwt_secret.get_secret_value(), validate=True
+            )
+        except binascii.Error as exc:
+            raise ValueError("JWT_SECRET must be valid base64") from exc
+        if len(decoded) < 64:
+            raise ValueError(
+                f"JWT_SECRET must contain at least 64 random bytes (got {len(decoded)})"
+            )
         return self
 
     @model_validator(mode="after")
