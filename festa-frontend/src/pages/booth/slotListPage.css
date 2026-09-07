@@ -1,0 +1,34 @@
+/* 부스 슬롯 화면 — Screen Local Baseline 토큰(--sc-*)만 쓴다 */
+.slot-mybooth { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.slot-mybooth-info { display: flex; align-items: center; gap: 10px; flex-grow: 1; flex-wrap: wrap; }
+.slot-mybooth-info strong { font-size: 16px; }
+
+.slot-error { margin-bottom: 14px; }
+
+.slot-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--sc-radius);
+  background: var(--sc-panel);
+  border: 1px solid var(--sc-border);
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+.slot-card:hover { border-color: var(--sc-border-strong); transform: translateY(-1px); }
+.slot-card-mine { border-color: rgba(77, 141, 255, 0.55); background: rgba(30, 44, 84, 0.92); }
+.slot-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.slot-code { font-size: 16px; font-weight: 800; letter-spacing: 0.02em; }
+.slot-card-body { display: flex; flex-direction: column; gap: 4px; min-height: 20px; }
+.slot-price { color: var(--sc-gold); font-size: 13px; font-weight: 700; }
+.slot-cta { width: 100%; }
+
+.slot-tx { margin-top: 18px; }

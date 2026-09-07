@@ -5,6 +5,11 @@ services:
     restart: unless-stopped
     ports: ["127.0.0.1:${AI_HOST_PORT:-8000}:8000"]
     networks: [ai]
+    env_file:
+      - ${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: dev
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
     volumes: [ai_data:/app/data]
     mem_limit: ${AI_MEMORY_LIMIT:-1g}
     cpus: ${AI_CPU_LIMIT:-1.0}

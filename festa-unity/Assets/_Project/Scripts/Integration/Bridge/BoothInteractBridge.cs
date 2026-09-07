@@ -16,7 +16,10 @@ namespace Festa.Integration
     /// payload 는 종류마다 다르다.
     /// <list type="bullet">
     /// <item><c>BOOTH_LAPTOP_INTERACT</c> — <c>{type, boothId, objectId}</c></item>
+    /// <item><c>BOOTH_PROJECT_INTERACT</c> — <c>{type, boothId, objectId}</c></item>
+    /// <item><c>BOOTH_SURVEY_INTERACT</c> — <c>{type, boothId, objectId}</c></item>
     /// <item><c>AI_AGENT_INTERACT</c> — <c>{type, boothId, objectId, configId}</c></item>
+    /// <item><c>WORLD_MANAGEMENT_INTERACT</c> — <c>{type}</c> · <b>필드 없음</b></item>
     /// </list>
     ///
     /// <c>configId → agentId</c> 이름 변환은 **FE 가 `AI_CHAT` payload 를 만들 때 한다.**
@@ -30,6 +33,30 @@ namespace Festa.Integration
 
         /// <summary>2026-08-20 FE·Unity·AI 3파트 확정 (Issue #2).</summary>
         public const string AiAgentInteract = "AI_AGENT_INTERACT";
+
+        /// <summary>2026-08-31 계약 확정 (GitLab #110 note 2754197, S15P21A604-343).</summary>
+        public const string ProjectInteract = "BOOTH_PROJECT_INTERACT";
+
+        /// <summary>2026-09-04 계약 확정 (S15P21A604-415).</summary>
+        public const string SurveyInteract = "BOOTH_SURVEY_INTERACT";
+
+        /// <summary>
+        /// 2026-09-04 계약 확정 (S15P21A604-414). <b>부스 종속이 아니다</b> — 그래서 접두사가
+        /// <c>BOOTH_</c> 가 아니라 <c>WORLD_</c> 이고 payload 에 boothId 가 없다. 관리 NPC 는
+        /// 월드 공용 운영 진입점이고, 관리 대상 부스는 로그인 사용자 기준으로 FE 가
+        /// <c>GET /booths/mine</c> 으로 resolve 한다. Unity 가 남의 임대 정보를 알 이유가 없다.
+        /// </summary>
+        public const string ManagementInteract = "WORLD_MANAGEMENT_INTERACT";
+
+        /// <summary>
+        /// 광장 게임기 (S15P21A604-440, GitLab #56 안 1). <c>{type, machineId}</c> — machineId 는 씬이 정한 canonical id 이고
+        /// FE 가 <c>GET /api/v1/arcade-machines/{machineId}</c> 로 어떤 게임이 걸렸는지 resolve 한다. Unity 는 gameId 를 모른다.
+        /// 이벤트 이름은 게임 파트 제안(docs/26 ③) — FE 수신부 확정 전.
+        /// </summary>
+        public const string ArcadeInteract = "WORLD_ARCADE_INTERACT";
+
+        /// <summary>부스 배치 GAME_PORTAL (spec 019 contracts/game-portal-bridge.md). <c>{type, boothId, objectId, configId}</c>, configId 는 1 이상.</summary>
+        public const string GameInteract = "BOOTH_GAME_INTERACT";
 
         /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
@@ -85,6 +112,80 @@ namespace Festa.Integration
             OnSent?.Invoke(AiAgentInteract);
         }
 
+        /// <summary>
+        /// 프로젝트 전시판 → 전시 열기 (S15P21A604-343).
+        ///
+        /// payload 는 <c>{boothId, objectId}</c> 뿐이다. <b>projectId·configId 를 보내지 않는다</b> —
+        /// 부스당 프로젝트는 1개라(spec 009 C-01) boothId 만으로 조회가 끝나고, 그 값은 BE 소유라
+        /// Unity 가 알지도 못한다. 노트북이 URL 을 보내지 않는 것과 같은 이유다(헌법 25조).
+        ///
+        /// 등록 여부와 무관하게 트리거만 발생시킨다 — 전시가 없으면 FE 가 빈 상태를 안내한다.
+        /// </summary>
+        public static void SendProjectInteract(int boothId, string objectId)
+        {
+            if (!HasObjectId(ProjectInteract, objectId)) return;
+            Send(BuildJson(ProjectInteract, boothId, objectId));
+            OnSent?.Invoke(ProjectInteract);
+        }
+
+        /// <summary>
+        /// 설문 키오스크 → 설문 열기 (S15P21A604-415).
+        ///
+        /// payload 는 <c>{boothId, objectId}</c> 뿐이다. <b>surveyId 를 보내지 않는다.</b>
+        /// 설문은 부스에 배치되는 것이고(spec 010) 발행 상태·설문 식별자는 BE 소유라 Unity 가
+        /// 알 수 없다. FE 가 boothId 로 해석하며, 부스에 설문이 여러 개가 되는 날에는
+        /// <c>objectId</c> 로 특정 설문에 binding 할 수 있게 두 값을 함께 보낸다.
+        ///
+        /// 발행 여부와 무관하게 트리거만 발생시킨다 — 없으면 FE 가 빈 상태를 안내한다.
+        /// </summary>
+        public static void SendSurveyInteract(int boothId, string objectId)
+        {
+            if (!HasObjectId(SurveyInteract, objectId)) return;
+            Send(BuildJson(SurveyInteract, boothId, objectId));
+            OnSent?.Invoke(SurveyInteract);
+        }
+
+        /// <summary>
+        /// 관리 NPC → 내 부스 관리 열기 (S15P21A604-414).
+        ///
+        /// <b>인자가 없다.</b> 관리 대상은 "로그인한 사람의 부스" 하나이고 그 식별은 FE·BE 몫이다.
+        /// 여기서 boothId 를 실어 보내려면 Unity 가 세션 사용자의 임대 정보를 알아야 하는데,
+        /// 영구 상태의 Source of Truth 는 Spring 이다(헌법 1조).
+        ///
+        /// 인증 여부도 판정하지 않는다 — 게스트가 눌러도 이벤트는 나가고, 회원 전용 안내는
+        /// FE 가 띄운다. 노트북·프로젝트가 "등록 여부와 무관하게 트리거만" 인 것과 같은 원칙이다.
+        /// </summary>
+        public static void SendManagementInteract()
+        {
+            Send(BuildTypeOnlyJson(ManagementInteract));
+            OnSent?.Invoke(ManagementInteract);
+        }
+
+        /// <summary>광장 게임기 — <see cref="ArcadeInteract"/>.</summary>
+        public static void SendArcadeInteract(string machineId)
+        {
+            if (string.IsNullOrEmpty(machineId))
+            {
+                Debug.LogWarning($"[BoothInteractBridge] machineId 가 없어 {ArcadeInteract} 이벤트를 건너뜁니다.");
+                return;
+            }
+            Send("{\"type\":\"" + ArcadeInteract + "\",\"machineId\":\"" + EscapeJson(machineId) + "\"}");
+            OnSent?.Invoke(ArcadeInteract);
+        }
+
+        /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>
+        public static void SendGameInteract(int boothId, string objectId, int configId)
+        {
+            if (!HasObjectId(GameInteract, objectId)) return;
+            if (configId <= 0)
+            {
+                Debug.LogWarning($"[BoothInteractBridge] configId={configId} 는 미연결이라 {GameInteract} 이벤트를 건너뜁니다 (booth={boothId}, object={objectId}).");
+                return;
+            }
+            Send(BuildJson(GameInteract, boothId, objectId, configId: configId));
+            OnSent?.Invoke(GameInteract);
+        }
+
         static bool HasObjectId(string type, string objectId)
         {
             if (!string.IsNullOrEmpty(objectId)) return true;
@@ -125,6 +226,12 @@ namespace Festa.Integration
 
             return json.Append('}').ToString();
         }
+
+        /// <summary>
+        /// 필드가 없는 이벤트용. <see cref="BuildJson"/> 는 boothId·objectId 를 필수로 받으므로
+        /// 0 과 빈 문자열을 억지로 채워 넣게 된다 — 받는 쪽이 "값이 있다" 로 읽는 바로 그 문제다.
+        /// </summary>
+        static string BuildTypeOnlyJson(string type) => "{\"type\":\"" + type + "\"}";
 
         static string EscapeJson(string value) => value
             .Replace("\\", "\\\\")

@@ -1,7 +1,9 @@
 package com.example.ssafesta.ai;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +18,18 @@ import org.springframework.data.repository.query.Param;
 public interface AiAgentRepository extends JpaRepository<AiAgent, Long> {
 
     Optional<AiAgent> findByBoothId(Long boothId);
+
+    /**
+     * Locks the agent row so document-quota checks are not racing each other (spec 007 FR-018).
+     *
+     * <p>The 10-document and 100MB ceilings are read-then-insert, and the partial unique index only
+     * catches two uploads of the <i>same</i> file. Two different files would each read "nine" and
+     * each insert. Serialising on the agent row is what makes the count mean something — the same
+     * move C-14 makes with the booth row for publish versus delete.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM AiAgent a WHERE a.id = :id")
+    Optional<AiAgent> findWithLockById(@Param("id") Long id);
 
     @Query(value = "SELECT EXISTS(SELECT 1 FROM ai_documents WHERE agent_id = :agentId)",
             nativeQuery = true)

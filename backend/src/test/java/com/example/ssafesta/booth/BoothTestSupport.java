@@ -18,12 +18,21 @@ public final class BoothTestSupport {
 
     /** Creates a member with a wallet and the signup grant, as registration would. */
     public static Long createMemberWithWallet(UserRepository users, WalletService wallets, String prefix) {
+        Long userId = createMember(users, prefix);
+        wallets.openWallet(userId);
+        return userId;
+    }
+
+    /**
+     * Creates a member row and nothing else — no wallet. Registration always opens one in the same
+     * transaction, so this is the broken state, not a normal one; it exists to check what the API
+     * answers when it is reached.
+     */
+    public static Long createMember(UserRepository users, String prefix) {
         // nickname 은 VARCHAR(30) 이다 (V1:6). nanoTime 을 붙이면 그것만으로 17자를 먹어 prefix 가
         // 조금만 길어도 넘친다 (T-103). SEQUENCE 는 JVM 당 유일하고 컨테이너는 실행마다 새로 뜨므로
         // 실행 간 충돌이 없다. 헬퍼마다 SEQUENCE 가 따로라 태그 한 글자로 서로를 가른다.
-        Long userId = users.save(new User(prefix + "b" + SEQUENCE.incrementAndGet())).getId();
-        wallets.openWallet(userId);
-        return userId;
+        return users.save(new User(prefix + "b" + SEQUENCE.incrementAndGet())).getId();
     }
 
     /**

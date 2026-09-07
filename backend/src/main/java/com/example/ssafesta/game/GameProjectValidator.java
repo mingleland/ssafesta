@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
@@ -57,8 +58,9 @@ public class GameProjectValidator {
      *
      * @throws GameValidationFailedException one or more rules broke; the exception carries all of them
      */
-    public void validateForDraft(JsonNode project, String rawBody, Long gameId) {
-        List<ApiErrorDetail> errors = commonErrors(project, rawBody, gameId);
+    public void validateForDraft(JsonNode project, String rawBody, Long gameId,
+                                 Map<String, GameAssetState> assetStates) {
+        List<ApiErrorDetail> errors = commonErrors(project, rawBody, gameId, assetStates);
         if (!errors.isEmpty()) {
             throw new GameValidationFailedException("게임을 저장할 수 없습니다.", errors, null);
         }
@@ -70,15 +72,17 @@ public class GameProjectValidator {
      * <p>Runs against the stored Draft, not the request: Publish takes no project body, so what gets
      * frozen is what the server already holds (contracts §Publish).
      */
-    public void validateForPublish(JsonNode project, String rawBody, Long gameId) {
-        List<ApiErrorDetail> errors = commonErrors(project, rawBody, gameId);
+    public void validateForPublish(JsonNode project, String rawBody, Long gameId,
+                                   Map<String, GameAssetState> assetStates) {
+        List<ApiErrorDetail> errors = commonErrors(project, rawBody, gameId, assetStates);
         errors.addAll(publishOnlyErrors(project));
         if (!errors.isEmpty()) {
             throw new GameValidationFailedException("게임을 공개할 수 없습니다.", errors, null);
         }
     }
 
-    private List<ApiErrorDetail> commonErrors(JsonNode project, String rawBody, Long gameId) {
+    private List<ApiErrorDetail> commonErrors(JsonNode project, String rawBody, Long gameId,
+                                              Map<String, GameAssetState> assetStates) {
         List<ApiErrorDetail> errors = new ArrayList<>();
 
         // Size first: a 20MB body would otherwise be walked in full before being refused.
@@ -91,7 +95,7 @@ public class GameProjectValidator {
 
         errors.addAll(envelopeErrors(project, gameId));
         errors.addAll(schemaErrors(project));
-        errors.addAll(assetSourceErrors(project));
+        errors.addAll(assetSourceErrors(project, gameId, assetStates));
         errors.addAll(duplicateIdErrors(project));
         errors.addAll(referenceErrors(project));
         errors.addAll(gameRulesErrors(project));
@@ -175,15 +179,16 @@ public class GameProjectValidator {
     }
 
     /**
-     * {@code builtin://} or a server-issued stable {@code asset://} only.
+     * Every declared asset source, checked the same way at Draft and at Publish.
      *
      * <p>The fixture validator's regex is {@code /^(builtin|asset):\/\//}, which lets
-     * {@code asset://local/...} through. The server looks at the authority too — fixtures are the
-     * floor and the server is the ceiling (contracts §Asset source). Draft is checked as well: #69
-     * considered passing local sources with a warning and rejected it, and the editor never creates
-     * one anyway.
+     * {@code asset://local/...} through. The server looks at the authority and at the asset's state
+     * too — fixtures are the floor and the server is the ceiling (contracts §Asset source). Draft is
+     * checked as well: #69 considered passing local sources with a warning and rejected it, and the
+     * editor never creates one anyway.
      */
-    private List<ApiErrorDetail> assetSourceErrors(JsonNode project) {
+    private List<ApiErrorDetail> assetSourceErrors(JsonNode project, Long gameId,
+                                                  Map<String, GameAssetState> assetStates) {
         List<ApiErrorDetail> errors = new ArrayList<>();
         List<JsonNode> assets = GameProjectJson.arrayAt(project, "assets");
         for (int i = 0; i < assets.size(); i++) {
@@ -191,34 +196,67 @@ public class GameProjectValidator {
             if (source == null) {
                 continue; // schema already reported the missing field
             }
-            if (!isPersistableSource(source)) {
-                errors.add(ApiErrorDetail.of("ASSET_SOURCE_INVALID",
-                        "/assets/" + i + "/source 는 builtin:// 만 사용할 수 있습니다. "
-                                + "사용자 에셋 업로드는 아직 제공되지 않습니다."));
+            String reason = unusableReason(source, gameId, assetStates);
+            if (reason != null) {
+                errors.add(ApiErrorDetail.of("ASSET_SOURCE_INVALID", "/assets/" + i + "/source — " + reason));
             }
         }
         return errors;
     }
 
     /**
-     * {@code builtin://} only, for now.
+     * {@code builtin://}, or a stable {@code asset://} this game owns and has verified.
      *
-     * <p>The contract's wording is "builtin:// or a <b>server-issued</b> stable asset://", and the
-     * server issues none: §Asset Boundary keeps user upload out of the MVP entirely, and the endpoint
-     * that would mint an {@code assetId} has no contract yet (#69). Accepting {@code asset://anything}
-     * would let a project store a reference to something that cannot exist, which becomes a missing
-     * image at play time rather than an error at save time.
+     * <p>The relaxation lands in the same commit as the issuing endpoint, which is what the contract
+     * requires (§9) and what the previous version of this comment promised. Split apart, one half
+     * refuses references to assets that now exist and the other stores references to assets that
+     * never will.
      *
-     * <p>So the count of valid {@code asset://} values is zero, and treating any of them as valid was
-     * an accident: only {@code asset://local} was being refused. Nothing legitimate sends one today —
-     * the editor's own preview scheme is {@code asset://local/...} and PR #72 already blocks those
-     * before publish.
+     * <p>Four things have to hold, and the last two are why a snapshot of asset <b>states</b> is
+     * passed in rather than a set of usable ids:
      *
-     * <p>The relaxation belongs in the same commit that adds issuance (#69). Keeping both halves
-     * together is what stops them from disagreeing.
+     * <ol>
+     *   <li>the scheme is one of the two permitted forms;</li>
+     *   <li>the authority is {@code game/{thisGameId}} — checked on the string, before any lookup,
+     *       so a reference aimed at another game is refused without touching its rows (§2);</li>
+     *   <li>a row for that {@code assetId} exists in this game;</li>
+     *   <li>it is {@code READY} — the bytes arrived and passed verification.</li>
+     * </ol>
+     *
+     * <p>All of them answer with the single rule {@code ASSET_SOURCE_INVALID}, because the rule
+     * vocabulary is closed (game-api.md §rule, 19 names approved in #48) and that row already covers
+     * "not {@code builtin://} and not a server-issued stable {@code asset://}". The reason travels in
+     * the message instead, so the editor can still say which of the four failed.
+     *
+     * <p>{@code ASSET_NOT_OWNED} stays unused, and now deliberately rather than for lack of a
+     * registry: the registry is keyed {@code (game_id, asset_id)}, so "another user's asset" and
+     * "no such asset here" are the same observation from inside this game. Telling them apart would
+     * mean querying across games to find out that someone else's asset exists — which is the answer
+     * we should not be giving.
+     *
+     * @return the reason it cannot be stored, or {@code null} when it can
      */
-    private boolean isPersistableSource(String source) {
-        return source.startsWith("builtin://");
+    private String unusableReason(String source, Long gameId, Map<String, GameAssetState> assetStates) {
+        if (source.startsWith("builtin://")) {
+            return null;
+        }
+        String prefix = "asset://game/" + gameId + "/";
+        if (!source.startsWith(prefix)) {
+            // Covers asset://local, another game's id, data:, blob:, file: and base64 alike.
+            return "builtin:// 또는 이 게임에 업로드한 asset:// 만 사용할 수 있습니다.";
+        }
+        String assetId = source.substring(prefix.length());
+        if (assetId.isEmpty() || assetId.indexOf('/') >= 0) {
+            return "asset:// 주소 형식이 올바르지 않습니다.";
+        }
+        GameAssetState state = assetStates.getOrDefault(assetId, GameAssetState.MISSING);
+        return switch (state) {
+            case READY -> null;
+            case UPLOADING -> "업로드가 끝나지 않은 이미지는 저장할 수 없습니다.";
+            case FAILED -> "업로드에 실패한 이미지는 저장할 수 없습니다. 다시 올려 주세요.";
+            case DELETED -> "삭제된 이미지는 새로 사용할 수 없습니다.";
+            case MISSING -> "이 게임에 없는 이미지입니다.";
+        };
     }
 
     /**
@@ -293,9 +331,9 @@ public class GameProjectValidator {
      * not take audio uploads, and #69 confirmed the server rejects it rather than storing something
      * no runtime will play.
      *
-     * <p>Still absent: {@code ASSET_NOT_OWNED} and {@code COMPLETION_PATH_MISSING}. The first needs
-     * server-side Asset registration to exist (#69), and the second needs the v1.1 {@code rules}
-     * vocabulary approved (#78) — guessing either would refuse projects the contract permits.
+     * <p>{@code ASSET_NOT_OWNED} is still unused, but no longer for want of a registry — see
+     * {@link #unusableReason}, where a foreign reference and an absent one are the same observation
+     * and are both refused at Draft as well. {@code COMPLETION_PATH_MISSING} is below.
      */
     private List<ApiErrorDetail> publishOnlyErrors(JsonNode project) {
         List<ApiErrorDetail> errors = new ArrayList<>(GameDialogueRules.errors(project));

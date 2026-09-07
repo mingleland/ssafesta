@@ -1,0 +1,11 @@
+name: festa-dev
+
+# Compose merges this project/network definition with exactly one component
+# overlay. Profiles and aliases belong to each overlay because YAML anchors do
+# not cross Compose files.
+services: {}
+
+networks:
+  dev-private:
+    name: festa-dev-private
+    internal: true

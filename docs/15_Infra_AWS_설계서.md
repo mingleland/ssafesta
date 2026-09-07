@@ -303,7 +303,14 @@ Spring → 후속 AI 처리 허용
 - R2를 사용할 수 없을 때도 S3-compatible 계약을 유지하며 단일 노드 MinIO로만 수동 fallback한다.
 - 한 시점에는 신규 업로드용 active write provider 하나만 허용한다. 기존 객체 읽기는 문서별 `storageProvider`를 따르므로 R2·MinIO reader 설정을 함께 유지한다.
 - Usage Guard snapshot은 R2 사용량·freshness 기반 업로드 허용만 판정하고 active provider를 소유하지 않는다.
-- active write provider와 upload-enabled는 Spring 배포 설정으로 주입한다. FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
+- active write provider와 upload gate는 Spring 배포 설정으로 주입한다(`AI_STORAGE_ACTIVE_WRITE_PROVIDER`·`AI_STORAGE_UPLOAD_GATE`, 둘 다 기본값 없음). FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
+- `AI_STORAGE_UPLOAD_GATE`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이다 (GitLab #100, 2026-09-01 확정). Storage Failover Control과 Usage Guard의 상태를 **운영자가 읽어 이 한 값으로 옮겨 적으며**, Spring은 그 상태 머신을 모른다. `storage-failover-state.schema.json`의 `uploadEnabled`는 Infra 상태 표현으로 그대로 두고, 그것을 Spring 설정으로 직접 주입하지 않는다.
+
+| 관측 상태 | `AI_STORAGE_UPLOAD_GATE` | Spring 응답 |
+|---|---|---|
+| Usage `NORMAL`·`WARNING`, 저장소 `R2_ACTIVE`, 검증 완료 `LOCAL_ACTIVE` | `OPEN` | 발급 |
+| Usage 사용량 90% 초과 | `QUOTA_BLOCKED` | `507 STORAGE_QUOTA_EXCEEDED` |
+| Usage stale, 저장소 `UPLOAD_BLOCKED`·`FALLBACK_VALIDATING`·`R2_RECONCILING` | `UNAVAILABLE` | `503 STORAGE_UNAVAILABLE` |
 - R2 원본 문서는 P0에서 별도 2차 외부 백업을 두지 않는다. MinIO는 같은 EC2의 임시 가용성 수단이며 backup·복제본으로 계산하지 않는다.
 
 Credential과 삭제 권한 경계:

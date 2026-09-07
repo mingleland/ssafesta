@@ -49,7 +49,6 @@ public class BoothStaff {
     public Long getBoothId() { return boothId; }
     public Long getUserId() { return userId; }
     public String getRole() { return role; }
-    public Instant getJoinedAt() { return joinedAt; }
 
     /** Composite key mirroring {@code PRIMARY KEY(booth_id, user_id)}. */
     public static class Key implements Serializable {

@@ -71,7 +71,36 @@ class GameWithdrawalIntegrationTest {
         assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
     }
 
-    private int count(String sql, Long argument) {
+    /**
+     * The bytes are outside the database, so withdrawal has to leave their coordinates behind.
+     *
+     * <p>Deleting the object inside this transaction is not an option: a storage failure would either
+     * roll the withdrawal back — a member cannot leave because a bucket is unreachable — or be lost
+     * after commit, and the object would stay forever with nothing pointing at it. The queue row is
+     * written by the same commit, which is the whole of contract §7.1.
+     */
+    @Test
+    void withdrawingHandsTheAssetObjectsToTheDeleteQueue() {
+        Long userId = GameTestSupport.createMember(users, "탈퇴자산");
+        Long gameId = games.save(new Game(userId, "자산 있는 게임")).getId();
+        jdbc.update("""
+                INSERT INTO game_assets (game_id, asset_id, kind, status, provider, storage_bucket,
+                                         object_key, declared_content_type, declared_byte_size,
+                                         upload_expires_at, created_by_user_id)
+                VALUES (?, 'aTestAsset', 'IMAGE', 'UPLOADING', 'R2', 'test-bucket',
+                        ?, 'image/png', 64, now() + interval '10 minutes', ?)
+                """, gameId, "games/" + gameId + "/assets/aTestAsset", userId);
+
+        deletions.deleteUserGraph(userId);
+
+        assertEquals(0, count("SELECT count(*) FROM game_assets WHERE game_id = ?", gameId),
+                "행이 남으면 games 삭제가 FK 로 막힌다");
+        assertEquals(1, count("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?",
+                "games/" + gameId + "/assets/aTestAsset"), "객체 좌표는 큐에 남아야 한다");
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
+    }
+
+    private int count(String sql, Object argument) {
         Integer found = jdbc.queryForObject(sql, Integer.class, argument);
         return found == null ? 0 : found;
     }

@@ -50,6 +50,7 @@ GRANT CONNECT ON DATABASE festa_demo_ai TO festa_demo_ai_app;
 \connect festa_dev_business
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO festa_dev_back_app;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 \connect festa_dev_ai
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
@@ -59,6 +60,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 \connect festa_demo_business
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO festa_demo_back_app;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 \connect festa_demo_ai
 REVOKE ALL ON SCHEMA public FROM PUBLIC;

@@ -68,7 +68,7 @@
 ### 사용자 스토리 1 구현
 
 - [ ] T021 [US1] `dev-ai`, `dev-back`, `dev-front`, `dev-game` 대상을 포함한 `festa-dev` 환경 매니페스트를 `infra/environments/config/manifests/dev.json`에 작성한다
-- [ ] T022 [US1] 공용 dev 프로젝트, 내부 네트워크 별칭, Mock 선택 입력과 컴포넌트 프로필을 `infra/environments/compose/dev/base.yaml`에 작성하고 승인된 IP 기반 `__dev/{front|api|ai|world}` 라우팅을 `infra/environments/nginx/sites/dev.conf`에 정의한다
+- [ ] T022 [US1] 공용 dev 프로젝트, 내부 네트워크 별칭, Mock 선택 입력과 컴포넌트 프로필을 `infra/environments/compose/dev/base.yaml`에 작성하고 승인된 IP 기반 `__dev/{front|api|ai}` 라우팅과 UnityTransport용 `world-dev.${ROOT_DOMAIN}` 전용 WSS host를 Nginx 설정에 정의한다
 - [ ] T023 [P] [US1] 환경에서 주입되는 엔드포인트와 자원 참조를 사용하는 FastAPI dev 서비스 오버레이를 `infra/environments/compose/dev/ai.yaml`에 추가한다
 - [ ] T024 [P] [US1] 환경 범위 PostgreSQL/Redis 연결을 사용하는 Spring dev 서비스 오버레이를 `infra/environments/compose/dev/back.yaml`에 추가한다
 - [ ] T025 [P] [US1] 환경 호스트 이름을 내장하지 않은 React·정적 dev 서비스 오버레이를 `infra/environments/compose/dev/front.yaml`에 추가한다

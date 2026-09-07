@@ -51,6 +51,7 @@ namespace Festa.World
         Material _groundShadowMaterial;
         Texture2D _groundShadowTexture;
         Animator _animator;
+        CharacterController _controller;
         string _appliedEncoded;
 
         public AvatarCatalog Catalog => _catalog;
@@ -61,6 +62,7 @@ namespace Festa.World
         {
             _player = GetComponent<NetworkPlayer>();
             _appearance = GetComponent<PlayerAppearanceController>();
+            _controller = GetComponent<CharacterController>();
             _provider = new CatalogAvatarVisualProvider(_catalog, _modularCatalog);
             if (_visualRoot == null) _visualRoot = transform;
         }
@@ -164,6 +166,13 @@ namespace Festa.World
 
             // 선 자세 기준값. 이모트로 접지를 고쳤다가 되돌릴 때 쓴다.
             _baseVisualLocalY = visualTransform.localPosition.y;
+
+            // **컨트롤러가 자리잡은 뒤 한 번 더 잰다.** 조립 시점에는 캐릭터가 아직
+            // 낙하·정착 중이라 루트가 바닥에서 0.10~0.22u 사이 어디에나 있을 수 있고
+            // (CharacterController 는 skinWidth 안에서 파고들었다 밀려나기를 반복한다),
+            // 그 순간 값으로 오프셋을 굳히면 정착 후 0.12u(≈1 cm) 어긋난 채 남는다.
+            _regroundAt = Time.time + SpawnSettle;
+            _baseNeedsRefresh = true;
         }
 
         // ── 포즈별 접지 보정 ────────────────────────────────────────
@@ -183,6 +192,11 @@ namespace Festa.World
         // 선 자세와 앉은 자세의 **중간값**이 나온다.
         const float RegroundSettle = 0.32f;
 
+        /// <summary>스폰 직후 컨트롤러가 바닥에 정착할 때까지 기다리는 시간.</summary>
+        const float SpawnSettle = 0.6f;
+
+        bool _baseNeedsRefresh;
+
         /// <summary>
         /// 접지가 선 자세와 다른 이모트. 새 이모트를 추가할 때 **추측하지 말고 재서** 넣는다 —
         /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
@@ -200,11 +214,108 @@ namespace Festa.World
             if (!TryGetVisibleGeometryBounds(out var fitted)) return false;
 
             var visualTransform = _currentVisual.transform;
-            float bottomRelativeToRoot = fitted.min.y - transform.position.y;
+            float bottomRelativeToContact = fitted.min.y - FootContactY();
             var p = visualTransform.localPosition;
-            p.y -= bottomRelativeToRoot - _groundClearance;
+            p.y -= bottomRelativeToContact - _groundClearance;
             visualTransform.localPosition = p;
+            _rootHeightAtGrounding = RootHeightAboveGround();
             return true;
+        }
+
+        /// <summary>
+        /// 루트가 바닥에서 얼마나 떠 있는지. 못 재면 <see cref="float.NaN"/>.
+        /// </summary>
+        float RootHeightAboveGround()
+            => TryFindGroundBelowFeet(out var g) ? transform.position.y - g : float.NaN;
+
+        /// <summary>
+        /// 루트 높이가 바뀐 만큼 외형을 보정해 발을 바닥에 붙여 둔다.
+        ///
+        /// <para><b>왜 한 번 재는 것으로 부족한가.</b> CharacterController 는 캡슐 바닥을
+        /// 바닥면에 붙이지 않고 skinWidth(0.22) 안에서 파고들었다 밀려나기를 반복한다.
+        /// 실측하면 루트가 바닥 위 0.10u 일 때도 0.22u 일 때도 있고, 착지·이동 이력에 따라
+        /// 갈린다. 외형은 루트의 자식이라 그 차이를 그대로 물려받아, 스폰 때 잰 값으로
+        /// 고정하면 상태가 바뀐 뒤 0.12u(≈1 cm) 어긋난 채 남는다.</para>
+        ///
+        /// <para><b>포즈는 다시 재지 않는다.</b> 여기서 하는 것은 루트 높이 변화분을
+        /// 상쇄하는 것뿐이다. 매 프레임 포즈 최하단을 바닥에 붙이면 걷는 동안 발이 번갈아
+        /// 뜨면서 몸이 펌프질한다 — 그래서 포즈 재측정은 이모트에서만 한다.</para>
+        ///
+        /// <para>레이캐스트 한 발을 10 Hz 로만 쏜다. 접지 중일 때만 도는데, 공중에서는
+        /// 바닥까지의 거리가 발 위치와 무관하기 때문이다.</para>
+        /// </summary>
+        void HoldFeetOnGround()
+        {
+            if (_currentVisual == null || _controller == null || !_controller.isGrounded) return;
+            if (Time.time < _nextFootCheck) return;
+            _nextFootCheck = Time.time + FootCheckInterval;
+
+            float now = RootHeightAboveGround();
+            if (float.IsNaN(now) || float.IsNaN(_rootHeightAtGrounding)) return;
+
+            float drift = now - _rootHeightAtGrounding;
+            if (Mathf.Abs(drift) < 0.01f) return;
+
+            var t = _currentVisual.transform;
+            var p = t.localPosition;
+            p.y -= drift;
+            t.localPosition = p;
+            _baseVisualLocalY -= drift;          // 이모트 복귀 기준값도 같이 옮긴다
+            _rootHeightAtGrounding = now;
+        }
+
+        const float FootCheckInterval = 0.1f;
+        float _nextFootCheck;
+        float _rootHeightAtGrounding = float.NaN;
+
+        /// <summary>
+        /// 발이 놓여야 할 높이 — **루트가 아니라 실제 바닥면**이다.
+        ///
+        /// <para>루트에 맞추면 뜬다. CharacterController 는 캡슐 바닥을 바닥면에 붙이지
+        /// 않고 띄운 채 정지하기 때문이다. 실측하면 루트가 바닥보다 0.10~0.22u 위에 있고
+        /// 그 값이 상황에 따라 변한다 — skinWidth(0.22) 를 상수로 빼는 것으로는 맞출 수
+        /// 없다. 여유값(0.03)까지 더해 아바타가 최대 0.25u 떠 있었다
+        /// (S15P21A604-355 사용자 지적).</para>
+        ///
+        /// <para>바닥을 못 찾으면(스폰 직후 허공 등) 캡슐 바닥으로 추정한다. 캡슐 바닥은
+        /// center.y - height/2 로 구한다 — 지금은 0 이지만 상수로 박으면 컨트롤러를
+        /// 조정할 때 조용히 어긋난다.</para>
+        /// </summary>
+        float FootContactY()
+        {
+            if (TryFindGroundBelowFeet(out var groundY)) return groundY;
+
+            float y = transform.position.y;
+            if (_controller == null) return y;
+            return y + _controller.center.y - _controller.height * 0.5f - _controller.skinWidth;
+        }
+
+        /// <summary>
+        /// 발 바로 위에서 아래로 쏴서 딛고 선 면을 찾는다.
+        ///
+        /// <para><see cref="TryFindGroundHeight"/> 를 쓰면 안 된다. 그쪽은 50u 위에서
+        /// 쏘고 <b>가장 높은 히트</b>를 고르기 때문에 실내에서는 천장·선반이 바닥으로
+        /// 잡힌다 — 접지 그림자를 대충 놓는 용도라 그래도 됐지만 발을 맞추는 데는 못 쓴다.
+        /// 여기서는 발 근처에서 시작하므로 가장 높은 히트가 곧 <b>바로 아래 면</b>이다.</para>
+        /// </summary>
+        bool TryFindGroundBelowFeet(out float groundY)
+        {
+            groundY = 0f;
+            var origin = transform.position + Vector3.up * 2f;
+            var hits = Physics.RaycastAll(origin, Vector3.down, 30f, ~0, QueryTriggerInteraction.Ignore);
+            var found = false;
+            var best = float.NegativeInfinity;
+
+            foreach (var hit in hits)
+            {
+                if (hit.transform == null || hit.transform.IsChildOf(transform)) continue;
+                if (hit.point.y <= best) continue;
+                best = hit.point.y;
+                found = true;
+            }
+
+            if (found) groundY = best;
+            return found;
         }
 
         /// <summary>이모트가 끝나면 선 자세 기준으로 되돌린다.</summary>
@@ -238,6 +349,13 @@ namespace Festa.World
 
                 var baked = new Mesh();
                 skinned.BakeMesh(baked);
+                // **바운즈를 다시 계산해야 한다.** BakeMesh 는 정점만 굽고 bounds 는
+                // SkinnedMeshRenderer 의 것(바인드포즈 골격 범위)을 그대로 물고 온다 —
+                // 이 함수가 BakeMesh 를 쓰는 이유였던 바로 그 부풀린 값이다 (T-201).
+                // 재계산을 빠뜨려 신발 최하단을 1.410 대신 0.214 로 읽었고, 그만큼
+                // 아바타가 **1.32u(≈10 cm) 떠 있었다** (S15P21A604-355 사용자 지적).
+                // 재계산 결과는 정점을 전부 훑은 값과 소수점 4자리까지 같고 3 ms 면 끝난다.
+                baked.RecalculateBounds();
                 var localBounds = baked.bounds;
                 Destroy(baked);
 
@@ -386,8 +504,17 @@ namespace Festa.World
             if (_regroundAt > 0f && Time.time >= _regroundAt)
             {
                 _regroundAt = 0f;
-                GroundToCurrentPose();
+                if (GroundToCurrentPose() && _baseNeedsRefresh)
+                {
+                    // 정착 후 다시 잰 값이 선 자세의 진짜 기준이다. 이모트로 접지를
+                    // 고쳤다 되돌릴 때 이 값으로 돌아간다.
+                    _baseNeedsRefresh = false;
+                    if (!ChangesGroundContact(_player.EmoteId.Value))
+                        _baseVisualLocalY = _currentVisual.transform.localPosition.y;
+                }
             }
+
+            HoldFeetOnGround();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
             if (!TryFindGroundHeight(out var groundY))

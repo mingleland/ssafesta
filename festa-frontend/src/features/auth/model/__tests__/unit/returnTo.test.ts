@@ -58,15 +58,15 @@ describe('saveReturnTo·consumeReturnTo', () => {
   it('안전한 경로를 저장했다가 1회 소비하고, 소비 후에는 남지 않는다', () => {
     saveReturnTo('/app/studio/abc');
     expect(consumeReturnTo()).toBe('/app/studio/abc');
-    expect(consumeReturnTo()).toBe('/app/home'); // 이미 소비됨 — 기본값
+    expect(consumeReturnTo()).toBe('/app/world'); // 이미 소비됨 — 기본값
   });
 
   it('안전하지 않은 경로는 애초에 저장하지 않는다', () => {
     saveReturnTo('https://evil.com');
-    expect(consumeReturnTo()).toBe('/app/home');
+    expect(consumeReturnTo()).toBe('/app/world');
   });
 
-  it('저장된 값이 없으면 기본 목적지(/app/home)로 떨어진다', () => {
-    expect(consumeReturnTo()).toBe('/app/home');
+  it('저장된 값이 없으면 기본 목적지(/app/world)로 떨어진다', () => {
+    expect(consumeReturnTo()).toBe('/app/world');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGameProject } from '../../contracts/gameProject.ts';
+import { GameProjectContractError, parseGameProject } from '../../contracts/gameProject.ts';
 import {
   addComponent,
   addDialogueScene,
@@ -15,13 +15,18 @@ import {
   duplicateObjects,
   fillTileLayer,
   floodFillTiles,
+  isTerminalActionType,
   moveObject,
   moveObjects,
   moveScene,
   paintTile,
   paintTiles,
   removeObjects,
+  reorderEventAction,
   resizeWorldScene,
+  sceneRemovalReason,
+  setStartScene,
+  startSceneChangeReason,
 } from '../../studio/model/authoringCommands.ts';
 import { createStarterProject } from '../../studio/model/createStarterProject.ts';
 
@@ -238,5 +243,79 @@ describe('Game Studio authoring commands', () => {
     const spawn = platformer.objects.find((object) => object.preset === 'PLAYER_SPAWN');
     if (spawn === undefined) throw new Error('expected player spawn');
     expect(() => removeObjects(oversized, platformer.id, [spawn.id])).not.toThrow();
+  });
+
+  // S15P21A604-360 — Event Action 순서를 드래그(햄버거 핸들)로 바꿀 수 있게 한다.
+  it('reorders event actions to an arbitrary position in one step, and leaves out-of-range/no-op moves untouched', () => {
+    let project = createStarterProject(52);
+    // takeLibraryKey: [GIVE_ITEM, HIDE_OBJECT] — 여기에 SET_VARIABLE을 하나 더 붙여
+    // 인접 swap으로는 표현 못 하는 "여러 칸 건너뛰는 드래그"를 검증한다.
+    project = appendEventAction(project, 'library', 'takeLibraryKey', 'SET_VARIABLE');
+
+    // 3번째(index 2) action을 맨 앞(index 0)으로 — 드래그 한 번으로 두 칸을 건너뛴다.
+    const moved = reorderEventAction(project, 'library', 'takeLibraryKey', 2, 0);
+    const scene = moved.scenes.find((candidate) => candidate.id === 'library');
+    if (scene?.type !== 'TOP_DOWN') throw new Error('expected library');
+    const takeLibraryKey = scene.events.find((candidate) => candidate.id === 'takeLibraryKey');
+    expect(takeLibraryKey?.actions.map((action) => action.type)).toEqual(['SET_VARIABLE', 'GIVE_ITEM', 'HIDE_OBJECT']);
+    expect(parseGameProject(moved)).toBe(moved);
+
+    // fromIndex === toIndex, 그리고 범위를 벗어난 인덱스는 아무것도 바꾸지 않아야 한다.
+    const originalTypes = ['GIVE_ITEM', 'HIDE_OBJECT', 'SET_VARIABLE'];
+    for (const [fromIndex, toIndex] of [[1, 1], [-1, 0], [0, 3]] as const) {
+      const noop = reorderEventAction(project, 'library', 'takeLibraryKey', fromIndex, toIndex);
+      const noopScene = noop.scenes.find((candidate) => candidate.id === 'library');
+      if (noopScene?.type !== 'TOP_DOWN') throw new Error('expected library');
+      expect(noopScene.events.find((candidate) => candidate.id === 'takeLibraryKey')?.actions.map((action) => action.type))
+        .toEqual(originalTypes);
+    }
+  });
+
+  // terminal Action(GO_TO_SCENE 등)은 배열의 마지막에만 있을 수 있다(event-runtime-semantics.md) —
+  // reorderEventAction이 이 규칙을 어기면 validated()가 TERMINAL_ACTION_NOT_LAST로 막아야 한다.
+  // EventEditor는 드롭 가능 최대 인덱스를 clamp해서 애초에 이 드롭이 발생하지 않게 막지만,
+  // 이 계약 자체는 커맨드가 직접 지켜야 한다.
+  it('rejects reordering that would move a terminal action out of the last position', () => {
+    const project = createStarterProject(53);
+    // openLockedDoor: [SET_VARIABLE, GO_TO_SCENE] — GO_TO_SCENE을 앞으로 옮기면 마지막 자리를 벗어난다.
+    let error: unknown;
+    try {
+      reorderEventAction(project, 'library', 'openLockedDoor', 1, 0);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(GameProjectContractError);
+    expect((error as GameProjectContractError).code).toBe('TERMINAL_ACTION_NOT_LAST');
+    expect(isTerminalActionType('GO_TO_SCENE')).toBe(true);
+    expect(isTerminalActionType('SET_VARIABLE')).toBe(false);
+  });
+
+  // S15P21A604-361 — 편집기에서 시작 Scene을 지정/변경할 수 있게 한다.
+  it('changes the start scene to a valid non-OVERLAY target and updates the delete guard accordingly', () => {
+    const project = createStarterProject(54);
+    expect(project.startSceneId).toBe('library');
+    // 옮기기 전 'library'는 시작 Scene이라 지울 수 없다 — 삭제 가드가 여전히 startSceneId를 본다는
+    // 걸 대조하기 위한 기준선이다.
+    expect(sceneRemovalReason(project, 'library')).toBe('시작 Scene은 삭제할 수 없습니다.');
+
+    const moved = setStartScene(project, 'ending');
+    expect(moved.startSceneId).toBe('ending');
+    expect(parseGameProject(moved)).toBe(moved);
+    // 시작 Scene 삭제 가드는 startSceneId를 그대로 읽으므로, 옮기고 나면 이제 'ending'이 막히고
+    // 예전 시작 Scene이었던 'library'는(다른 사유가 없다면) 더 이상 이 사유로 막히지 않아야 한다.
+    expect(sceneRemovalReason(moved, 'ending')).toBe('시작 Scene은 삭제할 수 없습니다.');
+    expect(sceneRemovalReason(moved, 'library')).toBeNull();
+  });
+
+  it('rejects setting an OVERLAY dialogue as the start scene, and reports the reason for both cases', () => {
+    const project = createStarterProject(55);
+
+    expect(startSceneChangeReason(project, 'library')).toBe('이미 시작 Scene입니다.');
+    expect(startSceneChangeReason(project, 'librarianDialogue'))
+      .toBe('게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.');
+    expect(startSceneChangeReason(project, 'ending')).toBeNull();
+
+    expect(() => setStartScene(project, 'librarianDialogue'))
+      .toThrow('게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.');
   });
 });

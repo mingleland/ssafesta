@@ -1,0 +1,178 @@
+# AI RAG Retrieval Spike (`S15P21A604-92`)
+
+PDF를 페이지별로 파싱하고, Embedding 모델과 청킹·Top-K 조합을 같은 평가셋으로 비교한다.
+결과에는 `Recall@K`, MRR, 검색 P50/P95, Context token 추정, 실패 질문 ID,
+임베딩 처리시간, 요청 수와 예상 GMS 크레딧이 기록된다.
+
+## 안전·계약 조건
+
+- 모든 모델 출력은 `1536`차원이어야 한다. 다르면 즉시 실패한다.
+- 실제 검증은 pgvector 임시 테이블을 사용하며 `booth_id + agent_id + model_id` 필터를 강제한다.
+- 임시 테이블은 연결 종료 시 사라지며 운영 테이블을 변경하지 않는다.
+- API Key와 DB URL은 환경변수로만 받고 결과 JSON에 기록하지 않는다.
+- 결과 파일에는 PDF 원문과 평가 질문을 넣지 않는다.
+
+## Conda 환경
+
+```bash
+cd spikes/ai-rag
+conda env create -f environment.yml
+conda activate ssafesta-rag-spike
+```
+
+환경이 이미 있다면 `conda env update -f environment.yml --prune`으로 갱신한다.
+
+## 환경변수
+
+PowerShell 예시이며 실제 Secret은 파일이나 저장소에 커밋하지 않는다.
+
+```powershell
+$env:GMS_API_KEY = "<Secret에서 주입>"
+$env:GMS_OPENAI_EMBEDDINGS_URL = "https://gms.ssafy.io/gmsapi/api.openai.com/v1/embeddings"
+$env:GMS_GEMINI_EMBEDDINGS_URL = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent"
+$env:RAG_SPIKE_DATABASE_URL = "postgresql://..."
+```
+
+URL 환경변수는 생략해도 위 GMS 주소가 기본값으로 사용된다.
+
+- OpenAI: `Authorization: Bearer`로 인증하고 배열 `input`을 전송하며 `data[].embedding`을 읽는다.
+- Gemini: `x-goog-api-key`로 인증하고 입력마다 `content.parts[].text`를 전송하며
+  `embedding.values`를 읽는다. `embedContent`가 단건 API이므로 `--batch-size`와 무관하게
+  텍스트당 요청 1회로 측정한다.
+- 두 provider 모두 pgvector 계약을 맞추기 위해 출력 차원을 1536으로 요청하고, 실제 응답이
+  1536차원이 아니면 즉시 실패한다.
+
+## 평가셋
+
+`eval.example.jsonl`을 복사하여 질문별 정답 페이지 또는 정답 문자열을 작성한다. 페이지 번호는
+PDF 뷰어의 1부터 시작하는 페이지 번호다. 최소 하나의 정답 기준이 필요하다.
+
+```json
+{"id":"q-001","query":"운영 시간은?","relevant_pages":[2],"relevant_contains":["운영 시간"]}
+```
+
+## 실행
+
+먼저 세 모델을 동일 기준으로 선별한다.
+
+```bash
+rag-spike \
+  --pdf data/sample.pdf \
+  --eval data/eval.jsonl \
+  --output results/screening.json \
+  --chunk-sizes 600 \
+  --overlap-ratios 0.15 \
+  --top-k 5
+```
+
+상위 두 모델만 튜닝한다.
+
+```bash
+rag-spike \
+  --pdf data/sample.pdf \
+  --eval data/eval.jsonl \
+  --output results/tuning.json \
+  --models text-embedding-3-small,text-embedding-3-large \
+  --chunk-sizes 300,600,900 \
+  --overlap-ratios 0.10,0.15,0.20 \
+  --top-k 3,5,8,10
+```
+
+세 문서의 튜닝 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-tuning-summary \
+  --inputs results/pinlog.json results/ssafesta.json results/sudal.json \
+  --json-output results/chunk-topk-summary.json \
+  --markdown-output results/chunk-topk-summary.md
+```
+
+370번의 실험 그리드와 확정 기본값은 각각 `config/tuning-grid.json`,
+`config/retrieval-defaults.json`에서 확인할 수 있다.
+
+pgvector 없이 API·청킹을 빠르게 확인할 때만 `--store memory`를 쓸 수 있다. Jira 완료 근거는
+반드시 기본값인 pgvector 실행 결과를 사용한다.
+
+## 청킹 전략 비교 (`S15P21A604-380`)
+
+370에서 확정한 model(`text-embedding-3-large`)과 top-k(10)을 고정하고, 청킹 전략만 변수로
+`fixed`(고정 토큰, 대조군)·`structural`(구조적)·`semantic`(의미적)·`parent_child` 4종을 비교한다.
+
+```bash
+rag-strategy-benchmark \
+  --pdf data/sample.pdf \
+  --eval data/eval.jsonl \
+  --output results/strategy-pinlog.json
+```
+
+세 문서 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-strategy-summary \
+  --inputs results/strategy-pinlog.json results/strategy-ssafesta.json results/strategy-sudal.json \
+  --json-output results/strategy-comparison-summary.json \
+  --markdown-output results/strategy-comparison-summary.md
+```
+
+- `semantic` 전략은 문장 경계 탐지에 추가 Embedding 요청이 든다. 결과 JSON의
+  `model.boundary_embedding_request_count`로 이 추가 비용을 따로 추적한다.
+- `parent_child` 전략은 작은 Child만 임베딩·검색하고, 검색 결과의 `context_content`/
+  `context_token_count`에 Child가 속한 Parent 전체 텍스트·토큰 수를 담아 Context 예산을 계산한다.
+- 각 전략의 확정 파라미터(청크 크기·임계값 등)는 `config/strategy-comparison-defaults.json`에서 확인한다.
+- 판정 기준은 370과 동일: Recall 0.95 이상 & 검색 P95 1,000ms 이하 게이트 통과 → MRR 높은 순 →
+  평균 Context 토큰 낮은 순.
+
+## Reranker 비교 (`S15P21A604-371`)
+
+370에서 확정한 청킹·모델·Top-K(`config/retrieval-defaults.json`) 위에서 4가지 방식을
+비교한다: Baseline(재정렬 없음) · 벡터 유사도 절단 · Cross-Encoder(로컬
+`sentence-transformers`) · GMS LLM(프롬프트 기반 listwise reranking). 각 방식 실패는
+조용히 기본값으로 되돌리지 않고 `rerank_failure_count`로 드러내며, 실패한 질문만
+bi-encoder 원 순서로 대체해 나머지 평가가 계속되게 한다.
+
+```bash
+rag-rerank \
+  --pdf data/sample.pdf \
+  --eval data/gold.jsonl \
+  --output results/pinlog-rerank.json \
+  --top-n 3,5 \
+  --similarity-max-distance 0.3,0.5 \
+  --llm-models gpt-5-nano,gpt-4.1-nano,gemini-2.5-flash-lite
+```
+
+세 문서 결과를 하나의 의사결정 문서로 집계한다.
+
+```bash
+rag-rerank-summary \
+  --inputs results/pinlog-rerank.json results/ssafesta-rerank.json results/sudal-rerank.json \
+  --json-output data/evaluation/reranker-summary.json \
+  --markdown-output data/evaluation/reranker-summary.md
+```
+
+- 실험 그리드는 `config/rerank-grid.json`에서 확인한다. `similarity_max_distance`는
+  임시값이다 — 실측 거리 분포를 보고 다시 조정해야 한다(스모크 실행에서 0.3 기준으로
+  전부 걸러져 recall 0이 나온 사례가 있다).
+- Cross-Encoder는 `sentence-transformers/ms-marco-MiniLM-L-6-v2`(영어 학습 모델)를
+  기본값으로 쓴다. 한국어 문서 도메인 특성상 baseline보다 낮게 나올 수 있어, 실측
+  결과를 그대로 신뢰하지 말고 실패 건수·지연·NDCG를 같이 봐야 한다.
+- GMS LLM reranker는 `GMS_API_KEY`로 실제 크레딧을 소비한다. 세 후보 모델 모두 1
+  Credit이지만 지연시간은 다르다(스모크 기준 gemini-2.5-flash-lite ≈ gpt-4.1-nano <
+  gpt-5-nano).
+- Jira 완료 근거는 다른 실험과 동일하게 `--store pgvector` 실행 결과여야 한다.
+  `--store memory`는 코드 동작 확인용으로만 쓴다.
+
+## 단위 테스트
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+## 결과 해석
+
+1. `leakage_count`가 1 이상이면 즉시 실패다.
+2. `recall_at_k >= 0.95`, `p95_search_ms <= 1000`을 만족하는 조합만 후보로 둔다.
+3. 후보 사이에서는 MRR이 높은 조합을 우선한다.
+4. 품질 차이가 미미하면 예상 GMS 크레딧과 처리시간이 낮은 모델을 선택한다.
+
+`estimated_gms_credits`는 화면에 표시된 모델별 크레딧에 HTTP 요청 수를 곱한 추정치다. GMS의
+실제 과금 단위가 토큰·배치 크기에 따라 다르면 콘솔 실사용량을 정본으로 기록한다.

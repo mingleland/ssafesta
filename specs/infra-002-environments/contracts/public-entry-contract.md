@@ -8,7 +8,8 @@
 | backend | `https://api.${ROOT_DOMAIN}` | demo Spring | bypass/no-store | infra-002 |
 | AI/SSE | `https://ai.${ROOT_DOMAIN}` | demo FastAPI | bypass/no-store, proxy buffering off | infra-002 + AI |
 | game | `wss://world.${ROOT_DOMAIN}:443` | `ws://demo-game:7777` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
-| dev | `http://${EC2_PUBLIC_IP}/__dev/{front|api|ai|world}` | selected dev service | bypass except explicit static test | infra-002 |
+| dev | `http://${EC2_PUBLIC_IP}/__dev/{front|api|ai}` | selected dev HTTP service | bypass except explicit static test | infra-002 |
+| dev world | `wss://world-dev.${ROOT_DOMAIN}:443` | selected dev game service | always bypass/no-store | infra-002 |
 
 `ROOT_DOMAIN`과 `EC2_PUBLIC_IP`는 runtime/preflight input이다. client build에 실제 값을 고정하지 않는다. Unity game endpoint는 world-sessions API 응답으로만 전달한다.
 

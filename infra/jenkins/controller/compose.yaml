@@ -26,7 +26,7 @@ services:
       GITLAB_HOST: ${GITLAB_HOST:-gitlab.com}
       GITLAB_SERVER_NAME: ${GITLAB_SERVER_NAME:-festa-gitlab}
       GITLAB_SERVER_URL: ${GITLAB_SERVER_URL:-https://gitlab.com}
-      GITLAB_WEBHOOK_SECRET: ${GITLAB_WEBHOOK_SECRET:-}
+      GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID: ${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID:-gitlab-webhook-secret}
     ports:
       - 127.0.0.1:8080:8080
     volumes:

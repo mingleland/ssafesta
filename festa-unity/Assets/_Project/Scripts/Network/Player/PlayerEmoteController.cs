@@ -47,6 +47,8 @@ namespace Festa.Network
         void Update()
         {
             if (!IsOwner) return;
+            // 호스트 Overlay 가 열려 있으면 이모트 입력도 읽지 않는다 (G-8, InputBridge).
+            if (Festa.Integration.InputBridge.IsLocked) return;
             var keyboard = Keyboard.current;
             var mouse = Mouse.current;
             if (keyboard == null || mouse == null) return;
@@ -193,7 +195,7 @@ namespace Festa.Network
         void EnsureGuiAssets()
         {
             if (_labelStyle != null) return;
-            var font = Resources.Load<Font>("Fonts/MalgunGothicLight");
+            var font = Resources.Load<Font>("Fonts/Jua-Regular") ?? Resources.Load<Font>("Fonts/MalgunGothicLight");   // 2026-09-06 디스플레이 글꼴(주아)
             _labelStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,

@@ -30,7 +30,10 @@ export const calculateFitZoom = (
   if (viewportWidth <= 0 || viewportHeight <= 0 || columns <= 0 || rows <= 0 || baseCellSize <= 0) return 100;
   const horizontal = ((viewportWidth - 56) / (columns * baseCellSize)) * 100;
   const vertical = ((viewportHeight - 56) / (rows * baseCellSize)) * 100;
-  return clamp(Math.floor(Math.min(horizontal, vertical) / 5) * 5, 10, 200);
+  // S15P21A604-394 — +/- 버튼·휠과 같은 30~300% 범위로 맞춘다. 예전 10~200 그대로 두면
+  // "전체" 맞춤이 30% 밑 값을 만들어낼 수 있어, 그 상태에서 -버튼/휠을 쓰면 즉시 30%로
+  // 튀어오르는 불일치가 생긴다.
+  return clamp(Math.floor(Math.min(horizontal, vertical) / 5) * 5, 30, 300);
 };
 
 export const calculateGridViewport = (

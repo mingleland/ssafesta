@@ -1,0 +1,9 @@
+embedding_api_key: SecretStr | None = None
+byte[] secret = Base64.getDecoder().decode(properties.jwtSecret());
+let accessToken: string | null = null;
+decoded_secret="$(mktemp)"
+headers={"x-goog-api-key": api_key}
+Secret: Base64 CONNECTION_TOKEN_SECRET
+API_KEY=${API_KEY}
+Authorization: Bearer $ACCESS_TOKEN
+Authorization: Bearer {accessToken}

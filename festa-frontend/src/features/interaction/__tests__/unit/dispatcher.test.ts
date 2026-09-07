@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { initInteractionDispatcher } from '../../dispatcher.ts';
 import { closeOverlay, getCurrentOverlay } from '../../../../shared/types/overlay.ts';
+import {
+  __resetGameClientUiForTests,
+  getGameClientUiSnapshot,
+} from '../../../world/model/gameClientUi.ts';
 
 // vitest 환경이 'node'라 jsdom 없이는 window가 없다 — 실 DOM은 필요 없고 initUnityBridge가
 // FestaUnity 콜백을 걸 대상 객체 하나만 있으면 되므로 최소 폴리필로 대체한다(jsdom 의존성 추가 없음).
@@ -19,24 +23,30 @@ function emit(json: string) {
 describe('initInteractionDispatcher', () => {
   beforeEach(() => {
     closeOverlay();
+    __resetGameClientUiForTests();
   });
 
-  it('BOOTH_LAPTOP_INTERACT를 payload 손실 없이 LAPTOP 오버레이로 연다', () => {
-    const unsubscribe = initInteractionDispatcher();
-    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://example.com' }));
-
-    expect(getCurrentOverlay()).toEqual({
-      type: 'LAPTOP',
-      payload: { boothId: 7, objectId: 'laptop-1', url: 'https://example.com' },
-    });
-    unsubscribe();
-  });
-
-  it('url 없는 BOOTH_LAPTOP_INTERACT도 그대로 연다(FR-009 — 미등록은 정상 경로)', () => {
+  it('BOOTH_LAPTOP_INTERACT를 LAPTOP 오버레이로 연다 — url 필드는 계약에서 제거됐다(-297, 정본은 booth 조회)', () => {
     const unsubscribe = initInteractionDispatcher();
     emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1' }));
 
-    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1', url: undefined } });
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('구버전 Unity가 url을 보내도 payload로 전달하지 않는다 — URL 정본은 GET /booths/{id}(016 C-01)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://stale.example.com' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'LAPTOP', payload: { boothId: 7, objectId: 'laptop-1' } });
+    unsubscribe();
+  });
+
+  it('BOOTH_PROJECT_INTERACT를 PROJECT 오버레이로 연다 — 계약 #110 note 2754197 (boothId·objectId, configId 없음)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_PROJECT_INTERACT', boothId: 7, objectId: 'project-panel-1' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'PROJECT', payload: { boothId: 7, objectId: 'project-panel-1' } });
     unsubscribe();
   });
 
@@ -73,5 +83,34 @@ describe('initInteractionDispatcher', () => {
     emit(JSON.stringify({ type: 'BOOTH_LAPTOP_INTERACT', boothId: 7, objectId: 'laptop-1', url: 'https://example.com' }));
 
     expect(getCurrentOverlay()).toBeNull();
+  });
+
+  it('BOOTH_SURVEY_INTERACT를 SURVEY 오버레이로 연다 — surveyId 없이 boothId·objectId 만 (S15P21A604-415)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'BOOTH_SURVEY_INTERACT', boothId: 3, objectId: 'kiosk-1' }));
+
+    // boothId 는 설문 ID 가 아니라 resolve context 다 — payload 에 surveyId 를 만들지 않는다
+    expect(getCurrentOverlay()).toEqual({ type: 'SURVEY', payload: { boothId: 3, objectId: 'kiosk-1' } });
+    unsubscribe();
+  });
+
+  it('WORLD_MANAGEMENT_INTERACT는 Overlay Bus가 아니라 관리 레이어를 연다 (S15P21A604-414)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_MANAGEMENT_INTERACT' }));
+
+    // 관리 화면은 Visitor Overlay 가 아니다 — Bus 는 비어 있어야 한다
+    expect(getCurrentOverlay()).toBeNull();
+    expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
+    unsubscribe();
+  });
+
+  it('관리 이벤트는 boothId를 싣지 않는다 — 대상 부스는 FE가 GET /booths/mine 으로 resolve 한다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    // Unity 가 실수로 boothId 를 보내도 관리 화면은 그 값을 쓰지 않는다
+    emit(JSON.stringify({ type: 'WORLD_MANAGEMENT_INTERACT', boothId: 99 }));
+
+    expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
+    expect(getCurrentOverlay()).toBeNull();
+    unsubscribe();
   });
 });

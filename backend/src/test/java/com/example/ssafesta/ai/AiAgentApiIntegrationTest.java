@@ -479,11 +479,15 @@ class AiAgentApiIntegrationTest {
 
     private void seedReference(String table, Owner owner, long agentId) {
         if ("ai_documents".equals(table)) {
+            // content_sha256·storage_provider·storage_bucket 은 V17 이 NOT NULL 로 넣었다
+            // (S15P21A604-106). 여기는 참조가 있다는 것만 만들면 되므로 값은 아무거나면 된다.
             jdbc.update("""
                     INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
-                                              size_bytes, s3_key, processing_status, uploaded_by_user_id)
-                    VALUES (?, ?, 'a.pdf', 'application/pdf', 1, ?, 'QUEUED', ?)
-                    """, owner.boothId(), agentId, "k/" + agentId, owner.userId());
+                                              size_bytes, s3_key, processing_status, uploaded_by_user_id,
+                                              content_sha256, storage_provider, storage_bucket)
+                    VALUES (?, ?, 'a.pdf', 'application/pdf', 1, ?, 'QUEUED', ?, ?, 'R2', 'test-ai-documents')
+                    """, owner.boothId(), agentId, "k/" + agentId, owner.userId(),
+                    "%064x".formatted(agentId));
         } else {
             jdbc.update("""
                     INSERT INTO consultations (booth_id, visitor_user_id, agent_id, status)

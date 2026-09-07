@@ -1,0 +1,3305 @@
+{
+  "schema_version": 1,
+  "document_count": 3,
+  "documents": [
+    "01_서비스_기획서.md",
+    "01_프로젝트_기획서.md",
+    "수달.pdf"
+  ],
+  "decision_policy": {
+    "minimum_weighted_recall": 0.95,
+    "maximum_search_p95_ms": 1000.0,
+    "tie_break_order": [
+      "quality gate",
+      "weighted recall desc",
+      "weighted MRR desc",
+      "weighted mean context tokens asc",
+      "search P95 asc"
+    ]
+  },
+  "quality_gate_candidate_count": 9,
+  "model_execution_summaries": [
+    {
+      "model_id": "text-embedding-3-large",
+      "embedding_request_count": 30,
+      "estimated_gms_credits": 0.30000000000000004,
+      "elapsed_seconds": 192.3311468998436
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "embedding_request_count": 30,
+      "estimated_gms_credits": 0.03,
+      "elapsed_seconds": 200.52729439991526
+    }
+  ],
+  "recommended": {
+    "model_id": "text-embedding-3-large",
+    "chunk_size": 900,
+    "overlap_ratio": 0.2,
+    "top_k": 10,
+    "evaluated_queries": 35,
+    "weighted_recall": 1.0,
+    "weighted_mrr": 0.69,
+    "worst_document_recall": 1.0,
+    "max_p50_search_ms": 44.40329992212355,
+    "max_p95_search_ms": 48.46600000746548,
+    "weighted_mean_context_tokens": 5023.4857142857145,
+    "max_p95_context_tokens": 7084.0,
+    "leakage_count": 0,
+    "documents": [
+      {
+        "document": "01_서비스_기획서.md",
+        "recall": 1.0,
+        "mrr": 0.8333333333333334,
+        "missed_case_ids": []
+      },
+      {
+        "document": "01_프로젝트_기획서.md",
+        "recall": 1.0,
+        "mrr": 0.8194444444444445,
+        "missed_case_ids": []
+      },
+      {
+        "document": "수달.pdf",
+        "recall": 1.0,
+        "mrr": 0.4869047619047619,
+        "missed_case_ids": []
+      }
+    ],
+    "quality_gate_passed": true
+  },
+  "best_by_model": [
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.69,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.40329992212355,
+      "max_p95_search_ms": 48.46600000746548,
+      "weighted_mean_context_tokens": 5023.4857142857145,
+      "max_p95_context_tokens": 7084.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8194444444444445,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.4869047619047619,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.566734693877551,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.334799982607365,
+      "max_p95_search_ms": 48.34769992157817,
+      "weighted_mean_context_tokens": 4919.2,
+      "max_p95_context_tokens": 6991.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7013888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.3156462585034014,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    }
+  ],
+  "candidates": [
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.69,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.40329992212355,
+      "max_p95_search_ms": 48.46600000746548,
+      "weighted_mean_context_tokens": 5023.4857142857145,
+      "max_p95_context_tokens": 7084.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8194444444444445,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.4869047619047619,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.68,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.27849990315735,
+      "max_p95_search_ms": 48.61259995959699,
+      "weighted_mean_context_tokens": 4805.371428571429,
+      "max_p95_context_tokens": 7084.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7555555555555555,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.48095238095238096,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.6638095238095238,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.296199921518564,
+      "max_p95_search_ms": 48.024100018665195,
+      "weighted_mean_context_tokens": 4941.885714285714,
+      "max_p95_context_tokens": 7084.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7430555555555555,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.4869047619047619,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.566734693877551,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.334799982607365,
+      "max_p95_search_ms": 48.34769992157817,
+      "weighted_mean_context_tokens": 4919.2,
+      "max_p95_context_tokens": 6991.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7013888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.3156462585034014,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.5605895691609977,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.21219998039305,
+      "max_p95_search_ms": 44.80080003850162,
+      "weighted_mean_context_tokens": 4827.6,
+      "max_p95_context_tokens": 6991.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.625,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.3300453514739229,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 1.0,
+      "weighted_mrr": 0.5359863945578232,
+      "worst_document_recall": 1.0,
+      "max_p50_search_ms": 44.173199916258454,
+      "max_p95_search_ms": 44.933600118383765,
+      "weighted_mean_context_tokens": 4679.228571428572,
+      "max_p95_context_tokens": 6991.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5611111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 1.0,
+          "mrr": 0.32329931972789117,
+          "missed_case_ids": []
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9714285714285714,
+      "weighted_mrr": 0.5638775510204082,
+      "worst_document_recall": 0.9285714285714286,
+      "max_p50_search_ms": 44.31900009512901,
+      "max_p95_search_ms": 48.60610002651811,
+      "weighted_mean_context_tokens": 4478.685714285714,
+      "max_p95_context_tokens": 6242.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7013888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.9285714285714286,
+          "mrr": 0.3085034013605442,
+          "missed_case_ids": [
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9714285714285714,
+      "weighted_mrr": 0.5574149659863945,
+      "worst_document_recall": 0.9285714285714286,
+      "max_p50_search_ms": 44.25089992582798,
+      "max_p95_search_ms": 48.397500067949295,
+      "weighted_mean_context_tokens": 4391.228571428572,
+      "max_p95_context_tokens": 5972.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.625,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.9285714285714286,
+          "mrr": 0.322108843537415,
+          "missed_case_ids": [
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9714285714285714,
+      "weighted_mrr": 0.5331292517006804,
+      "worst_document_recall": 0.9285714285714286,
+      "max_p50_search_ms": 44.26519991829991,
+      "max_p95_search_ms": 48.37239999324083,
+      "weighted_mean_context_tokens": 4254.742857142857,
+      "max_p95_context_tokens": 5738.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5611111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.9285714285714286,
+          "mrr": 0.31615646258503405,
+          "missed_case_ids": [
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": true
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.6842857142857143,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.22569996677339,
+      "max_p95_search_ms": 48.2101000379771,
+      "weighted_mean_context_tokens": 4589.085714285714,
+      "max_p95_context_tokens": 6242.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8194444444444445,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.4726190476190476,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.6742857142857144,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.346499955281615,
+      "max_p95_search_ms": 48.215199960395694,
+      "weighted_mean_context_tokens": 4361.628571428571,
+      "max_p95_context_tokens": 5913.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7555555555555555,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.4666666666666667,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.6580952380952381,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.29250000976026,
+      "max_p95_search_ms": 48.35299984551966,
+      "weighted_mean_context_tokens": 4482.371428571429,
+      "max_p95_context_tokens": 5972.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7430555555555555,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.4726190476190476,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.6059863945578231,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.31649995967746,
+      "max_p95_search_ms": 48.3233998529613,
+      "weighted_mean_context_tokens": 3480.057142857143,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6493055555555556,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.38698979591836735,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.6059863945578231,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.771699933335185,
+      "max_p95_search_ms": 48.35229995660484,
+      "weighted_mean_context_tokens": 4184.371428571429,
+      "max_p95_context_tokens": 6000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6493055555555556,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.38698979591836735,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5624149659863946,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.340800028294325,
+      "max_p95_search_ms": 44.70010008662939,
+      "weighted_mean_context_tokens": 3394.942857142857,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7962962962962963,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.625,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.3584183673469387,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5624149659863946,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.293300015851855,
+      "max_p95_search_ms": 48.426499823108315,
+      "weighted_mean_context_tokens": 4112.742857142857,
+      "max_p95_context_tokens": 5702.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7962962962962963,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.625,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.3584183673469387,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5588775510204081,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.333899859339,
+      "max_p95_search_ms": 48.06780000217259,
+      "weighted_mean_context_tokens": 3489.8285714285716,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6851851851851852,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6355158730158731,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.4119897959183673,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5588775510204081,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.349800096824765,
+      "max_p95_search_ms": 45.131999999284744,
+      "weighted_mean_context_tokens": 4255.4857142857145,
+      "max_p95_context_tokens": 5972.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6851851851851852,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6355158730158731,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.4119897959183673,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5218140589569161,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.51119992882013,
+      "max_p95_search_ms": 45.11189996264875,
+      "weighted_mean_context_tokens": 4045.285714285714,
+      "max_p95_context_tokens": 5702.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7592592592592592,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6319444444444444,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.2747732426303855,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.5055328798185941,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.32179988361895,
+      "max_p95_search_ms": 45.62010010704398,
+      "weighted_mean_context_tokens": 4130.4857142857145,
+      "max_p95_context_tokens": 6000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7407407407407408,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6314484126984127,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.24640022675736964,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9428571428571428,
+      "weighted_mrr": 0.3918480725623583,
+      "worst_document_recall": 0.8571428571428571,
+      "max_p50_search_ms": 44.36949989758432,
+      "max_p95_search_ms": 47.97259997576475,
+      "weighted_mean_context_tokens": 4184.371428571429,
+      "max_p95_context_tokens": 5972.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6296296296296297,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.36964285714285716,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.8571428571428571,
+          "mrr": 0.2580215419501134,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9142857142857143,
+      "weighted_mrr": 0.6795238095238095,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.3960998672992,
+      "max_p95_search_ms": 48.27359993942082,
+      "weighted_mean_context_tokens": 3181.3142857142857,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8194444444444445,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.46071428571428574,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9142857142857143,
+      "weighted_mrr": 0.6695238095238095,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.28059980273247,
+      "max_p95_search_ms": 48.58709988184273,
+      "weighted_mean_context_tokens": 3017.4857142857145,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7555555555555555,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.45476190476190476,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9142857142857143,
+      "weighted_mrr": 0.518639455782313,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.16430019773543,
+      "max_p95_search_ms": 45.070100110024214,
+      "weighted_mean_context_tokens": 3326.1428571428573,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7592592592592592,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6319444444444444,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.26683673469387753,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q08",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9142857142857143,
+      "weighted_mrr": 0.4717460317460318,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.32270000688732,
+      "max_p95_search_ms": 44.945300091058016,
+      "weighted_mean_context_tokens": 2427.714285714286,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.624074074074074,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.65,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.22103174603174605,
+          "missed_case_ids": [
+            "sudal-q05",
+            "sudal-q11",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.9142857142857143,
+      "weighted_mrr": 0.38867346938775515,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.22480007633567,
+      "max_p95_search_ms": 48.34889993071556,
+      "weighted_mean_context_tokens": 3441.0285714285715,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6296296296296297,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.36964285714285716,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.25008503401360543,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q10",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8857142857142857,
+      "weighted_mrr": 0.6485714285714286,
+      "worst_document_recall": 0.7857142857142857,
+      "max_p50_search_ms": 44.13559986278415,
+      "max_p95_search_ms": 45.23169994354248,
+      "weighted_mean_context_tokens": 3091.6857142857143,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.7291666666666666,
+          "missed_case_ids": [
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7857142857142857,
+          "mrr": 0.46071428571428574,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8857142857142857,
+      "weighted_mrr": 0.5509523809523809,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.35540013946593,
+      "max_p95_search_ms": 48.61269984394312,
+      "weighted_mean_context_tokens": 3103.4857142857145,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7013888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.2761904761904762,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8857142857142857,
+      "weighted_mrr": 0.5195238095238095,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.31040002964437,
+      "max_p95_search_ms": 44.80720008723438,
+      "weighted_mean_context_tokens": 3002.6285714285714,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5611111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.28214285714285714,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8857142857142857,
+      "weighted_mrr": 0.5062585034013605,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.28169992752373,
+      "max_p95_search_ms": 45.13109987601638,
+      "weighted_mean_context_tokens": 2447.0,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7111111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6138888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.28231292517006806,
+          "missed_case_ids": [
+            "sudal-q05",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8857142857142857,
+      "weighted_mrr": 0.49918367346938775,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.41859992220998,
+      "max_p95_search_ms": 48.87550021521747,
+      "weighted_mean_context_tokens": 3389.5714285714284,
+      "max_p95_context_tokens": 4800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7407407407407408,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6314484126984127,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.23052721088435374,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8571428571428571,
+      "weighted_mrr": 0.55,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.38519990071654,
+      "max_p95_search_ms": 44.88339996896684,
+      "weighted_mean_context_tokens": 2272.3714285714286,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7962962962962963,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.611111111111111,
+          "missed_case_ids": [
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.3392857142857143,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8571428571428571,
+      "weighted_mrr": 0.5471428571428572,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.23690005205572,
+      "max_p95_search_ms": 45.346900122240186,
+      "weighted_mean_context_tokens": 2351.4857142857145,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6851851851851852,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6236111111111111,
+          "missed_case_ids": [
+            "ssafesta-q06"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.39285714285714285,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8571428571428571,
+      "weighted_mrr": 0.5390476190476191,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.428199995309114,
+      "max_p95_search_ms": 48.700799932703376,
+      "weighted_mean_context_tokens": 3087.457142857143,
+      "max_p95_context_tokens": 4500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.611111111111111,
+          "missed_case_ids": [
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.28809523809523807,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8571428571428571,
+      "weighted_mrr": 0.5034013605442176,
+      "worst_document_recall": 0.6428571428571429,
+      "max_p50_search_ms": 44.460600009188056,
+      "max_p95_search_ms": 48.11530001461506,
+      "weighted_mean_context_tokens": 2020.2,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7111111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6138888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.6428571428571429,
+          "mrr": 0.2751700680272109,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8571428571428571,
+      "weighted_mrr": 0.43654195011337865,
+      "worst_document_recall": 0.6428571428571429,
+      "max_p50_search_ms": 44.24229986034334,
+      "max_p95_search_ms": 48.23959991335869,
+      "weighted_mean_context_tokens": 2420.4857142857145,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5166666666666667,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5466269841269841,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.6428571428571429,
+          "mrr": 0.2906746031746032,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q11",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8285714285714286,
+      "weighted_mrr": 0.59,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.324399903416634,
+      "max_p95_search_ms": 47.7940000128001,
+      "weighted_mean_context_tokens": 2317.057142857143,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.625,
+          "missed_case_ids": [
+            "ssafesta-q08",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.3678571428571429,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8285714285714286,
+      "weighted_mrr": 0.5057142857142857,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.4300000090152,
+      "max_p95_search_ms": 45.10629992000759,
+      "weighted_mean_context_tokens": 2261.8285714285716,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7592592592592592,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6319444444444444,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.23452380952380952,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8285714285714286,
+      "weighted_mrr": 0.43336734693877543,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.149599969387054,
+      "max_p95_search_ms": 44.73989992402494,
+      "weighted_mean_context_tokens": 2013.4857142857143,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5166666666666667,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5466269841269841,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.28273809523809523,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8285714285714286,
+      "weighted_mrr": 0.40741496598639454,
+      "worst_document_recall": 0.6428571428571429,
+      "max_p50_search_ms": 44.46670017205179,
+      "max_p95_search_ms": 45.67429982125759,
+      "weighted_mean_context_tokens": 2475.342857142857,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.4388888888888889,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.5756944444444444,
+          "missed_case_ids": [
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.6428571428571429,
+          "mrr": 0.2429421768707483,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q11",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8285714285714286,
+      "weighted_mrr": 0.35225623582766435,
+      "worst_document_recall": 0.7142857142857143,
+      "max_p50_search_ms": 44.309299904853106,
+      "max_p95_search_ms": 48.258200054988265,
+      "weighted_mean_context_tokens": 2419.457142857143,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5314814814814814,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.4472222222222222,
+          "missed_case_ids": [
+            "ssafesta-q12",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.7142857142857143,
+          "mrr": 0.155640589569161,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q11"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8,
+      "weighted_mrr": 0.6523809523809524,
+      "worst_document_recall": 0.6428571428571429,
+      "max_p50_search_ms": 44.27530011162162,
+      "max_p95_search_ms": 47.87580017000437,
+      "weighted_mean_context_tokens": 2067.6,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": [
+            "ssafesta-q13",
+            "ssafesta-q15"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.6428571428571429,
+          "mrr": 0.42857142857142855,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8,
+      "weighted_mrr": 0.6285714285714286,
+      "worst_document_recall": 0.6428571428571429,
+      "max_p50_search_ms": 44.27729989401996,
+      "max_p95_search_ms": 48.25510014779866,
+      "weighted_mean_context_tokens": 2031.857142857143,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.7083333333333334,
+          "missed_case_ids": [
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.6428571428571429,
+          "mrr": 0.42857142857142855,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 10,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8,
+      "weighted_mrr": 0.5010657596371882,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.398400001227856,
+      "max_p95_search_ms": 48.74180001206696,
+      "weighted_mean_context_tokens": 2481.5714285714284,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5962962962962962,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6875,
+          "missed_case_ids": [
+            "ssafesta-q06"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.2800453514739229,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8,
+      "weighted_mrr": 0.46,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.32210000231862,
+      "max_p95_search_ms": 48.55789989233017,
+      "weighted_mean_context_tokens": 2002.3714285714286,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.624074074074074,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6416666666666667,
+          "missed_case_ids": [
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.1988095238095238,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.8,
+      "weighted_mrr": 0.4045578231292517,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.32639991864562,
+      "max_p95_search_ms": 48.35639987140894,
+      "weighted_mean_context_tokens": 2067.285714285714,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.4388888888888889,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.5756944444444444,
+          "missed_case_ids": [
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.23579931972789114,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.638095238095238,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.4110999815166,
+      "max_p95_search_ms": 48.64799999631941,
+      "weighted_mean_context_tokens": 1969.4,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.7222222222222222,
+          "missed_case_ids": [
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.40476190476190477,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.5238095238095237,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.417399913072586,
+      "max_p95_search_ms": 48.306699842214584,
+      "weighted_mean_context_tokens": 1981.857142857143,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7777777777777778,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6805555555555555,
+          "missed_case_ids": [
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.2261904761904762,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.4978911564625851,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.30449986830354,
+      "max_p95_search_ms": 47.6883000228554,
+      "weighted_mean_context_tokens": 2070.3142857142857,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5962962962962962,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6875,
+          "missed_case_ids": [
+            "ssafesta-q06"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.27210884353741494,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.4904761904761904,
+      "worst_document_recall": 0.42857142857142855,
+      "max_p50_search_ms": 44.41780014894903,
+      "max_p95_search_ms": 47.30970016680658,
+      "weighted_mean_context_tokens": 1397.1714285714286,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7111111111111111,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6138888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.42857142857142855,
+          "mrr": 0.24285714285714285,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.4552380952380952,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.275399995967746,
+      "max_p95_search_ms": 48.353500198572874,
+      "weighted_mean_context_tokens": 1369.5714285714287,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.624074074074074,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6416666666666667,
+          "missed_case_ids": [
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.1869047619047619,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 8,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7714285714285715,
+      "weighted_mrr": 0.34622448979591836,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.321600114926696,
+      "max_p95_search_ms": 48.67530008777976,
+      "weighted_mean_context_tokens": 2007.4,
+      "max_p95_context_tokens": 2400.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5314814814814814,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.4472222222222222,
+          "missed_case_ids": [
+            "ssafesta-q12",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.1405612244897959,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7428571428571429,
+      "weighted_mrr": 0.36333333333333334,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.20810006558895,
+      "max_p95_search_ms": 44.77440007030964,
+      "weighted_mean_context_tokens": 2290.6285714285714,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6296296296296297,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.3458333333333334,
+          "missed_case_ids": [
+            "ssafesta-q08",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.20714285714285713,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q12",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.5142857142857142,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.30750012397766,
+      "max_p95_search_ms": 48.46010007895529,
+      "weighted_mean_context_tokens": 1504.8285714285714,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7962962962962963,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.75,
+          "mrr": 0.5694444444444444,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.2857142857142857,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.5142857142857142,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.19069993309677,
+      "max_p95_search_ms": 48.13700006343424,
+      "weighted_mean_context_tokens": 1546.4571428571428,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6851851851851852,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5694444444444444,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q06",
+            "ssafesta-q08",
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.35714285714285715,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.5047619047619047,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.16960012167692,
+      "max_p95_search_ms": 48.1515999417752,
+      "weighted_mean_context_tokens": 1992.8857142857144,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.75,
+          "mrr": 0.5694444444444444,
+          "missed_case_ids": [
+            "ssafesta-q09",
+            "ssafesta-q13",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.2380952380952381,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.48904761904761906,
+      "worst_document_recall": 0.35714285714285715,
+      "max_p50_search_ms": 44.167600106447935,
+      "max_p95_search_ms": 45.229699928313494,
+      "weighted_mean_context_tokens": 1437.3428571428572,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5962962962962962,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.9166666666666666,
+          "mrr": 0.6875,
+          "missed_case_ids": [
+            "ssafesta-q06"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.35714285714285715,
+          "mrr": 0.25,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 900,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.4809523809523809,
+      "worst_document_recall": 0.5714285714285714,
+      "max_p50_search_ms": 44.20299991033971,
+      "max_p95_search_ms": 48.218899872154,
+      "weighted_mean_context_tokens": 1945.8,
+      "max_p95_context_tokens": 2700.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8333333333333334,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.4861111111111111,
+          "missed_case_ids": [
+            "ssafesta-q09",
+            "ssafesta-q12",
+            "ssafesta-q13",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5714285714285714,
+          "mrr": 0.25,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.7142857142857143,
+      "weighted_mrr": 0.41619047619047617,
+      "worst_document_recall": 0.42857142857142855,
+      "max_p50_search_ms": 44.18670013546944,
+      "max_p95_search_ms": 48.27589984051883,
+      "weighted_mean_context_tokens": 1383.1714285714286,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5166666666666667,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.5208333333333334,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.42857142857142855,
+          "mrr": 0.2619047619047619,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6857142857142857,
+      "weighted_mrr": 0.5571428571428572,
+      "worst_document_recall": 0.5,
+      "max_p50_search_ms": 44.035499915480614,
+      "max_p95_search_ms": 47.97510011121631,
+      "weighted_mean_context_tokens": 1553.7428571428572,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.8888888888888888,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5833333333333334,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.5,
+          "mrr": 0.32142857142857145,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6571428571428571,
+      "weighted_mrr": 0.4761904761904762,
+      "worst_document_recall": 0.35714285714285715,
+      "max_p50_search_ms": 44.307699892669916,
+      "max_p95_search_ms": 48.520099837332964,
+      "weighted_mean_context_tokens": 867.2285714285714,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.8888888888888888,
+          "mrr": 0.5740740740740741,
+          "missed_case_ids": [
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.6666666666666666,
+          "missed_case_ids": [
+            "ssafesta-q06",
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.35714285714285715,
+          "mrr": 0.25,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6571428571428571,
+      "weighted_mrr": 0.4661904761904762,
+      "worst_document_recall": 0.42857142857142855,
+      "max_p50_search_ms": 44.12029986269772,
+      "max_p95_search_ms": 49.02180004864931,
+      "weighted_mean_context_tokens": 2281.6285714285714,
+      "max_p95_context_tokens": 3000.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7407407407407408,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5833333333333334,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.42857142857142855,
+          "mrr": 0.18928571428571428,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6571428571428571,
+      "weighted_mrr": 0.3838095238095238,
+      "worst_document_recall": 0.2857142857142857,
+      "max_p50_search_ms": 44.57379993982613,
+      "max_p95_search_ms": 48.16770018078387,
+      "weighted_mean_context_tokens": 1437.2857142857142,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.4388888888888889,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.8333333333333334,
+          "mrr": 0.5652777777777778,
+          "missed_case_ids": [
+            "ssafesta-q06",
+            "ssafesta-q09"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.2857142857142857,
+          "mrr": 0.19285714285714287,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 5,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6571428571428571,
+      "weighted_mrr": 0.32904761904761903,
+      "worst_document_recall": 0.42857142857142855,
+      "max_p50_search_ms": 44.173600152134895,
+      "max_p95_search_ms": 48.67210006341338,
+      "weighted_mean_context_tokens": 1366.2,
+      "max_p95_context_tokens": 1500.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.5314814814814814,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.41944444444444445,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q12",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.42857142857142855,
+          "mrr": 0.12142857142857143,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6285714285714286,
+      "weighted_mrr": 0.45714285714285713,
+      "worst_document_recall": 0.2857142857142857,
+      "max_p50_search_ms": 44.52120000496507,
+      "max_p95_search_ms": 48.08049998246133,
+      "weighted_mean_context_tokens": 1456.9714285714285,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7592592592592592,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.75,
+          "mrr": 0.5694444444444444,
+          "missed_case_ids": [
+            "ssafesta-q08",
+            "ssafesta-q12",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.2857142857142857,
+          "mrr": 0.16666666666666669,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.6,
+      "weighted_mrr": 0.39047619047619053,
+      "worst_document_recall": 0.42857142857142855,
+      "max_p50_search_ms": 44.25799986347556,
+      "max_p95_search_ms": 48.24629984796047,
+      "weighted_mean_context_tokens": 834.0285714285715,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.4444444444444444,
+          "missed_case_ids": [
+            "pinlog-q03",
+            "pinlog-q05",
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.75,
+          "mrr": 0.5,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q02",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.42857142857142855,
+          "mrr": 0.2619047619047619,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.5714285714285714,
+      "weighted_mrr": 0.44761904761904764,
+      "worst_document_recall": 0.2857142857142857,
+      "max_p50_search_ms": 44.21119997277856,
+      "max_p95_search_ms": 48.26029995456338,
+      "weighted_mean_context_tokens": 859.3714285714286,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.7777777777777778,
+          "mrr": 0.6666666666666666,
+          "missed_case_ids": [
+            "pinlog-q05",
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.75,
+          "mrr": 0.5555555555555556,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q06",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.2857142857142857,
+          "mrr": 0.21428571428571427,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.5714285714285714,
+      "weighted_mrr": 0.44761904761904764,
+      "worst_document_recall": 0.21428571428571427,
+      "max_p50_search_ms": 44.373900163918734,
+      "max_p95_search_ms": 47.478900058194995,
+      "weighted_mean_context_tokens": 1506.8857142857144,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.7407407407407408,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5833333333333334,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.21428571428571427,
+          "mrr": 0.14285714285714285,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-large",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.5714285714285714,
+      "weighted_mrr": 0.40952380952380957,
+      "worst_document_recall": 0.35714285714285715,
+      "max_p50_search_ms": 44.27359998226166,
+      "max_p95_search_ms": 48.0700999032706,
+      "weighted_mean_context_tokens": 843.7142857142857,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.7777777777777778,
+          "mrr": 0.5740740740740741,
+          "missed_case_ids": [
+            "pinlog-q05",
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5833333333333334,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09",
+            "ssafesta-q15"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.35714285714285715,
+          "mrr": 0.15476190476190474,
+          "missed_case_ids": [
+            "sudal-q03",
+            "sudal-q04",
+            "sudal-q05",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 600,
+      "overlap_ratio": 0.15,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.4857142857142857,
+      "weighted_mrr": 0.3047619047619048,
+      "worst_document_recall": 0.21428571428571427,
+      "max_p50_search_ms": 44.22350018285215,
+      "max_p95_search_ms": 48.5062999650836,
+      "weighted_mean_context_tokens": 1499.2285714285715,
+      "max_p95_context_tokens": 1800.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 1.0,
+          "mrr": 0.6296296296296297,
+          "missed_case_ids": []
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.4166666666666667,
+          "mrr": 0.25,
+          "missed_case_ids": [
+            "ssafesta-q04",
+            "ssafesta-q06",
+            "ssafesta-q08",
+            "ssafesta-q12",
+            "ssafesta-q13",
+            "ssafesta-q14",
+            "ssafesta-q15"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.21428571428571427,
+          "mrr": 0.14285714285714285,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q07",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.2,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.45714285714285713,
+      "weighted_mrr": 0.3380952380952381,
+      "worst_document_recall": 0.21428571428571427,
+      "max_p50_search_ms": 44.2399000748992,
+      "max_p95_search_ms": 47.962799901142716,
+      "weighted_mean_context_tokens": 868.9142857142857,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.5555555555555556,
+          "mrr": 0.3333333333333333,
+          "missed_case_ids": [
+            "pinlog-q03",
+            "pinlog-q05",
+            "pinlog-q08",
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.6666666666666666,
+          "mrr": 0.5277777777777778,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q06",
+            "ssafesta-q09",
+            "ssafesta-q13"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.21428571428571427,
+          "mrr": 0.17857142857142858,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    },
+    {
+      "model_id": "text-embedding-3-small",
+      "chunk_size": 300,
+      "overlap_ratio": 0.1,
+      "top_k": 3,
+      "evaluated_queries": 35,
+      "weighted_recall": 0.42857142857142855,
+      "weighted_mrr": 0.27619047619047615,
+      "worst_document_recall": 0.21428571428571427,
+      "max_p50_search_ms": 44.228200102224946,
+      "max_p95_search_ms": 48.19240001961589,
+      "weighted_mean_context_tokens": 837.2285714285714,
+      "max_p95_context_tokens": 900.0,
+      "leakage_count": 0,
+      "documents": [
+        {
+          "document": "01_서비스_기획서.md",
+          "recall": 0.5555555555555556,
+          "mrr": 0.42592592592592593,
+          "missed_case_ids": [
+            "pinlog-q02",
+            "pinlog-q03",
+            "pinlog-q05",
+            "pinlog-q09"
+          ]
+        },
+        {
+          "document": "01_프로젝트_기획서.md",
+          "recall": 0.5833333333333334,
+          "mrr": 0.40277777777777773,
+          "missed_case_ids": [
+            "ssafesta-q01",
+            "ssafesta-q08",
+            "ssafesta-q09",
+            "ssafesta-q12",
+            "ssafesta-q14"
+          ]
+        },
+        {
+          "document": "수달.pdf",
+          "recall": 0.21428571428571427,
+          "mrr": 0.07142857142857142,
+          "missed_case_ids": [
+            "sudal-q02",
+            "sudal-q03",
+            "sudal-q05",
+            "sudal-q06",
+            "sudal-q08",
+            "sudal-q10",
+            "sudal-q11",
+            "sudal-q12",
+            "sudal-q13",
+            "sudal-q14",
+            "sudal-q15"
+          ]
+        }
+      ],
+      "quality_gate_passed": false
+    }
+  ]
+}

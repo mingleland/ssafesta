@@ -1,5 +1,6 @@
 package com.example.ssafesta.common;
 
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * every integration test on the one shared context — a nested {@code @TestConfiguration} would fork
  * it and start a second Postgres and Redis for this one route.
  */
+@Hidden
 @RestController
 class BeanValidationProbeController {
 
