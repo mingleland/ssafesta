@@ -1486,11 +1486,11 @@ Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
 - **캐싱하지 않는다** (2026-09-07 확정, GitLab #119) — `system_prompt`가 길어도 매 요청 그대로
   싣는다. 버전·해시로 무효화만 알리는 방식은 필요해지면 그때 계약을 바꾼다
 - 인증은 벡터 검색 API와 동일한 `/internal/**` 체인·`INTERNAL_AI_TO_SPRING_TOKENS` 재사용
-### POST `/internal/ai/document-jobs/{jobId}/chunk-batches` · `/finalize`
+### POST `/internal/ai/document-jobs/{jobId}/` — `chunk-batches` · `finalize` · `heartbeat` · `failed`
 
 FastAPI 워커가 만든 결과를 Spring이 받는 경로 (spec 007, `S15P21A604-400`, GitLab #119 §3).
 정본 계약은 `specs/007-ai-agent-document/contracts/document-result-api.yaml`.
-**heartbeat·failed는 아직 없다**(같은 티켓 2차). cancel은 Spring→FastAPI 방향이라 여기 없다.
+cancel은 Spring→FastAPI 방향이라 여기 없다(#119 §4 — `S15P21A604-175`).
 
 ```
 POST /internal/ai/document-jobs/41/chunk-batches
@@ -1543,3 +1543,27 @@ POST /internal/ai/document-jobs/41/finalize
 - 저장 embedding도 `queryEmbedding`과 **같은 검증**을 받는다(1536차원, `float32` 범위, 노름
   overflow·underflow). #119에서 "저장 벡터 검증은 chunk를 쓰는 쪽 몫"이라고 넘긴 것이 이 자리다
 - 계약에 없는 필드는 버리지 않고 `400`으로 거부한다 — 검색 API와 같은 strict parser
+
+**heartbeat · failed · lease 회수**
+
+```
+POST /internal/ai/document-jobs/41/heartbeat   { "attemptNo": 0 }                        → 204
+POST /internal/ai/document-jobs/41/failed
+{ "attemptNo": 0, "failureCode": "PARSE_TIMEOUT", "retryable": true, "message": null }   → 204
+```
+
+- **워커는 보고만 하고, 다음에 무엇을 할지는 Spring이 정한다.** `retryable`은 워커의 판단이고
+  재시도 예산(`max_retries` 기본 3)은 Job이 들고 있다
+  - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다
+  - 여지가 있으면 `RETRY_WAIT` + `next_retry_at` — backoff **1 · 5 · 15분**(#119, 2026-09-03)
+  - `attempt_no + 1 > max_retries` → `DEAD`
+- **어느 쪽이든 `attempt_no`는 오른다.** 방금 실패한 워커의 늦은 결과를 `409`로 막는 것이 그 값이다.
+  그 attempt의 staging도 함께 지운다 — 남기면 다음 attempt의 batch와 섞여 finalize 개수 검증이
+  엉뚱한 곳에서 걸린다
+- **lease는 90초, heartbeat는 30초 주기**다(#119). 두 번까지 유실돼도 Job을 뺏기지 않는다.
+  `QUEUED` Job은 heartbeat로도 `RUNNING`이 된다
+- **lease가 만료되면 Spring의 sweeper(30초 주기)가 Job을 회수한다.** FastAPI는 DB 자격증명이 없어
+  죽은 워커가 스스로 반납할 수 없고, 회수가 없으면 문서는 영원히 READY가 되지 않는다. 회수가
+  `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
+  `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
+- `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다

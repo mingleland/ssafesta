@@ -2,7 +2,7 @@
 
 FastAPI → Spring 결과 API의 **endpoint 경로와 DTO 이름은 Jira S15P21A604-400에서 BE·AI가 확정한다.** 헌법 30조에 따라 임의의 경로를 OpenAPI로 고정하지 않는다.
 
-> **2026-09-07 — chunk batch·finalize 두 개는 `document-result-api.yaml`에 고정됐다** (S15P21A604-400 1차, GitLab #119 `note_2767904`로 제안 후 구현). 이 표의 의미 경계는 그대로 정본이고, 그 두 operation의 경로·DTO만 yaml이 가진다. heartbeat·failed는 아직 이 표만 있다.
+> **2026-09-07 — 네 operation 모두 `document-result-api.yaml`에 고정됐다** (S15P21A604-400, GitLab #119 `note_2767904`로 제안 후 구현). 이 표의 의미 경계는 그대로 정본이고, 경로·DTO는 yaml이 가진다. cancel은 Spring→FastAPI 방향이라 그 파일에 없다(#119 §4).
 
 | Operation | Required identity | Rule |
 |---|---|---|
