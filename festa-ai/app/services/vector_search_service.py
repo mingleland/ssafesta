@@ -8,8 +8,7 @@ S15P21A604-449 이후: 검색은 로컬 pgvector가 아니라 Spring이 소유�
 from __future__ import annotations
 
 from app.clients.spring_chunk_search import ChunkScope, RetrievedChunk, SpringChunkSearchClient
-from app.db.models import EMBEDDING_DIMENSION
-from app.providers.embedding import EmbeddingProvider
+from app.providers.embedding import EMBEDDING_DIMENSION, EmbeddingProvider
 
 
 class VectorSearchService:
