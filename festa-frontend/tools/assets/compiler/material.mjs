@@ -16,8 +16,11 @@ const floatOf = (text, key) => {
   const m = new RegExp(`- ${key}: ([-\\d.eE+]+)`).exec(text);
   return m === null ? null : Number(m[1]);
 };
+// `\r?` 가 있어야 한다. Unity 가 저장한 `.mat` 은 Windows 에서 **CRLF** 이고, `\n` 만 요구하면
+// 키 다음 줄바꿈에서 매치가 통째로 실패한다 — 조용히 "텍스처 없는 재질" 로 읽혀 리포트에는
+// `채널 [없음] · 원본 0 B` 만 남는다. LF 로 정규화한 픽스처 테스트는 이것을 잡지 못한다.
 const textureOf = (text, key) => {
-  const m = new RegExp(`- ${key}:\\n\\s*m_Texture: \\{fileID: (\\d+)(?:, guid: ([0-9a-f]{32}))?`).exec(text);
+  const m = new RegExp(`- ${key}:\\r?\\n\\s*m_Texture: \\{fileID: (\\d+)(?:, guid: ([0-9a-f]{32}))?`).exec(text);
   if (m === null || m[2] === undefined) return null;
   return m[2];
 };
@@ -75,19 +78,22 @@ export function parseMaterial(text, guidIndex) {
 }
 
 /**
- * 텍스처 경량화 계획. 실제 downscale·압축은 도구가 붙은 뒤다.
- * 지금은 **원본 바이트를 실측하고 목표를 적는다** — 그래야 나중에 before/after 를 말할 수 있다.
+ * 재질이 참조하는 텍스처의 **원본 바이트만** 실측한다.
+ *
+ * 실제 downscale·재패킹·webp 인코딩은 emit 단계(`toolchain/textures.mjs`)가 에셋별로 한다.
+ * 이 함수는 그 결과를 알지 못하므로 `runtimeBytes` 를 `null` 로 둔다 — **"아직 아무도 안 했다"
+ * 가 아니라 "여기서는 모른다"** 다. 예전 문구가 전자로 읽혀, 같은 실행 안에서 emit 이
+ * `3,386,787 → 7,392 B` 를 찍는 옆에서 probe 가 `runtime 미적용` 을 찍는 자기모순이 났다.
  */
 export function planTextureOptimization(textures) {
   const sourceBytes = textures.reduce((sum, t) => sum + (t.sourceBytes ?? 0), 0);
   return {
     sourceBytes,
     runtimeBytes: null,
-    applied: false,
+    measuredHere: false,
     reason:
       textures.length === 0
         ? '참조하는 텍스처가 없다 — 색만 있는 재질이다'
-        : 'downscale·atlas·KTX2 도구가 아직 없다. 원본 바이트만 실측했다',
-    pendingTool: textures.length === 0 ? null : 'sharp/squoosh(downscale) · toktx(KTX2)',
+        : '원본 바이트만 실측한다. 런타임 변환 결과는 emit 단계가 에셋별로 낸다',
   };
 }

@@ -80,6 +80,8 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
     assert config.settings.conversation_ttl_seconds == 1800
     assert config.settings.spring_booth_access_timeout_seconds == 1.0
+    assert config.settings.llm_ttft_timeout_seconds == 15.0
+    assert config.settings.llm_total_timeout_seconds == 60.0
     assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
 
 
@@ -312,6 +314,18 @@ def test_context_top_n_must_not_exceed_retrieval_top_k(
         overrides={"RETRIEVAL_TOP_K": "5", "RAG_CONTEXT_TOP_N": "6"},
     )
     with pytest.raises(ValidationError, match="RAG_CONTEXT_TOP_N"):
+        _fresh_settings_module()
+
+
+def test_ttft_timeout_must_not_exceed_total_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"LLM_TTFT_TIMEOUT_SECONDS": "60", "LLM_TOTAL_TIMEOUT_SECONDS": "15"},
+    )
+    with pytest.raises(ValidationError, match="LLM_TTFT_TIMEOUT_SECONDS"):
         _fresh_settings_module()
 
 
