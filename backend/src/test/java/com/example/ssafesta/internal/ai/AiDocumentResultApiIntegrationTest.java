@@ -123,6 +123,41 @@ class AiDocumentResultApiIntegrationTest {
                 job.documentId()));
     }
 
+    /**
+     * finalize 응답을 못 받은 워커가 다시 보낸 경우다.
+     *
+     * <p>마지막 호출의 응답이 유실되는 것은 특별한 사고가 아니라 흔한 경우이고, #119 §3 이 이
+     * 재전송을 멱등으로 요구한다. 410 으로 답하면 워커는 <b>성공한 작업을 실패로 보고한다.</b>
+     */
+    @Test
+    @DisplayName("같은 finalize 를 다시 보내면 204 이고 아무것도 바뀌지 않는다")
+    void resendingTheSameFinalizeIsIdempotent() throws Exception {
+        Job job = seedJob("finalize재전송");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        assertEquals(1, chunkCount(job), "재전송이 chunk 를 다시 넣으면 안 된다");
+        assertEquals("SUCCEEDED", jobStatus(job));
+        assertEquals("READY", documentStatus(job));
+    }
+
+    /** 끝난 Job 이 한 일과 다른 주장이면 재전송이 아니다. */
+    @Test
+    @DisplayName("끝난 Job 에 다른 개수로 finalize 하면 410 이다")
+    void aFinalizeThatContradictsTheFinishedJobIsGone() throws Exception {
+        Job job = seedJob("다른개수");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        mockMvc.perform(finalize(job, 7, SOURCE_HASH, MODEL))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+
+        assertEquals(1, chunkCount(job));
+    }
+
     // ── fencing ─────────────────────────────────────────────────────────────
 
     /**

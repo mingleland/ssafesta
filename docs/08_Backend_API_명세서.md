@@ -1225,6 +1225,8 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
+| `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
+| `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
 | `SURVEY_CLOSED` | 설문 마감 |
 | `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
@@ -1490,6 +1492,10 @@ POST /internal/ai/document-jobs/41/finalize
   자기가 밀려났다는 사실을 이 응답으로만 안다
 - **없는 Job과 끝난 Job을 구분하지 않는다** — 문서가 지워지면 Job도 `ON DELETE CASCADE`로 사라지고,
   어느 쪽이든 결과를 보낼 attempt가 없다는 답은 같다
+- **finalize 재전송은 `410`이 아니라 `204`다.** 같은 attempt가 같은 `sourceHash`·`totalChunkCount`로
+  이미 끝낸 Job이면 아무것도 하지 않고 답한다 — 마지막 호출의 응답이 유실되는 것은 흔한 경우이고,
+  여기서 `410`을 주면 워커가 **성공한 작업을 실패로 보고한다**(#119 §3의 멱등 요구). 숫자가 다르면
+  그 Job이 한 일과 다른 주장이라 `410`이다
 - **batch는 멱등하다.** staging PK가 `(job_id, batch_seq, chunk_no)`라 같은 batch 재전송이 아무것도
   바꾸지 않는다 — 워커가 응답을 못 받고 다시 보내는 것이 정상 경로다
 - **첫 batch가 `QUEUED` Job을 `RUNNING`으로 올린다.** 워커가 실제로 시작했다는 증거가 이것뿐이다

@@ -36,7 +36,8 @@ class AiDocumentJobRepository {
     Optional<JobRow> lockById(long jobId) {
         try {
             return Optional.ofNullable(jdbc.queryForObject("""
-                    SELECT id, document_id, booth_id, agent_id, source_hash, status, attempt_no
+                    SELECT id, document_id, booth_id, agent_id, source_hash, status, attempt_no,
+                           chunk_count
                       FROM ai_document_jobs
                      WHERE id = ?
                        FOR UPDATE
@@ -44,7 +45,7 @@ class AiDocumentJobRepository {
                     (row, index) -> new JobRow(row.getLong("id"), row.getLong("document_id"),
                             row.getLong("booth_id"), row.getLong("agent_id"),
                             row.getString("source_hash"), row.getString("status"),
-                            row.getInt("attempt_no")),
+                            row.getInt("attempt_no"), row.getObject("chunk_count", Integer.class)),
                     jobId));
         } catch (EmptyResultDataAccessException absent) {
             return Optional.empty();
@@ -132,8 +133,9 @@ class AiDocumentJobRepository {
                 """, documentId);
     }
 
+    /** {@code chunkCount} 는 finalize 전에는 {@code null} 이다 — 재전송 판정에 쓴다. */
     record JobRow(long id, long documentId, long boothId, long agentId, String sourceHash,
-                  String status, int attemptNo) { }
+                  String status, int attemptNo, Integer chunkCount) { }
 
     record StagedChunk(int chunkNo, String content, String embedding, String embeddingModelId,
                        Integer pageNumber, String section) { }

@@ -19,10 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Two operations in this slice — staged batches and the finalize that publishes them. FastAPI
  * holds no database credential, so everything a result changes happens here.
  *
- * <p>Every entry point passes the same two gates first: the Job must still be live ({@code 410}
- * otherwise) and the {@code attemptNo} must be the one currently running ({@code 409} otherwise).
- * Without the second gate a worker that lost its lease, and does not know it, overwrites the work
- * of the attempt that replaced it.
+ * <p>Every entry point passes the same two gates first: the {@code attemptNo} must be the one that
+ * owns the Job ({@code 409} otherwise), and the Job must not be finished ({@code 410} otherwise).
+ * Without the first gate a worker that lost its lease, and does not know it, overwrites the work of
+ * the attempt that replaced it.
+ *
+ * <p>finalize has one exception to the second gate: a Job this same attempt already finished, with
+ * the same file and the same count, is a <b>resend</b> and answers {@code 204}. Losing the response
+ * to the last call of a job is the ordinary case, and #119 §3 requires the resend to be idempotent —
+ * answering {@code 410} would make a worker report a failure for work that succeeded.
  */
 @Service
 public class AiDocumentResultService {
@@ -30,7 +35,9 @@ public class AiDocumentResultService {
     /** GitLab #119 §3-2, 2026-09-02 합의. 8 MiB 쪽은 본문 크기라 서버가 본다. */
     private static final int MAX_CHUNKS_PER_BATCH = 200;
 
-    private static final Set<String> TERMINAL = Set.of("SUCCEEDED", "DEAD", "CANCELLED");
+    private static final String SUCCEEDED = "SUCCEEDED";
+
+    private static final Set<String> TERMINAL = Set.of(SUCCEEDED, "DEAD", "CANCELLED");
 
     private final AiDocumentJobRepository jobs;
 
@@ -64,7 +71,19 @@ public class AiDocumentResultService {
         String modelId = required(request.embeddingModelId(), "embeddingModelId");
         String sourceHash = required(request.sourceHash(), "sourceHash");
 
-        JobRow job = live(jobId, request.attemptNo());
+        JobRow job = locked(jobId, request.attemptNo());
+        if (SUCCEEDED.equals(job.status())) {
+            // 응답을 못 받은 워커의 재전송이다. 같은 attempt 가 같은 파일을 같은 개수로 끝냈다면
+            // 할 일은 이미 다 돼 있다 — #119 §3 이 finalize 재전송을 멱등으로 요구한다.
+            // 숫자가 다르면 이 Job 이 한 일과 다른 주장이므로 끝난 Job 취급이다.
+            if (sourceHash.equals(job.sourceHash()) && Integer.valueOf(expected).equals(job.chunkCount())) {
+                return;
+            }
+            throw new ApiException(ErrorCode.JOB_GONE);
+        }
+        if (TERMINAL.contains(job.status())) {
+            throw new ApiException(ErrorCode.JOB_GONE);
+        }
         if (!job.sourceHash().equals(sourceHash)) {
             // 같은 jobId 인데 다른 파일을 처리했다는 뜻이다. 받아 주면 문서 본문이 조용히 바뀐다.
             throw ApiException.fieldInvalid("sourceHash", "Job 의 원본 해시와 다릅니다.");
@@ -101,11 +120,23 @@ public class AiDocumentResultService {
      * distinguishes them for the caller — there is no attempt left to send results to.
      */
     private JobRow live(long jobId, Integer attemptNo) {
-        int attempt = nonNegative(attemptNo, "attemptNo");
-        JobRow job = jobs.lockById(jobId).orElseThrow(() -> new ApiException(ErrorCode.JOB_GONE));
+        JobRow job = locked(jobId, attemptNo);
         if (TERMINAL.contains(job.status())) {
             throw new ApiException(ErrorCode.JOB_GONE);
         }
+        return job;
+    }
+
+    /**
+     * The Job with its row held, and the sender proved to be the attempt that owns it.
+     *
+     * <p>The attempt is checked before the status so a worker that was fenced out hears
+     * {@code 409} — the one answer that tells it to stop — even when the Job has since finished
+     * under the attempt that replaced it.
+     */
+    private JobRow locked(long jobId, Integer attemptNo) {
+        int attempt = nonNegative(attemptNo, "attemptNo");
+        JobRow job = jobs.lockById(jobId).orElseThrow(() -> new ApiException(ErrorCode.JOB_GONE));
         if (job.attemptNo() != attempt) {
             throw new ApiException(ErrorCode.JOB_ATTEMPT_STALE,
                     "현재 attempt 는 " + job.attemptNo() + " 입니다.");
