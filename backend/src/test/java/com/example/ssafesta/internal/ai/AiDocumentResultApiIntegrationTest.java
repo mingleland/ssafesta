@@ -532,6 +532,33 @@ class AiDocumentResultApiIntegrationTest {
         assertEquals(0, stagingCount(job), "죽은 attempt 의 staging 은 남으면 안 된다");
     }
 
+    /**
+     * 회수된 뒤 재시도 attempt 가 보낸 신호도 Job 을 RUNNING 으로 올려야 한다.
+     *
+     * <p>sweeper 는 {@code status = 'RUNNING'} 만 본다({@code ix_ai_document_jobs_lease}). 재시도
+     * attempt 가 RETRY_WAIT 에 머무르면 그 워커가 죽어도 아무도 회수하지 못하고, 부분 unique
+     * 인덱스가 RETRY_WAIT 를 살아 있는 Job 으로 세므로 그 문서의 새 Job 도 영구히 막힌다.
+     */
+    @Test
+    @DisplayName("회수된 Job 의 다음 attempt 도 RUNNING 으로 올라가고 다시 회수될 수 있다")
+    void aRetriedAttemptBecomesRunningAndStaysReclaimable() throws Exception {
+        Job job = seedJob("재시도회수");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        expireLease(job);
+        sweeper.reclaimExpiredLeases();
+        assertEquals("RETRY_WAIT", jobStatus(job));
+        assertEquals(1, attemptNo(job));
+
+        mockMvc.perform(heartbeat(job, 1)).andExpect(status().isNoContent());
+
+        assertEquals("RUNNING", jobStatus(job), "재시도 attempt 가 RETRY_WAIT 에 머물면 sweeper 가 못 본다");
+
+        expireLease(job);
+        sweeper.reclaimExpiredLeases();
+
+        assertEquals(2, attemptNo(job), "두 번째 워커가 죽어도 회수돼야 한다");
+    }
+
     @Test
     @DisplayName("lease 가 살아 있는 Job 은 건드리지 않는다")
     void aLiveLeaseIsLeftAlone() throws Exception {
