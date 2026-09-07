@@ -85,6 +85,8 @@ async def get_stream_service(request: Request) -> ConversationStreamService:
         rag_context_service=rag_context_service,
         llm_provider=request.app.state.llm_provider,
         ttl_seconds=settings.conversation_ttl_seconds,
+        ttft_timeout_seconds=settings.llm_ttft_timeout_seconds,
+        total_timeout_seconds=settings.llm_total_timeout_seconds,
     )
 
 
