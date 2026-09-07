@@ -14,7 +14,7 @@ import {
   setTopDownBackground,
   setObjectVisible,
 } from '../model/authoringCommands.ts';
-import { COMPONENT_LABELS, findPresetDefinition } from '../model/authoringRegistry.ts';
+import { COMPONENT_LABELS, describeSceneRuntimeMode, findPresetDefinition } from '../model/authoringRegistry.ts';
 import { AssetPickerModal } from './AssetPickerModal.tsx';
 import { CommitInput } from './CommitInput.tsx';
 import { SpriteAnimationInspector } from './SpriteAnimationInspector.tsx';
@@ -68,7 +68,7 @@ export const InspectorPanel = ({
             <span className="gss-eyebrow">SCENE</span>
             <h2>{scene.name}</h2>
           </div>
-          <span className="gss-type-badge">{scene.type === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</span>
+          <span className="gss-type-badge">{describeSceneRuntimeMode(scene.type)}</span>
         </div>
         <CommitInput
           label="Scene 이름"

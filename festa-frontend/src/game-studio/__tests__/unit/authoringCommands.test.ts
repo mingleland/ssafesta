@@ -43,6 +43,41 @@ describe('Game Studio authoring commands', () => {
     expect(parseGameProject(project)).toBe(project);
   });
 
+  // S15P21A604-488 — Overlay/Fullscreen은 둘 다 내부적으로 scene.type === 'DIALOGUE'라서,
+  // 번호를 presentation까지 따져서 세지 않으면 한쪽 카운터를 다른 쪽이 그대로 이어받는다
+  // (예: Overlay를 먼저 만들면 Fullscreen을 처음 만들어도 1이 아니라 2가 됨). starter
+  // project가 이미 각 타입/presentation을 하나씩 갖고 있어 절대 번호(1, 2...)를 그대로
+  // 가정하면 fixture 변경에 취약하므로, "추가 전 개수 + 1"로 상대 비교한다.
+  it('numbers each newly added scene independently per type, and independently per dialogue presentation', () => {
+    let project = parseGameProject(createStarterProject(488));
+
+    const topDownCount = () => project.scenes.filter((scene) => scene.type === 'TOP_DOWN').length;
+    const platformerCount = () => project.scenes.filter((scene) => scene.type === 'PLATFORMER').length;
+    const overlayCount = () => project.scenes.filter((scene) => scene.type === 'DIALOGUE' && scene.presentation === 'OVERLAY').length;
+    const fullscreenCount = () => project.scenes.filter((scene) => scene.type === 'DIALOGUE' && scene.presentation === 'FULL_SCREEN').length;
+
+    const topDownBefore = topDownCount();
+    project = addTopDownScene(project);
+    expect(project.scenes.at(-1)?.name).toBe(`새 맵-TopDown ${topDownBefore + 1}`);
+
+    const platformerBefore = platformerCount();
+    project = addPlatformerScene(project);
+    expect(project.scenes.at(-1)?.name).toBe(`새 맵-SideScroll ${platformerBefore + 1}`);
+
+    const overlayBefore = overlayCount();
+    const fullscreenBefore = fullscreenCount();
+
+    project = addDialogueScene(project, 'OVERLAY');
+    expect(project.scenes.at(-1)?.name).toBe(`새 대화-Overlay ${overlayBefore + 1}`);
+
+    // 방금 Overlay를 추가했지만 Fullscreen 카운터는 그 영향을 받지 않아야 한다(독립).
+    project = addDialogueScene(project, 'FULL_SCREEN');
+    expect(project.scenes.at(-1)?.name).toBe(`새 대화-Fullscreen ${fullscreenBefore + 1}`);
+
+    project = addDialogueScene(project, 'OVERLAY');
+    expect(project.scenes.at(-1)?.name).toBe(`새 대화-Overlay ${overlayBefore + 2}`);
+  });
+
   it('places, clamps, componentizes, and scripts an object without a genre-specific model', () => {
     let project = createStarterProject(42);
     const placed = addObject(project, 'library', 'INTERACTABLE', { x: 99, y: -4 });

@@ -35,7 +35,7 @@ import {
   startSceneChangeReason,
   withBuiltinAssetLibrary,
 } from '../model/authoringCommands.ts';
-import { PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
+import { describeSceneRuntimeMode, describeSceneType, PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
 import { createBlankProject } from '../model/createBlankProject.ts';
 import { createStarterProject } from '../model/createStarterProject.ts';
 import { createProjectFromTemplate, PROJECT_TEMPLATES, type ProjectTemplateId } from '../model/projectTemplates.ts';
@@ -1043,10 +1043,10 @@ export const GameStudioShell = ({
           <div className="gss-sidebar-section gss-scene-section">
             <div className="gss-sidebar-heading"><span>장면</span><span>{project.scenes.length}/50</span></div>
             <div className="gss-scene-add-row">
-              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 탐색 맵</button>
-              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 플랫폼</button>
-              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화</button>
-              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 연출</button>
+              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 맵-TopDown</button>
+              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 맵-SideScroll</button>
+              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화-Overlay</button>
+              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 대화-Fullscreen</button>
             </div>
             <nav className="gss-scene-list">
               {project.scenes.map((scene, index) => {
@@ -1111,7 +1111,7 @@ export const GameStudioShell = ({
                       type="button"
                     >
                       <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : 'Ⓣ'}</span>
-                      <div><strong>{scene.name}</strong><small>{index + 1} · {scene.type}</small></div>
+                      <div><strong>{scene.name}</strong><small>{index + 1} · {describeSceneType(scene)}</small></div>
                       {scene.id === project.startSceneId && <em>START</em>}
                     </button>
                   </div>
@@ -1302,7 +1302,7 @@ export const GameStudioShell = ({
 
         <section className="gss-workspace">
           <div className="gss-canvas-toolbar">
-            <div><span className="gss-type-badge">{selectedScene.type}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
+            <div><span className="gss-type-badge">{describeSceneType(selectedScene)}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
             {selectedScene.type !== 'DIALOGUE' && (
               <div className="gss-canvas-tools">
                 <div className="gss-tool-segment" role="group" aria-label="캔버스 도구">
@@ -1589,7 +1589,7 @@ export const GameStudioShell = ({
                 >
                   <img alt={`${template.title} 게임 화면 미리보기`} src={template.previewUrl} />
                   <div>
-                    <small>{template.genre} · {template.runtimeMode === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</small>
+                    <small>{template.genre} · {describeSceneRuntimeMode(template.runtimeMode)}</small>
                     <strong>{template.title}</strong>
                     <p>{template.description}</p>
                     <em>{template.systems.join(' · ')}</em>
