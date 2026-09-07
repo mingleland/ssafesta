@@ -15,8 +15,8 @@ import { EMISSION, evaluate } from './compiler/licenseGate.mjs';
 import { planTextureOptimization, resolveMaterial } from './compiler/material.mjs';
 import { RUNTIME_DIR, ensureDir } from './compiler/paths.mjs';
 
-/** v1 대표 — 조립체 하나. 늘리지 않는다 */
-const TARGET_ASSET_CODES = ['SURVEY_KIOSK_DEFAULT'];
+/** v1 대표 — 조립체 하나 + 텍스처 worst case 하나. 늘리지 않는다 */
+const TARGET_ASSET_CODES = ['SURVEY_KIOSK_DEFAULT', 'FURNITURE_CHAIR02_WHITE'];
 
 function materialPathOf(source) {
   return source.material === undefined ? null : resolve(projectRoot, UNITY_ASSETS_ROOT, source.material);
@@ -39,6 +39,7 @@ async function main() {
         assetCode: source.assetCode,
         objectType: source.objectType,
         sourcePackage: source.sourcePackage,
+        typeDefault: source.typeDefault,
         source: root,
         materialPath: materialPathOf(source),
         guidIndex,

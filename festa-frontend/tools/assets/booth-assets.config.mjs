@@ -84,6 +84,20 @@ export const BOOTH_ASSETS = [
     // Counter01 은 다시 4개 FBX(본체·상판·천·선반)를 물고 있다 — 중첩까지 한 번에 검증된다.
     note: 'Unity prefab 계층(중첩 포함)을 FE 에서 재현할 수 있는지 보는 대표',
   },
+  {
+    assetCode: 'FURNITURE_CHAIR02_WHITE',
+    objectType: 'FURNITURE',
+    kind: 'fbx',
+    fbx: 'Furniture/Chair02b.FBX',
+    unitScale: INCH_TO_M,
+    upAxis: 'zUp',
+    // 타입 기본이 아니다 — Chair02b 재질/텍스처를 실제로 쓰는 자산을 fixture 로 들여온 것뿐이다.
+    // Unity 에서 이 mesh 를 쓰는 것은 Chair02_White.prefab 이고 재질이 Chair02b.mat 다.
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    material: '_Project/Art/Booth/ExpoKit/Textures/Furniture/Materials/Chair02b.mat',
+    note: 'Chair02b 텍스처 세트(baseColor·normal·metallicRoughness)를 실제로 쓰는 자산 — 임의 매핑이 아니다',
+  },
 ];
 
 /**

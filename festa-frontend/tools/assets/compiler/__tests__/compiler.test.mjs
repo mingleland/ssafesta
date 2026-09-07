@@ -9,6 +9,8 @@ import { EMISSION, POLICY, canEmitProduction, evaluate } from '../licenseGate.mj
 import { SIMPLIFY_FLOOR_TRIANGLES, countTriangles, flattenAndMerge, planSimplification, quantizePositions } from '../geometry.mjs';
 import { parseMaterial, planTextureOptimization } from '../material.mjs';
 import { planThumbnail, stripMetadata } from '../emit.mjs';
+import { decideSimplify } from '../pipeline.mjs';
+import { makeCamera, renderToRaw } from '../toolchain/rasterizer.mjs';
 
 const packs = (policy) => ({ packages: { Vendor: { runtimeCompilePolicy: policy } } });
 
@@ -164,5 +166,38 @@ describe('Emit — authoring 흔적을 남기지 않는다', () => {
     const thumb = planThumbnail({ min: [0, 0, 0], max: [1, 1, 1] }, 'X');
     expect(thumb.rendered).toBe(false);
     expect(thumb.reason).toBeTruthy();
+  });
+});
+
+describe('Compiler 단순화 판단', () => {
+  it('예산 이하는 ratio 없이 보류하고 이유를 남긴다', () => {
+    const d = decideSimplify(286);
+    expect(d.ratio).toBeNull();
+    expect(d.reason).toContain('286');
+  });
+
+  it('예산 초과는 ratio 를 준다', () => {
+    const d = decideSimplify(5000);
+    expect(d.ratio).toBeGreaterThan(0);
+    expect(d.ratio).toBeLessThan(1);
+  });
+});
+
+describe('Thumbnail 래스터라이저', () => {
+  it('삼각형을 실제로 칠한다 — 빈 이미지가 나오면 썸네일이 아니다', () => {
+    // z=0 평면의 큰 삼각형 하나. 카메라 정면에 놓는다
+    const positions = Float32Array.from([-0.5, 0, 0, 0.5, 0, 0, 0, 1, 0]);
+    const normals = Float32Array.from([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+    const camera = makeCamera({ target: [0, 0.5, 0], radius: 1, size: 32, direction: [0, 0, 1] });
+    const { rgba } = renderToRaw({ positions, normals }, camera, { baseColor: [1, 1, 1] });
+    let painted = 0;
+    for (let i = 3; i < rgba.length; i += 4) if (rgba[i] > 0) painted += 1;
+    expect(painted).toBeGreaterThan(30);
+  });
+
+  it('아무것도 없으면 투명하게 남는다', () => {
+    const camera = makeCamera({ radius: 1, size: 16 });
+    const { rgba } = renderToRaw({ positions: new Float32Array(0), normals: new Float32Array(0) }, camera, { baseColor: [1, 1, 1] });
+    expect(rgba.every((v) => v === 0)).toBe(true);
   });
 });
