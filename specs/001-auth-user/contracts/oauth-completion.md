@@ -3,7 +3,7 @@
 ## 브라우저 흐름
 
 ```text
-GET /api/v1/auth/oauth/google|kakao
+GET /api/v1/auth/oauth/google|kakao|ssafy
   → provider 인증
   → backend callback
   → Set-Cookie: oauth_handoff (HttpOnly, Secure, SameSite=Lax, Path=/api/v1/auth/oauth/complete, 5분)

@@ -17,3 +17,7 @@ class CreateConversationRequest(ApiModel):
 class ConversationResponse(ApiModel):
     conversation_id: str
     expires_at: datetime
+
+
+class MessageRequest(ApiModel):
+    question: str = Field(min_length=1, max_length=2_000)

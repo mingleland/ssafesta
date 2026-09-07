@@ -4,6 +4,7 @@ import com.example.ssafesta.user.OAuthIdentityRepository;
 import com.example.ssafesta.user.OAuthProvider;
 import com.example.ssafesta.user.AccountStatus;
 import java.io.IOException;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseCookie;
@@ -43,10 +44,14 @@ public class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException {
         OAuth2AuthenticationToken oauth = (OAuth2AuthenticationToken) authentication;
-        OAuthProvider provider = OAuthProvider.valueOf(oauth.getAuthorizedClientRegistrationId().toUpperCase());
+        OAuthProvider provider = OAuthProvider.valueOf(
+                oauth.getAuthorizedClientRegistrationId().toUpperCase(Locale.ROOT));
         OAuth2User principal = oauth.getPrincipal();
-        Object subjectValue = principal.getAttribute(provider == OAuthProvider.GOOGLE ? "sub" : "id");
-        String subject = subjectValue != null ? subjectValue.toString() : null;
+        // The subject attribute differs per provider — "sub" on Google, "id" on Kakao, "userId" on
+        // SSAFY — and each registration already names it as its user-name-attribute, which is what
+        // getName() reads. Branching here instead would silently hand back null for whichever
+        // provider was added last, and null subjects register a new account on every login.
+        String subject = principal.getName();
         identities.findByProviderAndProviderSubject(provider, subject).ifPresentOrElse(identity -> {
             try {
                 if (identity.getUser().getStatus() != AccountStatus.ACTIVE) {
