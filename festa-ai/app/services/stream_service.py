@@ -23,7 +23,7 @@ from app.models.conversation import (
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
-from app.services.rag_service import RagContextService
+from app.services.rag_service import NoReadyContextResult, RagContextService
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,23 @@ class ConversationStreamService:
                     "retryable": True,
                 },
             )
+            return
+
+        if isinstance(context, NoReadyContextResult):
+            yield render("token", {"delta": context.message})
+            yield render("done", {"handoffRecommended": False})
+            now = self._clock()
+            turn = ConversationTurn(
+                request_id=request_id,
+                user_message_id=user_message_id,
+                assistant_message_id=assistant_message_id,
+                question=question,
+                answer=context.message,
+                sources=(),
+                created_at=now,
+            )
+            updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
+            await self._repository.save(updated)
             return
 
         answer_parts: list[str] = []
