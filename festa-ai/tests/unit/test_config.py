@@ -59,6 +59,8 @@ def test_valid_env_loads_with_documented_defaults(
     config = _fresh_settings_module()
 
     assert config.settings.job_heartbeat_seconds == 30
+    assert config.settings.document_worker_max_concurrency == 1
+    assert config.settings.document_worker_shutdown_grace_seconds == 30.0
     assert config.settings.spring_document_result_timeout_seconds == 5.0
     assert config.settings.embedding_batch_size == 96
     assert config.settings.embedding_provider == "mock"
