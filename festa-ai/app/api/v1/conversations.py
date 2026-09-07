@@ -1,8 +1,8 @@
 """Expose the Conversation create and message-streaming endpoints.
 
 `S15P21A604-126` — `POST /conversations` (spec 008 FR-024~027). `S15P21A604-140`
-adds `POST /conversations/{id}/messages` (FR-005a, C-07). Close (DELETE)
-belongs to 127.
+adds `POST /conversations/{id}/messages` (FR-005a, C-07). `S15P21A604-127`
+adds `DELETE /conversations/{id}` (FR-014/FR-028, D11).
 """
 
 from __future__ import annotations
@@ -192,3 +192,35 @@ async def stream_conversation_message(
         service.stream(conversation=conversation, question=payload.question),
         media_type="text/event-stream",
     )
+
+
+@router.delete(
+    "/{conversationId}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="closeConversation",
+    summary="Conversation 원문 즉시 삭제",
+    responses={
+        status.HTTP_403_FORBIDDEN: {
+            "description": "다른 사용자 Conversation",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def close_conversation(
+    conversationId: str,
+    member: Annotated[AuthenticatedMember, Depends(require_member)],
+    service: Annotated[ConversationService, Depends(get_conversation_service)],
+) -> None:
+    """Idempotent close — an unknown id also answers 204 so it leaks nothing.
+
+    No 404 here on purpose: `conversation-api.yaml` defines 204/403 only, and a
+    404 would tell a caller whether someone else's id exists.
+    """
+    try:
+        await service.close(conversation_id=conversationId, user_id=member.user_id)
+    except ConversationOwnershipMismatch as exc:
+        raise ApiError(
+            status_code=status.HTTP_403_FORBIDDEN,
+            code="CONVERSATION_OWNERSHIP_MISMATCH",
+            message="다른 사용자의 Conversation입니다.",
+        ) from exc

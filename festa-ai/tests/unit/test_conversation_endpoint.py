@@ -15,6 +15,7 @@ from app.services.conversation_service import (
     BoothAccessDenied,
     ConversationCreationFailed,
 )
+from app.services.stream_service import ConversationOwnershipMismatch
 
 _MEMBER = AuthenticatedMember(user_id=42)
 
@@ -24,6 +25,7 @@ class FakeConversationService:
         self.conversation = conversation
         self.error = error
         self.calls: list[dict[str, int]] = []
+        self.closed: list[dict[str, object]] = []
 
     async def create(self, *, user_id: int, booth_id: int, agent_id: int) -> Conversation:
         self.calls.append({"user_id": user_id, "booth_id": booth_id, "agent_id": agent_id})
@@ -31,6 +33,11 @@ class FakeConversationService:
             raise self.error
         assert self.conversation is not None
         return self.conversation
+
+    async def close(self, *, conversation_id: str, user_id: int) -> None:
+        self.closed.append({"conversation_id": conversation_id, "user_id": user_id})
+        if self.error is not None:
+            raise self.error
 
 
 def _client(service: FakeConversationService) -> TestClient:
@@ -101,3 +108,31 @@ def test_rejects_request_body_with_unknown_field() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_close_returns_204_and_forwards_the_authenticated_user() -> None:
+    service = FakeConversationService(conversation=_conversation())
+
+    response = _client(service).delete("/ai/v1/conversations/conv_abc")
+
+    assert response.status_code == 204
+    assert response.content == b""
+    assert service.closed == [{"conversation_id": "conv_abc", "user_id": 42}]
+
+
+def test_close_returns_204_for_an_unknown_conversation() -> None:
+    """Idempotent per the contract — 204 also leaks nothing about existence."""
+    service = FakeConversationService(conversation=_conversation())
+
+    response = _client(service).delete("/ai/v1/conversations/conv_never_existed")
+
+    assert response.status_code == 204
+
+
+def test_close_returns_403_for_another_users_conversation() -> None:
+    service = FakeConversationService(error=ConversationOwnershipMismatch("conv_abc"))
+
+    response = _client(service).delete("/ai/v1/conversations/conv_abc")
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "CONVERSATION_OWNERSHIP_MISMATCH"

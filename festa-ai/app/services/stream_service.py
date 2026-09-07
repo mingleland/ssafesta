@@ -89,6 +89,26 @@ class ConversationStreamService:
             raise BoothLeaseExpired(conversation_id)
         return conversation
 
+    async def _commit_turn(
+        self, conversation: Conversation, turn: ConversationTurn, *, now: datetime
+    ) -> None:
+        """Confirm one completed turn, unless the Conversation is already gone.
+
+        A close (`DELETE`) or the idle TTL can land while this stream is still
+        running — the client keeps reading, so we reach here either way. Writing
+        unconditionally would bring the question and answer text back for
+        another 30 minutes and break D11/SC-012, so the repository commit is
+        conditional and its failure is logged rather than swallowed.
+        """
+        updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
+        if not await self._repository.commit_turn(updated):
+            logger.info(
+                "completed turn dropped, conversation closed or expired mid-stream "
+                "conversation_id=%s request_id=%s",
+                conversation.conversation_id,
+                turn.request_id,
+            )
+
     async def stream(
         self, *, conversation: Conversation, question: str
     ) -> AsyncIterator[str]:
@@ -143,8 +163,7 @@ class ConversationStreamService:
                 sources=(),
                 created_at=now,
             )
-            updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-            await self._repository.save(updated)
+            await self._commit_turn(conversation, turn, now=now)
             return
 
         answer_parts: list[str] = []
@@ -251,5 +270,4 @@ class ConversationStreamService:
             sources=tuple(citations),
             created_at=now,
         )
-        updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-        await self._repository.save(updated)
+        await self._commit_turn(conversation, turn, now=now)
