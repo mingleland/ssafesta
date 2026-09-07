@@ -24,7 +24,7 @@ import { Inspector, InspectorEmpty } from '../../features/studio/ui/shell/Inspec
 import { TemplateInspector } from '../../features/studio/ui/shell/TemplateInspector';
 import { StatusBar } from '../../features/studio/ui/shell/StatusBar';
 import { BoothCanvasViewport } from '../../features/studio/ui/canvas/BoothCanvasViewport';
-import type { BoothDecor } from '../../features/studio/ui/canvas/TemporaryIsoRenderer';
+import type { BoothDecor } from '../../features/studio/ui/canvas/canvasTypes';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';

@@ -3,9 +3,14 @@ import type { DialogueChoice, DialogueScene, GameProject } from '../../contracts
 import {
   addDialogueChoice,
   addDialogueNode,
+  dialogueNodeRemovalReason,
   removeDialogueChoice,
+  removeDialogueNode,
   renameScene,
+  reorderDialogueNode,
   setDialogueBackground,
+  setStartNode,
+  startNodeChangeReason,
   updateDialogueChoice,
   updateDialogueNode,
 } from '../model/authoringCommands.ts';
@@ -33,6 +38,9 @@ const choiceOutcome = (choice: DialogueChoice): string => {
 export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueEditorProps) => {
   const [selectedNodeId, setSelectedNodeId] = useState(scene.startNodeId);
   useEffect(() => setSelectedNodeId(scene.startNodeId), [scene.id, scene.startNodeId]);
+  // S15P21A604-494 — 씬 목록의 드래그 정렬(draggedSceneIndex/dragOverSceneIndex)과 동일한 패턴.
+  const [draggedNodeIndex, setDraggedNodeIndex] = useState<number | null>(null);
+  const [dragOverNodeIndex, setDragOverNodeIndex] = useState<number | null>(null);
   const selectedNode = scene.nodes.find((node) => node.id === selectedNodeId) ?? scene.nodes[0];
   const dialogueFlow = useMemo(() => analyzeDialogueFlow(scene), [scene]);
 
@@ -88,21 +96,76 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
             type="button"
           >+</button>
         </div>
-        {scene.nodes.map((node, index) => (
-          <button
-            className={`gss-node-button${node.id === selectedNode.id ? ' is-active' : ''}`}
-            key={node.id}
-            onClick={() => setSelectedNodeId(node.id)}
-            type="button"
-          >
-            <span>{index + 1}</span>
-            <div>
-              <strong>{(node.id === selectedNode.id ? previewSpeaker : node.speaker) || '내레이션'}</strong>
-              <small>{node.id === selectedNode.id ? previewText : node.text}</small>
+        {scene.nodes.map((node, index) => {
+          const removalReason = dialogueNodeRemovalReason(project, scene.id, node.id);
+          const startReason = startNodeChangeReason(project, scene.id, node.id);
+          const rowClassName = ['gss-node-row',
+            draggedNodeIndex === index ? 'is-dragging' : '',
+            dragOverNodeIndex === index && draggedNodeIndex !== index ? 'is-drag-over' : '']
+            .filter(Boolean).join(' ');
+          return (
+            <div
+              className={rowClassName}
+              key={node.id}
+              onDragOver={(dragEvent) => {
+                if (draggedNodeIndex === null) return;
+                dragEvent.preventDefault();
+                if (dragOverNodeIndex !== index) setDragOverNodeIndex(index);
+              }}
+              onDrop={(dragEvent) => {
+                dragEvent.preventDefault();
+                if (draggedNodeIndex !== null && draggedNodeIndex !== index) {
+                  onApply(reorderDialogueNode(project, scene.id, scene.nodes[draggedNodeIndex]!.id, index));
+                }
+                setDraggedNodeIndex(null);
+                setDragOverNodeIndex(null);
+              }}
+            >
+              <button
+                aria-label={`${index + 1}번째 노드 순서 변경 핸들`}
+                className="gss-icon-button gss-drag-handle"
+                draggable
+                onDragEnd={() => { setDraggedNodeIndex(null); setDragOverNodeIndex(null); }}
+                onDragStart={(dragEvent) => {
+                  dragEvent.dataTransfer?.setData('text/plain', String(index));
+                  setDraggedNodeIndex(index);
+                }}
+                type="button"
+              >☰</button>
+              <button
+                className={`gss-node-button${node.id === selectedNode.id ? ' is-active' : ''}`}
+                onClick={() => setSelectedNodeId(node.id)}
+                type="button"
+              >
+                {/* S15P21A604-494 — 배열 인덱스 기반 번호는 드래그로 순서를 바꾸는 순간
+                    같이 바뀌어서 "이 노드의 고정된 이름표"처럼 오인하기 쉬웠다. 그 자체로
+                    저장되거나 참조되는 값도 아니라 표시를 뺀다 — 어떤 노드인지는
+                    speaker/text 요약과 START 배지로 구분한다. */}
+                <div>
+                  <strong>{(node.id === selectedNode.id ? previewSpeaker : node.speaker) || '내레이션'}</strong>
+                  <small>{node.id === selectedNode.id ? previewText : node.text}</small>
+                </div>
+                {node.id === scene.startNodeId && <em>START</em>}
+              </button>
+              <button
+                aria-label={`${index + 1}번째 노드를 시작으로 설정`}
+                className="gss-icon-button"
+                disabled={startReason !== null}
+                onClick={() => onApply(setStartNode(project, scene.id, node.id))}
+                title={startReason ?? '이 노드를 시작으로 설정'}
+                type="button"
+              >★</button>
+              <button
+                aria-label={`${index + 1}번째 노드 삭제`}
+                className="gss-icon-button"
+                disabled={removalReason !== null}
+                onClick={() => onApply(removeDialogueNode(project, scene.id, node.id))}
+                title={removalReason ?? '노드 삭제'}
+                type="button"
+              >×</button>
             </div>
-            {node.id === scene.startNodeId && <em>START</em>}
-          </button>
-        ))}
+          );
+        })}
       </aside>
 
       <div className="gss-dialogue-editor">

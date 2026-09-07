@@ -35,7 +35,7 @@ import {
   startSceneChangeReason,
   withBuiltinAssetLibrary,
 } from '../model/authoringCommands.ts';
-import { PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
+import { describeSceneRuntimeMode, describeSceneType, PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
 import { createBlankProject } from '../model/createBlankProject.ts';
 import { createStarterProject } from '../model/createStarterProject.ts';
 import { createProjectFromTemplate, PROJECT_TEMPLATES, type ProjectTemplateId } from '../model/projectTemplates.ts';
@@ -54,6 +54,8 @@ import { findPublishBlockers } from '../ports/publishValidation.ts';
 import { createGameProjectStore } from '../store/gameProjectStore.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { DialogueEditor } from './DialogueEditor.tsx';
+import { FloatingPanel } from './FloatingPanel.tsx';
+import { SceneFlowGraph } from './SceneFlowGraph.tsx';
 import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
 import { ObjectLayerPanel } from './ObjectLayerPanel.tsx';
@@ -251,6 +253,8 @@ export const GameStudioShell = ({
   // 템플릿/JSON 가져오기·내보내기)와, "게임 초기화"의 파괴적 액션 확인 단계.
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // 실험(정식 티켓 아님) — 씬 단위 게임 흐름을 그래프로 보여주는 모달.
+  const [showFlowGraph, setShowFlowGraph] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -677,6 +681,10 @@ export const GameStudioShell = ({
         || (target instanceof HTMLElement && target.isContentEditable);
       const insideDialog = target instanceof Element && target.closest('[role="dialog"]') !== null;
       if (event.key === 'Escape') {
+        if (showFlowGraph) {
+          setShowFlowGraph(false);
+          return;
+        }
         if (showResetConfirm) {
           setShowResetConfirm(false);
           return;
@@ -821,7 +829,7 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showFileMenu, showGuide, showResetConfirm, showTemplates, store]);
+  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showFileMenu, showFlowGraph, showGuide, showResetConfirm, showTemplates, store]);
 
   // S15P21A604-481 — "게임 초기화"(확인 다이얼로그를 거친 뒤에만 호출된다). 새 gameId 발급
   // 진입점 자체가 없어서(Notion QA id=25) "새 게임 생성"이 아니라 현재 gameId를 완전히 빈
@@ -1004,6 +1012,12 @@ export const GameStudioShell = ({
         <div className="gss-primary-actions">
           <button className="gss-guide-button" onClick={() => setShowGuide(true)} type="button">? 사용 안내</button>
           <button
+            aria-pressed={showFlowGraph}
+            className="gss-guide-button"
+            onClick={() => setShowFlowGraph((current) => !current)}
+            type="button"
+          >🔀 게임 흐름</button>
+          <button
             className="gss-preview-button"
             disabled={saveStatus === 'loading' || saveStatus === 'saving'}
             onClick={() => void openPreview()}
@@ -1043,10 +1057,10 @@ export const GameStudioShell = ({
           <div className="gss-sidebar-section gss-scene-section">
             <div className="gss-sidebar-heading"><span>장면</span><span>{project.scenes.length}/50</span></div>
             <div className="gss-scene-add-row">
-              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 탐색 맵</button>
-              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 플랫폼</button>
-              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화</button>
-              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 연출</button>
+              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 맵-TopDown</button>
+              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 맵-SideScroll</button>
+              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화-Overlay</button>
+              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 대화-Fullscreen</button>
             </div>
             <nav className="gss-scene-list">
               {project.scenes.map((scene, index) => {
@@ -1111,7 +1125,7 @@ export const GameStudioShell = ({
                       type="button"
                     >
                       <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : 'Ⓣ'}</span>
-                      <div><strong>{scene.name}</strong><small>{index + 1} · {scene.type}</small></div>
+                      <div><strong>{scene.name}</strong><small>{index + 1} · {describeSceneType(scene)}</small></div>
                       {scene.id === project.startSceneId && <em>START</em>}
                     </button>
                   </div>
@@ -1302,7 +1316,7 @@ export const GameStudioShell = ({
 
         <section className="gss-workspace">
           <div className="gss-canvas-toolbar">
-            <div><span className="gss-type-badge">{selectedScene.type}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
+            <div><span className="gss-type-badge">{describeSceneType(selectedScene)}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
             {selectedScene.type !== 'DIALOGUE' && (
               <div className="gss-canvas-tools">
                 <div className="gss-tool-segment" role="group" aria-label="캔버스 도구">
@@ -1589,7 +1603,7 @@ export const GameStudioShell = ({
                 >
                   <img alt={`${template.title} 게임 화면 미리보기`} src={template.previewUrl} />
                   <div>
-                    <small>{template.genre} · {template.runtimeMode === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</small>
+                    <small>{template.genre} · {describeSceneRuntimeMode(template.runtimeMode)}</small>
                     <strong>{template.title}</strong>
                     <p>{template.description}</p>
                     <em>{template.systems.join(' · ')}</em>
@@ -1627,6 +1641,18 @@ export const GameStudioShell = ({
             })()}
           </section>
         </div>
+      )}
+      {showFlowGraph && (
+        <FloatingPanel initialSize={{ height: 480, width: 760 }} onClose={() => setShowFlowGraph(false)} title="게임 흐름">
+          <SceneFlowGraph
+            onSelectScene={(sceneId) => {
+              setSelectedSceneId(sceneId);
+              setSelectedObjectId(null);
+              setSelectedObjectIds(new Set());
+            }}
+            project={project}
+          />
+        </FloatingPanel>
       )}
       {tutorialStep !== null && (
         <aside className="gss-tutorial-dock">

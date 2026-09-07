@@ -9,8 +9,10 @@ once streaming begins surfaces as an `error` event, never an HTTP error —
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
@@ -23,7 +25,7 @@ from app.models.conversation import (
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
-from app.services.rag_service import RagContextService
+from app.services.rag_service import NoReadyContextResult, RagContextService
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,14 @@ class ConversationOwnershipMismatch(Exception):
 
 class BoothLeaseExpired(Exception):
     pass
+
+
+class _StreamTimeout(Exception):
+    """FR-007 — TTFT 또는 전체 응답 timeout 예산을 넘겼다."""
+
+    def __init__(self, phase: str) -> None:
+        super().__init__(phase)
+        self.phase = phase
 
 
 def _new_id(prefix: str) -> str:
@@ -57,12 +67,16 @@ class ConversationStreamService:
         llm_provider: LLMProvider,
         ttl_seconds: int,
         clock: Callable[[], datetime] = _default_clock,
+        ttft_timeout_seconds: float = 15.0,
+        total_timeout_seconds: float = 60.0,
     ) -> None:
         self._repository = repository
         self._rag_context_service = rag_context_service
         self._llm_provider = llm_provider
         self._ttl_seconds = ttl_seconds
         self._clock = clock
+        self._ttft_timeout_seconds = ttft_timeout_seconds
+        self._total_timeout_seconds = total_timeout_seconds
 
     async def authorize(self, *, conversation_id: str, user_id: int) -> Conversation:
         """Run every check that must fail as an HTTP error, before SSE starts."""
@@ -116,13 +130,64 @@ class ConversationStreamService:
             )
             return
 
+        if isinstance(context, NoReadyContextResult):
+            yield render("token", {"delta": context.message})
+            yield render("done", {"handoffRecommended": False})
+            now = self._clock()
+            turn = ConversationTurn(
+                request_id=request_id,
+                user_message_id=user_message_id,
+                assistant_message_id=assistant_message_id,
+                question=question,
+                answer=context.message,
+                sources=(),
+                created_at=now,
+            )
+            updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
+            await self._repository.save(updated)
+            return
+
         answer_parts: list[str] = []
+        started_at = time.monotonic()
+        got_first_token = False
+        agen = self._llm_provider.stream(context.request).__aiter__()
         try:
-            async for token in self._llm_provider.stream(context.request):
+            while True:
+                if got_first_token:
+                    deadline = self._total_timeout_seconds
+                else:
+                    deadline = min(self._ttft_timeout_seconds, self._total_timeout_seconds)
+                remaining = deadline - (time.monotonic() - started_at)
+                phase = "TOTAL_RESPONSE" if got_first_token else "FIRST_TOKEN"
+                if remaining <= 0:
+                    raise _StreamTimeout(phase)
+                try:
+                    token = await asyncio.wait_for(agen.__anext__(), timeout=remaining)
+                except TimeoutError as exc:
+                    raise _StreamTimeout(phase) from exc
+                except StopAsyncIteration:
+                    break
                 if not token.text:
                     continue
+                got_first_token = True
                 answer_parts.append(token.text)
                 yield render("token", {"delta": token.text})
+        except _StreamTimeout as exc:
+            logger.warning(
+                "LLM stream timed out for conversation %s phase=%s",
+                conversation.conversation_id,
+                exc.phase,
+            )
+            yield render(
+                "error",
+                {
+                    "code": "LLM_TIMEOUT",
+                    "message": "AI 응답 생성이 지연되고 있습니다.",
+                    "retryable": True,
+                    "timeoutPhase": exc.phase,
+                },
+            )
+            return
         except ManagedLLMError as exc:
             logger.exception(
                 "LLM stream failed for conversation %s", conversation.conversation_id

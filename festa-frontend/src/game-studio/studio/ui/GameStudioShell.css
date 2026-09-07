@@ -630,15 +630,24 @@
 .gss-node-rail { background: #f7f8fa; border-right: 1px solid var(--gss-border); min-height: 0; overflow-y: auto; padding: 12px 9px; }
 .gss-node-rail-header { margin-bottom: 9px; padding: 0 4px; }
 .gss-node-rail-header button { background: var(--gss-panel-3); border: 1px solid var(--gss-border); border-radius: 5px; cursor: pointer; height: 24px; width: 24px; }
-.gss-node-button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 7px; cursor: pointer; display: grid; gap: 7px; grid-template-columns: 20px minmax(0,1fr); margin-bottom: 4px; padding: 8px 6px; text-align: left; width: 100%; }
+/* S15P21A604-494 — 씬 목록의 .gss-scene-row(드래그 핸들 + 선택 버튼)와 동일한 패턴을
+   따르되, 행마다 "시작으로 설정"·삭제 아이콘 버튼이 추가로 붙는다. */
+.gss-node-row { align-items: center; display: flex; gap: 4px; margin-bottom: 4px; }
+.gss-node-row.is-drag-over { border-radius: 8px; outline: 1px solid var(--gss-blue); outline-offset: -1px; }
+.gss-node-row.is-dragging { opacity: .4; }
+.gss-node-row .gss-drag-handle { flex: 0 0 auto; }
+.gss-node-row .gss-node-button { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
+.gss-node-row > .gss-icon-button { flex: 0 0 auto; }
+/* S15P21A604-494 — 배열 인덱스 번호 배지(원형 숫자 칸)를 없애면서 grid-template-columns도
+   20px 칸 없이 한 칸으로 정리했다. */
+.gss-node-button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 7px; cursor: pointer; display: grid; gap: 7px; grid-template-columns: minmax(0,1fr); padding: 8px 6px; text-align: left; width: 100%; }
 .gss-node-button:hover,
 .gss-node-button.is-active { background: var(--gss-blue-soft); border-color: rgba(37,99,235,.28); }
-.gss-node-button > span { align-items: center; background: #e4e8ee; border-radius: 50%; color: #4b5563; display: inline-flex; font-size: 8px; height: 20px; justify-content: center; }
 .gss-node-button strong,
 .gss-node-button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gss-node-button strong { font-size: 9px; }
 .gss-node-button small { color: var(--gss-muted); font-size: 7px; margin-top: 3px; }
-.gss-node-button em { color: var(--gss-green); font-size: 6px; font-style: normal; grid-column: 2; }
+.gss-node-button em { color: var(--gss-green); font-size: 6px; font-style: normal; }
 .gss-dialogue-editor { min-height: 0; overflow-y: auto; padding: 22px; }
 .gss-dialogue-scene-header { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 14px; }
 .gss-dialogue-scene-header > div { width: min(400px, 75%); }
@@ -692,6 +701,15 @@
 .gss-toast.is-error > span { background: rgba(220,38,38,.14); color: var(--gss-red); }
 .gss-toast em { color: var(--gss-muted); font-style: normal; margin-left: auto; }
 .gss-guide-backdrop { align-items: center; background: rgba(15,18,24,.6); display: flex; inset: 0; justify-content: center; padding: 30px; position: fixed; z-index: 100; }
+/* 실험(정식 티켓 아님) — 화면 전체를 덮는 backdrop이 없다: 편집 화면을 막지 않고 그 위에
+   떠 있기만 하는 창이라, 모달과 달리 뒤쪽 UI가 계속 조작 가능해야 한다. */
+.gss-floating-panel { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 12px; box-shadow: 0 24px 60px rgba(20,25,35,.35); display: flex; flex-direction: column; overflow: hidden; position: fixed; z-index: 90; }
+.gss-floating-panel-titlebar { align-items: center; background: #eef1f6; border-bottom: 1px solid #d7dce3; cursor: grab; display: flex; flex: 0 0 auto; justify-content: space-between; padding: 8px 12px; touch-action: none; }
+.gss-floating-panel-titlebar:active { cursor: grabbing; }
+.gss-floating-panel-titlebar strong { font-size: 12px; }
+.gss-floating-panel-titlebar button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 18px; line-height: 1; }
+.gss-floating-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px; }
+.gss-floating-panel-resize-handle { background: linear-gradient(135deg,transparent 50%,#9aa5b4 50%,#9aa5b4 60%,transparent 60%,transparent 70%,#9aa5b4 70%,#9aa5b4 80%,transparent 80%); bottom: 0; cursor: nwse-resize; height: 16px; position: absolute; right: 0; touch-action: none; width: 16px; }
 .gss-guide-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 14px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 620px; padding: 24px; width: 100%; }
 .gss-guide-modal > header { align-items: flex-start; display: flex; justify-content: space-between; }
 .gss-guide-modal > header span { color: #1d4ed8; font-size: 9px; font-weight: 850; letter-spacing: .1em; }
@@ -714,6 +732,30 @@
 .gss-template-modal h2 { font-size: 22px; margin: 5px 0; }
 .gss-template-modal > header p { color: #4b5563; font-size: 10px; margin: 0 0 18px; }
 .gss-template-modal > header button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 22px; }
+/* 실험(정식 티켓 아님) — 게임 흐름 그래프 모달. .gss-template-modal과 같은 톤의 오버레이
+   패널 껍데기를 재사용하고, 안쪽 내용(그래프)만 새로 정의한다. */
+/* 실험(정식 티켓 아님) — 모달 껍데기(.gss-flow-graph-modal)는 FloatingPanel로 대체됐다.
+   그래프 자체 스크롤 영역만 남는다(FloatingPanel의 리사이즈 가능한 본문 높이에 맞춘다). */
+/* S15P21A604-510 — 네이티브 스크롤(overflow) 대신 손수 만든 팬/줌 뷰포트로 바꿨다. 배경은
+   grab/grabbing 커서, 실제 이동·확대는 SceneFlowGraph가 .gss-flow-graph에 트랜스폼으로
+   적용한다(여기서는 뷰포트 자체의 크기/커서/클리핑만 다룬다). */
+.gss-flow-graph-viewport { cursor: grab; height: 100%; overflow: hidden; position: relative; touch-action: none; width: 100%; }
+.gss-flow-graph-viewport.is-panning { cursor: grabbing; }
+.gss-flow-graph { position: relative; }
+.gss-flow-graph-edges { left: 0; pointer-events: none; position: absolute; top: 0; }
+.gss-flow-edge { stroke: #9aa5b4; stroke-width: 1.6; }
+.gss-flow-edge.is-complete_game { stroke: var(--gss-green); }
+.gss-flow-graph-edges marker path { fill: #9aa5b4; }
+.gss-flow-node { background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; cursor: pointer; padding: 8px 10px; position: absolute; text-align: left; width: 168px; }
+.gss-flow-node:hover:not(:disabled) { border-color: rgba(37,99,235,.4); box-shadow: 0 4px 14px rgba(37,99,235,.15); }
+.gss-flow-node:disabled { cursor: default; opacity: .85; }
+.gss-flow-node.is-start { border-color: var(--gss-blue); border-width: 2px; }
+.gss-flow-node.is-endpoint { background: #eefaf1; border-color: var(--gss-green); }
+.gss-flow-node.is-unreachable { border-style: dashed; opacity: .6; }
+.gss-flow-node strong { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gss-flow-node small { color: var(--gss-muted); display: block; font-size: 9px; margin-top: 2px; }
+.gss-flow-node em { color: var(--gss-blue); font-size: 8px; font-style: normal; margin-top: 3px; display: block; }
+.gss-flow-node em.is-warning { color: #b45309; }
 .gss-template-grid { display: grid; gap: 10px; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .gss-template-grid > button { align-items: flex-start; background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; display: block; overflow: hidden; padding: 0; text-align: left; }
 .gss-template-grid > button:hover { background: rgba(37,99,235,.05); border-color: #4f82cd; transform: translateY(-1px); }
