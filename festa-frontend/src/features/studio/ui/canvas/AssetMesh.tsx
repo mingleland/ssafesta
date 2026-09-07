@@ -7,7 +7,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
-import { assetUrl } from '../../model/boothAssetManifest';
+import { boothAssetBaseUrl } from '../../model/boothAssetManifest';
+import { resolveAssetUrl } from '../../../../shared/assets/resolveAssetUrl';
 import { loadGlb } from './boothAssetCache';
 
 type LoadState =
@@ -27,7 +28,7 @@ interface Props {
 
 export function AssetMesh({ entry, color, roughness, metalness, fallback }: Props) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
-  const url = useMemo(() => assetUrl(entry.url), [entry.url]);
+  const url = useMemo(() => resolveAssetUrl(entry.url, boothAssetBaseUrl()), [entry.url]);
 
   useEffect(() => {
     let alive = true;

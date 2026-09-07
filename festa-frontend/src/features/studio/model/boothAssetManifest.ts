@@ -7,6 +7,8 @@
 // 다만 "없음" 과 "있는데 실패" 는 다르게 다룬다. 404 는 조용히 넘기고, 그 밖의 실패는
 // 이유를 남긴다 — 조용히 기본값으로 되돌아가는 것이 T-24 의 원인이었다.
 import type { ObjectType } from '../../../entities/layout/types';
+import { normalizeAssetBase, resolveAssetUrl } from '../../../shared/assets/resolveAssetUrl';
+import { boothAssetBase } from '../../../shared/config/runtime';
 
 export interface BoothAssetBounds {
   min: [number, number, number];
@@ -41,10 +43,15 @@ export interface BoothAssetManifest {
 export const BOOTH_ASSET_MANIFEST_URL = 'assets/booth/manifest.json';
 const SUPPORTED_VERSION = 1;
 
-/** BASE_URL 기준으로 푼다 — 앱이 하위 경로에 배포돼도 같은 코드가 동작해야 한다 */
-export function assetUrl(relative: string): string {
-  const base = import.meta.env.BASE_URL || '/';
-  return `${base.endsWith('/') ? base : `${base}/`}${relative.replace(/^\//, '')}`;
+/**
+ * manifest 안의 상대경로를 절대 URL 로 푸는 base.
+ *
+ * Unity 빌드(unity/host/resolver.ts)와 **같은 규칙**을 쓴다 — 각자 문자열을 이어 붙이면
+ * 이중 슬래시·오리진 해석·절대 URL 통과가 갈라진다(S15P21A604-427, #128 §4).
+ * 처음엔 여기서 BASE_URL 을 직접 만졌는데 그게 두 번째 규칙이었다.
+ */
+export function boothAssetBaseUrl(): URL {
+  return normalizeAssetBase(boothAssetBase());
 }
 
 export type ManifestResult =
@@ -55,7 +62,7 @@ export type ManifestResult =
 export async function fetchBoothAssetManifest(signal?: AbortSignal): Promise<ManifestResult> {
   let response: Response;
   try {
-    response = await fetch(assetUrl(BOOTH_ASSET_MANIFEST_URL), { signal });
+    response = await fetch(resolveAssetUrl(BOOTH_ASSET_MANIFEST_URL, boothAssetBaseUrl()), { signal });
   } catch (error) {
     return { kind: 'error', reason: error instanceof Error ? error.message : String(error) };
   }
