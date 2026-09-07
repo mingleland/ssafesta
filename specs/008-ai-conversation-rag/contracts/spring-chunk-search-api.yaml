@@ -32,7 +32,9 @@ paths:
                 $ref: '#/components/schemas/ChunkSearchResponse'
         '400':
           description: >-
-            embedding 차원·topK 검증 실패, 또는 계약에 없는 필드 포함(`code: VALIDATION_FAILED`).
+            embedding 차원·값 검증 실패(비유한값, float32 표현 범위 초과, 코사인 거리를
+            정의할 수 없는 0 노름·float32 노름 overflow/underflow 포함), topK 검증 실패,
+            또는 계약에 없는 필드 포함(`code: VALIDATION_FAILED`).
           content:
             application/json:
               schema:
@@ -40,7 +42,8 @@ paths:
         '401':
           description: >-
             AI→Spring Service Token 누락·오류(`code: UNAUTHORIZED`). `/internal/**` 체인에서
-            토큰 부재·오류는 익명으로 취급되어 403이 아니라 401이 된다.
+            토큰 부재·오류로 인증 객체가 없으면 명시적 `authenticationEntryPoint`가 401을
+            반환한다. `accessDeniedHandler`의 403은 인증됐지만 authority가 부족한 경우다.
           content:
             application/json:
               schema:
