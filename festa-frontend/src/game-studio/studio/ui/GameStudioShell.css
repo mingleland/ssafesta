@@ -736,7 +736,11 @@
    패널 껍데기를 재사용하고, 안쪽 내용(그래프)만 새로 정의한다. */
 /* 실험(정식 티켓 아님) — 모달 껍데기(.gss-flow-graph-modal)는 FloatingPanel로 대체됐다.
    그래프 자체 스크롤 영역만 남는다(FloatingPanel의 리사이즈 가능한 본문 높이에 맞춘다). */
-.gss-flow-graph-scroll { height: 100%; overflow: auto; }
+/* S15P21A604-510 — 네이티브 스크롤(overflow) 대신 손수 만든 팬/줌 뷰포트로 바꿨다. 배경은
+   grab/grabbing 커서, 실제 이동·확대는 SceneFlowGraph가 .gss-flow-graph에 트랜스폼으로
+   적용한다(여기서는 뷰포트 자체의 크기/커서/클리핑만 다룬다). */
+.gss-flow-graph-viewport { cursor: grab; height: 100%; overflow: hidden; position: relative; touch-action: none; width: 100%; }
+.gss-flow-graph-viewport.is-panning { cursor: grabbing; }
 .gss-flow-graph { position: relative; }
 .gss-flow-graph-edges { left: 0; pointer-events: none; position: absolute; top: 0; }
 .gss-flow-edge { stroke: #9aa5b4; stroke-width: 1.6; }
