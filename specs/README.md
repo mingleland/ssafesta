@@ -23,7 +23,7 @@
 | 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
 | 013 | avatar-customization | **P0** | Unity + FE + BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 016 | booth-laptop-homepage | **P0** | FE + Unity + BE | ✅ | — | — |
-| 010 | survey | P1 | FE + BE | ✅ | — | — |
+| 010 | survey | P1 | FE + BE | ✅ | ✅ **BE분** +research/data-model/contracts/quickstart | ✅ **BE분** |
 | 011 | staff-consultation | P1 | BE + FE | ✅ | — | — |
 | 012 | economy-inventory | P1 | BE | ✅ | — | — |
 | 014 | minigame | P1 | Unity + BE | ✅ **확정** | ✅ | ✅ |
