@@ -12,7 +12,12 @@ from datetime import datetime
 
 from redis.asyncio import Redis
 
-from app.models.conversation import Conversation, ConversationScope
+from app.models.conversation import (
+    Conversation,
+    ConversationScope,
+    ConversationTurn,
+    SourceCitation,
+)
 
 
 class ConversationRepository:
@@ -48,6 +53,25 @@ class ConversationRepository:
             "status": conversation.status,
             "lastActivityAt": conversation.last_activity_at.isoformat(),
             "expiresAt": conversation.expires_at.isoformat(),
+            "turns": [
+                {
+                    "requestId": turn.request_id,
+                    "userMessageId": turn.user_message_id,
+                    "assistantMessageId": turn.assistant_message_id,
+                    "question": turn.question,
+                    "answer": turn.answer,
+                    "sources": [
+                        {
+                            "documentId": source.document_id,
+                            "chunkId": source.chunk_id,
+                            "title": source.title,
+                        }
+                        for source in turn.sources
+                    ],
+                    "createdAt": turn.created_at.isoformat(),
+                }
+                for turn in conversation.turns
+            ],
         }
 
     @staticmethod
@@ -60,4 +84,23 @@ class ConversationRepository:
             status=data["status"],
             last_activity_at=datetime.fromisoformat(data["lastActivityAt"]),
             expires_at=datetime.fromisoformat(data["expiresAt"]),
+            turns=tuple(
+                ConversationTurn(
+                    request_id=turn["requestId"],
+                    user_message_id=turn["userMessageId"],
+                    assistant_message_id=turn["assistantMessageId"],
+                    question=turn["question"],
+                    answer=turn["answer"],
+                    sources=tuple(
+                        SourceCitation(
+                            document_id=source["documentId"],
+                            chunk_id=source["chunkId"],
+                            title=source["title"],
+                        )
+                        for source in turn["sources"]
+                    ),
+                    created_at=datetime.fromisoformat(turn["createdAt"]),
+                )
+                for turn in data.get("turns", [])
+            ),
         )
