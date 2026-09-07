@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GameProjectContractError, parseGameProject } from '../../contracts/gameProject.ts';
 import {
   addComponent,
+  addDialogueChoice,
+  addDialogueNode,
   addDialogueScene,
   addObject,
   addObjectEvent,
@@ -11,6 +13,7 @@ import {
   appendEventAction,
   appendEventCondition,
   copyObjectsToScene,
+  dialogueNodeRemovalReason,
   duplicateScene,
   duplicateObjects,
   fillTileLayer,
@@ -21,12 +24,17 @@ import {
   moveScene,
   paintTile,
   paintTiles,
+  removeDialogueNode,
   removeObjects,
+  reorderDialogueNode,
   reorderEventAction,
   resizeWorldScene,
   sceneRemovalReason,
+  setStartNode,
   setStartScene,
+  startNodeChangeReason,
   startSceneChangeReason,
+  updateDialogueChoice,
 } from '../../studio/model/authoringCommands.ts';
 import { createStarterProject } from '../../studio/model/createStarterProject.ts';
 
@@ -352,5 +360,99 @@ describe('Game Studio authoring commands', () => {
 
     expect(() => setStartScene(project, 'librarianDialogue'))
       .toThrow('게임 화면 위에 겹쳐 보이는 대화(OVERLAY)는 시작 Scene으로 지정할 수 없습니다.');
+  });
+
+  // S15P21A604-494 — 씬 목록의 reorderScene/startSceneChangeReason·setStartScene/
+  // sceneRemovalReason·removeScene을 대화 노드에도 그대로 미러링한다.
+  describe('dialogue node management', () => {
+    const buildDialogueScene = (gameId: number) => {
+      let project = addDialogueScene(parseGameProject(createStarterProject(gameId)), 'OVERLAY');
+      const sceneId = project.scenes.at(-1)?.id;
+      if (sceneId === undefined) throw new Error('expected a newly added DIALOGUE scene');
+      const initialScene = project.scenes.find((candidate) => candidate.id === sceneId);
+      if (initialScene?.type !== 'DIALOGUE') throw new Error('expected DIALOGUE scene');
+      const firstNodeId = initialScene.startNodeId;
+      const second = addDialogueNode(project, sceneId);
+      project = second.project;
+      const third = addDialogueNode(project, sceneId);
+      project = third.project;
+      return { project, sceneId, firstNodeId, secondNodeId: second.nodeId, thirdNodeId: third.nodeId };
+    };
+    const nodeOrder = (project: ReturnType<typeof buildDialogueScene>['project'], sceneId: string) => {
+      const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+      if (scene?.type !== 'DIALOGUE') throw new Error('expected DIALOGUE scene');
+      return scene.nodes.map((node) => node.id);
+    };
+
+    it('reorders dialogue nodes, no-ops when already in place, and clamps out-of-range targets', () => {
+      const { project, sceneId, firstNodeId, secondNodeId, thirdNodeId } = buildDialogueScene(60);
+      expect(nodeOrder(project, sceneId)).toEqual([firstNodeId, secondNodeId, thirdNodeId]);
+
+      const reordered = reorderDialogueNode(project, sceneId, thirdNodeId, 0);
+      expect(nodeOrder(reordered, sceneId)).toEqual([thirdNodeId, firstNodeId, secondNodeId]);
+      expect(parseGameProject(reordered)).toBe(reordered);
+
+      expect(reorderDialogueNode(project, sceneId, firstNodeId, 0)).toBe(project);
+
+      const clamped = reorderDialogueNode(project, sceneId, firstNodeId, 99);
+      expect(nodeOrder(clamped, sceneId)).toEqual([secondNodeId, thirdNodeId, firstNodeId]);
+    });
+
+    it('changes the start node, and reports/blocks the already-start case', () => {
+      const { project, sceneId, firstNodeId, secondNodeId } = buildDialogueScene(61);
+
+      expect(startNodeChangeReason(project, sceneId, firstNodeId)).toBe('이미 시작 노드입니다.');
+      expect(startNodeChangeReason(project, sceneId, secondNodeId)).toBeNull();
+
+      const moved = setStartNode(project, sceneId, secondNodeId);
+      const scene = moved.scenes.find((candidate) => candidate.id === sceneId);
+      if (scene?.type !== 'DIALOGUE') throw new Error('expected DIALOGUE scene');
+      expect(scene.startNodeId).toBe(secondNodeId);
+      expect(parseGameProject(moved)).toBe(moved);
+
+      expect(() => setStartNode(project, sceneId, firstNodeId)).toThrow('이미 시작 노드입니다.');
+    });
+
+    it('blocks removing the start node, a node referenced by another choice, or the last remaining node — and removes an eligible node otherwise', () => {
+      const { project: base, sceneId, firstNodeId, secondNodeId, thirdNodeId } = buildDialogueScene(62);
+      const withChoice = addDialogueChoice(base, sceneId, firstNodeId);
+      const firstSceneWithChoice = withChoice.scenes.find((candidate) => candidate.id === sceneId);
+      if (firstSceneWithChoice?.type !== 'DIALOGUE') throw new Error('expected DIALOGUE scene');
+      const choiceId = firstSceneWithChoice.nodes.find((node) => node.id === firstNodeId)?.choices.at(-1)?.id;
+      if (choiceId === undefined) throw new Error('expected a choice on the first node');
+      // firstNode의 선택지가 secondNode를 가리키게 한다 — secondNode는 이제 "참조 중"이다.
+      const project = updateDialogueChoice(withChoice, sceneId, firstNodeId, choiceId, (choice) => ({
+        ...choice,
+        nextNodeId: secondNodeId,
+        actions: [],
+      }));
+
+      expect(dialogueNodeRemovalReason(project, sceneId, firstNodeId))
+        .toBe('시작 노드는 삭제할 수 없습니다. 다른 노드를 시작으로 설정한 뒤 삭제하세요.');
+      expect(() => removeDialogueNode(project, sceneId, firstNodeId)).toThrow();
+
+      expect(dialogueNodeRemovalReason(project, sceneId, secondNodeId))
+        .toBe('다른 노드의 선택지가 이 대화를 가리키고 있습니다.');
+      expect(() => removeDialogueNode(project, sceneId, secondNodeId)).toThrow();
+
+      expect(dialogueNodeRemovalReason(project, sceneId, thirdNodeId)).toBeNull();
+      const afterRemoveThird = removeDialogueNode(project, sceneId, thirdNodeId);
+      expect(nodeOrder(afterRemoveThird, sceneId)).toEqual([firstNodeId, secondNodeId]);
+      expect(parseGameProject(afterRemoveThird)).toBe(afterRemoveThird);
+
+      // 남은 노드가 1개가 될 때까지 줄여서, 참조/START 문제가 없어도 마지막 1개는 못 지우는지 확인한다.
+      const choiceCleared = updateDialogueChoice(afterRemoveThird, sceneId, firstNodeId, choiceId, (choice) => ({
+        ...choice,
+        nextNodeId: undefined,
+        actions: [{ type: 'CLOSE_DIALOGUE' }],
+      }));
+      const secondIsStart = setStartNode(choiceCleared, sceneId, secondNodeId);
+      const onlySecondLeft = removeDialogueNode(secondIsStart, sceneId, firstNodeId);
+      expect(nodeOrder(onlySecondLeft, sceneId)).toEqual([secondNodeId]);
+
+      expect(dialogueNodeRemovalReason(onlySecondLeft, sceneId, secondNodeId))
+        .toBe('대화에는 최소 1개의 노드가 필요합니다.');
+      expect(() => removeDialogueNode(onlySecondLeft, sceneId, secondNodeId)).toThrow();
+    });
   });
 });

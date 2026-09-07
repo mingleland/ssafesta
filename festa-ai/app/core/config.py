@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     # Worker heartbeat — spec 007 plan.md Section 10. lease·재시도 예산은
     # Spring이 소유한다(S15P21A604-449) — FastAPI는 heartbeat 주기만 안다.
     job_heartbeat_seconds: int = Field(default=30, gt=0)
+    document_worker_max_concurrency: int = Field(default=1, gt=0)
+    document_worker_shutdown_grace_seconds: float = Field(default=30.0, ge=0)
 
     # Document limits and chunk tuning — spec 007 FR-011, FR-018, FR-020
     document_max_bytes: int = Field(default=20_971_520, gt=0)
@@ -180,6 +182,9 @@ class Settings(BaseSettings):
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
     # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
     spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
+    # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.
+    llm_ttft_timeout_seconds: float = Field(default=15.0, gt=0)
+    llm_total_timeout_seconds: float = Field(default=60.0, gt=0)
     # 문서 처리 결과 전달(S15P21A604-124) — heartbeat/batch/finalize/failed 공통 timeout.
     spring_document_result_timeout_seconds: float = Field(default=5.0, gt=0)
     # 한 번의 Embedding Provider 호출에 담을 최대 chunk 개수 — HTTP 결과 전송 batch(최대
@@ -242,6 +247,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "RAG_CONTEXT_TOP_N must not exceed RETRIEVAL_TOP_K "
                 f"(top_n={self.rag_context_top_n}, top_k={self.retrieval_top_k})"
+            )
+        if self.llm_ttft_timeout_seconds > self.llm_total_timeout_seconds:
+            raise ValueError(
+                "LLM_TTFT_TIMEOUT_SECONDS must not exceed LLM_TOTAL_TIMEOUT_SECONDS "
+                f"(ttft={self.llm_ttft_timeout_seconds}, total={self.llm_total_timeout_seconds})"
             )
         return self
 

@@ -1,24 +1,18 @@
-"""무상태 문서 처리 접수 endpoint (S15P21A604-449, S15P21A604-124).
-
-FastAPI는 문서 Job을 소유하지 않는다 — Spring이 만든 Job의 `jobId`·`attemptNo`와
-snapshot을 받아 202로 즉시 수락하고, 실제 처리(다운로드→검증→파싱→청킹→Embedding→
-Spring 결과 전송)는 background task로 넘긴다. 같은 `jobId+attemptNo`가 아직 처리
-중이면 두 번째 요청은 새 task를 만들지 않고 그대로 202를 반환한다 — 계약이 요구하는
-멱등 수락이다.
-"""
+"""Spring 소유 문서 Job attempt를 인증 후 프로세스 수명에 묶인 Worker에 전달한다."""
 
 from __future__ import annotations
 
-import asyncio
-import logging
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.dependencies.internal_auth import require_spring_service_token
+from app.api.errors import ApiError
 from app.api.schemas.documents import ErrorResponse, ProcessDocumentRequest
 from app.clients.spring_document_result import SpringDocumentResultClient
 from app.providers.document_parser import DefaultDocumentParser
+from app.providers.embedding import EmbeddingProvider
 from app.providers.factory import create_object_storage
 from app.services.document_processing_orchestrator import DocumentProcessingOrchestrator
 from app.services.document_processing_service import (
@@ -26,8 +20,13 @@ from app.services.document_processing_service import (
     ProcessingSnapshot,
 )
 from app.services.text_chunker import TikTokenCodec
+from app.workers.document_task_supervisor import (
+    DocumentTaskSupervisor,
+    SupervisorClosedError,
+)
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from app.core.config import Settings
 
 router = APIRouter(
     prefix="/documents",
@@ -36,20 +35,23 @@ router = APIRouter(
 )
 
 
-async def get_document_processing_orchestrator(
-    request: Request,
+def build_document_processing_orchestrator(
+    *,
+    settings: Settings,
+    spring_http_client: httpx.AsyncClient,
+    embedding_provider: EmbeddingProvider,
 ) -> DocumentProcessingOrchestrator:
-    settings = request.app.state.settings
+    """프로세스가 공유할 문서 처리 파이프라인을 한 번 조립한다."""
     result_client = SpringDocumentResultClient(
         base_url=settings.spring_internal_base_url,
         service_token=settings.internal_ai_to_spring_tokens[0],
         timeout_seconds=settings.spring_document_result_timeout_seconds,
-        client=request.app.state.spring_http_client,
+        client=spring_http_client,
     )
     embedding_service = DocumentEmbeddingService(
         storage_factory=lambda provider: create_object_storage(settings, provider),
         parser=DefaultDocumentParser(),
-        embedding_provider=request.app.state.embedding_provider,
+        embedding_provider=embedding_provider,
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         codec=TikTokenCodec(),
@@ -60,6 +62,10 @@ async def get_document_processing_orchestrator(
         result_client=result_client,
         heartbeat_interval_seconds=settings.job_heartbeat_seconds,
     )
+
+
+def get_document_task_supervisor(request: Request) -> DocumentTaskSupervisor:
+    return request.app.state.document_task_supervisor
 
 
 @router.post(
@@ -87,37 +93,32 @@ async def get_document_processing_orchestrator(
 )
 async def start_document_processing(
     snapshot: ProcessDocumentRequest,
-    request: Request,
-    orchestrator: Annotated[
-        DocumentProcessingOrchestrator, Depends(get_document_processing_orchestrator)
+    supervisor: Annotated[
+        DocumentTaskSupervisor, Depends(get_document_task_supervisor)
     ],
 ) -> Response:
-    in_flight: set[tuple[int, int]] = request.app.state.in_flight_document_jobs
-    key = (snapshot.job_id, snapshot.attempt_no)
-    if key in in_flight:
-        return Response(status_code=status.HTTP_202_ACCEPTED)
-    in_flight.add(key)
-
-    processing_snapshot = ProcessingSnapshot(
-        job_id=snapshot.job_id,
-        attempt_no=snapshot.attempt_no,
-        document_id=snapshot.document_id,
-        booth_id=snapshot.booth_id,
-        agent_id=snapshot.agent_id,
-        original_filename=snapshot.original_filename,
-        content_type=snapshot.content_type,
-        file_size_bytes=snapshot.file_size_bytes,
-        storage_provider=snapshot.storage_provider,
-        storage_bucket=snapshot.storage_bucket,
-        object_key=snapshot.object_key,
-        source_hash=snapshot.source_hash,
-    )
-
-    async def _run() -> None:
-        try:
-            await orchestrator.run(processing_snapshot)
-        finally:
-            in_flight.discard(key)
-
-    asyncio.create_task(_run())
+    try:
+        supervisor.submit(
+            ProcessingSnapshot(
+                job_id=snapshot.job_id,
+                attempt_no=snapshot.attempt_no,
+                document_id=snapshot.document_id,
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+                original_filename=snapshot.original_filename,
+                content_type=snapshot.content_type,
+                file_size_bytes=snapshot.file_size_bytes,
+                storage_provider=snapshot.storage_provider,
+                storage_bucket=snapshot.storage_bucket,
+                object_key=snapshot.object_key,
+                source_hash=snapshot.source_hash,
+            )
+        )
+    except SupervisorClosedError as exc:
+        raise ApiError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            code="WORKER_DRAINING",
+            message="문서 처리 Worker가 종료 중입니다.",
+            headers={"Retry-After": "1"},
+        ) from exc
     return Response(status_code=status.HTTP_202_ACCEPTED)
