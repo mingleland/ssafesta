@@ -8,7 +8,7 @@
 
 ## Phase 2: User Story 1 — Social sign-up and login
 
-**Goal**: Google/Kakao callback creates or resumes a member after nickname completion.
+**Goal**: Google/Kakao/SSAFY callback creates or resumes a member after nickname completion.
 
 - [ ] T004 [US1] Create user, OAuth identity and registration-attempt entities/repositories in `backend/src/main/java/com/example/ssafesta/user/`
 - [ ] T005 [US1] Implement OAuth state validation, provider identity lookup and nickname policy in `backend/src/main/java/com/example/ssafesta/auth/`
@@ -25,7 +25,7 @@
 ## Phase 4: User Story 4/5 — Account lifecycle and administration
 
 - [ ] T012 [US4] Implement immediate withdrawal, Booth/content unpublish, and session/world revocation in `backend/src/main/java/com/example/ssafesta/user/`
-- [ ] T012a [US4] Design and implement idempotent immediate hard-delete Workflow for DB dependents, Redis, file storage, Vector data and Google/Kakao unlink/revoke in `backend/src/main/java/com/example/ssafesta/user/`
+- [ ] T012a [US4] Design and implement idempotent immediate hard-delete Workflow for DB dependents, Redis, file storage, Vector data and Google/Kakao/SSAFY unlink/revoke in `backend/src/main/java/com/example/ssafesta/user/`
 - [ ] T013 [US5] **Deferred — 관리자 기능 추후 작업**: admin role/권한 모델 확정 뒤 수동 정지·정지 해제·상태 감사 endpoint를 `backend/src/main/java/com/example/ssafesta/admin/`에 구현한다.
 - [ ] T014 [US4] [US5] **Deferred — 관리자 기능 추후 작업**: lifecycle 및 관리자 권한·감사 테스트를 `backend/src/test/java/com/example/ssafesta/`에 추가한다.
 
