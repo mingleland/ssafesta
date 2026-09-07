@@ -426,7 +426,9 @@ export default function R3FBoothRenderer(p: BoothRendererProps) {
       orthographic
       dpr={[1, 2]}
       camera={{ position: isoCameraPosition(), zoom: 60, near: 0.1, far: 200 }}
-      gl={{ antialias: true, powerPreference: 'low-power' }}
+      // preserveDrawingBuffer: 합성 뒤에도 드로잉 버퍼를 남긴다. 없으면 canvas.toDataURL() 이
+      // 빈 이미지를 돌려줘 QA 캡처가 조용히 백지가 된다(S15P21A604-480 에서 실제로 그랬다).
+      gl={{ antialias: true, powerPreference: 'low-power', preserveDrawingBuffer: true }}
       // Unity WebGL 과 컨텍스트를 나눠 쓴다 — Studio 를 벗어나면 R3F 쪽은 dispose 되어야 한다.
       // frameloop='demand' 는 편집 조작이 없을 때 GPU 를 놀린다(공존 부담을 줄이는 값싼 수단).
       frameloop="demand"
