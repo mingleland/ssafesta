@@ -9,10 +9,12 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.api.errors import request_validation_error_handler
-from app.api.schemas.documents import ProcessDocumentRequest, ProcessDocumentResponse
+from app.api.schemas.documents import ProcessDocumentRequest
 
 
 VALID_REQUEST = {
+    "jobId": 123,
+    "attemptNo": 0,
     "documentId": 42,
     "boothId": 10,
     "agentId": 7,
@@ -30,6 +32,8 @@ def test_process_document_request_accepts_contract_payload() -> None:
     request = ProcessDocumentRequest.model_validate(VALID_REQUEST)
 
     assert request.document_id == 42
+    assert request.job_id == 123
+    assert request.attempt_no == 0
     assert request.model_dump(by_alias=True) == VALID_REQUEST
 
 
@@ -68,22 +72,6 @@ def test_process_document_request_rejects_contract_violations(
 def test_process_document_request_rejects_undeclared_fields() -> None:
     with pytest.raises(ValidationError):
         ProcessDocumentRequest.model_validate({**VALID_REQUEST, "unexpected": True})
-
-
-def test_process_document_response_serializes_camel_case() -> None:
-    response = ProcessDocumentResponse(
-        job_id="job_123",
-        document_id=42,
-        status="QUEUED",
-        existing=False,
-    )
-
-    assert response.model_dump(mode="json", by_alias=True) == {
-        "jobId": "job_123",
-        "documentId": 42,
-        "status": "QUEUED",
-        "existing": False,
-    }
 
 
 def test_request_validation_error_uses_sanitized_contract_body() -> None:

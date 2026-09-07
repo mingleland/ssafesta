@@ -18,15 +18,6 @@ class ApiModel(BaseModel):
     )
 
 
-class JobStatus(str, Enum):
-    QUEUED = "QUEUED"
-    RUNNING = "RUNNING"
-    RETRY_WAIT = "RETRY_WAIT"
-    SUCCEEDED = "SUCCEEDED"
-    DEAD = "DEAD"
-    CANCELLED = "CANCELLED"
-
-
 class DocumentContentType(str, Enum):
     PDF = "application/pdf"
     MARKDOWN = "text/markdown"
@@ -39,9 +30,11 @@ class StorageProvider(str, Enum):
 
 
 class ProcessDocumentRequest(ApiModel):
-    document_id: int = Field(json_schema_extra={"format": "int64"})
-    booth_id: int = Field(json_schema_extra={"format": "int64"})
-    agent_id: int = Field(json_schema_extra={"format": "int64"})
+    job_id: int = Field(ge=1, json_schema_extra={"format": "int64"})
+    attempt_no: int = Field(ge=0)
+    document_id: int = Field(ge=1, json_schema_extra={"format": "int64"})
+    booth_id: int = Field(ge=1, json_schema_extra={"format": "int64"})
+    agent_id: int = Field(ge=1, json_schema_extra={"format": "int64"})
     original_filename: str = Field(min_length=1, max_length=255)
     content_type: DocumentContentType
     file_size_bytes: int = Field(ge=1, le=20_971_520)
@@ -49,13 +42,6 @@ class ProcessDocumentRequest(ApiModel):
     storage_bucket: str = Field(min_length=1)
     object_key: str = Field(min_length=1)
     source_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
-
-
-class ProcessDocumentResponse(ApiModel):
-    job_id: str = Field(pattern=r"^job_[0-9]+$")
-    document_id: int = Field(json_schema_extra={"format": "int64"})
-    status: JobStatus
-    existing: bool
 
 
 class ErrorResponse(ApiModel):
