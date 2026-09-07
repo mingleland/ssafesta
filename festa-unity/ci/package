@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+
+IMAGE_NAME="${IMAGE_NAME:-festa-game}" \
+DOCKERFILE="${script_dir}/../Docker/Dockerfile" \
+BUILD_CONTEXT="${script_dir}/../Builds/linux-server" \
+bash "${repo_root}/infra/deploy/scripts/package-local-image.sh"

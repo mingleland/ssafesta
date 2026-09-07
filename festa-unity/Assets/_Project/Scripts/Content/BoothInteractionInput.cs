@@ -258,6 +258,14 @@ namespace Festa.Content
         {
             // 가시 결과는 전부 웹 화면 몫이라, 단독 실행에서는 "반응이 없다" 로 보인다.
             // 종류별로 무엇을 보냈는지 알려 준다 (S15P21A604-348).
+            //
+            // FE 가 붙어 있으면 띄우지 않는다 — FE 는 이 이벤트를 받아 **곧바로 오버레이를
+            // 연다.** 열린 화면 위에 "웹 화면에서 열립니다" 를 겹쳐 놓으면 안내가 아니라
+            // 잔상으로 읽힌다 (GitLab #141). 게이트는 빌드 종류가 아니라 조작 안내 카드와
+            // 같은 **FE 존재 여부**다 (S15P21A604-456) — 단독 실행이면 릴리스 빌드에서도
+            // 이 토스트가 필요하고, FE 임베드면 개발 빌드에서도 불필요하다.
+            if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
+
             _toast =
                 type == Bridge.AiAgentInteract    ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다" :
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :

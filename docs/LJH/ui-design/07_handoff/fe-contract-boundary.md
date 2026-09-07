@@ -139,5 +139,22 @@ FE 는 ①②③ 없이도 §G-8-1 을 먼저 구현할 수 있다(ESC·focus �
 ## 이 문서가 하지 않는 것
 
 - UI/UX polish, Visual Direction, 컴포넌트 구현 — 계약 경계만 다룬다.
-- Booth 2.5D 에셋(R3F·GLB) — `boothAssetBase` seam 만 열려 있고 구현은 DEFERRED (`05_technical-spikes/`).
+- Booth 2.5D 에셋(R3F·GLB) — Spike 단계이며 제품 계약이 아니다. 현황은
+  [`05_technical-spikes/booth-studio-2_5d/README.md`](../05_technical-spikes/booth-studio-2_5d/README.md).
+  현재 seam 은 아래와 같다.
+
+  ```text
+  BoothCanvasViewport   renderer boundary — SVG ↔ R3F 를 여기서만 바꿔 끼운다
+  OBJECT_LOCAL_BOUNDS   domain geometry truth — 모델 치수가 이것을 바꾸지 않는다
+  manifest              visual asset mapping (assetCode → runtime resource)
+  resolveAssetUrl       shared asset URL resolution contract (S15P21A604-427)
+  ```
+
+  **알려진 간극** — `-473` 의 `boothAssetManifest.ts` 가 자체 `assetUrl()` 로
+  `import.meta.env.BASE_URL` 을 쓴다. 결과는 shared `resolveAssetUrl` 과 같지만 규칙이 둘이라
+  배포 base 가 CDN 으로 바뀌면 갈라진다. `-473` 후속으로 정리한다
+  ([계획](../05_technical-spikes/booth-studio-2_5d/runtime-asset-compiler-v1-plan.md) §6).
+
+  이전 판에 적혀 있던 `boothAssetBase` 는 **코드에 존재하지 않는다**(`src` 전체 grep 0건).
+  `-427` 작업 때 "키 추가 자리" 로만 언급된 것이 인터페이스처럼 굳었다.
 - GAME(G-5) — `#56` ⓑⓒ 기획 확정과 BE endpoint 선행.

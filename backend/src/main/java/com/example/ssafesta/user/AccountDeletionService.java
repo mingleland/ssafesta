@@ -25,6 +25,14 @@ public class AccountDeletionService {
         // 따로 있던 것은 V1 의 FK 가 NO ACTION 이라 순서가 강제됐기 때문이고, V21 가
         // ai_document_chunks.document_id 를 ON DELETE CASCADE 로 바꾸면서 그 이유가 없어졌다.
         // Job 은 document_id CASCADE 로, staging 은 job_id CASCADE 로 따라 지워진다.
+        // 문서의 바이트도 DB 밖(객체 저장소)에 있다. 행이 사라지면 provider·bucket·key 좌표가 함께
+        // 사라져 객체를 다시 찾을 방법이 없으므로, 게임 에셋과 같은 순서로 같은 트랜잭션에서 삭제
+        // 큐로 먼저 옮긴다. 큐와 sweeper 는 provider·bucket·key 만 보고 어느 도메인의 객체인지
+        // 묻지 않고, 문서와 에셋이 같은 ObjectStorage·같은 provider 어휘(app.ai.storage)를 쓴다.
+        // 탈퇴 즉시 전체 하드삭제가 팀 결정이다 (docs/26, 2026-08-19 · S15P21A604-485).
+        // s3_key 는 발급 트랜잭션 안에서만 NULL 이라 커밋된 행에는 값이 있지만, 조건을 적어 두면
+        // 큐에 NOT NULL 위반이 들어갈 경로가 스키마와 무관하게 닫힌다.
+        jdbc.update("INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key) SELECT storage_provider, storage_bucket, s3_key FROM ai_documents WHERE s3_key IS NOT NULL AND (agent_id IN (SELECT id FROM ai_agents WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)) OR uploaded_by_user_id = ?) ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING", userId, userId);
         jdbc.update("DELETE FROM ai_documents WHERE agent_id IN (SELECT id FROM ai_agents WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)) OR uploaded_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM ai_agents WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM project_likes WHERE project_id IN (SELECT id FROM projects WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId);

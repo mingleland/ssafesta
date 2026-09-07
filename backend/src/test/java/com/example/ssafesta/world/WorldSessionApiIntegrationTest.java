@@ -64,8 +64,18 @@ class WorldSessionApiIntegrationTest {
                 .andExpect(jsonPath("$.expiresAt").isNotEmpty());
     }
 
+    /**
+     * The stored nickname is derived on the server; the appearance is <b>not carried at all</b>.
+     *
+     * <p>A saved appearance used to ride along as {@code avatarCode} and pushed a member's grant past
+     * the size Unity's connection request can hold, so members who had saved one could not enter the
+     * world (S15P21A604-468, GitLab #138). The appearance now reaches the game server over the RPC
+     * that follows spawn — the path guests and unsaved members always used. This test keeps a member
+     * with a saved appearance in the fixture on purpose: that is the account the claim used to appear
+     * for.
+     */
     @Test
-    void theGrantCarriesTheStoredNicknameAndAppearance() throws Exception {
+    void theGrantCarriesTheStoredNicknameButNeverTheAppearance() throws Exception {
         // Not what the caller claims — there is no request field for either, by design.
         User user = users.save(new User(newNickname()));
         user.changeAvatarCode(AVATAR);
@@ -76,7 +86,7 @@ class WorldSessionApiIntegrationTest {
         assertEquals("MEMBER", claims.get("role"));
         assertEquals(String.valueOf(user.getId()), claims.get("playerId"));
         assertEquals(user.getNickname(), claims.get("nickname"));
-        assertEquals(AVATAR, claims.get("avatarCode"));
+        assertEquals(null, claims.get("avatarCode"));
         assertEquals("11F-01", claims.get("channelId"));
     }
 
@@ -107,7 +117,7 @@ class WorldSessionApiIntegrationTest {
     // ------------------------------------------------------------- 게스트
 
     @Test
-    void aGuestIsAdmittedWithADerivedNameAndNoAppearance() throws Exception {
+    void aGuestIsAdmittedWithADerivedName() throws Exception {
         // Guests exist to look around (헌법 12조), and infra-003 D-04 makes them part of P0.
         Map<String, Object> claims = claimsOf(issueFor(guestBearer()));
 

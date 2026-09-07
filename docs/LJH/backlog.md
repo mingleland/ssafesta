@@ -34,6 +34,44 @@
 - [ ] **World 상호작용 Unity 잔여 검증 — `!250` 머지됨(09-05), Unity 파트 확인 대기.** 계약 확정·양쪽 구현·FE 검증(E2E·tsc·build·lint·vitest 83/83)은 끝났다. 남은 것은 Unity Editor 컴파일 · F 런타임 3종 · `ManagementDeskInteractable` 의 월드 NPC 프리팹 부착(나머지 둘은 `BoothObjectFactory` 가 런타임에 붙인다) · `BoothInteractBridgeTests` 보강(`-343` 작업 내용 4번). 선행 의존 `-336`(부스 내부 스케일)은 develop 머지됨(`b6322bc`). **네 티켓 모두 `Closes` 미사용**: 완료조건에 런타임 검증이 남아 있다
 - [ ] **`-179` 상태 정리는 황덕 몫** — 08-25부터 내 브랜치가 남의 키를 달고 그 티켓을 움직였다. `Closes` 는 develop 에 도달하지 않았고 MR !63 본문으로 통보했다. **브랜치를 만들 때 키의 소유자·컴포넌트를 먼저 확인한다**
 
+## Booth Studio 2.5D
+
+**상태는 evidence 확보이지 제품 완료가 아니다.** 판정 정본은
+[`ui-design/05_technical-spikes/booth-studio-2_5d/README.md`](ui-design/05_technical-spikes/booth-studio-2_5d/README.md) —
+여기에 상태를 복제하지 않는다.
+
+```text
+D-04   ADOPTED                        2.5D 편집기 구조
+D-05   PASS_CANDIDATE · NOT ADOPTED   R3F. canonical 15 Gate 중 PASS 11 · PARTIAL 4
+D-06   ADOPTED                        기존 Layout/Editor 계약 보존
+```
+
+**DONE EVIDENCE**
+
+- R3F renderer Spike (`-470`, 브랜치 push · MR 없음)
+- Unity FBX → GLB → R3F (`-473`, 브랜치 push · MR 없음)
+- Nested Prefab Assembly (`-476`, 브랜치 push · MR 없음)
+- 계약 AABB 와 실제 asset 대조 — DisplayBox 1.5mm · SurveyKiosk 5mm 이내
+- Studio lazy split — main 427.02 → 339.46 kB
+- context leak 기본 확인 — World↔Studio 3왕복 canvas 1개 유지
+
+**OPEN**
+
+- [ ] D-05 canonical 15 Gate reconciliation — PARTIAL 4건(B-1·B-4·B-5·B-9)
+- [ ] R3F adoption 결정 — Gate 해소 후 별도 결정. 문서가 내릴 것이 아니다
+- [ ] `resolveAssetUrl` seam 통일 — `-473` 후속. 지금 규칙이 둘이다
+- [ ] Runtime Asset Compiler v1 — 설계 [PROPOSAL](ui-design/04_prototypes/booth-studio-runtime-asset-compiler.md) · 계획 [v1-plan](ui-design/05_technical-spikes/booth-studio-2_5d/runtime-asset-compiler-v1-plan.md)
+- [ ] remesh / simplify
+- [ ] material bake
+- [ ] texture optimization — 사용 재질 원본 합 ~24MB
+- [ ] thumbnail automation — 팔레트와 캔버스가 같은 runtime asset 에서 나오게
+- [ ] visual parity gate — 서식만 있고 결과는 없다
+- [ ] source package license lock — **전 타입 확장의 선행 조건**
+- [ ] runtime delivery / pack hardening — 다음 단계
+- [ ] Persistent GameShell 이후 Unity + R3F 동시 상주 검증
+
+세 브랜치 모두 **merge 전**이다. 반영 순서는 `-470` → `-473` → `-476`.
+
 ## 착수 가능 — 협의 불요, 권장 순서순
 
 **Asset 계약이 develop 에 복구돼 2건이 열렸다.** 황덕이 [MR !53](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/merge_requests/53)(`-269`)로 `game-asset-upload.md` 를 재반입했다(08-27 10:41 머지, 파일 존재 확인).

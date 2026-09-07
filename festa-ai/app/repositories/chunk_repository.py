@@ -1,4 +1,11 @@
-"""Provide the single scope-safe entry point for RAG vector retrieval."""
+"""Local pgvector chunk search — superseded by S15P21A604-449 (Spring now owns search).
+
+Not wired into any live request path (`VectorSearchService` calls
+`app.clients.spring_chunk_search.SpringChunkSearchClient` instead as of
+`S15P21A604-140`). Left in place, untested-against-runtime, pending a
+dedicated cleanup of the AI DB schema/migration once `S15P21A604-124/125/184`
+also stop needing it — do not wire this back in.
+"""
 
 from __future__ import annotations
 

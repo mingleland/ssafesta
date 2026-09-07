@@ -95,20 +95,19 @@ public class WorldSessionService {
             throw new ApiException(ErrorCode.FORBIDDEN, "정지된 계정은 월드에 입장할 수 없습니다.");
         }
         return new WorldEntryTokenIssuer.WorldIdentity(jwt.getSubject(), MEMBER_ROLE, String.valueOf(user.getId()),
-                user.getNickname(), user.getAvatarCode());
+                user.getNickname());
     }
 
     /**
      * A guest has no stored nickname, so one is derived from the token subject — stable for the life
-     * of that guest token, which is as long as the guest exists (헌법 12조). No appearance either:
-     * null tells Unity to use its default rather than a server-invented preset.
+     * of that guest token, which is as long as the guest exists (헌법 12조).
      */
     private WorldEntryTokenIssuer.WorldIdentity guestIdentity(Jwt jwt) {
         String subject = jwt.getSubject();
         if (subject == null || subject.isBlank()) {
             throw new ApiException(ErrorCode.UNAUTHORIZED);
         }
-        return new WorldEntryTokenIssuer.WorldIdentity(subject, GUEST_ROLE, subject, guestNicknameOf(subject), null);
+        return new WorldEntryTokenIssuer.WorldIdentity(subject, GUEST_ROLE, subject, guestNicknameOf(subject));
     }
 
     private static String guestNicknameOf(String subject) {
