@@ -39,19 +39,3 @@
   outline: 2px solid rgba(255, 209, 102, 0.9);
   outline-offset: 3px;
 }
-
-/* 개발자 입장 실패 표시 — 버튼 바로 아래. 제품 패널 기하를 밀지 않도록 버튼과 같은 fixed 계열이다. */
-.dev-entry-error {
-  position: fixed;
-  top: 3.5rem;
-  left: 1rem;
-  z-index: 30;
-  max-width: 22rem;
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  background: rgba(120, 20, 20, 0.92);
-  color: #ffe4e4;
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
