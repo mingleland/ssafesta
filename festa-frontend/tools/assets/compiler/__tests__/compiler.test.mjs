@@ -123,15 +123,27 @@ describe('Material — Unity 어휘를 런타임 어휘로', () => {
     expect(parseMaterial(MAT, new Map()).textures[0].resolved).toBe(false);
   });
 
-  it('텍스처가 없으면 이유를 그렇게 적는다', () => {
-    expect(planTextureOptimization([]).pendingTool).toBeNull();
+  // Unity 가 저장한 `.mat` 은 Windows 에서 CRLF 다. 픽스처를 LF 로만 두면 줄바꿈에 걸리는
+  // 결함군을 영원히 못 잡는다 — 실제로 `textureOf` 가 `\n` 만 요구해 실 파일의 텍스처를
+  // 통째로 놓쳤고, 이 테스트는 그때 통과하고 있었다 (LJH T-61).
+  it('CRLF 로 저장된 `.mat` 에서도 같은 채널을 찾는다', () => {
+    const crlf = MAT.replace(/\n/g, '\r\n');
+    expect(crlf).toContain('\r\n');
+    expect(parseMaterial(crlf, new Map()).textures.map((t) => t.channel)).toEqual(['normal']);
   });
 
-  it('텍스처가 있으면 원본 바이트를 합치고 미적용임을 밝힌다', () => {
+  it('텍스처가 없으면 이유를 그렇게 적는다', () => {
+    expect(planTextureOptimization([]).reason).toContain('참조하는 텍스처가 없다');
+  });
+
+  // runtimeBytes 가 null 인 것은 "아직 아무도 변환하지 않았다" 가 아니라 **"여기서는 모른다"** 다.
+  // 실제 변환은 emit 단계가 에셋별로 한다 — 그 둘을 섞어 읽어 리포트가 자기모순을 냈다.
+  it('텍스처가 있으면 원본 바이트를 합치고, 런타임 값은 여기서 모른다고 밝힌다', () => {
     const plan = planTextureOptimization([{ sourceBytes: 100 }, { sourceBytes: 200 }]);
     expect(plan.sourceBytes).toBe(300);
     expect(plan.runtimeBytes).toBeNull();
-    expect(plan.applied).toBe(false);
+    expect(plan.measuredHere).toBe(false);
+    expect(plan.reason).toContain('emit 단계');
   });
 });
 
