@@ -45,6 +45,11 @@ class RagContextService:
     async def build(
         self, *, conversation: Conversation, question: str
     ) -> ContextBuildResult | NoReadyContextResult:
+        # Agent membership/activity must fail closed before Embedding and search.
+        # The Spring contract requires exactly one uncached lookup per question.
+        agent = await self._agent_config_provider.get(
+            booth_id=conversation.scope.booth_id, agent_id=conversation.scope.agent_id
+        )
         scope = ChunkScope(
             booth_id=conversation.scope.booth_id, agent_id=conversation.scope.agent_id
         )
@@ -53,10 +58,6 @@ class RagContextService:
         )
         if not chunks:
             return NoReadyContextResult()
-
-        agent = await self._agent_config_provider.get(
-            booth_id=conversation.scope.booth_id, agent_id=conversation.scope.agent_id
-        )
         turns = tuple(
             CompletedTurn(question=turn.question, answer=turn.answer)
             for turn in conversation.turns

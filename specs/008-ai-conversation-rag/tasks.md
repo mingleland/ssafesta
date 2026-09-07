@@ -16,6 +16,10 @@
 
 **Dependency**: T054와 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
 
+## S15P21A604-507 Spring Agent 설정 client 결선
+
+- [X] T055 [AI] `GET /internal/ai/agent-config` client를 공용 HTTP lifecycle과 연결하고, 질문마다 검색 전에 설정을 1회 조회한다. 성공 응답 다섯 필드를 엄격 변환하며 `AGENT_NOT_IN_BOOTH`·`AGENT_INACTIVE` 및 네트워크·계약 오류는 원문 노출 없이 Fail Closed 처리한다. 운영 `create_app()`의 Mock을 제거하고 단위·계약·회귀 테스트와 C-16 결정 문서를 갱신한다 (S15P21A604-507)
+
 ## Phase 1: Setup
 
 - [ ] T001 Add Redis, tokenizer, SSE test dependencies and pytest markers in festa-ai/pyproject.toml
