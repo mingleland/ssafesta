@@ -1,5 +1,6 @@
 package com.example.ssafesta.internal.ai;
 
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -50,14 +51,6 @@ class AiDocumentJobRepository {
         } catch (EmptyResultDataAccessException absent) {
             return Optional.empty();
         }
-    }
-
-    /** The first result of an attempt is the evidence that a worker actually started it. */
-    void markRunning(long jobId) {
-        jdbc.update("""
-                UPDATE ai_document_jobs SET status = 'RUNNING', updated_at = now()
-                 WHERE id = ? AND status = 'QUEUED'
-                """, jobId);
     }
 
     /**
@@ -128,7 +121,15 @@ class AiDocumentJobRepository {
     /** 90초 (GitLab #119). heartbeat 주기(30초)보다 커야 한다는 제약은 보내는 쪽 몫이다. */
     private static final int LEASE_SECONDS = 90;
 
-    /** Pushes the lease out. A heartbeat is also the first evidence a worker started. */
+    /**
+     * Pushes the lease out, and starts it if this is the attempt's first sign of life.
+     *
+     * <p>Called by <b>every</b> result a running worker sends, not only the heartbeat. A batch is
+     * proof of life too, and if it only moved the status the Job would sit {@code RUNNING} with a
+     * {@code NULL} lease — which the sweeper cannot see, because {@code NULL < now()} is not true.
+     * A worker that died between its first batch and its first heartbeat would hold that document
+     * forever: the partial unique index refuses a replacement Job while one is active.
+     */
     void extendLease(long jobId) {
         jdbc.update("""
                 UPDATE ai_document_jobs
@@ -199,8 +200,10 @@ class AiDocumentJobRepository {
                 """.formatted(BACKOFF.formatted("s.attempt_no + 1")), Long.class, limit);
         // 죽은 attempt 가 남긴 staging 은 지운다. 남기면 다음 attempt 의 batch 와 섞여
         // finalize 개수 검증이 엉뚱한 곳에서 걸린다.
-        for (Long jobId : reclaimed) {
-            clearStaging(jobId);
+        if (!reclaimed.isEmpty()) {
+            jdbc.update("DELETE FROM ai_document_chunk_staging WHERE job_id = ANY (?)",
+                    (PreparedStatement statement) -> statement.setArray(1,
+                            statement.getConnection().createArrayOf("bigint", reclaimed.toArray())));
         }
         return reclaimed.size();
     }

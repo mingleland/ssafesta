@@ -98,15 +98,38 @@ class AiDocumentResultApiIntegrationTest {
         assertEquals(1, chunkCount(job));
     }
 
+    /**
+     * 첫 batch 는 상태만 올리는 것이 아니라 <b>lease 도 잡는다.</b>
+     *
+     * <p>상태만 올리면 {@code lease_expires_at} 이 {@code NULL} 로 남고, sweeper 의 조건
+     * {@code lease_expires_at < now()} 는 {@code NULL} 에 대해 참이 아니다 — 첫 heartbeat 전에
+     * 죽은 워커의 Job 을 아무도 회수하지 못하고, 부분 unique 인덱스가 그 문서의 새 Job 도 막는다.
+     */
     @Test
-    @DisplayName("첫 batch 가 QUEUED Job 을 RUNNING 으로 올린다")
-    void theFirstBatchMovesTheJobToRunning() throws Exception {
+    @DisplayName("첫 batch 가 QUEUED Job 을 RUNNING 으로 올리고 lease 를 잡는다")
+    void theFirstBatchMovesTheJobToRunningAndTakesTheLease() throws Exception {
         Job job = seedJob("기동");
         assertEquals("QUEUED", jobStatus(job));
 
         mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
 
         assertEquals("RUNNING", jobStatus(job));
+        long seconds = secondsUntilLeaseExpiry(job);
+        assertTrue(seconds > 60 && seconds <= 90, "batch 도 lease 를 잡아야 한다: " + seconds);
+    }
+
+    /** heartbeat 를 한 번도 못 보내고 죽은 워커도 회수 대상이어야 한다. */
+    @Test
+    @DisplayName("heartbeat 없이 batch 만 보낸 뒤 죽은 워커의 Job 도 회수된다")
+    void aWorkerThatDiedBeforeItsFirstHeartbeatIsReclaimed() throws Exception {
+        Job job = seedJob("첫하트비트전사망");
+        mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
+        expireLease(job);
+
+        sweeper.reclaimExpiredLeases();
+
+        assertEquals("RETRY_WAIT", jobStatus(job));
+        assertEquals(1, attemptNo(job));
     }
 
     /** 재처리다 — 이전 판의 chunk 는 남지 않는다. */
