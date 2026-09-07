@@ -91,6 +91,12 @@ class _ConversationRepository:
     async def save(self, conversation: Conversation) -> None:
         self.saved.append(conversation)
 
+    async def commit_turn(self, conversation: Conversation) -> bool:
+        if self._conversation is None:
+            return False
+        self.saved.append(conversation)
+        return True
+
 
 class _RagContextService:
     def __init__(self, result: ContextBuildResult | None = None, error: Exception | None = None):
