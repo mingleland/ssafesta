@@ -40,7 +40,7 @@ def test_app_state_exposes_loaded_settings(
 def test_import_crashes_on_invalid_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    _set_env(monkeypatch, tmp_path, omit={"DATABASE_URL"})
+    _set_env(monkeypatch, tmp_path, omit={"REDIS_URL"})
 
     with pytest.raises(ValidationError):
         _fresh_app_module()

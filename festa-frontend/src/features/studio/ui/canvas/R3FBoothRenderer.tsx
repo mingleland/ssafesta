@@ -9,7 +9,7 @@
 //
 // default export 인 이유: BoothCanvasViewport 가 React.lazy 로 부른다. three 를 static import
 // 하면 Studio 를 열지 않는 사용자도 받게 된다.
-import { Suspense, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -19,6 +19,11 @@ import type { LayoutObject } from '../../../../entities/layout/types';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
 import type { BoothRendererProps } from './canvasTypes';
 import { boxPlacement, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
+import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
+import { AssetMesh } from './AssetMesh';
+import { pickAsset } from '../../model/boothAssetManifest';
+import type { BoothAssetEntry } from '../../model/boothAssetManifest';
+import { useBoothAssets } from '../../model/useBoothAssets';
 import { FALLBACK_BOX, OBJECT_FILL, OBJECT_SURFACE, shade } from './objectAppearance';
 
 const ROTATE_SNAP_DEG = 15;
@@ -31,6 +36,26 @@ interface DragState {
   origin: { x: number; z: number };
   grab: { x: number; z: number };
   startRotation: number;
+}
+
+/**
+ * 검증 모드에서만 프레임을 타이머로 민다. rAF 가 멈춘 환경(숨겨진 pane)에서도 3D 가 갱신된다.
+ * 제품 경로에서는 이 컴포넌트가 아예 렌더되지 않는다.
+ */
+function TimerDrivenFrames() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  useEffect(() => {
+    // R3F 의 advance() 를 먼저 써 봤는데 이 환경에서 프레임이 나오지 않았다.
+    // 렌더러를 직접 부르면 루프 구현과 무관하게 그려진다 — 검증 모드에서만 쓰는 길이다.
+    const id = setInterval(() => {
+      scene.updateMatrixWorld();
+      gl.render(scene, camera);
+    }, VISUAL_ACCEPTANCE_FRAME_MS);
+    return () => clearInterval(id);
+  }, [gl, scene, camera]);
+  return null;
 }
 
 // ── 카메라 ─────────────────────────────────────────────────────────
@@ -163,36 +188,58 @@ function BoothStage({ bounds, decor }: { bounds: BoothRendererProps['bounds']; d
 }
 
 // ── 오브젝트 ───────────────────────────────────────────────────────
+// manifest 에 그 오브젝트의 실제 모델이 있으면 GLB 를, 없으면 파라메트릭 박스를 쓴다.
+// 둘 중 무엇을 그리든 **도메인은 바뀌지 않는다** — 선택 윤곽·이탈 판정은 계약 AABB 그대로다.
+// 모델 치수가 계약과 조금 달라도 저장값·검증이 흔들리면 안 되기 때문이다.
 function ObjectMesh({
   obj,
   selected,
   outOfBounds,
+  asset,
   onDown,
 }: {
   obj: LayoutObject;
   selected: boolean;
   outOfBounds: boolean;
+  asset: BoothAssetEntry | undefined;
   onDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
   const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
   const { center, size } = boxPlacement(box);
   const surface = OBJECT_SURFACE[obj.type] ?? { roughness: 0.7, metalness: 0, opacity: 1 };
-  const color = OBJECT_FILL[obj.type] ?? '#e5e9f2';
+  const color = outOfBounds ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
+
+  const boxBody = (
+    <mesh position={center} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial
+        color={color}
+        roughness={surface.roughness}
+        metalness={surface.metalness}
+        transparent={surface.opacity < 1}
+        opacity={surface.opacity}
+      />
+    </mesh>
+  );
 
   return (
     <group position={[obj.position.x, 0, obj.position.z]} rotation={[0, (obj.rotationY * Math.PI) / 180, 0]}>
-      <mesh position={center} castShadow receiveShadow onPointerDown={onDown}>
-        <boxGeometry args={size} />
-        <meshStandardMaterial
-          color={outOfBounds ? '#ff8a8a' : color}
-          roughness={surface.roughness}
-          metalness={surface.metalness}
-          transparent={surface.opacity < 1}
-          opacity={surface.opacity}
-        />
-      </mesh>
+      {/* 픽킹은 group 이 받는다 — 모델이 여러 mesh 로 쪼개져 있어도 한 덩어리로 잡힌다 */}
+      <group onPointerDown={onDown}>
+        {asset === undefined ? (
+          boxBody
+        ) : (
+          <AssetMesh
+            entry={asset}
+            color={color}
+            roughness={surface.roughness}
+            metalness={surface.metalness}
+            fallback={boxBody}
+          />
+        )}
+      </group>
       {selected && (
-        // 선택 윤곽 — 살짝 키운 wireframe 상자. 모서리만 보이므로 본체를 가리지 않는다
+        // 선택 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다
         <mesh position={center}>
           <boxGeometry args={[size[0] * 1.04, size[1] * 1.04, size[2] * 1.04]} />
           <meshBasicMaterial color={outOfBounds ? '#ff5d5d' : '#5ee08a'} wireframe />
@@ -277,7 +324,7 @@ function Gizmo({
 }
 
 // ── 씬 ────────────────────────────────────────────────────────────
-function Scene(p: BoothRendererProps) {
+function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
   const pick = useGroundPicker();
   const drag = useRef<DragState | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -371,6 +418,7 @@ function Scene(p: BoothRendererProps) {
             obj={obj}
             selected={obj.objectId === p.selectedObjectId}
             outOfBounds={oob}
+            asset={pickAsset(p.assets, obj)}
             onDown={(e) => begin(e, obj, p.tool === 'rotate' ? 'rotate' : 'move')}
           />
         );
@@ -389,6 +437,9 @@ function Scene(p: BoothRendererProps) {
 }
 
 export default function R3FBoothRenderer(p: BoothRendererProps) {
+  // manifest 는 Canvas **밖**에서 읽는다. R3F 는 별도 reconciler 라 안쪽에서 앱 context 를
+  // 기대하지 않는 편이 안전하고, 여기서 읽으면 값은 그냥 prop 으로 내려간다.
+  const assets = useBoothAssets();
   return (
     <Canvas
       className="r3f-canvas"
@@ -396,13 +447,16 @@ export default function R3FBoothRenderer(p: BoothRendererProps) {
       orthographic
       dpr={[1, 2]}
       camera={{ position: isoCameraPosition(), zoom: 60, near: 0.1, far: 200 }}
-      gl={{ antialias: true, powerPreference: 'low-power' }}
+      // preserveDrawingBuffer: 합성 뒤에도 드로잉 버퍼를 남긴다. 없으면 canvas.toDataURL() 이
+      // 빈 이미지를 돌려줘 QA 캡처가 조용히 백지가 된다(S15P21A604-480 에서 실제로 그랬다).
+      gl={{ antialias: true, powerPreference: 'low-power', preserveDrawingBuffer: true }}
       // Unity WebGL 과 컨텍스트를 나눠 쓴다 — Studio 를 벗어나면 R3F 쪽은 dispose 되어야 한다.
       // frameloop='demand' 는 편집 조작이 없을 때 GPU 를 놀린다(공존 부담을 줄이는 값싼 수단).
-      frameloop="demand"
+      frameloop={IS_VISUAL_ACCEPTANCE ? 'never' : 'demand'}
     >
       <Suspense fallback={null}>
-        <Scene {...p} />
+        {IS_VISUAL_ACCEPTANCE && <TimerDrivenFrames />}
+        <Scene {...p} assets={assets} />
       </Suspense>
     </Canvas>
   );
