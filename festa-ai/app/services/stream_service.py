@@ -17,6 +17,10 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.models.conversation import (
     Conversation,
     ConversationTurn,
@@ -116,6 +120,35 @@ class ConversationStreamService:
             context = await self._rag_context_service.build(
                 conversation=conversation, question=question
             )
+        except AgentConfigDenied as exc:
+            logger.warning(
+                "Agent config denied for conversation %s code=%s",
+                conversation.conversation_id,
+                exc.code,
+            )
+            yield render(
+                "error",
+                {
+                    "code": exc.code,
+                    "message": "AI 직원 설정을 사용할 수 없습니다.",
+                    "retryable": False,
+                },
+            )
+            return
+        except SpringAgentConfigUnavailable:
+            logger.warning(
+                "Agent config lookup failed for conversation %s",
+                conversation.conversation_id,
+            )
+            yield render(
+                "error",
+                {
+                    "code": "AGENT_CONFIG_UNAVAILABLE",
+                    "message": "AI 직원 설정을 확인하지 못했습니다.",
+                    "retryable": True,
+                },
+            )
+            return
         except Exception:
             logger.exception(
                 "RAG context build failed for conversation %s", conversation.conversation_id

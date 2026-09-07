@@ -13,9 +13,9 @@ from app.api.errors import (
 )
 from app.api.v1.documents import build_document_processing_orchestrator
 from app.api.v1.router import router as api_v1_router
+from app.clients.spring_agent_config import SpringAgentConfigClient
 from app.core.config import settings
 from app.core.redis import create_redis_client
-from app.providers.agent_config import MockAgentConfigProvider
 from app.providers.factory import create_embedding_provider, create_llm_provider
 from app.workers.document_task_supervisor import DocumentTaskSupervisor
 
@@ -38,6 +38,12 @@ def create_app() -> FastAPI:
     )
     embedding_provider = create_embedding_provider(settings)
     llm_provider = create_llm_provider(settings)
+    agent_config_provider = SpringAgentConfigClient(
+        base_url=settings.spring_internal_base_url,
+        service_token=settings.internal_ai_to_spring_tokens[0],
+        timeout_seconds=settings.spring_agent_config_timeout_seconds,
+        client=spring_http_client,
+    )
     document_orchestrator = build_document_processing_orchestrator(
         settings=settings,
         spring_http_client=spring_http_client,
@@ -72,9 +78,7 @@ def create_app() -> FastAPI:
     app.state.embedding_provider = embedding_provider
     app.state.llm_provider = llm_provider
     app.state.document_task_supervisor = document_task_supervisor
-    # Placeholder pending S15P21A604-399 (Spring Agent 추론 설정 조회 내부 API) —
-    # see app/providers/agent_config.py.
-    app.state.agent_config_provider = MockAgentConfigProvider()
+    app.state.agent_config_provider = agent_config_provider
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.include_router(api_v1_router, prefix="/ai/v1")

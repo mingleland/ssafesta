@@ -8,6 +8,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest, LLMToken
@@ -225,6 +229,44 @@ async def test_context_build_failure_emits_single_error_event_and_no_commit() ->
 
     assert [event["type"] for event in events] == ["start", "error"]
     assert events[-1]["code"] == "CONTEXT_BUILD_FAILED"
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", ["AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"])
+async def test_agent_config_denial_emits_non_retryable_sanitized_error(code: str) -> None:
+    rag = _RagContextService(error=AgentConfigDenied(code))
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == code
+    assert events[-1]["retryable"] is False
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_agent_config_failure_emits_retryable_sanitized_error() -> None:
+    rag = _RagContextService(
+        error=SpringAgentConfigUnavailable("upstream-secret-prompt")
+    )
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == "AGENT_CONFIG_UNAVAILABLE"
+    assert events[-1]["retryable"] is True
+    assert "upstream-secret-prompt" not in events[-1]["message"]
     assert repository.saved == []
 
 
