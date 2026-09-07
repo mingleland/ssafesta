@@ -1,20 +1,10 @@
 // AI 직원 대화 Overlay — Overlay Family 재사용 (S15P21A604-406).
-// 실서버 SSE 결선 (S15P21A604-189) — Conversation 생성 → 메시지 스트리밍을 실제 AI 서버에
-// 붙인다. 파서(entities/conversation/stream.parser)는 mock 시절 그대로 재사용 — SSE 와이어
-// 텍스트를 소비하는 형태(AsyncGenerator<string>)가 같아서 소스만 mock→real로 바뀐다.
+// AI 서버 conversation API(SSE)는 미구현이라 여기서는 기존 mock 스트림(entities/conversation)만
+// 소비한다. 워커·계약 로직은 AI 파트 소관이라 건드리지 않는다 — 시각 정합과 상태 표현 범위.
 import { useEffect, useRef, useState } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
-import { createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
-import {
-  describeHttpError,
-  describeProtocolError,
-  describeSequenceGap,
-  describeSseError,
-  shouldResetConversation,
-  type StreamErrorDescription,
-} from '../../../entities/conversation/errorMessages';
+import { mockStreamSuccess } from '../../../entities/conversation/stream.mock';
 import { createSseParser } from '../../../entities/conversation/stream.parser';
-import { SseProtocolError } from '../../../entities/conversation/stream.types';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
 import { aiHandoffContext } from '../../consultation/model/startContext';
@@ -31,7 +21,6 @@ interface Turn {
   text: string;
   streaming?: boolean;
   sources?: string[];
-  error?: StreamErrorDescription;
 }
 
 const IcAgent = (
@@ -45,66 +34,39 @@ const IcAgent = (
 
 const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요'];
 
+// 목업 답변 토큰 — 실제 답변은 AI 서버가 만든다(008). 여기서는 스트리밍 표현만 보여 준다.
+function mockAnswerFor(question: string): string[] {
+  if (question.includes('기술')) {
+    return ['이 부스는 ', 'React 와 Unity WebGL 을 ', '함께 쓰는 구조로 만들었어요. ', '자세한 내용은 전시 자료에 정리돼 있습니다.'];
+  }
+  if (question.includes('팀')) {
+    return ['다섯 명이 ', '프론트엔드·백엔드·Unity·AI 로 나눠 ', '만들고 있습니다.'];
+  }
+  return ['부스에 등록된 자료를 찾아봤어요. ', '"', question, '"에 대해서는 ', '전시 중인 프로젝트 소개에서 확인하실 수 있습니다.'];
+}
+
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
   const consultation = useVisitorConsultation();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  // null = 아직 Conversation 없음(첫 질문에서 생성) — 403/404 오류 후에도 null로 되돌려
-  // 다음 질문이 새 Conversation을 만들게 한다(entities/conversation/errorMessages 참고)
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [turns]);
 
-  function setLastAgentTurn(update: Partial<Turn>) {
-    setTurns((t) => {
-      const next = [...t];
-      const last = next[next.length - 1];
-      next[next.length - 1] = { ...last, streaming: false, ...update };
-      return next;
-    });
-  }
-
   async function ask(question: string) {
     if (busy || question.trim() === '') return;
-    if (payload.agentId === undefined) {
-      setTurns((t) => [
-        ...t,
-        { role: 'user', text: question },
-        { role: 'agent', text: '', error: { headline: 'AI 직원 정보를 확인할 수 없습니다.', retryable: false } },
-      ]);
-      return;
-    }
-    const agentId = payload.agentId;
-
     setBusy(true);
     setDraft('');
     setTurns((t) => [...t, { role: 'user', text: question }, { role: 'agent', text: '', streaming: true }]);
     try {
-      let activeConversationId = conversationId;
-      if (activeConversationId === null) {
-        try {
-          const handle = await createConversation(payload.boothId, agentId);
-          activeConversationId = handle.conversationId;
-          setConversationId(activeConversationId);
-        } catch (e) {
-          setLastAgentTurn({
-            error: isAiHttpError(e)
-              ? describeHttpError(e)
-              : { headline: '대화를 시작할 수 없습니다.', retryable: true },
-          });
-          return;
-        }
-      }
-
+      // mock SSE 와이어 → 실제 파서(stream.parser)로 읽는다 — 실 서버가 오면 이 소스만 교체된다
       const parser = createSseParser();
       let acc = '';
       const sources: string[] = [];
-      let expectedSequence = 0;
       const apply = (done: boolean) => {
         setTurns((t) => {
           const next = [...t];
@@ -112,41 +74,20 @@ export function AiChatOverlay({ payload }: Props) {
           return next;
         });
       };
-
-      try {
-        streamLoop: for await (const chunk of streamMessage(activeConversationId, question)) {
-          for (const ev of parser.push(chunk)) {
-            // sequence는 무결성 검증 값이다(재개 offset 아님) — 결번은 잘린 응답으로 안내한다(#32 §3)
-            if (ev.sequence !== expectedSequence) {
-              setLastAgentTurn({ text: acc, sources: [...sources], error: describeSequenceGap() });
-              break streamLoop;
-            }
-            expectedSequence += 1;
-
-            if (ev.type === 'token') {
-              acc += ev.delta;
-              apply(false);
-            } else if (ev.type === 'source') {
-              sources.push(ev.title);
-            } else if (ev.type === 'done') {
-              apply(true);
-              break streamLoop;
-            } else if (ev.type === 'error') {
-              setLastAgentTurn({ text: acc, sources: [...sources], error: describeSseError(ev) });
-              break streamLoop;
-            }
-          }
-        }
-      } catch (e) {
-        if (e instanceof SseProtocolError) {
-          setLastAgentTurn({ text: acc, sources: [...sources], error: describeProtocolError() });
-        } else if (isAiHttpError(e)) {
-          if (shouldResetConversation(e)) setConversationId(null);
-          setLastAgentTurn({ text: acc, sources: [...sources], error: describeHttpError(e) });
-        } else {
-          throw e;
+      for await (const chunk of mockStreamSuccess(mockAnswerFor(question))) {
+        for (const ev of parser.push(chunk)) {
+          if (ev.type === 'token') acc += ev.delta;
+          if (ev.type === 'source') sources.push(ev.title);
+          apply(ev.type === 'done');
+          // 토큰이 한 번에 쏟아지면 스트리밍처럼 보이지 않는다 — 목업에서만 살짝 늦춘다
+          if (ev.type === 'token') await new Promise((r) => setTimeout(r, 45));
         }
       }
+      for (const ev of parser.flush()) {
+        if (ev.type === 'token') acc += ev.delta;
+        apply(true);
+      }
+      apply(true);
     } finally {
       setBusy(false);
     }
@@ -237,7 +178,7 @@ export function AiChatOverlay({ payload }: Props) {
           {turns.map((t, i) => (
             <div key={i} className={'ai-turn ai-turn-' + t.role}>
               {t.role === 'agent' && <span className="ai-avatar">AI</span>}
-              <div className={'ai-bubble' + (t.error !== undefined ? ' ai-bubble-error' : '')}>
+              <div className="ai-bubble">
                 {t.text}
                 {t.streaming && <span className="ai-caret" />}
                 {t.sources !== undefined && t.sources.length > 0 && !t.streaming && (
@@ -248,24 +189,6 @@ export function AiChatOverlay({ payload }: Props) {
                       </span>
                     ))}
                   </span>
-                )}
-                {t.error !== undefined && (
-                  <div className="ai-error">
-                    <span className="ai-error-message">
-                      {t.error.headline}
-                      {t.error.retryAfterSeconds !== undefined && ` (${t.error.retryAfterSeconds}초 후)`}
-                    </span>
-                    {t.error.retryable && (
-                      <button
-                        type="button"
-                        className="ov-btn ai-retry"
-                        disabled={busy}
-                        onClick={() => void ask(turns[i - 1]?.text ?? '')}
-                      >
-                        다시 시도
-                      </button>
-                    )}
-                  </div>
                 )}
               </div>
             </div>
