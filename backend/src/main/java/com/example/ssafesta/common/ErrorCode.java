@@ -161,6 +161,14 @@ public enum ErrorCode {
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
 
+    // ── Survey (010) ────────────────────────────────────────────────────────
+    // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
+    SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),
+    SURVEY_CLOSED(HttpStatus.CONFLICT, "마감된 설문입니다."),
+    SURVEY_ALREADY_RESPONDED(HttpStatus.CONFLICT, "이미 응답한 설문입니다."),
+    /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
+    SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
+
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),

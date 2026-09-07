@@ -23,6 +23,20 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
     Optional<Booth> findWithLockById(Long id);
 
     /**
+     * The same row, held so it cannot be rewritten underneath — but shared, so respondents do not
+     * queue behind each other (spec 010).
+     *
+     * <p>A survey submission and a survey edit race on the question rows: the editor replaces the
+     * question set while a visitor is inserting an answer that points at one of them, and
+     * {@code survey_answers.question_id} has no {@code ON DELETE}, so whichever loses gets a
+     * constraint error rather than an answer. The editor takes {@link #findWithLockById}; a
+     * submission takes this one. Two submissions never conflict with each other, which a write lock
+     * would have made them do.
+     */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    Optional<Booth> findWithSharedLockById(Long id);
+
+    /**
      * A member keeps one booth across leases, so re-leasing continues their own content rather
      * than handing them someone else's (spec 004 C-01).
      */
