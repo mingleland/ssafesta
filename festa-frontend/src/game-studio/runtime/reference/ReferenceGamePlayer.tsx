@@ -327,6 +327,13 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             className="grp-map"
             style={{
               aspectRatio: `${scene.width} / ${scene.height}`,
+              // S15P21A604-492 — CSS의 width: 100%(고정값)만으로는 세로가 긴 씬에서 비율이
+              // 깨진다: aspect-ratio로 계산된 높이가 max-height(calc(100vh - 130px))를
+              // 넘으면 높이는 잘리지만, width가 이미 고정값이라 폭이 다시 계산되지 않는다
+              // (스펙상 aspect-ratio는 auto인 쪽만 유도한다). 그래서 가로 제한(1120px, CSS
+              // max-width와 동일한 값)과 "세로 제한을 씬 비율로 역산한 폭" 중 작은 쪽을
+              // 직접 계산해 항상 비율이 유지되게 한다.
+              width: `min(1120px, calc((100vh - 130px) * ${scene.width} / ${scene.height}))`,
               ...(mapBackground === null ? {} : staticImageBackgroundStyle(mapBackground)),
               '--grp-columns': scene.width,
               '--grp-rows': scene.height,
