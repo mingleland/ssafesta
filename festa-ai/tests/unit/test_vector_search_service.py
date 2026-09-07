@@ -1,11 +1,11 @@
-"""Verify question embedding is connected to the scoped vector repository."""
+"""Verify question embedding is connected to Spring's chunk-search client (S15P21A604-449 이후)."""
 
 from __future__ import annotations
 
 import pytest
 
+from app.clients.spring_chunk_search import ChunkScope
 from app.providers.embedding import EmbeddingBatch
-from app.repositories.chunk_repository import ChunkScope
 from app.services.vector_search_service import VectorSearchService
 
 
@@ -24,13 +24,13 @@ class _EmbeddingProvider:
         )
 
 
-class _Repository:
+class _ChunkSearchClient:
     def __init__(self) -> None:
         self.scope = None
         self.embedding = None
         self.top_k = None
 
-    async def search_ready_chunks(self, *, scope, query_embedding, top_k):
+    async def search(self, *, scope, query_embedding, top_k):
         self.scope = scope
         self.embedding = query_embedding
         self.top_k = top_k
@@ -40,10 +40,10 @@ class _Repository:
 @pytest.mark.asyncio
 async def test_service_embeds_question_and_uses_server_scope() -> None:
     provider = _EmbeddingProvider()
-    repository = _Repository()
+    client = _ChunkSearchClient()
     service = VectorSearchService(
         embedding_provider=provider,
-        chunk_repository=repository,  # type: ignore[arg-type]
+        chunk_search_client=client,  # type: ignore[arg-type]
     )
     scope = ChunkScope(booth_id=10, agent_id=20)
 
@@ -51,18 +51,18 @@ async def test_service_embeds_question_and_uses_server_scope() -> None:
 
     assert result == ()
     assert provider.inputs == ("운영 시간이 언제인가요?",)
-    assert repository.scope == scope
-    assert repository.embedding == (0.25,) * 1536
-    assert repository.top_k == 3
+    assert client.scope == scope
+    assert client.embedding == (0.25,) * 1536
+    assert client.top_k == 3
 
 
 @pytest.mark.asyncio
-async def test_blank_question_does_not_call_embedding_or_database() -> None:
+async def test_blank_question_does_not_call_embedding_or_spring() -> None:
     provider = _EmbeddingProvider()
-    repository = _Repository()
+    client = _ChunkSearchClient()
     service = VectorSearchService(
         embedding_provider=provider,
-        chunk_repository=repository,  # type: ignore[arg-type]
+        chunk_search_client=client,  # type: ignore[arg-type]
     )
 
     with pytest.raises(ValueError, match="question must not be blank"):
@@ -73,16 +73,16 @@ async def test_blank_question_does_not_call_embedding_or_database() -> None:
         )
 
     assert provider.inputs is None
-    assert repository.scope is None
+    assert client.scope is None
 
 
 @pytest.mark.asyncio
-async def test_invalid_embedding_batch_fails_before_database_search() -> None:
+async def test_invalid_embedding_batch_fails_before_spring_search() -> None:
     provider = _EmbeddingProvider()
-    repository = _Repository()
+    client = _ChunkSearchClient()
     service = VectorSearchService(
         embedding_provider=provider,
-        chunk_repository=repository,  # type: ignore[arg-type]
+        chunk_search_client=client,  # type: ignore[arg-type]
     )
     provider.dimension = 1535
 
@@ -93,4 +93,4 @@ async def test_invalid_embedding_batch_fails_before_database_search() -> None:
             top_k=3,
         )
 
-    assert repository.scope is None
+    assert client.scope is None

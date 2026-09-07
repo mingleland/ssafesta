@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from html import escape
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from app.clients.spring_chunk_search import RetrievedChunk
 from app.providers.llm import LLMMessage, LLMRequest
-from app.repositories.chunk_repository import RetrievedChunk
 
 if TYPE_CHECKING:
     from app.core.config import Settings
