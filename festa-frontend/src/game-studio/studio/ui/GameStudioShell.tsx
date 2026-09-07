@@ -54,6 +54,7 @@ import { findPublishBlockers } from '../ports/publishValidation.ts';
 import { createGameProjectStore } from '../store/gameProjectStore.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { DialogueEditor } from './DialogueEditor.tsx';
+import { FloatingPanel } from './FloatingPanel.tsx';
 import { SceneFlowGraph } from './SceneFlowGraph.tsx';
 import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
@@ -1010,7 +1011,12 @@ export const GameStudioShell = ({
         </div>
         <div className="gss-primary-actions">
           <button className="gss-guide-button" onClick={() => setShowGuide(true)} type="button">? 사용 안내</button>
-          <button className="gss-guide-button" onClick={() => setShowFlowGraph(true)} type="button">🔀 게임 흐름</button>
+          <button
+            aria-pressed={showFlowGraph}
+            className="gss-guide-button"
+            onClick={() => setShowFlowGraph((current) => !current)}
+            type="button"
+          >🔀 게임 흐름</button>
           <button
             className="gss-preview-button"
             disabled={saveStatus === 'loading' || saveStatus === 'saving'}
@@ -1637,25 +1643,18 @@ export const GameStudioShell = ({
         </div>
       )}
       {showFlowGraph && (
-        <div className="gss-guide-backdrop" onMouseDown={() => setShowFlowGraph(false)} role="presentation">
-          <section aria-modal="true" className="gss-flow-graph-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
-            <header>
-              <div><span>실험 · 정식 기능 아님</span><h2>게임 흐름</h2><p>씬을 눌러 바로 이동합니다. 화살표는 Scene 이동/대화 표시/게임 완료 연결입니다.</p></div>
-              <button aria-label="게임 흐름 닫기" onClick={() => setShowFlowGraph(false)} type="button">×</button>
-            </header>
-            <div className="gss-flow-graph-scroll">
-              <SceneFlowGraph
-                onSelectScene={(sceneId) => {
-                  setSelectedSceneId(sceneId);
-                  setSelectedObjectId(null);
-                  setSelectedObjectIds(new Set());
-                  setShowFlowGraph(false);
-                }}
-                project={project}
-              />
-            </div>
-          </section>
-        </div>
+        <FloatingPanel initialSize={{ height: 480, width: 760 }} onClose={() => setShowFlowGraph(false)} title="게임 흐름">
+          <div className="gss-flow-graph-scroll">
+            <SceneFlowGraph
+              onSelectScene={(sceneId) => {
+                setSelectedSceneId(sceneId);
+                setSelectedObjectId(null);
+                setSelectedObjectIds(new Set());
+              }}
+              project={project}
+            />
+          </div>
+        </FloatingPanel>
       )}
       {tutorialStep !== null && (
         <aside className="gss-tutorial-dock">
