@@ -3,6 +3,23 @@
 **Input**: `specs/008-ai-conversation-rag/`의 spec·plan·research·data-model·contracts·quickstart
 **Tests**: FR-003 격리와 계약·timeout·삭제 검증은 필수다.
 
+## S15P21A604-449 Search Ownership Migration — 최우선 선행 작업
+
+> 아래 기존 항목 중 FastAPI `ChunkRepository` 또는 FastAPI의 pgvector 직접 조회를 요구하는 내용은 이 절로 대체되며 실행하지 않는다. 완료 이력은 삭제하지 않는다.
+
+- [X] T052 [DOCS] 문서 세트를 Spring Business DB/pgvector 단독 소유로 정합화한다 (S15P21A604-449)
+- [X] T053 [DOCS] `contracts/spring-chunk-search-api.yaml`에 검색 요청·응답과 격리 조건을 정의한다 (S15P21A604-449)
+- [ ] T054 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다. 내부 timeout 3초, threshold 없이 `topK`까지 채워서 반환하며, 계약(`additionalProperties: false`) 외 필드는 전역 오류 봉투 `400 VALIDATION_FAILED`로 거부한다 (S15P21A604-398)
+- [ ] T049 [AI] 직접 pgvector repository를 제거하고 질의 Embedding 후 Spring 검색 client를 호출하도록 변경한다
+- [ ] T050 [BE/AI] 실제 Business DB fixture로 topK, 3초 timeout, distance 정렬, threshold 없음과 scope 누출 0건을 검증한다
+- [ ] T051 [AI] 요청 시 보낸 `boothId + agentId`를 Conversation snapshot과 대조해 검증하고 위반 시 Fail Closed 처리한다 (검색 응답에는 scope 필드가 없다 — 재검증 대상은 요청이다)
+
+**Dependency**: T054와 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
+
+## S15P21A604-507 Spring Agent 설정 client 결선
+
+- [X] T055 [AI] `GET /internal/ai/agent-config` client를 공용 HTTP lifecycle과 연결하고, 질문마다 검색 전에 설정을 1회 조회한다. 성공 응답 다섯 필드를 엄격 변환하며 `AGENT_NOT_IN_BOOTH`·`AGENT_INACTIVE` 및 네트워크·계약 오류는 원문 노출 없이 Fail Closed 처리한다. 운영 `create_app()`의 Mock을 제거하고 단위·계약·회귀 테스트와 C-16 결정 문서를 갱신한다 (S15P21A604-507)
+
 ## Phase 1: Setup
 
 - [ ] T001 Add Redis, tokenizer, SSE test dependencies and pytest markers in festa-ai/pyproject.toml
@@ -31,7 +48,7 @@
 - [ ] T015 [P] [US1] Write Conversation API and C-07 SSE contract tests in festa-ai/tests/contract/test_conversation_api.py and festa-ai/tests/contract/test_sse_contract.py
 - [ ] T016 [P] [US1] Write context budget and completed-turn-only unit tests in festa-ai/tests/unit/test_context_service.py and festa-ai/tests/unit/test_conversation_repository.py
 - [ ] T017 [US1] Implement authenticated Conversation create/get/close lifecycle with 30-minute TTL in festa-ai/app/services/conversation_service.py
-- [ ] T018 [US1] Implement token counting and low-priority truncation order in festa-ai/app/services/context_service.py
+- [X] T018 [US1] Implement token counting and low-priority truncation order in festa-ai/app/services/context_service.py (`S15P21A604-129`)
 - [ ] T019 [US1] Implement question validation, READY-empty fixed response, retrieval, context assembly, and LLM orchestration in festa-ai/app/services/rag_service.py
 - [ ] T020 [US1] Implement C-07 sequence, source deduplication, terminal exclusivity, and completed-turn commit in festa-ai/app/services/stream_service.py
 - [ ] T021 [US1] Implement create, message SSE, and idempotent close endpoints in festa-ai/app/api/v1/conversations.py
@@ -50,7 +67,7 @@
 - [ ] T028 [P] [US2] Write repository Scope and READY-state isolation tests in festa-ai/tests/isolation/test_chunk_repository_scope.py
 - [ ] T029 [P] [US2] Write forged Scope and prompt-injection zero-call tests in festa-ai/tests/isolation/test_scope_forgery.py
 - [ ] T030 [P] [US2] Write LLM-input, SSE-source, answer-leak, and 50-request mixed concurrency tests in festa-ai/tests/isolation/test_rag_boundaries.py
-- [ ] T031 [US2] Implement the only public scoped READY search entry point in festa-ai/app/repositories/chunk_repository.py
+- [X] T031 [US2] Implement the only public scoped READY search entry point in festa-ai/app/repositories/chunk_repository.py (`S15P21A604-128`)
 - [ ] T032 [US2] Add RetrievedChunk Scope revalidation and fail-closed security metric in festa-ai/app/services/rag_service.py
 - [ ] T033 [US2] Add pytest -m isolation as a release-blocking stage in infra/jenkins/pipelines/component.groovy and infra/jenkins/pipelines/develop.groovy while preserving disabled .gitlab-ci.yml job definitions
 
@@ -76,6 +93,7 @@
 - [ ] T045 [P] Add executable local validation commands and expected outputs to festa-ai/README.md
 - [ ] T046 Run all commands in specs/008-ai-conversation-rag/quickstart.md and record results in specs/008-ai-conversation-rag/quickstart.md
 - [ ] T047 Verify no secrets or Conversation raw text are committed or emitted by tests using festa-ai/.env.example and festa-ai/tests/
+- [X] T048 [P] Implement OpenAI-compatible GMS LLM streaming adapter, shared Secret-based Provider switching, real Embedding/LLM regression, and sanitized usage cost logs in festa-ai/app/providers/, festa-ai/app/core/config.py, and festa-ai/tests/ (`S15P21A604-148`)
 
 ## Dependencies & Execution Order
 

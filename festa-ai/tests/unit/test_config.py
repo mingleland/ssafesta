@@ -1,3 +1,4 @@
+import base64
 import importlib
 import pathlib
 import sys
@@ -5,8 +6,11 @@ import sys
 import pytest
 from pydantic import ValidationError
 
+_VALID_JWT_SECRET = base64.b64encode(b"0" * 64).decode()
+
 VALID_ENV = {
-    "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/festa",
+    "JWT_SECRET": _VALID_JWT_SECRET,
+    "REDIS_URL": "redis://localhost:6379/0",
     "SPRING_INTERNAL_BASE_URL": "http://spring.internal:8080",
     "INTERNAL_SPRING_TO_AI_TOKENS": "spring-to-ai-token-1",
     "INTERNAL_AI_TO_SPRING_TOKENS": "ai-to-spring-token-1",
@@ -55,21 +59,38 @@ def test_valid_env_loads_with_documented_defaults(
     config = _fresh_settings_module()
 
     assert config.settings.job_heartbeat_seconds == 30
-    assert config.settings.job_lease_seconds == 90
-    assert config.settings.job_sweeper_seconds == 60
-    assert config.settings.job_max_retries == 3
-    assert config.settings.job_retry_backoff_seconds == [60, 300, 900]
+    assert config.settings.document_worker_max_concurrency == 1
+    assert config.settings.document_worker_shutdown_grace_seconds == 30.0
+    assert config.settings.spring_document_result_timeout_seconds == 5.0
+    assert config.settings.embedding_batch_size == 96
     assert config.settings.embedding_provider == "mock"
     assert config.settings.embedding_dimension == 1536
+    assert config.settings.embedding_model_id == "text-embedding-3-large"
+    assert config.settings.chunk_size == 900
+    assert config.settings.chunk_overlap == 180
+    assert config.settings.retrieval_top_k == 10
+    assert config.settings.rag_context_top_n == 5
+    assert config.settings.rag_input_token_budget == 8_000
+    assert config.settings.rag_tokenizer_encoding == "cl100k_base"
+    assert config.settings.llm_model_id == "gpt-4.1-mini"
+    assert config.settings.llm_temperature == 0.0
+    assert config.settings.llm_provider == "mock"
+    assert config.settings.llm_api_path == "/v1/chat/completions"
     assert config.settings.internal_spring_to_ai_tokens == ["spring-to-ai-token-1"]
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
+    assert config.settings.conversation_ttl_seconds == 1800
+    assert config.settings.spring_booth_access_timeout_seconds == 1.0
+    assert config.settings.spring_agent_config_timeout_seconds == 1.0
+    assert config.settings.llm_ttft_timeout_seconds == 15.0
+    assert config.settings.llm_total_timeout_seconds == 60.0
+    assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
 
 
 def test_missing_required_field_fails_fast(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    _set_env(monkeypatch, tmp_path, omit={"DATABASE_URL"})
-    with pytest.raises(ValidationError, match="database_url"):
+    _set_env(monkeypatch, tmp_path, omit={"REDIS_URL"})
+    with pytest.raises(ValidationError, match="REDIS_URL"):
         _fresh_settings_module()
 
 
@@ -81,23 +102,20 @@ def test_empty_string_required_field_fails_fast(
         _fresh_settings_module()
 
 
-def test_lease_must_exceed_heartbeat(
+def test_jwt_secret_must_be_valid_base64(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    _set_env(
-        monkeypatch,
-        tmp_path,
-        overrides={"JOB_HEARTBEAT_SECONDS": "90", "JOB_LEASE_SECONDS": "90"},
-    )
-    with pytest.raises(ValidationError, match="JOB_LEASE_SECONDS"):
+    _set_env(monkeypatch, tmp_path, overrides={"JWT_SECRET": "not-base64!!"})
+    with pytest.raises(ValidationError, match="JWT_SECRET must be valid base64"):
         _fresh_settings_module()
 
 
-def test_backoff_count_must_match_max_retries(
+def test_jwt_secret_must_be_at_least_64_bytes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    _set_env(monkeypatch, tmp_path, overrides={"JOB_RETRY_BACKOFF_SECONDS": "60,300"})
-    with pytest.raises(ValidationError, match="JOB_RETRY_BACKOFF_SECONDS"):
+    short_secret = base64.b64encode(b"0" * 32).decode()
+    _set_env(monkeypatch, tmp_path, overrides={"JWT_SECRET": short_secret})
+    with pytest.raises(ValidationError, match="at least 64 random bytes"):
         _fresh_settings_module()
 
 
@@ -190,7 +208,7 @@ def test_internal_tokens_reject_cross_direction_reuse(
         _fresh_settings_module()
 
 
-def test_blank_chunk_tuning_env_vars_resolve_to_none(
+def test_blank_chunk_tuning_env_vars_resolve_to_spike_defaults(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """Regression: `.env.example` ships CHUNK_SIZE= / CHUNK_OVERLAP= (blank).
@@ -204,8 +222,8 @@ def test_blank_chunk_tuning_env_vars_resolve_to_none(
     _set_env(monkeypatch, tmp_path, overrides={"CHUNK_SIZE": "", "CHUNK_OVERLAP": ""})
     config = _fresh_settings_module()
 
-    assert config.settings.chunk_size is None
-    assert config.settings.chunk_overlap is None
+    assert config.settings.chunk_size == 900
+    assert config.settings.chunk_overlap == 180
 
 
 def test_real_chunk_tuning_values_still_coerce_to_int(
@@ -219,7 +237,7 @@ def test_real_chunk_tuning_values_still_coerce_to_int(
     assert config.settings.chunk_overlap == 64
 
 
-def test_blank_embedding_model_id_resolves_to_none(
+def test_blank_embedding_model_id_resolves_to_spike_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     """Regression: `.env.example` ships EMBEDDING_MODEL_ID= (blank) too.
@@ -235,7 +253,81 @@ def test_blank_embedding_model_id_resolves_to_none(
     _set_env(monkeypatch, tmp_path, overrides={"EMBEDDING_MODEL_ID": ""})
     config = _fresh_settings_module()
 
-    assert config.settings.embedding_model_id is None
+    assert config.settings.embedding_model_id == "text-embedding-3-large"
+
+
+def test_chunk_overlap_must_be_smaller_than_chunk_size(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"CHUNK_SIZE": "900", "CHUNK_OVERLAP": "900"},
+    )
+    with pytest.raises(ValidationError, match="CHUNK_OVERLAP"):
+        _fresh_settings_module()
+
+
+def test_gms_llm_provider_requires_common_secret(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"LLM_PROVIDER": "gms"})
+
+    with pytest.raises(ValidationError, match="GMS_API_KEY"):
+        _fresh_settings_module()
+
+
+def test_gms_llm_and_embedding_share_injected_secret(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "LLM_PROVIDER": "gms",
+            "EMBEDDING_PROVIDER": "gms",
+            "GMS_API_KEY": "shared-gms-secret",
+        },
+    )
+
+    config = _fresh_settings_module()
+
+    assert config.settings.llm_provider == "gms"
+    assert config.settings.embedding_provider == "gms"
+    assert "shared-gms-secret" not in repr(config.settings)
+
+
+def test_unknown_llm_provider_fails_fast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"LLM_PROVIDER": "unknown"})
+
+    with pytest.raises(ValidationError, match="llm_provider"):
+        _fresh_settings_module()
+
+
+def test_context_top_n_must_not_exceed_retrieval_top_k(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"RETRIEVAL_TOP_K": "5", "RAG_CONTEXT_TOP_N": "6"},
+    )
+    with pytest.raises(ValidationError, match="RAG_CONTEXT_TOP_N"):
+        _fresh_settings_module()
+
+
+def test_ttft_timeout_must_not_exceed_total_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"LLM_TTFT_TIMEOUT_SECONDS": "60", "LLM_TOTAL_TIMEOUT_SECONDS": "15"},
+    )
+    with pytest.raises(ValidationError, match="LLM_TTFT_TIMEOUT_SECONDS"):
+        _fresh_settings_module()
 
 
 def test_blank_embedding_provider_resolves_to_mock_default(
@@ -267,15 +359,6 @@ def test_blank_embedding_api_path_resolves_to_default(
     config = _fresh_settings_module()
 
     assert config.settings.embedding_api_path == "/v1/embeddings"
-
-
-def test_sweeper_seconds_zero_fails_fast(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    """Finding 2: JOB_SWEEPER_SECONDS=0 previously booted successfully."""
-    _set_env(monkeypatch, tmp_path, overrides={"JOB_SWEEPER_SECONDS": "0"})
-    with pytest.raises(ValidationError, match="job_sweeper_seconds"):
-        _fresh_settings_module()
 
 
 def test_document_max_bytes_negative_fails_fast(

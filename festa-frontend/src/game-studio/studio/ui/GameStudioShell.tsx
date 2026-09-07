@@ -6,9 +6,10 @@ import {
   useState,
   useSyncExternalStore,
   type ChangeEvent,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { parseGameProject, type AssetReference, type GameObject, type GameProject } from '../../contracts/gameProject.ts';
+import { parseGameProject, type AssetReference, type GameObject, type GameProject, type Position2d } from '../../contracts/gameProject.ts';
 import {
   addDialogueScene,
   addAssetReference,
@@ -21,12 +22,12 @@ import {
   duplicateObjects,
   fillTileLayer,
   floodFillTiles,
-  moveScene,
   moveObjects,
   nextStableId,
   paintTiles,
   removeObjects,
   removeScene,
+  reorderScene,
   replaceComponent,
   renameProject,
   sceneRemovalReason,
@@ -34,7 +35,8 @@ import {
   startSceneChangeReason,
   withBuiltinAssetLibrary,
 } from '../model/authoringCommands.ts';
-import { PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
+import { describeSceneRuntimeMode, describeSceneType, PRESET_DEFINITIONS } from '../model/authoringRegistry.ts';
+import { createBlankProject } from '../model/createBlankProject.ts';
 import { createStarterProject } from '../model/createStarterProject.ts';
 import { createProjectFromTemplate, PROJECT_TEMPLATES, type ProjectTemplateId } from '../model/projectTemplates.ts';
 import { createBrowserAssetRepository, type GameAssetRepository } from '../assets/localAssetRepository.ts';
@@ -52,6 +54,8 @@ import { findPublishBlockers } from '../ports/publishValidation.ts';
 import { createGameProjectStore } from '../store/gameProjectStore.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { DialogueEditor } from './DialogueEditor.tsx';
+import { FloatingPanel } from './FloatingPanel.tsx';
+import { SceneFlowGraph } from './SceneFlowGraph.tsx';
 import { EventEditor } from './EventEditor.tsx';
 import { InspectorPanel } from './InspectorPanel.tsx';
 import { ObjectLayerPanel } from './ObjectLayerPanel.tsx';
@@ -104,6 +108,47 @@ const saveEditorSet = (gameId: number, kind: 'hidden' | 'locked', ids: ReadonlyS
     window.localStorage.setItem(editorSetStorageKey(gameId, kind), JSON.stringify([...ids]));
   } catch {
     // 편집 보조 상태 저장 실패는 GameProject 저장을 방해하지 않는다.
+  }
+};
+
+// S15P21A604-387 — 좌/우 패널 드래그 리사이즈. 최소값은 기존 반응형 브레이크포인트
+// (1250px/1039px/760px)들의 폭 중 가장 작은 값으로 고정하고, 최대값은 각 패널 기본폭
+// 대비 +25%로 고정한다(뷰포트에 따라 달라지지 않음 — QA id 5 결정 사항).
+const LEFT_PANEL_DEFAULT_WIDTH = 226;
+const LEFT_PANEL_MIN_WIDTH = 150;
+const LEFT_PANEL_MAX_WIDTH = Math.round(LEFT_PANEL_DEFAULT_WIDTH * 1.25);
+const RIGHT_PANEL_DEFAULT_WIDTH = 350;
+const RIGHT_PANEL_MIN_WIDTH = 230;
+const RIGHT_PANEL_MAX_WIDTH = Math.round(RIGHT_PANEL_DEFAULT_WIDTH * 1.25);
+const PANEL_WIDTHS_STORAGE_KEY = 'festa.game-studio.layout.panelWidths';
+
+interface PanelWidths {
+  readonly left: number;
+  readonly right: number;
+}
+
+const clampPanelWidth = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+// 패널 폭은 특정 게임 프로젝트가 아니라 에디터 자체에 대한 개인 UI 선호도라, 다른
+// 편집 보조 상태(editorSetStorageKey)와 달리 gameId 없이 전역 키로 저장한다 — 어느
+// 게임을 열어도 마지막으로 조절한 폭이 유지되는 편이 자연스럽다고 판단했다.
+const loadPanelWidths = (): PanelWidths => {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PANEL_WIDTHS_STORAGE_KEY) ?? 'null');
+    const raw = (parsed ?? {}) as { left?: unknown; right?: unknown };
+    const left = typeof raw.left === 'number' ? clampPanelWidth(raw.left, LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH) : LEFT_PANEL_DEFAULT_WIDTH;
+    const right = typeof raw.right === 'number' ? clampPanelWidth(raw.right, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH) : RIGHT_PANEL_DEFAULT_WIDTH;
+    return { left, right };
+  } catch {
+    return { left: LEFT_PANEL_DEFAULT_WIDTH, right: RIGHT_PANEL_DEFAULT_WIDTH };
+  }
+};
+
+const savePanelWidths = (widths: PanelWidths): void => {
+  try {
+    window.localStorage.setItem(PANEL_WIDTHS_STORAGE_KEY, JSON.stringify(widths));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 리사이즈 자체는 정상 동작한다.
   }
 };
 
@@ -161,6 +206,25 @@ export const GameStudioShell = ({
   const project = snapshot.project;
   const assetUrls = useResolvedAssetUrls(project.assets, assetRepository);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // S15P21A604-391 — Scene을 옮겼다가 돌아왔을 때 그 Scene에서 마지막으로 선택했던
+  // 오브젝트/레이어/캔버스 팬(뷰포트 중심)을 복원한다. 렌더링에 직접 관여하지 않는
+  // "떠날 때 적어두는" 용도라 useRef로 충분하다(줌은 이번 범위에서 제외 — 전역 공유 유지).
+  const sceneEditMemoryRef = useRef<Map<string, {
+    readonly selectedObjectId: string | null;
+    readonly selectedObjectIds: ReadonlySet<string>;
+    readonly selectedLayerId: string | null;
+    readonly placementPreset: GameObject['preset'] | null;
+    readonly tileBrush: number | null;
+    readonly viewportCenter: Position2d | null;
+    // 속성/이벤트/데이터 탭도 씬별로 기억한다 — 세 탭 다 구분 없이 동일하게 취급한다
+    // ("데이터" 탭이 사실 프로젝트 전체를 보여줘 씬 종속은 아니지만, 사용자가 명시적으로
+    // 구분 없이 기억하길 원해서 예외 없이 저장한다).
+    readonly rightPanel: RightPanel;
+  }>>(new Map());
+  // 현재 보고 있는 Scene의 캔버스 뷰포트 중심 — TopDownCanvas가 스크롤될 때마다 갱신해준다.
+  // Scene을 떠나는 순간 이 값을 sceneEditMemoryRef에 스냅샷으로 저장한다.
+  const currentViewportCenterRef = useRef<Position2d | null>(null);
+  const [restoreViewportCenter, setRestoreViewportCenter] = useState<Position2d | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState(project.startSceneId);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedObjectIds, setSelectedObjectIds] = useState<ReadonlySet<string>>(new Set());
@@ -185,9 +249,19 @@ export const GameStudioShell = ({
   const [showGuide, setShowGuide] = useState(() => shouldShowFirstVisitGuide(gameId));
   const [showTemplates, setShowTemplates] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<ProjectTemplateId | null>(null);
+  // S15P21A604-481 — 좌상단 "Game Studio" 라벨을 누르면 뜨는 팝업 메뉴(게임 초기화/시작
+  // 템플릿/JSON 가져오기·내보내기)와, "게임 초기화"의 파괴적 액션 확인 단계.
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // 실험(정식 티켓 아님) — 씬 단위 게임 흐름을 그래프로 보여주는 모달.
+  const [showFlowGraph, setShowFlowGraph] = useState(false);
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths());
+  const [draggedSceneIndex, setDraggedSceneIndex] = useState<number | null>(null);
+  const [dragOverSceneIndex, setDragOverSceneIndex] = useState<number | null>(null);
+  const panelResizeRef = useRef<{ readonly side: 'left' | 'right'; readonly startX: number; readonly startWidth: number } | null>(null);
   const [editorHiddenObjectIds, setEditorHiddenObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'hidden'));
   const [editorLockedObjectIds, setEditorLockedObjectIds] = useState<ReadonlySet<string>>(() => loadEditorSet(gameId, 'locked'));
   const [objectClipboard, setObjectClipboard] = useState<{ readonly sourceSceneId: string; readonly objectIds: readonly string[] } | null>(null);
@@ -195,6 +269,42 @@ export const GameStudioShell = ({
   const [recoveryCandidate, setRecoveryCandidate] = useState<RecoverySnapshot | null>(null);
   const [recoverySavedAt, setRecoverySavedAt] = useState<string | null>(null);
   const recoveryFailureReported = useRef(false);
+
+  // S15P21A604-387 — 좌/우 구분선 드래그 리사이즈. CanvasMinimap의 pointerdown~pointerup
+  // 패턴(setPointerCapture)을 그대로 따른다. pointerId를 캡처한 요소 자신에게 move/up을
+  // 걸어서, 커서가 구분선 밖으로 나가도 드래그가 끊기지 않게 한다.
+  const startPanelResize = (event: ReactPointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    panelResizeRef.current = { side, startX: event.clientX, startWidth: side === 'left' ? panelWidths.left : panelWidths.right };
+  };
+
+  const handlePanelResizeMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const resize = panelResizeRef.current;
+    if (resize === null) return;
+    const delta = event.clientX - resize.startX;
+    // 왼쪽 구분선은 오른쪽으로 끌수록(+delta) 넓어지고, 오른쪽 구분선은 왼쪽으로 끌수록(-delta) 넓어진다.
+    const rawWidth = resize.side === 'left' ? resize.startWidth + delta : resize.startWidth - delta;
+    const [min, max] = resize.side === 'left'
+      ? [LEFT_PANEL_MIN_WIDTH, LEFT_PANEL_MAX_WIDTH]
+      : [RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH];
+    const next = clampPanelWidth(rawWidth, min, max);
+    setPanelWidths((current) => (resize.side === 'left' ? { ...current, left: next } : { ...current, right: next }));
+  };
+
+  const stopPanelResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (panelResizeRef.current === null) return;
+    panelResizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    // 함수형 업데이터로 최신 상태를 읽어 저장한다 — 이 핸들러의 클로저가 잡은 panelWidths는
+    // 드래그 중 마지막 move 이후로 갱신되지 않았을 수 있다(비동기 state 업데이트).
+    setPanelWidths((current) => {
+      savePanelWidths(current);
+      return current;
+    });
+  };
 
   const selectedScene = project.scenes.find((scene) => scene.id === selectedSceneId) ?? project.scenes[0];
   const selectedObject = selectedScene !== undefined && selectedScene.type !== 'DIALOGUE'
@@ -571,6 +681,18 @@ export const GameStudioShell = ({
         || (target instanceof HTMLElement && target.isContentEditable);
       const insideDialog = target instanceof Element && target.closest('[role="dialog"]') !== null;
       if (event.key === 'Escape') {
+        if (showFlowGraph) {
+          setShowFlowGraph(false);
+          return;
+        }
+        if (showResetConfirm) {
+          setShowResetConfirm(false);
+          return;
+        }
+        if (showFileMenu) {
+          setShowFileMenu(false);
+          return;
+        }
         if (showGuide) {
           rememberGuideSeen(gameId);
           setShowGuide(false);
@@ -707,7 +829,23 @@ export const GameStudioShell = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showGuide, showTemplates, store]);
+  }, [apply, clearObjectSelection, copySelection, deleteSelection, duplicateSelection, editorHiddenObjectIds, editorLockedObjectIds, focusMode, gameId, paletteMode, pasteSelection, placeObject, placementPreset, save, selectObjects, selectedObjectIds, selectedSceneId, showFileMenu, showFlowGraph, showGuide, showResetConfirm, showTemplates, store]);
+
+  // S15P21A604-481 — "게임 초기화"(확인 다이얼로그를 거친 뒤에만 호출된다). 새 gameId 발급
+  // 진입점 자체가 없어서(Notion QA id=25) "새 게임 생성"이 아니라 현재 gameId를 완전히 빈
+  // 프로젝트로 되돌리는 것으로 범위를 축소했다 — 시작 템플릿/JSON 가져오기와 같은 "프로젝트
+  // 전체 교체" 패턴(store.reset + 선택 상태 초기화)을 그대로 따른다.
+  const resetToBlankProject = () => {
+    const next = createBlankProject(gameId);
+    store.reset(next);
+    setSelectedSceneId(next.startSceneId);
+    setSelectedObjectId(null);
+    setSelectedObjectIds(new Set());
+    setHasUnsavedChanges(true);
+    setSaveStatus('dirty');
+    setShowResetConfirm(false);
+    setNotice('게임을 빈 프로젝트로 초기화했습니다. 저장 전 플레이 테스트를 권장합니다.');
+  };
 
   const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -715,9 +853,14 @@ export const GameStudioShell = ({
     if (file === undefined) return;
     try {
       const imported = withBuiltinAssetLibrary(parseGameProject(JSON.parse(await file.text())));
-      if (imported.gameId !== gameId) throw new Error(`gameId가 ${gameId}인 프로젝트만 가져올 수 있습니다.`);
-      store.reset(imported);
-      setSelectedSceneId(imported.startSceneId);
+      // S15P21A604-483 — 파일에 박힌 gameId는 "어느 게임에서 내보내졌는지"를 나타내는
+      // 출처 메타데이터일 뿐 콘텐츠 유효성과 무관하다. 사용자는 파일을 열어보지 않는 한
+      // 그 값을 알 방법이 없어 gameId 불일치를 하드 에러로 막는 건 실질적으로 쓸 수 없는
+      // 검증이었다 — "게임 초기화"/"시작 템플릿"과 동일하게 항상 현재 화면의 gameId로
+      // 맞춰서(coerce) 적용한다.
+      const next = imported.gameId === gameId ? imported : { ...imported, gameId };
+      store.reset(next);
+      setSelectedSceneId(next.startSceneId);
       setSelectedObjectId(null);
       setSelectedObjectIds(new Set());
       setHasUnsavedChanges(true);
@@ -792,7 +935,49 @@ export const GameStudioShell = ({
       <header className="gss-topbar">
         <div className="gss-brand-area">
           <Link aria-label="홈으로 돌아가기" className="gss-back" to="/app/home">‹</Link>
-          <div className="gss-logo"><span>F</span><strong>Game Studio</strong></div>
+          <div className="gss-file-menu-anchor">
+            <button
+              aria-expanded={showFileMenu}
+              aria-haspopup="menu"
+              className="gss-logo gss-file-menu-trigger"
+              onClick={() => setShowFileMenu((current) => !current)}
+              type="button"
+            ><span>F</span><strong>Game Studio</strong><i className="gss-file-menu-caret">▾</i></button>
+            {showFileMenu && (
+              <>
+                <div className="gss-file-menu-backdrop" onMouseDown={() => setShowFileMenu(false)} role="presentation" />
+                <div className="gss-file-menu" role="menu">
+                  <button
+                    onClick={() => { setShowFileMenu(false); setShowResetConfirm(true); }}
+                    role="menuitem"
+                    type="button"
+                  >게임 초기화</button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); setPendingTemplateId(null); setShowTemplates(true); }}
+                    role="menuitem"
+                    type="button"
+                  >시작 템플릿</button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); fileInputRef.current?.click(); }}
+                    role="menuitem"
+                    type="button"
+                  >JSON 가져오기</button>
+                  <button
+                    onClick={() => { setShowFileMenu(false); downloadProject(project); }}
+                    role="menuitem"
+                    type="button"
+                  >JSON 내보내기</button>
+                </div>
+              </>
+            )}
+            {/* S15P21A604-481 — 메뉴 안에 두면 안 된다: "JSON 가져오기" 클릭이 메뉴를 닫는(즉
+                이 input을 unmount하는) 상태 갱신과 같은 이벤트 안에서 fileInputRef.current.click()을
+                부르는데, 네이티브 파일 선택창은 비동기라 사용자가 실제로 파일을 고르는 시점엔
+                이미 이 input이 트리에서 사라진 뒤다 — change가 그 시점엔 아무 React 컴포넌트에도
+                안 걸려 있어 onChange가 조용히 안 불린다(에러도, 반영도 없이). 그래서 메뉴 열림
+                여부와 무관하게 항상 마운트해 둔다. */}
+            <input accept="application/json,.json" hidden onChange={(event) => void importProject(event)} ref={fileInputRef} type="file" />
+          </div>
           <div className="gss-title-input">
             <CommitInput label="프로젝트 이름" onCommit={(title) => apply(renameProject(project, title))} value={project.title} />
           </div>
@@ -826,7 +1011,12 @@ export const GameStudioShell = ({
         </div>
         <div className="gss-primary-actions">
           <button className="gss-guide-button" onClick={() => setShowGuide(true)} type="button">? 사용 안내</button>
-          <button className="gss-guide-button" onClick={() => { setPendingTemplateId(null); setShowTemplates(true); }} type="button">▦ 시작 템플릿</button>
+          <button
+            aria-pressed={showFlowGraph}
+            className="gss-guide-button"
+            onClick={() => setShowFlowGraph((current) => !current)}
+            type="button"
+          >🔀 게임 흐름</button>
           <button
             className="gss-preview-button"
             disabled={saveStatus === 'loading' || saveStatus === 'saving'}
@@ -859,36 +1049,88 @@ export const GameStudioShell = ({
         </div>
       </header>
 
-      <section className="gss-layout">
+      <section
+        className="gss-layout"
+        style={{ '--gss-left-width': `${panelWidths.left}px`, '--gss-right-width': `${panelWidths.right}px` } as React.CSSProperties}
+      >
         <aside className="gss-left-sidebar">
           <div className="gss-sidebar-section gss-scene-section">
             <div className="gss-sidebar-heading"><span>장면</span><span>{project.scenes.length}/50</span></div>
             <div className="gss-scene-add-row">
-              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 탐색 맵</button>
-              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 플랫폼</button>
-              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화</button>
-              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 연출</button>
+              <button onClick={() => addScene('TOP_DOWN')} title="캐릭터가 이동하고 오브젝트와 상호작용하는 장면" type="button">+ 맵-TopDown</button>
+              <button onClick={() => addScene('PLATFORMER')} title="중력과 점프가 있는 횡스크롤 액션 장면" type="button">+ 맵-SideScroll</button>
+              <button onClick={() => addScene('DIALOGUE', 'OVERLAY')} title="게임 화면 위에 표시되는 대화와 선택지" type="button">+ 대화-Overlay</button>
+              <button onClick={() => addScene('DIALOGUE', 'FULL_SCREEN')} title="배경과 인물을 크게 보여주는 이야기 장면" type="button">+ 대화-Fullscreen</button>
             </div>
             <nav className="gss-scene-list">
-              {project.scenes.map((scene, index) => (
-                <button
-                  className={scene.id === selectedScene.id ? 'is-active' : ''}
-                  key={scene.id}
-                  onClick={() => {
-                    setSelectedSceneId(scene.id);
-                    setSelectedObjectId(null);
-                    setSelectedObjectIds(new Set());
-                    setPlacementPreset(null);
-                    setTileBrush(null);
-                    setSelectedLayerId(scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null);
-                  }}
-                  type="button"
-                >
-                  <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : '☰'}</span>
-                  <div><strong>{scene.name}</strong><small>{index + 1} · {scene.type}</small></div>
-                  {scene.id === project.startSceneId && <em>START</em>}
-                </button>
-              ))}
+              {project.scenes.map((scene, index) => {
+                const rowClassName = ['gss-scene-row',
+                  draggedSceneIndex === index ? 'is-dragging' : '',
+                  dragOverSceneIndex === index && draggedSceneIndex !== index ? 'is-drag-over' : '']
+                  .filter(Boolean).join(' ');
+                return (
+                  <div
+                    className={rowClassName}
+                    key={scene.id}
+                    onDragOver={(dragEvent) => {
+                      if (draggedSceneIndex === null) return;
+                      dragEvent.preventDefault();
+                      if (dragOverSceneIndex !== index) setDragOverSceneIndex(index);
+                    }}
+                    onDrop={(dragEvent) => {
+                      dragEvent.preventDefault();
+                      if (draggedSceneIndex !== null && draggedSceneIndex !== index) {
+                        apply(reorderScene(project, project.scenes[draggedSceneIndex]!.id, index));
+                      }
+                      setDraggedSceneIndex(null);
+                      setDragOverSceneIndex(null);
+                    }}
+                  >
+                    <button
+                      aria-label={`${scene.name} 순서 변경 핸들 (${index + 1}번째)`}
+                      className="gss-icon-button gss-drag-handle"
+                      draggable
+                      onDragEnd={() => { setDraggedSceneIndex(null); setDragOverSceneIndex(null); }}
+                      onDragStart={(dragEvent) => {
+                        dragEvent.dataTransfer?.setData('text/plain', String(index));
+                        setDraggedSceneIndex(index);
+                      }}
+                      type="button"
+                    >☰</button>
+                    <button
+                      className={scene.id === selectedScene.id ? 'is-active' : ''}
+                      onClick={() => {
+                        if (scene.id === selectedScene.id) return;
+                        // 떠나는 Scene의 현재 편집 상태를 스냅샷으로 남긴다.
+                        sceneEditMemoryRef.current.set(selectedScene.id, {
+                          selectedObjectId,
+                          selectedObjectIds,
+                          selectedLayerId,
+                          placementPreset,
+                          tileBrush,
+                          viewportCenter: currentViewportCenterRef.current,
+                          rightPanel,
+                        });
+                        const remembered = sceneEditMemoryRef.current.get(scene.id);
+                        setSelectedSceneId(scene.id);
+                        setSelectedObjectId(remembered?.selectedObjectId ?? null);
+                        setSelectedObjectIds(remembered?.selectedObjectIds ?? new Set());
+                        setPlacementPreset(remembered?.placementPreset ?? null);
+                        setTileBrush(remembered?.tileBrush ?? null);
+                        setSelectedLayerId(remembered?.selectedLayerId
+                          ?? (scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null));
+                        setRestoreViewportCenter(remembered?.viewportCenter ?? null);
+                        setRightPanel(remembered?.rightPanel ?? 'PROPERTIES');
+                      }}
+                      type="button"
+                    >
+                      <span>{scene.type === 'TOP_DOWN' ? '▦' : scene.type === 'PLATFORMER' ? '▰' : 'Ⓣ'}</span>
+                      <div><strong>{scene.name}</strong><small>{index + 1} · {describeSceneType(scene)}</small></div>
+                      {scene.id === project.startSceneId && <em>START</em>}
+                    </button>
+                  </div>
+                );
+              })}
             </nav>
             <div className="gss-scene-actions">
               <button
@@ -918,20 +1160,6 @@ export const GameStudioShell = ({
                 title="배치·타일·이벤트·대화를 모두 복제"
                 type="button"
               >Scene 복제</button>
-              <button
-                aria-label="Scene 위로 이동"
-                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === 0}
-                onClick={() => apply(moveScene(project, selectedScene.id, -1))}
-                title="Scene 순서를 위로 이동"
-                type="button"
-              >↑</button>
-              <button
-                aria-label="Scene 아래로 이동"
-                disabled={project.scenes.findIndex((scene) => scene.id === selectedScene.id) === project.scenes.length - 1}
-                onClick={() => apply(moveScene(project, selectedScene.id, 1))}
-                title="Scene 순서를 아래로 이동"
-                type="button"
-              >↓</button>
               <button
                 className="gss-text-danger"
                 disabled={sceneRemovalReason(project, selectedScene.id) !== null}
@@ -1075,16 +1303,20 @@ export const GameStudioShell = ({
               )}
             </div>
           )}
-          <div className="gss-import-export">
-            <button onClick={() => fileInputRef.current?.click()} type="button">JSON 가져오기</button>
-            <button onClick={() => downloadProject(project)} type="button">JSON 내보내기</button>
-            <input accept="application/json,.json" hidden onChange={(event) => void importProject(event)} ref={fileInputRef} type="file" />
-          </div>
         </aside>
+
+        <div
+          className="gss-panel-divider"
+          onPointerDown={(event) => startPanelResize(event, 'left')}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={stopPanelResize}
+          onPointerCancel={stopPanelResize}
+          title="드래그해서 패널 폭 조절"
+        />
 
         <section className="gss-workspace">
           <div className="gss-canvas-toolbar">
-            <div><span className="gss-type-badge">{selectedScene.type}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
+            <div><span className="gss-type-badge">{describeSceneType(selectedScene)}</span><strong>{selectedScene.name}</strong><small>{selectedScene.id}</small></div>
             {selectedScene.type !== 'DIALOGUE' && (
               <div className="gss-canvas-tools">
                 <div className="gss-tool-segment" role="group" aria-label="캔버스 도구">
@@ -1163,9 +1395,9 @@ export const GameStudioShell = ({
                   <button onClick={() => setZoom(100)} title="셀 한 칸을 32px로 표시" type="button">1:1</button>
                 </div>
                 <div className="gss-zoom-controls">
-                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(10, current - 10))} type="button">−</button>
+                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(30, current - 10))} type="button">−</button>
                   <span>{zoom}%</span>
-                  <button aria-label="확대" onClick={() => setZoom((current) => Math.min(200, current + 10))} type="button">+</button>
+                  <button aria-label="확대" onClick={() => setZoom((current) => Math.min(300, current + 10))} type="button">+</button>
                 </div>
                 <button
                   aria-keyshortcuts="Shift+F"
@@ -1221,9 +1453,11 @@ export const GameStudioShell = ({
               }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
+              onViewportSettle={(center) => { currentViewportCenterRef.current = center; }}
               onZoomChange={setZoom}
               onSelectObjects={selectObjects}
               placementPreset={placementPreset}
+              restoreViewportCenter={restoreViewportCenter}
               scene={selectedScene}
               selectedObjectId={selectedObjectId}
               selectedObjectIds={selectedObjectIds}
@@ -1264,6 +1498,15 @@ export const GameStudioShell = ({
             <span>Game #{gameId} · revision {project.revision}</span>
           </footer>
         </section>
+
+        <div
+          className="gss-panel-divider"
+          onPointerDown={(event) => startPanelResize(event, 'right')}
+          onPointerMove={handlePanelResizeMove}
+          onPointerUp={stopPanelResize}
+          onPointerCancel={stopPanelResize}
+          title="드래그해서 패널 폭 조절"
+        />
 
         <aside className="gss-right-sidebar">
           <div className="gss-panel-tabs">
@@ -1334,6 +1577,18 @@ export const GameStudioShell = ({
           </section>
         </div>
       )}
+      {showResetConfirm && (
+        <div className="gss-guide-backdrop" onMouseDown={() => setShowResetConfirm(false)} role="presentation">
+          <section aria-modal="true" className="gss-reset-confirm-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+            <h2>게임을 초기화할까요?</h2>
+            <p>현재 편집 내용이 전부 사라지고 완전히 빈 프로젝트(빈 맵 1개)로 바뀝니다. 저장하지 않은 변경은 되돌릴 수 없습니다.</p>
+            <div className="gss-reset-confirm-actions">
+              <button onClick={() => setShowResetConfirm(false)} type="button">취소</button>
+              <button className="gss-guide-start" onClick={resetToBlankProject} type="button">초기화</button>
+            </div>
+          </section>
+        </div>
+      )}
       {showTemplates && (
         <div className="gss-guide-backdrop" role="presentation" onMouseDown={() => { setPendingTemplateId(null); setShowTemplates(false); }}>
           <section aria-modal="true" className="gss-template-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
@@ -1348,7 +1603,7 @@ export const GameStudioShell = ({
                 >
                   <img alt={`${template.title} 게임 화면 미리보기`} src={template.previewUrl} />
                   <div>
-                    <small>{template.genre} · {template.runtimeMode === 'TOP_DOWN' ? '탐색 맵' : '플랫폼 맵'}</small>
+                    <small>{template.genre} · {describeSceneRuntimeMode(template.runtimeMode)}</small>
                     <strong>{template.title}</strong>
                     <p>{template.description}</p>
                     <em>{template.systems.join(' · ')}</em>
@@ -1386,6 +1641,18 @@ export const GameStudioShell = ({
             })()}
           </section>
         </div>
+      )}
+      {showFlowGraph && (
+        <FloatingPanel initialSize={{ height: 480, width: 760 }} onClose={() => setShowFlowGraph(false)} title="게임 흐름">
+          <SceneFlowGraph
+            onSelectScene={(sceneId) => {
+              setSelectedSceneId(sceneId);
+              setSelectedObjectId(null);
+              setSelectedObjectIds(new Set());
+            }}
+            project={project}
+          />
+        </FloatingPanel>
       )}
       {tutorialStep !== null && (
         <aside className="gss-tutorial-dock">

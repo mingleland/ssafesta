@@ -3,9 +3,14 @@ import type { DialogueChoice, DialogueScene, GameProject } from '../../contracts
 import {
   addDialogueChoice,
   addDialogueNode,
+  dialogueNodeRemovalReason,
   removeDialogueChoice,
+  removeDialogueNode,
   renameScene,
+  reorderDialogueNode,
   setDialogueBackground,
+  setStartNode,
+  startNodeChangeReason,
   updateDialogueChoice,
   updateDialogueNode,
 } from '../model/authoringCommands.ts';
@@ -33,10 +38,26 @@ const choiceOutcome = (choice: DialogueChoice): string => {
 export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueEditorProps) => {
   const [selectedNodeId, setSelectedNodeId] = useState(scene.startNodeId);
   useEffect(() => setSelectedNodeId(scene.startNodeId), [scene.id, scene.startNodeId]);
+  // S15P21A604-494 — 씬 목록의 드래그 정렬(draggedSceneIndex/dragOverSceneIndex)과 동일한 패턴.
+  const [draggedNodeIndex, setDraggedNodeIndex] = useState<number | null>(null);
+  const [dragOverNodeIndex, setDragOverNodeIndex] = useState<number | null>(null);
   const selectedNode = scene.nodes.find((node) => node.id === selectedNodeId) ?? scene.nodes[0];
   const dialogueFlow = useMemo(() => analyzeDialogueFlow(scene), [scene]);
 
+  // 커밋 전(blur/Enter 이전) 실시간 입력값 — LIVE PREVIEW·좌측 노드 요약을 즉시 갱신하기 위함.
+  // 실제 project 상태(undo 히스토리)는 여전히 CommitInput의 onCommit(blur/Enter)에서만 바뀐다.
+  const [speakerDraft, setSpeakerDraft] = useState<string | null>(null);
+  const [textDraft, setTextDraft] = useState<string | null>(null);
+  const [choiceDrafts, setChoiceDrafts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setSpeakerDraft(null);
+    setTextDraft(null);
+    setChoiceDrafts({});
+  }, [selectedNodeId, scene.id]);
+
   if (selectedNode === undefined) return null;
+  const previewSpeaker = speakerDraft ?? selectedNode.speaker;
+  const previewText = textDraft ?? selectedNode.text;
   const backgroundVisual = resolveStaticImageVisual(
     project.assets.find((asset) => asset.id === scene.backgroundAssetId),
     assetUrls,
@@ -75,21 +96,83 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
             type="button"
           >+</button>
         </div>
-        {scene.nodes.map((node, index) => (
-          <button
-            className={`gss-node-button${node.id === selectedNode.id ? ' is-active' : ''}`}
-            key={node.id}
-            onClick={() => setSelectedNodeId(node.id)}
-            type="button"
-          >
-            <span>{index + 1}</span>
-            <div><strong>{node.speaker || '내레이션'}</strong><small>{node.text}</small></div>
-            {node.id === scene.startNodeId && <em>START</em>}
-          </button>
-        ))}
+        {scene.nodes.map((node, index) => {
+          const removalReason = dialogueNodeRemovalReason(project, scene.id, node.id);
+          const startReason = startNodeChangeReason(project, scene.id, node.id);
+          const rowClassName = ['gss-node-row',
+            draggedNodeIndex === index ? 'is-dragging' : '',
+            dragOverNodeIndex === index && draggedNodeIndex !== index ? 'is-drag-over' : '']
+            .filter(Boolean).join(' ');
+          return (
+            <div
+              className={rowClassName}
+              key={node.id}
+              onDragOver={(dragEvent) => {
+                if (draggedNodeIndex === null) return;
+                dragEvent.preventDefault();
+                if (dragOverNodeIndex !== index) setDragOverNodeIndex(index);
+              }}
+              onDrop={(dragEvent) => {
+                dragEvent.preventDefault();
+                if (draggedNodeIndex !== null && draggedNodeIndex !== index) {
+                  onApply(reorderDialogueNode(project, scene.id, scene.nodes[draggedNodeIndex]!.id, index));
+                }
+                setDraggedNodeIndex(null);
+                setDragOverNodeIndex(null);
+              }}
+            >
+              <button
+                aria-label={`${index + 1}번째 노드 순서 변경 핸들`}
+                className="gss-icon-button gss-drag-handle"
+                draggable
+                onDragEnd={() => { setDraggedNodeIndex(null); setDragOverNodeIndex(null); }}
+                onDragStart={(dragEvent) => {
+                  dragEvent.dataTransfer?.setData('text/plain', String(index));
+                  setDraggedNodeIndex(index);
+                }}
+                type="button"
+              >☰</button>
+              <button
+                className={`gss-node-button${node.id === selectedNode.id ? ' is-active' : ''}`}
+                onClick={() => setSelectedNodeId(node.id)}
+                type="button"
+              >
+                {/* S15P21A604-494 — 배열 인덱스 기반 번호는 드래그로 순서를 바꾸는 순간
+                    같이 바뀌어서 "이 노드의 고정된 이름표"처럼 오인하기 쉬웠다. 그 자체로
+                    저장되거나 참조되는 값도 아니라 표시를 뺀다 — 어떤 노드인지는
+                    speaker/text 요약과 START 배지로 구분한다. */}
+                <div>
+                  <strong>{(node.id === selectedNode.id ? previewSpeaker : node.speaker) || '내레이션'}</strong>
+                  <small>{node.id === selectedNode.id ? previewText : node.text}</small>
+                </div>
+                {node.id === scene.startNodeId && <em>START</em>}
+              </button>
+              <button
+                aria-label={`${index + 1}번째 노드를 시작으로 설정`}
+                className="gss-icon-button"
+                disabled={startReason !== null}
+                onClick={() => onApply(setStartNode(project, scene.id, node.id))}
+                title={startReason ?? '이 노드를 시작으로 설정'}
+                type="button"
+              >★</button>
+              <button
+                aria-label={`${index + 1}번째 노드 삭제`}
+                className="gss-icon-button"
+                disabled={removalReason !== null}
+                onClick={() => onApply(removeDialogueNode(project, scene.id, node.id))}
+                title={removalReason ?? '노드 삭제'}
+                type="button"
+              >×</button>
+            </div>
+          );
+        })}
       </aside>
 
       <div className="gss-dialogue-editor">
+        {/* S15P21A604-512 — scene.presentation 원시값 배지 제거. 캔버스 상단 툴바가 이미
+            describeSceneType()으로 같은 정보를 "대화-Overlay"/"대화-Fullscreen"처럼
+            친숙하게 보여주고 있어서 여기서 다시 원시값("OVERLAY"/"FULL_SCREEN")을
+            보여주는 건 정보 중복이었다. */}
         <div className="gss-dialogue-scene-header">
           <div>
             <span className="gss-eyebrow">DIALOGUE SCENE</span>
@@ -99,7 +182,6 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               value={scene.name}
             />
           </div>
-          <span className="gss-type-badge">{scene.presentation}</span>
         </div>
         <section className="gss-dialogue-flow" aria-label="대화 흐름 개요">
           <header>
@@ -138,18 +220,30 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
           className={`gss-dialogue-live-preview${scene.presentation === 'OVERLAY' ? ' is-overlay' : ''}`}
           style={backgroundVisual === null ? undefined : staticImageBackgroundStyle(backgroundVisual)}
         >
-          <span className="gss-preview-badge">LIVE PREVIEW · {scene.presentation}</span>
+          {/* S15P21A604-512 — 원시 presentation 값 제거(정보 중복, 위 원인 참고). Overlay/
+              Fullscreen 차이는 이 미리보기 카드 자체의 레이아웃(is-overlay 클래스)으로
+              이미 시각적으로 드러난다. */}
+          <span className="gss-preview-badge">LIVE PREVIEW</span>
           {portraitVisual !== null && (
             <div className="gss-dialogue-preview-portrait" style={staticImageBackgroundStyle(portraitVisual)} />
           )}
           <div className="gss-dialogue-preview-box">
-            <strong>{selectedNode.speaker || '내레이션'}</strong>
-            <p>{selectedNode.text}</p>
-            {selectedNode.choices.length > 0 && <div>{selectedNode.choices.map((choice, index) => <span key={choice.id}>{index + 1}. {choice.text}</span>)}</div>}
+            <strong>{previewSpeaker || '내레이션'}</strong>
+            <p>{previewText}</p>
+            {selectedNode.choices.length > 0 && (
+              <div>
+                {selectedNode.choices.map((choice, index) => (
+                  <span key={choice.id}>{index + 1}. {choiceDrafts[choice.id] ?? choice.text}</span>
+                ))}
+              </div>
+            )}
           </div>
         </section>
         <section className="gss-dialogue-node-card">
-          <header><span>NODE</span><strong>{selectedNode.id}</strong></header>
+          {/* S15P21A604-512 — 내부 node id 노출 제거. 어떤 노드를 편집 중인지는 좌측 NODES
+              rail의 speaker/text 요약과 START 배지로 이미 구분되고, id 자체는 사용자에게
+              의미 없는 기술적 정보였다. */}
+          <header><span>NODE</span></header>
           <div className="gss-field-row">
             <label className="gss-field">
               <span>연출 배경</span>
@@ -181,6 +275,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               ...node,
               speaker,
             })))}
+            onDraftChange={setSpeakerDraft}
             value={selectedNode.speaker || '내레이션'}
           />
           <CommitInput
@@ -190,6 +285,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               ...node,
               text,
             })))}
+            onDraftChange={setTextDraft}
             value={selectedNode.text}
           />
         </section>
@@ -222,6 +318,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
                 choice.id,
                 (current) => ({ ...current, text }),
               ))}
+              onDraftChange={(text) => setChoiceDrafts((prev) => ({ ...prev, [choice.id]: text }))}
               value={choice.text}
             />
             <label className="gss-field">

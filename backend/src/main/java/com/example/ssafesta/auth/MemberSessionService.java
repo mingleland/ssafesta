@@ -1,5 +1,6 @@
 package com.example.ssafesta.auth;
 
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -17,11 +18,14 @@ public class MemberSessionService {
     private final StringRedisTemplate redis;
     private final AccessTokenService accessTokens;
     private final AuthProperties properties;
+    private final String keyspace;
 
-    public MemberSessionService(StringRedisTemplate redis, AccessTokenService accessTokens, AuthProperties properties) {
+    public MemberSessionService(StringRedisTemplate redis, AccessTokenService accessTokens, AuthProperties properties,
+            RedisKeyspaceProperties keyspace) {
         this.redis = redis;
         this.accessTokens = accessTokens;
         this.properties = properties;
+        this.keyspace = keyspace.prefix();
     }
 
     public MemberSession issue(Long userId) {
@@ -41,9 +45,18 @@ public class MemberSessionService {
         return new MemberSession(access.token(), access.expiresAt(), rawRefreshToken);
     }
 
+    /**
+     * Trades one refresh token for a new pair.
+     *
+     * <p>The read <b>consumes</b> the key. A plain {@code get} followed by a {@code delete} let two
+     * requests holding the same token both pass the checks below and both issue — which is exactly
+     * the replay the reuse detection exists to catch, walking straight past it. Only the caller whose
+     * {@code GETDEL} returned the value may continue; the loser sees {@code null} and takes the
+     * reuse branch. {@link OAuthHandoffService} consumes its handoff the same way (S15P21A604-485).
+     */
     public MemberSession refresh(String rawRefreshToken) {
         String hash = sha256(rawRefreshToken);
-        String session = redis.opsForValue().get(refreshKey(hash));
+        String session = redis.opsForValue().getAndDelete(refreshKey(hash));
         if (session == null) {
             String reusedBy = redis.opsForValue().get(reusedKey(hash));
             if (reusedBy != null) {
@@ -55,7 +68,6 @@ public class MemberSessionService {
         if (values.length != 2 || !isActive(Long.parseLong(values[0]), values[1])) {
             throw new InvalidRefreshTokenException();
         }
-        redis.delete(refreshKey(hash));
         redis.opsForValue().set(reusedKey(hash), values[0], properties.refreshTokenTtl());
         return issue(Long.parseLong(values[0]));
     }
@@ -74,10 +86,10 @@ public class MemberSessionService {
         return sessionId != null && sessionId.equals(redis.opsForValue().get(sessionKey(userId)));
     }
 
-    private String activeKey(Long userId) { return "auth:active:" + userId; }
-    private String refreshKey(String hash) { return "auth:refresh:" + hash; }
-    private String reusedKey(String hash) { return "auth:refresh:used:" + hash; }
-    private String sessionKey(Long userId) { return "auth:session:" + userId; }
+    private String activeKey(Long userId) { return keyspace + "auth:active:" + userId; }
+    private String refreshKey(String hash) { return keyspace + "auth:refresh:" + hash; }
+    private String reusedKey(String hash) { return keyspace + "auth:refresh:used:" + hash; }
+    private String sessionKey(Long userId) { return keyspace + "auth:session:" + userId; }
 
     private void markReused(String hash) {
         String session = redis.opsForValue().get(refreshKey(hash));

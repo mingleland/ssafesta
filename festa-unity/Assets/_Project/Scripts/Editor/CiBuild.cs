@@ -68,6 +68,35 @@ namespace Festa.EditorTools
                     Fail("WebGL 타깃 전환 실패");
             }
 
+            // 배포본이 부를 API. 기본 prod — 에셋 커밋값(Mock+Local)이 그대로 나가면 사용자 WebGL 이
+            // Mock 으로 동작한다 (S15P21A604-419). -festaEnv dev|local 로 바꿀 수 있다. Mock 은 CI 에서 항상 끈다.
+            var envArg = (ArgValue("-festaEnv") ?? "prod").ToLowerInvariant();
+            var env = envArg switch
+            {
+                "prod" => Festa.Integration.ApiEnvironment.Prod,
+                "dev" => Festa.Integration.ApiEnvironment.Dev,
+                "local" => Festa.Integration.ApiEnvironment.Local,
+                _ => throw new Exception($"알 수 없는 -festaEnv: {envArg} (prod|dev|local)"),
+            };
+            var apiConfig = FestaReleaseBuilder.LoadApiConfig();
+            bool prevMock = apiConfig != null && apiConfig.useMockApi;
+            var prevEnv = apiConfig != null ? apiConfig.activeEnvironment : Festa.Integration.ApiEnvironment.Local;
+            if (!FestaReleaseBuilder.ForceApiEnvironment(apiConfig, env))
+                Fail($"ApiConfig 를 {env} 로 강제하지 못했다");
+
+            // 압축도 **여기서 강제한다.** 지정하지 않으면 커밋된 ProjectSettings 값이 그대로
+            // 배포본이 된다 — 그 값은 Disabled/폴백 OFF 라서 CI 산출물이 비압축으로 나갔다
+            // (S15P21A604-474, GitLab #127 에서 인프라가 반려한 사유 중 하나).
+            //
+            // Brotli 만으로는 부족하다. 서버가 `Content-Encoding: br` 를 붙여 줘야 로드되는데
+            // 헤더 없는 정적 경로에서는 폴백이 있어야 산다 — 그래서 둘을 함께 켠다
+            // (메뉴 빌더 FestaReleaseBuilder 와 같은 결정, 28~35행).
+            var prevCompression = PlayerSettings.WebGL.compressionFormat;
+            bool prevFallback = PlayerSettings.WebGL.decompressionFallback;
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
+            PlayerSettings.WebGL.decompressionFallback = true;
+            Log("WebGL 압축 = Brotli + Decompression Fallback (배포 설정)");
+
             var options = new BuildPlayerOptions
             {
                 scenes = scenes,
@@ -75,10 +104,22 @@ namespace Festa.EditorTools
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None,   // Development OFF — 배포 설정
             };
-            RunBuild(options, "WebGL");
+            try { RunBuild(options, "WebGL"); }
+            finally
+            {
+                FestaReleaseBuilder.RestoreApiEnvironment(apiConfig, prevMock, prevEnv);
+                PlayerSettings.WebGL.compressionFormat = prevCompression;
+                PlayerSettings.WebGL.decompressionFallback = prevFallback;
+            }
 
-            // 파이프라인이 이 세 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
-            foreach (var required in new[] { "index.html", "Build", "TemplateData" })
+            // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
+            // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는
+            // 성공했는데 월드 진입이 404 로 실패했다 (S15P21A604-417). 파일명이 해시라
+            // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
+            FestaWebBuilder.WriteManifest(WebOutDir);
+
+            // 파이프라인이 이 네 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
+            foreach (var required in new[] { "index.html", "Build", "TemplateData", "manifest.json" })
             {
                 var path = Path.Combine(WebOutDir, required);
                 if (!File.Exists(path) && !Directory.Exists(path))

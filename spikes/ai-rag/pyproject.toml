@@ -12,6 +12,7 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "pypdf>=5,<7",
   "tiktoken>=0.8,<1",
+  "sentence-transformers>=3.0,<4",
 ]
 
 [project.scripts]
@@ -21,6 +22,10 @@ rag-tuning-summary = "rag_spike.tuning_cli:main"
 rag-generate = "rag_spike.generation_cli:main"
 rag-generate-review = "rag_spike.generation_review_cli:main"
 rag-judge = "rag_spike.judge_cli:main"
+rag-rerank = "rag_spike.rerank_cli:main"
+rag-rerank-summary = "rag_spike.rerank_summary_cli:main"
+rag-strategy-benchmark = "rag_spike.strategy_benchmark_cli:main"
+rag-strategy-summary = "rag_spike.strategy_summary_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rag_spike"]

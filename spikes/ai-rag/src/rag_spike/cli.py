@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from .benchmark import run_benchmark
+from .cli_common import load_env_file, parse_csv
 from .embedding import DEFAULT_GEMINI_URL, DEFAULT_OPENAI_URL, GmsEmbeddingClient
 from .models import MODEL_SPECS
 from .store import MemoryVectorStore, PgVectorStore
@@ -33,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
     if args.env_file:
-        _load_env_file(args.env_file)
-    model_ids = _csv(args.models, str)
+        load_env_file(args.env_file)
+    model_ids = parse_csv(args.models, str)
     unknown = [model_id for model_id in model_ids if model_id not in MODEL_SPECS]
     if unknown:
         raise SystemExit(f"지원하지 않는 모델: {', '.join(unknown)}")
@@ -56,9 +57,9 @@ def main() -> None:
             pdf_path=args.pdf,
             eval_path=args.eval_path,
             models=[MODEL_SPECS[model_id] for model_id in model_ids],
-            chunk_sizes=_csv(args.chunk_sizes, int),
-            overlap_ratios=_csv(args.overlap_ratios, float),
-            top_ks=_csv(args.top_k, int),
+            chunk_sizes=parse_csv(args.chunk_sizes, int),
+            overlap_ratios=parse_csv(args.overlap_ratios, float),
+            top_ks=parse_csv(args.top_k, int),
             client=client,
             store=store,
             booth_id=args.booth_id,
@@ -69,25 +70,6 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"결과 저장: {args.output}")
-
-
-def _csv(value: str, converter: type) -> list:
-    try:
-        parsed = [converter(item.strip()) for item in value.split(",") if item.strip()]
-    except ValueError as exc:
-        raise SystemExit(f"잘못된 CSV 인자: {value}") from exc
-    if not parsed:
-        raise SystemExit("CSV 인자는 하나 이상의 값을 가져야 합니다.")
-    return parsed
-
-
-def _load_env_file(path: Path) -> None:
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 if __name__ == "__main__":

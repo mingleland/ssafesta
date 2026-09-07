@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "source_pdf_name": "수달.pdf",
+  "page_count": 16,
+  "evaluation_case_count": 14,
+  "excluded_no_answer_count": 1,
+  "booth_id": 1,
+  "agent_id": 1,
+  "model": {
+    "model_id": "text-embedding-3-large",
+    "query_embedding_seconds": 1.9639300000853837,
+    "embedding_request_count": 10,
+    "boundary_embedding_request_count": 3,
+    "boundary_embedding_seconds": 3.052376499865204,
+    "estimated_gms_credits": 0.1,
+    "credit_assumption": "모델 카드 표시값 × HTTP 요청 수(의미 청킹 경계 탐지 요청 포함)"
+  },
+  "results": [
+    {
+      "strategy": "fixed",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 17,
+      "document_embedding_seconds": 0.6650102999992669,
+      "recall_at_k": 1.0,
+      "mrr": 0.4869047619047619,
+      "p50_search_ms": 49.182199873030186,
+      "p95_search_ms": 50.348599907010794,
+      "mean_context_tokens": 6311.0,
+      "p95_context_tokens": 7084,
+      "leakage_count": 0,
+      "evaluated_queries": 14,
+      "missed_case_ids": []
+    },
+    {
+      "strategy": "structural",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 17,
+      "document_embedding_seconds": 0.6170242999214679,
+      "recall_at_k": 1.0,
+      "mrr": 0.574092970521542,
+      "p50_search_ms": 48.68580005131662,
+      "p95_search_ms": 57.333300122991204,
+      "mean_context_tokens": 6177.571428571428,
+      "p95_context_tokens": 6802,
+      "leakage_count": 0,
+      "evaluated_queries": 14,
+      "missed_case_ids": []
+    },
+    {
+      "strategy": "semantic",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 173,
+      "document_embedding_seconds": 2.70627689990215,
+      "recall_at_k": 0.5714285714285714,
+      "mrr": 0.2638888888888889,
+      "p50_search_ms": 49.78859983384609,
+      "p95_search_ms": 52.4959999602288,
+      "mean_context_tokens": 986.7142857142857,
+      "p95_context_tokens": 1539,
+      "leakage_count": 0,
+      "evaluated_queries": 14,
+      "missed_case_ids": [
+        "sudal-q04",
+        "sudal-q05",
+        "sudal-q06",
+        "sudal-q08",
+        "sudal-q12",
+        "sudal-q13"
+      ]
+    },
+    {
+      "strategy": "parent_child",
+      "model_id": "text-embedding-3-large",
+      "dimension": 1536,
+      "top_k": 10,
+      "chunk_count": 43,
+      "document_embedding_seconds": 0.7714265000540763,
+      "recall_at_k": 0.9285714285714286,
+      "mrr": 0.3665532879818594,
+      "p50_search_ms": 49.03360013850033,
+      "p95_search_ms": 50.51369988359511,
+      "mean_context_tokens": 6902.428571428572,
+      "p95_context_tokens": 7918,
+      "leakage_count": 0,
+      "evaluated_queries": 14,
+      "missed_case_ids": [
+        "sudal-q12"
+      ]
+    }
+  ]
+}

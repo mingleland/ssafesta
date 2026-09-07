@@ -1,0 +1,33 @@
+meta {
+  name: 게시본 조회
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}/published
+  body: none
+  auth: none
+}
+
+docs {
+  ## 게시본 조회 — 플레이할 프로젝트
+
+  - 인증: **필요 없음.** 게스트도 게시된 게임을 플레이할 수 있다 (FR-023)
+  - 성공: `200 OK` + `ETag` 헤더
+
+  ### 캐시 규칙
+
+  이 URL은 "현재 게시본"을 따라가므로 `Cache-Control: no-cache`다 — 다시 게시하면 즉시 보여야 한다. 대신 `ETag`를 준다. 다음 호출에 `If-None-Match: <ETag>`를 보내면 회차가 그대로일 때 `304`로 답하고 **최대 2MB짜리 본문을 다시 읽지도, 보내지도 않는다.**
+
+  Bruno에서 확인하려면 응답 헤더의 `ETag` 값을 복사해 요청 헤더 `If-None-Match`로 넣고 다시 실행한다.
+
+  ### 두 가지 "안 보임"을 구분한다
+
+  | 코드 | 뜻 |
+  |---|---|
+  | `403 GAME_NOT_PUBLIC` | **게시는 됐지만** 현재 비공개다 |
+  | `404 GAME_NOT_PUBLISHED` | 공개 설정과 무관하게 **아직 게시본이 없다** |
+  | `404 GAME_NOT_FOUND` / `GAME_DELETED` | 게임이 없거나 삭제됐다 |
+  | `304` | `If-None-Match`가 현재 회차와 같다. 본문 없음 |
+}

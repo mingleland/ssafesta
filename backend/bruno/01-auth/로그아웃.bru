@@ -25,14 +25,22 @@ script:post-response {
 }
 
 docs {
-  ## 로그아웃
+  ## 로그아웃 — 서버 세션 폐기 + refresh 쿠키 삭제
 
-  현재 회원의 Redis 세션과 Refresh Token을 폐기하고 Refresh cookie를 삭제한다.
+  - 인증: **필수** (회원 또는 게스트 토큰)
+  - 성공: `204 No Content`. `Set-Cookie`로 `refresh_token`이 `Max-Age=0`으로 지워진다
 
-  - 인증: 회원 Access Token 필요 (`{{accessToken}}`이 Bearer 헤더로 자동 전송)
-  - Header: `Origin: {{baseUrl}}` 필수
-  - Request body: 없음
-  - 성공: `204 No Content`
+  ### 폐기는 서버에서 일어난다
 
-  성공 후 response script가 Bruno 환경의 `accessToken`도 비운다. 이후 보호 API를 호출하려면 OAuth 로그인을 다시 완료해야 한다.
+  회원 토큰이면 서버의 세션을 폐기한다. 그러면 **아직 만료 전인 Access Token도 이후 요청에서 `401`**이 된다 — 쿠키만 지우는 로그아웃은 누군가 복사해 둔 토큰을 살려 두므로 그렇게 하지 않는다.
+
+  확인 방법: 로그아웃 뒤 `02-users/내 정보 조회`를 같은 토큰으로 실행하면 `401`이어야 한다. `200`이 오면 세션 폐기가 동작하지 않은 것이다.
+
+  게스트 토큰으로 호출하면 폐기할 서버 세션이 없어 쿠키만 지우고 `204`다. 여러 번 호출해도 결과가 같다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `204` | 폐기 완료 |
+  | `401` | Access Token이 없거나 유효하지 않다 |
+  | `403 UNTRUSTED_ORIGIN` | `Origin`이 허용된 프론트 주소가 아니다 |
 }

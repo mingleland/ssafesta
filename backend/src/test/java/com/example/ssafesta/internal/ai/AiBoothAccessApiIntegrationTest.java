@@ -19,6 +19,8 @@ import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -246,6 +248,11 @@ class AiBoothAccessApiIntegrationTest {
      *
      * <p>주석으로 "문서에 없다"고 적는 것만으로는 아무것도 막지 못한다 — 그렇게 적어 두고 코드가
      * 하지 않던 것이 T-99 였다. 여기서 실제 문서를 읽어 확인한다.
+     *
+     * <p><b>{@code paths} 의 키를 본다</b> — 문서 전체에서 문자열을 찾지 않는다. 초판은
+     * {@code document.contains("/internal/")} 였고, S15P21A604-390 이 {@code info.description} 에
+     * "{@code /internal/**} 은 이 문서에 나오지 않는다"는 설명을 적자 그 문장 때문에 실패했다.
+     * 경로가 실렸는지와 산문이 그 접두사를 언급했는지는 다른 사실이고, 막아야 하는 것은 앞의 것이다.
      */
     @Test
     void theInternalPathIsNotPublishedInThePublicApiDocument() throws Exception {
@@ -253,8 +260,13 @@ class AiBoothAccessApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertFalse(document.contains("/internal/"),
-                "내부 경로가 공개 OpenAPI 문서에 실렸다");
+        List<String> published = new ArrayList<>();
+        for (String path : jsonMapper.readTree(document).path("paths").propertyNames()) {
+            if (path.startsWith("/internal")) {
+                published.add(path);
+            }
+        }
+        assertTrue(published.isEmpty(), "내부 경로가 공개 OpenAPI 문서에 실렸다: " + published);
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────────────────

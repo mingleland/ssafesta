@@ -2,7 +2,14 @@
   --grp-panel: #11151c;
   --grp-border: #303844;
   --grp-blue: #4d94ff;
-  background: radial-gradient(circle at 50% 30%, #18202b, #080a0e 70%);
+  /* S15P21A604-384: 상단바/HUD/완료·로딩 화면 같은 "틀"만 라이트로 바꾼다. 게임 캔버스
+     (맵·타일·스프라이트)와 대화 시스템은 게임 제작자가 만든 콘텐츠라 원래 프레젠테이션을
+     그대로 유지해야 해서, 위 --grp-border/--grp-blue 등 콘텐츠가 쓰는 토큰은 건드리지
+     않고 값을 그대로 둔다(예: .grp-story-backdrop, .grp-choices 등). 배경(무대 매팅)도
+     라이트로 바꾸되, 기본 color(#f3f5f8)는 손대지 않는다 — 대화 상자(.grp-dialogue) 등
+     콘텐츠 쪽 텍스트가 이 값을 그대로 상속해서 쓰기 때문에, 대신 틀 컨테이너마다 색을
+     명시적으로 덮어써서 다크 콘텐츠 쪽엔 영향이 안 가게 한다. */
+  background: radial-gradient(circle at 50% 30%, #f4f6fa, #e7ebf1 70%);
   color: #f3f5f8;
   display: grid;
   font-family: Inter, Pretendard, 'Segoe UI', sans-serif;
@@ -15,21 +22,24 @@
 }
 
 .grp-root button { color: inherit; font: inherit; }
-.grp-topbar { align-items: center; background: rgba(12,15,20,.94); border-bottom: 1px solid var(--grp-border); display: grid; grid-column: 1 / -1; grid-template-columns: 1fr auto 1fr; padding: 0 18px; }
+.grp-topbar { align-items: center; background: rgba(255,255,255,.94); border-bottom: 1px solid #dde2e9; color: #1a1f2b; display: grid; grid-column: 1 / -1; grid-template-columns: 1fr auto 1fr; padding: 0 18px; }
 .grp-topbar > div { align-items: center; display: flex; gap: 10px; }
 .grp-topbar > div:nth-child(2) { font-size: 10px; justify-content: center; }
-.grp-topbar > div:nth-child(2) span { color: #768190; }
-.grp-topbar > button { background: transparent; border: 1px solid var(--grp-border); border-radius: 7px; cursor: pointer; font-size: 10px; justify-self: end; padding: 8px 11px; }
-.grp-brand { align-items: center; background: linear-gradient(135deg,#3c8cff,#765fea); border-radius: 7px; display: inline-flex; font-weight: 900; height: 29px; justify-content: center; width: 29px; }
+.grp-topbar > div:nth-child(2) span { color: #5b6577; }
+.grp-topbar > button { background: transparent; border: 1px solid #ccd3dc; border-radius: 7px; cursor: pointer; font-size: 10px; justify-self: end; padding: 8px 11px; }
+.grp-brand { align-items: center; background: linear-gradient(135deg,#3c8cff,#765fea); border-radius: 7px; color: white; display: inline-flex; font-weight: 900; height: 29px; justify-content: center; width: 29px; }
 .grp-topbar strong { font-size: 13px; }
-.grp-topbar em { background: rgba(77,148,255,.13); border-radius: 4px; color: #7db0fc; font-size: 7px; font-style: normal; font-weight: 800; letter-spacing: .1em; padding: 4px 6px; }
-.grp-topbar em.is-good { background: rgba(77,196,139,.13); color: #72d7a6; }
-.grp-topbar em.is-low { background: rgba(235,168,73,.14); color: #efbc70; }
+.grp-topbar em { background: rgba(37,99,235,.1); border-radius: 4px; color: #1d4ed8; font-size: 7px; font-style: normal; font-weight: 800; letter-spacing: .1em; padding: 4px 6px; }
+.grp-topbar em.is-good { background: rgba(22,163,74,.1); color: #15803d; }
+.grp-topbar em.is-low { background: rgba(184,134,11,.12); color: #8a6410; }
 .grp-perf-monitor { align-items: center; display: inline-flex; gap: 4px; }
 .grp-topbar .grp-perf-monitor em { letter-spacing: 0; white-space: nowrap; }
 
 .grp-stage-wrap { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: hidden; padding: 34px; position: relative; }
-.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; width: 100%; }
+/* S15P21A604-492 — width는 여기서 고정하지 않는다(ReferenceGamePlayer.tsx의 인라인
+   style이 씬 비율을 반영해 매번 계산한다) — 고정 100%로 두면 세로가 긴 씬에서 비율이
+   깨진다. max-height/max-width는 그 계산식이 참조하는 상한이자 안전망으로 남겨둔다. */
+.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; }
 .grp-map::after { background-image: repeating-linear-gradient(to right,transparent 0,transparent calc((100% / var(--grp-columns)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-columns))),repeating-linear-gradient(to bottom,transparent 0,transparent calc((100% / var(--grp-rows)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-rows))); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 3; }
 .grp-tile-layer { display: grid; grid-template-columns: repeat(var(--grp-columns),1fr); grid-template-rows: repeat(var(--grp-rows),1fr); inset: 0; opacity: .72; pointer-events: none; position: absolute; z-index: 1; }
 .grp-tile-layer > span { border: 1px solid rgba(255,255,255,.025); }
@@ -50,7 +60,11 @@
 .grp-dialogue-layer { inset: 0; pointer-events: none; position: absolute; z-index: 100; }
 .grp-dialogue-full-background { background-position: center; background-size: cover; inset: 0; position: absolute; }
 .grp-dialogue-layer::after { background: linear-gradient(transparent 30%,rgba(5,7,11,.15) 55%,rgba(5,7,11,.55)); content: ''; inset: 0; position: absolute; z-index: 1; }
-.grp-dialogue-portrait { background-position: center; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 14px 24px rgba(0,0,0,.72)); height: 88%; left: 50%; position: absolute; transform: translateX(-50%); width: 38%; z-index: 2; }
+/* S15P21A604-406 — GameStudioShell.css의 .gss-dialogue-preview-portrait와 같은 이유로
+   width:38% 고정을 aspect-ratio:1/2(원본 스프라이트 셀 256×512 비율)로 교체. 자기 자신의
+   aspect-ratio라 부모(.grp-dialogue-layer 등)의 비율이 창 크기에 따라 달라져도 항상
+   height(88%, 그대로 유지)에 맞춰 폭이 정확하게 계산된다. */
+.grp-dialogue-portrait { aspect-ratio: 1 / 2; background-position: center; background-repeat: no-repeat; bottom: 0; filter: drop-shadow(0 14px 24px rgba(0,0,0,.72)); height: 88%; left: 50%; position: absolute; transform: translateX(-50%); z-index: 2; }
 .grp-dialogue { background: linear-gradient(90deg,rgba(28,20,44,.95),rgba(14,18,28,.94)); border: 1px solid rgba(174,155,222,.58); border-radius: 10px; bottom: 28px; box-shadow: 0 16px 45px rgba(0,0,0,.65); left: 6%; padding: 18px 22px; pointer-events: auto; position: absolute; right: 6%; z-index: 3; }
 .grp-speaker { color: #6fa7f8; font-size: 11px; font-weight: 850; letter-spacing: .06em; margin-bottom: 7px; }
 .grp-dialogue p { font-size: 15px; line-height: 1.65; margin: 0 0 15px; }
@@ -59,37 +73,37 @@
 .grp-choices button:hover { background: rgba(77,148,255,.13); border-color: var(--grp-blue); }
 .grp-choices button span { align-items: center; background: #29313c; border-radius: 50%; color: #9aa5b4; display: inline-flex; font-size: 8px; height: 20px; justify-content: center; margin-right: 9px; width: 20px; }
 
-.grp-hud { background: rgba(13,16,22,.94); border-left: 1px solid var(--grp-border); display: flex; flex-direction: column; gap: 18px; padding: 18px 14px; }
+.grp-hud { background: rgba(255,255,255,.96); border-left: 1px solid #dde2e9; color: #1a1f2b; display: flex; flex-direction: column; gap: 18px; padding: 18px 14px; }
 .grp-hud > div { display: grid; gap: 8px; }
-.grp-hud > div > span { color: #6f7a89; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
-.grp-hud small { color: #697382; font-size: 9px; }
-.grp-hud strong { background: #191e26; border: 1px solid var(--grp-border); border-radius: 6px; color: #e1bd68; font-size: 9px; padding: 8px; }
+.grp-hud > div > span { color: #4b5563; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
+.grp-hud small { color: #5b6577; font-size: 9px; }
+.grp-hud strong { background: #f4f6f9; border: 1px solid #dde2e9; border-radius: 6px; color: #8a6410; font-size: 9px; padding: 8px; }
 .grp-objectives strong { align-items: center; display: grid; gap: 6px; grid-template-columns: auto minmax(0,1fr) auto; }
-.grp-objectives strong i { color: #7b8797; font-style: normal; }
-.grp-objectives strong small { color: #7b8797; font-size: 7px; }
-.grp-objectives strong.is-complete { border-color: rgba(83,196,142,.45); color: #7cdbad; }
-.grp-objectives strong.is-complete i { color: #5fd39a; }
+.grp-objectives strong i { color: #5b6577; font-style: normal; }
+.grp-objectives strong small { color: #5b6577; font-size: 7px; }
+.grp-objectives strong.is-complete { border-color: rgba(22,163,74,.4); color: #15803d; }
+.grp-objectives strong.is-complete i { color: #15803d; }
 .grp-controls { margin-top: auto; }
 .grp-controls > div { display: grid; gap: 5px; grid-template-columns: repeat(3,1fr); }
-.grp-controls button { aspect-ratio: 1; background: #1b212a; border: 1px solid #39424e; border-radius: 6px; cursor: pointer; }
+.grp-controls button { aspect-ratio: 1; background: #f4f6f9; border: 1px solid #ccd3dc; border-radius: 6px; cursor: pointer; }
 .grp-controls button:first-child { grid-column: 2; }
 .grp-controls button:nth-child(2) { grid-column: 1; }
-.grp-controls button:hover { border-color: var(--grp-blue); }
-.grp-interact { background: linear-gradient(135deg,#286fe6,#486fd7); border: 1px solid #6094ee; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
+.grp-controls button:hover { border-color: #2563eb; }
+.grp-interact { background: linear-gradient(135deg,#286fe6,#486fd7); border: 1px solid #6094ee; border-radius: 8px; color: white; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
 .grp-interact kbd { background: rgba(0,0,0,.23); border-radius: 4px; margin-right: 6px; padding: 3px 5px; }
-.grp-shoot { background: linear-gradient(135deg,#b85a22,#d7475d); border: 1px solid #e77b68; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
+.grp-shoot { background: linear-gradient(135deg,#b85a22,#d7475d); border: 1px solid #e77b68; border-radius: 8px; color: white; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
 .grp-shoot kbd { background: rgba(0,0,0,.23); border-radius: 4px; margin-right: 6px; padding: 3px 5px; }
 
-.grp-result { align-items: center; background: rgba(10,13,18,.97); border: 1px solid rgba(83,196,142,.48); border-radius: 13px; box-shadow: 0 25px 80px rgba(0,0,0,.7); display: flex; flex-direction: column; left: 50%; min-width: 380px; padding: 34px; position: absolute; text-align: center; top: 50%; transform: translate(-50%,-50%); z-index: 20; }
-.grp-result > span { align-items: center; background: rgba(83,196,142,.15); border-radius: 50%; color: #65d69d; display: inline-flex; font-size: 30px; height: 70px; justify-content: center; width: 70px; }
+.grp-result { align-items: center; background: rgba(255,255,255,.98); border: 1px solid rgba(22,163,74,.4); border-radius: 13px; box-shadow: 0 25px 80px rgba(20,25,35,.35); color: #1a1f2b; display: flex; flex-direction: column; left: 50%; min-width: 380px; padding: 34px; position: absolute; text-align: center; top: 50%; transform: translate(-50%,-50%); z-index: 20; }
+.grp-result > span { align-items: center; background: rgba(22,163,74,.14); border-radius: 50%; color: #15803d; display: inline-flex; font-size: 30px; height: 70px; justify-content: center; width: 70px; }
 .grp-result h1 { font-size: 24px; margin: 17px 0 5px; }
-.grp-result p { color: #8994a3; font-size: 11px; }
+.grp-result p { color: #4b5563; font-size: 11px; }
 .grp-result > div { display: flex; gap: 8px; margin-top: 15px; }
-.grp-result button,.grp-loading button { background: #222a35; border: 1px solid #3b4655; border-radius: 7px; cursor: pointer; padding: 9px 13px; }
-.grp-result.is-error { border-color: rgba(235,105,112,.5); }
-.grp-result.is-error > span { background: rgba(235,105,112,.15); color: #ed747a; }
-.grp-loading { align-items: center; background: #0a0d12; color: white; display: flex; flex-direction: column; font-family: Inter,'Segoe UI',sans-serif; height: 100vh; justify-content: center; }
-.grp-loading p { color: #8792a1; }
+.grp-result button,.grp-loading button { background: #f4f6f9; border: 1px solid #ccd3dc; border-radius: 7px; color: #1a1f2b; cursor: pointer; padding: 9px 13px; }
+.grp-result.is-error { border-color: rgba(220,38,38,.45); }
+.grp-result.is-error > span { background: rgba(220,38,38,.12); color: #b91c1c; }
+.grp-loading { align-items: center; background: #f3f5f9; color: #1a1f2b; display: flex; flex-direction: column; font-family: Inter,'Segoe UI',sans-serif; height: 100vh; justify-content: center; }
+.grp-loading p { color: #4b5563; }
 
 .grp-root .is-tile-0 { background: #59544a; }
 .grp-root .is-tile-1 { background: #747064; }

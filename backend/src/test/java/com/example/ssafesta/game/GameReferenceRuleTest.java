@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -32,7 +33,7 @@ class GameReferenceRuleTest {
         firstAction(project).put("objectId", "존재하지않는오브젝트");
 
         assertRule("OBJECT_REFERENCE_NOT_FOUND",
-                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForDraft(project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     @Test
@@ -148,7 +149,7 @@ class GameReferenceRuleTest {
         ((ArrayNode) dialogueChoiceActions(project)).insert(0, hide);
 
         assertDoesNotThrow(() -> validator.validateForPublish(
-                project, GameTestSupport.write(project), GAME_ID));
+                project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ class GameReferenceRuleTest {
 
     private void assertPublishRule(ObjectNode project, String expectedRule) {
         assertRule(expectedRule,
-                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID));
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
     private void assertRule(String expectedRule, Executable call) {

@@ -1,7 +1,7 @@
 // stream.mock.ts fixture 왕복 검증 — fixture가 낸 SSE 텍스트를 parser로 되돌려 계약 순서를 확인한다.
 import { describe, expect, it } from 'vitest';
 import { createSseParser } from '../../stream.parser';
-import { mockStreamError, mockStreamSuccess } from '../../stream.mock';
+import { mockStreamError, mockStreamSequenceGap, mockStreamSuccess } from '../../stream.mock';
 import type { SseStreamEvent } from '../../stream.types';
 
 async function collect(gen: AsyncGenerator<string>): Promise<SseStreamEvent[]> {
@@ -52,5 +52,13 @@ describe('mockStreamError', () => {
     const error = events.at(-1);
     expect(error).toMatchObject({ type: 'error', code: 'INVALID_REQUEST', retryable: false });
     expect(error).not.toHaveProperty('timeoutPhase');
+  });
+});
+
+describe('mockStreamSequenceGap', () => {
+  it('종료 이벤트 직전 sequence 하나가 빠진 fixture를 방출한다', async () => {
+    const events = await collect(mockStreamSequenceGap());
+    expect(events.map((event) => event.sequence)).toEqual([0, 1, 3]);
+    expect(events.at(-1)?.type).toBe('done');
   });
 });

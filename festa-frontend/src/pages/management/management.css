@@ -1,0 +1,131 @@
+/* Management Detail 공통 — Booth Management 아래 상세 화면 3종이 함께 쓴다.
+   PageShell 의 sc-* 유틸(카드·버튼·칩·note)을 재사용하고 여기서는 관리 화면 고유 배치만 정의한다. */
+
+.mg-form { display: flex; flex-direction: column; gap: 16px; }
+.mg-field { display: flex; flex-direction: column; gap: 6px; }
+.mg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(234, 238, 251, 0.82);
+}
+.mg-dirty-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd66b;
+}
+.mg-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--festa-line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+.mg-input:focus { outline: 2px solid rgba(90, 140, 255, 0.55); outline-offset: 1px; }
+.mg-input:disabled { opacity: 0.55; }
+.mg-input-sm { height: 32px; font-size: 12.5px; }
+.mg-textarea { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.55; }
+
+.mg-form-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.mg-ok { font-size: 13px; color: var(--sc-ok, #5fd39b); }
+.mg-issues {
+  flex: 1;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: #ff9d9d;
+}
+
+/* Survey Builder */
+.mg-builder { display: flex; flex-direction: column; gap: 14px; }
+.mg-qlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.mg-q { display: flex; flex-direction: column; gap: 10px; }
+.mg-q-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mg-q-index { font-size: 12.5px; color: rgba(234, 238, 251, 0.6); }
+.mg-q-actions { margin-left: auto; display: flex; gap: 6px; }
+.mg-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: rgba(234, 238, 251, 0.82);
+}
+.mg-options { display: flex; flex-direction: column; gap: 7px; }
+.mg-add { display: flex; flex-direction: column; gap: 10px; }
+.mg-add-types { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.mg-tabs { display: inline-flex; gap: 4px; padding: 3px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); }
+.mg-tab {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(234, 238, 251, 0.7);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mg-tab-on { background: var(--festa-fill-strong); color: var(--festa-ink); }
+
+/* Survey Result */
+.mg-result { display: flex; flex-direction: column; gap: 14px; }
+.mg-agg { display: flex; flex-direction: column; }
+.mg-avg { margin: 0 0 10px; font-size: 24px; font-weight: 700; color: var(--festa-ink); }
+.mg-avg span { font-size: 12.5px; font-weight: 400; }
+.mg-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mg-bars li { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 10px; }
+.mg-bar-label { font-size: 13px; color: rgba(234, 238, 251, 0.86); }
+.mg-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.mg-bar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4d6bff, #7b4dff); }
+.mg-bar-count { font-size: 12.5px; text-align: right; color: rgba(234, 238, 251, 0.7); }
+.mg-texts {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mg-texts li {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Consultation Staff */
+.mg-active { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.mg-active-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mg-active-head button { margin-left: auto; }
+.mg-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  line-height: 1.55;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mg-queue { display: flex; flex-direction: column; }
+.mg-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.mg-card { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+.mg-card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }

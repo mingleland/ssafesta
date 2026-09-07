@@ -1,41 +1,15 @@
 // 보호 라우트 가드(T014a) — 판정 로직은 guard.ts(순수 함수, 단위 테스트 대상). 이 컴포넌트는
-// useSession 구독 + 분기 렌더링만 담당한다. 허용 화면 상단에 로그아웃 버튼(T013, FR-020)을 최소
-// 구현으로 함께 그린다 — 별도 공통 헤더 컴포넌트를 새로 만들 만큼의 화면이 아직 없다(plan.md
-// §기존 코드와의 접점: "버튼 위치는 가드 적용 화면 공통 헤더 최소 구현").
+// useSession 구독 + 분기 렌더링만 담당한다.
+//
+// UI 표시 책임은 여기 없다(D-08). 계정 표시·로그아웃은 ESC Game Menu 소관이며, 가드가 모든
+// 화면 위에 계정 헤더를 덧그리던 구조는 제거했다 — World 는 상주 플레이 화면이라 화면 고정
+// 계정 칩이 붙으면 안 된다.
 import type { ReactNode } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useSession, clearSession } from '../../features/auth/model/session';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { useSession } from '../../features/auth/model/session';
 import { saveReturnTo } from '../../features/auth/model/returnTo';
-import { authApi } from '../../entities/auth/api.select';
-import type { SessionKind } from '../../entities/auth/types';
 import { evaluateGuard, type GuardLevel } from './guard';
-
-function AuthHeader({ kind }: { kind: Exclude<SessionKind, 'anonymous'> }) {
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    try {
-      await authApi.logout();
-    } catch {
-      // 서버측 로그아웃이 실패해도 클라이언트 세션은 정리한다 — 남은 서버 상태 불일치는
-      // 다음 요청의 401로 자연 정리된다(logout endpoint 경로는 §미결, mock으로 선개발).
-    }
-    clearSession();
-    navigate('/login', { replace: true });
-  }
-
-  return (
-    <header>
-      {/* 조사까지 함께 분기한다 — '회원'은 받침이 있어 '으로', '게스트'는 모음으로 끝나 '로'다.
-          명사만 갈아 끼우고 조사를 고정하면 '회원로'가 된다(-272). 값이 둘뿐이라 조사 유틸을
-          따로 두지 않는다. */}
-      <span>{kind === 'member' ? '회원으로' : '게스트로'} 이용 중</span>
-      <button type="button" onClick={handleLogout}>
-        로그아웃
-      </button>
-    </header>
-  );
-}
+import './guardScreens.css';
 
 export function RequireAuth({ level, children }: { level: GuardLevel; children: ReactNode }) {
   const { kind, bootstrapped } = useSession();
@@ -43,7 +17,7 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
 
   // 부트스트랩(새로고침 복원) 완료 전의 anonymous는 "미확인"이다 — 여기서 redirect를 확정하면
   // refresh가 이길 수 없는 레이스가 돼 로그인 유지가 항상 깨진다(T012, quickstart §6 실측 발견)
-  if (!bootstrapped) return <p>세션 확인 중...</p>;
+  if (!bootstrapped) return <p className="festa-boot">입장 정보를 확인하고 있어요...</p>;
 
   const decision = evaluateGuard(kind, level);
 
@@ -54,16 +28,11 @@ export function RequireAuth({ level, children }: { level: GuardLevel; children: 
   }
   if (decision === 'block-member-only') {
     return (
-      <div>
-        <p>소셜 로그인이 필요한 기능입니다.</p>
+      <div className="festa-blocked">
+        <p>소셜 로그인 회원만 이용할 수 있는 기능입니다.</p>
         <Link to="/login">로그인하러 가기</Link>
       </div>
     );
   }
-  return (
-    <>
-      <AuthHeader kind={kind as Exclude<SessionKind, 'anonymous'>} />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

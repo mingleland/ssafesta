@@ -51,9 +51,12 @@ GET    /api/v1/games/{gameId}/assets/{assetId}/content   전달 — 302 redirect
 }
 ```
 
+- `uploadUrl`은 **R2 버킷으로 직접 가는 presigned PUT**이다. 바이트는 Spring 을 거치지 않는다.
 - `uploadUrl`은 민감정보다. log·DB·cache에 남기지 않고 GameProject에는 어떤 경우에도 저장하지 않는다.
-- grant 만료는 10분이다. 만료 후 `complete`는 실패하고 행은 `FAILED`가 된다.
-- 선언값(`contentType`·`byteSize`)은 **거절용으로만** 쓴다. 통과는 §5의 실제 바이트 검사가 결정한다.
+- `requiredHeaders`는 **그대로 보내야 한다.** `Content-Type`이 서명에 포함되므로 다른 값을 보내면 R2 가 403 으로 거절하고, 그 실패는 Spring 로그에 남지 않는다.
+- grant 만료는 10분이다. 만료 후 `complete`는 실패하고 행은 `FAILED`가 된다. **presigned URL 의 서명 수명도 정확히 10분이다** — 더 길면 `complete` 가 이미 거절한 뒤에 바이트가 도착해 아무도 가리키지 않는 객체가 남는다.
+- 선언값(`contentType`·`byteSize`)은 **거절용으로만** 쓴다. 통과는 §5의 실제 바이트 검사가 결정한다. 서명에 두 값이 박혀 있어도 마찬가지다 — 서명은 "이 객체 하나를 쓸 수 있다"는 허가이고 내용에 대한 진술이 아니다.
+- `complete` 는 R2 에서 객체를 **다시 읽어** 검증한다. 상한은 계약의 5 MiB 이고 선언 크기가 아니다 — 1 KiB 라고 선언하고 4 GiB 를 올리는 경우가 바로 선언 상한이 못 잡는 경우다.
 
 ### 3.2 완료
 
@@ -94,15 +97,26 @@ presigned PUT이라 서버는 업로드 요청 본문을 보지 못한다. 그�
 
 `deleted_at`이 있는 행은 목록에서 제외한다.
 
-### 3.4 전달 — presigned URL을 FE로 내보내지 않는다 (2026-08-26 확정)
+### 3.4 전달 — Spring 이 바이트를 중계한다 (2026-09-02 정정, 원안 2026-08-26)
 
-> **007 Document 업로드와 의도적으로 다르다.** 007은 presigned URL을 클라이언트에 넘기고 만료·재발급을 클라이언트가 다룬다. 019는 서버가 302로 대신 열어준다.
+> **정정.** 원안은 `/content` 가 **짧은 수명의 presigned GET 으로 302 redirect** 한다고 적었고, 근거는 "019 의 소비자는 `<img src>` 다" 였다. **두 전제 모두 실측과 다르다.**
 >
-> **근거**: 019의 소비자는 `<img src>`다. 만료 관리를 FE에 넘기면 이미지 30장이면 만료 시각 30개를 관리해야 하고, 그 실패는 "목록 중 한 장만 깨짐"으로 드러나 재현이 어렵다. 007의 소비자는 업로드 폼 하나라 만료를 다룰 지점이 한 곳이고 대량 조회가 없다 — **소비 형태가 달라서 선택이 갈린 것이고, 통일하지 않은 것이 결정이다.**
+> | 원안의 전제 | 실측 |
+> |---|---|
+> | 소비자는 `<img src>` | `remoteAssetRepository.ts` 는 `Authorization` 헤더를 붙인 `fetch` 로 받아 blob 으로 만든다 |
+> | 302 로 버킷을 열어주면 된다 | `object-storage-contract.md` §CORS 는 버킷에 `AllowedMethods: PUT` 만 허용한다 — 브라우저 GET 은 redirect 든 직접이든 CORS 에서 죽는다 |
+>
+> 302 는 인프라 계약을 바꾸지 않으면 애초에 동작하지 않는다. 그리고 브라우저에 presigned GET 을 넘기면 그 URL 은 자신을 만들어 낸 권한 검사(§7 공개 판정)보다 오래 산다 — 비공개 게임의 이미지 주소가 검사 없이 유효한 채로 남는다.
 
-`/content`는 짧은 수명의 presigned URL로 **302 redirect**한다. FE resolver는 `asset://game/{g}/{a}` → `/api/v1/games/{g}/assets/{a}/content` 문자열 변환 하나이고, 만료·재발급·batch 해석을 다루지 않아도 `<img src>`가 그대로 동작한다. 응답은 `Cache-Control: private, max-age=300`이다.
+`/content` 는 R2 에서 객체를 읽어 **바이트를 직접 응답한다.** 302 도, presigned GET 도 FE 로 나가지 않는다. FE resolver 는 `asset://game/{g}/{a}` → `/api/v1/games/{g}/assets/{a}/content` 문자열 변환 하나로 그대로 유지된다. 응답은 `Cache-Control: private, max-age=300` 과 `X-Content-Type-Options: nosniff` 이고, `Content-Type` 은 **검증으로 확정된 실제 타입**이다 (선언값이 아니다).
 
-> `ponytail:` 이미지 1장당 Spring 302 왕복 1회. 목록 화면에서 병목이 되면 batch presign(`POST .../assets/resolve`)을 추가한다 — 그때도 `asset://` 형식은 바뀌지 않는다.
+읽기는 그 행이 적어 둔 `provider`·`storage_bucket` 을 따른다. 지금 활성인 write provider 가 아니다 — MinIO fallback 으로 활성이 옮겨가도 R2 에 남은 옛 객체는 계속 R2 에서 읽힌다 (spec 007 FR-030 과 같은 불변식).
+
+읽기는 **행에 기록된 `byte_size` 와 길이가 정확히 같을 것**을 요구한다. `byte_size` 는 검증 때 실제로 읽은 바이트 수라서, 길이가 다르면 그것은 우리가 승인한 객체가 아니다 — `GAME_ASSET_NOT_READY` + rule `OBJECT_MISSING` 으로 거절한다. 객체가 사라진 경우와 같은 응답이고, 둘 다 "행은 READY 인데 저장소가 그것을 뒷받침하지 않는다" 다. `GAME_ASSET_DELETED` 는 일어나지 않은 삭제를 주장하는 것이 된다.
+
+> `ponytail:` 이미지 1장당 Spring 왕복 1회 + R2 GET 1회. 목록 화면에서 병목이 되면 그때 캐시나 batch 를 붙인다 — `asset://` 형식은 그때도 바뀌지 않는다.
+>
+> `ponytail:` 길이 일치는 **같은 길이의 다른 내용**으로 바꿔치기하는 것을 잡지 못한다. 크기가 다른 교체는 크든 작든 걸린다. 남은 창은 grant 의 10분이고, 소유자 자신의 서명 URL 이 필요하며, 닿는 범위는 자기 게임의 자산뿐이다 (그 사람은 이미 검증을 통과하는 것이면 무엇이든 올릴 수 있다). 이것이 허용되지 않는 시점이 오면 읽기에서 `sha256` 을 검증한다 — 요청당 최대 5 MiB 해시다.
 
 ## 4. 상태
 
@@ -192,7 +206,19 @@ sweeper 가 삭제    → 그대로 실행
 
 > ⚠️ **④가 계속 실패하면 드러내야 한다.** 재시도만 반복하면 큐가 영원히 비지 않고, **탈퇴한 사람의 이미지가 남아 있는 것을 아무도 모른다.** 임계치(같은 key 10회 또는 24시간)를 넘으면 로그와 에러 상태로 올린다 — 실패를 조용히 기본값으로 덮은 것이 T-24 의 원인이었고, 여기서 그 대가는 개인정보다.
 
-`@Scheduled` 는 현재 코드에 0 개다. 007 의 미완료 문서 sweeper 가 첫 번째가 되므로 **019 는 그 주기에 얹고 스케줄러를 새로 만들지 않는다.**
+`@Scheduled` 는 현재 코드에 0 개다. **007 의 미완료 문서 sweeper 는 결국 만들어지지 않았으므로**(-106 은 재시도 루프를 지우고 끝났다) 019 의 것이 첫 번째다 — `GameAssetDeleteQueue.sweep()`, `fixedDelay` 1분. 007 이 나중에 자기 sweeper 를 만들 때 이 주기에 얹을 수 있다.
+
+큐 적재 지점은 셋이고 **모두 행을 지우는 트랜잭션 안**이다.
+
+| 지점 | 무엇을 지우는가 |
+|---|---|
+| 회원 탈퇴 (`AccountDeletionService`) | 그 회원 게임의 모든 asset 행 |
+| 검증 실패 (`complete` → `FAILED`) | 방금 거절한 객체 |
+| 발급 시 죽은 행 청소 (`issue`) | 만료된 `UPLOADING`·오래된 `FAILED` 의 객체 |
+
+세 번째가 R2 로 옮기면서 새로 필요해진 것이다. 만료된 grant 도 `PUT` 을 받았을 수 있고 — 브라우저는 올렸다고 알려주지 않는다 — 바이트가 행 안에 없으므로 행만 지우면 객체가 남는다.
+
+sweep 은 작업을 **락으로 붙잡지 않고 임대한다.** `UPDATE ... FOR UPDATE SKIP LOCKED ... RETURNING` 으로 `next_attempt_at` 을 밀어 두고 트랜잭션을 끝낸 뒤 저장소를 호출한다 — 50행 × 왕복 1회를 트랜잭션 안에서 하면 가장 느린 provider 가 답할 때까지 락을 잡는다. 재시도 간격은 `attempts` 에 따라 늘고 30분에서 멈춘다.
 - Game soft delete는 Asset을 지우지 않는다. 복구 대상이기 때문이다.
 
 ## 8. 저장 경계
@@ -211,12 +237,28 @@ game_assets
   width, height      INTEGER
   sha256             CHAR(64)
   provider           VARCHAR(20) NOT NULL          -- R2 | MINIO_LOCAL (infra-002)
-  object_key         TEXT NOT NULL
+  storage_bucket     TEXT NOT NULL                 -- 발급 시점의 버킷. 읽기·삭제가 이것을 따른다
+  object_key         TEXT NOT NULL                 -- games/{gameId}/assets/{assetId}
   failure_rule       VARCHAR(60)                   -- FAILED 사유
+  declared_content_type VARCHAR(100) NOT NULL      -- 시작 요청의 선언값. complete 가 실제값과 대조한다
+  declared_byte_size    BIGINT NOT NULL
+  upload_expires_at  TIMESTAMPTZ NOT NULL          -- grant 만료(10분). quota 술어이기도 하다
   created_by_user_id BIGINT NOT NULL REFERENCES users(id)
   created_at, updated_at, deleted_at TIMESTAMPTZ
   UNIQUE (game_id, asset_id)
+
+game_asset_delete_queue                            -- §7.1
+  id                 BIGINT PK
+  provider, storage_bucket, object_key             -- 좌표만. 소유자 식별 정보를 남기지 않는다
+  attempts           INTEGER NOT NULL DEFAULT 0
+  last_error         VARCHAR(200)                  -- 예외 클래스명만 (메시지는 endpoint 를 흘린다)
+  created_at, next_attempt_at TIMESTAMPTZ
+  UNIQUE (provider, storage_bucket, object_key)
 ```
+
+`storage_bucket` 이 원안에 없던 컬럼이다. `provider` 만으로는 부족하다 — 버킷은 배포 설정이고, 계약의 fallback 은 "설정 변경 + 재배포" 라서 옛 행이 가리키는 버킷과 지금 활성인 버킷이 다를 수 있다.
+
+`object_key` 에는 **업로더가 정한 문자열이 하나도 들어가지 않는다.** 원본 파일명을 넣으면 경로·traversal·다른 사람 이름이 버킷 안으로 그대로 실려 간다. `assetId` 는 한 번만 쓰이므로 키를 재사용하거나 버전을 붙일 일이 없다.
 
 `UNIQUE(game_id, asset_id)`가 §2의 `asset://game/{gameId}/{assetId}` 형식과 1:1이다. 소유권은 조회 조건 자체에 들어가고 서비스가 따로 기억할 규칙이 아니다.
 

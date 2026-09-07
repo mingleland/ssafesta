@@ -1,0 +1,71 @@
+/* Booth Mini Preview — 4:3 고정(확정값). facade 데이터만으로 그린다. */
+.bmp {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+.bmp-awning {
+  position: relative;
+  height: 26%;
+  flex: none;
+}
+.bmp-awning-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.9) 0 12px,
+    transparent 12px 24px
+  );
+  mask-image: linear-gradient(180deg, transparent, #000);
+  opacity: 0.35;
+}
+.bmp-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-height: 0;
+}
+.bmp-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+}
+.bmp-logo-fallback {
+  display: grid;
+  place-items: center;
+  border: 2px solid;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--festa-ink);
+}
+.bmp-sign {
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--festa-ink);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+.bmp-floor {
+  height: 14%;
+  flex: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.45));
+}

@@ -27,9 +27,35 @@ export type BoothInteractEvent =
       boothId: number;
       objectId: string;
       configId: number; // Spring 소유 Game Portal Binding 식별자(signed Int32, #34). gameId 해석은 React가 서버 조회로 한다 — AI와 달리 이름 변환 함수가 없다
+    }
+  | {
+      type: 'BOOTH_SURVEY_INTERACT'; // 계약 확정: S15P21A604-415 (2026-09-04)
+      // boothId 는 설문의 ID 가 아니라 설문을 resolve 하기 위한 **context** 다. 부스당 활성
+      // 설문 1개를 boothId == surveyId 로 모델링하지 않는다 — 부스에 설문이 여럿이 되면
+      // objectId 로 특정 설문에 binding 하고, 그때 Unity 계약은 바뀌지 않는다.
+      boothId: number;
+      objectId: string;
     };
 
-type BoothInteractListener = (event: BoothInteractEvent) => void;
+/**
+ * 부스에 속하지 않는 월드 상호작용 — 관리 데스크/NPC (S15P21A604-414).
+ *
+ * `BoothInteractEvent` 와 **다른 union 으로 가른다.** 그쪽은 전부 `boothId`·`objectId` 를
+ * 가지며 그것이 계약의 핵심이다. 관리 진입점은 특정 부스에 종속되지 않아 필드가 없는데,
+ * 같은 union 에 넣으려면 두 필드를 optional 로 낮춰야 하고 그러면 나머지 5종에서 "있을 수도
+ * 있다" 가 돼 discriminated union 의 타입 안전성이 통째로 약해진다.
+ *
+ * 관리 대상 부스는 FE 가 `GET /booths/mine` 으로 resolve 한다 — Unity 는 세션 사용자의
+ * 임대 정보를 모르고 알 필요도 없다(헌법 1조).
+ */
+export type WorldInteractEvent = {
+  type: 'WORLD_MANAGEMENT_INTERACT';
+};
+
+/** onBoothInteract 채널로 들어오는 모든 이벤트 */
+export type UnityInteractEvent = BoothInteractEvent | WorldInteractEvent;
+
+type BoothInteractListener = (event: UnityInteractEvent) => void;
 
 const listeners = new Set<BoothInteractListener>();
 
@@ -39,11 +65,33 @@ type WorldGateReadyListener = () => void;
 
 const worldGateReadyListeners = new Set<WorldGateReadyListener>();
 
+// 월드 로드 시작 — 로비에서 사용자가 월드 입장을 눌러 main 씬 로드가 시작되는 순간 1회 (S15P21A604-429).
+// onWorldGateReady 하나만으로는 "로비에 머무는 중"과 "월드를 불러오는 중"이 구분되지 않는다. 앞은 사용자
+// 시간이라 안내가 없어야 하고 뒤는 50~84초 대기라 안내가 있어야 한다(#128). Unity 가 아직 이 신호를 보내지
+// 않으면 호스트는 지금과 똑같이 동작한다 — 신호가 도착하면 그때부터 안내가 켜진다.
+type WorldLoadStartListener = () => void;
+
+const worldLoadStartListeners = new Set<WorldLoadStartListener>();
+
+// 월드 접속 상태 (S15P21A604-432, #131). Unity 가 끊김 감지·재접속·포기까지 스스로 하고 그 상태만 밀어 준다 —
+// FE 는 표시와 복구 동선만 맡고 재시도 타이머·소켓 재연결을 다시 구현하지 않는다(중복 lifecycle 금지).
+//
+// detail 의 의미가 state 마다 다르다(Unity WorldReconnector.cs 실물 기준):
+//   'reconnecting' → 시도 회차 문자열("1".."5"). 회차 상한은 Unity 가 정하므로 FE 가 개수를 가정하지 않는다
+//   그 밖         → 서버 사유 문자열. 빈 문자열은 무응답이고, 목록에 없는 값이 올 수 있다(fallback 필수)
+export type WorldConnectionState = 'connected' | 'disconnected' | 'reconnecting' | 'failed';
+
+type WorldConnectionStateListener = (state: WorldConnectionState, detail: string) => void;
+
+const worldConnectionStateListeners = new Set<WorldConnectionStateListener>();
+
 declare global {
   interface Window {
     FestaUnity?: {
       onBoothInteract?: (json: string) => void;
       onWorldGateReady?: () => void;
+      onWorldLoadStart?: () => void;
+      onWorldConnectionState?: (state: string, detail: string) => void;
     };
   }
 }
@@ -51,7 +99,7 @@ declare global {
 export function initUnityBridge(): void {
   window.FestaUnity = window.FestaUnity || {};
   window.FestaUnity.onBoothInteract = (json: string) => {
-    let event: BoothInteractEvent;
+    let event: UnityInteractEvent;
     try {
       event = JSON.parse(json);
     } catch (err) {
@@ -71,6 +119,29 @@ export function initUnityBridge(): void {
   window.FestaUnity.onWorldGateReady = () => {
     for (const listener of worldGateReadyListeners) listener();
   };
+  window.FestaUnity.onWorldLoadStart = () => {
+    for (const listener of worldLoadStartListeners) listener();
+  };
+  window.FestaUnity.onWorldConnectionState = (state: string, detail: string) => {
+    // Unity 가 보낸 문자열을 그대로 신뢰하지 않는다 — 계약 밖 값이 오면 무시하고 로그로 드러낸다(T-24 정신)
+    if (!isWorldConnectionState(state)) {
+      console.error('[unity-bridge] 알 수 없는 onWorldConnectionState state', state, detail);
+      return;
+    }
+    for (const listener of worldConnectionStateListeners) {
+      try {
+        listener(state, detail ?? '');
+      } catch (err) {
+        console.error('[unity-bridge] onWorldConnectionState listener 오류', err);
+      }
+    }
+  };
+}
+
+const WORLD_CONNECTION_STATES: readonly string[] = ['connected', 'disconnected', 'reconnecting', 'failed'];
+
+function isWorldConnectionState(value: string): value is WorldConnectionState {
+  return WORLD_CONNECTION_STATES.includes(value);
 }
 
 export function subscribeBoothInteract(listener: BoothInteractListener): () => void {
@@ -84,6 +155,20 @@ export function subscribeWorldGateReady(listener: WorldGateReadyListener): () =>
   worldGateReadyListeners.add(listener);
   return () => {
     worldGateReadyListeners.delete(listener);
+  };
+}
+
+export function subscribeWorldLoadStart(listener: WorldLoadStartListener): () => void {
+  worldLoadStartListeners.add(listener);
+  return () => {
+    worldLoadStartListeners.delete(listener);
+  };
+}
+
+export function subscribeWorldConnectionState(listener: WorldConnectionStateListener): () => void {
+  worldConnectionStateListeners.add(listener);
+  return () => {
+    worldConnectionStateListeners.delete(listener);
   };
 }
 

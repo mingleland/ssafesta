@@ -28,6 +28,21 @@ namespace Festa.Integration
         }
 
         /// <summary>
+        /// Mock 에는 재고 서버가 없다 — <c>null</c> 을 돌려준다 (GitLab #120 §2).
+        ///
+        /// <para><b>"전부 보유" 를 꾸며내지 않는다.</b> 그러면 Mock 에서만 팔레트가 전부 열려,
+        /// 잠금이 깨진 것을 실서버에 붙이기 전까지 아무도 모른다. 대신 로비가
+        /// <see cref="ApiServices.IsMock"/> 를 보고 <b>명시적으로</b> 개발 모드 해제를 선택한다 —
+        /// 조용한 폴백과 달리 로그와 화면에 드러난다.</para>
+        /// </summary>
+        public async Task<CatalogItemsDto> GetAvatarPartCatalogAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            Debug.Log("[MockUserApi] 카탈로그 보유 정보 없음 — 로비가 개발 모드로 판단한다 (실서버에서는 owned 를 쓴다)");
+            return null;
+        }
+
+        /// <summary>
         /// 개발용 world session. **토큰은 진짜로 서명한다** (S15P21A604-331).
         ///
         /// <para>전에는 <c>"mock-connection-token"</c> 이라는 고정 문자열을 줬다. S15P21A604-85 로

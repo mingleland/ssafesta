@@ -42,6 +42,11 @@
 | 경로 | 상태 | 접근 | 내용 |
 |---|---|---|---|
 | `/login` | stub 교체 | 공개 | Google/Kakao 버튼 + 게스트 입장 + 실패 안내 영역(FR-007: 원인 범주·재시도 방법 표시) |
+
+> **2026-09-01 — SSAFY 버튼 미반영.** 헌법 11조가 v1.3 에서 SSAFY 를 더해 소셜 제공자가 셋이 됐고
+> 백엔드는 `S15P21A604-357` 로 `/api/v1/auth/oauth/ssafy` 를 받는다. `LoginPage.tsx` 는 아직
+> `type Provider = 'google' | 'kakao'` 라 화면에서 SSAFY 를 고를 수 없다. **FE 담당·일정 미정** —
+> 이 표를 고치기 전에 담당이 정해져야 해서 사실만 남긴다.
 | `/auth/callback` | 신규 | 공개 | mount 시 `complete()` 1회 호출 → `AUTHENTICATED`/`NICKNAME_REQUIRED`/오류 분기 |
 | `/app/*` 기존 라우트 | 가드 추가 | 표 아래 | `RequireAuth` 래퍼 |
 

@@ -1,0 +1,44 @@
+/* 내 정보 화면 — Screen Local Baseline 토큰(--sc-*)만 쓴다 */
+.pf-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 860px) { .pf-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.pf-identity { display: flex; gap: 16px; align-items: flex-start; }
+.pf-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #2f6bff, #7a5cff);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+}
+.pf-identity-body { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 0; }
+.pf-nickname-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pf-nickname { font-size: 20px; font-weight: 800; }
+.pf-nickname-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-input {
+  height: 32px;
+  padding: 0 11px;
+  border-radius: var(--sc-radius-control);
+  border: 1px solid var(--sc-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sc-text);
+  font-family: inherit;
+  font-size: 14px;
+}
+.pf-input:focus { outline: none; border-color: var(--sc-accent); }
+.pf-providers { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.pf-wallet { display: flex; flex-direction: column; gap: 6px; }
+.pf-balance { margin: 0; font-size: 30px; font-weight: 800; color: var(--sc-gold); font-variant-numeric: tabular-nums; }
+.pf-balance span { font-size: 14px; font-weight: 700; color: var(--sc-text-muted); margin-left: 4px; }
+
+.pf-tx { margin-top: 14px; }
+.pf-danger { margin-top: 14px; }
+.pf-confirm { display: flex; flex-direction: column; gap: 10px; }
+.pf-confirm-actions { display: flex; gap: 8px; }
+.pf-btn-danger { background: rgba(239, 93, 108, 0.16); border-color: rgba(239, 93, 108, 0.5); color: #ff9aa5; }

@@ -85,3 +85,18 @@ export async function* mockStreamError(
     splitMid,
   );
 }
+
+// 종료 이벤트 sequence가 하나 건너뛴 시나리오 — FE가 잘린 응답 안내를 표시하는 fixture.
+export async function* mockStreamSequenceGap(
+  options: MockStreamOptions = {},
+): AsyncGenerator<string> {
+  const { requestId, conversationId, messageId, splitMid } = { ...DEFAULTS, ...options };
+  const env = { requestId, conversationId, messageId };
+
+  yield* chunksOf(frame('start', { ...env, sequence: 0 }), splitMid);
+  yield* chunksOf(frame('token', { ...env, sequence: 1, delta: '답변 일부' }), splitMid);
+  yield* chunksOf(
+    frame('done', { ...env, sequence: 3, handoffRecommended: false }),
+    splitMid,
+  );
+}

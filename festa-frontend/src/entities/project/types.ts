@@ -27,6 +27,12 @@ export interface VisitorProjectListView {
   projects: VisitorProjectView[];
 }
 
+/** PUT/DELETE /projects/{id}/like 응답 (ProjectService.LikeView, -135) — §6 의 두 필드와 같은 이름·타입 */
+export interface LikeView {
+  likeCount: number;
+  likedByMe: boolean;
+}
+
 /**
  * POST/PATCH body. BE 는 PresenceField 로 "보낸 키만" 반영한다 — 키 생략은 유지, 명시적
  * null 은 비우기다. 따라서 dirty 키만 담아 직렬화해야 한다(전체 객체 전송 금지).

@@ -1,0 +1,30 @@
+meta {
+  name: AI 직원 단건 조회
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/agents/{{agentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## AI 직원 단건 조회
+
+  - 인증: **필수** (그 직원이 속한 부스의 편집 권한)
+  - 실행 전: `agentId` 환경변수. `AI 직원 생성`이 자동으로 넣어 준다
+
+  `systemPrompt`는 저장한 원문이 **글자 그대로** 돌아온다 — 서버가 다듬지 않는다. 줄바꿈과 공백까지 보존되는지 여기서 확인할 수 있다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 조회 성공 |
+  | `403` | 게스트 또는 그 부스 편집 권한 없음 |
+  | `404 AGENT_NOT_FOUND` | 그런 AI 직원이 없다 |
+}

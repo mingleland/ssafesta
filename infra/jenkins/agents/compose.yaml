@@ -8,11 +8,10 @@ x-agent: &agent
       JENKINS_INBOUND_AGENT_IMAGE: ${JENKINS_INBOUND_AGENT_IMAGE:?load infra/versions.env}
       DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:?load infra/versions.env}
       NODE_RUNTIME_IMAGE: ${NODE_RUNTIME_IMAGE:?load infra/versions.env}
+      PYTHON_JSONSCHEMA_VERSION: ${PYTHON_JSONSCHEMA_VERSION:?load infra/versions.env}
   image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
   restart: unless-stopped
   user: jenkins
-  networks:
-    - jenkins-control
   security_opt:
     - no-new-privileges:true
 
@@ -21,9 +20,10 @@ services:
     <<: *agent
     profiles: [linux-docker]
     container_name: festa-jenkins-agent-linux-docker
+    network_mode: host
     command:
       - -url
-      - http://jenkins-controller:8080
+      - http://127.0.0.1:8080
       - -secret
       - ${JENKINS_AGENT_SECRET_LINUX_DOCKER:?set in infra/.env}
       - -name
@@ -33,6 +33,8 @@ services:
       - /home/jenkins/agent/linux-docker
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
     volumes:
       - linux_docker_workspace:/home/jenkins/agent/linux-docker
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
@@ -41,6 +43,8 @@ services:
     <<: *agent
     profiles: [deploy]
     container_name: festa-jenkins-agent-deploy
+    networks:
+      - jenkins-control
     command:
       - -url
       - http://jenkins-controller:8080
@@ -61,6 +65,8 @@ services:
     <<: *agent
     profiles: [unity]
     container_name: festa-jenkins-agent-unity
+    networks:
+      - jenkins-control
     command:
       - -url
       - http://jenkins-controller:8080
@@ -74,10 +80,13 @@ services:
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
       UNITY_EDITOR_ROOT: /opt/unity
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
     volumes:
       - unity_workspace:/home/jenkins/agent/unity
       - unity_home:/home/jenkins
       - ${UNITY_EDITOR_ROOT:-/opt/unity}:/opt/unity:ro
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
 
 volumes:

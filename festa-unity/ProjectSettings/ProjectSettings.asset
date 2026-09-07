@@ -827,8 +827,8 @@ PlayerSettings:
   webGLCloseOnQuit: 0
   webWasm2023: 0
   scriptingDefineSymbols:
-    Standalone: 
-    WebGL: 
+    Standalone: HOSTNAME_RESOLUTION_AVAILABLE
+    WebGL: HOSTNAME_RESOLUTION_AVAILABLE
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

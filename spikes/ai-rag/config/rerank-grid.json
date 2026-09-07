@@ -1,0 +1,12 @@
+{
+  "decision_ticket": "S15P21A604-371",
+  "embedding_model": "text-embedding-3-large",
+  "chunk_size_tokens": 900,
+  "chunk_overlap_ratio": 0.2,
+  "retrieval_top_k": 10,
+  "top_n": [3, 5],
+  "similarity_max_distance": [0.3, 0.5],
+  "cross_encoder_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "gms_llm_models": ["gpt-5-nano", "gpt-4.1-nano", "gemini-2.5-flash-lite"],
+  "note": "similarity_max_distance는 실측 거리 분포를 보고 다시 조정해야 한다. 0.3은 임시값이며 pgvector 실측 스모크에서 전부 걸러져 recall 0을 낸 적이 있다."
+}

@@ -53,6 +53,18 @@ GENERATION_LLM_SPECS: dict[str, ModelSpec] = {
 }
 
 
+# S15P21A604-371 GMS LLM reranker 후보 — 지연시간 스크리닝을 통과한 저비용 3종만 쓴다.
+RERANK_LLM_SPECS: dict[str, ModelSpec] = {
+    "gpt-5-nano": ModelSpec(model_id="gpt-5-nano", provider="openai", credit_per_request=1.0),
+    "gpt-4.1-nano": ModelSpec(
+        model_id="gpt-4.1-nano", provider="openai", credit_per_request=1.0
+    ),
+    "gemini-2.5-flash-lite": ModelSpec(
+        model_id="gemini-2.5-flash-lite", provider="gemini", credit_per_request=1.0
+    ),
+}
+
+
 @dataclass(frozen=True)
 class PageText:
     page: int
@@ -66,6 +78,14 @@ class Chunk:
     chunk_no: int
     token_count: int
     content: str
+    context_content: str | None = None
+    context_token_count: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.context_content is None:
+            object.__setattr__(self, "context_content", self.content)
+        if self.context_token_count is None:
+            object.__setattr__(self, "context_token_count", self.token_count)
 
 
 @dataclass(frozen=True)
@@ -85,6 +105,14 @@ class SearchHit:
     distance: float
     booth_id: int
     agent_id: int
+    context_content: str | None = None
+    context_token_count: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.context_content is None:
+            object.__setattr__(self, "context_content", self.content)
+        if self.context_token_count is None:
+            object.__setattr__(self, "context_token_count", self.token_count)
 
 
 @dataclass(frozen=True)

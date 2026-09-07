@@ -8,6 +8,8 @@ the fail-fast behavior spec 007 plan.md Section 10 requires.
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -42,41 +44,30 @@ class Settings(BaseSettings):
     app_env: str = "local"
     log_level: str = "INFO"
 
-    # Database (runtime role only; alembic reads MIGRATION_DATABASE_URL directly)
-    database_url: SecretStr = Field(min_length=1)
-
-    # Worker lease and recovery — spec 007 plan.md Section 10 / research.md Section 5
+    # Worker heartbeat — spec 007 plan.md Section 10. lease·재시도 예산은
+    # Spring이 소유한다(S15P21A604-449) — FastAPI는 heartbeat 주기만 안다.
     job_heartbeat_seconds: int = Field(default=30, gt=0)
-    job_lease_seconds: int = Field(default=90, gt=0)
-    job_sweeper_seconds: int = Field(default=60, gt=0)
-    job_max_retries: int = Field(default=3, ge=0)
-    job_retry_backoff_seconds_csv: str = Field(
-        default="60,300,900", validation_alias="JOB_RETRY_BACKOFF_SECONDS"
-    )
+    document_worker_max_concurrency: int = Field(default=1, gt=0)
+    document_worker_shutdown_grace_seconds: float = Field(default=30.0, ge=0)
 
     # Document limits and chunk tuning — spec 007 FR-011, FR-018, FR-020
     document_max_bytes: int = Field(default=20_971_520, gt=0)
     agent_document_max_count: int = Field(default=10, gt=0)
     agent_document_max_total_bytes: int = Field(default=104_857_600, gt=0)
-    chunk_size: int | None = None
-    chunk_overlap: int | None = None
+    chunk_size: int = Field(default=900, gt=0)
+    chunk_overlap: int = Field(default=180, ge=0)
 
     @field_validator(
-        "chunk_size",
-        "chunk_overlap",
-        "embedding_model_id",
-        "embedding_api_base_url",
         "embedding_api_key",
+        "gms_api_key",
         mode="before",
     )
     @classmethod
     def _blank_to_none(cls, value: object) -> object:
         """Treat a blank/whitespace-only value as absent.
 
-        `.env.example` ships these keys blank (e.g. `CHUNK_SIZE=`,
-        `EMBEDDING_MODEL_ID=`) as documented "optional, no fixed default"
-        values (spec 007). python-dotenv parses `KEY=` as the env var being
-        present with value `""`, not absent — so without this coercion
+        `.env.example` may leave optional Secret values blank. python-dotenv parses
+        `KEY=` as the env var being present with value `""`, not absent — so without this coercion
         pydantic tries to parse `""` as the declared type (int, or
         `SecretStr` for `embedding_api_key`) and crashes uvicorn on boot
         with an unmodified `.env.example`-derived `.env`. Any other value
@@ -84,15 +75,39 @@ class Settings(BaseSettings):
         string like "512" or "text-embedding-3-small") passes through
         unchanged for normal coercion.
 
-        NOTE: `embedding_provider` and `embedding_api_path` are NOT in this
-        list — their types (`Literal["mock", "gms"]`, `str`) have no `None`
-        option, so mapping blank to `None` here would make them fail type
-        validation instead of falling back to their default. They get their
-        own blank-to-*default* validators below instead.
+        Non-Secret tuning fields get their own blank-to-default validators below.
         """
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    @field_validator("chunk_size", mode="before")
+    @classmethod
+    def _blank_chunk_size_to_spike_default(cls, value: object) -> object:
+        return 900 if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("chunk_overlap", mode="before")
+    @classmethod
+    def _blank_chunk_overlap_to_spike_default(cls, value: object) -> object:
+        return 180 if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("embedding_model_id", mode="before")
+    @classmethod
+    def _blank_embedding_model_to_spike_default(cls, value: object) -> object:
+        return (
+            "text-embedding-3-large"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
+    @field_validator("embedding_api_base_url", mode="before")
+    @classmethod
+    def _blank_embedding_url_to_gms_default(cls, value: object) -> object:
+        return (
+            "https://gms.ssafy.io/gmsapi/api.openai.com"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
 
     @field_validator("embedding_provider", mode="before")
     @classmethod
@@ -115,13 +130,68 @@ class Settings(BaseSettings):
             return "/v1/embeddings"
         return value
 
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def _blank_llm_provider_to_default(cls, value: object) -> object:
+        return "mock" if isinstance(value, str) and value.strip() == "" else value
+
+    @field_validator("llm_api_base_url", mode="before")
+    @classmethod
+    def _blank_llm_url_to_gms_default(cls, value: object) -> object:
+        return (
+            "https://gms.ssafy.io/gmsapi/api.openai.com"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
+    @field_validator("llm_api_path", mode="before")
+    @classmethod
+    def _blank_llm_api_path_to_default(cls, value: object) -> object:
+        return (
+            "/v1/chat/completions"
+            if isinstance(value, str) and value.strip() == ""
+            else value
+        )
+
     # Embedding provider — spec 007 FR-009 / 헌법 18조
     embedding_dimension: int = 1536
-    embedding_model_id: str | None = None
+    embedding_model_id: str = "text-embedding-3-large"
     embedding_provider: Literal["mock", "gms"] = "mock"
-    embedding_api_base_url: str | None = None
+    embedding_api_base_url: str = "https://gms.ssafy.io/gmsapi/api.openai.com"
     embedding_api_path: str = "/v1/embeddings"
     embedding_api_key: SecretStr | None = None
+
+    # RAG generation defaults — S15P21A604-370..372 spike decisions
+    retrieval_top_k: int = Field(default=10, gt=0)
+    rag_context_top_n: int = Field(default=5, gt=0)
+    rag_input_token_budget: int = Field(default=8_000, gt=0)
+    rag_tokenizer_encoding: str = Field(default="cl100k_base", min_length=1)
+    llm_model_id: str = Field(default="gpt-4.1-mini", min_length=1)
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    llm_provider: Literal["mock", "gms"] = "mock"
+    llm_api_base_url: str = "https://gms.ssafy.io/gmsapi/api.openai.com"
+    llm_api_path: str = "/v1/chat/completions"
+    llm_connect_timeout_seconds: float = Field(default=10.0, gt=0)
+    llm_read_timeout_seconds: float = Field(default=15.0, gt=0)
+    gms_api_key: SecretStr | None = None
+
+    # Conversation (spec 008) — Redis-backed, 30-minute sliding TTL
+    jwt_secret: SecretStr = Field(min_length=1, validation_alias="JWT_SECRET")
+    redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
+    conversation_ttl_seconds: int = Field(default=1800, gt=0)
+    spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+    # 질문마다 검색 전에 호출하는 Agent 설정 snapshot. 재시도·캐시는 하지 않는다.
+    spring_agent_config_timeout_seconds: float = Field(default=1.0, gt=0)
+    # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
+    spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
+    # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.
+    llm_ttft_timeout_seconds: float = Field(default=15.0, gt=0)
+    llm_total_timeout_seconds: float = Field(default=60.0, gt=0)
+    # 문서 처리 결과 전달(S15P21A604-124) — heartbeat/batch/finalize/failed 공통 timeout.
+    spring_document_result_timeout_seconds: float = Field(default=5.0, gt=0)
+    # 한 번의 Embedding Provider 호출에 담을 최대 chunk 개수 — HTTP 결과 전송 batch(최대
+    # 200개/8MiB, document-result-api.yaml)와는 별개로, Provider 요청 크기를 제어한다.
+    embedding_batch_size: int = Field(default=96, gt=0)
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
@@ -148,8 +218,8 @@ class Settings(BaseSettings):
     minio_secret_access_key: SecretStr = Field(min_length=1)
 
     @property
-    def job_retry_backoff_seconds(self) -> list[int]:
-        return [int(part) for part in _parse_csv(self.job_retry_backoff_seconds_csv)]
+    def jwt_secret_key(self) -> bytes:
+        return base64.b64decode(self.jwt_secret.get_secret_value())
 
     @property
     def internal_spring_to_ai_tokens(self) -> list[str]:
@@ -158,21 +228,6 @@ class Settings(BaseSettings):
     @property
     def internal_ai_to_spring_tokens(self) -> list[str]:
         return _parse_csv(self.internal_ai_to_spring_tokens_csv.get_secret_value())
-
-    @model_validator(mode="after")
-    def _validate_job_recovery(self) -> "Settings":
-        if self.job_lease_seconds <= self.job_heartbeat_seconds:
-            raise ValueError(
-                "JOB_LEASE_SECONDS must be greater than JOB_HEARTBEAT_SECONDS "
-                f"(lease={self.job_lease_seconds}, heartbeat={self.job_heartbeat_seconds})"
-            )
-        backoffs = self.job_retry_backoff_seconds
-        if len(backoffs) != self.job_max_retries:
-            raise ValueError(
-                "JOB_RETRY_BACKOFF_SECONDS entry count must equal JOB_MAX_RETRIES "
-                f"(backoffs={len(backoffs)}, max_retries={self.job_max_retries})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_embedding_dimension(self) -> "Settings":
@@ -184,19 +239,58 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _validate_rag_tuning(self) -> "Settings":
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                "CHUNK_OVERLAP must be smaller than CHUNK_SIZE "
+                f"(overlap={self.chunk_overlap}, size={self.chunk_size})"
+            )
+        if self.rag_context_top_n > self.retrieval_top_k:
+            raise ValueError(
+                "RAG_CONTEXT_TOP_N must not exceed RETRIEVAL_TOP_K "
+                f"(top_n={self.rag_context_top_n}, top_k={self.retrieval_top_k})"
+            )
+        if self.llm_ttft_timeout_seconds > self.llm_total_timeout_seconds:
+            raise ValueError(
+                "LLM_TTFT_TIMEOUT_SECONDS must not exceed LLM_TOTAL_TIMEOUT_SECONDS "
+                f"(ttft={self.llm_ttft_timeout_seconds}, total={self.llm_total_timeout_seconds})"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _validate_embedding_provider(self) -> "Settings":
         if self.embedding_provider != "gms":
             return self
 
         required = {
-            "EMBEDDING_MODEL_ID": self.embedding_model_id,
-            "EMBEDDING_API_BASE_URL": self.embedding_api_base_url,
-            "EMBEDDING_API_KEY": self.embedding_api_key,
+            "EMBEDDING_API_KEY or GMS_API_KEY": (
+                self.embedding_api_key or self.gms_api_key
+            ),
         }
         missing = [env_name for env_name, value in required.items() if value is None]
         if missing:
             raise ValueError(
                 "GMS embedding provider requires: " + ", ".join(sorted(missing))
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_llm_provider(self) -> "Settings":
+        if self.llm_provider == "gms" and self.gms_api_key is None:
+            raise ValueError("GMS LLM provider requires: GMS_API_KEY")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_jwt_secret(self) -> "Settings":
+        try:
+            decoded = base64.b64decode(
+                self.jwt_secret.get_secret_value(), validate=True
+            )
+        except binascii.Error as exc:
+            raise ValueError("JWT_SECRET must be valid base64") from exc
+        if len(decoded) < 64:
+            raise ValueError(
+                f"JWT_SECRET must contain at least 64 random bytes (got {len(decoded)})"
             )
         return self
 

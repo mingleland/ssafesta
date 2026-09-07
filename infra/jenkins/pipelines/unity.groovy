@@ -36,7 +36,7 @@ def call(Map config = [:]) {
                                 if (fresh == 75) { currentBuild.result = 'NOT_BUILT'; echo 'SUPERSEDED: newer game head exists'; return }
                                 if (fresh != 0) { error('game freshness check failed') }
                                 withEnv(["COMPOSE_FILE=infra/deploy/compose/dev/game.compose.yaml", 'COMPOSE_PROJECT=festa-dev-game', 'COMPOSE_SERVICE=game', "IMAGE_REF=${meta.imageRef}", "CONTENT_ID=${meta.contentId}"]) {
-                                    sh 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/deploy-component.sh'
+                                    sh 'infra/jenkins/scripts/with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh'
                                 }
                             }
                     }
