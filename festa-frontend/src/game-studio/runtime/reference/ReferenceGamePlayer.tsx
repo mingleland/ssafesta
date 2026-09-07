@@ -152,6 +152,20 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // S15P21A604-490 — 대화창(Overlay/Fullscreen 공용)이 떠 있을 때는 숫자키(1~6, 계약상
+      // 선택지 최대 개수)로 마우스 클릭과 동일하게 선택지를 고를 수 있다. 존재하지 않는
+      // 번호는 무시한다. OS auto-repeat(키를 계속 누르고 있으면 반복 발생하는 keydown)은
+      // 무시해 최초 입력에만 반응한다 — 선택으로 다음 노드가 떠서 같은 번호에 다른 선택지가
+      // 있으면 의도치 않게 연달아 고르게 되는 것을 막기 위함이다. NumLock이 꺼진 numpad는
+      // 지원하지 않는다(팀 결정, event.key 기반).
+      if (activeDialogue !== null && !event.repeat && /^[1-6]$/.test(event.key)) {
+        const choice = choices[Number(event.key) - 1];
+        if (choice !== undefined) {
+          event.preventDefault();
+          setRuntime((current) => chooseReferenceDialogue(project, current, choice.id));
+        }
+        return;
+      }
       const direction = keyDirection(event.key);
       if (direction !== null) {
         event.preventDefault();
@@ -313,6 +327,13 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             className="grp-map"
             style={{
               aspectRatio: `${scene.width} / ${scene.height}`,
+              // S15P21A604-492 — CSS의 width: 100%(고정값)만으로는 세로가 긴 씬에서 비율이
+              // 깨진다: aspect-ratio로 계산된 높이가 max-height(calc(100vh - 130px))를
+              // 넘으면 높이는 잘리지만, width가 이미 고정값이라 폭이 다시 계산되지 않는다
+              // (스펙상 aspect-ratio는 auto인 쪽만 유도한다). 그래서 가로 제한(1120px, CSS
+              // max-width와 동일한 값)과 "세로 제한을 씬 비율로 역산한 폭" 중 작은 쪽을
+              // 직접 계산해 항상 비율이 유지되게 한다.
+              width: `min(1120px, calc((100vh - 130px) * ${scene.width} / ${scene.height}))`,
               ...(mapBackground === null ? {} : staticImageBackgroundStyle(mapBackground)),
               '--grp-columns': scene.width,
               '--grp-rows': scene.height,
