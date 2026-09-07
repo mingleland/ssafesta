@@ -65,7 +65,7 @@ const state = loadState();
 // 실 흐름은 provider 왕복 후 서버가 HttpOnly cookie로 심지만(oauth-completion.md 브라우저 흐름),
 // mock에는 실 provider가 없으므로 이 함수로 즉시 handoff를 만들고 /auth/callback으로 navigate한다.
 // provider당 고정 계정 하나 — 같은 provider로 다시 "로그인"하면 같은 사람으로 재현된다(재로그인 시나리오).
-export function mockStartOAuth(providerId: 'google' | 'kakao'): void {
+export function mockStartOAuth(providerId: 'google' | 'kakao' | 'ssafy'): void {
   state.handoff = { token: `mock-handoff-${providerId}-${Date.now()}`, providerId, consumed: false };
   persistState();
 }
