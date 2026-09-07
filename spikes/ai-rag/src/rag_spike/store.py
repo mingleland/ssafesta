@@ -62,6 +62,8 @@ class MemoryVectorStore:
                 distance=_cosine_distance(row[5], query_vector),
                 booth_id=row[2],
                 agent_id=row[3],
+                context_content=row[4].context_content,
+                context_token_count=row[4].context_token_count,
             )
             for row in ranked
         ]
@@ -92,6 +94,8 @@ class PgVectorStore:
                     page integer NOT NULL,
                     token_count integer NOT NULL,
                     content text NOT NULL,
+                    context_content text NOT NULL,
+                    context_token_count integer NOT NULL,
                     embedding vector({TARGET_DIMENSION}) NOT NULL
                 ) ON COMMIT PRESERVE ROWS
                 """
@@ -119,8 +123,8 @@ class PgVectorStore:
                 """
                 INSERT INTO rag_spike_chunks
                     (run_id, model_id, booth_id, agent_id, chunk_id, page,
-                     token_count, content, embedding)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                     token_count, content, context_content, context_token_count, embedding)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
                 """,
                 [
                     (
@@ -129,6 +133,8 @@ class PgVectorStore:
                         chunk.page,
                         chunk.token_count,
                         chunk.content,
+                        chunk.context_content,
+                        chunk.context_token_count,
                         _vector_literal(vector),
                     )
                     for chunk, vector in zip(chunks, vectors, strict=True)
@@ -143,7 +149,7 @@ class PgVectorStore:
                 """
                 SELECT chunk_id, page, token_count, content,
                        embedding <=> %s::vector AS distance,
-                       booth_id, agent_id
+                       booth_id, agent_id, context_content, context_token_count
                   FROM rag_spike_chunks
                  WHERE run_id=%s AND model_id=%s AND booth_id=%s AND agent_id=%s
                  ORDER BY embedding <=> %s::vector

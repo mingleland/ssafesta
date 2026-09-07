@@ -72,14 +72,14 @@ describe('SlotListPage — -87 완료 조건', () => {
   it('조회 중에는 로딩 상태를 보여준다', () => {
     getSlots.mockReturnValue(new Promise(() => {})); // 끝나지 않는 요청 = 로딩 고정
     renderPage();
-    expect(screen.queryByText('불러오는 중...')).not.toBeNull();
+    expect(screen.queryByText('슬롯을 불러오는 중...')).not.toBeNull();
   });
 
   it('조회 실패는 조용히 빈 목록으로 떨어지지 않고 오류 문구를 낸다', async () => {
     getSlots.mockRejectedValue(new Error('network down'));
     renderPage();
     // 실패를 삼키고 빈 목록을 그리는 것이 T-24 의 형태다 — 그 회귀를 막는 줄이다
-    expect(await screen.findByText('슬롯 목록을 불러오지 못했습니다.')).not.toBeNull();
+    expect(await screen.findByText('슬롯 목록을 불러오지 못했습니다')).not.toBeNull();
   });
 
   it('슬롯 상태 3종을 서로 다르게 표기한다', async () => {

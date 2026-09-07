@@ -1,0 +1,8 @@
+/* World Scene — Unity World Layer + React Screen/Overlay Layer 를 겹쳐 놓는 자리 (S15P21A604-406).
+   Persistent GameShell 로 승격될 때 이 컨테이너가 셸의 몸이 된다. */
+.world-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0e1430;
+}

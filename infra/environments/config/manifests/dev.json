@@ -56,7 +56,7 @@
       "healthCheckRef": "game-readiness",
       "cpuLimitRef": "DEV_GAME_CPU_LIMIT",
       "memoryLimitRef": "DEV_GAME_MEMORY_LIMIT",
-      "persistentVolumeRefs": ["festa-dev-game-data"],
+      "persistentVolumeRefs": ["festa-dev-world-replay"],
       "releaseId": "${RELEASE_ID}"
     }
   ],
@@ -89,7 +89,8 @@
   "secretRefs": [
     "POSTGRES_DEV_BACK_CREDENTIAL_REF",
     "POSTGRES_DEV_AI_CREDENTIAL_REF",
-    "REDIS_DEV_CREDENTIAL_REF"
+    "REDIS_DEV_CREDENTIAL_REF",
+    "DEV_CONNECTION_TOKEN_SECRET_REF"
   ],
   "mockAdapters": [],
   "resourcePolicy": {

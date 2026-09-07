@@ -9,7 +9,8 @@
 // 흡수한다(api.mock.ts와 동일 패턴) — 미가용 시 복귀 없이 기본 목적지로 떨어진다(크래시보다 낫다).
 
 const STORAGE_KEY = 'festa-auth-return-to';
-const DEFAULT_RETURN_TO = '/app/home';
+// 기본 목적지 = World (D-08). 명시적 deep link 는 그대로 존중하고 기본값만 World 다.
+const DEFAULT_RETURN_TO = '/app/world';
 
 // open redirect 방어(S-20260823-80) — 앱 내부 경로만 허용한다. 정규식 대신 WHATWG URL 파서로
 // 브라우저가 실제로 그 문자열을 어떻게 해석할지 그대로 재현한다 — `/\evil.com`처럼 브라우저가

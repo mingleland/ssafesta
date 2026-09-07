@@ -9,9 +9,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisProperties;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 
 import com.example.ssafesta.storage.ObjectStorageProperties;
+import com.example.ssafesta.common.RedisCredentialCheck;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
 
 /**
@@ -36,6 +39,10 @@ class SharedConfigProfileTest {
         "POSTGRES_PASSWORD=injected-secret",
         "REDIS_HOST=redis.internal",
         "REDIS_PORT=6379",
+        // Redis ACL 자격증명 (S15P21A604-422). infra-002 T015 가 default 사용자를 끄므로
+        // 배포는 반드시 주입한다 — infra 프로파일에 기본값이 없다.
+        "REDIS_USERNAME=dev_back",
+        "REDIS_PASSWORD=injected-redis-secret",
         "JWT_SECRET=aW5qZWN0ZWQtand0LXNlY3JldA==",
         "CONNECTION_TOKEN_SECRET=injected-connection-secret",
         "INTERNAL_AI_TO_SPRING_TOKENS=injected-ai-token",
@@ -46,6 +53,9 @@ class SharedConfigProfileTest {
         "KAKAO_CLIENT_SECRET=kakao-secret",
         "KAKAO_REDIRECT_URI=https://api.example.test/login/oauth2/code/kakao",
         "ROOT_DOMAIN=example.test",
+        "WORLD_SCHEME=wss",
+        "WORLD_HOST=world-dev.example.test",
+        "WORLD_PORT=443",
         "FRONTEND_BASE_URL=https://example.test",
         "AUTH_COOKIE_SECURE=true",
         // Redis 키 네임스페이스 (S15P21A604-349). 기본값이 없어 배포가 반드시 주입한다.
@@ -90,9 +100,10 @@ class SharedConfigProfileTest {
             assertThat(env.getProperty("app.auth.frontend-base-url")).isEqualTo("https://example.test");
             assertThat(env.getProperty("app.auth.cookie-secure")).isEqualTo("true");
 
-            // application-infra.yml owns the world address and overrides the ws/127.0.0.1 defaults.
+            // application-infra.yml keeps secure defaults while allowing the dev dedicated host.
             assertThat(env.getProperty("app.world.scheme")).isEqualTo("wss");
-            assertThat(env.getProperty("app.world.host")).isEqualTo("world.example.test");
+            assertThat(env.getProperty("app.world.host")).isEqualTo("world-dev.example.test");
+            assertThat(env.getProperty("app.world.port")).isEqualTo("443");
         });
     }
 
@@ -226,6 +237,47 @@ class SharedConfigProfileTest {
         keyspaceRunner(withoutEnv("FESTA_ENVIRONMENT")).run(context -> {
             assertThat(context).hasFailed();
             assertThat(rootCauseOf(context.getStartupFailure())).contains("FESTA_ENVIRONMENT");
+        });
+    }
+
+    // ── Redis ACL 자격증명 (S15P21A604-422) ───────────────────────────────────────
+
+    @EnableConfigurationProperties(DataRedisProperties.class)
+    @Import(RedisCredentialCheck.class)
+    static class RedisCredentialBinding {
+    }
+
+    private ApplicationContextRunner redisRunner(String... propertyValues) {
+        return runner(propertyValues).withUserConfiguration(RedisCredentialBinding.class);
+    }
+
+    @Test
+    @DisplayName("infra 프로파일이 Redis ACL 자격증명을 묶는다")
+    void infraProfileBindsTheRedisAclCredentials() {
+        redisRunner(DEPLOY_ENV).run(context -> {
+            assertThat(context).hasNotFailed();
+
+            DataRedisProperties redis = context.getBean(DataRedisProperties.class);
+            assertThat(redis.getUsername()).isEqualTo("dev_back");
+            assertThat(redis.getPassword()).isEqualTo("injected-redis-secret");
+        });
+    }
+
+    /**
+     * 자격증명을 빠뜨리면 <b>기동이 실패한다</b>.
+     *
+     * <p>기본값을 지운 것만으로는 이 자리가 닫히지 않는다. 바인더는 해석되지 않은
+     * {@code ${REDIS_PASSWORD}} 를 "값이 있다" 로 통과시키고, Lettuce 는 지연 연결이라 서버가
+     * 그대로 뜬다. 실패는 첫 Redis 사용에서 {@code WRONGPASS} 로 나는데 health 본문에는 원인이
+     * 없다({@code show-details} 기본값이 {@code never}) — 뜬 서버에서 로그인만 안 되는 모양이다.
+     * {@code RedisCredentialCheck} 가 그것을 기동 시점으로 앞당긴다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"REDIS_USERNAME", "REDIS_PASSWORD"})
+    void missingRedisAclCredentialFailsToStart(String variable) {
+        redisRunner(withoutEnv(variable)).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(rootCauseOf(context.getStartupFailure())).contains(variable);
         });
     }
 

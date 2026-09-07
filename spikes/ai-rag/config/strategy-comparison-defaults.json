@@ -1,0 +1,69 @@
+{
+  "decision_ticket": "S15P21A604-380",
+  "fixed_from_ticket": "S15P21A604-370",
+  "embedding_model": "text-embedding-3-large",
+  "retrieval_top_k": 10,
+  "strategies": {
+    "fixed": {
+      "chunk_size_tokens": 900,
+      "overlap_ratio": 0.20
+    },
+    "structural": {
+      "chunk_size_tokens": 900
+    },
+    "semantic": {
+      "chunk_size_tokens": 900,
+      "breakpoint_threshold": 0.3
+    },
+    "parent_child": {
+      "parent_chunk_size_tokens": 1800,
+      "child_chunk_size_tokens": 300,
+      "child_overlap_ratio": 0.15
+    }
+  },
+  "quality_gate": {
+    "minimum_weighted_recall": 0.95,
+    "maximum_search_p95_ms": 1000,
+    "maximum_leakage_count": 0
+  },
+  "quality_evidence": {
+    "documents": ["01_서비스_기획서.md", "01_프로젝트_기획서.md", "수달.pdf"],
+    "recommended_strategy": "fixed",
+    "note": "370의 고정 토큰(900/20%) 기본값을 그대로 유지. structural이 근소하게 근접(평균 Context -9.4%, MRR -0.0023)하지만 fixed를 넘어서지 못함.",
+    "by_strategy": {
+      "fixed": {
+        "weighted_recall": 1.0,
+        "weighted_mrr": 0.69,
+        "weighted_mean_context_tokens": 5023.49,
+        "total_chunk_count": 26,
+        "quality_gate_passed": true
+      },
+      "structural": {
+        "weighted_recall": 1.0,
+        "weighted_mrr": 0.6877,
+        "weighted_mean_context_tokens": 4551.91,
+        "total_chunk_count": 26,
+        "quality_gate_passed": true
+      },
+      "parent_child": {
+        "weighted_recall": 0.9714,
+        "weighted_mrr": 0.6776,
+        "weighted_mean_context_tokens": 10206.09,
+        "total_chunk_count": 69,
+        "quality_gate_passed": true,
+        "missed_case_ids": ["sudal-q12"]
+      },
+      "semantic": {
+        "weighted_recall": 0.8,
+        "weighted_mrr": 0.4378,
+        "weighted_mean_context_tokens": 934.4,
+        "total_chunk_count": 286,
+        "quality_gate_passed": false,
+        "follow_up": "breakpoint_threshold=0.3이 한국어 짧은 문장에 과분할을 유발함(문서당 청크 26개 대비 최대 200개 이상). 임계값을 높여(예: 0.5~0.7) 재평가하는 별도 튜닝 스파이크가 필요."
+      }
+    },
+    "estimated_gms_credits_this_run": 0.24,
+    "embedding_request_count_this_run": 24,
+    "boundary_embedding_request_count_this_run": 6
+  }
+}

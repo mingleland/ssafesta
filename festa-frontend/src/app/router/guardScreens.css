@@ -1,0 +1,18 @@
+/* 가드가 직접 그리는 두 화면 — 부트스트랩 확인 중, member-only 차단.
+   계정 표시·로그아웃은 여기 없다(D-08): ESC Game Menu 소관이다. */
+/* 부트스트랩·차단 화면도 흰 페이지로 떨어지지 않게 최소 정리 */
+.festa-boot,
+.festa-blocked {
+  min-height: 100vh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0f1430;
+  color: #eaeefb;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  font-size: 14px;
+}
+.festa-blocked a { color: #4d8dff; }

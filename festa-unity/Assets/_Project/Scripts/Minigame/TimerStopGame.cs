@@ -97,7 +97,8 @@ namespace Festa.Minigame
             if (session == null || string.IsNullOrEmpty(session.sessionId))
             {
                 Current = Phase.Failed;
-                FailureReason = "게임을 시작하지 못했습니다 (서버 응답 없음)";
+                // 사유가 있으면 그대로(게스트·로그인 만료·서버 오류) — "서버 응답 없음" 은 정말 사유를 모를 때만.
+                FailureReason = _client.LastError ?? "게임을 시작하지 못했습니다 (서버 응답 없음)";
                 Debug.LogError("[TimerStopGame] 세션 발급 실패 — 목표 시간을 임의로 만들지 않고 중단한다. " +
                                "클라이언트가 목표를 정하면 FR-008 이 깨진다.");
                 Changed?.Invoke();

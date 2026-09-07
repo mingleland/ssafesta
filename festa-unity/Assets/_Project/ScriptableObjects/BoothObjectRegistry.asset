@@ -14,20 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _entries:
   - type: 1
+    assetCode: 
     prefab: {fileID: 3801289400879457829, guid: 9f01805853f304b499f8c91ad31881eb, type: 3}
   - type: 2
+    assetCode: 
     prefab: {fileID: 8991486769970036086, guid: fee8ed64f9a245e4b86bee520cad224f, type: 3}
   - type: 3
+    assetCode: 
     prefab: {fileID: 5577734239076184959, guid: 2b8aca0d66fa038429333a4ceb98f826, type: 3}
   - type: 4
+    assetCode: 
     prefab: {fileID: 4581309695110984524, guid: 6caac665a81e39b4d988bbb9ae704ba5, type: 3}
   - type: 5
+    assetCode: 
     prefab: {fileID: 8398569853281457755, guid: 8eb70fba3a98f0845b5cd8f68696181d, type: 3}
   - type: 6
+    assetCode: 
     prefab: {fileID: 1337682531828213733, guid: 1f49aeda857331b4abbe846d99ce6890, type: 3}
   - type: 7
+    assetCode: 
     prefab: {fileID: 6227837355520101681, guid: 6da2a4ff245f98e4d876eca966b1e7c4, type: 3}
   - type: 8
+    assetCode: 
     prefab: {fileID: 5162731688218373322, guid: 96b76174a6bb2024b8b43db70f407ffe, type: 3}
   - type: 9
     assetCode: FURNITURE_DEFAULT
@@ -35,3 +43,6 @@ MonoBehaviour:
   - type: 10
     assetCode: DECORATION_DEFAULT
     prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}
+  - type: 11
+    assetCode: 
+    prefab: {fileID: 2485468530564970264, guid: 80e835532d128f446b499157ee47035a, type: 3}

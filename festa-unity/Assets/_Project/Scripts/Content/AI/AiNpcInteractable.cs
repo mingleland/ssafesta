@@ -43,8 +43,17 @@ namespace Festa.Content
                 return;
             }
 
-            // 콘텐츠 미연결(configId 0) 판정은 브리지가 한다 — 같은 규칙을 두 곳에 두면
-            // 한쪽만 고치게 된다. 여기서는 값을 그대로 넘긴다.
+            // 콘텐츠 미연결(configId 0) — 브리지는 이벤트를 건너뛰므로(계약) 여기서 초점·잠금을 걸면
+            // 방문자에게는 "아무 반응 없이 화면만 잠기는" 상태가 된다 (2026-09-06 WebGL 실측, S15P21A604-448).
+            // 일반적인 NPC 처럼 한 줄 안내만 하고 카메라는 그대로 둔다. 이벤트 금지 판정 자체는 여전히 브리지 몫.
+            if (!_runtimeObject.HasConfig)
+            {
+                BoothInteractionInput.Toast("이 부스의 AI 도우미는 아직 준비 중이에요");
+                Debug.LogWarning($"[AiNpc] configId 가 0 이라 대화를 열지 않는다 (booth={_runtimeObject.BoothId}, object={_runtimeObject.ObjectId}). 스튜디오에서 AI 직원을 연결해야 한다.");
+                return;
+            }
+            // 대화 카메라 — NPC 를 가슴 높이에서 바라보는 일반적인 대화 구도.
+            Festa.World.InteractionFocusCamera.FocusOn(gameObject, 2.4f, 0.45f);
             BoothInteractBridge.SendAiAgentInteract(
                 _runtimeObject.BoothId, _runtimeObject.ObjectId, _runtimeObject.ConfigId);
         }

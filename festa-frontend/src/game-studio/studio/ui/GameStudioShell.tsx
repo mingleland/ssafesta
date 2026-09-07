@@ -1311,9 +1311,9 @@ export const GameStudioShell = ({
                   <button onClick={() => setZoom(100)} title="셀 한 칸을 32px로 표시" type="button">1:1</button>
                 </div>
                 <div className="gss-zoom-controls">
-                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(10, current - 10))} type="button">−</button>
+                  <button aria-label="축소" onClick={() => setZoom((current) => Math.max(30, current - 10))} type="button">−</button>
                   <span>{zoom}%</span>
-                  <button aria-label="확대" onClick={() => setZoom((current) => Math.min(200, current + 10))} type="button">+</button>
+                  <button aria-label="확대" onClick={() => setZoom((current) => Math.min(300, current + 10))} type="button">+</button>
                 </div>
                 <button
                   aria-keyshortcuts="Shift+F"

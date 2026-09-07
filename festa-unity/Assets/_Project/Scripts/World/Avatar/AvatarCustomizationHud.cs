@@ -9,6 +9,9 @@ namespace Festa.World
     ///
     /// 정식 서비스에서는 React 오버레이가 이 역할을 맡고 Unity는 AvatarBridge로 값만 받는다
     /// (Docs/avatar-customization-contract.md). 이 HUD는 그때까지의 구현 + 월드 단독 데모용.
+    ///
+    /// <para><b>에디터 전용.</b> 빌드(Development 포함)에서는 버튼·C 키 모두 나오지 않는다 — 2026-09-06 WebGL 실측에서
+    /// 월드 우상단 "Customize (C)" 버튼이 모든 사용자에게 보이며 이름표를 가렸다(S15P21A604-447). 커스터마이징은 로비 몫.</para>
     /// </summary>
     public class AvatarCustomizationHud : MonoBehaviour
     {
@@ -16,7 +19,11 @@ namespace Festa.World
 
         bool _open;
 
-        void Awake() => _open = _openByDefault;
+        void Awake()
+        {
+            _open = _openByDefault;
+            if (!Application.isEditor) enabled = false;
+        }
 
         void Update()
         {

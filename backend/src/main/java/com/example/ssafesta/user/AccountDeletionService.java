@@ -21,7 +21,10 @@ public class AccountDeletionService {
         jdbc.update("DELETE FROM surveys WHERE created_by_user_id = ?", userId);
         jdbc.update("DELETE FROM consultation_messages WHERE sender_user_id = ? OR consultation_id IN (SELECT id FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?)", userId, userId, userId, userId);
         jdbc.update("DELETE FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?", userId, userId, userId);
-        jdbc.update("DELETE FROM ai_document_chunks WHERE document_id IN (SELECT d.id FROM ai_documents d JOIN ai_agents a ON a.id = d.agent_id WHERE a.booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR d.uploaded_by_user_id = ?)", userId, userId);
+        // 문서 한 줄이면 청크·Job·staging 이 함께 지워진다 (V21). 이 자리에 청크 삭제가
+        // 따로 있던 것은 V1 의 FK 가 NO ACTION 이라 순서가 강제됐기 때문이고, V21 가
+        // ai_document_chunks.document_id 를 ON DELETE CASCADE 로 바꾸면서 그 이유가 없어졌다.
+        // Job 은 document_id CASCADE 로, staging 은 job_id CASCADE 로 따라 지워진다.
         jdbc.update("DELETE FROM ai_documents WHERE agent_id IN (SELECT id FROM ai_agents WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)) OR uploaded_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM ai_agents WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM project_likes WHERE project_id IN (SELECT id FROM projects WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId);

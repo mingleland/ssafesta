@@ -78,6 +78,8 @@ namespace Festa.World
             TryApplySceneHandoff();
         }
 
+        bool _handoffSaved;
+
         void TryApplySceneHandoff()
         {
             if (string.IsNullOrEmpty(_sceneHandoffEncoded)) return;
@@ -85,6 +87,16 @@ namespace Festa.World
             {
                 _sceneHandoffEncoded = null;
                 return;
+            }
+
+            // **로비에서 고른 외형을 프로필에도 저장한다** (S15P21A604-168, T-124).
+            // 전에는 월드 진입 시 서버 RPC 로 동기화만 하고 PUT /users/me/avatar 는 월드 안 "적용" 버튼 경로에서만 불렀다 —
+            // 정상 흐름(로비 커스터마이징 → 월드 입장)으로는 외형이 영영 저장되지 않아 다음 로그인에 기본 외형이 떴다.
+            // 회원 토큰이 있을 때만(게스트 403·미주입 401 은 뻔한 실패라 호출하지 않는다), 진입당 한 번.
+            if (!_handoffSaved && Festa.Integration.AuthBridge.HasToken && !Festa.Integration.AuthBridge.IsGuest)
+            {
+                _handoffSaved = true;
+                SaveToProfileAsync(_sceneHandoffEncoded);
             }
 
             // A host owns both sides of the connection.  Writing directly here

@@ -83,3 +83,14 @@ def test_tiktoken_codec_round_trips_real_text() -> None:
     encoding = tiktoken.get_encoding("cl100k_base")
     assert chunks[0].token_count == len(encoding.encode(chunks[0].content))
     assert "부스" in "".join(c.content for c in chunks)
+
+
+def test_tiktoken_windows_do_not_insert_unicode_replacement_characters() -> None:
+    codec = TikTokenCodec()
+    pages = [ParsedPage(page_number=1, text="한🙂글 문서입니다.")]
+
+    chunks = chunk_pages(pages, chunk_size=2, overlap=0, codec=codec)
+
+    assert all("�" not in chunk.content for chunk in chunks)
+    assert "한" in "".join(chunk.content for chunk in chunks)
+    assert "글" in "".join(chunk.content for chunk in chunks)

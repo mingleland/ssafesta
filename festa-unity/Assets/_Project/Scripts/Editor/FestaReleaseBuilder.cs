@@ -114,6 +114,9 @@ namespace Festa.EditorTools
         static void Run(bool restartContainer)
         {
             var started = DateTime.Now;
+            // 이미지 태그(소스 스탬프)는 **어떤 에셋도 건드리기 전**에 읽는다. 아래 ForceApiEnvironment 가
+            // ApiConfig.asset 을 디스크에 저장하므로, 3/3 단계에서 읽으면 깨끗한 체크아웃도 항상 -dirty 가 된다.
+            var sourceStamp = SourceStamp(ProjectRoot());
 
             // 되돌릴 것들. 여기서 놓치면 이후 에디터 작업이 조용히 어긋난다.
             var prevTarget = EditorUserBuildSettings.activeBuildTarget;
@@ -122,10 +125,16 @@ namespace Festa.EditorTools
             bool prevDev = EditorUserBuildSettings.development;
             var prevCompression = PlayerSettings.WebGL.compressionFormat;
             bool prevFallback = PlayerSettings.WebGL.decompressionFallback;
+            var apiConfig = LoadApiConfig();
+            bool prevMock = apiConfig != null && apiConfig.useMockApi;
+            var prevEnv = apiConfig != null ? apiConfig.activeEnvironment : Festa.Integration.ApiEnvironment.Local;
 
             try
             {
                 EditorUserBuildSettings.development = false;
+                // 배포본은 실서버·Prod 다. 에셋의 커밋 기본값은 에디터 편의를 위한 Mock+Local 이라,
+                // 강제하지 않으면 깨끗한 체크아웃에서 뽑은 WebGL 이 Mock 으로 나간다 (S15P21A604-419).
+                if (!ForceApiEnvironment(apiConfig, Festa.Integration.ApiEnvironment.Prod)) return;
 
                 if (!BuildLinuxServer()) return;
                 if (!BuildWebGL()) return;
@@ -137,7 +146,7 @@ namespace Festa.EditorTools
                     return;
                 }
 
-                var tags = BuildImage();
+                var tags = BuildImage(sourceStamp);
                 if (tags == null) return;
 
                 if (restartContainer && !RecreateContainer(tags[0])) return;
@@ -158,6 +167,7 @@ namespace Festa.EditorTools
                 EditorUserBuildSettings.standaloneBuildSubtarget = prevSubtarget;
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
                 PlayerSettings.WebGL.decompressionFallback = prevFallback;
+                RestoreApiEnvironment(apiConfig, prevMock, prevEnv);
 
                 // **"원래대로" 가 고장난 상태면 복원이 고장을 보존한다** (T-228).
                 //
@@ -220,6 +230,56 @@ namespace Festa.EditorTools
             EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
 
         // ── Linux 데디케이티드 서버 ────────────────────────────
+
+        const string ApiConfigPath = "Assets/_Project/ScriptableObjects/ApiConfig.asset";
+
+        internal static Festa.Integration.ApiConfig LoadApiConfig() =>
+            AssetDatabase.LoadAssetAtPath<Festa.Integration.ApiConfig>(ApiConfigPath);
+
+        /// <summary>
+        /// 빌드에 들어갈 API 환경을 강제한다. 에셋을 실제로 저장한다 — BuildPlayer 는 디스크의
+        /// 직렬화 상태를 읽으므로 메모리만 바꾸면 반영이 보장되지 않는다. 무엇으로 뽑았는지는
+        /// 로그에 반드시 남긴다 — 산출물만 보고는 알 수 없기 때문이다 (S15P21A604-419).
+        /// </summary>
+        internal static bool ForceApiEnvironment(Festa.Integration.ApiConfig cfg, Festa.Integration.ApiEnvironment env)
+        {
+            if (cfg == null)
+            {
+                Debug.LogError($"[Release] {ApiConfigPath} 를 찾지 못했다 — 어떤 API 를 부를지 정할 수 없어 멈춘다.");
+                return false;
+            }
+            cfg.useMockApi = false;
+            cfg.activeEnvironment = env;
+            var entry = cfg.Active;
+            if (entry == null || string.IsNullOrEmpty(entry.springBaseUrl) || entry.springBaseUrl.Contains("example.com"))
+            {
+                Debug.LogError($"[Release] ApiConfig {env} 항목의 springBaseUrl 이 비었거나 자리표시다: '{entry?.springBaseUrl}' — 이대로 뽑으면 아무 서버에도 붙지 않는다.");
+                return false;
+            }
+            EditorUtility.SetDirty(cfg);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Release] 이 빌드의 API — env={env} mock=false spring={entry.springBaseUrl} ai={entry.aiBaseUrl}");
+            return true;
+        }
+
+        internal static void RestoreApiEnvironment(Festa.Integration.ApiConfig cfg, bool prevMock, Festa.Integration.ApiEnvironment prevEnv)
+        {
+            // 빌드 전에 잡아 둔 참조를 믿지 않는다. 빌드 타깃 전환·리임포트를 거치면 그 참조는
+            // 파괴된 오브젝트(가짜 null)가 되고, 2026-09-05 Prod 빌드에서 바로 그 경로로 복원이
+            // **조용히 빠져** 작업본 에셋이 Prod 로 남았다. 경로로 다시 읽고, 못 읽으면 소리 낸다.
+            cfg = LoadApiConfig();
+            if (cfg == null)
+            {
+                Debug.LogError($"[Release] ApiConfig 복원 실패 — {ApiConfigPath} 를 다시 읽지 못했다. " +
+                               $"에셋이 env={prevEnv} mock={prevMock} 로 돌아가지 않았을 수 있다 — 손으로 확인해라.");
+                return;
+            }
+            cfg.useMockApi = prevMock;
+            cfg.activeEnvironment = prevEnv;
+            EditorUtility.SetDirty(cfg);
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[Release] ApiConfig 복원 — env={prevEnv} mock={prevMock}");
+        }
 
         static bool BuildLinuxServer()
         {
@@ -341,16 +401,73 @@ namespace Festa.EditorTools
         static bool VerifyRenderPipelineAssetsPacked(BuildReport report)
         {
             const string required = "Mobile_RPAsset";
+
+            int entries = 0;
             foreach (var packed in report.packedAssets)
                 foreach (var info in packed.contents)
+                {
+                    entries++;
                     if (info.sourceAssetPath != null && info.sourceAssetPath.Contains(required))
                         return true;
+                }
+
+            // **리포트가 비어 있는 것은 "에셋이 없다" 가 아니다.** 증분 빌드에서 Unity 가 데이터를 다시
+            // 패킹하지 않으면 packedAssets 가 통째로 비어 온다. 그걸 실패로 단정해서 2026-09-06 에
+            // 정상 산출물을 세 번 연속 반려했다 (T-126). 실제로 압축 전 산출물 안에는 들어 있었다.
+            // 그래서 리포트가 비었을 때만 산출물을 직접 뒤져 한 번 더 본다 — 확인 경로를 로그에 남긴다.
+            if (entries == 0 && StagedPlayerDataContains(required))
+            {
+                Debug.LogWarning(
+                    $"[Release] 빌드 리포트에 패킹 목록이 없다(증분 빌드) — 압축 전 산출물에서 {required} 를 직접 확인했다. 통과시킨다.");
+                return true;
+            }
 
             Debug.LogError(
                 $"[Release] {required} 가 빌드 산출물에 없다 — 이대로 배포하면 월드가 평평하게 렌더링된다.\n" +
-                "WebGL 기본 품질 레벨은 0(Mobile) 이고 그 레벨의 렌더 파이프라인이 이 에셋이다.\n" +
+                $"리포트 패킹 항목 {entries}건. WebGL 기본 품질 레벨은 0(Mobile) 이고 그 레벨의 렌더 파이프라인이 이 에셋이다.\n" +
                 "원인은 대개 빌드 시작 시점의 활성 타깃이 WebGL 이 아닌 것이다 (S15P21A604-316).");
             return false;
+        }
+
+        /// <summary>
+        /// 압축 전 WebGL 플레이어 데이터에서 이름 문자열을 찾는다 (리포트가 빈 증분 빌드용 2차 확인).
+        /// 200 MB 를 통째로 올리지 않고 겹치는 버퍼로 흘려 읽는다. 파일이 없으면 <c>false</c> — 확인 못 한 것은 통과가 아니다.
+        /// </summary>
+        static bool StagedPlayerDataContains(string needle)
+        {
+            var staged = Path.Combine(ProjectRoot(), "Library/Bee/artifacts/WebGL/webgl.data");
+            try
+            {
+                if (!File.Exists(staged))
+                {
+                    Debug.LogWarning($"[Release] 압축 전 산출물을 찾지 못했다 ({staged}) — 2차 확인 생략.");
+                    return false;
+                }
+
+                var pattern = Encoding.ASCII.GetBytes(needle);
+                using var fs = File.OpenRead(staged);
+                var buffer = new byte[1 << 20];
+                int carry = 0;
+                while (true)
+                {
+                    int read = fs.Read(buffer, carry, buffer.Length - carry);
+                    if (read <= 0) return false;
+                    int len = carry + read;
+                    for (int i = 0; i + pattern.Length <= len; i++)
+                    {
+                        int j = 0;
+                        while (j < pattern.Length && buffer[i + j] == pattern[j]) j++;
+                        if (j == pattern.Length) return true;
+                    }
+                    carry = Math.Min(pattern.Length - 1, len);
+                    Array.Copy(buffer, len - carry, buffer, 0, carry);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Release] 압축 전 산출물 스캔 실패: {ex.Message}");
+                return false;
+            }
         }
 
         static bool Succeeded(string what, BuildReport report)
@@ -386,8 +503,11 @@ namespace Festa.EditorTools
             return false;
         }
 
-        /// <summary>이미지를 빌드하고 붙인 태그를 돌려준다. 실패면 null.</summary>
-        static string[] BuildImage()
+        /// <summary>이미지를 빌드하고 붙인 태그를 돌려준다. 실패면 null. 스탬프는 호출 시점의 트리 상태.</summary>
+        static string[] BuildImage() => BuildImage(SourceStamp(ProjectRoot()));
+
+        /// <param name="sourceStamp">이미지 태그에 쓸 소스 스탬프 — 배포 빌드는 에셋을 강제 저장하기 전에 읽은 값을 넘긴다.</param>
+        static string[] BuildImage(string sourceStamp)
         {
             var root = ProjectRoot();
             if (!File.Exists(Path.Combine(root, DockerfilePath)))
@@ -398,7 +518,7 @@ namespace Festa.EditorTools
 
             // 커밋 해시를 태그로 남긴다 — "지금 도는 컨테이너가 어느 코드냐"에 답할 수 있어야 한다.
             // 커밋되지 않은 변경이 섞였으면 -dirty 를 붙인다. 재현 불가를 숨기지 않기 위해서다.
-            var tags = new[] { $"{ImageName}:dev", $"{ImageName}:{SourceStamp(root)}" };
+            var tags = new[] { $"{ImageName}:dev", $"{ImageName}:{sourceStamp}" };
             var args = new StringBuilder("build");
             foreach (var tag in tags) args.Append($" -t {tag}");
             args.Append($" -f {DockerfilePath} {ServerOutDir}");
