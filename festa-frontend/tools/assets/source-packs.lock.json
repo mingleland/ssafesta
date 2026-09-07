@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "note": "Source package 단위 라이선스 정책. 개별 에셋이 아니라 취득한 팩에 정책이 붙는다. 선언되지 않은 팩은 compile 되지 않는다.",
+  "reviewGuidance": "runtimeCompilePolicy 를 ALLOW_RUNTIME_COMPILE 로 올리려면 acquisitionSource 와 licenseClass 를 사람이 확인해 evidence 를 채워야 한다. AI 가 임의로 올리지 않는다.",
+  "packages": {
+    "ExpoKit": {
+      "vendor": "미확인",
+      "acquisitionSource": "미확인 — 저장소에 라이선스 파일이 없다",
+      "licenseClass": "UNKNOWN",
+      "evidence": null,
+      "runtimeCompilePolicy": "REVIEW_REQUIRED",
+      "assetRoots": ["Assets/_Project/Art/Booth/ExpoKit"],
+      "comment": "Booth 오브젝트 10종의 mesh 대부분이 여기서 온다. 디렉터리명 'Ressources' 오타로 보아 외산 팩이다."
+    },
+    "ithappy/Casino_Free": {
+      "vendor": "ithappy",
+      "acquisitionSource": "미확인",
+      "licenseClass": "UNKNOWN",
+      "evidence": null,
+      "runtimeCompilePolicy": "REVIEW_REQUIRED",
+      "assetRoots": ["Assets/ithappy/Casino_Free"],
+      "comment": "AI_AGENT 캐릭터와 여러 ExpoKit prefab 이 참조하는 Frame.fbx 가 여기 있다."
+    }
+  }
+}
