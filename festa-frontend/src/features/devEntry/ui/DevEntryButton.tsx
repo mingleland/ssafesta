@@ -14,24 +14,32 @@
 //
 // 월드 안에는 표시하지 않는다. 개발 진입은 로그인 화면에서 한 번 정해지는 일이고,
 // 게임 화면에 상시 표식을 두면 HUD 예산(총 점유 15% 미만)만 잠식한다.
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IS_DEV_ENTRY, enterAsDeveloper } from '../model/devEntry';
 import './devEntry.css';
 
 export function DevEntryButton() {
   const navigate = useNavigate();
+  // 실패를 삼키지 않는다 — 실 BE 에서 회원 세션을 못 받으면 그 사실을 화면에 남긴다.
+  // 예전에는 세션을 만든 뒤 첫 요청의 401 로 로그인 화면에 되돌아왔고, 이유가 어디에도 없었다.
+  const [failure, setFailure] = useState<string | null>(null);
   // 조건 하나로 컴포넌트 전체가 사라진다 — 프로덕션 빌드에는 이 갈래가 남지 않는다
   if (!IS_DEV_ENTRY) return null;
 
   return (
+    <>
     <button
       type="button"
       className="dev-entry-btn"
       aria-label="개발자로 입장"
       title="개발자로 입장 — 회원 세션으로 바로 들어갑니다"
       onClick={() => {
-        enterAsDeveloper();
-        navigate('/app/world', { replace: true });
+        setFailure(null);
+        enterAsDeveloper().then(
+          () => navigate('/app/world', { replace: true }),
+          (error: unknown) => setFailure(error instanceof Error ? error.message : String(error)),
+        );
       }}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -39,5 +47,13 @@ export function DevEntryButton() {
         <path d="M18.5 2.5 21.5 5.5" />
       </svg>
     </button>
+    {failure !== null && (
+      <p className="dev-entry-error" role="alert">
+        개발자 입장 실패 — {failure}
+        <br />
+        실 BE 모드에서는 `refresh_token` 쿠키가 있어야 회원 세션을 받는다.
+      </p>
+    )}
+    </>
   );
 }

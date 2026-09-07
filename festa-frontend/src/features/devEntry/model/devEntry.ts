@@ -8,6 +8,7 @@
 //   VITE_USE_MOCK    mock 데이터 소스
 //   VITE_MOCK_WORLD  Unity World mock 여부 (S15P21A604-466)
 //   VITE_DEV_ENTRY   개발자 전용 진입 여부 (이 파일)
+import * as authApi from '../../../entities/auth/api';
 import { setMemberSession } from '../../auth/model/session';
 
 /**
@@ -28,10 +29,22 @@ const DEV_SESSION_HOURS = 12;
  * OAuth 왕복도 닉네임 등록도 거치지 않는다. 목적이 "회원 전용 화면을 열어 보는 것" 이라
  * 그 앞의 절차는 확인 대상이 아니다 — 그 절차 자체를 보려면 제품 버튼을 쓰면 된다.
  *
- * 토큰은 개발용 표식이다. mock API 는 토큰을 보지 않고, 실 BE 는 어차피 거부한다 —
- * 이 진입은 mock 데이터와 함께 쓰는 것이 전제다.
+ * 토큰을 어디서 얻는지가 mock 이냐 실 BE 냐로 갈린다.
+ *
+ *   mock    `'dev-entry'` 표식. mock API 는 토큰을 보지 않는다
+ *   실 BE   `POST /auth/refresh` — `refresh_token` 쿠키로 **진짜 회원 세션**을 받는다
+ *
+ * 예전에는 실 BE 에서도 표식을 그대로 넣었다. 그러면 세션은 만들어지는데 첫 요청이 401 이 되고,
+ * 401 인터셉트가 세션을 지워 **로그인 화면으로 조용히 되돌아간다** — 무엇이 틀렸는지 아무 데도
+ * 남지 않는 실패였다. 실 BE 에서는 받아 낼 수 있을 때만 들어가고, 못 받으면 던져서 드러낸다
+ * (헌법: 실패를 조용히 기본값으로 되돌리지 않는다).
  */
-export function enterAsDeveloper(): void {
-  const expiresAt = new Date(Date.now() + DEV_SESSION_HOURS * 60 * 60 * 1000).toISOString();
-  setMemberSession('dev-entry', expiresAt);
+export async function enterAsDeveloper(): Promise<void> {
+  if (import.meta.env.VITE_USE_MOCK === 'true') {
+    const expiresAt = new Date(Date.now() + DEV_SESSION_HOURS * 60 * 60 * 1000).toISOString();
+    setMemberSession('dev-entry', expiresAt);
+    return;
+  }
+  const session = await authApi.refresh();
+  setMemberSession(session.accessToken, session.expiresAt);
 }
