@@ -87,8 +87,49 @@ class InternalTokenPropertiesTest {
         assertTrue(failureOf("").contains("ai-to-spring-tokens"));
     }
 
+    // ── 송신 방향도 같은 검증을 받는다 (S15P21A604-175) ──────────────────────────────
+
+    /** 검증은 방향별로 갈리지 않는다. 같은 실수가 어느 칸에서든 같은 기동 실패다. */
+    @ParameterizedTest
+    @ValueSource(strings = {"a,,b", "a,", "a, b", "same,same", "a,b,c", ""})
+    void theSendingDirectionRefusesTheSameMistakes(String tokens) {
+        assertTrue(outboundFailureOf(tokens).contains("spring-to-ai-tokens"));
+    }
+
+    /** 송신은 첫 값 하나다 — 나머지는 양쪽이 회전을 준비하는 동안 존재한다. */
+    @Test
+    void theSentTokenIsTheFirstOne() {
+        InternalTokenProperties properties = bind("in-a", "out-new,out-old");
+
+        assertEquals("out-new", properties.springToAiToken());
+        assertEquals(List.of("out-new", "out-old"), properties.springToAiTokenList());
+    }
+
+    /**
+     * 해석되지 않은 placeholder 는 거절한다.
+     *
+     * <p>이 케이스가 위 검증 전부를 통과한다 — {@code "${INTERNAL_SPRING_TO_AI_TOKENS}"} 는 빈
+     * 항목도, 공백도, 중복도, 셋도 아니다. 그대로 두면 그 문자열이 토큰이 되어 그 방향의 모든
+     * 호출이 영구히 401 이 되고, 변수 하나를 빠뜨린 배포가 상대 서비스 장애처럼 보인다. 저장소
+     * 설정에서 T-101 이 낸 것과 같은 모양이다.
+     */
+    @Test
+    void anUnresolvedPlaceholderRefusesToStart() {
+        assertTrue(failureOf("${INTERNAL_AI_TO_SPRING_TOKENS}").contains("해석되지 않았습니다"));
+        assertTrue(outboundFailureOf("${INTERNAL_SPRING_TO_AI_TOKENS}")
+                .contains("해석되지 않았습니다"));
+    }
+
     private static String failureOf(String tokens) {
-        BindException failure = assertThrows(BindException.class, () -> bind(tokens));
+        return rootMessageOf(() -> bind(tokens));
+    }
+
+    private static String outboundFailureOf(String tokens) {
+        return rootMessageOf(() -> bind("valid-inbound", tokens));
+    }
+
+    private static String rootMessageOf(org.junit.jupiter.api.function.Executable binding) {
+        BindException failure = assertThrows(BindException.class, binding);
         Throwable cause = failure;
         while (cause.getCause() != null) {
             cause = cause.getCause();
@@ -96,9 +137,15 @@ class InternalTokenPropertiesTest {
         return String.valueOf(cause.getMessage());
     }
 
+    /** The outbound value is a valid one, so a refusal can only be about the inbound argument. */
     private static InternalTokenProperties bind(String tokens) {
-        return new Binder(new MapConfigurationPropertySource(
-                Map.of("app.internal.ai-to-spring-tokens", tokens)))
+        return bind(tokens, "valid-outbound");
+    }
+
+    private static InternalTokenProperties bind(String aiToSpring, String springToAi) {
+        return new Binder(new MapConfigurationPropertySource(Map.of(
+                "app.internal.ai-to-spring-tokens", aiToSpring,
+                "app.internal.spring-to-ai-tokens", springToAi)))
                 .bind("app.internal", InternalTokenProperties.class).get();
     }
 }

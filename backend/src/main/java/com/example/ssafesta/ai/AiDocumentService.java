@@ -68,12 +68,14 @@ public class AiDocumentService {
     private final AiAgentProperties agentProperties;
     private final ObjectStorageProperties storageProperties;
     private final ObjectStorage storage;
+    private final DocumentJobDispatchService dispatcher;
     private final TransactionTemplate transactions;
 
     public AiDocumentService(AiDocumentRepository documents, AiAgentRepository agents,
                              BoothAccessGuard accessGuard,
                              AiAgentProperties agentProperties,
                              ObjectStorageProperties storageProperties, ObjectStorage storage,
+                             DocumentJobDispatchService dispatcher,
                              TransactionTemplate transactions) {
         this.documents = documents;
         this.agents = agents;
@@ -81,6 +83,7 @@ public class AiDocumentService {
         this.agentProperties = agentProperties;
         this.storageProperties = storageProperties;
         this.storage = storage;
+        this.dispatcher = dispatcher;
         this.transactions = transactions;
     }
 
@@ -259,7 +262,13 @@ public class AiDocumentService {
         }
         Optional<Long> storedSize = storage.headSize(snapshot.provider(), snapshot.bucket(),
                 snapshot.objectKey());
-        return transactions.execute(status -> settle(documentId, snapshot, storedSize));
+        Settled settled = Objects.requireNonNull(
+                transactions.execute(status -> settle(documentId, snapshot, storedSize)));
+        // Outside the transaction, on purpose — the same rule the HEAD above follows. The Job is
+        // already committed, so a delegation that fails leaves work the sweeper can pick up rather
+        // than a lock held across somebody else's network (S15P21A604-175).
+        settled.dispatch().ifPresent(dispatcher::dispatchQuietly);
+        return settled.view();
     }
 
     private Snapshot readSnapshot(Long documentId, Long userId) {
@@ -290,13 +299,16 @@ public class AiDocumentService {
         return null;
     }
 
-    private CompleteView settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
+    private Settled settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
         AiDocument document = documents.findWithLockById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
 
         CompleteView settled = decideWithoutStorage(document);
         if (settled != null) {
-            return settled;
+            // Already past the upload gate, so its Job was created by the call that put it there.
+            // Creating another would violate the one-active-Job index and re-process a document
+            // nobody changed.
+            return Settled.decided(settled);
         }
         if (!snapshot.sameStorage(document)) {
             // Reconcile moved the object while we were asking the old provider about it. The HEAD
@@ -318,7 +330,7 @@ public class AiDocumentService {
                 throw gone();
             }
             document.recover(now);
-            return CompleteView.of(document);
+            return Settled.uploaded(document, dispatcher.createQueuedJob(document));
         }
 
         if (!present) {
@@ -328,7 +340,28 @@ public class AiDocumentService {
                             : "업로드된 파일 크기가 요청과 다릅니다. 다시 올려 주세요.");
         }
         document.markUploaded(now);
-        return CompleteView.of(document);
+        return Settled.uploaded(document, dispatcher.createQueuedJob(document));
+    }
+
+    /**
+     * What {@link #settle} decided, and the delegation it left for after the commit.
+     *
+     * <p>Two fields rather than dispatching inside {@code settle}: the Job insert needs the document
+     * row lock and the delegation call must not have it, and that boundary is only visible if the
+     * transaction hands the work back out.
+     */
+    private record Settled(CompleteView view,
+                           Optional<DocumentProcessingClient.ProcessingRequest> dispatch) {
+
+        /** No write happened, so there is nothing to hand to FastAPI. */
+        static Settled decided(CompleteView view) {
+            return new Settled(view, Optional.empty());
+        }
+
+        static Settled uploaded(AiDocument document,
+                                DocumentProcessingClient.ProcessingRequest request) {
+            return new Settled(CompleteView.of(document), Optional.of(request));
+        }
     }
 
     private static boolean withinRecoveryWindow(AiDocument document, Instant now) {
