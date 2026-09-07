@@ -12,11 +12,19 @@ export const INCH_TO_M = 0.0254;
 
 export const UNITY_ASSET_ROOT = '../festa-unity/Assets/_Project/Art/Booth/ExpoKit/Models';
 
+/** guid 역인덱스를 만들 뿌리. prefab 이 참조를 guid 로만 갖고 있어 전 트리를 훑어야 한다 */
+export const UNITY_ASSETS_ROOT = '../festa-unity/Assets';
+
+/** 조립체 prefab 의 뿌리 — BoothObjectRegistry 가 타입에 물려 둔 그 파일들이다 */
+export const UNITY_PREFAB_ROOT = '../festa-unity/Assets/_Project/Prefabs/Booth';
+
 /**
  * @typedef {object} BoothAssetSource
  * @property {string} assetCode   계약의 assetCode. LayoutObject.assetCode 와 같은 값이다
  * @property {string} objectType  계약 ObjectType — 도메인 AABB 를 어디서 가져올지 정한다
- * @property {string} fbx         UNITY_ASSET_ROOT 기준 상대 경로
+ * @property {'fbx'|'prefab'} kind 단일 메시(fbx)인가 조립체(prefab)인가
+ * @property {string} [fbx]       kind='fbx' — UNITY_ASSET_ROOT 기준 상대 경로
+ * @property {string} [prefab]    kind='prefab' — UNITY_PREFAB_ROOT 기준 상대 경로
  * @property {number} unitScale   원본 단위 → 미터
  * @property {'zUp'|'yUp'} upAxis 원본의 위 방향
  * @property {boolean} typeDefault assetCode 없이 그 타입으로 놓였을 때 쓸 자산인가
@@ -28,6 +36,7 @@ export const BOOTH_ASSETS = [
   {
     assetCode: 'DECORATION_DEFAULT',
     objectType: 'DECORATION',
+    kind: 'fbx',
     fbx: 'Stands/DisplayBox01.FBX',
     unitScale: INCH_TO_M,
     upAxis: 'zUp',
@@ -40,6 +49,7 @@ export const BOOTH_ASSETS = [
   {
     assetCode: 'FURNITURE_CHAIR01',
     objectType: 'FURNITURE',
+    kind: 'fbx',
     fbx: 'Furniture/Chair01.FBX',
     unitScale: INCH_TO_M,
     upAxis: 'zUp',
@@ -50,5 +60,19 @@ export const BOOTH_ASSETS = [
     // 계약 AABB(1.5 × 0.75 × 1.72)는 그 세트의 것이다. 의자 하나는 당연히 그보다 작다 —
     // 이 어긋남은 결함이 아니라 "assetCode 가 타입 기본과 다르다" 는 뜻이다.
     note: '의자 단품 — 타입 기본(조립체)과 다른 assetCode 라 계약 AABB 보다 작은 것이 정상',
+  },
+  {
+    assetCode: 'SURVEY_KIOSK_DEFAULT',
+    objectType: 'SURVEY_KIOSK',
+    kind: 'prefab',
+    prefab: 'SurveyKiosk.prefab',
+    unitScale: INCH_TO_M,
+    // prefab 이 축을 세운다 — 자식 Transform 에 -90° X 회전이 이미 들어 있다.
+    // 그래서 여기서 또 눕히면 두 번 돌아간다. 단일 FBX 와 다른 점이 이것 하나다.
+    upAxis: 'yUp',
+    typeDefault: true,
+    // BoothObjectRegistry 의 SurveyKiosk = Counter01.prefab + Tablet.prefab 조립체다.
+    // Counter01 은 다시 4개 FBX(본체·상판·천·선반)를 물고 있다 — 중첩까지 한 번에 검증된다.
+    note: 'Unity prefab 계층(중첩 포함)을 FE 에서 재현할 수 있는지 보는 대표',
   },
 ];
