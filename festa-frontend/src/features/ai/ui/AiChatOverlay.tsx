@@ -2,9 +2,12 @@
 // SSE 렌더링(S15P21A604-182)의 token/source 누적·error/sequence 결번 처리는
 // entities/conversation/stream.consumer(consumeSseStream)에 위임한다. 이 파일(S15P21A604-189)은
 // 실서버 결선만 담당 — Conversation 생성 → streamMessage로 얻은 SSE 본문을 그 consumer에 넘긴다.
+// 종료 처리(S15P21A604-516): 오버레이가 사라지면 진행 중 스트림을 끊고 Conversation 원문을
+// 즉시 삭제한다. 닫기 핸들러가 아니라 **언마운트**에 건다 — OverlayHost 가 타입별로 컴포넌트를
+// 갈아끼우므로 Esc·배경 클릭·X·외부 closeOverlay()·다른 오버레이 전환이 전부 여기로 수렴한다.
 import { useEffect, useRef, useState } from 'react';
 import { closeOverlay } from '../../../shared/types/overlay';
-import { createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
+import { closeConversation, createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
 import { describeHttpError, shouldResetConversation } from '../../../entities/conversation/errorMessages';
 import { consumeSseStream } from '../../../entities/conversation/stream.consumer';
 import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
@@ -51,6 +54,25 @@ export function AiChatOverlay({ payload }: Props) {
   // 다음 질문이 새 Conversation을 만들게 한다(entities/conversation/errorMessages 참고)
   const [conversationId, setConversationId] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  // 언마운트 cleanup 은 마운트 시점 클로저라 state 를 stale 하게 본다 — 정리에 쓸 값은 ref 로 따로 든다.
+  const conversationIdRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  function rememberConversationId(id: string | null) {
+    conversationIdRef.current = id;
+    setConversationId(id);
+  }
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      const id = conversationIdRef.current;
+      // fire-and-forget — 화면이 이미 사라져 보여줄 곳이 없다. 실패해도 30분 유휴 TTL 이 지우고,
+      // /ai/* 라우팅이 아직 인프라 대기라(GitLab #144) 호출이 안 나갈 수도 있다. 그때도 조용해야 한다.
+      if (id !== null) void closeConversation(id).catch(() => {});
+    },
+    [],
+  );
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
@@ -66,8 +88,11 @@ export function AiChatOverlay({ payload }: Props) {
   }
 
   function showHttpError(e: unknown, question: string, fallbackHeadline: string) {
+    // 우리가 끊은 것이다 — 오류가 아니다. 오버레이는 이미 사라지는 중이라 그릴 화면도 없다.
+    // 판정 관용구는 game-studio/host/GameOverlay.tsx 와 같은 것을 쓴다(S15P21A604-516).
+    if (e instanceof DOMException && e.name === 'AbortError') return;
     if (isAiHttpError(e)) {
-      if (shouldResetConversation(e)) setConversationId(null);
+      if (shouldResetConversation(e)) rememberConversationId(null);
       const description = describeHttpError(e);
       setLastAgentTurn({
         status: 'error',
@@ -95,6 +120,10 @@ export function AiChatOverlay({ payload }: Props) {
     }
     const agentId = payload.agentId;
 
+    // 질문마다 새 컨트롤러다 — 이전 질문의 abort 상태를 물려받지 않는다.
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setBusy(true);
     setDraft('');
     setTurns((t) => [...t, { role: 'user', text: question }, { role: 'agent', text: '', streaming: true }]);
@@ -104,7 +133,7 @@ export function AiChatOverlay({ payload }: Props) {
         try {
           const handle = await createConversation(payload.boothId, agentId);
           activeConversationId = handle.conversationId;
-          setConversationId(activeConversationId);
+          rememberConversationId(activeConversationId);
         } catch (e) {
           showHttpError(e, question, '대화를 시작할 수 없습니다.');
           return;
@@ -112,7 +141,7 @@ export function AiChatOverlay({ payload }: Props) {
       }
 
       try {
-        await consumeSseStream(streamMessage(activeConversationId, question), (snapshot) => {
+        await consumeSseStream(streamMessage(activeConversationId, question, controller.signal), (snapshot) => {
           setTurns((t) => {
             const next = [...t];
             next[next.length - 1] = {

@@ -10,10 +10,12 @@ import { AiChatOverlay } from '../../AiChatOverlay';
 
 const createConversation = vi.fn();
 const streamMessage = vi.fn();
+const closeConversation = vi.fn();
 
 vi.mock('../../../../../entities/conversation/api', () => ({
   createConversation: (...args: unknown[]) => createConversation(...args),
   streamMessage: (...args: unknown[]) => streamMessage(...args),
+  closeConversation: (...args: unknown[]) => closeConversation(...args),
   isAiHttpError: (value: unknown): boolean =>
     typeof value === 'object' && value !== null && typeof (value as { status?: unknown }).status === 'number',
 }));
@@ -22,6 +24,8 @@ beforeEach(() => {
   createConversation.mockReset();
   createConversation.mockResolvedValue({ conversationId: 'conv_1', expiresAt: '2026-09-07T00:00:00Z' });
   streamMessage.mockReset();
+  closeConversation.mockReset();
+  closeConversation.mockResolvedValue(undefined);
   // jsdom은 Element.scrollTo를 구현하지 않는다 — 대화창 자동 스크롤 effect가 던지지 않게만 막는다.
   Element.prototype.scrollTo = vi.fn();
 });
@@ -55,7 +59,9 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
   });
 
   it('같은 대화에서 두 번째 질문은 Conversation을 다시 만들지 않는다', async () => {
-    streamMessage.mockReturnValue(mockStreamSuccess());
+    // mockReturnValue 로 주면 두 질문이 **같은 제너레이터 인스턴스**를 공유해 두 번째가 빈 스트림이 된다
+    // (실측: 1회차 'ab', 2회차 ''). 질문마다 새 스트림을 여는 실제 동작과 맞추려면 factory 여야 한다.
+    streamMessage.mockImplementation(() => mockStreamSuccess());
     render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
 
     ask('첫 질문');
@@ -108,11 +114,68 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     expect(createConversation).not.toHaveBeenCalled();
   });
 
+  it('오버레이가 사라지면 Conversation 을 즉시 삭제한다 (S15P21A604-516)', async () => {
+    streamMessage.mockImplementation(() => mockStreamSuccess());
+    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    ask('질문');
+    await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/);
+
+    unmount();
+
+    expect(closeConversation).toHaveBeenCalledWith('conv_1');
+  });
+
+  it('대화를 만들지 않고 닫으면 삭제를 부르지 않는다 — 지울 것이 없다', async () => {
+    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    unmount();
+    expect(closeConversation).not.toHaveBeenCalled();
+  });
+
+  it('삭제가 실패해도 조용하다 — 화면은 이미 닫혔고 30분 TTL 이 지운다', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    closeConversation.mockRejectedValue({ code: 'CONVERSATION_OWNERSHIP_MISMATCH', status: 403 });
+    streamMessage.mockImplementation(() => mockStreamSuccess());
+    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    ask('질문');
+    await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/);
+
+    expect(() => unmount()).not.toThrow();
+    await Promise.resolve();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it('진행 중 스트림을 언마운트에서 끊는다 — 버려질 답변에 토큰을 더 태우지 않는다', async () => {
+    let signal: AbortSignal | undefined;
+    // 끝나지 않는 스트림 — 사용자가 답변 도중에 닫는 상황이다.
+    streamMessage.mockImplementation((_id: string, _q: string, s: AbortSignal) => {
+      signal = s;
+      // abort 되면 풀리는 대기다. 영원히 pending 인 promise 를 쓰면 제너레이터가 워커에 남아
+      // 다른 테스트 파일을 간헐적으로 흔든다(실측: 전체 실행 2회 중 1회 무관한 파일이 red).
+      return (async function* () {
+        await new Promise<void>((resolve) => s.addEventListener('abort', () => resolve(), { once: true }));
+        yield '';
+      })();
+    });
+    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    ask('질문');
+    await waitFor(() => expect(signal).toBeDefined());
+    expect(signal!.aborted).toBe(false);
+
+    unmount();
+
+    expect(signal!.aborted).toBe(true);
+  });
+
   it('403(소유권·임대 만료)은 Conversation을 초기화해 다음 질문이 새로 만들게 한다', async () => {
-    // 스트림 시작 전 403(streamMessage 자체가 reject되는 경로) — SSE error 이벤트가 아니다.
-    streamMessage
-      .mockRejectedValueOnce({ code: 'BOOTH_LEASE_EXPIRED', message: '임대가 만료되었습니다.', status: 403 })
-      .mockReturnValueOnce(mockStreamSuccess());
+    // 스트림 시작 전 403(streamMessage 자체가 던지는 경로) — SSE error 이벤트가 아니다.
+    // mockRejectedValueOnce 는 Promise 를 주는데 streamMessage 는 async generator 라
+    // consumeSseStream 의 for-await 가 'rejected is not async iterable' TypeError 를 낸다(실측).
+    // 그러면 isAiHttpError 가 false 가 되어 403 초기화 경로 자체가 검증되지 않는다 — 던지는
+    // async generator 로 줘야 status 403 이 그대로 전달된다.
+    async function* rejects(): AsyncGenerator<string> {
+      throw { code: 'BOOTH_LEASE_EXPIRED', message: '임대가 만료되었습니다.', status: 403 };
+    }
+    streamMessage.mockImplementationOnce(() => rejects()).mockImplementationOnce(() => mockStreamSuccess());
 
     render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
     ask('첫 질문');
