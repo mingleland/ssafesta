@@ -2,7 +2,9 @@ package com.example.ssafesta.internal.ai;
 
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,8 +99,7 @@ class AiAgentConfigApiIntegrationTest {
         JsonNode body = bodyOf(boothId, 9_999_997L);
 
         assertFalse(body.get("found").asBoolean());
-        org.junit.jupiter.api.Assertions.assertEquals("AGENT_NOT_IN_BOOTH",
-                body.get("denialCode").asString());
+        assertEquals("AGENT_NOT_IN_BOOTH", body.get("denialCode").asString());
     }
 
     /** 다른 부스의 직원을 이 부스 이름으로 물어도 마찬가지다 (헌법 17조 격리). */
@@ -191,7 +192,7 @@ class AiAgentConfigApiIntegrationTest {
                 published.add(path);
             }
         }
-        assertFalse(!published.isEmpty(), "내부 경로가 공개 OpenAPI 문서에 실렸다: " + published);
+        assertTrue(published.isEmpty(), "내부 경로가 공개 OpenAPI 문서에 실렸다: " + published);
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────────────────────
