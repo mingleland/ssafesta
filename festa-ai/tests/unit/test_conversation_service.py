@@ -8,12 +8,14 @@ import fakeredis
 import pytest
 
 from app.clients.spring_booth_access import BoothAccessResult
+from app.models.conversation import Conversation
 from app.repositories.conversation_repository import ConversationRepository
 from app.services.conversation_service import (
     BoothAccessDenied,
     ConversationCreationFailed,
     ConversationService,
 )
+from app.services.stream_service import ConversationOwnershipMismatch
 from tests.fakes.spring_booth_access import FakeSpringBoothAccessClient
 
 
@@ -74,3 +76,58 @@ async def test_create_fails_closed_when_spring_is_unavailable() -> None:
         await service.create(user_id=42, booth_id=7, agent_id=3)
 
     assert await service._repository.get("conv_fixed") is None
+
+
+async def _seed(service: ConversationService, *, user_id: int, lease_ends_at: datetime) -> str:
+    conversation = Conversation.create(
+        conversation_id="conv_fixed",
+        user_id=user_id,
+        booth_id=7,
+        agent_id=3,
+        lease_ends_at=lease_ends_at,
+        now=datetime(2026, 9, 3, 11, 40, tzinfo=timezone.utc),
+        ttl_seconds=1800,
+    )
+    await service._repository.save(conversation)
+    return conversation.conversation_id
+
+
+@pytest.mark.asyncio
+async def test_close_deletes_the_owners_conversation() -> None:
+    spring_client = FakeSpringBoothAccessClient()
+    service = _service(spring_client)
+    conversation_id = await _seed(
+        service, user_id=42, lease_ends_at=datetime(2026, 9, 3, 12, 40, tzinfo=timezone.utc)
+    )
+
+    await service.close(conversation_id=conversation_id, user_id=42)
+
+    assert await service._repository.get(conversation_id) is None
+    # Article 3 — deleting raw text must not depend on Spring being reachable.
+    assert spring_client.calls == []
+
+
+@pytest.mark.asyncio
+async def test_close_deletes_even_when_the_lease_already_expired() -> None:
+    """An expired Lease must not strand raw text in Redis (D11 over FR-026)."""
+    service = _service(FakeSpringBoothAccessClient())
+    conversation_id = await _seed(
+        service, user_id=42, lease_ends_at=datetime(2026, 9, 3, 10, 0, tzinfo=timezone.utc)
+    )
+
+    await service.close(conversation_id=conversation_id, user_id=42)
+
+    assert await service._repository.get(conversation_id) is None
+
+
+@pytest.mark.asyncio
+async def test_close_refuses_another_users_conversation_and_keeps_it() -> None:
+    service = _service(FakeSpringBoothAccessClient())
+    conversation_id = await _seed(
+        service, user_id=42, lease_ends_at=datetime(2026, 9, 3, 12, 40, tzinfo=timezone.utc)
+    )
+
+    with pytest.raises(ConversationOwnershipMismatch):
+        await service.close(conversation_id=conversation_id, user_id=99)
+
+    assert await service._repository.get(conversation_id) is not None

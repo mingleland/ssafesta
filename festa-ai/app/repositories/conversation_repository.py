@@ -2,7 +2,12 @@
 
 30-minute TTL on every write (data-model.md invariant 3: every Conversation
 key must be gone within 30 minutes of the last activity, or immediately on
-explicit close — close is 127's scope, not this repository's).
+explicit close).
+
+`save` creates, `commit_turn` updates only what is still alive, `delete`
+removes. The split matters: a completed turn must never resurrect a
+Conversation that an explicit close or the idle TTL already removed
+(plan.md §5 "원자적으로 확정").
 """
 
 from __future__ import annotations
@@ -37,6 +42,26 @@ class ConversationRepository:
         if raw is None:
             return None
         return self._from_dict(json.loads(raw))
+
+    async def commit_turn(self, conversation: Conversation) -> bool:
+        """Persist a completed turn only while the Conversation still exists.
+
+        `SET ... XX` fails when an explicit close or the idle TTL removed the
+        key mid-stream, so the raw text stays gone instead of coming back with
+        a fresh 30-minute lifetime. The return value is that outcome — callers
+        must not discard it silently.
+        """
+        stored = await self._redis.set(
+            self._key(conversation.conversation_id),
+            json.dumps(self._to_dict(conversation)),
+            ex=self._ttl_seconds,
+            xx=True,
+        )
+        return bool(stored)
+
+    async def delete(self, conversation_id: str) -> None:
+        """Drop the single key holding this Conversation and its turn text."""
+        await self._redis.delete(self._key(conversation_id))
 
     @staticmethod
     def _key(conversation_id: str) -> str:
