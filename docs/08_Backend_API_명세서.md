@@ -1458,3 +1458,57 @@ Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에
   같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
   원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
   구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다
+
+### POST `/internal/ai/document-jobs/{jobId}/chunk-batches` · `/finalize`
+
+FastAPI 워커가 만든 결과를 Spring이 받는 경로 (spec 007, `S15P21A604-400`, GitLab #119 §3).
+정본 계약은 `specs/007-ai-agent-document/contracts/document-result-api.yaml`.
+**heartbeat·failed는 아직 없다**(같은 티켓 2차). cancel은 Spring→FastAPI 방향이라 여기 없다.
+
+```
+POST /internal/ai/document-jobs/41/chunk-batches
+{ "attemptNo": 0, "batchSeq": 0, "chunks": [
+  { "chunkNo": 0, "content": "...", "embedding": [0.01, ...1536개],
+    "embeddingModelId": "text-embedding-3-small", "pageNumber": 3, "section": "운영 안내" } ] }
+→ 204
+
+POST /internal/ai/document-jobs/41/finalize
+{ "attemptNo": 0, "sourceHash": "<64 hex>", "totalChunkCount": 128,
+  "embeddingModelId": "text-embedding-3-small" }
+→ 204
+```
+
+두 경로 모두 같은 관문 두 개를 먼저 지난다.
+
+| 상황 | 응답 |
+|---|---|
+| `attemptNo`가 Job의 현재 값과 다름 | **`409` `JOB_ATTEMPT_STALE`** |
+| Job이 `SUCCEEDED`·`DEAD`·`CANCELLED`이거나 없음 | **`410` `JOB_GONE`** |
+
+- **`409`가 있는 이유**: lease가 만료돼 Job을 회수하고 `attempt_no`를 올린 뒤, 죽은 줄 알았던 이전
+  워커가 결과를 보내오는 경우다. 받아 주면 **두 attempt의 chunk가 한 문서에 섞인다.** 보내는 쪽은
+  자기가 밀려났다는 사실을 이 응답으로만 안다
+- **없는 Job과 끝난 Job을 구분하지 않는다** — 문서가 지워지면 Job도 `ON DELETE CASCADE`로 사라지고,
+  어느 쪽이든 결과를 보낼 attempt가 없다는 답은 같다
+- **batch는 멱등하다.** staging PK가 `(job_id, batch_seq, chunk_no)`라 같은 batch 재전송이 아무것도
+  바꾸지 않는다 — 워커가 응답을 못 받고 다시 보내는 것이 정상 경로다
+- **첫 batch가 `QUEUED` Job을 `RUNNING`으로 올린다.** 워커가 실제로 시작했다는 증거가 이것뿐이다
+- **finalize는 검증에서 걸리면 아무것도 바꾸지 않는다.** 기존 chunk도 문서 상태도 그대로이고
+  staging도 남아 같은 attempt로 다시 finalize할 수 있다. 검증 4종은 전부 `400` `VALIDATION_FAILED`이고
+  `errors[].field`가 지점을 가리킨다
+
+  | 검증 | `field` | 막는 것 |
+  |---|---|---|
+  | 적재 개수 ≠ `totalChunkCount` | `totalChunkCount` | batch 유실 — 잘린 문서가 조용히 READY가 되는 것 |
+  | batch 간 `chunkNo` 중복 | `chunks` | `UNIQUE(document_id, chunk_no)` 위반으로 500이 되는 것 |
+  | 임베딩 모델 혼합 | `embeddingModelId` | 한 문서 안에서 거리 비교가 뜻을 잃는 것 |
+  | `sourceHash` ≠ Job의 값 | `sourceHash` | 같은 jobId로 다른 파일이 실려 본문이 바뀌는 것 |
+
+- **finalize 성공은 한 트랜잭션이다** — 기존 chunk 삭제 → staging 반영(`searchable = TRUE`) →
+  staging 정리 → Job `SUCCEEDED`·`chunk_count` → Document `READY`. 읽는 쪽은 이전 판 전체 아니면
+  새 판 전체만 본다
+- **같은 batch 안의 `chunkNo` 중복도 `400`이다.** staging PK가 조용히 흡수하면 보낸 쪽은 N개를
+  넣었다고 믿고 finalize에서 개수가 어긋난다 — 원인을 말할 수 있는 자리에서 막는다
+- 저장 embedding도 `queryEmbedding`과 **같은 검증**을 받는다(1536차원, `float32` 범위, 노름
+  overflow·underflow). #119에서 "저장 벡터 검증은 chunk를 쓰는 쪽 몫"이라고 넘긴 것이 이 자리다
+- 계약에 없는 필드는 버리지 않고 `400`으로 거부한다 — 검색 API와 같은 strict parser
