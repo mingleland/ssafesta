@@ -1,27 +1,28 @@
-"""Connect question embedding to the scope-safe RAG chunk repository."""
+"""Connect question embedding to Spring's scope-safe chunk-search endpoint.
+
+S15P21A604-449 이후: 검색은 로컬 pgvector가 아니라 Spring이 소유한다
+(``S15P21A604-140`` 범위로 흡수된 T049). 이 서비스는 질의 Embedding만 계산하고
+검색 자체는 ``SpringChunkSearchClient``에 맡긴다.
+"""
 
 from __future__ import annotations
 
+from app.clients.spring_chunk_search import ChunkScope, RetrievedChunk, SpringChunkSearchClient
 from app.db.models import EMBEDDING_DIMENSION
 from app.providers.embedding import EmbeddingProvider
-from app.repositories.chunk_repository import (
-    ChunkRepository,
-    ChunkScope,
-    RetrievedChunk,
-)
 
 
 class VectorSearchService:
-    """Embed one question and retrieve only chunks allowed by its server scope."""
+    """Embed one question and delegate scope-safe retrieval to Spring."""
 
     def __init__(
         self,
         *,
         embedding_provider: EmbeddingProvider,
-        chunk_repository: ChunkRepository,
+        chunk_search_client: SpringChunkSearchClient,
     ) -> None:
         self._embedding_provider = embedding_provider
-        self._chunk_repository = chunk_repository
+        self._chunk_search_client = chunk_search_client
 
     async def search(
         self,
@@ -41,7 +42,7 @@ class VectorSearchService:
         ):
             raise RuntimeError("EMBEDDING_DIMENSION_MISMATCH")
 
-        return await self._chunk_repository.search_ready_chunks(
+        return await self._chunk_search_client.search(
             scope=scope,
             query_embedding=batch.vectors[0],
             top_k=top_k,

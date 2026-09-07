@@ -9,12 +9,12 @@
 
 - [X] T052 [DOCS] 문서 세트를 Spring Business DB/pgvector 단독 소유로 정합화한다 (S15P21A604-449)
 - [X] T053 [DOCS] `contracts/spring-chunk-search-api.yaml`에 검색 요청·응답과 격리 조건을 정의한다 (S15P21A604-449)
-- [ ] T048 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다 (S15P21A604-398)
+- [ ] T054 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다. 내부 timeout 3초, threshold 없이 `topK`까지 채워서 반환하며, 계약(`additionalProperties: false`) 외 필드는 전역 오류 봉투 `400 VALIDATION_FAILED`로 거부한다 (S15P21A604-398)
 - [ ] T049 [AI] 직접 pgvector repository를 제거하고 질의 Embedding 후 Spring 검색 client를 호출하도록 변경한다
 - [ ] T050 [BE/AI] 실제 Business DB fixture로 topK, 3초 timeout, distance 정렬, threshold 없음과 scope 누출 0건을 검증한다
-- [ ] T051 [AI] 검색 응답을 Context에 넣기 전 Conversation scope를 재검증하고 위반 시 Fail Closed 처리한다
+- [ ] T051 [AI] 요청 시 보낸 `boothId + agentId`를 Conversation snapshot과 대조해 검증하고 위반 시 Fail Closed 처리한다 (검색 응답에는 scope 필드가 없다 — 재검증 대상은 요청이다)
 
-**Dependency**: T048과 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
+**Dependency**: T054와 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
 
 ## Phase 1: Setup
 
