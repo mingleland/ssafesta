@@ -43,6 +43,14 @@ namespace Festa.Diagnostics
         float _fps, _avgMs, _worstMs;
         float _sessionWorstMs;         // 리셋 이후 최악 프레임 (스파이크 흔적)
 
+        // 백분위용 표본. **평균과 최악만으로는 "가끔 튄다" 를 말할 수 없다** — 평균은
+        // 스파이크를 묻고 최악은 한 번의 이상치에 끌려간다. p95·p99 가 있어야
+        // "100번에 5번은 이만큼 걸린다" 를 수치로 합의할 수 있다.
+        // 창 하나(기본 1초)의 프레임 수는 많아야 수백이라 고정 배열로 충분하다.
+        readonly float[] _samples = new float[512];
+        int _sampleCount;
+        float _p95Ms, _p99Ms;
+
         // ── GC ──
         int _lastGcCount;
         int _gcPerWindow;
@@ -61,8 +69,28 @@ namespace Festa.Diagnostics
 
         // ── ProfilerRecorder — 개발 빌드/에디터에서 유효 ──
         ProfilerRecorder _drawCalls, _setPass, _batches, _tris, _sysMemory;
-        const string FmtNet = "송신 {0,7:F1} KB/s   수신 {1,7:F1} KB/s";
-        static readonly StringBuilder Sb = new StringBuilder(512);
+        // GPU 시간은 플랫폼·그래픽 API 에 따라 안 잡힌다. **없는데 있는 척하면 안 된다** —
+        // 예전에 "최악 프레임" 을 GPU 시간으로 읽고 최적화 근거로 삼은 적이 있다 (T-133).
+        // 유효하지 않으면 화면에 "GPU 계측 없음" 이라고 분명히 적는다.
+        ProfilerRecorder _gpuTime;
+
+        // 화면 문자열은 **영문만 쓴다.** IMGUI 기본 폰트에 한글 글리프가 없어서 한글 라벨은
+        // 공백으로 렌더된다. 라벨이 안 보이면 값만 남고, 값만 보고 다른 지표로 오독하는 일이
+        // 실제로 있었다 (T-133 — "최악 프레임" 을 GPU 시간으로 읽었다).
+        // 주석·문서는 한국어를 유지하고 화면에 그리는 문자열만 영문으로 둔다.
+        const string FmtNet = "tx {0,7:F1} KB/s   rx {1,7:F1} KB/s";
+        static readonly StringBuilder Sb = new StringBuilder(768);
+
+        // 표시 문자열은 **창이 갱신될 때만** 만든다. 예전에는 OnGUI 가 매 프레임
+        // AppendFormat 십여 번 + ToString() 을 돌려서, 계측 도구가 스스로 GC 쓰레기를
+        // 만들고 그 GC 를 자기가 표시했다. 계측 대상을 계측기가 오염시키면 안 된다.
+        string _cachedText = "";
+        bool _statsDirty = true;
+
+        // 측정 조건 각인 — 스크린샷 한 장으로 어느 조건의 수치인지 재구성할 수 있어야 한다.
+        // 빌드·해상도·품질이 다른 표본을 섞으면 A/B 가 무의미해진다 (T-211, T-133).
+        string _conditionLine = "";
+        int _lastW, _lastH;
         // IMGUI 전용 자원. OnGUI 와 함께 서버 빌드에서 빠진다 (S15P21A604-314).
 #if UNITY_EDITOR || !UNITY_SERVER
         static Texture2D _bg;
@@ -88,12 +116,14 @@ namespace Festa.Diagnostics
             _batches = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Batches Count");
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
             _sysMemory = ProfilerRecorder.StartNew(ProfilerCategory.Memory, "System Used Memory");
+            // WebGL 에서는 대개 잡히지 않는다. Valid 를 보고 표시를 가른다.
+            _gpuTime = ProfilerRecorder.StartNew(ProfilerCategory.Render, "GPU Frame Time");
         }
 
         void OnDisable()
         {
             _drawCalls.Dispose(); _setPass.Dispose(); _batches.Dispose();
-            _tris.Dispose(); _sysMemory.Dispose();
+            _tris.Dispose(); _sysMemory.Dispose(); _gpuTime.Dispose();
         }
 
         void Update()
@@ -119,6 +149,7 @@ namespace Festa.Diagnostics
             _windowElapsed += Time.unscaledDeltaTime;
             if (ms > _windowWorstMs) _windowWorstMs = ms;
             if (ms > _sessionWorstMs) _sessionWorstMs = ms;
+            if (_sampleCount < _samples.Length) _samples[_sampleCount++] = ms;
 
             SampleNetwork();
 
@@ -127,14 +158,28 @@ namespace Festa.Diagnostics
                 _fps = _windowFrames / _windowElapsed;
                 _avgMs = _windowElapsed * 1000f / _windowFrames;
                 _worstMs = _windowWorstMs;
+                ComputePercentiles();
 
                 int gc = System.GC.CollectionCount(0);
                 _gcPerWindow = gc - _lastGcCount;
                 _lastGcCount = gc;
                 _heapBytes = System.GC.GetTotalMemory(false);
 
-                _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f;
+                _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f; _sampleCount = 0;
+                _statsDirty = true;
             }
+        }
+
+        /// <summary>
+        /// 창 표본에서 p95·p99 를 낸다. 표본이 수백 개뿐이라 정렬 비용은 무시할 만하고,
+        /// 창 경계에서 한 번만 돈다. 할당을 만들지 않으려고 고정 배열을 제자리 정렬한다.
+        /// </summary>
+        void ComputePercentiles()
+        {
+            if (_sampleCount == 0) { _p95Ms = _p99Ms = 0f; return; }
+            System.Array.Sort(_samples, 0, _sampleCount);
+            _p95Ms = _samples[Mathf.Min(_sampleCount - 1, Mathf.FloorToInt(_sampleCount * 0.95f))];
+            _p99Ms = _samples[Mathf.Min(_sampleCount - 1, Mathf.FloorToInt(_sampleCount * 0.99f))];
         }
 
 
@@ -181,6 +226,8 @@ namespace Festa.Diagnostics
         {
             _sessionWorstMs = 0f;
             _windowElapsed = 0f; _windowFrames = 0; _windowWorstMs = 0f;
+            _sampleCount = 0; _p95Ms = _p99Ms = 0f;
+            _statsDirty = true;
         }
 
         // 서버 빌드는 IMGUI 모듈이 스트립돼, 이 메서드가 **존재하기만 해도** 유니티가
@@ -193,47 +240,111 @@ namespace Festa.Diagnostics
             if (!_visible) return;
             EnsureStyle();
 
+            // 화면 크기가 바뀌면 조건 줄(백버퍼)도 다시 만들어야 한다.
+            if (Screen.width != _lastW || Screen.height != _lastH) { _statsDirty = true; }
+            if (_statsDirty) { RebuildText(); _statsDirty = false; }
+
+            float scale = Mathf.Max(1f, Screen.height / 1080f);
+            float w = 430f * scale;
+            float h = 330f * scale;
+            // **좌상단을 피한다** — FE WorldHud 의 조작 안내 카드가 그 자리를 쓴다.
+            // 겹치면 라벨이 가려지고, 라벨 없는 값을 다른 지표로 오독하게 된다 (T-133).
+            var rect = new Rect(Screen.width - w - 10f, 10f, w, h);
+            GUI.DrawTexture(rect, Bg(), ScaleMode.StretchToFill);
+            GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width - 20f, rect.height - 16f), _cachedText, _style);
+        }
+
+        /// <summary>
+        /// 표시 문자열을 만든다. **창 갱신 시점에만** 불린다 — 매 프레임 만들면 그 할당이
+        /// 곧 GC 가 되고, 계측 도구가 자기가 만든 GC 를 계측해 보여주게 된다.
+        ///
+        /// 배치 원칙: **한 줄에 지표 하나, 라벨을 값 바로 앞에.** 예전에는
+        /// `FPS x  평균 y ms  최악 z ms` 처럼 한 줄에 셋을 넣었는데, 다른 UI 가 앞부분을
+        /// 가리자 오른쪽 끝 값만 보였고 그것을 GPU 시간으로 오독했다 (T-133).
+        /// </summary>
+        void RebuildText()
+        {
+            _lastW = Screen.width; _lastH = Screen.height;
             var nm = NetworkManager.Singleton;
+
             Sb.Clear();
-            Sb.Append("── PERF (F3 토글 / F4 리셋 / F9 LOD / F10 병합) ──\n");
-            // 조건을 화면에 박아 둔다 — 스크린샷만 보고도 어느 조건의 수치인지 알 수 있어야
-            // A/B 표본을 섞지 않는다 (T-211).
-            Sb.AppendFormat("아바타 거리 LOD: {0}\n",
-                Festa.World.AvatarAnimationLod.Enabled ? "ON" : "OFF");
-            Sb.Append(Festa.Avatar.AvatarMeshMerge.StateLabel).Append('\n');
-            Sb.AppendFormat("FPS {0,6:F1}   평균 {1,5:F1} ms   최악 {2,5:F1} ms\n", _fps, _avgMs, _worstMs);
-            Sb.AppendFormat("세션 최악 프레임 {0:F1} ms\n", _sessionWorstMs);
-            Sb.AppendFormat("관리 힙 {0,6:F1} MB   GC/{1:F0}s {2}\n",
-                _heapBytes / 1048576f, _window, _gcPerWindow);
+            Sb.Append("== PERF (F3 hide / F4 reset / F9 LOD / F10 merge) ==\n");
+
+            // ① 측정 조건 — 이게 없으면 스크린샷의 수치가 어느 조건인지 알 수 없다.
+            Sb.Append(BuildConditionLines());
+
+            // ② 프레임 — 한 줄에 하나씩.
+            Sb.AppendFormat("FPS        {0:F1}\n", _fps);
+            Sb.AppendFormat("frame avg  {0:F1} ms\n", _avgMs);
+            Sb.AppendFormat("frame p95  {0:F1} ms\n", _p95Ms);
+            Sb.AppendFormat("frame p99  {0:F1} ms\n", _p99Ms);
+            Sb.AppendFormat("frame worst {0:F1} ms (last {1:F0}s)\n", _worstMs, _window);
+            Sb.AppendFormat("session worst {0:F1} ms\n", _sessionWorstMs);
+
+            // ③ GPU — 잡히지 않으면 잡히지 않는다고 적는다. 이 자리를 비워 두면
+            //    옆 숫자를 GPU 로 오해하는 일이 또 생긴다 (T-133).
+            if (_gpuTime.Valid && _gpuTime.LastValue > 0)
+                Sb.AppendFormat("GPU frame  {0:F1} ms\n", _gpuTime.LastValue / 1e6f);
+            else
+                Sb.Append("GPU frame  NOT MEASURED (unsupported here)\n");
+
+            // ④ 메모리·GC
+            Sb.AppendFormat("heap       {0:F1} MB\n", _heapBytes / 1048576f);
+            Sb.AppendFormat("GC count   {0} (last {1:F0}s)\n", _gcPerWindow, _window);
             if (_sysMemory.Valid)
-                Sb.AppendFormat("시스템 사용 메모리 {0:F0} MB\n", _sysMemory.LastValue / 1048576f);
+                Sb.AppendFormat("sys mem    {0:F0} MB\n", _sysMemory.LastValue / 1048576f);
 
+            // ⑤ 렌더 작업량
             if (_drawCalls.Valid)
-                Sb.AppendFormat("드로우콜 {0}   SetPass {1}   배치 {2}\n",
-                    _drawCalls.LastValue, _setPass.Valid ? _setPass.LastValue : -1,
-                    _batches.Valid ? _batches.LastValue : -1);
-            if (_tris.Valid)
-                Sb.AppendFormat("삼각형 {0:N0}\n", _tris.LastValue);
+            {
+                Sb.AppendFormat("draws      {0}\n", _drawCalls.LastValue);
+                if (_setPass.Valid) Sb.AppendFormat("SetPass    {0}\n", _setPass.LastValue);
+                if (_batches.Valid) Sb.AppendFormat("batches    {0}\n", _batches.LastValue);
+            }
+            if (_tris.Valid) Sb.AppendFormat("tris       {0:N0}\n", _tris.LastValue);
 
+            // ⑥ 네트워크
             if (nm != null && (nm.IsClient || nm.IsServer))
             {
-                Sb.AppendFormat("접속 {0}명   스폰 오브젝트 {1}\n",
-                    nm.IsServer ? nm.ConnectedClientsIds.Count : 1,
+                Sb.AppendFormat("players    {0}\n",
+                    nm.IsServer ? nm.ConnectedClientsIds.Count : 1);
+                Sb.AppendFormat("spawned    {0}\n",
                     nm.SpawnManager != null ? nm.SpawnManager.SpawnedObjects.Count : 0);
                 if (nm.IsClient && !nm.IsServer && nm.NetworkConfig?.NetworkTransport != null)
-                    Sb.AppendFormat("RTT {0} ms\n",
+                    Sb.AppendFormat("RTT        {0} ms\n",
                         nm.NetworkConfig.NetworkTransport.GetCurrentRtt(NetworkManager.ServerClientId));
             }
-            else Sb.Append("네트워크 미연결\n");
+            else Sb.Append("net        OFFLINE\n");
 
             Sb.AppendFormat(FmtNet, _sentPerSec / 1024f, _recvPerSec / 1024f);
-            Sb.AppendLine();
 
-            float w = 380f * Mathf.Max(1f, Screen.height / 1080f);
-            float h = 228f * Mathf.Max(1f, Screen.height / 1080f);
-            var rect = new Rect(10f, 10f, w, h);
-            GUI.DrawTexture(rect, Bg(), ScaleMode.StretchToFill);
-            GUI.Label(new Rect(rect.x + 10f, rect.y + 8f, rect.width - 20f, rect.height - 16f), Sb.ToString(), _style);
+            _cachedText = Sb.ToString();
+        }
+
+        /// <summary>
+        /// 빌드·해상도·품질을 한 번만 조립해 둔다. 해상도만 창 크기 변화에 따라 갱신된다.
+        /// A/B 표본을 섞지 않으려면 스크린샷에 조건이 함께 찍혀 있어야 한다 (T-211).
+        /// </summary>
+        string BuildConditionLines()
+        {
+            if (_conditionLine.Length == 0)
+            {
+                var rp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline;
+                string rpName = rp != null ? rp.name : "Built-in";
+                float renderScale = -1f;
+#if UNITY_2021_1_OR_NEWER
+                if (rp is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp)
+                    renderScale = urp.renderScale;
+#endif
+                _conditionLine =
+                    $"build      {Application.version} / {(Debug.isDebugBuild ? "Development" : "Release")}\n" +
+                    $"quality    {QualitySettings.names[QualitySettings.GetQualityLevel()]} / {rpName}" +
+                    (renderScale > 0f ? $" / renderScale {renderScale:F2}\n" : "\n");
+            }
+            // 백버퍼는 창 크기·DPR 에 따라 바뀐다 — 매번 다시 만든다.
+            return _conditionLine +
+                   $"backbuffer {Screen.width}x{Screen.height} ({(Screen.width * (long)Screen.height) / 1e6f:F2} MP)\n" +
+                   $"avatar LOD {(Festa.World.AvatarAnimationLod.Enabled ? "ON" : "OFF")}\n";
         }
 
         // 아래 둘은 OnGUI 에서만 쓰인다. 같이 배제해야 서버 빌드에 IMGUI 참조가 남지 않는다.
