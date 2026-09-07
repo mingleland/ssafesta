@@ -48,15 +48,48 @@ Orientation Lock API 는 지원 환경에서만 보조 고려. MVP 범위를 ful
 - UI: Left Palette / Center 2.5D Canvas / Right Inspector — 3D 렌더러는 중앙 Canvas 한정, 나머지는 React DOM.
 - Visual/Interaction Reference: `00_context/sources/booth-2_5d-reference.png` — **확보 완료** (사람 제공 원본, SOURCE).
 
-## D-05 — 2.5D 1순위 기술 후보 (PROPOSAL — 채택 아님)
+## D-05 — 2.5D 렌더러 R3F (PASS_CANDIDATE — 채택 아님)
 
 ```text
-1순위: React + @react-three/fiber + three + @react-three/drei
+1순위: React + @react-three/fiber + three
 렌더 구조: OrthographicCamera + fixed isometric-like angle
 ```
 
-**production dependency 확정 아님** — `05_technical-spikes/booth-studio-2_5d/` feasibility spike(완료조건 15항) PASS 후에만 정식 채택.
+**production dependency 확정 아님.** 상태는 `PASS_CANDIDATE` 이고 `ADOPTED` 가 아니다.
+
+실 Spike evidence 는 확보됐다.
+
+```text
+S15P21A604-470   R3F renderer            파라메트릭 geometry · 실광원 · 그림자 · 3축 gizmo · lazy chunk
+S15P21A604-473   Unity FBX → GLB → R3F   실제 mesh 2종, 계약 AABB 와 1.5mm 이내
+S15P21A604-476   Nested Prefab Assembly  SurveyKiosk 조립, 계약 AABB 와 5mm 이내
+```
+
+**채택 조건** — D-05 원문이 요구한 완료조건 15항(`05_technical-spikes/booth-studio-r3f-asset-pipeline-plan.md` §47 의 Spike PASS 6 + MVP PASS 9)의 reconciliation 이 선행한다.
+
+```text
+canonical 15 Gate reconciliation 완료
++ 미검증 조건 해결 또는 명시적 수용
++ 별도 결정
+→ 그 뒤에만 ADOPTED
+```
+
+현재 대조 결과: PASS 11 · PARTIAL 4. 상세는
+[`05_technical-spikes/booth-studio-2_5d/gate-matrix.md`](../05_technical-spikes/booth-studio-2_5d/gate-matrix.md).
+현황 정본은 [`05_technical-spikes/booth-studio-2_5d/README.md`](../05_technical-spikes/booth-studio-2_5d/README.md) 다 — 상태를 이 문서에 복제하지 않는다.
+
+drei 는 도입했다가 뺐다 — 쓰는 API 가 없었다. `three` 와 `@react-three/fiber` 둘이다.
+
 실패 시 fallback(react-konva + isometric sprites 등 2D 가짜 2.5D)을 그때 재검토. 양쪽 동시 구현 금지.
+SVG 렌더러(`TemporaryIsoRenderer`)는 `VITE_R3F_CANVAS=false` 복귀 경로로 남겨 뒀다.
+
+### 후속 설계 (PROPOSAL — DECISION 아님)
+
+에셋 반입을 확장하려면 원본을 그대로 내보내지 않는 단계가 필요하다. 설계는
+[`04_prototypes/booth-studio-runtime-asset-compiler.md`](../04_prototypes/booth-studio-runtime-asset-compiler.md)
+에 있고 **PROPOSAL 이다.** 채택되면 그때 이 문서에 D-번호로 올린다.
+
+---
 
 ## D-06 — 기존 Layout 계약 최대 보존
 
