@@ -117,6 +117,13 @@ rag-generate \
 rag-generate-review --input results/generation.json --output results/generation-review.md
 ```
 
+사람 채점 대신 LLM Judge로 같은 5축을 자동 채점할 수도 있다(선택 사항 — Jira 티켓이
+"사람 평가 또는 LLM Judge"를 동등하게 인정한다).
+
+```bash
+rag-judge --input results/generation.json --output results/generation-judge-scores.json
+```
+
 - 평가셋은 새로 안 만든다 — 370·371과 같은 `data/gold/{pinlog,ssafesta,sudal}-sol-gold.jsonl`을
   재사용한다(ANSWERABLE/PARTIAL/NO_ANSWER 이미 포함).
 - **`temperature=0.0`으로 고정한다.** 고정하지 않으면 같은 모델·같은 입력도 호출마다 답이

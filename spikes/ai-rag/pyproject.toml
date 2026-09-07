@@ -20,6 +20,7 @@ rag-review = "rag_spike.review_cli:main"
 rag-tuning-summary = "rag_spike.tuning_cli:main"
 rag-generate = "rag_spike.generation_cli:main"
 rag-generate-review = "rag_spike.generation_review_cli:main"
+rag-judge = "rag_spike.judge_cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rag_spike"]
