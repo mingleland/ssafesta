@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
   title: Spring Document Result API for AI
-  version: 0.1.0
+  version: 1.0.0
   description: |
     FastAPI 워커가 만든 결과를 Spring 이 받는 계약이다 (S15P21A604-400, GitLab #119 §3).
     의미 경계는 `document-result-contract.md` 가 정본이고, 이 파일은 그 표의 경로·DTO 를 고정한다.
 
-    **이 판은 batch·finalize 두 개만 담는다.** heartbeat·failed 는 같은 티켓의 두 번째 MR 이다.
+    `document-result-contract.md` 표의 네 operation 을 전부 담는다.
     cancel 은 Spring → FastAPI 방향이라 여기 없다 (#119 §4, S15P21A604-175).
 
     모든 요청은 두 관문을 먼저 지난다.
@@ -94,6 +94,78 @@ paths:
           description: 끝났거나 없는 Job (`JOB_GONE`)
           content:
             application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/heartbeat:
+    post:
+      operationId: heartbeatAiDocumentJob
+      summary: lease 연장
+      description: |
+        워커가 30 초마다 보내고 lease 는 90 초다 — 두 번까지 유실돼도 Job 을 뺏기지 않는다.
+        `QUEUED` Job 은 heartbeat 로도 `RUNNING` 이 된다.
+
+        lease 가 만료되면 Spring 의 sweeper 가 Job 을 회수한다: `attempt_no` 가 오르고
+        `RETRY_WAIT`(재시도 여지가 있으면) 또는 `DEAD` 가 되며, 그 attempt 의 staging 은 지워진다.
+        회수 뒤 깨어난 워커의 결과는 `409` 다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HeartbeatRequest'
+      responses:
+        '204': { description: 연장됨 }
+        '400':
+          description: 검증 실패 (`VALIDATION_FAILED`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/failed:
+    post:
+      operationId: failAiDocumentJobAttempt
+      summary: attempt 실패 보고
+      description: |
+        **다음에 무엇을 할지는 Spring 이 정한다.** 워커는 무엇이 깨졌는지(`failureCode`)와 다시
+        해 볼 만한지(`retryable`)만 보고하고, 재시도 예산은 Job 이 들고 있다.
+
+        - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다.
+        - 재시도 여지가 있으면 `RETRY_WAIT` + `next_retry_at` (backoff 1 · 5 · 15 분)
+        - `attempt_no + 1 > max_retries`(기본 3) → `DEAD`
+
+        어느 쪽이든 **`attempt_no` 는 오른다** — 방금 실패한 워커의 늦은 결과를 `409` 로 막는 것이
+        그 값이다. 그 attempt 의 staging 도 함께 지운다: 남기면 다음 attempt 의 batch 와 섞여
+        finalize 개수 검증이 엉뚱한 곳에서 걸린다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FailedRequest'
+      responses:
+        '204': { description: 접수됨 }
+        '400':
+          description: 검증 실패 (`VALIDATION_FAILED`). `failureCode` 는 50자 이하다.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 끝났거나 없는 Job (`JOB_GONE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
 components:
   securitySchemes:
     serviceToken:
@@ -150,6 +222,27 @@ components:
         sourceHash: { type: string, pattern: '^[a-f0-9]{64}$' }
         totalChunkCount: { type: integer, minimum: 1 }
         embeddingModelId: { type: string, minLength: 1 }
+    HeartbeatRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+    FailedRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, failureCode, retryable]
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        failureCode:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 분기의 근거다. 컬럼이 `VARCHAR(50)` 이라 넘기면 `400` 이다.
+        retryable:
+          type: boolean
+          description: 다시 해 볼 만한지에 대한 워커의 판단. 최종 결정은 Spring 이 한다.
+        message: { type: [string, 'null'], description: 사람이 읽을 설명. 분기에 쓰지 않는다. }
     ApiErrorResponse:
       description: 프로젝트 전역 오류 봉투(docs/08 §1.3) — 이 API 전용 봉투를 따로 두지 않는다.
       type: object
