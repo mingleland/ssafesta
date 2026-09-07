@@ -129,12 +129,26 @@ class AiDocumentJobRepository {
      * {@code NULL} lease — which the sweeper cannot see, because {@code NULL < now()} is not true.
      * A worker that died between its first batch and its first heartbeat would hold that document
      * forever: the partial unique index refuses a replacement Job while one is active.
+     *
+     * <p>{@code RETRY_WAIT} promotes as well as {@code QUEUED}, and leaving it out was the same bug
+     * one layer along (S15P21A604-487). A reclaimed Job is {@code RETRY_WAIT}, so every attempt
+     * after the first started from that state — the lease was taken but the status never moved, and
+     * the sweeper only looks at {@code RUNNING} ({@code ix_ai_document_jobs_lease}). The second
+     * worker to die was therefore never reclaimed, {@code attempt_no} froze, and the active-Job
+     * index kept refusing a replacement for that document for good. Which is to say the retry path
+     * had no lease protection and no fencing at all — the ordinary path, since a retry only exists
+     * because the first attempt failed.
+     *
+     * <p>The terminal states are still preserved rather than promoted. {@code live} refuses them
+     * with {@code 410} before this runs, so they cannot arrive here, but a {@code CASE} that would
+     * resurrect a {@code DEAD} Job if that ever changed is not worth writing.
      */
     void extendLease(long jobId) {
         jdbc.update("""
                 UPDATE ai_document_jobs
                    SET lease_expires_at = now() + make_interval(secs => ?),
-                       status = CASE WHEN status = 'QUEUED' THEN 'RUNNING' ELSE status END,
+                       status = CASE WHEN status IN ('QUEUED', 'RETRY_WAIT') THEN 'RUNNING'
+                                     ELSE status END,
                        updated_at = now()
                  WHERE id = ?
                 """, LEASE_SECONDS, jobId);
