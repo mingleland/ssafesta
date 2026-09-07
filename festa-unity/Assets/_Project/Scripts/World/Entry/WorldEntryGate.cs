@@ -118,9 +118,11 @@ namespace Festa.World
 
             AdvanceFloorDisplay();
 
+            AdvanceWarmup();
+
             // 준비가 끝났다고 바로 열지 않는다. **11층 표시에 도착해야 연다** —
             // 5층에서 문이 열리면 엘리베이터라는 연출 자체가 깨진다.
-            if (!_arrivalRequested && IsPlayerReady())
+            if (!_arrivalRequested && IsPlayerReady() && IsRenderWarm)
             {
                 Festa.Integration.WorldLoadTimeline.Record(Festa.Integration.WorldLoadTimeline.PlayerReady);
                 RequestArrival("준비 완료");
@@ -157,6 +159,35 @@ namespace Festa.World
             _openReason = reason;
         }
 
+        // ── 렌더 워밍업 (S15P21A604-497) ───────────────────────────
+
+        /// <summary>
+        /// 스폰됐다고 **그릴 준비가 된 것은 아니다.** 실측(HitchLogger)에서 스폰 직후 첫 프레임이
+        /// 2,797 ms 걸렸다 — 드로우콜 0 → 1101, 삼각형 0 → 89.8만. 뒤이어 323 ms·160 ms 도 났다.
+        /// 예전에는 스폰만 보고 문을 열어서 그 정지를 사용자가 **문 밖에서** 맞았다.
+        ///
+        /// 그래서 스폰 이후 프레임이 실제로 안정될 때까지 기다린다. 대기를 늘리려는 것이 아니라
+        /// **같은 시간을 어디서 보내느냐**의 문제다 — 멈춘 월드 화면 대신 엘리베이터 안에서
+        /// 층수가 올라가는 것을 본다.
+        ///
+        /// 무거운 프레임이 하나라도 끼면 카운터를 리셋한다. 2.8초짜리가 지나간 직후를
+        /// "안정" 으로 오해하면 안 되기 때문이다.
+        /// </summary>
+        const int WarmupFrames = 12;
+        const float WarmupFrameMs = 40f;   // 60fps 예산 16.7ms 를 두 배 넘게 벗어나면 아직 덥혀지지 않았다
+
+        int _warmFrames;
+        bool IsRenderWarm => _warmFrames >= WarmupFrames;
+
+        void AdvanceWarmup()
+        {
+            if (_arrivalRequested) return;
+            if (!IsPlayerReady()) { _warmFrames = 0; return; }
+
+            if (Time.unscaledDeltaTime * 1000f <= WarmupFrameMs) _warmFrames++;
+            else _warmFrames = 0;
+        }
+
         // ── 진행 표시 (FR-013) ────────────────────────────────────
 
         /// <summary>
@@ -182,7 +213,8 @@ namespace Festa.World
             var nm = NetworkManager.Singleton;
             if (nm == null || !nm.IsClient) return StartFloor + 1f;   // 아직 접속 시작 전
             if (!nm.IsConnectedClient) return StartFloor + 3f;       // 전송 계층 연결·승인 대기
-            return TopFloor - 1f;                             // 승인됨 — 스폰만 남았다
+            if (!IsPlayerReady()) return TopFloor - 2f;              // 승인됨 — 스폰 대기
+            return TopFloor - 1f;                             // 스폰됨 — 첫 렌더가 덥혀지는 중
         }
 
         // ── 준비 판정 ─────────────────────────────────────────────
@@ -274,7 +306,9 @@ namespace Festa.World
         {
             _opening = true;
             _openProgress = 0f;
-            Debug.Log($"[WorldEntryGate] 개방 — {reason} ({_elapsed:F1}s)");
+            // 워밍업 프레임 수를 함께 남긴다 — 개방 시점에 렌더가 실제로 덥혀졌는지
+            // 로그만 보고 판정할 수 있어야 한다 (S15P21A604-497).
+            Debug.Log($"[WorldEntryGate] 개방 — {reason} ({_elapsed:F1}s, 워밍업 {_warmFrames}/{WarmupFrames})");
             Festa.Integration.WorldLoadTimeline.Finish(reason);
             NotifyGateReady();
         }
