@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
-// 실서버 결선 회귀 방어 (S15P21A604-189) — Conversation 생성·SSE 왕복·오류 계열별 UX를
-// entities/conversation/api를 mock해 검증한다. 파서·프레임 계약 자체는 stream.parser.test.ts 몫.
+// 실서버 결선(S15P21A604-189) + SSE 렌더링(S15P21A604-182) 통합 회귀 방어.
+// entities/conversation/api를 mock해 Conversation 생성·스트리밍을 대체하고, 실제 SSE 프레임은
+// entities/conversation/stream.mock의 검증된 fixture를 그대로 재사용한다(파서·consumer 자체
+// 계약은 stream.parser.test.ts·stream.consumer.test.ts 몫).
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockStreamError, mockStreamSequenceGap, mockStreamSuccess } from '../../../../../entities/conversation/stream.mock';
 import { AiChatOverlay } from '../../AiChatOverlay';
 
 const createConversation = vi.fn();
@@ -15,34 +18,9 @@ vi.mock('../../../../../entities/conversation/api', () => ({
     typeof value === 'object' && value !== null && typeof (value as { status?: unknown }).status === 'number',
 }));
 
-function frame(type: string, data: Record<string, unknown>): string {
-  return `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
-}
-
-async function* successStream(): AsyncGenerator<string> {
-  const env = { requestId: 'req_1', conversationId: 'conv_1', messageId: 'msg_1' };
-  yield frame('start', { ...env, sequence: 0 });
-  yield frame('token', { ...env, sequence: 1, delta: '안녕' });
-  yield frame('token', { ...env, sequence: 2, delta: '하세요' });
-  yield frame('source', { ...env, sequence: 3, documentId: 1, chunkId: 'c1', title: '문서.pdf' });
-  yield frame('done', { ...env, sequence: 4, handoffRecommended: false });
-}
-
-async function* errorStream(): AsyncGenerator<string> {
-  const env = { requestId: 'req_1', conversationId: 'conv_1', messageId: 'msg_1' };
-  yield frame('start', { ...env, sequence: 0 });
-  yield frame('error', {
-    ...env,
-    sequence: 1,
-    code: 'LLM_TIMEOUT',
-    message: '시간 초과',
-    retryable: true,
-    timeoutPhase: 'FIRST_TOKEN',
-  });
-}
-
 beforeEach(() => {
   createConversation.mockReset();
+  createConversation.mockResolvedValue({ conversationId: 'conv_1', expiresAt: '2026-09-07T00:00:00Z' });
   streamMessage.mockReset();
   // jsdom은 Element.scrollTo를 구현하지 않는다 — 대화창 자동 스크롤 effect가 던지지 않게만 막는다.
   Element.prototype.scrollTo = vi.fn();
@@ -60,65 +38,87 @@ function ask(question: string): void {
   fireEvent.click(screen.getByRole('button', { name: '보내기' }));
 }
 
-describe('AiChatOverlay 실서버 결선', () => {
-  it('질문을 보내면 Conversation을 만들고 스트리밍 답변을 누적해 보여준다', async () => {
-    createConversation.mockResolvedValue({ conversationId: 'conv_1', expiresAt: '2026-09-07T00:00:00Z' });
-    streamMessage.mockReturnValue(successStream());
+function askFirstSuggestion(): void {
+  render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트를 전시하나요?' }));
+}
 
-    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
-    ask('안녕하세요?');
+describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
+  it('token 누적 답변과 source 문서명을 done 뒤 표시한다', async () => {
+    streamMessage.mockReturnValue(mockStreamSuccess());
+    askFirstSuggestion();
 
-    await waitFor(() => expect(screen.getByText('안녕하세요')).toBeTruthy());
+    expect(await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/)).toBeTruthy();
+    expect(await screen.findByText('프로젝트_기획서.pdf')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(createConversation).toHaveBeenCalledWith(7, 3);
-    expect(streamMessage).toHaveBeenCalledWith('conv_1', '안녕하세요?');
-    expect(screen.getByText('문서.pdf')).toBeTruthy();
   });
 
   it('같은 대화에서 두 번째 질문은 Conversation을 다시 만들지 않는다', async () => {
-    createConversation.mockResolvedValue({ conversationId: 'conv_1', expiresAt: '2026-09-07T00:00:00Z' });
-    streamMessage.mockReturnValueOnce(successStream()).mockReturnValueOnce(successStream());
-
+    streamMessage.mockReturnValue(mockStreamSuccess());
     render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
-    ask('첫 질문');
-    await waitFor(() => expect(screen.getAllByText('안녕하세요')).toHaveLength(1));
 
+    ask('첫 질문');
+    await waitFor(() => expect(screen.getAllByText(/안녕하세요, 무엇을 도와드릴까요?/)).toHaveLength(1));
     ask('두 번째 질문');
-    await waitFor(() => expect(screen.getAllByText('안녕하세요')).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText(/안녕하세요, 무엇을 도와드릴까요?/)).toHaveLength(2));
 
     expect(createConversation).toHaveBeenCalledTimes(1);
   });
 
-  it('Conversation 생성 실패(503)는 재시도 가능한 오류로 보여준다', async () => {
+  it('error envelope의 메시지와 재시도 UX를 표시한다', async () => {
+    const factory = vi.fn(() => mockStreamError());
+    streamMessage.mockImplementation(factory);
+    askFirstSuggestion();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('AI 응답 오류: LLM_TIMEOUT');
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(factory).toHaveBeenCalledTimes(2));
+    // 재시도는 이미 만든 Conversation을 재사용한다 — error/truncated는 conversation 자체 문제가 아니다.
+    expect(createConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('종료 sequence 결번을 잘린 응답으로 안내한다', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    streamMessage.mockReturnValue(mockStreamSequenceGap());
+    askFirstSuggestion();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('응답이 중간에 끊겼습니다');
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
+  });
+
+  it('Conversation 생성 실패(503)는 재시도 가능한 오류로 보여주고 스트림을 시작하지 않는다', async () => {
+    createConversation.mockReset();
     createConversation.mockRejectedValue({ code: 'SPRING_UNAVAILABLE', message: '실패', status: 503 });
 
     render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
     ask('질문');
 
-    await waitFor(() =>
-      expect(screen.getByText('일시적으로 AI 상담을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.')).toBeTruthy(),
-    );
-    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
+    expect(
+      (await screen.findByRole('alert')).textContent,
+    ).toContain('일시적으로 AI 상담을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.');
     expect(streamMessage).not.toHaveBeenCalled();
-  });
-
-  it('스트림 중 error 이벤트는 지연 안내와 함께 재시도 버튼을 보여준다', async () => {
-    createConversation.mockResolvedValue({ conversationId: 'conv_1', expiresAt: '2026-09-07T00:00:00Z' });
-    streamMessage.mockReturnValue(errorStream());
-
-    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
-    ask('질문');
-
-    await waitFor(() => expect(screen.getByText(/첫 응답 지연/)).toBeTruthy());
-    expect(screen.getByRole('button', { name: '다시 시도' })).toBeTruthy();
   });
 
   it('agentId가 없으면 서버를 부르지 않고 바로 안내한다', async () => {
     render(<AiChatOverlay payload={{ boothId: 7 }} />);
     ask('질문');
 
-    await waitFor(() =>
-      expect(screen.getByText('AI 직원 정보를 확인할 수 없습니다.')).toBeTruthy(),
-    );
+    expect((await screen.findByRole('alert')).textContent).toContain('AI 직원 정보를 확인할 수 없습니다.');
     expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it('403(소유권·임대 만료)은 Conversation을 초기화해 다음 질문이 새로 만들게 한다', async () => {
+    // 스트림 시작 전 403(streamMessage 자체가 reject되는 경로) — SSE error 이벤트가 아니다.
+    streamMessage
+      .mockRejectedValueOnce({ code: 'BOOTH_LEASE_EXPIRED', message: '임대가 만료되었습니다.', status: 403 })
+      .mockReturnValueOnce(mockStreamSuccess());
+
+    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    ask('첫 질문');
+    await screen.findByRole('alert');
+
+    ask('두 번째 질문');
+    await waitFor(() => expect(createConversation).toHaveBeenCalledTimes(2));
   });
 });

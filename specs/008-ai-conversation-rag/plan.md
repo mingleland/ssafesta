@@ -92,14 +92,14 @@ festa-frontend/src/
 - 2,000자·Conversation 소유자·Lease 만료를 LLM 호출 전에 검사한다.
 - 사용자 활성 1개와 60초당 5회, Agent 활성 5개는 초과 즉시 `429 + Retry-After`다.
 - 전역 활성 20개만 FIFO 대기열 30개·10초를 사용한다. Redis 원자 연산으로 replica 간 정확성을 유지하고 취소·timeout 때 슬롯을 반환한다.
-- `READY` 문서가 0개면 고정 안내를 반환하고 검색·LLM을 호출하지 않는다.
+- 문서 개수를 미리 조회하는 API는 없다 — 검색은 항상 호출하고, Spring 응답이 `200 + items: []`(READY Chunk 없음)이면 고정 안내를 반환하고 LLM만 호출하지 않는다.
 
 ### 3. 격리 검색
 
 - FastAPI는 질의 Embedding을 만든 뒤 `POST /internal/ai/chunk-search`만 검색 진입점으로 사용한다.
 - Spring SQL은 `booth_id=:booth_id AND agent_id=:agent_id AND searchable=true`와 부모 Document `READY`를 강제한다.
 - `topK`는 최대 20, 내부 timeout은 3초다. cosine `distance` 오름차순이며 threshold는 적용하지 않는다.
-- FastAPI는 반환된 scope를 Context 조립 전에 전건 재검증한다. 불일치 1건이면 응답을 중단하고 원문 없는 보안 지표만 기록한다.
+- FastAPI는 요청에 실은 `boothId + agentId`를 Context 조립 전에 Conversation snapshot과 대조해 재검증한다(`spring-chunk-search-api.yaml` 응답에는 scope 필드가 없어 반환값을 재검증할 수 없다 — :40과 동일하게 검색 Scope의 유일한 출처는 Conversation snapshot이다). 불일치 1건이면 응답을 중단하고 원문 없는 보안 지표만 기록한다.
 
 ### 4. 컨텍스트 예산
 

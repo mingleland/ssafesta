@@ -186,6 +186,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
     conversation_ttl_seconds: int = Field(default=1800, gt=0)
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+    # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
+    spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)

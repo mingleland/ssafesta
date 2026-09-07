@@ -1,8 +1,7 @@
-// AI Chat 오류 계열별 안내 문구 — spec 008 C-07/FR-011 (S15P21A604-189).
-// HTTP 단계 오류(연결 전)와 SSE error 이벤트(연결 후)는 출처가 다르지만 사용자에게는 같은 모양의
-// 안내(문구 + 재시도 가능 여부 + 대기 시간)로 보여야 해서 한 타입으로 모은다.
+// AI Chat HTTP 단계(연결 전) 오류 안내 문구 — spec 008 FR-011 (S15P21A604-189).
+// SSE error 이벤트(연결 후)·sequence 결번은 entities/conversation/stream.consumer가
+// 이미 처리한다(S15P21A604-182) — 이 파일은 스트림 시작 전 실패(Conversation 생성·전송)만 다룬다.
 import type { AiHttpError } from './api';
-import type { AiErrorCode, SseErrorEvent } from './stream.types';
 
 export interface StreamErrorDescription {
   headline: string;
@@ -32,37 +31,4 @@ export function describeHttpError(error: AiHttpError): StreamErrorDescription {
     retryable: error.status === 429 || error.status === 503 || error.status >= 500,
     retryAfterSeconds: error.retryAfterSeconds,
   };
-}
-
-const SSE_ERROR_MESSAGES: Partial<Record<AiErrorCode, string>> = {
-  LLM_TIMEOUT: '답변 생성이 지연되고 있습니다.',
-  LLM_PROVIDER_ERROR: 'AI 응답 생성에 실패했습니다.',
-  RAG_SEARCH_FAILED: '자료 검색에 실패했습니다.',
-  RATE_LIMITED: '지금 대화 요청이 많습니다.',
-  STREAM_CLOSED: '연결이 끊겼습니다.',
-  BOOTH_LEASE_EXPIRED: '부스 임대가 만료되어 대화를 이어갈 수 없습니다.',
-  DOCUMENT_NOT_READY: '아직 상담 자료가 준비되지 않았습니다.',
-  INTERNAL_ERROR: '일시적인 오류가 발생했습니다.',
-};
-
-function timeoutSuffix(event: SseErrorEvent): string {
-  if (event.code !== 'LLM_TIMEOUT' || event.timeoutPhase === undefined) return '';
-  return event.timeoutPhase === 'FIRST_TOKEN' ? ' (첫 응답 지연)' : ' (전체 응답 지연)';
-}
-
-export function describeSseError(event: SseErrorEvent): StreamErrorDescription {
-  const headline = (SSE_ERROR_MESSAGES[event.code] ?? event.message) + timeoutSuffix(event);
-  return {
-    headline,
-    retryable: event.retryable,
-    retryAfterSeconds: event.retryAfterSeconds,
-  };
-}
-
-export function describeProtocolError(): StreamErrorDescription {
-  return { headline: '연결이 중간에 끊겼습니다. 다시 시도해주세요.', retryable: true };
-}
-
-export function describeSequenceGap(): StreamErrorDescription {
-  return { headline: '응답이 잘린 것 같습니다. 다시 시도해주세요.', retryable: true };
 }
