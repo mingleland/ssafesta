@@ -89,9 +89,7 @@ class ConversationStreamService:
             raise BoothLeaseExpired(conversation_id)
         return conversation
 
-    async def _commit_turn(
-        self, conversation: Conversation, turn: ConversationTurn, *, now: datetime
-    ) -> None:
+    async def _commit_turn(self, conversation: Conversation, turn: ConversationTurn) -> None:
         """Confirm one completed turn, unless the Conversation is already gone.
 
         A close (`DELETE`) or the idle TTL can land while this stream is still
@@ -100,7 +98,9 @@ class ConversationStreamService:
         another 30 minutes and break D11/SC-012, so the repository commit is
         conditional and its failure is logged rather than swallowed.
         """
-        updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
+        updated = conversation.record_turn(
+            turn, now=turn.created_at, ttl_seconds=self._ttl_seconds
+        )
         if not await self._repository.commit_turn(updated):
             logger.info(
                 "completed turn dropped, conversation closed or expired mid-stream "
@@ -163,7 +163,7 @@ class ConversationStreamService:
                 sources=(),
                 created_at=now,
             )
-            await self._commit_turn(conversation, turn, now=now)
+            await self._commit_turn(conversation, turn)
             return
 
         answer_parts: list[str] = []
@@ -270,4 +270,4 @@ class ConversationStreamService:
             sources=tuple(citations),
             created_at=now,
         )
-        await self._commit_turn(conversation, turn, now=now)
+        await self._commit_turn(conversation, turn)

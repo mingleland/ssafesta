@@ -211,10 +211,11 @@ async def close_conversation(
     member: Annotated[AuthenticatedMember, Depends(require_member)],
     service: Annotated[ConversationService, Depends(get_conversation_service)],
 ) -> None:
-    """Idempotent close — an unknown id also answers 204 so it leaks nothing.
+    """Close and delete the raw text now (FR-014/FR-028).
 
-    No 404 here on purpose: `conversation-api.yaml` defines 204/403 only, and a
-    404 would tell a caller whether someone else's id exists.
+    204 for an id that is already gone, per `conversation-api.yaml`, which
+    defines 204/403 and no 404 — so a client whose close is retried, or races
+    the idle TTL, does not have to treat either outcome as a failure.
     """
     try:
         await service.close(conversation_id=conversationId, user_id=member.user_id)

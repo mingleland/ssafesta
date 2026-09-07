@@ -84,10 +84,11 @@ class ConversationService:
     async def close(self, *, conversation_id: str, user_id: int) -> None:
         """Delete the raw text now (FR-014/FR-028, D11).
 
-        Idempotent: an unknown or already-expired id succeeds without saying
-        whether it ever existed. Deliberately does not reuse the streaming
-        `authorize()` — an expired Lease must still be able to delete, and no
-        Spring call belongs on this path (Article 3, AI failure isolation).
+        Idempotent: an unknown or already-expired id succeeds, so a retried
+        or duplicated close is harmless. Deliberately does not reuse the
+        streaming `authorize()` — an expired Lease must still be able to
+        delete, and no Spring call belongs on this path (Article 3, AI
+        failure isolation).
         """
         conversation = await self._repository.get(conversation_id)
         if conversation is None:

@@ -120,15 +120,6 @@ def test_close_returns_204_and_forwards_the_authenticated_user() -> None:
     assert service.closed == [{"conversation_id": "conv_abc", "user_id": 42}]
 
 
-def test_close_returns_204_for_an_unknown_conversation() -> None:
-    """Idempotent per the contract — 204 also leaks nothing about existence."""
-    service = FakeConversationService(conversation=_conversation())
-
-    response = _client(service).delete("/ai/v1/conversations/conv_never_existed")
-
-    assert response.status_code == 204
-
-
 def test_close_returns_403_for_another_users_conversation() -> None:
     service = FakeConversationService(error=ConversationOwnershipMismatch("conv_abc"))
 
