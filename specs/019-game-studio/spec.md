@@ -262,7 +262,7 @@
 
 ## Assumptions
 
-- 기존 Google/Kakao 인증과 Access/Refresh 정책을 재사용한다.
+- 기존 소셜 인증(Google·Kakao·SSAFY)과 Access/Refresh 정책을 재사용한다.
 - Game Studio는 기존 FESTA Web과 인증을 공유하는 같은 출처의 분리 영역으로 시작하며 별도 인증 앱을 만들지 않는다.
 - 편집과 Published 플레이는 서로 구분되는 인증된 게임 화면으로 제공한다.
 - 첫 MVP는 데스크톱 브라우저 편집을 우선하며 모바일은 플레이만 허용할 수 있다.

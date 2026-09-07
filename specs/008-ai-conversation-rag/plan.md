@@ -5,13 +5,13 @@
 
 ## Summary
 
-로그인 사용자가 부스 AI 직원과 대화하면 FastAPI가 Spring에서 Lease와 Agent 소속·`ACTIVE` 상태를 검증하고, Redis에 30분 TTL의 Conversation을 만든다. 질문은 서버가 보관한 `boothId + agentId` Scope로 `READY` Chunk만 pgvector 검색하고 LLM Adapter를 호출하며, `start/token/source/done/error` SSE 계약으로 React에 전달한다. 원문은 Redis에만 두고 정상 종료 즉시 또는 유휴 30분 후 삭제한다. 실제 PostgreSQL+pgvector의 격리 테스트는 릴리스 차단 조건이다.
+로그인 사용자가 부스 AI 직원과 대화하면 FastAPI가 Spring에서 Lease와 Agent 소속·`ACTIVE` 상태를 검증하고, Redis에 30분 TTL의 Conversation을 만든다. FastAPI는 질의 Embedding을 생성한 뒤 Spring의 `POST /internal/ai/chunk-search`로 `boothId + agentId` Scope 검색을 요청하고 LLM Adapter를 호출하며, `start/token/source/done/error` SSE 계약으로 React에 전달한다. 원문은 Redis에만 두고 정상 종료 즉시 또는 유휴 30분 후 삭제한다. Spring Business DB+pgvector를 통과하는 격리 테스트는 릴리스 차단 조건이다.
 
 ## Technical Context
 
 **Language/Version**: Python 3.12+, TypeScript/React 19
-**Primary Dependencies**: FastAPI, Uvicorn, SQLAlchemy 2.x async, psycopg 3, pgvector, redis-py asyncio, HTTPX, Pydantic Settings, LLM Provider adapter; React, TanStack Query, Vitest
-**Storage**: PostgreSQL+pgvector는 `READY` Chunk 검색 전용, Redis는 Conversation 원문·TTL·rate limit·전역 스트림/대기열 상태 전용. Conversation 원문의 PostgreSQL·로그 저장 금지
+**Primary Dependencies**: FastAPI, Uvicorn, redis-py asyncio, HTTPX, Pydantic Settings, Embedding/LLM Provider adapter; Spring Data JPA, pgvector; React, TanStack Query, Vitest
+**Storage**: Spring Business PostgreSQL+pgvector가 Chunk 검색을 단독 소유한다. FastAPI는 문서 DB에 연결하지 않고 Redis에 Conversation 원문·TTL·rate limit·전역 스트림/대기열 상태만 둔다. Conversation 원문의 PostgreSQL·로그 저장 금지
 **Testing**: pytest, pytest-asyncio, HTTPX ASGI client, 실제 PostgreSQL+pgvector·Redis 통합 Fixture/Testcontainers, LLM adapter fake; Vitest/Testing Library
 **Target Platform**: Linux Docker container와 브라우저 React overlay
 **Project Type**: FastAPI SSE web service + React overlay
@@ -25,11 +25,11 @@
 
 | 조항 | 검증 | 결과 |
 |---|---|---|
-| 1. Source of Truth | Lease·Agent 상태는 Spring, Chunk는 AI pgvector, 휘발성 Conversation은 Redis가 소유 | PASS |
+| 1. Source of Truth | Lease·Agent·Document·Chunk/pgvector는 Spring, 휘발성 Conversation은 Redis가 소유 | PASS |
 | 3. AI 장애 격리 | AI API와 overlay 실패가 월드·부스·비AI API를 차단하지 않음 | PASS |
 | 14. 접속 토큰 검증 | 사용자 Access Token만 받고 Refresh Token을 FastAPI에 전달하지 않음 | PASS |
 | 15. Adapter·Secret | LLM은 adapter 뒤, Provider·Service Token은 Secret 주입 | PASS |
-| 17. RAG 격리 | Repository API와 SQL에 `booth_id + agent_id + READY`를 필수화하고 실제 pgvector 테스트로 차단 | PASS |
+| 17. RAG 격리 | Spring 검색 API와 SQL에 `booth_id + agent_id + searchable + READY`를 필수화하고 실제 pgvector 테스트로 차단 | PASS |
 | 19. SSE 정규화 | Provider 원문을 노출하지 않고 C-07의 다섯 이벤트와 envelope만 전송 | PASS |
 | 24. 계약 변경 | FastAPI↔Spring·FastAPI↔React 계약을 `contracts/`에 명시 | PASS |
 | 25. 텍스트 UI | 입력·오류·근거·로그인 안내는 React overlay가 담당 | PASS |
@@ -63,9 +63,9 @@ festa-ai/
 ├── app/
 │   ├── api/v1/conversations.py
 │   ├── models/conversation.py
-│   ├── repositories/{chunk,conversation}_repository.py
+│   ├── repositories/conversation_repository.py
 │   ├── services/{conversation,context,rag,stream,capacity}_service.py
-│   ├── clients/spring_booth_access.py
+│   ├── clients/{spring_booth_access,spring_chunk_search}.py
 │   └── providers/llm.py
 └── tests/{unit,contract,integration,isolation}/
 
@@ -75,7 +75,7 @@ festa-frontend/src/
 └── features/ai-chat/__tests__/
 ```
 
-**Structure Decision**: spec 007의 `festa-ai/` 단일 서비스·Provider adapter·pgvector 구조를 확장한다. React에는 기존 `OverlayHost`가 여는 AI Chat feature만 추가한다. Spring에는 새 내부 접근 검증 계약의 consumer 구현만 필요하며 소유권을 FastAPI로 복제하지 않는다.
+**Structure Decision**: FastAPI는 Conversation orchestration과 질의 Embedding/LLM adapter만 담당한다. React에는 기존 `OverlayHost`가 여는 AI Chat feature를 추가하고, Spring이 Chunk repository와 pgvector 검색 endpoint를 소유한다.
 
 ## Detailed Design
 
@@ -96,9 +96,10 @@ festa-frontend/src/
 
 ### 3. 격리 검색
 
-- `ChunkRepository.search_ready_chunks(scope, embedding, top_k)`만 검색 진입점으로 허용한다.
-- SQL의 필수 WHERE는 `booth_id=:booth_id AND agent_id=:agent_id AND document_status='READY'`이며 호출자가 조건을 생략할 수 없는 Scope 값 객체를 받는다.
-- 반환 DTO에도 세 Scope 필드를 포함해 Context 조립 전에 전건 재검증한다. 불일치 1건이면 응답을 중단하고 원문 없는 보안 지표만 기록한다.
+- FastAPI는 질의 Embedding을 만든 뒤 `POST /internal/ai/chunk-search`만 검색 진입점으로 사용한다.
+- Spring SQL은 `booth_id=:booth_id AND agent_id=:agent_id AND searchable=true`와 부모 Document `READY`를 강제한다.
+- `topK`는 최대 20, 내부 timeout은 3초다. cosine `distance` 오름차순이며 threshold는 적용하지 않는다.
+- FastAPI는 반환된 scope를 Context 조립 전에 전건 재검증한다. 불일치 1건이면 응답을 중단하고 원문 없는 보안 지표만 기록한다.
 
 ### 4. 컨텍스트 예산
 

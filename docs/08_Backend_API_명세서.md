@@ -154,7 +154,7 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
   "userId": 12,
   "nickname": "FESTA_USER",
   "status": "ACTIVE",
-  "providers": ["GOOGLE"],
+  "providers": ["GOOGLE", "SSAFY"],
   "avatarCode": "fa|3=SK_Hair_Long_01|c=FF8800"
 }
 ```
@@ -1287,6 +1287,7 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > | `JWT_SECRET`(base64)·`CONNECTION_TOKEN_SECRET`·`INTERNAL_AI_TO_SPRING_TOKENS` | 없음 | **기동 실패** |
 > | `FESTA_ENVIRONMENT`(`dev`\|`demo`) | 없음 | **기동 실패** — Redis 키 네임스페이스다(`S15P21A604-349`). 조용히 빈 값으로 뜨면 dev·demo 가 세션과 일일 지급을 공유한다 |
 > | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URI`·`KAKAO_REST_API_KEY/CLIENT_SECRET/REDIRECT_URI` | 없음 | **기동 실패** |
+> | `SSAFY_CLIENT_ID/CLIENT_SECRET/REDIRECT_URI` | 없음 | SSAFY 로그인이 실패한다 (`S15P21A604-357`) |
 > | `R2_ENDPOINT`·`R2_BUCKET`·`R2_ACCESS_KEY_ID`·`R2_SECRET_ACCESS_KEY` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
 > | `AI_STORAGE_UPLOAD_GATE`·`AI_STORAGE_ACTIVE_WRITE_PROVIDER` *(007, S15P21A604-106)* | 없음 | **기동 실패** |
 > | `MINIO_ENDPOINT/BUCKET/ACCESS_KEY_ID/SECRET_ACCESS_KEY` *(007, fallback 시)* | 빈 값 | 전부 비면 미구성으로 빠진다. **부분 입력이면 기동 실패** |

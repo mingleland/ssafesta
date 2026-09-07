@@ -8,8 +8,8 @@
   z-index: 40;
   display: flex;
   align-items: center;
-  /* 고해상도에서 눈에 들어오는 크기까지 자란다 — -379 에서 정한 clamp 기반 반응형 관례를 따른다 */
-  --screen-control-size: clamp(48px, 4vh, 72px);
+  /* 치수는 :root 의 공통 토큰을 쓴다 — 좌상단 개발 진입구와 한 벌로 보이게 (S15P21A604-467) */
+  --screen-control-size: var(--festa-control-size);
   gap: calc(var(--screen-control-size) * 0.2);
 }
 
@@ -20,8 +20,8 @@
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  /* 원형이 아니라 모서리가 둥근 네모 — 로그인 버튼(radius clamp(12px,1.5vh,18px))과 같은 계열 */
-  border-radius: clamp(12px, 1.3vh, 20px);
+  /* 원형이 아니라 모서리가 둥근 네모 — 로그인 버튼과 같은 계열 */
+  border-radius: var(--festa-control-radius);
   background: rgba(20, 22, 46, 0.42);
   backdrop-filter: blur(6px);
   color: #f4f6ff;
