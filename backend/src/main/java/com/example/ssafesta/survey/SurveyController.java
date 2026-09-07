@@ -1,5 +1,7 @@
 package com.example.ssafesta.survey;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.MemberPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -7,13 +9,16 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -30,11 +35,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SurveyController {
 
     private static final String MEMBER_ONLY = "회원 계정만 설문을 편집할 수 있습니다.";
+    private static final String MEMBER_ROLE = "MEMBER";
+    private static final String GUEST_ROLE = "GUEST";
 
     private final SurveyService surveys;
+    private final SurveyResponseService submissions;
 
-    public SurveyController(SurveyService surveys) {
+    public SurveyController(SurveyService surveys, SurveyResponseService submissions) {
         this.surveys = surveys;
+        this.submissions = submissions;
     }
 
     @Operation(summary = "내 부스 설문 조회 — 편집자용",
@@ -121,5 +130,65 @@ public class SurveyController {
     public SurveyService.RunView run(@Parameter(description = "부스 식별자", example = "7")
                                      @PathVariable Long boothId) {
         return surveys.findRun(boothId);
+    }
+
+    @Operation(summary = "설문 응답 제출 — 1인 1응답",
+            description = """
+                    방문자가 답을 제출한다. **회원과 게스트 모두 제출할 수 있다** (C-05).
+
+                    **1인 1응답**이다. 회원은 계정 기준, 게스트는 접속 토큰 주체 기준이며 재제출은
+                    `409 SURVEY_ALREADY_RESPONDED`다. 게스트 토큰은 발급마다 주체가 새로 나오므로
+                    게스트의 중복 방지는 그 세션 안에서만 성립한다 — 계정 없는 사람을 그 이상
+                    식별할 방법이 없다.
+
+                    **보상이 있는 설문(`rewardCoin > 0`)은 게스트가 제출할 수 없다** —
+                    `403 MEMBER_ONLY`. 게스트에게는 지갑이 없어 지급이 불가능하고(헌법 12조),
+                    답을 받은 뒤 빈손으로 돌려보내지 않기 위해 시작 전에 막는다. 방문자 조회
+                    응답의 `rewardCoin`으로 화면이 미리 안내할 수 있다.
+
+                    보상은 응답 저장과 **같은 트랜잭션**에서 원장에 기록된다 (헌법 20조).
+                    멱등 기준이 `설문 + 회원`이므로 어떤 경로로 두 번 들어와도 지급은 한 번이다.
+
+                    답은 문항별로 하나씩 싣고 **유형에 맞는 키 하나만** 채운다 —
+                    선택형은 `selectedOptionIds`, 별점은 `rating`, 텍스트 3유형은 `text`다.
+                    다른 키가 실리면 `400`이다. 선택 문항을 답하지 않으려면 배열에서 빼거나
+                    빈 값으로 보낸다(빈 배열·공백 문자열은 "답하지 않음"이다).
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "`responseId`와 실제 지급된 `rewardedCoin`. 보상이 없으면 `0`이며 키는 항상 있다"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 이 설문의 문항이 아니거나, 유형에 맞지 않는 키, 남의 선택지, 별점 범위 밖, 길이 초과, 필수 문항 미응답. `errors[0].field`가 문제 자리다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 보상이 있는 설문에 게스트가 제출했다"),
+            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` · `BOOTH_NOT_FOUND` · `LAYOUT_NOT_PUBLISHED`"),
+            @ApiResponse(responseCode = "409", description = "`SURVEY_CLOSED`(마감) · `SURVEY_ALREADY_RESPONDED`(재제출) · `BOOTH_LEASE_EXPIRED`")})
+    @PostMapping("/surveys/{surveyId}/responses")
+    @ResponseStatus(HttpStatus.CREATED)
+    @SecurityRequirement(name = "bearerAuth")
+    public SurveyResponseService.SubmitResult submit(@AuthenticationPrincipal Jwt jwt,
+                                                     @Parameter(description = "설문 식별자 — 방문자 조회 응답의 `surveyId`", example = "12")
+                                                     @PathVariable Long surveyId,
+                                                     @RequestBody(required = false)
+                                                     SurveyResponseService.SubmitCommand command) {
+        return submissions.submit(surveyId, respondentOf(jwt), command);
+    }
+
+    /**
+     * Who is answering — read from the token, never from the request (헌법 16조).
+     *
+     * <p>Same shape as {@code WorldSessionService.identityOf}: a member becomes their id, a guest
+     * becomes their token subject, and a token carrying neither role is one this server did not
+     * issue.
+     */
+    private SurveyResponseService.Respondent respondentOf(Jwt jwt) {
+        if (jwt == null) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
+        }
+        String role = jwt.getClaimAsString("role");
+        if (MEMBER_ROLE.equals(role)) {
+            return SurveyResponseService.Respondent.member(MemberPrincipal.requireMemberId(jwt));
+        }
+        if (GUEST_ROLE.equals(role)) {
+            return SurveyResponseService.Respondent.guest(jwt.getSubject());
+        }
+        throw new ApiException(ErrorCode.UNAUTHORIZED);
     }
 }
