@@ -14,9 +14,9 @@
 //
 // 월드 안에는 표시하지 않는다. 개발 진입은 로그인 화면에서 한 번 정해지는 일이고,
 // 게임 화면에 상시 표식을 두면 HUD 예산(총 점유 15% 미만)만 잠식한다.
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isApiError } from '../../../shared/api/client';
+import { showToast } from '../../../shared/ui/toast/toastStore';
 import { IS_DEV_ENTRY, enterAsDeveloper } from '../model/devEntry';
 import './devEntry.css';
 
@@ -24,8 +24,8 @@ import './devEntry.css';
  * 오류를 사람이 읽을 한 줄로.
  *
  * `api()` 는 `Error` 가 아니라 **오류 봉투 객체**를 던진다(`isApiError`). `String(error)` 로
- * 떨어뜨리면 `[object Object]` 가 화면에 뜬다 — 실제로 그렇게 나왔다. 봉투면 `code` 와
- * `message` 를 함께 보여 준다. 이유를 드러내려고 만든 배너가 이유를 가리면 안 된다.
+ * 떨어뜨리면 `[object Object]` 가 뜬다 — 실제로 그렇게 나왔다. 봉투면 `code` 와 `message` 를
+ * 함께 보여 준다.
  */
 function describe(error: unknown): string {
   if (isApiError(error)) return `${error.code} — ${error.message}`;
@@ -35,24 +35,23 @@ function describe(error: unknown): string {
 
 export function DevEntryButton() {
   const navigate = useNavigate();
-  // 실패를 삼키지 않는다 — 실 BE 에서 회원 세션을 못 받으면 그 사실을 화면에 남긴다.
-  // 예전에는 세션을 만든 뒤 첫 요청의 401 로 로그인 화면에 되돌아왔고, 이유가 어디에도 없었다.
-  const [failure, setFailure] = useState<string | null>(null);
   // 조건 하나로 컴포넌트 전체가 사라진다 — 프로덕션 빌드에는 이 갈래가 남지 않는다
   if (!IS_DEV_ENTRY) return null;
 
   return (
-    <>
     <button
       type="button"
       className="dev-entry-btn"
       aria-label="개발자로 입장"
       title="개발자로 입장 — 회원 세션으로 바로 들어갑니다"
       onClick={() => {
-        setFailure(null);
+        // 실패는 공통 Toast 로 낸다 — 이 화면(LoginPage)이 이미 쓰는 층이고,
+        // `kind: 'error'` 는 자동 소멸이 없다("읽고 닫는 것", toastStore.ts).
+        // 직접 만든 fixed 배너는 버튼을 가렸고, 알림을 레이아웃에서 떼어 두라는
+        // toastStore 의 설계 이유를 그대로 위반한 것이었다.
         enterAsDeveloper().then(
           () => navigate('/app/world', { replace: true }),
-          (error: unknown) => setFailure(describe(error)),
+          (error: unknown) => showToast(describe(error), 'error'),
         );
       }}
     >
@@ -61,13 +60,5 @@ export function DevEntryButton() {
         <path d="M18.5 2.5 21.5 5.5" />
       </svg>
     </button>
-    {failure !== null && (
-      <p className="dev-entry-error" role="alert">
-        개발자 입장 실패 — {failure}
-        <br />
-        실 BE 모드에서는 `refresh_token` 쿠키가 있어야 회원 세션을 받는다.
-      </p>
-    )}
-    </>
   );
 }
