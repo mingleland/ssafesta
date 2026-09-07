@@ -91,6 +91,7 @@ for name in DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPR
   DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
   DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
+  grep -q "^[[:space:]]*${name}:.*\${${name}" "${controller_compose}" || fail "controller does not receive ${name}"
 done
 grep -q "file(credentialsId: envCredentialId, variable: 'COMPONENT_ENV_FILE')" "${component_pipeline}" \
   || fail "dev component pipeline does not bind runtime env file"
@@ -143,6 +144,14 @@ export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
 export JENKINS_AGENT_SECRET_UNITY="foundation-unity-agent-value"
 export ROOT_DOMAIN="example.invalid"
+export DEV_BACK_ENV_CREDENTIAL_ID="foundation-dev-back-env"
+export DEV_AI_ENV_CREDENTIAL_ID="foundation-dev-ai-env"
+export DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-dev-spring-to-ai"
+export DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-dev-ai-to-spring"
+export DEMO_BACK_ENV_CREDENTIAL_ID="foundation-demo-back-env"
+export DEMO_AI_ENV_CREDENTIAL_ID="foundation-demo-ai-env"
+export DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-demo-spring-to-ai"
+export DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-ai-to-spring"
 
 if command -v docker >/dev/null 2>&1; then
   runtime_env_dir="$(mktemp -d)"
