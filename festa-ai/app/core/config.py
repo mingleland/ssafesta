@@ -44,17 +44,9 @@ class Settings(BaseSettings):
     app_env: str = "local"
     log_level: str = "INFO"
 
-    # Database (runtime role only; alembic reads MIGRATION_DATABASE_URL directly)
-    database_url: SecretStr = Field(min_length=1)
-
-    # Worker lease and recovery — spec 007 plan.md Section 10 / research.md Section 5
+    # Worker heartbeat — spec 007 plan.md Section 10. lease·재시도 예산은
+    # Spring이 소유한다(S15P21A604-449) — FastAPI는 heartbeat 주기만 안다.
     job_heartbeat_seconds: int = Field(default=30, gt=0)
-    job_lease_seconds: int = Field(default=90, gt=0)
-    job_sweeper_seconds: int = Field(default=60, gt=0)
-    job_max_retries: int = Field(default=3, ge=0)
-    job_retry_backoff_seconds_csv: str = Field(
-        default="60,300,900", validation_alias="JOB_RETRY_BACKOFF_SECONDS"
-    )
 
     # Document limits and chunk tuning — spec 007 FR-011, FR-018, FR-020
     document_max_bytes: int = Field(default=20_971_520, gt=0)
@@ -188,6 +180,11 @@ class Settings(BaseSettings):
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
     # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
     spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
+    # 문서 처리 결과 전달(S15P21A604-124) — heartbeat/batch/finalize/failed 공통 timeout.
+    spring_document_result_timeout_seconds: float = Field(default=5.0, gt=0)
+    # 한 번의 Embedding Provider 호출에 담을 최대 chunk 개수 — HTTP 결과 전송 batch(최대
+    # 200개/8MiB, document-result-api.yaml)와는 별개로, Provider 요청 크기를 제어한다.
+    embedding_batch_size: int = Field(default=96, gt=0)
 
     # Spring internal callback — spec 007 plan.md Section 9
     spring_internal_base_url: str = Field(min_length=1)
@@ -214,10 +211,6 @@ class Settings(BaseSettings):
     minio_secret_access_key: SecretStr = Field(min_length=1)
 
     @property
-    def job_retry_backoff_seconds(self) -> list[int]:
-        return [int(part) for part in _parse_csv(self.job_retry_backoff_seconds_csv)]
-
-    @property
     def jwt_secret_key(self) -> bytes:
         return base64.b64decode(self.jwt_secret.get_secret_value())
 
@@ -228,21 +221,6 @@ class Settings(BaseSettings):
     @property
     def internal_ai_to_spring_tokens(self) -> list[str]:
         return _parse_csv(self.internal_ai_to_spring_tokens_csv.get_secret_value())
-
-    @model_validator(mode="after")
-    def _validate_job_recovery(self) -> "Settings":
-        if self.job_lease_seconds <= self.job_heartbeat_seconds:
-            raise ValueError(
-                "JOB_LEASE_SECONDS must be greater than JOB_HEARTBEAT_SECONDS "
-                f"(lease={self.job_lease_seconds}, heartbeat={self.job_heartbeat_seconds})"
-            )
-        backoffs = self.job_retry_backoff_seconds
-        if len(backoffs) != self.job_max_retries:
-            raise ValueError(
-                "JOB_RETRY_BACKOFF_SECONDS entry count must equal JOB_MAX_RETRIES "
-                f"(backoffs={len(backoffs)}, max_retries={self.job_max_retries})"
-            )
-        return self
 
     @model_validator(mode="after")
     def _validate_embedding_dimension(self) -> "Settings":
