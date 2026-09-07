@@ -120,7 +120,7 @@ export const addTopDownScene = (project: GameProject): GameProject => {
   const scene: TopDownScene = {
     id: sceneId,
     type: 'TOP_DOWN',
-    name: `새 맵 ${project.scenes.filter((candidate) => candidate.type === 'TOP_DOWN').length + 1}`,
+    name: `새 맵-TopDown ${project.scenes.filter((candidate) => candidate.type === 'TOP_DOWN').length + 1}`,
     width: 16,
     height: 10,
     tileLayers: [],
@@ -155,7 +155,7 @@ export const addPlatformerScene = (project: GameProject): GameProject => {
   const scene: PlatformerScene = {
     id: sceneId,
     type: 'PLATFORMER',
-    name: `새 플랫폼 맵 ${project.scenes.filter((candidate) => candidate.type === 'PLATFORMER').length + 1}`,
+    name: `새 맵-SideScroll ${project.scenes.filter((candidate) => candidate.type === 'PLATFORMER').length + 1}`,
     width: 24,
     height: 12,
     gravity: 12,
@@ -194,10 +194,16 @@ export const addDialogueScene = (
   const terminalAction: Action = presentation === 'OVERLAY'
     ? { type: 'CLOSE_DIALOGUE' }
     : { type: 'COMPLETE_GAME' };
+  // S15P21A604-488 — Overlay/Fullscreen은 둘 다 scene.type === 'DIALOGUE'라서, type만으로
+  // 세면 한쪽 번호를 다른 쪽이 이어받는다(예: Overlay 다음 첫 Fullscreen이 1이 아니라 2가
+  // 됨). presentation까지 같이 걸러서 두 카운터가 서로 독립적으로 1부터 시작하게 한다.
+  const presentationCount = project.scenes.filter((candidate) => (
+    candidate.type === 'DIALOGUE' && candidate.presentation === presentation
+  )).length + 1;
   const scene: DialogueScene = {
     id: sceneId,
     type: 'DIALOGUE',
-    name: presentation === 'OVERLAY' ? '새 대화' : '새 이야기 장면',
+    name: presentation === 'OVERLAY' ? `새 대화-Overlay ${presentationCount}` : `새 대화-Fullscreen ${presentationCount}`,
     presentation,
     startNodeId: nodeId,
     nodes: [{

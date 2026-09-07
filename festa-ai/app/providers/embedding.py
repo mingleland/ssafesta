@@ -8,6 +8,9 @@ from typing import Protocol, Sequence, runtime_checkable
 
 type EmbeddingVector = tuple[float, ...]
 
+EMBEDDING_DIMENSION = 1536
+"""헌법 18조 / spec 007 FR-009 — 모든 Embedding 벡터가 고정하는 차원이다."""
+
 
 @dataclass(frozen=True, slots=True)
 class EmbeddingBatch:

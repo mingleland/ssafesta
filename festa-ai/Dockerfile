@@ -10,8 +10,6 @@ RUN addgroup --system festa && adduser --system --ingroup festa festa
 
 COPY pyproject.toml ./
 COPY app ./app
-COPY alembic.ini ./alembic.ini
-COPY migrations ./migrations
 
 RUN pip install --no-cache-dir . \
     && mkdir -p "$TIKTOKEN_CACHE_DIR" \

@@ -1,4 +1,9 @@
-"""Verify document API DTOs against the spec 007 OpenAPI constraints."""
+"""Verify document API DTOs against the spec 007 OpenAPI constraints.
+
+S15P21A604-449 이후 계약(`document-processing-api.yaml` v0.6.0): FastAPI는 Job을
+소유하지 않으므로 요청에 `jobId`·`attemptNo`가 실리고, 202 Accepted는 본문이
+없다 — `ProcessDocumentResponse`는 더 이상 계약에 없다.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +14,12 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.api.errors import request_validation_error_handler
-from app.api.schemas.documents import ProcessDocumentRequest, ProcessDocumentResponse
+from app.api.schemas.documents import ProcessDocumentRequest
 
 
 VALID_REQUEST = {
+    "jobId": 501,
+    "attemptNo": 0,
     "documentId": 42,
     "boothId": 10,
     "agentId": 7,
@@ -29,6 +36,8 @@ VALID_REQUEST = {
 def test_process_document_request_accepts_contract_payload() -> None:
     request = ProcessDocumentRequest.model_validate(VALID_REQUEST)
 
+    assert request.job_id == 501
+    assert request.attempt_no == 0
     assert request.document_id == 42
     assert request.model_dump(by_alias=True) == VALID_REQUEST
 
@@ -39,6 +48,12 @@ def test_process_document_request_accepts_exact_20mb_limit() -> None:
     )
 
     assert request.file_size_bytes == 20_971_520
+
+
+def test_process_document_request_accepts_zero_attempt_no() -> None:
+    request = ProcessDocumentRequest.model_validate({**VALID_REQUEST, "attemptNo": 0})
+
+    assert request.attempt_no == 0
 
 
 def test_process_document_request_rejects_zero_byte_file() -> None:
@@ -54,6 +69,8 @@ def test_process_document_request_rejects_zero_byte_file() -> None:
         ("fileSizeBytes", 20_971_521),
         ("contentType", "application/octet-stream"),
         ("storageProvider", "S3"),
+        ("jobId", 0),
+        ("attemptNo", -1),
     ],
 )
 def test_process_document_request_rejects_contract_violations(
@@ -68,22 +85,6 @@ def test_process_document_request_rejects_contract_violations(
 def test_process_document_request_rejects_undeclared_fields() -> None:
     with pytest.raises(ValidationError):
         ProcessDocumentRequest.model_validate({**VALID_REQUEST, "unexpected": True})
-
-
-def test_process_document_response_serializes_camel_case() -> None:
-    response = ProcessDocumentResponse(
-        job_id="job_123",
-        document_id=42,
-        status="QUEUED",
-        existing=False,
-    )
-
-    assert response.model_dump(mode="json", by_alias=True) == {
-        "jobId": "job_123",
-        "documentId": 42,
-        "status": "QUEUED",
-        "existing": False,
-    }
 
 
 def test_request_validation_error_uses_sanitized_contract_body() -> None:
