@@ -169,6 +169,10 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
       </aside>
 
       <div className="gss-dialogue-editor">
+        {/* S15P21A604-512 — scene.presentation 원시값 배지 제거. 캔버스 상단 툴바가 이미
+            describeSceneType()으로 같은 정보를 "대화-Overlay"/"대화-Fullscreen"처럼
+            친숙하게 보여주고 있어서 여기서 다시 원시값("OVERLAY"/"FULL_SCREEN")을
+            보여주는 건 정보 중복이었다. */}
         <div className="gss-dialogue-scene-header">
           <div>
             <span className="gss-eyebrow">DIALOGUE SCENE</span>
@@ -178,7 +182,6 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               value={scene.name}
             />
           </div>
-          <span className="gss-type-badge">{scene.presentation}</span>
         </div>
         <section className="gss-dialogue-flow" aria-label="대화 흐름 개요">
           <header>
@@ -217,7 +220,10 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
           className={`gss-dialogue-live-preview${scene.presentation === 'OVERLAY' ? ' is-overlay' : ''}`}
           style={backgroundVisual === null ? undefined : staticImageBackgroundStyle(backgroundVisual)}
         >
-          <span className="gss-preview-badge">LIVE PREVIEW · {scene.presentation}</span>
+          {/* S15P21A604-512 — 원시 presentation 값 제거(정보 중복, 위 원인 참고). Overlay/
+              Fullscreen 차이는 이 미리보기 카드 자체의 레이아웃(is-overlay 클래스)으로
+              이미 시각적으로 드러난다. */}
+          <span className="gss-preview-badge">LIVE PREVIEW</span>
           {portraitVisual !== null && (
             <div className="gss-dialogue-preview-portrait" style={staticImageBackgroundStyle(portraitVisual)} />
           )}
@@ -234,7 +240,10 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
           </div>
         </section>
         <section className="gss-dialogue-node-card">
-          <header><span>NODE</span><strong>{selectedNode.id}</strong></header>
+          {/* S15P21A604-512 — 내부 node id 노출 제거. 어떤 노드를 편집 중인지는 좌측 NODES
+              rail의 speaker/text 요약과 START 배지로 이미 구분되고, id 자체는 사용자에게
+              의미 없는 기술적 정보였다. */}
+          <header><span>NODE</span></header>
           <div className="gss-field-row">
             <label className="gss-field">
               <span>연출 배경</span>
