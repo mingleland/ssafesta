@@ -86,7 +86,7 @@ public class GameAssetDeleteQueue {
                 jdbc.update("UPDATE game_asset_delete_queue SET last_error = ? WHERE id = ?",
                         failure.getClass().getSimpleName(), pending.id());
                 if (pending.attempts() >= ESCALATE_AFTER_ATTEMPTS) {
-                    log.error("자산 객체 삭제가 {}회 실패했습니다 — 탈퇴 회원의 이미지가 저장소에 남아 있을 수 있습니다."
+                    log.error("객체 삭제가 {}회 실패했습니다 — 지운 이미지나 문서가 저장소에 남아 있을 수 있습니다."
                                     + " id={} provider={} 원인={}",
                             pending.attempts(), pending.id(), pending.provider(),
                             failure.getClass().getSimpleName());

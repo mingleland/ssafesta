@@ -3,33 +3,13 @@
 // 좌표 규약은 계약(헌법 21조) 그대로 — 원점 = 바닥 중앙, +Z = 부스 정면, y = 높이. 화면 매핑은 이 파일에만 있다.
 import { useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
-import type { LayoutObject, ObjectType } from '../../../../entities/layout/types';
+import type { LayoutObject } from '../../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
-import type { TransformTool } from '../../model/studioMode';
+import type { BoothRendererProps } from './canvasTypes';
+import { FALLBACK_BOX, OBJECT_FILL, OBJECT_LABEL, shade } from './objectAppearance';
 import './isoRenderer.css';
-
-export interface BoothDecor {
-  floorHex: string;
-  wallHex: string;
-  primaryHex: string;
-  signText: string;
-  graphic: boolean;
-}
-
-interface Props {
-  objects: LayoutObject[];
-  selectedObjectId: string | null;
-  bounds: { width: number; depth: number; height: number };
-  zoom: number;
-  tool: TransformTool;
-  snapOn: boolean;
-  decor: BoothDecor;
-  onSelect: (objectId: string | null) => void;
-  onMove: (objectId: string, x: number, z: number) => void;
-  onRotate: (objectId: string, rotationY: number) => void;
-}
 
 // ── 아이소메트릭 투영(30°) ──────────────────────────────────────────
 // 화면 = ((x - z)·cos30, (x + z)·sin30 - y) · S. +Z(정면)는 화면 왼쪽-아래로 간다.
@@ -43,38 +23,6 @@ const proj = (x: number, y: number, z: number): P2 => ({ x: (x - z) * C, y: (x +
 const pts = (list: P2[]) => list.map((q) => q.x.toFixed(1) + ',' + q.y.toFixed(1)).join(' ');
 /** 바닥 평면(y=0) 역투영 — 드래그가 화면 이동을 월드 이동으로 되돌릴 때 쓴다 */
 const unproj = (sx: number, sy: number) => ({ x: (sx / C + sy / H) / 2, z: (sy / H - sx / C) / 2 });
-
-const OBJECT_FILL: Record<ObjectType, string> = {
-  AI_AGENT: '#8fb8ff',
-  VIDEO_SCREEN: '#28324a',
-  PROJECT_PANEL: '#eef2fa',
-  SURVEY_KIOSK: '#cfd6e6',
-  RECRUITMENT_BOARD: '#f6f7fb',
-  CONSULTATION_DESK: '#f2f4f8',
-  LAPTOP: '#dfe4ee',
-  LIKE_VOTE: '#ffc4dc',
-  FURNITURE: '#e6e9f0',
-  DECORATION: '#79c88a',
-};
-const OBJECT_LABEL: Record<ObjectType, string> = {
-  AI_AGENT: 'AI 직원',
-  VIDEO_SCREEN: '영상 스크린',
-  PROJECT_PANEL: '그래픽 패널',
-  SURVEY_KIOSK: '설문 키오스크',
-  RECRUITMENT_BOARD: '채용 보드',
-  CONSULTATION_DESK: '상담 데스크',
-  LAPTOP: '노트북',
-  LIKE_VOTE: '좋아요 스탠드',
-  FURNITURE: '가구',
-  DECORATION: '장식',
-};
-const FALLBACK_BOX = { min: { x: -0.25, y: 0, z: -0.25 }, max: { x: 0.25, y: 1, z: 0.25 } };
-
-function shade(hex: string, amount: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const f = (v: number) => Math.max(0, Math.min(255, Math.round(v * amount)));
-  return 'rgb(' + f((n >> 16) & 255) + ',' + f((n >> 8) & 255) + ',' + f(n & 255) + ')';
-}
 
 /** rotationY 를 적용한 바닥 사각형 4점(월드) */
 function footprintCorners(obj: LayoutObject) {
@@ -102,7 +50,7 @@ interface DragState {
   startRotation: number;
 }
 
-export function TemporaryIsoRenderer(p: Props) {
+export function TemporaryIsoRenderer(p: BoothRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 

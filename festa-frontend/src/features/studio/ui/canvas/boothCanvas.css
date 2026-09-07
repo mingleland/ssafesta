@@ -1,0 +1,14 @@
+/* R3F 캔버스 (S15P21A604-470).
+   R3F 는 <Canvas> 의 className 을 감싸는 div 에 붙이고, 그 div 에 position:relative·100%·100% 를
+   인라인으로 박는다. 인라인이 이기므로 여기서 position/inset 을 다시 쓰지 않는다 —
+   실제로 그렇게 썼다가 죽은 규칙이 됐다. 크기는 .studio-canvas 가 준다. */
+.r3f-canvas {
+  min-width: 0;
+  min-height: 0;
+  touch-action: none;
+  user-select: none;
+}
+.r3f-canvas canvas {
+  display: block;
+  outline: none;
+}

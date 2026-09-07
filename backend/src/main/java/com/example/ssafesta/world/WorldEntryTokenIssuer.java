@@ -66,9 +66,6 @@ public class WorldEntryTokenIssuer {
                 .claim("sessionId", sessionId)
                 .claim("worldId", WorldProperties.WORLD_ID)
                 .claim("channelId", WorldProperties.CHANNEL_ID);
-        if (identity.avatarCode() != null) {
-            claims.claim("avatarCode", identity.avatarCode());
-        }
         return new IssuedGrant(encoder.encode(JwtEncoderParameters.from(claims.build())).getTokenValue(), expiresAt);
     }
 
@@ -78,12 +75,16 @@ public class WorldEntryTokenIssuer {
      * trusting a userId, nickname or appearance the client asserts, and the game server is told to
      * ignore client-supplied identity in favour of these claims.
      *
-     * @param avatarCode the saved appearance, or {@code null} for a guest or a member who never saved
-     *                   one. A null is left <b>out</b> of the token rather than encoded as an empty
-     *                   string — an empty appearance code is not a value Unity can decode, whereas an
-     *                   absent claim already means "fall back to the default" on that side
+     * <p><b>The appearance is not here, and must not come back.</b> It used to ride along as an
+     * {@code avatarCode} claim, which put 411 characters of a member's saved appearance into a token
+     * Unity copies into its Netcode connection request — a message that is not fragmented and caps
+     * near 1,114 bytes. Members who had saved an appearance overflowed it and could not enter the
+     * world at all (GitLab #138, S15P21A604-468). The game server already receives the appearance
+     * over the RPC that follows spawn, which is the only path a guest or an unsaved member ever
+     * used. Keeping the grant free of it is what makes its size independent of a {@code TEXT}
+     * column that grows with every new customisation option.
      */
-    public record WorldIdentity(String subject, String role, String playerId, String nickname, String avatarCode) { }
+    public record WorldIdentity(String subject, String role, String playerId, String nickname) { }
 
     public record IssuedGrant(String token, Instant expiresAt) { }
 }
