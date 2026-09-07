@@ -5,6 +5,12 @@ heartbeat는 처리 중 background task로 30초마다 보내 lease를 연장한
 뜻이라 — lease를 잃었거나 Job이 끝났다 — `failed`를 다시 부르지 않고 조용히
 멈춘다. 그 밖의 실패만 `failure_policy.classify_failure`로 code/retryable을
 정해 Spring에 보고한다.
+
+S15P21A604-149: 처리 시작 직전과 finalize(공개) 직전, 두 번 Booth Lease를
+확인한다 — Job attemptNo/JOB_GONE 판정은 "이 attempt가 유효한가"만 보므로
+Job은 아직 살아있지만 Booth 임대가 그 사이 만료된 경우를 잡지 못한다.
+만료가 확인되면 finalize를 호출하지 않고(FR-015: 만료 Booth 문서는 READY로
+전환되면 안 된다) `BOOTH_LEASE_EXPIRED`로 `failed`를 보고한다.
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ import json
 import logging
 from collections.abc import Sequence
 
+from app.clients.spring_booth_access import SpringBoothAccessClient
 from app.clients.spring_document_result import (
     ChunkBatchItem,
     SpringDocumentResultClient,
@@ -23,6 +30,7 @@ from app.clients.spring_document_result import (
     SpringDocumentResultUnavailable,
 )
 from app.services.document_processing_service import (
+    BoothLeaseExpiredError,
     DocumentEmbeddingService,
     EmbeddedChunk,
     ProcessingSnapshot,
@@ -43,12 +51,14 @@ class DocumentProcessingOrchestrator:
         *,
         embedding_service: DocumentEmbeddingService,
         result_client: SpringDocumentResultClient,
+        booth_access_client: SpringBoothAccessClient,
         heartbeat_interval_seconds: float,
         max_chunks_per_batch: int = DEFAULT_MAX_CHUNKS_PER_BATCH,
         max_batch_bytes: int = DEFAULT_MAX_BATCH_BYTES,
     ) -> None:
         self._embedding_service = embedding_service
         self._result_client = result_client
+        self._booth_access_client = booth_access_client
         self._heartbeat_interval_seconds = heartbeat_interval_seconds
         self._max_chunks_per_batch = max_chunks_per_batch
         self._max_batch_bytes = max_batch_bytes
@@ -56,6 +66,7 @@ class DocumentProcessingOrchestrator:
     async def run(self, snapshot: ProcessingSnapshot) -> None:
         heartbeat_task = asyncio.create_task(self._heartbeat_loop(snapshot))
         try:
+            await self._ensure_lease_active(snapshot)
             chunks = await self._embedding_service.compute_embedded_chunks(snapshot)
             await self._send_and_finalize(snapshot, chunks)
         except _ATTEMPT_LOST_ERRORS:
@@ -76,6 +87,13 @@ class DocumentProcessingOrchestrator:
             with contextlib.suppress(asyncio.CancelledError):
                 await heartbeat_task
 
+    async def _ensure_lease_active(self, snapshot: ProcessingSnapshot) -> None:
+        result = await self._booth_access_client.check(
+            booth_id=snapshot.booth_id, agent_id=snapshot.agent_id
+        )
+        if not result.allowed:
+            raise BoothLeaseExpiredError(result.denial_code or "BOOTH_LEASE_EXPIRED")
+
     async def _send_and_finalize(
         self, snapshot: ProcessingSnapshot, chunks: tuple[EmbeddedChunk, ...]
     ) -> None:
@@ -86,6 +104,7 @@ class DocumentProcessingOrchestrator:
                 batch_seq=batch_seq,
                 chunks=[_to_chunk_batch_item(chunk) for chunk in batch],
             )
+        await self._ensure_lease_active(snapshot)
         await self._result_client.finalize(
             job_id=snapshot.job_id,
             attempt_no=snapshot.attempt_no,

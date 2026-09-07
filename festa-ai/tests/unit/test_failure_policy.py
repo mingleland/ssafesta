@@ -6,11 +6,15 @@ document-result-api.yaml의 `failureCode`는 최대 50자 문자열이며 분기
 
 from __future__ import annotations
 
+from app.clients.spring_booth_access import SpringBoothAccessUnavailable
 from app.providers.document_parser import DocumentParseError, ScannedDocumentError
 from app.providers.embedding import EmbeddingProvider  # noqa: F401  (protocol 문서화용)
 from app.providers.managed_embedding import ManagedEmbeddingError
 from app.providers.storage import ObjectNotFoundError, ObjectStorageError
-from app.services.document_processing_service import SourceHashMismatchError
+from app.services.document_processing_service import (
+    BoothLeaseExpiredError,
+    SourceHashMismatchError,
+)
 from app.services.failure_policy import classify_failure
 
 
@@ -63,6 +67,20 @@ def test_no_chunks_produced_is_not_retryable() -> None:
 
     assert outcome.code == "CHUNKING_FAILED"
     assert outcome.retryable is False
+
+
+def test_booth_lease_expired_is_not_retryable() -> None:
+    outcome = classify_failure(BoothLeaseExpiredError("BOOTH_LEASE_EXPIRED"))
+
+    assert outcome.code == "BOOTH_LEASE_EXPIRED"
+    assert outcome.retryable is False
+
+
+def test_booth_access_check_failure_is_retryable() -> None:
+    outcome = classify_failure(SpringBoothAccessUnavailable("unreachable"))
+
+    assert outcome.code == "BOOTH_ACCESS_CHECK_FAILED"
+    assert outcome.retryable is True
 
 
 def test_unknown_exception_falls_back_to_unexpected_error() -> None:
