@@ -66,6 +66,20 @@ describe('변환 정확도 — 계약 AABB 대조', () => {
     expect(delta[2]).toBeLessThan(0.005);
   });
 
+  it('조립체 키오스크가 계약 치수와 mm 단위로 맞는다 — prefab 계층 재현의 판정', () => {
+    // SurveyKiosk = Counter01.prefab + Tablet.prefab 이고 Counter01 은 다시 4개 FBX 를 문다.
+    // 이 값이 맞는다는 것은 자식 transform·중첩 prefab·단위가 전부 제자리라는 뜻이다 (S15P21A604-476).
+    const kiosk = entry({
+      assetCode: 'SURVEY_KIOSK_DEFAULT',
+      objectType: 'SURVEY_KIOSK',
+      bounds: { min: [-0.31, 0, -0.1598], max: [0.31, 0.9255, 0.1598] },
+    });
+    const delta = boundsDelta(kiosk, OBJECT_LOCAL_BOUNDS.SURVEY_KIOSK);
+    expect(delta[0]).toBeLessThan(0.005);
+    expect(delta[1]).toBeLessThan(0.005);
+    expect(delta[2]).toBeLessThan(0.005);
+  });
+
   it('의자는 FURNITURE 계약 치수와 크게 다르다 — 타입 기본이 조립체이기 때문이다', () => {
     // 어긋남을 결함으로 읽지 않으려고 여기 적어 둔다. FURNITURE 기본은 테이블+의자 세트다
     const chair = entry({
