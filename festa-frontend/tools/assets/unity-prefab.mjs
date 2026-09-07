@@ -82,7 +82,7 @@ const scalar = (body, key) => {
   return m === null ? null : m[1].trim();
 };
 const fileIdList = (body, key) => {
-  const m = new RegExp(`${key}:\\n((?:\\s*- \\{fileID: \\d+\\}\\n)*)`).exec(body);
+  const m = new RegExp(`${key}:\\r?\\n((?:\\s*- \\{fileID: \\d+\\}\\r?\\n)*)`).exec(body);
   if (m === null) return [];
   return [...m[1].matchAll(/fileID: (\d+)/g)].map((x) => x[1]);
 };
@@ -90,7 +90,10 @@ const fileIdList = (body, key) => {
 /** PrefabInstance 의 m_Modifications 에서 인스턴스 루트의 transform 을 꺼낸다 */
 function instanceTransform(body) {
   const get = (path, fallback) => {
-    const m = new RegExp(`propertyPath: ${path}\\n\\s*value: ([-\\d.eE+]+)`).exec(body);
+    // `\r?` 가 있어야 한다. Unity 가 저장한 `.prefab` 은 Windows 에서 CRLF 라 `\n` 만 요구하면
+    // **모든 override 가 매치에 실패하고 조용히 기본값으로 떨어진다** — 위치 0, 회전 항등, 배율 1.
+    // 그러면 조립체가 원점에 겹쳐 쌓이고 계약 치수와 어긋난다(키오스크가 누워 보인 원인).
+    const m = new RegExp(`propertyPath: ${path}\\r?\\n\\s*value: ([-\\d.eE+]+)`).exec(body);
     return m === null ? fallback : Number(m[1]);
   };
   return {
@@ -102,8 +105,13 @@ function instanceTransform(body) {
       w: get('m_LocalRotation\\.w', 1),
     },
     scale: { x: get('m_LocalScale\\.x', 1), y: get('m_LocalScale\\.y', 1), z: get('m_LocalScale\\.z', 1) },
-    name: (/propertyPath: m_Name\n\s*value: (.+)/.exec(body) ?? [undefined, null])[1],
+    name: (/propertyPath: m_Name\r?\n\s*value: (.+)/.exec(body) ?? [undefined, null])[1],
   };
+}
+
+/** 테스트 전용 — `instanceTransform` 은 내부 함수라 파일·FBX 없이 부를 길이 없다 */
+export function readInstanceTransformForTest(body) {
+  return instanceTransform(body);
 }
 
 function applyTransform(object3d, t) {
