@@ -709,7 +709,7 @@ sudo env \
   ROOT_DOMAIN=ssafesta.world \
   NGINX_ORIGIN_CERTIFICATE_FILE=/etc/nginx/tls/world-dev-origin.pem \
   NGINX_ORIGIN_PRIVATE_KEY_FILE=/etc/nginx/tls/world-dev-origin.key \
-  envsubst \
+  envsubst '${ROOT_DOMAIN} ${NGINX_ORIGIN_CERTIFICATE_FILE} ${NGINX_ORIGIN_PRIVATE_KEY_FILE}' \
   < infra/environments/nginx/sites/api.conf.template \
   | sudo tee /etc/nginx/sites-available/api.conf >/dev/null
 
