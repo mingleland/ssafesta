@@ -1458,3 +1458,29 @@ Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에
   같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
   원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
   구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다
+
+### GET `/internal/ai/agent-config`
+
+FastAPI의 프롬프트 빌더가 **질문마다** 호출한다 (spec 008, `S15P21A604-399`, GitLab #119 §5).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-agent-config-api.yaml`.
+
+```
+GET /internal/ai/agent-config?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+```json
+{ "found": true, "role": "PROJECT_DOCENT", "tone": "FRIENDLY", "responseLength": "MEDIUM",
+  "systemPrompt": "문서를 근거로 답한다.", "forbiddenTopics": ["가격 협상"] }
+```
+
+- **거부는 오류가 아니라 `200` + `found: false` + `denialCode`다** — `/internal/ai/booth-access`와
+  같은 관례. 다른 booth 소속 `agentId`와 존재하지 않는 `agentId`는 **구분해 알려주지 않는다**
+  (둘 다 `AGENT_NOT_IN_BOOTH`). `status`가 `ACTIVE`가 아니면 `AGENT_INACTIVE`이며, **이 경우
+  프롬프트 필드를 전혀 싣지 않는다** — 쓸 수 없는 값을 흘려 봐야 계약(`additionalProperties: false`
+  분기)만 어긴다
+- `forbiddenTopics`가 비어 있으면 `null`이 아니라 **빈 배열**이다(`AiAgent.getForbiddenTopics()`가
+  이미 그렇게 정규화한다)
+- **캐싱하지 않는다** (2026-09-07 확정, GitLab #119) — `system_prompt`가 길어도 매 요청 그대로
+  싣는다. 버전·해시로 무효화만 알리는 방식은 필요해지면 그때 계약을 바꾼다
+- 인증은 벡터 검색 API와 동일한 `/internal/**` 체인·`INTERNAL_AI_TO_SPRING_TOKENS` 재사용
