@@ -13,12 +13,25 @@ public class AccountDeletionService {
     @Transactional
     public void deleteUserGraph(Long userId) {
         jdbc.update("DELETE FROM account_status_histories WHERE user_id = ? OR actor_user_id = ?", userId, userId);
-        jdbc.update("DELETE FROM survey_answer_options WHERE answer_id IN (SELECT sa.id FROM survey_answers sa JOIN survey_responses sr ON sr.id = sa.response_id WHERE sr.respondent_user_id = ? OR sr.survey_id IN (SELECT id FROM surveys WHERE created_by_user_id = ?))", userId, userId);
-        jdbc.update("DELETE FROM survey_answers WHERE response_id IN (SELECT id FROM survey_responses WHERE respondent_user_id = ? OR survey_id IN (SELECT id FROM surveys WHERE created_by_user_id = ?))", userId, userId);
-        jdbc.update("DELETE FROM survey_responses WHERE respondent_user_id = ? OR survey_id IN (SELECT id FROM surveys WHERE created_by_user_id = ?)", userId, userId);
-        jdbc.update("DELETE FROM survey_options WHERE question_id IN (SELECT id FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE created_by_user_id = ?))", userId);
-        jdbc.update("DELETE FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE created_by_user_id = ?)", userId);
-        jdbc.update("DELETE FROM surveys WHERE created_by_user_id = ?", userId);
+        // 설문은 부스 소유자를 따라 지운다 — created_by_user_id 가 아니다 (spec 010, S15P21A604-130).
+        //
+        // requireEditor 가 소유자와 스태프를 함께 허용하므로 스태프가 만든 설문은
+        // created_by_user_id = 스태프다. 그 키로 지우면 두 방향이 다 틀린다: 스태프가 탈퇴하면
+        // 남의 부스 설문과 응답이 사라지고, 소유자가 탈퇴하면 surveys 행이 남아
+        // DELETE FROM booths 가 surveys_booth_id_fkey 로 실패한다 — 탈퇴 전체가 500 이 된다.
+        // 이 줄들이 쓰이기 시작하는 것은 설문 쓰기 경로가 열리는 지금부터다.
+        //
+        // 서비스가 created_by_user_id 에 항상 부스 소유자를 쓰지만(불변식 I-5) 그것에 기대지
+        // 않는다 — 삭제는 스키마가 허용하는 모든 값에 대해 옳아야 한다. 응답은 내가 남의 부스
+        // 설문에 답한 것도 지워야 하므로 respondent_user_id 조건을 함께 둔다.
+        jdbc.update("DELETE FROM survey_answer_options WHERE answer_id IN (SELECT sa.id FROM survey_answers sa JOIN survey_responses sr ON sr.id = sa.response_id WHERE sr.respondent_user_id = ? OR sr.survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)))", userId, userId);
+        jdbc.update("DELETE FROM survey_answers WHERE response_id IN (SELECT id FROM survey_responses WHERE respondent_user_id = ? OR survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)))", userId, userId);
+        jdbc.update("DELETE FROM survey_responses WHERE respondent_user_id = ? OR survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId, userId);
+        jdbc.update("DELETE FROM survey_options WHERE question_id IN (SELECT id FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)))", userId);
+        jdbc.update("DELETE FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId);
+        // created_by_user_id 조건을 함께 남긴다 — 부스가 이미 남의 것이 된 뒤에도(재임대)
+        // 내가 만든 행이 users(id) 를 참조한 채로 남으면 탈퇴가 실패한다.
+        jdbc.update("DELETE FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR created_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM consultation_messages WHERE sender_user_id = ? OR consultation_id IN (SELECT id FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?)", userId, userId, userId, userId);
         jdbc.update("DELETE FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?", userId, userId, userId);
         // 문서 한 줄이면 청크·Job·staging 이 함께 지워진다 (V21). 이 자리에 청크 삭제가
