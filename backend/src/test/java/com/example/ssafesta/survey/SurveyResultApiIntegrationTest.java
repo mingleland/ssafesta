@@ -114,6 +114,12 @@ class SurveyResultApiIntegrationTest {
                 .andExpect(jsonPath("$.firstRespondedAt").isNotEmpty())
                 .andExpect(jsonPath("$.lastRespondedAt").isNotEmpty())
                 .andExpect(jsonPath("$.perQuestion.length()").value(5))
+                // 문항 문구는 유형과 무관하게 전부 실린다 (S15P21A604-546) — 화면이 번호로 부르지 않는다
+                .andExpect(jsonPath("$.perQuestion[0].prompt").value("어떻게 왔나"))
+                .andExpect(jsonPath("$.perQuestion[1].prompt").value("관심"))
+                .andExpect(jsonPath("$.perQuestion[2].prompt").value("만족도"))
+                .andExpect(jsonPath("$.perQuestion[3].prompt").value("의견"))
+                .andExpect(jsonPath("$.perQuestion[4].prompt").value("한마디"))
                 // Q0 객관식 — 11 / 9
                 .andExpect(jsonPath("$.perQuestion[0].type").value("SINGLE_CHOICE"))
                 .andExpect(jsonPath("$.perQuestion[0].answeredCount").value(20))
@@ -168,6 +174,7 @@ class SurveyResultApiIntegrationTest {
                 .andExpect(jsonPath("$.firstRespondedAt").doesNotExist())
                 .andExpect(jsonPath("$.lastRespondedAt").doesNotExist())
                 .andExpect(jsonPath("$.perQuestion.length()").value(5))
+                .andExpect(jsonPath("$.perQuestion[0].prompt").value("어떻게 왔나"))
                 .andExpect(jsonPath("$.perQuestion[0].answeredCount").value(0))
                 // 아무도 고르지 않은 선택지도 0 으로 실린다 — 없는 선택지와 구별돼야 한다
                 .andExpect(jsonPath("$.perQuestion[0].counts.length()").value(2))

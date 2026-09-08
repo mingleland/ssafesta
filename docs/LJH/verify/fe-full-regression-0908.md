@@ -17,10 +17,28 @@ NOT_EXECUTED        시도하지 않았다 — 사유를 적는다
 
 | | 건수 |
 |---|---|
-| **PASS** | 78 |
+| **PASS** | 79 |
 | **FAIL** | 5 |
 | **BLOCKED_AT_** | 4 |
 | **NOT_EXECUTED** | 2 |
+
+**`BLOCKED_AT_` 4건의 구성**(§4) — 세는 기준을 적어 둔다. 처음 이 표를 쓸 때 구성을 안 적어
+헤딩 수(6)와 숫자(4)가 어긋나 보였다.
+
+```text
+BLOCKED_AT_PROVIDER_LOGIN_CREDENTIAL_REQUIRED   Google OAuth
+BLOCKED_AT_SERVER_BOOT                          AI FastAPI
+BLOCKED_AT_TAB_NOT_VISIBLE                      #73 활성 탭 성능
+BLOCKED_AT_REAL_ADAPTER_ABSENT                  Consultation
+
+세지 않는 것
+  BLOCKED_AT_PREVIEW_CWD_PINNED   내 도구 제약이지 검증 대상의 상태가 아니다 (기록용)
+```
+
+> **회귀 종료 뒤 1건이 PASS 로 바뀌었다** — SSAFY OAuth(`#114`)를 같은 날 16:45 에 관통했다(§4).
+> BE 회신이 host 를 바꾸지 않고 판정하는 절차를 줬고, `POST /auth/oauth/complete` 가
+> `200 NICKNAME_REQUIRED` 를 냈다. **`PASS 78 · BLOCKED 5` → `PASS 79 · BLOCKED 4`.**
+> 이 문서의 판정은 그 시점 기준으로 갱신돼 있다.
 
 **FAIL 은 이 회차에서 고치지 않고 티켓으로 분리했다** — 검증과 수정을 한 MR 에 섞으면
 "무엇을 검증했나" 가 diff 에 묻힌다.
@@ -253,23 +271,36 @@ Builder 의 문항·선택지 입력이 `<label>`·`aria-label` 없이 **placeho
                나는 자격증명을 입력하지 않는다. OAuth 동의 승인도 사용자 결정 사항이다
 ```
 
-### BLOCKED_AT_LOCAL_SESSION — SSAFY OAuth (`#114` 의 로컬 블로커)
+### PASS — SSAFY OAuth (`#114`) · **회귀 당일 늦게 관통했다**
 
-**사다리를 가장 멀리 올라갔다 — provider 로그인과 콜백을 통과했다.**
+> 이 항목은 회귀 시점에 `BLOCKED_AT_LOCAL_SESSION` 이었다. **같은 날 16:45 에 관통해 PASS 로 바꾼다** —
+> 낡은 BLOCKED 를 남겨 두면 다음 사람이 그것을 근거로 쓴다(오늘 `#136`·`#131` 에서 겪은 자리다).
+
+BE 회신(`#114`, 09-08 16:31)이 **host 를 바꾸지 않고 판정하는 절차**를 줬다
+(`docs/25_트러블슈팅.md:703`, T-104). 그대로 따랐다.
 
 ```text
-1. 재현        http://localhost:8080/oauth2/authorization/ssafy
-2. 마지막 성공  project.ssafy.com SSO 통과 → 8080 /login/oauth2/code/ssafy 도달
-               → dev.localhost:5174/auth/callback 로 리다이렉트
-3. 최초 실패    FE 가 POST /auth/oauth/complete 에서 400(handoff 누락) 또는 410
-4. 원문        화면 "입장 정보가 만료되었어요 / 처음부터 다시 로그인해 주세요."
-               (CallbackPage.tsx:141, phase='restart' = 400·410 공통)
-5. 관련        OAuthLoginSuccessHandler.java:83 — ResponseCookie.from(HANDOFF_COOKIE, …)
-               .httpOnly().secure().sameSite("Lax").path(…)  ← .domain() 없음 = host-only
-6. 다음 조건    아래 원인 참조
+1. http://localhost:8080/oauth2/authorization/ssafy
+2. SSAFY SSO 통과 → 콜백 → dev.localhost:5174/auth/callback ("입장 정보가 만료되었어요")
+   ← 이 시점에 handoff 쿠키는 이미 localhost 에 있다
+3. 같은 오리진 http://localhost:8080/swagger-ui/index.html 로 이동
+4. POST /api/v1/auth/oauth/complete
+
+   HTTP 200   { "status": "NICKNAME_REQUIRED", "accessToken": null }
 ```
 
-**원인 — 쿠키 host 불일치다.**
+```text
+SSAFY provider SSO         PASS
+Spring callback            PASS
+TOKEN_EXCHANGE             PASS
+POST /auth/oauth/complete  PASS   200 NICKNAME_REQUIRED
+남은 것                     닉네임 등록 한 단계 — 계정 생성이라 하지 않았다
+```
+
+`users = 1` · `oauth_identities = 0` 그대로이고 handoff 는 `REGISTRATION|SSAFY|<subject>` 로 남아 있다
+(`peekRegistration` 이라 complete 를 여러 번 불러도 소비되지 않는다 — 설계대로다).
+
+**따라서 `400 OAUTH_HANDOFF_MISSING` 은 OAuth 경로의 결함이 아니라 host 하나였다.**
 
 ```text
 등록된 redirect_uri   http://localhost:8080/login/oauth2/code/ssafy    host = localhost
@@ -278,10 +309,25 @@ handoff 쿠키          host-only (Domain 속성 없음) → localhost 에만 �
 → 쿠키가 host 를 건너가지 못한다 → complete 가 handoff 없이 도착 → 400
 ```
 
-**다음에 필요한 것**: FE·API host 를 redirect_uri 의 host(`localhost`)로 맞추거나, `dev.localhost`
-콜백을 provider console 에 등록한다. 내 스택은 `localhost:5173` + `localhost:8081` 이라 host 가 이미
-맞지만 **등록된 콜백 포트가 8080** 이고 그 포트를 타 세션이 쓰고 있어 내가 받을 수 없다.
-`*_REDIRECT_URI` 를 임의로 바꾸면 등록되지 않은 값이 되어 **새 mismatch 를 내가 만드는 것**이라 하지 않았다.
+#### 회귀 시점 판정에서 두 가지가 좁았다 — BE 지적
+
+1. **쿠키 host-only 는 설계다.** 저장소의 쿠키 5곳 전부 `.domain()` 이 없어, 같은 조건이면
+   `refresh_token` 도 실리지 않아 게스트 로그인과 `/auth/refresh` 까지 막힌다.
+   `handoff` 만의 문제로 좁혀 본 것이 내 오독이었다.
+2. **`dev.localhost` 는 저장소 어디에도 없다**(코드·`.env.example`·`infra` 0건). 커밋된 규약이 아니라
+   로컬 설정 값이다. 그래서 **A 안(로컬 API base 를 `localhost:8080`)이면 코드 변경 0** 이고,
+   `.domain()` 추가는 배포에서 쿠키 범위가 조용히 넓어져 하지 않는 편이 맞다.
+
+`*_REDIRECT_URI` 는 끝까지 바꾸지 않았다 — 등록되지 않은 값이 되어 **새 mismatch 를 만드는 쪽**이다.
+`FRONTEND_BASE_URL` 도 파일을 건드리지 않고 기동 인자로만 지정했다 — 그 값은 CORS 허용 오리진
+(`SecurityConfiguration:116`)과 Origin 검증 정본(`GuestAuthController:136`)을 겸한다.
+
+#### 남은 FE 몫
+
+`CallbackPage.tsx:138` 이 **400(handoff 누락)과 410(만료·재사용)을 같은 `phase='restart'` 로 합친다.**
+BE 는 두 경우를 의도적으로 다른 코드로 내는데 화면에서 구별이 사라진다 — 이번 진단에서도 화면만
+보고는 "400 또는 410" 으로밖에 못 적었고 서버를 직접 불러서야 `OAUTH_HANDOFF_MISSING` 을 확인했다.
+BE 가 FE 소관으로 넘겼고 별도 티켓으로 분리한다.
 
 ### BLOCKED_AT_SERVER_BOOT — AI FastAPI
 
@@ -301,7 +347,27 @@ handoff 쿠키          host-only (Domain 속성 없음) → localhost 에만 �
 6. 다음 조건    R2·MinIO 자격증명과 내부 서비스 토큰. **외부 자격증명이라 내가 얻거나 넣지 않는다**
 ```
 
+**재측정 (같은 날 16:40, BE 가 새 `.env` 를 넘겨준 뒤)** — `13 → 12`. `JWT_SECRET` 하나가 해소됐고
+나머지 12는 그대로다. 넘겨받은 `.env` 는 **backend 용**이라(`POSTGRES_*`·`REDIS_PORT`·`JWT_SECRET`·
+OAuth 3종·`CONNECTION_TOKEN_SECRET` 16키) **AI 계열 키가 하나도 없다.**
+
+```text
+여전히 없는 것 (12)
+  REDIS_URL · spring_internal_base_url
+  INTERNAL_SPRING_TO_AI_TOKENS · INTERNAL_AI_TO_SPRING_TOKENS
+  r2_{endpoint,bucket,access_key_id,secret_access_key}
+  minio_{endpoint,bucket,access_key_id,secret_access_key}
+```
+
+`GitLab #150` 으로 발급했고 요청은 **값이 아니라 주입 경로와 최소 실행 레시피**다.
+
 Spring 쪽 `/agents`·`/documents` 는 8081 에 살아 있으므로 에이전트 설정 경로는 FastAPI 와 무관하게 검증 가능하다.
+
+> **부수 발견** — BE 가 넘겨준 그 `.env` 의 `KAKAO_REDIRECT_URI` 가 **다음 줄을 삼킨 채**다
+> (그 줄만 122자, Google 46 · SSAFY 45). `docs/25` T-62 가 09-07 에 지적한 파손이 새 파일에도 남아 있다.
+> `CONNECTION_TOKEN_SECRET` 은 별도 줄에도 정상값이 있어 **월드 서버는 멀쩡하고 증상이 없다** — 그래서
+> 안 보인다. 값 파일이라 고치지 않고 `#114` 로 통보했다. 이 회차에서 Kakao redirect 가 정상으로 보인 것은
+> **내가 JVM 인자로 덮었기 때문**이지 파일이 고쳐진 것이 아니다.
 
 ### BLOCKED_AT_TAB_NOT_VISIBLE — `#73` 활성 탭 성능
 
