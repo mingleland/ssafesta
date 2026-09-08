@@ -78,6 +78,10 @@ app:
     access-token-ttl: PT30M
     refresh-token-ttl: P7D
     oauth-state-ttl: PT5M
+    # exp 를 지난 토큰을 얼마나 더 받아 주는가. Spring 기본값과 같은 60초이고, 적어 두는 이유는
+    # SurveyGuestKeySweeper 가 같은 값을 읽기 때문이다 — 이 시간이 지나기 전에 게스트 중복 방지
+    # 키를 지우면 아직 통과하는 토큰이 한 번 더 답할 수 있다 (헌법 12조 vs 1인 1응답).
+    jwt-clock-skew: PT60S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
@@ -120,6 +124,14 @@ app:
     max-questions: 30
     max-options: 10
     max-reward-coin: 10
+    # 제출 트랜잭션의 실제 상한. JDBC query timeout 으로 걸리므로 부스 락 대기도 여기서 끊긴다.
+    # 이 값이 없으면 아래 유예가 무엇을 덮는지 말할 수 없다 — 대기 시간에 상한이 없기 때문이다.
+    submit-timeout-seconds: 30
+    # 게스트 토큰이 더는 통과하지 않게 된 뒤에도 중복 방지 키를 이만큼 더 남긴다.
+    # 만료 직전에 인증돼 아직 처리 중인 요청이 있을 수 있고, 그 요청이 커밋하기 전에 키가
+    # 사라지면 중복 응답이 그대로 들어간다. submit-timeout 보다 길어야 하며(기동 시 검사),
+    # 그 차이가 트랜잭션 시작 전 대기(스레드 큐 등)를 덮는 여유다.
+    guest-key-grace: PT10M
 
   # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
   # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.

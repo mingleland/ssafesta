@@ -47,6 +47,22 @@ public class SurveyResponse {
     @Column(name = "respondent_guest_key", length = 100, updatable = false)
     private String respondentGuestKey;
 
+    /**
+     * When the guest session that produced this response expires — the token's own {@code exp},
+     * copied at submission (V23).
+     *
+     * <p>{@code SurveyGuestKeySweeper} clears {@link #respondentGuestKey} at this instant instead of
+     * guessing it from {@code submittedAt} plus the configured TTL. The guess is wrong both ways: it
+     * fires up to one TTL late, because the token was issued before the answer arrived, and a
+     * shortened TTL makes it fire while the token is still valid — which would let that same token
+     * answer again, a cleared key having left {@code ux_survey_responses_guest}.
+     *
+     * <p>{@code null} for members, who have no session expiry, and for guest rows written before
+     * V23; the sweeper keeps the old estimate for those.
+     */
+    @Column(name = "respondent_session_expires_at", updatable = false)
+    private Instant respondentSessionExpiresAt;
+
     @Column(name = "reward_ledger_entry_id")
     private Long rewardLedgerEntryId;
 
@@ -56,19 +72,26 @@ public class SurveyResponse {
     protected SurveyResponse() {
     }
 
-    private SurveyResponse(Long surveyId, Long respondentUserId, String respondentGuestKey, Instant now) {
+    private SurveyResponse(Long surveyId, Long respondentUserId, String respondentGuestKey,
+                           Instant sessionExpiresAt, Instant now) {
         this.surveyId = surveyId;
         this.respondentUserId = respondentUserId;
         this.respondentGuestKey = respondentGuestKey;
+        this.respondentSessionExpiresAt = sessionExpiresAt;
         this.submittedAt = now;
     }
 
     public static SurveyResponse byMember(Long surveyId, Long userId, Instant now) {
-        return new SurveyResponse(surveyId, userId, null, now);
+        return new SurveyResponse(surveyId, userId, null, null, now);
     }
 
-    public static SurveyResponse byGuest(Long surveyId, String guestKey, Instant now) {
-        return new SurveyResponse(surveyId, null, guestKey, now);
+    /**
+     * @param sessionExpiresAt the guest token's {@code exp}; {@code null} only if the token carried
+     *                         none, and then the sweeper falls back to its estimate
+     */
+    public static SurveyResponse byGuest(Long surveyId, String guestKey, Instant sessionExpiresAt,
+                                         Instant now) {
+        return new SurveyResponse(surveyId, null, guestKey, sessionExpiresAt, now);
     }
 
     /** Called only after {@code WalletService.credit} returned an entry id. */

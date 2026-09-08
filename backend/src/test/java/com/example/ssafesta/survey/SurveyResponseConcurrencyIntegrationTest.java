@@ -35,6 +35,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -70,6 +72,8 @@ class SurveyResponseConcurrencyIntegrationTest {
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private PlatformTransactionManager transactions;
+    @Autowired private BoothRepository boothsForLock;
     @Autowired private JsonMapper jsonMapper;
 
     @BeforeEach
@@ -131,6 +135,108 @@ class SurveyResponseConcurrencyIntegrationTest {
                 SurveyResponseService.rewardKey(13L, 7L), "설문이 다르면 키도 달라야 합니다.");
     }
 
+
+    /**
+     * 편집이 보상을 올리는 중에 들어온 제출은 <b>올린 값</b>으로 지급받아야 한다.
+     *
+     * <p>제출이 설문을 부스 락보다 먼저 읽으면, 락이 막고 있는 바로 그 편집보다 오래된 값을 들고
+     * 통과한다 — 락을 잡은 의미가 없어지고 지급액이 틀린다. 편집자 스레드가 락을 쥔 채 보상을
+     * 5에서 10으로 올린 뒤 커밋하고, 그동안 제출은 락 앞에서 기다린다. 기다렸다 통과한 제출이
+     * 5를 지급하면 그것이 이 결함이다.
+     *
+     * <p>래치로 순서를 고정한다 — 편집자가 락을 잡고 값을 바꾼 뒤에야 제출이 출발하므로, 제출이
+     * 먼저 공유 락을 가져가 편집자를 막는 반대 경합은 생기지 않는다.
+     */
+    @Test
+    void aSubmissionWaitingOnTheLockIsPaidTheEditedReward() throws Exception {
+        Fixture fixture = fixture("보상변경");
+        int before = balanceOf(fixture.ownerId());
+        CountDownLatch editorHoldsLock = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> editor = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+                boothsForLock.findWithLockById(fixture.boothId()).orElseThrow();
+                jdbc.update("UPDATE surveys SET reward_coin = ? WHERE id = ?", 10, fixture.surveyId());
+                editorHoldsLock.countDown();
+                sleepQuietly(400);
+                return null;
+            }));
+
+            Future<Integer> submitter = pool.submit(() -> {
+                editorHoldsLock.await();
+                return submissions.submit(fixture.surveyId(),
+                        SurveyResponseService.Respondent.member(fixture.ownerId()),
+                        answer(fixture.questionId())).rewardedCoin();
+            });
+
+            editor.get(30, TimeUnit.SECONDS);
+            assertEquals(10, submitter.get(30, TimeUnit.SECONDS),
+                    "락을 기다렸다 통과한 제출은 편집이 커밋한 보상액을 지급해야 합니다 — "
+                            + "5가 나오면 설문을 락보다 먼저 읽은 것입니다.");
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(before + 10, balanceOf(fixture.ownerId()), "지갑에도 올린 값이 들어가야 합니다.");
+        assertBalanceMatchesLedger(fixture.ownerId());
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+
+    /**
+     * 임대와 제출이 겹쳐도 교착이 나지 않아야 한다 — 두 트랜잭션이 지갑과 부스를 같은 순서로
+     * 잡을 때만 성립한다.
+     *
+     * <p>{@code BoothLeaseService.lease} 와 {@code InventoryService} 는 무엇을 하기도 전에
+     * {@code wallets.lockOwner} 를 부르고, 임대는 그 뒤에 부스 행을 쓴다. 즉 저장소의 순서는
+     * <b>지갑 → 부스</b>다. 제출이 부스를 먼저 잡으면 사이클이 닫힌다: 임대는 지갑을 쥔 채 부스를
+     * 기다리고, 제출은 그 부스를 쥔 채 같은 지갑을 기다린다. PostgreSQL 이 둘 중 하나를 죽인다.
+     *
+     * <p>여기서는 임대 트랜잭션을 손으로 흉내 낸다 — 지갑 락을 잡고, 래치를 열어 제출을 출발시킨
+     * 뒤, 부스 행을 쓴다. 제출이 부스를 먼저 잡던 시절에는 이 지점에서 교착이 났다.
+     */
+    @RepeatedTest(REPEATS)
+    void aLeaseAndASubmissionDoNotDeadlock() throws Exception {
+        Fixture fixture = fixture("교착");
+        CountDownLatch walletLocked = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> lease = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+                wallets.lockOwner(fixture.ownerId());
+                walletLocked.countDown();
+                sleepQuietly(300);
+                // 임대가 booth.attachSlot 으로 하는 것과 같은 것 — 부스 행에 배타 락이 걸린다.
+                jdbc.update("UPDATE booths SET name = name WHERE id = ?", fixture.boothId());
+                return null;
+            }));
+
+            Future<Integer> submitter = pool.submit(() -> {
+                walletLocked.await();
+                return submissions.submit(fixture.surveyId(),
+                        SurveyResponseService.Respondent.member(fixture.ownerId()),
+                        answer(fixture.questionId())).rewardedCoin();
+            });
+
+            lease.get(30, TimeUnit.SECONDS);
+            assertEquals(REWARD_COIN, submitter.get(30, TimeUnit.SECONDS),
+                    "제출은 교착 없이 끝나고 보상을 지급해야 합니다.");
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(1, responseCount(fixture.surveyId()));
+        assertBalanceMatchesLedger(fixture.ownerId());
+    }
+
     // ── 픽스처 ──────────────────────────────────────────────────────────────
 
     private SurveyResponseService.SubmitCommand answer(Long questionId) {
@@ -153,7 +259,7 @@ class SurveyResponseConcurrencyIntegrationTest {
                         .header("Authorization", bearer))
                 .andReturn().getResponse().getContentAsString());
         return new Fixture(view.get("surveyId").asLong(),
-                view.get("questions").get(0).get("questionId").asLong(), ownerId);
+                view.get("questions").get(0).get("questionId").asLong(), ownerId, boothId);
     }
 
     private List<Outcome> runTogether(int threads, TaskFactory factory) throws Exception {
@@ -206,7 +312,7 @@ class SurveyResponseConcurrencyIntegrationTest {
                 "잔액과 원장 합계가 일치해야 합니다 (spec 003 I-1) — userId=" + userId);
     }
 
-    private record Fixture(Long surveyId, Long questionId, Long ownerId) { }
+    private record Fixture(Long surveyId, Long questionId, Long ownerId, Long boothId) { }
 
     private enum Outcome { SUCCESS, DUPLICATE, OTHER }
 

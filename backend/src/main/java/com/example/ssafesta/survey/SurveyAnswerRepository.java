@@ -38,6 +38,8 @@ public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long
      * respondent field leaves this API (FR-009).
      *
      * @param questionId narrows to one question; {@code null} returns all three text types
+     * @param offset {@code long} because {@code page * size} overflows an {@code int} for a large
+     *               page, and a negative OFFSET is a database error rather than an empty page
      */
     @Query(value = """
             SELECT a.response_id AS response_id, a.question_id AS question_id, a.text_answer AS text
@@ -51,7 +53,7 @@ public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long
     List<TextAnswerRow> findTextAnswers(@Param("surveyId") Long surveyId,
                                         @Param("questionId") Long questionId,
                                         @Param("size") int size,
-                                        @Param("offset") int offset);
+                                        @Param("offset") long offset);
 
     @Query(value = """
             SELECT count(*)

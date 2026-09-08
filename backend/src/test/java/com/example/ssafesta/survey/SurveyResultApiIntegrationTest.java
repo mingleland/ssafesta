@@ -315,6 +315,24 @@ class SurveyResultApiIntegrationTest {
                 .andExpect(jsonPath("$.errors[0].field").value(field));
     }
 
+    /**
+     * 아무도 안 볼 만큼 큰 page 도 500 이 아니라 빈 페이지다.
+     *
+     * <p>{@code page * size} 를 int 로 곱하면 넘쳐서 음수가 되고, PostgreSQL 은 음수 OFFSET 을
+     * 거부한다 — 사용자에게는 500 이다. 검증이 page 상한을 두지 않으므로 곱셈 쪽이 넘치지 않아야
+     * 한다.
+     */
+    @Test
+    void aHugePageNumberIsAnEmptyPageNotAnError() throws Exception {
+        Fixture fixture = textFixture("큰페이지");
+        submitText(fixture, 1, 0);
+
+        mockMvc.perform(textAnswers(fixture, "?page=21474837&size=100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
     /** 남의 설문 문항으로 걸러도 빈 페이지가 아니라 400 이다 — 조용히 비면 "아무도 안 썼다"로 읽힌다. */
     @Test
     void aQuestionFromAnotherSurveyIsRejected() throws Exception {

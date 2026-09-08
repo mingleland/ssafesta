@@ -40,7 +40,8 @@ class OAuthLoginSuccessHandlerTest {
     private final MemberSessionService sessions = mock(MemberSessionService.class);
     private final OAuthHandoffService handoffs = mock(OAuthHandoffService.class);
     private final AuthProperties properties = new AuthProperties("secret", Duration.ofMinutes(30),
-            Duration.ofDays(14), Duration.ofMinutes(5), "/api/v1/auth/refresh", FRONTEND, false);
+            Duration.ofDays(14), Duration.ofMinutes(5), Duration.ofSeconds(60),
+            "/api/v1/auth/refresh", FRONTEND, false);
 
     private final OAuthLoginSuccessHandler handler =
             new OAuthLoginSuccessHandler(identities, sessions, handoffs, properties);

@@ -78,16 +78,47 @@ public class SurveyResponseService {
      * <p><b>Both live in one transaction.</b> 헌법 20조 wants the coin movement and the thing that
      * earned it to commit together; {@code WalletService} propagates {@code REQUIRED} throughout, so
      * it joins this one rather than opening its own.
+     *
+     * <p><b>Wallet first, booth second — that order is set elsewhere and this method follows it.</b>
+     * {@code BoothLeaseService.lease} and {@code InventoryService} both call
+     * {@code WalletService.lockOwner} before they touch anything else, and the lease then writes the
+     * booth row. Taking the booth first here would close the cycle: a member leasing a slot holds
+     * their wallet and waits for their booth while this transaction holds that booth and waits for
+     * the same wallet. PostgreSQL breaks the tie by killing one of them.
+     *
+     * <p>The wallet is locked for <b>every</b> member, not only when a reward is due, because
+     * whether one is due is only known after the booth lock — and reaching for the wallet at that
+     * point is the inversion this avoids. Guests have no wallet and skip it (헌법 12조).
+     *
+     * <p><b>The survey is read after the booth lock, not before.</b> An editor may change
+     * {@code rewardCoin} and {@code closesAt} even once responses exist (C-08), and it holds the
+     * booth write lock while doing so. A survey loaded before this lock is a snapshot from before
+     * that edit — so the payout would be the old amount and a survey closed a moment ago would
+     * still accept answers. Only the booth id is read first, because the lock needs it.
+     *
+     * <p><b>The timeout is load-bearing, not hygiene.</b> It becomes the JDBC query timeout, so a
+     * submission waiting on the booth lock is cancelled instead of waiting forever. That ceiling is
+     * what lets {@code SurveyGuestKeySweeper} say how long it must leave a guest's duplicate-guard
+     * key alone: without it, "wait ten minutes" describes nothing, because the wait has no bound.
+     * {@code SurveyProperties} refuses a configuration where the grace is not longer than this.
      */
-    @Transactional
+    @Transactional(timeoutString = "${app.survey.submit-timeout-seconds}")
     public SubmitResult submit(Long surveyId, Respondent respondent, SubmitCommand command) {
-        Survey survey = surveys.findById(surveyId)
+        Long boothId = surveys.findBoothIdById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
-        accessGuard.requireVisitorVisible(survey.getBoothId());
+        accessGuard.requireVisitorVisible(boothId);
+        // 지갑 먼저, 부스 나중 — 임대·구매가 정한 순서다(javadoc). 뒤집으면 교착이 생긴다.
+        if (respondent.isMember()) {
+            wallets.lockOwner(respondent.userId());
+        }
         // 편집이 문항을 바꾸는 동안 답을 넣으면 survey_answers.question_id FK 에 걸린다.
         // 공유 락이라 응답자끼리는 줄 서지 않는다.
-        booths.findWithSharedLockById(survey.getBoothId())
-                .orElseThrow(() -> new BoothNotFoundException(survey.getBoothId()));
+        booths.findWithSharedLockById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+
+        // 설문은 락을 잡은 뒤에 읽는다. 그 전에 읽으면 지급액·마감이 락이 막고 있는 편집보다
+        // 오래된 값이 된다.
+        Survey survey = surveys.findById(surveyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
 
         if (survey.isClosedAt(Instant.now())) {
             throw new ApiException(ErrorCode.SURVEY_CLOSED);
@@ -341,14 +372,19 @@ public class SurveyResponseService {
      *
      * <p>Exactly one field is set, mirroring {@code ck_survey_responses_respondent}.
      */
-    public record Respondent(Long userId, String guestKey) {
+    /**
+     * Who is answering. A guest carries the expiry of the session they are answering from, because
+     * that is when 헌법 12조 says their identifier stops being allowed to exist — see
+     * {@code SurveyGuestKeySweeper}.
+     */
+    public record Respondent(Long userId, String guestKey, Instant sessionExpiresAt) {
 
         public static Respondent member(Long userId) {
-            return new Respondent(userId, null);
+            return new Respondent(userId, null, null);
         }
 
-        public static Respondent guest(String subject) {
-            return new Respondent(null, subject);
+        public static Respondent guest(String subject, Instant sessionExpiresAt) {
+            return new Respondent(null, subject, sessionExpiresAt);
         }
 
         public boolean isMember() {
@@ -362,7 +398,7 @@ public class SurveyResponseService {
         SurveyResponse newResponse(Long surveyId, Instant now) {
             return isMember()
                     ? SurveyResponse.byMember(surveyId, userId, now)
-                    : SurveyResponse.byGuest(surveyId, guestKey, now);
+                    : SurveyResponse.byGuest(surveyId, guestKey, sessionExpiresAt, now);
         }
     }
 
