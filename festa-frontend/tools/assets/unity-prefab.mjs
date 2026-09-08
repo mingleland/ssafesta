@@ -17,7 +17,10 @@ import * as THREE from 'three';
 const DOC_RE = /^--- !u!(\d+) &(\d+)(?: stripped)?$/gm;
 
 /** classId — Unity 가 정한 숫자다 */
-const CLASS = { GAME_OBJECT: 1, TRANSFORM: 4, MESH_FILTER: 33, PREFAB: 1001 };
+const CLASS = { GAME_OBJECT: 1, TRANSFORM: 4, MESH_RENDERER: 23, MESH_FILTER: 33, PREFAB: 1001 };
+
+/** Unity 내장 재질(Default-Material 등)이 쓰는 guid. `.mat` 파일이 없다 — "못 찾음" 과 구분한다 */
+const UNITY_BUILTIN_GUID = '0000000000000000f000000000000000';
 
 /** 지원하지 않는 컴포넌트 — 만나면 경고만 남기고 지나간다 */
 const UNSUPPORTED = new Map([
@@ -87,6 +90,84 @@ const fileIdList = (body, key) => {
   return [...m[1].matchAll(/fileID: (\d+)/g)].map((x) => x[1]);
 };
 
+/**
+ * MeshRenderer 의 `m_Materials` 슬롯 — **순서가 submesh index 다.**
+ *
+ * 재질이 하나로 뭉개지던 원인이 여기다(S15P21A604-527). MeshFilter(형상)만 읽고
+ * MeshRenderer(재질)를 안 읽으면 조립체의 부위별 재질이 통째로 사라진다.
+ */
+export function readMaterialSlots(body) {
+  const m = /m_Materials:\r?\n((?:\s*- \{fileID: \d+[^}]*\}\r?\n)*)/.exec(body);
+  if (m === null) return [];
+  return [...m[1].matchAll(/\{fileID: (\d+)(?:, guid: ([0-9a-f]{32}))?/g)].map((x) => ({
+    fileID: x[1],
+    // 내장 재질은 `.mat` 이 없다. `null` 로 두면 소비처가 "재질 지정 없음" 으로 읽는다
+    guid: x[2] === undefined || x[2] === UNITY_BUILTIN_GUID ? null : x[2],
+  }));
+}
+
+/**
+ * PrefabInstance 가 자식 renderer 의 재질 슬롯을 덮어쓴 것.
+ *
+ * **값이 `value:` 가 아니라 `objectReference:` 에 있다** — transform override 와 다른 자리다.
+ * `value:` 만 읽으면 재질 override 가 통째로 안 보이고, 원본 재질이 그대로 남는다.
+ *
+ * `targetFileID` 는 **원본 prefab 안의 MeshRenderer fileID** 다. 이것으로 정확히 그
+ * renderer 의 그 슬롯 하나만 바꾼다 — 자식 트리 전체에 적용하면 형제 renderer 의 재질까지
+ * 덮어써서 원본과 달라진다.
+ */
+export function readInstanceMaterialOverrides(body) {
+  const re =
+    /- target: \{fileID: (\d+)[^}]*\}\r?\n\s*propertyPath: 'm_Materials\.Array\.data\[(\d+)\]'\r?\n\s*value:[^\r\n]*\r?\n\s*objectReference: \{fileID: \d+(?:, guid: ([0-9a-f]{32}))?/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    out.push({ targetFileID: m[1], slot: Number(m[2]), guid: m[3] === UNITY_BUILTIN_GUID ? null : (m[3] ?? null) });
+  }
+  return out;
+}
+
+/**
+ * Unity `.mat` 하나를 가리키는 three 재질.
+ *
+ * **판별 기준은 `userData.unityMaterialPath` 하나다.** `name` 은 GLTFExporter 가 glTF
+ * material 이름으로 실어 주는 식별용일 뿐이라, 이름 유무로 "Unity 재질을 해석했는가" 를
+ * 판단하지 않는다 — 이름은 다른 이유로도 붙는다.
+ */
+function unityMaterial(matPath) {
+  const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 });
+  material.userData.unityMaterialPath = matPath;
+  const rel = matPath.replace(/\\/g, '/').split('/Assets/').pop() ?? matPath;
+  material.name = `unity:${rel}`;
+  return material;
+}
+
+/** 슬롯 목록 → 슬롯별 three 재질(내장·미해결은 `null`). renderer 하나당 한 벌만 만든다 */
+function slotMaterials(slots, ctx, label, nodeName) {
+  return slots.map((slot) => {
+    if (slot.guid === null) return null;
+    const matPath = ctx.guidIndex.get(slot.guid);
+    if (matPath === undefined) {
+      ctx.warn(`${label}: 재질 guid ${slot.guid} 를 못 찾았다 (${nodeName})`);
+      return null;
+    }
+    return unityMaterial(matPath);
+  });
+}
+
+/** 슬롯 재질을 FBX 트리에 입힌다. submesh 가 여럿이면 index 로, 하나면 슬롯 0 으로 */
+function assignSlotMaterials(model, materials) {
+  if (materials.length === 0) return;
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    if (Array.isArray(o.material)) {
+      o.material = o.material.map((current, i) => materials[i] ?? materials[0] ?? current);
+      return;
+    }
+    if (materials[0] !== null && materials[0] !== undefined) o.material = materials[0];
+  });
+}
+
 /** PrefabInstance 의 m_Modifications 에서 인스턴스 루트의 transform 을 꺼낸다 */
 function instanceTransform(body) {
   const get = (path, fallback) => {
@@ -133,6 +214,10 @@ export function loadPrefab(prefabPath, ctx) {
   const docs = splitDocuments(text);
   const label = prefabPath.split('/').pop();
 
+  // MeshRenderer fileID → 그 renderer 의 슬롯 재질. 자식 PrefabInstance 의 재질 override 가
+  // `target.fileID` 로 이 표를 찾아 **그 renderer 의 그 슬롯 하나만** 바꾼다
+  const rendererMaterials = new Map();
+
   // GameObject fileID → Transform fileID (역방향이 필요하다 — Transform 이 GameObject 를 가리킨다)
   const transformOfGameObject = new Map();
   for (const [fileID, doc] of docs) {
@@ -155,9 +240,22 @@ export function loadPrefab(prefabPath, ctx) {
     const go = goRef === null ? undefined : docs.get(goRef.fileID);
     if (go !== undefined) {
       node.name = scalar(go.body, 'm_Name') ?? '';
-      for (const componentID of fileIdList(go.body, 'm_Component').concat(
+      const componentIDs = fileIdList(go.body, 'm_Component').concat(
         [...go.body.matchAll(/component: \{fileID: (\d+)\}/g)].map((x) => x[1]),
-      )) {
+      );
+
+      // 재질을 먼저 푼다 — 컴포넌트 순서상 MeshRenderer 가 MeshFilter 뒤에 올 수 있다.
+      // renderer 하나당 재질 한 벌을 만들어 두고, override 가 fileID 로 그 벌을 정확히 찾는다.
+      let renderer = null;
+      for (const componentID of componentIDs) {
+        const component = docs.get(componentID);
+        if (component === undefined || component.classId !== CLASS.MESH_RENDERER) continue;
+        renderer = { slots: slotMaterials(readMaterialSlots(component.body), ctx, label, node.name), models: [] };
+        rendererMaterials.set(componentID, renderer);
+        break;
+      }
+
+      for (const componentID of componentIDs) {
         const component = docs.get(componentID);
         if (component === undefined) continue;
         if (UNSUPPORTED.has(component.classId)) {
@@ -175,6 +273,10 @@ export function loadPrefab(prefabPath, ctx) {
         const model = ctx.loadFbx(fbxPath);
         // Unity 는 import 때 파일 단위 스케일을 메시에 굽는다. prefab transform 은 그 위에서 미터로 논다
         model.scale.multiplyScalar(ctx.unitScale);
+        if (renderer !== null) {
+          renderer.models.push(model);
+          assignSlotMaterials(model, renderer.slots);
+        }
         node.add(model);
       }
     }
@@ -225,9 +327,34 @@ export function loadPrefab(prefabPath, ctx) {
     const t = instanceTransform(doc.body);
     applyTransform(child, t);
     if (t.name !== null) child.name = t.name;
+
+    // 재질 override — 자식 트리 전체가 아니라 `target.fileID` 가 가리키는 renderer 의 그 슬롯만
+    const childRenderers = child.userData.rendererMaterials ?? new Map();
+    for (const override of readInstanceMaterialOverrides(doc.body)) {
+      const renderer = childRenderers.get(override.targetFileID);
+      if (renderer === undefined) {
+        ctx.warn(`${label}: 재질 override 의 target renderer ${override.targetFileID} 를 못 찾았다`);
+        continue;
+      }
+      if (override.slot >= renderer.slots.length) {
+        ctx.warn(`${label}: renderer ${override.targetFileID} 에 슬롯 ${override.slot} 이 없다`);
+        continue;
+      }
+      if (override.guid === null) continue; // 내장 재질로 되돌린 것 — 그대로 둔다
+      const matPath = ctx.guidIndex.get(override.guid);
+      if (matPath === undefined) {
+        ctx.warn(`${label}: override 재질 guid ${override.guid} 를 못 찾았다`);
+        continue;
+      }
+      // 그 renderer 의 그 슬롯 하나만. 형제 renderer 는 건드리지 않는다
+      renderer.slots[override.slot] = unityMaterial(matPath);
+      for (const model of renderer.models) assignSlotMaterials(model, renderer.slots);
+    }
+
     root.add(child);
   }
 
   root.updateMatrixWorld(true);
+  root.userData.rendererMaterials = rendererMaterials;
   return root;
 }

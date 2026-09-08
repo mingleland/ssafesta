@@ -111,19 +111,21 @@ D-05 canonical 15항 밖이다. `-480` 의 자체 판정이라 따로 둔다.
 | 텍스처가 런타임까지 도달 | **PASS** | GLB 내부 embed 확인 — 키오스크 `metallicRoughness` 1장, 의자 `baseColor`·`normal`·`metallicRoughness` 3장. 채널 재패킹 `A(smoothness)→G(1−roughness)·R(metallic)→B` 적용 | `!422` 이전에는 `AssetMesh` 가 계약 색으로 덮어써 **받은 텍스처를 버리고 있었다** |
 | Unity `.mat` ↔ 런타임 material | **PASS** | 대표 2종 모두 `baseColor`·`metalness`·`roughness` 값 일치 | 재현: `node tools/assets/parity-report.mjs` |
 | 8각도 시각 parity | **PASS** | 2026-09-08 실 Chrome — 대표 2종 `0·45·90·135·180·225·270·315` 전부. 키오스크는 배면 2단 선반까지, 의자는 등판 뒷면 색차까지 확인 ([parity §3·§4](../../06_visual-review/booth-studio-runtime-asset-parity.md)) | 캡처는 CDP 스크린샷이 아니라 `canvas.toDataURL()` 로 뽑는다 — `visibilityState: hidden` 을 타지 않는다(LJH T-56 우회) |
-| 다중 재질 보존 | **FAIL** | 키오스크 런타임 GLB 의 `materials` 가 1개. 원본은 `PlasticWhite.mat` + `Tablet.mat`(baseColor `Tablet.jpg`) + `AluminiumBrushed.mat` | 태블릿이 검은 화면 대신 흰 판이 된다. Compiler v2 범위 — `S15P21A604-527` (LJH T-72) |
+| 다중 재질 보존 | **PASS** | `-527` 해소. 키오스크 런타임 GLB `materials` **3개**가 원본 이름 그대로 구워진다 — `Tablet.mat`(baseColor `Tablet.jpg` 38,688 B → 1,126 B webp) · `AluminiumBrushed.mat` · `PlasticWhite.mat`. primitive 도 1:1:1 로 갈린다 | GLB 15,536 → 27,408 B(+76%). 텍스처가 3장 늘어난 값이라 예산 판단은 coverage 확대 때 다시 본다 |
 | Source(Unity Editor) 렌더 대조 | **NOT_OBTAINED** | — | 이 환경에 Unity Editor 가 없다. 원본 쪽 근거는 계약 AABB·`.mat`·원본 텍스처로 대신한다 |
 | normal map 화면 기여 | **NOT_TESTED** | — | Booth Studio 줌 상한 120%, 오브젝트 0.5 m 라 표면 요철을 분간할 수 없다 |
 
 ```text
-COMPILER_V1 = PARTIAL
-SURVEY_KIOSK_DEFAULT      PARTIAL          (형상 PASS · 재질 축약 미해소)
+COMPILER_V1 = PASS_CANDIDATE
+SURVEY_KIOSK_DEFAULT      PASS_CANDIDATE   (형상 PASS · 재질 3종 보존 PASS)
 FURNITURE_CHAIR02_WHITE   PASS_CANDIDATE
 ```
 
 **8각도는 해소됐다.** 두 회차를 막고 있던 것은 렌더가 아니라 캡처 경로였다 — 그 경로를 안 쓰는 방법이 있었다.
 
-**그래도 v1 을 올리지 않는다.** 이번엔 사유가 바뀌었다. 확인 범위가 좁아서가 아니라 **원본 속성 하나(다중 재질)가 재현되지 않기 때문**이다. 의자는 `PASS_CANDIDATE` 로 올렸다.
+**다중 재질도 해소됐다**(`-527`). 마지막까지 남았던 "원본 속성 하나가 재현되지 않는다" 가 없어져 `COMPILER_V1` 을 `PASS_CANDIDATE` 로 올린다.
+
+**`PASS` 가 아닌 이유는 하나** — normal map 의 화면 기여를 이 밀도에서 분리하지 못했고 그것을 `known differences` 에 적어 두었다. `ADOPTED` 는 D-05 canonical 15 Gate reconciliation 이 선행한다(§E).
 
 ## D-3. 의도적으로 미룬 것 — thumbnail / Asset Library 연결
 
