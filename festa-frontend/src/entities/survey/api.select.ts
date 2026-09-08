@@ -1,6 +1,6 @@
-// Survey Port 선택 지점 — real 어댑터는 아직 없다(BE -130~ 미착수). BE 계약 합의 시
-// api.ts(real)+mapper.ts 를 추가하고 여기서 VITE_USE_MOCK 3항으로 갈라지는 것이 교체의 전부다.
+// Survey Port 선택 지점 — 저장소 공통 관례(entities/catalog/api.select.ts 등)와 같은 한 줄이다.
 import type { SurveyPort } from './api.port';
+import { surveyHttpPort } from './api';
 import { surveyMockPort } from './api.mock';
 
-export const surveyApi: SurveyPort = surveyMockPort;
+export const surveyApi: SurveyPort = import.meta.env.VITE_USE_MOCK === 'true' ? surveyMockPort : surveyHttpPort;
