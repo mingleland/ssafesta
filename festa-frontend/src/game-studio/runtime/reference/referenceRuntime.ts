@@ -648,7 +648,10 @@ const interactionCandidates = (
   if (scene === undefined || scene.type === 'DIALOGUE' || playerPosition === null) return [];
   const forward = directionDelta[state.facing];
   const forwardPosition = { x: playerPosition.x + forward.x, y: playerPosition.y + forward.y };
-  return scene.objects.filter((object) => {
+  const manhattanDistanceToPlayer = (position: { x: number; y: number }): number => (
+    Math.abs(position.x - playerPosition.x) + Math.abs(position.y - playerPosition.y)
+  );
+  const candidates = scene.objects.filter((object) => {
     if (!isVisible(state, object)) return false;
     const objectPosition = state.objectPositions[object.id] ?? object.position;
     const interactable = object.components.find((component) => component.type === 'INTERACTABLE');
@@ -659,13 +662,22 @@ const interactionCandidates = (
     // ON_INTERACT 이벤트로만 상호작용 가능한 오브젝트는 range를 설정할 자리가 없으므로
     // 기존 그대로(같은 칸 또는 정면 한 칸)를 유지한다.
     if (interactable?.type === 'INTERACTABLE') {
-      const manhattanDistance = Math.abs(objectPosition.x - playerPosition.x) + Math.abs(objectPosition.y - playerPosition.y);
-      return manhattanDistance <= (interactable.range ?? 1);
+      return manhattanDistanceToPlayer(objectPosition) <= (interactable.range ?? 1);
     }
     const onCurrent = objectPosition.x === playerPosition.x && objectPosition.y === playerPosition.y;
     const inFront = objectPosition.x === forwardPosition.x && objectPosition.y === forwardPosition.y;
     const eventOnly = scene.events.some((event) => event.trigger.type === 'ON_INTERACT' && event.trigger.targetId === object.id);
     return eventOnly && (onCurrent || inFront);
+  });
+  // S15P21A604-544 — 여러 후보가 동시에 있을 때 "에디터에서 먼저 만든 쪽"(배열 순서)이
+  // 아니라 "플레이어와 더 가까운 쪽"이 우선하도록 거리순 정렬한다(QA 확정 — INTERACTABLE
+  // 유무와 무관하게 같은 거리 기준으로 비교). 거리가 같을 때는 별도 동률 처리를 두지
+  // 않는다 — Array.prototype.sort는 ES2019부터 표준으로 안정 정렬(stable sort)이 보장돼서,
+  // filter 직후 이미 scene.objects 선언 순서 그대로인 배열을 그대로 정렬하면 거리가 같은
+  // 항목끼리는 원래 순서(먼저 만든 쪽)가 자동으로 유지된다.
+  return [...candidates].sort((a, b) => {
+    const positionOf = (object: GameObject) => state.objectPositions[object.id] ?? object.position;
+    return manhattanDistanceToPlayer(positionOf(a)) - manhattanDistanceToPlayer(positionOf(b));
   });
 };
 
