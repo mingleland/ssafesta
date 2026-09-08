@@ -36,7 +36,10 @@ fi
 SH
 chmod +x "${work_dir}/docker"; export FAKE_DOCKER_LOG="${work_dir}/docker.log"
 export DOCKER_BIN="${work_dir}/docker" COMPOSE_FILE="${repo_root}/infra/deploy/compose/integration/compose.yaml" COMPOSE_PROJECT=festa-integration
-export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
+: >"${work_dir}/back.env"; : >"${work_dir}/ai.env"
+export BACK_ENV_FILE="${work_dir}/back.env" AI_ENV_FILE="${work_dir}/ai.env" FESTA_ENVIRONMENT=demo
+export INTERNAL_SPRING_TO_AI_TOKENS=spring-to-ai-test-only INTERNAL_AI_TO_SPRING_TOKENS=ai-to-spring-test-only
+export PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
 bash "${repo_root}/infra/deploy/scripts/deploy-release.sh"
 grep -q 'up -d --wait ai back front game' "${FAKE_DOCKER_LOG}"
 [[ ! -e "${work_dir}/target-state.json" ]]

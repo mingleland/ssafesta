@@ -93,6 +93,50 @@ rag-tuning-summary \
 pgvector 없이 API·청킹을 빠르게 확인할 때만 `--store memory`를 쓸 수 있다. Jira 완료 근거는
 반드시 기본값인 pgvector 실행 결과를 사용한다.
 
+## 답변 생성 LLM 비교 (`S15P21A604-372`)
+
+370에서 확정한 검색 파이프라인(top_n=5) 위에서 후보 LLM별로 NPC 답변을 생성해 비교한다.
+프롬프트는 `docs/13_AI_시스템_설계서.md` §11 구조(System Instruction + Role/Tone +
+Safety/Forbidden + Context + Question)를 따르고, Role/Tone/응답 길이는
+`docs/08_Backend_API_명세서.md` §6 화이트리스트(role: `PROJECT_DOCENT`/`GUIDE`,
+tone: `FRIENDLY`/`PROFESSIONAL`/`ENTHUSIASTIC`, responseLength: `SHORT`/`MEDIUM`/`LONG`)를
+그대로 쓴다.
+
+```bash
+rag-generate \
+  --pdf data/sample.pdf \
+  --gold data/gold.jsonl \
+  --output results/generation.json \
+  --models gpt-4.1-nano,gemini-2.5-flash-lite,gpt-4o-mini,gpt-4.1-mini,gpt-5.4-nano
+```
+
+사람이 채점할 Markdown으로 변환한다(질문마다 Groundedness·Relevance·환각·거절판단·자연스러움
+체크박스 포함).
+
+```bash
+rag-generate-review --input results/generation.json --output results/generation-review.md
+```
+
+사람 채점 대신 LLM Judge로 같은 5축을 자동 채점할 수도 있다(선택 사항 — Jira 티켓이
+"사람 평가 또는 LLM Judge"를 동등하게 인정한다).
+
+```bash
+rag-judge --input results/generation.json --output results/generation-judge-scores.json
+```
+
+- 평가셋은 새로 안 만든다 — 370·371과 같은 `data/gold/{pinlog,ssafesta,sudal}-sol-gold.jsonl`을
+  재사용한다(ANSWERABLE/PARTIAL/NO_ANSWER 이미 포함).
+- **`temperature=0.0`으로 고정한다.** 고정하지 않으면 같은 모델·같은 입력도 호출마다 답이
+  달라진다(실측에서 확인).
+- `responseLength → max_tokens` 매핑(`SHORT`=200/`MEDIUM`=400/`LONG`=800)은 `docs/08` §6
+  제안값이다. OpenAI 쪽은 파라미터명이 `max_tokens`가 아니라 **`max_completion_tokens`**여야
+  gpt-5 계열까지 전부 동작한다(구형 모델도 호환, `gms_chat.py`가 통일 적용).
+- 후보 풀·지연시간 스크리닝 결과(속도 미달로 제외한 모델)는 `config/generation-grid.json`
+  참조. 채점·fallback 정책·컨텍스트 길이/스트리밍 비교표는 아직 미완료 — 같은 파일의
+  `known_limitations`에 정리.
+- `--response-length SHORT|MEDIUM|LONG`(기본 `MEDIUM`)으로 `max_tokens` 캡을 바꿔 재실측할
+  수 있다. 출력 리포트의 `agent_preset` 필드에 실제 사용한 프리셋이 기록된다.
+
 ## 청킹 전략 비교 (`S15P21A604-380`)
 
 370에서 확정한 model(`text-embedding-3-large`)과 top-k(10)을 고정하고, 청킹 전략만 변수로

@@ -12,10 +12,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.clients.spring_booth_access import SpringBoothAccessUnavailable
 from app.providers.document_parser import DocumentParseError, ScannedDocumentError
 from app.providers.managed_embedding import ManagedEmbeddingError
 from app.providers.storage import ObjectNotFoundError, ObjectStorageError
-from app.services.document_processing_service import SourceHashMismatchError
+from app.services.document_processing_service import (
+    BoothLeaseExpiredError,
+    SourceHashMismatchError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +33,10 @@ def classify_failure(exc: Exception) -> FailureOutcome:
         return FailureOutcome(code=exc.code, retryable=exc.retryable)
     if isinstance(exc, SourceHashMismatchError):
         return FailureOutcome(code="SOURCE_HASH_MISMATCH", retryable=False)
+    if isinstance(exc, BoothLeaseExpiredError):
+        return FailureOutcome(code="BOOTH_LEASE_EXPIRED", retryable=False)
+    if isinstance(exc, SpringBoothAccessUnavailable):
+        return FailureOutcome(code="BOOTH_ACCESS_CHECK_FAILED", retryable=True)
     if isinstance(exc, ScannedDocumentError):
         return FailureOutcome(code="UNSUPPORTED_SCAN_PDF", retryable=False)
     if isinstance(exc, DocumentParseError):

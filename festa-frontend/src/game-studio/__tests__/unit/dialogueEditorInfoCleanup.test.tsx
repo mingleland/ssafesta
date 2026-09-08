@@ -53,8 +53,11 @@ describe('DialogueEditor — 정보 중복/불필요 표시 정리(S15P21A604-51
   });
 
   it('그 외 화면 요소는 그대로 남아 있다(회귀 없음)', () => {
+    // S15P21A604-513 — NODES rail이 FLOW OVERVIEW로 합쳐지면서 "NODES" 라벨 자체는
+    // 더 이상 존재하지 않는다(이 파일 아래 dialogueEditorNodeManagement.test.tsx가
+    // 그 통합을 별도로 검증한다). 이 회귀 테스트는 그와 무관한 요소만 확인한다.
     setup('OVERLAY');
-    expect(screen.getByText('NODES')).not.toBeNull();
+    expect(screen.getByText('FLOW OVERVIEW')).not.toBeNull();
     expect(screen.getByText('사용자 선택지')).not.toBeNull();
   });
 });
