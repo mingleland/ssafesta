@@ -41,7 +41,11 @@ namespace Festa.Integration
     { ""objectId"": ""legacy-desk"", ""type"": ""CONSULT_DESK"",
       ""position"": { ""x"": 5.5, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 9 },
     { ""objectId"": ""future-1"", ""type"": ""HOLOGRAM"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 999 }
+      ""position"": { ""x"": 0, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 999 },
+    { ""objectId"": ""portal-1"", ""type"": ""GAME_PORTAL"",
+      ""position"": { ""x"": -5.5, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 1 },
+    { ""objectId"": ""portal-unlinked"", ""type"": ""GAME_PORTAL"",
+      ""position"": { ""x"": 5.5, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 0 }
   ]
 }";
 
