@@ -577,7 +577,7 @@ map 제거    25~32% 감축 (normal + metallicRoughness 를 다 빼야 이만큼
 (§12-A-6 판정 기준 2번) 얻는 것이 절반이라 하지 않는다. 선택 UI 의 카드와 한 번의 미리보기에
 512 는 과하다.
 
-### 12-A-5. 잠정 정책 — Facade preview
+### 12-A-5. 확정 — Facade preview 정책
 
 ```text
 geometry   ratio 0.25          AABB 가 두 최악 표본 모두에서 완전히 유지되는 마지막 지점
@@ -589,8 +589,7 @@ thumbnail  256 px webp         실측 평균 5.3 KB
 **tri 상한을 숫자로 박지 않는다.** 상한을 정하면 그 숫자를 맞추려고 AABB 가 무너진 자산도
 통과시키게 된다. 판정은 `ratio` 와 AABB 게이트가 한다.
 
-**`texture 256` 은 아직 확정이 아니다** — 그 판정을 낸 렌더에 텍스처가 없었다(§12-A-6, LJH T-80).
-`geometry 0.25` 는 AABB·실루엣 근거라 텍스처와 무관해 잠정 유지한다.
+`texture 256` 은 T-80 복구 후 다시 검증했다(§12-A-6) — 256 과 2048 의 육안 차이가 없다.
 
 ### 12-A-6. 품질 판정 기준 — 내부 자산과 다르다
 
@@ -604,37 +603,73 @@ thumbnail  256 px webp         실측 평균 5.3 KB
 
 내부 Booth 자산의 기준(형상·치수 정확도)을 여기 적용하지 않는다.
 
-**R3F 실렌더 검증 — 1차 판정은 취소됐다 (2026-09-08)**
+**R3F 실렌더 검증 — 1차 판정 취소 후 재검증 (2026-09-08)**
 
-7종을 동일 카메라·조명으로 대조해 *"색·재질 인상 유지 PASS · texture 256 px PASS"* 를 냈는데,
-**그 렌더에는 텍스처가 아예 안 붙어 있었다**(LJH T-80). `prune()` 이 UV 를 지우고 있었고,
-GLB 는 이미지·연결을 다 갖춘 채 **샘플링만 안 되는** 상태였다. 단색 덩어리를 보고 "색·재질
-유지" 를 판정한 셈이라 그 결론은 성립하지 않는다.
+1차 판정(*"색·재질 인상 PASS · texture 256 px PASS"*)은 **텍스처가 아예 안 붙은 렌더로 나온
+것**이라 취소했다(LJH T-80 — `prune()` 이 UV 를 지우고 있었다). 파이프라인 복구 후 다시 쟀다.
 
-```text
-색·재질 인상          PASS 취소 → 재검증 필요
-texture 256 px        PASS 취소 → 재검증 필요
-geometry ratio 0.25   잠정 유지 (AABB·실루엣 근거는 텍스처와 무관하다)
-```
-
-**파이프라인 복구 후 재렌더** — 줄무늬·간판·색이 전부 나온다.
-근거: `06_visual-review/evidence/facade-texture-restored-2026-09-08.png`
+근거: `06_visual-review/evidence/facade-revalidate-uv-fixed-2026-09-08.png`
 
 ```text
-원본(ratio 1.0) ↔ preview(0.25 / 256 px)   육안 차이가 거의 없다
-팝콘 카트 바퀴 살                          여전히 preview 에서 손실
+ratio 1.0 / 512 px   ↔   ratio 0.25 / 256 px      7종 대조
 ```
 
-**다만 이것으로 PASS 를 다시 선언하지 않는다.** 남은 조건이 둘이다.
+| 판정 기준 | 결과 |
+|---|---|
+| 주요 색 구성 | 유지 — 줄무늬·간판·천막 패턴이 두 쪽 다 같다 |
+| 간판·그래픽 | 유지 |
+| 재질 인상(목재·금속·천) | 유지 |
+| 대표 장식 | 유지 |
+| 같은 외관으로 즉시 식별 | 가능 |
+| 예외 | 팝콘 카트 바퀴 살 — 0.25 에서 테두리만 남는다(작은 geometry 손실, 허용) |
+
+**`geometry 0.25` · `texture 256 px` 를 확정한다.** 근거가 이번에는 텍스처가 실제로 렌더된
+화면이다.
+
+### 12-A-6-a. UV 얼룩 — 경량화 정책과 무관하다
+
+사탕 노점 파라솔·퍼넬 케이크 하단에 얼룩이 보인다. 원인을 4단 비교로 갈랐다.
 
 ```text
-① Unity/Asset Store 원본과의 3단 비교      원본 ↔ ratio 1.0 ↔ 0.25 를 나란히 봐야
-                                           "원본 → 1.0" 단계 손실과 "1.0 → 0.25" 손실이 갈린다
-② UV 이음새 확인                           사탕 노점 파라솔·퍼넬 케이크 하단에 얼룩이 보인다.
-                                           아틀라스 UV 문제인지 원본이 그런 것인지 미확정
+ratio 1.0 / 512 px    얼룩 있음
+ratio 1.0 / 256 px    얼룩 있음   ← 해상도를 낮춰도 같다
+ratio 0.25 / 256 px   얼룩 있음   ← 감축과 무관하다
 ```
 
-`§21` 에 남긴다.
+`FACADE_STAND_CANDY_APPLE` 을 **256 · 512 · 1024 · 2048 px** 네 단계로 구워 나란히 봤다.
+근거: `06_visual-review/evidence/facade-texture-size-256-2048-2026-09-08.png`
+
+**네 단계가 전부 같다.** 2048 px(원본 해상도 그대로)에서도 얼룩이 그대로다.
+
+```text
+texture resize 문제      아니다 — 2048 에서도 동일
+geometry ratio 문제      아니다 — 1.0 에서도 동일
+R3F 샘플링 문제          아니다 — 모든 변형에서 동일
+```
+
+남은 후보는 **원본 UV/텍스처 조합** 또는 **FBX UV 해석**이다. 실측한 사실:
+
+```text
+원본 텍스처    2048×2048 아틀라스. 파라솔·줄무늬 패널이 촘촘한 UV 섬으로 배치돼 있다
+               (evidence/carnivalkit-atlas-source-2026-09-08.png)
+UV 채널        uv · uv1 두 세트. baseColor 는 uv(첫 세트)를 쓴다
+UV 범위        mesh 9개가 **전부 0~1 전 범위**. 각자 아틀라스 전체를 덮는다
+tiling/offset  scale(1,1) · offset(0,0) — 타일링 아님
+```
+
+**여기서 더 좁히려면 Unity 에서 같은 prefab 을 띄워 봐야 한다** — 원본이 원래 그렇게 보이는지,
+아니면 FBX UV 해석이 어긋난 것인지는 이 세션에서 가를 수 없다. `§21` 에 남긴다.
+
+**이 얼룩은 경량화 정책의 근거가 되지 않는다.** 정책을 어떻게 잡아도 같은 그림이 나온다.
+
+### 12-A-6-b. Emission / AO 미지원
+
+Compiler 가 소비하는 채널은 baseColor · normal · metallicRoughness 셋이다. CarnivalKit 재질에는
+`_EmissionMap`·`_OcclusionMap` 도 있다.
+
+**선택 UI 화면에서 눈에 띄는 차이를 못 찾았다** — 간판·장식이 baseColor 로 충분히 읽힌다.
+MVP 범위에서 억지로 확장하지 않는다. 발광이 정체성인 자산(네온 간판 등)이 후보에 들어오면
+그때 최소 지원안을 낸다.
 
 ### 12-A-7. 18종 전체 — 추정이 아니라 실컴파일
 
@@ -887,14 +922,12 @@ production       dist 에 자산이 실려 나간다
 ② FURNITURE·DECORATION 타입 기본 통일 (§8-4) Unity 기준 채택안 통보 필요
 ③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX).
                                              원본 수정 vs 목록 제외 — authoring 판단
-④ texture 256 px 재검증 (§12-A-6)            1차 판정이 텍스처 없는 렌더로 나왔다(T-80)
-⑤ Unity/Asset Store 3단 비교 (§12-A-6)       원본 ↔ ratio 1.0 ↔ 0.25.
-                                             "원본→1.0" 손실과 "1.0→0.25" 손실을 가른다
-⑥ UV 이음새 (§12-A-6)                        파라솔·퍼넬케이크 하단 얼룩. 아틀라스 문제인지 미확정
+④ UV 얼룩의 최종 원인 (§12-A-6-a)            resize·ratio·R3F 는 배제했다. 원본 UV 인지
+                                             FBX UV 해석인지는 Unity 실행이 필요하다
 ⑤ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
 ⑥ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
 ```
 
-**Facade visual parity 는 BLOCKED 였다가 풀렸고, 재판정이 남았다.** T-80(prune 이 UV 를 지움)을
-고쳐 텍스처가 실제로 렌더된다. 다만 그 위에서 `texture 256 px` 를 다시 검증해야 하고
-(§12-A-6), Unity/Asset Store 원본과의 3단 비교가 남았다. `geometry 0.25` 만 잠정 유지한다.
+**Facade visual parity 는 해소됐다.** T-80(prune 이 UV 를 지움)을 고친 뒤 복구된 파이프라인
+기준으로 재검증해 `geometry 0.25 + texture 256 px` 를 확정했다(§12-A-6). 남은 것은 경량화와
+무관한 UV 얼룩 하나뿐이다.
