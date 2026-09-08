@@ -76,16 +76,6 @@ export const PlayGamePage = () => {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // S15P21A604-409 — 예전엔 모듈 최상단 상수였다. import 시점에 딱 한 번만 env를 읽어서
-  // playGamePageAssetWiring.test.tsx가 vi.stubEnv로 이 값을 통제할 수 없었다(모듈이 이미
-  // import된 뒤라 stub이 반영 안 됨). useMemo([])로 "컴포넌트 마운트 시점"에 읽게 바꾸되,
-  // 참조는 마운트 동안 그대로 안정적으로 유지된다(원래 의도와 동일). 아래 이른 return들보다
-  // 먼저, 다른 hook들과 같은 자리에서 무조건 호출해야 한다(React Hooks 규칙).
-  const browserPublicationPorts = useMemo(() => {
-    const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true'
-      && import.meta.env.VITE_GAME_STUDIO_API_ENABLED !== 'true';
-    return browserPublicationEnabled ? createBrowserPublicationPorts() : null;
-  }, []);
   const parsedGameId = Number(gameId);
   // S15P21A604-409/-477 — 이전엔 모듈 최상단 상수로 import 시점에 한 번만 읽혀서, 테스트가
   // vi.stubEnv를 beforeEach에서 불러도 반영되지 않고 로컬 .env.local 값에 좌우됐다. 컴포넌트
