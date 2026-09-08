@@ -73,4 +73,12 @@ describe('labelForReason — SC-005', () => {
   it('모르는 값은 숨기지 않고 원문 반환', () => {
     expect(labelForReason('FUTURE_UNKNOWN_REASON')).toBe('FUTURE_UNKNOWN_REASON');
   });
+
+  // S15P21A604-543 회귀 — 2026-09-08 회귀에서 /app/profile 거래내역에 raw enum 이 그대로
+  // 노출된 두 값이다. 설문 보상은 -528 이 Survey 실 어댑터를 붙이며 처음 도달 가능해졌다.
+  // BE CoinReason 전체를 여기 복제하지 않는다 — 이번에 드러난 두 건만 잠근다.
+  it('SURVEY_REWARD·PURCHASE 도 한글 라벨이다 — raw enum 이 화면에 나가지 않는다', () => {
+    expect(labelForReason('SURVEY_REWARD')).toBe('설문 보상');
+    expect(labelForReason('PURCHASE')).toBe('아이템 구매');
+  });
 });

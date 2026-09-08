@@ -34,11 +34,22 @@ export interface TransactionPage {
 }
 
 // 알려진 reasonType의 한글 라벨 — 003 시점 3종 + 004의 LEASE_PAYMENT
+//
+// SURVEY_REWARD·PURCHASE 는 2026-09-08 회귀(S15P21A604-538)에서 빠진 것이 드러나 더했다.
+// 설문 보상은 -528 이 Survey 실 어댑터를 붙이면서 **처음 도달 가능해진 경로**라 그때 보였다 —
+// 화면에 `SURVEY_REWARD` 가 그대로 노출됐다(S15P21A604-543).
+//
+// 이 목록을 BE CoinReason 전체의 사본으로 만들지 않는다. 같은 열거가 두 곳에 생기면
+// 그 사본이 낡는 것을 아무도 못 잡고, 지금 고치는 것과 같은 종류의 문제가 하나 더 생긴다.
+// reason drift 자체를 막는 방법(BE 가 목록을 내려주거나 계약에 열거하고 그것을 근거로 삼는 것)은
+// 별도 후속이다.
 const REASON_LABELS: Record<string, string> = {
   INITIAL_GRANT: '가입 지급',
   DAILY_GRANT: '일일 지급',
   ADMIN_ADJUSTMENT: '운영자 조정',
   LEASE_PAYMENT: '부스 임대',
+  SURVEY_REWARD: '설문 보상',
+  PURCHASE: '아이템 구매',
 };
 
 // 모르는 reasonType은 원문 코드 그대로 반환 — 항목을 숨기면 SC-005 위반
