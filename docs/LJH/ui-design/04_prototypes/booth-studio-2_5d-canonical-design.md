@@ -254,6 +254,60 @@ FURNITURE 타입 기본
 
 **Facade 1개 = prefab 1개 = assetCode 1개 = GLB 1개 = thumbnail 1개.** 부품 22·소품 8 은 완성형 내부 구성이라 코드를 주지 않는다.
 
+### 8-7. Unity 전달용 계약표 — 이 표가 Registry 와 맞춰야 할 전부다
+
+게임 파트가 `#146` 에서 요청한 목록이 이것이다. **중간 변환 계층을 만들지 않는다** — FE 가 내는
+`(type, assetCode)` 를 Unity `BoothObjectRegistry` 가 같은 값으로 받는다.
+
+`typeDefault ✔` 는 **assetCode 없이 그 타입으로 놓였을 때** 쓸 자산이다. Registry 의 flag 이지
+assetCode 의 일부가 아니다 — 그래서 코드에 `_DEFAULT` 를 넣지 않는다.
+
+| ObjectType | assetCode | 화면에 보여야 하는 물건 | typeDefault |
+|---|---|---|---|
+| `SURVEY_KIOSK` | `BOOTH_KIOSK_SURVEY` | 설문 키오스크 — 흰 카운터 + 태블릿 화면 | ✔ |
+| `CONSULTATION_DESK` | `BOOTH_DESK_CONSULT` | 상담 데스크 | ✔ |
+| `VIDEO_SCREEN` | `BOOTH_SCREEN_VIDEO` | 영상 스크린 | ✔ |
+| `PROJECT_PANEL` | `BOOTH_PANEL_PROJECT` | 프로젝트 전시 패널 | ✔ |
+| `RECRUITMENT_BOARD` | `BOOTH_BOARD_RECRUIT` | 채용 안내 보드 | ✔ |
+| `LIKE_VOTE` | `BOOTH_STAND_LIKE` | 좋아요 투표 스탠드 | ✔ |
+| `LAPTOP` | `BOOTH_DESK_LAPTOP` | 노트북 (Laptop Free 90315) | ✔ |
+| `AI_AGENT` | `BOOTH_AGENT_AI` | AI 안내원 캐릭터 | ✔ |
+| `FURNITURE` | `FURN_SET_TABLE_CHAIRS` | 테이블 1 + 의자 3 세트 (1.43 × 0.75 × 1.58) | ✔ |
+| `FURNITURE` | `FURN_CHAIR_01_WHITE` | 흰 의자 (0.38 × 0.45 × 0.38) | |
+| `FURNITURE` | `FURN_CHAIR_01_BLUE` | 파란 의자 | |
+| `FURNITURE` | `FURN_CHAIR_01_ORANGE` | 주황 의자 | |
+| `FURNITURE` | `FURN_CHAIR_02_WHITE` | 흰 의자 (다른 형태) | |
+| `FURNITURE` | `FURN_COUNTER_01` | 카운터 (천 + 상판 + 선반) | |
+| `FURNITURE` | `FURN_COUNTER_01B` | 카운터 변형 | |
+| `FURNITURE` | `FURN_COUNTER_02` | 카운터 (다른 형태) | |
+| `FURNITURE` | `FURN_TABLE_ROUND` | 원형 테이블 | |
+| `FURNITURE` | `FURN_TABLE_SQUARE` | 사각 테이블 | |
+| `DECORATION` | `DISP_SET_BOX_01` | 진열장 조립체 | ✔ |
+| `DECORATION` | `DISP_BOX_01` | 진열 박스 단품 (유리 + 흰 플라스틱) | |
+| `DECORATION` | `DISP_STAND_PLASTIC_01` | 투명 스탠드 | |
+| `DECORATION` | `DEVICE_TABLET` | 태블릿 | |
+| `DECORATION` | `STRUCT_PANEL_01` | 알루미늄 패널 | |
+| `DECORATION` | `STRUCT_PANEL_02` | 알루미늄 패널 (변형) | |
+| `DECORATION` | `STRUCT_PANEL_03` | 알루미늄 패널 (변형) | |
+| `DECORATION` | `STRUCT_TRUSS_BASE` | 트러스 받침 | |
+| `DECORATION` | `STRUCT_TRUSS_VERTICAL` | 트러스 기둥 | |
+| `DECORATION` | `STRUCT_TRUSS_HORIZONTAL_LAMP` | 트러스 빔 + 조명 | |
+
+**28행이지만 지금 계약이 실제로 낼 수 있는 것은 `FURNITURE`·`DECORATION` 20행뿐이다.**
+나머지 8타입은 계약이 `assetCode` 를 허용하지 않아 typeDefault 만 나간다 — 확장은 §19-1.
+
+#### 레거시 교체
+
+| Unity 현재 값 | 교체 | 왜 |
+|---|---|---|
+| `FURNITURE_DEFAULT` | `FURN_SET_TABLE_CHAIRS` | 같은 자산(Furniture.prefab). 이름만 canonical 로 |
+| `DECORATION_DEFAULT` | `DISP_SET_BOX_01` | 같은 자산(Decoration.prefab). FE 의 동명 코드는 **다른 자산**이었다(§8-4) |
+| 미등록 9종 | §8-5 매핑 | `PLANT`·`SHELF`·`TRUSS_*`·`WALL_PLAIN`·`COUNTER_GRAPHIC` 은 FE 목업 코드였다 |
+
+교체 중에는 **양쪽을 동시에 받아도 된다** — 저장된 layout 에 옛 코드가 남아 있고, 조회 실패는
+타입 기본으로 떨어지는 기존 동작(`pickAsset` · Registry fallback)이 이미 받아 준다. 그 경로에서
+게임 파트가 넣어 둔 `[BoothObjectRegistry] Unknown assetCode` 경고가 남는다.
+
 ## 9. Asset Domain / UI Category / ObjectType — 세 축은 다르다
 
 ```text
@@ -387,12 +441,17 @@ migration: 현 4종은 **색 프리셋**이고 새 Template 은 **배치 recipe*
 
 ## 12. Facade
 
+### 12-1. 무엇인가 — 선택 UI 지 편집기가 아니다
+
 ```text
 자산     CarnivalKit 완성형 18종 (§8-6)
-UX       해금/보유 → 목록에서 하나 선택 → 2.5D preview → 적용
-저장     facadeAssetCode 1필드   ← 계약 확장 필요(§19)
-구조     prefab 1 = assetCode 1 = GLB 1 = thumbnail 1
+UX       목록(thumbnail) → 클릭 → 경량 preview → 적용 → facadeAssetCode 저장
+구조     prefab 1 = assetCode 1 = preview GLB 1 = thumbnail 1
+저장     facadeAssetCode 1필드   ← 계약 확장 필요(§19-2)
 ```
+
+**이번 범위에 없는 것** — Facade 자유 배치·편집 / 부품 조합 preset / 외부용 transform inspector /
+내부 Booth Editor 수준의 정밀 조작. Facade 는 "이 외관으로 하실래요?" 에 답하는 화면이다.
 
 **Facade 를 Booth Template 구성요소 조합으로 만들지 않는다.** 둘은 다른 축이다.
 
@@ -401,7 +460,181 @@ Booth Template   내부 LayoutObject 초기 배치 세트
 Facade           외부 완성형 에셋 1개 선택
 ```
 
-기존 `BoothShell`·`Panel`·`Truss` 는 **Facade 본체가 아니다** — 셸은 시스템이 항상 그리는 무대이고, Panel/Truss 는 내부 배치 자산으로 남는다.
+기존 `BoothShell`·`Panel`·`Truss` 는 **Facade 본체가 아니다** — 셸은 시스템이 항상 그리는
+무대이고, Panel/Truss 는 내부 배치 자산으로 남는다.
+
+### 12-2. representation 이원화 — identity 는 하나다
+
+```text
+assetCode                  동일             ← 이것이 identity 다
+Unity World representation Unity 원본 prefab
+React representation       preview GLB(강한 simplify) + thumbnail
+```
+
+이원화 비용(두 표현이 달라 보일 수 있다)보다 웹 경량화 이득이 크다고 판단했다 — Facade 는
+정밀 편집 대상이 아니라 **어떤 부스인지 알아보면 되는** 대상이라서다. 내부 Booth 자산에는
+이 판단을 적용하지 않는다(그쪽은 배치 정확도가 계약이다).
+
+### 12-3. 로딩 — 18종을 한꺼번에 받지 않는다
+
+```text
+목록 열기       thumbnail 18장만          95 KB   (실측)
+후보 클릭       그 자산의 preview GLB     평균 268 KB · 최대 903 KB
+두 번째 클릭    브라우저 HTTP 캐시        이미 받은 것은 재요청 없음
+World 적용      Unity 원본 (웹으로 안 나간다)
+```
+
+### 12-4. Selection UI 최소 데이터
+
+```text
+필수   assetCode · displayName · thumbnail · previewUrl · locked
+선택   category(그룹 4종: 게임 부스 · 독립 부스 · 노점 · 카트)
+```
+
+편집 metadata(objectType · typeDefault · 배치용 bounds)는 **넣지 않는다.** Facade 는 배치
+대상이 아니라 선택 대상이라 그 필드가 의미를 갖지 않는다 — Booth Interior entry 와 분리한다(§13).
+
+## 12-A. Facade 경량화 실험 (S15P21A604-552 실측)
+
+### 12-A-1. 먼저 잡은 것 — 이전 수치가 틀렸다
+
+`§17` 의 "최대 897k tri / 20.4 MB" 는 **중복 계상이었다.** 로더가 `m_Mesh` 의 fileID 로
+서브메시를 고르지 않고 **FBX 전체를 MeshFilter 마다 통째로 붙이고** 있었다.
+
+같은 조사에서 결함 셋을 함께 잡았다. 셋 다 조용히 실패하던 것이다.
+
+```text
+① 음수 fileID 미인식   정규식이 \d+ 라 FBX 서브에셋 참조를 통째로 놓쳤다
+                       CarnivalKit m_Mesh 288건 중 136건이 음수. 팝콘 카트는 0 tri 로 로드됐다
+② 서브메시 미선택      ①을 고치자 FBX 전체가 MeshFilter 수만큼 중복됐다(팝콘 카트 정확히 5배)
+                       GameObject 이름 = FBX 메시 이름이라 이름으로 고른다
+③ 단위                 CarnivalKit 은 cm 다. FBX 헤더 UnitScaleFactor 로 확정 —
+                       CarnivalKit 1.0(cm) · ExpoKit 2.54(inch). .meta 는 양쪽 다
+                       useFileScale: 1 이라 import 설정만 봐서는 갈리지 않는다
+```
+
+교정 후 실측: **18종 합계 791,006 tri · 최대 181,818 tri**(RING_TOSS). 자릿수가 다르다.
+
+### 12-A-2. 표본과 조건
+
+7종 — 밀도 스펙트럼 · 단일/nested · 서로 다른 실루엣을 덮게 골랐다.
+
+| 표본 | 원본 tri | mesh | 성격 |
+|---|---|---|---|
+| `FACADE_BOOTH_RING_TOSS` | 181,818 | 130 | 최고밀도 · nested `PF_Combined` |
+| `FACADE_BOOTH_WATER_GUN` | 158,266 | 66 | 고밀도 · 최대 실루엣 5.6 × 7.5 × 7.1 m |
+| `FACADE_STAND_CANDY_APPLE` | 48,818 | 9 | 중간 · 단일 prefab |
+| `FACADE_BOOTH_PRIZE_WALL` | 34,928 | 15 | 작은 덩어리(인형 15개)가 실루엣의 전부 |
+| `FACADE_STAND_FUNNEL_CAKE` | 19,636 | 23 | 재질 3 · 텍스처 9(20.65 MB) — 텍스처 worst case |
+| `FACADE_CART_POPCORN` | 6,314 | 5 | 경량 |
+| `FACADE_BOOTH_HIGH_STRIKER` | 1,161 | 2 | 초경량 — 더 줄일 게 남았는지 |
+
+`node tools/assets/facade-simplify-lab.mjs` · `facade-texture-lab.mjs` 로 재현한다.
+
+### 12-A-3. geometry 단계별 실측
+
+| 표본 | orig | 0.5 | 0.25 | 0.1 | 0.05 |
+|---|---|---|---|---|---|
+| RING_TOSS tri | 181,818 | 90,908 | 45,452 | 18,225 | 9,195 |
+| RING_TOSS 높이(m) | 6.846 | 6.846 | **6.846** | 6.831 | **4.269** ← 붕괴 |
+| WATER_GUN tri | 158,266 | 79,132 | 39,562 | 16,148 | 10,891 |
+| WATER_GUN 높이(m) | 7.534 | 7.534 | **7.534** | **4.758** ← 붕괴 | 4.758 |
+| CANDY_APPLE tri | 48,818 | 24,409 | 12,203 | 4,846 | 2,439 |
+| POPCORN tri | 6,314 | 2,971 | 1,802 | 1,797 | 1,797 |
+| HIGH_STRIKER tri | 1,161 | 730 | 730 | 736 | 736 |
+
+**세 가지가 나온다.**
+
+```text
+AABB 붕괴가 품질 하한의 객관 지표다   기둥·천막이 통째로 사라지면 높이가 30~37% 준다
+                                       WATER_GUN 은 0.1 에서, RING_TOSS 는 0.05 에서 무너진다
+작은 자산은 목표 비율에 못 간다        6k tri 는 0.25 에서 바닥(28%), 1.1k tri 는 63% 가 한계
+                                       meshoptimizer 가 topology 를 지킬 수 없어 멈춘다
+compile time 은 제약이 아니다          최대 1.2초
+```
+
+실루엣 육안 대조(`.generated/facade-lab/silhouette-*.png`)도 같은 결론이다 — 0.25 까지 네 표본
+모두 무엇인지 알아볼 수 있고, 0.05 에서 RING_TOSS 의 천막이 무너진다.
+
+### 12-A-4. texture 실측 — 가벼운 자산의 병목은 geometry 가 아니다
+
+원본 텍스처 비중(GLB 대비): RING_TOSS 5% · POPCORN 37% · **HIGH_STRIKER 61%**.
+`ratio` 를 아무리 낮춰도 HIGH_STRIKER 의 GLB 가 안 줄던 이유다.
+
+| 표본 | 512(현 기본) | 256 | 128 |
+|---|---|---|---|
+| HIGH_STRIKER 텍스처 | 54,088 B | 20,820 B | 8,620 B |
+| POPCORN 텍스처 | 87,568 B | 31,050 B | 10,842 B |
+| FUNNEL_CAKE 텍스처 | 141,656 B | 51,870 B | 19,462 B |
+| RING_TOSS 텍스처 | 162,688 B | 55,130 B | 18,210 B |
+
+```text
+512 → 256   62~66% 감축
+map 제거    25~32% 감축 (normal + metallicRoughness 를 다 빼야 이만큼)
+```
+
+**해상도가 map 제거보다 두 배 효과적이고 손실도 작다.** map 제거는 재질 인상을 바꾸는데
+(§12-A-6 판정 기준 2번) 얻는 것이 절반이라 하지 않는다. 선택 UI 의 카드와 한 번의 미리보기에
+512 는 과하다.
+
+### 12-A-5. 확정 — Facade preview 정책
+
+```text
+geometry   ratio 0.25          AABB 가 두 최악 표본 모두에서 완전히 유지되는 마지막 지점
+texture    maxSize 256         512 대비 62~66% 감축. map 은 전부 유지
+thumbnail  256 px webp         실측 평균 5.3 KB
+게이트     AABB 유지            원본 대비 각 축 5% 초과 축소면 그 자산은 ratio 를 올린다
+```
+
+**tri 상한을 숫자로 박지 않는다.** 상한을 정하면 그 숫자를 맞추려고 AABB 가 무너진 자산도
+통과시키게 된다. 판정은 `ratio` 와 AABB 게이트가 한다.
+
+### 12-A-6. 품질 판정 기준 — 내부 자산과 다르다
+
+```text
+1  전체 실루엣이 원본과 구별 가능
+2  색·재질의 주요 인상이 유지
+3  "어떤 외부 부스인지" 즉시 식별 가능
+4  대표 장식·간판·구조가 사라지지 않음
+5  작은 장식 디테일 손실은 허용
+```
+
+내부 Booth 자산의 기준(형상·치수 정확도)을 여기 적용하지 않는다.
+
+**한계** — 현재 육안 대조는 자체 래스터라이저의 단색 아이소 렌더라 **실루엣만** 판정한다.
+기준 2번(색·재질 인상)은 R3F 실렌더 대조가 필요하고 아직 못 했다. `§21` 에 남긴다.
+
+### 12-A-7. 18종 전체 — 추정이 아니라 실컴파일
+
+전 18종을 `ratio 0.25 + 256 px` 로 실제 컴파일한 값이다.
+
+```text
+geometry     791,006 → 203,679 tri   (25.7%)
+preview GLB  합계 4.72 MB · 평균 268 KB · 최대 903 KB(RING_TOSS)
+thumbnail    합계 95 KB · 평균 5.3 KB
+AABB         18종 전부 원본 유지 — 붕괴 0
+```
+
+```text
+목록 첫 로드   95 KB      thumbnail 18장
+선택 1회       평균 268 KB · 최대 903 KB
+전량 preview   4.72 MB    ← 이런 일은 일어나지 않는다(선택한 것만 받는다)
+```
+
+무거운 4종(RING_TOSS 903 KB · WATER_GUN 858 KB · CAN_KNOCKDOWN 726 KB · BASKETBALL 418 KB)이
+전체의 62%다. 나머지 14종은 평균 122 KB.
+
+### 12-A-8. inventory 이상 2건 — 18종 목록 재판정이 필요하다
+
+```text
+FACADE_BOOTH_PRIZE_WALL   구성이 인형 15개뿐이고 **벽·선반이 없다**. 0.39 × 2.83 × 0.41 m
+                          완성형 부스가 아니라 소품 세트다 — Facade 후보에서 빼는 것이 맞다
+FACADE_CART_HOT_DOG       카트 본체가 원점에서 10.04 m 떨어져 있다(2 클러스터, 최대 간격 10.96 m)
+                          bounds 11.5 m. 나머지 17종은 전부 1 클러스터다
+```
+
+둘 다 prefab authoring 문제다. 사용자가 이미 짚었다 — *"첨부 사진의 모든 요소가 외부 부스
+형태는 아니다."* 18종 목록은 **크기·구성 기준으로 한 번 더 걸러야 한다**(§21).
 
 ## 13. Runtime Manifest v2
 
@@ -428,6 +661,31 @@ Facade           외부 완성형 에셋 1개 선택
   }]
 }
 ```
+
+Facade entry 는 **편집 metadata 를 갖지 않는다**(§12-4). 배치 대상이 아니라 선택 대상이라
+`objectType`·`typeDefault` 가 의미를 갖지 않는다.
+
+```jsonc
+{
+  "assetCode": "FACADE_BOOTH_RING_TOSS",
+  "domain": "FACADE",
+  "url": "FACADE_BOOTH_RING_TOSS.glb",      // preview 전용 — Unity World 는 원본을 쓴다(§12-2)
+  "thumbnail": "FACADE_BOOTH_RING_TOSS.webp",
+  "bytes": 924264,
+  "triangles": 45452,
+  "bounds": { "min": [...], "max": [...] },
+  "materials": [ ... ],
+  "booth": null,
+  "facade": {
+    "displayName": "고리 던지기",
+    "group": "game",                         // game · booth · stand · cart (§12-4)
+    "preview": { "simplifyRatio": 0.25, "maxTextureSize": 256 }   // 어떻게 줄였는지 남긴다
+  }
+}
+```
+
+`facade.preview` 는 **재현용 기록**이다. 나중에 정책을 바꿀 때 어느 자산이 어떤 설정으로
+구워졌는지 파일에서 바로 읽히지 않으면 전량 재컴파일 말고는 확인할 방법이 없다.
 
 `uiCategory` 는 **넣지 않는다**(§10-2). `domain` 은 기술 분류라 넣는다.
 
@@ -482,11 +740,13 @@ thumbnail 소비   **없음** — 이번 §10 에서 연결한다
 
 ```text
 Booth interior   8종 합계 373.8 KB. 24종으로 늘려도 ~1.2 MB, 전량 동시 로드는 없다
-Facade           표본 20종 73.2 MB(텍스처 제외), 최대 20.4 MB(897k tri)
-                 → 현재 simplify(2000 tri 초과 시 ratio 0.6 1회)로는 웹 예산에 못 든다
+Facade           18종 원본 791,006 tri → preview 203,679 tri (ratio 0.25)
+                 preview GLB 합계 4.72 MB · 평균 268 KB · 최대 903 KB
+                 thumbnail 합계 95 KB — 목록 첫 로드가 이것뿐이다
 ```
 
-**임의 상한을 선언하지 않는다.** 지배 변수는 둘 — ⑴ Facade 감축 정책 ⑵ 공유 텍스처 중복. 둘 다 실험 근거를 만든 뒤 정한다(§20 P6).
+정책과 실측 근거는 §12-A. **자산 전량을 동시에 받는 경로는 설계에 없다** — 목록은 thumbnail,
+preview 는 사용자가 고른 하나다.
 
 ## 18. 기존 mock migration
 
@@ -538,17 +798,18 @@ spec 012 장식 범위(P1, 2차 MVP) 구현. item_type 문자열 확정 필요
 ## 20. 구현 단계 / 우선순위
 
 ```text
-P0  최종 설계 문서                     ← 이 문서
-P1  canonical assetCode 표 확정         ← §8
-P2  Asset Library 구조 구현             FE 내부. manifest consumer · thumbnail · FAMILY 그룹
-P3  Booth Template 모델 + 초기 UI       FE 내부. 실제 assetCode 기반
-P4  Manifest v2                         Compiler + FE 타입
+P0  최종 설계 문서                     ✔ 이 문서
+P1  canonical assetCode 표 확정         ✔ §8. Unity 전달용 계약표는 §8-7
+P2  Asset Library 구조 구현             ✔ -551. manifest consumer · thumbnail · FAMILY 그룹
+P3  Booth Template 모델 + 초기 UI       ✔ -551. 실제 assetCode 기반
+P6  Facade 경량화 실험                  ✔ -552. 정책 확정 §12-A-5, 18종 실측 §12-A-7
+P4  Manifest v2                         Compiler + FE 타입. facade 블록 포함
 P5  build-time pipeline                 §15
-P6  Facade 경량화 실험                  target-tri · 텍스처 공유
-P7  Facade Selection UI                 19-2 합의 후
+P7  Facade Selection UI                 19-2 합의 후. 필요 데이터는 §12-4
 ```
 
-**P2·P3 는 계약 변경도 타 파트 승인도 필요 없다** — FE 내부 구현이라 즉시 착수한다.
+**P6 을 P4 보다 먼저 했다** — Manifest v2 의 `facade` 블록에 무엇을 담을지가 경량화 정책에
+달려 있었다. 정책 없이 스키마를 먼저 박으면 실측 뒤에 다시 고치게 된다.
 
 ## 21. 완료 기준 / 미결정
 
@@ -567,7 +828,13 @@ production       dist 에 자산이 실려 나간다
 ```text
 ① 계약 assetCode 범위 확장 (§19-1)          3파트 합의
 ② FURNITURE·DECORATION 타입 기본 통일 (§8-4) Unity 기준 채택안 통보 필요
-③ Facade 감축 정책 (§17)                     실험 후 결정. 임의 수치 금지
-④ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
-⑤ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
+③ Facade 18종 목록 재판정 (§12-A-8)          PRIZE_WALL 은 소품 세트고 HOT_DOG 는
+                                             부품이 10 m 떨어져 있다. 크기·구성 기준 필요
+④ Facade 색·재질 인상 판정 (§12-A-6)         현 육안 대조는 단색 실루엣까지다.
+                                             R3F 실렌더 대조가 남았다
+⑤ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
+⑥ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
 ```
+
+**Facade 감축 정책은 더 이상 미결정이 아니다** — §12-A-5 에서 `ratio 0.25 + 256 px + AABB
+게이트`로 확정했다. 근거는 §12-A-3·12-A-4 실측이다.

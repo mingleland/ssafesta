@@ -239,7 +239,12 @@ export async function compileAsset(input, options) {
   report.stages.intermediate = { bytes: intermediate.length, ...before, sourceTriangles };
 
   // ── geometry ───────────────────────────────────────────────────
-  const decision = decideSimplify(before.triangles);
+  // Facade 는 판정 기준이 다르다(선택 UI 라 알아보기만 하면 된다). 호출부가 비율을 정하면
+  // 그것을 쓰고, 안 정하면 내부 자산 기본 정책을 그대로 쓴다 — 실험이 기본값을 흔들지 않게
+  const decision =
+    options.simplifyRatio === undefined
+      ? decideSimplify(before.triangles)
+      : { ratio: options.simplifyRatio, reason: `호출부 지정 ratio ${options.simplifyRatio}` };
   const applied = await transformRuntimeDocument(document, {
     simplifyRatio: decision.ratio,
     simplifyError: SIMPLIFY_ERROR,
