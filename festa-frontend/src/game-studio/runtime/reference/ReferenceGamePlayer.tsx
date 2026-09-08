@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_GAME_RULES, findScene, type AssetReference, type GameObjective, type GameProject, type TileLayer } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
@@ -32,6 +32,11 @@ interface ReferenceGamePlayerProps {
   readonly onExit: () => void;
   readonly showPerformanceMonitor?: boolean;
 }
+
+// S15P21A604-526 — 캐릭터 위 "-N" 피해 표시가 떠 있는 시간. ReferenceGamePlayer.css의
+// grp-damage-popup 애니메이션 duration과 반드시 같은 값이어야 한다(자바스크립트 타이머가
+// 실제로 요소를 지우는 시점 = CSS 애니메이션이 끝나 보이지 않게 되는 시점).
+const DAMAGE_POPUP_DURATION_MS = 900;
 
 const keyDirection = (key: string): MoveDirection | null => {
   if (key === 'ArrowUp' || key.toLowerCase() === 'w') return 'UP';
@@ -83,6 +88,14 @@ const objectiveCopy = (objective: GameObjective): string => {
 
 export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit, showPerformanceMonitor = false }: ReferenceGamePlayerProps) => {
   const [runtime, setRuntime] = useState(() => startReferenceRuntime(project));
+  // S15P21A604-526 — 체력이 깎여도 상단 수치 텍스트만 바뀌고 캐릭터 쪽에는 아무 피드백이
+  // 없던 것을, runtime.lastDamageTick 변화를 감지해 캐릭터 위에 "-N"을 잠깐 띄웠다 서서히
+  // 사라지게(DAMAGE_POPUP_DURATION_MS 뒤 자동 제거) 한다. 이 표시 자체는 게임 판정에
+  // 영향이 없는 순수 시각 효과라 굳이 runtime state(순수 함수 리듀서)에 넣지 않고 컴포넌트
+  // 로컬 state로 둔다.
+  const [damagePopups, setDamagePopups] = useState<readonly { readonly id: number; readonly amount: number }[]>([]);
+  const damagePopupIdRef = useRef(0);
+  const lastDamageTickRef = useRef(runtime.lastDamageTick);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [framePerformance, setFramePerformance] = useState<FramePerformanceSummary | null>(null);
@@ -140,6 +153,23 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
       }
     };
   }, [mode, project.gameId, sessionPort]);
+
+  // S15P21A604-526 — lastDamageTick이 이전에 본 값과 달라졌을 때만(=실제로 새 피해가
+  // 적용됐을 때만) 표시를 하나 추가한다. 무적 시간 중 damagePlayer가 조기 반환되는 호출은
+  // referenceRuntime.ts 쪽에서 애초에 이 값을 갱신하지 않으므로 여기서 따로 걸러낼 필요가
+  // 없다 — tick이 그대로면 이 effect도 아무 일도 하지 않는다.
+  useEffect(() => {
+    if (runtime.lastDamageAmount === null || runtime.lastDamageTick === lastDamageTickRef.current) return;
+    lastDamageTickRef.current = runtime.lastDamageTick;
+    const id = damagePopupIdRef.current + 1;
+    damagePopupIdRef.current = id;
+    const amount = runtime.lastDamageAmount;
+    setDamagePopups((current) => [...current, { id, amount }]);
+    const timeoutId = window.setTimeout(() => {
+      setDamagePopups((current) => current.filter((popup) => popup.id !== id));
+    }, DAMAGE_POPUP_DURATION_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [runtime.lastDamageAmount, runtime.lastDamageTick]);
 
   useEffect(() => {
     if (runtime.session.status !== 'COMPLETED' || sessionToken === null || completionReported.current) return;
@@ -349,18 +379,30 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
               const spriteVisual = sprite?.type === 'SPRITE'
                 ? resolveStaticImageVisual(project.assets.find((asset) => asset.id === sprite.assetId), assetUrls)
                 : null;
+              const objectPercentPosition = {
+                left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
+                top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
+              };
               return (
-                <span
-                  className={`grp-object grp-object--${object.preset.toLowerCase()}`}
-                  key={object.id}
-                  style={{
-                    left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
-                    top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
-                    transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
-                    zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
-                  }}
-                  title={definition.label}
-                >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                <Fragment key={object.id}>
+                  <span
+                    className={`grp-object grp-object--${object.preset.toLowerCase()}`}
+                    style={{
+                      ...objectPercentPosition,
+                      transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
+                      zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
+                    }}
+                    title={definition.label}
+                  >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                  {/* S15P21A604-529 — 이름이 있고("" 포함 빈 이름은 미표시) "플레이 중 표시"가
+                      켜진 오브젝트만, 오브젝트와 같은 좌표에서 위로 오프셋한 상시 이름표를
+                      그린다(-526의 순간 페이드아웃 표시와 달리 계속 떠 있음 — 별도 타이머
+                      없이 매 렌더마다 조건만 확인). PLAYER_SPAWN은 이 filter에서 이미
+                      제외되고 계약상 name/showNameInPlay 자체를 가질 수 없다. */}
+                  {object.showNameInPlay === true && object.name !== undefined && object.name !== '' && (
+                    <span className="grp-object-nameplate" style={objectPercentPosition}>{object.name}</span>
+                  )}
+                </Fragment>
               );
             })}
             {runtime.spawnedEnemies.map((enemy) => {
@@ -380,6 +422,21 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             >
               {playerSheet === undefined ? '◆' : <SpriteAnimationPreview clip={playerClip} sheet={playerSheet} size={72} />}
             </span>
+            {/* S15P21A604-526 — 캐릭터와 같은 좌표에 놓고 CSS(grp-damage-popup)로 오른쪽
+                위 오프셋 + 위로 이동하며 페이드아웃하는 애니메이션을 준다. 피격 시점의
+                정확한 위치가 아니라 "지금" 위치를 쓴다 — 체력이 0이 되어 즉시 체크포인트로
+                순간이동하는 마지막 피격은 표시가 새 위치에서 뜨지만, 표시 자체가 아주
+                짧게(900ms) 스쳐 지나가는 연출이라 문제되지 않는다고 판단했다. */}
+            {damagePopups.map((popup) => (
+              <span
+                className="grp-damage-popup"
+                key={popup.id}
+                style={{
+                  left: `${((runtime.playerPosition!.x + .5) / scene.width) * 100}%`,
+                  top: `${((runtime.playerPosition!.y + .5) / scene.height) * 100}%`,
+                }}
+              >-{popup.amount}</span>
+            ))}
           </div>
         )}
         {scene?.type === 'DIALOGUE' && (
