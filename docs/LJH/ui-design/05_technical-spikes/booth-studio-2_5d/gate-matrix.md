@@ -111,7 +111,7 @@ D-05 canonical 15항 밖이다. `-480` 의 자체 판정이라 따로 둔다.
 | 텍스처가 런타임까지 도달 | **PASS** | GLB 내부 embed 확인 — 키오스크 `metallicRoughness` 1장, 의자 `baseColor`·`normal`·`metallicRoughness` 3장. 채널 재패킹 `A(smoothness)→G(1−roughness)·R(metallic)→B` 적용 | `!422` 이전에는 `AssetMesh` 가 계약 색으로 덮어써 **받은 텍스처를 버리고 있었다** |
 | Unity `.mat` ↔ 런타임 material | **PASS** | 대표 2종 모두 `baseColor`·`metalness`·`roughness` 값 일치 | 재현: `node tools/assets/parity-report.mjs` |
 | 8각도 시각 parity | **PASS** | 2026-09-08 실 Chrome — 대표 2종 `0·45·90·135·180·225·270·315` 전부. 키오스크는 배면 2단 선반까지, 의자는 등판 뒷면 색차까지 확인 ([parity §3·§4](../../06_visual-review/booth-studio-runtime-asset-parity.md)) | 캡처는 CDP 스크린샷이 아니라 `canvas.toDataURL()` 로 뽑는다 — `visibilityState: hidden` 을 타지 않는다(LJH T-56 우회) |
-| 다중 재질 보존 | **FAIL** | 키오스크 런타임 GLB 의 `materials` 가 1개. 원본은 `PlasticWhite.mat` + `Tablet.mat`(baseColor `Tablet.jpg`) + `AluminiumBrushed.mat` | 태블릿이 검은 화면 대신 흰 판이 된다. Compiler v2 범위 (LJH T-72) |
+| 다중 재질 보존 | **FAIL** | 키오스크 런타임 GLB 의 `materials` 가 1개. 원본은 `PlasticWhite.mat` + `Tablet.mat`(baseColor `Tablet.jpg`) + `AluminiumBrushed.mat` | 태블릿이 검은 화면 대신 흰 판이 된다. Compiler v2 범위 — `S15P21A604-527` (LJH T-72) |
 | Source(Unity Editor) 렌더 대조 | **NOT_OBTAINED** | — | 이 환경에 Unity Editor 가 없다. 원본 쪽 근거는 계약 AABB·`.mat`·원본 텍스처로 대신한다 |
 | normal map 화면 기여 | **NOT_TESTED** | — | Booth Studio 줌 상한 120%, 오브젝트 0.5 m 라 표면 요철을 분간할 수 없다 |
 
