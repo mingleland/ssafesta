@@ -19,8 +19,9 @@ assert_file "${game_compose}"
 assert_file "${back_compose}"
 assert_file "${ai_compose}"
 assert_contains "${base}" '^name: festa-dev$' 'dev must use the festa-dev Compose project'
-assert_contains "${base}" 'name: festa-dev-private' 'dev private network name is required'
-assert_contains "${base}" 'internal: true' 'dev network must be internal'
+assert_contains "${base}" 'name: festa-dev-ai-back-private' 'dev AI and backend shared network is required'
+assert_contains "${base}" 'name: festa-dev-front-private' 'dev front network is required'
+assert_contains "${base}" 'name: festa-dev-game-private' 'dev game network is required'
 
 for route in front api ai; do
   assert_contains "${ingress}" "location /__dev/${route}/" "missing dev ${route} route"
