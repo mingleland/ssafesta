@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
+import { getMyAgents } from '../../../entities/agent/api';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
@@ -78,6 +79,13 @@ export function BoothManagementOverlay({ onClose }: Props) {
     enabled: boothId !== null,
   });
 
+  // AI 직원 0개 또는 1개(C-13) — 요약 한 줄만 여기서 쓰고, 편집은 상세 화면(AgentManagementPage)에서
+  const agentQuery = useQuery({
+    queryKey: ['booth-agent', boothId],
+    queryFn: () => getMyAgents(boothId as number),
+    enabled: boothId !== null,
+  });
+
   // 관리 작업 화면으로 나간다. 그 화면들은 WORLD_RETURN_TO_MANAGEMENT 로 돌아오므로
   // World 에 도착하면 이 관리 화면이 다시 열린다(user-flow-decisions §18.3·§19).
   function go(path: string) {
@@ -124,6 +132,14 @@ export function BoothManagementOverlay({ onClose }: Props) {
 
     const lease = myBooth.lease;
     const expired = remainingMs(lease.endsAt, Date.now()) === 0;
+    const agent = agentQuery.data?.agents[0] ?? null;
+    const agentSummary = agentQuery.isLoading
+      ? '불러오는 중...'
+      : agentQuery.isError
+        ? '불러오지 못함 — 관리에서 다시 시도'
+        : agent === null
+          ? 'AI 직원 미설정'
+          : `${agent.name} · 문서 업로드 가능`;
 
     return (
       <div className="bm-body">
@@ -176,6 +192,11 @@ export function BoothManagementOverlay({ onClose }: Props) {
             label="CONSULTATION"
             summary="상담 요청 운영"
             onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
+          />
+          <SectionRow
+            label="AI 직원"
+            summary={agentSummary}
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/agent`)}
           />
         </div>
 
