@@ -293,7 +293,7 @@ namespace Festa.Diagnostics
             var nm = NetworkManager.Singleton;
 
             Sb.Clear();
-            Sb.Append("== PERF (F3 hide / F4 reset / F9 LOD / F10 merge) ==\n");
+            Sb.Append("== PERF ( [ hide / ] reset / ; LOD / ' merge ) ==\n");
 
             // ① 측정 조건 — 이게 없으면 스크린샷의 수치가 어느 조건인지 알 수 없다.
             Sb.Append(BuildConditionLines());

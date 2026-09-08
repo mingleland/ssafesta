@@ -102,8 +102,8 @@ namespace Festa.Diagnostics
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
             StartTimers();
             LogSystemReport();
-            Debug.Log($"[Bench] 준비 — F5 고정 포즈 A/B (포즈 {Poses.Length} × 구성 {ConfigNames.Length} " +
-                      $"× 반복 {_repeats}) / F12 사용 가능 통계 열거 / 역슬래시 프레임 간격 히스토그램. " +
+            Debug.Log($"[Bench] 준비 — 쉼표(,) 고정 포즈 A/B (포즈 {Poses.Length} × 구성 {ConfigNames.Length} " +
+                      $"× 반복 {_repeats}) / 마침표(.) 사용 가능 통계 열거 / 역슬래시(\\) 프레임 간격 히스토그램. " +
                       $"유효 타이머 {_timerNames.Count}개");
         }
 
@@ -388,7 +388,7 @@ namespace Festa.Diagnostics
                     Sb.AppendFormat("    → 병합−원본: p50 {0:+0.0;-0.0;0} ms, draws {1:+0;-0;0}\n", dP50, dDraw);
             }
             if (_timerNames.Count == 0)
-                Sb.AppendLine("  CPU 타이머: 이 기기에서 유효한 마커 없음 (F12 로 목록 확인)");
+                Sb.AppendLine("  CPU 타이머: 이 기기에서 유효한 마커 없음 (마침표(.) 로 목록 확인)");
             Debug.Log(Sb.ToString());
         }
 
@@ -449,7 +449,7 @@ namespace Festa.Diagnostics
             if (!PerfHud.ToolsEnabled) return;
             GUI.Label(new Rect(10f, Screen.height - 44f, 760f, 20f),
                 _running ? "FIXED-POSE BENCH RUNNING - camera is pinned, no input needed"
-                         : "F11 fixed-pose A/B  /  F12 list available profiler stats");
+                         : ",  fixed-pose A/B  /  .  list available profiler stats  /  \\  frame-interval histogram");
         }
     }
 }

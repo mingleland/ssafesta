@@ -78,7 +78,7 @@ namespace Festa.Diagnostics
         readonly List<string> _report = new List<string>();
         ProfilerRecorder _draws, _tris;
         bool _running;
-        string _status = "F9 sweep (16s, keep walking) / F11 light A/B (stand still)";
+        string _status = "/  sweep (16s, keep walking)   /   -  light A/B (stand still)";
 
         int _abIndex;
         static readonly float[] AbMultipliers = { 0f, 1f, 2f, 3f, 4f };   // 0 = 원본 90등
@@ -104,7 +104,7 @@ namespace Festa.Diagnostics
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
             Collect();
             Debug.Log($"[Probe] 준비 — 원본 90등 활성={_origDownActive}, 구역병합 18등 활성={_origMergedActive}, " +
-                      $"채택 배율 x{_adoptedMultiplier:F1}. F9=결정 스윕(16초, 걸으면서) / F11=조명 A/B(정지)");
+                      $"채택 배율 x{_adoptedMultiplier:F1}. 슬래시(/)=결정 스윕(16초, 걸으면서) / 마이너스(-)=조명 A/B(정지)");
             // 채택안이 씬에 반영돼 있어야 정상이다. 아니면 누가 되돌려 놓은 것이니 눈에 띄게 알린다.
             if (!_origMergedActive || _origDownActive)
                 Debug.LogWarning("[Probe] 조명이 채택안(구역병합 18등)과 다르다 — 회귀했는지 확인하라");
