@@ -11,6 +11,7 @@ def call() {
         script: "infra/jenkins/scripts/detect-changed-components.sh ${range}"
     ).trim()
     final Map selection = readJSON text: selectionText, returnPojo: true
+    sh 'mkdir -p artifacts/develop'
     writeFile file: 'artifacts/develop/selection.json', text: "${selectionText}\n"
     archiveArtifacts artifacts: 'artifacts/develop/selection.json', allowEmptyArchive: false, fingerprint: true
 
