@@ -12,6 +12,7 @@ Reference/
 *.p12
 *.key
 infra/environments/**/secrets/
+infra/jenkins/runtime/
 
 # OS
 .DS_Store

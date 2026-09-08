@@ -844,3 +844,67 @@ sudo docker exec festa-jenkins-agent-linux-docker \
 8. 성공·실패 결과를 Jira와 작업일지에 남긴다.
 
 자동화의 핵심은 새로운 명령을 만들어 내는 것이 아니라, 이 문서에서 수동으로 성공한 명령을 Jenkins Credential과 승인된 Deploy Agent 경계 안에서 그대로 실행하는 것이다.
+
+---
+
+## 12. dev 컴포넌트 자동 배포 적용 (2026-09-08)
+
+component pipeline은 다음 순서로 실행된다.
+
+```text
+validate → test → build → package → 단일 component release manifest
+→ rootless image content ID 검증 → rootful Docker 전달
+→ infra-002 component-only deploy → 격리·readiness 검증 → evidence 보관
+```
+
+### 12-1. EC2 Deploy Agent 입력
+
+`infra/.env`에 값만 추가한다. 실제 GID는 서버에서 조회하며 저장소에 고정하지 않는다.
+
+```bash
+DEPLOY_DOCKER_SOCKET_PATH=/var/run/docker.sock
+DEPLOY_DOCKER_GID="$(getent group docker | cut -d: -f3)"
+FESTA_DEPLOY_STATE_PATH=/opt/festa/deploy-state
+```
+
+상태 경로는 Deploy Agent 실행 UID만 쓸 수 있게 준비한다.
+
+```bash
+sudo install -d -o ubuntu -g ubuntu -m 0750 /opt/festa/deploy-state
+```
+
+Deploy Agent는 rootless socket을 이미지 원본으로, rootful socket을 배포 대상으로 사용한다. rootful socket 접근은 호스트 제어 권한이므로 Controller와 일반 빌드 Agent에는 주지 않는다.
+
+### 12-2. Agent 재적용과 확인
+
+```bash
+cd ~/festa/S15P21A604
+set -a
+. infra/versions.env
+. infra/.env
+set +a
+
+sudo --preserve-env docker compose \
+  --profile deploy \
+  -f infra/jenkins/agents/compose.yaml \
+  up -d --build deploy-agent
+
+sudo docker exec festa-jenkins-agent-deploy sh -lc '
+  docker --host "$BUILD_DOCKER_HOST" version --format "build={{.Server.Version}}"
+  docker version --format "deploy={{.Server.Version}}"
+'
+```
+
+두 daemon 버전이 나오고 Jenkins의 `deploy` node가 Online이어야 한다.
+
+### 12-3. component 브랜치 동기화 주의
+
+GitLab multibranch Job은 각 component 브랜치의 `Jenkinsfile`과 `infra/jenkins/`을 읽는다. 중앙 Pipeline 변경이 develop에 병합돼도 `ai`·`back`·`front`·`game` 브랜치에는 자동 반영되지 않는다. Job 실행 전에 해당 공용 Pipeline 경로를 develop 기준으로 동기화하고 별도 MR로 각 브랜치에 반영한다.
+
+실측은 Back Job부터 시작한다. 성공 기준은 다음과 같다.
+
+- 단일 Back release manifest 생성
+- 동일 content ID가 rootful Docker에 존재
+- `festa-dev-back-1` health `healthy`
+- AI·Front·Game, demo와 data container 재시작 횟수 무변경
+- Jenkins artifact에 `release-manifest.json`, `environment-verification.json`, `verification-result.json` 존재

@@ -8,10 +8,12 @@ tests=(
   infra/tests/integration/test-component-isolation.sh
   infra/tests/integration/test-deploy-freshness.sh
   infra/tests/integration/test-local-image-store.sh
+  infra/tests/integration/test-local-image-transfer.sh
+  infra/tests/integration/test-jenkins-dev-deploy.sh
 )
 for test in "${tests[@]}"; do bash "${repo_root}/${test}" | tee "${evidence}/$(basename "${test}").log"; done
-grep -q 'BuildWebGL' "${repo_root}/festa-unity/Assets/_Project/Editor/CI/CIBuild.cs"
-grep -q 'BuildLinuxServer' "${repo_root}/festa-unity/Assets/_Project/Editor/CI/CIBuild.cs"
+grep -q 'BuildWeb(' "${repo_root}/festa-unity/Assets/_Project/Scripts/Editor/CiBuild.cs"
+grep -q 'BuildServer(' "${repo_root}/festa-unity/Assets/_Project/Scripts/Editor/CiBuild.cs"
 grep -q "node('unity-6000.0.78f1')" "${repo_root}/infra/jenkins/pipelines/unity.groovy"
 grep -q "lock(resource: 'deploy-dev-game')" "${repo_root}/infra/jenkins/pipelines/unity.groovy"
 echo 'STATIC_GATE: Unity Editor/module/license execution remains SERVER-GATE' | tee "${evidence}/unity-gate.log"

@@ -15,6 +15,7 @@ jenkinsfile="${repo_root}/Jenkinsfile"
 integration_compose="${repo_root}/infra/deploy/compose/integration/compose.yaml"
 component_pipeline="${repo_root}/infra/jenkins/pipelines/component.groovy"
 develop_pipeline="${repo_root}/infra/jenkins/pipelines/develop.groovy"
+dev_deploy_adapter="${repo_root}/infra/jenkins/scripts/deploy-dev-component.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -27,6 +28,9 @@ pass "controller port and mount policy"
 grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must use host networking"
 grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
 grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
+grep -q 'BUILD_DOCKER_HOST: unix:///var/run/rootless-docker.sock' "${agent_compose}" || fail "deploy agent lacks rootless image source"
+grep -q 'DEPLOY_DOCKER_SOCKET_PATH' "${agent_compose}" || fail "deploy agent lacks explicit rootful Docker socket"
+grep -q 'DEPLOY_DOCKER_GID' "${agent_compose}" || fail "deploy agent lacks rootful Docker group"
 pass "rootless Docker Testcontainers network policy"
 
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
@@ -99,8 +103,15 @@ grep -q "string(credentialsId: springToAiCredentialId, variable: 'INTERNAL_SPRIN
   || fail "dev component pipeline does not bind Spring-to-AI token"
 grep -q "string(credentialsId: aiToSpringCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')" "${component_pipeline}" \
   || fail "dev component pipeline does not bind shared AI-to-Spring token"
-grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
+grep -q 'build-release-manifest.sh' "${component_pipeline}" || fail "dev component pipeline does not build a release manifest"
+grep -q 'infra/jenkins/scripts/deploy-dev-component.sh' "${component_pipeline}" || fail "dev component pipeline bypasses the deploy agent adapter"
+grep -q 'transfer-local-image.sh' "${dev_deploy_adapter}" || fail "deploy agent adapter does not transfer its image"
+grep -q 'infra/environments/scripts/deploy-environment.sh' "${dev_deploy_adapter}" || fail "deploy agent adapter bypasses infra-002 deployment"
+grep -q 'infra/environments/scripts/verify-environment.sh' "${dev_deploy_adapter}" || fail "deploy agent adapter bypasses infra-002 verification"
+grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/jenkins/scripts/deploy-dev-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
   || fail "dev game pipeline does not require the connection token Secret file reference"
+grep -q 'build-release-manifest.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
+  || fail "dev game pipeline does not build a release manifest"
 grep -q "file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'BACK_ENV_FILE')" "${develop_pipeline}" \
   || fail "demo pipeline does not bind backend runtime env file"
 grep -q "file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE')" "${develop_pipeline}" \
@@ -143,6 +154,9 @@ export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
 export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
 export JENKINS_AGENT_SECRET_UNITY="foundation-unity-agent-value"
+export DEPLOY_DOCKER_SOCKET_PATH="/var/run/docker.sock"
+export DEPLOY_DOCKER_GID="999"
+export FESTA_DEPLOY_STATE_PATH="/tmp/festa-foundation-deploy-state"
 export ROOT_DOMAIN="example.invalid"
 export DEV_BACK_ENV_CREDENTIAL_ID="foundation-dev-back-env"
 export DEV_AI_ENV_CREDENTIAL_ID="foundation-dev-ai-env"

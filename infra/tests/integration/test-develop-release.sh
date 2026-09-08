@@ -26,6 +26,14 @@ python "${script_dir}/../helpers/assert-json.py" "${RELEASE_MANIFEST_PATH}" \
   'len(document["components"]) == 4' \
   'set(item["name"] for item in document["components"]) == {"ai","back","front","game"}'
 
+export RELEASE_COMPONENTS=back RELEASE_ID="back-${commit}-1" RELEASE_MANIFEST_PATH="${work_dir}/back-release.json"
+bash "${repo_root}/infra/deploy/scripts/build-release-manifest.sh"
+python "${script_dir}/../helpers/assert-json.py" "${RELEASE_MANIFEST_PATH}" \
+  'len(document["components"]) == 1' \
+  'document["components"][0]["name"] == "back"'
+unset RELEASE_COMPONENTS
+export RELEASE_ID="develop-${commit}-1" RELEASE_MANIFEST_PATH="${work_dir}/release.json"
+
 cat >"${work_dir}/docker" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail

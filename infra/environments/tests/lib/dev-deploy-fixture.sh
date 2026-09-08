@@ -26,6 +26,8 @@ set -euo pipefail
 printf '%s\n' "$*" >>"${FAKE_DOCKER_LOG}"
 candidate="sha256:$(printf 'b%.0s' {1..64})"
 
+if [[ "${1:-}" == --host ]]; then shift 2; fi
+
 if [[ "${1:-} ${2:-}" == 'image inspect' ]]; then
   printf '%s\n' "${candidate}"
   exit 0
@@ -40,13 +42,20 @@ fi
 if [[ "${1:-} ${2:-}" == 'network inspect' ]]; then exit 0; fi
 if [[ "${1:-}" == ps ]]; then
   project=''
+  target_service=''
+  label_only=false
   for arg in "$@"; do
     [[ "${arg}" == label=com.docker.compose.project=* ]] && project="${arg##*=}"
+    [[ "${arg}" == label=com.docker.compose.service=* ]] && target_service="${arg##*=}"
+    [[ "${arg}" == *'.Label'* && "${arg}" != *'.Names'* ]] && label_only=true
   done
   for row in "${FAKE_DOCKER_STATE}/${project}"__*; do
     [[ -f "${row}" ]] || continue
     service="${row##*__}"
-    printf '%s|%s\n' "$(cut -d'|' -f1 "${row}")" "${service}"
+    [[ -z "${target_service}" || "${service}" == "${target_service}" ]] || continue
+    if [[ "${label_only}" == true ]]; then printf '%s\n' "${service}"
+    else printf '%s|%s\n' "$(cut -d'|' -f1 "${row}")" "${service}"
+    fi
   done
   exit 0
 fi

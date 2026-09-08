@@ -1,6 +1,11 @@
 def call(Map config = [:]) {
     String safeJob = env.JOB_NAME.replaceAll(/[^A-Za-z0-9_.-]/, '_')
-    withEnv(["CI_COMPONENT=game", "CI_BRANCH=game", "CI_COMMIT_SHA=${env.GIT_COMMIT}", "CI_RUN_ID=${safeJob}-${env.BUILD_NUMBER}"]) {
+    String safeRun = "${safeJob}-${env.BUILD_NUMBER}"
+    String releaseId = "game-${env.GIT_COMMIT}-${env.BUILD_NUMBER}"
+    String candidateStash = "dev-game-candidate-${safeRun}"
+    String evidenceStash = "dev-game-evidence-${safeRun}"
+    withEnv(["CI_COMPONENT=game", "CI_BRANCH=game", "CI_COMMIT_SHA=${env.GIT_COMMIT}", "CI_RUN_ID=${safeRun}",
+             'DEPLOY_TARGET=dev-game', "RELEASE_ID=${releaseId}"]) {
         node('unity-6000.0.78f1') {
             [['webgl','WebGL'], ['linux-server','Linux Server']].each { target ->
                 stage("Unity ${target[1]}") {
@@ -17,41 +22,49 @@ def call(Map config = [:]) {
                     }
                 }
             }
-            def meta
             stage('Unity Test and Package') {
                 ws("/home/jenkins/agent/unity/workspaces/${safeJob}/linux-server") {
                     withEnv(["CI_ARTIFACT_DIR=${pwd()}/artifacts/game"]) {
                         sh 'infra/jenkins/scripts/with-credentials.sh -- ci/test'
                         sh 'infra/jenkins/scripts/with-credentials.sh -- ci/package'
-                        meta = readJSON file: 'artifacts/game/image-metadata.json'
                     }
                 }
             }
-            stage('Deploy Game') {
+            stage('Create release manifest') {
                 ws("/home/jenkins/agent/unity/workspaces/${safeJob}/linux-server") {
-                    withEnv(["CI_ARTIFACT_DIR=${pwd()}/artifacts/game"]) {
-                            milestone ordinal: env.BUILD_NUMBER.toInteger()
-                            lock(resource: 'deploy-dev-game') {
-                                int fresh = sh(returnStatus: true, script: 'FRESHNESS_EXPECTED_SHA="$CI_COMMIT_SHA" infra/jenkins/scripts/freshness.sh')
-                                if (fresh == 75) { currentBuild.result = 'NOT_BUILT'; echo 'SUPERSEDED: newer game head exists'; return }
-                                if (fresh != 0) { error('game freshness check failed') }
-                                withEnv(["COMPOSE_FILE=infra/deploy/compose/dev/game.compose.yaml", 'COMPOSE_PROJECT=festa-dev-game', 'COMPOSE_SERVICE=game', "IMAGE_REF=${meta.imageRef}", "CONTENT_ID=${meta.contentId}"]) {
-                                    sh 'infra/jenkins/scripts/with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh'
-                                }
-                            }
-                    }
-                }
-            }
-            stage('Verify Game') {
-                ws("/home/jenkins/agent/unity/workspaces/${safeJob}/linux-server") {
-                    withEnv(["CI_ARTIFACT_DIR=${pwd()}/artifacts/game"]) {
-                            withEnv(["DEPLOY_TARGET=dev-game", "RELEASE_ID=game-${env.GIT_COMMIT}-${env.BUILD_NUMBER}", 'COMPONENT_VERIFY_COMMAND=docker compose --project-name festa-dev-game --file infra/deploy/compose/dev/game.compose.yaml ps --status running --services | grep -qx game']) {
-                                sh 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/verify-component.sh'
-                            }
+                    String provider = env.SCM_PROVIDER?.trim() ?: (env.GIT_URL?.contains('gitlab') ? 'gitlab' : 'github')
+                    withEnv(["CI_ARTIFACT_DIR=${pwd()}/artifacts/game", "RELEASE_MANIFEST_PATH=${pwd()}/artifacts/game/release-manifest.json",
+                             "SCM_PROVIDER=${provider}", "SCM_REPOSITORY=${env.GIT_URL}", 'SCM_BRANCH=game',
+                             "JENKINS_JOB=${env.JOB_NAME}", "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}",
+                             "JENKINS_BUILD_URL=${env.BUILD_URL}", 'RELEASE_COMPONENTS=game',
+                             "COMPONENT_METADATA_DIR=${pwd()}/artifacts/game/components"]) {
+                        sh '''mkdir -p "$COMPONENT_METADATA_DIR"
+cp "$CI_ARTIFACT_DIR/image-metadata.json" "$COMPONENT_METADATA_DIR/$CI_COMPONENT.json"
+infra/deploy/scripts/build-release-manifest.sh'''
+                        stash name: candidateStash, includes: 'artifacts/game/image-metadata.json,artifacts/game/release-manifest.json'
                     }
                 }
             }
         }
+        stage('Deploy and verify game') {
+            node('deploy') {
+                ws("/home/jenkins/agent/deploy/workspaces/${safeRun}/game") {
+                    checkout scm
+                    unstash candidateStash
+                    withEnv(["CI_ARTIFACT_DIR=${pwd()}/artifacts/game", "RELEASE_MANIFEST_PATH=${pwd()}/artifacts/game/release-manifest.json"]) {
+                        milestone ordinal: env.BUILD_NUMBER.toInteger()
+                        lock(resource: 'deploy-dev-game') {
+                            int fresh = sh(returnStatus: true, script: 'FRESHNESS_EXPECTED_SHA="$CI_COMMIT_SHA" infra/jenkins/scripts/freshness.sh')
+                            if (fresh == 75) { currentBuild.result = 'NOT_BUILT'; echo 'SUPERSEDED: newer game head exists'; return }
+                            if (fresh != 0) { error('game freshness check failed') }
+                            sh 'infra/jenkins/scripts/with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/jenkins/scripts/deploy-dev-component.sh'
+                        }
+                    }
+                    stash name: evidenceStash, includes: 'artifacts/game/**'
+                }
+            }
+        }
+        unstash evidenceStash
     }
 }
 return this

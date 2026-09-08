@@ -8,17 +8,28 @@ set -euo pipefail
 
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 metadata_paths=()
-for component in ai back front game; do
+read -r -a release_components <<<"${RELEASE_COMPONENTS:-ai back front game}"
+[[ ${#release_components[@]} -gt 0 ]] || { echo 'RELEASE_COMPONENTS must not be empty' >&2; exit 64; }
+declare -A seen_components=()
+for component in "${release_components[@]}"; do
+  [[ "${component}" =~ ^(ai|back|front|game)$ ]] || { echo "invalid release component: ${component}" >&2; exit 64; }
+  [[ -z "${seen_components[${component}]:-}" ]] || { echo "duplicate release component: ${component}" >&2; exit 64; }
+  seen_components["${component}"]=1
   path="${COMPONENT_METADATA_DIR}/${component}.json"
   [[ -f "${path}" ]] || { echo "missing component metadata: ${component}" >&2; exit 66; }
   metadata_paths+=("$(native "${path}")")
 done
 output_native="$(native "${RELEASE_MANIFEST_PATH}")"
+component_names="$(IFS=,; echo "${release_components[*]}")"
 
-python - "${output_native}" "${metadata_paths[@]}" <<'PY'
+python - "${output_native}" "${component_names}" "${metadata_paths[@]}" <<'PY'
 import datetime,json,os,pathlib,sys
 components=[]
-for expected,path in zip(('ai','back','front','game'),sys.argv[2:]):
+expected_components=sys.argv[2].split(',')
+paths=sys.argv[3:]
+if len(expected_components) != len(paths):
+    raise SystemExit('component metadata count mismatch')
+for expected,path in zip(expected_components,paths):
     item=json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
     required={'component','sourceCommit','storageMode','imageRef','contentId'}
     missing=required-set(item)

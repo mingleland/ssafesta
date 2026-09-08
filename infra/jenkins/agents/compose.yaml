@@ -57,9 +57,18 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      BUILD_DOCKER_HOST: unix:///var/run/rootless-docker.sock
+      ENVIRONMENT_STATE_DIR: /var/lib/festa-deploy/environments
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
+    group_add:
+      - ${DEPLOY_DOCKER_GID:?set in infra/.env}
     volumes:
       - deploy_workspace:/home/jenkins/agent/deploy
-      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/rootless-docker.sock
+      - ${DEPLOY_DOCKER_SOCKET_PATH:?set in infra/.env}:/var/run/docker.sock
+      - ${FESTA_DEPLOY_STATE_PATH:-/opt/festa/deploy-state}:/var/lib/festa-deploy
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
 
   unity-agent:
     <<: *agent
