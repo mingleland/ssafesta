@@ -35,6 +35,14 @@ const TYPE_LABEL: Record<SurveyQuestionType, string> = {
 
 const ADDABLE: SurveyQuestionType[] = ['single', 'multi', 'rating', 'short_text', 'long_text', 'application'];
 
+// 응답 시각 표시 — 상태는 wire ISO 원형을 들고 있고 형식으로 바꾸는 것은 여기 한 곳이다.
+// 저장소에 공유 날짜 util 이 없어 다른 화면들과 같은 관례(인라인 Intl.DateTimeFormat)를 따른다.
+function respondedAt(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' }).format(
+    new Date(iso),
+  );
+}
+
 function BuilderTab({ boothId }: { boothId: number }) {
   const state = useSurveyBuilder();
 
@@ -200,7 +208,16 @@ function ResultTab({ boothId }: { boothId: number }) {
 
   return (
     <div className="mg-result">
-      <p className="sc-note">전체 응답 {state.totalResponses}건</p>
+      <p className="sc-note">
+        전체 응답 {state.totalResponses}건
+        {/* spec 010 US2 시나리오 1 — 응답 수와 함께 최초·최근 응답 시각을 보인다 */}
+        {state.firstRespondedAt !== null && state.lastRespondedAt !== null && (
+          <>
+            {' · '}최초 {respondedAt(state.firstRespondedAt)}
+            {' · '}최근 {respondedAt(state.lastRespondedAt)}
+          </>
+        )}
+      </p>
       {state.perQuestion.map((agg) => (
         <section key={agg.questionId} className="sc-card mg-agg">
           {agg.kind === 'choice' ? (
@@ -257,8 +274,11 @@ function ResultTab({ boothId }: { boothId: number }) {
         <section className="sc-card">
           <span className="sc-section-title">주관식 답변</span>
           <ul className="mg-texts">
-            {state.textAnswers.items.map((t, i) => (
-              <li key={i}>{t}</li>
+            {state.textAnswers.items.map((a, i) => (
+              // 같은 문항에 같은 답이 있을 수 있어 index 를 함께 쓴다 — responseId 는 Port 에 없다
+              <li key={`${a.questionId}-${i}`}>
+                <span className="sc-note">문항 {a.questionId}</span> {a.text}
+              </li>
             ))}
           </ul>
           {state.textAnswers.hasNext && (

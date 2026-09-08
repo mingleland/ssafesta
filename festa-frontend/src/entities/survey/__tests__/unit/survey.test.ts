@@ -150,8 +150,8 @@ describe('toResultSnapshot (§7)', () => {
   const result: SurveyResultWire = {
     surveyId: 12,
     totalResponses: 20,
-    firstRespondedAt: null,
-    lastRespondedAt: null,
+    firstRespondedAt: '2026-09-08T04:11:02Z',
+    lastRespondedAt: '2026-09-08T07:55:40Z',
     perQuestion: [
       { questionId: 101, type: 'SINGLE_CHOICE', answeredCount: 18, counts: [{ optionId: 1001, label: '월드', count: 11 }], average: null, distribution: [] },
       { questionId: 102, type: 'RATING', answeredCount: 20, counts: [], average: 4.2, distribution: [{ value: 5, count: 9 }] },
@@ -159,6 +159,19 @@ describe('toResultSnapshot (§7)', () => {
     ],
     textAnswers: { content: [{ responseId: 55, questionId: 103, text: '무대 일정 안내가…' }], page: 0, size: 20, totalElements: 12, totalPages: 1 },
   };
+
+  // spec 010 US2 시나리오 1 이 "전체 응답 수·최초·최근 응답 시각" 표시를 인수 조건으로 요구한다
+  it('최초·최근 응답 시각을 ISO 원형 그대로 옮긴다', () => {
+    const s = toResultSnapshot(result);
+    expect(s.firstRespondedAt).toBe('2026-09-08T04:11:02Z');
+    expect(s.lastRespondedAt).toBe('2026-09-08T07:55:40Z');
+  });
+
+  it('응답 0건이면 두 시각이 null 로 남는다 — 상태에서 문자열로 치환하지 않는다', () => {
+    const s = toResultSnapshot({ ...result, totalResponses: 0, firstRespondedAt: null, lastRespondedAt: null });
+    expect(s.firstRespondedAt).toBeNull();
+    expect(s.lastRespondedAt).toBeNull();
+  });
 
   it('텍스트 유형은 거르고 answeredCount 를 싣는다 — 비율의 분모다', () => {
     const snapshot = toResultSnapshot(result);
@@ -187,9 +200,10 @@ describe('toResultSnapshot (§7)', () => {
 
 describe('toTextAnswerPage (§8)', () => {
   const page = (over: Partial<SurveyTextPageWire>): SurveyTextPageWire => ({
+    // 문항 두 개를 섞는다 — 하나뿐이면 questionId 유실이 드러나지 않는다
     content: [
       { responseId: 1, questionId: 103, text: 'a' },
-      { responseId: 2, questionId: 103, text: 'b' },
+      { responseId: 2, questionId: 104, text: 'b' },
     ],
     page: 0,
     size: 2,
@@ -198,9 +212,17 @@ describe('toTextAnswerPage (§8)', () => {
     ...over,
   });
 
-  it('content 에서 본문만 꺼내고 hasNext 는 page + 1 < totalPages 다', () => {
-    expect(toTextAnswerPage(page({}))).toEqual({ items: ['a', 'b'], page: 0, hasNext: true });
+  it('hasNext 는 page + 1 < totalPages 다', () => {
+    expect(toTextAnswerPage(page({})).hasNext).toBe(true);
     expect(toTextAnswerPage(page({ page: 2 })).hasNext).toBe(false);
+  });
+
+  // text 만 남기면 텍스트 문항이 둘 이상인 설문에서 어느 질문의 답인지 복구할 수 없다 (#133)
+  it('questionId 를 버리지 않는다 — 서버 wire id 를 string 으로 담는다', () => {
+    expect(toTextAnswerPage(page({})).items).toEqual([
+      { questionId: '103', text: 'a' },
+      { questionId: '104', text: 'b' },
+    ]);
   });
 });
 
