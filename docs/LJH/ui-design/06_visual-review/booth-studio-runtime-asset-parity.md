@@ -1,6 +1,6 @@
 # Runtime Asset Visual Parity — 기록
 
-> **STATUS: 8각도 시각 parity 확보 · 재질 축약 1건 미해소**
+> **STATUS: 8각도 시각 parity 확보 · 다중 재질 보존 확보**
 >
 > 갱신: 2026-09-08 · Jira `S15P21A604-480`
 > 절차·서식: [`04_prototypes/booth-studio-runtime-asset-compiler.md`](../04_prototypes/booth-studio-runtime-asset-compiler.md) §9
@@ -20,7 +20,7 @@ Runtime Asset Compiler v1 이 대표 2종을 실제로 굽고, 그 산출물이 
 | 텍스처 채널 도달 | **확보** — GLB 내부 embed 확인 |
 | 런타임 렌더 정상성 | **확보** — 대표 2종 8각도 전부 실 Chrome 에서 봤다 |
 | 8각도 실루엣 | **확보** — §3·§4 의 evidence 이미지 |
-| 다중 재질 보존 | **미확보** — 키오스크가 재질 1개로 축약된다(§3) |
+| 다중 재질 보존 | **확보** — `-527` 로 키오스크 재질 3종이 살아난다(§3) |
 | Source(Unity Editor) 렌더 | **`NOT_OBTAINED`** — 이 환경에 Unity Editor 가 없다 |
 
 `NOT_OBTAINED` 는 "안 됐다" 가 아니라 **"이 환경에서 얻을 수 없다"** 다. 없는 비교를 지어 쓰지 않는다(§1 원칙).
@@ -115,22 +115,36 @@ GLB factor   metallic 0 · roughness 0.5
 
 prefab override 가 `m_LocalPosition (0, 0.9233265, 0.02)` 이고 회전이 눕혀서, 태블릿은 상판 위에 **평평히 놓인다**(0.173 × 0.26 × 0.0043 m). 상판이 0.9255 m 이므로 계약 Y 오차 4.5 mm 와도 맞는다. 화면에서는 상판 위 옅은 사각 자국으로만 보인다.
 
-**known difference — 다중 재질이 단일 재질로 축약된다.**
+**다중 재질은 보존된다 (`-527` 로 해소).**
 
-원본은 재질이 여럿이다. `Tablet.prefab` 은 `Tablet.mat`(baseColor = `Tablet.jpg`, 화면 이미지)과 `AluminiumBrushed.mat` 을 쓰고, 카운터는 `PlasticWhite.mat` 을 쓴다. 그런데 런타임 GLB 의 `materials` 는 **1개**다 — 자산 설정이 대표 `.mat` 하나(`PlasticWhite.mat`)를 asset 전체 재질로 옮긴다.
+처음에는 런타임 GLB 의 `materials` 가 **1개**였다. 컴파일러가 첫 재질로 몰고 나머지를 dispose 했기 때문이다. 그래서 태블릿이 검은 화면 대신 **흰 판**이 됐다(LJH T-72).
 
-결과: 태블릿이 검은 화면이 아니라 **흰 판**이 된다. 키오스크를 키오스크로 읽게 하는 단서가 바로 그 화면이므로, 형상이 맞아도 "설문 키오스크로 안 보인다"는 인상이 여기서 나온다. 형상 결함이 아니라 **재질 파이프라인의 범위 문제**다 (LJH T-72).
+지금은 원본 셋이 그대로 구워진다.
+
+| 런타임 재질 | 원본 | 텍스처 |
+|---|---|---|
+| `Tablet.mat` | 태블릿 화면 | `baseColor` **38,688 B 389×550 → 1,126 B webp** · `metallicRoughness` |
+| `AluminiumBrushed.mat` | 프레임·손잡이 | `metallicRoughness` 3,391,024 → 7,218 B |
+| `PlasticWhite.mat` | 카운터 본체 | `metallicRoughness` 3,386,787 → 7,392 B |
+
+primitive → material 분포도 `{0:1, 1:1, 2:1}` 로 갈린다. 원본의 재질 슬롯 구성은 fileID 단위로 대조했다 — `SurveyKiosk` 가 `Counter01` 의 Default-Material renderer(`&23014050457739150`) 두 슬롯만 `PlasticWhite` 로 덮고, `AluminiumBrushed` renderer(`&23299921322947628`)와 `Tablet` 은 **덮지 않는다.**
+
+![상판 위 태블릿 — 재질 보존 후](evidence/527-kiosk-tablet-material.webp)
+
+상판과 구분되는 색으로 보인다. `-527` 이전에는 같은 자리가 흰 판이었다(위 `480-kiosk-tablet-top.webp`).
+
+**대가는 바이트다** — GLB 15,536 → **27,408 B**(+76%). 텍스처가 1장에서 4장으로 늘어난 값이다. 자산 coverage 를 넓힐 때 예산을 다시 본다.
 
 ```text
 source render          NOT_OBTAINED   (Unity Editor 없음)
 runtime render         0·45·90·135·180·225·270·315  전부 확인
 
 silhouette result      PASS      (8각도 모두 카운터 형상 · 배면 선반까지 원본 계층과 일치)
-material result        PARTIAL   (대표 .mat 값은 일치하나 원본의 다중 재질이 1개로 축약)
+material result        PASS      (원본 3종이 이름·텍스처까지 런타임에 살아 있다 — -527)
 thumbnail result       NOT_ASSESSED  (팔레트가 아직 thumbnail 을 소비하지 않는다)
 
-known differences      Tablet.mat · AluminiumBrushed.mat 가 유실되어 태블릿이 흰 판이 된다
-판정                   PARTIAL
+known differences      없음
+판정                   PASS_CANDIDATE
 ```
 
 ## 4. 기록 — FURNITURE_CHAIR02_WHITE
@@ -207,7 +221,7 @@ Unity Editor 가 없어 source render 를 못 얻는다. 대신 **원본 파일�
 
 ## 6. 남은 것
 
-1. **다중 재질 보존** — 자산 하나가 재질 하나로 축약된다. 키오스크 태블릿의 화면 텍스처가 이 때문에 사라진다(§3, LJH T-72). Compiler v2 범위 — **`S15P21A604-527`** 로 추적
+1. ~~다중 재질 보존~~ — **해소됨**(`S15P21A604-527`). 키오스크 재질 3종이 살아난다(§3)
 2. **normal map 기여 판정** — Booth Studio 줌 상한이 120% 라 0.5 m 오브젝트의 표면 요철을 분간할 수 없다. 더 큰 화면 또는 별도 뷰어가 필요하다
 3. **thumbnail** — manifest 와 FE 타입에는 있으나 팔레트가 소비하지 않는다. asset coverage 부족 + 라이선스 게이트 때문에 **의도적으로 defer**(gate-matrix 참조)
 
@@ -216,13 +230,13 @@ Unity Editor 가 없어 source render 를 못 얻는다. 대신 **원본 파일�
 ## 7. 판정
 
 ```text
-SURVEY_KIOSK_DEFAULT       PARTIAL          (형상 PASS · 재질 축약 미해소)
+SURVEY_KIOSK_DEFAULT       PASS_CANDIDATE
 FURNITURE_CHAIR02_WHITE    PASS_CANDIDATE
-Runtime Asset Compiler v1  PARTIAL 유지
+Runtime Asset Compiler v1  PASS_CANDIDATE
 ```
 
 **의자는 올린다.** 8각도 실루엣이 전부 정상이고 `baseColor` 가 부위별로 화면에 도달하는 것을 눈으로 확인했다. `PASS` 가 아니라 `PASS_CANDIDATE` 인 이유는 하나 — normal map 의 화면 기여를 이 밀도에서 분리하지 못했고, 그것을 `known differences` 에 적어 두었기 때문이다.
 
-**키오스크는 올리지 않는다.** 형상은 8각도 전부 원본 계층과 맞지만 재질이 1개로 축약되어 태블릿 화면이 사라진다. 이것은 확인 범위의 문제가 아니라 **재현되지 않은 원본 속성**이므로 `PARTIAL` 이 맞다.
+**키오스크도 올린다.** 형상은 8각도 전부 원본 계층과 맞고, 마지막까지 남았던 재질 축약이 `-527` 로 해소돼 원본 3종이 살아난다.
 
-**Compiler v1 은 `PARTIAL` 을 유지한다** — 대표 2종 중 하나가 `PARTIAL` 이다. 다음에 막는 것은 사람이 화면을 보는 일이 아니라 **재질 파이프라인 범위**다(§6-1).
+**Compiler v1 도 `PASS_CANDIDATE` 로 올린다.** `PASS` 가 아닌 이유는 두 자산 공통으로 하나 — normal map 의 화면 기여를 이 밀도에서 분리하지 못했다(§6-2). 그것 말고 `known differences` 는 비어 있다.
