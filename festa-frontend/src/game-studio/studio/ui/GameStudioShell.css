@@ -221,6 +221,48 @@
 .gss-panel-divider::after { background: var(--gss-border); bottom: 0; content: ''; left: 50%; position: absolute; top: 0; transform: translateX(-50%); width: 1px; }
 .gss-panel-divider:hover::after,
 .gss-panel-divider:active::after { background: var(--gss-blue); width: 2px; }
+/* S15P21A604-522 — 접혔을 때는 패널 자체가 없어 화면에서 이 구분선이 사실상 유일한
+   경계 표시라, 평소(1px/hover 2px)보다 훨씬 두꺼운 선(5px)으로 존재감을 준다. */
+.gss-panel-divider--collapsible.is-collapsed::after { width: 5px; }
+.gss-panel-divider--collapsible.is-collapsed:hover::after,
+.gss-panel-divider--collapsible.is-collapsed:active::after { width: 5px; }
+/* S15P21A604-522 — 우측 구분선 위에 얹은 접기/펼치기 버튼. 구분선이 이미 position:relative라
+   버튼을 절대 위치로 세로 중앙에 두면, 사용자가 구분선을 드래그해 폭을 조절할 때도 버튼이
+   구분선과 함께 자동으로 움직인다(별도 좌표 계산 불필요). 배경을 확실한 불투명 색+테두리+
+   그림자로 줘서, hover 시 뒤의 구분선 파란 하이라이트가 버튼과 겹쳐 비쳐 보이지 않게 한다. */
+.gss-panel-collapse-toggle {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--gss-border);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(15,23,42,.18);
+  color: var(--gss-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 15px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  z-index: 26;
+}
+/* S15P21A604-522 — --gss-blue-soft는 불투명 배경 위에 겹쳐 쓰라고 만든 반투명(10%) 파란색
+   (rgba(37,99,235,.1))이다. hover 시 background를 이걸로 통째로 바꿔버리면 밑에 깔려 있던
+   흰색이 사라지고 10% 알파만 남아 거의 다 비쳐 보인다 — 불투명한 옅은 파란색을 직접 쓴다. */
+.gss-panel-collapse-toggle:hover { background: #e5efff; border-color: var(--gss-blue); color: var(--gss-blue); }
+/* S15P21A604-522 — 접힌 상태에서는 구분선 오른쪽에 실체가 있는 패널이 없어(폭 0), 가운데
+   정렬(left:50%)이면 버튼 절반이 그 빈 공간(사실상 화면 바깥)으로 넘어가 클릭 영역의
+   절반이 잘려 보인다. 접혔을 때만 구분선의 오른쪽 끝에 붙여서 버튼 전체가 캔버스 쪽
+   (화면 안)에 들어오게 한다. */
+.gss-panel-divider--collapsible.is-collapsed .gss-panel-collapse-toggle {
+  left: auto;
+  right: 0;
+  transform: translateY(-50%);
+}
 .gss-root.is-focus-mode .gss-layout { grid-template-columns: minmax(0,1fr); }
 .gss-root.is-focus-mode .gss-left-sidebar,
 .gss-root.is-focus-mode .gss-right-sidebar,

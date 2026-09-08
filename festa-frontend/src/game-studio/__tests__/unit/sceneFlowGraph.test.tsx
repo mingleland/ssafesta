@@ -37,8 +37,11 @@ const setup = () => {
   return { container };
 };
 
-const panelHeadingText = (container: HTMLElement): string | null => (
-  container.querySelector('.gss-panel-heading h2')?.textContent ?? null
+// S15P21A604-522 — DIALOGUE 씬은 우측 속성/이벤트/데이터 패널이 기본적으로 접혀 있어
+// 더 이상 항상 뜨는 신호가 아니다(패널이 접히면 .gss-panel-heading 자체가 렌더링되지
+// 않는다). 씬 이동 자체는 좌측 씬 목록의 활성(is-active) 행으로 확인한다.
+const activeSceneName = (container: HTMLElement): string | null => (
+  container.querySelector('.gss-scene-row button.is-active strong')?.textContent ?? null
 );
 
 const openFlowGraph = () => fireEvent.click(screen.getByRole('button', { name: '🔀 게임 흐름' }));
@@ -70,7 +73,7 @@ describe('GameStudioShell — 씬 흐름 그래프(실험)', () => {
     fireEvent.click(targetNode);
 
     expect(container.querySelector('.gss-floating-panel')).not.toBeNull();
-    expect(panelHeadingText(container)).toBe('사서와 대화');
+    expect(activeSceneName(container)).toBe('사서와 대화');
   });
 
   it('"게임 흐름" 버튼을 다시 누르거나 닫기(×) 버튼을 누르면 닫힌다', () => {
