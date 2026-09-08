@@ -1,9 +1,18 @@
 // Survey 응답 상태 기계 (S15P21A604-368) — UI 는 useSurveyRun() 과 액션만 소비한다.
 // 진입은 openOverlay('SURVEY', ...) intent 이후 — Unity SURVEY 이벤트 계약은 미정의라 배선 없음.
 import { useSyncExternalStore } from 'react';
+import { isApiError } from '../../../shared/api/client';
 import { surveyApi } from '../../../entities/survey/api.select';
 import { isEmptyAnswer } from '../../../entities/survey/mapper';
 import type { SurveyAnswerValue, SurveyQuestionVM, SurveyRunStatus } from '../../../shared/contracts/survey';
+
+/**
+ * 서버가 준 사용자용 문장만 꺼낸다. 오류 봉투가 아니면(네트워크 실패 등) `null` 이고
+ * 그때는 화면이 일반 문구를 쓴다 — 없는 문장을 지어내지 않는다.
+ */
+function userMessageOf(error: unknown): string | null {
+  return isApiError(error) ? error.message : null;
+}
 
 export interface SurveyRunState {
   status: SurveyRunStatus;
@@ -16,8 +25,20 @@ export interface SurveyRunState {
   questions: SurveyQuestionVM[];
   answers: Record<string, SurveyAnswerValue>;
   progress: { current: number; total: number };
-  /** rewardedCoin = 실제 지급된 코인. 성공 전에는 null */
-  submit: { phase: 'idle' | 'submitting' | 'success' | 'error'; rewardedCoin: number | null };
+  /**
+   * rewardedCoin = 실제 지급된 코인. 성공 전에는 null.
+   *
+   * errorMessage 는 **서버가 준 사용자용 문장**이다. `docs/08` §1.3-1 이
+   * *"사용자에게 보여줄 문장은 봉투 최상위 message 가 담는다"* 로 규정한 그 값이라 화면이
+   * 그대로 쓴다. 이것을 버리면 `409 SURVEY_ALREADY_RESPONDED`("이미 응답한 설문입니다")가
+   * "다시 시도해 주세요" 로 뭉개져 **재시도해도 성공하지 않는 오류에 재시도를 권하게 된다**
+   * (S15P21A604-541). `null` 은 서버 문장이 없다는 뜻이고 그때만 화면이 일반 문구를 쓴다.
+   */
+  submit: {
+    phase: 'idle' | 'submitting' | 'success' | 'error';
+    rewardedCoin: number | null;
+    errorMessage: string | null;
+  };
 }
 
 const initialState: SurveyRunState = {
@@ -28,7 +49,7 @@ const initialState: SurveyRunState = {
   questions: [],
   answers: {},
   progress: { current: 0, total: 0 },
-  submit: { phase: 'idle', rewardedCoin: null },
+  submit: { phase: 'idle', rewardedCoin: null, errorMessage: null },
 };
 
 let state: SurveyRunState = initialState;
@@ -84,7 +105,7 @@ export function setAnswer(questionId: string, value: SurveyAnswerValue): void {
   setState({
     answers,
     progress: { current: Object.keys(answers).length, total: state.questions.length },
-    submit: { phase: 'idle', rewardedCoin: null },
+    submit: { phase: 'idle', rewardedCoin: null, errorMessage: null },
   });
 }
 
@@ -109,14 +130,16 @@ export function canSubmit(): boolean {
 export async function submitSurveyRun(): Promise<void> {
   if (!canSubmit() || state.surveyId === null) return;
   const surveyId = state.surveyId;
-  setState({ submit: { phase: 'submitting', rewardedCoin: null } });
+  setState({ submit: { phase: 'submitting', rewardedCoin: null, errorMessage: null } });
   try {
     const result = await surveyApi.submitAnswers(surveyId, state.answers);
     if (state.surveyId !== surveyId) return;
-    setState({ submit: { phase: 'success', rewardedCoin: result.rewardedCoin } });
-  } catch {
+    setState({ submit: { phase: 'success', rewardedCoin: result.rewardedCoin, errorMessage: null } });
+  } catch (error) {
     if (state.surveyId !== surveyId) return;
-    setState({ submit: { phase: 'error', rewardedCoin: null } });
+    setState({
+      submit: { phase: 'error', rewardedCoin: null, errorMessage: userMessageOf(error) },
+    });
   }
 }
 
