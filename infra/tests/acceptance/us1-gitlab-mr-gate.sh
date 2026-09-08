@@ -38,6 +38,8 @@ job '.component-ci' | grep -Fq 'command -v python3' || fail 'CI summary runtime 
 check_gate front 'festa-frontend/**/*'
 echo 'PASS: front-only MR gate'
 check_gate back 'backend/**/*'
+job 'back-test' | grep -Fq 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' \
+  || fail 'back-test Testcontainers host override'
 echo 'PASS: back-only MR gate'
 
 for jira_job in jira-key-check jira-sync-in-progress jira-sync-in-review jira-sync-ready-for-deploy; do
