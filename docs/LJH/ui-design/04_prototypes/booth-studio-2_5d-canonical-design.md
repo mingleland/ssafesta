@@ -466,30 +466,38 @@ Facade           외부 완성형 에셋 1개 선택
 ### 12-2. representation 이원화 — identity 는 하나다
 
 ```text
-assetCode                  동일             ← 이것이 identity 다
+assetCode                  동일                      ← 이것이 identity 다
 Unity World representation Unity 원본 prefab
-React representation       preview GLB(강한 simplify) + thumbnail
+React representation       렌더 이미지 (thumbnail + preview WebP)
 ```
 
-이원화 비용(두 표현이 달라 보일 수 있다)보다 웹 경량화 이득이 크다고 판단했다 — Facade 는
-정밀 편집 대상이 아니라 **어떤 부스인지 알아보면 되는** 대상이라서다. 내부 Booth 자산에는
-이 판단을 적용하지 않는다(그쪽은 배치 정확도가 계약이다).
+**React 쪽을 3D 로 두지 않는다**(§12-A-6). Facade 는 선택 UI 라 3D 가 목적이 아니고,
+렌더 이미지가 품질·비용·위험 세 축에서 모두 낫다. 내부 Booth 자산에는 이 판단을 적용하지
+않는다 — 그쪽은 배치·회전이 있어 실시간 3D 가 필수다.
 
-### 12-3. 로딩 — 18종을 한꺼번에 받지 않는다
+`assetCode` 는 하나다. 파일명·GUID·별도 UI id 를 서비스 identity 로 만들지 않는다.
+
+### 12-3. 로딩 — 실측 (§12-A-5)
 
 ```text
-목록 열기       thumbnail 18장만          95 KB   (실측)
-후보 클릭       그 자산의 preview GLB     평균 268 KB · 최대 903 KB
-두 번째 클릭    브라우저 HTTP 캐시        이미 받은 것은 재요청 없음
+목록 열기       thumbnail 256 px WebP 16장     86 KB
+후보 클릭       그 자산의 preview 512 px       평균 14 KB
+두 번째 클릭    브라우저 HTTP 캐시             재요청 없음
+16종 전량       222 KB                         ← 3D 최소안 7.62 MB 의 1/34
 World 적용      Unity 원본 (웹으로 안 나간다)
 ```
+
+WebGL 컨텍스트도 GLTF 파싱도 없다. `<img>` 하나다.
 
 ### 12-4. Selection UI 최소 데이터
 
 ```text
-필수   assetCode · displayName · thumbnail · previewUrl · locked
-선택   category(그룹 4종: 게임 부스 · 독립 부스 · 노점 · 카트)
+필수   assetCode · displayName · thumbnailUrl · previewImages[] · locked · group
+선택   3D 를 쓰게 되면 previewGlbUrl 추가 (지금은 넣지 않는다)
 ```
+
+`previewImages[]` 를 배열로 두는 것은 뷰를 늘릴 여지를 남기기 위해서다. **지금은 3/4 사선
+1장으로 시작한다** — front·side 가 선택 정확도를 올린다는 근거가 아직 없다.
 
 편집 metadata(objectType · typeDefault · 배치용 bounds)는 **넣지 않는다.** Facade 는 배치
 대상이 아니라 선택 대상이라 그 필드가 의미를 갖지 않는다 — Booth Interior entry 와 분리한다(§13).
@@ -577,99 +585,132 @@ map 제거    25~32% 감축 (normal + metallicRoughness 를 다 빼야 이만큼
 (§12-A-6 판정 기준 2번) 얻는 것이 절반이라 하지 않는다. 선택 UI 의 카드와 한 번의 미리보기에
 512 는 과하다.
 
-### 12-A-5. 확정 — Facade preview 정책
+### 12-A-5. 표현 방식 총조사 — 무엇으로 보여줄 것인가
+
+`0.25/256` 을 정본화하기 전에 **Facade 를 React 에서 어떤 방식으로 보여줄지 자체**를 다시 물었다.
+질문은 하나다 — *"완제품 선택 UI 라는 전제에서, 실제 외관을 가장 충실히 보여주면서 구현·로딩·
+유지비가 가장 낮은 방식은 무엇인가."*
+
+#### Ground Truth — Compiler 산출물끼리 비교하지 않는다
+
+지금까지 "원본" 이라 부른 것은 `ratio 1.0` **산출물**이었고 그것도 flatten·join·weld·quantize·
+텍스처 재인코딩을 다 거친 뒤였다. 그 기준으로는 Compiler 자체의 손실을 볼 수 없다.
 
 ```text
-geometry   ratio 0.25          AABB 가 두 최악 표본 모두에서 완전히 유지되는 마지막 지점
-texture    maxSize 256         512 대비 62~66% 감축. map 은 전부 유지
-thumbnail  256 px webp         실측 평균 5.3 KB
-게이트     AABB 유지            원본 대비 각 축 5% 초과 축소면 그 자산은 ratio 를 올린다
+node tools/assets/facade-ground-truth.mjs
+  prefab → three → GLTFExporter → GLB     transform 0회 · quantize 0회
+  재질 → 원본 텍스처 파일 경로 JSON        리사이즈·재인코딩 0회
+  브라우저가 원본 PNG 를 직접 붙여 렌더
 ```
 
-**tri 상한을 숫자로 박지 않는다.** 상한을 정하면 그 숫자를 맞추려고 AABB 가 무너진 자산도
-통과시키게 된다. 판정은 `ratio` 와 AABB 게이트가 한다.
+**한계** — 이 장비에 Unity Editor 가 없다(`ProjectVersion 6000.0.78f1`, Hub 미설치). 그래서
+GT 는 "Unity 렌더" 가 아니라 **"같은 FBX·같은 텍스처를 Compiler 없이 그린 것"** 이다. URP Lit
+셰이더의 표현까지 재현하지는 않는다.
 
-`texture 256` 은 T-80 복구 후 다시 검증했다(§12-A-6) — 256 과 2048 의 육안 차이가 없다.
+#### 후보와 실측
 
-### 12-A-6. 품질 판정 기준 — 내부 자산과 다르다
+7종(고리던지기·물총사격·사탕노점·퍼넬케이크·팝콘카트·점집·매표소) × 6조합.
+근거: `06_visual-review/evidence/facade-gt-vs-candidates-2026-09-08.png`
+
+| | 7종 합계 | 16종 추정 |
+|---|---|---|
+| GT (무변환) | 48.93 MB | 111.8 MB |
+| A `0.25/256` | 3.33 MB | 7.62 MB |
+| B1 `0.25/512` | 3.80 MB | 8.68 MB |
+| B2 `0.25/1024` | 5.35 MB | 12.23 MB |
+| B4 `0.5/1024` | 7.49 MB | 17.13 MB |
+| **C 이미지** thumb 256 | **38 KB** | **86 KB** |
+| **C 이미지** preview 512 q80 | **97 KB** | **222 KB** |
+| C 이미지 preview 768 q80 | 175 KB | 400 KB |
+
+#### 육안 판정 (GT 대비 5점 만점)
 
 ```text
-1  전체 실루엣이 원본과 구별 가능
-2  색·재질의 주요 인상이 유지
-3  "어떤 외부 부스인지" 즉시 식별 가능
-4  대표 장식·간판·구조가 사라지지 않음
-5  작은 장식 디테일 손실은 허용
+고리던지기 · 물총사격 · 사탕노점 · 퍼넬케이크 · 점집 · 매표소
+  A(0.25/256) 부터 이미 GT 와 구별이 어렵다                          5점
+
+팝콘 카트
+  A · B1 · B2  바퀴 살이 사라지고 테두리만 남는다                    3점
+  B4(0.5)      바퀴 살 복원                                          5점
+  C 이미지     GT 렌더 그대로라 선명                                 5점
 ```
 
-내부 Booth 자산의 기준(형상·치수 정확도)을 여기 적용하지 않는다.
-
-**R3F 실렌더 검증 — 1차 판정 취소 후 재검증 (2026-09-08)**
-
-1차 판정(*"색·재질 인상 PASS · texture 256 px PASS"*)은 **텍스처가 아예 안 붙은 렌더로 나온
-것**이라 취소했다(LJH T-80 — `prune()` 이 UV 를 지우고 있었다). 파이프라인 복구 후 다시 쟀다.
-
-근거: `06_visual-review/evidence/facade-revalidate-uv-fixed-2026-09-08.png`
+**두 가지가 갈렸다.**
 
 ```text
-ratio 1.0 / 512 px   ↔   ratio 0.25 / 256 px      7종 대조
+texture 해상도(256 → 1024)   육안 차이를 거의 만들지 않는다
+geometry ratio(0.25 → 0.5)   얇은 구조(바퀴 살)를 좌우한다
 ```
 
-| 판정 기준 | 결과 |
-|---|---|
-| 주요 색 구성 | 유지 — 줄무늬·간판·천막 패턴이 두 쪽 다 같다 |
-| 간판·그래픽 | 유지 |
-| 재질 인상(목재·금속·천) | 유지 |
-| 대표 장식 | 유지 |
-| 같은 외관으로 즉시 식별 | 가능 |
-| 예외 | 팝콘 카트 바퀴 살 — 0.25 에서 테두리만 남는다(작은 geometry 손실, 허용) |
+즉 지금까지 조정해 온 축(텍스처)이 품질 변수가 아니었고, 실제 변수는 geometry 였다.
 
-**`geometry 0.25` · `texture 256 px` 를 확정한다.** 근거가 이번에는 텍스처가 실제로 렌더된
-화면이다.
-
-### 12-A-6-a. UV 얼룩 — 경량화 정책과 무관하다
-
-사탕 노점 파라솔·퍼넬 케이크 하단에 얼룩이 보인다. 원인을 4단 비교로 갈랐다.
+#### 로딩 실측
 
 ```text
-ratio 1.0 / 512 px    얼룩 있음
-ratio 1.0 / 256 px    얼룩 있음   ← 해상도를 낮춰도 같다
-ratio 0.25 / 256 px   얼룩 있음   ← 감축과 무관하다
+목록 7종 thumbnail    18 ms ·   38 KB      (16종 환산 86 KB)
+선택 1회 이미지 512    6 ms ·   18 KB
+선택 1회 3D GLB(A)    25 ms · 1,192 KB     ← 같은 자산에서 66배
+3D 전량 7종           69 ms ·   3.33 MB
 ```
 
-`FACADE_STAND_CANDY_APPLE` 을 **256 · 512 · 1024 · 2048 px** 네 단계로 구워 나란히 봤다.
-근거: `06_visual-review/evidence/facade-texture-size-256-2048-2026-09-08.png`
+로컬 서버라 **시간 차는 의미가 작다** — 실제 지표는 바이트다.
 
-**네 단계가 전부 같다.** 2048 px(원본 해상도 그대로)에서도 얼룩이 그대로다.
+### 12-A-6. 최종 판정 — 이미지 방식(C)
+
+| 축 | A `0.25/256` | B `고품질 GLB` | **C 이미지** | D Hybrid |
+|---|---|---|---|---|
+| Visual fidelity | 4 (팝콘 3) | 4~5 | **5 (GT 그대로)** | 5 |
+| 목록 초기 로드 | 85 KB | 85 KB | **86 KB** | 86 KB |
+| 선택 1회 | 268 KB 평균 | 500~1,100 KB | **14 KB 평균** | 14 KB + 선택 시 GLB |
+| 16종 총량 | 7.62 MB | 12~17 MB | **222 KB** | 222 KB + on-demand |
+| Runtime | WebGL 컨텍스트·GLTF 파싱·메모리 | 동상, 더 큼 | **`<img>`** | 조건부 |
+| 구현 복잡도 | R3F 뷰어 + manifest | 동상 | **이미지 태그** | 둘 다 |
+| 유지비 | prefab 변경 → 컴파일·재질·UV·확장 전부 재검증 | 동상 | **렌더 1회** | 둘 다 |
+| Unity–R3F parity 위험 | 높다(T-78·T-79·T-80 이 전부 이 경로) | 높다 | **없다(같은 렌더가 산출물)** | 남는다 |
+| 자동화 | 있음 | 있음 | **있음** | 있음 |
+| 모바일 | WebGL 부담 | 더 큼 | **가볍다** | 조건부 |
+| 판정 | CONDITIONAL | FAIL(비용 대비 이득 없음) | **PASS** | CONDITIONAL |
+
+**C 를 1순위로 권고한다.** 근거는 셋이다.
 
 ```text
-texture resize 문제      아니다 — 2048 에서도 동일
-geometry ratio 문제      아니다 — 1.0 에서도 동일
-R3F 샘플링 문제          아니다 — 모든 변형에서 동일
+① 품질이 가장 높다        GT 렌더 자체가 산출물이라 정의상 parity 가 100% 다
+② 비용이 압도적으로 작다   16종 222 KB. 3D 최소안(7.62 MB)의 1/34
+③ 위험이 사라진다         이번 회차에 잡은 결함 T-78·T-79·T-80 이 전부 GLB 변환 경로에서 났다.
+                          이미지 방식에는 그 경로가 없다
 ```
 
-남은 후보는 **원본 UV/텍스처 조합** 또는 **FBX UV 해석**이다. 실측한 사실:
+**D(Hybrid)는 지금 채택하지 않는다.** 3D 상세가 필요하다는 사용자 근거가 없다 — Facade 는
+"이 외관으로 하실래요?" 에 답하는 화면이고, 회전이 선택 오류를 줄인다는 실측이 없다. 필요해지면
+`previewGlbUrl` 을 추가하는 것으로 나중에 붙일 수 있다(§13).
+
+**B 는 탈락**이다. 용량이 2~5배 늘지만 A 대비 육안 이득이 팝콘 바퀴 살 하나뿐이고, 그것도
+이미지 방식이면 공짜로 해결된다.
+
+**A 는 3D 를 반드시 써야 할 이유가 생겼을 때의 보험**으로 남긴다 — 그때는 `ratio` 를 자산
+크기별로 갈라(작은 자산 0.5) 팝콘 문제를 없애야 한다.
+
+### 12-A-6-a. UV 얼룩 — 원본 쪽이다 (확정)
+
+사탕 노점 파라솔·퍼넬 케이크 하단 얼룩이 **GT(무변환)에도 그대로 있다.**
+`256·512·1024·2048 px` 전부, `ratio 1.0/0.5/0.25` 전부 동일하다.
 
 ```text
-원본 텍스처    2048×2048 아틀라스. 파라솔·줄무늬 패널이 촘촘한 UV 섬으로 배치돼 있다
-               (evidence/carnivalkit-atlas-source-2026-09-08.png)
-UV 채널        uv · uv1 두 세트. baseColor 는 uv(첫 세트)를 쓴다
-UV 범위        mesh 9개가 **전부 0~1 전 범위**. 각자 아틀라스 전체를 덮는다
-tiling/offset  scale(1,1) · offset(0,0) — 타일링 아님
+texture resize    아니다
+geometry ratio    아니다
+R3F 샘플링        아니다
+Compiler 변환     아니다   ← GT 가 배제한다
 ```
 
-**여기서 더 좁히려면 Unity 에서 같은 prefab 을 띄워 봐야 한다** — 원본이 원래 그렇게 보이는지,
-아니면 FBX UV 해석이 어긋난 것인지는 이 세션에서 가를 수 없다. `§21` 에 남긴다.
+원본은 2048² 아틀라스인데 mesh 들이 UV 0~1 전 범위를 쓴다. tiling 은 `(1,1)/(0,0)`.
+**남은 것은 원본 UV 조합 자체이거나 FBX UV 해석**인데, 이미지 방식에서는 **GT 렌더가 곧
+산출물이라 이 얼룩이 새로 생기지 않는다** — 원본에 있는 그대로 나간다. 우선순위가 내려간다.
 
-**이 얼룩은 경량화 정책의 근거가 되지 않는다.** 정책을 어떻게 잡아도 같은 그림이 나온다.
+### 12-A-6-b. Emission / AO
 
-### 12-A-6-b. Emission / AO 미지원
-
-Compiler 가 소비하는 채널은 baseColor · normal · metallicRoughness 셋이다. CarnivalKit 재질에는
-`_EmissionMap`·`_OcclusionMap` 도 있다.
-
-**선택 UI 화면에서 눈에 띄는 차이를 못 찾았다** — 간판·장식이 baseColor 로 충분히 읽힌다.
-MVP 범위에서 억지로 확장하지 않는다. 발광이 정체성인 자산(네온 간판 등)이 후보에 들어오면
-그때 최소 지원안을 낸다.
+Compiler 는 baseColor·normal·metallicRoughness 3채널만 소비하고 CarnivalKit 에는
+`_EmissionMap`·`_OcclusionMap` 도 있다. GT 대조에서 **눈에 띄는 차이를 못 찾았다.**
+이미지 방식에서는 렌더 시점에 필요하면 붙일 수 있으므로 Compiler 확장 자체가 불필요하다.
 
 ### 12-A-7. 18종 전체 — 추정이 아니라 실컴파일
 
@@ -754,30 +795,24 @@ pivot(바닥에서 뜸)   Compiler 가 바닥 중앙으로 맞춘다 — prefab 
 }
 ```
 
-Facade entry 는 **편집 metadata 를 갖지 않는다**(§12-4). 배치 대상이 아니라 선택 대상이라
-`objectType`·`typeDefault` 가 의미를 갖지 않는다.
+Facade entry 는 **편집 metadata 도 3D metadata 도 갖지 않는다**(§12-4). 배치 대상이 아니라
+선택 대상이고, 표현이 이미지라 `bytes`·`triangles`·`bounds`·`materials` 가 의미를 갖지 않는다.
 
 ```jsonc
 {
   "assetCode": "FACADE_BOOTH_RING_TOSS",
   "domain": "FACADE",
-  "url": "FACADE_BOOTH_RING_TOSS.glb",      // preview 전용 — Unity World 는 원본을 쓴다(§12-2)
-  "thumbnail": "FACADE_BOOTH_RING_TOSS.webp",
-  "bytes": 924264,
-  "triangles": 45452,
-  "bounds": { "min": [...], "max": [...] },
-  "materials": [ ... ],
-  "booth": null,
-  "facade": {
-    "displayName": "고리 던지기",
-    "group": "game",                         // game · booth · stand · cart (§12-4)
-    "preview": { "simplifyRatio": 0.25, "maxTextureSize": 256 }   // 어떻게 줄였는지 남긴다
-  }
+  "thumbnailUrl": "FACADE_BOOTH_RING_TOSS_thumb.webp",   // 256 px · 약 5 KB
+  "previewImages": [
+    { "url": "FACADE_BOOTH_RING_TOSS_512.webp", "width": 512, "view": "iso" }
+  ],
+  "facade": { "displayName": "고리 던지기", "group": "game" },
+  "booth": null
 }
 ```
 
-`facade.preview` 는 **재현용 기록**이다. 나중에 정책을 바꿀 때 어느 자산이 어떤 설정으로
-구워졌는지 파일에서 바로 읽히지 않으면 전량 재컴파일 말고는 확인할 방법이 없다.
+**사용하지 않는 3D 필드를 Facade 에 억지로 넣지 않는다.** 나중에 3D 상세가 필요해지면
+`previewGlbUrl` 하나를 더하는 것으로 끝난다.
 
 `uiCategory` 는 **넣지 않는다**(§10-2). `domain` 은 기술 분류라 넣는다.
 
@@ -832,13 +867,11 @@ thumbnail 소비   **없음** — 이번 §10 에서 연결한다
 
 ```text
 Booth interior   8종 합계 373.8 KB. 24종으로 늘려도 ~1.2 MB, 전량 동시 로드는 없다
-Facade           18종 원본 791,006 tri → preview 203,679 tri (ratio 0.25)
-                 preview GLB 합계 4.72 MB · 평균 268 KB · 최대 903 KB
-                 thumbnail 합계 95 KB — 목록 첫 로드가 이것뿐이다
+Facade           렌더 이미지 — 16종 thumbnail 86 KB · preview 512 px 합계 222 KB
+                 3D 최소안(0.25/256 GLB 7.62 MB)의 1/34
 ```
 
-정책과 실측 근거는 §12-A. **자산 전량을 동시에 받는 경로는 설계에 없다** — 목록은 thumbnail,
-preview 는 사용자가 고른 하나다.
+Facade 표현 방식 판정과 실측 근거는 §12-A-5·§12-A-6. **전량을 동시에 받는 경로는 설계에 없다.**
 
 ## 18. 기존 mock migration
 
@@ -891,17 +924,17 @@ spec 012 장식 범위(P1, 2차 MVP) 구현. item_type 문자열 확정 필요
 
 ```text
 P0  최종 설계 문서                     ✔ 이 문서
-P1  canonical assetCode 표 확정         ✔ §8. Unity 전달용 계약표는 §8-7
-P2  Asset Library 구조 구현             ✔ -551. manifest consumer · thumbnail · FAMILY 그룹
-P3  Booth Template 모델 + 초기 UI       ✔ -551. 실제 assetCode 기반
-P6  Facade 경량화 실험                  ✔ -552. 정책 확정 §12-A-5, 18종 실측 §12-A-7
-P4  Manifest v2                         Compiler + FE 타입. facade 블록 포함
-P5  build-time pipeline                 §15
-P7  Facade Selection UI                 19-2 합의 후. 필요 데이터는 §12-4
+P1  canonical assetCode 표 확정         ✔ §8. Unity 전달용 계약표는 §8-7 (#146 전달 완료)
+P2  Asset Library 구조 구현             ✔ -551
+P3  Booth Template 모델 + 초기 UI       ✔ -551
+P6  Facade 표현 방식 결정               ✔ -552. 렌더 이미지 채택 §12-A-6
+P4  Facade 이미지 생성 파이프라인        GT 렌더러를 build-time 으로 (§15)
+P5  Manifest v2                         facade 는 이미지 블록 (§13)
+P7  Facade Selection UI                 §12-4 최소 데이터. 19-2 합의 후 저장
 ```
 
-**P6 을 P4 보다 먼저 했다** — Manifest v2 의 `facade` 블록에 무엇을 담을지가 경량화 정책에
-달려 있었다. 정책 없이 스키마를 먼저 박으면 실측 뒤에 다시 고치게 된다.
+**P6 이 P4·P5 를 바꿨다** — Facade 가 이미지가 되면서 GLB 파이프라인·3D manifest 필드가
+필요 없어졌다. Booth Interior 의 R3F·Compiler 경로는 **그대로 둔다**(그쪽은 실시간 3D 가 계약이다).
 
 ## 21. 완료 기준 / 미결정
 
@@ -919,15 +952,14 @@ production       dist 에 자산이 실려 나간다
 
 ```text
 ① 계약 assetCode 범위 확장 (§19-1)          3파트 합의
-② FURNITURE·DECORATION 타입 기본 통일 (§8-4) Unity 기준 채택안 통보 필요
-③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX).
-                                             원본 수정 vs 목록 제외 — authoring 판단
-④ UV 얼룩의 최종 원인 (§12-A-6-a)            resize·ratio·R3F 는 배제했다. 원본 UV 인지
-                                             FBX UV 해석인지는 Unity 실행이 필요하다
+② FURNITURE·DECORATION 타입 기본 통일 (§8-4) #146 으로 통보 완료, Unity 회신 대기
+③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX)
+④ Facade 이미지 생성의 실행 위치             현재 GT 렌더러는 헤드리스 브라우저를 쓴다.
+                                             CI 에서 돌릴지, Unity Editor 툴로 옮길지 (§15)
 ⑤ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
 ⑥ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
 ```
 
-**Facade visual parity 는 해소됐다.** T-80(prune 이 UV 를 지움)을 고친 뒤 복구된 파이프라인
-기준으로 재검증해 `geometry 0.25 + texture 256 px` 를 확정했다(§12-A-6). 남은 것은 경량화와
-무관한 UV 얼룩 하나뿐이다.
+**Facade 표현 방식·감축 정책은 더 이상 미결정이 아니다** — §12-A-6 에서 렌더 이미지로
+확정했다. UV 얼룩(§12-A-6-a)은 원본 쪽이고 이미지 방식에서는 새로 생기지 않으므로
+우선순위를 내렸다.
