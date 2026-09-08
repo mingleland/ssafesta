@@ -25,7 +25,6 @@ from app.api.errors import ApiError, api_error_handler
 from app.api.v1.conversations import get_conversation_service, get_stream_service, router
 from app.core.auth import AuthenticatedMember, require_member
 from app.repositories.conversation_repository import ConversationRepository
-from app.services.capacity_service import CapacityService
 from app.services.conversation_service import ConversationService
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.providers.llm import LLMRequest
@@ -99,17 +98,6 @@ def _harness(*, ttl_seconds: int = 1800, no_ready: bool = False):
     app = FastAPI()
     app.add_exception_handler(ApiError, api_error_handler)
     app.include_router(router, prefix="/ai/v1")
-    app.state.capacity_service = CapacityService(
-        redis=redis,
-        user_concurrency_limit=1,
-        user_question_limit=5,
-        user_question_window_seconds=60.0,
-        agent_concurrency_limit=5,
-        global_concurrency_limit=20,
-        queue_capacity=30,
-        queue_wait_seconds=10.0,
-        active_lease_ttl_seconds=90.0,
-    )
     app.dependency_overrides[require_member] = lambda: _MEMBER
     app.dependency_overrides[get_conversation_service] = lambda: conversation_service
     app.dependency_overrides[get_stream_service] = lambda: stream_service

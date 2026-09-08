@@ -17,7 +17,6 @@ from app.clients.spring_agent_config import SpringAgentConfigClient
 from app.core.config import settings
 from app.core.redis import create_redis_client
 from app.providers.factory import create_embedding_provider, create_llm_provider
-from app.services.capacity_service import CapacityService
 from app.workers.document_task_supervisor import DocumentTaskSupervisor
 
 
@@ -54,17 +53,6 @@ def create_app() -> FastAPI:
         processor=document_orchestrator.run,
         max_concurrency=settings.document_worker_max_concurrency,
     )
-    capacity_service = CapacityService(
-        redis=redis,
-        user_concurrency_limit=settings.rate_limit_user_concurrency,
-        user_question_limit=settings.rate_limit_user_question_limit,
-        user_question_window_seconds=settings.rate_limit_user_question_window_seconds,
-        agent_concurrency_limit=settings.rate_limit_agent_concurrency,
-        global_concurrency_limit=settings.rate_limit_global_concurrency,
-        queue_capacity=settings.rate_limit_queue_capacity,
-        queue_wait_seconds=settings.rate_limit_queue_wait_seconds,
-        active_lease_ttl_seconds=settings.rate_limit_active_lease_ttl_seconds,
-    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
@@ -91,7 +79,6 @@ def create_app() -> FastAPI:
     app.state.llm_provider = llm_provider
     app.state.document_task_supervisor = document_task_supervisor
     app.state.agent_config_provider = agent_config_provider
-    app.state.capacity_service = capacity_service
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.include_router(api_v1_router, prefix="/ai/v1")

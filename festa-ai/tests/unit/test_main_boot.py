@@ -80,17 +80,6 @@ def test_app_uses_real_spring_agent_config_client(
     assert main.app.state.agent_config_provider._client is main.app.state.spring_http_client
 
 
-def test_app_wires_capacity_service_from_settings(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    _set_env(monkeypatch, tmp_path)
-    main = _fresh_app_module()
-
-    from app.services.capacity_service import CapacityService
-
-    assert isinstance(main.app.state.capacity_service, CapacityService)
-
-
 def test_import_crashes_on_invalid_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
