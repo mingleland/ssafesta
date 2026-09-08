@@ -1,16 +1,29 @@
-/* World·OverlayFrame 톤 재사용 — 새 팔레트를 만들지 않는다 */
-.dev-ai-page {
-  position: relative;
+/* DEV ONLY — AiChatOverlay(features/ai/ui/aiChatOverlay.css, overlayFrame.css)와 클래스·값을
+   공유하지 않는다. 독립 화면이라 여기서 바뀌어도 목업 쪽엔 영향이 없다. */
+.dac-entry,
+.dac-screen {
+  --dac-bg: #141a52;
+  --dac-panel: rgba(19, 24, 44, 0.94);
+  --dac-border: rgba(255, 255, 255, 0.12);
+  --dac-text: #eaeefb;
+  --dac-text-muted: #9aa2c2;
+  --dac-accent: #4d8dff;
+  --dac-danger: #ef5d6c;
+  --dac-font: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
   min-height: 100vh;
+  background: var(--dac-bg);
+  color: var(--dac-text);
+  font-family: var(--dac-font);
+}
+
+.dac-entry {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #141a52;
-  color: #eaeefb;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+  position: relative;
 }
 
-.dev-ai-badge {
+.dac-badge {
   position: fixed;
   top: 16px;
   left: 16px;
@@ -24,7 +37,7 @@
   padding: 5px 12px;
 }
 
-.dev-ai-panel {
+.dac-entry-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -32,69 +45,137 @@
   width: min(360px, 88vw);
   padding: 28px 26px;
   border-radius: 18px;
-  background: rgba(19, 24, 44, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--dac-panel);
+  border: 1px solid var(--dac-border);
   box-shadow: 0 26px 80px rgba(4, 6, 20, 0.62);
   backdrop-filter: blur(10px);
   text-align: center;
 }
 
-.dev-ai-title {
-  font-size: 16px;
+.dac-entry-title { font-size: 16px; }
+.dac-entry-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--dac-text-muted); }
+.dac-entry-fields { display: flex; gap: 10px; width: 100%; }
+.dac-entry-field { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--dac-text-muted); text-align: left; }
+.dac-entry-field input {
+  height: 36px; padding: 0 10px; border-radius: 10px;
+  border: 1px solid var(--dac-border); background: rgba(255, 255, 255, 0.05);
+  color: var(--dac-text); font-family: inherit; font-size: 13.5px;
 }
-
-.dev-ai-note {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.55;
-  color: #9aa2c2;
+.dac-entry-field input:focus { outline: none; border-color: var(--dac-accent); }
+.dac-entry-cta {
+  width: 100%; height: 42px; border-radius: 999px; border: none;
+  background: var(--dac-accent); color: #fff; font-family: inherit;
+  font-size: 14px; font-weight: 700; cursor: pointer;
 }
+.dac-entry-cta:hover { filter: brightness(1.08); }
 
-.dev-ai-fields {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-}
-
-.dev-ai-field {
-  flex: 1;
+/* ---- 화면 2·3 공용 골격 (전체 화면, Overlay 모달이 아니다) ---- */
+.dac-screen {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 11px;
-  color: #9aa2c2;
-  text-align: left;
+  height: 100vh;
 }
 
-.dev-ai-field input {
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #eaeefb;
-  font-family: inherit;
-  font-size: 13.5px;
-}
-
-.dev-ai-field input:focus {
-  outline: none;
-  border-color: #4d8dff;
-}
-
-.dev-ai-cta {
-  width: 100%;
-  height: 42px;
+.dac-back {
+  align-self: flex-start;
+  margin: 14px 0 0 16px;
+  background: transparent;
+  border: 1px solid var(--dac-border);
+  color: var(--dac-text-muted);
   border-radius: 999px;
-  border: none;
-  background: #4d8dff;
-  color: #fff;
+  padding: 6px 12px;
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 12px;
   cursor: pointer;
 }
 
-.dev-ai-cta:hover {
-  filter: brightness(1.08);
+.dac-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 16px;
+  border-bottom: 1px solid var(--dac-border);
+}
+.dac-head-title { font-size: 14px; font-weight: 700; }
+.dac-head-status { margin-left: auto; font-size: 11px; color: var(--dac-text-muted); font-family: ui-monospace, monospace; }
+
+.dac-thread {
+  flex-grow: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.dac-empty { color: var(--dac-text-muted); font-size: 13px; text-align: center; margin-top: 40px; }
+
+.dac-turn { display: flex; gap: 9px; max-width: 82%; }
+.dac-turn-user { align-self: flex-end; flex-direction: row-reverse; }
+.dac-turn-agent { align-self: flex-start; }
+.dac-role {
+  width: 26px; height: 26px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #2f6bff, #7a5cff); color: #fff;
+  font-size: 10px; font-weight: 800;
+}
+.dac-bubble {
+  padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.6;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--dac-border);
+  white-space: pre-wrap;
+}
+.dac-turn-user .dac-bubble { background: var(--dac-accent); border-color: var(--dac-accent); color: #fff; }
+.dac-caret {
+  display: inline-block; width: 7px; height: 13px; margin-left: 2px;
+  background: var(--dac-accent); vertical-align: text-bottom; animation: dac-blink 0.9s steps(1) infinite;
+}
+@keyframes dac-blink { 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) { .dac-caret { animation: none; } }
+.dac-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.dac-chip {
+  font-size: 10.5px; color: var(--dac-text-muted); background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--dac-border); border-radius: 999px; padding: 3px 9px;
+}
+.dac-error {
+  margin-top: 8px; color: var(--dac-danger); font-size: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.dac-retry {
+  border: 1px solid rgba(239, 93, 108, 0.45); background: rgba(239, 93, 108, 0.14); color: #ff9aa5;
+  border-radius: 999px; padding: 3px 10px; font-size: 11px; font-family: inherit; cursor: pointer;
+}
+
+.dac-composer {
+  display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--dac-border);
+  max-width: 720px; width: 100%; margin: 0 auto;
+}
+.dac-input {
+  flex-grow: 1; height: 38px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--dac-border); background: rgba(255, 255, 255, 0.05);
+  color: var(--dac-text); font-family: inherit; font-size: 13.5px;
+}
+.dac-input:focus { outline: none; border-color: var(--dac-accent); }
+.dac-send {
+  height: 38px; padding: 0 16px; border-radius: 10px; border: none;
+  background: var(--dac-accent); color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.dac-send:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- 게스트 게이트 ---- */
+.dac-gate {
+  flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; text-align: center; padding: 0 20px;
+}
+.dac-gate-icon {
+  width: 52px; height: 52px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(77, 141, 255, 0.14); color: var(--dac-accent);
+}
+.dac-gate-title { font-size: 17px; }
+.dac-gate-copy { margin: 0; font-size: 13px; color: var(--dac-text-muted); max-width: 32ch; }
+.dac-gate-cta {
+  height: 40px; padding: 0 20px; border-radius: 999px; border: none;
+  background: var(--dac-accent); color: #fff; font-weight: 700; font-size: 13.5px;
+  font-family: inherit; cursor: pointer; margin-top: 6px;
 }
