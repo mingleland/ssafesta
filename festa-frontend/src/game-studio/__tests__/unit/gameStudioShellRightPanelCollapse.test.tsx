@@ -30,7 +30,6 @@ const GAME_ID = 522;
 
 // starter project(createStarterProject.ts) 씬 구성: '도서관 입구'(TOP_DOWN, 시작 씬),
 // '사서와 대화'(DIALOGUE·OVERLAY), '도서관 밖으로'(DIALOGUE·FULL_SCREEN).
-const MAP_SCENE_NAME = '도서관 입구';
 const DIALOGUE_SCENE_NAME = '사서와 대화';
 const OTHER_DIALOGUE_SCENE_NAME = '도서관 밖으로';
 
