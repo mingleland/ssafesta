@@ -150,3 +150,90 @@ describe('reference web runtime — currentInteractionTarget(S15P21A604-532)', (
     expect(currentInteractionTarget(project, runtime)?.id).toBe('leverNoPrompt');
   });
 });
+
+// S15P21A604-534 — INTERACTABLE 컴포넌트에 range를 두어 상호작용 가능 거리를 오브젝트별로
+// 조정한다. 방향 무관 맨해튼 거리(|dx|+|dy|)로 판정하고, range 미지정 시 기본값 1이다.
+describe('reference web runtime — INTERACTABLE range(S15P21A604-534)', () => {
+  const buildProjectWithRangedObject = (range: number | undefined) => {
+    const original = createStarterProject(534);
+    return parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        // librarian(7,4)/libraryKeyObject(10,4)/lockedDoor(8,1)과 안 겹치는 자리(3,3)에
+        // 별도 오브젝트를 둬서 이 describe 블록의 판정만 단독으로 시험한다.
+        objects: [...scene.objects, {
+          id: 'rangedSign',
+          preset: 'INTERACTABLE' as const,
+          position: { x: 3, y: 3 },
+          visible: true,
+          components: [{ type: 'INTERACTABLE' as const, prompt: '표지판 읽기', ...(range === undefined ? {} : { range }) }],
+        }],
+      }),
+    });
+  };
+
+  it('range를 넘는 정면 거리에서는 잡히지 않는다', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3)에서 맨해튼 거리 3인 (3,6)에서 위를 보고 있음(범위 밖).
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 6 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+
+  it('range 이내의 정면 거리에서는 잡힌다', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3)에서 맨해튼 거리 2인 (3,5)에서 위를 보고 있음(범위 안).
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 5 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('대각선 방향도 맨해튼 거리로 판정된다(방향 무관)', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3) 기준 dx=1,dy=1인 (4,4) — 맨해튼 거리 2. 플레이어가 그쪽을 보고 있지 않아도
+    // (facing과 무관하게) 반경 판정이라 잡혀야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 4, y: 4 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('range를 지정하지 않으면 기본값 1이고, 방향과 무관하게 인접 칸이면 잡힌다', () => {
+    const project = buildProjectWithRangedObject(undefined);
+    // (3,3) 바로 왼쪽(2,3)에서 아래를 보고 있음 — 예전 로직이면 "정면"이 아니라서
+    // 상호작용이 안 됐겠지만, 이번 변경은 방향 무관 반경 1이라 잡혀야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 2, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('range를 지정하지 않은 기본값 1을 넘는 거리에서는 여전히 잡히지 않는다', () => {
+    const project = buildProjectWithRangedObject(undefined);
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 1, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+
+  it('INTERACTABLE 컴포넌트가 없는(이벤트 전용) 오브젝트는 range 판정의 영향을 받지 않고 기존(정면 한 칸)대로 동작한다', () => {
+    const original = createStarterProject(534);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        objects: [...scene.objects, {
+          id: 'leverNoPrompt',
+          preset: 'INTERACTABLE' as const,
+          position: { x: 3, y: 3 },
+          visible: true,
+          components: [],
+        }],
+        events: [...scene.events, {
+          id: 'pullLever',
+          trigger: { type: 'ON_INTERACT' as const, targetId: 'leverNoPrompt' },
+          conditions: [],
+          actions: [{ type: 'SET_VARIABLE' as const, variableId: 'doorOpened', value: true }],
+        }],
+      }),
+    });
+    // 옆(2,3)에서 아래를 보고 있음 — INTERACTABLE 컴포넌트가 있었다면(위 테스트처럼)
+    // 방향 무관 반경 1로 잡히겠지만, 이벤트 전용 오브젝트는 여전히 "정면"만 인정하므로
+    // 옆에 서서 다른 방향을 보고 있으면 잡히지 않아야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 2, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+});
