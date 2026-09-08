@@ -49,6 +49,25 @@
 .grp-static-sprite { background-repeat: no-repeat; display: block; height: 31px; image-rendering: pixelated; width: 31px; }
 .grp-player { filter: drop-shadow(0 5px 5px rgba(0,0,0,.7)); height: 56px; transition: left .1s linear,top .1s linear; width: 56px; z-index: 5; }
 .grp-player .gss-sprite-preview { transform: scale(.9); }
+/* S15P21A604-526 — 캐릭터(.grp-player)와 같은 left/top(%)에 놓고, 여기서 오른쪽 위로
+   오프셋한 뒤 위로 계속 이동하며 페이드아웃하는 애니메이션만 얹는다(.grp-player처럼
+   중앙 정렬용 translate(-50%,-50%)는 쓰지 않는다 — 시작 지점 자체를 이미 캐릭터
+   오른쪽 위로 잡기 위함). duration은 ReferenceGamePlayer.tsx의 DAMAGE_POPUP_DURATION_MS
+   와 반드시 같아야 자바스크립트가 지우는 시점과 애니메이션이 다 사라지는 시점이 맞는다. */
+.grp-damage-popup {
+  animation: grp-damage-float 900ms ease-out forwards;
+  color: #ff6b6b;
+  font-size: 16px;
+  font-weight: 800;
+  pointer-events: none;
+  position: absolute;
+  text-shadow: 0 2px 4px rgba(0,0,0,.65);
+  z-index: 9;
+}
+@keyframes grp-damage-float {
+  0% { opacity: 1; transform: translate(12px, -36px); }
+  100% { opacity: 0; transform: translate(12px, -78px); }
+}
 .grp-dynamic-enemy,.grp-projectile { align-items: center; display: flex; justify-content: center; position: absolute; transform: translate(-50%,-50%); z-index: 8; }
 .grp-dynamic-enemy { filter: drop-shadow(0 5px 5px rgba(0,0,0,.6)); height: 38px; width: 38px; }
 .grp-dynamic-enemy > span,.grp-projectile > span { background-repeat: no-repeat; display: block; height: 100%; image-rendering: pixelated; width: 100%; }
