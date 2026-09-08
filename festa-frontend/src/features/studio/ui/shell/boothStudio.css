@@ -588,3 +588,26 @@
 @media (prefers-reduced-motion: reduce) {
   .booth-studio * { transition: none !important; animation: none !important; }
 }
+
+/* ── Asset Library (S15P21A604-551) — manifest 가 준 실제 thumbnail ────────────── */
+/* CSS 로 그린 data-kind 아트와 같은 자리를 차지해야 목록이 흔들리지 않는다 */
+.studio-thumb-img {
+  width: 44px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: contain;
+  background: linear-gradient(180deg, #f3f5fa, #cdd3e0);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.studio-palette-search {
+  padding: 8px 10px 4px;
+}
+.studio-palette-search input {
+  width: 100%;
+  padding: 6px 9px;
+  font: inherit;
+  color: inherit;
+  background: var(--studio-input-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+}
