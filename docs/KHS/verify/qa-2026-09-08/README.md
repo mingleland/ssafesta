@@ -133,7 +133,7 @@
 | 축 | 릴리스 관측성 |
 | 상태 | **검증통과** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Diagnostics/PerfHud.cs:126` |
-| 처리 | ⬜ 미착수 |
+| 처리 | 🟡 부분 (2026-09-09) — 별도 비콘 대신 릴리스에서도 살아 있는 `DisplayRefreshAdapter` 30초 보고 줄에 힛치(>50ms) 수·카메라 위치를 추가(`[Festa/프레임] … 힛치 N │ 위치 (x,y,z) yawN`). 릴리스 빌드 `ef7e5f41` 크롬 콘솔에서 p50/p95/p99/최대/GC 줄 수신 확인. 진단 6종은 릴리스에서 꺼진 채 유지(실사용자 소환 위험) |
 
 **사용자가 겪는 일** — 사용자가 "축제장이 느리다", "걸을 때 툭툭 끊긴다" 고 말해도 우리에게는 숫자가 하나도 없다. 재현하려면 개발 빌드를 따로 뽑아 그 사용자 환경을 흉내내야 하는데 빌드가 35분이고, 개발 빌드는 릴리스와 성능 특성이 다르다. 결국 "내 PC 에서는 괜찮은데요" 로 끝난다.
 
@@ -205,7 +205,7 @@
 | 축 | 부스스튜디오→런타임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/ScriptableObjects/BoothObjectRegistry.asset:40` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — colosair 정본 28행(#146) 전부 등록. ExpoKit 래퍼 18종(`Prefabs/Booth/Decor`), typeDefault 빈 엔트리 2개, 레거시 2개 예약. Mock 픽스처로 플레이 실측: `FURN_CHAIR_01_BLUE`→파란 의자, `STRUCT_PANEL_01`→패널(세움·바닥 피벗), 경고 0. 첫 생성에서 원본 -90° 회전을 지워 눕혀졌던 것을 고쳤다. `verify/booth-decor-2026-09-09/` |
 
 **사용자가 겪는 일** — 오너가 팔레트에서 '화분'·'기본 패널'·'진열 선반'·'그래픽 카운터'를 골라 부스를 꾸민다. 스튜디오 썸네일과 미리보기는 각각 다르게 보인다. 게시하고 월드에 들어가면 장식은 전부 똑같은 유리 진열장, 가구는 전부 똑같은 원형 테이블이다. '내가 고른 게 안 나온다' 는 신고가 그대로 나온다.
 
@@ -223,7 +223,7 @@
 | 축 | 부스스튜디오→런타임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Booth/Runtime/WorldBoothPublishedBootstrap.cs:60` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 제안 (a)+(b) 둘 다. `RequestReload(slotId)` 가 한 슬롯만 재조회해 서명(version+오브젝트 열)이 바뀌면 Rebuild. 포털 입장 시 자동, FE 는 `SendMessage('BoothLayoutBridge','ReloadBoothSlot', slotId)` 로 즉시 반영(FE 호출은 #146 회신으로 요청). 플레이 실측: 동일 서명 무동작 / 변경 시 1회 재빌드·중복 없음 |
 
 **사용자가 겪는 일** — 오너가 스튜디오에서 배치를 바꾸고 '게시' 를 누른 뒤, 같은 탭에서 월드로 넘어가 부스에 들어간다. 예전 배치가 그대로 있다. 게시가 실패한 줄 알고 다시 게시한다. 시연 중이라면 그 자리에서 막힌다. 페이지를 통째로 새로고침해야만 반영된다.
 
@@ -629,9 +629,9 @@
 | | |
 |---|---|
 | 축 | 남은 성능 병목 |
-| 상태 | **미검증** |
+| 상태 | **에디터 실측 확인** — Animator 13기 중 12기 AlwaysAnimate |
 | 위치 | `festa-unity/Assets/_Project/Scenes/main.unity` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09, 씬) — 12기 `cullingMode` → `CullUpdateTransforms` (SerializedObject, 벤더 스크립트 무수정) |
 
 **사용자가 겪는 일** — 축제장 어디에 있든, NPC 를 보고 있지 않아도 CPU 를 쓴다. 12기라 단독으로는 크지 않지만 사람이 붐빌 때 아바타 비용 위에 그대로 얹힌다.
 
@@ -919,7 +919,7 @@
 | 축 | 부스스튜디오→런타임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Booth/Factory/BoothObjectFactory.cs:148` |
-| 처리 | ⬜ 미착수 |
+| 처리 | 🟡 부분 (2026-09-09) — 가구·장식(동작 없음)은 조준 대상에서 제외해 '전시물 · 준비 중' 이 뜨지 않게 했다. VIDEO_SCREEN·RECRUITMENT_BOARD·CONSULTATION_DESK·LIKE_VOTE 의 F 동작(React 화면)은 FE 계약이 필요한 별건 — 스튜디오 `linksConfigId` 정리는 #146 흐름에서 FE 와 |
 
 **사용자가 겪는 일** — 오너가 홍보 영상을 등록하고 영상 화면을 배치한다. 방문객은 화면 앞에서 F 를 눌러도 아무 일이 없고, 마우스를 정확히 올려야 '영상 화면 · 준비 중' 이 뜬다. 좋아요 스탠드도 같다 — 부스를 응원할 방법이 없다. 채용 게시판도 마찬가지. 스튜디오는 이 셋 모두 '연결하세요' 라고 안내한다.
 
@@ -937,7 +937,7 @@
 | 축 | 부스스튜디오→런타임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Prefabs/Booth/Laptop.prefab` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09, 프리팹) — 루트 BoxCollider: Laptop 0.8×0.75×0.8(테이블 전체), ConsultationDesk 렌더러 바운즈 1.86×0.92×1.16, Decoration 0.6×1.6×0.6. 벤더 원본 무수정. F 사거리(표면 20u)는 다음 플레이 확인 |
 
 **사용자가 겪는 일** — 방문객이 상담 데스크 뒤로 걸어 들어가고, 노트북 테이블을 몸으로 관통하고, 진열장 안을 통과해 지나간다. 부스가 '세트' 가 아니라 '스티커' 처럼 느껴진다.
 
@@ -973,7 +973,7 @@
 | 축 | 상호작용·미니게임 |
 | 상태 | **미검증** · 플레이 모드 필요 |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Interaction/InteractionFocusCamera.cs:108` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — `OnDestroy` 에서 `_active` 면 `EndFocus()`(우리가 건 잠금만 되돌림) 뒤 `s_instance` 해제 |
 
 **사용자가 겪는 일** — 부스 안에서 노트북/AI 를 들여다보던 중(초점 모드) 로비로 나갔다가 다시 월드로 들어오면, 화면은 정상인데 WASD 도 F 도 안 먹는다. 사용자는 '접속은 됐는데 캐릭터가 안 움직인다' 로 신고하고, 새로고침 말고는 복구 방법이 없다.
 
@@ -1009,7 +1009,7 @@
 | 축 | 상호작용·미니게임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Minigame/Slot/SlotMachineHud.cs:110` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 체험판이면 잔액 숫자를 `Muted` 회색으로, 설명을 "보유 코인 (가상 · 실제 잔액에 반영되지 않음)" 으로. 실제 판정이면 금색 그대로 |
 
 **사용자가 겪는 일** — 체험판 슬롯머신에서 잭팟을 터뜨리면 잔액이 100 → 150 으로 오른다. Esc 로 나갔다 다시 들어오면 100 으로 돌아와 있다. 배지를 못 본 사용자는 '코인이 없어졌다' 고 신고한다.
 
@@ -1027,7 +1027,7 @@
 | 축 | 상호작용·미니게임 |
 | 상태 | **미검증** · 플레이 모드 필요 |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Interaction/InteractionFocusCamera.cs:184` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 초점 중 우상단 `[Esc] 나가기` 알약(IMGUI, 클릭·터치로도 해제). 캔버스 포커스 회복 요청·자동 해제 안전장치는 미착수 |
 
 **사용자가 겪는 일** — 노트북을 들여다보다 웹 오버레이 바깥을 한 번 클릭한 뒤 Esc 를 누르면 아무 일도 안 일어난다. 화면은 노트북에 코를 박은 채 멈춰 있고 캐릭터는 안 움직인다. 태블릿에서는 처음부터 나갈 방법이 없다.
 
@@ -1045,7 +1045,7 @@
 | 축 | 상호작용·미니게임 |
 | 상태 | **미검증** · 플레이 모드 필요 |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Content/BoothInteractionInput.cs:62` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 잠금 분기에서 `_passive = null` |
 
 **사용자가 겪는 일** — 영상 화면이나 상담 데스크를 바라보다 F 로 다른 걸 열면, '영상 화면 · 준비 중' 알약이 미니게임 카드 한복판에 겹쳐 남는다. 사용자는 방금 연 화면이 '준비 중' 이라고 읽는다.
 
@@ -1063,7 +1063,7 @@
 | 축 | 아바타·캐릭터 |
 | 상태 | **검증통과** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Avatar/CatalogAvatarVisualProvider.cs:64` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — `CreateModular` 이 렌더러 0개면 root 를 파괴하고 null → placeholder 폴백이 실제로 발동. LogError 에 LastError 포함 |
 
 **사용자가 겪는 일** — 월드에서 어떤 사람은 몸이 전혀 안 보이고 머리 위 이름표만 떠다닌다. 본인이 그 사람이면 3인칭 카메라 앞에 아무것도 없어서 자기 캐릭터를 조종하고 있는지조차 알 수 없다. 폴백 캡슐이라도 나오면 "뭔가 잘못됐다" 는 것이 보이는데, 지금은 그냥 없다.
 
@@ -1207,7 +1207,7 @@
 | 축 | UI·입력·접근성 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Avatar/Assembly/AvatarMeshMerge.cs:91` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — ① `AvatarMeshMerge.Toggle` 은 PerfHud 가 켜진 씬에서 물러난다(이중 토글 해소, 로비에서는 그대로 동작) ② 미등록 4종(AvatarCostAb `=`·HitchLogger `` ` ``·SpawnRepeatProbe Home·AvatarMergeIntegrity Insert) `DiagnosticKeys.Claim` ③ 예약키에 F4·F8·F9·F10 추가, 플랫폼 조건 제거(에디터에서도 에러) |
 
 **사용자가 겪는 일** — 개발자·계측자가 겪는다. `'` 를 눌러 메시 병합 A/B 를 돌린다고 믿지만 실제로는 상태가 그대로라 두 조건의 표본이 같은 값으로 섞인다. 릴리스 빌드를 뽑기 전 마지막 계측이 이렇게 날아가면 하루가 사라진다.
 
@@ -1261,7 +1261,7 @@
 | 축 | UI·입력·접근성 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Interaction/InteractPromptUI.cs:33` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — `InteractPromptUI.UiScale()` = `Clamp(Screen.height/1080, 0.75, 2.0)` 로 프롬프트 3곳·조작 카드·이모트 휠이 같은 배율 |
 
 **사용자가 겪는 일** — 노트북에서 브라우저 창을 반만 띄우거나 세로가 짧은 화면을 쓰면 '조작 안내' 카드와 상호작용 프롬프트가 개미 글씨가 되어 무엇을 누르라는 건지 안 보인다. 처음 온 사람이 WASD·F 를 배울 유일한 통로가 이 카드다.
 
@@ -1279,7 +1279,7 @@
 | 축 | UI·입력·접근성 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Scripts/Network/Player/PlayerEmoteController.cs:13` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 링 반경·데드존·글꼴 4종을 `UiScale()` 배율로, 배율이 5% 이상 바뀌면 스타일 재생성. `ClampCenter` 는 화면이 여백×2 보다 작으면 클램프 생략 |
 
 **사용자가 겪는 일** — 고해상도 전체화면에서 감정 표현 휠만 유독 작고 글자가 흐리다. 창을 작게 쓰면 Alt+클릭했을 때 휠이 커서와 다른 곳에 뜨고, 원하는 감정 대신 옆 칸이 선택된다.
 
@@ -1297,7 +1297,7 @@
 | 축 | UI·입력·접근성 |
 | 상태 | **미검증** · 플레이 모드 필요 |
 | 위치 | `festa-unity/Assets/_Project/Scripts/World/Festival/PortalInteractor.cs:127` |
-| 처리 | ⬜ 미착수 |
+| 처리 | 🟡 부분 (2026-09-09) — GUI.* 만 쓰는 4종(BoothInteractionInput·PortalInteractor·PlayerEmoteController·ControlsHintHud)에 `useGUILayout = false` 로 Layout 패스 제거(호출 절반). '그릴 것 없으면 컴포넌트 끄기' 와 DevConnectionHud `#if` 제외는 미착수 — GC 실측 뒤 판단 |
 
 **사용자가 겪는 일** — 걸어 다니는 동안 1~2초에 한 번 미세하게 프레임이 걸린다. 마우스를 많이 움직일수록 잦아진다 — 사용자는 '움직이면 뚝뚝 끊긴다' 로 느낀다.
 
