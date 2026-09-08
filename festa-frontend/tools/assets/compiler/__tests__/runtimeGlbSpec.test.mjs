@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { Document } from '@gltf-transform/core';
 import { quantize } from '@gltf-transform/functions';
+import { transformRuntimeDocument } from '../toolchain/gltfPipeline.mjs';
 import { createIO } from '../toolchain/gltfPipeline.mjs';
 import { makeCamera, renderToRaw } from '../toolchain/rasterizer.mjs';
 
@@ -38,6 +39,36 @@ describe('런타임 GLB — quantize 는 확장 선언과 함께 나가야 한�
     const accessor = json.accessors[json.meshes[0].primitives[0].attributes.POSITION];
     expect(accessor.componentType).not.toBe(5126); // FLOAT 가 아니다
     expect(accessor.normalized).toBe(true);
+  });
+});
+
+describe('런타임 GLB — 텍스처가 붙을 UV 가 남아야 한다', () => {
+  /** 삼각형 하나 + TEXCOORD_0. 재질에는 아직 텍스처가 없다 — 실제 파이프라인이 그렇다 */
+  function uvDocument() {
+    const doc = new Document();
+    const buffer = doc.createBuffer();
+    const position = doc.createAccessor().setType('VEC3')
+      .setArray(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])).setBuffer(buffer);
+    const uv = doc.createAccessor().setType('VEC2')
+      .setArray(new Float32Array([0, 0, 1, 0, 0, 1])).setBuffer(buffer);
+    const material = doc.createMaterial().setBaseColorFactor([1, 1, 1, 1]);
+    const primitive = doc.createPrimitive()
+      .setAttribute('POSITION', position).setAttribute('TEXCOORD_0', uv).setMaterial(material);
+    const node = doc.createNode().setMesh(doc.createMesh().addPrimitive(primitive));
+    doc.createScene().addChild(node);
+    return doc;
+  }
+
+  it('transform 을 통과해도 TEXCOORD_0 이 남는다', async () => {
+    // prune 의 기본값(keepAttributes:false)은 "어느 재질도 안 쓰는" 정점 속성을 지운다.
+    // 이 파이프라인은 텍스처를 **prune 다음에** 굽기 때문에, 기본값이면 UV 가 통째로
+    // 사라지고 GLB 는 이미지·연결을 다 갖춘 채 **샘플링만 안 되는** 상태로 나온다(LJH T-80)
+    const doc = uvDocument();
+    await transformRuntimeDocument(doc, { simplifyRatio: null, simplifyError: 0.01 });
+    const kept = doc.getRoot().listMeshes()
+      .flatMap((m) => m.listPrimitives())
+      .filter((p) => p.getAttribute('TEXCOORD_0') !== null);
+    expect(kept.length).toBeGreaterThan(0);
   });
 });
 
