@@ -11,6 +11,8 @@ import type {
 
 export interface SurveyBuilderState {
   status: 'idle' | 'loading' | 'ready' | 'error';
+  /** 편집 대상 부스. 저장 경로가 부스 기준이라(계약 §4) 로드 시점에 고정된다 */
+  boothId: number | null;
   draft: SurveyDraftVM;
   dirty: boolean;
   save: { phase: 'idle' | 'submitting' | 'success' | 'error' };
@@ -20,6 +22,7 @@ const EMPTY_DRAFT: SurveyDraftVM = { title: '', questions: [] };
 
 const initialState: SurveyBuilderState = {
   status: 'idle',
+  boothId: null,
   draft: EMPTY_DRAFT,
   dirty: false,
   save: { phase: 'idle' },
@@ -58,18 +61,20 @@ export function useSurveyBuilder(): SurveyBuilderState {
   return useSyncExternalStore(subscribe, getSurveyBuilderSnapshot);
 }
 
-export async function loadSurveyBuilder(): Promise<void> {
-  setState({ ...initialState, status: 'loading' });
+export async function loadSurveyBuilder(boothId: number): Promise<void> {
+  setState({ ...initialState, status: 'loading', boothId });
   try {
-    const draft = await surveyApi.getDraft();
+    const draft = await surveyApi.getDraft(boothId);
     // 리로드 후 seq 가 0 부터 다시 시작하면 저장된 문항의 q-N 과 충돌한다 (-377) —
     // 복원된 id 의 최댓값 뒤에서 이어 발급한다
     questionSeq = Math.max(
       questionSeq,
       ...(draft?.questions ?? []).map((q) => Number(/^q-(\d+)$/.exec(q.id)?.[1] ?? 0)),
     );
+    if (state.boothId !== boothId) return; // 부스를 옮긴 뒤 도착한 이전 응답은 버린다
     setState({ status: 'ready', draft: draft ?? EMPTY_DRAFT, dirty: false });
   } catch {
+    if (state.boothId !== boothId) return;
     setState({ status: 'error' });
   }
 }
@@ -124,8 +129,15 @@ export function validateBuilder(): SurveyBuilderIssueVM[] {
   if (draft.title.trim() === '') issues.push({ message: '설문 제목을 입력해주세요.' });
   for (const q of draft.questions) {
     if (q.prompt.trim() === '') issues.push({ questionId: q.id, message: '질문 내용을 입력해주세요.' });
-    if ((q.type === 'single' || q.type === 'multi') && (q.options ?? []).filter((o) => o.label.trim() !== '').length < 2) {
-      issues.push({ questionId: q.id, message: '선택지는 2개 이상 필요합니다.' });
+    if (q.type === 'single' || q.type === 'multi') {
+      const options = q.options ?? [];
+      if (options.length < 2) {
+        issues.push({ questionId: q.id, message: '선택지는 2개 이상 필요합니다.' });
+      } else if (options.some((o) => o.label.trim() === '')) {
+        // 비공백 2개만 세면 뒤에 붙은 빈 선택지가 그대로 서버로 가고, 계약 §4 가 모든 label 비공백을
+        // 요구하므로 진단 불가능한 400 이 된다. FE 검증은 BE 의 상위 집합이어야 한다
+        issues.push({ questionId: q.id, message: '빈 선택지가 있습니다. 내용을 채우거나 지워주세요.' });
+      }
     }
     if (q.type === 'rating' && q.scale && q.scale.min >= q.scale.max) {
       issues.push({ questionId: q.id, message: '척도 최솟값은 최댓값보다 작아야 합니다.' });
@@ -135,10 +147,11 @@ export function validateBuilder(): SurveyBuilderIssueVM[] {
 }
 
 export async function saveSurveyBuilder(): Promise<void> {
-  if (state.status !== 'ready' || state.save.phase === 'submitting' || validateBuilder().length > 0) return;
+  if (state.status !== 'ready' || state.boothId === null) return;
+  if (state.save.phase === 'submitting' || validateBuilder().length > 0) return;
   setState({ save: { phase: 'submitting' } });
   try {
-    await surveyApi.saveDraft(state.draft);
+    await surveyApi.saveDraft(state.boothId, state.draft);
     setState({ dirty: false, save: { phase: 'success' } });
   } catch {
     setState({ save: { phase: 'error' } });

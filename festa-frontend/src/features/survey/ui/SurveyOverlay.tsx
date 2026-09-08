@@ -1,7 +1,8 @@
 // Survey 응답 Overlay — Overlay Family 재사용 (S15P21A604-406).
 // 데이터는 features/survey/model/run 의 상태 기계를 그대로 소비한다(-368).
-// BE endpoint·DTO 는 미확정(UNKNOWN)이라 UI 가 만들지 않는다 — mock adapter 가 채운다.
+// 진입은 부스다 — Unity 가 boothId 만 주고 설문 id 는 run 응답이 알려준다(계약 §5, -528).
 import { useEffect } from 'react';
+import { useSession } from '../../auth/model/session';
 import { closeOverlay } from '../../../shared/types/overlay';
 import type { SurveyQuestionVM } from '../../../shared/contracts/survey';
 import {
@@ -16,7 +17,8 @@ import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../
 import './surveyOverlay.css';
 
 interface Props {
-  payload: { boothId: number; surveyId?: string };
+  // surveyId 는 받지 않는다 — 서버가 부스로 설문을 찾아 주고 그 id 를 run 응답에 싣는다
+  payload: { boothId: number };
 }
 
 const IcSurvey = (
@@ -106,14 +108,18 @@ function QuestionInput({ q, value }: { q: SurveyQuestionVM; value: unknown }) {
 
 export function SurveyOverlay({ payload }: Props) {
   const run = useSurveyRun();
-  const surveyId = payload.surveyId ?? 'booth-' + payload.boothId;
+  const session = useSession();
+  const boothId = payload.boothId;
 
   useEffect(() => {
-    void loadSurveyRun(surveyId);
-  }, [surveyId]);
+    void loadSurveyRun(boothId);
+  }, [boothId]);
 
   const missing = run.status === 'ready' ? missingRequired() : [];
   const submitted = run.submit.phase === 'success';
+  // 보상이 걸린 설문은 게스트가 제출할 수 없다(403 MEMBER_ONLY). run 응답이 rewardCoin 을 싣는
+  // 이유가 이것이라, 실패한 뒤가 아니라 **제출 전에** 알린다
+  const guestBlocked = session.kind === 'guest' && run.rewardCoin > 0;
 
   return (
     <OverlayFrame
@@ -125,11 +131,14 @@ export function SurveyOverlay({ payload }: Props) {
       status={
         run.submit.phase === 'error' ? (
           <span className="ov-alert">제출하지 못했습니다. 다시 시도해 주세요.</span>
+        ) : guestBlocked ? (
+          <span className="ov-alert">코인이 걸린 설문이라 로그인해야 참여할 수 있습니다</span>
         ) : missing.length > 0 ? (
           <span className="ov-note">필수 문항 {missing.length}개가 남았습니다</span>
+        ) : run.rewardCoin > 0 ? (
+          <span className="ov-note">참여하면 {run.rewardCoin} 코인을 받습니다 · Esc 로 월드로 돌아갑니다</span>
         ) : (
-          // 설문 BE(-130·-190)는 미착수다 — mock adapter 로 도는 상태를 실제인 것처럼 보이게 하지 않는다
-          <span className="ov-note">응답 저장은 준비 중입니다 · Esc 로 월드로 돌아갑니다</span>
+          <span className="ov-note">Esc 로 월드로 돌아갑니다</span>
         )
       }
       footer={
@@ -138,7 +147,7 @@ export function SurveyOverlay({ payload }: Props) {
             <button type="button" className="ov-btn" onClick={closeOverlay}>
               나중에
             </button>
-            <button type="button" className="ov-btn ov-btn-primary" disabled={!canSubmit()} onClick={() => void submitSurveyRun()}>
+            <button type="button" className="ov-btn ov-btn-primary" disabled={guestBlocked || !canSubmit()} onClick={() => void submitSurveyRun()}>
               {run.submit.phase === 'submitting' ? '제출 중...' : '제출하기'}
             </button>
           </>
@@ -150,10 +159,19 @@ export function SurveyOverlay({ payload }: Props) {
       }
     >
       {run.status === 'loading' && <OverlayLoading label="설문을 불러오는 중..." />}
-      {run.status === 'error' && <OverlayError title="설문을 불러오지 못했습니다" onRetry={() => void loadSurveyRun(surveyId)} />}
+      {run.status === 'error' && <OverlayError title="설문을 불러오지 못했습니다" onRetry={() => void loadSurveyRun(boothId)} />}
       {run.status === 'empty' && <OverlayEmpty title="문항이 없습니다" hint="부스 주인이 문항을 등록하면 참여할 수 있습니다." />}
       {run.status === 'closed' && <OverlayEmpty title="마감된 설문입니다" hint="응답을 더 받지 않습니다." />}
-      {submitted && <OverlayEmpty title="응답을 제출했습니다" hint="참여해 주셔서 감사합니다." />}
+      {submitted && (
+        <OverlayEmpty
+          title="응답을 제출했습니다"
+          hint={
+            run.submit.rewardedCoin !== null && run.submit.rewardedCoin > 0
+              ? `${run.submit.rewardedCoin} 코인을 받았습니다. 참여해 주셔서 감사합니다.`
+              : '참여해 주셔서 감사합니다.'
+          }
+        />
+      )}
 
       {run.status === 'ready' && !submitted && (
         <ol className="sv-list">

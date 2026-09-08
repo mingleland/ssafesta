@@ -5,6 +5,8 @@ export const RESULT_AGGREGATES: SurveyQuestionAggregateVM[] = [
   {
     questionId: 'q-single',
     kind: 'choice',
+    // 단일선택은 선택 수 합(25)과 응답 수가 같다
+    answeredCount: 25,
     counts: [
       { optionId: 'o1', label: '프로젝트 전시', count: 12 },
       { optionId: 'o2', label: '미니게임', count: 9 },
@@ -14,6 +16,9 @@ export const RESULT_AGGREGATES: SurveyQuestionAggregateVM[] = [
   {
     questionId: 'q-multi',
     kind: 'choice',
+    // 복수선택은 선택 수 합(34)이 응답 수(20)를 넘는다 — 비율 합이 100% 를 넘고 그게 정상이다.
+    // 분모를 선택 수 합으로 잡으면 그 사실이 화면에서 사라지므로 fixture 로 차이를 남긴다.
+    answeredCount: 20,
     counts: [
       { optionId: 'o1', label: '콘텐츠', count: 15 },
       { optionId: 'o2', label: '분위기', count: 11 },
@@ -24,7 +29,7 @@ export const RESULT_AGGREGATES: SurveyQuestionAggregateVM[] = [
     questionId: 'q-rating',
     kind: 'rating',
     average: 4.2,
-    count: 25,
+    answeredCount: 25,
     // FR-006 — 평균과 분포를 함께 제공
     distribution: [
       { value: 1, count: 1 },
