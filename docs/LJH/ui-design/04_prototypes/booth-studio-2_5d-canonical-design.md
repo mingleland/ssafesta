@@ -601,8 +601,22 @@ thumbnail  256 px webp         실측 평균 5.3 KB
 
 내부 Booth 자산의 기준(형상·치수 정확도)을 여기 적용하지 않는다.
 
-**한계** — 현재 육안 대조는 자체 래스터라이저의 단색 아이소 렌더라 **실루엣만** 판정한다.
-기준 2번(색·재질 인상)은 R3F 실렌더 대조가 필요하고 아직 못 했다. `§21` 에 남긴다.
+**R3F 실렌더 검증 (2026-09-08 수행)** — 표본 7종을 **동일 카메라·조명**으로 원본과 나란히
+렌더해 대조했다. 근거: `docs/LJH/ui-design/06_visual-review/evidence/facade-preview-r3f-2026-09-08.png`
+
+```text
+고리 던지기 · 물총 사격 · 사탕 노점 · 퍼넬 케이크 · 점집 · 매표소   6종 통과
+  실루엣·색·재질 인상·대표 장식(간판·차양·깃발) 전부 유지. 원본과 구별이 어렵다
+
+팝콘 카트                                                        1종 부분 손실
+  바퀴 살(spoke)이 사라지고 테두리만 남는다. 카트로는 여전히 식별된다
+```
+
+**텍스처 256 px 이 색·재질 인상을 바꾸지 않는다**(기준 2번 통과). 바퀴 살은 얇은 구조라 먼저
+지워지는데, 판정 기준 5번("작은 장식 디테일 손실은 허용")의 범위로 본다 — 경계 사례이므로
+기록해 둔다. 되살리려면 그 자산만 simplify 를 건너뛰면 되고 비용은 +88 KB(91 → 179 KB)다.
+
+**이로써 `0.25 + 256 px` 를 Facade preview 기본 정책으로 확정한다.**
 
 ### 12-A-7. 18종 전체 — 추정이 아니라 실컴파일
 
@@ -624,17 +638,42 @@ AABB         18종 전부 원본 유지 — 붕괴 0
 무거운 4종(RING_TOSS 903 KB · WATER_GUN 858 KB · CAN_KNOCKDOWN 726 KB · BASKETBALL 418 KB)이
 전체의 62%다. 나머지 14종은 평균 122 KB.
 
-### 12-A-8. inventory 이상 2건 — 18종 목록 재판정이 필요하다
+### 12-A-8. 후보 선별 — 18종을 그대로 확정하지 않았다
+
+`node tools/assets/facade-triage.mjs` 로 18종 전부를 재검했다. 판정 축은 **"하나의 정상적인
+외관 단위인가"** 하나다 — 예뻐 보이는지가 아니다.
 
 ```text
-FACADE_BOOTH_PRIZE_WALL   구성이 인형 15개뿐이고 **벽·선반이 없다**. 0.39 × 2.83 × 0.41 m
-                          완성형 부스가 아니라 소품 세트다 — Facade 후보에서 빼는 것이 맞다
-FACADE_CART_HOT_DOG       카트 본체가 원점에서 10.04 m 떨어져 있다(2 클러스터, 최대 간격 10.96 m)
-                          bounds 11.5 m. 나머지 17종은 전부 1 클러스터다
+KEEP        16종
+PROP_ONLY    1종   FACADE_BOOTH_PRIZE_WALL
+FIX          1종   FACADE_CART_HOT_DOG
 ```
 
-둘 다 prefab authoring 문제다. 사용자가 이미 짚었다 — *"첨부 사진의 모든 요소가 외부 부스
-형태는 아니다."* 18종 목록은 **크기·구성 기준으로 한 번 더 걸러야 한다**(§21).
+| 자산 | 판정 | 근거 |
+|---|---|---|
+| `FACADE_BOOTH_PRIZE_WALL` | **PROP_ONLY** | 구성이 인형 15개뿐이고 **벽·선반이 없다.** 최대 부품이 전체의 20% — 구조물 없이 소품만 있다. 0.39 × 2.83 × 0.41 m |
+| `FACADE_CART_HOT_DOG` | **FIX** | 카트 본체가 원점에서 10.04 m 떨어져 있다(2 덩어리, 최대 간격 10.96 m). bounds 11.5 m. 나머지 17종은 전부 1 덩어리 |
+
+**자동 판정에서 뺀 축 2개** — 처음에 넣었다가 오탐이 나와 정보로만 남겼다.
+
+```text
+pivot(바닥에서 뜸)   Compiler 가 바닥 중앙으로 맞춘다 — prefab 원본 좌표는 결격이 아니다
+슬롯 크기 초과       Unity 부스 앵커가 균등 스케일(실측 13.26)을 건다.
+                     원본 미터를 6 m 슬롯과 직접 비교할 수 없다
+```
+
+이 둘을 결격으로 두면 `FACADE_CART_POPCORN`(0.40 m 뜸)과 `FACADE_BOOTH_WATER_GUN`(7.15 m)이
+떨어지는데, R3F 렌더로 보면 둘 다 멀쩡한 부스다. **판정 축을 임의로 만들면 멀쩡한 자산이 떨어진다.**
+
+**육안 확인** — 16종을 preview GLB 로 렌더해 전부 "어떤 부스인지 즉시 식별 가능" 을 확인했다.
+근거: `06_visual-review/evidence/facade-18-preview-gallery-2026-09-08.png`
+
+그 갤러리 캡처는 `BALLOON_DART`·`BASKETBALL` 두 칸이 비어 보이는데 **캡처 도구가 그 canvas 를
+못 담은 것**이다. 개별 렌더로 둘 다 정상임을 확인했다 —
+`06_visual-review/evidence/facade-balloon-basketball-detail-2026-09-08.png`.
+
+**최종 제공 목록은 16종**이다. 2종의 처분(원본 수정 vs 목록 제외)은 자산 authoring 문제라
+`§21` 에 남긴다.
 
 ## 13. Runtime Manifest v2
 
@@ -818,7 +857,7 @@ P7  Facade Selection UI                 19-2 합의 후. 필요 데이터는 §1
 ```text
 Asset Library    manifest 를 소비한다. CSS mock 썸네일 0. FAMILY 그룹으로 묶인다
 Template         선택 → LayoutObject 생성 → 이후 일반 편집과 동일 데이터
-Facade           18종 선택·미리보기·적용
+Facade           16종 선택·미리보기·적용 (18종 중 2종은 §12-A-8 처분 대기)
 Manifest v2      domain + booth/facade 블록
 production       dist 에 자산이 실려 나간다
 ```
@@ -828,13 +867,12 @@ production       dist 에 자산이 실려 나간다
 ```text
 ① 계약 assetCode 범위 확장 (§19-1)          3파트 합의
 ② FURNITURE·DECORATION 타입 기본 통일 (§8-4) Unity 기준 채택안 통보 필요
-③ Facade 18종 목록 재판정 (§12-A-8)          PRIZE_WALL 은 소품 세트고 HOT_DOG 는
-                                             부품이 10 m 떨어져 있다. 크기·구성 기준 필요
-④ Facade 색·재질 인상 판정 (§12-A-6)         현 육안 대조는 단색 실루엣까지다.
-                                             R3F 실렌더 대조가 남았다
+③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX).
+                                             원본 수정 vs 목록 제외 — authoring 판단
 ⑤ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
 ⑥ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
 ```
 
-**Facade 감축 정책은 더 이상 미결정이 아니다** — §12-A-5 에서 `ratio 0.25 + 256 px + AABB
-게이트`로 확정했다. 근거는 §12-A-3·12-A-4 실측이다.
+**Facade 감축 정책과 색·재질 판정은 더 이상 미결정이 아니다.** §12-A-5 에서 `ratio 0.25 +
+256 px + AABB 게이트`로 확정했고, §12-A-6 의 R3F 실렌더 대조로 색·재질 인상 유지를 확인했다
+(7종 중 6종 무손실, 팝콘 카트 바퀴 살만 손실 — 허용 범위).

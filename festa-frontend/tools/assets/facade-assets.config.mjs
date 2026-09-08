@@ -30,6 +30,8 @@ export const FACADE_SOURCE_PACKAGE = 'CarnivalKit';
  * @property {string} prefab     CARNIVAL_PREFAB_ROOT 기준 상대 경로
  * @property {string} group      UI 그룹 (게임 부스 / 독립 부스 / 노점 / 카트)
  * @property {string} displayName 사용자에게 보이는 이름
+ * @property {'KEEP'|'FIX'|'PROP_ONLY'} [triage] 선별 판정 (§12-A-8). 없으면 KEEP
+ * @property {string} [triageNote] FIX·PROP_ONLY 인 이유
  */
 
 /** @type {FacadeSource[]} */
@@ -45,7 +47,14 @@ export const FACADE_ASSETS = [
   // ── 독립 부스 4 ────────────────────────────────────────────────
   { assetCode: 'FACADE_BOOTH_FORTUNE_TELLER', prefab: 'PF_Fortune_Teller_Booth.prefab', group: 'booth', displayName: '점집' },
   { assetCode: 'FACADE_BOOTH_TICKET', prefab: 'PF_Small_Ticket_Booth.prefab', group: 'booth', displayName: '매표소' },
-  { assetCode: 'FACADE_BOOTH_PRIZE_WALL', prefab: 'PF_Plush_Prize_Wall.prefab', group: 'booth', displayName: '인형 경품대' },
+  {
+    assetCode: 'FACADE_BOOTH_PRIZE_WALL',
+    prefab: 'PF_Plush_Prize_Wall.prefab',
+    group: 'booth',
+    displayName: '인형 경품대',
+    triage: 'PROP_ONLY',
+    triageNote: '구성이 인형 15개뿐이고 벽·선반이 없다. 최대 부품이 전체의 20% — 외관 단위가 아니다',
+  },
   { assetCode: 'FACADE_BOOTH_HIGH_STRIKER', prefab: 'PF_High_Striker_Bell_Tower_Game_V1.prefab', group: 'booth', displayName: '힘 측정기' },
 
   // ── 노점 3 ─────────────────────────────────────────────────────
@@ -56,10 +65,25 @@ export const FACADE_ASSETS = [
   // ── 카트 5 ─────────────────────────────────────────────────────
   { assetCode: 'FACADE_CART_COTTON_CANDY', prefab: 'PF_Cotton_Candy_Cart.prefab', group: 'cart', displayName: '솜사탕 카트' },
   { assetCode: 'FACADE_CART_POPCORN', prefab: 'PF_Popcorn_Cart.prefab', group: 'cart', displayName: '팝콘 카트' },
-  { assetCode: 'FACADE_CART_HOT_DOG', prefab: 'PF_Hot_Dog_Cart.prefab', group: 'cart', displayName: '핫도그 카트' },
+  {
+    assetCode: 'FACADE_CART_HOT_DOG',
+    prefab: 'PF_Hot_Dog_Cart.prefab',
+    group: 'cart',
+    displayName: '핫도그 카트',
+    triage: 'FIX',
+    triageNote: '카트 본체가 원점에서 10.04 m 떨어져 있다(2 덩어리). 나머지 17종은 1 덩어리',
+  },
   { assetCode: 'FACADE_CART_ICE_CREAM', prefab: 'PF_Ice_Cream_Cart.prefab', group: 'cart', displayName: '아이스크림 카트' },
   { assetCode: 'FACADE_CART_SHAVED_ICE', prefab: 'PF_Shaved_Ice_Cart.prefab', group: 'cart', displayName: '빙수 카트' },
 ];
+
+/**
+ * 실제로 사용자에게 낼 수 있는 것 — `triage` 가 붙지 않은 것들.
+ *
+ * 18종을 그대로 확정하지 않는다(§12-A-8). 걸린 2종은 자산 authoring 문제라 **억지로
+ * 살리지 않고** 판정만 붙여 둔다 — 원본을 고칠지 목록에서 뺄지는 별개 결정이다.
+ */
+export const FACADE_PROVIDABLE = FACADE_ASSETS.filter((a) => a.triage === undefined);
 
 export const FACADE_GROUP_LABEL = {
   game: '게임 부스',
