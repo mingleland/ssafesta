@@ -83,6 +83,14 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.spring_agent_config_timeout_seconds == 1.0
     assert config.settings.llm_ttft_timeout_seconds == 15.0
     assert config.settings.llm_total_timeout_seconds == 60.0
+    assert config.settings.rate_limit_user_concurrency == 1
+    assert config.settings.rate_limit_user_question_limit == 5
+    assert config.settings.rate_limit_user_question_window_seconds == 60.0
+    assert config.settings.rate_limit_agent_concurrency == 5
+    assert config.settings.rate_limit_global_concurrency == 20
+    assert config.settings.rate_limit_queue_capacity == 30
+    assert config.settings.rate_limit_queue_wait_seconds == 10.0
+    assert config.settings.rate_limit_active_lease_ttl_seconds == 90.0
     assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
 
 
@@ -327,6 +335,21 @@ def test_ttft_timeout_must_not_exceed_total_timeout(
         overrides={"LLM_TTFT_TIMEOUT_SECONDS": "60", "LLM_TOTAL_TIMEOUT_SECONDS": "15"},
     )
     with pytest.raises(ValidationError, match="LLM_TTFT_TIMEOUT_SECONDS"):
+        _fresh_settings_module()
+
+
+def test_active_lease_ttl_must_exceed_total_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "LLM_TOTAL_TIMEOUT_SECONDS": "60",
+            "RATE_LIMIT_ACTIVE_LEASE_TTL_SECONDS": "60",
+        },
+    )
+    with pytest.raises(ValidationError, match="RATE_LIMIT_ACTIVE_LEASE_TTL_SECONDS"):
         _fresh_settings_module()
 
 

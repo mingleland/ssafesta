@@ -1,4 +1,4 @@
-"""Verify the message-streaming endpoint maps authorize() outcomes to its HTTP contract."""
+"""Verify the message-streaming endpoint maps authorize()/capacity outcomes to HTTP."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from app.api.errors import ApiError, api_error_handler, request_validation_error
 from app.api.v1.conversations import get_stream_service, router
 from app.core.auth import AuthenticatedMember, require_member
 from app.models.conversation import Conversation
+from app.services.capacity_service import CapacityExceeded
 from app.services.stream_service import (
     BoothLeaseExpired,
     ConversationNotFound,
@@ -52,11 +53,39 @@ class FakeStreamService:
         yield "event: done\ndata: {}\n\n"
 
 
-def _client(service: FakeStreamService) -> TestClient:
+class FakeCapacityLease:
+    def __init__(self, *, on_release) -> None:
+        self._on_release = on_release
+        self.released = False
+
+    async def release(self) -> None:
+        self.released = True
+        self._on_release()
+
+
+class FakeCapacityService:
+    """Always grants a lease unless `exceeded_retry_after` is set."""
+
+    def __init__(self, *, exceeded_retry_after: float | None = None) -> None:
+        self._exceeded_retry_after = exceeded_retry_after
+        self.acquire_calls: list[dict[str, int]] = []
+        self.leases: list[FakeCapacityLease] = []
+
+    async def acquire(self, *, user_id: int, agent_id: int) -> FakeCapacityLease:
+        self.acquire_calls.append({"user_id": user_id, "agent_id": agent_id})
+        if self._exceeded_retry_after is not None:
+            raise CapacityExceeded(self._exceeded_retry_after)
+        lease = FakeCapacityLease(on_release=lambda: None)
+        self.leases.append(lease)
+        return lease
+
+
+def _client(service: FakeStreamService, *, capacity_service: FakeCapacityService | None = None) -> TestClient:
     app = FastAPI()
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.include_router(router, prefix="/ai/v1")
+    app.state.capacity_service = capacity_service or FakeCapacityService()
     app.dependency_overrides[require_member] = lambda: _MEMBER
     app.dependency_overrides[get_stream_service] = lambda: service
     return TestClient(app)
@@ -129,3 +158,51 @@ def test_question_over_2000_characters_is_rejected() -> None:
 
     assert response.status_code == 422
     assert service.stream_calls == []
+
+
+def test_capacity_exceeded_returns_429_with_retry_after_header() -> None:
+    service = FakeStreamService(conversation=_conversation())
+    capacity_service = FakeCapacityService(exceeded_retry_after=7.2)
+
+    response = _client(service, capacity_service=capacity_service).post(
+        "/ai/v1/conversations/conv_abc/messages", json={"question": "안녕하세요"}
+    )
+
+    assert response.status_code == 429
+    assert response.json()["code"] == "RATE_LIMITED"
+    assert response.headers["retry-after"] == "8"
+    assert service.stream_calls == []
+
+
+def test_capacity_is_acquired_with_authorized_conversations_agent_id() -> None:
+    service = FakeStreamService(conversation=_conversation())
+    capacity_service = FakeCapacityService()
+
+    _client(service, capacity_service=capacity_service).post(
+        "/ai/v1/conversations/conv_abc/messages", json={"question": "안녕하세요"}
+    )
+
+    assert capacity_service.acquire_calls == [{"user_id": 42, "agent_id": 3}]
+
+
+def test_capacity_is_not_acquired_when_authorization_fails() -> None:
+    service = FakeStreamService(authorize_error=ConversationNotFound("conv_abc"))
+    capacity_service = FakeCapacityService()
+
+    _client(service, capacity_service=capacity_service).post(
+        "/ai/v1/conversations/conv_abc/messages", json={"question": "안녕하세요"}
+    )
+
+    assert capacity_service.acquire_calls == []
+
+
+def test_capacity_lease_is_released_after_stream_completes() -> None:
+    service = FakeStreamService(conversation=_conversation())
+    capacity_service = FakeCapacityService()
+
+    _client(service, capacity_service=capacity_service).post(
+        "/ai/v1/conversations/conv_abc/messages", json={"question": "안녕하세요"}
+    )
+
+    assert len(capacity_service.leases) == 1
+    assert capacity_service.leases[0].released is True
