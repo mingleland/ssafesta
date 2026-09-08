@@ -10,6 +10,7 @@ import type { GameSessionPort } from '../ports/gameSessionPort.ts';
 import { summarizeFramePerformance, type FramePerformanceSummary } from './framePerformance.ts';
 import {
   chooseReferenceDialogue,
+  currentInteractionTarget,
   interactReferencePlayer,
   moveReferencePlayer,
   movePlayerFromHeldKeys,
@@ -126,6 +127,11 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   const canShoot = scene !== undefined && scene.type !== 'DIALOGUE' && scene.objects.some((object) => (
     object.preset === 'PLAYER_SPAWN' && object.components.some((component) => component.type === 'SHOOTER')
   ));
+  // S15P21A604-532 — 하단 고정 "E 상호작용" 버튼과 정확히 같은 판정(currentInteractionTarget)
+  // 으로 오브젝트 위 안내 문구를 띄운다 — 둘이 다른 로직을 쓰면 "버튼은 눌리는데 힌트가
+  // 안 뜨는" 불일치가 생긴다. 대화가 진행 중일 때는(activeDialogue !== null) 기존 버튼도
+  // disabled되므로 힌트도 같이 숨긴다.
+  const interactionTarget = activeDialogue === null ? currentInteractionTarget(project, runtime) : null;
   const completionRules = (project.rules ?? DEFAULT_GAME_RULES).completion;
 
   useEffect(() => {
@@ -402,6 +408,17 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
                   {object.showNameInPlay === true && object.name !== undefined && object.name !== '' && (
                     <span className="grp-object-nameplate" style={objectPercentPosition}>{object.name}</span>
                   )}
+                  {/* S15P21A604-532 — 지금 상호작용 범위 안의 대상이면서 INTERACTABLE
+                      컴포넌트에 안내 문구가 있을 때만 오브젝트 "위"에 힌트를 띄운다(이름표는
+                      아래라 서로 안 겹친다). ON_INTERACT 이벤트로만 상호작용 가능하고
+                      INTERACTABLE 컴포넌트가 없는 오브젝트는 보여줄 문구 자체가 없어 표시하지
+                      않는다 — 하단 고정 "E 상호작용" 버튼은 이 조건과 무관하게 그대로 둔다. */}
+                  {interactionTarget?.id === object.id && (() => {
+                    const interactable = object.components.find((component) => component.type === 'INTERACTABLE');
+                    return interactable?.type === 'INTERACTABLE' ? (
+                      <span className="grp-interaction-hint" style={objectPercentPosition}>{interactable.prompt}</span>
+                    ) : null;
+                  })()}
                 </Fragment>
               );
             })}

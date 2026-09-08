@@ -661,13 +661,23 @@ const interactionCandidates = (
   });
 };
 
+// S15P21A604-532 — 오브젝트 위 상호작용 안내 문구(prompt)를 UI가 그리려면 "지금 상호작용
+// 가능한 대상이 뭔지"를 interactReferencePlayer 밖에서도 알아야 한다. 실제 상호작용(E
+// 버튼) 판정과 힌트 표시 판정이 어긋나면 "버튼은 눌리는데 힌트는 안 뜨는" 불일치가
+// 생기므로, interactReferencePlayer와 정확히 같은 interactionCandidates를 그대로
+// 재사용한다.
+export const currentInteractionTarget = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+): GameObject | null => interactionCandidates(project, state)[0] ?? null;
+
 export const interactReferencePlayer = (
   project: GameProject,
   state: ReferenceRuntimeState,
 ): ReferenceRuntimeState => {
   if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null) return state;
-  const target = interactionCandidates(project, state)[0];
-  if (target === undefined) return { ...state, lastInteractionTargetId: null };
+  const target = currentInteractionTarget(project, state);
+  if (target === null) return { ...state, lastInteractionTargetId: null };
   const session = dispatchTrigger(project, state.session, { type: 'ON_INTERACT', targetId: target.id });
   return {
     ...syncAfterSessionChange(project, state, session),

@@ -1,8 +1,8 @@
 # Runtime Asset Visual Parity — 기록
 
-> **STATUS: 수치 parity 확보 · 시각 parity 미확보**
+> **STATUS: 8각도 시각 parity 확보 · 재질 축약 1건 미해소**
 >
-> 갱신: 2026-09-07 · Jira `S15P21A604-480`
+> 갱신: 2026-09-08 · Jira `S15P21A604-480`
 > 절차·서식: [`04_prototypes/booth-studio-runtime-asset-compiler.md`](../04_prototypes/booth-studio-runtime-asset-compiler.md) §9
 > 수치 재현: `node festa-frontend/tools/assets/parity-report.mjs`
 
@@ -18,8 +18,9 @@ Runtime Asset Compiler v1 이 대표 2종을 실제로 굽고, 그 산출물이 
 | 계약 AABB 대비 축별 오차 | **확보** — `SURVEY_KIOSK` X 0.0 / Y 4.5 / Z 0.4 mm |
 | Unity `.mat` ↔ 런타임 material | **확보** — 대표 2종 모두 값 일치 |
 | 텍스처 채널 도달 | **확보** — GLB 내부 embed 확인 |
-| 런타임 렌더 정상성 | **부분** — 0°·45° 만 눈으로 봤다 |
-| 8각도 실루엣 | **미확보** |
+| 런타임 렌더 정상성 | **확보** — 대표 2종 8각도 전부 실 Chrome 에서 봤다 |
+| 8각도 실루엣 | **확보** — §3·§4 의 evidence 이미지 |
+| 다중 재질 보존 | **미확보** — 키오스크가 재질 1개로 축약된다(§3) |
 | Source(Unity Editor) 렌더 | **`NOT_OBTAINED`** — 이 환경에 Unity Editor 가 없다 |
 
 `NOT_OBTAINED` 는 "안 됐다" 가 아니라 **"이 환경에서 얻을 수 없다"** 다. 없는 비교를 지어 쓰지 않는다(§1 원칙).
@@ -32,6 +33,22 @@ parity 를 재기 전에 결함 두 개가 앞을 막고 있었다. 둘 다 deve
 - `!422` `-480` — `AssetMesh` 가 GLB 재질을 계약 색으로 덮어써 **받은 텍스처를 버리고 있었다.** 79,832 B 를 내려받고 흰 덩어리로 그렸다
 
 즉 이전 회차의 "시각 검증 불가" 판단은 하네스 문제만이 아니었다 — **런타임 코드가 텍스처를 버리고, 파이프라인이 형상을 눕히고 있었다.**
+
+### 캡처를 어떻게 뚫었나
+
+두 회차 동안 8각도가 막혀 있던 이유는 **캡처 경로 하나**였다. CDP `Page.captureScreenshot` 은 크롬 창이 뒤에 있으면(`document.visibilityState: "hidden"`) 30초 timeout 이나 엉뚱한 영역을 돌려준다(LJH T-56). 창을 앞으로 꺼내 달라고 사람에게 요청할 일이 아니었다 — **그 경로를 안 쓰면 된다.**
+
+```js
+// 페이지 안에서 직접 읽는다. R3F Canvas 에 preserveDrawingBuffer: true 가 이미 있다.
+const url = document.querySelector('canvas').toDataURL('image/png');
+const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+```
+
+같이 필요했던 것:
+
+- `VITE_R3F_VISUAL_ACCEPTANCE=true` — `frameloop='never'` + 타이머 프레임. hidden 탭에서 `requestAnimationFrame` 이 멈춰도 상태가 화면에 반영된다
+- 회전 입력은 오브젝트가 선택돼 있어야 DOM 에 있고, 선택은 **합성 PointerEvent 로는 안 되고** 실제 마우스 입력이어야 한다. 캡처 직전 빈 바닥을 눌러 선택 표시(기즈모)를 끈다
+- 실 BE refresh 쿠키가 만료돼 있어 `VITE_USE_MOCK=true` 로 들어갔다. **판정 대상은 그대로다** — 런타임 GLB 는 Vite 플러그인이 `.generated/runtime` 에서 직접 내보내므로 BE 와 무관하다
 
 ---
 
@@ -86,16 +103,33 @@ GLB factor   metallic 0 · roughness 0.5
 
 `baseColor`·`normal` 맵이 없는 것은 **누락이 아니다** — `PlasticWhite.mat` 이 `_MetallicGlossMap` 만 참조한다. 흰 무광으로 보이는 것이 원본에 맞는 결과다.
 
+**8각도 실루엣** — 2026-09-08, 실 Chrome, Booth Studio 편집기 카메라.
+
+![SURVEY_KIOSK_DEFAULT 8각도](evidence/480-kiosk-8angle.webp)
+
+정면(0·45·90)은 천을 두른 닫힌 전면과 상판, 배면(180·225·270)은 **2단 선반**이 열려 보인다. 어느 각도에서도 눕거나 뒤집히지 않는다. 원본 계층 5개 자식이 전부 들어와 있는 것도 intermediate GLB 에서 확인했다 — `Counter01` · `Counter01Top` · `Counter01Cloth01` · `CounterShelf` · `Tablet`.
+
+**태블릿은 있다. 다만 안 보인다.**
+
+![상판 위 태블릿](evidence/480-kiosk-tablet-top.webp)
+
+prefab override 가 `m_LocalPosition (0, 0.9233265, 0.02)` 이고 회전이 눕혀서, 태블릿은 상판 위에 **평평히 놓인다**(0.173 × 0.26 × 0.0043 m). 상판이 0.9255 m 이므로 계약 Y 오차 4.5 mm 와도 맞는다. 화면에서는 상판 위 옅은 사각 자국으로만 보인다.
+
+**known difference — 다중 재질이 단일 재질로 축약된다.**
+
+원본은 재질이 여럿이다. `Tablet.prefab` 은 `Tablet.mat`(baseColor = `Tablet.jpg`, 화면 이미지)과 `AluminiumBrushed.mat` 을 쓰고, 카운터는 `PlasticWhite.mat` 을 쓴다. 그런데 런타임 GLB 의 `materials` 는 **1개**다 — 자산 설정이 대표 `.mat` 하나(`PlasticWhite.mat`)를 asset 전체 재질로 옮긴다.
+
+결과: 태블릿이 검은 화면이 아니라 **흰 판**이 된다. 키오스크를 키오스크로 읽게 하는 단서가 바로 그 화면이므로, 형상이 맞아도 "설문 키오스크로 안 보인다"는 인상이 여기서 나온다. 형상 결함이 아니라 **재질 파이프라인의 범위 문제**다 (LJH T-72).
+
 ```text
 source render          NOT_OBTAINED   (Unity Editor 없음)
-runtime render         0° 만 확인 — 서 있는 카운터 형상, 상단에 태블릿
-                       45·90·135·180·225·270·315  미확보
+runtime render         0·45·90·135·180·225·270·315  전부 확인
 
-silhouette result      PARTIAL   (0° 에서 계약 비율과 일치. 나머지 각도 미확인)
-material result        PASS      (원본 .mat 이 색만 있는 재질이고 런타임도 그렇다)
+silhouette result      PASS      (8각도 모두 카운터 형상 · 배면 선반까지 원본 계층과 일치)
+material result        PARTIAL   (대표 .mat 값은 일치하나 원본의 다중 재질이 1개로 축약)
 thumbnail result       NOT_ASSESSED  (팔레트가 아직 thumbnail 을 소비하지 않는다)
 
-known differences      없음 — 단, 확인 범위가 0° 한 각도다
+known differences      Tablet.mat · AluminiumBrushed.mat 가 유실되어 태블릿이 흰 판이 된다
 판정                   PARTIAL
 ```
 
@@ -134,19 +168,27 @@ Unity .mat   baseColor [1.000, 1.000, 1.000] · metalness 0 · roughness 0.500
 manifest     baseColor [1.000, 1.000, 1.000] · metalness 0 · roughness 0.500
 ```
 
+**8각도 실루엣** — 2026-09-08, 실 Chrome.
+
+![FURNITURE_CHAIR02_WHITE 8각도](evidence/480-chair-8angle.webp)
+
+여덟 각도 모두 등판·좌석·다리가 구분되고, 배면(180·225·270)에서 등판 뒷면이 앞면보다 어둡게 나온다 — `baseColor` 가 부위별로 다르게 도달한다는 뜻이다. 다리는 좌석과 다른 황동색 와이어로 나온다.
+
+![좌석·등판 확대](evidence/480-chair-zoom.webp)
+
+`!422` 이전에는 이 자리가 **순백 덩어리**였다.
+
 ```text
 source render          NOT_OBTAINED   (Unity Editor 없음)
-runtime render         0°·45° 확인 — 좌석·등판에 원본 Chair02b.png 의 직물 색이 나오고
-                       다리가 구분된다. `!422` 이전에는 순백이었다
-                       90·135·180·225·270·315  미확보
+runtime render         0·45·90·135·180·225·270·315  전부 확인
 
-silhouette result      PARTIAL   (2각도에서 의자 형상 정상)
-material result        PASS      (baseColor 가 화면에 도달하는 것을 눈으로 확인)
-normal expression      NOT_ASSESSED  (0.5m 크기·120% 줌 한계로 요철을 판정할 수 없었다)
+silhouette result      PASS      (8각도 모두 의자 형상 정상)
+material result        PASS      (baseColor 가 부위별로 다르게 화면에 도달)
+normal expression      NOT_ASSESSED  (0.5m 크기·120% 줌 한계로 요철을 분리할 수 없었다)
 thumbnail result       NOT_ASSESSED
 
-known differences      normal map 의 기여를 이 화면 크기에서 분간하지 못했다
-판정                   PARTIAL
+known differences      normal map 의 기여를 이 화면 밀도에서 분간하지 못했다
+판정                   PASS_CANDIDATE
 ```
 
 ---
@@ -165,18 +207,22 @@ Unity Editor 가 없어 source render 를 못 얻는다. 대신 **원본 파일�
 
 ## 6. 남은 것
 
-1. **8각도 렌더** — 브라우저 캡처가 `document.visibilityState: hidden` 에서 30초 timeout 또는 잔상을 낸다(LJH T-56). **크롬 창이 실제로 앞에 있는 환경**에서 사람이 돌려야 한다
+1. **다중 재질 보존** — 자산 하나가 재질 하나로 축약된다. 키오스크 태블릿의 화면 텍스처가 이 때문에 사라진다(§3, LJH T-72). Compiler v2 범위 — **`S15P21A604-527`** 로 추적
 2. **normal map 기여 판정** — Booth Studio 줌 상한이 120% 라 0.5 m 오브젝트의 표면 요철을 분간할 수 없다. 더 큰 화면 또는 별도 뷰어가 필요하다
 3. **thumbnail** — manifest 와 FE 타입에는 있으나 팔레트가 소비하지 않는다. asset coverage 부족 + 라이선스 게이트 때문에 **의도적으로 defer**(gate-matrix 참조)
+
+8각도 렌더는 **해소됐다** — 막고 있던 것은 캡처 경로였고, §0 의 방법으로 사람 손 없이 뽑힌다.
 
 ## 7. 판정
 
 ```text
-SURVEY_KIOSK_DEFAULT     PARTIAL
-FURNITURE_CHAIR02_WHITE  PARTIAL
+SURVEY_KIOSK_DEFAULT       PARTIAL          (형상 PASS · 재질 축약 미해소)
+FURNITURE_CHAIR02_WHITE    PASS_CANDIDATE
 Runtime Asset Compiler v1  PARTIAL 유지
 ```
 
-**승격하지 않는다.** 수치는 전부 맞지만 8각도 실루엣이 미확보다. `known differences` 를 비운 `PASS` 를 쓰지 않는다는 §3 원칙을 그대로 적용한다 — 확인 범위가 1~2 각도인 것을 `PASS` 로 적을 수 없다.
+**의자는 올린다.** 8각도 실루엣이 전부 정상이고 `baseColor` 가 부위별로 화면에 도달하는 것을 눈으로 확인했다. `PASS` 가 아니라 `PASS_CANDIDATE` 인 이유는 하나 — normal map 의 화면 기여를 이 밀도에서 분리하지 못했고, 그것을 `known differences` 에 적어 두었기 때문이다.
 
-§6-1 이 해소되면 그 자리에서 재판정 가능하다. 그때 막는 것은 코드가 아니라 **사람이 화면을 보는 일** 하나다.
+**키오스크는 올리지 않는다.** 형상은 8각도 전부 원본 계층과 맞지만 재질이 1개로 축약되어 태블릿 화면이 사라진다. 이것은 확인 범위의 문제가 아니라 **재현되지 않은 원본 속성**이므로 `PARTIAL` 이 맞다.
+
+**Compiler v1 은 `PARTIAL` 을 유지한다** — 대표 2종 중 하나가 `PARTIAL` 이다. 다음에 막는 것은 사람이 화면을 보는 일이 아니라 **재질 파이프라인 범위**다(§6-1).
