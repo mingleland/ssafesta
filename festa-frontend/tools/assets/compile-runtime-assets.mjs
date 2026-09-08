@@ -16,7 +16,7 @@ import { planTextureOptimization, resolveMaterial } from './compiler/material.mj
 import { RUNTIME_DIR, ensureDir } from './compiler/paths.mjs';
 
 /** v1 대표 — 조립체 하나 + 텍스처 worst case 하나. 늘리지 않는다 */
-const TARGET_ASSET_CODES = ['SURVEY_KIOSK_DEFAULT', 'FURNITURE_CHAIR02_WHITE'];
+const TARGET_ASSET_CODES = ['BOOTH_KIOSK_SURVEY', 'FURN_CHAIR_02_WHITE', 'DISP_BOX_01', 'FURN_CHAIR_01_WHITE'];
 
 function materialPathOf(source) {
   return source.material === undefined ? null : resolve(projectRoot, UNITY_ASSETS_ROOT, source.material);
