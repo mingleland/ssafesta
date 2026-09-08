@@ -202,7 +202,9 @@ function toAggregate(wire: SurveyAggregateWire): SurveyQuestionAggregateVM | nul
 
 export function toTextAnswerPage(wire: SurveyTextPageWire): SurveyTextAnswerPage {
   return {
-    items: wire.content.map((c) => c.text),
+    // questionId 를 버리지 않는다 — 서버가 이미 주는 값이고, 없으면 텍스트 문항이 여럿일 때
+    // 어느 질문의 답인지 복구할 수 없다. run 경로 문항 id 와 같은 공간이 되도록 String() 을 쓴다
+    items: wire.content.map((c) => ({ questionId: String(c.questionId), text: c.text })),
     page: wire.page,
     hasNext: wire.page + 1 < wire.totalPages,
   };
@@ -217,6 +219,9 @@ export function toResultSnapshot(wire: SurveyResultWire): SurveyResultSnapshot {
   return {
     surveyId: wire.surveyId,
     totalResponses: wire.totalResponses,
+    // ISO 문자열 원형 그대로. 포맷은 UI 가 하고 null 은 null 로 둔다
+    firstRespondedAt: wire.firstRespondedAt,
+    lastRespondedAt: wire.lastRespondedAt,
     perQuestion,
     textAnswers: toTextAnswerPage(wire.textAnswers),
   };

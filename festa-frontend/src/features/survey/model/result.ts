@@ -12,9 +12,14 @@ export interface SurveyResultState {
   surveyId: number | null;
   /** 전체 응답 수. 빈 판정의 기준이고 화면에도 표시한다 */
   totalResponses: number;
+  /** 최초·최근 응답 시각 — wire ISO 원형. 포맷은 화면이 하고 null 은 null 로 둔다 */
+  firstRespondedAt: string | null;
+  lastRespondedAt: string | null;
   perQuestion: SurveyQuestionAggregateVM[];
   textAnswers: {
-    items: string[]; // 누적 — loadNextTextPage 가 다음 페이지를 이어 붙인다
+    // 누적 — loadNextTextPage 가 다음 페이지를 이어 붙인다.
+    // questionId 는 서버 wire id 를 담은 string 이다(Builder 의 q-1 과 다른 공간)
+    items: { questionId: string; text: string }[];
     page: number;
     hasNext: boolean;
     loadingNext: boolean;
@@ -26,6 +31,8 @@ const initialState: SurveyResultState = {
   boothId: null,
   surveyId: null,
   totalResponses: 0,
+  firstRespondedAt: null,
+  lastRespondedAt: null,
   perQuestion: [],
   textAnswers: { items: [], page: 0, hasNext: false, loadingNext: false },
 };
@@ -67,6 +74,8 @@ export async function loadSurveyResult(boothId: number): Promise<void> {
       status: isEmpty ? 'empty' : 'ready',
       surveyId: result.surveyId,
       totalResponses: result.totalResponses,
+      firstRespondedAt: result.firstRespondedAt,
+      lastRespondedAt: result.lastRespondedAt,
       perQuestion: result.perQuestion,
       textAnswers: { ...result.textAnswers, loadingNext: false },
     });

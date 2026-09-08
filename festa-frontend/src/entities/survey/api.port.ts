@@ -38,13 +38,34 @@ export interface SurveyRunSnapshot {
 }
 
 export interface SurveyTextAnswerPage {
-  items: string[];
+  /**
+   * 주관식 답변 한 페이지.
+   *
+   * **`questionId` 는 서버 wire id 를 담은 string 이다** — `String(서버 questionId)` 이고 run 경로
+   * 문항 id 와 **같은 공간**이다. Builder 가 로컬로 채번하는 `q-1` 과는 무관하므로, 이 값으로
+   * run 경로 문항과 대조하는 것은 유효하고 draft 경로 id 와 비교하는 것은 항상 틀린다.
+   *
+   * text 만 남기면 텍스트 문항이 2개 이상인 설문에서 **어느 질문의 답인지 복구할 수 없다**
+   * (GitLab #133, 2026-09-08 BE 지적).
+   */
+  items: { questionId: string; text: string }[];
   page: number;
   hasNext: boolean;
 }
 
 export interface SurveyResultSnapshot {
   surveyId: number;
+  /**
+   * 최초·최근 응답 시각. **wire 의 ISO 문자열 원형 그대로 둔다** — 표시 형식으로 바꾸는 것은 UI 의
+   * 책임이고, 상태에서 미리 가공하면 그 값이 표시용인지 원본인지 다음 소비자가 알 수 없다.
+   *
+   * 응답 0건이면 `null` 이고 **끝까지 `null` 이다**(상태에서 `''`·`'-'` 로 치환하지 않는다) —
+   * 그래야 "응답이 없다" 와 "그런 문자열" 이 구별된다.
+   *
+   * spec 010 US2 시나리오 1 이 이 두 값의 표시를 인수 조건으로 요구한다.
+   */
+  firstRespondedAt: string | null;
+  lastRespondedAt: string | null;
   /**
    * 전체 응답 수. **빈 결과 판정은 이 값으로 한다** — perQuestion 은 응답이 0건이어도 모든 문항을
    * 싣기 때문에(계약 §7) 길이로는 "아직 아무도 안 답함" 과 "문항이 없음" 이 구별되지 않는다.

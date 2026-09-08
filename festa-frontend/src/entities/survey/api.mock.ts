@@ -71,6 +71,9 @@ export const surveyMockPort: SurveyPort = {
       return {
         surveyId,
         totalResponses: 0,
+        // 응답 0건이면 서버가 두 시각을 null 로 준다 (계약 §7)
+        firstRespondedAt: null,
+        lastRespondedAt: null,
         perQuestion: RESULT_AGGREGATES.map((a) =>
           a.kind === 'rating'
             ? { ...a, answeredCount: 0, average: null, distribution: a.distribution.map((d) => ({ ...d, count: 0 })) }
@@ -79,7 +82,14 @@ export const surveyMockPort: SurveyPort = {
         textAnswers: { items: [], page: 0, hasNext: false },
       };
     }
-    return { surveyId, totalResponses: 20, perQuestion: RESULT_AGGREGATES, textAnswers: textPage(0) };
+    return {
+      surveyId,
+      totalResponses: 20,
+      firstRespondedAt: '2026-09-08T04:11:02Z',
+      lastRespondedAt: '2026-09-08T07:55:40Z',
+      perQuestion: RESULT_AGGREGATES,
+      textAnswers: textPage(0),
+    };
   },
 
   async getTextAnswers(_surveyId: number, page: number): Promise<SurveyTextAnswerPage> {

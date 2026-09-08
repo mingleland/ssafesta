@@ -149,11 +149,17 @@ export function validateBuilder(): SurveyBuilderIssueVM[] {
 export async function saveSurveyBuilder(): Promise<void> {
   if (state.status !== 'ready' || state.boothId === null) return;
   if (state.save.phase === 'submitting' || validateBuilder().length > 0) return;
+  // 저장 시작 시점의 부스를 잡아 둔다. await 뒤에 대조하지 않으면 저장 중 부스를 옮겼을 때
+  // 이전 부스의 늦은 응답이 **새 부스의 dirty 를 해제**해 미저장 변경이 사라진다
+  // (GitLab #133, 2026-09-08 BE 지적). run.ts 의 submitSurveyRun 과 같은 모양이다
+  const boothId = state.boothId;
   setState({ save: { phase: 'submitting' } });
   try {
-    await surveyApi.saveDraft(state.boothId, state.draft);
+    await surveyApi.saveDraft(boothId, state.draft);
+    if (state.boothId !== boothId) return;
     setState({ dirty: false, save: { phase: 'success' } });
   } catch {
+    if (state.boothId !== boothId) return;
     setState({ save: { phase: 'error' } });
   }
 }
