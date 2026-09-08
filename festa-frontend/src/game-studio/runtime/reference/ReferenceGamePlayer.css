@@ -13,7 +13,7 @@
   color: #f3f5f8;
   display: grid;
   font-family: Inter, Pretendard, 'Segoe UI', sans-serif;
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 54px minmax(0, 1fr);
   height: 100vh;
   min-height: 620px;
@@ -36,16 +36,85 @@
 .grp-topbar .grp-perf-monitor em { letter-spacing: 0; white-space: nowrap; }
 
 .grp-stage-wrap { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: hidden; padding: 34px; position: relative; }
-.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; width: 100%; }
+/* S15P21A604-492 — width는 여기서 고정하지 않는다(ReferenceGamePlayer.tsx의 인라인
+   style이 씬 비율을 반영해 매번 계산한다) — 고정 100%로 두면 세로가 긴 씬에서 비율이
+   깨진다. max-height/max-width는 그 계산식이 참조하는 상한이자 안전망으로 남겨둔다. */
+.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; }
 .grp-map::after { background-image: repeating-linear-gradient(to right,transparent 0,transparent calc((100% / var(--grp-columns)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-columns))),repeating-linear-gradient(to bottom,transparent 0,transparent calc((100% / var(--grp-rows)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-rows))); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 3; }
 .grp-tile-layer { display: grid; grid-template-columns: repeat(var(--grp-columns),1fr); grid-template-rows: repeat(var(--grp-rows),1fr); inset: 0; opacity: .72; pointer-events: none; position: absolute; z-index: 1; }
 .grp-tile-layer > span { border: 1px solid rgba(255,255,255,.025); }
 .grp-object,.grp-player { align-items: center; display: inline-flex; justify-content: center; position: absolute; transform: translate(-50%,-50%); z-index: 4; }
-.grp-object { background: rgba(7,9,12,.74); border: 1px solid rgba(255,255,255,.46); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.5); color: #f0c764; font-size: 17px; height: 34px; width: 34px; }
-.grp-object img { height: 31px; image-rendering: pixelated; object-fit: contain; width: 31px; }
-.grp-static-sprite { background-repeat: no-repeat; display: block; height: 31px; image-rendering: pixelated; width: 31px; }
+/* S15P21A604-537 — 34px 고정 대신, 이미 .grp-tile-layer가 쓰고 있는 --grp-columns/
+   --grp-rows(.grp-map에 심어진 씬 크기)로 격자 한 칸 크기에 맞춘다 — 에디터 캔버스의
+   .gss-map-object(calc(100% / 칸 수))와 정확히 같은 공식. 이모지 폴백 아이콘 자체의
+   font-size는 QA 확정대로 고정값 그대로 둔다(칸 크기와 무관). */
+.grp-object { border-radius: 8px; color: #f0c764; font-size: 17px; height: calc(100% / var(--grp-rows)); width: calc(100% / var(--grp-columns)); }
+/* S15P21A604-535 — 이미지 asset이 있으면(has-visual) 배경/테두리/그림자를 아예 안 둬서
+   에디터 캔버스(.gss-map-object, 기본 투명)와 같아지게 한다. 이미지가 없어 이모지
+   폴백(definition.icon)만 뜨는 경우엔 이 어두운 배지가 가독성에 필요해서 유지한다 —
+   원래는 이 배지가 이미지 유무와 무관하게 항상 붙어서, 커스텀 이미지가 플레이 중엔
+   불투명한 박스 안에 갇혀 보이던 게 이번 QA의 원인이었다. */
+.grp-object:not(.has-visual) { background: rgba(7,9,12,.74); border: 1px solid rgba(255,255,255,.46); box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+/* S15P21A604-537 — 31px 고정 대신 부모(.grp-object, 이제 격자 칸 크기) 대비 88%로 —
+   에디터 캔버스의 .gss-map-object > img/.gss-static-sprite와 정확히 같은 채움 비율. */
+.grp-object img { height: 88%; image-rendering: pixelated; object-fit: contain; width: 88%; }
+.grp-static-sprite { background-repeat: no-repeat; display: block; height: 88%; image-rendering: pixelated; width: 88%; }
+/* S15P21A604-529 — 오브젝트와 같은 left/top(%)에 놓고 아래로 오프셋만 준다(x축은 %로
+   중앙 정렬, y축은 px 고정값이라 translate 안에서 단위를 섞어 써도 된다 — 오브젝트 높이
+   (.grp-object 34px)의 절반을 넘어서는 값으로 잡아 하단에 겹치지 않게 뗀다). -526의
+   grp-damage-popup과 달리 애니메이션 없이 조건이 참인 동안 계속 떠 있는 상시 이름표다. */
+.grp-object-nameplate {
+  background: rgba(8,11,16,.72);
+  border-radius: 4px;
+  color: #f5f7fb;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  pointer-events: none;
+  position: absolute;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  transform: translate(-50%, 21px);
+  white-space: nowrap;
+  z-index: 20;
+}
+/* S15P21A604-532 — 오브젝트와 같은 left/top(%)에 놓고 위로 오프셋만 준다(.grp-object-nameplate
+   와 대칭 — 이름표는 아래, 안내 문구는 위라 서로 겹치지 않는다). 상시 이름표와 달리 지금
+   상호작용 범위 안에 있을 때만 조건부로 렌더링된다(별도 애니메이션은 없음). */
+.grp-interaction-hint {
+  background: rgba(37,99,235,.85);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  pointer-events: none;
+  position: absolute;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  transform: translate(-50%, -140%);
+  white-space: nowrap;
+  z-index: 20;
+}
 .grp-player { filter: drop-shadow(0 5px 5px rgba(0,0,0,.7)); height: 56px; transition: left .1s linear,top .1s linear; width: 56px; z-index: 5; }
 .grp-player .gss-sprite-preview { transform: scale(.9); }
+/* S15P21A604-526 — 캐릭터(.grp-player)와 같은 left/top(%)에 놓고, 여기서 오른쪽 위로
+   오프셋한 뒤 위로 계속 이동하며 페이드아웃하는 애니메이션만 얹는다(.grp-player처럼
+   중앙 정렬용 translate(-50%,-50%)는 쓰지 않는다 — 시작 지점 자체를 이미 캐릭터
+   오른쪽 위로 잡기 위함). duration은 ReferenceGamePlayer.tsx의 DAMAGE_POPUP_DURATION_MS
+   와 반드시 같아야 자바스크립트가 지우는 시점과 애니메이션이 다 사라지는 시점이 맞는다. */
+.grp-damage-popup {
+  animation: grp-damage-float 900ms ease-out forwards;
+  color: #ff6b6b;
+  font-size: 16px;
+  font-weight: 800;
+  pointer-events: none;
+  position: absolute;
+  text-shadow: 0 2px 4px rgba(0,0,0,.65);
+  z-index: 9;
+}
+@keyframes grp-damage-float {
+  0% { opacity: 1; transform: translate(12px, -36px); }
+  100% { opacity: 0; transform: translate(12px, -78px); }
+}
 .grp-dynamic-enemy,.grp-projectile { align-items: center; display: flex; justify-content: center; position: absolute; transform: translate(-50%,-50%); z-index: 8; }
 .grp-dynamic-enemy { filter: drop-shadow(0 5px 5px rgba(0,0,0,.6)); height: 38px; width: 38px; }
 .grp-dynamic-enemy > span,.grp-projectile > span { background-repeat: no-repeat; display: block; height: 100%; image-rendering: pixelated; width: 100%; }
@@ -70,26 +139,46 @@
 .grp-choices button:hover { background: rgba(77,148,255,.13); border-color: var(--grp-blue); }
 .grp-choices button span { align-items: center; background: #29313c; border-radius: 50%; color: #9aa5b4; display: inline-flex; font-size: 8px; height: 20px; justify-content: center; margin-right: 9px; width: 20px; }
 
-.grp-hud { background: rgba(255,255,255,.96); border-left: 1px solid #dde2e9; color: #1a1f2b; display: flex; flex-direction: column; gap: 18px; padding: 18px 14px; }
-.grp-hud > div { display: grid; gap: 8px; }
-.grp-hud > div > span { color: #4b5563; font-size: 8px; font-weight: 850; letter-spacing: .13em; }
-.grp-hud small { color: #5b6577; font-size: 9px; }
-.grp-hud strong { background: #f4f6f9; border: 1px solid #dde2e9; border-radius: 6px; color: #8a6410; font-size: 9px; padding: 8px; }
-.grp-objectives strong { align-items: center; display: grid; gap: 6px; grid-template-columns: auto minmax(0,1fr) auto; }
-.grp-objectives strong i { color: #5b6577; font-style: normal; }
-.grp-objectives strong small { color: #5b6577; font-size: 7px; }
-.grp-objectives strong.is-complete { border-color: rgba(22,163,74,.4); color: #15803d; }
-.grp-objectives strong.is-complete i { color: #15803d; }
-.grp-controls { margin-top: auto; }
-.grp-controls > div { display: grid; gap: 5px; grid-template-columns: repeat(3,1fr); }
-.grp-controls button { aspect-ratio: 1; background: #f4f6f9; border: 1px solid #ccd3dc; border-radius: 6px; cursor: pointer; }
-.grp-controls button:first-child { grid-column: 2; }
-.grp-controls button:nth-child(2) { grid-column: 1; }
-.grp-controls button:hover { border-color: #2563eb; }
-.grp-interact { background: linear-gradient(135deg,#286fe6,#486fd7); border: 1px solid #6094ee; border-radius: 8px; color: white; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
-.grp-interact kbd { background: rgba(0,0,0,.23); border-radius: 4px; margin-right: 6px; padding: 3px 5px; }
-.grp-shoot { background: linear-gradient(135deg,#b85a22,#d7475d); border: 1px solid #e77b68; border-radius: 8px; color: white; cursor: pointer; font-size: 10px; font-weight: 700; padding: 11px; }
-.grp-shoot kbd { background: rgba(0,0,0,.23); border-radius: 4px; margin-right: 6px; padding: 3px 5px; }
+/* S15P21A604-540 — 오른쪽 사이드바(구 .grp-hud/.grp-objectives/.grp-controls/.grp-interact/
+   .grp-shoot)를 걷어내고, 상태/목표/인벤토리/조작 안내를 게임 캔버스(.grp-map, 이미
+   position: relative) 안쪽 오버레이로 재배치한다. 전부 .grp-map을 기준으로 position:
+   absolute — z-index는 오브젝트(4)·이름표/힌트(20)보다는 위, 결과 화면(.grp-result, 20)·
+   대화 레이어(.grp-dialogue-layer, 100)보다는 아래로 둬서 게임 완료/대화 중엔 자연스럽게
+   가려지게 한다(과거엔 버튼 disabled로 이걸 흉내 냈다). */
+.grp-hud-objectives {
+  align-items: center;
+  background: rgba(255,255,255,.92);
+  border-radius: 8px;
+  color: #1a1f2b;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  left: 50%;
+  padding: 6px 12px;
+  position: absolute;
+  top: 10px;
+  transform: translateX(-50%);
+  z-index: 15;
+}
+.grp-hud-objectives > span { color: #4b5563; font-size: 8px; font-weight: 850; letter-spacing: .08em; white-space: nowrap; }
+.grp-hud-objectives strong { align-items: center; background: #f4f6f9; border: 1px solid #dde2e9; border-radius: 6px; color: #8a6410; display: grid; font-size: 9px; gap: 6px; grid-template-columns: auto minmax(0,1fr) auto; padding: 5px 8px; white-space: nowrap; }
+.grp-hud-objectives strong i { color: #5b6577; font-style: normal; }
+.grp-hud-objectives strong small { color: #5b6577; font-size: 7px; }
+.grp-hud-objectives strong.is-complete { border-color: rgba(22,163,74,.4); color: #15803d; }
+.grp-hud-objectives strong.is-complete i { color: #15803d; }
+
+.grp-hud-status { align-items: flex-end; display: flex; flex-direction: column; gap: 4px; position: absolute; right: 12px; top: 12px; z-index: 15; }
+.grp-hud-hearts { display: flex; gap: 3px; }
+.grp-hud-hearts span { color: rgba(255,255,255,.35); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); font-size: 15px; }
+.grp-hud-hearts span.is-filled { color: #ff5a6b; }
+.grp-hud-score { color: #ffd257; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); font-size: 13px; font-weight: 800; }
+
+.grp-hud-inventory { display: grid; gap: 4px; left: 12px; position: absolute; top: 12px; z-index: 15; }
+.grp-hud-inventory > span { color: rgba(255,255,255,.7); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); font-size: 8px; font-weight: 850; letter-spacing: .08em; }
+.grp-hud-inventory strong,.grp-hud-inventory small { background: rgba(8,11,16,.72); border-radius: 4px; color: #f5f7fb; display: block; font-size: 9px; padding: 3px 6px; }
+
+.grp-hud-actions { bottom: 12px; display: flex; gap: 8px; left: 12px; position: absolute; z-index: 15; }
+.grp-action-label { background: rgba(8,11,16,.72); border-radius: 5px; color: #f5f7fb; font-size: 9px; font-weight: 700; padding: 4px 8px; pointer-events: none; }
 
 .grp-result { align-items: center; background: rgba(255,255,255,.98); border: 1px solid rgba(22,163,74,.4); border-radius: 13px; box-shadow: 0 25px 80px rgba(20,25,35,.35); color: #1a1f2b; display: flex; flex-direction: column; left: 50%; min-width: 380px; padding: 34px; position: absolute; text-align: center; top: 50%; transform: translate(-50%,-50%); z-index: 20; }
 .grp-result > span { align-items: center; background: rgba(22,163,74,.14); border-radius: 50%; color: #15803d; display: inline-flex; font-size: 30px; height: 70px; justify-content: center; width: 70px; }

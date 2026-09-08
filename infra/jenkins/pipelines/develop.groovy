@@ -50,16 +50,18 @@ def call(Map config = [:]) {
                 int fresh = sh(returnStatus: true, script: 'FRESHNESS_EXPECTED_SHA="$CI_COMMIT_SHA" infra/jenkins/scripts/freshness.sh')
                 if (fresh == 75) { currentBuild.result = 'NOT_BUILT'; error('SUPERSEDED: newer develop head exists') }
                 if (fresh != 0) { error('develop freshness check failed') }
-                ['DEMO_BACK_ENV_CREDENTIAL_ID', 'DEMO_AI_ENV_CREDENTIAL_ID', 'DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID'].each { name ->
+                ['DEMO_BACK_ENV_CREDENTIAL_ID', 'DEMO_AI_ENV_CREDENTIAL_ID',
+                 'DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID', 'DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID'].each { name ->
                     if (!env[name]?.trim()) { error("필수 Jenkins credential ID 누락: ${name}") }
                 }
                 withCredentials([
                     file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'BACK_ENV_FILE'),
                     file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE'),
+                    string(credentialsId: env.DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS'),
                     string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
                 ]) {
                     withEnv(['FESTA_ENVIRONMENT=demo', 'PUBLIC_UNITY_BUILD_BASE=/unity/']) {
-                        sh 'infra/jenkins/scripts/with-credentials.sh BACK_ENV_FILE AI_ENV_FILE INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-release.sh'
+                        sh 'infra/jenkins/scripts/with-credentials.sh BACK_ENV_FILE AI_ENV_FILE INTERNAL_SPRING_TO_AI_TOKENS INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-release.sh'
                     }
                 }
                 int verified = sh(returnStatus: true, script: 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/verify-release.sh')

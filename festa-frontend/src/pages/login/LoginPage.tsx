@@ -104,7 +104,7 @@ export function LoginPage() {
   );
 
   function startOAuth(provider: AuthProviderId) {
-    // not_configured(ssafy) 는 여기 도달해도 아무 것도 하지 않는다 — 실 OAuth 계약(-357) 전 발명 금지
+    // 배선되지 않은 provider 는 여기서 멈춘다 — registry 가 유일한 판정자다(-495 이후 3종 모두 배선).
     if (!isConfiguredOAuth(provider)) return;
     if (USE_MOCK) {
       mockStartOAuth(provider);

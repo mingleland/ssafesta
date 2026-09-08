@@ -70,6 +70,37 @@ public class BoothAccessGuard {
     }
 
     /**
+     * What a visitor may open: the booth exists, its lease is live, and a layout is published.
+     *
+     * <p>These three gates were already written out three times — {@code ProjectService
+     * .requireVisitorVisible}, {@code BoothQueryService.findPublicBooth}, {@code
+     * BoothLayoutQueryService.findPublished}. A fourth copy is the one that forgets the lease line,
+     * and the way that failure looks is every happy path staying green while one expiry test goes
+     * red. It lives here now so the line exists once.
+     *
+     * <p><b>Order is contractual.</b> Missing booth, then expired lease, then unpublished — the same
+     * order the three copies use, so the frontend branches on one set of codes. It is also the order
+     * that does not tell someone with no business here whether this booth is still alive.
+     *
+     * <p>The existing three are left alone: they are working code under test, and rewriting them
+     * would put regression risk in a ticket that is adding a survey.
+     *
+     * @return the booth, so callers do not load it a second time
+     * @throws BoothNotFoundException       no such booth
+     * @throws BoothExpiredException        the lease ran out
+     * @throws LayoutNotPublishedException  nothing is published yet
+     */
+    @Transactional(readOnly = true)
+    public Booth requireVisitorVisible(Long boothId) {
+        Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        requireActiveLease(boothId);
+        if (!booth.isPublished()) {
+            throw new LayoutNotPublishedException();
+        }
+        return booth;
+    }
+
+    /**
      * Editor <b>and</b> unexpired — the pair nine call sites were writing on two adjacent lines.
      *
      * <p>Permission first, availability second: a member with no claim on this booth should be told

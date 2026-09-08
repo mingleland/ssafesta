@@ -73,17 +73,30 @@ const contentCalls = (stub: FetchStub) => stub.calls.filter((call) => call.url.e
 let createObjectURL: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // S15P21A604-409 — PlayGamePage 는 VITE_USE_MOCK==='true' && VITE_GAME_STUDIO_API_ENABLED!=='true' 면
+  // 이 파일이 스텁하는 global fetch를 아예 안 쓰는 브라우저 로컬 mock 게시 저장소로 새 버린다(개발자
+  // 로컬 .env.local 값에 좌우됨 — 이 checkout은 VITE_USE_MOCK=true라 실제로 항상 재현됐다). 이 테스트가
+  // 검증하려는 건 "실제 API 경로"이므로, 로컬 .env.local이 뭐든 항상 그 경로를 타도록 env를 고정한다.
+  vi.stubEnv('VITE_USE_MOCK', 'false');
+  vi.stubEnv('VITE_GAME_STUDIO_API_ENABLED', 'true');
   // jsdom 에는 없다. object URL 생성 자체가 "해석이 끝까지 갔다"의 관측 지점이라 세어 둔다.
   createObjectURL = vi.fn(() => 'blob:festa-test');
   vi.stubGlobal('URL', Object.assign(URL, {
     createObjectURL,
     revokeObjectURL: vi.fn(),
   }));
+  // S15P21A604-409/-477 — 로컬 .env.local(VITE_USE_MOCK=true)이 있으면 PlayGamePage가
+  // 브라우저 mock 게시 저장소로 라우팅돼 아래 global fetch 스텁이 개입할 여지가 없어진다.
+  // isBrowserPublicationEnabled()가 accessor로 바뀐 뒤에도 이 stub이 실제로 반영되는지가
+  // 이 파일의 핵심 검증 대상이다.
+  vi.stubEnv('VITE_USE_MOCK', 'false');
+  vi.stubEnv('VITE_GAME_STUDIO_API_ENABLED', 'true');
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 

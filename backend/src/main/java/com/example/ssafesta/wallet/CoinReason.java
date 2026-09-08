@@ -22,6 +22,9 @@ public final class CoinReason {
     /** Catalog item purchase (spec 012 FR-003). */
     public static final String PURCHASE = "PURCHASE";
 
+    /** Survey response reward, once per member per survey (spec 010 FR-005). */
+    public static final String SURVEY_REWARD = "SURVEY_REWARD";
+
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";
 

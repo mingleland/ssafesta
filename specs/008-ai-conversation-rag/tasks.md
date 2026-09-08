@@ -9,12 +9,16 @@
 
 - [X] T052 [DOCS] 문서 세트를 Spring Business DB/pgvector 단독 소유로 정합화한다 (S15P21A604-449)
 - [X] T053 [DOCS] `contracts/spring-chunk-search-api.yaml`에 검색 요청·응답과 격리 조건을 정의한다 (S15P21A604-449)
-- [ ] T048 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다 (S15P21A604-398)
+- [ ] T054 [BE] 검색 repository/service/controller에 `boothId + agentId + searchable=true + Document READY` 강제 조건을 구현한다. 내부 timeout 3초, threshold 없이 `topK`까지 채워서 반환하며, 계약(`additionalProperties: false`) 외 필드는 전역 오류 봉투 `400 VALIDATION_FAILED`로 거부한다 (S15P21A604-398)
 - [ ] T049 [AI] 직접 pgvector repository를 제거하고 질의 Embedding 후 Spring 검색 client를 호출하도록 변경한다
 - [ ] T050 [BE/AI] 실제 Business DB fixture로 topK, 3초 timeout, distance 정렬, threshold 없음과 scope 누출 0건을 검증한다
-- [ ] T051 [AI] 검색 응답을 Context에 넣기 전 Conversation scope를 재검증하고 위반 시 Fail Closed 처리한다
+- [ ] T051 [AI] 요청 시 보낸 `boothId + agentId`를 Conversation snapshot과 대조해 검증하고 위반 시 Fail Closed 처리한다 (검색 응답에는 scope 필드가 없다 — 재검증 대상은 요청이다)
 
-**Dependency**: T048과 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
+**Dependency**: T054와 S15P21A604-399 Agent 설정 합의 → T049/T051 → T050 Release Gate.
+
+## S15P21A604-507 Spring Agent 설정 client 결선
+
+- [X] T055 [AI] `GET /internal/ai/agent-config` client를 공용 HTTP lifecycle과 연결하고, 질문마다 검색 전에 설정을 1회 조회한다. 성공 응답 다섯 필드를 엄격 변환하며 `AGENT_NOT_IN_BOOTH`·`AGENT_INACTIVE` 및 네트워크·계약 오류는 원문 노출 없이 Fail Closed 처리한다. 운영 `create_app()`의 Mock을 제거하고 단위·계약·회귀 테스트와 C-16 결정 문서를 갱신한다 (S15P21A604-507)
 
 ## Phase 1: Setup
 

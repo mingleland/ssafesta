@@ -62,7 +62,9 @@ export interface Position2d {
 export type Component =
   | { readonly type: 'SPRITE'; readonly assetId: string; readonly scale?: number; readonly zIndex?: number }
   | { readonly type: 'COLLIDER'; readonly solid: boolean }
-  | { readonly type: 'INTERACTABLE'; readonly prompt: string }
+  // S15P21A604-534 — range 미지정 시 기본값 1(기존 "같은 칸 또는 정면 한 칸" 그대로).
+  // 방향 무관 맨해튼 거리(|dx|+|dy|) 기준으로 판정한다(referenceRuntime.ts 참고).
+  | { readonly type: 'INTERACTABLE'; readonly prompt: string; readonly range?: number }
   | { readonly type: 'PICKUP'; readonly itemId: string }
   | { readonly type: 'DAMAGE'; readonly amount: number }
   | { readonly type: 'HEALTH'; readonly max: number }
@@ -92,6 +94,12 @@ export interface GameObject {
   readonly position: Position2d;
   readonly visible: boolean;
   readonly components: readonly Component[];
+  // S15P21A604-529 — 에디터 내부 식별용 이름과, 플레이 중 그 이름을 캐릭터/오브젝트 위에
+  // 상시 표시할지 여부. 이름을 비우면(undefined) 표시를 켜놔도 아무것도 뜨지 않는다.
+  // PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어 캐릭터는 별도 렌더링)
+  // 둘 다 가질 수 없다 — validateObjectShape에서 강제한다.
+  readonly name?: string;
+  readonly showNameInPlay?: boolean;
 }
 
 export type Trigger =
@@ -422,8 +430,9 @@ const validateComponentShape = (value: unknown, path: string): void => {
     return;
   }
   if (base.type === 'INTERACTABLE') {
-    const record = recordAt(value, path, ['type', 'prompt']);
+    const record = recordAt(value, path, ['type', 'prompt'], ['type', 'prompt', 'range']);
     stringAt(record.prompt, `${path}.prompt`, 1, 80);
+    if (record.range !== undefined) integerAt(record.range, `${path}.range`, 1, 100);
     return;
   }
   if (base.type === 'PICKUP') {
@@ -475,9 +484,14 @@ const validateComponentShape = (value: unknown, path: string): void => {
 };
 
 const validateObjectShape = (value: unknown, path: string): void => {
-  const record = recordAt(value, path, ['id', 'preset', 'position', 'visible', 'components']);
+  const record = recordAt(
+    value,
+    path,
+    ['id', 'preset', 'position', 'visible', 'components'],
+    ['id', 'preset', 'position', 'visible', 'components', 'name', 'showNameInPlay'],
+  );
   stableIdAt(record.id, `${path}.id`);
-  enumAt(record.preset, `${path}.preset`, [
+  const preset = enumAt(record.preset, `${path}.preset`, [
     'PLAYER_SPAWN', 'WALL', 'NPC', 'INTERACTABLE', 'ITEM', 'DOOR', 'GOAL',
     'PLATFORM', 'HAZARD', 'ENEMY', 'TURRET', 'CHECKPOINT', 'SPAWNER', 'DECORATION',
   ]);
@@ -487,6 +501,17 @@ const validateObjectShape = (value: unknown, path: string): void => {
   expect(typeof record.visible === 'boolean', 'GAME_PROJECT_INVALID', `${path}.visible must be boolean`);
   arrayAt(record.components, `${path}.components`, 0, 10)
     .forEach((component, index) => validateComponentShape(component, `${path}.components[${index}]`));
+  // S15P21A604-529 — PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어
+  // 캐릭터는 .grp-player로 별도 렌더링) 이름/표시 설정 자체를 가질 수 없다(QA 확정 사항).
+  if (preset === 'PLAYER_SPAWN') {
+    expect(record.name === undefined, 'GAME_PROJECT_INVALID', `${path}.name is not allowed for PLAYER_SPAWN`);
+    expect(record.showNameInPlay === undefined, 'GAME_PROJECT_INVALID', `${path}.showNameInPlay is not allowed for PLAYER_SPAWN`);
+  } else {
+    if (record.name !== undefined) stringAt(record.name, `${path}.name`, 1, 40);
+    if (record.showNameInPlay !== undefined) {
+      expect(typeof record.showNameInPlay === 'boolean', 'GAME_PROJECT_INVALID', `${path}.showNameInPlay must be boolean`);
+    }
+  }
 };
 
 const validateTileLayerShape = (value: unknown, path: string): void => {

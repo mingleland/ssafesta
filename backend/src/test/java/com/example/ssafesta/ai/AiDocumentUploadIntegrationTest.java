@@ -20,10 +20,13 @@ import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
+import com.example.ssafesta.user.AccountDeletionService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,7 +47,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>T030 — 파일은 Spring 을 통과하지 않는다. 브라우저가 저장소로 직접 PUT 하므로, 여기서
  * "업로드했다"는 것은 {@link FakeObjectStorage#putObject} 다.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
+@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class,
+        FakeDocumentProcessingClientConfiguration.class})
 @SpringBootTest
 @AutoConfigureMockMvc
 class AiDocumentUploadIntegrationTest {
@@ -69,11 +73,15 @@ class AiDocumentUploadIntegrationTest {
     @Autowired private FakeObjectStorage storage;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private AccountDeletionService deletions;
+    @Autowired private FakeDocumentProcessingClient processing;
+    @Autowired private DocumentJobDispatchSweeper sweeper;
 
     @BeforeEach
     void reset() {
         releaseAllSlots(jdbc);
         storage.reset();
+        processing.reset();
     }
 
     // ── 발급 ────────────────────────────────────────────────────────────────
@@ -577,6 +585,156 @@ class AiDocumentUploadIntegrationTest {
         jdbc.update("UPDATE ai_documents SET processing_status = 'EXPIRED', expired_at = ? "
                         + "WHERE id = ?",
                 java.sql.Timestamp.from(Instant.now().minus(ago)), documentId);
+    }
+
+    /**
+     * 탈퇴가 문서 객체 좌표를 삭제 큐에 남긴다 (docs/26 2026-08-19 · S15P21A604-485).
+     *
+     * <p>바이트는 저장소에 있고 좌표는 행에만 있다. 행을 먼저 지우면 객체를 다시 찾을 방법이 없어
+     * 영구히 남는다 — 탈퇴 즉시 전체 하드삭제라는 결정과 정면으로 어긋난다.
+     *
+     * <p>여기서 객체를 직접 지우지 않는 이유는 게임 에셋과 같다. 저장소 실패가 탈퇴를 되돌리거나
+     * 커밋 뒤에 조용히 유실되기 때문에, 같은 커밋이 큐 행을 쓰고 sweeper 가 재시도한다.
+     */
+    @Test
+    void withdrawingHandsTheDocumentObjectsToTheDeleteQueue() throws Exception {
+        Owner owner = agentOwner("탈퇴문서");
+        String json = mockMvc.perform(uploadUrl(owner, body("project.pdf", "application/pdf",
+                        ONE_MB, SHA_A)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String objectKey = jsonMapper.readTree(json).get("objectKey").asString();
+
+        deletions.deleteUserGraph(owner.userId());
+
+        assertEquals(0, countBy("SELECT count(*) FROM ai_documents WHERE s3_key = ?", objectKey),
+                "문서 행은 탈퇴와 함께 사라진다");
+        assertEquals(1, countBy("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?",
+                objectKey), "객체 좌표가 큐에 없으면 저장소에 영구히 남는다");
+    }
+
+    // ── FastAPI 위임 (S15P21A604-175) ───────────────────────────────────────
+
+    /**
+     * 업로드가 확인되면 Job 이 생기고 그 스냅샷이 계약 형태로 FastAPI 에 나간다.
+     *
+     * <p>Job 이 <b>호출보다 먼저</b> 커밋되는 것이 이 절의 핵심이다. 결과 수신은
+     * {@code jobId + attemptNo} 로 펜싱하므로, 행이 없는 상태에서 워커가 먼저 시작하면 돌려보낼
+     * 곳이 없고 모든 콜백이 stale 이 된다.
+     */
+    @Test
+    void completingCreatesTheJobAndHandsItToFastApi() throws Exception {
+        Owner owner = agentOwner("위임");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        long documentId = idOf(grant);
+        Map<String, Object> job = jdbc.queryForMap(
+                "SELECT * FROM ai_document_jobs WHERE document_id = ?", documentId);
+        assertEquals("QUEUED", job.get("status"));
+        assertEquals(0, job.get("attempt_no"));
+        assertNotNull(job.get("next_retry_at"), "재배차 기준이 비면 sweeper 가 이 Job 을 못 본다");
+
+        DocumentProcessingClient.ProcessingRequest sent = processing.onlyRequest();
+        assertEquals(((Number) job.get("id")).longValue(), sent.jobId(), "보낸 jobId 가 그 행이어야 한다");
+        assertEquals(0, sent.attemptNo());
+        assertEquals(documentId, sent.documentId());
+        assertEquals(owner.boothId(), sent.boothId());
+        assertEquals(owner.agentId(), sent.agentId());
+        assertEquals("project.pdf", sent.originalFilename());
+        assertEquals("application/pdf", sent.contentType());
+        assertEquals(ONE_MB, sent.fileSizeBytes());
+        assertEquals("R2", sent.storageProvider());
+        assertEquals("test-ai-documents", sent.storageBucket());
+        assertEquals(keyOf(grant), sent.objectKey());
+        assertEquals(SHA_A, sent.sourceHash());
+    }
+
+    /** 같은 문서를 두 번 완료해도 Job 은 하나다 — 두 번째는 업로드 관문 뒤라 조기 반환된다. */
+    @Test
+    void completingTwiceCreatesOneJob() throws Exception {
+        Owner owner = agentOwner("위임중복");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        assertEquals(1, countBy("SELECT count(*) FROM ai_document_jobs WHERE document_id = ?",
+                idOf(grant)), "활성 Job 은 문서당 하나다");
+        assertEquals(1, processing.received().size(), "두 번째 완료는 위임을 다시 내지 않는다");
+    }
+
+    /**
+     * 위임이 실패해도 업로드 완료는 성공한다. 바이트는 이미 저장됐고 Job 도 커밋됐다.
+     *
+     * <p>남의 서비스가 안 된다고 사용자 요청을 깨면, 이미 올라간 파일을 다시 올리라고 하는 셈이다.
+     */
+    @Test
+    void aFailedDelegationStillCompletesTheUploadAndLeavesTheJobQueued() throws Exception {
+        Owner owner = agentOwner("위임실패");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        processing.failWith(new DocumentProcessingUnavailableException("연결할 수 없습니다."));
+
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        Map<String, Object> job = jdbc.queryForMap(
+                "SELECT status, attempt_no, next_retry_at FROM ai_document_jobs WHERE document_id = ?",
+                idOf(grant));
+        assertEquals("QUEUED", job.get("status"), "실패한 위임의 Job 은 재시도 가능한 상태로 남아야 한다");
+        assertNotNull(job.get("next_retry_at"));
+    }
+
+    /**
+     * 배차기가 밀린 Job 을 같은 attempt 로 다시 보낸다.
+     *
+     * <p>{@code attempt_no} 를 올리면 안 된다. 그 값이 결과 수신의 펜스라서, 올리면 앞선 호출을
+     * 실제로 받은 워커의 콜백이 전부 409 가 된다 — 확인하지 못한 배달을 확실한 실패로 바꾸는 셈이다.
+     */
+    @Test
+    void theSweeperResendsAnUndeliveredJobWithTheSameAttempt() throws Exception {
+        Owner owner = agentOwner("재배차");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        processing.failWith(new DocumentProcessingUnavailableException("연결할 수 없습니다."));
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        processing.reset();
+
+        // 시간을 재우지 않고 SQL 로 민다 — 생성 시 넣은 1분 대기를 지나게 한다.
+        jdbc.update("UPDATE ai_document_jobs SET next_retry_at = now() - interval '1 minute'"
+                + " WHERE document_id = ?", idOf(grant));
+        sweeper.dispatchDueJobs();
+
+        DocumentProcessingClient.ProcessingRequest resent = processing.onlyRequest();
+        assertEquals(0, resent.attemptNo(), "재배차는 attempt 를 올리지 않는다");
+        assertEquals(idOf(grant), resent.documentId());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT attempt_no FROM ai_document_jobs WHERE document_id = ?",
+                Integer.class, idOf(grant)));
+    }
+
+    /** 배달된 Job 은 batch·heartbeat 가 RUNNING 으로 올리므로 배차 대상에서 빠진다. */
+    @Test
+    void theSweeperLeavesADeliveredJobAlone() throws Exception {
+        Owner owner = agentOwner("배달됨");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        processing.reset();
+
+        jdbc.update("UPDATE ai_document_jobs SET status = 'RUNNING',"
+                + " next_retry_at = now() - interval '1 minute' WHERE document_id = ?", idOf(grant));
+        sweeper.dispatchDueJobs();
+
+        assertEquals(List.of(), processing.received(), "RUNNING 인 Job 을 다시 보내면 워커가 둘이 된다");
+    }
+
+    private int countBy(String sql, Object argument) {
+        Integer found = jdbc.queryForObject(sql, Integer.class, argument);
+        return found == null ? 0 : found;
     }
 
     private static String shaOf(int index) {

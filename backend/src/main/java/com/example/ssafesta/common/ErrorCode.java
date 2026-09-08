@@ -98,6 +98,20 @@ public enum ErrorCode {
      * 재시도가 아니라 <b>새 업로드 권한</b>이 필요하다는 뜻이라 409 와 구분한다.
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
+    /**
+     * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
+     *
+     * <p>lease 가 만료돼 Job 을 회수하고 {@code attempt_no} 를 올린 뒤, 죽은 줄 알았던 이전 워커가
+     * 결과를 보내오는 경우다. 받아 주면 두 attempt 의 chunk 가 섞인다. <b>재시도로 풀리지 않는다</b> —
+     * 보내는 쪽은 자기 attempt 가 끝났음을 알고 버려야 한다.
+     */
+    JOB_ATTEMPT_STALE(HttpStatus.CONFLICT, "이미 지난 attempt 의 결과입니다."),
+    /**
+     * Job 이 끝났거나 사라졌다 ({@code SUCCEEDED}·{@code DEAD}·{@code CANCELLED}, 또는 문서 삭제로
+     * CASCADE). {@link #DOCUMENT_UPLOAD_GONE} 과 같은 결로 410 이다 — 같은 Job 으로는 다시 시도할
+     * 곳이 없다.
+     */
+    JOB_GONE(HttpStatus.GONE, "이미 종료된 처리 작업입니다."),
     /** 저장소가 답하지 못했거나 감시가 끊겼다 (C-10). <b>재시도 가능</b>하다는 것이 507 과의 차이다. */
     STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
     /**
@@ -146,6 +160,14 @@ public enum ErrorCode {
     GAME_ASSET_NOT_READY(HttpStatus.CONFLICT, "자산이 아직 사용할 수 없는 상태입니다."),
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
+
+    // ── Survey (010) ────────────────────────────────────────────────────────
+    // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
+    SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),
+    SURVEY_CLOSED(HttpStatus.CONFLICT, "마감된 설문입니다."),
+    SURVEY_ALREADY_RESPONDED(HttpStatus.CONFLICT, "이미 응답한 설문입니다."),
+    /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
+    SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

@@ -35,16 +35,24 @@ const TYPE_LABEL: Record<SurveyQuestionType, string> = {
 
 const ADDABLE: SurveyQuestionType[] = ['single', 'multi', 'rating', 'short_text', 'long_text', 'application'];
 
-function BuilderTab() {
+// 응답 시각 표시 — 상태는 wire ISO 원형을 들고 있고 형식으로 바꾸는 것은 여기 한 곳이다.
+// 저장소에 공유 날짜 util 이 없어 다른 화면들과 같은 관례(인라인 Intl.DateTimeFormat)를 따른다.
+function respondedAt(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' }).format(
+    new Date(iso),
+  );
+}
+
+function BuilderTab({ boothId }: { boothId: number }) {
   const state = useSurveyBuilder();
 
   useEffect(() => {
-    void loadSurveyBuilder();
-  }, []);
+    void loadSurveyBuilder(boothId);
+  }, [boothId]);
 
   if (state.status === 'idle' || state.status === 'loading') return <ScreenLoading label="설문을 불러오는 중..." />;
   if (state.status === 'error') {
-    return <ScreenError title="설문을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyBuilder()} />;
+    return <ScreenError title="설문을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyBuilder(boothId)} />;
   }
 
   const issues = validateBuilder();
@@ -185,29 +193,44 @@ function BuilderTab() {
   );
 }
 
-function ResultTab({ surveyId }: { surveyId: string }) {
+function ResultTab({ boothId }: { boothId: number }) {
   const state = useSurveyResult();
 
   useEffect(() => {
-    void loadSurveyResult(surveyId);
-  }, [surveyId]);
+    void loadSurveyResult(boothId);
+  }, [boothId]);
 
   if (state.status === 'idle' || state.status === 'loading') return <ScreenLoading label="결과를 불러오는 중..." />;
   if (state.status === 'error') {
-    return <ScreenError title="결과를 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyResult(surveyId)} />;
+    return <ScreenError title="결과를 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyResult(boothId)} />;
   }
   if (state.status === 'empty') return <ScreenEmpty title="아직 응답이 없습니다" hint="방문자가 설문에 답하면 여기에 집계가 쌓입니다." />;
 
   return (
     <div className="mg-result">
+      <p className="sc-note">
+        전체 응답 {state.totalResponses}건
+        {/* spec 010 US2 시나리오 1 — 응답 수와 함께 최초·최근 응답 시각을 보인다 */}
+        {state.firstRespondedAt !== null && state.lastRespondedAt !== null && (
+          <>
+            {' · '}최초 {respondedAt(state.firstRespondedAt)}
+            {' · '}최근 {respondedAt(state.lastRespondedAt)}
+          </>
+        )}
+      </p>
       {state.perQuestion.map((agg) => (
         <section key={agg.questionId} className="sc-card mg-agg">
           {agg.kind === 'choice' ? (
             <>
-              <span className="sc-section-title">선택 분포</span>
+              <span className="sc-section-title">
+                선택 분포 <span className="sc-note">응답 {agg.answeredCount}건</span>
+              </span>
               <ul className="mg-bars">
                 {agg.counts.map((c) => {
-                  const total = agg.counts.reduce((sum, x) => sum + x.count, 0) || 1;
+                  // 분모는 **그 문항에 답한 응답 수**다(계약 §7). 선택 수 합으로 나누면 복수선택에서
+                  // 한 사람이 두 번 세어져 "응답자 중 몇 %" 가 아니라 "선택 중 몇 %" 가 된다.
+                  // 복수선택은 합이 100% 를 넘고 그 사실이 드러나는 편이 옳다
+                  const total = agg.answeredCount || 1;
                   return (
                     <li key={c.optionId}>
                       <span className="mg-bar-label">{c.label}</span>
@@ -224,11 +247,13 @@ function ResultTab({ surveyId }: { surveyId: string }) {
             <>
               <span className="sc-section-title">별점</span>
               <p className="mg-avg">
-                {agg.average.toFixed(1)} <span className="sc-note">평균 · 응답 {agg.count}건</span>
+                {/* 응답 0건이면 서버가 average 를 null 로 준다 — 0 으로 나누지 않는다(계약 §7) */}
+                {agg.average === null ? '—' : agg.average.toFixed(1)}{' '}
+                <span className="sc-note">평균 · 응답 {agg.answeredCount}건</span>
               </p>
               <ul className="mg-bars">
                 {agg.distribution.map((d) => {
-                  const total = agg.count || 1;
+                  const total = agg.answeredCount || 1;
                   return (
                     <li key={d.value}>
                       <span className="mg-bar-label">{d.value}점</span>
@@ -249,8 +274,11 @@ function ResultTab({ surveyId }: { surveyId: string }) {
         <section className="sc-card">
           <span className="sc-section-title">주관식 답변</span>
           <ul className="mg-texts">
-            {state.textAnswers.items.map((t, i) => (
-              <li key={i}>{t}</li>
+            {state.textAnswers.items.map((a, i) => (
+              // 같은 문항에 같은 답이 있을 수 있어 index 를 함께 쓴다 — responseId 는 Port 에 없다
+              <li key={`${a.questionId}-${i}`}>
+                <span className="sc-note">문항 {a.questionId}</span> {a.text}
+              </li>
             ))}
           </ul>
           {state.textAnswers.hasNext && (
@@ -270,8 +298,15 @@ function ResultTab({ surveyId }: { surveyId: string }) {
 }
 
 export function SurveyManagementPage() {
-  const { boothId } = useParams<{ boothId: string }>();
+  const { boothId: boothIdParam } = useParams<{ boothId: string }>();
   const [tab, setTab] = useState<'builder' | 'result'>('builder');
+  const boothId = Number(boothIdParam);
+
+  // 라우트가 :boothId 없이 매칭될 수 없지만, 숫자가 아닌 값이 오면 조회 경로가 조용히 깨진다 —
+  // 합성 id 를 만들어 덮던 자리(`booth-${boothId ?? '1'}`)를 없앤 대신 여기서 드러낸다
+  if (!Number.isSafeInteger(boothId) || boothId < 1) {
+    return <ScreenError title="올바르지 않은 부스입니다" message="주소를 확인해 주세요." />;
+  }
 
   return (
     <PageShell
@@ -289,7 +324,7 @@ export function SurveyManagementPage() {
         </div>
       }
     >
-      {tab === 'builder' ? <BuilderTab /> : <ResultTab surveyId={`booth-${boothId ?? '1'}`} />}
+      {tab === 'builder' ? <BuilderTab boothId={boothId} /> : <ResultTab boothId={boothId} />}
     </PageShell>
   );
 }

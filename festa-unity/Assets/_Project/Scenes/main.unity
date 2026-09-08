@@ -36380,6 +36380,8 @@ GameObject:
   - component: {fileID: 1237456545}
   - component: {fileID: 1237456544}
   - component: {fileID: 1237456548}
+  - component: {fileID: 1237456549}
+  - component: {fileID: 1237456550}
   m_Layer: 0
   m_Name: '@Diagnostics'
   m_TagString: Untagged
@@ -36477,6 +36479,36 @@ MonoBehaviour:
   _connectRetrySeconds: 3
   _turnInterval: 2.5
   _roamRadius: 150
+--- !u!114 &1237456549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237456543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad9b2247e0114134999400e4727975b5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _thresholdMs: 33.3
+  _minInterval: 0.15
+  _toggleKey: 289
+--- !u!114 &1237456550
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1237456543}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a23ea227eb48abd43880fe604f270cef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _startKey: 290
+  _settle: 0.7
+  _measure: 3.3
 --- !u!1 &1238070860
 GameObject:
   m_ObjectHideFlags: 0

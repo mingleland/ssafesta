@@ -120,7 +120,7 @@ export const addTopDownScene = (project: GameProject): GameProject => {
   const scene: TopDownScene = {
     id: sceneId,
     type: 'TOP_DOWN',
-    name: `새 맵 ${project.scenes.filter((candidate) => candidate.type === 'TOP_DOWN').length + 1}`,
+    name: `새 맵-TopDown ${project.scenes.filter((candidate) => candidate.type === 'TOP_DOWN').length + 1}`,
     width: 16,
     height: 10,
     tileLayers: [],
@@ -155,7 +155,7 @@ export const addPlatformerScene = (project: GameProject): GameProject => {
   const scene: PlatformerScene = {
     id: sceneId,
     type: 'PLATFORMER',
-    name: `새 플랫폼 맵 ${project.scenes.filter((candidate) => candidate.type === 'PLATFORMER').length + 1}`,
+    name: `새 맵-SideScroll ${project.scenes.filter((candidate) => candidate.type === 'PLATFORMER').length + 1}`,
     width: 24,
     height: 12,
     gravity: 12,
@@ -194,10 +194,16 @@ export const addDialogueScene = (
   const terminalAction: Action = presentation === 'OVERLAY'
     ? { type: 'CLOSE_DIALOGUE' }
     : { type: 'COMPLETE_GAME' };
+  // S15P21A604-488 — Overlay/Fullscreen은 둘 다 scene.type === 'DIALOGUE'라서, type만으로
+  // 세면 한쪽 번호를 다른 쪽이 이어받는다(예: Overlay 다음 첫 Fullscreen이 1이 아니라 2가
+  // 됨). presentation까지 같이 걸러서 두 카운터가 서로 독립적으로 1부터 시작하게 한다.
+  const presentationCount = project.scenes.filter((candidate) => (
+    candidate.type === 'DIALOGUE' && candidate.presentation === presentation
+  )).length + 1;
   const scene: DialogueScene = {
     id: sceneId,
     type: 'DIALOGUE',
-    name: presentation === 'OVERLAY' ? '새 대화' : '새 이야기 장면',
+    name: presentation === 'OVERLAY' ? `새 대화-Overlay ${presentationCount}` : `새 대화-Fullscreen ${presentationCount}`,
     presentation,
     startNodeId: nodeId,
     nodes: [{
@@ -568,6 +574,39 @@ export const setObjectVisible = (
   ...scene,
   objects: scene.objects.map((object) => object.id === objectId ? { ...object, visible } : object),
 }));
+
+// S15P21A604-529 — PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어
+// 캐릭터는 .grp-player로 별도 렌더링) 이름/표시 설정을 가질 수 없다(QA 확정 사항). UI가
+// 애초에 그 컨트롤을 렌더링하지 않지만, 명령 자체도 조용히 무시해 계약을 어기는 project가
+// 만들어지지 않게 방어한다.
+export const renameObject = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  name: string,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  const trimmed = name.trim();
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, name: trimmed === '' ? undefined : trimmed } : object),
+  };
+});
+
+export const setObjectNameVisible = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  showNameInPlay: boolean,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, showNameInPlay } : object),
+  };
+});
 
 const objectReferencedByAction = (
   project: GameProject,
@@ -1058,6 +1097,75 @@ export const removeDialogueChoice = (
   ...node,
   choices: node.choices.filter((choice) => choice.id !== choiceId),
 }));
+
+// S15P21A604-494 — 씬 목록의 reorderScene과 동일한 방식(범위를 벗어난 targetIndex는
+// 클램프, no-op이면 project를 그대로 반환해 불필요한 재검증을 피함).
+export const reorderDialogueNode = (
+  project: GameProject,
+  sceneId: string,
+  nodeId: string,
+  targetIndex: number,
+): GameProject => {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene?.type !== 'DIALOGUE') throw new Error(`${sceneId} is not a DIALOGUE scene`);
+  const sourceIndex = scene.nodes.findIndex((node) => node.id === nodeId);
+  if (sourceIndex < 0) throw new Error(`${nodeId} 노드를 찾을 수 없습니다.`);
+  const clampedTarget = Math.max(0, Math.min(scene.nodes.length - 1, targetIndex));
+  if (clampedTarget === sourceIndex) return project;
+  const nodes = [...scene.nodes];
+  const [node] = nodes.splice(sourceIndex, 1);
+  if (node === undefined) return project;
+  nodes.splice(clampedTarget, 0, node);
+  return replaceDialogueScene(project, sceneId, (current) => ({ ...current, nodes }));
+};
+
+// S15P21A604-494 — 씬 목록의 startSceneChangeReason/setStartScene과 동일한 방식.
+export const startNodeChangeReason = (
+  project: GameProject,
+  sceneId: string,
+  nodeId: string,
+): string | null => {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene?.type !== 'DIALOGUE') return 'DIALOGUE Scene을 찾을 수 없습니다.';
+  if (scene.startNodeId === nodeId) return '이미 시작 노드입니다.';
+  if (!scene.nodes.some((node) => node.id === nodeId)) return '노드를 찾을 수 없습니다.';
+  return null;
+};
+
+export const setStartNode = (project: GameProject, sceneId: string, nodeId: string): GameProject => {
+  const reason = startNodeChangeReason(project, sceneId, nodeId);
+  if (reason !== null) throw new Error(reason);
+  return replaceDialogueScene(project, sceneId, (scene) => ({ ...scene, startNodeId: nodeId }));
+};
+
+// S15P21A604-494 — 씬 목록의 sceneRemovalReason/removeScene과 동일한 방식. 차단 사유는
+// 셋: 시작 노드 자체(PLAYER_SPAWN처럼 보호된 역할), 다른 노드의 선택지가 nextNodeId로
+// 참조 중(externally referenced 오브젝트와 동일한 취급 — 자동으로 참조를 끊지 않고
+// 삭제 자체를 막는다), 노드가 1개만 남음(계약상 최소 1개 강제, Scene 최소 1개와 동일).
+export const dialogueNodeRemovalReason = (
+  project: GameProject,
+  sceneId: string,
+  nodeId: string,
+): string | null => {
+  const scene = project.scenes.find((candidate) => candidate.id === sceneId);
+  if (scene?.type !== 'DIALOGUE') return 'DIALOGUE Scene을 찾을 수 없습니다.';
+  if (scene.nodes.length === 1) return '대화에는 최소 1개의 노드가 필요합니다.';
+  if (scene.startNodeId === nodeId) return '시작 노드는 삭제할 수 없습니다. 다른 노드를 시작으로 설정한 뒤 삭제하세요.';
+  const referenced = scene.nodes.some((node) => (
+    node.id !== nodeId && node.choices.some((choice) => choice.nextNodeId === nodeId)
+  ));
+  if (referenced) return '다른 노드의 선택지가 이 대화를 가리키고 있습니다.';
+  return null;
+};
+
+export const removeDialogueNode = (project: GameProject, sceneId: string, nodeId: string): GameProject => {
+  const reason = dialogueNodeRemovalReason(project, sceneId, nodeId);
+  if (reason !== null) throw new Error(reason);
+  return replaceDialogueScene(project, sceneId, (scene) => ({
+    ...scene,
+    nodes: scene.nodes.filter((node) => node.id !== nodeId),
+  }));
+};
 
 export const addBooleanVariable = (project: GameProject): GameProject => {
   const id = nextStableId(project, 'variable');

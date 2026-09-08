@@ -78,6 +78,10 @@ app:
     access-token-ttl: PT30M
     refresh-token-ttl: P7D
     oauth-state-ttl: PT5M
+    # exp 를 지난 토큰을 얼마나 더 받아 주는가. Spring 기본값과 같은 60초이고, 적어 두는 이유는
+    # SurveyGuestKeySweeper 가 같은 값을 읽기 때문이다 — 이 시간이 지나기 전에 게스트 중복 방지
+    # 키를 지우면 아직 통과하는 토큰이 한 번 더 답할 수 있다 (헌법 12조 vs 1인 1응답).
+    jwt-clock-skew: PT60S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
@@ -112,6 +116,23 @@ app:
     price-coin: 100
     duration: PT24H
 
+  # spec 010 C-01·C-02 는 기획 미결이다. 값이 정해지면 이 세 줄만 바꾼다 (헌법 30조,
+  # docs/26 row 20·21). 나머지 상한(제목 200·문구 500·별점 1~10·단답 200·장문 2000)은
+  # 컬럼 폭이나 화면에서 나온 상수라 코드에 둔다 — 바뀌지 않는 값을 설정으로 빼지 않는다.
+  # FE Builder 에는 상한이 아예 없어 이 셋이 설문이 처음 만나는 제약이다.
+  survey:
+    max-questions: 30
+    max-options: 10
+    max-reward-coin: 10
+    # 제출 트랜잭션의 실제 상한. JDBC query timeout 으로 걸리므로 부스 락 대기도 여기서 끊긴다.
+    # 이 값이 없으면 아래 유예가 무엇을 덮는지 말할 수 없다 — 대기 시간에 상한이 없기 때문이다.
+    submit-timeout-seconds: 30
+    # 게스트 토큰이 더는 통과하지 않게 된 뒤에도 중복 방지 키를 이만큼 더 남긴다.
+    # 만료 직전에 인증돼 아직 처리 중인 요청이 있을 수 있고, 그 요청이 커밋하기 전에 키가
+    # 사라지면 중복 응답이 그대로 들어간다. submit-timeout 보다 길어야 하며(기동 시 검사),
+    # 그 차이가 트랜잭션 시작 전 대기(스레드 큐 등)를 덮는 여유다.
+    guest-key-grace: PT10M
+
   # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
   # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.
   # 개수로 유계이므로 보관 기간과 sweeper가 필요 없다 — 밀어내기가 삭제 트랜잭션 안에서 끝난다.
@@ -125,6 +146,9 @@ app:
   # 여기는 FastAPI→Spring 수신분만 둔다. Spring→FastAPI 송신분은 S15P21A604-175 몫이다.
   internal:
     ai-to-spring-tokens: ${INTERNAL_AI_TO_SPRING_TOKENS}
+    # Spring→FastAPI 송신분 (S15P21A604-175). 송신은 첫 값 하나이고 목록은 회전용이다.
+    # AI 쪽이 두 방향 토큰 집합이 겹치면 기동을 거부하므로 ai-to-spring 과 같은 값을 쓰면 안 된다.
+    spring-to-ai-tokens: ${INTERNAL_SPRING_TO_AI_TOKENS}
 
   # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
   # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
@@ -134,8 +158,13 @@ app:
     document-count-limit: 10
     document-total-bytes: 100MB
 
-  # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
   ai:
+    # 문서 처리를 시작시킬 FastAPI 의 주소 (S15P21A604-175). 경로는 계약이 소유하므로 오리진만 둔다.
+    # 기본값 없음 — Infra manifest 가 이미 http://ai:8000 을 규약으로 적어 뒀고, localhost 로 조용히
+    # 뜨면 위임이 전부 연결 실패로 떨어져 FastAPI 가 죽은 것처럼 보인다.
+    processing:
+      base-url: ${AI_INTERNAL_BASE_URL}
+    # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
     storage:
       # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환
       # 상태를 읽고 한 칸으로 옮겨 적는다 — 서버는 상태 기계를 알지 못한다.

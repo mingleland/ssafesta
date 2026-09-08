@@ -2,8 +2,10 @@
 
 FR-024/FR-025: any outcome other than a parsed `allowed:true` (denial or
 Spring being unreachable after the client's own retry) must refuse to create
-the Conversation and must not touch retrieval or the LLM. This module only
-covers creation; get/close/idle-expiry belongs to 127.
+the Conversation and must not touch retrieval or the LLM.
+
+Creation and explicit close live here; the idle TTL belongs to the
+repository, which puts it on every write.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from datetime import datetime, timezone
 from app.clients.spring_booth_access import SpringBoothAccessUnavailable
 from app.models.conversation import Conversation
 from app.repositories.conversation_repository import ConversationRepository
+from app.services.stream_service import ConversationOwnershipMismatch
 
 
 class BoothAccessDenied(Exception):
@@ -77,3 +80,19 @@ class ConversationService:
         )
         await self._repository.save(conversation)
         return conversation
+
+    async def close(self, *, conversation_id: str, user_id: int) -> None:
+        """Delete the raw text now (FR-014/FR-028, D11).
+
+        Idempotent: an unknown or already-expired id succeeds, so a retried
+        or duplicated close is harmless. Deliberately does not reuse the
+        streaming `authorize()` — an expired Lease must still be able to
+        delete, and no Spring call belongs on this path (Article 3, AI
+        failure isolation).
+        """
+        conversation = await self._repository.get(conversation_id)
+        if conversation is None:
+            return
+        if conversation.user_id != user_id:
+            raise ConversationOwnershipMismatch(conversation_id)
+        await self._repository.delete(conversation_id)

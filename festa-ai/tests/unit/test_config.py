@@ -9,7 +9,6 @@ from pydantic import ValidationError
 _VALID_JWT_SECRET = base64.b64encode(b"0" * 64).decode()
 
 VALID_ENV = {
-    "DATABASE_URL": "postgresql+psycopg://user:pass@localhost:5432/festa",
     "JWT_SECRET": _VALID_JWT_SECRET,
     "REDIS_URL": "redis://localhost:6379/0",
     "SPRING_INTERNAL_BASE_URL": "http://spring.internal:8080",
@@ -60,10 +59,10 @@ def test_valid_env_loads_with_documented_defaults(
     config = _fresh_settings_module()
 
     assert config.settings.job_heartbeat_seconds == 30
-    assert config.settings.job_lease_seconds == 90
-    assert config.settings.job_sweeper_seconds == 60
-    assert config.settings.job_max_retries == 3
-    assert config.settings.job_retry_backoff_seconds == [60, 300, 900]
+    assert config.settings.document_worker_max_concurrency == 1
+    assert config.settings.document_worker_shutdown_grace_seconds == 30.0
+    assert config.settings.spring_document_result_timeout_seconds == 5.0
+    assert config.settings.embedding_batch_size == 96
     assert config.settings.embedding_provider == "mock"
     assert config.settings.embedding_dimension == 1536
     assert config.settings.embedding_model_id == "text-embedding-3-large"
@@ -81,14 +80,17 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
     assert config.settings.conversation_ttl_seconds == 1800
     assert config.settings.spring_booth_access_timeout_seconds == 1.0
+    assert config.settings.spring_agent_config_timeout_seconds == 1.0
+    assert config.settings.llm_ttft_timeout_seconds == 15.0
+    assert config.settings.llm_total_timeout_seconds == 60.0
     assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
 
 
 def test_missing_required_field_fails_fast(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
-    _set_env(monkeypatch, tmp_path, omit={"DATABASE_URL"})
-    with pytest.raises(ValidationError, match="database_url"):
+    _set_env(monkeypatch, tmp_path, omit={"REDIS_URL"})
+    with pytest.raises(ValidationError, match="REDIS_URL"):
         _fresh_settings_module()
 
 
@@ -97,26 +99,6 @@ def test_empty_string_required_field_fails_fast(
 ) -> None:
     _set_env(monkeypatch, tmp_path, overrides={"R2_BUCKET": ""})
     with pytest.raises(ValidationError, match="r2_bucket"):
-        _fresh_settings_module()
-
-
-def test_lease_must_exceed_heartbeat(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    _set_env(
-        monkeypatch,
-        tmp_path,
-        overrides={"JOB_HEARTBEAT_SECONDS": "90", "JOB_LEASE_SECONDS": "90"},
-    )
-    with pytest.raises(ValidationError, match="JOB_LEASE_SECONDS"):
-        _fresh_settings_module()
-
-
-def test_backoff_count_must_match_max_retries(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    _set_env(monkeypatch, tmp_path, overrides={"JOB_RETRY_BACKOFF_SECONDS": "60,300"})
-    with pytest.raises(ValidationError, match="JOB_RETRY_BACKOFF_SECONDS"):
         _fresh_settings_module()
 
 
@@ -336,6 +318,18 @@ def test_context_top_n_must_not_exceed_retrieval_top_k(
         _fresh_settings_module()
 
 
+def test_ttft_timeout_must_not_exceed_total_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={"LLM_TTFT_TIMEOUT_SECONDS": "60", "LLM_TOTAL_TIMEOUT_SECONDS": "15"},
+    )
+    with pytest.raises(ValidationError, match="LLM_TTFT_TIMEOUT_SECONDS"):
+        _fresh_settings_module()
+
+
 def test_blank_embedding_provider_resolves_to_mock_default(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
@@ -365,15 +359,6 @@ def test_blank_embedding_api_path_resolves_to_default(
     config = _fresh_settings_module()
 
     assert config.settings.embedding_api_path == "/v1/embeddings"
-
-
-def test_sweeper_seconds_zero_fails_fast(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    """Finding 2: JOB_SWEEPER_SECONDS=0 previously booted successfully."""
-    _set_env(monkeypatch, tmp_path, overrides={"JOB_SWEEPER_SECONDS": "0"})
-    with pytest.raises(ValidationError, match="job_sweeper_seconds"):
-        _fresh_settings_module()
 
 
 def test_document_max_bytes_negative_fails_fast(

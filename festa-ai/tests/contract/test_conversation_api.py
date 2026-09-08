@@ -1,7 +1,12 @@
-"""Compare the generated Conversation-create OpenAPI with the checked-in contract.
+"""Compare the generated Conversation OpenAPI with the checked-in contract.
 
-Only `createConversation` — `close`/`streamConversationMessage` in
-`conversation-api.yaml` belong to 127/140 and are not implemented yet.
+Covers `createConversation` and `closeConversation`. `streamConversationMessage`
+carries an SSE body that OpenAPI cannot describe field by field, so its shape is
+pinned by `test_sse_contract.py` instead.
+
+FastAPI adds an automatic `422` to any operation with parameters or a body, and
+the contract does not list it — response-code comparisons therefore exclude
+`422` rather than allowing any extra code through.
 """
 
 from __future__ import annotations
@@ -88,3 +93,26 @@ def test_generated_create_conversation_openapi_matches_contract() -> None:
     assert _canonical_schema(generated_response, generated_components) == _canonical_schema(
         contract_response, contract_components
     )
+
+
+def test_generated_close_conversation_openapi_matches_contract() -> None:
+    contract = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
+    app = FastAPI()
+    app.include_router(router, prefix="/ai/v1")
+    generated = app.openapi()
+
+    contract_operation = contract["paths"]["/conversations/{conversationId}"]["delete"]
+    generated_operation = generated["paths"]["/ai/v1/conversations/{conversationId}"]["delete"]
+
+    assert generated_operation["operationId"] == contract_operation["operationId"]
+    assert generated_operation["summary"] == contract_operation["summary"]
+    assert generated_operation["security"] == contract["security"]
+
+    # 204/403 exactly — a 404 here would tell a caller whether someone else's id exists.
+    assert set(generated_operation["responses"]) - {"422"} == set(contract_operation["responses"])
+
+    contract_parameter = contract["components"]["parameters"]["ConversationId"]
+    generated_parameter = generated_operation["parameters"][0]
+    assert generated_parameter["name"] == contract_parameter["name"]
+    assert generated_parameter["in"] == contract_parameter["in"]
+    assert generated_parameter["required"] == contract_parameter["required"]

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from app.clients.spring_agent_config import AgentConfigDenied
 from app.clients.spring_chunk_search import ChunkScope, RetrievedChunk
 from app.models.conversation import Conversation
 from app.services.context_service import AgentPromptConfig, CompletedTurn
-from app.services.rag_service import RagContextService
+from app.services.rag_service import NoReadyContextResult, RagContextService
 
 
 def _chunk(index: int) -> RetrievedChunk:
@@ -115,7 +116,7 @@ async def test_build_uses_conversation_scope_for_retrieval() -> None:
 async def test_build_maps_conversation_turns_to_completed_turns() -> None:
     prompt_builder = _PromptBuilder()
     service = RagContextService(
-        vector_search=_VectorSearch(()),
+        vector_search=_VectorSearch((_chunk(1),)),
         agent_config_provider=_AgentConfigProvider(_agent_config()),
         prompt_builder=prompt_builder,
         retrieval_top_k=5,
@@ -127,6 +128,52 @@ async def test_build_maps_conversation_turns_to_completed_turns() -> None:
     assert prompt_builder.calls[0]["turns"] == (
         CompletedTurn(question="이전 질문", answer="이전 답변"),
     )
+
+
+@pytest.mark.asyncio
+async def test_build_returns_no_ready_context_when_search_finds_zero_chunks() -> None:
+    """SC-008: 설정은 질문당 1회 조회하고 READY 0건이면 LLM만 호출하지 않는다."""
+    agent_config_provider = _AgentConfigProvider(_agent_config())
+    prompt_builder = _PromptBuilder()
+    service = RagContextService(
+        vector_search=_VectorSearch(()),
+        agent_config_provider=agent_config_provider,
+        prompt_builder=prompt_builder,
+        retrieval_top_k=5,
+    )
+
+    result = await service.build(conversation=_conversation(), question="질문입니다")
+
+    assert isinstance(result, NoReadyContextResult)
+    assert result.message
+    assert agent_config_provider.calls == [{"booth_id": 10, "agent_id": 20}]
+    assert prompt_builder.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", ["AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"])
+async def test_agent_config_denial_stops_before_embedding_and_search(code: str) -> None:
+    class _DeniedProvider:
+        calls = 0
+
+        async def get(self, *, booth_id, agent_id):
+            self.calls += 1
+            raise AgentConfigDenied(code)
+
+    vector_search = _VectorSearch((_chunk(1),))
+    provider = _DeniedProvider()
+    service = RagContextService(
+        vector_search=vector_search,
+        agent_config_provider=provider,
+        prompt_builder=_PromptBuilder(),
+        retrieval_top_k=5,
+    )
+
+    with pytest.raises(AgentConfigDenied, match=code):
+        await service.build(conversation=_conversation(), question="질문입니다")
+
+    assert provider.calls == 1
+    assert vector_search.calls == []
 
 
 def test_rejects_non_positive_retrieval_top_k() -> None:

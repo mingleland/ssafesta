@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import fakeredis
@@ -56,3 +57,32 @@ async def test_save_sets_ttl_on_the_key(repository: ConversationRepository) -> N
 
     ttl = await repository._redis.ttl(f"conversation:{conversation.conversation_id}")
     assert 0 < ttl <= 1800
+
+
+async def test_commit_turn_updates_a_live_conversation_and_refreshes_ttl(
+    repository: ConversationRepository,
+) -> None:
+    conversation = _conversation()
+    await repository.save(conversation)
+
+    committed = await repository.commit_turn(conversation)
+
+    assert committed is True
+    assert await repository.get(conversation.conversation_id) == conversation
+    ttl = await repository._redis.ttl(f"conversation:{conversation.conversation_id}")
+    assert 0 < ttl <= 1800
+
+
+async def test_commit_turn_does_not_recreate_a_deleted_conversation(
+    repository: ConversationRepository,
+) -> None:
+    """127/D11: a completed turn must never bring closed raw text back."""
+    conversation = _conversation()
+    await repository.save(conversation)
+    await repository.delete(conversation.conversation_id)
+
+    committed = await repository.commit_turn(conversation)
+
+    assert committed is False
+    assert await repository.get(conversation.conversation_id) is None
+    assert await repository._redis.exists(f"conversation:{conversation.conversation_id}") == 0

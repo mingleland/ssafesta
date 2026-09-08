@@ -29,11 +29,13 @@ describe('로그인 레퍼런스 구조 (-379)', () => {
     expect(labels).toEqual(['SSAFY 로그인', 'Google 로그인', 'Kakao 로그인', '게스트로 둘러보기']);
   });
 
-  it('SSAFY 는 비활성이고 준비 중 배지를 유지한다 — 동작하지 않는 버튼을 눌리게 만들지 않는다', async () => {
+  it('OAuth 3종이 모두 눌린다 — 준비 중 배지는 남아 있지 않다 (-495)', async () => {
     const { container } = await renderLogin();
-    const ssafy = container.querySelector('.login-btn-ssafy') as HTMLButtonElement;
-    expect(ssafy.disabled).toBe(true);
-    expect(within(ssafy).getByText('준비 중')).toBeTruthy();
+    for (const id of ['ssafy', 'google', 'kakao']) {
+      const btn = container.querySelector(`.login-btn-${id}`) as HTMLButtonElement;
+      expect(btn.disabled).toBe(false);
+      expect(within(btn).queryByText('준비 중')).toBeNull();
+    }
   });
 
   it('게스트 버튼은 눌린다 — 유일한 실사용 진입점이다', async () => {

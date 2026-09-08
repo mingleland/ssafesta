@@ -892,39 +892,100 @@ Cursor 또는 Page 기반 거래 내역 조회.
 
 ## 9. Survey
 
-### POST `/booths/{boothId}/surveys`
+> 계약 정본은 `specs/010-survey/contracts/survey-api.md` 다. 이 절은 그 요약이다.
+> **부스당 설문 1개**이고(C-06) **저장하면 바로 공개된다**(C-07) — 게시 단계가 없다.
 
-### GET `/booths/{boothId}/surveys`
+| endpoint | 권한 | 티켓 |
+|---|---|---|
+| `GET /booths/{boothId}/survey` | 편집자. **임대 만료여도 조회된다**(FR-011) | -130 |
+| `PUT /booths/{boothId}/survey` | 편집자 + 유효 임대. 없으면 생성, 있으면 갱신 — 항상 200 | -130 · -190 |
+| `GET /booths/{boothId}/survey/run` | 방문자(회원·게스트). 응답의 `surveyId` 가 아래 두 경로의 키다 | -130 |
+| `POST /surveys/{surveyId}/responses` | 회원·게스트 | -131 · -192 |
+| `GET /surveys/{surveyId}/results` | 편집자 | -132 |
+| `GET /surveys/{surveyId}/text-answers?questionId=&page=&size=` | 편집자 | -193 |
 
-### GET `/surveys/{surveyId}`
+문항 유형 6종: `SINGLE_CHOICE` · `MULTIPLE_CHOICE` · `RATING` · `SHORT_TEXT` · `LONG_TEXT` · `APPLICATION` (FR-002).
 
-### PUT `/surveys/{surveyId}`
+### `PUT /booths/{boothId}/survey`
 
-### POST `/surveys/{surveyId}/responses`
-
-#### Request 예시
+`title`·`questions` 는 필수다. **`description`·`rewardCoin`·`closesAt` 은 키를 보내지 않으면 기존 값을 유지**하고 명시적 `null` 이면 비운다 — FE 가 일부 필드만 보내도 나머지가 지워지지 않는다.
 
 ```json
 {
-  "answers": [
-    {"questionId": 1, "selectedOptionIds": [3]},
-    {"questionId": 2, "text": "좋았습니다."}
+  "title": "A604 부스 설문",
+  "rewardCoin": 5,
+  "questions": [
+    {"type": "SINGLE_CHOICE", "prompt": "어떻게 알았나요?", "required": true,
+     "options": [{"label": "돌아다니다가"}, {"label": "추천"}]},
+    {"type": "RATING", "prompt": "만족도", "required": true, "scale": {"min": 1, "max": 5}},
+    {"type": "LONG_TEXT", "prompt": "개선할 점", "required": false}
   ]
 }
 ```
 
-검증:
+문항은 **전체 교체**다(`questionId` 를 받지 않는다). **응답이 1건 이상이면 문항 구조가 잠겨** 유형·문구·필수·선택지·척도가 다르면 `409 SURVEY_LOCKED` 이고, 제목·설명·보상·마감만 바꾸는 저장은 성공한다 (C-08).
 
-- 마감
-- 1인 1응답
-- 질문 유효성
-- 보상 중복
+검증 위반은 `400 VALIDATION_FAILED` + `errors[0].field` 이며 문항 안이면 `questions[2].options` 같은 경로다. 상한 셋(문항 수·선택지 수·보상 코인)은 **기획 미결이라 서버 설정값**이다 (C-01·C-02, docs/26 row 20·21).
 
-### GET `/surveys/{surveyId}/results`
+### `GET /booths/{boothId}/survey/run`
 
-Owner/허용된 Staff용 결과 조회.
+Unity 가 `{boothId, objectId}` 만 보내고 설문 식별자를 모르므로 부스 기준 경로다 (S15P21A604-415).
 
----
+```json
+{"surveyId": 12, "closed": false, "rewardCoin": 5, "questions": [...]}
+```
+
+마감된 설문도 문항을 그대로 돌려준다 — 화면은 마감을 표시하고 제출이 `409 SURVEY_CLOSED` 로 막는다. `rewardCoin > 0` 이면 게스트는 제출할 수 없어(지갑 없음, 헌법 12조) 그 값을 미리 싣는다.
+
+### `POST /surveys/{surveyId}/responses`
+
+```json
+{
+  "answers": [
+    {"questionId": 101, "selectedOptionIds": [1001]},
+    {"questionId": 102, "rating": 4},
+    {"questionId": 103, "text": "좋았습니다."}
+  ]
+}
+```
+
+→ `201 {"responseId": 55, "rewardedCoin": 5}`. **`rewardedCoin` 키는 항상 있고 보상이 없으면 `0`** 이다.
+
+검증: 마감 / 1인 1응답(회원은 `userId`, 게스트는 토큰 주체) / 문항·선택지가 이 설문 것인지 / 유형별 payload / 보상 중복(원장 멱등키).
+
+게스트 응답의 세션 흔적은 **세션을 더 쓸 수 없게 되면 지워진다**(헌법 12조). 기준은 제출 때 적어 둔 토큰의 `exp` **+ `app.auth.jwt-clock-skew`**(60초) — 디코더가 그때까지 토큰을 받아 주므로 그 전에 지우면 아직 통과하는 토큰이 재응답할 수 있다. 지워지는 것은 접속 토큰 주체와 만료 시각 둘이고, 답과 집계는 그대로다.
+
+### `GET /surveys/{surveyId}/results`
+
+Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답은 내려가지 않는다(FR-007). 전체 응답 수·최초/최근 응답 시각·문항별 응답 수·선택지별 수·별점 평균과 분포·주관식 첫 페이지. **비율은 싣지 않는다** — 복수선택은 합이 100% 를 넘으므로 화면이 `count / answeredCount` 로 계산한다. 응답 0건이면 모든 문항이 0 이고 `average` 는 `null` 이다(FR-012).
+
+응답자 식별 정보는 어떤 필드에도 없다(FR-009). 주관식 항목의 `responseId` 는 같은 사람의 답을 묶는 열쇠일 뿐이다.
+
+```json
+{
+  "surveyId": 12, "totalResponses": 20,
+  "firstRespondedAt": "2026-09-08T04:11:02Z", "lastRespondedAt": "2026-09-08T07:55:40Z",
+  "perQuestion": [
+    {"questionId": 101, "type": "SINGLE_CHOICE", "answeredCount": 18,
+     "counts": [{"optionId": 1001, "label": "월드를 돌아다니다가", "count": 11}],
+     "average": null, "distribution": []},
+    {"questionId": 102, "type": "RATING", "answeredCount": 20, "counts": [],
+     "average": 4.2, "distribution": [{"value": 1, "count": 0}, {"value": 2, "count": 1}]}
+  ],
+  "textAnswers": {"content": [{"responseId": 55, "questionId": 103, "text": "무대 일정 안내가…"}],
+                  "page": 0, "size": 20, "totalElements": 12, "totalPages": 1}
+}
+```
+
+`counts`·`average`·`distribution` 은 **유형과 무관하게 항상 있다** — 값이 없으면 `[]`·`null` 이다. `answeredCount` 는 그 문항에 답한 응답 수이므로 선택 문항을 건너뛴 사람이 있으면 `totalResponses` 보다 작다.
+
+### `GET /surveys/{surveyId}/text-answers?questionId&page&size`
+
+주관식 답변 페이지. 결과 조회의 `textAnswers` 가 첫 페이지이고 그 다음을 이 endpoint 로 넘긴다(FR-008). `page`(0부터, 기본 0) · `size`(1~100, 기본 20) · `questionId`(선택 — 없으면 텍스트 3유형 전체).
+
+**정렬은 답변 id 오름차순으로 고정**이다. 새 답변은 항상 뒤에 붙으므로 페이지를 넘기는 중에 제출이 들어와도 경계에서 중복·누락이 없다(C-09). 페이지 모양은 전역 규약(`content`·`page`·`size`·`totalElements`·`totalPages`)이고 `hasNext` 는 `page + 1 < totalPages` 로 판단한다.
+
+`page` 음수 · `size` 범위 밖 · 이 설문의 문항이 아닌 `questionId` 는 `400 VALIDATION_FAILED` 이고 `errors[0].field` 가 문제 필드다.
 
 ## 10. Staff / Permission
 
@@ -1225,8 +1286,12 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
-| `SURVEY_CLOSED` | 설문 마감 |
-| `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
+| `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
+| `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
+| `SURVEY_NOT_FOUND` | **404.** 부스에 설문이 없거나 `surveyId` 가 없다. 편집자 조회의 404 는 "아직 만들지 않았다"는 뜻이라 오류 상태가 아니다 |
+| `SURVEY_CLOSED` | **409.** 설문 마감 — `closesAt` 이 지났다 |
+| `SURVEY_ALREADY_RESPONDED` | **409.** 1인 1응답 위반. 회원은 `userId`, 게스트는 접속 토큰 주체 기준이다 |
+| `SURVEY_LOCKED` | **409.** 응답이 있는 설문의 문항 구조를 바꾸려 했다 (C-08). 제목·설명·보상·마감은 수정된다 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
 | `DUPLICATE_REQUEST` | 중복 요청 |
 | `INTERNAL_ERROR` | 서버 오류 |
@@ -1458,3 +1523,110 @@ Document 양쪽에서 검사한다** — 두 테이블의 scope 컬럼 사이에
   같은 `NaN`이 된다. 판정은 pgvector와 같은 **`float` 누산기**로 한다 — `double` 제곱합으로 재면
   원소 자체가 0으로 반올림되는 값(`1e-50`)만 걸리고, 원소는 정상 `float4`인데 **제곱이 언더플로하는
   구간**(`1e-23`씩이면 `double` 합은 `1.5e-43`, `float` 합은 정확히 `0`)을 놓친다
+
+### GET `/internal/ai/agent-config`
+
+FastAPI의 프롬프트 빌더가 **질문마다** 호출한다 (spec 008, `S15P21A604-399`, GitLab #119 §5).
+정본 계약은 `specs/008-ai-conversation-rag/contracts/spring-agent-config-api.yaml`.
+
+```
+GET /internal/ai/agent-config?boothId=7&agentId=3
+Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 첫 값>
+```
+
+```json
+{ "found": true, "role": "PROJECT_DOCENT", "tone": "FRIENDLY", "responseLength": "MEDIUM",
+  "systemPrompt": "문서를 근거로 답한다.", "forbiddenTopics": ["가격 협상"] }
+```
+
+- **거부는 오류가 아니라 `200` + `found: false` + `denialCode`다** — `/internal/ai/booth-access`와
+  같은 관례. 다른 booth 소속 `agentId`와 존재하지 않는 `agentId`는 **구분해 알려주지 않는다**
+  (둘 다 `AGENT_NOT_IN_BOOTH`). `status`가 `ACTIVE`가 아니면 `AGENT_INACTIVE`이며, **이 경우
+  프롬프트 필드를 전혀 싣지 않는다** — 쓸 수 없는 값을 흘려 봐야 계약(`additionalProperties: false`
+  분기)만 어긴다
+- `forbiddenTopics`가 비어 있으면 `null`이 아니라 **빈 배열**이다(`AiAgent.getForbiddenTopics()`가
+  이미 그렇게 정규화한다)
+- **캐싱하지 않는다** (2026-09-07 확정, GitLab #119) — `system_prompt`가 길어도 매 요청 그대로
+  싣는다. 버전·해시로 무효화만 알리는 방식은 필요해지면 그때 계약을 바꾼다
+- 인증은 벡터 검색 API와 동일한 `/internal/**` 체인·`INTERNAL_AI_TO_SPRING_TOKENS` 재사용
+### POST `/internal/ai/document-jobs/{jobId}/` — `chunk-batches` · `finalize` · `heartbeat` · `failed`
+
+FastAPI 워커가 만든 결과를 Spring이 받는 경로 (spec 007, `S15P21A604-400`, GitLab #119 §3).
+정본 계약은 `specs/007-ai-agent-document/contracts/document-result-api.yaml`.
+cancel은 Spring→FastAPI 방향이라 여기 없다(#119 §4 — `S15P21A604-175`).
+
+```
+POST /internal/ai/document-jobs/41/chunk-batches
+{ "attemptNo": 0, "batchSeq": 0, "chunks": [
+  { "chunkNo": 0, "content": "...", "embedding": [0.01, ...1536개],
+    "embeddingModelId": "text-embedding-3-small", "pageNumber": 3, "section": "운영 안내" } ] }
+→ 204
+
+POST /internal/ai/document-jobs/41/finalize
+{ "attemptNo": 0, "sourceHash": "<64 hex>", "totalChunkCount": 128,
+  "embeddingModelId": "text-embedding-3-small" }
+→ 204
+```
+
+두 경로 모두 같은 관문 두 개를 먼저 지난다.
+
+| 상황 | 응답 |
+|---|---|
+| `attemptNo`가 Job의 현재 값과 다름 | **`409` `JOB_ATTEMPT_STALE`** |
+| Job이 `SUCCEEDED`·`DEAD`·`CANCELLED`이거나 없음 | **`410` `JOB_GONE`** |
+
+- **`409`가 있는 이유**: lease가 만료돼 Job을 회수하고 `attempt_no`를 올린 뒤, 죽은 줄 알았던 이전
+  워커가 결과를 보내오는 경우다. 받아 주면 **두 attempt의 chunk가 한 문서에 섞인다.** 보내는 쪽은
+  자기가 밀려났다는 사실을 이 응답으로만 안다
+- **없는 Job과 끝난 Job을 구분하지 않는다** — 문서가 지워지면 Job도 `ON DELETE CASCADE`로 사라지고,
+  어느 쪽이든 결과를 보낼 attempt가 없다는 답은 같다
+- **finalize 재전송은 `410`이 아니라 `204`다.** 같은 attempt가 같은 `sourceHash`·`totalChunkCount`로
+  이미 끝낸 Job이면 아무것도 하지 않고 답한다 — 마지막 호출의 응답이 유실되는 것은 흔한 경우이고,
+  여기서 `410`을 주면 워커가 **성공한 작업을 실패로 보고한다**(#119 §3의 멱등 요구). 숫자가 다르면
+  그 Job이 한 일과 다른 주장이라 `410`이다
+- **batch는 멱등하다.** staging PK가 `(job_id, batch_seq, chunk_no)`라 같은 batch 재전송이 아무것도
+  바꾸지 않는다 — 워커가 응답을 못 받고 다시 보내는 것이 정상 경로다
+- **첫 batch가 `QUEUED` Job을 `RUNNING`으로 올린다.** 워커가 실제로 시작했다는 증거가 이것뿐이다
+- **finalize는 검증에서 걸리면 아무것도 바꾸지 않는다.** 기존 chunk도 문서 상태도 그대로이고
+  staging도 남아 같은 attempt로 다시 finalize할 수 있다. 검증 4종은 전부 `400` `VALIDATION_FAILED`이고
+  `errors[].field`가 지점을 가리킨다
+
+  | 검증 | `field` | 막는 것 |
+  |---|---|---|
+  | 적재 개수 ≠ `totalChunkCount` | `totalChunkCount` | batch 유실 — 잘린 문서가 조용히 READY가 되는 것 |
+  | batch 간 `chunkNo` 중복 | `chunks` | `UNIQUE(document_id, chunk_no)` 위반으로 500이 되는 것 |
+  | 임베딩 모델 혼합 | `embeddingModelId` | 한 문서 안에서 거리 비교가 뜻을 잃는 것 |
+  | `sourceHash` ≠ Job의 값 | `sourceHash` | 같은 jobId로 다른 파일이 실려 본문이 바뀌는 것 |
+
+- **finalize 성공은 한 트랜잭션이다** — 기존 chunk 삭제 → staging 반영(`searchable = TRUE`) →
+  staging 정리 → Job `SUCCEEDED`·`chunk_count` → Document `READY`. 읽는 쪽은 이전 판 전체 아니면
+  새 판 전체만 본다
+- **같은 batch 안의 `chunkNo` 중복도 `400`이다.** staging PK가 조용히 흡수하면 보낸 쪽은 N개를
+  넣었다고 믿고 finalize에서 개수가 어긋난다 — 원인을 말할 수 있는 자리에서 막는다
+- 저장 embedding도 `queryEmbedding`과 **같은 검증**을 받는다(1536차원, `float32` 범위, 노름
+  overflow·underflow). #119에서 "저장 벡터 검증은 chunk를 쓰는 쪽 몫"이라고 넘긴 것이 이 자리다
+- 계약에 없는 필드는 버리지 않고 `400`으로 거부한다 — 검색 API와 같은 strict parser
+
+**heartbeat · failed · lease 회수**
+
+```
+POST /internal/ai/document-jobs/41/heartbeat   { "attemptNo": 0 }                        → 204
+POST /internal/ai/document-jobs/41/failed
+{ "attemptNo": 0, "failureCode": "PARSE_TIMEOUT", "retryable": true, "message": null }   → 204
+```
+
+- **워커는 보고만 하고, 다음에 무엇을 할지는 Spring이 정한다.** `retryable`은 워커의 판단이고
+  재시도 예산(`max_retries` 기본 3)은 Job이 들고 있다
+  - `retryable: false` → 바로 `DEAD`. 손상된 파일은 세 번 더 해도 똑같이 깨진다
+  - 여지가 있으면 `RETRY_WAIT` + `next_retry_at` — backoff **1 · 5 · 15분**(#119, 2026-09-03)
+  - `attempt_no + 1 > max_retries` → `DEAD`
+- **어느 쪽이든 `attempt_no`는 오른다.** 방금 실패한 워커의 늦은 결과를 `409`로 막는 것이 그 값이다.
+  그 attempt의 staging도 함께 지운다 — 남기면 다음 attempt의 batch와 섞여 finalize 개수 검증이
+  엉뚱한 곳에서 걸린다
+- **lease는 90초, heartbeat는 30초 주기**다(#119). 두 번까지 유실돼도 Job을 뺏기지 않는다.
+  `QUEUED` Job은 heartbeat로도 `RUNNING`이 된다
+- **lease가 만료되면 Spring의 sweeper(30초 주기)가 Job을 회수한다.** FastAPI는 DB 자격증명이 없어
+  죽은 워커가 스스로 반납할 수 없고, 회수가 없으면 문서는 영원히 READY가 되지 않는다. 회수가
+  `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
+  `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
+- `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다

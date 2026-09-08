@@ -1,29 +1,31 @@
 # Booth Studio 실제 Unity 에셋 근사 렌더링 최종 설계안
 
-> **STATUS: PROPOSAL / SPIKE PLAN**
-> **IMPLEMENTATION: DEFERRED**
+> **STATUS: SPIKE PLAN / DESIGN REFERENCE**
+> **IMPLEMENTATION: PARTIALLY EXECUTED**
 > **TARGET: R3F + GLB + FE Asset Pipeline**
-> **TRIGGER: Booth Studio 실제 에셋 렌더링 고도화 착수 시**
 >
-> 반입일 2026-09-03. 본문은 원본 그대로이며 이 블록만 덧붙였다.
-> 이 문서는 확정 결정이 아니다 — `00_context/implementation-decisions.md` 의 D-05(R3F 1순위 후보,
-> 채택 아님)는 그대로이고, 이 계획은 그 spike 가 열릴 때의 실행 설계다.
->
-> 착수 전제(순서대로 충족돼야 한다):
 > ```text
-> User Flow / UX 정본화 완료
-> → !240 Presentation 재구성 완료
-> → Booth Management / Booth Studio 진입 구조 안정
-> → Booth Studio 기존 기능 회귀 안정
-> → 실제 에셋 렌더 고도화 우선순위 도달
-> → P0 DisplayBox Spike 착수
+> CURRENT STATUS        D-05 = PASS_CANDIDATE · NOT ADOPTED
+> EXECUTED EVIDENCE     S15P21A604-470 · -473 · -476
+> CANONICAL STATUS      05_technical-spikes/booth-studio-2_5d/README.md
+> CANONICAL GATE        05_technical-spikes/booth-studio-2_5d/gate-matrix.md
 > ```
+>
+> 반입일 2026-09-03. 본문(§0~§54)은 원본 그대로다. 갱신 2026-09-07 (S15P21A604-479).
+>
+> **이 문서의 역할은 상세 실행 설계·조사자료다.** 현황 판정은 하지 않는다 — 위 두 경로가 한다.
+> 확정 결정도 아니다: `00_context/implementation-decisions.md` D-05 가 결정 정본이고, 거기서도
+> R3F 는 채택되지 않았다.
+>
+> 착수 전제는 전부 충족됐다(User Flow 정본화 · !240 재구성 · Booth Studio 진입 구조 · 회귀 안정).
+> §45 의 P0~P8 중 실제 실행된 범위는 §45 각 절 상단의 STATUS 표시를 본다.
 >
 > 유지할 원칙: 기존 Booth Studio UX·Domain 계약 유지 / Renderer seam 만 교체 대상 /
 > Unity 신규 개발 0 목표 / FBX = Spike 용, GLB = 제품 포맷 후보 / `assetCode` 계약 유지 /
 > Backend 는 Unity GUID·GLB URL 을 알지 않는다 / 실제 Mesh 와 Domain Bounds 분리 /
 > 고정 Orthographic Camera / Current Layout 우선 Load + 나머지 Lazy Load /
-> Static Prefab 만 제한 지원 / Unity + R3F 동시 성능은 실제 적용 단계에서 반드시 검증.
+> Static Prefab 만 제한 지원 / Unity + R3F 동시 성능은 실제 적용 단계에서 반드시 검증
+> (**아직 미검증** — Persistent GameShell 이 없어 두 컨텍스트 동시 상주를 실측하지 못했다).
 
 
 > 목적: 현재 Booth Studio의 **React 기반 편집 UX와 좌표/회전/저장 계약은 유지**하면서,  
@@ -1924,6 +1926,8 @@ Fallback / 저사양 모드 후보이지 주력안은 아니다.
 
 ## P0 — 가장 작은 Feasibility Spike
 
+> **STATUS: EXECUTED** — `-473`. 다만 대상은 FBX 직접 로딩이 아니라 GLB 변환본이었다.
+
 대상:
 
 ```text
@@ -1957,6 +1961,8 @@ DisplayBox01.FBX
 
 ## P1 — 제품 Asset Format
 
+> **STATUS: EXECUTED (변형)** — Blender 없이 three GLTFExporter 로 GLB 를 만들었다. FBX 직접 로딩과의 비교는 하지 않았다.
+
 ```text
 DisplayBox01.FBX
 → Blender Headless
@@ -1979,6 +1985,8 @@ FBX 직접 로딩과 결과 비교.
 
 ## P2 — Asset Registry / Manifest
 
+> **STATUS: EXECUTED** — `-473`. assetCode → GLB URL + 실측 bbox. 다만 `typeDefault` 는 선언으로만 정한다.
+
 ```text
 assetCode
 → GLB URL
@@ -1992,6 +2000,8 @@ assetCode
 ---
 
 ## P3 — Furniture Prefab 정적 조합
+
+> **STATUS: EXECUTED (대표 1종)** — `-476` SurveyKiosk. Furniture 조립체 자체는 아직이다.
 
 필요 원본 Asset 확보:
 
@@ -2012,6 +2022,8 @@ assetCode
 ---
 
 ## P4 — 중앙 Renderer 통합
+
+> **STATUS: EXECUTED** — `-470`. `BoothCanvasViewport` seam 뒤에서 교체했고 SVG 복귀 경로를 남겼다.
 
 현재:
 
@@ -2038,6 +2050,8 @@ R3FBoothRenderer
 
 ## P5 — Load 정책
 
+> **STATUS: PARTIAL** — 캔버스 마운트 시 lazy 로드 + URL 캐시까지. 우선순위 계층·prefetch 는 미구현.
+
 구현:
 
 - Manifest Prefetch
@@ -2050,6 +2064,8 @@ R3FBoothRenderer
 ---
 
 ## P6 — Asset Build 자동화
+
+> **STATUS: PARTIAL** — `node tools/assets/build-booth-assets.mjs` 수동 실행.
 
 ```text
 npm run assets:build
@@ -2067,6 +2083,8 @@ npm run assets:build
 
 ## P7 — CI 자동화
 
+> **STATUS: NOT STARTED** — 러너가 없어 파이프라인 생성이 정지 상태다.
+
 GitLab:
 
 ```text
@@ -2078,6 +2096,8 @@ rules:changes
 ---
 
 ## P8 — 성능 / 회귀
+
+> **STATUS: PARTIAL** — 번들·heap·프레임·컨텍스트 누수는 쟀다. Unity 동시 상주는 못 쟀다.
 
 검증:
 
