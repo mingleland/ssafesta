@@ -47,6 +47,24 @@
 .grp-object { background: rgba(7,9,12,.74); border: 1px solid rgba(255,255,255,.46); border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.5); color: #f0c764; font-size: 17px; height: 34px; width: 34px; }
 .grp-object img { height: 31px; image-rendering: pixelated; object-fit: contain; width: 31px; }
 .grp-static-sprite { background-repeat: no-repeat; display: block; height: 31px; image-rendering: pixelated; width: 31px; }
+/* S15P21A604-529 — 오브젝트와 같은 left/top(%)에 놓고 아래로 오프셋만 준다(x축은 %로
+   중앙 정렬, y축은 px 고정값이라 translate 안에서 단위를 섞어 써도 된다 — 오브젝트 높이
+   (.grp-object 34px)의 절반을 넘어서는 값으로 잡아 하단에 겹치지 않게 뗀다). -526의
+   grp-damage-popup과 달리 애니메이션 없이 조건이 참인 동안 계속 떠 있는 상시 이름표다. */
+.grp-object-nameplate {
+  background: rgba(8,11,16,.72);
+  border-radius: 4px;
+  color: #f5f7fb;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 5px;
+  pointer-events: none;
+  position: absolute;
+  text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  transform: translate(-50%, 21px);
+  white-space: nowrap;
+  z-index: 20;
+}
 .grp-player { filter: drop-shadow(0 5px 5px rgba(0,0,0,.7)); height: 56px; transition: left .1s linear,top .1s linear; width: 56px; z-index: 5; }
 .grp-player .gss-sprite-preview { transform: scale(.9); }
 /* S15P21A604-526 — 캐릭터(.grp-player)와 같은 left/top(%)에 놓고, 여기서 오른쪽 위로
