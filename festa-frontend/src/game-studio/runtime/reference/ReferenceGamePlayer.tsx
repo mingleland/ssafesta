@@ -391,8 +391,13 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
               };
               return (
                 <Fragment key={object.id}>
+                  {/* S15P21A604-535 — 이미지 asset이 있으면(has-visual) 어두운 배지 박스를
+                      완전히 빼서 에디터 캔버스(.gss-map-object, 기본 투명)와 같아지게 한다.
+                      이미지가 없어 이모지 폴백(definition.icon)만 뜨는 경우는 그 배지가
+                      가독성에 필요해 기존 스타일을 유지한다(ReferenceGamePlayer.css의
+                      .grp-object:not(.has-visual) 참고). */}
                   <span
-                    className={`grp-object grp-object--${object.preset.toLowerCase()}`}
+                    className={`grp-object grp-object--${object.preset.toLowerCase()}${spriteVisual === null ? '' : ' has-visual'}`}
                     style={{
                       ...objectPercentPosition,
                       transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
