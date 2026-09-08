@@ -44,15 +44,21 @@
 .grp-tile-layer { display: grid; grid-template-columns: repeat(var(--grp-columns),1fr); grid-template-rows: repeat(var(--grp-rows),1fr); inset: 0; opacity: .72; pointer-events: none; position: absolute; z-index: 1; }
 .grp-tile-layer > span { border: 1px solid rgba(255,255,255,.025); }
 .grp-object,.grp-player { align-items: center; display: inline-flex; justify-content: center; position: absolute; transform: translate(-50%,-50%); z-index: 4; }
-.grp-object { border-radius: 8px; color: #f0c764; font-size: 17px; height: 34px; width: 34px; }
+/* S15P21A604-537 — 34px 고정 대신, 이미 .grp-tile-layer가 쓰고 있는 --grp-columns/
+   --grp-rows(.grp-map에 심어진 씬 크기)로 격자 한 칸 크기에 맞춘다 — 에디터 캔버스의
+   .gss-map-object(calc(100% / 칸 수))와 정확히 같은 공식. 이모지 폴백 아이콘 자체의
+   font-size는 QA 확정대로 고정값 그대로 둔다(칸 크기와 무관). */
+.grp-object { border-radius: 8px; color: #f0c764; font-size: 17px; height: calc(100% / var(--grp-rows)); width: calc(100% / var(--grp-columns)); }
 /* S15P21A604-535 — 이미지 asset이 있으면(has-visual) 배경/테두리/그림자를 아예 안 둬서
    에디터 캔버스(.gss-map-object, 기본 투명)와 같아지게 한다. 이미지가 없어 이모지
    폴백(definition.icon)만 뜨는 경우엔 이 어두운 배지가 가독성에 필요해서 유지한다 —
    원래는 이 배지가 이미지 유무와 무관하게 항상 붙어서, 커스텀 이미지가 플레이 중엔
    불투명한 박스 안에 갇혀 보이던 게 이번 QA의 원인이었다. */
 .grp-object:not(.has-visual) { background: rgba(7,9,12,.74); border: 1px solid rgba(255,255,255,.46); box-shadow: 0 4px 14px rgba(0,0,0,.5); }
-.grp-object img { height: 31px; image-rendering: pixelated; object-fit: contain; width: 31px; }
-.grp-static-sprite { background-repeat: no-repeat; display: block; height: 31px; image-rendering: pixelated; width: 31px; }
+/* S15P21A604-537 — 31px 고정 대신 부모(.grp-object, 이제 격자 칸 크기) 대비 88%로 —
+   에디터 캔버스의 .gss-map-object > img/.gss-static-sprite와 정확히 같은 채움 비율. */
+.grp-object img { height: 88%; image-rendering: pixelated; object-fit: contain; width: 88%; }
+.grp-static-sprite { background-repeat: no-repeat; display: block; height: 88%; image-rendering: pixelated; width: 88%; }
 /* S15P21A604-529 — 오브젝트와 같은 left/top(%)에 놓고 아래로 오프셋만 준다(x축은 %로
    중앙 정렬, y축은 px 고정값이라 translate 안에서 단위를 섞어 써도 된다 — 오브젝트 높이
    (.grp-object 34px)의 절반을 넘어서는 값으로 잡아 하단에 겹치지 않게 뗀다). -526의
