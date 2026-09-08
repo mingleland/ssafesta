@@ -59,6 +59,19 @@ namespace Festa.EditorTools
 
         static void BuildWeb(string[] scenes)
         {
+            // Unity 는 재빌드 시 이전 해시 파일을 지우지 않는다. 메뉴 빌더(FestaReleaseBuilder.BuildWebGL)는
+            // 이 안전장치를 갖고 있는데 CI 경로에는 빠져 있었다 — 2026-09-08 에 실제로 09-07 산출물
+            // (38544b30….data.unityweb, 141 MB)이 남아 .data.unityweb 가 두 개인 채로 나왔다.
+            // 산출물이 두 벌이면 "빌드가 두 번 돌았나" 로 읽히고, 압축해서 넘기면 배포본에 낡은 파일이 섞인다.
+            if (Directory.Exists(WebOutDir))
+            {
+                if (!WebOutDir.StartsWith("Builds/", StringComparison.Ordinal))
+                    Fail($"안전장치 — 출력 경로가 Builds/ 밖이다: {WebOutDir}");
+                Directory.Delete(WebOutDir, true);
+                Log($"{WebOutDir} 를 비웠다 (이전 해시 산출물 혼입 방지)");
+            }
+            Directory.CreateDirectory(WebOutDir);
+
             // URP 는 **활성 빌드 타깃 시점에** 포함할 RP 에셋을 결정한다 (S15P21A604-316).
             // BuildPlayer 에 타깃만 넘기면 늦다 — 먼저 전환해야 Mobile_RPAsset 이 들어간다.
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
