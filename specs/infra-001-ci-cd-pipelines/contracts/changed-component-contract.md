@@ -46,7 +46,7 @@ Components are unique and ordered `ai`, `back`, `front`, `game`. Empty `componen
 
 ## Event rules
 
-- GitLab MR: Front·Back `rules:changes` gate only; deploy does not exist in this pipeline.
+- GitLab MR: every valid MR runs `mr-status` so protected `develop` receives a non-skipped success status. Front·Back `rules:changes` gates are added only for their matching paths; deploy does not exist in this pipeline.
 - `jenkins_develop_push`: selected runtime components run CI, then all succeed before any deploy begins.
 - Jenkins shared CI: all component CI; never dev deploy.
 - docs-only: no CI/CD execution.
