@@ -38,8 +38,12 @@
 .grp-stage-wrap { align-items: center; display: flex; justify-content: center; min-height: 0; overflow: hidden; padding: 34px; position: relative; }
 /* S15P21A604-492 — width는 여기서 고정하지 않는다(ReferenceGamePlayer.tsx의 인라인
    style이 씬 비율을 반영해 매번 계산한다) — 고정 100%로 두면 세로가 긴 씬에서 비율이
-   깨진다. max-height/max-width는 그 계산식이 참조하는 상한이자 안전망으로 남겨둔다. */
-.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: calc(100vh - 130px); max-width: 1120px; overflow: hidden; position: relative; }
+   깨진다.
+   S15P21A604-542 — max-height/max-width의 실제 값은 인라인 style의 계산식이 이미
+   화면 크기 기준(92%)으로 정해준다 — 여기서는 100%(=.grp-stage-wrap의 padding을 뺀
+   가용 영역)로 안전망만 남겨, 계산식이 만에 하나 그 영역을 넘는 값을 내더라도 넘치지
+   않게 한다. */
+.grp-map { background-position: center; background-size: cover; border: 1px solid #4a5360; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.018); max-height: 100%; max-width: 100%; overflow: hidden; position: relative; }
 .grp-map::after { background-image: repeating-linear-gradient(to right,transparent 0,transparent calc((100% / var(--grp-columns)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-columns))),repeating-linear-gradient(to bottom,transparent 0,transparent calc((100% / var(--grp-rows)) - 1px),rgba(200,220,245,.07) calc(100% / var(--grp-rows))); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 3; }
 .grp-tile-layer { display: grid; grid-template-columns: repeat(var(--grp-columns),1fr); grid-template-rows: repeat(var(--grp-rows),1fr); inset: 0; opacity: .72; pointer-events: none; position: absolute; z-index: 1; }
 .grp-tile-layer > span { border: 1px solid rgba(255,255,255,.025); }
