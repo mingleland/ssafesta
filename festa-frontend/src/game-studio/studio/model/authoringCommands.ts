@@ -575,6 +575,39 @@ export const setObjectVisible = (
   objects: scene.objects.map((object) => object.id === objectId ? { ...object, visible } : object),
 }));
 
+// S15P21A604-529 — PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어
+// 캐릭터는 .grp-player로 별도 렌더링) 이름/표시 설정을 가질 수 없다(QA 확정 사항). UI가
+// 애초에 그 컨트롤을 렌더링하지 않지만, 명령 자체도 조용히 무시해 계약을 어기는 project가
+// 만들어지지 않게 방어한다.
+export const renameObject = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  name: string,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  const trimmed = name.trim();
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, name: trimmed === '' ? undefined : trimmed } : object),
+  };
+});
+
+export const setObjectNameVisible = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  showNameInPlay: boolean,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, showNameInPlay } : object),
+  };
+});
+
 const objectReferencedByAction = (
   project: GameProject,
   objectId: string,
