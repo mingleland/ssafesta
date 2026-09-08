@@ -214,6 +214,10 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - Q: 여러 컴포넌트 dev 배포 중 하나가 실패하면, 이미 배포된 같은 MR의 컴포넌트는 어떻게 할까? → A: 같은 MR에서 이미 갱신된 컴포넌트도 이전 정상 release로 자동 복구한다.
 - Q: dev 검증 뒤 demo 통합 배포는 언제 실행할까? → A: dev 검증 완료 후 Jenkins에서 명시적으로 승인한 release만 demo에 통합 배포한다.
 
+### Session 2026-09-09
+
+- Q: Front·Back 경로가 아닌 Infra·문서 MR은 component gate가 없는데, protected `develop`의 성공 pipeline 요구를 어떻게 만족할까? → A: 모든 유효 MR은 build·test·deploy를 수행하지 않는 `mr-status` job을 하나 실행한다. Front·Back component gate는 기존 `rules:changes`로만 추가되며, Jenkins의 merge 후 선택 CI와 중복되지 않는다.
+
 | ID | 질문/결정 | 결정 주체 | 결정 시점 |
 |---|---|---|---|
 | C-01 | **확정**: Jenkins 사용. 초기 단일 EC2 내 Controller/Agent 분리, 추후 Agent 별도 EC2 이전 가능. GitHub에서 GitLab 이전 시 Jenkins Webhook 연동 전환. | Infra | 2026-08-18 |

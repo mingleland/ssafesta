@@ -10,8 +10,8 @@
 - [X] T001 `infra/tests/acceptance/us1-gitlab-mr-gate.sh`에 Front-only, Back-only, Front·Back shared-path MR gate fixture를 작성한다
 - [X] T002 `.gitlab-ci.yml`에 MR pipeline workflow와 `jira-*` job 정의 보존·비실행 규칙을 구현한다
 - [X] T003 `.gitlab-ci.yml`에 `rules:changes` 기반 `front-test`·`front-build`·`back-test`·`back-build` job과 기존 `ci/test`·`ci/build` 호출을 추가한다
-- [ ] T004 `infra/evidence/gitlab-runner-gate.md`에 Docker 가능한 GitLab Runner 배정과 Front·Back MR gate 실측을 기록한다
-- [ ] T005 `infra/evidence/gitlab-merge-policy.md`에 GitLab required pipeline·protected `develop` merge 차단 설정 실측을 기록한다
+- [X] T004 `infra/evidence/gitlab-runner-gate.md`에 Docker 가능한 GitLab Runner 배정과 Front·Back MR gate 실측을 기록한다
+- [X] T005 `infra/evidence/gitlab-merge-policy.md`에 GitLab required pipeline·protected `develop` merge 차단 설정 실측을 기록한다
 
 **Checkpoint**: 필수 GitLab job 실패 MR은 merge되지 않으며, 성공 MR은 어떤 dev 컨테이너도 변경하지 않는다.
 
@@ -21,13 +21,13 @@
 
 **Purpose**: Jenkins는 merge 후 `develop` range만 판별하고 dev 배포를 담당한다.
 
-- [ ] T006 `infra/jenkins/tests/detect-changed-components.sh`에 develop push 단일·다중·shared CI·docs-only·미분류 경로 selection fixture를 작성한다
-- [ ] T007 `infra/jenkins/scripts/detect-changed-components.sh`에 develop Git diff 범위 검증과 `ai`, `back`, `front`, `game` JSON selection 출력을 구현한다
-- [ ] T008 `infra/jenkins/scripts/detect-changed-components.sh`에 미분류 CI·환경·배포 경로 fail-closed와 docs-only no-op을 구현한다
-- [ ] T009 `Jenkinsfile`에 `develop` push만 받는 dispatcher를 추가하고 feature MR branch dispatch를 제거한다
-- [ ] T010 `infra/jenkins/pipelines/component.groovy`가 `CI_COMPONENT`, source SHA, artifact directory를 입력으로 받아 merge 후 CI만 수행하도록 분리한다
-- [ ] T011 `infra/jenkins/pipelines/component.groovy`에 selected component stage summary·artifact fingerprint 기록을 추가한다
-- [ ] T012 `infra/jenkins/jobs/gitlab-develop-multibranch.groovy`를 추가해 develop push 전용 Jenkins job을 정의한다
+- [X] T006 `infra/jenkins/tests/detect-changed-components.sh`에 develop push 단일·다중·shared CI·docs-only·미분류 경로 selection fixture를 작성한다
+- [X] T007 `infra/jenkins/scripts/detect-changed-components.sh`에 develop Git diff 범위 검증과 `ai`, `back`, `front`, `game` JSON selection 출력을 구현한다
+- [X] T008 `infra/jenkins/scripts/detect-changed-components.sh`에 알려진 공통 CI·Infra 경로의 전체 컴포넌트 CI·비배포, 미분류 in-scope 경로 fail-closed, docs-only no-op을 구현한다
+- [X] T009 `Jenkinsfile`에 `develop` push만 받는 dispatcher를 추가하고 feature MR branch dispatch를 제거한다
+- [X] T010 `infra/jenkins/pipelines/component.groovy`가 `CI_COMPONENT`, source SHA, artifact directory를 입력으로 받아 merge 후 CI만 수행하도록 분리한다
+- [X] T011 `infra/jenkins/pipelines/component.groovy`에 selected component stage summary·artifact fingerprint 기록을 추가한다
+- [X] T012 `infra/jenkins/jobs/gitlab-develop-multibranch.groovy`를 추가해 develop push 전용 Jenkins job을 정의한다
 
 **Checkpoint**: Jenkins는 MR을 재실행하지 않고 develop push의 selection 결과만 dev 배포 후보로 만든다.
 

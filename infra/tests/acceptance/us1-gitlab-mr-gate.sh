@@ -34,6 +34,12 @@ require 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"' "$pipeline"
 require 'CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID' "$pipeline"
 require 'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^feature\//' "$pipeline"
 job '.component-ci' | grep -Fq 'command -v python3' || fail 'CI summary runtime dependency'
+status_section="$(job 'mr-status')"
+[[ -n "$status_section" ]] || fail 'missing MR status job'
+grep -Fq 'stage: validate' <<<"$status_section" || fail 'MR status stage'
+grep -Fq 'CI_PIPELINE_SOURCE == "merge_request_event"' <<<"$status_section" || fail 'MR status rule'
+grep -Fq 'MR pipeline status only' <<<"$status_section" || fail 'MR status no-op command'
+echo 'PASS: infra/docs-only MR receives a successful pipeline status'
 
 check_gate front 'festa-frontend/**/*'
 echo 'PASS: front-only MR gate'
