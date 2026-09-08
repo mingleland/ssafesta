@@ -61620,6 +61620,11 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2022660610}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!82 &2025786971 stripped
+AudioSource:
+  m_CorrespondingSourceObject: {fileID: 6487539499826891240, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2027795547
 GameObject:
   m_ObjectHideFlags: 0
@@ -64409,6 +64414,22 @@ PrefabInstance:
       propertyPath: destination
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 745451571287121185, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_Volume
+      value: 0.45
+      objectReference: {fileID: 0}
+    - target: {fileID: 745451571287121185, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: MaxDistance
+      value: 106
+      objectReference: {fileID: 0}
+    - target: {fileID: 745451571287121185, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: MinDistance
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 790371489795294309, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: winAudioSource
+      value: 
+      objectReference: {fileID: 2025786971}
     - target: {fileID: 796223115190824121, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: destination
       value: 
@@ -64484,6 +64505,18 @@ PrefabInstance:
     - target: {fileID: 5882037107150014486, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: destination
       value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 6487539499826891240, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_Volume
+      value: 0.45
+      objectReference: {fileID: 0}
+    - target: {fileID: 6487539499826891240, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: MaxDistance
+      value: 106
+      objectReference: {fileID: 0}
+    - target: {fileID: 6487539499826891240, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: MinDistance
+      value: 20
       objectReference: {fileID: 0}
     - target: {fileID: 6636007287849755654, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: destination

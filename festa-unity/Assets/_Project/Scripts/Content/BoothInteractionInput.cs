@@ -28,6 +28,15 @@ namespace Festa.Content
 
         static BoothInteractionInput _instance;
 
+        /// <summary>
+        /// 지금 부스 오브젝트 프롬프트(키캡 또는 안내 알약)가 화면에 떠 있는가.
+        /// 포털 프롬프트는 이게 참이면 그 프레임을 양보한다 — 두 알약이 화면 중앙 같은 자리에 겹쳐
+        /// 글자가 뭉개지던 문제(QA 2026-09-08 #26). 부스 오브젝트가 포털보다 우선인 이유: 포털은 발밑
+        /// 범위라 부스 문 앞에서는 늘 켜져 있고, 오브젝트는 조준해야만 켜져서 의도가 더 분명하다.
+        /// </summary>
+        public static bool PromptShowing =>
+            _instance != null && (_instance._hovered != null || _instance._passive != null);
+
         /// <summary>디스패처가 씬에 있도록 보장한다. 상호작용 오브젝트가 Awake 에서 호출한다.</summary>
         public static void Ensure()
         {
@@ -41,7 +50,12 @@ namespace Festa.Content
             // 씬 전환에도 남기지 않는다 — 부스 오브젝트와 생애를 맞춘다.
         }
 
-        void OnEnable() => Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        void OnEnable()
+        {
+            // 씬에 미리 놓인 인스턴스는 Ensure() 를 거치지 않으므로 여기서도 등록한다 (PromptShowing 이 본다).
+            if (_instance == null) _instance = this;
+            Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        }
         void OnDisable() => Festa.Integration.BoothInteractBridge.OnSent -= OnBridgeSent;
 
         void OnDestroy()

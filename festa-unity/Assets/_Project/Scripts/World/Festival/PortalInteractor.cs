@@ -143,6 +143,9 @@ namespace Festa.World
             if (_toast != null && Time.unscaledTime <= _toastUntil)
                 InteractPromptUI.DrawToast(_toast);
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
+            // 부스 오브젝트 프롬프트가 떠 있으면 양보한다 — 같은 자리에 알약 둘이 겹치면 둘 다 못 읽는다
+            // (QA 2026-09-08 #26). F 자체는 양쪽 다 살아 있으므로 입장은 그대로 된다.
+            if (Festa.Content.BoothInteractionInput.PromptShowing) return;
             InteractPromptUI.DrawPrompt(_nearest.promptText);
         }
     }

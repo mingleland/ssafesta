@@ -384,16 +384,29 @@ namespace Festa.World
             return found;
         }
 
+        /// <summary>
+        /// 지면 탐색용 히트 버퍼. **모든 아바타가 함께 쓴다** — 한 프레임 안에서 한 번에 하나씩만
+        /// 쓰이므로 공유해도 안전하고, 이걸 공유해야 할당이 0 이 된다.
+        ///
+        /// <para>예전에는 <c>Physics.RaycastAll</c> 이었다. 그쪽은 **호출마다 배열을 새로 할당**한다.
+        /// 아바타마다 매 프레임 부르므로 40명이면 프레임당 배열 40개가 쓰레기로 나갔다 —
+        /// "사람이 많아질수록 조금씩 무거워진다" 의 정체다. 레이캐스트 횟수가 아니라 할당이 문제였다
+        /// (2026-09-08 조사).</para>
+        /// </summary>
+        static readonly RaycastHit[] s_groundHits = new RaycastHit[16];
+
         bool TryFindGroundHeight(out float groundY)
         {
             groundY = 0f;
             var origin = _visualRoot.position + Vector3.up * 50f;
-            var hits = Physics.RaycastAll(origin, Vector3.down, 100f, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, 100f, ~0,
+                                                QueryTriggerInteraction.Ignore);
             var found = false;
             var bestY = float.NegativeInfinity;
 
-            foreach (var hit in hits)
+            for (int i = 0; i < count; i++)
             {
+                var hit = s_groundHits[i];
                 if (hit.transform == null || hit.transform.IsChildOf(transform))
                     continue;
                 if (hit.point.y <= bestY)
