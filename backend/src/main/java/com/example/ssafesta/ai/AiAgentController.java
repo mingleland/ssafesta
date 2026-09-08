@@ -64,7 +64,7 @@ public class AiAgentController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "생성된 AI 직원 전체"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 필수 누락이나 허용값 위반. `errors[0].field` 가 문제 필드다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스가 아니다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스가 아니다)"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = "`AGENT_LIMIT_EXCEEDED`(이미 1명 있다) 또는 `BOOTH_LEASE_EXPIRED`(임대 만료)")})
     @PostMapping("/booths/{boothId}/agents")
@@ -89,7 +89,7 @@ public class AiAgentController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "AI 직원 0개 또는 1개"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스가 아니다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스가 아니다)"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다")})
     @GetMapping("/booths/{boothId}/agents")
     @SecurityRequirement(name = "bearerAuth")
@@ -108,7 +108,7 @@ public class AiAgentController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "AI 직원 전체"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다")})
     @GetMapping("/agents/{agentId}")
     @SecurityRequirement(name = "bearerAuth")
@@ -132,7 +132,7 @@ public class AiAgentController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정된 AI 직원 전체"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 바꿀 내용이 없거나 허용값 위반, 또는 비울 수 없는 필드에 `null` 을 보냈다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다"),
             @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스다")})
     @PatchMapping("/agents/{agentId}")
@@ -156,7 +156,7 @@ public class AiAgentController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "삭제 완료. 본문 없음"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다"),
             @ApiResponse(responseCode = "409", description = "`AGENT_DELETE_CONFLICT`(작업본·현재 공개본이 참조 중) 또는 `BOOTH_LEASE_EXPIRED`")})
     @DeleteMapping("/agents/{agentId}")

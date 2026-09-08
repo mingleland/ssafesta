@@ -69,7 +69,7 @@ public class ProjectController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "생성된 프로젝트 전체"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 필수 누락·길이 초과·URL 규칙 위반. `errors[0].field` 가 문제 필드다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스가 아니다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스가 아니다)"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = "이미 프로젝트가 있거나 임대가 만료된 부스다")})
     @PostMapping("/booths/{boothId}/projects")
@@ -96,7 +96,7 @@ public class ProjectController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "프로젝트 0개 또는 1개"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스가 아니다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스가 아니다)"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다")})
     @GetMapping("/booths/{boothId}/projects")
     @SecurityRequirement(name = "bearerAuth")
@@ -144,7 +144,7 @@ public class ProjectController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정된 프로젝트 전체"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 바꿀 내용이 없거나 값 규칙 위반이다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스의 프로젝트가 아니다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(내 부스의 프로젝트가 아니다)"),
             @ApiResponse(responseCode = "404", description = "`PROJECT_NOT_FOUND` — 그런 프로젝트가 없다"),
             @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스다")})
     @PatchMapping("/projects/{projectId}")

@@ -7,9 +7,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -147,6 +151,43 @@ class OpenApiDocumentationTest {
     }
 
     /**
+     * 문서가 약속하는 오류코드가 {@code ErrorCode} 에 실재한다 (S15P21A604-514).
+     *
+     * <p>위의 검사들은 설명이 <b>있는지</b>만 본다. 설명이 <b>참인지</b>는 아무도 보지 않았고, 그 틈으로
+     * 실재하지 않는 {@code BOOTH_FORBIDDEN} 이 6개 컨트롤러 15곳에 들어가 있었다. 실제 응답의 코드는
+     * {@code BOOTH_EDITOR_FORBIDDEN} 이므로 Swagger 대로 분기를 짠 클라이언트의 그 분기는 영원히
+     * 걸리지 않는다 — 그리고 그 실패는 조용하다. 오류코드 이름은 계약이고, 계약은 검사되어야 한다.
+     *
+     * <p><b>설명의 첫 절만 본다.</b> 그 뒤는 코드의 뜻을 풀어 쓴 산문이고, 거기 백틱으로 적힌
+     * SCREAMING_CASE 는 오류코드가 아니라 도메인 값이다 — {@code VALIDATION_FAILED — visibility 가
+     * PRIVATE·PUBLIC 이 아니다} 의 {@code PRIVATE}, {@code GAME_ASSET_NOT_READY} 설명 안의
+     * {@code UPLOADING}·{@code OBJECT_MISSING} 처럼. 그것까지 요구하면 오류코드 enum 이 상태 enum 을
+     * 흡수해야 하므로, 코드 자리(맨 앞)에 적힌 것만 검사한다.
+     */
+    @Test
+    void documentedErrorCodesExistInTheEnum() throws Exception {
+        Set<String> declared = Arrays.stream(ErrorCode.values())
+                .map(Enum::name)
+                .collect(Collectors.toSet());
+        List<String> phantom = new ArrayList<>();
+        forEachOperation((id, operation) -> {
+            JsonNode responses = operation.path("responses");
+            for (String status : responses.propertyNames()) {
+                if (!status.startsWith("4") && !status.startsWith("5")) {
+                    continue;
+                }
+                for (String code : codesClaimedBy(responses.path(status).path("description").asString(""))) {
+                    if (!declared.contains(code)) {
+                        phantom.add(id + " " + status + " — `" + code + "` 는 ErrorCode 에 없습니다");
+                    }
+                }
+            }
+        });
+        assertTrue(phantom.isEmpty(),
+                "문서가 실재하지 않는 오류코드를 약속합니다:\n  " + String.join("\n  ", phantom));
+    }
+
+    /**
      * 모든 operation 이 {@code OpenApiConfiguration} 에 선언된 태그 아래에 있다.
      *
      * <p>{@code @Tag} 를 잊으면 springdoc 이 클래스 이름으로 태그를 만든다 —
@@ -236,5 +277,24 @@ class OpenApiDocumentationTest {
 
     private static boolean isBlank(JsonNode node) {
         return node.asString("").isBlank();
+    }
+
+    /** 백틱으로 감싼 SCREAMING_CASE. 오류코드를 적는 표기이자, 도메인 값을 적는 표기이기도 하다. */
+    private static final Pattern BACKTICKED_TOKEN = Pattern.compile("`([A-Z][A-Z0-9_]{2,})`");
+
+    /**
+     * 설명이 <b>오류코드로서</b> 약속하는 토큰 — 첫 em dash 또는 마침표 앞에 적힌 것.
+     *
+     * <p>{@code `MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(내 부스가 아니다)} 처럼 한 응답이 코드
+     * 여럿을 가질 수 있으므로 첫 하나로 끊지 않는다. 반대로 em dash 뒤는 산문이므로 세지 않는다.
+     */
+    private static List<String> codesClaimedBy(String description) {
+        String head = description.split("—|\\. ", 2)[0];
+        List<String> codes = new ArrayList<>();
+        Matcher matcher = BACKTICKED_TOKEN.matcher(head);
+        while (matcher.find()) {
+            codes.add(matcher.group(1));
+        }
+        return codes;
     }
 }
