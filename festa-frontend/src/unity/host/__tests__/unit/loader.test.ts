@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 describe('resolveDevicePixelRatio', () => {
-  it('상한을 넘는 화면은 1.5 로 낮춘다 — 실측 DPR 2.2 는 표시 크기의 4.84배를 그린다', () => {
+  it('상한을 넘는 화면은 1.5 로 낮춘다 — 상한이 없으면 표시 크기의 3배 넘게 그린다', () => {
     stubRatio(2.2);
     expect(resolveDevicePixelRatio()).toBe(1.5);
   });
