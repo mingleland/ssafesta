@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { parseGameProject, type AssetReference, type GameObject, type GameProject, type Position2d } from '../../contracts/gameProject.ts';
+import { parseGameProject, type AssetReference, type GameObject, type GameProject, type GameScene, type Position2d } from '../../contracts/gameProject.ts';
 import {
   addDialogueScene,
   addAssetReference,
@@ -152,6 +152,37 @@ const savePanelWidths = (widths: PanelWidths): void => {
   }
 };
 
+// S15P21A604-522 — 대화 씬 편집 시 우측 속성/이벤트/데이터 패널에 유용한 정보가 거의
+// 없어(표시방식/노드 수/시작 노드 정도, 안내 카드 하나) 화면 공간만 차지하는 문제를
+// 씬 타입별 기본값으로 완화한다. 맵 씬(TOP_DOWN/PLATFORMER)은 오브젝트 속성/이벤트
+// 편집에 패널이 필수라 기본 펼침, 대화 씬은 기본 접힘.
+const defaultRightPanelCollapsed = (sceneType: GameScene['type']): boolean => sceneType === 'DIALOGUE';
+
+const rightPanelCollapseStorageKey = (gameId: number) => `festa.game-studio.rightPanelCollapsed.${gameId}`;
+
+// panelWidths(위)는 localStorage에 게임과 무관하게 영구 저장되지만, 이 접힘 상태는
+// "브라우저 세션에서만 유지"하기로 결정했다(QA 확정 사항) — sessionStorage를 써서
+// 새로고침에는 남고 탭/브라우저를 닫으면 사라지게 한다.
+const loadRightPanelCollapsed = (gameId: number): Readonly<Record<string, boolean>> => {
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(rightPanelCollapseStorageKey(gameId)) ?? '{}');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed as Record<string, unknown>)
+      .filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean');
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+};
+
+const saveRightPanelCollapsed = (gameId: number, byScene: Readonly<Record<string, boolean>>): void => {
+  try {
+    window.sessionStorage.setItem(rightPanelCollapseStorageKey(gameId), JSON.stringify(byScene));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 접기/펼치기 자체는 정상 동작한다.
+  }
+};
+
 interface GameStudioShellProps {
   readonly gameId: number;
   readonly initialProject?: GameProject;
@@ -259,6 +290,13 @@ export const GameStudioShell = ({
   const [showLayers, setShowLayers] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [panelWidths, setPanelWidths] = useState<PanelWidths>(() => loadPanelWidths());
+  // S15P21A604-522 — 씬 id → 우측 패널 접힘 여부. 아직 이 씬에 대한 항목이 없으면(새로
+  // 추가한 씬 포함) defaultRightPanelCollapsed(scene.type)를 그대로 fallback으로 쓴다 —
+  // 그래서 씬을 어떻게 옮겨왔든(목록 클릭/씬 추가/복제/되돌리기 등) 항상 올바른 기본값 또는
+  // 마지막으로 저장한 상태가 나온다.
+  const [rightPanelCollapsedByScene, setRightPanelCollapsedByScene] = useState<Readonly<Record<string, boolean>>>(
+    () => loadRightPanelCollapsed(gameId),
+  );
   const [draggedSceneIndex, setDraggedSceneIndex] = useState<number | null>(null);
   const [dragOverSceneIndex, setDragOverSceneIndex] = useState<number | null>(null);
   const panelResizeRef = useRef<{ readonly side: 'left' | 'right'; readonly startX: number; readonly startWidth: number } | null>(null);
@@ -274,6 +312,11 @@ export const GameStudioShell = ({
   // 패턴(setPointerCapture)을 그대로 따른다. pointerId를 캡처한 요소 자신에게 move/up을
   // 걸어서, 커서가 구분선 밖으로 나가도 드래그가 끊기지 않게 한다.
   const startPanelResize = (event: ReactPointerEvent<HTMLDivElement>, side: 'left' | 'right') => {
+    // S15P21A604-522 — 우측 구분선 위 접기/펼치기 버튼에서 시작된 pointerdown까지 잡아버리면
+    // 그 버튼의 클릭이 드래그로 오인된다(FloatingPanel.startDrag/SceneFlowGraph.startPan과
+    // 같은 방어). 접힌 상태에서는 애초에 드래그로 폭을 조절할 대상이 없으니 무시한다.
+    if (event.target instanceof Element && event.target.closest('button') !== null) return;
+    if (side === 'right' && isRightPanelCollapsed) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     panelResizeRef.current = { side, startX: event.clientX, startWidth: side === 'left' ? panelWidths.left : panelWidths.right };
@@ -307,6 +350,19 @@ export const GameStudioShell = ({
   };
 
   const selectedScene = project.scenes.find((scene) => scene.id === selectedSceneId) ?? project.scenes[0];
+  const isRightPanelCollapsed = selectedScene === undefined
+    ? false
+    : rightPanelCollapsedByScene[selectedScene.id] ?? defaultRightPanelCollapsed(selectedScene.type);
+  const toggleRightPanelCollapsed = () => {
+    if (selectedScene === undefined) return;
+    const sceneId = selectedScene.id;
+    const nextValue = !isRightPanelCollapsed;
+    setRightPanelCollapsedByScene((current) => {
+      const next = { ...current, [sceneId]: nextValue };
+      saveRightPanelCollapsed(gameId, next);
+      return next;
+    });
+  };
   const selectedObject = selectedScene !== undefined && selectedScene.type !== 'DIALOGUE'
     ? selectedScene.objects.find((object) => object.id === selectedObjectId) ?? null
     : null;
@@ -1051,7 +1107,13 @@ export const GameStudioShell = ({
 
       <section
         className="gss-layout"
-        style={{ '--gss-left-width': `${panelWidths.left}px`, '--gss-right-width': `${panelWidths.right}px` } as React.CSSProperties}
+        style={{
+          '--gss-left-width': `${panelWidths.left}px`,
+          // S15P21A604-522 — 접힌 상태에서는 우측 컬럼 폭을 0으로 줄여 캔버스가 그만큼
+          // 넓어지게 한다. 구분선(6px) 컬럼은 grid-template-columns에 별도로 고정돼 있어
+          // 이 변수와 무관하게 항상 남는다(그 위 접기/펼치기 버튼이 계속 보이는 이유).
+          '--gss-right-width': isRightPanelCollapsed ? '0px' : `${panelWidths.right}px`,
+        } as React.CSSProperties}
       >
         <aside className="gss-left-sidebar">
           <div className="gss-sidebar-section gss-scene-section">
@@ -1500,66 +1562,82 @@ export const GameStudioShell = ({
         </section>
 
         <div
-          className="gss-panel-divider"
+          className={`gss-panel-divider gss-panel-divider--collapsible${isRightPanelCollapsed ? ' is-collapsed' : ''}`}
           onPointerDown={(event) => startPanelResize(event, 'right')}
           onPointerMove={handlePanelResizeMove}
           onPointerUp={stopPanelResize}
           onPointerCancel={stopPanelResize}
           title="드래그해서 패널 폭 조절"
-        />
+        >
+          {/* S15P21A604-522 — 접혔을 때도 이 버튼(과 구분선 자체)은 항상 보이고 클릭
+              가능해야 다시 펼칠 방법이 남는다 — 패널 내용만 사라지게 한다(아래 aside).
+              화살표는 "누르면 이 방향으로 접힌다/펼쳐진다"를 가리킨다: 펼친 상태에서는
+              오른쪽 바깥으로 밀어 접으라는 뜻의 ›, 접힌 상태에서는 다시 안쪽으로 끌어오라는
+              뜻의 ‹. */}
+          <button
+            aria-label={isRightPanelCollapsed ? '속성/이벤트/데이터 패널 펼치기' : '속성/이벤트/데이터 패널 접기'}
+            className="gss-panel-collapse-toggle"
+            onClick={toggleRightPanelCollapsed}
+            type="button"
+          >{isRightPanelCollapsed ? '‹' : '›'}</button>
+        </div>
 
         <aside className="gss-right-sidebar">
-          <div className="gss-panel-tabs">
-            {(['PROPERTIES', 'EVENTS', 'PROJECT'] as const).map((panel) => (
-              <button
-                className={rightPanel === panel ? 'is-active' : ''}
-                key={panel}
-                onClick={() => setRightPanel(panel)}
-                type="button"
-              >{panel === 'PROPERTIES' ? '속성' : panel === 'EVENTS' ? '이벤트' : '데이터'}</button>
-            ))}
-          </div>
-          <div className="gss-panel-scroll">
-            {rightPanel === 'PROPERTIES' && selectedScene.type !== 'DIALOGUE' && (
-              <InspectorPanel
-                assetUrls={assetUrls}
-                onApply={apply}
-                onObjectRemoved={clearObjectSelection}
-                onReplaceSprite={(file) => {
-                  if (selectedObject === null) return;
-                  void uploadAsset('IMAGE', file).then((asset) => {
-                    if (asset === null) return;
-                    apply(replaceComponent(
-                      store.getState().project,
-                      selectedScene.id,
-                      selectedObject.id,
-                      { type: 'SPRITE', assetId: asset.id, scale: 100, zIndex: 2 },
-                    ));
-                  });
-                }}
-                project={project}
-                scene={selectedScene}
-                selectedObject={selectedObject}
-              />
-            )}
-            {rightPanel === 'PROPERTIES' && selectedScene.type === 'DIALOGUE' && (
-              <div className="gss-panel-stack">
-                <div className="gss-panel-heading"><div><span className="gss-eyebrow">DIALOGUE</span><h2>{selectedScene.name}</h2></div></div>
-                <div className="gss-info-grid"><span>표시 방식</span><strong>{selectedScene.presentation}</strong><span>노드</span><strong>{selectedScene.nodes.length}</strong><span>시작 노드</span><strong>{selectedScene.startNodeId}</strong></div>
+          {!isRightPanelCollapsed && (
+            <>
+              <div className="gss-panel-tabs">
+                {(['PROPERTIES', 'EVENTS', 'PROJECT'] as const).map((panel) => (
+                  <button
+                    className={rightPanel === panel ? 'is-active' : ''}
+                    key={panel}
+                    onClick={() => setRightPanel(panel)}
+                    type="button"
+                  >{panel === 'PROPERTIES' ? '속성' : panel === 'EVENTS' ? '이벤트' : '데이터'}</button>
+                ))}
               </div>
-            )}
-            {rightPanel === 'EVENTS' && selectedScene.type !== 'DIALOGUE' && (
-              <EventEditor onApply={apply} project={project} scene={selectedScene} selectedObject={selectedObject} />
-            )}
-            {rightPanel === 'EVENTS' && selectedScene.type === 'DIALOGUE' && (
-              <div className="gss-help-card"><strong>선택지 결과가 Dialogue Event입니다</strong><p>중앙 편집기에서 다음 노드, Scene 이동, 대화 닫기 또는 게임 완료를 선택하세요.</p></div>
-            )}
-            {rightPanel === 'PROJECT' && <ProjectDataPanel
-              onApply={apply}
-              onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
-              project={project}
-            />}
-          </div>
+              <div className="gss-panel-scroll">
+                {rightPanel === 'PROPERTIES' && selectedScene.type !== 'DIALOGUE' && (
+                  <InspectorPanel
+                    assetUrls={assetUrls}
+                    onApply={apply}
+                    onObjectRemoved={clearObjectSelection}
+                    onReplaceSprite={(file) => {
+                      if (selectedObject === null) return;
+                      void uploadAsset('IMAGE', file).then((asset) => {
+                        if (asset === null) return;
+                        apply(replaceComponent(
+                          store.getState().project,
+                          selectedScene.id,
+                          selectedObject.id,
+                          { type: 'SPRITE', assetId: asset.id, scale: 100, zIndex: 2 },
+                        ));
+                      });
+                    }}
+                    project={project}
+                    scene={selectedScene}
+                    selectedObject={selectedObject}
+                  />
+                )}
+                {rightPanel === 'PROPERTIES' && selectedScene.type === 'DIALOGUE' && (
+                  <div className="gss-panel-stack">
+                    <div className="gss-panel-heading"><div><span className="gss-eyebrow">DIALOGUE</span><h2>{selectedScene.name}</h2></div></div>
+                    <div className="gss-info-grid"><span>표시 방식</span><strong>{selectedScene.presentation}</strong><span>노드</span><strong>{selectedScene.nodes.length}</strong><span>시작 노드</span><strong>{selectedScene.startNodeId}</strong></div>
+                  </div>
+                )}
+                {rightPanel === 'EVENTS' && selectedScene.type !== 'DIALOGUE' && (
+                  <EventEditor onApply={apply} project={project} scene={selectedScene} selectedObject={selectedObject} />
+                )}
+                {rightPanel === 'EVENTS' && selectedScene.type === 'DIALOGUE' && (
+                  <div className="gss-help-card"><strong>선택지 결과가 Dialogue Event입니다</strong><p>중앙 편집기에서 다음 노드, Scene 이동, 대화 닫기 또는 게임 완료를 선택하세요.</p></div>
+                )}
+                {rightPanel === 'PROJECT' && <ProjectDataPanel
+                  onApply={apply}
+                  onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
+                  project={project}
+                />}
+              </div>
+            </>
+          )}
         </aside>
       </section>
       {showGuide && (
