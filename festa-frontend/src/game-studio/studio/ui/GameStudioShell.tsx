@@ -103,6 +103,30 @@ const loadEditorSet = (gameId: number, kind: 'hidden' | 'locked'): ReadonlySet<s
   }
 };
 
+// S15P21A604-547 — "플레이 테스트"가 별도 라우트(/app/games/:id/play)로 이동하는 구조라,
+// 나갔다 돌아오면 GameStudioShell이 통째로 새로 마운트된다. selectedSceneId가 저장되지
+// 않는 순수 컴포넌트 state였을 때는, 마운트마다 실행되는 정상 초안 로드 콜백이 매번
+// project.startSceneId로 되돌려서 "플레이 테스트 후 항상 시작 씬으로 리셋"되는 결함이
+// 있었다 — editorHiddenObjectIds/editorLockedObjectIds와 같은 패턴으로 마지막 선택 씬을
+// 게임(gameId)별로 localStorage에 기억했다가 복원한다.
+const selectedSceneStorageKey = (gameId: number) => `festa.game-studio.editor.${gameId}.selectedScene`;
+
+const loadSelectedSceneId = (gameId: number): string | null => {
+  try {
+    return window.localStorage.getItem(selectedSceneStorageKey(gameId));
+  } catch {
+    return null;
+  }
+};
+
+const saveSelectedSceneId = (gameId: number, sceneId: string): void => {
+  try {
+    window.localStorage.setItem(selectedSceneStorageKey(gameId), sceneId);
+  } catch {
+    // 편집 보조 상태 저장 실패는 GameProject 저장을 방해하지 않는다.
+  }
+};
+
 const saveEditorSet = (gameId: number, kind: 'hidden' | 'locked', ids: ReadonlySet<string>): void => {
   try {
     window.localStorage.setItem(editorSetStorageKey(gameId, kind), JSON.stringify([...ids]));
@@ -183,6 +207,80 @@ const saveRightPanelCollapsed = (gameId: number, byScene: Readonly<Record<string
   }
 };
 
+// S15P21A604-547 — "플레이 테스트"는 별도 라우트로 이동하는 구조라, 나갔다 돌아오면
+// GameStudioShell이 통째로 새로 마운트된다. 우측 패널 탭·캔버스 확대(zoom)·뷰포트 중심은
+// 원래 sceneEditMemoryRef(useRef, 마운트 동안만 유효)에만 있어서 이 왕복에 전부 사라졌다 —
+// 위 rightPanelCollapsed와 같은 패턴(sessionStorage, "브라우저 세션에서만 유지")으로
+// 바꾼다. 탭·뷰포트는 씬별로, 줌은 (기존부터 씬 구분 없이 전역이었으므로) 게임별로 하나만
+// 기억한다.
+const rightPanelTabStorageKey = (gameId: number) => `festa.game-studio.rightPanelTab.${gameId}`;
+
+const loadRightPanelByScene = (gameId: number): Readonly<Record<string, RightPanel>> => {
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(rightPanelTabStorageKey(gameId)) ?? '{}');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed as Record<string, unknown>)
+      .filter((entry): entry is [string, RightPanel] => entry[1] === 'PROPERTIES' || entry[1] === 'EVENTS' || entry[1] === 'PROJECT');
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+};
+
+const saveRightPanelByScene = (gameId: number, byScene: Readonly<Record<string, RightPanel>>): void => {
+  try {
+    window.sessionStorage.setItem(rightPanelTabStorageKey(gameId), JSON.stringify(byScene));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 탭 전환 자체는 정상 동작한다.
+  }
+};
+
+const isPosition2d = (value: unknown): value is Position2d => (
+  typeof value === 'object' && value !== null
+  && typeof (value as Position2d).x === 'number' && typeof (value as Position2d).y === 'number'
+);
+
+const viewportCenterStorageKey = (gameId: number) => `festa.game-studio.viewportCenter.${gameId}`;
+
+const loadViewportCenterByScene = (gameId: number): Readonly<Record<string, Position2d>> => {
+  try {
+    const parsed: unknown = JSON.parse(window.sessionStorage.getItem(viewportCenterStorageKey(gameId)) ?? '{}');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const entries = Object.entries(parsed as Record<string, unknown>)
+      .filter((entry): entry is [string, Position2d] => isPosition2d(entry[1]));
+    return Object.fromEntries(entries);
+  } catch {
+    return {};
+  }
+};
+
+const saveViewportCenterByScene = (gameId: number, byScene: Readonly<Record<string, Position2d>>): void => {
+  try {
+    window.sessionStorage.setItem(viewportCenterStorageKey(gameId), JSON.stringify(byScene));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 캔버스 조작 자체는 정상 동작한다.
+  }
+};
+
+const zoomStorageKey = (gameId: number) => `festa.game-studio.zoom.${gameId}`;
+
+const loadZoom = (gameId: number): number => {
+  try {
+    const stored = Number(window.sessionStorage.getItem(zoomStorageKey(gameId)));
+    return Number.isFinite(stored) && stored >= 30 && stored <= 300 ? stored : 100;
+  } catch {
+    return 100;
+  }
+};
+
+const saveZoom = (gameId: number, zoom: number): void => {
+  try {
+    window.sessionStorage.setItem(zoomStorageKey(gameId), String(zoom));
+  } catch {
+    // 저장소가 차단된 브라우저에서도 확대/축소 자체는 정상 동작한다.
+  }
+};
+
 interface GameStudioShellProps {
   readonly gameId: number;
   readonly initialProject?: GameProject;
@@ -238,25 +336,19 @@ export const GameStudioShell = ({
   const assetUrls = useResolvedAssetUrls(project.assets, assetRepository);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // S15P21A604-391 — Scene을 옮겼다가 돌아왔을 때 그 Scene에서 마지막으로 선택했던
-  // 오브젝트/레이어/캔버스 팬(뷰포트 중심)을 복원한다. 렌더링에 직접 관여하지 않는
-  // "떠날 때 적어두는" 용도라 useRef로 충분하다(줌은 이번 범위에서 제외 — 전역 공유 유지).
+  // 오브젝트/레이어를 복원한다. 렌더링에 직접 관여하지 않는 "떠날 때 적어두는" 용도라
+  // useRef로 충분하다. 캔버스 뷰포트 중심·우측 패널 탭은 S15P21A604-547부터 여기가 아니라
+  // sessionStorage(뷰포트는 직접 읽고/쓰기, 탭은 rightPanelByScene state)로 옮겼다 — 이
+  // ref는 마운트 동안만 유효해서 플레이 테스트 왕복(=컴포넌트 재마운트)에 전부 사라졌었다.
   const sceneEditMemoryRef = useRef<Map<string, {
     readonly selectedObjectId: string | null;
     readonly selectedObjectIds: ReadonlySet<string>;
     readonly selectedLayerId: string | null;
     readonly placementPreset: GameObject['preset'] | null;
     readonly tileBrush: number | null;
-    readonly viewportCenter: Position2d | null;
-    // 속성/이벤트/데이터 탭도 씬별로 기억한다 — 세 탭 다 구분 없이 동일하게 취급한다
-    // ("데이터" 탭이 사실 프로젝트 전체를 보여줘 씬 종속은 아니지만, 사용자가 명시적으로
-    // 구분 없이 기억하길 원해서 예외 없이 저장한다).
-    readonly rightPanel: RightPanel;
   }>>(new Map());
-  // 현재 보고 있는 Scene의 캔버스 뷰포트 중심 — TopDownCanvas가 스크롤될 때마다 갱신해준다.
-  // Scene을 떠나는 순간 이 값을 sceneEditMemoryRef에 스냅샷으로 저장한다.
-  const currentViewportCenterRef = useRef<Position2d | null>(null);
   const [restoreViewportCenter, setRestoreViewportCenter] = useState<Position2d | null>(null);
-  const [selectedSceneId, setSelectedSceneId] = useState(project.startSceneId);
+  const [selectedSceneId, setSelectedSceneId] = useState(() => loadSelectedSceneId(gameId) ?? project.startSceneId);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [selectedObjectIds, setSelectedObjectIds] = useState<ReadonlySet<string>>(new Set());
   const [placementPreset, setPlacementPreset] = useState<GameObject['preset'] | null>(null);
@@ -266,12 +358,14 @@ export const GameStudioShell = ({
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
   const [tileBrush, setTileBrush] = useState<number | null>(null);
   const [tileTool, setTileTool] = useState<TileTool>('BRUSH');
-  const [rightPanel, setRightPanel] = useState<RightPanel>('PROPERTIES');
+  const [rightPanelByScene, setRightPanelByScene] = useState<Readonly<Record<string, RightPanel>>>(
+    () => loadRightPanelByScene(gameId),
+  );
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(() => loadZoom(gameId));
   const [fitRequestToken, setFitRequestToken] = useState(0);
   const [focusRequestToken, setFocusRequestToken] = useState(0);
   const [canvasTool, setCanvasTool] = useState<CanvasTool>('SELECT');
@@ -363,6 +457,31 @@ export const GameStudioShell = ({
       return next;
     });
   };
+  // S15P21A604-547 — isRightPanelCollapsed와 같은 방식(씬 id로 조회, 없으면 기본값)으로
+  // 파생시킨다. rightPanel은 예전에 컴포넌트 전역 state였는데, 씬을 옮길 때마다
+  // sceneEditMemoryRef에 수동으로 스냅샷·복원했었다 — 그 ref가 재마운트에 안 살아남아서
+  // 플레이 테스트 왕복 후 항상 "속성" 탭으로 되돌아가는 원인이었다.
+  const rightPanel = selectedScene === undefined ? 'PROPERTIES' : rightPanelByScene[selectedScene.id] ?? 'PROPERTIES';
+  const setRightPanel = (next: RightPanel) => {
+    if (selectedScene === undefined) return;
+    const sceneId = selectedScene.id;
+    setRightPanelByScene((current) => {
+      const nextRecord = { ...current, [sceneId]: next };
+      saveRightPanelByScene(gameId, nextRecord);
+      return nextRecord;
+    });
+  };
+  // S15P21A604-547 — TopDownCanvas.tsx가 명시한 계약(위 onViewportSettle 주석 참고)대로,
+  // React state를 갱신하지 않는 순수 부수효과로만 저장한다 — sessionStorage에 직접
+  // 읽고-고쳐-쓴다. useCallback으로 참조를 selectedSceneId/gameId가 실제로 바뀔 때만
+  // 갱신되게 고정한다 — 인라인 화살표를 그대로 넘기면 매 렌더 새 함수가 되어 TopDownCanvas의
+  // useEffect(deps: [canvasViewport, onViewportSettle])가 매번 다시 돌고, 그 안에서
+  // onViewportSettle을 다시 호출하는 것 자체는 원래 무해했지만(예전엔 ref만 바꿨다) 여기서
+  // state를 바꾸면 그 리렌더가 새 함수를 또 만들어 무한 루프가 된다(플레이 테스트 진입 시
+  // 화면이 멈추는 형태로 실제 재현됨 — 이번에 그 상태로 한 번 내보냈다가 발견해 되돌렸다).
+  const handleViewportSettle = useCallback((center: Position2d) => {
+    saveViewportCenterByScene(gameId, { ...loadViewportCenterByScene(gameId), [selectedSceneId]: center });
+  }, [gameId, selectedSceneId]);
   const selectedObject = selectedScene !== undefined && selectedScene.type !== 'DIALOGUE'
     ? selectedScene.objects.find((object) => object.id === selectedObjectId) ?? null
     : null;
@@ -397,7 +516,16 @@ export const GameStudioShell = ({
         if (draft !== null) {
           const upgradedDraft = withBuiltinAssetLibrary(draft);
           store.reset(upgradedDraft);
-          setSelectedSceneId(upgradedDraft.startSceneId);
+          // S15P21A604-547 — 이 초안 로드는 "새 프로젝트로 교체"가 아니라(내용은 그대로)
+          // 컴포넌트가 다시 마운트돼서 다시 불러온 것뿐이다(플레이 테스트 왕복, 새로고침
+          // 등) — 마지막으로 보던 씬이 여전히 존재하면 그걸 복원하고, 없으면(삭제됐거나
+          // 처음 여는 게임이면) startSceneId로 폴백한다.
+          const rememberedSceneId = loadSelectedSceneId(gameId);
+          setSelectedSceneId(
+            rememberedSceneId !== null && upgradedDraft.scenes.some((scene) => scene.id === rememberedSceneId)
+              ? rememberedSceneId
+              : upgradedDraft.startSceneId,
+          );
           loadedProject = upgradedDraft;
           setNotice(`${persistenceLabel}에 저장한 초안을 불러왔습니다.`);
         }
@@ -448,6 +576,21 @@ export const GameStudioShell = ({
 
   useEffect(() => saveEditorSet(gameId, 'hidden', editorHiddenObjectIds), [editorHiddenObjectIds, gameId]);
   useEffect(() => saveEditorSet(gameId, 'locked', editorLockedObjectIds), [editorLockedObjectIds, gameId]);
+  useEffect(() => saveSelectedSceneId(gameId, selectedSceneId), [gameId, selectedSceneId]);
+  useEffect(() => saveZoom(gameId, zoom), [gameId, zoom]);
+
+  // S15P21A604-547 — 씬이 바뀔 때(사용자가 목록에서 클릭했든, 컴포넌트가 막 마운트돼
+  // selectedSceneId가 처음 정해졌든) 그 씬에 저장된 뷰포트 중심으로 캔버스를 되돌린다.
+  // sessionStorage를 State로 미러링하지 않고 이 시점에 직접 읽는다 — State로 들고 있으면
+  // (처음에 그렇게 했다가 실측으로 발견한 회귀) onViewportSettle이 매 스크롤마다 그 State를
+  // 갱신해야 하는데, TopDownCanvas.tsx의 onViewportSettle 계약("값이 바뀔 때만 호출하고
+  // 리렌더를 일으키지 않는다" — 이 컴포넌트에는 매 렌더 새로 만들어지는 인라인 함수로
+  // 넘겨진다는 전제가 깔려 있다)과 충돌해 무한 렌더 루프가 났다(플레이 테스트 진입 시
+  // 화면이 멈추는 형태로 실제로 재현됨). State를 아예 두지 않고 필요한 시점(씬 전환)에만
+  // 직접 읽으면 이 문제 자체가 생기지 않는다.
+  useEffect(() => {
+    setRestoreViewportCenter(loadViewportCenterByScene(gameId)[selectedSceneId] ?? null);
+  }, [gameId, selectedSceneId]);
 
   useEffect(() => {
     if (selectedScene !== undefined) return;
@@ -1163,15 +1306,16 @@ export const GameStudioShell = ({
                       className={scene.id === selectedScene.id ? 'is-active' : ''}
                       onClick={() => {
                         if (scene.id === selectedScene.id) return;
-                        // 떠나는 Scene의 현재 편집 상태를 스냅샷으로 남긴다.
+                        // 떠나는 Scene의 현재 편집 상태를 스냅샷으로 남긴다(우측 패널
+                        // 탭·뷰포트 중심은 각자 sessionStorage에 실시간으로 이미 반영돼
+                        // 있어 여기서 따로 다룰 필요가 없다 — rightPanel/setRestoreViewportCenter
+                        // 위의 파생 로직·effect가 selectedSceneId 변경만으로 알아서 처리한다).
                         sceneEditMemoryRef.current.set(selectedScene.id, {
                           selectedObjectId,
                           selectedObjectIds,
                           selectedLayerId,
                           placementPreset,
                           tileBrush,
-                          viewportCenter: currentViewportCenterRef.current,
-                          rightPanel,
                         });
                         const remembered = sceneEditMemoryRef.current.get(scene.id);
                         setSelectedSceneId(scene.id);
@@ -1181,8 +1325,6 @@ export const GameStudioShell = ({
                         setTileBrush(remembered?.tileBrush ?? null);
                         setSelectedLayerId(remembered?.selectedLayerId
                           ?? (scene.type !== 'DIALOGUE' ? scene.tileLayers[0]?.id ?? null : null));
-                        setRestoreViewportCenter(remembered?.viewportCenter ?? null);
-                        setRightPanel(remembered?.rightPanel ?? 'PROPERTIES');
                       }}
                       type="button"
                     >
@@ -1515,7 +1657,7 @@ export const GameStudioShell = ({
               }}
               onPlaceObject={placeObject}
               onPlacementComplete={() => setPlacementPreset(null)}
-              onViewportSettle={(center) => { currentViewportCenterRef.current = center; }}
+              onViewportSettle={handleViewportSettle}
               onZoomChange={setZoom}
               onSelectObjects={selectObjects}
               placementPreset={placementPreset}

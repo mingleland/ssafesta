@@ -24,6 +24,11 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   window.sessionStorage.clear();
+  // S15P21A604-547 — GameStudioShell이 마지막 선택 씬을 localStorage에 저장하기 시작하면서,
+  // 이 파일의 모든 테스트가 같은 GAME_ID를 재사용하는 구조상 한 테스트에서 씬을 옮기면
+  // 그 선택이 localStorage에 남아 다음 테스트의 초기 선택 씬(따라서 그 씬에 종속된 우측
+  // 패널 접힘 상태)까지 오염시킨다 — 매 테스트 시작을 항상 시작 씬으로 되돌린다.
+  window.localStorage.clear();
 });
 
 const GAME_ID = 522;
