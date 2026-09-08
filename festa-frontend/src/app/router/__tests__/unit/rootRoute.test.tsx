@@ -18,6 +18,19 @@ afterEach(() => {
   __resetSessionForTests();
 });
 
+/**
+ * 이 파일의 `findBy*` 는 **lazy 라우트 경계를 넘어 기다린다** (S15P21A604-550).
+ *
+ * 클릭 → `navigate('/app/world')` → `/app/world` 의 lazy chunk 해석 → 그제서야 가드가
+ * `/login` 으로 되돌리거나 World 가 뜬다. 그 dynamic import 는 전체 스위트에서 1초를 넘긴다
+ * (실측 1058·1066·1098ms). testing-library 기본값이 1000ms 라 **단독 실행은 통과하고
+ * 전체 스위트에서만 red** 가 됐다 — 코드 결함이 아니라 이 파일의 대기 예산이 짧았던 것이다.
+ *
+ * 재는 것은 라우팅 semantics 지 로딩 속도가 아니다. 속도를 지키고 싶으면 그것을 재는
+ * 테스트를 따로 둔다 — 여기서 겸하면 무엇이 깨졌는지 알 수 없어진다.
+ */
+const LAZY_ROUTE_TIMEOUT = { timeout: 5000 };
+
 function renderAtRoot() {
   // 실제 라우터와 같은 정의를 쓴다 — 테스트용으로 별도 라우트를 다시 적으면 결함이
   // 그대로 남은 채 테스트만 통과한다
@@ -42,7 +55,7 @@ describe('루트 경로 `/`', () => {
     markBootstrapped();
     renderAtRoot();
     fireEvent.click(screen.getByRole('button', { name: '화면을 클릭해 시작하기' }));
-    expect(await screen.findByText('게스트로 둘러보기')).not.toBeNull();
+    expect(await screen.findByText('게스트로 둘러보기', {}, LAZY_ROUTE_TIMEOUT)).not.toBeNull();
   });
 
   it('게스트 세션이면 클릭 시 World 로 간다 (D-08 — 기본 상주 상태)', async () => {
@@ -51,7 +64,7 @@ describe('루트 경로 `/`', () => {
     renderAtRoot();
     fireEvent.click(screen.getByRole('button', { name: '화면을 클릭해 시작하기' }));
     // World 도착 판정은 HUD 조작 안내로 한다 — WorldSurface 는 aria-hidden 이라 잡히지 않는다
-    expect(await screen.findByLabelText('조작 안내')).not.toBeNull();
+    expect(await screen.findByLabelText('조작 안내', {}, LAZY_ROUTE_TIMEOUT)).not.toBeNull();
     // 계정 칩·로그아웃은 World 에 없다(D-08) — ESC Game Menu 소관
     expect(screen.queryByRole('button', { name: '로그아웃' })).toBeNull();
   });
@@ -65,6 +78,6 @@ describe('루트 경로 `/`', () => {
         <RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/app/home'] })} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByLabelText('조작 안내')).not.toBeNull();
+    expect(await screen.findByLabelText('조작 안내', {}, LAZY_ROUTE_TIMEOUT)).not.toBeNull();
   });
 });
