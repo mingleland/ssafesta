@@ -40,6 +40,17 @@ const DEV_SESSION_HOURS = 12;
  * (헌법: 실패를 조용히 기본값으로 되돌리지 않는다).
  */
 export async function enterAsDeveloper(): Promise<void> {
+  // 로컬 실 Spring 우회 — OAuth 왕복을 이 환경 네트워크가 완주할 수 없어(§상단 주석) refresh_token
+  // 쿠키를 발급받을 정상 경로가 없다. VITE_DEV_LOCAL_ACCESS_TOKEN에 로컬 JWT_SECRET으로 미리 만든
+  // access token을 넣어 두면 그걸 그대로 세션에 심는다 — 로컬 전용, 값이 없으면 이 분기는 안 탄다.
+  // MODE !== 'test' 가드: vitest도 .env를 읽어(vite 공용 설정) 이 값이 남아 있으면 authApi.refresh
+  // mock을 검증하는 기존 테스트를 조용히 우회해 버린다 — 테스트 모드에서는 이 분기 자체를 끈다.
+  const localToken = import.meta.env.VITE_DEV_LOCAL_ACCESS_TOKEN;
+  if (import.meta.env.MODE !== 'test' && typeof localToken === 'string' && localToken !== '') {
+    const expiresAt = new Date(Date.now() + DEV_SESSION_HOURS * 60 * 60 * 1000).toISOString();
+    setMemberSession(localToken, expiresAt);
+    return;
+  }
   if (import.meta.env.VITE_USE_MOCK === 'true') {
     const expiresAt = new Date(Date.now() + DEV_SESSION_HOURS * 60 * 60 * 1000).toISOString();
     setMemberSession('dev-entry', expiresAt);
