@@ -30,3 +30,7 @@ festa-ai/*.pdf
 
 # GitLab PAT 로컬 파일 — 절대 커밋하지 않는다 (2026-09-08)
 .gltok
+
+# 오클루전 A/B 원본 스크린샷 — 8MB, 에디터 메뉴로 재생성 가능 (2026-09-08)
+docs/KHS/verify/occlusion-ab/occlusion-off__*.png
+docs/KHS/verify/occlusion-ab/occlusion-on*__*.png
