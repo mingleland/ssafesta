@@ -644,30 +644,48 @@ const interactionCandidates = (
   state: ReferenceRuntimeState,
 ): readonly GameObject[] => {
   const scene = findScene(project, state.session.currentSceneId);
-  if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return [];
+  const playerPosition = state.playerPosition;
+  if (scene === undefined || scene.type === 'DIALOGUE' || playerPosition === null) return [];
   const forward = directionDelta[state.facing];
-  const forwardPosition = {
-    x: state.playerPosition.x + forward.x,
-    y: state.playerPosition.y + forward.y,
-  };
+  const forwardPosition = { x: playerPosition.x + forward.x, y: playerPosition.y + forward.y };
   return scene.objects.filter((object) => {
     if (!isVisible(state, object)) return false;
     const objectPosition = state.objectPositions[object.id] ?? object.position;
-    const onCurrent = objectPosition.x === state.playerPosition?.x && objectPosition.y === state.playerPosition.y;
+    const interactable = object.components.find((component) => component.type === 'INTERACTABLE');
+    // S15P21A604-534 — INTERACTABLE 컴포넌트가 있으면 그 range(미지정 시 기본값 1)를
+    // 방향 무관 맨해튼 거리(|dx|+|dy|)로 판정한다. range=1 기본값도 "정면만" 되던
+    // 예전과 달리 상하좌우 인접 4칸 어디서든 상호작용 가능해지는데, 이건 "방향 무관"
+    // 이라는 이번 QA의 설계 자체가 의도한 결과다. INTERACTABLE 컴포넌트 없이
+    // ON_INTERACT 이벤트로만 상호작용 가능한 오브젝트는 range를 설정할 자리가 없으므로
+    // 기존 그대로(같은 칸 또는 정면 한 칸)를 유지한다.
+    if (interactable?.type === 'INTERACTABLE') {
+      const manhattanDistance = Math.abs(objectPosition.x - playerPosition.x) + Math.abs(objectPosition.y - playerPosition.y);
+      return manhattanDistance <= (interactable.range ?? 1);
+    }
+    const onCurrent = objectPosition.x === playerPosition.x && objectPosition.y === playerPosition.y;
     const inFront = objectPosition.x === forwardPosition.x && objectPosition.y === forwardPosition.y;
-    const interactive = object.components.some((component) => component.type === 'INTERACTABLE')
-      || scene.events.some((event) => event.trigger.type === 'ON_INTERACT' && event.trigger.targetId === object.id);
-    return interactive && (onCurrent || inFront);
+    const eventOnly = scene.events.some((event) => event.trigger.type === 'ON_INTERACT' && event.trigger.targetId === object.id);
+    return eventOnly && (onCurrent || inFront);
   });
 };
+
+// S15P21A604-532 — 오브젝트 위 상호작용 안내 문구(prompt)를 UI가 그리려면 "지금 상호작용
+// 가능한 대상이 뭔지"를 interactReferencePlayer 밖에서도 알아야 한다. 실제 상호작용(E
+// 버튼) 판정과 힌트 표시 판정이 어긋나면 "버튼은 눌리는데 힌트는 안 뜨는" 불일치가
+// 생기므로, interactReferencePlayer와 정확히 같은 interactionCandidates를 그대로
+// 재사용한다.
+export const currentInteractionTarget = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+): GameObject | null => interactionCandidates(project, state)[0] ?? null;
 
 export const interactReferencePlayer = (
   project: GameProject,
   state: ReferenceRuntimeState,
 ): ReferenceRuntimeState => {
   if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null) return state;
-  const target = interactionCandidates(project, state)[0];
-  if (target === undefined) return { ...state, lastInteractionTargetId: null };
+  const target = currentInteractionTarget(project, state);
+  if (target === null) return { ...state, lastInteractionTargetId: null };
   const session = dispatchTrigger(project, state.session, { type: 'ON_INTERACT', targetId: target.id });
   return {
     ...syncAfterSessionChange(project, state, session),

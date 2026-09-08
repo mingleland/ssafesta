@@ -41,7 +41,15 @@ export const RESULT_AGGREGATES: SurveyQuestionAggregateVM[] = [
   },
 ];
 
-/** 주관식 응답 12건 — 페이지 크기 5 로 3페이지 (-194 페이지네이션 경계 재현) */
-export const TEXT_ANSWERS: string[] = Array.from({ length: 12 }, (_, i) => `주관식 응답 ${i + 1}`);
+/**
+ * 주관식 응답 12건 — 페이지 크기 5 로 3페이지 (-194 페이지네이션 경계 재현).
+ *
+ * **문항을 둘로 섞는다.** 텍스트 문항이 하나뿐이면 questionId 유실이 화면에 드러나지 않아
+ * 회귀를 못 잡는다 (GitLab #133, 2026-09-08 BE 지적).
+ */
+export const TEXT_ANSWERS: { questionId: string; text: string }[] = Array.from({ length: 12 }, (_, i) => ({
+  questionId: i % 2 === 0 ? '201' : '202',
+  text: `주관식 응답 ${i + 1}`,
+}));
 
 export const TEXT_PAGE_SIZE = 5;

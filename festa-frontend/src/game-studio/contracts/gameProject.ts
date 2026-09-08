@@ -62,7 +62,9 @@ export interface Position2d {
 export type Component =
   | { readonly type: 'SPRITE'; readonly assetId: string; readonly scale?: number; readonly zIndex?: number }
   | { readonly type: 'COLLIDER'; readonly solid: boolean }
-  | { readonly type: 'INTERACTABLE'; readonly prompt: string }
+  // S15P21A604-534 — range 미지정 시 기본값 1(기존 "같은 칸 또는 정면 한 칸" 그대로).
+  // 방향 무관 맨해튼 거리(|dx|+|dy|) 기준으로 판정한다(referenceRuntime.ts 참고).
+  | { readonly type: 'INTERACTABLE'; readonly prompt: string; readonly range?: number }
   | { readonly type: 'PICKUP'; readonly itemId: string }
   | { readonly type: 'DAMAGE'; readonly amount: number }
   | { readonly type: 'HEALTH'; readonly max: number }
@@ -428,8 +430,9 @@ const validateComponentShape = (value: unknown, path: string): void => {
     return;
   }
   if (base.type === 'INTERACTABLE') {
-    const record = recordAt(value, path, ['type', 'prompt']);
+    const record = recordAt(value, path, ['type', 'prompt'], ['type', 'prompt', 'range']);
     stringAt(record.prompt, `${path}.prompt`, 1, 80);
+    if (record.range !== undefined) integerAt(record.range, `${path}.range`, 1, 100);
     return;
   }
   if (base.type === 'PICKUP') {
