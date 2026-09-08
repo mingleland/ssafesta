@@ -297,6 +297,43 @@ async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -
 
 
 @pytest.mark.asyncio
+async def test_retry_after_failure_issues_new_request_id_and_commits_only_retry() -> None:
+    """FR-029: 실패 후 재시도는 conversationId를 유지하고 새 requestId를 발급하며,
+    done에 도달하지 못한 첫 시도는 대화 이력에 저장되지 않는다."""
+    conversation = _conversation()
+    failing_llm = FakeLLMProvider(
+        tokens=("일부",), raise_after=ManagedLLMError("LLM_TIMEOUT", retryable=True)
+    )
+    service, repository = _service(
+        conversation=conversation,
+        rag=_RagContextService(result=_context_result()),
+        llm=failing_llm,
+    )
+
+    failed_events = _events(
+        [event async for event in service.stream(conversation=conversation, question="질문")]
+    )
+    assert [event["type"] for event in failed_events] == ["start", "token", "error"]
+    assert repository.saved == []
+
+    succeeding_llm = FakeLLMProvider(tokens=("안녕",))
+    service._llm_provider = succeeding_llm
+    retry_events = _events(
+        [event async for event in service.stream(conversation=conversation, question="질문")]
+    )
+
+    assert [event["type"] for event in retry_events] == ["start", "token", "done"]
+    failed_request_id = failed_events[0]["requestId"]
+    retry_request_id = retry_events[0]["requestId"]
+    assert retry_request_id != failed_request_id
+    assert {event["conversationId"] for event in failed_events + retry_events} == {
+        conversation.conversation_id
+    }
+    assert len(repository.saved) == 1
+    assert repository.saved[0].turns[-1].request_id == retry_request_id
+
+
+@pytest.mark.asyncio
 async def test_ttft_timeout_before_first_token_emits_first_token_phase() -> None:
     """FR-007: 첫 토큰이 TTFT 예산 안에 오지 않으면 FIRST_TOKEN phase로 종료한다."""
     rag = _RagContextService(result=_context_result())

@@ -50,7 +50,7 @@
 - [ ] T017 [US1] Implement authenticated Conversation create/get/close lifecycle with 30-minute TTL in festa-ai/app/services/conversation_service.py
 - [X] T018 [US1] Implement token counting and low-priority truncation order in festa-ai/app/services/context_service.py (`S15P21A604-129`)
 - [ ] T019 [US1] Implement question validation, READY-empty fixed response, retrieval, context assembly, and LLM orchestration in festa-ai/app/services/rag_service.py
-- [ ] T020 [US1] Implement C-07 sequence, source deduplication, terminal exclusivity, and completed-turn commit in festa-ai/app/services/stream_service.py
+- [X] T020 [US1] Implement C-07 sequence, source deduplication, terminal exclusivity, and completed-turn commit in festa-ai/app/services/stream_service.py (`S15P21A604-196`)
 - [ ] T021 [US1] Implement create, message SSE, and idempotent close endpoints in festa-ai/app/api/v1/conversations.py
 - [ ] T022 [P] [US1] Define frontend API types and strict SSE parser in festa-frontend/src/entities/ai-conversation/types.ts and festa-frontend/src/entities/ai-conversation/events.ts
 - [ ] T023 [US1] Implement Conversation create/stream/close client in festa-frontend/src/entities/ai-conversation/api.ts
