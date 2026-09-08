@@ -12,7 +12,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { countTriangles } from './geometry.mjs';
-import { planTextureOptimization, resolveMaterial } from './material.mjs';
+import { resolveMaterial } from './material.mjs';
 import { evaluate } from './licenseGate.mjs';
 import { ensureDir } from './paths.mjs';
 import { TOOLCHAIN, createIO, measure, transformRuntimeDocument } from './toolchain/gltfPipeline.mjs';
@@ -126,43 +126,94 @@ function boundsOfGeometry(positions) {
   return { min: min.map(round), max: max.map(round) };
 }
 
-/** 런타임 재질을 문서에 심는다. 원본 재질 객체를 재사용하지 않는다 */
-async function bakeMaterial(document, runtime, textures, assetCode, options) {
-  const root = document.getRoot();
-  const material = root.listMaterials()[0] ?? document.createMaterial();
-  material
-    .setBaseColorFactor([runtime.baseColor[0], runtime.baseColor[1], runtime.baseColor[2], runtime.opacity])
-    .setMetallicFactor(runtime.metalness)
-    .setRoughnessFactor(runtime.roughness)
-    .setDoubleSided(false);
+/**
+ * three 씬에서 **glTF material 이름 → Unity `.mat` 경로** 표를 만든다.
+ *
+ * export **전에** 만든다. GLB `extras` 왕복에 기대면 `dedup`·`prune` 이 extras 를 어떻게
+ * 다루는지에 결과가 걸린다 — 그건 우리 계약이 아니다. 이름은 exporter 가 glTF material 로
+ * 그대로 실어 주므로 그것만 키로 쓴다.
+ */
+export function collectUnityMaterials(object3d) {
+  const map = new Map();
+  object3d.traverse((o) => {
+    if (o.isMesh !== true) return;
+    for (const material of Array.isArray(o.material) ? o.material : [o.material]) {
+      const path = material?.userData?.unityMaterialPath;
+      if (typeof path === 'string' && material.name) map.set(material.name, path);
+    }
+  });
+  return map;
+}
 
-  const encoded = [];
-  for (const texture of textures) {
-    if (!texture.resolved) continue;
-    const source = await describeSource(texture.sourcePath);
-    const result = await encodeForChannel(texture.channel, texture.sourcePath, { maxSize: options.maxTextureSize });
-    const buffer = result.buffer ?? result;
-    const image = document
-      .createTexture(`${assetCode}_${texture.channel}`)
-      .setImage(buffer)
-      .setMimeType('image/webp');
-    if (texture.channel === 'baseColor') material.setBaseColorTexture(image);
-    else if (texture.channel === 'normal') material.setNormalTexture(image);
-    else material.setMetallicRoughnessTexture(image);
-    encoded.push({
-      channel: texture.channel,
-      sourceBytes: texture.sourceBytes,
-      sourceSize: [source.width, source.height],
-      runtimeBytes: buffer.length,
-      runtimeSize: [result.width ?? null, result.height ?? null],
-      runtimeFormat: 'image/webp',
-      repacked: result.repacked ?? null,
+/**
+ * 런타임 재질을 문서에 심는다 — **재질 하나당 하나씩.**
+ *
+ * 예전에는 첫 재질로 전부 몰고 나머지를 dispose 했다. 그러면 조립체의 부위별 재질이
+ * 사라진다 — `SurveyKiosk` 의 태블릿 화면(`Tablet.mat`)이 카운터의 흰 플라스틱으로
+ * 덮여 흰 판이 됐다(S15P21A604-527, LJH T-72).
+ *
+ * @param unityMaterials glTF material 이름 → `.mat` 경로. 표에 없는 재질은 `fallback` 을 쓴다
+ */
+async function bakeMaterials(document, unityMaterials, fallback, assetCode, options) {
+  const root = document.getRoot();
+  if (root.listMaterials().length === 0) document.createMaterial();
+
+  const resolvedCache = new Map(); // .mat 경로 → resolveMaterial 결과
+  const textureCache = new Map(); // `${경로}|${채널}` → glTF Texture (같은 재질을 여럿이 쓰면 한 번만 굽는다)
+  const baked = [];
+
+  for (const material of root.listMaterials()) {
+    const matPath = unityMaterials.get(material.getName() ?? '');
+    let resolved = fallback;
+    if (matPath !== undefined) {
+      if (!resolvedCache.has(matPath)) resolvedCache.set(matPath, resolveMaterial(matPath, options.guidIndex));
+      resolved = resolvedCache.get(matPath);
+    }
+    const runtime = resolved.runtime;
+
+    material
+      .setBaseColorFactor([runtime.baseColor[0], runtime.baseColor[1], runtime.baseColor[2], runtime.opacity])
+      .setMetallicFactor(runtime.metalness)
+      .setRoughnessFactor(runtime.roughness)
+      .setDoubleSided(false);
+
+    const encoded = [];
+    for (const texture of resolved.textures) {
+      if (!texture.resolved) continue;
+      const key = `${texture.sourcePath}|${texture.channel}`;
+      let image = textureCache.get(key);
+      if (image === undefined) {
+        const source = await describeSource(texture.sourcePath);
+        const result = await encodeForChannel(texture.channel, texture.sourcePath, { maxSize: options.maxTextureSize });
+        const buffer = result.buffer ?? result;
+        image = document
+          .createTexture(`${assetCode}_${texture.channel}`)
+          .setImage(buffer)
+          .setMimeType('image/webp');
+        textureCache.set(key, image);
+        encoded.push({
+          channel: texture.channel,
+          sourceBytes: texture.sourceBytes,
+          sourceSize: [source.width, source.height],
+          runtimeBytes: buffer.length,
+          runtimeSize: [result.width ?? null, result.height ?? null],
+          runtimeFormat: 'image/webp',
+          repacked: result.repacked ?? null,
+        });
+      }
+      if (texture.channel === 'baseColor') material.setBaseColorTexture(image);
+      else if (texture.channel === 'normal') material.setNormalTexture(image);
+      else material.setMetallicRoughnessTexture(image);
+    }
+
+    baked.push({
+      // 원본 `.mat` 이름을 리포트에만 남긴다 — 런타임 문서에는 strip 단계가 이름을 지운다
+      source: matPath === undefined ? '(계약 대표 재질)' : matPath.replace(/\\/g, '/').split('/').pop(),
+      runtime,
+      textures: encoded,
     });
   }
-  // 다른 재질이 남아 있으면 첫 재질로 몰아 준다 — 런타임은 재질 하나면 된다
-  for (const primitive of root.listMeshes().flatMap((m) => m.listPrimitives())) primitive.setMaterial(material);
-  for (const other of root.listMaterials()) if (other !== material) other.dispose();
-  return encoded;
+  return baked;
 }
 
 /**
@@ -179,6 +230,8 @@ export async function compileAsset(input, options) {
 
   // ── intermediate ───────────────────────────────────────────────
   const sourceTriangles = countTriangles(input.source);
+  // export 전에 재질 표를 뜬다 — GLB extras 왕복에 기대지 않는다(bakeMaterials 주석 참조)
+  const unityMaterials = collectUnityMaterials(input.source);
   const intermediate = await toIntermediateGlb(input.source);
   const io = createIO();
   const document = await io.readBinary(intermediate);
@@ -199,12 +252,18 @@ export async function compileAsset(input, options) {
     input.materialPath === null
       ? { runtime: { baseColor: [0.85, 0.86, 0.9], opacity: 1, metalness: 0, roughness: 0.7 }, textures: [] }
       : resolveMaterial(input.materialPath, input.guidIndex);
-  const encoded = await bakeMaterial(document, material.runtime, material.textures, input.assetCode, { maxTextureSize });
-  const sourceBytes = planTextureOptimization(material.textures).sourceBytes;
+  const baked = await bakeMaterials(document, unityMaterials, material, input.assetCode, {
+    maxTextureSize,
+    guidIndex: input.guidIndex,
+  });
+  const encoded = baked.flatMap((m) => m.textures);
+  // 원본 바이트는 실제로 구운 `.mat` 들의 합이다 — 대표 재질 하나만 세면 다중 재질에서 과소 집계된다
+  const sourceBytes = encoded.reduce((sum, t) => sum + (t.sourceBytes ?? 0), 0);
   const runtimeBytes = encoded.reduce((sum, t) => sum + t.runtimeBytes, 0);
-  report.stages.material = { runtime: material.runtime, textures: encoded };
+  report.stages.material = { runtime: material.runtime, materials: baked, textures: encoded };
   report.stages.texture = {
     applied: encoded.length > 0,
+    materials: baked.length,
     sourceBytes,
     runtimeBytes,
     ratio: sourceBytes > 0 ? Number((runtimeBytes / sourceBytes).toFixed(4)) : null,
@@ -270,10 +329,13 @@ export function formatReport(report) {
   lines.push(`  geometry  ${s.geometry.applied.join(' → ')}`);
   lines.push(`            tri ${s.geometry.before.triangles} → ${s.geometry.after.triangles} · vert ${s.geometry.before.vertices} → ${s.geometry.after.vertices} · mesh ${s.geometry.before.meshes} → ${s.geometry.after.meshes} · node ${s.geometry.before.nodes} → ${s.geometry.after.nodes}`);
   lines.push(`            simplify ${s.geometry.decision.ratio === null ? '보류' : `ratio ${s.geometry.decision.ratio}`} (${s.geometry.decision.reason})`);
-  for (const t of s.material.textures) {
-    lines.push(`  texture   ${t.channel.padEnd(18)} ${t.sourceBytes} B ${t.sourceSize.join('x')} → ${t.runtimeBytes} B ${t.runtimeSize.join('x')} webp${t.repacked ? ` · ${t.repacked}` : ''}`);
+  for (const m of s.material.materials ?? []) {
+    lines.push(`  material  ${m.source.padEnd(24)} baseColor [${m.runtime.baseColor.map((v) => v.toFixed(2)).join(', ')}] · metal ${m.runtime.metalness} · rough ${m.runtime.roughness.toFixed(2)}`);
+    for (const t of m.textures) {
+      lines.push(`            ${t.channel.padEnd(18)} ${t.sourceBytes} B ${t.sourceSize.join('x')} → ${t.runtimeBytes} B ${t.runtimeSize.join('x')} webp${t.repacked ? ` · ${t.repacked}` : ''}`);
+    }
   }
-  if (s.texture.applied) lines.push(`            합계 ${s.texture.sourceBytes} → ${s.texture.runtimeBytes} B (${(s.texture.ratio * 100).toFixed(2)}%)`);
+  if (s.texture.applied) lines.push(`            합계 재질 ${s.texture.materials} · ${s.texture.sourceBytes} → ${s.texture.runtimeBytes} B (${(s.texture.ratio * 100).toFixed(2)}%)`);
   lines.push(`  strip     ${s.strip.renamedObjects}개 이름/extras 제거`);
   lines.push(`  emit      ${s.emit.file} ${s.emit.bytes} B · bbox ${(s.emit.bounds.max[0] - s.emit.bounds.min[0]).toFixed(4)} × ${(s.emit.bounds.max[1] - s.emit.bounds.min[1]).toFixed(4)} × ${(s.emit.bounds.max[2] - s.emit.bounds.min[2]).toFixed(4)}`);
   lines.push(`  thumbnail ${s.thumbnail.file} ${s.thumbnail.bytes} B (${s.thumbnail.size}px)`);
