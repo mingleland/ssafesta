@@ -1,17 +1,70 @@
 # Booth 장식 에셋 매핑 공백 — 실측 조사
 
-> 2026-09-07 · 조사자 이정헌(FE) · 게시 전 초안
+> 2026-09-07 작성 · **2026-09-08 게임 파트 회신(#146) 반영** · 조사자 이정헌(FE)
 > 근거는 전부 저장소 실측이다. 추정한 곳은 그렇게 적었다.
+> **틀린 문장은 지우지 않고 §0-1 에 남긴다** — 지우면 다음 사람이 같은 함정을 다시 판다.
 
 ## 0. 한 줄
 
 **부스 꾸미기 에셋에 대해 어휘가 네 벌 있고, 그중 어느 것도 정본이 아니다.** FE 팔레트가 쓰는 `assetCode` 7종은 저장소 어디에서도 정의되지 않고, 에셋 파이프라인이 만드는 4종과 **겹치는 것이 하나도 없다.**
 
+## 0-1. 회신 대조 (#146, 2026-09-08) — 서로 하나씩 틀렸다
+
+### 내가 틀린 것
+
+| 내 문장 | 실제 |
+|---|---|
+| §1-1 *"`assetCode` 개념이 없다. 타입 하나에 prefab 하나다"* | **틀렸다.** `BoothObjectRegistry.cs:35` 에 `assetCode` 필드가 있고 `GetPrefab(type, assetCode)` 가 `type:assetCode` 2단 조회를 한다(`:45`·`:103`). 못 찾으면 경고 후 타입 기본으로 떨어진다(`:55`) |
+| §1-1 (같은 문장의 전제) | `.asset` 11 엔트리 중 **2개는 이미 채워져 있다** — type 9 `FURNITURE_DEFAULT`, type 10 `DECORATION_DEFAULT`. "전부 비어 있다" 도 사실이 아니다 |
+
+**결과가 바뀐다.** FE 는 Unity 구조 변경을 기다릴 필요가 없다. 레지스트리에 `type:assetCode` 엔트리를 채우는 **데이터 작업**만 남는다. 계약의 `assetCode` 자유 문자열을 그대로 키로 쓴다.
+
+### 회신이 틀린 것
+
+회신은 *"부스 오브젝트 11종이 전부 프리미티브 플레이스홀더"* · *"`AiAgent`·`VideoScreen`·`ProjectPanel`·`SurveyKiosk`·… 참조 FBX 없음(전부)"* 이라고 적었다. **`develop` `cf636cd3` 기준 실측은 다르다.**
+
+원인은 조사 깊이다 — 이 prefab 들은 **FBX 를 직접 참조하지 않고 중첩 prefab 을 참조한다.** `.FBX` guid 만 찾으면 0건으로 보인다.
+
+| prefab | 직접 참조(중첩 prefab) |
+|---|---|
+| `AiAgent` | `31_Cashier.prefab` + Animator controller |
+| `VideoScreen` | `TrussVertical.prefab` · `Panel01b.prefab` |
+| `ProjectPanel` | `TrussBase.prefab` · `Panel03.prefab` |
+| `SurveyKiosk` | `Tablet.prefab` · `Counter01.prefab` |
+| `RecruitmentBoard` | `Panel02b.prefab` · `TrussBase.prefab` |
+| `ConsultationDesk` | `Counter01b.prefab` · `Chair02_White.prefab` · `Counter01.prefab` |
+| `Laptop` | `TableSquare.prefab` · `laptop.prefab` |
+| `LikeVote` | `Counter02.prefab` · `StandPlastic01.prefab` |
+| `Furniture` | `Chair01_orange` · `Chair01_blue` · `Chair01_white` · `TableRound.prefab` |
+| `Decoration` | `DisplayBox01Stuff.prefab` |
+
+`Counter01.prefab` 을 한 단계 더 들어가면 `Counter01.FBX` · `Counter01Top.FBX` · `Counter01Cloth01.FBX` · `CounterShelf.FBX` · `Frame.fbx` 가 나온다.
+
+그리고 `CreatePlaceholder` 는 **`prefab == null` 일 때만 도는 fallback** 이다(`BoothObjectFactory.cs:39-41`). 레지스트리 11 엔트리 전부 prefab guid 가 실재하므로 정상 경로에서는 프리미티브가 안 뜬다.
+
+FE 파이프라인이 키오스크에서 뽑아낸 모델은 다른 경로가 아니라 **바로 그 `SurveyKiosk.prefab`** 이다. `-476` 이 중첩 prefab 해석을 만들어 둔 것이 이 차이다.
+
+### 회신에서 그대로 받는 것
+
+- **ExpoKit 22 FBX 가 부스용 전부**, 현재 사용 중은 `Floor01`·`Panel02b` 2개
+- **CarnivalKit 42 FBX 는 월드 축제존 전용** → 부스 검증 범위에서 제외. `Art/World/CarnivalKit` 으로 이동 예정
+- **화분(`PLANT`) 원본은 저장소에 없다**
+- **게이트(`TRUSS_GATE`) 단일 모델이 없다** — 기둥 2 + 빔 1 조합이어야 한다. `TrussBase` 는 받침이다
+- `SHELF` → `CounterShelf`, `TRUSS_BEAM` → `TrussHorizontal`, `TRUSS_PILLAR` → `TrussVertical` **추정이 맞았다**
+- 저장소에 없는 부스용 prefab·FBX 는 **없다**
+- 라이선스 게이트는 양쪽 공통 제약 — 별도 이슈로 뺀다
+
+### 남은 결정 — FE 가 정한다
+
+`COUNTER_GRAPHIC` 에 어느 카운터를 붙일지. 카운터 계열이 6종(`Counter01`·`01Cloth`·`01Cloth01`·`01Top`·`02`·`02Cloth`)인데 "그래픽" 텍스처 변형은 없다. 게임 파트가 *"FE 팔레트 어휘를 정본으로 삼겠다"* 고 했으므로 팔레트 코드가 그대로 레지스트리 키가 된다.
+
 ## 1. 계층별 실측
 
 ### 1-1. Unity — `BoothObjectRegistry.asset`
 
-`ObjectType` 번호 → prefab 11개. **`assetCode` 개념이 없다.** 타입 하나에 prefab 하나다.
+`ObjectType` 번호 → prefab 11개.
+
+> ~~**`assetCode` 개념이 없다.** 타입 하나에 prefab 하나다.~~ — **이 문장은 틀렸다**(§0-1). `GetPrefab(type, assetCode)` 2단 조회가 이미 있고, 11 엔트리 중 2개는 `assetCode` 가 채워져 있다. `.asset` 만 보고 `.cs` 를 안 읽어서 난 오류다.
 
 | type | prefab |
 |---|---|
@@ -81,6 +134,7 @@ item_type 별 집계:  AVATAR_PART 97
 
 - 팔레트에서 **그래픽 카운터**를 놓으면 `assetCode: 'COUNTER_GRAPHIC'` 이 저장된다. 파이프라인에 그 코드가 없으므로 `pickAsset` 이 코드 조회에 실패하고, `objectType: FURNITURE` 의 타입 기본을 찾는데 그것도 없어(`FURNITURE_CHAIR02_WHITE.typeDefault === false`) **파라메트릭 박스로 떨어진다.**
 - 즉 **현재 팔레트 15종 중 실제 모델이 뜨는 것은 설문 키오스크 1종뿐이다.**
+  (이 문장은 **FE Booth Studio 2.5D 렌더러** 기준이다 — 런타임 manifest 에 구운 자산이 2종뿐이라 그렇다. Unity 런타임 기준이 아니다. #146 회신이 "Unity 쪽에서는 0종" 이라고 대조했는데 서로 다른 층을 말한 것이다.)
 - 서버는 어떤 문자열이든 받으므로, 오탈자나 폐기된 코드가 저장돼도 **게시 시점까지 아무도 모른다.**
 
 ## 3. 진행 방식 — 결정을 먼저 받지 않는다
