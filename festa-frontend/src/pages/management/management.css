@@ -29,6 +29,13 @@
   font-size: 13.5px;
 }
 .mg-input:focus { outline: 2px solid rgba(90, 140, 255, 0.55); outline-offset: 1px; }
+/* select 는 팝업(옵션 목록)을 OS 네이티브가 그린다 — .mg-input 의 밝은 글자색이 그 팝업에도
+   상속되는데, 팝업 배경은 이 다크 테마를 안 타서 흰 배경에 흰 글씨로 안 보이는 문제가 있었다
+   (실측 보고). option 에 배경·글자색을 명시해 팝업 자체를 다크로 강제한다. */
+select.mg-input option {
+  background-color: var(--festa-surface-solid);
+  color: var(--festa-ink);
+}
 .mg-input:disabled { opacity: 0.55; }
 .mg-input-sm { height: 32px; font-size: 12.5px; }
 .mg-textarea { height: auto; padding: 10px 12px; resize: vertical; line-height: 1.55; }
@@ -124,13 +131,23 @@
 .ag-doc-status { flex-shrink: 0; color: rgba(234, 238, 251, 0.65); }
 .ag-doc-status-error { color: #ff9d9d; }
 .ag-doc-note { margin-top: 10px; }
-.ag-status-legend { display: flex; flex-wrap: wrap; gap: 8px; }
-.ag-status-badge {
+
+/* 지금 상태 — 하나만 켠다. 색은 뜻으로 고른다: 대기=중립, 처리중=진행, 준비완료=성공, 실패/만료=위험 */
+.ag-status-current {
+  display: inline-flex; align-items: center;
+  padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.06); color: rgba(234, 238, 251, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+.ag-status-current-queued { background: rgba(255, 214, 107, 0.14); color: #ffd66b; border-color: rgba(255, 214, 107, 0.35); }
+.ag-status-current-processing { background: rgba(90, 140, 255, 0.16); color: #8fb2ff; border-color: rgba(90, 140, 255, 0.4); }
+.ag-status-current-ready { background: rgba(93, 211, 155, 0.14); color: #5fd39b; border-color: rgba(93, 211, 155, 0.35); }
+.ag-status-current-error, .ag-status-current-expired { background: rgba(255, 143, 143, 0.14); color: #ff8f8f; border-color: rgba(255, 143, 143, 0.35); }
+.ag-status-hint { margin-top: 8px; }
+.ag-status-unavailable { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ag-status-badge-off {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 12px; border-radius: 999px; font-size: 12.5px;
-  background: rgba(93, 211, 155, 0.14); color: #5fd39b; border: 1px solid rgba(93, 211, 155, 0.35);
-}
-.ag-status-badge-off {
   background: rgba(255, 255, 255, 0.04); color: rgba(234, 238, 251, 0.4);
   border: 1px dashed rgba(255, 255, 255, 0.16);
 }

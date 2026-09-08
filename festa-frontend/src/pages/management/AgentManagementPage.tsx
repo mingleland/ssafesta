@@ -40,14 +40,33 @@ const DOC_STATUS_LABEL: Record<DocumentProcessingStatus, string> = {
   EXPIRED: '만료',
 };
 
-/** 상태 5종 범례 — 뒤 2개는 서버에 없는 상태라 항상 비활성으로 그린다 */
-const STATUS_LEGEND: { key: string; label: string; wired: boolean }[] = [
-  { key: 'QUEUED', label: '대기', wired: true },
-  { key: 'PROCESSING', label: '처리 중', wired: true },
-  { key: 'READY', label: '준비완료', wired: true },
-  { key: 'FAILED', label: '실패', wired: false },
-  { key: 'INACTIVE', label: '비활성화', wired: false },
+// 상태 5종 중 실제로 도달 가능한 값. 동시에 여러 개가 "지금 상태"일 수 없다 — 배지 하나만
+// 켠다(요청 참고: 처음엔 5개를 항상 다 켜 둬서 "지금 어떤 상태인지" 헷갈린다는 지적을 받았다).
+type AgentStatus = 'NONE' | DocumentProcessingStatus | 'ERROR';
+
+const STATUS_LABEL: Record<AgentStatus, string> = {
+  NONE: '문서 없음',
+  QUEUED: '대기',
+  PROCESSING: '처리 중',
+  READY: '준비완료',
+  EXPIRED: '만료',
+  ERROR: '실패',
+};
+
+/** 뒤 2개는 서버에 그 개념 자체가 없다 — AiAgent.java: "There is no lifecycle here" */
+const UNAVAILABLE_STATES: { label: string; note: string }[] = [
+  { label: '처리 실패', note: 'job이 DEAD로 확정돼도 문서 상태에 반영하는 코드가 없음(-174 예정)' },
+  { label: '비활성화', note: 'AI 직원 활성/비활성 전환 API 자체가 없음' },
 ];
+
+/** 마지막으로 시도한 문서 하나로 판단한다 — 문서가 여럿이어도 "지금 상태"는 하나다. */
+function currentAgentStatus(documents: { phase: string; processingStatus?: DocumentProcessingStatus }[]): AgentStatus {
+  if (documents.length === 0) return 'NONE';
+  const last = documents[documents.length - 1];
+  if (last.phase === 'error') return 'ERROR';
+  if (last.phase === 'uploading' || last.phase === 'completing') return 'QUEUED';
+  return last.processingStatus ?? 'QUEUED';
+}
 
 export function AgentManagementPage() {
   const { boothId } = useParams<{ boothId: string }>();
@@ -219,11 +238,14 @@ export function AgentManagementPage() {
 
       <section className="sc-card ag-status">
         <span className="ag-section-title">상태</span>
-        <div className="ag-status-legend">
-          {STATUS_LEGEND.map((s) => (
-            <span key={s.key} className={'ag-status-badge' + (s.wired ? '' : ' ag-status-badge-off')}>
-              {s.label}
-              {!s.wired && <span className="ag-status-off-note">API 없음</span>}
+        <span className={'ag-status-current ag-status-current-' + currentAgentStatus(documents).toLowerCase()}>
+          {STATUS_LABEL[currentAgentStatus(documents)]}
+        </span>
+        <p className="sc-note ag-status-hint">서버가 아는 상태는 대기·처리 중·준비완료·만료뿐이라 그 안에서만 표시합니다.</p>
+        <div className="ag-status-unavailable">
+          {UNAVAILABLE_STATES.map((s) => (
+            <span key={s.label} className="ag-status-badge-off" title={s.note}>
+              {s.label} <span className="ag-status-off-note">API 없음</span>
             </span>
           ))}
         </div>
