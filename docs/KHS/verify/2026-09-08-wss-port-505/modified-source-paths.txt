@@ -1,0 +1,16 @@
+festa-unity/Assets/TextMesh Pro/Examples & Extras/Resources/Fonts & Materials/Anton SDF.asset
+festa-unity/Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset
+festa-unity/Assets/_Project/Resources/Fonts/Jua_SDF.asset
+festa-unity/Assets/_Project/Resources/Fonts/MalgunGothic_SDF.asset
+festa-unity/Assets/_Project/Resources/Fonts/NotoSansKRBold_SDF.asset
+festa-unity/Assets/_Project/Scenes/main.unity
+festa-unity/Assets/_Project/Scripts/Booth/Interaction/BoothInteractionTarget.cs
+festa-unity/Assets/_Project/Scripts/Diagnostics/HitchLogger.cs
+festa-unity/Assets/_Project/Scripts/Diagnostics/PerfHud.cs
+festa-unity/Assets/_Project/Scripts/Diagnostics/RenderCostProbe.cs
+festa-unity/Packages/manifest.json
+festa-unity/Packages/packages-lock.json
+festa-unity/Assets/_Project/Scripts/Diagnostics/FixedPoseBenchmark.cs
+festa-unity/Assets/_Project/Scripts/Diagnostics/FixedPoseBenchmark.cs.meta
+festa-unity/Assets/_Project/Scripts/Editor/ApiConfigGuard.cs
+festa-unity/Assets/_Project/Scripts/Editor/ApiConfigGuard.cs.meta
