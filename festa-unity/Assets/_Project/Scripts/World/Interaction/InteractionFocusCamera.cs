@@ -19,6 +19,9 @@ namespace Festa.World
     /// </summary>
     public sealed class InteractionFocusCamera : MonoBehaviour
     {
+        /// <summary>입력 잠금 주인 이름. 호스트 Overlay 가 자기 잠금을 풀 때 초점 잠금까지 풀지 않게 한다.</summary>
+        const string LockOwner = "InteractionFocusCamera";
+
         static InteractionFocusCamera s_instance;
 
         /// <summary>초점 모드가 끝났다(Esc·외부 잠금 해제·명시적 Release). 어떤 이유든 한 번만.</summary>
@@ -133,7 +136,7 @@ namespace Festa.World
                 if (lockInput && !InputBridge.IsLocked)
                 {
                     _lockedByUs = true;
-                    InputBridge.SetLocked(true);
+                    InputBridge.SetLocked(true, LockOwner);
                 }
                 Debug.Log($"[InteractionFocusCamera] 초점 시작 → {anchor.name}");
             }
@@ -153,7 +156,7 @@ namespace Festa.World
             if (_lockedByUs)
             {
                 _lockedByUs = false;
-                InputBridge.SetLocked(false);   // LockedChanged(false) 가 다시 들어오지만 _active 가 false 라 무시된다
+                InputBridge.SetLocked(false, LockOwner);   // LockedChanged(false) 가 다시 들어오지만 _active 가 false 라 무시된다
             }
 
             Debug.Log("[InteractionFocusCamera] 초점 해제");

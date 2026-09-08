@@ -43,6 +43,20 @@ namespace Festa.World
 
         void Update()
         {
+            // **화면이 열려 있으면 포털은 아무것도 하지 않는다.**
+            //
+            // 이 검사가 없어서, 부스 안 노트북·설문에 F 를 누르면 그 화면이 열리는 **동시에**
+            // 같은 F 한 번이 포털에도 먹혀 축제장으로 튕겨 나갔다. 미니게임이 떠 있는 중에도
+            // F 를 누르면 다른 부스로 순간이동했다 (2026-09-08 조사).
+            // 프롬프트·하이라이트까지 같이 끈다 — 조작이 막힌 상태에서 [F] 알약만 떠 있으면
+            // "눌러도 안 된다" 로 보인다 (S15P21A604-437 과 같은 이유).
+            if (Festa.Integration.InputBridge.IsLocked || InteractionFocusCamera.IsFocused)
+            {
+                _nearest = null;
+                UpdateHighlight();
+                return;
+            }
+
             _nearest = FindNearest();
             UpdateHighlight();
             if (_nearest == null) return;
