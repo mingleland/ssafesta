@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_GAME_RULES, findScene, type AssetReference, type GameObjective, type GameProject, type TileLayer } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
@@ -10,8 +10,8 @@ import type { GameSessionPort } from '../ports/gameSessionPort.ts';
 import { summarizeFramePerformance, type FramePerformanceSummary } from './framePerformance.ts';
 import {
   chooseReferenceDialogue,
+  currentInteractionTarget,
   interactReferencePlayer,
-  moveReferencePlayer,
   movePlayerFromHeldKeys,
   objectiveProgress,
   planCatchUpTicks,
@@ -32,6 +32,11 @@ interface ReferenceGamePlayerProps {
   readonly onExit: () => void;
   readonly showPerformanceMonitor?: boolean;
 }
+
+// S15P21A604-526 — 캐릭터 위 "-N" 피해 표시가 떠 있는 시간. ReferenceGamePlayer.css의
+// grp-damage-popup 애니메이션 duration과 반드시 같은 값이어야 한다(자바스크립트 타이머가
+// 실제로 요소를 지우는 시점 = CSS 애니메이션이 끝나 보이지 않게 되는 시점).
+const DAMAGE_POPUP_DURATION_MS = 900;
 
 const keyDirection = (key: string): MoveDirection | null => {
   if (key === 'ArrowUp' || key.toLowerCase() === 'w') return 'UP';
@@ -83,6 +88,14 @@ const objectiveCopy = (objective: GameObjective): string => {
 
 export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}, onExit, showPerformanceMonitor = false }: ReferenceGamePlayerProps) => {
   const [runtime, setRuntime] = useState(() => startReferenceRuntime(project));
+  // S15P21A604-526 — 체력이 깎여도 상단 수치 텍스트만 바뀌고 캐릭터 쪽에는 아무 피드백이
+  // 없던 것을, runtime.lastDamageTick 변화를 감지해 캐릭터 위에 "-N"을 잠깐 띄웠다 서서히
+  // 사라지게(DAMAGE_POPUP_DURATION_MS 뒤 자동 제거) 한다. 이 표시 자체는 게임 판정에
+  // 영향이 없는 순수 시각 효과라 굳이 runtime state(순수 함수 리듀서)에 넣지 않고 컴포넌트
+  // 로컬 state로 둔다.
+  const [damagePopups, setDamagePopups] = useState<readonly { readonly id: number; readonly amount: number }[]>([]);
+  const damagePopupIdRef = useRef(0);
+  const lastDamageTickRef = useRef(runtime.lastDamageTick);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [framePerformance, setFramePerformance] = useState<FramePerformanceSummary | null>(null);
@@ -113,6 +126,11 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
   const canShoot = scene !== undefined && scene.type !== 'DIALOGUE' && scene.objects.some((object) => (
     object.preset === 'PLAYER_SPAWN' && object.components.some((component) => component.type === 'SHOOTER')
   ));
+  // S15P21A604-532 — 하단 고정 "E 상호작용" 버튼과 정확히 같은 판정(currentInteractionTarget)
+  // 으로 오브젝트 위 안내 문구를 띄운다 — 둘이 다른 로직을 쓰면 "버튼은 눌리는데 힌트가
+  // 안 뜨는" 불일치가 생긴다. 대화가 진행 중일 때는(activeDialogue !== null) 기존 버튼도
+  // disabled되므로 힌트도 같이 숨긴다.
+  const interactionTarget = activeDialogue === null ? currentInteractionTarget(project, runtime) : null;
   const completionRules = (project.rules ?? DEFAULT_GAME_RULES).completion;
 
   useEffect(() => {
@@ -140,6 +158,23 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
       }
     };
   }, [mode, project.gameId, sessionPort]);
+
+  // S15P21A604-526 — lastDamageTick이 이전에 본 값과 달라졌을 때만(=실제로 새 피해가
+  // 적용됐을 때만) 표시를 하나 추가한다. 무적 시간 중 damagePlayer가 조기 반환되는 호출은
+  // referenceRuntime.ts 쪽에서 애초에 이 값을 갱신하지 않으므로 여기서 따로 걸러낼 필요가
+  // 없다 — tick이 그대로면 이 effect도 아무 일도 하지 않는다.
+  useEffect(() => {
+    if (runtime.lastDamageAmount === null || runtime.lastDamageTick === lastDamageTickRef.current) return;
+    lastDamageTickRef.current = runtime.lastDamageTick;
+    const id = damagePopupIdRef.current + 1;
+    damagePopupIdRef.current = id;
+    const amount = runtime.lastDamageAmount;
+    setDamagePopups((current) => [...current, { id, amount }]);
+    const timeoutId = window.setTimeout(() => {
+      setDamagePopups((current) => current.filter((popup) => popup.id !== id));
+    }, DAMAGE_POPUP_DURATION_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [runtime.lastDamageAmount, runtime.lastDamageTick]);
 
   useEffect(() => {
     if (runtime.session.status !== 'COMPLETED' || sessionToken === null || completionReported.current) return;
@@ -328,12 +363,19 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             style={{
               aspectRatio: `${scene.width} / ${scene.height}`,
               // S15P21A604-492 — CSS의 width: 100%(고정값)만으로는 세로가 긴 씬에서 비율이
-              // 깨진다: aspect-ratio로 계산된 높이가 max-height(calc(100vh - 130px))를
-              // 넘으면 높이는 잘리지만, width가 이미 고정값이라 폭이 다시 계산되지 않는다
-              // (스펙상 aspect-ratio는 auto인 쪽만 유도한다). 그래서 가로 제한(1120px, CSS
-              // max-width와 동일한 값)과 "세로 제한을 씬 비율로 역산한 폭" 중 작은 쪽을
-              // 직접 계산해 항상 비율이 유지되게 한다.
-              width: `min(1120px, calc((100vh - 130px) * ${scene.width} / ${scene.height}))`,
+              // 깨진다: aspect-ratio로 계산된 높이가 세로 제한을 넘으면 높이는 잘리지만,
+              // width가 이미 고정값이라 폭이 다시 계산되지 않는다(스펙상 aspect-ratio는
+              // auto인 쪽만 유도한다). 그래서 "가로 제한"과 "세로 제한을 씬 비율로 역산한
+              // 폭" 중 작은 쪽을 직접 계산해 항상 비율이 유지되게 한다.
+              // S15P21A604-542 — 대화형 씬(.grp-story-backdrop, 92%×82%)에 비해 맵형 씬이
+              // 화면과 무관한 고정 1120px 가로 상한 때문에 훨씬 작게 떠 화면 전환이
+              // 불연속적으로 느껴졌다. 가로 상한을 화면 크기 기준(100vw - .grp-stage-wrap
+              // 좌우 padding 34px×2)의 92%로 바꿔 큰 화면에서 훨씬 커지게 한다.
+              // 세로 쪽 (100vh - 130px)에는 처음에 여기도 .92를 곱했었는데, 이 값 자체가
+              // 이미 "넘치지 않는 최대치"였던 걸 다시 92%로 줄이는 꼴이라 세로 제한이
+              // 걸리는 씬(정사각형에 가깝거나 세로가 긴 씬)은 오히려 이전보다 작아지는
+              // 회귀가 나서(육안 확인으로 발견) 뺐다 — 가로만 92%를 곱하는 게 맞다.
+              width: `min(calc((100vw - 68px) * .92), calc((100vh - 130px) * ${scene.width} / ${scene.height}))`,
               ...(mapBackground === null ? {} : staticImageBackgroundStyle(mapBackground)),
               '--grp-columns': scene.width,
               '--grp-rows': scene.height,
@@ -349,18 +391,46 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
               const spriteVisual = sprite?.type === 'SPRITE'
                 ? resolveStaticImageVisual(project.assets.find((asset) => asset.id === sprite.assetId), assetUrls)
                 : null;
+              const objectPercentPosition = {
+                left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
+                top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
+              };
               return (
-                <span
-                  className={`grp-object grp-object--${object.preset.toLowerCase()}`}
-                  key={object.id}
-                  style={{
-                    left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
-                    top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
-                    transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
-                    zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
-                  }}
-                  title={definition.label}
-                >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                <Fragment key={object.id}>
+                  {/* S15P21A604-535 — 이미지 asset이 있으면(has-visual) 어두운 배지 박스를
+                      완전히 빼서 에디터 캔버스(.gss-map-object, 기본 투명)와 같아지게 한다.
+                      이미지가 없어 이모지 폴백(definition.icon)만 뜨는 경우는 그 배지가
+                      가독성에 필요해 기존 스타일을 유지한다(ReferenceGamePlayer.css의
+                      .grp-object:not(.has-visual) 참고). */}
+                  <span
+                    className={`grp-object grp-object--${object.preset.toLowerCase()}${spriteVisual === null ? '' : ' has-visual'}`}
+                    style={{
+                      ...objectPercentPosition,
+                      transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
+                      zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
+                    }}
+                    title={definition.label}
+                  >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                  {/* S15P21A604-529 — 이름이 있고("" 포함 빈 이름은 미표시) "플레이 중 표시"가
+                      켜진 오브젝트만, 오브젝트와 같은 좌표에서 위로 오프셋한 상시 이름표를
+                      그린다(-526의 순간 페이드아웃 표시와 달리 계속 떠 있음 — 별도 타이머
+                      없이 매 렌더마다 조건만 확인). PLAYER_SPAWN은 이 filter에서 이미
+                      제외되고 계약상 name/showNameInPlay 자체를 가질 수 없다. */}
+                  {object.showNameInPlay === true && object.name !== undefined && object.name !== '' && (
+                    <span className="grp-object-nameplate" style={objectPercentPosition}>{object.name}</span>
+                  )}
+                  {/* S15P21A604-532 — 지금 상호작용 범위 안의 대상이면서 INTERACTABLE
+                      컴포넌트에 안내 문구가 있을 때만 오브젝트 "위"에 힌트를 띄운다(이름표는
+                      아래라 서로 안 겹친다). ON_INTERACT 이벤트로만 상호작용 가능하고
+                      INTERACTABLE 컴포넌트가 없는 오브젝트는 보여줄 문구 자체가 없어 표시하지
+                      않는다 — 하단 고정 "E 상호작용" 버튼은 이 조건과 무관하게 그대로 둔다. */}
+                  {interactionTarget?.id === object.id && (() => {
+                    const interactable = object.components.find((component) => component.type === 'INTERACTABLE');
+                    return interactable?.type === 'INTERACTABLE' ? (
+                      <span className="grp-interaction-hint" style={objectPercentPosition}>{interactable.prompt}</span>
+                    ) : null;
+                  })()}
+                </Fragment>
               );
             })}
             {runtime.spawnedEnemies.map((enemy) => {
@@ -380,6 +450,54 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             >
               {playerSheet === undefined ? '◆' : <SpriteAnimationPreview clip={playerClip} sheet={playerSheet} size={72} />}
             </span>
+            {/* S15P21A604-526 — 캐릭터와 같은 좌표에 놓고 CSS(grp-damage-popup)로 오른쪽
+                위 오프셋 + 위로 이동하며 페이드아웃하는 애니메이션을 준다. 피격 시점의
+                정확한 위치가 아니라 "지금" 위치를 쓴다 — 체력이 0이 되어 즉시 체크포인트로
+                순간이동하는 마지막 피격은 표시가 새 위치에서 뜨지만, 표시 자체가 아주
+                짧게(900ms) 스쳐 지나가는 연출이라 문제되지 않는다고 판단했다. */}
+            {damagePopups.map((popup) => (
+              <span
+                className="grp-damage-popup"
+                key={popup.id}
+                style={{
+                  left: `${((runtime.playerPosition!.x + .5) / scene.width) * 100}%`,
+                  top: `${((runtime.playerPosition!.y + .5) / scene.height) * 100}%`,
+                }}
+              >-{popup.amount}</span>
+            ))}
+
+            {/* S15P21A604-540 — 오른쪽 사이드바를 없애고 상태/목표/인벤토리/조작 안내를
+                게임 캔버스(.grp-map) 안쪽 오버레이로 옮긴다. 목표 바는 기존과 동일한 조건
+                (objectives 없으면 미표시)으로 상단에, 상태(하트/점수)는 우측 상단, 인벤토리는
+                좌측 상단, 상호작용/발사 안내는 좌측 하단에 둔다. */}
+            {completionRules.objectives.length > 0 && (
+              <div className="grp-hud-objectives">
+                <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
+                {completionRules.objectives.map((objective) => {
+                  const progress = objectiveProgress(runtime, objective);
+                  const completed = progress >= objective.target;
+                  return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
+                })}
+              </div>
+            )}
+            <div className="grp-hud-status">
+              <div aria-label={`체력 ${runtime.playerHealth} / ${runtime.maxPlayerHealth}`} className="grp-hud-hearts">
+                {/* 깎이면 왼쪽부터 사라진다(QA 확정) — 남은 체력만큼 "오른쪽" 하트가
+                    채워진 상태로 남고, 왼쪽(index가 작은 쪽)부터 빈 하트가 된다. */}
+                {Array.from({ length: runtime.maxPlayerHealth }, (_, index) => (
+                  <span className={index >= runtime.maxPlayerHealth - runtime.playerHealth ? 'is-filled' : ''} key={index}>♥</span>
+                ))}
+              </div>
+              <strong className="grp-hud-score">★ {runtime.score.toLocaleString('ko-KR')}</strong>
+            </div>
+            <div className="grp-hud-inventory">
+              <span>INVENTORY</span>
+              {inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}
+            </div>
+            <div className="grp-hud-actions">
+              <span className="grp-action-label">E 상호작용</span>
+              {canShoot && <span className="grp-action-label">F 발사</span>}
+            </div>
           </div>
         )}
         {scene?.type === 'DIALOGUE' && (
@@ -428,24 +546,6 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
           </section>
         )}
       </section>
-
-      <aside className="grp-hud">
-        <div className="grp-player-stats"><span>상태</span><strong>♥ {runtime.playerHealth} / {runtime.maxPlayerHealth}</strong><strong>★ {runtime.score.toLocaleString('ko-KR')}점</strong></div>
-        {completionRules.objectives.length > 0 && (
-          <div className="grp-objectives">
-            <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
-            {completionRules.objectives.map((objective) => {
-              const progress = objectiveProgress(runtime, objective);
-              const completed = progress >= objective.target;
-              return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
-            })}
-          </div>
-        )}
-        <div><span>INVENTORY</span>{inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}</div>
-        <div className="grp-controls"><span>{scene?.type === 'PLATFORMER' ? '이동 / 점프' : '이동'}</span><div><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'UP'))} type="button">↑</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'LEFT'))} type="button">←</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'DOWN'))} type="button">↓</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'RIGHT'))} type="button">→</button></div></div>
-        <button className="grp-interact" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => interactReferencePlayer(project, current))} type="button"><kbd>E</kbd> 상호작용</button>
-        {canShoot && <button className="grp-shoot" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => shootReferenceProjectile(project, current))} type="button"><kbd>F</kbd> 발사</button>}
-      </aside>
     </main>
   );
 };

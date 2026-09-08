@@ -892,39 +892,100 @@ Cursor 또는 Page 기반 거래 내역 조회.
 
 ## 9. Survey
 
-### POST `/booths/{boothId}/surveys`
+> 계약 정본은 `specs/010-survey/contracts/survey-api.md` 다. 이 절은 그 요약이다.
+> **부스당 설문 1개**이고(C-06) **저장하면 바로 공개된다**(C-07) — 게시 단계가 없다.
 
-### GET `/booths/{boothId}/surveys`
+| endpoint | 권한 | 티켓 |
+|---|---|---|
+| `GET /booths/{boothId}/survey` | 편집자. **임대 만료여도 조회된다**(FR-011) | -130 |
+| `PUT /booths/{boothId}/survey` | 편집자 + 유효 임대. 없으면 생성, 있으면 갱신 — 항상 200 | -130 · -190 |
+| `GET /booths/{boothId}/survey/run` | 방문자(회원·게스트). 응답의 `surveyId` 가 아래 두 경로의 키다 | -130 |
+| `POST /surveys/{surveyId}/responses` | 회원·게스트 | -131 · -192 |
+| `GET /surveys/{surveyId}/results` | 편집자 | -132 |
+| `GET /surveys/{surveyId}/text-answers?questionId=&page=&size=` | 편집자 | -193 |
 
-### GET `/surveys/{surveyId}`
+문항 유형 6종: `SINGLE_CHOICE` · `MULTIPLE_CHOICE` · `RATING` · `SHORT_TEXT` · `LONG_TEXT` · `APPLICATION` (FR-002).
 
-### PUT `/surveys/{surveyId}`
+### `PUT /booths/{boothId}/survey`
 
-### POST `/surveys/{surveyId}/responses`
-
-#### Request 예시
+`title`·`questions` 는 필수다. **`description`·`rewardCoin`·`closesAt` 은 키를 보내지 않으면 기존 값을 유지**하고 명시적 `null` 이면 비운다 — FE 가 일부 필드만 보내도 나머지가 지워지지 않는다.
 
 ```json
 {
-  "answers": [
-    {"questionId": 1, "selectedOptionIds": [3]},
-    {"questionId": 2, "text": "좋았습니다."}
+  "title": "A604 부스 설문",
+  "rewardCoin": 5,
+  "questions": [
+    {"type": "SINGLE_CHOICE", "prompt": "어떻게 알았나요?", "required": true,
+     "options": [{"label": "돌아다니다가"}, {"label": "추천"}]},
+    {"type": "RATING", "prompt": "만족도", "required": true, "scale": {"min": 1, "max": 5}},
+    {"type": "LONG_TEXT", "prompt": "개선할 점", "required": false}
   ]
 }
 ```
 
-검증:
+문항은 **전체 교체**다(`questionId` 를 받지 않는다). **응답이 1건 이상이면 문항 구조가 잠겨** 유형·문구·필수·선택지·척도가 다르면 `409 SURVEY_LOCKED` 이고, 제목·설명·보상·마감만 바꾸는 저장은 성공한다 (C-08).
 
-- 마감
-- 1인 1응답
-- 질문 유효성
-- 보상 중복
+검증 위반은 `400 VALIDATION_FAILED` + `errors[0].field` 이며 문항 안이면 `questions[2].options` 같은 경로다. 상한 셋(문항 수·선택지 수·보상 코인)은 **기획 미결이라 서버 설정값**이다 (C-01·C-02, docs/26 row 20·21).
 
-### GET `/surveys/{surveyId}/results`
+### `GET /booths/{boothId}/survey/run`
 
-Owner/허용된 Staff용 결과 조회.
+Unity 가 `{boothId, objectId}` 만 보내고 설문 식별자를 모르므로 부스 기준 경로다 (S15P21A604-415).
 
----
+```json
+{"surveyId": 12, "closed": false, "rewardCoin": 5, "questions": [...]}
+```
+
+마감된 설문도 문항을 그대로 돌려준다 — 화면은 마감을 표시하고 제출이 `409 SURVEY_CLOSED` 로 막는다. `rewardCoin > 0` 이면 게스트는 제출할 수 없어(지갑 없음, 헌법 12조) 그 값을 미리 싣는다.
+
+### `POST /surveys/{surveyId}/responses`
+
+```json
+{
+  "answers": [
+    {"questionId": 101, "selectedOptionIds": [1001]},
+    {"questionId": 102, "rating": 4},
+    {"questionId": 103, "text": "좋았습니다."}
+  ]
+}
+```
+
+→ `201 {"responseId": 55, "rewardedCoin": 5}`. **`rewardedCoin` 키는 항상 있고 보상이 없으면 `0`** 이다.
+
+검증: 마감 / 1인 1응답(회원은 `userId`, 게스트는 토큰 주체) / 문항·선택지가 이 설문 것인지 / 유형별 payload / 보상 중복(원장 멱등키).
+
+게스트 응답의 세션 흔적은 **세션을 더 쓸 수 없게 되면 지워진다**(헌법 12조). 기준은 제출 때 적어 둔 토큰의 `exp` **+ `app.auth.jwt-clock-skew`**(60초) — 디코더가 그때까지 토큰을 받아 주므로 그 전에 지우면 아직 통과하는 토큰이 재응답할 수 있다. 지워지는 것은 접속 토큰 주체와 만료 시각 둘이고, 답과 집계는 그대로다.
+
+### `GET /surveys/{surveyId}/results`
+
+Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답은 내려가지 않는다(FR-007). 전체 응답 수·최초/최근 응답 시각·문항별 응답 수·선택지별 수·별점 평균과 분포·주관식 첫 페이지. **비율은 싣지 않는다** — 복수선택은 합이 100% 를 넘으므로 화면이 `count / answeredCount` 로 계산한다. 응답 0건이면 모든 문항이 0 이고 `average` 는 `null` 이다(FR-012).
+
+응답자 식별 정보는 어떤 필드에도 없다(FR-009). 주관식 항목의 `responseId` 는 같은 사람의 답을 묶는 열쇠일 뿐이다.
+
+```json
+{
+  "surveyId": 12, "totalResponses": 20,
+  "firstRespondedAt": "2026-09-08T04:11:02Z", "lastRespondedAt": "2026-09-08T07:55:40Z",
+  "perQuestion": [
+    {"questionId": 101, "type": "SINGLE_CHOICE", "answeredCount": 18,
+     "counts": [{"optionId": 1001, "label": "월드를 돌아다니다가", "count": 11}],
+     "average": null, "distribution": []},
+    {"questionId": 102, "type": "RATING", "answeredCount": 20, "counts": [],
+     "average": 4.2, "distribution": [{"value": 1, "count": 0}, {"value": 2, "count": 1}]}
+  ],
+  "textAnswers": {"content": [{"responseId": 55, "questionId": 103, "text": "무대 일정 안내가…"}],
+                  "page": 0, "size": 20, "totalElements": 12, "totalPages": 1}
+}
+```
+
+`counts`·`average`·`distribution` 은 **유형과 무관하게 항상 있다** — 값이 없으면 `[]`·`null` 이다. `answeredCount` 는 그 문항에 답한 응답 수이므로 선택 문항을 건너뛴 사람이 있으면 `totalResponses` 보다 작다.
+
+### `GET /surveys/{surveyId}/text-answers?questionId&page&size`
+
+주관식 답변 페이지. 결과 조회의 `textAnswers` 가 첫 페이지이고 그 다음을 이 endpoint 로 넘긴다(FR-008). `page`(0부터, 기본 0) · `size`(1~100, 기본 20) · `questionId`(선택 — 없으면 텍스트 3유형 전체).
+
+**정렬은 답변 id 오름차순으로 고정**이다. 새 답변은 항상 뒤에 붙으므로 페이지를 넘기는 중에 제출이 들어와도 경계에서 중복·누락이 없다(C-09). 페이지 모양은 전역 규약(`content`·`page`·`size`·`totalElements`·`totalPages`)이고 `hasNext` 는 `page + 1 < totalPages` 로 판단한다.
+
+`page` 음수 · `size` 범위 밖 · 이 설문의 문항이 아닌 `questionId` 는 `400 VALIDATION_FAILED` 이고 `errors[0].field` 가 문제 필드다.
 
 ## 10. Staff / Permission
 
@@ -1227,8 +1288,10 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
 | `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
 | `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
-| `SURVEY_CLOSED` | 설문 마감 |
-| `SURVEY_ALREADY_RESPONDED` | 1인 1응답 위반 |
+| `SURVEY_NOT_FOUND` | **404.** 부스에 설문이 없거나 `surveyId` 가 없다. 편집자 조회의 404 는 "아직 만들지 않았다"는 뜻이라 오류 상태가 아니다 |
+| `SURVEY_CLOSED` | **409.** 설문 마감 — `closesAt` 이 지났다 |
+| `SURVEY_ALREADY_RESPONDED` | **409.** 1인 1응답 위반. 회원은 `userId`, 게스트는 접속 토큰 주체 기준이다 |
+| `SURVEY_LOCKED` | **409.** 응답이 있는 설문의 문항 구조를 바꾸려 했다 (C-08). 제목·설명·보상·마감은 수정된다 |
 | `CONSULTATION_ALREADY_ACCEPTED` | 다른 Staff가 먼저 수락 |
 | `DUPLICATE_REQUEST` | 중복 요청 |
 | `INTERNAL_ERROR` | 서버 오류 |

@@ -224,7 +224,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | C-13 | 부스당 AI 직원 수 상한은? | BE + 기획 | **확정: 1명** (2026-08-27 팀 합의). 부스는 AI 직원을 하나만 두고, **직원의 `role`은 부스 종류에서 갈린다** — 프로젝트 부스면 `PROJECT_DOCENT`, 이벤트 부스면 `GUIDE`. C-12의 role이 정확히 2종인 이유가 이것이다. 다만 이벤트 부스는 아직 구현이 없어(`LayoutTemplate`의 값은 `PROJECT_EXHIBITION` 하나) **당분간 `role`을 서버가 파생하지 않고 소유자가 고른 값을 화이트리스트로 검증한다.** 부스 종류가 코드에 생기면 그때 서버가 종류별 허용 role로 좁힌다. 수치는 서버 설정으로 두고 코드에 하드코딩하지 않는다 |
 | C-14 | AI 직원 삭제를 지원하는가, 참조가 있으면 어떻게 하는가? | BE | **확정: 지원한다. 참조가 하나라도 있으면 `409 AGENT_DELETE_CONFLICT`로 거부하고 무엇이 막는지 message 에 담는다** (2026-08-30). **검사 대상 3종** — ⑴ `ai_documents.agent_id` ⑵ `consultations.agent_id` ⑶ **Draft·현재 Published Layout 의 `AI_AGENT.configId`**. `ai_document_chunks`는 독립 blocker로 검사하지 않는다 — Spring이 접근할 수 없어서가 아니라, Chunk의 정본 부모인 `ai_documents` 참조가 있으면 이미 삭제를 거부하고 문서 삭제 시 Chunk는 cascade 정리되므로 중복 검사할 필요가 없기 때문이다. **"현재 Published"는 `booths.published_layout_version` 포인터로 판정**한다. Draft 검사는 기존 데이터 보호이며 강한 불변식은 Published 무결성이다. Agent 삭제와 Layout Publish는 `booths` 행 잠금을 공유하고, 알려진 문서·상담 FK 위반만 같은 409로 번역한다. |
 | C-15 | AI 직원 편집 권한 범위는? | BE | **확정: 소유자 + 스태프**(`BoothAccessGuard`, 2026-08-30). 005·016·009 와 **정확히 같은 편집자 범위**다 — 같은 "편집자"가 기능마다 다른 뜻이 되지 않게 한다. 직원 역할별 제한(011 C-09 `ADMIN`·`CONTENT_EDITOR`)은 **011 구현 때 가드 한 곳에서 일괄**로 닫는다([GitLab #116](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/116)) — 그때까지 `CONSULTANT`도 편집할 수 있고, 이는 알고 여는 창이다 |
-| C-16 | FastAPI가 Agent 추론 설정을 어떤 API 형태와 빈도로 조회하는가? | AI + BE | **미확정: 별도 endpoint인지 Chunk 검색 응답에 결합할지, 별도 호출이면 경로·응답·캐시 무효화 방식을 S15P21A604-399에서 합의한다. 구현자는 임의로 경로 또는 캐시 정책을 확정하지 않는다.** |
+| C-16 | FastAPI가 Agent 추론 설정을 어떤 API 형태와 빈도로 조회하는가? | AI + BE | **확정: FastAPI가 질문마다 검색 전에 별도 `GET /internal/ai/agent-config?boothId=&agentId=`를 1회 호출하고 캐시하지 않는다. 인증은 `INTERNAL_AI_TO_SPRING_TOKENS`의 첫 토큰을 쓰며, `found:true`면 `role`·`tone`·`responseLength`·`systemPrompt`·`forbiddenTopics`를 받는다. `found:false`의 `AGENT_NOT_IN_BOOTH`·`AGENT_INACTIVE`와 401·timeout·5xx·계약 위반은 Fail Closed로 처리해 Embedding·검색·LLM을 호출하지 않는다.** ([계약](../008-ai-conversation-rag/contracts/spring-agent-config-api.yaml), S15P21A604-399·507) |
 | C-17 | FastAPI 결과 수신 API의 endpoint·DTO는 무엇인가? | AI + BE | **부분 확정: heartbeat·batch·finalize·failed 의미, `jobId+attemptNo` fencing, batch 상한, 409/410은 확정. 실제 경로·DTO 이름·공통 오류 봉투는 S15P21A604-400에서 합의한 뒤 OpenAPI로 고정한다.** |
 
 ### Session 2026-08-20
@@ -281,7 +281,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 
 | 항목 | 내용 | 완료 |
 |---|---|---|
-| ① Clarification 답변 (C-01~C-17) | C-01~C-09·C-11~C-15 확정. C-10 잔여 운영 수치, C-16 Agent 설정, C-17 결과 API 경로·DTO는 후속 이슈로 분리 | ☑ |
+| ① Clarification 답변 (C-01~C-17) | C-01~C-09·C-11~C-16 확정. C-10 잔여 운영 수치와 C-17 결과 API 경로·DTO는 후속 이슈로 분리 | ☑ |
 | ② 틀렸거나 과한 요구사항 지적 | | ☑ |
 | ③ 빠진 요구사항 추가 | | ☑ |
 

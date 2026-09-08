@@ -5,6 +5,8 @@ Flyway Community 에는 undo 가 없다. 되돌려야 하는 마이그레이션�
 | 파일 | 되돌리는 대상 | 주의 |
 |---|---|---|
 | `V21__rollback.sql` | `V21__ai_document_jobs_and_chunk_staging.sql` | Job·staging 행이 사라진다. 청크의 `job_id` 출처도 함께 없어진다 |
+| `V23__rollback.sql` | `V23__survey_guest_session_expiry.sql` | 게스트 세션 만료 시각이 사라진다. sweeper 가 추정(`submitted_at` + TTL)으로 돌아가 삭제가 늦어지고, TTL 을 줄이면 유효한 토큰의 키를 먼저 지울 수 있다. **응답·답·집계는 그대로다** |
+| `V22__rollback.sql` | `V22__survey_guest_and_rating_scale.sql` | **게스트 설문 응답이 사라진다** — `respondent_user_id SET NOT NULL` 복원이 그 행 때문에 실패하므로 자식부터 지운다. 회원 응답·설문·문항은 남는다. 별점 척도(`rating_min`·`rating_max`)도 함께 없어진다 |
 
 ## 실행 절차
 

@@ -15,6 +15,7 @@ jenkinsfile="${repo_root}/Jenkinsfile"
 integration_compose="${repo_root}/infra/deploy/compose/integration/compose.yaml"
 component_pipeline="${repo_root}/infra/jenkins/pipelines/component.groovy"
 develop_pipeline="${repo_root}/infra/jenkins/pipelines/develop.groovy"
+develop_job="${repo_root}/infra/jenkins/jobs/gitlab-develop-multibranch.groovy"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -87,28 +88,59 @@ assert 'secretToken' not in server
 PY
 pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
-for name in DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID \
-  DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
+for name in DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
+  DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
+  DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
+  grep -q "^[[:space:]]*${name}:.*\${${name}" "${controller_compose}" || fail "controller does not receive ${name}"
 done
-grep -q "file(credentialsId: envCredentialId, variable: 'COMPONENT_ENV_FILE')" "${component_pipeline}" \
-  || fail "dev component pipeline does not bind runtime env file"
-grep -q "string(credentialsId: tokenCredentialId, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')" "${component_pipeline}" \
-  || fail "dev component pipeline does not bind shared AI-to-Spring token"
+grep -q 'final String sourceSha = config.sourceSha as String' "${component_pipeline}" \
+  || fail "component CI does not accept its selected source SHA"
+grep -q 'final String artifactDir = config.artifactDir as String' "${component_pipeline}" \
+  || fail "component CI does not accept its selected artifact path"
+grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
+  || fail "game component CI does not reuse its Unity workspace"
+! grep -q 'deploy-component.sh' "${component_pipeline}" \
+  || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
   || fail "dev game pipeline does not require the connection token Secret file reference"
-grep -q "file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'BACK_ENV_FILE')" "${develop_pipeline}" \
-  || fail "demo pipeline does not bind backend runtime env file"
-grep -q "file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE')" "${develop_pipeline}" \
-  || fail "demo pipeline does not bind AI runtime env file"
-grep -q "string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')" "${develop_pipeline}" \
-  || fail "demo pipeline does not bind shared AI-to-Spring token"
-grep -q "'PUBLIC_UNITY_BUILD_BASE=/unity/'" "${develop_pipeline}" \
-  || fail "demo pipeline does not provide the same-origin Unity WebGL base"
+grep -q 'detect-changed-components.sh' "${develop_pipeline}" \
+  || fail "develop pipeline does not detect the pushed range"
+grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
+  || fail "develop pipeline does not create its selection artifact directory"
+! grep -q 'deploy-release.sh' "${develop_pipeline}" \
+  || fail "Phase 2 develop pipeline must not deploy demo"
+grep -q "branch != 'develop'" "${jenkinsfile}" \
+  || fail "Jenkinsfile accepts non-develop branches"
+! grep -q 'componentBranches' "${jenkinsfile}" \
+  || fail "Jenkinsfile retains legacy component branch dispatch"
+grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
+  || fail "GitLab develop-only multibranch job is missing"
+grep -q 'fingerprint: true' "${component_pipeline}" \
+  || fail "component CI does not fingerprint selected artifacts"
 grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo backend does not use infra profile"
 [[ "$(grep -c 'INTERNAL_AI_TO_SPRING_TOKENS:' "${integration_compose}")" -eq 2 ]] \
   || fail "shared AI-to-Spring token must reach exactly AI and backend"
+[[ "$(grep -c 'INTERNAL_SPRING_TO_AI_TOKENS:' "${integration_compose}")" -eq 2 ]] \
+  || fail "shared Spring-to-AI token must reach exactly AI and backend"
+grep -q 'AI_INTERNAL_BASE_URL: http://ai:8000' "${integration_compose}" || fail "demo backend lacks AI service DNS"
+grep -q 'SPRING_INTERNAL_BASE_URL: http://back:8080' "${integration_compose}" || fail "demo AI lacks backend service DNS"
 pass "runtime credential binding and least-privilege Compose wiring"
+
+stage_summary_dir="$(mktemp -d)"
+CI_ARTIFACT_DIR="${stage_summary_dir}" \
+CI_STAGE_SUMMARY_PATH="${stage_summary_dir}/stage-summaries/validate.json" \
+CI_COMPONENT=ai \
+CI_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 \
+CI_STAGE=validate \
+CI_STAGE_STATUS=SUCCEEDED \
+CI_STARTED_AT=2026-09-09T03:35:42Z \
+CI_FINISHED_AT=2026-09-09T03:35:43Z \
+"${repo_root}/infra/jenkins/scripts/write-stage-summary.sh" >/dev/null
+[[ -f "${stage_summary_dir}/stage-summaries/validate.json" ]] \
+  || fail "stage summary does not create its nested output directory"
+rm -rf "${stage_summary_dir}"
+pass "nested stage summary artifact path"
 
 grep -q 'proxy_pass http://127.0.0.1:8080' "${nginx}" || fail "Nginx does not proxy to loopback Jenkins"
 ! grep -Eq 'listen[[:space:]]+(8080|3000|50000)' "${nginx}" || fail "Nginx publicly listens on a forbidden port"
@@ -134,6 +166,14 @@ export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
 export JENKINS_AGENT_SECRET_UNITY="foundation-unity-agent-value"
 export ROOT_DOMAIN="example.invalid"
+export DEV_BACK_ENV_CREDENTIAL_ID="foundation-dev-back-env"
+export DEV_AI_ENV_CREDENTIAL_ID="foundation-dev-ai-env"
+export DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-dev-spring-to-ai"
+export DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-dev-ai-to-spring"
+export DEMO_BACK_ENV_CREDENTIAL_ID="foundation-demo-back-env"
+export DEMO_AI_ENV_CREDENTIAL_ID="foundation-demo-ai-env"
+export DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-demo-spring-to-ai"
+export DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-ai-to-spring"
 
 if command -v docker >/dev/null 2>&1; then
   runtime_env_dir="$(mktemp -d)"
@@ -148,13 +188,14 @@ if command -v docker >/dev/null 2>&1; then
   export CONNECTION_TOKEN_SECRET_FILE="${runtime_env_dir}/connection-token-secret"
   printf '%s\n' 'Zm91bmRhdGlvbi1vbmx5LWNvbm5lY3Rpb24tdG9rZW4tc2VjcmV0' >"${CONNECTION_TOKEN_SECRET_FILE}"
   export INTERNAL_AI_TO_SPRING_TOKENS=foundation-ai-to-spring-token
+  export INTERNAL_SPRING_TO_AI_TOKENS=foundation-spring-to-ai-token
   for component in ai back front game; do
     docker compose -f "${repo_root}/infra/deploy/compose/dev/${component}.compose.yaml" config --quiet
   done
   docker compose -f "${repo_root}/infra/deploy/compose/dev/back.compose.yaml" config | grep -q 'FESTA_ENVIRONMENT: dev' || fail "dev backend lacks Redis environment namespace"
   docker compose -f "${repo_root}/infra/deploy/compose/dev/ai.compose.yaml" config | grep -q 'FESTA_ENVIRONMENT: dev' || fail "dev FastAPI lacks environment namespace"
   export AI_IMAGE_REF=festa-ai:test BACK_IMAGE_REF=festa-back:test FRONT_IMAGE_REF=festa-front:test GAME_IMAGE_REF=festa-game:test
-  export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
+  export PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
   export BACK_ENV_FILE="${runtime_env_dir}/back.env" AI_ENV_FILE="${runtime_env_dir}/ai.env" FESTA_ENVIRONMENT=demo
   docker compose -f "${integration_compose}" config | grep -c 'FESTA_ENVIRONMENT: demo' | grep -qx '4' || fail "demo Compose lacks four environment namespaces"
   if (unset BACK_ENV_FILE; docker compose -f "${integration_compose}" config --quiet >/dev/null 2>&1); then

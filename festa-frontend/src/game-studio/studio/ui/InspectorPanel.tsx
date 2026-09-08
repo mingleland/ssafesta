@@ -8,9 +8,11 @@ import {
   objectRemovalReason,
   removeComponent,
   removeObject,
+  renameObject,
   renameScene,
   replaceComponent,
   resizeWorldScene,
+  setObjectNameVisible,
   setTopDownBackground,
   setObjectVisible,
 } from '../model/authoringCommands.ts';
@@ -166,6 +168,32 @@ export const InspectorPanel = ({
         <strong>{advanced ? '위치·구성 요소까지 직접 조정합니다' : '모습과 동작만 바꾸면 바로 플레이할 수 있습니다'}</strong>
         <p>{advanced ? 'ID와 좌표, 표시 순서, 구성 요소 추가·삭제를 사용할 수 있습니다.' : '세부 좌표와 기술 설정은 숨겨 두었습니다. 필요할 때만 고급 설정을 여세요.'}</p>
       </div>
+      {/* S15P21A604-529 — PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어
+          캐릭터는 캔버스 툴바/런타임에서 별도로 다룸) 이름을 지어도 보여줄 대상이 없다 —
+          이 프리셋만 이름/표시 설정 UI 자체를 아예 노출하지 않는다. */}
+      {selectedObject.preset !== 'PLAYER_SPAWN' && (
+        <>
+          <CommitInput
+            allowEmpty
+            label="오브젝트 이름"
+            onCommit={(name) => onApply(renameObject(project, scene.id, selectedObject.id, name))}
+            value={selectedObject.name ?? ''}
+          />
+          <label className="gss-check-row">
+            <input
+              checked={selectedObject.showNameInPlay === true}
+              onChange={(event) => onApply(setObjectNameVisible(
+                project,
+                scene.id,
+                selectedObject.id,
+                event.target.checked,
+              ))}
+              type="checkbox"
+            />
+            플레이 중 이름 표시
+          </label>
+        </>
+      )}
       {advanced && <div className="gss-id-chip">오브젝트 ID · {selectedObject.id}</div>}
       {advanced && <div className="gss-field-row">
         <label className="gss-field">
@@ -294,11 +322,26 @@ export const InspectorPanel = ({
             </label>
           )}
           {component.type === 'INTERACTABLE' && (
-            <CommitInput
-              label="상호작용 안내 문구"
-              onCommit={(prompt) => replace({ type: 'INTERACTABLE', prompt })}
-              value={component.prompt}
-            />
+            <>
+              {/* S15P21A604-534 — {...component, prompt}로 합성해야 range를 같이
+                  들고 있는다. {type:'INTERACTABLE', prompt}처럼 새로 만들면 이미
+                  설정해 둔 range가 문구를 고칠 때마다 조용히 사라진다. */}
+              <CommitInput
+                label="상호작용 안내 문구"
+                onCommit={(prompt) => replace({ ...component, prompt })}
+                value={component.prompt}
+              />
+              <label className="gss-field">
+                <span>상호작용 거리</span>
+                <input
+                  max={100}
+                  min={1}
+                  onChange={(event) => replace({ ...component, range: Number(event.target.value) })}
+                  type="number"
+                  value={component.range ?? 1}
+                />
+              </label>
+            </>
           )}
           {component.type === 'PICKUP' && (
             <label className="gss-field">

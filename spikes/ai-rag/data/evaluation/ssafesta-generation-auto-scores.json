@@ -1,0 +1,482 @@
+{
+  "ssafesta-q01": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.8175271309694904,
+      "evidence_sim": 0.8174796559495767,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.8336195702367812,
+      "evidence_sim": 0.8651307707109042,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.8705886974107707,
+      "evidence_sim": 0.8823341318014725,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8619081046541867,
+      "evidence_sim": 0.8723653193631883,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.7608404250774383,
+      "evidence_sim": 0.7817822725713759,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "ssafesta-q02": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.1646637555543499,
+      "evidence_sim": 0.18710804168192413,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7047838333257782,
+      "evidence_sim": 0.6009811602513754,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.7655264321820081,
+      "evidence_sim": 0.591611488751187,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6874056353705779,
+      "evidence_sim": 0.6068953302218638,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.7547687371703825,
+      "evidence_sim": 0.645451663454775,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q03": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.7714530814656247,
+      "evidence_sim": 0.7294277082176969,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6922175062209686,
+      "evidence_sim": 0.7721237429669524,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.6373055617501833,
+      "evidence_sim": 0.613778056981721,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.633912603666421,
+      "evidence_sim": 0.6730087808634895,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.6999143670127518,
+      "evidence_sim": 0.7111400340417953,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q04": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.5979991770475009,
+      "evidence_sim": 0.40673275239012624,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.5057925621335239,
+      "evidence_sim": 0.3625838613152001,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.2483299813064574,
+      "evidence_sim": 0.2861058234431966,
+      "refusal_ok": false,
+      "refusal_reason": "PARTIAL 문항인데 사실상 전면 거절만 함"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6714616617584761,
+      "evidence_sim": 0.6283703295377606,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.2483299813064574,
+      "evidence_sim": 0.2861058234431966,
+      "refusal_ok": false,
+      "refusal_reason": "PARTIAL 문항인데 사실상 전면 거절만 함"
+    }
+  },
+  "ssafesta-q05": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.7159107203678219,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.35979835329643056,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.35979835329643056,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6538668658185431,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.359799510161298,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    }
+  },
+  "ssafesta-q06": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.32269063053102903,
+      "evidence_sim": 0.28127907079003905,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7663161067682338,
+      "evidence_sim": 0.7502244374424617,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.7615119274711893,
+      "evidence_sim": 0.7775199404025106,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8576212348782061,
+      "evidence_sim": 0.7994931083682396,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.8286118511020314,
+      "evidence_sim": 0.7614788738683691,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "ssafesta-q07": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.7431522412410896,
+      "evidence_sim": 0.8260048574884303,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7120165419634206,
+      "evidence_sim": 0.7730066269286422,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.8470001288081306,
+      "evidence_sim": 0.7604472567248418,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.6937557921012025,
+      "evidence_sim": 0.7482021378037766,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.7610484834609624,
+      "evidence_sim": 0.756063269140576,
+      "refusal_ok": true,
+      "refusal_reason": "PARTIAL 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "ssafesta-q08": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.32262656962204667,
+      "evidence_sim": 0.2636751050486916,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6269297304274833,
+      "evidence_sim": 0.7238419569983948,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.6412805742216988,
+      "evidence_sim": 0.6674735954961926,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5157393148559262,
+      "evidence_sim": 0.8120594251690296,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.6096258039728255,
+      "evidence_sim": 0.5813043239402241,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    }
+  },
+  "ssafesta-q09": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.7125944416338104,
+      "evidence_sim": 0.7122928987684016,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.7069853075427585,
+      "evidence_sim": 0.7928034822813496,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.6609939840737707,
+      "evidence_sim": 0.6144411126638786,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7336724830976517,
+      "evidence_sim": 0.6519965543661521,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.6204085283255953,
+      "evidence_sim": 0.6804631893797953,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q10": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.7258146293921476,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6077199302566544,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.6270494574432864,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.5871022346902581,
+      "evidence_sim": null,
+      "refusal_ok": false,
+      "refusal_reason": "NO_ANSWER 문항인데 거절 없이 답변 — 근거 없는 단정 위험"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.3633758369951525,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    }
+  },
+  "ssafesta-q11": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.565978907974895,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.6281679433007766,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.3410075898774989,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.3410075898774989,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.5538919573307524,
+      "evidence_sim": null,
+      "refusal_ok": true,
+      "refusal_reason": "NO_ANSWER 문항에서 거절 문구 확인"
+    }
+  },
+  "ssafesta-q12": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.8413609501079566,
+      "evidence_sim": 0.7879477869818401,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.9316516696131051,
+      "evidence_sim": 0.8588624091009461,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.8654456197376112,
+      "evidence_sim": 0.7969593217324911,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7817576822872003,
+      "evidence_sim": 0.7382583710393694,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.8517357288932204,
+      "evidence_sim": 0.8341443882667507,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q13": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.17679644349202953,
+      "evidence_sim": 0.14165606527222327,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.77764692389144,
+      "evidence_sim": 0.7155955921920296,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.7865311293455403,
+      "evidence_sim": 0.7570808111893657,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.7842128911107935,
+      "evidence_sim": 0.7065723280467455,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.7324072319553828,
+      "evidence_sim": 0.67726446197272,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q14": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.762645786375239,
+      "evidence_sim": 0.7373492984956658,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.8021651434777429,
+      "evidence_sim": 0.7204074354483111,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.8153640321967215,
+      "evidence_sim": 0.7362500429273063,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.8621253396499006,
+      "evidence_sim": 0.7692315092194494,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.813565622383846,
+      "evidence_sim": 0.7777373174708877,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    }
+  },
+  "ssafesta-q15": {
+    "gpt-4.1-nano": {
+      "gold_sim": 0.2591873775680773,
+      "evidence_sim": 0.4075850027141247,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gemini-2.5-flash-lite": {
+      "gold_sim": 0.5548400415867328,
+      "evidence_sim": 0.6624171654376202,
+      "refusal_ok": true,
+      "refusal_reason": "ANSWERABLE 문항 — 거절 문구 동반하되 실질 답변도 포함"
+    },
+    "gpt-4o-mini": {
+      "gold_sim": 0.5594800511380948,
+      "evidence_sim": 0.6721484222462438,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-4.1-mini": {
+      "gold_sim": 0.468286725148418,
+      "evidence_sim": 0.6372256479664135,
+      "refusal_ok": true,
+      "refusal_reason": "거절 문구 없이 답변 시도 — 정상"
+    },
+    "gpt-5.4-nano": {
+      "gold_sim": 0.27329982142104237,
+      "evidence_sim": 0.28135257309620315,
+      "refusal_ok": false,
+      "refusal_reason": "ANSWERABLE 문항인데 사실상 전면 거절만 함"
+    }
+  }
+}

@@ -8,6 +8,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest, LLMToken
@@ -86,6 +90,12 @@ class _ConversationRepository:
 
     async def save(self, conversation: Conversation) -> None:
         self.saved.append(conversation)
+
+    async def commit_turn(self, conversation: Conversation) -> bool:
+        if self._conversation is None:
+            return False
+        self.saved.append(conversation)
+        return True
 
 
 class _RagContextService:
@@ -229,6 +239,44 @@ async def test_context_build_failure_emits_single_error_event_and_no_commit() ->
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("code", ["AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"])
+async def test_agent_config_denial_emits_non_retryable_sanitized_error(code: str) -> None:
+    rag = _RagContextService(error=AgentConfigDenied(code))
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == code
+    assert events[-1]["retryable"] is False
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_agent_config_failure_emits_retryable_sanitized_error() -> None:
+    rag = _RagContextService(
+        error=SpringAgentConfigUnavailable("upstream-secret-prompt")
+    )
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == "AGENT_CONFIG_UNAVAILABLE"
+    assert events[-1]["retryable"] is True
+    assert "upstream-secret-prompt" not in events[-1]["message"]
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
 async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -> None:
     rag = _RagContextService(result=_context_result())
     llm = FakeLLMProvider(
@@ -246,6 +294,43 @@ async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -
     assert events[-1]["code"] == "LLM_TIMEOUT"
     assert events[-1]["retryable"] is True
     assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_retry_after_failure_issues_new_request_id_and_commits_only_retry() -> None:
+    """FR-029: 실패 후 재시도는 conversationId를 유지하고 새 requestId를 발급하며,
+    done에 도달하지 못한 첫 시도는 대화 이력에 저장되지 않는다."""
+    conversation = _conversation()
+    failing_llm = FakeLLMProvider(
+        tokens=("일부",), raise_after=ManagedLLMError("LLM_TIMEOUT", retryable=True)
+    )
+    service, repository = _service(
+        conversation=conversation,
+        rag=_RagContextService(result=_context_result()),
+        llm=failing_llm,
+    )
+
+    failed_events = _events(
+        [event async for event in service.stream(conversation=conversation, question="질문")]
+    )
+    assert [event["type"] for event in failed_events] == ["start", "token", "error"]
+    assert repository.saved == []
+
+    succeeding_llm = FakeLLMProvider(tokens=("안녕",))
+    service._llm_provider = succeeding_llm
+    retry_events = _events(
+        [event async for event in service.stream(conversation=conversation, question="질문")]
+    )
+
+    assert [event["type"] for event in retry_events] == ["start", "token", "done"]
+    failed_request_id = failed_events[0]["requestId"]
+    retry_request_id = retry_events[0]["requestId"]
+    assert retry_request_id != failed_request_id
+    assert {event["conversationId"] for event in failed_events + retry_events} == {
+        conversation.conversation_id
+    }
+    assert len(repository.saved) == 1
+    assert repository.saved[0].turns[-1].request_id == retry_request_id
 
 
 @pytest.mark.asyncio

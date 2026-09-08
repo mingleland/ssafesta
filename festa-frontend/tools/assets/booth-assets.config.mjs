@@ -36,7 +36,7 @@ export const UNITY_PREFAB_ROOT = '../festa-unity/Assets/_Project/Prefabs/Booth';
 /** @type {BoothAssetSource[]} */
 export const BOOTH_ASSETS = [
   {
-    assetCode: 'DECORATION_DEFAULT',
+    assetCode: 'DISP_BOX_01',
     objectType: 'DECORATION',
     kind: 'fbx',
     fbx: 'Stands/DisplayBox01.FBX',
@@ -51,7 +51,7 @@ export const BOOTH_ASSETS = [
     note: '계약 AABB 와 1:1 로 대조 가능 — 파이프라인 정확도의 기준점',
   },
   {
-    assetCode: 'FURNITURE_CHAIR01',
+    assetCode: 'FURN_CHAIR_01_WHITE',
     objectType: 'FURNITURE',
     kind: 'fbx',
     fbx: 'Furniture/Chair01.FBX',
@@ -68,7 +68,7 @@ export const BOOTH_ASSETS = [
     note: '의자 단품 — 타입 기본(조립체)과 다른 assetCode 라 계약 AABB 보다 작은 것이 정상',
   },
   {
-    assetCode: 'SURVEY_KIOSK_DEFAULT',
+    assetCode: 'BOOTH_KIOSK_SURVEY',
     objectType: 'SURVEY_KIOSK',
     kind: 'prefab',
     prefab: 'SurveyKiosk.prefab',
@@ -85,7 +85,7 @@ export const BOOTH_ASSETS = [
     note: 'Unity prefab 계층(중첩 포함)을 FE 에서 재현할 수 있는지 보는 대표',
   },
   {
-    assetCode: 'FURNITURE_CHAIR02_WHITE',
+    assetCode: 'FURN_CHAIR_02_WHITE',
     objectType: 'FURNITURE',
     kind: 'fbx',
     fbx: 'Furniture/Chair02b.FBX',

@@ -20,6 +20,8 @@ Jenkins에 아래 ID를 등록하고 `infra/.env`에는 ID만 적는다.
 
 | ID 변수 | Jenkins 종류 | 내용 |
 |---|---|---|
+| `DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID` | Secret text | dev Spring→FastAPI 토큰 1~2개 |
+| `DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID` | Secret text | demo Spring→FastAPI 토큰 1~2개 |
 | `DEV_BACK_ENV_CREDENTIAL_ID` | Secret file | dev Spring 전용 dotenv |
 | `DEV_AI_ENV_CREDENTIAL_ID` | Secret file | dev FastAPI 전용 dotenv |
 | `DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID` | Secret text | dev FastAPI→Spring 토큰 1~2개 |

@@ -65,7 +65,7 @@ public class AiDocumentController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "발급 성공(`duplicate: false`, `uploadUrl` 있음) 또는 중복(`duplicate: true`, `uploadUrl` 없음)"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 파일 이름·MIME·크기·해시 형식 위반. 허용 형식과 상한을 넘은 경우도 여기다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다"),
             @ApiResponse(responseCode = "409", description = "`DOCUMENT_LIMIT_EXCEEDED`(문서 수·총량 상한 초과) 또는 `BOOTH_LEASE_EXPIRED`"),
             @ApiResponse(responseCode = "503", description = "`STORAGE_UNAVAILABLE` — 저장소를 쓸 수 없다. 잠시 뒤 다시 시도한다")})
@@ -97,7 +97,7 @@ public class AiDocumentController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "완료 처리됨. `processingStatus: QUEUED`"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`DOCUMENT_NOT_FOUND` — 그런 문서가 없다. 권한 검사보다 먼저 판정된다"),
             @ApiResponse(responseCode = "409", description = "`DOCUMENT_UPLOAD_INCOMPLETE` — 객체가 없거나 선언한 크기와 다르다. 또는 완료할 수 있는 상태가 아니다"),
             @ApiResponse(responseCode = "410", description = "`DOCUMENT_UPLOAD_GONE` — 업로드 유효 시간이 지났다. 1단계부터 다시 한다"),

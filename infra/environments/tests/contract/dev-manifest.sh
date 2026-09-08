@@ -27,13 +27,19 @@ if manifest["deploymentTargetIds"] != expected_targets:
 services = manifest["runtimeServices"]
 if {service["serviceId"] for service in services} != set(expected_targets.values()):
     raise SystemExit("dev manifest must declare exactly one runtime service per target")
-for field in ("serviceId", "networkRefs", "persistentVolumeRefs"):
+for field in ("serviceId", "persistentVolumeRefs"):
     values = []
     for service in services:
         value = service[field]
         values.extend(value if isinstance(value, list) else [value])
     if len(values) != len(set(values)):
         raise SystemExit(f"dev {field} values must be unique")
+
+networks = {service["serviceId"]: service["networkRefs"] for service in services}
+if networks["dev-ai"] != ["festa-dev-ai-back-private"] or networks["dev-back"] != ["festa-dev-ai-back-private"]:
+    raise SystemExit("dev AI and backend must share only the scoped AI-back network")
+if networks["dev-front"] != ["festa-dev-front-private"] or networks["dev-game"] != ["festa-dev-game-private"]:
+    raise SystemExit("dev front and game must keep component-scoped networks")
 
 release_ref = manifest["releaseManifestRef"]
 if not release_ref.startswith("infra/deploy/state/runtime/") or "${RELEASE_ID}" not in release_ref:

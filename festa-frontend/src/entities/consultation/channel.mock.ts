@@ -24,8 +24,12 @@ const QUEUE_FIXTURE: ConsultationRequestCard[] = [
 let queue: ConsultationRequestCard[] = [...QUEUE_FIXTURE];
 let active: ConsultationActiveSession | null = null;
 
+/** 마지막 요청이 실은 conversationId — 테스트가 "요약 재료가 서버로 갔는가" 를 본다 */
+let lastRequestedConversationId: string | undefined;
+
 export const consultationVisitorMock: ConsultationChannelPort = {
-  async requestConsultation(_boothId: number) {
+  async requestConsultation(_boothId: number, conversationId?: string) {
+    lastRequestedConversationId = conversationId;
     return { expiresInSeconds: CONSULTATION_EXPIRY_SECONDS };
   },
   async cancelRequest() {},
@@ -56,8 +60,13 @@ export function __simulateVisitorEvent(event: VisitorChannelEvent): void {
   for (const cb of visitorListeners) cb(event);
 }
 
+export function __lastRequestedConversationId(): string | undefined {
+  return lastRequestedConversationId;
+}
+
 export function __resetConsultationMockForTests(): void {
   visitorListeners = new Set();
+  lastRequestedConversationId = undefined;
   queue = [...QUEUE_FIXTURE];
   active = null;
 }

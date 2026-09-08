@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from app.api.dependencies.internal_auth import require_spring_service_token
 from app.api.errors import ApiError
 from app.api.schemas.documents import ErrorResponse, ProcessDocumentRequest
+from app.clients.spring_booth_access import SpringBoothAccessClient
 from app.clients.spring_document_result import SpringDocumentResultClient
 from app.providers.document_parser import DefaultDocumentParser
 from app.providers.embedding import EmbeddingProvider
@@ -48,6 +49,12 @@ def build_document_processing_orchestrator(
         timeout_seconds=settings.spring_document_result_timeout_seconds,
         client=spring_http_client,
     )
+    booth_access_client = SpringBoothAccessClient(
+        base_url=settings.spring_internal_base_url,
+        service_token=settings.internal_ai_to_spring_tokens[0],
+        timeout_seconds=settings.spring_booth_access_timeout_seconds,
+        client=spring_http_client,
+    )
     embedding_service = DocumentEmbeddingService(
         storage_factory=lambda provider: create_object_storage(settings, provider),
         parser=DefaultDocumentParser(),
@@ -60,6 +67,7 @@ def build_document_processing_orchestrator(
     return DocumentProcessingOrchestrator(
         embedding_service=embedding_service,
         result_client=result_client,
+        booth_access_client=booth_access_client,
         heartbeat_interval_seconds=settings.job_heartbeat_seconds,
     )
 
