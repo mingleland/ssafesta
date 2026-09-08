@@ -56,6 +56,21 @@ describe('loadSurveyResult', () => {
     await loadSurveyResult(MOCK_BOOTH_NORMAL);
     expect(getSurveyResultSnapshot().totalResponses).toBeGreaterThan(0);
   });
+
+  // spec 010 US2 시나리오 1 — 응답 수와 함께 최초·최근 응답 시각이 보여야 한다
+  it('최초·최근 응답 시각이 ISO 원형으로 상태에 실린다 — 포맷은 화면이 한다', async () => {
+    await loadSurveyResult(MOCK_BOOTH_NORMAL);
+    const s = getSurveyResultSnapshot();
+    expect(s.firstRespondedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(s.lastRespondedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('응답 0건이면 두 시각이 null 이다 — 상태에서 문자열로 치환하지 않는다', async () => {
+    await loadSurveyResult(MOCK_BOOTH_EMPTY);
+    const s = getSurveyResultSnapshot();
+    expect(s.firstRespondedAt).toBeNull();
+    expect(s.lastRespondedAt).toBeNull();
+  });
 });
 
 describe('loadNextTextPage (-194)', () => {
@@ -63,6 +78,8 @@ describe('loadNextTextPage (-194)', () => {
     await loadSurveyResult(MOCK_BOOTH_NORMAL);
     await loadNextTextPage();
     expect(getSurveyResultSnapshot().textAnswers.items).toHaveLength(10);
+    // 누적하면서 questionId 를 잃지 않는다 — 텍스트 문항이 둘 이상이면 이게 답의 소속이다
+    expect(new Set(getSurveyResultSnapshot().textAnswers.items.map((a) => a.questionId)).size).toBe(2);
     await loadNextTextPage();
     const s = getSurveyResultSnapshot();
     expect(s.textAnswers.items).toHaveLength(12);

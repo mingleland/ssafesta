@@ -19,8 +19,10 @@ import {
 } from '../../builder';
 import {
   MOCK_BOOTH_NEW,
+  MOCK_BOOTH_NORMAL,
   __resetSurveyMockForTests,
   __savedDraftForTests,
+  surveyMockPort,
 } from '../../../../../entities/survey/api.mock';
 
 beforeEach(() => {
@@ -141,5 +143,42 @@ describe('save', () => {
     expect(s.save.phase).toBe('error');
     expect(s.draft.title).toBe('FAIL');
     expect(s.dirty).toBe(true);
+  });
+});
+
+// 저장 중 부스를 옮기면 이전 부스의 늦은 응답이 새 부스 상태를 건드렸다 (GitLab #133, 2026-09-08 BE 지적).
+// loadSurveyBuilder 에는 가드가 있었는데 저장 경로에만 빠져 있었다.
+//
+// mock 의 saveDraft 는 즉시 resolve 해서 그냥 두면 순서가 재현되지 않는다 — 응답을 손으로 붙잡아
+// **부스를 옮긴 뒤에** 도착하게 만들어야 결함이 드러난다.
+describe('저장 늦은 응답 가드', () => {
+  it('저장 중 부스를 옮기면 이전 부스의 늦은 응답이 새 부스 상태를 건드리지 않는다', async () => {
+    const original = surveyMockPort.saveDraft;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    surveyMockPort.saveDraft = () => held;
+
+    try {
+      await loadSurveyBuilder(MOCK_BOOTH_NEW);
+      updateTitle('부스 A 설문');
+      addQuestion('short_text');
+      updateQuestion(getSurveyBuilderSnapshot().draft.questions[0].id, { prompt: '한마디' });
+
+      const saving = saveSurveyBuilder(); // 부스 A 저장 시작 — 응답은 붙잡혀 있다
+      await loadSurveyBuilder(MOCK_BOOTH_NORMAL); // 그 사이 부스를 옮긴다
+      expect(getSurveyBuilderSnapshot().save.phase).toBe('idle');
+
+      release(); // 이제서야 부스 A 의 성공 응답이 도착한다
+      await saving;
+
+      const s = getSurveyBuilderSnapshot();
+      expect(s.boothId).toBe(MOCK_BOOTH_NORMAL);
+      // 가드가 없으면 여기서 'success' 가 되고, 새 부스에 dirty 가 있었다면 그것도 함께 꺼진다
+      expect(s.save.phase).toBe('idle');
+    } finally {
+      surveyMockPort.saveDraft = original;
+    }
   });
 });
