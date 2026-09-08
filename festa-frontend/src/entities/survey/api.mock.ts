@@ -29,6 +29,11 @@ export const MOCK_BOOTH_SUBMIT_FAIL = 5;
 export const MOCK_BOOTH_RESULT_FAIL = 6;
 /** 보상이 걸린 설문 — 게스트 차단 안내 확인용 */
 export const MOCK_BOOTH_REWARDED = 7;
+/**
+ * 마감 + 보상이 함께 걸린 설문. 둘이 겹쳐야 드러나는 자리가 있다 —
+ * 마감인데 "참여하면 N 코인을 받습니다" 가 남는 결함(S15P21A604-541 F-3)이 그것이다.
+ */
+export const MOCK_BOOTH_CLOSED_REWARDED = 8;
 
 /** 부스마다 surveyId 를 하나씩 준다 — 실 서버처럼 run 응답이 id 를 알려주는 흐름을 흉내낸다 */
 const surveyIdOf = (boothId: number): number => 1000 + boothId;
@@ -46,11 +51,12 @@ let savedDraft: { boothId: number; draft: SurveyDraftVM } | null = null;
 export const surveyMockPort: SurveyPort = {
   async getRun(boothId: number): Promise<SurveyRunSnapshot> {
     const surveyId = surveyIdOf(boothId);
-    const rewardCoin = boothId === MOCK_BOOTH_REWARDED ? MOCK_REWARD_COIN : 0;
+    const rewardCoin =
+      boothId === MOCK_BOOTH_REWARDED || boothId === MOCK_BOOTH_CLOSED_REWARDED ? MOCK_REWARD_COIN : 0;
     if (boothId === MOCK_BOOTH_EMPTY || boothId === MOCK_BOOTH_NEW) {
       return { surveyId, status: 'open', rewardCoin, questions: [] };
     }
-    if (boothId === MOCK_BOOTH_CLOSED) {
+    if (boothId === MOCK_BOOTH_CLOSED || boothId === MOCK_BOOTH_CLOSED_REWARDED) {
       return { surveyId, status: 'closed', rewardCoin, questions: RUN_QUESTIONS };
     }
     return { surveyId, status: 'open', rewardCoin, questions: RUN_QUESTIONS };

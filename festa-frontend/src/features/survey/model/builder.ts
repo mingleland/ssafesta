@@ -1,6 +1,7 @@
 // Survey Builder 상태 기계 (S15P21A604-369) — 문항 편집·검증·저장. UI editor 는 UI Track 소유.
 // validation 은 FE 규칙으로 시작한다 — BE 검증(-190) 확정 시 Mapper 에서 정렬(FE 규칙은 상위 집합 유지).
 import { useSyncExternalStore } from 'react';
+import { isApiError } from '../../../shared/api/client';
 import { surveyApi } from '../../../entities/survey/api.select';
 import type {
   SurveyBuilderIssueVM,
@@ -15,7 +16,13 @@ export interface SurveyBuilderState {
   boothId: number | null;
   draft: SurveyDraftVM;
   dirty: boolean;
-  save: { phase: 'idle' | 'submitting' | 'success' | 'error' };
+  /**
+   * errorMessage 는 **서버가 준 사용자용 문장**이다 (`docs/08` §1.3-1). 화면이 그대로 쓴다 —
+   * 버리면 `409 SURVEY_LOCKED`("응답이 있는 설문은 문항을 바꿀 수 없습니다")가 "저장하지
+   * 못했습니다" 로 뭉개져 사용자가 사유를 알 수 없다 (S15P21A604-541).
+   * `null` 이면 서버 문장이 없다는 뜻이고 그때만 화면이 일반 문구를 쓴다.
+   */
+  save: { phase: 'idle' | 'submitting' | 'success' | 'error'; errorMessage: string | null };
 }
 
 const EMPTY_DRAFT: SurveyDraftVM = { title: '', questions: [] };
@@ -25,7 +32,7 @@ const initialState: SurveyBuilderState = {
   boothId: null,
   draft: EMPTY_DRAFT,
   dirty: false,
-  save: { phase: 'idle' },
+  save: { phase: 'idle', errorMessage: null },
 };
 
 let state: SurveyBuilderState = initialState;
@@ -45,7 +52,7 @@ function editDraft(mutate: (draft: SurveyDraftVM) => SurveyDraftVM): void {
   if (state.status !== 'ready') return;
   // 저장 중 편집은 save.phase 리셋으로 이중 저장 가드를 해제한다 (-377 공통 패턴) — 차단
   if (state.save.phase === 'submitting') return;
-  setState({ draft: mutate(state.draft), dirty: true, save: { phase: 'idle' } });
+  setState({ draft: mutate(state.draft), dirty: true, save: { phase: 'idle', errorMessage: null } });
 }
 
 function subscribe(listener: () => void): () => void {
@@ -153,14 +160,14 @@ export async function saveSurveyBuilder(): Promise<void> {
   // 이전 부스의 늦은 응답이 **새 부스의 dirty 를 해제**해 미저장 변경이 사라진다
   // (GitLab #133, 2026-09-08 BE 지적). run.ts 의 submitSurveyRun 과 같은 모양이다
   const boothId = state.boothId;
-  setState({ save: { phase: 'submitting' } });
+  setState({ save: { phase: 'submitting', errorMessage: null } });
   try {
     await surveyApi.saveDraft(boothId, state.draft);
     if (state.boothId !== boothId) return;
-    setState({ dirty: false, save: { phase: 'success' } });
-  } catch {
+    setState({ dirty: false, save: { phase: 'success', errorMessage: null } });
+  } catch (error) {
     if (state.boothId !== boothId) return;
-    setState({ save: { phase: 'error' } });
+    setState({ save: { phase: 'error', errorMessage: isApiError(error) ? error.message : null } });
   }
 }
 
