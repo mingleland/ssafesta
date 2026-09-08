@@ -94,7 +94,7 @@
     {
       "objectId": "chair-1",
       "type": "FURNITURE",
-      "assetCode": "FURNITURE_DEFAULT",
+      "assetCode": "FURN_CHAIR_01_BLUE",
       "position": {
         "x": 0,
         "y": 0,
@@ -106,7 +106,7 @@
     {
       "objectId": "plant-1",
       "type": "DECORATION",
-      "assetCode": "DECORATION_DEFAULT",
+      "assetCode": "STRUCT_PANEL_01",
       "position": {
         "x": 3,
         "y": 0,
