@@ -98,6 +98,8 @@ grep -q 'final String sourceSha = config.sourceSha as String' "${component_pipel
   || fail "component CI does not accept its selected source SHA"
 grep -q 'final String artifactDir = config.artifactDir as String' "${component_pipeline}" \
   || fail "component CI does not accept its selected artifact path"
+grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
+  || fail "game component CI does not reuse its Unity workspace"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
   || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
