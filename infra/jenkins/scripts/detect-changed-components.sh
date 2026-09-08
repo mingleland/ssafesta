@@ -22,7 +22,7 @@ branch="${branch#origin/}"
 [[ "${branch}" == develop ]] || { echo "only develop pushes are supported" >&2; exit 64; }
 [[ "${head}" =~ ^[0-9a-f]{40}$ ]] || { echo "head must be a full lowercase SHA" >&2; exit 64; }
 
-if [[ -z "${base}" ]]; then
+if [[ -z "${base}" || "${base}" == "${head}" ]]; then
   base="$(git rev-parse "${head}^1" 2>/dev/null || true)"
   [[ -n "${base}" ]] || { echo "base SHA is required for a root commit" >&2; exit 64; }
 fi

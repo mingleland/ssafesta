@@ -63,6 +63,9 @@ head="$(git rev-parse HEAD)"
 output="$(BRANCH_NAME=develop "${detector}" --head "${head}")"
 assert_selection "${output}" '[]' '[]' docs-only
 
+output="$(BRANCH_NAME=develop "${detector}" --base "${head}" --head "${head}")"
+assert_selection "${output}" '[]' '[]' docs-only
+
 base="$(git rev-parse HEAD)"
 commit_paths infra/environments/compose/dev/unknown.yaml
 head="$(git rev-parse HEAD)"
