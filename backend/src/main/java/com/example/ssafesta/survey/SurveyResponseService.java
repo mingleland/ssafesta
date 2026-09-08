@@ -79,10 +79,16 @@ public class SurveyResponseService {
      * earned it to commit together; {@code WalletService} propagates {@code REQUIRED} throughout, so
      * it joins this one rather than opening its own.
      *
-     * <p><b>Booth first, wallet second — do not swap these.</b> Every path that touches both takes
-     * them in this order: {@code BoothLeaseService.lease} updates the booth row and then charges,
-     * and this method locks the booth and then credits. Nothing takes the wallet first, so there is
-     * no cycle to deadlock on; moving the payout above the booth lock would create one.
+     * <p><b>Wallet first, booth second — that order is set elsewhere and this method follows it.</b>
+     * {@code BoothLeaseService.lease} and {@code InventoryService} both call
+     * {@code WalletService.lockOwner} before they touch anything else, and the lease then writes the
+     * booth row. Taking the booth first here would close the cycle: a member leasing a slot holds
+     * their wallet and waits for their booth while this transaction holds that booth and waits for
+     * the same wallet. PostgreSQL breaks the tie by killing one of them.
+     *
+     * <p>The wallet is locked for <b>every</b> member, not only when a reward is due, because
+     * whether one is due is only known after the booth lock — and reaching for the wallet at that
+     * point is the inversion this avoids. Guests have no wallet and skip it (헌법 12조).
      *
      * <p><b>The survey is read after the booth lock, not before.</b> An editor may change
      * {@code rewardCoin} and {@code closesAt} even once responses exist (C-08), and it holds the
@@ -95,6 +101,10 @@ public class SurveyResponseService {
         Long boothId = surveys.findBoothIdById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
         accessGuard.requireVisitorVisible(boothId);
+        // 지갑 먼저, 부스 나중 — 임대·구매가 정한 순서다(javadoc). 뒤집으면 교착이 생긴다.
+        if (respondent.isMember()) {
+            wallets.lockOwner(respondent.userId());
+        }
         // 편집이 문항을 바꾸는 동안 답을 넣으면 survey_answers.question_id FK 에 걸린다.
         // 공유 락이라 응답자끼리는 줄 서지 않는다.
         booths.findWithSharedLockById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));

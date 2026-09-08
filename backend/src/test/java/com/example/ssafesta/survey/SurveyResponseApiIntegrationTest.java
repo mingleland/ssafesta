@@ -67,6 +67,7 @@ class SurveyResponseApiIntegrationTest {
     @Autowired private AccessTokenService accessTokens;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private SurveyGuestKeySweeper guestKeySweeper;
 
     @BeforeEach
     void freeSlots() {
@@ -336,6 +337,63 @@ class SurveyResponseApiIntegrationTest {
                         .formatted(s.q(0), s.o(0, 0), s.q(1), s.o(1, 0), s.q(2), s.q(4),
                                 "나".repeat(2_000))))
                 .andExpect(status().isCreated());
+    }
+
+    /**
+     * 게스트 세션이 끝나면 그 식별자가 응답에서 사라진다 (헌법 12조).
+     *
+     * <p>지우는 것은 식별자 한 칸뿐이고 답은 남는다 — 응답은 그것을 수집한 부스의 것이라,
+     * 방문자 세션이 끝났다고 운영자의 결과가 사라지면 안 된다.
+     *
+     * <p>세션 수명({@code app.auth.access-token-ttl})이 지난 것으로 만들기 위해 제출 시각을
+     * 뒤로 민다. 스케줄러를 기다리지 않고 같은 메서드를 직접 부른다.
+     */
+    @Test
+    void anExpiredGuestSessionLosesItsKeyButKeepsItsAnswers() throws Exception {
+        Survey s = survey("게스트만료", 0);
+        mockMvc.perform(submit(s, guestBearer(), """
+                        {"answers":[
+                          {"questionId":%d,"selectedOptionIds":[%d]},
+                          {"questionId":%d,"selectedOptionIds":[%d]},
+                          {"questionId":%d,"rating":5},
+                          {"questionId":%d,"text":"게스트 의견"}]}"""
+                        .formatted(s.q(0), s.o(0, 0), s.q(1), s.o(1, 0), s.q(2), s.q(4))))
+                .andExpect(status().isCreated());
+        String key = jdbc.queryForObject(
+                "SELECT respondent_guest_key FROM survey_responses WHERE survey_id = ?", String.class, s.id);
+        assertThat(key).startsWith("guest:");
+
+        jdbc.update("UPDATE survey_responses SET submitted_at = now() - interval '2 hours' "
+                + "WHERE survey_id = ?", s.id);
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        Long responseId = jdbc.queryForObject(
+                "SELECT id FROM survey_responses WHERE survey_id = ?", Long.class, s.id);
+        assertThat(jdbc.queryForObject(
+                "SELECT respondent_guest_key FROM survey_responses WHERE id = ?", String.class, responseId))
+                .as("접속 토큰 주체가 남아 있으면 안 됩니다 (헌법 12조).")
+                .isEqualTo("expired:" + responseId);
+        assertThat(answerCount(s.id)).as("답은 그대로여야 합니다 — 부스가 수집한 데이터입니다.")
+                .isEqualTo(4);
+        assertThat(selectedOptionCount(s.id)).isEqualTo(2);
+    }
+
+    /** 아직 살아 있는 세션의 식별자는 건드리지 않는다 — 그동안은 1인 1응답이 그것으로 성립한다. */
+    @Test
+    void aLiveGuestSessionKeepsItsKey() throws Exception {
+        Survey s = survey("게스트유효", 0);
+        mockMvc.perform(submit(s, guestBearer(), """
+                        {"answers":[{"questionId":%d,"selectedOptionIds":[%d]},
+                                    {"questionId":%d,"selectedOptionIds":[%d]},
+                                    {"questionId":%d,"rating":3}]}"""
+                        .formatted(s.q(0), s.o(0, 0), s.q(1), s.o(1, 0), s.q(2))))
+                .andExpect(status().isCreated());
+
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(jdbc.queryForObject(
+                "SELECT respondent_guest_key FROM survey_responses WHERE survey_id = ?", String.class, s.id))
+                .as("세션이 살아 있는 동안은 그대로 둬야 합니다.").startsWith("guest:");
     }
 
     // ── 픽스처 ──────────────────────────────────────────────────────────────

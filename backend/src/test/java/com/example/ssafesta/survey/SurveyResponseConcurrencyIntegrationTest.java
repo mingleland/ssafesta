@@ -190,6 +190,53 @@ class SurveyResponseConcurrencyIntegrationTest {
         }
     }
 
+
+    /**
+     * 임대와 제출이 겹쳐도 교착이 나지 않아야 한다 — 두 트랜잭션이 지갑과 부스를 같은 순서로
+     * 잡을 때만 성립한다.
+     *
+     * <p>{@code BoothLeaseService.lease} 와 {@code InventoryService} 는 무엇을 하기도 전에
+     * {@code wallets.lockOwner} 를 부르고, 임대는 그 뒤에 부스 행을 쓴다. 즉 저장소의 순서는
+     * <b>지갑 → 부스</b>다. 제출이 부스를 먼저 잡으면 사이클이 닫힌다: 임대는 지갑을 쥔 채 부스를
+     * 기다리고, 제출은 그 부스를 쥔 채 같은 지갑을 기다린다. PostgreSQL 이 둘 중 하나를 죽인다.
+     *
+     * <p>여기서는 임대 트랜잭션을 손으로 흉내 낸다 — 지갑 락을 잡고, 래치를 열어 제출을 출발시킨
+     * 뒤, 부스 행을 쓴다. 제출이 부스를 먼저 잡던 시절에는 이 지점에서 교착이 났다.
+     */
+    @RepeatedTest(REPEATS)
+    void aLeaseAndASubmissionDoNotDeadlock() throws Exception {
+        Fixture fixture = fixture("교착");
+        CountDownLatch walletLocked = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> lease = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+                wallets.lockOwner(fixture.ownerId());
+                walletLocked.countDown();
+                sleepQuietly(300);
+                // 임대가 booth.attachSlot 으로 하는 것과 같은 것 — 부스 행에 배타 락이 걸린다.
+                jdbc.update("UPDATE booths SET name = name WHERE id = ?", fixture.boothId());
+                return null;
+            }));
+
+            Future<Integer> submitter = pool.submit(() -> {
+                walletLocked.await();
+                return submissions.submit(fixture.surveyId(),
+                        SurveyResponseService.Respondent.member(fixture.ownerId()),
+                        answer(fixture.questionId())).rewardedCoin();
+            });
+
+            lease.get(30, TimeUnit.SECONDS);
+            assertEquals(REWARD_COIN, submitter.get(30, TimeUnit.SECONDS),
+                    "제출은 교착 없이 끝나고 보상을 지급해야 합니다.");
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(1, responseCount(fixture.surveyId()));
+        assertBalanceMatchesLedger(fixture.ownerId());
+    }
+
     // ── 픽스처 ──────────────────────────────────────────────────────────────
 
     private SurveyResponseService.SubmitCommand answer(Long questionId) {
