@@ -77,7 +77,7 @@ const quat = (body, key) => {
   return m === null ? { x: 0, y: 0, z: 0, w: 1 } : { x: Number(m[1]), y: Number(m[2]), z: Number(m[3]), w: Number(m[4]) };
 };
 const ref = (body, key) => {
-  const m = new RegExp(`${key}: \\{fileID: (\\d+)(?:, guid: ([0-9a-f]{32}))?`).exec(body);
+  const m = new RegExp(`${key}: \\{fileID: (-?\\d+)(?:, guid: ([0-9a-f]{32}))?`).exec(body);
   return m === null ? null : { fileID: m[1], guid: m[2] ?? null };
 };
 const scalar = (body, key) => {
@@ -85,9 +85,9 @@ const scalar = (body, key) => {
   return m === null ? null : m[1].trim();
 };
 const fileIdList = (body, key) => {
-  const m = new RegExp(`${key}:\\r?\\n((?:\\s*- \\{fileID: \\d+\\}\\r?\\n)*)`).exec(body);
+  const m = new RegExp(`${key}:\\r?\\n((?:\\s*- \\{fileID: -?\\d+\\}\\r?\\n)*)`).exec(body);
   if (m === null) return [];
-  return [...m[1].matchAll(/fileID: (\d+)/g)].map((x) => x[1]);
+  return [...m[1].matchAll(/fileID: (-?\d+)/g)].map((x) => x[1]);
 };
 
 /**
@@ -97,9 +97,9 @@ const fileIdList = (body, key) => {
  * MeshRenderer(재질)를 안 읽으면 조립체의 부위별 재질이 통째로 사라진다.
  */
 export function readMaterialSlots(body) {
-  const m = /m_Materials:\r?\n((?:\s*- \{fileID: \d+[^}]*\}\r?\n)*)/.exec(body);
+  const m = /m_Materials:\r?\n((?:\s*- \{fileID: -?\d+[^}]*\}\r?\n)*)/.exec(body);
   if (m === null) return [];
-  return [...m[1].matchAll(/\{fileID: (\d+)(?:, guid: ([0-9a-f]{32}))?/g)].map((x) => ({
+  return [...m[1].matchAll(/\{fileID: (-?\d+)(?:, guid: ([0-9a-f]{32}))?/g)].map((x) => ({
     fileID: x[1],
     // 내장 재질은 `.mat` 이 없다. `null` 로 두면 소비처가 "재질 지정 없음" 으로 읽는다
     guid: x[2] === undefined || x[2] === UNITY_BUILTIN_GUID ? null : x[2],
@@ -118,7 +118,7 @@ export function readMaterialSlots(body) {
  */
 export function readInstanceMaterialOverrides(body) {
   const re =
-    /- target: \{fileID: (\d+)[^}]*\}\r?\n\s*propertyPath: 'm_Materials\.Array\.data\[(\d+)\]'\r?\n\s*value:[^\r\n]*\r?\n\s*objectReference: \{fileID: \d+(?:, guid: ([0-9a-f]{32}))?/g;
+    /- target: \{fileID: (-?\d+)[^}]*\}\r?\n\s*propertyPath: 'm_Materials\.Array\.data\[(\d+)\]'\r?\n\s*value:[^\r\n]*\r?\n\s*objectReference: \{fileID: -?\d+(?:, guid: ([0-9a-f]{32}))?/g;
   const out = [];
   let m;
   while ((m = re.exec(body)) !== null) {
@@ -207,6 +207,31 @@ function applyTransform(object3d, t) {
  * @param {string} prefabPath 절대 경로
  * @param {{guidIndex: Map<string,string>, unitScale: number, loadFbx: (p:string)=>THREE.Object3D, warn: (m:string)=>void, depth?: number}} ctx
  */
+/**
+ * FBX 하나에 메시가 여러 개일 때 **그 GameObject 가 쓰는 것 하나만** 고른다.
+ *
+ * `m_Mesh` 의 `fileID` 는 FBX 안 서브에셋을 가리키는데(음수인 경우가 많다) 그 값은 Unity
+ * 내부 해시라 FBXLoader 로는 되짚을 수 없다. 대신 Unity 가 import 할 때 GameObject 이름을
+ * 메시 이름 그대로 붙여 주므로 **이름으로 고른다.**
+ *
+ * 이름이 안 맞으면 원본 전체를 그대로 쓴다 — 메시가 하나뿐인 FBX(ExpoKit 단품)가 그 경우다.
+ * 고르지 않으면 MeshFilter 마다 FBX 전체가 붙어 **메시 수만큼 중복**된다(팝콘 카트: 5배).
+ */
+function selectSubMesh(model, nodeName) {
+  const meshes = [];
+  model.traverse((o) => {
+    if (o.isMesh) meshes.push(o);
+  });
+  if (meshes.length <= 1 || nodeName === '') return model;
+  if (!meshes.some((m) => m.name === nodeName)) return model;
+  // 고른 것을 꺼내지 않고 **나머지를 지운다** — FBX 루트의 축·단위 보정이 부모 체인에 걸려
+  // 있어서, 메시만 뽑아 새 그룹에 담으면 그 보정을 잃고 자세·크기가 틀어진다
+  for (const mesh of meshes) {
+    if (mesh.name !== nodeName) mesh.removeFromParent();
+  }
+  return model;
+}
+
 export function loadPrefab(prefabPath, ctx) {
   const depth = ctx.depth ?? 0;
   if (depth > 8) throw new Error(`prefab 중첩이 너무 깊다 — 순환일 수 있다: ${prefabPath}`);
@@ -241,7 +266,7 @@ export function loadPrefab(prefabPath, ctx) {
     if (go !== undefined) {
       node.name = scalar(go.body, 'm_Name') ?? '';
       const componentIDs = fileIdList(go.body, 'm_Component').concat(
-        [...go.body.matchAll(/component: \{fileID: (\d+)\}/g)].map((x) => x[1]),
+        [...go.body.matchAll(/component: \{fileID: (-?\d+)\}/g)].map((x) => x[1]),
       );
 
       // 재질을 먼저 푼다 — 컴포넌트 순서상 MeshRenderer 가 MeshFilter 뒤에 올 수 있다.
@@ -270,7 +295,7 @@ export function loadPrefab(prefabPath, ctx) {
           ctx.warn(`${label}: guid ${mesh.guid} 를 못 찾았다 (${node.name})`);
           continue;
         }
-        const model = ctx.loadFbx(fbxPath);
+        const model = selectSubMesh(ctx.loadFbx(fbxPath), node.name);
         // Unity 는 import 때 파일 단위 스케일을 메시에 굽는다. prefab transform 은 그 위에서 미터로 논다
         model.scale.multiplyScalar(ctx.unitScale);
         if (renderer !== null) {
