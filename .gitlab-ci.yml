@@ -13,6 +13,9 @@
 
 workflow:
   rules:
+    # TEMP(runner smoke): 이 브랜치에서만 파이프라인 생성을 허용한다. 확인 후 브랜치째 삭제한다.
+    - if: '$CI_COMMIT_BRANCH == "ci-runner-smoke"'
+
     # 2026-08-26: Jira Webhook 자동화와 Jenkins 전환 완료.
     # runner 없는 legacy jira-* pipeline의 무한 pending 및 이중 전환을 방지한다.
     - when: never
@@ -161,3 +164,20 @@ jira-sync-ready-for-deploy:
         label "$KEY" add ready-for-deploy
       done
       echo "참고: Done(완료) 전환은 production 배포 성공에만 연결한다 — 배포 파이프라인 구축 후 활성화 (docs/jira-gitlab-workflow.md §9)"
+
+# ──────────────────────────────────────────────────────────────
+# TEMP(runner smoke): shared/instance runner 가 이 프로젝트 job 을 실제로 잡는지만 본다.
+#   success  → runner 있음
+#   pending  → runner 없음 (등록 선행)
+# 확인 후 이 job 과 위 workflow 규칙, 브랜치를 모두 삭제한다.
+# ──────────────────────────────────────────────────────────────
+runner-smoke:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "ci-runner-smoke"'
+  script:
+    - echo "runner reachable"
+    - echo "runner=$CI_RUNNER_DESCRIPTION"
+    - echo "tags=$CI_RUNNER_TAGS"
+    - echo "executor=$CI_RUNNER_EXECUTABLE_ARCH"
