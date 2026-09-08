@@ -4,30 +4,31 @@ using UnityEngine;
 namespace Festa.Core
 {
     /// <summary>
-    /// 브라우저의 **실제** 주사율에 맞춰 <see cref="QualitySettings.vSyncCount"/> 를 정한다.
+    /// 브라우저 주사율에 맞춰 <see cref="QualitySettings.vSyncCount"/> 를 **적응형으로** 정한다.
+    /// 여유가 있으면 화면 주사율 그대로 돌고, 못 버티면 절반·1/3 로 내려온다.
     /// 목표는 "가장 빠른 프레임" 이 아니라 <b>흔들리지 않는 프레임</b>이다.
     ///
-    /// <para><b>무슨 문제를 푸는가 (2026-09-08 실측).</b> 사용자 브라우저에서 rAF 간격을 3,749 프레임 수집한 결과
-    /// 91.7% 가 정확히 8ms(120Hz) 아니면 17ms(60Hz) 에 붙어 있었다 — 연속 분포가 아니다. 즉 렌더가 서서히
-    /// 느려지는 것이 아니라, 프레임 시간이 8.33ms 를 살짝 넘는 순간 vsync 가 통째로 한 틱을 건너뛰어
-    /// <b>즉시 절반 속도</b>가 된다. 여유가 생기면 다시 올라간다. 초당 fps 가 50~107 을 오갔다.
-    /// 사용자가 며칠째 말한 "느려졌다 빨라졌다" 의 정체가 이 2단 양자화다.
-    /// 지금 이 게임은 120Hz 경계선 위에 걸터앉아 있어서 작은 부하 변동이 2배 스윙으로 증폭된다.</para>
+    /// <para><b>무슨 문제를 푸는가 (2026-09-08 실측).</b> 사용자 브라우저에서 rAF 간격을 3,749 프레임
+    /// 수집한 결과 91.7% 가 정확히 8ms(120Hz) 아니면 17ms(60Hz) 에 붙어 있었다 — 연속 분포가 아니다.
+    /// 프레임 시간이 8.33ms 를 살짝 넘는 순간 vsync 가 한 틱을 통째로 건너뛰어 <b>즉시 절반 속도</b>가
+    /// 되고, 여유가 생기면 다시 올라간다. 초당 fps 가 50~107 을 오갔다. 사용자가 며칠째 말한
+    /// "느려졌다 빨라졌다" 의 정체가 이 2단 양자화다. 경계선 위에 걸터앉으면 작은 변동이 2배 스윙이 된다.</para>
     ///
     /// <para><b>왜 targetFrameRate 가 아니라 vSyncCount 인가.</b> WebGL 플레이어에서
     /// <c>Application.targetFrameRate</c> 는 프레임 상한이 아니라 rAF 스왑 간격으로 번역되는데
-    /// 그 식(<c>60 / targetFrameRate</c>)에 <b>60 이 상수로 박혀 있다</b>. 그래서 120Hz 화면에서
-    /// <c>targetFrameRate = 60</c> 은 스왑 간격 1 — 지금의 <c>-1</c> 과 동일하고 아무것도 바뀌지 않는다.
-    /// 실제로 듣는 노브는 <c>vSyncCount</c>(= 원시 rAF 몇 틱마다 한 프레임) 하나다.</para>
+    /// 그 식(<c>60 / targetFrameRate</c>)에 <b>60 이 상수로 박혀 있다</b>. 120Hz 화면에서
+    /// <c>= 60</c> 은 스왑 간격 1 — 기본값 <c>-1</c> 과 동일하고 아무것도 바뀌지 않는다 (T-239).</para>
     ///
     /// <para><b>왜 주사율을 직접 재는가.</b> Unity 는 WebGL 에서 <c>Screen.currentResolution.refreshRateRatio</c> 를
-    /// 화면과 무관하게 항상 60 으로 보고한다(자리표시자라 신뢰할 수 없다). 주사율을 모르면 vSyncCount 를 정할 수 없다 —
-    /// 120Hz 에서 2 는 60fps 지만 60Hz 에서 2 는 30fps 다. 그래서 jslib 의 <c>FestaDisplayRefreshHz</c> 가
-    /// Unity 렌더 루프와 무관한 자체 rAF 프로브로 원시 vsync 간격을 재고, 여기서 그 값을 쓴다.
-    /// 창을 다른 모니터로 옮기면 추정치가 따라 바뀌므로 주기적으로 다시 확인한다.</para>
+    /// 화면과 무관하게 항상 60 으로 보고한다. jslib <c>FestaDisplayRefreshHz</c> 가 Unity 렌더 루프와
+    /// 무관한 자체 rAF 프로브로 재는데, <b>하위 10% 분위수</b>를 쓴다 — 중앙값을 쓰면 로딩 중처럼
+    /// 메인 스레드가 바쁠 때 "화면이 60Hz" 로 잘못 읽는다(배포본에서 실제로 발생, 상한이 풀렸다).</para>
     ///
-    /// <para>씬에 배치하지 않는다 — <see cref="RuntimeInitializeOnLoadMethod"/> 로 스스로 붙는다.
-    /// 진단 도구가 아니라 상시 동작이므로 개발 빌드 게이트를 두지 않는다.</para>
+    /// <para><b>릴리스에서도 돈다.</b> 진단 도구(PerfHud 등)는 <c>Debug.isDebugBuild</c> 게이트라
+    /// 배포본에서 아무것도 안 보인다. 이 컴포넌트는 게이트가 없고, 주기적으로 프레임 백분위를
+    /// 한 줄로 남긴다 — 사용자 브라우저 콘솔만으로 원격 판별이 되게 하려는 것이다.</para>
+    ///
+    /// <para>씬에 배치하지 않는다 — <see cref="RuntimeInitializeOnLoadMethod"/> 로 스스로 붙는다.</para>
     /// </summary>
     public class DisplayRefreshAdapter : MonoBehaviour
     {
@@ -41,21 +42,36 @@ namespace Festa.Core
         /// <summary>끄고 싶을 때 부트스트랩보다 먼저 false 로 두면 붙지 않는다.</summary>
         public static bool Enabled = true;
 
-        /// <summary>목표 프레임률. 주사율을 이 값으로 나눠 스왑 간격을 정한다.</summary>
-        const float TargetFps = 60f;
+        // ── 판정 상수 ────────────────────────────────────────────
+        const float WarmupSeconds = 10f;   // 로딩·셰이더 컴파일이 끝나기를 기다린다. 이 전에는 아무 판단도 하지 않는다
+        const float WindowSeconds = 3f;    // 한 번 판정에 쓰는 관측 창
+        const float MissSlack = 1.30f;     // 예산의 130% 를 넘으면 '놓친 프레임'. 지터에 여유를 준다
+        const float StepDownMissRate = 0.20f;  // 창의 20% 를 놓치면 못 버티는 것 — 내려간다
+        const float StepUpMissRate = 0.02f;    // 2% 미만이 3창 연속이면 여유가 있다 — 올라간다
+        const int StepUpCleanWindows = 3;
+        const float CooldownAfterDown = 12f;   // 내려간 뒤 이만큼은 다시 안 건드린다
+        const float CooldownAfterUp = 20f;     // 올라간 뒤는 더 길게 — 올렸다 내렸다가 제일 나쁘다
+        const int MinInterval = 1, MaxInterval = 4;
 
-        const float PollSeconds = 2f;
-        const int MinPlausibleHz = 30;
-        const int MaxPlausibleHz = 400;
+        const float ReportSeconds = 30f;   // 릴리스 관측용 요약 주기
+        const int RingSize = 2048;
 
-        float _nextPoll;
-        int _lastHz;
-        int _appliedInterval = -1;
+        static readonly int[] CommonHz = { 60, 75, 90, 100, 120, 144, 165, 240 };
 
-        // 적용 직후 실제로 먹었는지 확인하려고 한 번만 재는 자기 검증.
-        bool _verifying;
-        int _verifyFrames;
-        float _verifyAccum;
+        int _hz;                 // 확정된 화면 주사율
+        int _interval = -1;      // 현재 vSyncCount. -1 = 아직 결정 전
+        float _cooldownUntil;
+        int _cleanWindows;
+
+        // 관측 창
+        float _windowStart;
+        int _windowFrames, _windowMisses;
+
+        // 릴리스 요약용 링 버퍼
+        readonly float[] _ring = new float[RingSize];
+        int _ringCount, _ringHead;
+        float _nextReport;
+        int _gcAtLastReport;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
@@ -68,49 +84,120 @@ namespace Festa.Core
 #endif
         }
 
-        void Update()
+        void Start()
         {
-            if (_verifying) Verify();
-
-            if (Time.unscaledTime < _nextPoll) return;
-            _nextPoll = Time.unscaledTime + PollSeconds;
-
-            int hz = FestaDisplayRefreshHz();
-            if (hz < MinPlausibleHz || hz > MaxPlausibleHz) return;   // 아직 표본 부족이거나 이상치
-
-            // 주사율이 그대로면 다시 계산할 것이 없다.
-            if (hz == _lastHz && _appliedInterval > 0) return;
-            _lastHz = hz;
-
-            int interval = Mathf.Clamp(Mathf.RoundToInt(hz / TargetFps), 1, 4);
-            if (interval == _appliedInterval) return;
-
-            int before = QualitySettings.vSyncCount;
-            QualitySettings.vSyncCount = interval;
-            _appliedInterval = interval;
-
-            Debug.Log($"[DisplayRefreshAdapter] 주사율 {hz}Hz 측정 → vSyncCount {before} → {interval} " +
-                      $"(목표 {hz / (float)interval:F0}fps). targetFrameRate 는 WebGL 에서 듣지 않아 쓰지 않는다.");
-
-            _verifying = true;
-            _verifyFrames = 0;
-            _verifyAccum = 0f;
+            _windowStart = Time.unscaledTime;
+            _nextReport = Time.unscaledTime + WarmupSeconds + ReportSeconds;
+            _gcAtLastReport = System.GC.CollectionCount(0);
         }
 
-        /// <summary>적용이 실제로 프레임 간격을 바꿨는지 120 프레임 평균으로 확인해 한 줄 남긴다.</summary>
-        void Verify()
+        void Update()
         {
-            _verifyAccum += Time.unscaledDeltaTime;
-            if (++_verifyFrames < 120) return;
+            float dt = Time.unscaledDeltaTime;
+            _ring[_ringHead] = dt;
+            _ringHead = (_ringHead + 1) % RingSize;
+            if (_ringCount < RingSize) _ringCount++;
 
-            _verifying = false;
-            float meanMs = _verifyAccum / _verifyFrames * 1000f;
-            float expectedMs = _lastHz > 0 ? 1000f / (_lastHz / (float)_appliedInterval) : 0f;
-            Debug.Log($"[DisplayRefreshAdapter] 적용 후 실측 — 평균 프레임 {meanMs:F1}ms " +
-                      $"({1000f / meanMs:F0}fps), 기대 {expectedMs:F1}ms. " +
-                      (Mathf.Abs(meanMs - expectedMs) <= 3f
-                          ? "기대와 일치 — vSyncCount 가 먹었다."
-                          : "기대와 다르다 — vSyncCount 가 안 먹었거나 렌더가 그 간격을 못 맞춘다."));
+            float now = Time.unscaledTime;
+            if (now < WarmupSeconds) { _windowStart = now; return; }   // 로딩 구간은 판단 대상이 아니다
+
+            ResolveRefreshRate();
+            if (_hz <= 0) return;
+
+            if (_interval < 0)
+            {
+                // 첫 결정 — **화면 주사율 그대로 시작한다.** 버틸 수 있으면 그대로 두고,
+                // 못 버티면 아래 판정이 내려 준다. 처음부터 60 으로 묶으면 성능을 버리게 된다.
+                Apply(1, $"주사율 {_hz}Hz 확정 — 우선 전속으로 시작한다");
+                _windowStart = now; _windowFrames = _windowMisses = 0;
+            }
+
+            // 창 집계
+            float budgetMs = 1000f / _hz * _interval;
+            _windowFrames++;
+            if (dt * 1000f > budgetMs * MissSlack) _windowMisses++;
+
+            if (now - _windowStart >= WindowSeconds)
+            {
+                Evaluate(now, budgetMs);
+                _windowStart = now; _windowFrames = _windowMisses = 0;
+            }
+
+            if (now >= _nextReport) { Report(budgetMs); _nextReport = now + ReportSeconds; }
+        }
+
+        /// <summary>jslib 추정치를 흔한 주사율로 스냅한다. 119·121 같은 값이 매번 다른 판정을 만들지 않게.</summary>
+        void ResolveRefreshRate()
+        {
+            int raw = FestaDisplayRefreshHz();
+            if (raw < 30 || raw > 400) return;
+
+            int snapped = raw;
+            foreach (var c in CommonHz)
+                if (Mathf.Abs(raw - c) <= Mathf.Max(3, c * 0.04f)) { snapped = c; break; }
+
+            if (snapped == _hz) return;
+            // 주사율이 실제로 바뀌었다(다른 모니터로 창 이동). 처음부터 다시 판단한다.
+            if (_hz > 0) Debug.Log($"[DisplayRefreshAdapter] 주사율 변경 {_hz}Hz → {snapped}Hz — 판정을 다시 시작한다");
+            _hz = snapped;
+            _interval = -1;
+            _cleanWindows = 0;
+            _cooldownUntil = 0f;
+        }
+
+        void Evaluate(float now, float budgetMs)
+        {
+            if (_windowFrames < 30) return;                 // 표본이 모자라면 판단하지 않는다
+            float missRate = _windowMisses / (float)_windowFrames;
+
+            if (now < _cooldownUntil) return;
+
+            if (missRate > StepDownMissRate && _interval < MaxInterval)
+            {
+                _cleanWindows = 0;
+                Apply(_interval + 1,
+                    $"예산 {budgetMs:F1}ms 를 {missRate * 100f:F0}% 놓쳤다 — 못 버틴다, 한 단계 내린다");
+                _cooldownUntil = now + CooldownAfterDown;
+                return;
+            }
+
+            if (missRate < StepUpMissRate && _interval > MinInterval)
+            {
+                if (++_cleanWindows < StepUpCleanWindows) return;
+                _cleanWindows = 0;
+                Apply(_interval - 1,
+                    $"{StepUpCleanWindows}창 연속 놓친 프레임 {missRate * 100f:F1}% — 여유가 있다, 한 단계 올린다");
+                _cooldownUntil = now + CooldownAfterUp;
+                return;
+            }
+
+            _cleanWindows = 0;
+        }
+
+        void Apply(int interval, string why)
+        {
+            interval = Mathf.Clamp(interval, MinInterval, MaxInterval);
+            int before = QualitySettings.vSyncCount;
+            QualitySettings.vSyncCount = interval;
+            _interval = interval;
+            Debug.Log($"[DisplayRefreshAdapter] vSyncCount {before} → {interval} " +
+                      $"(화면 {_hz}Hz → 목표 {_hz / (float)interval:F0}fps). {why}");
+        }
+
+        /// <summary>릴리스에서도 남는 관측 한 줄. 30초에 한 번, 정렬 한 번 — 프레임당 비용 없음.</summary>
+        void Report(float budgetMs)
+        {
+            if (_ringCount < 60) return;
+            var buf = new float[_ringCount];
+            System.Array.Copy(_ring, buf, _ringCount);
+            System.Array.Sort(buf);
+            float P(float q) => buf[Mathf.Clamp(Mathf.FloorToInt(_ringCount * q), 0, _ringCount - 1)] * 1000f;
+
+            int gc = System.GC.CollectionCount(0);
+            Debug.Log($"[Festa/프레임] {_hz}Hz vSync{_interval} 예산 {budgetMs:F1}ms | " +
+                      $"p50 {P(0.5f):F1} p95 {P(0.95f):F1} p99 {P(0.99f):F1} 최대 {P(1f):F1} ms | " +
+                      $"표본 {_ringCount} | GC {gc - _gcAtLastReport}회/{ReportSeconds:F0}초");
+            _gcAtLastReport = gc;
         }
     }
 }

@@ -117,12 +117,17 @@ mergeInto(LibraryManager.library, {
             }
           }
           st.prev = now;
-          // 60 프레임마다 중앙값으로 다시 추정한다 — 평균은 한 번의 끊김에도 크게 흔들린다.
+          // 60 프레임마다 다시 추정한다.
+          //
+          // **중앙값이 아니라 하위 10% 분위수를 쓴다.** 디스플레이는 주사율보다 빨리 틱할 수 없지만
+          // 메인 스레드가 바쁘면 얼마든지 늦게 틱한다. 그래서 중앙값은 '화면 주사율' 이 아니라
+          // '지금 실제로 나오는 프레임률' 을 재게 된다 — 2026-09-08 배포본 실측에서 120Hz 화면을
+          // 로딩 중에 60Hz 로 잘못 읽어 상한이 풀렸다(vSyncCount 2 → 1). 가장 빠른 쪽이 진짜 주기다.
           if (st.buf.length >= 60 && st.since >= 60) {
             st.since = 0;
             var s = st.buf.slice().sort(function (a, b) { return a - b; });
-            var med = s[Math.floor(s.length / 2)];
-            if (med > 0) st.hz = Math.round(1000 / med);
+            var fast = s[Math.floor(s.length * 0.10)];
+            if (fast > 0) st.hz = Math.round(1000 / fast);
           }
           window.requestAnimationFrame(probe);
         };
