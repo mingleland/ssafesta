@@ -50,8 +50,35 @@ namespace Festa.World.Festival
         readonly List<Room> _rooms = new List<Room>();
         float _nextCheck;
 
+        /// <summary>
+        /// 방 목록을 다시 훑어야 하는가.
+        ///
+        /// <para><b>왜 필요한가.</b> 예전에는 <see cref="Awake"/> 에서 렌더러를 한 번만 스냅샷했다.
+        /// 그런데 부스 집기·간판·소품은 그 뒤에 <c>WorldBoothPublishedBootstrap</c> 이 비동기로 스폰한다 —
+        /// 즉 <b>정작 무거운 것들이 목록에 없어서 한 번도 꺼지지 않았다.</b> 꺼지던 것은 빈 방의
+        /// 벽·바닥·천장뿐이라, "부스 내부를 껐는데도 축제장 동향에서 여전히 끊긴다" 가 됐다
+        /// (2026-09-08 조사).</para>
+        /// </summary>
+        static bool s_rescanRequested;
+
+        /// <summary>부스 내용물이 새로 스폰된 뒤 부른다. 다음 판정에서 목록을 다시 만든다.</summary>
+        public static void RequestRescan() => s_rescanRequested = true;
+
+        /// <summary>안전망. 명시적 요청을 놓쳐도 이 주기로 한 번은 따라잡는다.</summary>
+        const float SafetyRescanSeconds = 5f;
+        float _nextSafetyRescan;
+
         void Awake()
         {
+            Collect();
+            Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt += RequestRescan;
+        }
+
+        void OnDestroy() => Festa.Booth.WorldBoothPublishedBootstrap.BoothsRebuilt -= RequestRescan;
+
+        void Collect()
+        {
+            _rooms.Clear();
             for (int i = 0; i < transform.childCount; i++)
             {
                 var c = transform.GetChild(i);
@@ -60,7 +87,7 @@ namespace Festa.World.Festival
                     Root = c,
                     Renderers = c.GetComponentsInChildren<Renderer>(true),
                     Lights = c.GetComponentsInChildren<Light>(true),
-                    Visible = true,
+                    Visible = true,   // 다시 훑은 직후에는 상태를 모른다 — force 로 한 번 확정한다
                 });
             }
         }
@@ -74,6 +101,26 @@ namespace Festa.World.Festival
 
         void Update()
         {
+            // 부스 집기가 새로 스폰됐으면 목록부터 다시 만든다 — 안 그러면 그것들은 영영 안 꺼진다.
+            if (s_rescanRequested || Time.unscaledTime >= _nextSafetyRescan)
+            {
+                bool explicitAsk = s_rescanRequested;
+                s_rescanRequested = false;
+                _nextSafetyRescan = Time.unscaledTime + SafetyRescanSeconds;
+
+                int before = 0;
+                foreach (var r in _rooms) before += r.Renderers.Length;
+                Collect();
+                int after = 0;
+                foreach (var r in _rooms) after += r.Renderers.Length;
+
+                if (after != before)
+                    Debug.Log($"[BoothInteriorCulling] 방 목록 갱신 — 렌더러 {before} → {after}" +
+                              (explicitAsk ? " (부스 스폰 알림)" : " (주기 확인)"));
+                Apply(force: true);
+                return;
+            }
+
             if (_checkInterval > 0f)
             {
                 if (Time.unscaledTime < _nextCheck) return;

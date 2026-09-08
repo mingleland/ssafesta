@@ -34,6 +34,12 @@ namespace Festa.Booth
         static bool s_Loading;
 
         /// <summary>
+        /// 부스 내용물을 실제로 하나 이상 새로 세웠을 때. 거리 컬링처럼 **렌더러 목록을 캐시해 둔 쪽**이
+        /// 다시 훑을 계기다 — 그러지 않으면 나중에 스폰된 집기가 목록에 없어 영영 안 꺼진다.
+        /// </summary>
+        public static event System.Action BoothsRebuilt;
+
+        /// <summary>
         /// 아직 못 채운 방만 다시 시도하는 주기. 조회가 한 번 실패하면 그 방은 세션 내내
         /// <see cref="BoothRuntime.IsLoaded"/> false 로 남아, 실제로는 게시돼 있는 부스인데도 포털이
         /// "아직 준비 중" 으로 막았다 (2026-09-08 조사). 채워진 방은 다시 부르지 않으므로
@@ -113,6 +119,11 @@ namespace Festa.Booth
                     built++;
                 }
                 Debug.Log($"[WorldBoothPublishedBootstrap] {slotIds.Count}실 중 {built}실 게시 렌더, 나머지는 기본 프레임");
+
+                // 방금 스폰한 집기들을 아는 쪽에 알린다. 이 알림이 없으면 거리 컬링은
+                // Awake 시점의 빈 방 렌더러만 알고 있어, 정작 무거운 것들이 안 꺼진다.
+                // 이벤트로 뒤집은 이유: Festa.Booth 는 Festa.World 를 참조하지 않는다(방향이 반대다).
+                if (built > 0) BoothsRebuilt?.Invoke();
             }
             catch (System.Exception e)
             {
