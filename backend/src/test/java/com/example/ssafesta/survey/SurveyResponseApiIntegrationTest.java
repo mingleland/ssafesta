@@ -355,7 +355,7 @@ class SurveyResponseApiIntegrationTest {
         submitAsGuest(s);
         assertThat(guestKeyOf(s)).startsWith("guest:");
 
-        expireSession(s, "now() - interval '1 minute'");
+        expireSession(s, "now() - interval '5 minutes'");
         guestKeySweeper.clearExpiredGuestKeys();
 
         Long responseId = jdbc.queryForObject(
@@ -363,9 +363,34 @@ class SurveyResponseApiIntegrationTest {
         assertThat(guestKeyOf(s))
                 .as("접속 토큰 주체가 남아 있으면 안 됩니다 (헌법 12조).")
                 .isEqualTo("expired:" + responseId);
+        assertThat(sessionExpiryOf(s))
+                .as("만료 시각도 세션 데이터입니다 — 남겨 두면 같은 토큰의 응답들을 exp 로 묶을 수 "
+                        + "있어 이름만 지운 셈이 됩니다.")
+                .isNull();
         assertThat(answerCount(s.id)).as("답은 그대로여야 합니다 — 부스가 수집한 데이터입니다.")
                 .isEqualTo(4);
         assertThat(selectedOptionCount(s.id)).isEqualTo(2);
+    }
+
+    /**
+     * {@code exp} 를 막 지난 토큰의 키는 아직 지우지 않는다.
+     *
+     * <p>디코더는 {@code exp + app.auth.jwt-clock-skew}(60초)까지 토큰을 받아 준다
+     * ({@code JwtTimestampValidator}). 그 사이에 키를 지우면 <b>아직 통과하는 토큰</b>이 중복 방지
+     * 없이 한 번 더 답할 수 있다 — 만료 직전에 인증돼 실행 중인 요청도 같은 경합이다.
+     */
+    @Test
+    void aTokenInsideTheClockSkewWindowKeepsItsKey() throws Exception {
+        Survey s = survey("스큐창", 0);
+        submitAsGuest(s);
+
+        // exp 는 지났지만 60초 스큐 안이다 — 이 토큰은 여전히 인증된다.
+        expireSession(s, "now() - interval '10 seconds'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("아직 인증되는 토큰의 중복 방지 키를 지우면 재응답이 열립니다.")
+                .startsWith("guest:");
     }
 
     /** 아직 살아 있는 세션의 식별자는 건드리지 않는다 — 그동안은 1인 1응답이 그것으로 성립한다. */
@@ -403,21 +428,26 @@ class SurveyResponseApiIntegrationTest {
     }
 
     /**
-     * V23 이전에 쌓인 행은 만료 시각이 없다 — 종전 추정으로 지운다.
+     * V23 이전에 쌓인 게스트 행에는 만료 시각이 없다 — <b>마이그레이션이 채운다.</b>
      *
-     * <p>그 규칙은 안정된 설정에서 늦기만 하고 이르지는 않다(토큰이 제출보다 먼저 발급된다).
-     * 이 경로가 없으면 옛 행의 식별자는 영원히 남는다.
+     * <p>sweeper 에 예외 분기를 두지 않기 위한 선택이다. {@code exp = 발급 + TTL} 이고 발급은
+     * 제출보다 앞서므로 {@code submitted_at + TTL} 은 실제 만료의 상한이다 — 늦게 지울 수는 있어도
+     * 이르게 지우지는 않는다. 여기서는 그 상태를 손으로 만들어 백필 SQL 을 그대로 돌린다.
      */
     @Test
-    void aRowWithoutARecordedExpiryFallsBackToTheOldEstimate() throws Exception {
-        Survey s = survey("구행", 0);
+    void theMigrationBackfillsRowsThatPredateTheExpiryColumn() throws Exception {
+        Survey s = survey("구행백필", 0);
         submitAsGuest(s);
         jdbc.update("UPDATE survey_responses SET respondent_session_expires_at = NULL, "
                 + "submitted_at = now() - interval '2 hours' WHERE survey_id = ?", s.id);
 
+        jdbc.update("UPDATE survey_responses "
+                + "SET respondent_session_expires_at = submitted_at + interval '30 minutes' "
+                + "WHERE respondent_guest_key IS NOT NULL AND respondent_session_expires_at IS NULL");
         guestKeySweeper.clearExpiredGuestKeys();
 
-        assertThat(guestKeyOf(s)).startsWith("expired:");
+        assertThat(guestKeyOf(s)).as("백필된 뒤에는 종전 행도 지워져야 합니다.")
+                .startsWith("expired:");
     }
 
     private void submitAsGuest(Survey s) throws Exception {
@@ -435,6 +465,12 @@ class SurveyResponseApiIntegrationTest {
     private void expireSession(Survey s, String sqlInstant) {
         jdbc.update("UPDATE survey_responses SET respondent_session_expires_at = " + sqlInstant
                 + " WHERE survey_id = ?", s.id);
+    }
+
+    private Instant sessionExpiryOf(Survey s) {
+        return jdbc.queryForObject(
+                "SELECT respondent_session_expires_at FROM survey_responses WHERE survey_id = ?",
+                Instant.class, s.id);
     }
 
     private String guestKeyOf(Survey s) {

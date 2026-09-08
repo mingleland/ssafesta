@@ -9,7 +9,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
 @Configuration
@@ -22,9 +25,22 @@ class JwtConfiguration {
         return NimbusJwtEncoder.withSecretKey(key).algorithm(MacAlgorithm.HS512).build();
     }
 
+    /**
+     * The timestamp validator is set explicitly so the tolerance is a number this project owns.
+     *
+     * <p>It is the same 60 seconds Spring applies by default, and the point is not the value — it is
+     * that {@code SurveyGuestKeySweeper} reads the same property. That sweeper deletes the key which
+     * stops a guest answering twice, and deleting it while this decoder still accepts the token
+     * would open exactly the door 1인 1응답 closes. Left implicit, the two numbers can drift without
+     * anything failing loudly.
+     */
     @Bean
     JwtDecoder jwtDecoder(AuthProperties properties) {
-        return NimbusJwtDecoder.withSecretKey(secretKey(properties)).macAlgorithm(MacAlgorithm.HS512).build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey(properties))
+                .macAlgorithm(MacAlgorithm.HS512).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<Jwt>(
+                new JwtTimestampValidator(properties.jwtClockSkew())));
+        return decoder;
     }
 
     private SecretKey secretKey(AuthProperties properties) {

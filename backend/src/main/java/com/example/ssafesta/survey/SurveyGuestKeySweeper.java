@@ -11,25 +11,29 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Drops the guest session identifier from a survey response once that session can no longer exist
+ * Drops the guest session's traces from a survey response once that session can no longer be used
  * (헌법 12조 — "게스트 세션은 둘러보기 전용이며 종료 시 데이터를 삭제한다").
  *
- * <p><b>The answers stay; only the identifier goes.</b> A response belongs to the booth that
- * collected it — deleting the row would let one visitor's session ending erase an operator's
- * result. What 12조 asks to delete is the guest's own session data, and on a response that is
- * exactly one column: {@code respondent_guest_key}, the access token subject.
+ * <p><b>The answers stay; only the session goes.</b> A response belongs to the booth that collected
+ * it — deleting the row would let one visitor's session ending erase an operator's result. What 12조
+ * asks to delete is the guest's own session data, and on a response that is two columns: the access
+ * token subject and the session's expiry.
  *
- * <p><b>Replaced rather than nulled, so no migration is needed.</b>
+ * <p><b>Both columns, not just the key.</b> Every response from one token carries the same
+ * {@code exp} to the microsecond, so an expiry left behind still groups one person's answers across
+ * surveys — that linkage is what 12조 is about, and dropping only its name does not remove it.
+ *
+ * <p><b>The key is replaced rather than nulled, so no migration is needed for it.</b>
  * {@code ck_survey_responses_respondent} requires exactly one of member id / guest key, and
  * {@code ux_survey_responses_guest} is unique over the non-null keys. Writing
- * {@code expired:<response id>} satisfies both — it is unique by construction and carries nothing
- * about the person, being derived from the row itself.
+ * {@code expired:<response id>} satisfies both — unique by construction, and carrying nothing about
+ * the person, being derived from the row itself.
  *
- * <p><b>1인 1응답 is not weakened.</b> Clearing happens at the token's own {@code exp}, and a guest
- * token cannot be refreshed ({@code /auth/refresh} renews member sessions only) — so the session
- * whose key is cleared is already dead and could not submit again either way. What comes back later
- * is a new token with a new subject, which this system has always counted as a different person
- * (계약 §6).
+ * <p><b>1인 1응답 is not weakened.</b> Clearing waits for the token's {@code exp} <i>plus</i> the
+ * decoder's clock skew, so the session whose key goes is one no request can still authenticate
+ * with. A guest token cannot be refreshed ({@code /auth/refresh} renews member sessions only), and
+ * what comes back later is a new token with a new subject — which this system has always counted as
+ * a different person (계약 §6).
  */
 @Component
 class SurveyGuestKeySweeper {
@@ -37,16 +41,17 @@ class SurveyGuestKeySweeper {
     private static final Logger log = LoggerFactory.getLogger(SurveyGuestKeySweeper.class);
 
     /**
-     * Rows already cleared are skipped by the {@code NOT LIKE} — without it every pass would rewrite
-     * the same rows to the same values forever. The second bound is the pre-V23 fallback.
+     * Rows already cleared drop out on their own — their expiry is {@code NULL} and no comparison
+     * matches it, which is also why the index behind this can shrink. Member rows never carry an
+     * expiry, so the guest-key test is a guard against a future writer setting one where it does not
+     * belong rather than a filter this pass needs.
      */
     private static final String CLEAR = """
             UPDATE survey_responses
-               SET respondent_guest_key = 'expired:' || id
+               SET respondent_guest_key = 'expired:' || id,
+                   respondent_session_expires_at = NULL
              WHERE respondent_guest_key IS NOT NULL
-               AND respondent_guest_key NOT LIKE 'expired:%'
-               AND (respondent_session_expires_at < ?
-                    OR (respondent_session_expires_at IS NULL AND submitted_at < ?))
+               AND respondent_session_expires_at < ?
             """;
 
     private final JdbcTemplate jdbc;
@@ -61,22 +66,25 @@ class SurveyGuestKeySweeper {
      * One pass every five minutes.
      *
      * <p><b>The session's own {@code exp} decides, not a guess.</b> Estimating the moment as
-     * {@code submitted_at + access-token-ttl} is wrong in both directions: the token was issued
-     * before the answer arrived, so it fires up to one TTL late; and shortening the TTL makes it
-     * fire while tokens issued under the old one are still valid, which lets the same token answer
-     * the same survey twice — a cleared key is no longer in {@code ux_survey_responses_guest}.
+     * {@code submitted_at + access-token-ttl} was wrong in both directions: the token is issued
+     * before the answer arrives, so it fired up to one TTL late; and shortening the TTL made it fire
+     * while tokens issued under the old one were still valid. V23 records the real {@code exp}, and
+     * backfilled the rows that predate it with that same upper bound.
      *
-     * <p>That estimate survives for rows written before V23, which have no expiry recorded. It is
-     * never <i>early</i> under a steady configuration, and no such rows are being created any more.
+     * <p><b>And it waits out the clock skew.</b> The decoder accepts a token until
+     * {@code exp + app.auth.jwt-clock-skew} ({@code JwtTimestampValidator}), so clearing at
+     * {@code exp} leaves a window where a request still authenticates while its duplicate-guard key
+     * is already gone — that same token could then answer the same survey twice. A request
+     * authenticated just before {@code exp} and still running is the same race. Subtracting the skew
+     * closes both: the newest row a pass can touch belongs to a token no request can still use.
      */
     @Scheduled(fixedDelayString = "PT5M")
     @Transactional
     public void clearExpiredGuestKeys() {
-        Instant now = Instant.now();
-        int cleared = jdbc.update(CLEAR, Timestamp.from(now),
-                Timestamp.from(now.minus(auth.accessTokenTtl())));
+        Instant unusableBefore = Instant.now().minus(auth.jwtClockSkew());
+        int cleared = jdbc.update(CLEAR, Timestamp.from(unusableBefore));
         if (cleared > 0) {
-            log.info("만료된 게스트 세션 식별자 {}건을 설문 응답에서 지웠습니다 (헌법 12조).", cleared);
+            log.info("만료된 게스트 세션 흔적 {}건을 설문 응답에서 지웠습니다 (헌법 12조).", cleared);
         }
     }
 }

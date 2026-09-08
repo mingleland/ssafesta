@@ -78,6 +78,10 @@ app:
     access-token-ttl: PT30M
     refresh-token-ttl: P7D
     oauth-state-ttl: PT5M
+    # exp 를 지난 토큰을 얼마나 더 받아 주는가. Spring 기본값과 같은 60초이고, 적어 두는 이유는
+    # SurveyGuestKeySweeper 가 같은 값을 읽기 때문이다 — 이 시간이 지나기 전에 게스트 중복 방지
+    # 키를 지우면 아직 통과하는 토큰이 한 번 더 답할 수 있다 (헌법 12조 vs 1인 1응답).
+    jwt-clock-skew: PT60S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.

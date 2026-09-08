@@ -209,11 +209,14 @@ closed = endsAt != null && !endsAt.isAfter(Instant.now())
 | 변경 | 이유 |
 |---|---|
 | `survey_responses.respondent_session_expires_at TIMESTAMPTZ` (nullable) | 제출 때 게스트 토큰의 `exp` 를 적는다. 회원은 `null`(세션 만료라는 개념이 없다), V23 이전 게스트 행도 `null` |
-| `ix_survey_responses_guest_session_expiry` (부분, `respondent_guest_key IS NOT NULL`) | sweeper 가 5분마다 "지울 것이 있는가" 를 묻는다. 응답이 쌓여도 스캔 폭이 늘지 않는다 |
+| `ix_survey_responses_guest_session_expiry` (부분, **`respondent_session_expires_at IS NOT NULL`**) | sweeper 가 5분마다 "지울 것이 있는가" 를 묻는다. 정리된 행은 이 칸이 `NULL` 이 되어 인덱스에서 빠지므로 응답이 쌓여도 인덱스와 탐색 범위가 함께 자라지 않는다. 술어를 `respondent_guest_key IS NOT NULL` 로 두면 `expired:` 로 바뀐 행이 영구히 남아 정확히 그 문제가 생긴다 |
+| V23 이전 게스트 행 백필 (`submitted_at + 30분`) | sweeper 에 예외 분기를 두지 않기 위해서다. `exp = 발급 + TTL` 이고 발급은 제출보다 앞서므로 이 값은 실제 만료의 **상한**이다 — 늦게 지울 수는 있어도 이르게 지우지 않는다 |
 
 **왜 추정으로는 안 되는가.** `submitted_at + 현재 TTL` 은 두 방향으로 틀린다. ① 토큰은 제출보다 먼저 발급되므로 실제 만료보다 최대 TTL 만큼 늦게 지운다. ② TTL 을 줄여 배포하면 아직 유효한 기존 토큰의 키를 먼저 지우고, 키가 지워진 행은 `ux_survey_responses_guest` 에서 빠지므로 **같은 토큰이 같은 설문에 한 번 더 답할 수 있다.**
 
-**지우는 방식은 대체이고 삭제가 아니다.** `respondent_guest_key` 를 `expired:{id}` 로 바꾼다 — `ck_survey_responses_respondent` 가 XOR 이라 `NULL` 로 비우면 위반하고, 행마다 유일한 값이라 부분 유니크 인덱스도 그대로다. **응답 행과 답은 지우지 않는다**: 응답은 그것을 수집한 부스의 것이고, 방문자 세션이 끝났다고 운영자의 집계가 줄어들면 안 된다.
+**지우는 것은 두 칸이다.** `respondent_guest_key` 는 `expired:{id}` 로 **대체**한다 — `ck_survey_responses_respondent` 가 XOR 이라 `NULL` 로 비우면 위반하고, 행마다 유일한 값이라 부분 유니크 인덱스도 그대로다. `respondent_session_expires_at` 은 **`NULL` 로 비운다** — 같은 토큰으로 낸 응답들은 `exp` 가 마이크로초까지 같아서, 남겨 두면 키를 지운 뒤에도 한 사람의 답을 설문 간에 묶을 수 있다. 12조가 지우라는 것이 그 연결이다. **응답 행과 답은 지우지 않는다**: 응답은 그것을 수집한 부스의 것이고, 방문자 세션이 끝났다고 운영자의 집계가 줄어들면 안 된다.
+
+**언제 지우는가 — `exp` 가 아니라 `exp + 허용 오차`다.** 디코더는 `exp + app.auth.jwt-clock-skew`(60초, `JwtTimestampValidator`)까지 토큰을 받아 준다. `exp` 에 지우면 그 사이에 **아직 인증되는 토큰**이 중복 방지 키 없이 한 번 더 답할 수 있고, 만료 직전에 인증돼 실행 중인 요청도 같은 경합이다. 그래서 skew 를 설정으로 꺼내 `JwtConfiguration` 과 sweeper 가 **같은 값**을 읽는다 — Spring 기본값에 기대면 두 숫자가 조용히 어긋난다.
 
 롤백 `db/rollback/V23__rollback.sql` — 컬럼과 인덱스만 없어지고 응답·답·집계는 그대로다.
 
