@@ -119,9 +119,9 @@
       "id": "legacy-survey",
       "type": "SURVEY",
       "position": {
-        "x": -5.5,
+        "x": -4.2,
         "y": 0,
-        "z": 7
+        "z": 6.2
       },
       "rotationY": 0,
       "configId": 12
@@ -130,9 +130,9 @@
       "objectId": "legacy-desk",
       "type": "CONSULT_DESK",
       "position": {
-        "x": 5.5,
+        "x": 4.2,
         "y": 0,
-        "z": 7
+        "z": 6.2
       },
       "rotationY": 0,
       "configId": 9
@@ -152,9 +152,9 @@
       "objectId": "portal-1",
       "type": "GAME_PORTAL",
       "position": {
-        "x": -5.5,
+        "x": -4.2,
         "y": 0,
-        "z": 10
+        "z": 3
       },
       "rotationY": 0,
       "configId": 1
@@ -163,9 +163,9 @@
       "objectId": "portal-unlinked",
       "type": "GAME_PORTAL",
       "position": {
-        "x": 5.5,
+        "x": 4.2,
         "y": 0,
-        "z": 10
+        "z": 3
       },
       "rotationY": 0,
       "configId": 0

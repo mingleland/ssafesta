@@ -37,15 +37,15 @@ namespace Festa.Integration
     { ""objectId"": ""plant-1"", ""type"": ""DECORATION"", ""assetCode"": ""DECORATION_DEFAULT"",
       ""position"": { ""x"": 3, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 0 },
     { ""id"": ""legacy-survey"", ""type"": ""SURVEY"",
-      ""position"": { ""x"": -5.5, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 12 },
+      ""position"": { ""x"": -4.2, ""y"": 0, ""z"": 6.2 }, ""rotationY"": 0, ""configId"": 12 },
     { ""objectId"": ""legacy-desk"", ""type"": ""CONSULT_DESK"",
-      ""position"": { ""x"": 5.5, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 9 },
+      ""position"": { ""x"": 4.2, ""y"": 0, ""z"": 6.2 }, ""rotationY"": 0, ""configId"": 9 },
     { ""objectId"": ""future-1"", ""type"": ""HOLOGRAM"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 999 },
+      ""position"": { ""x"": 0, ""y"": 0, ""z"": 6.2 }, ""rotationY"": 0, ""configId"": 999 },
     { ""objectId"": ""portal-1"", ""type"": ""GAME_PORTAL"",
-      ""position"": { ""x"": -5.5, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 1 },
+      ""position"": { ""x"": -4.2, ""y"": 0, ""z"": 3 }, ""rotationY"": 0, ""configId"": 1 },
     { ""objectId"": ""portal-unlinked"", ""type"": ""GAME_PORTAL"",
-      ""position"": { ""x"": 5.5, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 0 }
+      ""position"": { ""x"": 4.2, ""y"": 0, ""z"": 3 }, ""rotationY"": 0, ""configId"": 0 }
   ]
 }";
 

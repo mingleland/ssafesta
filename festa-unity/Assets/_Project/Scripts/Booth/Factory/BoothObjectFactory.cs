@@ -44,6 +44,7 @@ namespace Festa.Booth
             go.transform.localPosition =
                 (dto.position?.ToVector3() ?? Vector3.zero) + Vector3.up * groundLift;
             go.transform.localRotation = Quaternion.Euler(0f, dto.rotationY, 0f);
+            WarnIfOutsideRoom(objectId, go.transform.localPosition);
 
             var runtimeObject = go.GetComponent<BoothRuntimeObject>();
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
@@ -53,6 +54,38 @@ namespace Festa.Booth
             AttachContentBehaviour(go, type);
             AttachCommonInteraction(go, type);
             return go;
+        }
+
+        // ---------- 방 경계 검사 ----------
+
+        // 부스 방의 실제 크기. **FestaInteriorBuilder.cs:29-31 과 같은 값이어야 한다** —
+        // 그쪽은 Editor 어셈블리라 런타임에서 참조할 수 없어 여기에 다시 적는다.
+        // 레이아웃 좌표의 단위는 **미터**다(앵커의 균등 스케일 13.26 이 유닛으로 바꾼다. 실측 확인:
+        // 레이아웃 6 m 간격 → 월드 79.56 units = 6.00 m).
+        const float RoomHalfXMeters = 5.0f;    // 방 폭 10 m
+        const float RoomBackZMeters = -3.8f;
+        const float RoomFrontZMeters = 7.0f;   // 방 깊이 10.8 m
+
+        /// <summary>
+        /// 방 밖에 배치된 오브젝트를 **드러낸다**. 자르지는 않는다 — 자르면 배치가 조용히 달라져
+        /// "내가 놓은 데가 아닌데" 가 되고, 원인이 스튜디오인지 런타임인지 가릴 수 없게 된다.
+        ///
+        /// <para>사용자는 이걸 "부스에 배치했는데 밖에 떠 있다" 로 겪는다. 2026-09-08 실측에서
+        /// 계약 회귀 픽스처의 4/14 개가 방 밖이었다 — 08-31 에 방 크기를 바꾼 뒤
+        /// (커밋 c7770a3a "부스 셸을 방 크기에 맞추고") 픽스처 좌표가 따라가지 않았다.
+        /// 스튜디오가 방 경계로 제한하는지는 FE·BE 소관이라 별도 이슈로 올린다.</para>
+        /// </summary>
+        static void WarnIfOutsideRoom(string objectId, Vector3 localMeters)
+        {
+            if (Mathf.Abs(localMeters.x) <= RoomHalfXMeters
+                && localMeters.z >= RoomBackZMeters
+                && localMeters.z <= RoomFrontZMeters) return;
+
+            Debug.LogWarning(
+                $"[BoothObjectFactory] {objectId} 가 방 밖에 배치됐다 — " +
+                $"위치 ({localMeters.x:F1}, {localMeters.z:F1}) m, " +
+                $"방 한계 x ±{RoomHalfXMeters} m / z {RoomBackZMeters}~{RoomFrontZMeters} m. " +
+                "방문자에게는 부스 밖 허공에 떠 보인다. 스튜디오에서 안쪽으로 옮겨야 한다.");
         }
 
         // ---------- Placeholder ----------

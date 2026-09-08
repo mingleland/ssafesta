@@ -52,7 +52,18 @@ http.createServer((req,res)=>{
   const f=path.join(ROOT, url==="/"?"index.html":url.slice(1));
   fs.readFile(f,(e,d)=>{
     if(e){res.writeHead(404);return res.end("404 "+url)}
-    res.writeHead(200,{"Content-Type":MIME[path.extname(f)]||"application/octet-stream",
+    // 릴리스(Brotli) 산출물은 원래 확장자 뒤에 .unityweb 가 붙는다 (X.wasm.unityweb 등).
+    // 서버가 Content-Encoding: br 을 붙여야 브라우저가 풀어 준다 — 안 붙이면 Decompression Fallback 이
+    // JS 로 푸느라 로딩이 크게 느려지고, 폴백이 꺼진 빌드는 아예 못 뜬다.
+    const extra = {};
+    if (f.endsWith(".unityweb")) {
+      const inner = path.extname(f.slice(0, -".unityweb".length));
+      extra["Content-Type"] = inner === ".wasm" ? "application/wasm"
+                            : inner === ".js"   ? "text/javascript"
+                            : "application/octet-stream";
+      extra["Content-Encoding"] = "br";
+    }
+    res.writeHead(200,{"Content-Type":MIME[path.extname(f)]||"application/octet-stream", ...extra,
       "Cache-Control":"no-store",
       // FE(5173) 가 다른 오리진에서 manifest·바이너리를 읽는다 — CORS 필수.
       "Access-Control-Allow-Origin":"*",
