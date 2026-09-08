@@ -33,12 +33,49 @@ namespace Festa.Booth
 
         static bool s_Loading;
 
+        /// <summary>
+        /// 아직 못 채운 방만 다시 시도하는 주기. 조회가 한 번 실패하면 그 방은 세션 내내
+        /// <see cref="BoothRuntime.IsLoaded"/> false 로 남아, 실제로는 게시돼 있는 부스인데도 포털이
+        /// "아직 준비 중" 으로 막았다 (2026-09-08 조사). 채워진 방은 다시 부르지 않으므로
+        /// 전부 채워지면 요청이 0 이 된다.
+        /// </summary>
+        const float RetrySeconds = 20f;
+
+        /// <summary>재시도 상한. 서버가 정말 미게시라면 영원히 두드릴 이유가 없다.</summary>
+        const int MaxRetries = 6;
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
             if (Application.isBatchMode) return;   // 데디케이티드 서버 — 로컬 비주얼 없음
-            SceneManager.sceneLoaded += (_, _) => TryLoad();
+            SceneManager.sceneLoaded += (_, _) => { s_retries = 0; TryLoad(); };
             TryLoad();   // 첫 씬이 이미 월드인 경우 (에디터에서 main 직접 실행)
+            RetryLoopAsync();
+        }
+
+        static int s_retries;
+
+        /// <summary>
+        /// 못 채운 방을 주기적으로 다시 시도한다. <see cref="TryLoad"/> 는 이미
+        /// <c>IsLoaded</c> 인 방을 건너뛰므로, 부르기만 하면 남은 방만 조회한다.
+        /// </summary>
+        static async void RetryLoopAsync()
+        {
+            while (Application.isPlaying)
+            {
+                await Awaitable.WaitForSecondsAsync(RetrySeconds);
+                if (!Enabled || s_Loading || !Completed) continue;
+                if (s_retries >= MaxRetries) continue;
+
+                int pending = 0;
+                foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
+                    if (!r.IsLoaded) pending++;
+                if (pending == 0) continue;
+
+                s_retries++;
+                Debug.Log($"[WorldBoothPublishedBootstrap] 아직 못 채운 방 {pending}실 — 재시도 {s_retries}/{MaxRetries}");
+                TryLoad();
+            }
         }
 
         static async void TryLoad()
