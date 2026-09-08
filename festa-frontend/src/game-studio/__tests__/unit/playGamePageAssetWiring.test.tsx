@@ -85,6 +85,12 @@ beforeEach(() => {
     createObjectURL,
     revokeObjectURL: vi.fn(),
   }));
+  // S15P21A604-409/-477 — 로컬 .env.local(VITE_USE_MOCK=true)이 있으면 PlayGamePage가
+  // 브라우저 mock 게시 저장소로 라우팅돼 아래 global fetch 스텁이 개입할 여지가 없어진다.
+  // isBrowserPublicationEnabled()가 accessor로 바뀐 뒤에도 이 stub이 실제로 반영되는지가
+  // 이 파일의 핵심 검증 대상이다.
+  vi.stubEnv('VITE_USE_MOCK', 'false');
+  vi.stubEnv('VITE_GAME_STUDIO_API_ENABLED', 'true');
 });
 
 afterEach(() => {

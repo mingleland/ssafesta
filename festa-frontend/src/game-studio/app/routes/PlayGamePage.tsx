@@ -9,6 +9,7 @@ import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepo
 import { createApiGameAssetRepository } from '../../studio/assets/remoteAssetRepository.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { useResolvedAssetUrls } from '../../studio/assets/useResolvedAssetUrls.ts';
+import { isBrowserPublicationEnabled } from '../runtimeConfig.ts';
 
 const NO_ASSETS = [] as const;
 
@@ -86,6 +87,14 @@ export const PlayGamePage = () => {
     return browserPublicationEnabled ? createBrowserPublicationPorts() : null;
   }, []);
   const parsedGameId = Number(gameId);
+  // S15P21A604-409/-477 — 이전엔 모듈 최상단 상수로 import 시점에 한 번만 읽혀서, 테스트가
+  // vi.stubEnv를 beforeEach에서 불러도 반영되지 않고 로컬 .env.local 값에 좌우됐다. 컴포넌트
+  // 마운트 시점(이른 return들보다 먼저 호출 — Hooks 규칙 준수)에 isBrowserPublicationEnabled()
+  // accessor로 읽도록 옮겨서 그 클래스의 버그 자체가 생기지 않게 한다. 참조 안정성(마운트
+  // 동안 안 바뀜)은 그대로 유지된다.
+  const browserPublicationPorts = useMemo(() => (
+    isBrowserPublicationEnabled() ? createBrowserPublicationPorts() : null
+  ), []);
   if (!Number.isSafeInteger(parsedGameId) || parsedGameId < 1) {
     return <main className="grp-loading"><strong>FESTA Game Player</strong><p>올바르지 않은 게임 ID입니다.</p><button onClick={() => void navigate('/app/world')} type="button">월드로 돌아가기</button></main>;
   }
