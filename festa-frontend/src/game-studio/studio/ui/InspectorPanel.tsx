@@ -322,11 +322,26 @@ export const InspectorPanel = ({
             </label>
           )}
           {component.type === 'INTERACTABLE' && (
-            <CommitInput
-              label="상호작용 안내 문구"
-              onCommit={(prompt) => replace({ type: 'INTERACTABLE', prompt })}
-              value={component.prompt}
-            />
+            <>
+              {/* S15P21A604-534 — {...component, prompt}로 합성해야 range를 같이
+                  들고 있는다. {type:'INTERACTABLE', prompt}처럼 새로 만들면 이미
+                  설정해 둔 range가 문구를 고칠 때마다 조용히 사라진다. */}
+              <CommitInput
+                label="상호작용 안내 문구"
+                onCommit={(prompt) => replace({ ...component, prompt })}
+                value={component.prompt}
+              />
+              <label className="gss-field">
+                <span>상호작용 거리</span>
+                <input
+                  max={100}
+                  min={1}
+                  onChange={(event) => replace({ ...component, range: Number(event.target.value) })}
+                  type="number"
+                  value={component.range ?? 1}
+                />
+              </label>
+            </>
           )}
           {component.type === 'PICKUP' && (
             <label className="gss-field">
