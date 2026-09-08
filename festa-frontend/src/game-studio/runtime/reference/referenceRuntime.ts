@@ -35,6 +35,14 @@ export interface ReferenceRuntimeState {
   readonly playerHealth: number;
   readonly maxPlayerHealth: number;
   readonly invulnerableUntilTick: number;
+  // S15P21A604-526 — damagePlayer()가 실제로 체력을 깎을 때(무적 시간 중이 아닐 때)마다
+  // 그 순간의 피해량과 tick을 남긴다. UI(ReferenceGamePlayer)가 이 값의 변화를 감지해
+  // 캐릭터 위에 "-N" 플로팅 표시를 띄우는 데 쓴다. 무적 시간 가드에 걸려 damagePlayer가
+  // 조기 반환되는 호출은 실제 피해가 없었던 것이므로 이 값을 건드리지 않는다 — 그래야
+  // 연속 접촉 중에도 표시가 중복으로 뜨지 않는다. 체력이 0이 되는 마지막 피격(리스폰이든
+  // 게임오버든)에도 예외 없이 갱신된다.
+  readonly lastDamageAmount: number | null;
+  readonly lastDamageTick: number;
   readonly score: number;
   readonly defeatedEnemies: number;
   readonly elapsedMs: number;
@@ -149,6 +157,8 @@ export const startReferenceRuntime = (project: GameProject): ReferenceRuntimeSta
     playerHealth: 3,
     maxPlayerHealth: 3,
     invulnerableUntilTick: -1,
+    lastDamageAmount: null,
+    lastDamageTick: -1,
     score: 0,
     defeatedEnemies: 0,
     elapsedMs: 0,
@@ -199,7 +209,15 @@ const damagePlayer = (
 ): ReferenceRuntimeState => {
   if (state.tickCount < state.invulnerableUntilTick) return state;
   const remaining = state.playerHealth - amount;
-  if (remaining > 0) return { ...state, playerHealth: remaining, invulnerableUntilTick: state.tickCount + 8 };
+  if (remaining > 0) {
+    return {
+      ...state,
+      playerHealth: remaining,
+      invulnerableUntilTick: state.tickCount + 8,
+      lastDamageAmount: amount,
+      lastDamageTick: state.tickCount,
+    };
+  }
   if ((project.rules ?? DEFAULT_GAME_RULES).playerDefeat === 'END_GAME') {
     return {
       ...state,
@@ -208,6 +226,8 @@ const damagePlayer = (
         code: 'PLAYER_DEFEATED',
         message: '체력이 모두 소진되었습니다. 다시 도전해 보세요.',
       }),
+      lastDamageAmount: amount,
+      lastDamageTick: state.tickCount,
     };
   }
   return {
@@ -217,6 +237,8 @@ const damagePlayer = (
     verticalVelocity: 0,
     jumpHoldTicks: 0,
     invulnerableUntilTick: state.tickCount + 8,
+    lastDamageAmount: amount,
+    lastDamageTick: state.tickCount,
   };
 };
 

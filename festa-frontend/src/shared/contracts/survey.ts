@@ -41,14 +41,24 @@ export interface SurveyResultVM {
   textAnswers: { items: string[]; page: number; hasNext: boolean };
 }
 
+// answeredCount = **그 문항에 답한 응답 수**. 비율의 분모는 이것이다 — 서버는 비율을 주지 않고
+// 화면이 count / answeredCount 로 계산한다(계약 §7). 전체 응답 수와 다를 수 있다: 선택 문항을
+// 건너뛴 사람이 있기 때문이다. 복수선택은 합이 100% 를 넘고 그게 정상이다.
+//
+// 텍스트 3유형은 이 VM 에 자리가 없어 mapper 가 거른다(계약 §9 가 명시적으로 허용한 제외).
 export type SurveyQuestionAggregateVM =
-  | { questionId: string; kind: 'choice'; counts: { optionId: string; label: string; count: number }[] }
-  // FR-006 — 별점은 평균·분포를 함께 제공한다
+  | {
+      questionId: string;
+      kind: 'choice';
+      answeredCount: number;
+      counts: { optionId: string; label: string; count: number }[];
+    }
+  // FR-006 — 별점은 평균·분포를 함께 제공한다. 응답 0건이면 average 는 null 이다(0 으로 나누지 않는다)
   | {
       questionId: string;
       kind: 'rating';
-      average: number;
-      count: number;
+      answeredCount: number;
+      average: number | null;
       distribution: { value: number; count: number }[];
     };
 

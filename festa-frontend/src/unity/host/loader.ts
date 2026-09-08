@@ -16,10 +16,15 @@ declare global {
   }
 }
 
-// 렌더 해상도 상한 (S15P21A604-484). Unity 는 config 에 devicePixelRatio 가 없으면
-// window.devicePixelRatio 를 그대로 쓴다 — 게임 파트 실측에서 DPR 2.2 가 표시 크기의 4.84배
-// (백버퍼 2880x1530 vs CSS 1309x695)를 그려 정지 상태에서도 GPU 22.0ms 로 vsync 예산 16.7ms 를
-// 넘겼다. 1.5 면 2.25배가 된다.
+// 렌더 해상도 상한 (S15P21A604-484 · 근거 정정 -524). Unity 는 config 에 devicePixelRatio 가
+// 없으면 window.devicePixelRatio 를 그대로 쓴다 — 게임 파트 실측에서 상한 없이 표시 크기의
+// **약 3.1배**를 그렸고(URP Mobile_RPAsset 의 renderScale 0.8 을 반영한 실효값), 그 상태에서
+// **최악 프레임 시간**이 vsync 예산 16.7ms 를 넘겼다. GPU 시간이 아니다 — 게임 파트 계측기
+// (PerfHud)에 GPU 측정은 없고 그 값은 최근 1초 창의 최악 프레임 시간이다 (#143 2026-09-08 정정).
+//
+// 상한 적용 후 실측 (2026-09-08, FE 임베드·게스트·보이는 탭):
+//   백버퍼 2880x1418 (4.08MP) → 2160x1064 (2.30MP) · 실효 DPR 2.0 → 1.5 · 픽셀 -44%
+// 1.5 가 적절한 값이라는 것도 같은 회차에 확인됐다 — 글자·외곽선이 거칠어지지 않았다.
 //
 // 이 값은 **createUnityInstance 를 부르는 쪽에서만** 정할 수 있다. Unity 안에서
 // Screen.SetResolution 으로 낮추면 로더의 matchWebGLToCanvasSize 가 다음 프레임에 되돌려
