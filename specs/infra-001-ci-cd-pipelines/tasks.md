@@ -33,6 +33,14 @@
 
 ---
 
+### 운영 실측 (2026-09-09)
+
+- [X] `festa-gitlab-develop/develop`이 GitLab `develop` push로 자동 실행되고, `SELECTED_COMPONENTS: ai, back, front, game; deploy disabled in Phase 2`를 출력함을 확인했다.
+- [X] 새 Multibranch Job에서 selection artifact를 기록하고 AI·Back·Front·Game CI 순서로 진입하며, Phase 2에서 dev 컨테이너를 재생성하지 않음을 확인했다.
+- [X] Unity CI의 Missing Prefab 실패는 `festa-unity/Assets/_Project/Scenes/main.unity` 기존 소스 결함으로 분리한다. selector·Multibranch·agent 연결 실패로 처리하지 않는다.
+
+---
+
 ## Phase 3: User Story 1 - 파트 변경을 독립적으로 검증하고 dev에 배포한다 (Priority: P0) 🎯 MVP
 
 **Goal**: Squash Merge된 `develop`의 변경 컴포넌트만 모두 검증한 뒤 하나의 dev batch로 안전하게 반영한다.
