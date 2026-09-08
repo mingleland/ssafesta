@@ -1,14 +1,15 @@
 # Booth 에셋 공급 사슬 — 전체 구조 실측
 
-> 2026-09-08 · 조사자 이정헌(FE) · 정본 `origin/develop` **`c9960d41`**
+> 2026-09-08 조사 · **같은 날 라이선스 PASS 로 갱신(§3-2)** · 조사자 이정헌(FE)
+> 조사 시점 정본 `origin/develop` **`c9960d41`**
 > 근거는 전부 저장소 실측이다. 코드·커밋·registry 를 문서 주장보다 우선했다.
-> **조사만 했다** — 이 회차에 코드·registry·lock 은 손대지 않았다.
+> 조사 회차에는 아무것도 고치지 않았다. **`lock` 만 이후 라이선스 PASS 판단을 반영해 갱신했다**(§3-2) — Unity registry·prefab 은 그대로다.
 
 ## 0. 왜 이 문서가 있나
 
 `-480` 시각 acceptance 를 마친 뒤 *"실 에셋을 도입한다면?"* 이라는 질문이 나왔고, 그 답이 FE 안에서 나오지 않았다. 그래서 front 만 보지 않고 **원본 3D → Unity → Spring → FE → 빌드 → R3F** 전 구간을 한 번 실측했다.
 
-결론부터: **막고 있는 것은 하나다 — 벤더 에셋의 웹 변환·재배포 권리 증빙.** 나머지는 이미 결정돼 있거나 이미 구현돼 있다.
+조사 결론은 *"막고 있는 것은 벤더 에셋의 웹 변환·재배포 권리 증빙 하나"* 였고, **그 하나가 같은 날 닫혔다**(§3-2). 남은 것은 기술 본류다 — `-527` 다중 재질 보존부터.
 
 ---
 
@@ -28,7 +29,7 @@ Spring catalog   catalog_items — AVATAR_PART 97행. 부스 장식 0행. 스키
 FE assetCode     booth-assets.config.mjs(손으로 4종) · visualAssets.ts 팔레트(목업 7종)
   ↓ 생성:수동   node tools/assets/build-booth-assets.mjs → compile-runtime-assets.mjs
 generated        .generated/runtime/{*.glb,*.webp,manifest.json}        [.gitignore:35]
-  ↓ 배포        ✗ 미연결 — 의도된 게이트(§3-2)
+  ↓ 배포        ✗ 미연결 — 라이선스 게이트는 풀렸다(§3-2). 남은 것은 빌드 단계 연결(본류 P4)
 R3F consumer     boothAssetCache.loadGlb (URL 단위 lazy) → AssetMesh
 ```
 
@@ -70,24 +71,33 @@ BOOTH_PACKS = ExpoKit | ithappy/Casino_Free | _Project/Models(Laptop)
 
 FE 단독 불가 사유: Unity 도 같은 원본을 소비한다. 포맷이 GLB 로 바뀌면 Unity 쪽 `gltfast` 배선(현재 사용처 0건)이 필요하다.
 
-### 3-2. 웹 변환·최적화·재배포 권리 — **CROSS_PART · 현재 유일한 블로커**
+### 3-2. 웹 변환·최적화·재배포 권리 — **해소됨 (2026-09-08)**
 
-전수 확인 결과 **근거 0건**이다.
+조사 시점에는 저장소 근거가 0건이었고 이것이 유일한 블로커였다. `#148` 회신과 사용자 판단으로 닫혔다.
+
+**출처는 확정됐다** — 회신이 준 상품 매핑을 `AssetOrigin` 전수 실측으로 대조했다. 혼재·누락 0.
+
+| 팩 | 원본 상품 | mesh `.meta` 매핑 |
+|---|---|---|
+| `ExpoKit` | **Stand Expo Pack** (114974) / AndragorInc · 유료 | **22/22** |
+| `ithappy/Casino_Free` | **Casino FREE - Low Poly Asset Pack** (393074) / ithappy · 무료 | **95/95** |
+| `_Project/Models/Laptop` | **Laptop Free** (90315) | **1/1** |
+
+세 팩 모두 Unity Asset Store Standard EULA 다(`Laptop` 은 상품별 표기 미확인).
+
+> **조사 당시 판정 정정** — *"저장소에 라이선스 근거가 전혀 없다"* 는 절반 틀렸다. 라이선스 **파일**은 없지만 `.meta` 의 `AssetOrigin` 블록에 **상품 식별 메타데이터가 100% 있었다.** `.meta` 를 guid 용으로만 읽은 것이 원인이다.
+
+**배포 판정은 사용자가 내렸다.** 게임 파트 회신은 출처·약관 종류 확인까지이고 배포 허용을 선언하지 않았다 — 그 판단은 사용자 몫이었고, 2026-09-08 다음과 같이 확정됐다.
 
 ```text
-LICENSE/NOTICE/ThirdPartyNotices   벤더 3D 팩에 하나도 없음
-                                   (있는 3건은 폰트 2 + Sketchfab Curtain 1 — 부스 미사용)
-source-packs.lock.json             ExpoKit·ithappy 모두 licenseClass UNKNOWN · evidence null
-선언조차 안 된 팩                   Palmov·castles·danthaigames → compile: false
-커밋 이력                          라이선스 확인을 기록한 커밋 0건 (git log --all --grep 전수)
-반대 방향 기록                     docs/24:220 — "공개 저장소에 그대로 올리면 재배포 문제가 된다"
+LICENSE_ACQUISITION               PASS
+LICENSE_RUNTIME_USE               PASS
+PRODUCTION_EMISSION_LICENSE_GATE  PASS
 ```
 
-그리고 코드가 이 판단을 구현자에게 금지한다 — lock 파일 `reviewGuidance`: *"사람이 확인해 evidence 를 채워야 한다. AI 가 임의로 올리지 않는다."*
+`source-packs.lock.json` 세 팩 모두 `ALLOW_RUNTIME_COMPILE` 이고 `canEmitProduction()` 이 `true` 다. **추가 publisher 문의·EULA 재해석은 이 본류에서 진행하지 않는다.**
 
-**프로덕션 미배포는 누락이 아니라 이 게이트의 결과다.** `runtime.ts:53-60` 이 그 경계를 주석으로 적어 두었고, `canEmitProduction()` 이 `false` 인 동안 산출물은 `.generated/` 밖으로 나가지 않는다.
-
-→ **GitLab `#148`** 로 출처·라이선스 근거를 요청했다(2026-09-08).
+증빙에 포함되지 않은 것은 lock 의 `evidence.notVerified` 에 그대로 남겨 두었다 — 구매 계정·주문번호·seat 범위, `Laptop` 퍼블리셔.
 
 ### 3-3. 기존 벤더 자산 폐기 vs 병행 — **ALREADY_DECIDED**
 
@@ -134,7 +144,7 @@ blame  tasks.md:37   ff3c19702  강형순  2026-09-06 01:05
 | thumbnail 생성 | 있음 — 256px webp, manifest 에 실림 | `pipeline.mjs` `renderToRaw`+`encodeWebp` |
 | thumbnail 소비 | **없음** — 팔레트가 `data-kind` CSS 아트 | `AssetPalette.tsx` |
 | production URL seam | 있음 — CDN override + 테스트 | `runtime.ts:53` · `boothAssetUrl.test.ts:22` |
-| dist 배포 단계 | **없음(의도)** | §3-2. `PUBLIC_BOOTH_ASSET_BASE` 주입도 미연결 |
+| dist 배포 단계 | **없음** — 이제 라이선스가 아니라 미구현이다 | §3-2 해소. `PUBLIC_BOOTH_ASSET_BASE` 주입과 함께 본류 P4 |
 
 `dist/assets/booth-runtime/` 에 떨어뜨리면 dev 라우트와 같은 경로라 **nginx 변경 0** 이다(`nginx.conf:14` `try_files $uri`). 선례도 있다 — `docs/26:143` 은 manifest URL 해석을 *"FE 가 base 기준으로 해석한다 (2026-09-05, **FE 판단·구현 완료**)"* 로 닫았다.
 
@@ -143,11 +153,11 @@ blame  tasks.md:37   ff3c19702  강형순  2026-09-06 01:05
 ## 5. 남은 것
 
 ```text
-막힌 것 1건    벤더 3팩의 출처·라이선스 근거          → GitLab #148 (대기)
-구현 backlog   Spring 장식 카탈로그                  → spec 012 장식 범위 (P1, 2차 MVP)
-FE 판단 가능   dist 배포 단계 · PUBLIC_BOOTH_ASSET_BASE 주입 · thumbnail 연결
-               ※ 단 canEmitProduction() 이 false 인 동안 배포 단계는 붙이지 않는다
-기술적 유효    -527 다중 재질 보존 — FBX/prefab 을 계속 쓰는 한 필수
+해소됨         벤더 3팩 라이선스 — 2026-09-08 PASS (§3-2). lock 세 팩 ALLOW_RUNTIME_COMPILE
+구현 backlog   Spring 장식 카탈로그 → spec 012 장식 범위 (P1, 2차 MVP)
+본류 P0        -527 다중 재질 보존 — FBX/prefab 을 계속 쓰는 한 필수
+본류 P1~P5     자산 coverage 확대 · thumbnail 팔레트 연결 · assetCode drift 방지
+               · production 빌드 단계 연결 · 전체 parity acceptance
 ```
 
-**`#148` 답변이 오면**: 팩별 `ALLOW / REVIEW / BLOCK` 재판정 → `evidence` 기입 → production emission 재개 여부와 `-527` 착수 순서를 그때 정한다. 답변 전까지 lock 을 승격하지 않는다.
+2.5D 정본 방향은 그대로다 — **Unity 실제 자산 → Runtime Asset Compiler → 경량 runtime 3D → R3F 2.5D Booth Studio.**
