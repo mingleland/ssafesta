@@ -33,7 +33,7 @@ def call(Map config = [:]) {
 
     if (component == 'game') {
         node('unity-6000.0.78f1') {
-            ws("/home/jenkins/agent/unity/workspaces/${env.JOB_NAME.replaceAll(/[^A-Za-z0-9_.-]/, '_')}-${env.BUILD_NUMBER}/develop") {
+            ws('/home/jenkins/agent/unity/workspaces/develop-game') {
                 checkout scm
                 sh "git checkout --detach '${sourceSha}'"
                 runCi()

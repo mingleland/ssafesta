@@ -59,6 +59,10 @@ run_case '["back","front"]' '["back","front"]' component-source backend/src/main
 run_case '["ai","back","front","game"]' '[]' shared-ci Jenkinsfile
 run_case '[]' '[]' docs-only specs/infra-001-ci-cd-pipelines/notes.md
 
+head="$(git rev-parse HEAD)"
+output="$(BRANCH_NAME=develop "${detector}" --head "${head}")"
+assert_selection "${output}" '[]' '[]' docs-only
+
 base="$(git rev-parse HEAD)"
 commit_paths infra/environments/compose/dev/unknown.yaml
 head="$(git rev-parse HEAD)"
