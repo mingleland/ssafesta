@@ -9,6 +9,7 @@
 //
 // GUI 조작은 파이프라인 정본이 아니다 — 여기 있는 것은 전부 명령으로 다시 돌릴 수 있다.
 import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, flatten, join, prune, quantize, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 
@@ -18,8 +19,16 @@ export const TOOLCHAIN = {
   imageCodec: 'sharp',
 };
 
+/**
+ * 확장을 **반드시 등록한다.** 등록하지 않으면 `quantize()` 가 붙인
+ * `KHR_mesh_quantization` 이 파일에 안 써지고(`Some extensions were not registered for I/O`),
+ * `POSITION` 은 정규화된 SHORT 인데 그것을 선언하는 extension 이 없는 **스펙 위반 GLB** 가 나온다.
+ *
+ * 관대한 로더는 읽어 주지만 엄격한 쪽은 거부하고, 우리 자체 래스터라이저는 그 좌표를
+ * float 로 읽어 썸네일을 파편 덩어리로 만들었다.
+ */
 export function createIO() {
-  return new NodeIO();
+  return new NodeIO().registerExtensions(ALL_EXTENSIONS);
 }
 
 /**
