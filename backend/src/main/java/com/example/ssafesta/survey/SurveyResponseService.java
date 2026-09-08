@@ -78,16 +78,26 @@ public class SurveyResponseService {
      * <p><b>Both live in one transaction.</b> 헌법 20조 wants the coin movement and the thing that
      * earned it to commit together; {@code WalletService} propagates {@code REQUIRED} throughout, so
      * it joins this one rather than opening its own.
+     *
+     * <p><b>The survey is read after the booth lock, not before.</b> An editor may change
+     * {@code rewardCoin} and {@code closesAt} even once responses exist (C-08), and it holds the
+     * booth write lock while doing so. A survey loaded before this lock is a snapshot from before
+     * that edit — so the payout would be the old amount and a survey closed a moment ago would
+     * still accept answers. Only the booth id is read first, because the lock needs it.
      */
     @Transactional
     public SubmitResult submit(Long surveyId, Respondent respondent, SubmitCommand command) {
-        Survey survey = surveys.findById(surveyId)
+        Long boothId = surveys.findBoothIdById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
-        accessGuard.requireVisitorVisible(survey.getBoothId());
+        accessGuard.requireVisitorVisible(boothId);
         // 편집이 문항을 바꾸는 동안 답을 넣으면 survey_answers.question_id FK 에 걸린다.
         // 공유 락이라 응답자끼리는 줄 서지 않는다.
-        booths.findWithSharedLockById(survey.getBoothId())
-                .orElseThrow(() -> new BoothNotFoundException(survey.getBoothId()));
+        booths.findWithSharedLockById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+
+        // 설문은 락을 잡은 뒤에 읽는다. 그 전에 읽으면 지급액·마감이 락이 막고 있는 편집보다
+        // 오래된 값이 된다.
+        Survey survey = surveys.findById(surveyId)
+                .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
 
         if (survey.isClosedAt(Instant.now())) {
             throw new ApiException(ErrorCode.SURVEY_CLOSED);

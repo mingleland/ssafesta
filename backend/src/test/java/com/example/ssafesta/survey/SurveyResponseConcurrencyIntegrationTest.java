@@ -35,6 +35,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -70,6 +72,8 @@ class SurveyResponseConcurrencyIntegrationTest {
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private PlatformTransactionManager transactions;
+    @Autowired private BoothRepository boothsForLock;
     @Autowired private JsonMapper jsonMapper;
 
     @BeforeEach
@@ -131,6 +135,61 @@ class SurveyResponseConcurrencyIntegrationTest {
                 SurveyResponseService.rewardKey(13L, 7L), "설문이 다르면 키도 달라야 합니다.");
     }
 
+
+    /**
+     * 편집이 보상을 올리는 중에 들어온 제출은 <b>올린 값</b>으로 지급받아야 한다.
+     *
+     * <p>제출이 설문을 부스 락보다 먼저 읽으면, 락이 막고 있는 바로 그 편집보다 오래된 값을 들고
+     * 통과한다 — 락을 잡은 의미가 없어지고 지급액이 틀린다. 편집자 스레드가 락을 쥔 채 보상을
+     * 5에서 10으로 올린 뒤 커밋하고, 그동안 제출은 락 앞에서 기다린다. 기다렸다 통과한 제출이
+     * 5를 지급하면 그것이 이 결함이다.
+     *
+     * <p>래치로 순서를 고정한다 — 편집자가 락을 잡고 값을 바꾼 뒤에야 제출이 출발하므로, 제출이
+     * 먼저 공유 락을 가져가 편집자를 막는 반대 경합은 생기지 않는다.
+     */
+    @Test
+    void aSubmissionWaitingOnTheLockIsPaidTheEditedReward() throws Exception {
+        Fixture fixture = fixture("보상변경");
+        int before = balanceOf(fixture.ownerId());
+        CountDownLatch editorHoldsLock = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> editor = pool.submit(() -> new TransactionTemplate(transactions).execute(status -> {
+                boothsForLock.findWithLockById(fixture.boothId()).orElseThrow();
+                jdbc.update("UPDATE surveys SET reward_coin = ? WHERE id = ?", 10, fixture.surveyId());
+                editorHoldsLock.countDown();
+                sleepQuietly(400);
+                return null;
+            }));
+
+            Future<Integer> submitter = pool.submit(() -> {
+                editorHoldsLock.await();
+                return submissions.submit(fixture.surveyId(),
+                        SurveyResponseService.Respondent.member(fixture.ownerId()),
+                        answer(fixture.questionId())).rewardedCoin();
+            });
+
+            editor.get(30, TimeUnit.SECONDS);
+            assertEquals(10, submitter.get(30, TimeUnit.SECONDS),
+                    "락을 기다렸다 통과한 제출은 편집이 커밋한 보상액을 지급해야 합니다 — "
+                            + "5가 나오면 설문을 락보다 먼저 읽은 것입니다.");
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(before + 10, balanceOf(fixture.ownerId()), "지갑에도 올린 값이 들어가야 합니다.");
+        assertBalanceMatchesLedger(fixture.ownerId());
+    }
+
+    private static void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     // ── 픽스처 ──────────────────────────────────────────────────────────────
 
     private SurveyResponseService.SubmitCommand answer(Long questionId) {
@@ -153,7 +212,7 @@ class SurveyResponseConcurrencyIntegrationTest {
                         .header("Authorization", bearer))
                 .andReturn().getResponse().getContentAsString());
         return new Fixture(view.get("surveyId").asLong(),
-                view.get("questions").get(0).get("questionId").asLong(), ownerId);
+                view.get("questions").get(0).get("questionId").asLong(), ownerId, boothId);
     }
 
     private List<Outcome> runTogether(int threads, TaskFactory factory) throws Exception {
@@ -206,7 +265,7 @@ class SurveyResponseConcurrencyIntegrationTest {
                 "잔액과 원장 합계가 일치해야 합니다 (spec 003 I-1) — userId=" + userId);
     }
 
-    private record Fixture(Long surveyId, Long questionId, Long ownerId) { }
+    private record Fixture(Long surveyId, Long questionId, Long ownerId, Long boothId) { }
 
     private enum Outcome { SUCCESS, DUPLICATE, OTHER }
 

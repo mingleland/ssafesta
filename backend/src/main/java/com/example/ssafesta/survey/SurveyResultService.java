@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -63,8 +64,15 @@ public class SurveyResultService {
      * <p>Four {@code GROUP BY} reads plus the first text page, computed live rather than kept in a
      * counter column (C-04) — a stored total is a second thing that can disagree with the answers,
      * and SC-001 asks for the opposite of that.
+     *
+     * <p><b>{@code REPEATABLE_READ} because the five reads have to agree with each other.</b> Under
+     * the default {@code READ_COMMITTED} each statement takes its own snapshot, so a submission
+     * landing between them can put {@code answeredCount} above {@code totalResponses} — numbers
+     * that never described any real state of the survey. One snapshot for the whole method costs
+     * nothing here: a read-only transaction cannot lose a serialization conflict in PostgreSQL's
+     * repeatable read.
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ResultsView results(Long surveyId, Long userId) {
         Survey survey = requireEditableSurvey(surveyId, userId);
 
@@ -167,11 +175,15 @@ public class SurveyResultService {
     /**
      * The pages after the one {@link #results} embeds (FR-008).
      *
+     * <p>Same single snapshot as {@link #results}: {@code totalElements} and the rows are counted
+     * and read by two statements, and a page whose total disagrees with its own content is worse
+     * than a page one submission out of date.
+     *
      * @param questionId one text question, or {@code null} for all three text types
      * @throws ApiException {@code VALIDATION_FAILED} for a negative page, a size outside 1~100, or a
      *                      {@code questionId} belonging to another survey
      */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public TextAnswerPage textAnswers(Long surveyId, Long userId, Long questionId, int page, int size) {
         requireEditableSurvey(surveyId, userId);
         if (page < 0) {
@@ -190,7 +202,7 @@ public class SurveyResultService {
     private TextAnswerPage page(Long surveyId, Long questionId, int page, int size) {
         long total = answers.countTextAnswers(surveyId, questionId);
         List<TextAnswerView> content = answers
-                .findTextAnswers(surveyId, questionId, size, page * size).stream()
+                .findTextAnswers(surveyId, questionId, size, (long) page * size).stream()
                 .map(row -> new TextAnswerView(row.getResponseId(), row.getQuestionId(), row.getText()))
                 .toList();
         return new TextAnswerPage(content, page, size, total,
