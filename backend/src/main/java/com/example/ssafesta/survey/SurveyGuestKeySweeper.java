@@ -56,10 +56,12 @@ class SurveyGuestKeySweeper {
 
     private final JdbcTemplate jdbc;
     private final AuthProperties auth;
+    private final SurveyProperties survey;
 
-    SurveyGuestKeySweeper(JdbcTemplate jdbc, AuthProperties auth) {
+    SurveyGuestKeySweeper(JdbcTemplate jdbc, AuthProperties auth, SurveyProperties survey) {
         this.jdbc = jdbc;
         this.auth = auth;
+        this.survey = survey;
     }
 
     /**
@@ -75,13 +77,22 @@ class SurveyGuestKeySweeper {
      * {@code exp + app.auth.jwt-clock-skew} ({@code JwtTimestampValidator}), so clearing at
      * {@code exp} leaves a window where a request still authenticates while its duplicate-guard key
      * is already gone — that same token could then answer the same survey twice. A request
-     * authenticated just before {@code exp} and still running is the same race. Subtracting the skew
-     * closes both: the newest row a pass can touch belongs to a token no request can still use.
+     * closes the first: a token past {@code exp + skew} cannot start a new request.
+     *
+     * <p><b>And it waits out requests already running.</b> A request authenticated just before
+     * {@code exp} can still be in the server — blocked on the booth lock, say — after the skew has
+     * passed. Clearing its guard key before it commits lets it insert a duplicate. So the cut is
+     * pushed back by {@code app.survey.guest-key-grace} as well. <b>That is a bound, not a proof</b>:
+     * it is sized well past how long a request can live, and the alternative — keeping the
+     * identifier until nothing could conceivably be running — is keeping it forever, which is the
+     * thing 12조 forbids.
      */
     @Scheduled(fixedDelayString = "PT5M")
     @Transactional
     public void clearExpiredGuestKeys() {
-        Instant unusableBefore = Instant.now().minus(auth.jwtClockSkew());
+        Instant unusableBefore = Instant.now()
+                .minus(auth.jwtClockSkew())
+                .minus(survey.guestKeyGrace());
         int cleared = jdbc.update(CLEAR, Timestamp.from(unusableBefore));
         if (cleared > 0) {
             log.info("만료된 게스트 세션 흔적 {}건을 설문 응답에서 지웠습니다 (헌법 12조).", cleared);

@@ -355,7 +355,7 @@ class SurveyResponseApiIntegrationTest {
         submitAsGuest(s);
         assertThat(guestKeyOf(s)).startsWith("guest:");
 
-        expireSession(s, "now() - interval '5 minutes'");
+        expireSession(s, "now() - interval '30 minutes'");
         guestKeySweeper.clearExpiredGuestKeys();
 
         Long responseId = jdbc.queryForObject(
@@ -424,6 +424,27 @@ class SurveyResponseApiIntegrationTest {
 
         assertThat(guestKeyOf(s))
                 .as("토큰이 아직 유효한데 지우면 같은 토큰이 다시 답할 수 있습니다.")
+                .startsWith("guest:");
+    }
+
+    /**
+     * 스큐를 지났어도 <b>실행 중일 수 있는 요청</b>이 끝날 때까지는 지우지 않는다.
+     *
+     * <p>만료 직전에 인증된 요청이 부스 락 등에서 대기하다 스큐가 지난 뒤에 커밋할 수 있다. 그
+     * 전에 중복 방지 키가 사라지면 그 요청이 중복 응답을 그대로 넣는다. `app.survey.guest-key-grace`
+     * 가 그 창을 덮는다 — 증명이 아니라 요청 수명보다 넉넉히 잡은 경계다.
+     */
+    @Test
+    void aKeyIsKeptUntilAnyInFlightRequestCouldHaveFinished() throws Exception {
+        Survey s = survey("유예창", 0);
+        submitAsGuest(s);
+
+        // 스큐(60초)는 지났지만 유예(10분) 안이다.
+        expireSession(s, "now() - interval '5 minutes'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("실행 중이던 요청이 아직 커밋할 수 있는 동안 키를 지우면 중복 응답이 들어갑니다.")
                 .startsWith("guest:");
     }
 

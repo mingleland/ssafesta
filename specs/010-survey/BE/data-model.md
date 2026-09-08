@@ -216,7 +216,14 @@ closed = endsAt != null && !endsAt.isAfter(Instant.now())
 
 **지우는 것은 두 칸이다.** `respondent_guest_key` 는 `expired:{id}` 로 **대체**한다 — `ck_survey_responses_respondent` 가 XOR 이라 `NULL` 로 비우면 위반하고, 행마다 유일한 값이라 부분 유니크 인덱스도 그대로다. `respondent_session_expires_at` 은 **`NULL` 로 비운다** — 같은 토큰으로 낸 응답들은 `exp` 가 마이크로초까지 같아서, 남겨 두면 키를 지운 뒤에도 한 사람의 답을 설문 간에 묶을 수 있다. 12조가 지우라는 것이 그 연결이다. **응답 행과 답은 지우지 않는다**: 응답은 그것을 수집한 부스의 것이고, 방문자 세션이 끝났다고 운영자의 집계가 줄어들면 안 된다.
 
-**언제 지우는가 — `exp` 가 아니라 `exp + 허용 오차`다.** 디코더는 `exp + app.auth.jwt-clock-skew`(60초, `JwtTimestampValidator`)까지 토큰을 받아 준다. `exp` 에 지우면 그 사이에 **아직 인증되는 토큰**이 중복 방지 키 없이 한 번 더 답할 수 있고, 만료 직전에 인증돼 실행 중인 요청도 같은 경합이다. 그래서 skew 를 설정으로 꺼내 `JwtConfiguration` 과 sweeper 가 **같은 값**을 읽는다 — Spring 기본값에 기대면 두 숫자가 조용히 어긋난다.
+**언제 지우는가 — `exp + 허용 오차 + 유예`다.** 세 조각이 각각 다른 것을 막는다.
+
+| 조각 | 막는 것 |
+|---|---|
+| `exp` | 세션 자체 |
+| `+ app.auth.jwt-clock-skew`(60초) | 디코더가 `exp` 뒤에도 그만큼 토큰을 받아 준다(`JwtTimestampValidator`) — 그 사이에 지우면 **아직 인증되는 토큰**이 중복 방지 없이 다시 답한다. skew 를 설정으로 꺼내 `JwtConfiguration` 과 sweeper 가 **같은 값**을 읽는다. Spring 기본값에 기대면 두 숫자가 조용히 어긋난다 |
+| `+ app.survey.guest-key-grace`(10분) | 만료 직전에 인증된 요청이 부스 락 등에서 대기하다 스큐가 지난 뒤 커밋할 수 있다. 그 전에 키가 사라지면 **실행 중이던 요청**이 중복 응답을 넣는다. **이것은 증명이 아니라 경계다** — 요청 하나가 살아 있을 수 있는 시간보다 넉넉히 잡았고, 완전히 없애려면 식별자를 영원히 남겨야 하는데 그것이 12조가 금하는 것이다 |
+
 
 롤백 `db/rollback/V23__rollback.sql` — 컬럼과 인덱스만 없어지고 응답·답·집계는 그대로다.
 
