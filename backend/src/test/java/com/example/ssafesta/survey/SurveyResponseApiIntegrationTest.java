@@ -67,6 +67,7 @@ class SurveyResponseApiIntegrationTest {
     @Autowired private AccessTokenService accessTokens;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private SurveyGuestKeySweeper guestKeySweeper;
 
     @BeforeEach
     void freeSlots() {
@@ -336,6 +337,170 @@ class SurveyResponseApiIntegrationTest {
                         .formatted(s.q(0), s.o(0, 0), s.q(1), s.o(1, 0), s.q(2), s.q(4),
                                 "나".repeat(2_000))))
                 .andExpect(status().isCreated());
+    }
+
+    /**
+     * 게스트 세션이 끝나면 그 식별자가 응답에서 사라진다 (헌법 12조).
+     *
+     * <p>지우는 것은 식별자 한 칸뿐이고 답은 남는다 — 응답은 그것을 수집한 부스의 것이라,
+     * 방문자 세션이 끝났다고 운영자의 결과가 사라지면 안 된다.
+     *
+     * <p><b>제출 시각이 아니라 토큰의 만료 시각으로 판정한다.</b> 여기서 제출은 방금 했고
+     * {@code submitted_at + TTL} 은 아직 한참 남았다 — 그 추정으로 지우던 시절에는 이 응답이
+     * 30분 더 남아 있었다.
+     */
+    @Test
+    void anExpiredGuestSessionLosesItsKeyButKeepsItsAnswers() throws Exception {
+        Survey s = survey("게스트만료", 0);
+        submitAsGuest(s);
+        assertThat(guestKeyOf(s)).startsWith("guest:");
+
+        expireSession(s, "now() - interval '30 minutes'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        Long responseId = jdbc.queryForObject(
+                "SELECT id FROM survey_responses WHERE survey_id = ?", Long.class, s.id);
+        assertThat(guestKeyOf(s))
+                .as("접속 토큰 주체가 남아 있으면 안 됩니다 (헌법 12조).")
+                .isEqualTo("expired:" + responseId);
+        assertThat(sessionExpiryOf(s))
+                .as("만료 시각도 세션 데이터입니다 — 남겨 두면 같은 토큰의 응답들을 exp 로 묶을 수 "
+                        + "있어 이름만 지운 셈이 됩니다.")
+                .isNull();
+        assertThat(answerCount(s.id)).as("답은 그대로여야 합니다 — 부스가 수집한 데이터입니다.")
+                .isEqualTo(4);
+        assertThat(selectedOptionCount(s.id)).isEqualTo(2);
+    }
+
+    /**
+     * {@code exp} 를 막 지난 토큰의 키는 아직 지우지 않는다.
+     *
+     * <p>디코더는 {@code exp + app.auth.jwt-clock-skew}(60초)까지 토큰을 받아 준다
+     * ({@code JwtTimestampValidator}). 그 사이에 키를 지우면 <b>아직 통과하는 토큰</b>이 중복 방지
+     * 없이 한 번 더 답할 수 있다 — 만료 직전에 인증돼 실행 중인 요청도 같은 경합이다.
+     */
+    @Test
+    void aTokenInsideTheClockSkewWindowKeepsItsKey() throws Exception {
+        Survey s = survey("스큐창", 0);
+        submitAsGuest(s);
+
+        // exp 는 지났지만 60초 스큐 안이다 — 이 토큰은 여전히 인증된다.
+        expireSession(s, "now() - interval '10 seconds'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("아직 인증되는 토큰의 중복 방지 키를 지우면 재응답이 열립니다.")
+                .startsWith("guest:");
+    }
+
+    /** 아직 살아 있는 세션의 식별자는 건드리지 않는다 — 그동안은 1인 1응답이 그것으로 성립한다. */
+    @Test
+    void aLiveGuestSessionKeepsItsKey() throws Exception {
+        Survey s = survey("게스트유효", 0);
+        submitAsGuest(s);
+
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s)).as("세션이 살아 있는 동안은 그대로 둬야 합니다.").startsWith("guest:");
+    }
+
+    /**
+     * 오래 전에 답했어도 <b>토큰이 아직 유효하면</b> 지우지 않는다.
+     *
+     * <p>{@code submitted_at + 현재 TTL} 로 추정하던 시절의 구멍이다 — TTL 을 줄여 배포하면 아직
+     * 유효한 기존 토큰의 키가 먼저 지워지고, 키가 지워진 행은
+     * {@code ux_survey_responses_guest} 에서 빠지므로 <b>같은 토큰이 같은 설문에 한 번 더 답할 수
+     * 있다.</b> 만료 시각을 적어 두면 설정을 어떻게 바꾸든 이르게 지울 수 없다.
+     */
+    @Test
+    void aStillValidSessionKeepsItsKeyEvenIfItAnsweredLongAgo() throws Exception {
+        Survey s = survey("긴세션", 0);
+        submitAsGuest(s);
+        jdbc.update("UPDATE survey_responses SET submitted_at = now() - interval '2 hours' "
+                + "WHERE survey_id = ?", s.id);
+
+        expireSession(s, "now() + interval '1 hour'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("토큰이 아직 유효한데 지우면 같은 토큰이 다시 답할 수 있습니다.")
+                .startsWith("guest:");
+    }
+
+    /**
+     * 스큐를 지났어도 <b>실행 중일 수 있는 요청</b>이 끝날 때까지는 지우지 않는다.
+     *
+     * <p>만료 직전에 인증된 요청이 부스 락 등에서 대기하다 스큐가 지난 뒤에 커밋할 수 있다. 그
+     * 전에 중복 방지 키가 사라지면 그 요청이 중복 응답을 그대로 넣는다. `app.survey.guest-key-grace`
+     * 가 그 창을 덮는다 — 증명이 아니라 요청 수명보다 넉넉히 잡은 경계다.
+     */
+    @Test
+    void aKeyIsKeptUntilAnyInFlightRequestCouldHaveFinished() throws Exception {
+        Survey s = survey("유예창", 0);
+        submitAsGuest(s);
+
+        // 스큐(60초)는 지났지만 유예(10분) 안이다.
+        expireSession(s, "now() - interval '5 minutes'");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("실행 중이던 요청이 아직 커밋할 수 있는 동안 키를 지우면 중복 응답이 들어갑니다.")
+                .startsWith("guest:");
+    }
+
+    /**
+     * V23 이전에 쌓인 게스트 행에는 만료 시각이 없다 — <b>마이그레이션이 미래로 민다.</b>
+     *
+     * <p>그 행들이 어떤 TTL 로 발급된 토큰의 것인지 마이그레이션은 알 수 없다. `submitted_at + 30분`
+     * 처럼 값을 박으면 더 긴 TTL 을 쓰던 환경에서 아직 유효한 토큰의 키를 먼저 지우고, 환경마다
+     * 파일을 고치면 checksum 이 어긋난다. 그래서 과거를 추정하지 않고 <b>적용 시점 + 1일</b>로
+     * 민다 — 정리가 하루 늦어질 뿐 이르게 지우지 않는다.
+     */
+    @Test
+    void theMigrationPushesRowsThatPredateTheExpiryColumnIntoTheFuture() throws Exception {
+        Survey s = survey("구행백필", 0);
+        submitAsGuest(s);
+        jdbc.update("UPDATE survey_responses SET respondent_session_expires_at = NULL, "
+                + "submitted_at = now() - interval '2 hours' WHERE survey_id = ?", s.id);
+
+        jdbc.update("UPDATE survey_responses "
+                + "SET respondent_session_expires_at = now() + interval '1 day' "
+                + "WHERE respondent_guest_key IS NOT NULL AND respondent_session_expires_at IS NULL");
+        guestKeySweeper.clearExpiredGuestKeys();
+
+        assertThat(guestKeyOf(s))
+                .as("과거 제출이라도 상한이 미래면 아직 지우지 않습니다 — 이르게 지우지 않는 쪽이 "
+                        + "이 백필의 요점입니다.")
+                .startsWith("guest:");
+    }
+
+    private void submitAsGuest(Survey s) throws Exception {
+        mockMvc.perform(submit(s, guestBearer(), """
+                        {"answers":[
+                          {"questionId":%d,"selectedOptionIds":[%d]},
+                          {"questionId":%d,"selectedOptionIds":[%d]},
+                          {"questionId":%d,"rating":5},
+                          {"questionId":%d,"text":"게스트 의견"}]}"""
+                        .formatted(s.q(0), s.o(0, 0), s.q(1), s.o(1, 0), s.q(2), s.q(4))))
+                .andExpect(status().isCreated());
+    }
+
+    /** 토큰 만료 시각만 옮긴다 — 제출 시각은 그대로 두어 둘을 구별한다. */
+    private void expireSession(Survey s, String sqlInstant) {
+        jdbc.update("UPDATE survey_responses SET respondent_session_expires_at = " + sqlInstant
+                + " WHERE survey_id = ?", s.id);
+    }
+
+    private Instant sessionExpiryOf(Survey s) {
+        return jdbc.queryForObject(
+                "SELECT respondent_session_expires_at FROM survey_responses WHERE survey_id = ?",
+                Instant.class, s.id);
+    }
+
+    private String guestKeyOf(Survey s) {
+        return jdbc.queryForObject(
+                "SELECT respondent_guest_key FROM survey_responses WHERE survey_id = ?",
+                String.class, s.id);
     }
 
     // ── 픽스처 ──────────────────────────────────────────────────────────────
