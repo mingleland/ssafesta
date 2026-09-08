@@ -187,6 +187,18 @@ class Settings(BaseSettings):
     # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.
     llm_ttft_timeout_seconds: float = Field(default=15.0, gt=0)
     llm_total_timeout_seconds: float = Field(default=60.0, gt=0)
+    # 동시 스트림 한도·FIFO 대기열 (spec 008 FR-019/020, S15P21A604-142).
+    rate_limit_user_concurrency: int = Field(default=1, gt=0)
+    rate_limit_user_question_limit: int = Field(default=5, gt=0)
+    rate_limit_user_question_window_seconds: float = Field(default=60.0, gt=0)
+    rate_limit_agent_concurrency: int = Field(default=5, gt=0)
+    rate_limit_global_concurrency: int = Field(default=20, gt=0)
+    rate_limit_queue_capacity: int = Field(default=30, gt=0)
+    rate_limit_queue_wait_seconds: float = Field(default=10.0, gt=0)
+    # 사용자·AI 직원 카운터의 TTL 안전망 — 프로세스가 release() 없이 죽어도 스스로
+    # 회수되도록, 전체 응답 timeout보다 반드시 커야 한다(작으면 아직 진행 중인
+    # 스트림의 카운터가 만료돼 같은 한도를 두 번 내주게 된다).
+    rate_limit_active_lease_ttl_seconds: float = Field(default=90.0, gt=0)
     # 문서 처리 결과 전달(S15P21A604-124) — heartbeat/batch/finalize/failed 공통 timeout.
     spring_document_result_timeout_seconds: float = Field(default=5.0, gt=0)
     # 한 번의 Embedding Provider 호출에 담을 최대 chunk 개수 — HTTP 결과 전송 batch(최대
@@ -254,6 +266,13 @@ class Settings(BaseSettings):
             raise ValueError(
                 "LLM_TTFT_TIMEOUT_SECONDS must not exceed LLM_TOTAL_TIMEOUT_SECONDS "
                 f"(ttft={self.llm_ttft_timeout_seconds}, total={self.llm_total_timeout_seconds})"
+            )
+        if self.rate_limit_active_lease_ttl_seconds <= self.llm_total_timeout_seconds:
+            raise ValueError(
+                "RATE_LIMIT_ACTIVE_LEASE_TTL_SECONDS must exceed LLM_TOTAL_TIMEOUT_SECONDS "
+                "— otherwise a still-running stream's slot can expire and be double-issued "
+                f"(ttl={self.rate_limit_active_lease_ttl_seconds}, "
+                f"total={self.llm_total_timeout_seconds})"
             )
         return self
 

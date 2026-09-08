@@ -7,6 +7,8 @@ adds `DELETE /conversations/{id}` (FR-014/FR-028, D11).
 
 from __future__ import annotations
 
+import math
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, status
@@ -23,6 +25,7 @@ from app.clients.spring_booth_access import SpringBoothAccessClient
 from app.clients.spring_chunk_search import SpringChunkSearchClient
 from app.core.auth import AuthenticatedMember, require_member
 from app.repositories.conversation_repository import ConversationRepository
+from app.services.capacity_service import CapacityExceeded, CapacityLease
 from app.services.conversation_service import (
     BoothAccessDenied,
     ConversationCreationFailed,
@@ -157,11 +160,16 @@ async def create_conversation(
             "description": "Conversation 없음/TTL 만료",
             "model": ErrorResponse,
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "description": "사용자·AI 직원·전역 동시 스트림 한도 초과 (spec 008 FR-019/020)",
+            "model": ErrorResponse,
+        },
     },
 )
 async def stream_conversation_message(
     conversationId: str,
     payload: MessageRequest,
+    request: Request,
     member: Annotated[AuthenticatedMember, Depends(require_member)],
     service: Annotated[ConversationStreamService, Depends(get_stream_service)],
 ) -> StreamingResponse:
@@ -188,10 +196,37 @@ async def stream_conversation_message(
             message="부스 임대가 만료되었습니다.",
         ) from exc
 
+    capacity_service: CapacityService = request.app.state.capacity_service
+    try:
+        lease = await capacity_service.acquire(
+            user_id=member.user_id, agent_id=conversation.scope.agent_id
+        )
+    except CapacityExceeded as exc:
+        retry_after = max(1, math.ceil(exc.retry_after_seconds))
+        raise ApiError(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            code="RATE_LIMITED",
+            message="지금은 요청이 많아 응답할 수 없습니다. 잠시 후 다시 시도해주세요.",
+            headers={"Retry-After": str(retry_after)},
+        ) from exc
+
     return StreamingResponse(
-        service.stream(conversation=conversation, question=payload.question),
+        _release_after_stream(
+            service.stream(conversation=conversation, question=payload.question), lease
+        ),
         media_type="text/event-stream",
     )
+
+
+async def _release_after_stream(
+    inner: AsyncIterator[str], lease: CapacityLease
+) -> AsyncIterator[str]:
+    """Guarantee the capacity slot is freed once the SSE stream ends, however it ends."""
+    try:
+        async for event in inner:
+            yield event
+    finally:
+        await lease.release()
 
 
 @router.delete(
