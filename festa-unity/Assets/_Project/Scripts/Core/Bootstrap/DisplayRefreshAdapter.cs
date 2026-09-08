@@ -134,15 +134,45 @@ namespace Festa.Core
 
             int snapped = raw;
             foreach (var c in CommonHz)
-                if (Mathf.Abs(raw - c) <= Mathf.Max(3, c * 0.04f)) { snapped = c; break; }
+                if (Mathf.Abs(raw - c) <= Mathf.Max(3, c * 0.06f)) { snapped = c; break; }   // 125 → 120 도 스냅 (6%)
 
             if (snapped == _hz) return;
+
+            // **내려가는 변화는 우리가 무거울 때는 믿지 않는다.** 프로브는 메인 스레드가 비어야 화면 틱을
+            // 볼 수 있다. 프레임이 18ms 씩 걸리면 rAF 간격도 16.7ms 배수로만 찍혀 120Hz 화면을 60Hz 로
+            // 읽는다. 2026-09-09 릴리스 실측: 120→60→120 을 6초 주기로 왕복하며 vSyncCount 가 1↔2 로
+            // 튀었다 — 사용자가 며칠째 겪은 "느려졌다 빨라졌다" 를 이 장치가 스스로 만들어 낼 판이었다.
+            // 그래서 하향은 **지금 창의 놓친 프레임이 거의 없을 때(프레임이 싸서 프로브가 믿을 만할 때)** 만
+            // 받는다. 상향(60→120)은 부하로는 만들 수 없는 값이라 항상 받는다.
+            if (_hz > 0 && snapped < _hz)
+            {
+                float missRate = _windowFrames > 0 ? (float)_windowMisses / _windowFrames : 1f;
+                if (_interval < 0 || missRate > StepUpMissRate * 2.5f)
+                {
+                    if (now_LogThrottle(snapped))
+                        Debug.Log($"[DisplayRefreshAdapter] 주사율 {snapped}Hz 로 읽혔지만 무시 — 프레임이 무거워(창 미스 {missRate * 100f:F0}%) 프로브를 믿을 수 없다. {_hz}Hz 유지");
+                    return;
+                }
+            }
+
             // 주사율이 실제로 바뀌었다(다른 모니터로 창 이동). 처음부터 다시 판단한다.
             if (_hz > 0) Debug.Log($"[DisplayRefreshAdapter] 주사율 변경 {_hz}Hz → {snapped}Hz — 판정을 다시 시작한다");
             _hz = snapped;
             _interval = -1;
             _cleanWindows = 0;
             _cooldownUntil = 0f;
+        }
+
+        int _ignoredHzLogged;
+        float _ignoredHzLogAt;
+
+        /// <summary>무시한 하향 판독은 같은 값이면 30초에 한 번만 남긴다 — 매 프레임 찍으면 콘솔이 잠긴다.</summary>
+        bool now_LogThrottle(int snapped)
+        {
+            float t = Time.unscaledTime;
+            if (snapped == _ignoredHzLogged && t - _ignoredHzLogAt < 30f) return false;
+            _ignoredHzLogged = snapped; _ignoredHzLogAt = t;
+            return true;
         }
 
         void Evaluate(float now, float budgetMs)
