@@ -104,13 +104,15 @@ describe('ReferenceGamePlayer — 오브젝트 위 상호작용 안내 문구(S1
     tap('ArrowRight');
 
     expect(container.querySelector('.grp-interaction-hint')).toBeNull();
-    // 대상 자체는 여전히 잡혀야 하므로(E를 누르면 동작해야 함), 하단 버튼은 그대로 남아 있다.
-    expect(screen.getByRole('button', { name: 'E 상호작용' })).not.toBeNull();
+    // 대상 자체는 여전히 잡혀야 하므로(E를 누르면 동작해야 함), 좌측 하단 안내 라벨은
+    // 그대로 남아 있다(S15P21A604-540 — 클릭 가능한 버튼이 아니라 순수 안내 텍스트다).
+    expect(screen.getByText('E 상호작용')).not.toBeNull();
   });
 
-  it('하단 고정 상호작용 버튼의 텍스트는 그대로 "E 상호작용"이다(회귀 없음)', () => {
+  it('좌측 하단 상호작용 안내는 그대로 "E 상호작용" 텍스트이고, 버튼이 아니다(S15P21A604-540 회귀 없음)', () => {
     setup(createStarterProject(532));
     walkNextToLibrarian();
-    expect(screen.getByRole('button', { name: 'E 상호작용' })).not.toBeNull();
+    expect(screen.getByText('E 상호작용')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: 'E 상호작용' })).toBeNull();
   });
 });

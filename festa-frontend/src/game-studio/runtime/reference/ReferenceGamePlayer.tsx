@@ -12,7 +12,6 @@ import {
   chooseReferenceDialogue,
   currentInteractionTarget,
   interactReferencePlayer,
-  moveReferencePlayer,
   movePlayerFromHeldKeys,
   objectiveProgress,
   planCatchUpTicks,
@@ -459,6 +458,39 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
                 }}
               >-{popup.amount}</span>
             ))}
+
+            {/* S15P21A604-540 — 오른쪽 사이드바를 없애고 상태/목표/인벤토리/조작 안내를
+                게임 캔버스(.grp-map) 안쪽 오버레이로 옮긴다. 목표 바는 기존과 동일한 조건
+                (objectives 없으면 미표시)으로 상단에, 상태(하트/점수)는 우측 상단, 인벤토리는
+                좌측 상단, 상호작용/발사 안내는 좌측 하단에 둔다. */}
+            {completionRules.objectives.length > 0 && (
+              <div className="grp-hud-objectives">
+                <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
+                {completionRules.objectives.map((objective) => {
+                  const progress = objectiveProgress(runtime, objective);
+                  const completed = progress >= objective.target;
+                  return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
+                })}
+              </div>
+            )}
+            <div className="grp-hud-status">
+              <div aria-label={`체력 ${runtime.playerHealth} / ${runtime.maxPlayerHealth}`} className="grp-hud-hearts">
+                {/* 깎이면 왼쪽부터 사라진다(QA 확정) — 남은 체력만큼 "오른쪽" 하트가
+                    채워진 상태로 남고, 왼쪽(index가 작은 쪽)부터 빈 하트가 된다. */}
+                {Array.from({ length: runtime.maxPlayerHealth }, (_, index) => (
+                  <span className={index >= runtime.maxPlayerHealth - runtime.playerHealth ? 'is-filled' : ''} key={index}>♥</span>
+                ))}
+              </div>
+              <strong className="grp-hud-score">★ {runtime.score.toLocaleString('ko-KR')}</strong>
+            </div>
+            <div className="grp-hud-inventory">
+              <span>INVENTORY</span>
+              {inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}
+            </div>
+            <div className="grp-hud-actions">
+              <span className="grp-action-label">E 상호작용</span>
+              {canShoot && <span className="grp-action-label">F 발사</span>}
+            </div>
           </div>
         )}
         {scene?.type === 'DIALOGUE' && (
@@ -507,24 +539,6 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
           </section>
         )}
       </section>
-
-      <aside className="grp-hud">
-        <div className="grp-player-stats"><span>상태</span><strong>♥ {runtime.playerHealth} / {runtime.maxPlayerHealth}</strong><strong>★ {runtime.score.toLocaleString('ko-KR')}점</strong></div>
-        {completionRules.objectives.length > 0 && (
-          <div className="grp-objectives">
-            <span>게임 목표 · {completionRules.mode === 'ALL' ? '모두 달성' : '하나 달성'}</span>
-            {completionRules.objectives.map((objective) => {
-              const progress = objectiveProgress(runtime, objective);
-              const completed = progress >= objective.target;
-              return <strong className={completed ? 'is-complete' : ''} key={objective.type}><i>{completed ? '✓' : '○'}</i>{objectiveCopy(objective)}<small>{Math.min(progress, objective.target).toLocaleString('ko-KR')} / {objective.target.toLocaleString('ko-KR')}</small></strong>;
-            })}
-          </div>
-        )}
-        <div><span>INVENTORY</span>{inventory.length === 0 ? <small>비어 있음</small> : inventory.map((item) => <strong key={item}>◇ {item}</strong>)}</div>
-        <div className="grp-controls"><span>{scene?.type === 'PLATFORMER' ? '이동 / 점프' : '이동'}</span><div><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'UP'))} type="button">↑</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'LEFT'))} type="button">←</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'DOWN'))} type="button">↓</button><button onClick={() => setRuntime((current) => moveReferencePlayer(project, current, 'RIGHT'))} type="button">→</button></div></div>
-        <button className="grp-interact" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => interactReferencePlayer(project, current))} type="button"><kbd>E</kbd> 상호작용</button>
-        {canShoot && <button className="grp-shoot" disabled={activeDialogue !== null} onClick={() => setRuntime((current) => shootReferenceProjectile(project, current))} type="button"><kbd>F</kbd> 발사</button>}
-      </aside>
     </main>
   );
 };
