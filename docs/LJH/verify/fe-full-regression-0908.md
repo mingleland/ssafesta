@@ -363,11 +363,13 @@ OAuth 3종·`CONNECTION_TOKEN_SECRET` 16키) **AI 계열 키가 하나도 없다
 
 Spring 쪽 `/agents`·`/documents` 는 8081 에 살아 있으므로 에이전트 설정 경로는 FastAPI 와 무관하게 검증 가능하다.
 
-> **부수 발견** — BE 가 넘겨준 그 `.env` 의 `KAKAO_REDIRECT_URI` 가 **다음 줄을 삼킨 채**다
-> (그 줄만 122자, Google 46 · SSAFY 45). `docs/25` T-62 가 09-07 에 지적한 파손이 새 파일에도 남아 있다.
-> `CONNECTION_TOKEN_SECRET` 은 별도 줄에도 정상값이 있어 **월드 서버는 멀쩡하고 증상이 없다** — 그래서
-> 안 보인다. 값 파일이라 고치지 않고 `#114` 로 통보했다. 이 회차에서 Kakao redirect 가 정상으로 보인 것은
-> **내가 JVM 인자로 덮었기 때문**이지 파일이 고쳐진 것이 아니다.
+> **부수 발견 — 제기하고 해소까지 확인했다.** 16:30 판 `.env` 의 `KAKAO_REDIRECT_URI` 가
+> **다음 줄을 삼킨 채**였다(그 줄만 122자, Google 46 · SSAFY 45). `docs/25` T-62 가 09-07 에 지적한
+> 파손이 그 파일에도 남아 있었다. `CONNECTION_TOKEN_SECRET` 은 별도 줄에도 정상값이 있어
+> **월드 서버는 멀쩡하고 증상이 없다** — 그래서 안 보인다. 값 파일이라 고치지 않고 `#114` 로
+> 통보했고 **BE 가 17:09 판에서 고쳤다**(45자, `CONNECTION_TOKEN_SECRET` 60자로 분리).
+> **JVM 인자를 빼고** 8081 을 재기동해 Google·Kakao·SSAFY 세 authorize URL 의 `redirect_uri` 가
+> 전부 정상임을 확인했다 — 이제 파일만으로 맞는다.
 
 ### BLOCKED_AT_TAB_NOT_VISIBLE — `#73` 활성 탭 성능
 
