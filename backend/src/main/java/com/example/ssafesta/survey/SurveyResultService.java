@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SurveyResultService {
 
     /** The first page {@code GET .../results} embeds; the same default as the paged endpoint. */
-    static final int DEFAULT_TEXT_PAGE_SIZE = 20;
+    private static final int DEFAULT_TEXT_PAGE_SIZE = 20;
     private static final int MAX_TEXT_PAGE_SIZE = 100;
 
     private final SurveyRepository surveys;

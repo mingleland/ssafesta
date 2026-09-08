@@ -26,7 +26,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *                       indefinitely, and then no grace below is long enough to be true
  * @param guestKeyGrace  how long after a guest token stops being accepted {@code
  *                       SurveyGuestKeySweeper} still leaves its duplicate-guard key alone. Must
- *                       exceed {@code submitTimeout} — that is what makes it a bound rather than a
+ *                       exceed the ceiling above — that is what makes it a bound rather than a
  *                       hope, and the constructor refuses the configuration otherwise
  */
 @ConfigurationProperties("app.survey")
@@ -58,18 +58,13 @@ public record SurveyProperties(int maxQuestions, int maxOptions, int maxRewardCo
         // 유예가 제출 상한보다 짧으면 sweeper 가 아직 처리 중인 요청의 중복 방지 키를 지울 수
         // 있다. 이 검사가 유예를 "넉넉해 보이는 값" 이 아니라 강제되는 경계로 만든다.
         //
-        // submitTimeout() 을 부르지 않는다 — compact constructor 안에서는 필드가 아직 대입되기
-        // 전이라 그 접근자가 0 을 돌려주고, 이 검사가 조용히 통과한다(처음에 그렇게 썼다).
+        // 접근자를 두지 않고 여기서 만든다 — compact constructor 안에서는 필드가 아직 대입되기
+        // 전이라 접근자가 0 을 돌려주고, 이 검사가 조용히 통과한다(처음에 그렇게 썼다).
         Duration ceiling = Duration.ofSeconds(submitTimeoutSeconds);
         if (guestKeyGrace.compareTo(ceiling) <= 0) {
             throw new IllegalStateException("app.survey.guest-key-grace 는 submit-timeout-seconds 보다 "
                     + "길어야 합니다 — 그래야 실행 중인 제출이 끝난 뒤에 키가 지워집니다: "
                     + guestKeyGrace + " <= " + ceiling);
         }
-    }
-
-    /** The submission ceiling as a {@link Duration}, for comparing against {@link #guestKeyGrace}. */
-    public Duration submitTimeout() {
-        return Duration.ofSeconds(submitTimeoutSeconds);
     }
 }

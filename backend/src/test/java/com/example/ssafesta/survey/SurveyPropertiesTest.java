@@ -1,6 +1,5 @@
 package com.example.ssafesta.survey;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
@@ -33,12 +32,6 @@ class SurveyPropertiesTest {
         assertThatThrownBy(() -> new SurveyProperties(30, 10, 10, 0, GRACE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("submit-timeout-seconds");
-    }
-
-    @Test
-    void theCeilingIsExposedAsADurationForThatComparison() {
-        assertThat(new SurveyProperties(30, 10, 10, 30, GRACE).submitTimeout())
-                .isEqualTo(Duration.ofSeconds(30));
     }
 
     @Test
