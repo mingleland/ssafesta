@@ -417,6 +417,43 @@ class SurveyApiIntegrationTest {
                 "SELECT count(*) FROM surveys WHERE booth_id = ?", Long.class, owner.boothId())).isZero();
     }
 
+    /**
+     * 작성자가 탈퇴해도 <b>남의 부스 설문은 지우지 않고</b> 소유자에게 넘긴다.
+     *
+     * <p>{@code surveys.created_by_user_id} 는 NOT NULL 이고 {@code users(id)} 를 NO ACTION 으로
+     * 참조한다. 그러니 작성자 탈퇴는 그 행을 어떻게든 처리해야 하는데, 지우는 쪽을 고르면 부스
+     * 소유자의 설문과 남들이 답한 응답이 제3자의 탈퇴로 사라진다. 소유권을 넘기는 쪽이 옳다.
+     *
+     * <p>지우는 쪽이 틀린 또 하나의 이유: 자식(문항·선택지·응답)은 <b>부스 소유자</b> 기준으로
+     * 지워지므로, surveys 만 작성자 기준으로 지우면 {@code survey_questions_survey_id_fkey} 에
+     * 걸려 <b>탈퇴 전체가 실패</b>한다.
+     *
+     * <p>서비스는 항상 소유자를 쓰므로(불변식 I-5) 이 상태는 지금 API 로는 만들어지지 않는다.
+     * 그래도 삭제는 스키마가 허용하는 모든 값에 대해 옳아야 한다 — 그 원칙 때문에 삭제 SQL 에
+     * {@code created_by_user_id} 조건이 들어가 있고, 그렇다면 그 조건도 옳아야 한다.
+     */
+    @Test
+    void authorWithdrawalHandsTheSurveyToTheBoothOwner() throws Exception {
+        Owner owner = leasedOwner("작성자탈퇴");
+        Long authorUserId = createMemberWithWallet(users, wallets, "작성자");
+        mockMvc.perform(save(owner, TWO_QUESTIONS)).andExpect(status().isOk());
+        jdbc.update("UPDATE surveys SET created_by_user_id = ? WHERE booth_id = ?",
+                authorUserId, owner.boothId());
+
+        accountDeletion.deleteUserGraph(authorUserId);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM surveys WHERE booth_id = ?",
+                Long.class, owner.boothId()))
+                .as("남의 부스 설문이 작성자 탈퇴로 사라지면 안 됩니다.").isEqualTo(1L);
+        assertThat(jdbc.queryForObject(
+                "SELECT created_by_user_id FROM surveys WHERE booth_id = ?", Long.class, owner.boothId()))
+                .as("작성자 자리는 부스 소유자가 이어받아야 합니다 — NOT NULL 이고 users 를 참조합니다.")
+                .isEqualTo(owner.userId());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM survey_questions WHERE survey_id "
+                        + "IN (SELECT id FROM surveys WHERE booth_id = ?)", Long.class, owner.boothId()))
+                .as("문항도 그대로여야 합니다.").isEqualTo(2L);
+    }
+
     // ── 픽스처 ──────────────────────────────────────────────────────────────
 
     private RequestBuilder save(Owner owner, String body) {

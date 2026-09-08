@@ -29,9 +29,13 @@ public class AccountDeletionService {
         jdbc.update("DELETE FROM survey_responses WHERE respondent_user_id = ? OR survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId, userId);
         jdbc.update("DELETE FROM survey_options WHERE question_id IN (SELECT id FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)))", userId);
         jdbc.update("DELETE FROM survey_questions WHERE survey_id IN (SELECT id FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?))", userId);
-        // created_by_user_id 조건을 함께 남긴다 — 부스가 이미 남의 것이 된 뒤에도(재임대)
-        // 내가 만든 행이 users(id) 를 참조한 채로 남으면 탈퇴가 실패한다.
-        jdbc.update("DELETE FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR created_by_user_id = ?", userId, userId);
+        // 남의 부스에 내가 만든 설문은 지우지 않고 소유자에게 넘긴다. created_by_user_id 는
+        // NOT NULL 이고 users(id) 를 NO ACTION 으로 참조하므로 그 행을 어떻게든 처리해야 하는데,
+        // 지우는 쪽을 고르면 부스 소유자의 설문과 남들이 답한 응답이 제3자의 탈퇴로 사라진다.
+        // 게다가 자식(문항·선택지·응답)은 위에서 부스 소유자 기준으로만 지워지므로, surveys 만
+        // 작성자 기준으로 지우면 survey_questions_survey_id_fkey 에 걸려 탈퇴 전체가 실패한다.
+        jdbc.update("UPDATE surveys s SET created_by_user_id = b.owner_user_id FROM booths b WHERE b.id = s.booth_id AND s.created_by_user_id = ? AND b.owner_user_id <> ?", userId, userId);
+        jdbc.update("DELETE FROM surveys WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM consultation_messages WHERE sender_user_id = ? OR consultation_id IN (SELECT id FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?)", userId, userId, userId, userId);
         jdbc.update("DELETE FROM consultations WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR visitor_user_id = ? OR staff_user_id = ?", userId, userId, userId);
         // 문서 한 줄이면 청크·Job·staging 이 함께 지워진다 (V21). 이 자리에 청크 삭제가

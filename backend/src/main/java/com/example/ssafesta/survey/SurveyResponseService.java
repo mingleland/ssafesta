@@ -79,6 +79,11 @@ public class SurveyResponseService {
      * earned it to commit together; {@code WalletService} propagates {@code REQUIRED} throughout, so
      * it joins this one rather than opening its own.
      *
+     * <p><b>Booth first, wallet second — do not swap these.</b> Every path that touches both takes
+     * them in this order: {@code BoothLeaseService.lease} updates the booth row and then charges,
+     * and this method locks the booth and then credits. Nothing takes the wallet first, so there is
+     * no cycle to deadlock on; moving the payout above the booth lock would create one.
+     *
      * <p><b>The survey is read after the booth lock, not before.</b> An editor may change
      * {@code rewardCoin} and {@code closesAt} even once responses exist (C-08), and it holds the
      * booth write lock while doing so. A survey loaded before this lock is a snapshot from before
