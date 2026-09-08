@@ -202,6 +202,21 @@ closed = endsAt != null && !endsAt.isAfter(Instant.now())
 
 ---
 
+## 4-1. V23 delta — 게스트 세션 만료 시각 (2026-09-08)
+
+헌법 12조 후단("게스트 세션은 종료 시 데이터를 삭제한다")을 지키기 위해 추가했다. 착수 때 12조의 앞부분(임대·결제·영구 자산)만 근거로 삼아 이 조항을 짚지 못했다 — `docs/26` row 20 참조.
+
+| 변경 | 이유 |
+|---|---|
+| `survey_responses.respondent_session_expires_at TIMESTAMPTZ` (nullable) | 제출 때 게스트 토큰의 `exp` 를 적는다. 회원은 `null`(세션 만료라는 개념이 없다), V23 이전 게스트 행도 `null` |
+| `ix_survey_responses_guest_session_expiry` (부분, `respondent_guest_key IS NOT NULL`) | sweeper 가 5분마다 "지울 것이 있는가" 를 묻는다. 응답이 쌓여도 스캔 폭이 늘지 않는다 |
+
+**왜 추정으로는 안 되는가.** `submitted_at + 현재 TTL` 은 두 방향으로 틀린다. ① 토큰은 제출보다 먼저 발급되므로 실제 만료보다 최대 TTL 만큼 늦게 지운다. ② TTL 을 줄여 배포하면 아직 유효한 기존 토큰의 키를 먼저 지우고, 키가 지워진 행은 `ux_survey_responses_guest` 에서 빠지므로 **같은 토큰이 같은 설문에 한 번 더 답할 수 있다.**
+
+**지우는 방식은 대체이고 삭제가 아니다.** `respondent_guest_key` 를 `expired:{id}` 로 바꾼다 — `ck_survey_responses_respondent` 가 XOR 이라 `NULL` 로 비우면 위반하고, 행마다 유일한 값이라 부분 유니크 인덱스도 그대로다. **응답 행과 답은 지우지 않는다**: 응답은 그것을 수집한 부스의 것이고, 방문자 세션이 끝났다고 운영자의 집계가 줄어들면 안 된다.
+
+롤백 `db/rollback/V23__rollback.sql` — 컬럼과 인덱스만 없어지고 응답·답·집계는 그대로다.
+
 ## 5. 집계 쿼리 (C-04 실시간)
 
 `GET /surveys/{surveyId}/results`가 부르는 것들. 모두 `GROUP BY` 한 번이고 원본 응답은 서비스 밖으로 나가지 않는다(FR-007).

@@ -235,7 +235,7 @@ FE `submitAnswers(surveyId, answers)`.
 - **게스트 응답은 허용한다** (C-05, 기획 미결 · 구현 기본값). 단 `rewardCoin > 0`이면 **403 `MEMBER_ONLY`** — 게스트는 지갑이 없어 보상을 받을 수 없고(헌법 12조), 받지 못하는 사람에게 보상을 걸어 둔 설문을 시키지 않는다.
 - **1인 1응답**: 회원은 `userId`, 게스트는 접속 토큰의 주체로 판정한다. 재제출은 **409 `SURVEY_ALREADY_RESPONDED`**.
 
-> ⚠️ **게스트 세션 식별자는 세션이 끝나면 지워진다** (헌법 12조). 제출 후 `app.auth.access-token-ttl`(현재 30분)이 지나면 서버가 `respondent_guest_key`를 그 응답의 id에서 만든 값으로 바꾼다 — **답과 집계는 그대로 남고 접속 토큰 주체만 사라진다.** 게스트 토큰은 갱신이 없어 그 시점이면 세션도 이미 죽어 있으므로 1인 1응답이 약해지지 않는다.
+> ⚠️ **게스트 세션 식별자는 세션이 끝나면 지워진다** (헌법 12조). 기준은 **그 응답을 낸 접속 토큰의 만료 시각**이다 — 제출 때 토큰의 `exp`를 함께 적어 두고(V23), 그 시각이 지나면 서버가 `respondent_guest_key`를 그 응답의 id에서 만든 값으로 바꾼다. **답과 집계는 그대로 남고 접속 토큰 주체만 사라진다.** 게스트 토큰은 갱신이 없으므로 그 시점이면 세션도 이미 죽어 있고, 1인 1응답이 약해지지 않는다.
 >
 > ⚠️ **게스트 중복 방지는 토큰 단위다.** 게스트 토큰은 발급마다 새 주체를 받으므로 브라우저를 새로 열면 다른 사람으로 응답할 수 있다. 계정이 없는 사람을 그 이상으로 식별할 방법이 없고, 그 한계를 감수하는 것이 C-05의 전제다.
 
@@ -346,7 +346,8 @@ FE Port는 mock 기준으로 먼저 확정됐다. 실 어댑터에서 아래만 
 | `SurveyRunSnapshot.status: 'open'\|'closed'` | `closed: boolean` | `closed ? 'closed' : 'open'` |
 | `submitAnswers → Promise<void>` | `201 { responseId, rewardedCoin }` | **반환 타입 변경 필요.** 완료 화면에 `rewardedCoin`을 표시 (0이면 표시 없음) |
 | `answers: Record<string, SurveyAnswerValue>` | `{ answers: [...] }` 배열 | 맵 → 배열, `type` 판별자 → 유형별 키 |
-| `SurveyTextAnswerPage {items, page, hasNext}` | `{content, page, size, totalElements, totalPages}` | `items = content.map(c => c.text)`, `hasNext = page + 1 < totalPages` |
+| `SurveyTextAnswerPage {items, page, hasNext}` | `{content, page, size, totalElements, totalPages}` | `hasNext = page + 1 < totalPages`. ⚠️ **`items` 를 `string[]` 으로 두면 항목의 `questionId`·`responseId` 가 사라진다** — 텍스트 문항이 2개 이상이면 어느 질문의 답인지 복구할 수 없다. 문항별로 보여줄 계획이면 `?questionId=` 로 나눠 부르거나 `items` 를 객체 배열로 둔다 |
+| `SurveyResultSnapshot` 에 시각 필드 없음 | `firstRespondedAt` · `lastRespondedAt` (응답 0건이면 `null`) | ⚠️ **spec US2 시나리오 1이 "전체 응답 수·최초·최근 응답 시각이 보인다" 를 요구한다** — Port 에 두 필드를 더해야 화면에 올릴 수 있다 |
 | `SurveyQuestionAggregateVM` `kind: 'choice'\|'rating'` | `type` + 항상 있는 `counts`·`average`·`distribution` | `type`으로 `kind` 결정. 텍스트 유형은 VM에 없어 건너뛰거나 `answeredCount`만 쓴다 |
 | `getDraft() → null` | `404 SURVEY_NOT_FOUND` | 404를 `null`로 |
 | `saveDraft({title, questions})` | `PUT` 본문 | 그대로. `rewardCoin`·`closesAt`은 **키를 보내지 않으면 유지**된다 |

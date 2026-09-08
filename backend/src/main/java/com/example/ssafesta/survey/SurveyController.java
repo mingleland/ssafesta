@@ -269,7 +269,8 @@ public class SurveyController {
             return SurveyResponseService.Respondent.member(MemberPrincipal.requireMemberId(jwt));
         }
         if (GUEST_ROLE.equals(role)) {
-            return SurveyResponseService.Respondent.guest(jwt.getSubject());
+            // exp 를 함께 넘긴다 — 이 응답의 게스트 식별자를 언제 지울지가 그 값이다 (헌법 12조).
+            return SurveyResponseService.Respondent.guest(jwt.getSubject(), jwt.getExpiresAt());
         }
         throw new ApiException(ErrorCode.UNAUTHORIZED);
     }

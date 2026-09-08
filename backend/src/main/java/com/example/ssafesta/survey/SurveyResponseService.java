@@ -366,14 +366,19 @@ public class SurveyResponseService {
      *
      * <p>Exactly one field is set, mirroring {@code ck_survey_responses_respondent}.
      */
-    public record Respondent(Long userId, String guestKey) {
+    /**
+     * Who is answering. A guest carries the expiry of the session they are answering from, because
+     * that is when 헌법 12조 says their identifier stops being allowed to exist — see
+     * {@code SurveyGuestKeySweeper}.
+     */
+    public record Respondent(Long userId, String guestKey, Instant sessionExpiresAt) {
 
         public static Respondent member(Long userId) {
-            return new Respondent(userId, null);
+            return new Respondent(userId, null, null);
         }
 
-        public static Respondent guest(String subject) {
-            return new Respondent(null, subject);
+        public static Respondent guest(String subject, Instant sessionExpiresAt) {
+            return new Respondent(null, subject, sessionExpiresAt);
         }
 
         public boolean isMember() {
@@ -387,7 +392,7 @@ public class SurveyResponseService {
         SurveyResponse newResponse(Long surveyId, Instant now) {
             return isMember()
                     ? SurveyResponse.byMember(surveyId, userId, now)
-                    : SurveyResponse.byGuest(surveyId, guestKey, now);
+                    : SurveyResponse.byGuest(surveyId, guestKey, sessionExpiresAt, now);
         }
     }
 

@@ -25,11 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code expired:<response id>} satisfies both — it is unique by construction and carries nothing
  * about the person, being derived from the row itself.
  *
- * <p><b>1인 1응답 is not weakened.</b> A guest access token lives {@code app.auth.access-token-ttl}
- * and cannot be refreshed ({@code /auth/refresh} renews member sessions only), so by the time a key
- * is cleared the session that made it is already dead — it could not submit again either way. What
- * comes back later is a new token with a new subject, which this system has always counted as a
- * different person (계약 §6).
+ * <p><b>1인 1응답 is not weakened.</b> Clearing happens at the token's own {@code exp}, and a guest
+ * token cannot be refreshed ({@code /auth/refresh} renews member sessions only) — so the session
+ * whose key is cleared is already dead and could not submit again either way. What comes back later
+ * is a new token with a new subject, which this system has always counted as a different person
+ * (계약 §6).
  */
 @Component
 class SurveyGuestKeySweeper {
@@ -38,14 +38,15 @@ class SurveyGuestKeySweeper {
 
     /**
      * Rows already cleared are skipped by the {@code NOT LIKE} — without it every pass would rewrite
-     * the same rows to the same values forever.
+     * the same rows to the same values forever. The second bound is the pre-V23 fallback.
      */
     private static final String CLEAR = """
             UPDATE survey_responses
                SET respondent_guest_key = 'expired:' || id
              WHERE respondent_guest_key IS NOT NULL
                AND respondent_guest_key NOT LIKE 'expired:%'
-               AND submitted_at < ?
+               AND (respondent_session_expires_at < ?
+                    OR (respondent_session_expires_at IS NULL AND submitted_at < ?))
             """;
 
     private final JdbcTemplate jdbc;
@@ -59,15 +60,21 @@ class SurveyGuestKeySweeper {
     /**
      * One pass every five minutes.
      *
-     * <p>The retention is read from {@code app.auth.access-token-ttl} rather than duplicated as a
-     * survey setting: the thing being waited out <i>is</i> the guest session, so a second knob could
-     * only drift from it. A pass therefore clears keys whose session expired at least one pass ago.
+     * <p><b>The session's own {@code exp} decides, not a guess.</b> Estimating the moment as
+     * {@code submitted_at + access-token-ttl} is wrong in both directions: the token was issued
+     * before the answer arrived, so it fires up to one TTL late; and shortening the TTL makes it
+     * fire while tokens issued under the old one are still valid, which lets the same token answer
+     * the same survey twice — a cleared key is no longer in {@code ux_survey_responses_guest}.
+     *
+     * <p>That estimate survives for rows written before V23, which have no expiry recorded. It is
+     * never <i>early</i> under a steady configuration, and no such rows are being created any more.
      */
     @Scheduled(fixedDelayString = "PT5M")
     @Transactional
     public void clearExpiredGuestKeys() {
-        Instant cutoff = Instant.now().minus(auth.accessTokenTtl());
-        int cleared = jdbc.update(CLEAR, Timestamp.from(cutoff));
+        Instant now = Instant.now();
+        int cleared = jdbc.update(CLEAR, Timestamp.from(now),
+                Timestamp.from(now.minus(auth.accessTokenTtl())));
         if (cleared > 0) {
             log.info("만료된 게스트 세션 식별자 {}건을 설문 응답에서 지웠습니다 (헌법 12조).", cleared);
         }
