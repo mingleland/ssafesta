@@ -130,7 +130,7 @@ public class SurveyResultService {
             average = average(distribution);
         }
         return new QuestionAggregateView(question.getId(), question.getQuestionType().name(),
-                answeredCount, counts, average, distribution);
+                question.getQuestionText(), answeredCount, counts, average, distribution);
     }
 
     /**
@@ -247,10 +247,17 @@ public class SurveyResultService {
                               TextAnswerPage textAnswers) {
     }
 
-    /** {@code counts}·{@code average}·{@code distribution} are always present (계약 §1). */
-    public record QuestionAggregateView(Long questionId, String type, long answeredCount,
-                                        List<OptionCountView> counts, Double average,
-                                        List<RatingBucketView> distribution) {
+    /**
+     * {@code counts}·{@code average}·{@code distribution} are always present (계약 §1).
+     *
+     * <p>{@code prompt} carries the question's wording so the results screen never has to name a
+     * question by its id. It is called {@code prompt} — not {@code questionText} — because §3 and
+     * §5 already spell the same value that way; one value under two names splits the client
+     * adapter (S15P21A604-546).
+     */
+    public record QuestionAggregateView(Long questionId, String type, String prompt,
+                                        long answeredCount, List<OptionCountView> counts,
+                                        Double average, List<RatingBucketView> distribution) {
     }
 
     /** No ratio — {@code count / answeredCount} is the client's to compute (계약 §7). */
