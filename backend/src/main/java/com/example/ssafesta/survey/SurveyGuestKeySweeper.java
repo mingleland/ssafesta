@@ -81,11 +81,14 @@ class SurveyGuestKeySweeper {
      *
      * <p><b>And it waits out requests already running.</b> A request authenticated just before
      * {@code exp} can still be in the server — blocked on the booth lock, say — after the skew has
-     * passed. Clearing its guard key before it commits lets it insert a duplicate. So the cut is
-     * pushed back by {@code app.survey.guest-key-grace} as well. <b>That is a bound, not a proof</b>:
-     * it is sized well past how long a request can live, and the alternative — keeping the
-     * identifier until nothing could conceivably be running — is keeping it forever, which is the
-     * thing 12조 forbids.
+     * passed. Clearing its guard key before it commits lets it insert a duplicate.
+     *
+     * <p>So the cut is pushed back by {@code app.survey.guest-key-grace}, and that number means
+     * something because {@code app.survey.submit-timeout-seconds} caps a submission's transaction as a JDBC
+     * query timeout. A submission cannot outlive its timeout, and {@code SurveyProperties} refuses
+     * to start unless the grace exceeds it — the difference covers the stretch before the
+     * transaction opens. Without that ceiling the grace was a guess about an unbounded wait, which
+     * is exactly how it read on review.
      */
     @Scheduled(fixedDelayString = "PT5M")
     @Transactional

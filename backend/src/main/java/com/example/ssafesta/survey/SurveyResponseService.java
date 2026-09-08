@@ -95,8 +95,14 @@ public class SurveyResponseService {
      * booth write lock while doing so. A survey loaded before this lock is a snapshot from before
      * that edit — so the payout would be the old amount and a survey closed a moment ago would
      * still accept answers. Only the booth id is read first, because the lock needs it.
+     *
+     * <p><b>The timeout is load-bearing, not hygiene.</b> It becomes the JDBC query timeout, so a
+     * submission waiting on the booth lock is cancelled instead of waiting forever. That ceiling is
+     * what lets {@code SurveyGuestKeySweeper} say how long it must leave a guest's duplicate-guard
+     * key alone: without it, "wait ten minutes" describes nothing, because the wait has no bound.
+     * {@code SurveyProperties} refuses a configuration where the grace is not longer than this.
      */
-    @Transactional
+    @Transactional(timeoutString = "${app.survey.submit-timeout-seconds}")
     public SubmitResult submit(Long surveyId, Respondent respondent, SubmitCommand command) {
         Long boothId = surveys.findBoothIdById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));

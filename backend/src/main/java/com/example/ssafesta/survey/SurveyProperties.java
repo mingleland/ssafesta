@@ -19,14 +19,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param maxQuestions   questions per survey
  * @param maxOptions     options per choice question
  * @param maxRewardCoin  reward coin per response; `docs/01` §8 floats 5~10 and this is the top of it
+ * @param submitTimeoutSeconds hard ceiling on one submission's transaction, applied as the JDBC
+ *                       query timeout. Seconds rather than a {@code Duration} because
+ *                       {@code @Transactional(timeoutString = ...)} resolves a placeholder and parses
+ *                       it as seconds. Without this ceiling a submission can wait on the booth lock
+ *                       indefinitely, and then no grace below is long enough to be true
  * @param guestKeyGrace  how long after a guest token stops being accepted {@code
- *                       SurveyGuestKeySweeper} still leaves its duplicate-guard key alone. This one
- *                       is not a 기획 question — see the sweeper for why a request that authenticated
- *                       before the token expired can still be running afterwards
+ *                       SurveyGuestKeySweeper} still leaves its duplicate-guard key alone. Must
+ *                       exceed {@code submitTimeout} — that is what makes it a bound rather than a
+ *                       hope, and the constructor refuses the configuration otherwise
  */
 @ConfigurationProperties("app.survey")
 public record SurveyProperties(int maxQuestions, int maxOptions, int maxRewardCoin,
-                               Duration guestKeyGrace) {
+                               int submitTimeoutSeconds, Duration guestKeyGrace) {
 
     public SurveyProperties {
         // 0 이하로 조용히 뜨면 모든 저장이 400 이 되고, 화면에는 "문항이 너무 많습니다" 만
@@ -41,10 +46,30 @@ public record SurveyProperties(int maxQuestions, int maxOptions, int maxRewardCo
         if (maxRewardCoin < 0) {
             throw new IllegalStateException("app.survey.max-reward-coin 은 0 이상이어야 합니다: " + maxRewardCoin);
         }
+        if (submitTimeoutSeconds < 1) {
+            throw new IllegalStateException(
+                    "app.survey.submit-timeout-seconds 는 1 이상이어야 합니다: " + submitTimeoutSeconds);
+        }
         // 0 이면 실행 중이던 요청이 중복 방지 없이 통과하는 창이 다시 열린다.
         if (guestKeyGrace == null || guestKeyGrace.isNegative() || guestKeyGrace.isZero()) {
             throw new IllegalStateException(
                     "app.survey.guest-key-grace 는 0보다 커야 합니다: " + guestKeyGrace);
         }
+        // 유예가 제출 상한보다 짧으면 sweeper 가 아직 처리 중인 요청의 중복 방지 키를 지울 수
+        // 있다. 이 검사가 유예를 "넉넉해 보이는 값" 이 아니라 강제되는 경계로 만든다.
+        //
+        // submitTimeout() 을 부르지 않는다 — compact constructor 안에서는 필드가 아직 대입되기
+        // 전이라 그 접근자가 0 을 돌려주고, 이 검사가 조용히 통과한다(처음에 그렇게 썼다).
+        Duration ceiling = Duration.ofSeconds(submitTimeoutSeconds);
+        if (guestKeyGrace.compareTo(ceiling) <= 0) {
+            throw new IllegalStateException("app.survey.guest-key-grace 는 submit-timeout-seconds 보다 "
+                    + "길어야 합니다 — 그래야 실행 중인 제출이 끝난 뒤에 키가 지워집니다: "
+                    + guestKeyGrace + " <= " + ceiling);
+        }
+    }
+
+    /** The submission ceiling as a {@link Duration}, for comparing against {@link #guestKeyGrace}. */
+    public Duration submitTimeout() {
+        return Duration.ofSeconds(submitTimeoutSeconds);
     }
 }

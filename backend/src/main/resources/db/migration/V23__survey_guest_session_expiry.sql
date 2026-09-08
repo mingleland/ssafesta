@@ -13,12 +13,17 @@
 -- 묶을 수 있다. 12조가 지우라는 것이 바로 그 연결이다.
 ALTER TABLE survey_responses ADD COLUMN respondent_session_expires_at TIMESTAMPTZ;
 
--- V23 이전에 쌓인 게스트 응답에는 exp 가 없다. exp = 발급 + TTL 이고 발급은 제출보다
--- 앞서므로 `submitted_at + 30분`(그 시점의 access-token-ttl)은 실제 만료의 상한이다 —
--- 늦게 지울 수는 있어도 이르게 지우지는 않는다. 이 한 줄로 sweeper 에 예외 분기를 두지
--- 않는다. TTL 을 바꾼 뒤에 이 마이그레이션을 처음 적용하는 환경이라면 그 값으로 고쳐라.
+-- V23 이전에 쌓인 게스트 응답에는 exp 가 없다. 그 행들이 어떤 TTL 로 발급된 토큰의 것인지
+-- 이 스크립트는 알 수 없다 -- `submitted_at + 30분` 처럼 값을 박으면 그보다 긴 TTL 을 쓰던
+-- 환경에서 아직 유효한 토큰의 키를 먼저 지우게 되고, 환경마다 이 파일을 고치면 이미 적용된
+-- DB 와 checksum 이 어긋난다.
+--
+-- 그래서 과거를 추정하지 않고 미래로 민다: 이 마이그레이션이 도는 시점 + 1일. 배포 이전에
+-- 발급된 토큰은 그때면 어떤 TTL 이었든 죽어 있다(access token 은 분 단위이고 지금 값은 30분,
+-- 이 상한은 그 48배다). 정리가 하루 늦어질 뿐 이르게 지우지 않는다. 대상은 V22~V23 사이에
+-- 쌓인 유한한 행뿐이고, 그 뒤로는 제출이 진짜 exp 를 적는다.
 UPDATE survey_responses
-   SET respondent_session_expires_at = submitted_at + interval '30 minutes'
+   SET respondent_session_expires_at = now() + interval '1 day'
  WHERE respondent_guest_key IS NOT NULL
    AND respondent_session_expires_at IS NULL;
 
