@@ -61,6 +61,56 @@ namespace Festa.Booth
 
         static int s_retries;
 
+        /// <summary>슬롯별로 마지막에 적용한 레이아웃의 서명. 같은 서명이면 다시 짓지 않는다.</summary>
+        static readonly Dictionary<int, string> s_appliedSignature = new();
+
+        /// <summary>
+        /// 한 슬롯만 다시 조회해 **바뀌었으면** 다시 짓는다. 게시 뒤 새로고침 없이 반영되게 하는 경로(QA 2026-09-08 #11).
+        /// 부르는 곳: ① 포털로 그 방에 들어갈 때(<c>PortalInteractor</c>), ② FE 가 게시 성공을 알릴 때(<c>BoothLayoutBridge</c>).
+        /// 방 하나라 비용은 무시할 수 있고, 서명이 같으면 Rebuild 를 건너뛰어 들어갈 때마다 깜빡이지 않는다.
+        /// 미게시(null) 응답이면 기존 모습을 그대로 둔다 — 잠깐의 조회 실패로 방을 비우지 않는다.
+        /// </summary>
+        public static async void RequestReload(int slotId)
+        {
+            if (!Enabled || !Application.isPlaying) return;
+            BoothRuntime target = null;
+            foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
+                if (r.BoothId == slotId) { target = r; break; }
+            if (target == null) return;
+
+            try
+            {
+                var layout = await Festa.Integration.ApiServices.Booth.GetPublishedLayoutBySlotAsync(slotId);
+                if (layout == null || target == null) return;
+                string sig = Signature(layout);
+                if (s_appliedSignature.TryGetValue(slotId, out var prev) && prev == sig) return;   // 변화 없음
+                target.Rebuild(layout);
+                s_appliedSignature[slotId] = sig;
+                Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본 변경 감지 → 다시 지음 (v{layout.version}, 오브젝트 {layout.objects?.Length ?? 0})");
+                BoothsRebuilt?.Invoke();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 재조회 실패 — 기존 모습 유지: {e.Message}");
+            }
+        }
+
+        /// <summary>버전 + 오브젝트 열(id·type·assetCode·위치·회전·configId). Mock 처럼 version 이 0 이어도 내용 변화를 잡는다.</summary>
+        static string Signature(BoothLayoutDto layout)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append('v').Append(layout.version).Append('|');
+            if (layout.objects != null)
+                foreach (var o in layout.objects)
+                {
+                    if (o == null) continue;
+                    sb.Append(o.objectId ?? o.id).Append(':').Append(o.type).Append(':').Append(o.assetCode).Append(':');
+                    if (o.position != null) sb.Append(o.position.x).Append(',').Append(o.position.y).Append(',').Append(o.position.z);
+                    sb.Append(':').Append(o.rotationY).Append(':').Append(o.configId).Append(';');
+                }
+            return sb.ToString();
+        }
+
         /// <summary>
         /// 못 채운 방을 주기적으로 다시 시도한다. <see cref="TryLoad"/> 는 이미
         /// <c>IsLoaded</c> 인 방을 건너뛰므로, 부르기만 하면 남은 방만 조회한다.
@@ -116,6 +166,7 @@ namespace Festa.Booth
                     var runtime = bySlot[slotId];
                     if (runtime == null) continue;             // 씬 전환으로 파괴된 앵커
                     runtime.Rebuild(layout);
+                    s_appliedSignature[slotId] = Signature(layout);   // 첫 입장 때 같은 것을 다시 짓지 않게
                     built++;
                 }
                 Debug.Log($"[WorldBoothPublishedBootstrap] {slotIds.Count}실 중 {built}실 게시 렌더, 나머지는 기본 프레임");

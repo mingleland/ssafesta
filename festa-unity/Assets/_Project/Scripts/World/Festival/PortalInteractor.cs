@@ -84,6 +84,11 @@ namespace Festa.World
             _movement.transform.rotation = Quaternion.Euler(0f, dest.eulerAngles.y, 0f);
             if (_camera != null) _camera.SnapBehind(dest.eulerAngles.y);   // 카메라도 같은 방향 — 맵을 가로질러 날아오지 않게
             _lastTeleportTime = Time.time;
+
+            // 방에 들어갈 때 그 슬롯만 다시 조회한다 — 게시본이 바뀌었으면 새로고침 없이 반영된다(QA #11).
+            // 서명이 같으면 다시 짓지 않으므로 들어갈 때마다 깜빡이지 않는다. 출구 포털(Portal_Int_NN)은 대상이 아니다.
+            if (_nearest.name.StartsWith("Portal_Ext"))
+                Festa.Booth.WorldBoothPublishedBootstrap.RequestReload(_nearest.boothId);
         }
 
         string _toast;
