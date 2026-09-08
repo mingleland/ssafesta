@@ -1,4 +1,4 @@
-# 오클루전 A/B — occlusion-off
+# 오클루전 A/B — combine-after (병합 뒤, 오클루전 ON umbra 63440 — 라벨은 프로브가 저장 직후 umbraDataSize 를 0 으로 읽어 잘못 붙었다)
 umbraDataSize = 63440
 측정 프레임 = 30 평균
 
