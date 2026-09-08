@@ -1,0 +1,100 @@
+/* World·OverlayFrame 톤 재사용 — 새 팔레트를 만들지 않는다 */
+.dev-ai-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #141a52;
+  color: #eaeefb;
+  font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+}
+
+.dev-ai-badge {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #ffb648;
+  background: rgba(255, 182, 72, 0.14);
+  border: 1px solid rgba(255, 182, 72, 0.4);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+.dev-ai-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(360px, 88vw);
+  padding: 28px 26px;
+  border-radius: 18px;
+  background: rgba(19, 24, 44, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 26px 80px rgba(4, 6, 20, 0.62);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+
+.dev-ai-title {
+  font-size: 16px;
+}
+
+.dev-ai-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #9aa2c2;
+}
+
+.dev-ai-fields {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.dev-ai-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: #9aa2c2;
+  text-align: left;
+}
+
+.dev-ai-field input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eaeefb;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+.dev-ai-field input:focus {
+  outline: none;
+  border-color: #4d8dff;
+}
+
+.dev-ai-cta {
+  width: 100%;
+  height: 42px;
+  border-radius: 999px;
+  border: none;
+  background: #4d8dff;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dev-ai-cta:hover {
+  filter: brightness(1.08);
+}
