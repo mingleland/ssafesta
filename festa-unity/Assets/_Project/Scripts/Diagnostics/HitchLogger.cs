@@ -54,6 +54,7 @@ namespace Festa.Diagnostics
 
         void OnEnable()
         {
+            DiagnosticKeys.Claim(nameof(HitchLogger), _toggleKey);   // 중복·예약키 검사에 등록 (QA #64)
             if (!PerfHud.ToolsEnabled) { enabled = false; return; }
             _draws = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Draw Calls Count");
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");

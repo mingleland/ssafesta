@@ -165,6 +165,9 @@ namespace Festa.Booth
             // 오브젝트에도 "F — 상호작용" 힌트가 떴고 F 는 조용히 무시됐다 — 힌트가 거짓말을
             // 하면 동작하는 오브젝트까지 의심받는다 (S15P21A604-345 실측).
             bool interactive = go.GetComponentInChildren<Festa.Content.IBoothInteractable>(true) != null;
+            // 가구·장식은 조준 대상이 아니다 — 화분을 보면 '전시물 · 준비 중' 이 떠서 영원히 준비 중인 물건처럼 읽혔다
+            // (QA 2026-09-08 #48). 동작이 없는 장식에는 안내 알약도 하이라이트도 붙이지 않는다. 콜라이더는 프리팹 것으로 충분.
+            if (!interactive && (type == BoothObjectType.Furniture || type == BoothObjectType.Decoration)) return;
             var target = go.GetComponent<BoothInteractionTarget>();
             if (target == null) target = go.AddComponent<BoothInteractionTarget>();
             // 사거리는 **월드 유닛**이고 판정은 콜라이더 **표면** 기준이다

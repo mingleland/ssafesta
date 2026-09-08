@@ -52,6 +52,7 @@ namespace Festa.Content
 
         void OnEnable()
         {
+            useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스를 끄면 OnGUI 호출이 프레임당 절반으로 줄어 GC 가 준다 (QA #69)
             // 씬에 미리 놓인 인스턴스는 Ensure() 를 거치지 않으므로 여기서도 등록한다 (PromptShowing 이 본다).
             if (_instance == null) _instance = this;
             Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
@@ -77,6 +78,9 @@ namespace Festa.Content
             {
                 UpdateHover(null);
                 ShowHint(null);
+                // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
+                // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
+                _passive = null;
                 return;
             }
 

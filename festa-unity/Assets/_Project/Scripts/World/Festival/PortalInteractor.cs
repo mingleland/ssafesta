@@ -28,6 +28,8 @@ namespace Festa.World
         // (S15P21A604-355). 여기서 따로 그리면 둘이 다시 어긋난다.
         readonly InteractRing _ring = new InteractRing();
 
+        void Awake() => useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
+
         public override void OnNetworkSpawn()
         {
             enabled = IsOwner;

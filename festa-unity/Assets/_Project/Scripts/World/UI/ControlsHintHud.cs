@@ -19,6 +19,8 @@ namespace Festa.World.UI
     /// </summary>
     public sealed class ControlsHintHud : MonoBehaviour
     {
+        void Awake() => useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
+
         public const string ObjectName = "@ControlsHint";
         const float AutoShowSeconds = 15f;
         const float OwnerScanInterval = 0.5f;
@@ -120,7 +122,7 @@ namespace Festa.World.UI
             if (HostProvidesUi || _owner == null) return;
             if (InputBridge.IsLocked || InteractionFocusCamera.IsFocused) return;
 
-            float ui = Screen.height / 1080f;
+            float ui = InteractPromptUI.UiScale();   // 하한 0.75 — 작은 창에서 6~11px 로 줄던 것 (QA #67)
             float margin = Mathf.Round(24f * ui);
 
             if (!_open) { DrawChip(ui, margin); return; }

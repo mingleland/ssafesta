@@ -28,6 +28,8 @@ namespace Festa.Diagnostics
     /// </summary>
     public sealed class AvatarMergeIntegrity : MonoBehaviour
     {
+        void Awake() => DiagnosticKeys.Claim(nameof(AvatarMergeIntegrity), KeyCode.Insert);   // 중복·예약키 검사에 등록 (QA #64)
+
         bool _running;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]

@@ -224,9 +224,13 @@ namespace Festa.Core
             float P(float q) => buf[Mathf.Clamp(Mathf.FloorToInt(_ringCount * q), 0, _ringCount - 1)] * 1000f;
 
             int gc = System.GC.CollectionCount(0);
+            // 릴리스에서 유일하게 살아 있는 프레임 관측 줄이다(QA #6). 힛치 수(50ms 초과)와 최근 위치를 함께 남겨
+            // "느리다" 신고를 로그 한 줄로 재현 조건까지 좁힐 수 있게 한다. 진단 6종은 릴리스에서 꺼져 있다.
+            int hitches = 0; foreach (var f in buf) if (f > 0.050f) hitches++;
+            var cam = Camera.main; string where = cam != null ? cam.transform.position.ToString("F0") + " yaw" + cam.transform.eulerAngles.y.ToString("F0") : "-";
             Debug.Log($"[Festa/프레임] {_hz}Hz vSync{_interval} 예산 {budgetMs:F1}ms | " +
                       $"p50 {P(0.5f):F1} p95 {P(0.95f):F1} p99 {P(0.99f):F1} 최대 {P(1f):F1} ms | " +
-                      $"표본 {_ringCount} | GC {gc - _gcAtLastReport}회/{ReportSeconds:F0}초");
+                      $"힛치(>50ms) {hitches} | 표본 {_ringCount} | GC {gc - _gcAtLastReport}회/{ReportSeconds:F0}초 | 위치 {where}");
             _gcAtLastReport = gc;
         }
     }

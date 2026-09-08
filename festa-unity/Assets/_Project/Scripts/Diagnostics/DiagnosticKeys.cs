@@ -31,7 +31,8 @@ namespace Festa.Diagnostics
         /// <summary>WebGL 에서 브라우저가 가져가는 키. F11·F12 는 preventDefault 로도 못 막는다.</summary>
         static readonly HashSet<KeyCode> BrowserReserved = new()
         {
-            KeyCode.F1, KeyCode.F3, KeyCode.F5, KeyCode.F6, KeyCode.F7, KeyCode.F11, KeyCode.F12,
+            KeyCode.F1, KeyCode.F3, KeyCode.F4, KeyCode.F5, KeyCode.F6, KeyCode.F7, KeyCode.F8, KeyCode.F9, KeyCode.F10, KeyCode.F11, KeyCode.F12,
+            // F4 Alt+F4 / F8·F9·F10 은 브라우저·OS 메뉴바가 먹는 경우가 있어 예약으로 본다 (QA 2026-09-08 #64)
         };
 
         /// <summary>
@@ -51,7 +52,8 @@ namespace Festa.Diagnostics
 
             Owners[key] = owner;
 
-            if (Application.platform == RuntimePlatform.WebGLPlayer && BrowserReserved.Contains(key))
+            // 에디터·개발 빌드에서도 검사한다 — WebGL 이 주 배포 대상이라 배정 시점에 바로 드러나야 한다 (QA #64)
+            if (BrowserReserved.Contains(key))
                 Debug.LogError($"[DiagnosticKeys] {key} 는 브라우저 예약키다 ('{owner}' 가 요청). " +
                                "누르면 브라우저 기능이 먼저 동작해 테스트가 날아간다. 구두점 키로 옮겨라.");
 
