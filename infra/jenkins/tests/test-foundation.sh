@@ -104,6 +104,8 @@ grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/script
   || fail "dev game pipeline does not require the connection token Secret file reference"
 grep -q 'detect-changed-components.sh' "${develop_pipeline}" \
   || fail "develop pipeline does not detect the pushed range"
+grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
+  || fail "develop pipeline does not create its selection artifact directory"
 ! grep -q 'deploy-release.sh' "${develop_pipeline}" \
   || fail "Phase 2 develop pipeline must not deploy demo"
 grep -q "branch != 'develop'" "${jenkinsfile}" \
@@ -122,6 +124,21 @@ grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo b
 grep -q 'AI_INTERNAL_BASE_URL: http://ai:8000' "${integration_compose}" || fail "demo backend lacks AI service DNS"
 grep -q 'SPRING_INTERNAL_BASE_URL: http://back:8080' "${integration_compose}" || fail "demo AI lacks backend service DNS"
 pass "runtime credential binding and least-privilege Compose wiring"
+
+stage_summary_dir="$(mktemp -d)"
+CI_ARTIFACT_DIR="${stage_summary_dir}" \
+CI_STAGE_SUMMARY_PATH="${stage_summary_dir}/stage-summaries/validate.json" \
+CI_COMPONENT=ai \
+CI_COMMIT_SHA=0123456789abcdef0123456789abcdef01234567 \
+CI_STAGE=validate \
+CI_STAGE_STATUS=SUCCEEDED \
+CI_STARTED_AT=2026-09-09T03:35:42Z \
+CI_FINISHED_AT=2026-09-09T03:35:43Z \
+"${repo_root}/infra/jenkins/scripts/write-stage-summary.sh" >/dev/null
+[[ -f "${stage_summary_dir}/stage-summaries/validate.json" ]] \
+  || fail "stage summary does not create its nested output directory"
+rm -rf "${stage_summary_dir}"
+pass "nested stage summary artifact path"
 
 grep -q 'proxy_pass http://127.0.0.1:8080' "${nginx}" || fail "Nginx does not proxy to loopback Jenkins"
 ! grep -Eq 'listen[[:space:]]+(8080|3000|50000)' "${nginx}" || fail "Nginx publicly listens on a forbidden port"

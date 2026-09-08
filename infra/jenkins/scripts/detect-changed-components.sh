@@ -23,9 +23,8 @@ branch="${branch#origin/}"
 [[ "${head}" =~ ^[0-9a-f]{40}$ ]] || { echo "head must be a full lowercase SHA" >&2; exit 64; }
 
 if [[ -z "${base}" ]]; then
-  parents="$(git rev-list --parents -n 1 "${head}" 2>/dev/null || true)"
-  [[ "$(wc -w <<<"${parents}")" -eq 2 ]] || { echo "base SHA is required unless head is a one-parent squash commit" >&2; exit 64; }
-  base="${parents#* }"
+  base="$(git rev-parse "${head}^1" 2>/dev/null || true)"
+  [[ -n "${base}" ]] || { echo "base SHA is required for a root commit" >&2; exit 64; }
 fi
 [[ "${base}" =~ ^[0-9a-f]{40}$ ]] || { echo "base must be a full lowercase SHA" >&2; exit 64; }
 git cat-file -e "${base}^{commit}" 2>/dev/null || { echo "base commit is unavailable locally" >&2; exit 65; }
