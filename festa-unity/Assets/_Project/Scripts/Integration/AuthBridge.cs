@@ -53,12 +53,56 @@ namespace Festa.Integration
 
             s_accessToken = token.Trim();
             s_isGuest = ReadRoleIsGuest(s_accessToken);
+            SubjectKey = ReadSubjectKey(s_accessToken);
             // 토큰 값은 절대 로그에 남기지 않는다. 길이만으로 주입 여부를 확인한다.
             Debug.Log($"[AuthBridge] Access Token 주입됨 (길이 {s_accessToken.Length}, guest={s_isGuest})");
             TokenChanged?.Invoke();
         }
 
         static bool s_isGuest;
+
+        /// <summary>
+        /// 지금 로그인한 사람을 구분하는 **안정적이고 되돌릴 수 없는** 키. 토큰이 없으면 빈 문자열.
+        ///
+        /// <para>로컬 저장소를 사용자별로 나누는 데 쓴다. 공용 PC 에서 앞사람이 남긴 값을 뒷사람이
+        /// 읽어 가는 것을 막는다 — 아바타 씬 핸드오프가 실제로 그랬다(2026-09-08).</para>
+        ///
+        /// <para><c>sub</c> 클레임을 그대로 두지 않고 해시한다. PlayerPrefs 는 브라우저에 평문으로 남고
+        /// 우리는 거기에 사용자 식별자를 적을 이유가 없다.</para>
+        /// </summary>
+        public static string SubjectKey { get; private set; } = "";
+
+        static string ReadSubjectKey(string jwt)
+        {
+            try
+            {
+                var parts = jwt.Split('.');
+                if (parts.Length < 2) return "";
+                var b64 = parts[1].Replace('-', '+').Replace('_', '/');
+                switch (b64.Length % 4) { case 2: b64 += "=="; break; case 3: b64 += "="; break; }
+                var json = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(b64));
+
+                const string marker = "\"sub\"";
+                int i = json.IndexOf(marker, System.StringComparison.Ordinal);
+                if (i < 0) return "";
+                i = json.IndexOf(':', i + marker.Length);
+                if (i < 0) return "";
+                int s = json.IndexOf('"', i + 1);
+                if (s < 0) return "";
+                int e = json.IndexOf('"', s + 1);
+                if (e <= s) return "";
+                var sub = json.Substring(s + 1, e - s - 1);
+                if (sub.Length == 0) return "";
+
+                unchecked
+                {
+                    ulong h = 1469598103934665603UL;                 // FNV-1a 64
+                    foreach (var c in sub) { h ^= c; h *= 1099511628211UL; }
+                    return h.ToString("x16");
+                }
+            }
+            catch (System.Exception) { return ""; }
+        }
 
         /// <summary>
         /// 주입된 토큰의 <c>role</c> 클레임이 GUEST 인가. 게스트는 커스터마이징 없이 바로 월드에 들어간다
@@ -95,6 +139,7 @@ namespace Festa.Integration
         {
             s_accessToken = null;
             s_isGuest = false;
+            SubjectKey = "";
             Debug.Log("[AuthBridge] Access Token 해제됨");
             TokenChanged?.Invoke();
         }
