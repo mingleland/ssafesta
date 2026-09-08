@@ -176,6 +176,16 @@ jira-sync-ready-for-deploy:
     paths:
       - artifacts/
 
+# A valid MR must always publish a successful pipeline status so protected
+# develop does not treat an infra/docs-only MR as a skipped pipeline.
+mr-status:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo 'MR pipeline status only; component CI is selected by rules:changes'
+
 .front-changes:
   rules:
     - changes:
