@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_GAME_RULES, findScene, type AssetReference, type GameObjective, type GameProject, type TileLayer } from '../../contracts/gameProject.ts';
 import { getActiveDialogue, getAvailableDialogueChoices } from '../dialogue/dialogueRunner.ts';
 import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.ts';
@@ -379,18 +379,30 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
               const spriteVisual = sprite?.type === 'SPRITE'
                 ? resolveStaticImageVisual(project.assets.find((asset) => asset.id === sprite.assetId), assetUrls)
                 : null;
+              const objectPercentPosition = {
+                left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
+                top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
+              };
               return (
-                <span
-                  className={`grp-object grp-object--${object.preset.toLowerCase()}`}
-                  key={object.id}
-                  style={{
-                    left: `${((runtimePosition.x + .5) / scene.width) * 100}%`,
-                    top: `${((runtimePosition.y + .5) / scene.height) * 100}%`,
-                    transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
-                    zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
-                  }}
-                  title={definition.label}
-                >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                <Fragment key={object.id}>
+                  <span
+                    className={`grp-object grp-object--${object.preset.toLowerCase()}`}
+                    style={{
+                      ...objectPercentPosition,
+                      transform: `translate(-50%,-50%) scale(${sprite?.type === 'SPRITE' ? (sprite.scale ?? 100) / 100 : 1})`,
+                      zIndex: sprite?.type === 'SPRITE' ? 10 + (sprite.zIndex ?? 2) : 12,
+                    }}
+                    title={definition.label}
+                  >{spriteVisual === null ? definition.icon : <span className="grp-static-sprite" style={staticImageBackgroundStyle(spriteVisual)} />}</span>
+                  {/* S15P21A604-529 — 이름이 있고("" 포함 빈 이름은 미표시) "플레이 중 표시"가
+                      켜진 오브젝트만, 오브젝트와 같은 좌표에서 위로 오프셋한 상시 이름표를
+                      그린다(-526의 순간 페이드아웃 표시와 달리 계속 떠 있음 — 별도 타이머
+                      없이 매 렌더마다 조건만 확인). PLAYER_SPAWN은 이 filter에서 이미
+                      제외되고 계약상 name/showNameInPlay 자체를 가질 수 없다. */}
+                  {object.showNameInPlay === true && object.name !== undefined && object.name !== '' && (
+                    <span className="grp-object-nameplate" style={objectPercentPosition}>{object.name}</span>
+                  )}
+                </Fragment>
               );
             })}
             {runtime.spawnedEnemies.map((enemy) => {
