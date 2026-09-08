@@ -146,6 +146,33 @@
   border-radius: 999px; padding: 3px 10px; font-size: 11px; font-family: inherit; cursor: pointer;
 }
 
+/* 예시 질문 — 입력창 바로 위, 항상 노출. 참고 이미지의 pill 형 quick-reply 자리 */
+.dac-suggestions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 18px 0;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  scrollbar-width: thin;
+}
+.dac-suggestion {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 141, 255, 0.42);
+  background: rgba(77, 141, 255, 0.13);
+  color: #a9c6ff;
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dac-suggestion:hover:not(:disabled) { background: rgba(77, 141, 255, 0.24); }
+.dac-suggestion:disabled { opacity: 0.5; cursor: default; }
+
 .dac-composer {
   display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--dac-border);
   max-width: 720px; width: 100%; margin: 0 auto;

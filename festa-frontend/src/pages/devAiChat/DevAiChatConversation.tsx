@@ -19,6 +19,10 @@ interface Turn {
   retryQuestion?: string;
 }
 
+// 예시 질문 — 채팅창 위(입력창 바로 위)에 항상 띄운다. 대화가 시작된 뒤에도 계속 다른 예시로
+// 이어 물어볼 수 있게 남겨 둔다(요청 참고 이미지: 입력창 위 pill 형 quick-reply).
+const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요', '준비 기간이 얼마나 걸렸나요?'];
+
 export function DevAiChatConversation({
   boothId,
   agentId,
@@ -168,6 +172,14 @@ export function DevAiChatConversation({
               )}
             </div>
           </div>
+        ))}
+      </div>
+
+      <div className="dac-suggestions" role="group" aria-label="예시 질문">
+        {SUGGESTIONS.map((s) => (
+          <button key={s} type="button" className="dac-suggestion" disabled={busy} onClick={() => void ask(s)}>
+            {s}
+          </button>
         ))}
       </div>
 
