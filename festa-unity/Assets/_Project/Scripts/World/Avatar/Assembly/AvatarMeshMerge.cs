@@ -88,7 +88,7 @@ namespace Festa.Avatar
         {
             void Update()
             {
-                if (!Input.GetKeyDown(KeyCode.F10)) return;
+                if (!Input.GetKeyDown(KeyCode.Quote)    /* ' : PerfHud 메시병합 키와 같은 기능인데 F10 은 OS 메뉴바를 잡는다 */) return;
                 Enabled = !Enabled;
                 // 로비에는 HUD 가 없으므로 로그로 남긴다 — 브라우저 콘솔에서 읽힌다.
                 Debug.Log($"[AvatarMeshMerge] {StateLabel} — 옷을 갈아입어야 반영된다");

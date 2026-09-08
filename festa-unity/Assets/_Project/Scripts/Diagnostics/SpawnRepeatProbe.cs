@@ -48,7 +48,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F11)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Home)     /* F11 은 브라우저 전체화면 + RenderCostProbe 와 중복이었다 */) StartCoroutine(Run());
         }
 
         void OnLog(string condition, string stack, LogType type)

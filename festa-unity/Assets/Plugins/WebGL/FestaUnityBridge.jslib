@@ -89,5 +89,48 @@ mergeInto(LibraryManager.library, {
     } catch (error) {
       console.error('[FestaUnityBridge] onWorldLoadStart callback failed', error);
     }
+  },
+
+  // 디스플레이의 **실제** 주사율(Hz) 추정치. 아직 표본이 모자라면 0.
+  //
+  // 왜 필요한가. Unity 는 WebGL 에서 Screen.currentResolution.refreshRateRatio 를 화면과 무관하게
+  // 항상 60 으로 보고한다(자리표시자). 그런데 프레임 상한의 유일한 실동 노브인 QualitySettings.vSyncCount 는
+  // '원시 rAF 몇 틱마다 한 프레임을 그리는가' 라서, 주사율을 모르면 목표 fps 를 정할 수 없다 —
+  // 120Hz 에서 vSyncCount=2 는 60fps 지만 60Hz 에서는 30fps 다. 그래서 여기서 직접 잰다.
+  //
+  // Unity 의 렌더 루프와 **무관한** 자체 rAF 프로브를 돌린다. Unity 가 vSyncCount 로 스스로를 늦춰도
+  // 이 프로브는 원시 vsync 간격을 계속 보므로 추정이 오염되지 않는다. 창을 다른 모니터로 옮기면
+  // 값이 따라 바뀌도록 링 버퍼로 계속 갱신한다(비용은 프레임당 push 하나).
+  FestaDisplayRefreshHz: function () {
+    try {
+      if (!window.__festaRefresh) {
+        var st = { buf: [], hz: 0, prev: 0, since: 0 };
+        window.__festaRefresh = st;
+        var probe = function (now) {
+          if (st.prev > 0) {
+            var dt = now - st.prev;
+            // 탭 전환·리사이즈가 만든 이상치는 버린다. 1ms 미만은 합성 이벤트, 100ms 초과는 정지다.
+            if (dt > 1 && dt < 100) {
+              st.buf.push(dt);
+              if (st.buf.length > 180) st.buf.shift();
+              st.since++;
+            }
+          }
+          st.prev = now;
+          // 60 프레임마다 중앙값으로 다시 추정한다 — 평균은 한 번의 끊김에도 크게 흔들린다.
+          if (st.buf.length >= 60 && st.since >= 60) {
+            st.since = 0;
+            var s = st.buf.slice().sort(function (a, b) { return a - b; });
+            var med = s[Math.floor(s.length / 2)];
+            if (med > 0) st.hz = Math.round(1000 / med);
+          }
+          window.requestAnimationFrame(probe);
+        };
+        window.requestAnimationFrame(probe);
+      }
+      return window.__festaRefresh.hz | 0;
+    } catch (error) {
+      return 0;
+    }
   }
 });

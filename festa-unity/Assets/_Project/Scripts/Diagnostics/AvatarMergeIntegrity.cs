@@ -42,7 +42,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F12)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Insert)   /* F12 는 개발자도구 + FixedPoseBenchmark 와 중복이었다 */) StartCoroutine(Run());
         }
 
         IEnumerator Run()

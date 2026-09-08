@@ -32,7 +32,7 @@ namespace Festa.Diagnostics
     /// 조명이나 그림자를 되돌려 놓으면 F9 한 번으로 드러난다.
     ///
     /// F9 — 결정 스윕(4구성 × 4초 = 16초). 걸어다니는 동안 돌린다.
-    /// F7 — 조명 A/B(정지 상태로 본다). 천장 다운라이트를 원본 90개 / 구역병합 18개(밝기 배율별)로
+    /// F11 — 조명 A/B(정지 상태로 본다). 천장 다운라이트를 원본 90개 / 구역병합 18개(밝기 배율별)로
     ///      바꿔가며 멈춰 세운다. 프레임 수치가 아니라 **눈으로 보는 밝기·얼룩**을 판정하기 위한 것이다.
     ///
     /// 구역병합이 왜 품질을 해치지 않는가: 바닥 직교 렌더로 잰 결과 병합 후 얼룩(휘도 표준편차)이
@@ -44,7 +44,7 @@ namespace Festa.Diagnostics
     /// `m_RenderingMode: 2` = **Forward+** 이고, Forward+ 에서는 PerObjectLimit 과 PerVertex 설정이
     /// 모두 무효다(ForwardLights 가 타일/클러스터로 광원을 배분한다). 따라서 그 논거는 폐기한다.
     /// 병합의 실제 이득은 광원 개수 자체가 줄어 타일별 광원 목록이 짧아지는 것이고, 그 크기는
-    /// **아직 위치 통제된 재측정으로 확인되지 않았다** — F7 A/B 는 같은 자리에서 90 ↔ 18 을
+    /// **아직 위치 통제된 재측정으로 확인되지 않았다** — F11 A/B 는 같은 자리에서 90 ↔ 18 을
     /// 바꾸므로 그 검증에 쓸 수 있다. F9 스윕은 구간마다 걷는 위치가 달라 이 비교에는 못 쓴다.
     ///
     /// 측정이 끝나면 **들어올 때의 상태로** 원복한다. 기본값을 하드코딩하지 않는다 —
@@ -53,8 +53,8 @@ namespace Festa.Diagnostics
     /// </summary>
     public class RenderCostProbe : MonoBehaviour
     {
-        [SerializeField] KeyCode _sweepKey = KeyCode.F9;
-        [SerializeField] KeyCode _lightAbKey = KeyCode.F7;
+        const KeyCode _sweepKey = KeyCode.Slash;             // /  F9 는 AvatarCostAb 와 중복이었다
+        const KeyCode _lightAbKey = KeyCode.Minus;           // -  F11 은 브라우저 전체화면키다. 게다가 이 키는 천장 조명 리그를 영구히 바꾼다 — 모르고 누르면 그 뒤 측정이 전부 오염된다
         [Tooltip("시나리오를 적용하고 나서 버리는 시간(초). 카메라·컬링이 새 상태에 안정되기를 기다린다.")]
         [SerializeField] float _settle = 0.7f;
         [Tooltip("실제로 프레임을 수집하는 시간(초).")]
@@ -78,7 +78,7 @@ namespace Festa.Diagnostics
         readonly List<string> _report = new List<string>();
         ProfilerRecorder _draws, _tris;
         bool _running;
-        string _status = "F9 sweep (16s, keep walking) / F7 light A/B (stand still)";
+        string _status = "F9 sweep (16s, keep walking) / F11 light A/B (stand still)";
 
         int _abIndex;
         static readonly float[] AbMultipliers = { 0f, 1f, 2f, 3f, 4f };   // 0 = 원본 90등
@@ -89,6 +89,10 @@ namespace Festa.Diagnostics
 
         void OnEnable()
         {
+
+            // 키 충돌은 조용히 넘어가면 다음 사람이 같은 함정을 밟는다 — 여기서 신고하고 DiagnosticKeys 가 에러로 드러낸다.
+            DiagnosticKeys.Claim(nameof(RenderCostProbe), _sweepKey);
+            DiagnosticKeys.Claim(nameof(RenderCostProbe), _lightAbKey);
             if (!PerfHud.ToolsEnabled) { enabled = false; return; }
             _rp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
             if (_rp != null)
@@ -100,7 +104,7 @@ namespace Festa.Diagnostics
             _tris = ProfilerRecorder.StartNew(ProfilerCategory.Render, "Triangles Count");
             Collect();
             Debug.Log($"[Probe] 준비 — 원본 90등 활성={_origDownActive}, 구역병합 18등 활성={_origMergedActive}, " +
-                      $"채택 배율 x{_adoptedMultiplier:F1}. F9=결정 스윕(16초, 걸으면서) / F7=조명 A/B(정지)");
+                      $"채택 배율 x{_adoptedMultiplier:F1}. F9=결정 스윕(16초, 걸으면서) / F11=조명 A/B(정지)");
             // 채택안이 씬에 반영돼 있어야 정상이다. 아니면 누가 되돌려 놓은 것이니 눈에 띄게 알린다.
             if (!_origMergedActive || _origDownActive)
                 Debug.LogWarning("[Probe] 조명이 채택안(구역병합 18등)과 다르다 — 회귀했는지 확인하라");
@@ -150,7 +154,7 @@ namespace Festa.Diagnostics
             else if (Input.GetKeyDown(_lightAbKey)) StepLightAb();
         }
 
-        // ── F7: 조명 A/B ────────────────────────────────────────────
+        // ── F11: 조명 A/B ────────────────────────────────────────────
         // 프레임 수치가 아니라 보이는 품질을 판정하기 위한 것이다. 정지 상태로 같은 자리에서 눌러
         // 비교한다. 사용자는 앞선 최적화에서 글자가 얼룩덜룩해진 적이 있어 품질에 민감하다.
 

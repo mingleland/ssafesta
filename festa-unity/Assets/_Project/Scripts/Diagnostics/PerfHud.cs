@@ -21,15 +21,34 @@ namespace Festa.Diagnostics
     /// </summary>
     public class PerfHud : MonoBehaviour
     {
-        [SerializeField] KeyCode _toggleKey = KeyCode.F3;
-        [SerializeField] KeyCode _resetKey = KeyCode.F4;
+        // ── 진단 단축키 배치표 (2026-09-08 정리) ──────────────────────────────
+        // 키가 겹치면 **한 번 누를 때 두 가지가 동시에 바뀌어 측정이 조용히 오염된다.**
+        // 실제로 F9 가 RenderCostProbe 스윕과 PerfHud 아바타 LOD 토글에 동시에 걸려 있어서,
+        // 스윕을 돌릴 때마다 아바타 LOD 가 뒤집히고 있었다(09-07 측정 변동의 원인 중 하나).
+        // 새 진단 키를 추가할 때 반드시 이 표를 보고 빈 자리를 쓴다.
+        //
+        //   F1  PerfHud        아바타 거리 LOD 토글
+        //   F2  FixedPoseBenchmark  프레임 간격 히스토그램
+        //   F3  PerfHud        표시 토글
+        //   F4  PerfHud        통계 리셋
+        //   F5  FixedPoseBenchmark  고정 포즈 A/B 실행
+        //   F6  AvatarStressSpawner 아바타 추가
+        //   F7  AvatarStressSpawner 아바타 제거
+        //   F8  AvatarStressSpawner 전부 제거
+        //   F9  RenderCostProbe 결정 스윕
+        //   F10 PerfHud + AvatarMeshMerge  스킨메시 병합 A/B (둘이 같이 듣는 것은 의도)
+        //   F11 RenderCostProbe 조명 A/B
+        //   F12 FixedPoseBenchmark  사용 가능 통계 열거
+        //   `   HitchLogger    끊김 로그 토글
+        const KeyCode _toggleKey = KeyCode.LeftBracket;      // [  진단 키는 구두점만 쓴다 — DiagnosticKeys 참조
+        const KeyCode _resetKey = KeyCode.RightBracket;      // ]
         // 아바타 거리 LOD 를 빌드 안에서 껐다 켜기 위한 키. 빌드에서 A/B 를 하려면
         // 한 빌드 안에서 조건을 바꿀 수 있어야 한다 — 빌드를 두 번 떠서 비교하면
         // 빌드 간 차이가 섞여 조건 통제가 무너진다 (T-211).
-        [SerializeField] KeyCode _avatarLodKey = KeyCode.F9;
+        const KeyCode _avatarLodKey = KeyCode.Semicolon;     // ;  F9→F1 로 옮겼더니 F1 이 브라우저 도움말이라 또 옮겼다
         // 스킨메시 병합 A/B 키 (S15P21A604-258). 예전 F10 셰이더 판별 실험은 역할이 끝나
         // 제거됐으므로 그 자리를 쓴다.
-        [SerializeField] KeyCode _meshMergeKey = KeyCode.F10;
+        const KeyCode _meshMergeKey = KeyCode.Quote;         // '  F10 은 AvatarMeshMerge 와 중복이었다
         [SerializeField] bool _visibleOnStart = true;
         [Tooltip("프레임 통계를 집계하는 창 길이(초). 짧으면 튀고 길면 둔해진다.")]
         [SerializeField] float _window = 1.0f;
@@ -108,6 +127,12 @@ namespace Festa.Diagnostics
 
         void OnEnable()
         {
+
+            // 키 충돌은 조용히 넘어가면 다음 사람이 같은 함정을 밟는다 — 여기서 신고하고 DiagnosticKeys 가 에러로 드러낸다.
+            DiagnosticKeys.Claim(nameof(PerfHud), _toggleKey);
+            DiagnosticKeys.Claim(nameof(PerfHud), _resetKey);
+            DiagnosticKeys.Claim(nameof(PerfHud), _avatarLodKey);
+            DiagnosticKeys.Claim(nameof(PerfHud), _meshMergeKey);
             if (!ToolsEnabled) { enabled = false; return; }
             _visible = _visibleOnStart;
             _lastGcCount = System.GC.CollectionCount(0);

@@ -27,3 +27,6 @@ _to_delete/
 # 소스 자체도 커밋하지 않는다 (spikes/ai-rag/README.md 안전 조건)
 기획서 문서/
 festa-ai/*.pdf
+
+# GitLab PAT 로컬 파일 — 절대 커밋하지 않는다 (2026-09-08)
+.gltok

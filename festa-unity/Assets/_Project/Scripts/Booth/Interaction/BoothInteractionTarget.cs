@@ -68,8 +68,43 @@ namespace Festa.Booth
                     Mathf.Max(v.extents.x, v.extents.z) * 1.25f);
         }
 
-        /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈.</summary>
+        // ── 월드 바운즈 캐시 (S15P21A604-508) ────────────────────
+        //
+        // **매 프레임 계산하면 안 되는 값이다.** BoothInteractionInput.Update() 가 프레임마다
+        // Active 전수를 돌며 DistanceFrom() 을 부르고, 사거리 안에 대상이 있으면 HighlightFootprint()
+        // 로 한 번 더 부른다. 즉 프레임당 (활성 대상 수 + 최대 3)회 이 함수가 돌았다.
+        //
+        // 그 안의 GetComponentsInChildren<T>(true) 는 **호출마다 배열을 새로 할당**하고 계층을
+        // 통째로 순회한다. 콜라이더가 없으면 렌더러로 한 번 더 돈다. 초당 100프레임 × 수십 대상이면
+        // 초당 수천 번의 할당이고, WebGL/IL2CPP 에서 이건 그대로 GC 압력이 된다.
+        //
+        // 이 비용은 da3f05ec(2026-09-01, S15P21A604-355)에서 들어왔다. 그 전에는
+        // `(t.transform.position - origin).sqrMagnitude` 한 줄이었다. 표면 거리로 바꾼 것 자체는
+        // 옳다(피벗 거리는 큰 오브젝트에서 어긋난다 — T-232). **매 프레임 다시 계산한 것이 문제다.**
+        //
+        // 부스 오브젝트는 배치된 뒤 움직이지 않으므로 결과를 들고 있으면 된다. 다만 "안 움직인다"를
+        // 전제로만 두지 않고 **트랜스폼이 바뀌면 스스로 무효화**한다 — 레이아웃 재적용이나 씬 편집으로
+        // 옮겨져도 값이 낡지 않는다.
+        Bounds? _cachedBounds;
+        bool _boundsValid;
+        Matrix4x4 _boundsMatrix;
+
+        /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈. 트랜스폼이 그대로면 캐시를 쓴다.</summary>
         Bounds? WorldBounds()
+        {
+            var m = transform.localToWorldMatrix;
+            if (_boundsValid && m == _boundsMatrix) return _cachedBounds;
+
+            _cachedBounds = ComputeWorldBounds();
+            _boundsMatrix = m;
+            _boundsValid = true;
+            return _cachedBounds;
+        }
+
+        /// <summary>레이아웃 재적용처럼 **자식 구성이 바뀐** 경우 호출한다 — 트랜스폼 비교로는 못 잡는다.</summary>
+        public void InvalidateBounds() => _boundsValid = false;
+
+        Bounds? ComputeWorldBounds()
         {
             Bounds? acc = null;
             foreach (var c in GetComponentsInChildren<Collider>(true))
@@ -96,6 +131,8 @@ namespace Festa.Booth
             Interactive = highlightEnabled;
             EnsureCollider();
             CacheRenderers();
+            // EnsureCollider 가 콜라이더를 새로 붙일 수 있다 — 바운즈가 달라지므로 캐시를 버린다.
+            InvalidateBounds();
         }
 
         public bool CanInteract(Camera source = null)

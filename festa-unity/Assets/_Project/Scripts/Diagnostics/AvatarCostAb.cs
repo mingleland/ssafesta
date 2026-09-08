@@ -76,7 +76,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F9)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Equals)   /* = : F9 는 RenderCostProbe 스윕과 중복이었다 */) StartCoroutine(Run());
         }
 
         IEnumerator Run()

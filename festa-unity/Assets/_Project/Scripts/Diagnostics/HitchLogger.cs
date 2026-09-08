@@ -32,7 +32,7 @@ namespace Festa.Diagnostics
         [SerializeField] float _minInterval = 0.15f;
         [Tooltip("이 시간을 넘긴 프레임 간격은 끊김이 아니라 **정지**로 본다(ms). 탭 전환·창 최소화.")]
         [SerializeField] float _pauseMs = 1000f;
-        [SerializeField] KeyCode _toggleKey = KeyCode.F8;
+        [SerializeField] KeyCode _toggleKey = KeyCode.BackQuote;   // F8 → ` (AvatarStressSpawner 전부제거와 충돌했다)
 
         bool _enabled = true;
         float _lastLogTime;
@@ -60,7 +60,7 @@ namespace Festa.Diagnostics
             _prevGc = System.GC.CollectionCount(0);
             _prevHeap = System.GC.GetTotalMemory(false);
             Application.focusChanged += OnFocusChanged;
-            Debug.Log($"[HitchLogger] 준비 — 임계 {_thresholdMs:F0}ms, 정지 임계 {_pauseMs:F0}ms, F8 로 토글");
+            Debug.Log($"[HitchLogger] 준비 — 임계 {_thresholdMs:F0}ms, 정지 임계 {_pauseMs:F0}ms, ` 로 토글");
         }
 
         void OnDisable()
