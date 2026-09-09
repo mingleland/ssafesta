@@ -10,6 +10,7 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,16 +26,13 @@ import org.springframework.util.unit.DataSize;
  * storage, then tells us it is done. Nothing streams through Spring — the file never touches this
  * process, which is what makes a 20MB limit an assertion about a number rather than about memory.
  *
- * <p>Handing the document to FastAPI is S15P21A604-175, and expiring abandoned grants is
- * S15P21A604-174. A completed document sits in {@code QUEUED} until the first of those lands.
+ * <p>Handing the document to FastAPI is S15P21A604-175. Abandoned grants no longer hold their slot:
+ * {@link AiDocumentExpirySweeper} moves an unused one to {@code EXPIRED} an hour after it was
+ * issued (FR-026), and {@link #complete} takes it back for the next 24 hours (FR-027).
  *
- * <p><b>Until S15P21A604-174 lands, an abandoned grant holds its slot forever.</b> {@code QUEUED}
- * counts toward the ten of FR-018 ({@code AiDocumentRepository#countActive}) and nothing here moves
- * it to {@code EXPIRED} except a provider switch — there is no sweeper, and no delete endpoint. Ten
- * grants that were issued and never uploaded therefore block that agent with no way out: completing
- * answers {@code DOCUMENT_UPLOAD_INCOMPLETE} because the object is not there, and re-requesting the
- * same file reissues on the same row rather than freeing one. -174 is itself waiting on the AI
- * document DB redesign (GitLab #119), so this is a live operational limit, not a short gap.
+ * <p><b>Deleting the original once that window closes (FR-028) is still nobody's.</b> An expired
+ * row keeps its object key, and no pass removes the bytes — the row is out of the way, the storage
+ * is not.
  */
 @Service
 public class AiDocumentService {
@@ -238,6 +236,36 @@ public class AiDocumentService {
                 + "/documents/" + document.getId() + "/" + document.getOriginalFilename();
     }
 
+    // ── 목록·상태 조회 ──────────────────────────────────────────────────────
+
+    /**
+     * The agent's documents and how much of the quota they use (US2 시나리오 2·7, US3 시나리오 1).
+     *
+     * <p><b>{@code requireEditor}, not {@code requireActiveEditor}.</b> An expired lease turns the
+     * documents {@code DISABLED} and keeps the originals (FR-015) — being unable to look at what
+     * you own because the lease ran out would make that preservation pointless. Writing still needs
+     * an active lease; reading does not.
+     *
+     * <p><b>Nothing here touches FastAPI.</b> US2 시나리오 7 requires the list to answer while the
+     * AI service is down, and it does because every value on it is a column of {@code ai_documents}.
+     *
+     * <p>No paging. FR-018 caps an agent at ten active documents, and the inactive ones this list
+     * also returns are bounded by the same grants — a page parameter would be two sides of protocol
+     * for a list that fits on one screen. ponytail: add it when a real agent's list stops fitting.
+     */
+    public DocumentListView list(Long agentId, Long userId) {
+        AiAgent agent = agents.findById(agentId)
+                .orElseThrow(() -> new AiAgentNotFoundException(agentId));
+        accessGuard.requireEditor(agent.getBoothId(), userId);
+
+        List<DocumentView> rows = documents.findByAgentIdOrderByCreatedAtDesc(agentId).stream()
+                .map(DocumentView::of)
+                .toList();
+        return new DocumentListView(rows, new QuotaView(
+                documents.countActive(agentId), agentProperties.documentCountLimit(),
+                documents.sumActiveBytes(agentId), agentProperties.documentTotalBytes().toBytes()));
+    }
+
     // ── 업로드 완료 ─────────────────────────────────────────────────────────
 
     /**
@@ -300,6 +328,13 @@ public class AiDocumentService {
     }
 
     private Settled settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
+        // Agent first, then the document — the order issueUploadUrl takes. Reversing it here would
+        // put two paths that hold both rows in opposite orders, which is a deadlock rather than a
+        // style question. The lock is what makes the supersession check below decide something: a
+        // competing grant is a different row, so this document's own lock cannot serialise it.
+        agents.findWithLockById(snapshot.agentId())
+                .orElseThrow(() -> new AiAgentNotFoundException(snapshot.agentId()));
+
         AiDocument document = documents.findWithLockById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
 
@@ -327,6 +362,21 @@ public class AiDocumentService {
                 throw gone();
             }
             if (!present) {
+                throw gone();
+            }
+            // A newer grant for the same file already holds the active slot. Recovering would put
+            // two active rows on one (agent_id, content_sha256) and break
+            // ux_ai_documents_agent_active_sha — a 500 nobody could act on. The user has already
+            // started over with this file, so the sentence 410 carries ("업로드가 만료되었습니다.
+            // 새로 업로드해 주세요.") is exactly what happened to this grant.
+            //
+            // FR-027 is not weakened: it promises the original is kept and recoverable, not that a
+            // late completion outranks the upload the same user started afterwards.
+            boolean superseded = documents
+                    .findActiveByAgentAndSha(document.getAgentId(), document.getContentSha256())
+                    .filter(other -> !other.getId().equals(documentId))
+                    .isPresent();
+            if (superseded) {
                 throw gone();
             }
             document.recover(now);
@@ -479,6 +529,48 @@ public class AiDocumentService {
         }
     }
 
+    /**
+     * One row of the list.
+     *
+     * <p><b>{@code uploadedAt} is {@code null} while the bytes are still in flight.</b> That is the
+     * one thing {@code status} cannot say: a grant that was just issued and a document waiting to
+     * be processed are both {@code QUEUED}. A client can tell them apart with this field — and the
+     * expiry sweep reads the same column for the same reason.
+     *
+     * <p><b>No failure reason yet.</b> FR-007 requires a cleaned-up one and forbids leaking
+     * {@code ai_document_jobs.last_error}. The worker's {@code failureCode} is a free-form string
+     * of up to 50 characters with no agreed set, so there is nothing to translate from — and
+     * nothing writes {@code FAILED} to a document today in any case (GitLab #119). Whoever adds
+     * that writer (S15P21A604-400) adds the reason with it.
+     */
+    public record DocumentView(Long documentId, String fileName, String contentType,
+                               long sizeBytes, String status, Instant createdAt,
+                               Instant uploadedAt) {
+
+        static DocumentView of(AiDocument document) {
+            return new DocumentView(document.getId(), document.getOriginalFilename(),
+                    document.getContentType(), document.getSizeBytes(),
+                    document.getProcessingStatus(), document.getCreatedAt(),
+                    document.getUploadedAt());
+        }
+    }
+
+    /**
+     * What the agent has spent of FR-018's two limits.
+     *
+     * <p><b>{@code count} is not {@code documents.size()}.</b> Only {@code QUEUED},
+     * {@code PROCESSING} and {@code READY} take a slot — a failed or expired upload must not hold
+     * one (FR-019b) — while the list shows every status. Ten rows on screen can still leave room
+     * for another file, so a "n/10" indicator has to be drawn from here.
+     *
+     * <p>It is on the response at all because the limit is otherwise invisible until it refuses:
+     * today the only sign is {@code 409 DOCUMENT_LIMIT_EXCEEDED}, on a grant the user has already
+     * chosen a file for.
+     */
+    public record QuotaView(long count, int countLimit, long bytes, long bytesLimit) { }
+
+    public record DocumentListView(List<DocumentView> documents, QuotaView quota) { }
+
     /** What the grant transaction decided, carried out so the URL can be signed outside it. */
     private record Prepared(AiDocument document, boolean duplicate, boolean reissue,
                             UploadRequest request) {
@@ -496,13 +588,20 @@ public class AiDocumentService {
         }
     }
 
-    /** The row as it looked before the HEAD, plus any answer that needed no storage at all. */
-    private record Snapshot(String provider, String bucket, String objectKey, long sizeBytes,
-                            CompleteView decided) {
+    /**
+     * The row as it looked before the HEAD, plus any answer that needed no storage at all.
+     *
+     * <p>{@code agentId} is here so {@link #settle} can take the agent lock <b>before</b> it loads
+     * the document. The status is deliberately not carried: the sweeper may have moved it during
+     * the HEAD, which is the whole reason the write transaction decides again.
+     */
+    private record Snapshot(Long agentId, String provider, String bucket, String objectKey,
+                            long sizeBytes, CompleteView decided) {
 
         static Snapshot of(AiDocument document, CompleteView decided) {
-            return new Snapshot(document.getStorageProvider(), document.getStorageBucket(),
-                    document.getObjectKey(), document.getSizeBytes(), decided);
+            return new Snapshot(document.getAgentId(), document.getStorageProvider(),
+                    document.getStorageBucket(), document.getObjectKey(), document.getSizeBytes(),
+                    decided);
         }
 
         boolean sameStorage(AiDocument document) {
