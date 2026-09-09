@@ -98,6 +98,11 @@ def call() {
 
                 final List credentialBindings = []
                 final List credentialNames = []
+                final String checkoutCredentialId = env.GITLAB_CHECKOUT_CREDENTIALS_ID ?: ''
+                if (checkoutCredentialId.trim().isEmpty()) {
+                    error('GITLAB_CHECKOUT_CREDENTIALS_ID is required for the deploy freshness check')
+                }
+                credentialBindings << gitUsernamePassword(credentialsId: checkoutCredentialId)
                 if (deployComponents.contains('ai')) {
                     credentialBindings << file(credentialsId: env.DEV_AI_ENV_CREDENTIAL_ID, variable: 'DEV_AI_ENV_FILE')
                     credentialNames << 'DEV_AI_ENV_FILE'
