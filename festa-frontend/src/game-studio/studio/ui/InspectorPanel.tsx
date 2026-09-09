@@ -19,6 +19,7 @@ import {
 import { COMPONENT_LABELS, describeSceneRuntimeMode, findPresetDefinition } from '../model/authoringRegistry.ts';
 import { AssetPickerModal } from './AssetPickerModal.tsx';
 import { CommitInput } from './CommitInput.tsx';
+import { NumberCommitInput } from './NumberCommitInput.tsx';
 import { SpriteAnimationInspector } from './SpriteAnimationInspector.tsx';
 
 interface InspectorPanelProps {
@@ -331,16 +332,13 @@ export const InspectorPanel = ({
                 onCommit={(prompt) => replace({ ...component, prompt })}
                 value={component.prompt}
               />
-              <label className="gss-field">
-                <span>상호작용 거리</span>
-                <input
-                  max={100}
-                  min={1}
-                  onChange={(event) => replace({ ...component, range: Number(event.target.value) })}
-                  type="number"
-                  value={component.range ?? 1}
-                />
-              </label>
+              <NumberCommitInput
+                label="상호작용 거리"
+                max={100}
+                min={1}
+                onCommit={(range) => replace({ ...component, range })}
+                value={component.range ?? 1}
+              />
             </>
           )}
           {component.type === 'PICKUP' && (
@@ -354,26 +352,26 @@ export const InspectorPanel = ({
               </select>
             </label>
           )}
-          {component.type === 'DAMAGE' && <label className="gss-field"><span>닿을 때 피해</span><input min={1} max={999} onChange={(event) => replace({ ...component, amount: Number(event.target.value) })} type="number" value={component.amount} /></label>}
-          {component.type === 'HEALTH' && <label className="gss-field"><span>최대 체력</span><input min={1} max={9999} onChange={(event) => replace({ ...component, max: Number(event.target.value) })} type="number" value={component.max} /></label>}
+          {component.type === 'DAMAGE' && <NumberCommitInput label="닿을 때 피해" max={999} min={1} onCommit={(amount) => replace({ ...component, amount })} value={component.amount} />}
+          {component.type === 'HEALTH' && <NumberCommitInput label="최대 체력" max={9999} min={1} onCommit={(max) => replace({ ...component, max })} value={component.max} />}
           {component.type === 'SCORE_VALUE' && <label className="gss-field"><span>획득 점수</span><input min={-999999} max={999999} onChange={(event) => replace({ ...component, value: Number(event.target.value) })} type="number" value={component.value} /></label>}
           {component.type === 'CHECKPOINT' && <div className="gss-empty-inline">플레이어가 닿으면 다시 시작할 위치로 저장합니다.</div>}
           {component.type === 'AUTO_MOVE' && (
             <div className="gss-field-row">
               <label className="gss-field"><span>이동 방향</span><select onChange={(event) => replace({ ...component, axis: event.target.value as 'HORIZONTAL' | 'VERTICAL' })} value={component.axis}><option value="HORIZONTAL">좌우</option><option value="VERTICAL">상하</option></select></label>
-              <label className="gss-field"><span>이동 범위</span><input min={1} max={100} onChange={(event) => replace({ ...component, range: Number(event.target.value) })} type="number" value={component.range} /></label>
+              <NumberCommitInput label="이동 범위" max={100} min={1} onCommit={(range) => replace({ ...component, range })} value={component.range} />
             </div>
           )}
           {component.type === 'SHOOTER' && (
             <div className="gss-field-row">
-              <label className="gss-field"><span>피해량</span><input min={1} max={999} onChange={(event) => replace({ ...component, damage: Number(event.target.value) })} type="number" value={component.damage} /></label>
-              <label className="gss-field"><span>발사 간격 ms</span><input min={100} max={10000} onChange={(event) => replace({ ...component, cooldownMs: Number(event.target.value) })} type="number" value={component.cooldownMs} /></label>
+              <NumberCommitInput label="피해량" max={999} min={1} onCommit={(damage) => replace({ ...component, damage })} value={component.damage} />
+              <NumberCommitInput label="발사 간격 ms" max={10000} min={100} onCommit={(cooldownMs) => replace({ ...component, cooldownMs })} value={component.cooldownMs} />
             </div>
           )}
           {component.type === 'SPAWNER' && (
             <div className="gss-field-row">
-              <label className="gss-field"><span>생성 간격 ms</span><input min={250} max={60000} onChange={(event) => replace({ ...component, intervalMs: Number(event.target.value) })} type="number" value={component.intervalMs} /></label>
-              <label className="gss-field"><span>동시 최대</span><input min={1} max={100} onChange={(event) => replace({ ...component, maxAlive: Number(event.target.value) })} type="number" value={component.maxAlive} /></label>
+              <NumberCommitInput label="생성 간격 ms" max={60000} min={250} onCommit={(intervalMs) => replace({ ...component, intervalMs })} value={component.intervalMs} />
+              <NumberCommitInput label="동시 최대" max={100} min={1} onCommit={(maxAlive) => replace({ ...component, maxAlive })} value={component.maxAlive} />
             </div>
           )}
         </article>

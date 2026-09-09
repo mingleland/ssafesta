@@ -10,7 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +35,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -76,6 +79,7 @@ class AiDocumentUploadIntegrationTest {
     @Autowired private AccountDeletionService deletions;
     @Autowired private FakeDocumentProcessingClient processing;
     @Autowired private DocumentJobDispatchSweeper sweeper;
+    @Autowired private AiDocumentExpirySweeper expirySweeper;
 
     @BeforeEach
     void reset() {
@@ -453,6 +457,263 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_GONE"));
     }
 
+    // ── 목록·상태 조회 (US2 시나리오 2·7 · US3 시나리오 1) ──────────────────
+
+    /** 목록은 <b>모든 상태</b>를 최근 발급 순으로 준다 — 만료된 문서가 조용히 사라지면 안 된다. */
+    @Test
+    void theListShowsEveryStatusNewestFirst() throws Exception {
+        Owner owner = agentOwner("목록");
+        String old = grantJson(owner, body("old.pdf", "application/pdf", ONE_MB, SHA_A));
+        ageGrant(idOf(old), Duration.ofHours(2));
+        expirySweeper.expireAbandonedGrants();
+        String recent = grantJson(owner, body("recent.pdf", "application/pdf", 2 * ONE_MB, SHA_B));
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(2))
+                .andExpect(jsonPath("$.documents[0].documentId").value(idOf(recent)))
+                .andExpect(jsonPath("$.documents[0].fileName").value("recent.pdf"))
+                .andExpect(jsonPath("$.documents[0].contentType").value("application/pdf"))
+                .andExpect(jsonPath("$.documents[0].sizeBytes").value(2 * ONE_MB))
+                .andExpect(jsonPath("$.documents[0].status").value("QUEUED"))
+                .andExpect(jsonPath("$.documents[0].createdAt").isNotEmpty())
+                // 발급만 됐고 바이트는 아직이다 — status 로는 구분할 수 없는 상태다.
+                .andExpect(jsonPath("$.documents[0].uploadedAt").doesNotExist())
+                .andExpect(jsonPath("$.documents[1].documentId").value(idOf(old)))
+                .andExpect(jsonPath("$.documents[1].status").value("EXPIRED"));
+    }
+
+    /**
+     * <b>{@code quota.count} 는 목록 길이가 아니다.</b>
+     *
+     * <p>상한을 세는 것은 활성 3상태뿐이라, 만료·실패분이 섞이면 두 숫자가 갈린다. 화면이
+     * {@code documents.length} 로 "n/10" 을 그리면 아직 올릴 수 있는 사용자에게 꽉 찼다고 말한다.
+     */
+    @Test
+    void theQuotaCountsOnlyActiveDocumentsNotTheListLength() throws Exception {
+        Owner owner = agentOwner("쿼터");
+        seedActive(owner, "READY", shaOf(0), ONE_MB);
+        seedActive(owner, "FAILED", shaOf(1), 5 * ONE_MB);
+        String abandoned = grantJson(owner, body("abandoned.pdf", "application/pdf", ONE_MB, SHA_A));
+        ageGrant(idOf(abandoned), Duration.ofHours(2));
+        expirySweeper.expireAbandonedGrants();
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(3))
+                .andExpect(jsonPath("$.quota.count").value(1))
+                .andExpect(jsonPath("$.quota.countLimit").value(10))
+                .andExpect(jsonPath("$.quota.bytes").value(ONE_MB))
+                .andExpect(jsonPath("$.quota.bytesLimit").value(100L * 1024 * 1024));
+    }
+
+    /** 업로드가 확인되면 그 시각이 채워진다 — 화면이 "업로드 중" 과 "대기 중" 을 나누는 근거다. */
+    @Test
+    void completingFillsInTheUploadedAt() throws Exception {
+        Owner owner = agentOwner("업로드시각");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        mockMvc.perform(documents(owner))
+                .andExpect(jsonPath("$.documents[0].status").value("QUEUED"))
+                .andExpect(jsonPath("$.documents[0].uploadedAt").isNotEmpty());
+    }
+
+    /**
+     * 임대가 끝나도 소유자는 자기 문서를 볼 수 있다.
+     *
+     * <p>FR-015 는 만료 시 문서를 {@code DISABLED} 로 두되 <b>원본과 메타데이터는 보존</b>한다고
+     * 한다. 조회까지 막으면 그 보존이 아무 의미가 없다 — 그래서 이 경로만 편집 권한(`requireEditor`)을
+     * 쓰고 활성 임대(`requireActiveEditor`)를 요구하지 않는다.
+     */
+    @Test
+    void anExpiredLeaseStillLetsTheOwnerReadTheList() throws Exception {
+        Owner owner = agentOwner("만료임대");
+        grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        expireLease(jdbc, owner.boothId());
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(1));
+    }
+
+    @Test
+    void anotherMembersAgentIsForbidden() throws Exception {
+        Owner owner = agentOwner("주인");
+        Owner stranger = agentOwner("남");
+
+        mockMvc.perform(get("/api/v1/agents/{id}/documents", owner.agentId())
+                        .header("Authorization", bearerFor(stranger.userId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+    }
+
+    @Test
+    void listingAMissingAgentIsNotFound() throws Exception {
+        Owner owner = agentOwner("없는직원");
+
+        mockMvc.perform(get("/api/v1/agents/{id}/documents", 999_999_999L)
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+    }
+
+    // ── 만료 판정 (FR-026 · SC-010) ─────────────────────────────────────────
+
+    /**
+     * 발급만 받고 안 올린 문서는 1시간 뒤 만료되고, 갓 발급한 것은 그대로다.
+     *
+     * <p>{@code updated_at} 단정이 함께 있는 이유는 bulk update 가 엔티티 콜백을 타지 않기
+     * 때문이다. 질의에서 그 칸을 빼면 만료된 행이 발급 시각을 그대로 들고 있게 되는데, 상태만
+     * 보는 단정으로는 그게 보이지 않는다.
+     */
+    @Test
+    void anUnusedGrantExpiresAfterAnHourAndAFreshOneDoesNot() throws Exception {
+        Owner owner = agentOwner("만료");
+        String stale = grantJson(owner, body("stale.pdf", "application/pdf", ONE_MB, SHA_A));
+        String fresh = grantJson(owner, body("fresh.pdf", "application/pdf", ONE_MB, SHA_B));
+        Instant beforeSweep = Instant.now();
+        ageGrant(idOf(stale), Duration.ofHours(1).plusMinutes(1));
+
+        expirySweeper.expireAbandonedGrants();
+
+        AiDocument expired = documentRepository.findById(idOf(stale)).orElseThrow();
+        assertEquals("EXPIRED", expired.getProcessingStatus());
+        assertNotNull(expired.getExpiredAt(), "expired_at 이 비면 24시간 복구 창을 잴 수 없다");
+        assertTrue(updatedAt(idOf(stale)).isAfter(beforeSweep),
+                "bulk update 가 updated_at 을 안 건드렸다 — 만료된 행이 발급 시각을 들고 있다");
+        assertEquals("QUEUED", documentRepository.findById(idOf(fresh)).orElseThrow()
+                .getProcessingStatus());
+    }
+
+    /**
+     * 업로드가 확인된 문서는 아무리 오래돼도 쓸리지 않는다.
+     *
+     * <p>질의의 {@code uploaded_at IS NULL} 을 지우면 여기서만 걸린다. 그 조건은 "QUEUED" 를 다시
+     * 말한 것이 아니라 <b>경합 가드</b>다 — {@code /complete} 가 행을 쥔 채 커밋하는 동안 sweep 이
+     * 대기하고, 깨어나서 술어를 다시 보기 때문에 그 항이 있어야 아무 일도 일어나지 않는다.
+     * 없으면 방금 끝난 업로드를 만료로 덮고, 사용자에게는 {@code QUEUED} 라고 답한 뒤다.
+     */
+    @Test
+    void aCompletedDocumentIsNeverSweptHoweverOld() throws Exception {
+        Owner owner = agentOwner("완료본");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+        ageGrant(idOf(grant), Duration.ofDays(3));
+
+        expirySweeper.expireAbandonedGrants();
+
+        AiDocument stored = documentRepository.findById(idOf(grant)).orElseThrow();
+        assertEquals("QUEUED", stored.getProcessingStatus(), "업로드가 끝난 문서를 만료시켰다");
+        assertNull(stored.getExpiredAt());
+    }
+
+    /**
+     * HEAD 도중에 sweep 이 커밋해도 도착한 업로드가 이긴다.
+     *
+     * <p>{@code complete()} 는 읽기·HEAD·쓰기 세 단계이고 HEAD 시점에는 열린 트랜잭션이 없다.
+     * 그래서 이 콜백 안의 sweep 은 상위에 얹히지 않고 자기 트랜잭션으로 커밋한다 — 운영에서
+     * 일어나는 순서 그대로다. 쓰기 단계가 락을 잡고 다시 읽어 판단하므로 결과는 복구다.
+     */
+    @Test
+    void aSweepDuringTheHeadDoesNotStealACompletionThatArrived() throws Exception {
+        Owner owner = agentOwner("경합");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        ageGrant(idOf(grant), Duration.ofHours(2));
+        storage.onHead(key -> {
+            storage.onHead(k -> { });   // 한 번만
+            expirySweeper.expireAbandonedGrants();
+        });
+
+        mockMvc.perform(complete(owner, idOf(grant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.processingStatus").value("QUEUED"));
+
+        AiDocument stored = documentRepository.findById(idOf(grant)).orElseThrow();
+        assertNull(stored.getExpiredAt(), "복구했는데 expired_at 이 남아 있다");
+        assertEquals(1, countBy("SELECT count(*) FROM ai_document_jobs WHERE document_id = ?",
+                idOf(grant)));
+    }
+
+    /**
+     * 만료된 grant 를 두고 같은 파일을 다시 올리기 시작했으면, 늦게 도착한 옛 grant 는 410 이다.
+     *
+     * <p>가드가 없으면 <b>이 테스트는 500 이다.</b> 복구가 {@code QUEUED} 로 되돌리는 순간 한
+     * (agent, sha) 에 활성 행이 둘이 되어 {@code ux_ai_documents_agent_active_sha} 를 위반하고,
+     * 이 경로에는 그 위반을 번역하는 catch 가 없다.
+     *
+     * <p>FR-027 을 약화시키지 않는다 — 원본 보존과 복구 가능성을 약속했지, 같은 파일로 이미 다시
+     * 시작한 사용자를 이기는 것까지 약속하지 않았다.
+     */
+    @Test
+    void aNewerGrantForTheSameFileSupersedesTheExpiredOne() throws Exception {
+        Owner owner = agentOwner("대체됨");
+        String old = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(old), ONE_MB);
+        ageGrant(idOf(old), Duration.ofHours(2));
+        expirySweeper.expireAbandonedGrants();
+
+        // 만료됐으니 중복 판정에서 빠지고, 같은 파일이 새 행으로 시작한다 — 부분 인덱스의 의도다.
+        String reissued = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        assertNotEquals(idOf(old), idOf(reissued), "만료된 행에 재발급되면 이 시나리오가 아니다");
+
+        mockMvc.perform(complete(owner, idOf(old)))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_GONE"));
+
+        assertEquals("EXPIRED", documentRepository.findById(idOf(old)).orElseThrow()
+                .getProcessingStatus());
+        assertEquals(1, countBy("""
+                SELECT count(*) FROM ai_documents WHERE agent_id = ? AND content_sha256 = ?
+                  AND processing_status IN ('QUEUED', 'PROCESSING', 'READY')
+                """, owner.agentId(), SHA_A));
+    }
+
+    /**
+     * 만료가 슬롯을 실제로 돌려준다 — 이 티켓이 존재하는 이유다 (FR-018).
+     *
+     * <p>발급만 받고 안 올린 문서 열 개면 그 AI 직원은 문서를 더 못 올린다. 완료는 객체가 없어
+     * 거부되고, 같은 파일 재요청은 같은 행에 재발급이라 슬롯이 안 풀린다. 빠져나갈 길이 sweep
+     * 하나뿐이었다.
+     */
+    @Test
+    void expiringAnAbandonedGrantFreesTheAgentSlot() throws Exception {
+        Owner owner = agentOwner("슬롯");
+        for (int i = 0; i < 9; i++) {
+            seedActive(owner, "READY", shaOf(i), ONE_MB);
+        }
+        String abandoned = grantJson(owner, body("abandoned.pdf", "application/pdf", ONE_MB, SHA_A));
+
+        mockMvc.perform(uploadUrl(owner, body("next.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_LIMIT_EXCEEDED"));
+
+        ageGrant(idOf(abandoned), Duration.ofHours(1).plusMinutes(1));
+        expirySweeper.expireAbandonedGrants();
+
+        mockMvc.perform(uploadUrl(owner, body("next.pdf", "application/pdf", ONE_MB, SHA_B)))
+                .andExpect(status().isOk());
+    }
+
+    /**
+     * 스키마가 자기 값 도메인을 지킨다 (V24).
+     *
+     * <p>Flyway 가 뜬다는 것은 "SQL 문법이 맞고 기존 데이터가 제약을 만족한다" 까지만 증명한다.
+     * 이 제약을 넣은 이유는 raw JDBC 문자열의 오타인데, 그건 직접 써 봐야 확인된다. 오타 하나면
+     * 그 문서는 중복 판정·쿼터 집계·검색 게이트 세 곳에서 동시에, 조용히 사라진다.
+     */
+    @Test
+    void theSchemaRefusesAStatusOutsideTheContract() throws Exception {
+        Owner owner = agentOwner("오타");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update(
+                "UPDATE ai_documents SET processing_status = 'REDAY' WHERE id = ?", idOf(grant)));
+    }
+
     // ── 저장소 장애·차단 ────────────────────────────────────────────────────
 
     /**
@@ -535,6 +796,11 @@ class AiDocumentUploadIntegrationTest {
         return post("/api/v1/agents/{id}/documents/upload-url", owner.agentId())
                 .header("Authorization", bearerFor(owner.userId()))
                 .contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
+    private RequestBuilder documents(Owner owner) {
+        return get("/api/v1/agents/{id}/documents", owner.agentId())
+                .header("Authorization", bearerFor(owner.userId()));
     }
 
     private RequestBuilder complete(Owner owner, long documentId) {
@@ -732,9 +998,20 @@ class AiDocumentUploadIntegrationTest {
         assertEquals(List.of(), processing.received(), "RUNNING 인 Job 을 다시 보내면 워커가 둘이 된다");
     }
 
-    private int countBy(String sql, Object argument) {
-        Integer found = jdbc.queryForObject(sql, Integer.class, argument);
+    private int countBy(String sql, Object... arguments) {
+        Integer found = jdbc.queryForObject(sql, Integer.class, arguments);
         return found == null ? 0 : found;
+    }
+
+    /** 발급 시각을 과거로 민다 — 1시간 만료 판정이 보는 칸이 {@code created_at} 이다. */
+    private void ageGrant(long documentId, Duration ago) {
+        jdbc.update("UPDATE ai_documents SET created_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(Instant.now().minus(ago)), documentId);
+    }
+
+    private Instant updatedAt(long documentId) {
+        return jdbc.queryForObject("SELECT updated_at FROM ai_documents WHERE id = ?",
+                java.sql.Timestamp.class, documentId).toInstant();
     }
 
     private static String shaOf(int index) {

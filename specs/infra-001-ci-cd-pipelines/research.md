@@ -165,4 +165,36 @@ Phase 0에서 발견한 기술 선택은 모두 위 결정 또는 명시적 운�
 - P1 관측 retention·resource cap·threshold·panel 세부값
 - single-host down을 감시할 외부 실패영역 도입 여부
 
+## R-13. Branch name 대신 변경 경로로 component 선택
+
+**Decision**: GitLab MR은 native `rules:changes`로 Front·Back build/test gate를 선택한다. Jenkins `develop` push는 webhook의 `before..after`(없으면 `HEAD^..HEAD`) 범위를 `git diff --name-only`로 비교한다. 저장소 소유 detector가 경로를 `ai`, `back`, `front`, `game`, shared CI, docs-only로 분류해 Jenkins용 JSON selection record를 만든다.
+
+**Rationale**: GitLab merge gate에는 GitLab이 제공하는 MR diff matcher가 가장 작고 직접적이다. Jenkins는 merge 후 Squash range만 소비하므로 source branch 이름으로 component를 추정하지 않는다.
+
+**Alternatives considered**:
+- branch 이름에 component를 강제: 한 MR의 다중 component 변경을 표현하지 못해 기각.
+- GitLab label을 수동 선택: 사람이 빠뜨릴 수 있어 CI 차단 근거로 부적합.
+- 모든 MR에서 전 component build: 안전하지만 Unity 포함 불필요한 비용이 커 기각.
+
+## R-14. dev multi-component deployment batch
+
+**Decision**: `develop` push는 선택된 모든 component CI와 candidate image 준비를 끝낸 뒤 하나의 dev batch lock 아래에서만 배포한다. 시작 전 affected component의 current/known-good state를 snapshot하고, 하나라도 가역적 deploy/verify에 실패하면 같은 batch가 이미 바꾼 component만 snapshot으로 복원한다. 모든 verify가 성공할 때만 batch를 active로 승격한다.
+
+**Rationale**: component별 즉시 deploy는 하나의 Squash merge가 부분 적용된 채 끝날 수 있다. 기존 service-scoped deploy primitive는 재사용하되 batch orchestration만 추가하면 된다.
+
+**Alternatives considered**:
+- all-or-nothing container transaction: Docker Compose가 여러 독립 project를 원자적으로 commit하지 못해 기각.
+- full dev environment rollback: 변경하지 않은 component까지 되돌려 다른 MR을 훼손할 수 있어 기각.
+- old manifest를 일반 deploy 경로에 재투입: freshness 보장을 약화하므로 기각.
+
+## R-15. demo promotion 분리
+
+**Decision**: `develop` push는 demo를 호출하지 않는다. Jenkins manual promotion job이 active dev batch 또는 dev-verified release manifest를 입력으로 받고, 기존 demo deploy/verify/promote/rollback 도구를 재사용한다.
+
+**Rationale**: dev는 팀 통합 확인용이고 demo는 시연/실사용 상태다. 모든 develop merge가 demo 상태를 바꾸면 검증 중 변경이 사용자 경로에 노출된다.
+
+**Alternatives considered**:
+- every develop merge auto-demo: 사용자 승인 결정과 충돌해 기각.
+- 사람이 SSH로 demo 배포: artifact provenance와 rollback evidence를 잃어 기각.
+
 이 항목들은 기능 구현을 막는 코드 미정이 아니라 제공 자원/운영 승인에 종속된 설정 게이트다.

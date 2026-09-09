@@ -712,6 +712,101 @@ Compiler 는 baseColor·normal·metallicRoughness 3채널만 소비하고 Carniv
 `_EmissionMap`·`_OcclusionMap` 도 있다. GT 대조에서 **눈에 띄는 차이를 못 찾았다.**
 이미지 방식에서는 렌더 시점에 필요하면 붙일 수 있으므로 Compiler 확장 자체가 불필요하다.
 
+**남은 조건 ①② 를 겨냥한 추가 실측 (2026-09-08~09)** — 아래는 **관찰과 재현 정보**다.
+표현 방식 판정은 여기서 내리지 않는다(`!496` 에 보류).
+
+#### 기준을 Compiler 밖에 세웠다
+
+그때까지 "원본" 이라 부른 것은 `ratio 1.0` **산출물**이었고 flatten·join·weld·quantize·텍스처
+재인코딩을 전부 거친 뒤였다. 그 기준으로는 Compiler 자체의 손실을 볼 수 없어 별도 기준을 만들었다.
+
+```bash
+node tools/assets/facade-ground-truth.mjs --samples <assetCode,...>
+```
+
+```text
+prefab → three → GLTFExporter → GLB      transform 0회 · quantize 0회
+재질 → 원본 텍스처 경로 JSON             리사이즈·재인코딩 0회
+브라우저가 원본 PNG 를 직접 붙여 렌더
+```
+
+**한계** — 이 장비에 Unity Editor 가 없다(`ProjectVersion 6000.0.78f1`, Hub 미설치). 따라서 이
+기준은 **"Unity 렌더" 가 아니라 "같은 FBX·같은 텍스처를 Compiler 없이 그린 것"** 이고, URP Lit
+셰이더의 표현까지 재현하지 않는다. §12-A-6 의 남은 조건 ①(Unity/Asset Store 원본과의 비교)은
+**이것으로 대체되지 않는다** — 여전히 미확인이다.
+
+#### 7종 × 6조합 크기 실측
+
+근거: `06_visual-review/evidence/facade-gt-vs-candidates-2026-09-08.png`
+
+| 조합 | 7종 합계 | 16종 환산 |
+|---|---|---|
+| 무변환 기준 | 48.93 MB | 111.8 MB |
+| `0.25/256` | 3.33 MB | 7.62 MB |
+| `0.25/512` | 3.80 MB | 8.68 MB |
+| `0.25/1024` | 5.35 MB | 12.23 MB |
+| `0.5/1024` | 7.49 MB | 17.13 MB |
+| 렌더 이미지 thumb 256 | 38 KB | 86 KB |
+| 렌더 이미지 512 q80 | 97 KB | 222 KB |
+
+표본: 고리던지기 · 물총사격 · 사탕노점 · 퍼넬케이크 · 팝콘카트 · 점집 · 매표소.
+
+#### 육안 대조에서 관찰된 것
+
+```text
+texture 256 ↔ 1024      7종 모두에서 육안 차이를 확인하지 못했다
+geometry 0.25 → 0.5     팝콘 카트 바퀴 살이 0.25·0.25/512·0.25/1024 에서 테두리만 남고
+                        0.5 에서 다시 보인다. 얇은 구조에서만 나타난 차이다
+그 밖의 6종             기준과 `0.25/256` 사이에서 구별할 만한 차이를 찾지 못했다
+```
+
+`06_visual-review/evidence/facade-image-quality-2026-09-08.png` 는 렌더 이미지의
+thumb 256 / 512 q80 / 768 q80 을 나란히 둔 것이다.
+
+#### 로딩 (로컬 정적 서버)
+
+```text
+목록 7종 thumbnail     18 ms ·    38 KB
+선택 1회 이미지 512     6 ms ·    18 KB
+선택 1회 3D GLB(0.25/256)  25 ms · 1,192 KB
+3D 전량 7종            69 ms ·   3.33 MB
+```
+
+**로컬이라 시간 값은 네트워크 조건을 반영하지 않는다** — 함께 적은 바이트가 실질 지표다.
+
+### 12-A-6-a. UV 얼룩 — 웹 변환 단계는 배제된다
+
+사탕 노점 파라솔·퍼넬 케이크 하단의 얼룩을 조건을 바꿔 가며 관찰했다.
+
+```text
+ratio 1.0 / 512 px · 1.0 / 256 px · 0.25 / 256 px      전부 동일
+texture 256 · 512 · 1024 · 2048 px                     전부 동일
+Compiler 를 거치지 않은 기준(무변환)                    동일하게 나타난다
+```
+
+근거: `evidence/facade-texture-size-256-2048-2026-09-08.png` ·
+`evidence/facade-gt-vs-candidates-2026-09-08.png`
+
+**따라서 texture resize · geometry ratio · R3F 샘플링 · Compiler 변환은 원인에서 배제된다.**
+
+함께 실측한 것:
+
+```text
+원본 텍스처    2048×2048 아틀라스 (evidence/carnivalkit-atlas-source-2026-09-08.png)
+UV 채널        uv · uv1 두 세트. baseColor 는 uv(첫 세트)
+UV 범위        사탕 노점 mesh 9개가 전부 0~1 전 범위
+tiling/offset  scale(1,1) · offset(0,0)
+```
+
+**원인을 원본 UV 로 확정하지는 않는다.** Unity Editor 없이는 같은 prefab 이 Unity 에서 어떻게
+보이는지 대조할 수 없어, "원본이 그런 것" 과 "FBX UV 해석" 을 가르지 못한다.
+
+### 12-A-6-b. Emission / AO — 대조에서 눈에 띄지 않았다
+
+Compiler 가 소비하는 채널은 baseColor · normal · metallicRoughness 셋이고 CarnivalKit 재질에는
+`_EmissionMap`·`_OcclusionMap` 도 있다. 위 기준 대조에서 **두 맵의 부재로 인한 차이를 육안으로
+확인하지 못했다.** 판단 자체는 표현 방식이 정해진 뒤로 미룬다.
+
 ### 12-A-7. 18종 전체 — 추정이 아니라 실컴파일
 
 전 18종을 `ratio 0.25 + 256 px` 로 실제 컴파일한 값이다.
@@ -952,12 +1047,21 @@ production       dist 에 자산이 실려 나간다
 
 ```text
 ① 계약 assetCode 범위 확장 (§19-1)          3파트 합의
-② FURNITURE·DECORATION 타입 기본 통일 (§8-4) #146 으로 통보 완료, Unity 회신 대기
-③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX)
-④ Facade 이미지 생성의 실행 위치             현재 GT 렌더러는 헤드리스 브라우저를 쓴다.
-                                             CI 에서 돌릴지, Unity Editor 툴로 옮길지 (§15)
-⑤ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
-⑥ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
+② FURNITURE·DECORATION 타입 기본 통일 (§8-4) Unity 기준 채택안 통보 필요
+③ Facade 2종의 처분 (§12-A-8)                PRIZE_WALL(PROP_ONLY) · HOT_DOG(FIX).
+                                             원본 수정 vs 목록 제외 — authoring 판단
+④ texture 256 px 재검증 (§12-A-6)            조사 수행됨(2026-09-08~09). 256↔1024 육안 차이를
+                                             확인하지 못했다는 관찰까지. 판정은 미정
+⑤ Unity/Asset Store 비교 (§12-A-6)           **미수행.** Unity Editor 미설치라 Compiler 를
+                                             우회한 기준으로 대체했고, 그것은 Unity 렌더가 아니다
+⑥ UV 얼룩 (§12-A-6-a)                        조사 수행됨. 웹 변환 단계(resize·ratio·R3F·Compiler)는
+                                             배제. 원본 UV 인지 FBX 해석인지는 미확정
+⑦ Facade 표현 방식 (§12-A-5·12-A-6)          3D 유지 vs 렌더 이미지. 실측 근거는 문서에 있고
+                                             판정은 MR !496 에 보류돼 있다
+⑧ Laptop(.tga)·AiAgent(skinned)·BoothShell(Variant) 3종   파이프라인 확장 vs 자산 재저장
+⑨ Spring 부스 카탈로그 item_type 문자열       BE 확정 대기
+⑩ Facade 이미지 생성의 실행 위치            (이미지 방식을 택할 경우) 현재 GT 렌더러는
+                                             헤드리스 브라우저를 쓴다. CI vs Unity Editor 툴 (§15)
 ```
 
 **Facade 표현 방식·감축 정책은 더 이상 미결정이 아니다** — §12-A-6 에서 렌더 이미지로

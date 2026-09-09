@@ -3,6 +3,8 @@ package com.example.ssafesta.internal.ai;
 import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 class AiDocumentJobRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(AiDocumentJobRepository.class);
 
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate named;
@@ -235,11 +239,33 @@ class AiDocumentJobRepository {
                 """, chunkCount, jobId);
     }
 
+    /**
+     * Publishes the document, but only from a state that is allowed to reach {@code READY}.
+     *
+     * <p>Unconditional before S15P21A604-174. That was reachable once the expiry sweeper started
+     * producing {@code EXPIRED} rows: a document that left the active set would be pulled back into
+     * it by a finalize, silently, with no upload behind it.
+     *
+     * <p><b>{@code QUEUED} is transitional compatibility, not the rule.</b> Nothing writes
+     * {@code PROCESSING} yet — dispatch (S15P21A604-175) owns that edge — so today every healthy
+     * finalize arrives on a {@code QUEUED} document and requiring {@code PROCESSING} would match
+     * zero rows and leave every document unpublished. Narrow this to {@code PROCESSING} alone once
+     * -175 makes it mandatory.
+     *
+     * <p><b>A miss is logged, not thrown.</b> This is the last statement of {@code finalizeJob},
+     * after the chunks have been swapped and the Job marked {@code SUCCEEDED} in the same
+     * transaction. Throwing would roll back work that succeeded and hand the worker a job to redo;
+     * the document staying where it is, loudly, is the smaller failure.
+     */
     void markDocumentReady(long documentId) {
-        jdbc.update("""
+        int published = jdbc.update("""
                 UPDATE ai_documents SET processing_status = 'READY', updated_at = now()
-                 WHERE id = ?
+                 WHERE id = ? AND processing_status IN ('QUEUED', 'PROCESSING')
                 """, documentId);
+        if (published == 0) {
+            log.error("문서 {} 를 READY 로 올리지 못했습니다 — 허용되지 않는 상태입니다. "
+                    + "chunk 는 교체됐지만 문서는 공개되지 않습니다.", documentId);
+        }
     }
 
     /** {@code chunkCount} 는 finalize 전에는 {@code null} 이다 — 재전송 판정에 쓴다. */

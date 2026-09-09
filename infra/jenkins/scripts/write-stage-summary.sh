@@ -21,8 +21,8 @@ if [[ -z "${python_bin}" ]]; then
   fi
 fi
 
-mkdir -p "${CI_ARTIFACT_DIR}"
 output_path="${CI_STAGE_SUMMARY_PATH:-${CI_ARTIFACT_DIR}/stage-summary.json}"
+mkdir -p "$(dirname "${output_path}")"
 
 "${python_bin}" - "${output_path}" <<'PY'
 import datetime as dt
