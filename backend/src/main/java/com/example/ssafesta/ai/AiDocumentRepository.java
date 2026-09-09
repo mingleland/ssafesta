@@ -2,6 +2,7 @@ package com.example.ssafesta.ai;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -41,6 +42,15 @@ interface AiDocumentRepository extends JpaRepository<AiDocument, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM AiDocument d WHERE d.id = :id")
     Optional<AiDocument> findWithLockById(@Param("id") Long id);
+
+    /**
+     * The agent's documents, newest first — every status, including the ones the quota excludes.
+     *
+     * <p>A list that hid {@code EXPIRED} and {@code FAILED} would answer "where did my upload go?"
+     * with silence. US2 scenario 2 asks the opposite: the owner is supposed to see 업로드 만료 and
+     * 실패 as states, not as absences.
+     */
+    List<AiDocument> findByAgentIdOrderByCreatedAtDesc(Long agentId);
 
     /**
      * Expires grants that were issued and never used (FR-026).

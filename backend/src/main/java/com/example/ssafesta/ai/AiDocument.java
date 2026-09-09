@@ -135,6 +135,9 @@ public class AiDocument {
 
     String getProcessingStatus() { return processingStatus; }
 
+    /** When the grant was issued — the clock the 1-hour expiry counts from, and the list's order. */
+    Instant getCreatedAt() { return createdAt; }
+
     Instant getUploadedAt() { return uploadedAt; }
 
     Instant getExpiredAt() { return expiredAt; }

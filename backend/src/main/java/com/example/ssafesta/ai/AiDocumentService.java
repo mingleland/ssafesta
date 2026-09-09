@@ -10,6 +10,7 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -233,6 +234,36 @@ public class AiDocumentService {
     private static String objectKeyOf(AiDocument document) {
         return "booths/" + document.getBoothId() + "/agents/" + document.getAgentId()
                 + "/documents/" + document.getId() + "/" + document.getOriginalFilename();
+    }
+
+    // ── 목록·상태 조회 ──────────────────────────────────────────────────────
+
+    /**
+     * The agent's documents and how much of the quota they use (US2 시나리오 2·7, US3 시나리오 1).
+     *
+     * <p><b>{@code requireEditor}, not {@code requireActiveEditor}.</b> An expired lease turns the
+     * documents {@code DISABLED} and keeps the originals (FR-015) — being unable to look at what
+     * you own because the lease ran out would make that preservation pointless. Writing still needs
+     * an active lease; reading does not.
+     *
+     * <p><b>Nothing here touches FastAPI.</b> US2 시나리오 7 requires the list to answer while the
+     * AI service is down, and it does because every value on it is a column of {@code ai_documents}.
+     *
+     * <p>No paging. FR-018 caps an agent at ten active documents, and the inactive ones this list
+     * also returns are bounded by the same grants — a page parameter would be two sides of protocol
+     * for a list that fits on one screen. ponytail: add it when a real agent's list stops fitting.
+     */
+    public DocumentListView list(Long agentId, Long userId) {
+        AiAgent agent = agents.findById(agentId)
+                .orElseThrow(() -> new AiAgentNotFoundException(agentId));
+        accessGuard.requireEditor(agent.getBoothId(), userId);
+
+        List<DocumentView> rows = documents.findByAgentIdOrderByCreatedAtDesc(agentId).stream()
+                .map(DocumentView::of)
+                .toList();
+        return new DocumentListView(rows, new QuotaView(
+                documents.countActive(agentId), agentProperties.documentCountLimit(),
+                documents.sumActiveBytes(agentId), agentProperties.documentTotalBytes().toBytes()));
     }
 
     // ── 업로드 완료 ─────────────────────────────────────────────────────────
@@ -497,6 +528,48 @@ public class AiDocumentService {
             return new CompleteView(document.getId(), document.getProcessingStatus());
         }
     }
+
+    /**
+     * One row of the list.
+     *
+     * <p><b>{@code uploadedAt} is {@code null} while the bytes are still in flight.</b> That is the
+     * one thing {@code status} cannot say: a grant that was just issued and a document waiting to
+     * be processed are both {@code QUEUED}. A client can tell them apart with this field — and the
+     * expiry sweep reads the same column for the same reason.
+     *
+     * <p><b>No failure reason yet.</b> FR-007 requires a cleaned-up one and forbids leaking
+     * {@code ai_document_jobs.last_error}. The worker's {@code failureCode} is a free-form string
+     * of up to 50 characters with no agreed set, so there is nothing to translate from — and
+     * nothing writes {@code FAILED} to a document today in any case (GitLab #119). Whoever adds
+     * that writer (S15P21A604-400) adds the reason with it.
+     */
+    public record DocumentView(Long documentId, String fileName, String contentType,
+                               long sizeBytes, String status, Instant createdAt,
+                               Instant uploadedAt) {
+
+        static DocumentView of(AiDocument document) {
+            return new DocumentView(document.getId(), document.getOriginalFilename(),
+                    document.getContentType(), document.getSizeBytes(),
+                    document.getProcessingStatus(), document.getCreatedAt(),
+                    document.getUploadedAt());
+        }
+    }
+
+    /**
+     * What the agent has spent of FR-018's two limits.
+     *
+     * <p><b>{@code count} is not {@code documents.size()}.</b> Only {@code QUEUED},
+     * {@code PROCESSING} and {@code READY} take a slot — a failed or expired upload must not hold
+     * one (FR-019b) — while the list shows every status. Ten rows on screen can still leave room
+     * for another file, so a "n/10" indicator has to be drawn from here.
+     *
+     * <p>It is on the response at all because the limit is otherwise invisible until it refuses:
+     * today the only sign is {@code 409 DOCUMENT_LIMIT_EXCEEDED}, on a grant the user has already
+     * chosen a file for.
+     */
+    public record QuotaView(long count, int countLimit, long bytes, long bytesLimit) { }
+
+    public record DocumentListView(List<DocumentView> documents, QuotaView quota) { }
 
     /** What the grant transaction decided, carried out so the URL can be signed outside it. */
     private record Prepared(AiDocument document, boolean duplicate, boolean reissue,

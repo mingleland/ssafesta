@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -456,6 +457,108 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.code").value("DOCUMENT_UPLOAD_GONE"));
     }
 
+    // ── 목록·상태 조회 (US2 시나리오 2·7 · US3 시나리오 1) ──────────────────
+
+    /** 목록은 <b>모든 상태</b>를 최근 발급 순으로 준다 — 만료된 문서가 조용히 사라지면 안 된다. */
+    @Test
+    void theListShowsEveryStatusNewestFirst() throws Exception {
+        Owner owner = agentOwner("목록");
+        String old = grantJson(owner, body("old.pdf", "application/pdf", ONE_MB, SHA_A));
+        ageGrant(idOf(old), Duration.ofHours(2));
+        expirySweeper.expireAbandonedGrants();
+        String recent = grantJson(owner, body("recent.pdf", "application/pdf", 2 * ONE_MB, SHA_B));
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(2))
+                .andExpect(jsonPath("$.documents[0].documentId").value(idOf(recent)))
+                .andExpect(jsonPath("$.documents[0].fileName").value("recent.pdf"))
+                .andExpect(jsonPath("$.documents[0].contentType").value("application/pdf"))
+                .andExpect(jsonPath("$.documents[0].sizeBytes").value(2 * ONE_MB))
+                .andExpect(jsonPath("$.documents[0].status").value("QUEUED"))
+                .andExpect(jsonPath("$.documents[0].createdAt").isNotEmpty())
+                // 발급만 됐고 바이트는 아직이다 — status 로는 구분할 수 없는 상태다.
+                .andExpect(jsonPath("$.documents[0].uploadedAt").doesNotExist())
+                .andExpect(jsonPath("$.documents[1].documentId").value(idOf(old)))
+                .andExpect(jsonPath("$.documents[1].status").value("EXPIRED"));
+    }
+
+    /**
+     * <b>{@code quota.count} 는 목록 길이가 아니다.</b>
+     *
+     * <p>상한을 세는 것은 활성 3상태뿐이라, 만료·실패분이 섞이면 두 숫자가 갈린다. 화면이
+     * {@code documents.length} 로 "n/10" 을 그리면 아직 올릴 수 있는 사용자에게 꽉 찼다고 말한다.
+     */
+    @Test
+    void theQuotaCountsOnlyActiveDocumentsNotTheListLength() throws Exception {
+        Owner owner = agentOwner("쿼터");
+        seedActive(owner, "READY", shaOf(0), ONE_MB);
+        seedActive(owner, "FAILED", shaOf(1), 5 * ONE_MB);
+        String abandoned = grantJson(owner, body("abandoned.pdf", "application/pdf", ONE_MB, SHA_A));
+        ageGrant(idOf(abandoned), Duration.ofHours(2));
+        expirySweeper.expireAbandonedGrants();
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(3))
+                .andExpect(jsonPath("$.quota.count").value(1))
+                .andExpect(jsonPath("$.quota.countLimit").value(10))
+                .andExpect(jsonPath("$.quota.bytes").value(ONE_MB))
+                .andExpect(jsonPath("$.quota.bytesLimit").value(100L * 1024 * 1024));
+    }
+
+    /** 업로드가 확인되면 그 시각이 채워진다 — 화면이 "업로드 중" 과 "대기 중" 을 나누는 근거다. */
+    @Test
+    void completingFillsInTheUploadedAt() throws Exception {
+        Owner owner = agentOwner("업로드시각");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        storage.putObject(keyOf(grant), ONE_MB);
+        mockMvc.perform(complete(owner, idOf(grant))).andExpect(status().isOk());
+
+        mockMvc.perform(documents(owner))
+                .andExpect(jsonPath("$.documents[0].status").value("QUEUED"))
+                .andExpect(jsonPath("$.documents[0].uploadedAt").isNotEmpty());
+    }
+
+    /**
+     * 임대가 끝나도 소유자는 자기 문서를 볼 수 있다.
+     *
+     * <p>FR-015 는 만료 시 문서를 {@code DISABLED} 로 두되 <b>원본과 메타데이터는 보존</b>한다고
+     * 한다. 조회까지 막으면 그 보존이 아무 의미가 없다 — 그래서 이 경로만 편집 권한(`requireEditor`)을
+     * 쓰고 활성 임대(`requireActiveEditor`)를 요구하지 않는다.
+     */
+    @Test
+    void anExpiredLeaseStillLetsTheOwnerReadTheList() throws Exception {
+        Owner owner = agentOwner("만료임대");
+        grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        expireLease(jdbc, owner.boothId());
+
+        mockMvc.perform(documents(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents.length()").value(1));
+    }
+
+    @Test
+    void anotherMembersAgentIsForbidden() throws Exception {
+        Owner owner = agentOwner("주인");
+        Owner stranger = agentOwner("남");
+
+        mockMvc.perform(get("/api/v1/agents/{id}/documents", owner.agentId())
+                        .header("Authorization", bearerFor(stranger.userId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+    }
+
+    @Test
+    void listingAMissingAgentIsNotFound() throws Exception {
+        Owner owner = agentOwner("없는직원");
+
+        mockMvc.perform(get("/api/v1/agents/{id}/documents", 999_999_999L)
+                        .header("Authorization", bearerFor(owner.userId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+    }
+
     // ── 만료 판정 (FR-026 · SC-010) ─────────────────────────────────────────
 
     /**
@@ -693,6 +796,11 @@ class AiDocumentUploadIntegrationTest {
         return post("/api/v1/agents/{id}/documents/upload-url", owner.agentId())
                 .header("Authorization", bearerFor(owner.userId()))
                 .contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
+    private RequestBuilder documents(Owner owner) {
+        return get("/api/v1/agents/{id}/documents", owner.agentId())
+                .header("Authorization", bearerFor(owner.userId()));
     }
 
     private RequestBuilder complete(Owner owner, long documentId) {
