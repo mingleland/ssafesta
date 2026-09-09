@@ -124,6 +124,8 @@ grep -q "final List deployComponents = (selection.deployComponents as List).find
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
+grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pipeline}" \
+  || fail "deploy freshness check does not bind the GitLab checkout credential"
 grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
   || fail "dev batch does not recheck the develop head before deployment"
 grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
