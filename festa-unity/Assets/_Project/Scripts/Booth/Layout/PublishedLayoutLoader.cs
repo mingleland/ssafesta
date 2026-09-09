@@ -61,6 +61,7 @@ namespace Festa.Booth
             {
                 // 클라이언트 구현이 실패를 null 로 돌려주는 계약을 어겼을 때의 마지막 방어 —
                 // 슬롯 하나 때문에 12실 전체 로딩이 죽으면 안 된다 (완료 조건 ②).
+                PublishedSlotResolution.Set(slotId, transientFailure: true);   // 답을 못 받았다 — 재시도 대상
                 Debug.LogError($"[PublishedLayoutLoader] Slot {slotId} 조회 예외 — 이 슬롯만 비운다: {e.Message}");
                 return null;
             }
