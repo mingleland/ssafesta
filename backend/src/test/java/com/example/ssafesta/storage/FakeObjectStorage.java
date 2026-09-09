@@ -35,6 +35,7 @@ public class FakeObjectStorage implements ObjectStorage {
     private volatile String provider = "R2";
     private volatile String bucket = "test-ai-documents";
     private volatile Consumer<String> onHead = key -> { };
+    private volatile Consumer<String> onDelete = key -> { };
     private volatile RuntimeException headFailure;
     private volatile RuntimeException deleteFailure;
 
@@ -83,6 +84,7 @@ public class FakeObjectStorage implements ObjectStorage {
 
     @Override
     public void deleteObject(String provider, String bucket, String objectKey) {
+        onDelete.accept(objectKey);
         if (deleteFailure != null) {
             throw deleteFailure;
         }
@@ -119,6 +121,11 @@ public class FakeObjectStorage implements ObjectStorage {
         this.onHead = hook;
     }
 
+    /** Runs inside {@link #deleteObject}, before it removes anything — the seam for a delete-time race. */
+    public void onDelete(Consumer<String> hook) {
+        this.onDelete = hook;
+    }
+
     public void failHeadWith(RuntimeException failure) {
         this.headFailure = failure;
     }
@@ -140,6 +147,7 @@ public class FakeObjectStorage implements ObjectStorage {
         provider = "R2";
         bucket = "test-ai-documents";
         onHead = key -> { };
+        onDelete = key -> { };
         headFailure = null;
         deleteFailure = null;
     }

@@ -170,6 +170,10 @@ app:
       # SC-010 은 "생성 후 1시간 + 다음 판정 주기 안에 100% EXPIRED" 를 요구하므로, 이 값을
       # 늘리면 그만큼 늦어진다. 짧게 잡으면 매 주기가 ai_documents 전수 조회다 (인덱스 없음).
       expiry-scan-interval: PT5M
+      # FR-028 — EXPIRED 원본을 24시간 복구 창이 닫힌 뒤 지우는 별도 sweep 의 주기다
+      # (AiDocumentOriginalDeleteSweeper, S15P21A604-556). 위와 달리 아무도 이 값을 기다리지
+      # 않으므로 더 느슨하게 잡는다.
+      original-delete-scan-interval: PT30M
     # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
     storage:
       # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환
