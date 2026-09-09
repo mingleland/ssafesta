@@ -25,16 +25,13 @@ import org.springframework.util.unit.DataSize;
  * storage, then tells us it is done. Nothing streams through Spring — the file never touches this
  * process, which is what makes a 20MB limit an assertion about a number rather than about memory.
  *
- * <p>Handing the document to FastAPI is S15P21A604-175, and expiring abandoned grants is
- * S15P21A604-174. A completed document sits in {@code QUEUED} until the first of those lands.
+ * <p>Handing the document to FastAPI is S15P21A604-175. Abandoned grants no longer hold their slot:
+ * {@link AiDocumentExpirySweeper} moves an unused one to {@code EXPIRED} an hour after it was
+ * issued (FR-026), and {@link #complete} takes it back for the next 24 hours (FR-027).
  *
- * <p><b>Until S15P21A604-174 lands, an abandoned grant holds its slot forever.</b> {@code QUEUED}
- * counts toward the ten of FR-018 ({@code AiDocumentRepository#countActive}) and nothing here moves
- * it to {@code EXPIRED} except a provider switch — there is no sweeper, and no delete endpoint. Ten
- * grants that were issued and never uploaded therefore block that agent with no way out: completing
- * answers {@code DOCUMENT_UPLOAD_INCOMPLETE} because the object is not there, and re-requesting the
- * same file reissues on the same row rather than freeing one. -174 is itself waiting on the AI
- * document DB redesign (GitLab #119), so this is a live operational limit, not a short gap.
+ * <p><b>Deleting the original once that window closes (FR-028) is still nobody's.</b> An expired
+ * row keeps its object key, and no pass removes the bytes — the row is out of the way, the storage
+ * is not.
  */
 @Service
 public class AiDocumentService {
@@ -300,6 +297,13 @@ public class AiDocumentService {
     }
 
     private Settled settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
+        // Agent first, then the document — the order issueUploadUrl takes. Reversing it here would
+        // put two paths that hold both rows in opposite orders, which is a deadlock rather than a
+        // style question. The lock is what makes the supersession check below decide something: a
+        // competing grant is a different row, so this document's own lock cannot serialise it.
+        agents.findWithLockById(snapshot.agentId())
+                .orElseThrow(() -> new AiAgentNotFoundException(snapshot.agentId()));
+
         AiDocument document = documents.findWithLockById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
 
@@ -327,6 +331,21 @@ public class AiDocumentService {
                 throw gone();
             }
             if (!present) {
+                throw gone();
+            }
+            // A newer grant for the same file already holds the active slot. Recovering would put
+            // two active rows on one (agent_id, content_sha256) and break
+            // ux_ai_documents_agent_active_sha — a 500 nobody could act on. The user has already
+            // started over with this file, so the sentence 410 carries ("업로드가 만료되었습니다.
+            // 새로 업로드해 주세요.") is exactly what happened to this grant.
+            //
+            // FR-027 is not weakened: it promises the original is kept and recoverable, not that a
+            // late completion outranks the upload the same user started afterwards.
+            boolean superseded = documents
+                    .findActiveByAgentAndSha(document.getAgentId(), document.getContentSha256())
+                    .filter(other -> !other.getId().equals(documentId))
+                    .isPresent();
+            if (superseded) {
                 throw gone();
             }
             document.recover(now);
@@ -496,13 +515,20 @@ public class AiDocumentService {
         }
     }
 
-    /** The row as it looked before the HEAD, plus any answer that needed no storage at all. */
-    private record Snapshot(String provider, String bucket, String objectKey, long sizeBytes,
-                            CompleteView decided) {
+    /**
+     * The row as it looked before the HEAD, plus any answer that needed no storage at all.
+     *
+     * <p>{@code agentId} is here so {@link #settle} can take the agent lock <b>before</b> it loads
+     * the document. The status is deliberately not carried: the sweeper may have moved it during
+     * the HEAD, which is the whole reason the write transaction decides again.
+     */
+    private record Snapshot(Long agentId, String provider, String bucket, String objectKey,
+                            long sizeBytes, CompleteView decided) {
 
         static Snapshot of(AiDocument document, CompleteView decided) {
-            return new Snapshot(document.getStorageProvider(), document.getStorageBucket(),
-                    document.getObjectKey(), document.getSizeBytes(), decided);
+            return new Snapshot(document.getAgentId(), document.getStorageProvider(),
+                    document.getStorageBucket(), document.getObjectKey(), document.getSizeBytes(),
+                    decided);
         }
 
         boolean sameStorage(AiDocument document) {
