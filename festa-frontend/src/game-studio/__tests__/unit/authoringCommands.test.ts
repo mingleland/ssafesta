@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GameProjectContractError, parseGameProject } from '../../contracts/gameProject.ts';
 import {
+  addBooleanVariable,
   addComponent,
   addDialogueChoice,
   addDialogueNode,
@@ -26,6 +27,7 @@ import {
   paintTiles,
   removeDialogueNode,
   removeObjects,
+  removeVariableDefinition,
   renameObject,
   reorderDialogueNode,
   reorderEventAction,
@@ -515,5 +517,32 @@ describe('오브젝트 이름 및 표시 설정(S15P21A604-529)', () => {
 
     const afterVisible = setObjectNameVisible(project, 'library', spawnId, true);
     expect(findObject(afterVisible, spawnId)?.showNameInPlay).toBeUndefined();
+  });
+});
+
+describe('변수 삭제(S15P21A604-562)', () => {
+  it('참조되지 않는 변수는 지울 수 있다', () => {
+    const project = addBooleanVariable(createStarterProject(562));
+    const variableId = project.variables[project.variables.length - 1]!.id;
+
+    const removed = removeVariableDefinition(project, variableId);
+
+    expect(removed.variables.some((variable) => variable.id === variableId)).toBe(false);
+    expect(parseGameProject(removed)).toBe(removed);
+  });
+
+  it('조건·액션에서 참조 중인 변수를 지우면 검증이 막는다', () => {
+    // 스타터 프로젝트의 기본 변수 doorOpened는 library Scene의 이벤트가 이미
+    // VARIABLE_EQUALS 조건과 SET_VARIABLE 액션 양쪽에서 참조하고 있다.
+    const project = createStarterProject(563);
+
+    expect(() => removeVariableDefinition(project, 'doorOpened')).toThrow(GameProjectContractError);
+    let error: unknown;
+    try {
+      removeVariableDefinition(project, 'doorOpened');
+    } catch (thrown) {
+      error = thrown;
+    }
+    expect((error as GameProjectContractError).code).toBe('VARIABLE_REFERENCE_NOT_FOUND');
   });
 });
