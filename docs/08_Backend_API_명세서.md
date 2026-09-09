@@ -853,7 +853,7 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
 | `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
 | `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
-| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) |
+| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) — `PROCESSING` 은 AI 워커가 이미 파일을 쥔 상태라 저장소를 다시 묻지 않는다 |
 | `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
 | 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
 
@@ -889,6 +889,16 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `FAILED` | 실패 | 처리에 실패했다 |
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
+
+여섯 중 **`DISABLED` 만 아직 나오지 않는다** — 임대 만료가 그 값을 쓰는 작업(`S15P21A604-496`)이
+아직 없다. 나머지 다섯은 실제로 나온다.
+
+- `PROCESSING` 은 **AI 워커가 첫 신호를 보낸 순간**부터다. 위임이 나간 순간이 아니라서, AI 서버가
+  응답하지 않는 동안에는 `QUEUED` 로 남는다 — 아무 일도 일어나지 않는 문서를 "처리 중" 이라고
+  말하지 않는다
+- `FAILED` 는 처리 Job 이 재시도를 다 썼거나 재시도 불가로 끝났을 때다. **재시도가 남아 있는 동안은
+  `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
+  올릴 수 있다**
 
 **`quota.count` 는 `documents.length` 가 아니다.** 상한을 세는 것은 `QUEUED`·`PROCESSING`·`READY`
 뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 — 실패한 업로드가 슬롯을 잡으면 안 되기
