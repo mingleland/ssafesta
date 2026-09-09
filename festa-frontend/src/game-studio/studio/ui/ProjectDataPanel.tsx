@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   DEFAULT_GAME_RULES,
   estimateGameProjectJsonBytes,
@@ -21,13 +21,14 @@ import { CommitInput } from './CommitInput.tsx';
 import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../assets/builtinAssetCatalog.ts';
 import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
-import { findPublishBlockers } from '../ports/publishValidation.ts';
+import { findAssetUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
 import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
   readonly project: GameProject;
   readonly onApply: (project: GameProject) => void;
   readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
+  readonly onDeleteAsset: (assetId: string) => void;
 }
 
 const VariableValueInput = ({
@@ -66,9 +67,12 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
+  // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
+  // 확인을 받는다. null이면 확인 카드가 안 뜬다.
+  const [confirmDeleteAssetId, setConfirmDeleteAssetId] = useState<string | null>(null);
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
@@ -234,10 +238,43 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
       />
     </details>
     <div className="gss-asset-list">
-      {project.assets.map((asset) => (
-        <div key={asset.id}><span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>{asset.kind}</span><strong>{assetDisplayLabel(asset)}</strong><small>{asset.id}</small></div>
-      ))}
+      {project.assets.map((asset) => {
+        // 빌트인은 프로젝트 소유가 아니라 카탈로그 참조라 삭제 대상이 아니다.
+        const deletable = !asset.source.startsWith('builtin://');
+        return (
+          <div key={asset.id}>
+            <span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>{asset.kind}</span>
+            <strong>{assetDisplayLabel(asset)}</strong>
+            <small>{asset.id}</small>
+            {deletable && (
+              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} onClick={() => setConfirmDeleteAssetId(asset.id)} type="button">삭제</button>
+            )}
+          </div>
+        );
+      })}
     </div>
+    {confirmDeleteAssetId !== null && (() => {
+      const target = project.assets.find((asset) => asset.id === confirmDeleteAssetId);
+      if (target === undefined) return null;
+      const usage = findAssetUsageLocations(project, confirmDeleteAssetId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{assetDisplayLabel(target)} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 배치에서 사용되지 않는 자산입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 그 자리는 빈 값으로 남습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteAssetId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteAsset(confirmDeleteAssetId); setConfirmDeleteAssetId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
     <div className="gss-help-card"><strong>게시 연결 준비 완료</strong><p>편집기는 이미지 대신 assetId만 저장합니다. 현재 로컬 저장소를 게시 자산 API로 교체해도 프로젝트 구조는 바뀌지 않습니다.</p></div>
   </div>;
 };
