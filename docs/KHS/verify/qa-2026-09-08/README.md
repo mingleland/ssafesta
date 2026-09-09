@@ -575,9 +575,9 @@
 | | |
 |---|---|
 | 축 | 남은 성능 병목 |
-| 상태 | **미검증** |
+| 상태 | **미검증** (빌드로만 확인 가능) |
 | 위치 | `festa-unity/ProjectSettings/GraphicsSettings.asset:43` |
-| 처리 | ⬜ 미착수 |
+| 처리 | 🟡 1차 (2026-09-09, S15P21A604-493) — 이 에디터 세션(로비 제외 월드·부스·축제장 플레이)에서 추적된 변형을 `Resources/FestaTrackedVariants.shadervariants` 로 저장(178 셰이더/304 변형 → 에디터·Hidden·Legacy 102개 제거 후 **76 셰이더/187 변형**), `GraphicsSettings.m_PreloadedShaders` 에 등록. 로딩 시간 증가분·첫 시야 힛치 감소는 릴리스 빌드에서(체크리스트 R-10). 로비·아케이드 변형은 다음 플레이 투어 뒤 재저장 |
 
 **사용자가 겪는 일** — 월드에 들어가 첫 아바타(자기 자신 포함)가 그려지는 순간 화면이 한 번 확 멈춘다. 부스에 처음 커서를 올릴 때 또 한 번, 첫 불꽃/컨페티에서 또 한 번. 두 번째부터는 멀쩡해서 '가끔 튄다' 로만 보고된다.
 
@@ -955,7 +955,7 @@
 | 축 | 부스스튜디오→런타임 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Tools/mock-api/booth-slot-layout.json:141` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — 픽스처를 서버 규칙 안으로: 12개, x·z ±2.4 이내(HALF_WIDTH 3, 넓은 것은 안쪽 열), JSON·`MockBoothApiClient` 동일. FURNITURE·DECORATION 에 실제 assetCode(`FURN_CHAIR_01_BLUE`·`STRUCT_PANEL_01`). 뺀 것: CONSULT_DESK 별칭·HOLOGRAM·미연결 포털(상한 12) |
 
 **사용자가 겪는 일** — 개발·QA 가 Mock 으로 부스를 확인하면 통과다. 실제 게시본으로 보면 다른 그림이 나온다. 특히 장식·가구 외형 선택이 무시되는 문제(높음 건)가 목 데이터로는 재현되지 않아 릴리스까지 살아남는다.
 
@@ -1315,7 +1315,7 @@
 | 축 | UI·입력·접근성 |
 | 상태 | **미검증** |
 | 위치 | `festa-unity/Assets/_Project/Resources/Fonts/NotoSansKRBold_SDF.asset:137` |
-| 처리 | ⬜ 미착수 |
+| 처리 | ✅ 수정 (2026-09-09) — ① 세 폰트 `m_ClearDynamicDataOnBuild` 0. ② 이름표 글꼴 Noto 를 **28pt·pad 4·2048² 로 재생성**해 KS X 1001 한글 2350 + ASCII 를 미리 구움(1 아틀라스, Alpha8 4 MB). 90pt 그대로 굽자 1024² 아틀라스 26장이 돼 되돌렸다. 참조는 `Resources.Load` 경로 2곳뿐이라 GUID 변경 무해. ③ TMP Settings 전역 폴백에 Noto 추가. 이름표 선명도·`.data` 증가분은 빌드에서(체크리스트 R-11) |
 
 **사용자가 겪는 일** — 다른 사람이 접속해 이름표가 처음 뜨는 순간 화면이 한 박자 멈춘다. 사람이 몰리는 시연 초반에 반복된다.
 
