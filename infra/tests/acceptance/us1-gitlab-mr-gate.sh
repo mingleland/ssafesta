@@ -32,7 +32,7 @@ check_gate() {
 require 'CI_PIPELINE_SOURCE == "merge_request_event"' "$pipeline"
 require 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"' "$pipeline"
 require 'CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID' "$pipeline"
-require 'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^feature\//' "$pipeline"
+require 'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feature|feat|fix|docs|style|refactor|test|chore|design|comment|rename|remove|!BREAKING CHANGE|!HOTFIX)\//' "$pipeline"
 job '.component-ci' | grep -Fq 'command -v python3' || fail 'CI summary runtime dependency'
 status_section="$(job 'mr-status')"
 [[ -n "$status_section" ]] || fail 'missing MR status job'

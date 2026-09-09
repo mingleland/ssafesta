@@ -15,7 +15,7 @@ workflow:
   rules:
     # 2026-08-26: Jira Webhook 자동화와 Jenkins 전환 완료.
     # runner 없는 legacy jira-* pipeline의 무한 pending 및 이중 전환을 방지한다.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^feature\//'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feature|feat|fix|docs|style|refactor|test|chore|design|comment|rename|remove|!BREAKING CHANGE|!HOTFIX)\//'
 
     # 아래 규칙과 job은 이관 기록이다. 다시 켜기 전에 jira-* job을 제거하고
     # GitLab CI의 새 책임을 별도 이슈에서 정의해야 한다.
