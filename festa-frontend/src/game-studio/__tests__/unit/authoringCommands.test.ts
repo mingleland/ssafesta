@@ -3,6 +3,7 @@ import { GameProjectContractError, parseGameProject } from '../../contracts/game
 import {
   addBooleanVariable,
   addComponent,
+  addItemDefinition,
   addDialogueChoice,
   addDialogueNode,
   addDialogueScene,
@@ -26,6 +27,7 @@ import {
   paintTile,
   paintTiles,
   removeDialogueNode,
+  removeItemDefinition,
   removeObjects,
   removeVariableDefinition,
   renameObject,
@@ -544,5 +546,32 @@ describe('변수 삭제(S15P21A604-562)', () => {
       error = thrown;
     }
     expect((error as GameProjectContractError).code).toBe('VARIABLE_REFERENCE_NOT_FOUND');
+  });
+});
+
+describe('아이템 삭제(S15P21A604-565)', () => {
+  it('참조되지 않는 아이템은 지울 수 있다', () => {
+    const project = addItemDefinition(createStarterProject(565));
+    const itemId = project.items[project.items.length - 1]!.id;
+
+    const removed = removeItemDefinition(project, itemId);
+
+    expect(removed.items.some((item) => item.id === itemId)).toBe(false);
+    expect(parseGameProject(removed)).toBe(removed);
+  });
+
+  it('오브젝트의 PICKUP 컴포넌트에서 참조 중인 아이템을 지우면 검증이 막는다', () => {
+    // 스타터 프로젝트의 기본 아이템 libraryKey는 library Scene의 오브젝트가
+    // PICKUP 컴포넌트로 들고 있고, 이벤트도 GIVE_ITEM/HAS_ITEM으로 참조한다.
+    const project = createStarterProject(566);
+
+    expect(() => removeItemDefinition(project, 'libraryKey')).toThrow(GameProjectContractError);
+    let error: unknown;
+    try {
+      removeItemDefinition(project, 'libraryKey');
+    } catch (thrown) {
+      error = thrown;
+    }
+    expect((error as GameProjectContractError).code).toBe('PICKUP_ITEM_NOT_FOUND');
   });
 });
