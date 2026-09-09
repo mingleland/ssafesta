@@ -14,7 +14,7 @@ import {
   updateDialogueChoice,
   updateDialogueNode,
 } from '../model/authoringCommands.ts';
-import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
+import { resolveStaticImageVisual, staticImageBackgroundStyle, staticImagePortraitStyle } from '../assets/staticImageVisual.ts';
 import { assetDisplayLabel, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { analyzeDialogueFlow } from '../model/dialogueFlow.ts';
@@ -239,7 +239,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               이미 시각적으로 드러난다. */}
           <span className="gss-preview-badge">LIVE PREVIEW</span>
           {portraitVisual !== null && (
-            <div className="gss-dialogue-preview-portrait" style={staticImageBackgroundStyle(portraitVisual)} />
+            <div className="gss-dialogue-preview-portrait" style={staticImagePortraitStyle(portraitVisual)} />
           )}
           <div className="gss-dialogue-preview-box">
             <strong>{previewSpeaker || '내레이션'}</strong>

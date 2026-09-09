@@ -5,7 +5,7 @@ import { findBuiltinSpriteSheet } from '../../studio/assets/builtinAssetCatalog.
 import { findPresetDefinition } from '../../studio/model/authoringRegistry.ts';
 import { SpriteAnimationPreview } from '../../studio/ui/SpriteAnimationPreview.tsx';
 import { resolveTilesetVisual, tileBackgroundStyle } from '../../studio/assets/tilesetVisual.ts';
-import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../../studio/assets/staticImageVisual.ts';
+import { resolveStaticImageVisual, staticImageBackgroundStyle, staticImagePortraitStyle } from '../../studio/assets/staticImageVisual.ts';
 import type { GameSessionPort } from '../ports/gameSessionPort.ts';
 import { summarizeFramePerformance, type FramePerformanceSummary } from './framePerformance.ts';
 import {
@@ -512,7 +512,7 @@ export const ReferenceGamePlayer = ({ project, mode, sessionPort, assetUrls = {}
             {activeDialogue.scene.presentation === 'FULL_SCREEN' && dialogueBackground !== null && (
               <div className="grp-dialogue-full-background" style={staticImageBackgroundStyle(dialogueBackground)} />
             )}
-            {dialoguePortrait !== null && <div className="grp-dialogue-portrait" style={staticImageBackgroundStyle(dialoguePortrait)} />}
+            {dialoguePortrait !== null && <div className="grp-dialogue-portrait" style={staticImagePortraitStyle(dialoguePortrait)} />}
             <div className="grp-dialogue">
               <div className="grp-speaker">{activeDialogue.node.speaker || '내레이션'}</div>
               <p>{activeDialogue.node.text}</p>
