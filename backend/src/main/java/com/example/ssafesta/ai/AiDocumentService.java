@@ -261,9 +261,8 @@ public class AiDocumentService {
         List<DocumentView> rows = documents.findByAgentIdOrderByCreatedAtDesc(agentId).stream()
                 .map(DocumentView::of)
                 .toList();
-        return new DocumentListView(rows, new QuotaView(
-                documents.countActive(agentId), agentProperties.documentCountLimit(),
-                documents.sumActiveBytes(agentId), agentProperties.documentTotalBytes().toBytes()));
+        return new DocumentListView(rows, new QuotaView(agentProperties.documentCountLimit(),
+                agentProperties.documentTotalBytes().toBytes()));
     }
 
     // ── 업로드 완료 ─────────────────────────────────────────────────────────
@@ -543,31 +542,29 @@ public class AiDocumentService {
      * nothing writes {@code FAILED} to a document today in any case (GitLab #119). Whoever adds
      * that writer (S15P21A604-400) adds the reason with it.
      */
-    public record DocumentView(Long documentId, String fileName, String contentType,
-                               long sizeBytes, String status, Instant createdAt,
-                               Instant uploadedAt) {
+    public record DocumentView(Long documentId, String fileName, long sizeBytes, String status,
+                               Instant createdAt, Instant uploadedAt) {
 
         static DocumentView of(AiDocument document) {
             return new DocumentView(document.getId(), document.getOriginalFilename(),
-                    document.getContentType(), document.getSizeBytes(),
-                    document.getProcessingStatus(), document.getCreatedAt(),
-                    document.getUploadedAt());
+                    document.getSizeBytes(), document.getProcessingStatus(),
+                    document.getCreatedAt(), document.getUploadedAt());
         }
     }
 
     /**
-     * What the agent has spent of FR-018's two limits.
+     * FR-018's two limits, which the client cannot know on its own — they are server configuration.
      *
-     * <p><b>{@code count} is not {@code documents.size()}.</b> Only {@code QUEUED},
-     * {@code PROCESSING} and {@code READY} take a slot — a failed or expired upload must not hold
-     * one (FR-019b) — while the list shows every status. Ten rows on screen can still leave room
-     * for another file, so a "n/10" indicator has to be drawn from here.
+     * <p><b>What is spent is not here, because it is already in {@code documents}.</b> The slots
+     * taken are the rows whose status is {@code QUEUED}, {@code PROCESSING} or {@code READY}
+     * (FR-019b — a failed or expired upload holds nothing), and the bytes are their
+     * {@code sizeBytes}. Counting them here would be two more queries per poll for a number the
+     * caller can read off the array it just received.
      *
-     * <p>It is on the response at all because the limit is otherwise invisible until it refuses:
-     * today the only sign is {@code 409 DOCUMENT_LIMIT_EXCEEDED}, on a grant the user has already
-     * chosen a file for.
+     * <p>The limits are on the response because otherwise they surface only as a refusal:
+     * {@code 409 DOCUMENT_LIMIT_EXCEEDED}, on a grant the user has already chosen a file for.
      */
-    public record QuotaView(long count, int countLimit, long bytes, long bytesLimit) { }
+    public record QuotaView(int countLimit, long bytesLimit) { }
 
     public record DocumentListView(List<DocumentView> documents, QuotaView quota) { }
 
