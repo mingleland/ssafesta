@@ -30,9 +30,10 @@ import org.springframework.util.unit.DataSize;
  * {@link AiDocumentExpirySweeper} moves an unused one to {@code EXPIRED} an hour after it was
  * issued (FR-026), and {@link #complete} takes it back for the next 24 hours (FR-027).
  *
- * <p><b>Deleting the original once that window closes (FR-028) is still nobody's.</b> An expired
- * row keeps its object key, and no pass removes the bytes — the row is out of the way, the storage
- * is not.
+ * <p>Deleting the original once that window closes (FR-028) is {@link AiDocumentOriginalDeleteSweeper}
+ * — a separate pass on its own schedule, not this class. {@link #complete} still owns everything up
+ * to that point: an expired row keeps its object key until that sweeper's 24-hour-later pass takes
+ * it, not this one.
  */
 @Service
 public class AiDocumentService {
