@@ -500,38 +500,17 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.documents.length()").value(2))
                 .andExpect(jsonPath("$.documents[0].documentId").value(idOf(recent)))
                 .andExpect(jsonPath("$.documents[0].fileName").value("recent.pdf"))
-                .andExpect(jsonPath("$.documents[0].contentType").value("application/pdf"))
                 .andExpect(jsonPath("$.documents[0].sizeBytes").value(2 * ONE_MB))
                 .andExpect(jsonPath("$.documents[0].status").value("QUEUED"))
                 .andExpect(jsonPath("$.documents[0].createdAt").isNotEmpty())
                 // 발급만 됐고 바이트는 아직이다 — status 로는 구분할 수 없는 상태다.
                 .andExpect(jsonPath("$.documents[0].uploadedAt").doesNotExist())
                 .andExpect(jsonPath("$.documents[1].documentId").value(idOf(old)))
-                .andExpect(jsonPath("$.documents[1].status").value("EXPIRED"));
-    }
-
-    /**
-     * <b>{@code quota.count} 는 목록 길이가 아니다.</b>
-     *
-     * <p>상한을 세는 것은 활성 3상태뿐이라, 만료·실패분이 섞이면 두 숫자가 갈린다. 화면이
-     * {@code documents.length} 로 "n/10" 을 그리면 아직 올릴 수 있는 사용자에게 꽉 찼다고 말한다.
-     */
-    @Test
-    void theQuotaCountsOnlyActiveDocumentsNotTheListLength() throws Exception {
-        Owner owner = agentOwner("쿼터");
-        seedActive(owner, "READY", shaOf(0), ONE_MB);
-        seedActive(owner, "FAILED", shaOf(1), 5 * ONE_MB);
-        String abandoned = grantJson(owner, body("abandoned.pdf", "application/pdf", ONE_MB, SHA_A));
-        ageGrant(idOf(abandoned), Duration.ofHours(2));
-        expirySweeper.expireAbandonedGrants();
-
-        mockMvc.perform(documents(owner))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.documents.length()").value(3))
-                .andExpect(jsonPath("$.quota.count").value(1))
+                .andExpect(jsonPath("$.documents[1].status").value("EXPIRED"))
+                // 상한은 서버 설정이라 클라이언트가 알 수 없다. 쓴 양은 위 배열에서 읽는다.
                 .andExpect(jsonPath("$.quota.countLimit").value(10))
-                .andExpect(jsonPath("$.quota.bytes").value(ONE_MB))
-                .andExpect(jsonPath("$.quota.bytesLimit").value(100L * 1024 * 1024));
+                .andExpect(jsonPath("$.quota.bytesLimit").value(100L * 1024 * 1024))
+                .andExpect(jsonPath("$.quota.count").doesNotHaveJsonPath());
     }
 
     /** 업로드가 확인되면 그 시각이 채워진다 — 화면이 "업로드 중" 과 "대기 중" 을 나누는 근거다. */

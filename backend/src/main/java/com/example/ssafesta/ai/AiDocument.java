@@ -25,16 +25,15 @@ import java.time.Instant;
 public class AiDocument {
 
     /**
-     * Spring-side statuses. FastAPI never sees {@code EXPIRED} (data-model).
+     * The statuses this class compares against. FastAPI never sees {@code EXPIRED} (data-model).
      *
-     * <p>{@code DISABLED} is the sixth of FR-006 and is deliberately absent: nothing writes it yet.
-     * Lease expiry is the writer it is waiting for (FR-015, S15P21A604-496), and a constant with no
-     * writer reads like a state the system can reach.
+     * <p>{@code FAILED} and {@code DISABLED} are the other two of FR-006 and are not here: the only
+     * writes are SQL literals in {@code internal.ai}, which cannot see this class anyway, and a
+     * constant nothing reads is a state that only looks reachable.
      */
     static final String QUEUED = "QUEUED";
     static final String PROCESSING = "PROCESSING";
     static final String READY = "READY";
-    static final String FAILED = "FAILED";
     static final String EXPIRED = "EXPIRED";
 
     @Id

@@ -870,14 +870,13 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
     {
       "documentId": 153,
       "fileName": "발표자료.pdf",
-      "contentType": "application/pdf",
       "sizeBytes": 1048576,
       "status": "READY",
       "createdAt": "2026-09-09T01:15:02Z",
       "uploadedAt": "2026-09-09T01:20:11Z"
     }
   ],
-  "quota": { "count": 1, "countLimit": 10, "bytes": 1048576, "bytesLimit": 104857600 }
+  "quota": { "countLimit": 10, "bytesLimit": 104857600 }
 }
 ```
 
@@ -900,9 +899,13 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
   `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
   올릴 수 있다**
 
-**`quota.count` 는 `documents.length` 가 아니다.** 상한을 세는 것은 `QUEUED`·`PROCESSING`·`READY`
-뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 — 실패한 업로드가 슬롯을 잡으면 안 되기
-때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다. "n/10" 은 `quota.count` 로 그린다.**
+**`quota` 에는 상한만 있다. 쓴 양은 `documents` 에서 읽는다.** 자리를 차지하는 것은
+`QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 —
+실패한 업로드가 슬롯을 잡으면 안 되기 때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
+"n/10" 의 n 은 활성 3상태 행의 수이지 `documents.length` 가 아니다.
+
+서버가 그 수를 세어 내려보내지 않는 이유는 **응답에 이미 있기 때문**이다. 세어 주려면 폴링마다
+질의가 둘 늘어난다.
 
 `uploadedAt` 이 `null` 인 `QUEUED` 와 값이 있는 `QUEUED` 는 다르다 — 앞은 바이트가 아직 안 온
 것이고 뒤는 처리를 기다리는 것이다. `status` 만으로는 구분되지 않는다.
