@@ -23,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  * ({@link AiDocument#recover}). The row leaves the active set immediately — that is what frees the
  * slot — and comes back only if its bytes actually arrive.
  *
- * <p>Deleting the original once the recovery window closes (FR-028) is not here. Nothing does it
- * yet.
+ * <p>Deleting the original once the recovery window closes (FR-028) is not here — that is
+ * {@link AiDocumentOriginalDeleteSweeper}, a separate pass on its own schedule.
  */
 @Component
 class AiDocumentExpirySweeper {
