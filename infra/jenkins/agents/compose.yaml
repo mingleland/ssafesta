@@ -37,12 +37,15 @@ services:
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
     volumes:
       - linux_docker_workspace:/home/jenkins/agent/linux-docker
+      - image_transfer:/var/lib/festa-image-transfer
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
 
   deploy-agent:
     <<: *agent
     profiles: [deploy]
     container_name: festa-jenkins-agent-deploy
+    # Docker daemon control is host-root equivalent; only the deploy label gets this socket.
+    user: root
     networks:
       - jenkins-control
     command:
@@ -59,7 +62,8 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock
     volumes:
       - deploy_workspace:/home/jenkins/agent/deploy
-      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+      - image_transfer:/var/lib/festa-image-transfer
+      - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:
     <<: *agent
@@ -92,6 +96,7 @@ services:
 volumes:
   linux_docker_workspace:
   deploy_workspace:
+  image_transfer:
   unity_workspace:
   unity_home:
 

@@ -28,6 +28,8 @@ namespace Festa.World
         // (S15P21A604-355). 여기서 따로 그리면 둘이 다시 어긋난다.
         readonly InteractRing _ring = new InteractRing();
 
+        void Awake() => useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
+
         public override void OnNetworkSpawn()
         {
             enabled = IsOwner;
@@ -43,6 +45,20 @@ namespace Festa.World
 
         void Update()
         {
+            // **화면이 열려 있으면 포털은 아무것도 하지 않는다.**
+            //
+            // 이 검사가 없어서, 부스 안 노트북·설문에 F 를 누르면 그 화면이 열리는 **동시에**
+            // 같은 F 한 번이 포털에도 먹혀 축제장으로 튕겨 나갔다. 미니게임이 떠 있는 중에도
+            // F 를 누르면 다른 부스로 순간이동했다 (2026-09-08 조사).
+            // 프롬프트·하이라이트까지 같이 끈다 — 조작이 막힌 상태에서 [F] 알약만 떠 있으면
+            // "눌러도 안 된다" 로 보인다 (S15P21A604-437 과 같은 이유).
+            if (Festa.Integration.InputBridge.IsLocked || InteractionFocusCamera.IsFocused)
+            {
+                _nearest = null;
+                UpdateHighlight();
+                return;
+            }
+
             _nearest = FindNearest();
             UpdateHighlight();
             if (_nearest == null) return;
@@ -70,6 +86,11 @@ namespace Festa.World
             _movement.transform.rotation = Quaternion.Euler(0f, dest.eulerAngles.y, 0f);
             if (_camera != null) _camera.SnapBehind(dest.eulerAngles.y);   // 카메라도 같은 방향 — 맵을 가로질러 날아오지 않게
             _lastTeleportTime = Time.time;
+
+            // 방에 들어갈 때 그 슬롯만 다시 조회한다 — 게시본이 바뀌었으면 새로고침 없이 반영된다(QA #11).
+            // 서명이 같으면 다시 짓지 않으므로 들어갈 때마다 깜빡이지 않는다. 출구 포털(Portal_Int_NN)은 대상이 아니다.
+            if (_nearest.name.StartsWith("Portal_Ext"))
+                Festa.Booth.WorldBoothPublishedBootstrap.RequestReload(_nearest.boothId);
         }
 
         string _toast;
@@ -129,6 +150,9 @@ namespace Festa.World
             if (_toast != null && Time.unscaledTime <= _toastUntil)
                 InteractPromptUI.DrawToast(_toast);
             if (_nearest == null || Time.time - _lastTeleportTime < _cooldown) return;
+            // 부스 오브젝트 프롬프트가 떠 있으면 양보한다 — 같은 자리에 알약 둘이 겹치면 둘 다 못 읽는다
+            // (QA 2026-09-08 #26). F 자체는 양쪽 다 살아 있으므로 입장은 그대로 된다.
+            if (Festa.Content.BoothInteractionInput.PromptShowing) return;
             InteractPromptUI.DrawPrompt(_nearest.promptText);
         }
     }

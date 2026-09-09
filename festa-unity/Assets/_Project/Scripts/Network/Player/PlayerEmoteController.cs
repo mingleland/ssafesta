@@ -9,8 +9,10 @@ namespace Festa.Network
     [RequireComponent(typeof(NetworkPlayer))]
     public sealed class PlayerEmoteController : NetworkBehaviour
     {
-        const float DeadZone = 52f;      // 허브 반경과 맞춘다 — 허브 안에서는 선택되지 않는다
-        const float WheelRadius = 150f;  // 링 외곽 반경(화면 픽셀)
+        // 다른 HUD 와 같은 배율(Screen.height/1080, 0.75~2.0)을 따른다 — 고정 픽셀이라 고DPI 전체화면에서 휠만 절반
+        // 크기였고, 작은 창에서는 ClampCenter 의 min>max 로 중심이 커서에서 튀어 엉뚱한 감정이 선택됐다(QA #68).
+        static float DeadZone => 52f * Festa.World.InteractPromptUI.UiScale();      // 허브 반경과 맞춘다 — 허브 안에서는 선택되지 않는다
+        static float WheelRadius => 150f * Festa.World.InteractPromptUI.UiScale();  // 링 외곽 반경(화면 픽셀)
 
         // 휠 8칸 — 시계 방향(위부터). Labels 와 순서가 1:1 로 맞아야 한다.
         static readonly PlayerEmoteId[] Emotes =
@@ -40,7 +42,11 @@ namespace Festa.Network
         Texture2D _wedgeTexture;
         Texture2D _hubTexture;
 
-        void Awake() => _player = GetComponent<NetworkPlayer>();
+        void Awake()
+        {
+            _player = GetComponent<NetworkPlayer>();
+            useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
+        }
 
         public override void OnNetworkSpawn() => enabled = IsOwner;
 
@@ -84,7 +90,9 @@ namespace Festa.Network
 
         Vector2 ClampCenter(Vector2 pointer)
         {
-            var margin = WheelRadius + 74f;
+            var margin = WheelRadius + 74f * Festa.World.InteractPromptUI.UiScale();
+            // 화면이 여백 두 배보다 작으면 클램프의 min 이 max 를 넘어 중심이 튄다 — 그때는 클램프하지 않는다 (QA #68)
+            if (Screen.width < margin * 2f || Screen.height < margin * 2f) return pointer;
             return new Vector2(
                 Mathf.Clamp(pointer.x, margin, Screen.width - margin),
                 Mathf.Clamp(pointer.y, margin, Screen.height - margin));
@@ -192,27 +200,32 @@ namespace Festa.Network
             }
         }
 
+        float _builtScale = -1f;
+
         void EnsureGuiAssets()
         {
-            if (_labelStyle != null) return;
+            // 배율이 바뀌면(창 크기·모니터 이동) 글꼴 크기를 다시 만든다 — 다른 HUD 와 같은 크기로 보이게 (QA #68)
+            float s = Festa.World.InteractPromptUI.UiScale();
+            if (_labelStyle != null && Mathf.Abs(s - _builtScale) < 0.05f) return;
+            _builtScale = s;
             var font = Resources.Load<Font>("Fonts/Jua-Regular") ?? Resources.Load<Font>("Fonts/MalgunGothicLight");   // 2026-09-06 디스플레이 글꼴(주아)
             _labelStyle = new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
                 font = font,
-                fontSize = 15,
+                fontSize = Mathf.RoundToInt(15f * s),
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = new Color(0.80f, 0.83f, 0.90f) }
             };
             _selectedStyle = new GUIStyle(_labelStyle)
             {
-                fontSize = 17,
+                fontSize = Mathf.RoundToInt(17f * s),
                 normal = { textColor = new Color(1f, 0.97f, 0.88f) }
             };
-            _titleStyle = new GUIStyle(_labelStyle) { fontSize = 18 };
+            _titleStyle = new GUIStyle(_labelStyle) { fontSize = Mathf.RoundToInt(18f * s) };
             _hubPickStyle = new GUIStyle(_labelStyle)
             {
-                fontSize = 20,
+                fontSize = Mathf.RoundToInt(20f * s),
                 normal = { textColor = new Color(1f, 0.78f, 0.28f) }
             };
 
