@@ -18,6 +18,7 @@ export SCM_PROVIDER=github SCM_REPOSITORY=ssafy/festa SCM_BRANCH=develop CI_COMM
 export JENKINS_JOB=festa-develop JENKINS_BUILD_NUMBER=1 JENKINS_BUILD_URL=https://ci.example.invalid/job/festa/1/
 export ROLLBACK_CLASSIFICATION=SAFE DATA_CHANGE=none DB_SCHEMA_CHANGED=false SECRET_OR_CONFIG_CHANGED=false
 export COMPONENT_METADATA_DIR="${work_dir}" RELEASE_MANIFEST_PATH="${work_dir}/release.json"
+unset DEPLOY_COMPONENTS
 
 bash "${repo_root}/infra/deploy/scripts/build-release-manifest.sh"
 bash "${repo_root}/infra/jenkins/scripts/validate-contracts.sh" release "${RELEASE_MANIFEST_PATH}"
@@ -25,6 +26,12 @@ bash "${repo_root}/infra/jenkins/scripts/validate-contracts.sh" release "${RELEA
 python "${script_dir}/../helpers/assert-json.py" "${RELEASE_MANIFEST_PATH}" \
   'len(document["components"]) == 4' \
   'set(item["name"] for item in document["components"]) == {"ai","back","front","game"}'
+
+DEPLOY_COMPONENTS=back RELEASE_MANIFEST_PATH="${work_dir}/back-release.json" \
+  bash "${repo_root}/infra/deploy/scripts/build-release-manifest.sh"
+python "${script_dir}/../helpers/assert-json.py" "${work_dir}/back-release.json" \
+  'len(document["components"]) == 1' \
+  'document["components"][0]["name"] == "back"'
 
 cat >"${work_dir}/docker" <<'SH'
 #!/usr/bin/env bash
