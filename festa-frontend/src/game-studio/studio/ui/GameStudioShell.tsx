@@ -13,6 +13,7 @@ import { parseGameProject, type AssetReference, type GameObject, type GameProjec
 import {
   addDialogueScene,
   addAssetReference,
+  removeAssetReference,
   addObject,
   addTileLayer,
   addTopDownScene,
@@ -40,6 +41,7 @@ import { createBlankProject } from '../model/createBlankProject.ts';
 import { createStarterProject } from '../model/createStarterProject.ts';
 import { createProjectFromTemplate, PROJECT_TEMPLATES, type ProjectTemplateId } from '../model/projectTemplates.ts';
 import { createBrowserAssetRepository, type GameAssetRepository } from '../assets/localAssetRepository.ts';
+import { assetDisplayLabel } from '../assets/builtinAssetCatalog.ts';
 import { useResolvedAssetUrls } from '../assets/useResolvedAssetUrls.ts';
 import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
@@ -734,6 +736,24 @@ export const GameStudioShell = ({
       return null;
     }
   }, [apply, assetRepository, gameId, store]);
+
+  // S15P21A604-561 — 저장소 삭제(assetRepository.delete)와 프로젝트 참조 제거
+  // (removeAssetReference)를 한 동작으로 묶는다. removeAssetReference는 여전히 참조
+  // 중인 자산이면 validated()가 던지므로, 그 경우 저장소 쪽 삭제는 되돌리지 않고 그대로
+  // 두고(멱등이라 다음 시도에서 다시 지우면 됨) 에러만 보여준다 — 조용히 절반만 지운 채
+  // 넘어가지 않는다.
+  const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
+    const asset = store.getState().project.assets.find((candidate) => candidate.id === assetId);
+    if (asset === undefined) return;
+    try {
+      apply(removeAssetReference(store.getState().project, assetId));
+      if (assetRepository !== null) await assetRepository.delete(asset.source);
+      setNotice(`${assetDisplayLabel(asset)} 자산을 삭제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '자산을 삭제하지 못했습니다.');
+    }
+  }, [apply, assetRepository, store]);
 
   const save = useCallback(async (): Promise<DraftSaveReceipt | null> => {
     try {
@@ -1774,6 +1794,7 @@ export const GameStudioShell = ({
                 )}
                 {rightPanel === 'PROJECT' && <ProjectDataPanel
                   onApply={apply}
+                  onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
                   onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
                   project={project}
                 />}
