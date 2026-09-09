@@ -72,6 +72,7 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      ENVIRONMENT_STATE_DIR: /var/lib/festa-environments
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/__dev/api}
       PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
@@ -81,6 +82,7 @@ services:
     volumes:
       - deploy_workspace:/home/jenkins/agent/deploy
       - image_transfer:/var/lib/festa-image-transfer
+      - deploy_state:/var/lib/festa-environments
       - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:
@@ -114,6 +116,7 @@ services:
 volumes:
   linux_docker_workspace:
   deploy_workspace:
+  deploy_state:
   image_transfer:
   unity_workspace:
   unity_home:

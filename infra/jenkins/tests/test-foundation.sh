@@ -116,6 +116,10 @@ grep -q 'transfer-local-images.sh --import' "${develop_pipeline}" \
   || fail "deploy node does not verify candidate image receipt"
 grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-/__dev/api}' "${agent_compose}" \
   || fail "deploy agent does not receive the approved dev API base"
+grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" \
+  || fail "deploy agent does not persist dev batch state outside its container filesystem"
+grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \
+  || fail "deploy agent does not mount persistent dev batch state"
 grep -q "final List deployComponents = (selection.deployComponents as List).findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
