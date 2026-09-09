@@ -21,7 +21,7 @@ import { CommitInput } from './CommitInput.tsx';
 import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../assets/builtinAssetCatalog.ts';
 import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
-import { findAssetUsageLocations, findVariableUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
+import { findAssetUsageLocations, findVariableUsageLocations, findItemUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
 import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
@@ -30,6 +30,7 @@ interface ProjectDataPanelProps {
   readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
   readonly onDeleteAsset: (assetId: string) => void;
   readonly onDeleteVariable: (variableId: string) => void;
+  readonly onDeleteItem: (itemId: string) => void;
 }
 
 const VariableValueInput = ({
@@ -68,7 +69,7 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
   // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
@@ -76,6 +77,8 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
   const [confirmDeleteAssetId, setConfirmDeleteAssetId] = useState<string | null>(null);
   // S15P21A604-562 — 변수 삭제도 자산과 같은 확인 카드 패턴을 쓴다.
   const [confirmDeleteVariableId, setConfirmDeleteVariableId] = useState<string | null>(null);
+  // S15P21A604-565 — 아이템 삭제도 동일한 확인 카드 패턴을 쓴다.
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
@@ -198,7 +201,11 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
     <div className="gss-section-title"><span>ITEMS</span><small>{project.items.length}/100</small></div>
     {project.items.map((item) => (
       <article className="gss-data-card" key={item.id}>
-        <header><strong>{item.id}</strong><span>ITEM</span></header>
+        <header>
+          <strong>{item.id}</strong>
+          <span>ITEM</span>
+          <button aria-label={`${item.id} 삭제`} onClick={() => setConfirmDeleteItemId(item.id)} type="button">삭제</button>
+        </header>
         <CommitInput
           label="사용자에게 보이는 이름"
           onCommit={(name) => onApply(renameItemDefinition(project, item.id, name))}
@@ -212,6 +219,28 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
       onClick={() => onApply(addItemDefinition(project))}
       type="button"
     >+ 아이템</button>
+    {confirmDeleteItemId !== null && (() => {
+      const target = project.items.find((item) => item.id === confirmDeleteItemId);
+      if (target === undefined) return null;
+      const usage = findItemUsageLocations(project, confirmDeleteItemId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{target.name} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 오브젝트·조건·액션에서 사용되지 않는 아이템입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteItemId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteItem(confirmDeleteItemId); setConfirmDeleteItemId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
 
     <div className="gss-section-title"><span>ASSETS</span><small>{project.assets.length}/300</small></div>
     {publishBlockers.length > 0 && (

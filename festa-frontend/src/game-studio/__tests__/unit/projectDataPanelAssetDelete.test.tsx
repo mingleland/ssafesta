@@ -28,6 +28,7 @@ const setup = (project: GameProject) => {
     <ProjectDataPanel
       onApply={onApply}
       onDeleteAsset={onDeleteAsset}
+      onDeleteItem={() => undefined}
       onDeleteVariable={() => undefined}
       onUploadAsset={() => undefined}
       project={project}
