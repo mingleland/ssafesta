@@ -166,6 +166,14 @@
 ### Tests for User Story 3
 
 - [ ] T058 [P] [US3] [BE] AI 서비스 중단 상태의 목록 조회와 타 부스 접근 거부 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentQueryIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+  - 📎 **S15P21A604-173 (2026-09-09) 판단 근거**: "타 부스 접근 거부" 절반은 이미 있었다 —
+    `AiDocumentUploadIntegrationTest.anotherMembersAgentIsForbidden`·`listingAMissingAgentIsNotFound`
+    가 목록 조회 권한을 덮는다. 실제 공백은 `POST /documents/{documentId}/complete` 의 타인·게스트
+    차단이었고(`AiDocumentService.java:305` `requireActiveEditor` 로 서비스는 이미 막고 있었으나
+    테스트가 0건), 그 2건을 같은 파일에 추가했다(`completingSomeoneElsesDocumentIsForbidden`·
+    `guestsCannotCompleteDocuments`). **T058의 새 파일은 만들지 않는다** — 권한 테스트만 다시
+    쓰면 중복이 된다. "AI 서비스 중단 상태의 목록 조회" 부분은 이번 티켓 범위 밖이라 그대로
+    미해결로 남긴다 — 체크박스를 닫지 않는다
 - [ ] T059 [P] [US3] [BE] 사용자 삭제와 `EXPIRED` 24시간 경과 시 즉시 검색 제외·cleanup 영속 재시도·문서별 Provider `DeleteObject` 재시도 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentDeletionIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [ ] T080 [P] [US3] [BE] 문서 삭제·비활성화 시 FastAPI cleanup을 발행하고 장애 시 영속 재시도하며, 전체 활성 문서 inventory를 생성하는 통합 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentCleanupIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [X] T081 [P] [US3] [AI] ~~Business/AI DB cleanup reconciliation 테스트~~ → Spring FK cascade·cancel/fencing T094로 대체 (S15P21A604-449)

@@ -435,6 +435,31 @@ class AiDocumentUploadIntegrationTest {
                 .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
     }
 
+    /** {@code requireActiveEditor} 가 문서를 올린 부스가 아니면 막는다 — 업로드-URL 발급과 같은 규칙(S15P21A604-173). */
+    @Test
+    void completingSomeoneElsesDocumentIsForbidden() throws Exception {
+        Owner owner = agentOwner("완료타인");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+        Long stranger = createMemberWithWallet(users, wallets, "완료침입");
+
+        mockMvc.perform(post("/api/v1/documents/{id}/complete", idOf(grant))
+                        .header("Authorization", bearerFor(stranger)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
+    }
+
+    /** 게스트는 문 앞에서 막힌다 — 업로드-URL 발급과 같은 규칙(S15P21A604-173). */
+    @Test
+    void guestsCannotCompleteDocuments() throws Exception {
+        Owner owner = agentOwner("완료게스트");
+        String grant = grantJson(owner, body("project.pdf", "application/pdf", ONE_MB, SHA_A));
+
+        mockMvc.perform(post("/api/v1/documents/{id}/complete", idOf(grant))
+                        .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MEMBER_ONLY"));
+    }
+
     // ── 만료 복구 (FR-027) ──────────────────────────────────────────────────
 
     @Test
