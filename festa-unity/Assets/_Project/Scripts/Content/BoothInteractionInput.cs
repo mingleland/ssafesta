@@ -257,6 +257,8 @@ namespace Festa.Content
                 return "게임기 플레이";
             if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
                 return "타이밍 스톱 게임";
+            if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
+                return "소파에 앉기";   // 눕기 클립이 오면 "소파에 눕기"
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
