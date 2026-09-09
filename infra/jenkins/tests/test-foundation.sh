@@ -114,8 +114,16 @@ grep -q 'transfer-local-images.sh --export' "${develop_pipeline}" \
   || fail "develop pipeline does not export selected candidate images"
 grep -q 'transfer-local-images.sh --import' "${develop_pipeline}" \
   || fail "deploy node does not verify candidate image receipt"
-! grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
-  || fail "candidate transfer must not activate dev deployment"
+grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-/__dev/api}' "${agent_compose}" \
+  || fail "deploy agent does not receive the approved dev API base"
+grep -q "final List deployComponents = (selection.deployComponents as List).findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
+  || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
+grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
+  || fail "dev batch does not bind selected component credentials"
+grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
+  || fail "dev batch does not recheck the develop head before deployment"
+grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
+  || fail "candidate transfer does not activate the Phase 3 dev batch"
 grep -q "stash name: 'candidate-metadata-game'" "${component_pipeline}" \
   || fail "game candidate metadata cannot leave the Unity workspace"
 grep -q "unstash 'candidate-metadata-game'" "${develop_pipeline}" \

@@ -27,8 +27,12 @@ def call() {
     final String releaseManifest = "${artifactRoot}/release-manifest.json"
     final String transferBundle = "develop-${headSha}-${env.BUILD_NUMBER}"
     final String transferDir = '/var/lib/festa-image-transfer'
+    // `components` may be all components for a shared CI change. Only the
+    // detector's deployComponents contract is allowed to mutate dev.
+    final List deployComponents = (selection.deployComponents as List).findAll { it in ['ai', 'back', 'front'] }
+    final String deployComponentList = deployComponents.join(',')
 
-    echo "SELECTED_COMPONENTS: ${components.join(', ')}; candidate transfer enabled, deploy disabled"
+    echo "SELECTED_COMPONENTS: ${components.join(', ')}; dev batch targets: ${deployComponentList ?: 'none'}"
     components.each { component ->
         load('infra/jenkins/pipelines/component.groovy').call([
             component: component,
@@ -65,6 +69,7 @@ def call() {
         ]) {
             sh 'infra/deploy/scripts/build-release-manifest.sh'
             sh "infra/jenkins/scripts/transfer-local-images.sh --export --bundle '${transferBundle}' --transfer-dir '${transferDir}' --manifest '${releaseManifest}'"
+            stash name: 'candidate-release-manifest', includes: releaseManifest, useDefaultExcludes: false
         }
     }
 
@@ -73,7 +78,66 @@ def call() {
             ws('/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt') {
                 checkout scm
                 sh "git checkout --detach '${headSha}'"
+                unstash 'candidate-release-manifest'
                 sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${transferBundle}' --transfer-dir '${transferDir}'"
+            }
+        }
+    }
+
+    if (deployComponents.isEmpty()) {
+        echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
+        return
+    }
+
+    stage('Deploy Selected Components') {
+        node('deploy') {
+            ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
+                checkout scm
+                sh "git checkout --detach '${headSha}'"
+                unstash 'candidate-release-manifest'
+
+                final List credentialBindings = []
+                final List credentialNames = []
+                if (deployComponents.contains('ai')) {
+                    credentialBindings << file(credentialsId: env.DEV_AI_ENV_CREDENTIAL_ID, variable: 'DEV_AI_ENV_FILE')
+                    credentialNames << 'DEV_AI_ENV_FILE'
+                }
+                if (deployComponents.contains('back')) {
+                    credentialBindings << file(credentialsId: env.DEV_BACK_ENV_CREDENTIAL_ID, variable: 'DEV_BACK_ENV_FILE')
+                    credentialNames << 'DEV_BACK_ENV_FILE'
+                }
+                if (deployComponents.any { it in ['ai', 'back'] }) {
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                    credentialNames.addAll(['INTERNAL_SPRING_TO_AI_TOKENS', 'INTERNAL_AI_TO_SPRING_TOKENS'])
+                }
+
+                def deployBatch = {
+                    int deployStatus = sh(
+                        returnStatus: true,
+                        script: "infra/jenkins/scripts/with-credentials.sh ${credentialNames.join(' ')} -- infra/jenkins/scripts/deploy-dev-batch.sh"
+                    )
+                    archiveArtifacts artifacts: 'artifacts/develop/dev-batch-result.json', allowEmptyArchive: true, fingerprint: true
+                    if (deployStatus == 75) {
+                        currentBuild.result = 'NOT_BUILT'
+                        echo 'SUPERSEDED: newer develop head exists before dev deployment'
+                        return
+                    }
+                    if (deployStatus != 0) { error("dev batch failed with exit ${deployStatus}") }
+                }
+
+                withEnv([
+                    "DEV_BATCH_ID=develop-${headSha}-${env.BUILD_NUMBER}",
+                    "DEPLOY_COMPONENTS=${deployComponentList}",
+                    "RELEASE_MANIFEST_PATH=${releaseManifest}",
+                    "CI_ARTIFACT_DIR=${artifactRoot}",
+                    "FRESHNESS_EXPECTED_SHA=${headSha}",
+                    'CI_BRANCH=develop',
+                    'PUBLIC_API_BASE_URL=/__dev/api',
+                    'PUBLIC_UNITY_BUILD_BASE=/unity/'
+                ]) {
+                    if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }
+                }
             }
         }
     }

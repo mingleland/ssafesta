@@ -49,11 +49,11 @@
 
 - [X] T013 [P] [US1] `infra/jenkins/tests/deploy-dev-batch.sh`에 단일 component 성공, 다중 component 원자적 승격, 가역 실패 snapshot rollback fixture를 작성한다
 - [X] T014 [P] [US1] `infra/jenkins/tests/freshness-develop-push.sh`에 superseded develop SHA가 lock 획득 후 배포되지 않는 fixture를 작성한다
-- [ ] T015 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 candidate image 사전 검증, batch lock, affected current/known-good snapshot, ordered service-scoped deploy를 구현한다
+- [X] T015 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 candidate image 사전 검증, batch lock, affected current/known-good snapshot, ordered service-scoped deploy를 구현한다
 - [X] T016 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 모든 component verify 후 batch active 승격과 가역 실패 시 batch가 변경한 component만 snapshot 복원하는 처리를 구현한다
 - [X] T017 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 DB·secret/config·비가역·unknown 실패의 자동 rollback 금지 및 `MANUAL_ACTION_REQUIRED` evidence 출력을 구현한다
-- [ ] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
-- [ ] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
+- [X] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
+- [X] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
 - [ ] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
 - [ ] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
 - [ ] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다

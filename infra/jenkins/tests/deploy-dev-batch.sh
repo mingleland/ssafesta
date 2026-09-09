@@ -23,6 +23,7 @@ chmod +x "${work}/docker"
 cat >"${work}/deploy" <<'SH'
 #!/usr/bin/env bash
 printf 'deploy:%s\n' "${CI_COMPONENT}" >>"${BATCH_LOG}"
+if [[ -n "${DEPLOY_HOLD_SECONDS:-}" ]]; then sleep "${DEPLOY_HOLD_SECONDS}"; fi
 SH
 cat >"${work}/verify" <<'SH'
 #!/usr/bin/env bash
@@ -58,6 +59,21 @@ run_batch multi back,front
 grep -Fqx 'deploy:back' "${work}/multi.log"
 grep -Fqx 'deploy:front' "${work}/multi.log"
 grep -q '"status": "ACTIVE"' "${work}/artifacts/multi/dev-batch-result.json"
+
+DEPLOY_HOLD_SECONDS=2 run_batch lock-holder back &
+lock_holder_pid=$!
+for _ in {1..20}; do
+  grep -Fqx 'deploy:back' "${work}/lock-holder.log" 2>/dev/null && break
+  sleep 0.1
+done
+grep -Fqx 'deploy:back' "${work}/lock-holder.log"
+set +e
+DEV_BATCH_LOCK_TIMEOUT_SECONDS=1 run_batch lock-contender front
+lock_status=$?
+set -e
+[[ "${lock_status}" == 73 ]] || { echo 'concurrent batch did not stop at the deployment lock' >&2; exit 1; }
+grep -q '"status": "LOCKED"' "${work}/artifacts/lock-contender/dev-batch-result.json"
+wait "${lock_holder_pid}"
 
 if VERIFY_FAIL_COMPONENT=front run_batch failed back,front; then
   echo 'verification failure unexpectedly passed' >&2
