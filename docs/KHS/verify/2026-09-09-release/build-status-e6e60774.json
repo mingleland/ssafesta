@@ -1,0 +1,1 @@
+{"status":"ok","sha":"e6e60774","develop_merge":"aca07d42","started":"2026-09-09T14:09:14+09:00","minutes":18.2,"bytes":154188123,"zipBytes":153797201,"zipSha256":"603d69d0b9df2a405ff5c7d6d251ab0f04226780fa21b456a38e27185372e6c6","loader":"6434bb09bd5f9c55f154ce32be080583","output":"Builds/webgl","note":"warmup removed (T-246), aliases, 404 retry, runInBackground"}
