@@ -5,6 +5,10 @@
 // 여기서는 입력 → onApply 반영, 그리고 "안내 문구를 고쳐도 range가 사라지지 않는지"만 본다
 // (처음에 { type: 'INTERACTABLE', prompt }로 새로 합성해서 range를 조용히 날리는 실수를
 // 했었다 — 그 회귀를 여기서 잡는다).
+// S15P21A604-554 — 이 필드가 NumberCommitInput으로 바뀌면서 onChange는 로컬 draft만
+// 바꾸고, 실제 onApply 반영은 blur(또는 Enter)에서만 일어난다 — blur 없이 change만 하고
+// 확인하면 "화면에 남은 타이핑 중 글자"만 보는 셈이라 이 테스트의 원래 의도(실제로
+// 저장됐는지)를 증명하지 못한다. 그래서 range를 바꿀 때마다 명시적으로 blur까지 한다.
 import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -66,22 +70,26 @@ describe('InspectorPanel — 상호작용 거리 설정(S15P21A604-534)', () => 
     expect((screen.getByLabelText('상호작용 거리') as HTMLInputElement).value).toBe('1');
   });
 
-  it('거리를 입력하면 그 값이 오브젝트의 INTERACTABLE 컴포넌트에 저장된다', () => {
+  it('거리를 입력하고 포커스를 벗어나면 그 값이 오브젝트의 INTERACTABLE 컴포넌트에 저장된다', () => {
     const { project, objectId } = buildProject();
     setup(objectId, project);
 
-    fireEvent.change(screen.getByLabelText('상호작용 거리'), { target: { value: '5' } });
+    const rangeInput = screen.getByLabelText('상호작용 거리');
+    fireEvent.change(rangeInput, { target: { value: '5' } });
+    fireEvent.blur(rangeInput);
 
     // InspectorPanel은 controlled input(value={component.range ?? 1})이라, onApply로
     // 반영된 뒤 다시 그려진 입력값이 곧 실제 저장된 값이다.
     expect((screen.getByLabelText('상호작용 거리') as HTMLInputElement).value).toBe('5');
   });
 
-  it('안내 문구를 고쳐도 이미 설정한 거리가 사라지지 않는다', () => {
+  it('안내 문구를 고쳐도 이미 저장한(blur한) 거리가 사라지지 않는다', () => {
     const { project, objectId } = buildProject();
     setup(objectId, project);
 
-    fireEvent.change(screen.getByLabelText('상호작용 거리'), { target: { value: '7' } });
+    const rangeInput = screen.getByLabelText('상호작용 거리');
+    fireEvent.change(rangeInput, { target: { value: '7' } });
+    fireEvent.blur(rangeInput);
     const promptInput = screen.getByLabelText('상호작용 안내 문구');
     fireEvent.change(promptInput, { target: { value: '자물쇠 살펴보기' } });
     fireEvent.blur(promptInput);
