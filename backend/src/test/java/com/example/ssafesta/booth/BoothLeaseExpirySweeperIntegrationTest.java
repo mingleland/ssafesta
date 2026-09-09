@@ -292,15 +292,85 @@ class BoothLeaseExpirySweeperIntegrationTest {
                 "이 임대의 슬롯이 아닌 연결은 이 임대의 만료가 건드릴 것이 아닙니다.");
     }
 
+    /**
+     * @return 1 if the lease was granted, 0 if it lost the race. Only the two racing outcomes are
+     *     swallowed — anything else is a failure this class wants to see, not a zero
+     */
+    /**
+     * An edit that started while the lease was still valid must not put the slot connection back
+     * when it commits after the pass.
+     *
+     * <p>This is the one window the guard in {@code BoothLeaseService.expire} cannot see: the
+     * reviving write is not the pass, it is the other transaction. {@code BoothHomepageService} and
+     * {@code BoothFacadeService} reach a booth through {@code BoothAccessGuard.requireActiveEditor},
+     * which takes no row lock and admits the owner right up to the instant the lease runs out. Their
+     * flush then writes {@code current_slot_id} back from the snapshot they read — a booth row
+     * claiming a slot and a published layout while its lease says {@code EXPIRED}, and a pass that
+     * logged a cleanup which is no longer in the database.
+     *
+     * <p>Sequenced rather than raced: the editor loads the booth, the pass commits, and only then
+     * does the editor write. A latch is the only way to pin an ordering that a race would hit
+     * sometimes and CI would then fail on some other day.
+     */
+    @Test
+    void anEditCommittingAfterThePassDoesNotReviveTheSlotConnection() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "동시수정");
+        Long slotId = freeSlotIds(1).get(0);
+        BoothLease lease = leaseService.lease(userId, slotId, 1).lease();
+        endLease(lease.getId());
+
+        CountDownLatch loaded = new CountDownLatch(1);
+        CountDownLatch swept = new CountDownLatch(1);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            Future<?> editor = pool.submit(() -> new TransactionTemplate(transactions)
+                    .executeWithoutResult(status -> {
+                        Booth booth = booths.findById(lease.getBoothId()).orElseThrow();
+                        loaded.countDown();
+                        awaitQuietly(swept);
+                        booth.changeHomepageUrl("https://revive.example.com");
+                    }));
+            assertTrue(loaded.await(30, TimeUnit.SECONDS));
+            sweeper.expireStaleLeases();
+            swept.countDown();
+            editor.get(30, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        Booth booth = booths.findById(lease.getBoothId()).orElseThrow();
+        assertNull(booth.getCurrentSlotId(), "만료로 끊은 슬롯 연결이 나중 커밋으로 되살아나면 안 됩니다.");
+        assertNull(booth.getPublishedLayoutVersion());
+        assertEquals("https://revive.example.com", booth.getHomepageUrl(),
+                "수정 자체는 반영돼야 합니다 — 되살리지 않는 것과 수정을 잃는 것은 다릅니다.");
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            if (!latch.await(30, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("상대 스레드를 기다리다 시간이 지났습니다.");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+        }
+    }
+
     private int attempt(Long userId, Long slotId) {
         try {
             leaseService.lease(userId, slotId, 1);
             return 1;
-        } catch (RuntimeException exception) {
+        } catch (SlotAlreadyLeasedException | ActiveLeaseLimitException lost) {
             return 0;
         }
     }
 
+    /**
+     * Releases the tasks together and <b>lets anything they throw out</b>. Swallowing here would
+     * turn a deadlock or a constraint error in the pass into a plain "expired nothing", which the
+     * sum assertions read as success — the one expected failure, losing a lease race, is caught in
+     * {@link #attempt} by its own two exception types instead.
+     */
     private List<Integer> runTogether(List<Supplier<Integer>> tasks) throws Exception {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(tasks.size());
@@ -309,11 +379,7 @@ class BoothLeaseExpirySweeperIntegrationTest {
             for (Supplier<Integer> task : tasks) {
                 futures.add(pool.submit(() -> {
                     start.await();
-                    try {
-                        return task.get();
-                    } catch (RuntimeException failure) {
-                        return 0;
-                    }
+                    return task.get();
                 }));
             }
             start.countDown();

@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * A member's booth and the container its content hangs off (spec 004).
@@ -20,8 +21,19 @@ import java.time.Instant;
  * (invariant I-5, SC-004).
  *
  * <p>Expiry therefore never deletes a booth — it only detaches the slot (FR-010).
+ *
+ * <p><b>{@code @DynamicUpdate} is load-bearing, not a performance tweak.</b> This row has several
+ * independent writers — the owner editing their facade or homepage through
+ * {@link BoothAccessGuard#requireActiveEditor} (which takes no row lock), a layout publish, and the
+ * expiry pass detaching the slot. With Hibernate's default full-column {@code UPDATE}, an editor
+ * that read the row before the pass committed writes {@code current_slot_id} and
+ * {@code published_layout_version} back from its own snapshot when it flushes — reviving a slot
+ * connection the pass had just released, on a lease that is already {@code EXPIRED}. Writing only
+ * the columns a transaction actually changed is what keeps those writers from undoing each other;
+ * the alternative was a lock or a version column on every editor path (S15P21A604-152).
  */
 @Entity
+@DynamicUpdate
 @Table(name = "booths")
 public class Booth {
 
