@@ -31,14 +31,17 @@ namespace Festa.EditorTools
         /// </summary>
         sealed class TextPatch { public string Target; public Rect Area; public string Text; public float FontSize; public TMPro.TextAlignmentOptions Align; public Color Color; }
         static readonly Color PanelColor = new Color(0.80f, 0.80f, 0.86f);
-        static readonly Color InkColor = new Color(0.22f, 0.24f, 0.32f);
+        static readonly Color InkColor = new Color(0.08f, 0.08f, 0.10f);   // 사용자: 본문은 검은 글씨
+        static readonly Color TitleColor = new Color(0.16f, 0.17f, 0.22f);
         static readonly Color BlueColor = new Color(0.18f, 0.32f, 0.72f);
         static readonly TextPatch[] Patches =
         {
+            new TextPatch { Target = "content-introduction", Area = new Rect(0.06f, 0.125f, 0.30f, 0.065f), FontSize = 16f, Align = TMPro.TextAlignmentOptions.MidlineLeft, Color = TitleColor, Text = "<b>SSAFY 소개</b>" },
+            new TextPatch { Target = "content-introduction", Area = new Rect(0.52f, 0.125f, 0.30f, 0.065f), FontSize = 16f, Align = TMPro.TextAlignmentOptions.MidlineLeft, Color = TitleColor, Text = "<b>SSAFY 연혁</b>" },
             new TextPatch { Target = "content-introduction", Area = new Rect(0.07f, 0.44f, 0.40f, 0.12f), FontSize = 7f, Align = TMPro.TextAlignmentOptions.TopLeft, Color = InkColor,
                 Text = "<color=#2E52B8><b>삼성청년SW·AI아카데미(SSAFY)</b></color>는 삼성전자의 사회공헌 비전인 '함께가요 미래로! Enabling People'의 일환으로, 청년의 취업 경쟁력을 높이고 국가 소프트웨어·AI 경쟁력을 강화하기 위해 2018년 12월 출범한 청년 SW 교육 프로그램입니다.\n\n1년 1,600시간의 몰입형 교육과 취업 지원을 통해 IT 산업이 요구하는 실무형 인재를 키웁니다." },
-            new TextPatch { Target = "content-introduction", Area = new Rect(0.07f, 0.565f, 0.42f, 0.07f), FontSize = 7f, Align = TMPro.TextAlignmentOptions.TopLeft, Color = InkColor,
-                Text = "<b>전국 5개 캠퍼스</b>  서울 · 대전 · 광주 · 구미 · 부울경" },
+            new TextPatch { Target = "content-introduction", Area = new Rect(0.07f, 0.565f, 0.42f, 0.07f), FontSize = 6.2f, Align = TMPro.TextAlignmentOptions.TopLeft, Color = InkColor,
+                Text = "<b>전국 5개 캠퍼스</b>  서울·대전·광주·구미·부울경" },
             new TextPatch { Target = "content-introduction", Area = new Rect(0.52f, 0.44f, 0.44f, 0.175f), FontSize = 7f, Align = TMPro.TextAlignmentOptions.TopLeft, Color = InkColor,
                 Text = "<b>2018</b>  삼성청년SW아카데미 출범 · 1기 입과\n<b>2021</b>  \n<b>2022</b>  \n<b>2024</b>  \n<b>2025</b>  삼성청년SW·AI아카데미로 확대" },
             new TextPatch { Target = "content-introduction", Area = new Rect(0.52f, 0.81f, 0.30f, 0.04f), FontSize = 9f, Align = TMPro.TextAlignmentOptions.MidlineLeft, Color = BlueColor,
@@ -81,6 +84,45 @@ namespace Festa.EditorTools
                 var saved = new System.Collections.Generic.Dictionary<GameObject, int>();
                 foreach (var r in renderers) { saved[r.gameObject] = r.gameObject.layer; r.gameObject.layer = layer; }
 
+                // 렌더 함수 — 직교 카메라로 정면을 찍는다. 1차: 판넬 색 샘플용, 2차: 패치·글자를 얹은 최종본.
+                System.Func<Texture2D> renderPanel = () =>
+                {
+                    var camGo2 = new GameObject("__PanelBakeCam");
+                    try
+                    {
+                        var cam = camGo2.AddComponent<Camera>();
+                        cam.orthographic = true; cam.orthographicSize = halfH; cam.aspect = aspect;
+                        cam.nearClipPlane = 0.5f; cam.farClipPlane = depth * 2f + 60f;
+                        cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0, 0, 0, 0);
+                        cam.cullingMask = 1 << layer; cam.allowMSAA = true; cam.allowHDR = false;
+                        cam.transform.position = wb.center + normal * (depth + 30f);
+                        cam.transform.rotation = Quaternion.LookRotation(-normal, up);
+                        var rt = new RenderTexture(Resolution, Resolution, 24, RenderTextureFormat.ARGB32) { antiAliasing = 8 };
+                        cam.targetTexture = rt; cam.Render();
+                        var prev = RenderTexture.active; RenderTexture.active = rt;
+                        var t2 = new Texture2D(Resolution, Resolution, TextureFormat.RGBA32, false);
+                        t2.ReadPixels(new Rect(0, 0, Resolution, Resolution), 0, 0); t2.Apply();
+                        RenderTexture.active = prev; cam.targetTexture = null; rt.Release();
+                        return t2;
+                    }
+                    finally { Object.DestroyImmediate(camGo2); }
+                };
+
+                // 1차 렌더 → 판넬 바탕색 샘플. 판넬은 조명 때문에 위아래 밝기가 다르므로 **패치마다** 그 패치 바로 위(정규화 y−0.012) 가운데 픽셀을 쓴다.
+                // 상단 여백 한 점으로 칠했더니(6차 굽기) 중간 패치들이 살짝 밝게 떠 보였다.
+                var pass1 = renderPanel();
+                System.Func<float, float, Color> pixelAt = (nx, ny) => { var px = pass1.GetPixel((int)(Resolution * Mathf.Clamp01(nx)), (int)(Resolution * (1f - Mathf.Clamp01(ny)))); return new Color(px.r, px.g, px.b, 1f); };
+                var baseColor = pixelAt(0.5f, 0.06f);   // 상단 여백 = 판넬 바탕의 기준색
+                // 패치 둘레 네 점(위·아래·왼·오른, 0.012 바깥) 중 기준색에 가장 가까운 것 — 사진 캡션 바(검정)나 글자를 샘플하는 사고를 피한다(7차 굽기: 슬로건 패치가 검게 됨)
+                System.Func<Rect, Color> sampleFor = (area) =>
+                {
+                    var cands = new[] { pixelAt(area.x + area.width * 0.5f, area.y - 0.012f), pixelAt(area.x + area.width * 0.5f, area.yMax + 0.012f), pixelAt(area.x - 0.012f, area.y + area.height * 0.5f), pixelAt(area.xMax + 0.012f, area.y + area.height * 0.5f) };
+                    Color best = baseColor; float bestD = float.MaxValue;
+                    foreach (var c in cands) { float d = Mathf.Abs(c.r - baseColor.r) + Mathf.Abs(c.g - baseColor.g) + Mathf.Abs(c.b - baseColor.b); if (d < bestD) { bestD = d; best = c; } }
+                    return bestD < 0.25f ? best : baseColor;
+                };
+                Color sampledPanelColor = baseColor;
+
                 // 글자 덧대기 — 패치 쿼드(판넬색) + TMP 텍스트를 정면 살짝 앞에 세운다(굽고 나면 지운다)
                 var patchRoot = new GameObject("__PanelBakePatches"); patchRoot.layer = layer;
                 var faceCenter = wb.center + normal * Mathf.Abs(Vector3.Dot(wb.extents, normal));
@@ -96,42 +138,30 @@ namespace Festa.EditorTools
                     bg.name = "patch"; bg.layer = layer; bg.transform.SetParent(patchRoot.transform, true);
                     bg.transform.position = center + normal * 0.08f; bg.transform.rotation = Quaternion.LookRotation(-normal, up); bg.transform.localScale = new Vector3(w, h, 1f);
                     // 패치 재질 = 판넬 몸체 재질(_defaultMat) 그대로 — 같은 조명을 받아 색이 맞는다. 없으면 Unlit 판넬색
-                    Material bgMat = null; foreach (var rr in renderers) { foreach (var mm in rr.sharedMaterials) if (mm != null && mm.name.Contains("_defaultMat")) { bgMat = mm; break; } if (bgMat != null) break; }
-                    if (bgMat == null) { bgMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")); bgMat.SetColor("_BaseColor", PanelColor); } bg.GetComponent<MeshRenderer>().sharedMaterial = bgMat;
+                    var bgMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+                    sampledPanelColor = sampleFor(p.Area);
+                    bgMat.SetColor("_BaseColor", sampledPanelColor);   // 1차 렌더에서 이 패치 바로 위를 샘플한 판넬 색 — 패치가 보이지 않는다
+                    bg.GetComponent<MeshRenderer>().sharedMaterial = bgMat;
                     var tgo = new GameObject("text"); tgo.layer = layer; tgo.transform.SetParent(patchRoot.transform, true);
                     tgo.transform.position = center + normal * 0.12f; tgo.transform.rotation = Quaternion.LookRotation(-normal, up);
                     var tmp = tgo.AddComponent<TMPro.TextMeshPro>();
                     tmp.rectTransform.sizeDelta = new Vector2(w * 0.94f, h * 0.9f);
                     if (font != null) tmp.font = font;
-                    tmp.text = p.Text; tmp.enableAutoSizing = true; tmp.fontSizeMin = 2f; tmp.fontSizeMax = p.FontSize; tmp.fontSize = p.FontSize;   // 상자 안에 맞춰 줄인다 — 3차 굽기에서 글자가 사진 위로 넘쳤다 tmp.alignment = p.Align; tmp.color = p.Color; tmp.enableWordWrapping = true; tmp.richText = true;
+                    tmp.text = p.Text; tmp.enableAutoSizing = true; tmp.fontSizeMin = 2f; tmp.fontSizeMax = p.FontSize; tmp.fontSize = p.FontSize;   // 상자 안에 맞춰 줄인다 — 3차 굽기에서 글자가 사진 위로 넘쳤다
+                    tmp.alignment = p.Align; tmp.color = p.Color; tmp.enableWordWrapping = true; tmp.richText = true;
                     tmp.ForceMeshUpdate();
                     patched++;
                 }
 
-                var camGo = new GameObject("__PanelBakeCam");
                 Texture2D tex = null;
-                try
-                {
-                    var cam = camGo.AddComponent<Camera>();
-                    cam.orthographic = true; cam.orthographicSize = halfH; cam.aspect = aspect;
-                    cam.nearClipPlane = 0.5f; cam.farClipPlane = depth * 2f + 60f;
-                    cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0, 0, 0, 0);
-                    cam.cullingMask = 1 << layer; cam.allowMSAA = true; cam.allowHDR = false;
-                    cam.transform.position = wb.center + normal * (depth + 30f);
-                    cam.transform.rotation = Quaternion.LookRotation(-normal, up);
-                    var rt = new RenderTexture(Resolution, Resolution, 24, RenderTextureFormat.ARGB32) { antiAliasing = 8 };
-                    cam.targetTexture = rt; cam.Render();
-                    var prev = RenderTexture.active; RenderTexture.active = rt;
-                    tex = new Texture2D(Resolution, Resolution, TextureFormat.RGBA32, false);
-                    tex.ReadPixels(new Rect(0, 0, Resolution, Resolution), 0, 0); tex.Apply();
-                    RenderTexture.active = prev; cam.targetTexture = null; rt.Release();
-                }
+                try { tex = renderPanel(); }
                 finally
                 {
-                    Object.DestroyImmediate(camGo);
+                    Object.DestroyImmediate(pass1);
                     Object.DestroyImmediate(patchRoot);
                     foreach (var kv in saved) kv.Key.layer = kv.Value;
                 }
+                report.AppendLine($"  판넬 바탕색 샘플 {sampledPanelColor}");
 
                 string safe = target.name.Replace(' ', '_');
                 string pngPath = $"{OutDir}/{safe}_baked.png";
