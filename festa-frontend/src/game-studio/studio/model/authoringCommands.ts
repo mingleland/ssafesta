@@ -1205,6 +1205,16 @@ export const addAssetReference = (
   asset: AssetReference,
 ): GameProject => validated({ ...project, assets: [...project.assets, asset] });
 
+// S15P21A604-561 — 사용 중인 자산을 지우려 하면 validated()(parseGameProject)가
+// SCENE_BACKGROUND_ASSET_INVALID/DIALOGUE_PORTRAIT_ASSET_INVALID/SPRITE_ASSET_INVALID 등으로
+// 그대로 실패한다 — 참조가 하나라도 남아있으면 던진다. 이게 최종 안전망이고, 실제 UX는
+// 호출부(ProjectDataPanel)가 미리 findAssetUsageLocations로 사용 위치를 보여주고 확인을
+// 받은 뒤에만 이 함수를 부르는 쪽으로 짠다 — 여기서 조용히 무시하고 없던 일로 만들지 않는다.
+export const removeAssetReference = (
+  project: GameProject,
+  assetId: string,
+): GameProject => validated({ ...project, assets: project.assets.filter((asset) => asset.id !== assetId) });
+
 export const addTileLayer = (
   project: GameProject,
   sceneId: string,
