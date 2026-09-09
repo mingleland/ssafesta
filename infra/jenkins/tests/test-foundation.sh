@@ -110,6 +110,18 @@ grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
   || fail "develop pipeline does not create its selection artifact directory"
 ! grep -q 'deploy-release.sh' "${develop_pipeline}" \
   || fail "Phase 2 develop pipeline must not deploy demo"
+grep -q 'transfer-local-images.sh --export' "${develop_pipeline}" \
+  || fail "develop pipeline does not export selected candidate images"
+grep -q 'transfer-local-images.sh --import' "${develop_pipeline}" \
+  || fail "deploy node does not verify candidate image receipt"
+! grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
+  || fail "candidate transfer must not activate dev deployment"
+grep -q "stash name: 'candidate-metadata-game'" "${component_pipeline}" \
+  || fail "game candidate metadata cannot leave the Unity workspace"
+grep -q "unstash 'candidate-metadata-game'" "${develop_pipeline}" \
+  || fail "develop pipeline does not collect game candidate metadata"
+grep -q 'image-transfer-init' "${agent_compose}" \
+  || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile accepts non-develop branches"
 ! grep -q 'componentBranches' "${jenkinsfile}" \

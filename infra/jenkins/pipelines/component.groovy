@@ -27,6 +27,10 @@ def call(Map config = [:]) {
                     schemaVersion: '1.0.0', component: component, sourceSha: sourceSha, artifactDir: artifactDir
                 ], pretty: 2
                 archiveArtifacts artifacts: "${artifactDir}/**", allowEmptyArchive: false, fingerprint: true
+                if (component == 'game') {
+                    // WebGL/Linux Server outputs stay on the Unity Agent; only candidate identity crosses workspaces.
+                    stash name: 'candidate-metadata-game', includes: "${artifactDir}/image-metadata.json", useDefaultExcludes: false
+                }
             }
         }
     }
