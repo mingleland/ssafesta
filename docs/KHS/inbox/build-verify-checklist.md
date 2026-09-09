@@ -3,6 +3,7 @@
 > 빌드는 몰아서 한 번. 에디터에서 확인할 수 있는 것은 여기 적지 않는다 — 에디터 Play 로 바로 검증한다.
 > 여기에는 **빌드(WebGL·서버 이미지)로만 확인 가능한 항목**을 그때그때 한 줄씩 쌓고, 빌드 한 번에 위에서부터 전부 확인한 뒤 결과를 적는다.
 > 확인 환경: 데스크톱 앱 Browser 패널(보이는 탭 — `document.visibilityState === "visible"` 먼저 확인, T-115) 또는 사용자 Chrome. 숨은 탭에서 잰 수치는 무효.
+> 로컬 스택 호스트는 반드시 **`localhost` / `127.0.0.1`** — 릴리스 빌드의 평문 HTTP 차단(`insecureHttpOption: 0`)은 이 둘만 예외다. `dev.localhost` 같은 서브도메인은 `Insecure connection not allowed` 로 막힌다(T-248, #156).
 
 ## 다음 Development 빌드에서 확인할 것
 
