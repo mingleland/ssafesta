@@ -223,6 +223,33 @@ class AiDocumentUploadIntegrationTest {
 
     // ── 중복·재발급 (FR-019b·c, #84) ────────────────────────────────────────
 
+    /**
+     * 처리에 실패한 파일은 <b>같은 파일 그대로</b> 다시 올릴 수 있다 (FR-019b).
+     *
+     * <p>자리를 비켜 주는 것(위 절)과 다른 조건이다. 자리가 남아도 중복 판정이 실패한 문서를
+     * 붙잡고 있으면 사용자는 <b>그 파일만</b> 영영 못 올린다 — 다른 파일은 되는데 방금 실패한 그
+     * 파일은 안 되는, 설명하기 어려운 상태가 된다.
+     *
+     * <p>S15P21A604-175 가 {@code FAILED} 를 실제로 쓰기 시작하면서 도달 가능해졌다. 그전에는
+     * 이 상태를 만드는 코드가 없어 규칙만 있고 쓰이지 않았다.
+     */
+    @Test
+    void aFailedDocumentDoesNotBlockReuploadingTheSameFile() throws Exception {
+        Owner owner = agentOwner("실패후재업로드");
+        long failed = seedActive(owner, "FAILED", SHA_A, ONE_MB);
+
+        String json = mockMvc.perform(uploadUrl(owner, body("project.pdf", "application/pdf",
+                        ONE_MB, SHA_A)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.duplicate").value(false))
+                .andExpect(jsonPath("$.uploadUrl").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        assertNotEquals(failed, idOf(json), "실패한 행에 재발급하면 그 행이 되살아난다");
+        assertEquals("QUEUED", documentRepository.findById(idOf(json)).orElseThrow()
+                .getProcessingStatus());
+    }
+
     /** 이미 올라간 파일이면 URL 을 주지 않는다. 키 자체가 빠진다 — 프론트가 duplicate 로 갈린다. */
     @Test
     void anAlreadyUploadedFileAnswersDuplicateWithoutAUrl() throws Exception {
