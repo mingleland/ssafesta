@@ -50,29 +50,53 @@ namespace Festa.Integration
 #endif
         }
 
+        /// <summary>
+        /// 지금 잠금을 쥐고 있는 주체들. **하나라도 쥐고 있으면 잠긴 것이다.**
+        ///
+        /// <para>예전에는 <c>bool</c> 하나였고 "화면은 동시에 하나" 라고 가정했다. 그 가정이 틀렸다 —
+        /// 슬롯머신 HUD 가 잠근 상태에서 FE 패널을 열었다 닫으면 호스트의 <c>SetInputLocked("0")</c> 가
+        /// 그 잠금을 대신 풀어 버리고, <c>LockedChanged(false)</c> 를 받은 미니게임이 스스로 닫혔다.
+        /// 사용자에게는 "돌아가던 슬롯머신이 저절로 꺼진다" 로 보인다 (2026-09-08 조사).</para>
+        ///
+        /// <para>주인 이름으로 세면 각자 자기 것만 놓는다. 같은 주인이 두 번 잠가도 한 번만 센다 —
+        /// 해제를 한 번 빠뜨려 영영 잠기는 쪽이 두 번 잠기는 쪽보다 훨씬 나쁘다.</para>
+        /// </summary>
+        static readonly System.Collections.Generic.HashSet<string> s_holders = new();
+
+        const string HostOwner = "host";
+
         /// <summary>호스트 → Unity. "1"/"true" 잠금, "0"/"false"/빈 값 해제.</summary>
         public void SetInputLocked(string value)
         {
             bool locked = value == "1" || string.Equals(value, "true", System.StringComparison.OrdinalIgnoreCase);
-            if (locked == IsLocked) return;
-            IsLocked = locked;
-            Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")}");
-            LockedChanged?.Invoke(locked);
+            SetLocked(locked, HostOwner);
         }
 
         /// <summary>
-        /// Unity 안에서 여는 화면(미니게임 HUD 등)이 직접 잠근다. 호스트 Overlay 와 같은 규칙 —
-        /// 열릴 때 true, 닫힐 때 false. 여러 곳이 겹쳐 잠그는 경우는 없다(화면은 동시에 하나).
+        /// Unity 안에서 여는 화면(미니게임 HUD·초점 카메라 등)이 직접 잠근다.
+        /// <paramref name="owner"/> 는 그 화면을 가리키는 안정적인 이름이어야 한다 — 잠글 때와 풀 때가 같아야 한다.
         /// </summary>
-        public static void SetLocked(bool locked)
+        public static void SetLocked(bool locked, string owner)
         {
-            if (locked == IsLocked) return;
-            IsLocked = locked;
-            Debug.Log($"[InputBridge] 월드 입력 {(locked ? "잠금" : "해제")} (Unity 내부)");
-            LockedChanged?.Invoke(locked);
+            if (string.IsNullOrEmpty(owner)) owner = "unknown";
+            bool before = IsLocked;
+
+            if (locked) s_holders.Add(owner);
+            else s_holders.Remove(owner);
+
+            IsLocked = s_holders.Count > 0;
+            if (IsLocked == before) return;   // 다른 주인이 아직 쥐고 있으면 상태는 그대로다
+
+            Debug.Log($"[InputBridge] 월드 입력 {(IsLocked ? "잠금" : "해제")} " +
+                      $"(요청 '{owner}', 남은 주인 {s_holders.Count})");
+            LockedChanged?.Invoke(IsLocked);
         }
 
+        /// <summary>지금 잠금을 쥔 주체 목록. 안 풀리는 잠금을 추적할 때 쓴다.</summary>
+        public static string HoldersDescription() =>
+            s_holders.Count == 0 ? "(없음)" : string.Join(", ", s_holders);
+
         /// <summary>에디터·테스트용 별칭.</summary>
-        public static void SetLockedForTesting(bool locked) => SetLocked(locked);
+        public static void SetLockedForTesting(bool locked) => SetLocked(locked, "test");
     }
 }

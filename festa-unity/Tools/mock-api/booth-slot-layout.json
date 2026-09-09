@@ -1,0 +1,141 @@
+{
+  "boothId": 7,
+  "template": "PROJECT_EXHIBITION",
+  "version": 1,
+  "objects": [
+    {
+      "objectId": "ai-1",
+      "type": "AI_AGENT",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": -2.2
+      },
+      "rotationY": 0,
+      "configId": 78
+    },
+    {
+      "objectId": "screen-1",
+      "type": "VIDEO_SCREEN",
+      "position": {
+        "x": -0.8,
+        "y": 0,
+        "z": -2.2
+      },
+      "rotationY": 0,
+      "configId": 152
+    },
+    {
+      "objectId": "panel-1",
+      "type": "PROJECT_PANEL",
+      "position": {
+        "x": 0.8,
+        "y": 0,
+        "z": -2.2
+      },
+      "rotationY": 15,
+      "configId": 33
+    },
+    {
+      "objectId": "portal-1",
+      "type": "GAME_PORTAL",
+      "position": {
+        "x": 2.4,
+        "y": 0,
+        "z": -2.2
+      },
+      "rotationY": 0,
+      "configId": 1
+    },
+    {
+      "objectId": "survey-1",
+      "type": "SURVEY_KIOSK",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 0,
+      "configId": 12
+    },
+    {
+      "objectId": "desk-1",
+      "type": "CONSULTATION_DESK",
+      "position": {
+        "x": -0.8,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 0,
+      "configId": 9
+    },
+    {
+      "objectId": "laptop-1",
+      "type": "LAPTOP",
+      "position": {
+        "x": -0.8,
+        "y": 0.85,
+        "z": 0
+      },
+      "rotationY": 0,
+      "configId": 16
+    },
+    {
+      "objectId": "recruit-1",
+      "type": "RECRUITMENT_BOARD",
+      "position": {
+        "x": 0.8,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 0,
+      "configId": 21
+    },
+    {
+      "objectId": "vote-1",
+      "type": "LIKE_VOTE",
+      "position": {
+        "x": 2.4,
+        "y": 0,
+        "z": 0
+      },
+      "rotationY": 0,
+      "configId": 18
+    },
+    {
+      "id": "legacy-survey",
+      "type": "SURVEY",
+      "position": {
+        "x": -2.4,
+        "y": 0,
+        "z": 2.2
+      },
+      "rotationY": 0,
+      "configId": 12
+    },
+    {
+      "objectId": "chair-1",
+      "type": "FURNITURE",
+      "assetCode": "FURN_CHAIR_01_BLUE",
+      "position": {
+        "x": -0.8,
+        "y": 0,
+        "z": 2.2
+      },
+      "rotationY": 30,
+      "configId": 0
+    },
+    {
+      "objectId": "plant-1",
+      "type": "DECORATION",
+      "assetCode": "STRUCT_PANEL_01",
+      "position": {
+        "x": 0.8,
+        "y": 0,
+        "z": 2.2
+      },
+      "rotationY": 0,
+      "configId": 0
+    }
+  ]
+}

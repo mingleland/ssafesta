@@ -180,11 +180,17 @@ namespace Festa.Integration
             return mockSession;
         }
 
-        public Task<GameResultAckDto> ReportAsync(GameResultDto result)
+        public async Task<GameResultAckDto> ReportAsync(GameResultDto result)
         {
-            if (result != null && !string.IsNullOrEmpty(result.sessionId) && _mockSessions.Contains(result.sessionId))
-                return _mock.ReportAsync(result);
-            return _server.ReportAsync(result);
+            bool viaMock = result != null && !string.IsNullOrEmpty(result.sessionId)
+                           && _mockSessions.Contains(result.sessionId);
+            if (!viaMock) return await _server.ReportAsync(result);
+
+            // Mock 이 판정했다는 사실을 ack 에 실어 보낸다 — HUD 가 "체험판" 을 드러내는 근거다.
+            // Mock 구현이 이 값을 세우든 말든 여기서 확정한다. 이 경로로 온 것은 정의상 실서버가 아니다.
+            var ack = await _mock.ReportAsync(result);
+            if (ack != null) ack.simulated = true;
+            return ack;
         }
     }
 }
