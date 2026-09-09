@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1610396264999670623}
   - component: {fileID: 157434536028962001}
+  - component: {fileID: 371066522794879209}
   m_Layer: 0
   m_Name: FURN_CHAIR_01_ORANGE
   m_TagString: Untagged
@@ -45,6 +46,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5eff330b02db34240ab3dd551f81c2be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!65 &371066522794879209
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9039493908603224541}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.37736276, y: 0.45000032, z: 0.37736288}
+  m_Center: {x: 0, y: 0.22500013, z: -0.000000029802322}
 --- !u!1001 &2791226302142232930
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -97,7 +119,8 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 64260584171865606, guid: 6f5240c8a496d9643beb76f454956c11, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []

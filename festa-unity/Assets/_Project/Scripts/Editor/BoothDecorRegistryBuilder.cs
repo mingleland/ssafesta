@@ -58,6 +58,16 @@ namespace Festa.EditorTools
             new Row { Type = BoothObjectType.Decoration, Code = "STRUCT_TRUSS_BASE",    Source = Expo + "/Prefabs/Truss/TrussBase.prefab" },
             new Row { Type = BoothObjectType.Decoration, Code = "STRUCT_TRUSS_VERTICAL", Source = Expo + "/Prefabs/Truss/TrussVertical.prefab" },
             new Row { Type = BoothObjectType.Decoration, Code = "STRUCT_TRUSS_HORIZONTAL_LAMP", Source = Expo + "/Prefabs/Truss/TrussHorizontal_Lamp02.prefab" },
+            // 별칭 7행 — FE 스튜디오 팔레트(visualAssets.ts, develop 기준 2026-09-09)가 정본 28행과 다른 코드를 내보낸다.
+            // 게시본에 이 코드가 오면 "Unknown assetCode → 타입 기본" 으로 떨어져 벽 패널이 상자로 뜬다(실측: 부스 1 v15 WALL_PLAIN).
+            // 같은 래퍼를 가리키는 별칭으로 받아 준다. 정본화는 GitLab 이슈로 FE 에 요청.
+            new Row { Type = BoothObjectType.Decoration, Code = "WALL_PLAIN",      Source = WrapperDir + "/STRUCT_PANEL_01.prefab",            IsExisting = true },
+            new Row { Type = BoothObjectType.Furniture,  Code = "COUNTER_GRAPHIC", Source = WrapperDir + "/FURN_COUNTER_02.prefab",            IsExisting = true },
+            new Row { Type = BoothObjectType.Furniture,  Code = "SHELF",           Source = WrapperDir + "/DISP_STAND_PLASTIC_01.prefab",      IsExisting = true },
+            new Row { Type = BoothObjectType.Decoration, Code = "TRUSS_BEAM",      Source = WrapperDir + "/STRUCT_TRUSS_HORIZONTAL_LAMP.prefab", IsExisting = true },
+            new Row { Type = BoothObjectType.Decoration, Code = "TRUSS_PILLAR",    Source = WrapperDir + "/STRUCT_TRUSS_VERTICAL.prefab",      IsExisting = true },
+            new Row { Type = BoothObjectType.Decoration, Code = "TRUSS_GATE",      Source = WrapperDir + "/STRUCT_TRUSS_BASE.prefab",          IsExisting = true },
+            new Row { Type = BoothObjectType.Decoration, Code = "PLANT",           Source = "Assets/Palmov Island/Low Poly Houses Free Pack/Prefabs/Trees/potted tree.prefab" },
         };
 
         [MenuItem("Festa/부스/장식 assetCode 28행 등록 — GitLab #146")]
@@ -109,6 +119,7 @@ namespace Festa.EditorTools
 
             // 기존 Decoration.prefab 의 Standard(내장) 재질도 URP 로 덮는다 — DisplayBox01Stuff 유리·플라스틱 3슬롯
             FixLegacyWrapperMaterials("Assets/_Project/Prefabs/Booth/Decoration.prefab", urpDefault, report);
+            FixLegacyWrapperMaterials("Assets/_Project/Prefabs/Booth/Furniture.prefab", urpDefault, report);   // 타입 기본 — TableRound 볼록 콜라이더
 
             AssetDatabase.SaveAssets();
             report.Insert(0, $"[BoothDecorRegistryBuilder] 래퍼 {wrappers}개 생성, 레지스트리 엔트리 추가 {added} / 갱신 {updated} → 총 {entries.arraySize}\n");
@@ -142,9 +153,19 @@ namespace Festa.EditorTools
                 {
                     var mats = r.sharedMaterials; bool changed = false;
                     for (int i = 0; i < mats.Length; i++)
-                        if (mats[i] == null || mats[i].shader == null || !mats[i].shader.name.StartsWith("Universal Render Pipeline")) { mats[i] = urpDefault; changed = true; fixedMats++; }
+                        if (mats[i] == null || mats[i].shader == null || !mats[i].shader.name.StartsWith("Universal Render Pipeline")) { mats[i] = ConvertToUrpLit(mats[i], urpDefault, report); changed = true; fixedMats++; }
                     if (changed) r.sharedMaterials = mats;
                 }
+
+                // 볼록 MeshCollider 는 WebGL 로드 때 "Couldn't create a Convex Mesh … (256)" 경고와 함께 헐 생성 비용을 낸다
+                // (릴리스 37d9b4f4 월드 진입 로그, TableRound). 부스 소품은 상자 콜라이더로 충분하다 — 걷기 막기·F 조준용.
+                int removedMeshColliders = 0;
+                foreach (var mc in child.GetComponentsInChildren<MeshCollider>(true))
+                {
+                    if (!mc.convex) continue;
+                    Object.DestroyImmediate(mc); removedMeshColliders++;
+                }
+                if (removedMeshColliders > 0) report.AppendLine($"  {row.Code}: 볼록 MeshCollider {removedMeshColliders}개 제거 → 상자 콜라이더");
 
                 bool addedCollider = false;
                 if (root.GetComponentInChildren<Collider>(true) == null)
@@ -168,6 +189,47 @@ namespace Festa.EditorTools
             finally { Object.DestroyImmediate(root); }
         }
 
+        /// <summary>
+        /// 내장(Standard 등) 재질을 URP Lit 로 옮긴 재질 에셋을 만들어 돌려준다 — 색·베이스맵·노멀·스무스니스를 옮긴다.
+        /// 예전에는 URP 기본 재질(회색)로 덮어 벤더 소품이 전부 회색으로 떴다. 이름이 같으면 재사용한다. 벤더 원본은 건드리지 않는다.
+        /// </summary>
+        static Material ConvertToUrpLit(Material src, Material urpDefault, StringBuilder report)
+        {
+            if (src == null) return urpDefault;
+            var lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit == null) return urpDefault;
+            const string MatDir = WrapperDir + "/Materials";
+            EnsureFolder(MatDir);
+            string path = $"{MatDir}/{Sanitize(src.name)}_URP.mat";
+            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null) return existing;
+
+            var m = new Material(lit) { name = src.name + "_URP" };
+            if (src.HasProperty("_Color")) m.SetColor("_BaseColor", src.GetColor("_Color"));
+            if (src.HasProperty("_MainTex"))
+            {
+                m.SetTexture("_BaseMap", src.GetTexture("_MainTex"));
+                m.SetTextureScale("_BaseMap", src.GetTextureScale("_MainTex"));
+                m.SetTextureOffset("_BaseMap", src.GetTextureOffset("_MainTex"));
+            }
+            if (src.HasProperty("_BumpMap") && src.GetTexture("_BumpMap") != null)
+            {
+                m.SetTexture("_BumpMap", src.GetTexture("_BumpMap"));
+                m.EnableKeyword("_NORMALMAP");
+            }
+            if (src.HasProperty("_Glossiness")) m.SetFloat("_Smoothness", src.GetFloat("_Glossiness"));
+            if (src.HasProperty("_Metallic")) m.SetFloat("_Metallic", src.GetFloat("_Metallic"));
+            AssetDatabase.CreateAsset(m, path);
+            report.AppendLine($"  재질 변환 {src.name} ({(src.shader != null ? src.shader.name : "null")}) → {path}");
+            return m;
+        }
+
+        static string Sanitize(string s)
+        {
+            foreach (var c in System.IO.Path.GetInvalidFileNameChars()) s = s.Replace(c, '_');
+            return s.Replace(' ', '_');
+        }
+
         static void FixLegacyWrapperMaterials(string prefabPath, Material urpDefault, StringBuilder report)
         {
             var contents = PrefabUtility.LoadPrefabContents(prefabPath);
@@ -178,10 +240,26 @@ namespace Festa.EditorTools
                 {
                     var mats = r.sharedMaterials; bool changed = false;
                     for (int i = 0; i < mats.Length; i++)
-                        if (mats[i] == null || mats[i].shader == null || !mats[i].shader.name.StartsWith("Universal Render Pipeline")) { mats[i] = urpDefault; changed = true; fixedMats++; }
+                        if (mats[i] == null || mats[i].shader == null || !mats[i].shader.name.StartsWith("Universal Render Pipeline")) { mats[i] = ConvertToUrpLit(mats[i], urpDefault, report); changed = true; fixedMats++; }
                     if (changed) r.sharedMaterials = mats;
                 }
-                if (fixedMats > 0) { PrefabUtility.SaveAsPrefabAsset(contents, prefabPath); report.AppendLine($"{System.IO.Path.GetFileName(prefabPath)}: 내장 Standard 재질 {fixedMats}슬롯 → URP 기본"); }
+                // 볼록 MeshCollider 제거(WebGL 로드 때 헐 생성 경고·비용 — TableRound 가 매 기본 방마다 냈다) → 상자 콜라이더
+                int removed = 0;
+                foreach (var mc in contents.GetComponentsInChildren<MeshCollider>(true))
+                {
+                    if (!mc.convex) continue;
+                    Object.DestroyImmediate(mc, true); removed++;
+                }
+                if (removed > 0 && contents.GetComponentInChildren<Collider>(true) == null)
+                {
+                    var rs = contents.GetComponentsInChildren<Renderer>(true);
+                    if (rs.Length > 0)
+                    {
+                        var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
+                        var box = contents.AddComponent<BoxCollider>(); box.center = b.center; box.size = b.size;
+                    }
+                }
+                if (fixedMats > 0 || removed > 0) { PrefabUtility.SaveAsPrefabAsset(contents, prefabPath); report.AppendLine($"{System.IO.Path.GetFileName(prefabPath)}: 내장 재질 {fixedMats}슬롯 → URP Lit 변환, 볼록 MeshCollider {removed}개 제거"); }
             }
             finally { PrefabUtility.UnloadPrefabContents(contents); }
         }
