@@ -48,6 +48,27 @@
 .bm-remaining { font-size: 12.5px; }
 .bm-studio { margin-top: auto; align-self: flex-start; }
 
+.bm-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.bm-tab {
+  flex: 1;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  color: rgba(234, 238, 251, 0.62);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.bm-tab:hover { color: var(--festa-ink); }
+.bm-tab-on { background: rgba(255, 255, 255, 0.12); color: var(--festa-ink); font-weight: 700; }
+
 .bm-rows {
   display: flex;
   flex-direction: column;
@@ -124,8 +145,36 @@
 .bm-empty strong { font-size: 16px; color: var(--festa-ink); }
 .bm-empty .ov-btn { margin-top: 6px; }
 
+.bm-agent { display: flex; flex-direction: column; gap: 14px; }
+.bm-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bm-agent-head h3 { margin: 0 0 5px; font-size: 16px; color: var(--festa-ink); }
+.bm-agent-head p { margin: 0; }
+.bm-agent-state { flex: none; padding: 5px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(234, 238, 251, 0.65); font-size: 12px; }
+.bm-agent-state-on { background: rgba(104, 210, 133, 0.14); color: #83df99; }
+.bm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: rgba(234, 238, 251, 0.84); font-size: 13px; font-weight: 600; }
+.bm-field em { color: rgba(234, 238, 251, 0.52); font-style: normal; font-weight: 400; }
+.bm-field input, .bm-field select, .bm-field textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px; padding: 10px 11px; background: rgba(9, 14, 30, 0.7); color: var(--festa-ink); font: inherit; font-size: 13px; }
+.bm-field textarea { resize: vertical; line-height: 1.45; }
+.bm-field input:focus, .bm-field select:focus, .bm-field textarea:focus { outline: 2px solid rgba(142, 173, 255, 0.65); outline-offset: 1px; }
+/* select 옵션 팝업은 OS 네이티브가 그려서 이 배경색을 안 탄다 — 명시 안 하면 흰 배경에 밝은
+   글자가 상속돼 안 보인다(management.css 에서 실측한 것과 같은 버그, 여기도 선제 적용) */
+.bm-field select option { background-color: var(--festa-surface-solid); color: var(--festa-ink); }
+.bm-field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.bm-check { display: flex; align-items: center; gap: 8px; color: rgba(234, 238, 251, 0.84); font-size: 13px; cursor: pointer; }
+.bm-check input { accent-color: #8eadff; }
+.bm-agent-error { margin: -2px 0 0; color: #ff9aa2; font-size: 13px; }
+.bm-document { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.bm-document h4 { margin: 0 0 5px; color: var(--festa-ink); font-size: 14px; }
+.bm-document p { margin: 0; }
+.bm-upload { position: relative; overflow: hidden; cursor: pointer; }
+.bm-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.bm-upload-disabled { opacity: 0.48; cursor: not-allowed; }
+.bm-upload-disabled input { cursor: not-allowed; }
+.bm-upload-result { color: #83df99; font-size: 13px; }
+
 @media (max-width: 900px) {
   .bm-hero { grid-template-columns: 1fr; }
   .bm-row { grid-template-columns: 1fr auto; }
   .bm-row-summary { grid-column: 1 / -1; }
+  .bm-field-grid { grid-template-columns: 1fr; }
 }

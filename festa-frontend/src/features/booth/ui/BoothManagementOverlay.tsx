@@ -8,15 +8,16 @@
 // 진입은 World 의 Booth Management NPC + F 다. Unity 이벤트 계약(G-1)이 아직 없어 지금은
 // dev trigger 로만 열리며, 계약이 오면 dispatcher 가 openBoothManagement() 를 부르면 된다 —
 // 이 컴포넌트는 그대로다.
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
-import { getMyAgents } from '../../../entities/agent/api';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
 import { BoothMiniPreview } from './BoothMiniPreview';
+import { AiAgentManagementTab } from './AiAgentManagementTab';
 import './boothManagement.css';
 
 const IcBooth = (
@@ -59,6 +60,7 @@ function SectionRow({
 
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<'content' | 'ai-agent'>('content');
 
   // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
@@ -76,13 +78,6 @@ export function BoothManagementOverlay({ onClose }: Props) {
   const boothQuery = useQuery({
     queryKey: ['booth-detail', boothId],
     queryFn: () => facadeApi.getBooth(boothId as number),
-    enabled: boothId !== null,
-  });
-
-  // AI 직원 0개 또는 1개(C-13) — 요약 한 줄만 여기서 쓰고, 편집은 상세 화면(AgentManagementPage)에서
-  const agentQuery = useQuery({
-    queryKey: ['booth-agent', boothId],
-    queryFn: () => getMyAgents(boothId as number),
     enabled: boothId !== null,
   });
 
@@ -132,14 +127,6 @@ export function BoothManagementOverlay({ onClose }: Props) {
 
     const lease = myBooth.lease;
     const expired = remainingMs(lease.endsAt, Date.now()) === 0;
-    const agent = agentQuery.data?.agents[0] ?? null;
-    const agentSummary = agentQuery.isLoading
-      ? '불러오는 중...'
-      : agentQuery.isError
-        ? '불러오지 못함 — 관리에서 다시 시도'
-        : agent === null
-          ? 'AI 직원 미설정'
-          : `${agent.name} · 문서 업로드 가능`;
 
     return (
       <div className="bm-body">
@@ -176,29 +163,40 @@ export function BoothManagementOverlay({ onClose }: Props) {
           </div>
         </section>
 
-        {/* A — 기능별 Drill-down. 여기서 Editor 를 펼치지 않는다 */}
-        <div className="bm-rows">
-          <SectionRow
-            label="PROJECT"
-            summary="전시 프로젝트 등록·수정"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/project`)}
-          />
-          <SectionRow
-            label="SURVEY"
-            summary="설문 편집·응답 결과"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/survey`)}
-          />
-          <SectionRow
-            label="CONSULTATION"
-            summary="상담 요청 운영"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
-          />
-          <SectionRow
-            label="AI 직원"
-            summary={agentSummary}
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/agent`)}
-          />
+        {/* A — 기능별 Drill-down(콘텐츠) vs 이 자리에서 바로 편집(AI 직원). AI 직원은 부스당
+            1명뿐이고 문서 업로드까지 한 화면에서 오가야 해서 별도 페이지로 빼지 않는다. */}
+        <div className="bm-tabs" role="tablist" aria-label="부스 관리 메뉴">
+          <button type="button" role="tab" aria-selected={tab === 'content'} className={tab === 'content' ? 'bm-tab bm-tab-on' : 'bm-tab'} onClick={() => setTab('content')}>
+            콘텐츠 관리
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'ai-agent'} className={tab === 'ai-agent' ? 'bm-tab bm-tab-on' : 'bm-tab'} onClick={() => setTab('ai-agent')}>
+            AI 직원 관리
+          </button>
         </div>
+
+        {tab === 'content' ? (
+          <div className="bm-rows" role="tabpanel">
+            <SectionRow
+              label="PROJECT"
+              summary="전시 프로젝트 등록·수정"
+              onOpen={() => go(`/app/booths/${myBooth.boothId}/project`)}
+            />
+            <SectionRow
+              label="SURVEY"
+              summary="설문 편집·응답 결과"
+              onOpen={() => go(`/app/booths/${myBooth.boothId}/survey`)}
+            />
+            <SectionRow
+              label="CONSULTATION"
+              summary="상담 요청 운영"
+              onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
+            />
+          </div>
+        ) : (
+          <div role="tabpanel">
+            <AiAgentManagementTab boothId={myBooth.boothId} />
+          </div>
+        )}
 
         <section className="bm-info">
           <span className="bm-info-title">부스 정보</span>
