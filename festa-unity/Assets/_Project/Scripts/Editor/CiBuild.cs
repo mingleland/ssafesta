@@ -59,6 +59,19 @@ namespace Festa.EditorTools
 
         static void BuildWeb(string[] scenes)
         {
+            // Unity 는 재빌드 시 이전 해시 파일을 지우지 않는다. 메뉴 빌더(FestaReleaseBuilder.BuildWebGL)는
+            // 이 안전장치를 갖고 있는데 CI 경로에는 빠져 있었다 — 2026-09-08 에 실제로 09-07 산출물
+            // (38544b30….data.unityweb, 141 MB)이 남아 .data.unityweb 가 두 개인 채로 나왔다.
+            // 산출물이 두 벌이면 "빌드가 두 번 돌았나" 로 읽히고, 압축해서 넘기면 배포본에 낡은 파일이 섞인다.
+            if (Directory.Exists(WebOutDir))
+            {
+                if (!WebOutDir.StartsWith("Builds/", StringComparison.Ordinal))
+                    Fail($"안전장치 — 출력 경로가 Builds/ 밖이다: {WebOutDir}");
+                Directory.Delete(WebOutDir, true);
+                Log($"{WebOutDir} 를 비웠다 (이전 해시 산출물 혼입 방지)");
+            }
+            Directory.CreateDirectory(WebOutDir);
+
             // URP 는 **활성 빌드 타깃 시점에** 포함할 RP 에셋을 결정한다 (S15P21A604-316).
             // BuildPlayer 에 타깃만 넘기면 늦다 — 먼저 전환해야 Mobile_RPAsset 이 들어간다.
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
@@ -117,6 +130,12 @@ namespace Festa.EditorTools
             // 성공했는데 월드 진입이 404 로 실패했다 (S15P21A604-417). 파일명이 해시라
             // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
             FestaWebBuilder.WriteManifest(WebOutDir);
+
+            // 검증용 probe.html 을 산출물에 같이 넣는다 — FE 없이 빌드를 열어 SendMessage 로 상태를 주입하는 게임 파트의
+            // 유일한 릴리스 검증 수단인데, 빌드 폴더가 비워지면서 매번 사라졐다(QA #42). 정본은 Tools/probe.html.
+            // 배포 zip 은 manifest 가 가리키는 파일만 담으므로 실사용자에게 나가지 않는다.
+            var probeSrc = Path.Combine("Tools", "probe.html");
+            if (File.Exists(probeSrc)) { File.Copy(probeSrc, Path.Combine(WebOutDir, "probe.html"), true); Log("probe.html 동봉 (검증용, 배포 zip 제외)"); }
 
             // 파이프라인이 이 네 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
             foreach (var required in new[] { "index.html", "Build", "TemplateData", "manifest.json" })

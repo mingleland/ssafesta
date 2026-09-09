@@ -191,7 +191,37 @@ namespace Festa.Avatar
         }
         void OnDestroy() => Festa.Integration.AuthBridge.TokenChanged -= OnAuthTokenChanged;
         bool _guestEntered;
-        void OnAuthTokenChanged() => TryEnterWorldAsGuest();
+        bool _ownershipRetrying;
+
+        /// <summary>
+        /// 호스트가 토큰을 밀어 넣은 순간. 게스트면 바로 입장하고, <b>회원이면 보유 조회를 다시 돌린다.</b>
+        ///
+        /// <para>재시도가 없으면 회원은 옷이 전부 잠긴 채로 갇힌다. Awake 의 첫 조회는 토큰보다 먼저 나가
+        /// 401 을 받는데(React 는 createUnityInstance 가 resolve 된 뒤에야 SetAccessToken 을 보낸다 —
+        /// 첫 씬 Awake 가 구조적으로 앞선다), 그때 <see cref="AvatarOwnership.MarkFailed"/> 로 떨어지면
+        /// 되돌릴 경로가 없었다. 화면은 "새로고침 후 다시 시도해 주세요" 라고 안내하지만 새로고침해도
+        /// 순서가 같아 매번 같은 결과였다 — 시킨 대로 해도 안 낫는 안내다.
+        /// 게스트는 토큰 도착 즉시 월드로 빠져나가 이 증상을 안 겪는다. 회원만 겪는다 (2026-09-08 실측).</para>
+        /// </summary>
+        async void OnAuthTokenChanged()
+        {
+            if (TryEnterWorldAsGuest()) return;
+            if (_ownershipRetrying) return;
+            if (AvatarOwnership.JudgementReady) return;   // 이미 제대로 받았으면 건드리지 않는다
+            if (!Festa.Integration.AuthBridge.HasToken) return;
+
+            _ownershipRetrying = true;
+            try
+            {
+                Debug.Log("[CharacterLobby] 토큰이 늦게 도착했다 — 파츠 보유 조회를 다시 돌린다");
+                SetStatus("로그인 정보를 확인하는 중입니다…");
+                await LoadOwnershipAsync();
+                SanitizeLocked(ref _config);
+                Apply(); RefreshAll();
+                if (!_restoredExistingAppearance) await LoadPersistedAppearanceAsync();
+            }
+            finally { _ownershipRetrying = false; }
+        }
         bool TryEnterWorldAsGuest()
         {
             if (_guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;

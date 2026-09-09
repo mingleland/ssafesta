@@ -19,6 +19,9 @@ namespace Festa.Minigame
     /// </summary>
     public sealed class TimerStopGameHud : MonoBehaviour
     {
+        /// <summary>입력 잠금 주인 이름. 호스트 Overlay 가 자기 잠금을 풀 때 이 화면 것까지 풀지 않게 한다.</summary>
+        const string LockOwner = "TimerStopGameHud";
+
         TimerStopGame _game;
         TMP_Text _target, _timer, _result, _verdict;
         Button _action;
@@ -33,7 +36,7 @@ namespace Festa.Minigame
             var go = new GameObject("@TimerStopGameHud");
             var hud = go.AddComponent<TimerStopGameHud>();
             hud.Build(client);
-            InputBridge.SetLocked(true);
+            InputBridge.SetLocked(true, LockOwner);
             return hud;
         }
 
@@ -57,7 +60,7 @@ namespace Festa.Minigame
         {
             if (_released) return;
             _released = true;
-            InputBridge.SetLocked(false);
+            InputBridge.SetLocked(false, LockOwner);
         }
 
         void Build(IGameResultClient client)
@@ -187,7 +190,14 @@ namespace Festa.Minigame
                         _result.text = $"오차  {_game.ErrorSeconds:F3}초";
                         _result.color = FestaUiKit.Text;
                     }
-                    _verdict.text = _game.Verdict != null ? _game.Verdict.message : "결과 전송 중…";
+                    // 체험판(Mock 판정)이면 그 사실을 반드시 드러낸다 — 슬롯머신과 같은 규칙이다.
+                    // 조용히 실서버인 척하면 사용자는 기록·보상이 남은 줄 안다 (T-24).
+                    _verdict.text = _game.Verdict == null ? "결과 전송 중…"
+                                  : _game.Verdict.simulated
+                                      ? "체험판 — 기록·보상이 남지 않습니다"
+                                      : _game.Verdict.message;
+                    _verdict.color = _game.Verdict != null && _game.Verdict.simulated
+                                   ? FestaUiKit.Accent : FestaUiKit.Text;
                     SetAction("다시 하기", true);
                     break;
 

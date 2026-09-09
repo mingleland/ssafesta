@@ -28,6 +28,8 @@ namespace Festa.Diagnostics
     /// </summary>
     public sealed class AvatarMergeIntegrity : MonoBehaviour
     {
+        void Awake() => DiagnosticKeys.Claim(nameof(AvatarMergeIntegrity), KeyCode.Insert);   // 중복·예약키 검사에 등록 (QA #64)
+
         bool _running;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -42,7 +44,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F12)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Insert)   /* F12 는 개발자도구 + FixedPoseBenchmark 와 중복이었다 */) StartCoroutine(Run());
         }
 
         IEnumerator Run()

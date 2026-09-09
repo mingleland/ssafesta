@@ -25,6 +25,8 @@ namespace Festa.Diagnostics
     /// </summary>
     public sealed class AvatarCostAb : MonoBehaviour
     {
+        void Awake() => DiagnosticKeys.Claim(nameof(AvatarCostAb), KeyCode.Equals);   // 중복·예약키 검사에 등록 (QA #64)
+
         const int Avatars = 30;        // 완료 조건이 지정한 인원
         const int SettleFrames = 120;  // 소환 직후의 조립·GC 스파이크를 버린다
         const int SampleFrames = 300;  // 표본 구간
@@ -76,7 +78,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F9)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Equals)   /* = : F9 는 RenderCostProbe 스윕과 중복이었다 */) StartCoroutine(Run());
         }
 
         IEnumerator Run()

@@ -25,6 +25,8 @@ namespace Festa.Diagnostics
     /// </summary>
     public sealed class SpawnRepeatProbe : MonoBehaviour
     {
+        void Awake() => DiagnosticKeys.Claim(nameof(SpawnRepeatProbe), KeyCode.Home);   // 중복·예약키 검사에 등록 (QA #64)
+
         const int Attempts = 10;
         const float ConnectTimeout = 15f;    // 실시간. 저프레임에서도 흔들리지 않게 realtime 을 쓴다
         const float SettleAfterSpawn = 1.0f; // 스폰 직후 강제 이동이 끝나기를 기다린다
@@ -48,7 +50,7 @@ namespace Festa.Diagnostics
 
         void Update()
         {
-            if (!_running && Input.GetKeyDown(KeyCode.F11)) StartCoroutine(Run());
+            if (!_running && Input.GetKeyDown(KeyCode.Home)     /* F11 은 브라우저 전체화면 + RenderCostProbe 와 중복이었다 */) StartCoroutine(Run());
         }
 
         void OnLog(string condition, string stack, LogType type)
