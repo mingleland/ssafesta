@@ -58,7 +58,7 @@ public class AiDocumentResultService {
         JobRow job = live(jobId, request.attemptNo());
         // batch 도 살아 있다는 신호다 — heartbeat 와 같은 자리에서 lease 를 잡는다. 상태만 올리고
         // lease 를 비워 두면 첫 heartbeat 전에 죽은 워커의 Job 을 sweeper 가 영영 못 본다.
-        jobs.extendLease(job.id());
+        jobs.extendLease(job.id(), job.documentId());
         jobs.stageChunks(job.id(), batchSeq, staged);
     }
 
@@ -127,7 +127,7 @@ public class AiDocumentResultService {
     public void heartbeat(long jobId, String rawBody) {
         HeartbeatRequest request = StrictJsonReader.read(rawBody, HeartbeatRequest.class);
         JobRow job = live(jobId, request.attemptNo());
-        jobs.extendLease(job.id());
+        jobs.extendLease(job.id(), job.documentId());
     }
 
     /**

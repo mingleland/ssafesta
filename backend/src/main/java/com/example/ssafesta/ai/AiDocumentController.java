@@ -98,10 +98,10 @@ public class AiDocumentController {
                     | `EXPIRED` | **업로드 만료** — 1시간 안에 업로드가 끝나지 않았다. 파일을 다시 올리면 된다 |
                     | `DISABLED` | 임대 만료로 꺼진 상태. 사용자가 되돌릴 수 없다 |
 
-                    **`quota.count` 는 목록 길이와 다르다.** 상한을 세는 것은 `QUEUED`·`PROCESSING`·`READY`
-                    뿐이고, `FAILED`·`EXPIRED`·`DISABLED` 는 목록에는 나오지만 상한에는 안 들어간다 —
-                    실패한 업로드가 슬롯을 잡고 있으면 안 되기 때문이다. 화면의 "n/10" 은 `quota.count` 로
-                    그린다.
+                    **`quota` 에는 상한만 있다.** 쓴 양은 `documents` 에서 읽는다 — 자리를 차지하는 것은
+                    `QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만
+                    나온다(실패한 업로드가 슬롯을 잡으면 안 된다). 그래서 **행 10개가 보여도 업로드가 될 수
+                    있다** — "n/10" 의 n 은 활성 3상태 행의 수다.
 
                     **AI 처리 서버가 죽어 있어도 이 조회는 답한다.** 모든 값이 이 서버의 문서 행에 있다.
 

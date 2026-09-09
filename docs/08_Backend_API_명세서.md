@@ -853,7 +853,7 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
 | `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
 | `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
-| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) |
+| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) — `PROCESSING` 은 AI 워커가 이미 파일을 쥔 상태라 저장소를 다시 묻지 않는다 |
 | `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
 | 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
 
@@ -870,14 +870,13 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
     {
       "documentId": 153,
       "fileName": "발표자료.pdf",
-      "contentType": "application/pdf",
       "sizeBytes": 1048576,
       "status": "READY",
       "createdAt": "2026-09-09T01:15:02Z",
       "uploadedAt": "2026-09-09T01:20:11Z"
     }
   ],
-  "quota": { "count": 1, "countLimit": 10, "bytes": 1048576, "bytesLimit": 104857600 }
+  "quota": { "countLimit": 10, "bytesLimit": 104857600 }
 }
 ```
 
@@ -890,9 +889,23 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
 
-**`quota.count` 는 `documents.length` 가 아니다.** 상한을 세는 것은 `QUEUED`·`PROCESSING`·`READY`
-뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 — 실패한 업로드가 슬롯을 잡으면 안 되기
-때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다. "n/10" 은 `quota.count` 로 그린다.**
+여섯 중 **`DISABLED` 만 아직 나오지 않는다** — 임대 만료가 그 값을 쓰는 작업(`S15P21A604-496`)이
+아직 없다. 나머지 다섯은 실제로 나온다.
+
+- `PROCESSING` 은 **AI 워커가 첫 신호를 보낸 순간**부터다. 위임이 나간 순간이 아니라서, AI 서버가
+  응답하지 않는 동안에는 `QUEUED` 로 남는다 — 아무 일도 일어나지 않는 문서를 "처리 중" 이라고
+  말하지 않는다
+- `FAILED` 는 처리 Job 이 재시도를 다 썼거나 재시도 불가로 끝났을 때다. **재시도가 남아 있는 동안은
+  `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
+  올릴 수 있다**
+
+**`quota` 에는 상한만 있다. 쓴 양은 `documents` 에서 읽는다.** 자리를 차지하는 것은
+`QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 —
+실패한 업로드가 슬롯을 잡으면 안 되기 때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
+"n/10" 의 n 은 활성 3상태 행의 수이지 `documents.length` 가 아니다.
+
+서버가 그 수를 세어 내려보내지 않는 이유는 **응답에 이미 있기 때문**이다. 세어 주려면 폴링마다
+질의가 둘 늘어난다.
 
 `uploadedAt` 이 `null` 인 `QUEUED` 와 값이 있는 `QUEUED` 는 다르다 — 앞은 바이트가 아직 안 온
 것이고 뒤는 처리를 기다리는 것이다. `status` 만으로는 구분되지 않는다.
