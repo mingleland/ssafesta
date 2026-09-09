@@ -16,7 +16,7 @@
 | 낮음 | 2 | 10 | 1 | 13 |
 | **합계** | **19** | **48** | **17** | **84** |
 
-> **처리 현황 (2026-09-09 09:20, 각 항목의 `처리` 칸이 정본)** — 85건: ✅ 완료 43 · 🟡 부분 9 · ⏸ 보류(설계·자산·계약 필요) 10 · ➡ 타 파트 소관 11 · 반박됨·조치 불필요 12. `⬜ 미착수` 0.
+> **처리 현황 (2026-09-09 14:20, 각 항목의 `처리` 칸이 정본)** — 89건: ✅ 완료 47 · 🟡 부분 7 · ⏸ 보류(설계·자산·계약 필요) 12 · ➡ 타 파트 소관 11 · 반박됨·조치 불필요 12. `⬜ 미착수` 0. 09-09 오후 실측 추가 #86~#89(워밍업 제거·팔레트 별칭·404 재시도·runInBackground), #29/#43 은 프리웜 철회로 ⏸.
 > 높음 28: ✅ 21 · 🟡 3(#3 초기 힙 데이터 감량, #6 비콘은 보고 줄로 대체, #21 FE 호출 대기) · ⏸ 2(#2 정적 배칭 A/B, #5 조립 분산) · ➡ 2(#8·#9) · 반박 1(#23) — #10·#11 은 오늘 완료.
 > 빌드로만 확인되는 항목은 `inbox/build-verify-checklist.md` R-3~R-13. 검증은 문서상 `검증통과` 가 아니라 **에디터·빌드 실측** 으로 갱신한다.
 
@@ -1578,4 +1578,48 @@
 **근거** — Network/DevConnectionHud.cs:98-101 `void Update() { if (Application.isBatchMode) return; if (!InputBridge.IsLocked && WasToggleKeyPressedThisFrame()) s_panelVisible = !s_panelVisible; }` — isDebugBuild 검사 없음. :108 `if (!UnityEngine.Debug.isDebugBuild && !Application.isEditor) return;` 는 OnGUI 안에만 있다. Diagnostics/DiagnosticKeys.cs:82 `ClaimExternal("DevConnectionHud(신규 IS f2Key)", KeyCode.F2);`, :33-35 BrowserReserved 에 F2 없음. DiagnosticKeys.Dump() 실측 출력 첫 줄 `F2  DevConnectionHud(신규 IS f2Key)`.
 
 **제안 수정** — Update 의 토글 판정 앞에 `if (!UnityEngine.Debug.isDebugBuild && !Application.isEditor) return;` 를 넣고, 키를 F2 에서 구두점 키(예: KeyCode.Equals 는 이미 AvatarCostAb 가 쓰므로 KeyCode.Backspace 대신 KeyCode.Tilde 계열 미사용 키)로 옮긴 뒤 DiagnosticKeys.Claim 으로 다시 등록한다.
+
+## 86. 셰이더 워밍업(프리로드·분산 모두)이 월드 진입을 1~4분 굳힌다 — 변형 하나가 초 단위 (2026-09-09 실측 추가)
+
+| | |
+|---|---|
+| 축 | 진입 성능 |
+| 상태 | **재현됨** (릴리스 `37d9b4f4`, 크롬 5173) |
+| 위치 | `Core/Bootstrap/ShaderWarmupSpreader.cs`(삭제), `Resources/FestaTrackedVariants.shadervariants`(이동) |
+| 처리 | ✅ 제거 (2026-09-09, `30ecdeaa`) — [T-246](../../25_트러블슈팅.md#t-246). 프레임 3.4/10.8/13.8/45.9/58.0/53.6초, `완료 133 변형` +240s, 첫 접속 서버가 끊고 `connected +210.2s`. #29/#43 은 ⏸ 로 되돌림. 빌드 확인 R-15 |
+
+**사용자가 겪는 일** — 월드(회원은 로비)가 뜬 직후 화면이 3~4분 굳고, 첫 접속은 끊긴다. 사용자: "월드 불러오는데 렉이 저따구로 걸리면 게임을 어떻게 해".
+
+## 87. 스튜디오 팔레트 assetCode 7종이 정본 28행에 없어 게시본이 상자로 뜬다 (2026-09-09 실측 추가)
+
+| | |
+|---|---|
+| 축 | 부스 계약 정합 |
+| 상태 | **재현됨** (부스 1 v15 `WALL_PLAIN` → `Unknown assetCode … 타입 기본 자산으로 대체`) |
+| 위치 | FE `features/studio/model/visualAssets.ts` / Unity `BoothObjectRegistry.asset` |
+| 처리 | ✅ 게임 쪽 별칭 7행 (`36731693`) + ➡ FE 정본화 요청 [#154](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/154). 빌드 확인 R-16 |
+
+**사용자가 겪는 일** — 스튜디오에서 기본 패널·그래픽 카운터·진열 선반·트러스·화분을 놓고 게시하면 월드에서 전부 기본 상자 세트로 보인다. 템플릿 4종은 정본 코드라 정상.
+
+## 88. 미게시 방을 20초마다 다시 묻는다 — 11실 × 6회 헛조회 (2026-09-09 실측 추가)
+
+| | |
+|---|---|
+| 축 | 네트워크 낭비 |
+| 상태 | **재현됨** (`아직 못 채운 방 11실 — 재시도 1/6` … 6/6) |
+| 위치 | `Booth/Runtime/WorldBoothPublishedBootstrap.cs` RetryLoopAsync |
+| 처리 | ✅ 수정 (`36731693`) — `PublishedSlotResolution` 이 404/409 를 확정 답으로 기록, 일시 실패·미응답 방만 재시도. 빌드 확인 R-17 |
+
+**사용자가 겪는 일** — 직접 보이는 피해는 없다. 입장 후 2분간 66번의 불필요한 요청이 Spring 으로 간다(동시 접속 50명이면 3,300 요청).
+
+## 89. 브라우저 창이 포커스를 잃으면 Unity 가 통째로 멈춘다 — `runInBackground` 꺼짐 (2026-09-09 실측 추가)
+
+| | |
+|---|---|
+| 축 | 접속 안정성 |
+| 상태 | **재현됨** (회원 로비에서 5분 정지, 클릭하면 재개) |
+| 위치 | `ProjectSettings/ProjectSettings.asset` `runInBackground: 0` |
+| 처리 | ✅ 켬 (`36731693`). 빌드 확인 R-18 |
+
+**사용자가 겪는 일** — 로딩 중 다른 창을 보고 오면 로딩이 멈춰 있고, 월드에서 알림·메신저를 잠깐 보면 접속이 끊긴다(NGO 하트비트 30초). "입장 렉" 의 한 원인.
 
