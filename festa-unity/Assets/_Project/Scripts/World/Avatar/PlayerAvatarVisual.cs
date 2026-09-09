@@ -73,6 +73,21 @@ namespace Festa.World
             _player.AnimState.OnValueChanged += OnAnimStateChanged;
             _player.EmoteId.OnValueChanged += OnEmoteChanged;
 
+            // 서버는 grant 에 외형이 없어(#138) 초기값을 기본 프리셋으로 채우고, 진짜 외형은 소유자 RPC 로 곧 뒤따른다.
+            // 그 기본값으로 먼저 조립하면 사람 1명 입장에 모두의 화면에서 조립이 2번 돌고(40명이면 80회), 기본 아바타가
+            // 잠깐 보였다 옷을 갈아입는다(QA 2026-09-08 #37). 기본 프리셋이면 잠깐 기다려 진짜 외형이 오면 그것만 짓는다.
+            var initial = _appearance.Encoded.Value.ToString();
+            if (initial == AvatarAppearance.DefaultPreset) DeferDefaultBuildAsync();
+            else Rebuild(initial);
+        }
+
+        /// <summary>기본 프리셋 상태에서 1.5초 기다린다. 그 안에 외형이 오면 OnEncodedChanged 가 짓고 이 호출은 물러난다.
+        /// 끝내 안 오면(게스트·구 클라이언트) 기본 외형으로 짓는다 — 안 보이는 것보다는 기본 옷이 낫다.</summary>
+        async void DeferDefaultBuildAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(1.5f);
+            if (this == null || !IsSpawned) return;
+            if (_appliedEncoded != null) return;   // 그 사이 진짜 외형이 도착해 이미 지었다
             Rebuild(_appearance.Encoded.Value.ToString());
         }
 
@@ -384,16 +399,29 @@ namespace Festa.World
             return found;
         }
 
+        /// <summary>
+        /// 지면 탐색용 히트 버퍼. **모든 아바타가 함께 쓴다** — 한 프레임 안에서 한 번에 하나씩만
+        /// 쓰이므로 공유해도 안전하고, 이걸 공유해야 할당이 0 이 된다.
+        ///
+        /// <para>예전에는 <c>Physics.RaycastAll</c> 이었다. 그쪽은 **호출마다 배열을 새로 할당**한다.
+        /// 아바타마다 매 프레임 부르므로 40명이면 프레임당 배열 40개가 쓰레기로 나갔다 —
+        /// "사람이 많아질수록 조금씩 무거워진다" 의 정체다. 레이캐스트 횟수가 아니라 할당이 문제였다
+        /// (2026-09-08 조사).</para>
+        /// </summary>
+        static readonly RaycastHit[] s_groundHits = new RaycastHit[16];
+
         bool TryFindGroundHeight(out float groundY)
         {
             groundY = 0f;
             var origin = _visualRoot.position + Vector3.up * 50f;
-            var hits = Physics.RaycastAll(origin, Vector3.down, 100f, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, 100f, ~0,
+                                                QueryTriggerInteraction.Ignore);
             var found = false;
             var bestY = float.NegativeInfinity;
 
-            foreach (var hit in hits)
+            for (int i = 0; i < count; i++)
             {
+                var hit = s_groundHits[i];
                 if (hit.transform == null || hit.transform.IsChildOf(transform))
                     continue;
                 if (hit.point.y <= bestY)
