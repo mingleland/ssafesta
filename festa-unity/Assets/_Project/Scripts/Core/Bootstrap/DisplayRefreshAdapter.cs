@@ -134,9 +134,11 @@ namespace Festa.Core
 
             int snapped = raw;
             foreach (var c in CommonHz)
-                if (Mathf.Abs(raw - c) <= Mathf.Max(3, c * 0.06f)) { snapped = c; break; }   // 125 → 120 도 스냅 (6%)
+                if (Mathf.Abs(raw - c) <= Mathf.Max(3, c * 0.10f)) { snapped = c; break; }   // 125·129 → 120 스냅 (10%). 릴리스 539a55bc 실측: 129 판독이 리셋을 만들었다
 
             if (snapped == _hz) return;
+            // 현재 값과 10% 안이면 같은 화면이다 — rAF 지터(7.75ms → 129Hz)를 모니터 교체로 읽지 않는다. 진짜 교체(120→144)는 20%.
+            if (_hz > 0 && Mathf.Abs(snapped - _hz) <= _hz * 0.10f) return;
 
             // **내려가는 변화는 우리가 무거울 때는 믿지 않는다.** 프로브는 메인 스레드가 비어야 화면 틱을
             // 볼 수 있다. 프레임이 18ms 씩 걸리면 rAF 간격도 16.7ms 배수로만 찍혀 120Hz 화면을 60Hz 로
