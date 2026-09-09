@@ -70,6 +70,44 @@ export const findVariableUsageLocations = (
   return [...new Set(locations)];
 };
 
+// S15P21A604-565 — findAssetUsageLocations/findVariableUsageLocations와 같은 모양이되,
+// 아이템은 이벤트 조건·액션(HAS_ITEM/GIVE_ITEM/REMOVE_ITEM)뿐 아니라 오브젝트의 PICKUP
+// 컴포넌트에서도 참조되므로 오브젝트 순회가 하나 더 필요하다. (findAssetUsageLocations의
+// `project.items` 순회는 "자산 → 그 자산 쓰는 아이템" 반대 방향이라 여기선 쓰지 않는다.)
+export const findItemUsageLocations = (
+  project: GameProject,
+  itemId: string,
+): readonly string[] => {
+  const locations: string[] = [];
+  const usesItem = (condition: { readonly type: string; readonly itemId?: string }): boolean => (
+    condition.type === 'HAS_ITEM' && condition.itemId === itemId
+  );
+  const changesItem = (action: { readonly type: string; readonly itemId?: string }): boolean => (
+    (action.type === 'GIVE_ITEM' || action.type === 'REMOVE_ITEM') && action.itemId === itemId
+  );
+  for (const scene of project.scenes) {
+    if (scene.type === 'DIALOGUE') {
+      for (const node of scene.nodes) {
+        for (const choice of node.choices) {
+          if (choice.conditions?.some(usesItem)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 조건`);
+          if (choice.actions.some(changesItem)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 액션`);
+        }
+      }
+      continue;
+    }
+    for (const object of scene.objects) {
+      for (const component of object.components) {
+        if (component.type === 'PICKUP' && component.itemId === itemId) locations.push(`${scene.name} · ${object.id} 획득 오브젝트`);
+      }
+    }
+    for (const event of scene.events) {
+      if (event.conditions.some(usesItem)) locations.push(`${scene.name} · 이벤트 조건`);
+      if (event.actions.some(changesItem)) locations.push(`${scene.name} · 이벤트 액션`);
+    }
+  }
+  return [...new Set(locations)];
+};
+
 export const findPublishBlockers = (project: GameProject): readonly PublishBlocker[] => {
   const blockers: PublishBlocker[] = project.assets.flatMap((asset): readonly PublishBlocker[] => {
     if (asset.source.startsWith('asset://local/')) {

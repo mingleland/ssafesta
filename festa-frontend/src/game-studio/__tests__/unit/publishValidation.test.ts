@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findPublishBlockers, findVariableUsageLocations } from '../../studio/ports/publishValidation.ts';
+import { findPublishBlockers, findVariableUsageLocations, findItemUsageLocations } from '../../studio/ports/publishValidation.ts';
 import { cloneMinimalGameProject } from '../fixtures/minimalGameProject.ts';
 
 describe('GameProject publish preflight', () => {
@@ -82,6 +82,43 @@ describe('findVariableUsageLocations(S15P21A604-562)', () => {
     ];
 
     expect(findVariableUsageLocations(project, 'hintSeen')).toEqual([
+      '문 열림 안내 · 안내 선택지 조건',
+      '문 열림 안내 · 안내 선택지 액션',
+    ]);
+  });
+});
+
+describe('findItemUsageLocations(S15P21A604-565)', () => {
+  it('오브젝트의 PICKUP 컴포넌트, 이벤트 조건·액션에서 쓰이는 아이템을 모두 찾는다', () => {
+    // fixture의 key: roomKey 오브젝트가 PICKUP으로 들고, takeKey 이벤트가 GIVE_ITEM
+    // 액션으로, openDoor 이벤트가 HAS_ITEM 조건으로 참조한다 — 변수/자산과 달리
+    // 오브젝트 컴포넌트까지 훑어야 하는 게 이 함수만의 차이점이다.
+    const project = cloneMinimalGameProject();
+    expect(findItemUsageLocations(project, 'key')).toEqual([
+      '잠긴 방 · roomKey 획득 오브젝트',
+      '잠긴 방 · 이벤트 액션',
+      '잠긴 방 · 이벤트 조건',
+    ]);
+  });
+
+  it('사용되지 않는 아이템은 빈 배열을 반환한다', () => {
+    const project = cloneMinimalGameProject();
+    project.items.push({ id: 'unused', name: '안 쓰는 아이템' });
+    expect(findItemUsageLocations(project, 'unused')).toEqual([]);
+  });
+
+  it('DIALOGUE Scene 선택지의 조건·액션에서 쓰이는 아이템도 찾아낸다', () => {
+    const project = cloneMinimalGameProject();
+    project.items.push({ id: 'ticket', name: '입장권' });
+    const dialogueScene = project.scenes.find((scene) => scene.id === 'doorHint');
+    if (dialogueScene?.type !== 'DIALOGUE') throw new Error('doorHint fixture missing');
+    dialogueScene.nodes[0]!.choices[0]!.conditions = [{ type: 'HAS_ITEM', itemId: 'ticket' }];
+    dialogueScene.nodes[0]!.choices[0]!.actions = [
+      { type: 'REMOVE_ITEM', itemId: 'ticket' },
+      ...dialogueScene.nodes[0]!.choices[0]!.actions,
+    ];
+
+    expect(findItemUsageLocations(project, 'ticket')).toEqual([
       '문 열림 안내 · 안내 선택지 조건',
       '문 열림 안내 · 안내 선택지 액션',
     ]);

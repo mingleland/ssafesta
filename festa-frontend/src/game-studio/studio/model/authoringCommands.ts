@@ -1212,6 +1212,19 @@ export const renameItemDefinition = (
   items: project.items.map((item) => item.id === itemId ? { ...item, name: name.trim() } : item),
 });
 
+// S15P21A604-565 — removeAssetReference(-561)/removeVariableDefinition(-562)와 같은
+// 안전망 구조. 조건/액션(HAS_ITEM/GIVE_ITEM/REMOVE_ITEM)에서 참조 중이면
+// ITEM_REFERENCE_NOT_FOUND로, 오브젝트의 PICKUP 컴포넌트에서 참조 중이면
+// PICKUP_ITEM_NOT_FOUND로 validated()가 던진다 — 호출부가 미리
+// findItemUsageLocations로 사용 위치를 보여주고 확인받은 뒤에만 이 함수를 부른다.
+export const removeItemDefinition = (
+  project: GameProject,
+  itemId: string,
+): GameProject => validated({
+  ...project,
+  items: project.items.filter((item) => item.id !== itemId),
+});
+
 export const addAssetReference = (
   project: GameProject,
   asset: AssetReference,
