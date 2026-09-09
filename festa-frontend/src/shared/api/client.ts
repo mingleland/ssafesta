@@ -67,15 +67,17 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): voi
 
 // skipAuthRetry: 401 인터셉트 재시도 자체(그리고 refresh 요청 자신)에 다시 인터셉트가 걸려
 // 무한 루프가 되는 것을 막는 내부 플래그 — 호출부(entities/auth/api.ts의 refresh)가 명시한다.
-export type ApiInit = RequestInit & { skipAuthRetry?: boolean };
+// baseUrl: 기본값(apiBaseUrl) 대신 쓸 base — 인증 계열만 다른 호스트를 쓴다(S15P21A604-564,
+// entities/auth/api.ts 가 authBaseUrl() 을 넘긴다). 나머지 호출부는 넘기지 않는다.
+export type ApiInit = RequestInit & { skipAuthRetry?: boolean; baseUrl?: string };
 
 export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
-  const { skipAuthRetry, ...rest } = init;
+  const { skipAuthRetry, baseUrl, ...rest } = init;
   const headers = new Headers(rest.headers);
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
   if (rest.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${apiBaseUrl()}${path}`, {
+  const response = await fetch(`${baseUrl ?? apiBaseUrl()}${path}`, {
     ...rest,
     headers,
     signal: rest.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),

@@ -10,7 +10,7 @@ import { authApi } from '../../entities/auth/api.select';
 import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
-import { apiBaseUrl } from '../../shared/config/runtime';
+import { authBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
 import { DevEntryButton } from '../../features/devEntry/ui/DevEntryButton';
@@ -111,7 +111,9 @@ export function LoginPage() {
       navigate('/auth/callback');
       return;
     }
-    window.location.href = `${apiBaseUrl()}/api/v1/auth/oauth/${provider}`;
+    // 일반 API 와 다른 base 를 쓴다 — 인가 요청·provider 콜백·complete 가 같은 호스트여야
+    // host-only 인 JSESSIONID·oauth_handoff 가 이어진다 (S15P21A604-564, entities/auth/api.ts).
+    window.location.href = `${authBaseUrl()}/api/v1/auth/oauth/${provider}`;
   }
 
   async function handleGuestEnter() {
