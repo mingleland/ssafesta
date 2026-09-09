@@ -68,7 +68,7 @@ feature/S15P21A604-75-avatar-persist
 ```
 
 > **✅ 개정 (2026-08-24)**: develop/main 으로 향하는 작업 브랜치에는 **Jira Key 가 필수**다.
-> develop/main 대상 MR 의 제목·브랜치 키는 MR 리뷰에서 사람이 검증한다 (CI 러너 없음). Jira 상태 전이는 Webhook→Jira Automation('진행 중')과 내장 연동('완료')이 담당한다.
+> develop/main 대상 MR 의 제목·브랜치 키는 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 검증한다. develop 대상 MR은 최신 GitLab pipeline 성공 후에만 병합한다. Jira 상태 전이는 Webhook→Jira Automation('진행 중')과 내장 연동('완료')이 담당한다.
 > 상세: `docs/jira-gitlab-workflow.md`
 
 ### fix
@@ -128,6 +128,8 @@ main
 ```text
 feat feature fix refactor test docs chore build ci hotfix perf
 ```
+
+`develop` 대상 MR은 위 목록의 type만 사용한다. `.gitlab-ci.yml`의 MR pipeline 허용 prefix도 이 목록과 같아야 하며, type을 추가·삭제할 때는 두 파일을 같은 MR에서 함께 바꾼다.
 
 좋음:
 
@@ -220,7 +222,7 @@ docs(api): update consultation contract
 ```
 
 Jira Title Prefix와 유사하게 맞춘다.
-**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 반드시 있어야 한다.** GitLab CI 가 아니라 MR 리뷰 규칙으로 확인한다 (러너 없음, 2026-08-26).
+**develop/main 대상 MR 은 제목 또는 source branch 에 Jira Key 가 반드시 있어야 한다.** 현재 비활성인 `jira-key-check` 대신 MR 리뷰 규칙으로 확인한다. develop 대상 MR은 최신 GitLab pipeline 성공이 병합 조건이다.
 
 ---
 
