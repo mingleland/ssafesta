@@ -1186,6 +1186,18 @@ export const replaceVariableDefinition = (
     : variable),
 });
 
+// S15P21A604-562 — removeAssetReference(-561)와 같은 안전망 구조다. 조건(VARIABLE_EQUALS)
+// 이나 액션(SET_VARIABLE)에서 아직 참조 중인 변수를 지우면 validated()가
+// VARIABLE_REFERENCE_NOT_FOUND로 던진다 — 호출부(ProjectDataPanel)가 미리
+// findVariableUsageLocations로 사용 위치를 보여주고 확인받은 뒤에만 이 함수를 부른다.
+export const removeVariableDefinition = (
+  project: GameProject,
+  variableId: string,
+): GameProject => validated({
+  ...project,
+  variables: project.variables.filter((variable) => variable.id !== variableId),
+});
+
 export const addItemDefinition = (project: GameProject): GameProject => {
   const id = nextStableId(project, 'item');
   return validated({ ...project, items: [...project.items, { id, name: `새 아이템 ${project.items.length + 1}` }] });

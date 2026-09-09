@@ -28,6 +28,7 @@ const setup = (project: GameProject) => {
     <ProjectDataPanel
       onApply={onApply}
       onDeleteAsset={onDeleteAsset}
+      onDeleteVariable={() => undefined}
       onUploadAsset={() => undefined}
       project={project}
     />,
@@ -38,7 +39,7 @@ const setup = (project: GameProject) => {
 describe('ProjectDataPanel — 자산 삭제(S15P21A604-561)', () => {
   it('빌트인 자산에는 삭제 버튼이 없다', () => {
     setup(createStarterProject(GAME_ID));
-    expect(screen.queryByRole('button', { name: /삭제$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^내 자산 · .+ 삭제$/ })).toBeNull();
   });
 
   it('사용되지 않는 커스텀 자산은 삭제 버튼 → 확인 카드 → 삭제 확정까지 이어진다', () => {

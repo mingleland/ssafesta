@@ -14,6 +14,7 @@ import {
   addDialogueScene,
   addAssetReference,
   removeAssetReference,
+  removeVariableDefinition,
   addObject,
   addTileLayer,
   addTopDownScene,
@@ -754,6 +755,18 @@ export const GameStudioShell = ({
       setNotice(error instanceof Error ? error.message : '자산을 삭제하지 못했습니다.');
     }
   }, [apply, assetRepository, store]);
+
+  // S15P21A604-562 — deleteAsset과 같은 패턴. 참조 중인 변수를 지우면 validated()가
+  // VARIABLE_REFERENCE_NOT_FOUND로 던지고, 그 메시지를 그대로 보여준다.
+  const deleteVariable = useCallback((variableId: string): void => {
+    try {
+      apply(removeVariableDefinition(store.getState().project, variableId));
+      setNotice(`${variableId} 변수를 삭제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '변수를 삭제하지 못했습니다.');
+    }
+  }, [apply, store]);
 
   const save = useCallback(async (): Promise<DraftSaveReceipt | null> => {
     try {
@@ -1795,6 +1808,7 @@ export const GameStudioShell = ({
                 {rightPanel === 'PROJECT' && <ProjectDataPanel
                   onApply={apply}
                   onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
+                  onDeleteVariable={deleteVariable}
                   onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
                   project={project}
                 />}

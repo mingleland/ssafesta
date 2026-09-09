@@ -37,6 +37,39 @@ export const findAssetUsageLocations = (
   return [...new Set(locations)];
 };
 
+// S15P21A604-562 — findAssetUsageLocations와 같은 모양이다. VARIABLE_EQUALS 조건과
+// SET_VARIABLE 액션이 WORLD Scene의 이벤트, DIALOGUE Scene의 선택지 양쪽에 있을 수 있어
+// 둘 다 훑는다. 게임 규칙(rules.completion.objectives)은 변수를 참조하지 않으니 여기선
+// 안 본다.
+export const findVariableUsageLocations = (
+  project: GameProject,
+  variableId: string,
+): readonly string[] => {
+  const locations: string[] = [];
+  const usesVariable = (condition: { readonly type: string; readonly variableId?: string }): boolean => (
+    condition.type === 'VARIABLE_EQUALS' && condition.variableId === variableId
+  );
+  const setsVariable = (action: { readonly type: string; readonly variableId?: string }): boolean => (
+    action.type === 'SET_VARIABLE' && action.variableId === variableId
+  );
+  for (const scene of project.scenes) {
+    if (scene.type === 'DIALOGUE') {
+      for (const node of scene.nodes) {
+        for (const choice of node.choices) {
+          if (choice.conditions?.some(usesVariable)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 조건`);
+          if (choice.actions.some(setsVariable)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 액션`);
+        }
+      }
+      continue;
+    }
+    for (const event of scene.events) {
+      if (event.conditions.some(usesVariable)) locations.push(`${scene.name} · 이벤트 조건`);
+      if (event.actions.some(setsVariable)) locations.push(`${scene.name} · 이벤트 액션`);
+    }
+  }
+  return [...new Set(locations)];
+};
+
 export const findPublishBlockers = (project: GameProject): readonly PublishBlocker[] => {
   const blockers: PublishBlocker[] = project.assets.flatMap((asset): readonly PublishBlocker[] => {
     if (asset.source.startsWith('asset://local/')) {

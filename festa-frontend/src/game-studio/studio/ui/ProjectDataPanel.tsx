@@ -21,7 +21,7 @@ import { CommitInput } from './CommitInput.tsx';
 import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../assets/builtinAssetCatalog.ts';
 import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
-import { findAssetUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
+import { findAssetUsageLocations, findVariableUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
 import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
@@ -29,6 +29,7 @@ interface ProjectDataPanelProps {
   readonly onApply: (project: GameProject) => void;
   readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
   readonly onDeleteAsset: (assetId: string) => void;
+  readonly onDeleteVariable: (variableId: string) => void;
 }
 
 const VariableValueInput = ({
@@ -67,12 +68,14 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
   // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
   // 확인을 받는다. null이면 확인 카드가 안 뜬다.
   const [confirmDeleteAssetId, setConfirmDeleteAssetId] = useState<string | null>(null);
+  // S15P21A604-562 — 변수 삭제도 자산과 같은 확인 카드 패턴을 쓴다.
+  const [confirmDeleteVariableId, setConfirmDeleteVariableId] = useState<string | null>(null);
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
@@ -152,7 +155,11 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
     <div className="gss-section-title"><span>VARIABLES</span><small>{project.variables.length}/100</small></div>
     {project.variables.map((variable) => (
       <article className="gss-data-card" key={variable.id}>
-        <header><strong>{variable.id}</strong><span>{variable.type}</span></header>
+        <header>
+          <strong>{variable.id}</strong>
+          <span>{variable.type}</span>
+          <button aria-label={`${variable.id} 삭제`} onClick={() => setConfirmDeleteVariableId(variable.id)} type="button">삭제</button>
+        </header>
         <VariableValueInput
           onChange={(value) => onApply(replaceVariableDefinition(project, variable.id, value))}
           variable={variable}
@@ -165,6 +172,28 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
       onClick={() => onApply(addBooleanVariable(project))}
       type="button"
     >+ Boolean 변수</button>
+    {confirmDeleteVariableId !== null && (() => {
+      const target = project.variables.find((variable) => variable.id === confirmDeleteVariableId);
+      if (target === undefined) return null;
+      const usage = findVariableUsageLocations(project, confirmDeleteVariableId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{target.id} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 조건·액션에서 사용되지 않는 변수입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteVariableId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteVariable(confirmDeleteVariableId); setConfirmDeleteVariableId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
 
     <div className="gss-section-title"><span>ITEMS</span><small>{project.items.length}/100</small></div>
     {project.items.map((item) => (
