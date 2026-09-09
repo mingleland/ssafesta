@@ -16,6 +16,15 @@ x-agent: &agent
     - no-new-privileges:true
 
 services:
+  image-transfer-init:
+    <<: *agent
+    restart: 'no'
+    user: root
+    entrypoint: [/bin/sh, -ec]
+    command: [install -d -o jenkins -g jenkins -m 0770 /var/lib/festa-image-transfer]
+    volumes:
+      - image_transfer:/var/lib/festa-image-transfer
+
   linux-docker-agent:
     <<: *agent
     profiles: [linux-docker]
@@ -35,6 +44,9 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
     volumes:
       - linux_docker_workspace:/home/jenkins/agent/linux-docker
       - image_transfer:/var/lib/festa-image-transfer
@@ -60,6 +72,9 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
     volumes:
       - deploy_workspace:/home/jenkins/agent/deploy
       - image_transfer:/var/lib/festa-image-transfer
