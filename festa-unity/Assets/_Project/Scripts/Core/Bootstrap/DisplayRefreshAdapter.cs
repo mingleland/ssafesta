@@ -193,15 +193,36 @@ namespace Festa.Core
 
             if (missRate < StepUpMissRate && _interval > MinInterval)
             {
+                // **올라간 뒤의 예산으로도 버틸 수 있는가** 를 본다. 지금 예산(16.7ms)을 1.3배 여유 안에서 지키는
+                // 17ms 프레임은 올라간 예산(8.3ms)에서는 전부 미스다 — 2026-09-09 릴리스 d1165eb3 실측: vSync 2 에서
+                // 미스 1.1% 라 1 로 올리고, 3초 뒤 100% 미스로 다시 2 로. 23초 주기로 3초씩 120fps 를 헛도는 왕복이었다.
+                float nextBudgetMs = 1000f / _hz * (_interval - 1);
+                float nextMiss = MissRateAgainst(nextBudgetMs * MissSlack, _windowFrames);
+                if (nextMiss > StepUpMissRate) { _cleanWindows = 0; return; }   // 올려도 못 버틴다 — 지금 자리가 착지점
+
                 if (++_cleanWindows < StepUpCleanWindows) return;
                 _cleanWindows = 0;
                 Apply(_interval - 1,
-                    $"{StepUpCleanWindows}창 연속 놓친 프레임 {missRate * 100f:F1}% — 여유가 있다, 한 단계 올린다");
+                    $"{StepUpCleanWindows}창 연속 놓친 프레임 {missRate * 100f:F1}%, 올라간 예산 {nextBudgetMs:F1}ms 기준도 {nextMiss * 100f:F1}% — 여유가 있다, 한 단계 올린다");
                 _cooldownUntil = now + CooldownAfterUp;
                 return;
             }
 
             _cleanWindows = 0;
+        }
+
+        /// <summary>링 버퍼의 최근 <paramref name="frames"/>개 중 <paramref name="limitMs"/> 를 넘은 비율.</summary>
+        float MissRateAgainst(float limitMs, int frames)
+        {
+            int n = Mathf.Min(frames, _ringCount);
+            if (n == 0) return 1f;
+            int miss = 0;
+            for (int i = 1; i <= n; i++)
+            {
+                int idx = (_ringHead - i + RingSize) % RingSize;
+                if (_ring[idx] * 1000f > limitMs) miss++;
+            }
+            return miss / (float)n;
         }
 
         void Apply(int interval, string why)

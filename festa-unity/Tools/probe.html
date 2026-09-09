@@ -9,6 +9,8 @@
   <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
   <div id="status">loading…</div>
   <script>
+    // 로컬 검증: API 를 같은 오리진(serve.js 프록시·Mock 레이아웃)으로 — 없으면 빌드에 박힌 Prod 로 붙어 CORS 로 전부 실패한다 (T-237)
+    window.__FESTA_CONFIG__ = window.__FESTA_CONFIG__ || { apiBaseUrl: location.origin };
     // 게임 파트 검증용 — FE 임베드 없이 빌드를 열고 window.unityInstance 로 SendMessage 를 쓴다.
     // 파일명은 manifest.json 에서 읽는다(빌드마다 해시가 바뀐다). 브리지 수신부는 콘솔 로그로만 받는다.
     window.FestaUnity = {
