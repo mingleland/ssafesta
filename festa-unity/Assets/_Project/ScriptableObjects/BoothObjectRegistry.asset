@@ -136,3 +136,24 @@ MonoBehaviour:
   - type: 10
     assetCode: 
     prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}
+  - type: 10
+    assetCode: WALL_PLAIN
+    prefab: {fileID: 4605489429035552601, guid: 249aca43df93a3f48a2491e2e82553cc, type: 3}
+  - type: 9
+    assetCode: COUNTER_GRAPHIC
+    prefab: {fileID: 233849845533410192, guid: a9402c4d7c830df4abc921d008500e8e, type: 3}
+  - type: 9
+    assetCode: SHELF
+    prefab: {fileID: 9013948444015054775, guid: 28a3a9aa061728c428ab5c07aaf4feac, type: 3}
+  - type: 10
+    assetCode: TRUSS_BEAM
+    prefab: {fileID: 6645391271421932331, guid: 9ea1c1e7c0b5928499173611d571a9f7, type: 3}
+  - type: 10
+    assetCode: TRUSS_PILLAR
+    prefab: {fileID: 3262311506145060872, guid: ff208559d95c19b4dba50052d6a4cfe8, type: 3}
+  - type: 10
+    assetCode: TRUSS_GATE
+    prefab: {fileID: 6853192065166344656, guid: 5794253499cb7884ead22e718f00e8af, type: 3}
+  - type: 10
+    assetCode: PLANT
+    prefab: {fileID: 1183325711703539275, guid: 20c669534c9eb904a862740589560f7f, type: 3}

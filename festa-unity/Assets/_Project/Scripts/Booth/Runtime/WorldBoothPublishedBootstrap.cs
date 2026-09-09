@@ -54,7 +54,7 @@ namespace Festa.Booth
         static void Install()
         {
             if (Application.isBatchMode) return;   // 데디케이티드 서버 — 로컬 비주얼 없음
-            SceneManager.sceneLoaded += (_, _) => { s_retries = 0; TryLoad(); };
+            SceneManager.sceneLoaded += (_, _) => { s_retries = 0; PublishedSlotResolution.Clear(); TryLoad(); };
             TryLoad();   // 첫 씬이 이미 월드인 경우 (에디터에서 main 직접 실행)
             RetryLoopAsync();
         }
@@ -123,18 +123,21 @@ namespace Festa.Booth
                 if (!Enabled || s_Loading || !Completed) continue;
                 if (s_retries >= MaxRetries) continue;
 
+                // 미게시(404)로 확정된 방은 채워지지 않았어도 다시 묻지 않는다 — 릴리스 37d9b4f4 에서 11실 × 6회 헛조회.
+                // 일시 실패(네트워크·타임아웃)였거나 아직 답을 못 받은 방만 센다.
                 int pending = 0;
                 foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
-                    if (!r.IsLoaded) pending++;
+                    if (!r.IsLoaded && PublishedSlotResolution.NeedsRetry(r.BoothId)) pending++;
                 if (pending == 0) continue;
 
                 s_retries++;
-                Debug.Log($"[WorldBoothPublishedBootstrap] 아직 못 채운 방 {pending}실 — 재시도 {s_retries}/{MaxRetries}");
-                TryLoad();
+                Debug.Log($"[WorldBoothPublishedBootstrap] 조회가 일시 실패한 방 {pending}실 — 재시도 {s_retries}/{MaxRetries}");
+                TryLoad(onlyUnresolved: true);
             }
         }
 
-        static async void TryLoad()
+        /// <param name="onlyUnresolved">true 면 확정 답(200/404/409)을 이미 받은 방은 건너뛴다 — 재시도 루프용.</param>
+        static async void TryLoad(bool onlyUnresolved = false)
         {
             if (!Enabled || s_Loading) return;
 
@@ -151,6 +154,7 @@ namespace Festa.Booth
                 foreach (var r in runtimes)
                 {
                     if (r.IsLoaded || bySlot.ContainsKey(r.BoothId)) continue;
+                    if (onlyUnresolved && !PublishedSlotResolution.NeedsRetry(r.BoothId)) continue;
                     bySlot.Add(r.BoothId, r);
                     slotIds.Add(r.BoothId);
                 }
