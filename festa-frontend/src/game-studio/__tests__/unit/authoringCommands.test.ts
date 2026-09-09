@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GameProjectContractError, parseGameProject } from '../../contracts/gameProject.ts';
 import {
   addBooleanVariable,
+  addIntegerVariable,
+  addStringVariable,
   addComponent,
   addItemDefinition,
   addDialogueChoice,
@@ -573,5 +575,36 @@ describe('아이템 삭제(S15P21A604-565)', () => {
       error = thrown;
     }
     expect((error as GameProjectContractError).code).toBe('PICKUP_ITEM_NOT_FOUND');
+  });
+});
+
+describe('Integer·String 변수 생성(S15P21A604-566)', () => {
+  it('addIntegerVariable은 INTEGER 타입, 초기값 0인 변수를 추가한다', () => {
+    const project = addIntegerVariable(createStarterProject(567));
+    const created = project.variables[project.variables.length - 1]!;
+
+    expect(created.type).toBe('INTEGER');
+    expect(created.initialValue).toBe(0);
+    expect(parseGameProject(project)).toBe(project);
+  });
+
+  it('addStringVariable은 STRING 타입, 초기값 빈 문자열인 변수를 추가한다', () => {
+    const project = addStringVariable(createStarterProject(568));
+    const created = project.variables[project.variables.length - 1]!;
+
+    expect(created.type).toBe('STRING');
+    expect(created.initialValue).toBe('');
+    expect(parseGameProject(project)).toBe(project);
+  });
+
+  it('세 타입 모두 같은 id 프리픽스(variable)를 공유한다', () => {
+    let project = createStarterProject(569);
+    project = addBooleanVariable(project);
+    project = addIntegerVariable(project);
+    project = addStringVariable(project);
+
+    const newIds = project.variables.slice(-3).map((variable) => variable.id);
+    expect(newIds.every((id) => /^variable\d+$/.test(id))).toBe(true);
+    expect(new Set(newIds).size).toBe(3);
   });
 });
