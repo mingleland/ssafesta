@@ -48,8 +48,15 @@ PY
 source_commit="${source_commit%$'\r'}"
 [[ "${DEV_MOCK_COMPONENTS:-}" =~ ^$|^(ai|back|front|game)(,(ai|back|front|game))*$ ]] || fail 'DEV_MOCK_COMPONENTS must be a comma-separated component list'
 
-CI_BRANCH="${CI_BRANCH:-${branch}}" FRESHNESS_EXPECTED_SHA="${source_commit}" \
-  bash "${repo_root}/infra/jenkins/scripts/freshness.sh" >/dev/null
+if [[ "${DEV_BATCH_ROLLBACK:-0}" == 1 ]]; then
+  batch_state_root="${DEV_BATCH_STATE_ROOT:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/batches}"
+  expected_snapshot="${batch_state_root}/${DEV_BATCH_ID:-}/before/${component}.json"
+  [[ -n "${DEV_BATCH_ID:-}" && -f "${expected_snapshot}" ]] || fail 'dev batch rollback requires its captured snapshot'
+  [[ "$(readlink -f -- "${release_manifest}")" == "$(readlink -f -- "${expected_snapshot}")" ]] || fail 'dev batch rollback manifest is not the captured snapshot'
+else
+  CI_BRANCH="${CI_BRANCH:-${branch}}" FRESHNESS_EXPECTED_SHA="${source_commit}" \
+    bash "${repo_root}/infra/jenkins/scripts/freshness.sh" >/dev/null
+fi
 
 actual_content_id="$(${docker_bin} image inspect --format '{{.Id}}' "${image_ref}")"
 [[ "${actual_content_id}" == "${content_id}" ]] || fail "image content ID mismatch: expected=${content_id} actual=${actual_content_id}"
