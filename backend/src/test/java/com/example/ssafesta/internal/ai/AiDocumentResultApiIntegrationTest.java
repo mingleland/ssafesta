@@ -79,6 +79,31 @@ class AiDocumentResultApiIntegrationTest {
     }
 
     /**
+     * 만료된 문서는 finalize 로 공개되지 않는다 (S15P21A604-174).
+     *
+     * <p>{@code markDocumentReady} 는 출발 상태를 보지 않고 덮어썼다. 만료 sweep 이 들어오면서
+     * {@code EXPIRED} 행이 실제로 생기기 시작하므로, 그대로 두면 <b>업로드가 없는 문서가 조용히
+     * 공개된다</b> — 활성 집합에서 빠진 행이 finalize 하나로 되돌아온다.
+     *
+     * <p>그렇다고 예외로 막지는 않는다. 이 문장은 finalize 트랜잭션의 마지막이라 여기서 던지면
+     * 이미 교체된 chunk 와 Job 성공까지 함께 롤백되고, 워커는 성공한 Job 을 다시 처리한다. 문서가
+     * 제자리에 남고 로그가 남는 쪽이 작은 실패다.
+     */
+    @Test
+    @DisplayName("EXPIRED 문서는 finalize 해도 READY 로 올라가지 않는다")
+    void finalizeDoesNotPublishAnExpiredDocument() throws Exception {
+        Job job = seedJob("만료문서");
+        jdbc.update("UPDATE ai_documents SET processing_status = 'EXPIRED', expired_at = now() "
+                + "WHERE id = ?", job.documentId());
+
+        mockMvc.perform(batch(job, 0, chunk(0, "첫 조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        assertEquals("EXPIRED", documentStatus(job), "만료된 문서가 finalize 로 공개됐다");
+        assertEquals("SUCCEEDED", jobStatus(job), "Job 쪽은 롤백되지 않는다");
+    }
+
+    /**
      * 같은 batch 재전송은 아무것도 바꾸지 않는다.
      *
      * <p>staging PK 가 {@code (job_id, batch_seq, chunk_no)} 라 {@code ON CONFLICT DO NOTHING} 이
