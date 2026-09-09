@@ -2,6 +2,7 @@
 // 출처: 013a WebGL Host 계획 B-1
 
 import { resolveBuildDescriptor } from './resolver';
+import { publishHostApiBaseUrl } from '../../shared/config/runtime';
 import type { UnityInstance, UnityProgressListener } from './types';
 
 declare global {
@@ -46,6 +47,11 @@ export async function loadUnityBuild(
   canvas: HTMLCanvasElement,
   onProgress: UnityProgressListener,
 ): Promise<UnityInstance> {
+  // Unity 가 읽을 API base 를 **로더 스크립트보다 먼저** 확정한다 (S15P21A604-564).
+  // Unity 쪽 HostRuntimeConfig 는 window.__FESTA_CONFIG__.apiBaseUrl 을 한 번만 읽고 캐시하므로,
+  // 인스턴스가 선 뒤에 채우면 아무 효과가 없고 빌드 타임 값(Prod)이 그대로 남는다.
+  publishHostApiBaseUrl();
+
   const descriptor = await resolveBuildDescriptor();
   await injectLoaderScript(descriptor.loaderUrl);
 
