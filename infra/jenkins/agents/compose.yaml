@@ -72,6 +72,9 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/__dev/api}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
     depends_on:
       image-transfer-init:
         condition: service_completed_successfully

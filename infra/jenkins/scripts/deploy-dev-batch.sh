@@ -23,8 +23,11 @@ state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environme
 batch_dir="${state_root}/${DEV_BATCH_ID}"
 snapshot_dir="${batch_dir}/before"
 status_path="${CI_ARTIFACT_DIR}/dev-batch-result.json"
+lock_path="${state_root}/.deploy.lock"
+lock_timeout_seconds="${DEV_BATCH_LOCK_TIMEOUT_SECONDS:-300}"
 IFS=',' read -r -a components <<<"${DEPLOY_COMPONENTS}"
 (( ${#components[@]} > 0 )) || { echo 'DEPLOY_COMPONENTS must not be empty' >&2; exit 64; }
+[[ "${lock_timeout_seconds}" =~ ^[1-9][0-9]*$ ]] || { echo 'DEV_BATCH_LOCK_TIMEOUT_SECONDS must be a positive integer' >&2; exit 64; }
 
 declare -A seen=()
 for component in "${components[@]}"; do
@@ -100,7 +103,7 @@ PY
 
 run_component() {
   local action="$1" component="$2" manifest="$3"
-  local override=''
+  local override='' component_env=''
   case "${action}" in
     deploy)
       override="${DEPLOY_COMPONENT_COMMAND:-}"
@@ -116,21 +119,39 @@ run_component() {
     CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" bash -o pipefail -c "${override}"
     return $?
   fi
+  case "${component}" in
+    ai) component_env="${DEV_AI_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
+    back) component_env="${DEV_BACK_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
+  esac
+  if [[ "${component}" =~ ^(ai|back)$ && -z "${component_env}" ]]; then
+    echo "missing component environment file for ${component}" >&2
+    return 64
+  fi
   case "${action}" in
     deploy)
-      CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
+      COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
         bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
       ;;
     verify)
-      CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
+      COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
         bash "${repo_root}/infra/environments/scripts/verify-environment.sh" --environment dev --component "${component}"
       ;;
     rollback)
-      DEV_BATCH_ROLLBACK=1 DEV_BATCH_STATE_ROOT="${state_root}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
+      COMPONENT_ENV_FILE="${component_env}" DEV_BATCH_ROLLBACK=1 DEV_BATCH_STATE_ROOT="${state_root}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
         bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
       ;;
   esac
 }
+
+mkdir -p "${state_root}"
+command -v flock >/dev/null 2>&1 || { write_status MANUAL_ACTION_REQUIRED 'flock is required for the dev deployment lock'; exit 69; }
+exec {batch_lock_fd}>"${lock_path}"
+if ! flock -w "${lock_timeout_seconds}" "${batch_lock_fd}"; then
+  write_status LOCKED 'another dev deployment batch still owns the lock'
+  exit 73
+fi
+release_lock() { flock -u "${batch_lock_fd}" || true; }
+trap release_lock EXIT HUP INT TERM
 
 if [[ -n "${FRESHNESS_EXPECTED_SHA:-}" ]]; then
   set +e
