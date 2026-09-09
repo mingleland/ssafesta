@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>festa probe (Development)</title>
+  <style>html,body{margin:0;background:#111;color:#ddd;font:12px monospace} #unity-canvas{display:block;width:960px;height:600px;background:#222}</style>
+</head>
+<body>
+  <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+  <div id="status">loading…</div>
+  <script>
+    // 게임 파트 검증용 — FE 임베드 없이 빌드를 열고 window.unityInstance 로 SendMessage 를 쓴다.
+    // 파일명은 manifest.json 에서 읽는다(빌드마다 해시가 바뀐다). 브리지 수신부는 콘솔 로그로만 받는다.
+    window.FestaUnity = {
+      onBoothInteract: (json) => console.log('[probe] onBoothInteract →', json),
+      onWorldGateReady: () => console.log('[probe] onWorldGateReady'),
+      onWorldLoadStart: () => console.log('[probe] onWorldLoadStart'),
+      onWorldConnectionState: (state, reason) => console.log('[probe] onWorldConnectionState', state, reason),
+    };
+    const status = (t) => { document.getElementById("status").textContent = t; };
+    fetch("manifest.json", { cache: "no-store" }).then(r => r.json()).then((m) => {
+      const config = {
+        dataUrl: m.dataUrl, frameworkUrl: m.frameworkUrl, codeUrl: m.codeUrl,
+        streamingAssetsUrl: "StreamingAssets", companyName: "DefaultCompany", productName: "festa-unity", productVersion: "0.1.0",
+      };
+      const s = document.createElement("script");
+      s.src = m.loaderUrl;
+      s.onload = () => {
+        createUnityInstance(document.querySelector("#unity-canvas"), config, (p) => status("loading " + Math.round(p * 100) + "%"))
+          .then((inst) => { window.unityInstance = inst; status("ready " + m.loaderUrl); console.log('[probe] unityInstance ready', m.loaderUrl); })
+          .catch((e) => { status("error " + e); console.error(e); });
+      };
+      document.body.appendChild(s);
+    }).catch((e) => { status("manifest error " + e); console.error(e); });
+  </script>
+</body>
+</html>

@@ -104,7 +104,7 @@ namespace Festa.Content
             // 마우스를 올리지 않아도 사거리 안에 들어오면 자동으로 잡힌다 — 3인칭 걷기에서
             // "가까이 가면 F" 가 기대 동작이고, 마우스 조준을 요구하면 상호작용이 없는 것처럼
             // 보인다 (실 BE 첫 걷기에서 실측된 혼란). 조준이 없을 때만 근접으로 채운다.
-            targeted ??= NearestInteractableInRange();
+            targeted ??= NearestInteractableInRange(_hovered);
 
             UpdateHover(targeted);
             ShowHint(targeted);
@@ -122,23 +122,34 @@ namespace Festa.Content
             interactable?.Interact();
         }
 
-        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null.</summary>
-        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange()
+        /// <summary>
+        /// 새 후보가 현재 대상보다 이만큼(월드 유닛) 더 가까워야 대상을 바꾼다. 아케이드 두 대의 판정 표면이
+        /// 13 cm 간격이라 걷는 동안 대상이 매 프레임 흔들리고, 흔들릴 때마다 외곽선을 통째로 다시 만들었다(QA #52).
+        /// 3u ≈ 0.23 m.
+        /// </summary>
+        const float SwitchMargin = 3f;
+
+        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
+        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange(Festa.Booth.BoothInteractionTarget current)
         {
             var origin = InteractionOrigin();
             if (origin == null) return null;
 
             Festa.Booth.BoothInteractionTarget best = null;
             float bestDist = float.MaxValue;
+            float currentDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
                 if (t == null || !t.Interactive) continue;
                 // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
                 float d = t.DistanceFrom(origin.Value);
+                if (t == current && d <= t.MaxDistance) currentDist = d;
                 if (d > t.MaxDistance || d >= bestDist) continue;
                 best = t;
                 bestDist = d;
             }
+            if (current != null && best != current && currentDist < float.MaxValue && bestDist > currentDist - SwitchMargin)
+                return current;   // 근소한 차이면 붙잡고 있던 것을 유지한다
             return best;
         }
 

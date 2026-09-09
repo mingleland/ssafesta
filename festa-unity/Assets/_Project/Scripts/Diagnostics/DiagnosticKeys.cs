@@ -42,6 +42,9 @@ namespace Festa.Diagnostics
         public static KeyCode Claim(string owner, KeyCode key)
         {
             if (key == KeyCode.None) return key;
+            // 릴리스에서는 검사하지 않는다 — 개발자 도구의 배정 실수가 실사용자 콘솔에 빨간 에러로 뜰 이유가 없다 (QA #77).
+            // 진단 컴포넌트는 릴리스에서 스스로 꺼지지만 Claim 은 그 전(Awake/OnEnable)에 불린다.
+            if (!Application.isEditor && !Debug.isDebugBuild) return key;
 
             if (Owners.TryGetValue(key, out var existing) && existing != owner)
             {

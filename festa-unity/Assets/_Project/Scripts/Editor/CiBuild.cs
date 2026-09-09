@@ -131,6 +131,12 @@ namespace Festa.EditorTools
             // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
             FestaWebBuilder.WriteManifest(WebOutDir);
 
+            // 검증용 probe.html 을 산출물에 같이 넣는다 — FE 없이 빌드를 열어 SendMessage 로 상태를 주입하는 게임 파트의
+            // 유일한 릴리스 검증 수단인데, 빌드 폴더가 비워지면서 매번 사라졐다(QA #42). 정본은 Tools/probe.html.
+            // 배포 zip 은 manifest 가 가리키는 파일만 담으므로 실사용자에게 나가지 않는다.
+            var probeSrc = Path.Combine("Tools", "probe.html");
+            if (File.Exists(probeSrc)) { File.Copy(probeSrc, Path.Combine(WebOutDir, "probe.html"), true); Log("probe.html 동봉 (검증용, 배포 zip 제외)"); }
+
             // 파이프라인이 이 네 가지를 확인한다. 여기서 먼저 잡아 실패를 앞당긴다.
             foreach (var required in new[] { "index.html", "Build", "TemplateData", "manifest.json" })
             {
