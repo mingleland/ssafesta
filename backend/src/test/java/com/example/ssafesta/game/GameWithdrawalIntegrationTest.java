@@ -32,6 +32,7 @@ class GameWithdrawalIntegrationTest {
     @Autowired private GameRepository games;
     @Autowired private GameDraftRepository drafts;
     @Autowired private GamePublishedVersionRepository published;
+    @Autowired private ArcadeMachineBindingRepository bindings;
     @Autowired private GamePublishService publishService;
     @Autowired private UserRepository users;
     @Autowired private JdbcTemplate jdbc;
@@ -97,6 +98,27 @@ class GameWithdrawalIntegrationTest {
                 "행이 남으면 games 삭제가 FK 로 막힌다");
         assertEquals(1, count("SELECT count(*) FROM game_asset_delete_queue WHERE object_key = ?",
                 "games/" + gameId + "/assets/aTestAsset"), "객체 좌표는 큐에 남아야 한다");
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
+    }
+
+    /**
+     * An arcade machine binding points at {@code games} too (V27, S15P21A604-602).
+     *
+     * <p>Without its line in {@code AccountDeletionService} this withdrawal fails on the foreign
+     * key — and it fails only for the members whose game an operator happened to bind, which is the
+     * kind of gap that shows up in production rather than in a green build. The machine itself is a
+     * world fixture and stays; the binding is what goes.
+     */
+    @Test
+    void withdrawingRemovesArcadeMachineBindingsThatPointAtTheGame() {
+        Long userId = GameTestSupport.createMember(users, "탈퇴오락기");
+        Long gameId = games.save(new Game(userId, "오락기에 걸린 게임")).getId();
+        bindings.save(new ArcadeMachineBinding("withdrawal-arcade-" + gameId, gameId));
+
+        deletions.deleteUserGraph(userId);
+
+        assertTrue(games.findById(gameId).isEmpty(), "Game 이 남으면 users 삭제가 FK 로 막힌다");
+        assertEquals(0, count("SELECT count(*) FROM arcade_machine_bindings WHERE game_id = ?", gameId));
         assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
     }
 
