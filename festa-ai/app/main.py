@@ -1,4 +1,3 @@
-import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -16,6 +15,7 @@ from app.api.v1.documents import build_document_processing_orchestrator
 from app.api.v1.router import router as api_v1_router
 from app.clients.spring_agent_config import SpringAgentConfigClient
 from app.core.config import settings
+from app.core.logging import configure_logging
 from app.core.redis import create_redis_client
 from app.providers.factory import create_embedding_provider, create_llm_provider
 from app.workers.document_task_supervisor import DocumentTaskSupervisor
@@ -28,7 +28,7 @@ async def _close_if_supported(resource: Any) -> None:
 
 
 def create_app() -> FastAPI:
-    logging.basicConfig(level=settings.log_level)
+    configure_logging(settings.log_level)
 
     redis = create_redis_client(settings.redis_url)
     spring_http_client = httpx.AsyncClient(

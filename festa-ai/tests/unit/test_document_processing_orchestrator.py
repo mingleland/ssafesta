@@ -10,6 +10,7 @@ Booth의 문서가 READY로 전환되는 것을 막는다 (spec 007 FR-015).
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import pytest
 
@@ -17,6 +18,7 @@ from app.clients.spring_booth_access import BoothAccessResult
 from app.clients.spring_document_result import (
     SpringDocumentResultJobGone,
     SpringDocumentResultStaleAttempt,
+    SpringDocumentResultUnavailable,
 )
 from app.services.document_processing_orchestrator import DocumentProcessingOrchestrator
 from app.services.document_processing_service import EmbeddedChunk
@@ -174,6 +176,32 @@ async def test_run_reports_failed_when_embedding_computation_raises() -> None:
             "retryable": False,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_run_logs_safe_fields_when_failure_callback_is_undelivered(caplog) -> None:
+    raw_error = "provider 원문 오류입니다"
+    result_client = _FakeResultClient(
+        failed_error=SpringDocumentResultUnavailable(raw_error)
+    )
+    orchestrator = DocumentProcessingOrchestrator(
+        embedding_service=_FakeEmbeddingService(error=ValueError(raw_error)),
+        result_client=result_client,
+        booth_access_client=_FakeBoothAccessClient(),
+        heartbeat_interval_seconds=60.0,
+    )
+
+    with caplog.at_level(
+        logging.WARNING, logger="app.services.document_processing_orchestrator"
+    ):
+        await orchestrator.run(_snapshot())
+
+    record = caplog.records[-1]
+    assert record.getMessage() == "spring_failure_callback_undelivered"
+    assert record.job_id == 501
+    assert record.document_id == 9001
+    assert record.status == "UNDELIVERED"
+    assert raw_error not in caplog.text
 
 
 @pytest.mark.asyncio
