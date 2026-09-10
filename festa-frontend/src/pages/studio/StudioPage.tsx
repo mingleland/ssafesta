@@ -113,7 +113,8 @@ export function StudioPage() {
   // 그러지 않으면 좌표 입력 중 Backspace 가 숫자를 지우는 대신 오브젝트를 지운다.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const undoRedo = e.ctrlKey || e.metaKey;
+      if (!undoRedo && e.key !== 'Delete' && e.key !== 'Backspace') return;
       const target = e.target;
       const editingText =
         target instanceof HTMLInputElement ||
@@ -122,6 +123,22 @@ export function StudioPage() {
         (target instanceof HTMLElement && target.isContentEditable);
       if (editingText) return;
       if (target instanceof Element && target.closest('[role="dialog"]') !== null) return;
+
+      // Ctrl+Z 되돌리기 / Ctrl+Y·Ctrl+Shift+Z 다시 실행 (S15P21A604-605)
+      if (undoRedo) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          dispatch({ type: 'UNDO' });
+          return;
+        }
+        if (key === 'y' || (key === 'z' && e.shiftKey)) {
+          e.preventDefault();
+          dispatch({ type: 'REDO' });
+        }
+        return;
+      }
+
       const objectId = state.selectedObjectId;
       if (objectId === null) return;
       e.preventDefault();
@@ -341,6 +358,10 @@ export function StudioPage() {
             // 버튼 한 번이면 알려진 자리로 돌아온다
             setZoom((z) => ZOOM_PRESETS.find((preset) => preset > z + 0.001) ?? ZOOM_PRESETS[0])
           }
+          canUndo={state.past.length > 0}
+          canRedo={state.future.length > 0}
+          onUndo={() => dispatch({ type: 'UNDO' })}
+          onRedo={() => dispatch({ type: 'REDO' })}
           canReset={state.objects.length > 0 && !gates.leaseExpired}
           onReset={handleResetLayout}
         />
