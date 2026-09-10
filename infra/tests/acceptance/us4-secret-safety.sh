@@ -16,5 +16,5 @@ grep -q 'infra/jenkins/scripts/secret-scan.sh --path .' "${repo_root}/Jenkinsfil
 grep -q 'infra/jenkins/scripts/with-credentials.sh' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
 grep -q 'archiveArtifacts artifacts: .artifacts/develop/dev-batch-result.json' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
 grep -q 'Credentials/ManageDomains' "${repo_root}/infra/jenkins/casc/authorization.yaml"
-grep -q 'hostnameSpecification' "${repo_root}/infra/jenkins/casc/security.yaml"
+grep -q 'CI_SECRET_SCAN_REQUIRED' "${repo_root}/infra/jenkins/casc/security.yaml"
 echo "PASS: US4 secret safety acceptance"
