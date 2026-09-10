@@ -266,6 +266,39 @@ class StorageReconciliationControllerIntegrationTest {
                 Integer.class, document.id()));
     }
 
+    /**
+     * 판정이 {@code attemptCount} 한 필드에만 걸려 있지 않다는 단정.
+     *
+     * <p>이것 없이는 재전송 비교에서 {@code status}·{@code targetProvider} 같은 필드를 빼도 아무
+     * 테스트가 붉어지지 않는다. 여기서는 판정 자체가 {@code Payload} 의 record equality 라
+     * 필드를 빠뜨릴 자리가 없지만, 그 성질이 유지되는지는 이 단정이 본다.
+     */
+    @Test
+    @DisplayName("같은 키에 다른 status·targetProvider 가 와도 409 다")
+    void aResendThatChangesAnyContractFieldIsRefused() throws Exception {
+        Document document = seed("필드다름");
+        Map<String, Object> first = payload(document, "R2", "MINIO_LOCAL", "MISMATCH");
+        first.put("failureReason", "size mismatch");
+        mockMvc.perform(submit(first)).andExpect(status().isNoContent());
+
+        Map<String, Object> otherStatus = new LinkedHashMap<>(first);
+        otherStatus.put("status", "MISSING");
+        mockMvc.perform(submit(otherStatus))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RECONCILIATION_REPLAY_CONFLICT"));
+
+        Map<String, Object> otherTarget = new LinkedHashMap<>(first);
+        otherTarget.put("targetProvider", "R2");
+        mockMvc.perform(submit(otherTarget))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RECONCILIATION_REPLAY_CONFLICT"));
+
+        assertEquals(1, logCount(document));
+        assertEquals("MISMATCH", jdbc.queryForObject(
+                "SELECT status FROM storage_reconciliation_log WHERE document_id = ?",
+                String.class, document.id()));
+    }
+
     // ── 거부 ────────────────────────────────────────────────────────────────
 
     @Test
@@ -298,6 +331,9 @@ class StorageReconciliationControllerIntegrationTest {
         assertRejected(with(document, "expectedSize", -1), "expectedSize");
         assertRejected(with(document, "expectedSha256", "NOTAHASH"), "expectedSha256");
         assertRejected(with(document, "runId", "r".repeat(201)), "runId");
+        // 공백만 있는 키는 아무도 되짚을 수 없는 멱등 키다.
+        assertRejected(with(document, "runId", "   "), "runId");
+        assertRejected(with(document, "objectKey", " "), "objectKey");
         assertRejected(with(document, "resolvedAt", "2026-09-10T02:59:59Z"), "resolvedAt");
     }
 
@@ -409,11 +445,13 @@ class StorageReconciliationControllerIntegrationTest {
     /**
      * 적재와 문서 갱신은 한 번의 쓰기다.
      *
-     * <p>이 단정이 지키는 것은 {@code @Transactional} 이 <b>실제로 걸려 있는지</b>다.
-     * {@code AnnotationTransactionAttributeSource} 는 public 이 아닌 메서드를 건너뛰므로
-     * package-private 메서드에 붙은 애너테이션은 아무도 읽지 않고, 그러면 각 문장이 autocommit 으로
-     * 돌아 {@code FOR UPDATE} 잠금이 즉시 풀리고 여기서 로그 행만 남는다. 조용히 사라지는 종류의
-     * 실수라 동시성 테스트로는 간헐적으로만 드러난다.
+     * <p>이 단정이 지키는 것은 {@code @Transactional} 이 <b>실제로 걸려 있는지</b>다. 안 걸리면 각
+     * 문장이 autocommit 으로 돌아 {@code FOR UPDATE} 잠금이 즉시 풀리고 여기서 로그 행만 남는다.
+     * 조용히 사라지는 종류의 실수라 동시성 테스트로는 간헐적으로만 드러난다.
+     *
+     * <p>가시성 규칙을 여기 적지 않는 이유는 T-147 이다 — "public 이 아닌 메서드는 건너뛴다" 는
+     * 옛 규칙이 이 버전에서는 사실이 아니었고, 그 문장을 근거로 코드를 고쳤다가 되돌렸다. 이
+     * 테스트는 규칙이 어느 쪽이든 <b>트랜잭션이 실제로 걸렸는지</b>만 본다.
      */
     @Test
     @DisplayName("문서 갱신이 실패하면 적재도 함께 되돌아간다")

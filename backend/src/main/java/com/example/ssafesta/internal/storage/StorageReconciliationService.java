@@ -162,18 +162,25 @@ class StorageReconciliationService {
      * answered 204 would make one request mean two different things depending on when it was sent.
      */
     private static Outcome replayOutcome(StoredResult recorded, Payload sent) {
-        List<String> differences = differences(recorded.payload(), sent);
-        if (!differences.isEmpty()) {
-            // Accepting it silently would hide the sender's bug: idempotency means the same request
-            // is safe to repeat, not that the same key may carry different content.
-            log.warn("같은 reconcile 키에 다른 내용이 도착했습니다 — runId={} documentId={} 다른 필드={}. "
-                    + "먼저 저장된 결과를 유지합니다.", sent.runId(), sent.documentId(), differences);
-            return Outcome.REPLAY_CONFLICT;
+        // The verdict is record equality, not the field list below. A Payload field added later is
+        // then compared whether or not anyone remembers to name it: forgetting a line costs a
+        // vaguer log message, never a different result silently accepted as a resend.
+        if (recorded.payload().equals(sent)) {
+            return recorded.applyResult();
         }
-        return recorded.applyResult();
+        // Accepting it silently would hide the sender's bug: idempotency means the same request is
+        // safe to repeat, not that the same key may carry different content.
+        log.warn("같은 reconcile 키에 다른 내용이 도착했습니다 — runId={} documentId={} 다른 필드={}. "
+                        + "먼저 저장된 결과를 유지합니다.",
+                sent.runId(), sent.documentId(), differences(recorded.payload(), sent));
+        return Outcome.REPLAY_CONFLICT;
     }
 
-    /** {@code runId} and {@code documentId} are the key, so they are equal by construction. */
+    /**
+     * Which fields differ, for the log line only — the decision is made by record equality above.
+     *
+     * <p>{@code runId} and {@code documentId} are the key, so they are equal by construction.
+     */
     private static List<String> differences(Payload recorded, Payload sent) {
         List<String> fields = new ArrayList<>();
         diff(fields, "objectKey", recorded.objectKey(), sent.objectKey());
@@ -264,8 +271,10 @@ class StorageReconciliationService {
         }
     }
 
+    // isBlank, not isEmpty: a runId of spaces is a valid idempotency key that no one can look up,
+    // and an object key of spaces names nothing.
     private static String text(String value, String field, int maxLength) {
-        if (value == null || value.isEmpty()) {
+        if (value == null || value.isBlank()) {
             throw invalid(field, "값이 필요합니다.");
         }
         return withinLength(value, field, maxLength);

@@ -93,6 +93,13 @@ class AiInternalSecurityConfiguration {
      * <p>A lambda over {@code getRequestURI}, as {@code auth/SecurityConfiguration} already does.
      * The bare prefix is included because {@code /**} matches zero segments too — leaving it out
      * would put {@code /internal/ai} under a rule whose filter never runs.
+     *
+     * <p>{@code getRequestURI} carries the context path and is not decoded, while the authorization
+     * rule below sees the decoded path within the application. The two agree today because this
+     * application has no context path, and any disagreement fails <b>closed</b> — the filter skips,
+     * nothing is authenticated, the rule answers 401. Setting {@code server.servlet.context-path}
+     * would take every internal path down that way, so match on the same value the rule uses if
+     * that day comes.
      */
     private static RequestMatcher under(String prefix) {
         return request -> {
