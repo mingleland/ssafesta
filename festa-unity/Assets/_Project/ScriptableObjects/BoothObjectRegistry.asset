@@ -157,3 +157,6 @@ MonoBehaviour:
   - type: 10
     assetCode: PLANT
     prefab: {fileID: 1183325711703539275, guid: 20c669534c9eb904a862740589560f7f, type: 3}
+  - type: 10
+    assetCode: DECOR_PLANT_01
+    prefab: {fileID: 1183325711703539275, guid: 20c669534c9eb904a862740589560f7f, type: 3}

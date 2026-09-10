@@ -12,8 +12,11 @@ namespace Festa.World
     /// 잠시 끄고 메인 카메라를 대상 앞의 정해진 자리로 보간해 옮긴다. 그 동안 월드 입력은
     /// <see cref="InputBridge"/> 로 잠근다 — 캐릭터가 뛰어다니며 상호작용 프롬프트가 겹치는 일(-437)이 없다.</para>
     ///
-    /// <para><b>갇히지 않는다.</b> Esc 로 언제든 나가고, 호스트(React)가 오버레이를 닫으며
-    /// <c>SetInputLocked('0')</c> 을 보내면 그때도 풀린다. 어느 쪽이든 <see cref="Released"/> 가 한 번 발생한다.</para>
+    /// <para><b>갇히지 않는다.</b> Esc·우상단 [Esc] 알약으로 언제든 나가고, 호스트가
+    /// <c>SendMessage('WorldUiBridge','RequestExitWorldUi','esc')</c> 를 보내도 풀린다(#132). 어느 쪽이든
+    /// <see cref="Released"/> 가 한 번 발생한다. 호스트의 <c>SetInputLocked('0')</c> 만으로는 <b>풀리지 않는다</b> —
+    /// 잠금이 owner-set 이 된 뒤(09-08)로는 초점이 자기 잠금을 쥐고 있어 <c>LockedChanged</c> 가 오지 않기 때문이다.
+    /// <see cref="OnLockedChanged"/> 는 다른 주인이 전부 놓아 잠금이 실제로 풀린 경우에만 반응한다.</para>
     ///
     /// <para>씬을 고치지 않는다 — 처음 쓸 때 자동 생성되는 단일 인스턴스다.</para>
     /// </summary>
@@ -145,6 +148,7 @@ namespace Festa.World
                     InputBridge.SetLocked(true, LockOwner);
                 }
                 Debug.Log($"[InteractionFocusCamera] 초점 시작 → {anchor.name}");
+                WorldUiBridge.Publish();   // 호스트에 focus=true (#132 — ESC 중재용 상태 push, 전이 때만)
             }
         }
 
@@ -168,6 +172,7 @@ namespace Festa.World
             Debug.Log("[InteractionFocusCamera] 초점 해제");
             _releasing = false;
             Released?.Invoke();
+            WorldUiBridge.Publish();   // 호스트에 focus=false
         }
 
         void OnLockedChanged(bool locked)

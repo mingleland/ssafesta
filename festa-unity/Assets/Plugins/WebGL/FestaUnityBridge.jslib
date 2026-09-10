@@ -79,6 +79,22 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  // Unity 모달 상태 (GitLab #132 G-8-2 반대 방향, 2026-09-10): '{"focus":bool,"minigame":bool}'.
+  // 값이 바뀔 때만 온다. FE 는 이걸 보고 ESC 를 중재한다(FE 레이어 → Unity 모달 → GameMenu).
+  // 닫기는 별도 명령 SendMessage('WorldUiBridge','RequestExitWorldUi','esc') — 상태로 남의 기능을 닫지 않는다.
+  FestaNotifyWorldUiState: function (jsonPtr) {
+    var json = UTF8ToString(jsonPtr);
+    try {
+      if (window.FestaUnity && typeof window.FestaUnity.onWorldUiState === 'function') {
+        window.FestaUnity.onWorldUiState(json);
+        return;
+      }
+      console.warn('[FestaUnityBridge] window.FestaUnity.onWorldUiState is not ready', json);
+    } catch (error) {
+      console.error('[FestaUnityBridge] onWorldUiState callback failed', json, error);
+    }
+  },
+
   FestaNotifyWorldLoadStart: function () {
     try {
       if (window.FestaUnity && typeof window.FestaUnity.onWorldLoadStart === 'function') {
