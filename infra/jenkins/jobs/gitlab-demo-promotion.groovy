@@ -5,10 +5,8 @@ String checkoutCredential = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: '
 String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-demo-promotion') {
-    description('Manually promote a fully dev-verified release to demo. Approval and manifest paths are required.')
+    description('Manually promote the current fully dev-verified release to demo.')
     parameters {
-        stringParam('DEV_RELEASE_MANIFEST', '', 'Absolute path to the approved, full dev release manifest on the deploy agent')
-        stringParam('DEV_VERIFICATION_RESULT', '', 'Absolute path to the matching successful dev verification result on the deploy agent')
         stringParam('APPROVED_BY', '', 'Release approver identity recorded with this promotion')
     }
     definition {

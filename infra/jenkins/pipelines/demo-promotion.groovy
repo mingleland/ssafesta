@@ -12,12 +12,15 @@ pipeline {
         stage('Validate Approved Dev Release') {
             steps {
                 script {
-                    String manifest = params.DEV_RELEASE_MANIFEST?.trim()
-                    String verification = params.DEV_VERIFICATION_RESULT?.trim()
                     String approver = params.APPROVED_BY?.trim()
-                    if (!manifest || !verification || !approver) { error('DEV_RELEASE_MANIFEST, DEV_VERIFICATION_RESULT and APPROVED_BY are required') }
-                    // The input is the immutable artifact made by build-release-manifest.sh on develop.
-                    // Rebuilding it at approval time would weaken its image provenance.
+                    if (!approver) { error('APPROVED_BY is required') }
+                    String artifactDir = "${pwd()}/artifacts/demo-promotion"
+                    String manifest = "${artifactDir}/active-dev-release.json"
+                    String verification = "${artifactDir}/active-dev-verification.json"
+                    sh "mkdir -p '${artifactDir}'"
+                    withEnv(["ACTIVE_DEV_RELEASE_MANIFEST=${manifest}", "ACTIVE_DEV_VERIFICATION_RESULT=${verification}"]) {
+                        sh 'infra/jenkins/scripts/build-active-dev-release.sh'
+                    }
                     String releaseId = withEnv(["RELEASE_MANIFEST_PATH=${manifest}", "DEV_VERIFICATION_RESULT_PATH=${verification}", "DEMO_APPROVED_BY=${approver}"]) {
                         sh(returnStdout: true, script: 'infra/jenkins/scripts/validate-demo-promotion.sh').trim()
                     }

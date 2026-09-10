@@ -24,6 +24,7 @@ jobs_casc="${repo_root}/infra/jenkins/casc/jobs.yaml"
 demo_promotion_job="${repo_root}/infra/jenkins/jobs/gitlab-demo-promotion.groovy"
 demo_promotion_pipeline="${repo_root}/infra/jenkins/pipelines/demo-promotion.groovy"
 demo_promotion_validator="${repo_root}/infra/jenkins/scripts/validate-demo-promotion.sh"
+active_dev_release_builder="${repo_root}/infra/jenkins/scripts/build-active-dev-release.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -217,6 +218,7 @@ grep -q 'promote-release.sh' "${demo_promotion_pipeline}" \
 grep -q 'DEMO_VERIFY_WEB_COMMAND:' "${agent_compose}" \
   || fail "deploy agent lacks demo verification commands"
 [[ -x "${demo_promotion_validator}" ]] || fail "demo promotion validator is not executable"
+[[ -x "${active_dev_release_builder}" ]] || fail "active dev release builder is not executable"
 grep -q 'fingerprint: true' "${component_pipeline}" \
   || fail "component CI does not fingerprint selected artifacts"
 grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo backend does not use infra profile"
