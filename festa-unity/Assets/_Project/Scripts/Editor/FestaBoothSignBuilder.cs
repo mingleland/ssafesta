@@ -61,8 +61,12 @@ namespace Festa.EditorTools
             var festival = GameObject.Find("@Festival");
             if (festival == null) { Debug.LogError("[BoothSign] @Festival 이 없다."); return; }
 
-            var font = Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
-            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts/NotoSansKRBold_SDF 없음"); return; }
+            // **주아**를 쓴다. NotoSansKR Bold 는 각져서 분필 간판에 안 어울린다는 지적을 받았다
+            // (2026-09-10 — "너무 흰 배경에 딱딱한 폰트"). 주아는 둥글어서 손으로 쓴 느낌에 가깝고,
+            // 프로젝트의 디스플레이 글꼴(FestaUiKit.DisplayFont)과도 같은 것이다.
+            var font = Resources.Load<TMP_FontAsset>("Fonts/Jua_SDF")
+                    ?? Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
+            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts/Jua_SDF · NotoSansKRBold_SDF 둘 다 없음"); return; }
 
             var signPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SignPrefab);
             if (signPrefab == null) { Debug.LogError($"[BoothSign] {SignPrefab} 없음"); return; }
@@ -70,8 +74,12 @@ namespace Festa.EditorTools
             // 카드 바탕은 어둡게 둔다 — 썸네일이 붙으면 BoothSign.ShowThumbnail 이 흰색으로 올린다.
             var cardMat = Material("M_BoothSign_Card", new Color(0.07f, 0.09f, 0.16f), new Color(0.10f, 0.13f, 0.22f), 1f, 0.5f);
             var cardRimMat = Material("M_BoothSign_CardRim", new Color(0.36f, 0.78f, 0.98f), new Color(0.45f, 0.95f, 1.3f), 1f, 0.4f);
-            // 표지판 판때기. 은은하게만 발광시킨다 — 세게 주면 12개가 밤하늘의 등불이 된다(지붕 마퀴에서 겪은 문제).
-            var plateMat = Material("M_BoothSign_Plate", new Color(0.94f, 0.90f, 0.79f), new Color(0.94f, 0.88f, 0.72f), 0.35f, 0.15f);
+            // **칠판**이다. 처음엔 밝은 종이판이었는데 "흰 배경에 딱딱한 폰트라 별로" 라는 지적을
+            // 받고 짙은 슬레이트로 바꿨다 (2026-09-10, 사용자가 올린 카페 입간판 사진 기준).
+            // 발광은 아주 약하게만 — 밤에 글자가 읽히는 정도면 되고, 세게 주면 12개가 등불이 된다.
+            var plateMat = Material("M_BoothSign_Plate", new Color(0.105f, 0.125f, 0.118f), new Color(0.10f, 0.13f, 0.12f), 0.30f, 0.22f);
+            // 판 안쪽에 도는 얇은 흰 테두리 — 레퍼런스 사진의 그 선이다.
+            var chalkMat = Material("M_BoothSign_Chalk", new Color(0.88f, 0.89f, 0.84f), new Color(0.55f, 0.57f, 0.53f), 0.5f, 0.1f);
 
             var old = festival.transform.Find(RootName);
             if (old != null) Object.DestroyImmediate(old.gameObject);   // 두 번 돌려도 같은 결과
@@ -85,7 +93,7 @@ namespace Festa.EditorTools
                 var body = FindSlotBody(festival.transform, slot);
                 if (body == null) { missing++; Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 실물을 못 찾았다 — 건너뛴다."); continue; }
 
-                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat);
+                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat);
                 built++;
             }
 
@@ -117,7 +125,7 @@ namespace Festa.EditorTools
         }
 
         static void BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
-                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat)
+                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat, Material chalkMat)
         {
             bool northRow = b.center.z > AisleZ;
 
@@ -143,8 +151,8 @@ namespace Festa.EditorTools
             var front = FindPanel(sign.transform, "Front");
             var back = FindPanel(sign.transform, "Back");
 
-            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat);
-            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat);
+            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat, chalkMat);
+            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat, chalkMat);
 
             // ── 떠 있는 전시 카드 ──────────────────────────────
             // **썸네일이 실제로 로드됐을 때만** 켜진다 (BoothSign.ShowThumbnail).
@@ -182,7 +190,7 @@ namespace Festa.EditorTools
         /// Y 180° 를 한 번 더 준다(이게 없으면 거울 글씨가 된다 — 부스 내부 간판에서 이미 밟은 함정).</para>
         /// </summary>
         static TMP_Text PanelText(Transform parent, string name, TMP_FontAsset font, Renderer panel,
-                                  bool outward, int slot, Material plateMat)
+                                  bool outward, int slot, Material plateMat, Material chalkMat)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
@@ -191,8 +199,8 @@ namespace Festa.EditorTools
             var tmp = go.AddComponent<TextMeshPro>();
             tmp.font = font;
             tmp.text = $"{slot}번 부스";
-            // 밝은 판 위의 어두운 글자다 — 밤에 흰 글씨를 얹는 것보다 대비가 확실하다.
-            tmp.color = new Color(0.13f, 0.10f, 0.07f);
+            // 칠판 위의 분필 글씨. 순백은 인쇄물처럼 보여서 살짝 따뜻하게 흐린다.
+            tmp.color = new Color(0.92f, 0.93f, 0.88f);
             tmp.alignment = TextAlignmentOptions.Center;
             // **NoWrap 이 맞다.** 줄바꿈은 BoothSign.WrapByWord 가 어절 단위로 미리 넣는다 —
             // TMP 에 맡기면 한글을 글자 단위로 끊어 "스 / 마트팜" 같은 모양이 나온다.
@@ -220,19 +228,17 @@ namespace Festa.EditorTools
             float plateH = faceHeight * 0.70f;
             float lift = w * 0.05f;   // 판에서 띄우는 거리 — 배율과 함께 커져야 z-fighting 이 안 난다
 
-            // 나무판 위에 밝은 종이 한 장을 붙인 모양. 판이 어두운 나무라 글자만 얹으면
-            // 밤에 안 읽힌다 — "프로젝트명이 잘 보이게" 가 요구사항이다(2026-09-10).
-            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            plate.name = name + "Plate";
-            plate.transform.SetParent(parent, false);
-            plate.transform.localPosition = localCenter + normal * lift;
-            plate.transform.localRotation = rot;
-            plate.transform.localScale = new Vector3(plateW, plateH, lift * 0.5f);
-            Object.DestroyImmediate(plate.GetComponent<Collider>());
-            plate.GetComponent<Renderer>().sharedMaterial = plateMat;
-            Loose(plate);
+            // 나무판 위에 얹는 **칠판**. 세 겹이다 — 짙은 판, 그 위 흰 테두리, 다시 그 위 짙은 면.
+            // 가운데를 한 번 더 덮어야 흰 사각형이 **선**으로 남는다(솔리드 박스로 테두리를 만드는 방법).
+            // 레퍼런스 사진의 안쪽 흰 선이 이것이다.
+            Slab(parent, name + "Plate", localCenter + normal * lift, rot,
+                 new Vector3(plateW, plateH, lift * 0.5f), plateMat);
+            Slab(parent, name + "Rule", localCenter + normal * (lift * 1.25f), rot,
+                 new Vector3(plateW * 0.90f, plateH * 0.90f, lift * 0.3f), chalkMat);
+            Slab(parent, name + "RuleInner", localCenter + normal * (lift * 1.45f), rot,
+                 new Vector3(plateW * 0.90f - lift * 0.5f, plateH * 0.90f - lift * 0.5f, lift * 0.3f), plateMat);
 
-            go.transform.localPosition = localCenter + normal * (lift * 1.6f);
+            go.transform.localPosition = localCenter + normal * (lift * 1.8f);
             go.transform.localRotation = rot;
 
             float boxW = plateW * 0.92f;
@@ -250,6 +256,20 @@ namespace Festa.EditorTools
             tmp.fontSize = tmp.fontSizeMax;
             tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
             return tmp;
+        }
+
+        /// <summary>기울어진 판 위에 얹는 얇은 판 한 장. 칠판·테두리를 같은 방식으로 만든다.</summary>
+        static void Slab(Transform parent, string name, Vector3 localPos, Quaternion rot, Vector3 size, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = rot;
+            go.transform.localScale = size;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            Loose(go);
         }
 
         static GameObject Box(Transform parent, string name, Vector3 localPos, Vector3 size, Material mat)
