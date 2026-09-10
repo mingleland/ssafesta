@@ -43,6 +43,8 @@ class AvatarItemOwnershipApiIntegrationTest {
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
     private static final String FREE_ASSET = "656603128";
     private static final String PAID_ASSET = "2118850617";
+    /** {@code PAID_ASSET} sits in BOTTOM, priced 40 by V26 (GitLab #120 §8-2). */
+    private static final int PAID_PRICE = 40;
 
     @Autowired private MockMvc mockMvc;
     @Autowired private UserRepository users;
@@ -59,7 +61,7 @@ class AvatarItemOwnershipApiIntegrationTest {
     }
 
     @Test
-    void catalogContainsNinetySevenSalesUnitsAndTwelveFreeOwnedItems() throws Exception {
+    void catalogContainsNinetySevenSalesUnitsAndTwentyFreeOwnedItems() throws Exception {
         Long userId = newMemberWithWallet();
 
         mockMvc.perform(get("/api/v1/catalog/items")
@@ -67,7 +69,7 @@ class AvatarItemOwnershipApiIntegrationTest {
                         .header("Authorization", bearerFor(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(97))
-                .andExpect(jsonPath("$.items[?(@.owned == true)]", hasSize(12)))
+                .andExpect(jsonPath("$.items[?(@.owned == true)]", hasSize(20)))
                 .andExpect(jsonPath("$.items[?(@.assetKey == '1001')].equipSlot").value("HAT"));
     }
 
@@ -78,7 +80,7 @@ class AvatarItemOwnershipApiIntegrationTest {
                         .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(97))
-                .andExpect(jsonPath("$.items[?(@.owned == true)]", hasSize(12)));
+                .andExpect(jsonPath("$.items[?(@.owned == true)]", hasSize(20)));
     }
 
     @Test
@@ -94,7 +96,7 @@ class AvatarItemOwnershipApiIntegrationTest {
                 .andExpect(jsonPath("$.assetKey").value(PAID_ASSET))
                 .andExpect(jsonPath("$.owned").value(true));
 
-        assertEquals(before - 100, wallets.balanceOf(userId));
+        assertEquals(before - PAID_PRICE, wallets.balanceOf(userId));
         assertEquals(1, inventoryCount(userId, itemId));
 
         mockMvc.perform(get("/api/v1/catalog/items")
@@ -107,7 +109,7 @@ class AvatarItemOwnershipApiIntegrationTest {
                         .header("Authorization", bearerFor(userId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ITEM_ALREADY_OWNED"));
-        assertEquals(before - 100, wallets.balanceOf(userId));
+        assertEquals(before - PAID_PRICE, wallets.balanceOf(userId));
         assertEquals(1, inventoryCount(userId, itemId));
     }
 
@@ -127,7 +129,7 @@ class AvatarItemOwnershipApiIntegrationTest {
             assertEquals(Set.of("CREATED", "ITEM_ALREADY_OWNED"), results);
         }
 
-        assertEquals(before - 100, wallets.balanceOf(userId));
+        assertEquals(before - PAID_PRICE, wallets.balanceOf(userId));
         assertEquals(1, inventoryCount(userId, itemId));
         assertTrue(jdbc.queryForObject(
                 "SELECT COUNT(*) = 1 FROM coin_ledger_entries WHERE idempotency_key = ?", Boolean.class,
@@ -149,6 +151,38 @@ class AvatarItemOwnershipApiIntegrationTest {
 
         assertEquals(0, wallets.balanceOf(userId));
         assertEquals(0, inventoryCount(userId, itemId));
+    }
+
+    /**
+     * 확정 가격표(V26, GitLab #120 §8-2)의 <b>시드 상태</b>를 고정한다.
+     *
+     * <p>{@link #partsMissingFromTheUnityPaletteAreNotOnSale} 와 같은 성격이다 — 동작이 아니라
+     * 데이터가 되돌려지는 것을 잡는다. V26 은 슬롯 가격을 전량 덮은 뒤 무료 20종만 0 으로
+     * 되돌리므로, V16 에서 무료였던 네 종(안경 1·모자 family 1·한벌 2)이 유료로 올라간다.
+     * 그 네 종은 Unity {@code CreateDefault} 가 입히지 않는 슬롯이라 기본 아바타가 저장에서
+     * 거부되지 않는다.
+     */
+    @Test
+    void confirmedPricingLeavesTwentyFreePartsInSlotBands() {
+        assertEquals(20, avatarParts("price = 0"), "무료는 20종이어야 한다");
+        assertEquals(77, avatarParts("price > 0"), "유료는 77종이어야 한다");
+
+        assertEquals(0, avatarParts("price NOT IN (0, 30, 40, 50)"), "확정 가격은 30·40·50 뿐이다");
+        assertEquals(0, avatarParts("price > 0 AND equip_slot IN ('HAIR', 'GLASSES') AND price <> 30"));
+        assertEquals(0, avatarParts(
+                "price > 0 AND equip_slot IN ('TOP', 'BOTTOM', 'SHOES', 'HEAD') AND price <> 40"));
+        assertEquals(0, avatarParts("price > 0 AND equip_slot IN ('OUTFIT', 'HAT') AND price <> 50"));
+
+        assertEquals(8, avatarParts("price = 0 AND equip_slot = 'HEAD'"), "얼굴형은 전량 무료다");
+        assertEquals(0, avatarParts(
+                "price = 0 AND equip_slot IN ('OUTFIT', 'HAT', 'GLASSES')"),
+                "한벌·모자·안경은 전량 유료다");
+
+        for (String assetKey : List.of("2107176923", "1001", "512024387", "1164919338")) {
+            assertTrue(jdbc.queryForObject(
+                            "SELECT price > 0 FROM catalog_items WHERE asset_key = ?", Boolean.class, assetKey),
+                    assetKey + " 는 V16 무료였지만 V26 확정 가격표에서 유료다");
+        }
     }
 
     /**
@@ -247,6 +281,11 @@ class AvatarItemOwnershipApiIntegrationTest {
         Long userId = users.save(new User("소유권a" + SEQUENCE.incrementAndGet())).getId();
         wallets.openWallet(userId);
         return userId;
+    }
+
+    private int avatarParts(String where) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM catalog_items WHERE item_type = 'AVATAR_PART' AND " + where, Integer.class);
     }
 
     private Long itemId(String assetKey) {
