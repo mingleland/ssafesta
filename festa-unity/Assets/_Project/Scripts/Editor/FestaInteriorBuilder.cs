@@ -26,10 +26,27 @@ namespace Festa.EditorTools
 
         const float M = 13.26f;                 // 1 m
         const float AnchorScale = M;            // 부스 로컬 1 m = 월드 13.26 unit (레이아웃 좌표 = 미터)
-        const float RoomHalfX = 5.0f * M;       // 방 폭 10 m (셸 ±3.2 m + 통로 1.8 m)
-        const float RoomBackZ = -3.8f * M;      // 셸 뒷벽(-3.0 m) 뒤 0.8 m
-        const float RoomFrontZ = 7.0f * M;      // 셸 앞선(+3.15 m) 앞 3.85 m 통로 — 추적 카메라 기본 1.7 m·최대 3.4 m 가 벽에 눌리지 않게
-        const float WallH = 3.4f * M;           // 천장 3.4 m (셸 2.72 m + 여유)
+        // ── 방 규격 ─────────────────────────────────────────────────
+        // 방 크기는 그대로 두고 **셸을 방에 맞춘다**(사용자 지시 2026-09-10 — 방을 부스에 맞추지 말 것).
+        // 셸을 키우는 값은 아래 ShellFront* 상수에 있다.
+        const float RoomHalfX = 5.0f * M;       // 방 폭 10 m
+        const float RoomBackZ = -3.8f * M;      // 방 뒷벽
+        const float RoomFrontZ = 7.0f * M;      // 앞쪽 통로 — 추적 카메라 기본 1.7 m·최대 3.4 m 가 벽에 눌리지 않게
+        const float WallH = 6.0f * M;           // 천장 6.0 m — 3.4 m 는 갑갑하다는 지적으로 두 번 올렸다(3.4 → 4.4 → 6.0)
+
+        // ── 셸을 방에 맞추기 (2026-09-10) ─────────────────────────────
+        // 6 m 셸이 10 m 방 가운데 오도카니 놓여 "부스 벽이 방 크기에 비해 너무 작다" 는 지적을 받았다.
+        //
+        // **앵커 스케일은 건드리지 않는다.** 레이아웃 좌표는 부스 로컬 미터라는 FE·BE 계약이라, 앵커를 키우면
+        // 노트북·책상까지 같이 커진다. 대신 **셸(벽·바닥)만** 늘려 방 벽까지 닿게 한다 — 오브젝트는 제 크기 그대로
+        // 방 안쪽에 남는다. 스튜디오(6 m 격자)에서 배치할 수 있는 범위는 그대로이므로 계약도 그대로다.
+        //
+        // 셸 실측(스케일 1, 앵커 로컬 미터): x −3.092~+3.017(6.109 m), z ±3.017(6.034 m), y 0~2.715 m.
+        const float ShellMinXMeters = -3.092f, ShellMaxXMeters = 3.017f;
+        const float ShellMinZMeters = -3.017f, ShellMaxZMeters = 3.017f;
+        const float ShellHeightMeters = 2.715f;
+        const float ShellTargetFrontZ = 3.2f;   // 앞선은 거의 그대로 — 더 내밀면 스폰(+3.9 m)·문 통로를 먹는다
+        const float ShellTargetHeight = 4.8f;   // 천장(6.0 m) 아래 1.2 m — 벽이 방 높이를 따라가되 천장 띠는 남긴다
         const float WallT = 0.3f * M;
         const float Pitch = 700f;               // 방 간격 70 m (v2 와 같음 — 외부 포털 목적지 이름만 쓰므로 위치는 자유)
 
@@ -68,7 +85,7 @@ namespace Festa.EditorTools
             }
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(root.scene);
-            Debug.Log($"[Interior] v3 — 방 {i}실 (10 × 10 m, 천장 3.4 m, 셸 6 m 스케일 1, 앵커 {AnchorScale:F2}) + 내부 포털 {i}개 — 씬 저장 필요");
+            Debug.Log($"[Interior] v4 — 방 {i}실 (폭 {RoomHalfX * 2f / M:F1} m × 깊이 {(RoomFrontZ - RoomBackZ) / M:F1} m, 천장 {WallH / M:F1} m, 셸 6 m 스케일 1, 앵커 {AnchorScale:F2}) + 내부 포털 {i}개 — 씬 저장 필요");
         }
 
         static void BuildRoom(Transform parent, Vector3 c, int id, Material wall, Material floor, Material trim, Material doorMat,
@@ -127,8 +144,8 @@ namespace Festa.EditorTools
             WorldText(room.transform, "ExitSignText", "EXIT  ·  축제로 나가기", new Vector3(0, doorH + frameT + 0.32f * M, RoomFrontZ - 0.09f * M),
                       Quaternion.identity, 0.045f * M, new Color(0.05f, 0.12f, 0.08f), font);
 
-            // 부스 이름 — 셸 뒷벽(2.72 m) 위, 천장(3.4 m) 아래 띠에 맞춘다. 0.35·M 은 폭 11 m 였다 → 0.08·M ≈ 2.5 × 0.57 m.
-            WorldText(room.transform, "Sign", $"BOOTH {id:D2}", new Vector3(0, 3.08f * M, RoomBackZ - 0.02f * M),
+            // 부스 이름 — 셸 뒷벽(4.8 m) 위, 천장(6.0 m) 아래 띠 가운데. 0.35·M 은 폭 11 m 였다 → 0.08·M ≈ 2.5 × 0.57 m.
+            WorldText(room.transform, "Sign", $"BOOTH {id:D2}", new Vector3(0, 5.4f * M, RoomBackZ - 0.02f * M),
                       Quaternion.Euler(0f, 180f, 0f), 0.08f * M, new Color(0.25f, 0.2f, 0.15f), font);
 
             // ── 조명: 부스 위 4 등(따뜻함) + 통로 1 등. 천장 3.4 m 라 사거리 6 m 로 충분하다 ──
@@ -148,7 +165,7 @@ namespace Festa.EditorTools
                 l.type = LightType.Point;
                 l.color = new Color(1f, 0.95f, 0.88f);
                 l.intensity = li == 4 ? 200f : 300f;   // 실측: 180 → 0.215, 340 → 0.235(카펫이 짙어 한계) — 카펫을 밝히고 300 으로
-                l.range = 6.5f * M;
+                l.range = 9.5f * M;   // 천장 6.0 m — 6.5 m 로는 바닥에 닿기 전에 꺼져 실내가 어두웠다
                 l.shadows = LightShadows.None;
 
                 if (lampMat != null)
@@ -179,7 +196,19 @@ namespace Festa.EditorTools
             shell.transform.localPosition = Vector3.zero;
             // 셸 원본 방향 그대로: 벽이 -x(좌)·-z(후면), 정면 +z 개방 = FE 계약(passage.ts). 실측 2026-09-06 — 180° 돌리면 벽이 +x·+z 로 간다.
             shell.transform.localRotation = Quaternion.identity;
-            shell.transform.localScale = Vector3.one;
+
+            // 셸을 방에 맞춘다 — 좌우·뒤는 방 벽까지, 앞선은 통로를 먹지 않게 그대로, 높이는 천장 아래까지.
+            // 앵커 로컬(미터) 기준으로 계산한다. 앵커 스케일(13.26)은 그대로이므로 오브젝트 크기는 변하지 않는다.
+            float roomHalfXm = RoomHalfX / M, roomBackZm = RoomBackZ / M;
+            float sx = (roomHalfXm * 2f) / (ShellMaxXMeters - ShellMinXMeters);
+            float sz = (ShellTargetFrontZ - roomBackZm) / (ShellMaxZMeters - ShellMinZMeters);
+            float sy = ShellTargetHeight / ShellHeightMeters;
+            shell.transform.localScale = new Vector3(sx, sy, sz);
+            // 스케일은 원점(앵커) 기준이라 중심이 어긋난다 — 목표 구간의 중심으로 되돌린다.
+            shell.transform.localPosition = new Vector3(
+                0f - (ShellMinXMeters + ShellMaxXMeters) * 0.5f * sx,
+                0f,
+                (roomBackZm + ShellTargetFrontZ) * 0.5f - (ShellMinZMeters + ShellMaxZMeters) * 0.5f * sz);
             foreach (var t in shell.GetComponentsInChildren<Transform>(true).ToArray())
                 if (t != null && t.name.StartsWith("Truss"))
                     Object.DestroyImmediate(t.gameObject);
@@ -220,7 +249,10 @@ namespace Festa.EditorTools
             var ret = GameObject.Find($"ReturnPoint_{id:D2}");
             portal.destination = ret != null ? ret.transform : null;
             portal.promptText = "축제로 나가기";
-            portal.interactRadius = 1.5f * M;   // 매트 가장자리에서 1.5 m — 스폰 지점(1.2 m 앞)에서는 뜨지 않는다
+            // 2026-09-10 사거리 축소 — 매트 표면에서 12u(0.9 m). 바깥 부스 입장과 같은 값이라야 조작감이 갈리지 않는다.
+            portal.interactRadius = 12f;
+            portal.requireFacing = false;
+            portal.outlineWidth = 0.5f;         // 매트는 얇으니 가늘게
             // 거리 기준은 바닥 매트 — 사인보드(높이 2.9 m)로 재면 3D 거리에 높이가 섞여 매트 위에 서도 39 unit 이 나온다(실측).
             portal.boundsSource = mat.GetComponent<Renderer>();
             _ = frameL; _ = signBoard;
