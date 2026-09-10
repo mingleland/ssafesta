@@ -9,6 +9,7 @@ import { SurveyOverlay } from '../survey/ui/SurveyOverlay';
 import { ConsultationOverlay } from '../consultation/ui/ConsultationOverlay';
 import { AiChatOverlay } from '../ai/ui/AiChatOverlay';
 import { WorldGuideOverlay } from '../world/ui/WorldGuideOverlay';
+import { TimerStopOverlay } from '../minigame/ui/TimerStopOverlay';
 import { EventRewardShopOverlay } from '../event/ui/EventRewardShopOverlay';
 import type { GameOverlayPayload } from '../../game-studio/host/GameOverlay';
 
@@ -54,6 +55,12 @@ export function OverlayHost() {
 
   if (request.type === 'EVENT_SHOP') {
     return <EventRewardShopOverlay />;
+  }
+
+  if (request.type === 'MINIGAME') {
+    // 내장 미니게임 (S15P21A604-601). GAME 과 달리 lazy 로 가르지 않는다 — 게임 런타임을 끌고
+    // 오지 않아서 정적 import 로도 월드 진입 번들이 늘지 않는다.
+    return <TimerStopOverlay />;
   }
 
   if (request.type === 'GAME') {

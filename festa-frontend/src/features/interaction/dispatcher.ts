@@ -35,6 +35,11 @@ function dispatch(event: UnityInteractEvent): void {
       // 화면이 npcId 로 갈릴 것이 없다. 여러 이벤트가 생기면 그때 실어 보낸다.
       openVisitorOverlay('EVENT_SHOP', {});
       return;
+    case 'WORLD_MINIGAME_INTERACT':
+      // 내장 미니게임 (S15P21A604-601). 지금은 TIMER_STOP 하나뿐이라 화면이 payload 를 읽지 않지만,
+      // 두 값을 그대로 실어 둔다 — 종류가 늘면 gameId 로 갈리고, machineId 는 어느 기계였는지 되짚는 값이다.
+      openVisitorOverlay('MINIGAME', { gameId: event.gameId, machineId: event.machineId });
+      return;
     case 'WORLD_MANAGEMENT_INTERACT':
       // Overlay Bus 가 아니다. Bus 는 "부스 오브젝트를 열어 본다" 는 Visitor 층이고,
       // 관리 화면은 사용자가 직접 여는 별도 레이어다(gameClientUi) — !240 설계 그대로.
