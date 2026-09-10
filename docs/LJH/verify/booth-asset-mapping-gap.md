@@ -1,12 +1,17 @@
 # Booth 장식 에셋 매핑 공백 — 실측 조사
 
-> 2026-09-07 작성 · **2026-09-08 게임 파트 회신(#146) 반영** · 조사자 이정헌(FE)
+> 2026-09-07 작성 · 2026-09-08 게임 파트 회신(#146) 반영 · **2026-09-10 정합 완료(§6)** · 조사자 이정헌(FE)
 > 근거는 전부 저장소 실측이다. 추정한 곳은 그렇게 적었다.
 > **틀린 문장은 지우지 않고 §0-1 에 남긴다** — 지우면 다음 사람이 같은 함정을 다시 판다.
 
 ## 0. 한 줄
 
-**부스 꾸미기 에셋에 대해 어휘가 네 벌 있고, 그중 어느 것도 정본이 아니다.** FE 팔레트가 쓰는 `assetCode` 7종은 저장소 어디에서도 정의되지 않고, 에셋 파이프라인이 만드는 4종과 **겹치는 것이 하나도 없다.**
+**정본은 Unity `BoothObjectRegistry.asset` 하나로 정해졌고, FE 팔레트·파이프라인이 그것과 1:1 로 붙었다.**
+네 벌이던 어휘 중 FE 쪽 두 벌(팔레트 7종·파이프라인 4종)이 정본 코드로 맞춰졌고, 어긋나면 CI 가 red 다
+(`tools/paletteAssetCodes.test.mjs`). 남은 것은 `PLANT` 하나 — 자산은 있는데 정본 코드가 없다(§6-3).
+
+조사 시점(2026-09-07)의 한 줄은 이랬다: *"어휘가 네 벌 있고 그중 어느 것도 정본이 아니다. FE 팔레트가 쓰는
+`assetCode` 7종은 저장소 어디에서도 정의되지 않고, 파이프라인이 만드는 4종과 겹치는 것이 하나도 없다."*
 
 ## 0-1. 회신 대조 (#146, 2026-09-08) — 서로 하나씩 틀렸다
 
@@ -197,7 +202,116 @@ tri/바이트 · 실패 시 이유.
 
 Booth prefab 11개는 §1-1 표와 같다.
 
-## 7. 제약
+## 7. 제약 — 2026-09-10 기준 최신
 
-- **벤더 라이선스 게이트** — `ExpoKit` 은 `REVIEW_REQUIRED` 라 산출물이 로컬 Spike 범위를 못 벗어난다(`compiler/licenseGate.mjs`). 매핑을 확정해도 **배포 반입은 라이선스 판정 뒤다**
-- Runtime Asset Compiler v1 은 `TARGET_ASSET_CODES` 2종으로 의도적으로 제한돼 있다(`compile-runtime-assets.mjs:19`). 매핑이 늘면 이 목록도 함께 열어야 한다
+- **벤더 라이선스 게이트는 열렸다.** `source-packs.lock.json` 의 `ExpoKit` 이 `runtimeCompilePolicy:
+  ALLOW_RUNTIME_COMPILE` 이고, `evidence.decision` 에 *"runtime 변환·웹 사용·production emission 을 사용자
+  판단으로 PASS (2026-09-08)"* 가 적혀 있다. 게임 파트 회신(#148)은 출처·약관 종류 확인까지였고 배포 허용
+  판정은 사용자가 내렸다. `notVerified` 에 남은 것은 구매 계정·주문번호·취득일·seat 범위다.
+  **따라서 파이프라인 확대를 막는 라이선스 blocker 는 없다** — 이 문서가 오래 "REVIEW_REQUIRED" 라 적어 온
+  자리가 여기다.
+- `TARGET_ASSET_CODES` 는 이제 10종이다(`compile-runtime-assets.mjs`). 팔레트가 참조하는 코드는 전부 포함돼
+  있고, 그 1:1 은 `tools/paletteAssetCodes.test.mjs` 2층이 지킨다.
+
+---
+
+## 6. 정합 결과 (2026-09-10, S15P21A604-509)
+
+### 6-1. Unity 정본이 실제로 서빙본에 들어갔는가 — **커밋 SHA 로는 판정할 수 없었다**
+
+`#146` 회신이 커밋 `7fb057d1`·`5f680097` 을 댔지만 **그 SHA 는 어느 WebGL 빌드의 조상도 아니고 develop
+조상도 아니다**(rebase/squash 된 것으로 보인다). `git merge-base --is-ancestor` 로 "포함 안 됨" 이 나오는데
+실제로는 들어가 있다 — SHA 로 판정했으면 새 빌드를 요청하는 오판을 했을 것이다.
+
+**파일 내용으로 판정한 것이 답이다.**
+
+| package | build commit | 시각 | 값 있는 `assetCode` |
+|---:|---|---|---:|
+| 107 | `490bde34` | 09-10 09:03 | 37 |
+| 106 | `6e69c0b6` | 09-09 17:42 | 37 |
+| 105 `e6e60774` (서빙 중) | | 09-09 14:05 | **37** |
+| 104 | `664bc74e` | 09-09 10:42 | 30 |
+| 100 | `e30d8d49` | 09-08 15:17 | 2 |
+
+37 = canonical 28 + 레거시 별칭 7 + 예약 2(`FURNITURE_DEFAULT`·`DECORATION_DEFAULT`).
+`664bc74e`(30) → `e6e60774`(37) 의 차이가 정확히 레거시 별칭 7종이고, 그 커밋 제목이 *"부스 게시본 실측
+후속(**별칭**·404 재시도)"* 다.
+
+**결론: 28행 등록은 현재 서빙본에 이미 들어 있다. 새 Unity 빌드가 필요 없다.**
+
+### 6-2. 28행 판정 — 누락 0 · 중복 0 · code mutation 0
+
+레지스트리 엔트리 48 = 값 있음 37 + 빈 코드(typeDefault) 11. 중복 0, 비정규 표기 0.
+회신의 *"표의 값 그대로이고 중간 변환은 없습니다"* 가 실측으로 확인된다.
+
+**레거시 별칭 7종은 정본과 같은 prefab guid 를 가리킨다** — 매핑에 판단이 들어간 곳이 없다는 뜻이고,
+`#154` 가 제시한 대응표가 그대로 맞다.
+
+| 레거시 별칭 | 가리키는 prefab | 대응 정본 |
+|---|---|---|
+| `WALL_PLAIN` | `Decor/STRUCT_PANEL_01.prefab` | `STRUCT_PANEL_01` |
+| `COUNTER_GRAPHIC` | `Decor/FURN_COUNTER_02.prefab` | `FURN_COUNTER_02` |
+| `SHELF` | `Decor/DISP_STAND_PLASTIC_01.prefab` | `DISP_STAND_PLASTIC_01` |
+| `TRUSS_BEAM` | `Decor/STRUCT_TRUSS_HORIZONTAL_LAMP.prefab` | `STRUCT_TRUSS_HORIZONTAL_LAMP` |
+| `TRUSS_PILLAR` | `Decor/STRUCT_TRUSS_VERTICAL.prefab` | `STRUCT_TRUSS_VERTICAL` |
+| `TRUSS_GATE` | `Decor/STRUCT_TRUSS_BASE.prefab` | `STRUCT_TRUSS_BASE` |
+| `PLANT` | `Decor/PLANT.prefab` | **없음** |
+
+### 6-3. `PLANT` — 자산은 있는데 정본 코드가 없다
+
+게임 파트가 저폴리 화분 래퍼를 신설해 `Decor/PLANT.prefab` 이 실재한다. 그런데 정본 28행에 화분 대응
+코드가 없다. 팔레트는 `PLANT` 를 유지하고 **canonical 신규 정의를 `#154` 에 요청**했다 — 정본 표 갱신은
+게임 파트 결정이다. 그때까지 별칭으로 렌더되므로 사용자에게 보이는 문제는 없다.
+
+### 6-4. 파이프라인 — 4종 → 10종
+
+팔레트가 참조하는 6종을 `booth-assets.config.mjs` 에 넣고 실제로 변환했다. 래퍼가 PrefabInstance 라
+축은 prefab 이 세우고(`yUp`), 재질은 래퍼가 URP 기본으로 덮어 지정하지 않는다.
+
+| assetCode | GLB | tri | bbox (m) |
+|---|---:|---:|---|
+| `STRUCT_PANEL_01` | 16,828 B | 148 | 2.00 × 2.10 × 0.02 |
+| `FURN_COUNTER_02` | 29,516 B | — | 0.62 × 0.92 × 0.32 |
+| `DISP_STAND_PLASTIC_01` | 5,148 B | — | 0.21 × 0.31 × 0.09 |
+| `STRUCT_TRUSS_HORIZONTAL_LAMP` | 43,088 B | 982 | 1.56 × 2.25 × 0.30 |
+| `STRUCT_TRUSS_VERTICAL` | 26,500 B | 576 | 0.30 × 2.00 × 0.30 |
+| `STRUCT_TRUSS_BASE` | 19,308 B | 366 | 0.35 × 0.35 × 0.50 |
+
+경고 8건은 전부 `MonoBehaviour 는 재현하지 않는다`(래퍼가 붙인 BoxCollider)다 — 기존 `SurveyKiosk` 도
+같은 경고 2건을 내므로 신규 결함이 아니다. **막힌 항목은 없다.**
+
+dev 서버 실측: `/assets/booth-runtime/manifest.json` 이 10 assets 를 내고 6종 `.glb`·`.webp` 가 전부 200 이다.
+
+### 6-5. 알려진 어긋남 — 피벗 (이 작업 범위 밖)
+
+변환된 GLB 는 `bounds.min.y = 0` 으로 **바닥 정규화**된다. 그런데 Unity 원본은 `STRUCT_TRUSS_VERTICAL` 의
+피벗이 바닥 +0.5 m(TrussBase 위에 올리는 전제), `STRUCT_TRUSS_HORIZONTAL_LAMP` 가 2.6 m 높이다(#146 특기).
+**스튜디오 미리보기와 월드가 그만큼 어긋난다.**
+
+이번 범위에서 고치지 않았다 — 미리보기에 그 전제를 반영하려면 manifest 계약에 피벗 오프셋 필드를 더해야
+하고, 그것은 계약 변경이라 `-509` 완료조건 밖이다. 별도로 남긴다.
+
+### 6-6. 월드 렌더 실증 — **PASS** (2026-09-10, 회원 세션으로 관통)
+
+한때 HOLD 였다. 게시에 회원 세션이 필요한데 실 BE 가 개발자 진입을 거부하고(`enterAsDeveloper()` 의
+`'dev-entry'` 표식 토큰) 게스트는 스튜디오에 못 들어가기 때문이다. **사용자가 소셜 로그인을 직접 수행해
+그 막힘이 풀렸고, 관통 검증을 끝냈다.**
+
+```
+스튜디오(부스 #2) → 6종 배치 → 저장 → 게시(공개 1회차)
+BE 실측  booth-slots/12/layouts/published v1 objects 6
+         STRUCT_PANEL_01, FURN_COUNTER_02, STRUCT_TRUSS_HORIZONTAL_LAMP,
+         STRUCT_TRUSS_VERTICAL, STRUCT_TRUSS_BASE, DISP_STAND_PLASTIC_01
+월드 진입
+  [PublishedLayoutLoader] 12슬롯 병렬 조회 완료 — 게시 2 / 미게시·실패 10
+  [BoothRuntime] Booth 2 built: 6 objects (template=PROJECT_EXHIBITION)
+  [WorldBoothPublishedBootstrap] 12실 중 2실 게시 렌더, 나머지는 기본 프레임
+  Unknown assetCode 경고 0건
+  gate_open +2.4s
+```
+
+**`6 objects` 가 지어졌고 경고가 0 이다** — 팔레트가 내보낸 정본 코드를 Unity 가 그대로 해석했다는 뜻이다.
+경고는 전부 미게시 슬롯의 `published layout 없음 (404)` 10건이고 정상이다.
+
+스튜디오 UI 실측도 함께 남긴다: 팔레트 10종 전부 썸네일 이미지가 붙었고(파이프라인 산출물이 UI 까지 도달),
+배치한 오브젝트의 `자산 코드` 필드가 `STRUCT_PANEL_01`·`DISP_STAND_PLASTIC_01` 로 표시된다.

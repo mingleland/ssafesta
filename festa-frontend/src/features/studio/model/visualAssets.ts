@@ -11,7 +11,14 @@ export interface PaletteItem {
   label: string;
   objectType: ObjectType;
   thumb: ThumbKind;
-  /** 장식형 외형 코드(계약 assetCode). 기능형은 없음 */
+  /**
+   * 장식형 외형 코드(계약 assetCode). 기능형은 없음.
+   *
+   * **정본은 Unity `BoothObjectRegistry.asset` 이다** (S15P21A604-509, GitLab #146·#154).
+   * 여기 적은 코드가 그 레지스트리에 없으면 월드에서 타입 기본 자산(상자)으로 떨어진다 —
+   * 예전에 `WALL_PLAIN` 등 7종이 그 상태였고, 사용자는 "패널을 놓았는데 상자가 나온다" 를 겪었다.
+   * 그 사고가 다시 나지 않도록 `tools/paletteAssetCodes.test.mjs` 가 레지스트리와 대조한다.
+   */
   assetCode?: string;
   /** 카탈로그 매핑 확정 전 표시용 — 실제 잠금은 CatalogItemVM 이 정본 */
   locked?: boolean;
@@ -29,7 +36,7 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     id: 'wall',
     title: '벽면 패널',
     items: [
-      { id: 'wall-plain', label: '기본 패널', objectType: 'DECORATION', thumb: 'panel', assetCode: 'WALL_PLAIN' },
+      { id: 'wall-plain', label: '기본 패널', objectType: 'DECORATION', thumb: 'panel', assetCode: 'STRUCT_PANEL_01' },
       { id: 'wall-graphic', label: '그래픽 패널', objectType: 'PROJECT_PANEL', thumb: 'panel-graphic' },
       { id: 'wall-board', label: '채용 보드', objectType: 'RECRUITMENT_BOARD', thumb: 'board' },
     ],
@@ -39,17 +46,17 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     title: '카운터',
     items: [
       { id: 'counter-desk', label: '상담 데스크', objectType: 'CONSULTATION_DESK', thumb: 'desk' },
-      { id: 'counter-graphic', label: '그래픽 카운터', objectType: 'FURNITURE', thumb: 'counter-graphic', assetCode: 'COUNTER_GRAPHIC' },
-      { id: 'counter-shelf', label: '진열 선반', objectType: 'FURNITURE', thumb: 'shelf', assetCode: 'SHELF' },
+      { id: 'counter-graphic', label: '그래픽 카운터', objectType: 'FURNITURE', thumb: 'counter-graphic', assetCode: 'FURN_COUNTER_02' },
+      { id: 'counter-shelf', label: '진열 선반', objectType: 'FURNITURE', thumb: 'shelf', assetCode: 'DISP_STAND_PLASTIC_01' },
     ],
   },
   {
     id: 'truss',
     title: '트러스 / 프레임',
     items: [
-      { id: 'truss-beam', label: '트러스 빔', objectType: 'DECORATION', thumb: 'truss', assetCode: 'TRUSS_BEAM', locked: true },
-      { id: 'truss-pillar', label: '기둥', objectType: 'DECORATION', thumb: 'truss-pillar', assetCode: 'TRUSS_PILLAR', locked: true },
-      { id: 'truss-gate', label: '게이트', objectType: 'DECORATION', thumb: 'truss-gate', assetCode: 'TRUSS_GATE', locked: true },
+      { id: 'truss-beam', label: '트러스 빔', objectType: 'DECORATION', thumb: 'truss', assetCode: 'STRUCT_TRUSS_HORIZONTAL_LAMP', locked: true },
+      { id: 'truss-pillar', label: '기둥', objectType: 'DECORATION', thumb: 'truss-pillar', assetCode: 'STRUCT_TRUSS_VERTICAL', locked: true },
+      { id: 'truss-gate', label: '게이트', objectType: 'DECORATION', thumb: 'truss-gate', assetCode: 'STRUCT_TRUSS_BASE', locked: true },
     ],
   },
   {
