@@ -11,6 +11,10 @@ printf '%s\n' "$CI_RUNTIME_SECRET" >"${tmp}/cache.bin"
 if SECRET_CANARY=FESTA_RUNTIME_CANARY_71ab2c bash "${repo_root}/infra/jenkins/scripts/secret-scan.sh" --path "${tmp}" >/dev/null 2>&1; then
   echo 'canary in cache was not detected' >&2; exit 1
 fi
+grep -q 'infra/jenkins/scripts/secret-scan.sh --path .' "${repo_root}/.gitlab-ci.yml"
+grep -q 'infra/jenkins/scripts/secret-scan.sh --path .' "${repo_root}/Jenkinsfile"
+grep -q 'infra/jenkins/scripts/with-credentials.sh' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
+grep -q 'archiveArtifacts artifacts: .artifacts/develop/dev-batch-result.json' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
 grep -q 'Credentials/ManageDomains' "${repo_root}/infra/jenkins/casc/authorization.yaml"
 grep -q 'hostnameSpecification' "${repo_root}/infra/jenkins/casc/security.yaml"
 echo "PASS: US4 secret safety acceptance"
