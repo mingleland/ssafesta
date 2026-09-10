@@ -1,4 +1,5 @@
 using System.Linq;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 
@@ -45,7 +46,9 @@ namespace Festa.EditorTools
         const float ShellMinXMeters = -3.092f, ShellMaxXMeters = 3.017f;
         const float ShellMinZMeters = -3.017f, ShellMaxZMeters = 3.017f;
         const float ShellHeightMeters = 2.715f;
-        const float ShellTargetFrontZ = 6.6f;   // 정면 벽(7.0 m) 직전까지 — 5.6 에서 끊자 문 옆 1.4 m 가 흰 벽으로 남았다(3차 지적)
+        // 정면 벽 안쪽 면(7.0 m)까지 **딱 붙인다** — 6.6 에서 끊자 셸 앞선과 벽 사이 0.4 m 가 흰 벽·회색 바닥 띠로 남아
+        // "밑에 살짝 어긋난다"(사용자 2026-09-10 저녁). 5.6 → 6.6 → 7.0. 파샤는 벽 안쪽으로 옮긴다(아래).
+        const float ShellTargetFrontZ = 7.0f;
         const float ShellTargetHeight = 5.6f;   // 천장(6.0 m) 아래 0.4 m — 위쪽 흰 띠를 최소로
         const float WallT = 0.3f * M;
         const float Pitch = 700f;               // 방 간격 70 m (v2 와 같음 — 외부 포털 목적지 이름만 쓰므로 위치는 자유)
@@ -72,9 +75,10 @@ namespace Festa.EditorTools
             // 통로 카펫 — 밝은 천장·흰 파샤와 어울리는 따뜻한 밝은 회색. 남색 셸이 도드라진다.
             var floorMat = Mat("InteriorFloor", new Color(0.66f, 0.64f, 0.61f), 0.08f);
             var trimMat = Mat("InteriorTrim", new Color(0.22f, 0.23f, 0.27f), 0.3f);
-            var matMat = Mat("InteriorDoorMat", new Color(0.30f, 0.32f, 0.38f), 0.1f);
-            var exitMat = EmissiveMat("InteriorExitSign", new Color(0.35f, 0.95f, 0.55f), 2.2f);
-            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            // 출구 문 패널 — 파샤 스트라이프와 같은 계열의 짙은 남색. 흰 벽에서 문으로 읽히되 튀지 않는다.
+            var doorMat = Mat("InteriorDoor", new Color(0.13f, 0.17f, 0.30f), 0.35f);
+            var font = Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
+            if (font == null) { Debug.LogError("[Interior] Resources/Fonts/NotoSansKRBold_SDF 없음"); return; }
 
             int i = 0;
             foreach (Transform slot in slots)
@@ -82,7 +86,7 @@ namespace Festa.EditorTools
                 i++;
                 int col = (i - 1) % 4, row = (i - 1) / 4;
                 var center = new Vector3(700f + col * Pitch, 0f, row * Pitch);
-                BuildRoom(root.transform, center, i, wallMat, floorMat, trimMat, matMat, exitMat, font, shellPrefab, registry);
+                BuildRoom(root.transform, center, i, wallMat, floorMat, trimMat, doorMat, font, shellPrefab, registry);
             }
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(root.scene);
@@ -90,7 +94,7 @@ namespace Festa.EditorTools
         }
 
         static void BuildRoom(Transform parent, Vector3 c, int id, Material wall, Material floor, Material trim, Material doorMat,
-                              Material exitSign, Font font, GameObject shellPrefab, ScriptableObject registry)
+                              TMP_FontAsset font, GameObject shellPrefab, ScriptableObject registry)
         {
             var room = new GameObject($"Interior_{id:D2}");
             room.transform.SetParent(parent, false);
@@ -125,27 +129,24 @@ namespace Festa.EditorTools
             Box("Wall_E", new Vector3(RoomHalfX + WallT / 2f, WallH / 2f, zc), new Vector3(WallT, WallH, depth), wall, true);
             Box("Wall_W", new Vector3(-RoomHalfX - WallT / 2f, WallH / 2f, zc), new Vector3(WallT, WallH, depth), wall, true);
 
-            // 정면 벽은 문 자리(폭 2.2 m)를 비우고 좌우 두 장으로 세운다 — 문 너머는 어두운 매트(밖으로 나가는 느낌).
-            float doorW = 2.2f * M, doorH = 2.4f * M;
-            float sideW = (width - doorW) / 2f;
-            Box("Wall_Front_L", new Vector3(-(doorW / 2f + sideW / 2f), WallH / 2f, RoomFrontZ + WallT / 2f), new Vector3(sideW, WallH, WallT), wall, true);
-            Box("Wall_Front_R", new Vector3(doorW / 2f + sideW / 2f, WallH / 2f, RoomFrontZ + WallT / 2f), new Vector3(sideW, WallH, WallT), wall, true);
-            Box("Wall_Front_Top", new Vector3(0, (WallH + doorH) / 2f, RoomFrontZ + WallT / 2f), new Vector3(doorW, WallH - doorH, WallT), wall, true);
-            // 문 안쪽을 막는 검은 판 — 열린 문 너머가 허공으로 보이지 않게 (텔레포트 포털이라 실제로 나가는 문은 아니다)
-            Box("Door_Backdrop", new Vector3(0, doorH / 2f, RoomFrontZ + WallT * 1.6f), new Vector3(doorW, doorH, 0.02f * M), doorMat, false);
+            // 정면 벽은 **막힌 한 장**이다 (2026-09-10 사용자 지시 — "뚫린 문·검은 판·EXIT 글자가 이상하다. 막아 두고
+            // 거기 박으면 상호작용 키가 뜨게"). 전에는 문 자리를 비우고 검은 배경판 + 문틀 + 발광 EXIT 텍스트를 붙였는데,
+            // 텍스트 뒤 흰 사각·검은 구멍이 조악하게 보였다. 출구는 텔레포트 포털이라 실제로 열리는 문이 아니다 —
+            // 벽에 문 모양 패널 하나를 살짝 도드라지게 붙이고, 포털의 거리·외곽선 기준을 그 패널로 둔다.
+            Box("Wall_Front", new Vector3(0, WallH / 2f, RoomFrontZ + WallT / 2f), new Vector3(width, WallH, WallT), wall, true);
 
-            // 문틀(어두운 트림) + 발광 EXIT 사인 + 바닥 매트
-            float frameT = 0.15f * M;
-            var frameL = Box("DoorFrame_L", new Vector3(-doorW / 2f - frameT / 2f, doorH / 2f, RoomFrontZ), new Vector3(frameT, doorH, frameT * 2f), trim, true, false);
-            Box("DoorFrame_R", new Vector3(doorW / 2f + frameT / 2f, doorH / 2f, RoomFrontZ), new Vector3(frameT, doorH, frameT * 2f), trim, true, false);
-            Box("DoorFrame_Top", new Vector3(0, doorH + frameT / 2f, RoomFrontZ), new Vector3(doorW + frameT * 2f, frameT, frameT * 2f), trim, true, false);
-            var mat = Box("DoorMat", new Vector3(0, 0.01f * M, RoomFrontZ - 0.7f * M), new Vector3(doorW + frameT * 2f, 0.02f * M, 1.2f * M), doorMat, false, false);
-            var signBoard = Box("ExitSignBoard", new Vector3(0, doorH + frameT + 0.32f * M, RoomFrontZ - 0.05f * M), new Vector3(1.6f * M, 0.42f * M, 0.06f * M), exitSign, false, false);
-            // TextMesh 는 카메라가 +z 방향을 볼 때(글자의 -z 쪽에서) 바로 읽힌다. 출구 사인은 방 안(작은 z)에서 +z 를 보며 읽으니 회전 0,
-            // 뒷벽 BOOTH 사인은 +z 쪽에서 -z 를 보며 읽으니 180° (2026-09-06 실측 — 반대로 두면 좌우 반전).
-            // characterSize 실측(2026-09-06): 0.11·M 에서 글자 폭 2.9 m 로 판(1.6 m)을 넘쳤다 → 0.045·M ≈ 1.2 m.
-            WorldText(room.transform, "ExitSignText", "EXIT  ·  축제로 나가기", new Vector3(0, doorH + frameT + 0.32f * M, RoomFrontZ - 0.09f * M),
-                      Quaternion.identity, 0.045f * M, new Color(0.05f, 0.12f, 0.08f), font);
+            // 출구 문 패널 — 벽면에서 0.06 m 도드라진 짙은 남색 **양문**(폭 2.8 m × 높이 3.2 m). 6 m 천장 벽에 2.4 m 문은
+            // 짧아 보였다("프레임도 짧고", 사용자 2026-09-10) — 전시홀 출입구 비례로 키운다. 가운데 세로 홈 하나로 두 짝임을,
+            // 양쪽 손잡이 바로 문임을 알린다. 콜라이더 있음: 여기에 "박히는" 것이 상호작용 진입이다.
+            // 프롬프트·외곽선은 PortalInteractor 가 이 패널에 건다.
+            float doorW = 2.8f * M, doorH = 3.2f * M;
+            var door = Box("ExitDoor", new Vector3(0, doorH / 2f, RoomFrontZ - 0.03f * M), new Vector3(doorW, doorH, 0.06f * M), doorMat, true);
+            Box("ExitDoorSplit", new Vector3(0, doorH / 2f, RoomFrontZ - 0.07f * M), new Vector3(0.03f * M, doorH, 0.02f * M), trim, false, false);
+            Box("ExitDoorHandle_L", new Vector3(-0.22f * M, 1.05f * M, RoomFrontZ - 0.10f * M), new Vector3(0.05f * M, 0.8f * M, 0.05f * M), trim, false, false);
+            Box("ExitDoorHandle_R", new Vector3(0.22f * M, 1.05f * M, RoomFrontZ - 0.10f * M), new Vector3(0.05f * M, 0.8f * M, 0.05f * M), trim, false, false);
+            // 문 위 작은 안내 글자 — 남색 문 위에 흰 글자. EXIT 발광 사인·초록 판은 뺐다.
+            WorldText(room.transform, "ExitDoorLabel", "축제로 나가기", new Vector3(0, doorH + 0.35f * M, RoomFrontZ - 0.02f * M),
+                      Quaternion.identity, 0.28f * M, doorW, new Color(0.22f, 0.24f, 0.30f), font);
 
             // 부스 이름은 파샤(헤더)로 옮겼다 — 셸이 방 벽까지 닿으면서 뒷벽 사인이 셸 뒤에 가려 보이지 않는다.
 
@@ -195,11 +196,14 @@ namespace Festa.EditorTools
 
             // ② 부스 파샤(헤더) — 부스 앞선 위를 가로지르는 흰 띠, 아래에 남색 스트라이프, 글자는 남색.
             // 글자는 +z(문 쪽)에서 -z 를 보며 읽으므로 180° — identity 로 두면 좌우가 뒤집힌다(2차 캡처에서 확인).
-            float fasciaY = 4.7f * M, fasciaZ = ShellTargetFrontZ * M + 0.02f * M;
+            // 셸이 정면 벽에 붙으면서 파샤는 **벽 안쪽 면**(문 위쪽)에 건다 — 방 안(-z 쪽)에서 +z 를 보며 읽으니 회전은 identity.
+            // (셸 앞선 바깥에 두던 3차에서는 180° 였다 — 읽는 방향이 반대다.)
+            float fasciaY = 4.7f * M, fasciaZ = RoomFrontZ - 0.13f * M;
             Box("BoothFascia", new Vector3(0, fasciaY, fasciaZ), new Vector3(width, 0.8f * M, 0.26f * M), fasciaMat, true, false);
             Box("BoothFasciaStripe", new Vector3(0, fasciaY - 0.46f * M, fasciaZ), new Vector3(width, 0.12f * M, 0.30f * M), accentMat, false, false);
-            WorldText(room.transform, "FasciaText", $"BOOTH {id:D2}", new Vector3(0, fasciaY + 0.02f * M, fasciaZ + 0.15f * M),
-                      Quaternion.Euler(0f, 180f, 0f), 0.07f * M, new Color(0.10f, 0.18f, 0.45f), font);
+            // 글자 높이 0.45 m — 파샤 띠(0.8 m) 안에서 스트라이프(아래 0.12 m)를 피해 가운데 놓인다.
+            WorldText(room.transform, "FasciaText", $"BOOTH {id:D2}", new Vector3(0, fasciaY + 0.04f * M, fasciaZ - 0.15f * M),
+                      Quaternion.identity, 0.45f * M, width - 1f * M, new Color(0.10f, 0.18f, 0.45f), font);
 
             // ③ 걸레받이 — 벽과 바닥이 곧바로 만나면 종이 상자처럼 보인다. 짙은 회색 한 줄로 바닥선만 잡는다.
             var skirtMat = Mat("InteriorSkirting", new Color(0.30f, 0.30f, 0.32f), 0.2f);
@@ -306,36 +310,38 @@ namespace Festa.EditorTools
             // 2026-09-10 사거리 축소 — 매트 표면에서 12u(0.9 m). 바깥 부스 입장과 같은 값이라야 조작감이 갈리지 않는다.
             portal.interactRadius = 12f;
             portal.requireFacing = false;
-            portal.outlineWidth = 0.5f;         // 매트는 얇으니 가늘게
-            // 거리 기준은 바닥 매트 — 사인보드(높이 2.9 m)로 재면 3D 거리에 높이가 섞여 매트 위에 서도 39 unit 이 나온다(실측).
-            portal.boundsSource = mat.GetComponent<Renderer>();
-            _ = frameL; _ = signBoard;
+            portal.outlineWidth = 0.5f;
+            // 거리·외곽선 기준은 **문 패널**이다. 벽에 몸이 닿으면(캡슐 반경 2.75u) 표면 거리 ≈ 3u 라 12u 안에 들고,
+            // 문 패널 자체가 금색 외곽선으로 켜져 "여기에 F" 가 읽힌다. 바닥 매트·EXIT 텍스트는 뺐다.
+            portal.boundsSource = door.GetComponent<Renderer>();
+            portal.highlightRoot = door.transform;
         }
 
-        static void WorldText(Transform parent, string name, string text, Vector3 localPos, Quaternion rot, float charSize, Color color, Font font)
+        /// <summary>
+        /// 월드 3D 글자 — **TextMeshPro(SDF)**. 처음(v3)에는 레거시 <see cref="TextMesh"/> + LegacyRuntime 비트맵 폰트였는데
+        /// 글자가 흐릿하고 가장자리가 뭉개져 "글씨가 이상하다"(사용자 2026-09-10). 이름표·이정표와 같은 SDF 경로로 바꾼다 —
+        /// WebGL 에서 검증된 렌더링이고 어느 거리에서나 선이 살아 있다. fontSize 10 = 월드 1 unit (WorldNameplate 실측).
+        /// </summary>
+        static void WorldText(Transform parent, string name, string text, Vector3 localPos, Quaternion rot, float heightUnits, float widthUnits, Color color, TMP_FontAsset font)
         {
-            var go = new GameObject(name);
+            // RectTransform 을 먼저 붙인다 — 뒤에 붙이면 Transform 이 교체되어 참조가 깨진다(S15P21A604-355).
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
             go.transform.localRotation = rot;
-            var tm = go.AddComponent<TextMesh>();
-            tm.text = text;
-            tm.font = font;   // 런타임 TextMesh 폰트 명시 (T-158)
-            tm.fontSize = 64;
-            tm.characterSize = charSize;
-            tm.anchor = TextAnchor.MiddleCenter;
-            tm.color = color;
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.font = font;
+            tmp.text = text;
+            tmp.color = color;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.fontSize = heightUnits * 10f;
+            tmp.characterSpacing = 6f;   // 간판 글자는 자간을 살짝 벌려야 읽힌다
+            tmp.rectTransform.sizeDelta = new Vector2(widthUnits, heightUnits * 1.4f);
             var tr = go.GetComponent<MeshRenderer>();
-            var signMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "InteriorSignText.mat");
-            if (signMat == null)
-            {
-                signMat = new Material(Shader.Find("Festa/WorldText"));
-                AssetDatabase.CreateAsset(signMat, MatDir + "InteriorSignText.mat");
-            }
-            signMat.mainTexture = font.material.mainTexture;
-            EditorUtility.SetDirty(signMat);
-            tr.sharedMaterial = signMat;
             tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            tr.receiveShadows = false;
         }
 
         static Material Mat(string name, Color c, float smooth)
