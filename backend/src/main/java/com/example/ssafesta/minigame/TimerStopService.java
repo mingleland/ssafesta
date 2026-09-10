@@ -93,8 +93,10 @@ public class TimerStopService {
      *   <li><b>The daily total is summed inside that lock</b> for the same reason: two plays at
      *       48/50 that both read 48 both grant, and the day totals 58 (SC-003).
      *   <li><b>The ledger write is last</b>, and its idempotency key is derived from the session, so
-     *       a double payment is refused by a {@code UNIQUE} index even if the lock argument above
-     *       were ever wrong.
+     *       a double payment is refused even if the lock argument above were ever wrong:
+     *       {@code WalletService.applyEntry} looks the key up under its own wallet lock and returns
+     *       the entry already recorded. The {@code UNIQUE} index behind it is the backstop to that
+     *       lookup, not the thing that normally fires.
      * </ol>
      *
      * <p>No flush is forced before crediting. {@code SurveyResponseService} has to, because a
@@ -151,10 +153,15 @@ public class TimerStopService {
      * A resubmission returns the first verdict, not an error — FR-004 forbids paying twice, not
      * answering twice, and a client retrying after a timeout needs this to look like success.
      *
-     * <p>The verdict fields are rebuilt from the stored row. {@code dailyRemainingCoins} and
-     * {@code dailyLimitReached} are deliberately <b>not</b> — they answer "can I earn more right
-     * now", so they are recomputed. A first play that reported 45 remaining will report less once
-     * later plays have earned, and that is the useful answer.
+     * <p>{@code accepted}, {@code rewardedCoins} and {@code errorSeconds} come from the stored row.
+     * {@code dailyRemainingCoins} and {@code dailyLimitReached} are deliberately <b>not</b> — they
+     * answer "can I earn more right now", so they are recomputed. A first play that reported 45
+     * remaining will report less once later plays have earned, and that is the useful answer.
+     *
+     * <p>{@code tier}, {@code timedOut} and {@code message} are re-derived from the current
+     * configuration rather than stored, so editing the tier table can make a later replay of an
+     * older session report a band that no longer matches its {@code rewardedCoins}. Sessions are
+     * settled in seconds and the table is a balance knob, so no column is kept to freeze them.
      */
     private SubmitResult replay(Long userId, MinigameSession session) {
         MinigameProperties.TimerStop config = properties.timerStop();

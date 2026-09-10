@@ -46,8 +46,11 @@ public record MinigameProperties(int dailyCapCoins, TimerStop timerStop) {
      * @param elapsedToleranceSeconds how far the reported stop time may sit from the server's own
      *                               elapsed time before the claim is refused. Two-sided: above it
      *                               means "I stopped at a time that has not happened yet", below it
-     *                               means "I sat on the answer". 20× the tightest reward band, so a
-     *                               real player on a bad connection never trips it
+     *                               means "I sat on the answer". The lower side is the cheat window
+     *                               <i>and</i> the round-trip budget of an honest player at once —
+     *                               a client's timer starts one hop after the server's, so normal
+     *                               play always lands on that side. Tightening it refuses slow
+     *                               connections and burns their session. 잠정값이고 docs/26 결정 대기
      * @param tiers                  reward bands, <b>widest first</b>; {@code tier = index + 1} and
      *                               0 means no reward
      */
@@ -63,6 +66,9 @@ public record MinigameProperties(int dailyCapCoins, TimerStop timerStop) {
             requirePositive("target-max-seconds", targetMaxSeconds);
             requirePositive("fail-margin-seconds", failMarginSeconds);
             requirePositive("elapsed-tolerance-seconds", elapsedToleranceSeconds);
+            // Only the two bounds: they are the ones drawn through longValueExact() into a
+            // NUMERIC(8,3) column. fail-margin and elapsed-tolerance are compared and echoed, never
+            // stored, so a finer scale there is harmless.
             requireMillisecondScale("target-min-seconds", targetMinSeconds);
             requireMillisecondScale("target-max-seconds", targetMaxSeconds);
             if (targetMinSeconds.compareTo(targetMaxSeconds) >= 0) {

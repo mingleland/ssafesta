@@ -92,9 +92,10 @@ public class GlobalExceptionHandler {
         String name = exception.getName();
         log.debug("경로·질의 파라미터 형식 오류 — name={} value={}", name, exception.getValue());
         // The offending value is not echoed: it is attacker-controlled text and this body is
-        // rendered by clients. The name is enough to point at the field.
+        // rendered by clients. The parameter name stays out of the message for the same reason
+        // messagesCarryNoDebuggingTail exists — message is for the reader, field is for the client.
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
-                ErrorCode.VALIDATION_FAILED, "요청 값의 형식이 올바르지 않습니다: " + name,
+                ErrorCode.VALIDATION_FAILED, "요청 값의 형식이 올바르지 않습니다.",
                 RequestIdFilter.current(),
                 List.of(ApiErrorDetail.field(name, "값의 형식이 올바르지 않습니다.")), null));
     }

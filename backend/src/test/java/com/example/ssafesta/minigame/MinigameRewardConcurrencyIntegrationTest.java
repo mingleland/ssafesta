@@ -36,6 +36,11 @@ import org.springframework.test.context.TestPropertySource;
  * wallet row lock <b>before</b> it reads the session or sums the day, so every submission by one
  * member is serialized. Nothing in {@code minigame_sessions} is locked at all.
  *
+ * <p><b>Only the cap test proves that lock.</b> Delete the {@code lockOwner} call and this class
+ * fails 3/3 on {@link #twoSessionsFinishingAtOnceCannotBetweenThemCrossTheDailyCap} and stays green
+ * on the other — because the ledger's idempotency key holds SC-002 on its own. That is the design
+ * (two independent guards), so the same-session test is a check on the outcome, not on the lock.
+ *
  * <p>Repeated, because a race that passed once has not been shown to be closed.
  */
 @Import(TestcontainersConfiguration.class)
@@ -73,11 +78,9 @@ class MinigameRewardConcurrencyIntegrationTest {
         assertEquals(results.get(0).rewardedCoins(), results.get(1).rewardedCoins());
         assertEquals(results.get(0).accepted(), results.get(1).accepted());
 
+        // findByIdempotencyKey is a UNIQUE lookup — a second row for this session could not exist
+        // to be counted, and the balance below is what proves it was only paid once.
         assertTrue(ledger.findByIdempotencyKey(TimerStopService.rewardKey(issued.sessionId())).isPresent());
-        assertEquals(1, ledger.findAll().stream()
-                .filter(entry -> TimerStopService.rewardKey(issued.sessionId())
-                        .equals(entry.getIdempotencyKey()))
-                .count(), "같은 세션의 원장 행은 하나여야 합니다.");
         assertEquals(balanceBefore + 5, wallets.balanceOf(userId), "지급은 1회분이어야 합니다.");
         assertEquals(1, sessions.findByNonce(issued.sessionId()).stream()
                 .filter(session -> session.getRewardLedgerEntryId() != null).count());

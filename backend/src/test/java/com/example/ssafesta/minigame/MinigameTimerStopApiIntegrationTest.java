@@ -22,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -51,6 +52,7 @@ class MinigameTimerStopApiIntegrationTest {
     @Autowired private UserRepository users;
     @Autowired private MinigameSessionRepository minigameSessions;
     @Autowired private MinigameProperties properties;
+    @Autowired private JdbcTemplate jdbc;
 
     @Test
     void aSessionCarriesAServerChosenTargetInsideTheConfiguredRange() throws Exception {
@@ -93,6 +95,31 @@ class MinigameTimerStopApiIntegrationTest {
         assertEquals(MinigameSessionStatus.REJECTED,
                 minigameSessions.findByNonce(sessionId).orElseThrow().getStatus());
         assertEquals(balanceBefore, wallets.balanceOf(userId), "거부된 판이 코인을 지급하면 안 됩니다.");
+    }
+
+    @Test
+    void aStopTimeReportedLongAfterTheRoundIsRefused() throws Exception {
+        // The other half of the elapsed check, and the half an upper bound alone would miss
+        // (#134 §2 proposed only an upper bound): sit on the session, then report the target as if
+        // it had just happened — error 0.000, top band, every time. Without this case a one-sided
+        // check passes the whole suite.
+        //
+        // started_at is moved in SQL rather than slept for: the column is updatable = false and the
+        // wait would be a real hour.
+        String bearer = bearerFor(member("미니지연"));
+        String issued = issue(bearer);
+        UUID sessionId = UUID.fromString(text(issued, "sessionId"));
+        jdbc.update("update minigame_sessions set started_at = started_at - interval '1 hour' where nonce = ?",
+                sessionId);
+
+        submit(bearer, sessionId, number(issued, "targetSeconds"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accepted").value(false))
+                .andExpect(jsonPath("$.rewardedCoins").value(0))
+                .andExpect(jsonPath("$.tier").value(0));
+
+        assertEquals(MinigameSessionStatus.REJECTED,
+                minigameSessions.findByNonce(sessionId).orElseThrow().getStatus());
     }
 
     @Test
