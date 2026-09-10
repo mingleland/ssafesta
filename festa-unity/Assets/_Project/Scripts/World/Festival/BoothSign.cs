@@ -53,7 +53,17 @@ namespace Festa.World
         }
 
         /// <summary>표지판 한 판에 허용하는 최대 줄 수. 넘치면 글자가 작아진다(자동 축소).</summary>
-        public const int MaxLines = 3;
+        public const int MaxLines = 4;
+
+        /// <summary>
+        /// 한 줄에 담는 글자 수의 기준. <b>판이 가로보다 세로로 길다</b>(실측 7.7 × 9.7)라
+        /// 줄을 짧게 끊고 여러 줄로 쌓는 편이 글자를 크게 유지한다.
+        ///
+        /// <para>처음엔 8 이었는데 "AI 프로젝트 전시관" 이 <c>AI</c> / <c>프로젝트 전시관</c> 로 갈려
+        /// 둘째 줄이 판보다 넓어졌고, 자동 축소 바닥에 걸려 그대로 삐져나가 프레임 뒤로 잘렸다
+        /// (2026-09-10). 4 로 낮추면 <c>AI</c> / <c>프로젝트</c> / <c>전시관</c> 이 된다.</para>
+        /// </summary>
+        const int CharsPerLine = 4;
 
         /// <summary>
         /// 어절 단위로 줄을 나눈다. <b>TMP 에 맡기면 한글이 글자 단위로 끊긴다</b> — CJK 는
@@ -65,17 +75,40 @@ namespace Festa.World
         /// 마지막 줄에 한 글자만 남는 모양이 제일 못생겼다. 한 어절이 통째로 길면(공백 없는 긴 이름)
         /// 자르지 않고 그대로 둔다 — 자동 축소가 글자 크기를 줄여 맞춘다.</para>
         /// </summary>
+        /// <summary>
+        /// 공백이 없는 한 덩어리를 줄 수에 맞춰 <b>고르게</b> 쪼갠다.
+        /// 앞줄만 채우고 마지막 줄에 한 글자를 남기지 않도록 줄당 글자 수를 먼저 계산한다.
+        /// </summary>
+        static string ChunkByChar(string word, int maxLines)
+        {
+            if (word.Length <= CharsPerLine) return word;
+
+            int lines = Mathf.Clamp(Mathf.CeilToInt(word.Length / (float)CharsPerLine), 1, Mathf.Max(1, maxLines));
+            int per = Mathf.CeilToInt(word.Length / (float)lines);
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < word.Length; i += per)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(word, i, Mathf.Min(per, word.Length - i));
+            }
+            return sb.ToString();
+        }
+
         public static string WrapByWord(string text, int maxLines)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;
             var words = text.Trim().Split(new[] { ' ', '\t', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length <= 1) return text.Trim();
+
+            // 띄어쓰기가 없는 긴 이름("우리팀의아주긴프로젝트이름" 같은 것)은 어절이 하나라
+            // 나눌 자리가 없다. 그대로 두면 한 줄에 다 넣느라 글자가 5 pt 까지 쪼그라든다 —
+            // 여기서만 글자 단위로 쪼갠다. 지킬 어절 경계가 애초에 없으니 잃는 것이 없다.
+            if (words.Length == 1) return ChunkByChar(words[0], maxLines);
 
             int total = 0;
             foreach (var w in words) total += w.Length;
 
-            // 한 줄에 8글자쯤이 판 비율에 맞는다(실측). 그보다 길면 줄을 늘린다.
-            int lines = Mathf.Clamp(Mathf.CeilToInt(total / 8f), 1, Mathf.Max(1, maxLines));
+            int lines = Mathf.Clamp(Mathf.CeilToInt(total / (float)CharsPerLine), 1, Mathf.Max(1, maxLines));
             if (lines == 1) return string.Join(" ", words);
 
             int budget = Mathf.CeilToInt((float)(total + words.Length - 1) / lines);

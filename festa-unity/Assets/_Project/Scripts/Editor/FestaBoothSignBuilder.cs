@@ -216,8 +216,8 @@ namespace Festa.EditorTools
             var normal = new Vector3(0f, Mathf.Sin(lean * Mathf.Deg2Rad), dir * Mathf.Cos(lean * Mathf.Deg2Rad));
             var rot = outward ? Quaternion.Euler(lean, 180f, 0f) : Quaternion.Euler(lean, 0f, 0f);
 
-            float plateW = w * 0.84f;
-            float plateH = faceHeight * 0.66f;
+            float plateW = w * 0.88f;
+            float plateH = faceHeight * 0.70f;
             float lift = w * 0.05f;   // 판에서 띄우는 거리 — 배율과 함께 커져야 z-fighting 이 안 난다
 
             // 나무판 위에 밝은 종이 한 장을 붙인 모양. 판이 어두운 나무라 글자만 얹으면
@@ -235,13 +235,18 @@ namespace Festa.EditorTools
             go.transform.localPosition = localCenter + normal * (lift * 1.6f);
             go.transform.localRotation = rot;
 
-            float boxW = plateW * 0.9f;
-            float boxH = plateH * 0.86f;
-            // fontSize 10 = 월드 1 unit (WorldNameplate 실측). 한 줄이면 판 높이의 ~70% 를 채우고,
-            // 세 줄짜리 긴 이름이면 자동 축소가 1/3 까지 줄여 맞춘다 — 잘리지 않고 작아진다.
+            float boxW = plateW * 0.92f;
+            float boxH = plateH * 0.9f;
+
+            // fontSize 10 = 월드 1 unit (WorldNameplate 실측).
+            //
+            // **바닥을 낮게 둬야 한다.** 전에 min 을 boxH*1.8 로 잡았더니 "AI 프로젝트 전시관" 에서
+            // 자동 축소가 바닥에 걸린 채 멈췄고, 폭 6.89 박스에 11.18 짜리 글자가 그대로 삐져나가
+            // 입간판 프레임 뒤로 잘렸다 (2026-09-10). 이름 길이는 60자까지 올 수 있으니
+            // (facade.signText 계약) 축소 여지를 넉넉히 준다 — 작아질지언정 잘리지는 않는다.
             tmp.enableAutoSizing = true;
             tmp.fontSizeMax = boxH * 7f;
-            tmp.fontSizeMin = boxH * 1.8f;
+            tmp.fontSizeMin = boxH * 0.5f;
             tmp.fontSize = tmp.fontSizeMax;
             tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
             return tmp;
