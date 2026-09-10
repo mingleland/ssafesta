@@ -38,7 +38,7 @@ class HttpDocumentProcessingClientTest {
         server = MockRestServiceServer.bindTo(builder).build();
         // 송신은 첫 값이다 — 둘째는 회전 중에만 존재한다.
         client = new HttpDocumentProcessingClient(builder,
-                new InternalTokenProperties("inbound", "outbound-first,outbound-old"));
+                new InternalTokenProperties("inbound", "outbound-first,outbound-old", "infra"));
         server.expect(requestTo("http://ai.test:8000/ai/v1/documents/process"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer outbound-first"))

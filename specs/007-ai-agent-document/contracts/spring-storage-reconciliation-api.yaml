@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA Spring Internal Storage Reconciliation API
-  version: 0.1.0
-  description: Infra가 실행한 R2/MinIO reconcile 검증 결과를 Spring 소유 storage_reconciliation_log와 문서 storageProvider에 반영하는 내부 계약이다 (GitLab Work Item #100).
+  version: 0.2.0
+  description: |
+    Infra가 실행한 R2/MinIO reconcile 검증 결과를 Spring 소유 storage_reconciliation_log와 문서 storageProvider에 반영하는 내부 계약이다 (GitLab Work Item #100).
+
+    0.2.0 (S15P21A604-500, Spring 수신단 구현과 함께 개정):
+    - 409를 신설했다. 형식은 유효하지만 현재 상태에 반영할 수 없는 결과를 204로 삼키면 "VERIFIED인데 반영되지 않았는데 성공"이 된다.
+    - 500을 신설했다. targetProvider가 계약상 유효한데 Spring 배포에 그 provider 설정이 없는 경우는 요청 오류가 아니라 서버 설정 오류다.
+    - ErrorResponse를 Spring 공용 오류 봉투(code·message·requestId·errors·warnings)로 맞췄다. 이 API만 다른 오류 모양을 쓰지 않는다.
+    - runId·objectKey·contentType에 maxLength를 넣었다. 상한 없는 runId는 UNIQUE(run_id, document_id) 인덱스 튜플 한계에서 DB 오류로 터진다.
 servers:
   - url: /internal/storage
 security:
@@ -12,7 +19,46 @@ paths:
     post:
       operationId: submitReconciliationResult
       summary: reconcile 실행 결과 1건 반영
-      description: 동일 runId + documentId 재전송은 상태를 다시 반영하지 않고 멱등하게 성공한다. VERIFIED 상태만 문서 storageProvider를 변경한다.
+      description: |
+        동일 runId + documentId 재전송은 상태를 다시 반영하지 않고 멱등하게 성공한다. VERIFIED 상태만 문서 storageProvider를 변경한다.
+
+        ## 반영 조건 (VERIFIED)
+
+        아래를 모두 만족할 때만 문서에 반영한다. 하나라도 어긋나면 결과는 적재하되 문서는 바꾸지 않고 409를 낸다.
+
+        - 문서의 현재 objectKey가 요청의 objectKey와 같다
+        - **문서의 현재 storageProvider가 요청의 sourceProvider와 같다.** 늦게 도착한 결과가 그 사이 옮겨진 최신 저장 위치를 과거 위치로 되돌리지 않게 하기 위한 조건이다
+
+        Spring은 문서의 storageProvider와 함께 storageBucket도 targetProvider의 배포 설정 값으로 갱신한다. 두 provider의 버킷 이름이 다른 배포에서 provider만 바꾸면 이후 읽기·삭제가 존재하지 않는 좌표를 친다. 요청에 targetBucket을 넣어 이 추론을 없애는 안은 #100에서 논의 중이다.
+
+        ## 전제 — 한 문서에 동시 진행 run은 하나다
+
+        **한 document에 진행 중인 reconcile run은 최대 하나이며, 이전 run이 종료되기 전에는 다음 provider 전환을 시작하지 않는다.**
+
+        이 전제가 깨지면 위 sourceProvider 조건만으로는 저장 위치가 원래 값으로 돌아온 경우(A → B → A)를 구분할 수 없다. checkedAt은 "Infra가 검증을 끝낸 시각"이지 "어느 상태를 기준으로 시작했는가"가 아니어서 그 구분에 쓸 수 없다. 전제를 보장할 수 없는 운영이 되면 요청에 소스 상태의 revision을 싣는 방식으로 계약을 다시 고쳐야 한다.
+
+        ## sourceProvider == targetProvider
+
+        허용한다. R2_RECONCILING 단계의 제자리 검증이 이 형태다. 문서 반영은 사실상 no-op가 된다.
+
+        ## resolvedAt
+
+        Infra가 채우고 Spring은 받은 값을 그대로 저장한다. Spring은 이 값을 설정하지 않는다. checkedAt보다 앞설 수 없다.
+
+        ## 응답별 Infra 처리
+
+        | 응답 | Infra 처리 |
+        | --- | --- |
+        | 204 | 완료 |
+        | 409 RECONCILIATION_STALE | terminal. 같은 payload는 계속 409이므로 재시도하지 않는다 |
+        | 409 RECONCILIATION_REPLAY_CONFLICT | terminal. 같은 키로 다른 내용을 보낸 것이므로 송신 측을 확인한다 |
+        | 404 | terminal |
+        | 422 | terminal. payload를 고쳐야 한다 |
+        | 500 RECONCILIATION_CONFIGURATION_ERROR | Spring 배포 설정을 고친 뒤에는 재시도가 의미 있다 |
+
+        ## 멱등 보장 범위
+
+        멱등 응답 보장은 해당 문서가 존재하는 동안에 한한다. 문서가 삭제되면 그 문서의 reconcile 이력도 함께 삭제되고, 이후 같은 payload 재전송은 404다.
       requestBody:
         required: true
         content:
@@ -21,9 +67,23 @@ paths:
               $ref: '#/components/schemas/ReconciliationResultRequest'
       responses:
         '204':
-          description: 신규 또는 중복 결과 반영 성공
+          description: 신규 또는 중복 결과 반영 성공. 재전송은 최초 처리와 같은 응답을 낸다
         '404':
           description: documentId에 해당하는 문서가 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: |
+            결과는 적재됐으나 현재 상태에 반영할 수 없음. code로 구분한다.
+
+            - `RECONCILIATION_STALE` — 문서가 요청의 sourceProvider·objectKey를 더 이상 갖지 않는다
+            - `RECONCILIATION_REPLAY_CONFLICT` — 같은 runId + documentId로 다른 내용이 왔다. 먼저 저장된 결과가 유지된다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '422':
           description: 요청 형식 검증 실패
           content:
@@ -32,6 +92,13 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Infra→Spring Service Token 누락·오류 또는 AI 방향 토큰 재사용
+        '500':
+          description: |
+            `RECONCILIATION_CONFIGURATION_ERROR` — 요청은 유효하나 Spring 배포에 해당 provider 설정이 없거나 문서 행의 버킷이 설정과 어긋난다. 결과는 적재되지 않는다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     infraServiceToken:
@@ -51,12 +118,14 @@ components:
         runId:
           type: string
           minLength: 1
+          maxLength: 200
         documentId:
           type: integer
           format: int64
         objectKey:
           type: string
           minLength: 1
+          maxLength: 1024
         sourceProvider:
           type: string
           enum: [R2, MINIO_LOCAL]
@@ -73,8 +142,10 @@ components:
           minimum: 0
         expectedContentType:
           type: [string, 'null']
+          maxLength: 100
         actualContentType:
           type: [string, 'null']
+          maxLength: 100
         expectedSha256:
           type: [string, 'null']
           pattern: '^[a-f0-9]{64}$'
@@ -94,11 +165,36 @@ components:
           type: [string, 'null']
           format: date-time
     ErrorResponse:
+      description: Spring 공용 오류 봉투 (docs/08 §1.3). errors·warnings는 보고할 것이 없어도 빈 배열로 항상 있다.
       type: object
       additionalProperties: false
-      required: [code, message]
+      required: [code, message, requestId, errors, warnings]
       properties:
         code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: [string, 'null']
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      description: 값이 없는 키는 null이 아니라 아예 빠진다.
+      type: object
+      additionalProperties: false
+      required: [rule, message]
+      properties:
+        rule:
+          type: string
+        objectId:
+          type: string
+        field:
           type: string
         message:
           type: string

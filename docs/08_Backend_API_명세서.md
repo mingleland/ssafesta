@@ -1350,6 +1350,10 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
+| `RECONCILIATION_INVALID` *(007)* | **422.** reconcile 결과가 계약을 벗어났거나 자기모순이다 (FR-035). **이 API 만 422 를 쓴다** — 소비자가 Infra 스크립트라 사용자 입력 오류(400)와 구분한다 |
+| `RECONCILIATION_STALE` *(007)* | **409.** 결과는 적재했으나 문서가 그 source provider·object key 를 더는 갖지 않아 반영할 수 없다. **재시도로 풀리지 않는다** — 늦게 도착한 결과가 최신 저장 위치를 되돌리지 않게 하는 거부다 |
+| `RECONCILIATION_REPLAY_CONFLICT` *(007)* | **409.** 같은 `runId + documentId` 로 다른 내용이 왔다. 먼저 저장된 결과가 남는다 — 멱등은 같은 요청을 다시 보내도 안전하다는 뜻이지 같은 키로 다른 것을 보내도 된다는 뜻이 아니다 |
+| `RECONCILIATION_CONFIGURATION_ERROR` *(007)* | **500.** 요청은 유효한데 Spring 배포에 그 provider 설정이 없거나 문서 행의 bucket 이 설정과 어긋난다. 넷 중 **유일하게 재시도가 의미 있고**, 고칠 것은 payload 가 아니라 배포 설정이다 |
 | `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
 | `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
 | `SURVEY_NOT_FOUND` | **404.** 부스에 설문이 없거나 `surveyId` 가 없다. 편집자 조회의 404 는 "아직 만들지 않았다"는 뜻이라 오류 상태가 아니다 |
@@ -1467,7 +1471,16 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
 > `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지
 > 말고 이 체인에 자기 필터와 규칙을 더한다** — 우선순위가 낮은 체인을 새로 만들면 요청이 그곳까지
-> 가지 않는다. 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 그대로 분리된다.
+> 가지 않는다. T078(S15P21A604-500)이 그대로 따랐다: 같은 체인에 두 번째 필터와
+> `/internal/storage/**` 규칙이 붙었고 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로
+> 분리돼 있다.
+>
+> **두 필터는 서로 겹치지 않는 경로에서만 동작한다.** 그래서 토큰은 자기 방향만 연다 — AI 토큰을
+> `/internal/storage/**`에 내밀면 아무것도 인증되지 않아 **401**이고, 그 반대도 같다.
+>
+> 규칙이 **있는** 경로의 거부는 401, `denyAll`로 떨어지는 규칙 **없는** 경로의 거부는 **403**이다.
+> 의도한 구분이 아니라 판정 방식의 차이다 — authority 규칙은 `Authentication`을 요구해서 없으면
+> 인증 오류가 되고, `denyAll`은 아예 묻지 않아 접근 거부로 끝난다.
 
 ### GET `/internal/ai/booth-access`
 
@@ -1694,3 +1707,55 @@ POST /internal/ai/document-jobs/41/failed
   `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
   `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
 - `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다
+
+### POST `/internal/storage/reconciliation-runs`
+
+Infra가 실행한 R2↔MinIO reconcile 결과를 Spring이 받는다 (spec 007 FR-035, S15P21A604-500).
+정본 계약은 `specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml` **v0.2.0**.
+
+인증은 이 체인의 **Infra 방향 토큰**(`INTERNAL_INFRA_TO_SPRING_TOKENS`)이다. AI 방향 토큰과
+credential·scope가 분리돼 있어 서로의 경로를 열지 못한다. 세 토큰 집합 중 둘에 같은 값이 들어가면
+**Spring이 기동하지 않는다**.
+
+```text
+POST /internal/storage/reconciliation-runs
+Authorization: Bearer <INTERNAL_INFRA_TO_SPRING_TOKENS 의 첫 값>
+
+{ "runId": "2026-09-10T03:00Z-r2-reconcile", "documentId": 42,
+  "objectKey": "booth/7/agent/3/doc.pdf",
+  "sourceProvider": "MINIO_LOCAL", "targetProvider": "R2",
+  "status": "VERIFIED", "attemptCount": 1, "checkedAt": "2026-09-10T03:04:11Z" }
+→ 204
+```
+
+- **적재는 `runId + documentId` 기준으로 멱등**하다. 같은 키의 재전송은 상태를 다시 반영하지 않고
+  **최초 처리와 같은 응답**을 낸다 — 반영됐으면 204, 반영 못 했으면 계속 409다. 재전송을 무조건
+  204로 만들면 같은 요청이 1회차 409, 2회차 204가 된다
+- **`VERIFIED`만 문서를 옮긴다.** `MISMATCH`·`MISSING`은 적재만 한다
+- **반영 조건은 넷이다**: `VERIFIED` · 문서의 object key가 요청과 같음 · **문서의 현재
+  `storageProvider`가 요청의 `sourceProvider`와 같음** · 문서의 bucket이 그 provider의 배포 설정과
+  같음. 세 번째가 늦게 도착한 결과가 최신 저장 위치를 과거로 되돌리는 것을 막는다
+- 반영할 때 **`storageProvider`와 `storageBucket`을 함께** 옮긴다. 두 provider의 버킷 이름이 서로
+  다른 env라 provider만 바꾸면 이후 읽기·삭제가 없는 좌표를 친다. bucket 값은 계약에 없어 Spring이
+  배포 설정에서 해석한다 — 계약에 `targetBucket`을 넣는 안은 #100 논의 중이다
+- **전제**: 한 document에 진행 중인 reconcile run은 최대 하나이며 이전 run 종료 전 반대 방향 전환을
+  시작하지 않는다. 이 전제가 깨지면 위 세 번째 조건만으로는 저장 위치가 원래 값으로 돌아온 경우를
+  구분하지 못한다(`checkedAt`은 검증을 끝낸 시각이라 그 구분에 쓸 수 없다)
+- **멱등 보장 범위는 문서의 수명**이다. 문서가 삭제되면 reconcile 이력도 함께 삭제되고 이후 재전송은
+  404다
+
+| 응답 | 뜻 | Infra 처리 |
+|---|---|---|
+| `204` | 적재·반영됨, 또는 최초 처리와 같은 결과의 재전송 | 완료 |
+| `404 DOCUMENT_NOT_FOUND` | 그 `documentId`가 없다 | terminal |
+| `409 RECONCILIATION_STALE` | 적재는 됐고 반영은 못 했다 — 문서가 그 source·object key를 더는 갖지 않는다 | **terminal, 재시도 금지** |
+| `409 RECONCILIATION_REPLAY_CONFLICT` | 같은 키로 다른 내용이 왔다. 먼저 저장된 결과가 남는다 | terminal + 송신 측 확인 |
+| `422 RECONCILIATION_INVALID` | 계약을 벗어났거나 자기모순인 payload | terminal, payload 수정 |
+| `500 RECONCILIATION_CONFIGURATION_ERROR` | 요청은 유효한데 Spring 배포에 그 provider 설정이 없거나 문서 행의 bucket이 설정과 어긋난다. 적재되지 않는다 | Spring 설정 수정 후 재시도 |
+
+- **이 저장소에서 422를 쓰는 유일한 경로**다. 계약이 그렇게 정했고 소비자가 Infra 스크립트라
+  사용자 입력 오류(400)와 구분되는 편이 낫다
+- 상태별로 어떤 필드가 필수인지는 계약에 없고 Spring이 만들지 않는다. **자기모순만 거절**한다 —
+  `VERIFIED`인데 기대값과 실측값이 다르거나 실패 사유가 있는 경우, `MISSING`인데 실측값이 있는 경우
+- 결과는 `storage_reconciliation_log`(V25)에 남는다. `apply_result`가
+  `APPLIED`·`LOGGED_ONLY`·`STALE`로 **왜 반영되지 않았는지**를 행 자체에 적는다

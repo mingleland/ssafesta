@@ -1,6 +1,7 @@
 package com.example.ssafesta.internal.ai;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -99,7 +100,7 @@ class InternalTokenPropertiesTest {
     /** 송신은 첫 값 하나다 — 나머지는 양쪽이 회전을 준비하는 동안 존재한다. */
     @Test
     void theSentTokenIsTheFirstOne() {
-        InternalTokenProperties properties = bind("in-a", "out-new,out-old");
+        InternalTokenProperties properties = bind("in-a", "out-new,out-old", "infra-a");
 
         assertEquals("out-new", properties.springToAiToken());
         assertEquals(List.of("out-new", "out-old"), properties.springToAiTokenList());
@@ -118,6 +119,66 @@ class InternalTokenPropertiesTest {
         assertTrue(failureOf("${INTERNAL_AI_TO_SPRING_TOKENS}").contains("해석되지 않았습니다"));
         assertTrue(outboundFailureOf("${INTERNAL_SPRING_TO_AI_TOKENS}")
                 .contains("해석되지 않았습니다"));
+        assertTrue(infraFailureOf("${INTERNAL_INFRA_TO_SPRING_TOKENS}")
+                .contains("해석되지 않았습니다"));
+    }
+
+    // ── Infra 방향과 집합 간 분리 (S15P21A604-500) ──────────────────────────────────
+
+    /** 세 번째 방향도 같은 검증을 받는다. */
+    @ParameterizedTest
+    @ValueSource(strings = {"a,,b", "a,", "a, b", "same,same", "a,b,c", ""})
+    void theInfraDirectionRefusesTheSameMistakes(String tokens) {
+        assertTrue(infraFailureOf(tokens).contains("infra-to-spring-tokens"));
+    }
+
+    @Test
+    void theInfraTokensBindInOrder() {
+        InternalTokenProperties properties = bind("in-a", "out-a", "infra-new,infra-old");
+
+        assertEquals(List.of("infra-new", "infra-old"), properties.infraToSpringTokenList());
+    }
+
+    /**
+     * 세 집합 중 어느 둘이라도 값을 공유하면 기동하지 않는다.
+     *
+     * <p>집합마다 상대와 scope 가 다르다 — AI 방향은 사용자 PDF 를 파싱하는 Worker 옆에 있고,
+     * Infra 방향은 reconcile endpoint 하나만 연다. 한 값이 두 집합에 들어가면 그 순간 두 scope 가
+     * 하나로 합쳐지고 넓은 쪽 노출이 좁은 쪽에 닿는다.
+     *
+     * <p>지금까지 이 검사는 AI 쪽에만 있었다({@code festa-ai/app/core/config.py}). Spring 은 두
+     * 칸에 같은 값을 붙여 넣어도 떴다.
+     */
+    @Test
+    void aValueSharedByTwoSetsRefusesToStart() {
+        assertOverlapRefused(bindingOf("shared", "shared", "infra-only"),
+                "ai-to-spring-tokens", "spring-to-ai-tokens");
+        assertOverlapRefused(bindingOf("shared", "outbound-only", "shared"),
+                "ai-to-spring-tokens", "infra-to-spring-tokens");
+        assertOverlapRefused(bindingOf("inbound-only", "shared", "shared"),
+                "spring-to-ai-tokens", "infra-to-spring-tokens");
+    }
+
+    /** 회전 중 두 값 중 하나만 겹쳐도 겹친 것이다. */
+    @Test
+    void anOverlapInOnlyOneRotationSlotRefusesToStart() {
+        assertOverlapRefused(bindingOf("new-a,shared", "out-a", "shared,infra-old"),
+                "ai-to-spring-tokens", "infra-to-spring-tokens");
+    }
+
+    /** 메시지에 토큰 값이 들어가면 기동 로그가 Secret 을 흘린다 — 경로와 개수만 남긴다. */
+    private static void assertOverlapRefused(org.junit.jupiter.api.function.Executable binding,
+                                             String firstPath, String secondPath) {
+        String message = rootMessageOf(binding);
+        assertTrue(message.contains(firstPath), message);
+        assertTrue(message.contains(secondPath), message);
+        assertFalse(message.contains("shared"), message);
+    }
+
+    private static org.junit.jupiter.api.function.Executable bindingOf(String aiToSpring,
+                                                                      String springToAi,
+                                                                      String infraToSpring) {
+        return () -> bind(aiToSpring, springToAi, infraToSpring);
     }
 
     private static String failureOf(String tokens) {
@@ -125,7 +186,11 @@ class InternalTokenPropertiesTest {
     }
 
     private static String outboundFailureOf(String tokens) {
-        return rootMessageOf(() -> bind("valid-inbound", tokens));
+        return rootMessageOf(() -> bind("valid-inbound", tokens, "valid-infra"));
+    }
+
+    private static String infraFailureOf(String tokens) {
+        return rootMessageOf(() -> bind("valid-inbound", "valid-outbound", tokens));
     }
 
     private static String rootMessageOf(org.junit.jupiter.api.function.Executable binding) {
@@ -137,15 +202,17 @@ class InternalTokenPropertiesTest {
         return String.valueOf(cause.getMessage());
     }
 
-    /** The outbound value is a valid one, so a refusal can only be about the inbound argument. */
+    /** The other two values are valid, so a refusal can only be about the inbound argument. */
     private static InternalTokenProperties bind(String tokens) {
-        return bind(tokens, "valid-outbound");
+        return bind(tokens, "valid-outbound", "valid-infra");
     }
 
-    private static InternalTokenProperties bind(String aiToSpring, String springToAi) {
+    private static InternalTokenProperties bind(String aiToSpring, String springToAi,
+                                                String infraToSpring) {
         return new Binder(new MapConfigurationPropertySource(Map.of(
                 "app.internal.ai-to-spring-tokens", aiToSpring,
-                "app.internal.spring-to-ai-tokens", springToAi)))
+                "app.internal.spring-to-ai-tokens", springToAi,
+                "app.internal.infra-to-spring-tokens", infraToSpring)))
                 .bind("app.internal", InternalTokenProperties.class).get();
     }
 }
