@@ -70,10 +70,17 @@ public class BoothDocumentDeactivationService {
 
         // The active set is exactly ix_ai_document_jobs_active_document's (V21:51-53). Terminal Jobs
         // are the audit trail of earlier attempts and are left alone.
+        //
+        // worker_id and lease_expires_at survive, the way markSucceeded leaves them: they say which
+        // worker held the attempt and until when, and CANCELLED is terminal so nothing re-claims it.
+        // markFailed and the lease sweeper do clear them, but they clear a live claim — their rows
+        // can go back to RETRY_WAIT. next_retry_at goes because there is no next attempt.
+        // Neither column can be read by mistake afterwards: ix_ai_document_jobs_lease and the
+        // sweeper's predicate are both restricted to status = 'RUNNING' (V21:56, repository:270).
         List<CancelRequest> live = jdbc.query("""
                 UPDATE ai_document_jobs
                    SET status = 'CANCELLED', finished_at = now(), updated_at = now(),
-                       worker_id = NULL, lease_expires_at = NULL, next_retry_at = NULL,
+                       next_retry_at = NULL,
                        last_error_code = ?, last_error = '임대가 만료돼 처리를 취소했습니다.'
                  WHERE booth_id = ? AND status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
                 RETURNING id, attempt_no
@@ -85,6 +92,11 @@ public class BoothDocumentDeactivationService {
         // re-lease starts a new Job from QUEUED rather than reusing what this one embedded. The
         // search gate already reads processing_status = 'READY', so this frees vector storage
         // rather than fixing a leak.
+        //
+        // Booth-wide rather than scoped to the documents disabled below, which reads like it could
+        // take a FAILED document's evidence with it. It cannot: finalize is the only writer of this
+        // table and it only writes on success, so a FAILED or EXPIRED document has no chunks to
+        // lose. Scoping it would only add a subquery for an empty set.
         int chunks = jdbc.update("DELETE FROM ai_document_chunks WHERE booth_id = ?", boothId);
 
         // FAILED and EXPIRED stay as they are — they are already out of the active set, and
@@ -104,7 +116,11 @@ public class BoothDocumentDeactivationService {
                         OR (processing_status = 'QUEUED' AND uploaded_at IS NOT NULL))
                 """, boothId);
 
-        if (live.isEmpty() && disabled == 0) {
+        // chunks is in the condition so that no delete goes unsaid: a booth can reach here with
+        // nothing left to transition and rows still in this table (its documents disabled by an
+        // earlier pass, or left FAILED), and a silent DELETE is the one outcome nobody could explain
+        // afterwards.
+        if (live.isEmpty() && disabled == 0 && chunks == 0) {
             return;
         }
         log.info("임대 만료로 문서를 껐습니다 — boothId={}, 취소 Job={}건, DISABLED 문서={}건, 삭제 chunk={}건",

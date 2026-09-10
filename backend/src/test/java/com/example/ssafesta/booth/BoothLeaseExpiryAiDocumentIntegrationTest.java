@@ -89,6 +89,8 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
         assertNotNull(finishedAt(jobOf(running)), "취소된 Job 은 종료 시각이 남아야 합니다.");
         assertEquals("BOOTH_LEASE_EXPIRED", errorCode(jobOf(running)),
                 "왜 취소됐는지가 Job 에 남아야 합니다.");
+        assertEquals("worker-1", workerId(jobOf(running)),
+                "어느 워커의 attempt 였는지는 남아야 합니다 — markSucceeded 와 같은 판단입니다.");
         assertEquals(List.of("DISABLED", "DISABLED", "DISABLED", "DISABLED"),
                 List.of(documentStatus(queued), documentStatus(running), documentStatus(waiting),
                         documentStatus(ready)));
@@ -280,6 +282,11 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
 
     private String errorCode(long jobId) {
         return jdbc.queryForObject("SELECT last_error_code FROM ai_document_jobs WHERE id = ?",
+                String.class, jobId);
+    }
+
+    private String workerId(long jobId) {
+        return jdbc.queryForObject("SELECT worker_id FROM ai_document_jobs WHERE id = ?",
                 String.class, jobId);
     }
 
