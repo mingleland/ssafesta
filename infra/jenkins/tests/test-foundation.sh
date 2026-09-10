@@ -98,6 +98,14 @@ grep -q 'final String sourceSha = config.sourceSha as String' "${component_pipel
   || fail "component CI does not accept its selected source SHA"
 grep -q 'final String artifactDir = config.artifactDir as String' "${component_pipeline}" \
   || fail "component CI does not accept its selected artifact path"
+grep -Fq 'final String artifactRoot = "${pwd()}/${artifactDir}"' "${component_pipeline}" \
+  || fail "component CI does not root artifacts in the Jenkins workspace"
+grep -Fq '"CI_ARTIFACT_DIR=${artifactRoot}"' "${component_pipeline}" \
+  || fail "component CI does not pass the rooted artifact directory to adapters"
+grep -Fq '"CI_STAGE_SUMMARY_PATH=${artifactRoot}/stage-summaries/${name}.json"' "${component_pipeline}" \
+  || fail "component CI does not root stage summaries in the Jenkins workspace"
+grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_root}/ci/verify" \
+  || fail "component verification must remain valid after adapter directory dispatch"
 grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
   || fail "game component CI does not reuse its Unity workspace"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
