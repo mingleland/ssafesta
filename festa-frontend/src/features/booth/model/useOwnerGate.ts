@@ -21,7 +21,7 @@ export function judgeOwner(
   return 'owner';
 }
 
-export function useOwnerGate(boothId: number): { status: OwnerGateStatus } {
+export function useOwnerGate(boothId: number): { status: OwnerGateStatus; retry: () => void } {
   const { kind } = useSession();
   const isMember = kind === 'member';
   const myBoothQuery = useQuery({
@@ -31,9 +31,15 @@ export function useOwnerGate(boothId: number): { status: OwnerGateStatus } {
     // 않지만, 훅이 그 가정에 기대면 라우트 등급이 바뀔 때 조용히 깨진다(S15P21A604-458).
     enabled: isMember && Number.isFinite(boothId),
   });
+  // 'error'는 네트워크 실패라 되물으면 풀릴 수 있다 — 화면이 재시도를 줄 수 있게 훅이 제 쿼리를
+  // 다시 부르는 길을 연다. 화면이 queryClient를 직접 만지면 같은 키를 아는 곳이 둘로 늘어난다.
+  const retry = () => {
+    void myBoothQuery.refetch();
+  };
   // 회원이 아니면 소유자가 아니다 — 서버에 묻지 않고도 판정이 선다
-  if (!isMember) return { status: 'not-owner' };
+  if (!isMember) return { status: 'not-owner', retry };
   return {
     status: judgeOwner(myBoothQuery.data, myBoothQuery.isLoading, myBoothQuery.isError, boothId),
+    retry,
   };
 }
