@@ -223,6 +223,36 @@ public class SurveyService {
                 questionViews(survey.getId()));
     }
 
+    /**
+     * The festival's own survey, opened from the event prize shop (S15P21A604-621, GitLab #173).
+     *
+     * <p>Keyed by the event rather than by a booth, and <b>no booth gate runs</b> — there is no
+     * lease or published layout to check because there is no booth. That absence is the point: a
+     * booth-shaped event survey would need a fake user, lease and layout, and the day one of them
+     * expired the event would quietly 404.
+     *
+     * <p><b>{@code responded} rides along.</b> Re-entry has to say "이미 참여함" before the member
+     * presses anything, and a second endpoint for that one value would add a round trip to every
+     * open of the screen.
+     *
+     * <p>A closed survey still returns its questions, exactly like {@link #findRun} — the screen
+     * says 마감 while showing what was asked.
+     *
+     * @param memberId the caller; guests never reach here (the controller refuses them)
+     */
+    @Transactional(readOnly = true)
+    public EventRunView findEventRun(String surveyKey, Long memberId) {
+        Survey survey = surveys.findBySurveyKey(surveyKey)
+                .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
+        RespondedView responded = responses
+                .findBySurveyIdAndRespondentUserId(survey.getId(), memberId)
+                .map(response -> new RespondedView(response.getId(), response.getSubmittedAt()))
+                .orElse(null);
+        return new EventRunView(survey.getSurveyKey(), survey.getId(),
+                survey.isClosedAt(Instant.now()), survey.getRewardCoin(), true, responded,
+                questionViews(survey.getId()));
+    }
+
     // ── 검증 ────────────────────────────────────────────────────────────────
 
     private void validate(SurveyCommand body, Survey existing) {
@@ -538,5 +568,33 @@ public class SurveyService {
      * rewarded survey is members-only <b>before</b> they fill it in and get a 403.
      */
     public record RunView(Long surveyId, boolean closed, int rewardCoin, List<QuestionView> questions) {
+    }
+
+    /**
+     * The event survey run screen (S15P21A604-621, 계약 §11).
+     *
+     * <p>{@code questions} is the same shape as {@link RunView}'s so the client maps one form for
+     * both sources. The two fields that differ are the two facts a booth survey has no way to
+     * state:
+     *
+     * <ul>
+     *   <li>{@code memberOnly} — always {@code true} here, and <b>independent of
+     *       {@code rewardCoin}</b>. This survey pays nothing yet admits no guests, because the
+     *       draw has to identify who entered. A client judging on {@code rewardCoin > 0} alone
+     *       would open it to guests.
+     *   <li>{@code responded} — {@code null} until this member takes part. Re-entry shows the
+     *       completed state without a second call.
+     * </ul>
+     *
+     * <p>{@code surveyKey} is echoed back so a late response can be matched to the request that
+     * asked for it.
+     */
+    public record EventRunView(String surveyKey, Long surveyId, boolean closed, int rewardCoin,
+                               boolean memberOnly, RespondedView responded,
+                               List<QuestionView> questions) {
+    }
+
+    /** When this member already answered. */
+    public record RespondedView(Long responseId, Instant submittedAt) {
     }
 }

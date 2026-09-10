@@ -22,6 +22,15 @@ public interface SurveyResponseRepository extends JpaRepository<SurveyResponse, 
     boolean existsBySurveyIdAndRespondentUserId(Long surveyId, Long respondentUserId);
 
     /**
+     * The member's own response, for telling them they already took part (S15P21A604-621).
+     *
+     * <p>Separate from the {@code exists} above because the event run screen shows <i>when</i> they
+     * answered, and a second round trip for that one value is what the run response exists to
+     * avoid. {@code ux_survey_responses_member} guarantees the {@code Optional}.
+     */
+    Optional<SurveyResponse> findBySurveyIdAndRespondentUserId(Long surveyId, Long respondentUserId);
+
+    /**
      * The same for a guest, keyed on the access token subject.
      *
      * <p>Guest tokens are minted fresh on every {@code /auth/guest} call and never refreshed, so a
