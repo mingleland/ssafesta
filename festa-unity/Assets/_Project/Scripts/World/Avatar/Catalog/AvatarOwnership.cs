@@ -44,6 +44,34 @@ namespace Festa.Avatar
         /// <summary>서버 카탈로그에 등록된 소유 단위 키 — 보유와 무관하게 전부.</summary>
         static readonly HashSet<int> Cataloged = new();
 
+        /// <summary>
+        /// 구매 화면이 필요로 하는 품목 정보 — 소유 단위 키로 찾는다.
+        ///
+        /// <para>잠금 판정에는 <see cref="Owned"/> 하나면 되지만, "구매하시겠습니까" 를 띄우려면
+        /// <b>서버 itemId(구매 경로의 path 변수)와 가격</b>이 있어야 한다. 잠금 판정은 그대로
+        /// <c>owned</c> 하나를 쓰고, 여기 값들은 <b>표시·호출용</b>이다 (#120 §2-1 의 재계산 금지는
+        /// owned 를 다시 만들지 말라는 뜻이지 가격을 들고 있지 말라는 뜻이 아니다).</para>
+        /// </summary>
+        public struct CatalogEntry
+        {
+            public long ItemId;
+            public int Price;
+            public bool OnSale;
+            public string Name;
+        }
+
+        static readonly Dictionary<int, CatalogEntry> Entries = new();
+
+        /// <summary>소유 단위 키로 서버 품목 정보를 찾는다. 카탈로그에 없으면 false.</summary>
+        public static bool TryGetEntry(int ownershipKey, out CatalogEntry entry) => Entries.TryGetValue(ownershipKey, out entry);
+
+        /// <summary>아이템으로 바로 찾는다.</summary>
+        public static bool TryGetEntry(AvatarItemDefinition item, out CatalogEntry entry)
+        {
+            entry = default;
+            return item != null && Entries.TryGetValue(OwnershipKey(item), out entry);
+        }
+
         public static AvatarOwnershipState State { get; private set; } = AvatarOwnershipState.NotLoaded;
 
         /// <summary>실패 사유. <see cref="AvatarOwnershipState.Failed"/> 일 때만 채워진다.</summary>
@@ -83,14 +111,34 @@ namespace Festa.Avatar
         /// 소유 단위 키, <paramref name="ownedKeys"/> 는 그중 <c>owned</c> 인 것이다.
         /// </summary>
         public static void SetFromServer(IEnumerable<int> catalogKeys, IEnumerable<int> ownedKeys)
+            => SetFromServer(catalogKeys, ownedKeys, null);
+
+        /// <summary>
+        /// 위와 같되 구매 화면이 쓸 품목 정보(<paramref name="entries"/>)도 같이 받는다.
+        /// </summary>
+        public static void SetFromServer(IEnumerable<int> catalogKeys, IEnumerable<int> ownedKeys,
+                                         IEnumerable<KeyValuePair<int, CatalogEntry>> entries)
         {
             Cataloged.Clear();
             Owned.Clear();
+            Entries.Clear();
             if (catalogKeys != null) foreach (var key in catalogKeys) if (key != 0) Cataloged.Add(key);
             if (ownedKeys != null) foreach (var key in ownedKeys) if (key != 0) Owned.Add(key);
+            if (entries != null) foreach (var kv in entries) if (kv.Key != 0) Entries[kv.Key] = kv.Value;
 
             State = AvatarOwnershipState.Loaded;
             FailureReason = null;
+        }
+
+        /// <summary>
+        /// 구매가 끝난 품목을 보유로 올린다 (<c>201</c> 응답 뒤). <b>전체 재조회 대신 이 한 칸만 바꾼다</b> —
+        /// 재조회는 느리고, 그 사이 팔레트가 잠깐 다시 잠겨 보인다. 다음 정식 조회 때 서버 값으로 덮인다.
+        /// </summary>
+        public static void MarkOwned(int ownershipKey)
+        {
+            if (ownershipKey == 0 || State != AvatarOwnershipState.Loaded) return;
+            Owned.Add(ownershipKey);
+            Cataloged.Add(ownershipKey);
         }
 
         /// <summary>

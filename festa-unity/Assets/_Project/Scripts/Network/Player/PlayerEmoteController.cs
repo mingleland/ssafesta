@@ -50,6 +50,28 @@ namespace Festa.Network
 
         public override void OnNetworkSpawn() => enabled = IsOwner;
 
+        /// <summary>
+        /// 휠을 거치지 않고 코드에서 원샷 이모트를 재생한다 (하이 스트라이커의 내리찍기 등, 2026-09-10).
+        ///
+        /// <para><b>종료를 여기에 맡겨야 한다.</b> <see cref="NetworkPlayer.EmoteId"/> 에 직접 대입하면 원샷이라도
+        /// 끝나지 않는다 — 되돌리는 것은 <see cref="TrackOneShotDuration"/> 뿐이고, 그것은 휠이 예약한 것만 본다.
+        /// 이 경로로 넣으면 상태가 실제로 재생을 시작한 뒤 그 길이만큼 뒤에 자동으로 None 으로 돌아간다.</para>
+        /// </summary>
+        public void PlayOneShot(PlayerEmoteId emote)
+        {
+            if (!IsOwner || emote == PlayerEmoteId.None || IsLooping(emote)) return;
+            _player.EmoteId.Value = emote;
+            if (emote == PlayerEmoteId.Strike)
+            {
+                // 접촉·반동·복귀를 포함한 타임라인. 원본 대검 클립 길이와 독립적이다.
+                _oneShotStopAt = Time.unscaledTime + AvatarStrikeProp.SwingDuration;
+                _awaitingDuration = PlayerEmoteId.None;
+                return;
+            }
+            _oneShotStopAt = 0f;
+            _awaitingDuration = emote;
+        }
+
         void Update()
         {
             if (!IsOwner) return;

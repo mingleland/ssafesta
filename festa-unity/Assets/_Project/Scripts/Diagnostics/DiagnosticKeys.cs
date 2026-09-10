@@ -89,7 +89,7 @@ namespace Festa.Diagnostics
             ClaimExternal("AvatarCustomizationHud(신규 IS cKey)", KeyCode.C);
             ClaimExternal("PortalInteractor·부스 상호작용(신규 IS fKey)", KeyCode.F);
             ClaimExternal("InteractionFocusCamera 닫기(신규 IS escapeKey)", KeyCode.Escape);
-            ClaimExternal("ControlsHintHud(신규 IS hKey)", KeyCode.H);
+            // H 는 다시 비었다 — 조작 안내 HUD 를 제거하면서 토글도 없앴다(2026-09-10).
         }
     }
 }

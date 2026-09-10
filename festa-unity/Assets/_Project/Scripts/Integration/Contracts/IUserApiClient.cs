@@ -30,5 +30,17 @@ namespace Festa.Integration
         /// <c>MEMBER_ONLY</c> 로 거부된다.</para>
         /// </summary>
         Task<CatalogItemsDto> GetAvatarPartCatalogAsync();
+
+        /// <summary>
+        /// 파츠 구매 — <c>POST /api/v1/catalog/items/{itemId}/purchases</c> (GitLab #120 §2).
+        ///
+        /// <para><b>이중 차감은 서버가 막는다</b> — 지갑 <c>idempotencyKey</c> 와
+        /// <c>UNIQUE(user_id, catalog_item_id)</c> 두 겹이다(#120 §2). 클라이언트의 연타 방지는
+        /// 그 위에 얹는 편의이지 안전장치가 아니다. 두 번 눌려 두 번 가더라도 두 번째는
+        /// <c>ITEM_ALREADY_OWNED</c> 로 떨어지고 코인은 한 번만 빠진다.</para>
+        ///
+        /// <para>게스트는 <c>MEMBER_ONLY</c> 로 거부된다 — 호출 전에 화면에서 걸러야 한다.</para>
+        /// </summary>
+        Task<PurchaseResult> PurchaseAvatarPartAsync(long itemId);
     }
 }
