@@ -31,4 +31,20 @@
 .slot-price { color: var(--sc-gold); font-size: 13px; font-weight: 700; }
 .slot-cta { width: 100%; }
 
+/* 내 부스 카드는 전체가 Studio 진입점이다 (감사 항목 3) — 카드의 세로 흐름을 링크가 그대로 잇는다 */
+.slot-card-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.slot-card-hit:focus-visible {
+  outline: 2px solid var(--sc-accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+.slot-open { color: #9dc0ff; font-size: 13px; font-weight: 600; }
+.slot-card-mine:hover .slot-open { color: #c3d8ff; }
+
 .slot-tx { margin-top: 18px; }
