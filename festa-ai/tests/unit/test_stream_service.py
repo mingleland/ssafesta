@@ -139,6 +139,24 @@ def _events(raw_events: list[str]) -> list[dict]:
     return parsed
 
 
+def _assert_c07_contract(raw_events: list[str], *, terminal: str) -> list[dict]:
+    """Pin the wire-level C-07 rules shared with the frontend SSE parser."""
+    events = _events(raw_events)
+
+    for sequence, (raw, event) in enumerate(zip(raw_events, events, strict=True)):
+        event_line = next(line for line in raw.splitlines() if line.startswith("event: "))
+        assert event_line.removeprefix("event: ") == event["type"]
+        assert {"type", "requestId", "conversationId", "messageId", "sequence"} <= event.keys()
+        assert event["sequence"] == sequence
+
+    assert events[-1]["type"] == terminal
+    assert [event["type"] for event in events if event["type"] in {"done", "error"}] == [terminal]
+    assert len({event["requestId"] for event in events}) == 1
+    assert len({event["conversationId"] for event in events}) == 1
+    assert len({event["messageId"] for event in events}) == 1
+    return events
+
+
 @pytest.mark.asyncio
 async def test_authorize_raises_not_found_when_conversation_missing() -> None:
     service, _ = _service(conversation=None, rag=_RagContextService(), llm=FakeLLMProvider())
@@ -181,7 +199,7 @@ async def test_successful_stream_emits_start_token_source_done_in_order() -> Non
     )
 
     raw = [event async for event in service.stream(conversation=_conversation(), question="질문")]
-    events = _events(raw)
+    events = _assert_c07_contract(raw, terminal="done")
 
     types = [event["type"] for event in events]
     assert types == ["start", "token", "token", "source", "source", "done"]
@@ -215,8 +233,9 @@ async def test_duplicate_document_chunk_pair_emits_one_source_event() -> None:
         conversation=_conversation(), rag=rag, llm=FakeLLMProvider(tokens=("답",))
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="done",
     )
 
     assert len([event for event in events if event["type"] == "source"]) == 1
@@ -229,8 +248,9 @@ async def test_context_build_failure_emits_single_error_event_and_no_commit() ->
         conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="error",
     )
 
     assert [event["type"] for event in events] == ["start", "error"]
@@ -310,22 +330,27 @@ async def test_retry_after_failure_issues_new_request_id_and_commits_only_retry(
         llm=failing_llm,
     )
 
-    failed_events = _events(
-        [event async for event in service.stream(conversation=conversation, question="질문")]
+    failed_events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=conversation, question="질문")],
+        terminal="error",
     )
     assert [event["type"] for event in failed_events] == ["start", "token", "error"]
     assert repository.saved == []
 
     succeeding_llm = FakeLLMProvider(tokens=("안녕",))
     service._llm_provider = succeeding_llm
-    retry_events = _events(
-        [event async for event in service.stream(conversation=conversation, question="질문")]
+    retry_events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=conversation, question="질문")],
+        terminal="done",
     )
 
     assert [event["type"] for event in retry_events] == ["start", "token", "done"]
     failed_request_id = failed_events[0]["requestId"]
     retry_request_id = retry_events[0]["requestId"]
+    failed_message_id = failed_events[0]["messageId"]
+    retry_message_id = retry_events[0]["messageId"]
     assert retry_request_id != failed_request_id
+    assert retry_message_id != failed_message_id
     assert {event["conversationId"] for event in failed_events + retry_events} == {
         conversation.conversation_id
     }
@@ -346,8 +371,9 @@ async def test_ttft_timeout_before_first_token_emits_first_token_phase() -> None
         total_timeout_seconds=1.0,
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="error",
     )
 
     assert [event["type"] for event in events] == ["start", "error"]
@@ -370,8 +396,9 @@ async def test_total_timeout_after_first_token_emits_total_response_phase() -> N
         total_timeout_seconds=0.02,
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="error",
     )
 
     assert [event["type"] for event in events] == ["start", "token", "error"]
