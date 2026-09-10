@@ -215,15 +215,26 @@ namespace Festa.Integration
                     return request.downloadHandler.text;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 401:
-                    LastAuthError = string.IsNullOrEmpty(token)
-                        ? "Access Token 이 주입되지 않았다 (WebGL 호스트 wiring 확인)"
-                        : "Access Token 이 만료·무효다";
+                    if (string.IsNullOrEmpty(token))
+                    {
+                        // 토큰이 **아직** 없을 뿐, 호스트 배선이 끊긴 게 아닐 수 있다. 로비가 첫 조회를
+                        // 토큰 주입보다 먼저 보내는 경우가 실제로 있고(TokenChanged 로 다시 부른다),
+                        // 여기서 "wiring 확인" 이라고 단정한 문구가 demo 실측에서 원인을 FE 로 잘못
+                        // 몰고 갔다 (GitLab #175 → 실제 원인은 world 호스트 nginx 403, #142).
+                        // 배선 결함인지는 이 한 번으로 알 수 없으니 판정하지 않고 사실만 적는다.
+                        LastAuthError = "Access Token 이 아직 없다 — 주입 전 호출이면 토큰 도착 후 자동 재시도된다";
+                        Debug.LogWarning($"[HttpUserApi] {what} → 401 UNAUTHORIZED. {LastAuthError}");
+                        return null;
+                    }
+                    LastAuthError = "Access Token 이 만료·무효다";
                     Debug.LogError($"[HttpUserApi] {what} → 401 UNAUTHORIZED. {LastAuthError}");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 403:
+                    // 게스트에게 회원 전용 API 가 403 인 것은 **정상 응답**이다 — 서버가 계약대로
+                    // 답한 것이라 에러가 아니다. 빨간 에러로 남기면 진짜 실패와 구분이 안 된다(QA #77).
                     LastAuthError = "게스트 계정은 이 기능을 쓸 수 없다 (MEMBER_ONLY)";
-                    Debug.LogError($"[HttpUserApi] {what} → 403. {LastAuthError}");
+                    Debug.LogWarning($"[HttpUserApi] {what} → 403. {LastAuthError}");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError:
