@@ -28,6 +28,8 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <!-- 기본 빌드에서 뺄 JUnit 태그. 위 surefire 주석 참조 (S15P21A604-571) -->
+        <test.excludedGroups>stress</test.excludedGroups>
         <aws.sdk.version>2.32.14</aws.sdk.version>
     </properties>
     <dependencies>
@@ -195,6 +197,23 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <!--
+                    stress 로 표시한 테스트는 기본 빌드에서 뺀다. BoothLeaseStressIntegrationTest
+                    가 자기 주석에 "excluded from the fast build" 라고 적어 두었으나 surefire 설정이
+                    아예 없어 실제로는 매번 돌고 있었다 (S15P21A604-571).
+
+                    값을 property 로 여는 이유: 여기에 직접 적으면 plugin configuration 이 이겨서
+                    -DexcludedGroups= 로 못 푼다. 실측했다 — 그 상태에서 -Dgroups=stress 를 줘도
+                    0건이 돈다. 실제로 돌릴 때는 제외를 비운다:
+                    ./mvnw test -Dtest.excludedGroups= -Dgroups=stress
+                -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.excludedGroups}</excludedGroups>
+                </configuration>
             </plugin>
         </plugins>
     </build>
