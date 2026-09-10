@@ -79,13 +79,14 @@ namespace Festa.World
             var kb = Keyboard.current;
             if (kb == null || !kb.fKey.wasPressedThisFrame) return;
 
-            // 이벤트 부스는 입장하지 않는다 (GitLab #170). 목적지를 찾기 **전에** 갈라진다 —
+            // 이벤트 지점은 입장하지 않는다 (GitLab #170). 목적지를 찾기 **전에** 갈라진다 —
             // 이 포털에는 들어갈 방이 없어서 ResolveDestination 이 "Interior_01 을 못 찾았다" 로
             // 에러를 남기고 조용히 아무 일도 안 하는 상태가 된다.
+            //
+            // **게스트도 그대로 보낸다** — FE 가 세션 종류로 요청 전에 갈라 안내를 띄운다(#170 확인).
             if (_nearest.eventBooth)
             {
-                Festa.Integration.BoothInteractBridge.SendEventBoothInteract(
-                    _nearest.boothId, _nearest.slotId > 0 ? _nearest.slotId : _nearest.boothId);
+                Festa.Integration.BoothInteractBridge.SendEventInteract();
                 _lastTeleportTime = Time.time;   // 프롬프트를 잠깐 내려 연타를 막는다 — 입장과 같은 쿨다운
                 return;
             }

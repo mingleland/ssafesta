@@ -26,20 +26,16 @@ namespace Festa.World
         public Transform destination;
 
         /// <summary>
-        /// 이벤트 부스인가 (GitLab #170). 켜면 <b>입장하지 않는다</b> — F 는 그 자리에서
-        /// <c>BOOTH_EVENT_INTERACT</c> 를 프런트로 쏘고, 화면은 FE 오버레이가 그린다.
+        /// 이벤트 지점인가 (GitLab #170). 켜면 <b>입장하지 않는다</b> — F 는 그 자리에서
+        /// <c>WORLD_EVENT_INTERACT</c> 를 프런트로 쏘고, 화면(경품 상점·이벤트 설문)은 FE 가 그린다.
         ///
-        /// <para><b>왜 씬 설정인가.</b> 부스 종류가 서버에 없다 — <c>LayoutTemplate</c> 은 <c>PROJECT_EXHIBITION</c>
-        /// 하나뿐이고 <c>booths</c> 에 종류 칼럼이 없으며 슬롯 12개가 전부 <c>USER_RENTAL</c> 이다
-        /// (docs/26 · spec 007 C-13 · #112). #170 에서 <c>GET /booths/{boothId}</c> 에 <c>boothType</c> 을
-        /// 요청해 뒀고, 필드가 오면 이 체크박스 대신 서버 값으로 갈아탄다. 그때까지는 하드코딩이라
-        /// 슬롯을 옮기면 같이 옮겨야 한다.</para>
+        /// <para><b>왜 씬 설정인가.</b> 슬롯 1 은 임대가 없어 <b>boothId 가 아예 존재하지 않는다</b> —
+        /// 서버에 물어볼 대상이 없다. BE 가 <c>booth_slots.slot_type = EVENT</c> 를 추가하기로 했고
+        /// (S15P21A604-615), <c>GET /api/v1/booth-slots</c> 의 <c>type</c> 으로 토큰 없이 나온다.
+        /// 그것이 develop 에 오면 이 체크박스 대신 목록 1회 조회로 갈아탄다.</para>
         /// </summary>
-        [Tooltip("이벤트 부스 — 입장하지 않고 프런트로 BOOTH_EVENT_INTERACT 를 보낸다 (#170)")]
+        [Tooltip("이벤트 지점 — 입장하지 않고 프런트로 WORLD_EVENT_INTERACT 를 보낸다 (#170)")]
         public bool eventBooth;
-
-        [Tooltip("이벤트 부스가 차지한 슬롯 번호. 0 이면 boothId 를 그대로 쓴다 (지금은 1:1).")]
-        public int slotId;
 
         [Tooltip("프롬프트에 표시할 행동 문구 (예: '3번 부스 입장')")]
         public string promptText;
