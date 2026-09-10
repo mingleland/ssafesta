@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import (
     ApiError,
@@ -79,6 +80,15 @@ def create_app() -> FastAPI:
     app.state.llm_provider = llm_provider
     app.state.document_task_supervisor = document_task_supervisor
     app.state.agent_config_provider = agent_config_provider
+    # 로컬 브라우저 검증 전용 — 배포 CORS 정책(same-origin vs 별도 호스트)은 아직 미정(docs/26).
+    # Vite dev server(5173/5174)에서 festa-ai(8000)를 직접 호출할 때만 필요하다.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173", "http://localhost:5174"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)
     app.include_router(api_v1_router, prefix="/ai/v1")
