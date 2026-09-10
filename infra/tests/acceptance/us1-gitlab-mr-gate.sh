@@ -32,7 +32,7 @@ check_gate() {
 require 'CI_PIPELINE_SOURCE == "merge_request_event"' "$pipeline"
 require 'CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"' "$pipeline"
 require 'CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID' "$pipeline"
-require 'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feature|feat|fix|docs|style|refactor|test|chore|design|comment|rename|remove|!BREAKING CHANGE|!HOTFIX)\//' "$pipeline"
+require 'CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feat|feature|fix|refactor|test|docs|chore|build|ci|hotfix|perf)\/' "$pipeline"
 job '.component-ci' | grep -Fq 'command -v python3' || fail 'CI summary runtime dependency'
 status_section="$(job 'mr-status')"
 [[ -n "$status_section" ]] || fail 'missing MR status job'
@@ -41,6 +41,8 @@ grep -Fq 'CI_PIPELINE_SOURCE == "merge_request_event"' <<<"$status_section" || f
 grep -Fq 'MR pipeline status only' <<<"$status_section" || fail 'MR status no-op command'
 echo 'PASS: infra/docs-only MR receives a successful pipeline status'
 
+check_gate ai 'festa-ai/**/*'
+echo 'PASS: ai-only MR gate'
 check_gate front 'festa-frontend/**/*'
 echo 'PASS: front-only MR gate'
 check_gate back 'backend/**/*'
@@ -51,4 +53,4 @@ echo 'PASS: back-only MR gate'
 for jira_job in jira-key-check jira-sync-in-progress jira-sync-in-review jira-sync-ready-for-deploy; do
   job "$jira_job" | grep -Eq '^[[:space:]]+- when: never$' || fail "${jira_job} must stay disabled"
 done
-echo 'PASS: shared CI/pipeline paths run both gates; jira jobs remain disabled'
+echo 'PASS: shared CI/pipeline paths run AI, Front, and Back gates; jira jobs remain disabled'
