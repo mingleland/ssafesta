@@ -84,6 +84,16 @@ namespace Festa.Content
                 return;
             }
 
+            // 소파에 누워 있는 동안은 F·프롬프트·링을 전부 끈다 (사용자 지시 2026-09-10). 누운 채 F 를 다시 누르면
+            // 소파 위로 재텔레포트되며 자세가 바뀌고, 프롬프트가 떠 있으면 "다시 누르라" 는 뜻으로 읽힌다. 일어나기는 WASD.
+            if (Festa.World.LiePoseTable.IsLocalPlayerLying())
+            {
+                UpdateHover(null);
+                ShowHint(null);
+                _passive = null;
+                return;
+            }
+
             bool interactKey = InteractKeyPressedThisFrame();
 
             // ── 1순위: 마우스 조준 ──────────────────────────────
