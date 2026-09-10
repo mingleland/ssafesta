@@ -94,3 +94,27 @@
   backdrop-filter: blur(8px);
 }
 .world-hud-guide-open:hover { background: rgba(20, 26, 52, 0.85); }
+
+/* 이용 안내 진입 (S15P21A604-599) — 우하단.
+   좌하단은 조작 안내 카드(펼침 246px)와 접힘 버튼이 번갈아 쓰는 자리라 겹친다.
+   좌하단 중앙은 dev 상호작용 바, 우상단은 상담 Quick Access 다 — 남는 모서리가 여기 하나다. */
+.world-hud-help {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(12, 16, 34, 0.72);
+  backdrop-filter: blur(8px);
+  color: #eaeefb;
+  cursor: pointer;
+}
+.world-hud-help:hover { background: rgba(20, 26, 52, 0.85); }
+.world-hud-help:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+@media (prefers-reduced-transparency: reduce) {
+  .world-hud-help { background: #10142a; backdrop-filter: none; }
+}
