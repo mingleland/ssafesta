@@ -141,8 +141,8 @@
 
 | 항목 | 처리 |
 |---|---|
-| C-01 EC2 사양·SG 담당자 | `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_CHANGE_OWNER`, `SG_80_443_READY` late-bound input. 누락 시 resource/외부 network 단계 fail. |
-| C-02 실제 domain | `ROOT_DOMAIN`, domain owner late-bound input. host template은 고정하고 누락 시 DNS/TLS 단계 fail. |
+| C-01 EC2 사양·SG 담당자 | `SG_CHANGE_OWNER=정승욱(Infra)`로 확정. `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_80_443_READY`는 서버 실측 전까지 late-bound input이며 누락 시 resource/외부 network 단계 fail. |
+| C-02 실제 domain | `ROOT_DOMAIN=ssafesta.world`, domain owner는 정승욱(Infra)으로 확정. host template은 그대로 사용한다. |
 | C-07 시연 정책 | 해소: 시연 중 build/deploy 허용, high-load build 최대 1, demo cgroup 우선 보호. 숫자만 C-01 실측 후 입력. |
 | R2 무료 한도 | 공급자 변경 가능 설정. 현재 공식 값과 확인일을 기록하고 월별/가격 변경 시 재확인. |
 | WSS timeout | infra-003 외부 실측으로 이관. |
