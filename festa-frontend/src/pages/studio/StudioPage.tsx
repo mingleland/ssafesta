@@ -31,7 +31,7 @@ import { FacadePanel } from '../../features/studio/ui/FacadePanel';
 import type { ObjectType } from '../../entities/layout/types';
 import { useBoothAssets } from '../../features/studio/model/useBoothAssets';
 import type { LibraryItem } from '../../features/studio/model/assetLibrary';
-import { instantiateTemplate } from '../../features/studio/model/boothTemplates';
+import { findTemplate, instantiateTemplate } from '../../features/studio/model/boothTemplates';
 import { showToast } from '../../shared/ui/toast/toastStore';
 import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 
@@ -106,6 +106,29 @@ export function StudioPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveMutation.error]);
+
+  // 캔버스에서 Delete·Backspace 로 선택 오브젝트를 지운다 (S15P21A604-603).
+  // 입력 필드·다이얼로그 안에서는 가로채지 않는다 — Game Studio 의 editingText 판정과 같은 규칙이다.
+  // 그러지 않으면 좌표 입력 중 Backspace 가 숫자를 지우는 대신 오브젝트를 지운다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const target = e.target;
+      const editingText =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (editingText) return;
+      if (target instanceof Element && target.closest('[role="dialog"]') !== null) return;
+      const objectId = state.selectedObjectId;
+      if (objectId === null) return;
+      e.preventDefault();
+      dispatch({ type: 'REMOVE_OBJECT', objectId });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [state.selectedObjectId]);
 
   const template = templatesQuery.data?.templates.find((t) => t.template === state.template);
   const bounds = template?.footprint ?? BOOTH_SIZE_FALLBACK;
@@ -223,6 +246,18 @@ export function StudioPage() {
     }
   }
 
+  /**
+   * 전체 초기화 (S15P21A604-603) — 새 경로를 만들지 않는다.
+   *
+   * '빈 부스' 템플릿이 이미 `REPLACE_OBJECTS` 로 배치를 비우고, 확인 다이얼로그도 그 경로에
+   * "배치를 모두 비울까요?" 분기를 갖고 있다(S15P21A604-589). 툴바 버튼은 그 경로를 부를 뿐이다.
+   */
+  function handleResetLayout() {
+    const empty = findTemplate('EMPTY');
+    if (empty === undefined) return;
+    handleApplyTemplate(empty);
+  }
+
   function handleApplyTemplate(template: BoothTemplate) {
     // 비어 있으면 물을 것이 없다. 그 밖에는 반드시 한 번 묻는다 — 되돌릴 수단(Undo)이 아직
     // 없어서 확인이 유일한 안전망이다.
@@ -301,6 +336,8 @@ export function StudioPage() {
           onSave={handleSave}
           onPublish={() => publishMutation.mutate(boothIdNum)}
           onZoomToggle={() => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length)}
+          canReset={state.objects.length > 0 && !gates.leaseExpired}
+          onReset={handleResetLayout}
         />
       }
       rail={<ModeRail mode={mode} onChange={setMode} />}

@@ -21,6 +21,7 @@ import type { BoothRendererProps } from './canvasTypes';
 import { boxPlacement, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
 import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
 import { AssetMesh } from './AssetMesh';
+import { dragKind } from '../../model/studioMode';
 import { pickAsset } from '../../model/boothAssetManifest';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
 import { useBoothAssets } from '../../model/useBoothAssets';
@@ -419,7 +420,7 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
             selected={obj.objectId === p.selectedObjectId}
             outOfBounds={oob}
             asset={pickAsset(p.assets, obj)}
-            onDown={(e) => begin(e, obj, p.tool === 'rotate' ? 'rotate' : 'move')}
+            onDown={(e) => begin(e, obj, dragKind(e, p.tool))}
           />
         );
       })}
