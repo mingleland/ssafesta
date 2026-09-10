@@ -1,26 +1,26 @@
 // runtime config fallback 고정 — 런타임 주입이 실패했을 때 조용히 빈 base로 떨어지지 않는 것이 요지다.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { resolveApiBaseUrl, resolveHostApiBaseUrl } from '../../runtime';
+import { resolveOptionalBaseUrl, resolveHostApiBaseUrl } from '../../runtime';
 
-describe('resolveApiBaseUrl', () => {
+describe('resolveOptionalBaseUrl — 빈 값이 의미를 갖는 base (unityBuildBase)', () => {
   it('런타임 값이 있으면 그것을 쓴다 — 배포 이미지의 정상 경로', () => {
-    expect(resolveApiBaseUrl('https://api.example.test', 'http://localhost:8080')).toBe('https://api.example.test');
+    expect(resolveOptionalBaseUrl('https://api.example.test', 'http://localhost:8080')).toBe('https://api.example.test');
   });
 
   it('런타임 값이 없으면 빌드타임 값으로 내려간다 — npm run dev의 정상 경로', () => {
-    expect(resolveApiBaseUrl(undefined, 'http://localhost:8080')).toBe('http://localhost:8080');
+    expect(resolveOptionalBaseUrl(undefined, 'http://localhost:8080')).toBe('http://localhost:8080');
   });
 
   it('런타임 값이 빈 문자열이어도 빌드타임 값으로 내려간다 — 주입이 비어 온 경우', () => {
-    expect(resolveApiBaseUrl('', 'http://localhost:8080')).toBe('http://localhost:8080');
+    expect(resolveOptionalBaseUrl('', 'http://localhost:8080')).toBe('http://localhost:8080');
   });
 
   it('둘 다 없으면 상대 경로(빈 문자열) — same-origin 배치의 기본값', () => {
-    expect(resolveApiBaseUrl(undefined, undefined)).toBe('');
+    expect(resolveOptionalBaseUrl(undefined, undefined)).toBe('');
   });
 });
 
-// FE Host Gateway (S15P21A604-564). 이 판정이 resolveApiBaseUrl 과 갈라진 이유는 하나다 —
+// FE Host Gateway (S15P21A604-564). 이 판정이 resolveOptionalBaseUrl 과 갈라진 이유는 하나다 —
 // 같은 값을 Unity 도 읽는데, Unity 는 빈 문자열을 "주입 없음" 으로 읽어 빌드 타임 Prod 로 내려갔다.
 const ORIGIN = 'http://localhost:5173';
 
