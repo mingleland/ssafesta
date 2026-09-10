@@ -25,9 +25,13 @@ create_dev_deploy_fixture() {
 set -euo pipefail
 printf '%s\n' "$*" >>"${FAKE_DOCKER_LOG}"
 candidate="sha256:$(printf 'b%.0s' {1..64})"
+previous="sha256:$(printf 'a%.0s' {1..64})"
 
 if [[ "${1:-} ${2:-}" == 'image inspect' ]]; then
-  printf '%s\n' "${candidate}"
+  case "${!#}" in
+    *:old) printf '%s\n' "${previous}" ;;
+    *) printf '%s\n' "${candidate}" ;;
+  esac
   exit 0
 fi
 if [[ "${1:-}" == inspect ]]; then
@@ -59,7 +63,9 @@ if [[ "${1:-}" == compose ]]; then
   done
   if [[ "$*" == *' up -d --no-deps '* ]]; then
     service="${!#}"
-    printf '%s|%s|0|%s\n' "${project}-${service}-2" "${candidate}" "${RELEASE_ID}" >"${FAKE_DOCKER_STATE}/${project}__${service}"
+    image="${candidate}"
+    [[ "${COMPONENT_IMAGE_REF:-}" == *:old ]] && image="${previous}"
+    printf '%s|%s|0|%s\n' "${project}-${service}-2" "${image}" "${RELEASE_ID}" >"${FAKE_DOCKER_STATE}/${project}__${service}"
   fi
   exit 0
 fi
