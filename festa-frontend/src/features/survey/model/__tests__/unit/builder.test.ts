@@ -182,3 +182,20 @@ describe('저장 늦은 응답 가드', () => {
     }
   });
 });
+
+// S15P21A604-541 F-1 회귀 — 저장 경로도 같다. 409 SURVEY_LOCKED("응답이 있는 설문은 문항을
+// 바꿀 수 없습니다") 가 "저장하지 못했습니다" 로 뭉개지면 사용자가 다음 행동을 정할 수 없다.
+describe('저장 실패 문구 (S15P21A604-541 F-1)', () => {
+  it('서버 message 를 상태에 싣는다', async () => {
+    await loadSurveyBuilder(MOCK_BOOTH_NEW);
+    updateTitle('FAIL');
+    addQuestion('long_text');
+    const q = getSurveyBuilderSnapshot().draft.questions[0].id;
+    updateQuestion(q, { prompt: '의견?' });
+    await saveSurveyBuilder();
+
+    const s = getSurveyBuilderSnapshot();
+    expect(s.save.phase).toBe('error');
+    expect(s.save.errorMessage).toBe('일시적인 오류입니다.');
+  });
+});

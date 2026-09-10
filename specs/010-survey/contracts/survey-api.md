@@ -174,6 +174,16 @@ FE `saveDraft(draft)`. 없으면 만들고 있으면 갱신하며 **둘 다 200*
 - `description`·`rewardCoin`·`closesAt`은 **키 존재 여부로 판정한다** — 키가 없으면 **기존 값을 유지**하고, 명시적 `null`이면 비운다. FE `saveDraft`는 `{title, questions}`만 보내므로 이 규칙이 없으면 저장마다 보상이 0으로 지워진다. 016이 밟은 자리다(T-97).
 - 문항은 **전체 교체**다. `questionId`를 받지 않는다 — 순서 변경·삭제·추가가 한 번의 저장으로 표현되고, FE Builder가 로컬 id(`q-1`)로 편집하므로 서버 id를 왕복시킬 이유가 없다.
 
+### 응답 200
+
+**§2의 Survey 표현을 그대로 돌려준다** — 생성이든 수정이든 같다.
+
+`surveyId`가 여기 실리는 것이 계약이다. 첫 저장 직전에는 설문이 없어 §3이 404이므로, **첫 저장 직후 FE가 `surveyId`를 얻는 자리는 이 응답 하나뿐이다.** 제출·결과·주관식 조회가 모두 그 값을 쓴다. 서버는 처음부터 이 본문을 돌려주고 있었고 이 절이 빠져 있었다 (S15P21A604-546).
+
+서버 배정 `questionId`·`optionId`도 함께 돌아온다 — 요청은 로컬 id(`q-1`)로 보내고 응답에서 서버 id를 받는 형태다. 결과 화면이 문항을 가리킬 때 쓰는 값이 이것이다.
+
+**따라서 `GET /booths/{boothId}/survey/results` 별칭은 두지 않는다.** 편집자 화면은 §3 또는 이 응답에서 `surveyId`를 이미 쥐고 있어, 같은 집계를 두 경로로 두는 것이 된다 (#133 요청 2번에 대한 판단).
+
 ### 응답 있는 설문 (C-08)
 
 응답이 1건 이상이면 **문항 구조는 잠긴다.**
@@ -295,16 +305,17 @@ FE `getResult(surveyId)`. **집계는 서버가 계산한다** (FR-007) — 원�
   "firstRespondedAt": "2026-09-08T04:11:02Z",
   "lastRespondedAt": "2026-09-08T07:55:40Z",
   "perQuestion": [
-    { "questionId": 101, "type": "SINGLE_CHOICE", "answeredCount": 18,
+    { "questionId": 101, "type": "SINGLE_CHOICE", "prompt": "우리 부스를 어떻게 알았나요?",
+      "answeredCount": 18,
       "counts": [ { "optionId": 1001, "label": "월드를 돌아다니다가", "count": 11 },
                   { "optionId": 1002, "label": "추천을 받고", "count": 7 } ],
       "average": null, "distribution": [] },
-    { "questionId": 102, "type": "RATING", "answeredCount": 20,
+    { "questionId": 102, "type": "RATING", "prompt": "만족도", "answeredCount": 20,
       "counts": [], "average": 4.2,
       "distribution": [ { "value": 1, "count": 0 }, { "value": 2, "count": 1 },
                         { "value": 3, "count": 2 }, { "value": 4, "count": 8 },
                         { "value": 5, "count": 9 } ] },
-    { "questionId": 103, "type": "LONG_TEXT", "answeredCount": 12,
+    { "questionId": 103, "type": "LONG_TEXT", "prompt": "개선할 점", "answeredCount": 12,
       "counts": [], "average": null, "distribution": [] }
   ],
   "textAnswers": {
@@ -314,6 +325,7 @@ FE `getResult(surveyId)`. **집계는 서버가 계산한다** (FR-007) — 원�
 }
 ```
 
+- **각 문항은 `prompt`로 문항 문구를 싣는다.** 화면이 문항을 `문항 101`처럼 번호로 부르지 않게 하려는 것이고, FE가 §3을 다시 불러 조인할 이유를 없앤다. §2·§5가 같은 값을 이미 `prompt`로 내보내므로 이름을 맞췄다 — 한 값이 경로마다 다른 이름이면 어댑터가 갈린다 (S15P21A604-546).
 - **`perQuestion`은 모든 문항을 싣는다** — 텍스트 유형도 `answeredCount`만 채워 들어간다. 빠뜨리면 화면이 "3문항 중 2개"만 그리게 되고, 그게 응답 0인지 문항 삭제인지 알 수 없다.
 - **비율은 싣지 않는다.** `count / answeredCount`로 화면이 계산한다 — 복수선택은 합이 100%를 넘고(Edge Case) 그 사실이 수치에 그대로 드러나는 편이 옳다.
 - `answeredCount`는 **그 문항에 답한 응답 수**다. `totalResponses`와 다를 수 있다 — 선택 문항을 건너뛴 사람이 있기 때문이다 (Edge Case "미응답 문항은 문항별 응답 수에서 제외").

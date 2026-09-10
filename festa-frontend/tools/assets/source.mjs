@@ -79,11 +79,20 @@ export function convert(source) {
   const raw = sourceObject(source);
   const rawBounds = boundsOf(raw);
 
-  // 텍스처를 안 가져오므로 재질도 원본을 쓸 이유가 없다. 색은 런타임이 계약 표에서 준다.
+  // prefab 경로가 Unity `.mat` 을 풀어 심어 둔 재질은 **그대로 둔다**(S15P21A604-527).
+  // 판별은 `userData.unityMaterialPath` 하나로 한다 — 이름은 다른 이유로도 붙으므로
+  // 이름 유무로 판단하지 않는다. 그 표식이 없는 것(단일 FBX 경로)만 placeholder 로 덮는다.
+  const hasUnityMaterial = (material) =>
+    (Array.isArray(material) ? material : [material]).some(
+      (m) => typeof m?.userData?.unityMaterialPath === 'string',
+    );
+
   let triangles = 0;
   raw.traverse((o) => {
     if (!o.isMesh) return;
-    o.material = new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.7 });
+    if (!hasUnityMaterial(o.material)) {
+      o.material = new THREE.MeshStandardMaterial({ color: 0xd8dce6, roughness: 0.7 });
+    }
     const pos = o.geometry.getAttribute('position');
     triangles += (o.geometry.index ? o.geometry.index.count : pos.count) / 3;
   });

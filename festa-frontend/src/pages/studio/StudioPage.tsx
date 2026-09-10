@@ -28,6 +28,11 @@ import type { BoothDecor } from '../../features/studio/ui/canvas/canvasTypes';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';
+import type { ObjectType } from '../../entities/layout/types';
+import { useBoothAssets } from '../../features/studio/model/useBoothAssets';
+import type { LibraryItem } from '../../features/studio/model/assetLibrary';
+import { instantiateTemplate } from '../../features/studio/model/boothTemplates';
+import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 
 // 카탈로그 type — BE 시드는 AVATAR_PART 뿐(-167). 부스 장식 유형 값은 외부 확정 대기라 조회만 걸어 둔다
 const CATALOG_TYPE = 'BOOTH_DECOR';
@@ -62,6 +67,8 @@ export function StudioPage() {
   });
 
   const catalogQuery = useCatalogItems(CATALOG_TYPE);
+  // 좌측 Library 의 정본. 없으면 빈 배열이고 팔레트가 옛 목록으로 떨어진다(-551)
+  const boothAssets = useBoothAssets();
 
   const saveMutation = useSaveDraft(dispatch);
   const publishMutation = usePublish(dispatch);
@@ -156,11 +163,38 @@ export function StudioPage() {
     });
   }
 
-  function handleAdd(item: PaletteItem) {
+  function addAt(objectType: ObjectType, assetCode: string | undefined, taken: Array<{ x: number; z: number }>) {
     // 같은 지점에 쌓이면 선택도 드래그도 못 한다 — 빈 자리를 찾아 놓는다
-    const spot = findFreeSpot(state.objects.map((o) => ({ x: o.position.x, z: o.position.z })), bounds);
+    const spot = findFreeSpot(taken, bounds);
     // ADD_OBJECT 가 새 오브젝트를 선택한다 — 장식형이면 레지스트리의 외형 코드를 함께 기록한다
-    dispatch({ type: 'ADD_OBJECT', objectType: item.objectType, x: spot.x, z: spot.z, assetCode: item.assetCode });
+    dispatch({ type: 'ADD_OBJECT', objectType, x: spot.x, z: spot.z, assetCode });
+    return spot;
+  }
+
+  const placed = () => state.objects.map((o) => ({ x: o.position.x, z: o.position.z }));
+
+  function handleAdd(item: PaletteItem) {
+    addAt(item.objectType, item.assetCode, placed());
+  }
+
+  /** Asset Library(manifest 소비) 에서 고른 실자산 */
+  function handleAddAsset(item: LibraryItem) {
+    addAt(item.objectType, item.assetCode, placed());
+  }
+
+  /**
+   * Template 적용 — 일반 ADD_OBJECT 를 여러 번 부르는 것이 전부다.
+   * 전용 경로를 만들지 않는다. 상한·검증·undo 가 전부 기존 경로에 이미 있다.
+   */
+  function handleApplyTemplate(template: BoothTemplate) {
+    const taken = placed();
+    for (const object of instantiateTemplate(template)) {
+      if (taken.length >= maxObjects) break;
+      const spot = addAt(object.type, object.assetCode, taken);
+      // 템플릿이 준 좌표는 서로 겹치지 않지만, 이미 놓인 것과는 겹칠 수 있다.
+      // 그래서 실제로 놓인 자리를 누적해 다음 자산이 그 위에 앉지 않게 한다
+      taken.push(spot);
+    }
   }
 
   const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
@@ -240,7 +274,10 @@ export function StudioPage() {
           currentCount={state.objects.length}
           maxObjects={maxObjects}
           catalog={catalogQuery.data ?? []}
+          assets={boothAssets}
           activePresetId={preset?.id ?? null}
+          onAddAsset={handleAddAsset}
+          onApplyTemplate={handleApplyTemplate}
           onAddObject={handleAdd}
           onPickPreset={setPreset}
         />

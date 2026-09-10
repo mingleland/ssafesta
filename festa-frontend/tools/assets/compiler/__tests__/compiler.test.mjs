@@ -9,7 +9,7 @@ import { EMISSION, POLICY, canEmitProduction, evaluate } from '../licenseGate.mj
 import { SIMPLIFY_FLOOR_TRIANGLES, countTriangles, flattenAndMerge, planSimplification, quantizePositions } from '../geometry.mjs';
 import { parseMaterial, planTextureOptimization } from '../material.mjs';
 import { planThumbnail, stripMetadata } from '../emit.mjs';
-import { decideSimplify } from '../pipeline.mjs';
+import { collectUnityMaterials, decideSimplify } from '../pipeline.mjs';
 import { makeCamera, renderToRaw } from '../toolchain/rasterizer.mjs';
 
 const packs = (policy) => ({ packages: { Vendor: { runtimeCompilePolicy: policy } } });
@@ -211,5 +211,44 @@ describe('Thumbnail 래스터라이저', () => {
     const camera = makeCamera({ radius: 1, size: 16 });
     const { rgba } = renderToRaw({ positions: new Float32Array(0), normals: new Float32Array(0) }, camera, { baseColor: [1, 1, 1] });
     expect(rgba.every((v) => v === 0)).toBe(true);
+  });
+});
+
+describe('collectUnityMaterials — 판별 기준은 userData 다', () => {
+  const meshWith = (material) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+    const root = new THREE.Group();
+    root.add(mesh);
+    return root;
+  };
+  const unity = (name, path) => {
+    const m = new THREE.MeshStandardMaterial();
+    m.name = name;
+    m.userData.unityMaterialPath = path;
+    return m;
+  };
+
+  it('unityMaterialPath 가 있는 재질만 표에 넣는다', () => {
+    const plain = new THREE.MeshStandardMaterial();
+    plain.name = 'unity:거짓말';
+    const root = meshWith([unity('unity:Tablet.mat', '/abs/Tablet.mat'), plain]);
+    const map = collectUnityMaterials(root);
+    expect(map.get('unity:Tablet.mat')).toBe('/abs/Tablet.mat');
+    // 이름이 그럴듯해도 provenance 표식이 없으면 Unity 재질이 아니다
+    expect(map.has('unity:거짓말')).toBe(false);
+  });
+
+  it('여러 재질을 슬롯별로 모두 담는다 — 첫 재질로 몰지 않는다', () => {
+    const root = meshWith([
+      unity('unity:PlasticWhite.mat', '/abs/PlasticWhite.mat'),
+      unity('unity:AluminiumBrushed.mat', '/abs/AluminiumBrushed.mat'),
+    ]);
+    expect(collectUnityMaterials(root).size).toBe(2);
+  });
+
+  it('이름이 없으면 담지 않는다 — export 후 되찾을 키가 없다', () => {
+    const nameless = new THREE.MeshStandardMaterial();
+    nameless.userData.unityMaterialPath = '/abs/X.mat';
+    expect(collectUnityMaterials(meshWith(nameless)).size).toBe(0);
   });
 });

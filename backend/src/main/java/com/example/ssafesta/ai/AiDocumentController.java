@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,8 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Two calls around an upload that does not pass through here: {@code upload-url} hands out a
  * presigned {@code PUT} the browser uses directly, and {@code complete} is how the client says the
- * bytes landed. Listing, deleting and handing the document to FastAPI are separate issues
- * (S15P21A604-174, -175).
+ * bytes landed. A third call lists what the agent has and where each document is in
+ * processing. Deleting is a separate issue (FR-012), and handing the document to FastAPI is
+ * S15P21A604-175.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -65,7 +67,7 @@ public class AiDocumentController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "발급 성공(`duplicate: false`, `uploadUrl` 있음) 또는 중복(`duplicate: true`, `uploadUrl` 없음)"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 파일 이름·MIME·크기·해시 형식 위반. 허용 형식과 상한을 넘은 경우도 여기다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다"),
             @ApiResponse(responseCode = "409", description = "`DOCUMENT_LIMIT_EXCEEDED`(문서 수·총량 상한 초과) 또는 `BOOTH_LEASE_EXPIRED`"),
             @ApiResponse(responseCode = "503", description = "`STORAGE_UNAVAILABLE` — 저장소를 쓸 수 없다. 잠시 뒤 다시 시도한다")})
@@ -78,6 +80,46 @@ public class AiDocumentController {
             @RequestBody(required = false) AiDocumentService.UploadCommand command) {
         Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
         return documents.issueUploadUrl(agentId, userId, command);
+    }
+
+    @Operation(summary = "문서 목록·처리 상태 조회",
+            description = """
+                    이 AI 직원에 등록된 문서를 **모든 상태**로 돌려준다. 최근 발급 순이다.
+
+                    처리는 비동기라 업로드 완료(2단계)가 곧 준비 완료는 아니다. 진행은 이 endpoint 를
+                    다시 불러 확인한다.
+
+                    | `status` | 뜻 |
+                    |---|---|
+                    | `QUEUED` | 접수됨. `uploadedAt` 이 `null` 이면 **아직 업로드가 안 끝난 것**이다 |
+                    | `PROCESSING` | 처리 중 |
+                    | `READY` | 준비 완료 — 검색에 쓰인다 |
+                    | `FAILED` | 처리 실패 |
+                    | `EXPIRED` | **업로드 만료** — 1시간 안에 업로드가 끝나지 않았다. 파일을 다시 올리면 된다 |
+                    | `DISABLED` | 임대 만료로 꺼진 상태. 사용자가 되돌릴 수 없다 |
+
+                    **`quota` 에는 상한만 있다.** 쓴 양은 `documents` 에서 읽는다 — 자리를 차지하는 것은
+                    `QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만
+                    나온다(실패한 업로드가 슬롯을 잡으면 안 된다). 그래서 **행 10개가 보여도 업로드가 될 수
+                    있다** — "n/10" 의 n 은 활성 3상태 행의 수다.
+
+                    **AI 처리 서버가 죽어 있어도 이 조회는 답한다.** 모든 값이 이 서버의 문서 행에 있다.
+
+                    임대가 만료된 부스도 소유자·Staff 는 조회할 수 있다. 문서가 `DISABLED` 로 바뀔 뿐
+                    원본과 메타데이터는 보존된다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공. 문서가 없으면 `documents` 가 빈 배열이다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "404", description = "`AGENT_NOT_FOUND` — 그런 AI 직원이 없다")})
+    @GetMapping("/agents/{agentId}/documents")
+    @SecurityRequirement(name = "bearerAuth")
+    public AiDocumentService.DocumentListView list(
+            @AuthenticationPrincipal Jwt jwt,
+            @Parameter(description = "문서를 조회할 AI 직원", example = "78")
+            @PathVariable Long agentId) {
+        Long userId = MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY);
+        return documents.list(agentId, userId);
     }
 
     /** No request body: everything needed is on the row, and the object is verified against it. */
@@ -97,7 +139,7 @@ public class AiDocumentController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "완료 처리됨. `processingStatus: QUEUED`"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_FORBIDDEN`(그 부스 편집 권한이 없다)"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY`(게스트) 또는 `BOOTH_EDITOR_FORBIDDEN`(그 부스 편집 권한이 없다)"),
             @ApiResponse(responseCode = "404", description = "`DOCUMENT_NOT_FOUND` — 그런 문서가 없다. 권한 검사보다 먼저 판정된다"),
             @ApiResponse(responseCode = "409", description = "`DOCUMENT_UPLOAD_INCOMPLETE` — 객체가 없거나 선언한 크기와 다르다. 또는 완료할 수 있는 상태가 아니다"),
             @ApiResponse(responseCode = "410", description = "`DOCUMENT_UPLOAD_GONE` — 업로드 유효 시간이 지났다. 1단계부터 다시 한다"),

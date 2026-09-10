@@ -73,6 +73,21 @@ namespace Festa.World
             _player.AnimState.OnValueChanged += OnAnimStateChanged;
             _player.EmoteId.OnValueChanged += OnEmoteChanged;
 
+            // 서버는 grant 에 외형이 없어(#138) 초기값을 기본 프리셋으로 채우고, 진짜 외형은 소유자 RPC 로 곧 뒤따른다.
+            // 그 기본값으로 먼저 조립하면 사람 1명 입장에 모두의 화면에서 조립이 2번 돌고(40명이면 80회), 기본 아바타가
+            // 잠깐 보였다 옷을 갈아입는다(QA 2026-09-08 #37). 기본 프리셋이면 잠깐 기다려 진짜 외형이 오면 그것만 짓는다.
+            var initial = _appearance.Encoded.Value.ToString();
+            if (initial == AvatarAppearance.DefaultPreset) DeferDefaultBuildAsync();
+            else Rebuild(initial);
+        }
+
+        /// <summary>기본 프리셋 상태에서 1.5초 기다린다. 그 안에 외형이 오면 OnEncodedChanged 가 짓고 이 호출은 물러난다.
+        /// 끝내 안 오면(게스트·구 클라이언트) 기본 외형으로 짓는다 — 안 보이는 것보다는 기본 옷이 낫다.</summary>
+        async void DeferDefaultBuildAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(1.5f);
+            if (this == null || !IsSpawned) return;
+            if (_appliedEncoded != null) return;   // 그 사이 진짜 외형이 도착해 이미 지었다
             Rebuild(_appearance.Encoded.Value.ToString());
         }
 
@@ -122,6 +137,8 @@ namespace Festa.World
             _animator = _currentVisual.GetComponentInChildren<Animator>();
             AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
+            // 발 IK — 단차에서 한 발이 뜨거나 파묻히지 않게 (2026-09-09). 컨트롤러 Base Layer 에 IK Pass 가 켜져 있어야 OnAnimatorIK 가 불린다.
+            if (_animator != null && _animator.GetComponent<AvatarFootIK>() == null) _animator.gameObject.AddComponent<AvatarFootIK>();
 
             ApplyAnimState(_player.AnimState.Value);
             ApplyEmote(_player.EmoteId.Value);
@@ -202,7 +219,7 @@ namespace Festa.World
         /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
         /// 몸이 떠오른다.
         /// </summary>
-        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround;
+        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround || LiePoseTable.IsLie(emote);
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -384,16 +401,29 @@ namespace Festa.World
             return found;
         }
 
+        /// <summary>
+        /// 지면 탐색용 히트 버퍼. **모든 아바타가 함께 쓴다** — 한 프레임 안에서 한 번에 하나씩만
+        /// 쓰이므로 공유해도 안전하고, 이걸 공유해야 할당이 0 이 된다.
+        ///
+        /// <para>예전에는 <c>Physics.RaycastAll</c> 이었다. 그쪽은 **호출마다 배열을 새로 할당**한다.
+        /// 아바타마다 매 프레임 부르므로 40명이면 프레임당 배열 40개가 쓰레기로 나갔다 —
+        /// "사람이 많아질수록 조금씩 무거워진다" 의 정체다. 레이캐스트 횟수가 아니라 할당이 문제였다
+        /// (2026-09-08 조사).</para>
+        /// </summary>
+        static readonly RaycastHit[] s_groundHits = new RaycastHit[16];
+
         bool TryFindGroundHeight(out float groundY)
         {
             groundY = 0f;
             var origin = _visualRoot.position + Vector3.up * 50f;
-            var hits = Physics.RaycastAll(origin, Vector3.down, 100f, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, 100f, ~0,
+                                                QueryTriggerInteraction.Ignore);
             var found = false;
             var bestY = float.NegativeInfinity;
 
-            foreach (var hit in hits)
+            for (int i = 0; i < count; i++)
             {
+                var hit = s_groundHits[i];
                 if (hit.transform == null || hit.transform.IsChildOf(transform))
                     continue;
                 if (hit.point.y <= bestY)
@@ -712,12 +742,32 @@ namespace Festa.World
 
             // 접지가 바뀌는 포즈면 크로스페이드가 끝난 뒤 다시 잰다. 그렇지 않은 이모트는
             // 선 자세 기준으로 되돌린다(앉기 → 다른 이모트로 바로 넘어가는 경우).
-            if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
+            // 눕기는 선 자세→누운 자세가 멀어 0.2 초면 덜컥한다. 조금 길게 섞고, 재측정도 그만큼 뒤로.
+            bool lie = LiePoseTable.IsLie(emote);
+            float fade = lie ? 0.35f : 0.2f;
+            if (lie)
+            {
+                // 눕기는 **한 번 재지 않고 실측표로 내린다.** 클립의 루트는 팩의 침대·소파 바닥에 있고 몸은
+                // 0.3~0.5 m 위에 떠 있다(LiePoseTable). 표의 최하단은 루프 전체의 최저값 = 팩의 매트리스 면이라
+                // 그만큼 내리면 몸이 소파 윗면에 닿고, 팔을 들거나 뒤척이는 위상에서는 그 부위만 자연히 떠 있다.
+                // 한 순간을 재서 붙이면(GroundToCurrentPose) 그 순간 가장 낮았던 팔꿈치·손이 기준이 되어 나머지
+                // 위상에서 몸 전체가 소파에 0.7u(5 cm) 떠 보였다 — 2026-09-10 LieRight 실측. 외형 배율은 조립 때
+                // visualTransform.localScale 에 실려 있다(실측 13.74).
+                _regroundAt = 0f;
+                if (_currentVisual != null)
+                {
+                    var vt = _currentVisual.transform;
+                    var p = vt.localPosition;
+                    p.y = _baseVisualLocalY - (LiePoseTable.MinY(emote) - LiePoseTable.IdleMinY) * vt.localScale.y;
+                    vt.localPosition = p;
+                }
+            }
+            else if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
             else RestoreBaseGrounding();
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
-                _animator.CrossFadeInFixedTime(stateName, 0.2f, 0);
+                _animator.CrossFadeInFixedTime(stateName, fade, 0);
             else
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
         }

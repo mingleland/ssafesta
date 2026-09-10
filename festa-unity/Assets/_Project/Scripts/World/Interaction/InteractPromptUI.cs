@@ -22,6 +22,12 @@ namespace Festa.World
 
         static GUIContent Measure(string text) { s_measure.text = text; return s_measure; }
 
+        /// <summary>
+        /// 사용자용 HUD 공통 배율. 하한 0.75 — 창을 세로로 줄이면(백버퍼 600px) 키캡이 9px 까지 줄어 읽을 수 없었다
+        /// (QA 2026-09-08 #67). 상한 2.0 — 알약 모서리 반지름이 텍스처 한도(64)를 넘어 뒤집히는 것을 막는다.
+        /// </summary>
+        public static float UiScale() => Mathf.Clamp(Screen.height / 1080f, 0.75f, 2.0f);
+
         static Rect Snap(float x, float y, float w, float h) =>
             new Rect(Mathf.Round(x), Mathf.Round(y), Mathf.Round(w), Mathf.Round(h));
 
@@ -30,7 +36,7 @@ namespace Festa.World
         {
             if (string.IsNullOrEmpty(label)) return;
             EnsureStyles();
-            float ui = Screen.height / 1080f;
+            float ui = UiScale();
             _labelStyle.fontSize = Mathf.RoundToInt(24f * ui);
             _capStyle.fontSize = Mathf.RoundToInt(24f * ui);
             float cap = Mathf.Round(46f * ui);
@@ -56,7 +62,7 @@ namespace Festa.World
         {
             if (string.IsNullOrEmpty(label)) return;
             EnsureStyles();
-            float ui = Screen.height / 1080f;
+            float ui = UiScale();
             _labelStyle.fontSize = Mathf.RoundToInt(22f * ui);
             float padX = Mathf.Round(20f * ui);
             float labelW = Mathf.Round(_labelStyle.CalcSize(Measure(label)).x);
@@ -73,7 +79,7 @@ namespace Festa.World
         {
             if (string.IsNullOrEmpty(text)) return;
             EnsureStyles();
-            float ui = Screen.height / 1080f;
+            float ui = UiScale();
             _toastStyle.fontSize = Mathf.RoundToInt(20f * ui);
             float pad = Mathf.Round(16f * ui);
             float w = Mathf.Round(_toastStyle.CalcSize(Measure(text)).x) + pad * 2f;

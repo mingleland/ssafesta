@@ -105,7 +105,7 @@ TLS 경계:
 Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ── HTTP/WS ──> Container
 ```
 
-- Nginx는 Let's Encrypt 인증서를 사용하고 자동 갱신 후 reload한다.
+- Nginx에는 Cloudflare Origin Certificate를 설치한다. Cloudflare SSL 모드는 `Full (strict)`이며, 인증서·개인 키는 EC2/Nginx에만 보관하고 저장소에 커밋하지 않는다.
 - Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
 - `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
 - Unity 7777은 외부에 공개하지 않는다.
@@ -731,15 +731,15 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 
 | ID | 항목 | 결정 주체 | 결정 시점 |
 |---|---|---|---|
-| C-01 | EC2 vCPU·RAM·Disk와 80/443 Security Group 변경 담당자 | Infra + AWS 관리자 | 실환경 구성 전 |
-| C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra + 팀 | DNS/TLS 적용 전 |
-| C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra + 팀 리드 | Cloudflare/R2 적용 전 |
-| C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | 문서 업로드 적용 전 |
-| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님), 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** 원본 문서의 두 번째 외부 백업 위치는 미확정 ([spec 007 C-10](../specs/007-ai-agent-document/spec.md), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-01 | EC2 vCPU·RAM·Disk와 80/443 Security Group 변경 담당자 | Infra | **SG 변경 담당은 정승욱(Infra)으로 확정.** EC2 사양 실값은 서버 실측 때 입력한다. PostgreSQL·Redis·Unity 내부 포트는 외부에 열지 않는다. |
+| C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra | **`ssafesta.world`, 정승욱(Infra) 관리로 확정.** |
+| C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra | **정승욱(Infra)으로 확정.** |
+| C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | **80% 경고, 90%부터 신규 업로드 차단으로 확정.** 기존 문서 조회·AI 처리는 유지한다. |
+| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 S3-compatible MinIO fallback, 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** P0에서는 두 번째 외부 백업을 두지 않으며 MinIO는 백업이 아닌 임시 fallback이다. |
 | C-06 | PostgreSQL/pgvector Database·Schema·Role 분리와 최종 백업 보관 정책 | Infra + BE + AI | 데이터 환경 구성 전 |
 | C-07 | 시연 시간대·빌드/배포 동결 시간과 긴급 배포 승인 절차 | Infra + 팀 | 서버 부하 실측 후 |
-| C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | 관측 설계 전 |
-| C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | 외부 실측 후 |
+| C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | **EC2 실측 후 retention·disk cap·알림 threshold를 확정한다.** |
+| C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | **WSS Nginx idle timeout은 180초로 확정.** SSE keepalive는 AI 외부 실측 후 확정한다. |
 | C-10 | R2 가용성 자동 판정 수치(timeout·연속 5xx 횟수·관측 시간) | Infra + BE | P0 모니터링 자료 확보 후 별도 이슈에서 확정·장애 주입 검증 |
 
 이미 확정된 사항:
@@ -747,7 +747,7 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 - CI/CD는 Jenkins를 사용한다.
 - 초기 자원은 고성능 단일 EC2 한 대다.
 - dev는 EC2 IP, 최종 demo만 신규 도메인·TLS를 사용한다.
-- DNS/Proxy/CDN은 Cloudflare, Origin TLS는 Nginx Let's Encrypt를 사용한다.
+- DNS/Proxy/CDN은 Cloudflare, Origin TLS는 EC2 Nginx의 Cloudflare Origin Certificate를 사용한다.
 - demo 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다.
 - Unity Server는 11층·단일 채널 컨테이너 1개이며 외부 `wss:443`을 내부 `ws:7777`로 전달한다.
 - PostgreSQL/pgvector는 영구 데이터, Redis는 유실 가능한 임시 데이터만 담당한다.

@@ -179,7 +179,11 @@ function BuilderTab({ boothId }: { boothId: number }) {
           </ul>
         )}
         {state.save.phase === 'success' && <span className="mg-ok">저장했습니다</span>}
-        {state.save.phase === 'error' && <span className="sc-alert">저장하지 못했습니다.</span>}
+        {/* 서버 문장을 그대로 쓴다 (docs/08 §1.3-1) — SURVEY_LOCKED 처럼 사유를 알아야 다음
+            행동이 정해지는 오류가 여기로 온다. 없을 때만 일반 문구다 */}
+        {state.save.phase === 'error' && (
+          <span className="sc-alert">{state.save.errorMessage ?? '저장하지 못했습니다.'}</span>
+        )}
         <button
           type="button"
           className="sc-btn sc-btn-primary"

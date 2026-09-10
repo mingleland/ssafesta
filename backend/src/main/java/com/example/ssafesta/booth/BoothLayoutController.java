@@ -49,7 +49,7 @@ public class BoothLayoutController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "작업본과 현재 `revision`"),
             @ApiResponse(responseCode = "204", description = "편집 이력이 없다. 본문 없음 — 편집기는 빈 상태로 시작한다"),
-            @ApiResponse(responseCode = "403", description = "`BOOTH_FORBIDDEN` — 내 부스도, 내가 스태프인 부스도 아니다"),
+            @ApiResponse(responseCode = "403", description = "`BOOTH_EDITOR_FORBIDDEN` — 내 부스도, 내가 스태프인 부스도 아니다"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다")})
     @GetMapping("/draft")
     @SecurityRequirement(name = "bearerAuth")
@@ -96,7 +96,7 @@ public class BoothLayoutController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "저장 성공. 새 `revision` 과 `warnings` 가 함께 온다"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — JSON 이 아니거나 모르는 필드가 있거나 `expectedRevision` 이 없다"),
-            @ApiResponse(responseCode = "403", description = "`BOOTH_FORBIDDEN` — 편집 권한이 없다"),
+            @ApiResponse(responseCode = "403", description = "`BOOTH_EDITOR_FORBIDDEN` — 편집 권한이 없다"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = """
                     `code` 로 세 가지를 가른다.
@@ -134,7 +134,7 @@ public class BoothLayoutController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "공개 성공. 새 회차 번호·공개 시각·`warnings`"),
-            @ApiResponse(responseCode = "403", description = "`BOOTH_FORBIDDEN` — 편집 권한이 없다"),
+            @ApiResponse(responseCode = "403", description = "`BOOTH_EDITOR_FORBIDDEN` — 편집 권한이 없다"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 부스가 없거나 공개할 작업본이 없다"),
             @ApiResponse(responseCode = "409", description = "`LAYOUT_VALIDATION_FAILED`(규칙 위반으로 공개 거부) 또는 `BOOTH_LEASE_EXPIRED`(임대 만료)")})
     @PostMapping("/publish")

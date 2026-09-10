@@ -135,3 +135,21 @@ describe('submitSurveyRun', () => {
     expect(Object.keys(s.answers)).toHaveLength(3);
   });
 });
+
+// S15P21A604-541 F-1 회귀 — 서버가 준 사용자용 문장을 버리지 않는다.
+// 회귀 당시 catch {} 가 오류를 통째로 버려 409 SURVEY_ALREADY_RESPONDED("이미 응답한
+// 설문입니다") 가 "다시 시도해 주세요" 로 뭉개졌다 — 재시도로 풀리지 않는 오류인데도.
+// docs/08 §1.3-1 이 봉투 최상위 message 를 사용자용 문장으로 규정한다.
+describe('제출 실패 문구 (S15P21A604-541 F-1)', () => {
+  it('서버 message 를 상태에 싣는다', async () => {
+    await loadSurveyRun(MOCK_BOOTH_SUBMIT_FAIL);
+    setAnswer('q-single', { type: 'single', optionId: 'o1' });
+    setAnswer('q-multi', { type: 'multi', optionIds: ['o1'] });
+    setAnswer('q-rating', { type: 'rating', value: 3 });
+    await submitSurveyRun();
+
+    const s = getSurveyRunSnapshot();
+    expect(s.submit.phase).toBe('error');
+    expect(s.submit.errorMessage).toBe('일시적인 오류입니다.');
+  });
+});

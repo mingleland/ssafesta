@@ -166,6 +166,14 @@
 ### Tests for User Story 3
 
 - [ ] T058 [P] [US3] [BE] AI 서비스 중단 상태의 목록 조회와 타 부스 접근 거부 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentQueryIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+  - 📎 **S15P21A604-173 (2026-09-09) 판단 근거**: "타 부스 접근 거부" 절반은 이미 있었다 —
+    `AiDocumentUploadIntegrationTest.anotherMembersAgentIsForbidden`·`listingAMissingAgentIsNotFound`
+    가 목록 조회 권한을 덮는다. 실제 공백은 `POST /documents/{documentId}/complete` 의 타인·게스트
+    차단이었고(`AiDocumentService.java:305` `requireActiveEditor` 로 서비스는 이미 막고 있었으나
+    테스트가 0건), 그 2건을 같은 파일에 추가했다(`completingSomeoneElsesDocumentIsForbidden`·
+    `guestsCannotCompleteDocuments`). **T058의 새 파일은 만들지 않는다** — 권한 테스트만 다시
+    쓰면 중복이 된다. "AI 서비스 중단 상태의 목록 조회" 부분은 이번 티켓 범위 밖이라 그대로
+    미해결로 남긴다 — 체크박스를 닫지 않는다
 - [ ] T059 [P] [US3] [BE] 사용자 삭제와 `EXPIRED` 24시간 경과 시 즉시 검색 제외·cleanup 영속 재시도·문서별 Provider `DeleteObject` 재시도 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentDeletionIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [ ] T080 [P] [US3] [BE] 문서 삭제·비활성화 시 FastAPI cleanup을 발행하고 장애 시 영속 재시도하며, 전체 활성 문서 inventory를 생성하는 통합 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentCleanupIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [X] T081 [P] [US3] [AI] ~~Business/AI DB cleanup reconciliation 테스트~~ → Spring FK cascade·cancel/fencing T094로 대체 (S15P21A604-449)
@@ -175,7 +183,20 @@
 
 - [ ] T061 [US3] [BE] Spring DB만 사용해 문서 목록과 마지막 상태를 제공하는 조회 로직을 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentQueryService.java`에 구현한다
 - [ ] T062 [US3] [BE] 소유권 검증 후 Business DB Document를 삭제하고 FastAPI cleanup outbox와 문서별 Provider·bucket·objectKey 삭제 작업을 기록하는 로직을 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentDeletionService.java`에 구현한다
-- [ ] T063 [US3] [BE] 5분 주기로 미완료 문서를 `EXPIRED`로 전환하고 24시간 유예 후 문서별 Provider 원본을 HEAD 없이 삭제하며, 실패 시 `EXPIRED + storageProvider + storageBucket + objectKey`를 유지해 재시도하는 작업을 `backend/src/main/java/com/example/ssafesta/ai/ObjectDeletionWorker.java`에 구현한다. 배포 전 Infra와 각 Provider 자격증명의 대상 bucket/prefix `DeleteObject` 최소 권한을 확인한다
+- [X] T063 [US3] [BE] 5분 주기로 미완료 문서를 `EXPIRED`로 전환하고 24시간 유예 후 문서별 Provider 원본을 HEAD 없이 삭제하며, 실패 시 `EXPIRED + storageProvider + storageBucket + objectKey`를 유지해 재시도한다
+  - 📎 **구현 위치가 `ObjectDeletionWorker.java` 가 아니다** (S15P21A604-571 정정). 하나의 클래스로
+    적혀 있던 두 주기가 실제로는 서로 다른 일이라 둘로 나뉘었다 — `EXPIRED` 전환은
+    `ai/AiDocumentExpirySweeper.java`(5분, S15P21A604-174), 24시간 유예 후 원본 삭제는
+    `ai/AiDocumentOriginalDeleteSweeper.java`(30분, S15P21A604-556). 주기도 대상도 달라서 한
+    클래스에 두면 한쪽 실패가 다른 쪽을 멈춘다
+  - 📎 실패 시 보존은 **스냅샷 전체 조건부 갱신**으로 구현했다. 삭제 성공 뒤
+    `processing_status`·`expired_at`·`storage_provider`·`storage_bucket`·`s3_key` 가 **전부** 읽은
+    그대로일 때만 `s3_key` 를 비운다 — reconcile 이 그 사이 좌표를 옮기면 방금 지운 것이 그 행의
+    *옛* 위치라 새 좌표를 지우면 안 된다. 0행이면 완료로 치지 않고 WARN 을 남긴다
+  - ⚠️ **`FAILED` 원본은 범위 밖이다.** FR-028 이 규정한 것은 `EXPIRED` 24시간뿐이고, 실패 문서는
+    재처리·조사에 원본이 필요할 수 있다. `docs/26` 에 미결로 등록돼 있다
+  - ⚠️ 배포 전 Infra 와 각 Provider 자격증명의 대상 bucket/prefix `DeleteObject` 최소 권한 확인은
+    **아직 남아 있다** — 코드가 아니라 배포 준비 항목이라 체크박스와 별개로 둔다
 - [ ] T064 [US3] [BE] 목록·상태·삭제 endpoint를 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentController.java`에 연결한다
 - [ ] T065 [P] [US3] [FE] 문서 목록·상태별 한국어 표시·실패 사유·삭제 확인 UI를 `festa-frontend/src/features/ai-agent/components/DocumentList.tsx`에 구현한다
 - [X] T082 [US3] [BE] ~~FastAPI cleanup outbox/inventory 발행~~ → Spring 로컬 cancel/cascade T093으로 대체 (S15P21A604-449)

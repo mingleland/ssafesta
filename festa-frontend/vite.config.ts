@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
+// 게이트웨이 라우팅은 tools/devGateway.mjs 가 소유한다 — 이 파일을 import 하면 plugin-react 까지
+// 함께 로드돼 테스트 스위트가 무거워진다(LJH T-84). 계약 테스트는 tools/devGateway.test.mjs 다.
+import { createDevServerConfig } from './tools/devGateway.mjs'
 
 // Runtime Asset Compiler 산출물을 **dev 서버에서만** 내보낸다 (S15P21A604-480).
 // public/ 에 두면 프로덕션 이미지 빌드 컨텍스트에 섞일 여지가 생긴다. 여기 두면 dev 전용이
@@ -33,10 +36,10 @@ function serveRuntimeAssets() {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), serveRuntimeAssets()],
-  // 컨테이너 dev 타깃에서만 켠다 — Windows bind mount 는 inotify 이벤트를 컨테이너로 전달하지
-  // 않아 HMR 이 조용히 죽는다(느린 게 아니라 아예 안 온다). polling 은 CPU 를 계속 쓰므로
-  // 호스트 실행(기본 경로)에서는 끈 채로 둔다. Dockerfile 의 dev 타깃이 이 값을 세운다.
-  server: process.env.VITE_USE_POLLING === 'true' ? { watch: { usePolling: true, interval: 300 } } : undefined,
+  // FE Host Gateway (S15P21A604-564) — dev 서버가 하나의 오리진 뒤에서 API·WebGL 을 함께 내보낸다.
+  // React 와 Unity 가 환경별 Backend 주소를 직접 알지 않게 하는 것이 목적이다. 라우팅 규칙과 그
+  // 근거는 tools/devGateway.mjs 에 있다.
+  server: createDevServerConfig(process.env),
   test: {
     // 기본은 node — 순수 함수 테스트가 대부분이고 jsdom을 전역으로 켜면 그 전부가 느려진다.
     // 컴포넌트 테스트(.tsx)는 파일 상단 `// @vitest-environment jsdom` docblock으로 개별 전환한다 (G-4).

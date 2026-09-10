@@ -853,7 +853,7 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
 | `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
 | `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
-| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) |
+| `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) — `PROCESSING` 은 AI 워커가 이미 파일을 쥔 상태라 저장소를 다시 묻지 않는다 |
 | `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
 | 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
 
@@ -862,11 +862,75 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 
 ### GET `/agents/{agentId}/documents`
 
-문서 목록과 처리 상태 조회.
+이 AI 직원의 문서를 **모든 상태**로, `createdAt` 내림차순으로 돌려준다 (US2 시나리오 2·7 · US3 시나리오 1).
+
+```json
+{
+  "documents": [
+    {
+      "documentId": 153,
+      "fileName": "발표자료.pdf",
+      "sizeBytes": 1048576,
+      "status": "READY",
+      "createdAt": "2026-09-09T01:15:02Z",
+      "uploadedAt": "2026-09-09T01:20:11Z"
+    }
+  ],
+  "quota": { "countLimit": 10, "bytesLimit": 104857600 }
+}
+```
+
+| status | 화면 | 뜻 |
+|---|---|---|
+| `QUEUED` | 대기 중 | 접수됨. `uploadedAt` 이 `null` 이면 **아직 업로드가 안 끝났다** |
+| `PROCESSING` | 처리 중 | 임베딩 진행 중 |
+| `READY` | 준비 완료 | 검색에 쓰인다 |
+| `FAILED` | 실패 | 처리에 실패했다 |
+| `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
+| `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
+
+여섯 중 **`DISABLED` 만 아직 나오지 않는다** — 임대 만료가 그 값을 쓰는 작업(`S15P21A604-496`)이
+아직 없다. 나머지 다섯은 실제로 나온다.
+
+- `PROCESSING` 은 **AI 워커가 첫 신호를 보낸 순간**부터다. 위임이 나간 순간이 아니라서, AI 서버가
+  응답하지 않는 동안에는 `QUEUED` 로 남는다 — 아무 일도 일어나지 않는 문서를 "처리 중" 이라고
+  말하지 않는다
+- `FAILED` 는 처리 Job 이 재시도를 다 썼거나 재시도 불가로 끝났을 때다. **재시도가 남아 있는 동안은
+  `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
+  올릴 수 있다**
+
+**`quota` 에는 상한만 있다. 쓴 양은 `documents` 에서 읽는다.** 자리를 차지하는 것은
+`QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 —
+실패한 업로드가 슬롯을 잡으면 안 되기 때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
+"n/10" 의 n 은 활성 3상태 행의 수이지 `documents.length` 가 아니다.
+
+서버가 그 수를 세어 내려보내지 않는 이유는 **응답에 이미 있기 때문**이다. 세어 주려면 폴링마다
+질의가 둘 늘어난다.
+
+`uploadedAt` 이 `null` 인 `QUEUED` 와 값이 있는 `QUEUED` 는 다르다 — 앞은 바이트가 아직 안 온
+것이고 뒤는 처리를 기다리는 것이다. `status` 만으로는 구분되지 않는다.
+
+**페이지네이션 없음.** FR-018 이 직원당 활성 문서를 10개로 제한한다.
+
+**AI 처리 서버가 죽어 있어도 답한다** (US2 시나리오 7). 모든 값이 Spring 의 문서 행에 있다.
+
+권한은 부스 편집자(소유자·Staff)다. 발급·완료와 달리 **활성 임대를 요구하지 않는다** — FR-015 가
+만료 시 원본과 메타데이터를 보존하므로, 조회까지 막으면 그 보존이 의미가 없다.
+실패: `401` · `403 MEMBER_ONLY`(게스트)·`BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND`.
+
+> **실패 사유는 아직 응답에 없다.** FR-007 은 정제된 사유를 요구하고 `ai_document_jobs.last_error`
+> 원문 노출을 금지하는데, 워커가 보내는 `failureCode` 가 50자 이하 자유 문자열이라 옮길 집합이
+> 없다. 문서에 `FAILED` 를 쓰는 코드도 아직 없다 (GitLab #119). 그 writer(`S15P21A604-400`)가
+> 사유를 함께 넣는다.
 
 ### PATCH `/documents/{documentId}`
 
-ACTIVE / DISABLED 등 상태 관리.
+**미구현이고, 이 형태가 맞는지 확인이 필요하다.** 이 항목은 "ACTIVE / DISABLED 등 상태 관리" 로
+적혀 있었는데, `DISABLED` 는 임대 만료가 쓰는 값이라(FR-015) 사용자가 손으로 옮길 값이 아니다.
+사용자가 문서를 잠시 끄는 기능이 실제로 필요한 것인지 정해지기 전에는 열지 않는다.
+
+삭제(FR-012 · US3 시나리오 2)는 별개다 — `DELETE /documents/{documentId}` 로 열릴 자리이고
+아직 구현되지 않았다.
 
 ---
 

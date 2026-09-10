@@ -109,7 +109,21 @@ import.meta.env.VITE_API_BASE_URL
 
 ### 변수명
 
-entrypoint 가 받는 이름은 **`PUBLIC_API_BASE_URL`** 이다. Infra integration compose 가 주입하는 이름을 그대로 받는다 — 여기서 이름을 새로 만들면 Infra 파일을 고쳐야 하고 그건 F3 위반이다.
+entrypoint 가 받는 이름은 **`PUBLIC_<KEY>`** 다 — Infra integration compose 가 주입하는 이름을 그대로 받는다. 여기서 이름을 새로 만들면 Infra 파일을 고쳐야 하고 그건 F3 위반이다.
+
+`RuntimeAssetConfig` 의 키와 **1:1** 이고, camelCase 키에서 규칙대로 파생된다(`apiBaseUrl` → `PUBLIC_API_BASE_URL`). 배포 쪽이 이름을 추측하지 않아도 된다.
+
+| `window.__FESTA_CONFIG__` 키 | 환경변수 | 빌드타임 fallback |
+|---|---|---|
+| `apiBaseUrl` | `PUBLIC_API_BASE_URL` | `VITE_API_BASE_URL` → 없으면 FE 오리진 |
+| `authBaseUrl` | `PUBLIC_AUTH_BASE_URL` | `VITE_AUTH_BASE_URL` → 없으면 `apiBaseUrl` |
+| `aiApiBaseUrl` | `PUBLIC_AI_API_BASE_URL` | `VITE_AI_API_BASE_URL` → 없으면 FE 오리진 |
+| `unityBuildBase` | `PUBLIC_UNITY_BUILD_BASE` | `VITE_UNITY_BUILD_BASE` → 없으면 `''`(소비처가 이름으로 실패) |
+| `boothAssetBase` | `PUBLIC_BOOTH_ASSET_BASE` | 없음 → 앱 `BASE_URL` 아래 `assets/booth-runtime/` |
+
+**값이 빈 키는 산출물에 넣지 않는다** — "주입했는데 비었다" 와 "주입하지 않았다" 를 브라우저에서 구분하기 위해서다. 각 키의 지정·미지정은 기동 로그에 남는다.
+
+이 1:1 은 주석이 아니라 테스트가 지킨다 — `tools/runtimeConfigKeys.test.mjs` (`S15P21A604-567`). 그전에는 문서와 스크립트 주석이 "1:1" 이라 적어 두고 실제로는 5키 중 2키만 써서, `authBaseUrl`·`aiApiBaseUrl`·`boothAssetBase` 를 배포에서 주입할 방법이 없었다.
 
 ## 3. 결정 F3 — Infra 경계 불가침
 
@@ -191,3 +205,4 @@ docker run --rm -e PUBLIC_API_BASE_URL=http://localhost:8080 -p 3001:80 festa-fr
 | FE Docker용 Jira 이슈 | `S15P21A604-254` 발급 · MR !42 머지(2026-08-27)로 완료 |
 | Infra 의 "루트 compose" 신설 시점 | Infra 소관. 생기면 §6 절차가 대체될 수 있다 |
 | `VITE_UNITY_BUILD_BASE` 런타임화 | `S15P21A604-427` 로 구현 — `PUBLIC_UNITY_BUILD_BASE` → `window.__FESTA_CONFIG__.unityBuildBase`, 같은 accessor 패턴(`shared/config/runtime.ts unityBuildBase()`). 인프라 compose 주입은 #127 통보 |
+| 나머지 3키 런타임화 | `S15P21A604-567` 로 구현 — `authBaseUrl`·`aiApiBaseUrl`·`boothAssetBase` 가 `PUBLIC_*` 주입 경로를 갖는다. **FE 는 키를 받을 수 있게 만들었고, 환경별 값 공급은 Infra 소관이다** |

@@ -5,20 +5,34 @@ set -euo pipefail
 : "${JENKINS_JOB:?}" "${JENKINS_BUILD_NUMBER:?}" "${COMPONENT_METADATA_DIR:?}" "${RELEASE_MANIFEST_PATH:?}"
 [[ "${CI_COMMIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'full lowercase commit SHA required' >&2; exit 64; }
 [[ "${SCM_PROVIDER}" =~ ^(github|gitlab)$ ]] || { echo 'SCM_PROVIDER must be github or gitlab' >&2; exit 64; }
+python_bin="$(command -v python3 || command -v python || true)"
+[[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }
+
+components_csv="${DEPLOY_COMPONENTS:-ai,back,front,game}"
+IFS=',' read -r -a components <<<"${components_csv}"
+(( ${#components[@]} > 0 )) || { echo 'DEPLOY_COMPONENTS must not be empty' >&2; exit 64; }
+declare -A seen=()
+for component in "${components[@]}"; do
+  [[ "${component}" =~ ^(ai|back|front|game)$ ]] || { echo "invalid deploy component: ${component}" >&2; exit 64; }
+  [[ -z "${seen[${component}]:-}" ]] || { echo "duplicate deploy component: ${component}" >&2; exit 64; }
+  seen["${component}"]=1
+done
 
 native() { if command -v cygpath >/dev/null 2>&1; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 metadata_paths=()
-for component in ai back front game; do
+for component in "${components[@]}"; do
   path="${COMPONENT_METADATA_DIR}/${component}.json"
   [[ -f "${path}" ]] || { echo "missing component metadata: ${component}" >&2; exit 66; }
   metadata_paths+=("$(native "${path}")")
 done
 output_native="$(native "${RELEASE_MANIFEST_PATH}")"
+components_json="$(IFS=,; printf '%s' "${components[*]}")"
 
-python - "${output_native}" "${metadata_paths[@]}" <<'PY'
+DEPLOY_COMPONENTS="${components_json}" "${python_bin}" - "${output_native}" "${metadata_paths[@]}" <<'PY'
 import datetime,json,os,pathlib,sys
 components=[]
-for expected,path in zip(('ai','back','front','game'),sys.argv[2:]):
+expected_components=os.environ['DEPLOY_COMPONENTS'].split(',')
+for expected,path in zip(expected_components,sys.argv[2:]):
     item=json.loads(pathlib.Path(path).read_text(encoding='utf-8'))
     required={'component','sourceCommit','storageMode','imageRef','contentId'}
     missing=required-set(item)

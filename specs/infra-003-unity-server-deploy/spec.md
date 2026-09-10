@@ -33,8 +33,8 @@
 | D-03 | 새 배포·재시작 후 사용된 접속 권한 재사용 차단 | ✅ 원래 만료 시각까지 차단 기록 유지 |
 | D-04 | P0 사용자 무입력 연결 유지 시험 | ✅ 로그인 회원·게스트 모두 10분 |
 | D-05 | Unity Dedicated Server 대상 CPU 아키텍처와 OCI 계획 | ✅ Unity 6000.0.78f1과 호환되는 x86_64 EC2에서만 검증; OCI Unity 검증은 WebGL 정적 배포를 포함해 취소 |
-| O-01 | WSS heartbeat와 Nginx 최종 유휴 시간 | 외부 WSS 실측 후 확정; 초기 후보 180초 |
-| O-02 | 실제 도메인·EC2 용량·상위 네트워크 권한 | CPU 아키텍처는 x86_64로 고정하고, 나머지 EC2 사양·권한은 infra-002 C-01, 도메인은 C-02를 상속 |
+| O-01 | WSS heartbeat와 Nginx 최종 유휴 시간 | ✅ **Nginx idle timeout 180초 (2026-09-10 Infra 결정).** Unity heartbeat가 정상인 10분 무입력 연결은 유지하며 외부 WSS 검증으로 확인한다. |
+| O-02 | 실제 도메인·EC2 용량·상위 네트워크 권한 | `ROOT_DOMAIN=ssafesta.world`, SG 변경 담당=정승욱(Infra)으로 확정. CPU 아키텍처는 x86_64로 고정하고 EC2 사양 실값은 infra-002 C-01 실측을 기다린다. |
 
 ## User Scenarios & Testing *(mandatory)*
 

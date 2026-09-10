@@ -130,12 +130,16 @@ export function SurveyOverlay({ payload }: Props) {
       onClose={closeOverlay}
       status={
         run.submit.phase === 'error' ? (
-          <span className="ov-alert">제출하지 못했습니다. 다시 시도해 주세요.</span>
+          // 서버 문장을 그대로 쓴다 (docs/08 §1.3-1). 없을 때만 일반 문구인데, 그 문구도
+          // "다시 시도" 를 권하지 않는다 — 재시도로 풀리지 않는 오류가 여기 섞여 온다
+          <span className="ov-alert">{run.submit.errorMessage ?? '제출하지 못했습니다.'}</span>
         ) : guestBlocked ? (
           <span className="ov-alert">코인이 걸린 설문이라 로그인해야 참여할 수 있습니다</span>
         ) : missing.length > 0 ? (
           <span className="ov-note">필수 문항 {missing.length}개가 남았습니다</span>
-        ) : run.rewardCoin > 0 ? (
+        ) : // 보상 안내는 **아직 참여할 수 있을 때만** 성립한다. status·submit 은 독립 축이라
+        // 이 조건이 없으면 마감된 설문과 제출 완료 화면에서도 "참여하면 N 코인" 이 흘러나온다
+        run.status === 'ready' && !submitted && run.rewardCoin > 0 ? (
           <span className="ov-note">참여하면 {run.rewardCoin} 코인을 받습니다 · Esc 로 월드로 돌아갑니다</span>
         ) : (
           <span className="ov-note">Esc 로 월드로 돌아갑니다</span>
@@ -173,7 +177,12 @@ export function SurveyOverlay({ payload }: Props) {
         />
       )}
 
-      {run.status === 'ready' && !submitted && (
+      {/*
+        마감된 설문도 문항을 남긴다 — 계약 §5: "closed 면 문항은 그대로 싣는다. 화면이
+        '마감된 설문입니다' 를 보여주되 무엇을 물었는지는 남는다." 입력은 붙이지 않는다.
+        제출은 §6 이 409 로 막고, 여기서 답을 받을 수 있는 것처럼 보일 이유가 없다.
+      */}
+      {(run.status === 'ready' || run.status === 'closed') && !submitted && (
         <ol className="sv-list">
           {run.questions.map((q, i) => (
             <li key={q.id} className="sv-item">
@@ -182,7 +191,7 @@ export function SurveyOverlay({ payload }: Props) {
                 {q.prompt}
                 {q.required && <span className="sv-required">필수</span>}
               </p>
-              <QuestionInput q={q} value={run.answers[q.id]} />
+              {run.status === 'ready' && <QuestionInput q={q} value={run.answers[q.id]} />}
             </li>
           ))}
         </ol>

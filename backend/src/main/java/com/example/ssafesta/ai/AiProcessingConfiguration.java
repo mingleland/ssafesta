@@ -44,10 +44,20 @@ class AiProcessingConfiguration {
      * <p>Boot 4 moved {@code RestClient.Builder} autoconfiguration and {@code spring.http.client.*}
      * into a module {@code spring-boot-starter-webmvc} does not bring, so there is no ambient builder
      * to inherit timeouts from. Without this the read would have no timeout at all.
+     *
+     * <p><b>{@code HTTP_1_1} is not a default worth inheriting.</b> The JDK client negotiates
+     * {@code HTTP_2} unless told otherwise, and over a plaintext connection that means sending the
+     * first request as {@code HTTP/1.1} with an {@code Upgrade: h2c} header. uvicorn does not
+     * implement that upgrade and loses the body while parsing it, so FastAPI sees a request with no
+     * required fields and answers 422 — every time, for every document (GitLab #161). Nothing here
+     * wants HTTP/2: the only callee is one uvicorn process on the internal network, and the call is
+     * a single small POST that ends at 202.
      */
-    private static ClientHttpRequestFactory requestFactory() {
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+    static ClientHttpRequestFactory requestFactory() {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(CONNECT_TIMEOUT)
+                .build());
         factory.setReadTimeout(READ_TIMEOUT);
         return factory;
     }

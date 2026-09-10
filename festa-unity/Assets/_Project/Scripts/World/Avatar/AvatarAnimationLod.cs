@@ -32,7 +32,7 @@ namespace Festa.World
         /// <summary>측정·비교용 전역 스위치. 끄면 모든 아바타가 매 프레임 평가된다.</summary>
         public static bool Enabled = true;
 
-        [Tooltip("이 거리(월드 유닛) 안쪽은 매 프레임 갱신한다. 1 m = 10 유닛.")]
+        [Tooltip("이 거리(월드 유닛) 안쪽은 매 프레임 갱신한다. 1 m = 13.26 유닛 → 220 u ≈ 16.6 m.")]
         [SerializeField] float _nearDistance = 220f;
         [Tooltip("이 거리 안쪽은 midInterval 프레임마다 갱신한다.")]
         [SerializeField] float _midDistance = 480f;
@@ -64,12 +64,26 @@ namespace Festa.World
             _instance._entries.Add(new Entry
             {
                 Animator = animator,
-                Probe = skins.Length > 0 ? skins[0] : null,
+                Probe = PickLiveProbe(skins),
                 Skins = skins,
                 Pending = 0f,
                 Phase = _instance._entries.Count,
                 Band = -1,   // 첫 프레임에 반드시 한 번 적용되도록
             });
+        }
+
+        /// <summary>
+        /// 가시성 대표 렌더러는 **켜져 있는** 것이어야 한다. 꺼진 렌더러의 <c>isVisible</c> 은 항상 false 라
+        /// 중·원거리 밴드에서 애니메이터가 한 번도 돌지 않는다 — 헤어 01·04 착용자가 16.6 m 밖에서
+        /// 자세가 얼어붙은 채 미끄러지던 원인(QA 2026-09-08 #57). 병합이 원본 신체 렌더러를 끄면서
+        /// `skins[0]` 이 꺼진 렌더러가 되는 조합이 153개 중 4개 있었다.
+        /// 켜진 것이 하나도 없으면 null → "항상 보인다" 로 취급해 안전한 쪽으로 기운다.
+        /// </summary>
+        static Renderer PickLiveProbe(SkinnedMeshRenderer[] skins)
+        {
+            for (var i = 0; i < skins.Length; i++)
+                if (skins[i] != null && skins[i].enabled && skins[i].gameObject.activeInHierarchy) return skins[i];
+            return null;
         }
 
         public static void Unregister(Animator animator)
@@ -133,6 +147,9 @@ namespace Festa.World
 
                 // 화면 밖이면 쌓기만 하고 평가하지 않는다 — cullingMode 가 하던 일을 대신한다.
                 // 다시 보이면 그동안 쌓인 시간을 한 번에 넘겨 자세가 이어진다.
+                // 조립·병합이 렌더러를 껐다 켰다 하므로, 대표 렌더러가 꺼져 있으면 살아 있는 것으로 갈아탄다.
+                if (e.Probe != null && (!e.Probe.enabled || !e.Probe.gameObject.activeInHierarchy))
+                    e.Probe = PickLiveProbe(e.Skins);
                 bool visible = e.Probe == null || e.Probe.isVisible;
                 if (visible && (Time.frameCount + e.Phase) % interval == 0)
                 {

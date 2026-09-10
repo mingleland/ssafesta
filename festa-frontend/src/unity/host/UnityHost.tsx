@@ -14,7 +14,7 @@
 // 전혀 다른 시간이다. 앞은 로비에서 아바타를 고르는 자기 시간이라 안내가 뜨면 방해고, 뒤는 main 씬 로드
 // 50~84초 대기라 안내가 없으면 멈춘 것으로 오인한다. Unity 가 아직 시작 신호를 안 보내면 preparing-world
 // 에 들어가지 않으므로 이 컴포넌트는 예전과 똑같이 동작한다.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   initUnityBridge,
   subscribeWorldConnectionState,
@@ -25,6 +25,8 @@ import type { WorldConnectionState } from '../bridge/events';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
+import { syncAudioMute } from './audioBridge';
+import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/audio/model/screenAudio';
 import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
@@ -62,6 +64,14 @@ export function UnityHost() {
   // Visitor Overlay 뿐 아니라 Game Menu·Booth Management 도 포함한다: 잠금은 무엇이 그려지는가가
   // 아니라 무엇이 키보드를 갖는가의 문제이고, 그 판정은 worldScreen 하나가 갖는다.
   const screen = useWorldScreen();
+  // #151(-557): 화면 음소거 선호. `useScreenAudio()` 로 상태 전체를 구독하면 재생·자동재생 대기·
+  // 이관 완료 같은 무관한 전이에도 이 호스트가 다시 그려진다 — 여기서 필요한 것은 muted 하나다.
+  // 좁히는 데 새 API 를 만들지 않는다: screenAudio 가 이미 내보내는 구독·스냅샷 둘로 충분하다.
+  const screenMuted = useSyncExternalStore(
+    subscribeScreenAudio,
+    () => getScreenAudioSnapshot().muted,
+    () => getScreenAudioSnapshot().muted,
+  );
 
   useEffect(() => {
     initUnityBridge(); // 멱등 — 재호출해도 window.FestaUnity를 다시 잇기만 한다
@@ -162,6 +172,15 @@ export function UnityHost() {
     if (!instanceReady || instance === null) return;
     syncInputLock(instance, screen !== 'world');
   }, [instanceReady, screen]);
+
+  // #151 음소거 승계 (-557): 화면에서 끈 채로 월드에 들어가면 BGM 이 다시 나던 것. 인스턴스가 선
+  // 직후 현재 값을 한 번 — 새 인스턴스는 음소거 상태를 모른다(재시도 boot 포함). 이후에는 값이
+  // 바뀔 때만 다시 밀어 넣는다. 볼륨은 보내지 않는다 — -463 · #140 축이다(audioBridge.ts 주석).
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncAudioMute(instance, screenMuted);
+  }, [instanceReady, screenMuted]);
 
   // 최초 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
   // canvas 에 focus 가 없으면 WASD·F 가 Unity 에 들어가지 않는다 — 진입 직후 activeElement 가 SECTION 이라
