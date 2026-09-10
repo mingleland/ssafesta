@@ -12,7 +12,9 @@
 .world-hud-guide {
   position: absolute;
   left: 20px;
-  top: 20px;
+  /* 좌하단 — Unity ControlsHintHud 가 단독 실행에서 그리는 자리와 같다(감사 항목 12).
+     두 실행 모드에서 안내가 다른 자리에 뜨면 같은 화면으로 읽히지 않는다. */
+  bottom: 20px;
   width: 246px;
   padding: 12px 14px 13px;
   border-radius: 14px;
@@ -78,7 +80,7 @@
 .world-hud-guide-open {
   position: absolute;
   left: 20px;
-  top: 20px;
+  bottom: 20px;
   height: 32px;
   padding: 0 14px;
   border-radius: 999px;
