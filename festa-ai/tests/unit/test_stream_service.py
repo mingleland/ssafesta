@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -223,19 +224,33 @@ async def test_duplicate_document_chunk_pair_emits_one_source_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_context_build_failure_emits_single_error_event_and_no_commit() -> None:
-    rag = _RagContextService(error=RuntimeError("boom"))
+async def test_context_build_failure_emits_single_error_event_and_no_commit(caplog) -> None:
+    raw_question = "개인 원문 질문입니다"
+    raw_error = "provider 원문 오류입니다"
+    rag = _RagContextService(error=RuntimeError(raw_error))
     service, repository = _service(
         conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
-    )
+    with caplog.at_level(logging.ERROR, logger="app.services.stream_service"):
+        events = _events(
+            [
+                event
+                async for event in service.stream(
+                    conversation=_conversation(), question=raw_question
+                )
+            ]
+        )
 
     assert [event["type"] for event in events] == ["start", "error"]
     assert events[-1]["code"] == "CONTEXT_BUILD_FAILED"
     assert repository.saved == []
+    record = caplog.records[-1]
+    assert record.getMessage() == "conversation_stream_failed"
+    assert record.conversation_id == "conv_1"
+    assert record.error_code == "CONTEXT_BUILD_FAILED"
+    assert raw_question not in caplog.text
+    assert raw_error not in caplog.text
 
 
 @pytest.mark.asyncio
