@@ -77,8 +77,10 @@ namespace Festa.World
         // 두 줄 간격 222 → 카드 폭 158 이면 사이가 64 px 남는다.
         const float PanelW = 700f, PanelH = 1046f;
         const float MapH = 900f;
-        const float CardW = 158f, CardH = 122f;
-        const float CaptionH = 58f;
+        // 카드 높이 134 는 줄 간격(150 px)에서 역산한 상한이다 — 그보다 크면 위아래 카드가 닿는다.
+        // 자막을 70 으로 키운 것은 이름을 **두 줄**로 접어 크게 쓰기 위해서다(2026-09-11 "가독성").
+        const float CardW = 158f, CardH = 134f;
+        const float CaptionH = 70f;
         const float CardPad = 12f;   // 카드 안쪽 좌우 여백 — 글자가 테두리에 붙지 않게
 
         float MapW => MapH * FestivalMinimapArea.Aspect;
@@ -295,9 +297,12 @@ namespace Festa.World
             // (2026-09-10 "글씨가 너무 흐리다").
             FestaUiKit.Display(name);
             name.enableAutoSizing = true;
-            name.fontSizeMin = 15f;
-            name.fontSizeMax = 22f;
-            name.textWrappingMode = TextWrappingModes.Normal;
+            name.fontSizeMin = 17f;
+            name.fontSizeMax = 26f;
+            // **NoWrap.** TMP 에 맡기면 한글을 글자 단위로 끊어 "재활용 분류 카 / 메라" 가 됐다
+            // (2026-09-11 실측). 줄바꿈은 RefreshCells 가 BoothSign.WrapByWord 로 어절 단위로 미리 넣는다 —
+            // 입간판과 같은 규칙, 같은 코드다.
+            name.textWrappingMode = TextWrappingModes.NoWrap;
             name.overflowMode = TextOverflowModes.Ellipsis;
 
             // 번호는 사진 왼쪽 위 모서리에 작게 — 자막 폭을 이름에 다 내주기 위해서다.
@@ -369,7 +374,9 @@ namespace Festa.World
 
                 if (cell.LastName != info.Name)
                 {
-                    cell.Name.text = info.Name;
+                    // 어절 단위 두 줄 접기. 자막 상자 비율(가로/세로)을 넘겨 줄 수를 고르게 한다.
+                    float aspect = (CardW - CardPad * 2f) / (CaptionH - 8f);
+                    cell.Name.text = BoothSign.WrapByWord(info.Name, 2, aspect);
                     cell.LastName = info.Name;
                 }
                 if (cell.LastTexture != info.Thumbnail && info.Thumbnail != null)
