@@ -12,6 +12,8 @@ import {
 } from '../../contracts/gameProject.ts';
 import {
   addBooleanVariable,
+  addIntegerVariable,
+  addStringVariable,
   addItemDefinition,
   renameItemDefinition,
   replaceGameRules,
@@ -169,12 +171,30 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
         />
       </article>
     ))}
-    <button
-      className="gss-add-block"
-      disabled={project.variables.length >= 100}
-      onClick={() => onApply(addBooleanVariable(project))}
-      type="button"
-    >+ Boolean 변수</button>
+    {/* S15P21A604-566 — 버튼 3개를 가로로 늘어놓으면 패널 폭을 넘겨 가로 스크롤이 생겨서(기존
+        .gss-add-block의 width:100%가 flex item에서 각자 컨테이너 전체 폭을 요구했기 때문),
+        gss-inline-actions--thirds로 세 버튼이 폭을 1/3씩 나눠 갖도록 하고 캡션에서 "변수"를
+        빼 한 줄에 다 보이게 했다. */}
+    <div className="gss-inline-actions gss-inline-actions--thirds">
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addBooleanVariable(project))}
+        type="button"
+      >+ Boolean</button>
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addIntegerVariable(project))}
+        type="button"
+      >+ Integer</button>
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addStringVariable(project))}
+        type="button"
+      >+ String</button>
+    </div>
     {confirmDeleteVariableId !== null && (() => {
       const target = project.variables.find((variable) => variable.id === confirmDeleteVariableId);
       if (target === undefined) return null;
