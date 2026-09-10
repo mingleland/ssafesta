@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { GAME_PROJECT_LIMITS, type Component, type GameObject, type GameProject, type WorldScene } from '../../contracts/gameProject.ts';
-import { assetDisplayLabel, findBuiltinSpriteSheet, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
+import { assetDisplayLabel, findBuiltinSpriteSheet, partitionAssetsByRole } from '../assets/builtinAssetCatalog.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import {
   addComponent,
@@ -85,9 +85,25 @@ export const InspectorPanel = ({
             value={scene.backgroundAssetId ?? ''}
           >
             <option value="">배경 없음 · 타일만 사용</option>
-            {project.assets.filter((asset) => isAssetForRole(asset, 'BACKGROUND')).map((asset) => (
-              <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>
-            ))}
+            {/* S15P21A604-570 — 큐레이션된 빌트인과 내가 올린 이미지가 구분 없이 섞여 있던
+                문제(Notion QA #53)를 optgroup으로 나눠서 고친다. */}
+            {(() => {
+              const { builtin, custom } = partitionAssetsByRole(project.assets, 'BACKGROUND');
+              return (
+                <>
+                  {builtin.length > 0 && (
+                    <optgroup label="제공 자료">
+                      {builtin.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                    </optgroup>
+                  )}
+                  {custom.length > 0 && (
+                    <optgroup label="내 자산">
+                      {custom.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                    </optgroup>
+                  )}
+                </>
+              );
+            })()}
           </select>
         </label>
         <div className="gss-section-title"><span>맵 크기</span><small>오브젝트와 타일은 안전하게 유지됩니다</small></div>
