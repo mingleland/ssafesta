@@ -98,6 +98,83 @@ export const BOOTH_ASSETS = [
     material: '_Project/Art/Booth/ExpoKit/Textures/Furniture/Materials/Chair02b.mat',
     note: 'Chair02b 텍스처 세트(baseColor·normal·metallicRoughness)를 실제로 쓰는 자산 — 임의 매핑이 아니다',
   },
+  // ── #154 팔레트 정합으로 들어온 6종 (S15P21A604-509) ─────────────────────────────
+  // 팔레트가 내보내는 코드가 파이프라인 산출물과 1:1 이어야 한다는 것이 -509 완료조건 ② 다.
+  // 게임 파트가 `Prefabs/Booth/Decor/<코드>.prefab` 로 ExpoKit 프리팹을 감싼 래퍼를 만들어 뒀고
+  // (벤더 원본 무수정, GitLab #146), 레지스트리가 그 파일을 가리킨다 — 같은 파일을 여기서도 읽는다.
+  //
+  // 래퍼는 PrefabInstance 다: 루트 회전은 0 이고 원본 prefab 을 참조해 자식 Transform 을 override 한다.
+  // 그래서 축은 prefab 이 세운다(`yUp`) — 단일 FBX 처럼 여기서 또 눕히면 두 번 돌아간다.
+  // 재질은 래퍼가 URP 기본으로 덮어 뒀으므로 여기서 지정하지 않는다(색만 쓴다).
+  {
+    assetCode: 'STRUCT_PANEL_01',
+    objectType: 'DECORATION',
+    kind: 'prefab',
+    prefab: 'Decor/STRUCT_PANEL_01.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    note: '팔레트 벽면 패널 › 기본 패널. 예전 WALL_PLAIN 이 가리키던 그 자산이다 (#154)',
+  },
+  {
+    assetCode: 'FURN_COUNTER_02',
+    objectType: 'FURNITURE',
+    kind: 'prefab',
+    prefab: 'Decor/FURN_COUNTER_02.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    note: '팔레트 카운터 › 그래픽 카운터. 예전 COUNTER_GRAPHIC (#154)',
+  },
+  {
+    assetCode: 'DISP_STAND_PLASTIC_01',
+    objectType: 'DECORATION',
+    kind: 'prefab',
+    prefab: 'Decor/DISP_STAND_PLASTIC_01.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    note: '팔레트 카운터 › 진열 선반. 예전 SHELF (#154)',
+  },
+  {
+    assetCode: 'STRUCT_TRUSS_HORIZONTAL_LAMP',
+    objectType: 'DECORATION',
+    kind: 'prefab',
+    prefab: 'Decor/STRUCT_TRUSS_HORIZONTAL_LAMP.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    // 원본 피벗이 2.6 m 높이에 있다(게임 파트 #146 특기). 스튜디오 미리보기가 바닥 피벗을
+    // 가정하면 월드와 어긋난다 — 그 판정은 -509 P2 에 기록한다.
+    note: '팔레트 트러스 › 트러스 빔. 예전 TRUSS_BEAM. 피벗이 바닥이 아니다 (#146)',
+  },
+  {
+    assetCode: 'STRUCT_TRUSS_VERTICAL',
+    objectType: 'DECORATION',
+    kind: 'prefab',
+    prefab: 'Decor/STRUCT_TRUSS_VERTICAL.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    // 원본 피벗이 바닥에서 0.5 m 위다 — TrussBase 위에 올리는 전제 (#146).
+    note: '팔레트 트러스 › 기둥. 예전 TRUSS_PILLAR. 피벗 바닥 +0.5 m (#146)',
+  },
+  {
+    assetCode: 'STRUCT_TRUSS_BASE',
+    objectType: 'DECORATION',
+    kind: 'prefab',
+    prefab: 'Decor/STRUCT_TRUSS_BASE.prefab',
+    unitScale: INCH_TO_M,
+    upAxis: 'yUp',
+    typeDefault: false,
+    sourcePackage: 'ExpoKit',
+    note: '팔레트 트러스 › 게이트. 예전 TRUSS_GATE (#154)',
+  },
 ];
 
 /**

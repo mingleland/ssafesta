@@ -37,6 +37,15 @@ namespace Festa.Content
         public static bool PromptShowing =>
             _instance != null && (_instance._hovered != null || _instance._passive != null);
 
+        /// <summary>
+        /// 지금 F 에 응답할 **부스 오브젝트**가 잡혀 있는가 (안내 알약은 제외).
+        ///
+        /// <para>부스 입장 포털이 이걸 보고 그 프레임을 통째로 양보한다 — 슬롯머신처럼 부스에 붙어 있는
+        /// 오브젝트 앞에 서면 오브젝트 프롬프트가 뜨는데 **옆 부스 외곽선까지 같이 켜지고**, F 를 누르면
+        /// 오브젝트와 부스 입장이 동시에 먹었다 (2026-09-10 사용자 지적). 가까운 쪽(오브젝트)이 이긴다.</para>
+        /// </summary>
+        public static bool HasInteractTarget => _instance != null && _instance._hovered != null;
+
         /// <summary>디스패처가 씬에 있도록 보장한다. 상호작용 오브젝트가 Awake 에서 호출한다.</summary>
         public static void Ensure()
         {
@@ -80,6 +89,16 @@ namespace Festa.Content
                 ShowHint(null);
                 // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
                 // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
+                _passive = null;
+                return;
+            }
+
+            // 소파에 누워 있는 동안은 F·프롬프트·링을 전부 끈다 (사용자 지시 2026-09-10). 누운 채 F 를 다시 누르면
+            // 소파 위로 재텔레포트되며 자세가 바뀌고, 프롬프트가 떠 있으면 "다시 누르라" 는 뜻으로 읽힌다. 일어나기는 WASD.
+            if (Festa.World.LiePoseTable.IsLocalPlayerLying())
+            {
+                UpdateHover(null);
+                ShowHint(null);
                 _passive = null;
                 return;
             }
@@ -257,6 +276,8 @@ namespace Festa.Content
                 return "게임기 플레이";
             if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
                 return "타이밍 스톱 게임";
+            if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
+                return "소파에 눕기";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";

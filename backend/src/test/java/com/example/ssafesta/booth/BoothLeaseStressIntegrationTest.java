@@ -40,8 +40,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *
  * <p>{@link BoothLeaseConcurrencyIntegrationTest} shows the two-thread race is closed. This class
  * asks whether the same guarantees hold under real contention: a hundred members on one slot, and
- * one member clicking as fast as a mouse allows. Slow on purpose - tagged {@code stress} so it can
- * be excluded from the fast build.
+ * one member clicking as fast as a mouse allows. Slow on purpose - tagged {@code stress}, which
+ * {@code pom.xml} excludes from the default build. That exclusion only became real in
+ * S15P21A604-571; before it there was no surefire configuration at all and this ran every time.
+ * To run it: {@code ./mvnw test -Dtest.excludedGroups= -Dgroups=stress}.
  */
 @Tag("stress")
 @Import(TestcontainersConfiguration.class)

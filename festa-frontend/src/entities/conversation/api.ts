@@ -3,6 +3,7 @@
 // JSON이 아니라 SSE 본문(text/event-stream)을 그대로 흘려보내야 한다(S15P21A604-189).
 import { getAccessToken } from '../../shared/api/client';
 import { aiApiBaseUrl } from '../../shared/config/runtime';
+import { AI_ENDPOINT_UNREACHABLE } from './errorCodes';
 
 export interface AiHttpError {
   code: string;
@@ -31,15 +32,17 @@ async function aiFetch(path: string, init: RequestInit = {}): Promise<Response> 
 
 async function throwAiHttpError(response: Response): Promise<never> {
   let body: Partial<{ code: string; message: string }> = {};
+  let contractEnvelope = false;
   try {
     body = (await response.json()) as Partial<{ code: string; message: string }>;
+    contractEnvelope = true;
   } catch {
-    // 본문이 JSON이 아닌 응답(프록시 오류 등) — code/message 없이 status만으로 판단한다.
+    // 본문이 JSON 이 아니다 — 계약 봉투가 아니라 그 자리에 AI 서버가 없다는 신호로 읽는다.
   }
   const retryAfterHeader = response.headers.get('Retry-After');
   const error: AiHttpError = {
-    code: body.code ?? 'UNKNOWN',
-    message: body.message ?? response.statusText,
+    code: contractEnvelope ? (body.code ?? 'UNKNOWN') : AI_ENDPOINT_UNREACHABLE,
+    message: body.message ?? (contractEnvelope ? response.statusText : `AI 서버에 닿지 못했습니다 (${aiApiBaseUrl()}/ai/v1)`),
     status: response.status,
     retryAfterSeconds: retryAfterHeader !== null ? Number(retryAfterHeader) : undefined,
   };

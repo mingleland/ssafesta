@@ -137,6 +137,8 @@ namespace Festa.World
             _animator = _currentVisual.GetComponentInChildren<Animator>();
             AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
+            // 발 IK — 단차에서 한 발이 뜨거나 파묻히지 않게 (2026-09-09). 컨트롤러 Base Layer 에 IK Pass 가 켜져 있어야 OnAnimatorIK 가 불린다.
+            if (_animator != null && _animator.GetComponent<AvatarFootIK>() == null) _animator.gameObject.AddComponent<AvatarFootIK>();
 
             ApplyAnimState(_player.AnimState.Value);
             ApplyEmote(_player.EmoteId.Value);
@@ -181,6 +183,7 @@ namespace Festa.World
 
             // 선 자세 기준값. 이모트로 접지를 고쳤다가 되돌릴 때 쓴다.
             _baseVisualLocalY = visualTransform.localPosition.y;
+            _calibratedVisualLocalY = _baseVisualLocalY;   // 표류 상한의 기준 — 실측할 때만 바뀐다
 
             // **컨트롤러가 자리잡은 뒤 한 번 더 잰다.** 조립 시점에는 캐릭터가 아직
             // 낙하·정착 중이라 루트가 바닥에서 0.10~0.22u 사이 어디에나 있을 수 있고
@@ -217,7 +220,7 @@ namespace Festa.World
         /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
         /// 몸이 떠오른다.
         /// </summary>
-        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround;
+        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround || LiePoseTable.IsLie(emote);
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -271,13 +274,46 @@ namespace Festa.World
             float drift = now - _rootHeightAtGrounding;
             if (Mathf.Abs(drift) < 0.01f) return;
 
+            // **한 틱에 이만큼 넘게 변했으면 바닥 판독이 틀린 것이다.** 실제 표류는 skinWidth(0.22) 안팎이라
+            // 1.5u(11 cm)를 넘을 수 없다. 착지 프레임에 바닥을 놓쳐 몇 u 아래 슬래브를 잡으면 그 값이
+            // 그대로 보정으로 들어가 몸이 묻혔다 — 그런 판독은 보정하지 않고 기준만 다시 잡는다.
+            if (Mathf.Abs(drift) > MaxDriftPerTick) { _rootHeightAtGrounding = now; return; }
+
             var t = _currentVisual.transform;
             var p = t.localPosition;
             p.y -= drift;
+            float nextBase = _baseVisualLocalY - drift;
+
+            // **바닥 밑으로는 절대 내려가지 않는다** (사용자 지시 2026-09-10). 보정은 누적되는 값이라
+            // 위 검사만으로는 조금씩 밀려 내려갈 수 있다. 조립·재측정 때 잡은 기준(_calibratedVisualLocalY)
+            // 에서 벗어날 수 있는 폭을 못 박아 둔다 — 정상 보정은 skinWidth 범위라 이 한계에 닿지 않는다.
+            //
+            // 접지가 달라지는 이모트(앉기·눕기)는 제외한다 — 선 자세 기준으로 잡은 한계를 그대로 걸면
+            // 앉거나 누운 몸을 도로 끌어올려 공중에 띄운다.
+            if (!ChangesGroundContact(_player.EmoteId.Value))
+            {
+                float lo = _calibratedVisualLocalY - MaxVisualCorrection;
+                float hi = _calibratedVisualLocalY + MaxVisualCorrection;
+                p.y = Mathf.Clamp(p.y, lo, hi);
+                nextBase = Mathf.Clamp(nextBase, lo, hi);
+            }
+
             t.localPosition = p;
-            _baseVisualLocalY -= drift;          // 이모트 복귀 기준값도 같이 옮긴다
+            _baseVisualLocalY = nextBase;      // 이모트 복귀 기준값도 같이 옮긴다
             _rootHeightAtGrounding = now;
         }
+
+        /// <summary>한 번의 접지 보정이 넘을 수 없는 값. 이보다 크면 바닥 판독 오류로 본다.</summary>
+        const float MaxDriftPerTick = 1.5f;
+
+        /// <summary>조립·재측정 기준에서 외형이 벗어날 수 있는 최대 폭(위아래). 1.5u ≈ 11 cm.</summary>
+        const float MaxVisualCorrection = 1.5f;
+
+        /// <summary>
+        /// 마지막으로 **실측해서** 잡은 외형 오프셋. <see cref="_baseVisualLocalY"/> 는 접지 보정으로 조금씩
+        /// 움직이지만 이 값은 재측정할 때만 바뀐다 — 누적 표류의 상한을 여기에 건다.
+        /// </summary>
+        float _calibratedVisualLocalY;
 
         const float FootCheckInterval = 0.1f;
         float _nextFootCheck;
@@ -313,17 +349,30 @@ namespace Festa.World
         /// 잡힌다 — 접지 그림자를 대충 놓는 용도라 그래도 됐지만 발을 맞추는 데는 못 쓴다.
         /// 여기서는 발 근처에서 시작하므로 가장 높은 히트가 곧 <b>바로 아래 면</b>이다.</para>
         /// </summary>
+        /// <summary>발보다 이만큼 위까지는 바닥으로 인정한다 — 낮은 단차·경사에서 판독이 끊기지 않게.</summary>
+        const float GroundProbeTolerance = 2f;
+
         bool TryFindGroundBelowFeet(out float groundY)
         {
             groundY = 0f;
-            var origin = transform.position + Vector3.up * 2f;
-            var hits = Physics.RaycastAll(origin, Vector3.down, 30f, ~0, QueryTriggerInteraction.Ignore);
+
+            // **머리 위에서 쏜다.** 전에는 발밑 2u 에서 쐈는데, 조금 높은 데서 뛰어내린 착지 프레임에
+            // CharacterController 가 바닥을 파고들면 광선이 바닥 콜라이더 **안에서** 시작해 그 면을 놓친다.
+            // 그러면 그 아래 다른 슬래브가 바닥으로 잡히고, HoldFeetOnGround 가 그 차이(수 u)만큼 외형을
+            // 끌어내려 몸이 바닥에 묻힌 채 굳었다 (2026-09-10 사용자 지적 — 여러 곳에서 재현).
+            float up = _controller != null ? _controller.height + 2f : 24f;
+            var origin = transform.position + Vector3.up * up;
+            float ceiling = transform.position.y + GroundProbeTolerance;
+
+            var hits = Physics.RaycastAll(origin, Vector3.down, up + 30f, ~0, QueryTriggerInteraction.Ignore);
             var found = false;
             var best = float.NegativeInfinity;
 
             foreach (var hit in hits)
             {
                 if (hit.transform == null || hit.transform.IsChildOf(transform)) continue;
+                // 발보다 위에 있는 면(옆 단상·책상 상판)은 내가 선 바닥이 아니다.
+                if (hit.point.y > ceiling) continue;
                 if (hit.point.y <= best) continue;
                 best = hit.point.y;
                 found = true;
@@ -538,7 +587,10 @@ namespace Festa.World
                     // 고쳤다 되돌릴 때 이 값으로 돌아간다.
                     _baseNeedsRefresh = false;
                     if (!ChangesGroundContact(_player.EmoteId.Value))
+                    {
                         _baseVisualLocalY = _currentVisual.transform.localPosition.y;
+                        _calibratedVisualLocalY = _baseVisualLocalY;
+                    }
                 }
             }
 
@@ -740,12 +792,32 @@ namespace Festa.World
 
             // 접지가 바뀌는 포즈면 크로스페이드가 끝난 뒤 다시 잰다. 그렇지 않은 이모트는
             // 선 자세 기준으로 되돌린다(앉기 → 다른 이모트로 바로 넘어가는 경우).
-            if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
+            // 눕기는 선 자세→누운 자세가 멀어 0.2 초면 덜컥한다. 조금 길게 섞고, 재측정도 그만큼 뒤로.
+            bool lie = LiePoseTable.IsLie(emote);
+            float fade = lie ? 0.35f : 0.2f;
+            if (lie)
+            {
+                // 눕기는 **한 번 재지 않고 실측표로 내린다.** 클립의 루트는 팩의 침대·소파 바닥에 있고 몸은
+                // 0.3~0.5 m 위에 떠 있다(LiePoseTable). 표의 최하단은 루프 전체의 최저값 = 팩의 매트리스 면이라
+                // 그만큼 내리면 몸이 소파 윗면에 닿고, 팔을 들거나 뒤척이는 위상에서는 그 부위만 자연히 떠 있다.
+                // 한 순간을 재서 붙이면(GroundToCurrentPose) 그 순간 가장 낮았던 팔꿈치·손이 기준이 되어 나머지
+                // 위상에서 몸 전체가 소파에 0.7u(5 cm) 떠 보였다 — 2026-09-10 LieRight 실측. 외형 배율은 조립 때
+                // visualTransform.localScale 에 실려 있다(실측 13.74).
+                _regroundAt = 0f;
+                if (_currentVisual != null)
+                {
+                    var vt = _currentVisual.transform;
+                    var p = vt.localPosition;
+                    p.y = _baseVisualLocalY - (LiePoseTable.MinY(emote) - LiePoseTable.IdleMinY) * vt.localScale.y;
+                    vt.localPosition = p;
+                }
+            }
+            else if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
             else RestoreBaseGrounding();
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
-                _animator.CrossFadeInFixedTime(stateName, 0.2f, 0);
+                _animator.CrossFadeInFixedTime(stateName, fade, 0);
             else
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
         }

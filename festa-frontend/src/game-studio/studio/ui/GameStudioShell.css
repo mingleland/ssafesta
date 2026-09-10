@@ -620,6 +620,17 @@
 .gss-rule-fields { gap: 5px; min-width: 0; }
 .gss-rule-fields > * { flex: 1; min-width: 0; }
 .gss-add-block { border-style: dashed; color: #4b5563; width: 100%; }
+/* S15P21A604-566 — 변수 생성 버튼 3개(Boolean/Integer/String)를 gss-inline-actions에 나란히
+   두면 .gss-add-block의 width:100%가 각 버튼에 컨테이너 전체 폭을 요구해 가로 스크롤이
+   생긴다. 폭을 1/3씩 균등 분배(flex:1)하고 패딩·글자 크기를 줄여 한 줄에 다 보이게 한다. */
+.gss-inline-actions--thirds > .gss-add-block {
+  flex: 1 1 0;
+  font-size: 11px;
+  min-width: 0;
+  padding: 6px 4px;
+  text-align: center;
+  width: auto;
+}
 .gss-count-badge { align-items: center; border-radius: 50%; display: inline-flex; height: 28px; justify-content: center; padding: 0; width: 28px; }
 
 .gss-asset-list { display: grid; gap: 5px; }

@@ -115,6 +115,10 @@ app:
   lease:
     price-coin: 100
     duration: PT24H
+    # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
+    # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은
+    # 막힌다. 배치가 늦어지면 아무도 원하지 않는 슬롯의 연결 해제만 늦어진다.
+    expiry-scan-interval: PT5M
 
   # spec 010 C-01·C-02 는 기획 미결이다. 값이 정해지면 이 세 줄만 바꾼다 (헌법 30조,
   # docs/26 row 20·21). 나머지 상한(제목 200·문구 500·별점 1~10·단답 200·장문 2000)은
@@ -170,6 +174,10 @@ app:
       # SC-010 은 "생성 후 1시간 + 다음 판정 주기 안에 100% EXPIRED" 를 요구하므로, 이 값을
       # 늘리면 그만큼 늦어진다. 짧게 잡으면 매 주기가 ai_documents 전수 조회다 (인덱스 없음).
       expiry-scan-interval: PT5M
+      # FR-028 — EXPIRED 원본을 24시간 복구 창이 닫힌 뒤 지우는 별도 sweep 의 주기다
+      # (AiDocumentOriginalDeleteSweeper, S15P21A604-556). 위와 달리 아무도 이 값을 기다리지
+      # 않으므로 더 느슨하게 잡는다.
+      original-delete-scan-interval: PT30M
     # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
     storage:
       # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환

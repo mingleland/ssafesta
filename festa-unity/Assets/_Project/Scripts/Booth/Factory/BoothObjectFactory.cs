@@ -26,6 +26,15 @@ namespace Festa.Booth
                 return null;
             }
 
+            // 부스 안에는 게임기를 두지 않는다 (사용자 지시 2026-09-10). 게임은 따로 모아 놓는 부스로 갈 예정이라
+            // 전시 부스 안에 오락기가 서 있으면 성격이 섞인다. 게시본에 들어 있어도 클라이언트가 세우지 않는다 —
+            // 데이터를 지우는 것이 아니라 배치만 건너뛰므로, 나중에 방침이 바뀌면 이 한 줄만 되돌리면 된다.
+            if (type == BoothObjectType.GamePortal)
+            {
+                Debug.Log($"[BoothObjectFactory] 게임기(GAME_PORTAL, objectId={objectId})는 부스 내부에 배치하지 않는다 — 건너뜀");
+                return null;
+            }
+
             var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
             if (prefab == null && type == BoothObjectType.Laptop)
             {
@@ -62,6 +71,7 @@ namespace Festa.Booth
         // 그쪽은 Editor 어셈블리라 런타임에서 참조할 수 없어 여기에 다시 적는다.
         // 레이아웃 좌표의 단위는 **미터**다(앵커의 균등 스케일 13.26 이 유닛으로 바꾼다. 실측 확인:
         // 레이아웃 6 m 간격 → 월드 79.56 units = 6.00 m).
+        // FestaInteriorBuilder 의 방 규격과 같은 값이라야 한다.
         const float RoomHalfXMeters = 5.0f;    // 방 폭 10 m
         const float RoomBackZMeters = -3.8f;
         const float RoomFrontZMeters = 7.0f;   // 방 깊이 10.8 m
@@ -176,7 +186,11 @@ namespace Festa.Booth
             // 20f ≈ 1.5 m, 15f ≈ 1.1 m (부스 스케일 1 m ≈ 13.26 unit). 13f 는 표면 기준이어도
             // 큰 오브젝트 앞에서 닿지 않는다는 보고가 있어 올렸다.
             // 전에는 피벗 기준 40f 라 3 m 밖에서도 잡혀 "범위가 너무 크다" 는 보고를 받았다.
-            target.Configure(interactive ? 20f : 15f, interactive);
+            // 2026-09-10 사용자 지시로 "거의 외곽에 붙었을 때만" 으로 줄였다 (20/15 → 12/9).
+            // 판정이 **수평 거리**로 바뀌었으므로(BoothInteractionTarget.DistanceFrom) 12u ≈ 0.9 m 다.
+            // 더 줄이지 못하는 이유는 실측이다: 노트북은 책상 안쪽(앞면에서 7.9u)에 놓여 있고 플레이어 캡슐
+            // 반경이 2.75u 라, 책상에 몸이 닿아도 노트북까지 10.7u 다. 8u 로 두면 손이 닿는 자리에서 F 가 안 먹는다.
+            target.Configure(interactive ? 12f : 9f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)
