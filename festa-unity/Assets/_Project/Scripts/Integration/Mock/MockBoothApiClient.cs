@@ -94,5 +94,26 @@ namespace Festa.Integration
             if (detail != null) detail.boothId = boothId;
             return detail;
         }
+
+        // 간판·전시 카드 회귀용 (GitLab #171). 썸네일은 **일부러 절반만 채운다** —
+        // 그림이 오는 부스와 이름만 오는 부스가 섞여야 폴백 경로가 에디터에서도 지나간다.
+        // URL 은 실제로 받을 수 없는 예시 도메인이라, 로드 실패 폴백(이름 카드)까지 같이 밟힌다.
+        public async Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            if (boothId % 2 == 0) return null;   // 짝수 슬롯은 미게시 — GetPublishedLayoutBySlotAsync 와 같은 규칙
+            return new BoothProjectsDto
+            {
+                projects = new[]
+                {
+                    new BoothProjectDto
+                    {
+                        projectId = boothId,
+                        name = $"{boothId}번 팀 프로젝트",
+                        thumbnailUrl = boothId % 4 == 1 ? "https://cdn.example.com/thumb.png" : null,
+                    },
+                },
+            };
+        }
     }
 }

@@ -21,5 +21,11 @@ namespace Festa.Integration
         /// Facade 는 읽기만 가능하다 — 저장 endpoint 는 계약 미결(docs/26).
         /// </summary>
         Task<BoothDetailDto> GetBoothDetailAsync(int boothId);
+
+        /// <summary>
+        /// 공개된 전시 프로젝트 조회 (방문자 시점). 없거나 조회 불가면 null.
+        /// 축제장 부스 간판·전시 카드가 쓴다 (GitLab #171).
+        /// </summary>
+        Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId);
     }
 }

@@ -25,6 +25,22 @@ namespace Festa.World
         [Tooltip("F 를 눌렀을 때 이동할 지점")]
         public Transform destination;
 
+        /// <summary>
+        /// 이벤트 부스인가 (GitLab #170). 켜면 <b>입장하지 않는다</b> — F 는 그 자리에서
+        /// <c>BOOTH_EVENT_INTERACT</c> 를 프런트로 쏘고, 화면은 FE 오버레이가 그린다.
+        ///
+        /// <para><b>왜 씬 설정인가.</b> 부스 종류가 서버에 없다 — <c>LayoutTemplate</c> 은 <c>PROJECT_EXHIBITION</c>
+        /// 하나뿐이고 <c>booths</c> 에 종류 칼럼이 없으며 슬롯 12개가 전부 <c>USER_RENTAL</c> 이다
+        /// (docs/26 · spec 007 C-13 · #112). #170 에서 <c>GET /booths/{boothId}</c> 에 <c>boothType</c> 을
+        /// 요청해 뒀고, 필드가 오면 이 체크박스 대신 서버 값으로 갈아탄다. 그때까지는 하드코딩이라
+        /// 슬롯을 옮기면 같이 옮겨야 한다.</para>
+        /// </summary>
+        [Tooltip("이벤트 부스 — 입장하지 않고 프런트로 BOOTH_EVENT_INTERACT 를 보낸다 (#170)")]
+        public bool eventBooth;
+
+        [Tooltip("이벤트 부스가 차지한 슬롯 번호. 0 이면 boothId 를 그대로 쓴다 (지금은 1:1).")]
+        public int slotId;
+
         [Tooltip("프롬프트에 표시할 행동 문구 (예: '3번 부스 입장')")]
         public string promptText;
 
