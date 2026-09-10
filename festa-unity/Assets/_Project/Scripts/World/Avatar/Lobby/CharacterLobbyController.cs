@@ -317,6 +317,19 @@ namespace Festa.Avatar
                     return;
                 }
 
+                // **게스트는 아예 부르지 않는다.** `/catalog/items` 는 회원 전용이라 게스트에게는
+                // 401 이 정상 응답인데, 그것을 실패로 취급해 "불러오지 못했습니다 · 새로고침" 을
+                // 띄우고 있었다 — 새로고침해도 게스트인 한 달라지지 않으니 거짓 안내다.
+                // demo 실측에서 실제로 이 경로를 밟았다 (2026-09-10, GitLab #175).
+                //
+                // 토큰이 아예 없을 때도 같다. 보유 목록을 물어볼 신원이 없으면 물어볼 이유도 없다.
+                if (!Festa.Integration.AuthBridge.HasToken || Festa.Integration.AuthBridge.IsGuest)
+                {
+                    AvatarOwnership.MarkGuest("게스트·비로그인 — 회원 전용 /catalog/items 를 부르지 않는다");
+                    SetStatus("게스트는 기본 파츠만 사용할 수 있습니다. 로그인하면 보유 파츠가 열립니다.");
+                    return;
+                }
+
                 var catalog = await Festa.Integration.ApiServices.User.GetAvatarPartCatalogAsync();
                 if (catalog?.items == null)
                 {

@@ -144,6 +144,21 @@ namespace Festa.Avatar
         /// <summary>
         /// 조회 실패를 기록한다. 잠금은 유지된다 — 실패를 개방으로 바꾸지 않는다.
         /// </summary>
+        /// <summary>
+        /// 게스트·비로그인이라 <b>물어보지 않았다.</b> 잠금 결과는 <see cref="MarkFailed"/> 와 같지만
+        /// <b>에러가 아니다</b> — 게스트에게 보유 파츠가 없는 것은 정상이고, 빨간 에러를 남기면
+        /// 진짜 실패와 구분이 안 된다(QA #77 과 같은 이유). demo 실측에서 게스트가 이 경로를
+        /// 에러로 밟고 있었다 (2026-09-10, GitLab #175).
+        /// </summary>
+        public static void MarkGuest(string reason)
+        {
+            Cataloged.Clear();
+            Owned.Clear();
+            State = AvatarOwnershipState.Failed;   // 잠금은 같다 — 열어 주면 안 된다
+            FailureReason = string.IsNullOrEmpty(reason) ? "게스트" : reason;
+            Debug.Log($"[AvatarOwnership] 보유 파츠를 조회하지 않는다 — {FailureReason}. 기본 파츠만 쓴다.");
+        }
+
         public static void MarkFailed(string reason)
         {
             Cataloged.Clear();
