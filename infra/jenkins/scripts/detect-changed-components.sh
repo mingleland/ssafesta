@@ -64,6 +64,7 @@ shared_exact = {
     ".gitlab-ci.yml",
     "infra/environments/compose/dev/base.yaml",
     "infra/environments/config/manifests/dev.json",
+    "infra/environments/config/environments/dev.env.example",
     "infra/.env.example",
     "infra/versions.env",
 }

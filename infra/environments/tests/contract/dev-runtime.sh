@@ -23,15 +23,17 @@ assert_contains "${base}" 'name: festa-dev-ai-back-private' 'dev AI and backend 
 assert_contains "${base}" 'name: festa-dev-front-private' 'dev front network is required'
 assert_contains "${base}" 'name: festa-dev-game-private' 'dev game network is required'
 
-for route in front api ai; do
-  assert_contains "${ingress}" "location /__dev/${route}/" "missing dev ${route} route"
-done
-assert_not_contains "${ingress}" '/__dev/world/' 'UnityTransport cannot connect through a URL path'
+assert_contains "${ingress}" 'location / \{' 'dev frontend must be served at the host root'
+assert_contains "${ingress}" 'location /api/' 'missing same-origin dev API route'
+assert_contains "${ingress}" 'location /ai/v1/' 'missing same-origin dev AI route'
+assert_not_contains "${ingress}" '/__dev/' 'dev must not use a cookie-breaking API prefix'
 assert_contains "${ingress}" 'dev-allowlist/\*\.conf' 'dev routes must use the approved-IP allowlist'
 assert_contains "${ingress}" 'deny all;' 'dev routes must deny unapproved sources'
 assert_contains "${ingress}" '127\.0\.0\.1:3001' 'front must proxy through loopback'
 assert_contains "${ingress}" '127\.0\.0\.1:8081' 'api must proxy through loopback'
 assert_contains "${ingress}" '127\.0\.0\.1:8000' 'ai must proxy through loopback'
+assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8081;' 'API proxy must preserve /api cookie paths'
+assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8000;' 'AI proxy must preserve /ai/v1 paths'
 assert_contains "${world_ingress}" 'server_name world-dev\.\$\{ROOT_DOMAIN\};' 'world must use the dedicated dev host'
 assert_not_contains "${world_ingress}" '^[[:space:]]*http2 on;' 'dev world must remain compatible with the deployed Nginx version'
 assert_contains "${world_ingress}" 'real_ip_header CF-Connecting-IP;' 'dev world must restore the client IP supplied by Cloudflare'
