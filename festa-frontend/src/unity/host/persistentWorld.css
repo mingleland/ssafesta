@@ -1,0 +1,16 @@
+/* 라우트 밖에 상주하는 Unity 월드 (S15P21A604-620).
+   WorldPage 의 `.world-scene`(fixed inset:0)과 같은 자리를 차지하되 그보다 뒤에 깔린다 —
+   월드 위에 뜨는 것은 전부 라우트 안에서 그려진다. */
+.persistent-world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #0e1430;
+}
+
+/* 월드 화면을 떠난 동안. 떼지 않고 감추기만 한다 — DOM 에서 빠지면 Unity 가 죽는다.
+   pointer-events 를 끊어 두어야 위에 뜬 화면의 클릭을 canvas 가 가로채지 않는다. */
+.persistent-world[data-visible='false'] {
+  visibility: hidden;
+  pointer-events: none;
+}
