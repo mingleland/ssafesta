@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createAiAgent,
   getAiAgent,
+  listAiDocuments,
   uploadAiDocument,
   updateAiAgent,
   type AiAgent,
@@ -11,6 +12,7 @@ import {
   type AiAgentResponseLength,
   type AiAgentRole,
   type AiAgentTone,
+  type AiDocumentStatus,
 } from '../../../entities/aiAgent/api';
 import { isApiError } from '../../../shared/api/client';
 import { OverlayError, OverlayLoading } from '../../overlay/ui/OverlayFrame';
@@ -61,9 +63,30 @@ function toCommand(form: FormState): AiAgentCommand {
   };
 }
 
+const STATUS_LABEL: Record<AiDocumentStatus, string> = {
+  QUEUED: '대기',
+  PROCESSING: '처리중',
+  READY: '준비완료',
+  FAILED: '실패',
+  EXPIRED: '만료',
+  DISABLED: '비활성화',
+};
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
 export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const queryClient = useQueryClient();
   const agentQuery = useQuery({ queryKey: ['ai-agent', boothId], queryFn: () => getAiAgent(boothId) });
+  const agentId = agentQuery.data?.agentId ?? null;
+  const documentsQuery = useQuery({
+    queryKey: ['ai-agent-documents', agentId],
+    queryFn: () => listAiDocuments(agentId as number),
+    enabled: agentId !== null,
+  });
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
@@ -92,10 +115,11 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
       if (!agentQuery.data) throw new Error('AI 직원 설정을 먼저 저장해 주세요.');
       return uploadAiDocument(agentQuery.data.agentId, file);
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       setUploadMessage(result.duplicate ? '이미 등록된 문서입니다.' : `업로드 완료: 처리 대기(${result.processingStatus})`);
       setError(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
     },
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 업로드하지 못했습니다.'),
   });
@@ -157,6 +181,33 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
         </label>
         {!editing && <p className="ov-note">AI 직원 설정을 먼저 저장하면 문서를 등록할 수 있습니다.</p>}
         {uploadMessage && <p className="bm-upload-result" role="status">{uploadMessage}</p>}
+
+        {editing && (
+          <div className="bm-document-list-wrap">
+            {documentsQuery.data && (
+              <span className="ov-note bm-document-quota">
+                {documentsQuery.data.documents.filter((d) => d.status === 'QUEUED' || d.status === 'PROCESSING' || d.status === 'READY').length}
+                /{documentsQuery.data.quota.countLimit}개 ·{' '}
+                {formatBytes(documentsQuery.data.documents.reduce((sum, d) => sum + d.sizeBytes, 0))}
+                /{formatBytes(documentsQuery.data.quota.bytesLimit)}
+              </span>
+            )}
+            {documentsQuery.isLoading && <p className="ov-note">문서 목록을 불러오는 중...</p>}
+            {documentsQuery.isError && <p className="ov-note">문서 목록을 불러오지 못했습니다.</p>}
+            {documentsQuery.data?.documents.length === 0 && <p className="ov-note">아직 올린 문서가 없습니다.</p>}
+            {documentsQuery.data && documentsQuery.data.documents.length > 0 && (
+              <ul className="bm-document-list">
+                {documentsQuery.data.documents.map((doc) => (
+                  <li key={doc.documentId} className="bm-document-row">
+                    <span className="bm-document-name">{doc.fileName}</span>
+                    <span className="bm-document-meta">{formatBytes(doc.sizeBytes)}</span>
+                    <span className="bm-document-status">{STATUS_LABEL[doc.status]}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       <label className="bm-check"><input type="checkbox" checked={form.handoffEnabled} onChange={(event) => setForm({ ...form, handoffEnabled: event.target.checked })} /> 사람 상담으로 연결 허용</label>

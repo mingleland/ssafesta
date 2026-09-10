@@ -51,6 +51,26 @@ export function updateAiAgent(agentId: number, command: AiAgentCommand): Promise
 type UploadGrant = { duplicate: boolean; documentId: number; uploadUrl?: string };
 export type DocumentUploadResult = { duplicate: boolean; documentId: number; processingStatus?: string };
 
+export type AiDocumentStatus = 'QUEUED' | 'PROCESSING' | 'READY' | 'FAILED' | 'EXPIRED' | 'DISABLED';
+
+export interface AiDocumentView {
+  documentId: number;
+  fileName: string;
+  sizeBytes: number;
+  status: AiDocumentStatus;
+  createdAt: string;
+  uploadedAt: string | null;
+}
+
+export interface AiDocumentListView {
+  documents: AiDocumentView[];
+  quota: { countLimit: number; bytesLimit: number };
+}
+
+export function listAiDocuments(agentId: number): Promise<AiDocumentListView> {
+  return api<AiDocumentListView>(`/api/v1/agents/${agentId}/documents`);
+}
+
 function sha256Hex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
