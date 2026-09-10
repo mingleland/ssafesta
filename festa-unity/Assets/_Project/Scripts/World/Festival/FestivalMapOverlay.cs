@@ -78,7 +78,7 @@ namespace Festa.World
         const float PanelW = 700f, PanelH = 1046f;
         const float MapH = 900f;
         const float CardW = 158f, CardH = 122f;
-        const float CaptionH = 52f;
+        const float CaptionH = 58f;
         const float CardPad = 12f;   // 카드 안쪽 좌우 여백 — 글자가 테두리에 붙지 않게
 
         float MapW => MapH * FestivalMinimapArea.Aspect;
@@ -286,21 +286,25 @@ namespace Festa.World
             FestaUiKit.Place(caption.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
                              Vector2.zero, new Vector2(CardW - 2f, CaptionH));
 
-            var name = FestaUiKit.Label(caption.rectTransform, $"{slot}번 부스", 17f, new Vector2(0f, 0f),
+            var name = FestaUiKit.Label(caption.rectTransform, $"{slot}번 부스", 22f, new Vector2(0f, 0f),
                                         new Vector2(CardW - CardPad * 2f, CaptionH - 8f), Ivory, FontStyles.Bold,
                                         TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f),
                                         new Vector2(0.5f, 0.5f));
+            // **디스플레이 글꼴(주아)로 바꾼다.** 본문 글꼴은 SDF 샘플링이 28 이라 이 크기에서
+            // 흐리게 번진다 — 주아는 90 으로 구워져 있어 같은 크기에서 훨씬 또렷하다
+            // (2026-09-10 "글씨가 너무 흐리다").
+            FestaUiKit.Display(name);
             name.enableAutoSizing = true;
-            name.fontSizeMin = 11f;
-            name.fontSizeMax = 17f;
+            name.fontSizeMin = 15f;
+            name.fontSizeMax = 22f;
             name.textWrappingMode = TextWrappingModes.Normal;
             name.overflowMode = TextOverflowModes.Ellipsis;
 
             // 번호는 사진 왼쪽 위 모서리에 작게 — 자막 폭을 이름에 다 내주기 위해서다.
             var badge = FestaUiKit.Rect(crt, "Badge", new Color(0.043f, 0.051f, 0.063f, 0.92f), 8);
             FestaUiKit.Place(badge.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                             new Vector2(7f, -7f), new Vector2(32f, 24f));
-            var num = FestaUiKit.Label(badge.rectTransform, slot.ToString("00"), 14f, Vector2.zero,
+                             new Vector2(7f, -7f), new Vector2(38f, 28f));
+            var num = FestaUiKit.Label(badge.rectTransform, slot.ToString("00"), 17f, Vector2.zero,
                                        Vector2.zero, Teal, FontStyles.Bold, TextAlignmentOptions.Center);
             FestaUiKit.Stretch(num.rectTransform);
 
@@ -309,10 +313,10 @@ namespace Festa.World
             // 아예 **다른 층을 켜고 끈다**.
             var vacant = FestaUiKit.Rect(surface.transform, "Vacant", VacantBg, 10);
             FestaUiKit.Stretch(vacant.rectTransform);
-            FestaUiKit.Label(vacant.rectTransform, $"{slot:00}", 14f, new Vector2(0f, -10f),
+            FestaUiKit.Label(vacant.rectTransform, $"{slot:00}", 17f, new Vector2(0f, -10f),
                              new Vector2(CardW - CardPad * 2f, 20f), new Color(0.56f, 0.60f, 0.67f, 1f),
                              FontStyles.Bold, TextAlignmentOptions.Center, new Vector2(0.5f, 1f));
-            FestaUiKit.Label(vacant.rectTransform, "부스 없음", 16f, Vector2.zero, new Vector2(CardW - CardPad * 2f, 24f),
+            FestaUiKit.Label(vacant.rectTransform, "부스 없음", 20f, Vector2.zero, new Vector2(CardW - CardPad * 2f, 24f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Center,
                              new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
             vacant.gameObject.SetActive(false);

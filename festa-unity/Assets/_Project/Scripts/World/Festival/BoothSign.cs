@@ -118,19 +118,37 @@ namespace Festa.World
             //
             // 글자 크기는 줄 높이(판높이/줄수)와 글자 폭(판폭/가장 긴 줄) 중 작은 쪽에 묶인다.
             // 한글은 대체로 정사각이라 폭 = 높이로 놓고 비교하면 충분하다.
-            string best = null;
+            int limit = Mathf.Max(1, maxLines);
+            var packed = new string[limit + 1];
+            var scores = new float[limit + 1];
             float bestScore = -1f;
-            for (int lines = 1; lines <= Mathf.Max(1, maxLines); lines++)
+
+            for (int lines = 1; lines <= limit; lines++)
             {
-                var candidate = Pack(words, lines, out int longest);
-                if (candidate == null) continue;   // 그 줄 수로는 안 나뉜다
+                packed[lines] = Pack(words, lines, out int longest);
+                if (packed[lines] == null) continue;   // 그 줄 수로는 안 나뉜다
 
                 float byHeight = 1f / lines;
                 float byWidth = boxAspect / Mathf.Max(1, longest);
-                float score = Mathf.Min(byHeight, byWidth);
-                if (score > bestScore) { bestScore = score; best = candidate; }
+                scores[lines] = Mathf.Min(byHeight, byWidth);
+                bestScore = Mathf.Max(bestScore, scores[lines]);
             }
-            return best ?? string.Join(" ", words);
+            if (bestScore <= 0f) return string.Join(" ", words);
+
+            // **가장 큰 글자가 곧 가장 예쁜 것은 아니다.** 순수하게 크기만 보면 "운동 자세 교정" 이
+            // <c>운동 / 자세 / 교정</c> 으로 갈린다 — 세 줄로 쌓으면 글자가 1.53, 두 줄이면 1.31 이라
+            // 계산상으로는 세 줄이 이긴다. 그런데 한 줄에 두 글자는 읽기 나쁘다는 지적을 받았다
+            // (2026-09-10 — "한줄에 두글자밖에 안들어가네? 네글자까지는 되겠는데").
+            //
+            // 그래서 **최고치의 85% 안에 드는 것 중 줄 수가 가장 적은 것**을 고른다. 크기를 조금
+            // 내주고 줄을 길게 가져간다 — 위 예는 두 줄(1.31 = 최고의 86%)이 되고,
+            // "AI 프로젝트 전시관" 은 두 줄로 가면 54% 로 뚝 떨어지므로 세 줄이 그대로 남는다.
+            const float Tolerance = 0.85f;
+            for (int lines = 1; lines <= limit; lines++)
+                if (packed[lines] != null && scores[lines] >= bestScore * Tolerance)
+                    return packed[lines];
+
+            return string.Join(" ", words);
         }
 
         /// <summary>

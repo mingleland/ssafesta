@@ -271,9 +271,9 @@ namespace Festa.EditorTools
             go.transform.localPosition = localCenter + normal * (lift * 1.8f) - faceUp * (plateH * 0.22f);
             go.transform.localRotation = rot;
 
-            // **좌우 여백을 넉넉히.** 0.92 로 잡았을 때 글자가 분필 테두리선(0.90)을 밟았다
-            // (2026-09-10 지적). 0.70 이면 선 안쪽으로 확실히 들어온다.
-            float boxW = plateW * 0.70f;
+            // 좌우 여백. 0.92 는 분필 테두리선(0.90)을 밟았고, 0.70 은 너무 좁혀서 한 줄에 두 글자밖에
+            // 안 들어갔다 (2026-09-10 지적). 0.82 면 선 안쪽에 있으면서 네 글자가 들어간다.
+            float boxW = plateW * 0.82f;
             // 높이도 넉넉히. 0.32 로 잡았을 때 세 줄이 눌려 글자가 판 폭의 1/3 밖에 못 썼다.
             float boxH = plateH * 0.40f;
 
