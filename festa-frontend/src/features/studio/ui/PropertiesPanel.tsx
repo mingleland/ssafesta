@@ -1,14 +1,14 @@
 // 선택된 오브젝트의 위치·회전·콘텐츠 연결을 편집하는 패널 — 편집기의 유일한 "정밀 입력" 지점
 // 좌표는 캔버스 드래그로도 바뀌지만, 정확한 숫자 입력·configId 연결은 여기서만 가능하다
 // 출처: specs/005-booth-studio-layout/FE/tasks.md T014, data-model.md ObjectType 판정표
-// 표현은 Booth Studio Inspector(booth-2_5d-reference: Transform / 속성 / 재질) — 계약에 없는 항목은 목업(PROVISIONAL) 표기
+// 표현은 Booth Studio Inspector — Transform / 속성. 계약에 없는 항목(재질·색)은 두지 않는다 (S15P21A604-616)
 
 import { useEffect, useState } from 'react';
 import type { LayoutObject } from '../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
 import { clampToBooth, normalizeRotation } from '../lib/coords';
-import { IcCopy, IcTrash } from './shell/icons';
+import { IcTrash } from './shell/icons';
 
 interface Props {
   object: LayoutObject;
@@ -142,20 +142,9 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
         ) : (
           <p className="studio-note">홈페이지 주소는 부스 설정(외관 모드)에서 등록합니다.</p>
         )}
-        <div className="studio-kv"><span className="studio-kv-label">양면<span className="studio-provisional">목업</span></span><button type="button" className="studio-toggle" role="switch" aria-checked="true" disabled aria-label="양면" /></div>
-        <div className="studio-kv"><span className="studio-kv-label">그림자<span className="studio-provisional">목업</span></span><button type="button" className="studio-toggle" role="switch" aria-checked="true" disabled aria-label="그림자" /></div>
-      </div>
-
-      <div className="studio-group">
-        <p className="studio-group-title">재질<span className="studio-provisional">목업</span></p>
-        <div className="studio-kv"><span className="studio-kv-label">표면</span><span>무광 (Matte)</span></div>
-        <div className="studio-kv"><span className="studio-kv-label">기본 색상</span><span className="studio-color-chip" style={{ background: '#e5e9f2' }} /></div>
-        <div className="studio-kv"><span className="studio-kv-label">포인트 색상</span><span className="studio-color-chip" style={{ background: '#3b82f6' }} /></div>
-        <p className="studio-note">재질·색은 계약에 없는 항목 — 실제 저장되지 않는다.</p>
       </div>
 
       <div className="studio-inspector-foot">
-        <button type="button" className="studio-btn" disabled title="복제는 후속"><IcCopy size={15} /> 복제</button>
         <button type="button" className="studio-btn studio-btn-danger" onClick={onRemove}><IcTrash size={15} /> 삭제</button>
       </div>
     </>

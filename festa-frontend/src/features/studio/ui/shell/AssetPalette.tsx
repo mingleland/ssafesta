@@ -18,7 +18,7 @@ import { buildLibrary, filterLibrary } from '../../model/assetLibrary';
 import type { LibraryItem } from '../../model/assetLibrary';
 import { BOOTH_TEMPLATES } from '../../model/boothTemplates';
 import type { BoothTemplate } from '../../model/boothTemplates';
-import { IcChevron, IcCube, IcLock, IcPlus } from './icons';
+import { IcChevron, IcCube, IcLock } from './icons';
 
 interface Props {
   mode: StudioMode;
@@ -191,17 +191,13 @@ export function AssetPalette({
         )}
       </div>
 
-      <div className="studio-palette-foot">
-        {mode === 'layout' ? (
-          <button type="button" className="studio-btn studio-btn-outline" disabled title="에셋 업로드는 후속 계약">
-            <IcPlus size={16} /> 에셋 추가
-          </button>
-        ) : (
+      {mode !== 'layout' && (
+        <div className="studio-palette-foot">
           <span className="studio-note" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <IcCube size={14} /> {mode === 'facade' ? '벽면·바닥·그래픽은 목업 표현' : '프리셋은 외관 모드에서 저장'}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }
