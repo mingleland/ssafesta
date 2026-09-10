@@ -3,7 +3,47 @@ guid: e4257dfc156ac684e94507788561f864
 ModelImporter:
   serializedVersion: 22200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Aluminum]'
+    second: {fileID: 2100000, guid: 8aa5264efadc04c419da424102686e81, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Metal Seamed]'
+    second: {fileID: 2100000, guid: 38d7cee828db68647bd6523c2b415617, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Mirror 01]'
+    second: {fileID: 2100000, guid: cf18bf5a5ab839c41bd31b77a7e2a621, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Mirror 02]'
+    second: {fileID: 2100000, guid: 59bc499407fccd5449402e15c1692466, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Steel Brushed Stainless]'
+    second: {fileID: 2100000, guid: c7ba6e8860945844c8413692bd9548c8, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: '[Translucent Glass Gray]1'
+    second: {fileID: 2100000, guid: c31150758764f954bb44e5df5616eddb, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: _defaultMat
+    second: {fileID: 2100000, guid: 13b31acfcdfe7e5448c1fbbd9ed46297, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: disablity
+    second: {fileID: 2100000, guid: fc3a5dcc0b3791b4cbca7a96d8f7ba43, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0
