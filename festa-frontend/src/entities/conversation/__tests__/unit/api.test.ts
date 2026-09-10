@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setAccessToken } from '../../../../shared/api/client';
 import { closeConversation, createConversation, isAiHttpError, streamMessage } from '../../api';
+import { AI_ENDPOINT_UNREACHABLE } from '../../errorCodes';
 
 function jsonResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return {
@@ -55,12 +56,18 @@ describe('createConversation', () => {
     });
   });
 
-  it('오류 본문이 없어도(프록시 오류 등) UNKNOWN 코드로 던진다', async () => {
+  // 계약 봉투가 아닌 응답은 "AI 서버가 그 자리에 없다" 로 읽는다 (S15P21A604-567).
+  // 종전에는 UNKNOWN 이었고, 그러면 status 문구가 그대로 나가 404 가 "대화가 만료되었습니다" 로
+  // 안내됐다 — 만료된 대화가 없는데도 그렇게 말하는 상태였다.
+  it('오류 본문이 JSON 이 아니면(프록시 오류·미연결) AI_ENDPOINT_UNREACHABLE 로 던진다', async () => {
     const response = jsonResponse(502, {});
     response.json = () => Promise.reject(new Error('not json'));
     fetchMock.mockResolvedValueOnce(response);
 
-    await expect(createConversation(7, 3)).rejects.toMatchObject({ code: 'UNKNOWN', status: 502 });
+    await expect(createConversation(7, 3)).rejects.toMatchObject({
+      code: AI_ENDPOINT_UNREACHABLE,
+      status: 502,
+    });
   });
 
   it('429는 Retry-After 헤더를 초로 파싱해 함께 던진다', async () => {

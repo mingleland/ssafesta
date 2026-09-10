@@ -16,6 +16,15 @@ x-agent: &agent
     - no-new-privileges:true
 
 services:
+  image-transfer-init:
+    <<: *agent
+    restart: 'no'
+    user: root
+    entrypoint: [/bin/sh, -ec]
+    command: [install -d -o jenkins -g jenkins -m 0770 /var/lib/festa-image-transfer]
+    volumes:
+      - image_transfer:/var/lib/festa-image-transfer
+
   linux-docker-agent:
     <<: *agent
     profiles: [linux-docker]
@@ -35,14 +44,20 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock
       TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
     volumes:
       - linux_docker_workspace:/home/jenkins/agent/linux-docker
+      - image_transfer:/var/lib/festa-image-transfer
       - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
 
   deploy-agent:
     <<: *agent
     profiles: [deploy]
     container_name: festa-jenkins-agent-deploy
+    # Docker daemon control is host-root equivalent; only the deploy label gets this socket.
+    user: root
     networks:
       - jenkins-control
     command:
@@ -57,9 +72,18 @@ services:
       - /home/jenkins/agent/deploy
     environment:
       DOCKER_HOST: unix:///var/run/docker.sock
+      ENVIRONMENT_STATE_DIR: /var/lib/festa-environments
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/__dev/api}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
     volumes:
       - deploy_workspace:/home/jenkins/agent/deploy
-      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+      - image_transfer:/var/lib/festa-image-transfer
+      - deploy_state:/var/lib/festa-environments
+      - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:
     <<: *agent
@@ -92,6 +116,8 @@ services:
 volumes:
   linux_docker_workspace:
   deploy_workspace:
+  deploy_state:
+  image_transfer:
   unity_workspace:
   unity_home:
 

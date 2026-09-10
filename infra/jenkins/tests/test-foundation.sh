@@ -98,6 +98,14 @@ grep -q 'final String sourceSha = config.sourceSha as String' "${component_pipel
   || fail "component CI does not accept its selected source SHA"
 grep -q 'final String artifactDir = config.artifactDir as String' "${component_pipeline}" \
   || fail "component CI does not accept its selected artifact path"
+grep -Fq 'final String artifactRoot = "${pwd()}/${artifactDir}"' "${component_pipeline}" \
+  || fail "component CI does not root artifacts in the Jenkins workspace"
+grep -Fq '"CI_ARTIFACT_DIR=${artifactRoot}"' "${component_pipeline}" \
+  || fail "component CI does not pass the rooted artifact directory to adapters"
+grep -Fq '"CI_STAGE_SUMMARY_PATH=${artifactRoot}/stage-summaries/${name}.json"' "${component_pipeline}" \
+  || fail "component CI does not root stage summaries in the Jenkins workspace"
+grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_root}/ci/verify" \
+  || fail "component verification must remain valid after adapter directory dispatch"
 grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
   || fail "game component CI does not reuse its Unity workspace"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
@@ -110,6 +118,32 @@ grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
   || fail "develop pipeline does not create its selection artifact directory"
 ! grep -q 'deploy-release.sh' "${develop_pipeline}" \
   || fail "Phase 2 develop pipeline must not deploy demo"
+grep -q 'transfer-local-images.sh --export' "${develop_pipeline}" \
+  || fail "develop pipeline does not export selected candidate images"
+grep -q 'transfer-local-images.sh --import' "${develop_pipeline}" \
+  || fail "deploy node does not verify candidate image receipt"
+grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-/__dev/api}' "${agent_compose}" \
+  || fail "deploy agent does not receive the approved dev API base"
+grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" \
+  || fail "deploy agent does not persist dev batch state outside its container filesystem"
+grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \
+  || fail "deploy agent does not mount persistent dev batch state"
+grep -q "final List deployComponents = (selection.deployComponents as List).findAll { it in \['ai', 'back', 'front'\] }" "${develop_pipeline}" \
+  || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
+grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
+  || fail "dev batch does not bind selected component credentials"
+grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pipeline}" \
+  || fail "deploy freshness check does not bind the GitLab checkout credential"
+grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
+  || fail "dev batch does not recheck the develop head before deployment"
+grep -q 'deploy-dev-batch.sh' "${develop_pipeline}" \
+  || fail "candidate transfer does not activate the Phase 3 dev batch"
+grep -q "stash name: 'candidate-metadata-game'" "${component_pipeline}" \
+  || fail "game candidate metadata cannot leave the Unity workspace"
+grep -q "unstash 'candidate-metadata-game'" "${develop_pipeline}" \
+  || fail "develop pipeline does not collect game candidate metadata"
+grep -q 'image-transfer-init' "${agent_compose}" \
+  || fail "shared image transfer volume has no ownership initializer"
 grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile accepts non-develop branches"
 ! grep -q 'componentBranches' "${jenkinsfile}" \

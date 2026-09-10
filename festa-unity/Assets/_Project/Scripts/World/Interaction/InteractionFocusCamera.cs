@@ -19,6 +19,9 @@ namespace Festa.World
     /// </summary>
     public sealed class InteractionFocusCamera : MonoBehaviour
     {
+        /// <summary>입력 잠금 주인 이름. 호스트 Overlay 가 자기 잠금을 풀 때 초점 잠금까지 풀지 않게 한다.</summary>
+        const string LockOwner = "InteractionFocusCamera";
+
         static InteractionFocusCamera s_instance;
 
         /// <summary>초점 모드가 끝났다(Esc·외부 잠금 해제·명시적 Release). 어떤 이유든 한 번만.</summary>
@@ -105,7 +108,13 @@ namespace Festa.World
 
         void OnEnable() => InputBridge.LockedChanged += OnLockedChanged;
         void OnDisable() => InputBridge.LockedChanged -= OnLockedChanged;
-        void OnDestroy() { if (s_instance == this) s_instance = null; }
+        void OnDestroy()
+        {
+            // 초점 중에 씬이 바뀌면(Single 로드) 이 오브젝트는 파괴되는데 InputBridge 잠금은 static 이라 다음 씬으로
+            // 넘어간다 — 풀어 줄 주체가 없어 이동·F·이모트가 영원히 죽었다(QA 2026-09-08 #51). 우리가 건 잠금만 되돌린다.
+            if (_active) EndFocus();
+            if (s_instance == this) s_instance = null;
+        }
 
         void BeginFocus(Transform anchor, Vector3 cameraLocal, Vector3 lookLocal, bool lockInput)
             => BeginFocusWorld(anchor, anchor.TransformPoint(cameraLocal), anchor.TransformPoint(lookLocal), lockInput);
@@ -133,7 +142,7 @@ namespace Festa.World
                 if (lockInput && !InputBridge.IsLocked)
                 {
                     _lockedByUs = true;
-                    InputBridge.SetLocked(true);
+                    InputBridge.SetLocked(true, LockOwner);
                 }
                 Debug.Log($"[InteractionFocusCamera] 초점 시작 → {anchor.name}");
             }
@@ -153,7 +162,7 @@ namespace Festa.World
             if (_lockedByUs)
             {
                 _lockedByUs = false;
-                InputBridge.SetLocked(false);   // LockedChanged(false) 가 다시 들어오지만 _active 가 false 라 무시된다
+                InputBridge.SetLocked(false, LockOwner);   // LockedChanged(false) 가 다시 들어오지만 _active 가 false 라 무시된다
             }
 
             Debug.Log("[InteractionFocusCamera] 초점 해제");
@@ -165,6 +174,33 @@ namespace Festa.World
         {
             // 호스트가 오버레이를 닫으며 잠금을 풀었다 — 초점도 함께 끝낸다.
             if (!locked && _active) EndFocus();
+        }
+
+        /// <summary>
+        /// 초점 모드 나가기 어포던스 — 우상단 `[Esc] 나가기` 알약. Esc 하나만 있으면 ① 키보드 없는 기기, ② 캔버스가
+        /// 포커스를 잃어 Esc 가 브라우저로 가는 경우(captureAllKeyboardInput=false), ③ FE 가 잠금을 안 풀어 주는 경우에
+        /// 갇힌다(QA 2026-09-08 #54). 마우스·터치로도 눌린다. IMGUI 라 씬 배선이 없다.
+        /// </summary>
+        void OnGUI()
+        {
+            if (!_active) return;
+            float ui = InteractPromptUI.UiScale();
+            float h = Mathf.Round(44f * ui), cap = Mathf.Round(34f * ui), pad = Mathf.Round(14f * ui), gap = Mathf.Round(10f * ui);
+            const string label = "나가기";
+            int fs = Mathf.RoundToInt(20f * ui);
+            float labelW = InteractPromptUI.MeasureLabel(label, fs);
+            float w = pad + cap + gap + labelW + pad;
+            var rect = new Rect(Screen.width - w - Mathf.Round(24f * ui), Mathf.Round(24f * ui), w, h);
+            InteractPromptUI.DrawCard(rect, Mathf.RoundToInt(h / 2f), new Color(1f, 0.99f, 0.965f, 0.96f));
+            InteractPromptUI.DrawKeycap(new Rect(rect.x + pad, rect.y + (h - cap) / 2f, cap, cap), "Esc", Mathf.RoundToInt(13f * ui));
+            InteractPromptUI.DrawLabel(new Rect(rect.x + pad + cap + gap, rect.y, labelW + 4f, h), label, fs, Festa.World.UI.FestaUiKit.Text);
+
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && rect.Contains(e.mousePosition))
+            {
+                e.Use();
+                EndFocus();
+            }
         }
 
         void LateUpdate()

@@ -2,7 +2,7 @@
 #
 # Jira 상태 전이는 GitLab Project Webhook → Jira Automation이 담당한다.
 # 이 파일의 jira-* job은 이관 전 기록으로만 남기며 실행하지 않는다.
-# 애플리케이션 빌드·테스트·배포는 루트 Jenkinsfile과 ci/ adapter가 담당한다.
+# GitLab CI는 develop 대상 MR의 병합 전 gate를 담당한다. Jenkins는 develop 병합 뒤 빌드·배포를 담당한다.
 #
 # 워크플로 문서: docs/jira-gitlab-workflow.md
 #
@@ -13,12 +13,11 @@
 
 workflow:
   rules:
-    # 2026-08-26: Jira Webhook 자동화와 Jenkins 전환 완료.
-    # runner 없는 legacy jira-* pipeline의 무한 pending 및 이중 전환을 방지한다.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feature|feat|fix|docs|style|refactor|test|chore|design|comment|rename|remove|!BREAKING CHANGE|!HOTFIX)\//'
+    # docs/17의 허용 작업 type만 develop 대상 MR gate에 진입시킨다.
+    # jira-* job은 아래에서 when: never로 유지해 Jira 내장 연동과 이중 전환하지 않는다.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feat|feature|fix|refactor|test|docs|chore|build|ci|hotfix|perf)\//'
 
-    # 아래 규칙과 job은 이관 기록이다. 다시 켜기 전에 jira-* job을 제거하고
-    # GitLab CI의 새 책임을 별도 이슈에서 정의해야 한다.
+    # MR 파이프라인 외 push 파이프라인은 중복 실행을 피한다.
     # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
     - when: never
     - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'

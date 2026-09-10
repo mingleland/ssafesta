@@ -32,6 +32,10 @@ export interface AssetReference {
   readonly kind: 'IMAGE' | 'TILESET' | 'AUDIO';
   readonly source: string;
   readonly integrity?: string;
+  // S15P21A604-570 — 업로드 시점의 원본 파일명. 커스텀 자산이 "내 자산 · assetId"라는
+  // 내용을 전혀 알 수 없는 라벨로만 표시되던 문제(Notion QA #53)를 고치기 위해 추가했다.
+  // 소급 적용은 하지 않는다 — 없는 자산은 기존 폴백 라벨을 그대로 쓴다.
+  readonly label?: string;
 }
 
 export type GameObjectiveType = 'SCORE_AT_LEAST' | 'DEFEAT_ENEMIES' | 'SURVIVE_SECONDS';
@@ -308,11 +312,12 @@ const validateItemShape = (value: unknown, path: string): void => {
 };
 
 const validateAssetShape = (value: unknown, path: string): void => {
-  const record = recordAt(value, path, ['id', 'kind', 'source'], ['id', 'kind', 'source', 'integrity']);
+  const record = recordAt(value, path, ['id', 'kind', 'source'], ['id', 'kind', 'source', 'integrity', 'label']);
   stableIdAt(record.id, `${path}.id`);
   enumAt(record.kind, `${path}.kind`, ['IMAGE', 'TILESET', 'AUDIO']);
   stringAt(record.source, `${path}.source`, 1, 500);
   if (record.integrity !== undefined) stringAt(record.integrity, `${path}.integrity`, 0, 128);
+  if (record.label !== undefined) stringAt(record.label, `${path}.label`, 0, 255);
 };
 
 const validateGameRulesShape = (value: unknown, path: string): void => {

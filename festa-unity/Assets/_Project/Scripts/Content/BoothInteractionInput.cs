@@ -28,6 +28,24 @@ namespace Festa.Content
 
         static BoothInteractionInput _instance;
 
+        /// <summary>
+        /// 지금 부스 오브젝트 프롬프트(키캡 또는 안내 알약)가 화면에 떠 있는가.
+        /// 포털 프롬프트는 이게 참이면 그 프레임을 양보한다 — 두 알약이 화면 중앙 같은 자리에 겹쳐
+        /// 글자가 뭉개지던 문제(QA 2026-09-08 #26). 부스 오브젝트가 포털보다 우선인 이유: 포털은 발밑
+        /// 범위라 부스 문 앞에서는 늘 켜져 있고, 오브젝트는 조준해야만 켜져서 의도가 더 분명하다.
+        /// </summary>
+        public static bool PromptShowing =>
+            _instance != null && (_instance._hovered != null || _instance._passive != null);
+
+        /// <summary>
+        /// 지금 F 에 응답할 **부스 오브젝트**가 잡혀 있는가 (안내 알약은 제외).
+        ///
+        /// <para>부스 입장 포털이 이걸 보고 그 프레임을 통째로 양보한다 — 슬롯머신처럼 부스에 붙어 있는
+        /// 오브젝트 앞에 서면 오브젝트 프롬프트가 뜨는데 **옆 부스 외곽선까지 같이 켜지고**, F 를 누르면
+        /// 오브젝트와 부스 입장이 동시에 먹었다 (2026-09-10 사용자 지적). 가까운 쪽(오브젝트)이 이긴다.</para>
+        /// </summary>
+        public static bool HasInteractTarget => _instance != null && _instance._hovered != null;
+
         /// <summary>디스패처가 씬에 있도록 보장한다. 상호작용 오브젝트가 Awake 에서 호출한다.</summary>
         public static void Ensure()
         {
@@ -41,7 +59,13 @@ namespace Festa.Content
             // 씬 전환에도 남기지 않는다 — 부스 오브젝트와 생애를 맞춘다.
         }
 
-        void OnEnable() => Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        void OnEnable()
+        {
+            useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스를 끄면 OnGUI 호출이 프레임당 절반으로 줄어 GC 가 준다 (QA #69)
+            // 씬에 미리 놓인 인스턴스는 Ensure() 를 거치지 않으므로 여기서도 등록한다 (PromptShowing 이 본다).
+            if (_instance == null) _instance = this;
+            Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        }
         void OnDisable() => Festa.Integration.BoothInteractBridge.OnSent -= OnBridgeSent;
 
         void OnDestroy()
@@ -63,6 +87,19 @@ namespace Festa.Content
             {
                 UpdateHover(null);
                 ShowHint(null);
+                // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
+                // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
+                _passive = null;
+                return;
+            }
+
+            // 소파에 누워 있는 동안은 F·프롬프트·링을 전부 끈다 (사용자 지시 2026-09-10). 누운 채 F 를 다시 누르면
+            // 소파 위로 재텔레포트되며 자세가 바뀌고, 프롬프트가 떠 있으면 "다시 누르라" 는 뜻으로 읽힌다. 일어나기는 WASD.
+            if (Festa.World.LiePoseTable.IsLocalPlayerLying())
+            {
+                UpdateHover(null);
+                ShowHint(null);
+                _passive = null;
                 return;
             }
 
@@ -86,7 +123,7 @@ namespace Festa.Content
             // 마우스를 올리지 않아도 사거리 안에 들어오면 자동으로 잡힌다 — 3인칭 걷기에서
             // "가까이 가면 F" 가 기대 동작이고, 마우스 조준을 요구하면 상호작용이 없는 것처럼
             // 보인다 (실 BE 첫 걷기에서 실측된 혼란). 조준이 없을 때만 근접으로 채운다.
-            targeted ??= NearestInteractableInRange();
+            targeted ??= NearestInteractableInRange(_hovered);
 
             UpdateHover(targeted);
             ShowHint(targeted);
@@ -104,23 +141,34 @@ namespace Festa.Content
             interactable?.Interact();
         }
 
-        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null.</summary>
-        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange()
+        /// <summary>
+        /// 새 후보가 현재 대상보다 이만큼(월드 유닛) 더 가까워야 대상을 바꾼다. 아케이드 두 대의 판정 표면이
+        /// 13 cm 간격이라 걷는 동안 대상이 매 프레임 흔들리고, 흔들릴 때마다 외곽선을 통째로 다시 만들었다(QA #52).
+        /// 3u ≈ 0.23 m.
+        /// </summary>
+        const float SwitchMargin = 3f;
+
+        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
+        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange(Festa.Booth.BoothInteractionTarget current)
         {
             var origin = InteractionOrigin();
             if (origin == null) return null;
 
             Festa.Booth.BoothInteractionTarget best = null;
             float bestDist = float.MaxValue;
+            float currentDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
                 if (t == null || !t.Interactive) continue;
                 // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
                 float d = t.DistanceFrom(origin.Value);
+                if (t == current && d <= t.MaxDistance) currentDist = d;
                 if (d > t.MaxDistance || d >= bestDist) continue;
                 best = t;
                 bestDist = d;
             }
+            if (current != null && best != current && currentDist < float.MaxValue && bestDist > currentDist - SwitchMargin)
+                return current;   // 근소한 차이면 붙잡고 있던 것을 유지한다
             return best;
         }
 
@@ -228,6 +276,8 @@ namespace Festa.Content
                 return "게임기 플레이";
             if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
                 return "타이밍 스톱 게임";
+            if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
+                return "소파에 눕기";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";

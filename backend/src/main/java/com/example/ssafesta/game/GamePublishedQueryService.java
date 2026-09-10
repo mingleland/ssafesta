@@ -3,6 +3,7 @@ package com.example.ssafesta.game;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +18,13 @@ public class GamePublishedQueryService {
 
     private final GameRepository games;
     private final GamePublishedVersionRepository published;
+    private final GameAccessGuard guard;
 
-    public GamePublishedQueryService(GameRepository games, GamePublishedVersionRepository published) {
+    public GamePublishedQueryService(GameRepository games, GamePublishedVersionRepository published,
+                                     GameAccessGuard guard) {
         this.games = games;
         this.published = published;
+        this.guard = guard;
     }
 
     /**
@@ -92,6 +96,24 @@ public class GamePublishedQueryService {
         return new PublishedView(snapshot.getSchemaVersion(), gameId, snapshot.getVersionNo(),
                 snapshot.getProjectJson(), snapshot.getPublishedAt());
     }
+
+    /**
+     * Publish history for the editor's version screen (contracts §버전 목록). Owner only.
+     *
+     * <p>No {@code project_json} anywhere in this path — {@link GamePublishedVersionRepository.VersionRow}
+     * keeps it out of the query itself, not just out of the response. A 2MB cap times up to 50 rows
+     * would be a 100MB fetch for a list view otherwise (contract's own reasoning).
+     */
+    @Transactional(readOnly = true)
+    public VersionsView versions(Long gameId, Long userId) {
+        Game game = guard.requireOwnedLive(gameId, userId);
+        List<GamePublishedVersionRepository.VersionRow> rows =
+                published.findTop50ByGameIdOrderByVersionNoDesc(gameId);
+        return new VersionsView(gameId, game.getPublishedVersion(), rows);
+    }
+
+    public record VersionsView(Long gameId, Integer publishedVersion,
+                               List<GamePublishedVersionRepository.VersionRow> versions) { }
 
     public record PublishedView(String schemaVersion, Long gameId, int publishedVersion,
                                 String projectJson, Instant publishedAt) {

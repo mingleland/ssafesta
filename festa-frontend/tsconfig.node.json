@@ -5,6 +5,9 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "skipLibCheck": true,
+    /* tools/devGateway.mjs 를 그대로 읽어 타입을 추론한다 — 게이트웨이 라우팅을 vite.config.ts
+       밖으로 뺀 결과다(S15P21A604-564). 선언 파일을 따로 두지 않는다. */
+    "allowJs": true,
 
     /* Bundler mode */
     "module": "nodenext",
@@ -19,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "tools/devGateway.mjs"]
 }

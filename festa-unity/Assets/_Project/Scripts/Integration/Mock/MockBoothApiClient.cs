@@ -10,38 +10,41 @@ namespace Festa.Integration
     /// </summary>
     public class MockBoothApiClient : IBoothApiClient
     {
-        // canonical 10종 + 구 별칭 2종 + 미지원 타입 1종을 포함한 계약 회귀 검증용 Layout.
+        // 서버(LayoutValidator)가 실제로 받아 주는 배치만 담는다 — 오브젝트 ≤12, 좌표 x·z ±3 m(HALF_WIDTH), 회전 AABB 포함.
+        // 전에는 15개·x ±4.2·z 10 m 라 에디터에서 보는 부스가 실제 방문객이 볼 그림과 달랐다(QA 2026-09-08 #50).
+        // 계약 회귀: canonical 10종 + 구 별칭 1종(SURVEY→SURVEY_KIOSK) + GAME_PORTAL 연결 1종 + assetCode 2종.
+        // 빼낸 것: CONSULT_DESK 별칭·HOLOGRAM 미지원 타입·미연결 포털 — 12개 상한에 걸려 정리했고, 그 경로는 단위 테스트 몫이다.
+        // 넓은 것(상담 데스크 1.86 m·패널 2 m)은 안쪽 열(±0.8)에 둬 회전 AABB 가 ±3 을 넘지 않게 한다.
+        // Tools/mock-api/booth-slot-layout.json 과 같은 내용이어야 한다.
         const string MockLayoutJson = @"{
   ""boothId"": 7,
   ""template"": ""PROJECT_EXHIBITION"",
   ""version"": 1,
   ""objects"": [
     { ""objectId"": ""ai-1"", ""type"": ""AI_AGENT"",
-      ""position"": { ""x"": -3, ""y"": 0, ""z"": 1 }, ""rotationY"": 0, ""configId"": 78 },
+      ""position"": { ""x"": -2.4, ""y"": 0, ""z"": -2.2 }, ""rotationY"": 0, ""configId"": 78 },
     { ""objectId"": ""screen-1"", ""type"": ""VIDEO_SCREEN"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 1 }, ""rotationY"": 0, ""configId"": 152 },
+      ""position"": { ""x"": -0.8, ""y"": 0, ""z"": -2.2 }, ""rotationY"": 0, ""configId"": 152 },
     { ""objectId"": ""panel-1"", ""type"": ""PROJECT_PANEL"",
-      ""position"": { ""x"": 3, ""y"": 0, ""z"": 1 }, ""rotationY"": 15, ""configId"": 33 },
+      ""position"": { ""x"": 0.8, ""y"": 0, ""z"": -2.2 }, ""rotationY"": 15, ""configId"": 33 },
+    { ""objectId"": ""portal-1"", ""type"": ""GAME_PORTAL"",
+      ""position"": { ""x"": 2.4, ""y"": 0, ""z"": -2.2 }, ""rotationY"": 0, ""configId"": 1 },
     { ""objectId"": ""survey-1"", ""type"": ""SURVEY_KIOSK"",
-      ""position"": { ""x"": -3, ""y"": 0, ""z"": 4 }, ""rotationY"": 0, ""configId"": 12 },
-    { ""objectId"": ""recruit-1"", ""type"": ""RECRUITMENT_BOARD"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 4 }, ""rotationY"": 0, ""configId"": 21 },
+      ""position"": { ""x"": -2.4, ""y"": 0, ""z"": 0 }, ""rotationY"": 0, ""configId"": 12 },
     { ""objectId"": ""desk-1"", ""type"": ""CONSULTATION_DESK"",
-      ""position"": { ""x"": 3, ""y"": 0, ""z"": 4 }, ""rotationY"": 0, ""configId"": 9 },
+      ""position"": { ""x"": -0.8, ""y"": 0, ""z"": 0 }, ""rotationY"": 0, ""configId"": 9 },
     { ""objectId"": ""laptop-1"", ""type"": ""LAPTOP"",
-      ""position"": { ""x"": 3, ""y"": 0.85, ""z"": 4 }, ""rotationY"": 0, ""configId"": 16 },
+      ""position"": { ""x"": -0.8, ""y"": 0.85, ""z"": 0 }, ""rotationY"": 0, ""configId"": 16 },
+    { ""objectId"": ""recruit-1"", ""type"": ""RECRUITMENT_BOARD"",
+      ""position"": { ""x"": 0.8, ""y"": 0, ""z"": 0 }, ""rotationY"": 0, ""configId"": 21 },
     { ""objectId"": ""vote-1"", ""type"": ""LIKE_VOTE"",
-      ""position"": { ""x"": -3, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 18 },
-    { ""objectId"": ""chair-1"", ""type"": ""FURNITURE"", ""assetCode"": ""FURNITURE_DEFAULT"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 7 }, ""rotationY"": 30, ""configId"": 0 },
-    { ""objectId"": ""plant-1"", ""type"": ""DECORATION"", ""assetCode"": ""DECORATION_DEFAULT"",
-      ""position"": { ""x"": 3, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 0 },
+      ""position"": { ""x"": 2.4, ""y"": 0, ""z"": 0 }, ""rotationY"": 0, ""configId"": 18 },
     { ""id"": ""legacy-survey"", ""type"": ""SURVEY"",
-      ""position"": { ""x"": -5.5, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 12 },
-    { ""objectId"": ""legacy-desk"", ""type"": ""CONSULT_DESK"",
-      ""position"": { ""x"": 5.5, ""y"": 0, ""z"": 7 }, ""rotationY"": 0, ""configId"": 9 },
-    { ""objectId"": ""future-1"", ""type"": ""HOLOGRAM"",
-      ""position"": { ""x"": 0, ""y"": 0, ""z"": 10 }, ""rotationY"": 0, ""configId"": 999 }
+      ""position"": { ""x"": -2.4, ""y"": 0, ""z"": 2.2 }, ""rotationY"": 0, ""configId"": 12 },
+    { ""objectId"": ""chair-1"", ""type"": ""FURNITURE"", ""assetCode"": ""FURN_CHAIR_01_BLUE"",
+      ""position"": { ""x"": -0.8, ""y"": 0, ""z"": 2.2 }, ""rotationY"": 30, ""configId"": 0 },
+    { ""objectId"": ""plant-1"", ""type"": ""DECORATION"", ""assetCode"": ""STRUCT_PANEL_01"",
+      ""position"": { ""x"": 0.8, ""y"": 0, ""z"": 2.2 }, ""rotationY"": 0, ""configId"": 0 }
   ]
 }";
 
@@ -77,6 +80,7 @@ namespace Festa.Integration
             // 홀수 슬롯만 게시된 것으로 취급 — 12실 병렬 조회에서 "게시/미게시 혼재" 경로를
             // 에디터에서도 지나가게 하기 위해서다 (미게시 = null, S15P21A604-103 완료 조건).
             await Awaitable.WaitForSecondsAsync(0.1f);
+            PublishedSlotResolution.Set(slotId, transientFailure: false);   // Mock 은 항상 확정 답
             if (slotId % 2 == 0) return null;
             var layout = BoothLayoutParser.Parse(MockLayoutJson);
             if (layout != null) layout.boothId = slotId;

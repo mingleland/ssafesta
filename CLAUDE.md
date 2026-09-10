@@ -24,8 +24,8 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
    과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
    키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
-   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 한다.
+   develop 대상 MR은 최신 GitLab pipeline이 성공해야 병합할 수 있다. MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
 5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
    - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
      이 전환한다. 손으로 옮기지 마라.
@@ -36,9 +36,9 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
    완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
    전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
-7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
-   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
-   러너 확보 시 되살릴 기록이다.
+7. GitLab CI는 같은 프로젝트의 허용된 작업 브랜치가 develop으로 향하는 MR에서 실행된다.
+   `mr-status`는 모든 유효 MR에 성공 상태를 만들고, Front/Back 또는 공통 CI 변경은 해당 test/build를 추가 실행한다.
+   실행 중·실패 pipeline은 병합하지 말고 원인을 고쳐 새 커밋으로 재실행한다. Jenkins는 develop 병합 뒤 CI/CD를 담당한다.
 8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
    정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
    git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에

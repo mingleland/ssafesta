@@ -8,16 +8,17 @@ def call(Map config = [:]) {
 
     def runCi = {
         sh "test \"\$(git rev-parse HEAD)\" = '${sourceSha}'"
+        final String artifactRoot = "${pwd()}/${artifactDir}"
         withEnv([
             "CI_COMPONENT=${component}",
             'CI_BRANCH=develop',
             "CI_COMMIT_SHA=${sourceSha}",
             "CI_RUN_ID=${env.JOB_NAME.replaceAll(/[^A-Za-z0-9_.-]/, '_')}-${env.BUILD_NUMBER}",
-            "CI_ARTIFACT_DIR=${artifactDir}"
+            "CI_ARTIFACT_DIR=${artifactRoot}"
         ]) {
             ['validate', 'test', 'build', 'package'].each { name ->
                 stage("${component}: ${name.capitalize()}") {
-                    withEnv(["CI_STAGE_SUMMARY_PATH=${artifactDir}/stage-summaries/${name}.json"]) {
+                    withEnv(["CI_STAGE_SUMMARY_PATH=${artifactRoot}/stage-summaries/${name}.json"]) {
                         sh "infra/jenkins/scripts/with-credentials.sh -- ci/${name}"
                     }
                 }
@@ -27,6 +28,10 @@ def call(Map config = [:]) {
                     schemaVersion: '1.0.0', component: component, sourceSha: sourceSha, artifactDir: artifactDir
                 ], pretty: 2
                 archiveArtifacts artifacts: "${artifactDir}/**", allowEmptyArchive: false, fingerprint: true
+                if (component == 'game') {
+                    // WebGL/Linux Server outputs stay on the Unity Agent; only candidate identity crosses workspaces.
+                    stash name: 'candidate-metadata-game', includes: "${artifactDir}/image-metadata.json", useDefaultExcludes: false
+                }
             }
         }
     }

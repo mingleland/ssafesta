@@ -13,6 +13,9 @@ import { parseGameProject, type AssetReference, type GameObject, type GameProjec
 import {
   addDialogueScene,
   addAssetReference,
+  removeAssetReference,
+  removeVariableDefinition,
+  removeItemDefinition,
   addObject,
   addTileLayer,
   addTopDownScene,
@@ -40,6 +43,7 @@ import { createBlankProject } from '../model/createBlankProject.ts';
 import { createStarterProject } from '../model/createStarterProject.ts';
 import { createProjectFromTemplate, PROJECT_TEMPLATES, type ProjectTemplateId } from '../model/projectTemplates.ts';
 import { createBrowserAssetRepository, type GameAssetRepository } from '../assets/localAssetRepository.ts';
+import { assetDisplayLabel } from '../assets/builtinAssetCatalog.ts';
 import { useResolvedAssetUrls } from '../assets/useResolvedAssetUrls.ts';
 import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
@@ -725,15 +729,61 @@ export const GameStudioShell = ({
     try {
       const assetId = nextStableId(store.getState().project, kind === 'TILESET' ? 'tileset' : 'image');
       const result = await assetRepository.save(gameId, { file, kind, suggestedAssetId: assetId });
-      apply(addAssetReference(store.getState().project, result.asset));
+      // S15P21A604-570 — 원본 파일명을 버리지 않고 자산에 같이 저장한다. assetDisplayLabel()이
+      // "내 자산 · {label}"로 보여주기 전까지는 토스트 문구에서만 쓰고 사라졌었다.
+      const asset: AssetReference = { ...result.asset, label: result.originalName };
+      apply(addAssetReference(store.getState().project, asset));
       setNotice(`${result.originalName}을 ${kind} 자산으로 추가했습니다.`);
-      return result.asset;
+      return asset;
     } catch (error) {
       setSaveStatus('error');
       setNotice(error instanceof Error ? error.message : '자산을 추가하지 못했습니다.');
       return null;
     }
   }, [apply, assetRepository, gameId, store]);
+
+  // S15P21A604-561 — 저장소 삭제(assetRepository.delete)와 프로젝트 참조 제거
+  // (removeAssetReference)를 한 동작으로 묶는다. removeAssetReference는 여전히 참조
+  // 중인 자산이면 validated()가 던지므로, 그 경우 저장소 쪽 삭제는 되돌리지 않고 그대로
+  // 두고(멱등이라 다음 시도에서 다시 지우면 됨) 에러만 보여준다 — 조용히 절반만 지운 채
+  // 넘어가지 않는다.
+  const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
+    const asset = store.getState().project.assets.find((candidate) => candidate.id === assetId);
+    if (asset === undefined) return;
+    try {
+      apply(removeAssetReference(store.getState().project, assetId));
+      if (assetRepository !== null) await assetRepository.delete(asset.source);
+      setNotice(`${assetDisplayLabel(asset)} 자산을 삭제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '자산을 삭제하지 못했습니다.');
+    }
+  }, [apply, assetRepository, store]);
+
+  // S15P21A604-562 — deleteAsset과 같은 패턴. 참조 중인 변수를 지우면 validated()가
+  // VARIABLE_REFERENCE_NOT_FOUND로 던지고, 그 메시지를 그대로 보여준다.
+  const deleteVariable = useCallback((variableId: string): void => {
+    try {
+      apply(removeVariableDefinition(store.getState().project, variableId));
+      setNotice(`${variableId} 변수를 삭제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '변수를 삭제하지 못했습니다.');
+    }
+  }, [apply, store]);
+
+  // S15P21A604-565 — deleteVariable과 같은 패턴. 참조 중인 아이템을 지우면 validated()가
+  // ITEM_REFERENCE_NOT_FOUND(조건/액션) 또는 PICKUP_ITEM_NOT_FOUND(오브젝트 컴포넌트)로
+  // 던지고, 그 메시지를 그대로 보여준다.
+  const deleteItem = useCallback((itemId: string): void => {
+    try {
+      apply(removeItemDefinition(store.getState().project, itemId));
+      setNotice(`${itemId} 아이템을 삭제했습니다.`);
+    } catch (error) {
+      setSaveStatus('error');
+      setNotice(error instanceof Error ? error.message : '아이템을 삭제하지 못했습니다.');
+    }
+  }, [apply, store]);
 
   const save = useCallback(async (): Promise<DraftSaveReceipt | null> => {
     try {
@@ -1774,6 +1824,9 @@ export const GameStudioShell = ({
                 )}
                 {rightPanel === 'PROJECT' && <ProjectDataPanel
                   onApply={apply}
+                  onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
+                  onDeleteItem={deleteItem}
+                  onDeleteVariable={deleteVariable}
                   onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
                   project={project}
                 />}

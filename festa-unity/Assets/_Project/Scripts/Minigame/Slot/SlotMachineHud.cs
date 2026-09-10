@@ -109,7 +109,11 @@ namespace Festa.Minigame.Slot
             if (_session.Balance.HasValue)
             {
                 _balance.text = _session.Balance.Value.ToString("N0");
-                _balanceNote.text = "보유 코인";
+                // 체험판이면 숫자를 실제 잔액과 시각적으로 갈라 둔다 — 같은 자리·같은 금색이면 배지가 숫자를 못 이겨
+                // "딴 코인이 사라졌다" 로 읽힌다(QA 2026-09-08 #53). 회색 + '(가상)' 표기.
+                bool sim = _session.Simulated;
+                _balance.color = sim ? FestaUiKit.Muted : FestaUiKit.Gold;
+                _balanceNote.text = sim ? "보유 코인 (가상 · 실제 잔액에 반영되지 않음)" : "보유 코인";
             }
             else
             {

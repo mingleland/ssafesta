@@ -14,8 +14,8 @@ import {
   updateDialogueChoice,
   updateDialogueNode,
 } from '../model/authoringCommands.ts';
-import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
-import { assetDisplayLabel, isAssetForRole } from '../assets/builtinAssetCatalog.ts';
+import { resolveStaticImageVisual, staticImageBackgroundStyle, staticImagePortraitStyle } from '../assets/staticImageVisual.ts';
+import { assetDisplayLabel, partitionAssetsByRole } from '../assets/builtinAssetCatalog.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { analyzeDialogueFlow } from '../model/dialogueFlow.ts';
 
@@ -239,7 +239,7 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
               이미 시각적으로 드러난다. */}
           <span className="gss-preview-badge">LIVE PREVIEW</span>
           {portraitVisual !== null && (
-            <div className="gss-dialogue-preview-portrait" style={staticImageBackgroundStyle(portraitVisual)} />
+            <div className="gss-dialogue-preview-portrait" style={staticImagePortraitStyle(portraitVisual)} />
           )}
           <div className="gss-dialogue-preview-box">
             <strong>{previewSpeaker || '내레이션'}</strong>
@@ -266,7 +266,25 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
                 value={scene.backgroundAssetId ?? ''}
               >
                 <option value="">배경 없음 / 게임 화면 유지</option>
-                {project.assets.filter((asset) => isAssetForRole(asset, 'BACKGROUND')).map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                {/* S15P21A604-570 — 큐레이션된 빌트인과 내가 올린 이미지가 구분 없이 섞여 있던
+                    문제(Notion QA #53)를 optgroup으로 나눠서 고친다. */}
+                {(() => {
+                  const { builtin, custom } = partitionAssetsByRole(project.assets, 'BACKGROUND');
+                  return (
+                    <>
+                      {builtin.length > 0 && (
+                        <optgroup label="제공 자료">
+                          {builtin.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                        </optgroup>
+                      )}
+                      {custom.length > 0 && (
+                        <optgroup label="내 자산">
+                          {custom.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
             </label>
             <label className="gss-field">
@@ -279,7 +297,23 @@ export const DialogueEditor = ({ project, scene, assetUrls, onApply }: DialogueE
                 value={selectedNode.portraitAssetId ?? ''}
               >
                 <option value="">인물 없음</option>
-                {project.assets.filter((asset) => isAssetForRole(asset, 'PORTRAIT')).map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                {(() => {
+                  const { builtin, custom } = partitionAssetsByRole(project.assets, 'PORTRAIT');
+                  return (
+                    <>
+                      {builtin.length > 0 && (
+                        <optgroup label="제공 자료">
+                          {builtin.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                        </optgroup>
+                      )}
+                      {custom.length > 0 && (
+                        <optgroup label="내 자산">
+                          {custom.map((asset) => <option key={asset.id} value={asset.id}>{assetDisplayLabel(asset)}</option>)}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
             </label>
           </div>

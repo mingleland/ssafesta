@@ -97,5 +97,14 @@ namespace Festa.Integration
 
         /// <summary>사용자에게 그대로 보여줄 수 있는 안내. 비어 있을 수 있다.</summary>
         public string message;
+
+        /// <summary>
+        /// 이 판정이 <b>서버가 아니라 Mock 대역</b>에서 나왔는가. true 면 기록도 보상도 실제가 아니다.
+        ///
+        /// <para>슬롯머신(<see cref="SlotSpinResultDto.simulated"/>)에는 있던 것이 여기에는 없어서,
+        /// 타이밍 스톱은 BE 경로가 없어도 "기록되었습니다" 라고 말했다. 조용히 실서버인 척하지 않는다는
+        /// 규칙이 한쪽에만 지켜지고 있었다 (2026-09-08 조사, T-24).</para>
+        /// </summary>
+        public bool simulated;
     }
 }

@@ -68,7 +68,7 @@ describe('resolve', () => {
   });
 
   it('로컬 참조는 주입된 로컬 저장소에 넘긴다', async () => {
-    const local = { resolve: vi.fn(async () => 'blob:local') };
+    const local = { resolve: vi.fn(async () => 'blob:local'), delete: vi.fn(async () => undefined) };
     const fetchContent = vi.fn();
     const repository = createApiGameAssetRepository({ local, fetchContent });
     await expect(repository.resolve(`asset://local/7/${ASSET_ID}`)).resolves.toBe('blob:local');
@@ -157,5 +157,43 @@ describe('save — 계약 §3.1~3.2', () => {
     const { repository } = repositoryWith(request, upload);
     await expect(repository.save(7, { kind: 'IMAGE', file: file() })).rejects.toMatchObject({ code: 'GAME_API_RESPONSE_INVALID' });
     expect(upload).not.toHaveBeenCalled();
+  });
+});
+
+describe('delete — 계약 §7 (S15P21A604-561)', () => {
+  it('stable 참조는 DELETE /games/{gameId}/assets/{assetId} 를 부른다', async () => {
+    const request = vi.fn().mockResolvedValueOnce(undefined);
+    const repository = createApiGameAssetRepository({ request: request as never });
+    await repository.delete(`asset://game/7/${ASSET_ID}`);
+    expect(request).toHaveBeenCalledWith(`/api/v1/games/7/assets/${ASSET_ID}`, { method: 'DELETE' });
+  });
+
+  it('로컬 참조는 주입된 로컬 저장소의 delete로 넘기고 서버를 부르지 않는다', async () => {
+    const request = vi.fn();
+    const local = { resolve: vi.fn(async () => null), delete: vi.fn(async () => undefined) };
+    const repository = createApiGameAssetRepository({ request: request as never, local });
+    await repository.delete(`asset://local/7/${ASSET_ID}`);
+    expect(local.delete).toHaveBeenCalledWith(`asset://local/7/${ASSET_ID}`);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('로컬 저장소가 없으면 로컬 참조 삭제는 조용히 아무 일도 하지 않는다', async () => {
+    const request = vi.fn();
+    const repository = createApiGameAssetRepository({ request: request as never });
+    await expect(repository.delete(`asset://local/7/${ASSET_ID}`)).resolves.toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('builtin 참조는 건드리지 않는다', async () => {
+    const request = vi.fn();
+    const repository = createApiGameAssetRepository({ request: request as never });
+    await expect(repository.delete('builtin://sprites/hero.png')).resolves.toBeUndefined();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('서버 삭제 실패는 조용히 삼키지 않고 그대로 올린다', async () => {
+    const request = vi.fn().mockRejectedValueOnce(new Error('network down'));
+    const repository = createApiGameAssetRepository({ request: request as never });
+    await expect(repository.delete(`asset://game/7/${ASSET_ID}`)).rejects.toThrow();
   });
 });
