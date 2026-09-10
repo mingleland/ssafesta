@@ -1,6 +1,5 @@
 package com.example.ssafesta.minigame;
 
-import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.MemberPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -106,27 +105,9 @@ public class MinigameController {
     @PostMapping("/sessions/{sessionId}/result")
     public TimerStopService.SubmitResult submit(@AuthenticationPrincipal Jwt jwt,
                                                 @Parameter(description = "세션 발급 응답의 `sessionId`", example = "3f1a6d2c-8b5e-4c11-9a77-2d0e5f8c4b31")
-                                                @PathVariable String sessionId,
+                                                @PathVariable UUID sessionId,
                                                 @RequestBody(required = false)
                                                 TimerStopService.SubmitCommand command) {
-        return timerStop.submit(MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY),
-                parseSessionId(sessionId), command);
-    }
-
-    /**
-     * Declared as {@code String} and parsed here rather than typed as {@code UUID} on the path.
-     * A conversion failure on a typed path variable comes out of this application as a <b>500</b>:
-     * {@code MethodArgumentTypeMismatchException} does not take the 4xx branch of
-     * {@code GlobalExceptionHandler.handleUnexpected}. That gap is older and wider than this
-     * feature — every {@code @PathVariable Long} in the codebase has it — so it is reported
-     * separately rather than fixed under a minigame ticket. Parsing here keeps a typo in a URL from
-     * being reported as a server fault, and names the offending field while doing it.
-     */
-    private static UUID parseSessionId(String sessionId) {
-        try {
-            return UUID.fromString(sessionId);
-        } catch (IllegalArgumentException exception) {
-            throw ApiException.fieldInvalid("sessionId", "세션 식별자 형식이 올바르지 않습니다: " + sessionId);
-        }
+        return timerStop.submit(MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY), sessionId, command);
     }
 }

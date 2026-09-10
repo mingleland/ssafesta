@@ -1,5 +1,6 @@
 package com.example.ssafesta.common;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * Turns every exception that escapes a controller into the one error shape (docs/08 §1.3).
@@ -70,6 +72,31 @@ public class GlobalExceptionHandler {
                                 koreanOrFallback(error.getDefaultMessage())))
                         .toList(),
                 null));
+    }
+
+    /**
+     * A path variable or query parameter that could not be converted to its declared type —
+     * {@code /surveys/abc/responses} against {@code @PathVariable Long surveyId}.
+     *
+     * <p>Needed explicitly because {@link #handleUnexpected}'s {@link ErrorResponse} branch does not
+     * catch this one, so every typed parameter in the application answered a URL typo with a
+     * <b>500</b> and an ERROR line in the log. That is the shape of a server fault, and it made a
+     * client mistake look like ours (found while building the minigame result endpoint,
+     * S15P21A604-502).
+     *
+     * <p>Reported as {@code VALIDATION_FAILED} with the parameter in {@code field}, the same
+     * envelope Bean Validation produces — a client branches on one rule, not two.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        String name = exception.getName();
+        log.debug("경로·질의 파라미터 형식 오류 — name={} value={}", name, exception.getValue());
+        // The offending value is not echoed: it is attacker-controlled text and this body is
+        // rendered by clients. The name is enough to point at the field.
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
+                ErrorCode.VALIDATION_FAILED, "요청 값의 형식이 올바르지 않습니다: " + name,
+                RequestIdFilter.current(),
+                List.of(ApiErrorDetail.field(name, "값의 형식이 올바르지 않습니다.")), null));
     }
 
     /** Anything without a Hangul character is a framework default and must not reach the client. */
