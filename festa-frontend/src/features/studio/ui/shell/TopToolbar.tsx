@@ -1,6 +1,6 @@
-// Booth Studio 상단 툴바 — Reference 상단 행 그대로: 뒤로 · 제목 · 부스명 · 편집 상태 | 저장 · 게시 | 실행취소 · 다시실행 | 줌 · 설정
+// Booth Studio 상단 툴바 — 뒤로 · 제목 · 부스명 · 편집 상태 | 저장 · 게시 | 실행취소 · 다시실행 | 줌
 import type { SaveStatus } from '../../model/editorReducer';
-import { IcBack, IcChevron, IcEdit, IcGear, IcPlay, IcRedo, IcSave, IcTrash, IcUndo } from './icons';
+import { IcBack, IcChevron, IcEdit, IcPlay, IcRedo, IcSave, IcTrash, IcUndo } from './icons';
 
 interface Props {
   boothName: string;
@@ -99,7 +99,6 @@ export function TopToolbar(p: Props) {
         <button type="button" className="studio-btn studio-btn-ghost" onClick={p.onZoomToggle}>
           {p.zoomPercent}% <IcChevron size={14} />
         </button>
-        <button type="button" className="studio-btn studio-btn-ghost studio-btn-icon" disabled aria-label="보기 옵션"><IcGear size={18} /></button>
       </div>
     </header>
   );
