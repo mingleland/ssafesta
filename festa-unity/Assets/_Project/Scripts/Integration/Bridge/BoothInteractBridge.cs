@@ -67,17 +67,23 @@ namespace Festa.Integration
         public const string MinigameInteract = "WORLD_MINIGAME_INTERACT";
 
         /// <summary>
-        /// 이벤트 부스 (2026-09-10, GitLab #170). <c>{type, boothId, slotId}</c> — 슬롯 하나를 실제로 차지하므로
-        /// 접두사가 <c>WORLD_</c> 가 아니라 <c>BOOTH_</c> 다(payload 에 boothId 가 있으면 <c>BOOTH_</c> 라는 기존 규칙).
+        /// 이벤트 지점 — 경품 상점·이벤트 설문 (GitLab #170). payload 는 <c>{type}</c> <b>하나뿐이다.</b>
+        /// FE 가 <c>!613</c>(develop <c>c76b9f49</c>)에서 이미 열어 둔 이벤트라 Unity 는 보내기만 하면 된다.
         ///
-        /// <para><b>다른 부스와 달리 입장하지 않는다.</b> F 를 누른 자리에서 곧장 이 이벤트를 쏘고 화면은 FE 오버레이가
-        /// 그린다 — 미니게임(<see cref="MinigameInteract"/>)과 같은 분담이다. <b>Unity 는 무슨 행사인지 모른다</b>:
-        /// boothId 만 보내고 무엇을 띄울지는 FE 가 정한다(노트북에서 URL 을 안 보내는 것과 같은 원칙, 헌법 25조).</para>
+        /// <para><b>한때 <c>BOOTH_EVENT_INTERACT</c> 를 새로 만들려 했다가 철회했다</b> (#170, 2026-09-10).
+        /// 접두사 규칙을 "payload 에 boothId 가 있으면 <c>BOOTH_</c>" 로 읽었는데 그건 결과를 규칙으로
+        /// 착각한 것이고, 실제 기준은 <b>화면이 boothId 를 소비하는가</b> 다. 이벤트 화면은 부스에 속하지
+        /// 않아 boothId·slotId 를 쓰지 않으므로 <c>WORLD_</c> 이고, 안 쓰는 값을 실어 보내면 나중에
+        /// 의미 있는 값으로 읽힌다(노트북에서 url 을 뺀 것과 같은 이유 — #97, 헌법 25조).</para>
         ///
-        /// <para>FE 수신부 확정 전이다. 부스 종류(<c>boothType</c>)도 아직 서버에 없어서 지금은 씬 설정으로
-        /// "슬롯 1 = 이벤트 부스" 를 지정한다 — #170 에서 BE 에 필드를 요청해 뒀다.</para>
+        /// <para><b>게스트도 그대로 보낸다.</b> Unity 는 게이트를 걸지 않는다 — FE 가 세션 종류로
+        /// 요청을 만들기 전에 갈라서, 관리 데스크의 403 무한 재시도 함정(S15P21A604-458)이 재현되지
+        /// 않는다는 확인을 받았다(#170 colosair).</para>
+        ///
+        /// <para>기존 union 은 <c>{ type, npcId? }</c> 지만 지금 이벤트 지점이 하나뿐이라
+        /// <b>npcId 를 싣지 않는다.</b> 여러 곳이 생기면 그때 채운다.</para>
         /// </summary>
-        public const string EventBoothInteract = "BOOTH_EVENT_INTERACT";
+        public const string EventInteract = "WORLD_EVENT_INTERACT";
 
         /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
@@ -208,14 +214,12 @@ namespace Festa.Integration
         }
 
         /// <summary>
-        /// 이벤트 부스 — <see cref="EventBoothInteract"/>. <paramref name="slotId"/> 를 boothId 와 <b>따로</b> 보내는 이유는
-        /// 둘이 지금 1:1 일 뿐 같은 값이 아니기 때문이다(<c>GET /booths/{boothId}</c> 응답도 두 필드를 나눠 준다).
-        /// 임대가 슬롯을 옮기면 boothId 는 그대로고 slotId 만 바뀐다 — 합쳐 보내면 그때 FE 가 구분할 수단을 잃는다.
+        /// 이벤트 지점 — <see cref="EventInteract"/>. <b>필드가 없다.</b> 무엇을 띄울지는 FE 가 정한다.
         /// </summary>
-        public static void SendEventBoothInteract(int boothId, int slotId)
+        public static void SendEventInteract()
         {
-            Send("{\"type\":\"" + EventBoothInteract + "\",\"boothId\":" + boothId + ",\"slotId\":" + slotId + "}");
-            OnSent?.Invoke(EventBoothInteract);
+            Send("{\"type\":\"" + EventInteract + "\"}");
+            OnSent?.Invoke(EventInteract);
         }
 
         /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>
