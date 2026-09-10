@@ -18,12 +18,14 @@ namespace Festa.World
     [DisallowMultipleComponent]
     public sealed class AvatarStrikeProp : MonoBehaviour
     {
+        // 레퍼런스(사용자 사진 "King of the Hammer"): **긴 검은 자루 + 굵은 빨간 머리**.
+        // 처음에는 회색 쇠망치처럼 작게 만들어 멀리서 보이지도 않았다.
         [Header("망치 치수(아바타 로컬 미터)")]
-        [SerializeField] float _handleLength = 0.74f;   // 두 손 아래(-0.20)부터 머리 앞(+0.54)까지
-        [SerializeField] float _handleRadius = 0.022f;
-        [SerializeField] float _headOffset = 0.56f;     // 오른손에서 머리 중심까지
-        [SerializeField] float _headLength = 0.19f;
-        [SerializeField] float _headRadius = 0.052f;
+        [SerializeField] float _handleLength = 0.92f;   // 머리 중심에서 자루 끝(손 아래 0.26 m)까지
+        [SerializeField] float _handleRadius = 0.028f;
+        [SerializeField] float _headOffset = 0.66f;     // 오른손에서 머리 중심까지
+        [SerializeField] float _headLength = 0.30f;
+        [SerializeField] float _headRadius = 0.105f;
 
         NetworkPlayer _player;
         PlayerAvatarVisual _visual;
@@ -52,9 +54,13 @@ namespace Festa.World
             if (_prop == null) _prop = BuildMallet(_rightHand);
             if (_prop == null) return;
 
-            // 자루 축 = 뒤 손(오른손) → 앞 손(왼손). 머리는 앞 손 너머에 달린다.
-            // 처음에는 반대로 잡아 망치가 사람 쪽으로 향했다(사용자 지적 2026-09-10) — 이 클립은 왼손이 앞이다.
-            var axis = _leftHand.position - _rightHand.position;
+            // 자루 축 = 뒤 손(왼손) → 앞 손(오른손). 머리는 오른손 너머에 달린다.
+            //
+            // **임팩트 프레임 실측이 기준이다**(2026-09-10, MineStart t=1.16 s, 루트 로컬):
+            // 오른손 (0.013, 0.360, 0.255) · 왼손 (−0.041, 0.360, 0.154) — 오른손이 몸 앞쪽이다.
+            // (오른손 − 왼손) 으로 뻗으면 머리가 발 앞 0.75 m · 높이 0.36 m 로 떨어진다 — 내리찍는 끝이다.
+            // 반대로 잡으면 임팩트 순간 머리가 등 뒤로 간다.
+            var axis = _rightHand.position - _leftHand.position;
             if (axis.sqrMagnitude < 1e-6f) axis = _rightHand.forward;
             _prop.position = _rightHand.position;
             _prop.rotation = Quaternion.FromToRotation(Vector3.up, axis.normalized);
@@ -80,16 +86,19 @@ namespace Festa.World
             var root = new GameObject("StrikeMallet").transform;
             root.SetParent(hand, false);   // 손에 붙어 아바타 배율을 그대로 받는다 — 치수는 미터로 쓴다
 
-            var wood = RuntimeMaterial("FestaMalletHandle", new Color(0.36f, 0.24f, 0.14f), 0.15f);
-            var steel = RuntimeMaterial("FestaMalletHead", new Color(0.30f, 0.31f, 0.34f), 0.65f);
+            var wood = RuntimeMaterial("FestaMalletHandle", new Color(0.10f, 0.10f, 0.12f), 0.25f);   // 검은 자루
+            var steel = RuntimeMaterial("FestaMalletHead", new Color(0.72f, 0.13f, 0.12f), 0.30f);   // 빨간 머리
 
+            // 자루는 **머리 중심까지** 닿아야 한다. 전에는 길이를 따로 주다 보니 자루 끝과 머리 사이가
+            // 4 cm 벌어져 "망치가 끊어져" 보였다(사용자 지적 2026-09-10).
+            float handleBottom = _headOffset - _handleLength;
             var handle = Part(root, "Handle", wood);
-            handle.localPosition = new Vector3(0f, _headOffset - _headLength * 0.5f - _handleLength * 0.5f, 0f);
+            handle.localPosition = new Vector3(0f, (handleBottom + _headOffset) * 0.5f, 0f);
             handle.localScale = new Vector3(_handleRadius * 2f, _handleLength * 0.5f, _handleRadius * 2f);
 
             var head = Part(root, "Head", steel);
             head.localPosition = new Vector3(0f, _headOffset, 0f);
-            // 머리는 자루에 직교한다 — 실린더를 눕혀 붙인다.
+            // 머리는 자루에 **직교**한다 — 실린더를 눕혀 붙인다(자루 축은 로컬 y, 머리 축은 로컬 z).
             head.localRotation = Quaternion.Euler(90f, 0f, 0f);
             head.localScale = new Vector3(_headRadius * 2f, _headLength * 0.5f, _headRadius * 2f);
 

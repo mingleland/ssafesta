@@ -19,6 +19,16 @@ namespace Festa.World
         [Tooltip("이 상호작용이 움직일 기계. 비우면 씬의 첫 기계를 쓴다")]
         [SerializeField] HighStrikerMachine _machine;
 
+        /// <summary>작동 중인지 — <see cref="Festa.Content.BoothInteractionInput"/> 가 프롬프트·링을 아예 끄는 데 쓴다.</summary>
+        public bool IsBusy
+        {
+            get
+            {
+                var m = _machine != null ? _machine : HighStrikerMachine.Any();
+                return m != null && m.IsBusy;
+            }
+        }
+
         void Awake()
         {
             if (GetComponentsInChildren<Collider>(true).Length == 0) gameObject.AddComponent<BoxCollider>();
@@ -44,10 +54,13 @@ namespace Festa.World
                 return;
             }
 
-            // 기계를 마주 보게 돌린다. 옆·뒤에서 눌러도 내리찍는 방향이 맞아야 연출이 성립한다.
+            // 기계를 **똑바로 마주 본다**. 한 번은 임팩트 방향(루트 로컬 yaw 116°)에 맞춰 몸을 돌려 봤는데,
+            // 스윙 끝은 기계에 닿아도 사람이 등을 보이고 서서 "뒤돌아서 때린다" 로 읽혔다(사용자 지적 2026-09-10).
+            // 보이는 자세가 우선이다 — 마주 서고, 도끼질은 몸 앞·오른쪽으로 떨어진다.
             var toMachine = machine.transform.position - po.transform.position;
             toMachine.y = 0f;
-            if (toMachine.sqrMagnitude > 0.01f) po.transform.rotation = Quaternion.LookRotation(toMachine.normalized, Vector3.up);
+            if (toMachine.sqrMagnitude > 0.01f)
+                po.transform.rotation = Quaternion.LookRotation(toMachine.normalized, Vector3.up);
 
             // 내 화면은 먼저 잠근다 — 서버 왕복을 기다리는 동안 연타되면 이모트만 여러 번 나간다.
             // 남들은 SwingClientRpc 를 받는 순간 잠긴다.

@@ -10,7 +10,8 @@ namespace Festa.EditorTools
     ///
     /// <para>벤더 메시 <c>SM_High_Striker_Bell_Tower</c> 는 정적 한 덩이다 — 퍽도 별도 램프도 따로 없다.
     /// 그래서 퍽·별 8개·점수판을 실측 위치에 얹고 <see cref="HighStrikerMachine"/> 에 물린다.
-    /// <b>벤더 프리팹은 고치지 않는다</b>(에셋 원본 수정 금지) — 부품은 형제 루트 <c>@HighStriker_01</c> 아래에 둔다.</para>
+    /// <b>벤더 프리팹의 에셋 원본은 고치지 않는다</b> — 부품은 씬 인스턴스의 메시 자식 아래
+    /// <c>@HighStriker_01</c> 루트에 붙인다(기계를 옮기면 같이 따라간다).</para>
     ///
     /// <para>실측(2026-09-10, 프리팹 로컬 미터 · 월드 배율 13.26):
     /// 기둥 |x| ≤ 0.19 · 전면 z = −0.100 · y 0.6~2.7 / 안내판 |x| 0.35~0.70 · 전면 z ≈ 0.00 /
@@ -50,11 +51,17 @@ namespace Festa.EditorTools
             var old = GameObject.Find("@HighStriker_01");
             if (old != null) Object.DestroyImmediate(old);
 
+            // 부품은 **메시 자식의 자식**으로 넣는다. 처음에는 형제로 두고 월드 위치·회전·localScale 을 베껴
+            // "같은 공간" 을 흉내 냈는데, 기계를 옮길 때마다 어긋나고 실제로 부품이 벽 쪽으로 떨어져 나갔다
+            // (사용자 지적 2026-09-10, 캡처 3회). 메시 자식 아래에 identity 로 붙이면 아래 좌표가
+            // **정점 실측과 같은 공간**이 되고, 기계를 어디로 옮기든 따라간다.
+            var meshChild = machine.transform.Find("SM_High_Striker_Bell_Tower");
+            if (meshChild == null) { Debug.LogError("[HighStriker] SM_High_Striker_Bell_Tower 없음"); return; }
             var root = new GameObject("@HighStriker_01");
-            root.transform.SetParent(machine.transform.parent, false);
-            root.transform.position = machine.transform.position;
-            root.transform.rotation = machine.transform.rotation;
-            root.transform.localScale = machine.transform.localScale;   // 부품 좌표를 메시 로컬(미터)과 같게 맞춘다
+            root.transform.SetParent(meshChild, false);
+            root.transform.localPosition = Vector3.zero;
+            root.transform.localRotation = Quaternion.identity;
+            root.transform.localScale = Vector3.one;
 
             var puckMat = Mat("StrikerPuck", new Color(0.62f, 0.64f, 0.68f), 0.72f);
             var starOff = Mat("StrikerStarOff", new Color(0.30f, 0.13f, 0.11f), 0.2f);

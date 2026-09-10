@@ -116,7 +116,7 @@ namespace Festa.Content
                 aimed = hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>();
                 // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
                 // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다.
-                if (aimed != null && aimed.Interactive && IsInRange(aimed)) targeted = aimed;
+                if (aimed != null && aimed.Interactive && IsInRange(aimed) && !TemporarilyBlocked(aimed)) targeted = aimed;
             }
 
             // ── 2순위: 근접 자동 조준 (S15P21A604-346) ──────────
@@ -148,6 +148,21 @@ namespace Festa.Content
         /// </summary>
         const float SwitchMargin = 3f;
 
+        /// <summary>
+        /// 지금 이 순간만 반응하지 않는 대상인가. 참이면 **조준 대상에서 통째로 빼서** 프롬프트·발밑 링·외곽선이
+        /// 아예 뜨지 않고 F 도 먹지 않는다 (사용자 지시 2026-09-10 — "작동 중일 땐 상호작용 UI 를 꺼라,
+        /// 본인뿐 아니라 다른 사용자도"). 문구만 바꾸면 여전히 누를 것처럼 보인다.
+        ///
+        /// <para>하이 스트라이커는 연출이 도는 동안 잠긴다. 잠금은 서버 브로드캐스트를 받는 순간 모든
+        /// 클라이언트에서 함께 열리므로(<see cref="Festa.World.HighStrikerMachine.BeginBusy"/>), 치는 사람뿐
+        /// 아니라 옆에서 보는 사람의 화면에서도 같이 사라진다.</para>
+        /// </summary>
+        static bool TemporarilyBlocked(Festa.Booth.BoothInteractionTarget target)
+        {
+            var striker = target.GetComponentInParent<Festa.World.HighStrikerInteractable>();
+            return striker != null && striker.IsBusy;
+        }
+
         /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
         static Festa.Booth.BoothInteractionTarget NearestInteractableInRange(Festa.Booth.BoothInteractionTarget current)
         {
@@ -159,7 +174,7 @@ namespace Festa.Content
             float currentDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
-                if (t == null || !t.Interactive) continue;
+                if (t == null || !t.Interactive || TemporarilyBlocked(t)) continue;
                 // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
                 float d = t.DistanceFrom(origin.Value);
                 if (t == current && d <= t.MaxDistance) currentDist = d;
@@ -278,12 +293,9 @@ namespace Festa.Content
                 return "타이밍 스톱 게임";
             if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
                 return "소파에 눕기";
+            // 작동 중에는 여기까지 오지 않는다 — TemporarilyBlocked 가 대상에서 통째로 뺀다.
             if (target.GetComponentInParent<Festa.World.HighStrikerInteractable>() != null)
-            {
-                // 작동 중에는 누가 눌러도 안 되므로 문구로 먼저 알린다 (사용자 지시 2026-09-10 — 전원 차단).
-                var hsm = Festa.World.HighStrikerMachine.Any();
-                return hsm != null && hsm.IsBusy ? "작동 중 — 잠시 후" : "망치로 내리치기";
-            }
+                return "망치로 내리치기";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
