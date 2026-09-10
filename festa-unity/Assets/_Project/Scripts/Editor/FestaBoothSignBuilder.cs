@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Festa.World;
 using TMPro;
@@ -18,7 +19,12 @@ namespace Festa.EditorTools
     /// 판이 이미 글씨 쓰라고 비어 있다.</para>
     ///
     /// <para><b>왼쪽 앞.</b> 통로에서 부스를 바라보는 사람 기준의 왼쪽이다 — 북쪽 줄은 −x,
-    /// 남쪽 줄은 +x 로 갈린다(두 줄이 서로 마주 본다). 입구를 막지 않게 부스 폭의 62% 지점에 둔다.</para>
+    /// 남쪽 줄은 +x 로 갈린다(두 줄이 서로 마주 본다). 부스 정면을 가리지 않게 <b>폭 바깥</b>에 둔다.</para>
+    ///
+    /// <para><b>손으로 옮긴 자리를 이긴다.</b> 위 계산은 <b>처음 세울 때만</b> 쓰고, 이미 표지판이
+    /// 있으면 그 자리를 그대로 물려받는다. 이 빌더는 루트를 통째로 지우고 다시 짓기 때문에
+    /// 그러지 않으면 씬에서 맞춰 둔 자리가 매번 날아간다 (2026-09-10 — 12칸을 전부 옮겨 둔 것을
+    /// 날릴 뻔했다). 계산값으로 되돌리려면 "부스 표지판 위치 초기화" 메뉴를 쓴다.</para>
     ///
     /// <para><b>병합 대상이 아니다.</b> 루트 <c>@Festival/Festival_ProjectSigns</c> 는
     /// <c>FestivalStaticCombiner.Groups</c> 에 없다 — 들어가면 런타임에 글자를 못 바꾸고 유령이 남는다(T-254).
@@ -84,26 +90,69 @@ namespace Festa.EditorTools
             var photoMat = Material("M_BoothSign_Photo", Color.white, Color.black, 0f, 0.05f);
 
             var old = festival.transform.Find(RootName);
-            if (old != null) Object.DestroyImmediate(old.gameObject);   // 두 번 돌려도 같은 결과
+
+            // **손으로 옮긴 자리를 기억한다.** 이 빌더는 루트를 통째로 지우고 다시 짓기 때문에,
+            // 씬에서 표지판을 옮겨 두면 다음에 돌릴 때 계산값으로 되돌아간다 — 실제로 12칸을
+            // 전부 옮겨 놓은 것을 날릴 뻔했다 (2026-09-10). 사람이 정한 자리가 계산값보다 낫다.
+            // 처음부터 다시 잡고 싶으면 아래 "위치 초기화" 메뉴를 쓴다.
+            var kept = new Dictionary<int, (Vector3 pos, Quaternion rot)>();
+            if (old != null)
+            {
+                foreach (Transform child in old)
+                    if (TryParseSlot(child.name, out int n))
+                        kept[n] = (child.position, child.rotation);
+                Object.DestroyImmediate(old.gameObject);
+            }
 
             var root = new GameObject(RootName);
             root.transform.SetParent(festival.transform, false);
 
-            int built = 0, missing = 0;
+            int built = 0, missing = 0, restored = 0;
             for (int slot = 1; slot <= BoothSignPresenter.SlotCount; slot++)
             {
                 var body = FindSlotBody(festival.transform, slot);
                 if (body == null) { missing++; Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 실물을 못 찾았다 — 건너뛴다."); continue; }
 
-                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat, photoMat);
+                var sign = BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat, photoMat);
                 built++;
+
+                if (kept.TryGetValue(slot, out var place))
+                {
+                    sign.transform.SetPositionAndRotation(place.pos, place.rot);
+                    restored++;
+                }
             }
 
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             EditorSceneManager.SaveOpenScenes();
             Debug.Log($"[BoothSign] 표지판 {built}칸 생성" + (missing > 0 ? $" (실물 미확인 {missing}칸)" : "") +
+                      (restored > 0 ? $" · 기존 자리 {restored}칸 유지" : "") +
                       $" — 루트 @Festival/{RootName}. 값은 런타임에 BoothSignPresenter 가 채운다.");
         }
+
+        /// <summary>
+        /// 손으로 옮긴 자리를 버리고 <b>계산값으로 되돌린다.</b> 부스를 옮겼거나 배치를 처음부터
+        /// 다시 잡을 때만 쓴다 — 평소 빌드는 기존 자리를 유지한다.
+        /// </summary>
+        [MenuItem("Festa/World/부스 표지판 위치 초기화 (손으로 옮긴 자리 버림)")]
+        public static void ResetPlacement()
+        {
+            if (EditorApplication.isPlaying) { Debug.LogError("[BoothSign] 플레이 모드에서는 돌리지 않는다."); return; }
+
+            var festival = GameObject.Find("@Festival");
+            var old = festival != null ? festival.transform.Find(RootName) : null;
+            if (old == null) { Debug.LogWarning("[BoothSign] 표지판이 없다 — 생성 메뉴를 먼저 돌려라."); return; }
+
+            if (!EditorUtility.DisplayDialog("부스 표지판 위치 초기화",
+                    "씬에서 손으로 옮긴 표지판 자리를 버리고 계산값으로 되돌립니다. 되돌릴 수 없습니다.",
+                    "초기화", "취소")) return;
+
+            Object.DestroyImmediate(old.gameObject);
+            Build();   // 기억할 것이 없으니 계산값으로 새로 선다
+        }
+
+        static bool TryParseSlot(string objectName, out int slot)
+            => int.TryParse(objectName.Replace("BoothSign_", string.Empty), out slot);
 
         /// <summary>
         /// 그 슬롯의 실물 렌더러. 병합본(<c>FestivalSlot_NN_Combined</c>)이 있으면 그것이 정답이다 —
@@ -126,7 +175,7 @@ namespace Festa.EditorTools
             return null;
         }
 
-        static void BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
+        static GameObject BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
                              GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat, Material chalkMat, Material photoMat)
         {
             bool northRow = b.center.z > AisleZ;
@@ -180,6 +229,8 @@ namespace Festa.EditorTools
             comp.photoPlaceholders = new[] { numFront, numBack };
             comp.cardPivot = pivot.transform;
             comp.cardRenderer = card.GetComponent<Renderer>();
+
+            return go;
         }
 
         static Renderer FindPanel(Transform signRoot, string keyword)
