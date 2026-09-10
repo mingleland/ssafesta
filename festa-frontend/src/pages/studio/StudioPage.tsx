@@ -32,6 +32,7 @@ import type { ObjectType } from '../../entities/layout/types';
 import { useBoothAssets } from '../../features/studio/model/useBoothAssets';
 import type { LibraryItem } from '../../features/studio/model/assetLibrary';
 import { instantiateTemplate } from '../../features/studio/model/boothTemplates';
+import { showToast } from '../../shared/ui/toast/toastStore';
 import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 
 // 카탈로그 type — BE 시드는 AVATAR_PART 뿐(-167). 부스 장식 유형 값은 외부 확정 대기라 조회만 걸어 둔다
@@ -51,6 +52,8 @@ export function StudioPage() {
   const [zoomIdx, setZoomIdx] = useState(1);
   const [preset, setPreset] = useState<TemplatePreset | null>(null);
   const [facadePreview, setFacadePreview] = useState<BoothFacade | null>(null);
+  // 덮어쓰기 확인을 기다리는 템플릿 — 확인 전에는 배치를 건드리지 않는다
+  const [pendingTemplate, setPendingTemplate] = useState<BoothTemplate | null>(null);
   const [presetForFacade, setPresetForFacade] = useState<{ themeCode: BoothFacade['themeCode']; primaryColor: string } | null>(null);
 
   const draftQuery = useQuery({
@@ -202,18 +205,32 @@ export function StudioPage() {
   }
 
   /**
-   * Template 적용 — 일반 ADD_OBJECT 를 여러 번 부르는 것이 전부다.
-   * 전용 경로를 만들지 않는다. 상한·검증·undo 가 전부 기존 경로에 이미 있다.
+   * Template 적용 — **교체다** (S15P21A604-589).
+   *
+   * 예전에는 ADD_OBJECT 를 반복했다. 그러면 템플릿이 기존 배치 **위에 쌓여** 두 번 누르면
+   * 두 벌이 되고, 상한에 걸리면 조용히 중간에서 끊겼다. 템플릿은 "이 배치로 시작한다"는
+   * 뜻이므로 앞의 것을 덮는다 — 그 뜻을 REPLACE_OBJECTS 액션 하나로 표현한다.
+   *
+   * 템플릿이 준 좌표는 서로 겹치지 않으므로(boothTemplates 주석) 빈 자리 탐색이 필요 없다.
    */
-  function handleApplyTemplate(template: BoothTemplate) {
-    const taken = placed();
-    for (const object of instantiateTemplate(template)) {
-      if (taken.length >= maxObjects) break;
-      const spot = addAt(object.type, object.assetCode, taken);
-      // 템플릿이 준 좌표는 서로 겹치지 않지만, 이미 놓인 것과는 겹칠 수 있다.
-      // 그래서 실제로 놓인 자리를 누적해 다음 자산이 그 위에 앉지 않게 한다
-      taken.push(spot);
+  function applyTemplate(template: BoothTemplate) {
+    const objects = instantiateTemplate(template);
+    const fitted = objects.slice(0, maxObjects);
+    dispatch({ type: 'REPLACE_OBJECTS', objects: fitted });
+    // 잘렸다면 조용히 넘기지 않는다 — 화면에 없는 자산을 사용자가 찾게 만들지 않는다
+    if (fitted.length < objects.length) {
+      showToast(`이 부스에는 ${maxObjects}개까지 놓을 수 있어 ${objects.length - fitted.length}개는 적용하지 않았습니다.`, 'info');
     }
+  }
+
+  function handleApplyTemplate(template: BoothTemplate) {
+    // 비어 있으면 물을 것이 없다. 그 밖에는 반드시 한 번 묻는다 — 되돌릴 수단(Undo)이 아직
+    // 없어서 확인이 유일한 안전망이다.
+    if (state.objects.length > 0) {
+      setPendingTemplate(template);
+      return;
+    }
+    applyTemplate(template);
   }
 
   const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
@@ -340,8 +357,19 @@ export function StudioPage() {
       }
       status={<StatusBar count={state.objects.length} max={maxObjects} saveStatus={state.saveStatus} dirty={state.dirty} tool={tool} snap={snapOn} />}
       overlay={
+        // 공개 결과가 우선이다 — 서버가 이미 낸 답이라 사용자 확인 대기보다 먼저 보여야 한다
         gates.showPublishResult ? (
           <PublishDialog errors={gates.publishErrors} warnings={gates.publishWarnings} published={publishMutation.isSuccess} onClose={() => publishMutation.reset()} />
+        ) : pendingTemplate !== null ? (
+          <TemplateOverwriteDialog
+            template={pendingTemplate}
+            currentCount={state.objects.length}
+            onConfirm={() => {
+              applyTemplate(pendingTemplate);
+              setPendingTemplate(null);
+            }}
+            onCancel={() => setPendingTemplate(null)}
+          />
         ) : undefined
       }
     />
@@ -377,6 +405,44 @@ function GateActions({
       <Link className="studio-btn studio-btn-primary" to={to}>
         {toLabel}
       </Link>
+    </div>
+  );
+}
+
+/**
+ * 템플릿 덮어쓰기 확인 (S15P21A604-589).
+ *
+ * 템플릿 적용은 되돌릴 수 없다 — Undo 가 아직 없다. 그래서 이미 놓인 것이 있으면 반드시 한 번
+ * 묻는다. PublishDialog 와 같은 자리(Shell 의 overlay 슬롯)·같은 마크업을 쓴다.
+ */
+function TemplateOverwriteDialog({
+  template,
+  currentCount,
+  onConfirm,
+  onCancel,
+}: {
+  template: BoothTemplate;
+  currentCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const emptying = template.objects.length === 0;
+  return (
+    <div className="studio-dialog-backdrop">
+      <div role="dialog" className="studio-dialog" aria-modal="true" aria-labelledby="template-overwrite-title">
+        <h2 id="template-overwrite-title">{emptying ? '배치를 모두 비울까요?' : `'${template.name}' 으로 바꿀까요?`}</h2>
+        <p className="studio-note">
+          지금 놓여 있는 {currentCount}개가 사라지고 {emptying ? '빈 부스가 됩니다' : `템플릿 배치 ${template.objects.length}개로 바뀝니다`}. 되돌릴 수 없습니다.
+        </p>
+        <div className="studio-dialog-actions">
+          <button type="button" className="studio-btn" onClick={onCancel}>
+            취소
+          </button>
+          <button type="button" className="studio-btn studio-btn-primary" onClick={onConfirm}>
+            {emptying ? '모두 비우기' : '바꾸기'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
