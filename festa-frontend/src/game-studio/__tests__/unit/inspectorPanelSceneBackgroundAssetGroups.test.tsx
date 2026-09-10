@@ -1,0 +1,77 @@
+// @vitest-environment jsdom
+// S15P21A604-570 — 장면 배경 select에서 빌트인(제공 자료)과 내가 올린 이미지(내 자산)가
+// 구분 없이 한 줄에 섞여 있던 문제(Notion QA #53)를 optgroup으로 고쳤다. 여기서는 그
+// 배선(partitionAssetsByRole → optgroup)만 확인한다 — 분류 로직 자체는
+// assetDisplayLabel.test.ts가 이미 모델 레벨에서 검증했다.
+import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+import { InspectorPanel } from '../../studio/ui/InspectorPanel.tsx';
+import { addAssetReference } from '../../studio/model/authoringCommands.ts';
+import { createStarterProject } from '../../studio/model/createStarterProject.ts';
+import type { GameProject, WorldScene } from '../../contracts/gameProject.ts';
+
+afterEach(() => {
+  cleanup();
+});
+
+const GAME_ID = 570;
+
+const findScene = (project: GameProject): WorldScene => {
+  const scene = project.scenes.find((candidate) => candidate.type === 'TOP_DOWN');
+  if (scene?.type !== 'TOP_DOWN') throw new Error('expected a TOP_DOWN fixture scene');
+  return scene;
+};
+
+describe('InspectorPanel — 장면 배경 select 자산 그룹(S15P21A604-570)', () => {
+  it('빌트인은 "제공 자료", 내가 올린 이미지는 "내 자산" optgroup으로 나뉘고 원본 파일명이 보인다', () => {
+    let project = createStarterProject(GAME_ID);
+    project = addAssetReference(project, {
+      id: 'myBg',
+      kind: 'IMAGE',
+      source: `asset://local/${GAME_ID}/myBg`,
+      label: 'sunset.png',
+    });
+    const scene = findScene(project);
+
+    const { container } = render(
+      <InspectorPanel
+        assetUrls={{}}
+        onApply={() => undefined}
+        onObjectRemoved={() => undefined}
+        onReplaceSprite={() => undefined}
+        project={project}
+        scene={scene}
+        selectedObject={null}
+      />,
+    );
+
+    const groups = Array.from(container.querySelectorAll('optgroup'));
+    const groupLabels = groups.map((group) => group.getAttribute('label'));
+    expect(groupLabels).toContain('제공 자료');
+    expect(groupLabels).toContain('내 자산');
+
+    const customGroup = groups.find((group) => group.getAttribute('label') === '내 자산');
+    expect(customGroup).toBeTruthy();
+    expect(customGroup!.textContent).toContain('내 자산 · sunset.png');
+  });
+
+  it('커스텀 배경 자산이 없으면 "내 자산" optgroup 자체가 렌더되지 않는다', () => {
+    const project = createStarterProject(GAME_ID);
+    const scene = findScene(project);
+
+    const { container } = render(
+      <InspectorPanel
+        assetUrls={{}}
+        onApply={() => undefined}
+        onObjectRemoved={() => undefined}
+        onReplaceSprite={() => undefined}
+        project={project}
+        scene={scene}
+        selectedObject={null}
+      />,
+    );
+
+    const groups = Array.from(container.querySelectorAll('optgroup'));
+    expect(groups.map((group) => group.getAttribute('label'))).not.toContain('내 자산');
+  });
+});
