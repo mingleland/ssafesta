@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getActiveDialogue } from '../../runtime/dialogue/dialogueRunner.ts';
 import {
   chooseReferenceDialogue,
+  currentInteractionTarget,
   interactReferencePlayer,
   moveReferencePlayer,
   startReferenceRuntime,
@@ -98,5 +99,210 @@ describe('reference web runtime', () => {
     expect(runtime.session.objectVisibility.libraryKeyObject).toBe(false);
     expect(runtime.playerHealth).toBe(2);
     expect(runtime.playerPosition).toEqual(destination.objects.find((object) => object.preset === 'PLAYER_SPAWN')?.position);
+  });
+});
+
+// S15P21A604-532 — 오브젝트 위 상호작용 안내 문구를 띄우려면 "지금 상호작용 가능한
+// 대상이 뭔지"를 UI(ReferenceGamePlayer)에서도 계산할 수 있어야 한다. interactReferencePlayer
+// 내부에서만 쓰이던 판정 로직을 currentInteractionTarget으로 export해 그대로 재사용한다 —
+// 실제 상호작용(E 버튼)의 판정과 힌트 표시 판정이 어긋나면 "버튼은 되는데 힌트가 안 뜨는"
+// 식의 불일치가 생기므로, 반드시 같은 함수를 써야 한다.
+describe('reference web runtime — currentInteractionTarget(S15P21A604-532)', () => {
+  it('상호작용 범위(정면) 안에 있으면 그 오브젝트를 대상으로 잡는다', () => {
+    const project = createStarterProject(532);
+    // library 씬의 librarian(INTERACTABLE, prompt: '대화하기')은 (7,4)에 있다 — 그 한 칸
+    // 아래(7,5)에서 위를 보고 있으면 정면이 librarian과 겹친다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 7, y: 5 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('librarian');
+  });
+
+  it('범위 밖이면 대상이 없다(null)', () => {
+    const project = createStarterProject(532);
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 0, y: 0 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+
+  it('INTERACTABLE 컴포넌트 없이 ON_INTERACT 이벤트로만 상호작용 가능한 오브젝트도 대상으로 잡힌다', () => {
+    // interactReferencePlayer(실제 E 버튼)의 판정과 어긋나지 않아야 하므로, "대상으로
+    // 잡히는지" 자체는 INTERACTABLE 컴포넌트 유무와 무관해야 한다 — 안내 문구를 보여줄지
+    // 말지는 이 함수가 아니라 UI 쪽에서 prompt 유무로 따로 결정한다(Phase 2).
+    const original = createStarterProject(532);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        objects: [...scene.objects, {
+          id: 'leverNoPrompt',
+          preset: 'INTERACTABLE' as const,
+          position: { x: 7, y: 5 },
+          visible: true,
+          components: [],
+        }],
+        events: [...scene.events, {
+          id: 'pullLever',
+          trigger: { type: 'ON_INTERACT' as const, targetId: 'leverNoPrompt' },
+          conditions: [],
+          actions: [{ type: 'SET_VARIABLE' as const, variableId: 'doorOpened', value: true }],
+        }],
+      }),
+    });
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 7, y: 6 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('leverNoPrompt');
+  });
+});
+
+// S15P21A604-534 — INTERACTABLE 컴포넌트에 range를 두어 상호작용 가능 거리를 오브젝트별로
+// 조정한다. 방향 무관 맨해튼 거리(|dx|+|dy|)로 판정하고, range 미지정 시 기본값 1이다.
+describe('reference web runtime — INTERACTABLE range(S15P21A604-534)', () => {
+  const buildProjectWithRangedObject = (range: number | undefined) => {
+    const original = createStarterProject(534);
+    return parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        // librarian(7,4)/libraryKeyObject(10,4)/lockedDoor(8,1)과 안 겹치는 자리(3,3)에
+        // 별도 오브젝트를 둬서 이 describe 블록의 판정만 단독으로 시험한다.
+        objects: [...scene.objects, {
+          id: 'rangedSign',
+          preset: 'INTERACTABLE' as const,
+          position: { x: 3, y: 3 },
+          visible: true,
+          components: [{ type: 'INTERACTABLE' as const, prompt: '표지판 읽기', ...(range === undefined ? {} : { range }) }],
+        }],
+      }),
+    });
+  };
+
+  it('range를 넘는 정면 거리에서는 잡히지 않는다', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3)에서 맨해튼 거리 3인 (3,6)에서 위를 보고 있음(범위 밖).
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 6 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+
+  it('range 이내의 정면 거리에서는 잡힌다', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3)에서 맨해튼 거리 2인 (3,5)에서 위를 보고 있음(범위 안).
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 5 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('대각선 방향도 맨해튼 거리로 판정된다(방향 무관)', () => {
+    const project = buildProjectWithRangedObject(2);
+    // (3,3) 기준 dx=1,dy=1인 (4,4) — 맨해튼 거리 2. 플레이어가 그쪽을 보고 있지 않아도
+    // (facing과 무관하게) 반경 판정이라 잡혀야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 4, y: 4 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('range를 지정하지 않으면 기본값 1이고, 방향과 무관하게 인접 칸이면 잡힌다', () => {
+    const project = buildProjectWithRangedObject(undefined);
+    // (3,3) 바로 왼쪽(2,3)에서 아래를 보고 있음 — 예전 로직이면 "정면"이 아니라서
+    // 상호작용이 안 됐겠지만, 이번 변경은 방향 무관 반경 1이라 잡혀야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 2, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('rangedSign');
+  });
+
+  it('range를 지정하지 않은 기본값 1을 넘는 거리에서는 여전히 잡히지 않는다', () => {
+    const project = buildProjectWithRangedObject(undefined);
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 1, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+
+  it('INTERACTABLE 컴포넌트가 없는(이벤트 전용) 오브젝트는 range 판정의 영향을 받지 않고 기존(정면 한 칸)대로 동작한다', () => {
+    const original = createStarterProject(534);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        objects: [...scene.objects, {
+          id: 'leverNoPrompt',
+          preset: 'INTERACTABLE' as const,
+          position: { x: 3, y: 3 },
+          visible: true,
+          components: [],
+        }],
+        events: [...scene.events, {
+          id: 'pullLever',
+          trigger: { type: 'ON_INTERACT' as const, targetId: 'leverNoPrompt' },
+          conditions: [],
+          actions: [{ type: 'SET_VARIABLE' as const, variableId: 'doorOpened', value: true }],
+        }],
+      }),
+    });
+    // 옆(2,3)에서 아래를 보고 있음 — INTERACTABLE 컴포넌트가 있었다면(위 테스트처럼)
+    // 방향 무관 반경 1로 잡히겠지만, 이벤트 전용 오브젝트는 여전히 "정면"만 인정하므로
+    // 옆에 서서 다른 방향을 보고 있으면 잡히지 않아야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 2, y: 3 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)).toBeNull();
+  });
+});
+
+// S15P21A604-544 — 여러 오브젝트가 동시에 상호작용 후보일 때, "에디터에서 먼저 만든
+// 쪽"(scene.objects 배열 순서)이 아니라 "플레이어와 더 가까운 쪽"이 우선하도록 바꾼다.
+// 거리가 같을 때만 기존처럼 배열 순서로 폴백한다(QA 확정).
+describe('reference web runtime — 상호작용 우선순위 거리순(S15P21A604-544)', () => {
+  it('배열에 나중에 선언된 오브젝트라도 플레이어와 더 가까우면 그쪽이 선택된다', () => {
+    const original = createStarterProject(544);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        // farSign을 먼저(objects 배열 앞쪽에) 선언하고, closeSign을 나중에 선언한다 —
+        // 기존 로직(배열 순서 우선)이었다면 farSign이 이겼을 상황.
+        objects: [...scene.objects,
+          { id: 'farSign', preset: 'INTERACTABLE' as const, position: { x: 3, y: 3 }, visible: true, components: [{ type: 'INTERACTABLE' as const, prompt: '먼 표지판', range: 3 }] },
+          { id: 'closeSign', preset: 'INTERACTABLE' as const, position: { x: 3, y: 6 }, visible: true, components: [{ type: 'INTERACTABLE' as const, prompt: '가까운 표지판', range: 3 }] },
+        ],
+      }),
+    });
+    // (3,5) — farSign(3,3)까지 거리 2, closeSign(3,6)까지 거리 1. 둘 다 range(3) 안이라
+    // 동시에 후보지만, 더 가까운 closeSign이 선택돼야 한다.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 5 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('closeSign');
+  });
+
+  it('INTERACTABLE 오브젝트와 순수 이벤트 트리거 오브젝트도 같은 거리 기준으로 비교된다', () => {
+    const original = createStarterProject(544);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        // farSign(INTERACTABLE, range 넉넉함)을 먼저 선언하고, closeLever(이벤트 전용,
+        // 정면 한 칸)를 나중에 선언한다 — closeLever가 더 가까우므로 배열 순서와 무관하게
+        // closeLever가 이겨야 한다.
+        objects: [...scene.objects,
+          { id: 'farSign', preset: 'INTERACTABLE' as const, position: { x: 3, y: 3 }, visible: true, components: [{ type: 'INTERACTABLE' as const, prompt: '먼 표지판', range: 5 }] },
+          { id: 'closeLever', preset: 'INTERACTABLE' as const, position: { x: 3, y: 4 }, visible: true, components: [] },
+        ],
+        events: [...scene.events, {
+          id: 'pullCloseLever',
+          trigger: { type: 'ON_INTERACT' as const, targetId: 'closeLever' },
+          conditions: [],
+          actions: [{ type: 'SET_VARIABLE' as const, variableId: 'doorOpened', value: true }],
+        }],
+      }),
+    });
+    // (3,5)에서 위(UP)를 보면 정면이 closeLever(3,4) — 거리 1. farSign(3,3)까지는 거리 2.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 5 }, facing: 'UP' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('closeLever');
+  });
+
+  it('거리가 정확히 같으면 기존과 동일하게 배열 순서(먼저 선언된 쪽)가 유지된다(회귀)', () => {
+    const original = createStarterProject(544);
+    const project = parseGameProject({
+      ...original,
+      scenes: original.scenes.map((scene) => scene.id !== 'library' || scene.type !== 'TOP_DOWN' ? scene : {
+        ...scene,
+        // signA를 먼저, signB를 나중에 선언한다. 둘 다 플레이어로부터 거리 2로 동률.
+        objects: [...scene.objects,
+          { id: 'signA', preset: 'INTERACTABLE' as const, position: { x: 3, y: 3 }, visible: true, components: [{ type: 'INTERACTABLE' as const, prompt: 'A', range: 2 }] },
+          { id: 'signB', preset: 'INTERACTABLE' as const, position: { x: 3, y: 7 }, visible: true, components: [{ type: 'INTERACTABLE' as const, prompt: 'B', range: 2 }] },
+        ],
+      }),
+    });
+    // (3,5) — signA(3,3)까지 거리 2, signB(3,7)까지 거리 2로 동률.
+    const runtime = { ...startReferenceRuntime(project), playerPosition: { x: 3, y: 5 }, facing: 'DOWN' as const };
+    expect(currentInteractionTarget(project, runtime)?.id).toBe('signA');
   });
 });

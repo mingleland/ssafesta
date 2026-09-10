@@ -50,6 +50,13 @@ const sceneRowSubtitles = (container: HTMLElement): readonly string[] => (
   [...container.querySelectorAll('.gss-scene-row small')].map((el) => el.textContent ?? '')
 );
 
+// S15P21A604-522 — DIALOGUE 씬은 우측 패널이 기본적으로 접혀 있어(panelHeadingText가
+// 콕 집는 .gss-panel-heading 자체가 렌더링되지 않음) 대화 씬의 이름 확인은 좌측 씬 목록의
+// 활성(is-active) 행으로 한다.
+const activeSceneRowName = (container: HTMLElement): string | null => (
+  container.querySelector('.gss-scene-row button.is-active strong')?.textContent ?? null
+);
+
 describe('GameStudioShell — 씬 추가 버튼/이름/타입 뱃지 명칭(S15P21A604-488)', () => {
   it('씬 추가 버튼 4개가 새 명칭으로 보인다', () => {
     setup();
@@ -83,10 +90,10 @@ describe('GameStudioShell — 씬 추가 버튼/이름/타입 뱃지 명칭(S15P
     // 갖고 있으므로 새로 추가되는 것은 각각 2번이어야 한다 — 카운터가 서로 독립적임을 화면
     // 레벨에서도 재확인한다(authoringCommands.test.ts는 모델 레벨에서 이미 확인함).
     fireEvent.click(screen.getByRole('button', { name: '+ 대화-Overlay' }));
-    expect(panelHeadingText(container)).toBe('새 대화-Overlay 2');
+    expect(activeSceneRowName(container)).toBe('새 대화-Overlay 2');
 
     fireEvent.click(screen.getByRole('button', { name: '+ 대화-Fullscreen' }));
-    expect(panelHeadingText(container)).toBe('새 대화-Fullscreen 2');
+    expect(activeSceneRowName(container)).toBe('새 대화-Fullscreen 2');
   });
 
   it('좌측 Scene 목록 행과 캔버스 툴바도 새 명칭을 쓴다', () => {

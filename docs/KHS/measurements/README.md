@@ -1,10 +1,11 @@
 # 실측 증적
 
-`Festa/측정/` 메뉴의 Editor 도구가 만든 산출물을 그대로 보관한다.
+`Festa/측정/` 메뉴의 Editor 도구 산출물과 영상·Unity MCP·브라우저 실측 근거를 보관한다.
 숫자를 본문에 옮겨 적기만 하면 **나중에 그 숫자가 어디서 나왔는지 확인할 방법이 없다.**
 
 | 파일 | 도구 | 내용 |
 |---|---|---|
+| [webgl-stutter-diagnosis-2026-09-07.md](./webgl-stutter-diagnosis-2026-09-07.md) | 영상 분석·Unity MCP·브라우저 | 프레임 요동 실측, GPU 시간 오독 정정, DPR 병합 상태와 검증 계획 |
 | `avatar-catalog-audit.md` | 아바타 카탈로그 실측 | 카테고리·항목 수, 고유/공유 용량, 썸네일 누락 (spec 013 C-01) |
 | `build-report-audit.md` | 빌드 리포트 | 배포 WebGL 빌드의 에셋별 **실제** 용량 |
 | `avatar-ui-budget-before.md` | UI 텍스처 예산 | 조정 전 49개 텍스처의 해상도·런타임 크기 |

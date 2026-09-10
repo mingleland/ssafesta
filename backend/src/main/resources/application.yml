@@ -78,6 +78,10 @@ app:
     access-token-ttl: PT30M
     refresh-token-ttl: P7D
     oauth-state-ttl: PT5M
+    # exp 를 지난 토큰을 얼마나 더 받아 주는가. Spring 기본값과 같은 60초이고, 적어 두는 이유는
+    # SurveyGuestKeySweeper 가 같은 값을 읽기 때문이다 — 이 시간이 지나기 전에 게스트 중복 방지
+    # 키를 지우면 아직 통과하는 토큰이 한 번 더 답할 수 있다 (헌법 12조 vs 1인 1응답).
+    jwt-clock-skew: PT60S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
@@ -111,6 +115,27 @@ app:
   lease:
     price-coin: 100
     duration: PT24H
+    # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
+    # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은
+    # 막힌다. 배치가 늦어지면 아무도 원하지 않는 슬롯의 연결 해제만 늦어진다.
+    expiry-scan-interval: PT5M
+
+  # spec 010 C-01·C-02 는 기획 미결이다. 값이 정해지면 이 세 줄만 바꾼다 (헌법 30조,
+  # docs/26 row 20·21). 나머지 상한(제목 200·문구 500·별점 1~10·단답 200·장문 2000)은
+  # 컬럼 폭이나 화면에서 나온 상수라 코드에 둔다 — 바뀌지 않는 값을 설정으로 빼지 않는다.
+  # FE Builder 에는 상한이 아예 없어 이 셋이 설문이 처음 만나는 제약이다.
+  survey:
+    max-questions: 30
+    max-options: 10
+    max-reward-coin: 10
+    # 제출 트랜잭션의 실제 상한. JDBC query timeout 으로 걸리므로 부스 락 대기도 여기서 끊긴다.
+    # 이 값이 없으면 아래 유예가 무엇을 덮는지 말할 수 없다 — 대기 시간에 상한이 없기 때문이다.
+    submit-timeout-seconds: 30
+    # 게스트 토큰이 더는 통과하지 않게 된 뒤에도 중복 방지 키를 이만큼 더 남긴다.
+    # 만료 직전에 인증돼 아직 처리 중인 요청이 있을 수 있고, 그 요청이 커밋하기 전에 키가
+    # 사라지면 중복 응답이 그대로 들어간다. submit-timeout 보다 길어야 하며(기동 시 검사),
+    # 그 차이가 트랜잭션 시작 전 대기(스레드 큐 등)를 덮는 여유다.
+    guest-key-grace: PT10M
 
   # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
   # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.
@@ -143,6 +168,16 @@ app:
     # 뜨면 위임이 전부 연결 실패로 떨어져 FastAPI 가 죽은 것처럼 보인다.
     processing:
       base-url: ${AI_INTERNAL_BASE_URL}
+    document:
+      # spec 007 FR-026 이 운영 중 조정 가능하다고 한 유일한 값이다 — 만료 판정 "주기" 이고,
+      # 미완료 문서를 만료시키는 1시간 자체가 아니다. 1시간은 AiDocumentExpirySweeper 의 상수다.
+      # SC-010 은 "생성 후 1시간 + 다음 판정 주기 안에 100% EXPIRED" 를 요구하므로, 이 값을
+      # 늘리면 그만큼 늦어진다. 짧게 잡으면 매 주기가 ai_documents 전수 조회다 (인덱스 없음).
+      expiry-scan-interval: PT5M
+      # FR-028 — EXPIRED 원본을 24시간 복구 창이 닫힌 뒤 지우는 별도 sweep 의 주기다
+      # (AiDocumentOriginalDeleteSweeper, S15P21A604-556). 위와 달리 아무도 이 값을 기다리지
+      # 않으므로 더 느슨하게 잡는다.
+      original-delete-scan-interval: PT30M
     # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
     storage:
       # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환

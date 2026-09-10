@@ -9,7 +9,11 @@ from fastapi import APIRouter, Depends, Request, Response, status
 
 from app.api.dependencies.internal_auth import require_spring_service_token
 from app.api.errors import ApiError
-from app.api.schemas.documents import ErrorResponse, ProcessDocumentRequest
+from app.api.schemas.documents import (
+    CancelDocumentProcessingRequest,
+    ErrorResponse,
+    ProcessDocumentRequest,
+)
 from app.clients.spring_booth_access import SpringBoothAccessClient
 from app.clients.spring_document_result import SpringDocumentResultClient
 from app.providers.document_parser import DefaultDocumentParser
@@ -130,3 +134,39 @@ async def start_document_processing(
             headers={"Retry-After": "1"},
         ) from exc
     return Response(status_code=status.HTTP_202_ACCEPTED)
+
+
+@router.post(
+    "/cancel",
+    status_code=status.HTTP_204_NO_CONTENT,
+    operation_id="cancelDocumentProcessing",
+    summary="실행 중인 문서 처리 attempt 취소",
+    description=(
+        "같은 jobId+attemptNo가 이미 없거나 끝났어도 성공으로 응답한다(멱등). "
+        "attemptNo가 현재 실행 중인 것과 다르면 아무것도 하지 않고 성공으로 응답한다. "
+        "취소 대상 조회는 FastAPI 프로세스 하나의 in-memory 상태만 본다 — replica가 2개 "
+        "이상이면 이 API는 요청을 받은 프로세스가 아닌 다른 프로세스의 attempt를 취소하지 "
+        "못한다."
+    ),
+    responses={
+        status.HTTP_204_NO_CONTENT: {
+            "description": "취소 요청 수락(실제 취소 여부 무관 — 멱등)",
+            "content": None,
+        },
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "description": "요청 형식 검증 실패",
+            "model": ErrorResponse,
+        },
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Spring→FastAPI Service Token 누락·오류",
+        },
+    },
+)
+async def cancel_document_processing(
+    request: CancelDocumentProcessingRequest,
+    supervisor: Annotated[
+        DocumentTaskSupervisor, Depends(get_document_task_supervisor)
+    ],
+) -> Response:
+    supervisor.cancel(job_id=request.job_id, attempt_no=request.attempt_no)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

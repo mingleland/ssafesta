@@ -575,6 +575,39 @@ export const setObjectVisible = (
   objects: scene.objects.map((object) => object.id === objectId ? { ...object, visible } : object),
 }));
 
+// S15P21A604-529 — PLAYER_SPAWN은 플레이 중 화면에 렌더링되지 않는 마커라(플레이어
+// 캐릭터는 .grp-player로 별도 렌더링) 이름/표시 설정을 가질 수 없다(QA 확정 사항). UI가
+// 애초에 그 컨트롤을 렌더링하지 않지만, 명령 자체도 조용히 무시해 계약을 어기는 project가
+// 만들어지지 않게 방어한다.
+export const renameObject = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  name: string,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  const trimmed = name.trim();
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, name: trimmed === '' ? undefined : trimmed } : object),
+  };
+});
+
+export const setObjectNameVisible = (
+  project: GameProject,
+  sceneId: string,
+  objectId: string,
+  showNameInPlay: boolean,
+): GameProject => replaceTopDownScene(project, sceneId, (scene) => {
+  const target = scene.objects.find((object) => object.id === objectId);
+  if (target === undefined || target.preset === 'PLAYER_SPAWN') return scene;
+  return {
+    ...scene,
+    objects: scene.objects.map((object) => object.id === objectId ? { ...object, showNameInPlay } : object),
+  };
+});
+
 const objectReferencedByAction = (
   project: GameProject,
   objectId: string,
@@ -1142,6 +1175,24 @@ export const addBooleanVariable = (project: GameProject): GameProject => {
   });
 };
 
+// S15P21A604-566 — addBooleanVariable과 대칭. VariableValueInput(값 편집 UI)은 이미
+// INTEGER/STRING을 다 지원하는데 생성 진입점이 Boolean 하나뿐이었다 — 그 공백을 메운다.
+export const addIntegerVariable = (project: GameProject): GameProject => {
+  const id = nextStableId(project, 'variable');
+  return validated({
+    ...project,
+    variables: [...project.variables, { id, type: 'INTEGER', initialValue: 0 }],
+  });
+};
+
+export const addStringVariable = (project: GameProject): GameProject => {
+  const id = nextStableId(project, 'variable');
+  return validated({
+    ...project,
+    variables: [...project.variables, { id, type: 'STRING', initialValue: '' }],
+  });
+};
+
 export const replaceVariableDefinition = (
   project: GameProject,
   variableId: string,
@@ -1151,6 +1202,18 @@ export const replaceVariableDefinition = (
   variables: project.variables.map((variable) => variable.id === variableId
     ? { ...variable, initialValue }
     : variable),
+});
+
+// S15P21A604-562 — removeAssetReference(-561)와 같은 안전망 구조다. 조건(VARIABLE_EQUALS)
+// 이나 액션(SET_VARIABLE)에서 아직 참조 중인 변수를 지우면 validated()가
+// VARIABLE_REFERENCE_NOT_FOUND로 던진다 — 호출부(ProjectDataPanel)가 미리
+// findVariableUsageLocations로 사용 위치를 보여주고 확인받은 뒤에만 이 함수를 부른다.
+export const removeVariableDefinition = (
+  project: GameProject,
+  variableId: string,
+): GameProject => validated({
+  ...project,
+  variables: project.variables.filter((variable) => variable.id !== variableId),
 });
 
 export const addItemDefinition = (project: GameProject): GameProject => {
@@ -1167,10 +1230,33 @@ export const renameItemDefinition = (
   items: project.items.map((item) => item.id === itemId ? { ...item, name: name.trim() } : item),
 });
 
+// S15P21A604-565 — removeAssetReference(-561)/removeVariableDefinition(-562)와 같은
+// 안전망 구조. 조건/액션(HAS_ITEM/GIVE_ITEM/REMOVE_ITEM)에서 참조 중이면
+// ITEM_REFERENCE_NOT_FOUND로, 오브젝트의 PICKUP 컴포넌트에서 참조 중이면
+// PICKUP_ITEM_NOT_FOUND로 validated()가 던진다 — 호출부가 미리
+// findItemUsageLocations로 사용 위치를 보여주고 확인받은 뒤에만 이 함수를 부른다.
+export const removeItemDefinition = (
+  project: GameProject,
+  itemId: string,
+): GameProject => validated({
+  ...project,
+  items: project.items.filter((item) => item.id !== itemId),
+});
+
 export const addAssetReference = (
   project: GameProject,
   asset: AssetReference,
 ): GameProject => validated({ ...project, assets: [...project.assets, asset] });
+
+// S15P21A604-561 — 사용 중인 자산을 지우려 하면 validated()(parseGameProject)가
+// SCENE_BACKGROUND_ASSET_INVALID/DIALOGUE_PORTRAIT_ASSET_INVALID/SPRITE_ASSET_INVALID 등으로
+// 그대로 실패한다 — 참조가 하나라도 남아있으면 던진다. 이게 최종 안전망이고, 실제 UX는
+// 호출부(ProjectDataPanel)가 미리 findAssetUsageLocations로 사용 위치를 보여주고 확인을
+// 받은 뒤에만 이 함수를 부르는 쪽으로 짠다 — 여기서 조용히 무시하고 없던 일로 만들지 않는다.
+export const removeAssetReference = (
+  project: GameProject,
+  assetId: string,
+): GameProject => validated({ ...project, assets: project.assets.filter((asset) => asset.id !== assetId) });
 
 export const addTileLayer = (
   project: GameProject,

@@ -156,14 +156,83 @@ namespace Festa.EditorTools
             var code      = Find("code",      f => f.Contains(".wasm"));
             if (loader == null || data == null || framework == null || code == null) return;
 
+            // ── provenance (GitLab #142 §8, 2026-09-10) ─────────────────────────────
+            // 배포 파이프라인이 "이 산출물이 어느 커밋에서, 어떤 설정으로 나왔나" 를 manifest 하나로 판정한다.
+            // 새 파일을 만들지 않고 **확장**한다 — FE 는 manifest 하나만 읽는다. 로더 URL 4종은 그대로.
+            //   sourceCommit(40자)·dirty  → release-manifest.scm.commit 과 대조, dirty 면 배포 거부
+            //   buildProfile              → release 가 아니면 배포 거부
+            //   unityVersion/unityRevision → 재임포트 사고(#124) 기록 · apiEnvironment → Mock 유출(T-237) 기록
+            //   compression               → 비압축 반려(-474) 기록
+            // Registry 8자 관행이 "어느 커밋인지 자동 판정 불가" 를 만들었으므로 40자로 적는다.
+            var prov = CollectProvenance();
             var json = "{\n"
+                + "  \"schemaVersion\": \"1.0.0\",\n"
                 + $"  \"loaderUrl\": \"{loader}\",\n"
                 + $"  \"dataUrl\": \"{data}\",\n"
                 + $"  \"frameworkUrl\": \"{framework}\",\n"
-                + $"  \"codeUrl\": \"{code}\"\n"
+                + $"  \"codeUrl\": \"{code}\",\n"
+                + $"  \"sourceCommit\": \"{prov.commit}\",\n"
+                + $"  \"sourceBranch\": \"{prov.branch}\",\n"
+                + $"  \"dirty\": {(prov.dirty ? "true" : "false")},\n"
+                + $"  \"unityVersion\": \"{Application.unityVersion}\",\n"
+                + $"  \"unityRevision\": \"{prov.unityRevision}\",\n"
+                + $"  \"buildProfile\": \"{(EditorUserBuildSettings.development ? "development" : "release")}\",\n"
+                + $"  \"apiEnvironment\": \"{prov.apiEnvironment}\",\n"
+                + $"  \"compression\": \"{prov.compression}\",\n"
+                + $"  \"builtAt\": \"{System.DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}\"\n"
                 + "}\n";
             File.WriteAllText(Path.Combine(outDir, "manifest.json"), json);
-            Debug.Log($"[WebBuilder] manifest.json 생성 — loader={loader}");
+            Debug.Log($"[WebBuilder] manifest.json 생성 — loader={loader} commit={prov.commit.Substring(0, System.Math.Min(8, prov.commit.Length))} dirty={prov.dirty} profile={(EditorUserBuildSettings.development ? "development" : "release")}");
+        }
+
+        struct Provenance { public string commit, branch, unityRevision, apiEnvironment, compression; public bool dirty; }
+
+        /// <summary>git·ProjectVersion·PlayerSettings 에서 provenance 를 모은다. git 이 없으면 빈 값 — 파이프라인이 거부하게 둔다(조용히 통과시키지 않는다).</summary>
+        static Provenance CollectProvenance()
+        {
+            var p = new Provenance { commit = "", branch = "", unityRevision = "", apiEnvironment = "", compression = "" };
+            p.commit = Git("rev-parse HEAD");
+            p.branch = Git("rev-parse --abbrev-ref HEAD");
+            p.dirty = !string.IsNullOrEmpty(Git("status --porcelain --untracked-files=no"));
+            try
+            {
+                // ProjectVersion.txt: "m_EditorVersionWithRevision: 6000.0.78f1 (ec8a99a872be)"
+                foreach (var line in File.ReadAllLines(Path.Combine("ProjectSettings", "ProjectVersion.txt")))
+                    if (line.StartsWith("m_EditorVersionWithRevision:"))
+                    { int a = line.IndexOf('('), b = line.IndexOf(')'); if (a > 0 && b > a) p.unityRevision = line.Substring(a + 1, b - a - 1); }
+            }
+            catch { /* 기록용 — 없으면 빈 값 */ }
+            var api = AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/_Project/ScriptableObjects/ApiConfig.asset");
+            if (api != null)
+            {
+                var so = new SerializedObject(api);
+                var env = so.FindProperty("_activeEnvironment") ?? so.FindProperty("activeEnvironment");
+                var mock = so.FindProperty("_useMock") ?? so.FindProperty("useMock");
+                string envName = env != null ? (env.propertyType == SerializedPropertyType.Enum ? env.enumNames[env.enumValueIndex] : env.stringValue) : "?";
+                p.apiEnvironment = mock != null && mock.boolValue ? $"Mock({envName})" : envName;
+            }
+            var fmt = PlayerSettings.WebGL.compressionFormat;
+            p.compression = (fmt == WebGLCompressionFormat.Brotli ? "brotli" : fmt == WebGLCompressionFormat.Gzip ? "gzip" : "none")
+                            + (PlayerSettings.WebGL.decompressionFallback ? "+fallback" : "");
+            return p;
+        }
+
+        static string Git(string args)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo("git", args)
+                { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Directory.GetCurrentDirectory() };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                var output = proc.StandardOutput.ReadToEnd().Trim();
+                proc.WaitForExit(5000);
+                return proc.ExitCode == 0 ? output : "";
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[WebBuilder] git {args} 실패 — provenance 를 비운다: {ex.Message}");
+                return "";
+            }
         }
     }
 }

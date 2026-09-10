@@ -3,6 +3,8 @@ package com.example.ssafesta.internal.ai;
 import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -18,6 +20,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 class AiDocumentJobRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(AiDocumentJobRepository.class);
 
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate named;
@@ -143,8 +147,8 @@ class AiDocumentJobRepository {
      * with {@code 410} before this runs, so they cannot arrive here, but a {@code CASE} that would
      * resurrect a {@code DEAD} Job if that ever changed is not worth writing.
      */
-    void extendLease(long jobId) {
-        jdbc.update("""
+    void extendLease(long jobId, long documentId) {
+        int moved = jdbc.update("""
                 UPDATE ai_document_jobs
                    SET lease_expires_at = now() + make_interval(secs => ?),
                        status = CASE WHEN status IN ('QUEUED', 'RETRY_WAIT') THEN 'RUNNING'
@@ -152,6 +156,62 @@ class AiDocumentJobRepository {
                        updated_at = now()
                  WHERE id = ?
                 """, LEASE_SECONDS, jobId);
+        if (moved == 1) {
+            markDocumentProcessing(documentId);
+        }
+    }
+
+    /**
+     * The document follows its Job into work: {@code RUNNING} here means {@code PROCESSING} there.
+     *
+     * <p><b>Why the first worker signal and not the delegation.</b> Spring's call to FastAPI
+     * succeeding is not the work starting — {@code dispatchQuietly} swallows a failure and the
+     * dispatch sweeper retries every thirty seconds, so writing {@code PROCESSING} when the request
+     * goes out would show 처리 중 for a document nothing is touching while the AI service is down.
+     * A batch or a heartbeat is the worker saying it has the file.
+     *
+     * <p><b>Only when the Job row actually moved.</b> {@code moved == 1} is also proof of the
+     * status: {@code live} refuses the terminal states with {@code 410} before this runs, so a Job
+     * that reaches here is {@code QUEUED}, {@code RETRY_WAIT} or {@code RUNNING} — and the
+     * statement above leaves all three as {@code RUNNING}. Without the check a Job whose update
+     * matched nothing could still drag its document to {@code PROCESSING}.
+     *
+     * <p><b>Only from {@code QUEUED}.</b> {@code EXPIRED}, {@code FAILED} and {@code DISABLED} are
+     * states a late worker signal must not undo — the expiry sweep's decision, in particular, is
+     * exactly what {@code finalizeDoesNotPublishAnExpiredDocument} pins. Every heartbeat after the
+     * first matches nothing, which is what makes this cheap enough to run on all of them.
+     */
+    private void markDocumentProcessing(long documentId) {
+        jdbc.update("""
+                UPDATE ai_documents SET processing_status = 'PROCESSING', updated_at = now()
+                 WHERE id = ? AND processing_status = 'QUEUED'
+                """, documentId);
+    }
+
+    /**
+     * A Job that just died takes its document with it (FR-006).
+     *
+     * <p>Called after the statement that may have written {@code DEAD}, and conditioned on the row
+     * it wrote — the {@code DEAD}/{@code RETRY_WAIT} decision lives in that statement's
+     * {@code CASE}, and reading it back is cheaper than lifting the decision into Java where it
+     * would have to be kept in step with the SQL.
+     *
+     * <p><b>{@code RETRY_WAIT} deliberately does not reach here.</b> An attempt failing is not the
+     * document failing: the next attempt is already scheduled, the document stays
+     * {@code PROCESSING}, and its finalize still publishes. Marking it failed would leave a live
+     * Job attached to a dead document.
+     *
+     * <p>{@code DEAD} is terminal for the document too, so this is safe: {@code /complete} refuses
+     * a {@code FAILED} document, and re-uploading the same file starts a new row because the
+     * duplicate check excludes {@code FAILED}. Nothing arrives later expecting to publish this one.
+     */
+    private void markDocumentFailedIfJobDead(long jobId) {
+        jdbc.update("""
+                UPDATE ai_documents d SET processing_status = 'FAILED', updated_at = now()
+                  FROM ai_document_jobs j
+                 WHERE j.id = ? AND d.id = j.document_id AND j.status = 'DEAD'
+                   AND d.processing_status IN ('QUEUED', 'PROCESSING')
+                """, jobId);
     }
 
     /**
@@ -178,6 +238,7 @@ class AiDocumentJobRepository {
                  WHERE id = ?
                 """.formatted(BACKOFF.formatted("attempt_no + 1")),
                 retryable, retryable, retryable, failureCode, message, jobId);
+        markDocumentFailedIfJobDead(jobId);
         clearStaging(jobId);
     }
 
@@ -218,6 +279,16 @@ class AiDocumentJobRepository {
             jdbc.update("DELETE FROM ai_document_chunk_staging WHERE job_id = ANY (?)",
                     (PreparedStatement statement) -> statement.setArray(1,
                             statement.getConnection().createArrayOf("bigint", reclaimed.toArray())));
+            // 회수분 중 재시도를 다 쓴 것만 DEAD 다. 그 문서만 따라 죽는다 — 조건은 방금 쓴
+            // Job 행이고, 같은 배열을 다시 쓰므로 회수 목록을 또 만들지 않는다.
+            jdbc.update("""
+                    UPDATE ai_documents d SET processing_status = 'FAILED', updated_at = now()
+                      FROM ai_document_jobs j
+                     WHERE j.id = ANY (?) AND d.id = j.document_id AND j.status = 'DEAD'
+                       AND d.processing_status IN ('QUEUED', 'PROCESSING')
+                    """,
+                    (PreparedStatement statement) -> statement.setArray(1,
+                            statement.getConnection().createArrayOf("bigint", reclaimed.toArray())));
         }
         return reclaimed.size();
     }
@@ -235,11 +306,35 @@ class AiDocumentJobRepository {
                 """, chunkCount, jobId);
     }
 
+    /**
+     * Publishes the document, but only from a state that is allowed to reach {@code READY}.
+     *
+     * <p>Unconditional before S15P21A604-174. That was reachable once the expiry sweeper started
+     * producing {@code EXPIRED} rows: a document that left the active set would be pulled back into
+     * it by a finalize, silently, with no upload behind it.
+     *
+     * <p><b>{@code PROCESSING} only.</b> -174 had to allow {@code QUEUED} as well because nothing
+     * wrote {@code PROCESSING} — every healthy finalize arrived on a {@code QUEUED} document and a
+     * narrow guard would have published nothing. {@link #extendLease} now writes it, and the path
+     * is closed: finalize needs {@code totalChunkCount} positive and the staged total to match it,
+     * staging is only written by {@code acceptBatch}, and {@code acceptBatch} calls
+     * {@code extendLease} before it stages. So a batch — and therefore {@code PROCESSING} —
+     * provably precedes every finalize that gets this far.
+     *
+     * <p><b>A miss is logged, not thrown.</b> This is the last statement of {@code finalizeJob},
+     * after the chunks have been swapped and the Job marked {@code SUCCEEDED} in the same
+     * transaction. Throwing would roll back work that succeeded and hand the worker a job to redo;
+     * the document staying where it is, loudly, is the smaller failure.
+     */
     void markDocumentReady(long documentId) {
-        jdbc.update("""
+        int published = jdbc.update("""
                 UPDATE ai_documents SET processing_status = 'READY', updated_at = now()
-                 WHERE id = ?
+                 WHERE id = ? AND processing_status = 'PROCESSING'
                 """, documentId);
+        if (published == 0) {
+            log.error("문서 {} 를 READY 로 올리지 못했습니다 — 허용되지 않는 상태입니다. "
+                    + "chunk 는 교체됐지만 문서는 공개되지 않습니다.", documentId);
+        }
     }
 
     /** {@code chunkCount} 는 finalize 전에는 {@code null} 이다 — 재전송 판정에 쓴다. */

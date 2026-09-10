@@ -24,7 +24,13 @@ import java.time.Instant;
 @Table(name = "ai_documents")
 public class AiDocument {
 
-    /** Spring-side statuses. FastAPI never sees {@code EXPIRED} (data-model). */
+    /**
+     * The statuses this class compares against. FastAPI never sees {@code EXPIRED} (data-model).
+     *
+     * <p>{@code FAILED} and {@code DISABLED} are the other two of FR-006 and are not here: the only
+     * writes are SQL literals in {@code internal.ai}, which cannot see this class anyway, and a
+     * constant nothing reads is a state that only looks reachable.
+     */
     static final String QUEUED = "QUEUED";
     static final String PROCESSING = "PROCESSING";
     static final String READY = "READY";
@@ -134,6 +140,9 @@ public class AiDocument {
     String getStorageBucket() { return storageBucket; }
 
     String getProcessingStatus() { return processingStatus; }
+
+    /** When the grant was issued — the clock the 1-hour expiry counts from, and the list's order. */
+    Instant getCreatedAt() { return createdAt; }
 
     Instant getUploadedAt() { return uploadedAt; }
 

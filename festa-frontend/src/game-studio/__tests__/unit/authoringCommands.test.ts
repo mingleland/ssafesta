@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { GameProjectContractError, parseGameProject } from '../../contracts/gameProject.ts';
 import {
+  addBooleanVariable,
+  addIntegerVariable,
+  addStringVariable,
   addComponent,
+  addItemDefinition,
   addDialogueChoice,
   addDialogueNode,
   addDialogueScene,
@@ -25,11 +29,15 @@ import {
   paintTile,
   paintTiles,
   removeDialogueNode,
+  removeItemDefinition,
   removeObjects,
+  removeVariableDefinition,
+  renameObject,
   reorderDialogueNode,
   reorderEventAction,
   resizeWorldScene,
   sceneRemovalReason,
+  setObjectNameVisible,
   setStartNode,
   setStartScene,
   startNodeChangeReason,
@@ -454,5 +462,149 @@ describe('Game Studio authoring commands', () => {
         .toBe('대화에는 최소 1개의 노드가 필요합니다.');
       expect(() => removeDialogueNode(onlySecondLeft, sceneId, secondNodeId)).toThrow();
     });
+  });
+});
+
+// S15P21A604-529 — 오브젝트 이름/플레이 중 표시 여부. PLAYER_SPAWN은 플레이 중 화면에
+// 렌더링되지 않는 마커라 이름/표시 설정 자체를 둘 수 없다(QA 확정 사항) — 명령이 조용히
+// no-op으로 무시하는지까지 확인한다.
+describe('오브젝트 이름 및 표시 설정(S15P21A604-529)', () => {
+  const findObject = (project: ReturnType<typeof createStarterProject>, objectId: string) => {
+    const library = project.scenes.find((scene) => scene.id === 'library');
+    if (library?.type !== 'TOP_DOWN') throw new Error('expected library');
+    return library.objects.find((candidate) => candidate.id === objectId);
+  };
+
+  it('새로 배치한 오브젝트는 이름/표시 설정이 없다(기본값)', () => {
+    const project = createStarterProject(529);
+    const placed = addObject(project, 'library', 'NPC', { x: 3, y: 3 });
+    const object = findObject(placed.project, placed.objectId);
+    expect(object?.name).toBeUndefined();
+    expect(object?.showNameInPlay).toBeUndefined();
+  });
+
+  it('renameObject로 이름을 지으면 저장되고 앞뒤 공백은 trim된다', () => {
+    const project = createStarterProject(529);
+    const placed = addObject(project, 'library', 'NPC', { x: 3, y: 3 });
+    const renamed = renameObject(placed.project, 'library', placed.objectId, '  사서  ');
+    expect(findObject(renamed, placed.objectId)?.name).toBe('사서');
+    expect(parseGameProject(renamed)).toBe(renamed);
+  });
+
+  it('이름을 빈 문자열로 지우면 name이 사라진다(빈 문자열로 저장되지 않는다)', () => {
+    const project = createStarterProject(529);
+    const placed = addObject(project, 'library', 'NPC', { x: 3, y: 3 });
+    const renamed = renameObject(placed.project, 'library', placed.objectId, '사서');
+    const cleared = renameObject(renamed, 'library', placed.objectId, '   ');
+    expect(findObject(cleared, placed.objectId)?.name).toBeUndefined();
+    expect(parseGameProject(cleared)).toBe(cleared);
+  });
+
+  it('setObjectNameVisible로 플레이 중 표시 여부를 토글할 수 있다', () => {
+    const project = createStarterProject(529);
+    const placed = addObject(project, 'library', 'NPC', { x: 3, y: 3 });
+    const shown = setObjectNameVisible(placed.project, 'library', placed.objectId, true);
+    expect(findObject(shown, placed.objectId)?.showNameInPlay).toBe(true);
+    const hidden = setObjectNameVisible(shown, 'library', placed.objectId, false);
+    expect(findObject(hidden, placed.objectId)?.showNameInPlay).toBe(false);
+  });
+
+  it('PLAYER_SPAWN 오브젝트에는 이름/표시 설정을 할 수 없다(조용히 무시)', () => {
+    const project = createStarterProject(529);
+    const library = project.scenes.find((scene) => scene.id === 'library');
+    if (library?.type !== 'TOP_DOWN') throw new Error('expected library');
+    const spawnId = library.objects.find((object) => object.preset === 'PLAYER_SPAWN')?.id;
+    if (spawnId === undefined) throw new Error('expected a PLAYER_SPAWN object');
+
+    const afterRename = renameObject(project, 'library', spawnId, '주인공');
+    expect(findObject(afterRename, spawnId)?.name).toBeUndefined();
+
+    const afterVisible = setObjectNameVisible(project, 'library', spawnId, true);
+    expect(findObject(afterVisible, spawnId)?.showNameInPlay).toBeUndefined();
+  });
+});
+
+describe('변수 삭제(S15P21A604-562)', () => {
+  it('참조되지 않는 변수는 지울 수 있다', () => {
+    const project = addBooleanVariable(createStarterProject(562));
+    const variableId = project.variables[project.variables.length - 1]!.id;
+
+    const removed = removeVariableDefinition(project, variableId);
+
+    expect(removed.variables.some((variable) => variable.id === variableId)).toBe(false);
+    expect(parseGameProject(removed)).toBe(removed);
+  });
+
+  it('조건·액션에서 참조 중인 변수를 지우면 검증이 막는다', () => {
+    // 스타터 프로젝트의 기본 변수 doorOpened는 library Scene의 이벤트가 이미
+    // VARIABLE_EQUALS 조건과 SET_VARIABLE 액션 양쪽에서 참조하고 있다.
+    const project = createStarterProject(563);
+
+    expect(() => removeVariableDefinition(project, 'doorOpened')).toThrow(GameProjectContractError);
+    let error: unknown;
+    try {
+      removeVariableDefinition(project, 'doorOpened');
+    } catch (thrown) {
+      error = thrown;
+    }
+    expect((error as GameProjectContractError).code).toBe('VARIABLE_REFERENCE_NOT_FOUND');
+  });
+});
+
+describe('아이템 삭제(S15P21A604-565)', () => {
+  it('참조되지 않는 아이템은 지울 수 있다', () => {
+    const project = addItemDefinition(createStarterProject(565));
+    const itemId = project.items[project.items.length - 1]!.id;
+
+    const removed = removeItemDefinition(project, itemId);
+
+    expect(removed.items.some((item) => item.id === itemId)).toBe(false);
+    expect(parseGameProject(removed)).toBe(removed);
+  });
+
+  it('오브젝트의 PICKUP 컴포넌트에서 참조 중인 아이템을 지우면 검증이 막는다', () => {
+    // 스타터 프로젝트의 기본 아이템 libraryKey는 library Scene의 오브젝트가
+    // PICKUP 컴포넌트로 들고 있고, 이벤트도 GIVE_ITEM/HAS_ITEM으로 참조한다.
+    const project = createStarterProject(566);
+
+    expect(() => removeItemDefinition(project, 'libraryKey')).toThrow(GameProjectContractError);
+    let error: unknown;
+    try {
+      removeItemDefinition(project, 'libraryKey');
+    } catch (thrown) {
+      error = thrown;
+    }
+    expect((error as GameProjectContractError).code).toBe('PICKUP_ITEM_NOT_FOUND');
+  });
+});
+
+describe('Integer·String 변수 생성(S15P21A604-566)', () => {
+  it('addIntegerVariable은 INTEGER 타입, 초기값 0인 변수를 추가한다', () => {
+    const project = addIntegerVariable(createStarterProject(567));
+    const created = project.variables[project.variables.length - 1]!;
+
+    expect(created.type).toBe('INTEGER');
+    expect(created.initialValue).toBe(0);
+    expect(parseGameProject(project)).toBe(project);
+  });
+
+  it('addStringVariable은 STRING 타입, 초기값 빈 문자열인 변수를 추가한다', () => {
+    const project = addStringVariable(createStarterProject(568));
+    const created = project.variables[project.variables.length - 1]!;
+
+    expect(created.type).toBe('STRING');
+    expect(created.initialValue).toBe('');
+    expect(parseGameProject(project)).toBe(project);
+  });
+
+  it('세 타입 모두 같은 id 프리픽스(variable)를 공유한다', () => {
+    let project = createStarterProject(569);
+    project = addBooleanVariable(project);
+    project = addIntegerVariable(project);
+    project = addStringVariable(project);
+
+    const newIds = project.variables.slice(-3).map((variable) => variable.id);
+    expect(newIds.every((id) => /^variable\d+$/.test(id))).toBe(true);
+    expect(new Set(newIds).size).toBe(3);
   });
 });

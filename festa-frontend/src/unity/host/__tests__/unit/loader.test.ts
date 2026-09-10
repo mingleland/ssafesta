@@ -5,7 +5,8 @@
 // matchWebGLToCanvasSize 가 되돌리고, canvas.width/height 를 JS 로 바꾸면 렌더 루프가 멈춘다 —
 // 게임 파트가 둘 다 실측으로 확인하고 되돌린 경로다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadUnityBuild, resolveDevicePixelRatio } from '../../loader';
+import { loadUnityBuild, resolveDevicePixelRatio, watchDevicePixelRatio } from '../../loader';
+import type { UnityInstance } from '../../types';
 
 // jsdom 에서 window 를 통째로 stub 하면 document 까지 사라진다 — devicePixelRatio 만 바꾼다.
 function stubRatio(value: unknown) {
@@ -27,7 +28,7 @@ afterEach(() => {
 });
 
 describe('resolveDevicePixelRatio', () => {
-  it('상한을 넘는 화면은 1.5 로 낮춘다 — 실측 DPR 2.2 는 표시 크기의 4.84배를 그린다', () => {
+  it('상한을 넘는 화면은 1.5 로 낮춘다 — 상한이 없으면 표시 크기의 3배 넘게 그린다', () => {
     stubRatio(2.2);
     expect(resolveDevicePixelRatio()).toBe(1.5);
   });
@@ -49,6 +50,65 @@ describe('resolveDevicePixelRatio', () => {
     expect(resolveDevicePixelRatio()).toBe(1);
     stubRatio(-1);
     expect(resolveDevicePixelRatio()).toBe(1);
+  });
+});
+
+describe('watchDevicePixelRatio', () => {
+  // 부팅 때 한 번 정한 값이 세션 내내 남는 것이 #143 의 남은 결함이다. Unity 는 이 값을 1초 주기로
+  // 다시 읽으므로(실측), 밀도가 바뀔 때 갱신하면 재부팅 없이 따라간다.
+  function stubMatchMedia() {
+    const listeners: Array<() => void> = [];
+    const queries: string[] = [];
+    const matchMedia = vi.fn((query: string) => {
+      queries.push(query);
+      return {
+        addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+        removeEventListener: (_: string, fn: () => void) => {
+          const at = listeners.indexOf(fn);
+          if (at >= 0) listeners.splice(at, 1);
+        },
+      } as unknown as MediaQueryList;
+    });
+    vi.stubGlobal('matchMedia', matchMedia);
+    return { listeners, queries };
+  }
+
+  it('밀도가 바뀌면 상한을 다시 적용해 Module 에 쓴다', () => {
+    stubRatio(1.5);
+    const { listeners } = stubMatchMedia();
+    const instance = { Module: { devicePixelRatio: 1.5 } } as unknown as UnityInstance;
+
+    watchDevicePixelRatio(instance);
+    stubRatio(3);
+    listeners[0]();
+
+    expect(instance.Module?.devicePixelRatio).toBe(1.5); // 상한이 그대로 걸린다
+    stubRatio(1);
+    listeners[0]();
+    expect(instance.Module?.devicePixelRatio).toBe(1); // 낮아진 화면은 낮아진 값으로
+  });
+
+  it('해제하면 더 이상 쓰지 않는다 — 인스턴스가 죽은 뒤 남지 않게', () => {
+    stubRatio(1);
+    const { listeners } = stubMatchMedia();
+    const instance = { Module: { devicePixelRatio: 1 } } as unknown as UnityInstance;
+
+    const stop = watchDevicePixelRatio(instance);
+    const fire = listeners[0];
+    stop();
+    stubRatio(3);
+    fire();
+
+    expect(instance.Module?.devicePixelRatio).toBe(1);
+  });
+
+  it('Module 이 없는 인스턴스(mock 로더)에서도 터지지 않는다', () => {
+    stubRatio(2);
+    const { listeners } = stubMatchMedia();
+    const instance = {} as unknown as UnityInstance;
+
+    watchDevicePixelRatio(instance);
+    expect(() => listeners[0]()).not.toThrow();
   });
 });
 

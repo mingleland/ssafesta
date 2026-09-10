@@ -37,6 +37,77 @@ export const findAssetUsageLocations = (
   return [...new Set(locations)];
 };
 
+// S15P21A604-562 — findAssetUsageLocations와 같은 모양이다. VARIABLE_EQUALS 조건과
+// SET_VARIABLE 액션이 WORLD Scene의 이벤트, DIALOGUE Scene의 선택지 양쪽에 있을 수 있어
+// 둘 다 훑는다. 게임 규칙(rules.completion.objectives)은 변수를 참조하지 않으니 여기선
+// 안 본다.
+export const findVariableUsageLocations = (
+  project: GameProject,
+  variableId: string,
+): readonly string[] => {
+  const locations: string[] = [];
+  const usesVariable = (condition: { readonly type: string; readonly variableId?: string }): boolean => (
+    condition.type === 'VARIABLE_EQUALS' && condition.variableId === variableId
+  );
+  const setsVariable = (action: { readonly type: string; readonly variableId?: string }): boolean => (
+    action.type === 'SET_VARIABLE' && action.variableId === variableId
+  );
+  for (const scene of project.scenes) {
+    if (scene.type === 'DIALOGUE') {
+      for (const node of scene.nodes) {
+        for (const choice of node.choices) {
+          if (choice.conditions?.some(usesVariable)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 조건`);
+          if (choice.actions.some(setsVariable)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 액션`);
+        }
+      }
+      continue;
+    }
+    for (const event of scene.events) {
+      if (event.conditions.some(usesVariable)) locations.push(`${scene.name} · 이벤트 조건`);
+      if (event.actions.some(setsVariable)) locations.push(`${scene.name} · 이벤트 액션`);
+    }
+  }
+  return [...new Set(locations)];
+};
+
+// S15P21A604-565 — findAssetUsageLocations/findVariableUsageLocations와 같은 모양이되,
+// 아이템은 이벤트 조건·액션(HAS_ITEM/GIVE_ITEM/REMOVE_ITEM)뿐 아니라 오브젝트의 PICKUP
+// 컴포넌트에서도 참조되므로 오브젝트 순회가 하나 더 필요하다. (findAssetUsageLocations의
+// `project.items` 순회는 "자산 → 그 자산 쓰는 아이템" 반대 방향이라 여기선 쓰지 않는다.)
+export const findItemUsageLocations = (
+  project: GameProject,
+  itemId: string,
+): readonly string[] => {
+  const locations: string[] = [];
+  const usesItem = (condition: { readonly type: string; readonly itemId?: string }): boolean => (
+    condition.type === 'HAS_ITEM' && condition.itemId === itemId
+  );
+  const changesItem = (action: { readonly type: string; readonly itemId?: string }): boolean => (
+    (action.type === 'GIVE_ITEM' || action.type === 'REMOVE_ITEM') && action.itemId === itemId
+  );
+  for (const scene of project.scenes) {
+    if (scene.type === 'DIALOGUE') {
+      for (const node of scene.nodes) {
+        for (const choice of node.choices) {
+          if (choice.conditions?.some(usesItem)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 조건`);
+          if (choice.actions.some(changesItem)) locations.push(`${scene.name} · ${node.speaker || node.id} 선택지 액션`);
+        }
+      }
+      continue;
+    }
+    for (const object of scene.objects) {
+      for (const component of object.components) {
+        if (component.type === 'PICKUP' && component.itemId === itemId) locations.push(`${scene.name} · ${object.id} 획득 오브젝트`);
+      }
+    }
+    for (const event of scene.events) {
+      if (event.conditions.some(usesItem)) locations.push(`${scene.name} · 이벤트 조건`);
+      if (event.actions.some(changesItem)) locations.push(`${scene.name} · 이벤트 액션`);
+    }
+  }
+  return [...new Set(locations)];
+};
+
 export const findPublishBlockers = (project: GameProject): readonly PublishBlocker[] => {
   const blockers: PublishBlocker[] = project.assets.flatMap((asset): readonly PublishBlocker[] => {
     if (asset.source.startsWith('asset://local/')) {

@@ -79,6 +79,31 @@ class AiDocumentResultApiIntegrationTest {
     }
 
     /**
+     * 만료된 문서는 finalize 로 공개되지 않는다 (S15P21A604-174).
+     *
+     * <p>{@code markDocumentReady} 는 출발 상태를 보지 않고 덮어썼다. 만료 sweep 이 들어오면서
+     * {@code EXPIRED} 행이 실제로 생기기 시작하므로, 그대로 두면 <b>업로드가 없는 문서가 조용히
+     * 공개된다</b> — 활성 집합에서 빠진 행이 finalize 하나로 되돌아온다.
+     *
+     * <p>그렇다고 예외로 막지는 않는다. 이 문장은 finalize 트랜잭션의 마지막이라 여기서 던지면
+     * 이미 교체된 chunk 와 Job 성공까지 함께 롤백되고, 워커는 성공한 Job 을 다시 처리한다. 문서가
+     * 제자리에 남고 로그가 남는 쪽이 작은 실패다.
+     */
+    @Test
+    @DisplayName("EXPIRED 문서는 finalize 해도 READY 로 올라가지 않는다")
+    void finalizeDoesNotPublishAnExpiredDocument() throws Exception {
+        Job job = seedJob("만료문서");
+        jdbc.update("UPDATE ai_documents SET processing_status = 'EXPIRED', expired_at = now() "
+                + "WHERE id = ?", job.documentId());
+
+        mockMvc.perform(batch(job, 0, chunk(0, "첫 조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        assertEquals("EXPIRED", documentStatus(job), "만료된 문서가 finalize 로 공개됐다");
+        assertEquals("SUCCEEDED", jobStatus(job), "Job 쪽은 롤백되지 않는다");
+    }
+
+    /**
      * 같은 batch 재전송은 아무것도 바꾸지 않는다.
      *
      * <p>staging PK 가 {@code (job_id, batch_seq, chunk_no)} 라 {@code ON CONFLICT DO NOTHING} 이
@@ -114,6 +139,8 @@ class AiDocumentResultApiIntegrationTest {
         mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
 
         assertEquals("RUNNING", jobStatus(job));
+        // 워커가 파일을 쥐었다는 첫 신호다 — 문서도 여기서 "처리 중" 이 된다 (S15P21A604-175).
+        assertEquals("PROCESSING", documentStatus(job));
         long seconds = secondsUntilLeaseExpiry(job);
         assertTrue(seconds > 60 && seconds <= 90, "batch 도 lease 를 잡아야 한다: " + seconds);
     }
@@ -243,7 +270,8 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("JOB_GONE"));
 
-        assertEquals("PROCESSING", documentStatus(job));
+        // 이 결과는 다른 Job 으로 갔다. 이 문서는 batch 를 한 번도 못 받았으므로 그대로여야 한다.
+        assertEquals("QUEUED", documentStatus(job));
     }
 
     // ── finalize 검증 ────────────────────────────────────────────────────────
@@ -394,6 +422,9 @@ class AiDocumentResultApiIntegrationTest {
         mockMvc.perform(heartbeat(job, 0)).andExpect(status().isNoContent());
 
         assertEquals("RUNNING", jobStatus(job));
+        // batch 가 아니라 heartbeat 가 먼저 오는 순서도 실재한다. 문서 전이가 두 신호가 공유하는
+        // extendLease 에 있어야 이 단정이 선다 — acceptBatch 에 넣으면 여기서 깨진다.
+        assertEquals("PROCESSING", documentStatus(job));
         long seconds = secondsUntilLeaseExpiry(job);
         assertTrue(seconds > 60 && seconds <= 90, "lease 가 90초 근처여야 한다: " + seconds);
     }
@@ -433,6 +464,10 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("RETRY_WAIT", jobStatus(job));
+        // attempt 가 실패한 것이지 문서가 실패한 것이 아니다. 다음 attempt 가 예약돼 있고 그
+        // finalize 가 아직 이 문서를 공개해야 하므로, 여기서 FAILED 로 찍으면 살아 있는 Job 에
+        // 죽은 문서가 붙는다.
+        assertEquals("PROCESSING", documentStatus(job));
         assertEquals(1, attemptNo(job));
         assertEquals("PARSE_TIMEOUT", lastErrorCode(job));
         assertEquals(0, stagingCount(job), "죽은 attempt 의 staging 은 남으면 안 된다");
@@ -450,6 +485,8 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("DEAD", jobStatus(job));
+        // batch 가 한 번도 없었으므로 문서는 아직 QUEUED 였다 — 그 자리에서도 실패로 내려간다.
+        assertEquals("FAILED", documentStatus(job), "죽은 Job 의 문서가 대기 중으로 남았다");
         assertEquals(1, attemptNo(job), "DEAD 여도 attempt 는 올라야 늦은 결과가 막힌다");
     }
 
@@ -464,6 +501,7 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("DEAD", jobStatus(job));
+        assertEquals("FAILED", documentStatus(job));
         assertEquals(4, attemptNo(job));
     }
 
@@ -584,6 +622,8 @@ class AiDocumentResultApiIntegrationTest {
         sweeper.reclaimExpiredLeases();
 
         assertEquals("DEAD", jobStatus(job));
+        // 회수는 벌크라 경로가 다르다 — 회수분 중 DEAD 가 된 것만 문서를 따라 내린다.
+        assertEquals("FAILED", documentStatus(job));
         assertEquals(4, attemptNo(job));
     }
 
@@ -799,7 +839,7 @@ class AiDocumentResultApiIntegrationTest {
                 INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
                     size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
                     storage_provider, storage_bucket, uploaded_at)
-                VALUES (?, ?, 'seed.pdf', 'application/pdf', 1024, ?, 'PROCESSING', ?, ?,
+                VALUES (?, ?, 'seed.pdf', 'application/pdf', 1024, ?, 'QUEUED', ?, ?,
                     'R2', 'test-ai-documents', now())
                 RETURNING id
                 """, Long.class, boothId, agentId, objectKey, userId, SOURCE_HASH);

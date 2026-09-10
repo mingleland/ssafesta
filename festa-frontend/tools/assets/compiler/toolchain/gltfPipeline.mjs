@@ -9,6 +9,7 @@
 //
 // GUI 조작은 파이프라인 정본이 아니다 — 여기 있는 것은 전부 명령으로 다시 돌릴 수 있다.
 import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, flatten, join, prune, quantize, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 
@@ -18,8 +19,16 @@ export const TOOLCHAIN = {
   imageCodec: 'sharp',
 };
 
+/**
+ * 확장을 **반드시 등록한다.** 등록하지 않으면 `quantize()` 가 붙인
+ * `KHR_mesh_quantization` 이 파일에 안 써지고(`Some extensions were not registered for I/O`),
+ * `POSITION` 은 정규화된 SHORT 인데 그것을 선언하는 extension 이 없는 **스펙 위반 GLB** 가 나온다.
+ *
+ * 관대한 로더는 읽어 주지만 엄격한 쪽은 거부하고, 우리 자체 래스터라이저는 그 좌표를
+ * float 로 읽어 썸네일을 파편 덩어리로 만들었다.
+ */
 export function createIO() {
-  return new NodeIO();
+  return new NodeIO().registerExtensions(ALL_EXTENSIONS);
 }
 
 /**
@@ -54,8 +63,15 @@ export async function transformRuntimeDocument(document, { simplifyRatio, simpli
     applied.push(`simplify(ratio=${simplifyRatio}, error=${simplifyError})`);
   }
 
-  await document.transform(prune());
-  applied.push('prune');
+  // `keepAttributes: true` 가 **필수**다. 기본값(false)은 "아무 재질도 안 쓰는 정점 속성" 을
+  // 지우는데, 이 파이프라인은 텍스처를 **prune 다음에** 굽는다(`bakeMaterials`). 그래서 prune
+  // 시점의 재질에는 텍스처가 없고, `TEXCOORD_0` 이 통째로 미사용으로 판정돼 사라진다.
+  //
+  // 결과가 조용하다 — GLB 안에 이미지도 있고 material.baseColorTexture 연결도 있는데 UV 가
+  // 없어 **샘플링만 안 된다.** 모델이 단색으로 렌더되고, 리포트에는 "텍스처 N개 · M 바이트" 가
+  // 정상으로 찍힌다(LJH T-80).
+  await document.transform(prune({ keepAttributes: true }));
+  applied.push('prune(keepAttributes)');
   await document.transform(quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }));
   applied.push('quantize');
 

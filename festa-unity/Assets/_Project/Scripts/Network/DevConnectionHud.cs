@@ -96,7 +96,9 @@ namespace Festa.Network
         void Update()
         {
             if (Application.isBatchMode) return;
-            if (!Festa.Integration.InputBridge.IsLocked && WasToggleKeyPressedThisFrame()) s_panelVisible = !s_panelVisible;
+            // 릴리스에서는 패널을 그리지 않으므로 토글도 받지 않는다 — F2 가 "눌렀는데 아무 일 없음" 으로 남지 않게 (QA #84)
+            bool devTools = UnityEngine.Debug.isDebugBuild || Application.isEditor;
+            if (devTools && !Festa.Integration.InputBridge.IsLocked && WasToggleKeyPressedThisFrame()) s_panelVisible = !s_panelVisible;
         }
 
         void OnGUI()

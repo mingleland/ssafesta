@@ -18,6 +18,7 @@ export SCM_PROVIDER=github SCM_REPOSITORY=ssafy/festa SCM_BRANCH=develop CI_COMM
 export JENKINS_JOB=festa-develop JENKINS_BUILD_NUMBER=1 JENKINS_BUILD_URL=https://ci.example.invalid/job/festa/1/
 export ROLLBACK_CLASSIFICATION=SAFE DATA_CHANGE=none DB_SCHEMA_CHANGED=false SECRET_OR_CONFIG_CHANGED=false
 export COMPONENT_METADATA_DIR="${work_dir}" RELEASE_MANIFEST_PATH="${work_dir}/release.json"
+unset DEPLOY_COMPONENTS
 
 bash "${repo_root}/infra/deploy/scripts/build-release-manifest.sh"
 bash "${repo_root}/infra/jenkins/scripts/validate-contracts.sh" release "${RELEASE_MANIFEST_PATH}"
@@ -25,6 +26,12 @@ bash "${repo_root}/infra/jenkins/scripts/validate-contracts.sh" release "${RELEA
 python "${script_dir}/../helpers/assert-json.py" "${RELEASE_MANIFEST_PATH}" \
   'len(document["components"]) == 4' \
   'set(item["name"] for item in document["components"]) == {"ai","back","front","game"}'
+
+DEPLOY_COMPONENTS=back RELEASE_MANIFEST_PATH="${work_dir}/back-release.json" \
+  bash "${repo_root}/infra/deploy/scripts/build-release-manifest.sh"
+python "${script_dir}/../helpers/assert-json.py" "${work_dir}/back-release.json" \
+  'len(document["components"]) == 1' \
+  'document["components"][0]["name"] == "back"'
 
 cat >"${work_dir}/docker" <<'SH'
 #!/usr/bin/env bash
@@ -36,7 +43,10 @@ fi
 SH
 chmod +x "${work_dir}/docker"; export FAKE_DOCKER_LOG="${work_dir}/docker.log"
 export DOCKER_BIN="${work_dir}/docker" COMPOSE_FILE="${repo_root}/infra/deploy/compose/integration/compose.yaml" COMPOSE_PROJECT=festa-integration
-export BACK_BASE_URL=http://back:8080 AI_BASE_URL=http://ai:8000 PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
+: >"${work_dir}/back.env"; : >"${work_dir}/ai.env"
+export BACK_ENV_FILE="${work_dir}/back.env" AI_ENV_FILE="${work_dir}/ai.env" FESTA_ENVIRONMENT=demo
+export INTERNAL_SPRING_TO_AI_TOKENS=spring-to-ai-test-only INTERNAL_AI_TO_SPRING_TOKENS=ai-to-spring-test-only
+export PUBLIC_API_BASE_URL=http://front.invalid PUBLIC_UNITY_BUILD_BASE=/unity/
 bash "${repo_root}/infra/deploy/scripts/deploy-release.sh"
 grep -q 'up -d --wait ai back front game' "${FAKE_DOCKER_LOG}"
 [[ ! -e "${work_dir}/target-state.json" ]]

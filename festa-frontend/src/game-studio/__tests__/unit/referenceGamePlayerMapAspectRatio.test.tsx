@@ -6,6 +6,10 @@
 // aspect-ratio 렌더링)을 하지 않으므로, 여기서는 "생성된 인라인 style.width 값 자체가
 // 고정 100%가 아니라 씬 비율을 반영한 계산식인지"만 검증한다 — 실제 화면 비율은 로컬
 // 브라우저에서 육안으로 확인한다.
+// S15P21A604-542 — 가로 상한이 고정 1120px에서 화면 기준(100vw - 68px)의 92%로 바뀌었다.
+// 세로 쪽((100vh - 130px) * 비율)에는 .92를 곱하지 않는다 — 그 값 자체가 이미 "넘치지
+// 않는 최대치"였어서 다시 92%로 줄이면 세로 제한이 걸리는 씬은 오히려 이전보다 작아지는
+// 회귀가 났다(육안 확인으로 발견, 기존 클린한 0.2/5 배수는 그대로 유지된다).
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ReferenceGamePlayer } from '../../runtime/reference/ReferenceGamePlayer.tsx';
@@ -54,21 +58,20 @@ const renderMap = (width: number, height: number) => {
 };
 
 describe('ReferenceGamePlayer — 플레이 화면 맵 비율(S15P21A604-492)', () => {
-  it('세로가 긴 씬(8×40)은 폭이 고정 100%가 아니라 세로 제한을 반영한 계산식이다', () => {
+  it('세로가 긴 씬(8×40)은 폭이 고정 100%가 아니라 화면 기준 상한을 반영한 계산식이다', () => {
     const map = renderMap(8, 40);
 
-    // 가로 제한(1120px)과, 뷰포트 세로 제한을 씬 비율(8/40=0.2)로 역산한 값 중 작은 쪽이어야
-    // 한다. jsdom의 CSSOM이 calc 안의 상수 곱셈(width/height)을 8/40 → 0.2로 접어서
-    // 저장하므로(정상 동작), 리터럴 "8"/"40"이 아니라 그 접힌 배수를 확인한다.
+    // 가로 상한(화면의 92%)과, 세로 상한을 씬 비율(8/40=0.2)로 역산한 값 중 작은 쪽이어야
+    // 한다.
     expect(map.style.width).not.toBe('100%');
-    expect(map.style.width).toBe('min(1120px, 0.2 * (100vh - 130px))');
+    expect(map.style.width).toBe('min(0.92 * (100vw - 68px), 0.2 * (100vh - 130px))');
   });
 
   it('가로가 긴 씬(40×8)은 세로가 긴 씬과 정확히 역수 관계의 계산식을 쓴다(회귀 없이 동일한 로직 경로)', () => {
     const map = renderMap(40, 8);
 
     expect(map.style.width).not.toBe('100%');
-    expect(map.style.width).toBe('min(1120px, 5 * (100vh - 130px))');
+    expect(map.style.width).toBe('min(0.92 * (100vw - 68px), 5 * (100vh - 130px))');
   });
 
   it('aspect-ratio는 기존처럼 씬 비율 그대로 유지된다(회귀 없음)', () => {

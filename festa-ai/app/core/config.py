@@ -180,6 +180,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
     conversation_ttl_seconds: int = Field(default=1800, gt=0)
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+    # 질문마다 검색 전에 호출하는 Agent 설정 snapshot. 재시도·캐시는 하지 않는다.
+    spring_agent_config_timeout_seconds: float = Field(default=1.0, gt=0)
     # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
     spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
     # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.

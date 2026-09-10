@@ -8,7 +8,8 @@ services:
       - ${AI_ENV_FILE:?AI_ENV_FILE is required}
     environment:
       FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
-      BACK_BASE_URL: ${BACK_BASE_URL:?BACK_BASE_URL is required}
+      SPRING_INTERNAL_BASE_URL: http://back:8080
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
       INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
     volumes: [ai-data:/app/data]
   back:
@@ -20,7 +21,8 @@ services:
     environment:
       FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
       SPRING_PROFILES_ACTIVE: infra
-      AI_BASE_URL: ${AI_BASE_URL:?AI_BASE_URL is required}
+      AI_INTERNAL_BASE_URL: http://ai:8000
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
       INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
     volumes: [back-data:/app/data]
   front:

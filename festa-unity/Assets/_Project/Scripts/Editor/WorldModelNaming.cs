@@ -856,17 +856,72 @@ namespace Festa.EditorTools
         }
 
         /// <summary>
-        /// 월드 텍스처 임포터 설정 — WebGL 다운로드 크기용 crunch 압축.
-        /// 25장 전부 crunch 미적용 상태였다. 품질 75 는 월드 배경 텍스처에서 식별 불가.
+        /// 월드 텍스처 임포터 설정.
+        ///
+        /// <para><b>타일(.jpg, walltile, tile-mono)</b> — WebGL 다운로드 크기용 crunch 75. 반복 무늬라 식별 불가.</para>
+        ///
+        /// <para><b>글자·사진이 실린 판(그 외 .png)</b> — 2026-09-09 사용자: "11층 안내판 글자가 에디터에서도
+        /// 뭉개진다". 원인은 셋이 겹친 것이다. ① <c>npotScale ToNearest</c> 가 1462×825 를 1024×1024 로,
+        /// 3844×2050 을 2048×1024 로 **줄여서** 리샘플했다(세로 해상도 절반 손실).
+        /// ② 그 위에 crunch 75 가 글자 경계에 블록 노이즈를 얹었다. ③ 필터가 Bilinear·aniso 1 이라
+        /// 비스듬히 보면 밉맵이 한 단계 더 흐려졌다. 그래서 판은 픽셀을 지킨다 — crunch 끔,
+        /// Trilinear + aniso 8. 작은 판(≤512² 픽셀)은 NPOT 그대로 무압축(수십 KB).
+        /// 큰 판은 <c>ToLarger</c> 로 한 단계 큰 2의 제곱으로 **키워서** DXT — 원본 픽셀을 버리지
+        /// 않고 압축도 붙는다(1462×825 → 2048×1024, 3844×2050 → 2048×2048 상한).</para>
+        ///
+        /// <para>왜 NPOT 그대로 두지 않나: Unity 는 **밉맵이 있는 NPOT 텍스처에 DXT 를 붙이지 않는다**
+        /// (실측 2026-09-09: 1460×824·2048×1092 처럼 4의 배수라도 플랫폼 포맷을 DXT1 로 명시해도
+        /// RGB24 무압축으로 떨어져 판 4장이 54 MB 가 됐다). 판은 거리에서도 읽혀야 하니 밉맵을 끌 수 없다.</para>
         /// </summary>
         void OnPreprocessTexture()
         {
             if (Disabled) return;
             if (!assetPath.StartsWith("Assets/_Project/Models/MapTexture/")) return;
             var ti = (TextureImporter)assetImporter;
-            ti.textureCompression = TextureImporterCompression.Compressed;
-            ti.crunchedCompression = true;
-            ti.compressionQuality = 75;
+
+            if (!IsGraphicBoard(assetPath))
+            {
+                ti.textureCompression = TextureImporterCompression.Compressed;
+                ti.crunchedCompression = true;
+                ti.compressionQuality = 75;
+                return;
+            }
+
+            ti.GetSourceTextureWidthAndHeight(out int w, out int h);
+            bool small = (long)w * h <= 512L * 512L;
+            bool alpha = ti.DoesSourceTextureHaveAlpha();
+            ti.npotScale = small ? TextureImporterNPOTScale.None : TextureImporterNPOTScale.ToLarger;
+            ti.maxTextureSize = 2048;
+            ti.mipmapEnabled = true;
+            ti.filterMode = FilterMode.Trilinear;
+            ti.anisoLevel = 8;
+            ti.crunchedCompression = false;
+            ti.textureCompression = small
+                ? TextureImporterCompression.Uncompressed
+                : TextureImporterCompression.Compressed;
+
+            // 포맷은 플랫폼별로 명시한다 — "무엇이 적용되는가" 를 씬이 아니라 임포터에 남기기 위해서다.
+            var fmt = small
+                ? (alpha ? TextureImporterFormat.RGBA32 : TextureImporterFormat.RGB24)
+                : (alpha ? TextureImporterFormat.DXT5 : TextureImporterFormat.DXT1);
+            foreach (var platform in new[] { "Standalone", "WebGL" })
+            {
+                var ps = ti.GetPlatformTextureSettings(platform);
+                ps.overridden = true;
+                ps.maxTextureSize = 2048;
+                ps.format = fmt;
+                ps.crunchedCompression = false;
+                ps.textureCompression = ti.textureCompression;
+                ti.SetPlatformTextureSettings(ps);
+            }
+        }
+
+        /// <summary>글자·사진 판인가. 반복 타일 두 장만 예외다.</summary>
+        static bool IsGraphicBoard(string path)
+        {
+            if (!path.EndsWith(".png", System.StringComparison.OrdinalIgnoreCase)) return false;
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            return !name.StartsWith("walltile") && !name.StartsWith("tile-mono");
         }
     }
 }

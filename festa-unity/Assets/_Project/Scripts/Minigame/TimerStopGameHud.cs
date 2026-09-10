@@ -19,6 +19,9 @@ namespace Festa.Minigame
     /// </summary>
     public sealed class TimerStopGameHud : MonoBehaviour
     {
+        /// <summary>입력 잠금 주인 이름. 호스트 Overlay 가 자기 잠금을 풀 때 이 화면 것까지 풀지 않게 한다.</summary>
+        const string LockOwner = "TimerStopGameHud";
+
         TimerStopGame _game;
         TMP_Text _target, _timer, _result, _verdict;
         Button _action;
@@ -33,7 +36,11 @@ namespace Festa.Minigame
             var go = new GameObject("@TimerStopGameHud");
             var hud = go.AddComponent<TimerStopGameHud>();
             hud.Build(client);
-            InputBridge.SetLocked(true);
+            InputBridge.SetLocked(true, LockOwner);
+            // 호스트에 "Unity 미니게임 모달 열림" 을 알린다(#132). ESC 중재용 상태이고, 닫기는 RequestExitWorldUi 로만 온다.
+            WorldUiBridge.MinigameOpen = () => FindFirstObjectByType<TimerStopGameHud>() != null;
+            WorldUiBridge.CloseMinigame = () => { var h = FindFirstObjectByType<TimerStopGameHud>(); if (h != null) h.Close(); };
+            WorldUiBridge.Publish();
             return hud;
         }
 
@@ -57,7 +64,11 @@ namespace Festa.Minigame
         {
             if (_released) return;
             _released = true;
-            InputBridge.SetLocked(false);
+            InputBridge.SetLocked(false, LockOwner);
+            // 이 HUD 는 곧 파괴된다 — MinigameOpen 은 다음 프레임에 false 가 되지만 상태 push 는 지금 한다.
+            WorldUiBridge.MinigameOpen = null;
+            WorldUiBridge.CloseMinigame = null;
+            WorldUiBridge.Publish();
         }
 
         void Build(IGameResultClient client)
@@ -182,12 +193,27 @@ namespace Festa.Minigame
                     }
                     else
                     {
-                        // 오차만 보여준다. 등급·점수는 보상 정책이 정해진 뒤의 일이다 (C-03).
+                        // 오차는 **서버 판정값**을 우선 그린다(GitLab #134 §2) — 클라이언트 계산값과 갈리는 날 사용자에게
+                        // 클라이언트 숫자가 보이면 안 된다. 서버 응답 전·체험판이면 클라이언트 값.
                         _timer.color = FestaUiKit.Good;
-                        _result.text = $"오차  {_game.ErrorSeconds:F3}초";
+                        bool serverVerdict = _game.Verdict != null && !_game.Verdict.simulated && _game.Verdict.accepted;
+                        float shownError = serverVerdict ? _game.Verdict.errorSeconds : _game.ErrorSeconds;
+                        _result.text = $"오차  {shownError:F3}초";
                         _result.color = FestaUiKit.Text;
                     }
-                    _verdict.text = _game.Verdict != null ? _game.Verdict.message : "결과 전송 중…";
+                    // 체험판(Mock 판정)이면 그 사실을 반드시 드러낸다 — 슬롯머신과 같은 규칙이다.
+                    // 조용히 실서버인 척하면 사용자는 기록·보상이 남은 줄 안다 (T-24).
+                    // 실서버 판정은 구조 필드로 문구를 만든다 — 서버 message 는 ASCII 영문(WebGL IMGUI 한글 문제, T-22)이라
+                    // 그대로 보이면 어색하다(#134 §6). 한도 안내는 spec 014 Acceptance Scenario 4.
+                    _verdict.text = _game.Verdict == null ? "결과 전송 중…"
+                                  : _game.Verdict.simulated ? "체험판 — 기록·보상이 남지 않습니다"
+                                  : !_game.Verdict.accepted ? "결과가 인정되지 않았습니다 — 다시 시도해 주세요"
+                                  : _game.Verdict.rewardedCoins > 0
+                                      ? $"+{_game.Verdict.rewardedCoins} 코인" + (_game.Verdict.dailyLimitReached ? " · 오늘 보상 한도에 도달했습니다" : $" · 오늘 남은 보상 {_game.Verdict.dailyRemainingCoins}")
+                                  : _game.Verdict.dailyLimitReached ? "오늘 보상 한도에 도달했습니다 — 게임은 계속할 수 있어요"
+                                  : "보상 구간 밖 — 목표에 더 가깝게 멈춰 보세요";
+                    _verdict.color = _game.Verdict != null && _game.Verdict.simulated
+                                   ? FestaUiKit.Accent : FestaUiKit.Text;
                     SetAction("다시 하기", true);
                     break;
 

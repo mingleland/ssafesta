@@ -17,6 +17,10 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.models.conversation import (
     Conversation,
     ConversationTurn,
@@ -89,6 +93,26 @@ class ConversationStreamService:
             raise BoothLeaseExpired(conversation_id)
         return conversation
 
+    async def _commit_turn(self, conversation: Conversation, turn: ConversationTurn) -> None:
+        """Confirm one completed turn, unless the Conversation is already gone.
+
+        A close (`DELETE`) or the idle TTL can land while this stream is still
+        running — the client keeps reading, so we reach here either way. Writing
+        unconditionally would bring the question and answer text back for
+        another 30 minutes and break D11/SC-012, so the repository commit is
+        conditional and its failure is logged rather than swallowed.
+        """
+        updated = conversation.record_turn(
+            turn, now=turn.created_at, ttl_seconds=self._ttl_seconds
+        )
+        if not await self._repository.commit_turn(updated):
+            logger.info(
+                "completed turn dropped, conversation closed or expired mid-stream "
+                "conversation_id=%s request_id=%s",
+                conversation.conversation_id,
+                turn.request_id,
+            )
+
     async def stream(
         self, *, conversation: Conversation, question: str
     ) -> AsyncIterator[str]:
@@ -116,6 +140,35 @@ class ConversationStreamService:
             context = await self._rag_context_service.build(
                 conversation=conversation, question=question
             )
+        except AgentConfigDenied as exc:
+            logger.warning(
+                "Agent config denied for conversation %s code=%s",
+                conversation.conversation_id,
+                exc.code,
+            )
+            yield render(
+                "error",
+                {
+                    "code": exc.code,
+                    "message": "AI 직원 설정을 사용할 수 없습니다.",
+                    "retryable": False,
+                },
+            )
+            return
+        except SpringAgentConfigUnavailable:
+            logger.warning(
+                "Agent config lookup failed for conversation %s",
+                conversation.conversation_id,
+            )
+            yield render(
+                "error",
+                {
+                    "code": "AGENT_CONFIG_UNAVAILABLE",
+                    "message": "AI 직원 설정을 확인하지 못했습니다.",
+                    "retryable": True,
+                },
+            )
+            return
         except Exception:
             logger.exception(
                 "RAG context build failed for conversation %s", conversation.conversation_id
@@ -143,8 +196,7 @@ class ConversationStreamService:
                 sources=(),
                 created_at=now,
             )
-            updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-            await self._repository.save(updated)
+            await self._commit_turn(conversation, turn)
             return
 
         answer_parts: list[str] = []
@@ -251,5 +303,4 @@ class ConversationStreamService:
             sources=tuple(citations),
             created_at=now,
         )
-        updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-        await self._repository.save(updated)
+        await self._commit_turn(conversation, turn)

@@ -41,7 +41,10 @@ function project(camera, p) {
   return {
     px: ((x / half) * 0.5 + 0.5) * camera.size,
     py: (0.5 - (y / half) * 0.5) * camera.size,
-    depth: z,
+    // `forward` 는 물체에서 **카메라 쪽**을 가리킨다. 그래서 `dot` 이 클수록 가깝다 —
+    // z-buffer 규약("작을수록 가깝다")에 맞추려면 부호를 뒤집어야 한다. 안 뒤집으면
+    // 가장 먼 면이 살아남아 모델이 속을 뒤집은 파편 덩어리로 그려진다
+    depth: -z,
   };
 }
 

@@ -92,10 +92,29 @@ namespace Festa.Integration
         /// <summary>지급된 코인. 0 이면 무보상 — 사유는 <see cref="message"/> 에 있다.</summary>
         public int rewardedCoins;
 
-        /// <summary>일일 한도에 걸려 미지급인 경우 true (FR-005, SC-003).</summary>
+        /// <summary>일일 한도에 걸려 미지급인 경우 true (FR-005, SC-003). 정의는 <c>dailyRemainingCoins == 0</c> (#134 §2).</summary>
         public bool dailyLimitReached;
+
+        // ── 서버 권위 값 3종 (GitLab #134 §2, specs/014-minigame/contracts/minigame-api.yaml) ──
+        // 전에는 DTO 에 없어서 JsonUtility 가 버렸고, HUD 는 클라이언트 계산값을 그렸다. 두 값이 갈리는 날
+        // 사용자에게는 클라이언트 숫자가 보인다 — 서버가 준 값을 그대로 그린다.
+        /// <summary>서버가 판정한 오차(초). 클라이언트 계산값보다 이것을 그린다.</summary>
+        public float errorSeconds;
+        /// <summary>보상 구간. 0 = 무보상, 클수록 좋다(슬롯머신 tier 0 = 낙첨과 같은 극성).</summary>
+        public int tier;
+        /// <summary>오늘 더 받을 수 있는 코인. 재제출 시에는 최초값이 아니라 현재값이 온다.</summary>
+        public int dailyRemainingCoins;
 
         /// <summary>사용자에게 그대로 보여줄 수 있는 안내. 비어 있을 수 있다.</summary>
         public string message;
+
+        /// <summary>
+        /// 이 판정이 <b>서버가 아니라 Mock 대역</b>에서 나왔는가. true 면 기록도 보상도 실제가 아니다.
+        ///
+        /// <para>슬롯머신(<see cref="SlotSpinResultDto.simulated"/>)에는 있던 것이 여기에는 없어서,
+        /// 타이밍 스톱은 BE 경로가 없어도 "기록되었습니다" 라고 말했다. 조용히 실서버인 척하지 않는다는
+        /// 규칙이 한쪽에만 지켜지고 있었다 (2026-09-08 조사, T-24).</para>
+        /// </summary>
+        public bool simulated;
     }
 }

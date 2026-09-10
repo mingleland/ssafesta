@@ -86,9 +86,19 @@ namespace Festa.Avatar
         /// <summary>F10 을 눌러 병합을 켜고 끈다. 반영은 <b>다음 조립부터</b>다(옷을 갈아입으면 된다).</summary>
         class Toggle : MonoBehaviour
         {
+            // PerfHud 가 있는 씬에서는 PerfHud 가 같은 키(')로 같은 플래그를 뒤집는다 — 둘이 함께 돌면 한 번 눌러
+            // 두 번 뒤집혀 아무 일도 없었다(QA 2026-09-08 #64, T-238 이 잡으려던 사고). PerfHud 가 있으면 물러난다.
+            Festa.Diagnostics.PerfHud _hud; int _nextHudCheck;
+
             void Update()
             {
-                if (!Input.GetKeyDown(KeyCode.F10)) return;
+                if (Time.frameCount >= _nextHudCheck)
+                {
+                    _hud = FindAnyObjectByType<Festa.Diagnostics.PerfHud>(FindObjectsInactive.Exclude);
+                    _nextHudCheck = Time.frameCount + 60;
+                }
+                if (_hud != null && _hud.isActiveAndEnabled) return;
+                if (!Input.GetKeyDown(KeyCode.Quote)    /* ' : PerfHud 메시병합 키와 같은 기능인데 F10 은 OS 메뉴바를 잡는다 */) return;
                 Enabled = !Enabled;
                 // 로비에는 HUD 가 없으므로 로그로 남긴다 — 브라우저 콘솔에서 읽힌다.
                 Debug.Log($"[AvatarMeshMerge] {StateLabel} — 옷을 갈아입어야 반영된다");

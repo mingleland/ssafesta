@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   DEFAULT_GAME_RULES,
   estimateGameProjectJsonBytes,
@@ -12,6 +12,8 @@ import {
 } from '../../contracts/gameProject.ts';
 import {
   addBooleanVariable,
+  addIntegerVariable,
+  addStringVariable,
   addItemDefinition,
   renameItemDefinition,
   replaceGameRules,
@@ -19,15 +21,23 @@ import {
 } from '../model/authoringCommands.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../assets/builtinAssetCatalog.ts';
-import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
-import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
-import { findPublishBlockers } from '../ports/publishValidation.ts';
+import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
+import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
+import { findAssetUsageLocations, findVariableUsageLocations, findItemUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
 import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
   readonly project: GameProject;
+  // S15P21A604-573 — 자산 목록이 실제 이미지를 보여주려면 blob URL로 해석된 assetUrls가
+  // 필요하다. GameStudioShell.tsx는 이미 useResolvedAssetUrls로 이걸 계산해서
+  // InspectorPanel/DialogueEditor엔 넘기면서 이 패널에는 안 넘기고 있었다 — 그 배선 누락.
+  // optional로 둔다 — 없거나(테스트) 아직 해석 전(로딩 중)이면 썸네일 없이 배지만 보여준다.
+  readonly assetUrls?: Readonly<Record<string, string>>;
   readonly onApply: (project: GameProject) => void;
   readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
+  readonly onDeleteAsset: (assetId: string) => void;
+  readonly onDeleteVariable: (variableId: string) => void;
+  readonly onDeleteItem: (itemId: string) => void;
 }
 
 const VariableValueInput = ({
@@ -66,9 +76,16 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
+  // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
+  // 확인을 받는다. null이면 확인 카드가 안 뜬다.
+  const [confirmDeleteAssetId, setConfirmDeleteAssetId] = useState<string | null>(null);
+  // S15P21A604-562 — 변수 삭제도 자산과 같은 확인 카드 패턴을 쓴다.
+  const [confirmDeleteVariableId, setConfirmDeleteVariableId] = useState<string | null>(null);
+  // S15P21A604-565 — 아이템 삭제도 동일한 확인 카드 패턴을 쓴다.
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const projectBytes = estimateGameProjectJsonBytes(project);
   const projectUsage = Math.min(100, (projectBytes / GAME_PROJECT_LIMITS.maxJsonBytes) * 100);
   const publishBlockers = findPublishBlockers(project);
@@ -148,24 +165,72 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
     <div className="gss-section-title"><span>VARIABLES</span><small>{project.variables.length}/100</small></div>
     {project.variables.map((variable) => (
       <article className="gss-data-card" key={variable.id}>
-        <header><strong>{variable.id}</strong><span>{variable.type}</span></header>
+        <header>
+          <strong>{variable.id}</strong>
+          <span>{variable.type}</span>
+          <button aria-label={`${variable.id} 삭제`} onClick={() => setConfirmDeleteVariableId(variable.id)} type="button">삭제</button>
+        </header>
         <VariableValueInput
           onChange={(value) => onApply(replaceVariableDefinition(project, variable.id, value))}
           variable={variable}
         />
       </article>
     ))}
-    <button
-      className="gss-add-block"
-      disabled={project.variables.length >= 100}
-      onClick={() => onApply(addBooleanVariable(project))}
-      type="button"
-    >+ Boolean 변수</button>
+    {/* S15P21A604-566 — 버튼 3개를 가로로 늘어놓으면 패널 폭을 넘겨 가로 스크롤이 생겨서(기존
+        .gss-add-block의 width:100%가 flex item에서 각자 컨테이너 전체 폭을 요구했기 때문),
+        gss-inline-actions--thirds로 세 버튼이 폭을 1/3씩 나눠 갖도록 하고 캡션에서 "변수"를
+        빼 한 줄에 다 보이게 했다. */}
+    <div className="gss-inline-actions gss-inline-actions--thirds">
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addBooleanVariable(project))}
+        type="button"
+      >+ Boolean</button>
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addIntegerVariable(project))}
+        type="button"
+      >+ Integer</button>
+      <button
+        className="gss-add-block"
+        disabled={project.variables.length >= 100}
+        onClick={() => onApply(addStringVariable(project))}
+        type="button"
+      >+ String</button>
+    </div>
+    {confirmDeleteVariableId !== null && (() => {
+      const target = project.variables.find((variable) => variable.id === confirmDeleteVariableId);
+      if (target === undefined) return null;
+      const usage = findVariableUsageLocations(project, confirmDeleteVariableId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{target.id} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 조건·액션에서 사용되지 않는 변수입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteVariableId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteVariable(confirmDeleteVariableId); setConfirmDeleteVariableId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
 
     <div className="gss-section-title"><span>ITEMS</span><small>{project.items.length}/100</small></div>
     {project.items.map((item) => (
       <article className="gss-data-card" key={item.id}>
-        <header><strong>{item.id}</strong><span>ITEM</span></header>
+        <header>
+          <strong>{item.id}</strong>
+          <span>ITEM</span>
+          <button aria-label={`${item.id} 삭제`} onClick={() => setConfirmDeleteItemId(item.id)} type="button">삭제</button>
+        </header>
         <CommitInput
           label="사용자에게 보이는 이름"
           onCommit={(name) => onApply(renameItemDefinition(project, item.id, name))}
@@ -179,6 +244,28 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
       onClick={() => onApply(addItemDefinition(project))}
       type="button"
     >+ 아이템</button>
+    {confirmDeleteItemId !== null && (() => {
+      const target = project.items.find((item) => item.id === confirmDeleteItemId);
+      if (target === undefined) return null;
+      const usage = findItemUsageLocations(project, confirmDeleteItemId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{target.name} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 오브젝트·조건·액션에서 사용되지 않는 아이템입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteItemId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteItem(confirmDeleteItemId); setConfirmDeleteItemId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
 
     <div className="gss-section-title"><span>ASSETS</span><small>{project.assets.length}/300</small></div>
     {publishBlockers.length > 0 && (
@@ -234,10 +321,52 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset }: ProjectDat
       />
     </details>
     <div className="gss-asset-list">
-      {project.assets.map((asset) => (
-        <div key={asset.id}><span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>{asset.kind}</span><strong>{assetDisplayLabel(asset)}</strong><small>{asset.id}</small></div>
-      ))}
+      {project.assets.map((asset) => {
+        // 빌트인은 프로젝트 소유가 아니라 카탈로그 참조라 삭제 대상이 아니다.
+        const deletable = !asset.source.startsWith('builtin://');
+        // S15P21A604-573 — 종류 배지 하나로만 뭉뚱그려 보이던 자산 목록에 실제 썸네일을
+        // 넣는다. assetUrls에 아직 없으면(로딩 중이거나 AUDIO처럼 이미지가 없으면) 빈
+        // 자리만 남기고 배지는 그대로 보여준다 — gss-builtin-library와 같은 렌더 패턴.
+        const imageVisual = asset.kind === 'IMAGE' ? resolveStaticImageVisual(asset, assetUrls) : null;
+        const tilesetVisual = asset.kind === 'TILESET' ? resolveTilesetVisual(asset, assetUrls) : null;
+        return (
+          <div key={asset.id}>
+            <span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>
+              {imageVisual !== null && <i className="gss-asset-thumb" style={staticImageBackgroundStyle(imageVisual)} />}
+              {tilesetVisual !== null && <i className="gss-asset-thumb" style={tileBackgroundStyle(tilesetVisual, 0)} />}
+              <em>{asset.kind}</em>
+            </span>
+            <strong>{assetDisplayLabel(asset)}</strong>
+            <small>{asset.id}</small>
+            {deletable && (
+              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} onClick={() => setConfirmDeleteAssetId(asset.id)} type="button">삭제</button>
+            )}
+          </div>
+        );
+      })}
     </div>
+    {confirmDeleteAssetId !== null && (() => {
+      const target = project.assets.find((asset) => asset.id === confirmDeleteAssetId);
+      if (target === undefined) return null;
+      const usage = findAssetUsageLocations(project, confirmDeleteAssetId);
+      return (
+        <section className="gss-asset-delete-confirm" role="alertdialog">
+          <header><strong>{assetDisplayLabel(target)} 삭제할까요?</strong></header>
+          {usage.length === 0
+            ? <p>현재 배치에서 사용되지 않는 자산입니다.</p>
+            : (
+              <>
+                <p>다음 위치에서 사용 중입니다 — 삭제하면 그 자리는 빈 값으로 남습니다.</p>
+                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+              </>
+            )}
+          <div className="gss-inline-actions">
+            <button onClick={() => setConfirmDeleteAssetId(null)} type="button">취소</button>
+            <button onClick={() => { onDeleteAsset(confirmDeleteAssetId); setConfirmDeleteAssetId(null); }} type="button">삭제</button>
+          </div>
+        </section>
+      );
+    })()}
     <div className="gss-help-card"><strong>게시 연결 준비 완료</strong><p>편집기는 이미지 대신 assetId만 저장합니다. 현재 로컬 저장소를 게시 자산 API로 교체해도 프로젝트 구조는 바뀌지 않습니다.</p></div>
   </div>;
 };
