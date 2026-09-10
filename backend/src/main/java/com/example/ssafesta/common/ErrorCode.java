@@ -169,6 +169,12 @@ public enum ErrorCode {
     /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
     SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
 
+    // ── 미니게임 (014) ──────────────────────────────────────────────────────
+    // 하나뿐이다. 판정 거부·일일 한도 도달·재제출은 전부 200 이라 오류 어휘가 필요 없고
+    // (spec 014 Acceptance Scenario 4), 게스트·요청 값 오류는 MEMBER_ONLY·VALIDATION_FAILED 를
+    // 재사용한다. 남의 세션도 이 코드로 답한다 — 구분하면 세션의 존재를 알려주게 된다.
+    MINIGAME_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 세션을 찾을 수 없습니다."),
+
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
