@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -458,12 +459,35 @@ class StorageReconciliationControllerIntegrationTest {
     void aFailedDocumentUpdateRollsBackTheRecord() throws Exception {
         Document document = seed("롤백");
         doThrow(new DataAccessResourceFailureException("주입된 DB 실패"))
-                .when(results).applyStorageLocation(anyLong(), anyString(), anyString());
+                .when(results).applyStorageLocation(anyLong(), anyString(), anyString(),
+                        anyString(), anyString());
 
         mockMvc.perform(submit(verified(document, "R2", "MINIO_LOCAL")))
                 .andExpect(status().isInternalServerError());
 
         assertEquals(0, logCount(document), "반쯤 반영된 결과가 남으면 안 된다");
+        assertEquals("R2", providerOf(document));
+    }
+
+    /**
+     * 반영 UPDATE 가 0행이면 500 이고 적재도 남지 않는다.
+     *
+     * <p>실제로는 도달할 수 없다 — {@code lockDocument} 의 {@code FOR UPDATE} 가 트랜잭션 끝까지
+     * 행을 잡는다. 그래서 {@code WHERE} 절의 source 재확인이 죽은 코드처럼 보이는데, 이 단정이
+     * 그것이 죽지 않았음을 본다: 잠금 없이 이 메서드를 부르는 경로가 생기면 조용히 최신 위치를
+     * 덮어쓰는 대신 여기서 시끄럽게 실패한다. {@code APPLIED} 라고 적힌 행만 남는 것이 최악이다.
+     */
+    @Test
+    @DisplayName("반영이 0행이면 500 이고 로그 행도 남지 않는다")
+    void aGuardedUpdateThatMatchesNothingFailsLoudly() throws Exception {
+        Document document = seed("가드");
+        doReturn(0).when(results).applyStorageLocation(anyLong(), anyString(), anyString(),
+                anyString(), anyString());
+
+        mockMvc.perform(submit(verified(document, "R2", "MINIO_LOCAL")))
+                .andExpect(status().isInternalServerError());
+
+        assertEquals(0, logCount(document), "반영되지 않았는데 APPLIED 행이 남으면 안 된다");
         assertEquals("R2", providerOf(document));
     }
 

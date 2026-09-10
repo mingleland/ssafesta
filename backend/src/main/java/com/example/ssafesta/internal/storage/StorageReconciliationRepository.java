@@ -48,7 +48,7 @@ class StorageReconciliationRepository {
                                     rs.getInt("attempt_count"), rs.getString("failure_reason"),
                                     instant(rs.getTimestamp("checked_at")),
                                     instant(rs.getTimestamp("resolved_at"))),
-                            Outcome.valueOf(rs.getString("apply_result"))),
+                            storedOutcome(rs.getString("apply_result"))),
                     runId, documentId));
         } catch (EmptyResultDataAccessException absent) {
             return Optional.empty();
@@ -102,17 +102,44 @@ class StorageReconciliationRepository {
     }
 
     /**
-     * Moves the document to the verified location.
+     * Moves the document to the verified location, but only while it still holds the location the
+     * result was judged against.
      *
      * <p>Provider and bucket move together: the two providers have different bucket names, so a row
      * carrying one provider's bucket with the other's name points at nothing. {@code updated_at} is
      * set by hand — there is no {@code @PreUpdate} anywhere in this codebase.
+     *
+     * <p><b>The {@code WHERE} repeats the source check the service already made.</b> It is
+     * unreachable today — {@link #lockDocument} holds the row for the rest of the transaction, so
+     * nothing can move it in between — and that is the point: the safety currently lives in the call
+     * order, and a later caller that skips the lock would silently overwrite a newer location. Here
+     * it lives in the statement instead.
+     *
+     * @return 1 when the document was moved, 0 when it no longer holds {@code fromProvider} and
+     *         {@code fromObjectKey}
      */
-    void applyStorageLocation(long documentId, String provider, String bucket) {
-        jdbc.update("""
+    int applyStorageLocation(long documentId, String provider, String bucket, String fromProvider,
+                             String fromObjectKey) {
+        return jdbc.update("""
                 UPDATE ai_documents SET storage_provider = ?, storage_bucket = ?, updated_at = now()
-                 WHERE id = ?
-                """, provider, bucket, documentId);
+                 WHERE id = ? AND storage_provider = ? AND s3_key = ?
+                """, provider, bucket, documentId, fromProvider, fromObjectKey);
+    }
+
+    /**
+     * The stored {@code apply_result} as an {@link Outcome}.
+     *
+     * <p>{@link Outcome#REPLAY_CONFLICT} is never written, and this is where that stops being a
+     * comment: the {@code CHECK} constraint keeps it out of the column, and a value that got past
+     * the constraint would otherwise come back as an outcome the endpoint can answer with.
+     */
+    private static Outcome storedOutcome(String applyResult) {
+        Outcome outcome = Outcome.valueOf(applyResult);
+        if (outcome == Outcome.REPLAY_CONFLICT) {
+            throw new IllegalStateException(
+                    "storage_reconciliation_log.apply_result 에 저장될 수 없는 값이 있습니다: " + applyResult);
+        }
+        return outcome;
     }
 
     private static Instant instant(Timestamp value) {

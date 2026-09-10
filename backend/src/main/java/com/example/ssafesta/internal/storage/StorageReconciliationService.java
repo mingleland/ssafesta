@@ -12,9 +12,7 @@ import com.example.ssafesta.storage.ObjectStorageProperties;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -100,8 +98,15 @@ class StorageReconciliationService {
                     payload);
         }
         if (decision.outcome() == Outcome.APPLIED) {
-            results.applyStorageLocation(payload.documentId(), payload.targetProvider(),
-                    decision.targetBucket());
+            int moved = results.applyStorageLocation(payload.documentId(), payload.targetProvider(),
+                    decision.targetBucket(), payload.sourceProvider(), payload.objectKey());
+            if (moved == 0) {
+                // The row moved out from under a FOR UPDATE, which cannot happen. Failing here
+                // rolls the record back too, and that is the right way round: a row saying APPLIED
+                // for a document that was not moved is worse than no row at all.
+                throw new IllegalStateException(
+                        "잠근 문서 " + payload.documentId() + " 의 저장 위치가 반영 직전에 바뀌었습니다.");
+            }
         }
         return decision.outcome();
     }
@@ -162,48 +167,22 @@ class StorageReconciliationService {
      * answered 204 would make one request mean two different things depending on when it was sent.
      */
     private static Outcome replayOutcome(StoredResult recorded, Payload sent) {
-        // The verdict is record equality, not the field list below. A Payload field added later is
-        // then compared whether or not anyone remembers to name it: forgetting a line costs a
-        // vaguer log message, never a different result silently accepted as a resend.
+        // The verdict is record equality over every component. A Payload field added later is then
+        // compared whether or not anyone remembers it — there is no per-field list to keep in step.
         if (recorded.payload().equals(sent)) {
             return recorded.applyResult();
         }
         // Accepting it silently would hide the sender's bug: idempotency means the same request is
         // safe to repeat, not that the same key may carry different content.
-        log.warn("같은 reconcile 키에 다른 내용이 도착했습니다 — runId={} documentId={} 다른 필드={}. "
-                        + "먼저 저장된 결과를 유지합니다.",
-                sent.runId(), sent.documentId(), differences(recorded.payload(), sent));
+        //
+        // Both payloads whole rather than a list of differing field names. A record's generated
+        // toString names every component, so this cannot fall behind a field added later, and the
+        // operator reading it wants the two versions anyway — "targetProvider 가 다름" does not say
+        // which value arrived.
+        log.warn("같은 reconcile 키에 다른 내용이 도착했습니다 — runId={} documentId={}."
+                        + " 먼저 저장된 결과를 유지합니다. 저장={} 도착={}",
+                sent.runId(), sent.documentId(), recorded.payload(), sent);
         return Outcome.REPLAY_CONFLICT;
-    }
-
-    /**
-     * Which fields differ, for the log line only — the decision is made by record equality above.
-     *
-     * <p>{@code runId} and {@code documentId} are the key, so they are equal by construction.
-     */
-    private static List<String> differences(Payload recorded, Payload sent) {
-        List<String> fields = new ArrayList<>();
-        diff(fields, "objectKey", recorded.objectKey(), sent.objectKey());
-        diff(fields, "sourceProvider", recorded.sourceProvider(), sent.sourceProvider());
-        diff(fields, "targetProvider", recorded.targetProvider(), sent.targetProvider());
-        diff(fields, "status", recorded.status(), sent.status());
-        diff(fields, "expectedSize", recorded.expectedSize(), sent.expectedSize());
-        diff(fields, "actualSize", recorded.actualSize(), sent.actualSize());
-        diff(fields, "expectedContentType", recorded.expectedContentType(), sent.expectedContentType());
-        diff(fields, "actualContentType", recorded.actualContentType(), sent.actualContentType());
-        diff(fields, "expectedSha256", recorded.expectedSha256(), sent.expectedSha256());
-        diff(fields, "actualSha256", recorded.actualSha256(), sent.actualSha256());
-        diff(fields, "attemptCount", recorded.attemptCount(), sent.attemptCount());
-        diff(fields, "failureReason", recorded.failureReason(), sent.failureReason());
-        diff(fields, "checkedAt", recorded.checkedAt(), sent.checkedAt());
-        diff(fields, "resolvedAt", recorded.resolvedAt(), sent.resolvedAt());
-        return fields;
-    }
-
-    private static void diff(List<String> fields, String name, Object recorded, Object sent) {
-        if (!Objects.equals(recorded, sent)) {
-            fields.add(name);
-        }
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────
