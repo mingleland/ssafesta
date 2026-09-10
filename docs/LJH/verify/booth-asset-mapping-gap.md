@@ -291,12 +291,27 @@ dev 서버 실측: `/assets/booth-runtime/manifest.json` 이 10 assets 를 내�
 이번 범위에서 고치지 않았다 — 미리보기에 그 전제를 반영하려면 manifest 계약에 피벗 오프셋 필드를 더해야
 하고, 그것은 계약 변경이라 `-509` 완료조건 밖이다. 별도로 남긴다.
 
-### 6-6. 월드 렌더 실증은 HOLD
+### 6-6. 월드 렌더 실증 — **PASS** (2026-09-10, 회원 세션으로 관통)
 
-FE 가 새 코드로 게시해 월드에서 확인하려면 **회원 세션**이 필요한데, 실 BE 에서 개발자 진입이 거부된다
-(`enterAsDeveloper()` 의 `'dev-entry'` 표식 토큰 — LJH T-71 계열). 게스트는 스튜디오에 들어갈 수 없고,
-로컬 게시본은 슬롯 1 의 `SURVEY_KIOSK`(assetCode 없음) 하나뿐이라 레거시 코드로 저장된 대상도 없다.
+한때 HOLD 였다. 게시에 회원 세션이 필요한데 실 BE 가 개발자 진입을 거부하고(`enterAsDeveloper()` 의
+`'dev-entry'` 표식 토큰) 게스트는 스튜디오에 못 들어가기 때문이다. **사용자가 소셜 로그인을 직접 수행해
+그 막힘이 풀렸고, 관통 검증을 끝냈다.**
 
-**Unity 측 렌더는 게임 파트 실측이 있다** — Mock 픽스처에 `FURN_CHAIR_01_BLUE`·`STRUCT_PANEL_01` 을 넣어
-바닥 피벗으로 서는 것과 `Unknown assetCode` 경고 0건을 확인했다고 회신했다(#146). 그것은 그쪽 증거이고
-**내 증거가 아니다** — 그래서 여기서는 HOLD 로 적는다.
+```
+스튜디오(부스 #2) → 6종 배치 → 저장 → 게시(공개 1회차)
+BE 실측  booth-slots/12/layouts/published v1 objects 6
+         STRUCT_PANEL_01, FURN_COUNTER_02, STRUCT_TRUSS_HORIZONTAL_LAMP,
+         STRUCT_TRUSS_VERTICAL, STRUCT_TRUSS_BASE, DISP_STAND_PLASTIC_01
+월드 진입
+  [PublishedLayoutLoader] 12슬롯 병렬 조회 완료 — 게시 2 / 미게시·실패 10
+  [BoothRuntime] Booth 2 built: 6 objects (template=PROJECT_EXHIBITION)
+  [WorldBoothPublishedBootstrap] 12실 중 2실 게시 렌더, 나머지는 기본 프레임
+  Unknown assetCode 경고 0건
+  gate_open +2.4s
+```
+
+**`6 objects` 가 지어졌고 경고가 0 이다** — 팔레트가 내보낸 정본 코드를 Unity 가 그대로 해석했다는 뜻이다.
+경고는 전부 미게시 슬롯의 `published layout 없음 (404)` 10건이고 정상이다.
+
+스튜디오 UI 실측도 함께 남긴다: 팔레트 10종 전부 썸네일 이미지가 붙었고(파이프라인 산출물이 UI 까지 도달),
+배치한 오브젝트의 `자산 코드` 필드가 `STRUCT_PANEL_01`·`DISP_STAND_PLASTIC_01` 로 표시된다.
