@@ -47,7 +47,14 @@ class GameVersionsApiIntegrationTest {
                 .andExpect(jsonPath("$.versions.length()").value(2))
                 .andExpect(jsonPath("$.versions[0].versionNo").value(2))
                 .andExpect(jsonPath("$.versions[1].versionNo").value(1))
-                .andExpect(jsonPath("$.versions[0].project").doesNotExist());
+                .andExpect(jsonPath("$.versions[0].project").doesNotExist())
+                // 계약이 정한 세 필드가 전부, 그것만 나온다. 위 단정들은 versionNo 하나만 보므로,
+                // VersionItem.of 가 나머지 둘을 잘못 채워도(예: 다른 행의 값, null) 통과한다 —
+                // 프로젝션 getter 와 record 필드가 이름으로 묶이지 않고 위치로 묶이는 자리라
+                // 순서를 바꾸면 조용히 뒤바뀐다. 개수까지 보는 것은 필드가 느는 것도 막는다.
+                .andExpect(jsonPath("$.versions[0].length()").value(3))
+                .andExpect(jsonPath("$.versions[0].schemaVersion").isNotEmpty())
+                .andExpect(jsonPath("$.versions[0].publishedAt").isNotEmpty());
     }
 
     @Test
