@@ -23,6 +23,7 @@
 1. **Given** `feature/*` MR에 유효한 Front 또는 Back 변경이 제출되었을 때, **When** GitLab CI build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 dev 컴포넌트만 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
 2. **Given** `feature/*` MR의 필수 GitLab CI build 또는 test가 실패했을 때, **When** 파이프라인이 종료되면, **Then** 해당 변경은 `develop` 병합과 dev 배포가 차단되고 실패 단계와 원인을 개발자가 확인할 수 있다.
 3. **Given** 같은 `feature/*` MR 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 dev 환경을 덮어쓰지 않는다.
+4. **Given** Unity 담당자가 QA를 끝낸 최종 WebGL zip을 immutable release ID로 GitLab Generic Package Registry에 업로드했을 때, **When** 업로드 도우미가 산출물 SHA-256과 함께 Jenkins job을 호출하면, **Then** Jenkins는 패키지를 검증해 EC2 정적 release로 원자적으로 승격하고 Dedicated Server를 재시작하지 않는다.
 
 ---
 
@@ -132,6 +133,16 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-021**: 새 컨테이너 시작 또는 비AI 핵심 헬스체크가 실패하고 되돌릴 수 없는 데이터 변경이 없을 때, 시스템은 마지막 정상 릴리스로 자동 복구하고 복구 후 헬스체크를 다시 수행해야 한다.
 - **FR-022**: DB 스키마 변경, Secret·환경 설정 오류 또는 되돌릴 수 없는 데이터 변경이 관련된 실패는 자동 복구하지 않고 현재 상태와 로그를 보존한 뒤 승인된 담당자의 수동 판단을 기다려야 한다.
 - **FR-023**: 외부 AI 서비스 장애로 AI 응답 검증만 실패하면 통합 릴리스를 성공으로 기록하지 않되 정상인 월드와 비AI 컴포넌트를 자동 복구해서는 안 되며, AI 검증 재시도 또는 수동 승인을 기다려야 한다.
+- **FR-023a**: Unity 담당자의 QA 완료 후 GitLab Generic Package Registry에 성공한 최종 WebGL package 업로드를 해당 정적 산출물의 배포 승인 신호로 사용해야 한다.
+- **FR-023b**: 업로드 도우미는 package 업로드와 SHA-256 checksum 업로드가 모두 성공한 뒤에만 immutable release ID와 SHA-256을 Jenkins parameterized job에 전달해야 한다.
+- **FR-023c**: Jenkins는 개인 PAT가 아니라 `read_package_registry` 최소 권한 GitLab Deploy Token을 Jenkins Credentials에서 실행 시점에만 주입해 package를 내려받아야 한다.
+- **FR-023d**: Jenkins는 전달받은 SHA-256, ZIP 무결성, 절대·상위·드라이브 경로와 심볼릭 링크가 없는 안전한 entry, `index.html`·`manifest.json`·`Build/`·`TemplateData/`, manifest 4개 참조 파일을 승격 전에 검증해야 한다.
+- **FR-023e**: WebGL 산출물은 `/srv/festa/webgl/releases/<release-id>/`에 불변으로 설치하고, 동일 release ID의 동일 SHA 재호출은 멱등 처리하며 다른 SHA 재사용은 거부해야 한다.
+- **FR-023f**: Jenkins는 같은 파일시스템의 임시 심볼릭 링크와 원자적 rename으로만 `/srv/festa/webgl/current`를 전환하고 경로 내용을 직접 덮어쓰지 않아야 한다.
+- **FR-023g**: 전환 후 공개 URL의 index·manifest·manifest 참조 파일에 대해 HTTP 상태, MIME, Brotli와 Cache-Control을 검증하고 실패 시 직전 current를 복원해야 한다.
+- **FR-023h**: 성공한 current와 직전 previous release를 보존하면서 제한된 retention을 적용하고, WebGL 정적 배포는 Unity Dedicated Server 컨테이너를 재시작하지 않아야 한다.
+- **FR-023i**: 배포 이력은 release ID, artifact SHA-256, Registry package URL, 공개 대상 URL, 결과와 시각을 기록하되 인증정보 원문을 포함하지 않아야 한다.
+- **FR-023j**: Unity 담당자 PC는 Jenkins Agent로 상시 연결할 필요가 없으며 업로드 도우미 실행 시 GitLab과 Jenkins HTTPS API에 접근할 수 있으면 된다.
 
 #### P1 — 로그 기반 이상 탐지·운영 관측
 
@@ -172,6 +183,8 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **SC-009**: 동일 조건의 Unity 빌드 표본에서 유효한 캐시 사용 시 중앙 빌드 시간이 콜드 빌드 중앙값보다 짧음이 확인된다.
 - **SC-010**: 자동 복구 조건에 해당하는 배포 실패 표본의 100%에서 마지막 정상 릴리스가 복원되고 복구 후 비AI 핵심 헬스체크가 통과한다.
 - **SC-011**: 수동 판단 조건에 해당하는 실패 표본의 100%에서 자동 복구가 실행되지 않고 실패 상태·로그·대상 릴리스가 보존된다.
+- **SC-011a**: WebGL package 배포 fixture의 100%에서 정상·중복 trigger는 같은 SHA의 release로 수렴하고, bad SHA·unsafe ZIP·bad manifest·공개 검증 실패는 새 current를 남기지 않는다.
+- **SC-011a**: QA 완료 WebGL package 배포 표본의 100%에서 전달 SHA-256과 설치 SHA-256이 일치하고, 공개 검증 성공 시에만 새 current가 유지되며 실패 표본은 직전 current로 복원된다.
 - **SC-012**: Mattermost로 전송된 운영 알림의 100%가 알림 시점에 활성화된 탐지 규칙과 발생 대상으로 추적된다.
 - **SC-013**: 일반 CI 상태와 탐지 규칙에 맞지 않는 테스트 로그를 사용한 검증에서 Mattermost 운영 알림 발생 건수는 0건이다.
 - **SC-014**: 정의된 서버와 파트별 컨테이너 대상의 100%에서 CPU·메모리·디스크·네트워크 사용 상태를 대시보드로 구분해 확인할 수 있다.

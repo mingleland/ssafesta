@@ -58,3 +58,17 @@ CANDIDATE → DEPLOYING → ACTIVE
 ## DemoPromotion
 
 `promotionId`, `approvedBy`, `sourceDevBatchId`, `releaseManifest`, `status`, `verificationEvidence`. It is valid only when source batch is `ACTIVE` and all requested runtime components are dev-verified. A `develop` push cannot create this model automatically.
+
+## WebGLPackageDeployment
+
+| Field | Rule |
+|---|---|
+| `releaseId` | Generic Package version과 동일한 immutable ID |
+| `artifactSha256` | publisher가 전달하고 Jenkins가 다운로드 후 재계산한 64자리 SHA-256 |
+| `packageUrl` | `festa-webgl/<releaseId>/festa-webgl-release-<releaseId>.zip`; credential 제외 |
+| `releasePath` | `/srv/festa/webgl/releases/<releaseId>`; 같은 ID에 다른 SHA 금지 |
+| `current`, `previous` | 관리되는 release만 가리키는 상대 symbolic link |
+| `status` | `INSTALLED`, `ACTIVE`, `ROLLED_BACK`, `FAILED` |
+| `verification` | index·manifest·참조 Build 파일의 HTTP, MIME, Brotli, Cache-Control 결과 |
+
+동일 release ID와 SHA 재호출은 멱등이다. 공개 검증에 실패하면 `current`를 전환 전 값으로 되돌리고 candidate는 진단용으로 격리 보존한다.
