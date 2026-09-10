@@ -55,7 +55,7 @@
 - [X] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
 - [X] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
 - [ ] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
-- [ ] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
+- [X] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
 - [ ] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
 - [X] T022A [P] [US1] `infra/jenkins/tests/deploy-webgl-release.sh`에 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패 rollback과 retention fixture를 작성한다
 - [ ] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
