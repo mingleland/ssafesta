@@ -32,6 +32,7 @@ import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/aud
 import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
+import { setHostPhase } from './hostPhase';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
 
@@ -150,6 +151,12 @@ export function UnityHost() {
       clearWatchdog();
     };
   }, [attempt]);
+
+  // 이 단계를 화면 밖(World HUD)이 읽을 수 있게 옮겨 담는다 (S15P21A604-613).
+  // 단방향이라 두 값이 어긋날 수 없다 — 판정은 여전히 위 effect 한 곳에서만 일어난다.
+  useEffect(() => {
+    setHostPhase(status);
+  }, [status]);
 
   // 월드 로딩이 길어지면 문구를 바꾼다. preparing-world 에 들어간 시점부터 재고, 나가면 초기화한다.
   useEffect(() => {
