@@ -36,13 +36,21 @@ const LEGACY_ALIASES = new Set([
 ]);
 
 /**
- * 아직 정본 코드로 옮기지 못한 것 — **이유가 있어야 여기 들어온다.**
+ * 2층에서만 쓰는 예외 — **파이프라인에 없어도 되는 코드.** 이유가 있어야 여기 들어온다.
  *
- * PLANT: Unity 에 `Decor/PLANT.prefab`(저폴리 화분 래퍼)이 실재하는데 정본 28행에는 화분 대응
- * 코드가 없다. canonical 신규 정의는 정본 표 갱신이라 게임 파트 결정이고 #154 에 요청해 둔 상태다.
- * 결정이 오면 이 예외를 지우고 팔레트를 그 코드로 바꾼다.
+ * DECOR_PLANT_01: 레지스트리에는 정본 29행으로 등록돼 있다(#154 A안, 게임 파트 결정 2026-09-10).
+ * 그런데 `Decor/PLANT.prefab` 이 감싸는 원본은 ExpoKit 이 아니라
+ * `Assets/Palmov Island/Low Poly Houses Free Pack/Prefabs/Trees/potted tree.prefab` 이고,
+ * 그 팩은 `tools/assets/source-packs.lock.json` 에 선언돼 있지 않다. `compiler/licenseGate.mjs` 의
+ * `evaluate` 는 **선언되지 않은 package 를 compile 하지 않는다** — 그래서 파이프라인에 항목만 넣으면
+ * 이 테스트만 통과하고 실제 변환은 안 되는 반쪽이 된다.
+ *
+ * 즉 이것은 1층(레지스트리 정합) 문제가 아니라 **라이선스 게이트로 막힌 항목**이고,
+ * `-509` 완료조건 ④("라이선스 게이트로 막힌 항목은 '막혔다'가 코드가 아니라 기록으로 남는다")가
+ * 예정해 둔 자리다. 취득·라이선스 근거가 확인되면 lock 선언과 파이프라인 반입을 후속 검토하고
+ * 그때 이 예외를 지운다.
  */
-const LEGACY_ALLOWED = new Set(['PLANT']);
+const PIPELINE_EXEMPT = new Set(['DECOR_PLANT_01']);
 
 function paletteCodes() {
   return [...palette.matchAll(/assetCode: '([A-Z_0-9]+)'/g)].map((m) => m[1]);
@@ -66,13 +74,8 @@ describe('1층 — 팔레트 코드가 Unity 레지스트리에 있는가', () =
   });
 
   it('레거시 별칭으로 되돌아가지 않는다 — 별칭은 한 릴리스 뒤 정리된다 (#154)', () => {
-    const used = paletteCodes().filter((c) => LEGACY_ALIASES.has(c) && !LEGACY_ALLOWED.has(c));
-    expect(used).toEqual([]);
-  });
-
-  it('예외 목록은 실제로 쓰이는 것만 둔다 — 죽은 예외가 쌓이지 않게', () => {
-    const used = new Set(paletteCodes());
-    expect([...LEGACY_ALLOWED].filter((c) => !used.has(c))).toEqual([]);
+    // 예외 없이 본다. 팔레트에 남아 있던 마지막 별칭 PLANT 가 DECOR_PLANT_01 로 옮겨졌다.
+    expect(paletteCodes().filter((c) => LEGACY_ALIASES.has(c))).toEqual([]);
   });
 });
 
@@ -81,8 +84,13 @@ describe('2층 — 팔레트 코드가 파이프라인 산출물과 1:1 인가',
   // canonical 28 전부를 파이프라인에 넣으라는 뜻이 아니다 — 팔레트가 참조하는 것이 대상이다.
   it('팔레트가 쓰는 코드는 booth-assets.config.mjs 에도 있다', () => {
     const built = pipelineCodes();
-    const missing = paletteCodes().filter((c) => !built.has(c) && !LEGACY_ALLOWED.has(c));
+    const missing = paletteCodes().filter((c) => !built.has(c) && !PIPELINE_EXEMPT.has(c));
     expect(missing).toEqual([]);
+  });
+
+  it('예외 목록은 실제로 쓰이는 것만 둔다 — 죽은 예외가 쌓이지 않게', () => {
+    const used = new Set(paletteCodes());
+    expect([...PIPELINE_EXEMPT].filter((c) => !used.has(c))).toEqual([]);
   });
 
   it('파이프라인이 만드는 코드도 레지스트리에 있다 — 반대 방향도 어긋나지 않는다', () => {
