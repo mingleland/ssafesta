@@ -125,7 +125,9 @@ namespace Festa.World.UI
             float ui = InteractPromptUI.UiScale();   // 하한 0.75 — 작은 창에서 6~11px 로 줄던 것 (QA #67)
             float margin = Mathf.Round(24f * ui);
 
-            if (!_open) { DrawChip(ui, margin); return; }
+            // 닫혀 있으면 **아무것도 그리지 않는다.** 전에는 왼쪽 아래에 `[H] 조작 안내` 알약이 상주했는데
+            // 화면을 가린다는 지적을 받았다(2026-09-10). 처음 15초 카드와 H 토글은 그대로다.
+            if (!_open) return;
             DrawCard(ui, margin);
         }
 

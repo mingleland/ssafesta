@@ -28,9 +28,14 @@ namespace Festa.Minigame
         [Tooltip("씬이 정한 canonical id. FE 는 해석하지 않고 로그·분석에만 쓴다")]
         [SerializeField] string _machineId = "lounge-timer-stop-01";
 
-        [Header("초점 카메라 (기계 로컬 좌표 — 스케일 포함)")]
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.45f, 1.9f);
-        [SerializeField] Vector3 _lookLocal = new(0f, 1.3f, 0.2f);
+        // 화면 실측(2026-09-10, `Arcade_Screen_Material_URP` 서브메시): 월드 x −164.4~−162.5 · y 20.1~26.4 ·
+        // z −308.6~−300.0. 기계 로컬(회전 90°·스케일 1.33)로 옮기면 화면 중심이 (0.23, 17.5, −0.3) 이다.
+        //
+        // **미터가 아니라 월드 유닛이다**(1 m ≈ 13.26). 처음에는 (0, 1.45, 1.9) 를 넣어 두어 카메라가
+        // 기계 발치 바닥으로 들어갔다(사용자 지적 2026-09-10).
+        [Header("초점 카메라 (기계 로컬 좌표 — 월드 유닛, 스케일 포함)")]
+        [SerializeField] Vector3 _cameraLocal = new(0.23f, 18.8f, 13.5f);
+        [SerializeField] Vector3 _lookLocal = new(0.23f, 17.5f, -0.3f);
 
         /// <summary>호스트가 이 시간 안에 화면을 열지 않으면 초점을 스스로 푼다.</summary>
         const float HostResponseTimeout = 3f;

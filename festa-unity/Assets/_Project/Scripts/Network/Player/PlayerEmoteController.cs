@@ -61,6 +61,13 @@ namespace Festa.Network
         {
             if (!IsOwner || emote == PlayerEmoteId.None || IsLooping(emote)) return;
             _player.EmoteId.Value = emote;
+            if (emote == PlayerEmoteId.Strike)
+            {
+                // 접촉·반동·복귀를 포함한 타임라인. 원본 대검 클립 길이와 독립적이다.
+                _oneShotStopAt = Time.unscaledTime + AvatarStrikeProp.SwingDuration;
+                _awaitingDuration = PlayerEmoteId.None;
+                return;
+            }
             _oneShotStopAt = 0f;
             _awaitingDuration = emote;
         }

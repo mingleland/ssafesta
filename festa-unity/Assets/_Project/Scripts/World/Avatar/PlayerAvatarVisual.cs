@@ -816,6 +816,12 @@ namespace Festa.World
                     vt.localPosition = p;
                 }
             }
+            else if (emote == PlayerEmoteId.Strike)
+            {
+                // 망치 궤적은 서 있는 발 기준이다. 스윙 중간의 숙인 포즈로 루트를 재접지하면
+                // 팔·망치와 몸의 기준 높이가 갈라진다. 무릎 꿇는 구간은 StrikeProp에서 제외한다.
+                RestoreBaseGrounding();
+            }
             else if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
             else RestoreBaseGrounding();
 

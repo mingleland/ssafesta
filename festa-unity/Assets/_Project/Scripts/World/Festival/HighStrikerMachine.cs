@@ -41,6 +41,11 @@ namespace Festa.World
 
         public string MachineId => _machineId;
 
+        // CarnivalKit 메시 정점 실측: 버튼 중앙 (0, 0.409, 0.580).
+        // 기계의 이동·회전·배율을 포함해 망치의 실제 접촉점을 계산한다.
+        public Vector3 StrikeContact => transform.TransformPoint(new Vector3(0f, 0.409f, 0.580f));
+        public Vector3 PlayerFacing => -transform.forward;
+
         float _busyUntil;
 
         /// <summary>

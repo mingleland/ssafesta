@@ -23,14 +23,10 @@ namespace Festa.World
     public sealed class HighStrikerNetwork : NetworkBehaviour
     {
         /// <summary>
-        /// 스윙 클립(<c>GreatSwordCasting/Strike</c>, 0.93 s)의 임팩트 시점(초) — 실측 2026-09-10, 마지막 프레임.
-        ///
-        /// <para>사용자가 고른 Mixamo 클립에서 <b>내려찍는 구간만</b> 남겼다(30 fps 48~76 프레임).
-        /// 원본은 앞에 1초 정지(칼을 머리 위로 든 채)와 뒤에 0.5초 정지(무릎 꿇은 채)가 붙어 있어
-        /// 그대로 쓰면 "주저앉았다 일어난다" 로 보였다. 이미 짧게 잘랐으므로 배속은 1.0 이다.</para>
+        /// 망치 궤적의 접촉 시점. 실제 표시에서는 AvatarStrikeProp의 접촉 프레임을 기다린다.
         /// </summary>
         public const float StrikeSpeed = 1f;
-        public const float ImpactDelay = 0.90f / StrikeSpeed;
+        public const float ImpactDelay = AvatarStrikeProp.ImpactTime;
 
         /// <summary>한 기계가 다시 받을 때까지. 연출(상승 0.45 + 유지 1.4 + 낙하 0.6)보다 길게 잡는다.</summary>
         const float MachineCooldown = 3.2f;
@@ -97,16 +93,26 @@ namespace Festa.World
         {
             var machine = HighStrikerMachine.Find(machineId.ToString()) ?? HighStrikerMachine.Any();
             if (machine == null) return;
+            // 승인된 스윙만 재생한다. 같은 RPC에서 망치와 기계 타임라인을 시작한다.
+            if (IsOwner) GetComponent<PlayerEmoteController>()?.PlayOneShot(PlayerEmoteId.Strike);
+            var prop = GetComponent<AvatarStrikeProp>();
+            bool hasVisual = prop != null && prop.BeginSwing(machine);
             // 받는 즉시 잠근다 — 임팩트를 기다리는 사이에 옆 사람이 F 를 누르면 스윙이 겹친다.
             machine.BeginBusy(ImpactDelay + machine.SequenceSeconds);
             // 스윙 애니메이션이 내려찍는 순간에 퍽이 튀어 오르게 — 받은 시점부터 임팩트까지 기다린다.
-            StartCoroutine(PlayAtImpact(machine, power, score, nickname.ToString()));
+            StartCoroutine(PlayAtImpact(machine, hasVisual ? prop : null, power, score, nickname.ToString()));
         }
 
-        static IEnumerator PlayAtImpact(HighStrikerMachine machine, float power, int score, string nickname)
+        static IEnumerator PlayAtImpact(HighStrikerMachine machine, AvatarStrikeProp prop, float power, int score, string nickname)
         {
-            yield return new WaitForSeconds(ImpactDelay);
-            machine.PlaySwing(power, score, nickname);
+            if (prop != null)
+            {
+                // LateUpdate가 망치를 판에 붙인 다음 프레임에만 표시를 올린다.
+                while (prop != null && prop.IsSwinging && !prop.HasImpacted) yield return null;
+                if (prop == null || !prop.HasImpacted) yield break;
+            }
+            else yield return new WaitForSeconds(ImpactDelay);
+            if (machine != null) machine.PlaySwing(power, score, nickname);
         }
 
         [ServerRpc]
