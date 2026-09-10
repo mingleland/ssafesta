@@ -143,8 +143,8 @@ grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-}' "${agent_compose}" \
   || fail "deploy agent does not preserve the same-origin dev API fallback"
 grep -q 'PUBLIC_AI_API_BASE_URL: \${PUBLIC_AI_API_BASE_URL:-}' "${agent_compose}" \
   || fail "deploy agent does not preserve the same-origin dev AI fallback"
-grep -q 'PUBLIC_AUTH_BASE_URL: \${PUBLIC_AUTH_BASE_URL:-}' "${agent_compose}" \
-  || fail "deploy agent does not preserve the same-origin dev auth fallback"
+grep -Fq 'PUBLIC_AUTH_BASE_URL: ${PUBLIC_AUTH_BASE_URL:-https://api.${ROOT_DOMAIN:?set in infra/.env}}' "${agent_compose}" \
+  || fail "deploy agent does not preserve the public OAuth origin"
 grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" \
   || fail "deploy agent does not persist dev batch state outside its container filesystem"
 grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \
