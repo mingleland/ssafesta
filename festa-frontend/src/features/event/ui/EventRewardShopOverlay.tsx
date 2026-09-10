@@ -77,18 +77,11 @@ export function EventRewardShopOverlay() {
             title="경품 상점 준비 중"
             message="설문 참여 시 추첨을 통해 경품을 드립니다."
             action={
-              <button
-                type="button"
-                className="ov-btn ov-btn-primary"
-                disabled={surveyTarget === null}
-                onClick={() => {
-                  if (surveyTarget !== null) openVisitorOverlay('SURVEY', surveyTarget);
-                }}
-              >
+              // 부스 설문과 같은 오버레이로 간다 — 다른 것은 payload 의 source 하나다 (-608)
+              <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
                 설문 참여하기
               </button>
             }
-            hint={surveyTarget === null ? '설문 위치가 정해지면 여기서 바로 참여할 수 있습니다.' : undefined}
           />
         )}
       </div>

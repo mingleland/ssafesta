@@ -47,25 +47,26 @@ describe('PREPARING — 상품이 아직 없다', () => {
     expect(screen.getByText('설문 참여 시 추첨을 통해 경품을 드립니다.')).toBeTruthy();
   });
 
-  it('설문 대상이 없으면 CTA 를 비활성으로 두고 사유를 적는다 — 가짜 boothId 를 만들지 않는다', () => {
+  it('CTA 가 기존 Survey 오버레이로 간다 — 이벤트 설문용 새 OverlayType 을 만들지 않는다', () => {
     getRewardShopState.mockReturnValue({ phase: 'PREPARING', items: [] });
-    resolveEventSurveyTarget.mockReturnValue(null);
-
-    render(<EventRewardShopOverlay />);
-
-    expect(screen.getByRole('button', { name: '설문 참여하기' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText('설문 위치가 정해지면 여기서 바로 참여할 수 있습니다.')).toBeTruthy();
-    expect(openVisitorOverlay).not.toHaveBeenCalled();
-  });
-
-  it('설문 대상이 정해지면 같은 CTA 가 기존 Survey 진입으로 간다', () => {
-    getRewardShopState.mockReturnValue({ phase: 'PREPARING', items: [] });
-    resolveEventSurveyTarget.mockReturnValue({ boothId: 7 });
+    resolveEventSurveyTarget.mockReturnValue({ kind: 'event', surveyKey: 'SSAFESTA_2026' });
 
     render(<EventRewardShopOverlay />);
     screen.getByRole('button', { name: '설문 참여하기' }).click();
 
-    expect(openVisitorOverlay).toHaveBeenCalledWith('SURVEY', { boothId: 7 });
+    expect(openVisitorOverlay).toHaveBeenCalledWith('SURVEY', { kind: 'event', surveyKey: 'SSAFESTA_2026' });
+  });
+
+  it('부스가 아니라 surveyKey 로 간다 — 가짜 boothId 를 만들지 않는다 (S15P21A604-608)', () => {
+    getRewardShopState.mockReturnValue({ phase: 'PREPARING', items: [] });
+    resolveEventSurveyTarget.mockReturnValue({ kind: 'event', surveyKey: 'SSAFESTA_2026' });
+
+    render(<EventRewardShopOverlay />);
+    screen.getByRole('button', { name: '설문 참여하기' }).click();
+
+    const [, payload] = openVisitorOverlay.mock.calls[0] as [string, Record<string, unknown>];
+    expect(payload.kind).toBe('event');
+    expect(payload).not.toHaveProperty('boothId');
   });
 });
 
