@@ -39,6 +39,15 @@ namespace Festa.Network
         SitGround = 6,    // SitGround01 - Loop — 앉기 (루프)
         Drink = 7,        // Drink01_R - Loop — 건배 (루프)
         Thanks = 8,       // Reverence01 — 감사
+
+        // 2026-09-10 추가 — 11층 라운지 글자 소파 눕기 (Sleep Anim Pack, Humanoid 리타게팅).
+        // 소파 F(LoungeSofaInteractable) 가 무작위로 하나 고른다. 감정표현 휠에는 넣지 않는다.
+        // 값만 덧붙였다(기존 값·이름 불변) — 기준선 동결(헌법 27조)은 재구현·리팩터링 금지이고 이건 추가다.
+        LieSofa = 9,            // Sleep_Sofa_SleepLoop — 소파에 웅크려 눕기 (루프)
+        LieLeft = 10,           // Sleep_Bed_LeftSide_SleepLoop — 왼쪽으로 눕기 (루프)
+        LieRight = 11,          // Sleep_Bed_RightSide_SleepLoop — 오른쪽으로 눕기 (루프)
+        LieLeftRestless = 12,   // Sleep_Bed_LeftSide_RestlessLoop — 왼쪽 뒤척임 (루프)
+        LieRightRestless = 13,  // Sleep_Bed_RightSide_RestlessLoop — 오른쪽 뒤척임 (루프)
     }
 
     /// <summary>

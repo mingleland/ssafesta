@@ -123,7 +123,7 @@ namespace Festa.Network
         // 루프 이모트는 자동으로 끝나지 않는다 — 다시 선택하거나 이동하면 해제된다
         // (PlayerMovement 가 이동 시 EmoteId 를 None 으로 되돌린다).
         static bool IsLooping(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink;
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Drink || Festa.World.LiePoseTable.IsLie(emote);
 
         // ── 원샷 이모트 종료 시점 ──────────────────────────────────
         // 클립 이름으로 길이를 찾을 수 없다. 애니메이터 상태 이름은 `Emote_{enum}` 규약이지만
