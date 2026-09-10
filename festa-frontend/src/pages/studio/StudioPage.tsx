@@ -143,16 +143,35 @@ export function StudioPage() {
     return (
       <StudioGate>
         <p>이 부스의 소유자만 편집할 수 있습니다.</p>
-        <Link to="/app/booths">부스 슬롯 목록으로</Link>
+        <GateActions to="/app/booths" toLabel="부스 슬롯 목록으로" />
       </StudioGate>
     );
   }
   if (ownerGate.status === 'error') {
-    return <StudioGate>부스 소유 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</StudioGate>;
+    return (
+      <StudioGate>
+        <p>부스 소유 정보를 불러오지 못했습니다.</p>
+        <GateActions onRetry={ownerGate.retry} />
+      </StudioGate>
+    );
   }
   if (draftQuery.isLoading) return <StudioGate>불러오는 중...</StudioGate>;
-  if (gates.draftLeaseExpired) return <StudioGate>임대가 만료되어 이 부스를 편집할 수 없습니다.</StudioGate>;
-  if (draftQuery.isError) return <StudioGate>작업본을 불러오지 못했습니다.</StudioGate>;
+  if (gates.draftLeaseExpired) {
+    return (
+      <StudioGate>
+        <p>임대가 만료되어 이 부스를 편집할 수 없습니다.</p>
+        <GateActions />
+      </StudioGate>
+    );
+  }
+  if (draftQuery.isError) {
+    return (
+      <StudioGate>
+        <p>작업본을 불러오지 못했습니다.</p>
+        <GateActions onRetry={() => void draftQuery.refetch()} />
+      </StudioGate>
+    );
+  }
 
   function handleSave() {
     saveMutation.mutate({
@@ -326,5 +345,38 @@ export function StudioPage() {
         ) : undefined
       }
     />
+  );
+}
+
+/**
+ * Gate 화면의 탈출구 (S15P21A604-588).
+ *
+ * Gate 는 Shell 없이 카드만 그리므로 툴바의 '뒤로'가 없고, ESC Game Menu 는 World 전용이라
+ * 여기서 열리지 않는다. 그래서 링크가 없는 Gate 는 주소창 말고 나갈 길이 없는 막다른 화면이
+ * 된다 — 세션 만료 후 returnTo 가 이 화면으로 되돌리면 사용자가 그대로 갇힌다.
+ *
+ * 되물으면 풀릴 수 있는 실패(네트워크)에만 재시도를 준다. 임대 만료처럼 다시 물어도 답이 같은
+ * 것에는 주지 않는다 — 눌러도 그대로면 고장으로 읽힌다(-458 과 같은 원칙).
+ */
+function GateActions({
+  onRetry,
+  to = WORLD_RETURN_TO_MANAGEMENT,
+  toLabel = '부스 관리로',
+}: {
+  onRetry?: () => void;
+  to?: string;
+  toLabel?: string;
+}) {
+  return (
+    <div className="studio-gate-actions">
+      {onRetry !== undefined && (
+        <button type="button" className="studio-btn" onClick={onRetry}>
+          다시 시도
+        </button>
+      )}
+      <Link className="studio-btn studio-btn-primary" to={to}>
+        {toLabel}
+      </Link>
+    </div>
   );
 }
