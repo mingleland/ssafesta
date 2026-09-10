@@ -52,6 +52,24 @@ export interface SurveyRunWire {
   questions: SurveyQuestionWire[];
 }
 
+/**
+ * 이벤트 설문 run — 부스 경로(`SurveyRunWire`)와 같은 문항 모양에 세 가지가 더 붙는다
+ * (S15P21A604-608).
+ *
+ *   surveyKey   진입 열쇠. 응답에 되싣는 이유는 늦은 응답 가드가 요청과 대조하기 위해서다
+ *   memberOnly  보상 유무와 무관하게 회원 전용이다. 이벤트 설문은 추첨 때문에 참여자를 특정해야 한다
+ *   responded   이미 참여했으면 그 응답. 두 번째 조회로 알아내지 않는다
+ */
+export interface EventSurveyRunWire {
+  surveyKey: string;
+  surveyId: number;
+  closed: boolean;
+  rewardCoin: number;
+  memberOnly: boolean;
+  responded: { responseId: number; submittedAt: string } | null;
+  questions: SurveyQuestionWire[];
+}
+
 /** §6 제출 201 */
 export interface SurveySubmitWire {
   responseId: number;

@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('마감된 설문 (S15P21A604-541 F-2·F-3)', () => {
   it('문항을 남긴다 — 계약 §5 "무엇을 물었는지는 남는다"', async () => {
-    render(<SurveyOverlay payload={{ boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
+    render(<SurveyOverlay payload={{ kind: 'booth', boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
 
     await screen.findByText('마감된 설문입니다');
 
@@ -44,7 +44,7 @@ describe('마감된 설문 (S15P21A604-541 F-2·F-3)', () => {
   });
 
   it('입력은 붙이지 않는다 — 제출은 §6 이 409 로 막는다', async () => {
-    const { container } = render(<SurveyOverlay payload={{ boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
+    const { container } = render(<SurveyOverlay payload={{ kind: 'booth', boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
 
     await screen.findByText('마감된 설문입니다');
 
@@ -52,7 +52,7 @@ describe('마감된 설문 (S15P21A604-541 F-2·F-3)', () => {
   });
 
   it('"참여하면 N 코인" 을 띄우지 않는다 — 마감인데 참여를 권하지 않는다', async () => {
-    render(<SurveyOverlay payload={{ boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
+    render(<SurveyOverlay payload={{ kind: 'booth', boothId: MOCK_BOOTH_CLOSED_REWARDED }} />);
 
     await screen.findByText('마감된 설문입니다');
 
@@ -63,7 +63,7 @@ describe('마감된 설문 (S15P21A604-541 F-2·F-3)', () => {
 
 describe('제출 완료 (S15P21A604-541 F-4)', () => {
   it('"참여하면 N 코인" 이 사라진다 — 이미 받았는데 또 권하지 않는다', async () => {
-    render(<SurveyOverlay payload={{ boothId: MOCK_BOOTH_REWARDED }} />);
+    render(<SurveyOverlay payload={{ kind: 'booth', boothId: MOCK_BOOTH_REWARDED }} />);
 
     await waitFor(() => expect(getSurveyRunSnapshot().status).toBe('ready'));
 
