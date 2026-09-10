@@ -4,6 +4,8 @@
 
 export const AREA_OUT_OF_BOUNDS_MESSAGE = '회전한 실물이 부스 영역을 벗어났습니다.';
 export const CONFIG_NOT_LINKED_MESSAGE = '연결된 콘텐츠가 없습니다.';
+// 게시를 막지 않는다 — 서버가 겹침을 어떻게 다루는지 확정 전이라 FE 가 더 엄격해지면 안 된다(S15P21A604-607)
+export const OBJECTS_OVERLAP_MESSAGE = '다른 오브젝트와 겹쳐 있습니다.';
 
 export function objectLimitMessage(maxObjects: number, current: number): string {
   return `오브젝트는 ${maxObjects}개까지입니다. (현재 ${current}개)`;

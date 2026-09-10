@@ -34,6 +34,36 @@ describe('초기값', () => {
   });
 });
 
+// Unity 는 `JsonUtility` 가 아니라 **문자열 연결**로 payload 를 만든다.
+//   WorldUiBridge.cs:67
+//   "{\"focus\":" + (focus ? "true" : "false") + ",\"minigame\":" + (minigame ? "true" : "false") + "}"
+// 그래서 나올 수 있는 문자열이 정확히 넷이고, 여기서 그 넷을 그대로 잠근다. 필드 순서·공백·따옴표가
+// 바뀌면 이 테스트가 먼저 깨진다 — 다른 파트가 직렬화를 손봤을 때 브라우저까지 가서 알게 되지 않도록.
+describe('Unity 실제 payload (WorldUiBridge.cs 문자열 그대로)', () => {
+  it.each([
+    ['{"focus":false,"minigame":false}', { focus: false, minigame: false }],
+    ['{"focus":true,"minigame":false}', { focus: true, minigame: false }],
+    ['{"focus":false,"minigame":true}', { focus: false, minigame: true }],
+    ['{"focus":true,"minigame":true}', { focus: true, minigame: true }],
+  ])('%s', (json, expected) => {
+    // 초기값과 같은 조합도 실제로 반영됐는지 보려면 먼저 반대로 밀어 둔다.
+    applyWorldUiStateJson('{"focus":true,"minigame":true}');
+    __resetWorldUiStateForTests();
+    applyWorldUiStateJson(json);
+    expect(getWorldUiState()).toEqual(expected);
+  });
+
+  it('Unity 오브젝트·메서드 이름이 계약과 같다 — SendMessage 대상이 어긋나면 조용히 아무 일도 안 일어난다', async () => {
+    const { WORLD_UI_BRIDGE_OBJECT, requestExitWorldUi } = await import('../../../host/worldUiBridge');
+    const SendMessage = vi.fn();
+
+    requestExitWorldUi({ SendMessage } as never, 'esc');
+
+    expect(WORLD_UI_BRIDGE_OBJECT).toBe('WorldUiBridge');
+    expect(SendMessage).toHaveBeenCalledWith('WorldUiBridge', 'RequestExitWorldUi', 'esc');
+  });
+});
+
 describe('수신', () => {
   it('focus 를 받으면 Unity 모달이 있다고 판정한다', () => {
     applyWorldUiStateJson('{"focus":true,"minigame":false}');

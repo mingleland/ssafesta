@@ -22,6 +22,7 @@ import logging
 from collections.abc import Sequence
 
 from app.clients.spring_booth_access import SpringBoothAccessClient
+from app.core.logging import log_event
 from app.clients.spring_document_result import (
     ChunkBatchItem,
     SpringDocumentResultClient,
@@ -70,16 +71,29 @@ class DocumentProcessingOrchestrator:
             chunks = await self._embedding_service.compute_embedded_chunks(snapshot)
             await self._send_and_finalize(snapshot, chunks)
         except _ATTEMPT_LOST_ERRORS:
-            logger.info(
-                "document processing attempt superseded or job gone job_id=%s attempt_no=%s",
-                snapshot.job_id,
-                snapshot.attempt_no,
+            log_event(
+                logger,
+                logging.INFO,
+                "document_processing_stopped",
+                job_id=snapshot.job_id,
+                document_id=snapshot.document_id,
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+                attempt_no=snapshot.attempt_no,
+                status="SUPERSEDED",
             )
         except Exception as exc:  # noqa: BLE001 — 모든 처리 실패를 Spring에 보고해야 한다
-            logger.exception(
-                "document processing failed job_id=%s attempt_no=%s",
-                snapshot.job_id,
-                snapshot.attempt_no,
+            log_event(
+                logger,
+                logging.ERROR,
+                "document_processing_failed",
+                job_id=snapshot.job_id,
+                document_id=snapshot.document_id,
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+                attempt_no=snapshot.attempt_no,
+                status="FAILED",
+                error_code=classify_failure(exc).code,
             )
             await self._report_failure(snapshot, exc)
         finally:
@@ -127,11 +141,17 @@ class DocumentProcessingOrchestrator:
         except (*_ATTEMPT_LOST_ERRORS, SpringDocumentResultUnavailable):
             # Job을 이미 잃었거나 Spring이 응답하지 않는다 — Spring의 lease
             # sweeper가 만료된 attempt를 회수해 재시도/DEAD 판정을 대신한다.
-            logger.warning(
-                "could not report failure to Spring job_id=%s attempt_no=%s code=%s",
-                snapshot.job_id,
-                snapshot.attempt_no,
-                outcome.code,
+            log_event(
+                logger,
+                logging.WARNING,
+                "spring_failure_callback_undelivered",
+                job_id=snapshot.job_id,
+                document_id=snapshot.document_id,
+                booth_id=snapshot.booth_id,
+                agent_id=snapshot.agent_id,
+                attempt_no=snapshot.attempt_no,
+                status="UNDELIVERED",
+                error_code=outcome.code,
             )
 
     async def _heartbeat_loop(self, snapshot: ProcessingSnapshot) -> None:
@@ -144,10 +164,17 @@ class DocumentProcessingOrchestrator:
             except _ATTEMPT_LOST_ERRORS:
                 return
             except SpringDocumentResultUnavailable:
-                logger.warning(
-                    "heartbeat failed job_id=%s attempt_no=%s",
-                    snapshot.job_id,
-                    snapshot.attempt_no,
+                log_event(
+                    logger,
+                    logging.WARNING,
+                    "spring_heartbeat_undelivered",
+                    job_id=snapshot.job_id,
+                    document_id=snapshot.document_id,
+                    booth_id=snapshot.booth_id,
+                    agent_id=snapshot.agent_id,
+                    attempt_no=snapshot.attempt_no,
+                    status="UNDELIVERED",
+                    error_code="SPRING_UNAVAILABLE",
                 )
 
     def _split_into_batches(

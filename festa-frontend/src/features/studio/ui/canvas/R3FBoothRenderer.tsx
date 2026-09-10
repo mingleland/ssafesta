@@ -15,12 +15,14 @@ import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
+import { overlappingObjectIds } from '../../lib/overlap';
 import type { LayoutObject } from '../../../../entities/layout/types';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
 import type { BoothRendererProps } from './canvasTypes';
 import { boxPlacement, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
 import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
 import { AssetMesh } from './AssetMesh';
+import { dragKind } from '../../model/studioMode';
 import { pickAsset } from '../../model/boothAssetManifest';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
 import { useBoothAssets } from '../../model/useBoothAssets';
@@ -194,20 +196,21 @@ function BoothStage({ bounds, decor }: { bounds: BoothRendererProps['bounds']; d
 function ObjectMesh({
   obj,
   selected,
-  outOfBounds,
+  invalid,
   asset,
   onDown,
 }: {
   obj: LayoutObject;
   selected: boolean;
-  outOfBounds: boolean;
+  /** 경계 이탈이거나 다른 오브젝트와 겹친다 — 사용자에게는 둘 다 "이 자리는 안 된다" 다 */
+  invalid: boolean;
   asset: BoothAssetEntry | undefined;
   onDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
   const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
   const { center, size } = boxPlacement(box);
   const surface = OBJECT_SURFACE[obj.type] ?? { roughness: 0.7, metalness: 0, opacity: 1 };
-  const color = outOfBounds ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
+  const color = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
 
   const boxBody = (
     <mesh position={center} castShadow receiveShadow>
@@ -242,7 +245,7 @@ function ObjectMesh({
         // 선택 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다
         <mesh position={center}>
           <boxGeometry args={[size[0] * 1.04, size[1] * 1.04, size[2] * 1.04]} />
-          <meshBasicMaterial color={outOfBounds ? '#ff5d5d' : '#5ee08a'} wireframe />
+          <meshBasicMaterial color={invalid ? '#ff5d5d' : '#5ee08a'} wireframe />
         </mesh>
       )}
     </group>
@@ -328,6 +331,9 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
   const pick = useGroundPicker();
   const drag = useRef<DragState | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  // 겹침은 배치가 바뀔 때만 다시 센다 — 드래그 중 매 프레임 O(n²) 를 돌 이유가 없다
+  const overlapping = useMemo(() => overlappingObjectIds(p.objects), [p.objects]);
 
   const selected = p.objects.find((o) => o.objectId === p.selectedObjectId) ?? null;
   const halfDiag = Math.hypot(p.bounds.width, p.bounds.depth);
@@ -417,9 +423,9 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
             key={obj.objectId}
             obj={obj}
             selected={obj.objectId === p.selectedObjectId}
-            outOfBounds={oob}
+            invalid={oob || overlapping.has(obj.objectId)}
             asset={pickAsset(p.assets, obj)}
-            onDown={(e) => begin(e, obj, p.tool === 'rotate' ? 'rotate' : 'move')}
+            onDown={(e) => begin(e, obj, dragKind(e, p.tool))}
           />
         );
       })}

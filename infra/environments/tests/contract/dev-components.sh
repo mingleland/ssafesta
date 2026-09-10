@@ -23,6 +23,7 @@ assert_contains "${compose_dir}/ai.yaml" 'name: festa-data-private' 'AI must joi
 assert_contains "${compose_dir}/ai.yaml" 'name: festa-dev-ai-data' 'AI data volume must be environment-scoped'
 assert_contains "${compose_dir}/back.yaml" 'AI_INTERNAL_BASE_URL: http://ai:8000' 'backend must use AI service DNS'
 assert_contains "${compose_dir}/back.yaml" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'backend must receive its outbound token'
+assert_contains "${compose_dir}/back.yaml" 'INTERNAL_INFRA_TO_SPRING_TOKENS:' 'backend must receive its Infra-to-Spring token'
 assert_contains "${compose_dir}/front.yaml" 'PUBLIC_API_BASE_URL: \$\{PUBLIC_API_BASE_URL:' 'front API endpoint must be runtime-injected'
 assert_not_contains "${compose_dir}/front.yaml" 'ssafesta\.world' 'front must not bake an environment hostname'
 assert_contains "${compose_dir}/game.yaml" '127\.0\.0\.1:\$\{GAME_HOST_PORT:-7777\}:7777' 'game must expose only loopback ingress'

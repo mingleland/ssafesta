@@ -38,8 +38,8 @@
 - [ ] T090 [BE/AI] S15P21A604-400에서 heartbeat·batch·finalize·failed endpoint, DTO, 오류 봉투를 합의하고 `contracts/document-result-api.yaml`을 확정한다
 - [ ] T091 [BE/AI] S15P21A604-399에서 Agent 설정 조회 endpoint·응답 필드·호출 시점·캐시 정책을 합의하고 OpenAPI와 spec 008에 반영한다
 - [ ] T092 [AI] FastAPI 문서 DB 설정·Job/Chunk 모델·Repository·Alembic 실행 경로를 제거하고 처리/결과 API client로 교체한다
-- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다
-- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다
+- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다 (`S15P21A604-496`: 임대 만료 경로의 cancel 완료 — 활성 Job `CANCELLED`, 문서 `DISABLED`, chunk·staging 정리, FastAPI 멱등 cancel 전송. 나머지 pickup·lease·retry·staging·finalize 는 이미 `S15P21A604-400`·`-175` 로 구현됨)
+- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다 (`S15P21A604-496`: 임대 만료로 취소된 Job 의 늦은 finalize 가 410 이고 문서가 `DISABLED` 로 남는 케이스 추가)
 
 **Dependency**: T090·T091 합의 → OpenAPI 확정 → T092·T093 구현 → T094 통합 검증.
 
@@ -220,9 +220,9 @@
 - [ ] T073 [AI] `specs/007-ai-agent-document/quickstart.md`의 migration, DB CONNECT matrix, snapshot 처리, 중복, 강제 종료, callback 복구·404 원인별 재시도/종료, 청크 교체, cleanup·inventory reconciliation, stale 개정본, 내부 인증·회전, 수동 Provider 전환, 격리 검증을 순서대로 실행하고 결과를 `festa-ai/tests/validation/quickstart-results.md`에 기록한다
 - [ ] T074 [INFRA] FastAPI를 중단한 상태에서도 로그인·부스·월드 smoke와 Spring 문서 목록·마지막 상태 조회가 성공하는 AI 장애 격리 검증을 `infra/tests/integration/test-ai-failure-isolation.sh`에 추가한다
 - [ ] T075 [P] [INFRA] 방향별 Service Token Secret Reference와 내부 전용 network 주입을 `infra/deploy/compose/dev/`에 구성하고, Security Group·public route 차단 절차를 `infra/deploy/runbooks/internal-api-boundary.md`에 명시하며 외부 요청 차단 증거를 `infra/tests/security/test-internal-api-boundary.sh`에 기록한다
-- [ ] T076 [P] [INFRA] 자동 Provider 변경 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로만 전환하고 MinIO 비공개 접근·PUT/HEAD/본문/SHA-256/CORS를 검증하는 스크립트와 runbook을 `infra/deploy/scripts/storage-failover.sh` 및 `infra/deploy/runbooks/storage-failover.md`에 구현한다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치는 `docs/26_팀_결정_필요사항.md`에 등록된 P0 범위 제외 항목이므로 구현하지 않는다
-- [ ] T077 [P] [BE] Infra 전용 토큰 정상·누락·오류·AI 방향 토큰 재사용 401, `runId + documentId` 멱등 저장, `VERIFIED`만 Document Provider 변경, `MISMATCH/MISSING` 로그 전용 처리를 `backend/src/test/java/com/example/ssafesta/internal/storage/StorageReconciliationControllerIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
-- [ ] T078 [BE] Infra 전용 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 인증하는 `POST /internal/storage/reconciliation-runs`를 [spring-storage-reconciliation-api.yaml](../../specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml) 계약대로 구현해 T077을 통과시킨다. `runId + documentId` 멱등 저장, `VERIFIED` 객체만 Document `storage_provider` 반영, `MISMATCH`/`MISSING`은 로그만 적재한다
+- [ ] T076 [P] [INFRA] 자동 Provider 변경 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로만 전환하고, 진행 run이 있으면 다음 Provider 전환·reconcile 시작을 거부하는 단일 실행 lock을 `storage-failover.sh` 전체에 건다. MinIO 비공개 접근·PUT/HEAD/본문/SHA-256/CORS를 검증하는 스크립트와 runbook을 `infra/deploy/scripts/storage-failover.sh` 및 `infra/deploy/runbooks/storage-failover.md`에 구현한다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치는 `docs/26_팀_결정_필요사항.md`에 등록된 P0 범위 제외 항목이므로 구현하지 않는다
+- [x] T077 [P] [BE] Infra 전용 토큰 정상·누락·오류·AI 방향 토큰 재사용 401, `runId + documentId` 멱등 저장, `VERIFIED`만 Document Provider 변경, `MISMATCH/MISSING` 로그 전용 처리를 `backend/src/test/java/com/example/ssafesta/internal/storage/StorageReconciliationControllerIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+- [x] T078 [BE] Infra 전용 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 인증하는 `POST /internal/storage/reconciliation-runs`를 [spring-storage-reconciliation-api.yaml](../../specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml) 계약대로 구현해 T077을 통과시킨다. `runId + documentId` 멱등 저장, `VERIFIED` 객체만 Document `storage_provider` 반영, `MISMATCH`/`MISSING`은 로그만 적재한다
 - [ ] T079 [P] [INFRA] reconcile 스크립트가 검증 결과를 T078 endpoint로 전송하도록 `infra/deploy/scripts/storage-failover.sh`에 연결하고, Infra→Spring 토큰 누락·오류·AI 방향 토큰 재사용이 401로 거부되는지 `infra/tests/security/test-internal-api-boundary.sh`에 검증 케이스를 추가한다
 
 ---

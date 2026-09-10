@@ -7,7 +7,7 @@ build_project() {
     ai) (cd "${component_dir}" && python -m compileall -q .) ;;
     back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi) ;;
     front) (cd "${component_dir}" && npm ci && npm run build) ;;
-    game) bash festa-unity/ci/build --target all ;;
+    game) bash festa-unity/ci/build --target linux-server ;;
   esac
 }
-ci_run build BUILD_FAILED ci_dispatch_or build build_project
+ci_run build BUILD_FAILED ci_dispatch_or build build_project --target linux-server

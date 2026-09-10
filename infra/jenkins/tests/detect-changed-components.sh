@@ -57,6 +57,7 @@ run_case '["front"]' '["front"]' component-source festa-frontend/src/main.tsx
 run_case '["game"]' '["game"]' component-source festa-unity/Assets/main.cs
 run_case '["back","front"]' '["back","front"]' component-source backend/src/main/java/Multi.java festa-frontend/src/multi.tsx
 run_case '["ai","back","front","game"]' '[]' shared-ci Jenkinsfile
+run_case '["ai","back","front","game"]' '[]' shared-ci infra/.env.example infra/environments/nginx/sites/demo.conf.template infra/environments/tests/contract/demo-webgl.sh
 run_case '[]' '[]' docs-only specs/infra-001-ci-cd-pipelines/notes.md
 
 head="$(git rev-parse HEAD)"

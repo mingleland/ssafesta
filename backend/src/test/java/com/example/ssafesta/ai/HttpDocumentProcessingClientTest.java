@@ -14,6 +14,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ResponseActions;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -30,19 +31,14 @@ class HttpDocumentProcessingClientTest {
                     "application/pdf", 1024L, "R2", "festa-documents",
                     "booths/10/agents/3/documents/42/guide.pdf", "%064x".formatted(1));
 
+    private static final DocumentProcessingClient.CancelRequest CANCEL =
+            new DocumentProcessingClient.CancelRequest(7L, 3);
+
     private MockRestServiceServer server;
     private DocumentProcessingClient client;
 
     private void given(HttpStatus answer) {
-        RestClient.Builder builder = RestClient.builder().baseUrl("http://ai.test:8000");
-        server = MockRestServiceServer.bindTo(builder).build();
-        // 송신은 첫 값이다 — 둘째는 회전 중에만 존재한다.
-        client = new HttpDocumentProcessingClient(builder,
-                new InternalTokenProperties("inbound", "outbound-first,outbound-old"));
-        server.expect(requestTo("http://ai.test:8000/ai/v1/documents/process"))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(header("Authorization", "Bearer outbound-first"))
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+        expecting("http://ai.test:8000/ai/v1/documents/process")
                 .andExpect(jsonPath("$.jobId").value(7))
                 .andExpect(jsonPath("$.attemptNo").value(0))
                 .andExpect(jsonPath("$.documentId").value(42))
@@ -56,6 +52,26 @@ class HttpDocumentProcessingClientTest {
                 .andExpect(jsonPath("$.objectKey").exists())
                 .andExpect(jsonPath("$.sourceHash").exists())
                 .andRespond(withStatus(answer));
+    }
+
+    /** 같은 토큰·같은 전송, 다른 경로와 다른 성공 상태 (S15P21A604-496). */
+    private void givenCancel(HttpStatus answer) {
+        expecting("http://ai.test:8000/ai/v1/documents/cancel")
+                .andExpect(jsonPath("$.jobId").value(7))
+                .andExpect(jsonPath("$.attemptNo").value(3))
+                .andRespond(withStatus(answer));
+    }
+
+    private ResponseActions expecting(String url) {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://ai.test:8000");
+        server = MockRestServiceServer.bindTo(builder).build();
+        // 송신은 첫 값이다 — 둘째는 회전 중에만 존재한다.
+        client = new HttpDocumentProcessingClient(builder,
+                new InternalTokenProperties("inbound", "outbound-first,outbound-old", "infra"));
+        return server.expect(requestTo(url))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer outbound-first"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
     }
 
     /** 계약의 12필드가 camelCase 이름 그대로 나간다 — {@code additionalProperties: false} 라 하나도 틀리면 안 된다. */
@@ -104,5 +120,40 @@ class HttpDocumentProcessingClientTest {
 
         assertThrows(DocumentProcessingUnavailableException.class,
                 () -> client.startProcessing(REQUEST));
+    }
+
+    /**
+     * 취소는 두 식별자만 보낸다 — 여기도 {@code additionalProperties: false} 다.
+     *
+     * <p>{@code attemptNo} 가 핵심이다. 이 값이 빠지면 lease 회수로 새로 발급된 attempt 를
+     * 늦게 도착한 취소가 죽인다 (GitLab #162).
+     */
+    @Test
+    void theCancelCarriesTheJobAndItsAttempt() {
+        givenCancel(HttpStatus.NO_CONTENT);
+
+        client.cancelProcessing(CANCEL);
+
+        server.verify();
+    }
+
+    /**
+     * 계약은 204 다. job 없음·이미 종료·attemptNo 불일치가 전부 204 라, 그 밖의 답은
+     * "취소할 게 없었다" 가 아니라 <b>전달 자체가 안 됐다</b>는 뜻이다.
+     */
+    @Test
+    void anUnauthorizedCancelIsAFailure() {
+        givenCancel(HttpStatus.UNAUTHORIZED);
+
+        assertThrows(DocumentProcessingUnavailableException.class,
+                () -> client.cancelProcessing(CANCEL));
+    }
+
+    @Test
+    void aNotFoundCancelIsAFailureRatherThanASilentSuccess() {
+        givenCancel(HttpStatus.NOT_FOUND);
+
+        assertThrows(DocumentProcessingUnavailableException.class,
+                () -> client.cancelProcessing(CANCEL));
     }
 }

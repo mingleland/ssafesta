@@ -5,7 +5,8 @@
 import type { LayoutObject, ValidationDetail } from '../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../entities/layout/geometry';
-import { AREA_OUT_OF_BOUNDS_MESSAGE, CONFIG_NOT_LINKED_MESSAGE, objectLimitMessage } from '../../../entities/layout/messages';
+import { AREA_OUT_OF_BOUNDS_MESSAGE, CONFIG_NOT_LINKED_MESSAGE, OBJECTS_OVERLAP_MESSAGE, objectLimitMessage } from '../../../entities/layout/messages';
+import { overlappingObjectIds } from './overlap';
 
 // rule 이름은 서버 계약(contracts/layout-api.md)과 맞춰 사전 경고와 서버 응답을 같은 문구로 보이게 한다.
 export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
@@ -22,6 +23,14 @@ export function precheckWarnings(objects: LayoutObject[]): ValidationDetail[] {
         message: CONFIG_NOT_LINKED_MESSAGE,
       });
     }
+  }
+
+  // 겹침은 **경고**다 (S15P21A604-607). precheckErrors 에 넣지 않는 이유: 공개 판정의 권위는
+  // 서버이고(헌법 16조) 서버가 겹침을 어떻게 다루는지 아직 확정되지 않았다. FE 가 서버보다
+  // 엄격해지면 서버가 허용하는 배치를 FE 가 막는다.
+  const overlapping = overlappingObjectIds(objects);
+  for (const objectId of overlapping) {
+    details.push({ rule: 'OBJECTS_OVERLAP', objectId, message: OBJECTS_OVERLAP_MESSAGE });
   }
 
   return details;

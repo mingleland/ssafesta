@@ -186,6 +186,7 @@ public class OpenApiConfiguration {
                 tag("Game Studio", "브라우저 2D 게임의 제작·게시. 작업본과 게시본이 분리되어 있다"),
                 tag("Game Asset", "게임에 쓰는 이미지의 업로드·전달. 바이트는 저장소로 직접 올라가고 내려받기만 서버가 중계한다"),
                 tag("Inventory", "아바타 파츠 상점과 구매"),
+                tag("Minigame", "타이밍 스톱 미니게임의 세션 발급과 결과 제출. 목표 시간·오차·보상은 전부 서버가 정한다"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
     }
 

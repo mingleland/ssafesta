@@ -38,6 +38,15 @@ namespace Festa.Integration
             return detail;
         }
 
+        public async Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId)
+        {
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}/projects/published";
+            var body = await GetAsync(url, $"Booth {boothId}", "published projects");
+            // 404(미게시·부스 없음)·409(임대 만료)는 정상 경로다 — GetAsync 가 이미 null 로 접어 준다.
+            // 여기서 로그를 더 남기지 않는 이유: 축제장에 들어설 때마다 빈 부스 수만큼 경고가 쏟아진다.
+            return body == null ? null : BoothProjectParser.Parse(body);
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";

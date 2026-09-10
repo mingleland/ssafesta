@@ -51,6 +51,8 @@ class SharedConfigProfileTest {
         // Spring→FastAPI 송신분과 그 주소 (S15P21A604-175). 두 방향 토큰은 서로 달라야 한다 —
         // AI 쪽이 겹치는 설정으로는 기동하지 않는다.
         "INTERNAL_SPRING_TO_AI_TOKENS=injected-spring-token",
+        // Infra→Spring 수신분 (S15P21A604-500). 세 집합이 서로 달라야 Spring 이 뜬다.
+        "INTERNAL_INFRA_TO_SPRING_TOKENS=injected-infra-token",
         "AI_INTERNAL_BASE_URL=http://ai:8000",
         "GOOGLE_CLIENT_ID=google-id",
         "GOOGLE_CLIENT_SECRET=google-secret",
@@ -252,9 +254,15 @@ class SharedConfigProfileTest {
                     .isEqualTo("http://ai:8000");
             InternalTokenProperties tokens = context.getBean(InternalTokenProperties.class);
             assertThat(tokens.springToAiToken()).isEqualTo("injected-spring-token");
-            // 방향이 섞이면 넓은 쪽 노출이 좁은 쪽에 닿는다 (GitLab #102).
+            assertThat(tokens.infraToSpringTokenList()).containsExactly("injected-infra-token");
+            // 방향이 섞이면 넓은 쪽 노출이 좁은 쪽에 닿는다 (GitLab #102). Infra 방향까지 셋이라
+            // 세 쌍을 전부 본다 — 배포가 한 값을 두 칸에 붙여 넣는 것이 가장 흔한 실수다.
             assertThat(tokens.aiToSpringTokenList()).doesNotContainAnyElementsOf(
                     tokens.springToAiTokenList());
+            assertThat(tokens.aiToSpringTokenList()).doesNotContainAnyElementsOf(
+                    tokens.infraToSpringTokenList());
+            assertThat(tokens.springToAiTokenList()).doesNotContainAnyElementsOf(
+                    tokens.infraToSpringTokenList());
         });
     }
 
@@ -266,7 +274,8 @@ class SharedConfigProfileTest {
      * 쪽에서 T-101 이 낸 것과 같은 모양이라 같은 취급을 한다.
      */
     @ParameterizedTest
-    @ValueSource(strings = {"INTERNAL_SPRING_TO_AI_TOKENS", "AI_INTERNAL_BASE_URL"})
+    @ValueSource(strings = {"INTERNAL_SPRING_TO_AI_TOKENS", "INTERNAL_INFRA_TO_SPRING_TOKENS",
+        "AI_INTERNAL_BASE_URL"})
     void everyRequiredDelegationVariableFailsToStartWhenMissing(String variable) {
         delegationRunner(withoutEnv(variable)).run(context -> {
             assertThat(context).hasFailed();

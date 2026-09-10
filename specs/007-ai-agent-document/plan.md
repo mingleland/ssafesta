@@ -149,7 +149,7 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - Spring→FastAPI 처리·cancel은 `INTERNAL_SPRING_TO_AI_TOKENS`를 사용한다.
 - FastAPI→Spring 결과·검색은 `INTERNAL_AI_TO_SPRING_TOKENS`를 사용한다.
 - 수신자는 최대 두 토큰을 상수 시간으로 검증하고 반대 방향 토큰을 401로 거부한다.
-- 양쪽 로그·metric에는 `jobId`, `documentId`, `correlationId`, `attemptNo`, `workerId`를 남기되 원문·Secret·object key를 남기지 않는다.
+- Spring은 영속 Job 상태를 기준으로 DEAD 비율·callback 미전달을 집계·경고한다. 양쪽 로그에는 `jobId`, `documentId`, `correlationId`, `attemptNo`, `workerId`를 남기되 원문·Secret·object key를 남기지 않으며, FastAPI는 이 상태를 중복 저장·집계하지 않는다.
 
 ### 9. Cutover
 

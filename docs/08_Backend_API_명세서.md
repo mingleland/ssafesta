@@ -889,8 +889,23 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
 
-여섯 중 **`DISABLED` 만 아직 나오지 않는다** — 임대 만료가 그 값을 쓰는 작업(`S15P21A604-496`)이
-아직 없다. 나머지 다섯은 실제로 나온다.
+여섯 값이 전부 실제로 나온다. `DISABLED` 는 `S15P21A604-496` 이 임대 만료 경로에 붙으면서 마지막으로
+채워졌다 — 임대가 `EXPIRED` 로 넘어가는 **같은 트랜잭션**에서 그 부스의 활성 문서
+(`PROCESSING`·`READY`, 그리고 업로드가 끝난 `QUEUED`)가 `DISABLED` 로, 활성
+Job(`QUEUED`·`RUNNING`·`RETRY_WAIT`)이 `CANCELLED` 로 바뀌고 chunk·staging 이 정리된다
+(FR-015·FR-041). 원본과 메타데이터는 남는다. `FAILED`·`EXPIRED` 문서와 이미 끝난 Job 은 건드리지
+않는다 — 왜 못 쓰는 문서인지가 지워지면 안 된다.
+
+**발급만 받고 아직 올라오지 않은 `QUEUED`(`uploaded_at` 없음)는 예외다.** 그 행은 1시간 뒤
+`EXPIRED`(FR-026)로 가야 24시간 뒤 원본 삭제(FR-028) 경로에 오른다 — 임대 만료가 먼저 `DISABLED` 로
+바꾸면 두 sweeper 의 조건에서 동시에 벗어나 원본을 지울 방법이 없어진다. 그렇다고 `READY` 로 살아날
+수도 없다: 완료 요청은 활성 임대를 요구하므로 `409 BOOTH_LEASE_EXPIRED` 로 막힌다.
+
+돌고 있던 FastAPI attempt 에는 **커밋 뒤에** 멱등 cancel(`POST /ai/v1/documents/cancel`)을 한 번
+보낸다. 전달이 실패해도 DB 전이는 확정이고 재시도하지 않는다 — 취소를 못 들은 워커의 결과는 끝난
+Job 이라 `410 JOB_GONE` 으로 거부된다. 한 건이 실패하면 **남은 Job 의 취소도 보내지 않는다**: 상대는
+같은 FastAPI 프로세스 하나라 성공할 여지가 없고, 이 전송은 호출 스레드(재임대 요청일 수 있다)에서
+돌기 때문에 건당 read timeout 만 쌓인다.
 
 - `PROCESSING` 은 **AI 워커가 첫 신호를 보낸 순간**부터다. 위임이 나간 순간이 아니라서, AI 서버가
   응답하지 않는 동안에는 `QUEUED` 로 남는다 — 아무 일도 일어나지 않는 문서를 "처리 중" 이라고
@@ -1167,25 +1182,56 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
-## 14. Minigame — P1
+## 14. Minigame — 타이밍 스톱
 
-### POST `/minigames/{gameType}/sessions`
+> **정본은 `specs/014-minigame/contracts/minigame-api.yaml` 이다** (2026-09-10, GitLab #134 합의,
+> `S15P21A604-502`). 아래는 요약이고, 어긋나면 계약 파일이 맞다.
+>
+> 이 절의 예전 초안(`POST /minigames/{gameType}/results`, `{sessionId, score, elapsedMs}`)은
+> 실제로 만들어지지 않았다. `gameType` 경로 변수는 **미니게임이 1종뿐이라**(헌법 28조,
+> spec 014 FR-009) 필요가 없고, `score`·`elapsedMs` 는 클라이언트가 계산한 값이라 C-06 이
+> 신뢰를 금지한다.
 
-게임 시작용 세션/nonce 발급 후보.
+### POST `/minigames/timer-stop/sessions` → `201`
 
-### POST `/minigames/{gameType}/results`
-
-결과 제출과 보상 처리.
+한 판을 시작한다. 요청 본문은 읽지 않는다.
 
 ```json
-{
-  "sessionId": "game_...",
-  "score": 1820,
-  "elapsedMs": 71320
-}
+{ "sessionId": "3f1a6d2c-…", "targetSeconds": 7.381,
+  "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-클라이언트 결과를 무조건 신뢰하지 않고 최소한 세션 유효성·일일 제한을 검증한다.
+목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
+
+### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`
+
+```json
+// 요청 — 서버가 읽는 것은 이 필드 하나다
+{ "stoppedSeconds": 7.41 }
+
+// 응답
+{ "accepted": true, "errorSeconds": 0.029, "tier": 2, "timedOut": false,
+  "rewardedCoins": 5, "dailyLimitReached": false, "dailyRemainingCoins": 45,
+  "message": "+5 coins (tier 2)" }
+```
+
+- 오차·구간·보상·일일 한도는 **전부 서버가 계산한다** (C-06, FR-008, 헌법 16조). 배포된 Unity
+  클라이언트가 함께 보내는 `targetSeconds`·`errorSeconds`·`timedOut` 은 **조용히 무시**된다
+- 신고된 정지 시각은 서버 경과 시간과 **양방향**으로 대조한다 — 어긋나면 `accepted: false` 이고
+  세션은 소진된다. 이것이 막는 것과 못 막는 것은 계약 §3 에 적혀 있다
+- **판정 실패는 HTTP 오류가 아니다.** 검증 거부·실패 종료·일일 한도 도달·재제출은 전부 `200`
+  이다. **`429` 는 이 계약에서 나오지 않는다**
+- 재제출은 최초 판정을 그대로 돌려준다 (FR-004). 단 `dailyRemainingCoins`·`dailyLimitReached`
+  는 재제출 시점의 현재 상태다
+- 일일 한도 **50 Coin/일**, 기준일은 **제출 시각의 KST 날짜**. 남은 한도보다 보상이 크면
+  **남은 만큼만 잘라서** 지급한다
+- 오류: `400 VALIDATION_FAILED` (`stoppedSeconds` 누락·음수·범위 밖, `sessionId` 형식) ·
+  `401 UNAUTHORIZED` · `403 MEMBER_ONLY` (게스트) · `404 MINIGAME_SESSION_NOT_FOUND`
+  (없는 세션이거나 남의 세션 — 둘을 구분하지 않는다)
+
+**슬롯머신 API 는 없다.** 미니게임 1종 제한(헌법 28조·FR-009) 때문이고, 2종으로 늘릴지는
+`docs/26` 에 올라간 리드 결정이다 (`S15P21A604-569`).
 
 ---
 
@@ -1350,6 +1396,10 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `DOCUMENT_UPLOAD_GONE` *(007)* | **410.** 만료된 업로드의 원본이 없거나 24시간 유예가 지났다 (FR-027). 재시도가 아니라 **새 업로드 권한**이 필요하다 — 그래서 409 와 갈린다 |
 | `STORAGE_UNAVAILABLE` *(007)* | **503.** 저장소 장애 또는 감시 불능(`STALE_BLOCKED`)으로 발급을 막았다 (C-10). **재시도 가능**하다 |
 | `STORAGE_QUOTA_EXCEEDED` *(007)* | **507.** usage guard 90% 초과로 발급을 막았다 (C-10, #100). **재시도로 풀리지 않아** 503 과 가른다. 둘 다 **행을 만들기 전에** 거절한다 — 차단 중 만든 행은 FR-018 의 10개 슬롯을 먹는다 |
+| `RECONCILIATION_INVALID` *(007)* | **422.** reconcile 결과가 계약을 벗어났거나 자기모순이다 (FR-035). **이 API 만 422 를 쓴다** — 소비자가 Infra 스크립트라 사용자 입력 오류(400)와 구분한다 |
+| `RECONCILIATION_STALE` *(007)* | **409.** 결과는 적재했으나 문서가 그 source provider·object key 를 더는 갖지 않아 반영할 수 없다. **재시도로 풀리지 않는다** — 늦게 도착한 결과가 최신 저장 위치를 되돌리지 않게 하는 거부다 |
+| `RECONCILIATION_REPLAY_CONFLICT` *(007)* | **409.** 같은 `runId + documentId` 로 다른 내용이 왔다. 먼저 저장된 결과가 남는다 — 멱등은 같은 요청을 다시 보내도 안전하다는 뜻이지 같은 키로 다른 것을 보내도 된다는 뜻이 아니다 |
+| `RECONCILIATION_CONFIGURATION_ERROR` *(007)* | **500.** 요청은 유효한데 Spring 배포에 그 provider 설정이 없거나 문서 행의 bucket 이 설정과 어긋난다. 넷 중 **유일하게 재시도가 의미 있고**, 고칠 것은 payload 가 아니라 배포 설정이다 |
 | `JOB_ATTEMPT_STALE` *(007)* | **409.** 늦게 도착한 이전 attempt 의 결과. lease 만료로 Job 을 회수하고 `attempt_no` 를 올린 뒤 죽은 줄 알았던 워커가 보내온 경우다 — 받으면 두 attempt 의 chunk 가 섞인다. **재시도로 풀리지 않는다** |
 | `JOB_GONE` *(007)* | **410.** 처리 Job 이 끝났거나(`SUCCEEDED`·`DEAD`·`CANCELLED`) 문서 삭제로 사라졌다. 같은 Job 으로 다시 시도할 곳이 없다는 뜻이라 409 와 갈린다 |
 | `SURVEY_NOT_FOUND` | **404.** 부스에 설문이 없거나 `surveyId` 가 없다. 편집자 조회의 404 는 "아직 만들지 않았다"는 뜻이라 오류 상태가 아니다 |
@@ -1467,7 +1517,16 @@ Worker와 같은 메모리**에 있다. 하나로 묶으면 넓은 쪽의 위험
 > **보안 체인은 하나다.** `/internal/**` 전체를 한 체인이 **먼저 소비**하고 규칙이 없는 경로는
 > `denyAll`이다. 그러므로 Infra의 `/internal/storage/**`(spec 007 T078)는 **별도 체인을 만들지
 > 말고 이 체인에 자기 필터와 규칙을 더한다** — 우선순위가 낮은 체인을 새로 만들면 요청이 그곳까지
-> 가지 않는다. 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 그대로 분리된다.
+> 가지 않는다. T078(S15P21A604-500)이 그대로 따랐다: 같은 체인에 두 번째 필터와
+> `/internal/storage/**` 규칙이 붙었고 자격증명과 scope는 `INTERNAL_INFRA_TO_SPRING_TOKENS`로
+> 분리돼 있다.
+>
+> **두 필터는 서로 겹치지 않는 경로에서만 동작한다.** 그래서 토큰은 자기 방향만 연다 — AI 토큰을
+> `/internal/storage/**`에 내밀면 아무것도 인증되지 않아 **401**이고, 그 반대도 같다.
+>
+> 규칙이 **있는** 경로의 거부는 401, `denyAll`로 떨어지는 규칙 **없는** 경로의 거부는 **403**이다.
+> 의도한 구분이 아니라 판정 방식의 차이다 — authority 규칙은 `Authentication`을 요구해서 없으면
+> 인증 오류가 되고, `denyAll`은 아예 묻지 않아 접근 거부로 끝난다.
 
 ### GET `/internal/ai/booth-access`
 
@@ -1694,3 +1753,55 @@ POST /internal/ai/document-jobs/41/failed
   `attempt_no`를 올리는 것이 **얼어 있다 깨어난 워커**를 막는 유일한 수단이다 —
   `last_error_code = LEASE_EXPIRED`로 남는다. 여러 인스턴스가 떠도 `SKIP LOCKED`로 서로 다른 행을 집는다
 - `failureCode`는 **50자 이하**다(`last_error_code`가 `VARCHAR(50)`) — 넘기면 `400`이지 `500`이 아니다
+
+### POST `/internal/storage/reconciliation-runs`
+
+Infra가 실행한 R2↔MinIO reconcile 결과를 Spring이 받는다 (spec 007 FR-035, S15P21A604-500).
+정본 계약은 `specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml` **v0.2.0**.
+
+인증은 이 체인의 **Infra 방향 토큰**(`INTERNAL_INFRA_TO_SPRING_TOKENS`)이다. AI 방향 토큰과
+credential·scope가 분리돼 있어 서로의 경로를 열지 못한다. 세 토큰 집합 중 둘에 같은 값이 들어가면
+**Spring이 기동하지 않는다**.
+
+```text
+POST /internal/storage/reconciliation-runs
+Authorization: Bearer <INTERNAL_INFRA_TO_SPRING_TOKENS 의 첫 값>
+
+{ "runId": "2026-09-10T03:00Z-r2-reconcile", "documentId": 42,
+  "objectKey": "booth/7/agent/3/doc.pdf",
+  "sourceProvider": "MINIO_LOCAL", "targetProvider": "R2",
+  "status": "VERIFIED", "attemptCount": 1, "checkedAt": "2026-09-10T03:04:11Z" }
+→ 204
+```
+
+- **적재는 `runId + documentId` 기준으로 멱등**하다. 같은 키의 재전송은 상태를 다시 반영하지 않고
+  **최초 처리와 같은 응답**을 낸다 — 반영됐으면 204, 반영 못 했으면 계속 409다. 재전송을 무조건
+  204로 만들면 같은 요청이 1회차 409, 2회차 204가 된다
+- **`VERIFIED`만 문서를 옮긴다.** `MISMATCH`·`MISSING`은 적재만 한다
+- **반영 조건은 넷이다**: `VERIFIED` · 문서의 object key가 요청과 같음 · **문서의 현재
+  `storageProvider`가 요청의 `sourceProvider`와 같음** · 문서의 bucket이 그 provider의 배포 설정과
+  같음. 세 번째가 늦게 도착한 결과가 최신 저장 위치를 과거로 되돌리는 것을 막는다
+- 반영할 때 **`storageProvider`와 `storageBucket`을 함께** 옮긴다. 두 provider의 버킷 이름이 서로
+  다른 env라 provider만 바꾸면 이후 읽기·삭제가 없는 좌표를 친다. bucket 값은 계약에 없어 Spring이
+  배포 설정에서 해석한다 — 계약에 `targetBucket`을 넣는 안은 #100 논의 중이다
+- **전제**: 한 document에 진행 중인 reconcile run은 최대 하나이며 이전 run 종료 전 반대 방향 전환을
+  시작하지 않는다. 이 전제가 깨지면 위 세 번째 조건만으로는 저장 위치가 원래 값으로 돌아온 경우를
+  구분하지 못한다(`checkedAt`은 검증을 끝낸 시각이라 그 구분에 쓸 수 없다)
+- **멱등 보장 범위는 문서의 수명**이다. 문서가 삭제되면 reconcile 이력도 함께 삭제되고 이후 재전송은
+  404다
+
+| 응답 | 뜻 | Infra 처리 |
+|---|---|---|
+| `204` | 적재·반영됨, 또는 최초 처리와 같은 결과의 재전송 | 완료 |
+| `404 DOCUMENT_NOT_FOUND` | 그 `documentId`가 없다 | terminal |
+| `409 RECONCILIATION_STALE` | 적재는 됐고 반영은 못 했다 — 문서가 그 source·object key를 더는 갖지 않는다 | **terminal, 재시도 금지** |
+| `409 RECONCILIATION_REPLAY_CONFLICT` | 같은 키로 다른 내용이 왔다. 먼저 저장된 결과가 남는다 | terminal + 송신 측 확인 |
+| `422 RECONCILIATION_INVALID` | 계약을 벗어났거나 자기모순인 payload | terminal, payload 수정 |
+| `500 RECONCILIATION_CONFIGURATION_ERROR` | 요청은 유효한데 Spring 배포에 그 provider 설정이 없거나 문서 행의 bucket이 설정과 어긋난다. 적재되지 않는다 | Spring 설정 수정 후 재시도 |
+
+- **이 저장소에서 422를 쓰는 유일한 경로**다. 계약이 그렇게 정했고 소비자가 Infra 스크립트라
+  사용자 입력 오류(400)와 구분되는 편이 낫다
+- 상태별로 어떤 필드가 필수인지는 계약에 없고 Spring이 만들지 않는다. **자기모순만 거절**한다 —
+  `VERIFIED`인데 기대값과 실측값이 다르거나 실패 사유가 있는 경우, `MISSING`인데 실측값이 있는 경우
+- 결과는 `storage_reconciliation_log`(V25)에 남는다. `apply_result`가
+  `APPLIED`·`LOGGED_ONLY`·`STALE`로 **왜 반영되지 않았는지**를 행 자체에 적는다

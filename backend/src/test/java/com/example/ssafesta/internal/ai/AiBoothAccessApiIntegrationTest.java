@@ -228,12 +228,21 @@ class AiBoothAccessApiIntegrationTest {
     /**
      * 유효한 서비스 토큰이라도 정의되지 않은 내부 경로는 열리지 않는다.
      *
-     * <p>체인이 {@code /internal/**} 를 전부 소비하고 {@code denyAll} 로 닫으므로, 나중에 다른
-     * 토큰으로 인증할 경로(Infra reconciliation, spec 007 T078)가 이 토큰으로 새지 않는다.
+     * <p>체인이 {@code /internal/**} 를 전부 소비하고 {@code denyAll} 로 닫으므로, 다른 토큰으로
+     * 인증하는 경로가 이 토큰으로 새지 않는다.
+     *
+     * <p>이 테스트는 원래 {@code /internal/storage/anything} 을 썼다. 그 경로에 Infra 규칙이 생겨
+     * 더는 "정의되지 않은 경로"가 아니다 — AI 토큰이 거기서 막히는지는
+     * {@code StorageReconciliationControllerIntegrationTest} 가 본다.
+     *
+     * <p><b>여기는 401 이 아니라 403 이다.</b> 규칙이 있는 경로는 인증이 없으면 401 이지만
+     * ({@code hasAuthority} 가 supplier 를 불러 {@code AuthenticationCredentialsNotFoundException}
+     * 이 난다) {@code denyAll} 은 supplier 를 아예 부르지 않아 인증 여부와 무관하게 접근 거부로
+     * 끝난다. 두 자리의 상태가 다른 것은 의도가 아니라 결정 방식의 차이다.
      */
     @Test
     void anUndefinedInternalPathIsDeniedEvenWithAValidToken() throws Exception {
-        mockMvc.perform(get("/internal/storage/anything")
+        mockMvc.perform(get("/internal/unknown/anything")
                         .header("Authorization", "Bearer " + SERVICE_TOKEN))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));

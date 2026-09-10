@@ -16,6 +16,7 @@ assert_contains "${site}" 'location /unity/' 'Unity static files need a same-ori
 assert_contains "${site}" 'alias /srv/festa/webgl/current/' 'Unity must use the agreed current release directory'
 assert_contains "${site}" 'default_type application/wasm;' 'wasm must use its streaming MIME type'
 assert_contains "${site}" 'Content-Encoding br' 'Brotli Unity files must declare their encoding'
+assert_contains "${site}" '\(br\|unityweb\)' 'Nginx must serve both native Brotli and Unity fallback-compressed suffixes'
 assert_contains "${site}" 'max-age=31536000, immutable' 'hashed Unity build files need immutable caching'
 assert_contains "${site}" 'Cache-Control "no-cache"' 'manifest and entry files must be revalidated'
 assert_contains "${site}" 'proxy_pass http://127\.0\.0\.1:18080;' 'frontend must remain loopback-only behind Nginx'

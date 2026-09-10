@@ -18,6 +18,13 @@ import trackUrl from '../../../assets/festa/audio/midnight-circus-soft-login.mp3
  */
 export const MUSIC_MUTED_STORAGE_KEY = 'festa.settings.music.muted';
 
+/**
+ * 음악 크기 선호 저장 키 (S15P21A604-618). 0~1 이고 `TRACK_VOLUME` 에 곱해진다 — 이 값이
+ * 절대 볼륨이 아니라 **기준선 대비 배수**라는 뜻이다. 기준선은 11F 도착점에 맞춰 잡은
+ * 값이므로(아래 TRACK_VOLUME 주석) 사용자 조절이 그 근거를 지우지 않는다.
+ */
+export const MUSIC_VOLUME_STORAGE_KEY = 'festa.settings.music.volume';
+
 /** 이관 fade 길이(ms). 로딩 씬 진입과 함께 이 시간 동안 줄어 완전히 멈춘다. */
 export const SCREEN_AUDIO_FADE_MS = 1_500;
 
@@ -46,6 +53,8 @@ export const TRACK_VOLUME = 0.25;
 
 export interface ScreenAudioState {
   muted: boolean;
+  /** 사용자가 고른 음악 크기(0~1). 실제 출력은 TRACK_VOLUME 에 곱한 값이다 */
+  volume: number;
   playing: boolean;
   /** 자동재생이 거부돼 사용자 제스처를 기다리는 중 — 실패를 삼키지 않기 위한 표면이다 */
   pendingGesture: boolean;
@@ -62,13 +71,14 @@ export interface ScreenAudioState {
 
 const initialState: ScreenAudioState = {
   muted: false,
+  volume: 1,
   playing: false,
   pendingGesture: false,
   transitionPending: false,
   handedOff: false,
 };
 
-let state: ScreenAudioState = { ...initialState, muted: readMutedPreference() };
+let state: ScreenAudioState = { ...initialState, muted: readMutedPreference(), volume: readVolumePreference() };
 let element: HTMLAudioElement | null = null;
 let fadeTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -82,6 +92,7 @@ function setState(patch: Partial<ScreenAudioState>): void {
   const next = { ...state, ...patch };
   if (
     next.muted === state.muted &&
+    next.volume === state.volume &&
     next.playing === state.playing &&
     next.pendingGesture === state.pendingGesture &&
     next.transitionPending === state.transitionPending &&
@@ -102,6 +113,35 @@ function readMutedPreference(): boolean {
   }
 }
 
+function readVolumePreference(): number {
+  try {
+    const raw = window.localStorage.getItem(MUSIC_VOLUME_STORAGE_KEY);
+    if (raw === null) return 1;
+    const parsed = Number(raw);
+    // 저장소의 값을 믿지 않는다 — 사람이 손으로 고칠 수 있는 자리다
+    return Number.isFinite(parsed) ? clampVolume(parsed) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function writeVolumePreference(volume: number): void {
+  try {
+    window.localStorage.setItem(MUSIC_VOLUME_STORAGE_KEY, String(volume));
+  } catch {
+    // muted 와 같다 — 이번 세션에는 적용되고 다음 방문에 기억되지 않을 뿐이다
+  }
+}
+
+function clampVolume(volume: number): number {
+  return Math.min(1, Math.max(0, volume));
+}
+
+/** 실제로 element 에 넣는 값 — 기준선 × 사용자 배수 */
+function effectiveVolume(): number {
+  return TRACK_VOLUME * state.volume;
+}
+
 function writeMutedPreference(muted: boolean): void {
   try {
     window.localStorage.setItem(MUSIC_MUTED_STORAGE_KEY, String(muted));
@@ -119,7 +159,7 @@ function ensureElement(): HTMLAudioElement | null {
   const audio = new Audio(trackUrl);
   audio.loop = true;
   audio.preload = 'auto';
-  audio.volume = TRACK_VOLUME;
+  audio.volume = effectiveVolume();
   element = audio;
   return audio;
 }
@@ -139,7 +179,7 @@ export function unlockAndPlay(): void {
   const audio = ensureElement();
   if (audio === null) return;
   clearFade();
-  audio.volume = TRACK_VOLUME;
+  audio.volume = effectiveVolume();
   const started = audio.play();
   if (started === undefined) {
     // play() 가 Promise 를 돌려주지 않는 구형 구현
@@ -169,6 +209,19 @@ export function setMuted(muted: boolean): void {
   unlockAndPlay();
 }
 
+/**
+ * 음악 크기를 바꾼다. 재생 중이면 그 자리에서 들린다 — 슬라이더를 끌면서 결과를 들어야
+ * 고를 수 있다. fade 중에는 element 볼륨을 건드리지 않는다: 그 값은 fade 가 소유하고 있고,
+ * 끝나면 effectiveVolume() 으로 복원되므로 새 값이 그때 반영된다.
+ */
+export function setMusicVolume(volume: number): void {
+  const next = clampVolume(volume);
+  if (next === state.volume) return;
+  writeVolumePreference(next);
+  setState({ volume: next });
+  if (element !== null && fadeTimer === null) element.volume = effectiveVolume();
+}
+
 function fadeOutAndStop(): void {
   const audio = element;
   if (audio === null || !state.playing) {
@@ -187,7 +240,7 @@ function fadeOutAndStop(): void {
     clearFade();
     audio.pause();
     audio.currentTime = 0;
-    audio.volume = TRACK_VOLUME;
+    audio.volume = effectiveVolume();
     setState({ playing: false, pendingGesture: false, transitionPending: false, handedOff: true });
   }, FADE_STEP_MS);
 }
@@ -245,6 +298,6 @@ export function __resetScreenAudioForTests(): void {
   clearFade();
   element = null;
   // 모듈이 처음 로드될 때와 같은 자리에서 출발한다 — 저장된 음소거 선호도 그때 읽힌다
-  state = { ...initialState, muted: readMutedPreference() };
+  state = { ...initialState, muted: readMutedPreference(), volume: readVolumePreference() };
   listeners.clear();
 }
