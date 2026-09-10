@@ -24,6 +24,7 @@ const ENTRIES: { label: string; event: Record<string, unknown> }[] = [
   { label: '미니게임', event: { type: 'BOOTH_GAME_INTERACT', boothId: MOCK_BOOTH_ID, objectId: 'mock-portal', configId: 1 } },
   // 부스에 종속되지 않는 월드 상호작용 — payload 에 필드가 없다(S15P21A604-414)
   { label: '내 부스 관리', event: { type: 'WORLD_MANAGEMENT_INTERACT' } },
+  { label: '이벤트 경품', event: { type: 'WORLD_EVENT_INTERACT', npcId: 'mock-event-npc' } },
 ];
 
 export function MockInteractionBar() {
