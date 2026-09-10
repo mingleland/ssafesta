@@ -70,6 +70,16 @@ const VariableValueInput = ({
   );
 };
 
+// S15P21A604-580 — 유니코드 "×" 글자를 직접 썼더니 폰트마다 잉크(획)가 박스 중앙에서
+// 살짝 벗어나 보였다(아래·왼쪽으로 치우침 — 폰트 렌더링에 따라 달라지는 문제). SVG로
+// 바꾸면 폰트와 무관하게 항상 기하학적으로 정확히 중앙에 온다.
+const DeleteIcon = () => (
+  <svg aria-hidden="true" fill="none" height="12" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" viewBox="0 0 24 24" width="12">
+    <line x1="6" x2="18" y1="6" y2="18" />
+    <line x1="18" x2="6" y1="6" y2="18" />
+  </svg>
+);
+
 const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: string; readonly unit: string; readonly defaultTarget: number; readonly max: number }>> = {
   SCORE_AT_LEAST: { title: '점수 달성', unit: '점', defaultTarget: 500, max: 999999999 },
   DEFEAT_ENEMIES: { title: '적 처치', unit: '명', defaultTarget: 5, max: 10000 },
@@ -135,7 +145,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
       const definition = objectiveLabels[objective.type];
       return (
         <article className="gss-data-card" key={objective.type}>
-          <header><strong>{definition.title}</strong><button aria-label={`${definition.title} 목표 삭제`} onClick={() => replaceObjectives(rules.completion.objectives.filter((_, objectiveIndex) => objectiveIndex !== index))} type="button">×</button></header>
+          <header><strong>{definition.title}</strong><button aria-label={`${definition.title} 목표 삭제`} className="gss-delete-icon-button" onClick={() => replaceObjectives(rules.completion.objectives.filter((_, objectiveIndex) => objectiveIndex !== index))} type="button"><DeleteIcon /></button></header>
           <CommitInput
             label={`목표값 (${definition.unit})`}
             onCommit={(value) => {
@@ -168,7 +178,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
         <header>
           <strong>{variable.id}</strong>
           <span>{variable.type}</span>
-          <button aria-label={`${variable.id} 삭제`} onClick={() => setConfirmDeleteVariableId(variable.id)} type="button">삭제</button>
+          <button aria-label={`${variable.id} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteVariableId(variable.id)} type="button"><DeleteIcon /></button>
         </header>
         <VariableValueInput
           onChange={(value) => onApply(replaceVariableDefinition(project, variable.id, value))}
@@ -229,7 +239,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
         <header>
           <strong>{item.id}</strong>
           <span>ITEM</span>
-          <button aria-label={`${item.id} 삭제`} onClick={() => setConfirmDeleteItemId(item.id)} type="button">삭제</button>
+          <button aria-label={`${item.id} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteItemId(item.id)} type="button"><DeleteIcon /></button>
         </header>
         <CommitInput
           label="사용자에게 보이는 이름"
@@ -339,7 +349,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
             <strong>{assetDisplayLabel(asset)}</strong>
             <small>{asset.id}</small>
             {deletable && (
-              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} onClick={() => setConfirmDeleteAssetId(asset.id)} type="button">삭제</button>
+              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteAssetId(asset.id)} type="button"><DeleteIcon /></button>
             )}
           </div>
         );
