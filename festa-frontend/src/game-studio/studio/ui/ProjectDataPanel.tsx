@@ -21,13 +21,18 @@ import {
 } from '../model/authoringCommands.ts';
 import { CommitInput } from './CommitInput.tsx';
 import { assetDisplayLabel, BUILTIN_STATIC_IMAGES, BUILTIN_TILESETS } from '../assets/builtinAssetCatalog.ts';
-import { staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
-import { tileBackgroundStyle } from '../assets/tilesetVisual.ts';
+import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
+import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { findAssetUsageLocations, findVariableUsageLocations, findItemUsageLocations, findPublishBlockers } from '../ports/publishValidation.ts';
 import { analyzeProjectHealth } from '../model/projectHealth.ts';
 
 interface ProjectDataPanelProps {
   readonly project: GameProject;
+  // S15P21A604-573 — 자산 목록이 실제 이미지를 보여주려면 blob URL로 해석된 assetUrls가
+  // 필요하다. GameStudioShell.tsx는 이미 useResolvedAssetUrls로 이걸 계산해서
+  // InspectorPanel/DialogueEditor엔 넘기면서 이 패널에는 안 넘기고 있었다 — 그 배선 누락.
+  // optional로 둔다 — 없거나(테스트) 아직 해석 전(로딩 중)이면 썸네일 없이 배지만 보여준다.
+  readonly assetUrls?: Readonly<Record<string, string>>;
   readonly onApply: (project: GameProject) => void;
   readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
   readonly onDeleteAsset: (assetId: string) => void;
@@ -71,7 +76,7 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
   // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
@@ -319,9 +324,18 @@ export const ProjectDataPanel = ({ project, onApply, onUploadAsset, onDeleteAsse
       {project.assets.map((asset) => {
         // 빌트인은 프로젝트 소유가 아니라 카탈로그 참조라 삭제 대상이 아니다.
         const deletable = !asset.source.startsWith('builtin://');
+        // S15P21A604-573 — 종류 배지 하나로만 뭉뚱그려 보이던 자산 목록에 실제 썸네일을
+        // 넣는다. assetUrls에 아직 없으면(로딩 중이거나 AUDIO처럼 이미지가 없으면) 빈
+        // 자리만 남기고 배지는 그대로 보여준다 — gss-builtin-library와 같은 렌더 패턴.
+        const imageVisual = asset.kind === 'IMAGE' ? resolveStaticImageVisual(asset, assetUrls) : null;
+        const tilesetVisual = asset.kind === 'TILESET' ? resolveTilesetVisual(asset, assetUrls) : null;
         return (
           <div key={asset.id}>
-            <span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>{asset.kind}</span>
+            <span className={`gss-asset-kind is-${asset.kind.toLowerCase()}`}>
+              {imageVisual !== null && <i className="gss-asset-thumb" style={staticImageBackgroundStyle(imageVisual)} />}
+              {tilesetVisual !== null && <i className="gss-asset-thumb" style={tileBackgroundStyle(tilesetVisual, 0)} />}
+              <em>{asset.kind}</em>
+            </span>
             <strong>{assetDisplayLabel(asset)}</strong>
             <small>{asset.id}</small>
             {deletable && (

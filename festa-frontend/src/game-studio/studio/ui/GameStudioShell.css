@@ -645,9 +645,13 @@
 .gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr; padding: 8px; }
 .gss-asset-list strong { font-size: 9px; }
 .gss-asset-list small { color: #5b6577; font-size: 7px; grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gss-asset-kind { border-radius: 3px; color: #1d4ed8; font-size: 6px; font-weight: 850; grid-row: span 2; padding: 3px 4px; }
+.gss-asset-kind { align-items: center; border-radius: 3px; color: #1d4ed8; display: flex; flex-direction: column; font-size: 6px; font-weight: 850; gap: 4px; grid-row: span 2; padding: 3px 4px; }
+.gss-asset-kind em { font-style: normal; }
 .gss-asset-kind.is-audio { color: #7e22ce; }
 .gss-asset-kind.is-tileset { color: #15803d; }
+/* S15P21A604-573 — 데이터 탭 자산 목록이 종류 배지로만 뭉뚱그려 보이던 걸 고친다.
+   assetUrls로 해석 안 되면(로딩 중 · AUDIO) i가 아예 렌더되지 않아 배지만 남는다. */
+.gss-asset-thumb { background-color: #eef1f5; background-position: center; border-radius: 4px; display: block; height: 26px; image-rendering: pixelated; width: 26px; }
 .gss-data-card { display: grid; gap: 7px; }
 .gss-budget-card { background: #ffffff; border: 1px solid var(--gss-border); border-radius: 8px; padding: 10px; }
 .gss-budget-card header { display: flex; justify-content: space-between; }
