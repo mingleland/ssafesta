@@ -7,6 +7,7 @@ import type { LayoutObject } from '../../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
+import { dragKind } from '../../model/studioMode';
 import type { BoothRendererProps } from './canvasTypes';
 import { FALLBACK_BOX, OBJECT_FILL, OBJECT_LABEL, shade } from './objectAppearance';
 import './isoRenderer.css';
@@ -246,7 +247,7 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
             data-selected={isSel}
             data-dragging={drag?.objectId === obj.objectId}
             style={style}
-            onPointerDown={(e) => beginDrag(e, obj, p.tool === 'rotate' ? 'rotate' : 'move')}
+            onPointerDown={(e) => beginDrag(e, obj, dragKind(e, p.tool))}
           >
             <polygon className="iso-obj-shadow" points={pts(bottom)} />
             {sides.map(({ i, j }) => (

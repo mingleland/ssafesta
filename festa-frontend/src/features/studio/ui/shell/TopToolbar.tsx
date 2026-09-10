@@ -1,6 +1,6 @@
 // Booth Studio 상단 툴바 — Reference 상단 행 그대로: 뒤로 · 제목 · 부스명 · 편집 상태 | 저장 · 게시 | 실행취소 · 다시실행 | 줌 · 설정
 import type { SaveStatus } from '../../model/editorReducer';
-import { IcBack, IcChevron, IcEdit, IcGear, IcPlay, IcRedo, IcSave, IcUndo } from './icons';
+import { IcBack, IcChevron, IcEdit, IcGear, IcPlay, IcRedo, IcSave, IcTrash, IcUndo } from './icons';
 
 interface Props {
   boothName: string;
@@ -13,10 +13,13 @@ interface Props {
   publishing: boolean;
   publishedVersion: number | null;
   zoomPercent: number;
+  /** 배치를 비울 수 있는가 — 비어 있거나 임대가 끝났으면 누를 것이 없다 */
+  canReset: boolean;
   onBack: () => void;
   onSave: () => void;
   onPublish: () => void;
   onZoomToggle: () => void;
+  onReset: () => void;
 }
 
 function statusChip(s: SaveStatus, dirty: boolean, conflict: boolean, leaseExpired: boolean) {
@@ -51,6 +54,18 @@ export function TopToolbar(p: Props) {
         </button>
         <button type="button" className="studio-btn studio-btn-primary" onClick={p.onPublish} disabled={!p.canPublish}>
           <IcPlay size={14} /> {p.publishing ? '게시 중…' : '게시'}
+        </button>
+      </div>
+      <div className="studio-toolbar-group">
+        {/* 전체 초기화 (S15P21A604-603) — 확인 다이얼로그는 '빈 부스' 템플릿 경로가 띄운다 */}
+        <button
+          type="button"
+          className="studio-btn studio-btn-ghost"
+          onClick={p.onReset}
+          disabled={!p.canReset}
+          title={p.canReset ? '배치를 모두 비웁니다' : '비울 배치가 없습니다'}
+        >
+          <IcTrash size={16} /> 초기화
         </button>
       </div>
       <div className="studio-toolbar-group">
