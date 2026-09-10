@@ -25,6 +25,8 @@ namespace Festa.World
         [SerializeField] float _seatLift = 0.6f;
         [Tooltip("외형 배율(F_FullBody m → 월드 u) 을 못 읽을 때의 대체값. 조립된 아바타가 있으면 실제 localScale 을 쓴다")]
         [SerializeField] float _fallbackVisualScale = 14.2f;
+        [Tooltip("글자의 긴 축(_lieAxis) 길이가 이보다 짧으면 웅크림(LieSofa) 전용. 곧게 누운 몸 22.5u − 양쪽 2u 허용")]
+        [SerializeField] float _minLengthForStraightPoses = 18.5f;
 
         void Awake()
         {
@@ -46,17 +48,33 @@ namespace Festa.World
             if (rs.Length == 0) return;
             var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
 
-            // 이미 누워 있으면 다른 자세로 바꾼다(같은 것을 다시 뽑지 않는다)
-            var poses = LiePoseTable.SofaPoses;
-            var pose = poses[Random.Range(0, poses.Length)];
-            if (pose == player.EmoteId.Value) pose = poses[(System.Array.IndexOf(poses, pose) + 1) % poses.Length];
+            // 누운 채 다시 F — BoothInteractionInput 이 먼저 막지만(프롬프트·링도 끔), 다른 경로로 와도 재텔레포트하지 않는다.
+            if (LiePoseTable.IsLie(player.EmoteId.Value)) { Debug.Log("[LoungeSofa] 이미 누워 있다 — 무시(일어나기는 WASD)"); return; }
 
             var right = _lieAxis.sqrMagnitude > 0.001f ? _lieAxis.normalized : Vector3.right;
+
+            // 글자의 긴 축 길이가 짧으면(A·F·Y 14.5~16u) 곧게 누운 몸(22.5u)이 머리·발 3~4u 씩 넘어가 공중에 뜬다 →
+            // 웅크림(20.1u) 전용. S(20.5u)는 5종 전부. 문턱은 몸 길이 − 4u(양쪽 15 cm 허용).
+            float lengthAlongAxis = Mathf.Abs(Vector3.Dot(b.size, new Vector3(Mathf.Abs(right.x), Mathf.Abs(right.y), Mathf.Abs(right.z))));
+            var poses = lengthAlongAxis < _minLengthForStraightPoses ? LiePoseTable.NarrowSofaPoses : LiePoseTable.SofaPoses;
+            var pose = poses[Random.Range(0, poses.Length)];
             var forward = Vector3.Cross(right, Vector3.up);          // right × up = forward (왼손 좌표계)
             var rot = Quaternion.LookRotation(forward, Vector3.up);
 
             float scale = VisualScale(po, _fallbackVisualScale);
-            var seat = new Vector3(b.center.x, b.max.y + _seatLift, b.center.z) - right * (LiePoseTable.CenterX(pose) * scale);
+            float along = -LiePoseTable.CenterX(pose) * scale;                 // 루트의 글자 중앙 기준 위치(긴 축 방향)
+            float footEnd = LiePoseTable.DanglingFootEndX(pose);
+            if (footEnd > 0f)
+            {
+                // 웅크림: 늘어진 발(몸통보다 1.3u 아래)이 글자 위에 있으면 윗면을 뚫는다 → 발 끝이 글자 끝을 1.5u 넘게 민다.
+                // 머리 끝은 반대쪽 끝에서 3u 넘게 나가지 않도록 상한. S(20.5u): +1.9u 밀림, 좁은 글자(14.5u): 이미 밖이라 0.
+                float half = lengthAlongAxis * 0.5f;
+                float shift = Mathf.Max(0f, (half + 1.5f) - (along + footEnd * scale));
+                float headEnd = along + LiePoseTable.HeadEndX(pose) * scale + shift;
+                if (headEnd < -(half + 3f)) shift = Mathf.Max(0f, shift - (-(half + 3f) - headEnd));
+                along += shift;
+            }
+            var seat = new Vector3(b.center.x, b.max.y + _seatLift, b.center.z) + right * along;
 
             move.TeleportTo(seat);
             po.transform.rotation = rot;

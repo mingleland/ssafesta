@@ -28,7 +28,10 @@ namespace Festa.World
         /// <summary>루트 기준 몸 최하단(m). 눕기가 아니면 Idle 값.</summary>
         public static float MinY(PlayerEmoteId e) => e switch
         {
-            PlayerEmoteId.LieSofa => 0.312f,   // 표값 0.307 + 0.005 — 플레이 실측에서 위상 최저가 0.07u(5 mm) 떠서 내림
+            // 웅크림은 전체 최하단(0.307)이 **소파 밖으로 늘어진 발**이라 그 값으로 붙이면 몸통이 1.3u(9 cm) 뜬다
+            // (사용자 사진 2026-09-10 11:40, 재현 narrow_g46.png). 본 가중치로 부위별로 재면 몸통 0.397·허벅지 0.396·
+            // 정강이 0.351·발 0.307 — 소파에 닿는 면은 몸통·허벅지다. 발은 글자 끝 밖으로 내보낸다(LoungeSofaInteractable).
+            PlayerEmoteId.LieSofa => 0.397f,
             PlayerEmoteId.LieLeft => 0.499f,
             PlayerEmoteId.LieRight => 0.516f,
             PlayerEmoteId.LieLeftRestless => 0.495f,
@@ -53,5 +56,28 @@ namespace Festa.World
             PlayerEmoteId.LieSofa, PlayerEmoteId.LieLeft, PlayerEmoteId.LieRight,
             PlayerEmoteId.LieLeftRestless, PlayerEmoteId.LieRightRestless,
         };
+
+        /// <summary>
+        /// 웅크림(LieSofa)에서 늘어진 발 끝의 x(m, 루트 오른쪽 +) 와 머리 끝의 x. 발은 몸통보다 1.3u 아래로 늘어지므로
+        /// 글자 위에 있으면 윗면을 뚫는다 — 발 끝이 글자 끝을 1.5u 넘도록 루트를 밀되, 머리 끝은 반대쪽 끝 +3u 안에 둔다.
+        /// 다른 자세는 발이 몸통보다 높아(침대 클립) 해당 없음(0).
+        /// </summary>
+        public static float DanglingFootEndX(PlayerEmoteId e) => e == PlayerEmoteId.LieSofa ? 0.856f : 0f;
+        public static float HeadEndX(PlayerEmoteId e) => e == PlayerEmoteId.LieSofa ? -0.584f : 0f;
+
+        /// <summary>좁은 글자(몸이 넘어가는 소파) 전용 — 웅크림만. 사용자 지시 2026-09-10 "좁은 글자는 웅크림 전용으로".</summary>
+        public static readonly PlayerEmoteId[] NarrowSofaPoses = { PlayerEmoteId.LieSofa };
+
+        /// <summary>
+        /// 로컬 플레이어가 누워 있는가. 누운 동안은 상호작용 입력(F)·프롬프트·링을 전부 끈다 — 누운 채 F 를 다시 누르면
+        /// 소파 위로 다시 텔레포트되며 자세가 바뀌고 몸이 떠 보였다(사용자 사진 2026-09-10). 일어나는 길은 WASD 하나다.
+        /// </summary>
+        public static bool IsLocalPlayerLying()
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            var po = nm != null && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+            var np = po != null ? po.GetComponent<NetworkPlayer>() : null;
+            return np != null && IsLie(np.EmoteId.Value);
+        }
     }
 }
