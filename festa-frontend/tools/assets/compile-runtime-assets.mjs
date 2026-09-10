@@ -16,7 +16,14 @@ import { planTextureOptimization, resolveMaterial } from './compiler/material.mj
 import { RUNTIME_DIR, ensureDir } from './compiler/paths.mjs';
 
 /** v1 대표 — 조립체 하나 + 텍스처 worst case 하나. 늘리지 않는다 */
-const TARGET_ASSET_CODES = ['BOOTH_KIOSK_SURVEY', 'FURN_CHAIR_02_WHITE', 'DISP_BOX_01', 'FURN_CHAIR_01_WHITE'];
+// 팔레트가 참조하는 코드는 전부 여기 있어야 한다 — -509 완료조건 ②.
+// 그 1:1 은 tools/paletteAssetCodes.test.mjs 가 지킨다.
+const TARGET_ASSET_CODES = [
+  'BOOTH_KIOSK_SURVEY', 'FURN_CHAIR_02_WHITE', 'DISP_BOX_01', 'FURN_CHAIR_01_WHITE',
+  // #154 팔레트 정합으로 들어온 6종
+  'STRUCT_PANEL_01', 'FURN_COUNTER_02', 'DISP_STAND_PLASTIC_01',
+  'STRUCT_TRUSS_HORIZONTAL_LAMP', 'STRUCT_TRUSS_VERTICAL', 'STRUCT_TRUSS_BASE',
+];
 
 function materialPathOf(source) {
   return source.material === undefined ? null : resolve(projectRoot, UNITY_ASSETS_ROOT, source.material);
