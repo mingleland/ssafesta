@@ -144,6 +144,18 @@
 .gss-reset-confirm-actions button { border-radius: 7px; font-size: 11px; font-weight: 650; padding: 9px 15px; }
 .gss-reset-confirm-actions > button:not(.gss-guide-start) { background: #ffffff; border: 1px solid #ccd3dc; color: #333d4b; }
 
+/* S15P21A604-582 — 변수/아이템/자산 삭제 확인 모달. .gss-reset-confirm-modal과 같은 톤
+   (중앙 카드)이되, 사용 위치(⌖) 목록이 들어갈 수 있어 별도 클래스로 둔다. backdrop은
+   기존 .gss-guide-backdrop 재사용. */
+.gss-delete-confirm-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 15px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 400px; padding: 22px; width: 100%; }
+.gss-delete-confirm-modal h2 { font-size: 16px; margin: 0 0 8px; word-break: break-all; }
+.gss-delete-confirm-modal p { color: #4b5563; font-size: 11px; line-height: 1.6; margin: 0; }
+.gss-delete-confirm-modal em { color: #4b5563; display: block; font-size: 10px; font-style: normal; margin-top: 5px; }
+.gss-delete-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.gss-delete-confirm-actions button { background: #ffffff; border: 1px solid #ccd3dc; border-radius: 7px; color: #333d4b; font-size: 11px; font-weight: 650; padding: 9px 15px; }
+.gss-delete-confirm-actions .gss-delete-confirm-danger { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.4); color: var(--gss-red); }
+.gss-delete-confirm-actions .gss-delete-confirm-danger:hover:not(:disabled) { background: rgba(220,38,38,.16); border-color: rgba(220,38,38,.55); }
+
 .gss-title-input { border-left: 1px solid var(--gss-border); max-width: 280px; min-width: 150px; padding-left: 13px; }
 .gss-title-input .gss-field > span { display: none; }
 .gss-title-input input { background: transparent; border-color: transparent; font-weight: 650; padding: 6px 8px; }
