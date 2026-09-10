@@ -8,7 +8,8 @@
 
 **정본은 Unity `BoothObjectRegistry.asset` 하나로 정해졌고, FE 팔레트·파이프라인이 그것과 1:1 로 붙었다.**
 네 벌이던 어휘 중 FE 쪽 두 벌(팔레트 7종·파이프라인 4종)이 정본 코드로 맞춰졌고, 어긋나면 CI 가 red 다
-(`tools/paletteAssetCodes.test.mjs`). 남은 것은 `PLANT` 하나 — 자산은 있는데 정본 코드가 없다(§6-3).
+(`tools/paletteAssetCodes.test.mjs`). 화분도 `DECOR_PLANT_01` 로 정본 29행에 들어갔고 팔레트가 그 코드를 쓴다.
+남은 것은 그 자산의 **파이프라인 반입** 하나 — 원본 팩이 라이선스 lock 에 선언돼 있지 않다(§6-3).
 
 조사 시점(2026-09-07)의 한 줄은 이랬다: *"어휘가 네 벌 있고 그중 어느 것도 정본이 아니다. FE 팔레트가 쓰는
 `assetCode` 7종은 저장소 어디에서도 정의되지 않고, 파이프라인이 만드는 4종과 겹치는 것이 하나도 없다."*
@@ -255,13 +256,36 @@ Booth prefab 11개는 §1-1 표와 같다.
 | `TRUSS_BEAM` | `Decor/STRUCT_TRUSS_HORIZONTAL_LAMP.prefab` | `STRUCT_TRUSS_HORIZONTAL_LAMP` |
 | `TRUSS_PILLAR` | `Decor/STRUCT_TRUSS_VERTICAL.prefab` | `STRUCT_TRUSS_VERTICAL` |
 | `TRUSS_GATE` | `Decor/STRUCT_TRUSS_BASE.prefab` | `STRUCT_TRUSS_BASE` |
-| `PLANT` | `Decor/PLANT.prefab` | **없음** |
+| `PLANT` | `Decor/PLANT.prefab` | `DECOR_PLANT_01` (정본 29행, #154 A안) |
 
-### 6-3. `PLANT` — 자산은 있는데 정본 코드가 없다
+### 6-3. `DECOR_PLANT_01` — 코드는 정해졌고, 막힌 것은 라이선스다
 
-게임 파트가 저폴리 화분 래퍼를 신설해 `Decor/PLANT.prefab` 이 실재한다. 그런데 정본 28행에 화분 대응
-코드가 없다. 팔레트는 `PLANT` 를 유지하고 **canonical 신규 정의를 `#154` 에 요청**했다 — 정본 표 갱신은
-게임 파트 결정이다. 그때까지 별칭으로 렌더되므로 사용자에게 보이는 문제는 없다.
+`#154` 에서 게임 파트가 **A안을 채택**했다(2026-09-10). `DECOR_PLANT_01` 이 정본 **29행**으로 정의됐고
+등록까지 `origin/develop` 에 들어와 있다 — `PLANT` 별칭과 **같은 prefab guid** 를 가리킨다.
+
+```
+BoothObjectRegistry.asset:158  assetCode: PLANT            guid 20c66953…   ← 별칭, 한 릴리스 유지
+BoothObjectRegistry.asset:161  assetCode: DECOR_PLANT_01   guid 20c66953…
+```
+
+그래서 팔레트를 `DECOR_PLANT_01` 로 바꿨다. 1층(레지스트리 정합)은 예외 없이 통과한다.
+
+**파이프라인 반입은 막혀 있다 — 그리고 그것은 코드 문제가 아니다.** `Decor/PLANT.prefab` 이 감싸는
+원본을 guid 로 역추적하면 ExpoKit 이 아니다.
+
+```
+Decor/PLANT.prefab
+  └ guid 312cd58e… → Assets/Palmov Island/Low Poly Houses Free Pack/Prefabs/Trees/potted tree.prefab
+```
+
+이 팩은 `tools/assets/source-packs.lock.json` 에 선언돼 있지 않다(선언된 것은 `ExpoKit` ·
+`ithappy/Casino_Free` · `_Project/Models/Laptop` · `CarnivalKit` 넷뿐). `compiler/licenseGate.mjs` 의
+`evaluate` 는 **선언되지 않은 package 를 compile 하지 않으므로**, `booth-assets.config.mjs` 에 항목만
+넣으면 테스트만 통과하고 실제 변환은 안 되는 반쪽이 된다.
+
+즉 이것은 `-509` 완료조건 ④ — *"라이선스 게이트로 막힌 항목은 '막혔다'가 코드가 아니라 기록으로
+남는다"* — 가 예정해 둔 자리다. 그래서 `PIPELINE_EXEMPT` 로 2층에서만 예외를 두고 이유를 주석에 적었다.
+취득·라이선스 근거가 확인되면 lock 선언과 파이프라인 반입을 **후속 검토**한다(`#154` 에 요청).
 
 ### 6-4. 파이프라인 — 4종 → 10종
 
