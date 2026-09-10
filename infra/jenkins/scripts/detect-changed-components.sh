@@ -64,6 +64,7 @@ shared_exact = {
     ".gitlab-ci.yml",
     "infra/environments/compose/dev/base.yaml",
     "infra/environments/config/manifests/dev.json",
+    "infra/.env.example",
     "infra/versions.env",
 }
 shared_prefixes = (
@@ -71,6 +72,8 @@ shared_prefixes = (
     "infra/jenkins/",
     "infra/deploy/scripts/",
     "infra/environments/scripts/",
+    "infra/environments/nginx/",
+    "infra/environments/tests/",
     "infra/tests/",
 )
 docs_prefixes = ("docs/", "specs/", "infra/evidence/")
