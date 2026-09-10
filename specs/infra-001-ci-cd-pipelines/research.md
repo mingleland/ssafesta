@@ -197,4 +197,15 @@ Phase 0에서 발견한 기술 선택은 모두 위 결정 또는 명시적 운�
 - every develop merge auto-demo: 사용자 승인 결정과 충돌해 기각.
 - 사람이 SSH로 demo 배포: artifact provenance와 rollback evidence를 잃어 기각.
 
+## R-16. QA 완료 WebGL Package를 독립 배포 신호로 사용
+
+**Decision**: Unity 담당자가 QA를 마친 최종 zip을 Generic Package Registry에 올린 뒤, 같은 업로드 도우미가 immutable release ID와 SHA-256으로 Jenkins parameterized job을 호출한다. deploy-agent는 `read_package_registry` Deploy Token으로 내려받아 검증하고 `/srv/festa/webgl/current`만 원자 전환한다.
+
+**Rationale**: Package Registry에는 Jenkins push webhook 보장이 없고 Unity 담당자 PC를 상시 Jenkins Agent로 둘 필요도 없다. 업로드 성공 직후 HTTPS API 한 번을 호출하는 방식이 현재 전달 절차에 가장 작은 변경이다.
+
+**Alternatives considered**:
+- Registry latest polling: 불변 release 선택과 승인 시점이 모호하고 상시 poller가 필요해 기각.
+- Windows Jenkins Agent에서 빌드·rsync: 최종 전달본은 이미 QA가 끝났고 PC 상시 연결과 별도 SSH credential만 늘어나 기각.
+- 일반 `develop` push에 결합: Package 업로드라는 명시적 최종 승인과 무관한 코드 merge가 demo 정적 파일을 바꾸므로 기각.
+
 이 항목들은 기능 구현을 막는 코드 미정이 아니라 제공 자원/운영 승인에 종속된 설정 게이트다.

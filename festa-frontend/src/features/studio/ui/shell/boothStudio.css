@@ -584,6 +584,13 @@
   line-height: 1.6;
 }
 .studio-gate-card a { color: var(--studio-accent); }
+/* Gate 는 카드만 그려 툴바의 '뒤로'가 없다 — 탈출구를 카드 안에 둔다 (S15P21A604-588) */
+.studio-gate-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .booth-studio * { transition: none !important; animation: none !important; }

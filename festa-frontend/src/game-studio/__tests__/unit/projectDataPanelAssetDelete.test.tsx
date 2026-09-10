@@ -49,11 +49,11 @@ describe('ProjectDataPanel — 자산 삭제(S15P21A604-561)', () => {
     fireEvent.click(screen.getByRole('button', { name: /내 자산 · myPortrait 삭제/ }));
     expect(screen.getByText('현재 배치에서 사용되지 않는 자산입니다.')).toBeTruthy();
 
-    const confirmCard = screen.getByRole('alertdialog');
+    const confirmCard = screen.getByRole('dialog');
     fireEvent.click(within(confirmCard).getByRole('button', { name: '삭제' }));
 
     expect(onDeleteAsset).toHaveBeenCalledWith('myPortrait');
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('취소를 누르면 삭제하지 않고 확인 카드만 닫는다', () => {
@@ -63,7 +63,7 @@ describe('ProjectDataPanel — 자산 삭제(S15P21A604-561)', () => {
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
     expect(onDeleteAsset).not.toHaveBeenCalled();
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('사용 중인 자산은 삭제 전에 사용 위치를 보여준다', () => {
@@ -73,7 +73,7 @@ describe('ProjectDataPanel — 자산 삭제(S15P21A604-561)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /내 자산 · myPortrait 삭제/ }));
 
-    const confirmCard = screen.getByRole('alertdialog');
+    const confirmCard = screen.getByRole('dialog');
     expect(within(confirmCard).getByText('다음 위치에서 사용 중입니다 — 삭제하면 그 자리는 빈 값으로 남습니다.')).toBeTruthy();
     expect(within(confirmCard).getByText(/⌖/)).toBeTruthy();
   });

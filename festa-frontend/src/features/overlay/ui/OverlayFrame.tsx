@@ -21,15 +21,12 @@ interface Props {
 export function OverlayFrame({ title, subtitle, size = 'l', icon, children, footer, status, onClose }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
 
-  // Esc 로 닫는다. Unity Input Lock 계약(G-8-2)은 Unity 합의 대기 — 여기서는 화면 닫기와 focus 소유권만.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
+  // **Esc 리스너를 여기 두지 않는다** (-450, #132). 예전에는 이 프레임도 `window` 에 걸었는데,
+  // `WorldPage` 도 같은 `window` 에 걸려 있어 stopPropagation 으로는 서로를 막지 못하고 등록 순서로만
+  // 갈렸다. 판정자가 둘이면 "FE 레이어를 닫았다" 와 "닫을 게 없어 메뉴를 연다" 가 같은 키 한 번에
+  // 함께 일어난다. 지금은 `WorldPage` 가 유일한 중재자이고 이 프레임의 소비자는 전부 그 화면 안에
+  // 있다(OverlayHost·BoothManagementOverlay). 닫기는 배경 클릭·닫기 버튼·중재자가 한다.
+  //
   // focus 소유권 (S15P21A604-428, G-8-1). 열릴 때 프레임이 가져가고, 닫힐 때 돌려준다.
   // 돌려주지 않으면 focus 가 body 에 남고, Unity 6 WebGL 은 키보드 이벤트를 canvas 타깃으로 받으므로
   // 오버레이를 닫은 뒤 WASD·F 가 월드로 가지 않는다. 월드에서 F 로 연 경우 이전 요소가 곧 canvas 다.

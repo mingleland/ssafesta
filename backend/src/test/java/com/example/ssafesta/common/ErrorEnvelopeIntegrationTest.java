@@ -96,6 +96,41 @@ class ErrorEnvelopeIntegrationTest {
                 .andExpect(jsonPath("$.requestId").isString());
     }
 
+    /**
+     * A path variable that cannot be converted to its declared type.
+     *
+     * <p>Another route with its own fault: {@code MethodArgumentTypeMismatchException} does not take
+     * the {@code ErrorResponse} 4xx branch of {@code handleUnexpected}, so until
+     * {@code handleTypeMismatch} existed <b>every typed path variable in the application answered a
+     * URL typo with 500</b> — a client mistake wearing the shape of a server fault, and an ERROR
+     * line in the log for each one. Found while building the minigame result endpoint
+     * (S15P21A604-502), which is why the fix is global rather than in that one controller.
+     *
+     * <p>{@code booths/{id}} is a {@code Long} and the minigame session is a {@code UUID}: two
+     * different target types through one handler.
+     */
+    @Test
+    void aPathVariableOfTheWrongTypeIsARequestErrorRatherThanAServerFault() throws Exception {
+        mockMvc.perform(get("/api/v1/booths/{id}", "not-a-number").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").isString())
+                .andExpect(jsonPath("$.requestId").isString());
+    }
+
+    /** The offending value is client-controlled text and must not be echoed into a rendered body. */
+    @Test
+    void theRejectedValueIsNotReflectedBack() throws Exception {
+        // No slash in the payload — one would land the request on a different route and answer 404
+        // before the type mismatch is ever reached.
+        MvcResult result = mockMvc.perform(get("/api/v1/booths/{id}", "<img onerror=x>").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertFalse(result.getResponse().getContentAsString().contains("onerror"),
+                "거부된 입력값이 응답 본문에 그대로 돌아오면 안 됩니다.");
+    }
+
     /** 405 had a code in {@code codeFor} from the start, but nothing could reach it (#113). */
     @Test
     void anUnsupportedMethodIsRefusedWithItsOwnCode() throws Exception {

@@ -1,0 +1,344 @@
+openapi: 3.1.0
+
+# 미니게임(타이밍 스톱) 계약 — spec 014, Jira S15P21A604-502, GitLab #134
+#
+# 공동 정본이다. 게임 파트가 #134 (2026-09-10) 에서 "이 파일 기준으로 요청·HUD 를 맞추겠다" 고
+# 회신했으므로, Unity 의 DTO 와 이 문서가 어긋나면 이 문서가 맞다.
+#
+# 미니게임은 1종뿐이다 — 헌법 28조, spec 014 FR-009. 슬롯머신 API 는 이 계약에 없고, 2종으로
+# 늘릴지는 docs/26 (2026-09-10, S15P21A604-569) 에 올라간 리드 결정이다.
+
+info:
+  title: SSAFY FESTA — Minigame (Timing Stop)
+  version: 1.0.0
+  description: |
+    관리자 부스의 타이밍 스톱 게임. **판정과 지급은 전부 서버가 한다** — 클라이언트는 자기가
+    멈춘 시각 하나만 보고한다 (spec 014 C-06, FR-008, 헌법 12·16조).
+
+    ## 0. 이 계약이 정하는 것
+
+    | | |
+    |---|---|
+    | 목표 시간 | 서버가 매 판 `5.000`~`10.000` 초에서 무작위 발급 (FR-001a). 클라이언트가 정하지 않는다 |
+    | 실패 임계 | `failAfterSeconds = 목표 + 3초` (FR-001d). 서버가 내려준다 |
+    | 보상 | 오차 구간별 차등 (C-03). 기본값 `±0.1s → 5 Coin` · `±0.5s → 2 Coin` · 그 외 0 |
+    | 일일 한도 | **50 Coin/일**, 기준일은 **제출 시각의 KST 날짜** (C-04) |
+    | 중도 이탈 | 무보상 (C-05). 세션은 미완료로 남고 서버는 아무것도 하지 않는다 |
+
+    보상 수치와 실패 임계는 **서버 설정값**(`app.minigame.*`)이다. C-03 이 "수치는 밸런스 조정
+    가능하게 데이터로 둔다" 로 확정했기 때문이며, 기획이 값을 정하면 이 문서의 기본값 표와
+    설정이 함께 바뀐다. 클라이언트는 응답에 실린 값을 쓰고 어떤 수치도 상수로 박지 않는다.
+
+    ## 1. 결과 본문에서 서버가 읽는 것은 `stoppedSeconds` 하나다
+
+    이미 develop 에 올라간 Unity 클라이언트(`HttpGameResultClient`)는
+    `{targetSeconds, stoppedSeconds, errorSeconds, timedOut}` 을 보낸다. 나머지 셋은 **조용히
+    무시된다** — 거부하지 않는 이유는 배포된 클라이언트를 깨뜨리지 않기 위해서고, 존중하지
+    않는 이유는 C-06 이다. `errorSeconds: 0` 을 실어 보내도 최고 구간을 살 수 없다.
+
+    ## 2. 판정 실패는 HTTP 오류가 아니다
+
+    아래는 **전부 `200`** 이고 본문으로 구분한다. `4xx`·`5xx` 는 요청 자체가 잘못됐을 때뿐이다.
+
+    - `accepted: false` — 신고한 정지 시각이 서버 경과 시간과 맞지 않는다. **세션은 소진된다**
+    - `timedOut: true` — `failAfterSeconds` 를 넘겼다. 정상 플레이이고 보상만 없다
+    - `dailyLimitReached: true` — 오늘 더 받을 코인이 없다
+    - 같은 세션 재제출 — 최초 판정을 그대로 돌려주고 다시 지급하지 않는다
+
+    **`429` 는 이 계약에서 절대 나오지 않는다.** Acceptance Scenario 4 가 *"게임은 할 수 있으나
+    보상은 지급되지 않고 그 사실이 안내된다"* 이기 때문이다. Unity 의 429 분기
+    (`HttpGameResultClient` 의 일일 한도 안내)는 발화하지 않으므로, 한도 안내는
+    `dailyLimitReached` 로 그린다.
+
+    ## 3. 정지 시각 검증 — 무엇을 막고 무엇을 막지 않는가
+
+    서버는 자기 경과 시간과 신고된 정지 시각의 차이를 **양방향**으로 본다.
+
+    ```
+    serverElapsed = 지금 − serverStartedAt
+    |serverElapsed − stoppedSeconds| > 허용 오차(기본 2초)  →  accepted: false
+    ```
+
+    위쪽은 "아직 오지 않은 시각에 멈췄다", 아래쪽은 "답을 쥐고 있다가 늦게 보냈다" 를 막는다.
+    정직한 클라이언트의 차이는 왕복 지연(RTT)뿐이라 정상 플레이는 걸리지 않는다.
+
+    > **한계를 분명히 적는다.** `stoppedSeconds` 는 여전히 클라이언트 입력이다. 실제로 목표
+    > 시간만큼 기다렸다가 정확한 값을 보내면 통과한다. 즉 이것은 **지연 제출·명백한 시간
+    > 불일치 탐지**이지 `stoppedSeconds` 위변조를 막는 anti-cheat 가 아니다. 완전한 서버 권위
+    > 판정은 정지 신호의 **도착 시각**으로만 재야 하는데, 그러면 ±0.1s 구간이 RTT 에 좌우된다 —
+    > #134 §2 가 이 형태를 고른 이유다. 더 강한 보증이 필요해지면 별건으로 다룬다.
+
+    `timedOut` 은 `serverElapsed` 가 아니라 `stoppedSeconds` 로 판정한다. 도착 시각으로 재면
+    정직한 마지막 순간 정지가 네트워크 때문에 실패로 뒤집힌다.
+
+    ## 4. 일일 한도
+
+    - 한도는 **제출 시각의 KST 날짜**에 속한다. 23:59:58 에 시작해 00:00:03 에 제출한 판은
+      **다음 날** 한도에서 나간다. 시작일로 청구하면 자정을 걸쳐 세션을 열어 두고 두 날 한도를
+      한 번에 쓸 수 있다 — 의도된 동작이므로 "버그"로 고치지 않는다
+    - 남은 한도보다 보상이 크면 **남은 만큼만 잘라서** 지급한다. 누적 48 에 5짜리 판이면 2가 들어온다
+    - `dailyLimitReached` 는 `dailyRemainingCoins == 0` 과 **같은 뜻**이다. "이번 판이 잘렸다" 가
+      아니라 **"지금 더 받을 수 없다"** 이므로 누적 45 에서 5를 온전히 받아도 `true` 다
+    - 집계는 **원장 기준**이다 (오늘의 `MINIGAME_REWARD` 합계). 캐시를 정본으로 두지 않는다
+
+    ## 5. 재제출
+
+    `sessionId` 가 멱등성 키다 (FR-004). 두 번째 제출은 **최초 판정을 그대로** 돌려준다 —
+    `accepted`·`errorSeconds`·`tier`·`timedOut`·`rewardedCoins`·`message`.
+
+    **단 `dailyRemainingCoins`·`dailyLimitReached` 는 최초값이 아니라 재제출 시점의 현재
+    상태다.** 첫 판에서 `dailyRemainingCoins: 45` 를 봤더라도 그 뒤 다른 판으로 20을 더 받고
+    첫 세션을 재제출하면 `25` 가 온다 — 클라이언트에게 쓸모 있는 값이 현재 상태이기 때문이다.
+
+    ## 6. 만들지 않는 것
+
+    | | 이유 |
+    |---|---|
+    | 슬롯머신 API | 헌법 28조·FR-009 (미니게임 1종). 리드 결정은 `docs/26` |
+    | `429` 응답 | Acceptance Scenario 4 — 한도 도달자도 게임은 한다 |
+    | `GET /sessions/{id}` | 세션을 되읽을 이유가 없다. 결과는 제출 응답에 있다 |
+    | 랭킹·기록 조회 | spec 014 범위 밖 |
+    | 세션 만료 정리 | 미완료 세션은 C-05 대로 무보상으로 남는다 |
+    | 발급 rate limit | 코인은 제출 시점에 한도가 걸린다 — 지급 구멍이 아니라 행 증가일 뿐 |
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: 배포 (도메인은 인프라가 소유한다)
+  - url: http://localhost:8080/api/v1
+    description: 로컬
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Minigame
+    description: 타이밍 스톱 미니게임의 세션 발급과 결과 제출
+
+paths:
+  /minigames/timer-stop/sessions:
+    post:
+      tags: [Minigame]
+      operationId: startTimerStopSession
+      summary: 세션 발급
+      description: |
+        한 판을 시작한다. 목표 시간과 실패 임계, 서버 계측 시작 시각을 받는다.
+
+        **요청 본문은 읽지 않는다.** 배포된 Unity 클라이언트가 `{gameId}` 를 보내고 있어 받아만
+        두고 무시한다 — 미니게임은 1종뿐이라 식별할 대상이 없다.
+
+        **일일 한도에 도달했어도 세션은 발급된다** (Acceptance Scenario 4).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 무시된다. 호환을 위해 받기만 한다.
+              additionalProperties: true
+      responses:
+        "201":
+          description: 발급됨
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionIssued"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/MemberOnly"
+
+  /minigames/timer-stop/sessions/{sessionId}/result:
+    post:
+      tags: [Minigame]
+      operationId: submitTimerStopResult
+      summary: 결과 제출
+      description: |
+        정지 시각을 보고하고 판정·지급 결과를 받는다. 판정 실패·실패 종료·한도 도달·재제출은
+        전부 `200` 이다 (§2).
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: 세션 발급 응답의 `sessionId`
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitCommand"
+      responses:
+        "200":
+          description: |
+            판정 결과. `accepted: false` (검증 실패)·`timedOut: true` (실패 종료)·
+            `dailyLimitReached: true` (한도 도달)·재제출이 모두 이 상태다.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+        "400":
+          description: |
+            `VALIDATION_FAILED` — `stoppedSeconds` 누락·음수·범위 밖(`99999.999` 초과),
+            본문이 JSON 이 아님, `sessionId` 가 UUID 가 아님.
+            **세션은 그대로 남는다** — JSON 오타로 한 판을 잃지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/MemberOnly"
+        "404":
+          description: |
+            `MINIGAME_SESSION_NOT_FOUND` — 없는 세션이거나 **남의 세션**이다.
+            둘을 구분하지 않는다: 구분하면 남의 세션이 존재한다는 사실을 알려주게 된다.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 회원 Access Token. **게스트 토큰은 `403 MEMBER_ONLY`** 다 (헌법 12조).
+
+  responses:
+    Unauthorized:
+      description: "`UNAUTHORIZED` — 토큰이 없거나 유효하지 않다"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    MemberOnly:
+      description: |
+        `MEMBER_ONLY` — 게스트는 보상 게임에 참여할 수 없다. **세션 발급 단계에서** 거부한다 —
+        플레이시킨 뒤 보상이 없다고 알리는 것보다 낫다.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+
+  schemas:
+    SessionIssued:
+      type: object
+      required: [sessionId, targetSeconds, failAfterSeconds, serverStartedAt]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+          description: 결과 제출 경로이자 멱등성 키 (FR-004). 서버가 발급한다.
+          examples: ["3f1a6d2c-8b5e-4c11-9a77-2d0e5f8c4b31"]
+        targetSeconds:
+          type: number
+          description: 맞춰야 할 목표 시간(초). 밀리초(소수점 3자리)까지다.
+          examples: [7.381]
+        failAfterSeconds:
+          type: number
+          description: 이 시간을 넘기면 실패로 끝난다 (FR-001d). `targetSeconds + 3` 이 기본값이다.
+          examples: [10.381]
+        serverStartedAt:
+          type: string
+          format: date-time
+          description: |
+            서버가 계측을 시작한 시각(UTC). 클라이언트 타이머는 네트워크 한 홉만큼 늦게
+            시작하고, §3 의 허용 오차가 그 차이를 덮는다.
+
+    SubmitCommand:
+      type: object
+      required: [stoppedSeconds]
+      properties:
+        stoppedSeconds:
+          type: number
+          minimum: 0
+          maximum: 99999.999
+          description: |
+            시작 기준 경과 초. **서버가 읽는 유일한 필드다.** 밀리초 단위로 반올림된다.
+          examples: [7.41]
+      additionalProperties: true
+      description: |
+        `targetSeconds`·`errorSeconds`·`timedOut` 을 함께 보내도 된다 — 배포된 Unity 클라이언트가
+        그렇게 보내고 있다. **읽지 않는다** (§1).
+
+    SubmitResult:
+      type: object
+      required:
+        [accepted, errorSeconds, tier, timedOut, rewardedCoins, dailyLimitReached,
+         dailyRemainingCoins, message]
+      properties:
+        accepted:
+          type: boolean
+          description: |
+            `false` 는 §3 의 검증에 걸렸다는 뜻이고, **그 세션은 소진된다**. HTTP 는 여전히 `200` 이다.
+        errorSeconds:
+          type: number
+          description: "|목표 − 정지|. **서버가 계산한 값**이며 클라이언트가 보낸 값이 아니다."
+          examples: [0.029]
+        tier:
+          type: integer
+          minimum: 0
+          description: |
+            보상 구간. **0 = 무보상, 클수록 좋다** (같은 네임스페이스의 슬롯머신 제안과 극성을
+            맞췄다). 판정은 **가장 좁은 매칭 구간**이고 경계값은 포함이다 — 오차 `0.100` 은
+            `±0.1s` 구간이다. 기본값으로 `1 = ±0.5s(2 Coin)`, `2 = ±0.1s(5 Coin)`.
+            더 좁은 구간이 추가돼도 기존 번호는 밀리지 않는다.
+          examples: [2]
+        timedOut:
+          type: boolean
+          description: "`stoppedSeconds > failAfterSeconds`. 정상 플레이이고 보상만 없다."
+        rewardedCoins:
+          type: integer
+          minimum: 0
+          description: 실제로 지급된 코인. 일일 한도로 잘렸을 수 있다 (§4).
+          examples: [5]
+        dailyLimitReached:
+          type: boolean
+          description: |
+            `dailyRemainingCoins == 0` 과 같은 뜻. **"이번 판이 잘렸다" 가 아니라 "지금 더 받을 수
+            없다"** 이므로 누적 45 에서 5를 온전히 받아도 `true` 다.
+        dailyRemainingCoins:
+          type: integer
+          minimum: 0
+          description: 이번 지급 이후 오늘 남은 한도.
+          examples: [45]
+        message:
+          type: string
+          description: |
+            HUD 가 그대로 출력할 수 있는 한 줄. **ASCII 영문·숫자만 쓴다** — Unity WebGL 의 IMGUI 는
+            한글을 그리지 못한다 (T-22, spec 014 T013). 값 예: `+5 coins (tier 2)` ·
+            `Daily limit reached` · `Too slow` · `No reward` · `Result rejected`.
+          examples: ["+5 coins (tier 2)"]
+
+    ApiError:
+      type: object
+      required: [code, message, requestId, errors, warnings]
+      description: 전역 오류 봉투. `errors`·`warnings` 는 비어 있어도 항상 있다.
+      properties:
+        code:
+          type: string
+          examples: ["MINIGAME_SESSION_NOT_FOUND"]
+        message:
+          type: string
+        requestId:
+          type: string
+          description: 응답의 `X-Request-Id` 와 같다.
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              rule:
+                type: string
+              message:
+                type: string
+        warnings:
+          type: array
+          items:
+            type: object

@@ -13,6 +13,21 @@ import {
   openBoothManagement,
 } from '../../../../features/world/model/gameClientUi';
 import { getWorldScreen } from '../../../../features/world/model/worldScreen';
+import {
+  __resetWorldUiStateForTests,
+  applyWorldUiStateJson,
+} from '../../../../unity/bridge/worldUiState';
+
+// Unity 인스턴스·명령은 배선만 본다. 실제 SendMessage 는 이 테스트의 관심사가 아니다.
+const fakeInstance = { SendMessage: vi.fn() };
+const getReadyUnityInstance = vi.fn<() => typeof fakeInstance | null>(() => fakeInstance);
+const requestExitWorldUi = vi.fn();
+vi.mock('../../../../unity/host/sessionManager', () => ({
+  getReadyUnityInstance: () => getReadyUnityInstance(),
+}));
+vi.mock('../../../../unity/host/worldUiBridge', () => ({
+  requestExitWorldUi: (...args: unknown[]) => requestExitWorldUi(...args),
+}));
 
 // Unity·오버레이 내용물은 이 테스트의 관심사가 아니다 — ESC 배선만 본다.
 vi.mock('../../../../features/world/ui/WorldSurface.select', () => ({
@@ -35,12 +50,22 @@ const pressEscape = () =>
 beforeEach(() => {
   closeOverlay();
   __resetGameClientUiForTests();
+  __resetWorldUiStateForTests();
+  getReadyUnityInstance.mockReturnValue(fakeInstance);
+  requestExitWorldUi.mockClear();
 });
 afterEach(() => {
   cleanup();
   closeOverlay();
   __resetGameClientUiForTests();
+  __resetWorldUiStateForTests();
 });
+
+/** Unity 가 모달을 쥐었다고 알려 온 상태를 만든다 — 실제 경로와 같은 수신부를 탄다. */
+const unityModal = (patch: { focus?: boolean; minigame?: boolean }) =>
+  act(() => {
+    applyWorldUiStateJson(JSON.stringify({ focus: false, minigame: false, ...patch }));
+  });
 
 async function renderWorld() {
   const { WorldPage } = await import('../../WorldPage');
@@ -92,5 +117,67 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('management');
     pressEscape();
     expect(getWorldScreen()).toBe('world');
+  });
+});
+
+// Unity 가 쥔 모달까지 함께 중재한다 (-450 2차, GitLab #132).
+// 전에는 이 판정의 입력값이 FE store 둘뿐이라, 줌만 켜진 상태의 ESC 가 "떠 있는 게 없다" 로 읽혀
+// 줌은 풀리는데 Game Menu 가 같이 떴다.
+describe('WorldPage ESC 중재 — Unity 모달 (-450, #132)', () => {
+  it('FE 레이어가 없고 초점이 켜져 있으면 종료를 요청하고 Game Menu 를 열지 않는다', async () => {
+    await renderWorld();
+    unityModal({ focus: true });
+
+    pressEscape();
+
+    expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(requestExitWorldUi).toHaveBeenCalledWith(fakeInstance, 'esc');
+    expect(getWorldScreen()).toBe('world');
+  });
+
+  it('미니게임 HUD 도 같은 판정을 받는다 — 초점 전용 우회가 아니다', async () => {
+    await renderWorld();
+    unityModal({ minigame: true });
+
+    pressEscape();
+
+    expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(getWorldScreen()).toBe('world');
+  });
+
+  it('FE 레이어가 있으면 그것만 닫고 Unity 에는 아무것도 보내지 않는다 — 한 번에 하나다', async () => {
+    await renderWorld();
+    unityModal({ focus: true });
+    act(() => { openOverlay('LAPTOP', { boothId: 1 }); });
+
+    pressEscape();
+
+    expect(getCurrentOverlay()).toBeNull();
+    expect(requestExitWorldUi).not.toHaveBeenCalled();
+
+    // 다음 ESC 가 Unity 차례다. 상태는 FE 가 임의로 지우지 않는다 — 정본은 Unity 다.
+    pressEscape();
+    expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+  });
+
+  it('Unity 모달이 없으면 예전대로 Game Menu 를 연다', async () => {
+    await renderWorld();
+    unityModal({ focus: false, minigame: false });
+
+    pressEscape();
+
+    expect(requestExitWorldUi).not.toHaveBeenCalled();
+    expect(getWorldScreen()).toBe('menu');
+  });
+
+  it('인스턴스가 없으면 관측값을 비우고 Game Menu 로 내려간다 — ESC 가 아무 데도 가지 않게 두지 않는다', async () => {
+    await renderWorld();
+    unityModal({ focus: true });
+    getReadyUnityInstance.mockReturnValue(null);
+
+    pressEscape();
+
+    expect(requestExitWorldUi).not.toHaveBeenCalled();
+    expect(getWorldScreen()).toBe('menu');
   });
 });

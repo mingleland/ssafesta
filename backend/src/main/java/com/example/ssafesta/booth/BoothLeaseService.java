@@ -1,5 +1,6 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
@@ -23,7 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
  * made unrepresentable (FR-003, SC-002).
  *
  * <p>It also owns the other direction — {@link #expireStaleLeases()} and the private {@code expire}
- * every path shares — because expiry is the same two rows in the same transaction (S15P21A604-152).
+ * every path shares — because expiry is the same two rows in the same transaction (S15P21A604-152),
+ * plus the booth's AI documents since S15P21A604-496.
  */
 @Service
 public class BoothLeaseService {
@@ -41,14 +43,17 @@ public class BoothLeaseService {
     private final BoothRepository booths;
     private final BoothLeaseRepository leases;
     private final WalletService wallets;
+    private final BoothDocumentDeactivationService aiDocuments;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
-                             WalletService wallets, LeaseProperties properties) {
+                             WalletService wallets, BoothDocumentDeactivationService aiDocuments,
+                             LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
+        this.aiDocuments = aiDocuments;
         this.properties = properties;
     }
 
@@ -158,9 +163,9 @@ public class BoothLeaseService {
      * its {@code current_slot_id} — and its published layout with it — until someone happens to
      * lease again.
      *
-     * <p>The transaction covers both the transition and the slot release, which is what the contract
-     * asks for. It is also where S15P21A604-496 attaches the AI document and Job transitions that
-     * spec 007 FR-041 requires in the same transaction.
+     * <p>The transaction covers the transition, the slot release and — since S15P21A604-496 — the
+     * booth's AI document and Job transitions, which spec 007 FR-041 requires to be in the same
+     * transaction as the expiry.
      *
      * @return how many leases this pass transitioned
      */
@@ -193,6 +198,10 @@ public class BoothLeaseService {
         booths.findById(lease.getBoothId())
                 .filter(booth -> lease.getSlotId().equals(booth.getCurrentSlotId()))
                 .ifPresent(Booth::detachSlot);
+        // The AI half of the same expiry (spec 007 FR-015·FR-041, S15P21A604-496). It is here rather
+        // than in each caller because spec.md:71 wants it in this transaction, and because a second
+        // place to expire a lease is a second place to forget this.
+        aiDocuments.deactivate(lease.getBoothId());
         log.info("만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
                 lease.getId(), lease.getSlotId(), lease.getBoothId());
     }
