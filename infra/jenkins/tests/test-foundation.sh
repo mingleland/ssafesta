@@ -183,6 +183,8 @@ grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile retains legacy component branch dispatch"
 grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
+grep -q 'serverName(gitlabServerName)' "${develop_job}" \
+  || fail "GitLab develop Job DSL shadows the serverName method"
 grep -q "pipelineJob('festa-webgl-package-deploy')" "${webgl_job}" \
   || fail "GitLab WebGL package deployment job is missing"
 grep -q "scriptPath('infra/jenkins/pipelines/webgl-package-deploy.groovy')" "${webgl_job}" \
