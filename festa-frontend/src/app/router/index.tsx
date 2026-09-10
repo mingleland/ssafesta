@@ -8,7 +8,6 @@ import { SurveyManagementPage } from '../../pages/management/SurveyManagementPag
 import { ConsultationStaffPage } from '../../pages/management/ConsultationStaffPage';
 import { LoginPage } from '../../pages/login/LoginPage';
 import { CallbackPage } from '../../pages/auth/CallbackPage';
-import { DevAiChatPage } from '../../pages/devAiChat/DevAiChatPage';
 import { RequireAuth } from './RequireAuth';
 
 // 경로 목록: docs/10_Frontend_설계서.md §3. 각 spec 착수 시 해당 경로 추가.
@@ -143,21 +142,6 @@ export const routes = [
       };
     },
   },
-  // DEV ONLY — World 를 거치지 않고 AI_CHAT 오버레이(회원·게스트 두 갈래)를 boothId·agentId
-  // 바꿔가며 실 RAG 서버와 왕복 테스트하는 도구다. import.meta.env.DEV 로 묶어 프로덕션
-  // 라우트 테이블·번들에서 완전히 빠진다(IS_DEV_ENTRY·IS_DEV_INTERACTION_BAR 와 동일 원칙).
-  ...(import.meta.env.DEV
-    ? [
-        {
-          path: '/app/dev/ai-chat',
-          element: (
-            <RequireAuth level="guest-allowed">
-              <DevAiChatPage />
-            </RequireAuth>
-          ),
-        },
-      ]
-    : []),
 ];
 
 export const router = createBrowserRouter(routes);
