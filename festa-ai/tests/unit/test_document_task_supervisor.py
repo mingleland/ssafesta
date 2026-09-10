@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 
 import pytest
@@ -193,3 +194,50 @@ async def test_cancel_already_finished_attempt_is_a_noop() -> None:
     supervisor.cancel(job_id=1, attempt_no=0)
 
     assert supervisor.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_requested_cancel_logs_info_not_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def process(attempt: Attempt) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            raise
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+    supervisor.submit(Attempt(job_id=1, attempt_no=3))
+    await asyncio.sleep(0)
+
+    with caplog.at_level(
+        logging.INFO, logger="app.workers.document_task_supervisor"
+    ):
+        supervisor.cancel(job_id=1, attempt_no=3)
+        await _settle()
+
+    levels = [record.levelname for record in caplog.records]
+    assert levels == ["INFO"]
+
+
+@pytest.mark.asyncio
+async def test_shutdown_cancel_still_logs_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def process(attempt: Attempt) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            raise
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+    supervisor.submit(Attempt(job_id=1, attempt_no=0))
+    await asyncio.sleep(0)
+
+    with caplog.at_level(
+        logging.INFO, logger="app.workers.document_task_supervisor"
+    ):
+        await supervisor.close(grace_seconds=0)
+
+    levels = [record.levelname for record in caplog.records]
+    assert levels == ["WARNING"]

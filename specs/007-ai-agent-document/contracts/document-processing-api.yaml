@@ -34,7 +34,7 @@ paths:
     post:
       operationId: cancelDocumentProcessing
       summary: 실행 중인 문서 처리 attempt 취소
-      description: 같은 jobId+attemptNo가 이미 없거나 끝났어도 성공으로 응답한다(멱등). attemptNo가 현재 실행 중인 것과 다르면 아무것도 하지 않고 성공으로 응답한다.
+      description: 같은 jobId+attemptNo가 이미 없거나 끝났어도 성공으로 응답한다(멱등). attemptNo가 현재 실행 중인 것과 다르면 아무것도 하지 않고 성공으로 응답한다. 취소 대상 조회는 FastAPI 프로세스 하나의 in-memory 상태만 본다 — replica가 2개 이상이면 이 API는 요청을 받은 프로세스가 아닌 다른 프로세스의 attempt를 취소하지 못한다.
       requestBody:
         required: true
         content:
