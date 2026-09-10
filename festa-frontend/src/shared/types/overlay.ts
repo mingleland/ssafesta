@@ -16,7 +16,9 @@ export type OverlayType =
   /** 월드 이용 안내 — FE 가 직접 연다(최초 진입 1회 + 재열람). Unity 이벤트가 없다 */
   | 'WORLD_GUIDE'
   /** 이벤트 경품 상점 — 이벤트 NPC 상호작용. Unity discriminator 가 오면 dispatcher 에 case 하나를 더한다 */
-  | 'EVENT_SHOP';
+  | 'EVENT_SHOP'
+  /** 내장 미니게임 — 타이밍 스톱. Unity 에서 FE 로 이관한 화면이다(S15P21A604-601, #166) */
+  | 'MINIGAME';
 
 export interface OverlayRequest {
   type: OverlayType;
