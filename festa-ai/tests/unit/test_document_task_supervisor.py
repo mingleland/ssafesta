@@ -20,6 +20,12 @@ class Attempt:
     attempt_no: int
 
 
+async def _settle() -> None:
+    """완료된 task의 done_callback(call_soon으로 예약됨)까지 실행되도록 두 틱 양보한다."""
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+
 @pytest.mark.asyncio
 async def test_duplicate_attempt_runs_once() -> None:
     release = asyncio.Event()
@@ -114,3 +120,76 @@ async def test_close_rejects_new_attempts() -> None:
 
     with pytest.raises(SupervisorClosedError):
         supervisor.submit(Attempt(1, 0))
+
+
+@pytest.mark.asyncio
+async def test_cancel_stops_running_attempt_with_matching_key() -> None:
+    cancelled = asyncio.Event()
+
+    async def process(attempt: Attempt) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+    supervisor.submit(Attempt(job_id=1, attempt_no=3))
+    await asyncio.sleep(0)
+
+    supervisor.cancel(job_id=1, attempt_no=3)
+    await _settle()
+
+    assert cancelled.is_set()
+    assert supervisor.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_ignores_mismatched_attempt_no() -> None:
+    cancelled = asyncio.Event()
+
+    async def process(attempt: Attempt) -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+    supervisor.submit(Attempt(job_id=1, attempt_no=3))
+    await asyncio.sleep(0)
+
+    supervisor.cancel(job_id=1, attempt_no=2)
+    await asyncio.sleep(0)
+
+    assert not cancelled.is_set()
+    assert supervisor.active_count == 1
+
+    await supervisor.close(grace_seconds=0)
+
+
+@pytest.mark.asyncio
+async def test_cancel_unknown_job_is_a_noop() -> None:
+    async def process(attempt: Attempt) -> None:
+        return None
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+
+    supervisor.cancel(job_id=999, attempt_no=0)
+
+    assert supervisor.active_count == 0
+
+
+@pytest.mark.asyncio
+async def test_cancel_already_finished_attempt_is_a_noop() -> None:
+    async def process(attempt: Attempt) -> None:
+        return None
+
+    supervisor = DocumentTaskSupervisor(processor=process, max_concurrency=1)
+    supervisor.submit(Attempt(job_id=1, attempt_no=0))
+    await _settle()
+    assert supervisor.active_count == 0
+
+    supervisor.cancel(job_id=1, attempt_no=0)
+
+    assert supervisor.active_count == 0

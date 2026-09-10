@@ -144,7 +144,7 @@
 - [X] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
 - [ ] T048 [P] [US2] [AI] `S15P21A604-92`의 실측값을 초기 배포 설정에 반영하고 설정 기반 chunk size·overlap과 page/section 추적을 `festa-ai/app/services/text_chunker.py`에 구현한다 (`S15P21A604-123`: 설정 기반 chunk size·overlap과 page/section 추적 완료, `S15P21A604-92` 실측값을 초기 배포 설정에 반영하는 항목은 research.md 확정 후 후속)
 - [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata를 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드한 바이트의 SHA-256을 계산해 `sourceHash`와 대조한다. 불일치는 재시도 없이 `DEAD + SOURCE_HASH_MISMATCH`로 종료하고 Chunk를 저장하지 않으며, 일치할 때만 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하도록 `festa-ai/app/services/document_processing_service.py`에 구현한다
-- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속)
+- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속; `S15P21A604-572`: FR-041 cancel endpoint 완료)
 - [X] T051 [US2] [AI] `FOR UPDATE SKIP LOCKED` pickup과 30초 heartbeat 및 소유권 상실 시 결과 폐기를 `festa-ai/app/workers/document_worker.py`에 구현한다 (`S15P21A604-122`)
 - [X] T052 [US2] [AI] 기동 즉시 및 60초 주기의 만료 Job 회수와 재시도 상한 처리를 `festa-ai/app/services/job_recovery_service.py`에 구현한다 (`S15P21A604-183`)
 - [X] T053 [P] [US2] [AI] ~~상태 callback client~~ → heartbeat·batch·finalize·failed 결과 client T090/T092로 대체 (S15P21A604-449)
