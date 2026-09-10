@@ -141,8 +141,12 @@ export function SlotListPage() {
       <ul className="slot-grid">
         {slots.map((slot) => {
           const rentable = slot.status === 'AVAILABLE' && slot.type === 'USER_RENTAL';
-          return (
-            <li key={slot.slotId} className={'slot-card' + (slot.mine ? ' slot-card-mine' : '')}>
+          // 내 부스는 카드 어디를 눌러도 Studio 로 들어간다 — 예전에는 페이지 위쪽 배너의 링크
+          // 하나가 유일한 진입이라, 목록에서 제 부스를 찾아 눌러도 아무 일이 없었다(감사 항목 3).
+          // 임대 가능 카드에는 버튼이 따로 있고 그 카드는 mine 이 아니므로 클릭이 겹치지 않는다.
+          const studioPath = slot.mine && slot.boothId !== null ? `/app/studio/${slot.boothId}` : null;
+          const face = (
+            <>
               <div className="slot-card-head">
                 <strong className="slot-code">{slot.slotCode}</strong>
                 <span className={statusChipClass(slot)}>{slotStatusLabel(slot)}</span>
@@ -155,7 +159,19 @@ export function SlotListPage() {
                   </span>
                 )}
                 {rentable && <span className="slot-price">{LEASE_COIN_COST} 코인 / 1일</span>}
+                {studioPath !== null && <span className="slot-open">스튜디오에서 편집 →</span>}
               </div>
+            </>
+          );
+          return (
+            <li key={slot.slotId} className={'slot-card' + (slot.mine ? ' slot-card-mine' : '')}>
+              {studioPath !== null ? (
+                <Link className="slot-card-hit" to={studioPath} aria-label={`${slot.slotCode} 내 부스 편집`}>
+                  {face}
+                </Link>
+              ) : (
+                face
+              )}
 
               {rentable && isMember && (
                 <button type="button" className="sc-btn sc-btn-primary slot-cta" onClick={() => setConfirming(slot)} disabled={leaseMutation.isPending}>

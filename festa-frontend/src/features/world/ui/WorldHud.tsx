@@ -8,6 +8,11 @@
 // 말로 설명하지 않게 한다. FE 임베드에서는 Unity 카드가 숨겨져(-456) 이 목록이 유일한 안내다.
 // 그래서 사용자 테스트에서 실제로 묻는 것을 기준으로 고른다(GitLab #132, S15P21A604-460):
 // 이동·달리기·점프·시야·상호작용·감정 표현·창 닫기. 여기 없는 조작을 임의로 늘리지 않는다.
+//
+// F 항목에 부스 입장·나가기를 명시한다 (S15P21A604-592). Unity 카드에는 "F — 상호작용 · 부스
+// 입장" 이 있는데 FE 목록에는 그 말이 없어, 부스에 들어가고 나오는 방법을 안내에서 찾을 수
+// 없었다. 나가기도 같은 F 다 — 내부 공간 출구에 BoothPortal 이 하나 더 있다(festa-unity
+// World/Festival/BoothPortal.cs: "외부 부스와 내부 공간 출구에 하나씩").
 import { useState } from 'react';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import './worldHud.css';
@@ -57,7 +62,7 @@ export function WorldHud({ mock = false }: Props) {
             </li>
             <li>
               <span className="world-key">F</span>
-              가까운 부스·오브젝트와 상호작용
+              부스 입장·나가기 · 가까운 오브젝트와 상호작용
             </li>
             <li>
               <span className="world-key">Alt</span>

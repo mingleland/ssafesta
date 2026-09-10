@@ -1,0 +1,85 @@
+/* 임대 확인 모달 — Screen Local Baseline(--sc-*) 위에 얹는다 (감사 항목 1).
+   이 화면(SlotListPage)이 PageShell 로 이관될 때 모달만 빠져 브라우저 기본 <dialog> 스타일로
+   떴다. <dialog> 는 top layer 로 승격되지만 커스텀 속성 상속은 DOM 트리 기준이라
+   .festa-screen 안에 있는 한 --sc-* 는 그대로 닿는다 — 토큰을 다시 정의하지 않는다. */
+.lease-confirm {
+  width: min(420px, calc(100vw - 32px));
+  padding: 22px 24px 20px;
+  border: 1px solid var(--sc-border-strong);
+  border-radius: var(--sc-radius);
+  background: var(--sc-panel-sunken);
+  color: var(--sc-text);
+  font-family: var(--sc-font);
+  font-size: 14px;
+  line-height: 1.6;
+  box-shadow: 0 24px 60px rgba(4, 6, 20, 0.55);
+}
+
+/* 브라우저 기본 backdrop 은 거의 투명해 뒤 화면과 구분이 안 된다 */
+.lease-confirm::backdrop {
+  background: rgba(6, 9, 26, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.lease-confirm-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.lease-confirm-lead {
+  margin: 0 0 16px;
+  color: var(--sc-text-muted);
+}
+.lease-confirm-lead strong {
+  color: var(--sc-text);
+  font-weight: 700;
+}
+
+/* 차감 코인 · 보유 코인 — 숫자가 세로로 맞아야 비교가 된다 */
+.lease-confirm-figures {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--sc-radius-control);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sc-border);
+}
+.lease-confirm-figures dt {
+  color: var(--sc-text-muted);
+  font-size: 13px;
+}
+.lease-confirm-figures dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lease-confirm-cost {
+  color: var(--sc-gold);
+}
+
+.lease-confirm-alert {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--sc-radius-control);
+  background: rgba(239, 93, 108, 0.12);
+  border: 1px solid rgba(239, 93, 108, 0.32);
+  color: var(--sc-danger);
+  font-size: 13px;
+}
+
+.lease-confirm-note {
+  margin: 0 0 18px;
+  color: var(--sc-text-muted);
+  font-size: 13px;
+}
+
+.lease-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
