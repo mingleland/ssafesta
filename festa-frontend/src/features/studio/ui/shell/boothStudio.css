@@ -281,7 +281,6 @@
 .studio-thumb-price { color: var(--studio-accent); font-weight: 700; }
 .studio-thumb-label { line-height: 1.15; text-align: center; }
 .studio-palette-foot { padding: 10px; border-top: 1px solid var(--studio-border); }
-.studio-palette-foot .studio-btn { width: 100%; }
 
 /* ── Thumbnail art kinds (CSS 임시 — 실제 에셋 썸네일로 교체 예정) ── */
 .studio-thumb-art[data-kind='panel'] { background: linear-gradient(180deg, #f3f5fa, #cdd3e0); }
