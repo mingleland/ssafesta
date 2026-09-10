@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
 import type { BoothFacade } from '../../entities/booth/types';
-import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK } from '../../shared/config/studio';
+import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK, ZOOM_PRESETS, clampZoom } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
 import { useStudioGates } from '../../features/studio/model/useStudioGates';
@@ -37,7 +37,6 @@ import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 
 // 카탈로그 type — BE 시드는 AVATAR_PART 뿐(-167). 부스 장식 유형 값은 외부 확정 대기라 조회만 걸어 둔다
 const CATALOG_TYPE = 'BOOTH_DECOR';
-const ZOOM_STEPS = [0.8, 1, 1.2];
 
 export function StudioPage() {
   const { boothId } = useParams<{ boothId: string }>();
@@ -49,7 +48,9 @@ export function StudioPage() {
   const [mode, setMode] = useState<StudioMode>('layout');
   const [tool, setTool] = useState<TransformTool>('select');
   const [snapOn, setSnapOn] = useState(true);
-  const [zoomIdx, setZoomIdx] = useState(1);
+  // 줌은 연속값이다 (S15P21A604-604) — Ctrl+휠이 그 사이를 움직이고, 툴바 버튼은 프리셋을 돈다.
+  // 이산 3단계였을 때는 휠을 붙여도 0.8·1·1.2 사이만 오갔다.
+  const [zoom, setZoom] = useState<number>(1);
   const [preset, setPreset] = useState<TemplatePreset | null>(null);
   const [facadePreview, setFacadePreview] = useState<BoothFacade | null>(null);
   // 덮어쓰기 확인을 기다리는 템플릿 — 확인 전에는 배치를 건드리지 않는다
@@ -331,11 +332,15 @@ export function StudioPage() {
           canPublish={canPublish}
           publishing={publishMutation.isPending}
           publishedVersion={state.publishedVersion ?? null}
-          zoomPercent={Math.round(ZOOM_STEPS[zoomIdx] * 100)}
+          zoomPercent={Math.round(zoom * 100)}
           onBack={() => navigate(WORLD_RETURN_TO_MANAGEMENT)}
           onSave={handleSave}
           onPublish={() => publishMutation.mutate(boothIdNum)}
-          onZoomToggle={() => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length)}
+          onZoomToggle={() =>
+            // 지금 배율보다 큰 첫 프리셋으로. 끝에 닿으면 처음으로 돈다 — 휠로 벗어난 값에서도
+            // 버튼 한 번이면 알려진 자리로 돌아온다
+            setZoom((z) => ZOOM_PRESETS.find((preset) => preset > z + 0.001) ?? ZOOM_PRESETS[0])
+          }
           canReset={state.objects.length > 0 && !gates.leaseExpired}
           onReset={handleResetLayout}
         />
@@ -360,7 +365,7 @@ export function StudioPage() {
           objects={state.objects}
           selectedObjectId={state.selectedObjectId}
           bounds={bounds}
-          zoom={ZOOM_STEPS[zoomIdx]}
+          zoom={zoom}
           tool={tool}
           snapOn={snapOn}
           decor={decor}
@@ -370,7 +375,8 @@ export function StudioPage() {
           onRotate={(objectId, rotationY) => dispatch({ type: 'ROTATE_OBJECT', objectId, rotationY })}
           onTool={setTool}
           onSnapToggle={() => setSnapOn((s) => !s)}
-          onFrame={() => setZoomIdx(1)}
+          onZoomChange={(next) => setZoom(clampZoom(next))}
+          onFrame={() => setZoom(1)}
         />
       }
       inspector={
