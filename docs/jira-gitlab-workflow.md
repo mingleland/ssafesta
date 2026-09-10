@@ -156,9 +156,10 @@ Key 추출: 커밋 메시지·MR 제목의 `[A-Z][A-Z0-9]+-[0-9]+`. 어디에서
 | 변경 범위 | MR 검증 |
 |---|---|
 | 문서·명세·evidence-only | `mr-status` 성공 |
+| AI 변경 | `mr-status` + `ai-test` + `ai-build` |
 | Front 변경 | `mr-status` + `front-test` + `front-build` |
 | Back 변경 | `mr-status` + `back-test` + `back-build` |
-| `.gitlab-ci.yml` 또는 `ci/**` | 위 4개 컴포넌트 검증 모두 |
+| `.gitlab-ci.yml` 또는 `ci/**` | AI·Front·Back 컴포넌트 검증 모두 |
 
 - pipeline이 실행 중이거나 실패하면 병합하지 않는다. 원인을 고쳐 새 커밋으로 재실행한다.
 - Jenkins는 MR 합격 판정 대상이 아니다. Jenkins는 `develop` 병합 뒤 빌드·배포·리허설을 담당한다.
