@@ -1,11 +1,12 @@
 // Temporary Iso Renderer — SVG 아이소메트릭 투영으로 그리는 임시 2.5D 부스 (S15P21A604-405).
 // 교체 경계: BoothCanvasViewport 가 넘기는 props 만 소비한다. R3F/Three 로 바꿔도 Shell·Feature 는 그대로다.
 // 좌표 규약은 계약(헌법 21조) 그대로 — 원점 = 바닥 중앙, +Z = 부스 정면, y = 높이. 화면 매핑은 이 파일에만 있다.
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { LayoutObject } from '../../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
+import { overlappingObjectIds } from '../../lib/overlap';
 import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
 import { dragKind } from '../../model/studioMode';
 import type { BoothRendererProps } from './canvasTypes';
@@ -54,6 +55,8 @@ interface DragState {
 export function TemporaryIsoRenderer(p: BoothRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  // 겹침은 배치가 바뀔 때만 다시 센다 — R3F 렌더러와 같은 함수를 쓴다(표시가 갈리면 안 된다)
+  const overlapping = useMemo(() => overlappingObjectIds(p.objects), [p.objects]);
 
   const halfW = p.bounds.width / 2;
   const halfD = p.bounds.depth / 2;
@@ -228,6 +231,7 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
         const isSel = obj.objectId === p.selectedObjectId;
         const known = OBJECT_LOCAL_BOUNDS[obj.type];
         const oob = known !== undefined && isAreaOutOfBounds(worldAABB(known, obj.rotationY, obj.position), p.bounds);
+        const invalid = oob || overlapping.has(obj.objectId);
         const sides = [0, 1, 2, 3]
           .map((i) => {
             const j = (i + 1) % 4;
@@ -254,7 +258,7 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
               <polygon key={i} className={i % 2 === 0 ? 'iso-obj-left' : 'iso-obj-right'} points={pts([bottom[i], bottom[j], top[j], top[i]])} />
             ))}
             <polygon className="iso-obj-top" points={pts(top)} />
-            {isSel && <polygon className={oob ? 'iso-footprint iso-footprint-oob' : 'iso-footprint'} points={pts(bottom)} />}
+            {isSel && <polygon className={invalid ? 'iso-footprint iso-footprint-oob' : 'iso-footprint'} points={pts(bottom)} />}
             {/* 라벨은 선택했을 때만 — 전부 띄우면 부스가 글자로 덮인다 */}
             {isSel && (
               <text className="iso-obj-label" x={label.x} y={label.y}>
