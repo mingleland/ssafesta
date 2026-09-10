@@ -140,6 +140,9 @@ namespace Festa.EditorTools
 
         const float FixtureY = 2.65f;
 
+        /// <summary>부스 내부 매입등과 같은 색 (<see cref="FestaInteriorBuilder"/> 의 <c>BoothLight_N</c>).</summary>
+        static readonly Color BoothLightColor = new(1f, 0.97f, 0.93f);
+
         /// <summary>천장 스포트 — 기구 + 스포트 라이트 + 눈에 보이는 빛기둥.</summary>
         static void BuildExhibitLight(Transform parent)
         {
@@ -173,7 +176,8 @@ namespace Festa.EditorTools
             lens.transform.SetParent(rig, false);
             lens.transform.localPosition = new Vector3(0f, -0.175f, 0f);
             lens.transform.localScale = new Vector3(0.29f, 0.012f, 0.29f);
-            Paint(lens, EmissiveMat("LobbyFixtureLens", new Color(1f, 0.93f, 0.78f), 3.2f));
+            // 렌즈도 부스 매입등 패널과 같은 문법 — 발광 1.5 로 날아가지 않게(패널 주석 참조).
+            Paint(lens, EmissiveMat("LobbyFixtureLens", BoothLightColor, 1.5f));
 
             // 빛기둥 — 위가 좁고 아래가 넓은 원뿔. 위가 밝고 아래로 갈수록 사라진다.
             var beam = new GameObject("Beam");
@@ -193,13 +197,18 @@ namespace Festa.EditorTools
             spot.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // 아래를 본다
             var sl = spot.AddComponent<Light>();
             sl.type = LightType.Spot;
-            sl.color = new Color(1f, 0.93f, 0.82f);
-            sl.intensity = 34f;
+            // 색은 부스 내부 매입등과 **같은 값**이다 (FestaInteriorBuilder: BoothLight_N).
+            sl.color = BoothLightColor;
+            // **세기는 그 숫자를 그대로 못 쓴다.** 부스는 1 m = 13.26 unit 이라 같은 170 이어도 거리가
+            // 13 배라 도달량이 전혀 다르다 — 부스는 등이 피사체에서 ~54 u(4 m) 떨어져 E = 170/54² ≈ 0.06,
+            // 로비는 1.3 m 라 34 를 그대로 쓰면 E ≈ 21 로 200 배가 넘어 하얗게 날아갔다(사용자 지적).
+            // 로비의 기존 Key(디렉셔널 1.45) 위에 부드럽게 얹히는 값으로 환산했다.
+            sl.intensity = 3.2f;
             sl.range = 8f;
             sl.spotAngle = 48f;
             sl.innerSpotAngle = 26f;
             sl.shadows = LightShadows.Soft;
-            sl.shadowStrength = 0.55f;
+            sl.shadowStrength = 0.5f;
         }
 
         /// <summary>
@@ -244,11 +253,12 @@ namespace Festa.EditorTools
         /// <summary>빛기둥 세로 그라데이션 — 위(v=1)가 밝고 아래로 사라진다.</summary>
         static Texture2D BeamGradient()
         {
-            var tint = new Color(1f, 0.94f, 0.80f);
+            var tint = BoothLightColor;
             return Bake("LobbyBeamGradient", 2, 128, (u, v) =>
             {
                 // 0.55 는 우유처럼 뿌옇게 껴 아바타를 덮었다 — 빛으로 읽힐 만큼만 남긴다.
-                float a = Mathf.Pow(v, 2.4f) * 0.34f;
+                // 광원을 부스 등 세기로 낮추면서 기둥도 같이 옅게(0.34 → 0.24).
+                float a = Mathf.Pow(v, 2.4f) * 0.24f;
                 return new Color(tint.r, tint.g, tint.b, a);
             });
         }
