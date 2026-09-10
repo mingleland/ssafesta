@@ -20,6 +20,9 @@ webgl_job="${repo_root}/infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy"
 webgl_pipeline="${repo_root}/infra/jenkins/pipelines/webgl-package-deploy.groovy"
 webgl_deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
 webgl_publish="${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh"
+demo_promotion_job="${repo_root}/infra/jenkins/jobs/gitlab-demo-promotion.groovy"
+demo_promotion_pipeline="${repo_root}/infra/jenkins/pipelines/demo-promotion.groovy"
+demo_promotion_validator="${repo_root}/infra/jenkins/scripts/validate-demo-promotion.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -186,6 +189,25 @@ grep -q 'DEPLOY-TOKEN:' "${webgl_deploy}" || fail "Registry download does not us
 grep -q 'buildWithParameters' "${webgl_publish}" || fail "publisher does not trigger Jenkins after upload"
 ! grep -q 'unity-webgl-builder' "${webgl_job}" "${webgl_pipeline}" \
   || fail "obsolete Windows WebGL agent remains wired"
+grep -q "pipelineJob('festa-demo-promotion')" "${demo_promotion_job}" \
+  || fail "manual demo promotion job is missing"
+grep -q "scriptPath('infra/jenkins/pipelines/demo-promotion.groovy')" "${demo_promotion_job}" \
+  || fail "demo promotion job does not use the repository pipeline"
+grep -q 'validate-demo-promotion.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not validate its dev release"
+grep -q 'deploy-release.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not reuse demo deployment"
+grep -q 'verify-release.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not reuse integration verification"
+grep -q 'decide-recovery.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not apply recovery policy"
+grep -q 'rollback-release.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not reuse rollback"
+grep -q 'promote-release.sh' "${demo_promotion_pipeline}" \
+  || fail "demo promotion does not atomically promote a verified release"
+grep -q 'DEMO_VERIFY_WEB_COMMAND:' "${agent_compose}" \
+  || fail "deploy agent lacks demo verification commands"
+[[ -x "${demo_promotion_validator}" ]] || fail "demo promotion validator is not executable"
 grep -q 'fingerprint: true' "${component_pipeline}" \
   || fail "component CI does not fingerprint selected artifacts"
 grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo backend does not use infra profile"
