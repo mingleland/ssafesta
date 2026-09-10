@@ -43,6 +43,10 @@ namespace Festa.EditorTools
 
             var camGo = new GameObject("__MinimapCamera");
             var cam = camGo.AddComponent<Camera>();
+            GameObject fillLight = null;
+            var savedAmbientMode = RenderSettings.ambientMode;
+            var savedAmbientLight = RenderSettings.ambientLight;
+            float savedAmbientIntensity = RenderSettings.ambientIntensity;
             try
             {
                 cam.orthographic = true;
@@ -59,6 +63,23 @@ namespace Festa.EditorTools
                 // 아래를 보되 화면 위쪽이 월드 −x 가 되게. 그러면 오른쪽은 +z 다.
                 camGo.transform.position = new Vector3((MinX + MaxX) * 0.5f, 900f, (MinZ + MaxZ) * 0.5f);
                 camGo.transform.rotation = Quaternion.LookRotation(Vector3.down, new Vector3(-1f, 0f, 0f));
+
+                // 축제장은 밤이라 그냥 찍으면 지도가 너무 어둡다 ("전체적으로 어두워서 보기가 힘들다",
+                // 2026-09-10). 굽는 동안만 환경광을 올리고 위에서 빛을 하나 준다 — 씬은 건드리지 않는다.
+                savedAmbientMode = RenderSettings.ambientMode;
+                savedAmbientLight = RenderSettings.ambientLight;
+                savedAmbientIntensity = RenderSettings.ambientIntensity;
+                RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+                RenderSettings.ambientLight = new Color(0.62f, 0.63f, 0.68f);
+                RenderSettings.ambientIntensity = 1f;
+
+                fillLight = new GameObject("__MinimapFill");
+                var l = fillLight.AddComponent<Light>();
+                l.type = LightType.Directional;
+                l.color = new Color(1f, 0.98f, 0.93f);
+                l.intensity = 1.1f;
+                l.shadows = LightShadows.None;
+                fillLight.transform.rotation = Quaternion.Euler(78f, 20f, 0f);
 
                 var rt = new RenderTexture(width, Height, 24, RenderTextureFormat.ARGB32)
                 {
@@ -85,6 +106,11 @@ namespace Festa.EditorTools
             }
             finally
             {
+                // 조명·환경광은 **반드시** 되돌린다. 굽다가 실패해도 씬이 밝아진 채로 남으면 안 된다.
+                RenderSettings.ambientMode = savedAmbientMode;
+                RenderSettings.ambientLight = savedAmbientLight;
+                RenderSettings.ambientIntensity = savedAmbientIntensity;
+                if (fillLight != null) Object.DestroyImmediate(fillLight);
                 Object.DestroyImmediate(camGo);
             }
 

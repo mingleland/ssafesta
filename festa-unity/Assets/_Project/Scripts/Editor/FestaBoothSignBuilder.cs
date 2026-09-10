@@ -61,12 +61,12 @@ namespace Festa.EditorTools
             var festival = GameObject.Find("@Festival");
             if (festival == null) { Debug.LogError("[BoothSign] @Festival 이 없다."); return; }
 
-            // **주아**를 쓴다. NotoSansKR Bold 는 각져서 분필 간판에 안 어울린다는 지적을 받았다
-            // (2026-09-10 — "너무 흰 배경에 딱딱한 폰트"). 주아는 둥글어서 손으로 쓴 느낌에 가깝고,
-            // 프로젝트의 디스플레이 글꼴(FestaUiKit.DisplayFont)과도 같은 것이다.
-            var font = Resources.Load<TMP_FontAsset>("Fonts/Jua_SDF")
+            // **학교안심 칠판지우개**를 쓴다 (사용자 지정 2026-09-10). 분필로 쓴 글씨체라
+            // 칠판 입간판과 결이 맞는다. 없으면 주아 → NotoSansKR Bold 순으로 물러난다.
+            var font = Resources.Load<TMP_FontAsset>("Fonts/ChalkboardKR_SDF")
+                    ?? Resources.Load<TMP_FontAsset>("Fonts/Jua_SDF")
                     ?? Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
-            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts/Jua_SDF · NotoSansKRBold_SDF 둘 다 없음"); return; }
+            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts 에 쓸 글꼴이 없다"); return; }
 
             var signPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SignPrefab);
             if (signPrefab == null) { Debug.LogError($"[BoothSign] {SignPrefab} 없음"); return; }
@@ -80,6 +80,8 @@ namespace Festa.EditorTools
             var plateMat = Material("M_BoothSign_Plate", new Color(0.105f, 0.125f, 0.118f), new Color(0.10f, 0.13f, 0.12f), 0.30f, 0.22f);
             // 판 안쪽에 도는 얇은 흰 테두리 — 레퍼런스 사진의 그 선이다.
             var chalkMat = Material("M_BoothSign_Chalk", new Color(0.88f, 0.89f, 0.84f), new Color(0.55f, 0.57f, 0.53f), 0.5f, 0.1f);
+            // 전시 이미지가 붙는 면. 런타임에 BoothSign.ShowThumbnail 이 면마다 인스턴스를 떠서 텍스처를 넣는다.
+            var photoMat = Material("M_BoothSign_Photo", Color.white, Color.black, 0f, 0.05f);
 
             var old = festival.transform.Find(RootName);
             if (old != null) Object.DestroyImmediate(old.gameObject);   // 두 번 돌려도 같은 결과
@@ -93,7 +95,7 @@ namespace Festa.EditorTools
                 var body = FindSlotBody(festival.transform, slot);
                 if (body == null) { missing++; Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 실물을 못 찾았다 — 건너뛴다."); continue; }
 
-                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat);
+                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat, photoMat);
                 built++;
             }
 
@@ -125,7 +127,7 @@ namespace Festa.EditorTools
         }
 
         static void BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
-                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat, Material chalkMat)
+                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat, Material chalkMat, Material photoMat)
         {
             bool northRow = b.center.z > AisleZ;
 
@@ -151,8 +153,10 @@ namespace Festa.EditorTools
             var front = FindPanel(sign.transform, "Front");
             var back = FindPanel(sign.transform, "Back");
 
-            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat, chalkMat);
-            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat, chalkMat);
+            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat, chalkMat, photoMat,
+                                  out var photoFront, out var numFront, out float labelAspect);
+            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat, chalkMat, photoMat,
+                                      out var photoBack, out var numBack, out _);
 
             // ── 떠 있는 전시 카드 ──────────────────────────────
             // **썸네일이 실제로 로드됐을 때만** 켜진다 (BoothSign.ShowThumbnail).
@@ -171,6 +175,9 @@ namespace Festa.EditorTools
             comp.boothId = slot;
             comp.label = label;
             comp.labelBack = labelBack;
+            comp.labelBoxAspect = labelAspect;
+            comp.photoFaces = new[] { photoFront, photoBack };
+            comp.photoPlaceholders = new[] { numFront, numBack };
             comp.cardPivot = pivot.transform;
             comp.cardRenderer = card.GetComponent<Renderer>();
         }
@@ -190,8 +197,13 @@ namespace Festa.EditorTools
         /// Y 180° 를 한 번 더 준다(이게 없으면 거울 글씨가 된다 — 부스 내부 간판에서 이미 밟은 함정).</para>
         /// </summary>
         static TMP_Text PanelText(Transform parent, string name, TMP_FontAsset font, Renderer panel,
-                                  bool outward, int slot, Material plateMat, Material chalkMat)
+                                  bool outward, int slot, Material plateMat, Material chalkMat, Material photoMat,
+                                  out Renderer photoOut, out TMP_Text placeholderOut, out float boxAspectOut)
         {
+            photoOut = null;
+            placeholderOut = null;
+            boxAspectOut = 1.6f;
+
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             Loose(go);
@@ -238,11 +250,32 @@ namespace Festa.EditorTools
             Slab(parent, name + "RuleInner", localCenter + normal * (lift * 1.45f), rot,
                  new Vector3(plateW * 0.90f - lift * 0.5f, plateH * 0.90f - lift * 0.5f, lift * 0.3f), plateMat);
 
-            go.transform.localPosition = localCenter + normal * (lift * 1.8f);
+            // 판 위쪽 = 전시 이미지, 아래쪽 = 이름 (사용자가 올린 카페 입간판 레퍼런스 배치).
+            // 위/아래는 판의 기울기를 따라가는 방향이라 rot 를 곱해서 얻는다.
+            var faceUp = rot * Vector3.up;
+            float photoH = plateH * 0.38f;
+            float photoW = plateW * 0.62f;
+            float photoY = plateH * 0.22f;
+
+            var photo = Slab(parent, name + "Photo", localCenter + normal * (lift * 1.7f) + faceUp * photoY, rot,
+                             new Vector3(photoW, photoH, lift * 0.25f), photoMat);
+            photo.SetActive(false);   // 썸네일이 실제로 오면 BoothSign.ShowThumbnail 이 켠다
+            photoOut = photo.GetComponent<Renderer>();
+
+            // 이미지가 없는 동안 그 자리에 분필로 쓴 듯 번호를 남긴다 — 위쪽을 비워 두면
+            // 아래 이름만 덩그러니 남아 판이 반쪽으로 보인다.
+            placeholderOut = ChalkLabel(parent, name + "Num", font, $"{slot:00}",
+                                        localCenter + normal * (lift * 1.8f) + faceUp * photoY, rot,
+                                        photoW * 0.8f, photoH * 0.7f, new Color(0.72f, 0.75f, 0.70f));
+
+            go.transform.localPosition = localCenter + normal * (lift * 1.8f) - faceUp * (plateH * 0.22f);
             go.transform.localRotation = rot;
 
-            float boxW = plateW * 0.92f;
-            float boxH = plateH * 0.9f;
+            // **좌우 여백을 넉넉히.** 0.92 로 잡았을 때 글자가 분필 테두리선(0.90)을 밟았다
+            // (2026-09-10 지적). 0.70 이면 선 안쪽으로 확실히 들어온다.
+            float boxW = plateW * 0.70f;
+            // 높이도 넉넉히. 0.32 로 잡았을 때 세 줄이 눌려 글자가 판 폭의 1/3 밖에 못 썼다.
+            float boxH = plateH * 0.40f;
 
             // fontSize 10 = 월드 1 unit (WorldNameplate 실측).
             //
@@ -255,11 +288,12 @@ namespace Festa.EditorTools
             tmp.fontSizeMin = boxH * 0.5f;
             tmp.fontSize = tmp.fontSizeMax;
             tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
+            boxAspectOut = boxW / boxH;   // 줄 수를 고를 때 쓴다 (BoothSign.WrapByWord)
             return tmp;
         }
 
         /// <summary>기울어진 판 위에 얹는 얇은 판 한 장. 칠판·테두리를 같은 방식으로 만든다.</summary>
-        static void Slab(Transform parent, string name, Vector3 localPos, Quaternion rot, Vector3 size, Material mat)
+        static GameObject Slab(Transform parent, string name, Vector3 localPos, Quaternion rot, Vector3 size, Material mat)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
             go.name = name;
@@ -270,6 +304,31 @@ namespace Festa.EditorTools
             Object.DestroyImmediate(go.GetComponent<Collider>());
             go.GetComponent<Renderer>().sharedMaterial = mat;
             Loose(go);
+            return go;
+        }
+
+        /// <summary>
+        /// 판 위에 얹는 짧은 분필 글자 (전시 이미지가 없을 때의 번호). 자동 축소 없이 고정 크기다 —
+        /// 두 글자짜리라 넘칠 일이 없고, 칸마다 크기가 달라지면 오히려 지저분하다.
+        /// </summary>
+        static TMP_Text ChalkLabel(Transform parent, string name, TMP_FontAsset font, string text,
+                                   Vector3 localPos, Quaternion rot, float boxW, float boxH, Color color)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = rot;
+            Loose(go);
+
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.font = font;
+            tmp.text = text;
+            tmp.color = color;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.fontSize = boxH * 6f;   // fontSize 10 = 월드 1 unit
+            tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
+            return tmp;
         }
 
         static GameObject Box(Transform parent, string name, Vector3 localPos, Vector3 size, Material mat)

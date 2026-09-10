@@ -27,8 +27,8 @@ namespace Festa.World
     /// 고정이고, 그 폭 안에서 두 줄이 겹치지 않는 최대치가 카드 폭이다.</para>
     ///
     /// <para><b>복도에서부터 열린다.</b> 축제장 안에서만 열면 "가는 길에 어디로 갈지" 를 못 본다.
-    /// 11층 방(z &lt; -118)과 내부 부스 홀(x &gt; 500)만 뺀다. 복도에 있는 동안에는 내 위치가
-    /// 지도 밖이라 점을 가장자리에 붙이고 흐리게 둔다 — 안에 있는 척하지 않는다.</para>
+    /// 11층 방(z &lt; -118)과 내부 부스 홀(x &gt; 500)만 뺀다. 복도에 있는 동안에는 <b>내 위치 점을
+    /// 아예 끈다</b> — 지도 밖에 있는데 가장자리에 붙여 두면 거기 있는 것처럼 읽힌다.</para>
     ///
     /// <para><b>이미지·이름은 다시 묻지 않는다.</b> <see cref="BoothSignPresenter"/> 가 표지판을
     /// 채우며 받아 둔 것을 읽는다 — 일괄 조회 endpoint 가 없어 12칸 × 2요청이 이미 부담이다(#171 ④).</para>
@@ -54,14 +54,14 @@ namespace Festa.World
 
         // ── 색 ────────────────────────────────────────────────────
         // 네온은 남기되 **선과 점에만** 쓴다. 면을 시안으로 채웠더니 촌스러웠다 (2026-09-10 지적).
-        static readonly Color Veil     = new(0.020f, 0.024f, 0.031f, 0.86f);  // 뒤 월드 암막
-        static readonly Color Panel    = new(0.055f, 0.063f, 0.078f, 0.99f);  // 패널 바탕
-        static readonly Color Surface  = new(0.086f, 0.098f, 0.118f, 1f);     // 카드 바탕
-        static readonly Color Hairline = new(1f, 1f, 1f, 0.09f);              // 1 px 실선
-        static readonly Color Teal     = new(0.435f, 0.847f, 0.816f, 1f);     // 강조 — 아껴 쓴다
-        static readonly Color Ivory    = new(0.902f, 0.918f, 0.941f, 1f);
-        static readonly Color Muted    = new(0.478f, 0.518f, 0.588f, 1f);
-        static readonly Color VacantBg = new(0.075f, 0.082f, 0.098f, 1f);
+        static readonly Color Veil     = new(0.016f, 0.020f, 0.027f, 0.92f);  // 뒤 월드 암막 — 진하게 덮어야 지도가 뜬다
+        static readonly Color Panel    = new(0.086f, 0.098f, 0.122f, 1f);     // 패널 바탕
+        static readonly Color Surface  = new(0.153f, 0.169f, 0.204f, 1f);     // 카드 바탕 — 배경 사진 위에서 떠 보여야 한다
+        static readonly Color Hairline = new(1f, 1f, 1f, 0.22f);              // 1 px 실선
+        static readonly Color Teal     = new(0.514f, 0.918f, 0.882f, 1f);     // 강조 — 아껴 쓴다
+        static readonly Color Ivory    = new(0.980f, 0.988f, 1f, 1f);
+        static readonly Color Muted    = new(0.639f, 0.678f, 0.741f, 1f);
+        static readonly Color VacantBg = new(0.176f, 0.192f, 0.224f, 1f);
         static readonly Color Amber    = new(0.941f, 0.706f, 0.161f, 1f);
 
         // ── 치수 (기준 해상도 1920×1080) ──────────────────────────
@@ -70,12 +70,16 @@ namespace Festa.World
         //
         // 카드는 **실제 위치 그대로** 놓는다 — 사진 속 부스 지붕 위에 얹혀야 하므로 안쪽으로
         // 당기면(inset) 그만큼 어긋난다. 한 번 그렇게 만들었다가 36 px 씩 밀려 있었다.
-        // 대신 양 끝 줄 카드가 지도 밖으로 10~18 px 삐져나가는데, 패널 여백 안이라 잘리지 않는다.
-        // MapH 820 → MapW 474, 두 줄 간격 218 → 카드 폭 146 이면 사이가 72 px 남는다.
-        const float PanelW = 640f, PanelH = 980f;
-        const float MapH = 820f;
-        const float CardW = 146f, CardH = 112f;
-        const float CaptionH = 46f;
+        // 대신 굽는 범위를 690 으로 넓혀(FestivalMinimapArea) 양 끝 줄도 그림 안에 들어오게 했다 —
+        // 640 일 때는 카드가 그림 테두리를 11~18 px 밟았다.
+        //
+        // 크기는 한 번 키웠다 (2026-09-10 — "오버레이도 더 크게"). MapH 900 → MapW 482,
+        // 두 줄 간격 222 → 카드 폭 158 이면 사이가 64 px 남는다.
+        const float PanelW = 700f, PanelH = 1046f;
+        const float MapH = 900f;
+        const float CardW = 158f, CardH = 122f;
+        const float CaptionH = 52f;
+        const float CardPad = 12f;   // 카드 안쪽 좌우 여백 — 글자가 테두리에 붙지 않게
 
         float MapW => MapH * FestivalMinimapArea.Aspect;
 
@@ -210,7 +214,7 @@ namespace Festa.World
             if (shot != null)
             {
                 raw.texture = shot;
-                raw.color = new Color(1f, 1f, 1f, 0.92f);   // 카드가 위에 얹히므로 배경은 살짝 눕힌다
+                raw.color = Color.white;   // 굽는 쪽에서 이미 밝기를 올려 뒀다 — 여기서 더 눕히면 다시 어두워진다
             }
             else
             {
@@ -228,21 +232,21 @@ namespace Festa.World
 
         void BuildHeader(RectTransform root)
         {
-            FestaUiKit.Label(root, "F E S T I V A L", 13f, new Vector2(40f, -30f), new Vector2(360f, 20f),
+            FestaUiKit.Label(root, "F E S T I V A L", 15f, new Vector2(44f, -32f), new Vector2(360f, 22f),
                              Teal, FontStyles.Bold, TextAlignmentOptions.Left, new Vector2(0f, 1f));
 
-            var title = FestaUiKit.Label(root, "축제장 부스", 27f, new Vector2(38f, -50f), new Vector2(420f, 40f),
+            var title = FestaUiKit.Label(root, "축제장 부스", 32f, new Vector2(42f, -54f), new Vector2(420f, 46f),
                                          Ivory, FontStyles.Bold, TextAlignmentOptions.Left, new Vector2(0f, 1f));
             FestaUiKit.Display(title);
 
-            FestaUiKit.Label(root, "입구 아래 · 안쪽 위", 14f, new Vector2(-40f, -34f), new Vector2(300f, 20f),
+            FestaUiKit.Label(root, "입구 아래 · 안쪽 위", 16f, new Vector2(-44f, -36f), new Vector2(300f, 22f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Right, new Vector2(1f, 1f));
-            FestaUiKit.Label(root, "Tab · Esc 닫기", 14f, new Vector2(-40f, -56f), new Vector2(300f, 20f),
+            FestaUiKit.Label(root, "Tab · Esc 닫기", 16f, new Vector2(-44f, -60f), new Vector2(300f, 22f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Right, new Vector2(1f, 1f));
 
             var rule = FestaUiKit.Rect(root, "Rule", Hairline, 1);
             FestaUiKit.Place(rule.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                             new Vector2(0f, -98f), new Vector2(PanelW - 80f, 1f));
+                             new Vector2(0f, -104f), new Vector2(PanelW - 88f, 1f));
         }
 
         void BuildCell(int slot, Bounds world)
@@ -278,25 +282,25 @@ namespace Festa.World
             raw.color = new Color(1f, 1f, 1f, 0.06f);   // 그림이 오기 전에는 거의 빈 면
             raw.raycastTarget = false;
 
-            var caption = FestaUiKit.Rect(crt, "Caption", new Color(0.043f, 0.051f, 0.063f, 0.95f), 9);
+            var caption = FestaUiKit.Rect(crt, "Caption", new Color(0.055f, 0.063f, 0.078f, 0.98f), 9);
             FestaUiKit.Place(caption.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
                              Vector2.zero, new Vector2(CardW - 2f, CaptionH));
 
-            var name = FestaUiKit.Label(caption.rectTransform, $"{slot}번 부스", 14f, new Vector2(0f, 0f),
-                                        new Vector2(CardW - 34f, CaptionH - 6f), Ivory, FontStyles.Normal,
+            var name = FestaUiKit.Label(caption.rectTransform, $"{slot}번 부스", 17f, new Vector2(0f, 0f),
+                                        new Vector2(CardW - CardPad * 2f, CaptionH - 8f), Ivory, FontStyles.Bold,
                                         TextAlignmentOptions.Center, new Vector2(0.5f, 0.5f),
                                         new Vector2(0.5f, 0.5f));
             name.enableAutoSizing = true;
-            name.fontSizeMin = 9f;
-            name.fontSizeMax = 14f;
+            name.fontSizeMin = 11f;
+            name.fontSizeMax = 17f;
             name.textWrappingMode = TextWrappingModes.Normal;
             name.overflowMode = TextOverflowModes.Ellipsis;
 
             // 번호는 사진 왼쪽 위 모서리에 작게 — 자막 폭을 이름에 다 내주기 위해서다.
-            var badge = FestaUiKit.Rect(crt, "Badge", new Color(0.043f, 0.051f, 0.063f, 0.85f), 8);
+            var badge = FestaUiKit.Rect(crt, "Badge", new Color(0.043f, 0.051f, 0.063f, 0.92f), 8);
             FestaUiKit.Place(badge.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f),
-                             new Vector2(5f, -5f), new Vector2(26f, 20f));
-            var num = FestaUiKit.Label(badge.rectTransform, slot.ToString("00"), 12f, Vector2.zero,
+                             new Vector2(7f, -7f), new Vector2(32f, 24f));
+            var num = FestaUiKit.Label(badge.rectTransform, slot.ToString("00"), 14f, Vector2.zero,
                                        Vector2.zero, Teal, FontStyles.Bold, TextAlignmentOptions.Center);
             FestaUiKit.Stretch(num.rectTransform);
 
@@ -305,10 +309,10 @@ namespace Festa.World
             // 아예 **다른 층을 켜고 끈다**.
             var vacant = FestaUiKit.Rect(surface.transform, "Vacant", VacantBg, 10);
             FestaUiKit.Stretch(vacant.rectTransform);
-            FestaUiKit.Label(vacant.rectTransform, $"{slot:00}", 12f, new Vector2(0f, -8f),
-                             new Vector2(CardW - 20f, 18f), new Color(0.35f, 0.38f, 0.44f, 1f),
+            FestaUiKit.Label(vacant.rectTransform, $"{slot:00}", 14f, new Vector2(0f, -10f),
+                             new Vector2(CardW - CardPad * 2f, 20f), new Color(0.56f, 0.60f, 0.67f, 1f),
                              FontStyles.Bold, TextAlignmentOptions.Center, new Vector2(0.5f, 1f));
-            FestaUiKit.Label(vacant.rectTransform, "부스 없음", 13f, Vector2.zero, new Vector2(CardW - 20f, 22f),
+            FestaUiKit.Label(vacant.rectTransform, "부스 없음", 16f, Vector2.zero, new Vector2(CardW - CardPad * 2f, 24f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Center,
                              new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
             vacant.gameObject.SetActive(false);
@@ -377,16 +381,14 @@ namespace Festa.World
         {
             if (_dot == null) return;
 
+            // **복도에서는 점을 아예 끈다.** 전에는 가장자리에 붙이고 흐리게 뒀는데, 지도 안에
+            // 있지도 않은 점이 테두리에 걸쳐 있어 "저기 있는 건가" 로 읽혔다 (2026-09-10 지적).
+            // 축제장 밖이면 내 위치는 지도가 말할 수 있는 것이 아니다 — 안 그리는 것이 정직하다.
             bool inside = world.x < FestivalMaxX;
-            var p = WorldToMap(world);   // 점은 사진과 1:1 — inset 없이
-            float halfW = (MapW - 20f) * 0.5f, halfH = (MapH - 20f) * 0.5f;
-            p.x = Mathf.Clamp(p.x, -halfW, halfW);
-            p.y = Mathf.Clamp(p.y, -halfH, halfH);
-            _dot.anchoredPosition = p;
+            if (_dot.gameObject.activeSelf != inside) _dot.gameObject.SetActive(inside);
+            if (!inside) return;
 
-            var c = _dotCore.color;
-            float a = inside ? 1f : 0.4f;
-            if (!Mathf.Approximately(c.a, a)) _dotCore.color = new Color(c.r, c.g, c.b, a);
+            _dot.anchoredPosition = WorldToMap(world);   // 점은 사진과 1:1 — inset 없이
         }
 
         /// <summary>
