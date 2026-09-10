@@ -31,17 +31,16 @@ export const GameOverlay = ({ payload, portalRepository: repositoryProp }: GameO
   const [state, setState] = useState<PortalState>({ status: 'loading', attempt: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
+  // 게임 런타임이 키를 먹기 전에 focus 를 가져온다.
+  //
+  // **Esc 리스너는 걷어냈다** (-450, #132). 여기만 capture 단계로 `window` 에 걸려 있어서
+  // `WorldPage` 의 중재보다 먼저 오버레이를 닫았고, 그 다음 중재가 "떠 있는 게 없다" 로 읽어
+  // **Game Menu 를 함께 열었다.** preventDefault 는 다른 리스너를 막지 못한다. 지금은 `WorldPage`
+  // 가 유일한 중재자이고 이 오버레이는 그 화면의 `OverlayHost` 안에서만 뜬다.
   useEffect(() => {
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
     rootRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      closeOverlay();
-    };
-    window.addEventListener('keydown', closeOnEscape, true);
-    return () => window.removeEventListener('keydown', closeOnEscape, true);
   }, []);
 
   useEffect(() => {

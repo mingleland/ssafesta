@@ -1,6 +1,7 @@
 // Unity WebGL이 보내는 전역 콜백 이벤트를 React가 구독할 수 있게 잇는 다리
 // Unity → React 이벤트 계약. 패턴 출처: specs/013-avatar-customization/contracts/avatar-bridge.md
 // (window.FestaUnity 콜백 네임스페이스 — 기존 Unity 합의 규격, 새 패턴을 만들지 않는다)
+import { applyWorldUiStateJson } from './worldUiState';
 
 // 006 FR-009·FR-010: 상호작용 이벤트는 boothId+objectId 식별 포함
 export type BoothInteractEvent =
@@ -92,6 +93,7 @@ declare global {
       onWorldGateReady?: () => void;
       onWorldLoadStart?: () => void;
       onWorldConnectionState?: (state: string, detail: string) => void;
+      onWorldUiState?: (json: string) => void;
     };
   }
 }
@@ -135,6 +137,11 @@ export function initUnityBridge(): void {
         console.error('[unity-bridge] onWorldConnectionState listener 오류', err);
       }
     }
+  };
+  // Unity 모달 상태 (S15P21A604-450, #132). 판정·저장은 worldUiState 가 한다 — 이 파일은
+  // window.FestaUnity 배선만 갖는다. Unity 가 아직 안 보내면 예전과 똑같이 동작한다.
+  window.FestaUnity.onWorldUiState = (json: string) => {
+    applyWorldUiStateJson(json);
   };
 }
 

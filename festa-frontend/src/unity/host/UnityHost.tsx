@@ -22,6 +22,7 @@ import {
   subscribeWorldLoadStart,
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
+import { resetWorldUiState } from '../bridge/worldUiState';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
@@ -87,6 +88,9 @@ export function UnityHost() {
     setLongWait(false);
     setConnection(null);
     instanceRef.current = null;
+    // 새 인스턴스에는 모달이 없다 — 재시도 boot 뒤에도 옛 관측값이 남으면 ESC 가 닫을 수 없는
+    // Unity 모달을 향해 명령만 보낸다(-450). 상태는 인스턴스마다 새로 시작한다.
+    resetWorldUiState();
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
     // 인스턴스가 서면 해제한다. 이 타이머는 boot attempt 의 시간이지 사용자의 페이지 체류 시간이 아니다.
