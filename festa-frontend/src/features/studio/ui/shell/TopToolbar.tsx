@@ -13,12 +13,16 @@ interface Props {
   publishing: boolean;
   publishedVersion: number | null;
   zoomPercent: number;
+  canUndo: boolean;
+  canRedo: boolean;
   /** 배치를 비울 수 있는가 — 비어 있거나 임대가 끝났으면 누를 것이 없다 */
   canReset: boolean;
   onBack: () => void;
   onSave: () => void;
   onPublish: () => void;
   onZoomToggle: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onReset: () => void;
 }
 
@@ -69,9 +73,27 @@ export function TopToolbar(p: Props) {
         </button>
       </div>
       <div className="studio-toolbar-group">
-        {/* 실행취소/다시실행 — editorReducer 에 history 없음(P1). 목업 어포던스만, disabled */}
-        <button type="button" className="studio-btn studio-btn-ghost studio-btn-icon" disabled aria-label="실행 취소"><IcUndo size={18} /></button>
-        <button type="button" className="studio-btn studio-btn-ghost studio-btn-icon" disabled aria-label="다시 실행"><IcRedo size={18} /></button>
+        {/* 실행취소/다시실행 (S15P21A604-605) — editorReducer 의 스냅샷 스택이 판정한다 */}
+        <button
+          type="button"
+          className="studio-btn studio-btn-ghost studio-btn-icon"
+          onClick={p.onUndo}
+          disabled={!p.canUndo}
+          aria-label="실행 취소"
+          title="실행 취소 (Ctrl+Z)"
+        >
+          <IcUndo size={18} />
+        </button>
+        <button
+          type="button"
+          className="studio-btn studio-btn-ghost studio-btn-icon"
+          onClick={p.onRedo}
+          disabled={!p.canRedo}
+          aria-label="다시 실행"
+          title="다시 실행 (Ctrl+Y)"
+        >
+          <IcRedo size={18} />
+        </button>
       </div>
       <div className="studio-toolbar-group">
         <button type="button" className="studio-btn studio-btn-ghost" onClick={p.onZoomToggle}>
