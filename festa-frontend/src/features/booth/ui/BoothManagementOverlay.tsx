@@ -8,7 +8,6 @@
 // 진입은 World 의 Booth Management NPC + F 다. Unity 이벤트 계약(G-1)이 아직 없어 지금은
 // dev trigger 로만 열리며, 계약이 오면 dispatcher 가 openBoothManagement() 를 부르면 된다 —
 // 이 컴포넌트는 그대로다.
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
@@ -17,7 +16,6 @@ import { formatRemaining, remainingMs } from '../../../entities/booth/remaining'
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
 import { BoothMiniPreview } from './BoothMiniPreview';
-import { AiAgentManagementTab } from './AiAgentManagementTab';
 import './boothManagement.css';
 
 const IcBooth = (
@@ -60,10 +58,6 @@ function SectionRow({
 
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
-  // AI 직원은 부스당 1명뿐이고 문서 업로드까지 한 화면에서 오가야 해서 별도 페이지로 빼지
-  // 않는다 — 그렇다고 탭으로 분리하면 콘텐츠 관리 목록과 동떨어져 보여, CONSULTATION 아래
-  // 네 번째 행으로 두고 그 자리에서 펼친다.
-  const [aiAgentOpen, setAiAgentOpen] = useState(false);
 
   // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
@@ -182,22 +176,14 @@ export function BoothManagementOverlay({ onClose }: Props) {
             summary="상담 요청 운영"
             onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
           />
-          <button
-            type="button"
-            className="bm-row"
-            aria-expanded={aiAgentOpen}
-            onClick={() => setAiAgentOpen((open) => !open)}
-          >
-            <span className="bm-row-label">AI 직원</span>
-            <span className="bm-row-summary">대화 설정·답변 근거 문서 관리</span>
-            <span className="bm-row-cta">
-              {aiAgentOpen ? '접기' : '관리'}
-              {IcChevron}
-            </span>
-          </button>
+          {/* AI 직원도 다른 세 항목과 같은 drill-down — 문서 업로드가 있어 화면이 길어지므로
+              내 부스 관리 카드 안에 펼치지 않고 별도 화면으로 연다. */}
+          <SectionRow
+            label="AI 직원"
+            summary="대화 설정·답변 근거 문서 관리"
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/ai-agent`)}
+          />
         </div>
-
-        {aiAgentOpen && <AiAgentManagementTab boothId={myBooth.boothId} />}
 
         <section className="bm-info">
           <span className="bm-info-title">부스 정보</span>
