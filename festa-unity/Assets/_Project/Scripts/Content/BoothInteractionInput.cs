@@ -37,6 +37,15 @@ namespace Festa.Content
         public static bool PromptShowing =>
             _instance != null && (_instance._hovered != null || _instance._passive != null);
 
+        /// <summary>
+        /// 지금 F 에 응답할 **부스 오브젝트**가 잡혀 있는가 (안내 알약은 제외).
+        ///
+        /// <para>부스 입장 포털이 이걸 보고 그 프레임을 통째로 양보한다 — 슬롯머신처럼 부스에 붙어 있는
+        /// 오브젝트 앞에 서면 오브젝트 프롬프트가 뜨는데 **옆 부스 외곽선까지 같이 켜지고**, F 를 누르면
+        /// 오브젝트와 부스 입장이 동시에 먹었다 (2026-09-10 사용자 지적). 가까운 쪽(오브젝트)이 이긴다.</para>
+        /// </summary>
+        public static bool HasInteractTarget => _instance != null && _instance._hovered != null;
+
         /// <summary>디스패처가 씬에 있도록 보장한다. 상호작용 오브젝트가 Awake 에서 호출한다.</summary>
         public static void Ensure()
         {

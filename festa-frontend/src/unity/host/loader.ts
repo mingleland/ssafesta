@@ -82,3 +82,52 @@ export function resolveDevicePixelRatio(): number {
   }
   return Math.min(ratio as number, MAX_DEVICE_PIXEL_RATIO);
 }
+
+/**
+ * 화면 밀도가 바뀌면 Unity 에 다시 알린다 (S15P21A604-575, GitLab #143).
+ *
+ * 위 상한은 `createUnityInstance` 호출 시점의 `window.devicePixelRatio` 한 번으로 정해진다.
+ * 그런데 그 값은 세션 중에 바뀐다 — 브라우저 확대/축소, 밀도가 다른 모니터로 창 이동,
+ * OS 배율 변경. 부팅 값이 그대로 남으면 낮아진 화면에서는 필요 이상으로 그리고(성능),
+ * 높아진 화면에서는 표시 크기보다 적게 그린다(선명도). 둘 다 재부팅 전까지 안 돌아온다.
+ *
+ * 실측으로 확인한 것 (2026-09-10, 현재 서빙 중인 WebGL):
+ *   프레임워크는 `_JS_SystemInfo_GetPreferredDevicePixelRatio(){ return
+ *   Module.matchWebGLToCanvasSize==false ? 1 : Module.devicePixelRatio || window.devicePixelRatio || 1 }`
+ *   이고, Unity 는 이것을 **약 1초 주기로 계속 다시 읽는다**(부팅 1회가 아니다).
+ *   `Module.devicePixelRatio = 1.0` 을 쓰자 백버퍼가 1008x575 → 672x383 으로 줄었고
+ *   1.5 로 되돌리자 원래대로 돌아왔다. 렌더 루프도 멈추지 않았다.
+ * 그래서 캔버스 width/height 를 직접 건드리는 실패 경로(위 주석) 없이 이 한 값만 바꾸면 된다.
+ *
+ * `matchMedia('(resolution: Xdppx)')` 는 지금 값에 대한 질의라 한 번 어긋나면 다시 걸어야 한다 —
+ * 그래서 change 마다 새로 건다. 반환값은 해제 함수다.
+ */
+export function watchDevicePixelRatio(instance: UnityInstance): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return () => {};
+  }
+
+  let query: MediaQueryList | null = null;
+  let stopped = false;
+
+  const onChange = () => {
+    if (stopped) return;
+    const module = instance.Module;
+    if (module) module.devicePixelRatio = resolveDevicePixelRatio();
+    arm();
+  };
+
+  function arm() {
+    query?.removeEventListener('change', onChange);
+    query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    query.addEventListener('change', onChange);
+  }
+
+  arm();
+
+  return () => {
+    stopped = true;
+    query?.removeEventListener('change', onChange);
+    query = null;
+  };
+}
