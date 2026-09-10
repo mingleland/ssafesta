@@ -64,7 +64,9 @@ if [[ "${1:-}" == compose ]]; then
   if [[ "$*" == *' up -d --no-deps '* ]]; then
     service="${!#}"
     image="${candidate}"
-    [[ "${COMPONENT_IMAGE_REF:-}" == *:old ]] && image="${previous}"
+    if [[ "${COMPONENT_IMAGE_REF:-}" == *:old || "${RELEASE_ID:-}" == dev-previous-release ]]; then
+      image="${previous}"
+    fi
     printf '%s|%s|0|%s\n' "${project}-${service}-2" "${image}" "${RELEASE_ID}" >"${FAKE_DOCKER_STATE}/${project}__${service}"
   fi
   exit 0
