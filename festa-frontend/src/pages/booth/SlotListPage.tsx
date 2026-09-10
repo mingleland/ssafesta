@@ -12,6 +12,7 @@ import { leaseApi } from '../../entities/booth/leaseApi.select';
 import { formatRemaining, remainingMs } from '../../entities/booth/remaining';
 import { useLeaseSlot } from '../../features/booth/model/useLeaseSlot';
 import { LeaseConfirmDialog } from '../../features/booth/ui/LeaseConfirmDialog';
+import { SlotFloorPlan } from '../../features/booth/ui/SlotFloorPlan';
 import { WalletBadge } from '../../features/wallet/ui/WalletBadge';
 import { PageShell, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
 import { LEASE_COIN_COST } from '../../entities/booth/types';
@@ -137,6 +138,15 @@ export function SlotListPage() {
           {leaseErrorText(leaseMutation.error)}
         </p>
       )}
+
+      {/* 평면도 — 어느 자리인지 그림으로 한 번 (S15P21A604-606). 아래 목록을 대체하지 않는다:
+          핫스팟만 두면 키보드·스크린리더 사용자가 막힌다 */}
+      <SlotFloorPlan
+        slots={slots}
+        onPick={setConfirming}
+        isMember={isMember}
+        pending={leaseMutation.isPending}
+      />
 
       <ul className="slot-grid">
         {slots.map((slot) => {
