@@ -23,14 +23,14 @@ namespace Festa.World
     public sealed class HighStrikerNetwork : NetworkBehaviour
     {
         /// <summary>
-        /// 스윙 클립(<c>GreatSwordCasting/Strike</c>, 2.03 s)의 임팩트 시점(초) — 실측 2026-09-10, 손 최저 1.76 s.
+        /// 스윙 클립(<c>GreatSwordCasting/Strike</c>, 0.93 s)의 임팩트 시점(초) — 실측 2026-09-10, 마지막 프레임.
         ///
-        /// <para>사용자가 직접 고른 Mixamo 클립이다. 앞의 준비 동작과 뒤의 긴 정지를 잘라
-        /// (30 fps 기준 27~88 프레임) **머리 위로 들어올렸다가 내리찍는 구간**만 남겼다.
-        /// 팩에 있던 곡괭이질(몸을 접어 땅을 판다)·도끼질(옆으로 후려친다)은 둘 다 맞지 않아 버렸다.</para>
+        /// <para>사용자가 고른 Mixamo 클립에서 <b>내려찍는 구간만</b> 남겼다(30 fps 48~76 프레임).
+        /// 원본은 앞에 1초 정지(칼을 머리 위로 든 채)와 뒤에 0.5초 정지(무릎 꿇은 채)가 붙어 있어
+        /// 그대로 쓰면 "주저앉았다 일어난다" 로 보였다. 이미 짧게 잘랐으므로 배속은 1.0 이다.</para>
         /// </summary>
-        public const float StrikeSpeed = 1.7f;    // 2.03 s → 1.19 s. 타격감이 나게 당긴다
-        public const float ImpactDelay = 1.76f / StrikeSpeed;
+        public const float StrikeSpeed = 1f;
+        public const float ImpactDelay = 0.90f / StrikeSpeed;
 
         /// <summary>한 기계가 다시 받을 때까지. 연출(상승 0.45 + 유지 1.4 + 낙하 0.6)보다 길게 잡는다.</summary>
         const float MachineCooldown = 3.2f;
