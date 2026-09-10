@@ -3,10 +3,13 @@
 import { lazy, Suspense, useSyncExternalStore } from 'react';
 import { closeOverlay, getCurrentOverlay, subscribeOverlay } from '../../shared/types/overlay';
 import { LaptopOverlay } from './LaptopOverlay';
+import { OverlayEmpty, OverlayFrame } from './ui/OverlayFrame';
 import { ProjectOverlay } from '../project/ui/ProjectOverlay';
 import { SurveyOverlay } from '../survey/ui/SurveyOverlay';
 import { ConsultationOverlay } from '../consultation/ui/ConsultationOverlay';
 import { AiChatOverlay } from '../ai/ui/AiChatOverlay';
+import { WorldGuideOverlay } from '../world/ui/WorldGuideOverlay';
+import { EventRewardShopOverlay } from '../event/ui/EventRewardShopOverlay';
 import type { GameOverlayPayload } from '../../game-studio/host/GameOverlay';
 
 // lazy 로 가른다 — GameOverlay 는 PublishedGameSurface·ReferenceGamePlayer 를 통해 게임 런타임 전체를
@@ -43,6 +46,16 @@ export function OverlayHost() {
     return <AiChatOverlay payload={request.payload as { boothId: number; agentId?: number }} />;
   }
 
+  // 부스에 속하지 않는 둘 — payload 가 없다. 같은 Bus 를 쓰는 이유는 배타·ESC·입력 잠금·focus 가
+  // 이 길에 붙어 있기 때문이다(shared/types/overlay.ts 주석).
+  if (request.type === 'WORLD_GUIDE') {
+    return <WorldGuideOverlay />;
+  }
+
+  if (request.type === 'EVENT_SHOP') {
+    return <EventRewardShopOverlay />;
+  }
+
   if (request.type === 'GAME') {
     return (
       <Suspense fallback={<p>게임을 여는 중입니다.</p>}>
@@ -52,12 +65,11 @@ export function OverlayHost() {
   }
 
   // 여기 남는 것은 이 편집기가 모르는 미래 타입뿐이다 — 조용히 무시하지 않고 알린다.
+  // 프레임 밖 raw div 였던 자리다(-599) — 그러면 배경 클릭·focus 반환이 다른 오버레이와 갈라진다.
   return (
-    <div>
-      <p>이 기능은 준비 중입니다.</p>
-      <button type="button" onClick={closeOverlay}>
-        닫기
-      </button>
-    </div>
+    <OverlayFrame title="준비 중" size="s" onClose={closeOverlay}>
+      {/* 문구는 그대로 둔다 — 기존 계약 테스트가 이 문자열을 본다(overlayHostGameWiring.test) */}
+      <OverlayEmpty title="이 기능은 준비 중입니다." />
+    </OverlayFrame>
   );
 }

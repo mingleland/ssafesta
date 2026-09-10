@@ -49,9 +49,26 @@ export type BoothInteractEvent =
  * 관리 대상 부스는 FE 가 `GET /booths/mine` 으로 resolve 한다 — Unity 는 세션 사용자의
  * 임대 정보를 모르고 알 필요도 없다(헌법 1조).
  */
-export type WorldInteractEvent = {
-  type: 'WORLD_MANAGEMENT_INTERACT';
-};
+export type WorldInteractEvent =
+  | {
+      type: 'WORLD_MANAGEMENT_INTERACT';
+    }
+  | {
+      /**
+       * 이벤트 NPC 상호작용 — 경품 상점을 연다 (S15P21A604-599).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. `WORLD_MANAGEMENT_INTERACT` 와 같은 규칙이고
+       * 같은 `onBoothInteract` 채널로 온다 — 새 callback 을 만들지 않는다.
+       *
+       * `npcId` 는 씬 canonical id 로 로그·분석용이다. FE 는 해석하지 않는다 — 지금은 상점이 하나뿐이라
+       * 분기에 쓰이지 않고, 여러 이벤트 NPC 가 생기면 그때 이 값이 의미를 얻는다.
+       *
+       * ⚠️ Unity 송신부는 아직 없다. 이 타입은 FE 수신부가 먼저 서 있다는 뜻이고, 게임 파트가 보내기
+       * 시작하면 이 자리가 그대로 실경로가 된다(`BOOTH_PROJECT_INTERACT` 가 -343 에서 그랬던 것처럼).
+       */
+      type: 'WORLD_EVENT_INTERACT';
+      npcId?: string;
+    };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */
 export type UnityInteractEvent = BoothInteractEvent | WorldInteractEvent;

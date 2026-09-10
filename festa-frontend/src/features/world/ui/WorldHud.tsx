@@ -15,6 +15,7 @@
 // World/Festival/BoothPortal.cs: "외부 부스와 내부 공간 출구에 하나씩").
 import { useState } from 'react';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
+import { WorldGuideLauncher } from './WorldGuideLauncher';
 import './worldHud.css';
 
 interface Props {
@@ -83,6 +84,9 @@ export function WorldHud({ mock = false }: Props) {
           조작 안내
         </button>
       )}
+
+      {/* 이용 안내(무엇을 할 수 있는가) — 위 조작 안내(어떻게 움직이는가)와 다른 축이다 (-599) */}
+      <WorldGuideLauncher />
     </div>
   );
 }

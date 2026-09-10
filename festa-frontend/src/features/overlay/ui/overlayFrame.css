@@ -212,3 +212,80 @@
   font-size: 12px;
   font-weight: 600;
 }
+
+/* ── 카드 그리드 (S15P21A604-599) ──
+   가이드 카드와 상점 상품 카드가 같은 어휘를 쓴다. 화면마다 카드 CSS 를 복제하지 않는 것이 요점이다.
+   빈 목록에서도 격자를 걷지 않는다 — 그 위에 .ov-notice 를 얹기 위해서다. */
+.ov-grid-wrap { position: relative; min-height: 260px; }
+
+.ov-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 200px;
+  align-content: start;
+}
+.ov-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--ov-border);
+  border-radius: var(--ov-radius-control);
+  background: var(--ov-surface-raised);
+}
+.ov-card[data-disabled] { opacity: 0.55; }
+/* 헤더 배지와 같은 처방 — 아이콘 어휘를 한 벌로 유지한다 */
+.ov-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2f6bff, #7a5cff);
+  color: #fff;
+  flex-shrink: 0;
+}
+.ov-card-art { width: 38px; height: 38px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.ov-card-title { font-size: 14px; font-weight: 700; color: var(--ov-text); }
+.ov-card-desc { font-size: 12.5px; line-height: 1.55; color: var(--ov-text-muted); }
+.ov-card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* ── 안내 패널 (S15P21A604-599) ──
+   본문을 대체하지 않고 그 위에 얹힌다 — 뒤의 그리드가 보이는 채로 "지금은 쓸 수 없다" 를 말한다.
+   조건이 풀리면 이 패널만 사라지고 화면을 다시 만들지 않는다. */
+.ov-notice {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(320px, 100%);
+  padding: 20px 18px;
+  text-align: center;
+  border: 1px solid var(--ov-border-strong);
+  border-radius: var(--ov-radius);
+  background: var(--ov-surface-raised);
+  box-shadow: var(--ov-shadow);
+  backdrop-filter: blur(6px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ov-notice { background: #1c2340; backdrop-filter: none; }
+}
+.ov-notice-title { font-size: 15px; font-weight: 700; color: var(--ov-text); }
+.ov-notice-message { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ov-text-muted); }
