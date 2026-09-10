@@ -119,6 +119,10 @@ grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_ro
   || fail "component verification must remain valid after adapter directory dispatch"
 grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
   || fail "game component CI does not reuse its Unity workspace"
+grep -q 'game) bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
+  || fail "general game CI must build Linux Server only"
+! grep -q 'game) bash festa-unity/ci/build --target all' "${repo_root}/ci/build" \
+  || fail "general game CI must not build WebGL"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
   || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
