@@ -42,24 +42,21 @@ def _canonical_schema(schema: dict[str, Any], components: dict[str, Any]) -> Any
     }
 
 
-def test_generated_document_process_openapi_matches_contract() -> None:
-    contract = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
-    app = FastAPI()
-    app.include_router(router, prefix="/ai/v1")
-    generated = app.openapi()
-
-    contract_operation = contract["paths"]["/documents/process"]["post"]
-    generated_operation = generated["paths"]["/ai/v1/documents/process"]["post"]
+def _assert_operation_matches_contract(
+    *,
+    contract: dict[str, Any],
+    generated: dict[str, Any],
+    path: str,
+    generated_path: str,
+) -> None:
+    contract_operation = contract["paths"][path]["post"]
+    generated_operation = generated["paths"][generated_path]["post"]
 
     assert generated_operation["operationId"] == contract_operation["operationId"]
     assert generated_operation["summary"] == contract_operation["summary"]
     assert generated_operation["description"] == contract_operation["description"]
     assert generated_operation["security"] == contract["security"]
     assert set(generated_operation["responses"]) == set(contract_operation["responses"])
-
-    assert _canonical_schema(
-        generated["components"]["securitySchemes"]["serviceToken"], {}
-    ) == _canonical_schema(contract["components"]["securitySchemes"]["serviceToken"], {})
 
     contract_components = contract["components"]["schemas"]
     generated_components = generated["components"]["schemas"]
@@ -86,3 +83,35 @@ def test_generated_document_process_openapi_matches_contract() -> None:
         assert _canonical_schema(
             generated_schema, generated_components
         ) == _canonical_schema(contract_schema, contract_components)
+
+
+def test_generated_document_process_openapi_matches_contract() -> None:
+    contract = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
+    app = FastAPI()
+    app.include_router(router, prefix="/ai/v1")
+    generated = app.openapi()
+
+    assert _canonical_schema(
+        generated["components"]["securitySchemes"]["serviceToken"], {}
+    ) == _canonical_schema(contract["components"]["securitySchemes"]["serviceToken"], {})
+
+    _assert_operation_matches_contract(
+        contract=contract,
+        generated=generated,
+        path="/documents/process",
+        generated_path="/ai/v1/documents/process",
+    )
+
+
+def test_generated_document_cancel_openapi_matches_contract() -> None:
+    contract = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
+    app = FastAPI()
+    app.include_router(router, prefix="/ai/v1")
+    generated = app.openapi()
+
+    _assert_operation_matches_contract(
+        contract=contract,
+        generated=generated,
+        path="/documents/cancel",
+        generated_path="/ai/v1/documents/cancel",
+    )
