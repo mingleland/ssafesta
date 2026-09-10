@@ -95,6 +95,20 @@ export async function restartUnitySession(
   return acquireUnitySession(canvas, onProgress);
 }
 
+/**
+ * 지금 떠 있는 인스턴스 — 없으면 `null` (S15P21A604-450).
+ *
+ * `UnityHost` 밖에서도 명령을 보내야 하는 곳이 생겼다: ESC 중재는 `WorldPage` 가 하는데 그 화면은
+ * 인스턴스를 갖고 있지 않다(호스트는 `WorldSurface` 안에 있다). 참조를 prop·context 로 내려보내면
+ * "누가 Unity 를 부를 수 있는가" 가 화면 트리 모양에 묶인다 — 이미 단일화돼 있는 이 모듈이 그 답을
+ * 갖는 것이 맞다.
+ *
+ * **상태를 만들지 않는다.** 생성·종료 판단은 그대로 acquire/release 가 하고 여기서는 조회만 한다.
+ */
+export function getReadyUnityInstance(): UnityInstance | null {
+  return state.phase === 'ready' ? state.instance : null;
+}
+
 // 테스트 전용 — 모듈 스코프 상태를 테스트 간에 격리한다. 프로덕션 코드에서는 호출하지 않는다.
 export function __resetForTests(): void {
   cancelPendingRelease();
