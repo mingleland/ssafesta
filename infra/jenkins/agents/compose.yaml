@@ -76,6 +76,9 @@ services:
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
       PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/__dev/api}
       PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
+      WEBGL_RELEASE_ROOT: /srv/festa/webgl
+      WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
+      WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
     depends_on:
       image-transfer-init:
         condition: service_completed_successfully
@@ -83,6 +86,7 @@ services:
       - deploy_workspace:/home/jenkins/agent/deploy
       - image_transfer:/var/lib/festa-image-transfer
       - deploy_state:/var/lib/festa-environments
+      - ${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl
       - /var/run/docker.sock:/var/run/docker.sock
 
   unity-agent:

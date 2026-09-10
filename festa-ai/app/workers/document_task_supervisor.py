@@ -58,6 +58,7 @@ class DocumentTaskSupervisor:
         self._processor = processor
         self._slots = asyncio.Semaphore(max_concurrency)
         self._tasks: dict[AttemptKey, asyncio.Task[None]] = {}
+        self._cancel_requested: set[AttemptKey] = set()
         self._accepting = True
 
     @property
@@ -82,6 +83,19 @@ class DocumentTaskSupervisor:
         task.add_done_callback(lambda completed, attempt_key=key: self._finished(attempt_key, completed))
         return SubmitResult.ACCEPTED
 
+    def cancel(self, *, job_id: int, attempt_no: int) -> None:
+        """실행 중인 attempt를 취소 요청한다. 대상이 없어도 조용히 성공한다(멱등).
+
+        키가 정확히 일치하는 attempt만 취소한다 — 늦게 도착한 cancel이 lease
+        만료로 새로 발급된 다음 attempt를 죽이지 않는다.
+        """
+        key = AttemptKey(job_id=job_id, attempt_no=attempt_no)
+        task = self._tasks.get(key)
+        if task is None or task.done():
+            return
+        self._cancel_requested.add(key)
+        task.cancel()
+
     async def close(self, *, grace_seconds: float) -> None:
         """새 작업을 막고 제한시간까지 기다린 뒤 남은 작업을 취소한다."""
         if grace_seconds < 0:
@@ -103,12 +117,21 @@ class DocumentTaskSupervisor:
 
     def _finished(self, key: AttemptKey, task: asyncio.Task[None]) -> None:
         self._tasks.pop(key, None)
+        was_requested = key in self._cancel_requested
+        self._cancel_requested.discard(key)
         if task.cancelled():
-            logger.warning(
-                "Document attempt cancelled; Spring lease recovery required: job_id=%s attempt_no=%s",
-                key.job_id,
-                key.attempt_no,
-            )
+            if was_requested:
+                logger.info(
+                    "Document attempt cancelled by request: job_id=%s attempt_no=%s",
+                    key.job_id,
+                    key.attempt_no,
+                )
+            else:
+                logger.warning(
+                    "Document attempt cancelled; Spring lease recovery required: job_id=%s attempt_no=%s",
+                    key.job_id,
+                    key.attempt_no,
+                )
             return
         error = task.exception()
         if error is not None:

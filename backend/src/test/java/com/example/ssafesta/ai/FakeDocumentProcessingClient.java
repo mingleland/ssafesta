@@ -1,5 +1,6 @@
 package com.example.ssafesta.ai;
 
+import com.example.ssafesta.ai.DocumentProcessingClient.CancelRequest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,6 +14,8 @@ import java.util.List;
 public class FakeDocumentProcessingClient implements DocumentProcessingClient {
 
     private final List<ProcessingRequest> received = new ArrayList<>();
+
+    private final List<CancelRequest> cancelled = new ArrayList<>();
 
     /** When set, every call throws it. The delegation path has to survive an unreachable FastAPI. */
     private volatile RuntimeException failure;
@@ -29,9 +32,25 @@ public class FakeDocumentProcessingClient implements DocumentProcessingClient {
         received.add(request);
     }
 
+    @Override
+    public synchronized void cancelProcessing(CancelRequest request) {
+        RuntimeException arranged = failure;
+        // Recorded before throwing for the same reason as above: a test asserting that expiry
+        // commits anyway needs to see that the cancel was attempted.
+        cancelled.add(request);
+        if (arranged != null) {
+            throw arranged;
+        }
+    }
+
     /** Every call in order, failed ones included. */
     public synchronized List<ProcessingRequest> received() {
         return List.copyOf(received);
+    }
+
+    /** Every cancel in order, failed ones included. */
+    public synchronized List<CancelRequest> cancelled() {
+        return List.copyOf(cancelled);
     }
 
     public synchronized ProcessingRequest onlyRequest() {
@@ -47,6 +66,7 @@ public class FakeDocumentProcessingClient implements DocumentProcessingClient {
 
     public synchronized void reset() {
         received.clear();
+        cancelled.clear();
         failure = null;
     }
 }

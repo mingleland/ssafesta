@@ -22,10 +22,12 @@ import {
   subscribeWorldLoadStart,
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
+import { resetWorldUiState } from '../bridge/worldUiState';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
 import { syncAudioMute } from './audioBridge';
+import { watchDevicePixelRatio } from './loader';
 import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/audio/model/screenAudio';
 import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
@@ -86,6 +88,9 @@ export function UnityHost() {
     setLongWait(false);
     setConnection(null);
     instanceRef.current = null;
+    // 새 인스턴스에는 모달이 없다 — 재시도 boot 뒤에도 옛 관측값이 남으면 ESC 가 닫을 수 없는
+    // Unity 모달을 향해 명령만 보낸다(-450). 상태는 인스턴스마다 새로 시작한다.
+    resetWorldUiState();
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
     // 인스턴스가 서면 해제한다. 이 타이머는 boot attempt 의 시간이지 사용자의 페이지 체류 시간이 아니다.
@@ -181,6 +186,16 @@ export function UnityHost() {
     if (!instanceReady || instance === null) return;
     syncAudioMute(instance, screenMuted);
   }, [instanceReady, screenMuted]);
+
+  // #143 화면 밀도 변화 반영 (-575). 렌더 해상도 상한은 부팅 때 한 번 정해지는데, 확대/축소나
+  // 다른 밀도의 모니터로 창을 옮기면 그 값이 낡는다 — Unity 는 이 값을 1초 주기로 다시 읽으므로
+  // 바뀔 때마다 갱신하면 재부팅 없이 따라간다(loader.ts 주석의 실측). mock 인스턴스에는 Module 이
+  // 없고 그 경우 감시자는 아무 일도 하지 않는다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    return watchDevicePixelRatio(instance);
+  }, [instanceReady]);
 
   // 최초 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
   // canvas 에 focus 가 없으면 WASD·F 가 Unity 에 들어가지 않는다 — 진입 직후 activeElement 가 SECTION 이라

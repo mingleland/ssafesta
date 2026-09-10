@@ -6,6 +6,7 @@
 // 즉시 삭제한다. 닫기 핸들러가 아니라 **언마운트**에 건다 — OverlayHost 가 타입별로 컴포넌트를
 // 갈아끼우므로 Esc·배경 클릭·X·외부 closeOverlay()·다른 오버레이 전환이 전부 여기로 수렴한다.
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { closeConversation, createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
 import { describeHttpError, shouldResetConversation } from '../../../entities/conversation/errorMessages';
@@ -13,6 +14,7 @@ import { consumeSseStream } from '../../../entities/conversation/stream.consumer
 import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
+import { saveReturnTo } from '../../auth/model/returnTo';
 import { aiHandoffContext } from '../../consultation/model/startContext';
 import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
@@ -46,6 +48,9 @@ const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개�
 
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
+  const isMember = kind === 'member';
+  const location = useLocation();
+  const navigate = useNavigate();
   const consultation = useVisitorConsultation();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
@@ -78,6 +83,13 @@ export function AiChatOverlay({ payload }: Props) {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [turns]);
 
+  // 게스트·비로그인은 Conversation 생성 진입점 자체를 보이지 않는다(spec 008 FR-027·SC-011).
+  function goLogin() {
+    saveReturnTo(location.pathname + location.search + location.hash);
+    closeOverlay();
+    navigate('/login');
+  }
+
   function setLastAgentTurn(update: Partial<Turn>) {
     setTurns((t) => {
       const next = [...t];
@@ -108,8 +120,10 @@ export function AiChatOverlay({ payload }: Props) {
     setLastAgentTurn({ status: 'error', errorMessage: fallbackHeadline, retryable: true, retryQuestion: question });
   }
 
+  // 게스트는 footer·본문 어디에도 진입점(제안 칩·입력창)을 보지 못하지만, 여기서도 한 번 더
+  // 막는다(spec 008 FR-027) — Conversation 생성·검색·LLM 호출이 실제로 나가는 지점이라서다.
   async function ask(question: string) {
-    if (busy || question.trim() === '') return;
+    if (!isMember || busy || question.trim() === '') return;
     if (payload.agentId === undefined) {
       setTurns((t) => [
         ...t,
@@ -168,7 +182,6 @@ export function AiChatOverlay({ payload }: Props) {
   // 사람 상담 에스컬레이션 (spec 011 FR-005 · S15P21A604-416).
   // 대상 부스는 이 대화의 boothId 다 — AI_AGENT_INTERACT 가 준 값이라 FE 가 추측하지 않는다.
   // 게스트는 요청할 수 없다(FR-014) — 진입점에서 막는 것이 이 기능의 정책이다.
-  const isMember = kind === 'member';
   const consultationInProgress =
     consultation.phase === 'requesting' ||
     consultation.phase === 'waiting' ||
@@ -195,12 +208,12 @@ export function AiChatOverlay({ payload }: Props) {
         <span className="ov-note">
           {isMember
             ? '원하는 답을 못 찾으면 사람 상담을 요청할 수 있습니다'
-            : '부스 자료를 근거로 답합니다 · 사람 상담은 회원만 요청할 수 있습니다'}
+            : 'AI 직원과의 대화는 소셜 로그인 회원만 이용할 수 있습니다'}
         </span>
       }
       footer={
-        <>
-          {isMember && (
+        isMember ? (
+          <>
             <button
               type="button"
               className="ov-btn ai-escalate"
@@ -210,30 +223,38 @@ export function AiChatOverlay({ payload }: Props) {
             >
               사람 상담 요청
             </button>
-          )}
-        <form
-          className="ai-composer"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(draft);
-          }}
-        >
-          <input
-            className="ai-input"
-            type="text"
-            value={draft}
-            placeholder="부스에 대해 물어보세요"
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={busy}
-          />
-          <button type="submit" className="ov-btn ov-btn-primary" disabled={busy || draft.trim() === ''}>
-            보내기
-          </button>
-        </form>
-        </>
+            <form
+              className="ai-composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void ask(draft);
+              }}
+            >
+              <input
+                className="ai-input"
+                type="text"
+                value={draft}
+                placeholder="부스에 대해 물어보세요"
+                onChange={(e) => setDraft(e.target.value)}
+                disabled={busy}
+              />
+              <button type="submit" className="ov-btn ov-btn-primary" disabled={busy || draft.trim() === ''}>
+                보내기
+              </button>
+            </form>
+          </>
+        ) : undefined
       }
     >
-      {turns.length === 0 ? (
+      {!isMember ? (
+        <div className="festa-overlay-state">
+          <strong>로그인이 필요합니다</strong>
+          <p className="ov-note">AI 직원과의 대화는 소셜 로그인 회원만 이용할 수 있어요.</p>
+          <button type="button" className="ov-btn ov-btn-primary" onClick={goLogin}>
+            로그인하러 가기
+          </button>
+        </div>
+      ) : turns.length === 0 ? (
         <div className="ai-intro">
           <span className="ai-intro-badge">{IcAgent}</span>
           <strong>무엇이든 물어보세요</strong>

@@ -1823,6 +1823,7 @@ export const GameStudioShell = ({
                   <div className="gss-help-card"><strong>선택지 결과가 Dialogue Event입니다</strong><p>중앙 편집기에서 다음 노드, Scene 이동, 대화 닫기 또는 게임 완료를 선택하세요.</p></div>
                 )}
                 {rightPanel === 'PROJECT' && <ProjectDataPanel
+                  assetUrls={assetUrls}
                   onApply={apply}
                   onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
                   onDeleteItem={deleteItem}
