@@ -1175,6 +1175,24 @@ export const addBooleanVariable = (project: GameProject): GameProject => {
   });
 };
 
+// S15P21A604-566 — addBooleanVariable과 대칭. VariableValueInput(값 편집 UI)은 이미
+// INTEGER/STRING을 다 지원하는데 생성 진입점이 Boolean 하나뿐이었다 — 그 공백을 메운다.
+export const addIntegerVariable = (project: GameProject): GameProject => {
+  const id = nextStableId(project, 'variable');
+  return validated({
+    ...project,
+    variables: [...project.variables, { id, type: 'INTEGER', initialValue: 0 }],
+  });
+};
+
+export const addStringVariable = (project: GameProject): GameProject => {
+  const id = nextStableId(project, 'variable');
+  return validated({
+    ...project,
+    variables: [...project.variables, { id, type: 'STRING', initialValue: '' }],
+  });
+};
+
 export const replaceVariableDefinition = (
   project: GameProject,
   variableId: string,
