@@ -74,7 +74,7 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     items: [
       { id: 'agent', label: 'AI 직원', objectType: 'AI_AGENT', thumb: 'agent' },
       { id: 'vote', label: '좋아요 스탠드', objectType: 'LIKE_VOTE', thumb: 'vote' },
-      { id: 'plant', label: '화분', objectType: 'DECORATION', thumb: 'plant', assetCode: 'PLANT' },
+      { id: 'plant', label: '화분', objectType: 'DECORATION', thumb: 'plant', assetCode: 'DECOR_PLANT_01' },
     ],
   },
 ];

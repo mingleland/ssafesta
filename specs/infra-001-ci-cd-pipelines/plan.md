@@ -6,18 +6,18 @@
 
 고정 파트 브랜치 CI/CD를 폐기한다. `feature/* → develop` MR의 Front·Back build·test merge gate는 GitLab CI/Runner가 `rules:changes`로 수행한다. Jenkins는 MR을 다시 빌드하지 않고, Squash Merge된 `develop`에서 변경 컴포넌트를 빌드·검증한 뒤 dev에만 자동 배포한다. 여러 컴포넌트 변경은 전부 Jenkins CI 성공 후 하나의 dev 배포 묶음으로 적용하고, 중간 실패면 이미 갱신한 묶음 구성원을 직전 known-good 상태로 복구한다. demo는 develop push와 분리된 수동 promotion job으로, dev 검증을 통과한 release만 배포한다.
 
-기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 dev deploy/verify 도구를 재사용한다. 새 구현은 GitLab MR gate, Jenkins develop 범위 판별, dev 배포 묶음 상태·rollback 경계에 한정한다.
+기존 `.gitlab-ci.yml`, `ci/` build adapter, Jenkins controller/agent, release manifest, image provenance, Compose 기반 dev deploy/verify 도구를 재사용한다. WebGL은 Unity 담당자가 QA 완료 zip을 GitLab Generic Package Registry에 올린 뒤 업로드 도우미가 별도 Jenkins job을 호출한다. Jenkins deploy-agent가 package를 내려받아 검증하고 EC2 Nginx release pointer만 전환한다. Windows Jenkins Agent와 develop push WebGL 자동 빌드는 추가하지 않는다.
 
 ## Technical Context
 
 **Language/Version**: Jenkins Declarative Pipeline/Groovy, Bash, YAML/JSON Schema; Unity `6000.0.78f1`
 **Primary Dependencies**: GitLab CI/Runner, Jenkins LTS + GitLab Branch Source, Docker Engine/Compose v2, existing Jenkins Lockable Resources and milestone steps
-**Storage**: Jenkins artifacts/fingerprints; single EC2 local Docker image store; environment state files for dev current/known-good releases
+**Storage**: Jenkins artifacts/fingerprints; GitLab Generic Package Registry; single EC2 local Docker image store; `/srv/festa/webgl/releases`와 current/previous symbolic links
 **Testing**: shell unit tests for path detector; Jenkins/Groovy static checks; dev single- and multi-component deploy rehearsal; forced failure rollback rehearsal; manual demo promotion rehearsal
 **Target Platform**: Ubuntu EC2, rootless build agent + rootful deploy agent, WebGL and Linux Dedicated Server
 **Project Type**: Infrastructure as Code and Jenkins orchestration
 **Performance Goals**: unrelated components never rebuild/deploy; stale run never overwrites newer dev state; one failed component never leaves a partial dev batch active
-**Constraints**: GitLab MR runner has Docker access for Back Testcontainers; controller build prohibition; one Unity executor; secrets only through GitLab CI variables or Jenkins Credentials; no direct `develop` push; no demo automatic deploy; `festa-unity/Docker/` unchanged
+**Constraints**: GitLab MR runner has Docker access for Back Testcontainers; controller build prohibition; one Unity executor; secrets only through GitLab CI variables or Jenkins Credentials; no direct `develop` push; QA 완료 Package upload만 WebGL 자동 배포 승인; 일반 develop push는 demo 자동 배포 금지; `festa-unity/Docker/` unchanged
 **Scale/Scope**: components `ai`, `back`, `front`, `game`; same-project `feature/*` MR to `develop`; changed source, component deploy config, shared CI paths
 
 ## Constitution Check
@@ -64,7 +64,15 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 - Rollback may use only the batch snapshot, not an arbitrary old manifest. This avoids weakening normal commit freshness checks.
 - Shared CI paths never deploy because no runtime component changed. Component runtime/deploy config counts as that component change.
 
-### 4. Existing code to extend
+### 4. WebGL Package Registry delivery
+
+1. Unity 담당자 PC의 `publish-webgl-release.sh`가 zip 구조를 확인하고 SHA-256을 계산한다.
+2. 도우미가 `festa-webgl/<release-id>/festa-webgl-release-<release-id>.zip`과 checksum을 업로드한다. 두 업로드 성공 뒤에만 Jenkins job을 호출한다.
+3. deploy-agent는 Jenkins의 GitLab Deploy Token으로 package를 내려받고 SHA-256·안전한 ZIP entry·manifest 참조를 검증한다.
+4. 검증된 산출물을 `/srv/festa/webgl/releases/<release-id>`에 설치하고 `current`를 원자적으로 전환한다.
+5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. 이 경로는 Dedicated Server를 조작하지 않는다.
+
+### 5. Existing code to extend
 
 ```text
 .gitlab-ci.yml                                 Front·Back MR merge gate; jira-* definitions remain disabled
@@ -84,9 +92,10 @@ New scripts are justified only for one shared path detector and one dev batch co
 
 ```text
 infra/jenkins/
-├── pipelines/{component,develop,demo-promotion}.groovy
-├── scripts/{detect-changed-components,deploy-dev-batch}.sh
-└── tests/{detect-changed-components,deploy-dev-batch}.*
+├── jobs/gitlab-webgl-package-deploy.groovy
+├── pipelines/{component,develop,demo-promotion,webgl-package-deploy}.groovy
+├── scripts/{detect-changed-components,deploy-dev-batch,deploy-webgl-release,publish-webgl-release}.sh
+└── tests/{detect-changed-components,deploy-dev-batch,deploy-webgl-release}.*
 infra/environments/
 ├── compose/dev/{base,ai,back,front,game}.yaml
 └── state/dev/                            # runtime only, never committed

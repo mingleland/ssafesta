@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_GAME_RULES,
   estimateGameProjectJsonBytes,
@@ -40,6 +40,54 @@ interface ProjectDataPanelProps {
   readonly onDeleteItem: (itemId: string) => void;
 }
 
+// S15P21A604-582 — 변수/아이템/자산 삭제 확인 UI가 스타일 없이 각 섹션 맨 끝에 인라인으로
+// 렌더돼서(관련 CSS 0줄) 클릭한 카드와 동떨어진 위치에 문단처럼 떴다(Notion QA #56).
+// GameStudioShell.tsx의 showResetConfirm과 같은 중앙 모달 패턴으로 통일한다 — 문구/사용
+// 위치(⌖) 표시는 그대로, 감싸는 컨테이너만 교체.
+const DeleteConfirmModal = ({
+  title,
+  unusedNote,
+  usedNote,
+  usage,
+  onCancel,
+  onConfirm,
+}: {
+  readonly title: string;
+  readonly unusedNote: string;
+  readonly usedNote: string;
+  readonly usage: readonly string[];
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+}) => {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div className="gss-guide-backdrop" onMouseDown={onCancel} role="presentation">
+      <section aria-modal="true" className="gss-delete-confirm-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog">
+        <h2>{title} 삭제할까요?</h2>
+        {usage.length === 0
+          ? <p>{unusedNote}</p>
+          : (
+            <>
+              <p>{usedNote}</p>
+              {usage.map((location) => <em key={location}>⌖ {location}</em>)}
+            </>
+          )}
+        <div className="gss-delete-confirm-actions">
+          <button autoFocus onClick={onCancel} type="button">취소</button>
+          <button className="gss-delete-confirm-danger" onClick={onConfirm} type="button">삭제</button>
+        </div>
+      </section>
+    </div>
+  );
+};
+
 const VariableValueInput = ({
   variable,
   onChange,
@@ -69,6 +117,16 @@ const VariableValueInput = ({
     />
   );
 };
+
+// S15P21A604-580 — 유니코드 "×" 글자를 직접 썼더니 폰트마다 잉크(획)가 박스 중앙에서
+// 살짝 벗어나 보였다(아래·왼쪽으로 치우침 — 폰트 렌더링에 따라 달라지는 문제). SVG로
+// 바꾸면 폰트와 무관하게 항상 기하학적으로 정확히 중앙에 온다.
+const DeleteIcon = () => (
+  <svg aria-hidden="true" fill="none" height="12" stroke="currentColor" strokeLinecap="round" strokeWidth="2.5" viewBox="0 0 24 24" width="12">
+    <line x1="6" x2="18" y1="6" y2="18" />
+    <line x1="18" x2="6" y1="6" y2="18" />
+  </svg>
+);
 
 const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: string; readonly unit: string; readonly defaultTarget: number; readonly max: number }>> = {
   SCORE_AT_LEAST: { title: '점수 달성', unit: '점', defaultTarget: 500, max: 999999999 },
@@ -135,7 +193,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
       const definition = objectiveLabels[objective.type];
       return (
         <article className="gss-data-card" key={objective.type}>
-          <header><strong>{definition.title}</strong><button aria-label={`${definition.title} 목표 삭제`} onClick={() => replaceObjectives(rules.completion.objectives.filter((_, objectiveIndex) => objectiveIndex !== index))} type="button">×</button></header>
+          <header><strong>{definition.title}</strong><button aria-label={`${definition.title} 목표 삭제`} className="gss-delete-icon-button" onClick={() => replaceObjectives(rules.completion.objectives.filter((_, objectiveIndex) => objectiveIndex !== index))} type="button"><DeleteIcon /></button></header>
           <CommitInput
             label={`목표값 (${definition.unit})`}
             onCommit={(value) => {
@@ -168,7 +226,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
         <header>
           <strong>{variable.id}</strong>
           <span>{variable.type}</span>
-          <button aria-label={`${variable.id} 삭제`} onClick={() => setConfirmDeleteVariableId(variable.id)} type="button">삭제</button>
+          <button aria-label={`${variable.id} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteVariableId(variable.id)} type="button"><DeleteIcon /></button>
         </header>
         <VariableValueInput
           onChange={(value) => onApply(replaceVariableDefinition(project, variable.id, value))}
@@ -203,23 +261,15 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
     {confirmDeleteVariableId !== null && (() => {
       const target = project.variables.find((variable) => variable.id === confirmDeleteVariableId);
       if (target === undefined) return null;
-      const usage = findVariableUsageLocations(project, confirmDeleteVariableId);
       return (
-        <section className="gss-asset-delete-confirm" role="alertdialog">
-          <header><strong>{target.id} 삭제할까요?</strong></header>
-          {usage.length === 0
-            ? <p>현재 조건·액션에서 사용되지 않는 변수입니다.</p>
-            : (
-              <>
-                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
-                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
-              </>
-            )}
-          <div className="gss-inline-actions">
-            <button onClick={() => setConfirmDeleteVariableId(null)} type="button">취소</button>
-            <button onClick={() => { onDeleteVariable(confirmDeleteVariableId); setConfirmDeleteVariableId(null); }} type="button">삭제</button>
-          </div>
-        </section>
+        <DeleteConfirmModal
+          onCancel={() => setConfirmDeleteVariableId(null)}
+          onConfirm={() => { onDeleteVariable(confirmDeleteVariableId); setConfirmDeleteVariableId(null); }}
+          title={target.id}
+          unusedNote="현재 조건·액션에서 사용되지 않는 변수입니다."
+          usage={findVariableUsageLocations(project, confirmDeleteVariableId)}
+          usedNote="다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다."
+        />
       );
     })()}
 
@@ -229,7 +279,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
         <header>
           <strong>{item.id}</strong>
           <span>ITEM</span>
-          <button aria-label={`${item.id} 삭제`} onClick={() => setConfirmDeleteItemId(item.id)} type="button">삭제</button>
+          <button aria-label={`${item.id} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteItemId(item.id)} type="button"><DeleteIcon /></button>
         </header>
         <CommitInput
           label="사용자에게 보이는 이름"
@@ -247,23 +297,15 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
     {confirmDeleteItemId !== null && (() => {
       const target = project.items.find((item) => item.id === confirmDeleteItemId);
       if (target === undefined) return null;
-      const usage = findItemUsageLocations(project, confirmDeleteItemId);
       return (
-        <section className="gss-asset-delete-confirm" role="alertdialog">
-          <header><strong>{target.name} 삭제할까요?</strong></header>
-          {usage.length === 0
-            ? <p>현재 오브젝트·조건·액션에서 사용되지 않는 아이템입니다.</p>
-            : (
-              <>
-                <p>다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.</p>
-                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
-              </>
-            )}
-          <div className="gss-inline-actions">
-            <button onClick={() => setConfirmDeleteItemId(null)} type="button">취소</button>
-            <button onClick={() => { onDeleteItem(confirmDeleteItemId); setConfirmDeleteItemId(null); }} type="button">삭제</button>
-          </div>
-        </section>
+        <DeleteConfirmModal
+          onCancel={() => setConfirmDeleteItemId(null)}
+          onConfirm={() => { onDeleteItem(confirmDeleteItemId); setConfirmDeleteItemId(null); }}
+          title={target.name}
+          unusedNote="현재 오브젝트·조건·액션에서 사용되지 않는 아이템입니다."
+          usage={findItemUsageLocations(project, confirmDeleteItemId)}
+          usedNote="다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다."
+        />
       );
     })()}
 
@@ -339,7 +381,7 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
             <strong>{assetDisplayLabel(asset)}</strong>
             <small>{asset.id}</small>
             {deletable && (
-              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} onClick={() => setConfirmDeleteAssetId(asset.id)} type="button">삭제</button>
+              <button aria-label={`${assetDisplayLabel(asset)} 삭제`} className="gss-delete-icon-button" onClick={() => setConfirmDeleteAssetId(asset.id)} type="button"><DeleteIcon /></button>
             )}
           </div>
         );
@@ -348,23 +390,15 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
     {confirmDeleteAssetId !== null && (() => {
       const target = project.assets.find((asset) => asset.id === confirmDeleteAssetId);
       if (target === undefined) return null;
-      const usage = findAssetUsageLocations(project, confirmDeleteAssetId);
       return (
-        <section className="gss-asset-delete-confirm" role="alertdialog">
-          <header><strong>{assetDisplayLabel(target)} 삭제할까요?</strong></header>
-          {usage.length === 0
-            ? <p>현재 배치에서 사용되지 않는 자산입니다.</p>
-            : (
-              <>
-                <p>다음 위치에서 사용 중입니다 — 삭제하면 그 자리는 빈 값으로 남습니다.</p>
-                {usage.map((location) => <em key={location}>⌖ {location}</em>)}
-              </>
-            )}
-          <div className="gss-inline-actions">
-            <button onClick={() => setConfirmDeleteAssetId(null)} type="button">취소</button>
-            <button onClick={() => { onDeleteAsset(confirmDeleteAssetId); setConfirmDeleteAssetId(null); }} type="button">삭제</button>
-          </div>
-        </section>
+        <DeleteConfirmModal
+          onCancel={() => setConfirmDeleteAssetId(null)}
+          onConfirm={() => { onDeleteAsset(confirmDeleteAssetId); setConfirmDeleteAssetId(null); }}
+          title={assetDisplayLabel(target)}
+          unusedNote="현재 배치에서 사용되지 않는 자산입니다."
+          usage={findAssetUsageLocations(project, confirmDeleteAssetId)}
+          usedNote="다음 위치에서 사용 중입니다 — 삭제하면 그 자리는 빈 값으로 남습니다."
+        />
       );
     })()}
     <div className="gss-help-card"><strong>게시 연결 준비 완료</strong><p>편집기는 이미지 대신 assetId만 저장합니다. 현재 로컬 저장소를 게시 자산 API로 교체해도 프로젝트 구조는 바뀌지 않습니다.</p></div>

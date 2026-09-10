@@ -40,13 +40,13 @@ describe('ProjectDataPanel — 변수 삭제(S15P21A604-562)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: `${newVariableId} 삭제` }));
 
-    const confirmCard = screen.getByRole('alertdialog');
+    const confirmCard = screen.getByRole('dialog');
     expect(within(confirmCard).getByText('현재 조건·액션에서 사용되지 않는 변수입니다.')).toBeTruthy();
 
     fireEvent.click(within(confirmCard).getByRole('button', { name: '삭제' }));
 
     expect(onDeleteVariable).toHaveBeenCalledWith(newVariableId);
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('취소를 누르면 삭제하지 않고 확인 카드만 닫는다', () => {
@@ -58,7 +58,7 @@ describe('ProjectDataPanel — 변수 삭제(S15P21A604-562)', () => {
     fireEvent.click(screen.getByRole('button', { name: '취소' }));
 
     expect(onDeleteVariable).not.toHaveBeenCalled();
-    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('사용 중인 변수(doorOpened)는 삭제 전에 사용 위치를 보여준다', () => {
@@ -66,7 +66,7 @@ describe('ProjectDataPanel — 변수 삭제(S15P21A604-562)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'doorOpened 삭제' }));
 
-    const confirmCard = screen.getByRole('alertdialog');
+    const confirmCard = screen.getByRole('dialog');
     expect(within(confirmCard).getByText('다음 위치에서 사용 중입니다 — 삭제하면 검증 오류가 날 수 있습니다.')).toBeTruthy();
     // library Scene의 이벤트가 조건·액션 양쪽에서 doorOpened를 참조하므로 위치가 2개다.
     expect(within(confirmCard).getAllByText(/⌖/)).toHaveLength(2);

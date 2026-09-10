@@ -144,6 +144,18 @@
 .gss-reset-confirm-actions button { border-radius: 7px; font-size: 11px; font-weight: 650; padding: 9px 15px; }
 .gss-reset-confirm-actions > button:not(.gss-guide-start) { background: #ffffff; border: 1px solid #ccd3dc; color: #333d4b; }
 
+/* S15P21A604-582 — 변수/아이템/자산 삭제 확인 모달. .gss-reset-confirm-modal과 같은 톤
+   (중앙 카드)이되, 사용 위치(⌖) 목록이 들어갈 수 있어 별도 클래스로 둔다. backdrop은
+   기존 .gss-guide-backdrop 재사용. */
+.gss-delete-confirm-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 15px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 400px; padding: 22px; width: 100%; }
+.gss-delete-confirm-modal h2 { font-size: 16px; margin: 0 0 8px; word-break: break-all; }
+.gss-delete-confirm-modal p { color: #4b5563; font-size: 11px; line-height: 1.6; margin: 0; }
+.gss-delete-confirm-modal em { color: #4b5563; display: block; font-size: 10px; font-style: normal; margin-top: 5px; }
+.gss-delete-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.gss-delete-confirm-actions button { background: #ffffff; border: 1px solid #ccd3dc; border-radius: 7px; color: #333d4b; font-size: 11px; font-weight: 650; padding: 9px 15px; }
+.gss-delete-confirm-actions .gss-delete-confirm-danger { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.4); color: var(--gss-red); }
+.gss-delete-confirm-actions .gss-delete-confirm-danger:hover:not(:disabled) { background: rgba(220,38,38,.16); border-color: rgba(220,38,38,.55); }
+
 .gss-title-input { border-left: 1px solid var(--gss-border); max-width: 280px; min-width: 150px; padding-left: 13px; }
 .gss-title-input .gss-field > span { display: none; }
 .gss-title-input input { background: transparent; border-color: transparent; font-weight: 650; padding: 6px 8px; }
@@ -590,6 +602,26 @@
 .gss-inline-actions > select { flex: 1; }
 .gss-inline-actions > button { flex: 0 0 auto; padding: 8px 10px; }
 .gss-danger-button { background: rgba(220,38,38,.06); border: 1px solid rgba(220,38,38,.28); border-radius: 7px; color: var(--gss-red) !important; cursor: pointer; font-size: 10px; padding: 8px; }
+/* S15P21A604-580 — variables/items/assets/목표 목록의 "삭제" 텍스트 버튼이 스타일 없는
+   네이티브 버튼이라 튀어 보이던 문제. .gss-danger-button과 같은 빨간 톤을 재사용해
+   작은 원형 × 아이콘 버튼으로 통일한다. 유니코드 "×" 글자는 폰트마다 잉크가 박스 중앙에서
+   살짝 벗어나 보여서(아래·왼쪽으로 치우침) SVG(DeleteIcon)로 바꿨다 — 텍스트 전용 속성
+   (font-size/font-weight/line-height)은 더 필요 없어 제거했다. */
+.gss-delete-icon-button {
+  align-items: center;
+  background: rgba(220,38,38,.06);
+  border: 1px solid rgba(220,38,38,.28);
+  border-radius: 50%;
+  color: var(--gss-red) !important;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 20px;
+  justify-content: center;
+  padding: 0;
+  width: 20px;
+}
+.gss-delete-icon-button:hover:not(:disabled) { background: rgba(220,38,38,.14); border-color: rgba(220,38,38,.45); }
 
 .gss-event-card { display: grid; gap: 10px; padding: 12px; }
 .gss-recipe-box { background: linear-gradient(145deg,rgba(37,99,235,.07),rgba(147,51,234,.05)); border: 1px solid rgba(37,99,235,.22); border-radius: 9px; padding: 10px; }
@@ -642,7 +674,12 @@
 .gss-custom-assets summary { color: #333d4b; cursor: pointer; font-size: 9px; font-weight: 750; }
 .gss-custom-assets p { color: #5b6577; font-size: 8px; line-height: 1.5; }
 .gss-replace-asset-button { background: rgba(37,99,235,.06); border: 1px dashed rgba(37,99,235,.4); color: #1d4ed8 !important; font-size: 9px; padding: 8px; width: 100%; }
-.gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr; padding: 8px; }
+.gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr auto; padding: 8px; }
+/* S15P21A604-580 — 삭제 버튼에 grid 위치 지정이 없어 auto-placement로 좌측 하단(3번째 행,
+   1열)에 밀려나 있었다. 3번째 열을 명시적으로 만들어 오른쪽에 고정한다. 처음엔 2행 span +
+   컨테이너 상속 center로 세로 중앙에 뒀는데, 그러면 "썸네일/배지 칸 전체 높이의 중앙"이라
+   1행(파일명)보다 아래로 처져 보였다 — 1행에만 배치해 오른쪽 "위"에 오도록 고친다. */
+.gss-asset-list .gss-delete-icon-button { grid-column: 3; grid-row: 1; }
 .gss-asset-list strong { font-size: 9px; }
 .gss-asset-list small { color: #5b6577; font-size: 7px; grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gss-asset-kind { align-items: center; border-radius: 3px; color: #1d4ed8; display: flex; flex-direction: column; font-size: 6px; font-weight: 850; gap: 4px; grid-row: span 2; padding: 3px 4px; }

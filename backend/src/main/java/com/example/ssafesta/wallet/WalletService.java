@@ -1,5 +1,8 @@
 package com.example.ssafesta.wallet;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,6 +161,43 @@ public class WalletService {
     @Transactional(readOnly = true)
     public long ledgerSumOf(Long walletId) {
         return ledger.sumAmountByWalletId(walletId);
+    }
+
+    /**
+     * Coins this member has already been granted <b>today</b> under one reason, where "today" is the
+     * grant time zone's calendar day. The basis for every daily cap (spec 014 C-04).
+     *
+     * <p>Lives here rather than in the feature that needs it so that neither the wallet id nor the
+     * day boundary leaves this package: {@code app.wallet.daily-grant-zone} is the one definition of
+     * which day a coin policy belongs to, and a second copy is how the daily grant and a feature cap
+     * end up on different calendars.
+     *
+     * <p><b>Call this while holding the member's wallet lock</b> ({@link #lockOwner}). Read outside
+     * it, two concurrent submissions at 48/50 both see 48, both grant, and the day totals 58 — the
+     * same check-then-act this class exists to prevent.
+     */
+    @Transactional(readOnly = true)
+    public int grantedTodayFor(Long userId, String reasonType) {
+        return grantedOnDateFor(userId, reasonType, LocalDate.now(properties.dailyGrantZone()));
+    }
+
+    /**
+     * {@link #grantedTodayFor} for an explicit date. Exists so the day boundary can be exercised in
+     * tests without waiting for midnight, the same reason
+     * {@code DailyCoinGrantService.hasGrantedOn} takes one.
+     */
+    @Transactional(readOnly = true)
+    public int grantedOnDateFor(Long userId, String reasonType, LocalDate date) {
+        CoinReason.validate(reasonType);
+        Wallet wallet = requireWallet(userId);
+        ZoneId zone = properties.dailyGrantZone();
+        // atStartOfDay(zone) rather than atTime(0, 0).atZone(zone): it resolves a DST gap instead of
+        // producing an instant for a wall clock that never happened. Korea has none today; the cost
+        // of writing the version that stays right is zero.
+        Instant from = date.atStartOfDay(zone).toInstant();
+        Instant to = date.plusDays(1).atStartOfDay(zone).toInstant();
+        return Math.toIntExact(
+                ledger.sumAmountByWalletAndReasonBetween(wallet.getId(), reasonType, from, to));
     }
 
     private LedgerResult applyEntry(Long userId, LedgerEntryType entryType, int signedAmount, String reasonType,

@@ -1182,25 +1182,56 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
-## 14. Minigame — P1
+## 14. Minigame — 타이밍 스톱
 
-### POST `/minigames/{gameType}/sessions`
+> **정본은 `specs/014-minigame/contracts/minigame-api.yaml` 이다** (2026-09-10, GitLab #134 합의,
+> `S15P21A604-502`). 아래는 요약이고, 어긋나면 계약 파일이 맞다.
+>
+> 이 절의 예전 초안(`POST /minigames/{gameType}/results`, `{sessionId, score, elapsedMs}`)은
+> 실제로 만들어지지 않았다. `gameType` 경로 변수는 **미니게임이 1종뿐이라**(헌법 28조,
+> spec 014 FR-009) 필요가 없고, `score`·`elapsedMs` 는 클라이언트가 계산한 값이라 C-06 이
+> 신뢰를 금지한다.
 
-게임 시작용 세션/nonce 발급 후보.
+### POST `/minigames/timer-stop/sessions` → `201`
 
-### POST `/minigames/{gameType}/results`
-
-결과 제출과 보상 처리.
+한 판을 시작한다. 요청 본문은 읽지 않는다.
 
 ```json
-{
-  "sessionId": "game_...",
-  "score": 1820,
-  "elapsedMs": 71320
-}
+{ "sessionId": "3f1a6d2c-…", "targetSeconds": 7.381,
+  "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-클라이언트 결과를 무조건 신뢰하지 않고 최소한 세션 유효성·일일 제한을 검증한다.
+목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
+
+### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`
+
+```json
+// 요청 — 서버가 읽는 것은 이 필드 하나다
+{ "stoppedSeconds": 7.41 }
+
+// 응답
+{ "accepted": true, "errorSeconds": 0.029, "tier": 2, "timedOut": false,
+  "rewardedCoins": 5, "dailyLimitReached": false, "dailyRemainingCoins": 45,
+  "message": "+5 coins (tier 2)" }
+```
+
+- 오차·구간·보상·일일 한도는 **전부 서버가 계산한다** (C-06, FR-008, 헌법 16조). 배포된 Unity
+  클라이언트가 함께 보내는 `targetSeconds`·`errorSeconds`·`timedOut` 은 **조용히 무시**된다
+- 신고된 정지 시각은 서버 경과 시간과 **양방향**으로 대조한다 — 어긋나면 `accepted: false` 이고
+  세션은 소진된다. 이것이 막는 것과 못 막는 것은 계약 §3 에 적혀 있다
+- **판정 실패는 HTTP 오류가 아니다.** 검증 거부·실패 종료·일일 한도 도달·재제출은 전부 `200`
+  이다. **`429` 는 이 계약에서 나오지 않는다**
+- 재제출은 최초 판정을 그대로 돌려준다 (FR-004). 단 `dailyRemainingCoins`·`dailyLimitReached`
+  는 재제출 시점의 현재 상태다
+- 일일 한도 **50 Coin/일**, 기준일은 **제출 시각의 KST 날짜**. 남은 한도보다 보상이 크면
+  **남은 만큼만 잘라서** 지급한다
+- 오류: `400 VALIDATION_FAILED` (`stoppedSeconds` 누락·음수·범위 밖, `sessionId` 형식) ·
+  `401 UNAUTHORIZED` · `403 MEMBER_ONLY` (게스트) · `404 MINIGAME_SESSION_NOT_FOUND`
+  (없는 세션이거나 남의 세션 — 둘을 구분하지 않는다)
+
+**슬롯머신 API 는 없다.** 미니게임 1종 제한(헌법 28조·FR-009) 때문이고, 2종으로 늘릴지는
+`docs/26` 에 올라간 리드 결정이다 (`S15P21A604-569`).
 
 ---
 
