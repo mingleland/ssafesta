@@ -21,10 +21,11 @@ app:
     # HTTP localhost test only. Set AUTH_COOKIE_SECURE=true in HTTPS deployment.
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
 
-  # 내부 API 토큰. 로컬은 두 방향 값을 다르게 둔다 — 같으면 AI 쪽이 기동을 거부한다.
+  # 내부 API 토큰. 로컬도 세 값을 서로 다르게 둔다 — 겹치면 Spring 이 기동하지 않는다.
   internal:
     ai-to-spring-tokens: ${INTERNAL_AI_TO_SPRING_TOKENS:local-ai-to-spring}
     spring-to-ai-tokens: ${INTERNAL_SPRING_TO_AI_TOKENS:local-spring-to-ai}
+    infra-to-spring-tokens: ${INTERNAL_INFRA_TO_SPRING_TOKENS:local-infra-to-spring}
 
   ai:
     # 로컬 FastAPI 는 compose 가 8000 으로 띄운다.

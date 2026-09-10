@@ -185,6 +185,10 @@ app:
     # Spring→FastAPI 송신분 (S15P21A604-175). 송신은 첫 값 하나이고 목록은 회전용이다.
     # AI 쪽이 두 방향 토큰 집합이 겹치면 기동을 거부하므로 ai-to-spring 과 같은 값을 쓰면 안 된다.
     spring-to-ai-tokens: ${INTERNAL_SPRING_TO_AI_TOKENS}
+    # Infra→Spring 수신분 (S15P21A604-500). reconcile 결과만 받는 세 번째 상대이고 scope 도
+    # /internal/storage/** 하나다. 세 집합 중 둘에 같은 값이 들어가면 Spring 이 기동하지 않는다 —
+    # 값을 공유하는 순간 넓은 쪽 노출이 좁은 쪽에 닿는다.
+    infra-to-spring-tokens: ${INTERNAL_INFRA_TO_SPRING_TOKENS}
 
   # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
   # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
