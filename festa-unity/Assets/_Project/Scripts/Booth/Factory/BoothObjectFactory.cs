@@ -176,7 +176,11 @@ namespace Festa.Booth
             // 20f ≈ 1.5 m, 15f ≈ 1.1 m (부스 스케일 1 m ≈ 13.26 unit). 13f 는 표면 기준이어도
             // 큰 오브젝트 앞에서 닿지 않는다는 보고가 있어 올렸다.
             // 전에는 피벗 기준 40f 라 3 m 밖에서도 잡혀 "범위가 너무 크다" 는 보고를 받았다.
-            target.Configure(interactive ? 20f : 15f, interactive);
+            // 2026-09-10 사용자 지시로 "거의 외곽에 붙었을 때만" 으로 줄였다 (20/15 → 12/9).
+            // 판정이 **수평 거리**로 바뀌었으므로(BoothInteractionTarget.DistanceFrom) 12u ≈ 0.9 m 다.
+            // 더 줄이지 못하는 이유는 실측이다: 노트북은 책상 안쪽(앞면에서 7.9u)에 놓여 있고 플레이어 캡슐
+            // 반경이 2.75u 라, 책상에 몸이 닿아도 노트북까지 10.7u 다. 8u 로 두면 손이 닿는 자리에서 F 가 안 먹는다.
+            target.Configure(interactive ? 12f : 9f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)
