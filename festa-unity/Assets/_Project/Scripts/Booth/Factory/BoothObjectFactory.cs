@@ -26,6 +26,15 @@ namespace Festa.Booth
                 return null;
             }
 
+            // 부스 안에는 게임기를 두지 않는다 (사용자 지시 2026-09-10). 게임은 따로 모아 놓는 부스로 갈 예정이라
+            // 전시 부스 안에 오락기가 서 있으면 성격이 섞인다. 게시본에 들어 있어도 클라이언트가 세우지 않는다 —
+            // 데이터를 지우는 것이 아니라 배치만 건너뛰므로, 나중에 방침이 바뀌면 이 한 줄만 되돌리면 된다.
+            if (type == BoothObjectType.GamePortal)
+            {
+                Debug.Log($"[BoothObjectFactory] 게임기(GAME_PORTAL, objectId={objectId})는 부스 내부에 배치하지 않는다 — 건너뜀");
+                return null;
+            }
+
             var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
             if (prefab == null && type == BoothObjectType.Laptop)
             {
@@ -62,6 +71,7 @@ namespace Festa.Booth
         // 그쪽은 Editor 어셈블리라 런타임에서 참조할 수 없어 여기에 다시 적는다.
         // 레이아웃 좌표의 단위는 **미터**다(앵커의 균등 스케일 13.26 이 유닛으로 바꾼다. 실측 확인:
         // 레이아웃 6 m 간격 → 월드 79.56 units = 6.00 m).
+        // FestaInteriorBuilder 의 방 규격과 같은 값이라야 한다.
         const float RoomHalfXMeters = 5.0f;    // 방 폭 10 m
         const float RoomBackZMeters = -3.8f;
         const float RoomFrontZMeters = 7.0f;   // 방 깊이 10.8 m
