@@ -45,7 +45,7 @@ namespace Festa.EditorTools
         const float ShellMinXMeters = -3.092f, ShellMaxXMeters = 3.017f;
         const float ShellMinZMeters = -3.017f, ShellMaxZMeters = 3.017f;
         const float ShellHeightMeters = 2.715f;
-        const float ShellTargetFrontZ = 5.6f;   // 문 매트(5.7 m 부터) 직전까지 — 여기서 끊으면 옆이 흰 방 벽으로 남는다
+        const float ShellTargetFrontZ = 6.6f;   // 정면 벽(7.0 m) 직전까지 — 5.6 에서 끊자 문 옆 1.4 m 가 흰 벽으로 남았다(3차 지적)
         const float ShellTargetHeight = 5.6f;   // 천장(6.0 m) 아래 0.4 m — 위쪽 흰 띠를 최소로
         const float WallT = 0.3f * M;
         const float Pitch = 700f;               // 방 간격 70 m (v2 와 같음 — 외부 포털 목적지 이름만 쓰므로 위치는 자유)
@@ -69,7 +69,8 @@ namespace Festa.EditorTools
             var root = new GameObject("@BoothInteriors");
 
             var wallMat = Mat("InteriorWall", new Color(0.93f, 0.92f, 0.89f), 0.05f);
-            var floorMat = Mat("InteriorFloor", new Color(0.80f, 0.78f, 0.74f), 0.15f);
+            // 통로 카펫 — 밝은 천장·흰 파샤와 어울리는 따뜻한 밝은 회색. 남색 셸이 도드라진다.
+            var floorMat = Mat("InteriorFloor", new Color(0.66f, 0.64f, 0.61f), 0.08f);
             var trimMat = Mat("InteriorTrim", new Color(0.22f, 0.23f, 0.27f), 0.3f);
             var matMat = Mat("InteriorDoorMat", new Color(0.30f, 0.32f, 0.38f), 0.1f);
             var exitMat = EmissiveMat("InteriorExitSign", new Color(0.35f, 0.95f, 0.55f), 2.2f);
@@ -116,8 +117,10 @@ namespace Festa.EditorTools
             float depth = RoomFrontZ - RoomBackZ;                // 10 m
             float width = RoomHalfX * 2f;                        // 10 m
 
+            // 천장은 밝은 회백색 — 검은 천장(2차)은 노출 트러스와 함께 공사장처럼 읽혔다. 컨벤션홀의 흰 매입등 천장으로.
+            var ceilMat = Mat("InteriorCeiling", new Color(0.82f, 0.82f, 0.84f), 0.10f);
             Box("Floor", new Vector3(0, -WallT / 2f, zc), new Vector3(width, WallT, depth), floor, false);
-            Box("Ceiling", new Vector3(0, WallH + WallT / 2f, zc), new Vector3(width, WallT, depth), wall, false);
+            Box("Ceiling", new Vector3(0, WallH + WallT / 2f, zc), new Vector3(width, WallT, depth), ceilMat, false);
             Box("Wall_Back", new Vector3(0, WallH / 2f, RoomBackZ - WallT / 2f), new Vector3(width, WallH, WallT), wall, true);
             Box("Wall_E", new Vector3(RoomHalfX + WallT / 2f, WallH / 2f, zc), new Vector3(WallT, WallH, depth), wall, true);
             Box("Wall_W", new Vector3(-RoomHalfX - WallT / 2f, WallH / 2f, zc), new Vector3(WallT, WallH, depth), wall, true);
@@ -144,44 +147,64 @@ namespace Festa.EditorTools
             WorldText(room.transform, "ExitSignText", "EXIT  ·  축제로 나가기", new Vector3(0, doorH + frameT + 0.32f * M, RoomFrontZ - 0.09f * M),
                       Quaternion.identity, 0.045f * M, new Color(0.05f, 0.12f, 0.08f), font);
 
-            // 부스 이름 — 셸 뒷벽(4.8 m) 위, 천장(6.0 m) 아래 띠 가운데. 0.35·M 은 폭 11 m 였다 → 0.08·M ≈ 2.5 × 0.57 m.
-            WorldText(room.transform, "Sign", $"BOOTH {id:D2}", new Vector3(0, 5.4f * M, RoomBackZ - 0.02f * M),
-                      Quaternion.Euler(0f, 180f, 0f), 0.08f * M, new Color(0.25f, 0.2f, 0.15f), font);
+            // 부스 이름은 파샤(헤더)로 옮겼다 — 셸이 방 벽까지 닿으면서 뒷벽 사인이 셸 뒤에 가려 보이지 않는다.
 
-            // ── 조명: 부스 위 4 등(따뜻함) + 통로 1 등. 천장 3.4 m 라 사거리 6 m 로 충분하다 ──
-            var lampMat = AssetDatabase.LoadAssetAtPath<Material>(MatDir + "FestivalLamp.mat");
-            var lightPos = new[]
+            // ── 전시관 조명·구조 (2026-09-10 3차) ──────────────────────
+            //
+            // 1차: 흰 천장 + 둥근 전구 → "흰 상자에 전구". 2차: 검은 천장 + 노출 트러스 + LED 바 + 월 워시 스포트 →
+            // "난잡하고 공사현장 같다"(사용자). 검은 빔·하드 스포트 콘·검은 걸레받이가 전시 오브젝트의 금속 트러스와
+            // 겹쳐 공사장으로 읽혔다. 3차는 **컨벤션 센터의 정돈된 문법**으로 간다:
+            //   · 밝은 회백색 천장에 **매입형 조명 패널**(부드러운 흰 사각, 격자 배치) — 코엑스·킨텍스 전시홀 천장.
+            //   · 하드 스포트는 쓰지 않는다. 패널마다 낮은 세기의 포인트를 두어 **고르게** 밝힌다. 콘·핫스팟이 없어야 정돈된다.
+            //   · 파샤(헤더)는 **흰 띠 + 브랜드 남색 스트라이프 + 남색 글자** — 전시 부스 간판의 전형.
+            //   · 걸레받이는 짙은 회색 한 줄만. 트러스·검은 빔은 전부 뺀다.
+            var panelMat = EmissiveMat("InteriorLightPanel", new Color(1f, 0.98f, 0.95f), 1.5f);   // 날아가지 않는 부드러운 흰빛
+            var fasciaMat = Mat("InteriorFascia", new Color(0.96f, 0.96f, 0.95f), 0.12f);
+            var accentMat = Mat("InteriorAccent", new Color(0.10f, 0.18f, 0.45f), 0.25f);        // 셸 패널과 같은 계열 남색
+
+            // ① 매입 조명 패널 — 2열 × 3행 격자. 천장 면에 살짝 파묻혀 "매입등" 으로 읽힌다.
+            int li = 0;
+            for (int row = 0; row < 3; row++)
+            for (int col = 0; col < 2; col++)
             {
-                new Vector3(-1.6f * M, WallH - 0.2f * M, -1.6f * M), new Vector3(1.6f * M, WallH - 0.2f * M, -1.6f * M),
-                new Vector3(-1.6f * M, WallH - 0.2f * M, 1.4f * M),  new Vector3(1.6f * M, WallH - 0.2f * M, 1.4f * M),
-                new Vector3(0f, WallH - 0.2f * M, 4.6f * M),
-            };
-            for (int li = 0; li < lightPos.Length; li++)
-            {
-                var lgo = new GameObject(li == 4 ? "WalkwayLight" : $"BoothLight_{li}");
+                float px = (col == 0 ? -2.3f : 2.3f) * M;
+                float pz = (-2.2f + row * 3.4f) * M;
+                var panel = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                Object.DestroyImmediate(panel.GetComponent<Collider>());
+                panel.name = $"CeilingLamp_{li}";
+                panel.transform.SetParent(room.transform, false);
+                panel.transform.localPosition = new Vector3(px, WallH - 0.03f * M, pz);
+                panel.transform.localScale = new Vector3(1.6f * M, 0.06f * M, 1.2f * M);
+                var pr = panel.GetComponent<Renderer>();
+                pr.sharedMaterial = panelMat;
+                pr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                GameObjectUtility.SetStaticEditorFlags(panel, StaticEditorFlags.OccludeeStatic);
+
+                // 패널 아래 부드러운 채움광. 세기를 낮추고 개수로 채워 콘이 안 보이게 한다.
+                var lgo = new GameObject($"BoothLight_{li}");
                 lgo.transform.SetParent(room.transform, false);
-                lgo.transform.localPosition = lightPos[li];
+                lgo.transform.localPosition = new Vector3(px, WallH - 0.35f * M, pz);
                 var l = lgo.AddComponent<Light>();
                 l.type = LightType.Point;
-                l.color = new Color(1f, 0.95f, 0.88f);
-                l.intensity = li == 4 ? 200f : 300f;   // 실측: 180 → 0.215, 340 → 0.235(카펫이 짙어 한계) — 카펫을 밝히고 300 으로
-                l.range = 9.5f * M;   // 천장 6.0 m — 6.5 m 로는 바닥에 닿기 전에 꺼져 실내가 어두웠다
+                l.color = new Color(1f, 0.97f, 0.93f);
+                l.intensity = 170f;
+                l.range = 9.5f * M;
                 l.shadows = LightShadows.None;
-
-                if (lampMat != null)
-                {
-                    var strip = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                    Object.DestroyImmediate(strip.GetComponent<Collider>());
-                    strip.name = $"CeilingLamp_{li}";
-                    strip.transform.SetParent(room.transform, false);
-                    strip.transform.localPosition = new Vector3(lightPos[li].x, WallH - 0.02f * M, lightPos[li].z);
-                    strip.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // 아래를 본다
-                    strip.transform.localScale = new Vector3(1.2f * M, 0.5f * M, 1f);
-                    var sr = strip.GetComponent<Renderer>();
-                    sr.sharedMaterial = lampMat;
-                    sr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                }
+                li++;
             }
+
+            // ② 부스 파샤(헤더) — 부스 앞선 위를 가로지르는 흰 띠, 아래에 남색 스트라이프, 글자는 남색.
+            // 글자는 +z(문 쪽)에서 -z 를 보며 읽으므로 180° — identity 로 두면 좌우가 뒤집힌다(2차 캡처에서 확인).
+            float fasciaY = 4.7f * M, fasciaZ = ShellTargetFrontZ * M + 0.02f * M;
+            Box("BoothFascia", new Vector3(0, fasciaY, fasciaZ), new Vector3(width, 0.8f * M, 0.26f * M), fasciaMat, true, false);
+            Box("BoothFasciaStripe", new Vector3(0, fasciaY - 0.46f * M, fasciaZ), new Vector3(width, 0.12f * M, 0.30f * M), accentMat, false, false);
+            WorldText(room.transform, "FasciaText", $"BOOTH {id:D2}", new Vector3(0, fasciaY + 0.02f * M, fasciaZ + 0.15f * M),
+                      Quaternion.Euler(0f, 180f, 0f), 0.07f * M, new Color(0.10f, 0.18f, 0.45f), font);
+
+            // ③ 걸레받이 — 벽과 바닥이 곧바로 만나면 종이 상자처럼 보인다. 짙은 회색 한 줄로 바닥선만 잡는다.
+            var skirtMat = Mat("InteriorSkirting", new Color(0.30f, 0.30f, 0.32f), 0.2f);
+            Box("Skirting_E", new Vector3(RoomHalfX - 0.02f * M, 0.07f * M, zc), new Vector3(0.05f * M, 0.14f * M, depth), skirtMat, false, false);
+            Box("Skirting_W", new Vector3(-RoomHalfX + 0.02f * M, 0.07f * M, zc), new Vector3(0.05f * M, 0.14f * M, depth), skirtMat, false, false);
 
             // ── 부스 앵커: FE 레이아웃 미터 좌표의 원점 (1 m = 13.26 unit) ──
             var anchor = new GameObject($"BoothSlot_{id}");
