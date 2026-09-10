@@ -6,6 +6,7 @@ import { walletApi } from '../../../entities/wallet/api.select';
 import { LEASE_COIN_COST } from '../../../entities/booth/types';
 import type { SlotView } from '../../../entities/booth/types';
 import { judgeAffordability } from '../model/leaseConfirm';
+import './leaseConfirmDialog.css';
 
 interface Props {
   slot: SlotView;
@@ -29,29 +30,31 @@ export function LeaseConfirmDialog({ slot, pending, onConfirm, onCancel }: Props
   const affordability = judgeAffordability(balance, LEASE_COIN_COST);
 
   return (
-    <dialog ref={ref} onCancel={onCancel} aria-labelledby="lease-confirm-title">
-      <h2 id="lease-confirm-title">부스 슬롯 임대</h2>
-      <p>
+    <dialog ref={ref} className="lease-confirm" onCancel={onCancel} aria-labelledby="lease-confirm-title">
+      <h2 id="lease-confirm-title" className="lease-confirm-title">부스 슬롯 임대</h2>
+      <p className="lease-confirm-lead">
         <strong>{slot.slotCode}</strong> 슬롯을 24시간 임대합니다.
       </p>
-      <dl>
+      <dl className="lease-confirm-figures">
         <dt>차감 코인</dt>
-        <dd>{LEASE_COIN_COST}코인</dd>
+        <dd className="lease-confirm-cost">{LEASE_COIN_COST}코인</dd>
         <dt>보유 코인</dt>
         <dd>{balance === undefined ? '확인 중' : `${balance}코인`}</dd>
       </dl>
       {/* 부족해 보여도 요청은 막지 않는다 — 서버가 응답 전에 일일 지급을 반영하므로 이 값이 낮을 수 있다 */}
       {affordability === 'insufficient' && (
-        <p role="alert">보유 코인이 부족해 보입니다. 요청은 서버 잔액으로 다시 판정됩니다.</p>
+        <p className="lease-confirm-alert" role="alert">보유 코인이 부족해 보입니다. 요청은 서버 잔액으로 다시 판정됩니다.</p>
       )}
-      {walletQuery.isError && <p role="alert">잔액을 불러오지 못했습니다. 차감 후 내역에서 확인해 주세요.</p>}
-      <p>임대 후에는 변심에 의한 환불이 되지 않습니다.</p>
-      <button type="button" onClick={onConfirm} disabled={pending}>
-        {pending ? '요청 중...' : `${LEASE_COIN_COST}코인 차감하고 임대`}
-      </button>
-      <button type="button" onClick={onCancel} disabled={pending}>
-        취소
-      </button>
+      {walletQuery.isError && <p className="lease-confirm-alert" role="alert">잔액을 불러오지 못했습니다. 차감 후 내역에서 확인해 주세요.</p>}
+      <p className="lease-confirm-note">임대 후에는 변심에 의한 환불이 되지 않습니다.</p>
+      <div className="lease-confirm-actions">
+        <button type="button" className="sc-btn" onClick={onCancel} disabled={pending}>
+          취소
+        </button>
+        <button type="button" className="sc-btn sc-btn-primary" onClick={onConfirm} disabled={pending}>
+          {pending ? '요청 중...' : `${LEASE_COIN_COST}코인 차감하고 임대`}
+        </button>
+      </div>
     </dialog>
   );
 }
