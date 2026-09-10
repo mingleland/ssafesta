@@ -889,8 +889,15 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
 
-여섯 중 **`DISABLED` 만 아직 나오지 않는다** — 임대 만료가 그 값을 쓰는 작업(`S15P21A604-496`)이
-아직 없다. 나머지 다섯은 실제로 나온다.
+여섯 값이 전부 실제로 나온다. `DISABLED` 는 `S15P21A604-496` 이 임대 만료 경로에 붙으면서 마지막으로
+채워졌다 — 임대가 `EXPIRED` 로 넘어가는 **같은 트랜잭션**에서 그 부스의 활성 문서
+(`QUEUED`·`PROCESSING`·`READY`)가 `DISABLED` 로, 활성 Job(`QUEUED`·`RUNNING`·`RETRY_WAIT`)이
+`CANCELLED` 로 바뀌고 chunk·staging 이 정리된다 (FR-015·FR-041). 원본과 메타데이터는 남는다.
+`FAILED`·`EXPIRED` 문서와 이미 끝난 Job 은 건드리지 않는다 — 왜 못 쓰는 문서인지가 지워지면 안 된다.
+
+돌고 있던 FastAPI attempt 에는 **커밋 뒤에** 멱등 cancel(`POST /ai/v1/documents/cancel`)을 한 번
+보낸다. 전달이 실패해도 DB 전이는 확정이고 재시도하지 않는다 — 취소를 못 들은 워커의 결과는 끝난
+Job 이라 `410 JOB_GONE` 으로 거부된다.
 
 - `PROCESSING` 은 **AI 워커가 첫 신호를 보낸 순간**부터다. 위임이 나간 순간이 아니라서, AI 서버가
   응답하지 않는 동안에는 `QUEUED` 로 남는다 — 아무 일도 일어나지 않는 문서를 "처리 중" 이라고

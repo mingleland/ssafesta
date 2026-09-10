@@ -38,8 +38,8 @@
 - [ ] T090 [BE/AI] S15P21A604-400에서 heartbeat·batch·finalize·failed endpoint, DTO, 오류 봉투를 합의하고 `contracts/document-result-api.yaml`을 확정한다
 - [ ] T091 [BE/AI] S15P21A604-399에서 Agent 설정 조회 endpoint·응답 필드·호출 시점·캐시 정책을 합의하고 OpenAPI와 spec 008에 반영한다
 - [ ] T092 [AI] FastAPI 문서 DB 설정·Job/Chunk 모델·Repository·Alembic 실행 경로를 제거하고 처리/결과 API client로 교체한다
-- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다
-- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다
+- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다 (`S15P21A604-496`: 임대 만료 경로의 cancel 완료 — 활성 Job `CANCELLED`, 문서 `DISABLED`, chunk·staging 정리, FastAPI 멱등 cancel 전송. 나머지 pickup·lease·retry·staging·finalize 는 이미 `S15P21A604-400`·`-175` 로 구현됨)
+- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다 (`S15P21A604-496`: 임대 만료로 취소된 Job 의 늦은 finalize 가 410 이고 문서가 `DISABLED` 로 남는 케이스 추가)
 
 **Dependency**: T090·T091 합의 → OpenAPI 확정 → T092·T093 구현 → T094 통합 검증.
 
