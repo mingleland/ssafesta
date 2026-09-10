@@ -1,7 +1,6 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.ai.DocumentProcessingClient.CancelRequest;
-import java.sql.PreparedStatement;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +58,16 @@ public class BoothDocumentDeactivationService {
      * @param boothId the booth whose lease has just expired
      */
     public void deactivate(long boothId) {
+        // Before the UPDATE below, while the active set is still named by status — V21:94 says there
+        // is no staging TTL sweeper because the terminal transitions clear it, and CANCELLED is one
+        // of the three it names. Deleting first is what keeps this one statement instead of an id
+        // array built from the RETURNING rows.
+        jdbc.update("""
+                DELETE FROM ai_document_chunk_staging
+                 WHERE job_id IN (SELECT id FROM ai_document_jobs
+                                   WHERE booth_id = ? AND status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT'))
+                """, boothId);
+
         // The active set is exactly ix_ai_document_jobs_active_document's (V21:51-53). Terminal Jobs
         // are the audit trail of earlier attempts and are left alone.
         List<CancelRequest> live = jdbc.query("""
@@ -72,15 +81,6 @@ public class BoothDocumentDeactivationService {
                 (row, index) -> new CancelRequest(row.getLong("id"), row.getInt("attempt_no")),
                 CANCEL_REASON_CODE, boothId);
 
-        if (!live.isEmpty()) {
-            // V21:94 — there is no staging TTL sweeper because the terminal transitions clear it.
-            // CANCELLED is one of the three it names.
-            Long[] jobIds = live.stream().map(CancelRequest::jobId).toArray(Long[]::new);
-            jdbc.update("DELETE FROM ai_document_chunk_staging WHERE job_id = ANY (?)",
-                    (PreparedStatement statement) -> statement.setArray(1,
-                            statement.getConnection().createArrayOf("bigint", jobIds)));
-        }
-
         // FR-041 asks for the chunks too, and spec.md:71 makes them dead weight either way: a
         // re-lease starts a new Job from QUEUED rather than reusing what this one embedded. The
         // search gate already reads processing_status = 'READY', so this frees vector storage
@@ -89,9 +89,19 @@ public class BoothDocumentDeactivationService {
 
         // FAILED and EXPIRED stay as they are — they are already out of the active set, and
         // overwriting them would erase why a document is not usable.
+        //
+        // A QUEUED row whose upload never arrived (uploaded_at IS NULL) is left alone for a harder
+        // reason: FR-026 and FR-028 reach it only through EXPIRED. AiDocumentRepository's
+        // expireAbandonedGrants matches on (QUEUED, uploaded_at IS NULL) and
+        // AiDocumentOriginalDeleteSweeper on EXPIRED, so DISABLED here would strand the row and the
+        // bytes a late PUT may have left — the grant's own hour never fires and nothing ever deletes
+        // the original. FR-015 loses nothing by the exclusion: completing it needs an active lease
+        // (AiDocumentService.complete → requireActiveEditor), so it cannot reach READY either way.
         int disabled = jdbc.update("""
                 UPDATE ai_documents SET processing_status = 'DISABLED', updated_at = now()
-                 WHERE booth_id = ? AND processing_status IN ('QUEUED', 'PROCESSING', 'READY')
+                 WHERE booth_id = ?
+                   AND (processing_status IN ('PROCESSING', 'READY')
+                        OR (processing_status = 'QUEUED' AND uploaded_at IS NOT NULL))
                 """, boothId);
 
         if (live.isEmpty() && disabled == 0) {
@@ -115,10 +125,13 @@ public class BoothDocumentDeactivationService {
      * Inside the transaction it would do both wrong: a failure would roll the transition back, and
      * the call would hold row locks for the length of its timeout. So it goes after the commit.
      *
-     * <p><b>Not retried.</b> A worker that never hears about the cancellation finishes its embedding
-     * and its callback is refused — {@code CANCELLED} is terminal, so batch, heartbeat and finalize
-     * all answer {@code 410}. What is lost is the compute, not the consistency, which is why
-     * GitLab #162 settled on send-once.
+     * <p><b>Not retried, and it stops at the first failure.</b> A worker that never hears about the
+     * cancellation finishes its embedding and its callback is refused — {@code CANCELLED} is
+     * terminal, so batch, heartbeat and finalize all answer {@code 410}. What is lost is the
+     * compute, not the consistency, which is why GitLab #162 settled on send-once. The Jobs after a
+     * failure go to the same FastAPI process, so working through them buys nothing and costs a read
+     * timeout each — on the lazy re-lease path this loop runs on a member's request thread, and a
+     * booth at the document limit would hold it for over a minute.
      */
     private void cancelAfterCommit(List<CancelRequest> live) {
         if (live.isEmpty()) {
@@ -127,15 +140,17 @@ public class BoothDocumentDeactivationService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                for (CancelRequest request : live) {
+                for (int index = 0; index < live.size(); index++) {
+                    CancelRequest request = live.get(index);
                     try {
                         client.cancelProcessing(request);
                     } catch (RuntimeException failure) {
                         // Class name only, like the delegation path: the message carries the URL.
-                        log.warn("문서 처리 취소 전달 실패 jobId={} attemptNo={} 원인={} — 워커는 계속 돌지만"
-                                        + " 결과는 fencing 으로 거부됩니다.",
+                        log.warn("문서 처리 취소 전달 실패 jobId={} attemptNo={} 원인={} — 남은 {}건은"
+                                        + " 보내지 않습니다. 워커는 계속 돌지만 결과는 fencing 으로 거부됩니다.",
                                 request.jobId(), request.attemptNo(),
-                                failure.getClass().getSimpleName());
+                                failure.getClass().getSimpleName(), live.size() - index - 1);
+                        return;
                     }
                 }
             }

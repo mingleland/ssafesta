@@ -125,6 +125,27 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
         assertEquals(List.of(), client.cancelled(), "끝난 Job 에는 취소를 보내지 않습니다.");
     }
 
+    /**
+     * An outstanding upload grant is not a document to turn off. FR-026 and FR-028 reach it only
+     * through {@code EXPIRED}, and {@code expireAbandonedGrants} matches on
+     * ({@code QUEUED}, {@code uploaded_at IS NULL}) — {@code DISABLED} here would strand the row
+     * and whatever a late PUT left in storage where no sweeper can see either again.
+     */
+    @Test
+    void anOutstandingUploadGrantIsLeftForTheUploadExpirySweeper() {
+        Leased booth = leasedBooth("발급대기");
+        long agentId = seedAgent(booth.boothId());
+        long grant = seedDocument(booth.boothId(), agentId, "QUEUED", nextHash(), false);
+        long uploaded = seedDocument(booth.boothId(), agentId, "QUEUED");
+
+        sweeper.expireStaleLeases();
+
+        assertEquals("QUEUED", documentStatus(grant), "업로드 대기 그랜트는 임대 만료가 건드리지 않습니다.");
+        assertEquals(1, abandonedGrantCount(grant),
+                "expireAbandonedGrants 의 조건에 그대로 남아야 합니다 — 여기서 벗어나면 원본을 지울 경로가 없습니다.");
+        assertEquals("DISABLED", documentStatus(uploaded), "업로드가 끝난 문서는 꺼져야 합니다.");
+    }
+
     @Test
     void anotherBoothsDocumentsAreNotTouched() {
         Leased expiring = leasedBooth("만료측");
@@ -163,6 +184,26 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
         assertEquals("DISABLED", documentStatus(document));
         assertEquals(LeaseStatus.EXPIRED, leases.findById(booth.leaseId()).orElseThrow().getStatus());
         assertEquals(1, client.cancelled().size(), "전송은 시도돼야 합니다 — 삼키는 것은 실패뿐입니다.");
+    }
+
+    /**
+     * The Jobs after a failed cancel go to the same FastAPI process, so sending them buys nothing
+     * and costs a read timeout each — and on the lazy re-lease path that thread is a member's
+     * request. The DB transition is already committed for all of them.
+     */
+    @Test
+    void aFailedCancelStopsTheRestOfTheBatch() {
+        Leased booth = leasedBooth("전송중단");
+        long agentId = seedAgent(booth.boothId());
+        seedDocumentWithJob(booth, agentId, "PROCESSING", "RUNNING", 0);
+        seedDocumentWithJob(booth, agentId, "PROCESSING", "RUNNING", 0);
+        seedDocumentWithJob(booth, agentId, "PROCESSING", "RUNNING", 0);
+        client.failWith(new IllegalStateException("FastAPI 에 닿지 못했습니다."));
+
+        sweeper.expireStaleLeases();
+
+        assertEquals(1, client.cancelled().size(), "첫 실패에서 멈춰야 합니다.");
+        assertEquals(3, cancelledJobCount(booth.boothId()), "DB 전이는 세 건 모두 확정입니다.");
     }
 
     /**
@@ -257,6 +298,20 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
                 String.class, documentId);
     }
 
+    /** The predicate {@code AiDocumentRepository.expireAbandonedGrants} runs on. */
+    private int abandonedGrantCount(long documentId) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM ai_documents
+                 WHERE id = ? AND processing_status = 'QUEUED' AND uploaded_at IS NULL
+                """, Integer.class, documentId);
+    }
+
+    private int cancelledJobCount(Long boothId) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM ai_document_jobs WHERE booth_id = ? AND status = 'CANCELLED'",
+                Integer.class, boothId);
+    }
+
     private int chunkCount(Long boothId) {
         return jdbc.queryForObject("SELECT count(*) FROM ai_document_chunks WHERE booth_id = ?",
                 Integer.class, boothId);
@@ -317,10 +372,17 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
      * is made globally unique rather than derived from a label another class might also use.
      */
     private long seedDocument(Long boothId, long agentId, String status) {
-        return seedDocument(boothId, agentId, status, nextHash());
+        return seedDocument(boothId, agentId, status, nextHash(), true);
     }
 
-    private long seedDocument(Long boothId, long agentId, String status, String sourceHash) {
+    /**
+     * {@code uploaded} is what separates a document from an outstanding grant: {@code uploaded_at}
+     * is set by {@code complete}, and {@code NULL} there is the whole predicate
+     * {@code expireAbandonedGrants} runs on. The literal is interpolated rather than bound because
+     * a bound {@code NULL} timestamptz needs a cast to be typed at all.
+     */
+    private long seedDocument(Long boothId, long agentId, String status, String sourceHash,
+                              boolean uploaded) {
         Long userId = jdbc.queryForObject("SELECT owner_user_id FROM booths WHERE id = ?",
                 Long.class, boothId);
         return jdbc.queryForObject("""
@@ -328,10 +390,10 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
                     size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
                     storage_provider, storage_bucket, uploaded_at)
                 VALUES (?, ?, 'seed.pdf', 'application/pdf', 1024, ?, ?, ?, ?,
-                    'R2', 'test-ai-documents', now())
+                    'R2', 'test-ai-documents', %s)
                 RETURNING id
-                """, Long.class, boothId, agentId, "seed/expiry/" + UUID.randomUUID(), status,
-                userId, sourceHash);
+                """.formatted(uploaded ? "now()" : "NULL"), Long.class, boothId, agentId,
+                "seed/expiry/" + UUID.randomUUID(), status, userId, sourceHash);
     }
 
     private static String nextHash() {
@@ -341,7 +403,7 @@ class BoothLeaseExpiryAiDocumentIntegrationTest {
     private long seedDocumentWithJob(Leased booth, long agentId, String documentStatus,
                                      String jobStatus, int attemptNo) {
         String sourceHash = nextHash();
-        long documentId = seedDocument(booth.boothId(), agentId, documentStatus, sourceHash);
+        long documentId = seedDocument(booth.boothId(), agentId, documentStatus, sourceHash, true);
         jdbc.update("""
                 INSERT INTO ai_document_jobs (document_id, booth_id, agent_id, source_hash,
                     original_filename, content_type, file_size_bytes, storage_provider,
