@@ -67,6 +67,19 @@ namespace Festa.Integration
         public const string MinigameInteract = "WORLD_MINIGAME_INTERACT";
 
         /// <summary>
+        /// 이벤트 부스 (2026-09-10, GitLab #170). <c>{type, boothId, slotId}</c> — 슬롯 하나를 실제로 차지하므로
+        /// 접두사가 <c>WORLD_</c> 가 아니라 <c>BOOTH_</c> 다(payload 에 boothId 가 있으면 <c>BOOTH_</c> 라는 기존 규칙).
+        ///
+        /// <para><b>다른 부스와 달리 입장하지 않는다.</b> F 를 누른 자리에서 곧장 이 이벤트를 쏘고 화면은 FE 오버레이가
+        /// 그린다 — 미니게임(<see cref="MinigameInteract"/>)과 같은 분담이다. <b>Unity 는 무슨 행사인지 모른다</b>:
+        /// boothId 만 보내고 무엇을 띄울지는 FE 가 정한다(노트북에서 URL 을 안 보내는 것과 같은 원칙, 헌법 25조).</para>
+        ///
+        /// <para>FE 수신부 확정 전이다. 부스 종류(<c>boothType</c>)도 아직 서버에 없어서 지금은 씬 설정으로
+        /// "슬롯 1 = 이벤트 부스" 를 지정한다 — #170 에서 BE 에 필드를 요청해 뒀다.</para>
+        /// </summary>
+        public const string EventBoothInteract = "BOOTH_EVENT_INTERACT";
+
+        /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
         /// 노트북 F 의 가시 결과(홈페이지 열기)는 FE 몫이라, FE 가 없는 단독 실행에서는
         /// 발동해도 화면 변화가 없어 "안 된다" 로 보인다 — 월드 쪽이 최소한의 피드백을
@@ -192,6 +205,17 @@ namespace Festa.Integration
             Send("{\"type\":\"" + MinigameInteract + "\",\"gameId\":\"" + EscapeJson(gameId) +
                  "\",\"machineId\":\"" + EscapeJson(machineId ?? string.Empty) + "\"}");
             OnSent?.Invoke(MinigameInteract);
+        }
+
+        /// <summary>
+        /// 이벤트 부스 — <see cref="EventBoothInteract"/>. <paramref name="slotId"/> 를 boothId 와 <b>따로</b> 보내는 이유는
+        /// 둘이 지금 1:1 일 뿐 같은 값이 아니기 때문이다(<c>GET /booths/{boothId}</c> 응답도 두 필드를 나눠 준다).
+        /// 임대가 슬롯을 옮기면 boothId 는 그대로고 slotId 만 바뀐다 — 합쳐 보내면 그때 FE 가 구분할 수단을 잃는다.
+        /// </summary>
+        public static void SendEventBoothInteract(int boothId, int slotId)
+        {
+            Send("{\"type\":\"" + EventBoothInteract + "\",\"boothId\":" + boothId + ",\"slotId\":" + slotId + "}");
+            OnSent?.Invoke(EventBoothInteract);
         }
 
         /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>

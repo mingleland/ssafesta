@@ -147,6 +147,12 @@ namespace Festa.World
         public static bool IsRented(int slot)
         {
             if (slot < 1 || slot > SlotCount) return true;
+
+            // 이벤트 부스는 임대 대상이 아니라 운영 부스다 (GitLab #170). 게시본이 없는 것이 정상인데
+            // 그대로 두면 "빈 부스" 로 판정돼 직원·조명이 꺼지고 포털까지 사라진다 — 눌러 볼 수조차 없다.
+            var portal = Refs(slot).Portal;
+            if (portal != null && portal.eventBooth) return true;
+
             var runtime = Refs(slot).Runtime;
             // 판단 근거가 없으면(방·런타임 미생성) 조용히 끄지 않는다.
             return runtime == null || runtime.IsLoaded;
