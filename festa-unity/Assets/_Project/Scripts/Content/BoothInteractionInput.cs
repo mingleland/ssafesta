@@ -278,6 +278,12 @@ namespace Festa.Content
                 return "타이밍 스톱 게임";
             if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
                 return "소파에 눕기";
+            if (target.GetComponentInParent<Festa.World.HighStrikerInteractable>() != null)
+            {
+                // 작동 중에는 누가 눌러도 안 되므로 문구로 먼저 알린다 (사용자 지시 2026-09-10 — 전원 차단).
+                var hsm = Festa.World.HighStrikerMachine.Any();
+                return hsm != null && hsm.IsBusy ? "작동 중 — 잠시 후" : "망치로 내리치기";
+            }
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";

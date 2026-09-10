@@ -59,6 +59,14 @@ namespace Festa.Integration
         public const string GameInteract = "BOOTH_GAME_INTERACT";
 
         /// <summary>
+        /// 월드 내장 미니게임 (2026-09-10, GitLab #166). <c>{type, gameId, machineId}</c> — 화면은 FE 오버레이가 그리고
+        /// Unity 는 F 상호작용만 한다(사용자 지시). <see cref="ArcadeInteract"/> 와 나눈 이유는 해석 주체가 다르기 때문이다 —
+        /// 광장 게임기는 FE 가 machineId 로 <b>어떤 Game Studio 게임인지</b> 서버에 물어야 하지만, 내장 미니게임은
+        /// gameId 자체가 곧 화면이고 전용 API(<c>/api/v1/minigames/…</c>)를 쓴다. FE 수신부 확정 전이다.
+        /// </summary>
+        public const string MinigameInteract = "WORLD_MINIGAME_INTERACT";
+
+        /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
         /// 노트북 F 의 가시 결과(홈페이지 열기)는 FE 몫이라, FE 가 없는 단독 실행에서는
         /// 발동해도 화면 변화가 없어 "안 된다" 로 보인다 — 월드 쪽이 최소한의 피드백을
@@ -171,6 +179,19 @@ namespace Festa.Integration
             }
             Send("{\"type\":\"" + ArcadeInteract + "\",\"machineId\":\"" + EscapeJson(machineId) + "\"}");
             OnSent?.Invoke(ArcadeInteract);
+        }
+
+        /// <summary>월드 내장 미니게임 — <see cref="MinigameInteract"/>. gameId 는 화면 식별자(현재 <c>TIMER_STOP</c> 하나).</summary>
+        public static void SendMinigameInteract(string gameId, string machineId)
+        {
+            if (string.IsNullOrEmpty(gameId))
+            {
+                Debug.LogWarning($"[BoothInteractBridge] gameId 가 없어 {MinigameInteract} 이벤트를 건너뜁니다.");
+                return;
+            }
+            Send("{\"type\":\"" + MinigameInteract + "\",\"gameId\":\"" + EscapeJson(gameId) +
+                 "\",\"machineId\":\"" + EscapeJson(machineId ?? string.Empty) + "\"}");
+            OnSent?.Invoke(MinigameInteract);
         }
 
         /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>
