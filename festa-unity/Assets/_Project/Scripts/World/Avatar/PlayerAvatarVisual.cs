@@ -220,7 +220,11 @@ namespace Festa.World
         /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
         /// 몸이 떠오른다.
         /// </summary>
-        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround || LiePoseTable.IsLie(emote);
+        // 내리찍기(Strike)도 포함한다 — 무릎을 꿇으며 엉덩이가 0.95 → 0.54 m 로 떨어지고 발이 원점 아래
+        // 0.04 m 까지 내려간다. 접지 보정을 그대로 돌리면 그 프레임을 "바닥에 박힌 것" 으로 읽고 몸을
+        // 끌어내려 파묻힌다(사용자 지적 2026-09-10). 원샷이라 끝나면 RestoreBaseGrounding 이 되돌린다.
+        static bool ChangesGroundContact(PlayerEmoteId emote) =>
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike || LiePoseTable.IsLie(emote);
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -811,6 +815,12 @@ namespace Festa.World
                     p.y = _baseVisualLocalY - (LiePoseTable.MinY(emote) - LiePoseTable.IdleMinY) * vt.localScale.y;
                     vt.localPosition = p;
                 }
+            }
+            else if (emote == PlayerEmoteId.Strike)
+            {
+                // 망치 궤적은 서 있는 발 기준이다. 스윙 중간의 숙인 포즈로 루트를 재접지하면
+                // 팔·망치와 몸의 기준 높이가 갈라진다. 무릎 꿇는 구간은 StrikeProp에서 제외한다.
+                RestoreBaseGrounding();
             }
             else if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
             else RestoreBaseGrounding();
