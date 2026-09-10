@@ -5,7 +5,7 @@
 // 세션이 메모리 전용이라 API 가 죽으면 로그인 자체가 되지 않아 페이지에 도달할 수 없다.
 // 그래서 실서버가 덮지 못하는 세 상태를 여기서 고정한다(G-4 환경 도입 후 첫 페이지 테스트).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen , within} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SlotView } from '../../../../entities/booth/types';
@@ -68,6 +68,18 @@ afterEach(() => {
   __resetSessionForTests();
 });
 
+/**
+ * 슬롯 코드는 평면도(S15P21A604-606)와 목록 양쪽에 나온다 — 같은 데이터를 그림과 목록으로
+ * 각각 보여 주는 것이 의도다. 이 테스트는 목록 표기를 보므로 조회를 목록 안으로 좁힌다.
+ */
+async function inList(text: string): Promise<HTMLElement> {
+  // role='list' 로 잡으면 평면도 범례(ul)와 섞인다 — 슬롯 목록을 직접 지목한다
+  await screen.findByText(text, { selector: '.slot-grid *' });
+  const list = document.querySelector('.slot-grid');
+  if (list === null) throw new Error('슬롯 목록이 없다');
+  return within(list as HTMLElement).findByText(text);
+}
+
 describe('SlotListPage — -87 완료 조건', () => {
   it('조회 중에는 로딩 상태를 보여준다', () => {
     getSlots.mockReturnValue(new Promise(() => {})); // 끝나지 않는 요청 = 로딩 고정
@@ -96,7 +108,7 @@ describe('SlotListPage — -87 완료 조건', () => {
       }),
     ]);
     renderPage();
-    expect(await screen.findByText('F11-R01')).not.toBeNull();
+    expect(await inList('F11-R01')).not.toBeNull();
     const text = document.body.textContent ?? '';
     expect(text).toContain('임대 가능');
     expect(text).toContain('사용 중 — 남의 부스');
@@ -115,7 +127,7 @@ describe('SlotListPage — -87 완료 조건', () => {
       }),
     ]);
     renderPage();
-    expect(await screen.findByText('F11-R02')).not.toBeNull();
+    expect(await inList('F11-R02')).not.toBeNull();
     expect(document.body.textContent).toContain('남은 시간');
   });
 
@@ -128,14 +140,14 @@ describe('SlotListPage — -87 완료 조건', () => {
       }),
     ]);
     renderPage();
-    expect(await screen.findByText('F11-R02')).not.toBeNull();
+    expect(await inList('F11-R02')).not.toBeNull();
     expect(document.body.textContent).toContain('만료');
   });
 
   it('게스트에게는 임대 버튼 대신 로그인 안내를 준다', async () => {
     getSlots.mockResolvedValue([slot({})]);
     renderPage();
-    expect(await screen.findByText('F11-R01')).not.toBeNull();
+    expect(await inList('F11-R01')).not.toBeNull();
     expect(screen.queryByRole('button', { name: /임대/ })).toBeNull();
     expect(document.body.textContent).toContain('임대는 소셜 로그인 회원만 가능합니다.');
   });
