@@ -31,6 +31,7 @@ class BoothFacadeApiIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private BoothRepository booths;
+    @Autowired private BoothSlotRepository slots;
     @Autowired private UserRepository users;
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
@@ -199,6 +200,60 @@ class BoothFacadeApiIntegrationTest {
         mockMvc.perform(facadeRequest(owner, "{\"themeCode\":\"MONO\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+    }
+
+    /**
+     * 슬롯 목록이 같은 facade 를 싣는다 (S15P21A604-622, GitLab #171).
+     *
+     * <p>Unity 는 축제장에 들어서며 간판 12개를 한 번에 그린다. 이 필드가 없으면 목록 1회 +
+     * 부스당 상세 1회로 최대 13요청이다.
+     *
+     * <p>부스 상세와 <b>같은 값</b>인지까지 보는 이유: 두 경로가 각자 조립하면 한쪽만 갱신되는
+     * 날이 온다. 빈 슬롯이 {@code null} 인 것도 함께 본다 — 거기에 기본값이 들어가면 임대되지
+     * 않은 자리에 간판이 선다.
+     */
+    @Test
+    void theSlotListCarriesTheSameFacadeAndLeavesFreeSlotsNull() throws Exception {
+        Owner owner = leasedOwner("목록외관");
+        Long occupiedSlotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"MONO","primaryColor":"#3B82F6","signText":"목록 간판",
+                         "logoUrl":"https://cdn.example.com/list.png"}"""))
+                .andExpect(status().isOk());
+
+        int occupied = orderedIndexOf(occupiedSlotId);
+        int free = firstFreeIndex(occupiedSlotId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].boothId".formatted(occupied)).value(owner.boothId()))
+                .andExpect(jsonPath("$[%d].facade.themeCode".formatted(occupied)).value("MONO"))
+                .andExpect(jsonPath("$[%d].facade.primaryColor".formatted(occupied)).value("#3B82F6"))
+                .andExpect(jsonPath("$[%d].facade.signText".formatted(occupied)).value("목록 간판"))
+                .andExpect(jsonPath("$[%d].facade.logoUrl".formatted(occupied))
+                        .value("https://cdn.example.com/list.png"))
+                .andExpect(jsonPath("$[%d].status".formatted(free)).value("AVAILABLE"))
+                .andExpect(jsonPath("$[%d].facade".formatted(free))
+                        .value(org.hamcrest.Matchers.nullValue()));
+
+        // 같은 값을 부스 상세도 낸다.
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.facade.signText").value("목록 간판"))
+                .andExpect(jsonPath("$.facade.themeCode").value("MONO"));
+    }
+
+    private int orderedIndexOf(Long slotId) {
+        return slots.findAllOrdered().stream().map(BoothSlot::getId).toList().indexOf(slotId);
+    }
+
+    private int firstFreeIndex(Long occupiedSlotId) {
+        var ordered = slots.findAllOrdered();
+        for (int index = 0; index < ordered.size(); index++) {
+            if (!ordered.get(index).getId().equals(occupiedSlotId)) {
+                return index;
+            }
+        }
+        throw new IllegalStateException("빈 슬롯이 없습니다.");
     }
 
     private org.springframework.test.web.servlet.RequestBuilder facadeRequest(Owner owner, String body) {
