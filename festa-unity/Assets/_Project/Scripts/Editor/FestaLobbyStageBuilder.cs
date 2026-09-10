@@ -112,6 +112,13 @@ namespace Festa.EditorTools
             fl.range = 12f;
             fl.shadows = LightShadows.None;
 
+            // ⑧ 전시 조명 — 머리 위에서 아바타를 내리비춘다 (사용자 지시 2026-09-10 "전시하듯이").
+            //
+            // 기구는 y 2.65 에 둔다. 기본 구도(preset 0: 거리 3.55 · 시선 0.92 · FOV 35)에서 보이는 위쪽 한계가
+            // y ≈ 2.04 라 **기구 자체는 화면 밖**이고, 뒤로 물리면(줌 아웃 최대 6) 그때 들어온다.
+            // 대신 빛기둥이 화면 안까지 내려와 "위에서 비추고 있다" 가 항상 읽힌다.
+            BuildExhibitLight(root.transform);
+
             // ⑦ 바닥 반사광 — 무대 아래에서 살짝 올려 비춰 발과 바닥이 붙어 보이게.
             var bounce = new GameObject("Bounce Light");
             bounce.transform.SetParent(root.transform, false);
@@ -129,6 +136,121 @@ namespace Festa.EditorTools
 
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
             Debug.Log($"[LobbyStage] 스튜디오 배경 생성 — 원통 반지름 {Radius} m · 높이 {Height} m, 바닥·천장 캡, 무대 링, 채움광 2 — 씬 저장 필요");
+        }
+
+        const float FixtureY = 2.65f;
+
+        /// <summary>천장 스포트 — 기구 + 스포트 라이트 + 눈에 보이는 빛기둥.</summary>
+        static void BuildExhibitLight(Transform parent)
+        {
+            var rig = new GameObject("ExhibitLight").transform;
+            rig.SetParent(parent, false);
+            rig.localPosition = new Vector3(0f, FixtureY, 0f);
+
+            var metal = LitMat("LobbyFixtureMetal", Solid(new Color(0.10f, 0.11f, 0.14f)), 0.55f);
+
+            // 매달린 봉 — 기구가 허공에 떠 있으면 소품이 아니라 오류로 보인다.
+            var rod = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            rod.name = "Rod";
+            Object.DestroyImmediate(rod.GetComponent<Collider>());
+            rod.transform.SetParent(rig, false);
+            rod.transform.localPosition = new Vector3(0f, 0.62f, 0f);
+            rod.transform.localScale = new Vector3(0.035f, 0.62f, 0.035f);
+            Paint(rod, metal);
+
+            var housing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            housing.name = "Housing";
+            Object.DestroyImmediate(housing.GetComponent<Collider>());
+            housing.transform.SetParent(rig, false);
+            housing.transform.localPosition = Vector3.zero;
+            housing.transform.localScale = new Vector3(0.34f, 0.17f, 0.34f);
+            Paint(housing, metal);
+
+            // 렌즈 — 기구 아래에 붙은 밝은 원. 빛이 나오는 곳이 보여야 조명으로 읽힌다.
+            var lens = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            lens.name = "Lens";
+            Object.DestroyImmediate(lens.GetComponent<Collider>());
+            lens.transform.SetParent(rig, false);
+            lens.transform.localPosition = new Vector3(0f, -0.175f, 0f);
+            lens.transform.localScale = new Vector3(0.29f, 0.012f, 0.29f);
+            Paint(lens, EmissiveMat("LobbyFixtureLens", new Color(1f, 0.93f, 0.78f), 3.2f));
+
+            // 빛기둥 — 위가 좁고 아래가 넓은 원뿔. 위가 밝고 아래로 갈수록 사라진다.
+            var beam = new GameObject("Beam");
+            beam.transform.SetParent(rig, false);
+            beam.transform.localPosition = new Vector3(0f, -0.19f, 0f);
+            var mf = beam.AddComponent<MeshFilter>();
+            mf.sharedMesh = ConeMesh(0.26f, 1.15f, FixtureY - 0.19f + 1.25f, 40);
+            var mr = beam.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = AdditiveMat("LobbyBeam", BeamGradient());
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+            GameObjectUtility.SetStaticEditorFlags(beam, 0);
+
+            var spot = new GameObject("Spot");
+            spot.transform.SetParent(rig, false);
+            spot.transform.localPosition = new Vector3(0f, -0.18f, 0f);
+            spot.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // 아래를 본다
+            var sl = spot.AddComponent<Light>();
+            sl.type = LightType.Spot;
+            sl.color = new Color(1f, 0.93f, 0.82f);
+            sl.intensity = 34f;
+            sl.range = 8f;
+            sl.spotAngle = 48f;
+            sl.innerSpotAngle = 26f;
+            sl.shadows = LightShadows.Soft;
+            sl.shadowStrength = 0.55f;
+        }
+
+        /// <summary>
+        /// 위가 좁고 아래가 넓은 뿔대(뚜껑 없음). UV 의 v 는 <b>아래 0 · 위 1</b> 이라
+        /// 세로 그라데이션으로 아래쪽을 흐리게 만들 수 있다. 양면이라 안에서도 보인다.
+        /// </summary>
+        static Mesh ConeMesh(float topRadius, float bottomRadius, float height, int segments)
+        {
+            var verts = new Vector3[(segments + 1) * 2];
+            var uvs = new Vector2[verts.Length];
+            for (var i = 0; i <= segments; i++)
+            {
+                float t = i / (float)segments;
+                float a = t * Mathf.PI * 2f;
+                float cos = Mathf.Cos(a), sin = Mathf.Sin(a);
+                verts[i] = new Vector3(cos * bottomRadius, -height, sin * bottomRadius);
+                verts[segments + 1 + i] = new Vector3(cos * topRadius, 0f, sin * topRadius);
+                uvs[i] = new Vector2(t, 0f);
+                uvs[segments + 1 + i] = new Vector2(t, 1f);
+            }
+            var tris = new int[segments * 6];
+            for (var i = 0; i < segments; i++)
+            {
+                int b0 = i, b1 = i + 1, t0 = segments + 1 + i, t1 = segments + 2 + i;
+                int k = i * 6;
+                tris[k] = b0; tris[k + 1] = t0; tris[k + 2] = b1;
+                tris[k + 3] = b1; tris[k + 4] = t0; tris[k + 5] = t1;
+            }
+            var mesh = new Mesh { name = "LobbyBeamCone" };
+            mesh.vertices = verts;
+            mesh.uv = uvs;
+            mesh.triangles = tris;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            var path = TexDir + "LobbyBeamCone.asset";
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing != null) { EditorUtility.CopySerialized(mesh, existing); Object.DestroyImmediate(mesh); return existing; }
+            AssetDatabase.CreateAsset(mesh, path);
+            return mesh;
+        }
+
+        /// <summary>빛기둥 세로 그라데이션 — 위(v=1)가 밝고 아래로 사라진다.</summary>
+        static Texture2D BeamGradient()
+        {
+            var tint = new Color(1f, 0.94f, 0.80f);
+            return Bake("LobbyBeamGradient", 2, 128, (u, v) =>
+            {
+                // 0.55 는 우유처럼 뿌옇게 껴 아바타를 덮었다 — 빛으로 읽힐 만큼만 남긴다.
+                float a = Mathf.Pow(v, 2.4f) * 0.34f;
+                return new Color(tint.r, tint.g, tint.b, a);
+            });
         }
 
         static void Paint(GameObject go, Material mat)

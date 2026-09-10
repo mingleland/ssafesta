@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!28 &2800000
+Texture2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: LobbyBeamGradient
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 3
+  m_Width: 2
+  m_Height: 128
+  m_CompleteImageSize: 1024
+  m_MipsStripped: 0
+  m_TextureFormat: 4
+  m_MipCount: 1
+  m_IsReadable: 1
+  m_IsPreProcessed: 0
+  m_IgnoreMipmapLimit: 1
+  m_MipmapLimitGroupName: 
+  m_StreamingMipmaps: 0
+  m_StreamingMipmapsPriority: 0
+  m_VTOnly: 0
+  m_AlphaIsTransparency: 0
+  m_ImageCount: 1
+  m_TextureDimension: 2
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_LightmapFormat: 0
+  m_ColorSpace: 1
+  m_PlatformBlob: 
+  image data: 1024
+  _typelessdata: fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc00fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc01fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc02fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc03fff0cc04fff0cc04fff0cc04fff0cc04fff0cc04fff0cc04fff0cc04fff0cc04fff0cc05fff0cc05fff0cc05fff0cc05fff0cc05fff0cc05fff0cc06fff0cc06fff0cc06fff0cc06fff0cc06fff0cc06fff0cc07fff0cc07fff0cc07fff0cc07fff0cc08fff0cc08fff0cc08fff0cc08fff0cc08fff0cc08fff0cc09fff0cc09fff0cc09fff0cc09fff0cc0afff0cc0afff0cc0afff0cc0afff0cc0bfff0cc0bfff0cc0bfff0cc0bfff0cc0cfff0cc0cfff0cc0cfff0cc0cfff0cc0dfff0cc0dfff0cc0dfff0cc0dfff0cc0efff0cc0efff0cc0efff0cc0efff0cc0ffff0cc0ffff0cc10fff0cc10fff0cc10fff0cc10fff0cc11fff0cc11fff0cc11fff0cc11fff0cc12fff0cc12fff0cc13fff0cc13fff0cc13fff0cc13fff0cc14fff0cc14fff0cc15fff0cc15fff0cc15fff0cc15fff0cc16fff0cc16fff0cc17fff0cc17fff0cc18fff0cc18fff0cc18fff0cc18fff0cc19fff0cc19fff0cc1afff0cc1afff0cc1bfff0cc1bfff0cc1cfff0cc1cfff0cc1dfff0cc1dfff0cc1dfff0cc1dfff0cc1efff0cc1efff0cc1ffff0cc1ffff0cc20fff0cc20fff0cc21fff0cc21fff0cc22fff0cc22fff0cc23fff0cc23fff0cc24fff0cc24fff0cc25fff0cc25fff0cc26fff0cc26fff0cc27fff0cc27fff0cc28fff0cc28fff0cc29fff0cc29fff0cc2afff0cc2afff0cc2bfff0cc2bfff0cc2cfff0cc2cfff0cc2dfff0cc2dfff0cc2ffff0cc2ffff0cc30fff0cc30fff0cc31fff0cc31fff0cc32fff0cc32fff0cc33fff0cc33fff0cc34fff0cc34fff0cc36fff0cc36fff0cc37fff0cc37fff0cc38fff0cc38fff0cc39fff0cc39fff0cc3bfff0cc3bfff0cc3cfff0cc3cfff0cc3dfff0cc3dfff0cc3ffff0cc3ffff0cc40fff0cc40fff0cc42fff0cc42fff0cc43fff0cc43fff0cc44fff0cc44fff0cc46fff0cc46fff0cc47fff0cc47fff0cc49fff0cc49fff0cc4afff0cc4afff0cc4cfff0cc4cfff0cc4dfff0cc4dfff0cc4ffff0cc4ffff0cc50fff0cc50fff0cc52fff0cc52fff0cc53fff0cc53fff0cc55fff0cc55fff0cc57fff0cc57
+  m_StreamData:
+    serializedVersion: 2
+    offset: 0
+    size: 0
+    path: 
