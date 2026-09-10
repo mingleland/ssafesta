@@ -6,6 +6,7 @@ import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
 import { SurveyManagementPage } from '../../pages/management/SurveyManagementPage';
 import { ConsultationStaffPage } from '../../pages/management/ConsultationStaffPage';
+import { AiAgentManagementPage } from '../../pages/management/AiAgentManagementPage';
 import { LoginPage } from '../../pages/login/LoginPage';
 import { CallbackPage } from '../../pages/auth/CallbackPage';
 import { RequireAuth } from './RequireAuth';
@@ -84,6 +85,14 @@ export const routes = [
     element: (
       <RequireAuth level="member-only">
         <ConsultationStaffPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: '/app/booths/:boothId/ai-agent',
+    element: (
+      <RequireAuth level="member-only">
+        <AiAgentManagementPage />
       </RequireAuth>
     ),
   },
