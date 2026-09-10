@@ -22,8 +22,11 @@ namespace Festa.World
     {
         [SerializeField] AudioClip _morning;    // 11층: Algorithmic Morning
         [SerializeField] AudioClip _circus;     // 축제: Midnight Circus
-        [SerializeField] float _morningVolume = 0.5f;
-        [SerializeField] float _circusVolume = 0.55f;
+        // 두 곡의 원본 음량은 사실상 같다 — 실측 2026-09-10: K-가중 라우드니스 −19.54 / −19.61 LUFS
+        // (RMS 로도 −17.4 / −17.9 dBFS). 그러니 배율 차이는 곡 보정이 아니라 그냥 취향이고,
+        // 0.5 / 0.55 의 0.8 dB 차이는 들리지 않는다. **전체가 크다**는 지적을 받아 같은 비율로 낮춘다.
+        [SerializeField] float _morningVolume = 0.38f;
+        [SerializeField] float _circusVolume = 0.41f;
         [Tooltip("볼륨이 목표로 수렴하는 속도 (초당). 걸음 속도와 어울리는 완만한 값.")]
         [SerializeField] float _fadeSpeed = 1.4f;
 

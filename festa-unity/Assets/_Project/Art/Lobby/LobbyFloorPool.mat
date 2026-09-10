@@ -58,7 +58,7 @@ Material:
     - _BlendOp: 0
     - _Cull: 0
     - _Cutoff: 0.5
-    - _DstBlend: 1
+    - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _QueueOffset: 0
     - _SampleGI: 0

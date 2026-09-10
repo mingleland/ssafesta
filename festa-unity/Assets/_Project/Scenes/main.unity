@@ -42721,8 +42721,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _morning: {fileID: 8300000, guid: 22912cb7d46fe4541a9aaf49cfc0a63f, type: 3}
   _circus: {fileID: 8300000, guid: 9e6f9fd7b248e4f42a97d4fc4c2d8464, type: 3}
-  _morningVolume: 0.5
-  _circusVolume: 0.55
+  _morningVolume: 0.38
+  _circusVolume: 0.41
   _fadeSpeed: 1.4
 --- !u!4 &1066131235
 Transform:
@@ -82155,6 +82155,14 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1076138752423565884, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 1076138752423565884, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 45
+      objectReference: {fileID: 0}
     - target: {fileID: 1086861753986033424, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -82638,6 +82646,14 @@ PrefabInstance:
     - target: {fileID: 4646273687296722495, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: m_Enabled
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4708576510601660189, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 4708576510601660189, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 45
       objectReference: {fileID: 0}
     - target: {fileID: 4789364215061987448, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       propertyPath: m_Enabled
