@@ -54,9 +54,16 @@ function renderPage() {
   );
 }
 
-/** 카드 = 목록 항목. 그 안에서만 링크를 찾아야 페이지 상단 배너 링크와 섞이지 않는다 */
+/**
+ * 카드 = 목록 항목. 그 안에서만 링크를 찾아야 페이지 상단 배너 링크와 섞이지 않는다.
+ *
+ * 슬롯 코드는 화면에 두 번 나온다 — 평면도(S15P21A604-606)와 목록. 같은 데이터를 그림과
+ * 목록으로 각각 보여 주는 것이 의도이므로, 조회를 목록 안으로 좁힌다.
+ */
 function cardOf(slotCode: string): HTMLElement {
-  const code = screen.getByText(slotCode);
+  const list = document.querySelector('.slot-grid');
+  if (list === null) throw new Error('슬롯 목록이 없다');
+  const code = within(list as HTMLElement).getByText(slotCode);
   const card = code.closest('li');
   if (card === null) throw new Error(`카드를 찾지 못했다: ${slotCode}`);
   return card;
@@ -83,7 +90,7 @@ describe('슬롯 목록 — 내 부스 카드로 Studio 진입', () => {
     ]);
 
     renderPage();
-    await screen.findByText('F11-R01');
+    await screen.findByText('F11-R01', { selector: '.slot-grid *' });
 
     const link = within(cardOf('F11-R01')).getByRole('link');
     expect(link.getAttribute('href')).toBe(`/app/studio/${MY_BOOTH_ID}`);
@@ -95,7 +102,7 @@ describe('슬롯 목록 — 내 부스 카드로 Studio 진입', () => {
     ]);
 
     renderPage();
-    await screen.findByText('F11-R02');
+    await screen.findByText('F11-R02', { selector: '.slot-grid *' });
 
     expect(within(cardOf('F11-R02')).queryByRole('link')).toBeNull();
   });
@@ -104,7 +111,7 @@ describe('슬롯 목록 — 내 부스 카드로 Studio 진입', () => {
     getSlots.mockResolvedValue([slot({ slotId: 3, slotCode: 'F11-R03' })]);
 
     renderPage();
-    await screen.findByText('F11-R03');
+    await screen.findByText('F11-R03', { selector: '.slot-grid *' });
 
     const card = cardOf('F11-R03');
     expect(within(card).queryByRole('link')).toBeNull();
