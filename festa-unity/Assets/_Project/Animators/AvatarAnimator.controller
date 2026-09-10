@@ -816,7 +816,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Emote_Strike
-  m_Speed: 2.2
+  m_Speed: 1.7
   m_CycleOffset: 0
   m_Transitions: []
   m_StateMachineBehaviours: []
@@ -828,7 +828,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 7400002, guid: 5f82483d7b4020347b032d21507762cf, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: 6229e3b94bcf0464789c96f62058c494, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

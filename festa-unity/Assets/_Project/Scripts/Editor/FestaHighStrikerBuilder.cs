@@ -27,17 +27,19 @@ namespace Festa.EditorTools
         // 램프는 **기둥 면 위**에 얹는다. 기둥 옆(로컬 x −0.245)에 레일을 세워 봤더니 벽돌 벽·벽 램프와 겹쳐
         // 따로 노는 막대처럼 보였다(2026-09-10 캡처 2회). 벤더 기둥에는 이미 별·눈금(60·70·80)이 인쇄돼 있으니,
         // 그 위에 발광 원반을 겹쳐 "기둥의 등이 켜진다" 로 읽히게 한다. 퍽은 그 앞을 지나간다.
-        // 램프는 **기둥 정중앙**에 얹는다. 기둥은 y=25 에서 월드 z 142.9~147.1(4.2 u)로 좁아서,
-        // 로컬 x −0.08 에 두자 램프가 오른쪽 끝에 반쯤 걸쳐 벽돌 벽 위로 삐져나왔다(사용자 지적 "분리되지 않게").
-        // 실측(2026-09-10 플레이 모드 화면좌표): 기둥 중심 = 메시 로컬 x 0.000, 전면 z −0.106.
+        // 게이지는 **기둥 정중앙**에 얹는다. 실측(2026-09-10): 기둥 중심 = 메시 로컬 x 0.000, 전면 z −0.106,
+        // 기둥 폭 월드 4.2 u(로컬 0.32 m).
+        //
+        // 모양은 사용자 레퍼런스("King of the Hammer")를 따른다 — **어두운 베젤에 박힌 사각 LED 사다리**.
+        // 처음에는 둥근 램프 + 흰 사각 퍽이었는데 "네모랑 동그라미가 이상하다" 는 지적을 받았다.
+        // 실제 기계에는 물리적으로 오르내리는 퍽이 없고, 눈금이 아래에서 위로 차오른다.
         const float StarX = 0f;
-        const float StarZ = -0.068f;         // 기둥 전면(−0.106)에서 4 cm 앞 — 붙이면 z-파이팅으로 검게 나온다
-        const float StarDiameter = 0.22f;    // 기둥 폭 0.32 m 안에 들어가는 최대치. 0.115 는 멀리서 안 보였다
-        const float StarBottomY = 0.80f, StarTopY = 2.52f;
-        const int StarCount = 8;
+        const float StarZ = -0.062f;         // 기둥 전면(−0.106)에서 4 cm 앞 — 붙이면 z-파이팅으로 검게 나온다
+        const float SegWidth = 0.245f;       // 기둥 폭(0.32) 안쪽
+        const float SegHeight = 0.088f;
+        const float StarBottomY = 0.72f, StarTopY = 2.56f;
+        const int StarCount = 14;            // 레퍼런스는 15칸 — 기둥 길이에 맞춰 14칸
 
-        const float PuckRestY = 0.62f, PuckTopY = 2.55f;
-        const float ColumnFrontZ = -0.03f;   // 램프보다 앞 — 퍽이 등 위를 스치며 오른다
         const float BoardY = 3.70f;          // 3.35 에서는 꼭대기 별 장식에 글자가 가렸다
 
         [MenuItem("Festa/World/하이 스트라이커 부품 생성")]
@@ -63,17 +65,21 @@ namespace Festa.EditorTools
             root.transform.localRotation = Quaternion.identity;
             root.transform.localScale = Vector3.one;
 
-            var puckMat = Mat("StrikerPuck", new Color(0.62f, 0.64f, 0.68f), 0.72f);
-            var starOff = Mat("StrikerStarOff", new Color(0.30f, 0.13f, 0.11f), 0.2f);
-            var starOn = EmissiveMat("StrikerStarOn", new Color(1f, 0.85f, 0.30f), 3.0f);
+            var starOff = Mat("StrikerStarOff", new Color(0.055f, 0.05f, 0.06f), 0.55f);   // 꺼진 LED — 검은 유리
+            // 켜진 색은 높이에 따라 초록 → 호박 → 빨강 (레퍼런스 사다리와 같은 문법)
+            var onLow = EmissiveMat("StrikerLedGreen", new Color(0.25f, 1f, 0.42f), 3.2f);
+            var onMid = EmissiveMat("StrikerLedAmber", new Color(1f, 0.72f, 0.12f), 3.4f);
+            var onHigh = EmissiveMat("StrikerLedRed", new Color(1f, 0.22f, 0.16f), 3.6f);
+            var bezelMat = Mat("StrikerBezel", new Color(0.045f, 0.045f, 0.055f), 0.45f);
             var boardMat = Mat("StrikerBoard", new Color(0.09f, 0.10f, 0.14f), 0.25f);
             var frameMat = Mat("StrikerFrame", new Color(0.63f, 0.13f, 0.14f), 0.35f);   // 기계 몸통과 같은 붉은색
 
-            // ① 퍽 — 기둥 전면을 타고 오르내린다.
-            var puck = Box(root.transform, "Puck", new Vector3(0f, PuckRestY, ColumnFrontZ),
-                           new Vector3(0.40f, 0.17f, 0.05f), puckMat);   // 0.09 m 두께는 멀리서 실처럼 보였다
+            // ① 베젤 — LED 를 박아 넣을 어두운 띠. 이게 있어야 램프가 기둥에 붙은 계기로 읽힌다.
+            float ladderMid = (StarBottomY + StarTopY) * 0.5f;
+            Box(root.transform, "LedBezel", new Vector3(StarX, ladderMid, StarZ - 0.018f),
+                new Vector3(SegWidth + 0.05f, StarTopY - StarBottomY + SegHeight + 0.06f, 0.035f), bezelMat);
 
-            // ② 별 8개 — 기둥 면 위, 아래에서 위로. 켜짐/꺼짐은 머티리얼 교체다
+            // ② LED 사다리 — 아래에서 위로 차오른다. 켜짐/꺼짐은 머티리얼 교체다
             // (오브젝트를 껐다 켜면 배칭이 깨진다).
             var starRoot = new GameObject("Stars").transform;
             starRoot.SetParent(root.transform, false);
@@ -81,7 +87,7 @@ namespace Festa.EditorTools
             for (var i = 0; i < StarCount; i++)
             {
                 float y = Mathf.Lerp(StarBottomY, StarTopY, i / (float)(StarCount - 1));
-                Disc(starRoot, $"Star_{i}", new Vector3(StarX, y, StarZ), StarDiameter, starOff);
+                Box(starRoot, $"Star_{i}", new Vector3(StarX, y, StarZ), new Vector3(SegWidth, SegHeight, 0.03f), starOff);
             }
 
             // ③ 점수판 — 기계 꼭대기(별 장식 y ≈ 3.1) 위. 3.35 에서는 별 장식에 글자가 가렸다.
@@ -115,13 +121,14 @@ namespace Festa.EditorTools
             var hsm = root.AddComponent<HighStrikerMachine>();
             var so = new SerializedObject(hsm);
             so.FindProperty("_machineId").stringValue = MachineId;
-            so.FindProperty("_puckRestY").floatValue = PuckRestY;
-            so.FindProperty("_puckTopY").floatValue = PuckTopY;
-            so.FindProperty("_puck").objectReferenceValue = puck.transform;
             so.FindProperty("_starRoot").objectReferenceValue = starRoot;
             so.FindProperty("_scoreText").objectReferenceValue = tmp;
             so.FindProperty("_starOffMaterial").objectReferenceValue = starOff;
-            so.FindProperty("_starOnMaterial").objectReferenceValue = starOn;
+            var tiers = so.FindProperty("_starOnMaterials");
+            tiers.arraySize = 3;
+            tiers.GetArrayElementAtIndex(0).objectReferenceValue = onLow;
+            tiers.GetArrayElementAtIndex(1).objectReferenceValue = onMid;
+            tiers.GetArrayElementAtIndex(2).objectReferenceValue = onHigh;
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // ⑤ 상호작용은 **벤더 기계 본체**에 붙인다 — 사람이 다가가는 대상이 그것이라 사거리·외곽선이 자연스럽다.
@@ -133,7 +140,7 @@ namespace Festa.EditorTools
                 machine.AddComponent<Festa.Booth.BoothInteractionTarget>();
 
             EditorSceneManagerMarkDirty(root);
-            Debug.Log($"[HighStriker] 부품 생성 — 퍽 y {PuckRestY:F2}~{PuckTopY:F2} m, 별 {StarCount}개(x {StarX:F2}), 점수판 y 3.35 m — 씬 저장 필요");
+            Debug.Log($"[HighStriker] 부품 생성 — LED {StarCount}칸 (y {StarBottomY:F2}~{StarTopY:F2} m), 점수판 y {BoardY:F2} m — 씬 저장 필요");
         }
 
         static void EditorSceneManagerMarkDirty(GameObject go) =>
@@ -155,23 +162,6 @@ namespace Festa.EditorTools
             // (2026-09-10 실측: 퍽·램프·점수판이 전부 `Renderer.isVisible=false` 로 사라졌다). 여기 부품은
             // 퍽이 움직이고 램프가 머티리얼을 바꾸는 동적 오브젝트라 애초에 정적이 아니다.
             GameObjectUtility.SetStaticEditorFlags(go, 0);
-            return go;
-        }
-
-        /// <summary>납작한 원반 램프. 사각형 램프는 벽에 붙은 검은 타일처럼 보였다.</summary>
-        static GameObject Disc(Transform parent, string name, Vector3 localPos, float diameter, Material mat)
-        {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            go.name = name;
-            Object.DestroyImmediate(go.GetComponent<Collider>());
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = localPos;
-            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);   // 원반 면이 사람(로컬 +z)을 본다
-            go.transform.localScale = new Vector3(diameter, 0.012f, diameter);
-            var r = go.GetComponent<Renderer>();
-            r.sharedMaterial = mat;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            GameObjectUtility.SetStaticEditorFlags(go, 0);   // 위 Box 와 같은 이유 — 베이크 밖의 정적 오클루디는 통째로 컬링된다
             return go;
         }
 

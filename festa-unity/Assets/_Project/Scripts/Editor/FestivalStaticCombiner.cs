@@ -75,6 +75,10 @@ namespace Festa.EditorTools
                 .Where(r => !r.gameObject.name.StartsWith("Quad"))
                 .Where(r => r.GetComponentInParent<LODGroup>() == null)
                 .Where(r => !r.gameObject.name.EndsWith(CombinedSuffix) && !r.transform.parent.name.EndsWith(CombinedSuffix))
+                // **상호작용 오브젝트는 굽지 않는다.** 구우면 원본 렌더러가 꺼지고 그림은 병합 당시 위치에 굳는다 —
+                // 나중에 그 기계를 옮기면 콜라이더·자식(퍽·램프·점수판)만 따라가고 **보이는 몸통은 옛 자리에 남는다**.
+                // 2026-09-10 하이 스트라이커에서 실제로 그렇게 됐다: 몸통은 x −885, 실제 기계는 −916 (T-254).
+                .Where(r => r.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() == null)
                 .ToList();
 
             if (sources.Count < 2) { report.AppendLine($"{group.name}: 대상 {sources.Count}개 — 건너뜀"); return (sources.Count, sources.Count); }

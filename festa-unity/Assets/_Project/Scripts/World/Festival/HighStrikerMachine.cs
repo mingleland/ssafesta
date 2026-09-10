@@ -22,10 +22,6 @@ namespace Festa.World
         /// <summary>씬이 정한 canonical id. RPC 는 이 값으로 기계를 찾는다.</summary>
         [SerializeField] string _machineId = "plaza-high-striker-01";
 
-        [Header("퍽(쇠) 이동 구간 — 기계 로컬 y, 미터")]
-        [SerializeField] float _puckRestY = 0.62f;
-        [SerializeField] float _puckTopY = 2.55f;
-
         // 타격감이 나려면 **때린 순간에 이미 올라가 있어야 한다** (사용자 지적 2026-09-10 — "빨리 쾅 하고
         // 점수도 빠르게"). 0.45초에 걸쳐 올리자 망치가 닿은 뒤 퍽이 슬슬 따라가는 것처럼 보였다.
         [Header("연출 시간(초)")]
@@ -33,11 +29,12 @@ namespace Festa.World
         [SerializeField] float _holdSeconds = 1.1f;
         [SerializeField] float _fallSeconds = 0.4f;
 
-        [SerializeField] Transform _puck;
         [SerializeField] Transform _starRoot;
         [SerializeField] TextMeshPro _scoreText;
         [SerializeField] Material _starOffMaterial;
-        [SerializeField] Material _starOnMaterial;
+
+        /// <summary>켜진 색을 높이에 따라 나눈다 — 아래 초록, 가운데 호박, 위 빨강 (레퍼런스 사다리).</summary>
+        [SerializeField] Material[] _starOnMaterials = new Material[0];
 
         readonly List<Renderer> _stars = new();
         Coroutine _running;
@@ -120,7 +117,6 @@ namespace Festa.World
         public void ShowRecord(int score, string nickname)
         {
             SetStars(0);
-            if (_puck != null) _puck.localPosition = new Vector3(_puck.localPosition.x, _puckRestY, _puck.localPosition.z);
             WriteScoreboard(score, nickname, false);
         }
 
@@ -128,46 +124,44 @@ namespace Festa.World
         {
             int stars = StarsFromPower(power);
             bool bell = stars >= _stars.Count && _stars.Count > 0;
-            float topY = Mathf.Lerp(_puckRestY, _puckTopY, power);
 
             WriteScoreboard(score, nickname, bell);
 
-            // 올라간다 — 처음이 폭발적이고 끝이 느린 감속(실제 기계의 관성). 세제곱으로 눌러 "쾅" 이 나게.
+            // 차오른다 — 처음이 폭발적이고 끝이 느린 감속(실제 기계의 관성). 세제곱으로 눌러 "쾅" 이 나게.
             float t = 0f;
             while (t < _riseSeconds)
             {
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / _riseSeconds);
                 float eased = 1f - (1f - k) * (1f - k) * (1f - k);
-                SetPuckY(Mathf.Lerp(_puckRestY, topY, eased));
                 SetStars(Mathf.CeilToInt(eased * stars));
                 yield return null;
             }
-            SetPuckY(topY);
             SetStars(stars);
 
             yield return new WaitForSeconds(_holdSeconds);
 
-            // 내려온다.
+            // 위에서부터 꺼지며 내려온다.
             t = 0f;
             while (t < _fallSeconds)
             {
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / _fallSeconds);
-                SetPuckY(Mathf.Lerp(topY, _puckRestY, k * k));
+                SetStars(Mathf.CeilToInt(Mathf.Lerp(stars, 0f, k * k)));
                 yield return null;
             }
-            SetPuckY(_puckRestY);
             SetStars(0);
             _running = null;
             _busyUntil = 0f;
         }
 
-        void SetPuckY(float y)
+        /// <summary>켜진 칸 색 — 높이에 따라 초록 → 호박 → 빨강. 재료가 하나뿐이면 그것만 쓴다.</summary>
+        Material OnMaterial(int index)
         {
-            if (_puck == null) return;
-            var p = _puck.localPosition;
-            _puck.localPosition = new Vector3(p.x, y, p.z);
+            if (_starOnMaterials == null || _starOnMaterials.Length == 0) return null;
+            if (_starOnMaterials.Length == 1 || _stars.Count <= 1) return _starOnMaterials[0];
+            int tier = Mathf.Clamp(Mathf.FloorToInt(index / (float)_stars.Count * _starOnMaterials.Length), 0, _starOnMaterials.Length - 1);
+            return _starOnMaterials[tier];
         }
 
         void SetStars(int litCount)
@@ -175,7 +169,7 @@ namespace Festa.World
             for (var i = 0; i < _stars.Count; i++)
             {
                 if (_stars[i] == null) continue;
-                var wanted = i < litCount ? _starOnMaterial : _starOffMaterial;
+                var wanted = i < litCount ? OnMaterial(i) : _starOffMaterial;
                 if (wanted != null && _stars[i].sharedMaterial != wanted) _stars[i].sharedMaterial = wanted;
             }
         }
