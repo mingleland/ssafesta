@@ -78,7 +78,6 @@ case "${component}" in
     "${docker_bin}" network inspect festa-data-private >/dev/null
     ;;
   front)
-    : "${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required}"
     ;;
   game)
     : "${CONNECTION_TOKEN_SECRET_FILE:?CONNECTION_TOKEN_SECRET_FILE is required}"

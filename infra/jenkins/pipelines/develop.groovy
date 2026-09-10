@@ -140,7 +140,6 @@ def call() {
                     "CI_ARTIFACT_DIR=${artifactRoot}",
                     "FRESHNESS_EXPECTED_SHA=${headSha}",
                     'CI_BRANCH=develop',
-                    'PUBLIC_API_BASE_URL=/__dev/api',
                     'PUBLIC_UNITY_BUILD_BASE=/unity/'
                 ]) {
                     if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }

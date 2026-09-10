@@ -139,8 +139,12 @@ grep -q 'transfer-local-images.sh --export' "${develop_pipeline}" \
   || fail "develop pipeline does not export selected candidate images"
 grep -q 'transfer-local-images.sh --import' "${develop_pipeline}" \
   || fail "deploy node does not verify candidate image receipt"
-grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-/__dev/api}' "${agent_compose}" \
-  || fail "deploy agent does not receive the approved dev API base"
+grep -q 'PUBLIC_API_BASE_URL: \${PUBLIC_API_BASE_URL:-}' "${agent_compose}" \
+  || fail "deploy agent does not preserve the same-origin dev API fallback"
+grep -q 'PUBLIC_AI_API_BASE_URL: \${PUBLIC_AI_API_BASE_URL:-}' "${agent_compose}" \
+  || fail "deploy agent does not preserve the same-origin dev AI fallback"
+grep -q 'PUBLIC_AUTH_BASE_URL: \${PUBLIC_AUTH_BASE_URL:-}' "${agent_compose}" \
+  || fail "deploy agent does not preserve the same-origin dev auth fallback"
 grep -q 'ENVIRONMENT_STATE_DIR: /var/lib/festa-environments' "${agent_compose}" \
   || fail "deploy agent does not persist dev batch state outside its container filesystem"
 grep -q 'deploy_state:/var/lib/festa-environments' "${agent_compose}" \

@@ -74,7 +74,9 @@ services:
       DOCKER_HOST: unix:///var/run/docker.sock
       ENVIRONMENT_STATE_DIR: /var/lib/festa-environments
       ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
-      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-/__dev/api}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+      PUBLIC_AI_API_BASE_URL: ${PUBLIC_AI_API_BASE_URL:-}
+      PUBLIC_AUTH_BASE_URL: ${PUBLIC_AUTH_BASE_URL:-}
       PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
       WEBGL_RELEASE_ROOT: /srv/festa/webgl
       WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
