@@ -54,6 +54,31 @@ class BoothApiIntegrationTest {
                 .andExpect(jsonPath("$[0].floorNo").value(11));
     }
 
+    /**
+     * 슬롯 1은 이벤트 부스 자리다 (V28, S15P21A604-615 · GitLab #170).
+     *
+     * <p>두 단정이 한 테스트에 있는 것은 그 둘이 같은 사실이기 때문이다 — 목록의 {@code type}이
+     * 임대 거절의 근거이고, 클라이언트는 슬롯 번호가 아니라 그 값을 읽는다. 표식만 확인하면
+     * {@code isRentable()}이 {@code EVENT}를 통과시켜도 통과하고, 거절만 확인하면 Unity가 읽을
+     * 값이 사라져도 통과한다.
+     */
+    @Test
+    void theEventSlotIsMarkedAndCannotBeLeased() throws Exception {
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].slotId").value(1))
+                .andExpect(jsonPath("$[0].type").value("EVENT"));
+
+        Long userId = createMemberWithWallet(users, wallets, "이벤트슬롯");
+        long leasesBefore = leases.count();
+
+        mockMvc.perform(leaseRequest(1L, bearerFor(userId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
+
+        assertEquals(leasesBefore, leases.count(), "이벤트 슬롯에 임대가 생기면 안 됩니다.");
+    }
+
     @Test
     void leasingReturns201WithTheChargeAndTheNewBalance() throws Exception {
         Long userId = createMemberWithWallet(users, wallets, "API임대");

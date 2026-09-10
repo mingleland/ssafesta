@@ -52,12 +52,21 @@
 
 | 필드 | 값 |
 |---|---|
+| `type` | `USER_RENTAL` \| `ADMIN` \| `EVENT`. **`USER_RENTAL`만 임대할 수 있다**(FR-002) — 나머지는 `409 BOOTH_SLOT_NOT_RENTABLE`이다 |
 | `status` | `AVAILABLE` \| `OCCUPIED`. **`ends_at`을 반영한 값이다** — 만료된 임대가 남아 있어도 `AVAILABLE`로 보인다 |
 | `remainingSeconds` | 남은 시간. 만료·미임대면 `null` (FR-007, SC-005) |
 | `entryAvailable` | 지금 입장 가능한가. 만료됐으면 `false` |
 | `mine` | 요청자가 임차인인가. 비인증 요청은 항상 `false` |
 
 > `status`가 `AVAILABLE`인데 월드에는 부스가 보일 수 있다. 만료를 월드에 실시간 전파하지 않기 때문이다(FR-019). **이 응답이 권위다.**
+
+### 슬롯 1은 `EVENT`다 (2026-09-10, S15P21A604-615 · GitLab #170)
+
+축제장 1번 자리는 이벤트 부스이고 임대 대상이 아니다. **클라이언트는 슬롯 번호를 박아 두지 말고 이 `type`을 읽는다** — 자리가 바뀌는 날 하드코딩은 조용히 틀린다.
+
+- 임대 시도는 `409 BOOTH_SLOT_NOT_RENTABLE`이다. 별도 검사가 아니라 `USER_RENTAL`만 통과시키는 기존 게이트 그대로다.
+- **이벤트 콘텐츠는 부스가 아니다.** 경품 상점과 그 설문은 부스 밖에서 `surveyKey`로 찾는다(GitLab #173). 부스에 태우려면 가짜 유저·임대·게시 레이아웃이 필요하고, 그중 하나가 어긋나면 이벤트가 조용히 404가 된다.
+- 그래서 `GET /api/v1/booths/{boothId}`에 `boothType`을 두지 **않는다**. `EVENT` 슬롯은 임대되지 않아 부스 행이 생길 수 없고, 그 응답의 값은 언제나 "프로젝트 부스" 하나뿐이라 물어볼 것이 없다.
 
 ---
 
