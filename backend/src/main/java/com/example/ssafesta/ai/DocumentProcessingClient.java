@@ -1,8 +1,9 @@
 package com.example.ssafesta.ai;
 
 /**
- * The one call Spring makes into FastAPI: start processing a Job that already exists here
- * (contract {@code document-processing-api.yaml} v0.6.0, S15P21A604-175).
+ * The calls Spring makes into FastAPI: start processing a Job that already exists here, and cancel
+ * an attempt that is still running (contract {@code document-processing-api.yaml} v0.7.0,
+ * S15P21A604-175 · S15P21A604-496).
  *
  * <p>An interface with one implementation, which is normally a smell. It earns its place as a test
  * seam for the same reason {@code ObjectStorage} does: this is the only network call on the upload
@@ -29,6 +30,21 @@ public interface DocumentProcessingClient {
     void startProcessing(ProcessingRequest request);
 
     /**
+     * Asks FastAPI to stop one attempt of one Job.
+     *
+     * <p>Idempotent by contract in the widest sense: an unknown Job, a finished one and an
+     * {@code attemptNo} that is not the running one all answer {@code 204}. The last of those is the
+     * point of sending {@code attemptNo} at all — a cancel that arrives after lease recovery issued
+     * the next attempt must not kill the attempt that replaced it (GitLab #162).
+     *
+     * @throws DocumentProcessingUnavailableException when FastAPI could not be reached or answered
+     *                                               anything other than 204. Callers do not retry:
+     *                                               a worker that never hears is refused at its next
+     *                                               callback, because a cancelled Job is terminal
+     */
+    void cancelProcessing(CancelRequest request);
+
+    /**
      * Exactly the contract's {@code ProcessDocumentRequest}, in its field order.
      *
      * <p>The contract sets {@code additionalProperties: false}, so an extra field is a 422 rather
@@ -40,5 +56,14 @@ public interface DocumentProcessingClient {
                              String originalFilename, String contentType, long fileSizeBytes,
                              String storageProvider, String storageBucket, String objectKey,
                              String sourceHash) {
+    }
+
+    /**
+     * Exactly the contract's {@code CancelDocumentProcessingRequest}, in its field order.
+     *
+     * <p>The two identifiers and nothing else — {@code additionalProperties: false} applies here too,
+     * and the reason for the cancellation is Spring's business.
+     */
+    record CancelRequest(long jobId, int attemptNo) {
     }
 }
