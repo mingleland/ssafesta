@@ -121,6 +121,8 @@ grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_p
   || fail "game component CI does not reuse its Unity workspace"
 grep -q 'game) bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
   || fail "general game CI must build Linux Server only"
+grep -q 'ci_dispatch_or build build_project --target linux-server' "${repo_root}/ci/build" \
+  || fail "general game CI must pass the Linux Server target to its component adapter"
 ! grep -q 'game) bash festa-unity/ci/build --target all' "${repo_root}/ci/build" \
   || fail "general game CI must not build WebGL"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \

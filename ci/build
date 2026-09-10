@@ -10,4 +10,4 @@ build_project() {
     game) bash festa-unity/ci/build --target linux-server ;;
   esac
 }
-ci_run build BUILD_FAILED ci_dispatch_or build build_project
+ci_run build BUILD_FAILED ci_dispatch_or build build_project --target linux-server
