@@ -160,7 +160,6 @@ export function BoothManagementOverlay({ onClose }: Props) {
           </div>
         </section>
 
-        {/* A — 기능별 Drill-down. 여기서 Editor 를 펼치지 않는다 */}
         <div className="bm-rows">
           <SectionRow
             label="PROJECT"
@@ -176,6 +175,13 @@ export function BoothManagementOverlay({ onClose }: Props) {
             label="CONSULTATION"
             summary="상담 요청 운영"
             onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
+          />
+          {/* AI 직원도 다른 세 항목과 같은 drill-down — 문서 업로드가 있어 화면이 길어지므로
+              내 부스 관리 카드 안에 펼치지 않고 별도 화면으로 연다. */}
+          <SectionRow
+            label="AI 직원"
+            summary="대화 설정·답변 근거 문서 관리"
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/ai-agent`)}
           />
         </div>
 

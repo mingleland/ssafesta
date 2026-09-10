@@ -34,6 +34,15 @@ export interface SurveyRunSnapshot {
    * **0 보다 크면 게스트는 제출할 수 없다**(403 MEMBER_ONLY) — 실패하기 전에 알리라고 서버가 싣는다.
    */
   rewardCoin: number;
+  /**
+   * 보상과 **무관하게** 회원 전용인가 (S15P21A604-608).
+   *
+   * 부스 설문은 `rewardCoin > 0` 이 곧 회원 전용이라 이 값이 항상 false 다. 이벤트 설문은 보상이
+   * 0 인데도 회원 전용이다 — 추첨이 참여자를 특정해야 하기 때문이고, 그래서 두 축을 분리한다.
+   */
+  memberOnly: boolean;
+  /** 이미 참여했으면 그 응답. 재참여는 없다(409 SURVEY_ALREADY_RESPONDED) */
+  responded: { responseId: number; submittedAt: string } | null;
   questions: SurveyQuestionVM[];
 }
 
@@ -83,6 +92,12 @@ export interface SurveySubmitResult {
 
 export interface SurveyPort {
   getRun(boothId: number): Promise<SurveyRunSnapshot>;
+  /**
+   * 이벤트 설문 run — 부스가 아니라 `surveyKey` 로 찾는다 (S15P21A604-608).
+   *
+   * 반환형이 `getRun` 과 같다. 그래야 상태 기계·화면이 두 경로를 구별하지 않고, 진입 함수만 갈린다.
+   */
+  getEventRun(surveyKey: string): Promise<SurveyRunSnapshot>;
   submitAnswers(surveyId: number, answers: Record<string, SurveyAnswerValue>): Promise<SurveySubmitResult>;
   getResult(boothId: number): Promise<SurveyResultSnapshot>;
   getTextAnswers(surveyId: number, page: number): Promise<SurveyTextAnswerPage>;

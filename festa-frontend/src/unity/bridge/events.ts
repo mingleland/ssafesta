@@ -49,9 +49,48 @@ export type BoothInteractEvent =
  * 관리 대상 부스는 FE 가 `GET /booths/mine` 으로 resolve 한다 — Unity 는 세션 사용자의
  * 임대 정보를 모르고 알 필요도 없다(헌법 1조).
  */
-export type WorldInteractEvent = {
-  type: 'WORLD_MANAGEMENT_INTERACT';
-};
+export type WorldInteractEvent =
+  | {
+      type: 'WORLD_MANAGEMENT_INTERACT';
+    }
+  | {
+      /**
+       * 이벤트 NPC 상호작용 — 경품 상점을 연다 (S15P21A604-599).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. `WORLD_MANAGEMENT_INTERACT` 와 같은 규칙이고
+       * 같은 `onBoothInteract` 채널로 온다 — 새 callback 을 만들지 않는다.
+       *
+       * `npcId` 는 씬 canonical id 로 로그·분석용이다. FE 는 해석하지 않는다 — 지금은 상점이 하나뿐이라
+       * 분기에 쓰이지 않고, 여러 이벤트 NPC 가 생기면 그때 이 값이 의미를 얻는다.
+       *
+       * ⚠️ Unity 송신부는 아직 없다. 이 타입은 FE 수신부가 먼저 서 있다는 뜻이고, 게임 파트가 보내기
+       * 시작하면 이 자리가 그대로 실경로가 된다(`BOOTH_PROJECT_INTERACT` 가 -343 에서 그랬던 것처럼).
+       */
+      type: 'WORLD_EVENT_INTERACT';
+      npcId?: string;
+    }
+  | {
+      /**
+       * 내장 미니게임 상호작용 — 타이밍 스톱 (S15P21A604-601, GitLab #166).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. 같은 `onBoothInteract` 채널로 온다.
+       *
+       * `WORLD_ARCADE_INTERACT`(#135, Game Studio 게시 게임)와 **합치지 않는다.** 그쪽은
+       * `machineId → 서버 resolve` 로 "어느 게임기인가"(물리 오브젝트 분류)가 식별 축이고, 이쪽은
+       * `gameId` 로 "어떤 기능인가"가 축이다. 합치면 소비처가 `gameId` 유무로 다시 갈라야 해서
+       * dispatcher 의 `switch (event.type)` 하나로 끝나는 성질을 잃는다.
+       *
+       * `gameId` 는 내장 미니게임 식별자(지금은 `TIMER_STOP` 하나)이고 화면 선택에 쓴다.
+       * `machineId` 는 씬 canonical id 로 로그·분석용이다 — FE 는 해석하지 않는다.
+       *
+       * ⚠️ Unity 송신부는 아직 develop 에 없다. `BOOTH_PROJECT_INTERACT`(-343)·
+       * `WORLD_EVENT_INTERACT`(-599)와 같이 **FE 수신부가 먼저 서 있는** 상태이고, 게임 파트가
+       * 보내기 시작하면 이 자리가 그대로 실경로가 된다.
+       */
+      type: 'WORLD_MINIGAME_INTERACT';
+      gameId: string;
+      machineId?: string;
+    };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */
 export type UnityInteractEvent = BoothInteractEvent | WorldInteractEvent;

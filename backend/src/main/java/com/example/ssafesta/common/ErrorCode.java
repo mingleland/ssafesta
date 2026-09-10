@@ -123,6 +123,41 @@ public enum ErrorCode {
      */
     STORAGE_QUOTA_EXCEEDED(HttpStatus.INSUFFICIENT_STORAGE, "저장소 용량이 부족합니다. 관리자에게 문의해 주세요."),
 
+    // ── 저장소 reconcile 수신 (spec 007 FR-035, S15P21A604-500) ─────────────
+    // 계약 spring-storage-reconciliation-api.yaml v0.2.0 이 정본이다. Infra 가 이 네 code 로
+    // 재시도 여부를 가른다 — 500 하나만 재시도가 의미 있고 나머지는 terminal 이다.
+    /**
+     * 요청 형식이 계약에 맞지 않거나 자기모순이다 (예: {@code VERIFIED} 인데 sha256 이 서로 다르다).
+     *
+     * <p>이 API 만 422 를 쓴다. 계약이 그렇게 정했고, 소비자가 사람이 아니라 Infra 스크립트라
+     * 400(사용자 입력 오류)과 구분되는 편이 낫다.
+     */
+    RECONCILIATION_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "reconcile 결과 형식이 올바르지 않습니다."),
+    /**
+     * 결과는 적재했지만 문서에 반영할 수 없다 — 문서가 요청의 source provider·object key 를 더
+     * 이상 갖지 않는다.
+     *
+     * <p><b>재시도로 풀리지 않는다.</b> 같은 payload 는 영원히 이 응답을 받는다. 늦게 도착한 결과가
+     * 최신 저장 위치를 과거 값으로 되돌리지 않게 하는 것이 이 거부의 목적이다.
+     */
+    RECONCILIATION_STALE(HttpStatus.CONFLICT, "이미 반영할 수 없는 reconcile 결과입니다."),
+    /**
+     * 같은 {@code runId + documentId} 로 <b>다른 내용</b>이 왔다. 먼저 저장된 결과가 유지된다.
+     *
+     * <p>조용히 무시하면 보내는 쪽의 버그가 감춰진다 — 멱등은 "같은 요청을 다시 보내도 안전하다"
+     * 이지 "같은 키로 다른 것을 보내도 된다" 가 아니다.
+     */
+    RECONCILIATION_REPLAY_CONFLICT(HttpStatus.CONFLICT, "같은 reconcile 키로 다른 결과가 도착했습니다."),
+    /**
+     * 요청은 유효한데 Spring 배포가 그 provider 를 모른다 — 설정 누락이거나 문서 행의 버킷이
+     * 설정과 어긋난다. 요청 오류가 아니므로 422 가 아니다.
+     *
+     * <p>이 네 code 중 <b>유일하게 재시도가 의미 있다</b>. 다만 고쳐야 할 것은 payload 가 아니라
+     * Spring 배포 설정이다.
+     */
+    RECONCILIATION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,
+            "reconcile 결과를 반영할 수 없습니다. 서버 저장소 설정을 확인해 주세요."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —
@@ -168,6 +203,12 @@ public enum ErrorCode {
     SURVEY_ALREADY_RESPONDED(HttpStatus.CONFLICT, "이미 응답한 설문입니다."),
     /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
     SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
+
+    // ── 미니게임 (014) ──────────────────────────────────────────────────────
+    // 하나뿐이다. 판정 거부·일일 한도 도달·재제출은 전부 200 이라 오류 어휘가 필요 없고
+    // (spec 014 Acceptance Scenario 4), 게스트·요청 값 오류는 MEMBER_ONLY·VALIDATION_FAILED 를
+    // 재사용한다. 남의 세션도 이 코드로 답한다 — 구분하면 세션의 존재를 알려주게 된다.
+    MINIGAME_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 세션을 찾을 수 없습니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

@@ -30,9 +30,9 @@ ci_component_dir() {
 }
 ci_component_script() { echo "$(ci_component_dir)/ci/$1"; }
 ci_dispatch_or() {
-  local stage="$1"; shift
+  local stage="$1" fallback="$2"; shift 2
   local component_dir part
   component_dir="$(ci_component_dir)"
   part="${component_dir}/ci/${stage}"
-  if [[ -f "${part}" ]]; then (cd "${component_dir}" && bash "ci/${stage}"); else "$@"; fi
+  if [[ -f "${part}" ]]; then (cd "${component_dir}" && bash "ci/${stage}" "$@"); else "${fallback}" "$@"; fi
 }

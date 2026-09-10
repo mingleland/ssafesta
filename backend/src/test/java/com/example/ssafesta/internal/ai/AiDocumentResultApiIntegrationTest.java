@@ -257,6 +257,30 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("JOB_GONE"));
     }
 
+    /**
+     * 임대 만료가 남긴 상태에 늦은 finalize 가 도착하는 경우 (S15P21A604-496).
+     *
+     * <p>만료는 Job 을 {@code CANCELLED}, 문서를 {@code DISABLED} 로 내린다. 그 뒤 취소 전달을
+     * 못 받은 워커가 임베딩을 끝내고 finalize 를 보내와도 문서가 {@code READY} 로 되살아나면 안
+     * 된다 — 만료된 부스의 문서가 검색에 다시 들어간다. {@code markDocumentReady} 의
+     * {@code PROCESSING} 조건과 종료 Job 판정이 이중으로 막는 자리다.
+     */
+    @Test
+    @DisplayName("만료로 취소된 Job 의 늦은 finalize 는 410 이고 문서는 DISABLED 로 남는다")
+    void aLateFinalizeAfterLeaseExpiryCannotReviveTheDocument() throws Exception {
+        Job job = seedJob("만료후finalize");
+        jdbc.update("UPDATE ai_document_jobs SET status = 'CANCELLED' WHERE id = ?", job.id());
+        jdbc.update("UPDATE ai_documents SET processing_status = 'DISABLED' WHERE id = ?",
+                job.documentId());
+
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+
+        assertEquals("DISABLED", documentStatus(job));
+        assertEquals(0, chunkCount(job));
+    }
+
     /** 문서가 지워지면 Job 도 CASCADE 로 사라진다 — 없는 Job 과 같은 답이다. */
     @Test
     @DisplayName("없는 Job 의 결과는 410 이다")

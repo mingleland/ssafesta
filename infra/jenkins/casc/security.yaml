@@ -13,6 +13,12 @@ jenkins:
             value: "${GITLAB_API_CREDENTIALS_ID}"
           - key: GITLAB_CHECKOUT_CREDENTIALS_ID
             value: "${GITLAB_CHECKOUT_CREDENTIALS_ID}"
+          - key: GITLAB_PACKAGE_READ_CREDENTIAL_ID
+            value: "${GITLAB_PACKAGE_READ_CREDENTIAL_ID}"
+          - key: GITLAB_API_V4_URL
+            value: "${GITLAB_API_V4_URL}"
+          - key: GITLAB_PROJECT_ID
+            value: "${GITLAB_PROJECT_ID}"
           - key: DEPLOY_CREDENTIALS_ID
             value: "${DEPLOY_CREDENTIALS_ID}"
           - key: MATTERMOST_CREDENTIALS_ID

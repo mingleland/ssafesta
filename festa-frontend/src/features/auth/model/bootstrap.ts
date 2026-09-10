@@ -15,6 +15,16 @@ export async function bootstrapAuth(): Promise<void> {
   started = true;
   installUnauthorizedHandler();
   try {
+    // 로컬 E2E에서만 Spring이 발급한 회원 access token을 주입한다. 배포 번들에서는
+    // DEV가 false라 절대 실행되지 않으며, 토큰은 .env(커밋 안 됨)에만 둔다.
+    const e2eAccessToken = import.meta.env.DEV ? import.meta.env.VITE_E2E_ACCESS_TOKEN : undefined;
+    if (e2eAccessToken) {
+      setMemberSession(
+        e2eAccessToken,
+        import.meta.env.VITE_E2E_ACCESS_TOKEN_EXPIRES_AT ?? new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      );
+      return;
+    }
     // 성공 판정은 "예외 없음"이다(BE GuestTokenResponse 에 status 가 없다).
     // 게스트·비로그인은 refresh_token 쿠키가 없어 여기서 실패하고 조용히 anonymous 로 남는다.
     const result = await authApi.refresh();

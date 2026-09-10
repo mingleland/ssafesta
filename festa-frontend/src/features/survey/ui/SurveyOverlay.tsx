@@ -1,10 +1,14 @@
 // Survey 응답 Overlay — Overlay Family 재사용 (S15P21A604-406).
 // 데이터는 features/survey/model/run 의 상태 기계를 그대로 소비한다(-368).
-// 진입은 부스다 — Unity 가 boothId 만 주고 설문 id 는 run 응답이 알려준다(계약 §5, -528).
+//
+// **한 화면이 두 진입을 받는다** (S15P21A604-608). 부스 설문은 Unity 가 boothId 를 주고 서버가 그
+// 부스의 설문을 돌려주며(계약 §5, -528), 이벤트 설문은 부스에 속하지 않아 surveyKey 로 찾는다.
+// 그 둘 말고 다른 것은 같다 — 문항 유형·검증·제출·마감·오류가 전부 하나라서, 오버레이를 둘로
+// 나누면 문항 유형이 늘 때마다 두 곳을 고쳐야 하고 한쪽이 낡는다. 새 OverlayType 도 만들지 않는다.
 import { useEffect } from 'react';
 import { useSession } from '../../auth/model/session';
 import { closeOverlay } from '../../../shared/types/overlay';
-import type { SurveyQuestionVM } from '../../../shared/contracts/survey';
+import type { SurveyQuestionVM, SurveySource } from '../../../shared/contracts/survey';
 import {
   canSubmit,
   loadSurveyRun,
@@ -17,8 +21,8 @@ import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../
 import './surveyOverlay.css';
 
 interface Props {
-  // surveyId 는 받지 않는다 — 서버가 부스로 설문을 찾아 주고 그 id 를 run 응답에 싣는다
-  payload: { boothId: number };
+  // surveyId 는 받지 않는다 — 어느 경로든 서버가 설문을 찾아 주고 그 id 를 run 응답에 싣는다
+  payload: SurveySource;
 }
 
 const IcSurvey = (
@@ -27,6 +31,13 @@ const IcSurvey = (
     <path d="M9 9h6M9 13h4" />
   </svg>
 );
+
+/** 참여 시각 표시 — 저장소에 공유 날짜 util 이 없어 다른 화면과 같은 관례(인라인 Intl)를 따른다 */
+function respondedAt(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'short' }).format(
+    new Date(iso),
+  );
+}
 
 /** 유형별 입력 — 6유형은 spec 010 FR-002 확정분이다(-377 정정). 새 유형을 만들지 않는다. */
 function QuestionInput({ q, value }: { q: SurveyQuestionVM; value: unknown }) {
@@ -109,22 +120,37 @@ function QuestionInput({ q, value }: { q: SurveyQuestionVM; value: unknown }) {
 export function SurveyOverlay({ payload }: Props) {
   const run = useSurveyRun();
   const session = useSession();
-  const boothId = payload.boothId;
+  // payload 객체는 매 렌더 새 참조라 그대로 의존성에 넣으면 effect 가 계속 돈다. 원시값 둘로 풀고
+  // effect 안에서 다시 좁힌다 — 캐스팅 없이 타입이 맞는다
+  const boothId = payload.kind === 'booth' ? payload.boothId : null;
+  const surveyKey = payload.kind === 'event' ? payload.surveyKey : null;
 
-  useEffect(() => {
-    void loadSurveyRun(boothId);
-  }, [boothId]);
+  const reload = (): void => {
+    if (boothId !== null) void loadSurveyRun({ kind: 'booth', boothId });
+    else if (surveyKey !== null) void loadSurveyRun({ kind: 'event', surveyKey });
+  };
+
+  // reload 는 매 렌더 새 함수지만 의존성은 원시값 둘이다 — 그래서 다시 돌지 않는다
+  useEffect(reload, [boothId, surveyKey]);
 
   const missing = run.status === 'ready' ? missingRequired() : [];
-  const submitted = run.submit.phase === 'success';
-  // 보상이 걸린 설문은 게스트가 제출할 수 없다(403 MEMBER_ONLY). run 응답이 rewardCoin 을 싣는
-  // 이유가 이것이라, 실패한 뒤가 아니라 **제출 전에** 알린다
-  const guestBlocked = session.kind === 'guest' && run.rewardCoin > 0;
+  // 방금 제출했든 지난번에 참여했든 화면은 같다 — 참여가 끝났다는 사실이 같고, 상태를 늘리면
+  // 렌더 분기만 늘고 전이는 같아진다
+  const submitted = run.submit.phase === 'success' || run.respondedAt !== null;
+  // 게스트가 제출할 수 없는 설문은 두 종류다 — 코인이 걸린 부스 설문(403 MEMBER_ONLY)과 보상이
+  // 없어도 회원 전용인 이벤트 설문. run 응답이 두 값을 싣는 이유가 이것이라 **제출 전에** 알린다
+  const guestBlocked = session.kind === 'guest' && (run.rewardCoin > 0 || run.memberOnly);
 
   return (
     <OverlayFrame
       title="설문"
-      subtitle={run.status === 'ready' ? run.progress.current + ' / ' + run.progress.total + ' 답변' : '부스 설문'}
+      subtitle={
+        run.status === 'ready' && !submitted
+          ? run.progress.current + ' / ' + run.progress.total + ' 답변'
+          : boothId !== null
+            ? '부스 설문'
+            : '이벤트 설문'
+      }
       size="l"
       icon={IcSurvey}
       onClose={closeOverlay}
@@ -134,7 +160,9 @@ export function SurveyOverlay({ payload }: Props) {
           // "다시 시도" 를 권하지 않는다 — 재시도로 풀리지 않는 오류가 여기 섞여 온다
           <span className="ov-alert">{run.submit.errorMessage ?? '제출하지 못했습니다.'}</span>
         ) : guestBlocked ? (
-          <span className="ov-alert">코인이 걸린 설문이라 로그인해야 참여할 수 있습니다</span>
+          <span className="ov-alert">
+            {run.rewardCoin > 0 ? '코인이 걸린 설문이라 로그인해야 참여할 수 있습니다' : '회원만 참여할 수 있는 설문입니다 — 로그인해 주세요'}
+          </span>
         ) : missing.length > 0 ? (
           <span className="ov-note">필수 문항 {missing.length}개가 남았습니다</span>
         ) : // 보상 안내는 **아직 참여할 수 있을 때만** 성립한다. status·submit 은 독립 축이라
@@ -163,16 +191,23 @@ export function SurveyOverlay({ payload }: Props) {
       }
     >
       {run.status === 'loading' && <OverlayLoading label="설문을 불러오는 중..." />}
-      {run.status === 'error' && <OverlayError title="설문을 불러오지 못했습니다" onRetry={() => void loadSurveyRun(boothId)} />}
-      {run.status === 'empty' && <OverlayEmpty title="문항이 없습니다" hint="부스 주인이 문항을 등록하면 참여할 수 있습니다." />}
+      {run.status === 'error' && <OverlayError title="설문을 불러오지 못했습니다" onRetry={reload} />}
+      {run.status === 'empty' && (
+        <OverlayEmpty
+          title="문항이 없습니다"
+          hint={boothId !== null ? '부스 주인이 문항을 등록하면 참여할 수 있습니다.' : '문항이 등록되면 참여할 수 있습니다.'}
+        />
+      )}
       {run.status === 'closed' && <OverlayEmpty title="마감된 설문입니다" hint="응답을 더 받지 않습니다." />}
       {submitted && (
         <OverlayEmpty
-          title="응답을 제출했습니다"
+          title={run.submit.phase === 'success' ? '응답을 제출했습니다' : '이미 참여한 설문입니다'}
           hint={
             run.submit.rewardedCoin !== null && run.submit.rewardedCoin > 0
               ? `${run.submit.rewardedCoin} 코인을 받았습니다. 참여해 주셔서 감사합니다.`
-              : '참여해 주셔서 감사합니다.'
+              : run.respondedAt !== null && run.submit.phase !== 'success'
+                ? `${respondedAt(run.respondedAt)}에 참여하셨습니다. 감사합니다.`
+                : '참여해 주셔서 감사합니다.'
           }
         />
       )}

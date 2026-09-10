@@ -25,6 +25,15 @@ public final class CoinReason {
     /** Survey response reward, once per member per survey (spec 010 FR-005). */
     public static final String SURVEY_REWARD = "SURVEY_REWARD";
 
+    /**
+     * Minigame reward, once per session (spec 014 FR-006).
+     *
+     * <p>Also the key the daily cap counts by: today's entries under this reason <i>are</i> the
+     * running total (C-04), which is why the value lives here rather than in the minigame package —
+     * {@code WalletService.grantedTodayFor} has to be handed the same literal.
+     */
+    public static final String MINIGAME_REWARD = "MINIGAME_REWARD";
+
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";
 

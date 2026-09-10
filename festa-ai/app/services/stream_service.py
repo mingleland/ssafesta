@@ -26,6 +26,7 @@ from app.models.conversation import (
     ConversationTurn,
     SourceCitation,
 )
+from app.core.logging import log_event
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
@@ -106,11 +107,15 @@ class ConversationStreamService:
             turn, now=turn.created_at, ttl_seconds=self._ttl_seconds
         )
         if not await self._repository.commit_turn(updated):
-            logger.info(
-                "completed turn dropped, conversation closed or expired mid-stream "
-                "conversation_id=%s request_id=%s",
-                conversation.conversation_id,
-                turn.request_id,
+            log_event(
+                logger,
+                logging.INFO,
+                "conversation_turn_dropped",
+                conversation_id=conversation.conversation_id,
+                request_id=turn.request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="DROPPED",
             )
 
     async def stream(
@@ -141,10 +146,16 @@ class ConversationStreamService:
                 conversation=conversation, question=question
             )
         except AgentConfigDenied as exc:
-            logger.warning(
-                "Agent config denied for conversation %s code=%s",
-                conversation.conversation_id,
-                exc.code,
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code=exc.code,
             )
             yield render(
                 "error",
@@ -156,9 +167,16 @@ class ConversationStreamService:
             )
             return
         except SpringAgentConfigUnavailable:
-            logger.warning(
-                "Agent config lookup failed for conversation %s",
-                conversation.conversation_id,
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="AGENT_CONFIG_UNAVAILABLE",
             )
             yield render(
                 "error",
@@ -170,8 +188,16 @@ class ConversationStreamService:
             )
             return
         except Exception:
-            logger.exception(
-                "RAG context build failed for conversation %s", conversation.conversation_id
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="CONTEXT_BUILD_FAILED",
             )
             yield render(
                 "error",
@@ -225,10 +251,17 @@ class ConversationStreamService:
                 answer_parts.append(token.text)
                 yield render("token", {"delta": token.text})
         except _StreamTimeout as exc:
-            logger.warning(
-                "LLM stream timed out for conversation %s phase=%s",
-                conversation.conversation_id,
-                exc.phase,
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="LLM_TIMEOUT",
+                timeout_phase=exc.phase,
             )
             yield render(
                 "error",
@@ -241,8 +274,16 @@ class ConversationStreamService:
             )
             return
         except ManagedLLMError as exc:
-            logger.exception(
-                "LLM stream failed for conversation %s", conversation.conversation_id
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code=exc.code,
             )
             yield render(
                 "error",
@@ -250,9 +291,16 @@ class ConversationStreamService:
             )
             return
         except Exception:
-            logger.exception(
-                "Unexpected LLM stream failure for conversation %s",
-                conversation.conversation_id,
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="LLM_STREAM_FAILED",
             )
             yield render(
                 "error",

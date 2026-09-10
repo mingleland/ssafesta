@@ -117,19 +117,30 @@ namespace Festa.EditorTools
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None,   // Development OFF — 배포 설정
             };
-            try { RunBuild(options, "WebGL"); }
+            try
+            {
+                RunBuild(options, "WebGL");
+
+                // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
+                // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는
+                // 성공했는데 월드 진입이 404 로 실패했다 (S15P21A604-417). 파일명이 해시라
+                // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
+                //
+                // **finally 앞에서 써야 한다.** manifest 의 apiEnvironment·compression 은
+                // PlayerSettings 와 ApiConfig 를 그 자리에서 읽는데, 복원 뒤에 쓰면 **빌드에 실제로
+                // 들어간 값이 아니라 되돌린 값**이 기록된다. 2026-09-10 산출물이 실제로는
+                // Prod + Brotli 인데 manifest 에는 `"apiEnvironment": "Local"`,
+                // `"compression": "none"` 으로 남았다. 이 두 필드는 Mock 유출(T-237)과
+                // 비압축 반려(-474)를 잡으라고 넣은 것이라, 틀리면 있으나 마나가 아니라 **해롭다** —
+                // 진짜 Mock 유출도 같은 방식으로 가려진다.
+                FestaWebBuilder.WriteManifest(WebOutDir);
+            }
             finally
             {
                 FestaReleaseBuilder.RestoreApiEnvironment(apiConfig, prevMock, prevEnv);
                 PlayerSettings.WebGL.compressionFormat = prevCompression;
                 PlayerSettings.WebGL.decompressionFallback = prevFallback;
             }
-
-            // FE 는 <빌드 base>/manifest.json 에서 로더 URL 4종을 읽는다 (GitLab #60).
-            // 메뉴 빌더만 이 파일을 만들고 CI 경로는 빠져 있어서, CI 산출물은 빌드는
-            // 성공했는데 월드 진입이 404 로 실패했다 (S15P21A604-417). 파일명이 해시라
-            // FE 가 디렉터리를 추측할 수도 없다 — manifest 없는 산출물은 산출물이 아니다.
-            FestaWebBuilder.WriteManifest(WebOutDir);
 
             // 검증용 probe.html 을 산출물에 같이 넣는다 — FE 없이 빌드를 열어 SendMessage 로 상태를 주입하는 게임 파트의
             // 유일한 릴리스 검증 수단인데, 빌드 폴더가 비워지면서 매번 사라졐다(QA #42). 정본은 Tools/probe.html.

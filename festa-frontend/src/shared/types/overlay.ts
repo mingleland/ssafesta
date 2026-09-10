@@ -2,7 +2,23 @@
 // React 오버레이 계약 — 헌법 25조(텍스트 입력·외부 콘텐츠는 웹 레이어)
 // 소비 spec: 008(AI_CHAT)·016(LAPTOP)·020(GAME, #35 busypark)은 P0, 010(SURVEY)·011(CONSULTATION)은 P1,
 // 009(PROJECT)는 방문자 전시 — Unity 송신부(-343) 확정 전에는 mock intent(openOverlay 직접 호출)로만 열린다
-export type OverlayType = 'AI_CHAT' | 'LAPTOP' | 'GAME' | 'SURVEY' | 'CONSULTATION' | 'PROJECT';
+//
+// WORLD_GUIDE·EVENT_SHOP 은 **부스에 속하지 않는다**(S15P21A604-599). 그래도 같은 Bus 에 두는 이유는
+// 배타·ESC·입력 잠금·focus 반환이 전부 이 길에 붙어 있기 때문이다(worldScreen.ts). 별도 슬롯을 만들면
+// 그 넷을 새로 배선해야 하고, 그것이 지금 gameClientUi 와 Bus 가 갈려 있는 값을 또 치르는 일이 된다.
+export type OverlayType =
+  | 'AI_CHAT'
+  | 'LAPTOP'
+  | 'GAME'
+  | 'SURVEY'
+  | 'CONSULTATION'
+  | 'PROJECT'
+  /** 월드 이용 안내 — FE 가 직접 연다(최초 진입 1회 + 재열람). Unity 이벤트가 없다 */
+  | 'WORLD_GUIDE'
+  /** 이벤트 경품 상점 — 이벤트 NPC 상호작용. Unity discriminator 가 오면 dispatcher 에 case 하나를 더한다 */
+  | 'EVENT_SHOP'
+  /** 내장 미니게임 — 타이밍 스톱. Unity 에서 FE 로 이관한 화면이다(S15P21A604-601, #166) */
+  | 'MINIGAME';
 
 export interface OverlayRequest {
   type: OverlayType;

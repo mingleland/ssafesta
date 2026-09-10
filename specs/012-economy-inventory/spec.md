@@ -75,7 +75,7 @@
 
 | # | 질문 | 담당 | 메모 |
 |---|---|---|---|
-| C-01 | 아바타 파츠에 구매 개념을 도입하는가? | 기획 + BE + Unity | ✅ **도입 (2026-09-01, S15P21A604-378).** Unity 판매 단위 97종, 기본 12종 무료, 나머지 가격 100은 기획 확정 전 placeholder. Spring이 카탈로그·소유권 SSOT이며 `PUT /users/me/avatar`에서 미보유 착용을 막는다 |
+| C-01 | 아바타 파츠에 구매 개념을 도입하는가? | 기획 + BE + Unity | ✅ **도입 (2026-09-01, S15P21A604-378).** Unity 판매 단위 97종. 가격은 2026-09-10 기획 확정 — 무료 20종(HEAD 8 전량 + HAIR 4 + TOP 4 + BOTTOM 2 + SHOES 2), 유료 77종은 슬롯별 30(HAIR·GLASSES)·40(TOP·BOTTOM·SHOES·HEAD)·50(OUTFIT·HAT) 코인 (V26, S15P21A604-600). Spring이 카탈로그·소유권 SSOT이며 `PUT /users/me/avatar`에서 미보유 착용을 막는다 |
 | C-02 | 장식 아이템은 몇 종을 준비하는가? | 기획 + Unity | 3D 에셋 조달 범위 |
 
 ---

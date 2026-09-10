@@ -90,7 +90,10 @@ describe('initInteractionDispatcher', () => {
     emit(JSON.stringify({ type: 'BOOTH_SURVEY_INTERACT', boothId: 3, objectId: 'kiosk-1' }));
 
     // boothId 는 설문 ID 가 아니라 resolve context 다 — payload 에 surveyId 를 만들지 않는다
-    expect(getCurrentOverlay()).toEqual({ type: 'SURVEY', payload: { boothId: 3, objectId: 'kiosk-1' } });
+    expect(getCurrentOverlay()).toEqual({
+      type: 'SURVEY',
+      payload: { kind: 'booth', boothId: 3, objectId: 'kiosk-1' },
+    });
     unsubscribe();
   });
 

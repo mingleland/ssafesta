@@ -14,7 +14,9 @@
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IS_MOCK_WORLD, WorldSurface } from '../../features/world/ui/WorldSurface.select';
+import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
+import { useHostPhase } from '../../unity/host/hostPhase';
+import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
@@ -37,8 +39,23 @@ import './worldPage.css';
 
 export function WorldPage() {
   const ui = useGameClientUi();
+  // 캐릭터 선택·부팅·월드 로딩 중에는 World HUD 를 그리지 않는다 (S15P21A604-613).
+  // Unity 가 로비를 그리는 동안 "W A S D 이동"·"부스 입장" 안내가 떠 있으면 사실과 다르고,
+  // 상담·도움말도 그 맥락에서 열 수 있는 것이 아니다.
+  // mock 월드는 UnityHost 자체가 뜨지 않아 단계가 booting 에 머무르므로 예외로 둔다.
+  // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
+  const hostPhase = useHostPhase();
+  const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+
+  // 월드를 보여 달라고 요청한다. 화면을 떠날 때는 감추기만 하고 내리지 않는다 —
+  // 부스 스튜디오·관리 상세로 나갔다 돌아오는 것이 정상 동선이고, 그때마다 다시 부팅하지
+  // 않는 것이 상주 호스트의 존재 이유다 (S15P21A604-620).
+  useEffect(() => {
+    showWorld();
+    return hideWorld;
+  }, []);
 
   // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
   // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서
@@ -106,10 +123,10 @@ export function WorldPage() {
 
   return (
     <div className="world-scene">
-      {/* World Layer — 교체 경계. 목업은 최신 Unity 캡처 정지 화면, 실제는 UnityHost */}
-      <WorldSurface />
+      {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
+          여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
-      <WorldHud mock={IS_MOCK_WORLD} />
+      {inWorld && <WorldHud mock={IS_MOCK_WORLD} />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}

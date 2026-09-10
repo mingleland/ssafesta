@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react';
 import type { CatalogItemVM } from '../../model/catalog';
 import { findCatalogItem } from '../../model/catalog';
 import type { StudioMode } from '../../model/studioMode';
-import { FACADE_PALETTE_SECTIONS, LAYOUT_PALETTE, TEMPLATE_PRESETS } from '../../model/visualAssets';
+import { LAYOUT_PALETTE, TEMPLATE_PRESETS } from '../../model/visualAssets';
 import type { PaletteItem, TemplatePreset } from '../../model/visualAssets';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
 import { boothAssetBaseUrl } from '../../model/boothAssetManifest';
@@ -18,7 +18,7 @@ import { buildLibrary, filterLibrary } from '../../model/assetLibrary';
 import type { LibraryItem } from '../../model/assetLibrary';
 import { BOOTH_TEMPLATES } from '../../model/boothTemplates';
 import type { BoothTemplate } from '../../model/boothTemplates';
-import { IcChevron, IcCube, IcLock, IcPlus } from './icons';
+import { IcChevron, IcCube, IcLock } from './icons';
 
 interface Props {
   mode: StudioMode;
@@ -162,19 +162,12 @@ export function AssetPalette({
             </Section>
           ))}
 
-        {mode === 'facade' &&
-          FACADE_PALETTE_SECTIONS.map((section) => (
-            <Section key={section.id} title={section.title}>
-              <div className="studio-thumb-grid">
-                {section.items.map((sw) => (
-                  <button key={sw.id} type="button" className="studio-thumb" disabled title="목업 표현 — 저장 계약에 없는 항목">
-                    <span className="studio-swatch-art" data-kind={sw.id} />
-                    <span className="studio-thumb-label">{sw.label}</span>
-                  </button>
-                ))}
-              </div>
-            </Section>
-          ))}
+        {/* 외관은 오른쪽 패널이 저장한다 — 여기서 고를 것이 없다 (S15P21A604-617) */}
+        {mode === 'facade' && (
+          <Section title="외관">
+            <p className="studio-note">테마·대표색·간판 문구·로고를 오른쪽 <strong>부스 외관</strong> 패널에서 저장합니다.</p>
+          </Section>
+        )}
 
         {mode === 'template' && (
           <Section title="프리셋">
@@ -191,17 +184,13 @@ export function AssetPalette({
         )}
       </div>
 
-      <div className="studio-palette-foot">
-        {mode === 'layout' ? (
-          <button type="button" className="studio-btn studio-btn-outline" disabled title="에셋 업로드는 후속 계약">
-            <IcPlus size={16} /> 에셋 추가
-          </button>
-        ) : (
+      {mode !== 'layout' && (
+        <div className="studio-palette-foot">
           <span className="studio-note" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <IcCube size={14} /> {mode === 'facade' ? '벽면·바닥·그래픽은 목업 표현' : '프리셋은 외관 모드에서 저장'}
+            <IcCube size={14} /> 프리셋은 외관 모드에서 저장
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }

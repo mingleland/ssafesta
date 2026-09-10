@@ -21,3 +21,16 @@ export const MAX_OBJECTS_FALLBACK = 12;
 // 0을 유효 ID로 쓰면 연결된 오브젝트가 조용히 미연결로 렌더링된다(#45 전제).
 export const CONFIG_ID_MIN = 1;
 export const CONFIG_ID_MAX = 2_147_483_647;
+
+// 캔버스 줌 (S15P21A604-604). 툴바 프리셋은 이 범위 안의 세 점이고, Ctrl+휠은 그 사이를 연속으로 움직인다.
+// 상한·하한은 표시 배율일 뿐이라 저장 좌표에 영향이 없다(PX_PER_M 과 같은 성격).
+export const ZOOM_MIN = 0.4;
+export const ZOOM_MAX = 2.5;
+/** 휠 한 칸이 바꾸는 배율 — 곱셈이라 확대·축소가 대칭이다(덧셈이면 축소 쪽이 급해진다) */
+export const ZOOM_WHEEL_FACTOR = 1.1;
+/** 툴바 버튼이 도는 프리셋 */
+export const ZOOM_PRESETS = [0.8, 1, 1.2] as const;
+
+export function clampZoom(zoom: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom));
+}

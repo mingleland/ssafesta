@@ -1,0 +1,67 @@
+/* 음악 설정 (S15P21A604-618) — Game Menu 패널 안에 들어간다. 색은 gameMenu.css 계열을 따른다 */
+.ms-root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px 0;
+}
+
+.ms-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ms-label {
+  flex: 0 0 44px;
+  font-size: 13.5px;
+  color: #eaeefb;
+}
+
+.ms-toggle {
+  width: 40px;
+  height: 22px;
+  padding: 0 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.ms-toggle[aria-checked='true'] { background: rgba(77, 141, 255, 0.55); border-color: rgba(77, 141, 255, 0.7); }
+
+.ms-toggle-knob {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f4f6ff;
+  transition: transform 0.15s ease;
+}
+.ms-toggle[aria-checked='true'] .ms-toggle-knob { transform: translateX(18px); }
+
+.ms-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #4d8dff;
+  cursor: pointer;
+}
+
+.ms-value {
+  flex: 0 0 40px;
+  text-align: right;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(234, 238, 251, 0.72);
+}
+
+.ms-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(234, 238, 251, 0.5);
+}
+
+.ms-toggle:focus-visible,
+.ms-slider:focus-visible { outline: 2px solid #4d8dff; outline-offset: 2px; }

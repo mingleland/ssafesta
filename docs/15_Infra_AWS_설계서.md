@@ -305,6 +305,7 @@ Spring → 후속 AI 처리 허용
 - Usage Guard snapshot은 R2 사용량·freshness 기반 업로드 허용만 판정하고 active provider를 소유하지 않는다.
 - active write provider와 upload gate는 Spring 배포 설정으로 주입한다(`AI_STORAGE_ACTIVE_WRITE_PROVIDER`·`AI_STORAGE_UPLOAD_GATE`, 둘 다 기본값 없음). FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
 - `AI_STORAGE_UPLOAD_GATE`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이다 (GitLab #100, 2026-09-01 확정). Storage Failover Control과 Usage Guard의 상태를 **운영자가 읽어 이 한 값으로 옮겨 적으며**, Spring은 그 상태 머신을 모른다. `storage-failover-state.schema.json`의 `uploadEnabled`는 Infra 상태 표현으로 그대로 두고, 그것을 Spring 설정으로 직접 주입하지 않는다.
+- `storage-failover.sh`는 진행 중인 reconcile이 있으면 다음 Provider 전환·reconcile 시작을 거부하는 단일 실행 lock을 전체 상태 전환에 적용한다. 따라서 문서당 진행 reconcile run은 최대 하나이며, 이전 run 종료 전 다음 전환을 시작하지 않는다.
 
 | 관측 상태 | `AI_STORAGE_UPLOAD_GATE` | Spring 응답 |
 |---|---|---|

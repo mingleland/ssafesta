@@ -1,13 +1,14 @@
 package com.example.ssafesta.internal.ai;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Service tokens for the two internal directions between Spring and FastAPI (GitLab #102,
- * 2026-08-25).
+ * Service tokens for the internal directions into and out of Spring (GitLab #102, 2026-08-25;
+ * Infra direction added by S15P21A604-500).
  *
  * <p>Two tokens exist, one per direction, and they are not interchangeable: the AI→Spring one lives
  * in the same process as the Worker that parses user-uploaded PDFs, so the wider exposure must not
@@ -24,15 +25,27 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param springToAiTokens the tokens Spring <b>sends</b> when it calls FastAPI. Only the first is
  *                         ever sent; the rest exist so a rotation can be configured on both sides
  *                         before the sender moves (S15P21A604-175)
+ * @param infraToSpringTokens the tokens Spring <b>accepts</b> on {@code /internal/storage/**}
+ *                            (spec 007 FR-035). A third party with a third scope: Infra's reconcile
+ *                            script may report storage results and nothing else
  */
 @ConfigurationProperties("app.internal")
-public record InternalTokenProperties(String aiToSpringTokens, String springToAiTokens) {
+public record InternalTokenProperties(String aiToSpringTokens, String springToAiTokens,
+                                      String infraToSpringTokens) {
 
     private static final int MAX_TOKENS = 2;
 
+    private static final String AI_TO_SPRING = "app.internal.ai-to-spring-tokens";
+    private static final String SPRING_TO_AI = "app.internal.spring-to-ai-tokens";
+    private static final String INFRA_TO_SPRING = "app.internal.infra-to-spring-tokens";
+
     public InternalTokenProperties {
-        validate(aiToSpringTokens, "app.internal.ai-to-spring-tokens");
-        validate(springToAiTokens, "app.internal.spring-to-ai-tokens");
+        validate(aiToSpringTokens, AI_TO_SPRING);
+        validate(springToAiTokens, SPRING_TO_AI);
+        validate(infraToSpringTokens, INFRA_TO_SPRING);
+        noOverlap(aiToSpringTokens, AI_TO_SPRING, springToAiTokens, SPRING_TO_AI);
+        noOverlap(aiToSpringTokens, AI_TO_SPRING, infraToSpringTokens, INFRA_TO_SPRING);
+        noOverlap(springToAiTokens, SPRING_TO_AI, infraToSpringTokens, INFRA_TO_SPRING);
     }
 
     /** The accepted tokens, in configured order. The first is the one senders are expected to use. */
@@ -55,8 +68,13 @@ public record InternalTokenProperties(String aiToSpringTokens, String springToAi
         return springToAiTokenList().get(0);
     }
 
+    /** The accepted tokens on {@code /internal/storage/**}, in configured order. */
+    public List<String> infraToSpringTokenList() {
+        return split(infraToSpringTokens);
+    }
+
     /**
-     * The same four refusals for either direction, with the property path in the message.
+     * The same refusals for every direction, with the property path in the message.
      *
      * <p>Whitespace is refused rather than trimmed. Silently normalising a secret makes the
      * configured value differ from the compared value, and that gap shows up only as a runtime 401 —
@@ -88,6 +106,30 @@ public record InternalTokenProperties(String aiToSpringTokens, String springToAi
         if (parsed.size() > MAX_TOKENS) {
             throw new IllegalStateException(path + " 는 최대 " + MAX_TOKENS + "개입니다 (현재 "
                     + parsed.size() + "개). 회전에 필요한 것은 옛 값 하나뿐입니다.");
+        }
+    }
+
+    /**
+     * No value may appear in two of the three sets.
+     *
+     * <p>Each set is a different party with a different scope: the AI→Spring one lives beside the
+     * Worker that parses user-uploaded PDFs, Spring→FastAPI is what Spring hands out, and
+     * Infra→Spring opens only the reconcile endpoint. One value in two of them collapses two scopes
+     * into one, and the wider exposure reaches the narrower side.
+     *
+     * <p>Until now only the AI side refused this ({@code festa-ai/app/core/config.py}), so a
+     * deployment that pasted the same value into two Spring variables started fine. A third set
+     * makes that paste likelier, so the check moves here where all three are visible at once.
+     *
+     * <p>The message carries the two property paths and a count, never the values — this text ends
+     * up in a startup log.
+     */
+    private static void noOverlap(String rawA, String pathA, String rawB, String pathB) {
+        Set<String> shared = new LinkedHashSet<>(split(rawA));
+        shared.retainAll(Set.copyOf(split(rawB)));
+        if (!shared.isEmpty()) {
+            throw new IllegalStateException(pathA + " 와 " + pathB + " 에 같은 값이 " + shared.size()
+                    + "개 있습니다. 방향과 상대가 다르면 토큰도 달라야 합니다.");
         }
     }
 

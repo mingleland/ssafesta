@@ -43,9 +43,9 @@
 
 ## Phase 3: User Story 1 - 파트 변경을 독립적으로 검증하고 dev에 배포한다 (Priority: P0) 🎯 MVP
 
-**Goal**: Squash Merge된 `develop`의 변경 컴포넌트만 모두 검증한 뒤 하나의 dev batch로 안전하게 반영한다. `game` 변경은 기존 Linux Server 배포와 별개로, 개발/빌드 PC의 Unity WebGL Agent가 만든 정적 산출물을 EC2 nginx release로 승격한다.
+**Goal**: Squash Merge된 `develop`의 변경 컴포넌트만 모두 검증한 뒤 하나의 dev batch로 안전하게 반영한다. WebGL은 Unity 담당자가 QA 완료 최종 zip을 GitLab Generic Package Registry에 업로드하면 별도 Jenkins job이 deploy-agent에서 EC2 nginx release로 승격한다.
 
-**Independent Test**: back 단독 변경, shared CI 변경, back+front 동시 변경, 강제 verify 실패와 game-only WebGL release를 각각 실행해 selection·비배포·batch rollback을 확인한다. WebGL은 zip 전송이나 `/srv/festa/webgl/current` 직접 덮어쓰기 없이 release 디렉터리 동기화와 원자적 `current` 전환으로 검증한다.
+**Independent Test**: back 단독 변경, shared CI 변경, back+front 동시 변경, 강제 verify 실패를 각각 실행해 selection·비배포·batch rollback을 확인한다. WebGL은 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패를 실행해 release 설치·원자적 current·rollback·retention을 확인한다.
 
 - [X] T013 [P] [US1] `infra/jenkins/tests/deploy-dev-batch.sh`에 단일 component 성공, 다중 component 원자적 승격, 가역 실패 snapshot rollback fixture를 작성한다
 - [X] T014 [P] [US1] `infra/jenkins/tests/freshness-develop-push.sh`에 superseded develop SHA가 lock 획득 후 배포되지 않는 fixture를 작성한다
@@ -57,14 +57,14 @@
 - [ ] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
 - [ ] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
 - [ ] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
-- [ ] T022A [P] [US1] `infra/jenkins/tests/deploy-webgl-release.sh`에 WebGL release 구조 검증, release별 rsync staging, 원자적 `current` 전환, verify 실패 시 이전 known-good 정적 release 복원 fixture를 작성한다
-- [ ] T022B [US1] 개발/빌드 PC의 Jenkins node label `unity-webgl-builder`를 WebGL 전용 Agent로 등록하고, Unity 6000.0.78f1·Git·SSH/rsync와 EC2 WebGL release 경로만 쓸 수 있는 배포 credential의 preflight를 `infra/evidence/unity-webgl-builder-preflight.md`에 기록한다
-- [ ] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`를 추가해 `festa-unity/Builds/webgl/`을 빌드 PC에서 EC2 `/srv/festa/webgl/releases/<release-id>/`로 rsync하고, 구조·manifest·HTTP 응답을 검증한 뒤 같은 파일시스템에서 `current` 심볼릭 링크를 원자적으로 전환하도록 구현한다
-- [ ] T022D [US1] `infra/jenkins/pipelines/develop.groovy`에 `game` selection의 WebGL Build/Deploy/Verify를 `unity-webgl-builder`에서 실행하도록 연결한다. Linux Dedicated Server image build·`demo-game` 배포는 기존 Unity Agent/infra-003 경로로 유지하고, Jenkins controller에는 WebGL 산출물을 stash하지 않는다
-- [ ] T022E [US1] WebGL verify 실패·중단·신규 develop SHA supersede 시 새 정적 release를 `current`로 승격하지 않고, 이전 known-good release를 보존·기록하며, 성공한 release만 제한된 retention으로 유지하도록 연결한다
-- [ ] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 개발/빌드 PC Agent 등록, game-only develop merge, `<DEV_WEBGL_BASE_URL>/unity/manifest.json`·Brotli/MIME 헤더 확인, 현재/직전 WebGL release rollback 실측 절차를 추가한다
+- [X] T022A [P] [US1] `infra/jenkins/tests/deploy-webgl-release.sh`에 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패 rollback과 retention fixture를 작성한다
+- [ ] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
+- [X] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`에 Registry download, SHA-256·안전한 ZIP·manifest 검증, immutable release 설치, 원자적 `current`, 공개 HTTP 검증과 실패 rollback을 구현하고 Nginx가 `.br`·`.unityweb`을 동일한 Brotli 계약으로 제공하게 한다
+- [X] T022D [US1] `infra/jenkins/scripts/publish-webgl-release.sh`, `infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy`, `infra/jenkins/pipelines/webgl-package-deploy.groovy`로 upload 성공 후 Jenkins parameterized job→deploy-agent 흐름을 연결한다. Windows Agent는 추가하지 않는다
+- [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, current/previous 보호와 제한된 retention을 구현한다
+- [X] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 credential, 업로드, Jenkins job, MIME·Brotli·Cache-Control, rollback 확인 절차를 추가한다
 
-**Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. game merge의 WebGL은 개발/빌드 PC Agent에서 빌드되어 EC2 정적 release로 원자적으로 갱신되며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
+**Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
 
 ---
 

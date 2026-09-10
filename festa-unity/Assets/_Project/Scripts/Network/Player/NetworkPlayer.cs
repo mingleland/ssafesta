@@ -48,6 +48,11 @@ namespace Festa.Network
         LieRight = 11,          // Sleep_Bed_RightSide_SleepLoop — 오른쪽으로 눕기 (루프)
         LieLeftRestless = 12,   // Sleep_Bed_LeftSide_RestlessLoop — 왼쪽 뒤척임 (루프)
         LieRightRestless = 13,  // Sleep_Bed_RightSide_RestlessLoop — 오른쪽 뒤척임 (루프)
+
+        // 2026-09-10 추가 — 축제장 하이 스트라이커(망치 게임). Mine Animations 의 MineStart 를 리타게팅한 원샷.
+        // 감정표현 휠에는 넣지 않는다 — HighStrikerInteractable 만 재생한다. 재생 중에는 손에 망치가 생긴다
+        // (AvatarStrikeProp). 여기서도 값만 덧붙였다 (기준선 동결은 재구현 금지이지 확장 금지가 아니다).
+        Strike = 14,            // MineStart — 내리찍기 (원샷, 임팩트 1.16 s)
     }
 
     /// <summary>

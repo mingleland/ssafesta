@@ -43,6 +43,17 @@ namespace Festa.Integration
         }
 
         /// <summary>
+        /// Mock 구매. **성공만 돌려주지 않는다** — Mock 에서는 파츠가 전부 해제라 구매 화면 자체가 뜨지 않고,
+        /// 그런데도 이 경로가 불렸다면 화면 분기에 구멍이 있다는 뜻이다. 드러내고 실패로 남긴다 (T-24).
+        /// </summary>
+        public async Task<PurchaseResult> PurchaseAvatarPartAsync(long itemId)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            Debug.LogWarning($"[MockUserApi] 구매 요청이 왔다 — Mock 은 파츠가 전부 해제라 구매가 뜰 이유가 없다 (itemId={itemId}). 화면 분기를 확인하라.");
+            return PurchaseResult.Fail("MOCK_NO_PURCHASE", "Mock 모드에서는 구매하지 않는다 — 파츠는 이미 전부 해제 상태다");
+        }
+
+        /// <summary>
         /// 개발용 world session. **토큰은 진짜로 서명한다** (S15P21A604-331).
         ///
         /// <para>전에는 <c>"mock-connection-token"</c> 이라는 고정 문자열을 줬다. S15P21A604-85 로

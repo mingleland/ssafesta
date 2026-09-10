@@ -16,6 +16,10 @@ integration_compose="${repo_root}/infra/deploy/compose/integration/compose.yaml"
 component_pipeline="${repo_root}/infra/jenkins/pipelines/component.groovy"
 develop_pipeline="${repo_root}/infra/jenkins/pipelines/develop.groovy"
 develop_job="${repo_root}/infra/jenkins/jobs/gitlab-develop-multibranch.groovy"
+webgl_job="${repo_root}/infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy"
+webgl_pipeline="${repo_root}/infra/jenkins/pipelines/webgl-package-deploy.groovy"
+webgl_deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
+webgl_publish="${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -29,6 +33,13 @@ grep -q 'network_mode: host' "${agent_compose}" || fail "linux Docker agent must
 grep -q 'http://127.0.0.1:8080' "${agent_compose}" || fail "linux Docker agent must reach Jenkins through loopback"
 grep -q 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' "${agent_compose}" || fail "linux Docker agent lacks Testcontainers loopback override"
 pass "rootless Docker Testcontainers network policy"
+
+grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_compose}" \
+  || fail "deploy agent cannot mutate the host WebGL release root"
+grep -q 'WEBGL_PUBLIC_BASE_URL:' "${agent_compose}" || fail "deploy agent lacks the public WebGL verification URL"
+grep -q '^[[:space:]]*curl[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits curl"
+grep -q '^[[:space:]]*util-linux[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits flock"
+pass "WebGL deploy agent host path and runtime tools"
 
 for entrypoint in "${repo_root}"/infra/jenkins/scripts/*.sh "${repo_root}"/infra/deploy/scripts/*.sh; do
   [[ -x "${entrypoint}" ]] || fail "Shell entrypoint is not executable: ${entrypoint#"${repo_root}/"}"
@@ -88,7 +99,7 @@ assert 'secretToken' not in server
 PY
 pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
-for name in DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
+for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
   DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
   DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
@@ -108,6 +119,12 @@ grep -Fq 'bash "${ci_root}/infra/deploy/scripts/verify-component.sh"' "${repo_ro
   || fail "component verification must remain valid after adapter directory dispatch"
 grep -q "ws('/home/jenkins/agent/unity/workspaces/develop-game')" "${component_pipeline}" \
   || fail "game component CI does not reuse its Unity workspace"
+grep -q 'game) bash festa-unity/ci/build --target linux-server' "${repo_root}/ci/build" \
+  || fail "general game CI must build Linux Server only"
+grep -q 'ci_dispatch_or build build_project --target linux-server' "${repo_root}/ci/build" \
+  || fail "general game CI must pass the Linux Server target to its component adapter"
+! grep -q 'game) bash festa-unity/ci/build --target all' "${repo_root}/ci/build" \
+  || fail "general game CI must not build WebGL"
 ! grep -q 'deploy-component.sh' "${component_pipeline}" \
   || fail "Phase 2 component CI must not deploy"
 grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/scripts/deploy-component.sh' "${repo_root}/infra/jenkins/pipelines/unity.groovy" \
@@ -150,6 +167,19 @@ grep -q "branch != 'develop'" "${jenkinsfile}" \
   || fail "Jenkinsfile retains legacy component branch dispatch"
 grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
+grep -q "pipelineJob('festa-webgl-package-deploy')" "${webgl_job}" \
+  || fail "GitLab WebGL package deployment job is missing"
+grep -q "scriptPath('infra/jenkins/pipelines/webgl-package-deploy.groovy')" "${webgl_job}" \
+  || fail "WebGL package job does not use the repository pipeline"
+grep -q "usernamePassword(credentialsId: credentialId" "${webgl_pipeline}" \
+  || fail "WebGL package pipeline does not bind its Registry deploy token"
+grep -q "lock(resource: 'deploy-dev-game')" "${webgl_pipeline}" \
+  || fail "WebGL package deployment does not reuse the game deployment lock"
+grep -q 'deploy-webgl-release.sh' "${webgl_pipeline}" || fail "WebGL deployment script is not wired"
+grep -q 'DEPLOY-TOKEN:' "${webgl_deploy}" || fail "Registry download does not use a Deploy Token"
+grep -q 'buildWithParameters' "${webgl_publish}" || fail "publisher does not trigger Jenkins after upload"
+! grep -q 'unity-webgl-builder' "${webgl_job}" "${webgl_pipeline}" \
+  || fail "obsolete Windows WebGL agent remains wired"
 grep -q 'fingerprint: true' "${component_pipeline}" \
   || fail "component CI does not fingerprint selected artifacts"
 grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo backend does not use infra profile"

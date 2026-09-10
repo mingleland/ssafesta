@@ -54,3 +54,39 @@ export function isAreaOutOfBounds(
     world.max.y > booth.height + EPSILON
   );
 }
+
+/**
+ * 두 실물 범위가 바닥 평면에서 겹치는가 (S15P21A604-607).
+ *
+ * y 는 보지 않는다 — 편집기는 바닥 배치라 모든 오브젝트가 y=0 에서 시작하고, 높이가 달라도
+ * 같은 자리에 서면 사용자에게는 겹친 것이다.
+ *
+ * 맞닿은 것은 겹친 것이 아니다(`AREA_OUT_OF_BOUNDS` 가 "경계선상은 안" 으로 잡은 것과 같은
+ * 허용오차). 스냅 격자에 딱 붙여 놓은 배치가 경고로 뜨면 쓸 수 없다.
+ */
+export function areasOverlap(a: AABB, b: AABB): boolean {
+  return (
+    a.min.x < b.max.x - EPSILON &&
+    b.min.x < a.max.x - EPSILON &&
+    a.min.z < b.max.z - EPSILON &&
+    b.min.z < a.max.z - EPSILON
+  );
+}
+
+/**
+ * 서로 겹치는 오브젝트의 id 집합. 12개 규모라 단순 이중 순회로 충분하다.
+ *
+ * ponytail: O(n²) 스캔. maxObjects 가 수백으로 커지면 격자 분할로 바꾼다.
+ */
+export function overlappingIds(items: ReadonlyArray<{ objectId: string; area: AABB }>): Set<string> {
+  const hit = new Set<string>();
+  for (let i = 0; i < items.length; i += 1) {
+    for (let j = i + 1; j < items.length; j += 1) {
+      if (areasOverlap(items[i].area, items[j].area)) {
+        hit.add(items[i].objectId);
+        hit.add(items[j].objectId);
+      }
+    }
+  }
+  return hit;
+}

@@ -3,14 +3,28 @@
 // entities/conversation/api를 mock해 Conversation 생성·스트리밍을 대체하고, 실제 SSE 프레임은
 // entities/conversation/stream.mock의 검증된 fixture를 그대로 재사용한다(파서·consumer 자체
 // 계약은 stream.parser.test.ts·stream.consumer.test.ts 몫).
+// member 세션 고정(S15P21A604-118 게스트 차단 병합분): 이 파일은 회원 플로우만 본다 — 게스트
+// 진입점 차단은 AiChatOverlayAccess.test.tsx 몫이다. 기본 세션(anonymous)로 두면 게스트 게이트가
+// 그려져 여기 모든 assertion(입력창·제안 칩)이 애초에 못 찾는다.
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockStreamError, mockStreamSequenceGap, mockStreamSuccess } from '../../../../../entities/conversation/stream.mock';
 import { AiChatOverlay } from '../../AiChatOverlay';
+import { __resetSessionForTests, setMemberSession } from '../../../../auth/model/session';
+import type { ComponentProps } from 'react';
 
 const createConversation = vi.fn();
 const streamMessage = vi.fn();
 const closeConversation = vi.fn();
+
+function renderOverlay(payload: ComponentProps<typeof AiChatOverlay>['payload']) {
+  return render(
+    <MemoryRouter initialEntries={['/app/world']}>
+      <AiChatOverlay payload={payload} />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock('../../../../../entities/conversation/api', () => ({
   createConversation: (...args: unknown[]) => createConversation(...args),
@@ -28,11 +42,13 @@ beforeEach(() => {
   closeConversation.mockResolvedValue(undefined);
   // jsdom은 Element.scrollTo를 구현하지 않는다 — 대화창 자동 스크롤 effect가 던지지 않게만 막는다.
   Element.prototype.scrollTo = vi.fn();
+  setMemberSession('at', new Date(Date.now() + 60_000).toISOString());
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  __resetSessionForTests();
 });
 
 function ask(question: string): void {
@@ -43,7 +59,7 @@ function ask(question: string): void {
 }
 
 function askFirstSuggestion(): void {
-  render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+  renderOverlay({ boothId: 7, agentId: 3 });
   fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트를 전시하나요?' }));
 }
 
@@ -62,7 +78,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     // mockReturnValue 로 주면 두 질문이 **같은 제너레이터 인스턴스**를 공유해 두 번째가 빈 스트림이 된다
     // (실측: 1회차 'ab', 2회차 ''). 질문마다 새 스트림을 여는 실제 동작과 맞추려면 factory 여야 한다.
     streamMessage.mockImplementation(() => mockStreamSuccess());
-    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    renderOverlay({ boothId: 7, agentId: 3 });
 
     ask('첫 질문');
     await waitFor(() => expect(screen.getAllByText(/안녕하세요, 무엇을 도와드릴까요?/)).toHaveLength(1));
@@ -97,7 +113,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     createConversation.mockReset();
     createConversation.mockRejectedValue({ code: 'SPRING_UNAVAILABLE', message: '실패', status: 503 });
 
-    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    renderOverlay({ boothId: 7, agentId: 3 });
     ask('질문');
 
     expect(
@@ -107,7 +123,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
   });
 
   it('agentId가 없으면 서버를 부르지 않고 바로 안내한다', async () => {
-    render(<AiChatOverlay payload={{ boothId: 7 }} />);
+    renderOverlay({ boothId: 7 });
     ask('질문');
 
     expect((await screen.findByRole('alert')).textContent).toContain('AI 직원 정보를 확인할 수 없습니다.');
@@ -116,7 +132,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
 
   it('오버레이가 사라지면 Conversation 을 즉시 삭제한다 (S15P21A604-516)', async () => {
     streamMessage.mockImplementation(() => mockStreamSuccess());
-    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    const { unmount } = renderOverlay({ boothId: 7, agentId: 3 });
     ask('질문');
     await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/);
 
@@ -126,7 +142,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
   });
 
   it('대화를 만들지 않고 닫으면 삭제를 부르지 않는다 — 지울 것이 없다', async () => {
-    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    const { unmount } = renderOverlay({ boothId: 7, agentId: 3 });
     unmount();
     expect(closeConversation).not.toHaveBeenCalled();
   });
@@ -135,7 +151,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     closeConversation.mockRejectedValue({ code: 'CONVERSATION_OWNERSHIP_MISMATCH', status: 403 });
     streamMessage.mockImplementation(() => mockStreamSuccess());
-    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    const { unmount } = renderOverlay({ boothId: 7, agentId: 3 });
     ask('질문');
     await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/);
 
@@ -156,7 +172,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
         yield '';
       })();
     });
-    const { unmount } = render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    const { unmount } = renderOverlay({ boothId: 7, agentId: 3 });
     ask('질문');
     await waitFor(() => expect(signal).toBeDefined());
     expect(signal!.aborted).toBe(false);
@@ -177,7 +193,7 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     }
     streamMessage.mockImplementationOnce(() => rejects()).mockImplementationOnce(() => mockStreamSuccess());
 
-    render(<AiChatOverlay payload={{ boothId: 7, agentId: 3 }} />);
+    renderOverlay({ boothId: 7, agentId: 3 });
     ask('첫 질문');
     await screen.findByRole('alert');
 

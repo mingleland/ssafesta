@@ -199,6 +199,37 @@ mr-status:
         - ci/**/*
         - .gitlab-ci.yml
 
+.ai-changes:
+  rules:
+    - changes:
+        - festa-ai/**/*
+        - ci/**/*
+        - .gitlab-ci.yml
+
+ai-test:
+  extends:
+    - .component-ci
+    - .ai-changes
+  stage: test
+  image: python:3.13-slim
+  variables:
+    CI_COMPONENT: ai
+  script:
+    - bash ci/test
+
+ai-build:
+  extends:
+    - .component-ci
+    - .ai-changes
+  stage: build
+  image: python:3.13-slim
+  variables:
+    CI_COMPONENT: ai
+  needs:
+    - ai-test
+  script:
+    - bash ci/build
+
 front-test:
   extends:
     - .component-ci
