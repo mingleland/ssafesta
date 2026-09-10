@@ -60,7 +60,10 @@ function SectionRow({
 
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'content' | 'ai-agent'>('content');
+  // AI 직원은 부스당 1명뿐이고 문서 업로드까지 한 화면에서 오가야 해서 별도 페이지로 빼지
+  // 않는다 — 그렇다고 탭으로 분리하면 콘텐츠 관리 목록과 동떨어져 보여, CONSULTATION 아래
+  // 네 번째 행으로 두고 그 자리에서 펼친다.
+  const [aiAgentOpen, setAiAgentOpen] = useState(false);
 
   // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
@@ -163,40 +166,38 @@ export function BoothManagementOverlay({ onClose }: Props) {
           </div>
         </section>
 
-        {/* A — 기능별 Drill-down(콘텐츠) vs 이 자리에서 바로 편집(AI 직원). AI 직원은 부스당
-            1명뿐이고 문서 업로드까지 한 화면에서 오가야 해서 별도 페이지로 빼지 않는다. */}
-        <div className="bm-tabs" role="tablist" aria-label="부스 관리 메뉴">
-          <button type="button" role="tab" aria-selected={tab === 'content'} className={tab === 'content' ? 'bm-tab bm-tab-on' : 'bm-tab'} onClick={() => setTab('content')}>
-            콘텐츠 관리
-          </button>
-          <button type="button" role="tab" aria-selected={tab === 'ai-agent'} className={tab === 'ai-agent' ? 'bm-tab bm-tab-on' : 'bm-tab'} onClick={() => setTab('ai-agent')}>
-            AI 직원 관리
+        <div className="bm-rows">
+          <SectionRow
+            label="PROJECT"
+            summary="전시 프로젝트 등록·수정"
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/project`)}
+          />
+          <SectionRow
+            label="SURVEY"
+            summary="설문 편집·응답 결과"
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/survey`)}
+          />
+          <SectionRow
+            label="CONSULTATION"
+            summary="상담 요청 운영"
+            onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
+          />
+          <button
+            type="button"
+            className="bm-row"
+            aria-expanded={aiAgentOpen}
+            onClick={() => setAiAgentOpen((open) => !open)}
+          >
+            <span className="bm-row-label">AI 직원</span>
+            <span className="bm-row-summary">대화 설정·답변 근거 문서 관리</span>
+            <span className="bm-row-cta">
+              {aiAgentOpen ? '접기' : '관리'}
+              {IcChevron}
+            </span>
           </button>
         </div>
 
-        {tab === 'content' ? (
-          <div className="bm-rows" role="tabpanel">
-            <SectionRow
-              label="PROJECT"
-              summary="전시 프로젝트 등록·수정"
-              onOpen={() => go(`/app/booths/${myBooth.boothId}/project`)}
-            />
-            <SectionRow
-              label="SURVEY"
-              summary="설문 편집·응답 결과"
-              onOpen={() => go(`/app/booths/${myBooth.boothId}/survey`)}
-            />
-            <SectionRow
-              label="CONSULTATION"
-              summary="상담 요청 운영"
-              onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
-            />
-          </div>
-        ) : (
-          <div role="tabpanel">
-            <AiAgentManagementTab boothId={myBooth.boothId} />
-          </div>
-        )}
+        {aiAgentOpen && <AiAgentManagementTab boothId={myBooth.boothId} />}
 
         <section className="bm-info">
           <span className="bm-info-title">부스 정보</span>

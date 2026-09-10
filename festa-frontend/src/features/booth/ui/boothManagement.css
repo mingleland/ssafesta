@@ -48,27 +48,6 @@
 .bm-remaining { font-size: 12.5px; }
 .bm-studio { margin-top: auto; align-self: flex-start; }
 
-.bm-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.04);
-}
-.bm-tab {
-  flex: 1;
-  border: 0;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: transparent;
-  color: rgba(234, 238, 251, 0.62);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.bm-tab:hover { color: var(--festa-ink); }
-.bm-tab-on { background: rgba(255, 255, 255, 0.12); color: var(--festa-ink); font-weight: 700; }
-
 .bm-rows {
   display: flex;
   flex-direction: column;

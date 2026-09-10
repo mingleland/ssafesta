@@ -143,10 +143,9 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
       </div>
       <label className="bm-field"><span>시스템 프롬프트</span><textarea value={form.systemPrompt} onChange={(event) => setForm({ ...form, systemPrompt: event.target.value })} placeholder="AI 직원이 지켜야 할 답변 원칙을 작성하세요." rows={5} /></label>
       <label className="bm-field"><span>금지 주제 <em>쉼표로 구분</em></span><input value={form.forbiddenTopics} onChange={(event) => setForm({ ...form, forbiddenTopics: event.target.value })} placeholder="예: 개인정보, 경쟁사 비방" /></label>
-      <label className="bm-check"><input type="checkbox" checked={form.handoffEnabled} onChange={(event) => setForm({ ...form, handoffEnabled: event.target.checked })} /> 사람 상담으로 연결 허용</label>
-      {error && <p className="bm-agent-error" role="alert">{error}</p>}
-      <button type="submit" className="ov-btn ov-btn-primary" disabled={saveMutation.isPending}>{saveMutation.isPending ? '저장 중...' : editing ? '설정 저장' : 'AI 직원 등록'}</button>
 
+      {/* 답변 근거 문서 — "사람 상담으로 연결 허용" 판단은 AI 직원이 문서로 뭘 답할 수 있는지를
+          먼저 보고 나서가 자연스러워 그 위에 둔다. */}
       <section className="bm-document" aria-labelledby="ai-document-title">
         <div>
           <h4 id="ai-document-title">답변 근거 문서</h4>
@@ -159,6 +158,10 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
         {!editing && <p className="ov-note">AI 직원 설정을 먼저 저장하면 문서를 등록할 수 있습니다.</p>}
         {uploadMessage && <p className="bm-upload-result" role="status">{uploadMessage}</p>}
       </section>
+
+      <label className="bm-check"><input type="checkbox" checked={form.handoffEnabled} onChange={(event) => setForm({ ...form, handoffEnabled: event.target.checked })} /> 사람 상담으로 연결 허용</label>
+      {error && <p className="bm-agent-error" role="alert">{error}</p>}
+      <button type="submit" className="ov-btn ov-btn-primary" disabled={saveMutation.isPending}>{saveMutation.isPending ? '저장 중...' : editing ? '설정 저장' : 'AI 직원 등록'}</button>
     </form>
   );
 }
