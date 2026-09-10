@@ -20,6 +20,7 @@ webgl_job="${repo_root}/infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy"
 webgl_pipeline="${repo_root}/infra/jenkins/pipelines/webgl-package-deploy.groovy"
 webgl_deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
 webgl_publish="${repo_root}/infra/jenkins/scripts/publish-webgl-release.sh"
+jobs_casc="${repo_root}/infra/jenkins/casc/jobs.yaml"
 demo_promotion_job="${repo_root}/infra/jenkins/jobs/gitlab-demo-promotion.groovy"
 demo_promotion_pipeline="${repo_root}/infra/jenkins/pipelines/demo-promotion.groovy"
 demo_promotion_validator="${repo_root}/infra/jenkins/scripts/validate-demo-promotion.sh"
@@ -39,6 +40,12 @@ pass "rootless Docker Testcontainers network policy"
 
 grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_compose}" \
   || fail "deploy agent cannot mutate the host WebGL release root"
+grep -Fq '../jobs:/var/jenkins_home/job_dsl:ro' "${controller_compose}" \
+  || fail "controller does not mount repository Job DSL definitions"
+for job_dsl in gitlab-develop-multibranch.groovy gitlab-webgl-package-deploy.groovy gitlab-demo-promotion.groovy; do
+  grep -Fq "/var/jenkins_home/job_dsl/${job_dsl}" "${jobs_casc}" \
+    || fail "JCasC does not apply ${job_dsl}"
+done
 grep -q 'WEBGL_PUBLIC_BASE_URL:' "${agent_compose}" || fail "deploy agent lacks the public WebGL verification URL"
 grep -q '^[[:space:]]*curl[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits curl"
 grep -q '^[[:space:]]*util-linux[[:space:]\\]*$' "${agent_dockerfile}" || fail "agent image omits flock"
