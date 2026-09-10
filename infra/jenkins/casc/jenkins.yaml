@@ -62,3 +62,4 @@ unclassified:
       - name: deploy-dev-front
       - name: deploy-dev-game
       - name: deploy-integration-develop
+      - name: deploy-demo
