@@ -583,7 +583,7 @@ Cache-Control: no-store
 | ③ | `docs/08` §18 게임 코드 표 | 실제 wire 이름으로 정정하고 상세 code·rule 정본은 이 문서가 갖는다. 쓰이지 않는 옛 이름은 남기지 않는다 | #48 |
 | ④ | 사용자당 게임 상한 | **활성 20개**(soft-delete 제외), 초과 시 `GAME_LIMIT_EXCEEDED`(409). 서버 설정값이고 v1 기본 20. **삭제본은 별도로 5개**이며 초과분은 오래된 것부터 hard delete (§삭제본 보관) | #48 |
 | ⑤ | 내 게임 목록 | `GET /games/mine`. soft-delete 포함(`deletedAt`), 활성 먼저 `updatedAt` 내림차순, 6필드, 페이지네이션 없음 | #48 |
-| ⑥ | #81 Coin 차감 | **#48 범위에서 제외.** MVP는 무료·무보상을 유지하고 #81 계열에서 spec 개정 후 별도 구현한다 (FR-022·§MVP 제외 그대로) | #48 |
+| ⑥ | #81 Coin 차감 | ~~#48 범위에서 제외. MVP는 무료·무보상 유지, #81 계열에서 spec 개정 후 별도 구현~~ → **2026-08-26 갱신: #81 리드 확정으로 유료 입장이 v1 범위가 됐다** (*"BE 제안 8건 전부 채택 … 구현 착수는 S15P21A604-108(BE)·-117(FE)"*). **Reward·Ranking 제외는 그대로다.** 단 **구현은 보류**이고 이 문서에 §플레이 세션 절은 아직 없다 — 게임이 광장으로 옮겨져 진입 경로가 바뀌었고 해당 오락기가 아직 없다(`S15P21A604-598`, `docs/26` 결정 기록) | #48 → **#81** |
 | ⑦ | `INTERNAL_SERVER_ERROR` vs `INTERNAL_ERROR` | 서버는 **`INTERNAL_ERROR` 유지**. 전 endpoint 공통 코드라 서버를 바꾸지 않고 FE 재시도 판정을 맞춘다 | #104 |
 | — | 신규 이름 19개 | `errors[].rule` 16 + `code` 2(`GAME_VALIDATION_FAILED`·`GAME_LIMIT_EXCEEDED`) + `unavailableReason` 1(`CONFIG_DISABLED`) 전부 승인 | #48 |
 | — | 패키지 배치 | **기존 Backend와 같은 flat 구조.** `auth`·`booth`·`user`·`wallet` 관례를 따르고 019만 4계층 선례를 만들지 않는다 (`BE/plan.md`) | #48 |
@@ -592,7 +592,7 @@ Cache-Control: no-store
 
 ## MVP 제외
 
-- Coin/Reward 지급
+- **Reward 지급.** 유료 **입장**은 2026-08-26 #81 리드 확정으로 범위에 들어왔지만(FR-022 개정, 구현은 보류 — `S15P21A604-598`) 게임 결과에 대한 코인 **지급**은 여전히 범위 밖이다. 서버가 검증할 수 없는 완료·점수를 정산 근거로 삼지 않는다는 같은 원칙의 두 면이다
 - 경쟁 Ranking과 MVP score endpoint. 표시 전용 Ranking은 P1 별도 범위
 - 클라이언트 점수 기반 서버 정산
 - AI 생성 요청
