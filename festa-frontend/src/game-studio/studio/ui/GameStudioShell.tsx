@@ -1534,8 +1534,10 @@ export const GameStudioShell = ({
                           ><strong>{label}</strong><kbd>{shortcut}</kbd></button>
                         ))}
                       </div>
+                      {/* S15P21A604-595 — 개수를 16으로 하드코딩해서 8×8 타일셋의 앞 16칸만
+                          쓸 수 있었다. 선택된 타일셋의 실제 칸 수(columns×rows)만큼 노출한다. */}
                       <div className="gss-tile-palette">
-                        {Array.from({ length: 16 }, (_, index) => (
+                        {Array.from({ length: selectedTilesetVisual === null ? 0 : selectedTilesetVisual.columns * selectedTilesetVisual.rows }, (_, index) => (
                           <button
                             aria-label={`타일 ${index}`}
                             className={`is-tile-${index % 8}${tileBrush === index ? ' is-active' : ''}`}
@@ -1545,8 +1547,8 @@ export const GameStudioShell = ({
                             type="button"
                           ><span>{index}</span></button>
                         ))}
-                        <button className={tileBrush === -1 ? 'is-active is-eraser' : 'is-eraser'} onClick={() => setTileBrush(-1)} type="button">지우개</button>
                       </div>
+                      <button className={`gss-tile-eraser${tileBrush === -1 ? ' is-active' : ''}`} onClick={() => setTileBrush(-1)} type="button">지우개</button>
                       <div className="gss-inline-actions">
                         <button disabled={tileBrush === null} onClick={() => apply(fillTileLayer(project, selectedScene.id, selectedTileLayer.id, tileBrush ?? -1))} type="button">전체 채우기</button>
                         <button onClick={() => apply(fillTileLayer(project, selectedScene.id, selectedTileLayer.id, -1))} type="button">전체 지우기</button>
