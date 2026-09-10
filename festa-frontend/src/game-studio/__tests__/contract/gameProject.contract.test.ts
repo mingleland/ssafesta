@@ -45,6 +45,27 @@ describe('GameProject v1 contract', () => {
     expect(parsed).toEqual(minimalGameProject);
   });
 
+  // S15P21A604-570 — 자산에 원본 파일명(label)을 저장할 수 있게 됐다. 기존 자산(label 없음)도
+  // 여전히 유효해야 하고(소급 적용 없음), label이 있는 자산도 통과해야 한다.
+  it('accepts an asset with an optional label(S15P21A604-570)', () => {
+    const input = cloneMinimalGameProject();
+    const asset = input.assets.find((candidate) => candidate.id === 'keyImage');
+    if (asset === undefined) throw new Error('keyImage fixture asset missing');
+    (asset as DeepMutable<typeof asset>).label = 'staple-icon.png';
+
+    const parsed = parseGameProject(input);
+    expect(parsed).toBe(input);
+  });
+
+  it('rejects an asset whose label is not a string(S15P21A604-570)', () => {
+    const input = cloneMinimalGameProject();
+    const asset = input.assets.find((candidate) => candidate.id === 'keyImage');
+    if (asset === undefined) throw new Error('keyImage fixture asset missing');
+    (asset as unknown as { label: unknown }).label = 42;
+
+    expectContractError(input, 'GAME_PROJECT_INVALID');
+  });
+
   it.each([
     {
       name: 'unsupported schema',

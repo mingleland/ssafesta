@@ -729,9 +729,12 @@ export const GameStudioShell = ({
     try {
       const assetId = nextStableId(store.getState().project, kind === 'TILESET' ? 'tileset' : 'image');
       const result = await assetRepository.save(gameId, { file, kind, suggestedAssetId: assetId });
-      apply(addAssetReference(store.getState().project, result.asset));
+      // S15P21A604-570 — 원본 파일명을 버리지 않고 자산에 같이 저장한다. assetDisplayLabel()이
+      // "내 자산 · {label}"로 보여주기 전까지는 토스트 문구에서만 쓰고 사라졌었다.
+      const asset: AssetReference = { ...result.asset, label: result.originalName };
+      apply(addAssetReference(store.getState().project, asset));
       setNotice(`${result.originalName}을 ${kind} 자산으로 추가했습니다.`);
-      return result.asset;
+      return asset;
     } catch (error) {
       setSaveStatus('error');
       setNotice(error instanceof Error ? error.message : '자산을 추가하지 못했습니다.');
