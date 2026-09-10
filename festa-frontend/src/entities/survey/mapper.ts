@@ -22,6 +22,7 @@ import type {
   SurveyAnswerWire,
   SurveyQuestionWire,
   SurveyResultWire,
+  EventSurveyRunWire,
   SurveyRunWire,
   SurveySaveQuestionWire,
   SurveySaveWire,
@@ -100,6 +101,25 @@ export function toRunSnapshot(wire: SurveyRunWire): SurveyRunSnapshot {
     surveyId: wire.surveyId,
     status: wire.closed ? 'closed' : 'open',
     rewardCoin: wire.rewardCoin,
+    // 부스 설문에서 회원 전용은 보상이 있을 때뿐이다 — 그 판정은 rewardCoin 이 이미 싣고 있어서
+    // 여기서 다시 말하지 않는다. 참여 이력은 부스 계약에 없다(재참여는 409 가 막는다)
+    memberOnly: false,
+    responded: null,
+    questions: toRunQuestions(wire.questions),
+  };
+}
+
+/**
+ * 이벤트 설문 run (S15P21A604-608). 부스 경로와 **같은 스냅샷**으로 접는다 — 상태 기계와 화면이
+ * 두 경로를 구별하지 않는 것이 이 설계의 요점이라, 차이는 여기서 끝난다.
+ */
+export function toEventRunSnapshot(wire: EventSurveyRunWire): SurveyRunSnapshot {
+  return {
+    surveyId: wire.surveyId,
+    status: wire.closed ? 'closed' : 'open',
+    rewardCoin: wire.rewardCoin,
+    memberOnly: wire.memberOnly,
+    responded: wire.responded,
     questions: toRunQuestions(wire.questions),
   };
 }

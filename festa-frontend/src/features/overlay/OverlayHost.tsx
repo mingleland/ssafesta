@@ -1,6 +1,7 @@
 // Overlay Bus의 현재 요청을 실제 화면으로 그리는 유일한 지점. Unity 이벤트는 모른다 —
 // 그건 Interaction Dispatcher 몫이다(features/interaction/dispatcher.ts). 이 파일은 렌더링만 한다.
 import { lazy, Suspense, useSyncExternalStore } from 'react';
+import type { SurveySource } from '../../shared/contracts/survey';
 import { closeOverlay, getCurrentOverlay, subscribeOverlay } from '../../shared/types/overlay';
 import { LaptopOverlay } from './LaptopOverlay';
 import { OverlayEmpty, OverlayFrame } from './ui/OverlayFrame';
@@ -36,7 +37,8 @@ export function OverlayHost() {
   }
 
   if (request.type === 'SURVEY') {
-    return <SurveyOverlay payload={request.payload as { boothId: number; surveyId?: string }} />;
+    // 부스 설문과 이벤트 설문이 같은 타입을 쓴다 — 갈리는 것은 payload 의 source 다 (-608)
+    return <SurveyOverlay payload={request.payload as SurveySource} />;
   }
 
   if (request.type === 'CONSULTATION') {

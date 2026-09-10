@@ -17,8 +17,9 @@ import type {
   SurveySubmitResult,
   SurveyTextAnswerPage,
 } from './api.port';
-import { toDraft, toResultSnapshot, toRunSnapshot, toSaveBody, toTextAnswerPage, toWireAnswers } from './mapper';
+import { toDraft, toEventRunSnapshot, toResultSnapshot, toRunSnapshot, toSaveBody, toTextAnswerPage, toWireAnswers } from './mapper';
 import type {
+  EventSurveyRunWire,
   SurveyResultWire,
   SurveyRunWire,
   SurveySubmitBodyWire,
@@ -36,6 +37,12 @@ async function fetchSurvey(boothId: number): Promise<SurveyWire> {
 export const surveyHttpPort: SurveyPort = {
   async getRun(boothId: number): Promise<SurveyRunSnapshot> {
     return toRunSnapshot(await api<SurveyRunWire>(`${boothSurvey(boothId)}/run`));
+  },
+
+  async getEventRun(surveyKey: string): Promise<SurveyRunSnapshot> {
+    // 이벤트 설문은 부스에 속하지 않아 열쇠가 surveyKey 다. 제출부터는 surveyId 기준이라
+    // 기존 경로(POST /surveys/{surveyId}/responses)를 그대로 탄다 — 여기만 갈린다
+    return toEventRunSnapshot(await api<EventSurveyRunWire>(`/api/v1/event-surveys/${encodeURIComponent(surveyKey)}/run`));
   },
 
   async submitAnswers(surveyId: number, answers: Record<string, SurveyAnswerValue>): Promise<SurveySubmitResult> {

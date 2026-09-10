@@ -28,7 +28,8 @@ function dispatch(event: UnityInteractEvent): void {
     case 'BOOTH_SURVEY_INTERACT':
       // surveyId 는 싣지 않는다 — boothId 는 설문을 resolve 하기 위한 context 이고,
       // 실제 식별자 해석은 adapter 몫이다 (S15P21A604-415).
-      openVisitorOverlay('SURVEY', { boothId: event.boothId, objectId: event.objectId });
+      // kind 는 같은 오버레이를 쓰는 이벤트 설문과 갈라 주는 discriminator 다 (-608).
+      openVisitorOverlay('SURVEY', { kind: 'booth', boothId: event.boothId, objectId: event.objectId });
       return;
     case 'WORLD_EVENT_INTERACT':
       // 이벤트 NPC — 경품 상점 (S15P21A604-599). payload 를 넘기지 않는다: 상점이 하나뿐이라

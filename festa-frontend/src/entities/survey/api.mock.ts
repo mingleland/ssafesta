@@ -38,6 +38,29 @@ export const MOCK_BOOTH_CLOSED_REWARDED = 8;
 /** 부스마다 surveyId 를 하나씩 준다 — 실 서버처럼 run 응답이 id 를 알려주는 흐름을 흉내낸다 */
 const surveyIdOf = (boothId: number): number => 1000 + boothId;
 
+// ── 이벤트 설문 (S15P21A604-608) ────────────────────────────────────────────
+// 부스가 아니라 key 로 가른다. 부스 시나리오 상수를 재사용하지 않는다 — 이벤트 설문은 부스에
+// 속하지 않는다는 것이 이 작업의 전제라, mock 에서라도 두 공간을 섞으면 그 전제가 흐려진다.
+
+/**
+ * 평범한 이벤트 설문 — 아직 참여하지 않았다.
+ *
+ * **앱이 실제로 쓰는 key 와 같은 값이다**(`features/event/model/surveyEntry.ts`). mock 어댑터의
+ * 존재 이유가 BE 도달 전에 화면을 돌려 보는 것이라, 다른 key 를 주면 mock 모드에서 설문이
+ * 404 로만 보이고 아무것도 검증하지 못한다.
+ */
+export const MOCK_EVENT_SURVEY_KEY = 'SSAFESTA_2026';
+/** 이미 참여한 이벤트 설문 */
+export const MOCK_EVENT_SURVEY_DONE = 'SSAFESTA_MOCK_DONE';
+/** 마감된 이벤트 설문 */
+export const MOCK_EVENT_SURVEY_CLOSED = 'SSAFESTA_MOCK_CLOSED';
+
+const EVENT_SURVEY_IDS: Record<string, number> = {
+  [MOCK_EVENT_SURVEY_KEY]: 2001,
+  [MOCK_EVENT_SURVEY_DONE]: 2002,
+  [MOCK_EVENT_SURVEY_CLOSED]: 2003,
+};
+
 const MOCK_REWARD_COIN = 5;
 
 function apiError(code: string, message: string): ApiError {
@@ -53,13 +76,33 @@ export const surveyMockPort: SurveyPort = {
     const surveyId = surveyIdOf(boothId);
     const rewardCoin =
       boothId === MOCK_BOOTH_REWARDED || boothId === MOCK_BOOTH_CLOSED_REWARDED ? MOCK_REWARD_COIN : 0;
+    // 부스 설문에서 회원 전용은 rewardCoin 이 이미 말한다. 참여 이력은 부스 계약에 없다
+    const boothOnly = { memberOnly: false, responded: null } as const;
     if (boothId === MOCK_BOOTH_EMPTY || boothId === MOCK_BOOTH_NEW) {
-      return { surveyId, status: 'open', rewardCoin, questions: [] };
+      return { surveyId, status: 'open', rewardCoin, ...boothOnly, questions: [] };
     }
     if (boothId === MOCK_BOOTH_CLOSED || boothId === MOCK_BOOTH_CLOSED_REWARDED) {
-      return { surveyId, status: 'closed', rewardCoin, questions: RUN_QUESTIONS };
+      return { surveyId, status: 'closed', rewardCoin, ...boothOnly, questions: RUN_QUESTIONS };
     }
-    return { surveyId, status: 'open', rewardCoin, questions: RUN_QUESTIONS };
+    return { surveyId, status: 'open', rewardCoin, ...boothOnly, questions: RUN_QUESTIONS };
+  },
+
+  async getEventRun(surveyKey: string): Promise<SurveyRunSnapshot> {
+    const surveyId = EVENT_SURVEY_IDS[surveyKey];
+    if (surveyId === undefined) throw apiError('SURVEY_NOT_FOUND', '설문을 찾을 수 없습니다.');
+    return {
+      surveyId,
+      status: surveyKey === MOCK_EVENT_SURVEY_CLOSED ? 'closed' : 'open',
+      // 이벤트 설문은 코인을 주지 않는다 — 참여 자체가 추첨 응모다. 보상 0 인데도 회원 전용인
+      // 이유가 그것이고, 그래서 rewardCoin 과 memberOnly 가 별개 축이다
+      rewardCoin: 0,
+      memberOnly: true,
+      responded:
+        surveyKey === MOCK_EVENT_SURVEY_DONE
+          ? { responseId: 9001, submittedAt: '2026-09-10T04:12:00Z' }
+          : null,
+      questions: RUN_QUESTIONS,
+    };
   },
 
   async submitAnswers(surveyId: number, answers: Record<string, SurveyAnswerValue>): Promise<SurveySubmitResult> {
