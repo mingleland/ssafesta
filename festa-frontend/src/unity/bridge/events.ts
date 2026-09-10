@@ -68,6 +68,28 @@ export type WorldInteractEvent =
        */
       type: 'WORLD_EVENT_INTERACT';
       npcId?: string;
+    }
+  | {
+      /**
+       * 내장 미니게임 상호작용 — 타이밍 스톱 (S15P21A604-601, GitLab #166).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. 같은 `onBoothInteract` 채널로 온다.
+       *
+       * `WORLD_ARCADE_INTERACT`(#135, Game Studio 게시 게임)와 **합치지 않는다.** 그쪽은
+       * `machineId → 서버 resolve` 로 "어느 게임기인가"(물리 오브젝트 분류)가 식별 축이고, 이쪽은
+       * `gameId` 로 "어떤 기능인가"가 축이다. 합치면 소비처가 `gameId` 유무로 다시 갈라야 해서
+       * dispatcher 의 `switch (event.type)` 하나로 끝나는 성질을 잃는다.
+       *
+       * `gameId` 는 내장 미니게임 식별자(지금은 `TIMER_STOP` 하나)이고 화면 선택에 쓴다.
+       * `machineId` 는 씬 canonical id 로 로그·분석용이다 — FE 는 해석하지 않는다.
+       *
+       * ⚠️ Unity 송신부는 아직 develop 에 없다. `BOOTH_PROJECT_INTERACT`(-343)·
+       * `WORLD_EVENT_INTERACT`(-599)와 같이 **FE 수신부가 먼저 서 있는** 상태이고, 게임 파트가
+       * 보내기 시작하면 이 자리가 그대로 실경로가 된다.
+       */
+      type: 'WORLD_MINIGAME_INTERACT';
+      gameId: string;
+      machineId?: string;
     };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */
