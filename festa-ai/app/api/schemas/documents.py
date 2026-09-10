@@ -44,6 +44,11 @@ class ProcessDocumentRequest(ApiModel):
     source_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class CancelDocumentProcessingRequest(ApiModel):
+    job_id: int = Field(ge=1, json_schema_extra={"format": "int64"})
+    attempt_no: int = Field(ge=0)
+
+
 class ErrorResponse(ApiModel):
     code: str
     message: str
