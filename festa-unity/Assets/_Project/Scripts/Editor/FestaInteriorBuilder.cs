@@ -45,8 +45,8 @@ namespace Festa.EditorTools
         const float ShellMinXMeters = -3.092f, ShellMaxXMeters = 3.017f;
         const float ShellMinZMeters = -3.017f, ShellMaxZMeters = 3.017f;
         const float ShellHeightMeters = 2.715f;
-        const float ShellTargetFrontZ = 3.2f;   // 앞선은 거의 그대로 — 더 내밀면 스폰(+3.9 m)·문 통로를 먹는다
-        const float ShellTargetHeight = 4.8f;   // 천장(6.0 m) 아래 1.2 m — 벽이 방 높이를 따라가되 천장 띠는 남긴다
+        const float ShellTargetFrontZ = 5.6f;   // 문 매트(5.7 m 부터) 직전까지 — 여기서 끊으면 옆이 흰 방 벽으로 남는다
+        const float ShellTargetHeight = 5.6f;   // 천장(6.0 m) 아래 0.4 m — 위쪽 흰 띠를 최소로
         const float WallT = 0.3f * M;
         const float Pitch = 700f;               // 방 간격 70 m (v2 와 같음 — 외부 포털 목적지 이름만 쓰므로 위치는 자유)
 
@@ -212,6 +212,37 @@ namespace Festa.EditorTools
             foreach (var t in shell.GetComponentsInChildren<Transform>(true).ToArray())
                 if (t != null && t.name.StartsWith("Truss"))
                     Object.DestroyImmediate(t.gameObject);
+            // ── 오른쪽 벽 보강 (2026-09-10) ──────────────────────────
+            // 벤더 셸은 **좌(-x)·후면(-z)** 만 세운다. 6 m 셸일 때는 눈에 덜 띄었지만 방 크기로 키우고 나니
+            // 오른쪽이 흰 방 벽 그대로 남아 "빈 벽" 으로 보였다. 왼쪽 패널을 복제해 +x 로 대칭 배치한다.
+            var leftPanels = shell.transform.Cast<Transform>()
+                .Where(t => t.name.StartsWith("Panel02bCloth") && t.localPosition.x < -2.5f).ToArray();
+            foreach (var p in leftPanels)
+            {
+                var copy = Object.Instantiate(p.gameObject, shell.transform);
+                copy.name = p.name;
+                copy.transform.localPosition = new Vector3(-p.localPosition.x, p.localPosition.y, p.localPosition.z);
+                copy.transform.localRotation = Quaternion.Euler(270f, 270f, 0f);   // 좌측(y=90)의 거울 — 그래픽이 안쪽을 본다
+                copy.transform.localScale = p.localScale;
+            }
+
+            // ── 셸 벽 콜라이더 (2026-09-10) ──────────────────────────
+            // 벤더 프리팹에는 콜라이더가 **하나도 없다** — 부스 벽을 그대로 통과했다(사용자 지적).
+            // 패널마다 상자 콜라이더를 붙인다. 천은 두께가 거의 0 이라 그대로 쓰면 빠른 이동에서 뚫리므로 최소 두께를 준다.
+            foreach (var t in shell.GetComponentsInChildren<Transform>(true))
+            {
+                if (!t.name.StartsWith("Panel02bCloth")) continue;
+                if (t.GetComponent<Collider>() != null) continue;
+                var mf = t.GetComponent<MeshFilter>();
+                if (mf == null || mf.sharedMesh == null) continue;
+                var mb = mf.sharedMesh.bounds;
+                var size = mb.size;
+                size.x = Mathf.Max(size.x, 0.08f); size.y = Mathf.Max(size.y, 0.08f); size.z = Mathf.Max(size.z, 0.08f);
+                var bc = t.gameObject.AddComponent<BoxCollider>();
+                bc.center = mb.center;
+                bc.size = size;
+            }
+
             // 셸 카펫(Floor01)은 벤더 기본이 짙은 남색이라 방문객 시점 휘도가 0.2 대로 떨어진다(실측 2026-09-06).
             // 인스턴스 재질만 밝은 회청색 카펫으로 바꾼다 — 벤더 프리팹은 그대로.
             var carpet = Mat("InteriorBoothCarpet", new Color(0.52f, 0.55f, 0.64f), 0.05f);
