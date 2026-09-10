@@ -198,6 +198,27 @@ namespace Festa.EditorTools
             sign.transform.localScale = Vector3.one * SignScale;
             foreach (var t in sign.GetComponentsInChildren<Transform>(true)) Loose(t.gameObject);
 
+            // **몸이 걸리는 콜라이더.** 프리팹에는 콜라이더가 없어 사람이 입간판을 그냥 뚫고 지나갔다
+            // (2026-09-11 지적). 렌더러 경계를 실측해 상자 하나로 감싼다 — A 자 두 판을 따로 감쌀 만큼
+            // 정밀할 필요가 없고, 플레이어 캡슐 반경이 4.8 이라 상자 하나가 오히려 덜 걸린다.
+            // 카드·글자 등 나머지 자식은 콜라이더를 지운 채 두어(Box/Slab) 걸리는 것은 이 상자 하나다.
+            {
+                var bounds = new Bounds();
+                bool any = false;
+                foreach (var r in sign.GetComponentsInChildren<Renderer>(true))
+                {
+                    if (!any) { bounds = r.bounds; any = true; }
+                    else bounds.Encapsulate(r.bounds);
+                }
+                if (any)
+                {
+                    var box = go.AddComponent<BoxCollider>();
+                    box.center = go.transform.InverseTransformPoint(bounds.center);
+                    box.size = bounds.size;   // 루트 스케일이 1 이라 월드 크기가 곧 로컬 크기다
+                }
+                else Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 입간판 렌더러가 없어 콜라이더를 못 만들었다.");
+            }
+
             // 판 두 장의 위치·크기를 **실측해서** 글자를 얹는다 — 프리팹이 바뀌어도 따라간다.
             var front = FindPanel(sign.transform, "Front");
             var back = FindPanel(sign.transform, "Back");
