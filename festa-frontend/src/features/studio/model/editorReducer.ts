@@ -27,6 +27,9 @@ export type EditorAction =
   | { type: 'MOVE_OBJECT'; objectId: string; x: number; z: number }
   | { type: 'ROTATE_OBJECT'; objectId: string; rotationY: number }
   | { type: 'REMOVE_OBJECT'; objectId: string }
+  // 배치 전체 교체 — 템플릿 적용과 전체 초기화가 함께 쓴다. ADD_OBJECT 를 반복하면 기존 배치
+  // 위에 쌓이므로(감사 항목 4) 템플릿은 "덮어쓰기"라는 뜻을 액션 하나로 표현한다.
+  | { type: 'REPLACE_OBJECTS'; objects: LayoutObject[] }
   | { type: 'SELECT_OBJECT'; objectId: string | null }
   | { type: 'LINK_CONTENT'; objectId: string; configId: number | undefined }
   | { type: 'SET_ASSET_CODE'; objectId: string; assetCode: string | undefined }
@@ -113,6 +116,17 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         ...state,
         objects: state.objects.filter((o) => o.objectId !== action.objectId),
         selectedObjectId: state.selectedObjectId === action.objectId ? null : state.selectedObjectId,
+        dirty: true,
+        saveStatus: 'dirty',
+      };
+
+    case 'REPLACE_OBJECTS':
+      return {
+        ...state,
+        objects: action.objects,
+        // 교체하면 이전 선택은 더 이상 존재하지 않는다. 새 배치가 비어 있지 않으면 첫 오브젝트를
+        // 잡아 Inspector 가 빈 채로 남지 않게 한다 — 초기화(빈 배열)면 선택도 없다.
+        selectedObjectId: action.objects[0]?.objectId ?? null,
         dirty: true,
         saveStatus: 'dirty',
       };
