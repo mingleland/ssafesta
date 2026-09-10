@@ -74,9 +74,9 @@
 
 **Independent Test**: canary secret을 사용한 성공·실패 batch의 console, archive, manifest, workspace scan 결과가 모두 원문 미검출이다.
 
-- [ ] T023 [P] [US4] `infra/tests/security/test-secret-leak.sh`에 GitLab MR job log, dev batch state, Jenkins stage summary의 canary 누출 fixture를 추가한다
-- [ ] T024 [US4] `.gitlab-ci.yml`, `Jenkinsfile`, `infra/jenkins/pipelines/develop.groovy`의 새 경로를 각 CI secret masking·`infra/jenkins/scripts/with-credentials.sh`·`infra/jenkins/scripts/secret-scan.sh` 경계로 감싼다
-- [ ] T025 [US4] `infra/tests/acceptance/us4-secret-safety.sh`에 GitLab MR gate와 Jenkins develop batch의 성공·실패 증거 검증을 추가한다
+- [X] T023 [P] [US4] `infra/tests/security/test-secret-leak.sh`에 GitLab MR job log, dev batch state, Jenkins stage summary의 canary 누출 fixture를 추가한다
+- [X] T024 [US4] `.gitlab-ci.yml`, `Jenkinsfile`, `infra/jenkins/pipelines/develop.groovy`의 새 경로를 각 CI secret masking·`infra/jenkins/scripts/with-credentials.sh`·`infra/jenkins/scripts/secret-scan.sh` 경계로 감싼다
+- [X] T025 [US4] `infra/tests/acceptance/us4-secret-safety.sh`에 GitLab MR gate와 Jenkins develop batch의 성공·실패 증거 검증을 추가한다
 
 **Checkpoint**: 새 자동 경로가 credential ID만 기록하고 값은 어떤 보존물에도 남기지 않는다.
 
