@@ -26,6 +26,7 @@ IMAGE_REF=back:0123456789abcdef0123456789abcdef01234567 \
 CONTENT_ID=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
 COMPONENT_ENV_FILE="${tmp}/component.env" INTERNAL_SPRING_TO_AI_TOKENS=spring-to-ai-test-only \
 INTERNAL_AI_TO_SPRING_TOKENS=ai-to-spring-test-only \
+INTERNAL_INFRA_TO_SPRING_TOKENS=infra-to-spring-test-only \
 bash "${repo_root}/infra/deploy/scripts/deploy-component.sh"
 cp "${FAKE_DOCKER_LOG}" "${tmp}/deploy-calls.log"
 for component in ai back front game; do after[${component}]="$(${DOCKER_BIN} compose --project-name "festa-dev-${component}" ps -q "${component}")"; done

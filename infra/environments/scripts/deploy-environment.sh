@@ -62,10 +62,18 @@ actual_content_id="$(${docker_bin} image inspect --format '{{.Id}}' "${image_ref
 [[ "${actual_content_id}" == "${content_id}" ]] || fail "image content ID mismatch: expected=${content_id} actual=${actual_content_id}"
 
 case "${component}" in
-  ai|back)
+  ai)
     : "${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}"
     : "${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}"
     : "${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}"
+    assert_file "${COMPONENT_ENV_FILE}"
+    "${docker_bin}" network inspect festa-data-private >/dev/null
+    ;;
+  back)
+    : "${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}"
+    : "${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}"
+    : "${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}"
+    : "${INTERNAL_INFRA_TO_SPRING_TOKENS:?INTERNAL_INFRA_TO_SPRING_TOKENS is required}"
     assert_file "${COMPONENT_ENV_FILE}"
     "${docker_bin}" network inspect festa-data-private >/dev/null
     ;;

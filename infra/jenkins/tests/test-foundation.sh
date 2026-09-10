@@ -100,7 +100,7 @@ PY
 pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
 for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
-  DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
+  DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
   DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
   grep -q "^[[:space:]]*${name}:.*\${${name}" "${controller_compose}" || fail "controller does not receive ${name}"
@@ -149,6 +149,8 @@ grep -q "final List deployComponents = (selection.deployComponents as List).find
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
+grep -q "credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
+  || fail "dev backend does not bind the Infra-to-Spring token"
 grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pipeline}" \
   || fail "deploy freshness check does not bind the GitLab checkout credential"
 grep -q 'FRESHNESS_EXPECTED_SHA=' "${develop_pipeline}" \
@@ -234,6 +236,7 @@ export DEV_BACK_ENV_CREDENTIAL_ID="foundation-dev-back-env"
 export DEV_AI_ENV_CREDENTIAL_ID="foundation-dev-ai-env"
 export DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-dev-spring-to-ai"
 export DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-dev-ai-to-spring"
+export DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-dev-infra-to-spring"
 export DEMO_BACK_ENV_CREDENTIAL_ID="foundation-demo-back-env"
 export DEMO_AI_ENV_CREDENTIAL_ID="foundation-demo-ai-env"
 export DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-demo-spring-to-ai"
@@ -253,6 +256,7 @@ if command -v docker >/dev/null 2>&1; then
   printf '%s\n' 'Zm91bmRhdGlvbi1vbmx5LWNvbm5lY3Rpb24tdG9rZW4tc2VjcmV0' >"${CONNECTION_TOKEN_SECRET_FILE}"
   export INTERNAL_AI_TO_SPRING_TOKENS=foundation-ai-to-spring-token
   export INTERNAL_SPRING_TO_AI_TOKENS=foundation-spring-to-ai-token
+  export INTERNAL_INFRA_TO_SPRING_TOKENS=foundation-infra-to-spring-token
   for component in ai back front game; do
     docker compose -f "${repo_root}/infra/deploy/compose/dev/${component}.compose.yaml" config --quiet
   done

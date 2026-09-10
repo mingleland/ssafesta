@@ -58,5 +58,6 @@ assert_contains "${ai_compose}" 'name:[[:space:]]+festa-dev-ai-back-private' 'AI
 assert_contains "${back_compose}" 'AI_INTERNAL_BASE_URL:[[:space:]]+http://ai:8000' 'backend must call AI by service DNS'
 assert_contains "${ai_compose}" 'SPRING_INTERNAL_BASE_URL:[[:space:]]+http://back:8080' 'AI must call backend by service DNS'
 assert_contains "${back_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'backend must receive outbound Spring-to-AI token'
+assert_contains "${back_compose}" 'INTERNAL_INFRA_TO_SPRING_TOKENS:' 'backend must receive its Infra-to-Spring token'
 assert_contains "${ai_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'AI must receive inbound Spring-to-AI token'
 pass 'dev runtime keeps component inputs private and IP-gated ingress loopback-only'

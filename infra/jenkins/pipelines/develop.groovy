@@ -109,7 +109,9 @@ def call() {
                 }
                 if (deployComponents.contains('back')) {
                     credentialBindings << file(credentialsId: env.DEV_BACK_ENV_CREDENTIAL_ID, variable: 'DEV_BACK_ENV_FILE')
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
                     credentialNames << 'DEV_BACK_ENV_FILE'
+                    credentialNames << 'INTERNAL_INFRA_TO_SPRING_TOKENS'
                 }
                 if (deployComponents.any { it in ['ai', 'back'] }) {
                     credentialBindings << string(credentialsId: env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
