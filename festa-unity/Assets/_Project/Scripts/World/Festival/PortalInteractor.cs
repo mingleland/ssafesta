@@ -43,10 +43,12 @@ namespace Festa.World
             if (!IsOwner) return;
             _movement = GetComponent<PlayerMovement>();
             _camera = GetComponent<PlayerCameraFollow>();
+            Local = this;
         }
 
         public override void OnNetworkDespawn()
         {
+            if (Local == this) Local = null;
             _ring.Dispose();
             _outline.Dispose();
         }
@@ -105,6 +107,17 @@ namespace Festa.World
                 return;
             }
 
+            TeleportThrough(dest, _nearest);
+        }
+
+        /// <summary>
+        /// 포털을 통과한다 — F 와 호스트의 "나가기" 요청(#174, <see cref="BoothContextPresenter.TryExitCurrentBooth"/>)이
+        /// <b>같은 함수</b>를 탄다. 경로가 둘이면 한쪽만 고치는 날 카메라 방향·게시본 재조회가 갈린다.
+        /// </summary>
+        /// <param name="dest">도착점. <c>Interior_NN/SpawnPoint</c> 또는 <c>ReturnPoint_NN</c>.</param>
+        /// <param name="portal">밟은 포털. 호스트 요청처럼 포털 없이 나갈 때는 null.</param>
+        public void TeleportThrough(Transform dest, BoothPortal portal)
+        {
             _movement.TeleportTo(dest.position);
             // 목적지가 바라보는 방향으로 몸을 돌린다 — 부스 안 SpawnPoint 는 부스를(-z), ReturnPoint 는 축제를 향한다.
             // 전에는 들어오기 전 방향 그대로라 문 안에서 벽을 보고 서는 일이 있었다 (2026-09-06 v3 실측).
@@ -112,11 +125,17 @@ namespace Festa.World
             if (_camera != null) _camera.SnapBehind(dest.eulerAngles.y);   // 카메라도 같은 방향 — 맵을 가로질러 날아오지 않게
             _lastTeleportTime = Time.time;
 
+            // 부스 안/밖이 바뀌었으니 호스트에 바로 알린다 — 주기 스윕을 기다리면 버튼이 한 박자 늦게 꺼진다.
+            BoothContextPresenter.Refresh();
+
             // 방에 들어갈 때 그 슬롯만 다시 조회한다 — 게시본이 바뀌었으면 새로고침 없이 반영된다(QA #11).
             // 서명이 같으면 다시 짓지 않으므로 들어갈 때마다 깜빡이지 않는다. 출구 포털(Portal_Int_NN)은 대상이 아니다.
-            if (_nearest.name.StartsWith("Portal_Ext"))
-                Festa.Booth.WorldBoothPublishedBootstrap.RequestReload(_nearest.boothId);
+            if (portal != null && portal.name.StartsWith("Portal_Ext"))
+                Festa.Booth.WorldBoothPublishedBootstrap.RequestReload(portal.boothId);
         }
+
+        /// <summary>로컬 플레이어의 인터랙터. 호스트 요청(#174)이 텔레포트를 태울 때 쓴다. 스폰 전·접속 끊김이면 null.</summary>
+        public static PortalInteractor Local { get; private set; }
 
         string _toast;
         float _toastUntil;
