@@ -44,6 +44,29 @@ namespace Festa.World
         readonly Dictionary<int, BoothSign> _signs = new();
         bool _started;
 
+        /// <summary>
+        /// 부스 한 칸에 대해 <b>바깥에서 보이는 것 전부</b>. 표지판과 축제장 지도가 같은 값을 쓴다.
+        /// </summary>
+        public readonly struct BoothInfo
+        {
+            public readonly string Name;
+            public readonly Texture Thumbnail;   // null 가능 — 없거나 CORS 로 막혔거나
+            public readonly bool HasProject;
+
+            public BoothInfo(string name, Texture thumbnail, bool hasProject)
+            {
+                Name = name; Thumbnail = thumbnail; HasProject = hasProject;
+            }
+        }
+
+        // 조회 결과를 여기 남긴다. **지도가 따로 부르지 않게** 하려는 것이다 —
+        // 일괄 조회 endpoint 가 없어서 12칸 × 2요청이 이미 부담인데(#171 ④), 지도가 같은 것을
+        // 다시 물으면 그대로 두 배가 된다.
+        static readonly Dictionary<int, BoothInfo> Cache = new();
+
+        /// <summary>그 부스에 대해 조회가 끝났으면 true. 아직 안 왔으면 false.</summary>
+        public static bool TryGetInfo(int boothId, out BoothInfo info) => Cache.TryGetValue(boothId, out info);
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
         {
@@ -121,6 +144,9 @@ namespace Festa.World
 
             sign.SetLabel(name);
             // 카드는 여기서 켜지 않는다 — 썸네일이 **실제로 로드됐을 때만** BoothSign.ShowThumbnail 이 켠다.
+
+            // 지도가 읽어 갈 수 있게 남긴다. 썸네일은 나중에 오므로 이 시점에는 아직 null 이다.
+            Cache[sign.boothId] = new BoothInfo(name, null, project != null);
         }
 
         static async Task LoadThumbnailAsync(BoothSign sign, int boothId, string url)
@@ -148,6 +174,9 @@ namespace Festa.World
             var tex = DownloadHandlerTexture.GetContent(req);
             if (tex == null || sign == null) return;
             sign.ShowThumbnail(tex);
+
+            if (Cache.TryGetValue(boothId, out var prev))
+                Cache[boothId] = new BoothInfo(prev.Name, tex, prev.HasProject);
         }
 
         static string FirstNonBlank(params string[] values)

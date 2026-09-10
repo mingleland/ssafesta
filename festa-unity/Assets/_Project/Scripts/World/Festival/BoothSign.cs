@@ -26,6 +26,15 @@ namespace Festa.World
         [Tooltip("입간판 뒷면 글자. A 자 입간판은 양면이라 한쪽만 적으면 뒤에서 빈 판이 보인다.")]
         public TMP_Text labelBack;
 
+        [Tooltip("이름이 들어갈 자리의 가로:세로 비. 몇 줄로 접을지 고를 때 쓴다 — 빌더가 실측해 넣는다.")]
+        public float labelBoxAspect = 1.6f;
+
+        [Tooltip("입간판 판 위의 전시 이미지 면 (앞·뒤). 썸네일이 오면 켜진다.")]
+        public Renderer[] photoFaces;
+
+        [Tooltip("이미지가 없을 때 그 자리에 분필로 쓴 듯 남는 번호 (앞·뒤)")]
+        public TMP_Text[] photoPlaceholders;
+
         [Tooltip("떠 있는 전시 카드의 회전축. 이 트랜스폼을 돌린다.")]
         public Transform cardPivot;
 
@@ -47,13 +56,42 @@ namespace Festa.World
         /// <summary>표지판 양면에 이름을 적는다. 줄바꿈은 <see cref="WrapByWord"/> 가 어절 단위로 미리 넣는다.</summary>
         public void SetLabel(string text)
         {
-            var wrapped = WrapByWord(text, MaxLines);
+            var wrapped = WrapByWord(text, MaxLines, labelBoxAspect);
             if (label != null) label.text = wrapped;
             if (labelBack != null) labelBack.text = wrapped;
         }
 
         /// <summary>표지판 한 판에 허용하는 최대 줄 수. 넘치면 글자가 작아진다(자동 축소).</summary>
-        public const int MaxLines = 3;
+        public const int MaxLines = 4;
+
+        /// <summary>
+        /// 한 줄에 담는 글자 수의 기준. <b>판이 가로보다 세로로 길다</b>(실측 7.7 × 9.7)라
+        /// 줄을 짧게 끊고 여러 줄로 쌓는 편이 글자를 크게 유지한다.
+        ///
+        /// <para>지금은 <b>띄어쓰기 없는 한 덩어리를 쪼갤 때만</b> 쓴다 — 어절이 있는 이름의 줄 수는
+        /// 판 비율을 보고 <see cref="WrapByWord"/> 가 재서 고른다.</para>
+        /// </summary>
+        const int CharsPerLine = 4;
+
+        /// <summary>
+        /// 공백이 없는 한 덩어리를 줄 수에 맞춰 <b>고르게</b> 쪼갠다.
+        /// 앞줄만 채우고 마지막 줄에 한 글자를 남기지 않도록 줄당 글자 수를 먼저 계산한다.
+        /// </summary>
+        static string ChunkByChar(string word, int maxLines)
+        {
+            if (word.Length <= CharsPerLine) return word;
+
+            int lines = Mathf.Clamp(Mathf.CeilToInt(word.Length / (float)CharsPerLine), 1, Mathf.Max(1, maxLines));
+            int per = Mathf.CeilToInt(word.Length / (float)lines);
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < word.Length; i += per)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(word, i, Mathf.Min(per, word.Length - i));
+            }
+            return sb.ToString();
+        }
 
         /// <summary>
         /// 어절 단위로 줄을 나눈다. <b>TMP 에 맡기면 한글이 글자 단위로 끊긴다</b> — CJK 는
@@ -61,23 +99,69 @@ namespace Festa.World
         /// <c>7조 · 스 / 마트팜 / 모니터링</c> 으로 나왔다(2026-09-10 지적). 여기서 미리 <c>\n</c> 을
         /// 넣고 TMP 는 <c>NoWrap</c> 으로 두면 그 함정을 통째로 피한다.
         ///
-        /// <para>줄 수는 길이에서 정하고, 각 줄의 길이가 <b>고르게</b> 되도록 채운다 — 첫 줄만 꽉 차고
-        /// 마지막 줄에 한 글자만 남는 모양이 제일 못생겼다. 한 어절이 통째로 길면(공백 없는 긴 이름)
-        /// 자르지 않고 그대로 둔다 — 자동 축소가 글자 크기를 줄여 맞춘다.</para>
+        /// <para><paramref name="boxAspect"/> 는 글자가 들어갈 자리의 가로:세로 비다. 줄 수를
+        /// 이 비율에 맞춰 <b>재 보고 고른다</b> — 못 박아 두면 판 폭을 절반밖에 못 쓰는 경우가 생긴다.</para>
         /// </summary>
-        public static string WrapByWord(string text, int maxLines)
+        public static string WrapByWord(string text, int maxLines, float boxAspect = 1.6f)
         {
             if (string.IsNullOrWhiteSpace(text)) return string.Empty;
             var words = text.Trim().Split(new[] { ' ', '\t', '\n' }, System.StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length <= 1) return text.Trim();
+
+            // 띄어쓰기가 없는 긴 이름("우리팀의아주긴프로젝트이름" 같은 것)은 어절이 하나라
+            // 나눌 자리가 없다. 그대로 두면 한 줄에 다 넣느라 글자가 5 pt 까지 쪼그라든다 —
+            // 여기서만 글자 단위로 쪼갠다. 지킬 어절 경계가 애초에 없으니 잃는 것이 없다.
+            if (words.Length == 1) return ChunkByChar(words[0], maxLines);
+
+            // 줄 수를 **재 본 뒤에 고른다.** 예전에는 "총 글자 / 4" 로 못 박았는데, 그러면
+            // "AI 프로젝트 전시관" 이 세 줄로 갈려 판 폭의 절반밖에 못 썼다(3.4 / 6.6).
+            // 1~maxLines 를 다 접어 보고 **글자가 가장 커지는 쪽**을 쓴다.
+            //
+            // 글자 크기는 줄 높이(판높이/줄수)와 글자 폭(판폭/가장 긴 줄) 중 작은 쪽에 묶인다.
+            // 한글은 대체로 정사각이라 폭 = 높이로 놓고 비교하면 충분하다.
+            int limit = Mathf.Max(1, maxLines);
+            var packed = new string[limit + 1];
+            var scores = new float[limit + 1];
+            float bestScore = -1f;
+
+            for (int lines = 1; lines <= limit; lines++)
+            {
+                packed[lines] = Pack(words, lines, out int longest);
+                if (packed[lines] == null) continue;   // 그 줄 수로는 안 나뉜다
+
+                float byHeight = 1f / lines;
+                float byWidth = boxAspect / Mathf.Max(1, longest);
+                scores[lines] = Mathf.Min(byHeight, byWidth);
+                bestScore = Mathf.Max(bestScore, scores[lines]);
+            }
+            if (bestScore <= 0f) return string.Join(" ", words);
+
+            // **가장 큰 글자가 곧 가장 예쁜 것은 아니다.** 순수하게 크기만 보면 "운동 자세 교정" 이
+            // <c>운동 / 자세 / 교정</c> 으로 갈린다 — 세 줄로 쌓으면 글자가 1.53, 두 줄이면 1.31 이라
+            // 계산상으로는 세 줄이 이긴다. 그런데 한 줄에 두 글자는 읽기 나쁘다는 지적을 받았다
+            // (2026-09-10 — "한줄에 두글자밖에 안들어가네? 네글자까지는 되겠는데").
+            //
+            // 그래서 **최고치의 85% 안에 드는 것 중 줄 수가 가장 적은 것**을 고른다. 크기를 조금
+            // 내주고 줄을 길게 가져간다 — 위 예는 두 줄(1.31 = 최고의 86%)이 되고,
+            // "AI 프로젝트 전시관" 은 두 줄로 가면 54% 로 뚝 떨어지므로 세 줄이 그대로 남는다.
+            const float Tolerance = 0.85f;
+            for (int lines = 1; lines <= limit; lines++)
+                if (packed[lines] != null && scores[lines] >= bestScore * Tolerance)
+                    return packed[lines];
+
+            return string.Join(" ", words);
+        }
+
+        /// <summary>
+        /// 어절들을 정확히 <paramref name="lines"/> 줄로 고르게 나눈다. 나눌 수 없으면 null.
+        /// <paramref name="longest"/> 는 가장 긴 줄의 글자 수 — 글자 크기를 가늠하는 데 쓴다.
+        /// </summary>
+        static string Pack(string[] words, int lines, out int longest)
+        {
+            longest = 0;
+            if (lines > words.Length) return null;   // 어절보다 줄이 많을 수는 없다
 
             int total = 0;
             foreach (var w in words) total += w.Length;
-
-            // 한 줄에 8글자쯤이 판 비율에 맞는다(실측). 그보다 길면 줄을 늘린다.
-            int lines = Mathf.Clamp(Mathf.CeilToInt(total / 8f), 1, Mathf.Max(1, maxLines));
-            if (lines == 1) return string.Join(" ", words);
-
             int budget = Mathf.CeilToInt((float)(total + words.Length - 1) / lines);
 
             var sb = new System.Text.StringBuilder();
@@ -89,6 +173,7 @@ namespace Festa.World
                 // 마지막 줄에는 남은 것을 전부 밀어 넣는다 — 줄 수를 넘기지 않기 위해서다.
                 if (!first && lineLen + add > budget && used < lines)
                 {
+                    longest = Mathf.Max(longest, lineLen);
                     sb.Append('\n');
                     lineLen = 0;
                     used++;
@@ -101,7 +186,8 @@ namespace Festa.World
                 sb.Append(w);
                 lineLen += add;
             }
-            return sb.ToString();
+            longest = Mathf.Max(longest, lineLen);
+            return used == lines ? sb.ToString() : null;   // 요청한 줄 수를 다 못 채우면 버린다
         }
 
         /// <summary>
@@ -111,14 +197,38 @@ namespace Festa.World
         /// </summary>
         public void ShowThumbnail(Texture texture)
         {
-            if (cardRenderer == null || texture == null || cardPivot == null) return;
+            if (texture == null) return;
 
-            var mat = cardRenderer.material;   // 인스턴스 — sharedMaterial 을 건드리면 12칸이 같은 그림이 된다
-            mat.SetColor("_BaseColor", Color.white);
-            mat.SetTexture("_BaseMap", texture);
-            mat.mainTexture = texture;
+            // ① 떠 있는 카드
+            if (cardRenderer != null && cardPivot != null)
+            {
+                var mat = cardRenderer.material;   // 인스턴스 — sharedMaterial 을 건드리면 12칸이 같은 그림이 된다
+                mat.SetColor("_BaseColor", Color.white);
+                mat.SetTexture("_BaseMap", texture);
+                mat.mainTexture = texture;
+                cardPivot.gameObject.SetActive(true);
+            }
 
-            cardPivot.gameObject.SetActive(true);
+            // ② 입간판 판 위 (사용자가 올린 레퍼런스처럼 이미지 위 · 이름 아래)
+            if (photoFaces != null)
+            {
+                foreach (var r in photoFaces)
+                {
+                    if (r == null) continue;
+                    var m = r.material;   // 면마다 인스턴스가 필요하다 — 앞뒤가 같은 머티리얼을 공유하면 안 된다
+                    m.SetTexture("_BaseMap", texture);
+                    m.mainTexture = texture;
+                    // 밤에도 그림이 보이게 살짝 자체 발광시킨다. 발광 맵을 같이 물려야 면 전체가
+                    // 균일하게 뜨지 않고 그림 모양대로 밝아진다.
+                    m.EnableKeyword("_EMISSION");
+                    m.SetTexture("_EmissionMap", texture);
+                    m.SetColor("_EmissionColor", Color.white * 0.35f);
+                    r.gameObject.SetActive(true);
+                }
+            }
+            if (photoPlaceholders != null)
+                foreach (var t in photoPlaceholders)
+                    if (t != null) t.gameObject.SetActive(false);
         }
 
         void Awake()

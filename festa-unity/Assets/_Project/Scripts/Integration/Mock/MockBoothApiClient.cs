@@ -87,11 +87,26 @@ namespace Festa.Integration
             return layout;
         }
 
+        /// <summary>부스마다 다른 이름을 붙일 때 쓰는 예시 목록. 축제장 지도·표지판 회귀용이다.</summary>
+        static readonly string[] SampleNames =
+        {
+            "AI 프로젝트 전시관", "스마트팜 모니터링", "실시간 수어 통역", "코드리뷰 어시스턴트",
+            "여행 경로 추천", "반려동물 건강 기록", "회의록 자동 요약", "실내 길찾기",
+            "중고 거래 사기 탐지", "운동 자세 교정", "재활용 분류 카메라", "학습 습관 트래커",
+        };
+
         public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
         {
             await Awaitable.WaitForSecondsAsync(0.05f);
             var detail = BoothFacadeParser.Parse(MockDetailJson);
-            if (detail != null) detail.boothId = boothId;
+            if (detail == null) return null;
+
+            detail.boothId = boothId;
+            // **부스마다 이름을 다르게 준다.** 전에는 12칸이 전부 같은 이름이라 지도가 고장 난 것처럼
+            // 보였다 (2026-09-10). Mock 이 현실을 흉내 내지 못하면 화면 검증이 의미가 없다.
+            var name = SampleNames[Mathf.Abs(boothId - 1) % SampleNames.Length];
+            detail.name = name;
+            if (detail.facade != null) detail.facade.signText = name;
             return detail;
         }
 

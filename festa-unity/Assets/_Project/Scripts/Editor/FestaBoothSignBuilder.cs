@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using Festa.World;
 using TMPro;
@@ -18,7 +19,12 @@ namespace Festa.EditorTools
     /// 판이 이미 글씨 쓰라고 비어 있다.</para>
     ///
     /// <para><b>왼쪽 앞.</b> 통로에서 부스를 바라보는 사람 기준의 왼쪽이다 — 북쪽 줄은 −x,
-    /// 남쪽 줄은 +x 로 갈린다(두 줄이 서로 마주 본다). 입구를 막지 않게 부스 폭의 62% 지점에 둔다.</para>
+    /// 남쪽 줄은 +x 로 갈린다(두 줄이 서로 마주 본다). 부스 정면을 가리지 않게 <b>폭 바깥</b>에 둔다.</para>
+    ///
+    /// <para><b>손으로 옮긴 자리를 이긴다.</b> 위 계산은 <b>처음 세울 때만</b> 쓰고, 이미 표지판이
+    /// 있으면 그 자리를 그대로 물려받는다. 이 빌더는 루트를 통째로 지우고 다시 짓기 때문에
+    /// 그러지 않으면 씬에서 맞춰 둔 자리가 매번 날아간다 (2026-09-10 — 12칸을 전부 옮겨 둔 것을
+    /// 날릴 뻔했다). 계산값으로 되돌리려면 "부스 표지판 위치 초기화" 메뉴를 쓴다.</para>
     ///
     /// <para><b>병합 대상이 아니다.</b> 루트 <c>@Festival/Festival_ProjectSigns</c> 는
     /// <c>FestivalStaticCombiner.Groups</c> 에 없다 — 들어가면 런타임에 글자를 못 바꾸고 유령이 남는다(T-254).
@@ -61,8 +67,12 @@ namespace Festa.EditorTools
             var festival = GameObject.Find("@Festival");
             if (festival == null) { Debug.LogError("[BoothSign] @Festival 이 없다."); return; }
 
-            var font = Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
-            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts/NotoSansKRBold_SDF 없음"); return; }
+            // **학교안심 칠판지우개**를 쓴다 (사용자 지정 2026-09-10). 분필로 쓴 글씨체라
+            // 칠판 입간판과 결이 맞는다. 없으면 주아 → NotoSansKR Bold 순으로 물러난다.
+            var font = Resources.Load<TMP_FontAsset>("Fonts/ChalkboardKR_SDF")
+                    ?? Resources.Load<TMP_FontAsset>("Fonts/Jua_SDF")
+                    ?? Resources.Load<TMP_FontAsset>("Fonts/NotoSansKRBold_SDF");
+            if (font == null) { Debug.LogError("[BoothSign] Resources/Fonts 에 쓸 글꼴이 없다"); return; }
 
             var signPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SignPrefab);
             if (signPrefab == null) { Debug.LogError($"[BoothSign] {SignPrefab} 없음"); return; }
@@ -70,30 +80,79 @@ namespace Festa.EditorTools
             // 카드 바탕은 어둡게 둔다 — 썸네일이 붙으면 BoothSign.ShowThumbnail 이 흰색으로 올린다.
             var cardMat = Material("M_BoothSign_Card", new Color(0.07f, 0.09f, 0.16f), new Color(0.10f, 0.13f, 0.22f), 1f, 0.5f);
             var cardRimMat = Material("M_BoothSign_CardRim", new Color(0.36f, 0.78f, 0.98f), new Color(0.45f, 0.95f, 1.3f), 1f, 0.4f);
-            // 표지판 판때기. 은은하게만 발광시킨다 — 세게 주면 12개가 밤하늘의 등불이 된다(지붕 마퀴에서 겪은 문제).
-            var plateMat = Material("M_BoothSign_Plate", new Color(0.94f, 0.90f, 0.79f), new Color(0.94f, 0.88f, 0.72f), 0.35f, 0.15f);
+            // **칠판**이다. 처음엔 밝은 종이판이었는데 "흰 배경에 딱딱한 폰트라 별로" 라는 지적을
+            // 받고 짙은 슬레이트로 바꿨다 (2026-09-10, 사용자가 올린 카페 입간판 사진 기준).
+            // 발광은 아주 약하게만 — 밤에 글자가 읽히는 정도면 되고, 세게 주면 12개가 등불이 된다.
+            var plateMat = Material("M_BoothSign_Plate", new Color(0.105f, 0.125f, 0.118f), new Color(0.10f, 0.13f, 0.12f), 0.30f, 0.22f);
+            // 판 안쪽에 도는 얇은 흰 테두리 — 레퍼런스 사진의 그 선이다.
+            var chalkMat = Material("M_BoothSign_Chalk", new Color(0.88f, 0.89f, 0.84f), new Color(0.55f, 0.57f, 0.53f), 0.5f, 0.1f);
+            // 전시 이미지가 붙는 면. 런타임에 BoothSign.ShowThumbnail 이 면마다 인스턴스를 떠서 텍스처를 넣는다.
+            var photoMat = Material("M_BoothSign_Photo", Color.white, Color.black, 0f, 0.05f);
 
             var old = festival.transform.Find(RootName);
-            if (old != null) Object.DestroyImmediate(old.gameObject);   // 두 번 돌려도 같은 결과
+
+            // **손으로 옮긴 자리를 기억한다.** 이 빌더는 루트를 통째로 지우고 다시 짓기 때문에,
+            // 씬에서 표지판을 옮겨 두면 다음에 돌릴 때 계산값으로 되돌아간다 — 실제로 12칸을
+            // 전부 옮겨 놓은 것을 날릴 뻔했다 (2026-09-10). 사람이 정한 자리가 계산값보다 낫다.
+            // 처음부터 다시 잡고 싶으면 아래 "위치 초기화" 메뉴를 쓴다.
+            var kept = new Dictionary<int, (Vector3 pos, Quaternion rot)>();
+            if (old != null)
+            {
+                foreach (Transform child in old)
+                    if (TryParseSlot(child.name, out int n))
+                        kept[n] = (child.position, child.rotation);
+                Object.DestroyImmediate(old.gameObject);
+            }
 
             var root = new GameObject(RootName);
             root.transform.SetParent(festival.transform, false);
 
-            int built = 0, missing = 0;
+            int built = 0, missing = 0, restored = 0;
             for (int slot = 1; slot <= BoothSignPresenter.SlotCount; slot++)
             {
                 var body = FindSlotBody(festival.transform, slot);
                 if (body == null) { missing++; Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 실물을 못 찾았다 — 건너뛴다."); continue; }
 
-                BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat);
+                var sign = BuildOne(root.transform, slot, body.bounds, font, signPrefab, cardMat, cardRimMat, plateMat, chalkMat, photoMat);
                 built++;
+
+                if (kept.TryGetValue(slot, out var place))
+                {
+                    sign.transform.SetPositionAndRotation(place.pos, place.rot);
+                    restored++;
+                }
             }
 
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             EditorSceneManager.SaveOpenScenes();
             Debug.Log($"[BoothSign] 표지판 {built}칸 생성" + (missing > 0 ? $" (실물 미확인 {missing}칸)" : "") +
+                      (restored > 0 ? $" · 기존 자리 {restored}칸 유지" : "") +
                       $" — 루트 @Festival/{RootName}. 값은 런타임에 BoothSignPresenter 가 채운다.");
         }
+
+        /// <summary>
+        /// 손으로 옮긴 자리를 버리고 <b>계산값으로 되돌린다.</b> 부스를 옮겼거나 배치를 처음부터
+        /// 다시 잡을 때만 쓴다 — 평소 빌드는 기존 자리를 유지한다.
+        /// </summary>
+        [MenuItem("Festa/World/부스 표지판 위치 초기화 (손으로 옮긴 자리 버림)")]
+        public static void ResetPlacement()
+        {
+            if (EditorApplication.isPlaying) { Debug.LogError("[BoothSign] 플레이 모드에서는 돌리지 않는다."); return; }
+
+            var festival = GameObject.Find("@Festival");
+            var old = festival != null ? festival.transform.Find(RootName) : null;
+            if (old == null) { Debug.LogWarning("[BoothSign] 표지판이 없다 — 생성 메뉴를 먼저 돌려라."); return; }
+
+            if (!EditorUtility.DisplayDialog("부스 표지판 위치 초기화",
+                    "씬에서 손으로 옮긴 표지판 자리를 버리고 계산값으로 되돌립니다. 되돌릴 수 없습니다.",
+                    "초기화", "취소")) return;
+
+            Object.DestroyImmediate(old.gameObject);
+            Build();   // 기억할 것이 없으니 계산값으로 새로 선다
+        }
+
+        static bool TryParseSlot(string objectName, out int slot)
+            => int.TryParse(objectName.Replace("BoothSign_", string.Empty), out slot);
 
         /// <summary>
         /// 그 슬롯의 실물 렌더러. 병합본(<c>FestivalSlot_NN_Combined</c>)이 있으면 그것이 정답이다 —
@@ -116,8 +175,8 @@ namespace Festa.EditorTools
             return null;
         }
 
-        static void BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
-                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat)
+        static GameObject BuildOne(Transform parent, int slot, Bounds b, TMP_FontAsset font,
+                             GameObject signPrefab, Material cardMat, Material cardRimMat, Material plateMat, Material chalkMat, Material photoMat)
         {
             bool northRow = b.center.z > AisleZ;
 
@@ -143,8 +202,10 @@ namespace Festa.EditorTools
             var front = FindPanel(sign.transform, "Front");
             var back = FindPanel(sign.transform, "Back");
 
-            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat);
-            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat);
+            var label = PanelText(go.transform, "Label", font, front, outward: true, slot, plateMat, chalkMat, photoMat,
+                                  out var photoFront, out var numFront, out float labelAspect);
+            var labelBack = PanelText(go.transform, "LabelBack", font, back, outward: false, slot, plateMat, chalkMat, photoMat,
+                                      out var photoBack, out var numBack, out _);
 
             // ── 떠 있는 전시 카드 ──────────────────────────────
             // **썸네일이 실제로 로드됐을 때만** 켜진다 (BoothSign.ShowThumbnail).
@@ -163,8 +224,13 @@ namespace Festa.EditorTools
             comp.boothId = slot;
             comp.label = label;
             comp.labelBack = labelBack;
+            comp.labelBoxAspect = labelAspect;
+            comp.photoFaces = new[] { photoFront, photoBack };
+            comp.photoPlaceholders = new[] { numFront, numBack };
             comp.cardPivot = pivot.transform;
             comp.cardRenderer = card.GetComponent<Renderer>();
+
+            return go;
         }
 
         static Renderer FindPanel(Transform signRoot, string keyword)
@@ -182,8 +248,13 @@ namespace Festa.EditorTools
         /// Y 180° 를 한 번 더 준다(이게 없으면 거울 글씨가 된다 — 부스 내부 간판에서 이미 밟은 함정).</para>
         /// </summary>
         static TMP_Text PanelText(Transform parent, string name, TMP_FontAsset font, Renderer panel,
-                                  bool outward, int slot, Material plateMat)
+                                  bool outward, int slot, Material plateMat, Material chalkMat, Material photoMat,
+                                  out Renderer photoOut, out TMP_Text placeholderOut, out float boxAspectOut)
         {
+            photoOut = null;
+            placeholderOut = null;
+            boxAspectOut = 1.6f;
+
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             Loose(go);
@@ -191,8 +262,8 @@ namespace Festa.EditorTools
             var tmp = go.AddComponent<TextMeshPro>();
             tmp.font = font;
             tmp.text = $"{slot}번 부스";
-            // 밝은 판 위의 어두운 글자다 — 밤에 흰 글씨를 얹는 것보다 대비가 확실하다.
-            tmp.color = new Color(0.13f, 0.10f, 0.07f);
+            // 칠판 위의 분필 글씨. 순백은 인쇄물처럼 보여서 살짝 따뜻하게 흐린다.
+            tmp.color = new Color(0.92f, 0.93f, 0.88f);
             tmp.alignment = TextAlignmentOptions.Center;
             // **NoWrap 이 맞다.** 줄바꿈은 BoothSign.WrapByWord 가 어절 단위로 미리 넣는다 —
             // TMP 에 맡기면 한글을 글자 단위로 끊어 "스 / 마트팜" 같은 모양이 나온다.
@@ -216,33 +287,97 @@ namespace Festa.EditorTools
             var normal = new Vector3(0f, Mathf.Sin(lean * Mathf.Deg2Rad), dir * Mathf.Cos(lean * Mathf.Deg2Rad));
             var rot = outward ? Quaternion.Euler(lean, 180f, 0f) : Quaternion.Euler(lean, 0f, 0f);
 
-            float plateW = w * 0.84f;
-            float plateH = faceHeight * 0.66f;
+            float plateW = w * 0.88f;
+            float plateH = faceHeight * 0.70f;
             float lift = w * 0.05f;   // 판에서 띄우는 거리 — 배율과 함께 커져야 z-fighting 이 안 난다
 
-            // 나무판 위에 밝은 종이 한 장을 붙인 모양. 판이 어두운 나무라 글자만 얹으면
-            // 밤에 안 읽힌다 — "프로젝트명이 잘 보이게" 가 요구사항이다(2026-09-10).
-            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            plate.name = name + "Plate";
-            plate.transform.SetParent(parent, false);
-            plate.transform.localPosition = localCenter + normal * lift;
-            plate.transform.localRotation = rot;
-            plate.transform.localScale = new Vector3(plateW, plateH, lift * 0.5f);
-            Object.DestroyImmediate(plate.GetComponent<Collider>());
-            plate.GetComponent<Renderer>().sharedMaterial = plateMat;
-            Loose(plate);
+            // 나무판 위에 얹는 **칠판**. 세 겹이다 — 짙은 판, 그 위 흰 테두리, 다시 그 위 짙은 면.
+            // 가운데를 한 번 더 덮어야 흰 사각형이 **선**으로 남는다(솔리드 박스로 테두리를 만드는 방법).
+            // 레퍼런스 사진의 안쪽 흰 선이 이것이다.
+            Slab(parent, name + "Plate", localCenter + normal * lift, rot,
+                 new Vector3(plateW, plateH, lift * 0.5f), plateMat);
+            Slab(parent, name + "Rule", localCenter + normal * (lift * 1.25f), rot,
+                 new Vector3(plateW * 0.90f, plateH * 0.90f, lift * 0.3f), chalkMat);
+            Slab(parent, name + "RuleInner", localCenter + normal * (lift * 1.45f), rot,
+                 new Vector3(plateW * 0.90f - lift * 0.5f, plateH * 0.90f - lift * 0.5f, lift * 0.3f), plateMat);
 
-            go.transform.localPosition = localCenter + normal * (lift * 1.6f);
+            // 판 위쪽 = 전시 이미지, 아래쪽 = 이름 (사용자가 올린 카페 입간판 레퍼런스 배치).
+            // 위/아래는 판의 기울기를 따라가는 방향이라 rot 를 곱해서 얻는다.
+            var faceUp = rot * Vector3.up;
+            float photoH = plateH * 0.38f;
+            float photoW = plateW * 0.62f;
+            float photoY = plateH * 0.22f;
+
+            var photo = Slab(parent, name + "Photo", localCenter + normal * (lift * 1.7f) + faceUp * photoY, rot,
+                             new Vector3(photoW, photoH, lift * 0.25f), photoMat);
+            photo.SetActive(false);   // 썸네일이 실제로 오면 BoothSign.ShowThumbnail 이 켠다
+            photoOut = photo.GetComponent<Renderer>();
+
+            // 이미지가 없는 동안 그 자리에 분필로 쓴 듯 번호를 남긴다 — 위쪽을 비워 두면
+            // 아래 이름만 덩그러니 남아 판이 반쪽으로 보인다.
+            placeholderOut = ChalkLabel(parent, name + "Num", font, $"{slot:00}",
+                                        localCenter + normal * (lift * 1.8f) + faceUp * photoY, rot,
+                                        photoW * 0.8f, photoH * 0.7f, new Color(0.72f, 0.75f, 0.70f));
+
+            go.transform.localPosition = localCenter + normal * (lift * 1.8f) - faceUp * (plateH * 0.22f);
             go.transform.localRotation = rot;
 
-            float boxW = plateW * 0.9f;
-            float boxH = plateH * 0.86f;
-            // fontSize 10 = 월드 1 unit (WorldNameplate 실측). 한 줄이면 판 높이의 ~70% 를 채우고,
-            // 세 줄짜리 긴 이름이면 자동 축소가 1/3 까지 줄여 맞춘다 — 잘리지 않고 작아진다.
+            // 좌우 여백. 0.92 는 분필 테두리선(0.90)을 밟았고, 0.70 은 너무 좁혀서 한 줄에 두 글자밖에
+            // 안 들어갔다 (2026-09-10 지적). 0.82 면 선 안쪽에 있으면서 네 글자가 들어간다.
+            float boxW = plateW * 0.82f;
+            // 높이도 넉넉히. 0.32 로 잡았을 때 세 줄이 눌려 글자가 판 폭의 1/3 밖에 못 썼다.
+            float boxH = plateH * 0.40f;
+
+            // fontSize 10 = 월드 1 unit (WorldNameplate 실측).
+            //
+            // **바닥을 낮게 둬야 한다.** 전에 min 을 boxH*1.8 로 잡았더니 "AI 프로젝트 전시관" 에서
+            // 자동 축소가 바닥에 걸린 채 멈췄고, 폭 6.89 박스에 11.18 짜리 글자가 그대로 삐져나가
+            // 입간판 프레임 뒤로 잘렸다 (2026-09-10). 이름 길이는 60자까지 올 수 있으니
+            // (facade.signText 계약) 축소 여지를 넉넉히 준다 — 작아질지언정 잘리지는 않는다.
             tmp.enableAutoSizing = true;
             tmp.fontSizeMax = boxH * 7f;
-            tmp.fontSizeMin = boxH * 1.8f;
+            tmp.fontSizeMin = boxH * 0.5f;
             tmp.fontSize = tmp.fontSizeMax;
+            tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
+            boxAspectOut = boxW / boxH;   // 줄 수를 고를 때 쓴다 (BoothSign.WrapByWord)
+            return tmp;
+        }
+
+        /// <summary>기울어진 판 위에 얹는 얇은 판 한 장. 칠판·테두리를 같은 방식으로 만든다.</summary>
+        static GameObject Slab(Transform parent, string name, Vector3 localPos, Quaternion rot, Vector3 size, Material mat)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = name;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = rot;
+            go.transform.localScale = size;
+            Object.DestroyImmediate(go.GetComponent<Collider>());
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            Loose(go);
+            return go;
+        }
+
+        /// <summary>
+        /// 판 위에 얹는 짧은 분필 글자 (전시 이미지가 없을 때의 번호). 자동 축소 없이 고정 크기다 —
+        /// 두 글자짜리라 넘칠 일이 없고, 칸마다 크기가 달라지면 오히려 지저분하다.
+        /// </summary>
+        static TMP_Text ChalkLabel(Transform parent, string name, TMP_FontAsset font, string text,
+                                   Vector3 localPos, Quaternion rot, float boxW, float boxH, Color color)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = rot;
+            Loose(go);
+
+            var tmp = go.AddComponent<TextMeshPro>();
+            tmp.font = font;
+            tmp.text = text;
+            tmp.color = color;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.fontSize = boxH * 6f;   // fontSize 10 = 월드 1 unit
             tmp.rectTransform.sizeDelta = new Vector2(boxW, boxH);
             return tmp;
         }
