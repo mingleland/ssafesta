@@ -28,17 +28,30 @@ namespace Festa.World
         [Tooltip("프롬프트에 표시할 행동 문구 (예: '3번 부스 입장')")]
         public string promptText;
 
-        [Tooltip("상호작용 가능 거리 (world unit, 1 m = 10). boundsSource 가 있으면 표면 기준.")]
-        public float interactRadius = 30f;
+        [Tooltip("상호작용 가능 거리 (world unit, 1 m = 13.26). boundsSource 가 있으면 표면 기준.")]
+        public float interactRadius = 12f;
 
         [Tooltip("거리 판정·하이라이트 대상인 부스 실물 렌더러. 비우면 포털 위치 기준.")]
         public Renderer boundsSource;
 
-        [Tooltip("정면을 가진 상대(직원 등). 지정하면 그 시야 안에서만 상호작용된다. 비우면 전방향.")]
+        [Tooltip("정면을 가진 상대(직원 등). requireFacing 이 켜져 있을 때만 시야 판정에 쓴다.")]
         public Transform facingSource;
 
         [Tooltip("정면 기준 좌우 허용 각도(도). 70 이면 앞쪽 140도 부채꼴.")]
         [Range(15f, 180f)] public float facingHalfAngle = 70f;
+
+        [Tooltip("직원 시야 안에서만 열리게 할지. 2026-09-10 사용자 지시로 부스 입장은 사람이 아니라 부스에 붙었을 때가 됐다 — 기본 꺼짐.")]
+        public bool requireFacing = false;
+
+        [Tooltip("외곽선을 걸 트랜스폼. 비우면 boundsSource 의 트랜스폼.")]
+        public Transform highlightRoot;
+
+        [Tooltip("외곽선 두께(월드 유닛). 부스는 크므로 부스 오브젝트(0.35)보다 굵게 준다.")]
+        [Range(0.05f, 3f)] public float outlineWidth = 0.9f;
+
+        /// <summary>외곽선을 걸 트랜스폼 — 없으면 null(하이라이트 없음).</summary>
+        public Transform ResolveHighlightRoot()
+            => highlightRoot != null ? highlightRoot : (boundsSource != null ? boundsSource.transform : null);
 
         void OnEnable() => All.Add(this);
         void OnDisable() => All.Remove(this);
@@ -95,7 +108,9 @@ namespace Festa.World
         /// </summary>
         public bool IsInFacingArc(Vector3 pos)
         {
-            if (facingSource == null) return true;
+            // 2026-09-10: 부스 입장은 직원이 아니라 부스에 붙는 행동이 됐다 — 기본은 전방향이고,
+            // 시야 판정이 필요한 대상만 requireFacing 을 켠다.
+            if (!requireFacing || facingSource == null) return true;
 
             var forward = facingSource.forward; forward.y = 0f;
             var toPlayer = pos - facingSource.position; toPlayer.y = 0f;
@@ -119,14 +134,16 @@ namespace Festa.World
         /// </summary>
         public float DistanceFrom(Vector3 pos)
         {
+            // **부스 실물 표면이 1순위다** (2026-09-10 사용자 지시 — "npc 가 아니라 부스별로 딱 붙었을 때").
+            // 직원 거리는 그가 서 있는 자리에만 판정을 몰아 줘서, 부스 정면에 서 있어도 직원과 어긋나면 안 열렸다.
+            if (boundsSource != null)
+                return Vector3.Distance(pos, boundsSource.bounds.ClosestPoint(pos));
             if (facingSource != null)
             {
                 var flat = pos - facingSource.position;
                 flat.y = 0f;
                 return flat.magnitude;
             }
-            if (boundsSource != null)
-                return Vector3.Distance(pos, boundsSource.bounds.ClosestPoint(pos));
             return Vector3.Distance(pos, transform.position);
         }
 

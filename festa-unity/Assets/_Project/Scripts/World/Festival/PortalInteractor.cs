@@ -28,6 +28,13 @@ namespace Festa.World
         // (S15P21A604-355). 여기서 따로 그리면 둘이 다시 어긋난다.
         readonly InteractRing _ring = new InteractRing();
 
+        // 부스 구조물 외곽선 — 발밑 링만으로는 "이 부스가 지금 열린다" 가 잘 안 읽힌다는 사용자 지적(2026-09-10).
+        // 부스 오브젝트(노트북·설문)와 **같은 표현**을 쓴다(OutlineHighlighter) — 색·두께만 부스 크기에 맞춘다.
+        readonly OutlineHighlighter _outline = new OutlineHighlighter();
+
+        [Tooltip("외곽선 색. 발밑 링(금색)과 같은 계열이라야 같은 기능으로 읽힌다.")]
+        [SerializeField] Color _outlineColor = new Color(1f, 0.82f, 0.35f, 1f);
+
         void Awake() => useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스 제거로 OnGUI 호출·GC 절반 (QA #69)
 
         public override void OnNetworkSpawn()
@@ -41,6 +48,7 @@ namespace Festa.World
         public override void OnNetworkDespawn()
         {
             _ring.Dispose();
+            _outline.Dispose();
         }
 
         void Update()
@@ -52,7 +60,11 @@ namespace Festa.World
             // F 를 누르면 다른 부스로 순간이동했다 (2026-09-08 조사).
             // 프롬프트·하이라이트까지 같이 끈다 — 조작이 막힌 상태에서 [F] 알약만 떠 있으면
             // "눌러도 안 된다" 로 보인다 (S15P21A604-437 과 같은 이유).
-            if (Festa.Integration.InputBridge.IsLocked || InteractionFocusCamera.IsFocused)
+            // 부스 오브젝트(노트북·슬롯머신 등)가 잡혀 있으면 포털은 이 프레임을 통째로 양보한다.
+            // 전에는 프롬프트만 양보하고 F·하이라이트는 살아 있어서, 부스에 붙은 슬롯머신 앞에 서면
+            // 옆 부스 외곽선이 같이 켜지고 F 한 번에 게임과 입장이 동시에 먹었다 (2026-09-10 사용자 지적).
+            if (Festa.Integration.InputBridge.IsLocked || InteractionFocusCamera.IsFocused
+                || Festa.Content.BoothInteractionInput.HasInteractTarget)
             {
                 _nearest = null;
                 UpdateHighlight();
@@ -139,9 +151,11 @@ namespace Festa.World
         void UpdateHighlight()
         {
             bool show = _nearest != null && Time.time - _lastTeleportTime >= _cooldown;
-            if (!show) { _ring.Hide(); return; }
+            if (!show) { _ring.Hide(); _outline.Hide(); return; }
             var (pos, radius) = _nearest.HighlightFootprint();
             _ring.Show(pos, radius);
+            // 외곽선 대상이 없는 포털(내부 출구의 DoorMat 등)은 링만 — Show(null) 은 Hide 와 같다.
+            _outline.Show(_nearest.ResolveHighlightRoot(), _outlineColor, _nearest.outlineWidth);
         }
 
 
