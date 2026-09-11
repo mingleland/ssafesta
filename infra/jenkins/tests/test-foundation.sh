@@ -87,6 +87,9 @@ jenkins = document["jenkins"]
 assert jenkins["numExecutors"] == 0
 assert jenkins["mode"] == "EXCLUSIVE"
 assert jenkins["slaveAgentPort"] == -1
+users = {item["id"]: item for item in jenkins["securityRealm"]["local"]["users"]}
+assert "webgl-publisher" in users
+assert users["webgl-publisher"]["password"] == "${JENKINS_WEBGL_PUBLISHER_PASSWORD}"
 nodes = {item["permanent"]["name"]: item["permanent"] for item in jenkins["nodes"]}
 assert set(nodes) == {"linux-docker", "deploy", "unity"}
 assert len({node["remoteFS"] for node in nodes.values()}) == 3
@@ -103,12 +106,18 @@ gitlab=yaml.safe_load(pathlib.Path(sys.argv[3]).read_text(encoding='utf-8'))
 assert 'credentials' not in security, 'JCasC must not overwrite UI-managed credentials'
 entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
+publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
+assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
 assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
 assert 'secretToken' not in server
 PY
 pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
+
+grep -q 'JENKINS_WEBGL_PUBLISHER_PASSWORD: \${JENKINS_WEBGL_PUBLISHER_PASSWORD:?set in infra/.env}' "${controller_compose}" \
+  || fail "controller does not receive the WebGL publisher password"
+pass "WebGL publisher service account configuration"
 
 for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
   DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
@@ -274,6 +283,7 @@ export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
+export JENKINS_WEBGL_PUBLISHER_PASSWORD="foundation-webgl-publisher-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
 export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"
 export JENKINS_AGENT_SECRET_DEPLOY="foundation-deploy-agent-value"
