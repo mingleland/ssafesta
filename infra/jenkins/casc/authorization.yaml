@@ -13,6 +13,7 @@ jenkins:
               - Job/Discover
               - Job/Read
               - Job/Build
+              - User/Configure
         - group:
             name: infra-viewers
             permissions:

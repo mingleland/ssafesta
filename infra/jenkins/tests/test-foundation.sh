@@ -107,7 +107,7 @@ assert 'credentials' not in security, 'JCasC must not overwrite UI-managed crede
 entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
 publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
-assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
+assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build','User/Configure'}
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
 assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
