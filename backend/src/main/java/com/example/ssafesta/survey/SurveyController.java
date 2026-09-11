@@ -40,6 +40,8 @@ public class SurveyController {
 
     private static final String MEMBER_ONLY = "회원 계정만 설문을 편집할 수 있습니다.";
     private static final String MEMBER_ONLY_RESULTS = "회원 계정만 설문 결과를 조회할 수 있습니다.";
+    /** 보상이 아니라 추첨 때문이다 — 이 설문은 {@code rewardCoin} 이 0 이어도 회원 전용이다. */
+    private static final String MEMBER_ONLY_EVENT = "이벤트 설문은 회원만 참여할 수 있습니다.";
     private static final String MEMBER_ROLE = "MEMBER";
     private static final String GUEST_ROLE = "GUEST";
 
@@ -138,6 +140,44 @@ public class SurveyController {
     public SurveyService.RunView run(@Parameter(description = "부스 식별자", example = "7")
                                      @PathVariable Long boothId) {
         return surveys.findRun(boothId);
+    }
+
+    @Operation(summary = "이벤트 설문 조회 — 부스 밖 설문",
+            description = """
+                    축제 공용 이벤트 설문을 `surveyKey` 로 연다 (S15P21A604-621, GitLab #173).
+                    이벤트 경품 상점의 `[설문 참여하기]` 가 여기로 온다.
+
+                    **부스 설문이 아니다.** 부스 설문은 부스 주인이 만들고 그 부스 방문자가 답하지만,
+                    이것은 운영이 하나 만들고 축제 참가자 전체가 답한다. 그래서 임대·게시 검사가
+                    없다 — 검사할 부스가 없다.
+
+                    **회원 전용이다. 보상과 무관하다** — `rewardCoin` 이 `0` 이어도 게스트는
+                    `403 MEMBER_ONLY` 다. 추첨이 참여자를 특정해야 하기 때문이고, 그래서 응답에
+                    `memberOnly: true` 를 실어 화면이 제출 전에 안내할 수 있게 한다.
+                    `rewardCoin > 0` 하나로 판정하면 이 설문이 게스트에게 열린다.
+
+                    **이미 참여했으면 `responded` 에 그 응답이 들어온다.** 재참여가 없으므로
+                    화면이 제출 전에 "이미 참여함" 을 보여야 하는데, 그 한 값 때문에 왕복을 하나 더
+                    두지 않으려는 것이다.
+
+                    마감된 설문도 문항을 그대로 돌려준다 — 화면은 마감을 알리면서 무엇을 물었는지
+                    보여준다. 제출이 거절되는 쪽이다.
+
+                    제출은 부스 설문과 **같은 경로**를 쓴다 —
+                    `POST /api/v1/surveys/{surveyId}/responses` 에 이 응답의 `surveyId` 를 쓴다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "설문 전체 — 문항·마감 여부·참여 이력 포함"),
+            @ApiResponse(responseCode = "401", description = "토큰이 없다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다"),
+            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` — 그런 `surveyKey` 의 이벤트 설문이 없다")})
+    @GetMapping("/event-surveys/{surveyKey}/run")
+    @SecurityRequirement(name = "bearerAuth")
+    public SurveyService.EventRunView eventRun(@AuthenticationPrincipal Jwt jwt,
+                                               @Parameter(description = "이벤트 식별자",
+                                                       example = "SSAFESTA_2026")
+                                               @PathVariable String surveyKey) {
+        return surveys.findEventRun(surveyKey, MemberPrincipal.requireMemberId(jwt, MEMBER_ONLY_EVENT));
     }
 
     @Operation(summary = "설문 응답 제출 — 1인 1응답",
