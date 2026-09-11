@@ -34,10 +34,16 @@ interface ProjectDataPanelProps {
   // optional로 둔다 — 없거나(테스트) 아직 해석 전(로딩 중)이면 썸네일 없이 배지만 보여준다.
   readonly assetUrls?: Readonly<Record<string, string>>;
   readonly onApply: (project: GameProject) => void;
-  readonly onUploadAsset: (kind: AssetReference['kind'], file: File) => void;
+  // S15P21A604-630 — "이미지 추가"가 한 번에 여러 파일을 넘길 수 있도록 File 배열을 받는다.
+  // 호출부(GameStudioShell)가 순차 처리·300개 상한·배치 요약을 책임진다 — 이 컴포넌트는
+  // 선택된 파일을 그대로 넘기기만 한다.
+  readonly onUploadAsset: (kind: AssetReference['kind'], files: readonly File[]) => void;
   readonly onDeleteAsset: (assetId: string) => void;
   readonly onDeleteVariable: (variableId: string) => void;
   readonly onDeleteItem: (itemId: string) => void;
+  // S15P21A604-630 — 다중 업로드 처리 중임을 보여주는 "n/총" 카운터. 없거나 null이면
+  // (단일 파일이거나 업로드 중이 아니면) 표시하지 않는다.
+  readonly uploadProgress?: { readonly current: number; readonly total: number } | null;
 }
 
 // S15P21A604-582 — 변수/아이템/자산 삭제 확인 UI가 스타일 없이 각 섹션 맨 끝에 인라인으로
@@ -134,7 +140,7 @@ const objectiveLabels: Readonly<Record<GameObjectiveType, { readonly title: stri
   SURVIVE_SECONDS: { title: '시간 생존', unit: '초', defaultTarget: 30, max: 3600 },
 };
 
-export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem }: ProjectDataPanelProps) => {
+export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAsset, onDeleteAsset, onDeleteVariable, onDeleteItem, uploadProgress = null }: ProjectDataPanelProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
   const tilesetInput = useRef<HTMLInputElement>(null);
   // S15P21A604-561 — 삭제 버튼을 누르면 바로 지우지 않고, 사용 위치를 먼저 보여주고
@@ -342,22 +348,37 @@ export const ProjectDataPanel = ({ project, assetUrls = {}, onApply, onUploadAss
     </div>
     <details className="gss-custom-assets">
       <summary>내 자산으로 교체 (선택)</summary>
-      <p>기본 재료 대신 직접 만든 이미지를 쓸 때만 파일을 선택합니다.</p>
+      <p>기본 재료 대신 직접 만든 이미지를 쓸 때만 파일을 선택합니다. 이미지는 여러 장을 한 번에 고를 수 있습니다.</p>
       <div className="gss-inline-actions">
         <button disabled={project.assets.length >= 300} onClick={() => imageInput.current?.click()} type="button">이미지 추가</button>
         <button disabled={project.assets.length >= 300} onClick={() => tilesetInput.current?.click()} type="button">타일셋 추가</button>
       </div>
+      {uploadProgress !== null && (
+        <p className="gss-upload-progress">{uploadProgress.current}/{uploadProgress.total} 처리중…</p>
+      )}
+      {/* S15P21A604-630 — 이미지는 multiple로 여러 장을 한 번에 선택할 수 있다. 타일셋은
+          세트당 아틀라스 이미지 1장이 기본 단위라(8×8 등) 다중 선택 대상에서 뺐다 — 지금처럼
+          단일 파일 그대로 둔다. */}
       <input
         accept="image/png,image/jpeg,image/gif,image/webp"
         hidden
-        onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file !== undefined) onUploadAsset('IMAGE', file); }}
+        multiple
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          event.target.value = '';
+          if (files.length > 0) onUploadAsset('IMAGE', files);
+        }}
         ref={imageInput}
         type="file"
       />
       <input
         accept="image/png,image/jpeg,image/webp"
         hidden
-        onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file !== undefined) onUploadAsset('TILESET', file); }}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file !== undefined) onUploadAsset('TILESET', [file]);
+        }}
         ref={tilesetInput}
         type="file"
       />
