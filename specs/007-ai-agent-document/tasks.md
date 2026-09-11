@@ -54,8 +54,10 @@
 
 ### ① 교체된 원본은 복구 대상이 아니다 (FR-006·FR-027a·FR-028 / `S15P21A604-386`)
 
-- [ ] T095 [BE] `ai_documents.replaced_at`을 V30으로 추가하고, 수정본 교체가 기존 원본을 `EXPIRED` + `replaced_at`으로 전환하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentService.java`에 구현한다. `POST /documents/{documentId}/complete`의 24시간 복구 분기는 `replaced_at IS NULL`일 때만 태우고, 찍힌 행에는 이미 교체됐음을 알린다. **새 `DocumentStatus` 값을 만들지 않는다** — V24 CHECK는 그대로다
-- [ ] T096 [P] [BE] 교체 원본의 늦은 완료가 복구되지 않음, 미교체 `EXPIRED`의 복구는 그대로 동작함, `AiDocumentOriginalDeleteSweeper`가 둘 다 같은 조건으로 지움을 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentReplacementIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (SC-010)
+- [X] T095 [BE] `ai_documents.replaced_at`을 V30으로 추가하고, 수정본 교체가 기존 원본을 `EXPIRED` + `replaced_at`으로 전환하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentService.java`에 구현한다. `POST /documents/{documentId}/complete`의 24시간 복구 분기는 `replaced_at IS NULL`일 때만 태우고, 찍힌 행에는 이미 교체됐음을 알린다. **새 `DocumentStatus` 값을 만들지 않는다** — V24 CHECK는 그대로다
+- [X] T096 [P] [BE] 교체 원본의 늦은 완료가 복구되지 않음, 미교체 `EXPIRED`의 복구는 그대로 동작함을 검증한다 (SC-010).
+  📎 **검증 위치가 달라졌다** (`S15P21A604-386` 구현, 2026-09-11). 새 파일 `AiDocumentReplacementIntegrationTest` 대신 기존 세 파일에 나눠 넣었다 — `AiDocumentUploadIntegrationTest`(발급·완료·목록 분기, 교체 절), `AiDocumentConcurrencyIntegrationTest`(동시 교체 2건 → 활성 후속 1개), `AiDocumentResultApiIntegrationTest`(finalize 퇴역·재전송). 새 파일은 회원·부스·임대·직원 준비와 요청 헬퍼 전부를 복제해야 하고, 교체는 그 세 경로 <b>위에</b> 얹히는 동작이라 각자의 이웃 케이스 옆에 있는 편이 읽힌다.
+  📎 **스윕 케이스는 여기서 빠진다** — `AiDocumentOriginalDeleteSweeper`와 그 테스트는 `S15P21A604-637`(T099·T100) 소관이고, "교체된 원본도 24h 뒤 삭제된다" 단정도 그쪽이 가져간다. 이 MR 은 퇴역이 `expired_at`을 함께 찍는 것까지 보장한다(스윕이 보는 칸이다).
 - [ ] T097 [P] [FE] `replaced_at`이 찍힌 `EXPIRED`를 **교체됨**으로 표시하고 복구 안내를 띄우지 않도록 `festa-frontend/src/features/ai-agent/components/DocumentList.tsx`·`DocumentManager.tsx`에 반영한다 (FR-006). 상태 값이 늘지 않으므로 상태표 자체는 그대로다
 
 ### ② SC-007 분해 — 측정 주체를 나눈다 (SC-007a·SC-007b)
@@ -72,8 +74,8 @@
 
 > **`S15P21A604-386` 범위다.** 교체된 원본의 퇴역이 바로 이 finalize 트랜잭션 안에서 일어나므로, 별도 티켓으로 가르면 같은 메서드를 두 MR 이 나눠 고치게 된다. 교체 기능 없이 이 정정만 먼저 필요해지면 그때 분리한다.
 
-- [ ] T101 [BE] `AiDocumentJobRepository.markDocumentReady`가 0행이면 `ApiException(ErrorCode.JOB_GONE)`을 던져 finalize 전체를 롤백하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentJobRepository.java`를 고친다. 지금의 ERROR 로그 후 커밋은 FR-040의 단일 트랜잭션을 어긴다
-- [ ] T102 [P] [BE] finalize 직전 문서가 `DISABLED`·`EXPIRED`가 된 경우 Chunk·Job·Document가 전부 원상 유지되고 응답이 `410 JOB_GONE`이며 **재전송도 무변화 410**임을 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentResultApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (SC-014). `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 범위 밖이라 검증 대상이 아니다
+- [X] T101 [BE] `AiDocumentJobRepository.markDocumentReady`가 0행이면 `ApiException(ErrorCode.JOB_GONE)`을 던져 finalize 전체를 롤백하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentJobRepository.java`를 고친다. 지금의 ERROR 로그 후 커밋은 FR-040의 단일 트랜잭션을 어긴다
+- [X] T102 [P] [BE] finalize 직전 문서가 `DISABLED`·`EXPIRED`가 된 경우 Chunk·Job·Document가 전부 원상 유지되고 응답이 `410 JOB_GONE`이며 **재전송도 무변화 410**임을 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentResultApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (SC-014). `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 범위 밖이라 검증 대상이 아니다
 
 **Dependency**: 네 항목은 서로 독립이다. ①은 V30 → 서비스 → FE 순서, ③은 기존 스윕 위, ④는 기존 finalize 위에서 각각 끝난다. ②의 T098은 검색 경로가 이미 있어 바로 착수할 수 있다.
 

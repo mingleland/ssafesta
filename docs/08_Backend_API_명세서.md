@@ -829,6 +829,64 @@ Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트
 재발급 / 중복 처리) 중 가장 보수적인 쪽을 골랐다. 서로 다른 파일이 같은 해시를 주장하는 요청을 조용히
 통과시키면 서명한 것과 다른 파일이 올라간다.
 
+### PUT `/documents/{documentId}/replacement`
+
+**준비 완료(`READY`) 문서를 새 파일로 갈아 끼운다** (spec 007 FR-019 · FR-027a, `S15P21A604-386`).
+
+요청·응답은 위 `upload-url` 과 **같은 모양**이다 — `UploadCommand` 를 그대로 보내고 `UploadGrantView`
+를 그대로 받는다. 전용 DTO 는 없다. 다만 응답의 `documentId` 는 **새로 만들어진 문서**의 것이고,
+이어서 그 id 로 `POST /documents/{newDocumentId}/complete` 를 부른다. 2단계는 일반 업로드와 완전히 같다.
+
+`PUT` 인 이유는 요청이 "무엇을 교체할지" 를 이름으로 지목하고, 같은 요청을 반복하면 같은 상태로
+수렴하기 때문이다 — 두 번째 호출은 교체를 하나 더 만들지 않는다.
+
+#### 언제 무엇이 바뀌는가
+
+| 시점 | 교체본 | 원본 |
+|---|---|---|
+| 이 호출 | `QUEUED` 로 생김 (`uploadedAt` 없음) | **`READY` 그대로. 검색에 계속 쓰인다** |
+| 2단계 완료 | `QUEUED` (`uploadedAt` 채워짐), 처리 Job 생성 | **`READY` 그대로** |
+| 처리 중 | `PROCESSING` | **`READY` 그대로** |
+| 처리 **성공**(finalize) | `READY` | `EXPIRED` + `replacedAt` — 활성 Job `CANCELLED`, chunk 삭제 |
+| 처리 **실패** | `FAILED` | **`READY` 그대로** |
+
+**퇴역은 `complete` 가 아니라 finalize 다.** 완료는 "바이트가 도착했다" 일 뿐이고 그 파일이 읽히는지는
+아직 아무도 모른다 — 거기서 원본을 물리면 파싱 불가 파일 하나로 AI 직원이 답할 근거가 통째로 사라진다.
+
+#### 대상 상태
+
+**`READY` 만 교체할 수 있다.** 나머지 다섯은 `409 DOCUMENT_NOT_REPLACEABLE` 이다 —
+`QUEUED`·`PROCESSING` 은 이미 사용자가 원하는 버전이 되는 중이고, `FAILED`·`EXPIRED`·`DISABLED` 는
+중복 판정 밖(FR-019b)이라 같은 파일을 그냥 새 문서로 올리면 된다. 판정은 **행 잠금 안에서** 하므로,
+호출 직전에 임대가 만료돼 `DISABLED` 가 된 경우도 여기서 걸린다.
+
+#### 같은 해시로 다시 불렀을 때
+
+| 상황 | 응답 |
+|---|---|
+| **대상 문서 자신**과 같은 해시 | `200 duplicate:true` + 대상의 `documentId`. **행을 만들지 않고 원본도 안 건드린다** |
+| 같은 AI 직원의 **다른 활성 문서**와 같은 해시 | `409 DOCUMENT_NOT_REPLACEABLE` (강행하면 `ux_ai_documents_agent_active_sha` 위반) |
+| 진행 중인 교체본이 **아직 업로드 전**, 같은 파일 | `duplicate:false` + **같은 `documentId`** + 새 `uploadUrl` (#84 멱등 재발급) |
+| 〃, 해시는 같은데 이름·형식·크기가 다름 | `400 VALIDATION_FAILED` (`errors[0].field = contentSha256`) |
+| 〃, **다른 파일** | 그 교체본을 `EXPIRED` 로 버리고(**`replacedAt` 은 찍지 않는다**) 새 `documentId` 로 발급 |
+| 진행 중인 교체본이 **업로드 완료**(`QUEUED`), 같은 파일 | `200 duplicate:true` + 그 교체본의 `documentId` |
+| 〃, 다른 파일 | `409 DOCUMENT_NOT_REPLACEABLE` |
+| 진행 중인 교체본이 `PROCESSING` | `409 DOCUMENT_NOT_REPLACEABLE` |
+
+버려진 대기 교체본에 `replacedAt` 을 찍지 않는 것은 중요하다. 그 칸은 "더 새 버전이 자리를 넘겨받았다"
+는 뜻인데, 이 행은 아무것도 공개하지 못한 채 버려진 발급일 뿐이다 — 찍으면 복구 판정(FR-027)이
+이 행을 교체 원본으로 오해한다.
+
+#### 상한 (FR-018)
+
+**10개를 다 쓴 AI 직원도 교체할 수 있다.** 교체본은 원본의 자리를 이어받으므로 논리 합계가 늘지 않는다 —
+활성 상태인 행이 11개여도 `quota.usedCount` 는 10이다. 총량(100MB)은 교체본의 크기로 다시 계산하므로
+큰 파일로 갈아 끼우다 넘기면 `409 DOCUMENT_LIMIT_EXCEEDED` 이고, 이때 **교체본 행은 남지 않는다**.
+
+실패: `401` · `403 MEMBER_ONLY`(게스트)·`BOOTH_EDITOR_FORBIDDEN` · `404 DOCUMENT_NOT_FOUND` ·
+`409 DOCUMENT_NOT_REPLACEABLE`·`DOCUMENT_LIMIT_EXCEEDED`·`BOOTH_LEASE_EXPIRED` ·
+`503 STORAGE_UNAVAILABLE` · `507 STORAGE_QUOTA_EXCEEDED`. 발급과 같은 업로드 게이트(#100)를 지난다.
+
 ### POST `/documents/{documentId}/complete`
 
 브라우저가 presigned URL 로 업로드를 마친 뒤 부르는 확인 Endpoint. **요청 본문이 없다** — 판정에 필요한
@@ -853,6 +911,8 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
 | `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
 | `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
+| `EXPIRED` + **`replacedAt` 있음** (교체로 물러난 원본) | 확인 안 함 | `410 DOCUMENT_UPLOAD_GONE` — 시간과 무관하다 (FR-027a) |
+| `EXPIRED`, 교체가 **대기 중** (이 문서를 가리키는 활성 교체본이 있다) | 객체 있어도 | `410 DOCUMENT_UPLOAD_GONE` |
 | `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) — `PROCESSING` 은 AI 워커가 이미 파일을 쥔 상태라 저장소를 다시 묻지 않는다 |
 | `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
 | 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
@@ -860,9 +920,15 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 24시간 경과분을 객체 존재와 무관하게 `410` 으로 두는 것은 의도다 — 삭제는 sweeper 가 자기 주기로 하므로
 남아 있다고 받아 주면 유예 기간이 무의미해진다.
 
+교체로 물러난 원본을 시간과 무관하게 `410` 으로 두는 것도 같은 결이다. 24시간 복구는 "바이트가 안 왔다"
+는 만료에만 해당하고, 이미 새 버전이 자리를 넘겨받은 문서는 되돌릴 자리가 없다 — 되살리면 한 (직원,
+해시) 에 활성 행이 둘이 된다.
+
 ### GET `/agents/{agentId}/documents`
 
 이 AI 직원의 문서를 **모든 상태**로, `createdAt` 내림차순으로 돌려준다 (US2 시나리오 2·7 · US3 시나리오 1).
+**교체로 물러난 원본도 숨기지 않는다** — 사용자가 올린 것이 조용히 사라지면 안 되고, 대신 `replacedAt`
+으로 "교체됨" 임을 말한다 (FR-006).
 
 ```json
 {
@@ -873,10 +939,11 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
       "sizeBytes": 1048576,
       "status": "READY",
       "createdAt": "2026-09-09T01:15:02Z",
-      "uploadedAt": "2026-09-09T01:20:11Z"
+      "uploadedAt": "2026-09-09T01:20:11Z",
+      "replacedAt": null
     }
   ],
-  "quota": { "countLimit": 10, "bytesLimit": 104857600 }
+  "quota": { "countLimit": 10, "bytesLimit": 104857600, "usedCount": 1, "usedBytes": 1048576 }
 }
 ```
 
@@ -888,6 +955,11 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `FAILED` | 실패 | 처리에 실패했다 |
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
+
+**`EXPIRED` 는 `replacedAt` 으로 갈린다** (FR-027a). 값이 없으면 위 표대로 업로드 만료이고, 값이 있으면
+수정본으로 교체돼 물러난 원본이다 — 화면에 **교체됨**으로 적고 "다시 올려 주세요" 안내를 띄우지
+않는다. 복구되지 않는 행에 복구 버튼을 띄우면 눌러도 아무 일이 없는 컨트롤이 된다(T-24 와 같은 모양).
+**상태 값 자체는 여섯 그대로다** — `replacedAt` 은 구분자이지 상태가 아니다.
 
 여섯 값이 전부 실제로 나온다. `DISABLED` 는 `S15P21A604-496` 이 임대 만료 경로에 붙으면서 마지막으로
 채워졌다 — 임대가 `EXPIRED` 로 넘어가는 **같은 트랜잭션**에서 그 부스의 활성 문서
@@ -914,13 +986,17 @@ Job 이라 `410 JOB_GONE` 으로 거부된다. 한 건이 실패하면 **남은 
   `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
   올릴 수 있다**
 
-**`quota` 에는 상한만 있다. 쓴 양은 `documents` 에서 읽는다.** 자리를 차지하는 것은
-`QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 —
-실패한 업로드가 슬롯을 잡으면 안 되기 때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
-"n/10" 의 n 은 활성 3상태 행의 수이지 `documents.length` 가 아니다.
+**`quota` 는 상한과 쓴 양을 함께 준다.** 자리를 차지하는 것은 `QUEUED`·`PROCESSING`·`READY` 인
+행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 — 실패한 업로드가 슬롯을 잡으면 안 되기
+때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
 
-서버가 그 수를 세어 내려보내지 않는 이유는 **응답에 이미 있기 때문**이다. 세어 주려면 폴링마다
-질의가 둘 늘어난다.
+**"n/10" 의 n 은 `usedCount` 다.** `documents.length` 도, 활성 3상태 행의 수도 아니다 —
+교체가 진행 중이면 원본과 교체본이 둘 다 활성이지만 교체본이 원본의 자리를 이어받으므로, 활성 행이
+11개여도 `usedCount` 는 10이다. `usedBytes` 도 같은 뺄셈을 거친다.
+
+> 2026-09-11 변경 (`S15P21A604-386`). 이전에는 "쓴 양은 클라이언트가 배열에서 센다" 였다. 수정본 교체가
+> 그 전제를 깼다 — 배열만 세면 실제로는 성공할 업로드 앞에서 "11/10" 을 띄우게 된다. 폴링마다 질의가
+> 둘 늘어나는 것이 모든 클라이언트가 같은 뺄셈을 각자 다시 구현하는 것보다 싸다.
 
 `uploadedAt` 이 `null` 인 `QUEUED` 와 값이 있는 `QUEUED` 는 다르다 — 앞은 바이트가 아직 안 온
 것이고 뒤는 처리를 기다리는 것이다. `status` 만으로는 구분되지 않는다.
