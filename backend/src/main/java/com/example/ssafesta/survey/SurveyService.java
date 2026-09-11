@@ -244,13 +244,22 @@ public class SurveyService {
     public EventRunView findEventRun(String surveyKey, Long memberId) {
         Survey survey = surveys.findBySurveyKey(surveyKey)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
+        List<QuestionView> questionViews = questionViews(survey.getId());
+        // 문항이 없으면 아직 공개된 것이 아니다 (S15P21A604-621).
+        //
+        // 이벤트 설문은 시드로 행부터 들어오고 문항은 기획 문구가 도착한 뒤 얹는다. 그 사이에
+        // 빈 설문을 열어 주면 화면에 답할 것이 없는 제출 버튼이 서고, 누른 사람은 1인 1응답을
+        // 빈 응답으로 소진한다. 제출도 같은 판정으로 막는다 — 한쪽만 막으면 다른 쪽이 뚫린다.
+        if (questionViews.isEmpty()) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND, "아직 공개되지 않은 설문입니다.");
+        }
         RespondedView responded = responses
                 .findBySurveyIdAndRespondentUserId(survey.getId(), memberId)
                 .map(response -> new RespondedView(response.getId(), response.getSubmittedAt()))
                 .orElse(null);
         return new EventRunView(survey.getSurveyKey(), survey.getId(),
                 survey.isClosedAt(Instant.now()), survey.getRewardCoin(), true, responded,
-                questionViews(survey.getId()));
+                questionViews);
     }
 
     // ── 검증 ────────────────────────────────────────────────────────────────

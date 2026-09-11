@@ -44,6 +44,7 @@ public class SurveyResponseService {
     /** 같은 code 에 다른 이유다 — 보상이 아니라 추첨 때문이라 문장을 나눈다 (GitLab #173). */
     private static final String EVENT_MEMBER_ONLY_MESSAGE =
             "이벤트 설문은 회원만 참여할 수 있습니다. 로그인 후 다시 시도해 주세요.";
+    private static final String NOT_OPEN_YET_MESSAGE = "아직 공개되지 않은 설문입니다.";
 
     private final SurveyRepository surveys;
     private final SurveyQuestionRepository questions;
@@ -150,6 +151,19 @@ public class SurveyResponseService {
         }
 
         List<SurveyQuestion> questionRows = questions.findBySurveyIdOrderByDisplayOrderAsc(surveyId);
+        // 묻는 것이 없는 설문에는 답할 수 없다 (S15P21A604-621).
+        //
+        // 이 상태는 이벤트 설문에만 생긴다 — 부스 설문은 upsert 가 문항 1개 이상을 요구한다.
+        // 이벤트 설문은 시드로 들어오고 문항은 기획 문구가 도착한 뒤 따로 얹으므로, 그 사이에
+        // 창이 열린다. 막지 않으면 **1인 1응답이 사용자에게 불리하게 소진된다**: 빈 응답이
+        // 저장되고 ux_survey_responses_member 가 그 회원의 진짜 참여를 영영 막는다. 추첨
+        // 참여자 명단에는 아무것도 답하지 않은 사람이 남는다.
+        //
+        // 404 인 것은 조회와 같은 판정이기 때문이다 — 문항이 없는 설문은 아직 공개된 것이
+        // 아니다. FE 는 그 상태를 이미 "불러오지 못했습니다" 로 처리한다.
+        if (questionRows.isEmpty()) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND, NOT_OPEN_YET_MESSAGE);
+        }
         Map<Long, Set<Long>> allowedOptions = allowedOptionIds(questionRows);
         List<Submission> submissions = validate(command, questionRows, allowedOptions);
 
