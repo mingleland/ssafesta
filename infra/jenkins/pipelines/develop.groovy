@@ -1,5 +1,7 @@
 def call() {
-    final String headSha = env.GIT_COMMIT
+    // SCM environment variables may be absent after a Controller restart;
+    // the checked-out commit remains the authoritative build revision.
+    final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
     if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
     String range = "--branch develop --head '${headSha}'"

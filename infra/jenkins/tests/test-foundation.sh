@@ -151,6 +151,10 @@ grep -q 'with-credentials.sh CONNECTION_TOKEN_SECRET_FILE -- infra/deploy/script
   || fail "dev game pipeline does not require the connection token Secret file reference"
 grep -q 'detect-changed-components.sh' "${develop_pipeline}" \
   || fail "develop pipeline does not detect the pushed range"
+grep -q "script: 'git rev-parse HEAD'" "${develop_pipeline}" \
+  || fail "develop pipeline does not derive its head SHA from the checkout"
+! grep -q 'final String headSha = env.GIT_COMMIT' "${develop_pipeline}" \
+  || fail "develop pipeline relies on a restart-volatile GIT_COMMIT value"
 grep -q "mkdir -p artifacts/develop" "${develop_pipeline}" \
   || fail "develop pipeline does not create its selection artifact directory"
 ! grep -q 'deploy-release.sh' "${develop_pipeline}" \
