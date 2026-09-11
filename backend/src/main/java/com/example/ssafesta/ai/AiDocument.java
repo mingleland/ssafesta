@@ -93,6 +93,25 @@ public class AiDocument {
     @Column(name = "expired_at")
     private Instant expiredAt;
 
+    /**
+     * The {@code READY} document this one was uploaded to replace (FR-019), or {@code null} for an
+     * ordinary upload.
+     *
+     * <p>{@code updatable = false}: a row is a replacement or it is not, and nothing re-points one
+     * at a different original. The retirement in {@code AiDocumentResultService.finalizeJob} reads
+     * this to find which original to push out, so a later edit would retire the wrong document.
+     */
+    @Column(name = "replaces_document_id", updatable = false)
+    private Long replacesDocumentId;
+
+    /**
+     * When this document was pushed out by its replacement (FR-027a). {@code null} on every other
+     * row, including an {@code EXPIRED} one — that is the whole point: the same status means
+     * "recoverable within 24 hours" without this stamp and "already superseded" with it.
+     */
+    @Column(name = "replaced_at")
+    private Instant replacedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -104,7 +123,8 @@ public class AiDocument {
 
     AiDocument(Long boothId, Long agentId, Long uploadedByUserId, String originalFilename,
                String contentType, long sizeBytes, String contentSha256,
-               ObjectStorage.WriteTarget target, Instant now) {
+               ObjectStorage.WriteTarget target, Long replacesDocumentId, Instant now) {
+        this.replacesDocumentId = replacesDocumentId;
         this.boothId = boothId;
         this.agentId = agentId;
         this.uploadedByUserId = uploadedByUserId;
@@ -148,6 +168,10 @@ public class AiDocument {
 
     Instant getExpiredAt() { return expiredAt; }
 
+    Long getReplacesDocumentId() { return replacesDocumentId; }
+
+    Instant getReplacedAt() { return replacedAt; }
+
     /** True while the grant is outstanding: the URL was issued and no upload has been verified. */
     boolean isAwaitingUpload() {
         return QUEUED.equals(processingStatus) && uploadedAt == null;
@@ -155,6 +179,11 @@ public class AiDocument {
 
     boolean isExpired() {
         return EXPIRED.equals(processingStatus);
+    }
+
+    /** The only status a 수정본 교체 may target (FR-019) — see {@code AiDocumentService.replace}. */
+    boolean isReady() {
+        return READY.equals(processingStatus);
     }
 
     /** Called once, in the transaction that inserted the row — the key needs the generated id. */
@@ -167,7 +196,16 @@ public class AiDocument {
         this.updatedAt = now;
     }
 
-    /** The grant went unused, or its provider is no longer the one we write to (FR-032). */
+    /**
+     * The grant went unused, its provider is no longer the one we write to (FR-032), or it was an
+     * unfinished 교체 attempt the owner replaced with a different file.
+     *
+     * <p><b>{@code replacedAt} stays null here, deliberately.</b> All three cases are abandoned
+     * uploads, not documents that something newer took over — stamping them would tell
+     * {@code /complete} that a late completion has already been superseded when in fact nothing
+     * ever went live. Only {@code AiDocumentJobRepository.retireReplacedOriginal} writes that
+     * column, and only for an original a replacement actually reached {@code READY} over.
+     */
     void expire(Instant now) {
         this.processingStatus = EXPIRED;
         this.expiredAt = now;
