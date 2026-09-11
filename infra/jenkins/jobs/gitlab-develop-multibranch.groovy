@@ -1,7 +1,7 @@
 String gitlabServerName = System.getenv('GITLAB_SERVER_NAME') ?: 'CONFIGURE_ME'
 String gitlabCheckoutCredentialsId = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: 'gitlab-checkout'
-String projectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
-String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
+String gitlabProjectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
+String gitlabProjectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
 
 multibranchPipelineJob('festa-gitlab-develop') {
     description('GitLab develop push CI dispatcher; merge requests are gated by GitLab CI, never Jenkins.')
@@ -12,8 +12,8 @@ multibranchPipelineJob('festa-gitlab-develop') {
                     id('festa-gitlab-develop')
                     serverName(gitlabServerName)
                     credentialsId(gitlabCheckoutCredentialsId)
-                    projectOwner(projectOwner)
-                    projectPath(projectPath)
+                    projectOwner(gitlabProjectOwner)
+                    projectPath(gitlabProjectPath)
                     traits {
                         gitLabBranchDiscovery { strategyId(1) }
                         headWildcardFilter { includes('develop'); excludes('') }
