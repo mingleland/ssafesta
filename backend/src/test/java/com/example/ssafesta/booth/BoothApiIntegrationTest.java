@@ -32,6 +32,7 @@ class BoothApiIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private BoothLeaseService leaseService;
     @Autowired private BoothSlotRepository slots;
+    @Autowired private BoothRepository booths;
     @Autowired private BoothLeaseRepository leases;
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
@@ -70,13 +71,54 @@ class BoothApiIntegrationTest {
                 .andExpect(jsonPath("$[0].type").value("EVENT"));
 
         Long userId = createMemberWithWallet(users, wallets, "이벤트슬롯");
+        String bearer = bearerFor(userId);
+        // 일일 지급은 인증 요청마다 일어난다 — 거절 전에 받아 두지 않으면 잔액 비교가 그 지급을
+        // 거절 탓으로 읽는다 (같은 파일의 임대 성공 테스트와 같은 이유).
+        mockMvc.perform(get("/api/v1/wallets/me").header("Authorization", bearer)).andExpect(status().isOk());
+        int before = wallets.balanceOf(userId);
         long leasesBefore = leases.count();
 
-        mockMvc.perform(leaseRequest(1L, bearerFor(userId)))
+        mockMvc.perform(leaseRequest(1L, bearer))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
 
         assertEquals(leasesBefore, leases.count(), "이벤트 슬롯에 임대가 생기면 안 됩니다.");
+        assertEquals(before, wallets.balanceOf(userId), "거절된 임대는 코인을 쓰지 않습니다.");
+        BoothTestSupport.assertBalanceMatchesLedger(wallets, userId);
+    }
+
+    /**
+     * V28 이 적용될 때 1번 슬롯에 살아 있던 임대는 만료까지 그대로 간다 (S15P21A604-615).
+     *
+     * <p>마이그레이션 주석이 그렇게 정의했는데 검증은 없었다 — 테스트 DB 는 늘 V1부터 깨끗하게
+     * 올라오므로 그 경로를 아무도 밟지 않는다. 여기서는 <b>그 상태를 직접 만들어</b> 주장한 동작을
+     * 확인한다: 데이터가 깨지지 않고, 목록에 그대로 보이고, 만료 판정도 평소대로 돌고, 만료 뒤
+     * 재임대만 거절된다.
+     *
+     * <p>조건부 UPDATE 로 만들지 않은 이유가 여기 있다 — 환경마다 결과가 달라지면 "슬롯 1 은
+     * 이벤트다" 가 더 이상 계약이 아니게 된다.
+     */
+    @Test
+    void aLeaseThatPredatesTheEventSlotSurvivesUntilItExpires() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "이전임대");
+        Long boothId = booths.save(new Booth(userId, "이전임대 부스")).getId();
+        BoothLayoutTestSupport.grantLeaseOnSlot(jdbc, boothId, userId, 1L);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[0].type").value("EVENT"))
+                .andExpect(jsonPath("$[0].status").value("OCCUPIED"))
+                .andExpect(jsonPath("$[0].boothId").value(boothId));
+
+        BoothLayoutTestSupport.expireLease(jdbc, boothId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[0].type").value("EVENT"))
+                .andExpect(jsonPath("$[0].status").value("AVAILABLE"));
+
+        // 비워졌다고 다시 빌릴 수 있는 것은 아니다 — 이제 이벤트 자리다.
+        mockMvc.perform(leaseRequest(1L, bearerFor(createMemberWithWallet(users, wallets, "재임대시도"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
     }
 
     @Test
