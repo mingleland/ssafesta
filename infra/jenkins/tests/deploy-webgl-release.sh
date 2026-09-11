@@ -23,13 +23,14 @@ chmod +x "${fixture}/bin/flock"
 cat >"${fixture}/bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-output= headers= url=
+output= headers= url= resolved=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) output="$2"; shift 2 ;;
     --dump-header) headers="$2"; shift 2 ;;
+    --resolve) resolved=1; shift 2 ;;
     --header|--max-time) shift 2 ;;
-    --fail|--silent|--show-error|--location) shift ;;
+    --insecure|--fail|--silent|--show-error|--location) shift ;;
     *) url="$1"; shift ;;
   esac
 done
@@ -38,6 +39,15 @@ if [[ "${url}" == package://* ]]; then
   exit 0
 fi
 [[ "${FAIL_HTTP:-0}" != 1 ]] || exit 22
+# 엣지(Cloudflare)가 막는 상황. --resolve 가 붙은 요청 = 오리진 직접 확인이라 이 차단을 지나간다.
+if [[ "${EDGE_BLOCK:-0}" == 1 && "${resolved}" != 1 ]]; then
+  printf 'HTTP/2 403\r\nContent-Type: text/html\r\nserver: cloudflare\r\ncf-ray: fixture-ray-0001\r\n\r\n' >"${headers}"
+  exit 0
+fi
+if [[ "${ORIGIN_BLOCK:-0}" == 1 && "${resolved}" == 1 ]]; then
+  printf 'HTTP/2 502\r\nContent-Type: text/html\r\n\r\n' >"${headers}"
+  exit 0
+fi
 case "${url}" in
   */manifest.json) type='application/json' ;;
   */index.html) type='text/html' ;;
@@ -109,11 +119,27 @@ if deploy_package "${bad_manifest}" badman01 >/dev/null 2>&1; then echo 'bad man
 
 candidate="$(make_package new00001)"
 export WEBGL_EVIDENCE_PATH="${fixture}/webgl-deployment.json"
+# 재시도가 들어갔으므로 테스트에서는 대기 없이 한 번 더만 시도하게 한다 (S15P21A604-656).
+export WEBGL_VERIFY_RETRIES=2 WEBGL_VERIFY_RETRY_DELAY_SECONDS=0
 export FAIL_HTTP=1
 if deploy_package "${candidate}" new00001 >/dev/null 2>&1; then echo 'failed HTTP verification was accepted' >&2; exit 1; fi
 unset FAIL_HTTP
 grep -Fq '"status":"FAILED"' "${WEBGL_EVIDENCE_PATH}"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+
+# 엣지가 검증 요청만 막고 오리진은 멀쩡한 경우 — 릴리스를 되돌리지 않고 살려야 한다 (S15P21A604-656).
+export EDGE_BLOCK=1
+deploy_package "${candidate}" new00001 >/dev/null
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
+grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
+grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
+
+# 엣지도 오리진도 막히면 그건 진짜 실패다 — 그때는 되돌린다.
+rollback_probe="$(make_package new00003)"
+export ORIGIN_BLOCK=1
+if deploy_package "${rollback_probe}" new00003 >/dev/null 2>&1; then echo 'origin failure was accepted' >&2; exit 1; fi
+unset EDGE_BLOCK ORIGIN_BLOCK
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
 
 deploy_package "${candidate}" new00001
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
