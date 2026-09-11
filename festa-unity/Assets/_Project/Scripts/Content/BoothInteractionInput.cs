@@ -326,14 +326,24 @@ namespace Festa.Content
             // 이 토스트가 필요하고, FE 임베드면 개발 빌드에서도 불필요하다.
             if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
 
-            _toast =
+            // **아는 상호작용만 알린다.** 전에는 모르는 종류가 "홈페이지 열기 요청" 으로 떨어졌는데,
+            // 이 채널에는 사람이 누른 것이 아닌 **상태 통지**도 흐른다 — 월드 진입 직후 1회 나가는
+            // WORLD_BOOTH_CONTEXT(#174) 가 그렇다. 그래서 접속하자마자 누른 적도 없는 안내가 떴다
+            // (사용자 지적 2026-09-11). 종류를 모르면 아무 말도 하지 않는 편이 맞다.
+            string text =
                 type == Bridge.AiAgentInteract    ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다" :
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ArcadeInteract     ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                 type == Bridge.GameInteract       ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
-                                                    "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
+                type == Bridge.LaptopInteract     ? "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.MinigameInteract   ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
+                type == Bridge.EventInteract      ? "이벤트 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                                                    null;
+            if (text == null) return;
+
+            _toast = text;
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 
