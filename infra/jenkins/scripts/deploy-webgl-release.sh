@@ -195,10 +195,16 @@ log_verify_failure() {
 #   1 = 일시 실패(네트워크 오류·403·408·425·429·5xx) → 다시 물어볼 가치가 있다
 #   2 = 배포 결함(2xx 인데 Content-Type·Cache-Control·Content-Encoding 이 계약과 다르다) → 몇 번을 물어도 같다
 # 둘을 같은 실패로 묶으면 앞단이 잠깐 막은 것 때문에 멀쩡한 릴리스를 되돌리게 된다 (2026-09-11 #165).
+# 검증 요청이 쓰는 User-Agent. 기본 `curl/8.x` 는 엣지의 봇 규칙이 흔히 집는 값이고,
+# 우리는 사람이 브라우저로 여는 것과 **같은 파일이 같은 헤더로 나오는가**를 보려는 것이지
+# 봇으로 구분되려는 것이 아니다. 엣지 정책이 바뀌면 이 한 줄만 바꾸면 된다.
+VERIFY_USER_AGENT="${WEBGL_VERIFY_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36}"
+
 request_and_check() {
   local url="$1" expected_type="$2" require_brotli="$3" expected_cache="$4" file="$5"
   : >"${file}"
   curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+    --user-agent "${VERIFY_USER_AGENT}" \
     --dump-header "${file}" --output /dev/null "${url}" || return 1
   # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
   local status_line; status_line="$(head -n 1 "${file}" 2>/dev/null | tr -d '\r')"
@@ -225,17 +231,27 @@ verify_origin() {
   scheme="${base%%://*}"; host="${base#*://}"; host="${host%%/*}"; host="${host%%:*}"
   port=443; [[ "${scheme}" == http ]] && port=80
   local file; file="$(mktemp "${root}/.webgl-origin.XXXXXX")"
-  local rc=1
+  local rc=1 curl_rc=0
   if curl --silent --show-error --location --insecure \
       --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" --resolve "${host}:${port}:${addr}" \
-      --dump-header "${file}" --output /dev/null "${base}/${path}"; then
+      --user-agent "${VERIFY_USER_AGENT}" \
+      --dump-header "${file}" --output /dev/null "${base}/${path}" || { curl_rc=$?; false; }; then
     head -n 1 "${file}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]' \
       && grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${file}" \
       && grep -Fiq "Cache-Control: ${expected_cache}" "${file}" \
       && { [[ "${require_brotli}" != 1 ]] || grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${file}"; } \
       && rc=0
   fi
-  [[ ${rc} -eq 0 ]] || { echo "  origin check also failed: ${base}/${path} via ${addr}" >&2; log_verify_failure "origin ${base}/${path}" "${file}"; }
+  if [[ ${rc} -ne 0 ]]; then
+    # curl 7 = 연결 자체가 안 됐다. 배포물 문제가 아니라 **오리진 주소가 틀린 것**이므로 그렇게 말한다 —
+    # 이 에이전트가 웹 서버와 다른 호스트면 WEBGL_ORIGIN_ADDRESS 로 실제 주소를 줘야 한다.
+    if [[ ${curl_rc} -eq 7 ]]; then
+      echo "  오리진 확인 불가: ${addr}:${port} 에 연결되지 않는다 — 이 에이전트가 웹 서버가 아니면 WEBGL_ORIGIN_ADDRESS 를 지정해야 한다" >&2
+    else
+      echo "  origin check also failed: ${base}/${path} via ${addr}" >&2
+      log_verify_failure "origin ${base}/${path}" "${file}"
+    fi
+  fi
   rm -f "${file}"
   return ${rc}
 }
