@@ -59,8 +59,8 @@ public class MinigameController {
                     **일일 한도에 도달했어도 세션은 발급된다.** 게임은 할 수 있고 보상만 없다
                     (Acceptance Scenario 4).
 
-                    **요청 본문은 읽지 않는다.** 이미 배포된 Unity 클라이언트가 `{gameId}` 를 보내고
-                    있어 받아만 두고 무시한다 — 미니게임은 1종뿐이라(FR-009) 식별할 대상이 없다.
+                    **요청 본문은 읽지 않는다.** 미니게임이 1종뿐이라(FR-009) 식별할 대상이 없다.
+                    본문이 실려 와도 받아만 두고 무시한다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "`sessionId`·`targetSeconds`·`failAfterSeconds`·`serverStartedAt`"),
@@ -76,8 +76,8 @@ public class MinigameController {
             description = """
                     **서버가 읽는 것은 `stoppedSeconds` 하나다.** 오차·구간·보상·일일 한도는 전부
                     서버가 계산한다 (C-06, FR-008, 헌법 16조). 클라이언트가 `targetSeconds`·
-                    `errorSeconds`·`timedOut` 을 함께 보내도 **조용히 무시**된다 — 거부하지 않는 이유는
-                    이미 배포된 Unity 클라이언트가 그 셋을 보내고 있기 때문이다.
+                    `errorSeconds`·`timedOut` 을 함께 보내도 **조용히 무시**된다 — 받는 쪽을 좁혀서
+                    얻을 것이 없어 거부하지 않는다.
 
                     ### 판정 실패는 HTTP 오류가 아니다
                     아래는 **전부 `200`** 이고 본문으로 구분한다:
