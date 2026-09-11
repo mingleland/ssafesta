@@ -3,15 +3,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
+import { notifyBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
 
 export function useLeaseSlot() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (slotId: number) => leaseApi.leaseSlot(slotId),
-    onSuccess: () => {
+    onSuccess: (_result, slotId) => {
       queryClient.invalidateQueries({ queryKey: ['booth-slots'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
       queryClient.invalidateQueries({ queryKey: ['my-booth'] });
+      // 임대하면 BE 가 그 슬롯의 게시본을 만든다 — 상주 중인 Unity 가 그 슬롯을 다시 읽게 한다 (-644).
+      // 월드 밖(mock·미진입)이면 아무 일도 없다: 다음 진입이 읽는다.
+      notifyBoothSlotChanged(slotId);
     },
     onError: (error) => {
       if (!isApiError(error)) return;
