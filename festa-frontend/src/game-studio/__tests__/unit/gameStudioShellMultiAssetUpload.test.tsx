@@ -12,7 +12,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { GameStudioShell } from '../../studio/ui/GameStudioShell.tsx';
 import { createStarterProject } from '../../studio/model/createStarterProject.ts';
-import { addAssetReference } from '../../studio/model/authoringCommands.ts';
 import type { GameAssetRepository } from '../../studio/assets/localAssetRepository.ts';
 import type { AssetReference, GameProject } from '../../contracts/gameProject.ts';
 
@@ -144,16 +143,17 @@ describe('GameStudioShell — 데이터 탭 이미지 다중 업로드(S15P21A60
 
   it('자산 300개 상한에 도달하면 상한까지만 처리하고 초과분은 실패로 안내한다', async () => {
     const { repository, savedIds } = createMockRepository();
-    let project = createStarterProject(GAME_ID);
-    const existingCount = project.assets.length;
-    // 300개 상한 중 2자리만 남기고 채운다.
-    for (let index = 0; index < 300 - existingCount - 2; index += 1) {
-      project = addAssetReference(project, {
-        id: `stress${index}`,
-        kind: 'AUDIO',
-        source: `asset://local/${GAME_ID}/stress${index}`,
-      });
-    }
+    const starter = createStarterProject(GAME_ID);
+    // S15P21A604-626 조사에서 확인된 패턴 그대로: addAssetReference(→validated→
+    // parseGameProject)를 298번 루프에서 부르면 매 호출이 지금까지 쌓인 배열 전체를 다시
+    // 검증해 O(n²)이 되고, CI처럼 CPU가 눌린 환경에서는 testTimeout(5000ms)을 넘길 수 있다
+    // (로컬 22코어에서는 통과했지만 CI 컨테이너에서 timeout). 배열을 한 번에 이어붙이고
+    // 검증은 GameStudioShell 마운트 시 1회만 타도록 해서 O(n)으로 낮춘다.
+    const stressAssets: readonly AssetReference[] = Array.from(
+      { length: 300 - starter.assets.length - 2 },
+      (_, index) => ({ id: `stress${index}`, kind: 'AUDIO', source: `asset://local/${GAME_ID}/stress${index}` }),
+    );
+    const project: GameProject = { ...starter, assets: [...starter.assets, ...stressAssets] };
     expect(project.assets.length).toBe(298);
     const { container } = openDataTab(repository, project);
 
