@@ -33,13 +33,18 @@ download="$(mktemp "${root}/.webgl-download.XXXXXX")"
 staging=
 headers=
 status=FAILED
+# 엣지(Cloudflare)가 검증 요청을 막아 오리진 직접 확인으로 합격시킨 적이 있는가.
+# 증거에 남겨야 "이 릴리스는 공개 경로로는 확인하지 못했다" 를 나중에도 알 수 있다.
+edge_blocked=0
 cleanup() {
   rm -f "${download}" "${headers:-}"
   [[ -z "${staging:-}" ]] || rm -rf -- "${staging}"
   if [[ -n "${WEBGL_EVIDENCE_PATH:-}" ]]; then
     mkdir -p "$(dirname "${WEBGL_EVIDENCE_PATH}")"
-    printf '{"releaseId":"%s","artifactSha256":"%s","target":"%s","status":"%s","finishedAt":"%s"}\n' \
-      "${release_id}" "${expected_sha}" "${WEBGL_PUBLIC_BASE_URL}" "${status}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"${WEBGL_EVIDENCE_PATH}"
+    printf '{"releaseId":"%s","artifactSha256":"%s","target":"%s","status":"%s","verifiedVia":"%s","finishedAt":"%s"}\n' \
+      "${release_id}" "${expected_sha}" "${WEBGL_PUBLIC_BASE_URL}" "${status}" \
+      "$([[ "${edge_blocked}" == 1 ]] && echo origin || echo edge)" \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"${WEBGL_EVIDENCE_PATH}"
   fi
 }
 trap cleanup EXIT
@@ -186,26 +191,82 @@ log_verify_failure() {
     | sed 's/^/    /' >&2 || true
 }
 
+# 한 번 받아 보고 판정한다. **실패를 두 종류로 나누는 것이 요점이다.**
+#   1 = 일시 실패(네트워크 오류·403·408·425·429·5xx) → 다시 물어볼 가치가 있다
+#   2 = 배포 결함(2xx 인데 Content-Type·Cache-Control·Content-Encoding 이 계약과 다르다) → 몇 번을 물어도 같다
+# 둘을 같은 실패로 묶으면 앞단이 잠깐 막은 것 때문에 멀쩡한 릴리스를 되돌리게 된다 (2026-09-11 #165).
+request_and_check() {
+  local url="$1" expected_type="$2" require_brotli="$3" expected_cache="$4" file="$5"
+  : >"${file}"
+  curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+    --dump-header "${file}" --output /dev/null "${url}" || return 1
+  # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
+  local status_line; status_line="$(head -n 1 "${file}" 2>/dev/null | tr -d '\r')"
+  if ! [[ "${status_line}" =~ ^HTTP/[0-9.]+[[:space:]]+2[0-9][0-9] ]]; then
+    [[ "${status_line}" =~ [[:space:]](403|408|425|429|5[0-9][0-9])([[:space:]]|$) ]] && return 1
+    return 2
+  fi
+  grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${file}" || return 2
+  grep -Fiq "Cache-Control: ${expected_cache}" "${file}" || return 2
+  if [[ "${require_brotli}" == 1 ]]; then
+    grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${file}" || return 2
+  fi
+  return 0
+}
+
+# 엣지(Cloudflare)를 건너뛰고 **이 호스트의 nginx 에 직접** 같은 경로를 묻는다.
+# 이름은 그대로 두고 주소만 바꾸는 --resolve 라야 server_name·location 규칙을 그대로 탄다.
+# 오리진 인증서는 엣지 전용(origin cert)이라 공개 체인으로 검증되지 않으므로 --insecure 다 —
+# 여기서 보는 것은 신원이 아니라 **우리가 방금 올린 파일이 제대로 서빙되는가** 하나다.
+verify_origin() {
+  local path="$1" expected_type="$2" require_brotli="$3" expected_cache="$4"
+  [[ "${WEBGL_ORIGIN_VERIFY:-1}" == 1 ]] || return 1
+  local base="${WEBGL_PUBLIC_BASE_URL%/}" addr="${WEBGL_ORIGIN_ADDRESS:-127.0.0.1}" scheme host port
+  scheme="${base%%://*}"; host="${base#*://}"; host="${host%%/*}"; host="${host%%:*}"
+  port=443; [[ "${scheme}" == http ]] && port=80
+  local file; file="$(mktemp "${root}/.webgl-origin.XXXXXX")"
+  local rc=1
+  if curl --silent --show-error --location --insecure \
+      --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" --resolve "${host}:${port}:${addr}" \
+      --dump-header "${file}" --output /dev/null "${base}/${path}"; then
+    head -n 1 "${file}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]' \
+      && grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${file}" \
+      && grep -Fiq "Cache-Control: ${expected_cache}" "${file}" \
+      && { [[ "${require_brotli}" != 1 ]] || grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${file}"; } \
+      && rc=0
+  fi
+  [[ ${rc} -eq 0 ]] || { echo "  origin check also failed: ${base}/${path} via ${addr}" >&2; log_verify_failure "origin ${base}/${path}" "${file}"; }
+  rm -f "${file}"
+  return ${rc}
+}
+
 verify_http() {
   local path="$1" expected_type="$2" require_brotli="${3:-0}" expected_cache="$4" base="${WEBGL_PUBLIC_BASE_URL%/}"
+  local url="${base}/${path}" attempts="${WEBGL_VERIFY_RETRIES:-3}" delay="${WEBGL_VERIFY_RETRY_DELAY_SECONDS:-3}"
   headers="$(mktemp "${root}/.webgl-headers.XXXXXX")"
-  if ! curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
-    --dump-header "${headers}" --output /dev/null "${base}/${path}"; then
-    log_verify_failure "${base}/${path}" "${headers}"; return 1
-  fi
-  # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
-  if ! head -n 1 "${headers}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]'; then
-    log_verify_failure "${base}/${path}" "${headers}"; return 1
-  fi
-  grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${headers}" \
-    || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
-  grep -Fiq "Cache-Control: ${expected_cache}" "${headers}" \
-    || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
-  if [[ "${require_brotli}" == 1 ]]; then
-    grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${headers}" \
-      || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
+  local rc=1 i
+  for ((i = 1; i <= attempts; i++)); do
+    request_and_check "${url}" "${expected_type}" "${require_brotli}" "${expected_cache}" "${headers}"; rc=$?
+    [[ ${rc} -ne 1 ]] && break
+    if [[ ${i} -lt ${attempts} ]]; then
+      echo "  verify 일시 실패 — ${delay}s 뒤 재시도 ${i}/$((attempts - 1)): ${url}" >&2
+      sleep "${delay}"
+    fi
+  done
+  if [[ ${rc} -eq 0 ]]; then rm -f "${headers}"; headers=; return 0; fi
+
+  log_verify_failure "${url}" "${headers}"
+  # cf-ray 가 찍혔다면 우리 nginx 가 아니라 엣지가 끊은 것이다. 그럴 때만 오리진에 직접 물어
+  # **배포물 자체**를 판정한다 — 엣지가 검증자를 막았다는 이유로 멀쩡한 릴리스를 되돌리지 않기 위해서다.
+  if [[ ${rc} -eq 1 ]] && grep -qi '^cf-ray:' "${headers}" \
+     && verify_origin "${path}" "${expected_type}" "${require_brotli}" "${expected_cache}"; then
+    edge_blocked=1
+    echo "  엣지가 검증 요청을 막았지만 오리진은 정상이다 — 배포물로는 합격 처리: ${path}" >&2
+    rm -f "${headers}"; headers=
+    return 0
   fi
   rm -f "${headers}"; headers=
+  return 1
 }
 
 verify_release() {
@@ -259,4 +320,8 @@ for name in "${release_dirs[@]}"; do
 done
 
 status=SUCCEEDED
+if [[ "${edge_blocked}" == 1 ]]; then
+  echo "WARNING: 공개 경로 검증이 엣지에서 막혀 오리진 직접 확인으로 대체했다 —" \
+       "배포물은 정상이지만 엣지(Cloudflare)가 이 에이전트를 막는지 인프라에 확인이 필요하다." >&2
+fi
 echo "DEPLOYED_WEBGL_RELEASE: ${release_id} ${expected_sha}"
