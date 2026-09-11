@@ -685,6 +685,8 @@
 .gss-custom-assets { background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; padding: 9px; }
 .gss-custom-assets summary { color: #333d4b; cursor: pointer; font-size: 9px; font-weight: 750; }
 .gss-custom-assets p { color: #5b6577; font-size: 8px; line-height: 1.5; }
+/* S15P21A604-630 — 다중 이미지 업로드 진행 중 카운터. */
+.gss-upload-progress { color: #1d4ed8; font-size: 8px; font-weight: 700; margin: 4px 0 0; }
 .gss-replace-asset-button { background: rgba(37,99,235,.06); border: 1px dashed rgba(37,99,235,.4); color: #1d4ed8 !important; font-size: 9px; padding: 8px; width: 100%; }
 .gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr auto; padding: 8px; }
 /* S15P21A604-580 — 삭제 버튼에 grid 위치 지정이 없어 auto-placement로 좌측 하단(3번째 행,
