@@ -37,7 +37,7 @@ for expected in 'HS256' 'decoded length at least 32 bytes' 'TTL: 120 seconds' \
 done
 pass 'world-entry-token fixed claims and cryptographic boundary'
 
-for key in GAME_IMAGE_REF ROOT_DOMAIN CONNECTION_TOKEN_SECRET_FILE WORLD_ENTRY_TOKEN_ISSUER \
+for key in GAME_IMAGE_REF ROOT_DOMAIN DEMO_GAME_HOST_PORT CONNECTION_TOKEN_SECRET_FILE WORLD_ENTRY_TOKEN_ISSUER \
   WORLD_ENTRY_TOKEN_AUDIENCE WORLD_ID WORLD_CHANNEL_ID WORLD_MAX_PLAYERS WORLD_LEDGER_PATH; do
   grep -Eq "^${key}=" "${env_example}" || fail ".env.example missing ${key}"
 done

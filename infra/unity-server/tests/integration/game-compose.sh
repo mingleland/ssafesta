@@ -9,8 +9,8 @@ compose_file="${unity_server_dir}/compose.yaml"
 assert_file "${compose_file}"
 
 assert_contains "${compose_file}" '^[[:space:]]+demo-game:$' 'Compose must define one demo-game service'
-assert_contains "${compose_file}" '^[[:space:]]+expose:[[:space:]]+\["7777"\]$' 'game must expose internal 7777'
-assert_not_contains "${compose_file}" '^[[:space:]]+ports:' 'game must not publish a host port'
+assert_contains "${compose_file}" '^[[:space:]]+ports:$' 'game must publish a loopback port for host Nginx'
+assert_contains "${compose_file}" '127\.0\.0\.1:\$\{DEMO_GAME_HOST_PORT:-17777\}:7777' 'game must publish 7777 to loopback only'
 assert_contains "${compose_file}" '^[[:space:]]+user:[[:space:]]+"\$\{GAME_CONTAINER_UID' 'game must run as a non-root configured user'
 assert_contains "${compose_file}" '^[[:space:]]+read_only:[[:space:]]+true$' 'game root filesystem must be read-only'
 assert_contains "${compose_file}" '^[[:space:]]+cap_drop:[[:space:]]+\[ALL\]$' 'game must drop Linux capabilities'
@@ -39,7 +39,8 @@ export CONNECTION_TOKEN_SECRET_FILE="${secret_file}"
 export DOCKER_CONFIG="${docker_config}"
 
 docker compose -f "${compose_file}" config >"${rendered}"
-assert_not_contains "${rendered}" '^[[:space:]]+ports:$' 'rendered Compose publishes a host port'
+assert_contains "${rendered}" 'host_ip:[[:space:]]+127\.0\.0\.1' 'rendered Compose must bind the game port to loopback'
+assert_contains "${rendered}" 'published:[[:space:]]+"?17777"?' 'rendered Compose must use the demo loopback port'
 assert_contains "${rendered}" 'target:[[:space:]]+connection_token_secret' 'rendered Compose lost the Secret target'
 assert_contains "${rendered}" 'source:[[:space:]]+world-replay' 'rendered Compose lost the replay volume'
 pass 'Compose rendering'
