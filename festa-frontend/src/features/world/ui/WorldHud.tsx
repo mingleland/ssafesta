@@ -14,6 +14,7 @@
 // 없었다. 나가기도 같은 F 다 — 내부 공간 출구에 BoothPortal 이 하나 더 있다(festa-unity
 // World/Festival/BoothPortal.cs: "외부 부스와 내부 공간 출구에 하나씩").
 import { useState } from 'react';
+import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import { WorldGuideLauncher } from './WorldGuideLauncher';
 import './worldHud.css';
@@ -30,6 +31,9 @@ export function WorldHud({ mock = false }: Props) {
     <div className="world-hud">
       {/* 허용 4번 — 상담 상태 즉시 접근 */}
       <ConsultationQuickAccess />
+
+      {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
+      <BoothExitButton />
 
       {guideOpen && (
         <section className="world-hud-guide" aria-label="조작 안내">

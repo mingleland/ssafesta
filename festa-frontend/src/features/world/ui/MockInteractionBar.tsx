@@ -26,6 +26,10 @@ const ENTRIES: { label: string; event: Record<string, unknown> }[] = [
   { label: '내 부스 관리', event: { type: 'WORLD_MANAGEMENT_INTERACT' } },
   { label: '이벤트 경품', event: { type: 'WORLD_EVENT_INTERACT', npcId: 'mock-event-npc' } },
   { label: '타이밍 스톱', event: { type: 'WORLD_MINIGAME_INTERACT', gameId: 'TIMER_STOP', machineId: 'mock-timer-stop' } },
+  // 위치 알림 — 화면을 열지 않고 나가기 버튼의 노출 조건만 바꾼다 (S15P21A604-627, #174).
+  // 밖일 때 boothId 를 넣지 않는 것까지 Unity 송신부와 같다 — 0 을 실으면 "0번 부스" 로 읽힌다
+  { label: '부스 안', event: { type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: MOCK_BOOTH_ID } },
+  { label: '부스 밖', event: { type: 'WORLD_BOOTH_CONTEXT', insideBooth: false } },
 ];
 
 export function MockInteractionBar() {
