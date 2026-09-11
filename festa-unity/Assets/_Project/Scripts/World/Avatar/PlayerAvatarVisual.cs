@@ -780,9 +780,28 @@ namespace Festa.World
                     _animator.SetFloat(SpeedHash, running ? 2f : moving ? 1f : 0f);
             }
 
-            if (_player.EmoteId.Value == PlayerEmoteId.None)
+            if (_player.EmoteId.Value == PlayerEmoteId.None && !SwingHoldsAnimator)
                 CrossFadeLocomotion(state);
         }
+
+        /// <summary>
+        /// 망치 스윙이 애니메이터를 쥐고 있는가. 참이면 로코모션으로 갈아타지 않는다.
+        ///
+        /// <para><b>왜 EmoteId 만으로는 부족한가.</b> 스윙 시작은 <c>SwingClientRpc</c> 로 <b>즉시</b> 오는데
+        /// <see cref="Festa.Network.NetworkPlayer.EmoteId"/> 는 NetworkVariable 이라 다음 틱(30tick ≈ 33 ms)에
+        /// 온다. 그 틈에 남의 화면에서는 EmoteId 가 아직 None 이라, 치는 사람이 멈추며 바뀐 AnimState 가
+        /// 방금 켠 <c>Emote_Strike</c> 를 Idle 로 덮었다 — 남들 눈에는 "움찔하고 만다" 로 보였다
+        /// (사용자 지적 2026-09-11). 클립이 빌드에서 빠진 게 아니라 한 프레임 만에 덮인 것이다.</para>
+        /// </summary>
+        bool SwingHoldsAnimator
+        {
+            get
+            {
+                if (_strikeProp == null) _strikeProp = GetComponent<AvatarStrikeProp>();
+                return _strikeProp != null && _strikeProp.IsSwinging;
+            }
+        }
+        AvatarStrikeProp _strikeProp;
 
         void ApplyEmote(PlayerEmoteId emote)
         {
@@ -790,7 +809,9 @@ namespace Festa.World
             if (emote == PlayerEmoteId.None)
             {
                 RestoreBaseGrounding();
-                CrossFadeLocomotion(_player.AnimState.Value);
+                // 스윙 중이면 로코모션으로 돌리지 않는다 — 원샷 이모트가 None 으로 복귀하는 틱이
+                // 스윙 한가운데 떨어지면 망치만 남고 몸이 Idle 로 돌아간다. 복귀는 EndSwing 이 한다.
+                if (!SwingHoldsAnimator) CrossFadeLocomotion(_player.AnimState.Value);
                 return;
             }
 
