@@ -32,7 +32,13 @@
     "leaseEndsAt": "2026-08-20T07:12:03Z",
     "remainingSeconds": 71040,
     "entryAvailable": true,
-    "mine": false
+    "mine": false,
+    "facade": {
+      "themeCode": "DEFAULT",
+      "primaryColor": "#3B82F6",
+      "signText": "AI 프로젝트 전시관",
+      "logoUrl": "https://cdn.example.com/logo.png"
+    }
   },
   {
     "slotId": 6,
@@ -45,7 +51,8 @@
     "leaseEndsAt": null,
     "remainingSeconds": null,
     "entryAvailable": false,
-    "mine": false
+    "mine": false,
+    "facade": null
   }
 ]
 ```
@@ -56,6 +63,11 @@
 | `remainingSeconds` | 남은 시간. 만료·미임대면 `null` (FR-007, SC-005) |
 | `entryAvailable` | 지금 입장 가능한가. 만료됐으면 `false` |
 | `mine` | 요청자가 임차인인가. 비인증 요청은 항상 `false` |
+| `facade` | 점유 중인 부스의 외관 4필드. **빈 슬롯은 `null`**이다. 값은 `GET /booths/{boothId}`의 `facade`와 같다 (S15P21A604-622 · GitLab #171) |
+
+> **간판 12개를 요청 하나로 그린다.** Unity가 축제장에 들어서면 부스마다 간판을 세우는데, 이 필드가 없으면 슬롯 목록 1회 + 부스당 상세 1회로 최대 13요청이 든다. 부스 행은 `boothName` 때문에 이미 읽고 있으므로 질의가 늘지 않는다.
+>
+> 프로젝트명·대표 이미지는 여기 싣지 않는다 — 시야에 든 부스만 `GET /booths/{boothId}/projects/published`로 따로 읽는다(#171 합의).
 
 > `status`가 `AVAILABLE`인데 월드에는 부스가 보일 수 있다. 만료를 월드에 실시간 전파하지 않기 때문이다(FR-019). **이 응답이 권위다.**
 
