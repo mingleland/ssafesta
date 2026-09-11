@@ -88,18 +88,22 @@ class BoothApiIntegrationTest {
     }
 
     /**
-     * V28 이 적용될 때 1번 슬롯에 살아 있던 임대는 만료까지 그대로 간다 (S15P21A604-615).
+     * 이벤트 슬롯에 활성 임대가 얹혀 있어도 시스템이 평소대로 돈다 (S15P21A604-615).
      *
-     * <p>마이그레이션 주석이 그렇게 정의했는데 검증은 없었다 — 테스트 DB 는 늘 V1부터 깨끗하게
-     * 올라오므로 그 경로를 아무도 밟지 않는다. 여기서는 <b>그 상태를 직접 만들어</b> 주장한 동작을
-     * 확인한다: 데이터가 깨지지 않고, 목록에 그대로 보이고, 만료 판정도 평소대로 돌고, 만료 뒤
-     * 재임대만 거절된다.
+     * <p>V28 이 적용되는 순간 1번 슬롯에 임대가 살아 있을 수 있고, 마이그레이션은 그것을 만료까지
+     * 그대로 둔다. 여기서 확인하는 것은 <b>그 상태에서의 동작</b>이다 — 목록에 그대로 보이고,
+     * 만료 판정이 평소대로 돌고, 만료 뒤 재임대만 거절된다.
+     *
+     * <p><b>마이그레이션 순서는 여기서 검증되지 않는다.</b> 테스트 DB 는 늘 V1부터 전부 적용된 뒤에
+     * 시작하므로 이 임대는 V28 <i>뒤</i>에 생긴 것이고, V28 이 임대를 지우도록 고쳐도 이 테스트는
+     * 통과한다(변이로 확인했다). 그 주장은 {@link EventSlotMigrationScopeTest} 가 마이그레이션
+     * 파일의 범위로 고정한다.
      *
      * <p>조건부 UPDATE 로 만들지 않은 이유가 여기 있다 — 환경마다 결과가 달라지면 "슬롯 1 은
      * 이벤트다" 가 더 이상 계약이 아니게 된다.
      */
     @Test
-    void aLeaseThatPredatesTheEventSlotSurvivesUntilItExpires() throws Exception {
+    void anActiveLeaseOnTheEventSlotStillExpiresAndCannotBeRenewed() throws Exception {
         Long userId = createMemberWithWallet(users, wallets, "이전임대");
         Long boothId = booths.save(new Booth(userId, "이전임대 부스")).getId();
         BoothLayoutTestSupport.grantLeaseOnSlot(jdbc, boothId, userId, 1L);
