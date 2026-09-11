@@ -136,13 +136,23 @@ PY
 )"
 mapfile -t manifest_paths <<<"${manifest_output}"
 
+# 이 스크립트가 관리하기 전에 손으로 배포한 흔적이 남아 있을 수 있다(2026-09-10 수동 배포).
+# 그때의 current 는 releases/<id> 심링크가 아니라 실체 디렉터리이거나 다른 곳을 가리키는
+# 심링크다. 그대로 중단하면 첫 자동 배포가 영영 못 들어간다 — 그렇다고 덮어써 버리면
+# 되돌릴 것이 없어지므로, **옆으로 치워 두고** 진행한다. 롤백은 previous 가 맡는다.
 old_target=
 if [[ -L "${root}/current" ]]; then
   old_target="$(readlink "${root}/current")"
-  [[ "${old_target}" =~ ^releases/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] \
-    || { echo 'current points outside the managed WebGL releases' >&2; exit 68; }
+  if [[ ! "${old_target}" =~ ^releases/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+    legacy="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
+    echo "current points outside the managed WebGL releases (${old_target}) — moving it to $(basename "${legacy}")" >&2
+    mv -T "${root}/current" "${legacy}"
+    old_target=
+  fi
 elif [[ -e "${root}/current" ]]; then
-  echo 'current must be a symbolic link' >&2; exit 68
+  legacy="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
+  echo "current is not a symbolic link — moving it to $(basename "${legacy}")" >&2
+  mv -T "${root}/current" "${legacy}"
 fi
 
 tmp_link="${root}/.current.${release_id}.$$"
