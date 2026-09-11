@@ -1,8 +1,9 @@
 // GitHub jobs와 동일한 Jenkinsfile/stage 계약을 사용한다. 실제 전환 전 test folder에서 생성한다.
-String serverName = System.getenv('GITLAB_SERVER_NAME') ?: 'CONFIGURE_ME'
+String gitlabServerName = System.getenv('GITLAB_SERVER_NAME') ?: 'CONFIGURE_ME'
 String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID') ?: 'gitlab-api'
-String projectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
-String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
+String gitlabProjectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
+String gitlabProjectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
+String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPath}"
 
 ['ai', 'back', 'front', 'game', 'develop'].each { branchName ->
     multibranchPipelineJob("festa-gitlab-rehearsal/${branchName}") {
@@ -12,10 +13,10 @@ String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
                 source {
                     gitlab {
                         id("festa-gitlab-${branchName}")
-                        serverName(serverName)
+                        serverName(gitlabServerName)
                         credentialsId(gitlabApiCredentialsId)
-                        projectOwner(projectOwner)
-                        projectPath(projectPath)
+                        projectOwner(gitlabProjectOwner)
+                        projectPath(gitlabProjectFullPath)
                         traits {
                             gitLabBranchDiscovery { strategyId(1) }
                             headWildcardFilter { includes(branchName); excludes('') }

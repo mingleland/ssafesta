@@ -205,8 +205,10 @@ grep -q 'credentialsId(gitlabApiCredentialsId)' "${develop_job}" \
   || fail "GitLab develop Job DSL must use the API credential for project discovery"
 grep -q 'projectOwner(gitlabProjectOwner)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the projectOwner method"
-grep -q 'projectPath(gitlabProjectPath)' "${develop_job}" \
-  || fail "GitLab develop Job DSL shadows the projectPath method"
+grep -q 'String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPath}"' "${develop_job}" \
+  || fail "GitLab develop Job DSL must compose the full GitLab project path"
+grep -q 'projectPath(gitlabProjectFullPath)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must pass the full GitLab project path"
 ! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
   || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
 ! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \
