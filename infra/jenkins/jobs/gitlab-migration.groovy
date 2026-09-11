@@ -1,6 +1,6 @@
 // GitHub jobs와 동일한 Jenkinsfile/stage 계약을 사용한다. 실제 전환 전 test folder에서 생성한다.
 String serverName = System.getenv('GITLAB_SERVER_NAME') ?: 'CONFIGURE_ME'
-String credentialsId = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: 'gitlab-checkout'
+String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID') ?: 'gitlab-api'
 String projectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
 String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
 
@@ -13,7 +13,7 @@ String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
                     gitlab {
                         id("festa-gitlab-${branchName}")
                         serverName(serverName)
-                        credentialsId(credentialsId)
+                        credentialsId(gitlabApiCredentialsId)
                         projectOwner(projectOwner)
                         projectPath(projectPath)
                         traits {
