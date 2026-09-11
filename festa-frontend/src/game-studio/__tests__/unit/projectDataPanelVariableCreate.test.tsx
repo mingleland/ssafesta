@@ -72,8 +72,14 @@ describe('ProjectDataPanel — Integer·String 변수 생성(S15P21A604-566)', (
     };
     setup(full);
 
-    expect((screen.getByRole('button', { name: '+ Boolean' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: '+ Integer' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: '+ String' }) as HTMLButtonElement).disabled).toBe(true);
+    // 이 케이스에서만 getByText 로 찾는다 (GitLab #168). getByRole 은 DOM 을 순회하며 요소마다
+    // role 과 accessible name 을 계산하는데, 변수 100개가 그려진 상태에서는 그 비용이 렌더보다
+    // 크다 — 실측 median: 렌더 64.0ms · getByRole x3 138.2ms(p95 240.6) · getByText x3 51.5ms.
+    // 세 버튼은 텍스트를 직접 담고 있어 getByText 가 같은 button 요소를 돌려준다. 재는 대상
+    // (상한에서 비활성화되는가)은 그대로이고, 무관한 쿼리 비용만 뺐다.
+    // 변수가 적은 위 두 케이스는 getByRole 이 3.9ms 라 그대로 둔다.
+    expect((screen.getByText('+ Boolean') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText('+ Integer') as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByText('+ String') as HTMLButtonElement).disabled).toBe(true);
   });
 });
