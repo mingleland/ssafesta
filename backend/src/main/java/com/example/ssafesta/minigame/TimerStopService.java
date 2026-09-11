@@ -267,6 +267,7 @@ public class TimerStopService {
      *                       client that also sends {@code targetSeconds}, {@code errorSeconds} or
      *                       {@code timedOut} has them ignored rather than refused
      */
+    @Schema(name = "TimerStopSubmitCommand")
     public record SubmitCommand(
             @Schema(description = "플레이어가 정지시킨 시각(초, 시작 기준 경과)", example = "7.41")
             BigDecimal stoppedSeconds) {
@@ -284,6 +285,7 @@ public class TimerStopService {
      * @param dailyRemainingCoins what is left of today's cap after this grant
      * @param message             short ASCII line the HUD can print as-is (WebGL IMGUI, T-22)
      */
+    @Schema(name = "TimerStopSubmitResult")
     public record SubmitResult(boolean accepted, BigDecimal errorSeconds, int tier, boolean timedOut,
                                int rewardedCoins, boolean dailyLimitReached, int dailyRemainingCoins,
                                String message) {

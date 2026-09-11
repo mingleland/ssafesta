@@ -11,6 +11,7 @@ import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -347,6 +348,8 @@ public class SurveyResponseService {
 
     // ── 요청·응답 ───────────────────────────────────────────────────────────
 
+    // 미니게임 제출(TimerStopService.SubmitCommand)과 단순 이름이 같다 (S15P21A604-614).
+    @Schema(name = "SurveySubmitCommand")
     public record SubmitCommand(List<AnswerCommand> answers) {
 
         public SubmitCommand {
@@ -364,6 +367,7 @@ public class SurveyResponseService {
     }
 
     /** {@code rewardedCoin} is always present; {@code 0} means nothing was paid (계약 §1). */
+    @Schema(name = "SurveySubmitResult")
     public record SubmitResult(Long responseId, int rewardedCoin) {
     }
 

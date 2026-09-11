@@ -491,6 +491,9 @@ public class GameController {
         }
     }
 
+    // 부스 게시본(BoothLayoutController.PublishedResponse)과 단순 이름이 같다 — 갈라 두지
+    // 않으면 한쪽 문서가 다른 쪽 본문이 된다 (S15P21A604-614, GitLab #172).
+    @Schema(name = "PublishedGameResponse")
     public record PublishedResponse(
             @Schema(description = "GameProject 구조 버전. 게시 회차와 다른 개념이다", example = "1.0") String schemaVersion,
             @Schema(description = "게임 식별자", example = "42") Long gameId,
