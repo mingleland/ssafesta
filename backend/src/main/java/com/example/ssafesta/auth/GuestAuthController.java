@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
@@ -79,8 +80,9 @@ public class GuestAuthController {
             @ApiResponse(responseCode = "403", description = "`UNTRUSTED_ORIGIN` — `Origin` 이 허용된 프론트 주소가 아니다. 쿠키를 보기 전에 먼저 거절한다")})
     @PostMapping("/refresh")
     public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token", required = false) String refreshToken,
-                                                        @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {
-        requireTrustedOrigin(origin, properties);
+                                                        @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin,
+                                                        HttpServletRequest request) {
+        requireTrustedOrigin(request, origin);
         if (refreshToken == null) {
             throw new InvalidRefreshTokenException();
         }
@@ -108,8 +110,9 @@ public class GuestAuthController {
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt,
-                                       @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin) {
-        requireTrustedOrigin(origin, properties);
+                                       @Parameter(hidden = true) @RequestHeader(name = "Origin", required = false) String origin,
+                                       HttpServletRequest request) {
+        requireTrustedOrigin(request, origin);
         if (jwt != null && "MEMBER".equals(jwt.getClaimAsString("role"))) {
             try {
                 memberSessionService.revoke(Long.valueOf(jwt.getSubject()));
@@ -132,8 +135,10 @@ public class GuestAuthController {
             Instant expiresAt) {
     }
 
-    private void requireTrustedOrigin(String origin, AuthProperties properties) {
-        if (!properties.frontendBaseUrl().equals(origin)) {
+    // 판단은 RequestOrigins 가 소유한다 — refresh·logout·OAuth 시작이 같은 규칙을 봐야 하고,
+    // 여기에 두면 OAuth 쪽이 두 번째 사본을 만든다 (GitLab #177).
+    private void requireTrustedOrigin(HttpServletRequest request, String origin) {
+        if (!RequestOrigins.isTrusted(request, origin, properties)) {
             throw new ApiException(ErrorCode.UNTRUSTED_ORIGIN);
         }
     }
