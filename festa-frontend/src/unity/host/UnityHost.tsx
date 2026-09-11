@@ -23,6 +23,7 @@ import {
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
 import { resetWorldUiState } from '../bridge/worldUiState';
+import { resetWorldContext } from '../../features/world/model/worldContext';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
@@ -92,6 +93,9 @@ export function UnityHost() {
     // 새 인스턴스에는 모달이 없다 — 재시도 boot 뒤에도 옛 관측값이 남으면 ESC 가 닫을 수 없는
     // Unity 모달을 향해 명령만 보낸다(-450). 상태는 인스턴스마다 새로 시작한다.
     resetWorldUiState();
+    // 새 인스턴스는 부스 안에 있지 않다 — 옛 관측값이 남으면 밖인데도 나가기 버튼이
+    // 유령으로 떠 있게 된다 (S15P21A604-627).
+    resetWorldContext();
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,
     // 인스턴스가 서면 해제한다. 이 타이머는 boot attempt 의 시간이지 사용자의 페이지 체류 시간이 아니다.

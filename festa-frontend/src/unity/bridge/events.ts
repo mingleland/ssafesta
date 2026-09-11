@@ -90,6 +90,29 @@ export type WorldInteractEvent =
       type: 'WORLD_MINIGAME_INTERACT';
       gameId: string;
       machineId?: string;
+    }
+  | {
+      /**
+       * 부스 안/밖 컨텍스트 (S15P21A604-627, GitLab #174).
+       *
+       * **상호작용이 아니라 위치 알림이다.** 같은 `onBoothInteract` 채널로 오지만 화면을 열지
+       * 않는다 — dispatcher 가 `worldContext` 에 담아 두면, 부스 안일 때만 나가기 버튼이 뜬다.
+       *
+       * `WORLD_` 접두사인 이유는 `WORLD_MINIGAME_INTERACT`(#166)·`WORLD_EVENT_INTERACT`(-599)와
+       * 같다 — 화면이 `boothId` 를 **소비하지 않는다**. 버튼은 `insideBooth` 만 보고, `boothId` 는
+       * 로그·분석용이다.
+       *
+       * **밖일 때는 `boothId` 키 자체가 오지 않는다.** Unity 송신부가 그렇게 만든다
+       * (`BoothInteractBridge.SendBoothContext`) — `0` 을 실어 보내면 언젠가 "0번 부스" 로 읽히기
+       * 때문이다. 그래서 optional 이고, 판정은 `insideBooth` 하나로만 한다.
+       *
+       * 보내는 시점: 로컬 플레이어 생성 직후 1회 + 안↔밖이 바뀔 때만. 진입 직후 1회가 필요한
+       * 이유는 재접속·재시도 boot 에서 FE 가 초기값을 모르기 때문이다(`AudioBridge` 의 mute
+       * 동기화 -557 과 같은 이유).
+       */
+      type: 'WORLD_BOOTH_CONTEXT';
+      insideBooth: boolean;
+      boothId?: number;
     };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */
