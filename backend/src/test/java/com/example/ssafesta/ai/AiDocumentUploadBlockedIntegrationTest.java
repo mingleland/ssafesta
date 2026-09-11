@@ -7,6 +7,7 @@ import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +47,12 @@ class AiDocumentUploadBlockedIntegrationTest {
     private static final String UPLOAD = """
             {"fileName": "project.pdf", "contentType": "application/pdf", "size": 1048576,
              "contentSha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}""";
+    private static final String REPLACEMENT = """
+            {"fileName": "v2.pdf", "contentType": "application/pdf", "size": 1048576,
+             "contentSha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"}""";
+    /** 교체 대상이 들고 있는 해시 — 요청과 달라야 자기동일 no-op 으로 빠지지 않는다. */
+    private static final String ORIGINAL_SHA =
+            "1111111111111111111111111111111111111111111111111111111111111111";
 
     /** 할당량이 찼다 — usage guard 90% (#100). 기다린다고 풀리지 않으므로 507 이다. */
     @Nested
@@ -64,6 +71,24 @@ class AiDocumentUploadBlockedIntegrationTest {
 
             // 차단 중 만든 행은 FR-018 의 10개 슬롯을 뒤에 올 객체 없이 먹는다.
             assertEquals(0, documents.countActive(agentId), "차단인데 행이 생겼다");
+        }
+
+        /**
+         * 수정본 교체도 같은 게이트를 지난다.
+         *
+         * <p>교체본은 <b>새 객체</b>가 필요한 새 행이다 — 원본을 고치는 것이 아니라서, 저장소에
+         * 쓸 수 없는 동안 통과시키면 올라올 수 없는 객체를 기다리는 행이 남는다.
+         */
+        @Test
+        void aReplacementIsRefusedByTheSameGate() throws Exception {
+            long agentId = agent("할당량교체");
+            long original = readyDocument(agentId);
+
+            mockMvc.perform(replacement(original))
+                    .andExpect(status().isInsufficientStorage())
+                    .andExpect(jsonPath("$.code").value("STORAGE_QUOTA_EXCEEDED"));
+
+            assertEquals(0, countReplacementsOf(original), "차단인데 교체본 행이 생겼다");
         }
     }
 
@@ -89,6 +114,18 @@ class AiDocumentUploadBlockedIntegrationTest {
                     .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"));
 
             assertEquals(0, documents.countActive(agentId), "차단인데 행이 생겼다");
+        }
+
+        @Test
+        void aReplacementIsRefusedByTheSameGate() throws Exception {
+            long agentId = agent("사용불가교체");
+            long original = readyDocument(agentId);
+
+            mockMvc.perform(replacement(original))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.code").value("STORAGE_UNAVAILABLE"));
+
+            assertEquals(0, countReplacementsOf(original), "차단인데 교체본 행이 생겼다");
         }
     }
 
@@ -128,10 +165,10 @@ class AiDocumentUploadBlockedIntegrationTest {
         @Autowired private UserRepository users;
         @Autowired private WalletService wallets;
         @Autowired private MemberSessionService sessions;
-        @Autowired private JdbcTemplate jdbc;
+        @Autowired protected JdbcTemplate jdbc;
         @Autowired private JsonMapper jsonMapper;
 
-        private Long userId;
+        protected Long userId;
 
         @BeforeEach
         void freeSlots() {
@@ -154,6 +191,31 @@ class AiDocumentUploadBlockedIntegrationTest {
             return post("/api/v1/agents/{id}/documents/upload-url", agentId)
                     .header("Authorization", bearer())
                     .contentType(MediaType.APPLICATION_JSON).content(UPLOAD);
+        }
+
+        protected org.springframework.test.web.servlet.RequestBuilder replacement(long documentId) {
+            return put("/api/v1/documents/{id}/replacement", documentId)
+                    .header("Authorization", bearer())
+                    .contentType(MediaType.APPLICATION_JSON).content(REPLACEMENT);
+        }
+
+        /** 게이트가 닫힌 배포에서도 교체 <b>대상</b>은 있어야 한다 — 발급 경로는 지금 막혀 있다. */
+        protected long readyDocument(long agentId) {
+            return jdbc.queryForObject("""
+                    INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
+                        size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
+                        storage_provider, storage_bucket, uploaded_at)
+                    SELECT booth_id, id, 'v1.pdf', 'application/pdf', 1048576,
+                           'seed/gate/' || id, 'READY', ?, ?, 'R2', 'test-ai-documents', now()
+                      FROM ai_agents WHERE id = ?
+                    RETURNING id
+                    """, Long.class, userId, ORIGINAL_SHA, agentId);
+        }
+
+        protected int countReplacementsOf(long documentId) {
+            return jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?",
+                    Integer.class, documentId);
         }
 
         private String bearer() {

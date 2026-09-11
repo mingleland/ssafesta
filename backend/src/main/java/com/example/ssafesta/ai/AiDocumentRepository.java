@@ -23,13 +23,41 @@ interface AiDocumentRepository extends JpaRepository<AiDocument, Long> {
     Optional<AiDocument> findActiveByAgentAndSha(@Param("agentId") Long agentId,
                                                  @Param("sha") String sha);
 
-    @Query("SELECT COUNT(d) FROM AiDocument d WHERE d.agentId = :agentId "
+    /**
+     * The document a 수정본 교체 is being uploaded over, if one is still in flight.
+     *
+     * <p>At most one row can match: {@code ux_ai_documents_active_replacement} (V30) is unique on
+     * {@code replaces_document_id} across exactly these three statuses. A second row here would mean
+     * the agent lock was bypassed, and {@code Optional} failing loudly is the right answer to that.
+     */
+    @Query("SELECT d FROM AiDocument d WHERE d.replacesDocumentId = :documentId "
             + "AND d.processingStatus IN ('QUEUED', 'PROCESSING', 'READY')")
+    Optional<AiDocument> findActiveReplacementOf(@Param("documentId") Long documentId);
+
+    /**
+     * How many slots the agent is actually using (FR-018).
+     *
+     * <p><b>The {@code NOT EXISTS} is what makes a replacement possible at ten documents.</b> While
+     * a 수정본 교체 is in flight both rows exist and both are active — the original is still
+     * {@code READY} and searchable until the new one publishes (FR-040), so neither can be excluded
+     * by status. Counting both would make every replacement on a full agent a
+     * {@code DOCUMENT_LIMIT_EXCEEDED}, which is the one operation a full agent most needs. The
+     * successor already stands for its original's slot, so the original drops out of the sum.
+     *
+     * <p>Nothing changes for an agent with no replacement in flight: no row points at any of its
+     * documents, so the subquery is false for all of them.
+     */
+    @Query("SELECT COUNT(d) FROM AiDocument d WHERE d.agentId = :agentId "
+            + "AND d.processingStatus IN ('QUEUED', 'PROCESSING', 'READY') "
+            + "AND NOT EXISTS (SELECT 1 FROM AiDocument r WHERE r.replacesDocumentId = d.id "
+            + "AND r.processingStatus IN ('QUEUED', 'PROCESSING', 'READY'))")
     long countActive(@Param("agentId") Long agentId);
 
     /** {@code COALESCE} because an agent with no documents sums to {@code null}, not zero. */
     @Query("SELECT COALESCE(SUM(d.sizeBytes), 0) FROM AiDocument d WHERE d.agentId = :agentId "
-            + "AND d.processingStatus IN ('QUEUED', 'PROCESSING', 'READY')")
+            + "AND d.processingStatus IN ('QUEUED', 'PROCESSING', 'READY') "
+            + "AND NOT EXISTS (SELECT 1 FROM AiDocument r WHERE r.replacesDocumentId = d.id "
+            + "AND r.processingStatus IN ('QUEUED', 'PROCESSING', 'READY'))")
     long sumActiveBytes(@Param("agentId") Long agentId);
 
     /**

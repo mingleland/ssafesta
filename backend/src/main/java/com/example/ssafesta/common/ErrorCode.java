@@ -99,6 +99,14 @@ public enum ErrorCode {
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
     /**
+     * 수정본 교체를 지금 걸 수 없다 (FR-019, S15P21A604-386). 교체 대상은 {@code READY} 하나이고,
+     * 그 위에 이미 다른 교체가 진행 중이거나 같은 파일이 다른 문서로 등록돼 있으면 여기로 온다.
+     *
+     * <p>무엇이 막는지는 thrower 가 message 에 담는다 — 대상 상태·진행 중인 교체·다른 문서의 중복은
+     * 사용자가 할 일이 서로 다르다. {@link #DOCUMENT_LIMIT_EXCEEDED} 와 같은 결이다.
+     */
+    DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
+    /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
      * <p>lease 가 만료돼 Job 을 회수하고 {@code attempt_no} 를 올린 뒤, 죽은 줄 알았던 이전 워커가
