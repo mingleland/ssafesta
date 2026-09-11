@@ -200,6 +200,18 @@ namespace Festa.Network
             // CharacterController 가 켜져 있으면 그 대입과 싸우므로 Owner 만 남긴다.
             if (_controller != null) _controller.enabled = IsOwner;
 
+            // **사람끼리 겹치지 않게 한다** (사용자 지적 2026-09-11 — 캐릭터가 서로 통째로 지나갔다).
+            //
+            // 위에서 원격의 CharacterController 를 끄는 순간 그 사람은 콜리전이 하나도 없는 상태가 된다.
+            // CharacterController 는 그 자체가 콜라이더라, 끄면 남의 Move() 가 막힐 것도 사라진다.
+            // 그래서 **원격에만** 캡슐을 켠다 — NetworkTransform 이 위치를 쓰는 것은 그대로 두고
+            // 부딪힐 몸만 세워 두는 것이다.
+            //
+            // 내 것은 끈 채로 둔다. 켜면 내 CharacterController 가 내 캡슐과 싸워 제자리에서 튄다.
+            // 즉 각 화면에서 "나는 CC, 남들은 캡슐" 이고, 막히는 판정은 내 CC 가 남의 캡슐을 미는 쪽으로 일어난다.
+            var body = GetComponent<CapsuleCollider>();
+            if (body != null) body.enabled = !IsOwner;
+
             if (IsServer)
                 ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
 
