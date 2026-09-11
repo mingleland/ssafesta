@@ -59,22 +59,27 @@ class RequestOriginsTest {
     }
 
     /**
-     * <b>알려진 천장이다 — 통과가 정답이라서 통과하는 것이 아니다.</b>
+     * <b>이 테스트가 이 클래스에서 제일 중요하다.</b>
      *
-     * <p>{@code getServerName()} 은 요청이 보낸 Host 헤더이고 nginx 가 세 환경 모두
-     * {@code proxy_set_header Host $host} 로 원본을 넘긴다. 그래서 배포 프로파일에서도
-     * {@code Host: localhost} 를 단 요청에는 로컬 가지가 열린다. 브라우저는 Host 를 주소창에서
-     * 만들어 임의 값을 못 보내므로 실사용 공격 경로가 아니고, 지금 이것을 막고 있는 것은 이 코드가
-     * 아니라 앞단 인프라(Cloudflare·server_name·allowlist)다.
+     * <p>{@code getServerName()} 은 요청이 보낸 Host 헤더이고, nginx 가 세 환경 모두
+     * {@code proxy_set_header Host $host} 로 원본을 넘긴다. 그래서 요청의 Host 만 보고 로컬을 판단하면
+     * 배포에 도달한 {@code Host: localhost} 요청에도 가지가 열리고, 그것을 막는 것이 코드가 아니라
+     * 앞단 인프라가 된다. {@code frontendBaseUrl} 은 요청자가 못 바꾸므로 그 값으로 판단해야 배포의
+     * 신뢰 모델이 <b>코드로</b> 닫힌다 (#177 리뷰 지적 → 2026-09-11 FE 합의).
      *
-     * <p>코드로 닫으려면 {@code frontendBaseUrl} 의 host 가 localhost 인지(= 로컬 배포인지)를 조건에
-     * 함께 걸면 된다. #177 리뷰에서 제안했고 FE 제안 원안대로 가기로 해 넣지 않았다. 넣는 순간 이
-     * 테스트는 {@code assertFalse} 로 뒤집힌다 — 그때 이 주석도 같이 지운다.
+     * <p>이것이 {@code true} 로 뒤집히면 배포 BE 가 로컬 포트를 신뢰하게 된다.
      */
     @Test
-    void aDeployedProfileStillOpensTheLocalBranchForALocalHostHeader() {
-        assertTrue(RequestOrigins.isTrusted(request("http", "localhost", 9999), "http://localhost:9999", props(DEPLOYED_BASE)),
-                "현재 규칙의 천장을 드러내는 테스트다 — 통과를 바라는 것이 아니다.");
+    void aDeployedProfileNeverOpensTheLocalBranchEvenForALocalHostHeader() {
+        assertFalse(RequestOrigins.isTrusted(request("http", "localhost", 9999), "http://localhost:9999", props(DEPLOYED_BASE)),
+                "배포에서는 Host 가 무엇이든 로컬 가지가 열리면 안 된다.");
+    }
+
+    /** {@code frontendBaseUrl} 을 못 읽으면 "로컬 아님"으로 닫는다 — 모르면 넓히지 않는다. */
+    @Test
+    void anUnparseableFrontendBaseUrlClosesTheLocalBranch() {
+        assertFalse(RequestOrigins.isTrusted(request("http", "localhost", 5175), "http://localhost:5175", props("not a url")),
+                "설정을 못 읽는 상태에서 가지를 열면 안 된다.");
     }
 
     /** 기본 포트는 생략한다. 붙이면 브라우저가 보낸 Origin 과 문자열이 어긋나 조용히 거부된다. */

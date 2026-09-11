@@ -1,6 +1,7 @@
 package com.example.ssafesta.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.util.Set;
 
 /**
@@ -11,24 +12,22 @@ import java.util.Set;
  * 밀리면(5174·5175·5199) 그 순간 refresh 가 {@code UNTRUSTED_ORIGIN} 이 되고 OAuth 복귀가 엉뚱한
  * 포트로 가는데, 그 하나를 없애려고 설정·CORS 목록·wildcard 를 늘리지 않기 위한 seam 이다.
  *
- * <p><b>경계 조건 둘을 알고 쓴다.</b>
+ * <p><b>로컬 가지는 요청이 아니라 배포로 연다.</b> {@code getServerName()} 은 서버의 속성이 아니라
+ * <b>요청이 보낸 Host 헤더</b>이고, nginx 가 세 환경 모두 {@code proxy_set_header Host $host} 로 원본을
+ * 그대로 넘긴다. 그래서 요청의 Host 만 보고 판단하면 배포에 도달한 {@code Host: localhost} 요청에도
+ * 가지가 열리고, "배포에서는 안 열린다"를 보증하는 것이 코드가 아니라 앞단 인프라
+ * (Cloudflare·server_name·allowlist)가 된다. {@link #isLocalDeployment} 를 함께 거는 이유가 그것이다 —
+ * {@code frontendBaseUrl} 은 요청자가 못 바꾸므로 배포에서는 Host 가 무엇이든 가지가 영구히 닫힌다
+ * (#177 리뷰 지적 → 2026-09-11 FE 합의).
  *
- * <p>하나. {@code getServerName()} 은 서버의 속성이 아니라 <b>요청이 보낸 Host 헤더</b>다. nginx 가
- * 세 환경 모두 {@code proxy_set_header Host $host} 로 원본을 그대로 넘기므로, 배포에 도달한 요청이
- * {@code Host: localhost} 를 달고 있으면 아래 로컬 가지가 열린다. 브라우저는 Host 를 주소창에서
- * 만들어 임의 값을 못 보내니 실사용 공격 경로는 아니지만, <b>"배포에서는 이 가지가 안 열린다"를
- * 보증하는 것은 이 코드가 아니라 앞단 인프라</b>다. 코드로 닫으려면 조건에
- * {@code frontendBaseUrl 의 host 가 localhost 인가}(= 로컬 배포인가)를 함께 걸면 된다 — #177 리뷰에서
- * 제안했고, FE 제안 원안대로 가기로 해 여기서는 넣지 않았다.
- *
- * <p>둘. Host 에 포트가 없으면 {@code getServerPort()} 는 80 이 아니라 <b>커넥터 포트</b>(로컬 8080)를
+ * <p><b>경계 조건 하나.</b> Host 에 포트가 없으면 {@code getServerPort()} 는 80 이 아니라 <b>커넥터 포트</b>(로컬 8080)를
  * 돌려준다. 그래서 {@code Host: localhost} 요청의 ownOrigin 은 {@code http://localhost:8080} 이고
  * 브라우저가 보낸 {@code Origin: http://localhost} 와 어긋나 거부된다. 안전한 쪽으로 어긋나므로
  * 그대로 둔다 — 느슨해지는 방향이 아니다.
  */
 final class RequestOrigins {
 
-    /** 로컬 가지를 여는 Host. 이름 해석이 아니라 문자열이다 — {@code contains} 나 접미사 비교로 넓히지 않는다. */
+    /** 로컬로 치는 host. 이름 해석이 아니라 문자열이다 — {@code contains} 나 접미사 비교로 넓히지 않는다. */
     private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "127.0.0.1");
 
     private RequestOrigins() {
@@ -56,6 +55,30 @@ final class RequestOrigins {
         if (candidate.equals(properties.frontendBaseUrl())) {
             return true;
         }
-        return LOCAL_HOSTS.contains(request.getServerName()) && candidate.equals(ownOrigin(request));
+        return isLocalDeployment(properties)
+                && isLocalHost(request.getServerName())
+                && candidate.equals(ownOrigin(request));
+    }
+
+    /**
+     * 이 인스턴스가 로컬 개발 스택인가. 판단 재료는 <b>요청이 못 건드리는 설정값</b>이어야 한다 —
+     * 요청의 Host 로 판단하면 배포에서도 가지가 열린다.
+     */
+    private static boolean isLocalDeployment(AuthProperties properties) {
+        return isLocalHost(hostOf(properties.frontendBaseUrl()));
+    }
+
+    private static boolean isLocalHost(String host) {
+        // Set.of 의 contains 는 null 에 NPE 를 던진다 — 값이 없으면 "로컬 아님"으로 닫는다.
+        return host != null && LOCAL_HOSTS.contains(host);
+    }
+
+    /** 파싱에 실패하면 null 이다. 신뢰 판단에서 그것은 곧 "로컬 아님"이라 안전한 쪽으로 닫힌다. */
+    private static String hostOf(String url) {
+        try {
+            return URI.create(url).getHost();
+        } catch (IllegalArgumentException malformed) {
+            return null;
+        }
     }
 }
