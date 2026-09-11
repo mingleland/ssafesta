@@ -21,8 +21,11 @@ namespace Festa.EditorTools
         const string RootName = "@PanelText";
         const string PanelName = "content-introduction";
 
-        /// <summary>글자를 얹을 기준 면. 판넬 표면(z=-324.956)보다 이만큼 앞에 세운다.</summary>
-        const float Lift = 0.6f;
+        /// <summary>
+        /// 판넬 면에서 띄우는 거리(u). 1 m = 10 u 이므로 0.12 는 1.2 cm — 눈으로는 면에 붙어 보이고
+        /// 깊이 버퍼가 판넬과 구분할 만큼은 된다. 0.6(6 cm)은 옆에서 보면 떠 보였다(사용자 지적).
+        /// </summary>
+        const float Lift = 0.12f;
 
         /// <summary>본문 색 — 완전 검정은 실내광에서 먹어 보인다.</summary>
         static readonly Color Ink = new(0.09f, 0.10f, 0.12f, 1f);
