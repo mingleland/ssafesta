@@ -14,6 +14,7 @@ assert_file "${verifier}"
 assert_contains "${nginx_template}" 'listen[[:space:]]+443[[:space:]]+ssl' 'world ingress must listen on TLS 443'
 assert_contains "${nginx_template}" 'proxy_set_header[[:space:]]+Upgrade' 'world ingress must preserve WebSocket Upgrade'
 assert_not_contains "${nginx_template}" 'listen[[:space:]]+7777' 'world ingress must not publish game port 7777'
+assert_not_contains "${nginx_template}" '^[[:space:]]*http2 on;' 'world ingress must remain compatible with the deployed Nginx version'
 assert_contains "${verifier}" '7777' 'external verifier must check that public 7777 is blocked'
 
 bash "${verifier}" --config-only >/dev/null
