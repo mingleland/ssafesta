@@ -70,7 +70,6 @@ namespace Festa.Content
 
         void OnDestroy()
         {
-            _ring.Dispose();
             if (_instance == this) _instance = null;
         }
 
@@ -86,7 +85,6 @@ namespace Festa.Content
             if (Festa.Integration.InputBridge.IsLocked)
             {
                 UpdateHover(null);
-                ShowHint(null);
                 // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
                 // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
                 _passive = null;
@@ -98,7 +96,6 @@ namespace Festa.Content
             if (Festa.World.LiePoseTable.IsLocalPlayerLying())
             {
                 UpdateHover(null);
-                ShowHint(null);
                 _passive = null;
                 return;
             }
@@ -126,7 +123,6 @@ namespace Festa.Content
             targeted ??= NearestInteractableInRange(_hovered);
 
             UpdateHover(targeted);
-            ShowHint(targeted);
 
             // F 응답이 없는 부스 오브젝트(영상 화면·좋아요·상담 데스크 등)를 **조준**했을 때만 "준비 중" 을 알린다 (S15P21A604-455).
             // 근접 자동 조준은 쓰지 않는다 — 옆을 지나갈 때마다 뜨면 소음이다. 키캡이 없으니 -345 의 거짓 힌트 금지와도 맞는다.
@@ -264,19 +260,15 @@ namespace Festa.Content
         }
 
         // ── 프롬프트 ─────────────────────────────────────────
-        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널 + 발밑 링.
+        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널. 그리기는 InteractPromptUI 한 곳에만 있다.
         // 전에는 여기만 화면 하단 uGUI 텍스트라, 같은 F 조작인데 다른 기능처럼 보였다
-        // (S15P21A604-355 사용자 보고). 그리기는 InteractPromptUI 한 곳에만 있다.
-        readonly Festa.World.InteractRing _ring = new Festa.World.InteractRing();
+        // (S15P21A604-355 사용자 보고).
+        //
+        // **발밑 링은 쓰지 않는다** (사용자 지시 2026-09-11). 포털은 부스 앞 빈 바닥에 깔려 "여기로 들어간다"
+        // 로 읽히지만, 오락기·슬롯머신은 기계가 바닥을 거의 덮고 서 있어 링이 기계 밑단과 겹쳐 잘린 빛줄기로
+        // 나왔다 — 바닥에 포털이 열린 것처럼 보인다는 지적. 기계는 프롬프트 알약만으로 충분히 읽힌다.
         string _toast;
         float _toastUntil;
-
-        void ShowHint(Festa.Booth.BoothInteractionTarget target)
-        {
-            if (target == null) { _ring.Hide(); return; }
-            var (pos, radius) = target.HighlightFootprint();
-            _ring.Show(pos, radius);
-        }
 
         /// <summary>대상별 행동 문구. 포털이 "3번 부스 입장" 을 쓰듯 여기도 무엇을 하는지 적는다.</summary>
         static string PromptFor(Festa.Booth.BoothInteractionTarget target)
