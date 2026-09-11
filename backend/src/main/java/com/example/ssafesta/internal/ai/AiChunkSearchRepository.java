@@ -44,15 +44,27 @@ class AiChunkSearchRepository {
     //           않는다 — hnsw.max_scan_tuples·scan_mem_multiplier 에서 멈추므로 여전히 topK 보다
     //           적게 올 수 있다. 정확성이 계약인 동안은 이 GUC 가 유일하게 보장하는 수단이다.
     static final String SEARCH = """
+            -- 질의 벡터를 MATERIALIZED CTE 에서 딱 한 번만 vector 로 바꾼다 (S15P21A604-654).
+            -- 본문에 CAST(:queryEmbedding AS vector) 를 그대로 두면 pgjdbc 가
+            -- prepareThreshold=5 로 statement 를 서버 측으로 승격시킨 뒤부터 Postgres 가
+            -- generic plan 을 쓰고, 거기서는 이 캐스트가 상수로 접히지 않아 3,000자짜리
+            -- 리터럴을 vector_in 이 행마다 다시 파싱한다. 실측에서 6번째 호출부터 3초
+            -- statement 상한에 붙었고 회복하지 않았다 (145,646행 기준 395ms -> 3,000ms+).
+            -- 비용 모델은 그 파싱을 못 보므로 계획을 바꾸는 것으로는 막을 수 없다.
+            -- MATERIALIZED 는 최적화 울타리라 계획 모드와 무관하게 한 번만 평가된다.
+            WITH q AS MATERIALIZED (
+                SELECT CAST(:queryEmbedding AS vector) AS v
+            )
             SELECT c.content,
                    c.chunk_no,
                    c.page_number,
                    c.section,
                    c.document_id,
                    d.original_filename,
-                   c.embedding <=> CAST(:queryEmbedding AS vector) AS distance
+                   c.embedding <=> q.v AS distance
               FROM ai_document_chunks c
               JOIN ai_documents d ON d.id = c.document_id
+             CROSS JOIN q
              WHERE c.booth_id = :boothId
                AND c.agent_id = :agentId
                AND c.searchable = TRUE
@@ -72,7 +84,7 @@ class AiChunkSearchRepository {
                -- 함께 걸러지지만 유한값으로 떨어지면 아무 뜻 없는 거리로 순위에 낀다.
                -- 저장 벡터 자체의 검증은 chunk 를 쓰는 쪽 몫이다 (S15P21A604-400).
                -- 검색이 할 수 있는 것은 여기까지이며, 이 줄을 그 검증의 대체물로 읽으면 안 된다.
-               AND (c.embedding <=> CAST(:queryEmbedding AS vector)) <> 'NaN'::float8
+               AND (c.embedding <=> q.v) <> 'NaN'::float8
              ORDER BY distance, c.document_id, c.chunk_no
              LIMIT :topK
             """;
