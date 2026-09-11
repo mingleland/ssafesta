@@ -94,5 +94,25 @@ namespace Festa.Integration
             }
             Debug.Log($"[WorldUiBridge] RequestExitWorldUi({reason}) — 닫을 Unity 모달이 없다");
         }
+
+        /// <summary>
+        /// 호스트 → Unity. <b>이 사람을 부스 밖으로 내보낸다</b> (GitLab #174, S15P21A604-623).
+        /// FE 의 "나가기" 버튼이 부른다.
+        ///
+        /// <para><see cref="RequestExitWorldUi"/> 와 <b>합치지 않는다.</b> 그건 "네가 연 화면을 닫아 달라",
+        /// 이건 "이 사람을 부스 밖으로 내보내 달라" 다. 합치면 부스 안에서 초점 카메라를 닫으려던 ESC 가
+        /// 사람을 밖으로 내보낼 수 있다.</para>
+        ///
+        /// <para><b>멱등.</b> 부스 밖이면 아무 일도 하지 않고 로그만 남긴다 — FE 가 상태 경합을 신경 쓰지 않아도
+        /// 되게. 퇴장은 기존 <c>Portal_Int_NN → ReturnPoint_NN</c> 경로를 그대로 탄다(텔레포트·카메라 스냅·
+        /// 게시본 재조회까지 F 와 같다). 성공 콜백은 없다 — 퇴장이 끝나면 <c>insideBooth:false</c> 가 나간다.</para>
+        /// </summary>
+        public void RequestExitBooth(string reason)
+        {
+            if (Festa.World.BoothContextPresenter.TryExitCurrentBooth(out int boothId))
+                Debug.Log($"[WorldUiBridge] RequestExitBooth({reason}) → 부스 {boothId} 퇴장");
+            else
+                Debug.Log($"[WorldUiBridge] RequestExitBooth({reason}) — 부스 밖이라 무시한다");
+        }
     }
 }

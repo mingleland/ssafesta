@@ -86,6 +86,19 @@ namespace Festa.Integration
         public const string EventInteract = "WORLD_EVENT_INTERACT";
 
         /// <summary>
+        /// 부스 안/밖 <b>컨텍스트</b> (GitLab #174, S15P21A604-623). <c>{type, insideBooth, boothId?}</c> —
+        /// 상호작용이 아니라 상태 전이라서 다른 <c>*_INTERACT</c> 와 이름 꼴이 다르다. 채널은 같다.
+        ///
+        /// <para>FE 는 이 값으로 부스 안에서 "나가기" 버튼을 띄운다. <c>WorldUiState</c> 에 넣지 않은 이유는
+        /// 그쪽 <c>hasUnityModal()</c> 이 <c>focus || minigame</c> 이라, 부스 안에 있다는 이유만으로 "Unity 모달"
+        /// 로 오판해 ESC 가 GameMenu 를 못 여는 회귀가 나기 때문이다 — UI 모달 상태와 월드 컨텍스트는 층이 다르다.</para>
+        ///
+        /// <para><b>월드 진입 직후 현재 값을 1회 보낸다.</b> 전이만 보내면 재접속·재시도 boot 에서 FE 가 초기값을
+        /// 모른다 — AudioBridge 의 mute 동기화(-557)와 같은 이유. 이후는 바뀔 때만이다.</para>
+        /// </summary>
+        public const string BoothContext = "WORLD_BOOTH_CONTEXT";
+
+        /// <summary>
         /// payload 가 **실제로 송신된** 직후 이벤트 종류를 알린다 (S15P21A604-348).
         /// 노트북 F 의 가시 결과(홈페이지 열기)는 FE 몫이라, FE 가 없는 단독 실행에서는
         /// 발동해도 화면 변화가 없어 "안 된다" 로 보인다 — 월드 쪽이 최소한의 피드백을
@@ -220,6 +233,19 @@ namespace Festa.Integration
         {
             Send("{\"type\":\"" + EventInteract + "\"}");
             OnSent?.Invoke(EventInteract);
+        }
+
+        /// <summary>
+        /// 부스 컨텍스트 — <see cref="BoothContext"/>. 안에 있을 때만 <c>boothId</c> 를 싣는다(FE 는 로그용으로만 쓴다).
+        /// 밖일 때 <c>boothId</c> 를 0 으로 실어 보내면 나중에 "0번 부스" 로 읽히므로 키를 뺀다.
+        /// </summary>
+        public static void SendBoothContext(bool insideBooth, int boothId)
+        {
+            string json = insideBooth
+                ? "{\"type\":\"" + BoothContext + "\",\"insideBooth\":true,\"boothId\":" + boothId + "}"
+                : "{\"type\":\"" + BoothContext + "\",\"insideBooth\":false}";
+            Send(json);
+            OnSent?.Invoke(BoothContext);
         }
 
         /// <summary>부스 배치 게임 포털 — <see cref="GameInteract"/>. configId 0 은 미연결 sentinel 이라 보내지 않는다(계약).</summary>
