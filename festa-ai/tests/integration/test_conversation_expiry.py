@@ -218,7 +218,7 @@ def test_close_mid_stream_keeps_raw_text_out_of_redis_and_the_log(
     assert asyncio.run(repository.get(conversation_id)) is None
 
     logged = " | ".join(record.getMessage() for record in caplog.records)
-    assert "completed turn dropped" in logged  # 조용히 삼키지 않는다 (T-24)
+    assert "conversation_turn_dropped" in logged  # 조용히 삼키지 않는다 (T-24, S15P21A604-147 구조화 로깅)
     for secret in (_QUESTION, *_ANSWER_TOKENS, _CHUNK_TEXT):
         assert secret.strip() not in logged
         assert json.dumps(secret.strip())[1:-1] not in logged
