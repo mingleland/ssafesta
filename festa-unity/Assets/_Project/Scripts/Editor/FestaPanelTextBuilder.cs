@@ -48,14 +48,12 @@ namespace Festa.EditorTools
                     Color=Ink, Align=TextAlignmentOptions.TopLeft, Style=FontStyles.Bold },
 
             new() { Name="Body_Intro", X=0.055f, Y=0.425f, W=0.405f, Size=0.455f,
-                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=1.06f,
+                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=1.547f,
                     Text="삼성청년SW·AI아카데미 ( <color=#2947A0><b>SSAFY</b></color> ) 는 삼성전자의\n" +
-                         "사회공헌 비전인 <color=#2947A0><b>\"함께가요 미래로!</b></color>\n" +
-                         "<color=#2947A0><b>Enabling People\"</b></color> 의 취지에 따라 삼성의 SW 교육\n" +
-                         "경험과 고용노동부의 취업지원 노하우를 바탕으로\n" +
-                         "취업 준비생에게 SW·AI 역량 향상 교육 및 다양한\n" +
-                         "취업지원 서비스를 제공하여 취업에 성공하도록\n" +
-                         "지원하는 프로그램입니다." },
+                         "사회공헌 비전인 <color=#2947A0><b>\"함께가요 미래로!</b></color> <color=#2947A0><b>Enabling People\"</b></color> 의 \n" +
+                         "취지에 따라 삼성의 SW 교육경험과 고용노동부의 취업지원 노하우를 바탕으로\n" +
+                         "취업 준비생에게 SW·AI 역량 향상 교육 및 다양한 취업지원 서비스를 제공하여 \n" +
+                         "취업에 성공하도록 지원하는 프로그램입니다." },
 
             new() { Name="Head_Facility", Text="시설현황", X=0.055f, Y=0.572f, W=0.30f, Size=0.54f,
                     Color=Ink, Align=TextAlignmentOptions.TopLeft, Style=FontStyles.Bold },
@@ -74,11 +72,11 @@ namespace Festa.EditorTools
                     Color=Gray, Align=TextAlignmentOptions.TopLeft },
 
             new() { Name="History_Years", X=0.545f, Y=0.400f, W=0.085f, Size=0.68f,
-                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=1.68f,
+                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=1.266f,
                     Text="20<b>18</b>\n20<b>21</b>\n20<b>23</b>\n20<b>25</b>\n20<b>26</b>" },
 
             new() { Name="History_Items", X=0.628f, Y=0.406f, W=0.325f, Size=0.465f,
-                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=1.06f,
+                    Color=Ink, Align=TextAlignmentOptions.TopLeft, LineSpacing=0.756f,
                     Text="○ 12.10  SSAFY 1기 입학식 및 개소식\n" +
                          "○ 12.20  고용노동부 MOU 체결\n\n" +
                          "○ 07.09  부울경 캠퍼스 개소식\n\n" +
