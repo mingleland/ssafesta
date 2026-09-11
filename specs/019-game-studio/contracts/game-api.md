@@ -572,6 +572,58 @@ Cache-Control: no-store
 - `gameId`·`publishedVersion`은 nullable이다. Binding은 있고 Game이 미발행이면 `gameId`는 값이 있고
   `publishedVersion`이 `null`이다.
 
+## Arcade Machine Resolution
+
+> **위 §Booth Portal Resolution 과 다른 경로다.** 그쪽은 임대 부스 안에 배치된 `GAME_PORTAL` 을
+> `configId` 로 푸는 것이고 현재 **보류**다(`S15P21A604-158`·`-204`). 아래는 **월드 고정물**인
+> 오락기를 씬의 `machineId` 로 푸는 것이고 구현본이다(`S15P21A604-602`, GitLab #56 안 1 · #135).
+
+```text
+GET /api/v1/arcade-machines/{machineId}
+Cache-Control: no-store
+```
+
+응답 예시:
+
+```json
+{
+  "machineId": "plaza-arcade-01",
+  "gameId": 123,
+  "publishedVersion": 5,
+  "playable": true,
+  "unavailableReason": null
+}
+```
+
+- **`machineId` 는 씬이 정한 canonical id 다.** 서버가 발급하지 않는다. Unity 는 이 값만 알고
+  `gameId` 를 모른다 — 큐레이션이 바뀌어도 Unity 빌드가 바뀌지 않게 한 분담이다 (FR-017).
+- **오락기 1대 = 게임 1개 고정 바인딩**이다 (2026-09-10 배치 결정, `docs/26` 결정 기록). 그래서 이
+  경로에 공개 게임 목록 endpoint 가 필요하지 않다.
+- **토큰이 없어도 호출된다.** 게시된 게임 플레이는 게스트의 몫이기도 하다 (FR-023).
+- **공개 상태는 매 요청 서버가 판정한다.** `Cache-Control: no-store` 인 이유이며, 캐시된 응답은
+  방금 비공개로 바꾼 게임을 계속 열어 준다.
+- **`boothId` 가 없다.** 월드 고정물이라 임대·소유권 판정이 없다 — `BOOTH_LEASE_EXPIRED` 계열도
+  이 경로에서는 나오지 않는다. 부스 경로(위 절)와 갈리는 지점이다.
+- `publishedVersion` 은 `playable: true` 일 때만 값이 있다.
+- 바인딩 행은 v1 에서 **운영자 시드 데이터**다. 관리자 UI 는 범위 밖이고 쓰기 endpoint 가 없다.
+- 회원 탈퇴는 그 회원 게임에 걸린 바인딩을 함께 지운다 (FR-040). 기계는 월드에 남고, 운영자가
+  다시 걸기 전까지 그 기계는 `MACHINE_NOT_FOUND` 로 답한다.
+
+### `unavailableReason` 어휘 — 게임 공개 상태 3종
+
+| unavailableReason | 뜻 |
+|---|---|
+| `GAME_DELETED` | 연결된 Game 이 soft delete 됨 |
+| `GAME_NOT_PUBLIC` | 연결된 Game 이 `PRIVATE` |
+| `GAME_NOT_PUBLISHED` | 연결된 Game 에 Published Version 이 없음 |
+
+- **표의 순서가 판정 순서다.** 세 상태는 겹칠 수 있고(비공개·미게시 게임을 삭제하면 셋 다 참),
+  그때는 위쪽이 답이다. 사용자가 보는 문장이 하나여야 하기 때문이다.
+- 셋 다 **HTTP 200 + `playable: false`** 다. 오락기는 월드 고정물이라 월드를 끊지 않고 안내만
+  띄운다 (FR-020).
+- **`MACHINE_NOT_FOUND` 만 HTTP 404 + 봉투 `code`** 다. 등록되지 않은 `machineId` 이며, 200 으로
+  보낼 수 없다 — 응답의 다른 필드를 채울 근거가 없다.
+
 ## 확정 기록
 
 이 문서의 미결 항목은 **2026-08-25에 전부 확정됐다.** 근거는 GitLab #104(①⑦)와 #48(★ 승인·②③④⑤⑥)이다.

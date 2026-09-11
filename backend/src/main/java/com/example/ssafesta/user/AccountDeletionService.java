@@ -77,6 +77,10 @@ public class AccountDeletionService {
         jdbc.update("DELETE FROM game_assets WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR created_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM game_published_versions WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR published_by_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM game_drafts WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?) OR updated_by_user_id = ?", userId, userId);
+        // 오락기 바인딩도 games 를 참조한다 (V27, S15P21A604-602). 이 줄이 없으면 자기 게임이
+        // 오락기에 걸린 회원의 탈퇴가 FK 위반으로 실패한다. 기계 자체는 월드 고정물이라 남고,
+        // 바인딩이 사라진 기계는 운영자가 다시 걸 때까지 MACHINE_NOT_FOUND 로 답한다.
+        jdbc.update("DELETE FROM arcade_machine_bindings WHERE game_id IN (SELECT id FROM games WHERE owner_user_id = ?)", userId);
         jdbc.update("DELETE FROM games WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM booth_leases WHERE booth_id IN (SELECT id FROM booths WHERE owner_user_id = ?) OR lessee_user_id = ?", userId, userId);
         jdbc.update("DELETE FROM booths WHERE owner_user_id = ?", userId);

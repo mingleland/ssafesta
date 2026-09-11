@@ -82,6 +82,12 @@ class SecurityConfiguration {
                         // prefix stay authenticated, and Authoring refuses guests separately with
                         // MEMBER_ONLY rather than with a 401.
                         .requestMatchers(HttpMethod.GET, "/api/v1/games/*/published").permitAll()
+                        // Arcade machines are world fixtures a guest walks up to, and playing a
+                        // published game is a guest's to do (FR-023) — the same reason the line
+                        // above is open. Resolution reads only which game is bound and whether it
+                        // is public; there is no owner or lease in this path to judge
+                        // (S15P21A604-602).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/arcade-machines/*").permitAll()
                         // A published game's assets are read without a session: the play page
                         // resolves asset:// for a guest, and the filter runs before the service can
                         // decide anything (GitLab #69, 2026-08-28 — "필터에서는 경로를 열고 판정은
