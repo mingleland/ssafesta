@@ -308,11 +308,20 @@ class BoothLayoutApiIntegrationTest {
                 .andExpect(jsonPath("$.objects[0].objectId").value("panel-b"));
     }
 
-    /** V12 (T057): slotId 1~12가 Unity 앵커 01~12와 대응한다는 것이 계약이다. */
+    /**
+     * V12 (T057): slotId 1~12가 Unity 앵커 01~12와 대응한다는 것이 계약이다.
+     *
+     * <p>세는 것은 <b>방</b>이지 임대 슬롯이 아니다. V28이 1번을 이벤트 자리로 뺐지만
+     * (S15P21A604-615) 방은 그대로 12개이며, 앵커 대응은 종류와 무관하게 성립해야 한다 —
+     * 종류로 세면 이벤트 자리가 늘 때마다 앵커 계약이 깨진 것처럼 보인다.
+     */
     @Test
     void theSeedFixesTwelveRoomsToAnchorNumbers() {
         assertEquals(12, jdbc.queryForObject(
-                "SELECT count(*) FROM booth_slots WHERE slot_type = 'USER_RENTAL'", Integer.class));
+                "SELECT count(*) FROM booth_slots WHERE floor_no = 11", Integer.class));
+        assertEquals("EVENT", jdbc.queryForObject(
+                "SELECT slot_type FROM booth_slots WHERE id = 1", String.class),
+                "1번 방은 이벤트 자리다 (V28)");
 
         for (int anchor = 1; anchor <= 12; anchor++) {
             assertEquals("F11-R%02d".formatted(anchor),

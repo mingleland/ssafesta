@@ -6,7 +6,7 @@
 
 ## Summary
 
-USER_RENTAL 슬롯 12개의 임대를 구현한다. 핵심은 **코인 차감과 임대 생성이 하나의 트랜잭션**이라는 것(FR-003)과 **한 슬롯에 활성 임대가 하나뿐**이라는 것(FR-004)이다. 둘 다 DB 제약이 지킨다 — V1에 이미 있는 `ux_booth_leases_active_slot` 부분 UNIQUE 인덱스와 `booths.current_slot_id` UNIQUE다. 003의 `WalletService.spend`를 같은 트랜잭션에서 호출하므로, 임대가 실패하면 코인도 함께 롤백된다.
+방 12개 중 임대 가능한 `USER_RENTAL` 11개의 임대를 구현한다 (1번 방은 V28에서 `EVENT`로 빠졌다 — S15P21A604-615). 핵심은 **코인 차감과 임대 생성이 하나의 트랜잭션**이라는 것(FR-003)과 **한 슬롯에 활성 임대가 하나뿐**이라는 것(FR-004)이다. 둘 다 DB 제약이 지킨다 — V1에 이미 있는 `ux_booth_leases_active_slot` 부분 UNIQUE 인덱스와 `booths.current_slot_id` UNIQUE다. 003의 `WalletService.spend`를 같은 트랜잭션에서 호출하므로, 임대가 실패하면 코인도 함께 롤백된다.
 
 만료는 **읽기 시 판정**(`status='ACTIVE' AND ends_at > now()`)이 권위이고, **재임대 트랜잭션에서 상태를 전이**한다(FR-017). 004 범위에서는 스케줄러를 두지 않았다 — **2026-09-09 보완(S15P21A604-152)**: 주기 배치를 그 위에 얹었다(C-02 참조). 권위는 그대로 읽기 시 판정이고, 배치는 재임대 요청이 오지 않는 슬롯의 연결 해제를 앞당길 뿐이다. 만료를 월드에 실시간 전파하지 않고, 접근 시 거부·안내로 처리한다(FR-019) — 전파 계약은 `docs/HDD/부스_변경_신호_계약.md`로 분리했다.
 
@@ -26,11 +26,11 @@ USER_RENTAL 슬롯 12개의 임대를 구현한다. 핵심은 **코인 차감과
 
 **Project Type**: Web API (`backend/`)
 
-**Performance Goals**: 슬롯 12개. 동시 임대 요청이 실제로 발생하는 규모
+**Performance Goals**: 방 12개(임대 가능 11개). 동시 임대 요청이 실제로 발생하는 규모
 
 **Constraints**: 코인만 차감되는 상태 0건, 한 슬롯 두 명 임대 0건, 게스트 임대 불가
 
-**Scale/Scope**: 슬롯 12개 / 사용자당 활성 임대 1개 / 임대 1일 100코인
+**Scale/Scope**: 방 12개(임대 가능 11개) / 사용자당 활성 임대 1개 / 임대 1일 100코인
 
 ## Constitution Check
 
@@ -70,7 +70,7 @@ specs/004-booth-slot-lease/
 backend/src/main/java/com/example/ssafesta/booth/
 ├── BoothSlot.java                    # 슬롯 엔티티
 ├── BoothSlotRepository.java
-├── SlotType.java                     # USER_RENTAL / ADMIN
+├── SlotType.java                     # USER_RENTAL / ADMIN / EVENT (V28, -615)
 ├── Booth.java                        # 부스 — 소유자에 귀속 (C-01)
 ├── BoothRepository.java
 ├── BoothStatus.java

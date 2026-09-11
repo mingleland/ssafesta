@@ -32,6 +32,7 @@ class BoothApiIntegrationTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private BoothLeaseService leaseService;
     @Autowired private BoothSlotRepository slots;
+    @Autowired private BoothRepository booths;
     @Autowired private BoothLeaseRepository leases;
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
@@ -52,6 +53,76 @@ class BoothApiIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(7)))
                 .andExpect(jsonPath("$[0].slotCode").value("F11-R01"))
                 .andExpect(jsonPath("$[0].floorNo").value(11));
+    }
+
+    /**
+     * 슬롯 1은 이벤트 부스 자리다 (V28, S15P21A604-615 · GitLab #170).
+     *
+     * <p>두 단정이 한 테스트에 있는 것은 그 둘이 같은 사실이기 때문이다 — 목록의 {@code type}이
+     * 임대 거절의 근거이고, 클라이언트는 슬롯 번호가 아니라 그 값을 읽는다. 표식만 확인하면
+     * {@code isRentable()}이 {@code EVENT}를 통과시켜도 통과하고, 거절만 확인하면 Unity가 읽을
+     * 값이 사라져도 통과한다.
+     */
+    @Test
+    void theEventSlotIsMarkedAndCannotBeLeased() throws Exception {
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].slotId").value(1))
+                .andExpect(jsonPath("$[0].type").value("EVENT"));
+
+        Long userId = createMemberWithWallet(users, wallets, "이벤트슬롯");
+        String bearer = bearerFor(userId);
+        // 일일 지급은 인증 요청마다 일어난다 — 거절 전에 받아 두지 않으면 잔액 비교가 그 지급을
+        // 거절 탓으로 읽는다 (같은 파일의 임대 성공 테스트와 같은 이유).
+        mockMvc.perform(get("/api/v1/wallets/me").header("Authorization", bearer)).andExpect(status().isOk());
+        int before = wallets.balanceOf(userId);
+        long leasesBefore = leases.count();
+
+        mockMvc.perform(leaseRequest(1L, bearer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
+
+        assertEquals(leasesBefore, leases.count(), "이벤트 슬롯에 임대가 생기면 안 됩니다.");
+        assertEquals(before, wallets.balanceOf(userId), "거절된 임대는 코인을 쓰지 않습니다.");
+        BoothTestSupport.assertBalanceMatchesLedger(wallets, userId);
+    }
+
+    /**
+     * 이벤트 슬롯에 활성 임대가 얹혀 있어도 시스템이 평소대로 돈다 (S15P21A604-615).
+     *
+     * <p>V28 이 적용되는 순간 1번 슬롯에 임대가 살아 있을 수 있고, 마이그레이션은 그것을 만료까지
+     * 그대로 둔다. 여기서 확인하는 것은 <b>그 상태에서의 동작</b>이다 — 목록에 그대로 보이고,
+     * 만료 판정이 평소대로 돌고, 만료 뒤 재임대만 거절된다.
+     *
+     * <p><b>마이그레이션 순서는 여기서 검증되지 않는다.</b> 테스트 DB 는 늘 V1부터 전부 적용된 뒤에
+     * 시작하므로 이 임대는 V28 <i>뒤</i>에 생긴 것이고, V28 이 임대를 지우도록 고쳐도 이 테스트는
+     * 통과한다(변이로 확인했다). 그 주장은 {@link EventSlotMigrationScopeTest} 가 마이그레이션
+     * 파일의 범위로 고정한다.
+     *
+     * <p>조건부 UPDATE 로 만들지 않은 이유가 여기 있다 — 환경마다 결과가 달라지면 "슬롯 1 은
+     * 이벤트다" 가 더 이상 계약이 아니게 된다.
+     */
+    @Test
+    void anActiveLeaseOnTheEventSlotStillExpiresAndCannotBeRenewed() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "이전임대");
+        Long boothId = booths.save(new Booth(userId, "이전임대 부스")).getId();
+        BoothLayoutTestSupport.grantLeaseOnSlot(jdbc, boothId, userId, 1L);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[0].type").value("EVENT"))
+                .andExpect(jsonPath("$[0].status").value("OCCUPIED"))
+                .andExpect(jsonPath("$[0].boothId").value(boothId));
+
+        BoothLayoutTestSupport.expireLease(jdbc, boothId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[0].type").value("EVENT"))
+                .andExpect(jsonPath("$[0].status").value("AVAILABLE"));
+
+        // 비워졌다고 다시 빌릴 수 있는 것은 아니다 — 이제 이벤트 자리다.
+        mockMvc.perform(leaseRequest(1L, bearerFor(createMemberWithWallet(users, wallets, "재임대시도"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BOOTH_SLOT_NOT_RENTABLE"));
     }
 
     @Test
