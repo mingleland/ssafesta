@@ -26,6 +26,8 @@ assert_contains "${base}" 'name: festa-dev-game-private' 'dev game network is re
 assert_contains "${ingress}" 'location / \{' 'dev frontend must be served at the host root'
 assert_contains "${ingress}" 'location /api/' 'missing same-origin dev API route'
 assert_contains "${ingress}" 'location /ai/v1/' 'missing same-origin dev AI route'
+assert_contains "${ingress}" 'location /unity/' 'missing same-origin dev WebGL route'
+assert_contains "${ingress}" 'alias /srv/festa/webgl/current/' 'dev WebGL must share the promoted WebGL release'
 assert_not_contains "${ingress}" '/__dev/' 'dev must not use a cookie-breaking API prefix'
 assert_contains "${ingress}" 'dev-allowlist/\*\.conf' 'dev routes must use the approved-IP allowlist'
 assert_contains "${ingress}" 'deny all;' 'dev routes must deny unapproved sources'

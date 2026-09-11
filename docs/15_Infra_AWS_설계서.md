@@ -494,6 +494,8 @@ demo       ← develop, 실제 사용자 계약과 외부 연동
 
 dev 배포는 다른 dev와 demo를 재시작하거나 교체하지 않는다. demo는 실제 도메인·HTTPS/WSS·실제 외부 API를 사용하는 통합 사용자 경로다.
 
+dev 공개 진입점은 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`이다. Nginx는 `/`→Front, `/api/`→Spring, `/ai/v1/`→FastAPI, `/unity/`→`/srv/festa/webgl/current`을 제공한다. WebGL `current`는 demo와 공유하므로 WebGL release 전환 시 두 host가 같은 정적 build를 제공한다. UnityTransport는 경로 기반 WebSocket을 지원하지 않아 `wss://world-dev.${ROOT_DOMAIN}:443`을 사용한다.
+
 ---
 
 ## 17. Secret 관리
