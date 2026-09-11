@@ -199,8 +199,10 @@ grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
-grep -q 'credentialsId(gitlabCheckoutCredentialsId)' "${develop_job}" \
-  || fail "GitLab develop Job DSL shadows the credentialsId method"
+grep -q "String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID')" "${develop_job}" \
+  || fail "GitLab develop Job DSL must read the API credential"
+grep -q 'credentialsId(gitlabApiCredentialsId)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must use the API credential for project discovery"
 grep -q 'projectOwner(gitlabProjectOwner)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the projectOwner method"
 grep -q 'projectPath(gitlabProjectPath)' "${develop_job}" \

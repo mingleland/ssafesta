@@ -1,5 +1,5 @@
 String gitlabServerName = System.getenv('GITLAB_SERVER_NAME') ?: 'CONFIGURE_ME'
-String gitlabCheckoutCredentialsId = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: 'gitlab-checkout'
+String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID') ?: 'gitlab-api'
 String gitlabProjectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
 String gitlabProjectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
 
@@ -11,7 +11,7 @@ multibranchPipelineJob('festa-gitlab-develop') {
                 gitlab {
                     id('festa-gitlab-develop')
                     serverName(gitlabServerName)
-                    credentialsId(gitlabCheckoutCredentialsId)
+                    credentialsId(gitlabApiCredentialsId)
                     projectOwner(gitlabProjectOwner)
                     projectPath(gitlabProjectPath)
                     traits {
