@@ -24,8 +24,14 @@ import './worldHud.css';
 export function WorldHud() {
   const [guideOpen, setGuideOpen] = useState(true);
 
+  // HUD 의 버튼은 마우스로 눌러도 focus 를 가져가지 않는다 (S15P21A604-648). 브라우저 기본은 mousedown
+  // 에서 그 버튼으로 focus 를 옮기는데, 그러면 canvas 가 focus 를 잃어 WASD·F 가 Unity 에 안 들어간다
+  // (!279 captureAllKeyboardInput=false). 나가기 버튼은 눌린 뒤 사라져 focus 가 body 로 떨어지고,
+  // 이용 안내 버튼은 -428 이 "연 요소" 인 그 버튼으로 focus 를 돌려준다 — 둘 다 캔버스를 다시 클릭하기
+  // 전까지 키가 죽는다(2026-09-11 5173 실측). mousedown 의 기본 동작만 막는다: click 은 mouseup 뒤에
+  // 그대로 오고, Tab 으로 HUD 버튼에 가는 키보드 경로도 그대로다. HUD 안에는 입력창이 없다.
   return (
-    <div className="world-hud">
+    <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
       {/* 허용 4번 — 상담 상태 즉시 접근 */}
       <ConsultationQuickAccess />
 
