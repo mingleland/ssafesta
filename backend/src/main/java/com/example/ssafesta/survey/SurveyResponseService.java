@@ -41,6 +41,10 @@ public class SurveyResponseService {
     private static final String REWARD_REFERENCE_TYPE = "SURVEY";
     private static final String GUEST_ONLY_MESSAGE =
             "보상이 있는 설문은 회원만 참여할 수 있습니다.";
+    /** 같은 code 에 다른 이유다 — 보상이 아니라 추첨 때문이라 문장을 나눈다 (GitLab #173). */
+    private static final String EVENT_MEMBER_ONLY_MESSAGE =
+            "이벤트 설문은 회원만 참여할 수 있습니다. 로그인 후 다시 시도해 주세요.";
+    private static final String NOT_OPEN_YET_MESSAGE = "아직 공개되지 않은 설문입니다.";
 
     private final SurveyRepository surveys;
     private final SurveyQuestionRepository questions;
@@ -104,30 +108,62 @@ public class SurveyResponseService {
      */
     @Transactional(timeoutString = "${app.survey.submit-timeout-seconds}")
     public SubmitResult submit(Long surveyId, Respondent respondent, SubmitCommand command) {
-        Long boothId = surveys.findBoothIdById(surveyId)
-                .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
-        accessGuard.requireVisitorVisible(boothId);
+        // 스칼라 projection 이라 "설문이 없다" 와 "부스에 속하지 않는다(이벤트 설문)" 가 둘 다
+        // empty 로 온다 (V29, S15P21A604-621). 가르지 않으면 이벤트 설문 제출이 404 가 된다.
+        // 존재 확인은 boothId 가 없을 때만 도므로 부스 설문 경로에는 질의가 늘지 않는다.
+        Long boothId = surveys.findBoothIdById(surveyId).orElse(null);
+        if (boothId == null && !surveys.existsById(surveyId)) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND);
+        }
+        if (boothId != null) {
+            accessGuard.requireVisitorVisible(boothId);
+        }
         // 지갑 먼저, 부스 나중 — 임대·구매가 정한 순서다(javadoc). 뒤집으면 교착이 생긴다.
         if (respondent.isMember()) {
             wallets.lockOwner(respondent.userId());
         }
         // 편집이 문항을 바꾸는 동안 답을 넣으면 survey_answers.question_id FK 에 걸린다.
         // 공유 락이라 응답자끼리는 줄 서지 않는다.
-        booths.findWithSharedLockById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        //
+        // 이벤트 설문에는 잠글 부스가 없고, 잠글 이유도 없다 — 편집 endpoint 가 없어 시드로만
+        // 들어오므로 동시 편집이 일어나지 않는다. 나중에 이벤트 설문 편집기를 만들면 이 락을
+        // surveys 행으로 옮겨야 한다.
+        if (boothId != null) {
+            booths.findWithSharedLockById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        }
 
         // 설문은 락을 잡은 뒤에 읽는다. 그 전에 읽으면 지급액·마감이 락이 막고 있는 편집보다
         // 오래된 값이 된다.
         Survey survey = surveys.findById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
 
+        List<SurveyQuestion> questionRows = questions.findBySurveyIdOrderByDisplayOrderAsc(surveyId);
+        // 묻는 것이 없는 설문에는 답할 수 없다 (S15P21A604-621).
+        //
+        // 이 상태는 이벤트 설문에만 생긴다 — 부스 설문은 upsert 가 문항 1개 이상을 요구한다.
+        // 이벤트 설문은 시드로 들어오고 문항은 기획 문구가 도착한 뒤 따로 얹으므로, 그 사이에
+        // 창이 열린다. 막지 않으면 **1인 1응답이 사용자에게 불리하게 소진된다**: 빈 응답이
+        // 저장되고 ux_survey_responses_member 가 그 회원의 진짜 참여를 영영 막는다.
+        //
+        // **마감·게스트 검사보다 앞이다.** 아직 공개되지 않은 것은 마감될 수도, 권한을 따질 수도
+        // 없다. 뒤에 두면 문항 없는 설문이 마감됐을 때 조회는 404 인데 제출만 409 가 되어 같은
+        // 사실에 두 답이 생긴다.
+        if (questionRows.isEmpty()) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND, NOT_OPEN_YET_MESSAGE);
+        }
         if (survey.isClosedAt(Instant.now())) {
             throw new ApiException(ErrorCode.SURVEY_CLOSED);
+        }
+        // 두 이유가 겹치지 않는다. 부스 설문은 보상 때문에 막고(게스트는 지갑이 없다, 헌법 12조),
+        // 이벤트 설문은 보상이 0 이어도 막는다 — 추첨이 참여자를 특정해야 한다 (GitLab #173).
+        // reward 하나로 판정하면 보상 없는 이벤트 설문이 게스트에게 열린다.
+        if (respondent.isGuest() && survey.isEvent()) {
+            throw new ApiException(ErrorCode.MEMBER_ONLY, EVENT_MEMBER_ONLY_MESSAGE);
         }
         if (respondent.isGuest() && survey.hasReward()) {
             throw new ApiException(ErrorCode.MEMBER_ONLY, GUEST_ONLY_MESSAGE);
         }
 
-        List<SurveyQuestion> questionRows = questions.findBySurveyIdOrderByDisplayOrderAsc(surveyId);
         Map<Long, Set<Long>> allowedOptions = allowedOptionIds(questionRows);
         List<Submission> submissions = validate(command, questionRows, allowedOptions);
 

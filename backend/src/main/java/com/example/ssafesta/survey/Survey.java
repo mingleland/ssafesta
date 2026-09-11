@@ -36,9 +36,25 @@ public class Survey {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Fixed at creation — a survey moving between booths would move responses across owners. */
-    @Column(name = "booth_id", nullable = false, updatable = false)
+    /**
+     * Fixed at creation — a survey moving between booths would move responses across owners.
+     *
+     * <p><b>{@code null} means this is the festival's own survey</b>, not a booth's (V29,
+     * S15P21A604-621). The two are exclusive and the database says so: {@code ck_surveys_scope}
+     * makes exactly one of {@code boothId} and {@link #surveyKey} present.
+     */
+    @Column(name = "booth_id", updatable = false)
     private Long boothId;
+
+    /**
+     * The event this survey belongs to, for surveys that belong to no booth (V29, GitLab #173).
+     *
+     * <p>There is no {@code events} table, so this <i>is</i> the event identifier —
+     * {@code ux_surveys_key} is what makes "one survey per event" an invariant, mirroring
+     * {@code ux_surveys_booth} on the other axis.
+     */
+    @Column(name = "survey_key", updatable = false, length = 50)
+    private String surveyKey;
 
     @Column(nullable = false, length = 200)
     private String title;
@@ -61,7 +77,12 @@ public class Survey {
     @Column(name = "ends_at")
     private Instant endsAt;
 
-    @Column(name = "created_by_user_id", nullable = false, updatable = false)
+    /**
+     * {@code null} only on an event survey — nobody creates it through the app (V29). The CHECK
+     * keeps the booth side's "always has an author" intact, so this being nullable is a fact about
+     * event rows and not a relaxation for booth rows.
+     */
+    @Column(name = "created_by_user_id", updatable = false)
     private Long createdByUserId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -109,6 +130,20 @@ public class Survey {
         return rewardCoin > 0;
     }
 
+    /**
+     * The festival's own survey rather than a booth's (V29, GitLab #173).
+     *
+     * <p>Asked on the key rather than on {@code boothId == null} so the question reads as what it
+     * is. The CHECK makes the two equivalent; the name is what keeps call sites honest.
+     *
+     * <p><b>Members only, regardless of reward.</b> The prize draw has to identify who entered, so
+     * {@link #hasReward()} — which is what gates guests on booth surveys — says nothing here. Both
+     * conditions are asked at submission.
+     */
+    public boolean isEvent() {
+        return surveyKey != null;
+    }
+
     public Long getId() {
         return id;
     }
@@ -135,5 +170,9 @@ public class Survey {
 
     public Long getCreatedByUserId() {
         return createdByUserId;
+    }
+
+    public String getSurveyKey() {
+        return surveyKey;
     }
 }

@@ -220,6 +220,13 @@ public class SurveyResultService {
     private Survey requireEditableSurvey(Long surveyId, Long userId) {
         Survey survey = surveys.findById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
+        // 이벤트 설문은 부스가 없어 편집자라는 개념이 없다 (V29, S15P21A604-621). 여기서 끊지
+        // 않으면 boothId 가 null 인 채 가드로 내려가 500 이 되고, 이 경로의 익명 계약
+        // (ResultsView 에 응답자 필드 없음, FR-009·SC-003)이 어느 축의 것인지도 흐려진다.
+        // 없는 것처럼 답하는 것이 맞다 — 이 경로에 이벤트 설문이라는 자원은 존재하지 않는다.
+        if (survey.isEvent()) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND);
+        }
         accessGuard.requireEditor(survey.getBoothId(), userId);
         return survey;
     }

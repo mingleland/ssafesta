@@ -18,8 +18,11 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.WalletService;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -238,6 +241,47 @@ class SurveyResponseConcurrencyIntegrationTest {
     }
 
     // ── 픽스처 ──────────────────────────────────────────────────────────────
+
+    /**
+     * 게스트 넷이 같은 키로 동시에 제출해도 응답은 하나다 — 그리고 <b>여기가 유니크 제약 번역이
+     * 실제로 밟히는 유일한 경로</b>다.
+     *
+     * <p>회원 제출은 {@code WalletService.lockOwner} 가 지갑 행에 쓰기 락을 잡아 같은 회원끼리
+     * 직렬화되므로, 뒤따르는 요청은 사전 {@code alreadyResponded} 검사에서 끝나고
+     * {@code ux_survey_responses_*} 에는 닿지 않는다. 위의 회원 동시 제출 테스트가 증명하는 것은
+     * 결과이지 번역이 아니다.
+     *
+     * <p>게스트는 지갑이 없어 그 락을 지나지 않는다. 그래서 넷이 실제로 겹치고, 사전 검사를 함께
+     * 통과한 둘 이상이 {@code flush} 에서 부딪힌다. 번역이 없으면 그 순간
+     * {@code DataIntegrityViolationException} 이 그대로 올라와 500 이 된다 — 이 테스트는 그때
+     * {@code Outcome.OTHER} 도 아니고 <b>실행 예외</b>로 깨진다.
+     */
+    @RepeatedTest(3)
+    void simultaneousGuestSubmissionsTranslateTheUniqueViolation() throws Exception {
+        Fixture fixture = fixture("게스트동시");
+        // 보상이 있으면 게스트가 MEMBER_ONLY 로 먼저 막혀 경합 자체가 일어나지 않는다 (C-05).
+        jdbc.update("UPDATE surveys SET reward_coin = 0 WHERE id = ?", fixture.surveyId());
+        String guestKey = "guest:" + UUID.randomUUID();
+        Instant expiresAt = Instant.now().plus(Duration.ofMinutes(30));
+
+        List<Outcome> outcomes = runTogether(4, index -> () -> {
+            try {
+                submissions.submit(fixture.surveyId(),
+                        SurveyResponseService.Respondent.guest(guestKey, expiresAt),
+                        answer(fixture.questionId()));
+                return Outcome.SUCCESS;
+            } catch (ApiException exception) {
+                return exception.errorCode() == ErrorCode.SURVEY_ALREADY_RESPONDED
+                        ? Outcome.DUPLICATE
+                        : Outcome.OTHER;
+            }
+        });
+
+        assertEquals(1, count(outcomes, Outcome.SUCCESS), "제출은 정확히 한 건만 성공해야 합니다: " + outcomes);
+        assertEquals(0, count(outcomes, Outcome.OTHER),
+                "제약 위반이 다른 code 로 새어 나왔습니다: " + outcomes);
+        assertEquals(1, responseCount(fixture.surveyId()), "응답 행은 하나여야 합니다.");
+    }
 
     private SurveyResponseService.SubmitCommand answer(Long questionId) {
         return new SurveyResponseService.SubmitCommand(List.of(

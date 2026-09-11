@@ -17,6 +17,15 @@ public interface SurveyRepository extends JpaRepository<Survey, Long> {
     Optional<Survey> findByBoothId(Long boothId);
 
     /**
+     * The festival's own survey, found by its event key rather than by a booth (V29,
+     * S15P21A604-621).
+     *
+     * <p>{@code ux_surveys_key} guarantees the {@code Optional} the same way
+     * {@code ux_surveys_booth} does for {@link #findByBoothId}.
+     */
+    Optional<Survey> findBySurveyKey(String surveyKey);
+
+    /**
      * Which booth a survey belongs to, <b>without loading the survey</b>.
      *
      * <p>A submission needs the booth id to take the row lock that keeps an editor out, but loading
