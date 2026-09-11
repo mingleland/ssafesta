@@ -6,25 +6,22 @@
 //
 // 조작 안내 항목은 Unity 카드(S15P21A604-451)와 같은 어휘를 쓴다 — 같은 조작을 두 파트가 다른
 // 말로 설명하지 않게 한다. FE 임베드에서는 Unity 카드가 숨겨져(-456) 이 목록이 유일한 안내다.
-// 그래서 사용자 테스트에서 실제로 묻는 것을 기준으로 고른다(GitLab #132, S15P21A604-460):
-// 이동·달리기·점프·시야·상호작용·감정 표현·창 닫기. 여기 없는 조작을 임의로 늘리지 않는다.
+// 항목은 사용자 테스트에서 실제로 묻는 것만 고른다(GitLab #132, S15P21A604-460).
 //
-// F 항목에 부스 입장·나가기를 명시한다 (S15P21A604-592). Unity 카드에는 "F — 상호작용 · 부스
-// 입장" 이 있는데 FE 목록에는 그 말이 없어, 부스에 들어가고 나오는 방법을 안내에서 찾을 수
-// 없었다. 나가기도 같은 F 다 — 내부 공간 출구에 BoothPortal 이 하나 더 있다(festa-unity
-// World/Festival/BoothPortal.cs: "외부 부스와 내부 공간 출구에 하나씩").
+// **설명은 한 단어로 끝낸다** (S15P21A604-631). 이 카드는 키를 처음 익힐 때 훑는 것이지 읽는
+// 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 손에 익는 것이라
+// 목록에 있어도 읽히지 않아 뺐다.
+//
+// F 에서 "부스 입장·나가기" 를 뺀 근거: -592 가 그 말을 넣은 이유는 **나가는 방법을 안내 말고는
+// 알 곳이 없었기** 때문이다. 지금은 부스 안에 있으면 나가기 버튼이 직접 뜨고(-627) 그 버튼에
+// F 키 배지도 함께 있어, 화면이 스스로 말하는 것을 안내가 반복할 필요가 없다.
 import { useState } from 'react';
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import { WorldGuideLauncher } from './WorldGuideLauncher';
 import './worldHud.css';
 
-interface Props {
-  /** 월드가 목업 정지 화면인지 — 안내 문구를 사실대로 바꾼다 */
-  mock?: boolean;
-}
-
-export function WorldHud({ mock = false }: Props) {
+export function WorldHud() {
   const [guideOpen, setGuideOpen] = useState(true);
 
   return (
@@ -62,24 +59,19 @@ export function WorldHud({ mock = false }: Props) {
               점프
             </li>
             <li>
-              <span className="world-key">마우스 우클릭</span>
-              드래그해서 시야 돌리기
-            </li>
-            <li>
               <span className="world-key">F</span>
-              부스 입장·나가기 · 가까운 오브젝트와 상호작용
+              상호작용
             </li>
             <li>
               <span className="world-key">Alt</span>
               <span className="world-key">클릭</span>
-              감정 표현
+              감정
             </li>
             <li>
               <span className="world-key">Esc</span>
-              열린 창 닫기 · 메뉴 열기
+              메뉴
             </li>
           </ul>
-          {mock && <p className="world-hud-note">월드는 목업 정지 화면입니다 — 실제 이동은 Unity 연결 후 동작합니다.</p>}
         </section>
       )}
 
