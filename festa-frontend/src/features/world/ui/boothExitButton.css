@@ -1,0 +1,50 @@
+/* 부스 나가기 (S15P21A604-627) — 하단 중앙.
+   네 모서리는 이미 차 있다: 좌하단 조작 안내 · 우하단 이용 안내 · 우상단 상담 Quick Access.
+   하단 중앙이 제품에서 비어 있는 유일한 자리이고, 부스 안에서만 뜨는 일시 요소라 상시 자리를
+   뺏지 않는다.
+
+   bottom 은 DEV 상호작용 바를 피해 잡았다 — 그 바는 bottom 26px 에 높이가 항목 수를 따라
+   늘어나며, 현재 2줄에서 상단이 111px 이다(실측). 제품에는 그 바가 없으므로 이 여백은
+   dev 에서만 의미가 있다. */
+.booth-exit {
+  position: absolute;
+  left: 50%;
+  bottom: 124px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(12, 16, 34, 0.82);
+  box-shadow: 0 14px 38px rgba(4, 6, 20, 0.5);
+  backdrop-filter: blur(8px);
+  color: #eaeefb;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .booth-exit { background: #10142a; backdrop-filter: none; }
+}
+.booth-exit:hover { background: rgba(22, 28, 56, 0.9); border-color: rgba(255, 255, 255, 0.44); }
+.booth-exit:focus-visible { outline: 2px solid #4d8dff; outline-offset: 3px; }
+
+/* 같은 일을 하는 키가 이미 있다는 것을 같이 보여 준다 — 버튼이 F 를 대체하지 않는다 */
+.booth-exit-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: rgba(234, 238, 251, 0.86);
+}

@@ -21,3 +21,18 @@ export type ExitWorldUiReason = 'esc';
 export function requestExitWorldUi(instance: UnityInstance, reason: ExitWorldUiReason): void {
   instance.SendMessage(WORLD_UI_BRIDGE_OBJECT, 'RequestExitWorldUi', reason);
 }
+
+/**
+ * 부스 밖으로 내보내 달라고 요청한다 (S15P21A604-627, GitLab #174).
+ *
+ * **`RequestExitWorldUi` 와 합치지 않는다.** 그건 "네가 연 화면을 닫아 달라" 이고 이것은
+ * "이 사람을 부스 밖으로 내보내 달라" 다. 합치면 부스 안에서 초점 카메라를 닫으려던 ESC 가
+ * 사람을 밖으로 내보낼 수 있다 — 게임 파트도 같은 이유로 메서드를 갈랐다(#174 회신).
+ *
+ * 부스 밖에서 와도 Unity 가 무시한다(멱등) — FE 가 상태 경합을 신경 쓰지 않아도 된다.
+ * 성공 콜백은 없다: 퇴장이 끝나면 `WORLD_BOOTH_CONTEXT{insideBooth:false}` 가 오고,
+ * 그것이 버튼을 내린다. 퇴장 자체는 기존 F·Portal 과 같은 경로를 탄다.
+ */
+export function requestExitBooth(instance: UnityInstance): void {
+  instance.SendMessage(WORLD_UI_BRIDGE_OBJECT, 'RequestExitBooth', 'exit-button');
+}
