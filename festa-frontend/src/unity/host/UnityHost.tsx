@@ -35,6 +35,7 @@ import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
+import { getWorldMount, subscribeWorldMount } from './worldMount';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
 
@@ -76,6 +77,12 @@ export function UnityHost() {
     subscribeScreenAudio,
     () => getScreenAudioSnapshot().muted,
     () => getScreenAudioSnapshot().muted,
+  );
+  // 상주 월드가 지금 보이는가 (S15P21A604-643). muted 와 같은 이유로 visible 하나만 좁게 구독한다.
+  const worldVisible = useSyncExternalStore(
+    subscribeWorldMount,
+    () => getWorldMount().visible,
+    () => getWorldMount().visible,
   );
 
   useEffect(() => {
@@ -235,17 +242,24 @@ export function UnityHost() {
     return watchDevicePixelRatio(instance);
   }, [instanceReady]);
 
-  // 최초 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
+  // 월드 진입 시 캔버스에 focus 를 준다 (-450, #132). !279 로 captureAllKeyboardInput=false 가 되면서
   // canvas 에 focus 가 없으면 WASD·F 가 Unity 에 들어가지 않는다 — 진입 직후 activeElement 가 SECTION 이라
   // 첫 키가 무시되는 것을 게임 파트가 실측했다(2026-09-05 23:00). tabIndex=-1 이라 프로그램 focus 가 된다(-421).
   // 월드가 주인이 아닌 채로 들어왔다면 뺏지 않는다 — 떠 있는 그쪽이 키보드 주인이다.
+  //
+  // **상주 월드로 돌아올 때도 준다** (S15P21A604-643). -620 이전에는 라우트 복귀가 곧 이 컴포넌트의
+  // 재마운트라 위 효과가 다시 돌았는데, 지금은 마운트가 유지되므로 visible 전이를 따로 봐야 한다 —
+  // 안 보면 /app/profile 에서 돌아온 뒤 캔버스를 클릭하기 전까지 WASD 가 죽어 있다(2026-09-11 실측).
+  // React 입력창이 focus 를 쥐고 있으면 침범하지 않는다 — 복귀 직후엔 body 라 그 경우만 받는다.
   useEffect(() => {
-    if (!instanceReady || screen !== 'world') return;
+    if (!instanceReady || !worldVisible || screen !== 'world') return;
+    const active = document.activeElement;
+    if (active !== null && active !== document.body && active !== canvasRef.current) return;
     canvasRef.current?.focus();
     // screen 을 의존성에 넣지 않는다: 오버레이를 닫을 때의 focus 복구는 -428(OverlayFrame)이 이미 하고 있고,
-    // 여기서 또 하면 두 곳이 같은 일을 다투게 된다. 이 효과는 boot attempt 당 1회다.
+    // 여기서 또 하면 두 곳이 같은 일을 다투게 된다. 이 효과는 boot attempt 당 1회 + 월드가 다시 보일 때 1회다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instanceReady]);
+  }, [instanceReady, worldVisible]);
 
   // 진짜 언마운트에서만 세션을 정리한다 — sessionManager의 예약 지연이 StrictMode의
   // mount→cleanup→mount 사이에서 다음 마운트의 acquire 호출로 취소된다(B-2).
