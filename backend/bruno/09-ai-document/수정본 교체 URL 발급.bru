@@ -1,0 +1,89 @@
+meta {
+  name: 수정본 교체 URL 발급
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/v1/documents/{{documentId}}/replacement
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "fileName": "project-v2.pdf",
+    "contentType": "application/pdf",
+    "size": 2097152,
+    "contentSha256": "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.documentId) {
+    // 이후 `업로드 완료`가 이 id 로 불린다 — 교체본이 새 문서이기 때문이다.
+    bru.setEnvVar("documentId", res.body.documentId);
+  }
+}
+
+docs {
+  ## 수정본 교체 1단계 — 준비 완료 문서를 새 파일로 갈아 끼운다
+
+  spec 007 FR-019 · FR-027a (`S15P21A604-386`).
+
+  - 인증: **필수** (그 부스 편집 권한 + 활성 임대)
+  - 실행 전: `documentId` 환경변수가 **`READY` 문서**를 가리켜야 한다
+  - 성공: `200 OK` — 요청·응답 모양은 `업로드 URL 발급`과 같다
+
+  ### 응답의 `documentId`는 새 문서다
+
+  교체는 기존 행을 고치는 것이 아니라 **문서를 하나 더 만드는 일**이다. 이 요청의 post-response 스크립트가
+  `documentId`를 교체본으로 바꿔 두므로, 이어서 `업로드 완료`를 그대로 부르면 된다. 2단계는 일반 업로드와
+  완전히 같다.
+
+  ```bash
+  curl -X PUT --upload-file ./project-v2.pdf "<uploadUrl>"
+  ```
+
+  ### 원본은 언제 물러나는가
+
+  | 시점 | 교체본 | 원본 |
+  |---|---|---|
+  | 이 요청 | `QUEUED` | **`READY` 그대로** |
+  | 업로드 완료 | `QUEUED` (`uploadedAt` 채워짐) | **`READY` 그대로** |
+  | 처리 **성공** | `READY` | `EXPIRED` + `replacedAt` |
+  | 처리 **실패** | `FAILED` | **`READY` 그대로** |
+
+  **완료만으로는 아무것도 물러나지 않는다.** 퇴역은 교체본이 실제로 `READY`가 된 뒤다 — 파싱 불가 파일
+  하나로 AI 직원이 답할 근거가 사라지면 안 된다.
+
+  물러난 원본은 목록에 `EXPIRED` + `replacedAt`으로 **남는다**. 화면에는 "교체됨"으로 적고 다시 올리기
+  안내를 띄우지 않는다. 그 행에 `업로드 완료`를 부르면 `410 DOCUMENT_UPLOAD_GONE`이다.
+
+  ### 대상은 `READY` 하나다
+
+  나머지 다섯 상태는 `409 DOCUMENT_NOT_REPLACEABLE`이다. `QUEUED`·`PROCESSING`은 이미 원하는 버전이
+  되는 중이고, `FAILED`·`EXPIRED`·`DISABLED`는 중복 판정 밖이라 같은 파일을 그냥 새로 올리면 된다.
+
+  ### 10개를 다 써도 교체는 된다
+
+  교체본이 원본의 자리를 이어받으므로 논리 합계가 늘지 않는다. 목록 응답의 `quota.usedCount`가 그 수다 —
+  활성 행이 11개여도 10으로 나온다. 총량(100MB)은 교체본 크기로 다시 계산한다.
+
+  ### 응답 코드
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 발급(`duplicate: false`) 또는 중복(`duplicate: true`, URL 없음) |
+  | `400 VALIDATION_FAILED` | 파일 형식 위반. 진행 중인 교체본과 해시는 같은데 이름·형식·크기가 다른 경우도 여기다 |
+  | `403` | 게스트 또는 그 부스 편집 권한 없음 |
+  | `404 DOCUMENT_NOT_FOUND` | 그런 문서가 없다 |
+  | `409 DOCUMENT_NOT_REPLACEABLE` | 대상이 `READY`가 아니거나, 이미 진행 중인 교체가 있거나, 같은 파일이 다른 문서로 등록돼 있다 |
+  | `409 DOCUMENT_LIMIT_EXCEEDED` | 총량 상한 초과 (행은 남지 않는다) |
+  | `409 BOOTH_LEASE_EXPIRED` | 임대가 끝났다 — 조회만 열려 있다 |
+  | `503 STORAGE_UNAVAILABLE` / `507 STORAGE_QUOTA_EXCEEDED` | 발급과 같은 업로드 게이트 |
+}
