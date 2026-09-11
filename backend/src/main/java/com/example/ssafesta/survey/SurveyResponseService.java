@@ -137,6 +137,20 @@ public class SurveyResponseService {
         Survey survey = surveys.findById(surveyId)
                 .orElseThrow(() -> new ApiException(ErrorCode.SURVEY_NOT_FOUND));
 
+        List<SurveyQuestion> questionRows = questions.findBySurveyIdOrderByDisplayOrderAsc(surveyId);
+        // 묻는 것이 없는 설문에는 답할 수 없다 (S15P21A604-621).
+        //
+        // 이 상태는 이벤트 설문에만 생긴다 — 부스 설문은 upsert 가 문항 1개 이상을 요구한다.
+        // 이벤트 설문은 시드로 들어오고 문항은 기획 문구가 도착한 뒤 따로 얹으므로, 그 사이에
+        // 창이 열린다. 막지 않으면 **1인 1응답이 사용자에게 불리하게 소진된다**: 빈 응답이
+        // 저장되고 ux_survey_responses_member 가 그 회원의 진짜 참여를 영영 막는다.
+        //
+        // **마감·게스트 검사보다 앞이다.** 아직 공개되지 않은 것은 마감될 수도, 권한을 따질 수도
+        // 없다. 뒤에 두면 문항 없는 설문이 마감됐을 때 조회는 404 인데 제출만 409 가 되어 같은
+        // 사실에 두 답이 생긴다.
+        if (questionRows.isEmpty()) {
+            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND, NOT_OPEN_YET_MESSAGE);
+        }
         if (survey.isClosedAt(Instant.now())) {
             throw new ApiException(ErrorCode.SURVEY_CLOSED);
         }
@@ -150,20 +164,6 @@ public class SurveyResponseService {
             throw new ApiException(ErrorCode.MEMBER_ONLY, GUEST_ONLY_MESSAGE);
         }
 
-        List<SurveyQuestion> questionRows = questions.findBySurveyIdOrderByDisplayOrderAsc(surveyId);
-        // 묻는 것이 없는 설문에는 답할 수 없다 (S15P21A604-621).
-        //
-        // 이 상태는 이벤트 설문에만 생긴다 — 부스 설문은 upsert 가 문항 1개 이상을 요구한다.
-        // 이벤트 설문은 시드로 들어오고 문항은 기획 문구가 도착한 뒤 따로 얹으므로, 그 사이에
-        // 창이 열린다. 막지 않으면 **1인 1응답이 사용자에게 불리하게 소진된다**: 빈 응답이
-        // 저장되고 ux_survey_responses_member 가 그 회원의 진짜 참여를 영영 막는다. 추첨
-        // 참여자 명단에는 아무것도 답하지 않은 사람이 남는다.
-        //
-        // 404 인 것은 조회와 같은 판정이기 때문이다 — 문항이 없는 설문은 아직 공개된 것이
-        // 아니다. FE 는 그 상태를 이미 "불러오지 못했습니다" 로 처리한다.
-        if (questionRows.isEmpty()) {
-            throw new ApiException(ErrorCode.SURVEY_NOT_FOUND, NOT_OPEN_YET_MESSAGE);
-        }
         Map<Long, Set<Long>> allowedOptions = allowedOptionIds(questionRows);
         List<Submission> submissions = validate(command, questionRows, allowedOptions);
 

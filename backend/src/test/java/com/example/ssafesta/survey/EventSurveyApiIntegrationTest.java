@@ -115,6 +115,28 @@ class EventSurveyApiIntegrationTest {
         assertEquals(0, countResponses(), "빈 응답이 저장되면 그 회원의 참여 기회가 사라진다");
     }
 
+    /**
+     * 문항이 없으면서 마감이기도 하면 <b>문항 없음이 이긴다</b> — 조회와 제출이 같은 답을 한다.
+     *
+     * <p>겹치지 않는 상태만 보면 판정 순서를 바꿔도 전부 통과한다. 실제로 제출이 마감 검사를 먼저
+     * 하고 있어서, 같은 설문이 조회에서는 404 인데 제출에서는 409 였다. 아직 공개되지 않은 것은
+     * 마감될 수도 없다.
+     */
+    @Test
+    void beingUnpublishedOutranksBeingClosed() throws Exception {
+        Long memberId = createMemberWithWallet(users, wallets, "미공개마감");
+        jdbc.update("UPDATE surveys SET ends_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minusSeconds(60)), eventSurveyId());
+
+        mockMvc.perform(get(runPath(EVENT_KEY)).header("Authorization", bearerFor(memberId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SURVEY_NOT_FOUND"));
+
+        mockMvc.perform(submitEmpty(bearerFor(memberId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SURVEY_NOT_FOUND"));
+    }
+
     // ── 스키마 ──────────────────────────────────────────────────────────────
 
     /** 시드가 실제로 부스 밖에 있다. booth_id 가 채워져 있으면 이 기능 전체가 무의미하다. */
@@ -329,10 +351,14 @@ class EventSurveyApiIntegrationTest {
     /**
      * 같은 회원이 동시에 제출해도 응답은 하나다.
      *
-     * <p>부스 설문은 부스 공유 락이 응답자들을 줄 세우지만 <b>이벤트 설문에는 그 락이 없다</b> —
-     * 잠글 부스가 없기 때문이다. 그래서 여기서는 {@code ux_survey_responses_member} 하나가 유일한
-     * 방어선이고, 그 제약 위반이 500 이 아니라 {@code SURVEY_ALREADY_RESPONDED} 로 번역되는지까지
-     * 함께 본다.
+     * <p><b>이 테스트가 무엇을 증명하고 무엇을 증명하지 않는지</b>를 적어 둔다. 회원 제출은
+     * {@code WalletService.lockOwner} 가 지갑 행에 쓰기 락을 잡아 <b>같은 회원끼리 직렬화된다</b> —
+     * 이벤트 설문에 부스 공유 락이 없어도 그렇다. 그래서 뒤따르는 요청은 사전 {@code alreadyResponded}
+     * 검사에서 끝나고, {@code ux_survey_responses_member} 위반과 그 번역은 여기서 일어나지 않는다.
+     *
+     * <p>즉 이 테스트가 고정하는 것은 <b>결과</b>(4건 중 1건만 저장)이지 제약 번역 경로가 아니다.
+     * 그 경로는 지갑 락이 없는 게스트에서만 실제로 밟히므로 {@code SurveyResponseConcurrencyIntegrationTest}
+     * 가 따로 본다.
      */
     @Test
     void simultaneousSubmissionsFromOneMemberStoreExactlyOneResponse() throws Exception {
