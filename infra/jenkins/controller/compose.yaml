@@ -15,6 +15,7 @@ services:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false
       JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:?set in infra/.env}
       JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:?set in infra/.env}
+      JENKINS_WEBGL_PUBLISHER_PASSWORD: ${JENKINS_WEBGL_PUBLISHER_PASSWORD:?set in infra/.env}
       JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:?set in infra/.env}
       GITHUB_CREDENTIALS_ID: ${GITHUB_CREDENTIALS_ID:-github-scm}
       GITLAB_CREDENTIALS_ID: ${GITLAB_CREDENTIALS_ID:-gitlab-scm}

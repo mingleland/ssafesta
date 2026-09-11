@@ -6,6 +6,13 @@ jenkins:
             name: "${JENKINS_ADMIN_ID}"
             permissions:
               - Overall/Administer
+        - user:
+            name: webgl-publisher
+            permissions:
+              - Overall/Read
+              - Job/Discover
+              - Job/Read
+              - Job/Build
         - group:
             name: infra-viewers
             permissions:
