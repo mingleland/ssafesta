@@ -9,7 +9,7 @@ namespace Festa.Minigame
     /// <summary>
     /// 내장 미니게임 기계에 F — **화면은 FE 오버레이가 그린다** (사용자 지시 2026-09-10, GitLab #166).
     ///
-    /// <para>전에는 여기서 <see cref="TimerStopGameHud"/> 를 직접 열어 Unity 안에서 10초를 세고 결과까지 그렸다.
+    /// <para>전에는 여기서 <c>TimerStopGameHud</c>(2026-09-11 제거, #134) 를 직접 열어 Unity 안에서 10초를 세고 결과까지 그렸다.
     /// 이제 Unity 는 <c>WORLD_MINIGAME_INTERACT {gameId, machineId}</c> 만 보내고, 진행·서버 판정 호출·결과 표시는
     /// FE 가 맡는다. 광장 게임기(<see cref="Festa.Content.Arcade.ArcadeMachineInteractable"/>)와 같은 구조다.</para>
     ///
