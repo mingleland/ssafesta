@@ -25,11 +25,22 @@
  * `/ai/v1` 은 기본으로 열지 않는다. 로컬 8000 은 WebGL 정적 서버가 이미 쓰고 있어 FastAPI 대상이
  * 정해져야 켤 수 있다.
  *
+ * `/oauth2` 는 **local 개발용 auth gateway 보정**이다(S15P21A604-649, GitLab #177). OAuth 시작
+ * `GET /api/v1/auth/oauth/{provider}` 가 Spring 의 `302 Location: /oauth2/authorization/{provider}`
+ * (상대 경로)로 이어지는데, 이 prefix 가 게이트웨이에 없으면 브라우저가 FE 오리진의 `/oauth2/...` 로
+ * 가서 index.html 을 받는다. 같은 target 으로 넘기면 BE 가 `Set-Cookie: JSESSIONID`(host-only,
+ * 포트 무관)를 심고 provider 로 보낸다. provider 콜백(`/login/oauth2/code/*`)은 등록된 BE 주소로
+ * 직접 돌아오므로 **여기서 받지 않는다** — 그것을 프록시하면 provider 콘솔 등록값을 포트마다
+ * 바꿔야 한다. **dev/demo/prod nginx 계약 변경이 아니다** — dev 의 `dev.conf` 에는 `/oauth2/` route
+ * 가 없고 OAuth 시작이 `api.<domain>` vhost 를 탄다. 로컬만 한 오리진으로 접기 때문에 필요한 보정이다.
+ *
  * @param {Record<string, string | undefined>} env process.env
  */
 export function createGatewayProxy(env = {}) {
+  const api = env.VITE_PROXY_API_TARGET ?? 'http://127.0.0.1:8080';
   return {
-    '/api': { target: env.VITE_PROXY_API_TARGET ?? 'http://127.0.0.1:8080' },
+    '/api': { target: api },
+    '/oauth2': { target: api },
     '/unity': {
       target: env.VITE_PROXY_UNITY_TARGET ?? 'http://127.0.0.1:8000',
       rewrite: (path) => path.replace(/^\/unity/, ''),
