@@ -6,13 +6,13 @@
 
 **Status**: Confirmed — **Infra 리뷰 완료 (2026-08-18)**
 
-**Input**: `docs/sdd/parts/INFRA.md`의 infra-001 초안을 기반으로, `ai`/`back`/`front`/`game` 파트 브랜치의 독립 CI/CD와 `develop` 통합 배포를 명세한다. 후속 요구로 수집 Agent 기반 로그·서버 지표 관측과 규칙 기반 Mattermost 알림을 P1에 포함한다.
+**Input**: `docs/sdd/parts/INFRA.md`의 infra-001 초안을 기반으로, GitLab CI/Runner의 `feature/* → develop` MR build·test merge gate와 Jenkins의 `develop` 선택적 dev 배포, 승인된 release의 demo 통합 배포를 명세한다. 후속 요구로 수집 Agent 기반 로그·서버 지표 관측과 규칙 기반 Mattermost 알림을 P1에 포함한다.
 
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 파트 변경을 독립적으로 검증하고 배포한다 (Priority: P0)
 
-파트 개발자는 자기 파트 브랜치에 변경을 올리면 다른 파트의 개발 흐름을 방해하지 않고 해당 변경의 빌드·테스트·개발환경 배포 결과를 확인한다.
+파트 개발자는 `feature/*` MR에 변경을 올리면 GitLab CI의 필수 build·test 결과를 확인하고, 통과한 변경이 `develop`에 병합된 뒤 Jenkins의 해당 컴포넌트 dev 배포 결과를 확인한다.
 
 **Why this priority**: 네 파트가 서로의 배포를 기다리거나 다른 컴포넌트를 재시작하면 병렬 개발이 불가능해지므로, 프로젝트의 기본 개발 경로다.
 
@@ -20,23 +20,24 @@
 
 **Acceptance Scenarios**:
 
-1. **Given** 한 파트 브랜치에 유효한 변경이 제출되었을 때, **When** 자동 검증이 완료되면, **Then** 해당 파트의 개발환경만 새 버전으로 갱신되고 다른 파트는 재시작되지 않는다.
-2. **Given** 한 파트의 빌드 또는 테스트가 실패했을 때, **When** 파이프라인이 종료되면, **Then** 해당 변경은 배포되지 않고 실패 단계와 원인을 개발자가 확인할 수 있다.
-3. **Given** 같은 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 개발환경을 덮어쓰지 않는다.
+1. **Given** `feature/*` MR에 유효한 Front 또는 Back 변경이 제출되었을 때, **When** GitLab CI build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 dev 컴포넌트만 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
+2. **Given** `feature/*` MR의 필수 GitLab CI build 또는 test가 실패했을 때, **When** 파이프라인이 종료되면, **Then** 해당 변경은 `develop` 병합과 dev 배포가 차단되고 실패 단계와 원인을 개발자가 확인할 수 있다.
+3. **Given** 같은 `feature/*` MR 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 dev 환경을 덮어쓰지 않는다.
+4. **Given** Unity 담당자가 QA를 끝낸 최종 WebGL zip을 immutable release ID로 GitLab Generic Package Registry에 업로드했을 때, **When** 업로드 도우미가 산출물 SHA-256과 함께 Jenkins job을 호출하면, **Then** Jenkins는 패키지를 검증해 EC2 정적 release로 원자적으로 승격하고 Dedicated Server를 재시작하지 않는다.
 
 ---
 
-### User Story 2 - develop을 통합 시연 가능한 상태로 배포한다 (Priority: P0)
+### User Story 2 - 승인된 release를 demo 통합 환경에 배포한다 (Priority: P0)
 
-릴리스 담당자는 완료된 변경만 `develop`에 병합하고, 모든 컴포넌트가 함께 배포된 뒤 핵심 사용자 여정이 통과한 경우에만 통합 배포를 성공으로 판단한다.
+릴리스 담당자는 dev에서 검증된 `develop` release를 명시적으로 승인하고, 모든 컴포넌트가 함께 demo에 배포된 뒤 핵심 사용자 여정이 통과한 경우에만 통합 배포를 성공으로 판단한다.
 
-**Why this priority**: `develop`은 실사용 환경 기준선이므로 개별 컴포넌트의 성공만으로는 시연 가능 상태를 보장할 수 없다.
+**Why this priority**: demo는 통합 시연 환경이므로 개발 중인 모든 `develop` 변경이 자동으로 배포되면 안 되며, 승인된 release만 시연 가능 상태를 보장해야 한다.
 
-**Independent Test**: 검증된 변경을 `develop`에 반영한 뒤 웹 접속, 로그인, 월드 입장, AI 응답으로 이어지는 통합 헬스체크가 모두 통과해야 성공으로 기록되는지 확인한다.
+**Independent Test**: dev 검증된 `develop` release를 Jenkins에서 승인한 뒤 웹 접속, 로그인, 월드 입장, AI 응답으로 이어지는 demo 통합 헬스체크가 모두 통과해야 성공으로 기록되는지 확인한다.
 
 **Acceptance Scenarios**:
 
-1. **Given** 완료된 변경이 `develop`에 병합되었을 때, **When** 통합 파이프라인이 실행되면, **Then** 배포 대상 전체가 동일한 릴리스로 갱신되고 핵심 사용자 여정 검증이 시작된다.
+1. **Given** dev 검증을 통과한 `develop` release가 승인되었을 때, **When** demo 통합 파이프라인이 실행되면, **Then** 배포 대상 전체가 동일한 릴리스로 갱신되고 핵심 사용자 여정 검증이 시작된다.
 2. **Given** 모든 컴포넌트 배포와 핵심 사용자 여정 검증이 통과했을 때, **When** 실행이 종료되면, **Then** 해당 릴리스는 성공 상태와 추적 가능한 버전 정보로 기록된다.
 3. **Given** 배포 또는 핵심 사용자 여정의 어느 한 단계가 실패했을 때, **When** 실행이 종료되면, **Then** 성공으로 표시되지 않으며 마지막 정상 릴리스를 복구할 수 있는 상태가 보존된다.
 
@@ -90,10 +91,10 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ### Edge Cases
 
-- 같은 파트 브랜치에 여러 변경이 빠르게 제출되어 실행 순서가 뒤바뀌는 경우
+- 같은 `feature/*` MR 브랜치에 여러 변경이 빠르게 제출되어 실행 순서가 뒤바뀌는 경우
 - 한 파트의 검증은 성공했지만 배포 대상이 응답하지 않는 경우
 - 단일 EC2에서 한 파트의 빌드 또는 실행 부하가 다른 파트와 Jenkins의 가용성을 저해하는 경우
-- `develop` 배포 중 일부 컴포넌트만 갱신되고 나머지가 실패하는 경우
+- demo 통합 배포 중 일부 컴포넌트만 갱신되고 나머지가 실패하는 경우
 - 통합 헬스체크에서 웹 접속은 성공하지만 로그인·월드 입장·AI 응답 중 일부만 실패하는 경우
 - 캐시가 손상되었거나 변경 내용과 호환되지 않아 재사용할 수 없는 경우
 - 배포 중 비밀값이 오류 메시지나 명령 출력에 포함될 가능성이 있는 경우
@@ -108,15 +109,16 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ### Functional Requirements
 
-- **FR-001**: 시스템은 `ai`, `back`, `front`, `game` 각 파트 브랜치의 변경을 서로 독립된 파이프라인으로 처리해야 한다.
-- **FR-002**: 각 파트 파이프라인은 해당 파트가 정의한 빌드와 자동 테스트를 배포보다 먼저 수행해야 한다.
-- **FR-003**: 빌드 또는 필수 테스트가 하나라도 실패하면 해당 변경의 배포를 차단해야 한다.
-- **FR-004**: 파트 브랜치의 성공한 배포는 해당 파트 개발환경만 갱신해야 하며 다른 파트 컴포넌트를 재시작하거나 교체해서는 안 된다.
-- **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다.
+- **FR-001**: GitLab CI/Runner는 `feature/* → develop` MR의 `festa-frontend/**`, `backend/**`, 공용 계약·CI 경로를 `rules:changes`로 매핑해 필요한 Front·Back build·test job만 실행해야 한다. Front·Back 공용 경로는 두 gate를 모두 실행한다. `jira-*` job 정의는 보존하되 실행하지 않는다.
+- **FR-002**: GitLab CI의 Front gate는 `ci/test front` 및 `ci/build front`, Back gate는 `ci/test back` 및 `ci/build back`을 수행해야 한다. Back gate runner는 Testcontainers를 위해 Docker executor 또는 Docker socket 접근을 제공해야 한다.
+- **FR-003**: GitLab의 필수 MR gate가 하나라도 실패하면 `develop` 병합을 차단해야 한다. Jenkins의 `develop` 검증이 실패하면 dev 배포를 차단해야 한다.
+- **FR-003a**: 초기 MR merge gate 범위는 Front·Back이다. AI·Game의 MR gate는 해당 실행환경이 준비되는 별도 작업으로 남기며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
+- **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 개발환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
+- **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다. 하나의 MR이 여러 컴포넌트를 변경하면 모든 변경 컴포넌트의 CI가 성공한 뒤에만 dev 배포를 시작해야 하며, 배포 또는 검증이 하나라도 실패하면 같은 MR에서 이미 갱신된 컴포넌트를 이전 정상 release로 자동 복구해야 한다.
 - **FR-006**: 모든 실행은 변경 식별자, 대상 파트, 단계별 결과, 산출물 식별자, 배포 대상과 최종 상태를 추적 가능하게 기록해야 한다.
-- **FR-007**: `develop` 변경은 모든 서버 컴포넌트를 하나의 통합 릴리스 단위로 배포해야 한다.
-- **FR-008**: `develop` 배포는 웹 접속 → 로그인 → 월드 입장 → AI 응답의 핵심 사용자 여정을 순서대로 검증해야 한다.
-- **FR-009**: `develop` 배포는 모든 필수 배포 단계와 핵심 사용자 여정이 통과한 경우에만 성공으로 기록해야 한다.
+- **FR-007**: 승인된 `develop` release만 모든 서버 컴포넌트를 하나의 통합 릴리스 단위로 demo에 배포해야 한다.
+- **FR-008**: demo 통합 배포는 웹 접속 → 로그인 → 월드 입장 → AI 응답의 핵심 사용자 여정을 순서대로 검증해야 한다.
+- **FR-009**: demo 통합 배포는 모든 필수 배포 단계와 핵심 사용자 여정이 통과한 경우에만 성공으로 기록해야 한다.
 - **FR-010**: 통합 배포 실패 시 시스템은 실패 릴리스의 승격을 막고 마지막 정상 릴리스를 식별·복구할 수 있는 상태를 보존해야 한다.
 - **FR-011**: 서버 컴포넌트의 배포 산출물은 헌법 7조에 따라 재현 가능한 컨테이너 이미지여야 한다.
 - **FR-012**: Unity 자동 빌드는 유효한 캐시를 재사용하고, 캐시가 유효하지 않을 때 안전하게 폐기한 뒤 재생성할 수 있어야 한다.
@@ -131,6 +133,16 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-021**: 새 컨테이너 시작 또는 비AI 핵심 헬스체크가 실패하고 되돌릴 수 없는 데이터 변경이 없을 때, 시스템은 마지막 정상 릴리스로 자동 복구하고 복구 후 헬스체크를 다시 수행해야 한다.
 - **FR-022**: DB 스키마 변경, Secret·환경 설정 오류 또는 되돌릴 수 없는 데이터 변경이 관련된 실패는 자동 복구하지 않고 현재 상태와 로그를 보존한 뒤 승인된 담당자의 수동 판단을 기다려야 한다.
 - **FR-023**: 외부 AI 서비스 장애로 AI 응답 검증만 실패하면 통합 릴리스를 성공으로 기록하지 않되 정상인 월드와 비AI 컴포넌트를 자동 복구해서는 안 되며, AI 검증 재시도 또는 수동 승인을 기다려야 한다.
+- **FR-023a**: Unity 담당자의 QA 완료 후 GitLab Generic Package Registry에 성공한 최종 WebGL package 업로드를 해당 정적 산출물의 배포 승인 신호로 사용해야 한다.
+- **FR-023b**: 업로드 도우미는 package 업로드와 SHA-256 checksum 업로드가 모두 성공한 뒤에만 immutable release ID와 SHA-256을 Jenkins parameterized job에 전달해야 한다.
+- **FR-023c**: Jenkins는 개인 PAT가 아니라 `read_package_registry` 최소 권한 GitLab Deploy Token을 Jenkins Credentials에서 실행 시점에만 주입해 package를 내려받아야 한다.
+- **FR-023d**: Jenkins는 전달받은 SHA-256, ZIP 무결성, 절대·상위·드라이브 경로와 심볼릭 링크가 없는 안전한 entry, `index.html`·`manifest.json`·`Build/`·`TemplateData/`, manifest 4개 참조 파일을 승격 전에 검증해야 한다.
+- **FR-023e**: WebGL 산출물은 `/srv/festa/webgl/releases/<release-id>/`에 불변으로 설치하고, 동일 release ID의 동일 SHA 재호출은 멱등 처리하며 다른 SHA 재사용은 거부해야 한다.
+- **FR-023f**: Jenkins는 같은 파일시스템의 임시 심볼릭 링크와 원자적 rename으로만 `/srv/festa/webgl/current`를 전환하고 경로 내용을 직접 덮어쓰지 않아야 한다.
+- **FR-023g**: 전환 후 공개 URL의 index·manifest·manifest 참조 파일에 대해 HTTP 상태, MIME, Brotli와 Cache-Control을 검증하고 실패 시 직전 current를 복원해야 한다.
+- **FR-023h**: 성공한 current와 직전 previous release를 보존하면서 제한된 retention을 적용하고, WebGL 정적 배포는 Unity Dedicated Server 컨테이너를 재시작하지 않아야 한다.
+- **FR-023i**: 배포 이력은 release ID, artifact SHA-256, Registry package URL, 공개 대상 URL, 결과와 시각을 기록하되 인증정보 원문을 포함하지 않아야 한다.
+- **FR-023j**: Unity 담당자 PC는 Jenkins Agent로 상시 연결할 필요가 없으며 업로드 도우미 실행 시 GitLab과 Jenkins HTTPS API에 접근할 수 있으면 된다.
 
 #### P1 — 로그 기반 이상 탐지·운영 관측
 
@@ -148,7 +160,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **Pipeline Definition**: 어떤 브랜치 변경이 어떤 검증·배포 흐름을 거치는지 정의하는 버전 관리 대상.
 - **Pipeline Run**: 하나의 변경으로 시작된 실행. 변경 식별자, 단계별 결과, 시작·종료 시각과 최종 상태를 가진다.
 - **Build Artifact**: 검증을 통과한 배포 후보. 원본 변경과 무결하게 연결되어야 한다.
-- **Deployment Target**: 파트별 개발환경 또는 `develop` 통합환경처럼 릴리스가 적용되는 논리적 대상.
+- **Deployment Target**: 컴포넌트별 dev 환경 또는 승인된 release의 demo 통합환경처럼 릴리스가 적용되는 논리적 대상.
 - **Release**: 함께 배포·검증되는 산출물들의 식별 가능한 묶음.
 - **Health Check Result**: 핵심 사용자 여정의 단계별 성공·실패와 실패 지점을 나타내는 결과.
 - **Secret Reference**: 실제 값을 포함하지 않고 승인된 비밀정보 저장소의 항목을 가리키는 참조.
@@ -160,10 +172,10 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ### Measurable Outcomes
 
-- **SC-001**: 대상 파트 브랜치의 유효한 변경 100%가 수동 요청 없이 해당 파트 파이프라인을 시작한다.
+- **SC-001**: `feature/* → develop` MR의 Front·Back 변경 100%가 수동 요청 없이 해당 GitLab CI gate를 시작하고, Front·Back 공용 경로 변경 100%가 두 gate를 모두 시작한다.
 - **SC-002**: 빌드 또는 필수 테스트가 실패한 실행의 개발환경 배포 건수는 0건이다.
-- **SC-003**: 파트 브랜치 배포로 인해 변경 대상이 아닌 다른 파트 컴포넌트가 재시작되는 건수는 0건이다.
-- **SC-004**: 성공으로 기록된 `develop` 릴리스의 100%가 웹 접속·로그인·월드 입장·AI 응답 검증 기록을 모두 가진다.
+- **SC-003**: `develop` 배포로 인해 변경 대상이 아닌 다른 컴포넌트가 재시작되는 건수와 공용 파이프라인 파일 변경으로 dev 컴포넌트가 재시작되는 건수는 각각 0건이다.
+- **SC-004**: 성공으로 기록된 demo 통합 릴리스의 100%가 웹 접속·로그인·월드 입장·AI 응답 검증 기록을 모두 가진다.
 - **SC-005**: 성공·실패 실행 표본의 100%에서 변경부터 산출물, 배포 대상, 최종 상태까지 이력을 재구성할 수 있다.
 - **SC-006**: 분기별 복구 리허설의 100%에서 마지막 정상 릴리스를 식별하고 문서화된 절차로 복구할 수 있다.
 - **SC-007**: 저장소·로그·캐시·산출물에 대한 비밀값 원문 검사 결과가 0건이다.
@@ -171,6 +183,8 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **SC-009**: 동일 조건의 Unity 빌드 표본에서 유효한 캐시 사용 시 중앙 빌드 시간이 콜드 빌드 중앙값보다 짧음이 확인된다.
 - **SC-010**: 자동 복구 조건에 해당하는 배포 실패 표본의 100%에서 마지막 정상 릴리스가 복원되고 복구 후 비AI 핵심 헬스체크가 통과한다.
 - **SC-011**: 수동 판단 조건에 해당하는 실패 표본의 100%에서 자동 복구가 실행되지 않고 실패 상태·로그·대상 릴리스가 보존된다.
+- **SC-011a**: WebGL package 배포 fixture의 100%에서 정상·중복 trigger는 같은 SHA의 release로 수렴하고, bad SHA·unsafe ZIP·bad manifest·공개 검증 실패는 새 current를 남기지 않는다.
+- **SC-011a**: QA 완료 WebGL package 배포 표본의 100%에서 전달 SHA-256과 설치 SHA-256이 일치하고, 공개 검증 성공 시에만 새 current가 유지되며 실패 표본은 직전 current로 복원된다.
 - **SC-012**: Mattermost로 전송된 운영 알림의 100%가 알림 시점에 활성화된 탐지 규칙과 발생 대상으로 추적된다.
 - **SC-013**: 일반 CI 상태와 탐지 규칙에 맞지 않는 테스트 로그를 사용한 검증에서 Mattermost 운영 알림 발생 건수는 0건이다.
 - **SC-014**: 정의된 서버와 파트별 컨테이너 대상의 100%에서 CPU·메모리·디스크·네트워크 사용 상태를 대시보드로 구분해 확인할 수 있다.
@@ -178,8 +192,9 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ## Assumptions
 
-- `ai`/`back`/`front`/`game` 파트 브랜치와 완료분만 `develop`에 Squash Merge하는 정책은 헌법 10조의 확정 사항이다.
-- 개발환경은 파트 브랜치별로 독립 배포하고 `develop`은 통합 demo 환경으로 사용한다.
+- 개발 흐름은 `feature/*` 브랜치에서 `develop`으로 Merge Request를 만들고 Squash Merge한다. 고정 `ai`/`back`/`front`/`game` 파트 브랜치는 사용하지 않는다.
+- GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단만 담당한다. Jenkins는 merge 후 네 컴포넌트의 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
+- `develop` 병합은 변경 컴포넌트만 dev에 자동 배포한다. demo 통합 환경은 dev 검증 후 Jenkins에서 승인한 release만 배포한다.
 - 각 파트는 파이프라인이 호출할 수 있는 빌드 명령과 필수 테스트 범위를 소유하고 유지한다.
 - CI/CD 서비스는 Jenkins를 사용한다. 소스 저장소는 초기 GitHub에서 추후 GitLab으로 이전하되 Jenkins 파이프라인은 유지하고 연동 Webhook만 전환한다.
 - 초기에는 제공받은 단일 EC2 안에서 Jenkins Controller와 빌드 Agent를 논리적으로 분리하며, Controller에서 빌드를 직접 실행하지 않는다. 자원이 추가되면 Agent를 별도 EC2로 이전할 수 있어야 한다.
@@ -188,7 +203,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - 통합 배포 복구는 실패 유형에 따라 조건부 자동화한다. 되돌릴 수 있는 컨테이너 시작·비AI 핵심 헬스체크 실패는 자동 복구하고, DB·Secret·환경 설정·되돌릴 수 없는 데이터 변경 및 AI 외부 장애는 상태를 보존한 뒤 수동 판단한다.
 - AWS 서버 자원은 제공되며, 환경·도메인·인증서의 상세 구성은 `infra-002-environments`에서 다룬다.
 - Unity Dedicated Server의 외부 `wss://` 노출과 로드밸런서 실측은 `infra-003-unity-server-deploy`에서 다룬다.
-- AI 장애는 월드 접속과 비AI 기능의 가용성을 중단시키지 않아야 하지만, `develop` 통합 릴리스의 전체 성공 판정에는 AI 응답 검증 결과를 포함한다.
+- AI 장애는 월드 접속과 비AI 기능의 가용성을 중단시키지 않아야 하지만, demo 통합 릴리스의 전체 성공 판정에는 AI 응답 검증 결과를 포함한다.
 - 로그 기반 이상 탐지와 서버 사용량 관측은 P1이다. 구체적인 탐지 패턴·임계치·지속시간·재알림 간격, 로그·지표 보존 기간과 대시보드 패널 구성은 운영 경험과 EC2 사양을 확인한 뒤 후속 설계에서 정한다.
 
 ## Clarifications
@@ -200,7 +215,21 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - Q: CI 서비스와 작업 실행용 컴퓨터를 어떤 구성으로 운영할까요? → A: Jenkins를 사용하고, 초기에는 단일 EC2 안에서 Controller와 Agent를 분리하며 추후 Agent를 별도 EC2로 이전할 수 있게 구성한다. 소스 저장소는 GitHub에서 시작해 GitLab으로 이전하며 Jenkins 연동 Webhook을 전환한다.
 - Q: Jenkins의 Unity 자동 빌드에 사용할 라이선스 유형과 EC2 활성화 방식을 무엇으로 확정할까요? → A: Unity Personal 라이선스를 영속 Unity Agent에서 관리자가 Unity Hub로 1회 활성화하고, Agent 폐기·교체 시에만 반납한다. Unity 계정 인증정보는 Jenkins에 저장하지 않는다.
 - Q: 파트별 개발환경을 제공받은 EC2 한 대에서 컨테이너로 분리할까요, 아니면 파트마다 별도 EC2로 분리할까요? → A: 제공 서버가 한 대이므로 단일 EC2 안에서 파트별 컨테이너·네트워크·배포 단위를 논리적으로 분리하고, 추후 개별 이전할 수 있게 구성한다.
-- Q: `develop` 통합 배포가 실패했을 때 어디까지 자동으로 이전 정상 버전으로 복구하고, 어떤 경우에 사람의 승인을 기다릴까요? → A: 컨테이너 시작·비AI 핵심 헬스체크의 되돌릴 수 있는 실패는 자동 복구한다. DB·Secret·환경 설정·되돌릴 수 없는 데이터 변경 및 AI만의 외부 장애는 상태를 보존하고 수동 판단한다.
+- Q: demo 통합 배포가 실패했을 때 어디까지 자동으로 이전 정상 버전으로 복구하고, 어떤 경우에 사람의 승인을 기다릴까요? → A: 컨테이너 시작·비AI 핵심 헬스체크의 되돌릴 수 있는 실패는 자동 복구한다. DB·Secret·환경 설정·되돌릴 수 없는 데이터 변경 및 AI만의 외부 장애는 상태를 보존하고 수동 판단한다.
+
+### Session 2026-09-08
+
+- Q: `feature/*` MR 생성·갱신 시, 변경된 컴포넌트만 CI를 실행할까? → A: GitLab CI가 초기 Front·Back merge gate를 `rules:changes`로 실행하고, `develop` 병합 후 Jenkins가 같은 변경 컴포넌트를 dev에 배포한다.
+- Q: GitLab CI와 Jenkins가 같은 MR build·test를 중복 실행할까? → A: 하지 않는다. GitLab CI는 merge 전 gate, Jenkins는 merge 후 selected CI·dev 배포와 demo promotion만 담당한다.
+- Q: `infra/**`, `Jenkinsfile`, 공용 빌드 파일이 바뀌면 어떻게 처리할까? → A: 모든 컴포넌트 CI만 실행하고 dev 자동 배포는 하지 않는다.
+- Q: 특정 컴포넌트의 배포 설정만 바뀌면, 그 컴포넌트 변경으로 보고 dev에 자동 배포할까? → A: 해당 컴포넌트만 CI를 실행하고 `develop` 병합 후 dev에 자동 배포한다.
+- Q: 하나의 MR이 여러 컴포넌트를 바꾸면, 변경된 모든 컴포넌트 CI가 통과한 뒤에만 dev 배포할까? → A: 변경 컴포넌트 전체 CI가 성공한 뒤 해당 컴포넌트들을 dev에 배포한다.
+- Q: 여러 컴포넌트 dev 배포 중 하나가 실패하면, 이미 배포된 같은 MR의 컴포넌트는 어떻게 할까? → A: 같은 MR에서 이미 갱신된 컴포넌트도 이전 정상 release로 자동 복구한다.
+- Q: dev 검증 뒤 demo 통합 배포는 언제 실행할까? → A: dev 검증 완료 후 Jenkins에서 명시적으로 승인한 release만 demo에 통합 배포한다.
+
+### Session 2026-09-09
+
+- Q: Front·Back 경로가 아닌 Infra·문서 MR은 component gate가 없는데, protected `develop`의 성공 pipeline 요구를 어떻게 만족할까? → A: 모든 유효 MR은 build·test·deploy를 수행하지 않는 `mr-status` job을 하나 실행한다. Front·Back component gate는 기존 `rules:changes`로만 추가되며, Jenkins의 merge 후 선택 CI와 중복되지 않는다.
 
 | ID | 질문/결정 | 결정 주체 | 결정 시점 |
 |---|---|---|---|

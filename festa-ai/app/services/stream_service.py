@@ -17,11 +17,16 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timezone
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.models.conversation import (
     Conversation,
     ConversationTurn,
     SourceCitation,
 )
+from app.core.logging import log_event
 from app.providers.llm import LLMProvider
 from app.providers.managed_llm import ManagedLLMError
 from app.repositories.conversation_repository import ConversationRepository
@@ -89,6 +94,30 @@ class ConversationStreamService:
             raise BoothLeaseExpired(conversation_id)
         return conversation
 
+    async def _commit_turn(self, conversation: Conversation, turn: ConversationTurn) -> None:
+        """Confirm one completed turn, unless the Conversation is already gone.
+
+        A close (`DELETE`) or the idle TTL can land while this stream is still
+        running — the client keeps reading, so we reach here either way. Writing
+        unconditionally would bring the question and answer text back for
+        another 30 minutes and break D11/SC-012, so the repository commit is
+        conditional and its failure is logged rather than swallowed.
+        """
+        updated = conversation.record_turn(
+            turn, now=turn.created_at, ttl_seconds=self._ttl_seconds
+        )
+        if not await self._repository.commit_turn(updated):
+            log_event(
+                logger,
+                logging.INFO,
+                "conversation_turn_dropped",
+                conversation_id=conversation.conversation_id,
+                request_id=turn.request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="DROPPED",
+            )
+
     async def stream(
         self, *, conversation: Conversation, question: str
     ) -> AsyncIterator[str]:
@@ -116,9 +145,59 @@ class ConversationStreamService:
             context = await self._rag_context_service.build(
                 conversation=conversation, question=question
             )
+        except AgentConfigDenied as exc:
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code=exc.code,
+            )
+            yield render(
+                "error",
+                {
+                    "code": exc.code,
+                    "message": "AI 직원 설정을 사용할 수 없습니다.",
+                    "retryable": False,
+                },
+            )
+            return
+        except SpringAgentConfigUnavailable:
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="AGENT_CONFIG_UNAVAILABLE",
+            )
+            yield render(
+                "error",
+                {
+                    "code": "AGENT_CONFIG_UNAVAILABLE",
+                    "message": "AI 직원 설정을 확인하지 못했습니다.",
+                    "retryable": True,
+                },
+            )
+            return
         except Exception:
-            logger.exception(
-                "RAG context build failed for conversation %s", conversation.conversation_id
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="CONTEXT_BUILD_FAILED",
             )
             yield render(
                 "error",
@@ -143,8 +222,7 @@ class ConversationStreamService:
                 sources=(),
                 created_at=now,
             )
-            updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-            await self._repository.save(updated)
+            await self._commit_turn(conversation, turn)
             return
 
         answer_parts: list[str] = []
@@ -173,10 +251,17 @@ class ConversationStreamService:
                 answer_parts.append(token.text)
                 yield render("token", {"delta": token.text})
         except _StreamTimeout as exc:
-            logger.warning(
-                "LLM stream timed out for conversation %s phase=%s",
-                conversation.conversation_id,
-                exc.phase,
+            log_event(
+                logger,
+                logging.WARNING,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="LLM_TIMEOUT",
+                timeout_phase=exc.phase,
             )
             yield render(
                 "error",
@@ -189,8 +274,16 @@ class ConversationStreamService:
             )
             return
         except ManagedLLMError as exc:
-            logger.exception(
-                "LLM stream failed for conversation %s", conversation.conversation_id
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code=exc.code,
             )
             yield render(
                 "error",
@@ -198,9 +291,16 @@ class ConversationStreamService:
             )
             return
         except Exception:
-            logger.exception(
-                "Unexpected LLM stream failure for conversation %s",
-                conversation.conversation_id,
+            log_event(
+                logger,
+                logging.ERROR,
+                "conversation_stream_failed",
+                conversation_id=conversation.conversation_id,
+                request_id=request_id,
+                booth_id=conversation.scope.booth_id,
+                agent_id=conversation.scope.agent_id,
+                status="FAILED",
+                error_code="LLM_STREAM_FAILED",
             )
             yield render(
                 "error",
@@ -251,5 +351,4 @@ class ConversationStreamService:
             sources=tuple(citations),
             created_at=now,
         )
-        updated = conversation.record_turn(turn, now=now, ttl_seconds=self._ttl_seconds)
-        await self._repository.save(updated)
+        await self._commit_turn(conversation, turn)

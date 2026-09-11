@@ -1,0 +1,47 @@
+/* 타이밍 스톱 (S15P21A604-601). 색·간격은 overlayFrame.css 의 --ov-* 토큰만 쓴다 —
+   오버레이 안이므로 전역 토큰과 섞지 않는다. */
+
+.ts-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 8px;
+  text-align: center;
+}
+
+.ts-guide {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--ov-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* 숫자가 바뀔 때 폭이 흔들리지 않게 tabular-nums 를 준다 — 초시계가 좌우로 떨리면 읽기 어렵다 */
+.ts-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ov-text);
+}
+
+.ts-clock-idle { color: var(--ov-text-muted); }
+.ts-clock-done { font-size: 34px; }
+
+.ts-headline {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.ts-tone-reward { color: #7ee0a5; }
+.ts-tone-neutral { color: var(--ov-text); }
+.ts-tone-fail { color: #ff9b9b; }
+
+.ts-error {
+  margin: 0;
+  color: var(--ov-text-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}

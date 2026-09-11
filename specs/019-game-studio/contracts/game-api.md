@@ -572,6 +572,58 @@ Cache-Control: no-store
 - `gameId`·`publishedVersion`은 nullable이다. Binding은 있고 Game이 미발행이면 `gameId`는 값이 있고
   `publishedVersion`이 `null`이다.
 
+## Arcade Machine Resolution
+
+> **위 §Booth Portal Resolution 과 다른 경로다.** 그쪽은 임대 부스 안에 배치된 `GAME_PORTAL` 을
+> `configId` 로 푸는 것이고 현재 **보류**다(`S15P21A604-158`·`-204`). 아래는 **월드 고정물**인
+> 오락기를 씬의 `machineId` 로 푸는 것이고 구현본이다(`S15P21A604-602`, GitLab #56 안 1 · #135).
+
+```text
+GET /api/v1/arcade-machines/{machineId}
+Cache-Control: no-store
+```
+
+응답 예시:
+
+```json
+{
+  "machineId": "plaza-arcade-01",
+  "gameId": 123,
+  "publishedVersion": 5,
+  "playable": true,
+  "unavailableReason": null
+}
+```
+
+- **`machineId` 는 씬이 정한 canonical id 다.** 서버가 발급하지 않는다. Unity 는 이 값만 알고
+  `gameId` 를 모른다 — 큐레이션이 바뀌어도 Unity 빌드가 바뀌지 않게 한 분담이다 (FR-017).
+- **오락기 1대 = 게임 1개 고정 바인딩**이다 (2026-09-10 배치 결정, `docs/26` 결정 기록). 그래서 이
+  경로에 공개 게임 목록 endpoint 가 필요하지 않다.
+- **토큰이 없어도 호출된다.** 게시된 게임 플레이는 게스트의 몫이기도 하다 (FR-023).
+- **공개 상태는 매 요청 서버가 판정한다.** `Cache-Control: no-store` 인 이유이며, 캐시된 응답은
+  방금 비공개로 바꾼 게임을 계속 열어 준다.
+- **`boothId` 가 없다.** 월드 고정물이라 임대·소유권 판정이 없다 — `BOOTH_LEASE_EXPIRED` 계열도
+  이 경로에서는 나오지 않는다. 부스 경로(위 절)와 갈리는 지점이다.
+- `publishedVersion` 은 `playable: true` 일 때만 값이 있다.
+- 바인딩 행은 v1 에서 **운영자 시드 데이터**다. 관리자 UI 는 범위 밖이고 쓰기 endpoint 가 없다.
+- 회원 탈퇴는 그 회원 게임에 걸린 바인딩을 함께 지운다 (FR-040). 기계는 월드에 남고, 운영자가
+  다시 걸기 전까지 그 기계는 `MACHINE_NOT_FOUND` 로 답한다.
+
+### `unavailableReason` 어휘 — 게임 공개 상태 3종
+
+| unavailableReason | 뜻 |
+|---|---|
+| `GAME_DELETED` | 연결된 Game 이 soft delete 됨 |
+| `GAME_NOT_PUBLIC` | 연결된 Game 이 `PRIVATE` |
+| `GAME_NOT_PUBLISHED` | 연결된 Game 에 Published Version 이 없음 |
+
+- **표의 순서가 판정 순서다.** 세 상태는 겹칠 수 있고(비공개·미게시 게임을 삭제하면 셋 다 참),
+  그때는 위쪽이 답이다. 사용자가 보는 문장이 하나여야 하기 때문이다.
+- 셋 다 **HTTP 200 + `playable: false`** 다. 오락기는 월드 고정물이라 월드를 끊지 않고 안내만
+  띄운다 (FR-020).
+- **`MACHINE_NOT_FOUND` 만 HTTP 404 + 봉투 `code`** 다. 등록되지 않은 `machineId` 이며, 200 으로
+  보낼 수 없다 — 응답의 다른 필드를 채울 근거가 없다.
+
 ## 확정 기록
 
 이 문서의 미결 항목은 **2026-08-25에 전부 확정됐다.** 근거는 GitLab #104(①⑦)와 #48(★ 승인·②③④⑤⑥)이다.
@@ -583,7 +635,7 @@ Cache-Control: no-store
 | ③ | `docs/08` §18 게임 코드 표 | 실제 wire 이름으로 정정하고 상세 code·rule 정본은 이 문서가 갖는다. 쓰이지 않는 옛 이름은 남기지 않는다 | #48 |
 | ④ | 사용자당 게임 상한 | **활성 20개**(soft-delete 제외), 초과 시 `GAME_LIMIT_EXCEEDED`(409). 서버 설정값이고 v1 기본 20. **삭제본은 별도로 5개**이며 초과분은 오래된 것부터 hard delete (§삭제본 보관) | #48 |
 | ⑤ | 내 게임 목록 | `GET /games/mine`. soft-delete 포함(`deletedAt`), 활성 먼저 `updatedAt` 내림차순, 6필드, 페이지네이션 없음 | #48 |
-| ⑥ | #81 Coin 차감 | **#48 범위에서 제외.** MVP는 무료·무보상을 유지하고 #81 계열에서 spec 개정 후 별도 구현한다 (FR-022·§MVP 제외 그대로) | #48 |
+| ⑥ | #81 Coin 차감 | ~~#48 범위에서 제외. MVP는 무료·무보상 유지, #81 계열에서 spec 개정 후 별도 구현~~ → **2026-08-26 갱신: #81 리드 확정으로 유료 입장이 v1 범위가 됐다** (*"BE 제안 8건 전부 채택 … 구현 착수는 S15P21A604-108(BE)·-117(FE)"*). **Reward·Ranking 제외는 그대로다.** 단 **구현은 보류**이고 이 문서에 §플레이 세션 절은 아직 없다 — 게임이 광장으로 옮겨져 진입 경로가 바뀌었고 해당 오락기가 아직 없다(`S15P21A604-598`, `docs/26` 결정 기록) | #48 → **#81** |
 | ⑦ | `INTERNAL_SERVER_ERROR` vs `INTERNAL_ERROR` | 서버는 **`INTERNAL_ERROR` 유지**. 전 endpoint 공통 코드라 서버를 바꾸지 않고 FE 재시도 판정을 맞춘다 | #104 |
 | — | 신규 이름 19개 | `errors[].rule` 16 + `code` 2(`GAME_VALIDATION_FAILED`·`GAME_LIMIT_EXCEEDED`) + `unavailableReason` 1(`CONFIG_DISABLED`) 전부 승인 | #48 |
 | — | 패키지 배치 | **기존 Backend와 같은 flat 구조.** `auth`·`booth`·`user`·`wallet` 관례를 따르고 019만 4계층 선례를 만들지 않는다 (`BE/plan.md`) | #48 |
@@ -592,7 +644,7 @@ Cache-Control: no-store
 
 ## MVP 제외
 
-- Coin/Reward 지급
+- **Reward 지급.** 유료 **입장**은 2026-08-26 #81 리드 확정으로 범위에 들어왔지만(FR-022 개정, 구현은 보류 — `S15P21A604-598`) 게임 결과에 대한 코인 **지급**은 여전히 범위 밖이다. 서버가 검증할 수 없는 완료·점수를 정산 근거로 삼지 않는다는 같은 원칙의 두 면이다
 - 경쟁 Ranking과 MVP score endpoint. 표시 전용 Ranking은 P1 별도 범위
 - 클라이언트 점수 기반 서버 정산
 - AI 생성 요청

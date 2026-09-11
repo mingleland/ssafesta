@@ -25,6 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Without the first gate a worker that lost its lease, and does not know it, overwrites the work of
  * the attempt that replaced it.
  *
+ * <p>finalize is also where a 수정본 교체 lands (FR-027a): publishing the new version is the moment
+ * the original it replaced stops being the answer, so retiring that original is the last statement
+ * of the same transaction. Everything before it failing means the original is untouched.
+ *
  * <p>finalize has one exception to the second gate: a Job this same attempt already finished, with
  * the same file and the same count, is a <b>resend</b> and answers {@code 204}. Losing the response
  * to the last call of a job is the ordinary case, and #119 §3 requires the resend to be idempotent —
@@ -58,7 +62,7 @@ public class AiDocumentResultService {
         JobRow job = live(jobId, request.attemptNo());
         // batch 도 살아 있다는 신호다 — heartbeat 와 같은 자리에서 lease 를 잡는다. 상태만 올리고
         // lease 를 비워 두면 첫 heartbeat 전에 죽은 워커의 Job 을 sweeper 가 영영 못 본다.
-        jobs.extendLease(job.id());
+        jobs.extendLease(job.id(), job.documentId());
         jobs.stageChunks(job.id(), batchSeq, staged);
     }
 
@@ -115,6 +119,9 @@ public class AiDocumentResultService {
         jobs.clearStaging(job.id());
         jobs.markSucceeded(job.id(), staging.total());
         jobs.markDocumentReady(job.documentId());
+        // 마지막이다. 이 문서가 실제로 READY 가 된 뒤라야 밀려난 원본을 물릴 수 있다 (FR-027a) —
+        // 위에서 하나라도 걸리면 원본은 READY 그대로이고 AI 직원은 답할 근거를 잃지 않는다.
+        jobs.retireReplacedOriginal(job.documentId());
     }
 
     /**
@@ -127,7 +134,7 @@ public class AiDocumentResultService {
     public void heartbeat(long jobId, String rawBody) {
         HeartbeatRequest request = StrictJsonReader.read(rawBody, HeartbeatRequest.class);
         JobRow job = live(jobId, request.attemptNo());
-        jobs.extendLease(job.id());
+        jobs.extendLease(job.id(), job.documentId());
     }
 
     /**

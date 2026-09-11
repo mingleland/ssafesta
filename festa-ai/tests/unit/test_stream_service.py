@@ -4,10 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from app.clients.spring_agent_config import (
+    AgentConfigDenied,
+    SpringAgentConfigUnavailable,
+)
 from app.clients.spring_chunk_search import RetrievedChunk
 from app.models.conversation import Conversation
 from app.providers.llm import LLMRequest, LLMToken
@@ -87,6 +92,12 @@ class _ConversationRepository:
     async def save(self, conversation: Conversation) -> None:
         self.saved.append(conversation)
 
+    async def commit_turn(self, conversation: Conversation) -> bool:
+        if self._conversation is None:
+            return False
+        self.saved.append(conversation)
+        return True
+
 
 class _RagContextService:
     def __init__(self, result: ContextBuildResult | None = None, error: Exception | None = None):
@@ -127,6 +138,24 @@ def _events(raw_events: list[str]) -> list[dict]:
         data_line = next(line for line in raw.splitlines() if line.startswith("data: "))
         parsed.append(json.loads(data_line[len("data: ") :]))
     return parsed
+
+
+def _assert_c07_contract(raw_events: list[str], *, terminal: str) -> list[dict]:
+    """Pin the wire-level C-07 rules shared with the frontend SSE parser."""
+    events = _events(raw_events)
+
+    for sequence, (raw, event) in enumerate(zip(raw_events, events, strict=True)):
+        event_line = next(line for line in raw.splitlines() if line.startswith("event: "))
+        assert event_line.removeprefix("event: ") == event["type"]
+        assert {"type", "requestId", "conversationId", "messageId", "sequence"} <= event.keys()
+        assert event["sequence"] == sequence
+
+    assert events[-1]["type"] == terminal
+    assert [event["type"] for event in events if event["type"] in {"done", "error"}] == [terminal]
+    assert len({event["requestId"] for event in events}) == 1
+    assert len({event["conversationId"] for event in events}) == 1
+    assert len({event["messageId"] for event in events}) == 1
+    return events
 
 
 @pytest.mark.asyncio
@@ -171,7 +200,7 @@ async def test_successful_stream_emits_start_token_source_done_in_order() -> Non
     )
 
     raw = [event async for event in service.stream(conversation=_conversation(), question="질문")]
-    events = _events(raw)
+    events = _assert_c07_contract(raw, terminal="done")
 
     types = [event["type"] for event in events]
     assert types == ["start", "token", "token", "source", "source", "done"]
@@ -205,16 +234,49 @@ async def test_duplicate_document_chunk_pair_emits_one_source_event() -> None:
         conversation=_conversation(), rag=rag, llm=FakeLLMProvider(tokens=("답",))
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="done",
     )
 
     assert len([event for event in events if event["type"] == "source"]) == 1
 
 
 @pytest.mark.asyncio
-async def test_context_build_failure_emits_single_error_event_and_no_commit() -> None:
-    rag = _RagContextService(error=RuntimeError("boom"))
+async def test_context_build_failure_emits_single_error_event_and_no_commit(caplog) -> None:
+    raw_question = "개인 원문 질문입니다"
+    raw_error = "provider 원문 오류입니다"
+    rag = _RagContextService(error=RuntimeError(raw_error))
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    with caplog.at_level(logging.ERROR, logger="app.services.stream_service"):
+        events = _assert_c07_contract(
+            [
+                event
+                async for event in service.stream(
+                    conversation=_conversation(), question=raw_question
+                )
+            ],
+            terminal="error",
+        )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == "CONTEXT_BUILD_FAILED"
+    assert repository.saved == []
+    record = caplog.records[-1]
+    assert record.getMessage() == "conversation_stream_failed"
+    assert record.conversation_id == "conv_1"
+    assert record.error_code == "CONTEXT_BUILD_FAILED"
+    assert raw_question not in caplog.text
+    assert raw_error not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code", ["AGENT_NOT_IN_BOOTH", "AGENT_INACTIVE"])
+async def test_agent_config_denial_emits_non_retryable_sanitized_error(code: str) -> None:
+    rag = _RagContextService(error=AgentConfigDenied(code))
     service, repository = _service(
         conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
     )
@@ -224,7 +286,28 @@ async def test_context_build_failure_emits_single_error_event_and_no_commit() ->
     )
 
     assert [event["type"] for event in events] == ["start", "error"]
-    assert events[-1]["code"] == "CONTEXT_BUILD_FAILED"
+    assert events[-1]["code"] == code
+    assert events[-1]["retryable"] is False
+    assert repository.saved == []
+
+
+@pytest.mark.asyncio
+async def test_agent_config_failure_emits_retryable_sanitized_error() -> None:
+    rag = _RagContextService(
+        error=SpringAgentConfigUnavailable("upstream-secret-prompt")
+    )
+    service, repository = _service(
+        conversation=_conversation(), rag=rag, llm=FakeLLMProvider()
+    )
+
+    events = _events(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    )
+
+    assert [event["type"] for event in events] == ["start", "error"]
+    assert events[-1]["code"] == "AGENT_CONFIG_UNAVAILABLE"
+    assert events[-1]["retryable"] is True
+    assert "upstream-secret-prompt" not in events[-1]["message"]
     assert repository.saved == []
 
 
@@ -249,6 +332,48 @@ async def test_llm_failure_mid_stream_emits_single_error_event_and_no_commit() -
 
 
 @pytest.mark.asyncio
+async def test_retry_after_failure_issues_new_request_id_and_commits_only_retry() -> None:
+    """FR-029: 실패 후 재시도는 conversationId를 유지하고 새 requestId를 발급하며,
+    done에 도달하지 못한 첫 시도는 대화 이력에 저장되지 않는다."""
+    conversation = _conversation()
+    failing_llm = FakeLLMProvider(
+        tokens=("일부",), raise_after=ManagedLLMError("LLM_TIMEOUT", retryable=True)
+    )
+    service, repository = _service(
+        conversation=conversation,
+        rag=_RagContextService(result=_context_result()),
+        llm=failing_llm,
+    )
+
+    failed_events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=conversation, question="질문")],
+        terminal="error",
+    )
+    assert [event["type"] for event in failed_events] == ["start", "token", "error"]
+    assert repository.saved == []
+
+    succeeding_llm = FakeLLMProvider(tokens=("안녕",))
+    service._llm_provider = succeeding_llm
+    retry_events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=conversation, question="질문")],
+        terminal="done",
+    )
+
+    assert [event["type"] for event in retry_events] == ["start", "token", "done"]
+    failed_request_id = failed_events[0]["requestId"]
+    retry_request_id = retry_events[0]["requestId"]
+    failed_message_id = failed_events[0]["messageId"]
+    retry_message_id = retry_events[0]["messageId"]
+    assert retry_request_id != failed_request_id
+    assert retry_message_id != failed_message_id
+    assert {event["conversationId"] for event in failed_events + retry_events} == {
+        conversation.conversation_id
+    }
+    assert len(repository.saved) == 1
+    assert repository.saved[0].turns[-1].request_id == retry_request_id
+
+
+@pytest.mark.asyncio
 async def test_ttft_timeout_before_first_token_emits_first_token_phase() -> None:
     """FR-007: 첫 토큰이 TTFT 예산 안에 오지 않으면 FIRST_TOKEN phase로 종료한다."""
     rag = _RagContextService(result=_context_result())
@@ -261,8 +386,9 @@ async def test_ttft_timeout_before_first_token_emits_first_token_phase() -> None
         total_timeout_seconds=1.0,
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="error",
     )
 
     assert [event["type"] for event in events] == ["start", "error"]
@@ -285,8 +411,9 @@ async def test_total_timeout_after_first_token_emits_total_response_phase() -> N
         total_timeout_seconds=0.02,
     )
 
-    events = _events(
-        [event async for event in service.stream(conversation=_conversation(), question="질문")]
+    events = _assert_c07_contract(
+        [event async for event in service.stream(conversation=_conversation(), question="질문")],
+        terminal="error",
     )
 
     assert [event["type"] for event in events] == ["start", "token", "error"]

@@ -48,6 +48,46 @@ class GuestAuthApiIntegrationTest {
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
     /**
+     * FE dev 게이트웨이 경유 요청이 Origin 관문을 통과한다 (GitLab #177).
+     *
+     * <p>Vite 프록시는 {@code changeOrigin} 없이 돌므로 BE 가 보는 Host 와 Origin 이 둘 다 FE 포트다.
+     * 그 둘이 같으면 Spring 은 CORS 요청으로 보지도 않고, 남는 관문은 컨트롤러의 Origin 검사
+     * 하나다. 통과의 증거는 200 이 아니라 <b>401</b> 이다 — 쿠키가 없으니 다음 단계에서 떨어지는
+     * 것이 정상이고, 403 이면 관문에서 막힌 것이다.
+     */
+    @Test
+    void aRequestThroughTheLocalDevGatewayPassesTheOriginGate() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5175")
+                        .with(request -> {
+                            request.setServerName("localhost");
+                            request.setServerPort(5175);
+                            return request;
+                        }))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /**
+     * Host 와 Origin 이 같다는 것만으로는 믿지 않는다.
+     *
+     * <p>이 한 줄이 없으면 규칙이 "요청자가 신뢰 기준을 정한다"로 넓어진다
+     * ({@code docs/25_트러블슈팅.md} T-102).
+     */
+    @Test
+    void aNonLocalHostMatchingItsOwnOriginIsStillRefused() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, "http://evil.example")
+                        .with(request -> {
+                            request.setServerName("evil.example");
+                            request.setServerPort(80);
+                            return request;
+                        }))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("UNTRUSTED_ORIGIN"));
+    }
+
+    /**
      * The body is asserted through the decoder rather than by shape alone.
      *
      * <p>{@code accessToken} being a non-empty string is what a broken issuer would also produce.

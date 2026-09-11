@@ -35,6 +35,14 @@ export interface ReferenceRuntimeState {
   readonly playerHealth: number;
   readonly maxPlayerHealth: number;
   readonly invulnerableUntilTick: number;
+  // S15P21A604-526 — damagePlayer()가 실제로 체력을 깎을 때(무적 시간 중이 아닐 때)마다
+  // 그 순간의 피해량과 tick을 남긴다. UI(ReferenceGamePlayer)가 이 값의 변화를 감지해
+  // 캐릭터 위에 "-N" 플로팅 표시를 띄우는 데 쓴다. 무적 시간 가드에 걸려 damagePlayer가
+  // 조기 반환되는 호출은 실제 피해가 없었던 것이므로 이 값을 건드리지 않는다 — 그래야
+  // 연속 접촉 중에도 표시가 중복으로 뜨지 않는다. 체력이 0이 되는 마지막 피격(리스폰이든
+  // 게임오버든)에도 예외 없이 갱신된다.
+  readonly lastDamageAmount: number | null;
+  readonly lastDamageTick: number;
   readonly score: number;
   readonly defeatedEnemies: number;
   readonly elapsedMs: number;
@@ -149,6 +157,8 @@ export const startReferenceRuntime = (project: GameProject): ReferenceRuntimeSta
     playerHealth: 3,
     maxPlayerHealth: 3,
     invulnerableUntilTick: -1,
+    lastDamageAmount: null,
+    lastDamageTick: -1,
     score: 0,
     defeatedEnemies: 0,
     elapsedMs: 0,
@@ -199,7 +209,15 @@ const damagePlayer = (
 ): ReferenceRuntimeState => {
   if (state.tickCount < state.invulnerableUntilTick) return state;
   const remaining = state.playerHealth - amount;
-  if (remaining > 0) return { ...state, playerHealth: remaining, invulnerableUntilTick: state.tickCount + 8 };
+  if (remaining > 0) {
+    return {
+      ...state,
+      playerHealth: remaining,
+      invulnerableUntilTick: state.tickCount + 8,
+      lastDamageAmount: amount,
+      lastDamageTick: state.tickCount,
+    };
+  }
   if ((project.rules ?? DEFAULT_GAME_RULES).playerDefeat === 'END_GAME') {
     return {
       ...state,
@@ -208,6 +226,8 @@ const damagePlayer = (
         code: 'PLAYER_DEFEATED',
         message: '체력이 모두 소진되었습니다. 다시 도전해 보세요.',
       }),
+      lastDamageAmount: amount,
+      lastDamageTick: state.tickCount,
     };
   }
   return {
@@ -217,6 +237,8 @@ const damagePlayer = (
     verticalVelocity: 0,
     jumpHoldTicks: 0,
     invulnerableUntilTick: state.tickCount + 8,
+    lastDamageAmount: amount,
+    lastDamageTick: state.tickCount,
   };
 };
 
@@ -622,30 +644,60 @@ const interactionCandidates = (
   state: ReferenceRuntimeState,
 ): readonly GameObject[] => {
   const scene = findScene(project, state.session.currentSceneId);
-  if (scene === undefined || scene.type === 'DIALOGUE' || state.playerPosition === null) return [];
+  const playerPosition = state.playerPosition;
+  if (scene === undefined || scene.type === 'DIALOGUE' || playerPosition === null) return [];
   const forward = directionDelta[state.facing];
-  const forwardPosition = {
-    x: state.playerPosition.x + forward.x,
-    y: state.playerPosition.y + forward.y,
-  };
-  return scene.objects.filter((object) => {
+  const forwardPosition = { x: playerPosition.x + forward.x, y: playerPosition.y + forward.y };
+  const manhattanDistanceToPlayer = (position: { x: number; y: number }): number => (
+    Math.abs(position.x - playerPosition.x) + Math.abs(position.y - playerPosition.y)
+  );
+  const candidates = scene.objects.filter((object) => {
     if (!isVisible(state, object)) return false;
     const objectPosition = state.objectPositions[object.id] ?? object.position;
-    const onCurrent = objectPosition.x === state.playerPosition?.x && objectPosition.y === state.playerPosition.y;
+    const interactable = object.components.find((component) => component.type === 'INTERACTABLE');
+    // S15P21A604-534 — INTERACTABLE 컴포넌트가 있으면 그 range(미지정 시 기본값 1)를
+    // 방향 무관 맨해튼 거리(|dx|+|dy|)로 판정한다. range=1 기본값도 "정면만" 되던
+    // 예전과 달리 상하좌우 인접 4칸 어디서든 상호작용 가능해지는데, 이건 "방향 무관"
+    // 이라는 이번 QA의 설계 자체가 의도한 결과다. INTERACTABLE 컴포넌트 없이
+    // ON_INTERACT 이벤트로만 상호작용 가능한 오브젝트는 range를 설정할 자리가 없으므로
+    // 기존 그대로(같은 칸 또는 정면 한 칸)를 유지한다.
+    if (interactable?.type === 'INTERACTABLE') {
+      return manhattanDistanceToPlayer(objectPosition) <= (interactable.range ?? 1);
+    }
+    const onCurrent = objectPosition.x === playerPosition.x && objectPosition.y === playerPosition.y;
     const inFront = objectPosition.x === forwardPosition.x && objectPosition.y === forwardPosition.y;
-    const interactive = object.components.some((component) => component.type === 'INTERACTABLE')
-      || scene.events.some((event) => event.trigger.type === 'ON_INTERACT' && event.trigger.targetId === object.id);
-    return interactive && (onCurrent || inFront);
+    const eventOnly = scene.events.some((event) => event.trigger.type === 'ON_INTERACT' && event.trigger.targetId === object.id);
+    return eventOnly && (onCurrent || inFront);
+  });
+  // S15P21A604-544 — 여러 후보가 동시에 있을 때 "에디터에서 먼저 만든 쪽"(배열 순서)이
+  // 아니라 "플레이어와 더 가까운 쪽"이 우선하도록 거리순 정렬한다(QA 확정 — INTERACTABLE
+  // 유무와 무관하게 같은 거리 기준으로 비교). 거리가 같을 때는 별도 동률 처리를 두지
+  // 않는다 — Array.prototype.sort는 ES2019부터 표준으로 안정 정렬(stable sort)이 보장돼서,
+  // filter 직후 이미 scene.objects 선언 순서 그대로인 배열을 그대로 정렬하면 거리가 같은
+  // 항목끼리는 원래 순서(먼저 만든 쪽)가 자동으로 유지된다.
+  return [...candidates].sort((a, b) => {
+    const positionOf = (object: GameObject) => state.objectPositions[object.id] ?? object.position;
+    return manhattanDistanceToPlayer(positionOf(a)) - manhattanDistanceToPlayer(positionOf(b));
   });
 };
+
+// S15P21A604-532 — 오브젝트 위 상호작용 안내 문구(prompt)를 UI가 그리려면 "지금 상호작용
+// 가능한 대상이 뭔지"를 interactReferencePlayer 밖에서도 알아야 한다. 실제 상호작용(E
+// 버튼) 판정과 힌트 표시 판정이 어긋나면 "버튼은 눌리는데 힌트는 안 뜨는" 불일치가
+// 생기므로, interactReferencePlayer와 정확히 같은 interactionCandidates를 그대로
+// 재사용한다.
+export const currentInteractionTarget = (
+  project: GameProject,
+  state: ReferenceRuntimeState,
+): GameObject | null => interactionCandidates(project, state)[0] ?? null;
 
 export const interactReferencePlayer = (
   project: GameProject,
   state: ReferenceRuntimeState,
 ): ReferenceRuntimeState => {
   if (state.session.status !== 'PLAYING' || state.session.activeDialogueSceneId !== null) return state;
-  const target = interactionCandidates(project, state)[0];
-  if (target === undefined) return { ...state, lastInteractionTargetId: null };
+  const target = currentInteractionTarget(project, state);
+  if (target === null) return { ...state, lastInteractionTargetId: null };
   const session = dispatchTrigger(project, state.session, { type: 'ON_INTERACT', targetId: target.id });
   return {
     ...syncAfterSessionChange(project, state, session),

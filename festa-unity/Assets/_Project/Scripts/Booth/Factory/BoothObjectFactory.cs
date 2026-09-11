@@ -26,6 +26,15 @@ namespace Festa.Booth
                 return null;
             }
 
+            // 부스 안에는 게임기를 두지 않는다 (사용자 지시 2026-09-10). 게임은 따로 모아 놓는 부스로 갈 예정이라
+            // 전시 부스 안에 오락기가 서 있으면 성격이 섞인다. 게시본에 들어 있어도 클라이언트가 세우지 않는다 —
+            // 데이터를 지우는 것이 아니라 배치만 건너뛰므로, 나중에 방침이 바뀌면 이 한 줄만 되돌리면 된다.
+            if (type == BoothObjectType.GamePortal)
+            {
+                Debug.Log($"[BoothObjectFactory] 게임기(GAME_PORTAL, objectId={objectId})는 부스 내부에 배치하지 않는다 — 건너뜀");
+                return null;
+            }
+
             var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
             if (prefab == null && type == BoothObjectType.Laptop)
             {
@@ -44,6 +53,7 @@ namespace Festa.Booth
             go.transform.localPosition =
                 (dto.position?.ToVector3() ?? Vector3.zero) + Vector3.up * groundLift;
             go.transform.localRotation = Quaternion.Euler(0f, dto.rotationY, 0f);
+            WarnIfOutsideRoom(objectId, go.transform.localPosition);
 
             var runtimeObject = go.GetComponent<BoothRuntimeObject>();
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
@@ -53,6 +63,39 @@ namespace Festa.Booth
             AttachContentBehaviour(go, type);
             AttachCommonInteraction(go, type);
             return go;
+        }
+
+        // ---------- 방 경계 검사 ----------
+
+        // 부스 방의 실제 크기. **FestaInteriorBuilder.cs:29-31 과 같은 값이어야 한다** —
+        // 그쪽은 Editor 어셈블리라 런타임에서 참조할 수 없어 여기에 다시 적는다.
+        // 레이아웃 좌표의 단위는 **미터**다(앵커의 균등 스케일 13.26 이 유닛으로 바꾼다. 실측 확인:
+        // 레이아웃 6 m 간격 → 월드 79.56 units = 6.00 m).
+        // FestaInteriorBuilder 의 방 규격과 같은 값이라야 한다.
+        const float RoomHalfXMeters = 5.0f;    // 방 폭 10 m
+        const float RoomBackZMeters = -3.8f;
+        const float RoomFrontZMeters = 7.0f;   // 방 깊이 10.8 m
+
+        /// <summary>
+        /// 방 밖에 배치된 오브젝트를 **드러낸다**. 자르지는 않는다 — 자르면 배치가 조용히 달라져
+        /// "내가 놓은 데가 아닌데" 가 되고, 원인이 스튜디오인지 런타임인지 가릴 수 없게 된다.
+        ///
+        /// <para>사용자는 이걸 "부스에 배치했는데 밖에 떠 있다" 로 겪는다. 2026-09-08 실측에서
+        /// 계약 회귀 픽스처의 4/14 개가 방 밖이었다 — 08-31 에 방 크기를 바꾼 뒤
+        /// (커밋 c7770a3a "부스 셸을 방 크기에 맞추고") 픽스처 좌표가 따라가지 않았다.
+        /// 스튜디오가 방 경계로 제한하는지는 FE·BE 소관이라 별도 이슈로 올린다.</para>
+        /// </summary>
+        static void WarnIfOutsideRoom(string objectId, Vector3 localMeters)
+        {
+            if (Mathf.Abs(localMeters.x) <= RoomHalfXMeters
+                && localMeters.z >= RoomBackZMeters
+                && localMeters.z <= RoomFrontZMeters) return;
+
+            Debug.LogWarning(
+                $"[BoothObjectFactory] {objectId} 가 방 밖에 배치됐다 — " +
+                $"위치 ({localMeters.x:F1}, {localMeters.z:F1}) m, " +
+                $"방 한계 x ±{RoomHalfXMeters} m / z {RoomBackZMeters}~{RoomFrontZMeters} m. " +
+                "방문자에게는 부스 밖 허공에 떠 보인다. 스튜디오에서 안쪽으로 옮겨야 한다.");
         }
 
         // ---------- Placeholder ----------
@@ -132,6 +175,9 @@ namespace Festa.Booth
             // 오브젝트에도 "F — 상호작용" 힌트가 떴고 F 는 조용히 무시됐다 — 힌트가 거짓말을
             // 하면 동작하는 오브젝트까지 의심받는다 (S15P21A604-345 실측).
             bool interactive = go.GetComponentInChildren<Festa.Content.IBoothInteractable>(true) != null;
+            // 가구·장식은 조준 대상이 아니다 — 화분을 보면 '전시물 · 준비 중' 이 떠서 영원히 준비 중인 물건처럼 읽혔다
+            // (QA 2026-09-08 #48). 동작이 없는 장식에는 안내 알약도 하이라이트도 붙이지 않는다. 콜라이더는 프리팹 것으로 충분.
+            if (!interactive && (type == BoothObjectType.Furniture || type == BoothObjectType.Decoration)) return;
             var target = go.GetComponent<BoothInteractionTarget>();
             if (target == null) target = go.AddComponent<BoothInteractionTarget>();
             // 사거리는 **월드 유닛**이고 판정은 콜라이더 **표면** 기준이다
@@ -140,7 +186,11 @@ namespace Festa.Booth
             // 20f ≈ 1.5 m, 15f ≈ 1.1 m (부스 스케일 1 m ≈ 13.26 unit). 13f 는 표면 기준이어도
             // 큰 오브젝트 앞에서 닿지 않는다는 보고가 있어 올렸다.
             // 전에는 피벗 기준 40f 라 3 m 밖에서도 잡혀 "범위가 너무 크다" 는 보고를 받았다.
-            target.Configure(interactive ? 20f : 15f, interactive);
+            // 2026-09-10 사용자 지시로 "거의 외곽에 붙었을 때만" 으로 줄였다 (20/15 → 12/9).
+            // 판정이 **수평 거리**로 바뀌었으므로(BoothInteractionTarget.DistanceFrom) 12u ≈ 0.9 m 다.
+            // 더 줄이지 못하는 이유는 실측이다: 노트북은 책상 안쪽(앞면에서 7.9u)에 놓여 있고 플레이어 캡슐
+            // 반경이 2.75u 라, 책상에 몸이 닿아도 노트북까지 10.7u 다. 8u 로 두면 손이 닿는 자리에서 F 가 안 먹는다.
+            target.Configure(interactive ? 12f : 9f, interactive);
         }
 
         static void AttachContentBehaviour(GameObject go, BoothObjectType type)

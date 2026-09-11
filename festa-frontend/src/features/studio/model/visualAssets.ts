@@ -11,7 +11,14 @@ export interface PaletteItem {
   label: string;
   objectType: ObjectType;
   thumb: ThumbKind;
-  /** 장식형 외형 코드(계약 assetCode). 기능형은 없음 */
+  /**
+   * 장식형 외형 코드(계약 assetCode). 기능형은 없음.
+   *
+   * **정본은 Unity `BoothObjectRegistry.asset` 이다** (S15P21A604-509, GitLab #146·#154).
+   * 여기 적은 코드가 그 레지스트리에 없으면 월드에서 타입 기본 자산(상자)으로 떨어진다 —
+   * 예전에 `WALL_PLAIN` 등 7종이 그 상태였고, 사용자는 "패널을 놓았는데 상자가 나온다" 를 겪었다.
+   * 그 사고가 다시 나지 않도록 `tools/paletteAssetCodes.test.mjs` 가 레지스트리와 대조한다.
+   */
   assetCode?: string;
   /** 카탈로그 매핑 확정 전 표시용 — 실제 잠금은 CatalogItemVM 이 정본 */
   locked?: boolean;
@@ -29,7 +36,7 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     id: 'wall',
     title: '벽면 패널',
     items: [
-      { id: 'wall-plain', label: '기본 패널', objectType: 'DECORATION', thumb: 'panel', assetCode: 'WALL_PLAIN' },
+      { id: 'wall-plain', label: '기본 패널', objectType: 'DECORATION', thumb: 'panel', assetCode: 'STRUCT_PANEL_01' },
       { id: 'wall-graphic', label: '그래픽 패널', objectType: 'PROJECT_PANEL', thumb: 'panel-graphic' },
       { id: 'wall-board', label: '채용 보드', objectType: 'RECRUITMENT_BOARD', thumb: 'board' },
     ],
@@ -39,17 +46,17 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     title: '카운터',
     items: [
       { id: 'counter-desk', label: '상담 데스크', objectType: 'CONSULTATION_DESK', thumb: 'desk' },
-      { id: 'counter-graphic', label: '그래픽 카운터', objectType: 'FURNITURE', thumb: 'counter-graphic', assetCode: 'COUNTER_GRAPHIC' },
-      { id: 'counter-shelf', label: '진열 선반', objectType: 'FURNITURE', thumb: 'shelf', assetCode: 'SHELF' },
+      { id: 'counter-graphic', label: '그래픽 카운터', objectType: 'FURNITURE', thumb: 'counter-graphic', assetCode: 'FURN_COUNTER_02' },
+      { id: 'counter-shelf', label: '진열 선반', objectType: 'FURNITURE', thumb: 'shelf', assetCode: 'DISP_STAND_PLASTIC_01' },
     ],
   },
   {
     id: 'truss',
     title: '트러스 / 프레임',
     items: [
-      { id: 'truss-beam', label: '트러스 빔', objectType: 'DECORATION', thumb: 'truss', assetCode: 'TRUSS_BEAM', locked: true },
-      { id: 'truss-pillar', label: '기둥', objectType: 'DECORATION', thumb: 'truss-pillar', assetCode: 'TRUSS_PILLAR', locked: true },
-      { id: 'truss-gate', label: '게이트', objectType: 'DECORATION', thumb: 'truss-gate', assetCode: 'TRUSS_GATE', locked: true },
+      { id: 'truss-beam', label: '트러스 빔', objectType: 'DECORATION', thumb: 'truss', assetCode: 'STRUCT_TRUSS_HORIZONTAL_LAMP', locked: true },
+      { id: 'truss-pillar', label: '기둥', objectType: 'DECORATION', thumb: 'truss-pillar', assetCode: 'STRUCT_TRUSS_VERTICAL', locked: true },
+      { id: 'truss-gate', label: '게이트', objectType: 'DECORATION', thumb: 'truss-gate', assetCode: 'STRUCT_TRUSS_BASE', locked: true },
     ],
   },
   {
@@ -67,37 +74,24 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     items: [
       { id: 'agent', label: 'AI 직원', objectType: 'AI_AGENT', thumb: 'agent' },
       { id: 'vote', label: '좋아요 스탠드', objectType: 'LIKE_VOTE', thumb: 'vote' },
-      { id: 'plant', label: '화분', objectType: 'DECORATION', thumb: 'plant', assetCode: 'PLANT' },
+      { id: 'plant', label: '화분', objectType: 'DECORATION', thumb: 'plant', assetCode: 'DECOR_PLANT_01' },
     ],
   },
 ];
 
-// ── 외관(Facade) 모드 팔레트 — 실제 계약은 themeCode·primaryColor·signText·logoUrl 4필드뿐.
-//    벽면/바닥/그래픽 항목은 목업 표현(PROVISIONAL)이며 저장되지 않는다.
-export interface FacadeSwatch {
-  id: string;
-  label: string;
-  provisional: boolean;
-}
-export const FACADE_PALETTE_SECTIONS: Array<{ id: string; title: string; items: FacadeSwatch[] }> = [
-  { id: 'wall', title: '벽면', items: [{ id: 'wall-white', label: '화이트', provisional: true }, { id: 'wall-graphic', label: '그래픽', provisional: true }, { id: 'wall-wood', label: '우드', provisional: true }] },
-  { id: 'floor', title: '바닥', items: [{ id: 'floor-blue', label: '블루 카펫', provisional: true }, { id: 'floor-grey', label: '그레이', provisional: true }, { id: 'floor-wood', label: '우드', provisional: true }] },
-  { id: 'graphic', title: '그래픽', items: [{ id: 'g-wave', label: '웨이브', provisional: true }, { id: 'g-solid', label: '단색', provisional: true }, { id: 'g-logo', label: '로고', provisional: true }] },
-];
-
-// ── 템플릿(Template) 모드 프리셋 — 목업. 실제 계약으로 저장 가능한 부분은 themeCode·primaryColor 뿐(외관 모드에서 저장).
+// ── 템플릿(Template) 모드 프리셋. 저장되는 것은 themeCode·primaryColor 뿐이고(외관 모드에서 저장),
+//    floorHex 는 캔버스 미리보기 입력이다 — 화면에는 보이지만 계약에는 없다 (S15P21A604-617).
 export interface TemplatePreset {
   id: string;
   label: string;
   themeCode: ThemeCode;
   primaryHex: string; // FACADE_PALETTE 12색 중 하나 — 계약 밖 색 금지
-  accentHex: string; // 목업 전용(트러스 포인트·카운터 그래픽) — 저장 안 됨
-  floorHex: string; // 목업 전용
+  floorHex: string; // 캔버스 미리보기 바닥색 — 저장되지 않는다
   description: string;
 }
 export const TEMPLATE_PRESETS: TemplatePreset[] = [
-  { id: 'blue', label: 'Blue', themeCode: 'SSAFY_BLUE', primaryHex: '#3B82F6', accentHex: '#06B6D4', floorHex: '#1d4ed8', description: '시안 그래픽 · 블루 카펫 · 화이트 월' },
-  { id: 'green', label: 'Green', themeCode: 'DEFAULT', primaryHex: '#22C55E', accentHex: '#84CC16', floorHex: '#166534', description: '라임 포인트 · 그린 카펫' },
-  { id: 'orange', label: 'Orange', themeCode: 'WARM', primaryHex: '#F97316', accentHex: '#F59E0B', floorHex: '#9a3412', description: '웜 톤 · 앰버 포인트' },
-  { id: 'custom', label: 'Custom', themeCode: 'MONO', primaryHex: '#6366F1', accentHex: '#A855F7', floorHex: '#312e81', description: '외관 모드에서 직접 조합' },
+  { id: 'blue', label: 'Blue', themeCode: 'SSAFY_BLUE', primaryHex: '#3B82F6', floorHex: '#1d4ed8', description: '시안 그래픽 · 블루 카펫 · 화이트 월' },
+  { id: 'green', label: 'Green', themeCode: 'DEFAULT', primaryHex: '#22C55E', floorHex: '#166534', description: '라임 포인트 · 그린 카펫' },
+  { id: 'orange', label: 'Orange', themeCode: 'WARM', primaryHex: '#F97316', floorHex: '#9a3412', description: '웜 톤 · 앰버 포인트' },
+  { id: 'custom', label: 'Custom', themeCode: 'MONO', primaryHex: '#6366F1', floorHex: '#312e81', description: '외관 모드에서 직접 조합' },
 ];

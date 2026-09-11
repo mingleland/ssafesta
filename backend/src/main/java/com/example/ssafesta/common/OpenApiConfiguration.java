@@ -180,11 +180,13 @@ public class OpenApiConfiguration {
                 tag("Booth Facade", "부스 외관 — 간판 문구·색·로고"),
                 tag("Booth Homepage", "부스 노트북에 띄우는 외부 홈페이지 주소"),
                 tag("Project", "부스에 전시하는 프로젝트 카드의 작성·공개"),
+                tag("Survey", "부스 설문의 문항 편집·응답·결과 집계. 부스당 설문 1개이고 저장하면 바로 공개된다"),
                 tag("AI Agent", "부스당 1명인 AI 직원의 인격 설정(이름·역할·말투·지시문)"),
                 tag("AI Document", "AI 직원이 답변 근거로 쓰는 문서의 업로드. presigned URL 로 저장소에 직접 올린다"),
                 tag("Game Studio", "브라우저 2D 게임의 제작·게시. 작업본과 게시본이 분리되어 있다"),
                 tag("Game Asset", "게임에 쓰는 이미지의 업로드·전달. 바이트는 저장소로 직접 올라가고 내려받기만 서버가 중계한다"),
                 tag("Inventory", "아바타 파츠 상점과 구매"),
+                tag("Minigame", "타이밍 스톱 미니게임의 세션 발급과 결과 제출. 목표 시간·오차·보상은 전부 서버가 정한다"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
     }
 

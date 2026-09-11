@@ -17,6 +17,9 @@
 | `S15P21A604-93` | FastAPI 스캐폴드와 실행·테스트·컨테이너 기반(T001~T007) | 공통 스캐폴드는 완료. 스파이크와 독립적이며 튜닝 값은 포함하지 않음 |
 | `S15P21A604-94` | Provider protocol·fake·Embedding adapter(T007, T018, T047) | T001 및 스파이크 결과 확인 후 시작 |
 | `S15P21A604-95` | Alembic·DB session·Job 모델과 migration(T004, T012~T014) | T001 완료 후 시작 |
+| `S15P21A604-386` | 문서 수정본 교체와 교체된 원본의 `replaced_at`(T095~T097) + finalize 롤백·410(T101·T102) | `S15P21A604-647`(spec 개정) 머지 후 |
+| `S15P21A604-521` | 최대 부하 정확 스캔·검색 P95 Testcontainers 검증(T098) | 동일 |
+| `S15P21A604-637` | `FAILED` 원본 7일 유예 삭제(T099·T100) | 동일 |
 
 `S15P21A604-92`의 실측값은 `research.md`에 기록하고, 청킹 기본값을 구현하는 T048과 최대 허용량 품질을 검증하는 T067에서 사용한다. 실측 전에는 chunk size·overlap을 코드나 spec에 고정하지 않는다.
 
@@ -38,10 +41,43 @@
 - [ ] T090 [BE/AI] S15P21A604-400에서 heartbeat·batch·finalize·failed endpoint, DTO, 오류 봉투를 합의하고 `contracts/document-result-api.yaml`을 확정한다
 - [ ] T091 [BE/AI] S15P21A604-399에서 Agent 설정 조회 endpoint·응답 필드·호출 시점·캐시 정책을 합의하고 OpenAPI와 spec 008에 반영한다
 - [ ] T092 [AI] FastAPI 문서 DB 설정·Job/Chunk 모델·Repository·Alembic 실행 경로를 제거하고 처리/결과 API client로 교체한다
-- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다
-- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다
+- [ ] T093 [BE] V21 위에 Job pickup·lease·retry, batch staging, finalize, failed/cancel 서비스를 구현한다 (`S15P21A604-496`: 임대 만료 경로의 cancel 완료 — 활성 Job `CANCELLED`, 문서 `DISABLED`, chunk·staging 정리, FastAPI 멱등 cancel 전송. 나머지 pickup·lease·retry·staging·finalize 는 이미 `S15P21A604-400`·`-175` 로 구현됨)
+- [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다 (`S15P21A604-496`: 임대 만료로 취소된 Job 의 늦은 finalize 가 410 이고 문서가 `DISABLED` 로 남는 케이스 추가)
 
 **Dependency**: T090·T091 합의 → OpenAPI 확정 → T092·T093 구현 → T094 통합 검증.
+
+---
+
+## S15P21A604-647 개정 반영 — 2026-09-11 결정 4건
+
+> `docs/26_팀_결정_필요사항.md` 결정 기록 로그 2026-09-11에 등록된 네 건을 구현으로 옮긴다. 이 절의 항목은 **위 Phase 목록과 독립적으로 착수할 수 있다** — 모두 이미 구현된 코드를 고치거나 그 위에 얹는 일이다.
+
+### ① 교체된 원본은 복구 대상이 아니다 (FR-006·FR-027a·FR-028 / `S15P21A604-386`)
+
+- [X] T095 [BE] `ai_documents.replaced_at`을 V30으로 추가하고, 수정본 교체가 기존 원본을 `EXPIRED` + `replaced_at`으로 전환하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentService.java`에 구현한다. `POST /documents/{documentId}/complete`의 24시간 복구 분기는 `replaced_at IS NULL`일 때만 태우고, 찍힌 행에는 이미 교체됐음을 알린다. **새 `DocumentStatus` 값을 만들지 않는다** — V24 CHECK는 그대로다
+- [X] T096 [P] [BE] 교체 원본의 늦은 완료가 복구되지 않음, 미교체 `EXPIRED`의 복구는 그대로 동작함을 검증한다 (SC-010).
+  📎 **검증 위치가 달라졌다** (`S15P21A604-386` 구현, 2026-09-11). 새 파일 `AiDocumentReplacementIntegrationTest` 대신 기존 세 파일에 나눠 넣었다 — `AiDocumentUploadIntegrationTest`(발급·완료·목록 분기, 교체 절), `AiDocumentConcurrencyIntegrationTest`(동시 교체 2건 → 활성 후속 1개), `AiDocumentResultApiIntegrationTest`(finalize 퇴역·재전송). 새 파일은 회원·부스·임대·직원 준비와 요청 헬퍼 전부를 복제해야 하고, 교체는 그 세 경로 <b>위에</b> 얹히는 동작이라 각자의 이웃 케이스 옆에 있는 편이 읽힌다.
+  📎 **스윕 케이스는 여기서 빠진다** — `AiDocumentOriginalDeleteSweeper`와 그 테스트는 `S15P21A604-637`(T099·T100) 소관이고, "교체된 원본도 24h 뒤 삭제된다" 단정도 그쪽이 가져간다. 이 MR 은 퇴역이 `expired_at`을 함께 찍는 것까지 보장한다(스윕이 보는 칸이다).
+- [ ] T097 [P] [FE] `replaced_at`이 찍힌 `EXPIRED`를 **교체됨**으로 표시하고 복구 안내를 띄우지 않도록 `festa-frontend/src/features/ai-agent/components/DocumentList.tsx`·`DocumentManager.tsx`에 반영한다 (FR-006). 상태 값이 늘지 않으므로 상태표 자체는 그대로다
+
+### ② SC-007 분해 — 측정 주체를 나눈다 (SC-007a·SC-007b)
+
+- [ ] T098 [BE] `N_total` = **145,646** chunk fixture로 최대 부하에서 정확 스캔 유지·정답 청크 Top-K 포함률 100%(SC-007a)와 검색 P95 1초(SC-006)를 Testcontainers로 검증한다 (`S15P21A604-521`). 상수 산출 근거는 [plan.md §3](./plan.md)이며 fixture가 이 값보다 작으면 안 된다
+- T067은 **AI 소관으로 좁힌다** — 아래 Phase 6 참조. 의미 회수율 95%(SC-007b)만 남고 BE Testcontainers 몫은 T098로 간다
+
+### ③ `FAILED` 원본 삭제 정책 (FR-028a / `S15P21A604-637`)
+
+- [ ] T099 [BE] `FAILED` 문서의 원본을 `updated_at` 기준 7일 유예 후 `EXPIRED`와 **같은 스윕 경로**에서 삭제하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentOriginalDeleteSweeper.java`에 추가한다. 대상 조회·스냅샷 전체 일치 조건부 갱신·48시간 `ERROR` 승격은 기존 구조를 그대로 쓴다. **공유 claim/lock과 영속 삭제 큐는 만들지 않는다** — 클래스 주석의 범위 밖 표기(`FAILED`는 `docs/26` 미결)도 함께 갱신한다
+- [ ] T100 [P] [BE] 7일 미만은 보존, 7일 경과는 삭제, 유예 중 재처리로 `FAILED`를 벗어난 행은 스냅샷 불일치로 자동 제외, 조회와 삭제 사이 재처리가 끼면 `ERROR` 경보를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentOriginalDeleteSweeperIntegrationTest.java`에 추가한다. 기존 `aFailedDocumentIsNotTouched`는 **7일 미만 보존 케이스로 바뀐다** — 지우지 않고 조건을 옮긴다
+
+### ④ FR-040 위반 정정 — finalize 원자성 (FR-040a)
+
+> **`S15P21A604-386` 범위다.** 교체된 원본의 퇴역이 바로 이 finalize 트랜잭션 안에서 일어나므로, 별도 티켓으로 가르면 같은 메서드를 두 MR 이 나눠 고치게 된다. 교체 기능 없이 이 정정만 먼저 필요해지면 그때 분리한다.
+
+- [X] T101 [BE] `AiDocumentJobRepository.markDocumentReady`가 0행이면 `ApiException(ErrorCode.JOB_GONE)`을 던져 finalize 전체를 롤백하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentJobRepository.java`를 고친다. 지금의 ERROR 로그 후 커밋은 FR-040의 단일 트랜잭션을 어긴다
+- [X] T102 [P] [BE] finalize 직전 문서가 `DISABLED`·`EXPIRED`가 된 경우 Chunk·Job·Document가 전부 원상 유지되고 응답이 `410 JOB_GONE`이며 **재전송도 무변화 410**임을 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentResultApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (SC-014). `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 범위 밖이라 검증 대상이 아니다
+
+**Dependency**: 네 항목은 서로 독립이다. ①은 V30 → 서비스 → FE 순서, ③은 기존 스윕 위, ④는 기존 finalize 위에서 각각 끝난다. ②의 T098은 검색 경로가 이미 있어 바로 착수할 수 있다.
 
 ---
 
@@ -144,7 +180,7 @@
 - [X] T047 [P] [US2] [AI] batch Embedding 호출과 결과 1536차원 검증을 `festa-ai/app/providers/managed_embedding.py`에 구현한다
 - [ ] T048 [P] [US2] [AI] `S15P21A604-92`의 실측값을 초기 배포 설정에 반영하고 설정 기반 chunk size·overlap과 page/section 추적을 `festa-ai/app/services/text_chunker.py`에 구현한다 (`S15P21A604-123`: 설정 기반 chunk size·overlap과 page/section 추적 완료, `S15P21A604-92` 실측값을 초기 배포 설정에 반영하는 항목은 research.md 확정 후 후속)
 - [ ] T049 [US2] [AI] 영속된 Spring snapshot과 원본 metadata를 검증하고 문서별 `storageProvider + bucket + objectKey` 저장소에서 다운로드한 바이트의 SHA-256을 계산해 `sourceHash`와 대조한다. 불일치는 재시도 없이 `DEAD + SOURCE_HASH_MISMATCH`로 종료하고 Chunk를 저장하지 않으며, 일치할 때만 검색 불가 Chunk 교체와 Job `SUCCEEDED`를 AI DB 단일 트랜잭션으로 처리하도록 `festa-ai/app/services/document_processing_service.py`에 구현한다
-- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속)
+- [ ] T050 [P] [US2] [AI] snapshot 기반 멱등 처리 요청, 반복 204 cleanup, 내부 Job 상태 조회 endpoint를 `festa-ai/app/api/v1/documents.py`에 구현한다 (`S15P21A604-121`: 멱등 처리 요청 완료, cleanup·상태 조회는 후속; `S15P21A604-572`: FR-041 cancel endpoint 완료)
 - [X] T051 [US2] [AI] `FOR UPDATE SKIP LOCKED` pickup과 30초 heartbeat 및 소유권 상실 시 결과 폐기를 `festa-ai/app/workers/document_worker.py`에 구현한다 (`S15P21A604-122`)
 - [X] T052 [US2] [AI] 기동 즉시 및 60초 주기의 만료 Job 회수와 재시도 상한 처리를 `festa-ai/app/services/job_recovery_service.py`에 구현한다 (`S15P21A604-183`)
 - [X] T053 [P] [US2] [AI] ~~상태 callback client~~ → heartbeat·batch·finalize·failed 결과 client T090/T092로 대체 (S15P21A604-449)
@@ -166,6 +202,14 @@
 ### Tests for User Story 3
 
 - [ ] T058 [P] [US3] [BE] AI 서비스 중단 상태의 목록 조회와 타 부스 접근 거부 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentQueryIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+  - 📎 **S15P21A604-173 (2026-09-09) 판단 근거**: "타 부스 접근 거부" 절반은 이미 있었다 —
+    `AiDocumentUploadIntegrationTest.anotherMembersAgentIsForbidden`·`listingAMissingAgentIsNotFound`
+    가 목록 조회 권한을 덮는다. 실제 공백은 `POST /documents/{documentId}/complete` 의 타인·게스트
+    차단이었고(`AiDocumentService.java:305` `requireActiveEditor` 로 서비스는 이미 막고 있었으나
+    테스트가 0건), 그 2건을 같은 파일에 추가했다(`completingSomeoneElsesDocumentIsForbidden`·
+    `guestsCannotCompleteDocuments`). **T058의 새 파일은 만들지 않는다** — 권한 테스트만 다시
+    쓰면 중복이 된다. "AI 서비스 중단 상태의 목록 조회" 부분은 이번 티켓 범위 밖이라 그대로
+    미해결로 남긴다 — 체크박스를 닫지 않는다
 - [ ] T059 [P] [US3] [BE] 사용자 삭제와 `EXPIRED` 24시간 경과 시 즉시 검색 제외·cleanup 영속 재시도·문서별 Provider `DeleteObject` 재시도 테스트를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentDeletionIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [ ] T080 [P] [US3] [BE] 문서 삭제·비활성화 시 FastAPI cleanup을 발행하고 장애 시 영속 재시도하며, 전체 활성 문서 inventory를 생성하는 통합 테스트를 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentCleanupIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
 - [X] T081 [P] [US3] [AI] ~~Business/AI DB cleanup reconciliation 테스트~~ → Spring FK cascade·cancel/fencing T094로 대체 (S15P21A604-449)
@@ -175,7 +219,21 @@
 
 - [ ] T061 [US3] [BE] Spring DB만 사용해 문서 목록과 마지막 상태를 제공하는 조회 로직을 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentQueryService.java`에 구현한다
 - [ ] T062 [US3] [BE] 소유권 검증 후 Business DB Document를 삭제하고 FastAPI cleanup outbox와 문서별 Provider·bucket·objectKey 삭제 작업을 기록하는 로직을 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentDeletionService.java`에 구현한다
-- [ ] T063 [US3] [BE] 5분 주기로 미완료 문서를 `EXPIRED`로 전환하고 24시간 유예 후 문서별 Provider 원본을 HEAD 없이 삭제하며, 실패 시 `EXPIRED + storageProvider + storageBucket + objectKey`를 유지해 재시도하는 작업을 `backend/src/main/java/com/example/ssafesta/ai/ObjectDeletionWorker.java`에 구현한다. 배포 전 Infra와 각 Provider 자격증명의 대상 bucket/prefix `DeleteObject` 최소 권한을 확인한다
+- [X] T063 [US3] [BE] 5분 주기로 미완료 문서를 `EXPIRED`로 전환하고 24시간 유예 후 문서별 Provider 원본을 HEAD 없이 삭제하며, 실패 시 `EXPIRED + storageProvider + storageBucket + objectKey`를 유지해 재시도한다
+  - 📎 **구현 위치가 `ObjectDeletionWorker.java` 가 아니다** (S15P21A604-571 정정). 하나의 클래스로
+    적혀 있던 두 주기가 실제로는 서로 다른 일이라 둘로 나뉘었다 — `EXPIRED` 전환은
+    `ai/AiDocumentExpirySweeper.java`(5분, S15P21A604-174), 24시간 유예 후 원본 삭제는
+    `ai/AiDocumentOriginalDeleteSweeper.java`(30분, S15P21A604-556). 주기도 대상도 달라서 한
+    클래스에 두면 한쪽 실패가 다른 쪽을 멈춘다
+  - 📎 실패 시 보존은 **스냅샷 전체 조건부 갱신**으로 구현했다. 삭제 성공 뒤
+    `processing_status`·`expired_at`·`storage_provider`·`storage_bucket`·`s3_key` 가 **전부** 읽은
+    그대로일 때만 `s3_key` 를 비운다 — reconcile 이 그 사이 좌표를 옮기면 방금 지운 것이 그 행의
+    *옛* 위치라 새 좌표를 지우면 안 된다. 0행이면 완료로 치지 않고 WARN 을 남긴다
+  - ✅ **`FAILED` 원본 — 2026-09-11 확정으로 범위 밖이 아니게 됐다.** FR-028a 가 `updated_at` 기준
+    7일 유예 후 **같은 스윕 경로**에서 삭제하도록 정했다(`docs/26` 결정 기록 로그 2026-09-11).
+    구현·검증은 T099·T100(`S15P21A604-637`)이며 이 체크박스와는 별개다
+  - ⚠️ 배포 전 Infra 와 각 Provider 자격증명의 대상 bucket/prefix `DeleteObject` 최소 권한 확인은
+    **아직 남아 있다** — 코드가 아니라 배포 준비 항목이라 체크박스와 별개로 둔다
 - [ ] T064 [US3] [BE] 목록·상태·삭제 endpoint를 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentController.java`에 연결한다
 - [ ] T065 [P] [US3] [FE] 문서 목록·상태별 한국어 표시·실패 사유·삭제 확인 UI를 `festa-frontend/src/features/ai-agent/components/DocumentList.tsx`에 구현한다
 - [X] T082 [US3] [BE] ~~FastAPI cleanup outbox/inventory 발행~~ → Spring 로컬 cancel/cascade T093으로 대체 (S15P21A604-449)
@@ -190,7 +248,8 @@
 **Purpose**: 보안·성능·운영·문서 검증을 완료한다.
 
 - [ ] T066 [P] [AI] 사용자 응답과 로그에서 Secret·Stack Trace·object key·Provider 원문이 노출되지 않는지 `festa-ai/tests/integration/test_sensitive_data_redaction.py`로 검증한다
-- [ ] T067 [P] [AI] Agent당 문서 10개·100MB에서 검색 P95 1초와 정답 근거 Top-K 포함률 95%를 `festa-ai/tests/performance/test_rag_retrieval.py`로 검증한다
+- [ ] T067 [P] [AI] 자연어 품질 평가 질의에서 정답 근거 문서의 **의미 회수율 95% 이상**(SC-007b)을 `festa-ai/tests/performance/test_rag_retrieval.py`로 검증한다
+  - 📎 **범위가 좁혀졌다 (S15P21A604-647, 2026-09-11).** 원래 이 항목이 SC-006 P95와 "Top-K 포함률 95%"를 함께 지고 있었으나, Spring 검색은 `SET LOCAL enable_indexscan = off`로 정확 스캔을 강제해 범위 안 모든 청크를 채점한다 — BE 쪽 포함률은 구조상 100%(SC-007a)거나 버그이며 95%를 잴 대상이 아니다. **최대 부하 정확 스캔과 검색 P95는 T098(BE, `S15P21A604-521`, Testcontainers)로 이관**했고, 여기에는 임베딩·청킹 품질이 결정하는 의미 회수율만 남는다
 - [ ] T068 [P] [AI] Job 상태별 수·queue age·처리 시간·lease 회수·callback 지연 지표를 `festa-ai/app/core/metrics.py`에 구현한다
 - [ ] T069 [P] [AI] health/live·ready endpoint와 설정·DB·Worker 준비 상태를 `festa-ai/app/api/health.py`에 구현한다
 - [ ] T070 [P] [AI] 중앙 Jenkins의 Component Pipeline Contract가 호출할 FastAPI `ci/validate·test·build·package·verify` adapter를 `festa-ai/ci/`에 구성하고 단위·계약·통합·장애 주입·격리 테스트와 machine-readable report를 연결한다
@@ -199,9 +258,9 @@
 - [ ] T073 [AI] `specs/007-ai-agent-document/quickstart.md`의 migration, DB CONNECT matrix, snapshot 처리, 중복, 강제 종료, callback 복구·404 원인별 재시도/종료, 청크 교체, cleanup·inventory reconciliation, stale 개정본, 내부 인증·회전, 수동 Provider 전환, 격리 검증을 순서대로 실행하고 결과를 `festa-ai/tests/validation/quickstart-results.md`에 기록한다
 - [ ] T074 [INFRA] FastAPI를 중단한 상태에서도 로그인·부스·월드 smoke와 Spring 문서 목록·마지막 상태 조회가 성공하는 AI 장애 격리 검증을 `infra/tests/integration/test-ai-failure-isolation.sh`에 추가한다
 - [ ] T075 [P] [INFRA] 방향별 Service Token Secret Reference와 내부 전용 network 주입을 `infra/deploy/compose/dev/`에 구성하고, Security Group·public route 차단 절차를 `infra/deploy/runbooks/internal-api-boundary.md`에 명시하며 외부 요청 차단 증거를 `infra/tests/security/test-internal-api-boundary.sh`에 기록한다
-- [ ] T076 [P] [INFRA] 자동 Provider 변경 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로만 전환하고 MinIO 비공개 접근·PUT/HEAD/본문/SHA-256/CORS를 검증하는 스크립트와 runbook을 `infra/deploy/scripts/storage-failover.sh` 및 `infra/deploy/runbooks/storage-failover.md`에 구현한다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치는 `docs/26_팀_결정_필요사항.md`에 등록된 P0 범위 제외 항목이므로 구현하지 않는다
-- [ ] T077 [P] [BE] Infra 전용 토큰 정상·누락·오류·AI 방향 토큰 재사용 401, `runId + documentId` 멱등 저장, `VERIFIED`만 Document Provider 변경, `MISMATCH/MISSING` 로그 전용 처리를 `backend/src/test/java/com/example/ssafesta/internal/storage/StorageReconciliationControllerIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
-- [ ] T078 [BE] Infra 전용 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 인증하는 `POST /internal/storage/reconciliation-runs`를 [spring-storage-reconciliation-api.yaml](../../specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml) 계약대로 구현해 T077을 통과시킨다. `runId + documentId` 멱등 저장, `VERIFIED` 객체만 Document `storage_provider` 반영, `MISMATCH`/`MISSING`은 로그만 적재한다
+- [ ] T076 [P] [INFRA] 자동 Provider 변경 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로만 전환하고, 진행 run이 있으면 다음 Provider 전환·reconcile 시작을 거부하는 단일 실행 lock을 `storage-failover.sh` 전체에 건다. MinIO 비공개 접근·PUT/HEAD/본문/SHA-256/CORS를 검증하는 스크립트와 runbook을 `infra/deploy/scripts/storage-failover.sh` 및 `infra/deploy/runbooks/storage-failover.md`에 구현한다. `R2_RECONCILING` 중 신규 업로드 허용 여부와 장애 자동 판정 수치는 `docs/26_팀_결정_필요사항.md`에 등록된 P0 범위 제외 항목이므로 구현하지 않는다
+- [x] T077 [P] [BE] Infra 전용 토큰 정상·누락·오류·AI 방향 토큰 재사용 401, `runId + documentId` 멱등 저장, `VERIFIED`만 Document Provider 변경, `MISMATCH/MISSING` 로그 전용 처리를 `backend/src/test/java/com/example/ssafesta/internal/storage/StorageReconciliationControllerIntegrationTest.java`에 먼저 작성하고 실패를 확인한다
+- [x] T078 [BE] Infra 전용 `INTERNAL_INFRA_TO_SPRING_TOKENS`로 인증하는 `POST /internal/storage/reconciliation-runs`를 [spring-storage-reconciliation-api.yaml](../../specs/007-ai-agent-document/contracts/spring-storage-reconciliation-api.yaml) 계약대로 구현해 T077을 통과시킨다. `runId + documentId` 멱등 저장, `VERIFIED` 객체만 Document `storage_provider` 반영, `MISMATCH`/`MISSING`은 로그만 적재한다
 - [ ] T079 [P] [INFRA] reconcile 스크립트가 검증 결과를 T078 endpoint로 전송하도록 `infra/deploy/scripts/storage-failover.sh`에 연결하고, Infra→Spring 토큰 누락·오류·AI 방향 토큰 재사용이 401로 거부되는지 `infra/tests/security/test-internal-api-boundary.sh`에 검증 케이스를 추가한다
 
 ---

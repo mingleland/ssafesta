@@ -99,6 +99,14 @@ public enum ErrorCode {
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
     /**
+     * 수정본 교체를 지금 걸 수 없다 (FR-019, S15P21A604-386). 교체 대상은 {@code READY} 하나이고,
+     * 그 위에 이미 다른 교체가 진행 중이거나 같은 파일이 다른 문서로 등록돼 있으면 여기로 온다.
+     *
+     * <p>무엇이 막는지는 thrower 가 message 에 담는다 — 대상 상태·진행 중인 교체·다른 문서의 중복은
+     * 사용자가 할 일이 서로 다르다. {@link #DOCUMENT_LIMIT_EXCEEDED} 와 같은 결이다.
+     */
+    DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
+    /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
      * <p>lease 가 만료돼 Job 을 회수하고 {@code attempt_no} 를 올린 뒤, 죽은 줄 알았던 이전 워커가
@@ -123,6 +131,41 @@ public enum ErrorCode {
      */
     STORAGE_QUOTA_EXCEEDED(HttpStatus.INSUFFICIENT_STORAGE, "저장소 용량이 부족합니다. 관리자에게 문의해 주세요."),
 
+    // ── 저장소 reconcile 수신 (spec 007 FR-035, S15P21A604-500) ─────────────
+    // 계약 spring-storage-reconciliation-api.yaml v0.2.0 이 정본이다. Infra 가 이 네 code 로
+    // 재시도 여부를 가른다 — 500 하나만 재시도가 의미 있고 나머지는 terminal 이다.
+    /**
+     * 요청 형식이 계약에 맞지 않거나 자기모순이다 (예: {@code VERIFIED} 인데 sha256 이 서로 다르다).
+     *
+     * <p>이 API 만 422 를 쓴다. 계약이 그렇게 정했고, 소비자가 사람이 아니라 Infra 스크립트라
+     * 400(사용자 입력 오류)과 구분되는 편이 낫다.
+     */
+    RECONCILIATION_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "reconcile 결과 형식이 올바르지 않습니다."),
+    /**
+     * 결과는 적재했지만 문서에 반영할 수 없다 — 문서가 요청의 source provider·object key 를 더
+     * 이상 갖지 않는다.
+     *
+     * <p><b>재시도로 풀리지 않는다.</b> 같은 payload 는 영원히 이 응답을 받는다. 늦게 도착한 결과가
+     * 최신 저장 위치를 과거 값으로 되돌리지 않게 하는 것이 이 거부의 목적이다.
+     */
+    RECONCILIATION_STALE(HttpStatus.CONFLICT, "이미 반영할 수 없는 reconcile 결과입니다."),
+    /**
+     * 같은 {@code runId + documentId} 로 <b>다른 내용</b>이 왔다. 먼저 저장된 결과가 유지된다.
+     *
+     * <p>조용히 무시하면 보내는 쪽의 버그가 감춰진다 — 멱등은 "같은 요청을 다시 보내도 안전하다"
+     * 이지 "같은 키로 다른 것을 보내도 된다" 가 아니다.
+     */
+    RECONCILIATION_REPLAY_CONFLICT(HttpStatus.CONFLICT, "같은 reconcile 키로 다른 결과가 도착했습니다."),
+    /**
+     * 요청은 유효한데 Spring 배포가 그 provider 를 모른다 — 설정 누락이거나 문서 행의 버킷이
+     * 설정과 어긋난다. 요청 오류가 아니므로 422 가 아니다.
+     *
+     * <p>이 네 code 중 <b>유일하게 재시도가 의미 있다</b>. 다만 고쳐야 할 것은 payload 가 아니라
+     * Spring 배포 설정이다.
+     */
+    RECONCILIATION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR,
+            "reconcile 결과를 반영할 수 없습니다. 서버 저장소 설정을 확인해 주세요."),
+
     // ── Game Studio (spec 019) ──────────────────────────────────────────────
     // contracts/game-api.md v1.0 §봉투 code 표 14행이 정본이다. 여기 없는 GAME_* 가 응답에 나오면
     // 계약 위반이다. MEMBER_ONLY·VALIDATION_FAILED·BOOTH_LEASE_EXPIRED 는 위에 있는 것을 재사용한다 —
@@ -144,6 +187,12 @@ public enum ErrorCode {
     /** 사용자가 스스로 풀 수 있는 상태다 — thrower 가 상한값과 해결 방법을 message 에 담는다. */
     GAME_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "만들 수 있는 게임 수를 초과했습니다."),
     CONFIG_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 포털 연결을 찾을 수 없습니다."),
+    /**
+     * 오락기 해석의 유일한 non-200 이다 (S15P21A604-602). 게임이 미게시·비공개·삭제인 것은 오류가
+     * 아니라 {@code playable:false} + {@code unavailableReason} 으로 나간다 — 오락기는 월드
+     * 고정물이라 월드를 끊지 않는다 (spec 019 FR-020).
+     */
+    MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록되지 않은 게임기입니다."),
 
     // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
     // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에
@@ -160,6 +209,20 @@ public enum ErrorCode {
     GAME_ASSET_NOT_READY(HttpStatus.CONFLICT, "자산이 아직 사용할 수 없는 상태입니다."),
     GAME_ASSET_DELETED(HttpStatus.CONFLICT, "삭제된 자산입니다."),
     GAME_ASSET_IN_USE(HttpStatus.CONFLICT, "사용 중인 자산입니다."),
+
+    // ── Survey (010) ────────────────────────────────────────────────────────
+    // CLOSED · ALREADY_RESPONDED 는 docs/08 §18 이 예약해 둔 어휘다. 신설은 뒤 둘이다.
+    SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "설문을 찾을 수 없습니다."),
+    SURVEY_CLOSED(HttpStatus.CONFLICT, "마감된 설문입니다."),
+    SURVEY_ALREADY_RESPONDED(HttpStatus.CONFLICT, "이미 응답한 설문입니다."),
+    /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
+    SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
+
+    // ── 미니게임 (014) ──────────────────────────────────────────────────────
+    // 하나뿐이다. 판정 거부·일일 한도 도달·재제출은 전부 200 이라 오류 어휘가 필요 없고
+    // (spec 014 Acceptance Scenario 4), 게스트·요청 값 오류는 MEMBER_ONLY·VALIDATION_FAILED 를
+    // 재사용한다. 남의 세션도 이 코드로 답한다 — 구분하면 세션의 존재를 알려주게 된다.
+    MINIGAME_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 세션을 찾을 수 없습니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

@@ -14,7 +14,9 @@
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { IS_MOCK_WORLD, WorldSurface } from '../../features/world/ui/WorldSurface.select';
+import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
+import { useHostPhase } from '../../unity/host/hostPhase';
+import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
@@ -30,12 +32,30 @@ import {
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
 import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
+import { getReadyUnityInstance } from '../../unity/host/sessionManager';
+import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
 import './worldPage.css';
 
 export function WorldPage() {
   const ui = useGameClientUi();
+  // 캐릭터 선택·부팅·월드 로딩 중에는 World HUD 를 그리지 않는다 (S15P21A604-613).
+  // Unity 가 로비를 그리는 동안 "W A S D 이동"·"부스 입장" 안내가 떠 있으면 사실과 다르고,
+  // 상담·도움말도 그 맥락에서 열 수 있는 것이 아니다.
+  // mock 월드는 UnityHost 자체가 뜨지 않아 단계가 booting 에 머무르므로 예외로 둔다.
+  // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
+  const hostPhase = useHostPhase();
+  const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+
+  // 월드를 보여 달라고 요청한다. 화면을 떠날 때는 감추기만 하고 내리지 않는다 —
+  // 부스 스튜디오·관리 상세로 나갔다 돌아오는 것이 정상 동선이고, 그때마다 다시 부팅하지
+  // 않는 것이 상주 호스트의 존재 이유다 (S15P21A604-620).
+  useEffect(() => {
+    showWorld();
+    return hideWorld;
+  }, []);
 
   // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
   // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서
@@ -58,16 +78,43 @@ export function WorldPage() {
     };
   }, []);
 
-  // ESC 계층: 떠 있는 것이 있으면 그 하나를 닫고, 아무것도 없을 때만 Game Menu 를 연다 —
-  // 그것이 "ESC = 나/시스템"의 의미다(D-08). 무엇이 떠 있는지는 여기서 판정하지 않는다.
-  // 우선순위는 worldScreen 이 소유한다(-450) — 두 store 를 여기서 손으로 합성하던 것을 걷어냈다.
+  // ESC 중재 — **이 화면이 유일한 판정자다** (-450, #132).
   //
-  // OverlayFrame·GameOverlay 의 자체 ESC 핸들러는 그대로 둔다. 그쪽도 결국 같은 레이어를 닫으므로
-  // 중복 실행돼도 결과가 같고(멱등), 걷어내면 focus 복구(-428) 회귀 위험만 커진다.
+  //   1. FE 레이어가 있으면  → 그 하나만 닫는다. Unity 모달은 유지한다
+  //   2. FE 레이어가 없고 Unity 모달이 있으면 → 닫아 달라고 요청하고 Game Menu 는 열지 않는다
+  //   3. 둘 다 없으면 → Game Menu ("ESC = 나/시스템", D-08)
+  //
+  // 2단계가 이번에 생겼다. 전에는 FE 레이어가 없으면 곧장 Game Menu 를 열었는데, 그 판정의 입력값
+  // (worldScreen)은 FE store 둘만 본다 — Unity 가 초점 카메라나 미니게임 HUD 를 쥐고 있어도 FE 에게는
+  // 'world' 로 보였다. 그래서 줌만 켜진 상태에서 ESC 를 누르면 **줌은 풀리는데 설정 창이 같이 떴다.**
+  // 이제 Unity 관측값(bridge/worldUiState)을 함께 본다.
+  //
+  // **상태를 보고 남의 것을 닫지 않는다.** focus 가 true 라고 FE 가 Unity 를 끄는 것이 아니라
+  // 요청을 보내고, 무엇을 닫을지는 Unity 가 정한다(worldUiBridge.ts 주석 — 2026-09-08 슬롯머신 사고).
+  //
+  // 다른 ESC 리스너는 걷어냈다. OverlayFrame·GameOverlay 도 window 에 걸려 있었는데, 같은 target
+  // 이라 stopPropagation 으로는 서로를 막을 수 없고 등록 순서로만 갈렸다 — 그래서 GAME 오버레이는
+  // capture 로 먼저 닫히고 뒤이어 이 핸들러가 "떠 있는 게 없다" 로 읽어 Game Menu 를 열고 있었다.
+  // 판정자를 하나로 두는 것이 그 계열을 통째로 없애는 방법이다. focus 복구(-428)는 OverlayFrame 의
+  // 언마운트 효과가 그대로 하므로 영향이 없다.
+  //
+  // ESC 한 번이 여러 레이어를 동시에 걷지 않는다(worldPageEscLayering.test.tsx).
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
       if (closeTopScreen()) return;
+
+      if (hasUnityModal()) {
+        const instance = getReadyUnityInstance();
+        if (instance !== null) {
+          requestExitWorldUi(instance, 'esc');
+          return;
+        }
+        // 관측값은 남아 있는데 인스턴스가 없다(mock 월드·종료 직후). 보낼 곳이 없으므로 관측값을
+        // 신뢰하지 않고 비운 뒤 3단계로 내려간다 — ESC 가 아무 데도 가지 않는 상태를 만들지 않는다.
+        resetWorldUiState();
+      }
+
       openMenu();
     }
     window.addEventListener('keydown', onKeyDown);
@@ -76,10 +123,10 @@ export function WorldPage() {
 
   return (
     <div className="world-scene">
-      {/* World Layer — 교체 경계. 목업은 최신 Unity 캡처 정지 화면, 실제는 UnityHost */}
-      <WorldSurface />
+      {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
+          여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
-      <WorldHud mock={IS_MOCK_WORLD} />
+      {inWorld && <WorldHud />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}

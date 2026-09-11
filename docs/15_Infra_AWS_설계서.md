@@ -105,7 +105,7 @@ TLS 경계:
 Browser ── TLS ──> Cloudflare ── TLS Full (strict) ──> Nginx ── HTTP/WS ──> Container
 ```
 
-- Nginx는 Let's Encrypt 인증서를 사용하고 자동 갱신 후 reload한다.
+- Nginx에는 Cloudflare Origin Certificate를 설치한다. Cloudflare SSL 모드는 `Full (strict)`이며, 인증서·개인 키는 EC2/Nginx에만 보관하고 저장소에 커밋하지 않는다.
 - Cloudflare SSL 모드는 `Full (strict)`로 설정한다.
 - `world.<domain>`은 WebSocket Upgrade Header를 전달하고 내부 `ws://unity:7777`로 프록시한다.
 - Unity 7777은 외부에 공개하지 않는다.
@@ -305,6 +305,7 @@ Spring → 후속 AI 처리 허용
 - Usage Guard snapshot은 R2 사용량·freshness 기반 업로드 허용만 판정하고 active provider를 소유하지 않는다.
 - active write provider와 upload gate는 Spring 배포 설정으로 주입한다(`AI_STORAGE_ACTIVE_WRITE_PROVIDER`·`AI_STORAGE_UPLOAD_GATE`, 둘 다 기본값 없음). FastAPI는 active provider를 결정하지 않고 문서/Job의 provider를 사용한다.
 - `AI_STORAGE_UPLOAD_GATE`는 `OPEN`·`QUOTA_BLOCKED`·`UNAVAILABLE` 셋이다 (GitLab #100, 2026-09-01 확정). Storage Failover Control과 Usage Guard의 상태를 **운영자가 읽어 이 한 값으로 옮겨 적으며**, Spring은 그 상태 머신을 모른다. `storage-failover-state.schema.json`의 `uploadEnabled`는 Infra 상태 표현으로 그대로 두고, 그것을 Spring 설정으로 직접 주입하지 않는다.
+- `storage-failover.sh`는 진행 중인 reconcile이 있으면 다음 Provider 전환·reconcile 시작을 거부하는 단일 실행 lock을 전체 상태 전환에 적용한다. 따라서 문서당 진행 reconcile run은 최대 하나이며, 이전 run 종료 전 다음 전환을 시작하지 않는다.
 
 | 관측 상태 | `AI_STORAGE_UPLOAD_GATE` | Spring 응답 |
 |---|---|---|
@@ -492,6 +493,8 @@ demo       ← develop, 실제 사용자 계약과 외부 연동
 - 배포 이력과 current/known-good
 
 dev 배포는 다른 dev와 demo를 재시작하거나 교체하지 않는다. demo는 실제 도메인·HTTPS/WSS·실제 외부 API를 사용하는 통합 사용자 경로다.
+
+dev 공개 진입점은 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`이다. Nginx는 `/`→Front, `/api/`→Spring, `/ai/v1/`→FastAPI, `/unity/`→`/srv/festa/webgl/current`을 제공한다. WebGL `current`는 demo와 공유하므로 WebGL release 전환 시 두 host가 같은 정적 build를 제공한다. UnityTransport는 경로 기반 WebSocket을 지원하지 않아 `wss://world-dev.${ROOT_DOMAIN}:443`을 사용한다.
 
 ---
 
@@ -731,15 +734,15 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 
 | ID | 항목 | 결정 주체 | 결정 시점 |
 |---|---|---|---|
-| C-01 | EC2 vCPU·RAM·Disk와 80/443 Security Group 변경 담당자 | Infra + AWS 관리자 | 실환경 구성 전 |
-| C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra + 팀 | DNS/TLS 적용 전 |
-| C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra + 팀 리드 | Cloudflare/R2 적용 전 |
-| C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | 문서 업로드 적용 전 |
-| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 MinIO fallback(S3-compatible fallback 아님), 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** 원본 문서의 두 번째 외부 백업 위치는 미확정 ([spec 007 C-10](../specs/007-ai-agent-document/spec.md), [GitLab Work Item #100](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/100)) |
+| C-01 | EC2 vCPU·RAM·Disk와 80/443 Security Group 변경 담당자 | Infra | **SG 변경 담당은 정승욱(Infra)으로 확정.** EC2 사양 실값은 서버 실측 때 입력한다. PostgreSQL·Redis·Unity 내부 포트는 외부에 열지 않는다. |
+| C-02 | 신규 demo 루트 도메인과 구매·관리 계정 담당자 | Infra | **`ssafesta.world`, 정승욱(Infra) 관리로 확정.** |
+| C-03 | Cloudflare DNS/CDN·R2 사용 계정과 결제·초과 과금 책임 | Infra | **정승욱(Infra)으로 확정.** |
+| C-04 | R2 무과금 안전 한도와 신규 업로드 차단 기준 | Infra + BE + 기획 | **80% 경고, 90%부터 신규 업로드 차단으로 확정.** 기존 문서 조회·AI 처리는 유지한다. |
+| C-05 | R2 장애 시 fallback·복구 | Infra + BE + AI | **확정: 운영자 승인 기반 단일 노드 S3-compatible MinIO fallback, 자동 failover·이중 쓰기·자동 원복 금지, 문서별 Provider 읽기.** P0에서는 두 번째 외부 백업을 두지 않으며 MinIO는 백업이 아닌 임시 fallback이다. |
 | C-06 | PostgreSQL/pgvector Database·Schema·Role 분리와 최종 백업 보관 정책 | Infra + BE + AI | 데이터 환경 구성 전 |
 | C-07 | 시연 시간대·빌드/배포 동결 시간과 긴급 배포 승인 절차 | Infra + 팀 | 서버 부하 실측 후 |
-| C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | 관측 설계 전 |
-| C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | 외부 실측 후 |
+| C-08 | Docker 로그 보존량과 P1 지표·탐지 규칙·Mattermost 재알림 기준 | Infra | **EC2 실측 후 retention·disk cap·알림 threshold를 확정한다.** |
+| C-09 | WSS heartbeat/timeout과 SSE keepalive의 최종값 | Infra + Unity + AI | **WSS Nginx idle timeout은 180초로 확정.** SSE keepalive는 AI 외부 실측 후 확정한다. |
 | C-10 | R2 가용성 자동 판정 수치(timeout·연속 5xx 횟수·관측 시간) | Infra + BE | P0 모니터링 자료 확보 후 별도 이슈에서 확정·장애 주입 검증 |
 
 이미 확정된 사항:
@@ -747,7 +750,7 @@ ECR/ECS/ALB/RDS부터 구성하지 않는다. 현재 성공 기준은 단일 EC2
 - CI/CD는 Jenkins를 사용한다.
 - 초기 자원은 고성능 단일 EC2 한 대다.
 - dev는 EC2 IP, 최종 demo만 신규 도메인·TLS를 사용한다.
-- DNS/Proxy/CDN은 Cloudflare, Origin TLS는 Nginx Let's Encrypt를 사용한다.
+- DNS/Proxy/CDN은 Cloudflare, Origin TLS는 EC2 Nginx의 Cloudflare Origin Certificate를 사용한다.
 - demo 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다.
 - Unity Server는 11층·단일 채널 컨테이너 1개이며 외부 `wss:443`을 내부 `ws:7777`로 전달한다.
 - PostgreSQL/pgvector는 영구 데이터, Redis는 유실 가능한 임시 데이터만 담당한다.

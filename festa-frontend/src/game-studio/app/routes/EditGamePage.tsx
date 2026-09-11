@@ -4,12 +4,7 @@ import { createApiGameDraftRepository, createApiGamePublisher } from '../../stud
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { GameStudioShell } from '../../studio/ui/GameStudioShell.tsx';
 import { createEditorStressProject } from '../../studio/model/createEditorStressProject.ts';
-
-const serverAuthoringEnabled = import.meta.env.VITE_GAME_STUDIO_API_ENABLED === 'true';
-const browserPublicationEnabled = import.meta.env.VITE_USE_MOCK === 'true' && !serverAuthoringEnabled;
-const serverDraftRepository = serverAuthoringEnabled ? createApiGameDraftRepository() : undefined;
-const serverPublisher = serverAuthoringEnabled ? createApiGamePublisher() : undefined;
-const browserPublicationPorts = browserPublicationEnabled ? createBrowserPublicationPorts() : null;
+import { isBrowserPublicationEnabled, isServerAuthoringEnabled } from '../runtimeConfig.ts';
 
 export const EditGamePage = () => {
   const { gameId } = useParams();
@@ -17,6 +12,21 @@ export const EditGamePage = () => {
   const parsedGameId = Number(gameId);
   const validGameId = Number.isSafeInteger(parsedGameId) && parsedGameId >= 1;
   const stressFixtureEnabled = import.meta.env.DEV && searchParams.get('fixture') === 'max';
+  // S15P21A604-409/-477 — 이전엔 아래 다섯 값이 전부 모듈 최상단 상수로 import 시점에 한
+  // 번만 읽혀서, .env.local 값에 좌우되는 결함이 PlayGamePage.tsx(S15P21A604-409)와 똑같이
+  // 있었다(GitLab Issue #125). 컴포넌트 마운트 시점(이른 return보다 먼저 — Hooks 규칙
+  // 준수)에 accessor로 읽고, 포트 인스턴스는 useMemo로 참조 안정성을 유지한다.
+  const serverAuthoringEnabled = isServerAuthoringEnabled();
+  const browserPublicationEnabled = isBrowserPublicationEnabled();
+  const serverDraftRepository = useMemo(() => (
+    serverAuthoringEnabled ? createApiGameDraftRepository() : undefined
+  ), [serverAuthoringEnabled]);
+  const serverPublisher = useMemo(() => (
+    serverAuthoringEnabled ? createApiGamePublisher() : undefined
+  ), [serverAuthoringEnabled]);
+  const browserPublicationPorts = useMemo(() => (
+    browserPublicationEnabled ? createBrowserPublicationPorts() : null
+  ), [browserPublicationEnabled]);
   const initialProject = useMemo(() => (
     stressFixtureEnabled && validGameId ? createEditorStressProject(parsedGameId) : undefined
   ), [parsedGameId, stressFixtureEnabled, validGameId]);

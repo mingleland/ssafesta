@@ -5,13 +5,14 @@
 // 메뉴를 닫는 것이 곧 World 복귀다.
 //
 // 데이터는 기존 모델을 그대로 쓴다 — profile.ts(닉네임·provider·avatar) + wallet 쿼리(잔액).
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { loadProfile, useProfile } from '../../profile/model/profile';
 import { useSession } from '../../auth/model/session';
 import { logout } from '../../auth/model/logout';
 import { walletApi } from '../../../entities/wallet/api.select';
+import { MusicSettings } from '../../audio/ui/MusicSettings';
 import './gameMenu.css';
 
 const PROVIDER_LABEL: Record<string, string> = { google: 'Google', kakao: 'Kakao', ssafy: 'SSAFY', guest: '게스트' };
@@ -26,6 +27,8 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
   const isMember = kind === 'member';
   const state = useProfile();
   const navigate = useNavigate();
+  // 설정은 같은 패널 안에서 열고 닫는다 — ESC 한 번으로 닫히는 자리를 하나 더 만들지 않는다
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const walletQuery = useQuery({
     queryKey: ['wallet-balance'],
@@ -88,11 +91,19 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
         <div className="gm-space" aria-hidden="true" />
 
         <div className="gm-system">
-          {/* Settings 실제 기능은 Deferred(game-client-experience-draft §13) — 없는 설정을 만들지 않는다 */}
-          <button type="button" className="gm-item" disabled title="준비 중입니다">
+          {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
+          <button
+            type="button"
+            className="gm-item"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
             설정
-            <span className="gm-badge">준비 중</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={settingsOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
+            </svg>
           </button>
+          {settingsOpen && <MusicSettings />}
           <button type="button" className="gm-item gm-item-out" onClick={() => void handleLogout()}>
             로그아웃
           </button>

@@ -28,7 +28,7 @@
 
 **⚠️ 이 단계가 끝나기 전에는 어떤 User Story도 시작할 수 없다**
 
-- [x] T003 [P] `booth/SlotType.java`(`USER_RENTAL`/`ADMIN`) · `booth/LeaseStatus.java`(`ACTIVE`/`EXPIRED`) · `booth/BoothStatus.java`(`ACTIVE`/`INACTIVE`)
+- [x] T003 [P] `booth/SlotType.java`(`USER_RENTAL`/`ADMIN`/`EVENT` — `EVENT`는 V28에서 추가, S15P21A604-615) · `booth/LeaseStatus.java`(`ACTIVE`/`EXPIRED`) · `booth/BoothStatus.java`(`ACTIVE`/`INACTIVE`)
 - [x] T004 [P] `booth/BoothSlot.java` — `booth_slots` 매핑. **점유 상태를 갖지 않는다** (활성 임대의 존재가 곧 점유, research R-02)
 - [x] T005 [P] `booth/Booth.java` — `booths` 매핑. `owner_user_id`가 주인이고 `current_slot_id`는 임대 중에만 채워진다. `attachSlot`/`detachSlot` 메서드로만 변경 (data-model §2)
 - [x] T006 [P] `booth/BoothLease.java` — `booth_leases` 매핑. 유일한 변경은 `expire()` 상태 전이. `ends_at`은 생성자가 `starts_at + 기간`으로 계산한다 (I-4)
@@ -83,6 +83,7 @@
 - [x] T024 [US3] 만료 판정을 조회 경로 전체에 적용 — 슬롯 목록 `status`/`entryAvailable`, 활성 임대 한도 검사, 내 부스 조회. **모두 T008의 술어를 경유**한다 (I-3, SC-003)
 - [x] T025 [US3] 재임대 시 상태 전이 (FR-017) — 그 슬롯의 만료된 `ACTIVE` 임대를 `EXPIRED`로 바꾸고 이전 Booth의 `current_slot_id`를 해제한 뒤 새 임대를 만든다. **같은 트랜잭션.** 이게 없으면 `ux_booth_leases_active_slot`과 `current_slot_id` UNIQUE 때문에 재임대가 영구히 막힌다
 - [x] T026 [US3] `GET /booths/{boothId}`의 만료 응답 (FR-019) — `409 BOOTH_LEASE_EXPIRED` + "임대가 만료된 부스입니다." **조용히 빈 화면을 주지 않는다**
+- [x] T035 [US3] **보완 (2026-09-09, S15P21A604-152)** — 만료 상태 전이 주기 배치 `BoothLeaseExpirySweeper`. spec C-02·plan 이 004 범위에서 배치를 넣지 않은 것은 `research.md`가 *"배치는 정리 작업일 뿐이다 … 필요해지면 이 위에 얹을 수 있다"*로 열어 둔 결정이고, 그 위에 얹었다. **권위는 그대로 읽기 시 판정**(T024)이다. T025 가 만든 전이를 공용 메서드로 추출해 lazy 두 경로와 배치가 같은 메서드를 지난다 — spec 007 FR-041 이 같은 트랜잭션을 요구하는 S15P21A604-496 이 붙을 자리를 한 곳으로 만든다. 전역 조회는 `FOR UPDATE SKIP LOCKED` + batch 상한, 부스 detach 는 그 임대의 슬롯을 가리킬 때만. `Booth`에 `@DynamicUpdate` — 잠금 없는 편집 경로(`requireActiveEditor`)의 전체 컬럼 UPDATE 가 배치가 끊은 슬롯 연결을 되살리기 때문이다. 테스트 `BoothLeaseExpirySweeperIntegrationTest` 23건
 - [x] T027 [US3] `test/.../booth/BoothExpiryIntegrationTest.java` — 만료 임대의 슬롯이 `AVAILABLE`·`entryAvailable=false`(SC-003) / `GET /booths/{id}` 409 / **다른 사용자 재임대 성공 + 이전 임대 `EXPIRED` 전이**(FR-017) / **재임대자가 이전 소유자 Booth를 받지 않음**(SC-004, I-5) / 이전 소유자의 Booth·콘텐츠 보존(FR-010) / 만료 임대가 한도를 점유하지 않음(I-3)
 
 **Checkpoint**: 만료·재임대가 콘텐츠 격리를 유지한 채 동작한다
@@ -108,13 +109,14 @@ Phase 1 (T001~T002)
    └─> Phase 2 (T003~T010)          ← 모든 Story의 선행
           └─> Phase 3 US1 (T011~T019)
                  ├─> Phase 4 US2 (T020~T023)   ← US1의 임대 경로 위에서 검증
-                 └─> Phase 5 US3 (T024~T027)   ← US1 이후, US2와 병렬 가능
+                 └─> Phase 5 US3 (T024~T027, T035)   ← US1 이후, US2와 병렬 가능
                         └─> Phase 6 (T028~T034)
 ```
 
 - **T011은 T008 이후**: 만료 술어가 있어야 점유·한도를 판정한다
 - **T012는 T011 이후**: 임대 id가 있어야 멱등성 키를 만든다
 - **T025는 T011 이후**: 임대 생성 경로 안에 전이가 들어간다
+- **T035는 T025 이후**: 배치는 T025 가 만든 전이를 공용 메서드로 뽑아 같이 쓴다
 - **T020은 T011 이후**: 제약 위반 변환은 임대 경로의 일부다
 
 ## Parallel Execution

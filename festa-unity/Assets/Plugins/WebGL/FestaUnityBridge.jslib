@@ -79,6 +79,22 @@ mergeInto(LibraryManager.library, {
     }
   },
 
+  // Unity 모달 상태 (GitLab #132 G-8-2 반대 방향, 2026-09-10): '{"focus":bool,"minigame":bool}'.
+  // 값이 바뀔 때만 온다. FE 는 이걸 보고 ESC 를 중재한다(FE 레이어 → Unity 모달 → GameMenu).
+  // 닫기는 별도 명령 SendMessage('WorldUiBridge','RequestExitWorldUi','esc') — 상태로 남의 기능을 닫지 않는다.
+  FestaNotifyWorldUiState: function (jsonPtr) {
+    var json = UTF8ToString(jsonPtr);
+    try {
+      if (window.FestaUnity && typeof window.FestaUnity.onWorldUiState === 'function') {
+        window.FestaUnity.onWorldUiState(json);
+        return;
+      }
+      console.warn('[FestaUnityBridge] window.FestaUnity.onWorldUiState is not ready', json);
+    } catch (error) {
+      console.error('[FestaUnityBridge] onWorldUiState callback failed', json, error);
+    }
+  },
+
   FestaNotifyWorldLoadStart: function () {
     try {
       if (window.FestaUnity && typeof window.FestaUnity.onWorldLoadStart === 'function') {
@@ -88,6 +104,54 @@ mergeInto(LibraryManager.library, {
       console.warn('[FestaUnityBridge] window.FestaUnity.onWorldLoadStart is not ready');
     } catch (error) {
       console.error('[FestaUnityBridge] onWorldLoadStart callback failed', error);
+    }
+  },
+
+  // 디스플레이의 **실제** 주사율(Hz) 추정치. 아직 표본이 모자라면 0.
+  //
+  // 왜 필요한가. Unity 는 WebGL 에서 Screen.currentResolution.refreshRateRatio 를 화면과 무관하게
+  // 항상 60 으로 보고한다(자리표시자). 그런데 프레임 상한의 유일한 실동 노브인 QualitySettings.vSyncCount 는
+  // '원시 rAF 몇 틱마다 한 프레임을 그리는가' 라서, 주사율을 모르면 목표 fps 를 정할 수 없다 —
+  // 120Hz 에서 vSyncCount=2 는 60fps 지만 60Hz 에서는 30fps 다. 그래서 여기서 직접 잰다.
+  //
+  // Unity 의 렌더 루프와 **무관한** 자체 rAF 프로브를 돌린다. Unity 가 vSyncCount 로 스스로를 늦춰도
+  // 이 프로브는 원시 vsync 간격을 계속 보므로 추정이 오염되지 않는다. 창을 다른 모니터로 옮기면
+  // 값이 따라 바뀌도록 링 버퍼로 계속 갱신한다(비용은 프레임당 push 하나).
+  FestaDisplayRefreshHz: function () {
+    try {
+      if (!window.__festaRefresh) {
+        var st = { buf: [], hz: 0, prev: 0, since: 0 };
+        window.__festaRefresh = st;
+        var probe = function (now) {
+          if (st.prev > 0) {
+            var dt = now - st.prev;
+            // 탭 전환·리사이즈가 만든 이상치는 버린다. 1ms 미만은 합성 이벤트, 100ms 초과는 정지다.
+            if (dt > 1 && dt < 100) {
+              st.buf.push(dt);
+              if (st.buf.length > 180) st.buf.shift();
+              st.since++;
+            }
+          }
+          st.prev = now;
+          // 60 프레임마다 다시 추정한다.
+          //
+          // **중앙값이 아니라 하위 10% 분위수를 쓴다.** 디스플레이는 주사율보다 빨리 틱할 수 없지만
+          // 메인 스레드가 바쁘면 얼마든지 늦게 틱한다. 그래서 중앙값은 '화면 주사율' 이 아니라
+          // '지금 실제로 나오는 프레임률' 을 재게 된다 — 2026-09-08 배포본 실측에서 120Hz 화면을
+          // 로딩 중에 60Hz 로 잘못 읽어 상한이 풀렸다(vSyncCount 2 → 1). 가장 빠른 쪽이 진짜 주기다.
+          if (st.buf.length >= 60 && st.since >= 60) {
+            st.since = 0;
+            var s = st.buf.slice().sort(function (a, b) { return a - b; });
+            var fast = s[Math.floor(s.length * 0.10)];
+            if (fast > 0) st.hz = Math.round(1000 / fast);
+          }
+          window.requestAnimationFrame(probe);
+        };
+        window.requestAnimationFrame(probe);
+      }
+      return window.__festaRefresh.hz | 0;
+    } catch (error) {
+      return 0;
     }
   }
 });

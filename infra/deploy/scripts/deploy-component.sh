@@ -6,8 +6,14 @@ docker_bin="${DOCKER_BIN:-docker}"
 [[ "${COMPOSE_PROJECT}" == "festa-dev-${CI_COMPONENT}" ]] || { echo 'unexpected compose project' >&2; exit 64; }
 [[ -f "${COMPOSE_FILE}" ]] || { echo 'compose file missing' >&2; exit 66; }
 if [[ "${CI_COMPONENT}" == ai || "${CI_COMPONENT}" == back ]]; then
-  : "${COMPONENT_ENV_FILE:?}" "${INTERNAL_AI_TO_SPRING_TOKENS:?}"
+  : "${COMPONENT_ENV_FILE:?}" "${INTERNAL_SPRING_TO_AI_TOKENS:?}" "${INTERNAL_AI_TO_SPRING_TOKENS:?}"
+  [[ "${CI_COMPONENT}" != back ]] || : "${INTERNAL_INFRA_TO_SPRING_TOKENS:?}"
   [[ -f "${COMPONENT_ENV_FILE}" ]] || { echo 'component runtime env credential file missing' >&2; exit 66; }
+  internal_network=festa-dev-ai-back-private
+  if ! "${docker_bin}" network inspect "${internal_network}" >/dev/null 2>&1; then
+    "${docker_bin}" network create --label org.ssafy-festa.managed=true "${internal_network}" >/dev/null 2>&1 ||
+      "${docker_bin}" network inspect "${internal_network}" >/dev/null
+  fi
 fi
 if [[ "${CI_COMPONENT}" == game ]]; then
   : "${CONNECTION_TOKEN_SECRET_FILE:?}"

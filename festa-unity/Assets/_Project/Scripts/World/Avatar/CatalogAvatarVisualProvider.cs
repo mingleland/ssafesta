@@ -61,6 +61,17 @@ namespace Festa.World
             assembler.Catalog = _modularCatalog;
             assembler.Apply(config);
             if (!string.IsNullOrEmpty(assembler.LastError)) Debug.LogError($"[AvatarVisual] {assembler.LastError}");
+
+            // 조립이 실패해도 root 는 만들어져 있어 `??=` 폴백이 절대 발동하지 않았다 — 그릴 것이 0개인 빈 오브젝트가
+            // 그대로 진행돼 몸은 사라지고 이름표만 공중에 떴다(QA 2026-09-08 #56). 렌더러가 하나도 없으면 null 을
+            // 돌려 호출자의 placeholder 폴백이 실제로 작동하게 한다.
+            if (root.GetComponentsInChildren<Renderer>(true).Length == 0)
+            {
+                Debug.LogError("[AvatarVisual] 조립 결과에 렌더러가 없다 — placeholder 로 폴백한다" +
+                               (string.IsNullOrEmpty(assembler.LastError) ? "" : $" ({assembler.LastError})"));
+                Object.Destroy(root);
+                return null;
+            }
             return root;
         }
 

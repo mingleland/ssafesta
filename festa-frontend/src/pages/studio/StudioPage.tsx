@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
 import type { BoothFacade } from '../../entities/booth/types';
-import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK } from '../../shared/config/studio';
+import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK, ZOOM_PRESETS, clampZoom } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
 import { useSaveDraft, usePublish } from '../../features/studio/model/useLayoutMutations';
 import { useStudioGates } from '../../features/studio/model/useStudioGates';
@@ -28,10 +28,15 @@ import type { BoothDecor } from '../../features/studio/ui/canvas/canvasTypes';
 import { PropertiesPanel } from '../../features/studio/ui/PropertiesPanel';
 import { PublishDialog, DetailList } from '../../features/studio/ui/PublishDialog';
 import { FacadePanel } from '../../features/studio/ui/FacadePanel';
+import type { ObjectType } from '../../entities/layout/types';
+import { useBoothAssets } from '../../features/studio/model/useBoothAssets';
+import type { LibraryItem } from '../../features/studio/model/assetLibrary';
+import { findTemplate, instantiateTemplate } from '../../features/studio/model/boothTemplates';
+import { showToast } from '../../shared/ui/toast/toastStore';
+import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 
 // 카탈로그 type — BE 시드는 AVATAR_PART 뿐(-167). 부스 장식 유형 값은 외부 확정 대기라 조회만 걸어 둔다
 const CATALOG_TYPE = 'BOOTH_DECOR';
-const ZOOM_STEPS = [0.8, 1, 1.2];
 
 export function StudioPage() {
   const { boothId } = useParams<{ boothId: string }>();
@@ -43,9 +48,13 @@ export function StudioPage() {
   const [mode, setMode] = useState<StudioMode>('layout');
   const [tool, setTool] = useState<TransformTool>('select');
   const [snapOn, setSnapOn] = useState(true);
-  const [zoomIdx, setZoomIdx] = useState(1);
+  // 줌은 연속값이다 (S15P21A604-604) — Ctrl+휠이 그 사이를 움직이고, 툴바 버튼은 프리셋을 돈다.
+  // 이산 3단계였을 때는 휠을 붙여도 0.8·1·1.2 사이만 오갔다.
+  const [zoom, setZoom] = useState<number>(1);
   const [preset, setPreset] = useState<TemplatePreset | null>(null);
   const [facadePreview, setFacadePreview] = useState<BoothFacade | null>(null);
+  // 덮어쓰기 확인을 기다리는 템플릿 — 확인 전에는 배치를 건드리지 않는다
+  const [pendingTemplate, setPendingTemplate] = useState<BoothTemplate | null>(null);
   const [presetForFacade, setPresetForFacade] = useState<{ themeCode: BoothFacade['themeCode']; primaryColor: string } | null>(null);
 
   const draftQuery = useQuery({
@@ -62,6 +71,8 @@ export function StudioPage() {
   });
 
   const catalogQuery = useCatalogItems(CATALOG_TYPE);
+  // 좌측 Library 의 정본. 없으면 빈 배열이고 팔레트가 옛 목록으로 떨어진다(-551)
+  const boothAssets = useBoothAssets();
 
   const saveMutation = useSaveDraft(dispatch);
   const publishMutation = usePublish(dispatch);
@@ -96,6 +107,46 @@ export function StudioPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveMutation.error]);
+
+  // 캔버스에서 Delete·Backspace 로 선택 오브젝트를 지운다 (S15P21A604-603).
+  // 입력 필드·다이얼로그 안에서는 가로채지 않는다 — Game Studio 의 editingText 판정과 같은 규칙이다.
+  // 그러지 않으면 좌표 입력 중 Backspace 가 숫자를 지우는 대신 오브젝트를 지운다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const undoRedo = e.ctrlKey || e.metaKey;
+      if (!undoRedo && e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const target = e.target;
+      const editingText =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+      if (editingText) return;
+      if (target instanceof Element && target.closest('[role="dialog"]') !== null) return;
+
+      // Ctrl+Z 되돌리기 / Ctrl+Y·Ctrl+Shift+Z 다시 실행 (S15P21A604-605)
+      if (undoRedo) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          dispatch({ type: 'UNDO' });
+          return;
+        }
+        if (key === 'y' || (key === 'z' && e.shiftKey)) {
+          e.preventDefault();
+          dispatch({ type: 'REDO' });
+        }
+        return;
+      }
+
+      const objectId = state.selectedObjectId;
+      if (objectId === null) return;
+      e.preventDefault();
+      dispatch({ type: 'REMOVE_OBJECT', objectId });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [state.selectedObjectId]);
 
   const template = templatesQuery.data?.templates.find((t) => t.template === state.template);
   const bounds = template?.footprint ?? BOOTH_SIZE_FALLBACK;
@@ -136,16 +187,35 @@ export function StudioPage() {
     return (
       <StudioGate>
         <p>이 부스의 소유자만 편집할 수 있습니다.</p>
-        <Link to="/app/booths">부스 슬롯 목록으로</Link>
+        <GateActions to="/app/booths" toLabel="부스 슬롯 목록으로" />
       </StudioGate>
     );
   }
   if (ownerGate.status === 'error') {
-    return <StudioGate>부스 소유 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</StudioGate>;
+    return (
+      <StudioGate>
+        <p>부스 소유 정보를 불러오지 못했습니다.</p>
+        <GateActions onRetry={ownerGate.retry} />
+      </StudioGate>
+    );
   }
   if (draftQuery.isLoading) return <StudioGate>불러오는 중...</StudioGate>;
-  if (gates.draftLeaseExpired) return <StudioGate>임대가 만료되어 이 부스를 편집할 수 없습니다.</StudioGate>;
-  if (draftQuery.isError) return <StudioGate>작업본을 불러오지 못했습니다.</StudioGate>;
+  if (gates.draftLeaseExpired) {
+    return (
+      <StudioGate>
+        <p>임대가 만료되어 이 부스를 편집할 수 없습니다.</p>
+        <GateActions />
+      </StudioGate>
+    );
+  }
+  if (draftQuery.isError) {
+    return (
+      <StudioGate>
+        <p>작업본을 불러오지 못했습니다.</p>
+        <GateActions onRetry={() => void draftQuery.refetch()} />
+      </StudioGate>
+    );
+  }
 
   function handleSave() {
     saveMutation.mutate({
@@ -156,11 +226,64 @@ export function StudioPage() {
     });
   }
 
-  function handleAdd(item: PaletteItem) {
+  function addAt(objectType: ObjectType, assetCode: string | undefined, taken: Array<{ x: number; z: number }>) {
     // 같은 지점에 쌓이면 선택도 드래그도 못 한다 — 빈 자리를 찾아 놓는다
-    const spot = findFreeSpot(state.objects.map((o) => ({ x: o.position.x, z: o.position.z })), bounds);
+    const spot = findFreeSpot(taken, bounds);
     // ADD_OBJECT 가 새 오브젝트를 선택한다 — 장식형이면 레지스트리의 외형 코드를 함께 기록한다
-    dispatch({ type: 'ADD_OBJECT', objectType: item.objectType, x: spot.x, z: spot.z, assetCode: item.assetCode });
+    dispatch({ type: 'ADD_OBJECT', objectType, x: spot.x, z: spot.z, assetCode });
+    return spot;
+  }
+
+  const placed = () => state.objects.map((o) => ({ x: o.position.x, z: o.position.z }));
+
+  function handleAdd(item: PaletteItem) {
+    addAt(item.objectType, item.assetCode, placed());
+  }
+
+  /** Asset Library(manifest 소비) 에서 고른 실자산 */
+  function handleAddAsset(item: LibraryItem) {
+    addAt(item.objectType, item.assetCode, placed());
+  }
+
+  /**
+   * Template 적용 — **교체다** (S15P21A604-589).
+   *
+   * 예전에는 ADD_OBJECT 를 반복했다. 그러면 템플릿이 기존 배치 **위에 쌓여** 두 번 누르면
+   * 두 벌이 되고, 상한에 걸리면 조용히 중간에서 끊겼다. 템플릿은 "이 배치로 시작한다"는
+   * 뜻이므로 앞의 것을 덮는다 — 그 뜻을 REPLACE_OBJECTS 액션 하나로 표현한다.
+   *
+   * 템플릿이 준 좌표는 서로 겹치지 않으므로(boothTemplates 주석) 빈 자리 탐색이 필요 없다.
+   */
+  function applyTemplate(template: BoothTemplate) {
+    const objects = instantiateTemplate(template);
+    const fitted = objects.slice(0, maxObjects);
+    dispatch({ type: 'REPLACE_OBJECTS', objects: fitted });
+    // 잘렸다면 조용히 넘기지 않는다 — 화면에 없는 자산을 사용자가 찾게 만들지 않는다
+    if (fitted.length < objects.length) {
+      showToast(`이 부스에는 ${maxObjects}개까지 놓을 수 있어 ${objects.length - fitted.length}개는 적용하지 않았습니다.`, 'info');
+    }
+  }
+
+  /**
+   * 전체 초기화 (S15P21A604-603) — 새 경로를 만들지 않는다.
+   *
+   * '빈 부스' 템플릿이 이미 `REPLACE_OBJECTS` 로 배치를 비우고, 확인 다이얼로그도 그 경로에
+   * "배치를 모두 비울까요?" 분기를 갖고 있다(S15P21A604-589). 툴바 버튼은 그 경로를 부를 뿐이다.
+   */
+  function handleResetLayout() {
+    const empty = findTemplate('EMPTY');
+    if (empty === undefined) return;
+    handleApplyTemplate(empty);
+  }
+
+  function handleApplyTemplate(template: BoothTemplate) {
+    // 비어 있으면 물을 것이 없다. 그 밖에는 반드시 한 번 묻는다 — 되돌릴 수단(Undo)이 아직
+    // 없어서 확인이 유일한 안전망이다.
+    if (state.objects.length > 0) {
+      setPendingTemplate(template);
+      return;
+    }
+    applyTemplate(template);
   }
 
   const selectedObject = state.objects.find((o) => o.objectId === state.selectedObjectId);
@@ -226,11 +349,21 @@ export function StudioPage() {
           canPublish={canPublish}
           publishing={publishMutation.isPending}
           publishedVersion={state.publishedVersion ?? null}
-          zoomPercent={Math.round(ZOOM_STEPS[zoomIdx] * 100)}
+          zoomPercent={Math.round(zoom * 100)}
           onBack={() => navigate(WORLD_RETURN_TO_MANAGEMENT)}
           onSave={handleSave}
           onPublish={() => publishMutation.mutate(boothIdNum)}
-          onZoomToggle={() => setZoomIdx((i) => (i + 1) % ZOOM_STEPS.length)}
+          onZoomToggle={() =>
+            // 지금 배율보다 큰 첫 프리셋으로. 끝에 닿으면 처음으로 돈다 — 휠로 벗어난 값에서도
+            // 버튼 한 번이면 알려진 자리로 돌아온다
+            setZoom((z) => ZOOM_PRESETS.find((preset) => preset > z + 0.001) ?? ZOOM_PRESETS[0])
+          }
+          canUndo={state.past.length > 0}
+          canRedo={state.future.length > 0}
+          onUndo={() => dispatch({ type: 'UNDO' })}
+          onRedo={() => dispatch({ type: 'REDO' })}
+          canReset={state.objects.length > 0 && !gates.leaseExpired}
+          onReset={handleResetLayout}
         />
       }
       rail={<ModeRail mode={mode} onChange={setMode} />}
@@ -240,7 +373,10 @@ export function StudioPage() {
           currentCount={state.objects.length}
           maxObjects={maxObjects}
           catalog={catalogQuery.data ?? []}
+          assets={boothAssets}
           activePresetId={preset?.id ?? null}
+          onAddAsset={handleAddAsset}
+          onApplyTemplate={handleApplyTemplate}
           onAddObject={handleAdd}
           onPickPreset={setPreset}
         />
@@ -250,7 +386,7 @@ export function StudioPage() {
           objects={state.objects}
           selectedObjectId={state.selectedObjectId}
           bounds={bounds}
-          zoom={ZOOM_STEPS[zoomIdx]}
+          zoom={zoom}
           tool={tool}
           snapOn={snapOn}
           decor={decor}
@@ -260,7 +396,8 @@ export function StudioPage() {
           onRotate={(objectId, rotationY) => dispatch({ type: 'ROTATE_OBJECT', objectId, rotationY })}
           onTool={setTool}
           onSnapToggle={() => setSnapOn((s) => !s)}
-          onFrame={() => setZoomIdx(1)}
+          onZoomChange={(next) => setZoom(clampZoom(next))}
+          onFrame={() => setZoom(1)}
         />
       }
       inspector={
@@ -284,10 +421,92 @@ export function StudioPage() {
       }
       status={<StatusBar count={state.objects.length} max={maxObjects} saveStatus={state.saveStatus} dirty={state.dirty} tool={tool} snap={snapOn} />}
       overlay={
+        // 공개 결과가 우선이다 — 서버가 이미 낸 답이라 사용자 확인 대기보다 먼저 보여야 한다
         gates.showPublishResult ? (
           <PublishDialog errors={gates.publishErrors} warnings={gates.publishWarnings} published={publishMutation.isSuccess} onClose={() => publishMutation.reset()} />
+        ) : pendingTemplate !== null ? (
+          <TemplateOverwriteDialog
+            template={pendingTemplate}
+            currentCount={state.objects.length}
+            onConfirm={() => {
+              applyTemplate(pendingTemplate);
+              setPendingTemplate(null);
+            }}
+            onCancel={() => setPendingTemplate(null)}
+          />
         ) : undefined
       }
     />
+  );
+}
+
+/**
+ * Gate 화면의 탈출구 (S15P21A604-588).
+ *
+ * Gate 는 Shell 없이 카드만 그리므로 툴바의 '뒤로'가 없고, ESC Game Menu 는 World 전용이라
+ * 여기서 열리지 않는다. 그래서 링크가 없는 Gate 는 주소창 말고 나갈 길이 없는 막다른 화면이
+ * 된다 — 세션 만료 후 returnTo 가 이 화면으로 되돌리면 사용자가 그대로 갇힌다.
+ *
+ * 되물으면 풀릴 수 있는 실패(네트워크)에만 재시도를 준다. 임대 만료처럼 다시 물어도 답이 같은
+ * 것에는 주지 않는다 — 눌러도 그대로면 고장으로 읽힌다(-458 과 같은 원칙).
+ */
+function GateActions({
+  onRetry,
+  to = WORLD_RETURN_TO_MANAGEMENT,
+  toLabel = '부스 관리로',
+}: {
+  onRetry?: () => void;
+  to?: string;
+  toLabel?: string;
+}) {
+  return (
+    <div className="studio-gate-actions">
+      {onRetry !== undefined && (
+        <button type="button" className="studio-btn" onClick={onRetry}>
+          다시 시도
+        </button>
+      )}
+      <Link className="studio-btn studio-btn-primary" to={to}>
+        {toLabel}
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * 템플릿 덮어쓰기 확인 (S15P21A604-589).
+ *
+ * 템플릿 적용은 되돌릴 수 없다 — Undo 가 아직 없다. 그래서 이미 놓인 것이 있으면 반드시 한 번
+ * 묻는다. PublishDialog 와 같은 자리(Shell 의 overlay 슬롯)·같은 마크업을 쓴다.
+ */
+function TemplateOverwriteDialog({
+  template,
+  currentCount,
+  onConfirm,
+  onCancel,
+}: {
+  template: BoothTemplate;
+  currentCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const emptying = template.objects.length === 0;
+  return (
+    <div className="studio-dialog-backdrop">
+      <div role="dialog" className="studio-dialog" aria-modal="true" aria-labelledby="template-overwrite-title">
+        <h2 id="template-overwrite-title">{emptying ? '배치를 모두 비울까요?' : `'${template.name}' 으로 바꿀까요?`}</h2>
+        <p className="studio-note">
+          지금 놓여 있는 {currentCount}개가 사라지고 {emptying ? '빈 부스가 됩니다' : `템플릿 배치 ${template.objects.length}개로 바뀝니다`}. 되돌릴 수 없습니다.
+        </p>
+        <div className="studio-dialog-actions">
+          <button type="button" className="studio-btn" onClick={onCancel}>
+            취소
+          </button>
+          <button type="button" className="studio-btn studio-btn-primary" onClick={onConfirm}>
+            {emptying ? '모두 비우기' : '바꾸기'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -6,24 +6,37 @@
 //
 // 조작 안내 항목은 Unity 카드(S15P21A604-451)와 같은 어휘를 쓴다 — 같은 조작을 두 파트가 다른
 // 말로 설명하지 않게 한다. FE 임베드에서는 Unity 카드가 숨겨져(-456) 이 목록이 유일한 안내다.
-// 그래서 사용자 테스트에서 실제로 묻는 것을 기준으로 고른다(GitLab #132, S15P21A604-460):
-// 이동·달리기·점프·시야·상호작용·감정 표현·창 닫기. 여기 없는 조작을 임의로 늘리지 않는다.
+// 항목은 사용자 테스트에서 실제로 묻는 것만 고른다(GitLab #132, S15P21A604-460).
+//
+// **설명은 한 단어로 끝낸다** (S15P21A604-631). 이 카드는 키를 처음 익힐 때 훑는 것이지 읽는
+// 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 손에 익는 것이라
+// 목록에 있어도 읽히지 않아 뺐다.
+//
+// F 에서 "부스 입장·나가기" 를 뺀 근거: -592 가 그 말을 넣은 이유는 **나가는 방법을 안내 말고는
+// 알 곳이 없었기** 때문이다. 지금은 부스 안에 있으면 나가기 버튼이 직접 뜨고(-627) 그 버튼에
+// F 키 배지도 함께 있어, 화면이 스스로 말하는 것을 안내가 반복할 필요가 없다.
 import { useState } from 'react';
+import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
+import { WorldGuideLauncher } from './WorldGuideLauncher';
 import './worldHud.css';
 
-interface Props {
-  /** 월드가 목업 정지 화면인지 — 안내 문구를 사실대로 바꾼다 */
-  mock?: boolean;
-}
-
-export function WorldHud({ mock = false }: Props) {
+export function WorldHud() {
   const [guideOpen, setGuideOpen] = useState(true);
 
+  // HUD 의 버튼은 마우스로 눌러도 focus 를 가져가지 않는다 (S15P21A604-648). 브라우저 기본은 mousedown
+  // 에서 그 버튼으로 focus 를 옮기는데, 그러면 canvas 가 focus 를 잃어 WASD·F 가 Unity 에 안 들어간다
+  // (!279 captureAllKeyboardInput=false). 나가기 버튼은 눌린 뒤 사라져 focus 가 body 로 떨어지고,
+  // 이용 안내 버튼은 -428 이 "연 요소" 인 그 버튼으로 focus 를 돌려준다 — 둘 다 캔버스를 다시 클릭하기
+  // 전까지 키가 죽는다(2026-09-11 5173 실측). mousedown 의 기본 동작만 막는다: click 은 mouseup 뒤에
+  // 그대로 오고, Tab 으로 HUD 버튼에 가는 키보드 경로도 그대로다. HUD 안에는 입력창이 없다.
   return (
-    <div className="world-hud">
+    <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
       {/* 허용 4번 — 상담 상태 즉시 접근 */}
       <ConsultationQuickAccess />
+
+      {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
+      <BoothExitButton />
 
       {guideOpen && (
         <section className="world-hud-guide" aria-label="조작 안내">
@@ -52,24 +65,19 @@ export function WorldHud({ mock = false }: Props) {
               점프
             </li>
             <li>
-              <span className="world-key">마우스 우클릭</span>
-              드래그해서 시야 돌리기
-            </li>
-            <li>
               <span className="world-key">F</span>
-              가까운 부스·오브젝트와 상호작용
+              상호작용
             </li>
             <li>
               <span className="world-key">Alt</span>
               <span className="world-key">클릭</span>
-              감정 표현
+              감정
             </li>
             <li>
               <span className="world-key">Esc</span>
-              열린 창 닫기 · 메뉴 열기
+              메뉴
             </li>
           </ul>
-          {mock && <p className="world-hud-note">월드는 목업 정지 화면입니다 — 실제 이동은 Unity 연결 후 동작합니다.</p>}
         </section>
       )}
 
@@ -78,6 +86,9 @@ export function WorldHud({ mock = false }: Props) {
           조작 안내
         </button>
       )}
+
+      {/* 이용 안내(무엇을 할 수 있는가) — 위 조작 안내(어떻게 움직이는가)와 다른 축이다 (-599) */}
+      <WorldGuideLauncher />
     </div>
   );
 }

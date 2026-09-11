@@ -9,8 +9,14 @@ namespace Festa.Booth
     {
         static readonly int EmissionColor = Shader.PropertyToID("_EmissionColor");
 
-        /// <summary>판정 거리. **월드 유닛**이며 콜라이더 표면 기준이다 (20f ≈ 1.5 m).</summary>
-        [SerializeField, Min(0.5f)] float _maxDistance = 20f;
+        /// <summary>
+        /// 판정 거리. **월드 유닛**이며 콜라이더 표면 기준이다 (1 m = 13.26u).
+        ///
+        /// <para>2026-09-10 사용자 요청으로 20f → 10f 로 줄였다 — "거의 외곽에 붙었을 때만".
+        /// 표면 기준 **수평** 거리라 오브젝트 크기·높이와 무관하고, 플레이어 캡슐 반경(2.75u)을 빼면
+        /// 몸과 표면 사이가 7u(0.55 m) 남는다. 이보다 줄이면 캡슐이 표면에 닿아도 F 가 안 먹는 자리가 생긴다.</para>
+        /// </summary>
+        [SerializeField, Min(0.5f)] float _maxDistance = 10f;
         [SerializeField] bool _highlightEnabled = true;
         [Tooltip("강조 색. 발밑 링(금색)과 같은 계열이라야 같은 기능으로 읽힌다.")]
         [SerializeField] Color _highlightColor = new(1f, 0.82f, 0.35f, 1f);
@@ -19,12 +25,6 @@ namespace Festa.Booth
         [SerializeField, Range(0.1f, 3f)] float _highlightStrength = 0.9f;
 
         readonly List<Renderer> _renderers = new();
-        // 하이라이트는 **재질 인스턴스**로 건다. MaterialPropertyBlock 으로 _EmissionColor 만
-        // 써 넣던 이전 방식은 **셰이더 키워드를 켤 수 없어**, 재질에 _EMISSION 이 꺼져 있으면
-        // 아무 일도 일어나지 않았다 — 하이라이트가 조용히 죽어 있었다 (S15P21A604-355).
-        // 강조 대상은 항상 하나뿐이라 인스턴스 비용은 무시할 수 있다.
-        readonly List<Material[]> _originalMaterials = new();
-        readonly List<Material> _instanced = new();
         bool _highlighted;
 
         // ── 근접 자동 조준용 레지스트리 ─────────────────────────
@@ -50,11 +50,27 @@ namespace Festa.Booth
         /// 를 크기가 제각각인 부스 오브젝트 전부에 한 숫자로 걸 수 있다 (S15P21A604-355).
         /// 포털(<see cref="Festa.World.BoothPortal"/>)이 쓰던 방식과 같다.</para>
         /// </summary>
+        /// <summary>
+        /// 아바타 키만큼은 "같은 높이" 로 본다. 22.375u 에 여유를 붙인 값 — 발밑(루트) 기준이라
+        /// 머리 위 조금까지가 손이 닿는 범위다.
+        /// </summary>
+        const float VerticalSlack = 26f;
+
         public float DistanceFrom(Vector3 pos)
         {
             var b = WorldBounds();
-            return b.HasValue ? Vector3.Distance(pos, b.Value.ClosestPoint(pos))
-                              : Vector3.Distance(pos, transform.position);
+            if (!b.HasValue) return Vector3.Distance(pos, transform.position);
+
+            var closest = b.Value.ClosestPoint(pos);
+
+            // **수평 거리로 잰다.** 3차원 거리로 재면 책상 위 노트북처럼 대상이 눈높이에 있을 때
+            // 발밑 기준 높이 차만으로 이미 10u 라, 사거리를 "붙어야 잡힌다"(8u)로 줄이는 순간
+            // 책상에 몸이 닿는 자리에서도 사거리 밖이 된다 (2026-09-10 실측 10.1u).
+            float flat = new Vector2(pos.x - closest.x, pos.z - closest.z).magnitude;
+
+            // 위아래로 멀리 떨어진 것(윗층·천장 부착물)까지 잡히면 안 되므로 여유를 넘는 높이 차는 더한다.
+            float dy = Mathf.Abs(pos.y - closest.y);
+            return flat + Mathf.Max(0f, dy - VerticalSlack);
         }
 
         /// <summary>하이라이트 링을 놓을 바닥 지점과 반경 — 포털과 같은 표현을 쓴다.</summary>
@@ -68,8 +84,43 @@ namespace Festa.Booth
                     Mathf.Max(v.extents.x, v.extents.z) * 1.25f);
         }
 
-        /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈.</summary>
+        // ── 월드 바운즈 캐시 (S15P21A604-508) ────────────────────
+        //
+        // **매 프레임 계산하면 안 되는 값이다.** BoothInteractionInput.Update() 가 프레임마다
+        // Active 전수를 돌며 DistanceFrom() 을 부르고, 사거리 안에 대상이 있으면 HighlightFootprint()
+        // 로 한 번 더 부른다. 즉 프레임당 (활성 대상 수 + 최대 3)회 이 함수가 돌았다.
+        //
+        // 그 안의 GetComponentsInChildren<T>(true) 는 **호출마다 배열을 새로 할당**하고 계층을
+        // 통째로 순회한다. 콜라이더가 없으면 렌더러로 한 번 더 돈다. 초당 100프레임 × 수십 대상이면
+        // 초당 수천 번의 할당이고, WebGL/IL2CPP 에서 이건 그대로 GC 압력이 된다.
+        //
+        // 이 비용은 da3f05ec(2026-09-01, S15P21A604-355)에서 들어왔다. 그 전에는
+        // `(t.transform.position - origin).sqrMagnitude` 한 줄이었다. 표면 거리로 바꾼 것 자체는
+        // 옳다(피벗 거리는 큰 오브젝트에서 어긋난다 — T-232). **매 프레임 다시 계산한 것이 문제다.**
+        //
+        // 부스 오브젝트는 배치된 뒤 움직이지 않으므로 결과를 들고 있으면 된다. 다만 "안 움직인다"를
+        // 전제로만 두지 않고 **트랜스폼이 바뀌면 스스로 무효화**한다 — 레이아웃 재적용이나 씬 편집으로
+        // 옮겨져도 값이 낡지 않는다.
+        Bounds? _cachedBounds;
+        bool _boundsValid;
+        Matrix4x4 _boundsMatrix;
+
+        /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈. 트랜스폼이 그대로면 캐시를 쓴다.</summary>
         Bounds? WorldBounds()
+        {
+            var m = transform.localToWorldMatrix;
+            if (_boundsValid && m == _boundsMatrix) return _cachedBounds;
+
+            _cachedBounds = ComputeWorldBounds();
+            _boundsMatrix = m;
+            _boundsValid = true;
+            return _cachedBounds;
+        }
+
+        /// <summary>레이아웃 재적용처럼 **자식 구성이 바뀐** 경우 호출한다 — 트랜스폼 비교로는 못 잡는다.</summary>
+        public void InvalidateBounds() => _boundsValid = false;
+
+        Bounds? ComputeWorldBounds()
         {
             Bounds? acc = null;
             foreach (var c in GetComponentsInChildren<Collider>(true))
@@ -96,6 +147,8 @@ namespace Festa.Booth
             Interactive = highlightEnabled;
             EnsureCollider();
             CacheRenderers();
+            // EnsureCollider 가 콜라이더를 새로 붙일 수 있다 — 바운즈가 달라지므로 캐시를 버린다.
+            InvalidateBounds();
         }
 
         public bool CanInteract(Camera source = null)
@@ -170,100 +223,22 @@ namespace Festa.Booth
         }
 
         // ── 외곽선 하이라이트 (S15P21A604-437) ──────────────────────
-        // 전에는 렌더러 재질을 인스턴스로 바꿔 에미션을 켰다 — prefab 전체(관리 데스크의 NPC+테이블)가
-        // 노랗게 빛나 "선택" 이 아니라 "발광" 으로 보였다. 이제는 대상 부위 렌더러마다 같은 메시를
-        // 노멀 방향으로 밀어 낸 **앞면 컬링 복제 렌더러**를 자식으로 붙여 테두리만 그린다(Festa/Outline).
-        // 원본 재질은 건드리지 않으므로 재질 누수·복원 실패 계열의 문제가 사라진다.
+        // 그리는 방법은 Festa.World.OutlineHighlighter 한 곳에만 있다 — 부스 구조물(PortalInteractor)과
+        // 같은 표현이라야 "상호작용할 수 있다" 가 한 가지 뜻으로 읽힌다 (2026-09-10 공용화).
         [Tooltip("이 트랜스폼 아래 렌더러에만 외곽선을 건다. 비우면 대상 전체 — 관리 데스크처럼 NPC+테이블이 " +
                  "한 대상이면 NPC 쪽 트랜스폼을 지정한다.")]
         [SerializeField] Transform _highlightRoot;
         [SerializeField, Range(0.05f, 2f)] float _outlineWidth = 0.35f;   // 월드 유닛 (1 m = 13.26)
-        static Material s_outlineMaterialTemplate;
-        Material _outlineMaterial;
-        readonly List<GameObject> _outlineObjects = new();
-        const string OutlineObjectName = "__FestaOutline";
+        readonly Festa.World.OutlineHighlighter _outline = new();
 
         /// <summary>외곽선을 걸 트랜스폼을 코드에서 정한다(팩토리·씬 배치 양쪽).</summary>
         public void SetHighlightRoot(Transform root) => _highlightRoot = root;
 
         void ApplyHighlightMaterials()
-        {
-            if (_outlineMaterial == null)
-            {
-                if (s_outlineMaterialTemplate == null)
-                {
-                    var shader = Shader.Find("Festa/Outline");
-                    if (shader == null)
-                    {
-                        Debug.LogError("[BoothInteractionTarget] Festa/Outline 셰이더를 찾지 못했다 — Resources/Shaders 에 있어야 빌드에 포함된다. 하이라이트 없이 진행한다.");
-                        return;
-                    }
-                    s_outlineMaterialTemplate = new Material(shader);
-                }
-                _outlineMaterial = new Material(s_outlineMaterialTemplate);
-                _outlineMaterial.SetColor("_Color", _highlightColor);
-                _outlineMaterial.SetFloat("_Width", _outlineWidth);
-                _instanced.Add(_outlineMaterial);
-            }
+            => _outline.Show(_highlightRoot != null ? _highlightRoot : transform, _highlightColor, _outlineWidth);
 
-            var root = _highlightRoot != null ? _highlightRoot : transform;
-            foreach (var r in root.GetComponentsInChildren<Renderer>(false))
-            {
-                if (r == null || r.gameObject.name == OutlineObjectName) continue;
-                if (r is ParticleSystemRenderer || r is LineRenderer || r is TrailRenderer) continue;
+        void RestoreMaterials() => _outline.Hide();
 
-                var go = new GameObject(OutlineObjectName);
-                go.transform.SetParent(r.transform, false);
-                go.layer = r.gameObject.layer;
-
-                if (r is SkinnedMeshRenderer skinned)
-                {
-                    var copy = go.AddComponent<SkinnedMeshRenderer>();
-                    copy.sharedMesh = skinned.sharedMesh;
-                    copy.bones = skinned.bones;
-                    copy.rootBone = skinned.rootBone;
-                    copy.localBounds = skinned.localBounds;
-                    copy.quality = skinned.quality;
-                    copy.updateWhenOffscreen = skinned.updateWhenOffscreen;
-                    copy.sharedMaterials = Repeat(_outlineMaterial, skinned.sharedMaterials.Length);
-                    copy.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    copy.receiveShadows = false;
-                }
-                else if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var filter) && filter.sharedMesh != null)
-                {
-                    go.AddComponent<MeshFilter>().sharedMesh = filter.sharedMesh;
-                    var copy = go.AddComponent<MeshRenderer>();
-                    copy.sharedMaterials = Repeat(_outlineMaterial, r.sharedMaterials.Length);
-                    copy.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    copy.receiveShadows = false;
-                }
-                else
-                {
-                    Destroy(go);
-                    continue;
-                }
-                _outlineObjects.Add(go);
-            }
-        }
-
-        static Material[] Repeat(Material m, int count)
-        {
-            var arr = new Material[Mathf.Max(1, count)];
-            for (int i = 0; i < arr.Length; i++) arr[i] = m;
-            return arr;
-        }
-
-        void RestoreMaterials()
-        {
-            foreach (var go in _outlineObjects) if (go != null) Destroy(go);
-            _outlineObjects.Clear();
-            _originalMaterials.Clear();
-            // 만든 인스턴스는 반드시 지운다 — 강조할 때마다 새로 만들면 재질이 샌다.
-            foreach (var m in _instanced) if (m != null) Destroy(m);
-            _instanced.Clear();
-            _outlineMaterial = null;
-        }
-
-        void OnDestroy() => RestoreMaterials();
+        void OnDestroy() => _outline.Dispose();
     }
 }

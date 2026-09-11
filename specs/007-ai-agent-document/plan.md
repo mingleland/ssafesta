@@ -1,8 +1,8 @@
 # Implementation Plan: AI 직원 / 문서 파이프라인
 
-**Branch**: `docs/S15P21A604-449-ai-document-contract` | **Date**: 2026-09-06 | **Spec**: [spec.md](./spec.md)
-**Input**: GitLab Work Item #119의 게시 합의와 Spring Flyway V21
-**Decision record**: [research.md](./research.md), [GitLab #119](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/119)
+**Branch**: `docs/S15P21A604-647-spec007-revision` | **Date**: 2026-09-11 (개정) · 2026-09-06 (최초) | **Spec**: [spec.md](./spec.md)
+**Input**: GitLab Work Item #119의 게시 합의와 Spring Flyway V21, 2026-09-11 결정 4건(`S15P21A604-647`)
+**Decision record**: [research.md](./research.md), [GitLab #119](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/119), `docs/26_팀_결정_필요사항.md` 결정 기록 로그 2026-09-11
 
 ## Summary
 
@@ -18,7 +18,7 @@ spec 007의 완료 경계는 문서가 `READY`가 되고 Spring 내부 검색 AP
 **Testing**: Spring 통합 테스트/Testcontainers, pytest 계약·Worker 테스트, 실제 PostgreSQL+pgvector 격리 fixture, storage·Embedding fake
 **Target Platform**: Linux Docker container
 **Project Type**: Spring 영속/API 서비스 + FastAPI 처리 Worker
-**Performance Goals**: Agent당 문서 10개·100MB에서 검색 P95 1초 이하, 정답 근거 Top-K 포함률 95% 이상
+**Performance Goals**: Agent당 문서 10개·100MB(= `N_total` 145,646 chunk)에서 검색 P95 1초 이하. Top-K 포함률은 층별로 다르다 — Spring 정확 스캔 100%(SC-007a), AI 의미 회수율 95% 이상(SC-007b)
 **Constraints**: PDF·MD·TXT 20MB, vector 1536차원, scope 유출 0건, FastAPI 문서 DB credential 0개, 영구 `PROCESSING` 0건
 **Scale/Scope**: P0 push Worker, batch 최대 200 Chunk/8MB, topK 최대 20
 
@@ -34,7 +34,7 @@ spec 007의 완료 경계는 문서가 `READY`가 되고 Spring 내부 검색 AP
 | 18. Embedding 차원 | `vector(1536)`과 `embedding_model_id` 검증 | PASS |
 | 24. 계약 변경 | #119 게시 합의와 OpenAPI를 AI·BE가 공동 검토 | PASS |
 | 27. 기준선 동결 | 기존 Unity 기준선과 무관한 서버 문서 파이프라인 변경 | PASS |
-| 30. 미정 항목 | Agent 설정 조회 형태는 S15P21A604-399에서 확정 전 구현하지 않음 | PASS |
+| 30. 미정 항목 | Agent 설정 조회 형태는 S15P21A604-399에서 확정. 2026-09-11 결정 4건(교체 원본 복구 제외·SC-007 분해·FAILED 7일·FR-040a)은 `docs/26` 결정 기록 로그에 등록 후 반영 | PASS |
 
 ### 설계 후 재검증
 
@@ -42,6 +42,13 @@ spec 007의 완료 경계는 문서가 `READY`가 되고 Spring 내부 검색 AP
 - DB 커밋과 외부 callback 사이 정합성 문제가 Spring finalize 로컬 트랜잭션으로 사라진다.
 - cancel 전달 실패와 늦은 Worker 결과는 `attemptNo` fencing으로 격리한다.
 - Chunk 검색의 scope 조건은 클라이언트가 추가·삭제할 수 없는 Spring 서버 조건이다.
+
+### 2026-09-11 개정 재검증 (`S15P21A604-647`)
+
+- 상태 값을 늘리지 않고 `replaced_at` 하나로 복구 가능 여부를 가른다 → V24 CHECK·스윕 predicate·OpenAPI·FE 상태표가 그대로다.
+- `FAILED` 원본 삭제가 `EXPIRED`와 같은 스윕 경로를 재사용한다 → 새 워커·새 큐가 생기지 않는다.
+- finalize의 마지막 0행이 예외로 바뀌어 FR-040의 "하나의 트랜잭션"이 실제로 성립한다 (지금 구현은 이를 어긴다).
+- SC-007이 층별로 갈려 각 기준이 측정 가능한 주체를 갖는다 — BE는 `S15P21A604-521`, AI는 T067.
 
 ## Project Structure
 
@@ -93,6 +100,19 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - Spring `JobStatus`: `QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED`
 - Spring은 Document·Job·Chunk·staging의 유일한 영속 writer다.
 - FastAPI는 전달받은 snapshot과 메모리의 in-flight 상태만 사용한다.
+- **`EXPIRED`는 복구 가능 여부까지 말하지 않는다.** 그것은 `replaced_at`(V30 예정)이 가른다 — 값이 없으면 업로드 미완료 만료라 보존 기간 안에 복구되고, 값이 있으면 수정본 교체로 밀려난 원본이라 복구 대상이 아니다(FR-027a). 상태 값을 늘리지 않는 이유는 갈라야 할 것이 "복구 가능한가" 하나뿐이기 때문이다 — `REPLACED`를 새로 만들면 V24 CHECK 개정·스윕 predicate·OpenAPI·FE 상태표·기존 테스트가 전부 따라온다.
+
+### 1-1. 원본 삭제 스윕
+
+한 경로가 세 종류의 원본을 같은 방식으로 지운다. 대상 판정은 상태와 경과 시간뿐이고 `replaced_at`은 보지 않는다.
+
+| 대상 | 유예 기준 | 유예 | 근거 |
+|---|---|---|---|
+| `EXPIRED` (업로드 미완료) | `expired_at` | 24시간 | FR-027·FR-028 |
+| `EXPIRED` + `replaced_at` (교체된 원본) | `expired_at` | 24시간 | FR-028 — 복구 경로가 없는 행이 삭제 경로에서도 빠지면 원본만 무기한 남는다 |
+| `FAILED` | `updated_at` | **7일** | FR-028a — 조사·재처리는 유예 안에서 한다 |
+
+물리 삭제는 트랜잭션 밖이라 사후 조건부 `UPDATE`로 되돌릴 수 없다. 조회와 삭제 사이에 복구·재처리가 끼는 경쟁은 **허용하고 `ERROR` 경보로 드러낸다** — 스윕 인스턴스가 하나이고 경쟁 창이 한 행의 저장소 왕복 한 번이라, 공유 claim/lock이나 영속 삭제 큐를 들이는 비용이 그 창이 막는 손해보다 크다. 경보가 실제로 울리면 그때 근거가 생긴다.
 
 ### 2. 처리 요청과 Worker 소유권
 
@@ -111,6 +131,24 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - PDF는 페이지 정보를, MD·TXT는 UTF-8 텍스트를 보존한다.
 - chunk size·overlap은 배포 설정이며 embedding은 1536차원을 검증한다.
 
+#### 최대 부하 fixture 규모 `N_total` = 145,646 chunk
+
+SC-007a와 `S15P21A604-521`의 Testcontainers fixture가 쓸 상수다. **보수적 상한**이며, 실제 문서는 이보다 훨씬 적은 청크를 만든다.
+
+| 단계 | 근거 | 값 |
+|---|---|---|
+| ① 에이전트당 원본 총량 | FR-018 / `config.py` `agent_document_max_total_bytes` | 104,857,600 B (100 MiB) |
+| ② 바이트 → 토큰 상한 | cl100k_base BPE 어휘에 256개 단일 바이트가 모두 있어 토큰 하나는 최소 1바이트다 → **토큰 수 ≤ 바이트 수** | ≤ 104,857,600 토큰 |
+| ③ 가장 조밀한 contentType | `text/markdown`·`text/plain`은 파일 바이트 = UTF-8 텍스트 바이트(비율 1.0). `application/pdf`는 컨테이너·폰트·xref 오버헤드가 있어 같은 바이트에서 추출 텍스트가 더 적다 → **TXT·MD가 최악** | 비율 1.0 채택 |
+| ④ chunk stride | `config.py` `chunk_size` 900 − `chunk_overlap` 180 (`text_chunker.chunk_pages`의 `step`) | 720 토큰 |
+| ⑤ 페이지 경계 보정 | MD·TXT는 문서 전체가 1 페이지(`document_parser._parse_plain_text`)이고, 페이지마다 마지막 부분 창이 하나 더 생긴다. 문서 수 상한은 10(FR-018) | +10 |
+
+**`N_total` = ⌈104,857,600 / 720⌉ + 10 = 145,636 + 10 = 145,646**
+
+- ②는 증명 가능한 상한이다. 한국어는 cl100k_base에서 대략 2~3 B/token, 영어는 약 4 B/token이라 실측은 이 값의 1/2~1/4 수준이 된다.
+- 한 페이지의 창 개수는 `⌈(t − 900) / 720⌉ + 1`(t ≤ 900이면 1)이다. 문서 수 상한 10을 그대로 더하면 어떤 분할에서도 이 값을 넘지 않는다 — 가장 나쁜 분할의 실측 합은 145,640이다.
+- 상한 밖으로 두는 것: **텍스트가 거의 없는 페이지를 극단적으로 많이 담은 PDF.** 페이지마다 1 청크가 나므로 산술적으로는 이 값을 넘을 수 있지만, 그 구성은 정상 문서가 아니고 부하 fixture의 기준이 되지 않는다. 실제로 문제가 되면 그때 페이지 수 상한을 별도로 정한다.
+
 ### 4. Batch와 finalize
 
 - batch 상한은 200 Chunk 또는 8MB 중 먼저 도달하는 값이다.
@@ -119,6 +157,9 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - finalize는 staging 개수, 0부터 이어지는 chunk 번호, source hash, embedding model, 1536차원을 검증한다.
 - 검증 후 기존 Chunk 삭제 → 신규 Chunk 반영 → `searchable=true` → Job `SUCCEEDED` → Document `READY`를 한 트랜잭션으로 처리한다.
 - 중간 실패는 전부 rollback되어 기존 검색 가능 Chunk를 보존한다.
+- **마지막 `READY` 전환이 0행이어도 예외로 롤백한다** (FR-040a). 문서가 그 사이 `DISABLED`·`EXPIRED`가 된 경우이며, 여기서 로그만 남기고 커밋하면 검색되지 않는 문서에 새 Chunk가 붙고 Job은 `SUCCEEDED`가 되어 FR-040의 원자성이 깨진다.
+- 롤백은 `SUCCEEDED` 표시도 되돌리므로 재전송이 finalize 멱등 분기(Job `SUCCEEDED`일 때만 진입)에 닿지 못한다. 그래서 이 경로의 응답은 **`410 JOB_GONE`**이고 반복 요청도 무변화 410이다 — 워커가 attempt를 올려 다시 시도해도 결과가 같다는 뜻이라 `409`(stale attempt)와 구분된다.
+- `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 이 spec 범위 밖이다.
 
 결과 수신 의미 계약: [document-result-contract.md](./contracts/document-result-contract.md). Endpoint와 DTO 명칭은 Jira S15P21A604-400에서 합의한 뒤 OpenAPI로 고정한다.
 
@@ -137,6 +178,7 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - 요청은 임의 필터를 받지 않고 topK를 20 이하로 제한한다.
 - 응답은 출처 필드와 cosine `distance`를 제공하며 최소 임계값은 적용하지 않는다.
 - FastAPI는 응답 scope를 전건 재검증한 뒤 Context에 넣는다.
+- **검색은 정확 스캔이다.** `SET LOCAL enable_indexscan = off`로 HNSW ordered index scan을 그 문장에서만 막는다 — scope 필터와 join이 붙은 상태에서 HNSW는 후필터라 매칭 청크가 있어도 `topK`보다 적게 돌려줄 수 있고, 오류 없이 짧아진 결과는 답변이 인용을 조용히 잃는 형태로만 드러난다. SC-007a의 100%가 성립하는 근거가 이것이고, 그래서 그 층에서 95%라는 비율은 측정 대상이 아니다.
 
 계약: [spec 008 spring-chunk-search-api.yaml](../008-ai-conversation-rag/contracts/spring-chunk-search-api.yaml)
 
@@ -149,7 +191,7 @@ FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코
 - Spring→FastAPI 처리·cancel은 `INTERNAL_SPRING_TO_AI_TOKENS`를 사용한다.
 - FastAPI→Spring 결과·검색은 `INTERNAL_AI_TO_SPRING_TOKENS`를 사용한다.
 - 수신자는 최대 두 토큰을 상수 시간으로 검증하고 반대 방향 토큰을 401로 거부한다.
-- 양쪽 로그·metric에는 `jobId`, `documentId`, `correlationId`, `attemptNo`, `workerId`를 남기되 원문·Secret·object key를 남기지 않는다.
+- Spring은 영속 Job 상태를 기준으로 DEAD 비율·callback 미전달을 집계·경고한다. 양쪽 로그에는 `jobId`, `documentId`, `correlationId`, `attemptNo`, `workerId`를 남기되 원문·Secret·object key를 남기지 않으며, FastAPI는 이 상태를 중복 저장·집계하지 않는다.
 
 ### 9. Cutover
 

@@ -45,6 +45,38 @@ namespace Festa.Integration
         public CatalogItemDto[] items;
     }
 
+    /// <summary>공통 오류 봉투 <c>{code, message, ...}</c>. 구매 실패 분기는 상태 코드가 아니라 이 <c>code</c> 로 한다.</summary>
+    [Serializable]
+    public class ApiErrorDto
+    {
+        public string code;
+        public string message;
+    }
+
+    /// <summary>
+    /// 파츠 구매 결과 — <c>POST /api/v1/catalog/items/{itemId}/purchases</c> (GitLab #120 §2·§7).
+    ///
+    /// <para><b>실패 사유를 코드로 들고 온다.</b> 화면이 "코인이 모자랍니다" 와 "이미 가지고 있습니다" 와
+    /// "판매가 중지됐습니다" 를 다르게 말해야 하는데, HTTP 상태는 셋 다 409 라 구분이 안 된다.
+    /// 서버가 주는 <c>code</c> 를 그대로 싣는다 — 문구 비교는 하지 않는다(문구는 바뀐다).</para>
+    /// </summary>
+    public sealed class PurchaseResult
+    {
+        public bool ok;
+
+        /// <summary>실패 시 서버 오류 코드. <c>INSUFFICIENT_COIN</c>·<c>ITEM_ALREADY_OWNED</c>·
+        /// <c>ITEM_NOT_ON_SALE</c>·<c>CATALOG_ITEM_NOT_FOUND</c>·<c>MEMBER_ONLY</c> 등. 통신 실패면 null.</summary>
+        public string code;
+
+        /// <summary>로그·디버그용 사유. 화면 문구는 호출자가 <see cref="code"/> 로 만든다.</summary>
+        public string reason;
+
+        /// <summary>성공(201) 본문 — 그 품목의 <c>owned: true</c>.</summary>
+        public CatalogItemDto item;
+
+        public static PurchaseResult Fail(string code, string reason) => new() { ok = false, code = code, reason = reason };
+    }
+
     /// <summary>
     /// World 접속 endpoint (deployment-handoff §3 계약).
     /// full URI가 아닌 구조화 필드 — UnityTransport API(host/port)에 직접 매핑된다.

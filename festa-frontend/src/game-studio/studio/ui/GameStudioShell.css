@@ -144,6 +144,18 @@
 .gss-reset-confirm-actions button { border-radius: 7px; font-size: 11px; font-weight: 650; padding: 9px 15px; }
 .gss-reset-confirm-actions > button:not(.gss-guide-start) { background: #ffffff; border: 1px solid #ccd3dc; color: #333d4b; }
 
+/* S15P21A604-582 — 변수/아이템/자산 삭제 확인 모달. .gss-reset-confirm-modal과 같은 톤
+   (중앙 카드)이되, 사용 위치(⌖) 목록이 들어갈 수 있어 별도 클래스로 둔다. backdrop은
+   기존 .gss-guide-backdrop 재사용. */
+.gss-delete-confirm-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 15px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 400px; padding: 22px; width: 100%; }
+.gss-delete-confirm-modal h2 { font-size: 16px; margin: 0 0 8px; word-break: break-all; }
+.gss-delete-confirm-modal p { color: #4b5563; font-size: 11px; line-height: 1.6; margin: 0; }
+.gss-delete-confirm-modal em { color: #4b5563; display: block; font-size: 10px; font-style: normal; margin-top: 5px; }
+.gss-delete-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.gss-delete-confirm-actions button { background: #ffffff; border: 1px solid #ccd3dc; border-radius: 7px; color: #333d4b; font-size: 11px; font-weight: 650; padding: 9px 15px; }
+.gss-delete-confirm-actions .gss-delete-confirm-danger { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.4); color: var(--gss-red); }
+.gss-delete-confirm-actions .gss-delete-confirm-danger:hover:not(:disabled) { background: rgba(220,38,38,.16); border-color: rgba(220,38,38,.55); }
+
 .gss-title-input { border-left: 1px solid var(--gss-border); max-width: 280px; min-width: 150px; padding-left: 13px; }
 .gss-title-input .gss-field > span { display: none; }
 .gss-title-input input { background: transparent; border-color: transparent; font-weight: 650; padding: 6px 8px; }
@@ -221,6 +233,48 @@
 .gss-panel-divider::after { background: var(--gss-border); bottom: 0; content: ''; left: 50%; position: absolute; top: 0; transform: translateX(-50%); width: 1px; }
 .gss-panel-divider:hover::after,
 .gss-panel-divider:active::after { background: var(--gss-blue); width: 2px; }
+/* S15P21A604-522 — 접혔을 때는 패널 자체가 없어 화면에서 이 구분선이 사실상 유일한
+   경계 표시라, 평소(1px/hover 2px)보다 훨씬 두꺼운 선(5px)으로 존재감을 준다. */
+.gss-panel-divider--collapsible.is-collapsed::after { width: 5px; }
+.gss-panel-divider--collapsible.is-collapsed:hover::after,
+.gss-panel-divider--collapsible.is-collapsed:active::after { width: 5px; }
+/* S15P21A604-522 — 우측 구분선 위에 얹은 접기/펼치기 버튼. 구분선이 이미 position:relative라
+   버튼을 절대 위치로 세로 중앙에 두면, 사용자가 구분선을 드래그해 폭을 조절할 때도 버튼이
+   구분선과 함께 자동으로 움직인다(별도 좌표 계산 불필요). 배경을 확실한 불투명 색+테두리+
+   그림자로 줘서, hover 시 뒤의 구분선 파란 하이라이트가 버튼과 겹쳐 비쳐 보이지 않게 한다. */
+.gss-panel-collapse-toggle {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--gss-border);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(15,23,42,.18);
+  color: var(--gss-muted);
+  cursor: pointer;
+  display: flex;
+  font-size: 15px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  z-index: 26;
+}
+/* S15P21A604-522 — --gss-blue-soft는 불투명 배경 위에 겹쳐 쓰라고 만든 반투명(10%) 파란색
+   (rgba(37,99,235,.1))이다. hover 시 background를 이걸로 통째로 바꿔버리면 밑에 깔려 있던
+   흰색이 사라지고 10% 알파만 남아 거의 다 비쳐 보인다 — 불투명한 옅은 파란색을 직접 쓴다. */
+.gss-panel-collapse-toggle:hover { background: #e5efff; border-color: var(--gss-blue); color: var(--gss-blue); }
+/* S15P21A604-522 — 접힌 상태에서는 구분선 오른쪽에 실체가 있는 패널이 없어(폭 0), 가운데
+   정렬(left:50%)이면 버튼 절반이 그 빈 공간(사실상 화면 바깥)으로 넘어가 클릭 영역의
+   절반이 잘려 보인다. 접혔을 때만 구분선의 오른쪽 끝에 붙여서 버튼 전체가 캔버스 쪽
+   (화면 안)에 들어오게 한다. */
+.gss-panel-divider--collapsible.is-collapsed .gss-panel-collapse-toggle {
+  left: auto;
+  right: 0;
+  transform: translateY(-50%);
+}
 .gss-root.is-focus-mode .gss-layout { grid-template-columns: minmax(0,1fr); }
 .gss-root.is-focus-mode .gss-left-sidebar,
 .gss-root.is-focus-mode .gss-right-sidebar,
@@ -238,15 +292,13 @@
 .gss-object-section { flex: 1; min-height: 0; overflow-y: auto; }
 .gss-sidebar-heading,
 .gss-section-title,
-.gss-node-rail-header,
 .gss-choice-heading {
   align-items: center;
   display: flex;
   justify-content: space-between;
 }
 .gss-sidebar-heading > span:first-child,
-.gss-section-title > span,
-.gss-node-rail-header > span {
+.gss-section-title > span {
   color: #333d4b;
   font-size: 10px;
   font-weight: 800;
@@ -325,11 +377,15 @@
 .gss-tile-mode-row button { align-items: center; background: #f4f6f9; border: 1px solid #d7dce3; border-radius: 6px; color: #47536a; display: flex; font-size: 8px; justify-content: space-between; min-height: 30px; padding: 6px 7px; text-align: left; }
 .gss-tile-mode-row button.is-active { background: rgba(37,99,235,.1); border-color: #4f86d5; color: #1d4ed8; }
 .gss-tile-mode-row kbd { background: rgba(20,25,35,.06); border-radius: 3px; color: #5b6577; font-family: inherit; font-size: 7px; padding: 2px 4px; }
-.gss-tile-palette { display: grid; gap: 5px; grid-template-columns: repeat(4, 1fr); }
+/* S15P21A604-595 — 8×8(64칸) 타일셋 전부를 노출하므로 팔레트가 세로로 길어진다. 팔레트만
+   스크롤되게 하고(아래 지우개·전체 채우기 버튼은 항상 보이게), grid-auto-rows: min-content
+   로 중첩 스크롤에서 aspect-ratio 행이 붕괴하는 문제(S15P21A604-587)를 예방한다. */
+.gss-tile-palette { display: grid; gap: 5px; grid-auto-rows: min-content; grid-template-columns: repeat(4, 1fr); max-height: 232px; overflow-y: auto; padding-right: 3px; }
 .gss-tile-palette button { aspect-ratio: 1; border: 1px solid #ccd3dc; border-radius: 5px; cursor: pointer; overflow: hidden; padding: 0; position: relative; }
 .gss-tile-palette button.is-active { box-shadow: 0 0 0 2px var(--gss-blue); }
 .gss-tile-palette button span { background: rgba(0,0,0,.55); border-radius: 2px; bottom: 2px; color: white; font-size: 6px; padding: 1px 2px; position: absolute; right: 2px; }
-.gss-tile-palette button.is-eraser { aspect-ratio: auto; background: #eef1f5; color: var(--gss-muted); font-size: 8px; grid-column: span 2; min-height: 30px; }
+.gss-tile-eraser { background: #eef1f5; border: 1px solid #ccd3dc; border-radius: 5px; color: var(--gss-muted); cursor: pointer; font-size: 8px; margin-top: 5px; min-height: 30px; width: 100%; }
+.gss-tile-eraser.is-active { box-shadow: 0 0 0 2px var(--gss-blue); }
 .is-tile-0 { background: #59544a; }
 .is-tile-1 { background: #747064; }
 .is-tile-2 { background: #393d42; }
@@ -550,6 +606,26 @@
 .gss-inline-actions > select { flex: 1; }
 .gss-inline-actions > button { flex: 0 0 auto; padding: 8px 10px; }
 .gss-danger-button { background: rgba(220,38,38,.06); border: 1px solid rgba(220,38,38,.28); border-radius: 7px; color: var(--gss-red) !important; cursor: pointer; font-size: 10px; padding: 8px; }
+/* S15P21A604-580 — variables/items/assets/목표 목록의 "삭제" 텍스트 버튼이 스타일 없는
+   네이티브 버튼이라 튀어 보이던 문제. .gss-danger-button과 같은 빨간 톤을 재사용해
+   작은 원형 × 아이콘 버튼으로 통일한다. 유니코드 "×" 글자는 폰트마다 잉크가 박스 중앙에서
+   살짝 벗어나 보여서(아래·왼쪽으로 치우침) SVG(DeleteIcon)로 바꿨다 — 텍스트 전용 속성
+   (font-size/font-weight/line-height)은 더 필요 없어 제거했다. */
+.gss-delete-icon-button {
+  align-items: center;
+  background: rgba(220,38,38,.06);
+  border: 1px solid rgba(220,38,38,.28);
+  border-radius: 50%;
+  color: var(--gss-red) !important;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 20px;
+  justify-content: center;
+  padding: 0;
+  width: 20px;
+}
+.gss-delete-icon-button:hover:not(:disabled) { background: rgba(220,38,38,.14); border-color: rgba(220,38,38,.45); }
 
 .gss-event-card { display: grid; gap: 10px; padding: 12px; }
 .gss-recipe-box { background: linear-gradient(145deg,rgba(37,99,235,.07),rgba(147,51,234,.05)); border: 1px solid rgba(37,99,235,.22); border-radius: 9px; padding: 10px; }
@@ -580,23 +656,53 @@
 .gss-rule-fields { gap: 5px; min-width: 0; }
 .gss-rule-fields > * { flex: 1; min-width: 0; }
 .gss-add-block { border-style: dashed; color: #4b5563; width: 100%; }
+/* S15P21A604-566 — 변수 생성 버튼 3개(Boolean/Integer/String)를 gss-inline-actions에 나란히
+   두면 .gss-add-block의 width:100%가 각 버튼에 컨테이너 전체 폭을 요구해 가로 스크롤이
+   생긴다. 폭을 1/3씩 균등 분배(flex:1)하고 패딩·글자 크기를 줄여 한 줄에 다 보이게 한다. */
+.gss-inline-actions--thirds > .gss-add-block {
+  flex: 1 1 0;
+  font-size: 11px;
+  min-width: 0;
+  padding: 6px 4px;
+  text-align: center;
+  width: auto;
+}
 .gss-count-badge { align-items: center; border-radius: 50%; display: inline-flex; height: 28px; justify-content: center; padding: 0; width: 28px; }
 
 .gss-asset-list { display: grid; gap: 5px; }
-.gss-builtin-library { display: grid; gap: 6px; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 260px; overflow-y: auto; padding-right: 3px; }
+/* S15P21A604-587 — 썸네일이 얇은 가로 띠로 잘려 보이던 문제. 원인은 두 가지:
+   ① grid-auto-rows 미지정(기본 auto)이라, 이 중첩 스크롤 컨텍스트(.gss-panel-scroll 안의
+      max-height 그리드)에서 자동 행이 ~18px로 붕괴돼 셀들이 세로로 ~98px씩 겹쳤다. 위 행이
+      아래 행을 덮어 각 스프라이트의 윗부분만 얇게 보였다 → grid-auto-rows: max-content로
+      행이 콘텐츠 높이를 갖게 한다.
+   ② span에 width만 있고 height가 없어 셀 폭만큼 늘어난 직사각형이었다 → aspect-ratio 1/1로
+      정사각형화(팔레트·재료함 등 다른 스프라이트 프리뷰는 전부 이미 정사각형). max-width로
+      좁은(2열) 브레이크포인트 상한. */
+.gss-builtin-library { display: grid; gap: 6px; grid-auto-rows: max-content; grid-template-columns: repeat(3,minmax(0,1fr)); max-height: 320px; overflow-y: auto; padding-right: 3px; }
 .gss-builtin-library > div { background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; min-width: 0; overflow: hidden; }
-.gss-builtin-library > div > span { background-position: center; display: block; height: 58px; image-rendering: pixelated; }
+.gss-builtin-library > div > span { aspect-ratio: 1 / 1; background-position: center; display: block; image-rendering: pixelated; margin-inline: auto; max-width: 104px; width: 100%; }
 .gss-builtin-library small { color: #4b5563; display: block; font-size: 7px; overflow: hidden; padding: 5px; text-overflow: ellipsis; white-space: nowrap; }
 .gss-custom-assets { background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; padding: 9px; }
 .gss-custom-assets summary { color: #333d4b; cursor: pointer; font-size: 9px; font-weight: 750; }
 .gss-custom-assets p { color: #5b6577; font-size: 8px; line-height: 1.5; }
+/* S15P21A604-630 — 다중 이미지 업로드 진행 중 카운터. */
+.gss-upload-progress { color: #1d4ed8; font-size: 8px; font-weight: 700; margin: 4px 0 0; }
 .gss-replace-asset-button { background: rgba(37,99,235,.06); border: 1px dashed rgba(37,99,235,.4); color: #1d4ed8 !important; font-size: 9px; padding: 8px; width: 100%; }
-.gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr; padding: 8px; }
+.gss-asset-list > div { align-items: center; background: #ffffff; border: 1px solid var(--gss-border); border-radius: 7px; display: grid; gap: 7px; grid-template-columns: auto 1fr auto; padding: 8px; }
+/* S15P21A604-580 — 삭제 버튼에 grid 위치 지정이 없어 auto-placement로 좌측 하단(3번째 행,
+   1열)에 밀려나 있었다. 3번째 열을 명시적으로 만들어 오른쪽에 고정한다. 처음엔 2행 span +
+   컨테이너 상속 center로 세로 중앙에 뒀는데, 그러면 "썸네일/배지 칸 전체 높이의 중앙"이라
+   1행(파일명)보다 아래로 처져 보였다 — 1행에만 배치해 오른쪽 "위"에 오도록 고친다. */
+.gss-asset-list .gss-delete-icon-button { grid-column: 3; grid-row: 1; }
 .gss-asset-list strong { font-size: 9px; }
 .gss-asset-list small { color: #5b6577; font-size: 7px; grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gss-asset-kind { border-radius: 3px; color: #1d4ed8; font-size: 6px; font-weight: 850; grid-row: span 2; padding: 3px 4px; }
+.gss-asset-kind { align-items: center; border-radius: 3px; color: #1d4ed8; display: flex; flex-direction: column; font-size: 6px; font-weight: 850; gap: 4px; grid-row: span 2; padding: 3px 4px; }
+.gss-asset-kind em { font-style: normal; }
 .gss-asset-kind.is-audio { color: #7e22ce; }
 .gss-asset-kind.is-tileset { color: #15803d; }
+/* S15P21A604-573 — 데이터 탭 자산 목록이 종류 배지로만 뭉뚱그려 보이던 걸 고친다.
+   assetUrls로 해석 안 되면(로딩 중 · AUDIO) i가 아예 렌더되지 않아 배지만 남는다. */
+.gss-asset-thumb { background-color: #eef1f5; background-position: center; border-radius: 4px; display: block; height: 26px; image-rendering: pixelated; width: 26px; }
 .gss-data-card { display: grid; gap: 7px; }
 .gss-budget-card { background: #ffffff; border: 1px solid var(--gss-border); border-radius: 8px; padding: 10px; }
 .gss-budget-card header { display: flex; justify-content: space-between; }
@@ -626,48 +732,68 @@
 .gss-data-card > header strong { font-family: ui-monospace, Consolas, monospace; font-size: 10px; }
 .gss-data-card > header span { color: #5b6577; font-size: 7px; }
 
-.gss-dialogue-workspace { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 0; overflow: hidden; }
-.gss-node-rail { background: #f7f8fa; border-right: 1px solid var(--gss-border); min-height: 0; overflow-y: auto; padding: 12px 9px; }
-.gss-node-rail-header { margin-bottom: 9px; padding: 0 4px; }
-.gss-node-rail-header button { background: var(--gss-panel-3); border: 1px solid var(--gss-border); border-radius: 5px; cursor: pointer; height: 24px; width: 24px; }
-/* S15P21A604-494 — 씬 목록의 .gss-scene-row(드래그 핸들 + 선택 버튼)와 동일한 패턴을
-   따르되, 행마다 "시작으로 설정"·삭제 아이콘 버튼이 추가로 붙는다. */
-.gss-node-row { align-items: center; display: flex; gap: 4px; margin-bottom: 4px; }
-.gss-node-row.is-drag-over { border-radius: 8px; outline: 1px solid var(--gss-blue); outline-offset: -1px; }
-.gss-node-row.is-dragging { opacity: .4; }
-.gss-node-row .gss-drag-handle { flex: 0 0 auto; }
-.gss-node-row .gss-node-button { flex: 1 1 auto; margin-bottom: 0; min-width: 0; }
-.gss-node-row > .gss-icon-button { flex: 0 0 auto; }
-/* S15P21A604-494 — 배열 인덱스 번호 배지(원형 숫자 칸)를 없애면서 grid-template-columns도
-   20px 칸 없이 한 칸으로 정리했다. */
-.gss-node-button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 7px; cursor: pointer; display: grid; gap: 7px; grid-template-columns: minmax(0,1fr); padding: 8px 6px; text-align: left; width: 100%; }
-.gss-node-button:hover,
-.gss-node-button.is-active { background: var(--gss-blue-soft); border-color: rgba(37,99,235,.28); }
-.gss-node-button strong,
-.gss-node-button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gss-node-button strong { font-size: 9px; }
-.gss-node-button small { color: var(--gss-muted); font-size: 7px; margin-top: 3px; }
-.gss-node-button em { color: var(--gss-green); font-size: 6px; font-style: normal; }
-.gss-dialogue-editor { min-height: 0; overflow-y: auto; padding: 22px; }
+/* S15P21A604-513 — 씬 헤더 + FLOW OVERVIEW(.gss-dialogue-sticky)는 화면 상단에 고정,
+   LIVE PREVIEW부터 아래(.gss-dialogue-scroll)만 독립적으로 스크롤되도록 워크스페이스
+   전체를 세로 flex 2단으로 바꿨다. 예전에는 좌측 NODES rail 190px + 우측 나머지라는
+   2열 grid였다(rail은 이 티켓에서 FLOW OVERVIEW로 흡수되어 삭제됨). */
+.gss-dialogue-workspace { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.gss-dialogue-sticky { flex: 0 0 auto; padding: 22px 22px 0; }
+.gss-dialogue-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 22px 22px; }
+/* S15P21A604-513 (3차) — FLOW OVERVIEW는 가로 스크롤 고정폭 카드다. 카드 하나가 곧
+   드래그 대상이자 선택 버튼(role="button")이라 별도 ☰ 핸들이 없다 — 카드 아무 곳이나
+   잡아 드래그하면 순서가 바뀐다. ★/×는 카드 우측 상단에 겹쳐서(.gss-node-card-actions,
+   position:absolute) 넣어 카드 밖으로 튀어나오지 않는다. */
+.gss-flow-node-card {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 158px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+  position: relative;
+  text-align: left;
+}
+.gss-flow-node-card:hover,
+.gss-flow-node-card.is-active { background: var(--gss-blue-soft); border-color: rgba(37,99,235,.28); }
+.gss-flow-node-card:focus-visible { outline: 2px solid var(--gss-blue); outline-offset: 1px; }
+.gss-flow-node-card.is-drag-over { outline: 1px solid var(--gss-blue); outline-offset: -1px; }
+.gss-flow-node-card.is-dragging { opacity: .4; }
+/* S15P21A604-513 — 예전 FLOW OVERVIEW 카드의 "미연결"/"결과 확인" 표시(빨간 테두리)를 유지. */
+.gss-flow-node-card.is-unreachable,
+.gss-flow-node-card.has-incomplete-outcome { border-color: rgba(220,38,38,.5); }
+/* S15P21A604-494 — 배열 인덱스 번호 배지(원형 숫자 칸)는 달지 않는다(드래그로 바뀌는
+   목록에 고정 번호는 오인의 소지). 화자/결과 요약 텍스트 오른쪽은 ★/× 아이콘과 겹치지
+   않도록 여백을 둔다. */
+.gss-flow-node-card strong,
+.gss-flow-node-card small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gss-flow-node-card strong { font-size: 9px; padding-right: 34px; }
+.gss-flow-node-card small { color: var(--gss-muted); font-size: 7px; margin-top: 3px; }
+.gss-flow-node-card em { color: var(--gss-green); font-size: 6px; font-style: normal; }
+.gss-node-card-actions { display: flex; gap: 2px; position: absolute; right: 4px; top: 4px; }
+.gss-node-card-actions .gss-icon-button { height: 18px; width: 18px; }
 .gss-dialogue-scene-header { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 14px; }
 .gss-dialogue-scene-header > div { width: min(400px, 75%); }
 .gss-dialogue-scene-header .gss-field > span { display: none; }
 .gss-dialogue-scene-header input { font-size: 15px; font-weight: 750; }
 .gss-dialogue-flow { background: linear-gradient(145deg,rgba(37,99,235,.06),rgba(37,99,235,.01)); border: 1px solid #c7d3e6; border-radius: 9px; margin-bottom: 14px; padding: 11px; }
-.gss-dialogue-flow > header { align-items: center; display: flex; justify-content: space-between; }
+.gss-dialogue-flow > header { align-items: center; display: flex; gap: 8px; justify-content: space-between; }
 .gss-dialogue-flow > header strong { display: block; font-size: 11px; margin-top: 3px; }
+/* S15P21A604-513 (4차) — 메트릭 배지(도달/미연결/결과 확인)를 + 버튼과 한 그룹으로
+   묶어 박스 우측에 나란히 붙인다(제목만 왼쪽에 남기고 나머지는 오른쪽 정렬). */
+.gss-dialogue-flow-header-right { align-items: center; display: flex; gap: 8px; }
 .gss-dialogue-flow-metrics { align-items: center; display: flex; gap: 5px; }
 .gss-dialogue-flow-metrics span,.gss-dialogue-flow-metrics em { border-radius: 4px; font-size: 7px; font-style: normal; padding: 4px 6px; }
 .gss-dialogue-flow-metrics span { background: rgba(37,99,235,.1); color: #1d4ed8; }
 .gss-dialogue-flow-metrics em { background: rgba(220,38,38,.08); color: #b91c1c; }
+/* S15P21A604-513 — NODES rail을 흡수하면서 잠깐 세로 목록(overflow-y)으로 바꿔봤으나,
+   rail용 가로 행 스타일이 그대로 늘어나 카드가 옆으로 너무 길어 보이는 문제가 생겼다.
+   원래 FLOW OVERVIEW의 가로 스크롤 카드 레이아웃으로 되돌리고, 카드 내부만 세로로
+   재배치했다(위 `.gss-dialogue-flow-list .gss-node-row` 참고) — 카드 폭이 고정이라
+   노드가 많아져도(최대 300개) 무한정 넓어지지 않고 가로로 스크롤된다. */
 .gss-dialogue-flow-list { display: flex; gap: 6px; margin-top: 9px; overflow-x: auto; padding-bottom: 3px; }
-.gss-dialogue-flow-list button { align-items: center; background: #ffffff; border: 1px solid #ccd3dc; border-radius: 7px; display: grid; flex: 0 0 150px; gap: 7px; grid-template-columns: 20px minmax(0,1fr); min-height: 46px; padding: 7px; text-align: left; }
-.gss-dialogue-flow-list button:hover,.gss-dialogue-flow-list button.is-active { background: rgba(37,99,235,.06); border-color: #4f86d5; }
-.gss-dialogue-flow-list button.is-unreachable,.gss-dialogue-flow-list button.has-incomplete-outcome { border-color: rgba(220,38,38,.5); }
-.gss-dialogue-flow-list button > span { align-items: center; background: #e4e8ee; border-radius: 50%; color: #4b5563; display: flex; font-size: 7px; height: 20px; justify-content: center; width: 20px; }
-.gss-dialogue-flow-list strong,.gss-dialogue-flow-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gss-dialogue-flow-list strong { font-size: 8px; }
-.gss-dialogue-flow-list small { color: #5b6577; font-size: 7px; margin-top: 3px; }
 .gss-dialogue-flow > p { color: #9d5a5a; font-size: 7px; line-height: 1.4; margin: 7px 0 0; }
 .gss-dialogue-live-preview { aspect-ratio: 16 / 9; background: radial-gradient(circle at 50% 30%,#33445e,#101521); background-position: center; background-size: cover; border: 1px solid #c7cedb; border-radius: 10px; box-shadow: 0 18px 45px rgba(20,25,35,.18); margin-bottom: 16px; overflow: hidden; position: relative; }
 .gss-dialogue-live-preview::after { background: linear-gradient(transparent 35%,rgba(4,6,10,.28) 70%,rgba(4,6,10,.64)); content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 1; }
@@ -701,6 +827,15 @@
 .gss-toast.is-error > span { background: rgba(220,38,38,.14); color: var(--gss-red); }
 .gss-toast em { color: var(--gss-muted); font-style: normal; margin-left: auto; }
 .gss-guide-backdrop { align-items: center; background: rgba(15,18,24,.6); display: flex; inset: 0; justify-content: center; padding: 30px; position: fixed; z-index: 100; }
+/* 실험(정식 티켓 아님) — 화면 전체를 덮는 backdrop이 없다: 편집 화면을 막지 않고 그 위에
+   떠 있기만 하는 창이라, 모달과 달리 뒤쪽 UI가 계속 조작 가능해야 한다. */
+.gss-floating-panel { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 12px; box-shadow: 0 24px 60px rgba(20,25,35,.35); display: flex; flex-direction: column; overflow: hidden; position: fixed; z-index: 90; }
+.gss-floating-panel-titlebar { align-items: center; background: #eef1f6; border-bottom: 1px solid #d7dce3; cursor: grab; display: flex; flex: 0 0 auto; justify-content: space-between; padding: 8px 12px; touch-action: none; }
+.gss-floating-panel-titlebar:active { cursor: grabbing; }
+.gss-floating-panel-titlebar strong { font-size: 12px; }
+.gss-floating-panel-titlebar button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 18px; line-height: 1; }
+.gss-floating-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 16px; }
+.gss-floating-panel-resize-handle { background: linear-gradient(135deg,transparent 50%,#9aa5b4 50%,#9aa5b4 60%,transparent 60%,transparent 70%,#9aa5b4 70%,#9aa5b4 80%,transparent 80%); bottom: 0; cursor: nwse-resize; height: 16px; position: absolute; right: 0; touch-action: none; width: 16px; }
 .gss-guide-modal { background: linear-gradient(145deg,#ffffff,#f4f6fa); border: 1px solid #d7dce3; border-radius: 14px; box-shadow: 0 30px 100px rgba(20,25,35,.35); max-width: 620px; padding: 24px; width: 100%; }
 .gss-guide-modal > header { align-items: flex-start; display: flex; justify-content: space-between; }
 .gss-guide-modal > header span { color: #1d4ed8; font-size: 9px; font-weight: 850; letter-spacing: .1em; }
@@ -723,6 +858,30 @@
 .gss-template-modal h2 { font-size: 22px; margin: 5px 0; }
 .gss-template-modal > header p { color: #4b5563; font-size: 10px; margin: 0 0 18px; }
 .gss-template-modal > header button { background: transparent; border: 0; color: #4b5563; cursor: pointer; font-size: 22px; }
+/* 실험(정식 티켓 아님) — 게임 흐름 그래프 모달. .gss-template-modal과 같은 톤의 오버레이
+   패널 껍데기를 재사용하고, 안쪽 내용(그래프)만 새로 정의한다. */
+/* 실험(정식 티켓 아님) — 모달 껍데기(.gss-flow-graph-modal)는 FloatingPanel로 대체됐다.
+   그래프 자체 스크롤 영역만 남는다(FloatingPanel의 리사이즈 가능한 본문 높이에 맞춘다). */
+/* S15P21A604-510 — 네이티브 스크롤(overflow) 대신 손수 만든 팬/줌 뷰포트로 바꿨다. 배경은
+   grab/grabbing 커서, 실제 이동·확대는 SceneFlowGraph가 .gss-flow-graph에 트랜스폼으로
+   적용한다(여기서는 뷰포트 자체의 크기/커서/클리핑만 다룬다). */
+.gss-flow-graph-viewport { cursor: grab; height: 100%; overflow: hidden; position: relative; touch-action: none; width: 100%; }
+.gss-flow-graph-viewport.is-panning { cursor: grabbing; }
+.gss-flow-graph { position: relative; }
+.gss-flow-graph-edges { left: 0; pointer-events: none; position: absolute; top: 0; }
+.gss-flow-edge { stroke: #9aa5b4; stroke-width: 1.6; }
+.gss-flow-edge.is-complete_game { stroke: var(--gss-green); }
+.gss-flow-graph-edges marker path { fill: #9aa5b4; }
+.gss-flow-node { background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; cursor: pointer; padding: 8px 10px; position: absolute; text-align: left; width: 168px; }
+.gss-flow-node:hover:not(:disabled) { border-color: rgba(37,99,235,.4); box-shadow: 0 4px 14px rgba(37,99,235,.15); }
+.gss-flow-node:disabled { cursor: default; opacity: .85; }
+.gss-flow-node.is-start { border-color: var(--gss-blue); border-width: 2px; }
+.gss-flow-node.is-endpoint { background: #eefaf1; border-color: var(--gss-green); }
+.gss-flow-node.is-unreachable { border-style: dashed; opacity: .6; }
+.gss-flow-node strong { display: block; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gss-flow-node small { color: var(--gss-muted); display: block; font-size: 9px; margin-top: 2px; }
+.gss-flow-node em { color: var(--gss-blue); font-size: 8px; font-style: normal; margin-top: 3px; display: block; }
+.gss-flow-node em.is-warning { color: #b45309; }
 .gss-template-grid { display: grid; gap: 10px; grid-template-columns: repeat(3,minmax(0,1fr)); }
 .gss-template-grid > button { align-items: flex-start; background: #ffffff; border: 1px solid #d7dce3; border-radius: 10px; display: block; overflow: hidden; padding: 0; text-align: left; }
 .gss-template-grid > button:hover { background: rgba(37,99,235,.05); border-color: #4f82cd; transform: translateY(-1px); }

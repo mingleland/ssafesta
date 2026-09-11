@@ -5,6 +5,10 @@ import {
   __resetGameClientUiForTests,
   getGameClientUiSnapshot,
 } from '../../../world/model/gameClientUi.ts';
+import {
+  __resetWorldContextForTests,
+  getWorldContext,
+} from '../../../world/model/worldContext.ts';
 
 // vitest 환경이 'node'라 jsdom 없이는 window가 없다 — 실 DOM은 필요 없고 initUnityBridge가
 // FestaUnity 콜백을 걸 대상 객체 하나만 있으면 되므로 최소 폴리필로 대체한다(jsdom 의존성 추가 없음).
@@ -24,6 +28,7 @@ describe('initInteractionDispatcher', () => {
   beforeEach(() => {
     closeOverlay();
     __resetGameClientUiForTests();
+    __resetWorldContextForTests();
   });
 
   it('BOOTH_LAPTOP_INTERACT를 LAPTOP 오버레이로 연다 — url 필드는 계약에서 제거됐다(-297, 정본은 booth 조회)', () => {
@@ -90,7 +95,10 @@ describe('initInteractionDispatcher', () => {
     emit(JSON.stringify({ type: 'BOOTH_SURVEY_INTERACT', boothId: 3, objectId: 'kiosk-1' }));
 
     // boothId 는 설문 ID 가 아니라 resolve context 다 — payload 에 surveyId 를 만들지 않는다
-    expect(getCurrentOverlay()).toEqual({ type: 'SURVEY', payload: { boothId: 3, objectId: 'kiosk-1' } });
+    expect(getCurrentOverlay()).toEqual({
+      type: 'SURVEY',
+      payload: { kind: 'booth', boothId: 3, objectId: 'kiosk-1' },
+    });
     unsubscribe();
   });
 
@@ -111,6 +119,25 @@ describe('initInteractionDispatcher', () => {
 
     expect(getGameClientUiSnapshot().managementOverlay).toBe(true);
     expect(getCurrentOverlay()).toBeNull();
+    unsubscribe();
+  });
+
+  // 위치 알림 — 화면을 열지 않는 유일한 이벤트다 (S15P21A604-627, GitLab #174)
+  it('WORLD_BOOTH_CONTEXT 는 오버레이를 열지 않고 월드 컨텍스트만 갱신한다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: true, boothId: 3 });
+    expect(getCurrentOverlay()).toBeNull(); // 상호작용이 아니다 — 여는 화면이 없다
+    unsubscribe();
+  });
+
+  it('부스 밖 payload 에는 boothId 키가 없다 — Unity 가 0 을 보내지 않는 계약 그대로 받는다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: true, boothId: 3 }));
+    emit(JSON.stringify({ type: 'WORLD_BOOTH_CONTEXT', insideBooth: false }));
+
+    expect(getWorldContext()).toEqual({ insideBooth: false, boothId: null });
     unsubscribe();
   });
 });

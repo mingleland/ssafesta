@@ -37,6 +37,11 @@ assert d['stage']==sys.argv[2] and d['commit']==sys.argv[3] and d['status']=='SU
 PY
 done
 
+game_build_output="$(CI_COMPONENT=game CI_BRANCH=develop CI_COMMIT_SHA="${sha}" CI_RUN_ID=test-game-build \
+  CI_ARTIFACT_DIR="${tmp}/game-build" UNITY_EXECUTABLE=/bin/true bash "${repo_root}/ci/build")"
+grep -Fqx 'Unity 6000.0.78f1 배치 빌드 — 타깃 linux-server' <<<"${game_build_output}" \
+  || { echo "general game CI did not select the Linux Server target" >&2; exit 1; }
+
 if CI_DRY_RUN=1 CI_COMPONENT=back CI_BRANCH=back CI_COMMIT_SHA=short CI_RUN_ID=x \
   CI_ARTIFACT_DIR="${tmp}/invalid" bash "${repo_root}/ci/validate" >/dev/null 2>&1; then
   echo "short SHA was accepted" >&2; exit 1

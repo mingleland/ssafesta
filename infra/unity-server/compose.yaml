@@ -10,7 +10,8 @@ services:
     security_opt: [no-new-privileges:true]
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=64m
-    expose: ["7777"]
+    ports:
+      - "127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}:7777"
     networks: [demo]
     environment:
       FESTA_ENVIRONMENT: demo

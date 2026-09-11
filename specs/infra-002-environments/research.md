@@ -30,7 +30,7 @@
 
 ## R-03. 공개 ingress·TLS·CDN
 
-**Decision**: Nginx만 80/443을 공개한다. dev front·api·ai는 EC2 IP의 제한된 Nginx 경로를 사용하고, URL path를 지원하지 않는 UnityTransport는 `world-dev.${ROOT_DOMAIN}` 전용 WSS host를 사용한다. demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
+**Decision**: Nginx만 80/443을 공개한다. dev front·api·ai·WebGL은 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`의 `/`, `/api/`, `/ai/v1/`, `/unity/`를 사용하며, WebGL은 demo와 같은 `current` release를 제공한다. URL path를 지원하지 않는 UnityTransport는 `world-dev.${ROOT_DOMAIN}` 전용 WSS host를 사용한다. demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
 
 **Rationale**: 헌법 6·7조의 단일 EC2 경계를 구현하고 ALB/NLB 없이 TLS와 static offload를 제공한다. host별 cache 정책이 동적 응답 혼입을 막는다.
 
@@ -141,8 +141,8 @@
 
 | 항목 | 처리 |
 |---|---|
-| C-01 EC2 사양·SG 담당자 | `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_CHANGE_OWNER`, `SG_80_443_READY` late-bound input. 누락 시 resource/외부 network 단계 fail. |
-| C-02 실제 domain | `ROOT_DOMAIN`, domain owner late-bound input. host template은 고정하고 누락 시 DNS/TLS 단계 fail. |
+| C-01 EC2 사양·SG 담당자 | `SG_CHANGE_OWNER=정승욱(Infra)`로 확정. `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_80_443_READY`는 서버 실측 전까지 late-bound input이며 누락 시 resource/외부 network 단계 fail. |
+| C-02 실제 domain | `ROOT_DOMAIN=ssafesta.world`, domain owner는 정승욱(Infra)으로 확정. host template은 그대로 사용한다. |
 | C-07 시연 정책 | 해소: 시연 중 build/deploy 허용, high-load build 최대 1, demo cgroup 우선 보호. 숫자만 C-01 실측 후 입력. |
 | R2 무료 한도 | 공급자 변경 가능 설정. 현재 공식 값과 확인일을 기록하고 월별/가격 변경 시 재확인. |
 | WSS timeout | infra-003 외부 실측으로 이관. |

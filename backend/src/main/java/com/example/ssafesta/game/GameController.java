@@ -301,6 +301,29 @@ public class GameController {
                 outcome.publishedAt(), outcome.warnings());
     }
 
+    @Operation(summary = "버전 목록 — 게시 이력을 새 것부터 본다",
+            description = """
+                    이 게임의 게시 이력을 `versionNo` 내림차순으로 돌려준다. 소유자만 볼 수 있다.
+
+                    **`project` 본문은 싣지 않는다** — 이력 화면용 목록이고, 2MB 짜리 게시본 최대 50개를
+                    한 응답에 담으면 100MB가 된다. 특정 회차의 본문은 후속 버전 고정 URL의 몫이다.
+
+                    최신 50건까지만 돌려준다 — v1에는 페이지네이션이 없다. `publishedVersion` 은 현재
+                    공개 포인터이고, `versions` 가 비어 있지 않은데 이 값이 `null` 이면 공개 중단 상태다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "게시 이력 (최신 50건)"),
+            @ApiResponse(responseCode = "403", description = "`GAME_FORBIDDEN` — 내 게임이 아니다"),
+            @ApiResponse(responseCode = "404", description = "`GAME_NOT_FOUND`(없다) 또는 `GAME_DELETED`(삭제된 게임이다)")})
+    @GetMapping("/{gameId}/versions")
+    @SecurityRequirement(name = "bearerAuth")
+    public VersionsResponse versions(@AuthenticationPrincipal Jwt jwt,
+                                     @Parameter(description = "내 게임 식별자", example = "42")
+                                     @PathVariable Long gameId) {
+        Long userId = GamePrincipal.requireMemberId(jwt);
+        return VersionsResponse.of(publishedQueries.versions(gameId, userId));
+    }
+
     /**
      * The public snapshot. Open to guests — playing a published game is theirs too (FR-023).
      *
@@ -446,6 +469,31 @@ public class GameController {
             @Schema(description = "게시 시각(UTC)", example = "2026-09-02T05:41:00Z") Instant publishedAt,
             @Schema(description = "게시를 막지 않은 경고. 없으면 빈 배열이다") List<String> warnings) { }
 
+    public record VersionsResponse(
+            @Schema(description = "게임 식별자", example = "42") Long gameId,
+            @Schema(description = "현재 공개 회차. `versions`가 비어 있지 않은데 이 값이 null이면 공개 중단 상태다",
+                    example = "5") Integer publishedVersion,
+            @Schema(description = "게시 이력, versionNo 내림차순, 최신 50건까지") List<VersionItem> versions) {
+
+        static VersionsResponse of(GamePublishedQueryService.VersionsView view) {
+            return new VersionsResponse(view.gameId(), view.publishedVersion(),
+                    view.versions().stream().map(VersionItem::of).toList());
+        }
+    }
+
+    public record VersionItem(
+            @Schema(description = "게시 회차", example = "5") int versionNo,
+            @Schema(description = "GameProject 구조 버전", example = "1.1.0") String schemaVersion,
+            @Schema(description = "게시 시각(UTC)", example = "2026-08-23T13:22:00Z") Instant publishedAt) {
+
+        static VersionItem of(GamePublishedVersionRepository.VersionRow row) {
+            return new VersionItem(row.getVersionNo(), row.getSchemaVersion(), row.getPublishedAt());
+        }
+    }
+
+    // 부스 게시본(BoothLayoutController.PublishedResponse)과 단순 이름이 같다 — 갈라 두지
+    // 않으면 한쪽 문서가 다른 쪽 본문이 된다 (S15P21A604-614, GitLab #172).
+    @Schema(name = "PublishedGameResponse")
     public record PublishedResponse(
             @Schema(description = "GameProject 구조 버전. 게시 회차와 다른 개념이다", example = "1.0") String schemaVersion,
             @Schema(description = "게임 식별자", example = "42") Long gameId,

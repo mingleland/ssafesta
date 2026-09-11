@@ -56,7 +56,7 @@ public class BoothFacadeController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "저장된 외관 전체"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 테마·색 형식·팔레트·간판 길이·로고 URL 위반. 사유마다 메시지가 다르다"),
-            @ApiResponse(responseCode = "403", description = "`BOOTH_FORBIDDEN` — 내 부스도, 내가 스태프인 부스도 아니다"),
+            @ApiResponse(responseCode = "403", description = "`BOOTH_EDITOR_FORBIDDEN` — 내 부스도, 내가 스태프인 부스도 아니다"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스는 외관을 고칠 수 없다")})
     @PutMapping

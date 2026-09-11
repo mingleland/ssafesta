@@ -142,6 +142,8 @@ nmap -Pn -p 22,80,443,5432,6379,7777,8080,9000,9001 "$EC2_PUBLIC_IP"
 curl -fsS "https://demo.${ROOT_DOMAIN}/health"
 curl -fsS "https://api.${ROOT_DOMAIN}/health"
 curl -fsS -N "https://ai.${ROOT_DOMAIN}/health"
+curl -fsS "https://dev.${ROOT_DOMAIN}/"
+curl -fsS "https://dev.${ROOT_DOMAIN}/unity/manifest.json"
 openssl s_client -connect "demo.${ROOT_DOMAIN}:443" -servername "demo.${ROOT_DOMAIN}"
 ```
 
@@ -150,6 +152,7 @@ Expected:
 - 승인된 source의 22와 public 80/443 외 internal/data/management port 연결 성공 0건.
 - Security Group과 UFW 결과를 각각 기록해 차단 계층을 구분할 수 있다.
 - demo hosts의 DNS와 certificate chain/expiry가 유효하고 Cloudflare-origin Full (strict)이 동작한다.
+- 승인된 source에서는 `dev.${ROOT_DOMAIN}`의 `/`, `/api/`, `/ai/v1/`, `/unity/`가 HTTPS로 제공되고, `/unity/`은 demo와 같은 WebGL `current` release를 가리킨다.
 - content-hash static asset 두 번째 요청은 origin 도달이 감소한다.
 - HTML은 새 release를 재검증하고 API/auth/SSE/upload grant/WebSocket 응답은 MISS가 아니라 명시적 BYPASS/no-store다.
 

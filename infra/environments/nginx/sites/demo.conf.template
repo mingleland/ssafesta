@@ -33,24 +33,24 @@ server {
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
-    location ~ ^/unity/Build/([^/]+\.wasm)\.br$ {
-        alias /srv/festa/webgl/current/Build/$1.br;
+    location ~ ^/unity/Build/([^/]+\.wasm)\.(br|unityweb)$ {
+        alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/wasm;
         add_header Content-Encoding br always;
         add_header Vary Accept-Encoding always;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
-    location ~ ^/unity/Build/([^/]+\.js)\.br$ {
-        alias /srv/festa/webgl/current/Build/$1.br;
+    location ~ ^/unity/Build/([^/]+\.js)\.(br|unityweb)$ {
+        alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/javascript;
         add_header Content-Encoding br always;
         add_header Vary Accept-Encoding always;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
-    location ~ ^/unity/Build/([^/]+\.data)\.br$ {
-        alias /srv/festa/webgl/current/Build/$1.br;
+    location ~ ^/unity/Build/([^/]+\.data)\.(br|unityweb)$ {
+        alias /srv/festa/webgl/current/Build/$1.$2;
         default_type application/octet-stream;
         add_header Content-Encoding br always;
         add_header Vary Accept-Encoding always;

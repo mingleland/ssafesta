@@ -2,6 +2,7 @@ package com.example.ssafesta.internal.ai;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,15 +45,27 @@ class AiChunkSearchRepository {
     //           않는다 — hnsw.max_scan_tuples·scan_mem_multiplier 에서 멈추므로 여전히 topK 보다
     //           적게 올 수 있다. 정확성이 계약인 동안은 이 GUC 가 유일하게 보장하는 수단이다.
     static final String SEARCH = """
+            -- 질의 벡터를 MATERIALIZED CTE 에서 딱 한 번만 vector 로 바꾼다 (S15P21A604-654).
+            -- 본문에 CAST(:queryEmbedding AS vector) 를 그대로 두면 pgjdbc 가
+            -- prepareThreshold=5 로 statement 를 서버 측으로 승격시킨 뒤부터 Postgres 가
+            -- generic plan 을 쓰고, 거기서는 이 캐스트가 상수로 접히지 않아 3,000자짜리
+            -- 리터럴을 vector_in 이 행마다 다시 파싱한다. 실측에서 6번째 호출부터 3초
+            -- statement 상한에 붙었고 회복하지 않았다 (145,646행 기준 395ms -> 3,000ms+).
+            -- 비용 모델은 그 파싱을 못 보므로 계획을 바꾸는 것으로는 막을 수 없다.
+            -- MATERIALIZED 는 최적화 울타리라 계획 모드와 무관하게 한 번만 평가된다.
+            WITH q AS MATERIALIZED (
+                SELECT CAST(:queryEmbedding AS vector) AS v
+            )
             SELECT c.content,
                    c.chunk_no,
                    c.page_number,
                    c.section,
                    c.document_id,
                    d.original_filename,
-                   c.embedding <=> CAST(:queryEmbedding AS vector) AS distance
+                   c.embedding <=> q.v AS distance
               FROM ai_document_chunks c
               JOIN ai_documents d ON d.id = c.document_id
+             CROSS JOIN q
              WHERE c.booth_id = :boothId
                AND c.agent_id = :agentId
                AND c.searchable = TRUE
@@ -72,7 +85,7 @@ class AiChunkSearchRepository {
                -- 함께 걸러지지만 유한값으로 떨어지면 아무 뜻 없는 거리로 순위에 낀다.
                -- 저장 벡터 자체의 검증은 chunk 를 쓰는 쪽 몫이다 (S15P21A604-400).
                -- 검색이 할 수 있는 것은 여기까지이며, 이 줄을 그 검증의 대체물로 읽으면 안 된다.
-               AND (c.embedding <=> CAST(:queryEmbedding AS vector)) <> 'NaN'::float8
+               AND (c.embedding <=> q.v) <> 'NaN'::float8
              ORDER BY distance, c.document_id, c.chunk_no
              LIMIT :topK
             """;
@@ -129,29 +142,81 @@ class AiChunkSearchRepository {
 
     List<AiChunkSearchService.ChunkSearchItem> search(long boothId, long agentId,
                                                       String queryEmbedding, int topK) {
+        return searchWithDiagnostics(boothId, agentId, queryEmbedding, topK).value();
+    }
+
+    /**
+     * The same search, with what the GUC actually did handed back (S15P21A604-521).
+     *
+     * <p>The production path runs through here and drops the observations, so the test can assert
+     * the apply/restore pair happened <b>on the path that serves requests</b>. An assertion on the
+     * result rows cannot: identical-vector Top-1 comes back right whether the planner used HNSW or
+     * a full scan, so deleting {@link #EXACT_SCAN} would leave every row-level test green.
+     *
+     * <p>The observation is a return value rather than a field because this is a singleton bean —
+     * a "last call" field would be overwritten by whichever concurrent search finished second and
+     * the test would flake against the running application.
+     */
+    ExactScan<List<AiChunkSearchService.ChunkSearchItem>> searchWithDiagnostics(
+            long boothId, long agentId, String queryEmbedding, int topK) {
+        return withExactScan(() -> jdbc.query(SEARCH, params(boothId, agentId, queryEmbedding, topK),
+                (row, index) -> new AiChunkSearchService.ChunkSearchItem(
+                        row.getString("content"),
+                        row.getInt("chunk_no"),
+                        // getInt reads 0 for SQL NULL; both columns are nullable in V21 and the
+                        // contract types them as nullable, so the object accessor is the honest
+                        // one.
+                        row.getObject("page_number", Integer.class),
+                        row.getString("section"),
+                        row.getLong("document_id"),
+                        row.getString("original_filename"),
+                        row.getDouble("distance"))));
+    }
+
+    /**
+     * The plan the forced path produces, for a test to log. Diagnostics only — nothing asserts on
+     * it, because a plan is the planner's wording and changes with a minor version.
+     */
+    List<String> explainSearch(long boothId, long agentId, String queryEmbedding, int topK) {
+        return withExactScan(() -> jdbc.queryForList("EXPLAIN (ANALYZE, BUFFERS) " + SEARCH,
+                params(boothId, agentId, queryEmbedding, topK), String.class)).value();
+    }
+
+    private static Map<String, Object> params(long boothId, long agentId, String queryEmbedding,
+                                              int topK) {
+        return Map.of("boothId", boothId, "agentId", agentId,
+                "queryEmbedding", queryEmbedding, "topK", topK);
+    }
+
+    /**
+     * Applies {@link #EXACT_SCAN}, runs {@code statement}, puts the previous value back.
+     *
+     * <p>Reading the setting back after the {@code SET LOCAL} costs one extra round trip on every
+     * search. That is the price of the guarantee being checkable at all: a diagnostics-only branch
+     * would let the production path drift away from the path the test proves.
+     */
+    private <T> ExactScan<T> withExactScan(Supplier<T> statement) {
         String previousIndexScans = template.queryForObject(READ_INDEX_SCANS, String.class);
         template.execute(EXACT_SCAN);
+        String applied;
+        T value;
         try {
-            return jdbc.query(SEARCH,
-                    Map.of("boothId", boothId, "agentId", agentId,
-                            "queryEmbedding", queryEmbedding, "topK", topK),
-                    (row, index) -> new AiChunkSearchService.ChunkSearchItem(
-                            row.getString("content"),
-                            row.getInt("chunk_no"),
-                            // getInt reads 0 for SQL NULL; both columns are nullable in V21 and the
-                            // contract types them as nullable, so the object accessor is the honest
-                            // one.
-                            row.getObject("page_number", Integer.class),
-                            row.getString("section"),
-                            row.getLong("document_id"),
-                            row.getString("original_filename"),
-                            row.getDouble("distance")));
-        } finally {
+            applied = template.queryForObject(READ_INDEX_SCANS, String.class);
+            value = statement.get();
+        } catch (RuntimeException | Error failure) {
             // Also on the timeout path: the ceiling firing must not leave the caller's transaction
             // planning everything else without index scans.
             restoreIndexScans(previousIndexScans);
+            throw failure;
         }
+        return new ExactScan<>(value, applied, restoreIndexScans(previousIndexScans));
     }
+
+    /**
+     * @param applied  {@code enable_indexscan} as the session read it after {@link #EXACT_SCAN}
+     * @param restored the value put back afterwards, {@code null} if the restore itself failed
+     */
+    record ExactScan<T>(T value, String applied, String restored) { }
 
     /**
      * Puts {@code enable_indexscan} back without ever replacing the exception that brought us here.
@@ -166,13 +231,17 @@ class AiChunkSearchRepository {
      * {@code SET LOCAL} dies with the transaction, so an aborted one has already undone it. The
      * restore matters only when the caller's transaction survives to run more queries, and that is
      * precisely when this statement succeeds.
+     *
+     * @return the value now in effect — {@code set_config} answers with it, so observing the
+     *         restore costs nothing — or {@code null} when the restore itself failed
      */
-    private void restoreIndexScans(String previousIndexScans) {
+    private String restoreIndexScans(String previousIndexScans) {
         try {
-            template.queryForObject(RESTORE_INDEX_SCANS, String.class, previousIndexScans);
+            return template.queryForObject(RESTORE_INDEX_SCANS, String.class, previousIndexScans);
         } catch (DataAccessException exception) {
             log.warn("enable_indexscan 복원에 실패했습니다 — 트랜잭션 종료가 SET LOCAL 을 되돌립니다.",
                     exception);
+            return null;
         }
     }
 

@@ -13,10 +13,13 @@ import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -79,6 +82,114 @@ class AiDocumentResultApiIntegrationTest {
     }
 
     /**
+     * {@code READY} 로 갈 수 없는 문서의 finalize 는 <b>전부</b> 롤백되고 {@code 410} 이다
+     * (T102 · FR-040a · SC-014).
+     *
+     * <p>이 자리가 오래 틀려 있었다. {@code markDocumentReady} 가 0행이면 ERROR 로그만 남기고
+     * chunk 교체와 Job {@code SUCCEEDED} 는 커밋됐다 — 검색되지 않는 문서에 새 chunk 가 붙고 Job 은
+     * 성공했다고 말한다. FR-040 이 요구한 "하나의 트랜잭션" 이 정확히 그 조합을 금지한다.
+     *
+     * <p>롤백하면 {@code SUCCEEDED} 표시도 취소되므로 재전송이 멱등 분기(Job 이 {@code SUCCEEDED}
+     * 일 때만 진입)로 들어가지 못한다. 그래서 <b>같은 요청을 반복해도 무변화 410</b> 이고, 그것이
+     * 사실이다 — 이 Job 의 어떤 attempt 도 {@code PROCESSING} 을 떠난 문서를 공개할 수 없다.
+     *
+     * <p>{@code DISABLED}·{@code EXPIRED} 를 {@code PROCESSING} 으로 되돌리는 복구는 spec 범위
+     * 밖이라 여기서 재지 않는다.
+     */
+    @ParameterizedTest(name = "{0} 문서의 finalize 는 전부 롤백되고 410 이다")
+    @ValueSource(strings = {"EXPIRED", "DISABLED"})
+    void finalizeRollsBackEntirelyWhenTheDocumentCannotBePublished(String status) throws Exception {
+        Job job = seedJob("공개불가" + status);
+        seedChunk(job, 99, "예전 조각");
+        mockMvc.perform(batch(job, 0, chunk(0, "새 조각"))).andExpect(status().isNoContent());
+        jdbc.update("UPDATE ai_documents SET processing_status = ? WHERE id = ?",
+                status, job.documentId());
+
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+
+        assertEquals(status, documentStatus(job), "공개할 수 없는 문서가 움직였다");
+        assertEquals("RUNNING", jobStatus(job), "Job 이 SUCCEEDED 로 남았다 — 롤백되지 않았다");
+        assertEquals(1, chunkCount(job), "옛 chunk 가 교체됐다 — 롤백되지 않았다");
+        assertEquals(99, chunkNos(job).get(0), "남아 있어야 할 것은 교체 전 chunk 다");
+        assertEquals(1, stagingCount(job), "staging 이 지워졌다 — 롤백되지 않았다");
+
+        // 재전송도 같은 410 이고 아무것도 바뀌지 않는다. 롤백이 SUCCEEDED 를 남기지 않았으므로
+        // finalize 의 멱등 분기로는 들어갈 수 없다.
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+        assertEquals(status, documentStatus(job));
+        assertEquals("RUNNING", jobStatus(job));
+        assertEquals(1, chunkCount(job));
+        assertEquals(1, stagingCount(job));
+    }
+
+    // ── 수정본 교체 (S15P21A604-386 · FR-027a) ───────────────────────────────
+
+    /**
+     * 교체본이 {@code READY} 가 된 그 트랜잭션에서 원본이 물러난다.
+     *
+     * <p>{@code replaced_at} 이 찍히는 유일한 자리다. 같은 {@code EXPIRED} 라도 이 칸이 있으면
+     * 복구 대상이 아니고(FR-027a), 없으면 24시간 안에 완료로 되살아난다(FR-027).
+     */
+    @Test
+    @DisplayName("교체본이 READY 가 되면 원본이 EXPIRED + replaced_at 으로 물러난다")
+    void finalizingAReplacementRetiresTheOriginal() throws Exception {
+        Job job = seedJob("교체본");
+        long original = seedReplacedOriginal(job);
+
+        mockMvc.perform(batch(job, 0, chunk(0, "새 조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        assertEquals("READY", documentStatus(job), "교체본이 공개되지 않았다");
+        assertEquals("EXPIRED", statusOf(original), "원본이 물러나지 않았다");
+        assertTrue(hasReplacedAt(original), "replaced_at 이 찍히지 않았다 — 복구 경로가 열려 있다");
+        assertTrue(hasExpiredAt(original),
+                "expired_at 이 없으면 원본 삭제 스윕이 이 행을 영영 집지 못한다 (FR-028)");
+        assertEquals(0, chunksOf(original), "원본 chunk 가 남아 검색에 섞인다");
+    }
+
+    /**
+     * 물리는 것은 <b>활성</b> Job 뿐이다.
+     *
+     * <p>정상 {@code READY} 문서의 과거 Job 은 {@code SUCCEEDED} 이고, 그것은 이 문서가 어떻게
+     * 만들어졌는지의 기록이다. 싹 {@code CANCELLED} 로 덮으면 그 기록이 사라진다.
+     */
+    @Test
+    @DisplayName("원본 퇴역은 활성 Job 만 취소하고 끝난 Job 은 건드리지 않는다")
+    void retiringTheOriginalOnlyCancelsItsLiveJobs() throws Exception {
+        Job job = seedJob("과거Job");
+        long original = seedReplacedOriginal(job);
+        long succeeded = seedJobRow(job, original, "SUCCEEDED");
+        long live = seedJobRow(job, original, "RETRY_WAIT");
+
+        mockMvc.perform(batch(job, 0, chunk(0, "새 조각"))).andExpect(status().isNoContent());
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL)).andExpect(status().isNoContent());
+
+        assertEquals("SUCCEEDED", jobStatusOf(succeeded), "끝난 Job 의 기록이 지워졌다");
+        assertEquals("CANCELLED", jobStatusOf(live), "활성 Job 이 남았다 — 늦은 결과가 들어온다");
+    }
+
+    /** 처리가 실패하면 원본은 {@code READY} 그대로다 — 교체의 가장 중요한 단정이다. */
+    @Test
+    @DisplayName("교체본의 finalize 가 실패하면 원본은 READY 로 남는다")
+    void aFailedReplacementLeavesTheOriginalReady() throws Exception {
+        Job job = seedJob("교체실패");
+        long original = seedReplacedOriginal(job);
+
+        mockMvc.perform(batch(job, 0, chunk(0, "새 조각"))).andExpect(status().isNoContent());
+        // 개수가 어긋난다 — finalize 검증에서 걸리는 정상적인 실패 경로다.
+        mockMvc.perform(finalize(job, 2, SOURCE_HASH, MODEL))
+                .andExpect(status().isBadRequest());
+
+        assertEquals("READY", statusOf(original), "교체가 실패했는데 원본이 물러났다");
+        assertTrue(!hasReplacedAt(original), "실패한 교체가 replaced_at 을 찍었다");
+        assertEquals(1, chunksOf(original), "원본 chunk 가 지워졌다 — 답할 근거가 사라진다");
+    }
+
+    /**
      * 같은 batch 재전송은 아무것도 바꾸지 않는다.
      *
      * <p>staging PK 가 {@code (job_id, batch_seq, chunk_no)} 라 {@code ON CONFLICT DO NOTHING} 이
@@ -114,6 +225,8 @@ class AiDocumentResultApiIntegrationTest {
         mockMvc.perform(batch(job, 0, chunk(0, "조각"))).andExpect(status().isNoContent());
 
         assertEquals("RUNNING", jobStatus(job));
+        // 워커가 파일을 쥐었다는 첫 신호다 — 문서도 여기서 "처리 중" 이 된다 (S15P21A604-175).
+        assertEquals("PROCESSING", documentStatus(job));
         long seconds = secondsUntilLeaseExpiry(job);
         assertTrue(seconds > 60 && seconds <= 90, "batch 도 lease 를 잡아야 한다: " + seconds);
     }
@@ -230,6 +343,30 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("JOB_GONE"));
     }
 
+    /**
+     * 임대 만료가 남긴 상태에 늦은 finalize 가 도착하는 경우 (S15P21A604-496).
+     *
+     * <p>만료는 Job 을 {@code CANCELLED}, 문서를 {@code DISABLED} 로 내린다. 그 뒤 취소 전달을
+     * 못 받은 워커가 임베딩을 끝내고 finalize 를 보내와도 문서가 {@code READY} 로 되살아나면 안
+     * 된다 — 만료된 부스의 문서가 검색에 다시 들어간다. {@code markDocumentReady} 의
+     * {@code PROCESSING} 조건과 종료 Job 판정이 이중으로 막는 자리다.
+     */
+    @Test
+    @DisplayName("만료로 취소된 Job 의 늦은 finalize 는 410 이고 문서는 DISABLED 로 남는다")
+    void aLateFinalizeAfterLeaseExpiryCannotReviveTheDocument() throws Exception {
+        Job job = seedJob("만료후finalize");
+        jdbc.update("UPDATE ai_document_jobs SET status = 'CANCELLED' WHERE id = ?", job.id());
+        jdbc.update("UPDATE ai_documents SET processing_status = 'DISABLED' WHERE id = ?",
+                job.documentId());
+
+        mockMvc.perform(finalize(job, 1, SOURCE_HASH, MODEL))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.code").value("JOB_GONE"));
+
+        assertEquals("DISABLED", documentStatus(job));
+        assertEquals(0, chunkCount(job));
+    }
+
     /** 문서가 지워지면 Job 도 CASCADE 로 사라진다 — 없는 Job 과 같은 답이다. */
     @Test
     @DisplayName("없는 Job 의 결과는 410 이다")
@@ -243,7 +380,8 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("JOB_GONE"));
 
-        assertEquals("PROCESSING", documentStatus(job));
+        // 이 결과는 다른 Job 으로 갔다. 이 문서는 batch 를 한 번도 못 받았으므로 그대로여야 한다.
+        assertEquals("QUEUED", documentStatus(job));
     }
 
     // ── finalize 검증 ────────────────────────────────────────────────────────
@@ -394,6 +532,9 @@ class AiDocumentResultApiIntegrationTest {
         mockMvc.perform(heartbeat(job, 0)).andExpect(status().isNoContent());
 
         assertEquals("RUNNING", jobStatus(job));
+        // batch 가 아니라 heartbeat 가 먼저 오는 순서도 실재한다. 문서 전이가 두 신호가 공유하는
+        // extendLease 에 있어야 이 단정이 선다 — acceptBatch 에 넣으면 여기서 깨진다.
+        assertEquals("PROCESSING", documentStatus(job));
         long seconds = secondsUntilLeaseExpiry(job);
         assertTrue(seconds > 60 && seconds <= 90, "lease 가 90초 근처여야 한다: " + seconds);
     }
@@ -433,6 +574,10 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("RETRY_WAIT", jobStatus(job));
+        // attempt 가 실패한 것이지 문서가 실패한 것이 아니다. 다음 attempt 가 예약돼 있고 그
+        // finalize 가 아직 이 문서를 공개해야 하므로, 여기서 FAILED 로 찍으면 살아 있는 Job 에
+        // 죽은 문서가 붙는다.
+        assertEquals("PROCESSING", documentStatus(job));
         assertEquals(1, attemptNo(job));
         assertEquals("PARSE_TIMEOUT", lastErrorCode(job));
         assertEquals(0, stagingCount(job), "죽은 attempt 의 staging 은 남으면 안 된다");
@@ -450,6 +595,8 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("DEAD", jobStatus(job));
+        // batch 가 한 번도 없었으므로 문서는 아직 QUEUED 였다 — 그 자리에서도 실패로 내려간다.
+        assertEquals("FAILED", documentStatus(job), "죽은 Job 의 문서가 대기 중으로 남았다");
         assertEquals(1, attemptNo(job), "DEAD 여도 attempt 는 올라야 늦은 결과가 막힌다");
     }
 
@@ -464,6 +611,7 @@ class AiDocumentResultApiIntegrationTest {
                 .andExpect(status().isNoContent());
 
         assertEquals("DEAD", jobStatus(job));
+        assertEquals("FAILED", documentStatus(job));
         assertEquals(4, attemptNo(job));
     }
 
@@ -584,6 +732,8 @@ class AiDocumentResultApiIntegrationTest {
         sweeper.reclaimExpiredLeases();
 
         assertEquals("DEAD", jobStatus(job));
+        // 회수는 벌크라 경로가 다르다 — 회수분 중 DEAD 가 된 것만 문서를 따라 내린다.
+        assertEquals("FAILED", documentStatus(job));
         assertEquals(4, attemptNo(job));
     }
 
@@ -786,6 +936,94 @@ class AiDocumentResultApiIntegrationTest {
      * 만 쓰면 다른 클래스가 같은 이름("정상"·"상한" 등)을 쓸 때 전체 실행에서만 깨진다. 클래스
      * 단위로 돌리면 통과하는 종류라 값 자체를 전역 유일하게 만든다.
      */
+    // ── 수정본 교체 준비·확인 ────────────────────────────────────────────────
+
+    /**
+     * {@code job} 의 문서가 교체본이 되도록 원본 {@code READY} 문서를 하나 세우고 연결한다.
+     *
+     * <p>{@code /replacement} 를 거치지 않는다 — 이 파일이 보는 것은 finalize 가 그 연결을 어떻게
+     * 처리하는가이지 연결이 어떻게 생기는가가 아니다. 발급 경로는
+     * {@code AiDocumentUploadIntegrationTest} 가 본다.
+     *
+     * @return 원본 문서 id
+     */
+    private long seedReplacedOriginal(Job job) {
+        long original = jdbc.queryForObject("""
+                INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
+                    size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
+                    storage_provider, storage_bucket, uploaded_at)
+                VALUES (?, ?, 'original.pdf', 'application/pdf', 1024, ?, 'READY',
+                    (SELECT uploaded_by_user_id FROM ai_documents WHERE id = ?), ?,
+                    'R2', 'test-ai-documents', now())
+                RETURNING id
+                """, Long.class, job.boothId(), job.agentId(),
+                "seed/original/" + UUID.randomUUID(), job.documentId(), "%064x".formatted(31));
+        jdbc.update("UPDATE ai_documents SET replaces_document_id = ? WHERE id = ?",
+                original, job.documentId());
+        seedChunkFor(job, original, 0, "원본 조각");
+        return original;
+    }
+
+    /** 교체 전에 이미 공개돼 있던 chunk — 롤백·퇴역이 이 행을 어떻게 다루는지가 단정 대상이다. */
+    private void seedChunk(Job job, int chunkNo, String content) {
+        seedChunkFor(job, job.documentId(), chunkNo, content);
+    }
+
+    private void seedChunkFor(Job job, long documentId, int chunkNo, String content) {
+        jdbc.update("""
+                INSERT INTO ai_document_chunks (document_id, booth_id, agent_id, chunk_no, content,
+                    embedding, embedding_model_id, searchable)
+                VALUES (?, ?, ?, ?, ?, CAST(? AS vector), ?, TRUE)
+                """, documentId, job.boothId(), job.agentId(), chunkNo, content,
+                vector(DIMENSIONS), MODEL);
+    }
+
+    /** 원본에 딸린 Job 을 상태만 정해 하나 더 만든다 — 퇴역이 무엇을 취소하는지 가르는 용도다. */
+    private long seedJobRow(Job job, long documentId, String status) {
+        return jdbc.queryForObject("""
+                INSERT INTO ai_document_jobs (document_id, booth_id, agent_id, source_hash,
+                    original_filename, content_type, file_size_bytes, storage_provider,
+                    storage_bucket, object_key, status, attempt_no)
+                VALUES (?, ?, ?, ?, 'original.pdf', 'application/pdf', 1024, 'R2',
+                    'test-ai-documents', ?, ?, 0)
+                RETURNING id
+                """, Long.class, documentId, job.boothId(), job.agentId(), SOURCE_HASH,
+                "seed/original-job/" + UUID.randomUUID(), status);
+    }
+
+    private String statusOf(long documentId) {
+        return jdbc.queryForObject("SELECT processing_status FROM ai_documents WHERE id = ?",
+                String.class, documentId);
+    }
+
+    private boolean hasReplacedAt(long documentId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT replaced_at IS NOT NULL FROM ai_documents WHERE id = ?", Boolean.class,
+                documentId));
+    }
+
+    private boolean hasExpiredAt(long documentId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT expired_at IS NOT NULL FROM ai_documents WHERE id = ?", Boolean.class,
+                documentId));
+    }
+
+    private int chunksOf(long documentId) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM ai_document_chunks WHERE document_id = ?",
+                Integer.class, documentId);
+    }
+
+    private List<Integer> chunkNos(Job job) {
+        return jdbc.queryForList("""
+                SELECT chunk_no FROM ai_document_chunks WHERE document_id = ? ORDER BY chunk_no
+                """, Integer.class, job.documentId());
+    }
+
+    private String jobStatusOf(long jobId) {
+        return jdbc.queryForObject("SELECT status FROM ai_document_jobs WHERE id = ?", String.class,
+                jobId);
+    }
+
     private Job seedJob(String prefix) {
         String objectKey = "seed/result/" + prefix + "/" + UUID.randomUUID();
         Long userId = createMemberWithWallet(users, wallets, prefix);
@@ -799,7 +1037,7 @@ class AiDocumentResultApiIntegrationTest {
                 INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
                     size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
                     storage_provider, storage_bucket, uploaded_at)
-                VALUES (?, ?, 'seed.pdf', 'application/pdf', 1024, ?, 'PROCESSING', ?, ?,
+                VALUES (?, ?, 'seed.pdf', 'application/pdf', 1024, ?, 'QUEUED', ?, ?,
                     'R2', 'test-ai-documents', now())
                 RETURNING id
                 """, Long.class, boothId, agentId, objectKey, userId, SOURCE_HASH);

@@ -20,6 +20,7 @@ assert_contains "${overlay}" 'REDIS_USERNAME: dev_back' 'backend must use the de
 assert_contains "${overlay}" 'FESTA_ENVIRONMENT: dev' 'backend must use the dev Redis namespace'
 assert_contains "${overlay}" 'ROOT_DOMAIN: \$\{ROOT_DOMAIN:\?ROOT_DOMAIN is required\}' 'infra profile must receive the root domain'
 assert_contains "${overlay}" 'COMPONENT_ENV_FILE' 'backend runtime secrets must come from a credential file'
+assert_contains "${overlay}" 'INTERNAL_INFRA_TO_SPRING_TOKENS:' 'backend must receive its Infra-to-Spring token'
 assert_contains "${overlay}" 'name: festa-data-private' 'backend must use the named private data network'
 assert_contains "${data_compose}" 'name: festa-data-private' 'data project must create the named private data network'
 assert_contains "${repo_root}/infra/environments/redis/users.acl.example" 'user dev_back .*~dev:\*' 'dev backend ACL must cover its namespaced Redis keys'

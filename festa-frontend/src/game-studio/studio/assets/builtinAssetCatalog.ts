@@ -223,11 +223,34 @@ export const isAssetForRole = (
   return !asset.source.startsWith('builtin://');
 };
 
+// S15P21A604-570 — 역할별 select에서 "제공 자료"(큐레이션된 빌트인)와 "내 자산"(업로드한
+// 커스텀 이미지, 역할 제한 없이 전부 통과)을 optgroup으로 나눠 보여주기 위한 판별. 커스텀은
+// 역할을 강제하지 않는다(하나의 업로드 이미지를 여러 컴포넌트에서 재사용하는 구조라 강제하면
+// 재사용성이 깨진다) — 대신 어느 쪽인지 구분해서 보여줘 "아무 데나 꽂힘"을 눈에 보이게 한다.
+export const isCustomAsset = (asset: AssetReference): boolean => (
+  !asset.source.startsWith('builtin://')
+);
+
+// 역할별 select 3곳(InspectorPanel 배경, DialogueEditor 배경·인물)이 공통으로 쓰는 분리
+// 로직 — "제공 자료"(builtin)와 "내 자산"(custom) optgroup으로 나눠 렌더링하는 데 쓴다.
+export const partitionAssetsByRole = (
+  assets: readonly AssetReference[],
+  role: StaticImageDefinition['category'],
+): { readonly builtin: readonly AssetReference[]; readonly custom: readonly AssetReference[] } => {
+  const forRole = assets.filter((asset) => isAssetForRole(asset, role));
+  return {
+    builtin: forRole.filter((asset) => !isCustomAsset(asset)),
+    custom: forRole.filter(isCustomAsset),
+  };
+};
+
 export const assetDisplayLabel = (asset: AssetReference): string => (
   findBuiltinSpriteSheet(asset.source)?.label
   ?? findBuiltinStaticImage(asset.source)?.label
   ?? findBuiltinTileset(asset.source)?.label
-  ?? `내 자산 · ${asset.id}`
+  // S15P21A604-570 — 원본 파일명(label)이 있으면 그걸 보여준다. 없는 자산(소급 적용 전에
+  // 이미 업로드된 것들)은 기존 폴백을 그대로 쓴다.
+  ?? `내 자산 · ${asset.label ?? asset.id}`
 );
 
 const builtinAssetId = (source: string): string => `builtin_${source

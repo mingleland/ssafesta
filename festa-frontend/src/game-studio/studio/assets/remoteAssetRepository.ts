@@ -114,7 +114,7 @@ export interface RemoteAssetRepositoryOptions {
   readonly upload?: PresignedUploader;
   readonly fetchContent?: AssetContentFetcher;
   /** 기존 프로젝트의 `asset://local/` 참조는 편집 중에만 이쪽으로 넘긴다(-116 오프라인 fallback). */
-  readonly local?: Pick<GameAssetRepository, 'resolve'> | null;
+  readonly local?: Pick<GameAssetRepository, 'resolve' | 'delete'> | null;
 }
 
 export const createApiGameAssetRepository = (
@@ -148,6 +148,24 @@ export const createApiGameAssetRepository = (
       if (ref === null) return null;
       const blob = await fetchContent(assetContentPath(ref));
       return URL.createObjectURL(blob);
+    },
+    // S15P21A604-561 — 계약 §7: DELETE /games/{gameId}/assets/{assetId}, soft delete.
+    // -116과 같은 이유로 asset://local/ 은 로컬 저장소로 그대로 넘긴다. 서버 실패는
+    // (예: 아직 backend가 이 endpoint를 구현하지 않은 경우) 조용히 삼키지 않고
+    // normalizeGameAuthoringError로 감싸 그대로 올린다 — "실패를 기본값으로 덮지 않는다"
+    // 원칙(CLAUDE.md).
+    delete: async (source) => {
+      if (source.startsWith(LOCAL_PREFIX)) {
+        if (local !== null) await local.delete(source);
+        return;
+      }
+      const ref = parseStableAssetSource(source);
+      if (ref === null) return;
+      try {
+        await request<unknown>(`/api/v1/games/${ref.gameId}/assets/${ref.assetId}`, { method: 'DELETE' });
+      } catch (error) {
+        throw normalizeGameAuthoringError(error);
+      }
     },
   };
 };

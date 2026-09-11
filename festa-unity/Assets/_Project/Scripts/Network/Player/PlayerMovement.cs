@@ -200,6 +200,18 @@ namespace Festa.Network
             // CharacterController 가 켜져 있으면 그 대입과 싸우므로 Owner 만 남긴다.
             if (_controller != null) _controller.enabled = IsOwner;
 
+            // **사람끼리 겹치지 않게 한다** (사용자 지적 2026-09-11 — 캐릭터가 서로 통째로 지나갔다).
+            //
+            // 위에서 원격의 CharacterController 를 끄는 순간 그 사람은 콜리전이 하나도 없는 상태가 된다.
+            // CharacterController 는 그 자체가 콜라이더라, 끄면 남의 Move() 가 막힐 것도 사라진다.
+            // 그래서 **원격에만** 캡슐을 켠다 — NetworkTransform 이 위치를 쓰는 것은 그대로 두고
+            // 부딪힐 몸만 세워 두는 것이다.
+            //
+            // 내 것은 끈 채로 둔다. 켜면 내 CharacterController 가 내 캡슐과 싸워 제자리에서 튄다.
+            // 즉 각 화면에서 "나는 CC, 남들은 캡슐" 이고, 막히는 판정은 내 CC 가 남의 캡슐을 미는 쪽으로 일어난다.
+            var body = GetComponent<CapsuleCollider>();
+            if (body != null) body.enabled = !IsOwner;
+
             if (IsServer)
                 ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
 
@@ -472,8 +484,61 @@ namespace Festa.Network
                 return;
             }
 
-            var velocity = horizontalVelocity + Vector3.up * _verticalSpeed;
+            var velocity = horizontalVelocity + NoStandSlide() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
+        }
+
+        // ── 올라설 수 없는 표면 (2026-09-10 사용자 지시) ────────────────
+        //
+        // 슬롯머신·오락기·책상 같은 **상호작용 오브젝트 위에 올라선 채로 서 있는** 모습이 나왔다.
+        // 점프로 올라갈 수 있는 높이라 콜라이더만으로는 막히지 않는다.
+        //
+        // 막는 방법으로 위를 트리거로 만들거나 경사 캡을 씌우는 안이 있지만, 오브젝트마다 모양이 달라
+        // 일반화가 안 된다. 대신 **올라선 것이 감지되면 바깥으로 미끄러뜨린다** — 발이 닿은 순간부터
+        // 오브젝트 중심 반대 방향으로 밀려 가장자리에서 떨어진다. 입력으로 버텨도 밀림이 이긴다.
+        //
+        // 라운지 글자 소파는 예외다 — F 로 올라가 눕는 자리다(사용자 확인).
+        // 달리기(_runSpeed 65)보다 빨라야 한다. 입력에 **더해지는** 값이라 달리기보다 느리면
+        // 중심 쪽으로 달려서 계속 올라서 있을 수 있다 — 그러면 막은 것이 아니다.
+        const float NoStandSlideSpeed = 90f;
+        const float NoStandHold = 0.2f;        // 접촉이 끊겨도 이만큼은 밀어 가장자리를 넘긴다
+        Vector3 _noStandPush;
+        float _noStandPushUntil;
+        int _noStandCachedId;
+        bool _noStandCachedResult;
+
+        Vector3 NoStandSlide()
+            => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+
+        void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            // 위에 올라선 접촉만 본다. 옆면을 스치는 것(normal.y≈0)은 그냥 벽이다.
+            if (hit.normal.y < 0.5f) return;
+            if (!IsNoStandSurface(hit.collider)) return;
+
+            var away = transform.position - hit.collider.bounds.center;
+            away.y = 0f;
+            // 정확히 중심 위에 서 있으면 방향이 없다 — 보고 있는 쪽으로 내보낸다.
+            _noStandPush = away.sqrMagnitude > 0.01f ? away.normalized : transform.forward;
+            _noStandPushUntil = Time.time + NoStandHold;
+        }
+
+        /// <summary>
+        /// 올라설 수 없는 표면인가. 상호작용 오브젝트(<see cref="Festa.Booth.BoothInteractionTarget"/>) 전부가 대상이고
+        /// 라운지 소파만 예외다. 콜라이더 하나당 계층 탐색이 들어가므로 마지막 결과를 캐시한다 —
+        /// 같은 발판을 매 프레임 다시 훑지 않는다.
+        /// </summary>
+        bool IsNoStandSurface(Collider c)
+        {
+            if (c == null) return false;
+            int id = c.GetInstanceID();
+            if (id == _noStandCachedId) return _noStandCachedResult;
+
+            bool result = c.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() != null
+                          && c.GetComponentInParent<Festa.World.LoungeSofaInteractable>() == null;
+            _noStandCachedId = id;
+            _noStandCachedResult = result;
+            return result;
         }
 
         // ── 합성 입력 (부하 테스트 봇 전용) ─────────────────────────

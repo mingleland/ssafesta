@@ -11,6 +11,7 @@ ARG PYTHON_JSONSCHEMA_VERSION
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        curl \
         jq \
         libasound2t64 \
         libgl1 \
@@ -26,6 +27,7 @@ RUN apt-get update \
         python3-venv \
         redis-tools \
         unzip \
+        util-linux \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
@@ -45,6 +47,7 @@ RUN python -m venv /opt/jenkins-python \
     && psql --version \
     && redis-cli --version \
     && unzip -v >/dev/null \
+    && flock --version \
     && docker compose version
 ENV PATH="/opt/jenkins-python/bin:${PATH}"
 USER jenkins

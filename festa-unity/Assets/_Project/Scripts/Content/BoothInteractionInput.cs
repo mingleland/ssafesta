@@ -28,6 +28,24 @@ namespace Festa.Content
 
         static BoothInteractionInput _instance;
 
+        /// <summary>
+        /// 지금 부스 오브젝트 프롬프트(키캡 또는 안내 알약)가 화면에 떠 있는가.
+        /// 포털 프롬프트는 이게 참이면 그 프레임을 양보한다 — 두 알약이 화면 중앙 같은 자리에 겹쳐
+        /// 글자가 뭉개지던 문제(QA 2026-09-08 #26). 부스 오브젝트가 포털보다 우선인 이유: 포털은 발밑
+        /// 범위라 부스 문 앞에서는 늘 켜져 있고, 오브젝트는 조준해야만 켜져서 의도가 더 분명하다.
+        /// </summary>
+        public static bool PromptShowing =>
+            _instance != null && (_instance._hovered != null || _instance._passive != null);
+
+        /// <summary>
+        /// 지금 F 에 응답할 **부스 오브젝트**가 잡혀 있는가 (안내 알약은 제외).
+        ///
+        /// <para>부스 입장 포털이 이걸 보고 그 프레임을 통째로 양보한다 — 슬롯머신처럼 부스에 붙어 있는
+        /// 오브젝트 앞에 서면 오브젝트 프롬프트가 뜨는데 **옆 부스 외곽선까지 같이 켜지고**, F 를 누르면
+        /// 오브젝트와 부스 입장이 동시에 먹었다 (2026-09-10 사용자 지적). 가까운 쪽(오브젝트)이 이긴다.</para>
+        /// </summary>
+        public static bool HasInteractTarget => _instance != null && _instance._hovered != null;
+
         /// <summary>디스패처가 씬에 있도록 보장한다. 상호작용 오브젝트가 Awake 에서 호출한다.</summary>
         public static void Ensure()
         {
@@ -41,12 +59,17 @@ namespace Festa.Content
             // 씬 전환에도 남기지 않는다 — 부스 오브젝트와 생애를 맞춘다.
         }
 
-        void OnEnable() => Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        void OnEnable()
+        {
+            useGUILayout = false;   // GUI.* 만 쓴다 — Layout 패스를 끄면 OnGUI 호출이 프레임당 절반으로 줄어 GC 가 준다 (QA #69)
+            // 씬에 미리 놓인 인스턴스는 Ensure() 를 거치지 않으므로 여기서도 등록한다 (PromptShowing 이 본다).
+            if (_instance == null) _instance = this;
+            Festa.Integration.BoothInteractBridge.OnSent += OnBridgeSent;
+        }
         void OnDisable() => Festa.Integration.BoothInteractBridge.OnSent -= OnBridgeSent;
 
         void OnDestroy()
         {
-            _ring.Dispose();
             if (_instance == this) _instance = null;
         }
 
@@ -62,7 +85,18 @@ namespace Festa.Content
             if (Festa.Integration.InputBridge.IsLocked)
             {
                 UpdateHover(null);
-                ShowHint(null);
+                // 안내 알약(_passive)도 내린다 — 이것만 남겨 두면 OnGUI 의 `else if (_passive != null)` 가 살아
+                // '영상 화면 · 준비 중' 이 미니게임 카드 위에 붙박이로 떴다(QA 2026-09-08 #55).
+                _passive = null;
+                return;
+            }
+
+            // 소파에 누워 있는 동안은 F·프롬프트·링을 전부 끈다 (사용자 지시 2026-09-10). 누운 채 F 를 다시 누르면
+            // 소파 위로 재텔레포트되며 자세가 바뀌고, 프롬프트가 떠 있으면 "다시 누르라" 는 뜻으로 읽힌다. 일어나기는 WASD.
+            if (Festa.World.LiePoseTable.IsLocalPlayerLying())
+            {
+                UpdateHover(null);
+                _passive = null;
                 return;
             }
 
@@ -79,17 +113,16 @@ namespace Festa.Content
                 aimed = hit.collider.GetComponentInParent<Festa.Booth.BoothInteractionTarget>();
                 // **사거리 밖이면 대상으로 치지 않는다.** 전에는 화면에 보이기만 하면 눌렸다 —
                 // 6.5 m 떨어진 부스가 열리는 것을 실측으로 확인했다.
-                if (aimed != null && aimed.Interactive && IsInRange(aimed)) targeted = aimed;
+                if (aimed != null && aimed.Interactive && IsInRange(aimed) && !TemporarilyBlocked(aimed)) targeted = aimed;
             }
 
             // ── 2순위: 근접 자동 조준 (S15P21A604-346) ──────────
             // 마우스를 올리지 않아도 사거리 안에 들어오면 자동으로 잡힌다 — 3인칭 걷기에서
             // "가까이 가면 F" 가 기대 동작이고, 마우스 조준을 요구하면 상호작용이 없는 것처럼
             // 보인다 (실 BE 첫 걷기에서 실측된 혼란). 조준이 없을 때만 근접으로 채운다.
-            targeted ??= NearestInteractableInRange();
+            targeted ??= NearestInteractableInRange(_hovered);
 
             UpdateHover(targeted);
-            ShowHint(targeted);
 
             // F 응답이 없는 부스 오브젝트(영상 화면·좋아요·상담 데스크 등)를 **조준**했을 때만 "준비 중" 을 알린다 (S15P21A604-455).
             // 근접 자동 조준은 쓰지 않는다 — 옆을 지나갈 때마다 뜨면 소음이다. 키캡이 없으니 -345 의 거짓 힌트 금지와도 맞는다.
@@ -104,23 +137,49 @@ namespace Festa.Content
             interactable?.Interact();
         }
 
-        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null.</summary>
-        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange()
+        /// <summary>
+        /// 새 후보가 현재 대상보다 이만큼(월드 유닛) 더 가까워야 대상을 바꾼다. 아케이드 두 대의 판정 표면이
+        /// 13 cm 간격이라 걷는 동안 대상이 매 프레임 흔들리고, 흔들릴 때마다 외곽선을 통째로 다시 만들었다(QA #52).
+        /// 3u ≈ 0.23 m.
+        /// </summary>
+        const float SwitchMargin = 3f;
+
+        /// <summary>
+        /// 지금 이 순간만 반응하지 않는 대상인가. 참이면 **조준 대상에서 통째로 빼서** 프롬프트·발밑 링·외곽선이
+        /// 아예 뜨지 않고 F 도 먹지 않는다 (사용자 지시 2026-09-10 — "작동 중일 땐 상호작용 UI 를 꺼라,
+        /// 본인뿐 아니라 다른 사용자도"). 문구만 바꾸면 여전히 누를 것처럼 보인다.
+        ///
+        /// <para>하이 스트라이커는 연출이 도는 동안 잠긴다. 잠금은 서버 브로드캐스트를 받는 순간 모든
+        /// 클라이언트에서 함께 열리므로(<see cref="Festa.World.HighStrikerMachine.BeginBusy"/>), 치는 사람뿐
+        /// 아니라 옆에서 보는 사람의 화면에서도 같이 사라진다.</para>
+        /// </summary>
+        static bool TemporarilyBlocked(Festa.Booth.BoothInteractionTarget target)
+        {
+            var striker = target.GetComponentInParent<Festa.World.HighStrikerInteractable>();
+            return striker != null && striker.IsBusy;
+        }
+
+        /// <summary>사거리 안에서 가장 가까운 F 응답 대상. 없으면 null. 현재 대상이 사거리 안이면 히스테리시스를 둔다.</summary>
+        static Festa.Booth.BoothInteractionTarget NearestInteractableInRange(Festa.Booth.BoothInteractionTarget current)
         {
             var origin = InteractionOrigin();
             if (origin == null) return null;
 
             Festa.Booth.BoothInteractionTarget best = null;
             float bestDist = float.MaxValue;
+            float currentDist = float.MaxValue;
             foreach (var t in Festa.Booth.BoothInteractionTarget.Active)
             {
-                if (t == null || !t.Interactive) continue;
+                if (t == null || !t.Interactive || TemporarilyBlocked(t)) continue;
                 // 표면 기준 — 피벗으로 재면 큰 오브젝트가 부당하게 멀게 잡힌다 (T-232).
                 float d = t.DistanceFrom(origin.Value);
+                if (t == current && d <= t.MaxDistance) currentDist = d;
                 if (d > t.MaxDistance || d >= bestDist) continue;
                 best = t;
                 bestDist = d;
             }
+            if (current != null && best != current && currentDist < float.MaxValue && bestDist > currentDist - SwitchMargin)
+                return current;   // 근소한 차이면 붙잡고 있던 것을 유지한다
             return best;
         }
 
@@ -201,19 +260,15 @@ namespace Festa.Content
         }
 
         // ── 프롬프트 ─────────────────────────────────────────
-        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널 + 발밑 링.
+        // 포털(부스 입장)과 **같은 화면 언어**를 쓴다 — 키캡 패널. 그리기는 InteractPromptUI 한 곳에만 있다.
         // 전에는 여기만 화면 하단 uGUI 텍스트라, 같은 F 조작인데 다른 기능처럼 보였다
-        // (S15P21A604-355 사용자 보고). 그리기는 InteractPromptUI 한 곳에만 있다.
-        readonly Festa.World.InteractRing _ring = new Festa.World.InteractRing();
+        // (S15P21A604-355 사용자 보고).
+        //
+        // **발밑 링은 쓰지 않는다** (사용자 지시 2026-09-11). 포털은 부스 앞 빈 바닥에 깔려 "여기로 들어간다"
+        // 로 읽히지만, 오락기·슬롯머신은 기계가 바닥을 거의 덮고 서 있어 링이 기계 밑단과 겹쳐 잘린 빛줄기로
+        // 나왔다 — 바닥에 포털이 열린 것처럼 보인다는 지적. 기계는 프롬프트 알약만으로 충분히 읽힌다.
         string _toast;
         float _toastUntil;
-
-        void ShowHint(Festa.Booth.BoothInteractionTarget target)
-        {
-            if (target == null) { _ring.Hide(); return; }
-            var (pos, radius) = target.HighlightFootprint();
-            _ring.Show(pos, radius);
-        }
 
         /// <summary>대상별 행동 문구. 포털이 "3번 부스 입장" 을 쓰듯 여기도 무엇을 하는지 적는다.</summary>
         static string PromptFor(Festa.Booth.BoothInteractionTarget target)
@@ -228,6 +283,11 @@ namespace Festa.Content
                 return "게임기 플레이";
             if (target.GetComponentInParent<Festa.Minigame.MinigameInteractable>() != null)
                 return "타이밍 스톱 게임";
+            if (target.GetComponentInParent<Festa.World.LoungeSofaInteractable>() != null)
+                return "소파에 눕기";
+            // 작동 중에는 여기까지 오지 않는다 — TemporarilyBlocked 가 대상에서 통째로 뺀다.
+            if (target.GetComponentInParent<Festa.World.HighStrikerInteractable>() != null)
+                return "망치로 내리치기";
 
             var ro = target.GetComponentInParent<Festa.Booth.BoothRuntimeObject>();
             if (ro == null) return "상호작용";
@@ -266,14 +326,24 @@ namespace Festa.Content
             // 이 토스트가 필요하고, FE 임베드면 개발 빌드에서도 불필요하다.
             if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
 
-            _toast =
+            // **아는 상호작용만 알린다.** 전에는 모르는 종류가 "홈페이지 열기 요청" 으로 떨어졌는데,
+            // 이 채널에는 사람이 누른 것이 아닌 **상태 통지**도 흐른다 — 월드 진입 직후 1회 나가는
+            // WORLD_BOOTH_CONTEXT(#174) 가 그렇다. 그래서 접속하자마자 누른 적도 없는 안내가 떴다
+            // (사용자 지적 2026-09-11). 종류를 모르면 아무 말도 하지 않는 편이 맞다.
+            string text =
                 type == Bridge.AiAgentInteract    ? "AI 직원 호출을 보냈습니다 — 대화 창은 웹 화면이 엽니다" :
                 type == Bridge.ProjectInteract    ? "프로젝트 전시 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.SurveyInteract     ? "설문 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ManagementInteract ? "부스 관리 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.ArcadeInteract     ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                 type == Bridge.GameInteract       ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
-                                                    "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다";
+                type == Bridge.LaptopInteract     ? "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.MinigameInteract   ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
+                type == Bridge.EventInteract      ? "이벤트 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                                                    null;
+            if (text == null) return;
+
+            _toast = text;
             _toastUntil = Time.unscaledTime + 2.5f;
         }
 

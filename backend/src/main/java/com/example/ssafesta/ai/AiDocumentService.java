@@ -10,6 +10,7 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,16 +26,19 @@ import org.springframework.util.unit.DataSize;
  * storage, then tells us it is done. Nothing streams through Spring — the file never touches this
  * process, which is what makes a 20MB limit an assertion about a number rather than about memory.
  *
- * <p>Handing the document to FastAPI is S15P21A604-175, and expiring abandoned grants is
- * S15P21A604-174. A completed document sits in {@code QUEUED} until the first of those lands.
+ * <p>Handing the document to FastAPI is S15P21A604-175. Abandoned grants no longer hold their slot:
+ * {@link AiDocumentExpirySweeper} moves an unused one to {@code EXPIRED} an hour after it was
+ * issued (FR-026), and {@link #complete} takes it back for the next 24 hours (FR-027).
  *
- * <p><b>Until S15P21A604-174 lands, an abandoned grant holds its slot forever.</b> {@code QUEUED}
- * counts toward the ten of FR-018 ({@code AiDocumentRepository#countActive}) and nothing here moves
- * it to {@code EXPIRED} except a provider switch — there is no sweeper, and no delete endpoint. Ten
- * grants that were issued and never uploaded therefore block that agent with no way out: completing
- * answers {@code DOCUMENT_UPLOAD_INCOMPLETE} because the object is not there, and re-requesting the
- * same file reissues on the same row rather than freeing one. -174 is itself waiting on the AI
- * document DB redesign (GitLab #119), so this is a live operational limit, not a short gap.
+ * <p>{@link #replace} is the same two steps aimed at an existing {@code READY} document (FR-019):
+ * it grants a URL for a second row that points back at the first. Retiring the first is not this
+ * class's — it happens in {@code AiDocumentResultService.finalizeJob}, once the new version is
+ * actually published (FR-027a).
+ *
+ * <p>Deleting the original once that window closes (FR-028) is {@link AiDocumentOriginalDeleteSweeper}
+ * — a separate pass on its own schedule, not this class. {@link #complete} still owns everything up
+ * to that point: an expired row keeps its object key until that sweeper's 24-hour-later pass takes
+ * it, not this one.
  */
 @Service
 public class AiDocumentService {
@@ -149,26 +153,200 @@ public class AiDocumentService {
                     // The write target moved under an unfinished grant: the old object would land
                     // in a storage we no longer write to, so it is abandoned and a new row starts
                     // in the current one (FR-032).
-                    existing.expire(Instant.now());
+                    abandon(existing);
                 } else {
                     return Prepared.duplicate(existing);
                 }
             }
 
-            requireRoom(agent.getId(), request.size());
-
-            Instant now = Instant.now();
-            AiDocument document = new AiDocument(agent.getBoothId(), agent.getId(), userId,
-                    request.fileName(), request.contentType(), request.size(),
-                    request.contentSha256(), target, now);
-            // saveAndFlush, not save: the id has to exist before the object key can be built, and
-            // flushing here also means an index violation surfaces inside this transaction instead
-            // of at commit time, where the stack trace no longer says which insert caused it.
-            document = documents.saveAndFlush(document);
-            document.assignObjectKey(objectKeyOf(document));
-            return Prepared.issued(document);
+            return Prepared.issued(insert(agent.getBoothId(), agent.getId(), userId, request,
+                    target, null));
         });
         return present(Objects.requireNonNull(prepared));
+    }
+
+    // ── 수정본 교체 ─────────────────────────────────────────────────────────
+
+    /**
+     * Issues an upload URL for a new version of a {@code READY} document (FR-019, US2 시나리오 5).
+     *
+     * <p>A replacement is a <b>second document</b>, not an edit of the first. The original stays
+     * {@code READY} and searchable the whole way through and is only pushed out once the new one
+     * actually publishes ({@code AiDocumentResultService.finalizeJob}) — so a file that fails to
+     * parse costs nothing, which is the opposite of retiring the original at {@code /complete} and
+     * leaving the agent with no document at all when processing then fails.
+     *
+     * <p>The client finishes with the ordinary {@code POST /documents/{newDocumentId}/complete}. It
+     * needs no new response type either: what it gets back is a grant, and a grant is a
+     * {@link UploadGrantView}.
+     *
+     * <p><b>Only {@code READY} can be replaced.</b> The other five states each have their own way
+     * out — a {@code QUEUED} or {@code PROCESSING} document is already becoming the version the
+     * owner wants, and {@code FAILED}, {@code EXPIRED} and {@code DISABLED} are outside the
+     * duplicate rule (FR-019b) so the same file simply goes up again as a new document. Widening
+     * this would mean two answers to "upload this file" with no way to tell which one the owner
+     * meant.
+     */
+    public UploadGrantView replace(Long documentId, Long userId, UploadCommand command) {
+        AiDocument document = documents.findById(documentId)
+                .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
+        // Permission before availability, and before the lock — same order as issueUploadUrl.
+        accessGuard.requireActiveEditor(document.getBoothId(), userId);
+
+        UploadRequest request = validated(command);
+
+        switch (storageProperties.uploadGate()) {
+            case QUOTA_BLOCKED -> throw new StorageQuotaExceededException();
+            case UNAVAILABLE -> throw new StorageUnavailableException(
+                    "현재 문서 업로드를 받을 수 없습니다. 잠시 후 다시 시도해 주세요.");
+            case OPEN -> { }
+        }
+
+        ObjectStorage.WriteTarget target = storage.activeWriteTarget();
+        Prepared prepared = transactions.execute(status -> {
+            // Agent first, then the document — the order settle() takes. Two paths that hold both
+            // rows in opposite orders is a deadlock, not a style question. The agent lock is also
+            // what serialises the quota and the successor lookup below, exactly as in grant().
+            agents.findWithLockById(document.getAgentId())
+                    .orElseThrow(() -> new AiAgentNotFoundException(document.getAgentId()));
+            AiDocument original = documents.findWithLockById(documentId)
+                    .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
+
+            // Re-read under the lock. The status seen above may be minutes old: a lease expiring
+            // (FR-015) turns this document DISABLED in its own transaction, and replacing a
+            // document that is no longer live would publish into a booth nobody can edit.
+            if (!original.isReady()) {
+                throw new ApiException(ErrorCode.DOCUMENT_NOT_REPLACEABLE,
+                        "준비 완료(READY) 문서만 교체할 수 있습니다. 현재 상태: "
+                                + original.getProcessingStatus());
+            }
+            return prepareReplacement(original, userId, request, target);
+        });
+        return present(Objects.requireNonNull(prepared));
+    }
+
+    /**
+     * Decides what a replacement request means for a target that is already being replaced.
+     *
+     * <p><b>A pre-read under the agent lock, not a caught constraint violation.</b> Absorbing a
+     * {@code ux_ai_documents_active_replacement} failure would be the wrong shape twice over: after
+     * a violated {@code saveAndFlush} neither the transaction nor the persistence context can be
+     * reused, and the index is the backstop for a writer that skipped this lock — turning it into a
+     * cheerful 200 would hide exactly that defect (the same judgement {@link #issueUploadUrl}
+     * records about the hash index).
+     */
+    private Prepared prepareReplacement(AiDocument original, Long userId, UploadRequest request,
+                                        ObjectStorage.WriteTarget target) {
+        Long documentId = original.getId();
+        if (original.getContentSha256().equals(request.contentSha256())) {
+            // The file the owner picked is the one already there. Nothing to replace, and creating
+            // a row would spend a slot and a Job on an identical original — FR-019c's reading of a
+            // duplicate, applied to the target itself.
+            return Prepared.duplicate(original);
+        }
+
+        Optional<AiDocument> inFlight = documents.findActiveReplacementOf(documentId);
+        // FR-019b uniqueness is per (agent, hash) across the active states, so a replacement
+        // carrying a hash another live document already holds cannot be inserted at all. Saying so
+        // here names the document that blocks it; letting the index fire would be a 500.
+        //
+        // The target and the replacement already being uploaded over it are not "elsewhere": the
+        // first is the row this call is aimed at, and the second is this same request arriving
+        // again — both are answered below rather than refused.
+        Optional<AiDocument> sameFileElsewhere =
+                documents.findActiveByAgentAndSha(original.getAgentId(), request.contentSha256())
+                        .filter(other -> !other.getId().equals(documentId))
+                        .filter(other -> inFlight.isEmpty()
+                                || !other.getId().equals(inFlight.get().getId()));
+        if (sameFileElsewhere.isPresent()) {
+            throw new ApiException(ErrorCode.DOCUMENT_NOT_REPLACEABLE,
+                    "같은 파일이 이미 다른 문서로 등록돼 있습니다. 그 문서를 교체하거나 삭제한 뒤 시도해 주세요.");
+        }
+
+        if (inFlight.isEmpty()) {
+            return Prepared.issued(insert(original.getBoothId(), original.getAgentId(), userId,
+                    request, target, documentId));
+        }
+
+        AiDocument successor = inFlight.get();
+        if (!successor.isAwaitingUpload()) {
+            if (AiDocument.QUEUED.equals(successor.getProcessingStatus())
+                    && successor.getContentSha256().equals(request.contentSha256())) {
+                // Uploaded and waiting to be processed. The request has already been carried out,
+                // so this is the duplicate answer, pointed at the row that is doing the work.
+                return Prepared.duplicate(successor);
+            }
+            // PROCESSING, READY, or a different file on an upload that already landed. Cancelling
+            // work that is under way — or that a worker is holding the file for — is a different
+            // operation from starting one, and nothing asked for it.
+            throw new ApiException(ErrorCode.DOCUMENT_NOT_REPLACEABLE,
+                    "이미 진행 중인 교체가 있습니다. 끝난 뒤 다시 시도해 주세요.");
+        }
+
+        if (successor.getContentSha256().equals(request.contentSha256())) {
+            if (isResumable(successor, target)) {
+                // Same file, grant still outstanding: re-sign it (#84 멱등 재발급). present()
+                // checks the name, type and size against the row before signing.
+                return Prepared.reissue(successor, request);
+            }
+            // The write target moved under the unfinished grant (FR-032).
+            abandon(successor);
+        } else {
+            // The owner changed their mind about which file replaces this document. The old grant
+            // has no object behind it and no Job — createQueuedJob runs in the same transaction
+            // that fills uploaded_at, so a row awaiting upload provably has none — so expiring it
+            // is the whole of the cleanup. expire() deliberately leaves replaced_at null: nothing
+            // took this row over, it was simply abandoned (FR-027a).
+            abandon(successor);
+        }
+        return Prepared.issued(insert(original.getBoothId(), original.getAgentId(), userId, request,
+                target, documentId));
+    }
+
+    /**
+     * Gives up an unfinished grant so a new row can take its place.
+     *
+     * <p><b>The flush is load-bearing, not a tidy-up.</b> Hibernate's action queue runs inserts
+     * before updates, so without it the replacement row is inserted while this one is still active
+     * and the partial unique indexes refuse it — {@code ux_ai_documents_agent_active_sha} on the
+     * FR-032 path, {@code ux_ai_documents_active_replacement} when the owner swaps which file
+     * replaces a document. Both are legitimate requests and both would come back a 500.
+     *
+     * <p>It used to work by accident: the quota pre-check sat between the two and its JPQL query
+     * auto-flushed the update. Moving that check after the insert (see {@link #insert}) took the
+     * accident away, which is reason enough to state the ordering here instead.
+     */
+    private void abandon(AiDocument grant) {
+        grant.expire(Instant.now());
+        documents.flush();
+    }
+
+    /**
+     * Creates the row and proves it fits, in that order.
+     *
+     * <p><b>The quota is checked after the insert, not before.</b> A replacement's arithmetic only
+     * balances once the row exists: {@code countActive} drops the original because a live successor
+     * points at it, and nothing points at it until the successor is there. Asked beforehand, the
+     * eleventh row of a full agent is refused and replacing a document becomes impossible exactly
+     * when it matters most. Asked afterwards, the answer is the logical total and the refusal rolls
+     * the insert back with it.
+     *
+     * <p>Nothing changes for an ordinary upload: the pre-check asked whether this row <i>would</i>
+     * exceed the limit and the post-check asks whether it <i>does</i>, over the same rows and the
+     * same numbers.
+     */
+    private AiDocument insert(Long boothId, Long agentId, Long userId, UploadRequest request,
+                              ObjectStorage.WriteTarget target, Long replaces) {
+        AiDocument document = new AiDocument(boothId, agentId, userId, request.fileName(),
+                request.contentType(), request.size(), request.contentSha256(), target, replaces,
+                Instant.now());
+        // saveAndFlush, not save: the id has to exist before the object key can be built, and
+        // flushing here also means an index violation surfaces inside this transaction instead
+        // of at commit time, where the stack trace no longer says which insert caused it.
+        document = documents.saveAndFlush(document);
+        document.assignObjectKey(objectKeyOf(document));
+        requireRoom(agentId);
+        return document;
     }
 
     /**
@@ -221,13 +399,14 @@ public class AiDocumentService {
         }
     }
 
-    private void requireRoom(Long agentId, long size) {
+    /** FR-018's two limits, read off the logical totals — see {@link #insert} for the ordering. */
+    private void requireRoom(Long agentId) {
         int countLimit = agentProperties.documentCountLimit();
-        if (documents.countActive(agentId) >= countLimit) {
+        if (documents.countActive(agentId) > countLimit) {
             throw AiDocumentLimitException.byCount(countLimit);
         }
         DataSize totalLimit = agentProperties.documentTotalBytes();
-        if (documents.sumActiveBytes(agentId) + size > totalLimit.toBytes()) {
+        if (documents.sumActiveBytes(agentId) > totalLimit.toBytes()) {
             throw AiDocumentLimitException.byTotalSize(totalLimit);
         }
     }
@@ -236,6 +415,36 @@ public class AiDocumentService {
     private static String objectKeyOf(AiDocument document) {
         return "booths/" + document.getBoothId() + "/agents/" + document.getAgentId()
                 + "/documents/" + document.getId() + "/" + document.getOriginalFilename();
+    }
+
+    // ── 목록·상태 조회 ──────────────────────────────────────────────────────
+
+    /**
+     * The agent's documents and how much of the quota they use (US2 시나리오 2·7, US3 시나리오 1).
+     *
+     * <p><b>{@code requireEditor}, not {@code requireActiveEditor}.</b> An expired lease turns the
+     * documents {@code DISABLED} and keeps the originals (FR-015) — being unable to look at what
+     * you own because the lease ran out would make that preservation pointless. Writing still needs
+     * an active lease; reading does not.
+     *
+     * <p><b>Nothing here touches FastAPI.</b> US2 시나리오 7 requires the list to answer while the
+     * AI service is down, and it does because every value on it is a column of {@code ai_documents}.
+     *
+     * <p>No paging. FR-018 caps an agent at ten active documents, and the inactive ones this list
+     * also returns are bounded by the same grants — a page parameter would be two sides of protocol
+     * for a list that fits on one screen. ponytail: add it when a real agent's list stops fitting.
+     */
+    public DocumentListView list(Long agentId, Long userId) {
+        AiAgent agent = agents.findById(agentId)
+                .orElseThrow(() -> new AiAgentNotFoundException(agentId));
+        accessGuard.requireEditor(agent.getBoothId(), userId);
+
+        List<DocumentView> rows = documents.findByAgentIdOrderByCreatedAtDesc(agentId).stream()
+                .map(DocumentView::of)
+                .toList();
+        return new DocumentListView(rows, new QuotaView(agentProperties.documentCountLimit(),
+                agentProperties.documentTotalBytes().toBytes(),
+                documents.countActive(agentId), documents.sumActiveBytes(agentId)));
     }
 
     // ── 업로드 완료 ─────────────────────────────────────────────────────────
@@ -283,6 +492,18 @@ public class AiDocumentService {
      * upload gate never triggers a HEAD.
      */
     private static CompleteView decideWithoutStorage(AiDocument document) {
+        if (document.getReplacedAt() != null) {
+            // FR-027a. EXPIRED here means "a newer version took this document's place", not
+            // "the bytes never arrived" — and the 24-hour recovery window (FR-027) belongs to the
+            // second reading only. Recovering this row would put the old version back into the
+            // active set alongside the one that replaced it.
+            //
+            // Checked before every other branch, on both reads, so the answer never depends on
+            // what storage says: the object may well still be sitting there until the delete sweep
+            // takes it (FR-028), and it is not what decides this.
+            throw new ApiException(ErrorCode.DOCUMENT_UPLOAD_GONE,
+                    "이 문서는 수정본으로 교체되었습니다. 교체본을 사용해 주세요.");
+        }
         if (PAST_UPLOAD.contains(document.getProcessingStatus())) {
             return CompleteView.of(document);
         }
@@ -300,6 +521,13 @@ public class AiDocumentService {
     }
 
     private Settled settle(Long documentId, Snapshot snapshot, Optional<Long> storedSize) {
+        // Agent first, then the document — the order issueUploadUrl takes. Reversing it here would
+        // put two paths that hold both rows in opposite orders, which is a deadlock rather than a
+        // style question. The lock is what makes the supersession check below decide something: a
+        // competing grant is a different row, so this document's own lock cannot serialise it.
+        agents.findWithLockById(snapshot.agentId())
+                .orElseThrow(() -> new AiAgentNotFoundException(snapshot.agentId()));
+
         AiDocument document = documents.findWithLockById(documentId)
                 .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
 
@@ -327,6 +555,34 @@ public class AiDocumentService {
                 throw gone();
             }
             if (!present) {
+                throw gone();
+            }
+            // A newer grant for the same file already holds the active slot. Recovering would put
+            // two active rows on one (agent_id, content_sha256) and break
+            // ux_ai_documents_agent_active_sha — a 500 nobody could act on. The user has already
+            // started over with this file, so the sentence 410 carries ("업로드가 만료되었습니다.
+            // 새로 업로드해 주세요.") is exactly what happened to this grant.
+            //
+            // FR-027 is not weakened: it promises the original is kept and recoverable, not that a
+            // late completion outranks the upload the same user started afterwards.
+            boolean superseded = documents
+                    .findActiveByAgentAndSha(document.getAgentId(), document.getContentSha256())
+                    .filter(other -> !other.getId().equals(documentId))
+                    .isPresent();
+            if (superseded) {
+                throw gone();
+            }
+            // The same argument for the replacement index (V30). Two ways this row's recovery would
+            // break ux_ai_documents_active_replacement: something is already being uploaded over
+            // this document, or — if this row is itself an abandoned 교체 attempt — over the same
+            // target it was meant to replace. Either way the live attempt is the one the owner
+            // started last, and this one is the grant that ran out.
+            boolean replacementPending =
+                    documents.findActiveReplacementOf(documentId).isPresent()
+                            || (document.getReplacesDocumentId() != null && documents
+                                    .findActiveReplacementOf(document.getReplacesDocumentId())
+                                    .isPresent());
+            if (replacementPending) {
                 throw gone();
             }
             document.recover(now);
@@ -479,6 +735,56 @@ public class AiDocumentService {
         }
     }
 
+    /**
+     * One row of the list.
+     *
+     * <p><b>{@code uploadedAt} is {@code null} while the bytes are still in flight.</b> That is the
+     * one thing {@code status} cannot say: a grant that was just issued and a document waiting to
+     * be processed are both {@code QUEUED}. A client can tell them apart with this field — and the
+     * expiry sweep reads the same column for the same reason.
+     *
+     * <p><b>No failure reason yet.</b> FR-007 requires a cleaned-up one and forbids leaking
+     * {@code ai_document_jobs.last_error}. The worker's {@code failureCode} is a free-form string
+     * of up to 50 characters with no agreed set, so there is nothing to translate from — and
+     * nothing writes {@code FAILED} to a document today in any case (GitLab #119). Whoever adds
+     * that writer (S15P21A604-400) adds the reason with it.
+     *
+     * <p><b>{@code replacedAt} is the second thing {@code status} cannot say.</b> An
+     * {@code EXPIRED} row with it set was pushed out by a newer version; without it the upload
+     * simply never arrived and can still be completed for 24 hours (FR-027 vs FR-027a). The screen
+     * has to tell those apart — offering "다시 올려 주세요" on a document that was replaced is the
+     * shape of T-24, a control that reads as working and does nothing. Adding a
+     * {@code DocumentStatus} value instead would drag the V24 check, the sweep predicates, OpenAPI
+     * and every existing test along for one bit of information.
+     */
+    public record DocumentView(Long documentId, String fileName, long sizeBytes, String status,
+                               Instant createdAt, Instant uploadedAt, Instant replacedAt) {
+
+        static DocumentView of(AiDocument document) {
+            return new DocumentView(document.getId(), document.getOriginalFilename(),
+                    document.getSizeBytes(), document.getProcessingStatus(),
+                    document.getCreatedAt(), document.getUploadedAt(), document.getReplacedAt());
+        }
+    }
+
+    /**
+     * FR-018's two limits and how much of them is spent.
+     *
+     * <p>The limits are on the response because otherwise they surface only as a refusal:
+     * {@code 409 DOCUMENT_LIMIT_EXCEEDED}, on a grant the user has already chosen a file for.
+     *
+     * <p><b>{@code usedCount} and {@code usedBytes} used to be left out</b>, on the grounds that the
+     * caller can count the array it just received. 수정본 교체 ended that: while a replacement is in
+     * flight the array holds eleven rows on a ten-slot agent and every one of them is in an active
+     * status, so counting them shows "11/10" beside an upload that will in fact succeed. The
+     * successor stands for its original's slot (see {@code AiDocumentRepository.countActive}), and
+     * that subtraction is a server-side fact — two queries per poll is what it costs to not make
+     * every client re-derive it, and get it wrong.
+     */
+    public record QuotaView(int countLimit, long bytesLimit, long usedCount, long usedBytes) { }
+
+    public record DocumentListView(List<DocumentView> documents, QuotaView quota) { }
+
     /** What the grant transaction decided, carried out so the URL can be signed outside it. */
     private record Prepared(AiDocument document, boolean duplicate, boolean reissue,
                             UploadRequest request) {
@@ -496,13 +802,20 @@ public class AiDocumentService {
         }
     }
 
-    /** The row as it looked before the HEAD, plus any answer that needed no storage at all. */
-    private record Snapshot(String provider, String bucket, String objectKey, long sizeBytes,
-                            CompleteView decided) {
+    /**
+     * The row as it looked before the HEAD, plus any answer that needed no storage at all.
+     *
+     * <p>{@code agentId} is here so {@link #settle} can take the agent lock <b>before</b> it loads
+     * the document. The status is deliberately not carried: the sweeper may have moved it during
+     * the HEAD, which is the whole reason the write transaction decides again.
+     */
+    private record Snapshot(Long agentId, String provider, String bucket, String objectKey,
+                            long sizeBytes, CompleteView decided) {
 
         static Snapshot of(AiDocument document, CompleteView decided) {
-            return new Snapshot(document.getStorageProvider(), document.getStorageBucket(),
-                    document.getObjectKey(), document.getSizeBytes(), decided);
+            return new Snapshot(document.getAgentId(), document.getStorageProvider(),
+                    document.getStorageBucket(), document.getObjectKey(), document.getSizeBytes(),
+                    decided);
         }
 
         boolean sameStorage(AiDocument document) {

@@ -1,96 +1,152 @@
-def call(Map config = [:]) {
-    final String commit = env.GIT_COMMIT
-    final String runId = "${env.JOB_NAME}-${env.BUILD_NUMBER}".replaceAll(/[^A-Za-z0-9_.-]/, '_')
-    final String artifactRoot = "${env.WORKSPACE}/artifacts/develop"
-    final String metadataDir = "${artifactRoot}/components"
-    final String releaseId = "develop-${commit}-${env.BUILD_NUMBER}"
-    final List components = ['ai', 'back', 'front']
+def call() {
+    // SCM environment variables may be absent after a Controller restart;
+    // the checked-out commit remains the authoritative build revision.
+    final String headSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    if (!(headSha ==~ /^[0-9a-f]{40}$/)) { error('GIT_COMMIT must be a full lowercase SHA') }
 
-    withEnv(["CI_BRANCH=develop", "CI_COMMIT_SHA=${commit}", "CI_RUN_ID=${runId}", "RELEASE_ID=${releaseId}",
-             "DEPLOY_TARGET=integration-develop", "CI_ARTIFACT_DIR=${artifactRoot}", "COMPONENT_METADATA_DIR=${metadataDir}",
-             "RELEASE_MANIFEST_PATH=${artifactRoot}/release-manifest.json", "STATE_DIR=${env.WORKSPACE}/infra/deploy/state/runtime/integration-develop"]) {
-        stage('Build candidate components') {
-            components.each { component ->
-                withEnv(["CI_COMPONENT=${component}", "CI_ARTIFACT_DIR=${artifactRoot}/build/${component}"]) {
-                    sh "infra/jenkins/scripts/with-credentials.sh -- ci/validate"
-                    sh "infra/jenkins/scripts/with-credentials.sh -- ci/test"
-                    sh "infra/jenkins/scripts/with-credentials.sh -- ci/build"
-                    sh "infra/jenkins/scripts/with-credentials.sh -- ci/package"
-                    sh "mkdir -p '${metadataDir}' && cp '${artifactRoot}/build/${component}/image-metadata.json' '${metadataDir}/${component}.json'"
-                }
+    String range = "--branch develop --head '${headSha}'"
+    final String baseSha = env.GIT_BEFORE_SHA ?: env.GIT_PREVIOUS_COMMIT ?: env.GIT_PREVIOUS_SUCCESSFUL_COMMIT ?: ''
+    if (baseSha) { range += " --base '${baseSha}'" }
+
+    final String selectionText = sh(
+        returnStdout: true,
+        script: "infra/jenkins/scripts/detect-changed-components.sh ${range}"
+    ).trim()
+    final Map selection = readJSON text: selectionText, returnPojo: true
+    sh 'mkdir -p artifacts/develop'
+    writeFile file: 'artifacts/develop/selection.json', text: "${selectionText}\n"
+    archiveArtifacts artifacts: 'artifacts/develop/selection.json', allowEmptyArchive: false, fingerprint: true
+
+    final List components = selection.components as List
+    if (components.isEmpty()) {
+        echo "NO_OP: ${selection.reasons.join(', ')}"
+        return
+    }
+
+    final String componentList = components.join(',')
+    final String artifactRoot = 'artifacts/develop'
+    final String metadataDir = "${artifactRoot}/release-metadata"
+    final String releaseManifest = "${artifactRoot}/release-manifest.json"
+    final String transferBundle = "develop-${headSha}-${env.BUILD_NUMBER}"
+    final String transferDir = '/var/lib/festa-image-transfer'
+    // `components` may be all components for a shared CI change. Only the
+    // detector's deployComponents contract is allowed to mutate dev.
+    final List deployComponents = (selection.deployComponents as List).findAll { it in ['ai', 'back', 'front'] }
+    final String deployComponentList = deployComponents.join(',')
+
+    echo "SELECTED_COMPONENTS: ${components.join(', ')}; dev batch targets: ${deployComponentList ?: 'none'}"
+    components.each { component ->
+        load('infra/jenkins/pipelines/component.groovy').call([
+            component: component,
+            sourceSha: selection.headSha,
+            artifactDir: "artifacts/develop/build/${component}"
+        ])
+    }
+    if (components.contains('game')) {
+        stage('Collect Game Candidate Metadata') {
+            unstash 'candidate-metadata-game'
+        }
+    }
+
+    stage('Candidate Manifest') {
+        sh """
+            mkdir -p '${metadataDir}'
+            rm -f '${metadataDir}'/*.json
+            for component in ${componentList.replace(',', ' ')}; do
+                cp '${artifactRoot}/build/'\${component}'/image-metadata.json' '${metadataDir}/'\${component}'.json'
+            done
+        """
+        withEnv([
+            "DEPLOY_COMPONENTS=${componentList}",
+            "COMPONENT_METADATA_DIR=${metadataDir}",
+            "RELEASE_MANIFEST_PATH=${releaseManifest}",
+            "RELEASE_ID=develop-${headSha}-${env.BUILD_NUMBER}",
+            'SCM_PROVIDER=gitlab',
+            'SCM_REPOSITORY=s15-metaverse-game-sub1/S15P21A604',
+            'SCM_BRANCH=develop',
+            "CI_COMMIT_SHA=${headSha}",
+            "JENKINS_JOB=${env.JOB_NAME}",
+            "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}",
+            "JENKINS_BUILD_URL=${env.BUILD_URL}"
+        ]) {
+            sh 'infra/deploy/scripts/build-release-manifest.sh'
+            sh "infra/jenkins/scripts/transfer-local-images.sh --export --bundle '${transferBundle}' --transfer-dir '${transferDir}' --manifest '${releaseManifest}'"
+            stash name: 'candidate-release-manifest', includes: releaseManifest, useDefaultExcludes: false
+        }
+    }
+
+    stage('Deploy Candidate Receipt') {
+        node('deploy') {
+            ws('/home/jenkins/agent/deploy/workspaces/develop-candidate-receipt') {
+                checkout scm
+                sh "git checkout --detach '${headSha}'"
+                unstash 'candidate-release-manifest'
+                sh "infra/jenkins/scripts/transfer-local-images.sh --import --bundle '${transferBundle}' --transfer-dir '${transferDir}'"
             }
         }
-        stage('Build candidate game') {
-            node('unity-6000.0.78f1') {
-                ws("/home/jenkins/agent/unity/workspaces/${runId}/develop") {
-                    checkout scm
-                    withEnv(["CI_COMPONENT=game", "CI_BRANCH=develop", "CI_COMMIT_SHA=${commit}", "CI_RUN_ID=${runId}",
-                             "CI_ARTIFACT_DIR=${pwd()}/artifacts/develop/build/game"]) {
-                        sh 'infra/jenkins/scripts/with-credentials.sh -- ci/validate'
-                        sh 'infra/jenkins/scripts/with-credentials.sh -- ci/test'
-                        sh 'infra/jenkins/scripts/with-credentials.sh -- ci/build'
-                        sh 'infra/jenkins/scripts/with-credentials.sh -- ci/package'
-                        stash name: "develop-game-${runId}", includes: 'artifacts/develop/build/game/image-metadata.json', useDefaultExcludes: false
+    }
+
+    if (deployComponents.isEmpty()) {
+        echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
+        return
+    }
+
+    stage('Deploy Selected Components') {
+        node('deploy') {
+            ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
+                checkout scm
+                sh "git checkout --detach '${headSha}'"
+                unstash 'candidate-release-manifest'
+
+                final List credentialBindings = []
+                final List credentialNames = []
+                final String checkoutCredentialId = env.GITLAB_CHECKOUT_CREDENTIALS_ID ?: ''
+                if (checkoutCredentialId.trim().isEmpty()) {
+                    error('GITLAB_CHECKOUT_CREDENTIALS_ID is required for the deploy freshness check')
+                }
+                credentialBindings << gitUsernamePassword(credentialsId: checkoutCredentialId)
+                if (deployComponents.contains('ai')) {
+                    credentialBindings << file(credentialsId: env.DEV_AI_ENV_CREDENTIAL_ID, variable: 'DEV_AI_ENV_FILE')
+                    credentialNames << 'DEV_AI_ENV_FILE'
+                }
+                if (deployComponents.contains('back')) {
+                    credentialBindings << file(credentialsId: env.DEV_BACK_ENV_CREDENTIAL_ID, variable: 'DEV_BACK_ENV_FILE')
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS')
+                    credentialNames << 'DEV_BACK_ENV_FILE'
+                    credentialNames << 'INTERNAL_INFRA_TO_SPRING_TOKENS'
+                }
+                if (deployComponents.any { it in ['ai', 'back'] }) {
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_SPRING_TO_AI_TOKENS')
+                    credentialBindings << string(credentialsId: env.DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+                    credentialNames.addAll(['INTERNAL_SPRING_TO_AI_TOKENS', 'INTERNAL_AI_TO_SPRING_TOKENS'])
+                }
+
+                def deployBatch = {
+                    int deployStatus = sh(
+                        returnStatus: true,
+                        script: "infra/jenkins/scripts/with-credentials.sh ${credentialNames.join(' ')} -- infra/jenkins/scripts/deploy-dev-batch.sh"
+                    )
+                    archiveArtifacts artifacts: 'artifacts/develop/dev-batch-result.json', allowEmptyArchive: true, fingerprint: true
+                    if (deployStatus == 75) {
+                        currentBuild.result = 'NOT_BUILT'
+                        echo 'SUPERSEDED: newer develop head exists before dev deployment'
+                        return
                     }
+                    if (deployStatus != 0) { error("dev batch failed with exit ${deployStatus}") }
                 }
-            }
-            unstash "develop-game-${runId}"
-            sh "mkdir -p '${metadataDir}' && cp 'artifacts/develop/build/game/image-metadata.json' '${metadataDir}/game.json'"
-        }
-        stage('Create candidate manifest') {
-            withEnv(["SCM_PROVIDER=${env.SCM_PROVIDER ?: 'github'}", "SCM_REPOSITORY=${env.SCM_REPOSITORY ?: env.GIT_URL}", 'SCM_BRANCH=develop',
-                     "JENKINS_JOB=${env.JOB_NAME}", "JENKINS_BUILD_NUMBER=${env.BUILD_NUMBER}", "JENKINS_BUILD_URL=${env.BUILD_URL}"]) {
-                sh 'infra/deploy/scripts/build-release-manifest.sh'
-                sh 'mkdir -p "$STATE_DIR/candidates" && cp "$RELEASE_MANIFEST_PATH" "$STATE_DIR/candidates/$RELEASE_ID.json"'
-            }
-        }
-        stage('Deploy and verify candidate') {
-            milestone ordinal: env.BUILD_NUMBER.toInteger()
-            lock(resource: 'deploy-integration-develop') {
-                int fresh = sh(returnStatus: true, script: 'FRESHNESS_EXPECTED_SHA="$CI_COMMIT_SHA" infra/jenkins/scripts/freshness.sh')
-                if (fresh == 75) { currentBuild.result = 'NOT_BUILT'; error('SUPERSEDED: newer develop head exists') }
-                if (fresh != 0) { error('develop freshness check failed') }
-                ['DEMO_BACK_ENV_CREDENTIAL_ID', 'DEMO_AI_ENV_CREDENTIAL_ID', 'DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID'].each { name ->
-                    if (!env[name]?.trim()) { error("필수 Jenkins credential ID 누락: ${name}") }
-                }
-                withCredentials([
-                    file(credentialsId: env.DEMO_BACK_ENV_CREDENTIAL_ID, variable: 'BACK_ENV_FILE'),
-                    file(credentialsId: env.DEMO_AI_ENV_CREDENTIAL_ID, variable: 'AI_ENV_FILE'),
-                    string(credentialsId: env.DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_AI_TO_SPRING_TOKENS')
+
+                withEnv([
+                    "DEV_BATCH_ID=develop-${headSha}-${env.BUILD_NUMBER}",
+                    "DEPLOY_COMPONENTS=${deployComponentList}",
+                    "RELEASE_MANIFEST_PATH=${releaseManifest}",
+                    "CI_ARTIFACT_DIR=${artifactRoot}",
+                    "FRESHNESS_EXPECTED_SHA=${headSha}",
+                    'CI_BRANCH=develop',
+                    'PUBLIC_UNITY_BUILD_BASE=/unity/'
                 ]) {
-                    withEnv(['FESTA_ENVIRONMENT=demo', 'PUBLIC_UNITY_BUILD_BASE=/unity/']) {
-                        sh 'infra/jenkins/scripts/with-credentials.sh BACK_ENV_FILE AI_ENV_FILE INTERNAL_AI_TO_SPRING_TOKENS -- infra/deploy/scripts/deploy-release.sh'
-                    }
+                    if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }
                 }
-                int verified = sh(returnStatus: true, script: 'infra/jenkins/scripts/with-credentials.sh -- infra/deploy/scripts/verify-release.sh')
-                sh 'RECOVERY_DECISION_PATH="$CI_ARTIFACT_DIR/recovery-decision.json" VERIFICATION_RESULT_PATH="$CI_ARTIFACT_DIR/verification-result.json" infra/deploy/scripts/decide-recovery.sh'
-                def decision = readJSON file: 'artifacts/develop/recovery-decision.json'
-                if (verified == 0 && decision.decision == 'NONE') {
-                    sh 'VERIFICATION_RESULT_PATH="$CI_ARTIFACT_DIR/verification-result.json" infra/deploy/scripts/promote-release.sh'
-                } else if (decision.decision == 'AUTO_ROLLBACK') {
-                    if (!fileExists("${env.STATE_DIR}/target-state.json")) {
-                        sh '''python -c "import json,os; p=os.environ['CI_ARTIFACT_DIR']+'/recovery-decision.json'; d=json.load(open(p)); d.update(decision='MANUAL',reason='no known-good release exists'); open(p,'w').write(json.dumps(d,indent=2))"'''
-                        echo 'MANUAL_ACTION_REQUIRED: no known-good release exists'
-                    } else {
-                        def targetState = readJSON file: "${env.STATE_DIR}/target-state.json"
-                        withEnv(["KNOWN_GOOD_MANIFEST_PATH=${env.STATE_DIR}/releases/${targetState.knownGoodReleaseId}.json", "CI_ARTIFACT_DIR=${artifactRoot}/rollback"]) {
-                            int rollbackStatus = sh(returnStatus: true, script: 'infra/deploy/scripts/rollback-release.sh')
-                            if (rollbackStatus != 0) { echo 'ROLLBACK_FAILED: automatic retry is forbidden' }
-                        }
-                    }
-                    currentBuild.result = 'FAILURE'
-                } else if (decision.decision == 'AI_RETRY') {
-                    currentBuild.result = 'UNSTABLE'; echo 'AWAITING_AI_RETRY_OR_APPROVAL'
-                } else {
-                    currentBuild.result = 'FAILURE'; echo 'MANUAL_ACTION_REQUIRED'
-                }
-                sh 'rm -f "$STATE_DIR/candidates/$RELEASE_ID.json"'
             }
-        }
-        stage('Provenance') {
-            sh 'VERIFICATION_RESULT_PATH="$CI_ARTIFACT_DIR/verification-result.json" RECOVERY_DECISION_PATH="$CI_ARTIFACT_DIR/recovery-decision.json" ROLLBACK_DECISION_PATH="$CI_ARTIFACT_DIR/rollback/rollback-decision.json" DEPLOYMENT_RECORD_PATH="$CI_ARTIFACT_DIR/deployment-record.json" RUN_ID="$CI_RUN_ID" infra/deploy/scripts/write-deployment-record.sh'
-            sh 'PROVENANCE_LOG="$CI_ARTIFACT_DIR/provenance.jsonl" RUN_ID="$CI_RUN_ID" VERIFICATION_RESULT_PATH="$CI_ARTIFACT_DIR/verification-result.json" DEPLOYMENT_RECORD_PATH="$CI_ARTIFACT_DIR/deployment-record.json" infra/jenkins/scripts/provenance.sh'
-            load('infra/jenkins/pipelines/provenance.groovy').archiveReleaseEvidence('artifacts/develop')
         }
     }
 }

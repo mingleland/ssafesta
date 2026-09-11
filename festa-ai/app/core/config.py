@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     @field_validator(
         "embedding_api_key",
         "gms_api_key",
+        "minio_endpoint",
+        "minio_bucket",
+        "minio_access_key_id",
+        "minio_secret_access_key",
         mode="before",
     )
     @classmethod
@@ -180,6 +184,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(min_length=1, validation_alias="REDIS_URL")
     conversation_ttl_seconds: int = Field(default=1800, gt=0)
     spring_booth_access_timeout_seconds: float = Field(default=1.0, gt=0)
+    # 질문마다 검색 전에 호출하는 Agent 설정 snapshot. 재시도·캐시는 하지 않는다.
+    spring_agent_config_timeout_seconds: float = Field(default=1.0, gt=0)
     # Spring 내부 검색 timeout이 3초이므로(spring-chunk-search-api.yaml) 여유를 둔다.
     spring_chunk_search_timeout_seconds: float = Field(default=3.5, gt=0)
     # 응답 timeout (spec 008 FR-007, 헌법 19조) — 첫 token까지 15초, 전체 응답 60초.
@@ -209,11 +215,14 @@ class Settings(BaseSettings):
     # is region-less, so "auto" is the documented literal value (팀 결정 필요사항 §①).
     r2_region: str = "auto"
 
-    # MinIO object storage (operator-approved manual fallback only) — spec 007 FR-030..033
-    minio_endpoint: str = Field(min_length=1)
-    minio_bucket: str = Field(min_length=1)
-    minio_access_key_id: SecretStr = Field(min_length=1)
-    minio_secret_access_key: SecretStr = Field(min_length=1)
+    # MinIO object storage (operator-approved manual fallback only) — spec 007
+    # FR-030..033. R2 is the sole P0 active provider (GitLab #100); an R2-only
+    # deployment carries no MinIO credentials at all, so these are optional —
+    # `_validate_minio_storage` below still requires all four or none.
+    minio_endpoint: str | None = None
+    minio_bucket: str | None = None
+    minio_access_key_id: SecretStr | None = None
+    minio_secret_access_key: SecretStr | None = None
 
     @property
     def jwt_secret_key(self) -> bytes:
@@ -308,6 +317,29 @@ class Settings(BaseSettings):
             raise ValueError(
                 "INTERNAL_SPRING_TO_AI_TOKENS and INTERNAL_AI_TO_SPRING_TOKENS "
                 "must not share tokens"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_minio_storage(self) -> "Settings":
+        """MinIO is an operator-approved manual fallback, not always provisioned
+        (S15P21A604-594) — an R2-only deployment must boot with all four MinIO
+        values absent. A partial set means misconfiguration rather than
+        "not yet provisioned", so it fails fast instead of booting with a
+        half-set fallback that would only error once actually selected.
+        """
+        fields = {
+            "MINIO_ENDPOINT": self.minio_endpoint,
+            "MINIO_BUCKET": self.minio_bucket,
+            "MINIO_ACCESS_KEY_ID": self.minio_access_key_id,
+            "MINIO_SECRET_ACCESS_KEY": self.minio_secret_access_key,
+        }
+        present = [name for name, value in fields.items() if value is not None]
+        if present and len(present) != len(fields):
+            missing = [name for name in fields if name not in present]
+            raise ValueError(
+                "MinIO storage settings must be all present or all absent, "
+                f"missing: {', '.join(missing)}"
             )
         return self
 

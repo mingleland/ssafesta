@@ -189,7 +189,7 @@
 - 단일 EC2에서는 PostgreSQL 인스턴스 하나를 공유하되 Spring의 영구 비즈니스 데이터와 AI의 pgvector 데이터는 별도 데이터베이스와 별도 서비스 계정으로 분리한다. 각 서비스 계정은 상대 데이터베이스에 접근할 수 없어야 한다.
 - `infra-001-ci-cd-pipelines`가 빌드·패키징·배포·검증·롤백·Secret Scan·관측 기반을 제공하며, 이 기능은 그 계약을 소비한다.
 - dev는 파트별 독립 실행 대상으로 Mock 연동을 허용하고, demo는 `develop` 통합 릴리스의 실사용 기준 환경이다.
-- 도메인 구매 전에는 Nginx가 EC2 공인 IP의 HTTP 진입점을 제공한다. 도메인 구매 후에도 dev는 EC2 IP 기반의 제한적 검증 경로를 유지하고, 신규 도메인과 TLS는 최종 demo에 적용한다. HTTPS·소셜 로그인·Secure Cookie와 최종 WSS 검증은 demo 완료 조건으로 다룬다.
+- dev는 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`에서 `/`, `/api/`, `/ai/v1/`, `/unity/`를 제공하고, UnityTransport는 `wss://world-dev.${ROOT_DOMAIN}:443` 전용 host를 사용한다. HTTPS·소셜 로그인·Secure Cookie는 dev에서도 계약 검증할 수 있으나, demo promotion의 전체 사용자 여정과 최종 WSS 검증은 demo 완료 조건으로 별도 관리한다.
 - 외부 S3-compatible Object Storage는 EC2의 디스크·네트워크·운영 부하를 줄이는 우선 경로이며 Cloudflare R2를 사용한다. Cloudflare DNS/CDN과 R2는 팀 소유 계정으로 관리하고 과금 책임자를 지정하며, 결제수단 등록과 초과 과금 위험 때문에 애플리케이션 측 무과금 안전 한도를 적용한다.
 - 외부 Object Storage를 사용할 수 없을 때는 신규 업로드를 차단하고, 운영자가 단일 서버 내 S3-compatible 대체 저장소의 연결과 쓰기 동작을 검증한 뒤 수동 전환한다. 같은 서버 장애로 데이터가 함께 유실되는 한계는 수용하지 않고 기록한다.
 - 추가 서버나 별도 외부 백업 서비스는 도입하지 않는다. PostgreSQL 백업은 기존 R2의 비공개 Backup Bucket에 보관하고, R2 원본 문서는 별도 2차 백업 없이 R2 자체 보존성에 의존하는 한계를 수용한다.

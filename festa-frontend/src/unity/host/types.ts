@@ -16,6 +16,13 @@ export interface UnityInstance {
   SendMessage(gameObjectName: string, methodName: string, value?: string | number): void;
   SetFullscreen(fullscreen: 0 | 1): void;
   Quit(): Promise<void>;
+  /**
+   * emscripten Module. 로더가 `{ Module, SetFullscreen, SendMessage, Quit, GetMetricsInfo }` 를
+   * resolve 하는 것을 실측으로 확인했다 (S15P21A604-575) — 전역에는 아무것도 남지 않으므로
+   * (`window.unityFramework` 는 null 이다) 이 프로퍼티가 Module 에 닿는 유일한 경로다.
+   * mock 로더에는 없으므로 optional 이고, 읽는 쪽은 없을 때를 반드시 다룬다.
+   */
+  Module?: { devicePixelRatio?: number };
 }
 
 export type UnityProgressListener = (progress: number) => void;

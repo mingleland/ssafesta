@@ -88,6 +88,15 @@ namespace Festa.Integration
             }
         }
 
+        /// <summary>오류 봉투 <c>{ code, message, ... }</c> 의 <c>code</c> 가 <paramref name="code"/> 인가. 본문이 비었거나 JSON 이 아니면 false.</summary>
+        static bool BodyHasCode(string body, string code)
+        {
+            if (string.IsNullOrEmpty(body)) return false;
+            try { return JsonUtility.FromJson<ErrorEnvelope>(body)?.code == code; }
+            catch { return false; }
+        }
+        [System.Serializable] class ErrorEnvelope { public string code; public string message; }
+
         async Task<string> PostAsync(string url, string payload, string what)
         {
             LastEndpointMissing = false;
@@ -111,6 +120,18 @@ namespace Festa.Integration
                     LastError = null;
                     return request.downloadHandler.text;
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404 || request.responseCode == 405:
+                    // BE 가 붙은 뒤 404 는 두 뜻이다 (GitLab #134 §4-1). 본문 `code` 로 가른다 — 전역 오류 봉투는
+                    // `{ code, message, requestId, ... }` 로 고정돼 있어 code 는 항상 있다.
+                    //   · MINIGAME_SESSION_NOT_FOUND → 없는/남의 세션. 서버는 멀쩡하다 → 재시작 안내, Mock 폴백 금지
+                    //   · code 없음                  → 경로 없음(서버 미배포) → 종전처럼 LastEndpointMissing
+                    // 상태 코드만 보던 때는 재로그인 뒤 옛 sessionId 제출이 "서버 미준비" 로 나가고, 그 플래그로
+                    // 실서버가 살아 있는데 체험판으로 떨어질 수 있었다.
+                    if (BodyHasCode(request.downloadHandler?.text, "MINIGAME_SESSION_NOT_FOUND"))
+                    {
+                        LastError = "게임 세션이 만료됐어요. 다시 시작해 주세요.";
+                        Debug.LogWarning($"[HttpGameResult] {what} → 404 MINIGAME_SESSION_NOT_FOUND (세션 만료/불일치 — 경로는 살아 있다).");
+                        return null;
+                    }
                     LastEndpointMissing = true;
                     LastError = "게임 서버가 아직 준비되지 않았어요";
                     return null;
@@ -180,11 +201,17 @@ namespace Festa.Integration
             return mockSession;
         }
 
-        public Task<GameResultAckDto> ReportAsync(GameResultDto result)
+        public async Task<GameResultAckDto> ReportAsync(GameResultDto result)
         {
-            if (result != null && !string.IsNullOrEmpty(result.sessionId) && _mockSessions.Contains(result.sessionId))
-                return _mock.ReportAsync(result);
-            return _server.ReportAsync(result);
+            bool viaMock = result != null && !string.IsNullOrEmpty(result.sessionId)
+                           && _mockSessions.Contains(result.sessionId);
+            if (!viaMock) return await _server.ReportAsync(result);
+
+            // Mock 이 판정했다는 사실을 ack 에 실어 보낸다 — HUD 가 "체험판" 을 드러내는 근거다.
+            // Mock 구현이 이 값을 세우든 말든 여기서 확정한다. 이 경로로 온 것은 정의상 실서버가 아니다.
+            var ack = await _mock.ReportAsync(result);
+            if (ack != null) ack.simulated = true;
+            return ack;
         }
     }
 }

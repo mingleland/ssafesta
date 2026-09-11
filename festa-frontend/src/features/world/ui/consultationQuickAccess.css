@@ -1,8 +1,11 @@
 /* World HUD 우상단 — 상담 즉시 접근. 숫자 badge 를 쓰지 않는다(실제 데이터에 없다). */
 .cqa {
   position: absolute;
-  right: 20px;
-  top: 20px;
+  /* Landing·Login 의 ScreenControls 와 같은 좌표·같은 치수 토큰을 쓴다 (감사 항목 13).
+     예전에는 여기만 px 고정(40px / top·right 20px)이라 화면을 넘어오면 컨트롤이 자리도 크기도
+     달라졌고, --festa-toast-top 이 control-size 기준으로 계산돼 토스트도 어긋난 높이에서 떴다. */
+  right: 2vw;
+  top: 3vh;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -10,22 +13,26 @@
 }
 .cqa-btn {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: var(--festa-control-size);
+  height: var(--festa-control-size);
   display: grid;
   place-items: center;
-  border-radius: 13px;
-  border: 1px solid var(--festa-line);
-  background: var(--festa-surface);
-  backdrop-filter: blur(8px);
-  color: rgba(234, 238, 251, 0.86);
+  border-radius: var(--festa-control-radius);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(20, 22, 46, 0.42);
+  backdrop-filter: blur(6px);
+  color: #f4f6ff;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
+/* 아이콘은 버튼과 함께 자란다 — 고정 20px 이면 커진 버튼 안에서 점처럼 보인다(screenControls 와 같은 규칙) */
+.cqa-btn svg { width: 52%; height: 52%; }
+.cqa-btn:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 3px; }
 @media (prefers-reduced-transparency: reduce) {
-  .cqa-btn { background: #10142a; backdrop-filter: none; }
+  .cqa-btn { background: #14162e; backdrop-filter: none; }
 }
-.cqa-btn:disabled { cursor: default; color: rgba(234, 238, 251, 0.5); }
-.cqa-btn:hover:not(:disabled) { background: rgba(24, 32, 66, 0.9); }
+.cqa-btn:disabled { cursor: default; color: rgba(244, 246, 255, 0.55); }
+.cqa-btn:hover:not(:disabled) { background: rgba(20, 22, 46, 0.66); border-color: rgba(255, 255, 255, 0.42); }
 .cqa-btn-on { border-color: rgba(120, 170, 255, 0.5); color: var(--festa-ink); }
 .cqa-dot {
   position: absolute;

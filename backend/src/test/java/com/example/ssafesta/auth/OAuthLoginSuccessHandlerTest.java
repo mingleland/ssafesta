@@ -2,6 +2,7 @@ package com.example.ssafesta.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -40,7 +41,8 @@ class OAuthLoginSuccessHandlerTest {
     private final MemberSessionService sessions = mock(MemberSessionService.class);
     private final OAuthHandoffService handoffs = mock(OAuthHandoffService.class);
     private final AuthProperties properties = new AuthProperties("secret", Duration.ofMinutes(30),
-            Duration.ofDays(14), Duration.ofMinutes(5), "/api/v1/auth/refresh", FRONTEND, false);
+            Duration.ofDays(14), Duration.ofMinutes(5), Duration.ofSeconds(60),
+            "/api/v1/auth/refresh", FRONTEND, false);
 
     private final OAuthLoginSuccessHandler handler =
             new OAuthLoginSuccessHandler(identities, sessions, handoffs, properties);
@@ -74,12 +76,72 @@ class OAuthLoginSuccessHandlerTest {
                 "Path 가 원본과 같아야 브라우저가 지운다: " + setCookie);
     }
 
+    /**
+     * 콜백 provenance (GitLab #177).
+     *
+     * <p>provider 콜백은 등록된 redirect URI 때문에 <b>8080 으로</b> 들어온다. 그래서 여기서 요청의
+     * origin 을 다시 보면 항상 8080 이고, 시작 단계에서 확인해 둔 5175 를 잃는다. 이 테스트가
+     * {@code FRONTEND} 로 떨어지면 로컬 로그인이 엉뚱한 포트로 돌아간다는 뜻이다.
+     */
+    @Test
+    void theCallbackReturnsToTheOriginProvenAtTheStartNotToItsOwnHost() throws Exception {
+        User member = new User("복귀회원");
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "subject"))
+                .thenReturn(Optional.of(new OAuthIdentity(member, OAuthProvider.GOOGLE, "subject")));
+        when(sessions.issue(any())).thenReturn(
+                new MemberSessionService.MemberSession("access", Instant.EPOCH, "refresh"));
+        MockHttpServletRequest callback = callbackCarrying("http://localhost:5175");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(callback, response, googleToken());
+
+        assertEquals("http://localhost:5175/auth/callback", response.getRedirectedUrl(),
+                "시작 때 증명된 origin 으로 돌아가야 한다.");
+        assertNull(callback.getSession(false).getAttribute(OAuthLoginSuccessHandler.RETURN_ORIGIN_SESSION_ATTRIBUTE),
+                "1회용이다 — 남으면 다음 로그인이 지난 흐름의 포트로 간다.");
+    }
+
+    /** 저장된 값이 없으면 오늘과 같다. 8080 직행·Swagger 절차가 이 갈래를 탄다. */
+    @Test
+    void withoutAProvenOriginTheCallbackFallsBackToTheConfiguredFrontend() throws Exception {
+        when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "subject"))
+                .thenReturn(Optional.empty());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, googleToken());
+
+        assertEquals(FRONTEND + "/auth/callback", response.getRedirectedUrl());
+    }
+
+    /** 거부도 같은 규칙을 탄다 — 정지 계정만 5173 으로 튕기면 로컬에서 이유를 볼 수 없다. */
+    @Test
+    void aSuspendedAccountIsRefusedOnTheSameOriginTheLoginStartedFrom() throws Exception {
+        MockHttpServletResponse response = refuse(suspended(), callbackCarrying("http://localhost:5175"));
+
+        assertEquals("http://localhost:5175/auth/callback?error=ACCOUNT_SUSPENDED", response.getRedirectedUrl());
+    }
+
+    private MockHttpServletRequest callbackCarrying(String provenOrigin) {
+        // provider 콜백이 도착하는 곳 — FE 포트가 아니라 백엔드 포트다.
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setScheme("http");
+        request.setServerName("localhost");
+        request.setServerPort(8080);
+        request.getSession(true).setAttribute(
+                OAuthLoginSuccessHandler.RETURN_ORIGIN_SESSION_ATTRIBUTE, provenOrigin);
+        return request;
+    }
+
     private MockHttpServletResponse refuse(User user) throws Exception {
+        return refuse(user, new MockHttpServletRequest());
+    }
+
+    private MockHttpServletResponse refuse(User user, MockHttpServletRequest request) throws Exception {
         when(identities.findByProviderAndProviderSubject(OAuthProvider.GOOGLE, "subject"))
                 .thenReturn(Optional.of(new OAuthIdentity(user, OAuthProvider.GOOGLE, "subject")));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
-        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, googleToken());
+        handler.onAuthenticationSuccess(request, response, googleToken());
         return response;
     }
 

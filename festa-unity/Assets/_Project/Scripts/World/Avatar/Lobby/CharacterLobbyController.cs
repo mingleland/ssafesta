@@ -140,6 +140,52 @@ namespace Festa.Avatar
                 ? "로그인하면 상점에서 구매해 사용할 수 있어요."
                 : "아직 보유하지 않은 항목입니다. 상점에서 구매할 수 있어요.");
         }
+
+        /// <summary>
+        /// 잠긴 항목을 눌렀을 때 — <b>구매 창을 연다</b> (사용자 지시 2026-09-10).
+        ///
+        /// <para>전에는 상태 줄에 "상점에서 구매할 수 있어요" 만 적었다. 정작 상점이 어디인지 없어서
+        /// 살 방법이 없는 안내였다. 계약(#120 §2)은 이미 있으므로 여기서 바로 구매한다.</para>
+        ///
+        /// <para>창까지 가지 않고 상태 줄에서 끝내는 경우가 셋 있다 — 보유 조회 실패(원인이 구매가 아니라
+        /// 새로고침이다), 게스트(구매가 <c>MEMBER_ONLY</c> 로 거부되니 눌러도 실패할 버튼을 권하지 않는다),
+        /// 서버 카탈로그에 없거나 판매 중지(살 수 없다).</para>
+        /// </summary>
+        void ShowPurchaseOrNotice(AvatarItemDefinition item, string displayName)
+        {
+            if (item == null) { ShowLockedNotice(); return; }
+
+            if (AvatarOwnership.State == AvatarOwnershipState.Failed)
+            {
+                SetStatus("보유 정보를 불러오지 못해 잠겨 있습니다. 새로고침 후 다시 시도해 주세요.");
+                return;
+            }
+            if (!Festa.Integration.ApiServices.IsMock && !Festa.Integration.AuthBridge.HasToken)
+            {
+                SetStatus("로그인하면 상점에서 구매해 사용할 수 있어요.");
+                return;
+            }
+            if (!AvatarOwnership.TryGetEntry(item, out var entry) || entry.ItemId <= 0)
+            {
+                SetStatus("상점 정보를 불러오지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+                return;
+            }
+            if (!entry.OnSale)
+            {
+                SetStatus("지금은 판매하지 않는 아이템이에요.");
+                return;
+            }
+
+            string label = !string.IsNullOrEmpty(entry.Name) ? entry.Name : displayName;
+            int key = AvatarOwnership.OwnershipKey(item);
+            AvatarPurchaseDialog.Open(label, entry.Price, entry.ItemId, key, _ =>
+            {
+                // 산 즉시 팔레트를 다시 그린다 — 자물쇠가 풀린 것이 바로 보여야 한다.
+                RefreshWardrobe();
+                RefreshItems();
+                SetStatus($"{label} 을(를) 구매했어요. 이제 입어 볼 수 있어요.");
+            });
+        }
         static readonly Color[] NaturalHairColors = {new(.08f,.065f,.06f),new(.16f,.105f,.08f),new(.28f,.17f,.11f),new(.42f,.25f,.15f),new(.34f,.17f,.12f),new(.62f,.49f,.33f)};
         static readonly Color[] NaturalIrisColors = {new(.20f,.12f,.08f),new(.34f,.23f,.12f),new(.17f,.29f,.39f),new(.24f,.35f,.29f),new(.29f,.31f,.33f)};
         static readonly Color[] NaturalLipColors = {new(.62f,.31f,.31f),new(.70f,.39f,.36f),new(.55f,.27f,.29f),new(.72f,.44f,.40f),new(.48f,.23f,.22f)};
@@ -191,7 +237,37 @@ namespace Festa.Avatar
         }
         void OnDestroy() => Festa.Integration.AuthBridge.TokenChanged -= OnAuthTokenChanged;
         bool _guestEntered;
-        void OnAuthTokenChanged() => TryEnterWorldAsGuest();
+        bool _ownershipRetrying;
+
+        /// <summary>
+        /// 호스트가 토큰을 밀어 넣은 순간. 게스트면 바로 입장하고, <b>회원이면 보유 조회를 다시 돌린다.</b>
+        ///
+        /// <para>재시도가 없으면 회원은 옷이 전부 잠긴 채로 갇힌다. Awake 의 첫 조회는 토큰보다 먼저 나가
+        /// 401 을 받는데(React 는 createUnityInstance 가 resolve 된 뒤에야 SetAccessToken 을 보낸다 —
+        /// 첫 씬 Awake 가 구조적으로 앞선다), 그때 <see cref="AvatarOwnership.MarkFailed"/> 로 떨어지면
+        /// 되돌릴 경로가 없었다. 화면은 "새로고침 후 다시 시도해 주세요" 라고 안내하지만 새로고침해도
+        /// 순서가 같아 매번 같은 결과였다 — 시킨 대로 해도 안 낫는 안내다.
+        /// 게스트는 토큰 도착 즉시 월드로 빠져나가 이 증상을 안 겪는다. 회원만 겪는다 (2026-09-08 실측).</para>
+        /// </summary>
+        async void OnAuthTokenChanged()
+        {
+            if (TryEnterWorldAsGuest()) return;
+            if (_ownershipRetrying) return;
+            if (AvatarOwnership.JudgementReady) return;   // 이미 제대로 받았으면 건드리지 않는다
+            if (!Festa.Integration.AuthBridge.HasToken) return;
+
+            _ownershipRetrying = true;
+            try
+            {
+                Debug.Log("[CharacterLobby] 토큰이 늦게 도착했다 — 파츠 보유 조회를 다시 돌린다");
+                SetStatus("로그인 정보를 확인하는 중입니다…");
+                await LoadOwnershipAsync();
+                SanitizeLocked(ref _config);
+                Apply(); RefreshAll();
+                if (!_restoredExistingAppearance) await LoadPersistedAppearanceAsync();
+            }
+            finally { _ownershipRetrying = false; }
+        }
         bool TryEnterWorldAsGuest()
         {
             if (_guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
@@ -241,6 +317,19 @@ namespace Festa.Avatar
                     return;
                 }
 
+                // **게스트는 아예 부르지 않는다.** `/catalog/items` 는 회원 전용이라 게스트에게는
+                // 401 이 정상 응답인데, 그것을 실패로 취급해 "불러오지 못했습니다 · 새로고침" 을
+                // 띄우고 있었다 — 새로고침해도 게스트인 한 달라지지 않으니 거짓 안내다.
+                // demo 실측에서 실제로 이 경로를 밟았다 (2026-09-10, GitLab #175).
+                //
+                // 토큰이 아예 없을 때도 같다. 보유 목록을 물어볼 신원이 없으면 물어볼 이유도 없다.
+                if (!Festa.Integration.AuthBridge.HasToken || Festa.Integration.AuthBridge.IsGuest)
+                {
+                    AvatarOwnership.MarkGuest("게스트·비로그인 — 회원 전용 /catalog/items 를 부르지 않는다");
+                    SetStatus("게스트는 기본 파츠만 사용할 수 있습니다. 로그인하면 보유 파츠가 열립니다.");
+                    return;
+                }
+
                 var catalog = await Festa.Integration.ApiServices.User.GetAvatarPartCatalogAsync();
                 if (catalog?.items == null)
                 {
@@ -251,6 +340,7 @@ namespace Festa.Avatar
 
                 var cataloged = new List<int>(catalog.items.Length);
                 var owned = new List<int>();
+                var entries = new List<KeyValuePair<int, AvatarOwnership.CatalogEntry>>(catalog.items.Length);
                 foreach (var item in catalog.items)
                 {
                     // assetKey 는 서버가 문자열로 내려주지만 avatar_code 의 i= 칸은 정수다.
@@ -262,9 +352,14 @@ namespace Festa.Avatar
                     }
                     cataloged.Add(key);
                     if (item.owned) owned.Add(key);
+                    // 구매 화면이 쓸 값 — 서버 itemId(구매 경로)와 가격. 잠금 판정은 여전히 owned 하나다.
+                    entries.Add(new KeyValuePair<int, AvatarOwnership.CatalogEntry>(key, new AvatarOwnership.CatalogEntry
+                    {
+                        ItemId = item.itemId, Price = item.price, OnSale = item.onSale, Name = item.name,
+                    }));
                 }
 
-                AvatarOwnership.SetFromServer(cataloged, owned);
+                AvatarOwnership.SetFromServer(cataloged, owned, entries);
                 Debug.Log($"[CharacterLobby] 파츠 보유 정보 적용 — 카탈로그 {cataloged.Count}종 중 보유 {owned.Count}종");
             }
             catch (Exception exception)
@@ -485,7 +580,8 @@ namespace Festa.Avatar
                 var presentation=WardrobePresentation(_wardrobeCategory,captured);
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 ImageButton(_wardrobeGrid,PrettyName(presentation.displayName),presentation.thumbnail,
-                    locked?ShowLockedNotice:()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),
+                    locked?new UnityEngine.Events.UnityAction(()=>ShowPurchaseOrNotice(captured,PrettyName(presentation.displayName)))
+                          :()=>SelectWardrobeItem(_wardrobeCategory,captured.itemId),
                     158,148,IsSelected(_wardrobeCategory,captured),null,locked);
             }
             _wardrobeGrid.anchoredPosition=new Vector2(_wardrobeGrid.anchoredPosition.x,keepWardrobeScroll?_wardrobeScrollY:0f);
@@ -609,7 +705,7 @@ namespace Festa.Avatar
                 var captured=definitions[index];
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 var select=locked
-                    ?new UnityEngine.Events.UnityAction(ShowLockedNotice)
+                    ?new UnityEngine.Events.UnityAction(()=>ShowPurchaseOrNotice(captured,PrettyName(captured.displayName)))
                     :new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
                 if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured),locked);
                 else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured),locked);

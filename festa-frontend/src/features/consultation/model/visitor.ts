@@ -26,6 +26,12 @@ export interface VisitorConsultationState {
    */
   source: ConsultationStartSource | null;
   boothId: number | null;
+  /**
+   * 요약 재료가 된 AI 대화 id. `source` 와 같은 성격의 경계 기록이다 — 표시용이 아니라
+   * 재요청(C-01)이 같은 대화 맥락을 다시 실어 보내기 위한 값이다. 대화가 이미 닫혔으면
+   * 서버가 요약을 못 만들어 `null` 이 되지만, 그건 요청을 막지 않는다(#133).
+   */
+  conversationId: string | null;
   /** waiting 전용 — C-01 잔여 시간 안내 */
   remainingSeconds: number | null;
   /** active 전용 */
@@ -35,6 +41,7 @@ export interface VisitorConsultationState {
 const initialState: VisitorConsultationState = {
   phase: 'idle',
   boothId: null,
+  conversationId: null,
   source: null,
   remainingSeconds: null,
   staffName: null,
@@ -105,13 +112,20 @@ function onChannelEvent(event: VisitorChannelEvent): void {
  */
 export async function requestConsultation(context: ConsultationStartContext): Promise<void> {
   if (state.phase === 'requesting' || state.phase === 'waiting' || state.phase === 'active') return;
-  const { boothId, source } = context;
+  const { boothId, source, conversationId } = context;
   detachChannel(); // 로컬 만료(expired) 상태에서 재요청하면 기존 구독을 먼저 정리한다
-  setState({ phase: 'requesting', boothId, source, remainingSeconds: null, staffName: null });
+  setState({
+    phase: 'requesting',
+    boothId,
+    source,
+    conversationId: conversationId ?? null,
+    remainingSeconds: null,
+    staffName: null,
+  });
   try {
-    // handoffSummary 는 아직 채널로 넘기지 않는다 — 요청 프레임 schema 가 transport(G-7·-137)
-    // 확정 대기라 여기서 발명하지 않는다. mock 채널은 자체 fixture 로 요약을 만든다.
-    const { expiresInSeconds } = await consultationChannel.requestConsultation(boothId);
+    // 요청 body 는 { boothId, conversationId? } 다 (#133 확정). 요약 텍스트는 싣지 않는다 —
+    // 서버가 conversationId 로 FastAPI 에 요약을 청해 생성 시점 스냅샷으로 굳힌다.
+    const { expiresInSeconds } = await consultationChannel.requestConsultation(boothId, conversationId);
     unsubscribeChannel = consultationChannel.onVisitorEvent(onChannelEvent);
     setState({ phase: 'waiting', remainingSeconds: expiresInSeconds });
     countdown = setInterval(() => {
@@ -134,8 +148,9 @@ export async function rerequestConsultation(): Promise<void> {
   if (state.phase !== 'expired' || state.boothId === null) return;
   const boothId = state.boothId;
   const source = state.source ?? 'AI_HANDOFF';
+  const conversationId = state.conversationId ?? undefined;
   setState({ phase: 'idle' });
-  await requestConsultation({ boothId, source });
+  await requestConsultation({ boothId, source, conversationId });
 }
 
 export async function cancelConsultation(): Promise<void> {
@@ -145,7 +160,7 @@ export async function cancelConsultation(): Promise<void> {
   try {
     await consultationChannel.cancelRequest();
   } finally {
-    setState({ phase: 'idle', source: null, remainingSeconds: null });
+    setState({ phase: 'idle', source: null, conversationId: null, remainingSeconds: null });
   }
 }
 

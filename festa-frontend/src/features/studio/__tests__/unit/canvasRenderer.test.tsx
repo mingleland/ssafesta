@@ -61,6 +61,7 @@ const BASE = {
   onTool: () => {},
   onSnapToggle: () => {},
   onFrame: () => {},
+  onZoomChange: () => {},
 };
 
 describe('뷰포트 골격 — 렌더러가 무엇이든 유지된다', () => {

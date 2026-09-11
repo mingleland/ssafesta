@@ -12,6 +12,8 @@ jenkins:
       users:
         - id: "${JENKINS_ADMIN_ID}"
           password: "${JENKINS_ADMIN_PASSWORD}"
+        - id: webgl-publisher
+          password: "${JENKINS_WEBGL_PUBLISHER_PASSWORD}"
   nodes:
     - permanent:
         name: linux-docker
@@ -62,3 +64,4 @@ unclassified:
       - name: deploy-dev-front
       - name: deploy-dev-game
       - name: deploy-integration-develop
+      - name: deploy-demo

@@ -108,6 +108,53 @@ namespace Festa.Integration
         }
 
         /// <summary>
+        /// POST /api/v1/catalog/items/{itemId}/purchases — 파츠 구매 (GitLab #120 §2·§7).
+        ///
+        /// <para><b>공통 <see cref="SendAsync"/> 를 쓰지 않는다.</b> 그쪽은 실패하면 본문을 버리고 null 만
+        /// 돌려주는데, 구매는 <b>실패 사유가 화면 문구를 가른다</b> — 코인 부족·이미 보유·판매 중지가
+        /// 전부 409 라 상태 코드만으로는 구분이 안 되고, 서버 봉투의 <c>code</c> 를 읽어야 한다.</para>
+        /// </summary>
+        public async Task<PurchaseResult> PurchaseAvatarPartAsync(long itemId)
+        {
+            if (itemId <= 0) return PurchaseResult.Fail(null, $"itemId 가 유효하지 않다 ({itemId})");
+
+            using var request = new UnityWebRequest($"{_baseUrl}/api/v1/catalog/items/{itemId}/purchases", UnityWebRequest.kHttpVerbPOST)
+            {
+                downloadHandler = new DownloadHandlerBuffer(),
+            };
+            request.timeout = TimeoutSeconds;
+            request.SetRequestHeader("Content-Type", "application/json");
+            var token = _tokenProvider.GetAccessToken();
+            if (!string.IsNullOrEmpty(token)) request.SetRequestHeader("Authorization", $"Bearer {token}");
+
+            try { await request.SendWebRequest(); }
+            catch { /* WebGL 에서 실패 요청의 await 가 던질 수 있다 — 아래에서 결과로 판정한다 */ }
+
+            string body = request.downloadHandler != null ? request.downloadHandler.text : null;
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                LastAuthError = null;
+                var item = ParseOrNull<CatalogItemDto>(body, "purchases");
+                Debug.Log($"[HttpUserApi] 파츠 구매 성공 — itemId={itemId} code={item?.code}");
+                return new PurchaseResult { ok = true, item = item };
+            }
+
+            // 상태 코드가 아니라 봉투의 code 로 가른다. 봉투가 없으면(프록시 오류 등) code 는 null 로 남기고
+            // 호출자가 "알 수 없는 오류" 로 다룬다 — 임의로 코인 부족이라고 지어내지 않는다.
+            var error = ParseOrNull<ApiErrorDto>(body, "purchases 오류 봉투");
+            string code = string.IsNullOrEmpty(error?.code) ? null : error.code;
+            if (code == null && request.responseCode == 401) code = "UNAUTHORIZED";
+            if (code == null && request.responseCode == 403) code = "MEMBER_ONLY";
+            if (request.responseCode == 401 || request.responseCode == 403)
+                LastAuthError = request.responseCode == 401 ? "Access Token 이 만료·무효다" : "게스트 계정은 구매할 수 없다 (MEMBER_ONLY)";
+
+            string reason = $"HTTP {request.responseCode} code={code ?? "(없음)"} body={body}";
+            Debug.LogError($"[HttpUserApi] 파츠 구매 실패 — itemId={itemId} {reason}");
+            return PurchaseResult.Fail(code, reason);
+        }
+
+        /// <summary>
         /// POST /api/v1/world-sessions — 구조화 endpoint + 120초 1회용 connection token.
         /// Unity 는 endpoint 를 하드코딩하지 않고 항상 이 응답만 쓴다 (헌법 8조).
         /// 본문은 전체 optional 이지만 worldId 를 명시해 서버 기본값에 의존하지 않는다.
@@ -168,15 +215,26 @@ namespace Festa.Integration
                     return request.downloadHandler.text;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 401:
-                    LastAuthError = string.IsNullOrEmpty(token)
-                        ? "Access Token 이 주입되지 않았다 (WebGL 호스트 wiring 확인)"
-                        : "Access Token 이 만료·무효다";
+                    if (string.IsNullOrEmpty(token))
+                    {
+                        // 토큰이 **아직** 없을 뿐, 호스트 배선이 끊긴 게 아닐 수 있다. 로비가 첫 조회를
+                        // 토큰 주입보다 먼저 보내는 경우가 실제로 있고(TokenChanged 로 다시 부른다),
+                        // 여기서 "wiring 확인" 이라고 단정한 문구가 demo 실측에서 원인을 FE 로 잘못
+                        // 몰고 갔다 (GitLab #175 → 실제 원인은 world 호스트 nginx 403, #142).
+                        // 배선 결함인지는 이 한 번으로 알 수 없으니 판정하지 않고 사실만 적는다.
+                        LastAuthError = "Access Token 이 아직 없다 — 주입 전 호출이면 토큰 도착 후 자동 재시도된다";
+                        Debug.LogWarning($"[HttpUserApi] {what} → 401 UNAUTHORIZED. {LastAuthError}");
+                        return null;
+                    }
+                    LastAuthError = "Access Token 이 만료·무효다";
                     Debug.LogError($"[HttpUserApi] {what} → 401 UNAUTHORIZED. {LastAuthError}");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 403:
+                    // 게스트에게 회원 전용 API 가 403 인 것은 **정상 응답**이다 — 서버가 계약대로
+                    // 답한 것이라 에러가 아니다. 빨간 에러로 남기면 진짜 실패와 구분이 안 된다(QA #77).
                     LastAuthError = "게스트 계정은 이 기능을 쓸 수 없다 (MEMBER_ONLY)";
-                    Debug.LogError($"[HttpUserApi] {what} → 403. {LastAuthError}");
+                    Debug.LogWarning($"[HttpUserApi] {what} → 403. {LastAuthError}");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError:

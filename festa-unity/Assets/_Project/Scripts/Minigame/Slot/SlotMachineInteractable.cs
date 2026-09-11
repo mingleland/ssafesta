@@ -24,9 +24,12 @@ namespace Festa.Minigame.Slot
         [SerializeField] string _machineId = "plaza-slot-01";
 
         [Header("초점 카메라 (기계 로컬 좌표 — 스케일 포함)")]
-        // 게임 화면(제목·잭팟·릴, 세로 약 12 unit)만 거의 가득 차게 — 화면 중심(로컬 y≈1.74)에서 정면 12 unit(0.9 m). 사용자 지시 2026-09-06.
-        [SerializeField] Vector3 _cameraLocal = new(0f, 1.84f, 1.10f);
-        [SerializeField] Vector3 _lookLocal = new(0f, 1.80f, 0.12f);
+        // **릴을 본다.** 실측: 릴 4개(Slot_Machine_01_Spin_01..04)의 중심이 로컬 (0, 1.44, 0.12) 이고
+        // 블록 크기가 가로 0.51 · 세로 0.41 이다. 전에는 y 1.80 을 봤는데 그건 릴이 아니라 **위쪽 잭팟 판**이라,
+        // 상호작용하면 돌아가는 릴이 화면 아래로 밀려났다 (2026-09-10 사용자 지적, 두 번째).
+        // 카메라 z 0.72 → 릴 앞면(z≈0.19)에서 0.53 → 세로 화각 60° 기준 릴이 화면의 약 2/3 를 채운다.
+        [SerializeField] Vector3 _cameraLocal = new(0f, 1.45f, 0.72f);
+        [SerializeField] Vector3 _lookLocal = new(0f, 1.44f, 0.12f);
 
         [Header("릴 연출 프리셋 (PresetUVSlotMachine.presets 인덱스)")]
         [Tooltip("약한 당첨 → 강한 당첨 순. tier 1..N 에 대응.")]

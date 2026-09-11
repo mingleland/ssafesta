@@ -1,5 +1,6 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
@@ -21,6 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
  * if anything below fails — including the unique index rejecting a concurrent lease — the charge
  * rolls back with it. "Coins gone, no booth" is not handled by a compensating refund here; it is
  * made unrepresentable (FR-003, SC-002).
+ *
+ * <p>It also owns the other direction — {@link #expireStaleLeases()} and the private {@code expire}
+ * every path shares — because expiry is the same two rows in the same transaction (S15P21A604-152),
+ * plus the booth's AI documents since S15P21A604-496.
  */
 @Service
 public class BoothLeaseService {
@@ -31,19 +36,24 @@ public class BoothLeaseService {
     static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
     /** V6, lower case: PostgreSQL reports index names folded. */
     private static final String ACTIVE_LESSEE_INDEX = "ux_booth_leases_active_lessee";
+    /** How many leases one sweeper transaction takes — see {@link BoothLeaseRepository#findStaleActive}. */
+    private static final int EXPIRY_BATCH = 5;
 
     private final BoothSlotRepository slots;
     private final BoothRepository booths;
     private final BoothLeaseRepository leases;
     private final WalletService wallets;
+    private final BoothDocumentDeactivationService aiDocuments;
     private final LeaseProperties properties;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
-                             WalletService wallets, LeaseProperties properties) {
+                             WalletService wallets, BoothDocumentDeactivationService aiDocuments,
+                             LeaseProperties properties) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
+        this.aiDocuments = aiDocuments;
         this.properties = properties;
     }
 
@@ -132,18 +142,68 @@ public class BoothLeaseService {
      * a stale row as active, and {@code booths.current_slot_id} is UNIQUE (FR-017, D05).
      */
     private void releaseStaleLeases(Long slotId, Instant now) {
-        List<BoothLease> stale = leases.findStaleActiveBySlotId(slotId, now);
-        for (BoothLease lease : stale) {
-            lease.expire();
-            booths.findById(lease.getBoothId()).ifPresent(Booth::detachSlot);
-            log.info("만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
-                    lease.getId(), slotId, lease.getBoothId());
+        for (BoothLease lease : leases.findStaleActiveBySlotId(slotId, now)) {
+            expire(lease);
         }
         // A booth may still point at this slot even without a stale lease row (e.g. data repaired
         // by hand). Detach it too, or the UNIQUE column blocks the new booth.
         booths.findByCurrentSlotId(slotId).ifPresent(Booth::detachSlot);
         leases.flush();
         booths.flush();
+    }
+
+    /**
+     * Expires stale leases wherever they sit, in one transaction — the sweeper's entry point
+     * (S15P21A604-152, docs/08 "Lease 만료 처리 계약").
+     *
+     * <p><b>This does not make the batch authoritative.</b> Validity is still decided when a lease
+     * is read ({@code status = ACTIVE AND ends_at > now}, spec 004 C-02), so a stopped scheduler
+     * cannot let an expired booth be entered. What the pass adds is the DB state itself: without it
+     * the transition waits for the next re-lease of that slot or member, so an expired booth keeps
+     * its {@code current_slot_id} — and its published layout with it — until someone happens to
+     * lease again.
+     *
+     * <p>The transaction covers the transition, the slot release and — since S15P21A604-496 — the
+     * booth's AI document and Job transitions, which spec 007 FR-041 requires to be in the same
+     * transaction as the expiry.
+     *
+     * @return how many leases this pass transitioned
+     */
+    @Transactional
+    public int expireStaleLeases() {
+        List<BoothLease> stale = leases.findStaleActive(Instant.now(), EXPIRY_BATCH);
+        for (BoothLease lease : stale) {
+            expire(lease);
+        }
+        return stale.size();
+    }
+
+    /**
+     * One lease's expiry, for every path that expires one — the lazy paths above and the sweeper.
+     *
+     * <p>Both halves belong together (docs/08): a lease that is {@code EXPIRED} while its booth
+     * still points at the slot leaves the slot unleasable, and a detached booth whose lease is still
+     * {@code ACTIVE} occupies the member's one-lease limit.
+     *
+     * <p><b>The booth is detached only if it still points at this lease's slot.</b> The sweeper runs
+     * against rows nobody asked about, so it can meet a booth that has already moved on: a member
+     * whose lease on slot A expired and who has since leased slot B has one booth pointing at B, and
+     * an unconditional detach here would null out that pointer — and, through
+     * {@link Booth#detachSlot}, the published layout version of a booth with a perfectly valid
+     * lease. The lazy paths are unaffected by the guard: they run before {@code attachSlot}, so the
+     * booth still points at the slot being released.
+     */
+    private void expire(BoothLease lease) {
+        lease.expire();
+        booths.findById(lease.getBoothId())
+                .filter(booth -> lease.getSlotId().equals(booth.getCurrentSlotId()))
+                .ifPresent(Booth::detachSlot);
+        // The AI half of the same expiry (spec 007 FR-015·FR-041, S15P21A604-496). It is here rather
+        // than in each caller because spec.md:71 wants it in this transaction, and because a second
+        // place to expire a lease is a second place to forget this.
+        aiDocuments.deactivate(lease.getBoothId());
+        log.info("만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
+                lease.getId(), lease.getSlotId(), lease.getBoothId());
     }
 
     /**
@@ -156,10 +216,7 @@ public class BoothLeaseService {
      */
     private void releaseStaleLeasesOfMember(Long userId, Instant now) {
         for (BoothLease lease : leases.findStaleActiveByLesseeUserId(userId, now)) {
-            lease.expire();
-            booths.findById(lease.getBoothId()).ifPresent(Booth::detachSlot);
-            log.info("만료 임대 정리(회원) — leaseId={}, userId={}, slotId={}",
-                    lease.getId(), userId, lease.getSlotId());
+            expire(lease);
         }
         leases.flush();
         booths.flush();

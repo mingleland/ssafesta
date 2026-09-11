@@ -3,6 +3,7 @@ package com.example.ssafesta.game;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +18,13 @@ public class GamePublishedQueryService {
 
     private final GameRepository games;
     private final GamePublishedVersionRepository published;
+    private final GameAccessGuard guard;
 
-    public GamePublishedQueryService(GameRepository games, GamePublishedVersionRepository published) {
+    public GamePublishedQueryService(GameRepository games, GamePublishedVersionRepository published,
+                                     GameAccessGuard guard) {
         this.games = games;
         this.published = published;
+        this.guard = guard;
     }
 
     /**
@@ -36,17 +40,43 @@ public class GamePublishedQueryService {
     public int currentVersion(Long gameId) {
         Game game = games.findById(gameId)
                 .orElseThrow(() -> new ApiException(ErrorCode.GAME_NOT_FOUND));
+        ErrorCode blocked = blockedReason(game);
+        if (blocked != null) {
+            throw new ApiException(blocked);
+        }
+        return game.getPublishedVersion();
+    }
+
+    /**
+     * Why this game cannot be played right now, or {@code null} if it can.
+     *
+     * <p><b>The order is the contract</b>, not a style choice: a deleted game answers
+     * {@code GAME_DELETED} even though it is also private and unpublished, and a private one
+     * answers {@code GAME_NOT_PUBLIC} even with a version pointer. Each answer is a different
+     * sentence to the player and the editor branches on them (contracts §Runtime).
+     *
+     * <p>Living here rather than in each caller is what keeps that order single. Two readers ask
+     * this question in different shapes — {@link #find} and {@link #currentVersion} raise it as an
+     * error, {@code ArcadeMachineResolveService} reports it as {@code unavailableReason} on a
+     * {@code 200} — and a copy in the arcade path would drift the first time the order changed.
+     * The three names double as the wire vocabulary the contract lists for
+     * {@code unavailableReason} (§Booth Portal Resolution), so they are reused rather than
+     * re-spelled.
+     *
+     * <p>A {@code PUBLIC} game with nothing published is a legal state, not a fault: visibility and
+     * publishing are independent axes (contracts §공개 설정 변경).
+     */
+    static ErrorCode blockedReason(Game game) {
         if (game.isDeleted()) {
-            throw new ApiException(ErrorCode.GAME_DELETED);
+            return ErrorCode.GAME_DELETED;
         }
         if (game.getVisibility() != GameVisibility.PUBLIC) {
-            throw new ApiException(ErrorCode.GAME_NOT_PUBLIC);
+            return ErrorCode.GAME_NOT_PUBLIC;
         }
-        Integer pointer = game.getPublishedVersion();
-        if (pointer == null) {
-            throw new ApiException(ErrorCode.GAME_NOT_PUBLISHED);
+        if (game.getPublishedVersion() == null) {
+            return ErrorCode.GAME_NOT_PUBLISHED;
         }
-        return pointer;
+        return null;
     }
 
     /** The validator tag for a version number. Published rows never change, so the number is enough. */
@@ -70,18 +100,11 @@ public class GamePublishedQueryService {
     public PublishedView find(Long gameId, Long viewerUserId) {
         Game game = games.findById(gameId)
                 .orElseThrow(() -> new ApiException(ErrorCode.GAME_NOT_FOUND));
-        if (game.isDeleted()) {
-            throw new ApiException(ErrorCode.GAME_DELETED);
+        ErrorCode blocked = blockedReason(game);
+        if (blocked != null) {
+            throw new ApiException(blocked);
         }
-        if (game.getVisibility() != GameVisibility.PUBLIC) {
-            throw new ApiException(ErrorCode.GAME_NOT_PUBLIC);
-        }
-        Integer pointer = game.getPublishedVersion();
-        if (pointer == null) {
-            // Legal state, not a fault: visibility and publishing are independent axes, so a PUBLIC
-            // game with nothing published lands here (contracts §공개 설정 변경).
-            throw new ApiException(ErrorCode.GAME_NOT_PUBLISHED);
-        }
+        int pointer = game.getPublishedVersion();
 
         GamePublishedVersion snapshot = published.findByGameIdAndVersionNo(gameId, pointer)
                 // The composite foreign key makes this unreachable. If it ever happens the pointer
@@ -92,6 +115,24 @@ public class GamePublishedQueryService {
         return new PublishedView(snapshot.getSchemaVersion(), gameId, snapshot.getVersionNo(),
                 snapshot.getProjectJson(), snapshot.getPublishedAt());
     }
+
+    /**
+     * Publish history for the editor's version screen (contracts §버전 목록). Owner only.
+     *
+     * <p>No {@code project_json} anywhere in this path — {@link GamePublishedVersionRepository.VersionRow}
+     * keeps it out of the query itself, not just out of the response. A 2MB cap times up to 50 rows
+     * would be a 100MB fetch for a list view otherwise (contract's own reasoning).
+     */
+    @Transactional(readOnly = true)
+    public VersionsView versions(Long gameId, Long userId) {
+        Game game = guard.requireOwnedLive(gameId, userId);
+        List<GamePublishedVersionRepository.VersionRow> rows =
+                published.findTop50ByGameIdOrderByVersionNoDesc(gameId);
+        return new VersionsView(gameId, game.getPublishedVersion(), rows);
+    }
+
+    public record VersionsView(Long gameId, Integer publishedVersion,
+                               List<GamePublishedVersionRepository.VersionRow> versions) { }
 
     public record PublishedView(String schemaVersion, Long gameId, int publishedVersion,
                                 String projectJson, Instant publishedAt) {

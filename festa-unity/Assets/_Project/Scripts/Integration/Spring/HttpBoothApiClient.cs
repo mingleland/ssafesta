@@ -38,6 +38,15 @@ namespace Festa.Integration
             return detail;
         }
 
+        public async Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId)
+        {
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}/projects/published";
+            var body = await GetAsync(url, $"Booth {boothId}", "published projects");
+            // 404(미게시·부스 없음)·409(임대 만료)는 정상 경로다 — GetAsync 가 이미 null 로 접어 준다.
+            // 여기서 로그를 더 남기지 않는 이유: 축제장에 들어설 때마다 빈 부스 수만큼 경고가 쏟아진다.
+            return body == null ? null : BoothProjectParser.Parse(body);
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";
@@ -49,8 +58,15 @@ namespace Festa.Integration
             // visitor 경로 — 슬롯을 임차 중인 부스의 공개본을 서버가 풀어서 준다.
             // 응답 스키마는 booths 경로와 동일 (BE PublishedView 가 BoothLayoutDto 필드명에 맞춰져 있다).
             var url = $"{_baseUrl}/api/v1/booth-slots/{slotId}/layouts/published";
-            return await GetLayoutAsync(url, $"Slot {slotId}");
+            _lastTransientFailure = false;
+            var layout = await GetLayoutAsync(url, $"Slot {slotId}");
+            // 404(미게시)·409(임대 만료)·파싱 실패는 서버가 답한 확정 결과 — 재시도 루프가 다시 묻지 않게 기록한다.
+            PublishedSlotResolution.Set(slotId, _lastTransientFailure);
+            return layout;
         }
+
+        /// <summary>직전 <see cref="GetAsync"/> 가 네트워크·타임아웃으로 끝났는가(true). HTTP 응답을 받았으면 false.</summary>
+        bool _lastTransientFailure;
 
         async Task<BoothLayoutDto> GetLayoutAsync(string url, string who)
         {
@@ -104,6 +120,7 @@ namespace Festa.Integration
                     return null;
 
                 default: // ConnectionError, DataProcessingError, timeout
+                    _lastTransientFailure = true;
                     Debug.LogError($"[HttpBoothApiClient] GET {url} 실패: {request.error} (CORS/네트워크/타임아웃 확인)");
                     return null;
             }

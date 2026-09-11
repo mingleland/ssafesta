@@ -80,6 +80,7 @@ def test_valid_env_loads_with_documented_defaults(
     assert config.settings.internal_ai_to_spring_tokens == ["ai-to-spring-token-1"]
     assert config.settings.conversation_ttl_seconds == 1800
     assert config.settings.spring_booth_access_timeout_seconds == 1.0
+    assert config.settings.spring_agent_config_timeout_seconds == 1.0
     assert config.settings.llm_ttft_timeout_seconds == 15.0
     assert config.settings.llm_total_timeout_seconds == 60.0
     assert config.settings.jwt_secret_key == base64.b64decode(_VALID_JWT_SECRET)
@@ -99,6 +100,81 @@ def test_empty_string_required_field_fails_fast(
     _set_env(monkeypatch, tmp_path, overrides={"R2_BUCKET": ""})
     with pytest.raises(ValidationError, match="r2_bucket"):
         _fresh_settings_module()
+
+
+def test_minio_fully_unset_allows_boot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """S15P21A604-594: R2 단독 배포는 MinIO 네 값이 전부 없어도 기동해야 한다."""
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        omit={
+            "MINIO_ENDPOINT",
+            "MINIO_BUCKET",
+            "MINIO_ACCESS_KEY_ID",
+            "MINIO_SECRET_ACCESS_KEY",
+        },
+    )
+    config = _fresh_settings_module()
+
+    assert config.settings.minio_endpoint is None
+    assert config.settings.minio_bucket is None
+    assert config.settings.minio_access_key_id is None
+    assert config.settings.minio_secret_access_key is None
+
+
+def test_minio_fully_blank_allows_boot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(
+        monkeypatch,
+        tmp_path,
+        overrides={
+            "MINIO_ENDPOINT": "",
+            "MINIO_BUCKET": "",
+            "MINIO_ACCESS_KEY_ID": "",
+            "MINIO_SECRET_ACCESS_KEY": "",
+        },
+    )
+    config = _fresh_settings_module()
+
+    assert config.settings.minio_endpoint is None
+    assert config.settings.minio_bucket is None
+
+
+def test_minio_partial_config_fails_fast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, omit={"MINIO_ACCESS_KEY_ID"})
+    with pytest.raises(ValidationError, match="MINIO_ACCESS_KEY_ID"):
+        _fresh_settings_module()
+
+
+def test_minio_partial_blank_fails_fast(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    _set_env(monkeypatch, tmp_path, overrides={"MINIO_SECRET_ACCESS_KEY": ""})
+    with pytest.raises(ValidationError, match="MINIO_SECRET_ACCESS_KEY"):
+        _fresh_settings_module()
+
+
+def test_minio_fully_present_still_loads(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """네 값 전부 존재 — 기존 fallback adapter 경로는 회귀 없이 그대로 동작해야 한다."""
+    _set_env(monkeypatch, tmp_path)
+    config = _fresh_settings_module()
+
+    assert config.settings.minio_endpoint == "http://minio.internal:9000"
+    assert config.settings.minio_bucket == "festa-documents-local"
+    assert (
+        config.settings.minio_access_key_id.get_secret_value() == "minio-access-key"
+    )
+    assert (
+        config.settings.minio_secret_access_key.get_secret_value()
+        == "minio-secret-key"
+    )
 
 
 def test_jwt_secret_must_be_valid_base64(

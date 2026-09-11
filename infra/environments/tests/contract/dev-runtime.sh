@@ -10,26 +10,39 @@ ingress="${repo_root}/infra/environments/nginx/sites/dev.conf"
 world_ingress="${repo_root}/infra/environments/nginx/sites/world-dev.conf.template"
 game_compose="${repo_root}/infra/deploy/compose/dev/game.compose.yaml"
 back_compose="${repo_root}/infra/deploy/compose/dev/back.compose.yaml"
+ai_compose="${repo_root}/infra/deploy/compose/dev/ai.compose.yaml"
 
 assert_file "${base}"
 assert_file "${ingress}"
 assert_file "${world_ingress}"
 assert_file "${game_compose}"
 assert_file "${back_compose}"
+assert_file "${ai_compose}"
 assert_contains "${base}" '^name: festa-dev$' 'dev must use the festa-dev Compose project'
-assert_contains "${base}" 'name: festa-dev-private' 'dev private network name is required'
-assert_contains "${base}" 'internal: true' 'dev network must be internal'
+assert_contains "${base}" 'name: festa-dev-ai-back-private' 'dev AI and backend shared network is required'
+assert_contains "${base}" 'name: festa-dev-front-private' 'dev front network is required'
+assert_contains "${base}" 'name: festa-dev-game-private' 'dev game network is required'
 
-for route in front api ai; do
-  assert_contains "${ingress}" "location /__dev/${route}/" "missing dev ${route} route"
-done
-assert_not_contains "${ingress}" '/__dev/world/' 'UnityTransport cannot connect through a URL path'
+assert_contains "${ingress}" 'location / \{' 'dev frontend must be served at the host root'
+assert_contains "${ingress}" 'location /api/' 'missing same-origin dev API route'
+assert_contains "${ingress}" 'location /ai/v1/' 'missing same-origin dev AI route'
+assert_contains "${ingress}" 'location /unity/' 'missing same-origin dev WebGL route'
+assert_contains "${ingress}" 'alias /srv/festa/webgl/current/' 'dev WebGL must share the promoted WebGL release'
+assert_not_contains "${ingress}" '/__dev/' 'dev must not use a cookie-breaking API prefix'
+assert_contains "${ingress}" 'real_ip_header CF-Connecting-IP;' 'dev must restore the client IP supplied by Cloudflare'
+assert_contains "${ingress}" 'real_ip_recursive on;' 'dev must recursively resolve the trusted proxy chain'
+assert_contains "${ingress}" 'set_real_ip_from 173\.245\.48\.0/20;' 'dev must trust Cloudflare proxy ranges'
+assert_contains "${ingress}" 'set_real_ip_from 2c0f:f248::/32;' 'dev must trust Cloudflare IPv6 proxy ranges'
+assert_not_contains "${ingress}" 'set_real_ip_from (0\.0\.0\.0/0|::/0);' 'dev must not trust arbitrary forwarded client IP headers'
 assert_contains "${ingress}" 'dev-allowlist/\*\.conf' 'dev routes must use the approved-IP allowlist'
 assert_contains "${ingress}" 'deny all;' 'dev routes must deny unapproved sources'
 assert_contains "${ingress}" '127\.0\.0\.1:3001' 'front must proxy through loopback'
 assert_contains "${ingress}" '127\.0\.0\.1:8081' 'api must proxy through loopback'
 assert_contains "${ingress}" '127\.0\.0\.1:8000' 'ai must proxy through loopback'
+assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8081;' 'API proxy must preserve /api cookie paths'
+assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8000;' 'AI proxy must preserve /ai/v1 paths'
 assert_contains "${world_ingress}" 'server_name world-dev\.\$\{ROOT_DOMAIN\};' 'world must use the dedicated dev host'
+assert_not_contains "${world_ingress}" 'world\.\$\{ROOT_DOMAIN\}' 'dev world must not claim the demo world host'
 assert_not_contains "${world_ingress}" '^[[:space:]]*http2 on;' 'dev world must remain compatible with the deployed Nginx version'
 assert_contains "${world_ingress}" 'real_ip_header CF-Connecting-IP;' 'dev world must restore the client IP supplied by Cloudflare'
 assert_contains "${world_ingress}" 'real_ip_recursive on;' 'dev world must recursively resolve the trusted proxy chain'
@@ -50,4 +63,13 @@ assert_contains "${game_compose}" 'file: \$\{CONNECTION_TOKEN_SECRET_FILE:' 'gam
 assert_contains "${back_compose}" 'WORLD_SCHEME:[[:space:]]+wss' 'backend must advertise a secure world endpoint'
 assert_contains "${back_compose}" 'WORLD_HOST:[[:space:]]+world-dev\.\$\{ROOT_DOMAIN' 'backend must advertise the dedicated dev world host'
 assert_contains "${back_compose}" 'WORLD_PORT:[[:space:]]+"443"' 'backend must advertise world port 443'
+assert_contains "${back_compose}" 'name:[[:space:]]+festa-dev-ai-back-private' 'backend must join shared AI network'
+assert_contains "${ai_compose}" 'name:[[:space:]]+festa-dev-ai-back-private' 'AI must join shared backend network'
+assert_contains "${back_compose}" 'AI_INTERNAL_BASE_URL:[[:space:]]+http://ai:8000' 'backend must call AI by service DNS'
+assert_contains "${ai_compose}" 'SPRING_INTERNAL_BASE_URL:[[:space:]]+http://back:8080' 'AI must call backend by service DNS'
+assert_contains "${back_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'backend must receive outbound Spring-to-AI token'
+assert_contains "${back_compose}" 'INTERNAL_INFRA_TO_SPRING_TOKENS:' 'backend must receive its Infra-to-Spring token'
+assert_contains "${ai_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'AI must receive inbound Spring-to-AI token'
+assert_contains "${ai_compose}" '/ai/v1/health/live' 'AI healthcheck must use FastAPI liveness endpoint'
+assert_contains "${repo_root}/infra/environments/compose/dev/ai.yaml" '/ai/v1/health/live' 'environment AI healthcheck must use FastAPI liveness endpoint'
 pass 'dev runtime keeps component inputs private and IP-gated ingress loopback-only'
