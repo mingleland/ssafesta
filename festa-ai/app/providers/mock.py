@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 from collections.abc import AsyncIterator, Sequence
 
 from app.providers.embedding import EmbeddingBatch, EmbeddingVector
-from app.providers.llm import LLMRequest, LLMToken
+from app.providers.llm import HANDOFF_SUMMARY_MARKER, LLMRequest, LLMToken
 
 
 EMBEDDING_DIMENSION = 1536
@@ -63,6 +64,19 @@ class MockLLMProvider:
 
     @staticmethod
     def _response_for(request: LLMRequest) -> str:
+        turn_pair_count = sum(
+            1 for message in request.messages if HANDOFF_SUMMARY_MARKER in message.content
+        ) // 2
+        if turn_pair_count:
+            return json.dumps(
+                {
+                    "summary": f"방문자와 AI 직원이 {turn_pair_count}개 turn 동안 대화했습니다.",
+                    "topics": ["Mock 주제"],
+                    "lastUserIntent": "Mock 마지막 사용자 의도",
+                },
+                ensure_ascii=False,
+            )
+
         user_messages = [
             message.content for message in request.messages if message.role == "user"
         ]
