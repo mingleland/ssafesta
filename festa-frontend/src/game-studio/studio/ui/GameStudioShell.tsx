@@ -369,6 +369,8 @@ export const GameStudioShell = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // S15P21A604-630 — 다중 이미지 업로드 진행 표시. 파일이 1장이면 즉시 끝나 굳이 안 보여준다.
+  const [uploadProgress, setUploadProgress] = useState<{ readonly current: number; readonly total: number } | null>(null);
   const [zoom, setZoom] = useState(() => loadZoom(gameId));
   const [fitRequestToken, setFitRequestToken] = useState(0);
   const [focusRequestToken, setFocusRequestToken] = useState(0);
@@ -741,6 +743,45 @@ export const GameStudioShell = ({
       return null;
     }
   }, [apply, assetRepository, gameId, store]);
+
+  // S15P21A604-630 — 여러 파일을 한 번에 올릴 때 uploadAsset()을 병렬로(Promise.all/forEach)
+  // 부르면 안 된다. nextStableId가 await 이전의 store 상태를 보고 계산되므로, 두 파일이 거의
+  // 동시에 시작하면 같은 ID를 배정받고 로컬 저장소(IndexedDB)에서 같은 키를 두고 blob이 서로
+  // 덮어써 "프로젝트엔 등록됐는데 내용은 다른 파일" 이라는 조용한 오염이 생긴다. 그래서
+  // 한 파일의 상태 반영(uploadAsset 내부 apply)까지 끝난 뒤에야 다음 파일의 nextStableId를
+  // 계산하도록 반드시 순차(await)로 처리한다.
+  //
+  // 자산 300개 상한을 넘는 배치는 상한까지만 처리하고 초과분은 시작 전에 실패로 분류한다 —
+  // 한도 도달 시점까지 하나씩 시도하다 실패하는 것보다 사용자가 결과를 한 번에 볼 수 있다.
+  //
+  // uploadAsset 자체가 파일마다 setNotice로 토스트를 띄우므로, 배치가 끝난 뒤 마지막에
+  // 부르는 setNotice(summary)가 자연히 그 토스트들을 덮어써 요약만 남는다.
+  const uploadAssets = useCallback(async (
+    kind: AssetReference['kind'],
+    files: readonly File[],
+  ): Promise<void> => {
+    if (files.length === 0) return;
+    const remaining = Math.max(0, 300 - store.getState().project.assets.length);
+    const accepted = files.slice(0, remaining);
+    const rejectedByCap = files.slice(remaining);
+    const failures: string[] = rejectedByCap.map((file) => `${file.name}(자산 300개 상한 초과)`);
+    let succeeded = 0;
+    for (const [index, file] of accepted.entries()) {
+      if (accepted.length > 1) setUploadProgress({ current: index + 1, total: accepted.length });
+      const asset = await uploadAsset(kind, file);
+      if (asset === null) {
+        failures.push(`${file.name}(추가 실패)`);
+      } else {
+        succeeded += 1;
+      }
+    }
+    setUploadProgress(null);
+    if (accepted.length > 1 || failures.length > 0) {
+      setNotice(failures.length === 0
+        ? `${succeeded}개 자산을 추가했습니다.`
+        : `${succeeded}개 추가, ${failures.length}개 실패: ${failures.join(', ')}`);
+    }
+  }, [store, uploadAsset]);
 
   // S15P21A604-561 — 저장소 삭제(assetRepository.delete)와 프로젝트 참조 제거
   // (removeAssetReference)를 한 동작으로 묶는다. removeAssetReference는 여전히 참조
@@ -1830,8 +1871,9 @@ export const GameStudioShell = ({
                   onDeleteAsset={(assetId: string) => { void deleteAsset(assetId); }}
                   onDeleteItem={deleteItem}
                   onDeleteVariable={deleteVariable}
-                  onUploadAsset={(kind: AssetReference['kind'], file: File) => { void uploadAsset(kind, file); }}
+                  onUploadAsset={(kind: AssetReference['kind'], files: readonly File[]) => { void uploadAssets(kind, files); }}
                   project={project}
+                  uploadProgress={uploadProgress}
                 />}
               </div>
             </>
