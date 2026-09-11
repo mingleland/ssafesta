@@ -25,6 +25,7 @@ GameObject:
   - component: {fileID: 3077078690858850745}
   - component: {fileID: 6804392290677801411}
   - component: {fileID: 1582079450886445712}
+  - component: {fileID: 5813659176010968827}
   m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -401,3 +402,26 @@ MonoBehaviour:
   _headOffset: 0.56
   _headLength: 0.19
   _headRadius: 0.052
+--- !u!136 &5813659176010968827
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 0
+  serializedVersion: 2
+  m_Radius: 2.75
+  m_Height: 16.875
+  m_Direction: 1
+  m_Center: {x: 0, y: 8.4375, z: 0}

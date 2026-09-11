@@ -244,20 +244,30 @@ namespace Festa.World
         /// 앉기처럼 크게 한 번 바뀌는 변화는 0.3 초 안에 따라붙는다. 그래서 감쇠 계수를
         /// 프레임률과 무관하게 지수식으로 준다(가변 프레임률에서 흔들림 폭이 달라지지 않는다).</para>
         /// </summary>
+        /// <remarks>
+        /// <b>몸통 높이만 거른다 — 캐릭터가 통째로 오르내리는 것은 그대로 따라간다.</b>
+        /// 전에는 월드 Y 를 통으로 걸러서, 점프하면 이름표가 바닥 높이에 남아 캐릭터와 겹쳤다
+        /// (사용자 지적 2026-09-11). 점프는 루트가 움직이는 것이라 거를 대상이 아닌데도
+        /// 한 프레임 변화량이 <see cref="LargePoseChange"/> 를 못 넘어 즉시 붙기 분기에도 안 걸렸다.
+        ///
+        /// 걸러야 하는 것은 <b>루트 기준 머리 높이</b>다 — 걷기 반동·호흡은 여기서 흔들리고,
+        /// 점프·계단·경사는 루트에서 움직인다. 둘을 나눠 앞의 것만 거른다.
+        /// </remarks>
         float SmoothTopY()
         {
-            float raw = RawTopY();
-            if (!_smoothed) { _smoothTopY = raw; _smoothed = true; return raw; }
-            // 큰 변화(앉기 등)는 굳이 늦출 이유가 없다 — 바로 따라간다.
-            if (Mathf.Abs(raw - _smoothTopY) > LargePoseChange) { _smoothTopY = raw; return raw; }
-            _smoothTopY = Mathf.Lerp(_smoothTopY, raw, 1f - Mathf.Exp(-TopFollowRate * Time.deltaTime));
-            return _smoothTopY;
+            float rootY = transform.position.y;
+            float rawLocal = RawTopY() - rootY;   // 루트 위로 머리가 얼마나 있나
+            if (!_smoothed) { _smoothLocalTop = rawLocal; _smoothed = true; return rootY + rawLocal; }
+            // 큰 변화(앉기·눕기 등)는 굳이 늦출 이유가 없다 — 바로 따라간다.
+            if (Mathf.Abs(rawLocal - _smoothLocalTop) > LargePoseChange) _smoothLocalTop = rawLocal;
+            else _smoothLocalTop = Mathf.Lerp(_smoothLocalTop, rawLocal, 1f - Mathf.Exp(-TopFollowRate * Time.deltaTime));
+            return rootY + _smoothLocalTop;
         }
 
         /// <summary>이보다 크게 바뀌면 자세가 통째로 바뀐 것으로 보고 즉시 맞춘다 (월드 유닛).</summary>
         const float LargePoseChange = 4f;
         const float TopFollowRate = 7f;
-        float _smoothTopY;
+        float _smoothLocalTop;
         bool _smoothed;
 
         void LateUpdate()

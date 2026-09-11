@@ -261,6 +261,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6774008}
   m_Mesh: {fileID: 4300000, guid: 487da0a858bf4b744b72b0c8d8660841, type: 3}
+--- !u!1 &7688234 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5905103208395970875, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &7688236
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7688234}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 1.3339657e-12, y: 0.48631486, z: -0.000015258789}
 --- !u!1 &10552142
 GameObject:
   m_ObjectHideFlags: 0
@@ -2255,7 +2281,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -2268,7 +2294,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -2584,6 +2610,7 @@ GameObject:
   - component: {fileID: 40526404}
   - component: {fileID: 40526406}
   - component: {fileID: 40526405}
+  - component: {fileID: 40526407}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -2659,6 +2686,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 40526403}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &40526407
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 40526403}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &43540296
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3792,6 +3840,7 @@ GameObject:
   - component: {fileID: 74669564}
   - component: {fileID: 74669566}
   - component: {fileID: 74669565}
+  - component: {fileID: 74669567}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -3867,6 +3916,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 74669563}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &74669567
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 74669563}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &75856105
 GameObject:
   m_ObjectHideFlags: 0
@@ -4315,6 +4385,7 @@ GameObject:
   - component: {fileID: 89018391}
   - component: {fileID: 89018393}
   - component: {fileID: 89018392}
+  - component: {fileID: 89018394}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -4390,6 +4461,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 89018390}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &89018394
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 89018390}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &89029665
 GameObject:
   m_ObjectHideFlags: 0
@@ -4401,6 +4493,7 @@ GameObject:
   - component: {fileID: 89029666}
   - component: {fileID: 89029668}
   - component: {fileID: 89029667}
+  - component: {fileID: 89029669}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalWallLamp__2_1
   m_TagString: Untagged
@@ -4476,6 +4569,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 89029665}
   m_Mesh: {fileID: 4300000, guid: 38d3c36858a4b55419d74ce802d58f30, type: 2}
+--- !u!65 &89029669
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 89029665}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 151.20001, y: 7.4000015, z: 6.200012}
+  m_Center: {x: -352.5, y: 28.017113, z: 308.6356}
 --- !u!1 &91018526
 GameObject:
   m_ObjectHideFlags: 0
@@ -4856,6 +4970,7 @@ GameObject:
   - component: {fileID: 93723366}
   - component: {fileID: 93723368}
   - component: {fileID: 93723367}
+  - component: {fileID: 93723369}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -4931,6 +5046,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 93723365}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &93723369
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 93723365}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &93798866
 GameObject:
   m_ObjectHideFlags: 0
@@ -5253,6 +5389,7 @@ GameObject:
   - component: {fileID: 98654446}
   - component: {fileID: 98654448}
   - component: {fileID: 98654447}
+  - component: {fileID: 98654449}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -5328,6 +5465,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 98654445}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &98654449
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 98654445}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &98860221
 GameObject:
   m_ObjectHideFlags: 0
@@ -8557,7 +8715,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -8570,12 +8728,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 26.5
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -8840,6 +8998,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 169291553}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &172879860 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 505309669738856402, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &172879862
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 172879860}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0.0000076293945}
 --- !u!1 &177877889
 GameObject:
   m_ObjectHideFlags: 0
@@ -9059,7 +9243,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -9072,12 +9256,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.2
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -9918,6 +10102,7 @@ GameObject:
   - component: {fileID: 226160663}
   - component: {fileID: 226160665}
   - component: {fileID: 226160664}
+  - component: {fileID: 226160666}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -9993,6 +10178,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 226160662}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &226160666
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 226160662}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &227690146
 GameObject:
   m_ObjectHideFlags: 0
@@ -10004,6 +10210,7 @@ GameObject:
   - component: {fileID: 227690147}
   - component: {fileID: 227690149}
   - component: {fileID: 227690148}
+  - component: {fileID: 227690150}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -10079,6 +10286,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 227690146}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &227690150
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227690146}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &231142481
 GameObject:
   m_ObjectHideFlags: 0
@@ -10374,7 +10602,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -10387,12 +10615,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.8
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -11000,7 +11228,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -11013,7 +11241,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -11241,6 +11469,7 @@ GameObject:
   - component: {fileID: 255168755}
   - component: {fileID: 255168757}
   - component: {fileID: 255168756}
+  - component: {fileID: 255168758}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -11316,6 +11545,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 255168754}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &255168758
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 255168754}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &257178852
 GameObject:
   m_ObjectHideFlags: 0
@@ -11327,6 +11577,7 @@ GameObject:
   - component: {fileID: 257178853}
   - component: {fileID: 257178855}
   - component: {fileID: 257178854}
+  - component: {fileID: 257178856}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -11402,6 +11653,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 257178852}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &257178856
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 257178852}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &260467097
 GameObject:
   m_ObjectHideFlags: 0
@@ -11413,6 +11685,7 @@ GameObject:
   - component: {fileID: 260467098}
   - component: {fileID: 260467100}
   - component: {fileID: 260467099}
+  - component: {fileID: 260467101}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalWallLamp__4_1
   m_TagString: Untagged
@@ -11488,6 +11761,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 260467097}
   m_Mesh: {fileID: 4300000, guid: 6a7df46f48e085346a06038f4220423a, type: 2}
+--- !u!65 &260467101
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 260467097}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 59.83557, y: 7.4000015, z: 54.8356}
+  m_Center: {x: -886.8178, y: 28.017113, z: 284.3178}
 --- !u!1 &262792795
 GameObject:
   m_ObjectHideFlags: 0
@@ -11792,6 +12086,7 @@ GameObject:
   - component: {fileID: 266673965}
   - component: {fileID: 266673967}
   - component: {fileID: 266673966}
+  - component: {fileID: 266673968}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__4__1
   m_TagString: Untagged
@@ -11867,6 +12162,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 266673964}
   m_Mesh: {fileID: 4300000, guid: 48bc12385efdba44893d6bd4705fb960, type: 2}
+--- !u!65 &266673968
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 266673964}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 8.599976, y: 6.1495895, z: 15.256891}
+  m_Center: {x: -860, y: 35.19191, z: -21.964043}
 --- !u!1 &268673554
 GameObject:
   m_ObjectHideFlags: 0
@@ -11933,7 +12249,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -11946,12 +12262,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -12403,7 +12719,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -12416,7 +12732,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -12525,6 +12841,7 @@ GameObject:
   - component: {fileID: 279399360}
   - component: {fileID: 279399362}
   - component: {fileID: 279399361}
+  - component: {fileID: 279399363}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -12600,6 +12917,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 279399359}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &279399363
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 279399359}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &282265435
 GameObject:
   m_ObjectHideFlags: 0
@@ -12891,6 +13229,7 @@ GameObject:
   - component: {fileID: 284451595}
   - component: {fileID: 284451597}
   - component: {fileID: 284451596}
+  - component: {fileID: 284451598}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -12966,6 +13305,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 284451594}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &284451598
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 284451594}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &286251173
 GameObject:
   m_ObjectHideFlags: 0
@@ -14250,6 +14610,7 @@ GameObject:
   - component: {fileID: 309298879}
   - component: {fileID: 309298881}
   - component: {fileID: 309298880}
+  - component: {fileID: 309298882}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -14325,6 +14686,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 309298878}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &309298882
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 309298878}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &309378662
 GameObject:
   m_ObjectHideFlags: 0
@@ -15552,7 +15934,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -15565,12 +15947,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 23.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -15971,7 +16353,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -15984,7 +16366,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -16537,6 +16919,7 @@ GameObject:
   - component: {fileID: 348270845}
   - component: {fileID: 348270847}
   - component: {fileID: 348270846}
+  - component: {fileID: 348270848}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__3_1
   m_TagString: Untagged
@@ -16612,6 +16995,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 348270844}
   m_Mesh: {fileID: 4300000, guid: c4764a75bb19fad4e9b035055ca409c9, type: 2}
+--- !u!65 &348270848
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 348270844}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 153.59998, y: 6.1495895, z: 15.256897}
+  m_Center: {x: -642.5, y: 35.19191, z: 311.96405}
 --- !u!1 &352827780
 GameObject:
   m_ObjectHideFlags: 0
@@ -16837,7 +17241,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -16850,12 +17254,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 22.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -16959,6 +17363,7 @@ GameObject:
   - component: {fileID: 355286376}
   - component: {fileID: 355286378}
   - component: {fileID: 355286377}
+  - component: {fileID: 355286379}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -17034,6 +17439,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 355286375}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &355286379
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 355286375}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &355320025
 GameObject:
   m_ObjectHideFlags: 0
@@ -17100,7 +17526,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -17113,12 +17539,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 22.5
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -17626,6 +18052,7 @@ GameObject:
   - component: {fileID: 361852925}
   - component: {fileID: 361852927}
   - component: {fileID: 361852926}
+  - component: {fileID: 361852928}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -17701,6 +18128,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 361852924}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &361852928
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 361852924}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &362308313
 GameObject:
   m_ObjectHideFlags: 0
@@ -18877,6 +19325,7 @@ GameObject:
   - component: {fileID: 398935051}
   - component: {fileID: 398935053}
   - component: {fileID: 398935052}
+  - component: {fileID: 398935054}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -18952,6 +19401,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 398935050}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &398935054
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 398935050}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &410193436
 GameObject:
   m_ObjectHideFlags: 0
@@ -19334,7 +19804,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -19347,12 +19817,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -20200,7 +20670,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -20213,7 +20683,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -21565,6 +22035,7 @@ GameObject:
   - component: {fileID: 483460766}
   - component: {fileID: 483460768}
   - component: {fileID: 483460767}
+  - component: {fileID: 483460769}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -21640,6 +22111,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 483460765}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &483460769
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 483460765}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &486421705
 GameObject:
   m_ObjectHideFlags: 0
@@ -22221,6 +22713,7 @@ GameObject:
   - component: {fileID: 495807418}
   - component: {fileID: 495807420}
   - component: {fileID: 495807419}
+  - component: {fileID: 495807421}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -22296,6 +22789,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 495807417}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &495807421
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 495807417}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &497766909
 GameObject:
   m_ObjectHideFlags: 0
@@ -23212,6 +23726,7 @@ GameObject:
   - component: {fileID: 516844786}
   - component: {fileID: 516844788}
   - component: {fileID: 516844787}
+  - component: {fileID: 516844789}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -23287,6 +23802,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 516844785}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &516844789
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 516844785}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &518035988
 GameObject:
   m_ObjectHideFlags: 0
@@ -24322,6 +24858,32 @@ Transform:
   - {fileID: 1753481257}
   m_Father: {fileID: 1560589606}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &549458651 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8044950792141764808, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &549458653
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 549458651}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0}
 --- !u!1 &549622368
 GameObject:
   m_ObjectHideFlags: 0
@@ -25020,6 +25582,7 @@ GameObject:
   - component: {fileID: 565722184}
   - component: {fileID: 565722186}
   - component: {fileID: 565722185}
+  - component: {fileID: 565722187}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -25095,6 +25658,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 565722183}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &565722187
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 565722183}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &566165175
 GameObject:
   m_ObjectHideFlags: 0
@@ -25736,6 +26320,7 @@ GameObject:
   - component: {fileID: 578354440}
   - component: {fileID: 578354442}
   - component: {fileID: 578354441}
+  - component: {fileID: 578354443}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -25811,6 +26396,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 578354439}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &578354443
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 578354439}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &578646183
 GameObject:
   m_ObjectHideFlags: 0
@@ -26148,6 +26754,7 @@ GameObject:
   - component: {fileID: 589028706}
   - component: {fileID: 589028708}
   - component: {fileID: 589028707}
+  - component: {fileID: 589028709}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -26223,6 +26830,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 589028705}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &589028709
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 589028705}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &592456754
 GameObject:
   m_ObjectHideFlags: 0
@@ -26287,6 +26915,7 @@ GameObject:
   - component: {fileID: 592938844}
   - component: {fileID: 592938846}
   - component: {fileID: 592938845}
+  - component: {fileID: 592938847}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -26362,6 +26991,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 592938843}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &592938847
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 592938843}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &594659235
 GameObject:
   m_ObjectHideFlags: 0
@@ -26908,7 +27558,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -26921,12 +27571,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 22.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -28794,6 +29444,7 @@ GameObject:
   - component: {fileID: 630676917}
   - component: {fileID: 630676919}
   - component: {fileID: 630676918}
+  - component: {fileID: 630676920}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -28869,6 +29520,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 630676916}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &630676920
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 630676916}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &633058762
 GameObject:
   m_ObjectHideFlags: 0
@@ -28966,6 +29638,7 @@ GameObject:
   - component: {fileID: 635886875}
   - component: {fileID: 635886877}
   - component: {fileID: 635886876}
+  - component: {fileID: 635886878}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -29041,6 +29714,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 635886874}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &635886878
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 635886874}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &635896301
 GameObject:
   m_ObjectHideFlags: 0
@@ -29052,6 +29746,7 @@ GameObject:
   - component: {fileID: 635896302}
   - component: {fileID: 635896304}
   - component: {fileID: 635896303}
+  - component: {fileID: 635896305}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -29127,6 +29822,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 635896301}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &635896305
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 635896301}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &635971541
 GameObject:
   m_ObjectHideFlags: 0
@@ -29584,6 +30300,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 645931633}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &647973285 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4714545516385405074, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &647973287
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 647973285}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.9743614, y: 0.9726297, z: 1.1649619}
+  m_Center: {x: 0, y: 0.48631483, z: 0}
 --- !u!1 &648603302
 GameObject:
   m_ObjectHideFlags: 0
@@ -30536,7 +31278,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -30549,12 +31291,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -30713,7 +31455,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -30726,7 +31468,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -31412,6 +32154,7 @@ GameObject:
   - component: {fileID: 677160665}
   - component: {fileID: 677160667}
   - component: {fileID: 677160666}
+  - component: {fileID: 677160668}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -31487,6 +32230,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 677160664}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &677160668
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 677160664}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &678096316
 GameObject:
   m_ObjectHideFlags: 0
@@ -31498,6 +32262,7 @@ GameObject:
   - component: {fileID: 678096317}
   - component: {fileID: 678096319}
   - component: {fileID: 678096318}
+  - component: {fileID: 678096320}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -31573,6 +32338,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 678096316}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &678096320
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 678096316}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &679081983
 GameObject:
   m_ObjectHideFlags: 0
@@ -32161,7 +32947,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -32174,7 +32960,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -32882,6 +33668,32 @@ SkinnedMeshRenderer:
     m_Center: {x: 0, y: 0, z: 0.7999999}
     m_Extent: {x: 0.5, y: 0.49999994, z: 0.8085654}
   m_DirtyAABB: 0
+--- !u!1 &697575997 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8932877280485891256, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &697575999
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 697575997}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 1.3339657e-12, y: 0.48631486, z: -0.000015258789}
 --- !u!1 &699507014
 GameObject:
   m_ObjectHideFlags: 0
@@ -33669,6 +34481,7 @@ GameObject:
   - component: {fileID: 708165025}
   - component: {fileID: 708165027}
   - component: {fileID: 708165026}
+  - component: {fileID: 708165028}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -33744,6 +34557,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 708165024}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &708165028
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 708165024}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &709229896
 GameObject:
   m_ObjectHideFlags: 0
@@ -33810,7 +34644,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -33823,7 +34657,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -34162,6 +34996,7 @@ GameObject:
   - component: {fileID: 714729952}
   - component: {fileID: 714729954}
   - component: {fileID: 714729953}
+  - component: {fileID: 714729955}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -34237,6 +35072,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 714729951}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &714729955
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 714729951}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &714820099
 GameObject:
   m_ObjectHideFlags: 0
@@ -36261,6 +37117,58 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 749152355}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &752302132 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4646434094641061295, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+  m_PrefabInstance: {fileID: 936026030}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &752302136
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 752302132}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.62401, y: 0.35354775, z: 0.09312627}
+  m_Center: {x: 0.812004, y: 0.1767734, z: 0.046555504}
+--- !u!1 &753302100 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8810828387247094803, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &753302102
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 753302100}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0.0000076293945}
 --- !u!1 &756781231
 GameObject:
   m_ObjectHideFlags: 0
@@ -36413,7 +37321,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -36426,12 +37334,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -36535,6 +37443,7 @@ GameObject:
   - component: {fileID: 758780762}
   - component: {fileID: 758780764}
   - component: {fileID: 758780763}
+  - component: {fileID: 758780765}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -36610,6 +37519,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 758780761}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &758780765
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 758780761}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &760370688
 GameObject:
   m_ObjectHideFlags: 0
@@ -36621,6 +37551,7 @@ GameObject:
   - component: {fileID: 760370689}
   - component: {fileID: 760370691}
   - component: {fileID: 760370690}
+  - component: {fileID: 760370692}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -36696,6 +37627,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 760370688}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &760370692
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 760370688}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &761311082
 GameObject:
   m_ObjectHideFlags: 0
@@ -37110,6 +38062,7 @@ GameObject:
   - component: {fileID: 777732440}
   - component: {fileID: 777732442}
   - component: {fileID: 777732441}
+  - component: {fileID: 777732443}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__2__1
   m_TagString: Untagged
@@ -37185,6 +38138,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 777732439}
   m_Mesh: {fileID: 4300000, guid: 33018bd9678dc6645b1bd538332032ad, type: 2}
+--- !u!65 &777732443
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 777732439}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 153.59998, y: 6.1495895, z: 15.256891}
+  m_Center: {x: -352.5, y: 35.19191, z: -21.964043}
 --- !u!1 &782283602
 GameObject:
   m_ObjectHideFlags: 0
@@ -37482,7 +38456,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -37495,12 +38469,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -38129,7 +39103,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -38142,7 +39116,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -38306,7 +39280,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -38319,12 +39293,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 23.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -38841,6 +39815,32 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1564708124}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &801871218 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2522916985894711653, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+  m_PrefabInstance: {fileID: 936026030}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &801871222
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 801871218}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.62401, y: 0.35354775, z: 0.09312627}
+  m_Center: {x: 0.81200475, y: 0.1767734, z: 0.046563134}
 --- !u!1 &806740797
 GameObject:
   m_ObjectHideFlags: 0
@@ -39222,7 +40222,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -39235,12 +40235,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 22.5
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -40390,6 +41390,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 833853556}
   m_Mesh: {fileID: 4300000, guid: 487da0a858bf4b744b72b0c8d8660841, type: 3}
+--- !u!1 &837205476 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1166252075515688671, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &837205478
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 837205476}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0}
 --- !u!1 &842166307
 GameObject:
   m_ObjectHideFlags: 0
@@ -40547,7 +41573,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -40560,7 +41586,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -41200,7 +42226,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -41213,12 +42239,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -42201,7 +43227,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -42214,7 +43240,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -42462,6 +43488,7 @@ GameObject:
   - component: {fileID: 871974353}
   - component: {fileID: 871974355}
   - component: {fileID: 871974354}
+  - component: {fileID: 871974356}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__3__1
   m_TagString: Untagged
@@ -42537,6 +43564,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 871974352}
   m_Mesh: {fileID: 4300000, guid: e0573f1efb6197745881b2435785a414, type: 2}
+--- !u!65 &871974356
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 871974352}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 153.59998, y: 6.1495895, z: 15.256891}
+  m_Center: {x: -642.5, y: 35.19191, z: -21.964043}
 --- !u!1 &872480431
 GameObject:
   m_ObjectHideFlags: 0
@@ -42669,6 +43717,7 @@ GameObject:
   - component: {fileID: 872543361}
   - component: {fileID: 872543363}
   - component: {fileID: 872543362}
+  - component: {fileID: 872543364}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -42744,6 +43793,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 872543360}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &872543364
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 872543360}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &875448450
 GameObject:
   m_ObjectHideFlags: 0
@@ -43045,6 +44115,7 @@ GameObject:
   - component: {fileID: 881822758}
   - component: {fileID: 881822760}
   - component: {fileID: 881822759}
+  - component: {fileID: 881822761}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -43120,6 +44191,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 881822757}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &881822761
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 881822757}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &885653726
 GameObject:
   m_ObjectHideFlags: 0
@@ -43519,6 +44611,7 @@ GameObject:
   - component: {fileID: 888203476}
   - component: {fileID: 888203478}
   - component: {fileID: 888203477}
+  - component: {fileID: 888203479}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalWallLamp__3_1
   m_TagString: Untagged
@@ -43594,6 +44687,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 888203475}
   m_Mesh: {fileID: 4300000, guid: f8af335236ebcfb44bb7b8af7ea895ba, type: 2}
+--- !u!65 &888203479
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 888203475}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 151.19995, y: 7.4000015, z: 6.200012}
+  m_Center: {x: -642.5, y: 28.017113, z: 308.6356}
 --- !u!1 &889862195
 GameObject:
   m_ObjectHideFlags: 0
@@ -44441,6 +45555,7 @@ GameObject:
   - component: {fileID: 916530943}
   - component: {fileID: 916530945}
   - component: {fileID: 916530944}
+  - component: {fileID: 916530946}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -44516,6 +45631,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 916530942}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &916530946
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916530942}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &917014142
 GameObject:
   m_ObjectHideFlags: 0
@@ -44772,6 +45908,7 @@ GameObject:
   - component: {fileID: 925302678}
   - component: {fileID: 925302680}
   - component: {fileID: 925302679}
+  - component: {fileID: 925302681}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -44847,6 +45984,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 925302677}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &925302681
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 925302677}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &926048074
 GameObject:
   m_ObjectHideFlags: 0
@@ -44858,6 +46016,7 @@ GameObject:
   - component: {fileID: 926048075}
   - component: {fileID: 926048077}
   - component: {fileID: 926048076}
+  - component: {fileID: 926048078}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalPole__2_0
   m_TagString: Untagged
@@ -44933,6 +46092,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 926048074}
   m_Mesh: {fileID: 4300000, guid: 4d55fff4c01499b44ae9aaee57cc445e, type: 2}
+--- !u!65 &926048078
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 926048074}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 116.85632, y: 55.68889, z: 81.85629}
+  m_Center: {x: -407.5, y: 27.844444, z: 145}
 --- !u!1 &930734884
 GameObject:
   m_ObjectHideFlags: 0
@@ -47282,6 +48462,15 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 3458384908162803272, guid: d17c66a2b930fe841bb877d684606688, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1143018130}
+    - targetCorrespondingSourceObject: {fileID: 4646434094641061295, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 752302136}
+    - targetCorrespondingSourceObject: {fileID: 307119095006812937, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1409881128}
+    - targetCorrespondingSourceObject: {fileID: 2522916985894711653, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 801871222}
     - targetCorrespondingSourceObject: {fileID: 8945610655285875059, guid: d17c66a2b930fe841bb877d684606688, type: 3}
       insertIndex: -1
       addedObject: {fileID: 415468019}
@@ -47717,7 +48906,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -47730,7 +48919,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -48846,6 +50035,7 @@ GameObject:
   - component: {fileID: 959975487}
   - component: {fileID: 959975489}
   - component: {fileID: 959975488}
+  - component: {fileID: 959975490}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalWallLamp__2__1
   m_TagString: Untagged
@@ -48921,6 +50111,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 959975486}
   m_Mesh: {fileID: 4300000, guid: a3b44bc42a9edf3408f27375aab905b8, type: 2}
+--- !u!65 &959975490
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 959975486}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 151.20001, y: 7.4000015, z: 6.200001}
+  m_Center: {x: -352.5, y: 28.017113, z: -18.635597}
 --- !u!1 &961904091
 GameObject:
   m_ObjectHideFlags: 0
@@ -49734,7 +50945,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -49747,7 +50958,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -51128,6 +52339,7 @@ GameObject:
   - component: {fileID: 1007902201}
   - component: {fileID: 1007902203}
   - component: {fileID: 1007902202}
+  - component: {fileID: 1007902204}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -51203,6 +52415,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1007902200}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1007902204
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1007902200}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1008698348
 GameObject:
   m_ObjectHideFlags: 0
@@ -51511,6 +52744,7 @@ GameObject:
   - component: {fileID: 1021368436}
   - component: {fileID: 1021368438}
   - component: {fileID: 1021368437}
+  - component: {fileID: 1021368439}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__4_1
   m_TagString: Untagged
@@ -51586,6 +52820,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1021368435}
   m_Mesh: {fileID: 4300000, guid: 1c7c26d1a118fc84787fa08753e2f6ef, type: 2}
+--- !u!65 &1021368439
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1021368435}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 68.892456, y: 6.1495895, z: 63.8925}
+  m_Center: {x: -890.14624, y: 35.19191, z: 287.64624}
 --- !u!1 &1025387611
 GameObject:
   m_ObjectHideFlags: 0
@@ -51826,6 +53081,7 @@ GameObject:
   - component: {fileID: 1027007223}
   - component: {fileID: 1027007225}
   - component: {fileID: 1027007224}
+  - component: {fileID: 1027007226}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalWallLamp__3__1
   m_TagString: Untagged
@@ -51901,6 +53157,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1027007222}
   m_Mesh: {fileID: 4300000, guid: 44ae172e32c67584c84b81b2a4073d97, type: 2}
+--- !u!65 &1027007226
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1027007222}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 151.19995, y: 7.4000015, z: 6.200001}
+  m_Center: {x: -642.5, y: 28.017113, z: -18.635597}
 --- !u!1 &1027095046
 GameObject:
   m_ObjectHideFlags: 0
@@ -53230,7 +54507,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -53243,7 +54520,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -54353,6 +55630,7 @@ GameObject:
   - component: {fileID: 1075252082}
   - component: {fileID: 1075252084}
   - component: {fileID: 1075252083}
+  - component: {fileID: 1075252085}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -54428,6 +55706,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1075252081}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1075252085
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1075252081}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1078183930
 GameObject:
   m_ObjectHideFlags: 0
@@ -54790,6 +56089,7 @@ GameObject:
   - component: {fileID: 1087153827}
   - component: {fileID: 1087153829}
   - component: {fileID: 1087153828}
+  - component: {fileID: 1087153830}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -54865,6 +56165,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1087153826}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1087153830
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1087153826}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1087969217
 GameObject:
   m_ObjectHideFlags: 0
@@ -56424,7 +57745,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -56437,7 +57758,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -57710,6 +59031,7 @@ GameObject:
   - component: {fileID: 1135796580}
   - component: {fileID: 1135796582}
   - component: {fileID: 1135796581}
+  - component: {fileID: 1135796583}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -57785,6 +59107,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1135796579}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1135796583
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1135796579}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1143018122 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3458384908162803272, guid: d17c66a2b930fe841bb877d684606688, type: 3}
@@ -58240,6 +59583,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1157368056}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1159600599 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8683416217277325716, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1159600601
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1159600599}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0}
 --- !u!1 &1163771539
 GameObject:
   m_ObjectHideFlags: 0
@@ -58483,6 +59852,7 @@ GameObject:
   - component: {fileID: 1168152114}
   - component: {fileID: 1168152116}
   - component: {fileID: 1168152115}
+  - component: {fileID: 1168152117}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__4_0
   m_TagString: Untagged
@@ -58558,6 +59928,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1168152113}
   m_Mesh: {fileID: 4300000, guid: f57be1159e170a64e9854418d991fa13, type: 2}
+--- !u!65 &1168152117
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1168152113}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 15.256836, y: 6.1495895, z: 8.600002}
+  m_Center: {x: -916.96405, y: 35.19191, z: 40}
 --- !u!1 &1168988001
 GameObject:
   m_ObjectHideFlags: 0
@@ -59192,7 +60583,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -59205,12 +60596,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.8
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -59369,7 +60760,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -59382,7 +60773,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -59753,7 +61144,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -59766,12 +61157,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.4
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -59930,7 +61321,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -59943,12 +61334,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.8
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -61518,6 +62909,7 @@ GameObject:
   - component: {fileID: 1217801102}
   - component: {fileID: 1217801104}
   - component: {fileID: 1217801103}
+  - component: {fileID: 1217801105}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalLamp__1_0
   m_TagString: Untagged
@@ -61593,6 +62985,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1217801101}
   m_Mesh: {fileID: 4300000, guid: 4143e6e5fccdc4d4ba29ba0029a3ec78, type: 2}
+--- !u!65 &1217801105
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217801101}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 5.568878, y: 5.568886, z: 113.568886}
+  m_Center: {x: -236, y: 58.34074, z: 146}
 --- !u!1 &1219059191
 GameObject:
   m_ObjectHideFlags: 0
@@ -61635,6 +63048,7 @@ GameObject:
   - component: {fileID: 1220513823}
   - component: {fileID: 1220513825}
   - component: {fileID: 1220513824}
+  - component: {fileID: 1220513826}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -61710,6 +63124,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1220513822}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1220513826
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1220513822}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1221549954
 GameObject:
   m_ObjectHideFlags: 0
@@ -61831,6 +63266,32 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &1222936565 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5177409225916182922, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1222936567
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1222936565}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.0726331, y: 0.9726297, z: 1.1694025}
+  m_Center: {x: 0, y: 0.48631483, z: 0}
 --- !u!1 &1224454226
 GameObject:
   m_ObjectHideFlags: 0
@@ -63190,6 +64651,7 @@ GameObject:
   - component: {fileID: 1267644244}
   - component: {fileID: 1267644246}
   - component: {fileID: 1267644245}
+  - component: {fileID: 1267644247}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -63265,6 +64727,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1267644243}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1267644247
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1267644243}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1268205906
 GameObject:
   m_ObjectHideFlags: 0
@@ -64146,6 +65629,7 @@ GameObject:
   - component: {fileID: 1282336644}
   - component: {fileID: 1282336646}
   - component: {fileID: 1282336645}
+  - component: {fileID: 1282336647}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -64221,6 +65705,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1282336643}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1282336647
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1282336643}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1285404322
 GameObject:
   m_ObjectHideFlags: 0
@@ -64917,6 +66422,32 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &1307280861 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1360343561460156746, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1307280863
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1307280861}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 1.3339657e-12, y: 0.48631486, z: -0.000015258789}
 --- !u!1 &1307757204
 GameObject:
   m_ObjectHideFlags: 0
@@ -66334,6 +67865,7 @@ GameObject:
   - component: {fileID: 1344615316}
   - component: {fileID: 1344615318}
   - component: {fileID: 1344615317}
+  - component: {fileID: 1344615319}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -66409,6 +67941,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1344615315}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1344615319
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1344615315}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1344881493
 GameObject:
   m_ObjectHideFlags: 0
@@ -66451,6 +68004,7 @@ GameObject:
   - component: {fileID: 1347456657}
   - component: {fileID: 1347456659}
   - component: {fileID: 1347456658}
+  - component: {fileID: 1347456660}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -66526,6 +68080,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1347456656}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1347456660
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1347456656}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1350553580
 GameObject:
   m_ObjectHideFlags: 0
@@ -67089,6 +68664,7 @@ GameObject:
   - component: {fileID: 1357250306}
   - component: {fileID: 1357250308}
   - component: {fileID: 1357250307}
+  - component: {fileID: 1357250309}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalLamp__3_0
   m_TagString: Untagged
@@ -67164,6 +68740,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1357250305}
   m_Mesh: {fileID: 4300000, guid: 6b3dd428b35e43542ab0912a1252fecf, type: 2}
+--- !u!65 &1357250309
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1357250305}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 120.56885, y: 5.568886, z: 85.568886}
+  m_Center: {x: -637.5, y: 58.34074, z: 145}
 --- !u!4 &1362420861 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8515861212230794861, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
@@ -67493,6 +69090,7 @@ GameObject:
   - component: {fileID: 1374189131}
   - component: {fileID: 1374189133}
   - component: {fileID: 1374189132}
+  - component: {fileID: 1374189134}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -67568,6 +69166,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1374189130}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1374189134
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1374189130}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1374790997
 GameObject:
   m_ObjectHideFlags: 0
@@ -67980,6 +69599,7 @@ GameObject:
   - component: {fileID: 1384126712}
   - component: {fileID: 1384126714}
   - component: {fileID: 1384126713}
+  - component: {fileID: 1384126715}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -68055,6 +69675,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1384126711}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1384126715
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1384126711}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1385844291
 GameObject:
   m_ObjectHideFlags: 0
@@ -68543,6 +70184,7 @@ GameObject:
   - component: {fileID: 1398661070}
   - component: {fileID: 1398661072}
   - component: {fileID: 1398661071}
+  - component: {fileID: 1398661073}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalPole__3_0
   m_TagString: Untagged
@@ -68618,6 +70260,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1398661069}
   m_Mesh: {fileID: 4300000, guid: 6dcb811022e399a4094e6679df8b165a, type: 2}
+--- !u!65 &1398661073
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1398661069}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 116.85632, y: 55.68889, z: 81.85629}
+  m_Center: {x: -637.5, y: 27.844444, z: 145}
 --- !u!1 &1399055176 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6887130101567274594, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
@@ -68665,6 +70328,7 @@ GameObject:
   - component: {fileID: 1399265511}
   - component: {fileID: 1399265513}
   - component: {fileID: 1399265512}
+  - component: {fileID: 1399265514}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -68740,6 +70404,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1399265510}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1399265514
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1399265510}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1402318892
 GameObject:
   m_ObjectHideFlags: 0
@@ -68851,7 +70536,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -68864,12 +70549,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.6
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -69169,6 +70854,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1409305057}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1409881124 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 307119095006812937, guid: d17c66a2b930fe841bb877d684606688, type: 3}
+  m_PrefabInstance: {fileID: 936026030}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1409881128
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1409881124}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.62401, y: 0.35354775, z: 0.09312627}
+  m_Center: {x: 0.812005, y: 0.1767734, z: 0.046563134}
 --- !u!1 &1414214928
 GameObject:
   m_ObjectHideFlags: 0
@@ -69411,7 +71122,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -69424,7 +71135,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -70171,6 +71882,7 @@ GameObject:
   - component: {fileID: 1442269894}
   - component: {fileID: 1442269896}
   - component: {fileID: 1442269895}
+  - component: {fileID: 1442269897}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -70246,6 +71958,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1442269893}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1442269897
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1442269893}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1444223734
 GameObject:
   m_ObjectHideFlags: 0
@@ -70954,7 +72687,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -70967,12 +72700,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 26.25
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -71369,6 +73102,7 @@ GameObject:
   - component: {fileID: 1466195885}
   - component: {fileID: 1466195887}
   - component: {fileID: 1466195886}
+  - component: {fileID: 1466195888}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -71444,6 +73178,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1466195884}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1466195888
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1466195884}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1467537655
 GameObject:
   m_ObjectHideFlags: 0
@@ -71946,6 +73701,7 @@ GameObject:
   - component: {fileID: 1473869359}
   - component: {fileID: 1473869361}
   - component: {fileID: 1473869360}
+  - component: {fileID: 1473869362}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -72021,6 +73777,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1473869358}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1473869362
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1473869358}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1474261494
 GameObject:
   m_ObjectHideFlags: 0
@@ -72534,6 +74311,7 @@ GameObject:
   - component: {fileID: 1479751006}
   - component: {fileID: 1479751008}
   - component: {fileID: 1479751007}
+  - component: {fileID: 1479751009}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -72609,6 +74387,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1479751005}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1479751009
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1479751005}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1481102213
 GameObject:
   m_ObjectHideFlags: 0
@@ -72706,6 +74505,7 @@ GameObject:
   - component: {fileID: 1485915840}
   - component: {fileID: 1485915842}
   - component: {fileID: 1485915841}
+  - component: {fileID: 1485915843}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -72781,6 +74581,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1485915839}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1485915843
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1485915839}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1001 &1487251596
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -73181,6 +75002,7 @@ GameObject:
   - component: {fileID: 1501059959}
   - component: {fileID: 1501059961}
   - component: {fileID: 1501059960}
+  - component: {fileID: 1501059962}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -73256,6 +75078,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1501059958}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1501059962
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1501059958}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1502972757
 GameObject:
   m_ObjectHideFlags: 0
@@ -74502,6 +76345,7 @@ GameObject:
   - component: {fileID: 1536002665}
   - component: {fileID: 1536002667}
   - component: {fileID: 1536002666}
+  - component: {fileID: 1536002668}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -74577,6 +76421,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1536002664}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1536002668
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1536002664}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1540700421
 GameObject:
   m_ObjectHideFlags: 0
@@ -76482,6 +78347,7 @@ GameObject:
   - component: {fileID: 1596569356}
   - component: {fileID: 1596569358}
   - component: {fileID: 1596569357}
+  - component: {fileID: 1596569359}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -76557,6 +78423,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1596569355}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1596569359
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1596569355}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1601163076
 GameObject:
   m_ObjectHideFlags: 0
@@ -78141,6 +80028,7 @@ GameObject:
   - component: {fileID: 1626556279}
   - component: {fileID: 1626556281}
   - component: {fileID: 1626556280}
+  - component: {fileID: 1626556282}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -78216,6 +80104,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1626556278}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1626556282
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1626556278}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1636041528
 GameObject:
   m_ObjectHideFlags: 0
@@ -78867,6 +80776,7 @@ GameObject:
   - component: {fileID: 1648119469}
   - component: {fileID: 1648119471}
   - component: {fileID: 1648119470}
+  - component: {fileID: 1648119472}
   m_Layer: 0
   m_Name: CeilingLamp_4
   m_TagString: Untagged
@@ -78942,6 +80852,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1648119468}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1648119472
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1648119468}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1648216316
 GameObject:
   m_ObjectHideFlags: 0
@@ -80141,6 +82072,7 @@ GameObject:
   - component: {fileID: 1661369470}
   - component: {fileID: 1661369472}
   - component: {fileID: 1661369471}
+  - component: {fileID: 1661369473}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -80216,6 +82148,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1661369469}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1661369473
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1661369469}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1663090252
 GameObject:
   m_ObjectHideFlags: 0
@@ -80769,7 +82722,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -80782,7 +82735,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -81282,6 +83235,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1690644412}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1690660594 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7992914039180969834, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1690660596
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1690660594}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019302}
+  m_Center: {x: 0, y: 0.48631486, z: 0}
 --- !u!1 &1692398442
 GameObject:
   m_ObjectHideFlags: 0
@@ -81880,6 +83859,7 @@ GameObject:
   - component: {fileID: 1701587074}
   - component: {fileID: 1701587076}
   - component: {fileID: 1701587075}
+  - component: {fileID: 1701587077}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -81955,6 +83935,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1701587073}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1701587077
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1701587073}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000076293945}
 --- !u!1 &1702832011
 GameObject:
   m_ObjectHideFlags: 0
@@ -82331,7 +84332,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -82344,12 +84345,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 26.5
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -82836,6 +84837,7 @@ GameObject:
   - component: {fileID: 1716717357}
   - component: {fileID: 1716717359}
   - component: {fileID: 1716717358}
+  - component: {fileID: 1716717360}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -82911,6 +84913,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1716717356}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1716717360
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1716717356}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1719721989
 GameObject:
   m_ObjectHideFlags: 0
@@ -83913,6 +85936,7 @@ GameObject:
   - component: {fileID: 1737353230}
   - component: {fileID: 1737353232}
   - component: {fileID: 1737353231}
+  - component: {fileID: 1737353233}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -83988,6 +86012,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1737353229}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1737353233
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1737353229}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1738172806
 GameObject:
   m_ObjectHideFlags: 0
@@ -84772,7 +86817,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -84785,7 +86830,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -84953,6 +86998,7 @@ GameObject:
   - component: {fileID: 1761162058}
   - component: {fileID: 1761162060}
   - component: {fileID: 1761162059}
+  - component: {fileID: 1761162061}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -85028,6 +87074,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1761162057}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1761162061
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1761162057}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1765384575
 GameObject:
   m_ObjectHideFlags: 0
@@ -86542,7 +88609,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -86555,7 +88622,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -88011,7 +90078,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -88024,7 +90091,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -89083,6 +91150,7 @@ GameObject:
   - component: {fileID: 1812569287}
   - component: {fileID: 1812569289}
   - component: {fileID: 1812569288}
+  - component: {fileID: 1812569290}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -89158,6 +91226,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1812569286}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1812569290
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1812569286}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1813171906
 GameObject:
   m_ObjectHideFlags: 0
@@ -89279,6 +91368,32 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &1814216003 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3373215139287685631, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1814216005
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1814216003}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 0, y: 0.48631486, z: 0}
 --- !u!1 &1819373188
 GameObject:
   m_ObjectHideFlags: 0
@@ -89735,6 +91850,7 @@ GameObject:
   - component: {fileID: 1826828568}
   - component: {fileID: 1826828570}
   - component: {fileID: 1826828569}
+  - component: {fileID: 1826828571}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -89810,6 +91926,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1826828567}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1826828571
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826828567}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1828332067
 GameObject:
   m_ObjectHideFlags: 0
@@ -90377,6 +92514,7 @@ GameObject:
   - component: {fileID: 1836835176}
   - component: {fileID: 1836835178}
   - component: {fileID: 1836835177}
+  - component: {fileID: 1836835179}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalLamp__2_0
   m_TagString: Untagged
@@ -90452,6 +92590,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1836835175}
   m_Mesh: {fileID: 4300000, guid: bdc735d1b2004de48a0973059b648eb4, type: 2}
+--- !u!65 &1836835179
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1836835175}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 120.56891, y: 5.568886, z: 85.568886}
+  m_Center: {x: -407.5, y: 58.34074, z: 145}
 --- !u!1 &1837397829
 GameObject:
   m_ObjectHideFlags: 0
@@ -90495,6 +92654,7 @@ GameObject:
   - component: {fileID: 1840885084}
   - component: {fileID: 1840885086}
   - component: {fileID: 1840885085}
+  - component: {fileID: 1840885087}
   m_Layer: 0
   m_Name: CeilingLamp_2
   m_TagString: Untagged
@@ -90570,6 +92730,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1840885083}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1840885087
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1840885083}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1843188778
 GameObject:
   m_ObjectHideFlags: 0
@@ -91151,6 +93332,7 @@ GameObject:
   - component: {fileID: 1863011252}
   - component: {fileID: 1863011254}
   - component: {fileID: 1863011253}
+  - component: {fileID: 1863011255}
   m_Layer: 0
   m_Name: Festival_WallLights_FestivalLampMetal__2_1
   m_TagString: Untagged
@@ -91226,6 +93408,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1863011251}
   m_Mesh: {fileID: 4300000, guid: 04614eae3b17307409eefc51fbfda264, type: 2}
+--- !u!65 &1863011255
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863011251}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 153.59998, y: 6.1495895, z: 15.256897}
+  m_Center: {x: -352.5, y: 35.19191, z: 311.96405}
 --- !u!1 &1866659650
 GameObject:
   m_ObjectHideFlags: 0
@@ -91523,7 +93726,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -91536,12 +93739,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 25.8
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -92376,6 +94579,7 @@ GameObject:
   - component: {fileID: 1885095285}
   - component: {fileID: 1885095287}
   - component: {fileID: 1885095286}
+  - component: {fileID: 1885095288}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -92451,6 +94655,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1885095284}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1885095288
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1885095284}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &1886745231
 GameObject:
   m_ObjectHideFlags: 0
@@ -92548,6 +94773,7 @@ GameObject:
   - component: {fileID: 1886830621}
   - component: {fileID: 1886830623}
   - component: {fileID: 1886830622}
+  - component: {fileID: 1886830624}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -92623,6 +94849,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1886830620}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &1886830624
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1886830620}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1888569406
 GameObject:
   m_ObjectHideFlags: 0
@@ -92722,7 +94969,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -92735,7 +94982,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -93228,7 +95475,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -93241,7 +95488,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -94332,7 +96579,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4289904568
   m_fontColor: {r: 0.72, g: 0.75, b: 0.7, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -94345,7 +96592,7 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
@@ -95456,7 +97703,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -95469,12 +97716,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.24033
+  m_fontSize: 26.25
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -96356,6 +98603,32 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1956234532}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1958328489 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4052277952991770181, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &1958328491
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1958328489}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 1.3339657e-12, y: 0.48631486, z: -0.000015258789}
 --- !u!1 &1959667304
 GameObject:
   m_ObjectHideFlags: 0
@@ -98377,6 +100650,7 @@ GameObject:
   - component: {fileID: 2003907869}
   - component: {fileID: 2003907871}
   - component: {fileID: 2003907870}
+  - component: {fileID: 2003907872}
   m_Layer: 0
   m_Name: CeilingLamp_3
   m_TagString: Untagged
@@ -98452,6 +100726,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2003907868}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &2003907872
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2003907868}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2007980088
 GameObject:
   m_ObjectHideFlags: 0
@@ -99089,6 +101384,7 @@ GameObject:
   - component: {fileID: 2016158668}
   - component: {fileID: 2016158670}
   - component: {fileID: 2016158669}
+  - component: {fileID: 2016158671}
   m_Layer: 0
   m_Name: CeilingLamp_5
   m_TagString: Untagged
@@ -99164,6 +101460,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2016158667}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &2016158671
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2016158667}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: -0.0000038146973}
 --- !u!1 &2016413477
 GameObject:
   m_ObjectHideFlags: 0
@@ -99385,6 +101702,7 @@ GameObject:
   - component: {fileID: 2017476054}
   - component: {fileID: 2017476056}
   - component: {fileID: 2017476055}
+  - component: {fileID: 2017476057}
   m_Layer: 0
   m_Name: CeilingLamp_0
   m_TagString: Untagged
@@ -99460,6 +101778,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2017476053}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &2017476057
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2017476053}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2018033031
 GameObject:
   m_ObjectHideFlags: 0
@@ -100847,6 +103186,7 @@ GameObject:
   - component: {fileID: 2052830610}
   - component: {fileID: 2052830612}
   - component: {fileID: 2052830611}
+  - component: {fileID: 2052830613}
   m_Layer: 0
   m_Name: Festival_Lamps_FestivalPole__1_0
   m_TagString: Untagged
@@ -100922,6 +103262,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2052830609}
   m_Mesh: {fileID: 4300000, guid: 6c5b5e16b2337974898e13b035f13181, type: 2}
+--- !u!65 &2052830613
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2052830609}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.8562927, y: 55.68889, z: 109.85629}
+  m_Center: {x: -236, y: 27.844444, z: 146}
 --- !u!1 &2054484945
 GameObject:
   m_ObjectHideFlags: 0
@@ -100965,6 +103326,7 @@ GameObject:
   - component: {fileID: 2058844674}
   - component: {fileID: 2058844676}
   - component: {fileID: 2058844675}
+  - component: {fileID: 2058844677}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -101040,6 +103402,53 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2058844673}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &2058844677
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2058844673}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &2062804397 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8910140229169228289, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+  m_PrefabInstance: {fileID: 6592871644968697607}
+  m_PrefabAsset: {fileID: 0}
+--- !u!65 &2062804399
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2062804397}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.60791016, y: 0.9726297, z: 1.0019531}
+  m_Center: {x: 1.3339657e-12, y: 0.48631486, z: -0.000015258789}
 --- !u!1 &2067671754
 GameObject:
   m_ObjectHideFlags: 0
@@ -101992,6 +104401,7 @@ GameObject:
   - component: {fileID: 2096149519}
   - component: {fileID: 2096149521}
   - component: {fileID: 2096149520}
+  - component: {fileID: 2096149522}
   m_Layer: 0
   m_Name: CeilingLamp_1
   m_TagString: Untagged
@@ -102067,6 +104477,27 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2096149518}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!65 &2096149522
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096149518}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2099886967
 GameObject:
   m_ObjectHideFlags: 0
@@ -102260,7 +104691,7 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
+    rgba: 4292931051
   m_fontColor: {r: 0.92, g: 0.93, b: 0.88, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
@@ -102273,12 +104704,12 @@ MonoBehaviour:
   m_spriteAsset: {fileID: 0}
   m_tintAllSprites: 0
   m_StyleSheet: {fileID: 0}
-  m_TextStyleHashCode: 0
+  m_TextStyleHashCode: -1183493901
   m_overrideHtmlColors: 0
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 32.166676
+  m_fontSize: 25.2
   m_fontSizeBase: 36
   m_fontWeight: 400
   m_enableAutoSizing: 1
@@ -105201,6 +107632,48 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6887130101567274594, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1399055179}
+    - targetCorrespondingSourceObject: {fileID: 5177409225916182922, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1222936567}
+    - targetCorrespondingSourceObject: {fileID: 4714545516385405074, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 647973287}
+    - targetCorrespondingSourceObject: {fileID: 1360343561460156746, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1307280863}
+    - targetCorrespondingSourceObject: {fileID: 8683416217277325716, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1159600601}
+    - targetCorrespondingSourceObject: {fileID: 8910140229169228289, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2062804399}
+    - targetCorrespondingSourceObject: {fileID: 8810828387247094803, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 753302102}
+    - targetCorrespondingSourceObject: {fileID: 5905103208395970875, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7688236}
+    - targetCorrespondingSourceObject: {fileID: 505309669738856402, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 172879862}
+    - targetCorrespondingSourceObject: {fileID: 8932877280485891256, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 697575999}
+    - targetCorrespondingSourceObject: {fileID: 7992914039180969834, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1690660596}
+    - targetCorrespondingSourceObject: {fileID: 4052277952991770181, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1958328491}
+    - targetCorrespondingSourceObject: {fileID: 1166252075515688671, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 837205478}
+    - targetCorrespondingSourceObject: {fileID: 3373215139287685631, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1814216005}
+    - targetCorrespondingSourceObject: {fileID: 8044950792141764808, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 549458653}
   m_SourcePrefab: {fileID: 100100000, guid: b57b72edb75d5c54fa1e53a398c569bf, type: 3}
 --- !u!65 &7004940816199674899
 BoxCollider:
