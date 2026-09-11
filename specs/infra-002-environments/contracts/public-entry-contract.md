@@ -7,7 +7,7 @@
 | demo web | `https://demo.${ROOT_DOMAIN}` | demo front/static release | HTML revalidate, content-hash asset immutable | infra-002 |
 | backend | `https://api.${ROOT_DOMAIN}` | demo Spring | bypass/no-store | infra-002 |
 | AI/SSE | `https://ai.${ROOT_DOMAIN}` | demo FastAPI | bypass/no-store, proxy buffering off | infra-002 + AI |
-| game | `wss://world.${ROOT_DOMAIN}:443` | `ws://demo-game:7777` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
+| game | `wss://world.${ROOT_DOMAIN}:443` | `ws://127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
 | dev | `https://dev.${ROOT_DOMAIN}{/,api/,ai/v1/,unity/}` | selected dev Front/Spring/FastAPI and shared WebGL `current` | API/AI bypass/no-store; WebGL HTML revalidates and hashed Build assets are immutable | infra-002 |
 | dev world | `wss://world-dev.${ROOT_DOMAIN}:443` | selected dev game service | always bypass/no-store | infra-002 |
 
@@ -16,10 +16,10 @@
 ## Required network path
 
 ```text
-Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → Docker internal service
+Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → loopback-only demo-game listener
 ```
 
-- Nginx만 host 80/443에 bind한다. 80은 최종 demo에서 443으로 redirect한다.
+- Nginx만 public host 80/443에 bind한다. demo-game 7777은 `127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}`로만 publish하고, 80은 최종 demo에서 443으로 redirect한다.
 - SSH 22는 승인된 source 범위에만 허용한다.
 - PostgreSQL 5432, Redis 6379, Unity 7777, Jenkins 8080, MinIO 9000/9001과 관측 port는 public bind하지 않는다.
 - Cloudflare → origin은 Full (strict) TLS다. 인증서 검증을 끄는 origin fallback을 금지한다.

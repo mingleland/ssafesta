@@ -16,6 +16,6 @@ assert_contains "${nginx_template}" 'proxy_send_timeout[[:space:]]+180s;' 'initi
 assert_contains "${nginx_template}" 'proxy_buffering[[:space:]]+off;' 'WebSocket buffering must be disabled'
 assert_contains "${nginx_template}" 'proxy_cache[[:space:]]+off;' 'WebSocket caching must be disabled'
 assert_contains "${nginx_template}" 'Cache-Control[[:space:]]+"no-store"' 'WebSocket response must be no-store'
-assert_contains "${nginx_template}" 'proxy_pass[[:space:]]+http://\$\{GAME_UPSTREAM_HOST\}:\$\{GAME_UPSTREAM_PORT\};' 'upstream must be injected, not hardcoded to a public endpoint'
+assert_contains "${nginx_template}" 'proxy_pass[[:space:]]+http://127\.0\.0\.1:\$\{DEMO_GAME_HOST_PORT\};' 'upstream must use the loopback-only demo game port'
 assert_not_contains "${nginx_template}" 'proxy_ssl_verify[[:space:]]+off' 'TLS verification bypass is forbidden'
 pass 'Nginx WebSocket Upgrade, timeout and cache boundary'

@@ -36,8 +36,9 @@ pass 'immutable image reference and Secret shape'
 
 command -v docker >/dev/null 2>&1 || fail 'Docker CLI is required'
 docker compose -f "${unity_server_dir}/compose.yaml" config >"${rendered}"
-assert_not_contains "${rendered}" '^[[:space:]]+ports:$' 'rendered Compose publishes game port 7777'
-pass 'Compose renders without public game port'
+assert_contains "${rendered}" 'host_ip:[[:space:]]+127\.0\.0\.1' 'rendered Compose must bind game port to loopback'
+assert_contains "${rendered}" 'published:[[:space:]]+"?17777"?' 'rendered Compose must use the demo loopback port'
+pass 'Compose renders with a loopback-only game port'
 
 if (( config_only == 1 )); then
   exit 0
