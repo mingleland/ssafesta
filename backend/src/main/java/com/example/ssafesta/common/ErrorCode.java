@@ -179,6 +179,12 @@ public enum ErrorCode {
     /** 사용자가 스스로 풀 수 있는 상태다 — thrower 가 상한값과 해결 방법을 message 에 담는다. */
     GAME_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "만들 수 있는 게임 수를 초과했습니다."),
     CONFIG_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 포털 연결을 찾을 수 없습니다."),
+    /**
+     * 오락기 해석의 유일한 non-200 이다 (S15P21A604-602). 게임이 미게시·비공개·삭제인 것은 오류가
+     * 아니라 {@code playable:false} + {@code unavailableReason} 으로 나간다 — 오락기는 월드
+     * 고정물이라 월드를 끊지 않는다 (spec 019 FR-020).
+     */
+    MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "등록되지 않은 게임기입니다."),
 
     // ── Game Asset 업로드 (spec 019, #69) ───────────────────────────────────
     // contracts/game-asset-upload.md §6 의 11행이 정본이다. 여기 없는 GAME_ASSET_* 가 응답에
