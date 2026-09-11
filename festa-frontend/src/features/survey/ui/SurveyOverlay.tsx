@@ -125,13 +125,25 @@ export function SurveyOverlay({ payload }: Props) {
   const boothId = payload.kind === 'booth' ? payload.boothId : null;
   const surveyKey = payload.kind === 'event' ? payload.surveyKey : null;
 
+  // **게스트는 이벤트 설문을 요청하지 않는다** (S15P21A604-621 실측).
+  //
+  // 서버가 `GET /event-surveys/{key}/run` 을 컨트롤러에서 회원 전용으로 막는다 — 게스트 토큰이면
+  // run 응답의 `memberOnly` 를 보기도 전에 403 이다. 그대로 두면 화면이 로그인 안내가 아니라
+  // "설문을 불러오지 못했습니다" 로 떨어진다.
+  //
+  // 그래서 세션 종류로 **요청을 만들기 전에** 가른다. 관리 데스크에서 게스트가 403 을 기다리다
+  // 무한 로딩에 빠진 것(-458)과 같은 함정을 피하는 방법이고, GitLab #170 에 그렇게 답했다.
+  // 부스 설문은 게스트도 참여할 수 있으므로(C-05) 이 차단은 이벤트 경로에만 건다.
+  const eventGuestBlocked = surveyKey !== null && session.kind !== 'member';
+
   const reload = (): void => {
+    if (eventGuestBlocked) return;
     if (boothId !== null) void loadSurveyRun({ kind: 'booth', boothId });
     else if (surveyKey !== null) void loadSurveyRun({ kind: 'event', surveyKey });
   };
 
   // reload 는 매 렌더 새 함수지만 의존성은 원시값 둘이다 — 그래서 다시 돌지 않는다
-  useEffect(reload, [boothId, surveyKey]);
+  useEffect(reload, [boothId, surveyKey, eventGuestBlocked]);
 
   const missing = run.status === 'ready' ? missingRequired() : [];
   // 방금 제출했든 지난번에 참여했든 화면은 같다 — 참여가 끝났다는 사실이 같고, 상태를 늘리면
@@ -139,7 +151,7 @@ export function SurveyOverlay({ payload }: Props) {
   const submitted = run.submit.phase === 'success' || run.respondedAt !== null;
   // 게스트가 제출할 수 없는 설문은 두 종류다 — 코인이 걸린 부스 설문(403 MEMBER_ONLY)과 보상이
   // 없어도 회원 전용인 이벤트 설문. run 응답이 두 값을 싣는 이유가 이것이라 **제출 전에** 알린다
-  const guestBlocked = session.kind === 'guest' && (run.rewardCoin > 0 || run.memberOnly);
+  const guestBlocked = eventGuestBlocked || (session.kind === 'guest' && (run.rewardCoin > 0 || run.memberOnly));
 
   return (
     <OverlayFrame
@@ -190,15 +202,22 @@ export function SurveyOverlay({ payload }: Props) {
         )
       }
     >
-      {run.status === 'loading' && <OverlayLoading label="설문을 불러오는 중..." />}
-      {run.status === 'error' && <OverlayError title="설문을 불러오지 못했습니다" onRetry={reload} />}
-      {run.status === 'empty' && (
+      {eventGuestBlocked && (
+        <OverlayEmpty title="회원만 참여할 수 있습니다" hint="로그인하면 이벤트 설문에 참여할 수 있어요." />
+      )}
+      {!eventGuestBlocked && run.status === 'loading' && <OverlayLoading label="설문을 불러오는 중..." />}
+      {!eventGuestBlocked && run.status === 'error' && (
+        // 서버 문장을 그대로 쓴다 — 이벤트 설문은 문항이 아직 없으면 404 와 함께
+        // "아직 공개되지 않은 설문입니다." 를 준다. 버리면 준비 중과 고장이 구별되지 않는다
+        <OverlayError title="설문을 불러오지 못했습니다" message={run.loadErrorMessage ?? undefined} onRetry={reload} />
+      )}
+      {!eventGuestBlocked && run.status === 'empty' && (
         <OverlayEmpty
           title="문항이 없습니다"
           hint={boothId !== null ? '부스 주인이 문항을 등록하면 참여할 수 있습니다.' : '문항이 등록되면 참여할 수 있습니다.'}
         />
       )}
-      {run.status === 'closed' && <OverlayEmpty title="마감된 설문입니다" hint="응답을 더 받지 않습니다." />}
+      {!eventGuestBlocked && run.status === 'closed' && <OverlayEmpty title="마감된 설문입니다" hint="응답을 더 받지 않습니다." />}
       {submitted && (
         <OverlayEmpty
           title={run.submit.phase === 'success' ? '응답을 제출했습니다' : '이미 참여한 설문입니다'}

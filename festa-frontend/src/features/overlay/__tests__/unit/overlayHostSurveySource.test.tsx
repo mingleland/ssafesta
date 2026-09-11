@@ -11,6 +11,9 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { OverlayHost } from '../../OverlayHost';
 import { closeOverlay, openOverlay } from '../../../../shared/types/overlay';
 
+// 이벤트 설문은 회원 전용이라(-621) 세션이 회원이어야 로드까지 간다
+vi.mock('../../../auth/model/session', () => ({ useSession: () => ({ kind: 'member' }) }));
+
 vi.mock('../../../../entities/survey/api.select', async () => {
   const { surveyMockPort } = await import('../../../../entities/survey/api.mock');
   return { surveyApi: surveyMockPort };
