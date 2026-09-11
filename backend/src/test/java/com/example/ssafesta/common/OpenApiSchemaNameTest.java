@@ -113,10 +113,54 @@ class OpenApiSchemaNameTest {
                 "미니게임 본문이 설문 문서에 실렸다: " + survey);
     }
 
+    /**
+     * 응답 쪽도 각자의 본문을 싣는다.
+     *
+     * <p>덮어쓰기는 요청·응답을 가리지 않는다. 세 쌍 중 두 쌍이 응답 타입이고
+     * ({@code PublishedResponse}·{@code SubmitResult}) 그중 하나는 FE 가 보고하지도 않은 것이라,
+     * 요청 한 쌍만 확인하고 넘어가면 고쳐졌다는 근거가 나머지 넷에는 없다.
+     */
+    @Test
+    void theDocumentGivesEachResponseItsOwnFields() throws Exception {
+        JsonNode document = json.readTree(mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+
+        Set<String> layout = responsePropertiesOf(document,
+                "/api/v1/booths/{boothId}/layouts/publish", "post", "200");
+        Set<String> game = responsePropertiesOf(document, "/api/v1/games/{gameId}/published", "get", "200");
+        Set<String> minigame = responsePropertiesOf(document,
+                "/api/v1/minigames/timer-stop/sessions/{sessionId}/result", "post", "200");
+        Set<String> survey = responsePropertiesOf(document,
+                "/api/v1/surveys/{surveyId}/responses", "post", "201");
+
+        assertTrue(layout.contains("boothId") && !layout.contains("gameId"),
+                "부스 게시 응답에 게임 본문이 실렸다: " + layout);
+        assertTrue(game.contains("gameId") && !game.contains("boothId"),
+                "게임 게시 응답에 부스 본문이 실렸다: " + game);
+        assertTrue(minigame.contains("errorSeconds") && !minigame.contains("responseId"),
+                "미니게임 결과 응답에 설문 본문이 실렸다: " + minigame);
+        assertTrue(survey.contains("responseId") && !survey.contains("errorSeconds"),
+                "설문 제출 응답에 미니게임 본문이 실렸다: " + survey);
+    }
+
     /** 그 경로 POST 요청 본문 스키마의 property 이름들. {@code $ref} 를 한 번 따라간다. */
     private Set<String> requestBodyPropertiesOf(JsonNode document, String path) {
-        JsonNode schema = document.path("paths").path(path).path("post").path("requestBody")
-                .path("content").path("application/json").path("schema");
+        return propertiesOf(document, document.path("paths").path(path).path("post")
+                .path("requestBody").path("content").path("application/json").path("schema"));
+    }
+
+    /** 그 경로·메서드·상태의 응답 본문 스키마 property 이름들. */
+    private Set<String> responsePropertiesOf(JsonNode document, String path, String method, String status) {
+        return propertiesOf(document, document.path("paths").path(path).path(method)
+                .path("responses").path(status).path("content").path("*/*").isMissingNode()
+                        ? document.path("paths").path(path).path(method).path("responses").path(status)
+                                .path("content").path("application/json").path("schema")
+                        : document.path("paths").path(path).path(method).path("responses").path(status)
+                                .path("content").path("*/*").path("schema"));
+    }
+
+    private Set<String> propertiesOf(JsonNode document, JsonNode schema) {
         String ref = schema.path("$ref").asString("");
         JsonNode resolved = ref.isBlank()
                 ? schema
