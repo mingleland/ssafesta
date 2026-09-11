@@ -23,13 +23,6 @@ namespace Festa.Network
         // 커지므로 속도를 같은 비율로 올려야 발이 미끄러지지 않는다.
         [SerializeField] float _moveSpeed = 45f;
         [SerializeField] float _runSpeed = 65f;
-
-        /// <summary>기대 이동량의 이 비율보다 덜 갔으면 "막혔다" 로 본다. 경사·계단의 감속은 통과시킬 만큼 낮다.</summary>
-        const float BlockedSpeedRatio = 0.2f;
-        /// <summary>이만큼(초) 계속 막혀야 제자리 자세로 바꾼다 — 문턱에 한두 프레임 끼는 것에는 반응하지 않는다.</summary>
-        const float BlockedAnimDelay = 0.15f;
-        Vector3 _prevFramePos;
-        float _blockedFor;
         [SerializeField, Min(0.01f)] float _turnSmoothTime = 0.08f;
         [SerializeField, Min(1f)] float _maxTurnSpeedDeg = 1080f;
 
@@ -351,23 +344,6 @@ namespace Festa.Network
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
-
-            // **벽에 막히면 제자리 자세로 떨어뜨린다** (사용자 지적 2026-09-11 — "그냥 서 있을 땐
-            // 괜찮은데 벽 쪽으로 계속 누르면 파묻힌다").
-            //
-            // 캡슐은 벽에서 제대로 멈추는데, 달리기 모션은 입력만 보고 계속 돌았다. 그 모션의
-            // 팔·상체가 캡슐(r=2.75) 밖으로 나가므로 몸이 벽을 뚫고 들어간 것처럼 보인다.
-            // 캡슐을 키우면 좁은 통로가 막히니(부스 출입문 37u) 그쪽은 답이 아니다 —
-            // **실제로 나아가지 못하면 걷지 않는 것**으로 보는 편이 맞고, 벽 앞에서 제자리걸음을
-            // 하지 않게 되어 보기에도 옳다.
-            var planar = transform.position - _prevFramePos; planar.y = 0f;
-            float want = (running ? _runSpeed : _moveSpeed) * Time.deltaTime;
-            if (moving && want > 0.0001f && planar.magnitude < want * BlockedSpeedRatio) _blockedFor += Time.deltaTime;
-            else _blockedFor = 0f;
-            _prevFramePos = transform.position;
-            // 한두 프레임 끼는 것(문턱·경사)에 반응하지 않도록 잠깐 참는다. 공중에서는 showAirborne 이
-            // AnimState 를 Jump 로 덮으므로 이 값이 착지 전에 관여하지 않는다.
-            if (_blockedFor > BlockedAnimDelay) { moving = false; running = false; }
 
             if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
                 _player.EmoteId.Value = PlayerEmoteId.None;
