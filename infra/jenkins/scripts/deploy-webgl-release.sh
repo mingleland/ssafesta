@@ -137,22 +137,34 @@ PY
 mapfile -t manifest_paths <<<"${manifest_output}"
 
 # 이 스크립트가 관리하기 전에 손으로 배포한 흔적이 남아 있을 수 있다(2026-09-10 수동 배포).
-# 그때의 current 는 releases/<id> 심링크가 아니라 실체 디렉터리이거나 다른 곳을 가리키는
-# 심링크다. 그대로 중단하면 첫 자동 배포가 영영 못 들어간다 — 그렇다고 덮어써 버리면
-# 되돌릴 것이 없어지므로, **옆으로 치워 두고** 진행한다. 롤백은 previous 가 맡는다.
+# 그때의 current 는 releases/<id> 상대 심링크가 아니라 절대 경로 심링크이거나 실체 디렉터리다.
+# 그대로 중단하면 첫 자동 배포가 영영 못 들어간다 — 옆으로 치워 두고 진행한다.
+#
+# **치운 것을 반드시 기억해 둔다.** 처음 이 분기를 넣었을 때 old_target 을 비워 버려서,
+# 검증이 실패하자 롤백이 되돌릴 대상을 잃고 current 를 지웠다 — demo 의 /unity/ 가 404 로
+# 내려앉았다(2026-09-11 06:01 UTC, build #3). 롤백은 legacy_current 를 제자리로 되돌린다.
 old_target=
+legacy_current=
 if [[ -L "${root}/current" ]]; then
   old_target="$(readlink "${root}/current")"
   if [[ ! "${old_target}" =~ ^releases/[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
-    legacy="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
-    echo "current points outside the managed WebGL releases (${old_target}) — moving it to $(basename "${legacy}")" >&2
-    mv -T "${root}/current" "${legacy}"
+    legacy_current="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
+    echo "current points outside the managed WebGL releases (${old_target}) — moving it to $(basename "${legacy_current}")" >&2
+    mv -T "${root}/current" "${legacy_current}"
     old_target=
   fi
 elif [[ -e "${root}/current" ]]; then
-  legacy="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
-  echo "current is not a symbolic link — moving it to $(basename "${legacy}")" >&2
-  mv -T "${root}/current" "${legacy}"
+  legacy_current="${root}/current.legacy.$(date -u +%Y%m%d%H%M%S)"
+  echo "current is not a symbolic link — moving it to $(basename "${legacy_current}")" >&2
+  mv -T "${root}/current" "${legacy_current}"
+else
+  # current 가 아예 없다. 앞선 실패로 치워만 두고 못 되돌린 것이 남아 있으면 그것을 롤백 대상으로 삼는다 —
+  # 그래야 이번 배포가 또 실패해도 서비스가 되살아난다. 가장 최근 것 하나만 본다.
+  for candidate in "${root}"/current.legacy.*; do
+    [[ -e "${candidate}" ]] && legacy_current="${candidate}"
+  done
+  [[ -n "${legacy_current}" ]] \
+    && echo "no current; will fall back to $(basename "${legacy_current}") if this release fails verification" >&2
 fi
 
 tmp_link="${root}/.current.${release_id}.$$"
@@ -189,11 +201,16 @@ verify_release() {
 }
 
 if ! verify_release; then
-  echo "public WebGL verification failed; restoring ${old_target:-empty current}" >&2
+  echo "public WebGL verification failed; restoring ${old_target:-${legacy_current:-empty current}}" >&2
   if [[ -n "${old_target}" ]]; then
     rollback_link="${root}/.rollback.${release_id}.$$"
     ln -s "${old_target}" "${rollback_link}"
     mv -Tf "${rollback_link}" "${root}/current"
+  elif [[ -n "${legacy_current}" && -e "${legacy_current}" ]]; then
+    # 손으로 배포해 둔 것을 옆으로 치워 왔다면 **그것을 제자리로 되돌린다.**
+    # 여기서 그냥 지우면 서비스가 통째로 내려간다 — 실제로 그렇게 내려갔다.
+    rm -f "${root}/current"
+    mv -T "${legacy_current}" "${root}/current"
   else
     rm -f "${root}/current"
   fi
