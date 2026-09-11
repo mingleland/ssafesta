@@ -19,12 +19,14 @@
 ### 1. 경제 처리는 전부 서버
 
 보상 지급은 Spring이 판단하고 원장에 기록한다 (헌법 16조).
-Unity는 **결과를 보고할 뿐 지급을 결정하지 않는다.** 이 경계는 게임 종류와 무관하게 고정이다.
+클라이언트는 **결과를 보고할 뿐 지급을 결정하지 않는다.** 이 경계는 게임 종류·클라이언트와 무관하게 고정이다.
 
 ```text
-Unity: 게임 진행 → 결과 보고
+FE 오버레이: 게임 진행 → 정지 시각 보고
 Spring: 검증 → 한도 확인 → 지급 판단 → Ledger 기록
 ```
+
+게임 화면은 2026-09-10 에 Unity 에서 FE 오버레이로 이관됐다 (GitLab #166, `S15P21A604-601`). Unity 는 상호작용 이벤트(`WORLD_MINIGAME_INTERACT`)만 보내고 게임을 돌리지 않는다.
 
 ### 2. 멱등성이 필수
 
@@ -49,10 +51,10 @@ Spring: 검증 → 한도 확인 → 지급 판단 → Ledger 기록
 
 | 항목 | 값 |
 |---|---|
-| Engine | Unity 6000.0.78f1 / URP 17.0.4 |
-| 결과 전송 | HTTP (`IBoothApiClient` 패턴 재사용) — 실시간 채널 불필요 |
+| 게임 화면 | React 오버레이 (`festa-frontend/src/features/minigame/`) — 2026-09-10 이관 |
+| 진입 신호 | Unity → FE `WORLD_MINIGAME_INTERACT` |
+| 결과 전송 | HTTP — 실시간 채널 불필요 |
 | 경제 | Spring Ledger (spec 003 계약) |
-| Target | Unity Web |
 | 범위 | **1종만** (헌법 19조) |
 
 ## Constitution Check

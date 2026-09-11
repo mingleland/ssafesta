@@ -3,7 +3,7 @@
 **Spec**: `014-minigame`
 **Created**: 2026-08-12
 **Status**: ✅ **확정** (Unity 리드, 2026-08-12) — **2차 MVP (P1)**
-**주 담당**: Unity + Backend(정산)
+**주 담당**: FE + Backend(정산) — 게임 화면이 2026-09-10 에 Unity 에서 FE 오버레이로 이관됐다 (GitLab #166, `S15P21A604-601`). Unity 는 `WORLD_MINIGAME_INTERACT` 송신만 한다
 **선행 spec**: 002, 003
 **근거 문서**: docs/02 §2.11(GAME-01~05), docs/01 §7.2
 
