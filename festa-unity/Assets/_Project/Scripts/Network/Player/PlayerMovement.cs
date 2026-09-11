@@ -352,14 +352,15 @@ namespace Festa.Network
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
 
-            // **벽에 막히면 제자리 자세로 떨어뜨린다** (사용자 지적 2026-09-11 — "그냥 서 있을 땐
-            // 괜찮은데 벽 쪽으로 계속 누르면 파묻힌다").
+            // **벽에 막히면 다리만 멈춘다** (사용자 지적 2026-09-11).
             //
-            // 캡슐은 벽에서 제대로 멈추는데, 달리기 모션은 입력만 보고 계속 돌았다. 그 모션의
-            // 팔·상체가 캡슐(r=2.75) 밖으로 나가므로 몸이 벽을 뚫고 들어간 것처럼 보인다.
-            // 캡슐을 키우면 좁은 통로가 막히니(부스 출입문 37u) 그쪽은 답이 아니다 —
-            // **실제로 나아가지 못하면 걷지 않는 것**으로 보는 편이 맞고, 벽 앞에서 제자리걸음을
-            // 하지 않게 되어 보기에도 옳다.
+            // 캡슐은 벽에서 제대로 멈추는데 달리기 모션은 입력만 보고 계속 돌아, 그 모션의 팔·상체가
+            // 캡슐 밖으로 나가 몸이 벽을 뚫은 것처럼 보였다.
+            //
+            // <b>이동 자체를 끄면 안 된다.</b> 처음에 여기서 moving 을 false 로 만들었더니 속도가 0 이
+            // 되고, 속도가 0 이니 변위도 0 이라 다시 "막힘" 으로 읽혀 **키를 뗄 때까지 조작이 풀리지
+            // 않았다**(사용자 지적 — "조작이 끊겨서 별로다"). 벽을 따라 옆으로 빠져나가는 것까지 막혔다.
+            // 막힘은 **표시에만** 쓴다 — 이동·회전은 평소대로 두고 애니메이션만 제자리로 내린다.
             var planar = transform.position - _prevFramePos; planar.y = 0f;
             float want = (running ? _runSpeed : _moveSpeed) * Time.deltaTime;
             if (moving && want > 0.0001f && planar.magnitude < want * BlockedSpeedRatio) _blockedFor += Time.deltaTime;
@@ -367,7 +368,7 @@ namespace Festa.Network
             _prevFramePos = transform.position;
             // 한두 프레임 끼는 것(문턱·경사)에 반응하지 않도록 잠깐 참는다. 공중에서는 showAirborne 이
             // AnimState 를 Jump 로 덮으므로 이 값이 착지 전에 관여하지 않는다.
-            if (_blockedFor > BlockedAnimDelay) { moving = false; running = false; }
+            bool animBlocked = _blockedFor > BlockedAnimDelay;
 
             if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
                 _player.EmoteId.Value = PlayerEmoteId.None;
@@ -467,7 +468,7 @@ namespace Festa.Network
             }
 
             // 다리가 재생할 방향 — 몸 기준 지역 좌표계로 넘긴다.
-            UpdateMoveParams(input, moving, running);
+            UpdateMoveParams(input, moving && !animBlocked, running && !animBlocked);
 
             // 공중에서는 이동 입력과 무관하게 Jump 를 보낸다 — 원격 클라이언트가
             // 같은 애니메이션을 재생한다 (AnimState 는 Owner 쓰기 권한이다).
@@ -479,7 +480,7 @@ namespace Festa.Network
             // 바닥 이음새에서 한두 프레임 뜨는 것에까지 착지를 재생하면 그냥 걷는 동안
             // 계속 무릎을 굽힌다. showAirborne 은 이미 그 유예를 통과한 값이다.
             if (_wasShowingAirborne && !showAirborne)
-                _landHoldUntil = Time.time + (moving ? LandHoldMoving : LandHoldIdle);
+                _landHoldUntil = Time.time + ((moving && !animBlocked) ? LandHoldMoving : LandHoldIdle);
             _wasShowingAirborne = showAirborne;
 
             var next = _jumpPending
@@ -488,8 +489,8 @@ namespace Festa.Network
                 ? PlayerAnimState.Jump
                 : Time.time < _landHoldUntil
                 ? PlayerAnimState.JumpLand
-                : !moving ? PlayerAnimState.Idle
-                : running ? PlayerAnimState.Run : PlayerAnimState.Walk;
+                : (!moving || animBlocked) ? PlayerAnimState.Idle
+                : (running && !animBlocked) ? PlayerAnimState.Run : PlayerAnimState.Walk;
             if (_player.AnimState.Value != next)
                 _player.AnimState.Value = next;
         }
