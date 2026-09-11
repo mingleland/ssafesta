@@ -22,11 +22,12 @@ import {
   subscribeWorldLoadStart,
 } from '../bridge/events';
 import type { WorldConnectionState } from '../bridge/events';
-import { resetWorldUiState } from '../bridge/worldUiState';
+import { hasUnityModal, resetWorldUiState } from '../bridge/worldUiState';
 import { resetWorldContext } from '../../features/world/model/worldContext';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
+import { requestExitWorldUi } from './worldUiBridge';
 import { syncAudioMute } from './audioBridge';
 import { watchDevicePixelRatio } from './loader';
 import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/audio/model/screenAudio';
@@ -187,6 +188,32 @@ export function UnityHost() {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncInputLock(instance, screen !== 'world');
+  }, [instanceReady, screen]);
+
+  // Unity 초점과 짝이 된 레이어가 닫혔으면 Unity 모달도 함께 끝낸다 (-642, #132).
+  //
+  // 여는 것은 하나의 동작이다 — Unity `Interact()` 가 초점 줌과 상호작용 이벤트를 같은 동기
+  // 경로에서 한다(`LaptopInteractable.cs:43-44` 외 7종). 그런데 닫는 것은 ESC·배경 클릭·X 가
+  // 전부 FE 쪽에만 닿아 줌이 남았다. 남으면 `InputBridge` holders 에 "InteractionFocusCamera" 가
+  // 그대로 있어 `SetInputLocked('0')` 이 `LockedChanged` 를 발화시키지 못하고(owner-set),
+  // **월드 입력이 통째로 잠긴 채 끝난다** — WASD·F·재진입이 전부 죽는다.
+  //
+  // 합류점을 `closeOverlay()` 가 아니라 화면 소유권 전이로 잡는다. 관리 화면
+  // (`WORLD_MANAGEMENT_INTERACT`)도 초점을 쓰는데 그쪽은 Overlay Bus 가 아니라 gameClientUi 라,
+  // Bus 에 걸면 빠진다. `worldScreen` 은 둘을 합쳐 보는 유일한 판정이다.
+  //
+  // **상태를 보고 남의 것을 닫지 않는다.** 요청만 보내고 무엇을 닫을지는 Unity 가 정한다
+  // (worldUiBridge.ts 주석 — 2026-09-08 슬롯머신 사고). 관측값은 구독하지 않고 여기서 한 번
+  // 읽는다: 필요한 것은 화면이 바뀐 그 시점의 Unity 상태뿐이고, 구독하면 무관한 전이마다
+  // 이 호스트가 다시 그려진다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    // 아직 짝이 되는 레이어가 떠 있다 — 오버레이 종류만 바뀐 경우를 포함한다(screen 이 안 변한다)
+    if (screen === 'visitor' || screen === 'management') return;
+    // 줌 없이 열린 레이어였다(이벤트 NPC·상담 Quick Access·월드 안내) — 보낼 것이 없다
+    if (!hasUnityModal()) return;
+    requestExitWorldUi(instance, 'overlay-closed');
   }, [instanceReady, screen]);
 
   // #151 음소거 승계 (-557): 화면에서 끈 채로 월드에 들어가면 BGM 이 다시 나던 것. 인스턴스가 선
