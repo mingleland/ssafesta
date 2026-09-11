@@ -1,5 +1,7 @@
 package com.example.ssafesta.internal.ai;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Optional;
@@ -321,10 +323,19 @@ class AiDocumentJobRepository {
      * {@code extendLease} before it stages. So a batch — and therefore {@code PROCESSING} —
      * provably precedes every finalize that gets this far.
      *
-     * <p><b>A miss is logged, not thrown.</b> This is the last statement of {@code finalizeJob},
-     * after the chunks have been swapped and the Job marked {@code SUCCEEDED} in the same
-     * transaction. Throwing would roll back work that succeeded and hand the worker a job to redo;
-     * the document staying where it is, loudly, is the smaller failure.
+     * <p><b>A miss rolls the whole finalize back</b> (FR-040a). It used to log and let the rest
+     * commit, on the grounds that redoing a successful Job is worse than a document staying put.
+     * That reading was wrong about what committed: chunk replacement and Job {@code SUCCEEDED}
+     * alone are exactly the partial outcome FR-040's single transaction forbids — new chunks
+     * hanging off a document nothing can search, and a Job claiming it succeeded. The document was
+     * never going to be published either way; the only question was whether the other half of the
+     * work stayed behind as a lie.
+     *
+     * <p>The caller answers {@code 410 JOB_GONE}. Rolling back un-marks {@code SUCCEEDED} too, so a
+     * resend cannot take finalize's idempotent branch and gets the same 410, having changed
+     * nothing — which is the truth of it: no attempt of this Job can publish a document that has
+     * left {@code PROCESSING}. Putting a {@code DISABLED} or {@code EXPIRED} document back is a
+     * business decision belonging to FR-015 and FR-026, not to finalize (spec 007 범위 밖).
      */
     void markDocumentReady(long documentId) {
         int published = jdbc.update("""
@@ -333,8 +344,66 @@ class AiDocumentJobRepository {
                 """, documentId);
         if (published == 0) {
             log.error("문서 {} 를 READY 로 올리지 못했습니다 — 허용되지 않는 상태입니다. "
-                    + "chunk 는 교체됐지만 문서는 공개되지 않습니다.", documentId);
+                    + "finalize 전체를 롤백합니다.", documentId);
+            throw new ApiException(ErrorCode.JOB_GONE);
         }
+    }
+
+    /**
+     * Pushes out the document this one was uploaded to replace, now that the replacement is live
+     * (FR-019 · FR-027a, S15P21A604-386).
+     *
+     * <p><b>Here and not at {@code /complete}.</b> Retiring the original when the upload finishes
+     * would leave the agent with nothing to answer from whenever processing then fails — and
+     * processing failing is the ordinary case this whole retry machinery exists for. The original
+     * stays {@code READY} and searchable right up to the statement above; if finalize throws
+     * anywhere, including there, this never runs and nothing moved.
+     *
+     * <p>The row keeps {@code EXPIRED} rather than gaining a status of its own, and
+     * {@code replaced_at} is what separates it from an upload that never arrived — the recovery
+     * path reads that one column (FR-027a). {@code expired_at} is set for the same clock the delete
+     * sweep measures from: FR-028 treats both kinds of {@code EXPIRED} alike, and a row with no
+     * recovery path that also fell out of the delete path would keep its original forever.
+     *
+     * <p>Only {@code QUEUED}/{@code RUNNING}/{@code RETRY_WAIT} Jobs are cancelled. A healthy
+     * {@code READY} document's past Jobs are {@code SUCCEEDED} — terminal, and the audit trail of
+     * how it was built.
+     */
+    void retireReplacedOriginal(long documentId) {
+        List<Long> retired = jdbc.queryForList("""
+                UPDATE ai_documents original
+                   SET processing_status = 'EXPIRED', expired_at = now(), replaced_at = now(),
+                       updated_at = now()
+                  FROM ai_documents replacement
+                 WHERE replacement.id = ? AND original.id = replacement.replaces_document_id
+                   AND original.processing_status = 'READY'
+                RETURNING original.id
+                """, Long.class, documentId);
+        if (retired.isEmpty()) {
+            // The ordinary case: this document replaces nothing. (Or the original already left
+            // READY — a lease expiry got there first, and DISABLED is its answer, not ours.)
+            return;
+        }
+        long original = retired.get(0);
+        // Staging first, while the active set is still named by status — the same order
+        // BoothDocumentDeactivationService takes, and for the same reason: V21 has no staging TTL
+        // sweeper because the terminal transitions clear it, and CANCELLED is one of them.
+        jdbc.update("""
+                DELETE FROM ai_document_chunk_staging
+                 WHERE job_id IN (SELECT id FROM ai_document_jobs
+                                   WHERE document_id = ? AND status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT'))
+                """, original);
+        jdbc.update("""
+                UPDATE ai_document_jobs
+                   SET status = 'CANCELLED', finished_at = now(), updated_at = now(),
+                       next_retry_at = NULL, last_error_code = 'DOCUMENT_REPLACED',
+                       last_error = '수정본으로 교체돼 처리를 취소했습니다.'
+                 WHERE document_id = ? AND status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
+                """, original);
+        // The search gate already gives nothing for a non-READY document, so this frees vector
+        // storage rather than closing a leak — the same judgement the lease-expiry path records.
+        jdbc.update("DELETE FROM ai_document_chunks WHERE document_id = ?", original);
+        log.info("수정본 교체로 원본 문서 {} 를 물렸습니다 — 교체본 {}", original, documentId);
     }
 
     /** {@code chunkCount} 는 finalize 전에는 {@code null} 이다 — 재전송 판정에 쓴다. */
