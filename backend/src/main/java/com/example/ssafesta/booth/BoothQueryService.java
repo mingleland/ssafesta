@@ -49,9 +49,11 @@ public class BoothQueryService {
             if (lease == null) {
                 return SlotView.available(slot);
             }
-            String boothName = booths.findById(lease.getBoothId()).map(Booth::getName).orElse(null);
+            // 부스를 통째로 들고 간다. 이름만 뽑고 버리던 자리인데, 같은 행에 facade 4필드가
+            // 있어 그것을 함께 실으면 Unity 가 간판 12개를 요청 하나로 그린다 (GitLab #171).
+            Booth booth = booths.findById(lease.getBoothId()).orElse(null);
             boolean mine = viewerUserId != null && viewerUserId.equals(lease.getLesseeUserId());
-            return SlotView.occupied(slot, lease, boothName, mine, now);
+            return SlotView.occupied(slot, lease, booth, mine, now);
         }).toList();
     }
 
@@ -98,19 +100,33 @@ public class BoothQueryService {
         return booth.isPublished() ? booth.getHomepageUrl() : null;
     }
 
+    /**
+     * @param facade the occupying booth's exterior, or {@code null} on a free slot
+     *        (S15P21A604-622, GitLab #171). Unity draws twelve signs on entering the festival;
+     *        without this it needed a second call per booth — thirteen requests where one will do.
+     *        The booth row is already loaded to get {@code boothName}, so carrying it costs no
+     *        query. Same values as {@code GET /booths/{boothId}}'s {@code facade}.
+     */
     public record SlotView(Long slotId, String slotCode, short floorNo, String type, String status,
                            Long boothId, String boothName, Instant leaseEndsAt, Long remainingSeconds,
-                           boolean entryAvailable, boolean mine) {
+                           boolean entryAvailable, boolean mine,
+                           BoothFacadeService.FacadeView facade) {
 
         static SlotView available(BoothSlot slot) {
             return new SlotView(slot.getId(), slot.getSlotCode(), slot.getFloorNo(), slot.getSlotType().name(),
-                    "AVAILABLE", null, null, null, null, false, false);
+                    "AVAILABLE", null, null, null, null, false, false, null);
         }
 
-        static SlotView occupied(BoothSlot slot, BoothLease lease, String boothName, boolean mine, Instant now) {
+        /**
+         * @param booth the occupying booth, or {@code null} if the row is missing — the lease
+         *        points at it, so that is a server fault the caller reports as a blank name rather
+         *        than a failed list of twelve
+         */
+        static SlotView occupied(BoothSlot slot, BoothLease lease, Booth booth, boolean mine, Instant now) {
             return new SlotView(slot.getId(), slot.getSlotCode(), slot.getFloorNo(), slot.getSlotType().name(),
-                    "OCCUPIED", lease.getBoothId(), boothName, lease.getEndsAt(),
-                    lease.remainingSecondsAt(now), true, mine);
+                    "OCCUPIED", lease.getBoothId(), booth == null ? null : booth.getName(),
+                    lease.getEndsAt(), lease.remainingSecondsAt(now), true, mine,
+                    booth == null ? null : BoothFacadeService.FacadeView.of(booth));
         }
     }
 
