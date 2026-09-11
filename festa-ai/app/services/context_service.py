@@ -22,6 +22,7 @@ MAX_QUESTION_CHARACTERS = 2_000
 MAX_RECENT_TURNS = 6
 DEFAULT_CONTEXT_TOP_N = 5
 DEFAULT_TOKEN_BUDGET = 8_000
+MAX_PROJECT_FACT_CHARACTERS = 1_000
 
 PLATFORM_INSTRUCTION = """[플랫폼 필수 규칙]
 당신은 SSAFY FESTA의 부스 AI 직원이다.
@@ -97,6 +98,41 @@ class ContextBudgetExceededError(ValueError):
         self.token_budget = token_budget
 
 
+def _validate_optional_fact(name: str, value: str | None) -> None:
+    if value is not None and (
+        type(value) is not str
+        or not value.strip()
+        or len(value) > MAX_PROJECT_FACT_CHARACTERS
+    ):
+        raise ValueError(f"{name}은 null 또는 비어 있지 않은 문자열이어야 합니다.")
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectFacts:
+    """Spring이 소유하고 Agent 설정 조회로 제공하는 프로젝트 정형 정보다."""
+
+    introduction: str | None
+    target_audience: str | None
+    tech_stack: str | None
+
+    def __post_init__(self) -> None:
+        _validate_optional_fact("introduction", self.introduction)
+        _validate_optional_fact("target_audience", self.target_audience)
+        _validate_optional_fact("tech_stack", self.tech_stack)
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractedProjectFacts:
+    """문서 처리 attempt가 Spring finalize에 전달할 AI 추출 결과다."""
+
+    target_audience: str | None
+    tech_stack: str | None
+
+    def __post_init__(self) -> None:
+        _validate_optional_fact("target_audience", self.target_audience)
+        _validate_optional_fact("tech_stack", self.tech_stack)
+
+
 @dataclass(frozen=True, slots=True)
 class AgentPromptConfig:
     """Spring이 검증한 Agent 설정을 프롬프트용 값으로 고정한다."""
@@ -106,6 +142,7 @@ class AgentPromptConfig:
     response_length: ResponseLength
     system_prompt: str
     forbidden_topics: tuple[str, ...] = ()
+    project_facts: ProjectFacts | None = None
 
     def __post_init__(self) -> None:
         if self.role not in ROLE_INSTRUCTIONS:

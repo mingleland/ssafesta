@@ -10,7 +10,7 @@ from app.clients.spring_agent_config import (
     SpringAgentConfigClient,
     SpringAgentConfigUnavailable,
 )
-from app.services.context_service import AgentPromptConfig
+from app.services.context_service import AgentPromptConfig, ProjectFacts
 
 
 def _client(handler, *, timeout_seconds: float = 1.0) -> SpringAgentConfigClient:
@@ -54,6 +54,36 @@ async def test_get_sends_scope_token_and_maps_all_prompt_fields() -> None:
         response_length="LONG",
         system_prompt="프로젝트의 기술 선택을 설명한다.",
         forbidden_topics=("개인정보", "미공개 정보"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_maps_optional_project_facts_without_breaking_legacy_shape() -> None:
+    client = _client(
+        lambda _request: httpx.Response(
+            200,
+            json={
+                "found": True,
+                "role": "PROJECT_DOCENT",
+                "tone": "FRIENDLY",
+                "responseLength": "SHORT",
+                "systemPrompt": "안내한다.",
+                "forbiddenTopics": [],
+                "projectFacts": {
+                    "introduction": "온라인 프로젝트 전시 플랫폼입니다.",
+                    "targetAudience": "프로젝트를 전시하고 싶은 교육생",
+                    "techStack": "FastAPI, Spring Boot, React, Unity",
+                },
+            },
+        )
+    )
+
+    result = await client.get(booth_id=7, agent_id=3)
+
+    assert result.project_facts == ProjectFacts(
+        introduction="온라인 프로젝트 전시 플랫폼입니다.",
+        target_audience="프로젝트를 전시하고 싶은 교육생",
+        tech_stack="FastAPI, Spring Boot, React, Unity",
     )
 
 
@@ -126,6 +156,15 @@ async def test_timeout_is_fail_closed_and_not_retried() -> None:
         },
         {"found": False, "denialCode": "UNKNOWN"},
         {"found": False, "denialCode": "AGENT_INACTIVE", "systemPrompt": "leak"},
+        {
+            "found": True,
+            "role": "GUIDE",
+            "tone": "FRIENDLY",
+            "responseLength": "MEDIUM",
+            "systemPrompt": "안내한다.",
+            "forbiddenTopics": [],
+            "projectFacts": {"introduction": "소개만 있음"},
+        },
     ],
 )
 async def test_contract_violation_is_fail_closed(body: object) -> None:

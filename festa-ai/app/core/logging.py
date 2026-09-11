@@ -21,6 +21,7 @@ _FIELD_NAMES = frozenset(
         "status",
         "error_code",
         "timeout_phase",
+        "intent",
     }
 )
 

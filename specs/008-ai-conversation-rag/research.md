@@ -47,3 +47,11 @@
 **Rationale**: 2026-08-26 Clarification을 구현 가능한 단일 결정 순서로 고정한다.
 
 **Alternatives considered**: 문자 수 근사는 모델 token 한도를 보장하지 못한다. 무조건 오래된 순서만 자르면 검색 근거와 안전 지시가 손상될 수 있다.
+
+## 7. 정형 정보 추출·단축 응답
+
+**Decision**: Embedding이 끝난 Chunk에서 키워드로 관련 후보만 제한하고 공유 LLM adapter를 한 번 호출한다. 결과는 기존 finalize의 선택 필드로 Spring에 넘기며, 질문 시에는 Agent 설정의 정형값과 정확히 일치하는 화이트리스트 질문만 바로 답한다.
+
+**Rationale**: 문서별 1회 추출 비용으로 반복 질문의 질의 Embedding·검색·LLM 비용을 모두 없앨 수 있다. finalize를 재사용하면 별도 callback의 인증·재시도·stale attempt 로직이 필요 없다.
+
+**Alternatives considered**: 별도 의도 분류 LLM은 질문마다 비용이 들고, 임베딩 유사도 분류는 오탐 범위가 넓다. 새 결과 API는 기존 finalize와 원자성이 갈리고 동일한 재시도 로직을 중복한다.

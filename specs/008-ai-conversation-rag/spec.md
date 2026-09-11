@@ -137,7 +137,7 @@ FE는 중간 `sequence` 불일치를 사용자에게 노출하지 않고 경고�
 - **FR-018**: 여러 AI 직원은 전용 LLM 인스턴스를 각각 소유하지 않고 **공유 LLM 어댑터와 제한된 워커 풀**을 사용해야 한다. 각 요청에는 해당 `boothId + agentId`로 검증된 설정과 검색 범위만 결합해야 한다.
 - **FR-019**: 초기 처리 한도는 사용자당 활성 스트림 1개·슬라이딩 60초간 유효 질문 5회, AI 직원당 활성 스트림 5개, 서비스 전체 활성 스트림 20개로 적용해야 한다. 인증된 사용자의 `userId`를 제한 키로 사용하며, 입력 검증에서 거부되어 LLM을 호출하지 않은 요청은 질문 횟수에 포함하지 않는다. 사용자 또는 AI 직원 한도 초과는 대기열에 넣지 않고 LLM 호출 전에 `429 Too Many Requests`와 `Retry-After`로 즉시 거부해야 한다.
 - **FR-020**: 서비스 전체 동시 처리 한도만 넘은 유효 요청은 FIFO 대기열에 최대 30개까지 넣는다. 대기열이 가득 찼거나 10초 안에 처리 슬롯을 얻지 못하면 LLM을 호출하지 않은 채 `429 Too Many Requests`와 `Retry-After`를 반환해야 한다. 한도 값은 환경 설정으로 조정 가능해야 한다.
-- **FR-021**: 질문마다 Spring 검색 API를 호출해야 하며, 응답이 `200 + items: []`이면 LLM 호출만 생략하고 자료 미준비 고정 안내를 반환해야 한다. 일반 지식이나 직원 지시문만으로 답변해서는 안 된다.
+- **FR-021**: FR-032의 정형 질문 단축 응답에 해당하지 않는 질문은 Spring 검색 API를 호출해야 하며, 응답이 `200 + items: []`이면 LLM 호출만 생략하고 자료 미준비 고정 안내를 반환해야 한다. 일반 지식이나 직원 지시문만으로 답변해서는 안 된다.
 - **FR-022**: `boothId`, `agentId`, 허용 문서 상태는 인증·Conversation에 연결된 서버 측 값으로 결정해야 하며 사용자 질문, Agent 지시문 또는 검색 문서에서 받은 값으로 덮어써서는 안 된다. 다른 Booth 데이터·시스템 프롬프트·비밀정보를 요구하는 질문도 동일한 검색 범위를 유지해야 한다.
 - **FR-023**: Prompt Injection 탐지 결과는 보조 신호로만 사용할 수 있으며 데이터 격리를 탐지 모델이나 키워드 차단에 의존해서는 안 된다. 시스템 프롬프트·API Key·내부 오류 상세를 응답이나 `source` 이벤트에 포함해서는 안 된다.
 - **FR-024**: Conversation 생성 시 FastAPI는 Spring을 서버 간 호출해 **Lease 유효성, `agentId`의 `boothId` 소속 여부, Agent의 `ACTIVE` 상태**를 검증하고 응답 본문의 `leaseEndsAt`을 Conversation에 저장해야 한다. 세 조건 중 하나라도 충족하지 않으면 Fail Closed로 Conversation 생성을 거부하고 검색·LLM 호출을 수행해서는 안 된다. 서명된 Snapshot은 사용하지 않으며, 이후 질문마다 Spring을 다시 호출하지 않고 FastAPI가 UTC 시각과 저장된 `leaseEndsAt`을 비교해야 한다 ([GitHub Issue #14](https://github.com/kanghyunsoon/ssafesta/issues/14)).
@@ -148,6 +148,8 @@ FE는 중간 `sequence` 불일치를 사용자에게 노출하지 않고 경고�
 - **FR-029**: 실패한 Stream의 재시도는 기존 `conversationId`를 유지하고 새 `requestId`·`messageId`를 발급해야 한다. `done`에 도달하지 못한 사용자 질문·부분 AI 응답은 대화 이력에 확정 저장해서는 안 된다.
 - **FR-030**: FastAPI는 질의 Embedding만 생성하고 Spring 검색 API에 전달해야 한다. `topK` 상한은 20, timeout은 3초이며 코사인 `distance`가 작은 순서로 반환한다. P0에는 distance threshold를 적용하지 않는다.
 - **FR-031**: FastAPI는 문서 Chunk/Embedding DB 자격증명, ORM, Repository 또는 migration을 가져서는 안 된다. 검색 결과의 scope를 LLM 입력 조립 전에 다시 검증해야 한다.
+- **FR-032**: FastAPI는 Agent 설정에 저장된 프로젝트 소개·대상 사용자·사용 기술에 한해 보수적인 전체 문자열 매칭으로 단축 응답할 수 있어야 한다. 단일 의도로 확정되지 않거나 값이 없으면 기존 검색·RAG 경로로 폴백해야 하며, 매칭 성공 시 질의 Embedding·검색·LLM 호출은 모두 0건이어야 한다.
+- **FR-033**: 문서 Embedding이 끝난 뒤 FastAPI는 같은 attempt의 Chunk에서 대상 사용자와 사용 기술을 1회 추출해 문서 finalize와 함께 Spring에 전달해야 한다. 추출 결과는 문서 근거에 명시된 값만 허용하며 추출 실패는 기록하되 문서 finalize를 막지 않아야 한다. 영구 정형 정보의 Source of Truth와 stale-attempt 갱신 방어는 Spring이 소유한다.
 
 ### Key Entities
 
@@ -172,6 +174,8 @@ FE는 중간 `sequence` 불일치를 사용자에게 노출하지 않고 경고�
 - **SC-011**: 게스트가 AI 직원과 상호작용했을 때 Conversation 생성·검색·LLM 호출은 각각 0건이고 로그인 안내가 표시된다.
 - **SC-012**: 명시적 종료된 Conversation 원문은 즉시 삭제되고, 종료 호출이 유실된 Conversation 원문도 마지막 활동 후 30분을 넘겨 남아 있는 사례가 0건이다.
 - **SC-013**: 정상·실패·중간 이벤트 누락·재시도 계약 테스트에서 모든 SSE 이벤트의 공통 envelope와 `type=event`, 연속 `sequence`, 단일 종료 이벤트 규칙을 검증하고, 실패 후 재시도 시 같은 `conversationId`와 새 요청·메시지 ID가 사용된다.
+- **SC-014**: 프로젝트 소개·대상 사용자·사용 기술의 화이트리스트 질문은 저장값이 있을 때 검색·LLM 호출 0건으로 답하고, 복합·유사·값 누락 질문은 기존 RAG 경로로 폴백한다.
+- **SC-015**: 문서 정보 추출 성공 시 finalize에 대상 사용자·사용 기술이 포함되고, 추출 오류 시 원문 없는 경고를 남긴 뒤 정형 정보 없이 finalize가 정상 완료된다.
 
 ---
 
