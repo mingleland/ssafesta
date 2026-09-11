@@ -40,6 +40,14 @@ export interface SurveyRunState {
   memberOnly: boolean;
   /** 이미 참여한 시각. null 이 아니면 재참여가 없다 — 화면은 제출 완료와 같은 자리를 쓴다 */
   respondedAt: string | null;
+  /**
+   * 로드 실패 시 **서버가 준 사용자용 문장**. 제출 실패가 그것을 쓰는 이유와 같다(-541).
+   *
+   * 이벤트 설문은 아직 문항이 없으면 서버가 404 와 함께 "아직 공개되지 않은 설문입니다." 를
+   * 준다 — 그 문장을 버리면 화면이 "불러오지 못했습니다" 로 뭉개져, 고장과 준비 중이 구별되지
+   * 않는다. `null` 은 서버 문장이 없다는 뜻이고 그때만 화면이 일반 문구를 쓴다.
+   */
+  loadErrorMessage: string | null;
   questions: SurveyQuestionVM[];
   answers: Record<string, SurveyAnswerValue>;
   progress: { current: number; total: number };
@@ -66,6 +74,7 @@ const initialState: SurveyRunState = {
   rewardCoin: 0,
   memberOnly: false,
   respondedAt: null,
+  loadErrorMessage: null,
   questions: [],
   answers: {},
   progress: { current: 0, total: 0 },
@@ -120,9 +129,9 @@ export async function loadSurveyRun(source: SurveySource): Promise<void> {
       questions: run.questions,
       progress: { current: 0, total: run.questions.length },
     });
-  } catch {
+  } catch (error) {
     if (!isSameSurveySource(state.source, source)) return;
-    setState({ status: 'error' });
+    setState({ status: 'error', loadErrorMessage: userMessageOf(error) });
   }
 }
 

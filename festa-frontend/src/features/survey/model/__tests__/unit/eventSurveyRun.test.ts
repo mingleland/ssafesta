@@ -54,6 +54,13 @@ describe('이벤트 설문 로드', () => {
     expect(getSurveyRunSnapshot().status).toBe('error');
   });
 
+  it('서버가 준 문장을 들고 있는다 — 준비 중과 고장을 화면이 구별해야 한다 (S15P21A604-621)', async () => {
+    // 실서버는 문항이 아직 없으면 404 와 함께 "아직 공개되지 않은 설문입니다." 를 준다
+    await loadSurveyRun({ kind: 'event', surveyKey: 'NOPE' });
+
+    expect(getSurveyRunSnapshot().loadErrorMessage).toBe('설문을 찾을 수 없습니다.');
+  });
+
   it('마감된 이벤트 설문도 문항을 남긴다 (계약 §5 와 같은 규칙)', async () => {
     await loadSurveyRun({ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_CLOSED });
 

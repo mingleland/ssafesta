@@ -21,7 +21,7 @@ import {
   MOCK_EVENT_SURVEY_KEY,
   __resetSurveyMockForTests,
 } from '../../../../../entities/survey/api.mock';
-import { __resetSurveyRunForTests } from '../../../model/run';
+import { __resetSurveyRunForTests, getSurveyRunSnapshot } from '../../../model/run';
 import { SurveyOverlay } from '../../SurveyOverlay';
 
 beforeEach(() => {
@@ -50,12 +50,24 @@ describe('회원', () => {
 });
 
 describe('게스트', () => {
-  it('보상이 0 이어도 막힌다 — 이벤트 설문은 회원 전용이다', async () => {
+  it('요청을 만들기 전에 막는다 — 서버가 run 을 회원 전용으로 닫아 두었다 (S15P21A604-621)', async () => {
     session.mockReturnValue({ kind: 'guest' });
     render(<SurveyOverlay payload={{ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_KEY }} />);
 
-    await waitFor(() => expect(screen.getByText('회원만 참여할 수 있는 설문입니다 — 로그인해 주세요')).toBeTruthy());
-    expect(screen.getByRole('button', { name: '제출하기' }).hasAttribute('disabled')).toBe(true);
+    await waitFor(() => expect(screen.getByText('회원만 참여할 수 있습니다')).toBeTruthy());
+    // 403 을 받아 오류 화면으로 떨어지는 것이 아니라 안내로 선다
+    expect(screen.queryByText('설문을 불러오지 못했습니다')).toBeNull();
+    expect(screen.queryByRole('button', { name: '제출하기' })).toBeNull();
+    expect(screen.getByText('회원만 참여할 수 있는 설문입니다 — 로그인해 주세요')).toBeTruthy();
+  });
+
+  it('로드 자체를 하지 않는다 — 상태 기계가 idle 에 머문다', async () => {
+    session.mockReturnValue({ kind: 'guest' });
+    render(<SurveyOverlay payload={{ kind: 'event', surveyKey: MOCK_EVENT_SURVEY_KEY }} />);
+
+    await waitFor(() => expect(screen.getByText('회원만 참여할 수 있습니다')).toBeTruthy());
+    expect(getSurveyRunSnapshot().status).toBe('idle');
+    expect(getSurveyRunSnapshot().source).toBeNull();
   });
 
   it('보상 없는 부스 설문은 그대로 열려 있다 — memberOnly 를 부스 경로에 흘리지 않는다', async () => {
