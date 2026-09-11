@@ -22,22 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class ArcadeMachineResolveService {
 
     private final ArcadeMachineBindingRepository bindings;
-    private final GameRepository games;
 
-    public ArcadeMachineResolveService(ArcadeMachineBindingRepository bindings, GameRepository games) {
+    public ArcadeMachineResolveService(ArcadeMachineBindingRepository bindings) {
         this.bindings = bindings;
-        this.games = games;
     }
 
     @Transactional(readOnly = true)
     public ResolvedView resolve(String machineId) {
-        ArcadeMachineBinding binding = bindings.findById(machineId)
+        // 바인딩과 게임을 한 질의로 읽는다 — 나눠 읽으면 탈퇴 커밋을 사이에 두고 찢어진다
+        // (repository javadoc). 없으면 어느 쪽이 없든 "이 기계는 걸린 게임이 없다" 로 같다.
+        Game game = bindings.findBoundGame(machineId)
                 .orElseThrow(() -> new ApiException(ErrorCode.MACHINE_NOT_FOUND));
-        Game game = games.findById(binding.getGameId())
-                // The foreign key makes this unreachable. If it ever happens the binding outlived
-                // its game, which is a server fault — reported as one rather than smoothed over
-                // with a playable:false the operator would never see (T-24).
-                .orElseThrow(() -> new ApiException(ErrorCode.GAME_PROJECT_INVALID));
 
         ErrorCode blocked = GamePublishedQueryService.blockedReason(game);
         boolean playable = blocked == null;

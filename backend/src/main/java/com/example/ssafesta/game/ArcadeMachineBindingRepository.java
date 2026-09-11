@@ -1,6 +1,9 @@
 package com.example.ssafesta.game;
 
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Arcade machine bindings, keyed by the scene's machine id.
@@ -10,4 +13,19 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * S15P21A604-602 범위 밖).
  */
 public interface ArcadeMachineBindingRepository extends JpaRepository<ArcadeMachineBinding, String> {
+
+    /**
+     * The game this machine runs, read in <b>one</b> statement.
+     *
+     * <p>Two reads would tear. A withdrawal deletes the binding and the game in one transaction, so
+     * under {@code READ COMMITTED} a resolver that read the binding first could see it, lose the
+     * race, and then find no game — answering {@code 500} for what is really "this machine is not
+     * bound any more". The foreign key does not help: it forbids a dangling row at rest, not a read
+     * that straddles the commit. One statement sees one snapshot, so the pair is all-or-nothing.
+     *
+     * <p>Empty therefore means the same thing either way — no binding, or a binding whose game went
+     * with it — and both are {@code MACHINE_NOT_FOUND}.
+     */
+    @Query("select g from ArcadeMachineBinding b join Game g on g.id = b.gameId where b.machineId = :machineId")
+    Optional<Game> findBoundGame(@Param("machineId") String machineId);
 }
