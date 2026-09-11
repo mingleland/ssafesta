@@ -171,15 +171,39 @@ tmp_link="${root}/.current.${release_id}.$$"
 ln -s "releases/${release_id}" "${tmp_link}"
 mv -Tf "${tmp_link}" "${root}/current"
 
+# 검증이 실패하면 **왜 실패했는지 로그에 남긴다.**
+# 전에는 `curl --fail` 이 조용히 종료해 "403" 이라는 숫자만 남았고, 그게 파일 문제인지
+# 앞단(WAF·프록시) 차단인지 구분할 수 없어 사람이 서버에 들어가 다시 확인해야 했다
+# (2026-09-11 #165). 상태줄과 몇 개 헤더만 찍어도 그 한 번이 사라진다.
+# 토큰이 실리는 요청이 아니므로 헤더를 남겨도 비밀이 새지 않는다.
+log_verify_failure() {
+  local url="$1" file="$2"
+  local status; status="$(head -n 1 "${file}" 2>/dev/null | tr -d '\r')"
+  echo "  verify failed: ${url}" >&2
+  [[ -n "${status}" ]] && echo "    ${status}" >&2
+  # 앞단이 누구인지 드러내는 헤더만 추린다 — cf-ray 가 있으면 Cloudflare 단에서 끊긴 것이다.
+  grep -Ei '^(server|cf-ray|cf-cache-status|via|x-cache|content-type|cache-control|content-encoding):' "${file}" 2>/dev/null \
+    | sed 's/^/    /' >&2 || true
+}
+
 verify_http() {
   local path="$1" expected_type="$2" require_brotli="${3:-0}" expected_cache="$4" base="${WEBGL_PUBLIC_BASE_URL%/}"
   headers="$(mktemp "${root}/.webgl-headers.XXXXXX")"
-  if ! curl --fail --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
-    --dump-header "${headers}" --output /dev/null "${base}/${path}"; then return 1; fi
-  grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${headers}" || return 1
-  grep -Fiq "Cache-Control: ${expected_cache}" "${headers}" || return 1
+  if ! curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+    --dump-header "${headers}" --output /dev/null "${base}/${path}"; then
+    log_verify_failure "${base}/${path}" "${headers}"; return 1
+  fi
+  # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
+  if ! head -n 1 "${headers}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]'; then
+    log_verify_failure "${base}/${path}" "${headers}"; return 1
+  fi
+  grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${headers}" \
+    || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
+  grep -Fiq "Cache-Control: ${expected_cache}" "${headers}" \
+    || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
   if [[ "${require_brotli}" == 1 ]]; then
-    grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${headers}" || return 1
+    grep -Eiq '^Content-Encoding:[[:space:]]*br[[:space:]]*$' "${headers}" \
+      || { log_verify_failure "${base}/${path}" "${headers}"; return 1; }
   fi
   rm -f "${headers}"; headers=
 }
