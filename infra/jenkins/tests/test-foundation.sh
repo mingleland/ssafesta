@@ -188,6 +188,14 @@ grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
 grep -q 'credentialsId(gitlabCheckoutCredentialsId)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the credentialsId method"
+grep -q 'projectOwner(gitlabProjectOwner)' "${develop_job}" \
+  || fail "GitLab develop Job DSL shadows the projectOwner method"
+grep -q 'projectPath(gitlabProjectPath)' "${develop_job}" \
+  || fail "GitLab develop Job DSL shadows the projectPath method"
+! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
+  || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
+! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \
+  || fail "GitLab develop Job DSL declares a projectPath variable that shadows the method"
 grep -q "pipelineJob('festa-webgl-package-deploy')" "${webgl_job}" \
   || fail "GitLab WebGL package deployment job is missing"
 grep -q "scriptPath('infra/jenkins/pipelines/webgl-package-deploy.groovy')" "${webgl_job}" \
