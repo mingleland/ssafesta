@@ -242,6 +242,52 @@ class BoothFacadeApiIntegrationTest {
                 .andExpect(jsonPath("$.facade.themeCode").value("MONO"));
     }
 
+    /**
+     * 외관을 한 번도 손대지 않은 부스도 {@code facade} 객체를 받는다.
+     *
+     * <p>여기서 {@code null} 이 오면 클라이언트는 "빈 슬롯" 과 "기본 외관" 을 구별할 수 없다 —
+     * 간판이 서지 않는다. 기본값은 부스 생성 시 {@code DEFAULT} 이고 나머지는 비어 있다.
+     */
+    @Test
+    void anOccupiedSlotWithoutACustomFacadeStillCarriesTheDefault() throws Exception {
+        Owner owner = leasedOwner("기본외관");
+        int occupied = orderedIndexOf(booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId());
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].status".formatted(occupied)).value("OCCUPIED"))
+                .andExpect(jsonPath("$[%d].facade".formatted(occupied)).exists())
+                .andExpect(jsonPath("$[%d].facade.themeCode".formatted(occupied)).value("DEFAULT"))
+                .andExpect(jsonPath("$[%d].facade.signText".formatted(occupied))
+                        .value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    /**
+     * 임대가 끝나면 그 자리는 빈 슬롯이고 옛 간판도 함께 사라진다.
+     *
+     * <p>`status` 는 `ends_at` 을 반영해 이미 `AVAILABLE` 로 나오는데, facade 만 남으면 월드에
+     * <b>임차인이 없는 부스의 간판</b>이 선다. 부스 행은 콘텐츠 보존 때문에 그대로 살아 있으므로
+     * (FR-010) 이 자리는 lease 유무로 갈려야 한다.
+     */
+    @Test
+    void anExpiredLeaseLeavesTheSlotFreeAndHidesItsFacade() throws Exception {
+        Owner owner = leasedOwner("만료외관목록");
+        Long slotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"MONO","signText":"사라질 간판"}"""))
+                .andExpect(status().isOk());
+        BoothLayoutTestSupport.expireLease(jdbc, owner.boothId());
+
+        int index = orderedIndexOf(slotId);
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].status".formatted(index)).value("AVAILABLE"))
+                .andExpect(jsonPath("$[%d].boothName".formatted(index))
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$[%d].facade".formatted(index))
+                        .value(org.hamcrest.Matchers.nullValue()));
+    }
+
     private int orderedIndexOf(Long slotId) {
         return slots.findAllOrdered().stream().map(BoothSlot::getId).toList().indexOf(slotId);
     }
