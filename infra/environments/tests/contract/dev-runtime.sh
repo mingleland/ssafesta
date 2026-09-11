@@ -69,4 +69,6 @@ assert_contains "${ai_compose}" 'SPRING_INTERNAL_BASE_URL:[[:space:]]+http://bac
 assert_contains "${back_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'backend must receive outbound Spring-to-AI token'
 assert_contains "${back_compose}" 'INTERNAL_INFRA_TO_SPRING_TOKENS:' 'backend must receive its Infra-to-Spring token'
 assert_contains "${ai_compose}" 'INTERNAL_SPRING_TO_AI_TOKENS:' 'AI must receive inbound Spring-to-AI token'
+assert_contains "${ai_compose}" '/ai/v1/health/live' 'AI healthcheck must use FastAPI liveness endpoint'
+assert_contains "${repo_root}/infra/environments/compose/dev/ai.yaml" '/ai/v1/health/live' 'environment AI healthcheck must use FastAPI liveness endpoint'
 pass 'dev runtime keeps component inputs private and IP-gated ingress loopback-only'
