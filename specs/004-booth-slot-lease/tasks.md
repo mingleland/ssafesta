@@ -28,7 +28,7 @@
 
 **⚠️ 이 단계가 끝나기 전에는 어떤 User Story도 시작할 수 없다**
 
-- [x] T003 [P] `booth/SlotType.java`(`USER_RENTAL`/`ADMIN`) · `booth/LeaseStatus.java`(`ACTIVE`/`EXPIRED`) · `booth/BoothStatus.java`(`ACTIVE`/`INACTIVE`)
+- [x] T003 [P] `booth/SlotType.java`(`USER_RENTAL`/`ADMIN`/`EVENT` — `EVENT`는 V28에서 추가, S15P21A604-615) · `booth/LeaseStatus.java`(`ACTIVE`/`EXPIRED`) · `booth/BoothStatus.java`(`ACTIVE`/`INACTIVE`)
 - [x] T004 [P] `booth/BoothSlot.java` — `booth_slots` 매핑. **점유 상태를 갖지 않는다** (활성 임대의 존재가 곧 점유, research R-02)
 - [x] T005 [P] `booth/Booth.java` — `booths` 매핑. `owner_user_id`가 주인이고 `current_slot_id`는 임대 중에만 채워진다. `attachSlot`/`detachSlot` 메서드로만 변경 (data-model §2)
 - [x] T006 [P] `booth/BoothLease.java` — `booth_leases` 매핑. 유일한 변경은 `expire()` 상태 전이. `ends_at`은 생성자가 `starts_at + 기간`으로 계산한다 (I-4)

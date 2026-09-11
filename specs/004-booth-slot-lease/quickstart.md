@@ -58,7 +58,7 @@ cd backend; .\mvnw.cmd test
 cd backend && ./mvnw test -Dtest=SsafestaApplicationTests
 ```
 
-Flyway가 V1 → V5까지 올라가고 `ddl-auto=validate`가 엔티티-스키마 일치를 검증한다. V5·V12 시딩으로 **USER_RENTAL 슬롯 12개(11층)** 가 들어간다.
+Flyway가 V1 → V5까지 올라가고 `ddl-auto=validate`가 엔티티-스키마 일치를 검증한다. V5·V12 시딩으로 방 12개(11층)가 들어가고, **V28이 1번을 `EVENT`로 바꿔 임대 가능한 것은 11개**가 된다 (S15P21A604-615).
 
 ## 3. 수동 검증 (Bruno)
 
@@ -71,7 +71,7 @@ cd backend && ./mvnw spring-boot:run
 
 1. `01-auth` — 로그인해 Access Token 확보
 2. `03-wallet/내 지갑 조회` → 신규 계정이면 **250**
-3. `04-booth-lease/슬롯 목록 조회` → 12개, 전부 `AVAILABLE`
+3. `04-booth-lease/슬롯 목록 조회` → 12개, 전부 `AVAILABLE`. 1번은 `type: "EVENT"`라 임대하면 `409 BOOTH_SLOT_NOT_RENTABLE`이다
 4. `04-booth-lease/부스 임대` → `201`, `chargedCoin: 100`, `balanceAfter: 150`
 5. `03-wallet/내 거래 내역 조회` → `LEASE_PAYMENT` `-100` 1행
 6. `04-booth-lease/슬롯 목록 조회` → 그 슬롯이 `OCCUPIED`, `remainingSeconds`가 줄어든다

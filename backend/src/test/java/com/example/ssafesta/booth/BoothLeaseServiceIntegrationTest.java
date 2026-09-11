@@ -45,15 +45,29 @@ class BoothLeaseServiceIntegrationTest {
         BoothTestSupport.releaseAllSlots(jdbc);
     }
 
-    /** V5의 7개를 V12가 12개로 확장했다 — Unity 축제 존 12실과 맞춘 값이다 (#62). */
+    /**
+     * 방은 12개, 임대할 수 있는 것은 11개다.
+     *
+     * <p>V5의 7개를 V12가 12개로 늘렸고(#62, Unity 축제 존 12실), V28이 그중 1번을 이벤트 부스
+     * 자리로 뺐다 (S15P21A604-615 · GitLab #170). 기획의 부스 구성표에 원래 있던 구분이다
+     * (docs/01 §부스 구성 — 이벤트 부스 1). <b>방 수는 그대로 12</b>여야 한다 — 줄어들면 Unity
+     * 앵커가 빈 방을 가리킨다.
+     */
     @Test
-    void twelveUserRentalSlotsAreSeeded() {
-        List<BoothSlot> rentable = slots.findAllOrdered().stream()
+    void elevenRentalRoomsAndOneEventRoomAreSeeded() {
+        List<BoothSlot> all = slots.findAllOrdered();
+        List<BoothSlot> rentable = all.stream()
                 .filter(slot -> slot.getSlotType() == SlotType.USER_RENTAL).toList();
+        List<BoothSlot> event = all.stream()
+                .filter(slot -> slot.getSlotType() == SlotType.EVENT).toList();
 
-        assertEquals(12, rentable.size());
-        assertTrue(rentable.stream().allMatch(slot -> slot.getFloorNo() == 11));
+        assertEquals(12, all.size());
+        assertEquals(11, rentable.size());
+        assertEquals(1, event.size());
+        assertEquals(1L, event.get(0).getId(), "이벤트 자리는 1번 방이다");
+        assertTrue(all.stream().allMatch(slot -> slot.getFloorNo() == 11));
         assertTrue(rentable.stream().allMatch(BoothSlot::isRentable));
+        assertFalse(event.get(0).isRentable(), "이벤트 자리는 임대 대상이 아니다");
     }
 
     @Test

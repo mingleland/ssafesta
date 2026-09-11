@@ -13,7 +13,7 @@
 | `id` | BIGINT | PK | |
 | `slot_code` | VARCHAR(30) | NOT NULL, **UNIQUE** | 사람이 읽는 식별자 (`F11-R01`) |
 | `floor_no` | SMALLINT | NOT NULL | 층 |
-| `slot_type` | VARCHAR(30) | NOT NULL | `USER_RENTAL` / 관리자 유형 |
+| `slot_type` | VARCHAR(30) | NOT NULL | `USER_RENTAL` / `ADMIN` / `EVENT` |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE` | 슬롯 자체의 운영 상태 |
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
@@ -21,7 +21,7 @@
 
 - **점유 여부는 이 테이블에 두지 않는다.** 활성 임대의 존재가 곧 점유다 (research R-02). `status`는 "이 슬롯을 임대 상품으로 여는가"라는 운영 스위치이고, 임대 생명주기와 무관하다.
 - `USER_RENTAL`이 아닌 슬롯은 임대 대상이 아니다 (`SlotNotRentableException`).
-- V5 마이그레이션이 7개를 시딩하고 **V12가 12개로 확장한다** (11층, U-03). `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 V12는 id를 명시 삽입한다 (#62).
+- V5 마이그레이션이 7개를 시딩하고 **V12가 12개로 확장**하며, **V28이 1번을 `EVENT`로 바꿔 임대 가능한 것은 11개**가 된다 (11층, U-03. S15P21A604-615 · GitLab #170). 방 수는 그대로 12다 — 줄이면 Unity 앵커가 빈 방을 가리킨다. `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 V12는 id를 명시 삽입한다 (#62).
 
 ## 2. Booth (`booths`) — 기존 테이블
 
