@@ -1,3 +1,4 @@
+using Festa.Booth;
 using Festa.Content;
 using Festa.Integration;
 using TMPro;
