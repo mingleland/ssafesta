@@ -24,13 +24,15 @@ chmod +x "${fixture}/bin/flock"
 cat >"${fixture}/bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-output= headers= url= resolved=0
+output= headers= url= resolved=0 accepts_br=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) output="$2"; shift 2 ;;
     --dump-header) headers="$2"; shift 2 ;;
     --resolve) resolved=1; shift 2 ;;
-    --header|--max-time|--max-filesize|--user-agent) shift 2 ;;
+    # 실제 앞단은 Vary: Accept-Encoding 으로 협상한다 — br 을 받겠다고 하지 않으면 풀어서 준다.
+    --header) [[ "$2" == [Aa]ccept-[Ee]ncoding:*br* ]] && accepts_br=1; shift 2 ;;
+    --max-time|--max-filesize|--user-agent) shift 2 ;;
     --insecure|--fail|--silent|--show-error|--location) shift ;;
     *) url="$1"; shift ;;
   esac
@@ -67,8 +69,11 @@ case "${url}" in
   *.data.br|*.data.unityweb) type='application/octet-stream' ;;
   *) type='application/octet-stream' ;;
 esac
-printf 'HTTP/2 200\r\nContent-Type: %s\r\n' "${type}" >"${headers}"
-case "${url}" in *.br|*.unityweb) printf 'Content-Encoding: br\r\n' >>"${headers}" ;; esac
+printf 'HTTP/2 200\r\nContent-Type: %s\r\nvary: Accept-Encoding\r\n' "${type}" >"${headers}"
+# br 을 받겠다고 한 요청에만 Content-Encoding 을 붙인다 (S15P21A604-666).
+if [[ "${accepts_br}" == 1 ]]; then
+  case "${url}" in *.br|*.unityweb) printf 'Content-Encoding: br\r\n' >>"${headers}" ;; esac
+fi
 case "${url}" in
   */manifest.json|*/index.html) printf 'Cache-Control: no-cache\r\n' >>"${headers}" ;;
   *) printf 'Cache-Control: public, max-age=31536000, immutable\r\n' >>"${headers}" ;;
