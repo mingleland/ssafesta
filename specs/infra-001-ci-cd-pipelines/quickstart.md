@@ -63,7 +63,7 @@ infra/jenkins/scripts/publish-webgl-release.sh \
 ```
 
 5. zip과 `.sha256` 업로드가 모두 성공한 뒤 Jenkins가 `RELEASE_ID=490bde34`, `ARTIFACT_SHA256=<64 hex>`로 시작하는지 확인한다. 토큰 원문을 console·artifact에 남기지 않는다.
-6. 성공 후 EC2에서 `readlink /srv/festa/webgl/current`, `readlink /srv/festa/webgl/previous`와 각 release의 `.artifact-sha256`을 확인한다.
+6. 성공 후 EC2에서 `readlink /srv/festa/webgl/current`, `readlink /srv/festa/webgl/previous`와 각 release의 `.artifact-sha256`을 확인한다. `find /srv/festa/webgl -maxdepth 1 -name 'current.legacy.[0-9]*'`로 본 UTC 14자리 timestamp legacy는 최신 두 개만 남아야 하며, timestamp 형식이 아닌 이름은 정리 대상이 아니다. 검증·출처 검사 실패 실행 뒤에는 legacy 목록이 변하면 안 된다.
 7. 공개 검증은 다음 기준을 모두 만족해야 한다: `/manifest.json` JSON + `no-cache`, `/index.html` HTML + `no-cache`, manifest의 Build 4종 HTTP 200, 확장자별 MIME, 압축 파일 `Content-Encoding: br`, Build 파일 `public, max-age=31536000, immutable`.
 8. 공개 검증을 의도적으로 실패시킨 rehearsal에서는 job이 실패하고 `current`가 실행 전 release로 복원되어야 한다. Dedicated Server 컨테이너 ID와 시작 시각은 바뀌지 않아야 한다.
 

@@ -412,6 +412,21 @@ PY
   mv -f "${temp}" "${target}"
 }
 
+prune_legacy_releases() {
+  local name kept=0
+  local -a legacy_names=()
+  mapfile -t legacy_names < <(
+    find -P "${root}" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
+      -name 'current.legacy.*' -printf '%f\n' | sort -r
+  )
+  for name in "${legacy_names[@]}"; do
+    [[ "${name}" =~ ^current\.legacy\.[0-9]{14}$ ]] || continue
+    kept=$((kept + 1))
+    (( kept <= 2 )) && continue
+    rm -rf -- "${root:?}/${name}"
+  done
+}
+
 if ! verify_release; then
   echo "public WebGL verification failed; restoring ${old_target:-${legacy_current:-empty current}}" >&2
   if [[ -n "${old_target}" ]]; then
@@ -447,6 +462,7 @@ for name in "${release_dirs[@]}"; do
 done
 
 record_known_good
+prune_legacy_releases
 status=SUCCEEDED
 if [[ "${edge_blocked}" == 1 ]]; then
   echo "WARNING: 공개 경로 검증이 엣지에서 막혀 오리진 직접 확인으로 대체했다 —" \
