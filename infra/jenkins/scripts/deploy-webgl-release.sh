@@ -59,11 +59,21 @@ curl --fail --silent --show-error \
 actual_sha="$(sha256sum "${download}" | awk '{print $1}')"
 [[ "${actual_sha}" == "${expected_sha}" ]] || { echo "artifact SHA-256 mismatch for ${release_id}" >&2; exit 65; }
 
+# 릴리스 디렉터리는 **웹 서버가 읽을 수 있어야 한다.**
+# `mktemp -d` 는 0700 으로 만들고, 우리는 그것을 그대로 릴리스 자리로 옮겼다. 그래서 nginx 가
+# 디렉터리에 들어가지 못해 기본 오류 페이지 `403 Forbidden` 을 돌려줬다 — 엣지 차단으로 보이던
+# 것의 정체가 이것이다 (#165 build #6~#12, 본문 제목이 Cloudflare 페이지가 아니었다).
+# 되돌린 뒤에는 손으로 올린 예전 배포본(정상 모드)이 서빙돼 200 이 나왔고, 그 시차가 "IP 차이"
+# 처럼 보였다. a+rX 는 디렉터리에만 실행 비트를 준다 — 파일을 실행 가능하게 만들지 않는다.
+open_for_web() { chmod -R a+rX "$1"; }
+
 if [[ -e "${candidate}" ]]; then
   [[ -d "${candidate}" && ! -L "${candidate}" && -f "${candidate}/.artifact-sha256" ]] \
     || { echo "existing release path is invalid: ${release_id}" >&2; exit 66; }
   [[ "$(<"${candidate}/.artifact-sha256")" == "${expected_sha}" ]] \
     || { echo "release ID already exists with another artifact: ${release_id}" >&2; exit 67; }
+  # 이미 깔려 있는 릴리스도 고쳐 둔다 — 0700 으로 남은 디렉터리는 다시 돌려도 계속 403 이다.
+  open_for_web "${candidate}"
 else
   staging="$(mktemp -d "${releases}/.${release_id}.staging.XXXXXX")"
   "${PYTHON_BIN:-python}" - "${download}" "${staging}" "${WEBGL_MAX_UNCOMPRESSED_BYTES:-4294967296}" <<'PY'
@@ -121,6 +131,7 @@ PY
   printf '%s\n' "${expected_sha}" >"${staging}/.artifact-sha256"
   printf '{"releaseId":"%s","artifactSha256":"%s","packageUrl":"%s","installedAt":"%s"}\n' \
     "${release_id}" "${expected_sha}" "${package_url}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"${staging}/.release.json"
+  open_for_web "${staging}"
   mv "${staging}" "${candidate}"
   staging=
 fi

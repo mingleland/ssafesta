@@ -118,7 +118,17 @@ old="$(make_package old00001)"
 deploy_package "${old}" old00001
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
 grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+# 릴리스 디렉터리는 웹 서버가 들어갈 수 있어야 한다. mktemp -d 가 만든 0700 을 그대로 두면
+# nginx 가 403 Forbidden 을 돌려주고, 그게 엣지 차단처럼 보인다 (S15P21A604-665, GitLab #165).
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001")" == *5 ]]
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/Build")" == *5 ]]
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/index.html")" == *[4567] ]]
+# 파일에까지 실행 비트를 뿌리면 안 된다 — a+rX 의 X 는 디렉터리에만 붙는다.
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/index.html")" != *[1357] ]]
+# 이미 0700 으로 깔려 있던 릴리스를 다시 돌리면 고쳐 줘야 한다 — 아니면 같은 403 이 영영 반복된다.
+chmod 700 "${WEBGL_RELEASE_ROOT}/releases/old00001"
 deploy_package "${old}" old00001
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001")" == *5 ]]
 [[ "$(find "${WEBGL_RELEASE_ROOT}/releases" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ]]
 
 if FAKE_PACKAGE="${old}" "${deploy}" --release-id badsha01 --sha256 "$(printf '0%.0s' {1..64})" --package-url package://badsha01 >/dev/null 2>&1; then
