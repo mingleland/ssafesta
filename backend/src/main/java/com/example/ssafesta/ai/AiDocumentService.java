@@ -10,6 +10,8 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -378,6 +380,7 @@ public class AiDocumentService {
         // Outside the transaction: signing is offline, and a lock held across it buys nothing.
         String url = storage.presignPut(document.getStorageProvider(), document.getStorageBucket(),
                 document.getObjectKey(), document.getContentType(), document.getSizeBytes(),
+                Base64.getEncoder().encodeToString(HexFormat.of().parseHex(document.getContentSha256())),
                 storageProperties.presignTtl());
         return UploadGrantView.issued(document.getId(), url, document.getObjectKey());
     }
