@@ -1,0 +1,7 @@
+{
+  "storageGbMonth": 10,
+  "classARequests": 1000000,
+  "classBRequests": 10000000,
+  "verifiedAt": "2026-08-24",
+  "sourceUrl": "https://developers.cloudflare.com/r2/pricing/"
+}

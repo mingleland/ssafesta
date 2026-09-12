@@ -62,18 +62,20 @@ public class S3ObjectStorage implements ObjectStorage, AutoCloseable {
 
     @Override
     public String presignPut(String provider, String bucket, String objectKey, String contentType,
-                             long contentLength, Duration ttl) {
-        PutObjectRequest put = PutObjectRequest.builder()
+                             long contentLength, String checksumSha256, Duration ttl) {
+        PutObjectRequest.Builder put = PutObjectRequest.builder()
                 .bucket(bucket)
                 .key(objectKey)
                 // Signed in, so a browser cannot upload a different type or a larger file than the
                 // one the quota check approved. Without these the grant is a blank cheque.
                 .contentType(contentType)
-                .contentLength(contentLength)
-                .build();
+                .contentLength(contentLength);
+        if (checksumSha256 != null) {
+            put.checksumSHA256(checksumSha256);
+        }
         return endpoint(provider).presigner.presignPutObject(PutObjectPresignRequest.builder()
                 .signatureDuration(ttl)
-                .putObjectRequest(put)
+                .putObjectRequest(put.build())
                 .build()).url().toString();
     }
 

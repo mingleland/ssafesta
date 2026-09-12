@@ -35,7 +35,7 @@ public interface ObjectStorage {
      * transaction and needs no test double of its own.
      */
     String presignPut(String provider, String bucket, String objectKey, String contentType,
-                      long contentLength, Duration ttl);
+                      long contentLength, String checksumSha256, Duration ttl);
 
     /**
      * The stored object's size, or empty when there is no such object.
