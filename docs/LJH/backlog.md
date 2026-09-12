@@ -90,7 +90,7 @@ D-06   ADOPTED                        기존 Layout/Editor 계약 보존
 |---|---|
 | `-91` 013a AT wiring | receiver·timing·refresh 반영 미결(#60 이 푼 것은 token type 하나) |
 | `-133`·`-194` Survey | `docs/08` §9 results 가 제목 한 줄짜리 stub |
-| `-134` Project 전시 | spec 009 C-01~C-04 미결. [#110](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/110) 에 **FE 몫 회신 완료**(C-03 URL 참조 동의, C-02 는 제공자 목록이 기획 몫). C-01·C-03 이 닫히면 FE plan·tasks 착수 |
+| `-134` Project 전시 | [#110](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/110) **CLOSED(09-10 21:02, BE)** — C-01·C-03~C-07 확정, 남은 미결은 **C-02(영상 제공자 범위) 하나**로 `docs/26` ① 표 23번 기획 결정 추적. C-02 와 무관한 범위(전시 표시·부스당 1개·URL 참조 이미지)는 착수 가능 |
 | `-195` YouTube 임베드 | 016 C-01 3파트 합동 미결 + 009 C-02 |
 
 ## 대기
