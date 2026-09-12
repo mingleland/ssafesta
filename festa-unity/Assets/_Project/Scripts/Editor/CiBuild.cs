@@ -81,6 +81,13 @@ namespace Festa.EditorTools
                     Fail("WebGL 타깃 전환 실패");
             }
 
+            // **소스 출처는 여기서 찍는다 — 아래 ForceApiEnvironment 가 에셋을 디스크에 저장하기 전에.**
+            // manifest 는 복원 전에 써야 하는데(apiEnvironment·compression 이 빌드에 실제로 들어간 값이어야 한다),
+            // 그 시점의 `git status` 는 빌더가 만든 변경 때문에 **깨끗한 체크아웃에서도 항상 dirty** 다.
+            // 그 값으로는 배포 게이트를 통과할 수 없다 (2026-09-13 f31e039c 빌드에서 실측, T-259 잔여).
+            var scm = FestaWebBuilder.ReadScmStamp();
+            Log($"소스 출처 고정 — commit={(scm.commit.Length >= 8 ? scm.commit.Substring(0, 8) : scm.commit)} branch={scm.branch} dirty={scm.dirty}");
+
             // 배포본이 부를 API. 기본 prod — 에셋 커밋값(Mock+Local)이 그대로 나가면 사용자 WebGL 이
             // Mock 으로 동작한다 (S15P21A604-419). -festaEnv dev|local 로 바꿀 수 있다. Mock 은 CI 에서 항상 끈다.
             var envArg = (ArgValue("-festaEnv") ?? "prod").ToLowerInvariant();
@@ -133,7 +140,7 @@ namespace Festa.EditorTools
                 // `"compression": "none"` 으로 남았다. 이 두 필드는 Mock 유출(T-237)과
                 // 비압축 반려(-474)를 잡으라고 넣은 것이라, 틀리면 있으나 마나가 아니라 **해롭다** —
                 // 진짜 Mock 유출도 같은 방식으로 가려진다.
-                FestaWebBuilder.WriteManifest(WebOutDir);
+                FestaWebBuilder.WriteManifest(WebOutDir, scm);
             }
             finally
             {
