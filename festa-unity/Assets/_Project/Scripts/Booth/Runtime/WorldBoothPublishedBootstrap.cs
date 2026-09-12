@@ -73,6 +73,14 @@ namespace Festa.Booth
         public static async void RequestReload(int slotId)
         {
             if (!Enabled || !Application.isPlaying) return;
+
+            // 바깥 표현(간판 문구·부스 대표색)도 같이 다시 읽는다 — 그 값들은 **레이아웃 버전을 바꾸지 않아**
+            // 아래 서명 비교로는 걸러지지 않는다. 임대하고 돌아왔는데 간판이 그대로이던 자리다.
+            // 목록을 버리는 것은 여기 한 곳에서만 한다 (S15P21A604-659).
+            BoothSlotDirectory.Invalidate();
+            Festa.World.BoothSignPresenter.Refresh(slotId);
+            Festa.World.BoothFacadePresenter.Refresh(slotId);
+
             BoothRuntime target = null;
             foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
                 if (r.BoothId == slotId) { target = r; break; }

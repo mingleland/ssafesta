@@ -154,7 +154,14 @@ namespace Festa.Integration
                     boothName = occupied ? $"{slotId}번 칸 부스" : null,
                     entryAvailable = occupied,
                     facade = occupied
-                        ? new BoothFacadeDto { themeCode = "DEFAULT", signText = $"{slotId}번 칸 간판" }
+                        ? new BoothFacadeDto
+                        {
+                            themeCode = "DEFAULT",
+                            signText = $"{slotId}번 칸 간판",
+                            // 칸마다 다른 색을 준다 — 대표색이 **그 칸에만** 칠해지는지 눈으로 가릴 수 있어야 한다
+                            // (S15P21A604-659). 실서버 값은 스튜디오 팔레트에서 온다.
+                            primaryColor = MockFacadeColors[(slotId / 2) % MockFacadeColors.Length],
+                        }
                         : null,
                 };
             }
@@ -163,5 +170,8 @@ namespace Festa.Integration
 
         /// <summary>Mock 이 만들어 주는 슬롯 수. 씬의 간판 수(BoothSignPresenter.SlotCount)와 같은 값이다.</summary>
         const int BoothSignSlotCount = 12;
+
+        /// <summary>Mock 대표색 팔레트. 스튜디오 팔레트(#17 12색)에서 눈에 잘 띄는 것만 골랐다.</summary>
+        static readonly string[] MockFacadeColors = { "#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899" };
     }
 }
