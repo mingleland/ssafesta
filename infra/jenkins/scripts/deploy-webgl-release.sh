@@ -155,6 +155,25 @@ PY
 )"
 mapfile -t manifest_paths <<<"${manifest_output}"
 
+# 산출물의 출처를 **공개하기 전에** 확인한다 (S15P21A604-667).
+# 전에는 이 검사가 심링크 교체·검증·정리 다음에 있었다. build #14 에서 검사에 걸린 릴리스가
+# 그대로 current 에 남아 demo 가 그것을 서비스했다 — 그 시점에는 되돌릴 대상인 previous 도
+# 이미 갱신됐고 보존 정책으로 지워진 릴리스도 있어 되돌릴 수가 없었다.
+# 매니페스트는 압축을 푼 순간 읽을 수 있으므로, 공개 전에 막으면 되돌릴 일 자체가 생기지 않는다.
+"${PYTHON_BIN:-python}" - "${candidate}/manifest.json" <<'PY'
+import json, pathlib, re, sys
+manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+commit = manifest.get('sourceCommit')
+if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit):
+    raise SystemExit('WebGL manifest has an invalid sourceCommit')
+if (manifest.get('sourceBranch') != 'develop' or manifest.get('dirty') is not False
+        or manifest.get('buildProfile') != 'release'):
+    raise SystemExit(
+        'WebGL manifest is not a clean develop release build '
+        f"(sourceBranch={manifest.get('sourceBranch')!r} dirty={manifest.get('dirty')!r} "
+        f"buildProfile={manifest.get('buildProfile')!r})")
+PY
+
 # 이 스크립트가 관리하기 전에 손으로 배포한 흔적이 남아 있을 수 있다(2026-09-10 수동 배포).
 # 그때의 current 는 releases/<id> 상대 심링크가 아니라 절대 경로 심링크이거나 실체 디렉터리다.
 # 그대로 중단하면 첫 자동 배포가 영영 못 들어간다 — 옆으로 치워 두고 진행한다.
@@ -378,10 +397,10 @@ import datetime,json,pathlib,re,sys
 manifest_path,target,release_id,artifact_sha,package_url,public_url,edge_blocked=sys.argv[1:]
 manifest=json.loads(pathlib.Path(manifest_path).read_text(encoding='utf-8'))
 commit=manifest.get('sourceCommit')
+# 출처 판정(develop·clean·release)은 **공개 전** 게이트가 이미 했다 — 여기서 또 떨어지면
+# 그때는 되돌릴 수 없는 자리다. 여기서는 기록에 쓸 값이 성한지만 확인한다.
 if not isinstance(commit,str) or not re.fullmatch(r'[0-9a-f]{40}',commit):
     raise SystemExit('WebGL manifest has an invalid sourceCommit')
-if manifest.get('sourceBranch') != 'develop' or manifest.get('dirty') is not False or manifest.get('buildProfile') != 'release':
-    raise SystemExit('WebGL manifest is not a clean develop release build')
 document={
     'schemaVersion':'1.0.0', 'releaseId':release_id, 'artifactSha256':artifact_sha,
     'sourceCommit':commit, 'sourceBranch':'develop', 'packageUrl':package_url,

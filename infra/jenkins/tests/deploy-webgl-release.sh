@@ -100,6 +100,8 @@ manifest = {
 }
 if mode == 'bad-manifest':
     manifest['codeUrl'] = 'Build/missing.wasm.br'
+if mode == 'dirty':
+    manifest['dirty'] = True
 with zipfile.ZipFile(output, 'w') as archive:
     archive.writestr('index.html', '<!doctype html>')
     archive.writestr('manifest.json', json.dumps(manifest))
@@ -147,6 +149,13 @@ if deploy_package "${traversal}" escape01 >/dev/null 2>&1; then echo 'traversal 
 
 bad_manifest="$(make_package badman01 bad-manifest)"
 if deploy_package "${bad_manifest}" badman01 >/dev/null 2>&1; then echo 'bad manifest was accepted' >&2; exit 1; fi
+
+# 출처가 깨끗하지 않은 빌드는 **공개 전에** 막혀야 한다 — current 가 그대로여야 한다는 뜻이다
+# (S15P21A604-667: 검사가 공개 다음에 있어 탈락한 빌드가 demo 에 그대로 남았다).
+dirty_build="$(make_package dirty001 dirty)"
+if deploy_package "${dirty_build}" dirty001 >/dev/null 2>&1; then echo 'dirty build was accepted' >&2; exit 1; fi
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
 
 candidate="$(make_package new00001)"
 export WEBGL_EVIDENCE_PATH="${fixture}/webgl-deployment.json"
