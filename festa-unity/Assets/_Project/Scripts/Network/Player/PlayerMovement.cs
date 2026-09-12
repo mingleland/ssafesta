@@ -345,7 +345,11 @@ namespace Festa.Network
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
 
-            if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
+            // 이동·점프는 이모트를 끝낸다. **점프가 빠져 있었다** — 앉거나 누운 채로 Space 를 누르면
+            // 그 자세 그대로 몸이 떠올랐다 (사용자 보고 2026-09-13, 소파·바닥 앉기 둘 다).
+            // 막지 않고 해제하는 쪽을 고른 것은 이동과 같은 규칙이기 때문이다 — 사용자가 Space 를
+            // 눌렀다는 것은 그 자세를 끝내겠다는 뜻이지, 입력이 씹히길 바라는 것이 아니다.
+            if ((moving || IsJumpPressed()) && _player.EmoteId.Value != PlayerEmoteId.None)
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
             // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.

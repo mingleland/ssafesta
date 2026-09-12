@@ -39,6 +39,19 @@ namespace Festa.World
         [SerializeField] int _midInterval = 2;
         [SerializeField] int _farInterval = 4;
 
+        /// <summary>
+        /// 이 수 이하로는 간격 갱신을 **아예 걸지 않는다.**
+        ///
+        /// <para>이 장치의 근거는 위 주석 그대로 "40기를 화면에 담았을 때 애니메이터·본 갱신이 4.7 ms" 다.
+        /// 그런데 밴드 판정이 거리뿐이라 <b>월드에 두세 명뿐일 때도 똑같이 걸린다.</b> 그 상황에서
+        /// 아끼는 시간은 0.2 ms 남짓인데, 16.6 m 밖의 사람이 2프레임마다(60 Hz 화면에서 30 갱신/초)
+        /// 움직여 눈에 띄게 끊긴다 — 사용자 보고 2026-09-13.</para>
+        ///
+        /// <para>비용이 사람 수에 비례하므로 게이트도 사람 수로 둔다. 넘는 순간부터 원래대로 동작한다.</para>
+        /// </summary>
+        [Tooltip("등록된 아바타가 이 수 이하면 간격 갱신을 걸지 않는다 — 적은 인원에서는 아끼는 값보다 끊김이 크다")]
+        [SerializeField] int _minAvatarsToThrottle = 8;
+
         static AvatarAnimationLod _instance;
 
         struct Entry
@@ -116,8 +129,8 @@ namespace Festa.World
                 var e = _entries[i];
                 if (e.Animator == null) { _entries.RemoveAt(i); continue; }
 
-                // 스위치가 꺼져 있거나 카메라가 없으면 Unity 기본 동작으로 되돌린다.
-                if (!Enabled || camera == null)
+                // 스위치가 꺼져 있거나, 카메라가 없거나, 사람이 적으면 Unity 기본 동작으로 되돌린다.
+                if (!Enabled || camera == null || _entries.Count <= _minAvatarsToThrottle)
                 {
                     if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; }
                     if (e.Band != 0) { ApplySkinQuality(e, 0); e.Band = 0; }
