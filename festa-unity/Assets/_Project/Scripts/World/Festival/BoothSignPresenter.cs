@@ -87,11 +87,9 @@ namespace Festa.World
 
         async Task RefreshAsync(int slotId)
         {
-            var api = ApiServices.Booth;
-            if (api == null) return;
-            // 임대가 바뀌었을 수도 있으니 목록부터 다시 읽는다 — 요청 한 번이고, 그래야 방금 임대한
-            // 칸의 이름이 바로 붙는다.
-            if (!await LoadSlotsAsync(api)) return;
+            // 목록을 버리는 것은 신호를 받은 쪽(WorldBoothPublishedBootstrap.RequestReload)이 한다 —
+            // 표현마다 버리면 같은 응답을 여러 번 받는다. 여기서는 공유본을 다시 읽기만 한다.
+            if (!await LoadSlotsAsync()) return;
             await FillOneAsync(slotId);
         }
 
@@ -127,17 +125,16 @@ namespace Festa.World
             // 조회하면 남의 부스가 나온다 — 간판이 옆 칸 이름을 띄우던 원인이다 (S15P21A604-658).
             // 이 목록이 slotId → boothId·boothName·facade 를 이어 주고, 덕분에 첫 진입 요청도
             // 최대 24회에서 1 + 임대된 칸 수로 줄어든다 (#171 ④).
-            if (!await LoadSlotsAsync(api)) return;
+            if (!await LoadSlotsAsync()) return;
 
             foreach (var kv in _signs)
                 await FillOneAsync(kv.Key);
         }
 
-        async Task<bool> LoadSlotsAsync(IBoothApiClient api)
+        async Task<bool> LoadSlotsAsync()
         {
-            BoothSlotDto[] slots = null;
-            try { slots = await api.GetSlotsAsync(); }
-            catch (System.Exception e) { Debug.LogWarning($"[BoothSignPresenter] 슬롯 목록 조회 실패: {e.Message}"); }
+            // 목록은 대표색 표현과 나눠 쓴다 — 각자 부르면 같은 응답을 두 번 받는다 (S15P21A604-659).
+            var slots = await BoothSlotDirectory.GetAsync();
 
             if (slots == null)
             {
