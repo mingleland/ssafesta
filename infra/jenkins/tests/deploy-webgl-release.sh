@@ -153,9 +153,22 @@ if deploy_package "${bad_manifest}" badman01 >/dev/null 2>&1; then echo 'bad man
 # 출처가 깨끗하지 않은 빌드는 **공개 전에** 막혀야 한다 — current 가 그대로여야 한다는 뜻이다
 # (S15P21A604-667: 검사가 공개 다음에 있어 탈락한 빌드가 demo 에 그대로 남았다).
 dirty_build="$(make_package dirty001 dirty)"
+mkdir -p \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.not-a-timestamp"
+# 보존 순서는 디렉터리 mtime이 아니라 이름의 UTC timestamp다. 수동 복구·이동으로 mtime이
+# 바뀌어도 newest two가 달라지면 안 된다.
+touch -t 202609120003.03 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001"
+touch -t 202609120001.01 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002"
+touch -t 202609120002.02 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003"
 if deploy_package "${dirty_build}" dirty001 >/dev/null 2>&1; then echo 'dirty build was accepted' >&2; exit 1; fi
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
 grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]
 
 candidate="$(make_package new00001)"
 export WEBGL_EVIDENCE_PATH="${fixture}/webgl-deployment.json"
@@ -175,6 +188,10 @@ deploy_package "${candidate}" new00001 >/dev/null 2>"${fixture}/edge-block.log"
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+[[ ! -e "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.not-a-timestamp" ]]
 # 막혔을 때 인프라가 바로 쓸 수 있는 두 가지가 로그에 남아야 한다 (S15P21A604-664, GitLab #165).
 grep -Fq 'used Cloudflare to restrict access' "${fixture}/edge-block.log"
 grep -Fq 'error code: 1020' "${fixture}/edge-block.log"
