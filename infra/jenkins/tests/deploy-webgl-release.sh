@@ -8,6 +8,7 @@ fixture="$(mktemp -d)"
 trap 'rm -rf "${fixture}"' EXIT
 
 export WEBGL_RELEASE_ROOT="${fixture}/webgl"
+export ENVIRONMENT_STATE_DIR="${fixture}/state"
 export WEBGL_PUBLIC_BASE_URL='https://demo.example.invalid/unity'
 export WEBGL_RETENTION_COUNT=2
 export GITLAB_DEPLOY_TOKEN='fixture-token'
@@ -77,6 +78,10 @@ manifest = {
     'dataUrl': f'Build/{release_id}.data.br',
     'frameworkUrl': f'Build/{release_id}.framework.js.br',
     'codeUrl': f'Build/{release_id}.wasm.br',
+    'sourceCommit': 'a' * 40,
+    'sourceBranch': 'develop',
+    'dirty': False,
+    'buildProfile': 'release',
 }
 if mode == 'bad-manifest':
     manifest['codeUrl'] = 'Build/missing.wasm.br'
@@ -84,7 +89,7 @@ with zipfile.ZipFile(output, 'w') as archive:
     archive.writestr('index.html', '<!doctype html>')
     archive.writestr('manifest.json', json.dumps(manifest))
     archive.writestr('TemplateData/style.css', '')
-    for path in manifest.values():
+    for path in (manifest['loaderUrl'], manifest['dataUrl'], manifest['frameworkUrl'], manifest['codeUrl']):
         if path != 'Build/missing.wasm.br':
             archive.writestr(path, release_id)
     if mode == 'traversal':
@@ -102,6 +107,7 @@ deploy_package() {
 old="$(make_package old00001)"
 deploy_package "${old}" old00001
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
 deploy_package "${old}" old00001
 [[ "$(find "${WEBGL_RELEASE_ROOT}/releases" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ]]
 
@@ -126,6 +132,7 @@ if deploy_package "${candidate}" new00001 >/dev/null 2>&1; then echo 'failed HTT
 unset FAIL_HTTP
 grep -Fq '"status":"FAILED"' "${WEBGL_EVIDENCE_PATH}"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
 
 # 엣지가 검증 요청만 막고 오리진은 멀쩡한 경우 — 릴리스를 되돌리지 않고 살려야 한다 (S15P21A604-656).
 export EDGE_BLOCK=1
@@ -133,6 +140,7 @@ deploy_package "${candidate}" new00001 >/dev/null
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
+grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
 
 # 엣지도 오리진도 막히면 그건 진짜 실패다 — 그때는 되돌린다.
 rollback_probe="$(make_package new00003)"
