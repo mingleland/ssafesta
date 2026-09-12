@@ -118,18 +118,18 @@
 - [ ] T040 [P] [US3] 4개 역할 × 4개 데이터베이스 CONNECT 행렬, AI 전용 pgvector와 런타임 역할 권한을 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/postgres-isolation.sh`에 작성한다
 - [ ] T041 [P] [US3] Redis 익명·기본 사용자, 환경 간 키, 금지 명령, TTL과 공개 포트 없음을 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/redis-acl.sh`에 작성한다
 - [ ] T042 [P] [US3] 정상, 잘못된 Content-Type, 만료, 다른 객체, 크기 불일치, 위조 MIME, SHA 불일치와 중복 완료 업로드 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/integration/object-upload.sh`에 작성한다
-- [ ] T043 [P] [US3] 현재·예상 저장량, Class A와 Class B에 대한 79%/80%/90% 및 61분 경과 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/r2-usage-guard.sh`에 작성한다
+- [X] T043 [P] [US3] 현재·예상 저장량, Class A와 Class B에 대한 79%/80%/90% 및 61분 경과 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/r2-usage-guard.sh`에 작성한다
 - [ ] T044 [P] [US3] R2 probe 실패 시 신규 업로드 차단, 기존 문서 조회·비AI 경로 유지, R2 probe와 최신 usage snapshot 성공 후 재개를 검증하는 실패 우선 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
 - [ ] T045 [P] [US3] 스키마, 행, 벡터, 릴리스, 체크섬, 보존 기간과 문서 목록 검증 근거를 포함하는 실패 우선 R2 전용 PostgreSQL 덤프·복원 테스트를 `infra/environments/tests/failure/postgres-restore.sh`에 작성한다
 - [ ] T046 [P] [US3] 재인증, 영구 데이터 손실 0, RAG 범위·리비전 재구축과 설문 집계 일치를 검증하는 실패 우선 Redis 전체 손실 테스트를 `infra/environments/tests/failure/redis-total-loss.sh`에 작성한다
 
 ### 사용자 스토리 3 구현
 
-- [ ] T047 [P] [US3] 비공개 R2 Standard 버킷 2개, 분리된 문서·백업 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
-- [ ] T048 [P] [US3] 정확한 허용 출처, PUT 전용 메서드, 필수 Content-Type·체크섬 헤더, 노출 ETag와 와일드카드 금지를 `infra/environments/storage/r2/documents-cors.json`에 정의한다
-- [ ] T049 [US3] URL을 영속 저장하지 않는 S3 호환 사전 서명·PUT·HEAD·본문 매직 바이트·SHA-256·멱등 완료 검사를 `infra/environments/storage/r2/presign-probe.sh`에 구현한다
-- [ ] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
-- [ ] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
+- [X] T047 [P] [US3] 비공개 R2 Standard 버킷 2개, 분리된 문서·백업 자격증명 참조, 공개 접근 비활성화와 백업 버킷 CORS 없음을 `infra/environments/storage/r2/buckets.example.yaml`에 정의한다
+- [X] T048 [P] [US3] 정확한 허용 출처, PUT 전용 메서드, 필수 Content-Type·체크섬 헤더, 노출 ETag와 와일드카드 금지를 `infra/environments/storage/r2/documents-cors.json`에 정의한다
+- [X] T049 [US3] URL을 영속 저장하지 않는 S3 호환 사전 서명·PUT·HEAD·본문 매직 바이트·SHA-256·멱등 완료 검사를 `infra/environments/storage/r2/presign-probe.sh`에 구현한다
+- [X] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
+- [X] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
 - [ ] T052 [P] [US3] R2 document bucket의 credential·PUT·HEAD·CORS를 검증하는 contract probe를 `infra/environments/storage/r2/probe.sh`에 구현한다
 - [ ] T053 [US3] `R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE` admission 전이와 R2 probe·최신 usage snapshot 근거 요구사항을 `infra/environments/storage/usage-guard/transition.sh`에 구현한다
 - [ ] T054 [US3] R2 장애 복구 뒤 probe와 usage snapshot을 다시 수집·평가하고, 성공 전에는 uploadEnabled를 복구하지 않는 절차를 `infra/environments/storage/usage-guard/recover.sh`에 구현한다

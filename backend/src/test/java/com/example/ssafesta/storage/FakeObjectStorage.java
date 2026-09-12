@@ -46,7 +46,7 @@ public class FakeObjectStorage implements ObjectStorage {
 
     @Override
     public String presignPut(String provider, String bucket, String objectKey, String contentType,
-                             long contentLength, Duration ttl) {
+                             long contentLength, String checksumSha256, Duration ttl) {
         // Shaped like a real presigned URL so a test can tell one issue from the next.
         return "https://fake.storage.test/" + bucket + "/" + objectKey
                 + "?sig=" + System.nanoTime() + "&len=" + contentLength

@@ -75,6 +75,10 @@ function sha256Hex(bytes: ArrayBuffer): string {
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function sha256Base64(bytes: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
+}
+
 function contentTypeFor(file: File): string {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith('.pdf')) return 'application/pdf';
@@ -97,7 +101,14 @@ export async function uploadAiDocument(agentId: number, file: File): Promise<Doc
   if (grant.duplicate) return { duplicate: true, documentId: grant.documentId };
   if (!grant.uploadUrl) throw new Error('문서 업로드 URL을 받지 못했습니다.');
 
-  const response = await fetch(grant.uploadUrl, { method: 'PUT', body: file });
+  const response = await fetch(grant.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentTypeFor(file),
+      'x-amz-checksum-sha256': sha256Base64(digest),
+    },
+    body: file,
+  });
   if (!response.ok) throw new Error('저장소에 파일을 업로드하지 못했습니다.');
 
   const completed = await api<{ documentId: number; processingStatus: string }>(
