@@ -259,11 +259,18 @@ log_edge_client_ip() {
 # 봇으로 구분되려는 것이 아니다. 엣지 정책이 바뀌면 이 한 줄만 바꾸면 된다.
 VERIFY_USER_AGENT="${WEBGL_VERIFY_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36}"
 
+# **brotli 를 받겠다고 말해야 brotli 로 온다.** 앞단(Cloudflare·nginx 둘 다)은 `Vary: Accept-Encoding`
+# 으로 협상하고, 요청이 br 을 받지 못한다고 하면 **풀어서** 내려준다. curl 기본값은 Accept-Encoding
+# 을 아예 보내지 않으므로, 우리는 멀쩡한 brotli 배포물을 "Content-Encoding 이 없다" 며 결함으로
+# 판정하고 있었다 (#165 build #13). 사람이 브라우저로 여는 것과 같은 응답을 보겠다는 검증인데
+# 정작 브라우저가 보내는 헤더가 빠져 있었다. 헤더만 보므로 curl 이 풀 필요는 없다(--compressed 아님).
+VERIFY_ACCEPT_ENCODING="${WEBGL_VERIFY_ACCEPT_ENCODING:-br, gzip}"
+
 request_and_check() {
   local url="$1" expected_type="$2" require_brotli="$3" expected_cache="$4" file="$5"
   : >"${file}"
   curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
-    --user-agent "${VERIFY_USER_AGENT}" \
+    --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
     --dump-header "${file}" --output /dev/null "${url}" || return 1
   # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
   local status_line; status_line="$(head -n 1 "${file}" 2>/dev/null | tr -d '\r')"
@@ -293,7 +300,7 @@ verify_origin() {
   local rc=1 curl_rc=0
   if curl --silent --show-error --location --insecure \
       --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" --resolve "${host}:${port}:${addr}" \
-      --user-agent "${VERIFY_USER_AGENT}" \
+      --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
       --dump-header "${file}" --output /dev/null "${base}/${path}" || { curl_rc=$?; false; }; then
     head -n 1 "${file}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]' \
       && grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${file}" \
