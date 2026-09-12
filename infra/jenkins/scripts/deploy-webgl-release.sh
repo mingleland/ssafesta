@@ -165,8 +165,8 @@ elif [[ -e "${root}/current" ]]; then
 else
   # current 가 아예 없다. 앞선 실패로 치워만 두고 못 되돌린 것이 남아 있으면 그것을 롤백 대상으로 삼는다 —
   # 그래야 이번 배포가 또 실패해도 서비스가 되살아난다. 가장 최근 것 하나만 본다.
-  for candidate in "${root}"/current.legacy.*; do
-    [[ -e "${candidate}" ]] && legacy_current="${candidate}"
+  for legacy_candidate in "${root}"/current.legacy.*; do
+    [[ -e "${legacy_candidate}" ]] && legacy_current="${legacy_candidate}"
   done
   [[ -n "${legacy_current}" ]] \
     && echo "no current; will fall back to $(basename "${legacy_current}") if this release fails verification" >&2
@@ -301,6 +301,32 @@ verify_release() {
   done
 }
 
+record_known_good() {
+  local state_root target temp
+  state_root="${WEBGL_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
+  target="${state_root}/known-good/webgl.json"
+  mkdir -p "$(dirname "${target}")"
+  temp="${target}.tmp.$$"
+  "${PYTHON_BIN:-python}" - "${candidate}/manifest.json" "${temp}" "${release_id}" "${expected_sha}" "${package_url}" "${WEBGL_PUBLIC_BASE_URL}" "${edge_blocked}" <<'PY'
+import datetime,json,pathlib,re,sys
+manifest_path,target,release_id,artifact_sha,package_url,public_url,edge_blocked=sys.argv[1:]
+manifest=json.loads(pathlib.Path(manifest_path).read_text(encoding='utf-8'))
+commit=manifest.get('sourceCommit')
+if not isinstance(commit,str) or not re.fullmatch(r'[0-9a-f]{40}',commit):
+    raise SystemExit('WebGL manifest has an invalid sourceCommit')
+if manifest.get('sourceBranch') != 'develop' or manifest.get('dirty') is not False or manifest.get('buildProfile') != 'release':
+    raise SystemExit('WebGL manifest is not a clean develop release build')
+document={
+    'schemaVersion':'1.0.0', 'releaseId':release_id, 'artifactSha256':artifact_sha,
+    'sourceCommit':commit, 'sourceBranch':'develop', 'packageUrl':package_url,
+    'publicBaseUrl':public_url, 'verifiedVia':'origin' if edge_blocked == '1' else 'edge',
+    'recordedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+}
+path=pathlib.Path(target); path.write_text(json.dumps(document,indent=2)+'\n',encoding='utf-8')
+PY
+  mv -f "${temp}" "${target}"
+}
+
 if ! verify_release; then
   echo "public WebGL verification failed; restoring ${old_target:-${legacy_current:-empty current}}" >&2
   if [[ -n "${old_target}" ]]; then
@@ -335,6 +361,7 @@ for name in "${release_dirs[@]}"; do
   if (( kept > retention - 2 )); then rm -rf -- "${releases:?}/${name}"; fi
 done
 
+record_known_good
 status=SUCCEEDED
 if [[ "${edge_blocked}" == 1 ]]; then
   echo "WARNING: 공개 경로 검증이 엣지에서 막혀 오리진 직접 확인으로 대체했다 —" \
