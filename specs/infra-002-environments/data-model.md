@@ -32,7 +32,7 @@
 | Field | Type | Rule |
 |---|---|---|
 | `serviceId` | string | 환경 내 고유 |
-| `component` | enum | `ai`, `back`, `front`, `game`, `ingress`, `postgres`, `redis`, `minio` |
+| `component` | enum | `ai`, `back`, `front`, `game`, `ingress`, `postgres`, `redis` |
 | `imageRef` | string/ref | immutable tag/digest; data service는 pinned version |
 | `networkRefs` | string[] | 필요한 internal network만 |
 | `internalEndpoint` | URI | host port 공개 주소 금지 |
@@ -88,8 +88,8 @@
 
 | Field | Type | Rule |
 |---|---|---|
-| `providerId` | string | `r2-documents`, `r2-backups`, `minio-emergency` |
-| `providerType` | enum | `R2`, `MINIO` |
+| `providerId` | string | `r2-documents`, `r2-backups` |
+| `providerType` | enum | `R2` |
 | `endpointRef`, `region` | config | S3 adapter input |
 | `bucket` | string | document와 backup 별도 |
 | `storageClass` | enum | R2는 `STANDARD` |
@@ -161,28 +161,21 @@ maxRatio ≥ 0.90                 → UPLOAD_BLOCKED
 now - dataFreshThrough > 60 min → STALE_BLOCKED (ratio보다 우선)
 ```
 
-## 8. Storage Failover State
+## 8. R2 Admission State
 
 | Field | Type | Rule |
 |---|---|---|
-| `state` | enum | 아래 전이 중 하나 |
-| `activeWriteProvider` | provider ref/null | blocked 상태는 null |
-| `changedBy` | operator id | 자동 전환 금지 |
-| `changedAt`, `reason` | audit | 필수 |
-| `validationEvidenceRefs` | string[] | provider probe 결과 |
-| `backlogObjectCount`, `reconciliationCursor` | recovery | MinIO → R2 진행 상태 |
-| `lastVerifiedAt` | timestamp | 상태 검증 시각 |
+| `state` | enum | `R2_WRITABLE`, `UPLOAD_BLOCKED` |
+| `uploadEnabled` | boolean | `R2_WRITABLE`일 때만 true |
+| `reason` | string | R2 probe 실패, 90% 한도, stale snapshot 등 차단 근거 |
+| `lastVerifiedAt` | timestamp | 마지막 성공 R2 contract probe 시각 |
+| `usageSnapshotRef` | reference | 입장 판단에 쓴 최신 usage snapshot |
 
 ```text
-R2_ACTIVE
-  → UPLOAD_BLOCKED
-  → FALLBACK_VALIDATING
-  → LOCAL_ACTIVE
-  → R2_RECONCILING
-  → R2_ACTIVE
+R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE
 ```
 
-모든 전이는 운영자 승인과 evidence를 요구한다. `LOCAL_ACTIVE` 객체는 provider metadata가 `MINIO_LOCAL`이고 reconcile 검증 전에는 R2 객체로 표시하지 않는다.
+R2 장애·90% 사용량·stale snapshot은 `UPLOAD_BLOCKED`로 전환한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 `R2_WRITABLE`로 복귀한다. 공급자 전환·backlog·reconciliation 상태는 없다.
 
 ## 9. Redis Cache Class
 
@@ -249,4 +242,4 @@ RAG document, metadata, chunk, vector와 survey/question/response는 이 모델�
 - PostgreSQL Binding → Backup Set N:1/1:N.
 - Temporary Object Grant → Object Storage Provider N:1, Upload Verification 1:0..1.
 - Redis Cache Class → PostgreSQL/R2 Source of Truth reference, Redis value 자체는 영구 entity가 아님.
-- Storage Failover State는 active write provider만 바꾸며 기존 object provider metadata를 일괄 추정하지 않는다.
+- R2 Admission State는 신규 upload grant만 제어하며 기존 R2 object metadata를 변경하지 않는다.
