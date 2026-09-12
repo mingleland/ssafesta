@@ -84,7 +84,7 @@
 ### Tests for User Story 2 ⚠️
 
 - [X] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
-- [ ] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
+- [X] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
 - [ ] T028 [P] [US2] 내부 listener 실패·외부 승인 실패 후보가 current/known-good으로 승격되지 않고 이전 ref로 복구되는 장애 테스트를 `infra/unity-server/tests/failure/deploy-rollback.sh`에 작성한다
 - [ ] T029 [P] [US2] process running·internal listening·external handshake·approved admission을 서로 다른 상태로 판정하는 테스트를 `infra/unity-server/tests/integration/game-readiness.sh`에 작성한다
 
@@ -92,7 +92,7 @@
 
 - [X] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
 - [X] T031 [P] [US2] host·game image의 x86_64 일치와 에뮬레이션 미사용, image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
-- [ ] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
+- [X] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
 - [ ] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
 - [ ] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
 - [ ] T035 [P] [US2] release/client 호환 ref, 단계별 readiness와 비대상 restart delta를 민감정보 없이 수집하는 `infra/unity-server/scripts/collect-deploy-evidence.sh`를 구현한다
