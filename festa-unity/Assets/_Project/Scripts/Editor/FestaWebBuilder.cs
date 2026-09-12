@@ -124,8 +124,33 @@ namespace Festa.EditorTools
         [MenuItem("Festa/부하테스트/manifest.json 재생성 (기존 빌드)")]
         public static void RegenerateManifest() => WriteManifest(OutDir);
 
+        /// <summary>
+        /// 빌드 **시작 전에** 찍어 두는 소스 상태. 이걸 안 넘기면 지금 이 순간의 작업 트리를 읽는다.
+        ///
+        /// <para><b>왜 미리 찍어야 하나.</b> 빌드 절차 자체가 에셋을 고쳐 디스크에 쓴다 —
+        /// <see cref="FestaReleaseBuilder.ForceApiEnvironment"/> 는 `ApiConfig.asset` 을 Prod 로 바꿔 저장하고,
+        /// 동적 한글 글꼴은 `ClearDynamicDataOnBuild` 로 글자표가 비워진다. manifest 는 이 mutation 이
+        /// 아직 되돌려지기 전에 써야 하므로(`apiEnvironment`·`compression` 이 빌드에 실제로 들어간 값이어야 한다),
+        /// 그 자리에서 `git status` 를 읽으면 **깨끗한 체크아웃에서 뽑아도 언제나 `dirty: true`** 가 된다.
+        /// 그 값으로는 배포 게이트를 통과할 수 없고, 손으로 고치면 게이트가 있으나 마나가 된다.</para>
+        ///
+        /// <para>그래서 <b>소스 출처만</b> 빌드 전 시점으로 고정하고, 설정 값(`apiEnvironment`·`compression`)은
+        /// 지금 읽는다. 둘은 서로 다른 질문이다 — "어느 커밋인가" 와 "무엇으로 구웠나".</para>
+        /// </summary>
+        internal struct ScmStamp { public string commit, branch; public bool dirty; }
+
+        /// <summary>에셋을 건드리기 전에 부른다. 빌더들이 첫 줄에서 이걸 찍어 <see cref="WriteManifest(string, ScmStamp?)"/> 로 넘긴다.</summary>
+        internal static ScmStamp ReadScmStamp() => new ScmStamp
+        {
+            commit = Git("rev-parse HEAD"),
+            branch = Git("rev-parse --abbrev-ref HEAD"),
+            dirty = !string.IsNullOrEmpty(Git("status --porcelain --untracked-files=no")),
+        };
+
         /// <summary>배포 빌더(FestaReleaseBuilder)도 자기 출력 디렉터리로 이걸 부른다.</summary>
-        internal static void WriteManifest(string outDir)
+        internal static void WriteManifest(string outDir) => WriteManifest(outDir, null);
+
+        internal static void WriteManifest(string outDir, ScmStamp? scm)
         {
             var buildDir = Path.Combine(outDir, "Build");
             if (!Directory.Exists(buildDir))
@@ -164,7 +189,7 @@ namespace Festa.EditorTools
             //   unityVersion/unityRevision → 재임포트 사고(#124) 기록 · apiEnvironment → Mock 유출(T-237) 기록
             //   compression               → 비압축 반려(-474) 기록
             // Registry 8자 관행이 "어느 커밋인지 자동 판정 불가" 를 만들었으므로 40자로 적는다.
-            var prov = CollectProvenance();
+            var prov = CollectProvenance(scm);
             var json = "{\n"
                 + "  \"schemaVersion\": \"1.0.0\",\n"
                 + $"  \"loaderUrl\": \"{loader}\",\n"
@@ -188,12 +213,15 @@ namespace Festa.EditorTools
         struct Provenance { public string commit, branch, unityRevision, apiEnvironment, compression; public bool dirty; }
 
         /// <summary>git·ProjectVersion·PlayerSettings 에서 provenance 를 모은다. git 이 없으면 빈 값 — 파이프라인이 거부하게 둔다(조용히 통과시키지 않는다).</summary>
-        static Provenance CollectProvenance()
+        static Provenance CollectProvenance(ScmStamp? scm)
         {
             var p = new Provenance { commit = "", branch = "", unityRevision = "", apiEnvironment = "", compression = "" };
-            p.commit = Git("rev-parse HEAD");
-            p.branch = Git("rev-parse --abbrev-ref HEAD");
-            p.dirty = !string.IsNullOrEmpty(Git("status --porcelain --untracked-files=no"));
+            // 미리 찍어 둔 것이 있으면 그것이 답이다 (ScmStamp 주석 참조). 없으면 지금 읽는다 —
+            // 메뉴에서 손으로 manifest 만 다시 만드는 경로는 빌드가 에셋을 건드린 뒤가 아니다.
+            var stamp = scm ?? ReadScmStamp();
+            p.commit = stamp.commit;
+            p.branch = stamp.branch;
+            p.dirty = stamp.dirty;
             try
             {
                 // ProjectVersion.txt: "m_EditorVersionWithRevision: 6000.0.78f1 (ec8a99a872be)"
