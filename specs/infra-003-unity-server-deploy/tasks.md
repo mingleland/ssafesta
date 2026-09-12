@@ -95,8 +95,8 @@
 - [X] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
 - [X] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
 - [X] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
-- [ ] T035 [P] [US2] release/client 호환 ref, 단계별 readiness와 비대상 restart delta를 민감정보 없이 수집하는 `infra/unity-server/scripts/collect-deploy-evidence.sh`를 구현한다
-- [ ] T036 [US2] game 배포·검증·승격·복구와 단일 EC2 전체 장애 한계를 `infra/unity-server/runbooks/deploy-and-rollback.md`에 작성한다
+- [X] T035 [P] [US2] release/client 호환 ref, 단계별 readiness와 비대상 restart delta를 민감정보 없이 수집하는 `infra/unity-server/scripts/collect-deploy-evidence.sh`를 구현한다
+- [X] T036 [US2] game 배포·검증·승격·복구와 단일 EC2 전체 장애 한계를 `infra/unity-server/runbooks/deploy-and-rollback.md`에 작성한다
 
 **Checkpoint**: game-only 배포가 다른 demo 서비스와 분리되고 실패 후보는 known-good으로 복구된다.
 
