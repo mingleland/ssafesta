@@ -340,6 +340,7 @@ namespace Festa.Content
                 type == Bridge.LaptopInteract     ? "홈페이지 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                 type == Bridge.MinigameInteract   ? "게임 실행 요청을 보냈습니다 — 웹 화면에서 게임이 열립니다 (Esc 로 나가기)" :
                 type == Bridge.EventInteract      ? "이벤트 열기 요청을 보냈습니다 — 웹 화면에서 열립니다" :
+                type == Bridge.GuideInteract      ? "이용 안내 요청을 보냈습니다 — 웹 화면에서 열립니다" :
                                                     null;
             if (text == null) return;
 
