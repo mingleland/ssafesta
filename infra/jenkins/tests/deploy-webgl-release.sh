@@ -30,13 +30,23 @@ while [[ $# -gt 0 ]]; do
     --output) output="$2"; shift 2 ;;
     --dump-header) headers="$2"; shift 2 ;;
     --resolve) resolved=1; shift 2 ;;
-    --header|--max-time) shift 2 ;;
+    --header|--max-time|--max-filesize|--user-agent) shift 2 ;;
     --insecure|--fail|--silent|--show-error|--location) shift ;;
     *) url="$1"; shift ;;
   esac
 done
 if [[ "${url}" == package://* ]]; then
   cp "${FAKE_PACKAGE}" "${output}"
+  exit 0
+fi
+# 진단용 요청은 헤더를 받지 않는다 — 차단 페이지 본문과 /cdn-cgi/trace 를 흉내 낸다 (S15P21A604-664).
+if [[ -z "${headers}" ]]; then
+  case "${url}" in
+    */cdn-cgi/trace) printf 'fl=1f2\nh=demo.example.invalid\nip=203.0.113.7\ncolo=ICN\n'; exit 0 ;;
+  esac
+  if [[ "${EDGE_BLOCK:-0}" == 1 && -n "${output}" ]]; then
+    printf '<!DOCTYPE html><html><head><title>Access denied | demo.example.invalid used Cloudflare to restrict access</title></head><body>error code: 1020</body></html>' >"${output}"
+  fi
   exit 0
 fi
 [[ "${FAIL_HTTP:-0}" != 1 ]] || exit 22
@@ -136,11 +146,15 @@ grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-g
 
 # 엣지가 검증 요청만 막고 오리진은 멀쩡한 경우 — 릴리스를 되돌리지 않고 살려야 한다 (S15P21A604-656).
 export EDGE_BLOCK=1
-deploy_package "${candidate}" new00001 >/dev/null
+deploy_package "${candidate}" new00001 >/dev/null 2>"${fixture}/edge-block.log"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+# 막혔을 때 인프라가 바로 쓸 수 있는 두 가지가 로그에 남아야 한다 (S15P21A604-664, GitLab #165).
+grep -Fq 'used Cloudflare to restrict access' "${fixture}/edge-block.log"
+grep -Fq 'error code: 1020' "${fixture}/edge-block.log"
+grep -Fq 'ip=203.0.113.7' "${fixture}/edge-block.log"
 
 # 엣지도 오리진도 막히면 그건 진짜 실패다 — 그때는 되돌린다.
 rollback_probe="$(make_package new00003)"
