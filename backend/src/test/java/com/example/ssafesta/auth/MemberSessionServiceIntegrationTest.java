@@ -120,9 +120,10 @@ class MemberSessionServiceIntegrationTest {
     /**
      * 계보는 회전을 여러 번 지나도 이어진다 (S15P21A604-660).
      *
-     * <p>한 번짜리 회전 테스트로도 "회전마다 새 계보를 발급하는" 구현은 걸린다 — 활성 계보가 달라져
-     * 차단을 기대하는 단정이 깨지기 때문이다. 여러 홉을 지나며 계보가 흘러내리는 구현은 이 테스트로만
-     * 잡힌다.
+     * <p><b>한 번짜리 회전 테스트는 이것을 못 잡는다.</b> 회전이 한 번뿐이면 그 회전이 만든 계보가 곧
+     * 활성 계보라서 대조가 그대로 통과하기 때문이다. 회전마다 계보를 새로 발급하도록 변이시켜
+     * 확인했고, 그때 빨개진 것은 이 테스트 하나뿐이었다 — 기존
+     * {@code reusedRotatedRefreshTokenRevokesTheActiveSession} 은 초록으로 남았다.
      */
     @Test
     void aFamilySurvivesRepeatedRotationSoTheFirstTokenStillClosesIt() {
