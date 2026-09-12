@@ -61,7 +61,7 @@
 - [ ] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
 - [X] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`에 Registry download, SHA-256·안전한 ZIP·manifest 검증, immutable release 설치, 원자적 `current`, 공개 HTTP 검증과 실패 rollback을 구현하고 Nginx가 `.br`·`.unityweb`을 동일한 Brotli 계약으로 제공하게 한다
 - [X] T022D [US1] `infra/jenkins/scripts/publish-webgl-release.sh`, `infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy`, `infra/jenkins/pipelines/webgl-package-deploy.groovy`로 upload 성공 후 Jenkins parameterized job→deploy-agent 흐름을 연결한다. Windows Agent는 추가하지 않는다
-- [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, current/previous 보호와 제한된 retention을 구현한다
+- [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, `current`·`previous` 보호와 성공 배포 뒤 UTC timestamp legacy 최신 두 개만 보존하는 retention을 구현한다
 - [X] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 credential, 업로드, Jenkins job, MIME·Brotli·Cache-Control, rollback 확인 절차를 추가한다
 
 **Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.

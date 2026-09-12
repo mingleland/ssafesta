@@ -70,7 +70,7 @@ GitLab's `rules:changes` evaluates the MR diff. A Jenkins `develop` Squash merge
 2. 도우미가 `festa-webgl/<release-id>/festa-webgl-release-<release-id>.zip`과 checksum을 업로드한다. 두 업로드 성공 뒤에만 Jenkins job을 호출한다.
 3. deploy-agent는 Jenkins의 GitLab Deploy Token으로 package를 내려받고 SHA-256·안전한 ZIP entry·manifest 참조를 검증한다.
 4. 검증된 산출물을 `/srv/festa/webgl/releases/<release-id>`에 설치하고 `current`를 원자적으로 전환한다.
-5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. 이 경로는 Dedicated Server를 조작하지 않는다.
+5. 공개 HTTP의 MIME·Brotli·Cache-Control 검증 실패 시 이전 `current`를 복원한다. known-good 기록까지 성공했을 때만 `current`·`previous`와 최신 `current.legacy.<UTC 14자리 timestamp>` 두 개를 남기고 오래된 legacy를 정리한다. 이 경로는 Dedicated Server를 조작하지 않는다.
 
 ### 5. Existing code to extend
 
