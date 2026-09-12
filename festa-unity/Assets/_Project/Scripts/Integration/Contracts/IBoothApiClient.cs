@@ -27,5 +27,14 @@ namespace Festa.Integration
         /// 축제장 부스 간판·전시 카드가 쓴다 (GitLab #171).
         /// </summary>
         Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId);
+
+        /// <summary>
+        /// 축제장 12칸의 임대 상태를 <b>한 번에</b> 조회한다 (<c>GET /api/v1/booth-slots</c>). 실패하면 null.
+        ///
+        /// <para>이 목록이 <b>slotId ↔ boothId 를 잇는 정본</b>이다. 씬의 간판·포털은 슬롯 번호만 알고,
+        /// 어느 부스가 그 칸을 쓰는지는 서버만 안다 — 둘을 같은 값으로 쓰면 남의 부스를 조회한다
+        /// (S15P21A604-658). OCCUPIED 슬롯에는 <c>boothName</c>·<c>facade</c> 도 함께 온다.</para>
+        /// </summary>
+        Task<BoothSlotDto[]> GetSlotsAsync();
     }
 }
