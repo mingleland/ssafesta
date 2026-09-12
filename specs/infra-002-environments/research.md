@@ -77,17 +77,17 @@
 - 90%에서 read까지 차단: FR-025의 기존 문서 조회 유지에 어긋난다.
 - 가격/한도를 code constant로 고정: 공급자 정책 변경을 흡수하지 못한다.
 
-## R-07. S3-compatible 수동 emergency fallback
+## R-07. R2-only outage admission
 
-**Decision**: 단일 node/single drive MinIO를 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태로 수동 운영한다. validation은 disk·credential·PUT·HEAD·CORS·외부 port 차단을 확인한다. local object에는 provider를 기록하고 R2 복귀 시 같은 key의 size/type/SHA-256을 검증한 뒤 metadata를 전환한다. 9000/9001은 host public port로 publish하지 않는다.
+**Decision**: 초기 범위에서 Cloudflare R2만 사용한다. R2 probe 실패 또는 usage guard 차단 시 새 upload grant를 fail-closed하며, R2 contract probe와 최신 usage snapshot이 성공할 때만 재개한다. 기존 문서 조회와 R2 비의존 비AI 기능은 가능한 범위에서 유지한다.
 
-**Rationale**: S3-compatible adapter를 유지하면서 R2 장애 중 제한적 신규 업로드만 복구할 수 있다. MinIO 공식 single-node/single-drive 안내도 이를 개발·평가 또는 availability 요구가 낮은 용도로 설명하므로 같은 EC2의 backup이나 durability 수단으로 간주할 수 없다. [MinIO container deployment](https://min.io/docs/minio/container/index.html)
+**Rationale**: 공급자 전환·객체 metadata 이중화·reconciliation을 만들지 않아 운영 경계가 하나로 유지된다. 단일 EC2 MinIO는 R2와 다른 내구성 계층이 아니므로 복구 수단으로 보지 않는다. 구현과 운영은 R2 usage guard와 PostgreSQL R2 backup에 집중한다.
 
-**Alternatives considered**:
+**Alternatives rejected**:
 
-- 자동 failover: split-brain·누락 객체 위험이 있고 FR-017을 위반한다.
-- local directory 직접 저장: S3-compatible 계약을 깨뜨린다.
-- MinIO를 상시 backup으로 간주: EC2와 장애 영역이 같아 FR-018을 충족하지 못한다.
+- 자동 failover: split-brain·누락 객체 위험이 있다.
+- 수동 MinIO: 같은 EC2 장애 영역이며 전환·reconciliation 복잡도만 추가한다.
+- 로컬 디렉터리: 서버 유실 시 문서를 함께 잃고 R2 계약을 이중화한다.
 
 ## R-08. PostgreSQL database/role 격리와 backup
 

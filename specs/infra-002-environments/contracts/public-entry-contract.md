@@ -21,7 +21,7 @@ Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → loopback-only demo-game l
 
 - Nginx만 public host 80/443에 bind한다. demo-game 7777은 `127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}`로만 publish하고, 80은 최종 demo에서 443으로 redirect한다.
 - SSH 22는 승인된 source 범위에만 허용한다.
-- PostgreSQL 5432, Redis 6379, Unity 7777, Jenkins 8080, MinIO 9000/9001과 관측 port는 public bind하지 않는다.
+- PostgreSQL 5432, Redis 6379, Unity 7777, Jenkins 8080과 관측 port는 public bind하지 않는다.
 - Cloudflare → origin은 Full (strict) TLS다. 인증서 검증을 끄는 origin fallback을 금지한다.
 - ALB·NLB·ACM은 이 계약의 구성요소가 아니다.
 

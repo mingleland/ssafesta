@@ -119,7 +119,7 @@
       "properties": {
         "serviceId": { "type": "string", "minLength": 1 },
         "component": {
-          "enum": ["ai", "back", "front", "game", "ingress", "postgres", "redis", "minio"]
+          "enum": ["ai", "back", "front", "game", "ingress", "postgres", "redis"]
         },
         "imageRef": {
           "type": "string",
