@@ -36,6 +36,9 @@ status=FAILED
 # 엣지(Cloudflare)가 검증 요청을 막아 오리진 직접 확인으로 합격시킨 적이 있는가.
 # 증거에 남겨야 "이 릴리스는 공개 경로로는 확인하지 못했다" 를 나중에도 알 수 있다.
 edge_blocked=0
+# 차단 진단(본문·출발지 IP)은 **한 번만** 남긴다. 엣지가 막으면 파일마다 같은 차단 페이지가
+# 돌아와, 그대로 두면 같은 문장이 산출물 개수만큼 반복되고 요청도 그만큼 늘어난다.
+diagnosed=0
 cleanup() {
   rm -f "${download}" "${headers:-}"
   [[ -z "${staging:-}" ]] || rm -rf -- "${staging}"
@@ -189,6 +192,51 @@ log_verify_failure() {
   # 앞단이 누구인지 드러내는 헤더만 추린다 — cf-ray 가 있으면 Cloudflare 단에서 끊긴 것이다.
   grep -Ei '^(server|cf-ray|cf-cache-status|via|x-cache|content-type|cache-control|content-encoding):' "${file}" 2>/dev/null \
     | sed 's/^/    /' >&2 || true
+  if [[ "${url}" == http* && "${diagnosed}" == 0 ]]; then
+    diagnosed=1
+    log_verify_body "${url}"
+    grep -qi '^cf-ray:' "${file}" && log_edge_client_ip
+  fi
+  return 0
+}
+
+# 차단 페이지의 **본문**을 남긴다. 헤더만으로는 "403" 까지만 알 수 있고, 어떤 규칙에
+# 걸렸는지(예: `error code: 1020`)는 본문에만 있다 — 인프라가 허용 규칙을 넣으려면 그게 필요하다
+# (#165 회신: "재발 시 cf-ray 와 응답 본문까지 함께 확인하겠습니다").
+# 본문은 **실패했을 때만 따로 받는다.** 정상 경로에서 130 MB 짜리 data 파일을 디스크에
+# 받아 두지 않으려는 것이다. 64 KB 를 넘기면 curl 이 스스로 끊고, 그때는 조용히 넘어간다.
+log_verify_body() {
+  local url="$1"
+  local body; body="$(mktemp "${root}/.webgl-body.XXXXXX")"
+  curl --silent --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+    --user-agent "${VERIFY_USER_AGENT}" --max-filesize 65536 \
+    --output "${body}" "${url}" 2>/dev/null || true
+  if [[ -s "${body}" ]]; then
+    local title code text
+    title="$(tr -d '\r\n' <"${body}" | sed -n 's/.*<title[^>]*>\([^<]*\)<\/title>.*/\1/p' | cut -c1-200)"
+    code="$(grep -oiE 'error code: *[0-9]+' "${body}" 2>/dev/null | head -n 1)"
+    text="$(sed -e 's/<[^>]*>/ /g' "${body}" 2>/dev/null | tr -s '[:space:]' ' ' | cut -c1-300)"
+    [[ -n "${title}" ]] && echo "    본문 제목: ${title}" >&2
+    [[ -n "${code}" ]] && echo "    본문 코드: ${code}" >&2
+    [[ -z "${title}" && -z "${code}" && -n "${text// /}" ]] && echo "    본문: ${text}" >&2
+  fi
+  rm -f "${body}"
+}
+
+# 엣지가 막았다면 다음 질문은 **어느 IP 가 막혔는가**다. Cloudflare 존은 어디서나
+# /cdn-cgi/trace 로 자기가 본 클라이언트 IP 를 돌려준다 — 그 값이 곧 인프라가 허용 목록에
+# 넣어야 할 이 에이전트의 출발지 주소다. 차단이 /unity/* 에만 걸려 있으면 이 경로는 답한다.
+# 답하지 않으면 존 전체가 막힌 것이고, 그것도 하나의 정보다.
+log_edge_client_ip() {
+  local base="${WEBGL_PUBLIC_BASE_URL%/}" host trace
+  host="${base#*://}"; host="${host%%/*}"
+  trace="$(curl --silent --max-time 10 --user-agent "${VERIFY_USER_AGENT}" \
+    "${base%%://*}://${host}/cdn-cgi/trace" 2>/dev/null | grep -E '^(ip|colo|loc)=' | tr '\n' ' ' || true)"
+  if [[ -n "${trace// /}" ]]; then
+    echo "    엣지가 본 이 에이전트: ${trace}" >&2
+  else
+    echo "    엣지가 본 이 에이전트: /cdn-cgi/trace 도 답하지 않는다 (존 전체 차단으로 보인다)" >&2
+  fi
 }
 
 # 한 번 받아 보고 판정한다. **실패를 두 종류로 나누는 것이 요점이다.**
