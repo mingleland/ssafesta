@@ -216,9 +216,11 @@ Expected:
 Expected sequence:
 
 1. R2 probe 실패 시 신규 upload grant가 차단된다.
-2. MinIO·로컬 디스크·다른 provider 전환과 reconciliation은 발생하지 않는다.
+2. 이 장애 시험은 신규 upload를 fail-closed한다. 자동 provider 전환·로컬 디스크 fallback은 발생하지 않는다.
 3. 기존 문서 조회와 R2 비의존 비AI 경로는 계속 동작한다.
 4. R2 복구 후 R2 contract probe와 최신 usage snapshot이 모두 성공하면 신규 upload grant가 재개된다.
+
+R2 장기 장애에서의 MinIO fallback은 이 probe 시험의 자동 후속 단계가 아니다. 운영자 승인 뒤 `storage-failover.sh`가 단일 lock으로 전환과 reconcile을 직렬화하며, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다.
 
 R2 원본 문서에는 2차 백업이 없으며 PostgreSQL dump만 private R2 backup bucket에 보관한다.
 
