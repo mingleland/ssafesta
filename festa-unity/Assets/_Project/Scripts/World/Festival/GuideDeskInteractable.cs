@@ -70,21 +70,36 @@ namespace Festa.World
 
             var go = new GameObject("GuideBubble");
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, _bubbleHeight, 0f);
-            _bubble = go.transform;
 
             var tmp = go.AddComponent<TextMeshPro>();
+
+            // **Transform 참조는 AddComponent 뒤에 잡는다.** TextMeshPro 는 RectTransform 을 요구해서
+            // 붙이는 순간 유니티가 기존 Transform 을 **파괴하고 갈아끼운다.** 앞에서 잡아 두면 그 참조가
+            // 죽은 채로 남아 LateUpdate 가 `_bubble == null` 로 매 프레임 되돌아 나간다 —
+            // 빌보드가 한 번도 돌지 않아 글자가 부모 회전 그대로 굳고, 보는 방향에 따라 좌우가 뒤집혀 보였다.
+            // (2026-09-13 플레이 모드 실측: 카메라를 옮기고 프레임을 넘겨도 rotY 가 90 에서 변하지 않았고,
+            //  리플렉션으로 읽은 `_bubble` 이 "파괴됨" 이었다.)
+            _bubble = tmp.transform;
+            _bubble.localPosition = new Vector3(0f, _bubbleHeight, 0f);
+
             tmp.font = font;
             tmp.text = BubbleText;
-            tmp.color = new Color(0.97f, 0.97f, 0.94f);
+            tmp.color = new Color(1f, 0.99f, 0.95f);
             tmp.alignment = TextAlignmentOptions.Center;
             // 줄바꿈은 문구에 직접 넣었다. TMP 에 맡기면 한글을 글자 단위로 끊는다 (간판에서 겪은 것).
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Overflow;
             tmp.fontSize = 28f;   // fontSize 10 = 월드 1 unit (WorldNameplate 실측)
-            tmp.outlineWidth = 0.18f;
-            tmp.outlineColor = new Color32(24, 28, 38, 220);
             _label = tmp;
+
+            // **외곽선은 머티리얼 인스턴스에 넣어야 나온다.** `tmp.outlineWidth` 만 세우면
+            // 공유 머티리얼에 OUTLINE_ON 키워드가 없어 아무 일도 일어나지 않는다 —
+            // 밝은 벽 앞에서 흰 글자가 그대로 묻혔다. 이름표(WorldNameplate)와 같은 방식으로 맞춘다.
+            var mat = tmp.fontMaterial;                       // 이 텍스트 전용 인스턴스
+            mat.SetFloat(ShaderUtilities.ID_FaceDilate, 0.15f);
+            mat.EnableKeyword("OUTLINE_ON");
+            mat.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0.02f, 0.02f, 0.04f, 1f));
+            mat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.25f);
         }
 
         /// <summary>
