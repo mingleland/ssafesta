@@ -151,6 +151,41 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
 
     // ── 도우미 ──────────────────────────────────────────────────────────────
 
+    /**
+     * spec 011 이 2026-09-13 에 더한 표들을 삭제 그래프가 실제로 지나는가 (S15P21A604-693 테스트 공백).
+     *
+     * <p>{@code AccountDeletionService} 는 순수 SQL 이라 FK 순서 오류는 <b>그 표에 행이 있을 때만</b>
+     * 터진다. 지금까지의 탈퇴 테스트는 전부 상담·직원·초대·방문 행이 없는 회원으로 돌았다.
+     * 여기서는 남의 부스의 직원이면서, 대기 중 초대를 받았고, 방문 기록이 있고, 진행 중 상담의
+     * 담당 직원인 회원을 지운다.
+     */
+    @Test
+    void withdrawingRemovesStaffInvitationVisitAndConsultationRows() {
+        Long userId = member("직원탈퇴");
+        Long ownerId = member("직원탈퇴부스주");
+        Long visitorId = member("직원탈퇴방문");
+        Long boothId = booths.save(new Booth(ownerId, "직원탈퇴 부스")).getId();
+        jdbc.update("INSERT INTO booth_staffs(booth_id, user_id, role) VALUES (?, ?, 'CONSULTANT')",
+                boothId, userId);
+        jdbc.update("INSERT INTO staff_invitations(booth_id, invited_user_id, invited_by_user_id, role, status, expires_at)"
+                + " VALUES (?, ?, ?, 'ADMIN', 'PENDING', now() + interval '1 day')", boothId, userId, ownerId);
+        jdbc.update("INSERT INTO booth_visit_events(booth_id, visitor_user_id, world_channel) VALUES (?, ?, '11F-01')",
+                boothId, userId);
+        jdbc.update("INSERT INTO consultations(booth_id, visitor_user_id, staff_user_id, status, requested_at, accepted_at)"
+                + " VALUES (?, ?, ?, 'ACCEPTED', now(), now())", boothId, visitorId, userId);
+
+        assertDoesNotThrow(() -> lifecycle.withdraw(userId));
+
+        assertEquals(0, count("SELECT count(*) FROM booth_staffs WHERE user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM staff_invitations WHERE invited_user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM booth_visit_events WHERE visitor_user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM consultations WHERE staff_user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
+        assertTrue(booths.existsById(boothId), "남의 부스는 직원의 탈퇴로 사라지면 안 된다.");
+        assertEquals(1, count("SELECT count(*) FROM users WHERE id = ?", visitorId),
+                "상담 상대였던 방문자는 남는다.");
+    }
+
     private Long member(String prefix) {
         return createMemberWithWallet(users, wallets, prefix);
     }

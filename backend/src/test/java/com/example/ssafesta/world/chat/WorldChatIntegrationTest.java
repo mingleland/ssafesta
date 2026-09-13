@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import com.example.ssafesta.user.AccountLifecycleService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
@@ -21,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -42,6 +47,31 @@ class WorldChatIntegrationTest {
     /** 발행을 가로채 무엇이 나갔는지 본다 — 브로커를 띄우지 않아 결과가 흔들리지 않는다. */
     @MockitoBean private SimpMessagingTemplate messaging;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private RedisKeyspaceProperties keyspace;
+
+    /**
+     * Redis 가 답하지 않으면 <b>막는다</b>(fail-closed, S15P21A604-693 테스트 공백).
+     *
+     * <p>도배 판정이 불가능할 때 열어 두면 Redis 가 흔들리는 순간 광장이 도배된다. 그래서 거부이고,
+     * 거부된 줄은 토픽에 나가지 않는다. 판정 불가는 도배(429)와 다른 코드라 클라이언트가 "잠시 뒤"
+     * 와 "지금은 채팅 불가" 를 가른다.
+     */
+    @Test
+    void whenRedisIsDownTheMessageIsRefusedNotBroadcast() {
+        Long sender = member("레디스장애");
+        StringRedisTemplate downRedis = mock(StringRedisTemplate.class);
+        when(downRedis.opsForValue()).thenThrow(new RedisConnectionFailureException("redis down"));
+        WorldChatService withoutRedis = new WorldChatService(messaging, users,
+                new WorldChatRateLimiter(downRedis, keyspace));
+
+        WorldChatUnavailableException refused = assertThrows(WorldChatUnavailableException.class,
+                () -> withoutRedis.say(sender, new WorldChatSend("들리세요?")));
+
+        assertEquals(com.example.ssafesta.common.ErrorCode.CHAT_UNAVAILABLE, refused.errorCode());
+        assertInstanceOf(RedisConnectionFailureException.class, refused.getCause(),
+                "원인이 붙어 있어야 Redis 가 왜 답하지 않았는지 로그에서 추적할 수 있다.");
+        assertNothingSent();
+    }
 
     @Test
     void aMessageGoesOutWithTheNicknameTheServerLookedUp() {
