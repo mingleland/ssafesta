@@ -10,6 +10,7 @@ backup_init() {
   backup_require R2_BACKUP_BUCKET
   backup_require AWS_ACCESS_KEY_ID
   backup_require AWS_SECRET_ACCESS_KEY
+  backup_require PGPASSWORD
   : "${AWS_DEFAULT_REGION:=auto}"
   : "${AWS_CLI:=aws}"
   : "${DOCKER_BIN:=docker}"
@@ -23,7 +24,8 @@ backup_init() {
 }
 
 backup_aws() { "${AWS_CLI}" --endpoint-url "${R2_BACKUP_ENDPOINT}" s3 "$@"; }
-backup_psql() { "${DOCKER_BIN}" exec "${POSTGRES_CONTAINER}" psql -U festa_admin -d "$1" -v ON_ERROR_STOP=1 "${@:2}"; }
+backup_docker_exec() { "${DOCKER_BIN}" exec -e PGPASSWORD "${POSTGRES_CONTAINER}" "$@"; }
+backup_psql() { backup_docker_exec psql -U festa_admin -d "$1" -v ON_ERROR_STOP=1 "${@:2}"; }
 backup_python() { "${PYTHON_BIN}" "$@"; }
 
 backup_databases() {
