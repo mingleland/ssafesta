@@ -115,8 +115,8 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-002**: GitLab CI의 Front gate는 `ci/test front` 및 `ci/build front`, Back gate는 `ci/test back` 및 `ci/build back`을 수행해야 한다. Back gate runner는 Testcontainers를 위해 Docker executor 또는 Docker socket 접근을 제공해야 한다.
 - **FR-003**: GitLab의 필수 MR gate가 하나라도 실패하면 `develop` 병합을 차단해야 한다. Jenkins의 `develop` 검증이 실패하면 dev 배포를 차단해야 한다.
 - **FR-003a**: GitLab CI/Runner의 초기 MR merge gate는 Front·Back을 `rules:changes`로 수행한다. Game MR gate는 Jenkins Unity agent가 수행하며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
-- **FR-003b**: `festa-unity/**`, Game CI adapter 또는 Unity project 설정 변경 MR은 Jenkins Unity agent에서 해당 MR head SHA의 Unity 스크립트 컴파일과 `ci/test` EditMode를 실행해야 한다. 이 실행은 GitLab MR의 필수 성공 상태를 게시해야 하며, 실패·timeout·agent 미가용은 merge를 차단해야 한다.
-- **FR-003c**: MR용 Unity 검증 경로는 `ci/validate`와 `ci/test`만 실행하고 이미지 build·package·Registry 업로드·Jenkins dev deploy·demo promotion·운영 컨테이너 재시작을 호출해서는 안 된다. merge 후 `develop`의 기존 build/package/deploy 흐름은 별도로 유지한다.
+- **FR-003b**: `festa-unity/**`, Game CI adapter 또는 Unity project 설정 변경 MR은 Jenkins Unity agent에서 해당 MR head SHA의 `ci/test` EditMode를 실행해야 한다. `ci/test`가 수행하는 Unity 스크립트 컴파일과 모든 EditMode 정적 검사는 이 gate의 일부다. 실행은 GitLab MR의 필수 성공 상태를 게시해야 하며, 실패·timeout·agent 미가용은 merge를 차단해야 한다.
+- **FR-003c**: MR용 Unity 검증 경로는 `ci/test`만 실행하고 이미지 build·package·Registry 업로드·Jenkins dev deploy·demo promotion·운영 컨테이너 재시작을 호출해서는 안 된다. merge 후 `develop`의 기존 build/package/deploy 흐름은 별도로 유지한다.
 - **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 개발환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
 - **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다. 하나의 MR이 여러 컴포넌트를 변경하면 모든 변경 컴포넌트의 CI가 성공한 뒤에만 dev 배포를 시작해야 하며, 배포 또는 검증이 하나라도 실패하면 같은 MR에서 이미 갱신된 컴포넌트를 이전 정상 release로 자동 복구해야 한다.
 - **FR-006**: 모든 실행은 변경 식별자, 대상 파트, 단계별 결과, 산출물 식별자, 배포 대상과 최종 상태를 추적 가능하게 기록해야 한다.
