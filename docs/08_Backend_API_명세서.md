@@ -1428,29 +1428,34 @@ Owner · `ADMIN` · `CONTENT_EDITOR` 만. `CONSULTANT` 는 제외된다 — 상�
   "consultations": 12,
   "consultationsEnded": 6,
   "surveyResponses": 31,
-  "aiUsages": null,
-  "revenueCoin": null
+  "leaseCostCoin": 300,
+  "surveyRewardCoin": 155,
+  "aiUsages": null
 }
 ```
 
-**`null` 은 0 이 아니다.** `null` 은 **집계할 원천이 아직 없다**, `0` 은 **원천은 있고 그 기간에 0건이었다**. 이 구분이 없으면 FE 는 "AI 이용 0건" 카드를 영원히 띄운다.
+**`null` 은 0 이 아니다.** `null` 은 **집계할 원천이 아직 없다**, `0` 은 **원천은 있고 그 기간에 0건이었다**. 지금 `null` 인 칸은 `aiUsages` 하나다.
 
 | 필드 | 원천 |
 |---|---|
 | `visits` · `uniqueVisitors` · `averageDwellSeconds` · `openVisits` | `booth_visit_events` — §14-1 과 같은 정의다 |
 | `consultations` · `consultationsEnded` | `consultations`. **요청 시각 기준**이라 아직 안 끝난 상담도 요청한 기간에 센다 |
 | `surveyResponses` | 이 부스의 설문에 달린 응답. 게스트 응답도 센다 |
+| `leaseCostCoin` · `surveyRewardCoin` | `coin_ledger_entries` 를 `reference_id` 로 되짚는다. 아래 참조 |
 | `aiUsages` | **없다** — AI 대화를 남기는 표가 저장소에 아직 없다 (AI 파트 소관) |
-| `revenueCoin` | **없다** — 부스로 코인이 *들어오는* 경로가 설계에 없다. 아래 참조 |
 
-#### `revenueCoin` 이 `null` 인 이유
+#### 코인 칸은 "수익" 이 아니다
 
-원장에서 부스와 닿는 사유는 둘뿐이고, 둘 다 수익이 아니다.
+**부스로 코인이 들어오는 경로가 없다.** 원장에서 부스와 닿는 사유는 둘뿐이고 둘 다 수익이 아니다.
 
-- **임대료** (`BOOTH_LEASE`) — 부스 소유자가 **낸다**. 비용이다.
-- **설문 보상** (`SURVEY_REWARD`) — 응답자에게 **발행된다**. 차감되는 지갑이 없어 부스가 내는 것이 아니다.
+- **임대료** (`LEASE_PAYMENT` / `BOOTH_LEASE`) — 부스 소유자가 **낸다**. 비용이다
+- **설문 보상** (`SURVEY_REWARD` / `SURVEY`) — 응답자에게 **발행된다**. 차감되는 지갑이 없어 부스가 내는 것이 아니다
 
-`booth_daily_metrics.revenue_coin` 컬럼도 같은 가정 위에 있다. 무엇을 수익으로 볼지는 기획 결정이라 임의로 정하지 않았다(헌법 30조) — `docs/26` 에 결정 요청으로 올려 두었다.
+그래서 "수익" 대신 이 둘을 그대로 준다 — **쓴 코인**과 **뿌린 코인**이다(2026-09-13 백엔드 결정, `docs/26`). 둘 다 양수로 나간다.
+
+`surveyRewardCoin` 은 `surveyResponses` 옆에 놓고 읽으면 그대로 의미가 된다 — **코인 155개를 뿌려 응답 31개를 받았다.** 보상 구조가 먹히는지가 그 두 숫자에 있다.
+
+진짜 유입 경로가 생기면(`S15P21A604-634` AI 상담 이용료 차감·운영자 수익 배분) 그때 `revenueCoin` 을 이 둘 **옆에 더한다**. `booth_daily_metrics.revenue_coin` 컬럼은 그 자리로 남겨 둔다.
 
 #### 그 밖
 
