@@ -6,6 +6,7 @@ import {
   getAiAgent,
   listAiDocuments,
   uploadAiDocument,
+  replaceAiDocument,
   updateAiAgent,
   type AiAgent,
   type AiAgentCommand,
@@ -124,6 +125,22 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 업로드하지 못했습니다.'),
   });
 
+  // 교체는 업로드와 같은 3단계를 타지만 1단계가 원본 문서를 지목한다 (S15P21A604-691, #179).
+  // 원본은 새 문서가 준비 완료가 될 때까지 그대로 답변에 쓰이므로, 실패해도 근거가 비지 않는다.
+  const replaceMutation = useMutation({
+    mutationFn: ({ documentId, file }: { documentId: number; file: File }) => replaceAiDocument(documentId, file),
+    onSuccess: async (result) => {
+      setUploadMessage(
+        result.duplicate
+          ? '같은 내용이라 교체하지 않았습니다.'
+          : `교체 접수: 처리 대기(${result.processingStatus}) · 준비가 끝나면 기존 문서를 대신합니다`,
+      );
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
+    },
+    onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 교체하지 못했습니다.'),
+  });
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.name.trim() || !form.systemPrompt.trim()) {
@@ -138,6 +155,14 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     if (!file) return;
     setUploadMessage(null);
     uploadMutation.mutate(file);
+  }
+
+  function selectReplacement(documentId: number, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadMessage(null);
+    replaceMutation.mutate({ documentId, file });
+    event.target.value = '';
   }
 
   if (agentQuery.isLoading) return <OverlayLoading label="AI 직원 설정을 불러오는 중..." />;
@@ -202,6 +227,19 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                     <span className="bm-document-name">{doc.fileName}</span>
                     <span className="bm-document-meta">{formatBytes(doc.sizeBytes)}</span>
                     <span className="bm-document-status">{STATUS_LABEL[doc.status]}</span>
+                    {/* 교체는 준비 완료된 문서에만 연다 — 서버도 그 상태만 받는다(DOCUMENT_NOT_REPLACEABLE) */}
+                    {doc.status === 'READY' && (
+                      <label className={'bm-document-replace' + (replaceMutation.isPending ? ' bm-upload-disabled' : '')}>
+                        {replaceMutation.isPending && replaceMutation.variables?.documentId === doc.documentId ? '교체 중...' : '수정본 교체'}
+                        <input
+                          type="file"
+                          accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                          disabled={replaceMutation.isPending}
+                          aria-label={`${doc.fileName} 수정본 교체`}
+                          onChange={(event) => selectReplacement(doc.documentId, event)}
+                        />
+                      </label>
+                    )}
                   </li>
                 ))}
               </ul>

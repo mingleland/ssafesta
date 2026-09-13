@@ -153,10 +153,13 @@
 .bm-document-list-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px; }
 .bm-document-quota { align-self: flex-end; }
 .bm-document-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.bm-document-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); font-size: 12.5px; }
+.bm-document-row { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); font-size: 12.5px; }
 .bm-document-name { color: var(--festa-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bm-document-meta { color: rgba(234, 238, 251, 0.55); white-space: nowrap; }
 .bm-document-status { color: rgba(234, 238, 251, 0.75); font-weight: 600; white-space: nowrap; }
+/* 파일 선택을 감춘 라벨 — 업로드 버튼(.bm-upload)과 같은 방식이고 행 안에 들어가도록만 작게 잡는다 */
+.bm-document-replace { position: relative; overflow: hidden; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.16); color: rgba(234, 238, 251, 0.82); font-size: 12px; }
+.bm-document-replace input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 
 @media (max-width: 900px) {
   .bm-hero { grid-template-columns: 1fr; }
