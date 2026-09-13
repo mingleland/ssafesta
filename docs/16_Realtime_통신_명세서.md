@@ -17,8 +17,9 @@
 | AI 응답 | SSE 우선 | FastAPI |
 | AI 문서 상태 | REST Polling 우선 | FastAPI/Spring |
 | Staff Presence | WebSocket 후보 | Spring + Redis |
-| 사람 상담 메시지 | **P2** — P1 범위 밖 (spec 011 C-12) | Spring |
+| 사람 상담 메시지 | **P2** — 아직 없다. §12 는 미구현 초안이다 (spec 011 C-12) | Spring |
 | 상담 요청/수락 알림 | **STOMP over native WebSocket** (단방향) | Spring |
+| **월드 공용 채팅** | **STOMP** — 클라이언트가 보내는 유일한 경로 (§8-1) | Spring (저장 안 함) |
 | Minigame 실시간 상태 | NGO | Unity Server |
 
 ---
@@ -255,6 +256,61 @@ in-memory simple broker 다. Spring 을 두 대 이상 띄우면 A 에 붙은 �
 
 ---
 
+## 8-1. 월드 공용 채팅 (STOMP) — 구현 완료 (S15P21A604-687)
+
+**클라이언트가 서버로 보내는 유일한 경로다.** 나머지 STOMP 는 전부 단방향 알림이다.
+
+### 연결
+
+`wss://<host>/ws` — §14 의 WS Token 을 `CONNECT` 헤더에 싣는다. **한 소켓이 상담 알림과 이 채팅을 함께 나른다.** `wss://<host>/ws/consultation` 도 같은 것으로 남겨 두었다.
+
+**회원 전용이다.** WS Token 이 회원에게만 발급되므로 게스트는 연결 자체가 되지 않는다.
+
+### 보내기 — `SEND /app/world/chat`
+
+```json
+{ "content": "안녕하세요" }
+```
+
+**보낸 사람도 시각도 받지 않는다.** 클라이언트가 정할 수 있는 값이면 사칭과 조작이 된다. 본문에 `nickname` 이나 `senderUserId` 를 실어도 서버가 읽지 않는다.
+
+### 받기 — `SUBSCRIBE /topic/world/chat`
+
+```json
+{ "senderUserId": 7, "nickname": "덕", "content": "안녕하세요", "sentAt": "2026-09-13T20:10:00Z" }
+```
+
+`nickname` 은 **서버가 조회한 값**이고, `content` 는 `strip()` 을 거친 정규화본이다 — 보낸 그대로가 아니다.
+
+### 오류 — `SUBSCRIBE /user/queue/world/chat/errors`
+
+`SEND` 에는 응답이 없어서 별도 큐로 간다. **보낸 세션에만** 전달된다 — 같은 계정의 다른 탭에는 가지 않는다.
+
+```json
+{ "code": "CHAT_TOO_FAST", "message": "잠시 후 다시 보내 주세요." }
+```
+
+| code | 조건 |
+|---|---|
+| `VALIDATION_FAILED` | 빈 내용·공백만, 또는 **100 code point** 초과 |
+| `CHAT_TOO_FAST` | 3초 안에 두 번째 |
+| `CHAT_UNAVAILABLE` | 도배 방지를 판정할 수 없다 (Redis 장애) |
+| `MEMBER_ONLY` | 정지·탈퇴된 계정 — WS Token 이 5분 남아 있어도 거부된다 |
+
+**길이는 code point 로 센다.** `String.length()` 는 UTF-16 단위라 이모지 하나가 2자가 되고, 상한이 사람이 보는 길이와 어긋난다. 이모지 100개는 통과한다.
+
+**Redis 가 답하지 않으면 막는다**(fail-closed). 도배 방지가 필수 조건이라, 판정할 수 없을 때 열어 두면 Redis 가 흔들리는 순간 광장이 도배된다.
+
+### 한계
+
+- **저장하지 않는다.** 표가 없다 — 재접속하면 이전 대화가 없고, 인스턴스가 죽으면 그 대화는 사라진다. 광장 잡담은 스크롤백 가치가 낮고, 남기면 보존 기간과 탈퇴 삭제 경로가 함께 붙는다(D11)
+- **토픽이 하나다.** 채널별로 가르지 않는다 — 채널을 클라이언트가 지정하게 하면 **서버가 누가 어느 채널에 있는지 몰라 검증할 수 없다**. 채널 배정(`S15P21A604-499`)이 서면 그때 쪼갠다
+- **월드 접속 여부를 보지 않는다.** "유효한 WS Token 을 가진 회원" 이면 월드 밖에서도 보낼 수 있다
+- **단일 인스턴스 전제.** §8 의 한계와 같다 — 서버를 둘로 늘리면 서로의 말이 보이지 않는다
+- **신고·차단·금칙어가 없다.** 운영 인력을 전제하는 기능이라 시연 규모에 맞지 않는다
+
+---
+
 ## 9. Staff Presence — WebSocket 이 아니라 REST·DB
 
 > **2026-09-13 정정** (`S15P21A604-136`). 이전 판은 `STAFF_PRESENCE_SET` WebSocket 메시지와
@@ -352,7 +408,13 @@ Visitor
 
 ---
 
-## 12. Consultation Message
+## 12. Consultation Message — **미구현 초안**
+
+> ⚠️ **이 절은 구현돼 있지 않다.** 상담 메시지는 P2 이고(spec 011 C-12), 아래 envelope 를 받는 곳이 서버에 없다.
+>
+> 그리고 지금 보내면 **연결이 끊긴다.** `S15P21A604-686` 이후 클라이언트 `SEND` 는 allowlist 밖이면 거부되고, 상담 메시지 destination 은 그 목록에 없다. 구현할 때 그 티켓의 목록에 추가하면서 이 절을 확정본으로 고쳐야 한다.
+>
+> 실제로 동작하는 클라이언트 → 서버 경로는 **월드 공용 채팅(§8-1) 하나뿐**이다.
 
 ### Client → Server
 
@@ -410,17 +472,18 @@ REQUESTED
 
 ---
 
-## 14. WebSocket 인증
+## 14. WebSocket 인증 — 확정 (S15P21A604-137·-686)
 
-연결 시 인증 Token을 검증한다.
+**STOMP `CONNECT` 프레임의 `Authorization: Bearer <token>` 헤더 하나다.** 아래 후보 목록은 구현 전 초안이었고, §8 이 정본이다.
 
-후보:
+| | |
+|---|---|
+| 토큰 | `POST /api/v1/realtime/ws-token` 이 주는 **5분짜리 전용 토큰** (헌법 13조). Access Token 재사용 불가 |
+| 전달 | STOMP `CONNECT` 헤더. **URL query 는 보지 않는다** — 접속 로그·referrer 에 남기 때문이다 (FR-019) |
+| 핸드셰이크 | HTTP 인증을 타지 않는다. `/ws`·`/ws/**` 가 `permitAll` 이고 신원은 `CONNECT` 에서 본다 |
+| 만료 | 연결 성립 후에는 만료가 연결을 끊지 않는다 (FR-020) |
 
-- Handshake Header
-- Query Token은 노출 위험 때문에 신중히 사용
-- STOMP CONNECT Header
-
-정확한 방식은 Spring WebSocket 구현체 선택 후 확정한다.
+**연결 뒤에도 경계가 있다** (`S15P21A604-686`). 클라이언트 `SEND` 는 allowlist 밖이면 거부되고, 개인 큐는 `/user/queue/**` 로만 구독한다 — raw `/queue/**` 직접 구독은 거부된다. 토픽별 SUBSCRIBE 자격 검증은 별도 보안 검토 범위다.
 
 ---
 
