@@ -77,6 +77,7 @@ export PYTHON_BIN="${PYTHON_BIN:-python3}"
 dump_output="$(bash "$repo_root/infra/environments/postgres/backup/dump.sh" --environment demo --tier manual-test)"
 manifest_key="$("$PYTHON_BIN" -c "import json; print(json.loads('''$dump_output''')['manifestKey'])")"
 assert_file "$temp_dir/bucket/$manifest_key"
+assert_contains "$temp_dir/state/awscli-r2.conf" 'addressing_style = path' 'R2 requests use path-style addressing'
 assert_contains "$temp_dir/bucket/$manifest_key" 'schemaSha256' 'manifest records schema fingerprint'
 assert_contains "$temp_dir/bucket/$manifest_key" 'tableRows' 'manifest records exact row counts'
 
