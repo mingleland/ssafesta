@@ -48,7 +48,7 @@ Web app — 백엔드는 `backend/src/main/java/com/example/ssafesta/`, 테스�
 - [x] T006 `backend/src/main/java/com/example/ssafesta/booth/BoothAccessGuard.java` 의 `requireEditor` 에 역할 게이트를 태운다 — 현재는 행 존재만 본다. `CONSULTANT` 는 거부하고 Owner·`ADMIN`·`CONTENT_EDITOR` 만 통과시킨다
 - [x] T007 `backend/src/test/java/com/example/ssafesta/booth/BoothAccessGuardRoleTest.java` — 역할별 통과·거부 매트릭스. **`requireEditor` 를 쓰는 경로 전부(Layout 2곳·LayoutQuery·AiAgent 2곳·AiDocument·Survey·SurveyResult·Project)가 같은 판정을 받는지** 함께 고정한다
 - [x] T008 [P] 기존 `ErrorCode` enum에 이 spec의 오류 코드 추가 — `STAFF_INVITATION_PENDING`·`STAFF_ALREADY_MEMBER`·`STAFF_INVITATION_FORBIDDEN`·`STAFF_INVITATION_NOT_PENDING`·`STAFF_OWNER_IMMUTABLE`·`CONSULTATION_ALREADY_ACTIVE`·`CONSULTATION_NOT_REQUESTED`·`CONSULTATION_REQUEST_PENDING`. `GUEST_FORBIDDEN`·`BOOTH_LEASE_EXPIRED`·`BOOTH_FORBIDDEN`은 기존 코드를 재사용한다(신설 금지, docs/08 §1.3)
-- [ ] T009 [P] 기존 springdoc 스키마 충돌 검증 테스트 갱신 — 새 DTO가 단순 이름 충돌을 일으키지 않는지 (T-148 재발 방지)
+- [x] T009 [P] 기존 springdoc 스키마 충돌 검증 테스트 갱신 — 새 DTO가 단순 이름 충돌을 일으키지 않는지 (T-148 재발 방지)
 
 **Checkpoint**: V31이 적용되고 역할 게이트가 서면 US3를 시작할 수 있다.
 
@@ -140,11 +140,11 @@ Web app — 백엔드는 `backend/src/main/java/com/example/ssafesta/`, 테스�
 
 ## Phase 6: Polish & Cross-Cutting
 
-- [ ] T043 `docs/08_Backend_API_명세서.md` §12를 확정 계약에 맞춘다 — 현재 §12는 다른 경로를 적고 있다 (research R-01). §10에 `GET /staff-invitations/mine`(FR-016)과 Owner 취소(FR-017) 추가, §11 Presence에 `BUSY` 서버 전용 규칙 명시
-- [ ] T044 [P] Realtime 명세(`docs/08` §12가 참조하는 docs/16 §11)에 STOMP 구독·이벤트 봉투 반영
-- [ ] T045 [P] `specs/011-staff-consultation/spec.md` 리뷰 표의 BE 검토칸 서명
-- [ ] T046 헌법 24조 통보 — FE·AI에 `docs/08` §12 정정 사실을 알린다(경로 변경이 아니라 **문서를 실제 계약에 맞추는 것**임을 명시). GitLab #133·#176에 회신
-- [ ] T047 `cd backend && ./mvnw -B test` 전 스위트 통과 확인 (기준선 1195건 + 이 spec의 신규 테스트)
+- [x] T043 `docs/08_Backend_API_명세서.md` §12를 확정 계약에 맞춘다 — 현재 §12는 다른 경로를 적고 있다 (research R-01). §10에 `GET /staff-invitations/mine`(FR-016)과 Owner 취소(FR-017) 추가, §11 Presence에 `BUSY` 서버 전용 규칙 명시
+- [x] T044 [P] Realtime 명세(`docs/08` §12가 참조하는 docs/16 §11)에 STOMP 구독·이벤트 봉투 반영
+- [x] T045 [P] `specs/011-staff-consultation/spec.md` 리뷰 표의 BE 검토칸 서명
+- [ ] T046 (초안 작성 완료, 게시 승인 대기) 헌법 24조 통보 — FE·AI에 `docs/08` §12 정정 사실을 알린다(경로 변경이 아니라 **문서를 실제 계약에 맞추는 것**임을 명시). GitLab #133·#176에 회신
+- [x] T047 `cd backend && ./mvnw -B test` 전 스위트 통과 확인 (기준선 1195건 + 이 spec의 신규 테스트)
 
 ---
 
