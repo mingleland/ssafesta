@@ -227,6 +227,25 @@ public enum ErrorCode {
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    // ── 상담 (spec 011 US1) ─────────────────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §B 가 정본이다.
+    // 게스트 거부는 MEMBER_ONLY 를, 만료 부스는 BOOTH_LEASE_EXPIRED 를 재사용한다 — 같은 사건에
+    // 두 이름을 만들지 않는다.
+    CONSULTATION_NOT_FOUND(HttpStatus.NOT_FOUND, "상담 요청을 찾을 수 없습니다."),
+    /** 이 방문자가 그 부스에 걸어 둔 대기 중 요청이 이미 있다. */
+    CONSULTATION_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 보낸 상담 요청이 기다리고 있습니다."),
+    /**
+     * 수락하려는 직원에게 이미 활성 상담이 있다 (C-06, FR-021).
+     *
+     * <p>{@code ux_consultations_active_staff} 가 DB 에서도 막으므로, 동시 요청에서도 둘째는
+     * 이 code 로 떨어진다.
+     */
+    CONSULTATION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "이미 진행 중인 상담이 있습니다."),
+    /** 이미 다른 직원이 가져갔거나 만료·취소됐다. 만료는 스위퍼를 기다리지 않고 읽는 쪽이 본다. */
+    CONSULTATION_NOT_REQUESTED(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 상담 요청입니다."),
+    /** 내 요청도, 내가 맡은 상담도 아니다. */
+    CONSULTATION_FORBIDDEN(HttpStatus.FORBIDDEN, "이 상담에 대한 권한이 없습니다."),
+
     // ── Staff 초대·권한 (spec 011 US3) ──────────────────────────────────────
     // specs/011-staff-consultation/contracts/staff-consultation-api.md §A 가 정본이다.
     // BOOTH_EDITOR_FORBIDDEN·MEMBER_ONLY·VALIDATION_FAILED 는 위에 있는 것을 재사용한다.
