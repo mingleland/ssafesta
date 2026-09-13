@@ -1,22 +1,31 @@
 package com.example.ssafesta.booth;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Read side of booths and slots (spec 004 FR-001, FR-007).
  *
- * <p>Every occupancy answer here goes through {@link BoothLeaseRepository}'s validity queries, so
- * a lease whose time has passed reads as free even before anyone transitions it. That is what
- * keeps an expired booth out of the world without a scheduler (SC-003, research R-03).
+ * <p>Occupancy is always decided by the same predicate — {@code status = ACTIVE and endsAt > now} —
+ * so a lease whose time has passed reads as free before anyone transitions it. That is what keeps
+ * an expired booth out of the world without a scheduler (SC-003, research R-03).
+ *
+ * <p><b>The predicate is written twice.</b> {@link BoothLeaseRepository}'s validity queries serve
+ * the single-booth reads, and {@link BoothSlotRepository#findOccupancy} repeats it inside a join
+ * because the slot list has to read the booth in the <i>same statement</i> (S15P21A604-682) —
+ * JPQL gives no way to share the fragment. The duplication is deliberate and load-bearing, so it is
+ * pinned by a test that asserts both queries select the same leases from one fixture
+ * ({@code BoothSlotOccupancySingleStatementTest}); change one and that test fails.
  */
 @Service
 public class BoothQueryService {
+
+    private static final Logger log = LoggerFactory.getLogger(BoothQueryService.class);
 
     private final BoothSlotRepository slots;
     private final BoothRepository booths;
@@ -39,21 +48,24 @@ public class BoothQueryService {
     @Transactional(readOnly = true)
     public List<SlotView> listSlots(Long viewerUserId) {
         Instant now = Instant.now();
-        Map<Long, BoothLease> bySlot = new HashMap<>();
-        for (BoothLease lease : leases.findAllValid(now)) {
-            bySlot.put(lease.getSlotId(), lease);
-        }
 
-        return slots.findAllOrdered().stream().map(slot -> {
-            BoothLease lease = bySlot.get(slot.getId());
+        return slots.findOccupancy(now).stream().map(row -> {
+            BoothLease lease = row.lease();
             if (lease == null) {
-                return SlotView.available(slot);
+                return SlotView.available(row.slot());
+            }
+            if (row.booth() == null) {
+                // 한 문장 안에서는 성립할 수 없다 — booth_leases.booth_id 가 NOT NULL REFERENCES
+                // booths(id) 다. 그래도 조용히 넘기지 않는다: 없는 부스를 OCCUPIED·입장가능으로
+                // 보여 주면 방문자는 들어갈 수 없는 간판을 보고, 원인은 로그에 남지 않는다 (T-24).
+                log.error("임대가 없는 부스를 가리킨다 — slotId={}, leaseId={}, boothId={}",
+                        row.slot().getId(), lease.getId(), lease.getBoothId());
+                return SlotView.available(row.slot());
             }
             // 부스를 통째로 들고 간다. 이름만 뽑고 버리던 자리인데, 같은 행에 facade 4필드가
             // 있어 그것을 함께 실으면 Unity 가 간판 12개를 요청 하나로 그린다 (GitLab #171).
-            Booth booth = booths.findById(lease.getBoothId()).orElse(null);
             boolean mine = viewerUserId != null && viewerUserId.equals(lease.getLesseeUserId());
-            return SlotView.occupied(slot, lease, booth, mine, now);
+            return SlotView.occupied(row.slot(), lease, row.booth(), mine, now);
         }).toList();
     }
 
@@ -118,15 +130,15 @@ public class BoothQueryService {
         }
 
         /**
-         * @param booth the occupying booth, or {@code null} if the row is missing — the lease
-         *        points at it, so that is a server fault the caller reports as a blank name rather
-         *        than a failed list of twelve
+         * @param booth the occupying booth — <b>never {@code null}</b>. The lease and the booth now
+         *        come from one statement, so "lease without booth" is not a shape this can be
+         *        called with; the caller drops such a row before it gets here (S15P21A604-682)
          */
         static SlotView occupied(BoothSlot slot, BoothLease lease, Booth booth, boolean mine, Instant now) {
             return new SlotView(slot.getId(), slot.getSlotCode(), slot.getFloorNo(), slot.getSlotType().name(),
-                    "OCCUPIED", lease.getBoothId(), booth == null ? null : booth.getName(),
+                    "OCCUPIED", lease.getBoothId(), booth.getName(),
                     lease.getEndsAt(), lease.remainingSecondsAt(now), true, mine,
-                    booth == null ? null : BoothFacadeService.FacadeView.of(booth));
+                    BoothFacadeService.FacadeView.of(booth));
         }
     }
 
