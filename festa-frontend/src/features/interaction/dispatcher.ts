@@ -53,6 +53,12 @@ function dispatch(event: UnityInteractEvent): void {
       // 대상 부스는 이 화면이 GET /booths/mine 으로 resolve 한다.
       openManagement();
       return;
+    case 'WORLD_GUIDE_INTERACT':
+      // 안내데스크 NPC (S15P21A604-688, #184). 새 화면을 만들지 않는다 — 월드 첫 진입에서
+      // WorldGuideLauncher 가 1회 자동으로 여는 그 오버레이를 같은 키로 다시 연다.
+      // payload 를 넘기지 않는 이유는 WORLD_EVENT_INTERACT 와 같다: 화면이 읽을 값이 없다.
+      openVisitorOverlay('WORLD_GUIDE', {});
+      return;
     default:
       return;
   }
