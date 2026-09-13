@@ -10,6 +10,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>The editor check was here from the start. Spreading those two lines across three services is
  * how one of them eventually forgets the staff branch, or worse, forgets the owner check entirely.
+ * Since spec 011 the same check also reads the staff <b>role</b>, which is the other reason it has
+ * to stay in one place: a role gate copied nine times is a role gate that is wrong in one of them.
  *
  * <p>Expiry joined for the same reason, but after it had already happened: the lease check had
  * been copied into eight services, three of them behind a private {@code requireValidLease}, and a
@@ -36,17 +38,32 @@ public class BoothAccessGuard {
     }
 
     /**
+     * Owner, or a staff member whose <b>role</b> may edit (spec 011 FR-002, C-09).
+     *
+     * <p>This used to be "a row exists". That was safe only while nothing created rows — spec 005
+     * read the table and 011 had not been built. Opening invitations without this line would hand a
+     * {@code CONSULTANT} every path behind this method, which is not only booth studio: AI agents,
+     * AI documents, surveys, survey results and projects all gate here.
+     *
      * @return the booth, so callers do not load it a second time
      * @throws BoothNotFoundException        no such booth
-     * @throws BoothEditorForbiddenException the member is neither owner nor staff
+     * @throws BoothEditorForbiddenException not the owner, or a staff member whose role cannot edit
      */
     @Transactional(readOnly = true)
     public Booth requireEditor(Long boothId, Long userId) {
         Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
-        if (!booth.isOwnedBy(userId) && !staffs.existsByBoothIdAndUserId(boothId, userId)) {
+        if (!booth.isOwnedBy(userId) && !mayEditAsStaff(boothId, userId)) {
             throw new BoothEditorForbiddenException();
         }
         return booth;
+    }
+
+    /** Absent row, unknown role and non-editing role all answer the same way: no. */
+    private boolean mayEditAsStaff(Long boothId, Long userId) {
+        return staffs.findRole(boothId, userId)
+                .flatMap(StaffRole::from)
+                .filter(StaffRole::mayEditBoothContent)
+                .isPresent();
     }
 
     /**
