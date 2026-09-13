@@ -35,6 +35,29 @@ namespace Festa.World
         Vector3 _pinLocalPos;
         Quaternion _pinLocalRot;
 
+        /// <summary>
+        /// 저작 위치를 대신할 **한시적인 자세**. 켜져 있는 동안만 이 값으로 못 박는다.
+        ///
+        /// <para>클립마다 몸이 루트에서 떨어져 있는 거리가 달라, 자세를 바꾸면 같은 루트에서도
+        /// 몸이 딴 자리에 선다. 게다가 돌려세우면 몸이 시각물 원점을 중심으로 돌아 자리가 또 바뀐다 —
+        /// 위치와 회전을 따로 주면 서로를 무너뜨리므로 <b>한 쌍으로</b> 받는다.
+        /// 트랜스폼에 직접 쓰면 이 컴포넌트의 LateUpdate 와 순서 싸움이 나므로 통로는 여기 하나다.</para>
+        /// </summary>
+        bool _hasOverride;
+        Vector3 _overridePos;
+        Quaternion _overrideRot;
+
+        /// <summary>한시적인 자세를 건다(시각물의 부모 기준 로컬). 거둘 때는 <see cref="ClearPose"/>.</summary>
+        public void SetPose(Vector3 localPos, Quaternion localRot)
+        {
+            _hasOverride = true;
+            _overridePos = localPos;
+            _overrideRot = localRot;
+        }
+
+        /// <summary>한시적인 자세를 거두고 씬에 저작된 값으로 돌아간다.</summary>
+        public void ClearPose() => _hasOverride = false;
+
         void Awake()
         {
             if (_visual == null)
@@ -52,8 +75,8 @@ namespace Festa.World
         void LateUpdate()
         {
             if (_visual == null) return;
-            _visual.localPosition = _pinLocalPos;
-            _visual.localRotation = _pinLocalRot;
+            _visual.localPosition = _hasOverride ? _overridePos : _pinLocalPos;
+            _visual.localRotation = _hasOverride ? _overrideRot : _pinLocalRot;
         }
     }
 }
