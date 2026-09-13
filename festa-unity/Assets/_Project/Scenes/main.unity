@@ -37604,7 +37604,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 92ec17c40d5c4d299f5315179c9361b7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _maxDistance: 42
+  _maxDistance: 9
   _highlightEnabled: 1
   _highlightColor: {r: 1, g: 0.82, b: 0.35, a: 1}
   _highlightStrength: 0.9
@@ -37624,9 +37624,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _returnAfter: 300
   _lineDuration: 2.2
-  _bubbleHeight: 13
-  _visibleDistance: 180
-  _bubblePullToCamera: 0
   _sleepEmote: 9
 --- !u!114 &766188889
 MonoBehaviour:
@@ -52924,43 +52921,43 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: 1.23
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: -0.03
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -1.98
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: 0.99545914
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: -0.0004577671
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: -0.0950679
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: -0.0047933036
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
+      value: -0.104
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
+      value: -10.91
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
+      value: -0.542
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
