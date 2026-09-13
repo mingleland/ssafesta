@@ -35,9 +35,18 @@ namespace Festa.World
 
         Animator _animator;
         GameObject[] _visuals;
-        float _hiddenUntil;
+        Collider[] _colliders;
         float _lineUntil;
         bool _caught;
+
+        /// <summary>서버가 정한 복귀 시각(서버 시간). 0 이면 자고 있다.</summary>
+        double _returnAtServerTime;
+
+        /// <summary>씬에 있는 자는 직원들. 네트워크 통로(플레이어 쪽)가 이 표로 찾아온다.</summary>
+        static readonly System.Collections.Generic.List<NappingStaffInteractable> s_all = new();
+
+        /// <summary>들킨 뒤 돌아오기까지(초). 서버가 복귀 시각을 정할 때 쓴다.</summary>
+        public static float ReturnAfterSeconds { get; private set; } = 300f;
 
         Transform _visual;
         PinVisualRoot _pin;
@@ -77,6 +86,12 @@ namespace Festa.World
             var renderers = GetComponentsInChildren<Renderer>(true);
             _visuals = new GameObject[renderers.Length];
             for (int i = 0; i < renderers.Length; i++) _visuals[i] = renderers[i].gameObject;
+
+            // 부딪히는 몸도 함께 쥔다 — 사라질 때 같이 꺼야 보이지 않는 벽이 남지 않는다.
+            _colliders = GetComponentsInChildren<Collider>(true);
+
+            ReturnAfterSeconds = _returnAfter;
+            if (!s_all.Contains(this)) s_all.Add(this);
 
             PlaySleep();
         }
@@ -200,44 +215,106 @@ namespace Festa.World
             else Debug.LogWarning($"[NappingStaff] 자는 포즈 상태를 찾지 못했다: {state}");
         }
 
+        /// <summary>
+        /// 보이는 것과 <b>부딪히는 것</b>을 함께 끈다.
+        ///
+        /// <para>처음에는 렌더러와 조준 대상만 껐다. 그랬더니 <b>사라진 자리에 보이지 않는 벽이 남아</b>
+        /// 사람이 걸렸다 — 콜라이더는 렌더러와 다른 오브젝트에 붙어 있어 같이 꺼지지 않는다
+        /// (2026-09-14 사용자 지적). 안 보이는 사람은 부딪히지도 않아야 한다.</para>
+        /// </summary>
         void SetVisible(bool on)
         {
-            if (_visuals == null) return;
-            for (int i = 0; i < _visuals.Length; i++)
-                if (_visuals[i] != null) _visuals[i].SetActive(on);
+            if (_visuals != null)
+                for (int i = 0; i < _visuals.Length; i++)
+                    if (_visuals[i] != null) _visuals[i].SetActive(on);
+
+            if (_colliders != null)
+                for (int i = 0; i < _colliders.Length; i++)
+                    if (_colliders[i] != null) _colliders[i].enabled = on;
+
             var target = GetComponent<BoothInteractionTarget>();
             if (target != null) target.enabled = on;   // 안 보이는 사람을 조준하지 않게
         }
+
+        void OnDestroy() => s_all.Remove(this);
 
         void LateUpdate()
         {
             if (!_caught) return;
 
-            // 대사 시간이 지나면 사라지고, 그 뒤 5분이 지나면 돌아온다.
+            // 대사 시간이 지나면 사라진다. 복귀는 **서버가 정한 시각**으로 각자 센다 —
+            // 그래야 5분 동안 트래픽 없이도 모두가 같은 순간에 다시 본다.
             if (_lineUntil > 0f && Time.time >= _lineUntil)
             {
                 _lineUntil = 0f;
                 SetVisible(false);
-                _hiddenUntil = Time.time + _returnAfter;
             }
-            else if (_hiddenUntil > 0f && Time.time >= _hiddenUntil)
+            else if (_lineUntil <= 0f && NappingStaffNetwork.ServerNow() >= _returnAtServerTime)
             {
-                _hiddenUntil = 0f;
                 _caught = false;
+                _returnAtServerTime = 0d;
                 SetVisible(true);
                 if (_pin != null) _pin.ClearPose();   // 다시 누우니 씬에 저작된 자세로 돌아간다
                 PlaySleep();
             }
         }
 
+        /// <summary>
+        /// F 를 눌렀다. <b>판정은 서버가 한다</b> — 직원은 축제장에 하나뿐이라 두 사람이 동시에
+        /// 걸어도 한 번만 들켜야 하고, 사라진 모습은 모두에게 같아야 한다.
+        ///
+        /// <para>접속이 없으면(에디터 단독 실행) 그 자리에서 혼자 처리한다 — 네트워크가 없다고
+        /// 아무 일도 일어나지 않으면 손으로 확인할 방법이 없다.</para>
+        /// </summary>
         public void Interact()
         {
             if (_caught) return;   // 이미 들켰다 — 두 번 깨우지 않는다
+
+            var net = LocalNetwork();
+            if (net != null) { net.RequestWake(); return; }
+
+            // 오프라인 경로.
+            ApplyWake(NappingStaffNetwork.ServerNow() + _returnAfter, showLine: true);
+        }
+
+        static NappingStaffNetwork LocalNetwork()
+        {
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            var po = nm != null && nm.IsListening && nm.LocalClient != null ? nm.LocalClient.PlayerObject : null;
+            return po != null ? po.GetComponent<NappingStaffNetwork>() : null;
+        }
+
+        /// <summary>서버가 승인한 깨우기를 씬의 모든 자는 직원에게 적용한다.</summary>
+        public static void ApplyWakeToAll(double returnAtServerTime, bool showLine)
+        {
+            for (int i = 0; i < s_all.Count; i++)
+                if (s_all[i] != null) s_all[i].ApplyWake(returnAtServerTime, showLine);
+        }
+
+        /// <summary>늦게 들어온 사람에게 현재 상태를 맞춘다 — 이미 사라진 상태면 대사 없이 감춘 채로 시작한다.</summary>
+        public static void ApplyLateJoin(double returnAtServerTime)
+        {
+            for (int i = 0; i < s_all.Count; i++)
+            {
+                var s = s_all[i];
+                if (s == null) continue;
+                s._caught = true;
+                s._lineUntil = 0f;
+                s._returnAtServerTime = returnAtServerTime;
+                s.SetVisible(false);
+            }
+        }
+
+        void ApplyWake(double returnAtServerTime, bool showLine)
+        {
+            if (_caught) return;
             _caught = true;
+            _returnAtServerTime = returnAtServerTime;
             _lineUntil = Time.time + _lineDuration;
 
-            // 화면 평면에 띄운다 (위 클래스 주석 참조).
-            BoothInteractionInput.Toast(CaughtLine, _lineDuration);
+            // 대사는 말을 건 사람에게만. 화면 평면 토스트라 멀리 있는 사람에게 띄우면
+            // 보이지도 않는 사람의 말이 화면을 가린다.
+            if (showLine) BoothInteractionInput.Toast(CaughtLine, _lineDuration);
 
             ApplyStandPose();
 
