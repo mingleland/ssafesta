@@ -1,5 +1,6 @@
 package com.example.ssafesta.consultation.ws;
 
+import com.example.ssafesta.common.RedisKeyspaceProperties;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Base64;
@@ -20,6 +21,9 @@ import org.springframework.stereotype.Service;
  * <p>저장소는 Redis 다 — Refresh Token 이 이미 쓰고 있어 새 저장소가 늘지 않는다. TTL 이 곧
  * 만료라 스위퍼도 필요 없다.
  *
+ * <p>dev·demo 가 Redis 하나를 공유하므로 키 맨 앞에 환경 namespace 를 붙인다.
+ * 그렇지 않으면 한 환경에서 발급한 5분 토큰이 다른 환경의 STOMP 연결도 열어 준다.
+ *
  * <p><b>연결 성립 후에는 만료가 연결을 끊지 않는다</b>(FR-020). 이 토큰은 <i>연결을 여는</i>
  * 열쇠이지 세션의 수명이 아니다. 끊긴 뒤 재연결할 때 새로 발급받는다.
  */
@@ -33,9 +37,11 @@ public class WsTokenService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final StringRedisTemplate redis;
+    private final String keyspace;
 
-    public WsTokenService(StringRedisTemplate redis) {
+    public WsTokenService(StringRedisTemplate redis, RedisKeyspaceProperties keyspace) {
         this.redis = redis;
+        this.keyspace = keyspace.prefix();
     }
 
     /** 회원 한 명에게 5분짜리 연결 열쇠를 준다. 재연결마다 새로 발급받는다. */
@@ -43,7 +49,7 @@ public class WsTokenService {
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-        redis.opsForValue().set(KEY_PREFIX + token, String.valueOf(userId), VALID_FOR);
+        redis.opsForValue().set(key(token), String.valueOf(userId), VALID_FOR);
         return new Issued(token, VALID_FOR.toSeconds());
     }
 
@@ -58,8 +64,12 @@ public class WsTokenService {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
-        String userId = redis.opsForValue().get(KEY_PREFIX + token);
+        String userId = redis.opsForValue().get(key(token));
         return userId == null ? Optional.empty() : Optional.of(Long.valueOf(userId));
+    }
+
+    private String key(String token) {
+        return keyspace + KEY_PREFIX + token;
     }
 
     public record Issued(String token, long expiresInSeconds) { }

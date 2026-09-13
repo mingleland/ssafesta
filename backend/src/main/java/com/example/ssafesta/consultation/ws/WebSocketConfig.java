@@ -18,7 +18,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  *
  * <p><b>SEND destination 이 없다.</b> P1 에서 이 채널은 서버에서 클라이언트로 가는 단방향
  * 알림이고 행동은 전부 REST 다(C-12) — 그래서 {@code setApplicationDestinationPrefixes} 를
- * 두지 않는다. 클라이언트가 보낼 곳이 없다는 것이 계약이다.
+ * 두지 않는다. 다만 이 설정의 부재를 보안 경계로 삼지 않는다. 클라이언트가
+ * broker destination 으로 보내는 직접 SEND 는 {@link StompAuthChannelInterceptor} 가 명시적으로
+ * 거부한다.
  *
  * <p><b>한계를 적어 둔다.</b> in-memory simple broker 라 <b>단일 인스턴스 전제</b>다. Spring 을
  * 두 대 이상 띄우면 A 에 붙은 직원이 B 가 발행한 이벤트를 받지 못한다. P1 배포 형상이 단일
