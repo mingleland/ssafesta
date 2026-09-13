@@ -87,7 +87,16 @@ public class BoothVisitService {
         if (!from.isBefore(to)) {
             throw ApiException.fieldInvalid("from", "조회 시작이 끝보다 앞서야 합니다.");
         }
+        return rawMetrics(boothId, from, to);
+    }
 
+    /**
+     * 게이트 없는 집계 — 이미 권한을 판정한 쪽이 쓴다 (부스 대시보드, {@code S15P21A604-501}).
+     *
+     * <p>패키지 밖으로 열지 않는다. 게이트를 건너뛸 수 있는 문을 공개 API 로 두면 언젠가 게이트 없이
+     * 호출된다.
+     */
+    MetricsView rawMetrics(Long boothId, Instant from, Instant to) {
         Object[] row = visits.summarize(boothId, from, to);
         // 네이티브 집계는 [count, count, avg, count] 를 한 행으로 준다. 드라이버가 감싸는 방식이
         // 버전마다 달라 첫 원소가 다시 배열인 경우가 있어 풀어 본다.

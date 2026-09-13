@@ -1411,19 +1411,59 @@ Unity 는 Spring 에 아무 신호도 보내지 않는다(2026-09-07 확정). �
 
 ## 15. Dashboard — P1
 
+> 구현·계약 정본: `specs/015-dashboard/contracts/dashboard-summary-api.md` (`S15P21A604-501`).
+
 ### GET `/booths/{boothId}/dashboard/summary?from=&to=`
+
+Owner · `ADMIN` · `CONTENT_EDITOR` 만. `CONSULTANT` 는 제외된다 — 상담원은 상담을 하지 부스 운영 지표를 보지 않는다. `from` 포함, `to` 제외, 둘 다 필수(ISO-8601).
 
 ```json
 {
+  "from": "2026-09-01T00:00:00Z",
+  "to": "2026-09-14T00:00:00Z",
   "visits": 120,
-  "aiUsages": 43,
-  "consultations": 8,
+  "uniqueVisitors": 88,
+  "averageDwellSeconds": 143,
+  "openVisits": 4,
+  "consultations": 12,
+  "consultationsEnded": 6,
   "surveyResponses": 31,
-  "revenueCoin": 320
+  "aiUsages": null,
+  "revenueCoin": null
 }
 ```
 
-고급 체류 시간·전환율은 P2다.
+**`null` 은 0 이 아니다.** `null` 은 **집계할 원천이 아직 없다**, `0` 은 **원천은 있고 그 기간에 0건이었다**. 이 구분이 없으면 FE 는 "AI 이용 0건" 카드를 영원히 띄운다.
+
+| 필드 | 원천 |
+|---|---|
+| `visits` · `uniqueVisitors` · `averageDwellSeconds` · `openVisits` | `booth_visit_events` — §14-1 과 같은 정의다 |
+| `consultations` · `consultationsEnded` | `consultations`. **요청 시각 기준**이라 아직 안 끝난 상담도 요청한 기간에 센다 |
+| `surveyResponses` | 이 부스의 설문에 달린 응답. 게스트 응답도 센다 |
+| `aiUsages` | **없다** — AI 대화를 남기는 표가 저장소에 아직 없다 (AI 파트 소관) |
+| `revenueCoin` | **없다** — 부스로 코인이 *들어오는* 경로가 설계에 없다. 아래 참조 |
+
+#### `revenueCoin` 이 `null` 인 이유
+
+원장에서 부스와 닿는 사유는 둘뿐이고, 둘 다 수익이 아니다.
+
+- **임대료** (`BOOTH_LEASE`) — 부스 소유자가 **낸다**. 비용이다.
+- **설문 보상** (`SURVEY_REWARD`) — 응답자에게 **발행된다**. 차감되는 지갑이 없어 부스가 내는 것이 아니다.
+
+`booth_daily_metrics.revenue_coin` 컬럼도 같은 가정 위에 있다. 무엇을 수익으로 볼지는 기획 결정이라 임의로 정하지 않았다(헌법 30조) — `docs/26` 에 결정 요청으로 올려 두었다.
+
+#### 그 밖
+
+- **집계는 실시간 계산이다.** 사전 집계 표(`booth_daily_metrics`)는 비워 둔다 — 갱신이 실패해도 조용히 그럴듯한 숫자를 계속 보여주기 때문이다. 부스 12개 규모에서는 원본 스캔이 더 싸다.
+- **임대가 끝난 부스도 지난 기간을 볼 수 있다.** 행사 뒤 정산을 해야 한다 (spec 015 C-03).
+- **플랫폼 전체 집계는 없다.** 전역 관리자 권한 모델이 미정이다 (`docs/26`, `S15P21A604-165`).
+- 고급 전환율은 P2다.
+
+| 오류 | 조건 |
+|---|---|
+| `400 VALIDATION_FAILED` | `from` 이 `to` 보다 뒤이거나 같다 |
+| `403 BOOTH_EDITOR_FORBIDDEN` | 호출자가 Owner·`ADMIN`·`CONTENT_EDITOR` 가 아니다 |
+| `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 |
 
 ---
 
