@@ -26,8 +26,14 @@ class StaffInvitationExpirySweeper {
         this.invitations = invitations;
     }
 
-    /** 초대 기한이 48시간이라 10분이면 넉넉하다. 주기는 운영 손잡이, 48시간은 계약이다. */
-    @Scheduled(fixedDelayString = "${app.staff.invitation-expiry-scan-interval:PT10M}")
+    /** 초대 기한이 48시간이라 10분이면 넉넉하다. 주기는 운영 손잡이, 48시간은 계약이다.
+     *
+     * <p><b>부팅 즉시는 돌지 않는다.</b> 기한이 48시간인 일을 배포 때마다 즉시 쓸어낼 이유가 없고,
+     * 부팅 순간은 다른 초기화가 몰려 있는 시간이다. 실제로 전체 테스트에서 이 즉시 실행이
+     * {@code ArcadeMachineSingleQueryTest} 의 전역 문장 카운터에 섞여 그 테스트를 깨뜨렸다.
+     */
+    @Scheduled(initialDelayString = "${app.staff.invitation-expiry-initial-delay:PT1M}",
+            fixedDelayString = "${app.staff.invitation-expiry-scan-interval:PT10M}")
     void expireStaleInvitations() {
         int moved = invitations.expireStale();
         if (moved > 0) {

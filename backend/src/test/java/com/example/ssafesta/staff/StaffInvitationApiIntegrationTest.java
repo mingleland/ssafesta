@@ -51,6 +51,7 @@ class StaffInvitationApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private StaffInvitationService invitationService;
 
     @BeforeEach
     void freeSlots() {
@@ -289,6 +290,40 @@ class StaffInvitationApiIntegrationTest {
                         .header("Authorization", otherOwner.bearer()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("STAFF_INVITATION_NOT_FOUND"));
+    }
+
+    // -- 만료 스위퍼 --------------------------------------------------------
+
+    /**
+     * 스위퍼가 기한 지난 대기분을 EXPIRED 로 옮긴다 (C-07).
+     *
+     * <p>정확성은 읽는 쪽이 이미 지고 있으므로(위 만료 테스트들) 이 패스가 고치는 것은 목록에
+     * PENDING 이 영영 쌓이는 쪽이다. 그래서 확인할 것은 "옮겨졌는가" 하나다.
+     */
+    @Test
+    void sweeperMovesOverduePendingToExpired() throws Exception {
+        Owner owner = leasedOwner("스위퍼");
+        Member invitee = member("스위퍼대상");
+        Long invitationId = createdInvitationId(owner, invitee, "CONSULTANT");
+        pushExpiryIntoThePast(invitationId);
+
+        invitationService.expireStale();
+
+        assertEquals("EXPIRED", jdbc.queryForObject(
+                "SELECT status FROM staff_invitations WHERE id = ?", String.class, invitationId));
+    }
+
+    /** 아직 기한이 남은 초대는 건드리지 않는다. */
+    @Test
+    void sweeperLeavesLiveInvitationsAlone() throws Exception {
+        Owner owner = leasedOwner("스위퍼보존");
+        Member invitee = member("살아있는초대");
+        Long invitationId = createdInvitationId(owner, invitee, "CONSULTANT");
+
+        invitationService.expireStale();
+
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM staff_invitations WHERE id = ?", String.class, invitationId));
     }
 
     // ── 도우미 ──────────────────────────────────────────────────────────────
