@@ -271,6 +271,12 @@ public enum ErrorCode {
     STAFF_OWNER_IMMUTABLE(HttpStatus.CONFLICT, "부스 소유자는 직원 목록에서 변경할 수 없습니다."),
     STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "그 부스의 직원이 아닙니다."),
 
+    // 월드 공용 채팅 (spec 002 contracts, S15P21A604-687). STOMP 로만 나가지만 ErrorCode 를
+    // 싣는다 — 싣지 않으면 500 INTERNAL_ERROR 로 나가고, 보낸 쪽이 고칠 수 있는 거절과 서버
+    // 결함이 같은 모양이 된다 (DomainExceptionEnvelopeTest 가 지키는 규약).
+    CHAT_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 보내 주세요."),
+    CHAT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "채팅을 잠시 사용할 수 없습니다."),
+
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");

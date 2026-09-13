@@ -2,6 +2,7 @@ package com.example.ssafesta.consultation.ws;
 
 import java.security.Principal;
 import java.util.List;
+import java.util.Set;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -23,10 +24,15 @@ import org.springframework.stereotype.Component;
  * <p>검증된 회원 id 를 {@link Principal} 로 심어 {@code /user/queue/...} 가 그 사람에게만 가게
  * 한다. Spring 의 user destination 이 이 이름으로 대상을 고른다.
  *
- * <p><b>클라이언트 SEND 는 기본 거부다.</b> {@code /topic}·{@code /queue} destination 은
- * 컨트롤러를 거치지 않고 simple broker 로 갈 수 있어 상담 이벤트를 위조한다.
- * 현재 계약에는 클라이언트가 보낼 destination 이 하나도 없다. 후속 기능이 SEND 를
- * 추가하면 그 티켓이 정확한 destination 하나만 allowlist 에 추가해야 한다.
+ * <p><b>클라이언트 SEND 는 allowlist 밖이면 거부다.</b> {@code /topic}·{@code /queue}
+ * destination 은 컨트롤러를 거치지 않고 simple broker 로 갈 수 있어 서버 이벤트를 위조한다.
+ * 허용은 {@link #ALLOWED_SEND_DESTINATIONS} 가 전부이고, 기능이 늘 때마다 그 티켓이 정확한
+ * destination 하나씩만 더한다.
+ *
+ * <p><b>거부는 연결을 끊는다.</b> 여기서 던진 예외는 ERROR 프레임과 함께 세션을 닫는다. 이것이
+ * 의도다 — 허용 목록 밖으로 보내는 쪽은 공격자이거나 고장난 클라이언트이고, 조용히 버리면
+ * 후자는 자기가 깨진 줄 모른 채 계속 돈다. 한 소켓이 상담 알림과 채팅을 함께 나르므로 대가가
+ * 작지 않다는 것은 알고 있다 — 실제로 정상 클라이언트가 여기 걸리면 버리는 쪽으로 바꾼다.
  *
  * <p><b>raw {@code /queue/**} 구독도 거부한다.</b> 개인 알림은 반드시
  * {@code /user/queue/**} 를 통해 Spring 의 session 변환을 거친다. 토픽별 구독 자격은
@@ -36,6 +42,14 @@ import org.springframework.stereotype.Component;
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private static final String BEARER = "Bearer ";
+
+    /**
+     * 클라이언트가 SEND 할 수 있는 destination 전부 (S15P21A604-687).
+     *
+     * <p>접두 매칭이 아니라 <b>정확히 일치</b>다. {@code /app/world/} 로 시작하는 것을 전부 열면
+     * 나중에 추가되는 핸들러가 이 목록을 손대지 않고 열려 버린다.
+     */
+    private static final Set<String> ALLOWED_SEND_DESTINATIONS = Set.of("/app/world/chat");
 
     private final WsTokenService tokens;
 
@@ -52,7 +66,8 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         StompCommand command = accessor.getCommand();
-        if (StompCommand.SEND.equals(command)) {
+        if (StompCommand.SEND.equals(command)
+                && !ALLOWED_SEND_DESTINATIONS.contains(accessor.getDestination())) {
             throw new IllegalArgumentException(
                     "클라이언트가 SEND 할 수 있는 destination 이 아닙니다.");
         }
