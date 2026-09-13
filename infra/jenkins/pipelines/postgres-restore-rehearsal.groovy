@@ -17,10 +17,12 @@ pipeline {
                     if (!manifestKey) { error('MANIFEST_KEY is required') }
                     if (!(target ==~ /disposable-[a-z0-9][a-z0-9-]{0,62}/)) { error('TARGET must start with disposable-') }
                     String artifact = "${pwd()}/artifacts/postgres-restore/result.json"
+                    String readerCredentialId = env.R2_POSTGRES_BACKUP_READER_CREDENTIAL_ID ?: 'r2-postgres-backup-reader'
+                    String postgresCredentialId = env.POSTGRES_BACKUP_ADMIN_PASSWORD_CREDENTIAL_ID ?: 'postgres-backup-admin-password'
                     withCredentials([
-                        usernamePassword(credentialsId: env.R2_POSTGRES_BACKUP_READER_CREDENTIAL_ID,
+                        usernamePassword(credentialsId: readerCredentialId,
                             usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: env.POSTGRES_BACKUP_ADMIN_PASSWORD_CREDENTIAL_ID, variable: 'PGPASSWORD')
+                        string(credentialsId: postgresCredentialId, variable: 'PGPASSWORD')
                     ]) {
                         withEnv(["BACKUP_MANIFEST_KEY=${manifestKey}", "RESTORE_TARGET=${target}", "POSTGRES_RESTORE_RESULT=${artifact}"]) {
                             sh '''mkdir -p "$(dirname "$POSTGRES_RESTORE_RESULT")"
