@@ -1,5 +1,5 @@
 {
-    "name": "Festa.Integration.Contracts",
+    "name": "Festa.Integration.WorldSession",
     "rootNamespace": "Festa.Integration",
     "references": [],
     "includePlatforms": [],
