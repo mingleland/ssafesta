@@ -64,9 +64,14 @@ class SecurityConfiguration {
     SecurityFilterChain securityFilterChain(HttpSecurity http, OAuthLoginSuccessHandler successHandler,
                                             MemberSessionService sessions, ApiErrorWriter errors) throws Exception {
         return http.cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**"))
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**", "/ws/**"))
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
+                        // 상담 STOMP 핸드셰이크는 HTTP 인증을 타지 않는다 — 신원은 CONNECT 프레임의
+                        // WS Token 으로 확인하고(FR-019, StompAuthChannelInterceptor), 그 검증에
+                        // 실패한 연결은 거부된다. 여기서 막으면 핸드셰이크 단계에서 토큰을 URL 로
+                        // 넘겨야 하는데 그것이 바로 FR-019 가 금지하는 것이다.
+                        .requestMatchers("/ws/consultation/**", "/ws/consultation").permitAll()
                         // Slot browsing is open: a guest session exists to look around (헌법 12조).
                         // Leasing under /booth-slots/{id}/leases stays authenticated.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots", "/api/v1/booths/*").permitAll()

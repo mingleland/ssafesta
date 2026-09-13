@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class SurveyResponseService {
 
-    private static final String REWARD_REFERENCE_TYPE = "SURVEY";
+    private static final String REWARD_REFERENCE_TYPE = CoinReason.SURVEY_REFERENCE_TYPE;
     private static final String GUEST_ONLY_MESSAGE =
             "보상이 있는 설문은 회원만 참여할 수 있습니다.";
     /** 같은 code 에 다른 이유다 — 보상이 아니라 추첨 때문이라 문장을 나눈다 (GitLab #173). */

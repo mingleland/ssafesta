@@ -2,6 +2,8 @@ package com.example.ssafesta.internal.ai;
 
 import com.example.ssafesta.ai.AiAgent;
 import com.example.ssafesta.ai.AiAgentRepository;
+import com.example.ssafesta.project.Project;
+import com.example.ssafesta.project.ProjectRepository;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -21,9 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AiAgentConfigService {
 
     private final AiAgentRepository agents;
+    private final ProjectRepository projects;
 
-    AiAgentConfigService(AiAgentRepository agents) {
+    AiAgentConfigService(AiAgentRepository agents, ProjectRepository projects) {
         this.agents = agents;
+        this.projects = projects;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +43,7 @@ public class AiAgentConfigService {
         if (!agent.isActive()) {
             return AgentConfigView.agentInactive();
         }
-        return AgentConfigView.found(agent);
+        return AgentConfigView.found(agent, projects.findByBoothId(boothId).orElse(null));
     }
 
     /**
@@ -49,20 +53,43 @@ public class AiAgentConfigService {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record AgentConfigView(boolean found, String role, String tone, String responseLength,
                                   String systemPrompt, List<String> forbiddenTopics,
-                                  String denialCode) {
+                                  ProjectFacts projectFacts, String denialCode) {
 
-        static AgentConfigView found(AiAgent agent) {
+        static AgentConfigView found(AiAgent agent, Project project) {
             return new AgentConfigView(true, agent.getRole(), agent.getTone(),
                     agent.getResponseLength(), agent.getSystemPrompt(), agent.getForbiddenTopics(),
-                    null);
+                    ProjectFacts.of(project), null);
         }
 
         static AgentConfigView agentNotInBooth() {
-            return new AgentConfigView(false, null, null, null, null, null, "AGENT_NOT_IN_BOOTH");
+            return new AgentConfigView(false, null, null, null, null, null, null,
+                    "AGENT_NOT_IN_BOOTH");
         }
 
         static AgentConfigView agentInactive() {
-            return new AgentConfigView(false, null, null, null, null, null, "AGENT_INACTIVE");
+            return new AgentConfigView(false, null, null, null, null, null, null, "AGENT_INACTIVE");
+        }
+    }
+
+    /**
+     * rule-based 단축 응답이 쓰는 정형 정보 (S15P21A604-597·-396).
+     *
+     * <p><b>세 값 모두 {@code null} 일 수 있다.</b> 소개는 운영자가 안 썼을 수 있고, 나머지 둘은 AI 가
+     * 아직 추출하지 않았을 수 있다. 그래서 {@code projectFacts} 자체도 프로젝트가 없으면 빠진다 —
+     * 값이 없는 것을 빈 문자열로 채우면 받는 쪽이 "소개가 없는 부스" 와 "소개가 빈 문자열인 부스" 를
+     * 구분하지 못한다.
+     *
+     * @param introduction {@code projects.description} 이다. 운영자가 직접 쓴 프로젝트 소개
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ProjectFacts(String introduction, String targetAudience, String techStack) {
+
+        static ProjectFacts of(Project project) {
+            if (project == null) {
+                return null;
+            }
+            return new ProjectFacts(project.getDescription(), project.getTargetAudience(),
+                    project.getTechStack());
         }
     }
 }

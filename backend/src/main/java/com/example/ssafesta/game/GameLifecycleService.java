@@ -24,16 +24,19 @@ public class GameLifecycleService {
     private final GameDraftRepository drafts;
     private final GamePublishedVersionRepository published;
     private final GameAssetRepository assets;
+    private final ArcadeMachineBindingRepository bindings;
     private final GameAccessGuard guard;
     private final GameProperties properties;
 
     public GameLifecycleService(GameRepository games, GameDraftRepository drafts,
                                 GamePublishedVersionRepository published, GameAssetRepository assets,
-                                GameAccessGuard guard, GameProperties properties) {
+                                ArcadeMachineBindingRepository bindings, GameAccessGuard guard,
+                                GameProperties properties) {
         this.games = games;
         this.drafts = drafts;
         this.published = published;
         this.assets = assets;
+        this.bindings = bindings;
         this.guard = guard;
         this.properties = properties;
     }
@@ -146,6 +149,11 @@ public class GameLifecycleService {
         assets.deleteAllByGameId(game.getId());
         drafts.findById(game.getId()).ifPresent(drafts::delete);
         published.deleteAll(published.findAllByGameIdOrderByVersionNoDesc(game.getId()));
+        // Same failure as the assets above, one table later: V27 gave arcade machines a plain
+        // foreign key to games with no ON DELETE, on purpose, so the deleting side has to name what
+        // it removes. Withdrawal already did; eviction did not, and a creator whose oldest deleted
+        // game sat on a machine could not delete anything else (S15P21A604-681).
+        bindings.deleteByGameId(game.getId());
         games.flush();
         games.delete(game);
     }

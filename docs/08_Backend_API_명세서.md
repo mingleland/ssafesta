@@ -1144,86 +1144,121 @@ Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답�
 
 ## 10. Staff / Permission
 
+> **정본은 `specs/011-staff-consultation/contracts/staff-consultation-api.md` §A 다** (2026-09-13, `S15P21A604-136` 구현과 함께 정정). 이 절은 그 요약이다.
+
 ### POST `/booths/{boothId}/staff-invitations`
 
-직원 초대.
+직원 초대. **Owner 와 `ADMIN` 만** 보낸다 — `CONTENT_EDITOR` 는 콘텐츠를 고치지만 사람을 들이지는 못한다(FR-002).
 
 ```json
-{
-  "userId": 45,
-  "role": "CONSULTANT"
-}
+{ "nickname": "덕", "role": "CONSULTANT" }
 ```
+
+> **대상은 닉네임이다.** 이전 판에는 `userId` 로 적혀 있었는데 **Owner 가 남의 숫자 id 를 알아낼 경로가 없다** — 사용자 조회·검색 endpoint 가 없고, 만들면 닉네임 훑기·id 수집 표면이 함께 생긴다. `users.nickname` 이 V1 부터 `UNIQUE` 다.
+
+응답 `201`: `{ invitationId, boothId, boothName, nickname, role, expiresAt }`. 초대는 **48시간** 유효하다(C-07).
+
+오류: `403 STAFF_MANAGER_FORBIDDEN` · `404 STAFF_INVITEE_NOT_FOUND` · `409 STAFF_ALREADY_MEMBER` · `409 STAFF_INVITATION_PENDING`
+
+### GET `/staff-invitations/mine`
+
+본인에게 온 **대기 중이고 만료되지 않은** 초대만(FR-016, C-08). 만료 배치를 기다리지 않는다 — 눌러 봐야 409 인 카드를 보여 주지 않는다.
 
 ### POST `/staff-invitations/{invitationId}/accept`
 
+초대받은 본인만. 수락 시점에 `booth_staffs` 행이 생기고 역할이 적용된다. → `204`
+
+### DELETE `/booths/{boothId}/staff-invitations/{invitationId}`
+
+Owner·`ADMIN` 이 대기 중 초대를 거둔다(FR-017). → `204`
+
+> **초대받은 사용자의 거절 API 는 없다**(C-10). 수락하지 않으면 48시간 뒤 만료된다.
+
 ### GET `/booths/{boothId}/staff`
 
-### PATCH `/booths/{boothId}/staff/{userId}`
+부스 **구성원이면 누구나** 본다 — `CONSULTANT` 도 같은 부스에 누가 있는지는 알아야 한다.
 
-권한 변경.
+**Owner 가 역할 `OWNER` 의 읽기 전용 행으로 함께 나온다**(FR-018). Owner 는 `booth_staffs` 에 저장되지 않으며 `readOnly: true` 로 표시된다. `consultationStatus` 는 직원 행에만 있고 Owner 행에서는 `null` 이다.
 
-### DELETE `/booths/{boothId}/staff/{userId}`
+### PATCH `/booths/{boothId}/staff/{userId}` · DELETE `…`
 
-Owner 본인 제거 금지 등 정책 검증 필요.
+Owner·`ADMIN` 만. **Owner 를 가리키면 `409 STAFF_OWNER_IMMUTABLE`** 이다 — 행이 없어서 나는 404 와 구분한다. 목록에 분명히 보이던 사람을 404 로 답하면 "이 부스와 무관하다" 로 읽힌다.
 
 ---
 
 ## 11. Staff Presence
 
-실시간 상태 자체는 Redis/WebSocket 중심이지만 상태 변경 API가 필요하면 다음 구조를 사용할 수 있다.
-
 ### PUT `/booths/{boothId}/staff/me/presence`
 
 ```json
-{
-  "status": "AVAILABLE"
-}
+{ "status": "AVAILABLE" }
 ```
 
-실시간 구독 event는 Realtime 명세서에서 관리한다.
+`AVAILABLE`·`AWAY`·`OFFLINE` 만 받는다. **`BUSY` 는 서버가 관리한다** — 상담 수락이 넣고 종료가 되돌린다. 직접 지정하면 `400 VALIDATION_FAILED` 다.
+
+기본값은 `OFFLINE` 이다 — US2 가 "담당자가 항상 있을 수 없다, 오프라인이 기본 상태" 로 못박았다.
 
 ---
 
 ## 12. Consultation
 
-### POST `/booths/{boothId}/consultations`
+> **정본은 `specs/011-staff-consultation/contracts/staff-consultation-api.md` §B 다.** 이 절의 이전 판(`POST /booths/{boothId}/consultations` 계열)은 **무효다** — 실제 계약은 2026-09-07 BE 회신(GitLab #133)으로 확정됐고 FE 가 `S15P21A604-519` 로 선반영을 마쳤다. 2026-09-13 `S15P21A604-137` 구현과 함께 정정한다.
 
-사람 상담 요청 생성. `requested_at + 10분`을 `expiresAt`으로 계산해 응답에 포함한다 (C-01, spec 011 — 2026-08-31 확정, GitLab work_items#118).
+### POST `/consultation/ws-token`
 
-```json
-{
-  "conversationId": "conv_01JABCXYZ",
-  "agentId": 78
-}
+STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, expiresInSeconds: 300 }`
+
+`Authorization: Bearer <token>` 헤더로 STOMP `CONNECT` 에 싣는다. **URL query 로 넘기지 않으며 Access Token 재사용도 허용하지 않는다**(헌법 13조). 연결 성립 후에는 만료가 연결을 끊지 않는다.
+
+### STOMP
+
+```text
+엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
+구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
+            /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
+SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
+봉투        { type, requestId, occurredAt, … }
 ```
 
-응답 예:
+방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`.
+
+> **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
+
+### POST `/consultation/requests`
+
+**회원 전용**이다 — 게스트는 `403 MEMBER_ONLY`(FR-014). 요청은 **10분** 유효하다(C-01).
 
 ```json
-{
-  "consultationId": 901,
-  "status": "REQUESTED",
-  "requestedAt": "...",
-  "expiresAt": "..."
-}
+{ "boothId": 7, "conversationId": "conv_01JABCXYZ" }
 ```
 
-10분 내 Accept가 없으면 `REQUESTED → EXPIRED`로 전환하고 `CONSULTATION_EXPIRED` WebSocket 이벤트로 알린다(docs/16 §11). FE는 `expiresAt`으로 잔여 시간을 안내하고 만료 후 재요청 버튼을 노출한다.
+→ `201 { requestId, expiresInSeconds: 600 }`
 
-### GET `/consultations/{consultationId}`
+**요약 텍스트는 클라이언트가 보내지 않는다.** 서버가 `conversationId` 로 FastAPI 에 요약을 청해 **요청 생성 시점 스냅샷**으로 굳힌다(FR-012). 생성 실패는 `null` 일 뿐 요청을 막지 않는다(헌법 3조).
 
-응답 `status`에 `EXPIRED`가 포함된다.
+오류: `409 CONSULTATION_REQUEST_PENDING` · `409 BOOTH_LEASE_EXPIRED`
 
-### POST `/consultations/{consultationId}/accept`
+### DELETE `/consultation/requests/{requestId}`
 
-한 명의 Staff만 성공해야 한다. 이미 `EXPIRED`/`REJECTED`/다른 Staff가 `ACCEPTED`한 요청은 거부한다.
+방문자 본인. 상태는 `CANCELLED` 로 남는다 — 만료와 가르는 이유는 직원 화면이 다른 이벤트를 받기 때문이다. → `204`
 
-### POST `/consultations/{consultationId}/end`
+### GET `/booths/{boothId}/consultation/requests`
 
-상담 종료.
+부스 구성원이면 누구나. **대기 중이고 만료되지 않은** 것만 준다.
 
-메시지는 WebSocket event 중심으로 처리한다. 오프라인 시 메시지 남기기(비동기 문의)는 P1에서 제외하고 P2 후속 이슈로 분리했다(C-02, spec 011). 원문 History REST Endpoint 도입 여부·보존 기간은 P2 spec 착수 시 확정한다(C-03). P1 메타데이터·Handoff Summary(`consultations.summary`)는 프로젝트 종료 시 일괄 삭제한다(docs/09 §27).
+### POST `/consultation/requests/{requestId}/accept`
+
+**정확히 한 명만 성공한다**(SC-001). **직원 한 명에게 활성 상담은 1건**이고(C-06, FR-021) 위반은 `409 CONSULTATION_ALREADY_ACTIVE` 이며 **기존 상담은 유지된다**.
+
+→ `200 { requestId, sessionId, visitorNickname, handoffSummary }` — `sessionId` 는 `requestId` 와 **같은 값**이다(한 행이 요청과 세션을 겸한다).
+
+### POST `/consultation/sessions/{sessionId}/end`
+
+방문자·직원 **누구나** 끝낸다(FR-010). → `204`
+
+### P1 에 없는 것
+
+실시간 메시지 송수신·저장은 **P2**(C-12). 오프라인 비동기 문의도 **P2**(C-02). 원문 History 조회는 P2 spec 착수 시 저장 여부부터 재검토한다(C-03). P1 메타데이터·Handoff Summary 는 프로젝트 종료 시 일괄 삭제한다.
 
 ---
 
@@ -1311,21 +1346,129 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
-## 15. Dashboard — P1
+## 14-1. Booth Metrics — 방문·체류 계측
 
-### GET `/booths/{boothId}/dashboard/summary?from=&to=`
+> **BE 구현 완료 (`S15P21A604-240`, 2026-09-13). 발신 쪽 합의는 대기 중이다** — 아래 "묻는 것" 참조.
+>
+> 계측이 배포 **전에** 심겨 있어야 하는 이유는 간단하다. "Coin 시스템 유효성은 배포 후 사용자 반응으로 검증하라" 는 피드백을 실행하려면 그 반응을 기록할 자리가 먼저 있어야 한다 — 배포 후에 붙이면 첫 사용자들의 행동이 남지 않는다(GitLab #94).
+
+### 누가 부르는가 — **React 호스트**
+
+Unity 는 Spring 에 아무 신호도 보내지 않는다(2026-09-07 확정). 부스 구역 진입·이탈을 **브릿지 이벤트로 받은 React** 가 아래 경로를 부른다.
+
+### POST `/booths/{boothId}/visits`
+
+```json
+{ "worldChannel": "F11-CH01" }
+```
+
+→ `201 { "visitId": "123", "enteredAt": "..." }`
+
+- **회원과 게스트 모두 센다.** 부스 구경은 게스트에게 열려 있고(헌법 12조가 막는 것은 소유·결제다), 통계에서 빼면 실제 트래픽을 절반만 본다.
+- **회원의 입장 신호가 두 번 오면 새 기록을 만들지 않는다** — 같은 `visitId` 가 돌아온다. 브릿지 이벤트 재전송이 방문 수를 부풀리지 않게 한다. 게스트는 식별자가 없어 합치지 못한다.
+- 공개되지 않았거나 임대가 끝난 부스는 거부된다 — 들어갈 수 없는 부스의 방문 기록은 집계를 오염시킨다.
+- `worldChannel` 이 필수인 이유: 채널이 여럿이라(정원 20) 같은 부스라도 채널별로 트래픽이 갈린다.
+
+### POST `/booths/{boothId}/visits/{visitId}/exit`
+
+→ `204`. 본인 방문만 닫을 수 있다.
+
+**닫히지 않은 방문이 정상이다.** 브라우저를 그냥 닫으면 이 신호가 오지 않는다. 서버는 그런 행을 오류로 다루지 않고 **평균 체류에서 빼고 그 수를 따로 보고**한다.
+
+> 임의의 timeout 으로 닫지 않는 이유: 그러면 체류시간이 실제 값이 아니라 **서버가 고른 상수**가 된다. "평균 3분" 이 사용자 행동인지 timeout 설정인지 구분할 수 없게 된다.
+
+### GET `/booths/{boothId}/visit-metrics?from=&to=`
+
+부스 운영자(Owner·`ADMIN`·`CONTENT_EDITOR`)용.
 
 ```json
 {
+  "from": "...", "to": "...",
   "visits": 120,
-  "aiUsages": 43,
-  "consultations": 8,
-  "surveyResponses": 31,
-  "revenueCoin": 320
+  "uniqueVisitors": 87,
+  "averageDwellSeconds": 154,
+  "openVisits": 3
 }
 ```
 
-고급 체류 시간·전환율은 P2다.
+`uniqueVisitors` 는 **회원 기준**이다(게스트는 식별자가 없어 각 방문이 따로 세어진다). `averageDwellSeconds` 는 **닫힌 방문만**의 평균이다.
+
+### 이 endpoint 가 하지 않는 것
+
+| 항목 | 왜 | 어디로 |
+|---|---|---|
+| 코인 순환량 | 이미 `coin_ledger_entries` 에 사유 코드와 함께 남는다. 같은 사실을 두 곳에 쓰면 둘이 갈린다 | §15 (`S15P21A604-501`) |
+| 플랫폼 전체 집계 | "관리자용" 은 전역 관리자 개념을 전제하는데 그 권한 모델이 미정이다 | `S15P21A604-165`, `docs/26` 등재됨 |
+| `booth_daily_metrics` 선집계 | 원본 스캔이 느려질 때 얹는 것이다. 부스 12개 규모에서는 실시간 계산이 맞다 | 느려지면 그때 |
+
+### 발신 쪽에 묻는 것
+
+1. **Unity 가 부스 구역 이탈을 브릿지로 알리는가?** 알린다면 이벤트 이름은? 알리지 않는다면 체류시간 표본이 `openVisits` 쪽으로 쏠린다 — 그 경우 **React 가 오버레이 종료·페이지 이탈에서 부르는 것**을 대안으로 제안한다.
+2. `worldChannel` 값의 형식 — React 가 월드 세션에서 받는 채널 식별자를 그대로 쓰면 되는가?
+3. 진입 이벤트 재전송을 발신 쪽에서 억제할 수 있는가 — 서버는 회원만 합칠 수 있어, 억제되면 게스트 통계도 정확해진다.
+
+---
+
+## 15. Dashboard — P1
+
+> 구현·계약 정본: `specs/015-dashboard/contracts/dashboard-summary-api.md` (`S15P21A604-501`).
+
+### GET `/booths/{boothId}/dashboard/summary?from=&to=`
+
+Owner · `ADMIN` · `CONTENT_EDITOR` 만. `CONSULTANT` 는 제외된다 — 상담원은 상담을 하지 부스 운영 지표를 보지 않는다. `from` 포함, `to` 제외, 둘 다 필수(ISO-8601).
+
+```json
+{
+  "from": "2026-09-01T00:00:00Z",
+  "to": "2026-09-14T00:00:00Z",
+  "visits": 120,
+  "uniqueVisitors": 88,
+  "averageDwellSeconds": 143,
+  "openVisits": 4,
+  "consultations": 12,
+  "consultationsEnded": 6,
+  "surveyResponses": 31,
+  "leaseCostCoin": 300,
+  "surveyRewardCoin": 155,
+  "aiUsages": null
+}
+```
+
+**`null` 은 0 이 아니다.** `null` 은 **집계할 원천이 아직 없다**, `0` 은 **원천은 있고 그 기간에 0건이었다**. 지금 `null` 인 칸은 `aiUsages` 하나다.
+
+| 필드 | 원천 |
+|---|---|
+| `visits` · `uniqueVisitors` · `averageDwellSeconds` · `openVisits` | `booth_visit_events` — §14-1 과 같은 정의다 |
+| `consultations` · `consultationsEnded` | `consultations`. **요청 시각 기준**이라 아직 안 끝난 상담도 요청한 기간에 센다 |
+| `surveyResponses` | 이 부스의 설문에 달린 응답. 게스트 응답도 센다 |
+| `leaseCostCoin` · `surveyRewardCoin` | `coin_ledger_entries` 를 `reference_id` 로 되짚는다. 아래 참조 |
+| `aiUsages` | **없다** — AI 대화를 남기는 표가 저장소에 아직 없다 (AI 파트 소관) |
+
+#### 코인 칸은 "수익" 이 아니다
+
+**부스로 코인이 들어오는 경로가 없다.** 원장에서 부스와 닿는 사유는 둘뿐이고 둘 다 수익이 아니다.
+
+- **임대료** (`LEASE_PAYMENT` / `BOOTH_LEASE`) — 부스 소유자가 **낸다**. 비용이다
+- **설문 보상** (`SURVEY_REWARD` / `SURVEY`) — 응답자에게 **발행된다**. 차감되는 지갑이 없어 부스가 내는 것이 아니다
+
+그래서 "수익" 대신 이 둘을 그대로 준다 — **쓴 코인**과 **뿌린 코인**이다(2026-09-13 백엔드 결정, `docs/26`). 둘 다 양수로 나간다.
+
+`surveyRewardCoin` 은 `surveyResponses` 옆에 놓고 읽으면 그대로 의미가 된다 — **코인 155개를 뿌려 응답 31개를 받았다.** 보상 구조가 먹히는지가 그 두 숫자에 있다.
+
+진짜 유입 경로가 생기면(`S15P21A604-634` AI 상담 이용료 차감·운영자 수익 배분) 그때 `revenueCoin` 을 이 둘 **옆에 더한다**. `booth_daily_metrics.revenue_coin` 컬럼은 그 자리로 남겨 둔다.
+
+#### 그 밖
+
+- **집계는 실시간 계산이다.** 사전 집계 표(`booth_daily_metrics`)는 비워 둔다 — 갱신이 실패해도 조용히 그럴듯한 숫자를 계속 보여주기 때문이다. 부스 12개 규모에서는 원본 스캔이 더 싸다.
+- **임대가 끝난 부스도 지난 기간을 볼 수 있다.** 행사 뒤 정산을 해야 한다 (spec 015 C-03).
+- **플랫폼 전체 집계는 없다.** 전역 관리자 권한 모델이 미정이다 (`docs/26`, `S15P21A604-165`).
+- 고급 전환율은 P2다.
+
+| 오류 | 조건 |
+|---|---|
+| `400 VALIDATION_FAILED` | `from` 이 `to` 보다 뒤이거나 같다 |
+| `403 BOOTH_EDITOR_FORBIDDEN` | 호출자가 Owner·`ADMIN`·`CONTENT_EDITOR` 가 아니다 |
+| `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 |
 
 ---
 

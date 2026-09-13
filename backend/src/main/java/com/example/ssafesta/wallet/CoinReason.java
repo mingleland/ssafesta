@@ -34,8 +34,17 @@ public final class CoinReason {
      */
     public static final String MINIGAME_REWARD = "MINIGAME_REWARD";
 
+    /** Booth lease fee, charged to the lessee (spec 004 FR-006). */
+    public static final String LEASE_PAYMENT = "LEASE_PAYMENT";
+
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";
+
+    /** {@code reference_type} recorded alongside {@link #LEASE_PAYMENT}; the id is a lease. */
+    public static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
+
+    /** {@code reference_type} recorded alongside {@link #SURVEY_REWARD}; the id is a survey. */
+    public static final String SURVEY_REFERENCE_TYPE = "SURVEY";
 
     static final int MAX_LENGTH = 40;
 

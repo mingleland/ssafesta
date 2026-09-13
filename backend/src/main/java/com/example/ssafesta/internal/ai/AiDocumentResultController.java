@@ -53,6 +53,16 @@ class AiDocumentResultController {
         results.heartbeat(jobId, body);
     }
 
+    /**
+     * 문서에서 뽑은 프로젝트 정형 정보 (S15P21A604-597). 임베딩이 끝난 뒤에 오므로 성공한 Job 도
+     * 받는다 — 나머지 넷과 다른 점이다.
+     */
+    @PostMapping(path = "/{jobId}/project-facts", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void projectFacts(@PathVariable long jobId, @RequestBody(required = false) String body) {
+        results.acceptProjectFacts(jobId, body);
+    }
+
     @PostMapping(path = "/{jobId}/failed", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void failed(@PathVariable long jobId, @RequestBody(required = false) String body) {

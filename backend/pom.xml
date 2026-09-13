@@ -69,6 +69,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!--
+          상담 실시간 알림 (spec 011 C-05, S15P21A604-137). native WebSocket 위에 STOMP 를 얹고
+          SockJS 는 쓰지 않는다. P1 에서 이 채널은 서버에서 클라이언트로 가는 알림 전용이고
+          행동은 전부 REST 다 — 정본이 REST 라서 이 의존성이 빠져도 기능이 멈추지는 않는다.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>

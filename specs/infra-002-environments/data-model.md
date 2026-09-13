@@ -165,17 +165,19 @@ now - dataFreshThrough > 60 min → STALE_BLOCKED (ratio보다 우선)
 
 | Field | Type | Rule |
 |---|---|---|
-| `state` | enum | `R2_WRITABLE`, `UPLOAD_BLOCKED` |
-| `uploadEnabled` | boolean | `R2_WRITABLE`일 때만 true |
+| `state` | enum | `R2_WRITABLE`, `MINIO_WRITABLE`, `UPLOAD_BLOCKED` |
+| `activeProvider` | enum | `R2`, `MINIO_LOCAL`; 정상 운영은 `R2` |
+| `uploadEnabled` | boolean | `R2_WRITABLE` 또는 `MINIO_WRITABLE`일 때만 true |
 | `reason` | string | R2 probe 실패, 90% 한도, stale snapshot 등 차단 근거 |
 | `lastVerifiedAt` | timestamp | 마지막 성공 R2 contract probe 시각 |
 | `usageSnapshotRef` | reference | 입장 판단에 쓴 최신 usage snapshot |
 
 ```text
 R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE
+UPLOAD_BLOCKED → MINIO_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE
 ```
 
-R2 장애·90% 사용량·stale snapshot은 `UPLOAD_BLOCKED`로 전환한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 `R2_WRITABLE`로 복귀한다. 공급자 전환·backlog·reconciliation 상태는 없다.
+active provider가 R2일 때 R2 장애·90% 사용량·stale snapshot은 `UPLOAD_BLOCKED`로 전환한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 `R2_WRITABLE`로 복귀한다. R2 장기 장애의 `MINIO_WRITABLE` 전환과 R2 복귀는 운영자 승인 `storage-failover.sh`가 단일 lock으로 수행하며, reconcile run과 `targetBucket`은 spec 007 C-10/FR-035 계약에서 기록한다.
 
 ## 9. Redis Cache Class
 

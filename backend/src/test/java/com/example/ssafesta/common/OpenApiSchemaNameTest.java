@@ -170,6 +170,62 @@ class OpenApiSchemaNameTest {
         return names;
     }
 
+    /**
+     * 수집기가 <b>일반 class</b> 의 중첩 타입도 따라간다 (S15P21A604-684).
+     *
+     * <p>이 테스트가 따로 있는 이유는 위 세 테스트가 <b>지금 저장소에 충돌이 없다는 사실 때문에</b>
+     * 초록이기 때문이다. 수집기가 class 에서 멈춰도 모을 것이 없으면 통과한다 — 즉 그물이
+     * 찢어졌는지를 그 테스트들로는 알 수 없다. 그래서 충돌을 <b>일부러 만들어</b> 그물이 잡는지
+     * 본다.
+     *
+     * <p>고치기 전 구현({@code if (!type.isRecord()) return;})에서는 {@code Item} 이 한 번도
+     * 수집되지 않아 이 단정이 실패한다.
+     */
+    @Test
+    void theCollectorFollowsPlainClassMembers() {
+        Map<String, Set<Class<?>>> byWireName = new TreeMap<>();
+
+        collect(FieldHolder.class, byWireName, new HashSet<>());
+        collect(SetterHolder.class, byWireName, new HashSet<>());
+        collect(GetterHolder.class, byWireName, new HashSet<>());
+
+        Set<Class<?>> item = byWireName.getOrDefault("Item", Set.of());
+        assertTrue(item.size() == 3,
+                "일반 class 의 필드·setter·getter 를 따라가지 못하면 같은 이름의 중첩 DTO 가"
+                        + " 충돌해도 이 테스트가 초록이 됩니다. 수집된 것: " + item);
+    }
+
+    /** 필드로만 들고 있는 DTO — {@code SurveyCommand.questions} 와 같은 모양. */
+    static class FieldHolder {
+        private List<Item> items = List.of();
+
+        static class Item {
+            public String a;
+        }
+    }
+
+    /** setter 로만 받는 DTO — {@code SurveyCommand} 가 실제로 이 모양이다(getter 가 없다). */
+    static class SetterHolder {
+        public void setItem(Item item) {
+            // 수집 대상은 파라미터 타입이다. 본문은 이 테스트와 무관하다.
+        }
+
+        static class Item {
+            public int b;
+        }
+    }
+
+    /** getter 로 내보내는 응답 DTO. */
+    static class GetterHolder {
+        public Item getItem() {
+            return null;
+        }
+
+        static class Item {
+            public boolean c;
+        }
+    }
+
     /** 컨트롤러가 실제로 주고받는 타입 — 요청 본문과 반환값. */
     private Set<Class<?>> exposedTypes() {
         Set<Class<?>> types = new LinkedHashSet<>();
@@ -207,24 +263,59 @@ class OpenApiSchemaNameTest {
         }
     }
 
-    /** record 부품을 따라 내려가며 wire 이름을 모은다. */
+    /** 문서에 실리는 멤버를 따라 내려가며 wire 이름을 모은다. */
     private void collect(Class<?> type, Map<String, Set<Class<?>>> byWireName, Set<Class<?>> seen) {
         if (!isOurs(type) || !seen.add(type)) {
             return;
         }
         byWireName.computeIfAbsent(wireNameOf(type), key -> new LinkedHashSet<>()).add(type);
-        if (!type.isRecord()) {
-            return;
-        }
-        for (RecordComponent component : type.getRecordComponents()) {
-            List<Class<?>> nested = new ArrayList<>();
+        for (Type member : documentedMembers(type)) {
             Set<Class<?>> unwrapped = new LinkedHashSet<>();
-            addUnwrapped(component.getGenericType(), unwrapped);
-            nested.addAll(unwrapped);
-            for (Class<?> child : nested) {
+            addUnwrapped(member, unwrapped);
+            for (Class<?> child : unwrapped) {
                 collect(child, byWireName, seen);
             }
         }
+    }
+
+    /**
+     * 문서에 실리는 멤버들의 타입.
+     *
+     * <p><b>record 만 따라가면 절반을 놓친다.</b> 예전에는 {@code if (!type.isRecord()) return;} 로
+     * 일반 class 에서 재귀가 끊겼는데, 실제 요청 DTO 중에 class 가 있다 —
+     * {@code SurveyService.SurveyCommand} 는 {@code PresenceField} 를 쓰느라 record 가 아니고 그
+     * 안에 {@code QuestionCommand}·{@code OptionCommand} 가 중첩돼 있다. 그 타입들과 같은 이름의
+     * DTO 가 다른 도메인에 생기면 springdoc 이 한쪽을 덮는데 이 테스트는 초록이었다
+     * (S15P21A604-684).
+     *
+     * <p>필드·getter·setter 를 모두 본다. 한 가지만 보면 그 관례를 안 쓰는 DTO 가 그대로 구멍이
+     * 된다 — {@code SurveyCommand} 는 private 필드와 <b>setter</b> 로 받고 getter 가 없다.
+     */
+    private List<Type> documentedMembers(Class<?> type) {
+        if (type.isRecord()) {
+            return java.util.Arrays.stream(type.getRecordComponents())
+                    .map(RecordComponent::getGenericType)
+                    .map(Type.class::cast)
+                    .toList();
+        }
+        List<Type> members = new ArrayList<>();
+        for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+            if (!java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                members.add(field.getGenericType());
+            }
+        }
+        for (Method method : type.getMethods()) {
+            if (method.getDeclaringClass() == Object.class
+                    || java.lang.reflect.Modifier.isStatic(method.getModifiers())) {
+                continue;
+            }
+            if (method.getParameterCount() == 0 && method.getReturnType() != void.class) {
+                members.add(method.getGenericReturnType());
+            } else if (method.getParameterCount() == 1 && method.getName().startsWith("set")) {
+                members.add(method.getGenericParameterTypes()[0]);
+            }
+        }
+        return members;
     }
 
     /** {@code @Schema(name = "…")} 이 있으면 그것이 문서에 실리는 이름이고, 없으면 단순 이름이다. */
