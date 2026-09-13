@@ -51,9 +51,17 @@ V1에 있지만 **P1에서 쓰지 않는다**(C-12 — 실시간 메시지 송�
 
 ---
 
-## V31 마이그레이션 — 더할 것
+## 마이그레이션 — 더할 것
 
-> develop 최신은 `V30__ai_documents_replacement.sql`이다.
+> develop 최신은 `V30__ai_documents_replacement.sql` 이었다.
+>
+> **한 파일로 묶지 않고 쓰는 시점에 맞춰 가른다.** 아래 다섯 덩이 중 지금 필요한 것은 ①뿐이다 — 나머지는 읽는 코드가 아직 없고, 아무도 읽지 않는 컬럼을 먼저 넣으면 그것이 어느 작업에 속했는지가 흐려진다.
+>
+> | 파일 | 담는 것 | 시점 |
+> |---|---|---|
+> | `V31__booth_staff_role_vocabulary.sql` ✅ | ① 역할 어휘 CHECK | **완료** — 역할 게이트(T006)가 딛는다 |
+> | V32 | ② `consultation_status` 컬럼 · `staff_invitations` CHECK | Phase 3·4 |
+> | V33 | ③ 활성 상담 부분 유니크 인덱스 ④ 대기열 인덱스 ⑤ `consultations` 상태 CHECK | Phase 5 |
 
 ```sql
 -- 1) 직원 상담 상태 (FR-004, R-04). 기본은 OFFLINE — US2가 "오프라인이 기본 상태"로 못박았다
