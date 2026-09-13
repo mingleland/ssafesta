@@ -3,8 +3,12 @@ package com.example.ssafesta.consultation.ws;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 상담 상태 변화를 구독자에게 알린다 (spec 011, contracts §B).
@@ -14,13 +18,23 @@ import org.springframework.stereotype.Component;
  * 끊긴 사이의 이벤트는 유실되고, 클라이언트는 REST 로 다시 읽은 상태와 그 뒤에 도착한 이벤트를
  * 이 값으로 정렬한다.
  *
- * <p><b>이 알림은 정본이 아니다.</b> 정본은 REST 이고 이벤트 재전송은 P1 에 없다. 그래서 발행
- * 실패가 상담 자체를 되돌리지 않는다 — 호출 쪽은 트랜잭션 안에서 부르지만, 여기서 던지는 예외가
- * 수락을 무르게 하면 "알림이 안 갔다" 가 "상담이 안 열렸다" 가 된다.
+ * <p><b>이 알림은 정본이 아니다.</b> 정본은 REST 이고 이벤트 재전송은 P1 에 없다. 그래서
+ * (S15P21A604-693) 두 가지를 코드로 보장한다 — 예전에는 Javadoc 에만 있었다:
+ *
+ * <ul>
+ *   <li><b>커밋 뒤에 나간다.</b> 호출 쪽은 트랜잭션 안에서 부른다. 그 자리에서 바로 보내면
+ *       구독자가 REST 로 다시 읽었을 때 아직 없는 상담을 알리게 되고, 롤백된 상담도 알린다.
+ *       트랜잭션이 없으면 즉시 보낸다.
+ *   <li><b>발행 실패는 WARN 한 줄이다.</b> 여기서 던지는 예외가 호출 쪽으로 올라가면 수락이
+ *       롤백돼 "알림이 안 갔다" 가 "상담이 안 열렸다" 가 된다.
+ * </ul>
+ *
+ * <p>봉투의 {@code occurredAt} 은 호출 시점에 찍는다 — 커밋 뒤로 미루면 같은 트랜잭션의 이벤트
+ * 순서가 뒤집힐 수 있다.
  */
 @Component
 public class ConsultationEventPublisher {
-
+    private static final Logger log = LoggerFactory.getLogger(ConsultationEventPublisher.class);
     private static final String STAFF_TOPIC = "/topic/booths/%d/consultation";
     private static final String VISITOR_QUEUE = "/queue/consultation";
 
@@ -77,11 +91,36 @@ public class ConsultationEventPublisher {
 
     private void toStaff(Long boothId, Map<String, Object> event) {
         // (Object) 캐스팅은 오버로드를 가른다 — Map 은 convertAndSend(D, T) 와도 맞아 모호해진다.
-        messaging.convertAndSend(STAFF_TOPIC.formatted(boothId), (Object) event);
+        publish(event, () -> messaging.convertAndSend(STAFF_TOPIC.formatted(boothId), (Object) event));
     }
 
     private void toVisitor(Long visitorUserId, Map<String, Object> event) {
-        messaging.convertAndSendToUser(String.valueOf(visitorUserId), VISITOR_QUEUE, event);
+        publish(event, () -> messaging.convertAndSendToUser(String.valueOf(visitorUserId), VISITOR_QUEUE, event));
+    }
+
+    /** 트랜잭션 안이면 커밋 뒤에, 아니면 지금. 어느 쪽이든 실패는 로그로 끝난다. */
+    private void publish(Map<String, Object> event, Runnable send) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    safeSend(event, send);
+                }
+            });
+            return;
+        }
+        safeSend(event, send);
+    }
+
+    private static void safeSend(Map<String, Object> event, Runnable send) {
+        try {
+            send.run();
+        } catch (RuntimeException failure) {
+            // 정본은 REST 다. 여기서 던지면 알림 장애가 상담 장애가 된다 — 어느 알림이 빠졌는지만
+            // 원인과 함께 남긴다. 구독자는 재연결 시 REST 로 다시 읽는다.
+            log.warn("상담 이벤트 발행 실패 — type={} requestId={}",
+                    event.get("type"), event.get("requestId"), failure);
+        }
     }
 
     private static Map<String, Object> envelope(String type, Long requestId) {
