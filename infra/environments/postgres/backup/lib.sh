@@ -20,7 +20,12 @@ backup_init() {
   command -v "${AWS_CLI}" >/dev/null 2>&1 || backup_die 'aws CLI is required'
   command -v "${DOCKER_BIN}" >/dev/null 2>&1 || backup_die 'docker is required'
   command -v "${PYTHON_BIN}" >/dev/null 2>&1 || backup_die 'python3 is required'
-  export AWS_DEFAULT_REGION
+  mkdir -p "${BACKUP_STATE_DIR}"
+  AWS_CONFIG_FILE="${BACKUP_STATE_DIR}/awscli-r2.conf"
+  local config_tmp="${AWS_CONFIG_FILE}.$$"
+  printf '[default]\nregion = %s\ns3 =\n    addressing_style = path\n' "${AWS_DEFAULT_REGION}" >"${config_tmp}"
+  mv "${config_tmp}" "${AWS_CONFIG_FILE}"
+  export AWS_DEFAULT_REGION AWS_CONFIG_FILE
 }
 
 backup_aws() { "${AWS_CLI}" --endpoint-url "${R2_BACKUP_ENDPOINT}" s3 "$@"; }
