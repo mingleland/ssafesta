@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Set;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
@@ -23,6 +25,11 @@ import org.springframework.stereotype.Component;
  *
  * <p>검증된 회원 id 를 {@link Principal} 로 심어 {@code /user/queue/...} 가 그 사람에게만 가게
  * 한다. Spring 의 user destination 이 이 이름으로 대상을 고른다.
+ *
+ * <p><b>분기는 {@code SimpMessageType} 으로 한다</b>(S15P21A604-692). {@code StompCommand} 는 와이어
+ * 표기일 뿐이고 브로커·핸들러가 실제로 보는 것은 simpType 이다 — command 로 가르면 같은 simpType 을
+ * 가진 다른 표기가 정책을 그냥 지나간다. 실제로 {@code STOMP}(= {@code CONNECT})는 토큰 검증을,
+ * {@code MESSAGE}(= {@code SEND})는 destination 차단을 우회했다.
  *
  * <p><b>클라이언트 SEND 는 allowlist 밖이면 거부다.</b> {@code /topic}·{@code /queue}
  * destination 은 컨트롤러를 거치지 않고 simple broker 로 갈 수 있어 서버 이벤트를 위조한다.
@@ -51,6 +58,16 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
      */
     private static final Set<String> ALLOWED_SEND_DESTINATIONS = Set.of("/app/world/chat");
 
+    /**
+     * 서버가 클라이언트에게 쓰는 command (S15P21A604-692).
+     *
+     * <p>{@code MESSAGE} 가 여기 있는 것이 핵심이다 — 그 command 는 {@code SEND} 와 <b>같은
+     * {@code SimpMessageType.MESSAGE}</b> 라, 클라이언트가 그 표기로 보내면 브로커가 그대로
+     * 처리한다. simpType 분기만으로도 막히지만, 애초에 올 수 없는 프레임이라 이름으로도 끊는다.
+     */
+    private static final Set<StompCommand> SERVER_ONLY_COMMANDS = Set.of(
+            StompCommand.CONNECTED, StompCommand.MESSAGE, StompCommand.RECEIPT, StompCommand.ERROR);
+
     private final WsTokenService tokens;
 
     public StompAuthChannelInterceptor(WsTokenService tokens) {
@@ -66,22 +83,33 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         StompCommand command = accessor.getCommand();
-        if (StompCommand.SEND.equals(command)
+        if (command != null && SERVER_ONLY_COMMANDS.contains(command)) {
+            // 서버가 클라이언트에게 쓰는 command 다. 인바운드로 오는 것은 정상 경로가 아니다.
+            throw new IllegalArgumentException("클라이언트가 보낼 수 있는 프레임이 아닙니다.");
+        }
+
+        // 분기는 command 가 아니라 simpType 으로 한다 — 브로커·핸들러가 그 값으로 동작하고,
+        // command 로 가르면 같은 simpType 을 가진 다른 표기가 정책을 그냥 지나간다
+        // (S15P21A604-692: STOMP=CONNECT, MESSAGE=SEND 가 그렇게 새어 나갔다).
+        SimpMessageType type = command == null
+                ? SimpMessageHeaderAccessor.getMessageType(message.getHeaders())
+                : command.getMessageType();
+        if (SimpMessageType.MESSAGE.equals(type)
                 && !ALLOWED_SEND_DESTINATIONS.contains(accessor.getDestination())) {
             throw new IllegalArgumentException(
                     "클라이언트가 SEND 할 수 있는 destination 이 아닙니다.");
         }
-        if (StompCommand.SUBSCRIBE.equals(command) && isRawQueue(accessor.getDestination())) {
+        if (SimpMessageType.SUBSCRIBE.equals(type) && isRawQueue(accessor.getDestination())) {
             throw new IllegalArgumentException(
                     "개인 큐는 /user/queue/** destination 으로 구독해야 합니다.");
         }
-        if (!StompCommand.CONNECT.equals(command)) {
+        if (!SimpMessageType.CONNECT.equals(type)) {
             return message;
         }
 
         Long userId = tokens.resolve(bearerOf(accessor))
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "상담 채널 연결에는 유효한 WS Token 이 필요합니다."));
+                        "실시간 채널 연결에는 유효한 WS Token 이 필요합니다."));
         accessor.setUser(new ConsultationPrincipal(String.valueOf(userId)));
         return message;
     }
