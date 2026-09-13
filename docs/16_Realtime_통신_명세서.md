@@ -483,7 +483,16 @@ REQUESTED
 | 핸드셰이크 | HTTP 인증을 타지 않는다. `/ws`·`/ws/**` 가 `permitAll` 이고 신원은 `CONNECT` 에서 본다 |
 | 만료 | 연결 성립 후에는 만료가 연결을 끊지 않는다 (FR-020) |
 
-**연결 뒤에도 경계가 있다** (`S15P21A604-686`). 클라이언트 `SEND` 는 allowlist 밖이면 거부되고, 개인 큐는 `/user/queue/**` 로만 구독한다 — raw `/queue/**` 직접 구독은 거부된다. 토픽별 SUBSCRIBE 자격 검증은 별도 보안 검토 범위다.
+**연결 뒤에도 경계가 있다** (`S15P21A604-686`·`-692`). 클라이언트 `SEND` 는 allowlist 밖이면 거부되고, 개인 큐는 `/user/queue/**` 로만 구독한다 — raw `/queue/**` 직접 구독은 거부된다. 토픽별 SUBSCRIBE 자격 검증은 별도 보안 검토 범위다.
+
+**판정 기준은 `SimpMessageType` 이지 STOMP command 가 아니다** (`S15P21A604-692`). command 는 와이어 표기일 뿐이고 브로커·핸들러가 보는 것은 simpType 이라, command 로 가르면 같은 simpType 의 다른 표기가 정책을 지나간다. 실제로 그렇게 새어 나간 것이 둘이다.
+
+| 표기 | simpType | 무엇을 우회했나 |
+|---|---|---|
+| `STOMP` | `CONNECT` | **토큰 검증** — STOMP 1.2 가 `CONNECT` 의 동의어로 규정한다 |
+| `MESSAGE` | `MESSAGE` | **destination 차단** — `SEND` 와 같은 simpType 이라 브로커가 그대로 처리한다 |
+
+서버 전용 command(`CONNECTED`·`MESSAGE`·`RECEIPT`·`ERROR`)는 인바운드에서 이름만으로도 거부한다.
 
 ---
 

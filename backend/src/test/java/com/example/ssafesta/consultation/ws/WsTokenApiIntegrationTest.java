@@ -14,7 +14,9 @@ import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -168,6 +170,69 @@ class WsTokenApiIntegrationTest {
         assertEquals(send, interceptor.preSend(send, null));
     }
 
+    /**
+     * <b>{@code STOMP} 프레임도 {@code CONNECT} 다.</b> STOMP 1.2 가 동의어로 규정하고 Spring 은
+     * 별도 enum 상수로 둔다 — {@code StompCommand} 로 분기하면 이 표기가 토큰 검증을 지나간다
+     * (S15P21A604-692).
+     */
+    @Test
+    void aStompFrameWithoutATokenIsRefusedLikeConnect() {
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(connectLike(StompCommand.STOMP, null), null));
+    }
+
+    /** 유효한 토큰을 실은 {@code STOMP} 프레임은 {@code CONNECT} 와 똑같이 연결된다. */
+    @Test
+    void aStompFrameWithAValidTokenConnects() {
+        Long userId = createMemberWithWallet(users, wallets, "STOMP프레임");
+        String token = tokens.issue(userId).token();
+
+        Message<?> connected = interceptor.preSend(
+                connectLike(StompCommand.STOMP, "Bearer " + token), null);
+
+        assertEquals(String.valueOf(userId),
+                StompHeaderAccessor.wrap(connected).getUser().getName());
+    }
+
+    /**
+     * <b>서버 전용 command 는 인바운드에서 거부한다.</b>
+     *
+     * <p>{@code MESSAGE} 가 특히 그렇다 — {@code SEND} 와 같은 {@code SimpMessageType.MESSAGE} 라,
+     * 막지 않으면 그 표기로 destination 차단을 지나 브로커까지 간다 (S15P21A604-692).
+     */
+    @ParameterizedTest
+    @EnumSource(value = StompCommand.class, names = {"MESSAGE", "CONNECTED", "RECEIPT", "ERROR"})
+    void serverOnlyFramesAreRefusedInbound(StompCommand command) {
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frame(command, "/topic/world/chat"), null));
+    }
+
+    /**
+     * <b>전 command 를 훑는다.</b>
+     *
+     * <p>-686·-687 의 테스트는 정상 클라이언트가 쓰는 command 만 고정했고, 규격에는 있지만 아무도
+     * 안 쓰는 {@code STOMP}·{@code MESSAGE} 가 그 사이로 새어 나갔다. 여기서 표 전체를 돌아,
+     * 새 command 가 생겨도 <b>판정 없이 통과하는 일이 없게</b> 한다.
+     */
+    @Test
+    void everyCommandHasAVerdict() {
+        Set<StompCommand> passed = EnumSet.noneOf(StompCommand.class);
+        for (StompCommand command : StompCommand.values()) {
+            try {
+                interceptor.preSend(frame(command, "/topic/world/chat"), null);
+                passed.add(command);
+            } catch (RuntimeException refused) {
+                // 거부는 판정이다.
+            }
+        }
+
+        assertEquals(EnumSet.of(StompCommand.DISCONNECT, StompCommand.SUBSCRIBE,
+                        StompCommand.UNSUBSCRIBE, StompCommand.ACK, StompCommand.NACK,
+                        StompCommand.BEGIN, StompCommand.COMMIT, StompCommand.ABORT),
+                passed,
+                "통과하는 command 목록이 바뀌었습니다. 새 command 가 판정 없이 지나가고 있지 않은지 보세요.");
+    }
+
     /** raw queue 는 user destination 변환을 우회하므로 직접 구독하지 못한다. */
     @Test
     void aRawQueueSubscriptionIsRefused() {
@@ -200,6 +265,16 @@ class WsTokenApiIntegrationTest {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         if (header != null) {
             accessor.setNativeHeader(header, value);
+        }
+        accessor.setLeaveMutable(true);
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
+    /** {@code CONNECT} 계열 프레임 — 헤더 유무만 다르게 준다. */
+    private Message<?> connectLike(StompCommand command, String authorization) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        if (authorization != null) {
+            accessor.setNativeHeader("Authorization", authorization);
         }
         accessor.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
