@@ -36,6 +36,9 @@ status=FAILED
 # 엣지(Cloudflare)가 검증 요청을 막아 오리진 직접 확인으로 합격시킨 적이 있는가.
 # 증거에 남겨야 "이 릴리스는 공개 경로로는 확인하지 못했다" 를 나중에도 알 수 있다.
 edge_blocked=0
+# 차단 진단(본문·출발지 IP)은 **한 번만** 남긴다. 엣지가 막으면 파일마다 같은 차단 페이지가
+# 돌아와, 그대로 두면 같은 문장이 산출물 개수만큼 반복되고 요청도 그만큼 늘어난다.
+diagnosed=0
 cleanup() {
   rm -f "${download}" "${headers:-}"
   [[ -z "${staging:-}" ]] || rm -rf -- "${staging}"
@@ -56,11 +59,21 @@ curl --fail --silent --show-error \
 actual_sha="$(sha256sum "${download}" | awk '{print $1}')"
 [[ "${actual_sha}" == "${expected_sha}" ]] || { echo "artifact SHA-256 mismatch for ${release_id}" >&2; exit 65; }
 
+# 릴리스 디렉터리는 **웹 서버가 읽을 수 있어야 한다.**
+# `mktemp -d` 는 0700 으로 만들고, 우리는 그것을 그대로 릴리스 자리로 옮겼다. 그래서 nginx 가
+# 디렉터리에 들어가지 못해 기본 오류 페이지 `403 Forbidden` 을 돌려줬다 — 엣지 차단으로 보이던
+# 것의 정체가 이것이다 (#165 build #6~#12, 본문 제목이 Cloudflare 페이지가 아니었다).
+# 되돌린 뒤에는 손으로 올린 예전 배포본(정상 모드)이 서빙돼 200 이 나왔고, 그 시차가 "IP 차이"
+# 처럼 보였다. a+rX 는 디렉터리에만 실행 비트를 준다 — 파일을 실행 가능하게 만들지 않는다.
+open_for_web() { chmod -R a+rX "$1"; }
+
 if [[ -e "${candidate}" ]]; then
   [[ -d "${candidate}" && ! -L "${candidate}" && -f "${candidate}/.artifact-sha256" ]] \
     || { echo "existing release path is invalid: ${release_id}" >&2; exit 66; }
   [[ "$(<"${candidate}/.artifact-sha256")" == "${expected_sha}" ]] \
     || { echo "release ID already exists with another artifact: ${release_id}" >&2; exit 67; }
+  # 이미 깔려 있는 릴리스도 고쳐 둔다 — 0700 으로 남은 디렉터리는 다시 돌려도 계속 403 이다.
+  open_for_web "${candidate}"
 else
   staging="$(mktemp -d "${releases}/.${release_id}.staging.XXXXXX")"
   "${PYTHON_BIN:-python}" - "${download}" "${staging}" "${WEBGL_MAX_UNCOMPRESSED_BYTES:-4294967296}" <<'PY'
@@ -118,6 +131,7 @@ PY
   printf '%s\n' "${expected_sha}" >"${staging}/.artifact-sha256"
   printf '{"releaseId":"%s","artifactSha256":"%s","packageUrl":"%s","installedAt":"%s"}\n' \
     "${release_id}" "${expected_sha}" "${package_url}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"${staging}/.release.json"
+  open_for_web "${staging}"
   mv "${staging}" "${candidate}"
   staging=
 fi
@@ -140,6 +154,25 @@ for key in ('loaderUrl', 'dataUrl', 'frameworkUrl', 'codeUrl'):
 PY
 )"
 mapfile -t manifest_paths <<<"${manifest_output}"
+
+# 산출물의 출처를 **공개하기 전에** 확인한다 (S15P21A604-667).
+# 전에는 이 검사가 심링크 교체·검증·정리 다음에 있었다. build #14 에서 검사에 걸린 릴리스가
+# 그대로 current 에 남아 demo 가 그것을 서비스했다 — 그 시점에는 되돌릴 대상인 previous 도
+# 이미 갱신됐고 보존 정책으로 지워진 릴리스도 있어 되돌릴 수가 없었다.
+# 매니페스트는 압축을 푼 순간 읽을 수 있으므로, 공개 전에 막으면 되돌릴 일 자체가 생기지 않는다.
+"${PYTHON_BIN:-python}" - "${candidate}/manifest.json" <<'PY'
+import json, pathlib, re, sys
+manifest = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+commit = manifest.get('sourceCommit')
+if not isinstance(commit, str) or not re.fullmatch(r'[0-9a-f]{40}', commit):
+    raise SystemExit('WebGL manifest has an invalid sourceCommit')
+if (manifest.get('sourceBranch') != 'develop' or manifest.get('dirty') is not False
+        or manifest.get('buildProfile') != 'release'):
+    raise SystemExit(
+        'WebGL manifest is not a clean develop release build '
+        f"(sourceBranch={manifest.get('sourceBranch')!r} dirty={manifest.get('dirty')!r} "
+        f"buildProfile={manifest.get('buildProfile')!r})")
+PY
 
 # 이 스크립트가 관리하기 전에 손으로 배포한 흔적이 남아 있을 수 있다(2026-09-10 수동 배포).
 # 그때의 current 는 releases/<id> 상대 심링크가 아니라 절대 경로 심링크이거나 실체 디렉터리다.
@@ -165,8 +198,8 @@ elif [[ -e "${root}/current" ]]; then
 else
   # current 가 아예 없다. 앞선 실패로 치워만 두고 못 되돌린 것이 남아 있으면 그것을 롤백 대상으로 삼는다 —
   # 그래야 이번 배포가 또 실패해도 서비스가 되살아난다. 가장 최근 것 하나만 본다.
-  for candidate in "${root}"/current.legacy.*; do
-    [[ -e "${candidate}" ]] && legacy_current="${candidate}"
+  for legacy_candidate in "${root}"/current.legacy.*; do
+    [[ -e "${legacy_candidate}" ]] && legacy_current="${legacy_candidate}"
   done
   [[ -n "${legacy_current}" ]] \
     && echo "no current; will fall back to $(basename "${legacy_current}") if this release fails verification" >&2
@@ -189,6 +222,51 @@ log_verify_failure() {
   # 앞단이 누구인지 드러내는 헤더만 추린다 — cf-ray 가 있으면 Cloudflare 단에서 끊긴 것이다.
   grep -Ei '^(server|cf-ray|cf-cache-status|via|x-cache|content-type|cache-control|content-encoding):' "${file}" 2>/dev/null \
     | sed 's/^/    /' >&2 || true
+  if [[ "${url}" == http* && "${diagnosed}" == 0 ]]; then
+    diagnosed=1
+    log_verify_body "${url}"
+    grep -qi '^cf-ray:' "${file}" && log_edge_client_ip
+  fi
+  return 0
+}
+
+# 차단 페이지의 **본문**을 남긴다. 헤더만으로는 "403" 까지만 알 수 있고, 어떤 규칙에
+# 걸렸는지(예: `error code: 1020`)는 본문에만 있다 — 인프라가 허용 규칙을 넣으려면 그게 필요하다
+# (#165 회신: "재발 시 cf-ray 와 응답 본문까지 함께 확인하겠습니다").
+# 본문은 **실패했을 때만 따로 받는다.** 정상 경로에서 130 MB 짜리 data 파일을 디스크에
+# 받아 두지 않으려는 것이다. 64 KB 를 넘기면 curl 이 스스로 끊고, 그때는 조용히 넘어간다.
+log_verify_body() {
+  local url="$1"
+  local body; body="$(mktemp "${root}/.webgl-body.XXXXXX")"
+  curl --silent --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
+    --user-agent "${VERIFY_USER_AGENT}" --max-filesize 65536 \
+    --output "${body}" "${url}" 2>/dev/null || true
+  if [[ -s "${body}" ]]; then
+    local title code text
+    title="$(tr -d '\r\n' <"${body}" | sed -n 's/.*<title[^>]*>\([^<]*\)<\/title>.*/\1/p' | cut -c1-200)"
+    code="$(grep -oiE 'error code: *[0-9]+' "${body}" 2>/dev/null | head -n 1)"
+    text="$(sed -e 's/<[^>]*>/ /g' "${body}" 2>/dev/null | tr -s '[:space:]' ' ' | cut -c1-300)"
+    [[ -n "${title}" ]] && echo "    본문 제목: ${title}" >&2
+    [[ -n "${code}" ]] && echo "    본문 코드: ${code}" >&2
+    [[ -z "${title}" && -z "${code}" && -n "${text// /}" ]] && echo "    본문: ${text}" >&2
+  fi
+  rm -f "${body}"
+}
+
+# 엣지가 막았다면 다음 질문은 **어느 IP 가 막혔는가**다. Cloudflare 존은 어디서나
+# /cdn-cgi/trace 로 자기가 본 클라이언트 IP 를 돌려준다 — 그 값이 곧 인프라가 허용 목록에
+# 넣어야 할 이 에이전트의 출발지 주소다. 차단이 /unity/* 에만 걸려 있으면 이 경로는 답한다.
+# 답하지 않으면 존 전체가 막힌 것이고, 그것도 하나의 정보다.
+log_edge_client_ip() {
+  local base="${WEBGL_PUBLIC_BASE_URL%/}" host trace
+  host="${base#*://}"; host="${host%%/*}"
+  trace="$(curl --silent --max-time 10 --user-agent "${VERIFY_USER_AGENT}" \
+    "${base%%://*}://${host}/cdn-cgi/trace" 2>/dev/null | grep -E '^(ip|colo|loc)=' | tr '\n' ' ' || true)"
+  if [[ -n "${trace// /}" ]]; then
+    echo "    엣지가 본 이 에이전트: ${trace}" >&2
+  else
+    echo "    엣지가 본 이 에이전트: /cdn-cgi/trace 도 답하지 않는다 (존 전체 차단으로 보인다)" >&2
+  fi
 }
 
 # 한 번 받아 보고 판정한다. **실패를 두 종류로 나누는 것이 요점이다.**
@@ -200,11 +278,18 @@ log_verify_failure() {
 # 봇으로 구분되려는 것이 아니다. 엣지 정책이 바뀌면 이 한 줄만 바꾸면 된다.
 VERIFY_USER_AGENT="${WEBGL_VERIFY_USER_AGENT:-Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36}"
 
+# **brotli 를 받겠다고 말해야 brotli 로 온다.** 앞단(Cloudflare·nginx 둘 다)은 `Vary: Accept-Encoding`
+# 으로 협상하고, 요청이 br 을 받지 못한다고 하면 **풀어서** 내려준다. curl 기본값은 Accept-Encoding
+# 을 아예 보내지 않으므로, 우리는 멀쩡한 brotli 배포물을 "Content-Encoding 이 없다" 며 결함으로
+# 판정하고 있었다 (#165 build #13). 사람이 브라우저로 여는 것과 같은 응답을 보겠다는 검증인데
+# 정작 브라우저가 보내는 헤더가 빠져 있었다. 헤더만 보므로 curl 이 풀 필요는 없다(--compressed 아님).
+VERIFY_ACCEPT_ENCODING="${WEBGL_VERIFY_ACCEPT_ENCODING:-br, gzip}"
+
 request_and_check() {
   local url="$1" expected_type="$2" require_brotli="$3" expected_cache="$4" file="$5"
   : >"${file}"
   curl --silent --show-error --location --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" \
-    --user-agent "${VERIFY_USER_AGENT}" \
+    --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
     --dump-header "${file}" --output /dev/null "${url}" || return 1
   # --fail 을 뺐으므로 상태코드를 직접 본다 (--fail 은 본문·헤더를 버려 진단을 못 남긴다).
   local status_line; status_line="$(head -n 1 "${file}" 2>/dev/null | tr -d '\r')"
@@ -234,7 +319,7 @@ verify_origin() {
   local rc=1 curl_rc=0
   if curl --silent --show-error --location --insecure \
       --max-time "${WEBGL_VERIFY_TIMEOUT_SECONDS:-20}" --resolve "${host}:${port}:${addr}" \
-      --user-agent "${VERIFY_USER_AGENT}" \
+      --user-agent "${VERIFY_USER_AGENT}" --header "Accept-Encoding: ${VERIFY_ACCEPT_ENCODING}" \
       --dump-header "${file}" --output /dev/null "${base}/${path}" || { curl_rc=$?; false; }; then
     head -n 1 "${file}" | grep -Eq '^HTTP/[0-9.]+ 2[0-9][0-9]' \
       && grep -Eiq "^Content-Type:[[:space:]]*${expected_type}([[:space:]]*;|[[:space:]]*$)" "${file}" \
@@ -301,6 +386,47 @@ verify_release() {
   done
 }
 
+record_known_good() {
+  local state_root target temp
+  state_root="${WEBGL_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/var/lib/festa-environments}/dev/batches}"
+  target="${state_root}/known-good/webgl.json"
+  mkdir -p "$(dirname "${target}")"
+  temp="${target}.tmp.$$"
+  "${PYTHON_BIN:-python}" - "${candidate}/manifest.json" "${temp}" "${release_id}" "${expected_sha}" "${package_url}" "${WEBGL_PUBLIC_BASE_URL}" "${edge_blocked}" <<'PY'
+import datetime,json,pathlib,re,sys
+manifest_path,target,release_id,artifact_sha,package_url,public_url,edge_blocked=sys.argv[1:]
+manifest=json.loads(pathlib.Path(manifest_path).read_text(encoding='utf-8'))
+commit=manifest.get('sourceCommit')
+# 출처 판정(develop·clean·release)은 **공개 전** 게이트가 이미 했다 — 여기서 또 떨어지면
+# 그때는 되돌릴 수 없는 자리다. 여기서는 기록에 쓸 값이 성한지만 확인한다.
+if not isinstance(commit,str) or not re.fullmatch(r'[0-9a-f]{40}',commit):
+    raise SystemExit('WebGL manifest has an invalid sourceCommit')
+document={
+    'schemaVersion':'1.0.0', 'releaseId':release_id, 'artifactSha256':artifact_sha,
+    'sourceCommit':commit, 'sourceBranch':'develop', 'packageUrl':package_url,
+    'publicBaseUrl':public_url, 'verifiedVia':'origin' if edge_blocked == '1' else 'edge',
+    'recordedAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+}
+path=pathlib.Path(target); path.write_text(json.dumps(document,indent=2)+'\n',encoding='utf-8')
+PY
+  mv -f "${temp}" "${target}"
+}
+
+prune_legacy_releases() {
+  local name kept=0
+  local -a legacy_names=()
+  mapfile -t legacy_names < <(
+    find -P "${root}" -mindepth 1 -maxdepth 1 \( -type d -o -type l \) \
+      -name 'current.legacy.*' -printf '%f\n' | sort -r
+  )
+  for name in "${legacy_names[@]}"; do
+    [[ "${name}" =~ ^current\.legacy\.[0-9]{14}$ ]] || continue
+    kept=$((kept + 1))
+    (( kept <= 2 )) && continue
+    rm -rf -- "${root:?}/${name}"
+  done
+}
+
 if ! verify_release; then
   echo "public WebGL verification failed; restoring ${old_target:-${legacy_current:-empty current}}" >&2
   if [[ -n "${old_target}" ]]; then
@@ -335,6 +461,8 @@ for name in "${release_dirs[@]}"; do
   if (( kept > retention - 2 )); then rm -rf -- "${releases:?}/${name}"; fi
 done
 
+record_known_good
+prune_legacy_releases
 status=SUCCEEDED
 if [[ "${edge_blocked}" == 1 ]]; then
   echo "WARNING: 공개 경로 검증이 엣지에서 막혀 오리진 직접 확인으로 대체했다 —" \

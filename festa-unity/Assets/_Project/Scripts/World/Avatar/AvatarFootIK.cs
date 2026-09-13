@@ -59,10 +59,19 @@ namespace Festa.World
             _lHit = Probe(AvatarIKGoal.LeftFoot, out _lPos, out _lRot);
             _rHit = Probe(AvatarIKGoal.RightFoot, out _rPos, out _rRot);
 
-            // 골반: 두 발 중 더 낮은 쪽만큼 내린다(발이 공중에 뜨는 쪽을 땅에 닿게). 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
-            float lDelta = _lHit ? _lPos.y - _anim.GetIKPosition(AvatarIKGoal.LeftFoot).y : 0f;
-            float rDelta = _rHit ? _rPos.y - _anim.GetIKPosition(AvatarIKGoal.RightFoot).y : 0f;
-            float drop = Mathf.Clamp(Mathf.Min(lDelta, rDelta, 0f), -_maxPelvisDrop, 0f) * _weight;
+            // 골반: **지면이 루트보다 낮을 때만** 내린다. 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
+            //
+            // 전에는 `지면높이 - 애니메이션 발높이` 를 썼는데, 그러면 **애니메이션이 들어 올린 발**까지
+            // "떠 있다" 로 읽는다. 걷기 스윙이나 아이들의 무게중심 이동으로 한 발이 올라가는 순간
+            // 그 차이만큼 골반이 내려가, 평지에 그냥 서 있어도 자세가 주저앉았다 (사용자 보고 2026-09-13).
+            // 아래 `Apply` 에는 들린 발을 거르는 가드가 있는데 골반 계산에만 없었다.
+            //
+            // 기준을 **실제 지면 높이 대 루트 높이**로 바꾼다. 평지에서는 둘이 같아 보정이 0 이 되고,
+            // 한 발이 낮은 단차 위에 있을 때만 그 깊이만큼 내려간다 — 원래 의도 그대로다.
+            float rootY = transform.position.y;
+            float lGround = _lHit ? _lPos.y - _footHeight : rootY;
+            float rGround = _rHit ? _rPos.y - _footHeight : rootY;
+            float drop = Mathf.Clamp(Mathf.Min(lGround, rGround) - rootY, -_maxPelvisDrop, 0f) * _weight;
             _pelvisOffset = Mathf.Lerp(_pelvisOffset, drop, Time.deltaTime * _weightLerp);
             if (Mathf.Abs(_pelvisOffset) > 0.001f)
             {

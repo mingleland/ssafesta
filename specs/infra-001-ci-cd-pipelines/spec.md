@@ -140,7 +140,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-023e**: WebGL 산출물은 `/srv/festa/webgl/releases/<release-id>/`에 불변으로 설치하고, 동일 release ID의 동일 SHA 재호출은 멱등 처리하며 다른 SHA 재사용은 거부해야 한다.
 - **FR-023f**: Jenkins는 같은 파일시스템의 임시 심볼릭 링크와 원자적 rename으로만 `/srv/festa/webgl/current`를 전환하고 경로 내용을 직접 덮어쓰지 않아야 한다.
 - **FR-023g**: 전환 후 공개 URL의 index·manifest·manifest 참조 파일에 대해 HTTP 상태, MIME, Brotli와 Cache-Control을 검증하고 실패 시 직전 current를 복원해야 한다.
-- **FR-023h**: 성공한 current와 직전 previous release를 보존하면서 제한된 retention을 적용하고, WebGL 정적 배포는 Unity Dedicated Server 컨테이너를 재시작하지 않아야 한다.
+- **FR-023h**: 성공·known-good 기록이 끝난 WebGL 배포에서만 `current`와 `previous`를 보존하고, `/srv/festa/webgl/current.legacy.<UTC 14자리 timestamp>` 중 최신 두 개만 남겨야 한다. 검증·출처 검사 실패 시 legacy 정리를 실행하지 않으며, WebGL 정적 배포는 Unity Dedicated Server 컨테이너를 재시작하지 않아야 한다.
 - **FR-023i**: 배포 이력은 release ID, artifact SHA-256, Registry package URL, 공개 대상 URL, 결과와 시각을 기록하되 인증정보 원문을 포함하지 않아야 한다.
 - **FR-023j**: Unity 담당자 PC는 Jenkins Agent로 상시 연결할 필요가 없으며 업로드 도우미 실행 시 GitLab과 Jenkins HTTPS API에 접근할 수 있으면 된다.
 

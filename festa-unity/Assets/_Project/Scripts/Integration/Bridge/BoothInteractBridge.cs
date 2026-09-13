@@ -201,6 +201,27 @@ namespace Festa.Integration
             OnSent?.Invoke(ManagementInteract);
         }
 
+        /// <summary>
+        /// 안내데스크 — 이용 가이드라인 화면 (S15P21A604-674, GitLab #184). payload 는 <c>{type}</c> 하나뿐이다.
+        ///
+        /// <para><c>WORLD_</c> 접두사인 이유는 <b>화면이 boothId 를 소비하지 않기</b> 때문이다 —
+        /// <see cref="EventInteract"/>(-599) · <see cref="MinigameInteract"/>(#166) 와 같은 기준이다.
+        /// 안내 데스크가 하나뿐이라 <c>npcId</c> 도 싣지 않는다. 여러 곳이 생기면 그때 채운다 —
+        /// 안 쓰는 값을 실어 보내면 나중에 의미 있는 값으로 읽힌다(헌법 25조).</para>
+        ///
+        /// <para><b>FE 수신부 확정 전이다</b>(#184). 송신부를 먼저 깔아 두는 것은
+        /// <see cref="EventInteract"/> 때와 같은 순서다 — 수신부가 서면 그날 바로 붙는다.
+        /// 그때까지 F 는 초점만 잡고 화면은 열리지 않는다.</para>
+        /// </summary>
+        public const string GuideInteract = "WORLD_GUIDE_INTERACT";
+
+        /// <summary>안내데스크 NPC — <see cref="GuideInteract"/>. 게스트도 그대로 보낸다.</summary>
+        public static void SendGuideInteract()
+        {
+            Send(BuildTypeOnlyJson(GuideInteract));
+            OnSent?.Invoke(GuideInteract);
+        }
+
         /// <summary>광장 게임기 — <see cref="ArcadeInteract"/>.</summary>
         public static void SendArcadeInteract(string machineId)
         {

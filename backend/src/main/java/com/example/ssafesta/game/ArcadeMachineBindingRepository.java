@@ -28,4 +28,19 @@ public interface ArcadeMachineBindingRepository extends JpaRepository<ArcadeMach
      */
     @Query("select g from ArcadeMachineBinding b join Game g on g.id = b.gameId where b.machineId = :machineId")
     Optional<Game> findBoundGame(@Param("machineId") String machineId);
+
+    /**
+     * Every machine that runs this game, unbound — the game is about to be deleted for good.
+     *
+     * <p>The foreign key is deliberately plain {@code REFERENCES} with no {@code ON DELETE} (V27),
+     * so whoever deletes a game has to clear this table first. Two callers do: withdrawal
+     * ({@code AccountDeletionService}, in SQL) and trash eviction
+     * ({@code GameLifecycleService#hardDelete}) — the second one forgot, and the delete failed with
+     * the whole request rolled back (S15P21A604-681).
+     *
+     * <p>A machine whose game is gone is left with no row rather than a dangling one. The resolver
+     * already answers {@code MACHINE_NOT_FOUND} for that, which is what an operator should see
+     * until they point the machine somewhere else.
+     */
+    void deleteByGameId(Long gameId);
 }

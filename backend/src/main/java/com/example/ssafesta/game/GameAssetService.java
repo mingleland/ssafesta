@@ -132,7 +132,7 @@ public class GameAssetService {
                 // Signed for exactly the grant's lifetime — a longer signature would let bytes land
                 // after complete has already refused the row, leaving an object nothing points at.
                 String uploadUrl = storage.presignPut(target.provider(), target.bucket(), objectKey,
-                        declaredContentType, declaredByteSize, GRANT_TTL);
+                        declaredContentType, declaredByteSize, null, GRANT_TTL);
                 return new IssuedGrant(assetId, expiresAt, uploadUrl, declaredContentType);
             }
         }

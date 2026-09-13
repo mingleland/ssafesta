@@ -42,7 +42,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * 부스에 속하지 않는 이벤트 설문 (S15P21A604-621, GitLab #173 · 계약 §11).
+ * 부스에 속하지 않는 이벤트 설문 (S15P21A604-621, GitLab #173 · 계약 §8-1).
  *
  * <p>이 스위트가 지키는 것은 <b>두 축이 서로를 침범하지 않는다</b>는 것이다. 같은 표·같은 제출
  * 경로를 쓰면서 부스 관문만 건너뛰므로, 한쪽 경로가 다른 쪽 자원을 집어 들면 조용히 틀린다 —
