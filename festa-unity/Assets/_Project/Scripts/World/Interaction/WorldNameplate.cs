@@ -297,7 +297,8 @@ namespace Festa.World
             float dist = toCam.magnitude;
 
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label) && IsBodyVisible();
+            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label)
+                        && IsBodyVisible() && !IsOccluded(cam);
             _renderer.enabled = show;
             if (!show) return;
 
@@ -313,6 +314,53 @@ namespace Festa.World
             if (flat.sqrMagnitude > 0.0001f)
                 _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
         }
+
+        /// <summary>
+        /// 카메라와 몸 사이에 **단단한 것**이 있는가. 있으면 이름표를 감춘다.
+        ///
+        /// <para><b>왜 <see cref="Renderer.isVisible"/> 로는 안 되나.</b> 그 값은
+        /// "어느 카메라에든 보이는가" 다 — 에디터에서는 **씬 뷰 카메라에만 보여도 true** 라
+        /// 게임 뷰에서 벽 뒤에 있어도 이름표가 뜬다. 빌드에서도 그 벽이 베이크된 오클루더가
+        /// 아니면 걸리지 않는다. 사용자가 반복해서 지적한 "벽 쪽으로 가면 닉네임만 뜬다" 가 이것이다.</para>
+        ///
+        /// <para>그래서 <b>카메라에서 머리까지 선분을 직접 쏜다.</b> 자기 몸(자식 콜라이더)은 건너뛰고,
+        /// 트리거는 무시한다. 매 프레임 쏘면 사람 수만큼 늘어나므로 <c>OcclusionInterval</c> 프레임마다
+        /// 한 번만 재고 그 사이는 직전 값을 쓴다 — 이름표가 깜빡일 만큼 빠른 변화가 아니다.</para>
+        /// </summary>
+        bool IsOccluded(Camera cam)
+        {
+            if (!_hideWhenOccluded) return false;
+            if (Time.frameCount - _occlusionFrame < OcclusionInterval) return _occluded;
+            _occlusionFrame = Time.frameCount;
+
+            var head = _root != null ? _root.position : transform.position;
+            var origin = cam.transform.position;
+            var delta = head - origin;
+            float d = delta.magnitude;
+            if (d < 0.05f) { _occluded = false; return false; }
+
+            // 끝점을 살짝 당긴다 — 머리 바로 옆 벽에 스치는 것까지 가림으로 치면 붙어 설 때 깜빡인다.
+            int n = Physics.RaycastNonAlloc(origin, delta / d, _occlusionHits, d - 1.5f, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var t = _occlusionHits[i].transform;
+                if (t == null) continue;
+                if (t.IsChildOf(transform) || transform.IsChildOf(t)) continue;   // 자기 몸은 가림이 아니다
+                _occluded = true;
+                return true;
+            }
+            _occluded = false;
+            return false;
+        }
+
+        [Tooltip("몸이 가려지면 이름표도 감춘다. 끄면 벽 너머로 이름만 떠 보인다")]
+        [SerializeField] bool _hideWhenOccluded = true;
+
+        /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
+        const int OcclusionInterval = 3;
+        static readonly RaycastHit[] _occlusionHits = new RaycastHit[8];
+        int _occlusionFrame = -100;
+        bool _occluded;
 
         /// <summary>
         /// 몸 렌더러 중 하나라도 이번 프레임에 그려졌는가(<see cref="Renderer.isVisible"/> 는 프러스텀·오클루전 컬링 결과를 반영한다).
