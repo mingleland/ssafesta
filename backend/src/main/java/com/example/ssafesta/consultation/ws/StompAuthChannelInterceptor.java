@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * <p>검증에 실패하면 <b>예외를 던져 연결을 거부한다.</b> 조용히 통과시키면 인증 없는 연결이
  * {@code /topic/booths/*} 를 구독해 남의 부스 대기열을 읽는다.
  *
- * <p>토큰은 {@code Authorization: Bearer …} 헤더로만 받는다. <b>URL query 는 보지 않는다</b> —
+ * <p>토큰은 {@code Authorization: Bearer <token>} 헤더로만 받는다. <b>URL query 는 보지 않는다</b> —
  * 그 자리에 실린 토큰은 접속 로그와 referrer 에 남는다(FR-019).
  *
  * <p>검증된 회원 id 를 {@link Principal} 로 심어 {@code /user/queue/...} 가 그 사람에게만 가게
