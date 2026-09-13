@@ -71,7 +71,9 @@ class SecurityConfiguration {
                         // WS Token 으로 확인하고(FR-019, StompAuthChannelInterceptor), 그 검증에
                         // 실패한 연결은 거부된다. 여기서 막으면 핸드셰이크 단계에서 토큰을 URL 로
                         // 넘겨야 하는데 그것이 바로 FR-019 가 금지하는 것이다.
-                        .requestMatchers("/ws/consultation/**", "/ws/consultation").permitAll()
+                        // /ws 는 범용 엔드포인트이고 /ws/consultation 은 이미 통보한 경로라 함께 연다.
+                        // 등록하지 않으면 STOMP CONNECT 검증 전에 핸드셰이크가 401 로 끊긴다.
+                        .requestMatchers("/ws", "/ws/**").permitAll()
                         // Slot browsing is open: a guest session exists to look around (헌법 12조).
                         // Leasing under /booth-slots/{id}/leases stays authenticated.
                         .requestMatchers(HttpMethod.GET, "/api/v1/booth-slots", "/api/v1/booths/*").permitAll()

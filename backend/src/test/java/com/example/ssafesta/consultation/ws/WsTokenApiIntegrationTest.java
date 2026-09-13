@@ -139,8 +139,8 @@ class WsTokenApiIntegrationTest {
      * 클라이언트는 어떤 destination 으로도 직접 SEND 할 수 없다.
      *
      * <p>{@code /topic}·{@code /queue} 는 컨트롤러를 거치지 않고 broker 로 갈 수 있어
-     * 서버 이벤트를 위조한다. {@code /app/world/chat} 도 채팅 기능이 없는 이 티켓에서는
-     * 열지 않고, 후속 티켓이 정확한 한 건만 allowlist 에 추가한다.
+     * 서버 이벤트를 위조한다. {@code /app} 아래라고 열리는 것도 아니다 — allowlist 는 접두가
+     * 아니라 <b>정확히 일치</b>라서, 등록된 핸들러가 없는 {@code /app/...} 도 거부된다.
      */
     @ParameterizedTest
     @ValueSource(strings = {
@@ -148,12 +148,24 @@ class WsTokenApiIntegrationTest {
             "/topic/booths/7/consultation",
             "/queue/consultation",
             "/user/queue/consultation",
-            "/app/world/chat",
+            "/app/world/consultation",
             "/unregistered"
     })
     void everyClientSendIsRefused(String destination) {
         assertThrows(IllegalArgumentException.class,
                 () -> interceptor.preSend(frame(StompCommand.SEND, destination), null));
+    }
+
+    /**
+     * allowlist 에 오른 destination 하나는 통과한다 (S15P21A604-687 월드 채팅).
+     *
+     * <p>거부만 고정하면 목록을 통째로 비워도 초록이 된다 — 그러면 채팅이 조용히 죽는다.
+     */
+    @Test
+    void theAllowlistedChatDestinationPassesThrough() {
+        Message<?> send = frame(StompCommand.SEND, "/app/world/chat");
+
+        assertEquals(send, interceptor.preSend(send, null));
     }
 
     /** raw queue 는 user destination 변환을 우회하므로 직접 구독하지 못한다. */
