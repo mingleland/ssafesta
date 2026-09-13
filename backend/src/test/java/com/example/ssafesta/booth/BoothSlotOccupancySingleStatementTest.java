@@ -5,6 +5,7 @@ import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.example.ssafesta.CapturingStatementInspector;
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
@@ -30,7 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties =
         "spring.jpa.properties.hibernate.session_factory.statement_inspector="
-                + "com.example.ssafesta.booth.CapturingStatementInspector")
+                + "com.example.ssafesta.CapturingStatementInspector")
 class BoothSlotOccupancySingleStatementTest {
 
     @Autowired private BoothQueryService query;
