@@ -221,6 +221,11 @@ Token 재사용도 허용하지 않는다 — 토큰 4계층 분리의 이유다
 P1 의 이 채널은 **서버에서 클라이언트로 가는 단방향 알림 전용**이다(C-12). 요청·취소·수락·종료는
 전부 REST 이고, 그래서 서버에 SEND destination 자체가 등록돼 있지 않다.
 
+**destination 미등록을 보안 경계로 삼지 않는다.** 클라이언트의 STOMP `SEND` 는 inbound
+interceptor 가 기본 거부한다. 이 방어가 없으면 `/topic/**`·`/queue/**` 로 보낸 프레임이
+컨트롤러를 우회해 simple broker 로 갈 수 있다. 개인 알림 구독은 `/user/queue/**` 만 쓰며,
+raw `/queue/**` 구독은 거부한다. 토픽별 SUBSCRIBE 자격 검증은 별도 보안 검토 범위다.
+
 ### Server → Client 봉투
 
 ```json

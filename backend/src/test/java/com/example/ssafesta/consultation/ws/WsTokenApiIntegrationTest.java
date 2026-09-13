@@ -16,6 +16,9 @@ import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -132,12 +135,51 @@ class WsTokenApiIntegrationTest {
                 () -> interceptor.preSend(connectWith("Authorization", "Bearer 없는토큰"), null));
     }
 
-    /** {@code CONNECT} 가 아닌 프레임은 그대로 지나간다 — 구독·해제까지 막으면 연결이 죽는다. */
+    /**
+     * 클라이언트는 어떤 destination 으로도 직접 SEND 할 수 없다.
+     *
+     * <p>{@code /topic}·{@code /queue} 는 컨트롤러를 거치지 않고 broker 로 갈 수 있어
+     * 서버 이벤트를 위조한다. {@code /app/world/chat} 도 채팅 기능이 없는 이 티켓에서는
+     * 열지 않고, 후속 티켓이 정확한 한 건만 allowlist 에 추가한다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/topic/world/chat",
+            "/topic/booths/7/consultation",
+            "/queue/consultation",
+            "/user/queue/consultation",
+            "/app/world/chat",
+            "/unregistered"
+    })
+    void everyClientSendIsRefused(String destination) {
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frame(StompCommand.SEND, destination), null));
+    }
+
+    /** raw queue 는 user destination 변환을 우회하므로 직접 구독하지 못한다. */
     @Test
-    void otherFramesPassThrough() {
-        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
-        accessor.setLeaveMutable(true);
-        Message<?> frame = MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    void aRawQueueSubscriptionIsRefused() {
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, "/queue/consultation-user42"), null));
+    }
+
+    /** 기존 상담 계약이 쓰는 두 구독은 그대로 유지한다. */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/user/queue/consultation",
+            "/topic/booths/7/consultation"
+    })
+    void consultationContractSubscriptionsPassThrough(String destination) {
+        Message<?> subscription = frame(StompCommand.SUBSCRIBE, destination);
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    /** 구독 해제와 정상 종료는 destination 정책의 대상이 아니다. */
+    @ParameterizedTest
+    @EnumSource(value = StompCommand.class, names = {"UNSUBSCRIBE", "DISCONNECT"})
+    void lifecycleFramesPassThrough(StompCommand command) {
+        Message<?> frame = frame(command, null);
 
         assertEquals(frame, interceptor.preSend(frame, null));
     }
@@ -146,6 +188,15 @@ class WsTokenApiIntegrationTest {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         if (header != null) {
             accessor.setNativeHeader(header, value);
+        }
+        accessor.setLeaveMutable(true);
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+    }
+
+    private Message<?> frame(StompCommand command, String destination) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        if (destination != null) {
+            accessor.setDestination(destination);
         }
         accessor.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
