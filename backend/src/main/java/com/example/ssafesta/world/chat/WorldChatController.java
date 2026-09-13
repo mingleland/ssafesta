@@ -3,6 +3,8 @@ package com.example.ssafesta.world.chat;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.security.Principal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -20,6 +22,8 @@ public class WorldChatController {
 
     /** 오류가 가는 자리. 다른 SEND 기능이 생겨도 겹치지 않도록 기능 이름을 경로에 넣는다. */
     static final String ERROR_QUEUE = "/queue/world/chat/errors";
+
+    private static final Logger log = LoggerFactory.getLogger(WorldChatController.class);
 
     private final WorldChatService chat;
 
@@ -47,7 +51,9 @@ public class WorldChatController {
         if (failure instanceof ApiException api) {
             return new WorldChatError(api.errorCode().name(), api.getMessage());
         }
-        // 알 수 없는 실패의 내부 사정은 클라이언트로 새지 않게 한다.
+        // 알 수 없는 실패의 내부 사정은 클라이언트로 새지 않게 한다 — 대신 여기 남긴다. 클라이언트에는
+        // CHAT_UNAVAILABLE 로 뭉개져 나가므로, 이 줄이 없으면 서버 오류가 아무 흔적 없이 사라진다 (T-24).
+        log.error("월드 채팅 처리 실패 — 알 수 없는 예외를 CHAT_UNAVAILABLE 로 답합니다.", failure);
         return new WorldChatError(ErrorCode.CHAT_UNAVAILABLE.name(),
                 ErrorCode.CHAT_UNAVAILABLE.defaultMessage());
     }
