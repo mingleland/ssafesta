@@ -24,6 +24,8 @@ namespace Festa.EditorTools
         const string WebOutDir = "Builds/webgl";
         const string ServerOutDir = "Builds/linux-server";
         const string ServerExeName = "festa-unity.x86_64";
+        const string SmokeOutDir = "Builds/linux-smoke";
+        const string SmokeExeName = "festa-world-smoke.x86_64";
 
         public static void Build()
         {
@@ -42,8 +44,9 @@ namespace Festa.EditorTools
                 {
                     case "webgl":        BuildWeb(scenes); break;
                     case "linux-server": BuildServer(scenes); break;
+                    case "linux-smoke":  BuildSmoke(scenes); break;
                     case "all":          BuildServer(scenes); BuildWeb(scenes); break;
-                    default:             Fail($"알 수 없는 타깃: {target} (webgl|linux-server|all)"); break;
+                    default:             Fail($"알 수 없는 타깃: {target} (webgl|linux-server|linux-smoke|all)"); break;
                 }
 
                 Log("빌드 성공");
@@ -162,6 +165,29 @@ namespace Festa.EditorTools
                 if (!File.Exists(path) && !Directory.Exists(path))
                     Fail($"WebGL 산출물에 {required} 가 없다: {path}");
             }
+        }
+
+        /// <summary>
+        /// Linux headless 승인 접속 smoke runner (S15P21A604-675, GitLab #185).
+        ///
+        /// <para><b>서버가 아니라 클라이언트다.</b> 서버 서브타깃으로 구우면 <c>UNITY_SERVER</c> 가 정의되고
+        /// 접속하는 쪽이 아니라 받는 쪽이 된다. 이 실행기는 실제 사용자처럼 <b>들어가 보는</b> 것이 일이라
+        /// Player 서브타깃이어야 한다 — 인프라가 확보한 라이선스 모듈도
+        /// <c>linux64_player_nondevelopment_mono</c> 다.</para>
+        /// </summary>
+        static void BuildSmoke(string[] scenes)
+        {
+            EditorUserBuildSettings.standaloneBuildSubtarget = StandaloneBuildSubtarget.Player;
+
+            var options = new BuildPlayerOptions
+            {
+                scenes = scenes,
+                locationPathName = Path.Combine(SmokeOutDir, SmokeExeName),
+                target = BuildTarget.StandaloneLinux64,
+                subtarget = (int)StandaloneBuildSubtarget.Player,
+                options = BuildOptions.None,
+            };
+            RunBuild(options, "Linux smoke 클라이언트");
         }
 
         static void BuildServer(string[] scenes)
