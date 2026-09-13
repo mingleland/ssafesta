@@ -37624,8 +37624,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _returnAfter: 300
   _lineDuration: 2.2
-  _bubbleHeight: 10
+  _bubbleHeight: 13
   _visibleDistance: 180
+  _bubblePullToCamera: 0
   _sleepEmote: 9
 --- !u!114 &766188889
 MonoBehaviour:
@@ -81890,7 +81891,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 2800
-  field of view: 60
+  field of view: 62
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -81916,8 +81917,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1640560785}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.043619387, y: 0, z: 0, w: 0.99904823}
-  m_LocalPosition: {x: -92, y: 18, z: 0}
+  m_LocalRotation: {x: -0.0050526215, y: 0.99242014, z: -0.11474857, w: -0.04369835}
+  m_LocalPosition: {x: -188, y: 24, z: -198}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
