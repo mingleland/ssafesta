@@ -101,9 +101,10 @@ namespace Festa.World
             // 화면 평면에 띄운다 (위 클래스 주석 참조).
             BoothInteractionInput.Toast(CaughtLine, _lineDuration);
 
-            // 일어나는 척 — 누운 이모트를 풀면 기본 자세로 돌아간다.
-            if (_animator != null && _animator.HasState(0, Animator.StringToHash("Idle")))
-                _animator.CrossFadeInFixedTime("Idle", 0.2f, 0);
+            // **자세를 바꾸지 않는다.** 클립마다 루트 오프셋이 달라 어떤 자세로 넘겨도 몸이 옮겨진다 —
+            // 실측: 눕기 골반 x -191.4 / 앉기 -184.1 / Idle -186.3. 좁은 틈에서 그만큼 움직이면
+            // 판넬에 껴 들어간다. 런타임에서 트랜스폼을 보정하는 것은 금지다(에디터가 정본).
+            // 그래서 들킨 뒤에도 누운 자세 그대로 사과하고 사라진다.
         }
     }
 }
