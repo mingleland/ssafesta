@@ -33,7 +33,12 @@ backup_r2_signing_trace() {
   local trace
   trace="$(mktemp)"
   "${AWS_CLI}" --debug --endpoint-url "${R2_BACKUP_ENDPOINT}" s3api head-bucket --bucket "${R2_BACKUP_BUCKET}" >/dev/null 2>"${trace}" || true
-  sed -n '/CanonicalRequest:/,/StringToSign:/p' "${trace}" >&2
+  awk '
+    /CanonicalRequest:/ { capture = 1 }
+    capture { print }
+    /StringToSign:/ { remaining = 3; next }
+    remaining > 0 { remaining--; if (remaining == 0) exit }
+  ' "${trace}" >&2
   rm -f "${trace}"
 }
 

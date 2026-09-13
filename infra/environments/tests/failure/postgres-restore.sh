@@ -84,7 +84,7 @@ assert_contains "$temp_dir/bucket/$manifest_key" 'tableRows' 'manifest records e
 cat >"$temp_dir/bin/aws-trace" <<'SH'
 #!/usr/bin/env bash
 if [[ "$1" == --debug ]]; then
-  printf 'CanonicalRequest:\nHEAD\n/postgres-backups\nhost:r2.example.invalid\nStringToSign:\n' >&2
+  printf 'CanonicalRequest:\nHEAD\n/postgres-backups\nhost:r2.example.invalid\nStringToSign:\n20260913T155457Z\n20260913/auto/s3/aws4_request\ncanonical-request-sha256\n' >&2
   printf 'Authorization: must-not-be-printed\n' >&2
 fi
 exit 254
@@ -96,6 +96,7 @@ trace_status=$?
 set -e
 [[ "$trace_status" -eq 254 ]] || fail 'R2 trace changed the upload failure status'
 [[ "$trace_output" == *'CanonicalRequest:'* ]] || fail 'R2 trace omitted canonical request'
+[[ "$trace_output" == *'20260913/auto/s3/aws4_request'* ]] || fail 'R2 trace omitted signing scope'
 [[ "$trace_output" != *'must-not-be-printed'* ]] || fail 'R2 trace exposed authorization data'
 
 if bash "$repo_root/infra/environments/postgres/backup/restore.sh" --target live-demo --manifest-key "$manifest_key" >/dev/null 2>&1; then
