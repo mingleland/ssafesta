@@ -188,6 +188,7 @@ public class OpenApiConfiguration {
                 tag("Inventory", "아바타 파츠 상점과 구매"),
                 tag("Minigame", "타이밍 스톱 미니게임의 세션 발급과 결과 제출. 목표 시간·오차·보상은 전부 서버가 정한다"),
                 tag("Staff Invitation", "부스 직원 초대·수락·취소. 닉네임으로 부르며 48시간 뒤 만료된다"),
+                tag("Consultation", "사람 상담 요청·수락·종료. 회원 전용이고 요청은 10분 뒤 만료된다"),
                 tag("Booth Staff", "부스 직원 목록과 역할 관리. 소유자는 읽기 전용 행으로 함께 나온다"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
     }

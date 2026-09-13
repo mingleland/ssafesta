@@ -118,7 +118,9 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 
 ### `POST /api/v1/consultation/requests`
 
-인증된 회원만. **게스트는 `403 GUEST_FORBIDDEN`** 과 함께 소셜 로그인 안내를 받는다(FR-014, 헌법 12조).
+인증된 회원만. **게스트는 `403 MEMBER_ONLY`** 와 함께 소셜 로그인 안내를 받는다(FR-014, 헌법 12조).
+
+> 구현하며 `GUEST_FORBIDDEN` 에서 고쳤다 (2026-09-13). 게스트 거부는 이미 `MEMBER_ONLY` 라는 이름을 갖고 있고, 같은 사건에 두 이름을 만들면 FE 가 분기를 두 벌 관리한다 (`docs/08` §1.3).
 
 ```json
 { "boothId": 7, "conversationId": "conv_01JABCXYZ" }
@@ -132,13 +134,21 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 
 | 오류 | 조건 |
 |---|---|
-| `403 GUEST_FORBIDDEN` | 게스트 |
+| `403 MEMBER_ONLY` | 게스트 |
 | `409 CONSULTATION_REQUEST_PENDING` | 이 방문자의 대기 중 요청이 이미 있다 |
 | `409 BOOTH_LEASE_EXPIRED` | 부스 임대가 만료됐다 |
 
 ### `DELETE /api/v1/consultation/requests/{requestId}`
 
 방문자 본인. 대기 중 요청을 취소한다. → `204`
+
+상태는 `CANCELLED` 로 남는다 — `EXPIRED` 와 가르는 이유는 대기열에서 사라진 **까닭**이 다르고, 직원 화면이 다른 이벤트(`cancelled` / `expired`)를 받기 때문이다.
+
+| 오류 | 조건 |
+|---|---|
+| `403 CONSULTATION_FORBIDDEN` | 내 요청이 아니다 |
+| `404 CONSULTATION_NOT_FOUND` | 그런 요청이 없다 |
+| `409 CONSULTATION_NOT_REQUESTED` | 이미 수락·취소·만료됐다 |
 
 ### `GET /api/v1/booths/{boothId}/consultation/requests`
 
@@ -165,6 +175,12 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 ### `POST /api/v1/consultation/sessions/{sessionId}/end`
 
 방문자·직원 **누구나** 종료할 수 있다. 상대에게 `ended` 이벤트가 간다(FR-010). → `204`
+
+| 오류 | 조건 |
+|---|---|
+| `403 CONSULTATION_FORBIDDEN` | 내 상담이 아니다 |
+| `404 CONSULTATION_NOT_FOUND` | 그런 세션이 없다 |
+| `409 CONSULTATION_NOT_REQUESTED` | 진행 중인 상담이 아니다 |
 
 ---
 
