@@ -32,6 +32,12 @@ async function renderLogin() {
 
 beforeEach(() => {
   vi.stubEnv('VITE_USE_MOCK', 'false');
+  // base 두 개를 **빈 값으로 못박는다.** vitest 는 Vite 파이프라인이라 이 저장소 밖의 `.env` 를
+  // 그대로 읽는데, 옛 `.env.example` 이 "로컬에서는 http://localhost:8080 을 넣는다" 고 권했다.
+  // 그 값을 가진 머신에서는 아래 `url.origin` 단정이 8080 을 만나 깨진다 — 결과가 환경에 달리면
+  // 이 테스트가 잠그려는 계약이 잠기지 않는다.
+  vi.stubEnv('VITE_AUTH_BASE_URL', '');
+  vi.stubEnv('VITE_API_BASE_URL', '');
 });
 
 afterEach(() => {
@@ -43,7 +49,11 @@ afterEach(() => {
 describe.each([
   ['http://localhost:5173'],
   ['http://localhost:5175'],
-  ['http://127.0.0.1:5188'],
+  // **`localhost` 로만 연다.** `127.0.0.1` 로 시작하면 JSESSIONID(host-only)가 그 호스트에 붙고,
+  // provider 콜백은 등록값인 `localhost:8080` 으로 돌아와 세션이 실리지 않는다 — Spring 이
+  // `authorization_request_not_found` 로 떨어진다. 쿠키 host 비교는 포트만 무관하고 호스트는
+  // 정확 일치다(`127.0.0.1` ≠ `localhost`). 포트만 다른 경우를 잠그는 것이 이 표의 목적이다.
+  ['http://localhost:5188'],
 ])('OAuth 시작 origin 전달 — %s', (origin) => {
   it('Google 버튼이 /api/v1/auth/oauth/google?return=<origin> 으로 이동한다', async () => {
     const loc = stubLocation(origin);

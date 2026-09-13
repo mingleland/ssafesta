@@ -34,6 +34,12 @@
  * 바꿔야 한다. **dev/demo/prod nginx 계약 변경이 아니다** — dev 의 `dev.conf` 에는 `/oauth2/` route
  * 가 없고 OAuth 시작이 `api.<domain>` vhost 를 탄다. 로컬만 한 오리진으로 접기 때문에 필요한 보정이다.
  *
+ * **로컬 dev 서버는 `localhost` 로 연다.** `127.0.0.1:<port>` 로 열면 OAuth 가 깨진다 — 시작 요청이
+ * 받은 JSESSIONID 는 host-only 라 `127.0.0.1` 에 붙는데 provider 콜백은 등록값인
+ * `localhost:8080/login/oauth2/code/*` 로 돌아와 그 쿠키를 못 싣고, Spring 이
+ * `authorization_request_not_found` 로 떨어진다. 아래 프록시 **대상** 주소의 127.0.0.1 은 서버 간
+ * 연결이라 무관하다 — 브라우저가 여는 주소만 `localhost` 면 된다.
+ *
  * @param {Record<string, string | undefined>} env process.env
  */
 export function createGatewayProxy(env = {}) {
