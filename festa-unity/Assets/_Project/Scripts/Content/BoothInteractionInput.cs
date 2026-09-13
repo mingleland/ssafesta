@@ -195,6 +195,12 @@ namespace Festa.Content
             return target.DistanceFrom(origin.Value) <= target.MaxDistance;
         }
 
+        /// <summary>
+        /// 상호작용을 건 사람의 자리. 사거리 판정이 쓰는 기준과 <b>같은 것</b>을 내보낸다 —
+        /// NPC 가 "말 건 사람을 바라보게" 할 때 다른 기준을 쓰면 조준과 시선이 어긋난다.
+        /// </summary>
+        public static Vector3? InteractorPosition() => InteractionOrigin();
+
         static Vector3? InteractionOrigin()
         {
             var nm = Unity.Netcode.NetworkManager.Singleton;
