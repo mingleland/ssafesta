@@ -55,6 +55,8 @@ public class ConsultationService {
     @Transactional
     public RequestView request(Long visitorUserId, RequestCommand command) {
         Long boothId = requireBoothId(command);
+        // 존재부터 본다 — 임대 검사만 하면 없는 부스가 "임대가 끝났다"(409) 로 답한다 (S15P21A604-693).
+        staffGuard.requireBooth(boothId);
         boothGuard.requireActiveLease(boothId);
         consultations.findPendingOf(boothId, visitorUserId).ifPresent(pending -> {
             throw new ApiException(ErrorCode.CONSULTATION_REQUEST_PENDING);

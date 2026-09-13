@@ -136,6 +136,7 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 |---|---|
 | `403 MEMBER_ONLY` | 게스트 |
 | `409 CONSULTATION_REQUEST_PENDING` | 이 방문자의 대기 중 요청이 이미 있다 |
+| `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 (2026-09-13, S15P21A604-693 — 이전에는 임대 검사만 해 `409 BOOTH_LEASE_EXPIRED` 로 답했다) |
 | `409 BOOTH_LEASE_EXPIRED` | 부스 임대가 만료됐다 |
 
 ### `DELETE /api/v1/consultation/requests/{requestId}`
