@@ -49,16 +49,14 @@ namespace Festa.Network
         /// </summary>
         public bool StartClient(WorldSessionDto session, ConnectionPayload payload)
         {
-            if (session?.endpoint == null || string.IsNullOrEmpty(session.endpoint.host))
+            if (!WorldSessionEndpoint.TryGetConnectionData(session, out var host, out var port, out var secure))
             {
-                Debug.LogError("[ConnectionManager] world session endpoint가 비어있음");
+                Debug.LogError("[ConnectionManager] world session endpoint가 유효하지 않음");
                 return false;
             }
 
             payload.connectionToken = session.connectionToken;
-
-            bool secure = string.Equals(session.endpoint.scheme, "wss", StringComparison.OrdinalIgnoreCase);
-            return StartClientInternal(session.endpoint.host, (ushort)session.endpoint.port, secure, payload);
+            return StartClientInternal(host, port, secure, payload);
         }
 
         /// <summary>개발용 직접 접속 (DevConnectionHud 수동 입력, 항상 평문 ws).</summary>
