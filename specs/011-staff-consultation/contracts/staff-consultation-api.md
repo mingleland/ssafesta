@@ -17,17 +17,20 @@
 Owner·`ADMIN`만. 초대를 만든다.
 
 ```json
-{ "userId": 45, "role": "CONSULTANT" }
+{ "nickname": "덕", "role": "CONSULTANT" }
 ```
 
-→ `201 { "invitationId": 12, "expiresAt": "..." }` — `expiresAt` 은 생성 + **48시간**(C-07).
+→ `201 { "invitationId": 12, "boothId": 7, "boothName": "…", "nickname": "덕", "role": "CONSULTANT", "expiresAt": "..." }` — `expiresAt` 은 생성 + **48시간**(C-07).
+
+> **대상은 닉네임이다 — `userId` 가 아니다.** `docs/08` §10 은 `userId` 를 적었지만 Owner 가 남의 숫자 id 를 알아낼 경로가 없다. 사용자 검색 endpoint 를 열면 닉네임 훑기·id 수집 표면이 함께 생기므로 만들지 않았고, `users.nickname` 이 V1 부터 `UNIQUE` 라 식별자로 충분하다. `docs/08` §10 정정은 이 구현과 함께 나간다 (헌법 24조 통보).
 
 | 오류 | 조건 |
 |---|---|
-| `403 BOOTH_FORBIDDEN` | 호출자가 Owner·`ADMIN` 이 아니다 |
+| `403 STAFF_MANAGER_FORBIDDEN` | 호출자가 Owner·`ADMIN` 이 아니다 — `CONTENT_EDITOR` 는 콘텐츠를 고치지만 사람을 들이지는 못한다 |
+| `404 STAFF_INVITEE_NOT_FOUND` | 그 닉네임의 회원이 없다 |
 | `409 STAFF_INVITATION_PENDING` | 같은 사용자에게 대기 중 초대가 이미 있다 (`ux_staff_invitations_pending`) |
-| `409 STAFF_ALREADY_MEMBER` | 이미 직원이다 |
-| `400 VALIDATION_FAILED` | `role` 이 `ADMIN`·`CONTENT_EDITOR`·`CONSULTANT` 밖이다 |
+| `409 STAFF_ALREADY_MEMBER` | 이미 소유자이거나 직원이다 |
+| `400 VALIDATION_FAILED` | `nickname` 누락, 또는 `role` 이 `ADMIN`·`CONTENT_EDITOR`·`CONSULTANT` 밖이다 |
 
 ### `GET /api/v1/staff-invitations/mine`
 
@@ -42,7 +45,9 @@ Owner·`ADMIN`만. 초대를 만든다.
 | 오류 | 조건 |
 |---|---|
 | `403 STAFF_INVITATION_FORBIDDEN` | 내게 온 초대가 아니다 |
-| `409 STAFF_INVITATION_NOT_PENDING` | 이미 수락·취소됐거나 48시간이 지났다 |
+| `404 STAFF_INVITATION_NOT_FOUND` | 그런 초대가 없다 |
+| `409 STAFF_INVITATION_NOT_PENDING` | 이미 수락·취소됐거나 48시간이 지났다. **만료는 스위퍼를 기다리지 않고 읽는 쪽이 판정한다** |
+| `409 STAFF_ALREADY_MEMBER` | 초대를 받는 사이에 이미 직원이 됐다 |
 
 ### `DELETE /api/v1/booths/{boothId}/staff-invitations/{invitationId}`
 
@@ -61,7 +66,9 @@ Owner·직원 누구나. **Owner를 읽기 전용 `OWNER` 행으로 포함한다
 ]
 ```
 
-`OWNER` 행은 `PATCH`·`DELETE` 대상이 아니다 — 시도하면 `409 STAFF_OWNER_IMMUTABLE`.
+`OWNER` 행은 `PATCH`·`DELETE` 대상이 아니다 — 시도하면 `409 STAFF_OWNER_IMMUTABLE`. 직원이 아닌 사람을 가리키면 `404 STAFF_NOT_FOUND` 다. 둘을 가르는 이유는, 목록에 분명히 보이던 Owner 를 404 로 답하면 "이 부스와 무관하다" 로 읽히기 때문이다.
+
+조회 게이트는 **부스 구성원**이다 — 편집 게이트가 아니다. `CONSULTANT` 도 같은 부스에 누가 있는지는 알아야 한다. 구성원이 아니면 `403 STAFF_MANAGER_FORBIDDEN`.
 
 ### `PATCH /api/v1/booths/{boothId}/staff/{userId}` · `DELETE …`
 
