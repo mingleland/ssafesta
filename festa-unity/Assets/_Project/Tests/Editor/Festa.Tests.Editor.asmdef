@@ -6,6 +6,7 @@
         "UnityEngine.TestRunner",
         "Festa.Network.Auth",
         "Festa.Integration.Bridge",
+        "Festa.Integration.Contracts",
         "Festa.Booth.Catalog"
     ],
     "includePlatforms": [
