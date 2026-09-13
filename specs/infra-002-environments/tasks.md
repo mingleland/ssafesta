@@ -131,10 +131,10 @@
 - [X] T050 [P] [US3] `collectedAt`과 `dataFreshThrough`를 포함한 계정 전체 R2 작업·저장량 15분 주기 수집을 `infra/environments/storage/usage-guard/collect-cloudflare.sh`에 구현한다
 - [X] T051 [US3] 보수적인 현재·예상 GB-month 비율, Class A/B 비율, 80% 경고, 90% 차단과 오래된 데이터의 안전 차단 평가를 `infra/environments/storage/usage-guard/evaluate.sh`에 구현한다
 - [ ] T052 [P] [US3] R2 document bucket의 credential·PUT·HEAD·CORS를 검증하는 contract probe를 `infra/environments/storage/r2/probe.sh`에 구현한다
-- [ ] T053 [US3] active provider가 R2인 `R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE` admission 전이와 R2 probe·최신 usage snapshot 근거 요구사항을 `infra/environments/storage/usage-guard/transition.sh`에 구현한다. MinIO 전환은 spec 007 C-10/T076이 소유한다.
-- [ ] T054 [US3] active provider가 R2인 장애 복구 뒤 probe와 usage snapshot을 다시 수집·평가하고, 성공 전에는 uploadEnabled를 복구하지 않는 절차를 `infra/environments/storage/usage-guard/recover.sh`에 구현한다. MinIO fallback 중 R2 복귀는 자동으로 수행하지 않는다.
-- [ ] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
-- [ ] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
+- [ ] T053 [US3] `R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE` admission 전이와 R2 probe·최신 usage snapshot 근거 요구사항을 `infra/environments/storage/usage-guard/transition.sh`에 구현한다
+- [ ] T054 [US3] R2 장애 복구 뒤 probe와 usage snapshot을 다시 수집·평가하고, 성공 전에는 uploadEnabled를 복구하지 않는 절차를 `infra/environments/storage/usage-guard/recover.sh`에 구현한다
+- [X] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
+- [X] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
 - [ ] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
 - [ ] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
 - [ ] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/config/RedisKeyspaceProperties.java`에 추가한다
