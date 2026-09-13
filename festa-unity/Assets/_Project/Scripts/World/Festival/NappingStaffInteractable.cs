@@ -18,7 +18,10 @@ namespace Festa.World
     [DisallowMultipleComponent]
     public sealed class NappingStaffInteractable : MonoBehaviour, IBoothInteractable
     {
-        const string CaughtLine = "죄..죄송합니다. 얼른 들어가겠습니다.";
+        // **두 줄로 끊는다.** 한 줄이면 좁은 틈(가용 폭 10 u)에서 양끝이 화면 밖으로 나가
+        // "뭐라고 하는지" 를 읽을 수 없다 — 실측으로 확인했다. TMP 자동 줄바꿈은 한글을
+        // 글자 단위로 끊으므로 문구에 직접 넣는다(간판에서 겪은 것).
+        const string CaughtLine = "죄..죄송합니다.\n얼른 들어가겠습니다.";
 
         [Tooltip("들킨 뒤 다시 돌아오기까지(초)")]
         [SerializeField] float _returnAfter = 300f;
@@ -27,13 +30,13 @@ namespace Festa.World
         [SerializeField] float _lineDuration = 2.2f;
 
         [Tooltip("말풍선을 몸 위 얼마에 둘지(u). 누워 있으므로 낮다 — 1 m = 13.26 u")]
-        [SerializeField] float _bubbleHeight = 10f;
+        [SerializeField] float _bubbleHeight = 13f;
 
         [Tooltip("말풍선이 보이기 시작하는 거리(u)")]
         [SerializeField] float _visibleDistance = 180f;
 
         [Tooltip("말풍선을 보는 사람 쪽으로 수평으로 끌어내는 양(u). 몸이 벽에 묻혀 있어 골반 위에 두면 대사가 안 보인다")]
-        [SerializeField] float _bubblePullToCamera = 9f;
+        [SerializeField] float _bubblePullToCamera = 0f;
 
         /// <summary>자는 포즈로 쓸 이모트. 인스펙터에서 바꿀 수 있게 둔다 — 클립마다 누운 방향이 다르다.</summary>
         [SerializeField] Festa.Network.PlayerEmoteId _sleepEmote = Festa.Network.PlayerEmoteId.LieSofa;
@@ -99,7 +102,7 @@ namespace Festa.World
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Overflow;
-            tmp.fontSize = 17f;   // 틈이 좁아 22 면 한 줄이 화면 밖으로 나간다 (실측)
+            tmp.fontSize = 15f;   // 틈이 좁아 22 면 한 줄이 화면 밖으로 나간다 (실측)
             tmp.enabled = false;   // 들키기 전에는 조용하다
             _label = tmp;
 
@@ -157,9 +160,12 @@ namespace Festa.World
                 // 골반 위에 그대로 두면 **벽 속**이다 — 이 직원은 깊이 0.5 m 짜리 창틀 니치에 누워 있어
                 // 몸의 절반이 창측 벽에 묻혀 있다(실측: 니치 6.66 u, 몸 폭 9.68 u). 말풍선까지 거기 두면
                 // 깨워도 대사가 안 보인다. 그래서 **보는 사람 쪽으로 수평으로 끌어낸다.**
+                // **카메라 쪽으로 끌어내지 않는다(기본 0).** 끌어내면 틈 밖으로 나가 벽 모서리에 잘린다 —
+                // 실측으로 확인했다. 골반 바로 위, 틈 안쪽에 두는 쪽이 가장 잘 읽힌다.
                 var toCam = cam.transform.position - _hips.position;
                 toCam.y = 0f;
-                var pull = toCam.sqrMagnitude > 0.0001f ? toCam.normalized * _bubblePullToCamera : Vector3.zero;
+                var pull = (_bubblePullToCamera > 0.01f && toCam.sqrMagnitude > 0.0001f)
+                    ? toCam.normalized * _bubblePullToCamera : Vector3.zero;
                 _bubble.position = _hips.position + Vector3.up * _bubbleHeight + pull;
             }
             if ((cam.transform.position - _bubble.position).sqrMagnitude > _visibleDistance * _visibleDistance) return;
