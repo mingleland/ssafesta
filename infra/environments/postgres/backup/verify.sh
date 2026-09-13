@@ -16,7 +16,7 @@ while IFS=$'\t' read -r source_db restore_db expected_vector expected_tables exp
   actual_tables="$(backup_psql "$restore_db" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')")"
   [[ "$actual_vector" == "$expected_vector" ]] || backup_die "pgvector mismatch: $source_db"
   [[ "$actual_tables" == "$expected_tables" ]] || backup_die "table count mismatch: $source_db"
-  actual_schema_sha="$("${DOCKER_BIN}" exec "${POSTGRES_CONTAINER}" pg_dump -U festa_admin -d "$restore_db" --schema-only --no-owner --no-privileges | sha256sum | awk '{print $1}')"
+  actual_schema_sha="$(backup_docker_exec pg_dump -U festa_admin -d "$restore_db" --schema-only --no-owner --no-privileges | sha256sum | awk '{print $1}')"
   [[ "$actual_schema_sha" == "$expected_schema_sha" ]] || backup_die "schema mismatch: $source_db"
   while IFS=$'\t' read -r table expected_rows; do
     actual_rows="$(backup_psql "$restore_db" -Atc "SELECT count(*) FROM ${table}")"

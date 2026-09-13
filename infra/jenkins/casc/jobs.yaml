@@ -4,3 +4,5 @@ jobs:
   - file: /var/jenkins_home/job_dsl/gitlab-develop-multibranch.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-webgl-package-deploy.groovy
   - file: /var/jenkins_home/job_dsl/gitlab-demo-promotion.groovy
+  - file: /var/jenkins_home/job_dsl/gitlab-postgres-backup.groovy
+  - file: /var/jenkins_home/job_dsl/gitlab-postgres-restore-rehearsal.groovy
