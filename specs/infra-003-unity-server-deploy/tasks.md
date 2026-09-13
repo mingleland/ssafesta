@@ -57,7 +57,7 @@
 ### Tests for User Story 1 ⚠️
 
 - [X] T015 [P] [US1] 회원·게스트 인증, `wss/world/443`, `11F/11F-01`, 120초 token 응답과 비인가 거부를 검증하는 API 통합 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionApiIntegrationTest.java`에 작성한다
-- [ ] T016 [P] [US1] `WorldSessionDto.endpoint`의 ws/wss 매핑, 호스트 검증과 하드코딩 주소 부재를 검사하는 Unity EditMode 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/WorldSessionEndpointTests.cs`에 작성한다
+- [X] T016 [P] [US1] `WorldSessionDto.endpoint`의 ws/wss 매핑, 호스트 검증과 하드코딩 주소 부재를 검사하는 Unity EditMode 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/WorldSessionEndpointTests.cs`에 작성한다
 - [X] T017 [P] [US1] host 443·Full(strict)·Upgrade·cache bypass와 public 7777 차단을 실패 우선 검증하는 테스트를 `infra/unity-server/tests/integration/public-wss.sh`에 작성한다
 - [X] T018 [P] [US1] 인증서 만료·호스트 불일치·신뢰 실패를 우회하지 않는 원본 TLS 검사를 `infra/unity-server/tests/security/tls-strict.sh`에 작성한다
 

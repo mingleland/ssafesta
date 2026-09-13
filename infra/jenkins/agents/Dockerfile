@@ -11,6 +11,7 @@ ARG PYTHON_JSONSCHEMA_VERSION
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        awscli \
         curl \
         jq \
         libasound2t64 \
@@ -44,6 +45,7 @@ RUN python -m venv /opt/jenkins-python \
     && npm --version \
     && javac -version \
     && jq --version \
+    && aws --version \
     && psql --version \
     && redis-cli --version \
     && unzip -v >/dev/null \

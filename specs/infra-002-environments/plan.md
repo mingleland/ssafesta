@@ -8,7 +8,7 @@
 
 IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반 dev/demo 실행 환경을 구성한다. Nginx만 80/443 공개 진입점으로 두고 최종 demo는 `Cloudflare DNS/Proxy → EC2 Nginx → 내부 서비스` 경로를 사용한다. 파트별 dev 배포와 `develop` 통합 demo는 network·설정·데이터·release state를 분리하고, 기존 `infra-001`의 release/verification/rollback 계약을 그대로 소비한다.
 
-한 PostgreSQL 인스턴스 안에서 환경별 Spring DB와 AI pgvector DB를 별도 database/role로 분리한다. Redis는 환경·서비스별 ACL과 key prefix를 적용한 단일 임시 저장소로 사용하며 영구 원본을 저장하지 않는다. AI 원본 문서는 비공개 Cloudflare R2 Standard bucket에 저장하고 PostgreSQL dump는 별도 private backup bucket에 보관한다. R2 장애 시 신규 업로드를 차단하며 MinIO·로컬 디스크·다른 공급자로 전환하지 않는다.
+한 PostgreSQL 인스턴스 안에서 환경별 Spring DB와 AI pgvector DB를 별도 database/role로 분리한다. Redis는 환경·서비스별 ACL과 key prefix를 적용한 단일 임시 저장소로 사용하며 영구 원본을 저장하지 않는다. AI 원본 문서는 정상 운영에서 비공개 Cloudflare R2 Standard bucket에 저장하고 PostgreSQL dump는 별도 private backup bucket에 보관한다. R2 장애 시 신규 업로드를 먼저 차단하며, 장기 장애에서만 운영자 승인 후 MinIO fallback과 reconcile을 수행한다. 로컬 디스크와 자동 provider 전환은 사용하지 않는다.
 
 ## Technical Context
 
@@ -79,8 +79,8 @@ IAM Role과 AWS Console/API 권한이 없는 단일 EC2에 Docker Compose 기반
 - browser upload는 서버가 영구 metadata에서 결정한 unique object key에 대한 짧은 PUT presigned URL을 발급하고, 허용 origin/method/header만 CORS에 등록한다. 완료 callback 후 server-side HEAD로 존재·크기·declared content type을 확인하고 본문 magic bytes·SHA-256 검증까지 통과한 뒤 처리 상태를 진행한다.
 - R2 Standard의 storage·Class A·Class B 한도는 configuration으로 관리한다. GraphQL Analytics를 15분마다 수집하고 storage current/projected ratio 및 월 누적 operation ratio 중 최댓값으로 판정한다. 80%는 warning, 90%는 신규 upload grant 차단이며 기존 GET은 유지한다.
 - 마지막 정상 usage snapshot이 60분을 넘으면 신규 upload는 fail-closed한다. 지표 조회 실패를 0%로 취급하지 않는다.
-- storage state는 `R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE`로만 전이한다. R2 probe 실패·90% 사용량·stale snapshot은 신규 업로드를 차단하며, R2 contract probe와 최신 usage snapshot이 모두 성공해야 재개한다.
-- MinIO·로컬 디스크·다른 provider 전환과 reconciliation은 초기 범위에 없다. R2 원본 문서에는 2차 백업이 없고 PostgreSQL dump만 private R2 backup bucket에 보관한다.
+- active provider가 R2일 때 R2 probe 실패·90% 사용량·stale snapshot은 신규 업로드를 먼저 차단한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 R2 차단 상태에서 재개한다. MinIO fallback 중 R2 복귀는 자동 전환하지 않는다.
+- 자동 전환과 로컬 디스크 fallback은 없다. R2 장기 장애의 MinIO 전환·reconciliation은 운영자 승인을 받은 `storage-failover.sh`만 수행하며, 상태 전환부터 reconcile 종료까지 단일 lock으로 직렬화한다. R2 원본 문서에는 2차 백업이 없고 PostgreSQL dump만 private R2 backup bucket에 보관한다.
 
 ## Project Structure
 

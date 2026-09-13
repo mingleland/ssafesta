@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.ai.BoothDocumentDeactivationService;
 import com.example.ssafesta.common.ConstraintViolations;
+import com.example.ssafesta.wallet.CoinReason;
 import com.example.ssafesta.wallet.CoinSpendCommand;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletService;
@@ -32,8 +33,8 @@ public class BoothLeaseService {
 
     private static final Logger log = LoggerFactory.getLogger(BoothLeaseService.class);
     private static final int ALLOWED_DURATION_DAYS = 1;
-    static final String LEASE_REASON = "LEASE_PAYMENT";
-    static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
+    static final String LEASE_REASON = CoinReason.LEASE_PAYMENT;
+    static final String LEASE_REFERENCE_TYPE = CoinReason.LEASE_REFERENCE_TYPE;
     /** V6, lower case: PostgreSQL reports index names folded. */
     private static final String ACTIVE_LESSEE_INDEX = "ux_booth_leases_active_lessee";
     /** How many leases one sweeper transaction takes — see {@link BoothLeaseRepository#findStaleActive}. */

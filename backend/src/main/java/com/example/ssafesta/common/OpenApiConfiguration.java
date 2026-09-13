@@ -187,6 +187,12 @@ public class OpenApiConfiguration {
                 tag("Game Asset", "게임에 쓰는 이미지의 업로드·전달. 바이트는 저장소로 직접 올라가고 내려받기만 서버가 중계한다"),
                 tag("Inventory", "아바타 파츠 상점과 구매"),
                 tag("Minigame", "타이밍 스톱 미니게임의 세션 발급과 결과 제출. 목표 시간·오차·보상은 전부 서버가 정한다"),
+                tag("Staff Invitation", "부스 직원 초대·수락·취소. 닉네임으로 부르며 48시간 뒤 만료된다"),
+                tag("Booth Metrics", "부스 방문·체류 계측과 운영자용 집계. 게스트 방문도 센다"),
+                tag("Booth Dashboard", "부스 운영 요약. null 은 0 이 아니라 \"셀 원천이 아직 없다\" 는 뜻이다"),
+                tag("Consultation", "사람 상담 요청·수락·종료. 회원 전용이고 요청은 10분 뒤 만료된다"),
+                tag("Realtime", "STOMP 연결용 5분 토큰. 한 소켓이 상담 알림과 월드 채팅을 함께 나른다"),
+                tag("Booth Staff", "부스 직원 목록과 역할 관리. 소유자는 읽기 전용 행으로 함께 나온다"),
                 tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
     }
 

@@ -27160,6 +27160,50 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!1 &594738820
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 594738822}
+  - component: {fileID: 594738821}
+  m_Layer: 0
+  m_Name: '@BoothInteractionInput'
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &594738821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 594738820}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d9cf64e8f5fca74da899faeb597ab00, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &594738822
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 594738820}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &594816722
 GameObject:
   m_ObjectHideFlags: 0
@@ -51750,31 +51794,31 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: 1.23
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: -0.03
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: -1.98
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 1
+      value: -0.9954693
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.x
-      value: 0
+      value: 0.0004543835
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0
+      value: 0.094979815
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalRotation.z
-      value: 0
+      value: 0.0044266004
       objectReference: {fileID: 0}
     - target: {fileID: 8983737875179621075, guid: e972aad183b64959a20c26bf38010a8b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -108972,3 +109016,4 @@ SceneRoots:
   - {fileID: 1092249367}
   - {fileID: 1002336965}
   - {fileID: 766188891}
+  - {fileID: 594738822}
