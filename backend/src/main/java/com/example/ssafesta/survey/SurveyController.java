@@ -182,7 +182,12 @@ public class SurveyController {
 
     @Operation(summary = "설문 응답 제출 — 1인 1응답",
             description = """
-                    방문자가 답을 제출한다. **회원과 게스트 모두 제출할 수 있다** (C-05).
+                    방문자가 답을 제출한다. **부스 설문은 회원과 게스트 모두 제출할 수 있다** (C-05).
+
+                    **이벤트 설문은 회원 전용이다** — 게스트는 `403 MEMBER_ONLY` 다. 이것은
+                    `rewardCoin` 과 **무관하다**: 보상이 0이어도 추첨이 참여자를 식별해야 하므로
+                    게스트를 받지 않는다. `rewardCoin > 0` 만 보고 분기하는 클라이언트는 이벤트
+                    설문을 게스트에게 열어 준다 (S15P21A604-621).
 
                     **1인 1응답**이다. 회원은 계정 기준, 게스트는 접속 토큰 주체 기준이며 재제출은
                     `409 SURVEY_ALREADY_RESPONDED`다. 게스트 토큰은 발급마다 주체가 새로 나오므로
@@ -205,8 +210,8 @@ public class SurveyController {
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "`responseId`와 실제 지급된 `rewardedCoin`. 보상이 없으면 `0`이며 키는 항상 있다"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 이 설문의 문항이 아니거나, 유형에 맞지 않는 키, 남의 선택지, 별점 범위 밖, 길이 초과, 필수 문항 미응답. `errors[0].field`가 문제 자리다"),
-            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 보상이 있는 설문에 게스트가 제출했다"),
-            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` · `BOOTH_NOT_FOUND` · `LAYOUT_NOT_PUBLISHED`"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트가 **이벤트 설문**(보상과 무관) 또는 **보상이 있는 설문**에 제출했다. 사유마다 메시지가 다르다"),
+            @ApiResponse(responseCode = "404", description = "`SURVEY_NOT_FOUND` — 없는 설문이거나 **문항이 하나도 없다**(\"아직 공개되지 않은 설문입니다\") · `BOOTH_NOT_FOUND` · `LAYOUT_NOT_PUBLISHED`"),
             @ApiResponse(responseCode = "409", description = "`SURVEY_CLOSED`(마감) · `SURVEY_ALREADY_RESPONDED`(재제출) · `BOOTH_LEASE_EXPIRED`")})
     @PostMapping("/surveys/{surveyId}/responses")
     @ResponseStatus(HttpStatus.CREATED)
