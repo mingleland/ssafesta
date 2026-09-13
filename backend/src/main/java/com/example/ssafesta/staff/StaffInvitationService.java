@@ -6,6 +6,7 @@ import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.booth.BoothStaffRepository;
 import com.example.ssafesta.booth.StaffRole;
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ConstraintViolations;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -13,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,8 +65,16 @@ public class StaffInvitationService {
                     throw new ApiException(ErrorCode.STAFF_INVITATION_PENDING);
                 });
 
-        StaffInvitation saved = invitations.save(
-                new StaffInvitation(boothId, invitee.getId(), inviterUserId, role, Instant.now()));
+        StaffInvitation saved;
+        try {
+            // flush 를 여기서 한다 — 위 조회를 함께 통과한 두 요청 중 진 쪽의 INSERT 가
+            // ux_staff_invitations_pending 에 걸리는 자리를 이 메서드 안으로 당겨 409 로 번역한다.
+            // 커밋 시점까지 미루면 그 위반은 컨트롤러 밖에서 500 이 된다 (S15P21A604-693).
+            saved = invitations.saveAndFlush(
+                    new StaffInvitation(boothId, invitee.getId(), inviterUserId, role, Instant.now()));
+        } catch (DataIntegrityViolationException violation) {
+            throw translateInvite(violation);
+        }
         return InvitationView.of(saved, booth.getName(), invitee.getNickname());
     }
 
@@ -103,9 +113,36 @@ public class StaffInvitationService {
         if (staffs.findRole(invitation.getBoothId(), userId).isPresent()) {
             throw new ApiException(ErrorCode.STAFF_ALREADY_MEMBER);
         }
-
-        staffs.save(new BoothStaff(invitation.getBoothId(), userId, invitation.getRole().name()));
+        try {
+            // 같은 사람의 더블클릭이 위 조회를 둘 다 통과하면 두 번째 INSERT 가 booth_staffs 의
+            // PK 에 걸린다. 여기서 flush 해 그 위반을 STAFF_ALREADY_MEMBER 로 답한다 (S15P21A604-693).
+            staffs.saveAndFlush(new BoothStaff(invitation.getBoothId(), userId, invitation.getRole().name()));
+        } catch (DataIntegrityViolationException violation) {
+            throw translateAccept(violation);
+        }
         invitation.accept(Instant.now());
+    }
+
+    /**
+     * 수락의 INSERT 가 깨뜨린 제약이 무엇인지 보고 답을 고른다.
+     *
+     * <p>PK 위반만 "이미 구성원" 이다. 다른 위반(외래키 등)은 설명할 수 없는 사건이라 원본을 그대로
+     * 올린다 — 500 이 되고 로그에 크게 남는 쪽이 조용히 틀린 409 보다 정직하다 (T-24,
+     * {@code ProjectService.translate} 와 같은 규칙).
+     */
+    static RuntimeException translateAccept(DataIntegrityViolationException violation) {
+        if (ConstraintViolations.isViolationOf(violation, "booth_staffs_pkey")) {
+            return new ApiException(ErrorCode.STAFF_ALREADY_MEMBER);
+        }
+        return violation;
+    }
+
+    /** 초대의 INSERT 가 깨뜨린 제약 — 부분 유니크 인덱스면 "대기 중 초대가 이미 있다". */
+    static RuntimeException translateInvite(DataIntegrityViolationException violation) {
+        if (ConstraintViolations.isViolationOf(violation, "ux_staff_invitations_pending")) {
+            return new ApiException(ErrorCode.STAFF_INVITATION_PENDING);
+        }
+        return violation;
     }
 
     /** Owner·{@code ADMIN} 이 대기 중 초대를 거둔다 (FR-017). 초대받은 쪽의 거절 API 는 없다 (C-10). */
