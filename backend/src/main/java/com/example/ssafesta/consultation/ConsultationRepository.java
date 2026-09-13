@@ -80,4 +80,24 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
               and c.requestedAt <= :cutoff
             """)
     int expireStaleAsOf(@Param("cutoff") Instant cutoff);
+
+    /**
+     * 부스 대시보드용 기간 집계 (spec 015 FR-004, S15P21A604-501).
+     *
+     * <p>요청 시각 기준이다 — 한 상담이 기간 경계를 넘어 끝나도 요청한 기간에 센다. 그래야 두 기간의
+     * 합이 전체와 같다. 종료 시각 기준으로 세면 아직 안 끝난 상담이 어느 기간에도 안 들어간다.
+     *
+     * <p>{@code ended} 는 {@code count(case ...)} 다. {@code sum} 을 쓰면 대상 행이 없을 때
+     * {@code null} 이 나와 읽는 쪽이 그것을 0 으로 되돌리는 코드를 또 쓰게 된다.
+     */
+    @Query("""
+            select new com.example.ssafesta.consultation.ConsultationCounts(
+                       count(c),
+                       count(case when c.status = com.example.ssafesta.consultation.ConsultationStatus.ENDED
+                                  then 1 end))
+            from Consultation c
+            where c.boothId = :boothId and c.requestedAt >= :from and c.requestedAt < :to
+            """)
+    ConsultationCounts countForBoothBetween(@Param("boothId") Long boothId,
+                                            @Param("from") Instant from, @Param("to") Instant to);
 }

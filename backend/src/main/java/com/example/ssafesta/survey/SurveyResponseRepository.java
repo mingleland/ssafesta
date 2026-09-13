@@ -1,7 +1,10 @@
 package com.example.ssafesta.survey;
 
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Responses, and the two questions the edit path asks of them.
@@ -40,4 +43,20 @@ public interface SurveyResponseRepository extends JpaRepository<SurveyResponse, 
     boolean existsBySurveyIdAndRespondentGuestKey(Long surveyId, String respondentGuestKey);
 
     Optional<SurveyResponse> findByIdAndSurveyId(Long id, Long surveyId);
+
+    /**
+     * 부스 대시보드용 기간 집계 (spec 015 FR-003, S15P21A604-501).
+     *
+     * <p>게스트 응답도 센다 — 설문은 게스트에게 열려 있고(V22), 빼면 응답 현황이 실제의 일부만 된다.
+     *
+     * <p>{@code boothId} 로 거르면 행사 설문({@code surveyKey} 를 가진 것)은 자연히 빠진다. 그쪽은
+     * 부스 소유가 아니라 {@code Survey.boothId} 가 {@code null} 이다.
+     */
+    @Query("""
+            select count(r) from SurveyResponse r
+            where r.submittedAt >= :from and r.submittedAt < :to
+              and r.surveyId in (select s.id from Survey s where s.boothId = :boothId)
+            """)
+    long countForBoothBetween(@Param("boothId") Long boothId,
+                              @Param("from") Instant from, @Param("to") Instant to);
 }
