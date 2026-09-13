@@ -20,7 +20,7 @@ Reference: [changed-component contract](./contracts/changed-component-contract.m
 ## 1A. Game MR Unity test-only gate
 
 1. `festa-unity/**` 또는 Unity project 설정만 바꾸는 `feature/S15P21A604-N-...` MR을 `develop`으로 만든다.
-2. Expected: Jenkins Unity agent가 **MR head SHA**에서 `ci/validate`와 `ci/test`만 실행하고, GitLab MR에 Unity validation 성공 상태를 게시한다.
+2. Expected: Jenkins Unity agent가 **MR head SHA**에서 `ci/test`만 실행하고, GitLab MR에 Unity validation 성공 상태를 게시한다. `ci/test` 안의 Unity 스크립트 컴파일과 EditMode 정적 검사도 함께 통과해야 한다.
 3. Jenkins console과 Docker 상태를 확인한다. Expected: `ci/build`, `ci/package`, Registry upload, Compose deploy/promotion 호출이 없고 dev/demo 컨테이너 restart delta가 모두 0이다.
 4. 컴파일 또는 EditMode를 의도적으로 실패시킨 별도 MR을 실행한다. Expected: Unity validation 상태가 실패하고 GitLab은 merge를 차단한다. agent offline·timeout도 성공 또는 skip으로 처리하지 않는다.
 
