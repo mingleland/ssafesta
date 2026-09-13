@@ -1,5 +1,6 @@
 package com.example.ssafesta.booth;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -14,4 +15,9 @@ public interface BoothStaffRepository extends JpaRepository<BoothStaff, BoothSta
      */
     @Query("select s.role from BoothStaff s where s.boothId = :boothId and s.userId = :userId")
     Optional<String> findRole(@Param("boothId") Long boothId, @Param("userId") Long userId);
+
+    /** The booth roster, oldest seat first — the order the owner added people in. */
+    List<BoothStaff> findByBoothIdOrderByJoinedAt(Long boothId);
+
+    Optional<BoothStaff> findByBoothIdAndUserId(Long boothId, Long userId);
 }

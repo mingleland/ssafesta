@@ -227,6 +227,31 @@ public enum ErrorCode {
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    // ── Staff 초대·권한 (spec 011 US3) ──────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §A 가 정본이다.
+    // BOOTH_EDITOR_FORBIDDEN·MEMBER_ONLY·VALIDATION_FAILED 는 위에 있는 것을 재사용한다.
+    /**
+     * 부스 운영진이 아니다 — 초대·역할 변경·직원 제거는 Owner 와 {@code ADMIN} 만 한다 (FR-001).
+     *
+     * <p>{@code BOOTH_EDITOR_FORBIDDEN} 과 가르는 이유는 물음이 다르기 때문이다. 저쪽은 "콘텐츠를
+     * 고칠 수 있는가", 이쪽은 "사람을 들이고 뺄 수 있는가" 다. {@code CONTENT_EDITOR} 는 앞의
+     * 답이 예이고 뒤의 답이 아니오라서, 한 code 로 묶으면 FE 가 그 둘을 구분할 수 없다.
+     */
+    STAFF_MANAGER_FORBIDDEN(HttpStatus.FORBIDDEN, "직원을 관리할 권한이 없습니다."),
+    /** 초대하려는 닉네임의 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    STAFF_INVITEE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 닉네임의 회원이 없습니다."),
+    STAFF_INVITATION_NOT_FOUND(HttpStatus.NOT_FOUND, "초대를 찾을 수 없습니다."),
+    /** {@code ux_staff_invitations_pending} 이 DB 에서도 막는다. */
+    STAFF_INVITATION_PENDING(HttpStatus.CONFLICT, "이미 보낸 초대가 처리되기를 기다리고 있습니다."),
+    /** 수락·취소됐거나 48시간이 지났다 (C-07). 만료는 스위퍼를 기다리지 않고 읽는 쪽이 판정한다. */
+    STAFF_INVITATION_NOT_PENDING(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 초대입니다."),
+    /** 내게 온 초대가 아니다. 존재 여부는 이미 아는 사람만 물을 수 있으므로 404 가 아니라 403 이다. */
+    STAFF_INVITATION_FORBIDDEN(HttpStatus.FORBIDDEN, "내게 온 초대가 아닙니다."),
+    STAFF_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 이 부스의 구성원입니다."),
+    /** Owner 는 {@code booth_staffs} 행이 아니다 (FR-018) — 역할 변경·제거 대상이 아니다. */
+    STAFF_OWNER_IMMUTABLE(HttpStatus.CONFLICT, "부스 소유자는 직원 목록에서 변경할 수 없습니다."),
+    STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "그 부스의 직원이 아닙니다."),
+
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");
