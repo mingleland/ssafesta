@@ -32,6 +32,9 @@ namespace Festa.World
         [Tooltip("말풍선이 보이기 시작하는 거리(u)")]
         [SerializeField] float _visibleDistance = 180f;
 
+        [Tooltip("말풍선을 보는 사람 쪽으로 수평으로 끌어내는 양(u). 몸이 벽에 묻혀 있어 골반 위에 두면 대사가 안 보인다")]
+        [SerializeField] float _bubblePullToCamera = 9f;
+
         /// <summary>자는 포즈로 쓸 이모트. 인스펙터에서 바꿀 수 있게 둔다 — 클립마다 누운 방향이 다르다.</summary>
         [SerializeField] Festa.Network.PlayerEmoteId _sleepEmote = Festa.Network.PlayerEmoteId.LieSofa;
 
@@ -81,21 +84,31 @@ namespace Festa.World
             }
             var go = new GameObject("NapBubble");
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, _bubbleHeight, 0f);   // LateUpdate 가 골반 위로 다시 잡는다
-            _bubble = go.transform;
 
             var tmp = go.AddComponent<TextMeshPro>();
+
+            // **Transform 은 AddComponent 뒤에 잡는다** — TMP 가 RectTransform 으로 갈아끼우면서
+            // 먼저 잡아 둔 Transform 을 파괴한다. 그러면 LateUpdate 가 매 프레임 즉시 되돌아 나가
+            // 빌보드가 돌지 않는다 (안내 말풍선에서 실측으로 확인한 것과 같은 원인).
+            _bubble = tmp.transform;
+            _bubble.localPosition = new Vector3(0f, _bubbleHeight, 0f);   // LateUpdate 가 골반 위로 다시 잡는다
+
             tmp.font = font;
             tmp.text = CaughtLine;
-            tmp.color = new Color(0.97f, 0.97f, 0.94f);
+            tmp.color = new Color(1f, 0.99f, 0.95f);
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.textWrappingMode = TextWrappingModes.NoWrap;
             tmp.overflowMode = TextOverflowModes.Overflow;
-            tmp.fontSize = 22f;
-            tmp.outlineWidth = 0.18f;
-            tmp.outlineColor = new Color32(24, 28, 38, 220);
+            tmp.fontSize = 17f;   // 틈이 좁아 22 면 한 줄이 화면 밖으로 나간다 (실측)
             tmp.enabled = false;   // 들키기 전에는 조용하다
             _label = tmp;
+
+            // 외곽선은 머티리얼 인스턴스에 넣어야 실제로 그려진다 (이름표와 같은 방식).
+            var mat = tmp.fontMaterial;
+            mat.SetFloat(ShaderUtilities.ID_FaceDilate, 0.15f);
+            mat.EnableKeyword("OUTLINE_ON");
+            mat.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0.02f, 0.02f, 0.04f, 1f));
+            mat.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.25f);
         }
 
         void PlaySleep()
@@ -139,7 +152,16 @@ namespace Festa.World
             if (_bubble == null || _label == null || !_label.enabled) return;
             var cam = Camera.main;
             if (cam == null) return;
-            if (_hips != null) _bubble.position = _hips.position + Vector3.up * _bubbleHeight;
+            if (_hips != null)
+            {
+                // 골반 위에 그대로 두면 **벽 속**이다 — 이 직원은 깊이 0.5 m 짜리 창틀 니치에 누워 있어
+                // 몸의 절반이 창측 벽에 묻혀 있다(실측: 니치 6.66 u, 몸 폭 9.68 u). 말풍선까지 거기 두면
+                // 깨워도 대사가 안 보인다. 그래서 **보는 사람 쪽으로 수평으로 끌어낸다.**
+                var toCam = cam.transform.position - _hips.position;
+                toCam.y = 0f;
+                var pull = toCam.sqrMagnitude > 0.0001f ? toCam.normalized * _bubblePullToCamera : Vector3.zero;
+                _bubble.position = _hips.position + Vector3.up * _bubbleHeight + pull;
+            }
             if ((cam.transform.position - _bubble.position).sqrMagnitude > _visibleDistance * _visibleDistance) return;
             var to = cam.transform.position - _bubble.position;
             to.y = 0f;
