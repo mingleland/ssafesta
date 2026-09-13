@@ -3,6 +3,7 @@ package com.example.ssafesta.consultation;
 import com.example.ssafesta.booth.BoothAccessGuard;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.consultation.ws.ConsultationEventPublisher;
 import com.example.ssafesta.staff.StaffAccessGuard;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -32,15 +33,17 @@ public class ConsultationService {
     private final StaffAccessGuard staffGuard;
     private final HandoffSummaryClient summaries;
     private final UserRepository users;
+    private final ConsultationEventPublisher events;
 
     public ConsultationService(ConsultationRepository consultations, BoothAccessGuard boothGuard,
                                StaffAccessGuard staffGuard, HandoffSummaryClient summaries,
-                               UserRepository users) {
+                               UserRepository users, ConsultationEventPublisher events) {
         this.consultations = consultations;
         this.boothGuard = boothGuard;
         this.staffGuard = staffGuard;
         this.summaries = summaries;
         this.users = users;
+        this.events = events;
     }
 
     /**
@@ -61,6 +64,7 @@ public class ConsultationService {
         Consultation saved = consultations.save(new Consultation(boothId, visitorUserId,
                 command.agentId(), command.conversationId(),
                 summaries.summarize(command.conversationId()), now));
+        events.requested(boothId, saved.getId(), nicknameOf(visitorUserId), now, saved.getSummary());
         return new RequestView(String.valueOf(saved.getId()), saved.remainingSecondsAt(now));
     }
 
@@ -75,6 +79,7 @@ public class ConsultationService {
             throw new ApiException(ErrorCode.CONSULTATION_NOT_REQUESTED);
         }
         consultation.cancel(Instant.now());
+        events.cancelled(consultation.getBoothId(), consultation.getId());
     }
 
     /** 그 부스의 대기열. 부스 구성원이면 누구나 본다 — 수락은 못 해도 상황은 알아야 한다. */
@@ -115,9 +120,14 @@ public class ConsultationService {
         }
 
         Consultation taken = require(requestId);
+        String staffNickname = nicknameOf(staffUserId);
+        // 진 직원들의 대기열에서 카드를 내린다. 이것이 없으면 그 카드가 화면에 남아 있다가
+        // 누를 때 409 로 터진다.
+        events.taken(taken.getBoothId(), taken.getId(), staffNickname);
+        events.accepted(taken.getVisitorUserId(), taken.getId(), staffNickname);
+
         String id = String.valueOf(taken.getId());
-        return new AcceptedView(id, id, nicknamesOf(List.of(taken.getVisitorUserId()))
-                .get(taken.getVisitorUserId()), taken.getSummary());
+        return new AcceptedView(id, id, nicknameOf(taken.getVisitorUserId()), taken.getSummary());
     }
 
     /** 방문자·직원 누구나 끝낸다 (FR-010). */
@@ -133,12 +143,23 @@ public class ConsultationService {
             throw new ApiException(ErrorCode.CONSULTATION_NOT_REQUESTED);
         }
         consultation.end(Instant.now());
+        events.ended(consultation.getVisitorUserId(), consultation.getId());
     }
 
-    /** 스위퍼가 부르는 자리 — 트랜잭션 경계를 프록시로 타려고 서비스에 둔다. */
+    /**
+     * 스위퍼가 부르는 자리 — 트랜잭션 경계를 프록시로 타려고 서비스에 둔다.
+     *
+     * <p>벌크 갱신 <b>전에</b> 대상을 읽는다. 갱신은 몇 행을 옮겼는지만 알려 주므로, 누구의
+     * 화면에서 카드를 내려야 하는지는 그 전에 확보해야 한다.
+     */
     @Transactional
     public int expireStale() {
-        return consultations.expireStaleAsOf(cutoff(Instant.now()));
+        Instant cutoff = cutoff(Instant.now());
+        List<Consultation> overdue = consultations.findOverdue(cutoff);
+        int moved = consultations.expireStaleAsOf(cutoff);
+        overdue.forEach(item ->
+                events.expired(item.getBoothId(), item.getVisitorUserId(), item.getId()));
+        return moved;
     }
 
     private Consultation require(Long id) {
@@ -149,6 +170,10 @@ public class ConsultationService {
     /** 이 시각보다 오래된 요청은 만료다 (C-01 — 10분). */
     private static Instant cutoff(Instant now) {
         return now.minus(Consultation.REQUEST_VALID_FOR);
+    }
+
+    private String nicknameOf(Long userId) {
+        return users.findById(userId).map(User::getNickname).orElse(null);
     }
 
     private Map<Long, String> nicknamesOf(List<Long> userIds) {

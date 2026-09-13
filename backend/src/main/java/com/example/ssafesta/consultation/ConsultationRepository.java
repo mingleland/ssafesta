@@ -55,6 +55,19 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
                @Param("now") Instant now, @Param("cutoff") Instant cutoff);
 
     /**
+     * 기한이 지난 대기분 — 벌크 갱신 <b>전에</b> 누구에게 알릴지 확보하려고 읽는다.
+     *
+     * <p>갱신은 몇 행을 옮겼는지만 알려 준다. 방문자 큐와 부스 대기열에서 카드를 내리려면
+     * {@code boothId}·{@code visitorUserId} 가 필요하므로 그 전에 한 번 읽는다.
+     */
+    @Query("""
+            select c from Consultation c
+            where c.status = com.example.ssafesta.consultation.ConsultationStatus.REQUESTED
+              and c.requestedAt <= :cutoff
+            """)
+    List<Consultation> findOverdue(@Param("cutoff") Instant cutoff);
+
+    /**
      * 기한이 지난 대기분을 {@code EXPIRED} 로 (C-01, research R-07).
      *
      * @return 옮긴 행 수
