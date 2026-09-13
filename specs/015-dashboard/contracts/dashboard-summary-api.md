@@ -27,8 +27,9 @@
   "consultations": 12,
   "consultationsEnded": 6,
   "surveyResponses": 31,
-  "aiUsages": null,
-  "revenueCoin": null
+  "leaseCostCoin": 300,
+  "surveyRewardCoin": 155,
+  "aiUsages": null
 }
 ```
 
@@ -43,15 +44,12 @@
 | `visits` · `uniqueVisitors` · `averageDwellSeconds` · `openVisits` | FR-001 | `booth_visit_events` (`S15P21A604-240`) |
 | `consultations` · `consultationsEnded` | FR-004 | `consultations` (`S15P21A604-137`) |
 | `surveyResponses` | FR-003 | `survey_responses` ⋈ `surveys.booth_id` |
+| `leaseCostCoin` · `surveyRewardCoin` | FR-005 | `coin_ledger_entries` ⋈ `booth_leases`·`surveys` (`reference_id`) |
 | `aiUsages` | FR-002 | **원천 없음** — AI 대화 기록 표가 저장소에 없다 |
-| `revenueCoin` | FR-005 | **원천 없음** — 부스로 코인이 들어오는 경로가 설계에 없다 |
 
-두 `null` 은 성격이 다르다.
+`null` 인 칸은 **`aiUsages` 하나**다. AI 상담 대화를 남기는 표가 생기면 채운다(`S15P21A604-139` 계열). 표 이름·컬럼은 AI 파트 소관이라 여기서 정하지 않는다.
 
-- **`aiUsages`** 는 *아직* 없다. AI 상담 대화를 남기는 표가 생기면 채운다 (`S15P21A604-139` 계열). 표 이름·컬럼은 AI 파트 소관이라 여기서 정하지 않는다.
-- **`revenueCoin`** 은 *설계에* 없다. 아래 참조.
-
-### `revenueCoin` 이 `null` 인 이유 — 부스는 코인을 벌지 않는다
+### 코인 칸이 "수익" 이 아닌 이유 — 부스는 코인을 벌지 않는다
 
 원장(`coin_ledger_entries`)에 실제로 쓰이는 사유는 다섯 가지다.
 
@@ -65,7 +63,11 @@
 
 부스로 코인이 **들어오는** 경로는 하나도 없다. `revenueCoin` 은 그런 경로가 있다고 가정한 필드이고, `booth_daily_metrics.revenue_coin` 컬럼도 같은 가정 위에 있다.
 
-여기서 임의로 정하지 않는다 (헌법 30조). 결정 요청은 `docs/26` 에 올렸다. 무엇으로 정해지든 이 필드는 `null` 에서 숫자로 바뀔 뿐이라 FE 계약은 지금 확정할 수 있다.
+**확정 (2026-09-13, 백엔드 파트, `docs/26`)**: `revenueCoin` 을 없애고 **쓴 코인**(`leaseCostCoin`)과 **뿌린 코인**(`surveyRewardCoin`) 두 칸으로 바꿔 읽는다. 둘 다 양수다.
+
+타협이 아니라 원래 맞는 지표다. 이 대시보드의 존재 이유가 GitLab #94 의 *"Coin 시스템 유효성을 배포 후 사용자 반응으로 검증하라"* 이고, 그 관점에서 부스는 코인을 **뿌리는 쪽**이자 **쓰는 쪽**이다. 특히 `surveyRewardCoin` 은 `surveyResponses` 옆에서 그대로 읽힌다 — 코인 155개를 뿌려 응답 31개를 받았다.
+
+진짜 유입 경로가 생기면(`S15P21A604-634`) 그때 `revenueCoin` 을 이 둘 **옆에 더한다**. `booth_daily_metrics.revenue_coin` 컬럼은 그 자리로 남겨 둔다.
 
 ### 오류
 
