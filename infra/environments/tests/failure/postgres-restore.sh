@@ -31,6 +31,7 @@ cat >"$temp_dir/bin/docker" <<'SH'
 set -euo pipefail
 [[ "$1" == exec ]] || exit 2; shift
 [[ "${1:-}" == -i ]] && shift
+[[ "${1:-}" == -e ]] && shift 2
 shift # container
 command="$1"; shift
 if [[ "$command" == pg_dump ]]; then
@@ -57,6 +58,7 @@ chmod +x "$temp_dir/bin/aws" "$temp_dir/bin/docker"
 export PATH="$temp_dir/bin:$PATH" FAKE_BUCKET="$temp_dir/bucket" FAKE_CALLS="$temp_dir/calls"
 export R2_BACKUP_ENDPOINT='https://r2.example.invalid' R2_BACKUP_BUCKET='postgres-backups'
 export AWS_ACCESS_KEY_ID='test-key' AWS_SECRET_ACCESS_KEY='test-secret' BACKUP_STATE_DIR="$temp_dir/state"
+export PGPASSWORD='test-postgres-password'
 export DOCUMENT_INVENTORY_REF='inventory://demo/2026-09-13' RELEASE_ID='test-release' BACKUP_SET_ID='demo-test-backup'
 export PYTHON_BIN="${PYTHON_BIN:-python3}"
 

@@ -47,7 +47,7 @@ PY
   [[ "$actual_sha" == "$expected_sha" ]] || backup_die "checksum mismatch: $source_db"
   backup_psql postgres -c "DROP DATABASE IF EXISTS \"${restore_db}\""
   backup_psql postgres -c "CREATE DATABASE \"${restore_db}\""
-  "${DOCKER_BIN}" exec -i "${POSTGRES_CONTAINER}" pg_restore -U festa_admin -d "$restore_db" --no-owner --no-privileges <"${work}/${source_db}.dump"
+  "${DOCKER_BIN}" exec -i -e PGPASSWORD "${POSTGRES_CONTAINER}" pg_restore -U festa_admin -d "$restore_db" --no-owner --no-privileges <"${work}/${source_db}.dump"
 done < <(backup_databases "$(backup_python - "${work}/manifest.json" <<'PY'
 import json,sys
 print(json.load(open(sys.argv[1]))['environment'])
