@@ -5,6 +5,9 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.internal.ai.AiDocumentJobRepository.JobRow;
 import com.example.ssafesta.internal.ai.AiDocumentJobRepository.StagedChunk;
 import com.example.ssafesta.internal.ai.AiDocumentJobRepository.StagingSummary;
+import com.example.ssafesta.project.Project;
+import com.example.ssafesta.project.ProjectRepository;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -47,10 +50,21 @@ public class AiDocumentResultService {
 
     private static final Set<String> TERMINAL = Set.of(SUCCEEDED, "DEAD", "CANCELLED");
 
-    private final AiDocumentJobRepository jobs;
+    /**
+     * 정형 정보를 받을 수 없는 상태. {@link #TERMINAL} 과 달리 {@code SUCCEEDED} 가 빠져 있다 —
+     * 추출은 임베딩이 <b>끝난 뒤</b> 오므로 성공한 Job 이 정상이다 (S15P21A604-597).
+     */
+    private static final Set<String> ABANDONED = Set.of("DEAD", "CANCELLED");
 
-    AiDocumentResultService(AiDocumentJobRepository jobs) {
+    /** 프롬프트에 실릴 값이다. 넘치면 조용히 자르지 않고 400 으로 답한다. */
+    private static final int MAX_FACT_LENGTH = 2000;
+
+    private final AiDocumentJobRepository jobs;
+    private final ProjectRepository projects;
+
+    AiDocumentResultService(AiDocumentJobRepository jobs, ProjectRepository projects) {
         this.jobs = jobs;
+        this.projects = projects;
     }
 
     @Transactional
@@ -162,6 +176,55 @@ public class AiDocumentResultService {
     }
 
     /**
+     * 문서에서 뽑은 프로젝트 정형 정보를 받는다 (S15P21A604-597, GitLab #169).
+     *
+     * <p>다른 네 경로와 달리 <b>성공한 Job 도 받는다.</b> 추출은 임베딩이 끝난 뒤에 오기 때문이다.
+     * 버려진 Job({@code DEAD}·{@code CANCELLED})만 {@code 410} 이다 — 취소된 문서의 추출 결과가
+     * 최신 값을 덮지 않아야 한다.
+     *
+     * <p><b>최신성은 {@code jobId} 로만 판정한다.</b> 도착 순서로 판정하면 재시도가 오래된 추출을
+     * 새 값 위에 덮는다. 오래된 결과와 같은 Job 의 재전송은 둘 다 조용히 {@code 204} 다 — 보낸 쪽이
+     * 할 수 있는 일이 없고, 실패로 답하면 워커가 성공한 작업을 실패로 보고한다.
+     *
+     * <p><b>부스에 프로젝트가 없으면 아무것도 하지 않는다.</b> 정형 정보는 프로젝트의 속성이고,
+     * 프로젝트를 만들지 않은 부스에는 담을 곳이 없다. 이것도 {@code 204} 다 — 보낸 쪽이 고칠 수 있는
+     * 잘못이 아니다.
+     *
+     * <p>두 값은 <b>함께</b> 갈아끼운다. 한 문서에서 나온 한 번의 추출이라, 한쪽만 보내 나머지를
+     * 남겨 두면 서로 다른 문서에서 온 두 값이 한 프로젝트에 섞인다.
+     */
+    @Transactional
+    public void acceptProjectFacts(long jobId, String rawBody) {
+        ProjectFactsRequest request = StrictJsonReader.read(rawBody, ProjectFactsRequest.class);
+        String sourceHash = required(request.sourceHash(), "sourceHash");
+        String targetAudience = fact(request.targetAudience(), "targetAudience");
+        String techStack = fact(request.techStack(), "techStack");
+        if (targetAudience == null && techStack == null) {
+            // 빈 요청이 기존 값을 지우는 것을 막는다. 정말 둘 다 없는 문서라면 보내지 않으면 된다.
+            throw ApiException.fieldInvalid("targetAudience", "둘 중 하나는 값이 있어야 합니다.");
+        }
+
+        JobRow job = locked(jobId, request.attemptNo());
+        if (ABANDONED.contains(job.status())) {
+            throw new ApiException(ErrorCode.JOB_GONE);
+        }
+        if (!job.sourceHash().equals(sourceHash)) {
+            // 같은 jobId 인데 다른 파일에서 뽑았다는 뜻이다. finalize 와 같은 판단이다.
+            throw ApiException.fieldInvalid("sourceHash", "Job 의 원본 해시와 다릅니다.");
+        }
+        if (request.documentId() != null && request.documentId() != job.documentId()) {
+            // 보낸 쪽이 다른 문서를 말하고 있다. 받아 주면 엉뚱한 부스의 프로젝트가 바뀐다.
+            throw ApiException.fieldInvalid("documentId", "Job 의 문서와 다릅니다.");
+        }
+
+        Project project = projects.findByBoothId(job.boothId()).orElse(null);
+        if (project == null || !project.factsAreOlderThan(jobId)) {
+            return;
+        }
+        project.applyFacts(targetAudience, techStack, job.documentId(), jobId, Instant.now());
+    }
+
+    /**
      * The Job as it must be for a result to count, with the row locked for the rest of the
      * transaction.
      *
@@ -238,6 +301,22 @@ public class AiDocumentResultService {
         return value;
     }
 
+    /** 없어도 되지만, 있다면 비어 있지 않고 길이 안이어야 한다. */
+    private static String fact(String value, String field) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            // 빈 문자열은 "없음" 과 다르게 보이지만 담기면 똑같이 쓸모없다. 보낸 쪽이 고칠 수 있다.
+            throw ApiException.fieldInvalid(field, "빈 문자열은 보낼 수 없습니다.");
+        }
+        if (trimmed.length() > MAX_FACT_LENGTH) {
+            throw ApiException.fieldInvalid(field, MAX_FACT_LENGTH + "자 이하여야 합니다.");
+        }
+        return trimmed;
+    }
+
     private static String required(String value, String field) {
         if (value == null || value.isBlank()) {
             throw ApiException.fieldInvalid(field, "값이 필요합니다.");
@@ -256,6 +335,15 @@ public class AiDocumentResultService {
                                   String embeddingModelId) { }
 
     public record HeartbeatRequest(Integer attemptNo) { }
+
+    /**
+     * @param documentId 선택이다 — Job 이 이미 문서를 가리키므로 서버가 쓰는 값은 Job 쪽이다.
+     *        보내면 교차 검증에 쓴다
+     * @param sourceHash 티켓이 {@code sourceRevision} 이라 부른 것. 이 컨트롤러의 다른 네 경로가
+     *        모두 {@code sourceHash} 라 이름을 맞췄다 (AI 파트 확인 필요)
+     */
+    public record ProjectFactsRequest(Integer attemptNo, Long documentId, String sourceHash,
+                                      String targetAudience, String techStack) { }
 
     /** {@code message} 는 선택이다 — 코드가 분기의 근거이고 문장은 사람이 읽을 것이다. */
     public record FailedRequest(Integer attemptNo, String failureCode, Boolean retryable,
