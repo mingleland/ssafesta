@@ -41,10 +41,12 @@ Web app — 백엔드는 `backend/src/main/java/com/example/ssafesta/`, 테스�
 
 **⚠️ CRITICAL**: 이 단계가 끝나기 전에는 어떤 스토리도 시작하지 않는다. 특히 T006 전에 초대 API를 열면 `CONSULTANT` 가 남의 부스 문서·설문까지 만지게 된다.
 
-- [ ] T004 `backend/src/main/resources/db/migration/V31__staff_consultation_p1.sql` 작성 — `booth_staffs.consultation_status` 컬럼, 역할·상태 CHECK 4종, `ux_consultations_active_staff` 부분 유니크 인덱스, `ix_consultations_booth_status` ([data-model.md](./data-model.md))
-- [ ] T005 [P] `backend/src/main/java/com/example/ssafesta/staff/StaffRole.java` 에 역할 enum(`ADMIN`·`CONTENT_EDITOR`·`CONSULTANT`)과 편집 권한 판정 추가 (FR-002, C-09)
-- [ ] T006 `backend/src/main/java/com/example/ssafesta/booth/BoothAccessGuard.java` 의 `requireEditor` 에 역할 게이트를 태운다 — 현재는 행 존재만 본다. `CONSULTANT` 는 거부하고 Owner·`ADMIN`·`CONTENT_EDITOR` 만 통과시킨다
-- [ ] T007 `backend/src/test/java/com/example/ssafesta/booth/BoothAccessGuardRoleTest.java` — 역할별 통과·거부 매트릭스. **`requireEditor` 를 쓰는 경로 전부(Layout 2곳·LayoutQuery·AiAgent 2곳·AiDocument·Survey·SurveyResult·Project)가 같은 판정을 받는지** 함께 고정한다
+- [x] T004 `backend/src/main/resources/db/migration/V31__booth_staff_role_vocabulary.sql` — `booth_staffs.role` CHECK. **T006 이 딛는 부분만 넣는다** ([data-model.md](./data-model.md))
+- [ ] T004b `booth_staffs.consultation_status` 컬럼과 `staff_invitations` 상태·역할 CHECK — Phase 3·4 가 행을 만들 때 함께 (V32)
+- [ ] T004c `ux_consultations_active_staff` 부분 유니크 인덱스와 `ix_consultations_booth_status`, `consultations` 상태 CHECK — Phase 5 에서 (V33)
+- [x] T005 [P] `backend/src/main/java/com/example/ssafesta/booth/StaffRole.java` — 역할 enum(`ADMIN`·`CONTENT_EDITOR`·`CONSULTANT`)과 `mayEditBoothContent()`. **`staff/` 가 아니라 `booth/` 다** — `booth_staffs.role` 컬럼의 의미이고 유일한 소비자인 `BoothAccessGuard` 가 거기 있다. `staff/` 가 이것을 import 한다 (FR-002, C-09)
+- [x] T006 `backend/src/main/java/com/example/ssafesta/booth/BoothAccessGuard.java` 의 `requireEditor` 에 역할 게이트를 태운다 — 현재는 행 존재만 본다. `CONSULTANT` 는 거부하고 Owner·`ADMIN`·`CONTENT_EDITOR` 만 통과시킨다
+- [x] T007 `backend/src/test/java/com/example/ssafesta/booth/BoothAccessGuardRoleTest.java` — 역할별 통과·거부 매트릭스. **`requireEditor` 를 쓰는 경로 전부(Layout 2곳·LayoutQuery·AiAgent 2곳·AiDocument·Survey·SurveyResult·Project)가 같은 판정을 받는지** 함께 고정한다
 - [ ] T008 [P] 기존 `ErrorCode` enum에 이 spec의 오류 코드 추가 — `STAFF_INVITATION_PENDING`·`STAFF_ALREADY_MEMBER`·`STAFF_INVITATION_FORBIDDEN`·`STAFF_INVITATION_NOT_PENDING`·`STAFF_OWNER_IMMUTABLE`·`CONSULTATION_ALREADY_ACTIVE`·`CONSULTATION_NOT_REQUESTED`·`CONSULTATION_REQUEST_PENDING`. `GUEST_FORBIDDEN`·`BOOTH_LEASE_EXPIRED`·`BOOTH_FORBIDDEN`은 기존 코드를 재사용한다(신설 금지, docs/08 §1.3)
 - [ ] T009 [P] 기존 springdoc 스키마 충돌 검증 테스트 갱신 — 새 DTO가 단순 이름 충돌을 일으키지 않는지 (T-148 재발 방지)
 
