@@ -17,8 +17,8 @@
 | AI 응답 | SSE 우선 | FastAPI |
 | AI 문서 상태 | REST Polling 우선 | FastAPI/Spring |
 | Staff Presence | WebSocket 후보 | Spring + Redis |
-| 사람 상담 메시지 | WebSocket 후보 | Spring |
-| 상담 요청/수락 알림 | WebSocket | Spring + Redis |
+| 사람 상담 메시지 | **P2** — P1 범위 밖 (spec 011 C-12) | Spring |
+| 상담 요청/수락 알림 | **STOMP over native WebSocket** (단방향) | Spring |
 | Minigame 실시간 상태 | NGO | Unity Server |
 
 ---
@@ -193,54 +193,84 @@ error
 
 ---
 
-## 8. Staff Presence WebSocket
+## 8. 상담 알림 채널 (STOMP)
 
-### 연결 Endpoint 후보
+> **2026-09-13 확정·구현** (`S15P21A604-137`). 이 절의 이전 판은 연결 endpoint 와 STOMP 사용
+> 여부를 "후보" 로 두고 Presence 를 WebSocket 메시지로 받는 설계였다. **둘 다 실제와 다르다** —
+> 정본은 `specs/011-staff-consultation/contracts/staff-consultation-api.md` §B 다.
 
 ```text
-/ws
+엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
+            /api/v1 아래가 아니다 — STOMP 등록이 REST 매핑과 별개다
+인증        POST /api/v1/consultation/ws-token 으로 5분 토큰을 받아
+            STOMP CONNECT 의 Authorization 헤더에 Bearer 로 싣는다 (FR-019)
 ```
 
-또는 STOMP 사용 여부는 팀 Spring 구조에 따라 결정한다.
+**URL query 로 토큰을 넘기지 않는다.** 그 자리의 값은 접속 로그와 referrer 에 남는다. Access
+Token 재사용도 허용하지 않는다 — 토큰 4계층 분리의 이유다(헌법 13조).
 
-### Client → Server
+### 구독
+
+```text
+/user/queue/consultation              방문자 — 내 요청의 상태 변화
+/topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
+```
+
+### Client → Server: **없다**
+
+P1 의 이 채널은 **서버에서 클라이언트로 가는 단방향 알림 전용**이다(C-12). 요청·취소·수락·종료는
+전부 REST 이고, 그래서 서버에 SEND destination 자체가 등록돼 있지 않다.
+
+### Server → Client 봉투
 
 ```json
-{
-  "type": "STAFF_PRESENCE_SET",
-  "boothId": 7,
-  "status": "AVAILABLE"
-}
+{ "type": "requested", "requestId": "901", "occurredAt": "...", "visitorNickname": "...", "handoffSummary": null }
 ```
 
-### Server → Client
+| 구독 | `type` |
+|---|---|
+| 방문자 | `accepted`(+`staffName`) · `expired` · `ended` |
+| 직원 | `requested` · `cancelled` · `expired` · `taken`(+`staffName`) |
 
-```json
-{
-  "type": "STAFF_PRESENCE_CHANGED",
-  "boothId": 7,
-  "userId": 45,
-  "status": "AVAILABLE",
-  "occurredAt": "..."
-}
-```
+`taken` 이 있는 이유는 **진 직원의 대기열에서 카드를 내리기 위해서**다. 없으면 그 카드가 화면에
+남아 있다가 누를 때 409 로 터진다.
 
-실제 사용자 권한은 Server가 검증한다.
+### 유실은 계약이 인정한다
+
+**이벤트 재전송이 P1 에 없다.** 끊긴 사이의 변화는 유실되고, 클라이언트는 재연결 직후 대기열과
+요청 상태를 REST 로 다시 읽는다. `occurredAt` 이 그때 순서를 가르는 값이다.
+
+**정본은 REST 이고 이것은 알림이다.**
+
+### 한계 — 단일 인스턴스 전제
+
+in-memory simple broker 다. Spring 을 두 대 이상 띄우면 A 에 붙은 직원이 B 가 발행한 이벤트를
+받지 못한다. 스케일아웃이 정해지면 외부 브로커 릴레이가 필요하며, 그것은 **배포 형상 결정 뒤의
+후속**이다.
 
 ---
 
-## 9. Presence 저장
+## 9. Staff Presence — WebSocket 이 아니라 REST·DB
 
-Redis 후보:
+> **2026-09-13 정정** (`S15P21A604-136`). 이전 판은 `STAFF_PRESENCE_SET` WebSocket 메시지와
+> Redis 저장을 적었다. 구현은 그 어느 쪽도 아니다.
 
 ```text
-staff:booth:{boothId}:{userId} = AVAILABLE
-presence:user:{userId} = ONLINE
+PUT /api/v1/booths/{boothId}/staff/me/presence   { "status": "AVAILABLE" }
+저장  booth_staffs.consultation_status (V33)
 ```
 
-### TTL
+`AVAILABLE`·`AWAY`·`OFFLINE` 만 받는다. **`BUSY` 는 서버가 관리한다** — 상담 수락이 넣고 종료가
+되돌린다. 직접 지정하면 `400` 이다.
 
-WebSocket 연결 종료 누락에 대비해 Heartbeat/TTL을 둔다. 정확한 초 값은 구현 시 결정한다.
+기본값은 `OFFLINE` 이다 — spec 011 US2 가 "담당자가 항상 있을 수 없다, **오프라인이 기본 상태**"
+로 못박았으므로 행이 생기는 순간의 값이 곧 정상 경로다.
+
+**Redis 를 쓰지 않은 이유**: `booth_staffs` 행이 이미 있고 조회 경로가 전부 REST 다(직원 목록·
+대기열). Redis 에 따로 두면 재시작·정합·삭제 시점을 새로 관리해야 하는데 P1 이 얻는 것이 없다.
+
+**연결 종료 시 자동 `OFFLINE` 전환은 P1 범위 밖이다.** 연결 수명과 상담 가능 여부는 별개다 —
+직원이 창을 닫아도 자리에 있을 수 있다. 필요해지면 P2 에서 연결 이벤트와 묶는다.
 
 ---
 
