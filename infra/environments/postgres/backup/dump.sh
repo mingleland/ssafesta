@@ -42,6 +42,7 @@ while IFS= read -r database; do
   [[ -s "$dump" ]] || backup_die "empty dump: $database"
   sha="$(sha256sum "$dump" | awk '{print $1}')"
   bytes="$(wc -c <"$dump" | tr -d ' ')"
+  (( bytes <= 5368709120 )) || backup_die "dump exceeds single PutObject limit: $database"
   vector_version="$(backup_psql "$database" -Atc "SELECT COALESCE((SELECT extversion FROM pg_extension WHERE extname='vector'),'absent')")"
   tables="$(backup_psql "$database" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')")"
   schema_sha="$(sha256sum "$schema_dump" | awk '{print $1}')"
@@ -68,13 +69,13 @@ items=[json.loads(line) for line in pathlib.Path(rows).read_text().splitlines() 
 pathlib.Path(out).write_text(json.dumps({'schemaVersion':'1.0.0','backupSetId':backup_id,'environment':env,'tier':tier,'sourceReleaseId':release or None,'postgresVersion':postgres,'documentInventoryRef':inventory,'databases':items,'createdAt':datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')},indent=2)+'\n')
 PY
 
-while IFS=$'\t' read -r database key; do backup_aws cp "${work}/${database}.dump" "s3://${R2_BACKUP_BUCKET}/${key}" --only-show-errors; done < <(backup_python - "$manifest_input" <<'PY'
+while IFS=$'\t' read -r database key; do backup_s3api put-object --bucket "$R2_BACKUP_BUCKET" --key "$key" --body "${work}/${database}.dump" >/dev/null; done < <(backup_python - "$manifest_input" <<'PY'
 import json, pathlib, sys
 for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
     item=json.loads(line); print(item['database'], item['dumpKey'], sep='\t')
 PY
 )
 manifest_key="${object_prefix}/manifest.json"
-backup_aws cp "$manifest" "s3://${R2_BACKUP_BUCKET}/${manifest_key}" --only-show-errors
+backup_s3api put-object --bucket "$R2_BACKUP_BUCKET" --key "$manifest_key" --body "$manifest" >/dev/null
 cp "$manifest" "${BACKUP_STATE_DIR}/manifests/${backup_set_id}.json"
 printf '{"backupSetId":"%s","manifestKey":"%s","status":"UPLOADED_UNVERIFIED"}\n' "$backup_set_id" "$manifest_key"

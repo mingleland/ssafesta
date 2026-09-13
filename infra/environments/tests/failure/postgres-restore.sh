@@ -14,8 +14,20 @@ mkdir -p "$temp_dir/bin" "$temp_dir/bucket"
 cat >"$temp_dir/bin/aws" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-while [[ "$1" != cp ]]; do shift; done
-shift; source="$1"; destination="$2"
+while [[ "$1" != cp && "$1" != put-object ]]; do shift; done
+operation="$1"; shift
+if [[ "$operation" == put-object ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --key) key="$2"; shift 2 ;;
+      --body) source="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  destination="s3://${R2_BACKUP_BUCKET}/${key}"
+else
+  source="$1"; destination="$2"
+fi
 map_path() {
   if [[ "$1" == s3://* ]]; then
     object="${1#s3://}"; printf '%s/%s\n' "$FAKE_BUCKET" "${object#*/}"
