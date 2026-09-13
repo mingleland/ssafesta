@@ -12,6 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.booth.Booth;
+import com.example.ssafesta.booth.BoothRepository;
+import com.example.ssafesta.booth.BoothStaff;
+import com.example.ssafesta.booth.BoothStaffRepository;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.EnumSet;
@@ -51,6 +55,8 @@ class WsTokenApiIntegrationTest {
     @Autowired private WsTokenService tokens;
     @Autowired private StompAuthChannelInterceptor interceptor;
     @Autowired private JsonMapper jsonMapper;
+    @Autowired private BoothRepository booths;
+    @Autowired private BoothStaffRepository staffs;
 
     @Test
     void aMemberGetsAFiveMinuteToken() throws Exception {
@@ -240,16 +246,75 @@ class WsTokenApiIntegrationTest {
                 () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, "/queue/consultation-user42"), null));
     }
 
-    /** 기존 상담 계약이 쓰는 두 구독은 그대로 유지한다. */
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "/user/queue/consultation",
-            "/topic/booths/7/consultation"
-    })
-    void consultationContractSubscriptionsPassThrough(String destination) {
-        Message<?> subscription = frame(StompCommand.SUBSCRIBE, destination);
+    /** 방문자 개인 큐는 user destination 변환이 주인을 고르므로 여기서 더 볼 것이 없다. */
+    @Test
+    void theVisitorQueueSubscriptionPassesThrough() {
+        Message<?> subscription = frame(StompCommand.SUBSCRIBE, "/user/queue/consultation");
 
         assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    // ── 부스 토픽 구독 게이트 (S15P21A604-693) ─────────────────────────────
+    //
+    // CONNECT 에서 신원을 확정하고, SUBSCRIBE 에서 boothId 별 구성원을 본다. CONNECT 시점에는
+    // boothId 가 없어 멤버십을 검사할 수 없다. GitLab #133(2026-09-07) 에서 FE 에 약속한 동작이다.
+
+    @Test
+    void theBoothOwnerMaySubscribeToTheBoothTopic() {
+        Long ownerId = createMemberWithWallet(users, wallets, "토픽소유자");
+        Long boothId = booths.save(new Booth(ownerId, "토픽 부스")).getId();
+        Message<?> subscription = frameAs(ownerId, StompCommand.SUBSCRIBE, boothTopic(boothId));
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    /** 상담원은 콘텐츠는 못 고치지만 대기열은 봐야 한다 — 역할과 무관하게 구성원이면 통과다. */
+    @Test
+    void aConsultantMaySubscribeToTheBoothTopic() {
+        Long ownerId = createMemberWithWallet(users, wallets, "토픽소유자");
+        Long consultantId = createMemberWithWallet(users, wallets, "토픽상담원");
+        Long boothId = booths.save(new Booth(ownerId, "토픽 부스")).getId();
+        staffs.save(new BoothStaff(boothId, consultantId, "CONSULTANT"));
+        Message<?> subscription = frameAs(consultantId, StompCommand.SUBSCRIBE, boothTopic(boothId));
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    /**
+     * 구성원이 아닌 회원은 거부된다 — WS Token 만 있으면 남의 부스 대기열(방문자 닉네임·AI 대화
+     * 요약)을 읽을 수 있던 자리다.
+     */
+    @Test
+    void aStrangerIsRefusedTheBoothTopic() {
+        Long ownerId = createMemberWithWallet(users, wallets, "토픽소유자");
+        Long strangerId = createMemberWithWallet(users, wallets, "토픽남");
+        Long boothId = booths.save(new Booth(ownerId, "토픽 부스")).getId();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frameAs(strangerId, StompCommand.SUBSCRIBE, boothTopic(boothId)), null));
+    }
+
+    /** 주체가 없는 SUBSCRIBE 는 판정할 대상이 없으므로 거부다 — 조용히 통과시키면 게이트가 없는 것과 같다. */
+    @Test
+    void aSubscriptionWithoutAPrincipalIsRefusedTheBoothTopic() {
+        Long ownerId = createMemberWithWallet(users, wallets, "토픽소유자");
+        Long boothId = booths.save(new Booth(ownerId, "토픽 부스")).getId();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, boothTopic(boothId)), null));
+    }
+
+    /** 없는 부스도 거부다 — 존재하지 않는 대기열을 미리 구독해 두는 경로를 남기지 않는다. */
+    @Test
+    void anUnknownBoothTopicIsRefused() {
+        Long memberId = createMemberWithWallet(users, wallets, "토픽없는부스");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frameAs(memberId, StompCommand.SUBSCRIBE, boothTopic(999_999L)), null));
+    }
+
+    private static String boothTopic(Long boothId) {
+        return "/topic/booths/" + boothId + "/consultation";
     }
 
     /** 구독 해제와 정상 종료는 destination 정책의 대상이 아니다. */
@@ -281,9 +346,17 @@ class WsTokenApiIntegrationTest {
     }
 
     private Message<?> frame(StompCommand command, String destination) {
+        return frameAs(null, command, destination);
+    }
+
+    /** CONNECT 가 심어 둔 주체를 흉내낸다 — SUBSCRIBE 는 그 이름으로 구성원을 판정한다. */
+    private Message<?> frameAs(Long userId, StompCommand command, String destination) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
         if (destination != null) {
             accessor.setDestination(destination);
+        }
+        if (userId != null) {
+            accessor.setUser(new StompAuthChannelInterceptor.ConsultationPrincipal(String.valueOf(userId)));
         }
         accessor.setLeaveMutable(true);
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
