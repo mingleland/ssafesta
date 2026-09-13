@@ -9,6 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.user.UserRepository;
+import com.example.ssafesta.wallet.CoinCreditCommand;
+import com.example.ssafesta.wallet.CoinReason;
+import com.example.ssafesta.wallet.CoinSpendCommand;
+import com.example.ssafesta.wallet.LedgerEntryType;
 import com.example.ssafesta.wallet.WalletService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,18 +75,21 @@ class BoothDashboardApiIntegrationTest {
     /**
      * <b>{@code null} 은 0 이 아니다.</b>
      *
-     * <p>AI 이용은 대화 기록 표가 아직 없고, 수익은 부스로 코인이 들어오는 경로가 설계에 없다. 0 으로
-     * 채우면 FE 는 "AI 이용 0건 · 수익 0" 카드를 영원히 띄우고, 아무도 그것이 집계 결과가 아니라
-     * 없는 것이라는 사실을 모른다.
+     * <p>AI 이용은 대화 기록 표가 아직 없다. 0 으로 채우면 FE 는 "AI 이용 0건" 카드를 영원히 띄우고,
+     * 아무도 그것이 집계 결과가 아니라 없는 것이라는 사실을 모른다.
+     *
+     * <p>코인 칸은 이제 {@code null} 이 아니다 — 셀 원천이 있다(쓴 코인·뿌린 코인). 그래서 이 둘은
+     * 0 이 정상이고, 그 사실도 함께 고정한다.
      */
     @Test
-    void sourcelessMetricsAreNullNotZero() throws Exception {
+    void theSourcelessMetricIsNullWhileCoinIsZero() throws Exception {
         Booth booth = publishedBooth("원천없음");
 
         summary(booth, bearerFor(booth.getOwnerUserId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.aiUsages").value(nullValue()))
-                .andExpect(jsonPath("$.revenueCoin").value(nullValue()));
+                .andExpect(jsonPath("$.leaseCostCoin").value(0))
+                .andExpect(jsonPath("$.surveyRewardCoin").value(0));
     }
 
     /** 데이터 0건 부스가 오류 없이 0 을 보인다 (SC-002) — 평균은 0 으로 나누지 않는다. */
@@ -138,6 +145,72 @@ class BoothDashboardApiIntegrationTest {
         summary(mine, bearerFor(mine.getOwnerUserId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.surveyResponses").value(0));
+    }
+
+
+    /**
+     * <b>코인 칸은 "수익" 이 아니라 쓴 것과 뿌린 것이다.</b>
+     *
+     * <p>부스로 코인이 들어오는 경로가 없기 때문이다 — 임대료는 소유자가 <i>내는</i> 돈이고, 설문
+     * 보상은 차감되는 지갑 없이 <i>발행</i>된다. 임대료를 음수로, 보상을 양수로 그대로 흘리면 읽는
+     * 쪽이 부호를 해석해야 하므로 둘 다 양수로 준다.
+     */
+    @Test
+    void theSummaryReportsCoinSpentAndCoinIssued() throws Exception {
+        Booth booth = publishedBooth("코인");
+        chargeLease(booth, 100);
+        issueSurveyReward(booth, 55);
+
+        summary(booth, bearerFor(booth.getOwnerUserId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaseCostCoin").value(100))
+                .andExpect(jsonPath("$.surveyRewardCoin").value(55));
+    }
+
+    /**
+     * 다른 부스의 코인이 섞이지 않는다.
+     *
+     * <p>원장에는 부스 컬럼이 없다 — {@code reference_id} 로 임대·설문을 되짚어야 부스를 안다.
+     * 그 되짚기가 빠지면 플랫폼 전체 코인이 한 부스의 숫자로 나온다.
+     */
+    @Test
+    void anotherBoothsCoinIsNotCounted() throws Exception {
+        Booth mine = publishedBooth("내코인");
+        Booth theirs = publishedBooth("남코인");
+        chargeLease(theirs, 100);
+        issueSurveyReward(theirs, 55);
+
+        summary(mine, bearerFor(mine.getOwnerUserId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaseCostCoin").value(0))
+                .andExpect(jsonPath("$.surveyRewardCoin").value(0));
+    }
+
+    /** 기간 밖 원장은 빠진다 — 그렇지 않으면 from/to 가 코인 칸에서만 장식이 된다. */
+    @Test
+    void coinOutsideTheWindowIsExcluded() throws Exception {
+        Booth booth = publishedBooth("코인기간");
+        chargeLease(booth, 100);
+        issueSurveyReward(booth, 55);
+        jdbc.update("UPDATE coin_ledger_entries SET created_at = now() - interval '30 days'");
+
+        summary(booth, bearerFor(booth.getOwnerUserId()), "2100-01-01T00:00:00Z", "2100-01-02T00:00:00Z")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaseCostCoin").value(0))
+                .andExpect(jsonPath("$.surveyRewardCoin").value(0));
+    }
+
+    /** 다른 사유의 원장은 세지 않는다 — 미니게임 보상이 설문 보상으로 잡히면 안 된다. */
+    @Test
+    void unrelatedLedgerReasonsAreNotCounted() throws Exception {
+        Booth booth = publishedBooth("다른사유");
+        wallets.credit(new CoinCreditCommand(booth.getOwnerUserId(), LedgerEntryType.REWARD, 77,
+                CoinReason.MINIGAME_REWARD, "MINIGAME_SESSION", "1", "t-minigame-" + booth.getId()));
+
+        summary(booth, bearerFor(booth.getOwnerUserId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.surveyRewardCoin").value(0))
+                .andExpect(jsonPath("$.leaseCostCoin").value(0));
     }
 
     /**
@@ -207,6 +280,24 @@ class BoothDashboardApiIntegrationTest {
 
     private Long member(String prefix) {
         return createMemberWithWallet(users, wallets, prefix);
+    }
+
+    /** 이 부스의 임대료를 실제 원장 어휘로 태운다 — 참조는 그 부스의 임대 행 id 다. */
+    private void chargeLease(Booth booth, int amount) {
+        Long leaseId = jdbc.queryForObject(
+                "SELECT id FROM booth_leases WHERE booth_id = ? ORDER BY id DESC LIMIT 1",
+                Long.class, booth.getId());
+        wallets.spend(new CoinSpendCommand(booth.getOwnerUserId(), amount, CoinReason.LEASE_PAYMENT,
+                CoinReason.LEASE_REFERENCE_TYPE, String.valueOf(leaseId), "t-lease-" + leaseId));
+    }
+
+    /** 이 부스 설문이 응답자에게 보상을 발행한다 — 차감되는 지갑은 없다. */
+    private void issueSurveyReward(Booth booth, int amount) {
+        Long surveyId = seedSurvey(booth.getId(), booth.getOwnerUserId());
+        Long respondent = member("보상받는이" + surveyId);
+        wallets.credit(new CoinCreditCommand(respondent, LedgerEntryType.REWARD, amount,
+                CoinReason.SURVEY_REWARD, CoinReason.SURVEY_REFERENCE_TYPE,
+                String.valueOf(surveyId), "t-reward-" + surveyId));
     }
 
     private void seedClosedVisit(Long boothId, Long userId, int dwellSeconds) {
