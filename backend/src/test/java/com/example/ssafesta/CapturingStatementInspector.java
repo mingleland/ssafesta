@@ -1,4 +1,4 @@
-package com.example.ssafesta.booth;
+package com.example.ssafesta;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,6 +19,10 @@ import org.hibernate.resource.jdbc.spi.StatementInspector;
  *
  * <p>등록은 프로퍼티로 한다 —
  * {@code spring.jpa.properties.hibernate.session_factory.statement_inspector}.
+ *
+ * <p>테스트 루트 패키지에 둔 이유는 소비자가 도메인을 넘기 때문이다. 처음에는 {@code booth}
+ * 테스트에만 있었는데(S15P21A604-682), 같은 취약성이 {@code game} 쪽에도 있어
+ * (S15P21A604-685) 두 곳이 같은 도구를 쓴다.
  */
 public class CapturingStatementInspector implements StatementInspector {
 
@@ -30,12 +34,12 @@ public class CapturingStatementInspector implements StatementInspector {
         return sql;
     }
 
-    static void clear() {
+    public static void clear() {
         CAPTURED.clear();
     }
 
     /** 그 조각을 포함한 문장들. 소문자로 비교하므로 조각도 소문자로 준다. */
-    static List<String> matching(String fragment) {
+    public static List<String> matching(String fragment) {
         synchronized (CAPTURED) {
             return CAPTURED.stream().filter(sql -> sql.contains(fragment)).toList();
         }
