@@ -20,10 +20,12 @@ pipeline {
                     if (!inventoryRef) { error('DOCUMENT_INVENTORY_REF is required') }
                     String releaseId = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
                     String artifact = "${pwd()}/artifacts/postgres-backup/result.json"
+                    String writerCredentialId = env.R2_POSTGRES_BACKUP_WRITER_CREDENTIAL_ID ?: 'r2-postgres-backup-writer'
+                    String postgresCredentialId = env.POSTGRES_BACKUP_ADMIN_PASSWORD_CREDENTIAL_ID ?: 'postgres-backup-admin-password'
                     withCredentials([
-                        usernamePassword(credentialsId: env.R2_POSTGRES_BACKUP_WRITER_CREDENTIAL_ID,
+                        usernamePassword(credentialsId: writerCredentialId,
                             usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-                        string(credentialsId: env.POSTGRES_BACKUP_ADMIN_PASSWORD_CREDENTIAL_ID, variable: 'PGPASSWORD')
+                        string(credentialsId: postgresCredentialId, variable: 'PGPASSWORD')
                     ]) {
                         withEnv(["RELEASE_ID=${releaseId}", "DOCUMENT_INVENTORY_REF=${inventoryRef}", "POSTGRES_BACKUP_RESULT=${artifact}"]) {
                             sh '''mkdir -p "$(dirname "$POSTGRES_BACKUP_RESULT")"
