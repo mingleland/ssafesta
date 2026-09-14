@@ -107,7 +107,7 @@ assert 'credentials' not in security, 'JCasC must not overwrite UI-managed crede
 entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
 publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
-assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build','User/Configure'}
+assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
 assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
@@ -199,12 +199,16 @@ grep -q "multibranchPipelineJob('festa-gitlab-develop')" "${develop_job}" \
   || fail "GitLab develop-only multibranch job is missing"
 grep -q 'serverName(gitlabServerName)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the serverName method"
-grep -q 'credentialsId(gitlabCheckoutCredentialsId)' "${develop_job}" \
-  || fail "GitLab develop Job DSL shadows the credentialsId method"
+grep -q "String gitlabApiCredentialsId = System.getenv('GITLAB_API_CREDENTIALS_ID')" "${develop_job}" \
+  || fail "GitLab develop Job DSL must read the API credential"
+grep -q 'credentialsId(gitlabApiCredentialsId)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must use the API credential for project discovery"
 grep -q 'projectOwner(gitlabProjectOwner)' "${develop_job}" \
   || fail "GitLab develop Job DSL shadows the projectOwner method"
-grep -q 'projectPath(gitlabProjectPath)' "${develop_job}" \
-  || fail "GitLab develop Job DSL shadows the projectPath method"
+grep -q 'String gitlabProjectFullPath = "${gitlabProjectOwner}/${gitlabProjectPath}"' "${develop_job}" \
+  || fail "GitLab develop Job DSL must compose the full GitLab project path"
+grep -q 'projectPath(gitlabProjectFullPath)' "${develop_job}" \
+  || fail "GitLab develop Job DSL must pass the full GitLab project path"
 ! grep -q '^String projectOwner[[:space:]]*=' "${develop_job}" \
   || fail "GitLab develop Job DSL declares a projectOwner variable that shadows the method"
 ! grep -q '^String projectPath[[:space:]]*=' "${develop_job}" \

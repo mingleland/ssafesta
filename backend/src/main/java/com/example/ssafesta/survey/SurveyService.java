@@ -580,7 +580,7 @@ public class SurveyService {
     }
 
     /**
-     * The event survey run screen (S15P21A604-621, 계약 §11).
+     * The event survey run screen (S15P21A604-621, 계약 §8-1).
      *
      * <p>{@code questions} is the same shape as {@link RunView}'s so the client maps one form for
      * both sources. The two fields that differ are the two facts a booth survey has no way to

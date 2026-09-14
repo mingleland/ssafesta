@@ -53,7 +53,7 @@ namespace Festa.Booth
             go.transform.localPosition =
                 (dto.position?.ToVector3() ?? Vector3.zero) + Vector3.up * groundLift;
             go.transform.localRotation = Quaternion.Euler(0f, dto.rotationY, 0f);
-            WarnIfOutsideRoom(objectId, go.transform.localPosition);
+            WarnIfOutsideRoom(objectId, go);
 
             var runtimeObject = go.GetComponent<BoothRuntimeObject>();
             if (runtimeObject == null) runtimeObject = go.AddComponent<BoothRuntimeObject>();
@@ -76,6 +76,9 @@ namespace Festa.Booth
         const float RoomBackZMeters = -3.8f;
         const float RoomFrontZMeters = 7.0f;   // 방 깊이 10.8 m
 
+        /// <summary>벽에 닿은 것과 뚫은 것을 가르는 여유. 셸 메시가 방 한계보다 조금 안쪽에 있어 0 으로 두면 잔소리가 된다.</summary>
+        const float RoomEdgeToleranceMeters = 0.1f;
+
         /// <summary>
         /// 방 밖에 배치된 오브젝트를 **드러낸다**. 자르지는 않는다 — 자르면 배치가 조용히 달라져
         /// "내가 놓은 데가 아닌데" 가 되고, 원인이 스튜디오인지 런타임인지 가릴 수 없게 된다.
@@ -84,18 +87,68 @@ namespace Festa.Booth
         /// 계약 회귀 픽스처의 4/14 개가 방 밖이었다 — 08-31 에 방 크기를 바꾼 뒤
         /// (커밋 c7770a3a "부스 셸을 방 크기에 맞추고") 픽스처 좌표가 따라가지 않았다.
         /// 스튜디오가 방 경계로 제한하는지는 FE·BE 소관이라 별도 이슈로 올린다.</para>
+        ///
+        /// <para>판정은 피벗이 아니라 **실물 크기**다 (S15P21A604-657). 피벗만 보면 폭 1.55 m 짜리
+        /// 프로젝트 패널을 x=+4.8 · 회전 90° 로 놓았을 때 피벗은 방 안이라 조용한데 판은 뒷벽을
+        /// 0.56 m 뚫는다 — 2026-09-11 플레이 모드 실측에서 그대로 나왔다. 뚫리는 것은 피벗이 아니라 판이다.</para>
         /// </summary>
-        static void WarnIfOutsideRoom(string objectId, Vector3 localMeters)
+        static void WarnIfOutsideRoom(string objectId, GameObject go)
         {
-            if (Mathf.Abs(localMeters.x) <= RoomHalfXMeters
-                && localMeters.z >= RoomBackZMeters
-                && localMeters.z <= RoomFrontZMeters) return;
+            var localPos = go.transform.localPosition;
+            if (!TryLocalExtents(go, out var min, out var max))
+            {
+                // 실물 크기를 못 재는 경우(렌더러가 없거나 스킨드 뿐)는 종전대로 피벗으로 본다.
+                min = max = localPos;
+            }
+
+            float over = RoomEdgeToleranceMeters;
+            float left = (-RoomHalfXMeters) - min.x, right = max.x - RoomHalfXMeters;
+            float back = RoomBackZMeters - min.z, front = max.z - RoomFrontZMeters;
+            if (left <= over && right <= over && back <= over && front <= over) return;
+
+            var sides = new System.Collections.Generic.List<string>(4);
+            if (left > over) sides.Add($"왼쪽 벽 {left:F2} m");
+            if (right > over) sides.Add($"오른쪽 벽 {right:F2} m");
+            if (back > over) sides.Add($"뒷벽 {back:F2} m");
+            if (front > over) sides.Add($"앞쪽 {front:F2} m");
 
             Debug.LogWarning(
-                $"[BoothObjectFactory] {objectId} 가 방 밖에 배치됐다 — " +
-                $"위치 ({localMeters.x:F1}, {localMeters.z:F1}) m, " +
+                $"[BoothObjectFactory] {objectId} 가 방을 벗어났다 — {string.Join(", ", sides)} 넘음. " +
+                $"피벗 ({localPos.x:F2}, {localPos.z:F2}) m, 실물 x {min.x:F2}~{max.x:F2} · z {min.z:F2}~{max.z:F2} m, " +
                 $"방 한계 x ±{RoomHalfXMeters} m / z {RoomBackZMeters}~{RoomFrontZMeters} m. " +
-                "방문자에게는 부스 밖 허공에 떠 보인다. 스튜디오에서 안쪽으로 옮겨야 한다.");
+                "방문자에게는 벽을 뚫고 나가 보인다. 스튜디오에서 안쪽으로 옮겨야 한다.");
+        }
+
+        /// <summary>
+        /// 오브젝트가 실제로 차지하는 범위를 **부스 로컬 미터**로 잰다.
+        ///
+        /// <para><see cref="SkinnedMeshRenderer"/> 는 제외한다 — 그쪽 바운즈는 bind-pose 기준이라
+        /// 실제 자세보다 훨씬 크게 잡히고(팔 벌린 T 포즈), 그걸로 재면 벽 근처 NPC 마다 없는 경고가 뜬다.
+        /// 스킨드만 있는 오브젝트는 false 를 돌려 호출부가 피벗으로 판정하게 둔다.</para>
+        /// </summary>
+        static bool TryLocalExtents(GameObject go, out Vector3 min, out Vector3 max)
+        {
+            min = max = Vector3.zero;
+            var anchor = go.transform.parent;
+            if (anchor == null) return false;
+
+            bool any = false;
+            foreach (var renderer in go.GetComponentsInChildren<MeshRenderer>(false))
+            {
+                var b = renderer.bounds;   // 월드 AABB
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    var world = new Vector3(
+                        (corner & 1) == 0 ? b.min.x : b.max.x,
+                        (corner & 2) == 0 ? b.min.y : b.max.y,
+                        (corner & 4) == 0 ? b.min.z : b.max.z);
+                    var local = anchor.InverseTransformPoint(world);
+                    if (!any) { min = max = local; any = true; continue; }
+                    min = Vector3.Min(min, local);
+                    max = Vector3.Max(max, local);
+                }
+            }
+            return any;
         }
 
         // ---------- Placeholder ----------

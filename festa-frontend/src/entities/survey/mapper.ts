@@ -125,16 +125,18 @@ export function toEventRunSnapshot(wire: EventSurveyRunWire): SurveyRunSnapshot 
 }
 
 export function toDraft(wire: SurveyWire): SurveyDraftVM {
-  return { title: wire.title, questions: toDraftQuestions(wire.questions) };
+  return { title: wire.title, rewardCoin: wire.rewardCoin, questions: toDraftQuestions(wire.questions) };
 }
 
 /**
- * §4 PUT 본문. **description·rewardCoin·closesAt 키를 싣지 않는다** — 계약이 키 존재 여부로
- * 판정하므로, FE 가 그 값을 편집하지 않는 지금 키를 실으면 저장할 때마다 보상이 지워진다(T-97 자리).
+ * §4 PUT 본문. **description·closesAt 키를 싣지 않는다** — 계약이 키 존재 여부로 판정하므로,
+ * FE 가 편집하지 않는 값의 키를 실으면 저장할 때마다 지워진다(T-97 자리). rewardCoin 은
+ * Builder 가 편집하므로(S15P21A604-520) 로드한 값을 그대로 되싣는다 — 키를 빼면 이제는 편집이 유실된다.
  */
 export function toSaveBody(draft: SurveyDraftVM): SurveySaveWire {
   return {
     title: draft.title,
+    rewardCoin: draft.rewardCoin,
     questions: draft.questions.map((q): SurveySaveQuestionWire => {
       const wire: SurveySaveQuestionWire = {
         type: TYPE_TO_WIRE[q.type],

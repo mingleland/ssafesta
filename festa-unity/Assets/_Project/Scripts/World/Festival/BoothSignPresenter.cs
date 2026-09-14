@@ -10,19 +10,22 @@ namespace Festa.World
     /// <summary>
     /// 축제장 부스 12칸의 <b>바깥 간판</b>에 이름과 전시 이미지를 채운다 (GitLab #171).
     ///
-    /// <para><b>값의 출처는 이미 있는 계약 둘이다</b> — 새로 정한 것이 없다.
-    /// <c>GET /booths/{id}</c> 의 <c>name</c>·<c>facade.signText</c> (docs/08 §3·§4) 와
-    /// <c>GET /booths/{id}/projects/published</c> 의 <c>name</c>·<c>thumbnailUrl</c> (spec 009 §6).</para>
+    /// <para><b>값의 출처는 슬롯 목록 하나와 전시 조회 하나다.</b>
+    /// <c>GET /api/v1/booth-slots</c> 가 12칸의 <c>boothId</c>·<c>boothName</c>·<c>facade</c> 를 한 번에 주고
+    /// (BE S15P21A604-622), 전시 이미지는 임대된 칸의 <b>진짜 boothId</b> 로
+    /// <c>GET /api/v1/booths/{boothId}/projects/published</c> 를 부른다 (spec 009 §6).</para>
+    ///
+    /// <para><b>칸 번호를 부스 식별자로 쓰지 않는다.</b> 씬의 간판은 칸 번호(1~12)만 아는데 그 번호로
+    /// 부스를 조회하면 남의 부스가 나온다 — 실제로 슬롯 1 간판에 슬롯 3 임차인의 문구가 떴다
+    /// (S15P21A604-658). 둘을 잇는 정본은 슬롯 목록뿐이다.</para>
     ///
     /// <para><b>표시 우선순위</b> — 앞의 것이 비면 뒤로 내려간다:
-    /// <c>facade.signText</c> → <c>booths.name</c> → <c>projects[0].name</c> → <c>"N번 부스"</c>.
-    /// FE 가 사용자에게 어느 칸을 입력받는지 아직 확정 전이라(#171 ②) 셋 다 받는다 —
-    /// 어느 쪽이 채워지든 간판에 뭔가는 뜬다.</para>
+    /// <c>facade.signText</c> → <c>boothName</c> → <c>projects[0].name</c> → <c>"N번 부스"</c>.
+    /// FE 도 같은 순서를 쓴다(<c>BoothMiniPreview</c>, #171 ② 회신).</para>
     ///
     /// <para><b>한 번만 조회한다.</b> <see cref="BoothVacancyPresenter"/> 처럼 주기적으로 쓸어보지 않는다 —
-    /// 간판 문구는 임대 중에 바뀌는 값이 아니고, 12칸 × 2요청이라 반복하면 그대로 서버 부하다.
-    /// 부스에 들어갔다 나오면 그 칸만 다시 읽는다(<see cref="Refresh"/>) — 스튜디오에서 고치고
-    /// 돌아왔을 때 반영되게 하려는 것이다.</para>
+    /// 간판 문구는 임대 중에 바뀌는 값이 아니다. 부스에 들어갔다 나오면 그 칸만 다시 읽는다
+    /// (<see cref="Refresh"/>) — 스튜디오에서 고치고 돌아왔을 때 반영되게 하려는 것이다.</para>
     ///
     /// <para><b>이미지가 안 나올 수 있다.</b> WebGL 은 <c>UnityWebRequestTexture</c> 로 굽는 순간
     /// 브라우저 CORS 를 탄다 — <c>Access-Control-Allow-Origin</c> 이 없으면 조용히 실패한다.
@@ -59,13 +62,12 @@ namespace Festa.World
             }
         }
 
-        // 조회 결과를 여기 남긴다. **지도가 따로 부르지 않게** 하려는 것이다 —
-        // 일괄 조회 endpoint 가 없어서 12칸 × 2요청이 이미 부담인데(#171 ④), 지도가 같은 것을
-        // 다시 물으면 그대로 두 배가 된다.
+        // 조회 결과를 여기 남긴다. **지도가 따로 부르지 않게** 하려는 것이다 — 지도가 같은 것을
+        // 다시 물으면 요청이 그대로 두 배가 된다. 키는 **칸 번호**다(간판·포털과 같은 번호).
         static readonly Dictionary<int, BoothInfo> Cache = new();
 
-        /// <summary>그 부스에 대해 조회가 끝났으면 true. 아직 안 왔으면 false.</summary>
-        public static bool TryGetInfo(int boothId, out BoothInfo info) => Cache.TryGetValue(boothId, out info);
+        /// <summary>그 칸에 대해 조회가 끝났으면 true. 아직 안 왔으면 false. 키는 칸 번호(1~12)다.</summary>
+        public static bool TryGetInfo(int slotId, out BoothInfo info) => Cache.TryGetValue(slotId, out info);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Install()
@@ -77,10 +79,18 @@ namespace Festa.World
         }
 
         /// <summary>부스 한 칸을 다시 읽는다. 스튜디오에서 고치고 돌아온 경우를 위한 것이다.</summary>
-        public static void Refresh(int boothId)
+        public static void Refresh(int slotId)
         {
             if (_instance == null) return;
-            _ = _instance.FillOneAsync(boothId);
+            _ = _instance.RefreshAsync(slotId);
+        }
+
+        async Task RefreshAsync(int slotId)
+        {
+            // 목록을 버리는 것은 신호를 받은 쪽(WorldBoothPublishedBootstrap.RequestReload)이 한다 —
+            // 표현마다 버리면 같은 응답을 여러 번 받는다. 여기서는 공유본을 다시 읽기만 한다.
+            if (!await LoadSlotsAsync()) return;
+            await FillOneAsync(slotId);
         }
 
         void Update()
@@ -99,46 +109,76 @@ namespace Festa.World
             _ = FillAllAsync();
         }
 
+        /// <summary>슬롯 번호 → 그 칸을 쓰는 부스. 목록 조회 결과를 그대로 들고 있는다.</summary>
+        readonly Dictionary<int, BoothSlotDto> _slots = new();
+
         async Task FillAllAsync()
         {
-            // 12칸을 **순차로** 읽는다. 동시에 24요청을 던지면 WebGL 에서 첫 진입이 그만큼 느려지고,
-            // 일괄 조회 endpoint 가 없어서 어차피 요청 수는 같다(#171 ④ 에서 목록 endpoint 를 요청해 뒀다).
-            // 간판은 서 있기만 해도 부스가 깨져 보이지 않으므로 늦게 채워져도 괜찮다.
+            var api = ApiServices.Booth;
+            if (api == null)
+            {
+                Debug.LogWarning("[BoothSignPresenter] ApiServices.Booth 가 없다 — 간판은 기본 문구로 둔다.");
+                return;
+            }
+
+            // **먼저 슬롯 목록을 한 번 읽는다.** 씬의 간판은 칸 번호(1~12)만 아는데 그 번호로 부스를
+            // 조회하면 남의 부스가 나온다 — 간판이 옆 칸 이름을 띄우던 원인이다 (S15P21A604-658).
+            // 이 목록이 slotId → boothId·boothName·facade 를 이어 주고, 덕분에 첫 진입 요청도
+            // 최대 24회에서 1 + 임대된 칸 수로 줄어든다 (#171 ④).
+            if (!await LoadSlotsAsync()) return;
+
             foreach (var kv in _signs)
                 await FillOneAsync(kv.Key);
         }
 
-        async Task FillOneAsync(int boothId)
+        async Task<bool> LoadSlotsAsync()
         {
-            if (!_signs.TryGetValue(boothId, out var sign) || sign == null) return;
+            // 목록은 대표색 표현과 나눠 쓴다 — 각자 부르면 같은 응답을 두 번 받는다 (S15P21A604-659).
+            var slots = await BoothSlotDirectory.GetAsync();
 
-            var api = ApiServices.Booth;
-            if (api == null)
+            if (slots == null)
             {
-                Debug.LogWarning($"[BoothSignPresenter] ApiServices.Booth 가 없다 — 부스 {boothId} 간판은 기본 문구로 둔다.");
-                Apply(sign, null, null);
-                return;
+                // 여기서 칸 번호로 부스를 조회하는 옛 경로로 되돌아가지 않는다 — 그건 남의 부스를 띄운다.
+                // 이름 없는 간판이 낫다.
+                Debug.LogWarning("[BoothSignPresenter] 슬롯 목록을 받지 못했다 — 간판은 'N번 부스' 로 둔다.");
+                return false;
             }
 
-            BoothDetailDto detail = null;
-            BoothProjectsDto projects = null;
-            try { detail = await api.GetBoothDetailAsync(boothId); }
-            catch (System.Exception e) { Debug.LogWarning($"[BoothSignPresenter] 부스 {boothId} 상세 조회 실패: {e.Message}"); }
-            try { projects = await api.GetPublishedProjectsAsync(boothId); }
-            catch (System.Exception e) { Debug.LogWarning($"[BoothSignPresenter] 부스 {boothId} 전시 조회 실패: {e.Message}"); }
-
-            var first = projects?.projects != null && projects.projects.Length > 0 ? projects.projects[0] : null;
-            Apply(sign, detail, first);
-
-            if (!string.IsNullOrWhiteSpace(first?.thumbnailUrl))
-                await LoadThumbnailAsync(sign, boothId, first.thumbnailUrl);
+            _slots.Clear();
+            foreach (var s in slots)
+                if (s != null && s.slotId >= 1 && s.slotId <= SlotCount) _slots[s.slotId] = s;
+            return true;
         }
 
-        static void Apply(BoothSign sign, BoothDetailDto detail, BoothProjectDto project)
+        async Task FillOneAsync(int slotId)
+        {
+            if (!_signs.TryGetValue(slotId, out var sign) || sign == null) return;
+
+            _slots.TryGetValue(slotId, out var slot);
+            Apply(sign, slot, null);
+
+            // 임대되지 않은 칸은 전시도 없다 — 요청을 아낀다.
+            if (slot == null || !slot.HasBooth) return;
+
+            var api = ApiServices.Booth;
+            BoothProjectsDto projects = null;
+            try { projects = await api.GetPublishedProjectsAsync(slot.boothId); }
+            catch (System.Exception e) { Debug.LogWarning($"[BoothSignPresenter] 부스 {slot.boothId} 전시 조회 실패: {e.Message}"); }
+
+            var first = projects?.projects != null && projects.projects.Length > 0 ? projects.projects[0] : null;
+            if (first == null) return;
+
+            Apply(sign, slot, first);
+
+            if (!string.IsNullOrWhiteSpace(first.thumbnailUrl))
+                await LoadThumbnailAsync(sign, slotId, first.thumbnailUrl);
+        }
+
+        static void Apply(BoothSign sign, BoothSlotDto slot, BoothProjectDto project)
         {
             string name = FirstNonBlank(
-                detail?.facade?.signText,
-                detail?.name,
+                slot?.facade?.signText,
+                slot?.boothName,
                 project?.name,
                 $"{sign.boothId}번 부스");
 
@@ -149,13 +189,15 @@ namespace Festa.World
             Cache[sign.boothId] = new BoothInfo(name, null, project != null);
         }
 
-        static async Task LoadThumbnailAsync(BoothSign sign, int boothId, string url)
+        // 인자는 **칸 번호**다. 로그에 "부스 N" 으로 적으면 부스 식별자로 읽혀서, 이 파일이 방금 고친
+        // 혼동(S15P21A604-658)을 로그가 다시 만든다 — 그래서 "슬롯 N" 으로 적는다.
+        static async Task LoadThumbnailAsync(BoothSign sign, int slotId, string url)
         {
             // https 만 계약이다 (spec 009 §1 URL 규칙). http 는 mixed content 로 브라우저가 막아
             // 요청 자체가 안 나가므로 여기서 걸러 이유를 남긴다 — 조용한 실패로 두지 않는다.
             if (!url.StartsWith("https://"))
             {
-                Debug.LogWarning($"[BoothSignPresenter] 부스 {boothId} 썸네일이 https 가 아니다 ('{url}') — " +
+                Debug.LogWarning($"[BoothSignPresenter] 슬롯 {slotId} 썸네일이 https 가 아니다 ('{url}') — " +
                                  "WebGL 에서 mixed content 로 차단된다. 프로젝트명 카드로 둔다.");
                 return;
             }
@@ -166,7 +208,7 @@ namespace Festa.World
 
             if (req.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[BoothSignPresenter] 부스 {boothId} 썸네일 로드 실패 ({req.result}: {req.error}) — {url}\n" +
+                Debug.LogWarning($"[BoothSignPresenter] 슬롯 {slotId} 썸네일 로드 실패 ({req.result}: {req.error}) — {url}\n" +
                                  "WebGL 이면 CORS 헤더(Access-Control-Allow-Origin)를 먼저 의심하라 (#171 ③). 프로젝트명 카드로 둔다.");
                 return;
             }
@@ -175,8 +217,8 @@ namespace Festa.World
             if (tex == null || sign == null) return;
             sign.ShowThumbnail(tex);
 
-            if (Cache.TryGetValue(boothId, out var prev))
-                Cache[boothId] = new BoothInfo(prev.Name, tex, prev.HasProject);
+            if (Cache.TryGetValue(slotId, out var prev))
+                Cache[slotId] = new BoothInfo(prev.Name, tex, prev.HasProject);
         }
 
         static string FirstNonBlank(params string[] values)

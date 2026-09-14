@@ -14,8 +14,14 @@ import type { UnityInstance } from './types';
 
 export const WORLD_UI_BRIDGE_OBJECT = 'WorldUiBridge';
 
-/** 왜 나가려 하는지 — Unity 가 모르는 값이 오면 무시하고 기본 동작(최상위 모달 종료)을 한다. */
-export type ExitWorldUiReason = 'esc';
+/**
+ * 왜 나가려 하는지 — Unity 가 모르는 값이 오면 무시하고 기본 동작(최상위 모달 종료)을 한다.
+ *
+ *   'esc'             FE 레이어가 없는 상태에서 ESC 를 받았다 (WorldPage 중재 2단계)
+ *   'overlay-closed'  Unity 초점과 짝이 된 FE 레이어가 닫혔다 (UnityHost). ESC·배경 클릭·
+ *                     X 버튼·레이어 전환이 전부 여기로 모인다 — 무엇으로 닫았는지는 구분하지 않는다
+ */
+export type ExitWorldUiReason = 'esc' | 'overlay-closed';
 
 /** Unity 가 쥔 최상위 모달을 닫아 달라고 요청한다. 아무것도 없으면 Unity 가 무시한다(멱등). */
 export function requestExitWorldUi(instance: UnityInstance, reason: ExitWorldUiReason): void {

@@ -101,6 +101,9 @@ app:
     initial-grant: 200
     daily-grant: 50
     daily-grant-zone: Asia/Seoul
+    # 잔액-원장 정합성 점검 배치 (spec 003 FR-014). 탐지·기록만 하고 보정하지 않는다.
+    reconciliation-initial-delay: PT5M
+    reconciliation-scan-interval: PT1H
 
   # 미니게임 정산 (spec 014 C-03·C-04). 시간대는 여기 없다 — 위 daily-grant-zone 하나가
   # "코인 정책의 하루"를 정하고, 사본을 두면 일일 지급과 미니게임 한도가 다른 달력을 쓰게 된다.
@@ -214,6 +217,12 @@ app:
       # (AiDocumentOriginalDeleteSweeper, S15P21A604-556). 위와 달리 아무도 이 값을 기다리지
       # 않으므로 더 느슨하게 잡는다.
       original-delete-scan-interval: PT30M
+      # FR-028a — 같은 sweep 이 FAILED 문서의 원본을 지우기 전까지 두는 유예다
+      # (S15P21A604-637). updated_at 부터 재고, EXPIRED 의 24시간 복구 창(FR-027, 코드 상수)과는
+      # 별개 값이다 — 저쪽은 "복구할 수 있는 기간"이고 이쪽은 "사람이 실패를 들여다보고 재처리를
+      # 걸 기간"이라 같이 움직일 이유가 없다. 줄이면 조사할 시간이 줄고, 늘리면 못 쓰는 원본이
+      # 그만큼 저장소에 남는다.
+      failed-original-grace: P7D
     # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
     storage:
       # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환

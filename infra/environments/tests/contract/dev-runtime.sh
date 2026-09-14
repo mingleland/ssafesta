@@ -42,6 +42,7 @@ assert_contains "${ingress}" '127\.0\.0\.1:8000' 'ai must proxy through loopback
 assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8081;' 'API proxy must preserve /api cookie paths'
 assert_contains "${ingress}" 'proxy_pass http://127\.0\.0\.1:8000;' 'AI proxy must preserve /ai/v1 paths'
 assert_contains "${world_ingress}" 'server_name world-dev\.\$\{ROOT_DOMAIN\};' 'world must use the dedicated dev host'
+assert_not_contains "${world_ingress}" 'world\.\$\{ROOT_DOMAIN\}' 'dev world must not claim the demo world host'
 assert_not_contains "${world_ingress}" '^[[:space:]]*http2 on;' 'dev world must remain compatible with the deployed Nginx version'
 assert_contains "${world_ingress}" 'real_ip_header CF-Connecting-IP;' 'dev world must restore the client IP supplied by Cloudflare'
 assert_contains "${world_ingress}" 'real_ip_recursive on;' 'dev world must recursively resolve the trusted proxy chain'

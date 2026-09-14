@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://demo.${ROOT_DOMAIN}",
+      "https://dev.${ROOT_DOMAIN}"
+    ],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type", "x-amz-checksum-sha256"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 900
+  }
+]

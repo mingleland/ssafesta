@@ -17,9 +17,16 @@ Reference: [changed-component contract](./contracts/changed-component-contract.m
 3. Expected: GitLab `back-test` and `back-build` pass; no Jenkins job or `dev-back` container is recreated.
 4. Repeat with `festa-frontend/**`; expect only Front jobs. Change a Front·Back shared contract path; expect both gates.
 
+## 1A. Game MR Unity test-only gate
+
+1. `festa-unity/**` 또는 Unity project 설정만 바꾸는 `feature/S15P21A604-N-...` MR을 `develop`으로 만든다.
+2. Expected: Jenkins Unity agent가 **MR head SHA**에서 `ci/test`만 실행하고, GitLab MR에 Unity validation 성공 상태를 게시한다. `ci/test` 안의 Unity 스크립트 컴파일과 EditMode 정적 검사도 함께 통과해야 한다.
+3. Jenkins console과 Docker 상태를 확인한다. Expected: `ci/build`, `ci/package`, Registry upload, Compose deploy/promotion 호출이 없고 dev/demo 컨테이너 restart delta가 모두 0이다.
+4. 컴파일 또는 EditMode를 의도적으로 실패시킨 별도 MR을 실행한다. Expected: Unity validation 상태가 실패하고 GitLab은 merge를 차단한다. agent offline·timeout도 성공 또는 skip으로 처리하지 않는다.
+
 ## 2. Required gate failure
 
-1. Make either required GitLab build/test job fail.
+1. Make a required GitLab build/test job or the Game Unity test-only validation fail.
 2. Expected: GitLab prevents merge to `develop`; no Jenkins dev deployment starts.
 
 ## 3. Squash merge to dev
@@ -63,7 +70,7 @@ infra/jenkins/scripts/publish-webgl-release.sh \
 ```
 
 5. zip과 `.sha256` 업로드가 모두 성공한 뒤 Jenkins가 `RELEASE_ID=490bde34`, `ARTIFACT_SHA256=<64 hex>`로 시작하는지 확인한다. 토큰 원문을 console·artifact에 남기지 않는다.
-6. 성공 후 EC2에서 `readlink /srv/festa/webgl/current`, `readlink /srv/festa/webgl/previous`와 각 release의 `.artifact-sha256`을 확인한다.
+6. 성공 후 EC2에서 `readlink /srv/festa/webgl/current`, `readlink /srv/festa/webgl/previous`와 각 release의 `.artifact-sha256`을 확인한다. `find /srv/festa/webgl -maxdepth 1 -name 'current.legacy.[0-9]*'`로 본 UTC 14자리 timestamp legacy는 최신 두 개만 남아야 하며, timestamp 형식이 아닌 이름은 정리 대상이 아니다. 검증·출처 검사 실패 실행 뒤에는 legacy 목록이 변하면 안 된다.
 7. 공개 검증은 다음 기준을 모두 만족해야 한다: `/manifest.json` JSON + `no-cache`, `/index.html` HTML + `no-cache`, manifest의 Build 4종 HTTP 200, 확장자별 MIME, 압축 파일 `Content-Encoding: br`, Build 파일 `public, max-age=31536000, immutable`.
 8. 공개 검증을 의도적으로 실패시킨 rehearsal에서는 job이 실패하고 `current`가 실행 전 release로 복원되어야 한다. Dedicated Server 컨테이너 ID와 시작 시각은 바뀌지 않아야 한다.
 

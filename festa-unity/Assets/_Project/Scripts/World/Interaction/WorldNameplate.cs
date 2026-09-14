@@ -87,6 +87,27 @@ namespace Festa.World
         public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(1f, distance);
 
         /// <summary>
+        /// 글자 크기와 외곽선 두께를 올려 <b>배경이 무엇이든 읽히게</b> 한다. NPC 안내 이름표용.
+        ///
+        /// <para><b>왜 필요한가.</b> NPC 를 구분하려고 쓴 노란색(휘도 0.70)이 안내데스크 뒤 밝은 회색 벽
+        /// (0.68)과 밝기가 거의 같아, 색만 다르고 명암이 없어 글자 모양이 안 잡혔다 (2026-09-14 사용자 지적).</para>
+        ///
+        /// <para><b>색으로는 못 푼다.</b> 밝은 벽과 밤하늘 양쪽에 동시에 대비가 나는 단일 색은 없다 —
+        /// 어둡게 내리면 벽에서 읽히는 대신 밤 배경에서 묻힌다. 그래서 <b>배경별로 다른 부분이 담당한다</b>:
+        /// 밝은 배경은 <b>검은 외곽선</b>이, 어두운 배경은 밝은 속면이 맡는다. 여기서 올리는 두 값이 그
+        /// 분담을 실제로 작동시킨다 — 외곽선을 두껍게, 그리고 그 외곽선이 화면에서 픽셀로 분해되도록 크게.</para>
+        ///
+        /// <para><b>그림자(underlay)는 여전히 쓰지 않는다</b> — <see cref="ApplyOutline"/> 참고. 한글에서
+        /// 획 사이를 뿌옇게 먹는다. 외곽선 상한이 0.25 인 것도 같은 이유라, 그 위는 받아도 깎는다.</para>
+        /// </summary>
+        public void SetLegibility(float characterHeight, float outlineWidth)
+        {
+            _baseCharacterHeight = Mathf.Max(0.1f, characterHeight);
+            _outlineWidth = Mathf.Clamp(outlineWidth, 0f, 0.25f);
+            if (_material != null) _material.SetFloat(ShaderUtilities.ID_OutlineWidth, _outlineWidth);
+        }
+
+        /// <summary>
         /// 글자 색을 바꾼다. <b>본인과 남을 색으로 구분</b>하는 데 쓴다 — 이름을 읽지 않고도
         /// 어느 쪽이 나인지 한눈에 들어와야 한다.
         /// </summary>
@@ -213,8 +234,81 @@ namespace Festa.World
             _measured = true;
         }
 
+        /// <summary>
+        /// 머리 본을 따라가지 않고 <b>사람이 들어가 있는 구조물의 정점</b>에 고정할지.
+        /// 매표소처럼 건물 안에 NPC 가 서 있는 자리에 이름을 붙일 때 쓴다 — 그때 기준은
+        /// 사람 머리가 아니라 지붕이다 (2026-09-14 사용자 지정).
+        /// </summary>
+        bool _pinToStructureTop;
+
+        /// <summary>찾아낸 구조물 정점의 월드 Y. 아직 못 찾았으면 <see cref="float.MinValue"/>.</summary>
+        float _structureTopY = float.MinValue;
+
+        /// <summary>머리 위로 지붕을 찾아 올려다볼 거리(u). 이 씬의 사람 키가 22 남짓이다.</summary>
+        const float StructureSearchUp = 120f;
+        const int StructureSearchMaxTries = 20;
+        int _structureTries;
+        static readonly RaycastHit[] _structureHits = new RaycastHit[16];
+
+        /// <summary>구조물 정점에 고정한다(사람 머리를 따라가지 않는다).</summary>
+        public void PinToStructureTop()
+        {
+            _pinToStructureTop = true;
+            _headBone = null;
+            _structureTopY = float.MinValue;
+            _structureTries = 0;
+        }
+
+        /// <summary>
+        /// 머리 위로 레이를 쏴 <b>맨 먼저 만나는 지붕</b>을 찾고, 그 콜라이더의 정점을 이름표 높이로 삼는다.
+        ///
+        /// <para><b>왜 자식 렌더러를 재지 않나.</b> 매표소 NPC 가 달린 <c>@ManagementDesk</c> 는 시각물
+        /// 하나만 자식으로 가진 마커라, 자식을 재면 나오는 값이 <b>NPC 정수리</b>다 — 정확히 사용자가
+        /// 아니라고 한 그 자리다. 매표소 구조물은 씬에서 별개 오브젝트라 계층으로는 닿지 않는다.</para>
+        ///
+        /// <para><b>왜 위에서 아래로 쏘지 않나.</b> 축제장이 실내라 높은 데서 내려쏘면 건물 천장이 먼저
+        /// 잡힌다. 머리 위에서 올려쏘면 첫 히트가 그 사람을 덮고 있는 지붕이다 — 범위가 알아서 한정된다.</para>
+        ///
+        /// <para>가로 위치는 NPC 기준 그대로 둔다. 지붕 콜라이더의 중심을 쓰면 여러 부스를 덮는 큰 판일 때
+        /// 엉뚱한 데로 끌려간다 — 사람 바로 위, 지붕 높이면 "매표소 위" 로 읽힌다.</para>
+        ///
+        /// <para>못 찾으면 정수리 높이로 남되 <b>조용히 그러지 않는다</b>. 지붕에 콜라이더가 없다는 건
+        /// 여기서만 드러난다.</para>
+        /// </summary>
+        void MeasureStructureTop()
+        {
+            if (_structureTopY > float.MinValue || _structureTries >= StructureSearchMaxTries) return;
+            _structureTries++;
+
+            var origin = new Vector3(transform.position.x, _topY + 0.5f, transform.position.z);
+            int n = Physics.RaycastNonAlloc(origin, Vector3.up, _structureHits, StructureSearchUp, ~0, QueryTriggerInteraction.Ignore);
+
+            Collider nearest = null;
+            float best = float.MaxValue;
+            for (int i = 0; i < n; i++)
+            {
+                var c = _structureHits[i].collider;
+                if (c == null || c.transform.IsChildOf(transform)) continue;   // 자기 몸은 지붕이 아니다
+                if (_structureHits[i].distance < best) { best = _structureHits[i].distance; nearest = c; }
+            }
+
+            if (nearest == null)
+            {
+                if (_structureTries >= StructureSearchMaxTries)
+                    Debug.LogWarning($"[WorldNameplate] '{_label}' 머리 위 {StructureSearchUp}u 안에 지붕 콜라이더가 없다 — 정수리 높이로 둔다");
+                return;
+            }
+
+            _structureTopY = nearest.bounds.max.y;
+            Debug.Log($"[WorldNameplate] '{_label}' 구조물 정점 {_structureTopY:F1} (정수리 {_topY:F1}, 지붕 {nearest.name})");
+        }
+
         /// <summary>지금 자세의 정수리 높이. 머리 본이 있으면 자세를 따라간다.</summary>
-        float RawTopY() => _headBone != null ? _headBone.position.y + _headToTop : _topY;
+        float RawTopY()
+        {
+            if (_pinToStructureTop) return _structureTopY > _topY ? _structureTopY : _topY;
+            return _headBone != null ? _headBone.position.y + _headToTop : _topY;
+        }
 
         // 머리 본을 못 잡았으면 주기적으로 다시 시도한다. 첫 측정은 아바타 파츠가 조립되기 전에 돌 수
         // 있어 Animator 가 아직 없고, 그러면 이름표가 **고정 높이**로 굳어 앉기(SitGround)·마시기 이모트에
@@ -223,6 +317,7 @@ namespace Festa.World
         const int RebindEveryFrames = 30, RebindMaxAttempts = 200;   // 약 0.5초 간격, 최대 ~100초
         void TryRebindHead()
         {
+            if (_pinToStructureTop) return;   // 지붕에 고정된 이름표는 머리를 따라가지 않는다
             if (_headBone != null || _rebindAttempts >= RebindMaxAttempts) return;
             if (Time.frameCount % RebindEveryFrames != 0) return;
             _rebindAttempts++;
@@ -274,6 +369,7 @@ namespace Festa.World
         {
             if (_text == null) return;
             if (!_measured) MeasureTop();
+            if (_pinToStructureTop) MeasureStructureTop();
             TryRebindHead();
 
             var cam = Camera.main;
@@ -297,7 +393,8 @@ namespace Festa.World
             float dist = toCam.magnitude;
 
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label) && IsBodyVisible();
+            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label)
+                        && IsBodyVisible() && !IsOccluded(cam);
             _renderer.enabled = show;
             if (!show) return;
 
@@ -315,11 +412,62 @@ namespace Festa.World
         }
 
         /// <summary>
+        /// 카메라와 몸 사이에 **단단한 것**이 있는가. 있으면 이름표를 감춘다.
+        ///
+        /// <para><b>왜 <see cref="Renderer.isVisible"/> 로는 안 되나.</b> 그 값은
+        /// "어느 카메라에든 보이는가" 다 — 에디터에서는 **씬 뷰 카메라에만 보여도 true** 라
+        /// 게임 뷰에서 벽 뒤에 있어도 이름표가 뜬다. 빌드에서도 그 벽이 베이크된 오클루더가
+        /// 아니면 걸리지 않는다. 사용자가 반복해서 지적한 "벽 쪽으로 가면 닉네임만 뜬다" 가 이것이다.</para>
+        ///
+        /// <para>그래서 <b>카메라에서 머리까지 선분을 직접 쏜다.</b> 자기 몸(자식 콜라이더)은 건너뛰고,
+        /// 트리거는 무시한다. 매 프레임 쏘면 사람 수만큼 늘어나므로 <c>OcclusionInterval</c> 프레임마다
+        /// 한 번만 재고 그 사이는 직전 값을 쓴다 — 이름표가 깜빡일 만큼 빠른 변화가 아니다.</para>
+        /// </summary>
+        bool IsOccluded(Camera cam)
+        {
+            if (!_hideWhenOccluded) return false;
+            if (Time.frameCount - _occlusionFrame < OcclusionInterval) return _occluded;
+            _occlusionFrame = Time.frameCount;
+
+            var head = _root != null ? _root.position : transform.position;
+            var origin = cam.transform.position;
+            var delta = head - origin;
+            float d = delta.magnitude;
+            if (d < 0.05f) { _occluded = false; return false; }
+
+            // 끝점을 살짝 당긴다 — 머리 바로 옆 벽에 스치는 것까지 가림으로 치면 붙어 설 때 깜빡인다.
+            int n = Physics.RaycastNonAlloc(origin, delta / d, _occlusionHits, d - 1.5f, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < n; i++)
+            {
+                var t = _occlusionHits[i].transform;
+                if (t == null) continue;
+                if (t.IsChildOf(transform) || transform.IsChildOf(t)) continue;   // 자기 몸은 가림이 아니다
+                _occluded = true;
+                return true;
+            }
+            _occluded = false;
+            return false;
+        }
+
+        [Tooltip("몸이 가려지면 이름표도 감춘다. 끄면 벽 너머로 이름만 떠 보인다")]
+        [SerializeField] bool _hideWhenOccluded = true;
+
+        /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
+        const int OcclusionInterval = 3;
+        static readonly RaycastHit[] _occlusionHits = new RaycastHit[8];
+        int _occlusionFrame = -100;
+        bool _occluded;
+
+        /// <summary>
         /// 몸 렌더러 중 하나라도 이번 프레임에 그려졌는가(<see cref="Renderer.isVisible"/> 는 프러스텀·오클루전 컬링 결과를 반영한다).
         /// 전부 비활성(초점 모드 자기 숨김)이거나 컬링됐으면 false.
         /// </summary>
         bool IsBodyVisible()
         {
+            // 지붕에 붙은 이름표의 주인은 건물이지 그 안의 사람이 아니다. NPC 는 부스 벽에 가려
+            // 컬링되기 쉬운데, 그걸로 지붕 위 글자를 끄면 밖에서는 이름이 아예 안 뜬다.
+            if (_pinToStructureTop) return true;
+
             if (_bodyRenderers == null || Time.frameCount - _bodyRefreshFrame > 120)
             {
                 var list = new System.Collections.Generic.List<Renderer>();

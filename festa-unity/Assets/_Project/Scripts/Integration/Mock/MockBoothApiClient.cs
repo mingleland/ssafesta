@@ -130,5 +130,48 @@ namespace Festa.Integration
                 },
             };
         }
+
+        public async Task<BoothSlotDto[]> GetSlotsAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+
+            // 홀수 슬롯만 임대 중 — 다른 Mock 응답(미게시 규칙)과 같은 결을 유지한다.
+            // **슬롯 번호와 부스 식별자를 일부러 다르게 준다**(boothId = slotId + 100). 둘을 같은 값으로 쓰는
+            // 회귀를 Mock 에서 먼저 드러내려는 것이다 — 실서버에서도 두 값은 다르다 (S15P21A604-658).
+            var slots = new BoothSlotDto[BoothSignSlotCount];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                int slotId = i + 1;
+                bool occupied = slotId % 2 == 1;
+                slots[i] = new BoothSlotDto
+                {
+                    slotId = slotId,
+                    slotCode = $"F11-R{slotId:00}",
+                    floorNo = 11,
+                    type = slotId == 1 ? "EVENT" : "USER_RENTAL",
+                    status = occupied ? "OCCUPIED" : "AVAILABLE",
+                    boothId = occupied ? slotId + 100 : 0,
+                    boothName = occupied ? $"{slotId}번 칸 부스" : null,
+                    entryAvailable = occupied,
+                    facade = occupied
+                        ? new BoothFacadeDto
+                        {
+                            themeCode = "DEFAULT",
+                            signText = $"{slotId}번 칸 간판",
+                            // 칸마다 다른 색을 준다 — 대표색이 **그 칸에만** 칠해지는지 눈으로 가릴 수 있어야 한다
+                            // (S15P21A604-659). 실서버 값은 스튜디오 팔레트에서 온다.
+                            primaryColor = MockFacadeColors[(slotId / 2) % MockFacadeColors.Length],
+                        }
+                        : null,
+                };
+            }
+            return slots;
+        }
+
+        /// <summary>Mock 이 만들어 주는 슬롯 수. 씬의 간판 수(BoothSignPresenter.SlotCount)와 같은 값이다.</summary>
+        const int BoothSignSlotCount = 12;
+
+        /// <summary>Mock 대표색 팔레트. 스튜디오 팔레트(#17 12색)에서 눈에 잘 띄는 것만 골랐다.</summary>
+        static readonly string[] MockFacadeColors = { "#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899" };
     }
 }

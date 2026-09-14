@@ -23,7 +23,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -45,7 +48,48 @@ class GuestAuthApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private UserRepository users;
     @Autowired private JwtDecoder jwtDecoder;
+    @Autowired private JwtEncoder jwtEncoder;
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
+
+    /**
+     * FE dev 게이트웨이 경유 요청이 Origin 관문을 통과한다 (GitLab #177).
+     *
+     * <p>Vite 프록시는 {@code changeOrigin} 없이 돌므로 BE 가 보는 Host 와 Origin 이 둘 다 FE 포트다.
+     * 그 둘이 같으면 Spring 은 CORS 요청으로 보지도 않고, 남는 관문은 컨트롤러의 Origin 검사
+     * 하나다. 통과의 증거는 200 이 아니라 <b>401</b> 이다 — 쿠키가 없으니 다음 단계에서 떨어지는
+     * 것이 정상이고, 403 이면 관문에서 막힌 것이다.
+     */
+    @Test
+    void aRequestThroughTheLocalDevGatewayPassesTheOriginGate() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, "http://localhost:5175")
+                        .with(request -> {
+                            request.setServerName("localhost");
+                            request.setServerPort(5175);
+                            return request;
+                        }))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /**
+     * Host 와 Origin 이 같다는 것만으로는 믿지 않는다.
+     *
+     * <p>이 한 줄이 없으면 규칙이 "요청자가 신뢰 기준을 정한다"로 넓어진다
+     * ({@code docs/25_트러블슈팅.md} T-102).
+     */
+    @Test
+    void aNonLocalHostMatchingItsOwnOriginIsStillRefused() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, "http://evil.example")
+                        .with(request -> {
+                            request.setServerName("evil.example");
+                            request.setServerPort(80);
+                            return request;
+                        }))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("UNTRUSTED_ORIGIN"));
+    }
 
     /**
      * The body is asserted through the decoder rather than by shape alone.
@@ -104,14 +148,41 @@ class GuestAuthApiIntegrationTest {
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
 
+        // The status alone let this slip: the filter used to answer with response.sendError,
+        // which has no body at all — the client saw a 401 with nothing to branch on
+        // (S15P21A604-693, HDD T-157).
         mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("로그인 세션이 종료되었습니다."))
+                .andExpect(jsonPath("$.requestId").isString());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .header(HttpHeaders.ORIGIN, trustedOrigin)
                         .cookie(new Cookie("refresh_token", session.refreshToken())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /**
+     * The other branch of {@code SessionRevocationFilter}: a MEMBER token whose subject is not a
+     * member id. {@code AccessTokenService} cannot mint one, so the token is signed here directly.
+     * It has to land in the envelope too, and with the code the refresh path already uses for a
+     * token that cannot identify a member (S15P21A604-693).
+     */
+    @Test
+    void aMemberTokenWhoseSubjectIsNotANumberIsRefusedInsideTheEnvelope() throws Exception {
+        Instant now = Instant.now();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(JwtClaimsSet.builder()
+                .subject("not-a-member-id").issuedAt(now).expiresAt(now.plusSeconds(60))
+                .id(UUID.randomUUID().toString()).claim("role", "MEMBER").claim("sid", "sid")
+                .build())).getTokenValue();
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"))
+                .andExpect(jsonPath("$.requestId").isString());
     }
 }

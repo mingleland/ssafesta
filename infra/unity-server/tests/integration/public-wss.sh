@@ -12,6 +12,7 @@ verifier="${unity_server_dir}/scripts/verify-public-wss.sh"
 assert_file "${nginx_template}"
 assert_file "${verifier}"
 assert_contains "${nginx_template}" 'listen[[:space:]]+443[[:space:]]+ssl' 'world ingress must listen on TLS 443'
+assert_contains "${nginx_template}" 'proxy_pass http://127\.0\.0\.1:\$\{DEMO_GAME_HOST_PORT\};' 'world ingress must target the demo loopback port'
 assert_contains "${nginx_template}" 'proxy_set_header[[:space:]]+Upgrade' 'world ingress must preserve WebSocket Upgrade'
 assert_not_contains "${nginx_template}" 'listen[[:space:]]+7777' 'world ingress must not publish game port 7777'
 assert_not_contains "${nginx_template}" '^[[:space:]]*http2 on;' 'world ingress must remain compatible with the deployed Nginx version'

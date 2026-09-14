@@ -50,6 +50,7 @@
 7. **Given** AI 처리 서비스가 일시적으로 응답하지 않음, **When** 소유자가 문서 목록과 상태를 조회하면, **Then** 기존 문서 상태를 계속 확인할 수 있다.
 8. **Given** 업로드를 완료하지 않은 문서, **When** 생성 후 1시간이 지나면, **Then** 문서는 `EXPIRED`로 표시되고 RAG 처리 대상에 포함되지 않는다.
 9. **Given** `EXPIRED` 전환 후 24시간 안에 업로드 완료를 요청함, **When** 원본 객체가 남아 있으면, **Then** 동일 문서가 `QUEUED`로 복구되어 정상 처리된다.
+10. **Given** 수정본 교체로 밀려나 `replaced_at`이 찍힌 `EXPIRED` 원본, **When** 보존 기간 안에 늦은 완료를 요청하면, **Then** 복구되지 않고 이미 교체됐음을 알린다.
 
 ### User Story 3 — 문서를 관리한다 (Priority: P1)
 
@@ -68,9 +69,11 @@
 - 같은 문서를 두 번 올린 경우 동일 AI 직원에 등록된 활성 문서와 파일 SHA-256이 같으면 중복으로 판정하고 재처리하지 않는다. 수정본 교체는 기존 문서를 지정하는 별도 교체 요청으로 처리한다.
 - 업로드 URL은 발급 후 15분간 유효하다. 문서 생성 후 1시간 동안 업로드가 완료되지 않으면 `EXPIRED`로 전환하고, 전환 후 24시간 동안 늦은 완료 요청을 복구할 수 있도록 원본을 보존한다. 이후에도 미완료면 Spring이 원본 삭제를 재시도한다.
 - `EXPIRED` 문서의 늦은 완료 요청에서 원본이 남아 있으면 `QUEUED`로 복구하고, 이미 삭제되었으면 새 업로드 권한을 받도록 안내한다.
+- 수정본 교체로 밀려난 원본은 `EXPIRED`가 되며 `replaced_at`이 함께 찍힌다. 이 행은 **복구 대상이 아니다** — 같은 `EXPIRED`라도 "아직 안 올라온 것"과 "이미 다른 원본으로 대체된 것"은 되돌릴 자리가 다르다. 원본 삭제는 기존 `EXPIRED` 스윕이 그대로 처리한다.
+- `FAILED` 문서의 원본은 `updated_at` 기준 7일 유예 후 `EXPIRED`와 같은 스윕 경로에서 삭제한다. 조사·재처리는 유예 기간 안에 한다.
 - 처리 중 임대가 만료되면 문서 원본·메타데이터는 보존하고 Spring은 같은 DB 트랜잭션에서 `DocumentStatus`를 `DISABLED`, 활성 Job을 `CANCELLED`로 전환하고 Chunk·staging을 정리한다. 실행 중 FastAPI 작업에는 멱등 cancel을 전달하며, 전달에 실패해도 늦은 결과는 `attemptNo` fencing으로 거부한다. 재임대 후 활성화할 때는 새 Job을 `QUEUED`부터 다시 처리한다.
 - 처리 도중 서버가 재시작되거나 Worker heartbeat가 끊기면 만료된 실행 작업을 회수해 재시도한다. 최대 3회의 재시도 후에도 완료하지 못하면 실행 작업은 `DEAD`, 문서는 정제된 실패 사유와 함께 `FAILED`가 되며 영원히 `PROCESSING`에 머물지 않는다.
-- 문서가 많은 경우에도 검색 전에 `boothId + agentId + READY`로 범위를 제한한다. AI 직원당 문서는 최대 10개·총 100MB로 제한하고, 최대 허용량에서 검색 응답 P95 1초 이하 및 정답 근거 문서의 Top-K 포함률 95% 이상을 검증한다.
+- 문서가 많은 경우에도 검색 전에 `boothId + agentId + READY`로 범위를 제한한다. AI 직원당 문서는 최대 10개·총 100MB로 제한하고, 최대 허용량에서 검색 응답 P95 1초 이하를 검증한다. Top-K 포함률은 두 층이 다르다 — Spring 검색은 범위 안 모든 청크를 채점하므로 정답 청크가 **100%** 들어와야 하고, 자연어 질의의 **의미** 회수율 95% 이상은 AI 층에서 따로 잰다 (SC-007a·SC-007b).
 - 내부 Service Token 교체 중에는 수신자가 기존·신규 토큰을 먼저 함께 허용한 뒤 송신 토큰을 전환하고, 안정화 확인 후 기존 토큰을 제거해 배포 순서 차이로 `401`이 발생하지 않게 한다.
 - R2 장애 시 자동으로 MinIO로 전환하거나 양쪽에 동시에 쓰지 않는다. 운영자가 검증·승인한 뒤 활성 **쓰기** Provider만 바꾸며, 기존 문서는 문서별 `storageProvider + bucket + objectKey`가 가리키는 저장소에서 계속 읽는다.
 - 업로드를 재개하려는 동안 활성 쓰기 Provider가 바뀌었으면 기존 미완료 문서를 `EXPIRED`로 전환하고 새 문서·새 object key로 업로드를 시작한다.
@@ -92,6 +95,8 @@
 - **FR-004**: 소유자는 AI 직원에 문서를 업로드할 수 있어야 한다.
 - **FR-005**: 문서 처리는 **비동기**여야 하며 다른 기능을 막아서는 안 된다.
 - **FR-006**: 문서는 **`DocumentStatus`(`QUEUED`/`PROCESSING`/`READY`/`FAILED`/`DISABLED`/`EXPIRED`)** 를 가져야 하고 조회할 수 있어야 한다. `EXPIRED`는 사용자에게 **업로드 만료**로 표시한다.
+  다만 **`replaced_at`이 찍힌 `EXPIRED` 행은 목록에서 "교체됨"으로 표시하고 복구 안내를 제공해서는 안 된다** — 같은 상태 값이 화면에서 두 가지 뜻으로 읽히지 않아야 하며, 복구할 수 없는 원본에 복구 버튼을 띄우면 T-24와 같은 "말은 되는데 동작하지 않는" 조합이 된다.
+  **상태 값 자체는 늘리지 않는다.** `replaced_at`은 구분자이지 상태가 아니다 (`DocumentStatus` 6종 유지).
 - **FR-007**: 실패한 문서는 사용자가 이해하고 대응할 수 있도록 정제된 **실패 사유**를 제공해야 하며, 내부 예외·Stack Trace·외부 Provider 원문 오류를 노출해서는 안 된다.
 - **FR-008**: 처리된 문서 조각에는 **boothId, agentId, 임베딩 모델 식별자**가 기록되어야 한다 (헌법 18조).
 - **FR-009**: 임베딩 차원은 **1536으로 고정**한다 (헌법 18조).
@@ -104,7 +109,7 @@
 - **FR-016**: 문서 처리 작업은 **`JobStatus`(`QUEUED`/`RUNNING`/`RETRY_WAIT`/`SUCCEEDED`/`DEAD`/`CANCELLED`)** 를 가져야 한다.
 - **FR-017**: RAG 검색은 FastAPI의 직접 DB 조회가 아니라 Spring 내부 검색 경로만 사용해야 한다. Spring은 `boothId + agentId + searchable=true + DocumentStatus.READY`를 서버에서 강제하고, FastAPI는 반환된 모든 Chunk의 scope를 Context 조립 전에 다시 검증해야 한다.
 - **FR-018**: AI 직원 한 명이 등록할 수 있는 문서는 최대 10개, 총 원본 크기는 100MB로 제한해야 한다.
-- **FR-019**: 동일 AI 직원의 활성 문서 중 파일 SHA-256이 같은 문서가 있으면 중복으로 판정하고 재처리하지 않아야 한다. 수정본 교체는 기존 `documentId`를 지정하는 명시적 요청으로 처리해야 한다.
+- **FR-019**: 동일 AI 직원의 활성 문서 중 파일 SHA-256이 같은 문서가 있으면 중복으로 판정하고 재처리하지 않아야 한다. 수정본 교체는 기존 `documentId`를 지정하는 명시적 요청으로 처리해야 한다. 교체로 밀려난 원본의 상태와 복구 가능 여부는 FR-027a가 정한다.
 - **FR-019a**: 업로드 URL 발급 요청은 파일 SHA-256(`contentSha256`, `^[a-f0-9]{64}$`)을 **필수로** 받아야 한다.
   이 값은 **사전 중복 확인에만** 쓰고 최종 검증이 아니다 — 원본의 실제 해시는 FastAPI가 R2에서 다시 계산해
   대조하며, 불일치하면 Chunk를 저장하지 않고 `failureCode=SOURCE_HASH_MISMATCH`인 `FAILED` callback을 보낸다
@@ -123,7 +128,12 @@
 - **FR-025**: 동일 문서에 활성 실행 작업은 하나만 존재해야 하며, 중복 처리 요청에는 기존 활성 작업을 반환해야 한다.
 - **FR-026**: 업로드 URL의 기본 유효시간은 15분이며, 생성 후 1시간 동안 완료되지 않은 문서는 `EXPIRED`로 전환해야 한다. 만료 판정 주기는 5분을 기본값으로 하되 운영 설정으로 조정할 수 있어야 한다.
 - **FR-027**: `EXPIRED` 전환 후 24시간 동안 원본을 보존해야 한다. 이 기간의 늦은 완료 요청은 원본이 있으면 `QUEUED`로 복구하고, 원본이 없으면 새 업로드 권한이 필요함을 알려야 한다.
+- **FR-027a**: **수정본 교체(FR-019)로 밀려난 원본은 복구 대상에서 제외해야 한다.** 교체된 원본은 `EXPIRED`로 전환하면서 `replaced_at`(신규 컬럼, V30 예정)을 함께 기록하고, 이 값이 있는 행에는 FR-027의 24시간 복구 경로를 적용하지 않는다. 보존 기간 안의 늦은 완료 요청이라도 `QUEUED`로 되돌리지 않고 이미 교체됐음을 알려야 한다. 판정 근거는 **`replaced_at`의 존재 여부 하나**이며 새 `DocumentStatus` 값을 만들지 않는다.
 - **FR-028**: Spring은 `EXPIRED` 전환 후 24시간이 지난 미완료 원본을 R2에서 삭제해야 한다. 삭제 실패 시 `EXPIRED` 상태와 object key를 유지하고 성공할 때까지 재시도해야 한다.
+  **교체된 원본(FR-027a)도 같은 스윕이 같은 조건으로 처리한다** — 스윕의 대상 판정은 `EXPIRED` + 경과 시간뿐이며 `replaced_at`을 보지 않는다. 복구 경로가 없는 행이 삭제 경로에서 빠지면 원본만 무기한 남는다.
+- **FR-028a**: Spring은 `FAILED` 문서의 원본을 `updated_at` 기준 **7일** 유예 후 FR-028과 **같은 스윕 경로**에서 삭제해야 한다. 조사·재처리는 유예 기간 안에 수행한다.
+  물리 삭제는 트랜잭션 밖에서 일어나므로 사후 조건부 `UPDATE`로 되돌릴 수 없다. 따라서 **조회와 삭제 사이에 재처리가 끼어드는 경쟁은 허용하고 `ERROR` 경보로 드러낸다** — 이미 `EXPIRED` 경로가 내린 것과 같은 판단이며, 유예 중 재처리로 `FAILED`를 벗어난 행은 스냅샷 전체 일치 조건에서 자동으로 빠진다.
+  **공유 claim/lock과 영속 삭제 큐는 범위 밖이다** — 스윕 인스턴스가 하나이고 경쟁 창은 한 행의 저장소 왕복 한 번뿐이라, 새 영속 구조를 들이는 비용이 그 창이 막는 손해보다 크다. 경보가 실제로 울리면 그때 도입 근거가 생긴다.
 - **FR-029**: Spring↔FastAPI 내부 호출은 방향별로 분리된 Bearer Service Token을 사용해야 한다. 수신자는 네트워크 차단 설정과 독립적으로 토큰을 항상 검증하고, 누락·오류·반대 방향 토큰은 `401`로 거부해야 한다. Secret은 해당 방향의 송신자와 수신자에만 주입하고 저장소·로그에 기록해서는 안 된다.
 - **FR-030**: 각 문서는 `storageProvider(R2/MINIO_LOCAL) + bucket + objectKey`를 가져야 한다. 신규 업로드는 Spring의 활성 쓰기 Provider를 사용하고, FastAPI는 전역 활성 Provider가 아니라 문서 메타데이터의 저장소 식별자로 원본을 읽어야 한다.
 - **FR-031**: P0의 R2 장애 probe는 운영 판단을 위한 evidence만 수집하며 `UPLOAD_BLOCKED` 전환은 운영자가 수동으로 수행해야 한다. 자동 장애 판정과 자동 상태 전환은 후속 이슈에서 기준이 확정될 때까지 구현하지 않는다. MinIO 전환과 R2 원복은 운영자의 검증·승인이 있어야 하며, 검증된 객체만 reconcile 후 Provider를 R2로 변경해야 한다.
@@ -136,6 +146,9 @@
 - **FR-038**: Spring은 소유권·임대·문서 상태를 검증하고 Job을 먼저 생성한 뒤 FastAPI에 `jobId`, `attemptNo`, `documentId`, `boothId`, `agentId`, 파일명·형식·크기·SHA-256, `storageProvider + bucket + objectKey`, embedding model·chunker version snapshot을 전달해야 한다. FastAPI는 장시간 연결 없이 `202 Accepted`로 비동기 접수하고 이 snapshot으로만 원본을 처리해야 한다.
 - **FR-039**: FastAPI는 처리 결과를 최대 200 Chunk 또는 HTTP body 8MB 중 먼저 도달하는 batch로 Spring에 전송해야 한다. Spring은 `(jobId, batchSeq, chunkNo)` 기준으로 같은 batch를 멱등 수신하고, heartbeat는 현재 `attemptNo + workerId`가 일치할 때만 lease를 연장해야 한다.
 - **FR-040**: Spring은 finalize에서 staging 개수·`chunkNo` 연속성·source hash·embedding model·1536차원을 검증한 뒤 기존 Chunk 교체, 신규 Chunk의 검색 활성화, Job `SUCCEEDED`, Document `READY`를 하나의 로컬 DB 트랜잭션으로 확정해야 한다. 실패하면 기존 검색 가능 Chunk와 Document 상태가 유지되어야 한다.
+- **FR-040a**: **`READY` 전환이 0행이면 finalize 전체를 롤백해야 한다.** 문서가 그 사이 `DISABLED`·`EXPIRED`가 되어 `PROCESSING`이 아니면 `READY`로 올릴 수 없고, 이때 Chunk 교체와 Job `SUCCEEDED`만 커밋되면 **FR-040이 요구한 "하나의 트랜잭션"이 깨진다** — 검색되지 않는 문서에 새 Chunk가 붙고 Job은 성공했다고 말한다. 경고 로그만 남기고 나머지를 커밋해서는 안 된다.
+  롤백하면 `SUCCEEDED` 표시도 취소되므로 재전송이 finalize 멱등 분기(Job이 `SUCCEEDED`일 때만 진입)로 들어가지 못한다. 따라서 이 실패의 응답은 **`410 JOB_GONE`** 이고, **같은 요청을 반복해도 아무것도 바뀌지 않은 채 같은 410** 이어야 한다. 워커가 재시도로 해결할 수 있는 상황이 아니라는 뜻을 그대로 전달하는 코드이며, `409`(stale attempt)와 달리 attempt를 올려 다시 시도해도 결과가 같다.
+  **`DISABLED`·`EXPIRED`가 된 문서를 `PROCESSING`으로 되돌리는 복구 정책은 이 spec의 범위 밖이다.** 임대 만료·업로드 만료는 각각 FR-015·FR-026이 정한 비즈니스 판정이며, finalize가 그것을 뒤집을 자리가 아니다.
 - **FR-041**: 문서 삭제·비활성화·임대 만료 시 Spring은 로컬 DB 트랜잭션에서 활성 Job을 `CANCELLED`로 전환하고 Chunk·staging을 정리해야 한다. 실행 중 FastAPI 작업에는 멱등 cancel을 전송하되 전달 실패가 DB 정합성을 막아서는 안 되며, 늦은 결과는 fencing으로 거부해야 한다.
 - **FR-042**: FastAPI는 query embedding과 서버가 보관한 `boothId + agentId`, `topK`를 Spring 내부 검색 API에 전달해야 한다. Spring은 `boothId + agentId + searchable=true + DocumentStatus.READY`를 강제하고 `topK`를 최대 20으로 제한하며, cosine distance(`distance`, 낮을수록 유사)를 반환해야 한다. 최소 유사도 임계값은 적용하지 않는다.
 
@@ -155,7 +168,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 | `READY` | 처리 완료, RAG 검색 가능 |
 | `FAILED` | 처리 실패, 실패 사유 확인 가능 |
 | `DISABLED` | 원본·메타데이터는 보존하지만 RAG 검색에서 제외 |
-| `EXPIRED` | 업로드 미완료로 만료됨. RAG 처리·검색에서 제외되며 보존 기간 안에는 완료 요청으로 복구 가능 |
+| `EXPIRED` | 원본이 활성 집합에서 빠짐. RAG 처리·검색에서 제외된다. **복구 가능 여부는 `replaced_at`이 가른다** — 값이 없으면 업로드 미완료 만료이며 보존 기간 안에 완료 요청으로 복구할 수 있고(FR-027), 값이 있으면 수정본 교체로 밀려난 원본이라 복구 대상이 아니다(FR-027a). 두 경우 모두 원본 삭제 스윕은 동일하다(FR-028) |
 
 | JobStatus | 의미 |
 |---|---|
@@ -178,7 +191,7 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 ### Key Entities
 
 - **AI Agent**: AI 직원. 부스, 이름, 역할, 지시문, 생성 시각
-- **Document**: 업로드된 문서. 부스, 에이전트, 파일명, 크기, SHA-256, object key, 상태, 실패 사유, 업로드 시각
+- **Document**: 업로드된 문서. 부스, 에이전트, 파일명, 크기, SHA-256, object key, 상태, 실패 사유, 업로드 시각, 만료 시각, **교체 시각(`replaced_at` — 수정본 교체로 밀려난 원본에만 기록, 신규 컬럼 V30 예정)**
 - **Processing Job**: Spring이 생성·영속화하는 문서 처리 실행 단위. 문서 snapshot, 작업 상태, attempt fencing, 재시도 횟수, Worker 소유권과 heartbeat 만료 시각, 다음 재시도 시각, 시작·종료 시각, 내부 실패 정보
 - **Chunk Staging**: FastAPI가 보낸 미확정 batch를 Spring이 finalize 전까지 보관하는 영역. jobId, batchSeq, chunkNo, 텍스트, 임베딩, 모델, 페이지·섹션
 - **Chunk**: finalize가 성공한 문서 조각. 문서, 원본 Job 값, boothId, agentId, 텍스트, 임베딩 벡터, `embedding_model_id`, 검색 가능 여부
@@ -194,14 +207,16 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - **SC-004**: 다른 부스의 문서 조각이 검색된 사례가 **0건** (008의 Critical Test와 연동).
 - **SC-005**: 정의된 문서 처리 실패 코드마다 비어 있지 않은 정제된 한국어 대응 메시지를 제공하고, 메시지에서 Secret·Stack Trace·object key·Provider 원문 오류 노출은 0건이다.
 - **SC-006**: AI 직원당 최대 허용량(문서 10개·총 100MB)에서 검색 응답 시간은 P95 1초 이하다.
-- **SC-007**: 사전에 정답 근거 문서를 지정한 품질 평가 질문에서 해당 문서가 Top-K에 포함되는 비율은 95% 이상이다.
+- **SC-007a** (BE): AI 직원당 최대 부하(`N_total` = **145,646** chunk)에서 Spring 내부 검색이 **정확 스캔을 유지**해, 사전에 지정한 정답 청크가 Top-K에 포함되는 비율이 **100%** 다. 벡터 인덱스의 후필터로 Top-K가 조용히 짧아진 사례는 0건이다. `N_total` 산출 근거는 [plan.md §3](./plan.md)에 있다.
+- **SC-007b** (AI): 사전에 정답 근거 문서를 지정한 자연어 품질 평가 질문에서 해당 문서가 Top-K에 포함되는 **의미 회수율**은 95% 이상이다.
+  SC-007이 하나였을 때 이 둘이 섞여 있었다. Spring 검색은 범위 안 모든 청크를 채점하므로 BE 쪽 포함률은 구조상 100%거나 버그이며, 95%라는 비율을 잴 대상이 아니다. 95%는 질의 문장이 정답 청크와 의미적으로 이어지는가의 문제이고 그것은 임베딩·청킹 품질, 즉 AI 층의 책임이다.
 - **SC-008**: 처리 서버 강제 종료 시험에서 중단된 작업의 100%가 자동 회수되어 재시도되거나 최종 실패로 종료된다.
 - **SC-009**: AI 처리 서비스 중단 중에도 사용자는 기존 문서 목록과 마지막 처리 상태를 조회할 수 있다.
-- **SC-010**: 업로드 미완료 문서는 생성 후 1시간과 다음 5분 판정 주기 안에 100% `EXPIRED`로 전환되고, 보존 기한이 지난 원본은 삭제되거나 재시도 대상으로 남는다.
+- **SC-010**: 업로드 미완료 문서는 생성 후 1시간과 다음 5분 판정 주기 안에 100% `EXPIRED`로 전환되고, 보존 기한(`EXPIRED` 24시간 · `replaced_at`이 찍힌 교체 원본 동일 · `FAILED` `updated_at` 기준 7일)이 지난 원본은 삭제되거나 재시도 대상으로 남는다. `replaced_at`이 찍힌 행이 늦은 완료 요청으로 복구된 사례는 **0건**이며, 조회와 삭제 사이 재처리가 끼어든 경쟁은 삭제를 막지 않되 100% `ERROR` 경보로 남는다.
 - **SC-011**: 두 내부 API에서 유효한 방향 토큰만 허용하고 누락·오류·반대 방향 토큰은 100% `401`로 거부하며, `[old] → [old,new] → [new,old] → [new]` 회전 검증 중 정상 호출 실패는 0건이다.
 - **SC-012**: R2 차단→운영자 승인→MinIO 전환→문서별 Provider 읽기→R2 reconcile→승인 원복 시험에서 자동 Provider 변경과 이중 쓰기는 0건이고, 검증되지 않은 객체의 Provider 변경은 0건이다.
 - **SC-013**: 배포 환경의 FastAPI에 문서 PostgreSQL credential이 주입된 사례와 문서 DB 연결 시도가 모두 0건이며, AI 문서 영속 상태를 변경하는 경로는 Spring 내부 API뿐이다.
-- **SC-014**: 중복·순서 변경·누락 batch, finalize 직전 장애, cancel 경합, 오래된 attempt 결과 시험에서 Chunk 중복과 부분 교체가 0건이고 삭제·비활성 문서가 검색된 사례가 0건이다.
+- **SC-014**: 중복·순서 변경·누락 batch, finalize 직전 장애, cancel 경합, 오래된 attempt 결과 시험에서 Chunk 중복과 부분 교체가 0건이고 삭제·비활성 문서가 검색된 사례가 0건이다. `READY`로 전환할 수 없는 문서의 finalize는 100% 전부 롤백되어 Job이 `SUCCEEDED`로 남은 사례가 0건이며, 같은 요청을 반복해도 상태 변화 없이 같은 `410`을 받는다.
 
 ---
 
@@ -230,14 +245,14 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 ### Session 2026-08-20
 
 - Q: 처리 중 임대가 만료되면 문서와 실행 작업을 어떻게 처리하는가? → A: 원본·메타데이터는 보존하고 문서는 `DISABLED`, 작업은 `CANCELLED`로 전환하며 재임대 후 `QUEUED`부터 다시 처리한다.
-- Q: 문서가 많은 경우 검색 품질과 속도를 어떻게 보장하는가? → A: `boothId + agentId + READY` 선필터, AI 직원당 10개·총 100MB 상한, P95 1초 이하·Top-K 포함률 95% 이상을 적용한다.
+- Q: 문서가 많은 경우 검색 품질과 속도를 어떻게 보장하는가? → A: `boothId + agentId + READY` 선필터, AI 직원당 10개·총 100MB 상한, P95 1초 이하·Top-K 포함률 95% 이상을 적용한다. → **포함률 부분은 2026-09-11 결정으로 SC-007a(BE 100%)·SC-007b(AI 95%)로 갈렸다.**
 - Q: C-01~C-07의 권장안과 C-03 변경안을 확정하는가? → A: C-03은 SHA-256 중복 방지·명시적 교체 변경안을 적용하고, 나머지는 표의 권장안을 확정한다. 서버 재시작 복구 저장 방식은 Issue #11 합의대로 C-04와 상태 모델에 반영한다.
 - Q: 처리 서버 재시작과 Worker heartbeat 만료를 어떻게 복구하는가? → A: 사용자 문서 상태와 내부 실행 상태를 분리하고, 영속 Job을 heartbeat 30초·lease 90초·sweeper 60초 기준으로 회수한다. 최대 3회 재시도(1·5·15분 대기) 후 `DEAD → FAILED`로 종료한다.
 - Q: Worker lease 만료와 부스 임대 만료는 같은가? → A: 다르다. Worker lease 만료는 `RETRY_WAIT`로 복구하며, 부스 임대 만료는 `CANCELLED → DISABLED`로 처리한다.
 
 ### Session 2026-08-25
 
-- Q: 업로드 미완료 문서는 어떻게 정리하는가? → A: 업로드 URL은 15분, 미완료 문서는 생성 후 1시간에 `EXPIRED`, 24시간 보존 후 Spring이 R2 원본을 삭제한다. 보존 기간 내 늦은 완료는 원본이 있으면 `QUEUED`로 복구한다.
+- Q: 업로드 미완료 문서는 어떻게 정리하는가? → A: 업로드 URL은 15분, 미완료 문서는 생성 후 1시간에 `EXPIRED`, 24시간 보존 후 Spring이 R2 원본을 삭제한다. 보존 기간 내 늦은 완료는 원본이 있으면 `QUEUED`로 복구한다. → **복구 조건은 2026-09-11 결정으로 좁혀졌다 — `replaced_at`이 찍힌 교체 원본은 제외한다(FR-027a).**
 - Q: Spring↔FastAPI 내부 API 인증과 토큰 회전은 어떻게 하는가? → A: 방향별 토큰을 콤마 목록으로 주입하고 첫 값만 송신하며 수신자는 최대 2개 값을 상수 시간으로 검증한다. 회전은 `[old] → [old,new] → [new,old] → [new]` 순서로 수행하고 mTLS는 P2로 둔다.
 - Q: R2 장애 시 저장소를 어떻게 전환하는가? → A: 자동 failover·이중 쓰기·자동 원복 없이 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE`를 운영자 승인으로 전환한다. 신규 쓰기는 Spring 설정을 따르고 기존 읽기는 문서별 Provider를 따른다. C-10의 잔여 항목은 추가 합의 전 구현자가 정하지 않는다.
 - Q: 저장소 장애로 `DEAD`가 된 Job을 저장소 복구 후 자동으로 재처리하는가? → A: 하지 않는다. Spring Job은 `DEAD`, Document는 `FAILED`로 유지한다. 복구 후에는 reconcile 완료를 확인한 뒤 명시적 재처리 요청으로 새 Spring Job을 만든다.
@@ -264,6 +279,15 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - Q: 결과를 어떻게 원자적으로 공개하는가? → A: FastAPI가 batch로 staging에 보내고 Spring finalize가 검증·Chunk 교체·`searchable=true`·Job `SUCCEEDED`·Document `READY`를 하나의 로컬 트랜잭션으로 확정한다.
 - Q: 검색 경계는 어디에서 강제하는가? → A: Spring 내부 검색 API가 `boothId + agentId + searchable=true + READY`를 강제하고 FastAPI가 반환 scope를 다시 검증한다. cosine `distance`를 그대로 반환하며 최소 임계값은 두지 않는다.
 
+### Session 2026-09-11
+
+- Q: 수정본 교체로 밀려난 원본은 어떤 상태이며 복구할 수 있는가? → A: `EXPIRED` + `replaced_at`이고 **복구 대상이 아니다**(FR-027a). 기존 `EXPIRED` 정의가 "보존 기간 안에는 복구 가능"이라 교체 원본과 충돌했는데, 상태를 늘리는 대신 구분자 컬럼 하나로 가른다. 목록 표시(FR-006)·복구(FR-027)·삭제 스윕(FR-028)·State Model·SC-010을 함께 맞췄다.
+- Q: `REPLACED` 상태를 새로 만들지 않는 이유는? → A: **상태 하나를 늘리면 V24 CHECK 개정·스윕 predicate·OpenAPI·FE 상태표·기존 테스트가 전부 따라오는데, 갈라야 하는 것은 "복구 가능한가" 한 가지뿐이라 컬럼 하나로 충분하다.**
+- Q: 최대 허용량에서 Top-K 포함률 95%는 누구의 기준인가? → A: 둘로 나눈다. Spring 검색은 `SET LOCAL enable_indexscan = off`로 정확 스캔을 강제해 범위 안 모든 청크를 채점하므로 BE 쪽은 **100%**(SC-007a, `S15P21A604-521`, Testcontainers)이고, 95%는 자연어 질의의 의미 회수율(SC-007b, T067, AI)이다. 구조상 100%인 값에 95%를 걸면 버그를 통과시킨다.
+- Q: 최대 부하 픽스처의 `N_total`은? → A: **145,646 chunk.** 산출은 plan.md §3.
+- Q: `FAILED` 문서의 원본은 언제 지우는가? → A: `updated_at` 기준 7일 유예 후 `EXPIRED`와 같은 스윕 경로(FR-028a). 조회와 삭제 사이 재처리 경쟁은 허용하고 `ERROR` 경보로 드러내며, 공유 claim/lock·영속 삭제 큐는 범위 밖이다.
+- Q: finalize의 `READY` 전환이 0행이면? → A: 예외를 던져 finalize 전체를 롤백하고 `410 JOB_GONE`을 돌려준다(FR-040a). 반복 요청도 무변화 410이다. 지금 구현은 ERROR 로그만 남기고 나머지를 커밋해 FR-040을 어기고 있다. `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 범위 밖이다.
+
 ---
 
 ## Out of Scope
@@ -274,6 +298,8 @@ JobStatus: QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED
 - 문서 자동 요약·태깅
 - 스캔 이미지 PDF OCR
 - 내부 API mTLS 인증서 발급·갱신·폐기 자동화(P2 보안 강화)
+- `DISABLED`·`EXPIRED`가 된 문서를 `PROCESSING`으로 되돌리는 복구 정책 (FR-040a)
+- 원본 삭제 스윕의 공유 claim/lock과 영속 삭제 큐 (FR-028a — 경쟁은 허용하고 `ERROR` 경보로 드러낸다)
 
 ---
 

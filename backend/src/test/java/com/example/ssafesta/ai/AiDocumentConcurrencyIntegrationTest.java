@@ -155,6 +155,65 @@ class AiDocumentConcurrencyIntegrationTest {
         assertNotNull(documents.findById(grant.documentId()).orElseThrow().getUploadedAt());
     }
 
+    /**
+     * 한 원본에 서로 다른 파일로 교체가 동시에 걸리면 <b>살아 있는 교체본은 정확히 하나</b>다.
+     *
+     * <p>{@code ux_ai_documents_active_replacement} 는 최후 방어선이고, 최후 방어선에 걸리면 500
+     * 이다. 실제로 막는 것은 agent 행 잠금 하나다 — 둘 다 "교체본이 없다" 를 읽으면 한 원본을
+     * 가리키는 활성 행이 둘이 되고, finalize 가 둘 다 같은 원본을 물리려 든다.
+     *
+     * <p>진 쪽이 오류가 아니라는 것도 함께 본다. 나중에 온 요청이 사용자의 최신 의사이므로 앞선
+     * 발급을 버리고 새로 시작한다 — 버려진 행은 {@code EXPIRED} 이고 {@code replaced_at} 은 찍히지
+     * 않는다 (FR-027a).
+     */
+    @RepeatedTest(5)
+    void twoRacingReplacementsLeaveExactlyOneLiveSuccessor() throws Exception {
+        Owner owner = agentOwner("교체경합");
+        long original = seedReady(owner, shaOf(300));
+
+        List<Outcome<AiDocumentService.UploadGrantView>> outcomes = new ArrayList<>();
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Outcome<AiDocumentService.UploadGrantView>>> futures = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                String sha = shaOf(400 + i);
+                String name = "v2-" + i + ".pdf";
+                futures.add(pool.submit(() -> call(() -> {
+                    await(start);
+                    return documentService.replace(original, owner.userId(),
+                            new AiDocumentService.UploadCommand(name, "application/pdf",
+                                    ONE_MB, sha));
+                })));
+            }
+            start.countDown();
+            for (Future<Outcome<AiDocumentService.UploadGrantView>> future : futures) {
+                outcomes.add(future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        outcomes.forEach(outcome -> {
+            if (!outcome.succeeded()) {
+                throw new AssertionError("교체 발급이 실패했다", outcome.failure());
+            }
+        });
+        assertEquals(1, countBy("""
+                SELECT COUNT(*) FROM ai_documents WHERE replaces_document_id = ?
+                  AND processing_status IN ('QUEUED', 'PROCESSING', 'READY')
+                """, original), "한 원본에 살아 있는 교체본이 하나가 아니다");
+        assertEquals(0, countBy("""
+                SELECT COUNT(*) FROM ai_documents
+                 WHERE replaces_document_id = ? AND replaced_at IS NOT NULL
+                """, original), "버려진 발급에 replaced_at 이 찍혔다");
+        assertEquals("READY", jdbc.queryForObject(
+                "SELECT processing_status FROM ai_documents WHERE id = ?", String.class, original),
+                "교체를 거는 것만으로 원본이 물러났다");
+        // 교체본이 원본의 자리를 이어받으므로 한 자리 그대로다.
+        assertEquals(1, documents.countActive(owner.agentId()));
+    }
+
     // ── 실행 도구 ────────────────────────────────────────────────────────────
 
     private <T> List<Outcome<T>> together(int threads, Callable<T> action) throws Exception {
@@ -202,15 +261,21 @@ class AiDocumentConcurrencyIntegrationTest {
 
     // ── 준비 ────────────────────────────────────────────────────────────────
 
-    private void seedReady(Owner owner, String sha) {
-        jdbc.update("""
+    private long seedReady(Owner owner, String sha) {
+        return jdbc.queryForObject("""
                 INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
                     size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
                     storage_provider, storage_bucket, uploaded_at)
                 VALUES (?, ?, 'seed.pdf', 'application/pdf', ?, ?, 'READY', ?, ?,
                     'R2', 'test-ai-documents', now())
-                """, owner.boothId(), owner.agentId(), ONE_MB,
+                RETURNING id
+                """, Long.class, owner.boothId(), owner.agentId(), ONE_MB,
                 "seed/" + owner.agentId() + "/" + sha, owner.userId(), sha);
+    }
+
+    private int countBy(String sql, Object... arguments) {
+        Integer found = jdbc.queryForObject(sql, Integer.class, arguments);
+        return found == null ? 0 : found;
     }
 
     private static String shaOf(int index) {

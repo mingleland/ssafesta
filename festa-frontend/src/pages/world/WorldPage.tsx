@@ -23,6 +23,17 @@ import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
+import { WorldChatLayer } from '../../features/worldChat/ui/WorldChatLayer';
+import {
+  WORLD_CHAT_INPUT_ID,
+  canUseWorldChat,
+  closeWorldChat,
+  getWorldChatSnapshot,
+  openWorldChat,
+  resolveEnterAction,
+  sendWorldChat,
+  startWorldChat,
+} from '../../features/worldChat/model/worldChat';
 import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
@@ -102,6 +113,12 @@ export function WorldPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      // 채팅이 열려 있으면 그것부터 닫는다. 입력창을 두고 Game Menu 가 열리면 글을 쓰다 말고
+      // 메뉴가 덮는다.
+      if (getWorldChatSnapshot().open) {
+        closeWorldChat();
+        return;
+      }
       if (closeTopScreen()) return;
 
       if (hasUnityModal()) {
@@ -121,12 +138,42 @@ export function WorldPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Enter 판정자도 한 곳이다 — ESC 와 같은 이유다. 채팅 화면이 자기 리스너를 걸면 등록 순서로만
+  // 갈리는 그 계열의 버그가 돌아온다 (S15P21A604-706).
+  useEffect(() => {
+    const stopChat = startWorldChat();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Enter') return;
+      // 조합 중 Enter·Shift+Enter 를 거르는 규칙까지 resolveEnterAction 이 갖는다 — 규칙을 두
+      // 곳에 두면 갈린다.
+      const chat = getWorldChatSnapshot();
+      const action = resolveEnterAction(e, {
+        open: chat.open,
+        inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
+        member: canUseWorldChat(),
+      });
+      if (action === 'ignore') return;
+      e.preventDefault();
+      if (action === 'send') sendWorldChat(chat.draft);
+      else openWorldChat();
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      stopChat();
+    };
+  }, []);
+
   return (
     <div className="world-scene">
       {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
           여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
       {inWorld && <WorldHud />}
+      {/* 채팅 — HUD 밖이다. HUD 의 mousedown 차단이 입력창 focus 를 막는다 (S15P21A604-648) */}
+      {inWorld && <WorldChatLayer />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}

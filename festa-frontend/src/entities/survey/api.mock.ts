@@ -63,9 +63,12 @@ const EVENT_SURVEY_IDS: Record<string, number> = {
 
 const MOCK_REWARD_COIN = 5;
 
-function apiError(code: string, message: string): ApiError {
-  return { code, message, errors: [], warnings: [] };
+function apiError(code: string, message: string, errors: ApiError['errors'] = []): ApiError {
+  return { code, message, errors, warnings: [] };
 }
+
+/** 보상 상한 — 서버 `app.survey.*` 기본값 10 (GitLab #133). 기획 확정 시 값만 바뀐다 */
+export const MOCK_REWARD_COIN_MAX = 10;
 
 let submitted: Record<string, SurveyAnswerValue> | null = null;
 let submittedSurveyId: number | null = null;
@@ -153,6 +156,12 @@ export const surveyMockPort: SurveyPort = {
   // title 'FAIL' = 저장 실패 시나리오
   async saveDraft(boothId: number, draft: SurveyDraftVM): Promise<void> {
     if (draft.title === 'FAIL') throw apiError('UNKNOWN', '일시적인 오류입니다.');
+    // 상한 초과는 서버가 400 VALIDATION_FAILED + errors[0].field 로 거절한다 (docs/08 §1.3-1)
+    if (draft.rewardCoin > MOCK_REWARD_COIN_MAX) {
+      throw apiError('VALIDATION_FAILED', '입력값을 확인해 주세요.', [
+        { rule: 'FIELD_INVALID', field: 'rewardCoin', message: `보상 코인은 ${MOCK_REWARD_COIN_MAX} 이하여야 합니다.` },
+      ]);
+    }
     savedDraft = { boothId, draft: structuredClone(draft) };
   },
 };

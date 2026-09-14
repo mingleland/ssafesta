@@ -176,9 +176,9 @@ namespace Festa.Integration
             var session = ParseOrNull<WorldSessionDto>(body, "world-sessions");
             if (session == null) return null;
 
-            if (session.endpoint == null || string.IsNullOrEmpty(session.endpoint.host) || session.endpoint.port == 0)
+            if (!WorldSessionEndpoint.TryGetConnectionData(session, out _, out _, out _))
             {
-                Debug.LogError("[HttpUserApi] world-session 응답에 endpoint 가 없다 — 접속 불가");
+                Debug.LogError("[HttpUserApi] world-session 응답 endpoint 가 유효하지 않다 — 접속 불가");
                 return null;
             }
 

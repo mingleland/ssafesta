@@ -53,6 +53,10 @@ namespace Festa.Core
         const float CooldownAfterUp = 20f;     // 올라간 뒤는 더 길게 — 올렸다 내렸다가 제일 나쁘다
         const int MinInterval = 1, MaxInterval = 4;
 
+        // 상향 탐침 — 실패하면 기다리는 시간을 두 배로 늘리고 상한에서 멈춘다.
+        const float ProbeBackoffStart = 20f;
+        const float ProbeBackoffMax = 240f;
+
         const float ReportSeconds = 30f;   // 릴리스 관측용 요약 주기
         const int RingSize = 2048;
 
@@ -62,6 +66,15 @@ namespace Festa.Core
         int _interval = -1;      // 현재 vSyncCount. -1 = 아직 결정 전
         float _cooldownUntil;
         int _cleanWindows;
+
+        // ── 상향 탐침 ────────────────────────────────────────────
+        /// <summary>탐침으로 올려 둔 상태인가. 이 창의 결과로 유지/복귀를 정한다.</summary>
+        bool _probing;
+        /// <summary>탐침이 실패했을 때 되돌아갈 자리.</summary>
+        int _probeFallback;
+        /// <summary>다음 탐침까지 기다릴 시간. 실패할수록 늘린다 — 계속 헛도는 것이 제일 나쁘다.</summary>
+        float _probeBackoff = ProbeBackoffStart;
+        float _nextProbeAt;
 
         // 관측 창
         float _windowStart;
@@ -100,6 +113,15 @@ namespace Festa.Core
 
             float now = Time.unscaledTime;
             if (now < WarmupSeconds) { _windowStart = now; return; }   // 로딩 구간은 판단 대상이 아니다
+
+            // **화면이 앞에 없을 때의 프레임은 판단에 쓰지 않는다.** 탭이 뒤로 가면 브라우저가 rAF 를
+            // 늦추거나 멈춘다 — 그 간격을 "못 버틴다" 로 읽으면 돌아왔을 때 이미 한 단계 내려가 있다.
+            // 창을 통째로 버리고 다시 시작한다(남은 표본과 섞지 않는다).
+            if (!Application.isFocused)
+            {
+                _windowStart = now; _windowFrames = _windowMisses = 0; _cleanWindows = 0;
+                return;
+            }
 
             ResolveRefreshRate();
             if (_hz <= 0) return;
@@ -184,29 +206,61 @@ namespace Festa.Core
 
             if (now < _cooldownUntil) return;
 
+            // 탐침 중이었다면 이 창의 결과로 유지할지 되돌릴지 정한다.
+            if (_probing)
+            {
+                _probing = false;
+                // **합격선은 상향 기준(2%)이다.** 처음에 하향 기준(20%)을 썼다가 미스 16.6% 짜리를
+                // "성공" 으로 붙잡아 120fps 에 눌러앉혔고, 배포본에서 p95 954ms · 최대 1.78초 정지가 났다
+                // (2026-09-14 실측). 올라간 자리를 **지킬 수 있을 때만** 남는다 — 간신히 버티는 것은 실패다.
+                if (missRate > StepUpMissRate)
+                {
+                    Apply(_probeFallback, $"탐침 실패 — 예산 {budgetMs:F1}ms 를 {missRate * 100f:F1}% 놓쳤다, 되돌린다");
+                    _probeBackoff = Mathf.Min(_probeBackoff * 2f, ProbeBackoffMax);
+                    _nextProbeAt = now + _probeBackoff;
+                    _cooldownUntil = now + CooldownAfterDown;
+                }
+                else
+                {
+                    Debug.Log($"[DisplayRefreshAdapter] 탐침 성공 — 목표 {_hz / (float)_interval:F0}fps 를 미스 {missRate * 100f:F1}% 로 지킨다");
+                    _probeBackoff = ProbeBackoffStart;
+                    _nextProbeAt = now + CooldownAfterUp;
+                    _cooldownUntil = now + CooldownAfterUp;
+                }
+                _cleanWindows = 0;
+                return;
+            }
+
             if (missRate > StepDownMissRate && _interval < MaxInterval)
             {
                 _cleanWindows = 0;
                 Apply(_interval + 1,
                     $"예산 {budgetMs:F1}ms 를 {missRate * 100f:F0}% 놓쳤다 — 못 버틴다, 한 단계 내린다");
                 _cooldownUntil = now + CooldownAfterDown;
+                _nextProbeAt = now + _probeBackoff;
                 return;
             }
 
-            if (missRate < StepUpMissRate && _interval > MinInterval)
+            // ── 상향은 **탐침으로만** 한다 ──────────────────────────────────
+            //
+            // 예전에는 "올라간 예산으로도 버티는가" 를 지금 프레임 간격으로 계산했다. **그 방법은 원리적으로
+            // 절대 통과할 수 없다.** vSync 로 묶여 있으면 모든 프레임 간격이 현재 예산 이상으로 나오기 때문이다 —
+            // vSync4(33.3ms)에서 다음 예산 기준선은 25×1.3=32.5ms 라 **모든 프레임이 미스**로 세어진다.
+            // vSync2(16.7ms)에서도 기준선 10.8ms 라 마찬가지다. 결과적으로 이 장치는 **한 번 내려가면 영영
+            // 못 올라오는 일방통행**이었고, 씬이 아무리 가벼워져도 30fps 에 갇혔다
+            // (2026-09-14 배포본 실측: 전 구역 vSync4 고정, p50 33~42ms).
+            //
+            // 스로틀된 간격으로는 여유를 알 수 없다. **실제로 한 단계 올려 보고 한 창을 재는 것**이 유일한 방법이다.
+            // 실패하면 즉시 되돌리고 다음 시도까지 기다리는 시간을 두 배로 늘린다 — 올렸다 내렸다를 반복하는 것이
+            // 제일 나쁘기 때문이다(2026-09-09 d1165eb3 실측: 23초 주기로 3초씩 헛도는 왕복).
+            if (missRate < StepUpMissRate && _interval > MinInterval && now >= _nextProbeAt)
             {
-                // **올라간 뒤의 예산으로도 버틸 수 있는가** 를 본다. 지금 예산(16.7ms)을 1.3배 여유 안에서 지키는
-                // 17ms 프레임은 올라간 예산(8.3ms)에서는 전부 미스다 — 2026-09-09 릴리스 d1165eb3 실측: vSync 2 에서
-                // 미스 1.1% 라 1 로 올리고, 3초 뒤 100% 미스로 다시 2 로. 23초 주기로 3초씩 120fps 를 헛도는 왕복이었다.
-                float nextBudgetMs = 1000f / _hz * (_interval - 1);
-                float nextMiss = MissRateAgainst(nextBudgetMs * MissSlack, _windowFrames);
-                if (nextMiss > StepUpMissRate) { _cleanWindows = 0; return; }   // 올려도 못 버틴다 — 지금 자리가 착지점
-
                 if (++_cleanWindows < StepUpCleanWindows) return;
                 _cleanWindows = 0;
+                _probing = true;
+                _probeFallback = _interval;
                 Apply(_interval - 1,
-                    $"{StepUpCleanWindows}창 연속 놓친 프레임 {missRate * 100f:F1}%, 올라간 예산 {nextBudgetMs:F1}ms 기준도 {nextMiss * 100f:F1}% — 여유가 있다, 한 단계 올린다");
-                _cooldownUntil = now + CooldownAfterUp;
+                    $"{StepUpCleanWindows}창 연속 미스 {missRate * 100f:F1}% — 한 단계 올려 **탐침**한다 (실패하면 {_probeFallback} 로 되돌린다)");
                 return;
             }
 

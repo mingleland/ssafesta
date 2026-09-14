@@ -71,7 +71,7 @@ class BoothLayoutConcurrencyIntegrationTest {
         editors[0] = ownerId;
         for (int index = 1; index < WRITERS; index++) {
             Long staffId = createMemberWithWallet(users, wallets, "직원" + index);
-            staffs.save(new BoothStaff(boothId, staffId, "EDITOR"));
+            staffs.save(new BoothStaff(boothId, staffId, "CONTENT_EDITOR"));
             editors[index] = staffId;
         }
         return editors;

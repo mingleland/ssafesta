@@ -12,7 +12,8 @@ if SECRET_CANARY=FESTA_RUNTIME_CANARY_71ab2c bash "${repo_root}/infra/jenkins/sc
   echo 'canary in cache was not detected' >&2; exit 1
 fi
 grep -q 'infra/jenkins/scripts/secret-scan.sh --path .' "${repo_root}/.gitlab-ci.yml"
-grep -q 'infra/jenkins/scripts/secret-scan.sh --path .' "${repo_root}/Jenkinsfile"
+grep -q 'infra/jenkins/scripts/secret-scan.sh --tracked --path .' "${repo_root}/Jenkinsfile"
+grep -q 'infra/jenkins/scripts/secret-scan.sh --path artifacts' "${repo_root}/Jenkinsfile"
 grep -q 'infra/jenkins/scripts/with-credentials.sh' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
 grep -q 'archiveArtifacts artifacts: .artifacts/develop/dev-batch-result.json' "${repo_root}/infra/jenkins/pipelines/develop.groovy"
 grep -q 'Credentials/ManageDomains' "${repo_root}/infra/jenkins/casc/authorization.yaml"
