@@ -17,8 +17,10 @@ import { setMemberSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { NicknameForm } from '../../features/auth/ui/NicknameForm';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
-import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.png';
-import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.png';
+// WebP (S15P21A604-733). 콜백은 로그인 왕복의 착지점이라 여기서도 같은 자산을 받는다 —
+// 한쪽만 바꾸면 PNG 가 번들에 그대로 남아 전환의 의미가 없다.
+import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.webp';
+import landingBackgroundUrl from '../../assets/festa/backgrounds/landing-background.webp';
 import './callbackPage.css';
 
 type Phase = 'completing' | 'nickname-required' | 'restart' | 'suspended';

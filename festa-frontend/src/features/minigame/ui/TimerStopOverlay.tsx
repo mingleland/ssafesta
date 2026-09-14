@@ -143,12 +143,12 @@ export function TimerStopOverlay() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [start, stopAndSubmit]);
 
-  const target = phase.kind === 'RUNNING' || phase.kind === 'SUBMITTING' ? phase.session.targetSeconds : null;
-
+  // 목표 초는 부제가 아니라 플레이 영역 안에 둔다 (S15P21A604-733) — 달리는 중에 읽어야 하는 값이
+  // 제목 옆 작은 글씨에 있으면 눈이 가지 않는다. 부제는 항상 같은 안내로 둔다.
   return (
     <OverlayFrame
       title="타이밍 스톱"
-      subtitle={target === null ? '목표 시간에 맞춰 멈추세요' : `목표 ${target.toFixed(3)}초`}
+      subtitle="목표 시간에 맞춰 멈추세요"
       size="m"
       icon={IcTimer}
       onClose={closeOverlay}
@@ -198,6 +198,9 @@ function Body({ phase, elapsed, onRetry }: { phase: TimerStopPhase; elapsed: num
     const shown = phase.kind === 'RUNNING' ? elapsed : phase.stoppedSeconds;
     return (
       <div className="ts-stage">
+        <p className="ts-target">
+          목표 <strong className="ts-target-value">{phase.session.targetSeconds.toFixed(3)}</strong>초
+        </p>
         <span className="ts-clock" aria-live="off">{shown.toFixed(3)}</span>
         <p className="ov-note">
           {phase.kind === 'RUNNING' ? `${phase.session.failAfterSeconds.toFixed(3)}초를 넘기면 실패예요` : '결과를 보내는 중...'}
