@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { createApiGameDraftRepository, createApiGamePublisher } from '../../studio/ports/gameAuthoringApi.ts';
+import { createApiGameDraftRepository, createApiGamePublisher, createApiGameVisibilityPort } from '../../studio/ports/gameAuthoringApi.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { GameStudioShell } from '../../studio/ui/GameStudioShell.tsx';
 import { createEditorStressProject } from '../../studio/model/createEditorStressProject.ts';
@@ -24,6 +24,9 @@ export const EditGamePage = () => {
   const serverPublisher = useMemo(() => (
     serverAuthoringEnabled ? createApiGamePublisher() : undefined
   ), [serverAuthoringEnabled]);
+  const serverVisibilityPort = useMemo(() => (
+    serverAuthoringEnabled ? createApiGameVisibilityPort() : undefined
+  ), [serverAuthoringEnabled]);
   const browserPublicationPorts = useMemo(() => (
     browserPublicationEnabled ? createBrowserPublicationPorts() : null
   ), [browserPublicationEnabled]);
@@ -42,6 +45,7 @@ export const EditGamePage = () => {
       persistenceLabel={stressFixtureEnabled ? '최대 부하 검증' : serverAuthoringEnabled ? '서버' : browserPublicationEnabled ? '브라우저(Mock)' : '브라우저'}
       publisher={stressFixtureEnabled ? null : serverPublisher ?? browserPublicationPorts?.publisher}
       repository={stressFixtureEnabled ? null : serverDraftRepository}
+      visibilityPort={stressFixtureEnabled ? null : serverVisibilityPort ?? null}
     />
   );
 };
