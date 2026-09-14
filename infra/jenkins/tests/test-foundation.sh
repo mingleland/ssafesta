@@ -234,6 +234,12 @@ grep -q "permission('hudson.model.Item.Build', 'unity-mr-validator')" "${unity_m
   || fail "Unity MR validator cannot build its own job"
 grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
   || fail "Unity MR validation does not use Unity agent"
+grep -q "gitlabCommitStatus(name: 'unity-mr-validation')" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not publish the required GitLab status context"
+grep -q 'with-credentials.sh -- bash ci/test' "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not use the credential-masking command wrapper"
+grep -q '^set +x$' "${repo_root}/infra/jenkins/scripts/with-credentials.sh" \
+  || fail "credential wrapper does not disable shell command echoing"
 for forbidden in 'ci/build' 'ci/package' 'docker compose' 'deploy-component.sh' 'deploy-dev-batch.sh' 'deploy-release.sh' 'promote-release.sh'; do
   ! grep -Fq "${forbidden}" "${unity_mr_pipeline}" \
     || fail "Unity MR validation contains forbidden ${forbidden}"
