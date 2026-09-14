@@ -1,5 +1,7 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.project.Project;
+import com.example.ssafesta.project.ProjectRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -31,13 +33,16 @@ public class BoothQueryService {
     private final BoothRepository booths;
     private final BoothLeaseRepository leases;
     private final BoothAccessGuard accessGuard;
+    private final ProjectRepository projects;
 
     public BoothQueryService(BoothSlotRepository slots, BoothRepository booths,
-                             BoothLeaseRepository leases, BoothAccessGuard accessGuard) {
+                             BoothLeaseRepository leases, BoothAccessGuard accessGuard,
+                             ProjectRepository projects) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.accessGuard = accessGuard;
+        this.projects = projects;
     }
 
     /**
@@ -102,14 +107,42 @@ public class BoothQueryService {
      *
      * <p>The laptop is an object inside the published layout, so that predicate lines up exactly
      * with the moment a visitor could click it — there is no window where the URL is readable but
-     * unreachable. An unregistered URL is {@code null} too, which lets the overlay decide
-     * "unregistered or unpublished" from one value instead of two (FR-009, research R-05).
+     * unreachable. A booth with neither a registered URL nor a project service address
+     * ({@link #projectServiceUrl}) is {@code null} too, which lets the overlay decide "nothing to
+     * open" from one value instead of three (FR-009, research R-05).
      *
      * <p>Expiry needs no branch here: {@link #findPublicBooth} has already refused with
      * {@code BOOTH_LEASE_EXPIRED} by this point.
      */
     private String visibleHomepageUrl(Booth booth) {
-        return booth.isPublished() ? booth.getHomepageUrl() : null;
+        if (!booth.isPublished()) {
+            return null;
+        }
+        if (booth.getHomepageUrl() != null) {
+            return booth.getHomepageUrl();
+        }
+        return projectServiceUrl(booth);
+    }
+
+    /**
+     * The laptop falls back to the project's <b>service address</b> (2026-09-14 결정).
+     *
+     * <p>{@code booths.homepage_url} has an endpoint but no screen — nothing in the frontend calls
+     * {@code PUT /booths/{id}/homepage}, so in practice the column is always empty and the laptop
+     * was unreachable for every booth that ever existed. The one place an owner actually types an
+     * address for their own service is 프로젝트 관리's "서비스 주소" ({@code projects.deploy_url}),
+     * and that is the address they expect the laptop to open.
+     *
+     * <p><b>Registered beats derived.</b> A value someone put in {@code homepage_url} is an explicit
+     * choice, so it wins; this only fills the hole underneath it. Which means the fallback
+     * disappears on its own the day the registration screen ships — nothing to undo.
+     *
+     * <p><b>Visitor path only.</b> {@link MyBoothView} still reports the stored column verbatim: it
+     * is the owner's prefill, and prefilling a form with a value that was never registered would
+     * make them save a copy of it under a different name.
+     */
+    private String projectServiceUrl(Booth booth) {
+        return projects.findByBoothId(booth.getId()).map(Project::getDeployUrl).orElse(null);
     }
 
     /**

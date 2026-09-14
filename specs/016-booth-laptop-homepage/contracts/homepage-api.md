@@ -65,7 +65,21 @@ Content-Type: application/json
 }
 ```
 
-**노출 게이트 (FR-003)**: `publishedLayoutVersion`이 `null`이면 `homepageUrl`도 **`null`** 로 내려간다 — "공개 상태" = **공개된 Layout이 있는 상태**로 해석한다(노트북은 공개 Layout 안에만 존재하므로 방문자가 URL을 쓰는 순간과 일치). 미등록이어도 `null`이다 — FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다(FR-009).
+**노출 게이트 (FR-003)**: `publishedLayoutVersion`이 `null`이면 `homepageUrl`도 **`null`** 로 내려간다 — "공개 상태" = **공개된 Layout이 있는 상태**로 해석한다(노트북은 공개 Layout 안에만 존재하므로 방문자가 URL을 쓰는 순간과 일치).
+
+**서비스 주소 폴백 (2026-09-14 결정, 계약 변경)**: 게이트를 통과한 뒤 `booths.homepage_url`이 비어 있으면 **그 부스 프로젝트의 `deployUrl`(spec 009 "서비스 주소")이 내려간다.**
+
+| 등록값 `homepage_url` | 프로젝트 `deploy_url` | 응답 `homepageUrl` |
+|---|---|---|
+| 있음 | 무엇이든 | **등록값** (등록값이 이긴다) |
+| 없음 | 있음 | 프로젝트 `deployUrl` |
+| 없음 | 없음 / 프로젝트 없음 | `null` |
+
+근거: `PUT /booths/{id}/homepage`는 구현돼 있지만 **이를 호출하는 화면이 FE에 없다** — 등록 데이터층(`features/studio/model/homepage.ts`)은 어느 컴포넌트도 import하지 않고, `PropertiesPanel`이 안내하는 "부스 설정(외관 모드)"의 `FacadePanel`에는 그 칸이 없다. 그래서 실서비스에서 노트북은 **어느 부스에서도** "준비 안 됨"이었다(2026-09-14 보고). 소유자가 자기 서비스 주소를 실제로 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나뿐이고, 그것이 소유자가 노트북에서 열릴 것으로 기대하는 주소다.
+
+폴백은 **빈 자리만 메운다** — 등록 화면이 생기는 날 등록값이 자동으로 이기므로 되돌릴 작업이 없다. 셋 다 없을 때 `null`인 것은 그대로라, FE는 여전히 `null` 하나로 안내 분기를 끝낸다(FR-009).
+
+**소유자 프리필에는 폴백을 적용하지 않는다** — `GET /booths/mine`은 저장된 컬럼 그대로다. 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장하게 되고, 한 주소가 두 컬럼에 복사돼 이후 한쪽만 고치면 갈린다.
 
 > **`null`은 키를 생략하는 것이 아니다** — `homepageUrl` 키는 **항상 응답에 존재**하고 값이 `null`로 의미를 전달한다(`PUT` 해제 응답·`/mine`·공개 조회 모두). FE가 `null` 하나로 분기하는 계약이 성립하려면 키가 사라지지 않아야 한다. 서버 전역 JSON 설정에 null 제외(`default-property-inclusion=non_null`)를 걸면 이 계약이 깨진다.
 > 검증도 이 구분을 표현해야 한다 — `jsonPath(…).doesNotExist()`는 **키 부재와 명시적 `null`을 똑같이 통과시켜** 계약을 지키지 못하고, `exists()`는 반대로 명시적 `null`에서 실패한다. 응답 본문을 파싱해 **키 존재와 `null`을 따로** 단언한다 (`BoothHomepageApiIntegrationTest.assertPresentAndNull`, T-97).
