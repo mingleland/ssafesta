@@ -829,6 +829,64 @@ Presigned Upload URL 발급. 중복 판정을 겸한다 (#84, 2026-08-25 3파트
 재발급 / 중복 처리) 중 가장 보수적인 쪽을 골랐다. 서로 다른 파일이 같은 해시를 주장하는 요청을 조용히
 통과시키면 서명한 것과 다른 파일이 올라간다.
 
+### PUT `/documents/{documentId}/replacement`
+
+**준비 완료(`READY`) 문서를 새 파일로 갈아 끼운다** (spec 007 FR-019 · FR-027a, `S15P21A604-386`).
+
+요청·응답은 위 `upload-url` 과 **같은 모양**이다 — `UploadCommand` 를 그대로 보내고 `UploadGrantView`
+를 그대로 받는다. 전용 DTO 는 없다. 다만 응답의 `documentId` 는 **새로 만들어진 문서**의 것이고,
+이어서 그 id 로 `POST /documents/{newDocumentId}/complete` 를 부른다. 2단계는 일반 업로드와 완전히 같다.
+
+`PUT` 인 이유는 요청이 "무엇을 교체할지" 를 이름으로 지목하고, 같은 요청을 반복하면 같은 상태로
+수렴하기 때문이다 — 두 번째 호출은 교체를 하나 더 만들지 않는다.
+
+#### 언제 무엇이 바뀌는가
+
+| 시점 | 교체본 | 원본 |
+|---|---|---|
+| 이 호출 | `QUEUED` 로 생김 (`uploadedAt` 없음) | **`READY` 그대로. 검색에 계속 쓰인다** |
+| 2단계 완료 | `QUEUED` (`uploadedAt` 채워짐), 처리 Job 생성 | **`READY` 그대로** |
+| 처리 중 | `PROCESSING` | **`READY` 그대로** |
+| 처리 **성공**(finalize) | `READY` | `EXPIRED` + `replacedAt` — 활성 Job `CANCELLED`, chunk 삭제 |
+| 처리 **실패** | `FAILED` | **`READY` 그대로** |
+
+**퇴역은 `complete` 가 아니라 finalize 다.** 완료는 "바이트가 도착했다" 일 뿐이고 그 파일이 읽히는지는
+아직 아무도 모른다 — 거기서 원본을 물리면 파싱 불가 파일 하나로 AI 직원이 답할 근거가 통째로 사라진다.
+
+#### 대상 상태
+
+**`READY` 만 교체할 수 있다.** 나머지 다섯은 `409 DOCUMENT_NOT_REPLACEABLE` 이다 —
+`QUEUED`·`PROCESSING` 은 이미 사용자가 원하는 버전이 되는 중이고, `FAILED`·`EXPIRED`·`DISABLED` 는
+중복 판정 밖(FR-019b)이라 같은 파일을 그냥 새 문서로 올리면 된다. 판정은 **행 잠금 안에서** 하므로,
+호출 직전에 임대가 만료돼 `DISABLED` 가 된 경우도 여기서 걸린다.
+
+#### 같은 해시로 다시 불렀을 때
+
+| 상황 | 응답 |
+|---|---|
+| **대상 문서 자신**과 같은 해시 | `200 duplicate:true` + 대상의 `documentId`. **행을 만들지 않고 원본도 안 건드린다** |
+| 같은 AI 직원의 **다른 활성 문서**와 같은 해시 | `409 DOCUMENT_NOT_REPLACEABLE` (강행하면 `ux_ai_documents_agent_active_sha` 위반) |
+| 진행 중인 교체본이 **아직 업로드 전**, 같은 파일 | `duplicate:false` + **같은 `documentId`** + 새 `uploadUrl` (#84 멱등 재발급) |
+| 〃, 해시는 같은데 이름·형식·크기가 다름 | `400 VALIDATION_FAILED` (`errors[0].field = contentSha256`) |
+| 〃, **다른 파일** | 그 교체본을 `EXPIRED` 로 버리고(**`replacedAt` 은 찍지 않는다**) 새 `documentId` 로 발급 |
+| 진행 중인 교체본이 **업로드 완료**(`QUEUED`), 같은 파일 | `200 duplicate:true` + 그 교체본의 `documentId` |
+| 〃, 다른 파일 | `409 DOCUMENT_NOT_REPLACEABLE` |
+| 진행 중인 교체본이 `PROCESSING` | `409 DOCUMENT_NOT_REPLACEABLE` |
+
+버려진 대기 교체본에 `replacedAt` 을 찍지 않는 것은 중요하다. 그 칸은 "더 새 버전이 자리를 넘겨받았다"
+는 뜻인데, 이 행은 아무것도 공개하지 못한 채 버려진 발급일 뿐이다 — 찍으면 복구 판정(FR-027)이
+이 행을 교체 원본으로 오해한다.
+
+#### 상한 (FR-018)
+
+**10개를 다 쓴 AI 직원도 교체할 수 있다.** 교체본은 원본의 자리를 이어받으므로 논리 합계가 늘지 않는다 —
+활성 상태인 행이 11개여도 `quota.usedCount` 는 10이다. 총량(100MB)은 교체본의 크기로 다시 계산하므로
+큰 파일로 갈아 끼우다 넘기면 `409 DOCUMENT_LIMIT_EXCEEDED` 이고, 이때 **교체본 행은 남지 않는다**.
+
+실패: `401` · `403 MEMBER_ONLY`(게스트)·`BOOTH_EDITOR_FORBIDDEN` · `404 DOCUMENT_NOT_FOUND` ·
+`409 DOCUMENT_NOT_REPLACEABLE`·`DOCUMENT_LIMIT_EXCEEDED`·`BOOTH_LEASE_EXPIRED` ·
+`503 STORAGE_UNAVAILABLE` · `507 STORAGE_QUOTA_EXCEEDED`. 발급과 같은 업로드 게이트(#100)를 지난다.
+
 ### POST `/documents/{documentId}/complete`
 
 브라우저가 presigned URL 로 업로드를 마친 뒤 부르는 확인 Endpoint. **요청 본문이 없다** — 판정에 필요한
@@ -853,6 +911,8 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `EXPIRED`, **전환 후 24시간 이내** | 객체 있고 크기 일치 | `200`, **같은 `documentId` 로 `QUEUED` 복구** (FR-027) |
 | `EXPIRED`, 24시간 이내 | 객체 없음 | `410 DOCUMENT_UPLOAD_GONE` |
 | `EXPIRED`, **24시간 경과** | **객체가 남아 있어도** | `410 DOCUMENT_UPLOAD_GONE` |
+| `EXPIRED` + **`replacedAt` 있음** (교체로 물러난 원본) | 확인 안 함 | `410 DOCUMENT_UPLOAD_GONE` — 시간과 무관하다 (FR-027a) |
+| `EXPIRED`, 교체가 **대기 중** (이 문서를 가리키는 활성 교체본이 있다) | 객체 있어도 | `410 DOCUMENT_UPLOAD_GONE` |
 | `PROCESSING`·`READY` | 확인 안 함 | `200` (현재 상태 그대로) — `PROCESSING` 은 AI 워커가 이미 파일을 쥔 상태라 저장소를 다시 묻지 않는다 |
 | `FAILED`·`DISABLED` | 확인 안 함 | `409 DOCUMENT_UPLOAD_INCOMPLETE` |
 | 아무 상태 | 저장소가 답하지 못함 | `503 STORAGE_UNAVAILABLE` |
@@ -860,9 +920,15 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 24시간 경과분을 객체 존재와 무관하게 `410` 으로 두는 것은 의도다 — 삭제는 sweeper 가 자기 주기로 하므로
 남아 있다고 받아 주면 유예 기간이 무의미해진다.
 
+교체로 물러난 원본을 시간과 무관하게 `410` 으로 두는 것도 같은 결이다. 24시간 복구는 "바이트가 안 왔다"
+는 만료에만 해당하고, 이미 새 버전이 자리를 넘겨받은 문서는 되돌릴 자리가 없다 — 되살리면 한 (직원,
+해시) 에 활성 행이 둘이 된다.
+
 ### GET `/agents/{agentId}/documents`
 
 이 AI 직원의 문서를 **모든 상태**로, `createdAt` 내림차순으로 돌려준다 (US2 시나리오 2·7 · US3 시나리오 1).
+**교체로 물러난 원본도 숨기지 않는다** — 사용자가 올린 것이 조용히 사라지면 안 되고, 대신 `replacedAt`
+으로 "교체됨" 임을 말한다 (FR-006).
 
 ```json
 {
@@ -873,10 +939,11 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
       "sizeBytes": 1048576,
       "status": "READY",
       "createdAt": "2026-09-09T01:15:02Z",
-      "uploadedAt": "2026-09-09T01:20:11Z"
+      "uploadedAt": "2026-09-09T01:20:11Z",
+      "replacedAt": null
     }
   ],
-  "quota": { "countLimit": 10, "bytesLimit": 104857600 }
+  "quota": { "countLimit": 10, "bytesLimit": 104857600, "usedCount": 1, "usedBytes": 1048576 }
 }
 ```
 
@@ -888,6 +955,11 @@ HEAD 는 **문서 행의 `storageProvider` + `bucket` + `objectKey`** 로 한다
 | `FAILED` | 실패 | 처리에 실패했다 |
 | `EXPIRED` | **업로드 만료** | 발급 후 1시간 안에 업로드가 끝나지 않았다 (FR-026). 다시 올리면 된다 |
 | `DISABLED` | 사용 중지 | 임대 만료로 꺼졌다 (FR-015). 사용자가 되돌릴 수 없다 |
+
+**`EXPIRED` 는 `replacedAt` 으로 갈린다** (FR-027a). 값이 없으면 위 표대로 업로드 만료이고, 값이 있으면
+수정본으로 교체돼 물러난 원본이다 — 화면에 **교체됨**으로 적고 "다시 올려 주세요" 안내를 띄우지
+않는다. 복구되지 않는 행에 복구 버튼을 띄우면 눌러도 아무 일이 없는 컨트롤이 된다(T-24 와 같은 모양).
+**상태 값 자체는 여섯 그대로다** — `replacedAt` 은 구분자이지 상태가 아니다.
 
 여섯 값이 전부 실제로 나온다. `DISABLED` 는 `S15P21A604-496` 이 임대 만료 경로에 붙으면서 마지막으로
 채워졌다 — 임대가 `EXPIRED` 로 넘어가는 **같은 트랜잭션**에서 그 부스의 활성 문서
@@ -914,13 +986,17 @@ Job 이라 `410 JOB_GONE` 으로 거부된다. 한 건이 실패하면 **남은 
   `PROCESSING` 그대로**다. 실패한 문서는 상한과 중복 판정에서 빠지므로 **같은 파일을 그대로 다시
   올릴 수 있다**
 
-**`quota` 에는 상한만 있다. 쓴 양은 `documents` 에서 읽는다.** 자리를 차지하는 것은
-`QUEUED`·`PROCESSING`·`READY` 인 행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 —
-실패한 업로드가 슬롯을 잡으면 안 되기 때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
-"n/10" 의 n 은 활성 3상태 행의 수이지 `documents.length` 가 아니다.
+**`quota` 는 상한과 쓴 양을 함께 준다.** 자리를 차지하는 것은 `QUEUED`·`PROCESSING`·`READY` 인
+행뿐이고 `FAILED`·`EXPIRED`·`DISABLED` 는 목록에만 나온다 — 실패한 업로드가 슬롯을 잡으면 안 되기
+때문이다 (FR-019b). **행 10개가 보여도 업로드가 될 수 있다.**
 
-서버가 그 수를 세어 내려보내지 않는 이유는 **응답에 이미 있기 때문**이다. 세어 주려면 폴링마다
-질의가 둘 늘어난다.
+**"n/10" 의 n 은 `usedCount` 다.** `documents.length` 도, 활성 3상태 행의 수도 아니다 —
+교체가 진행 중이면 원본과 교체본이 둘 다 활성이지만 교체본이 원본의 자리를 이어받으므로, 활성 행이
+11개여도 `usedCount` 는 10이다. `usedBytes` 도 같은 뺄셈을 거친다.
+
+> 2026-09-11 변경 (`S15P21A604-386`). 이전에는 "쓴 양은 클라이언트가 배열에서 센다" 였다. 수정본 교체가
+> 그 전제를 깼다 — 배열만 세면 실제로는 성공할 업로드 앞에서 "11/10" 을 띄우게 된다. 폴링마다 질의가
+> 둘 늘어나는 것이 모든 클라이언트가 같은 뺄셈을 각자 다시 구현하는 것보다 싸다.
 
 `uploadedAt` 이 `null` 인 `QUEUED` 와 값이 있는 `QUEUED` 는 다르다 — 앞은 바이트가 아직 안 온
 것이고 뒤는 처리를 기다리는 것이다. `status` 만으로는 구분되지 않는다.
@@ -1068,86 +1144,121 @@ Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답�
 
 ## 10. Staff / Permission
 
+> **정본은 `specs/011-staff-consultation/contracts/staff-consultation-api.md` §A 다** (2026-09-13, `S15P21A604-136` 구현과 함께 정정). 이 절은 그 요약이다.
+
 ### POST `/booths/{boothId}/staff-invitations`
 
-직원 초대.
+직원 초대. **Owner 와 `ADMIN` 만** 보낸다 — `CONTENT_EDITOR` 는 콘텐츠를 고치지만 사람을 들이지는 못한다(FR-002).
 
 ```json
-{
-  "userId": 45,
-  "role": "CONSULTANT"
-}
+{ "nickname": "덕", "role": "CONSULTANT" }
 ```
+
+> **대상은 닉네임이다.** 이전 판에는 `userId` 로 적혀 있었는데 **Owner 가 남의 숫자 id 를 알아낼 경로가 없다** — 사용자 조회·검색 endpoint 가 없고, 만들면 닉네임 훑기·id 수집 표면이 함께 생긴다. `users.nickname` 이 V1 부터 `UNIQUE` 다.
+
+응답 `201`: `{ invitationId, boothId, boothName, nickname, role, expiresAt }`. 초대는 **48시간** 유효하다(C-07).
+
+오류: `403 STAFF_MANAGER_FORBIDDEN` · `404 STAFF_INVITEE_NOT_FOUND` · `409 STAFF_ALREADY_MEMBER` · `409 STAFF_INVITATION_PENDING`
+
+### GET `/staff-invitations/mine`
+
+본인에게 온 **대기 중이고 만료되지 않은** 초대만(FR-016, C-08). 만료 배치를 기다리지 않는다 — 눌러 봐야 409 인 카드를 보여 주지 않는다.
 
 ### POST `/staff-invitations/{invitationId}/accept`
 
+초대받은 본인만. 수락 시점에 `booth_staffs` 행이 생기고 역할이 적용된다. → `204`
+
+### DELETE `/booths/{boothId}/staff-invitations/{invitationId}`
+
+Owner·`ADMIN` 이 대기 중 초대를 거둔다(FR-017). → `204`
+
+> **초대받은 사용자의 거절 API 는 없다**(C-10). 수락하지 않으면 48시간 뒤 만료된다.
+
 ### GET `/booths/{boothId}/staff`
 
-### PATCH `/booths/{boothId}/staff/{userId}`
+부스 **구성원이면 누구나** 본다 — `CONSULTANT` 도 같은 부스에 누가 있는지는 알아야 한다.
 
-권한 변경.
+**Owner 가 역할 `OWNER` 의 읽기 전용 행으로 함께 나온다**(FR-018). Owner 는 `booth_staffs` 에 저장되지 않으며 `readOnly: true` 로 표시된다. `consultationStatus` 는 직원 행에만 있고 Owner 행에서는 `null` 이다.
 
-### DELETE `/booths/{boothId}/staff/{userId}`
+### PATCH `/booths/{boothId}/staff/{userId}` · DELETE `…`
 
-Owner 본인 제거 금지 등 정책 검증 필요.
+Owner·`ADMIN` 만. **Owner 를 가리키면 `409 STAFF_OWNER_IMMUTABLE`** 이다 — 행이 없어서 나는 404 와 구분한다. 목록에 분명히 보이던 사람을 404 로 답하면 "이 부스와 무관하다" 로 읽힌다.
 
 ---
 
 ## 11. Staff Presence
 
-실시간 상태 자체는 Redis/WebSocket 중심이지만 상태 변경 API가 필요하면 다음 구조를 사용할 수 있다.
-
 ### PUT `/booths/{boothId}/staff/me/presence`
 
 ```json
-{
-  "status": "AVAILABLE"
-}
+{ "status": "AVAILABLE" }
 ```
 
-실시간 구독 event는 Realtime 명세서에서 관리한다.
+`AVAILABLE`·`AWAY`·`OFFLINE` 만 받는다. **`BUSY` 는 서버가 관리한다** — 상담 수락이 넣고 종료가 되돌린다. 직접 지정하면 `400 VALIDATION_FAILED` 다.
+
+기본값은 `OFFLINE` 이다 — US2 가 "담당자가 항상 있을 수 없다, 오프라인이 기본 상태" 로 못박았다.
 
 ---
 
 ## 12. Consultation
 
-### POST `/booths/{boothId}/consultations`
+> **정본은 `specs/011-staff-consultation/contracts/staff-consultation-api.md` §B 다.** 이 절의 이전 판(`POST /booths/{boothId}/consultations` 계열)은 **무효다** — 실제 계약은 2026-09-07 BE 회신(GitLab #133)으로 확정됐고 FE 가 `S15P21A604-519` 로 선반영을 마쳤다. 2026-09-13 `S15P21A604-137` 구현과 함께 정정한다.
 
-사람 상담 요청 생성. `requested_at + 10분`을 `expiresAt`으로 계산해 응답에 포함한다 (C-01, spec 011 — 2026-08-31 확정, GitLab work_items#118).
+### POST `/consultation/ws-token`
 
-```json
-{
-  "conversationId": "conv_01JABCXYZ",
-  "agentId": 78
-}
+STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, expiresInSeconds: 300 }`
+
+`Authorization: Bearer <token>` 헤더로 STOMP `CONNECT` 에 싣는다. **URL query 로 넘기지 않으며 Access Token 재사용도 허용하지 않는다**(헌법 13조). 연결 성립 후에는 만료가 연결을 끊지 않는다.
+
+### STOMP
+
+```text
+엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
+구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
+            /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
+SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
+봉투        { type, requestId, occurredAt, … }
 ```
 
-응답 예:
+방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`.
+
+> **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
+
+### POST `/consultation/requests`
+
+**회원 전용**이다 — 게스트는 `403 MEMBER_ONLY`(FR-014). 요청은 **10분** 유효하다(C-01).
 
 ```json
-{
-  "consultationId": 901,
-  "status": "REQUESTED",
-  "requestedAt": "...",
-  "expiresAt": "..."
-}
+{ "boothId": 7, "conversationId": "conv_01JABCXYZ" }
 ```
 
-10분 내 Accept가 없으면 `REQUESTED → EXPIRED`로 전환하고 `CONSULTATION_EXPIRED` WebSocket 이벤트로 알린다(docs/16 §11). FE는 `expiresAt`으로 잔여 시간을 안내하고 만료 후 재요청 버튼을 노출한다.
+→ `201 { requestId, expiresInSeconds: 600 }`
 
-### GET `/consultations/{consultationId}`
+**요약 텍스트는 클라이언트가 보내지 않는다.** 서버가 `conversationId` 로 FastAPI 에 요약을 청해 **요청 생성 시점 스냅샷**으로 굳힌다(FR-012). 생성 실패는 `null` 일 뿐 요청을 막지 않는다(헌법 3조).
 
-응답 `status`에 `EXPIRED`가 포함된다.
+오류: `409 CONSULTATION_REQUEST_PENDING` · `409 BOOTH_LEASE_EXPIRED`
 
-### POST `/consultations/{consultationId}/accept`
+### DELETE `/consultation/requests/{requestId}`
 
-한 명의 Staff만 성공해야 한다. 이미 `EXPIRED`/`REJECTED`/다른 Staff가 `ACCEPTED`한 요청은 거부한다.
+방문자 본인. 상태는 `CANCELLED` 로 남는다 — 만료와 가르는 이유는 직원 화면이 다른 이벤트를 받기 때문이다. → `204`
 
-### POST `/consultations/{consultationId}/end`
+### GET `/booths/{boothId}/consultation/requests`
 
-상담 종료.
+부스 구성원이면 누구나. **대기 중이고 만료되지 않은** 것만 준다.
 
-메시지는 WebSocket event 중심으로 처리한다. 오프라인 시 메시지 남기기(비동기 문의)는 P1에서 제외하고 P2 후속 이슈로 분리했다(C-02, spec 011). 원문 History REST Endpoint 도입 여부·보존 기간은 P2 spec 착수 시 확정한다(C-03). P1 메타데이터·Handoff Summary(`consultations.summary`)는 프로젝트 종료 시 일괄 삭제한다(docs/09 §27).
+### POST `/consultation/requests/{requestId}/accept`
+
+**정확히 한 명만 성공한다**(SC-001). **직원 한 명에게 활성 상담은 1건**이고(C-06, FR-021) 위반은 `409 CONSULTATION_ALREADY_ACTIVE` 이며 **기존 상담은 유지된다**.
+
+→ `200 { requestId, sessionId, visitorNickname, handoffSummary }` — `sessionId` 는 `requestId` 와 **같은 값**이다(한 행이 요청과 세션을 겸한다).
+
+### POST `/consultation/sessions/{sessionId}/end`
+
+방문자·직원 **누구나** 끝낸다(FR-010). → `204`
+
+### P1 에 없는 것
+
+실시간 메시지 송수신·저장은 **P2**(C-12). 오프라인 비동기 문의도 **P2**(C-02). 원문 History 조회는 P2 spec 착수 시 저장 여부부터 재검토한다(C-03). P1 메타데이터·Handoff Summary 는 프로젝트 종료 시 일괄 삭제한다.
 
 ---
 
@@ -1235,21 +1346,129 @@ Owner 본인 제거 금지 등 정책 검증 필요.
 
 ---
 
-## 15. Dashboard — P1
+## 14-1. Booth Metrics — 방문·체류 계측
 
-### GET `/booths/{boothId}/dashboard/summary?from=&to=`
+> **BE 구현 완료 (`S15P21A604-240`, 2026-09-13). 발신 쪽 합의는 대기 중이다** — 아래 "묻는 것" 참조.
+>
+> 계측이 배포 **전에** 심겨 있어야 하는 이유는 간단하다. "Coin 시스템 유효성은 배포 후 사용자 반응으로 검증하라" 는 피드백을 실행하려면 그 반응을 기록할 자리가 먼저 있어야 한다 — 배포 후에 붙이면 첫 사용자들의 행동이 남지 않는다(GitLab #94).
+
+### 누가 부르는가 — **React 호스트**
+
+Unity 는 Spring 에 아무 신호도 보내지 않는다(2026-09-07 확정). 부스 구역 진입·이탈을 **브릿지 이벤트로 받은 React** 가 아래 경로를 부른다.
+
+### POST `/booths/{boothId}/visits`
+
+```json
+{ "worldChannel": "F11-CH01" }
+```
+
+→ `201 { "visitId": "123", "enteredAt": "..." }`
+
+- **회원과 게스트 모두 센다.** 부스 구경은 게스트에게 열려 있고(헌법 12조가 막는 것은 소유·결제다), 통계에서 빼면 실제 트래픽을 절반만 본다.
+- **회원의 입장 신호가 두 번 오면 새 기록을 만들지 않는다** — 같은 `visitId` 가 돌아온다. 브릿지 이벤트 재전송이 방문 수를 부풀리지 않게 한다. 게스트는 식별자가 없어 합치지 못한다.
+- 공개되지 않았거나 임대가 끝난 부스는 거부된다 — 들어갈 수 없는 부스의 방문 기록은 집계를 오염시킨다.
+- `worldChannel` 이 필수인 이유: 채널이 여럿이라(정원 20) 같은 부스라도 채널별로 트래픽이 갈린다.
+
+### POST `/booths/{boothId}/visits/{visitId}/exit`
+
+→ `204`. 본인 방문만 닫을 수 있다.
+
+**닫히지 않은 방문이 정상이다.** 브라우저를 그냥 닫으면 이 신호가 오지 않는다. 서버는 그런 행을 오류로 다루지 않고 **평균 체류에서 빼고 그 수를 따로 보고**한다.
+
+> 임의의 timeout 으로 닫지 않는 이유: 그러면 체류시간이 실제 값이 아니라 **서버가 고른 상수**가 된다. "평균 3분" 이 사용자 행동인지 timeout 설정인지 구분할 수 없게 된다.
+
+### GET `/booths/{boothId}/visit-metrics?from=&to=`
+
+부스 운영자(Owner·`ADMIN`·`CONTENT_EDITOR`)용.
 
 ```json
 {
+  "from": "...", "to": "...",
   "visits": 120,
-  "aiUsages": 43,
-  "consultations": 8,
-  "surveyResponses": 31,
-  "revenueCoin": 320
+  "uniqueVisitors": 87,
+  "averageDwellSeconds": 154,
+  "openVisits": 3
 }
 ```
 
-고급 체류 시간·전환율은 P2다.
+`uniqueVisitors` 는 **회원 기준**이다(게스트는 식별자가 없어 각 방문이 따로 세어진다). `averageDwellSeconds` 는 **닫힌 방문만**의 평균이다.
+
+### 이 endpoint 가 하지 않는 것
+
+| 항목 | 왜 | 어디로 |
+|---|---|---|
+| 코인 순환량 | 이미 `coin_ledger_entries` 에 사유 코드와 함께 남는다. 같은 사실을 두 곳에 쓰면 둘이 갈린다 | §15 (`S15P21A604-501`) |
+| 플랫폼 전체 집계 | "관리자용" 은 전역 관리자 개념을 전제하는데 그 권한 모델이 미정이다 | `S15P21A604-165`, `docs/26` 등재됨 |
+| `booth_daily_metrics` 선집계 | 원본 스캔이 느려질 때 얹는 것이다. 부스 12개 규모에서는 실시간 계산이 맞다 | 느려지면 그때 |
+
+### 발신 쪽에 묻는 것
+
+1. **Unity 가 부스 구역 이탈을 브릿지로 알리는가?** 알린다면 이벤트 이름은? 알리지 않는다면 체류시간 표본이 `openVisits` 쪽으로 쏠린다 — 그 경우 **React 가 오버레이 종료·페이지 이탈에서 부르는 것**을 대안으로 제안한다.
+2. `worldChannel` 값의 형식 — React 가 월드 세션에서 받는 채널 식별자를 그대로 쓰면 되는가?
+3. 진입 이벤트 재전송을 발신 쪽에서 억제할 수 있는가 — 서버는 회원만 합칠 수 있어, 억제되면 게스트 통계도 정확해진다.
+
+---
+
+## 15. Dashboard — P1
+
+> 구현·계약 정본: `specs/015-dashboard/contracts/dashboard-summary-api.md` (`S15P21A604-501`).
+
+### GET `/booths/{boothId}/dashboard/summary?from=&to=`
+
+Owner · `ADMIN` · `CONTENT_EDITOR` 만. `CONSULTANT` 는 제외된다 — 상담원은 상담을 하지 부스 운영 지표를 보지 않는다. `from` 포함, `to` 제외, 둘 다 필수(ISO-8601).
+
+```json
+{
+  "from": "2026-09-01T00:00:00Z",
+  "to": "2026-09-14T00:00:00Z",
+  "visits": 120,
+  "uniqueVisitors": 88,
+  "averageDwellSeconds": 143,
+  "openVisits": 4,
+  "consultations": 12,
+  "consultationsEnded": 6,
+  "surveyResponses": 31,
+  "leaseCostCoin": 300,
+  "surveyRewardCoin": 155,
+  "aiUsages": null
+}
+```
+
+**`null` 은 0 이 아니다.** `null` 은 **집계할 원천이 아직 없다**, `0` 은 **원천은 있고 그 기간에 0건이었다**. 지금 `null` 인 칸은 `aiUsages` 하나다.
+
+| 필드 | 원천 |
+|---|---|
+| `visits` · `uniqueVisitors` · `averageDwellSeconds` · `openVisits` | `booth_visit_events` — §14-1 과 같은 정의다 |
+| `consultations` · `consultationsEnded` | `consultations`. **요청 시각 기준**이라 아직 안 끝난 상담도 요청한 기간에 센다 |
+| `surveyResponses` | 이 부스의 설문에 달린 응답. 게스트 응답도 센다 |
+| `leaseCostCoin` · `surveyRewardCoin` | `coin_ledger_entries` 를 `reference_id` 로 되짚는다. 아래 참조 |
+| `aiUsages` | **없다** — AI 대화를 남기는 표가 저장소에 아직 없다 (AI 파트 소관) |
+
+#### 코인 칸은 "수익" 이 아니다
+
+**부스로 코인이 들어오는 경로가 없다.** 원장에서 부스와 닿는 사유는 둘뿐이고 둘 다 수익이 아니다.
+
+- **임대료** (`LEASE_PAYMENT` / `BOOTH_LEASE`) — 부스 소유자가 **낸다**. 비용이다
+- **설문 보상** (`SURVEY_REWARD` / `SURVEY`) — 응답자에게 **발행된다**. 차감되는 지갑이 없어 부스가 내는 것이 아니다
+
+그래서 "수익" 대신 이 둘을 그대로 준다 — **쓴 코인**과 **뿌린 코인**이다(2026-09-13 백엔드 결정, `docs/26`). 둘 다 양수로 나간다.
+
+`surveyRewardCoin` 은 `surveyResponses` 옆에 놓고 읽으면 그대로 의미가 된다 — **코인 155개를 뿌려 응답 31개를 받았다.** 보상 구조가 먹히는지가 그 두 숫자에 있다.
+
+진짜 유입 경로가 생기면(`S15P21A604-634` AI 상담 이용료 차감·운영자 수익 배분) 그때 `revenueCoin` 을 이 둘 **옆에 더한다**. `booth_daily_metrics.revenue_coin` 컬럼은 그 자리로 남겨 둔다.
+
+#### 그 밖
+
+- **집계는 실시간 계산이다.** 사전 집계 표(`booth_daily_metrics`)는 비워 둔다 — 갱신이 실패해도 조용히 그럴듯한 숫자를 계속 보여주기 때문이다. 부스 12개 규모에서는 원본 스캔이 더 싸다.
+- **임대가 끝난 부스도 지난 기간을 볼 수 있다.** 행사 뒤 정산을 해야 한다 (spec 015 C-03).
+- **플랫폼 전체 집계는 없다.** 전역 관리자 권한 모델이 미정이다 (`docs/26`, `S15P21A604-165`).
+- 고급 전환율은 P2다.
+
+| 오류 | 조건 |
+|---|---|
+| `400 VALIDATION_FAILED` | `from` 이 `to` 보다 뒤이거나 같다 |
+| `403 BOOTH_EDITOR_FORBIDDEN` | 호출자가 Owner·`ADMIN`·`CONTENT_EDITOR` 가 아니다 |
+| `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 |
 
 ---
 

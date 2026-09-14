@@ -113,6 +113,25 @@ export type WorldInteractEvent =
       type: 'WORLD_BOOTH_CONTEXT';
       insideBooth: boolean;
       boothId?: number;
+    }
+  | {
+      /**
+       * 안내데스크 NPC — 이용 안내 화면 (S15P21A604-688, GitLab #184).
+       *
+       * **payload 가 없다.** 화면이 `boothId` 도 `npcId` 도 소비하지 않는다 — 안내 데스크가
+       * 하나뿐이고, 열리는 것은 부스에 속하지 않는 `WORLD_GUIDE` 오버레이다. 여러 곳이 생기면
+       * 그때 식별자를 싣는다(게임 파트도 같은 판단, #184).
+       *
+       * `WORLD_` 접두사인 이유는 `WORLD_EVENT_INTERACT`(-599)·`WORLD_MINIGAME_INTERACT`(#166)와
+       * 같다 — 부스 컨텍스트를 쓰지 않는 월드 상호작용이다.
+       *
+       * 말풍선("F 를 눌러 이용 안내를 보세요")은 Unity 가 월드 안에 그린다. FE 계약을 늘리지
+       * 않으려는 것이고 부스 간판·이름표와 같은 방식이다.
+       *
+       * ⚠️ Unity 송신부는 아직 develop 에 없다. `WORLD_EVENT_INTERACT` 와 같이 **FE 수신부가
+       * 먼저 서 있는** 상태이고, 게임 파트가 보내기 시작하면 이 자리가 그대로 실경로가 된다.
+       */
+      type: 'WORLD_GUIDE_INTERACT';
     };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */

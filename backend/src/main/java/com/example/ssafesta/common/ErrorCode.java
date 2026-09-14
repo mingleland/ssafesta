@@ -99,6 +99,14 @@ public enum ErrorCode {
      */
     DOCUMENT_UPLOAD_GONE(HttpStatus.GONE, "업로드가 만료되었습니다. 새로 업로드해 주세요."),
     /**
+     * 수정본 교체를 지금 걸 수 없다 (FR-019, S15P21A604-386). 교체 대상은 {@code READY} 하나이고,
+     * 그 위에 이미 다른 교체가 진행 중이거나 같은 파일이 다른 문서로 등록돼 있으면 여기로 온다.
+     *
+     * <p>무엇이 막는지는 thrower 가 message 에 담는다 — 대상 상태·진행 중인 교체·다른 문서의 중복은
+     * 사용자가 할 일이 서로 다르다. {@link #DOCUMENT_LIMIT_EXCEEDED} 와 같은 결이다.
+     */
+    DOCUMENT_NOT_REPLACEABLE(HttpStatus.CONFLICT, "이 문서는 교체할 수 없습니다."),
+    /**
      * 늦게 도착한 이전 attempt 의 결과다 (GitLab #119 §3, S15P21A604-400).
      *
      * <p>lease 가 만료돼 Job 을 회수하고 {@code attempt_no} 를 올린 뒤, 죽은 줄 알았던 이전 워커가
@@ -219,6 +227,56 @@ public enum ErrorCode {
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
+    // ── 상담 (spec 011 US1) ─────────────────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §B 가 정본이다.
+    // 게스트 거부는 MEMBER_ONLY 를, 만료 부스는 BOOTH_LEASE_EXPIRED 를 재사용한다 — 같은 사건에
+    // 두 이름을 만들지 않는다.
+    CONSULTATION_NOT_FOUND(HttpStatus.NOT_FOUND, "상담 요청을 찾을 수 없습니다."),
+    /** 이 방문자가 그 부스에 걸어 둔 대기 중 요청이 이미 있다. */
+    CONSULTATION_REQUEST_PENDING(HttpStatus.CONFLICT, "이미 보낸 상담 요청이 기다리고 있습니다."),
+    /**
+     * 수락하려는 직원에게 이미 활성 상담이 있다 (C-06, FR-021).
+     *
+     * <p>{@code ux_consultations_active_staff} 가 DB 에서도 막으므로, 동시 요청에서도 둘째는
+     * 이 code 로 떨어진다.
+     */
+    CONSULTATION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "이미 진행 중인 상담이 있습니다."),
+    /** 이미 다른 직원이 가져갔거나 만료·취소됐다. 만료는 스위퍼를 기다리지 않고 읽는 쪽이 본다. */
+    CONSULTATION_NOT_REQUESTED(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 상담 요청입니다."),
+    /** 내 요청도, 내가 맡은 상담도 아니다. */
+    CONSULTATION_FORBIDDEN(HttpStatus.FORBIDDEN, "이 상담에 대한 권한이 없습니다."),
+
+    // ── Staff 초대·권한 (spec 011 US3) ──────────────────────────────────────
+    // specs/011-staff-consultation/contracts/staff-consultation-api.md §A 가 정본이다.
+    // BOOTH_EDITOR_FORBIDDEN·MEMBER_ONLY·VALIDATION_FAILED 는 위에 있는 것을 재사용한다.
+    /**
+     * 부스 운영진이 아니다 — 초대·역할 변경·직원 제거는 Owner 와 {@code ADMIN} 만 한다 (FR-001).
+     *
+     * <p>{@code BOOTH_EDITOR_FORBIDDEN} 과 가르는 이유는 물음이 다르기 때문이다. 저쪽은 "콘텐츠를
+     * 고칠 수 있는가", 이쪽은 "사람을 들이고 뺄 수 있는가" 다. {@code CONTENT_EDITOR} 는 앞의
+     * 답이 예이고 뒤의 답이 아니오라서, 한 code 로 묶으면 FE 가 그 둘을 구분할 수 없다.
+     */
+    STAFF_MANAGER_FORBIDDEN(HttpStatus.FORBIDDEN, "직원을 관리할 권한이 없습니다."),
+    /** 초대하려는 닉네임의 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    STAFF_INVITEE_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 닉네임의 회원이 없습니다."),
+    STAFF_INVITATION_NOT_FOUND(HttpStatus.NOT_FOUND, "초대를 찾을 수 없습니다."),
+    /** {@code ux_staff_invitations_pending} 이 DB 에서도 막는다. */
+    STAFF_INVITATION_PENDING(HttpStatus.CONFLICT, "이미 보낸 초대가 처리되기를 기다리고 있습니다."),
+    /** 수락·취소됐거나 48시간이 지났다 (C-07). 만료는 스위퍼를 기다리지 않고 읽는 쪽이 판정한다. */
+    STAFF_INVITATION_NOT_PENDING(HttpStatus.CONFLICT, "더 이상 수락할 수 없는 초대입니다."),
+    /** 내게 온 초대가 아니다. 존재 여부는 이미 아는 사람만 물을 수 있으므로 404 가 아니라 403 이다. */
+    STAFF_INVITATION_FORBIDDEN(HttpStatus.FORBIDDEN, "내게 온 초대가 아닙니다."),
+    STAFF_ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 이 부스의 구성원입니다."),
+    /** Owner 는 {@code booth_staffs} 행이 아니다 (FR-018) — 역할 변경·제거 대상이 아니다. */
+    STAFF_OWNER_IMMUTABLE(HttpStatus.CONFLICT, "부스 소유자는 직원 목록에서 변경할 수 없습니다."),
+    STAFF_NOT_FOUND(HttpStatus.NOT_FOUND, "그 부스의 직원이 아닙니다."),
+
+    // 월드 공용 채팅 (spec 002 contracts, S15P21A604-687). STOMP 로만 나가지만 ErrorCode 를
+    // 싣는다 — 싣지 않으면 500 INTERNAL_ERROR 로 나가고, 보낸 쪽이 고칠 수 있는 거절과 서버
+    // 결함이 같은 모양이 된다 (DomainExceptionEnvelopeTest 가 지키는 규약).
+    CHAT_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 보내 주세요."),
+    CHAT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "채팅을 잠시 사용할 수 없습니다."),
+
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 요청 방식입니다."),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 오류가 발생했습니다.");

@@ -304,6 +304,67 @@ class BoothApiIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    // -- 슬롯 점유 한 질의 (S15P21A604-682) ------------------------------------
+
+    /**
+     * 임대가 실린 슬롯은 부스 정보도 <b>함께</b> 실린다.
+     *
+     * <p>이것이 이 기능의 불변식이다. 예전에는 임대 목록과 부스를 따로 읽어서, 두 질의 사이에
+     * 탈퇴가 커밋되면 {@code OCCUPIED} 인데 이름도 facade 도 없는 행이 나갔다 — 방문자에게는
+     * 들어갈 수 없는 간판이 보였다. 지금은 셋이 한 문장에서 온다.
+     *
+     * <p><b>문장 수를 세지 않는다.</b> 그 방식은 {@code SessionFactory} 전역 카운터를 읽어서
+     * 배경 스위퍼 하나만 늘어도 깨진다 (T-154). 여기서는 응답의 모양으로 고정한다.
+     */
+    @Test
+    void anOccupiedSlotCarriesItsBoothInTheSameRow() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "점유조인");
+        String bearer = bearerFor(userId);
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("OCCUPIED"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothName").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].facade").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].entryAvailable").value(true));
+    }
+
+    /** 빈 슬롯은 부스 자리가 전부 비어 있다 — 조인이 왼쪽 바깥이라는 확인이기도 하다. */
+    @Test
+    void aFreeSlotCarriesNoBooth() throws Exception {
+        Long slotId = freeSlotId();
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].entryAvailable").value(false));
+    }
+
+    /**
+     * 기한이 지난 임대는 행이 남아 있어도 빈 슬롯이다.
+     *
+     * <p>유효 판정이 조인 {@code on} 절로 들어갔으므로, 그 조건이 빠지면 만료된 임대가 다시
+     * {@code OCCUPIED} 로 올라온다. 스위퍼가 옮겨 주기 전에도 비어 보여야 한다 (SC-003).
+     */
+    @Test
+    void anExpiredLeaseLeavesTheSlotAvailable() throws Exception {
+        Long userId = createMemberWithWallet(users, wallets, "만료조인");
+        String bearer = bearerFor(userId);
+        Long slotId = freeSlotId();
+        mockMvc.perform(leaseRequest(slotId, bearer)).andExpect(status().isCreated());
+        jdbc.update("UPDATE booth_leases SET starts_at = now() - interval '25 hours', "
+                + "ends_at = now() - interval '1 hour' WHERE slot_id = ?", slotId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$[?(@.slotId == " + slotId + ")].boothId").value(org.hamcrest.Matchers.contains(org.hamcrest.Matchers.nullValue())));
+    }
+
     private org.springframework.test.web.servlet.RequestBuilder leaseRequest(Long slotId, String bearer) {
         return post("/api/v1/booth-slots/{slotId}/leases", slotId)
                 .header("Authorization", bearer)

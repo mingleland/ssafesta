@@ -8,6 +8,7 @@ fixture="$(mktemp -d)"
 trap 'rm -rf "${fixture}"' EXIT
 
 export WEBGL_RELEASE_ROOT="${fixture}/webgl"
+export ENVIRONMENT_STATE_DIR="${fixture}/state"
 export WEBGL_PUBLIC_BASE_URL='https://demo.example.invalid/unity'
 export WEBGL_RETENTION_COUNT=2
 export GITLAB_DEPLOY_TOKEN='fixture-token'
@@ -23,13 +24,16 @@ chmod +x "${fixture}/bin/flock"
 cat >"${fixture}/bin/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-output= headers= url=
+output= headers= url= resolved=0 accepts_br=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --output) output="$2"; shift 2 ;;
     --dump-header) headers="$2"; shift 2 ;;
-    --header|--max-time) shift 2 ;;
-    --fail|--silent|--show-error|--location) shift ;;
+    --resolve) resolved=1; shift 2 ;;
+    # 실제 앞단은 Vary: Accept-Encoding 으로 협상한다 — br 을 받겠다고 하지 않으면 풀어서 준다.
+    --header) [[ "$2" == [Aa]ccept-[Ee]ncoding:*br* ]] && accepts_br=1; shift 2 ;;
+    --max-time|--max-filesize|--user-agent) shift 2 ;;
+    --insecure|--fail|--silent|--show-error|--location) shift ;;
     *) url="$1"; shift ;;
   esac
 done
@@ -37,7 +41,26 @@ if [[ "${url}" == package://* ]]; then
   cp "${FAKE_PACKAGE}" "${output}"
   exit 0
 fi
+# 진단용 요청은 헤더를 받지 않는다 — 차단 페이지 본문과 /cdn-cgi/trace 를 흉내 낸다 (S15P21A604-664).
+if [[ -z "${headers}" ]]; then
+  case "${url}" in
+    */cdn-cgi/trace) printf 'fl=1f2\nh=demo.example.invalid\nip=203.0.113.7\ncolo=ICN\n'; exit 0 ;;
+  esac
+  if [[ "${EDGE_BLOCK:-0}" == 1 && -n "${output}" ]]; then
+    printf '<!DOCTYPE html><html><head><title>Access denied | demo.example.invalid used Cloudflare to restrict access</title></head><body>error code: 1020</body></html>' >"${output}"
+  fi
+  exit 0
+fi
 [[ "${FAIL_HTTP:-0}" != 1 ]] || exit 22
+# 엣지(Cloudflare)가 막는 상황. --resolve 가 붙은 요청 = 오리진 직접 확인이라 이 차단을 지나간다.
+if [[ "${EDGE_BLOCK:-0}" == 1 && "${resolved}" != 1 ]]; then
+  printf 'HTTP/2 403\r\nContent-Type: text/html\r\nserver: cloudflare\r\ncf-ray: fixture-ray-0001\r\n\r\n' >"${headers}"
+  exit 0
+fi
+if [[ "${ORIGIN_BLOCK:-0}" == 1 && "${resolved}" == 1 ]]; then
+  printf 'HTTP/2 502\r\nContent-Type: text/html\r\n\r\n' >"${headers}"
+  exit 0
+fi
 case "${url}" in
   */manifest.json) type='application/json' ;;
   */index.html) type='text/html' ;;
@@ -46,8 +69,11 @@ case "${url}" in
   *.data.br|*.data.unityweb) type='application/octet-stream' ;;
   *) type='application/octet-stream' ;;
 esac
-printf 'HTTP/2 200\r\nContent-Type: %s\r\n' "${type}" >"${headers}"
-case "${url}" in *.br|*.unityweb) printf 'Content-Encoding: br\r\n' >>"${headers}" ;; esac
+printf 'HTTP/2 200\r\nContent-Type: %s\r\nvary: Accept-Encoding\r\n' "${type}" >"${headers}"
+# br 을 받겠다고 한 요청에만 Content-Encoding 을 붙인다 (S15P21A604-666).
+if [[ "${accepts_br}" == 1 ]]; then
+  case "${url}" in *.br|*.unityweb) printf 'Content-Encoding: br\r\n' >>"${headers}" ;; esac
+fi
 case "${url}" in
   */manifest.json|*/index.html) printf 'Cache-Control: no-cache\r\n' >>"${headers}" ;;
   *) printf 'Cache-Control: public, max-age=31536000, immutable\r\n' >>"${headers}" ;;
@@ -67,14 +93,20 @@ manifest = {
     'dataUrl': f'Build/{release_id}.data.br',
     'frameworkUrl': f'Build/{release_id}.framework.js.br',
     'codeUrl': f'Build/{release_id}.wasm.br',
+    'sourceCommit': 'a' * 40,
+    'sourceBranch': 'develop',
+    'dirty': False,
+    'buildProfile': 'release',
 }
 if mode == 'bad-manifest':
     manifest['codeUrl'] = 'Build/missing.wasm.br'
+if mode == 'dirty':
+    manifest['dirty'] = True
 with zipfile.ZipFile(output, 'w') as archive:
     archive.writestr('index.html', '<!doctype html>')
     archive.writestr('manifest.json', json.dumps(manifest))
     archive.writestr('TemplateData/style.css', '')
-    for path in manifest.values():
+    for path in (manifest['loaderUrl'], manifest['dataUrl'], manifest['frameworkUrl'], manifest['codeUrl']):
         if path != 'Build/missing.wasm.br':
             archive.writestr(path, release_id)
     if mode == 'traversal':
@@ -92,7 +124,18 @@ deploy_package() {
 old="$(make_package old00001)"
 deploy_package "${old}" old00001
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+# 릴리스 디렉터리는 웹 서버가 들어갈 수 있어야 한다. mktemp -d 가 만든 0700 을 그대로 두면
+# nginx 가 403 Forbidden 을 돌려주고, 그게 엣지 차단처럼 보인다 (S15P21A604-665, GitLab #165).
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001")" == *5 ]]
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/Build")" == *5 ]]
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/index.html")" == *[4567] ]]
+# 파일에까지 실행 비트를 뿌리면 안 된다 — a+rX 의 X 는 디렉터리에만 붙는다.
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001/index.html")" != *[1357] ]]
+# 이미 0700 으로 깔려 있던 릴리스를 다시 돌리면 고쳐 줘야 한다 — 아니면 같은 403 이 영영 반복된다.
+chmod 700 "${WEBGL_RELEASE_ROOT}/releases/old00001"
 deploy_package "${old}" old00001
+[[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001")" == *5 ]]
 [[ "$(find "${WEBGL_RELEASE_ROOT}/releases" -mindepth 1 -maxdepth 1 -type d | wc -l)" -eq 1 ]]
 
 if FAKE_PACKAGE="${old}" "${deploy}" --release-id badsha01 --sha256 "$(printf '0%.0s' {1..64})" --package-url package://badsha01 >/dev/null 2>&1; then
@@ -107,13 +150,59 @@ if deploy_package "${traversal}" escape01 >/dev/null 2>&1; then echo 'traversal 
 bad_manifest="$(make_package badman01 bad-manifest)"
 if deploy_package "${bad_manifest}" badman01 >/dev/null 2>&1; then echo 'bad manifest was accepted' >&2; exit 1; fi
 
+# 출처가 깨끗하지 않은 빌드는 **공개 전에** 막혀야 한다 — current 가 그대로여야 한다는 뜻이다
+# (S15P21A604-667: 검사가 공개 다음에 있어 탈락한 빌드가 demo 에 그대로 남았다).
+dirty_build="$(make_package dirty001 dirty)"
+mkdir -p \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" \
+  "${WEBGL_RELEASE_ROOT}/current.legacy.not-a-timestamp"
+# 보존 순서는 디렉터리 mtime이 아니라 이름의 UTC timestamp다. 수동 복구·이동으로 mtime이
+# 바뀌어도 newest two가 달라지면 안 된다.
+touch -t 202609120003.03 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001"
+touch -t 202609120001.01 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002"
+touch -t 202609120002.02 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003"
+if deploy_package "${dirty_build}" dirty001 >/dev/null 2>&1; then echo 'dirty build was accepted' >&2; exit 1; fi
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]
+
 candidate="$(make_package new00001)"
 export WEBGL_EVIDENCE_PATH="${fixture}/webgl-deployment.json"
+# 재시도가 들어갔으므로 테스트에서는 대기 없이 한 번 더만 시도하게 한다 (S15P21A604-656).
+export WEBGL_VERIFY_RETRIES=2 WEBGL_VERIFY_RETRY_DELAY_SECONDS=0
 export FAIL_HTTP=1
 if deploy_package "${candidate}" new00001 >/dev/null 2>&1; then echo 'failed HTTP verification was accepted' >&2; exit 1; fi
 unset FAIL_HTTP
 grep -Fq '"status":"FAILED"' "${WEBGL_EVIDENCE_PATH}"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+
+# 엣지가 검증 요청만 막고 오리진은 멀쩡한 경우 — 릴리스를 되돌리지 않고 살려야 한다 (S15P21A604-656).
+export EDGE_BLOCK=1
+deploy_package "${candidate}" new00001 >/dev/null 2>"${fixture}/edge-block.log"
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
+grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
+grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
+grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+[[ ! -e "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]
+[[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.not-a-timestamp" ]]
+# 막혔을 때 인프라가 바로 쓸 수 있는 두 가지가 로그에 남아야 한다 (S15P21A604-664, GitLab #165).
+grep -Fq 'used Cloudflare to restrict access' "${fixture}/edge-block.log"
+grep -Fq 'error code: 1020' "${fixture}/edge-block.log"
+grep -Fq 'ip=203.0.113.7' "${fixture}/edge-block.log"
+
+# 엣지도 오리진도 막히면 그건 진짜 실패다 — 그때는 되돌린다.
+rollback_probe="$(make_package new00003)"
+export ORIGIN_BLOCK=1
+if deploy_package "${rollback_probe}" new00003 >/dev/null 2>&1; then echo 'origin failure was accepted' >&2; exit 1; fi
+unset EDGE_BLOCK ORIGIN_BLOCK
+[[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
 
 deploy_package "${candidate}" new00001
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"

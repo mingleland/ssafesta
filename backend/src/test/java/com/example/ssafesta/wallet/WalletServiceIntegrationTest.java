@@ -185,6 +185,36 @@ class WalletServiceIntegrationTest {
                 LedgerEntryType.SPEND, 10, "MINIGAME_REWARD", null, null, "bad-type-key"));
     }
 
+    /**
+     * 같은 키가 <b>다른 지갑</b>의 항목을 가리키면 조용히 {@code alreadyApplied} 가 아니라 크게 던진다
+     * (S15P21A604-695).
+     *
+     * <p>키는 전역 UNIQUE 라 조회도 전역이다 — 그래서 주인 검사가 따라와야 한다. 검사가 없으면
+     * 호출자는 자기 지갑에 아무 일도 없이 "반영됐다" 를 받는다. 서버가 만든 키가 지갑 사이에서
+     * 겹쳤다는 뜻이라 클라이언트 오류(409)가 아니라 서버 결함(500)으로 드러나야 한다.
+     * {@code UNIQUE} 위반의 {@code DataIntegrityViolationException} 과는 타입으로 갈린다.
+     */
+    @Test
+    void aKeyAlreadyUsedByAnotherWalletIsRefusedLoudly() {
+        Long first = createMember(users, "교차키갑");
+        Long second = createMember(users, "교차키을");
+        wallets.openWallet(first);
+        wallets.openWallet(second);
+        String sharedKey = "SURVEY_REWARD:" + first + ":shared";
+        wallets.credit(new CoinCreditCommand(first, LedgerEntryType.REWARD, 5, "SURVEY_REWARD",
+                "SURVEY", "1", sharedKey));
+
+        assertThrows(IllegalStateException.class, () -> wallets.credit(new CoinCreditCommand(
+                second, LedgerEntryType.REWARD, 5, "SURVEY_REWARD", "SURVEY", "1", sharedKey)));
+
+        assertEquals(properties.initialGrant(), wallets.balanceOf(second), "다른 지갑의 키로는 아무 것도 변하지 않는다.");
+        Long secondWalletId = walletRepository.findByUserId(second).orElseThrow().getId();
+        assertTrue(ledger.findByIdempotencyKey(sharedKey)
+                .filter(entry -> entry.getWalletId().equals(secondWalletId)).isEmpty(),
+                "을의 원장에 갑의 키가 붙으면 안 된다.");
+        assertBalanceMatchesLedger(wallets, second);
+    }
+
     @Test
     void anOverlongIdempotencyKeyFailsInsteadOfBeingTruncated() {
         Long userId = createMember(users, "키길이");

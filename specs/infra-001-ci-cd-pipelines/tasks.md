@@ -1,7 +1,7 @@
 # Tasks: 변경 컴포넌트 CI와 dev 배포
 
 **Input**: `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`
-**Branch policy**: GitLab CI/Runner는 `feature/* → develop` MR의 Front·Back merge gate만 수행한다. Jenkins는 Squash Merge된 `develop`의 변경 컴포넌트 CI·dev 배포와 수동 demo promotion을 수행한다.
+**Branch policy**: GitLab CI/Runner는 `feature/* → develop` MR의 Front·Back merge gate를 수행한다. Game MR은 Jenkins Unity agent의 무배포 컴파일·EditMode gate가 검증한다. Jenkins `develop` job은 Squash Merge된 변경 컴포넌트 CI·dev 배포와 수동 demo promotion을 수행한다.
 
 ## Phase 1: GitLab MR merge gate
 
@@ -17,6 +17,22 @@
 
 ---
 
+## Phase 1A: Game MR Unity test-only gate
+
+**Purpose**: Game 변경 MR의 head SHA를 Jenkins Unity agent에서 `ci/test`로 검증하고, 결과를 GitLab의 필수 상태로 게시한다. `ci/test`는 Unity 스크립트 컴파일과 EditMode 정적 검사를 포함한다. 이 경로는 build·package·Registry·dev/demo 배포를 절대 호출하지 않는다.
+
+- [ ] T044 [P] `infra/tests/acceptance/us1-gitlab-mr-gate.sh`에 Game 변경이 Unity MR gate를 요구하고, docs-only MR에는 요구하지 않는 contract fixture를 추가한다
+- [ ] T045 [P] `infra/jenkins/tests/unity-mr-validation.sh`에 MR head SHA checkout, `ci/test` 실행, build/package/deploy 명령 부재와 실패 상태 게시 계약을 검사하는 fixture를 작성한다
+- [ ] T046 `infra/jenkins/pipelines/unity-mr-validation.groovy`에 Unity agent의 MR head SHA checkout → `ci/test` → GitLab commit status 게시 순서를 구현한다. 이 pipeline에는 image build, package, Compose, deploy credential 또는 promotion stage를 두지 않는다
+- [ ] T047 `infra/jenkins/jobs/gitlab-unity-mr-validation.groovy`에 Game MR만 수신하고 source SHA·MR 식별자를 전달하는 Jenkins job을 정의한다
+- [ ] T048 `.gitlab-ci.yml`에 `festa-unity/**`, Game CI adapter와 Unity project 설정 변경을 감지해 Jenkins Unity MR gate를 dispatch하고, Jenkins 결과가 GitLab pipeline의 필수 성공 상태가 되도록 연결한다
+- [ ] T049 [P] `infra/jenkins/tests/test-foundation.sh`에 MR Unity job의 Unity agent label, no-deploy 명령 집합, GitLab status context와 Jenkins credential masking을 정적 검증한다
+- [ ] T050 `infra/evidence/gitlab-unity-mr-gate.md`에 정상 EditMode, 의도적 컴파일/EditMode 실패, agent 미가용 실패가 각각 GitLab merge를 차단하고 dev/demo 컨테이너 restart delta가 0인 실측을 기록한다
+
+**Checkpoint**: Game MR의 Unity 컴파일 또는 EditMode가 실패·timeout·skip이면 merge되지 않으며, 성공·실패 어느 경우에도 dev/demo 런타임은 변경되지 않는다.
+
+---
+
 ## Phase 2: Jenkins develop 선택·배포 경계
 
 **Purpose**: Jenkins는 merge 후 `develop` range만 판별하고 dev 배포를 담당한다.
@@ -29,7 +45,7 @@
 - [X] T011 `infra/jenkins/pipelines/component.groovy`에 selected component stage summary·artifact fingerprint 기록을 추가한다
 - [X] T012 `infra/jenkins/jobs/gitlab-develop-multibranch.groovy`를 추가해 develop push 전용 Jenkins job을 정의한다
 
-**Checkpoint**: Jenkins는 MR을 재실행하지 않고 develop push의 selection 결과만 dev 배포 후보로 만든다.
+**Checkpoint**: Jenkins develop job은 MR test-only job과 분리되어 develop push의 selection 결과만 dev 배포 후보로 만든다.
 
 ---
 
@@ -61,7 +77,7 @@
 - [ ] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
 - [X] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`에 Registry download, SHA-256·안전한 ZIP·manifest 검증, immutable release 설치, 원자적 `current`, 공개 HTTP 검증과 실패 rollback을 구현하고 Nginx가 `.br`·`.unityweb`을 동일한 Brotli 계약으로 제공하게 한다
 - [X] T022D [US1] `infra/jenkins/scripts/publish-webgl-release.sh`, `infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy`, `infra/jenkins/pipelines/webgl-package-deploy.groovy`로 upload 성공 후 Jenkins parameterized job→deploy-agent 흐름을 연결한다. Windows Agent는 추가하지 않는다
-- [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, current/previous 보호와 제한된 retention을 구현한다
+- [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, `current`·`previous` 보호와 성공 배포 뒤 UTC timestamp legacy 최신 두 개만 보존하는 retention을 구현한다
 - [X] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 credential, 업로드, Jenkins job, MIME·Brotli·Cache-Control, rollback 확인 절차를 추가한다
 
 **Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
@@ -143,8 +159,9 @@
 ## Dependencies & Execution Order
 
 ```text
-T001–T005 GitLab MR gate
-  → T006–T012 Jenkins develop selection
+T001–T005 GitLab Front·Back MR gate
+  ├→ T044–T050 Jenkins Unity Game MR gate
+  └→ T006–T012 Jenkins develop selection
     → T013–T022 dev batch (US1)
       ├→ T023–T025 secret verification (US4)
       ├→ T026–T030 manual demo promotion (US2)
@@ -160,7 +177,7 @@ all implementation → T038–T043 live evidence
 
 ## Implementation Strategy
 
-1. **MVP**: T001–T022 — prove GitLab MR gate and Jenkins selected dev deployment, including rollback.
+1. **MVP**: T001–T022와 T044–T050 — Front·Back GitLab gate, Game Unity MR gate, Jenkins selected dev deployment과 rollback을 검증한다.
 2. Add T023–T025 before using any new route with real credentials.
 3. Add T026–T030 to move demo only by approval.
 4. Complete traceability/observability and then record actual EC2 evidence.

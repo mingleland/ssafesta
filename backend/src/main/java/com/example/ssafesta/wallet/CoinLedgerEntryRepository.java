@@ -46,4 +46,42 @@ public interface CoinLedgerEntryRepository extends JpaRepository<CoinLedgerEntry
      */
     @Query("select e.walletId, sum(e.amount) from CoinLedgerEntry e group by e.walletId")
     List<Object[]> sumAmountGroupedByWalletId();
+
+    /**
+     * 한 부스와 닿는 코인 흐름 (spec 015 FR-005, S15P21A604-501).
+     *
+     * <p><b>부스로 코인이 들어오는 경로는 없다.</b> 원장 사유를 전수로 보면 부스와 닿는 것은 둘뿐이고
+     * 둘 다 수익이 아니다 — 임대료는 소유자가 <i>내는</i> 돈이고, 설문 보상은 차감되는 지갑 없이
+     * <i>발행</i>된다. 그래서 "수익" 대신 이 둘을 그대로 돌려준다: 이 부스가 코인 경제에서 무엇을
+     * 쓰고 무엇을 뿌렸는가.
+     *
+     * <p>특히 설문 보상은 응답 수 옆에 놓이면 바로 읽힌다 — 코인 155개를 뿌려 응답 31개를 받았다.
+     * 보상 구조가 실제로 먹히는지가 그 두 숫자에 있다(GitLab #94 의 검증 지표).
+     *
+     * <p>네이티브인 이유는 {@code reference_id} 가 {@code VARCHAR} 이고 임대·설문 어느 쪽과도 연관
+     * 매핑이 없기 때문이다. 원장이 자기 참조를 해석하는 질의라 이 자리에 둔다.
+     *
+     * @return {@code [임대료 합(양수), 설문 보상 발행 합]}
+     */
+    @Query(value = """
+            select
+              coalesce(sum(-e.amount) filter (
+                  where e.reason_type = :leaseReason and e.reference_type = :leaseRefType), 0),
+              coalesce(sum(e.amount) filter (
+                  where e.reason_type = :surveyReason and e.reference_type = :surveyRefType), 0)
+            from coin_ledger_entries e
+            where e.created_at >= :from and e.created_at < :to
+              and ((e.reason_type = :leaseReason and e.reference_type = :leaseRefType
+                    and e.reference_id in (select cast(l.id as varchar)
+                                           from booth_leases l where l.booth_id = :boothId))
+                or (e.reason_type = :surveyReason and e.reference_type = :surveyRefType
+                    and e.reference_id in (select cast(s.id as varchar)
+                                           from surveys s where s.booth_id = :boothId)))
+            """, nativeQuery = true)
+    Object[] sumBoothCoinFlow(@Param("boothId") Long boothId,
+                              @Param("from") Instant from, @Param("to") Instant to,
+                              @Param("leaseReason") String leaseReason,
+                              @Param("leaseRefType") String leaseRefType,
+                              @Param("surveyReason") String surveyReason,
+                              @Param("surveyRefType") String surveyRefType);
 }

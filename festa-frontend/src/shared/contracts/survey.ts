@@ -92,5 +92,7 @@ export interface SurveyBuilderIssueVM {
 
 export interface SurveyDraftVM {
   title: string;
+  /** 응답 보상 Coin. 0 = 보상 없음. 0 보다 크면 그 설문은 회원 전용이 된다(C-05, GitLab #133) */
+  rewardCoin: number;
   questions: SurveyQuestionVM[];
 }

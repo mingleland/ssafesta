@@ -77,17 +77,16 @@
 - 90%에서 read까지 차단: FR-025의 기존 문서 조회 유지에 어긋난다.
 - 가격/한도를 code constant로 고정: 공급자 정책 변경을 흡수하지 못한다.
 
-## R-07. S3-compatible 수동 emergency fallback
+## R-07. 승인된 MinIO fallback과 outage admission
 
-**Decision**: 단일 node/single drive MinIO를 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태로 수동 운영한다. validation은 disk·credential·PUT·HEAD·CORS·외부 port 차단을 확인한다. local object에는 provider를 기록하고 R2 복귀 시 같은 key의 size/type/SHA-256을 검증한 뒤 metadata를 전환한다. 9000/9001은 host public port로 publish하지 않는다.
+**Decision**: Cloudflare R2가 정상 운영의 primary provider다. R2 probe 실패 또는 usage guard 차단 시 새 upload grant를 먼저 fail-closed한다. R2 장기 장애에서는 운영자 승인 후 MinIO로 전환할 수 있다. `storage-failover.sh`는 전환과 reconcile 전체를 단일 lock으로 직렬화하고, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다. reconcile 결과는 target provider와 `targetBucket`을 명시한다. 기존 문서 조회와 R2 비의존 비AI 기능은 가능한 범위에서 유지한다.
 
-**Rationale**: S3-compatible adapter를 유지하면서 R2 장애 중 제한적 신규 업로드만 복구할 수 있다. MinIO 공식 single-node/single-drive 안내도 이를 개발·평가 또는 availability 요구가 낮은 용도로 설명하므로 같은 EC2의 backup이나 durability 수단으로 간주할 수 없다. [MinIO container deployment](https://min.io/docs/minio/container/index.html)
+**Rationale**: 자동 failover는 split-brain·누락 객체 위험이 있으므로 금지한다. 반면 장기 R2 장애에서 운영자 승인 fallback을 남기면 서비스 중단 선택지를 보존할 수 있다. 단일 lock과 명시적 target bucket은 A→B→A 동시 reconcile 및 설정 추론을 막는다. MinIO는 PostgreSQL backup의 대체 수단이 아니며, DB backup은 계속 private R2 bucket에 보관한다.
 
-**Alternatives considered**:
+**Alternatives rejected**:
 
-- 자동 failover: split-brain·누락 객체 위험이 있고 FR-017을 위반한다.
-- local directory 직접 저장: S3-compatible 계약을 깨뜨린다.
-- MinIO를 상시 backup으로 간주: EC2와 장애 영역이 같아 FR-018을 충족하지 못한다.
+- 자동 failover: split-brain·누락 객체 위험이 있다.
+- 로컬 디렉터리: 서버 유실 시 문서를 함께 잃고 R2 계약을 이중화한다.
 
 ## R-08. PostgreSQL database/role 격리와 backup
 

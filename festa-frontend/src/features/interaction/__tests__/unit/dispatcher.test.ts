@@ -140,4 +140,14 @@ describe('initInteractionDispatcher', () => {
     expect(getWorldContext()).toEqual({ insideBooth: false, boothId: null });
     unsubscribe();
   });
+
+  // 안내데스크 NPC — 새 화면이 아니라 이미 있는 이용 안내 오버레이를 다시 연다
+  // (S15P21A604-688, GitLab #184). payload 는 없다 — 화면이 읽을 값이 없다
+  it('WORLD_GUIDE_INTERACT 는 이용 안내 오버레이를 payload 없이 연다', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_GUIDE_INTERACT' }));
+
+    expect(getCurrentOverlay()).toEqual({ type: 'WORLD_GUIDE', payload: {} });
+    unsubscribe();
+  });
 });

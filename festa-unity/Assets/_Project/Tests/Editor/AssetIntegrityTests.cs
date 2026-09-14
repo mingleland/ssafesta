@@ -151,6 +151,67 @@ namespace Festa.Tests
                 "assetCode 를 비워라 (T-148).\n" + string.Join("\n", offenders));
         }
 
+        /// <summary>
+        /// T-269 회귀 방지 — <b>테스트 코드가 배포본에 섞여 들어가는 것</b>을 막는다.
+        ///
+        /// <para>2026-09-13 릴리스 빌드가 이렇게 죽었다.</para>
+        /// <code>
+        /// Mono.Cecil.AssemblyResolutionException: Failed to resolve assembly:
+        ///   'nunit.framework, Version=3.5.0.0, Culture=neutral, PublicKeyToken=null'
+        /// </code>
+        /// <para><c>Tests/EditMode/</c> 에 asmdef 가 없어 그 안의 테스트가 <b>기본 어셈블리
+        /// (Assembly-CSharp)</b> 로 들어갔다. 기본 어셈블리는 플레이어 빌드에 포함되므로 NUnit 이
+        /// 통째로 끌려오고, 관리 코드 스트리핑 단계에서 해석에 실패한다.</para>
+        ///
+        /// <para><b>에디터에서는 아무 문제가 없다.</b> 에디터에는 NUnit 이 있으니 컴파일도 되고
+        /// 테스트도 돈다 — <b>플레이어 빌드에 가서야</b> 드러난다. 그래서 "컴파일 + EditMode" 게이트로는
+        /// 이 부류가 잡히지 않는다. 이 검사가 그 자리를 메운다(몇 초면 끝난다).</para>
+        /// </summary>
+        [Test]
+        public void 테스트_전용_코드는_테스트_어셈블리_안에만_있다()
+        {
+            const string root = "Assets/_Project";
+            var offenders = new List<string>();
+
+            foreach (var file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+            {
+                var text = File.ReadAllText(file);
+                if (!text.Contains("NUnit.Framework") && !text.Contains("UnityEngine.TestTools")) continue;
+
+                var asmdef = NearestAsmdef(Path.GetDirectoryName(file));
+                if (asmdef == null)
+                {
+                    offenders.Add($"{Rel(file)} — asmdef 밖이다 (기본 어셈블리로 들어가 배포본에 실린다)");
+                    continue;
+                }
+                // 테스트 어셈블리는 에디터 전용이고 UNITY_INCLUDE_TESTS 로 플레이어에서 빠진다.
+                var json = File.ReadAllText(asmdef);
+                if (!json.Contains("UNITY_INCLUDE_TESTS"))
+                    offenders.Add($"{Rel(file)} — {Path.GetFileName(asmdef)} 에 UNITY_INCLUDE_TESTS 제약이 없다");
+            }
+
+            Assert.IsEmpty(offenders,
+                "테스트 전용 코드가 배포되는 어셈블리에 있다. 플레이어 빌드가 nunit.framework 해석 실패로 죽는다 " +
+                "(T-269). Tests/Editor/ 로 옮기거나 UNITY_INCLUDE_TESTS 를 건 asmdef 를 둬라.\n"
+                + string.Join("\n", offenders));
+        }
+
+        /// <summary>이 폴더부터 위로 올라가며 처음 만나는 asmdef. 없으면 기본 어셈블리에 들어간다는 뜻이다.</summary>
+        static string NearestAsmdef(string dir)
+        {
+            var full = Path.GetFullPath(dir);
+            var stop = Path.GetFullPath("Assets");
+            while (!string.IsNullOrEmpty(full) && full.StartsWith(stop))
+            {
+                var found = Directory.GetFiles(full, "*.asmdef", SearchOption.TopDirectoryOnly);
+                if (found.Length > 0) return found[0];
+                full = Path.GetDirectoryName(full);
+            }
+            return null;
+        }
+
+        static string Rel(string path) => path.Replace('\\', '/');
+
         static void OpenMainScene()
         {
             var scene = SceneManager.GetActiveScene();

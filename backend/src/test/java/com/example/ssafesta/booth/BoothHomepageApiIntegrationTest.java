@@ -77,7 +77,7 @@ class BoothHomepageApiIntegrationTest {
     void registeredStaffMayRegisterToo() throws Exception {
         Owner owner = leasedOwner("스태프등록");
         Long staff = createMemberWithWallet(users, wallets, "스태프");
-        staffs.save(new BoothStaff(owner.boothId(), staff, "STAFF"));
+        staffs.save(new BoothStaff(owner.boothId(), staff, "CONTENT_EDITOR"));
 
         mockMvc.perform(put("/api/v1/booths/{id}/homepage", owner.boothId())
                         .header("Authorization", bearerFor(staff))

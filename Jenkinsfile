@@ -12,7 +12,7 @@ pipeline {
             steps { sh 'infra/jenkins/scripts/check-agent-capabilities.sh' }
         }
         stage('Security Preflight') {
-            steps { sh 'infra/jenkins/scripts/secret-scan.sh --path .' }
+            steps { sh 'infra/jenkins/scripts/secret-scan.sh --tracked --path .' }
         }
         stage('Develop Push Dispatch') {
             steps {
@@ -27,7 +27,7 @@ pipeline {
 
     post {
         always {
-            sh 'infra/jenkins/scripts/secret-scan.sh --path .'
+            sh 'infra/jenkins/scripts/secret-scan.sh --path artifacts'
             archiveArtifacts artifacts: 'artifacts/**/*', allowEmptyArchive: true, fingerprint: true
         }
     }

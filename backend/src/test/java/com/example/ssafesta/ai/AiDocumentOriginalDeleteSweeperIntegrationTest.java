@@ -20,6 +20,7 @@ import com.example.ssafesta.user.UserRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,11 +30,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * {@link AiDocumentOriginalDeleteSweeper} (FR-028, S15P21A604-556).
+ * {@link AiDocumentOriginalDeleteSweeper} — the {@code EXPIRED} leg (FR-028, S15P21A604-556) and the
+ * {@code FAILED} leg (FR-028a, S15P21A604-637), which share one sweep path.
  *
  * <p>Rows are seeded straight into {@code ai_documents} by JDBC rather than through the upload API
  * — the sweeper only ever reads and writes that table, and going through upload-url/complete/expire
  * for every case would test three endpoints' worth of behaviour this class does not touch.
+ *
+ * <p>Not asserted here yet: a replaced original (FR-027a — {@code EXPIRED} carrying {@code
+ * replaced_at}) is swept by these same {@code EXPIRED} cases, because the sweep's eligibility is
+ * status plus elapsed time and nothing else — it never reads {@code replaced_at}. The column
+ * arrives with V30 (S15P21A604-386); the assertion goes in once that merges.
  */
 @Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
 @SpringBootTest
@@ -240,6 +247,135 @@ class AiDocumentOriginalDeleteSweeperIntegrationTest {
             }
         });
 
+        List<ILoggingEvent> logged = sweepAndCaptureLogs();
+
+        assertTrue(logged.stream().anyMatch(event -> event.getLevel() == Level.ERROR
+                        && event.getFormattedMessage().contains(String.valueOf(documentId))),
+                "복구된 문서의 원본을 지운 사고가 ERROR로 남지 않았다: " + logged);
+        assertTrue(logged.stream().noneMatch(event -> event.getLevel() == Level.WARN),
+                "사고인데 무해한 좌표-경합과 같은 WARN으로도 찍혔다: " + logged);
+
+        AiDocument after = documents.findById(documentId).orElseThrow();
+        assertEquals("QUEUED", after.getProcessingStatus());
+        assertEquals("s3-key-sliver", after.getObjectKey(), "s3_key는 그대로인데 원본은 실제로 지워졌다");
+        assertFalse(storage.hasObject("s3-key-sliver"), "이 테스트가 재현하는 사고 자체 — 원본이 지워졌다");
+    }
+
+    /**
+     * FR-028a's grace. Was {@code aFailedDocumentIsNotTouched}, when {@code FAILED} was out of this
+     * sweep's scope entirely — the sweep takes those rows now, just not before day seven. The
+     * clock is {@code updated_at}, not {@code expired_at}, so this row is 6d23h old by the only
+     * measure that counts.
+     */
+    @Test
+    void leavesAFailedDocumentInsideItsGraceAlone() {
+        long documentId = seed("FAILED", "s3-key-failed", Duration.ofDays(6).plusHours(23));
+        storage.putObject("s3-key-failed", 1024);
+
+        sweeper.deleteExpiredOriginals();
+
+        assertTrue(storage.hasObject("s3-key-failed"), "유예 안인데 원본이 지워졌다");
+        assertEquals("s3-key-failed", documents.findById(documentId).orElseThrow().getObjectKey());
+    }
+
+    /** Past the grace, a {@code FAILED} original goes the same way an {@code EXPIRED} one does. */
+    @Test
+    void deletesAFailedOriginalPastTheGrace() {
+        long documentId = seed("FAILED", "s3-key-failed-old", Duration.ofDays(7).plusMinutes(1));
+        storage.putObject("s3-key-failed-old", 1024);
+
+        sweeper.deleteExpiredOriginals();
+
+        assertFalse(storage.hasObject("s3-key-failed-old"), "유예가 끝났는데 원본이 남아 있다");
+        assertNull(documents.findById(documentId).orElseThrow().getObjectKey(),
+                "s3_key 가 비워지지 않았다");
+    }
+
+    /** Same retry contract as the {@code EXPIRED} leg — a storage failure writes nothing at all. */
+    @Test
+    void aStorageFailureOnAFailedOriginalLeavesTheRowUntouchedForTheNextPass() {
+        long documentId = seed("FAILED", "s3-key-failed-stuck", Duration.ofDays(7).plusHours(1));
+        storage.putObject("s3-key-failed-stuck", 1024);
+        storage.failDeleteWith(new StorageUnavailableException("일시 장애"));
+
+        sweeper.deleteExpiredOriginals();
+
+        assertTrue(storage.hasObject("s3-key-failed-stuck"), "실패했는데 객체가 지워졌다");
+        AiDocument after = documents.findById(documentId).orElseThrow();
+        assertEquals("s3-key-failed-stuck", after.getObjectKey(), "실패했는데 s3_key 가 비워졌다");
+        assertEquals("FAILED", after.getProcessingStatus(), "실패했는데 상태가 바뀌었다");
+
+        storage.failDeleteWith(null);
+        sweeper.deleteExpiredOriginals();
+
+        assertFalse(storage.hasObject("s3-key-failed-stuck"));
+        assertNull(documents.findById(documentId).orElseThrow().getObjectKey());
+    }
+
+    /**
+     * FR-028a's "스냅샷 전체 일치 조건에서 자동으로 빠진다": a reprocess landing while an
+     * <b>earlier</b> row of the same batch is still being deleted moves this row off {@code FAILED}
+     * and stamps {@code updated_at} — two legs of the snapshot predicate at once. The re-check right
+     * before the delete therefore drops it and its original is never touched.
+     */
+    @Test
+    void aFailedRowReprocessedWhileAnEarlierRowInTheBatchIsStillBeingDeletedSurvives() {
+        long reprocessing = seed("FAILED", "s3-key-failed-later", Duration.ofDays(8));
+        seed("FAILED", "s3-key-failed-first", Duration.ofDays(9)); // sorts first — ORDER BY updated_at
+        storage.putObject("s3-key-failed-later", 1024);
+        storage.putObject("s3-key-failed-first", 1024);
+        storage.onDelete(key -> {
+            if ("s3-key-failed-first".equals(key)) {
+                jdbc.update("UPDATE ai_documents SET processing_status = 'QUEUED', updated_at = now() "
+                        + "WHERE id = ?", reprocessing);
+            }
+        });
+
+        sweeper.deleteExpiredOriginals();
+
+        assertTrue(storage.hasObject("s3-key-failed-later"), "재처리된 문서의 원본이 지워졌다");
+        AiDocument after = documents.findById(reprocessing).orElseThrow();
+        assertEquals("s3-key-failed-later", after.getObjectKey());
+        assertEquals("QUEUED", after.getProcessingStatus());
+    }
+
+    /**
+     * FR-028a's accepted race, {@code FAILED} leg. The reprocess lands in the sliver the re-check
+     * cannot close — between it and the delete call itself. The bytes are gone and no later
+     * {@code UPDATE} brings them back, so <b>zero rows updated is not success here</b>: {@code s3_key}
+     * must stay exactly as it was (the row is no longer a sweep candidate, and clearing it would
+     * quietly file the incident as a completed deletion) and the accident has to surface as
+     * {@code ERROR}, not the WARN a harmless coordinate race gets.
+     */
+    @Test
+    void aFailedRowReprocessedInTheSliverBeforeItsOwnDeleteIsLoggedAsAnError() {
+        long documentId = seed("FAILED", "s3-key-failed-sliver", Duration.ofDays(8));
+        storage.putObject("s3-key-failed-sliver", 1024);
+        storage.onDelete(key -> {
+            if ("s3-key-failed-sliver".equals(key)) {
+                jdbc.update("UPDATE ai_documents SET processing_status = 'QUEUED', updated_at = now() "
+                        + "WHERE id = ?", documentId);
+            }
+        });
+
+        List<ILoggingEvent> logged = sweepAndCaptureLogs();
+
+        assertTrue(logged.stream().anyMatch(event -> event.getLevel() == Level.ERROR
+                        && event.getFormattedMessage().contains(String.valueOf(documentId))),
+                "재처리된 문서의 원본을 지운 사고가 ERROR로 남지 않았다: " + logged);
+        assertTrue(logged.stream().noneMatch(event -> event.getLevel() == Level.WARN
+                        && event.getFormattedMessage().contains(String.valueOf(documentId))),
+                "사고인데 무해한 좌표-경합과 같은 WARN으로도 찍혔다: " + logged);
+
+        AiDocument after = documents.findById(documentId).orElseThrow();
+        assertEquals("QUEUED", after.getProcessingStatus());
+        assertEquals("s3-key-failed-sliver", after.getObjectKey(),
+                "갱신이 0행이어야 하는데 s3_key 가 비워졌다 — 사고가 성공으로 표시됐다");
+        assertFalse(storage.hasObject("s3-key-failed-sliver"),
+                "이 테스트가 재현하는 사고 자체 — 원본이 지워졌다");
+    }
+
+    private List<ILoggingEvent> sweepAndCaptureLogs() {
         Logger logger = (Logger) org.slf4j.LoggerFactory.getLogger(AiDocumentOriginalDeleteSweeper.class);
         ListAppender<ILoggingEvent> capture = new ListAppender<>();
         capture.start();
@@ -249,41 +385,25 @@ class AiDocumentOriginalDeleteSweeperIntegrationTest {
         } finally {
             logger.detachAppender(capture);
         }
-
-        assertTrue(capture.list.stream().anyMatch(event -> event.getLevel() == Level.ERROR
-                        && event.getFormattedMessage().contains(String.valueOf(documentId))),
-                "복구된 문서의 원본을 지운 사고가 ERROR로 남지 않았다: " + capture.list);
-        assertTrue(capture.list.stream().noneMatch(event -> event.getLevel() == Level.WARN),
-                "사고인데 무해한 좌표-경합과 같은 WARN으로도 찍혔다: " + capture.list);
-
-        AiDocument after = documents.findById(documentId).orElseThrow();
-        assertEquals("QUEUED", after.getProcessingStatus());
-        assertEquals("s3-key-sliver", after.getObjectKey(), "s3_key는 그대로인데 원본은 실제로 지워졌다");
-        assertFalse(storage.hasObject("s3-key-sliver"), "이 테스트가 재현하는 사고 자체 — 원본이 지워졌다");
+        return capture.list;
     }
 
-    /** {@code EXPIRED} only — a {@code FAILED} document's original is out of this sweep's scope. */
-    @Test
-    void aFailedDocumentIsNotTouched() {
-        long documentId = seed("FAILED", "s3-key-failed", Duration.ofHours(25));
-        storage.putObject("s3-key-failed", 1024);
-
-        sweeper.deleteExpiredOriginals();
-
-        assertTrue(storage.hasObject("s3-key-failed"));
-        assertEquals("s3-key-failed", documents.findById(documentId).orElseThrow().getObjectKey());
-    }
-
-    private long seed(String status, String objectKey, Duration expiredAgo) {
+    /**
+     * {@code ago} backdates both clocks the sweep can run on — {@code expired_at} for the
+     * {@code EXPIRED} leg, {@code updated_at} for the {@code FAILED} one — so each case reads as the
+     * age of whichever one its status makes relevant. The other is inert: neither leg looks at the
+     * column the other times from.
+     */
+    private long seed(String status, String objectKey, Duration ago) {
         String sha = "%064x".formatted(SEQUENCE.incrementAndGet());
+        Timestamp at = Timestamp.from(Instant.now().minus(ago));
         return jdbc.queryForObject("""
                 INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
                     size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
-                    storage_provider, storage_bucket, uploaded_at, expired_at)
+                    storage_provider, storage_bucket, uploaded_at, expired_at, updated_at)
                 VALUES (?, ?, 'sweep.pdf', 'application/pdf', 1024, ?, ?, ?, ?, 'R2',
-                    'test-ai-documents', now(), ?)
+                    'test-ai-documents', now(), ?, ?)
                 RETURNING id
-                """, Long.class, boothId, agentId, objectKey, status, userId, sha,
-                Timestamp.from(Instant.now().minus(expiredAgo)));
+                """, Long.class, boothId, agentId, objectKey, status, userId, sha, at, at);
     }
 }

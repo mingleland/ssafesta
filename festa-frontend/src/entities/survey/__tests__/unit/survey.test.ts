@@ -44,7 +44,7 @@ describe('문항 유형 매핑', () => {
   it.each(WIRE_TYPES)('%s ↔ %s 를 왕복한다', (wire, vm) => {
     const [mapped] = toDraftQuestions([question({ type: wire, options: [], scale: null })]);
     expect(mapped.type).toBe(vm as SurveyQuestionType);
-    const [back] = toSaveBody({ title: 't', questions: [{ ...mapped, options: undefined }] }).questions;
+    const [back] = toSaveBody({ title: 't', rewardCoin: 0, questions: [{ ...mapped, options: undefined }] }).questions;
     expect(back.type).toBe(wire);
   });
 
@@ -86,6 +86,7 @@ describe('toRunSnapshot (§5)', () => {
 describe('toSaveBody (§4)', () => {
   const draft: SurveyDraftVM = {
     title: 'A604 부스 설문',
+    rewardCoin: 5,
     questions: [
       { id: 'q-1', type: 'single', prompt: '어떻게 알았나요?', required: true, options: [{ id: 'o-1', label: '월드' }] },
       { id: 'q-2', type: 'rating', prompt: '만족도', required: true, scale: { min: 1, max: 5 } },
@@ -93,11 +94,12 @@ describe('toSaveBody (§4)', () => {
     ],
   };
 
-  // 키가 없어야 서버가 기존 값을 유지한다. 값이 아니라 **키 부재**를 본다 (T-97 회귀)
-  it('description·rewardCoin·closesAt 키를 싣지 않는다 — 실으면 저장할 때마다 보상이 지워진다', () => {
+  // 키가 없어야 서버가 기존 값을 유지한다. 값이 아니라 **키 부재**를 본다 (T-97 회귀).
+  // rewardCoin 은 Builder 가 편집하므로 이제 싣는다 (S15P21A604-520) — 빼면 편집이 유실된다
+  it('description·closesAt 키를 싣지 않고 rewardCoin 은 편집값 그대로 싣는다', () => {
     const body = toSaveBody(draft) as unknown as Record<string, unknown>;
-    expect(Object.keys(body)).toEqual(['title', 'questions']);
-    expect('rewardCoin' in body).toBe(false);
+    expect(Object.keys(body)).toEqual(['title', 'rewardCoin', 'questions']);
+    expect(body.rewardCoin).toBe(5);
     expect('description' in body).toBe(false);
     expect('closesAt' in body).toBe(false);
   });
@@ -284,11 +286,11 @@ describe('surveyHttpPort', () => {
     await expect(surveyHttpPort.getDraft(7)).rejects.toMatchObject({ code: 'BOOTH_NOT_FOUND' });
   });
 
-  it('saveDraft 는 PUT 본문에 title·questions 만 싣는다', async () => {
+  it('saveDraft 는 PUT 본문에 title·rewardCoin·questions 만 싣는다', async () => {
     const calls = stubFetch(() => ({ body: SURVEY_BODY }));
-    await surveyHttpPort.saveDraft(7, { title: 'A604', questions: [] });
+    await surveyHttpPort.saveDraft(7, { title: 'A604', rewardCoin: 0, questions: [] });
     expect(calls[0].init?.method).toBe('PUT');
-    expect(Object.keys(JSON.parse(String(calls[0].init?.body)))).toEqual(['title', 'questions']);
+    expect(Object.keys(JSON.parse(String(calls[0].init?.body)))).toEqual(['title', 'rewardCoin', 'questions']);
   });
 
   it('submitAnswers 는 surveyId 경로로 POST 하고 지급 코인을 돌려준다', async () => {

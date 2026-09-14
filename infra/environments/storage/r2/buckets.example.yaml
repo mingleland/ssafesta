@@ -1,0 +1,15 @@
+# R2 bucket policy reference. Actual account IDs, bucket names, and credentials stay in runtime Secrets.
+documentBucket:
+  provider: cloudflare-r2
+  storageClass: Standard
+  publicAccess: false
+  credentialRef: R2_DOCUMENT_SIGNER_CREDENTIAL_REF
+  readCredentialRef: R2_DOCUMENT_READER_CREDENTIAL_REF
+  corsRef: documents-cors.json
+backupBucket:
+  provider: cloudflare-r2
+  storageClass: Standard
+  publicAccess: false
+  credentialRef: R2_BACKUP_WRITER_CREDENTIAL_REF
+  readCredentialRef: R2_RESTORE_READER_CREDENTIAL_REF
+  cors: disabled

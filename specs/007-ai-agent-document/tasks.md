@@ -17,6 +17,9 @@
 | `S15P21A604-93` | FastAPI 스캐폴드와 실행·테스트·컨테이너 기반(T001~T007) | 공통 스캐폴드는 완료. 스파이크와 독립적이며 튜닝 값은 포함하지 않음 |
 | `S15P21A604-94` | Provider protocol·fake·Embedding adapter(T007, T018, T047) | T001 및 스파이크 결과 확인 후 시작 |
 | `S15P21A604-95` | Alembic·DB session·Job 모델과 migration(T004, T012~T014) | T001 완료 후 시작 |
+| `S15P21A604-386` | 문서 수정본 교체와 교체된 원본의 `replaced_at`(T095~T097) + finalize 롤백·410(T101·T102) | `S15P21A604-647`(spec 개정) 머지 후 |
+| `S15P21A604-521` | 최대 부하 정확 스캔·검색 P95 Testcontainers 검증(T098) | 동일 |
+| `S15P21A604-637` | `FAILED` 원본 7일 유예 삭제(T099·T100) | 동일 |
 
 `S15P21A604-92`의 실측값은 `research.md`에 기록하고, 청킹 기본값을 구현하는 T048과 최대 허용량 품질을 검증하는 T067에서 사용한다. 실측 전에는 chunk size·overlap을 코드나 spec에 고정하지 않는다.
 
@@ -42,6 +45,39 @@
 - [ ] T094 [BE/AI] batch 멱등·순서 독립, stale 409, cancelled 410, finalize rollback과 FastAPI DB credential 부재를 자동 검증한다 (`S15P21A604-496`: 임대 만료로 취소된 Job 의 늦은 finalize 가 410 이고 문서가 `DISABLED` 로 남는 케이스 추가)
 
 **Dependency**: T090·T091 합의 → OpenAPI 확정 → T092·T093 구현 → T094 통합 검증.
+
+---
+
+## S15P21A604-647 개정 반영 — 2026-09-11 결정 4건
+
+> `docs/26_팀_결정_필요사항.md` 결정 기록 로그 2026-09-11에 등록된 네 건을 구현으로 옮긴다. 이 절의 항목은 **위 Phase 목록과 독립적으로 착수할 수 있다** — 모두 이미 구현된 코드를 고치거나 그 위에 얹는 일이다.
+
+### ① 교체된 원본은 복구 대상이 아니다 (FR-006·FR-027a·FR-028 / `S15P21A604-386`)
+
+- [X] T095 [BE] `ai_documents.replaced_at`을 V30으로 추가하고, 수정본 교체가 기존 원본을 `EXPIRED` + `replaced_at`으로 전환하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentService.java`에 구현한다. `POST /documents/{documentId}/complete`의 24시간 복구 분기는 `replaced_at IS NULL`일 때만 태우고, 찍힌 행에는 이미 교체됐음을 알린다. **새 `DocumentStatus` 값을 만들지 않는다** — V24 CHECK는 그대로다
+- [X] T096 [P] [BE] 교체 원본의 늦은 완료가 복구되지 않음, 미교체 `EXPIRED`의 복구는 그대로 동작함을 검증한다 (SC-010).
+  📎 **검증 위치가 달라졌다** (`S15P21A604-386` 구현, 2026-09-11). 새 파일 `AiDocumentReplacementIntegrationTest` 대신 기존 세 파일에 나눠 넣었다 — `AiDocumentUploadIntegrationTest`(발급·완료·목록 분기, 교체 절), `AiDocumentConcurrencyIntegrationTest`(동시 교체 2건 → 활성 후속 1개), `AiDocumentResultApiIntegrationTest`(finalize 퇴역·재전송). 새 파일은 회원·부스·임대·직원 준비와 요청 헬퍼 전부를 복제해야 하고, 교체는 그 세 경로 <b>위에</b> 얹히는 동작이라 각자의 이웃 케이스 옆에 있는 편이 읽힌다.
+  📎 **스윕 케이스는 여기서 빠진다** — `AiDocumentOriginalDeleteSweeper`와 그 테스트는 `S15P21A604-637`(T099·T100) 소관이고, "교체된 원본도 24h 뒤 삭제된다" 단정도 그쪽이 가져간다. 이 MR 은 퇴역이 `expired_at`을 함께 찍는 것까지 보장한다(스윕이 보는 칸이다).
+- [ ] T097 [P] [FE] `replaced_at`이 찍힌 `EXPIRED`를 **교체됨**으로 표시하고 복구 안내를 띄우지 않도록 `festa-frontend/src/features/ai-agent/components/DocumentList.tsx`·`DocumentManager.tsx`에 반영한다 (FR-006). 상태 값이 늘지 않으므로 상태표 자체는 그대로다
+
+### ② SC-007 분해 — 측정 주체를 나눈다 (SC-007a·SC-007b)
+
+- [ ] T098 [BE] `N_total` = **145,646** chunk fixture로 최대 부하에서 정확 스캔 유지·정답 청크 Top-K 포함률 100%(SC-007a)와 검색 P95 1초(SC-006)를 Testcontainers로 검증한다 (`S15P21A604-521`). 상수 산출 근거는 [plan.md §3](./plan.md)이며 fixture가 이 값보다 작으면 안 된다
+- T067은 **AI 소관으로 좁힌다** — 아래 Phase 6 참조. 의미 회수율 95%(SC-007b)만 남고 BE Testcontainers 몫은 T098로 간다
+
+### ③ `FAILED` 원본 삭제 정책 (FR-028a / `S15P21A604-637`)
+
+- [ ] T099 [BE] `FAILED` 문서의 원본을 `updated_at` 기준 7일 유예 후 `EXPIRED`와 **같은 스윕 경로**에서 삭제하도록 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentOriginalDeleteSweeper.java`에 추가한다. 대상 조회·스냅샷 전체 일치 조건부 갱신·48시간 `ERROR` 승격은 기존 구조를 그대로 쓴다. **공유 claim/lock과 영속 삭제 큐는 만들지 않는다** — 클래스 주석의 범위 밖 표기(`FAILED`는 `docs/26` 미결)도 함께 갱신한다
+- [ ] T100 [P] [BE] 7일 미만은 보존, 7일 경과는 삭제, 유예 중 재처리로 `FAILED`를 벗어난 행은 스냅샷 불일치로 자동 제외, 조회와 삭제 사이 재처리가 끼면 `ERROR` 경보를 `backend/src/test/java/com/example/ssafesta/ai/AiDocumentOriginalDeleteSweeperIntegrationTest.java`에 추가한다. 기존 `aFailedDocumentIsNotTouched`는 **7일 미만 보존 케이스로 바뀐다** — 지우지 않고 조건을 옮긴다
+
+### ④ FR-040 위반 정정 — finalize 원자성 (FR-040a)
+
+> **`S15P21A604-386` 범위다.** 교체된 원본의 퇴역이 바로 이 finalize 트랜잭션 안에서 일어나므로, 별도 티켓으로 가르면 같은 메서드를 두 MR 이 나눠 고치게 된다. 교체 기능 없이 이 정정만 먼저 필요해지면 그때 분리한다.
+
+- [X] T101 [BE] `AiDocumentJobRepository.markDocumentReady`가 0행이면 `ApiException(ErrorCode.JOB_GONE)`을 던져 finalize 전체를 롤백하도록 `backend/src/main/java/com/example/ssafesta/internal/ai/AiDocumentJobRepository.java`를 고친다. 지금의 ERROR 로그 후 커밋은 FR-040의 단일 트랜잭션을 어긴다
+- [X] T102 [P] [BE] finalize 직전 문서가 `DISABLED`·`EXPIRED`가 된 경우 Chunk·Job·Document가 전부 원상 유지되고 응답이 `410 JOB_GONE`이며 **재전송도 무변화 410**임을 `backend/src/test/java/com/example/ssafesta/internal/ai/AiDocumentResultApiIntegrationTest.java`에 먼저 작성하고 실패를 확인한다 (SC-014). `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 범위 밖이라 검증 대상이 아니다
+
+**Dependency**: 네 항목은 서로 독립이다. ①은 V30 → 서비스 → FE 순서, ③은 기존 스윕 위, ④는 기존 finalize 위에서 각각 끝난다. ②의 T098은 검색 경로가 이미 있어 바로 착수할 수 있다.
 
 ---
 
@@ -193,8 +229,9 @@
     `processing_status`·`expired_at`·`storage_provider`·`storage_bucket`·`s3_key` 가 **전부** 읽은
     그대로일 때만 `s3_key` 를 비운다 — reconcile 이 그 사이 좌표를 옮기면 방금 지운 것이 그 행의
     *옛* 위치라 새 좌표를 지우면 안 된다. 0행이면 완료로 치지 않고 WARN 을 남긴다
-  - ⚠️ **`FAILED` 원본은 범위 밖이다.** FR-028 이 규정한 것은 `EXPIRED` 24시간뿐이고, 실패 문서는
-    재처리·조사에 원본이 필요할 수 있다. `docs/26` 에 미결로 등록돼 있다
+  - ✅ **`FAILED` 원본 — 2026-09-11 확정으로 범위 밖이 아니게 됐다.** FR-028a 가 `updated_at` 기준
+    7일 유예 후 **같은 스윕 경로**에서 삭제하도록 정했다(`docs/26` 결정 기록 로그 2026-09-11).
+    구현·검증은 T099·T100(`S15P21A604-637`)이며 이 체크박스와는 별개다
   - ⚠️ 배포 전 Infra 와 각 Provider 자격증명의 대상 bucket/prefix `DeleteObject` 최소 권한 확인은
     **아직 남아 있다** — 코드가 아니라 배포 준비 항목이라 체크박스와 별개로 둔다
 - [ ] T064 [US3] [BE] 목록·상태·삭제 endpoint를 `backend/src/main/java/com/example/ssafesta/ai/AiDocumentController.java`에 연결한다
@@ -211,7 +248,8 @@
 **Purpose**: 보안·성능·운영·문서 검증을 완료한다.
 
 - [ ] T066 [P] [AI] 사용자 응답과 로그에서 Secret·Stack Trace·object key·Provider 원문이 노출되지 않는지 `festa-ai/tests/integration/test_sensitive_data_redaction.py`로 검증한다
-- [ ] T067 [P] [AI] Agent당 문서 10개·100MB에서 검색 P95 1초와 정답 근거 Top-K 포함률 95%를 `festa-ai/tests/performance/test_rag_retrieval.py`로 검증한다
+- [ ] T067 [P] [AI] 자연어 품질 평가 질의에서 정답 근거 문서의 **의미 회수율 95% 이상**(SC-007b)을 `festa-ai/tests/performance/test_rag_retrieval.py`로 검증한다
+  - 📎 **범위가 좁혀졌다 (S15P21A604-647, 2026-09-11).** 원래 이 항목이 SC-006 P95와 "Top-K 포함률 95%"를 함께 지고 있었으나, Spring 검색은 `SET LOCAL enable_indexscan = off`로 정확 스캔을 강제해 범위 안 모든 청크를 채점한다 — BE 쪽 포함률은 구조상 100%(SC-007a)거나 버그이며 95%를 잴 대상이 아니다. **최대 부하 정확 스캔과 검색 P95는 T098(BE, `S15P21A604-521`, Testcontainers)로 이관**했고, 여기에는 임베딩·청킹 품질이 결정하는 의미 회수율만 남는다
 - [ ] T068 [P] [AI] Job 상태별 수·queue age·처리 시간·lease 회수·callback 지연 지표를 `festa-ai/app/core/metrics.py`에 구현한다
 - [ ] T069 [P] [AI] health/live·ready endpoint와 설정·DB·Worker 준비 상태를 `festa-ai/app/api/health.py`에 구현한다
 - [ ] T070 [P] [AI] 중앙 Jenkins의 Component Pipeline Contract가 호출할 FastAPI `ci/validate·test·build·package·verify` adapter를 `festa-ai/ci/`에 구성하고 단위·계약·통합·장애 주입·격리 테스트와 machine-readable report를 연결한다

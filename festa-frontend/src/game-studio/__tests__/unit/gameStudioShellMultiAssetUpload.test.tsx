@@ -167,5 +167,9 @@ describe('GameStudioShell — 데이터 탭 이미지 다중 업로드(S15P21A60
 
     await screen.findByText(/2개 추가, 3개 실패:.*자산 300개 상한 초과/);
     expect(savedIds).toHaveLength(2);
-  });
+    // 이 케이스만 예산을 늘린다 (S15P21A604-650). 위에서 O(n²)를 피했어도 298개 자산 프로젝트를
+    // 마운트하고 업로드 5건을 순차 처리하며 건마다 parseGameProject 가 자산 전체를 검증한다 —
+    // 로컬 22코어에서도 1.9~2.3초라 CI(2~4배)에서는 기본 5000ms 를 결정적으로 넘긴다(3회 연속,
+    // develop 189742 red). 기능 테스트라 timeout 은 성능 계약이 아니고 단언은 그대로다.
+  }, 15_000);
 });

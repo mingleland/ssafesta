@@ -67,6 +67,12 @@
 
 `name` 외 모든 필드는 `null`일 수 있다.
 
+> **`targetAudience`·`techStack` 은 이 표현에 없다** (`S15P21A604-597`). V35 가 `projects` 에
+> 더한 두 칼럼은 AI 가 문서에서 추출해 채우며, 지금의 소비자는 AI 의 rule-based 단축 응답
+> 하나뿐이다(`specs/008-*/contracts/spring-agent-config-api.yaml`). 공개 계약에 필드를 더하면
+> 다른 파트가 반응해야 하므로, 요청이 있을 때 연다. **등록·수정 API 도 이 두 값을 받지 않는다** —
+> 사람이 쓰는 값이 아니다.
+
 ### URL 필드 규칙 (5종 공통)
 
 `thumbnailUrl` · `videoUrl` · `deployUrl` · `gitUrl` · `portfolioUrl`

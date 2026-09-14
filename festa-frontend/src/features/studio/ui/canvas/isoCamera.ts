@@ -79,3 +79,17 @@ export function rotationFromDrag(
   const a1 = Math.atan2(now.x - origin.x, now.z - origin.z);
   return startRotation + ((a1 - a0) * 180) / Math.PI;
 }
+
+/**
+ * 회전 드래그를 시작할 수 있는 최소 그랩 반경(미터) — 피벗 위를 잡으면 방향이 정의되지 않는다 (S15P21A604-689).
+ *
+ * 위 함수는 피벗을 중심으로 한 두 방향의 각도차를 쓴다. 그랩이 피벗에 가까울수록 그 방향이 불안정해져서,
+ * 실측에서는 피벗에서 0.004 m 떨어진 지점을 잡자 커서 1 px 이동이 44°, 2 px 이 63° 로 커밋됐다.
+ * 0.3 m 는 가장 작은 오브젝트(폭 0.32 m)의 반폭보다 커서, 이 반경 밖은 항상 오브젝트 가장자리이거나 기즈모다.
+ */
+export const MIN_ROTATE_RADIUS_M = 0.3;
+
+/** 그랩 지점이 회전 각도를 정의할 만큼 피벗에서 떨어져 있는가 */
+export function canRotateFrom(origin: { x: number; z: number }, grab: { x: number; z: number }): boolean {
+  return Math.hypot(grab.x - origin.x, grab.z - origin.z) >= MIN_ROTATE_RADIUS_M;
+}

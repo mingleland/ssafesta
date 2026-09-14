@@ -57,7 +57,7 @@
 ### Tests for User Story 1 ⚠️
 
 - [X] T015 [P] [US1] 회원·게스트 인증, `wss/world/443`, `11F/11F-01`, 120초 token 응답과 비인가 거부를 검증하는 API 통합 테스트를 `backend/src/test/java/com/example/ssafesta/world/WorldSessionApiIntegrationTest.java`에 작성한다
-- [ ] T016 [P] [US1] `WorldSessionDto.endpoint`의 ws/wss 매핑, 호스트 검증과 하드코딩 주소 부재를 검사하는 Unity EditMode 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/WorldSessionEndpointTests.cs`에 작성한다
+- [X] T016 [P] [US1] `WorldSessionDto.endpoint`의 ws/wss 매핑, 호스트 검증과 하드코딩 주소 부재를 검사하는 Unity EditMode 테스트를 `festa-unity/Assets/_Project/Tests/EditMode/WorldSessionEndpointTests.cs`에 작성한다
 - [X] T017 [P] [US1] host 443·Full(strict)·Upgrade·cache bypass와 public 7777 차단을 실패 우선 검증하는 테스트를 `infra/unity-server/tests/integration/public-wss.sh`에 작성한다
 - [X] T018 [P] [US1] 인증서 만료·호스트 불일치·신뢰 실패를 우회하지 않는 원본 TLS 검사를 `infra/unity-server/tests/security/tls-strict.sh`에 작성한다
 
@@ -84,19 +84,19 @@
 ### Tests for User Story 2 ⚠️
 
 - [X] T026 [P] [US2] 단일 `demo-game`, maxPlayers 40, 비관리자, 내부 expose-only 7777, replay volume과 Secret mount를 검사하는 Compose 테스트를 `infra/unity-server/tests/integration/game-compose.sh`에 작성한다
-- [ ] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
-- [ ] T028 [P] [US2] 내부 listener 실패·외부 승인 실패 후보가 current/known-good으로 승격되지 않고 이전 ref로 복구되는 장애 테스트를 `infra/unity-server/tests/failure/deploy-rollback.sh`에 작성한다
-- [ ] T029 [P] [US2] process running·internal listening·external handshake·approved admission을 서로 다른 상태로 판정하는 테스트를 `infra/unity-server/tests/integration/game-readiness.sh`에 작성한다
+- [X] T027 [P] [US2] game-only `--no-deps` 배포 전후 Backend·AI·web restart count 0과 image ref 변경 범위를 검사하는 테스트를 `infra/unity-server/tests/integration/game-only-deploy.sh`에 작성한다
+- [X] T028 [P] [US2] 내부 listener 실패·외부 승인 실패 후보가 current/known-good으로 승격되지 않고 이전 ref로 복구되는 장애 테스트를 `infra/unity-server/tests/failure/deploy-rollback.sh`에 작성한다
+- [X] T029 [P] [US2] process running·internal listening·external handshake·approved admission을 서로 다른 상태로 판정하는 테스트를 `infra/unity-server/tests/integration/game-readiness.sh`에 작성한다
 
 ### Implementation for User Story 2
 
 - [X] T030 [US2] 불변 game image, `11F-01`, maxPlayers 40, 비관리자·cap drop, 내부 7777, replay volume과 Secret mount를 `infra/unity-server/compose.yaml`에 구성한다
 - [X] T031 [P] [US2] host·game image의 x86_64 일치와 에뮬레이션 미사용, image digest/full SHA, Secret 파일, demo network, volume과 7777 비공개를 배포 전에 검사하는 `infra/unity-server/scripts/preflight.sh`를 구현한다
-- [ ] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
-- [ ] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
-- [ ] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
-- [ ] T035 [P] [US2] release/client 호환 ref, 단계별 readiness와 비대상 restart delta를 민감정보 없이 수집하는 `infra/unity-server/scripts/collect-deploy-evidence.sh`를 구현한다
-- [ ] T036 [US2] game 배포·검증·승격·복구와 단일 EC2 전체 장애 한계를 `infra/unity-server/runbooks/deploy-and-rollback.md`에 작성한다
+- [X] T032 [US2] infra-001 target lock과 release state를 재사용해 candidate를 `--no-deps`로 올리고 비대상 restart count를 보존하는 `infra/unity-server/scripts/deploy-game.sh`를 구현한다
+- [X] T033 [US2] 내부 listener와 실제 승인 WSS를 모두 통과해야 current/known-good을 갱신하는 `infra/unity-server/scripts/promote-game.sh`를 구현한다
+- [X] T034 [US2] 검증 실패 시 실패 ref를 기록하고 마지막 known-good image로 game만 복구하는 `infra/unity-server/scripts/rollback-game.sh`를 구현한다
+- [X] T035 [P] [US2] release/client 호환 ref, 단계별 readiness와 비대상 restart delta를 민감정보 없이 수집하는 `infra/unity-server/scripts/collect-deploy-evidence.sh`를 구현한다
+- [X] T036 [US2] game 배포·검증·승격·복구와 단일 EC2 전체 장애 한계를 `infra/unity-server/runbooks/deploy-and-rollback.md`에 작성한다
 
 **Checkpoint**: game-only 배포가 다른 demo 서비스와 분리되고 실패 후보는 known-good으로 복구된다.
 

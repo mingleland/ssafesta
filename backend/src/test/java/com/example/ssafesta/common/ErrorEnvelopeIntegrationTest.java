@@ -90,7 +90,10 @@ class ErrorEnvelopeIntegrationTest {
      */
     @Test
     void anUnknownPathUnderAuthenticationIsNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/booths/{id}/staff", 1L).with(jwt()))
+        // 예시 경로를 한 번 옮겼다. 원래는 /booths/{id}/staff 였는데 spec 011 이 그것을 구현하면서
+        // 404 대신 권한 거부(403)가 돌아왔다 (S15P21A604-136). 이 테스트가 재는 것은 특정 기능이
+        // 아니라 "없는 경로도 봉투를 쓴다" 이므로, 아직 아무도 쓰지 않는 이름으로 바꾼다.
+        mockMvc.perform(get("/api/v1/booths/{id}/not-an-endpoint", 1L).with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.requestId").isString());
