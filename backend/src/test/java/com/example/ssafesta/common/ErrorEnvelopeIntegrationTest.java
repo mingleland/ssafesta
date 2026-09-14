@@ -8,11 +8,14 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.ssafesta.TestcontainersConfiguration;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -364,6 +367,31 @@ class ErrorEnvelopeIntegrationTest {
         assertEquals(java.util.List.of(),
                 ApiErrorResponse.of(ErrorCode.BOOTH_NOT_FOUND, null, "req_test", java.util.List.of(), null).errors(),
                 "빈 목록도 null이 아니라 빈 배열이어야 합니다.");
+    }
+
+    /**
+     * 컨트롤러 밖에서 끝난 실패가 클라이언트에 닿는 <b>세 번째 경로</b> — 컨테이너 ERROR dispatch.
+     *
+     * <p>필터가 던진 예외·{@code sendError}·허용 경로의 404 가 전부 여기로 온다. 체인이 이 dispatch
+     * 를 거부하면 실제 실패와 무관한 401 이 나가고, 통과시키기만 하면 Boot 의 Whitelabel HTML 이
+     * 나간다 — SSAFY registration 이 빠졌을 때 실제로 두 모양이 동시에 관측됐다.
+     * {@code Content-Type} 단정이 HTML 회귀를 잡고, {@code requestId} 단정이 ERROR dispatch 에서
+     * MDC 가 비는 회귀를 잡는다.
+     */
+    @Test
+    void theContainerErrorDispatchIsAnsweredInTheEnvelope() throws Exception {
+        mockMvc.perform(get("/error").with(request -> {
+                    request.setDispatcherType(DispatcherType.ERROR);
+                    request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, 500);
+                    // 이것이 있어야 OncePerRequestFilter 가 "ERROR dispatch 를 건너뛸지" 를 실제로 묻는다.
+                    request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/oauth2/authorization/ssafy");
+                    return request;
+                }))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.requestId").isString());
     }
 
     private String idOf(MvcResult result) {

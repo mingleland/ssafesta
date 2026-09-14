@@ -14,6 +14,7 @@ import java.net.URI;
 import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,9 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class OAuthAuthorizationController {
 
     private final AuthProperties properties;
+    private final ClientRegistrationRepository clientRegistrations;
 
-    public OAuthAuthorizationController(AuthProperties properties) {
+    public OAuthAuthorizationController(AuthProperties properties,
+                                        ClientRegistrationRepository clientRegistrations) {
         this.properties = properties;
+        this.clientRegistrations = clientRegistrations;
     }
 
     /**
@@ -60,7 +64,11 @@ public class OAuthAuthorizationController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "302", description = "제공자 동의 화면으로 이동. `Location` 헤더를 따라간다"),
-            @ApiResponse(responseCode = "404", description = "`OAUTH_PROVIDER_NOT_SUPPORTED` — 지원하지 않는 제공자 이름이다")})
+            @ApiResponse(responseCode = "404",
+                    description = """
+                            `OAUTH_PROVIDER_NOT_SUPPORTED` — 지원하지 않는 제공자 이름이거나,
+                            이름은 맞지만 이 서버에 그 제공자의 OAuth client 가 등록되지 않았다.
+                            뒤쪽은 배포 환경변수(`*_CLIENT_ID`·`_SECRET`·`_REDIRECT_URI`) 누락이다.""")})
     @GetMapping("/{provider}")
     public ResponseEntity<Void> authorize(
             // allowableValues 는 컴파일 상수여야 해서 enum 을 읽어올 수 없다. OAuthProvider 에
@@ -80,6 +88,14 @@ public class OAuthAuthorizationController {
         try {
             OAuthProvider.valueOf(normalized.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException unsupported) {
+            throw new ApiException(ErrorCode.OAUTH_PROVIDER_NOT_SUPPORTED);
+        }
+        // 이름을 아는 것과 로그인할 수 있는 것은 다르다. registration 은 application.yml 과 배포
+        // env 가 함께 만들고, 없는 채로 302 하면 다음 홉의 Spring Security 가
+        // InvalidClientRegistrationIdException(IllegalArgumentException)을 던져 500 이 된다.
+        // 그 500 은 FE 가 읽을 값이 없는 자리에서 터지므로 여기서, FE 가 실제로 부르는 이 경로에서
+        // 끊는다 (S15P21A604-357 후속).
+        if (clientRegistrations.findByRegistrationId(normalized) == null) {
             throw new ApiException(ErrorCode.OAUTH_PROVIDER_NOT_SUPPORTED);
         }
         // 신뢰 판단은 여기, 시작 요청에서만 한다. 통과한 값만 세션에 들어가므로 콜백은 꺼내 쓰기만
