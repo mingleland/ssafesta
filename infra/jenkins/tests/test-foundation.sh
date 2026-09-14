@@ -120,6 +120,8 @@ pass "JCasC credential persistence, GitLab migration and least-privilege matrix"
 
 grep -q 'JENKINS_WEBGL_PUBLISHER_PASSWORD: \${JENKINS_WEBGL_PUBLISHER_PASSWORD:?set in infra/.env}' "${controller_compose}" \
   || fail "controller does not receive the WebGL publisher password"
+grep -q 'JENKINS_UNITY_MR_PIPELINE_BRANCH: \${JENKINS_UNITY_MR_PIPELINE_BRANCH:-develop}' "${controller_compose}" \
+  || fail "controller does not receive the Unity MR pipeline branch"
 pass "WebGL publisher service account configuration"
 
 for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
@@ -306,6 +308,7 @@ export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
+export JENKINS_UNITY_MR_PIPELINE_BRANCH=develop
 export JENKINS_WEBGL_PUBLISHER_PASSWORD="foundation-webgl-publisher-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"
 export JENKINS_AGENT_SECRET_LINUX_DOCKER="foundation-linux-agent-value"

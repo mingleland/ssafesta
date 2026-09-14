@@ -2,6 +2,7 @@ String serverUrl = System.getenv('GITLAB_SERVER_URL') ?: 'https://lab.ssafy.com'
 String projectOwner = System.getenv('GITLAB_PROJECT_OWNER') ?: 'CONFIGURE_ME'
 String projectPath = System.getenv('GITLAB_PROJECT_PATH') ?: 'CONFIGURE_ME'
 String checkoutCredential = System.getenv('GITLAB_CHECKOUT_CREDENTIALS_ID') ?: 'gitlab-checkout'
+String pipelineBranch = System.getenv('JENKINS_UNITY_MR_PIPELINE_BRANCH') ?: 'develop'
 String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-unity-mr-validation') {
@@ -16,7 +17,7 @@ pipelineJob('festa-unity-mr-validation') {
             scm {
                 git {
                     remote { url(repositoryUrl); credentials(checkoutCredential) }
-                    branches('*/develop')
+                    branches("*/${pipelineBranch}")
                     extensions { cloneOptions { shallow(true); depth(1); noTags(true) } }
                 }
             }
