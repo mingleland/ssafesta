@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetSessionForTests, setGuestSession, setMemberSession } from '../../../auth/model/session';
 import { CHAT_ERROR_MESSAGE, __resetWorldChatForTests, getWorldChatSnapshot } from '../../model/worldChat';
 import { WorldChatLayer } from '../../ui/WorldChatLayer';
@@ -14,6 +14,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe('WorldChatLayer', () => {
@@ -46,5 +47,25 @@ describe('WorldChatLayer', () => {
 
     expect(container.querySelector('.world-chat')).not.toBeNull();
     expect(container.querySelector('.world-hud .world-chat')).toBeNull();
+  });
+
+  it('실제 높이 하나를 형제 HUD 레이아웃에 전달한다', () => {
+    class ResizeObserverMock {
+      private readonly callback: ResizeObserverCallback;
+
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        this.callback([{ target, contentRect: { height: 112 } } as ResizeObserverEntry], this as unknown as ResizeObserver);
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+    const onHeightChange = vi.fn();
+
+    render(<WorldChatLayer onHeightChange={onHeightChange} />);
+    expect(onHeightChange).toHaveBeenLastCalledWith(112);
   });
 });

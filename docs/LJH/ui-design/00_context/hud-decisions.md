@@ -13,13 +13,15 @@
 
 F 상호작용(감지·Prompt·입력·Highlight·즉시 Feedback)은 Unity 완결 — React 렌더링을 기다리는 구조 금지.
 
-## React 소관 HUD — 4종
+## React 소관 HUD — 6종
 
 ```text
 1. 이동·조작 안내
 2. 미니게임 점수 / 진행도        (해당 콘텐츠 진행 중에만)
 3. Toast / Notification
 4. Consultation Quick Access    (우상단, 상시)
+5. 월드 공용 텍스트 채팅        (좌하단, 회원 입력)
+6. 브라우저 전체화면 토글       (우상단, 상담 아래)
 ```
 
 1~3 은 Post-MVP Optional 이다 — component/pattern preview·mock 가능하나 MVP 필수는 아니며 Core 디자인을 지연시키지 않는다.
@@ -83,6 +85,28 @@ F 상호작용(감지·Prompt·입력·Highlight·즉시 Feedback)은 Unity 완�
 **상태를 FE 가 들고 있지 않는다.** 정본은 브라우저이고 `fullscreenchange` 로 아이콘을 맞춘다 — `F11` 이나 `ESC` 로 빠져나가면 FE state 는 곧바로 어긋난다.
 
 **자동 진입은 보조다.** 로그인 클릭에서 의도만 남기고 '월드 입장' 클릭에서 시도한다(OAuth 가 document 를 갈아 전체화면을 푼다). 거부돼도 월드 진입을 막지 않고 이 버튼이 정본 경로로 남는다.
+
+## World HUD layout 계약 (S15P21A604-740)
+
+HUD는 새 공통 컴포넌트로 감싸지 않는다. 기존 요소가 아래 토큰·영역을 직접 소비한다.
+
+```css
+--festa-hud-margin-x: max(16px, 2vw);
+--festa-hud-margin-y: max(16px, 3vh);
+```
+
+| 영역 | 역할 | 우선순위 |
+|---|---|---|
+| 좌하단 | 채팅 → 조작 안내 | 화면 하단 → 안전 여백 → 채팅 실제 높이 → 공통 간격 → 안내 순서. 채팅은 `.world-hud` 밖 형제이며 `WorldPage`가 높이 변수 하나로 연결한다 |
+| 우상단 | 상담 → 전체화면 | 상담이 첫 칸, 전체화면이 공통 간격 아래 칸 |
+| 우하단 | 이용 안내 | 좌하단·우상단과 독립 |
+| 하단 중앙 | Context action / Booth Exit | `insideBooth`일 때만. 클릭형이며 F 키 표기를 복제하지 않는다 |
+| 상단 중앙 | Toast | 월드에서만 예약. Overlay·system보다 낮지 않다 |
+
+낮은 높이에서는 채팅 로그와 조작 안내가 각자 가용 높이 안에서 스크롤한다. 720px 이하에서는
+`채팅 → Booth Exit → 조작 안내`로 세로 전환해 가로 충돌을 없앤다. 채팅이 닫히거나 안내가 접히면
+높이 변수가 즉시 다시 계산되어 빈 자리를 남기지 않는다. World HUD 소유 CSS의 z-index는 토큰만
+쓰며, 외부 dialog·라이브러리 계층은 이 규칙의 범위 밖이다.
 
 ## 그 외 HUD — Unity 귀속 또는 폐기
 

@@ -1,6 +1,6 @@
 // World 위 React HUD — hud-decisions.md 가 허용한 것만 그린다 (S15P21A604-406).
-// 허용 4종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
-//          Consultation Quick Access(우상단, 상시 — 상담만의 예외).
+// 허용 6종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
+//          Consultation Quick Access / 월드 채팅 / 전체화면.
 // 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel · 기능 launcher.
 // F 상호작용 prompt·하이라이트·이름표는 Unity 소관이라 여기서 만들지 않는다.
 //
@@ -12,9 +12,8 @@
 // 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 손에 익는 것이라
 // 목록에 있어도 읽히지 않아 뺐다.
 //
-// F 에서 "부스 입장·나가기" 를 뺀 근거: -592 가 그 말을 넣은 이유는 **나가는 방법을 안내 말고는
-// 알 곳이 없었기** 때문이다. 지금은 부스 안에 있으면 나가기 버튼이 직접 뜨고(-627) 그 버튼에
-// F 키 배지도 함께 있어, 화면이 스스로 말하는 것을 안내가 반복할 필요가 없다.
+// F 에서 "부스 입장·나가기" 를 뺀 근거: 부스 안에서는 클릭형 나가기 버튼이 직접 떠서 안내가
+// 같은 동작을 반복할 필요가 없다(S15P21A604-740).
 import { useState } from 'react';
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';

@@ -77,6 +77,11 @@ async function renderWorld() {
 }
 
 describe('WorldPage ESC 계층 (-450)', () => {
+  it('월드일 때만 Toast 상단 중앙 예약 상태를 붙인다', async () => {
+    await renderWorld();
+    expect(document.body.classList.contains('world-active')).toBe(true);
+  });
+
   it('아무것도 없으면 Game Menu 를 연다 — ESC 는 나/시스템이다', async () => {
     await renderWorld();
     pressEscape();
