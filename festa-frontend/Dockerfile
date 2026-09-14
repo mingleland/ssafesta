@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ── dev: vite dev server. 소스는 bind mount 로 넣고 node_modules 는 컨테이너 것을 쓴다 ──
-#   docker run -v "$PWD:/app" -v festa-fe-node-modules:/app/node_modules -p 5173:5173 <image>
+#   docker run -v "$PWD:/app" -v "$(dirname "$PWD")/festa-unity:/festa-unity:ro" -v festa-fe-node-modules:/app/node_modules -p 5173:5173 <image>
 # 두 번째 -v 가 핵심이다 — 없으면 호스트의 /app 마운트가 이미지 안 node_modules 를 가려
 # rolldown 네이티브 바인딩을 못 찾고 죽는다. **이름 있는 볼륨을 쓴다** — 익명 볼륨
 # (-v /app/node_modules)으로는 이 환경(Windows·Docker 29.6.1)에서 같은 증상이 났다
@@ -22,16 +22,12 @@ COPY . .
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
-# ── build: 정적 산출물 생성 ──
-FROM base AS build
-COPY . .
-RUN npm run build
-
 # ── prod: nginx 정적 서빙 ──
 # 80 포트로 서빙한다 — infra/deploy/compose/dev/front.compose.yaml 의 healthcheck 가
 # wget -qO- http://127.0.0.1/ 로 확인한다.
 FROM nginx:alpine AS prod
-COPY --from=build /app/dist /usr/share/nginx/html
+# CI front-build artifact의 dist만 받는다. Unity 원본은 이 Docker context에 넣지 않는다.
+COPY dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 # nginx 이미지가 기동 직전 /docker-entrypoint.d/*.sh 를 실행한다 — entrypoint 를 재정의하지 않는다.
 COPY docker/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
