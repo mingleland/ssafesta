@@ -29,7 +29,11 @@ namespace Festa.World
     public sealed class GuideDeskInteractable : MonoBehaviour, IBoothInteractable
     {
         /// <summary>머리 위에 띄울 이름. 사람 닉네임과 같은 자리, 같은 크기다.</summary>
-        [SerializeField] string _displayName = "안내데스크 NPC";
+        /// <remarks>
+        /// "안내데스크 NPC" 에서 사용자가 줄인 문구다 (2026-09-14). 인스펙터가 아니라 여기 둔다 —
+        /// 씬에 박으면 재직렬화 때 색·크기까지 함께 굳어 코드에서 고친 값이 먹지 않는다.
+        /// </remarks>
+        [SerializeField] string _displayName = "안내 데스크";
 
         [Tooltip("이름이 보이기 시작하는 거리(u).")]
         [SerializeField] float _visibleDistance = 260f;
