@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -25,8 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
  * 부스 방문·체류 계측 (S15P21A604-240, GitLab #94).
  *
  * <p><b>발신자는 React 호스트다.</b> Unity 는 Spring 에 아무 신호도 보내지 않으므로(2026-09-07
- * 확정), 부스 구역 진입·이탈을 브릿지 이벤트로 받은 React 가 이 경로를 부른다. 이 계약은 게임
- * 파트와 합의가 필요하며 그 통보는 별건이다.
+ * 확정), 부스 구역 진입·이탈을 브릿지 이벤트로 받은 React 가 이 경로를 부른다.
+ *
+ * <p><b>발신 지점 합의는 끝났다</b> (GitLab #186, 2026-09-13~14). 게임 파트가
+ * <i>"{@code POST /visits}·{@code /exit} 를 FE 에서 이 전이에 걸면 Unity 쪽 추가 작업 없이 된다"</i>
+ * 고 회신했고(Unity 는 부스 안팎 전이를 {@code WORLD_BOOTH_CONTEXT} 로 이미 FE 에 보낸다), FE 는
+ * 같은 이슈에서 채널 값을 서버가 파생하는 안으로 확정했다.
  */
 @RestController
 @RequestMapping("/api/v1/booths/{boothId}")
@@ -51,10 +54,13 @@ public class BoothVisitController {
 
                     공개되지 않았거나 임대가 끝난 부스는 거부된다 — 들어갈 수 없는 부스에
                     들어갔다는 기록은 집계를 오염시킨다.
+
+                    **요청 본문이 없다.** 어느 월드 채널에서 들어왔는지는 서버가 정한다 — 클라이언트는
+                    그 값을 가질 길이 없고, 채널 정체성을 클라이언트 주장에서 받지 않는 것이 이
+                    시스템의 기존 판단이다(헌법 16조).
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "`visitId` 와 `enteredAt`. 재전송이면 기존 방문"),
-            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `worldChannel` 누락"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` · `LAYOUT_NOT_PUBLISHED`"),
             @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED`")})
     @PostMapping("/visits")
@@ -62,9 +68,8 @@ public class BoothVisitController {
     @SecurityRequirement(name = "bearerAuth")
     public BoothVisitService.VisitView enter(
             @AuthenticationPrincipal Jwt jwt,
-            @Parameter(description = "부스 식별자", example = "7") @PathVariable Long boothId,
-            @RequestBody(required = false) BoothVisitService.EnterCommand command) {
-        return visits.enter(boothId, MemberPrincipal.optionalMemberId(jwt), command);
+            @Parameter(description = "부스 식별자", example = "7") @PathVariable Long boothId) {
+        return visits.enter(boothId, MemberPrincipal.optionalMemberId(jwt));
     }
 
     @Operation(summary = "부스 방문 종료",
