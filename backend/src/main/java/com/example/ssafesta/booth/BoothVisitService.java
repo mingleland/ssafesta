@@ -2,6 +2,7 @@ package com.example.ssafesta.booth;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.world.WorldProperties;
 import java.math.BigDecimal;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
@@ -37,13 +38,26 @@ public class BoothVisitService {
      *
      * <p>회원의 입장 신호가 두 번 오면 <b>새 행을 만들지 않는다</b> — 브릿지 이벤트는 재전송될 수
      * 있고 그때마다 행이 늘면 방문 수가 실제보다 커진다. 게스트는 식별자가 없어 합치지 못한다.
+     *
+     * <p><b>채널은 서버가 정한다 — 요청 본문이 없다.</b> 예전에는 {@code worldChannel} 을 필수로
+     * 받았는데, 클라이언트가 그 값을 가질 길이 없었다: Access Token 클레임에 채널이 없고,
+     * {@code channelId} 를 담은 world entry token 은 게임 서버로 가며, 세션은 저장되지 않아 조회
+     * 경로도 없다. 그래서 계약에 적힌 값({@code F11-CH01})은 서버가 실제로 쓰는 채널 식별자
+     * ({@code 11F-01})와 <b>한 번도 맞은 적이 없었다.</b>
+     *
+     * <p>채널 정체성을 클라이언트에게서 받지 않는 것은 이 시스템의 기존 판단이기도 하다 —
+     * {@code WorldSessionService} 가 grant 의 모든 클레임을 요청이 아니라 서버에서 파생하는 이유와
+     * 같다(헌법 16조). 단일 채널이 MVP 확정 상태라는 근거는 {@link
+     * com.example.ssafesta.world.WorldProperties} 의 {@code CHANNEL_ID} 다(FR-011, Issue #31).
+     *
+     * <p>다채널이 열려도 클라이언트가 싣는 길로 돌아가지 않는다. 검증되지 않은 값을 신뢰하지 않는다는
+     * 판단은 채널이 늘어난다고 뒤집히지 않으므로, 그때는 <b>서버가 검증한 컨텍스트</b>에서 파생한다.
      */
     @Transactional
-    public VisitView enter(Long boothId, Long visitorUserId, EnterCommand command) {
+    public VisitView enter(Long boothId, Long visitorUserId) {
         // 방문자가 실제로 볼 수 있는 부스인지까지 본다 — 만료된 부스에 들어갔다는 기록은
         // 집계를 오염시킨다.
         accessGuard.requireVisitorVisible(boothId);
-        String worldChannel = requireWorldChannel(command);
 
         if (visitorUserId != null) {
             var open = visits.findOpenVisit(boothId, visitorUserId);
@@ -51,8 +65,8 @@ public class BoothVisitService {
                 return VisitView.of(open.get());
             }
         }
-        return VisitView.of(visits.save(
-                new BoothVisit(boothId, visitorUserId, worldChannel, Instant.now())));
+        return VisitView.of(visits.save(new BoothVisit(
+                boothId, visitorUserId, WorldProperties.CHANNEL_ID, Instant.now())));
     }
 
     /**
@@ -114,19 +128,6 @@ public class BoothVisitService {
         }
         return ((Number) value).longValue();
     }
-
-    private static String requireWorldChannel(EnterCommand command) {
-        if (command == null || command.worldChannel() == null || command.worldChannel().isBlank()) {
-            throw ApiException.fieldInvalid("worldChannel", "어느 채널에서 들어왔는지가 필요합니다.");
-        }
-        return command.worldChannel().trim();
-    }
-
-    /**
-     * @param worldChannel 어느 월드 채널에서 들어왔는가. 채널이 여럿이라(2026-09-07 확정, 정원 20)
-     *        같은 부스라도 채널별로 트래픽이 갈린다
-     */
-    public record EnterCommand(String worldChannel) { }
 
     public record VisitView(String visitId, Instant enteredAt) {
 

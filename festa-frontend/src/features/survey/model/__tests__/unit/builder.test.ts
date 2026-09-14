@@ -14,12 +14,14 @@ import {
   reorderQuestion,
   saveSurveyBuilder,
   updateQuestion,
+  updateRewardCoin,
   updateTitle,
   validateBuilder,
 } from '../../builder';
 import {
   MOCK_BOOTH_NEW,
   MOCK_BOOTH_NORMAL,
+  MOCK_REWARD_COIN_MAX,
   __resetSurveyMockForTests,
   __savedDraftForTests,
   surveyMockPort,
@@ -197,5 +199,42 @@ describe('저장 실패 문구 (S15P21A604-541 F-1)', () => {
     const s = getSurveyBuilderSnapshot();
     expect(s.save.phase).toBe('error');
     expect(s.save.errorMessage).toBe('일시적인 오류입니다.');
+  });
+});
+
+// GitLab #133 — 서버는 응답 보상 Coin 을 지급하는데 Builder 에 값을 넣을 자리가 없었다.
+describe('응답 보상 코인 (S15P21A604-520)', () => {
+  it('새 설문은 0(보상 없음)으로 시작하고, 편집한 값이 저장 본문까지 간다', async () => {
+    await readyBuilder();
+    expect(getSurveyBuilderSnapshot().draft.rewardCoin).toBe(0);
+    addQuestion('long_text');
+    updateQuestion(getSurveyBuilderSnapshot().draft.questions[0].id, { prompt: '의견?' });
+    updateRewardCoin(3);
+    await saveSurveyBuilder();
+    expect(getSurveyBuilderSnapshot().save.phase).toBe('success');
+    expect(__savedDraftForTests()?.draft.rewardCoin).toBe(3);
+  });
+
+  it('음수·소수는 FE 검증이 먼저 잡는다', async () => {
+    await readyBuilder();
+    updateRewardCoin(-1);
+    expect(validateBuilder().map((i) => i.message)).toContain('보상 코인은 0 이상의 정수여야 합니다.');
+    updateRewardCoin(1.5);
+    expect(validateBuilder().map((i) => i.message)).toContain('보상 코인은 0 이상의 정수여야 합니다.');
+  });
+
+  it('상한 초과는 서버 400 의 errors[0].field 가 rewardCoin 필드 오류로 붙는다', async () => {
+    await readyBuilder();
+    addQuestion('long_text');
+    updateQuestion(getSurveyBuilderSnapshot().draft.questions[0].id, { prompt: '의견?' });
+    updateRewardCoin(MOCK_REWARD_COIN_MAX + 1);
+    await saveSurveyBuilder();
+    const s = getSurveyBuilderSnapshot();
+    expect(s.save.phase).toBe('error');
+    expect(s.save.fieldError).toEqual({ field: 'rewardCoin', message: `보상 코인은 ${MOCK_REWARD_COIN_MAX} 이하여야 합니다.` });
+    expect(s.dirty).toBe(true);
+    // 값을 고치면 필드 오류는 사라진다
+    updateRewardCoin(MOCK_REWARD_COIN_MAX);
+    expect(getSurveyBuilderSnapshot().save.fieldError).toBeNull();
   });
 });

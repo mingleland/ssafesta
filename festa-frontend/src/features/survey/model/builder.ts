@@ -22,17 +22,23 @@ export interface SurveyBuilderState {
    * 못했습니다" 로 뭉개져 사용자가 사유를 알 수 없다 (S15P21A604-541).
    * `null` 이면 서버 문장이 없다는 뜻이고 그때만 화면이 일반 문구를 쓴다.
    */
-  save: { phase: 'idle' | 'submitting' | 'success' | 'error'; errorMessage: string | null };
+  save: {
+    phase: 'idle' | 'submitting' | 'success' | 'error';
+    errorMessage: string | null;
+    /** 서버가 `errors[0].field` 로 짚은 필드 — 화면이 그 입력 옆에 붙인다 (S15P21A604-520) */
+    fieldError: { field: string; message: string } | null;
+  };
 }
 
-const EMPTY_DRAFT: SurveyDraftVM = { title: '', questions: [] };
+const EMPTY_DRAFT: SurveyDraftVM = { title: '', rewardCoin: 0, questions: [] };
+const NO_SAVE: SurveyBuilderState['save'] = { phase: 'idle', errorMessage: null, fieldError: null };
 
 const initialState: SurveyBuilderState = {
   status: 'idle',
   boothId: null,
   draft: EMPTY_DRAFT,
   dirty: false,
-  save: { phase: 'idle', errorMessage: null },
+  save: NO_SAVE,
 };
 
 let state: SurveyBuilderState = initialState;
@@ -52,7 +58,7 @@ function editDraft(mutate: (draft: SurveyDraftVM) => SurveyDraftVM): void {
   if (state.status !== 'ready') return;
   // 저장 중 편집은 save.phase 리셋으로 이중 저장 가드를 해제한다 (-377 공통 패턴) — 차단
   if (state.save.phase === 'submitting') return;
-  setState({ draft: mutate(state.draft), dirty: true, save: { phase: 'idle', errorMessage: null } });
+  setState({ draft: mutate(state.draft), dirty: true, save: NO_SAVE });
 }
 
 function subscribe(listener: () => void): () => void {
@@ -129,11 +135,19 @@ export function updateTitle(title: string): void {
   editDraft((draft) => ({ ...draft, title }));
 }
 
-/** FE 규칙: 제목·문항 비공백, 선택형 옵션 최소 2, rating min<max */
+/** 0 = 보상 없음. 상한은 서버 설정이라 FE 가 정하지 않는다 — 초과는 저장 시 400 이 필드로 돌아온다 */
+export function updateRewardCoin(rewardCoin: number): void {
+  editDraft((draft) => ({ ...draft, rewardCoin }));
+}
+
+/** FE 규칙: 제목·문항 비공백, 선택형 옵션 최소 2, rating min<max, 보상 코인은 0 이상의 정수 */
 export function validateBuilder(): SurveyBuilderIssueVM[] {
   const issues: SurveyBuilderIssueVM[] = [];
   const { draft } = state;
   if (draft.title.trim() === '') issues.push({ message: '설문 제목을 입력해주세요.' });
+  if (!Number.isInteger(draft.rewardCoin) || draft.rewardCoin < 0) {
+    issues.push({ message: '보상 코인은 0 이상의 정수여야 합니다.' });
+  }
   for (const q of draft.questions) {
     if (q.prompt.trim() === '') issues.push({ questionId: q.id, message: '질문 내용을 입력해주세요.' });
     if (q.type === 'single' || q.type === 'multi') {
@@ -160,14 +174,22 @@ export async function saveSurveyBuilder(): Promise<void> {
   // 이전 부스의 늦은 응답이 **새 부스의 dirty 를 해제**해 미저장 변경이 사라진다
   // (GitLab #133, 2026-09-08 BE 지적). run.ts 의 submitSurveyRun 과 같은 모양이다
   const boothId = state.boothId;
-  setState({ save: { phase: 'submitting', errorMessage: null } });
+  setState({ save: { ...NO_SAVE, phase: 'submitting' } });
   try {
     await surveyApi.saveDraft(boothId, state.draft);
     if (state.boothId !== boothId) return;
-    setState({ dirty: false, save: { phase: 'success', errorMessage: null } });
+    setState({ dirty: false, save: { ...NO_SAVE, phase: 'success' } });
   } catch (error) {
     if (state.boothId !== boothId) return;
-    setState({ save: { phase: 'error', errorMessage: isApiError(error) ? error.message : null } });
+    // errors[0].field 가 있으면 그 필드의 오류다 — 상한 초과 rewardCoin 이 여기로 온다 (GitLab #133)
+    const detail = isApiError(error) ? error.errors.find((e) => e.field !== undefined) : undefined;
+    setState({
+      save: {
+        phase: 'error',
+        errorMessage: isApiError(error) ? error.message : null,
+        fieldError: detail?.field !== undefined ? { field: detail.field, message: detail.message } : null,
+      },
+    });
   }
 }
 
