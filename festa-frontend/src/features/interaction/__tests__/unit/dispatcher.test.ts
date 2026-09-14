@@ -74,6 +74,18 @@ describe('initInteractionDispatcher', () => {
     unsubscribe();
   });
 
+  it('WORLD_ARCADE_INTERACT도 같은 GAME 오버레이를 열되 machineId만 싣는다(S15P21A604-712, #135)', () => {
+    const unsubscribe = initInteractionDispatcher();
+    emit(JSON.stringify({ type: 'WORLD_ARCADE_INTERACT', machineId: 'plaza-arcade-02' }));
+
+    // 부스 필드를 만들어 넣지 않는다 — 오락기는 월드 고정물이라 boothId 가 없다.
+    expect(getCurrentOverlay()).toEqual({
+      type: 'GAME',
+      payload: { machineId: 'plaza-arcade-02' },
+    });
+    unsubscribe();
+  });
+
   it('미지 type은 무시한다 — 서버가 신설한 이벤트에도 크래시하지 않는다(전방 호환)', () => {
     const unsubscribe = initInteractionDispatcher();
     emit(JSON.stringify({ type: 'UNKNOWN_FUTURE_EVENT', boothId: 7 }));
