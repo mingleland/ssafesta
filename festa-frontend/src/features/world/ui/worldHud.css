@@ -118,3 +118,29 @@
 @media (prefers-reduced-transparency: reduce) {
   .world-hud-help { background: #10142a; backdrop-filter: none; }
 }
+
+/* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 **같은 우상단 열**에 한 칸 아래로 쌓는다 —
+   좌표·크기를 같은 토큰으로 잡아야 화면이 커져도 둘이 어긋나지 않는다(consultationQuickAccess.css 와
+   같은 근거). `.world-hud` 는 클릭을 통과시키므로 버튼만 다시 받는다. */
+.world-hud-fullscreen {
+  position: absolute;
+  right: 2vw;
+  top: calc(3vh + var(--festa-control-size) + 10px);
+  width: var(--festa-control-size);
+  height: var(--festa-control-size);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(12, 16, 34, 0.72);
+  backdrop-filter: blur(8px);
+  color: #eaeefb;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.world-hud-fullscreen svg { width: 48%; height: 48%; }
+.world-hud-fullscreen:hover { background: rgba(20, 26, 52, 0.85); }
+.world-hud-fullscreen:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+@media (prefers-reduced-transparency: reduce) {
+  .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
+}
