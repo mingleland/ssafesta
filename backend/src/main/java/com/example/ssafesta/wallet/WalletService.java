@@ -27,6 +27,16 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This ordering assumes {@code READ COMMITTED} (PostgreSQL's default), where each statement
  * takes a fresh snapshot and therefore sees the committed entry after the lock is granted.
+ *
+ * <p><b>Why the idempotency lookup is global, and why an owner check follows it.</b> The key is
+ * {@code UNIQUE} across the whole ledger, so the lookup has to be global too — a per-wallet lookup
+ * would miss a colliding key and then hit the constraint. But a global hit can belong to
+ * <i>another</i> wallet, and answering {@code alreadyApplied} in that case hands the caller a
+ * success while nothing happened to their wallet. Every production key today carries the wallet
+ * owner or a per-owner reference ({@code userId}, {@code leaseId}, a session {@code nonce}), so a
+ * cross-wallet hit means a server-side key recipe collided. That is a defect, not a client error:
+ * it is thrown as {@code IllegalStateException} and surfaces as a 500 with the key and both wallet
+ * ids in the log (S15P21A604-695).
  */
 @Service
 public class WalletService {
@@ -214,7 +224,17 @@ public class WalletService {
 
         Optional<CoinLedgerEntry> recorded = ledger.findByIdempotencyKey(idempotencyKey);
         if (recorded.isPresent()) {
-            return LedgerResult.alreadyApplied(recorded.get());
+            CoinLedgerEntry entry = recorded.get();
+            if (!entry.getWalletId().equals(wallet.getId())) {
+                // 키는 전역 UNIQUE 라 조회도 전역이 맞다 — 그래서 주인 검사가 그 다음이다. 여기 걸리면
+                // 서버가 만든 키가 지갑 사이에서 겹친 것이다. 조용히 alreadyApplied 로 답하면 호출자는
+                // 자기 지갑에 아무 일도 없이 "반영됐다" 를 받고, 새 항목을 만들면 UNIQUE 에 걸린다.
+                // 클라이언트 잘못이 아니라 서버 결함이라 409 로 위장하지 않고 크게 던진다 (T-24).
+                throw new IllegalStateException("멱등키가 다른 지갑의 원장 항목을 가리킵니다 — key=" + idempotencyKey
+                        + ", entryWalletId=" + entry.getWalletId() + ", walletId=" + wallet.getId()
+                        + " (S15P21A604-695)");
+            }
+            return LedgerResult.alreadyApplied(entry);
         }
 
         if (signedAmount < 0 && !wallet.canAfford(-signedAmount)) {
