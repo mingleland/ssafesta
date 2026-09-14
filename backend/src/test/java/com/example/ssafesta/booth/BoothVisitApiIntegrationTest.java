@@ -127,17 +127,36 @@ class BoothVisitApiIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * 채널은 서버가 정한다 — 본문이 없어도, 빈 객체여도 기록된다.
+     *
+     * <p>예전에는 {@code worldChannel} 이 필수라 둘 다 400 이었다. 클라이언트가 가질 수 없는 값을
+     * 요구하던 것이고(계약의 {@code F11-CH01} 은 실제 채널 식별자와 한 번도 맞지 않았다), 그래서
+     * FE 가 이 경로를 아예 부르지 못했다.
+     *
+     * <p><b>두 요청을 서로 다른 방문자로 보낸다.</b> 같은 회원으로 두 번 보내면 재전송 병합
+     * (`findOpenVisit`)에 걸려 두 번째가 저장 경로를 타지 않는다 — 그러면 "본문 없이도 저장된다" 를
+     * 증명하지 못한다.
+     */
     @Test
-    void worldChannelIsRequired() throws Exception {
-        Booth booth = publishedBooth("채널없음");
-        String visitor = bearerFor(createMemberWithWallet(users, wallets, "채널없는방문자"));
+    void theChannelComesFromTheServerSoNoBodyIsNeeded() throws Exception {
+        Booth booth = publishedBooth("본문없음");
+        String withoutBody = bearerFor(createMemberWithWallet(users, wallets, "본문없는방문자"));
+        String withEmptyBody = bearerFor(createMemberWithWallet(users, wallets, "빈본문방문자"));
 
         mockMvc.perform(post("/api/v1/booths/{id}/visits", booth.getId())
-                        .header("Authorization", visitor)
+                        .header("Authorization", withoutBody))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/booths/{id}/visits", booth.getId())
+                        .header("Authorization", withEmptyBody)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[0].field").value("worldChannel"));
+                .andExpect(status().isCreated());
+
+        assertEquals(2, count("SELECT count(*) FROM booth_visit_events WHERE booth_id = ?",
+                booth.getId()));
+        assertEquals(2, count("SELECT count(*) FROM booth_visit_events"
+                + " WHERE booth_id = ? AND world_channel = '11F-01'", booth.getId()));
     }
 
     /** 들어갈 수 없는 부스의 방문은 기록하지 않는다 — 집계가 오염된다. */
@@ -226,9 +245,7 @@ class BoothVisitApiIntegrationTest {
 
     private ResultActions enter(Booth booth, String bearer) throws Exception {
         return mockMvc.perform(post("/api/v1/booths/{id}/visits", booth.getId())
-                .header("Authorization", bearer)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"worldChannel\":\"F11-CH01\"}"));
+                .header("Authorization", bearer));
     }
 
     private Long visitIdOf(ResultActions actions) throws Exception {
@@ -238,13 +255,13 @@ class BoothVisitApiIntegrationTest {
 
     private void seedVisit(Long boothId, Long userId, int dwellSeconds) {
         jdbc.update("INSERT INTO booth_visit_events(booth_id, visitor_user_id, world_channel,"
-                + " entered_at, exited_at) VALUES(?, ?, 'F11-CH01', now(), now() + (? || ' seconds')::interval)",
+                + " entered_at, exited_at) VALUES(?, ?, '11F-01', now(), now() + (? || ' seconds')::interval)",
                 boothId, userId, dwellSeconds);
     }
 
     private void seedOpenVisit(Long boothId, Long userId) {
         jdbc.update("INSERT INTO booth_visit_events(booth_id, visitor_user_id, world_channel,"
-                + " entered_at) VALUES(?, ?, 'F11-CH01', now())", boothId, userId);
+                + " entered_at) VALUES(?, ?, '11F-01', now())", boothId, userId);
     }
 
     /**

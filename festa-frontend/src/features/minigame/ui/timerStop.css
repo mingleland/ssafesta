@@ -27,6 +27,22 @@
   color: var(--ov-text);
 }
 
+/* 목표 초 (S15P21A604-733). 초시계 바로 위에 두고 강조색을 준다 — 부제에 있을 때는 제목 옆
+   작은 글씨라 달리는 중에 읽히지 않았다. 초시계보다 작게 두어 둘이 다투지 않게 한다. */
+.ts-target {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ov-text-muted);
+}
+
+.ts-target-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ov-accent, #ffc94d);
+}
+
 .ts-clock-idle { color: var(--ov-text-muted); }
 .ts-clock-done { font-size: 34px; }
 

@@ -5,10 +5,10 @@
 | Entry | External address | Nginx upstream | Cache | Owner |
 |---|---|---|---|---|
 | demo web | `https://demo.${ROOT_DOMAIN}` | demo front/static release | HTML revalidate, content-hash asset immutable | infra-002 |
-| backend | `https://api.${ROOT_DOMAIN}` | demo Spring | bypass/no-store | infra-002 |
+| backend | `https://api.${ROOT_DOMAIN}` (`/ws`, `/ws/consultation` included) | demo Spring | bypass/no-store; WebSocket Upgrade forwarding | infra-002 |
 | AI/SSE | `https://ai.${ROOT_DOMAIN}` | demo FastAPI | bypass/no-store, proxy buffering off | infra-002 + AI |
 | game | `wss://world.${ROOT_DOMAIN}:443` | `ws://127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
-| dev | `https://dev.${ROOT_DOMAIN}{/,api/,ai/v1/,unity/}` | selected dev Front/Spring/FastAPI and shared WebGL `current` | API/AI bypass/no-store; WebGL HTML revalidates and hashed Build assets are immutable | infra-002 |
+| dev | `https://dev.${ROOT_DOMAIN}{/,api/,ai/v1/,unity/,ws}` | selected dev Front/Spring/FastAPI and shared WebGL `current` | API/AI/WebSocket bypass/no-store; WebGL HTML revalidates and hashed Build assets are immutable | infra-002 |
 | dev world | `wss://world-dev.${ROOT_DOMAIN}:443` | selected dev game service | always bypass/no-store | infra-002 |
 
 `ROOT_DOMAIN`과 `EC2_PUBLIC_IP`는 runtime/preflight input이다. client build에 실제 값을 고정하지 않는다. Unity game endpoint는 world-sessions API 응답으로만 전달한다.

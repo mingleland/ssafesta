@@ -67,7 +67,7 @@
 
 | rule | 적용 | 뜻 |
 |---|---|---|
-| `CONFIG_NOT_LINKED` | 공개만 | 기능 오브젝트에 `configId` 미연결 (C-04 확정: 경고 유지 — #45) |
+| `CONFIG_NOT_LINKED` | 공개만 | 기능 오브젝트에 `configId` 미연결 (C-04 확정: 경고 유지 — #45). **`LAPTOP`·`SURVEY_KIOSK`는 같은 rule 을 부스 단위 술어로 답한다** — 노트북은 홈페이지 URL 미등록(016 §3-1), 키오스크는 그 부스에 설문 없음(010 C-06, `S15P21A604-699`) |
 | `CONFIG_UNVERIFIED` | 공개만 | 연결 대상의 종류를 아직 서버가 확인할 수 없음 |
 | `FRONT_BLOCKED` | 공개만 | 관람 띠 도달 가능 비율 50% 미만 (§10-3, #19 ⑤) |
 | `ISOLATED_AREA` | 공개만 | 통행 불가 고립 공간 1㎡ 이상 — 배치 전체 항목이라 `objectId` 없음 (§10-3) |
@@ -105,7 +105,7 @@
 | `objects[].type` | string | ✅ | `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
 | `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조). 부스는 **6×6×2.72m** (높이는 셸 벽 패널 실측 — #19 ②, 2026-08-21 확정) → 앵커는 `|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`, **실물(회전 반영 AABB)도 같은 영역 안이어야 한다** (§10) |
 | `objects[].rotationY` | number | ✅ | 도(degree), `[0,360)`. `0`이면 +Z를 바라봄 |
-| `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID — **signed Int32, `1 ~ 2,147,483,647`, 0 금지**(Unity가 필드 부재를 0으로 읽어 미연결 판정에 씀 — #45 전제, #34에서 DB `CHECK (config_id > 0)`로 강제). 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조) |
+| `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID — **signed Int32, `1 ~ 2,147,483,647`, 0 금지**(Unity가 필드 부재를 0으로 읽어 미연결 판정에 씀 — #45 전제, #34에서 DB `CHECK (config_id > 0)`로 강제). 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조).<br>**`LAPTOP`·`SURVEY_KIOSK`는 이 필드를 쓰지 않는다** — 연결 대상이 부스당 하나뿐이라 서버가 부스로 찾는다(노트북은 `booths.homepage_url`, 키오스크는 그 부스의 설문). 실어 보내도 서버가 읽지 않으며, 노트북에 실으면 `CONFIG_UNVERIFIED`가 붙는다 |
 | `objects[].assetCode` | string | ❌ | `FURNITURE`·`DECORATION`의 구체 자산 식별자 |
 
 **표에 없는 필드는 거부된다** — 계약에 없는 필드가 하나라도 있으면 저장 자체가 `409 LAYOUT_VALIDATION_FAILED` + `rule: MALFORMED_LAYOUT`로 실패한다(조용히 버리지 않는다 — 버리면 편집기는 저장됐다고 믿는데 서버에는 없는 T-24 모양이 된다). 필드 추가 순서는 **3파트 합의 → BE가 `schemaVersion` 올리고 배포 → 그다음 FE 전송**이다 (헌법 24조, #36 명문화 2026-08-21).

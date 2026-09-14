@@ -2,7 +2,7 @@
 // 슬롯만 배치한다: Toolbar / ModeRail / Palette / Canvas / Inspector / Status. 내용은 모드가 채운다.
 // 배경은 목업용 이미지(landing-background) — Persistent GameShell 도달 시 Unity World 로 교체된다.
 import type { ReactNode } from 'react';
-import worldBackdropUrl from '../../../../assets/festa/backgrounds/landing-background.png';
+import worldBackdropUrl from '../../../../assets/festa/backgrounds/landing-background.webp';
 import { layoutConfigStyle } from '../../model/studioLayoutConfig';
 import './boothStudio.css';
 

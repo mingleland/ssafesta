@@ -445,6 +445,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - 소유자·Staff만 호출할 수 있다(facade·layout과 동일한 편집자 범위). 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 코드·rule 없음.**
 - 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
+- **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 
 ---
 
@@ -1358,16 +1359,14 @@ Unity 는 Spring 에 아무 신호도 보내지 않는다(2026-09-07 확정). �
 
 ### POST `/booths/{boothId}/visits`
 
-```json
-{ "worldChannel": "F11-CH01" }
-```
+**요청 본문 없음.**
 
 → `201 { "visitId": "123", "enteredAt": "..." }`
 
 - **회원과 게스트 모두 센다.** 부스 구경은 게스트에게 열려 있고(헌법 12조가 막는 것은 소유·결제다), 통계에서 빼면 실제 트래픽을 절반만 본다.
 - **회원의 입장 신호가 두 번 오면 새 기록을 만들지 않는다** — 같은 `visitId` 가 돌아온다. 브릿지 이벤트 재전송이 방문 수를 부풀리지 않게 한다. 게스트는 식별자가 없어 합치지 못한다.
 - 공개되지 않았거나 임대가 끝난 부스는 거부된다 — 들어갈 수 없는 부스의 방문 기록은 집계를 오염시킨다.
-- `worldChannel` 이 필수인 이유: 채널이 여럿이라(정원 20) 같은 부스라도 채널별로 트래픽이 갈린다.
+- **어느 월드 채널에서 들어왔는지는 서버가 채운다** (`S15P21A604-240`, GitLab #186 에서 확정). 예전에는 `worldChannel` 을 본문으로 받았는데 클라이언트가 그 값을 가질 길이 없었다 — Access Token 클레임에 채널이 없고, `channelId` 를 담은 world entry token 은 게임 서버로 가며, 월드 세션은 저장되지 않아 조회 경로도 없다. 채널 정체성을 클라이언트 주장에서 받지 않는 것은 `world-sessions` 가 이미 지키는 규칙과 같다(헌법 16조).
 
 ### POST `/booths/{boothId}/visits/{visitId}/exit`
 
@@ -1404,8 +1403,9 @@ Unity 는 Spring 에 아무 신호도 보내지 않는다(2026-09-07 확정). �
 ### 발신 쪽에 묻는 것
 
 1. **Unity 가 부스 구역 이탈을 브릿지로 알리는가?** 알린다면 이벤트 이름은? 알리지 않는다면 체류시간 표본이 `openVisits` 쪽으로 쏠린다 — 그 경우 **React 가 오버레이 종료·페이지 이탈에서 부르는 것**을 대안으로 제안한다.
-2. `worldChannel` 값의 형식 — React 가 월드 세션에서 받는 채널 식별자를 그대로 쓰면 되는가?
-3. 진입 이벤트 재전송을 발신 쪽에서 억제할 수 있는가 — 서버는 회원만 합칠 수 있어, 억제되면 게스트 통계도 정확해진다.
+2. 진입 이벤트 재전송을 발신 쪽에서 억제할 수 있는가 — 서버는 회원만 합칠 수 있어, 억제되면 게스트 통계도 정확해진다.
+
+> ~~`worldChannel` 값의 형식~~ — **닫혔다.** 서버가 채우므로 발신 쪽이 정할 것이 없다 (`S15P21A604-240`).
 
 ---
 

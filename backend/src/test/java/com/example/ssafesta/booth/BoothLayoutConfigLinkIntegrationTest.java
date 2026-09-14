@@ -181,9 +181,92 @@ class BoothLayoutConfigLinkIntegrationTest {
                 "LAPTOP 은 연결 대상을 서버가 확인할 수 없습니다: " + outcome.warnings());
     }
 
+    /**
+     * {@code SURVEY_KIOSK} moved the same way {@code LAPTOP} did (spec 010 C-06, GitLab #181).
+     *
+     * <p>This is the case that actually broke: the kiosk published, the visitor pressed F, and
+     * {@code /survey/run} answered 404 because the booth had no survey. The old predicate could not
+     * see it — it only asked whether a {@code configId} was present.
+     */
+    @Test
+    void aKioskInABoothWithNoSurveyWarns() {
+        Owner owner = leasedOwner("설문없음");
+        layouts.saveDraft(owner.boothId(), owner.userId(), kioskLayout(1));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        // Warn-and-allow: the booth owner may place the kiosk before writing the survey.
+        assertEquals(1, outcome.publishedVersion());
+        assertTrue(outcome.warnings().stream().anyMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())
+                        && "이 부스에 설문이 없습니다.".equals(w.message())),
+                "설문이 없는 키오스크는 경고해야 합니다: " + outcome.warnings());
+    }
+
+    @Test
+    void aKioskInABoothWithASurveyDoesNotWarn() {
+        Owner owner = leasedOwner("설문있음");
+        registerSurvey(owner.boothId(), owner.userId());
+        layouts.saveDraft(owner.boothId(), owner.userId(), kioskLayout(1));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        // Neither warning is true of it: nothing is missing, and nothing is left unverified.
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())
+                        || "CONFIG_UNVERIFIED".equals(w.rule())),
+                "설문이 있는 키오스크에는 경고가 남으면 안 됩니다: " + outcome.warnings());
+    }
+
+    /**
+     * The false positive this change removes.
+     *
+     * <p>A kiosk carries no meaningful {@code configId} — the booth holds one survey and the run
+     * endpoint finds it by booth. Judging the kiosk by the id flagged booths whose survey worked.
+     */
+    @Test
+    void aKioskWithoutAConfigIdInABoothWithASurveyDoesNotWarn() {
+        Owner owner = leasedOwner("설문있음configId없음");
+        registerSurvey(owner.boothId(), owner.userId());
+        layouts.saveDraft(owner.boothId(), owner.userId(), kioskLayout(null));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "configId 는 키오스크의 열쇠가 아닙니다: " + outcome.warnings());
+    }
+
+    /** Nothing to press, nothing to warn about — same shape as the laptop case above. */
+    @Test
+    void aBoothWithNoKioskIsNotWarnedAboutItsMissingSurvey() {
+        Owner owner = leasedOwner("키오스크없음");
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"deco-1","type":"DECORATION","position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """);
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "키오스크가 없으면 설문 경고를 낼 일이 없습니다: " + outcome.warnings());
+    }
+
     /** Written straight to the column — spec 016's endpoint has its own test for the write path. */
     private void registerHomepage(Long boothId, String url) {
         jdbc.update("UPDATE booths SET homepage_url = ? WHERE id = ?", url, boothId);
+    }
+
+    /** Straight to the table for the same reason — spec 010's upsert has its own tests. */
+    private void registerSurvey(Long boothId, Long userId) {
+        jdbc.update("INSERT INTO surveys (booth_id, title, created_by_user_id) VALUES (?, ?, ?)",
+                boothId, "만족도 조사", userId);
+    }
+
+    private String kioskLayout(Integer configId) {
+        String config = configId == null ? "" : "\"configId\":%d,".formatted(configId);
+        return """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"kiosk-1","type":"SURVEY_KIOSK",%s
+                   "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """.formatted(config);
     }
 
     private String laptopLayout(Integer configId) {

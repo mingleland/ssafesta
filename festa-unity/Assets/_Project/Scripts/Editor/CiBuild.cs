@@ -31,6 +31,15 @@ namespace Festa.EditorTools
         {
             try
             {
+                // **`-quit` 과 같이 쓰면 안 된다.** 유니티가 빌드 도중 종료 요청을 받아들여 셰이더 변형을
+                // 굽다 말고 내려가면, BuildPipeline.BuildPlayer 가 반환하지 않아 아래 결과 단언이 통째로
+                // 건너뛰어지고 **종료 코드 0 에 산출물 없음**이 된다 — 실패가 성공으로 보인다.
+                // 2026-09-14 Jenkins 실측에서 그대로 났다: "[9799s] 2784/3584 variants ready" 뒤로
+                // 결과 로그 없음, exit 0, 산출물 없음(GitLab #185). 종료는 이 메서드가 Exit 로 직접 정한다.
+                if (Environment.GetCommandLineArgs().Any(a => a == "-quit"))
+                    Fail("-quit 과 함께 실행하지 마라. 빌드 도중 에디터가 내려가 결과 단언이 건너뛰어지고 " +
+                         "종료 코드 0 에 산출물 없음이 된다. 종료 코드는 CiBuild 가 정한다 (festa-unity/ci/build 참고).");
+
                 var target = ArgValue("-festaTarget") ?? "all";
                 Log($"타깃 = {target}");
 
@@ -218,6 +227,18 @@ namespace Festa.EditorTools
 
             if (summary.result != BuildResult.Succeeded)
                 Fail($"{label} 빌드 실패: {summary.result}");
+
+            // **산출물이 실제로 있는지까지 본다** (2026-09-14 인프라 요청, GitLab #185).
+            // result 가 Succeeded 인데 파일이 없는 경우가 있다 — 출력 경로가 다른 곳으로 잡히거나
+            // 빌드 후처리가 지운 경우다. 그걸 성공으로 넘기면 다음 단계가 "실행기가 없다" 로 터지고
+            // 원인을 여기가 아니라 거기서 찾게 된다.
+            var produced = options.locationPathName;
+            bool exists = File.Exists(produced) || Directory.Exists(produced);
+            if (!exists)
+                Fail($"{label} 빌드가 Succeeded 인데 산출물이 없다: {Path.GetFullPath(produced)}");
+
+            long bytes = File.Exists(produced) ? new FileInfo(produced).Length : -1;
+            Log($"{label} 산출물 확인 — {Path.GetFullPath(produced)}" + (bytes >= 0 ? $" ({bytes} B)" : " (디렉터리)"));
         }
 
         static string[] EnabledScenes() =>

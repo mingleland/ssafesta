@@ -25,7 +25,7 @@ vi.mock('../../sessionManager', () => ({
 }));
 // 이 테스트의 관심사는 focus 하나다 — 같은 인스턴스를 쓰는 다른 동기화는 뺀다
 vi.mock('../../authBridge', () => ({ syncAccessToken: () => 'cleared' }));
-vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {} }));
+vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {}, syncAudioVolume: () => {} }));
 vi.mock('../../inputBridge', () => ({ syncInputLock: () => {} }));
 
 const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi.fn(), Quit: async () => {} });
