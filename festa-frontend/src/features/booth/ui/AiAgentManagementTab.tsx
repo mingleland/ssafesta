@@ -91,6 +91,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -104,9 +105,29 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
         ? updateAiAgent(agentQuery.data.agentId, command)
         : createAiAgent(boothId, command);
     },
-    onSuccess: async () => {
+    // 등록 폼에서 미리 골라둔 문서를 저장 직후 같은 agentId 로 순차 업로드한다 —
+    // "저장 먼저, 업로드는 그다음 화면에서" 두 단계를 사용자가 거치지 않게 한다.
+    onSuccess: async (agent) => {
       await queryClient.invalidateQueries({ queryKey: ['ai-agent', boothId] });
       setError(null);
+      if (pendingFiles.length > 0) {
+        const files = pendingFiles;
+        setPendingFiles([]);
+        setUploadMessage(`문서 ${files.length}건 업로드 중...`);
+        let uploaded = 0;
+        for (const file of files) {
+          try {
+            await uploadAiDocument(agent.agentId, file);
+            uploaded += 1;
+          } catch {
+            // 개별 문서 업로드 실패는 등록 자체를 무효화하지 않는다 — 건너뛰고 계속한다
+          }
+        }
+        setUploadMessage(
+          uploaded === files.length ? `문서 ${uploaded}건 업로드 완료` : `문서 ${uploaded}/${files.length}건 업로드 완료 (일부 실패)`,
+        );
+        await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agent.agentId] });
+      }
     },
     onError: (cause) => setError(isApiError(cause) ? cause.message : 'AI 직원 설정을 저장하지 못했습니다.'),
   });
@@ -157,6 +178,24 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     uploadMutation.mutate(file);
   }
 
+  // 등록 전(agentId 없음) 단계 — 선택만 해두고 실제 업로드는 저장 성공 뒤 saveMutation.onSuccess 가 한다
+  function stagePendingFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setPendingFiles((prev) => {
+      const next = [...prev];
+      for (const file of Array.from(files)) {
+        if (!next.some((existing) => existing.name === file.name && existing.size === file.size)) next.push(file);
+      }
+      return next;
+    });
+    event.target.value = '';
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
   function selectReplacement(documentId: number, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -200,11 +239,35 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
           <h4 id="ai-document-title">답변 근거 문서</h4>
           <p className="ov-note">PDF, Markdown, 텍스트 파일을 최대 20MB까지 올릴 수 있습니다. 업로드 후 처리 완료 전까지는 답변 근거에 쓰이지 않습니다.</p>
         </div>
-        <label className={'ov-btn bm-upload' + (!editing || uploadMutation.isPending ? ' bm-upload-disabled' : '')}>
-          {uploadMutation.isPending ? '업로드 중...' : '문서 업로드'}
-          <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" disabled={!editing || uploadMutation.isPending} onChange={selectFile} />
-        </label>
-        {!editing && <p className="ov-note">AI 직원 설정을 먼저 저장하면 문서를 등록할 수 있습니다.</p>}
+        {!editing && (
+          <>
+            <label className="ov-btn bm-upload">
+              파일 선택
+              <input type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" onChange={stagePendingFiles} />
+            </label>
+            <p className="ov-note">선택한 문서는 &apos;AI 직원 등록&apos; 저장과 함께 업로드됩니다.</p>
+            {pendingFiles.length > 0 && (
+              <ul className="bm-document-list">
+                {pendingFiles.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${index}`} className="bm-document-row">
+                    <span className="bm-document-name">{file.name}</span>
+                    <span className="bm-document-meta">{formatBytes(file.size)}</span>
+                    <button type="button" className="bm-document-remove" onClick={() => removePendingFile(index)}>
+                      제거
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {editing && (
+          <label className={'ov-btn bm-upload' + (uploadMutation.isPending ? ' bm-upload-disabled' : '')}>
+            {uploadMutation.isPending ? '업로드 중...' : '문서 업로드'}
+            <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" disabled={uploadMutation.isPending} onChange={selectFile} />
+          </label>
+        )}
         {uploadMessage && <p className="bm-upload-result" role="status">{uploadMessage}</p>}
 
         {editing && (
