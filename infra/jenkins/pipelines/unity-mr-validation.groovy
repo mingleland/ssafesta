@@ -8,7 +8,10 @@ if (!(sourceBranch ==~ /^(feat|feature|fix|refactor|test|docs|chore|build|ci|hot
 
 def safeJob = env.JOB_NAME.replaceAll(/[^A-Za-z0-9_.-]/, '_')
 def artifactDir = "artifacts/unity-mr/${env.BUILD_NUMBER}"
-def repositoryUrl = "${env.GITLAB_SERVER_URL ?: 'https://lab.ssafy.com'}/${env.GITLAB_PROJECT_OWNER}/${env.GITLAB_PROJECT_PATH}.git"
+def serverUrl = env.GITLAB_SERVER_URL ?: 'https://lab.ssafy.com'
+def projectOwner = env.GITLAB_PROJECT_OWNER ?: 's15-metaverse-game-sub1'
+def projectPath = env.GITLAB_PROJECT_PATH ?: 'S15P21A604'
+def repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 def checkoutCredential = env.GITLAB_CHECKOUT_CREDENTIALS_ID ?: 'gitlab-checkout'
 
 gitlabCommitStatus(name: 'unity-mr-validation') {
