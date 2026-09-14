@@ -128,3 +128,33 @@ Phase 1 (T001~T002)
 ## Implementation Strategy
 
 **MVP는 Phase 1~4까지다.** 만료 처리(US3)가 없어도 임대 자체는 동작하고, 경제 무결성 요구(SC-001·SC-002)는 Phase 4에서 증명된다. 다만 **US3의 T025(상태 전이)가 없으면 재임대가 불가능**하므로 실사용 전에는 Phase 5까지 필요하다.
+
+---
+
+## Phase 7 — US4 부스 반납 (조기 취소) · 2026-09-14 추가
+
+spec 004에 D12·FR-020·FR-021·User Story 4가 들어오면서 붙은 작업이다. **위 T001~T035는 그대로 유효하고 지우지 않는다** — 반납은 그 위에 얹힌다.
+
+핵심은 **새 해제 경로를 만들지 않는 것**이다. T025/T035가 만든 공용 만료 메서드를 상태 인자로 일반화해 반납이 같은 자리를 지나게 한다. 두 번째 해제 경로는 나중에 한쪽만 고치는 자리가 된다.
+
+| ID | 상태 | 작업 | 파일 |
+|---|---|---|---|
+| T036 | [X] | `LeaseStatus`에 `CANCELLED` 추가 + javadoc 정정("no cancellation" 문구 제거). **마이그레이션 없음** — `status`는 `VARCHAR(20)`이고 CHECK 제약이 없으며, 부분 유니크 인덱스 둘 다 `status='ACTIVE'`만 본다 | `booth/LeaseStatus.java` |
+| T037 | [X] | `BoothLease.cancel()` 추가 (`expire()` 옆, 상태만 다름) | `booth/BoothLease.java` |
+| T038 | [X] | `findActiveByLesseeUserIdForUpdate(userId)` 신설 — `PESSIMISTIC_WRITE`, **시간 술어 없음**. 시간 판정은 기존 `findValidByLesseeUserId`가 계속 맡는다(유효성 규칙은 Repository 한 곳) | `booth/BoothLeaseRepository.java` |
+| T039 | [X] | private `expire(BoothLease)` → `release(BoothLease, LeaseStatus)` 일반화. 기존 만료 3경로는 `EXPIRED`로 호출. **만료 로그 문구는 글자 그대로 유지** — `BoothLeaseExpirySweeperIntegrationTest`가 문자열 원본을 단언한다 | `booth/BoothLeaseService.java` |
+| T040 | [X] | `cancel(userId, slotId)` 신설 — 지갑 락 → 임대 행 락 → 락 뒤 유효성 재조회 → 슬롯 일치 확인 → `release(.., CANCELLED)`. **지갑은 건드리지 않는다**(FR-021) | `booth/BoothLeaseService.java` |
+| T041 | [X] | `BoothDocumentDeactivationService.deactivate(boothId, Cause)` — 사람이 읽는 문구·로그만 원인별로 가른다. **기계용 `last_error_code`는 `BOOTH_LEASE_EXPIRED` 유지**(AI 파트와 공유하는 어휘, "유효한 임대 없음"으로 재정의) | `ai/BoothDocumentDeactivationService.java` |
+| T042 | [X] | `ACTIVE_LEASE_NOT_FOUND` + `ActiveLeaseNotFoundException`. `ACTIVE_LEASE_LIMIT` 메시지에 반납 경로 반영 | `common/ErrorCode.java`, `booth/ActiveLeaseNotFoundException.java` |
+| T043 | [X] | `DELETE /api/v1/booth-slots/{slotId}/leases/mine` → `204`. Swagger 포함 | `booth/BoothSlotController.java` |
+| T044 | [X] | 반납 한 바퀴 + 거부 3경로 통합테스트. **"다른 회원이 그 자리를 빌린다"가 detach를 증명하는 줄**이다 — 같은 회원의 재임대만 보면 `detachSlot` 누락도 통과한다 | `BoothApiIntegrationTest` |
+| T045 | [X] | 락 프로토콜 경합 테스트 2종(반납 선점 / 배치 선점). `findStaleActive`의 `moment`에 미래 시각을 넘겨 `Clock` 주입 없이 고정한다. **`@Lock` 제거 변이로 10건 실패 확인** | `BoothLeaseConcurrencyIntegrationTest` |
+| T046 | [X] | 반납 시 AI Job `CANCELLED`·문서 `DISABLED`·staging/chunk 정리·FastAPI cancel 호출 수 검증 | `BoothLeaseExpiryAiDocumentIntegrationTest` |
+| T047 | [X] | 문서: spec 004(spec·data-model·contract) · spec 007 FR-015·FR-041 · spec 008 FR-024·FR-026 · docs/02 BOOTH-09 · docs/08 · bruno | — |
+
+### 범위 밖 (Phase 7에서 하지 않는다)
+
+- **코인 환불** — D06이 유지된다 (FR-021)
+- **관리자 강제 회수** — admin 권한 모델 미결, `S15P21A604-736`
+- **열린 AI Conversation 즉시 차단** — spec 008 FR-024가 대화 생성 시 저장한 `leaseEndsAt`을 보므로 반납이 즉시 끊지 못한다. 실질 노출이 없고(신규 대화 차단 + 문서 `DISABLED`로 "자료 미준비" 안내) 30분 유휴 TTL이 닫으므로 **한계를 문서화하는 쪽으로 확정**했다 (spec 004 Edge Cases)
+- **월드 실시간 전파** — 만료와 같은 구멍이다 (FR-019)

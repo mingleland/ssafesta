@@ -282,13 +282,29 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 - `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치). 미등록도 `null`이라 FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
+### DELETE `/booth-slots/{slotId}/leases/mine` — spec 004 신설 (D12, 2026-09-14)
+
+만료를 기다리지 않고 임차인이 자리를 내놓는다 (FR-020). **`204 No Content`, 본문 없음.**
+
+- **환불 없다** (FR-021). D06의 "변심 환불 없음"이 그대로 적용되고, 반납은 자리만 비운다. 재임대는 새 결제다.
+- 반납 즉시 슬롯이 `AVAILABLE`이 되고 활성 임대 한도(D01)가 풀린다. 콘텐츠는 보존된다 (FR-010).
+- 경로의 `slotId`는 **확인용**이다. 활성 임대는 하나뿐이라 없어도 찾을 수 있지만, 낡은 화면이 엉뚱한 부스를 날리는 것을 막는다.
+
+| 코드 | 오류 코드 | 상황 |
+|---|---|---|
+| 204 | — | 반납 완료 |
+| 403 | `MEMBER_ONLY` | 게스트 토큰 |
+| 404 | `ACTIVE_LEASE_NOT_FOUND` | 이 자리에 반납할 내 임대가 없다 |
+
+> ⚠️ **재시도한 요청도 `404`다. 오류로 표시하지 않는다** — 슬롯 목록과 내 부스를 다시 읽는 신호다. `ACTIVE_LEASE_NOT_FOUND`는 "임대가 없다"·"내 임대가 다른 자리에 있다"·"방금 만료됐다"를 가르지 않는다. 셋 다 화면이 낡았다는 뜻이고 클라이언트가 할 일이 같다.
+
 ### POST `/booths/{boothId}/leases/extend` — P1
 
 임대 연장. 정확한 정책은 TBD.
 
-### Lease 만료 처리 계약
+### Lease 종료 처리 계약
 
-- `ACTIVE → EXPIRED` 전환과 `booths.current_slot_id` 해제는 하나의 트랜잭션으로 처리한다.
+- `ACTIVE`에서 나가는 전환(`EXPIRED` 만료 · `CANCELLED` 반납)과 `booths.current_slot_id` 해제는 하나의 트랜잭션으로 처리한다. **만료와 반납은 같은 경로를 지나고 기록에 남는 단어만 다르다** (D12).
 - 만료 즉시 해당 슬롯의 `entryAvailable`을 `false`로 반환한다.
 - 외부 Facade는 슬롯 응답에서 숨기고 기본 빈 슬롯으로 표시한다.
 - 기존 Published Layout은 일반 Runtime 조회 대상에서 제외하되 Owner의 Draft/보존 데이터는 삭제하지 않는다.
