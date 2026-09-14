@@ -149,8 +149,29 @@ namespace Festa.Core
         }
 
         /// <summary>jslib 추정치를 흔한 주사율로 스냅한다. 119·121 같은 값이 매번 다른 판정을 만들지 않게.</summary>
+        /// <summary>
+        /// vSyncCount 를 바꾼 뒤 프로브 표본이 새 리듬으로 다 갈릴 때까지 기다리는 시간(초).
+        ///
+        /// <para>jslib 프로브는 최근 180개 rAF 간격을 들고 60프레임마다 다시 추정한다. 60fps 면
+        /// 180표본이 3초어치라, 그 전에 읽으면 <b>바뀌기 전 간격</b>이 섞인 값이 나온다.</para>
+        /// </summary>
+        const float HzProbeSettle = 4f;
+        float _hzProbeStaleUntil;
+
         void ResolveRefreshRate()
         {
+            // **우리가 방금 리듬을 바꿨으면 주사율을 다시 읽지 않는다.**
+            //
+            // 2026-09-14 배포본(3bc7de33) 실측에서 진입 구간에 이 순환이 돌았다:
+            //   120Hz 확정 → 예산 8.3ms 를 100% 놓침 → vSync 1→2
+            //   → "주사율 변경 120Hz → 60Hz — 판정을 다시 시작한다" → vSync 2→1 → 다시 120Hz 판독 → …
+            // 로딩 중에는 메인 스레드가 포화돼 **모든** rAF 간격이 16.7ms 이상으로 늘어나고, 하위 10%
+            // 분위마저 16.7ms 가 되어 120Hz 화면이 60Hz 로 읽힌다. 아래 미스율 가드가 그걸 막으라고
+            // 있는데, vSync 2 로 내린 직후에는 프레임이 실제로 싸져서 미스율이 0 이 되고 **버퍼에 남아
+            // 있던 낡은 60Hz 판독이 그때 통과한다.** 가드가 "화면이 바뀐 것" 과 "우리가 나눈 것" 을
+            // 구분하지 못하는 것이다. 그래서 간접 지표가 아니라 원인(낡은 표본)에서 막는다.
+            if (Time.unscaledTime < _hzProbeStaleUntil) return;
+
             int raw = FestaDisplayRefreshHz();
             if (raw < 30 || raw > 400) return;
 
@@ -287,6 +308,9 @@ namespace Festa.Core
             int before = QualitySettings.vSyncCount;
             QualitySettings.vSyncCount = interval;
             _interval = interval;
+            // 리듬을 바꿨다 — 프로브 버퍼(180표본)가 아직 **바뀌기 전 간격**으로 차 있다.
+            // 그 낡은 값으로 주사율을 다시 판정하면 우리 조작이 우리 관측을 오염시킨다.
+            if (before != interval) _hzProbeStaleUntil = Time.unscaledTime + HzProbeSettle;
             Debug.Log($"[DisplayRefreshAdapter] vSyncCount {before} → {interval} " +
                       $"(화면 {_hz}Hz → 목표 {_hz / (float)interval:F0}fps). {why}");
         }
