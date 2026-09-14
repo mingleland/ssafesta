@@ -46,16 +46,18 @@ public class BoothLeaseService {
     private final WalletService wallets;
     private final BoothDocumentDeactivationService aiDocuments;
     private final LeaseProperties properties;
+    private final BoothChangeNotifier changes;
 
     public BoothLeaseService(BoothSlotRepository slots, BoothRepository booths, BoothLeaseRepository leases,
                              WalletService wallets, BoothDocumentDeactivationService aiDocuments,
-                             LeaseProperties properties) {
+                             LeaseProperties properties, BoothChangeNotifier changes) {
         this.slots = slots;
         this.booths = booths;
         this.leases = leases;
         this.wallets = wallets;
         this.aiDocuments = aiDocuments;
         this.properties = properties;
+        this.changes = changes;
     }
 
     /**
@@ -104,6 +106,9 @@ public class BoothLeaseService {
 
         Booth booth = ownBooth(userId);
         booth.attachSlot(slotId);
+        // 새 임차인의 부스가 이 슬롯에 섰다. 월드에 있는 사람에게는 아직 빈 슬롯이거나 이전
+        // 임차인의 간판이다 (S15P21A604-727).
+        changes.slotChanged(slotId);
 
         BoothLease lease;
         try {
@@ -203,6 +208,9 @@ public class BoothLeaseService {
         // than in each caller because spec.md:71 wants it in this transaction, and because a second
         // place to expire a lease is a second place to forget this.
         aiDocuments.deactivate(lease.getBoothId());
+        // 만료는 부스가 슬롯을 놓는 일이라 부스에서 슬롯을 읽을 수 없다 — 임대가 들고 있던 것을
+        // 쓴다. 게으른 경로와 스위퍼가 둘 다 여기를 지나므로 신호도 한 곳에서 나간다.
+        changes.slotChanged(lease.getSlotId());
         log.info("만료 임대 정리 — leaseId={}, slotId={}, boothId={}",
                 lease.getId(), lease.getSlotId(), lease.getBoothId());
     }

@@ -22,16 +22,19 @@ public class BoothLayoutService {
     private final BoothAccessGuard accessGuard;
     private final LayoutValidator validator;
     private final BoothRepository booths;
+    private final BoothChangeNotifier changes;
 
     public BoothLayoutService(BoothLayoutDraftRepository drafts,
                               BoothLayoutPublishedVersionRepository published,
                               BoothAccessGuard accessGuard,
-                              LayoutValidator validator, BoothRepository booths) {
+                              LayoutValidator validator, BoothRepository booths,
+                              BoothChangeNotifier changes) {
         this.drafts = drafts;
         this.published = published;
         this.accessGuard = accessGuard;
         this.validator = validator;
         this.booths = booths;
+        this.changes = changes;
     }
 
     /**
@@ -103,6 +106,9 @@ public class BoothLayoutService {
         BoothLayoutPublishedVersion snapshot = published.saveAndFlush(new BoothLayoutPublishedVersion(
                 boothId, nextVersion, draft.getSchemaVersion(), draft.getLayoutJson(), userId));
         booth.publishLayoutVersion(nextVersion);
+        // 게시한 사람의 브라우저만 알던 자리다. 이 신호가 없으면 월드에 이미 있는 사람들은 세션
+        // 내내 이전 공개본을 본다 (S15P21A604-727, spec 005 SC-002).
+        changes.boothChanged(booth);
 
         return new PublishOutcome(boothId, nextVersion, snapshot.getPublishedAt(), validation.warnings());
     }

@@ -22,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class BoothHomepageService {
 
     private final BoothAccessGuard accessGuard;
+    private final BoothChangeNotifier changes;
 
-    public BoothHomepageService(BoothAccessGuard accessGuard) {
+    public BoothHomepageService(BoothAccessGuard accessGuard, BoothChangeNotifier changes) {
         this.accessGuard = accessGuard;
+        this.changes = changes;
     }
 
     @Transactional
@@ -34,6 +36,7 @@ public class BoothHomepageService {
         Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
         booth.changeHomepageUrl(validated(command));
+        changes.boothChanged(booth);
         return new HomepageView(booth.getHomepageUrl());
     }
 

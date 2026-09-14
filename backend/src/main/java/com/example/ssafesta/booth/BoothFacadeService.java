@@ -24,9 +24,11 @@ public class BoothFacadeService {
     private static final int MAX_SIGN_TEXT = 60;
 
     private final BoothAccessGuard accessGuard;
+    private final BoothChangeNotifier changes;
 
-    public BoothFacadeService(BoothAccessGuard accessGuard) {
+    public BoothFacadeService(BoothAccessGuard accessGuard, BoothChangeNotifier changes) {
         this.accessGuard = accessGuard;
+        this.changes = changes;
     }
 
     @Transactional
@@ -47,6 +49,9 @@ public class BoothFacadeService {
         HttpUrlValidator.validateHttpsOnly(command.logoUrl(), "logoUrl", "로고");
 
         booth.changeFacade(themeCode, primaryColor, command.signText(), command.logoUrl());
+        // 간판 문구·대표색은 배치 회차를 올리지 않는다. 신호를 보내지 않으면 월드에 있는 사람은
+        // 포탈로 그 방에 들어갈 때까지 옛 간판을 본다 (S15P21A604-727).
+        changes.boothChanged(booth);
         return FacadeView.of(booth);
     }
 

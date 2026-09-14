@@ -32,6 +32,25 @@ public final class MemberPrincipal {
         }
     }
 
+    /**
+     * The member id behind an already-authenticated STOMP connection, or {@code null} for a guest.
+     *
+     * <p>A guest's subject is {@code guest:<uuid>}, so it never parses as a number; a numeric
+     * subject is issued only to members ({@code WsTokenController}). That invariant is what the
+     * chat and booth-topic gates read, and it lives here so both read the same rule
+     * (S15P21A604-727).
+     */
+    public static Long optionalMemberId(java.security.Principal principal) {
+        if (principal == null) {
+            return null;
+        }
+        try {
+            return Long.valueOf(principal.getName());
+        } catch (NumberFormatException guest) {
+            return null;
+        }
+    }
+
     public static Long requireMemberId(Jwt jwt) {
         return requireMemberId(jwt, ErrorCode.MEMBER_ONLY.defaultMessage());
     }

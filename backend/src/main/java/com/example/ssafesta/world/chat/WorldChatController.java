@@ -2,6 +2,7 @@ package com.example.ssafesta.world.chat;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.common.MemberPrincipal;
 import java.security.Principal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,12 @@ import org.springframework.stereotype.Controller;
  * 월드 공용 채팅의 유일한 SEND 자리 (S15P21A604-687).
  *
  * <p>보내는 사람은 {@link Principal} 로 온다 — {@code StompAuthChannelInterceptor} 가 {@code CONNECT}
- * 에서 WS Token 을 검증하고 심어 둔 회원 id 다. <b>요청 본문에서 신원을 읽지 않는다.</b>
+ * 에서 WS Token 을 검증하고 심어 둔 주체다. <b>요청 본문에서 신원을 읽지 않는다.</b>
+ *
+ * <p><b>게스트는 여기서 막는다</b>(S15P21A604-727). 게스트도 연결은 하지만 그 연결은 읽기
+ * 전용이다. 인터셉터의 destination 정책으로 막지 않는 이유는 <b>그 거부가 연결을 끊기</b>
+ * 때문이다 — 같은 소켓이 부스 변경 방송을 나르므로, 채팅 프레임 하나 때문에 월드 동기화까지
+ * 죽으면 대가가 사건에 비해 크다. 여기서 막으면 오류 큐로 사유만 가고 연결은 산다.
  */
 @Controller
 public class WorldChatController {
@@ -33,7 +39,11 @@ public class WorldChatController {
 
     @MessageMapping("/world/chat")
     public void say(Principal sender, @Payload WorldChatSend command) {
-        chat.say(Long.valueOf(sender.getName()), command);
+        Long senderUserId = MemberPrincipal.optionalMemberId(sender);
+        if (senderUserId == null) {
+            throw new ApiException(ErrorCode.MEMBER_ONLY, "회원 계정만 채팅할 수 있습니다.");
+        }
+        chat.say(senderUserId, command);
     }
 
     /**

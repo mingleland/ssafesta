@@ -11,6 +11,7 @@
 - [x] **T001** [US1] `BoothRuntime`이 **공개본 엔드포인트**를 조회하도록 전환 (작업본 노출 금지 → FR-002)
 - [x] **T002** [US1] 조회 실패 시 해당 부스만 비우고 월드는 유지되는지 회귀 확인 (이미 구현 — 깨지지 않았는지만 확인)
 - [ ] **T003** [US1] 갱신 정책 구현 — **부스 구역 진입 시 조회** (C-01 최소안). 기존 오브젝트 정리 후 재생성
+- [x] **T003-1** [US1] **서버 변경 신호** (C-01 개정, `S15P21A604-727`) — Spring 이 STOMP `/topic/world/booths` 로 `{ slotId }` 방송, FE 가 `BoothLayoutBridge.ReloadBoothSlot` 호출. **Unity 수정 0** (`WorldBoothPublishedBootstrap.RequestReload` 가 이미 슬롯 재조회·서명 비교·재생성을 한다). BE 완료, FE 구현은 GitLab #193
 - [x] **T004** [P] 생성된 오브젝트 수를 로그로 남기기 (부하 테스트 근거 + 상한 결정 자료)
 
 ## Phase 2: 계약 반영 (005 확정 후 — 차단됨)

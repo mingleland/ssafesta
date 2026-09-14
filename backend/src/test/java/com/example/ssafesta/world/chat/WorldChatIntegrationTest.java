@@ -56,6 +56,25 @@ class WorldChatIntegrationTest {
      * 거부된 줄은 토픽에 나가지 않는다. 판정 불가는 도배(429)와 다른 코드라 클라이언트가 "잠시 뒤"
      * 와 "지금은 채팅 불가" 를 가른다.
      */
+    /**
+     * <b>게스트는 말할 수 없다</b> (S15P21A604-727).
+     *
+     * <p>예전에는 WS Token 이 회원에게만 나가 연결 자체가 게이트였다. 부스 변경 방송을 게스트
+     * 화면까지 보내려고 게스트 연결을 열었으므로, 발신 게이트가 이제 명시적으로 있어야 한다 —
+     * 없으면 {@code Long.valueOf(주체)} 가 {@code NumberFormatException} 으로 터져 게스트에게
+     * {@code CHAT_UNAVAILABLE} 이 가고 서버 로그에는 알 수 없는 예외가 쌓인다.
+     */
+    @Test
+    void aGuestCannotSpeak() {
+        WorldChatController controller = new WorldChatController(chat);
+
+        ApiException refused = assertThrows(ApiException.class,
+                () -> controller.say(() -> "guest:abc", new WorldChatSend("안녕하세요")));
+
+        assertEquals(com.example.ssafesta.common.ErrorCode.MEMBER_ONLY, refused.errorCode());
+        assertNothingSent();
+    }
+
     @Test
     void whenRedisIsDownTheMessageIsRefusedNotBroadcast() {
         Long sender = member("레디스장애");

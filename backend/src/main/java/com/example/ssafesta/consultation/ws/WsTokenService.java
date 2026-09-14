@@ -18,6 +18,11 @@ import org.springframework.stereotype.Service;
  * <p><b>URL query 로 넘기지 않는다</b>(FR-019). 토큰이 접속 로그·referrer 에 남기 때문이고,
  * 그래서 이 값은 STOMP {@code CONNECT} 프레임의 {@code Authorization} 헤더로만 간다.
  *
+ * <p><b>주체는 문자열이다</b>(S15P21A604-727). 회원은 id 의 문자열 표현({@code "7"})이고 게스트는
+ * 접속 토큰의 주체({@code "guest:<uuid>"})다. 게스트도 연결할 수 있어야 부스 변경 방송이 게스트
+ * 화면까지 닿는다 — 그 전에는 게스트가 세션 내내 낡은 부스를 보고 있었다. <b>숫자인 주체는 곧
+ * 회원</b>이고, 회원만 할 수 있는 일(채팅 발신·부스 대기열 구독)은 그 판정을 쓴다.
+ *
  * <p>저장소는 Redis 다 — Refresh Token 이 이미 쓰고 있어 새 저장소가 늘지 않는다. TTL 이 곧
  * 만료라 스위퍼도 필요 없다.
  *
@@ -44,28 +49,31 @@ public class WsTokenService {
         this.keyspace = keyspace.prefix();
     }
 
-    /** 회원 한 명에게 5분짜리 연결 열쇠를 준다. 재연결마다 새로 발급받는다. */
-    public Issued issue(Long userId) {
+    /**
+     * 한 사람에게 5분짜리 연결 열쇠를 준다. 재연결마다 새로 발급받는다.
+     *
+     * @param subject 회원 id 의 문자열 표현, 또는 게스트 접속 토큰의 주체
+     */
+    public Issued issue(String subject) {
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-        redis.opsForValue().set(key(token), String.valueOf(userId), VALID_FOR);
+        redis.opsForValue().set(key(token), subject, VALID_FOR);
         return new Issued(token, VALID_FOR.toSeconds());
     }
 
     /**
-     * 토큰이 가리키는 회원. 없거나 만료됐으면 비어 있다.
+     * 토큰이 가리키는 주체. 없거나 만료됐으면 비어 있다.
      *
      * <p><b>한 번 쓰고 지우지 않는다.</b> 끊긴 연결을 클라이언트가 즉시 되잇는 경우가 정상
      * 경로이고, 그때마다 REST 왕복을 강제하면 재연결이 느려진다. 5분이라는 짧은 수명이 재사용
      * 창을 대신 막는다.
      */
-    public Optional<Long> resolve(String token) {
+    public Optional<String> resolve(String token) {
         if (token == null || token.isBlank()) {
             return Optional.empty();
         }
-        String userId = redis.opsForValue().get(key(token));
-        return userId == null ? Optional.empty() : Optional.of(Long.valueOf(userId));
+        return Optional.ofNullable(redis.opsForValue().get(key(token)));
     }
 
     private String key(String token) {

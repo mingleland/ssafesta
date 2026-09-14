@@ -13,7 +13,7 @@
 | Player 위치/회전 | NGO + Dedicated Server | Unity Server |
 | Player Spawn/Despawn | NGO | Unity Server |
 | World/Channel 접속 | REST + NGO | Spring Session + Unity Server |
-| Booth Layout | REST | Spring |
+| Booth Layout | REST + **STOMP 무효화 신호** (§8-2) | Spring |
 | AI 응답 | SSE 우선 | FastAPI |
 | AI 문서 상태 | REST Polling 우선 | FastAPI/Spring |
 | Staff Presence | WebSocket 후보 | Spring + Redis |
@@ -264,7 +264,7 @@ in-memory simple broker 다. Spring 을 두 대 이상 띄우면 A 에 붙은 �
 
 `wss://<host>/ws` — §14 의 WS Token 을 `CONNECT` 헤더에 싣는다. **한 소켓이 상담 알림과 이 채팅을 함께 나른다.** `wss://<host>/ws/consultation` 도 같은 것으로 남겨 두었다.
 
-**회원 전용이다.** WS Token 이 회원에게만 발급되므로 게스트는 연결 자체가 되지 않는다.
+**읽기는 게스트도 한다** (2026-09-14, `S15P21A604-687` 최초 판 정정). 처음에는 WS Token 이 회원에게만 발급돼 연결 자체가 회원 게이트였는데, §8-2 부스 변경 신호를 게스트 화면까지 보내려고 게스트에게도 토큰을 연다(`S15P21A604-727`). **보내는 것은 여전히 회원만이다** — 게스트가 `SEND` 하면 `MEMBER_ONLY` 가 오류 큐로 오고 **연결은 끊기지 않는다.**
 
 ### 보내기 — `SEND /app/world/chat`
 
@@ -308,6 +308,51 @@ in-memory simple broker 다. Spring 을 두 대 이상 띄우면 A 에 붙은 �
 - **월드 접속 여부를 보지 않는다.** "유효한 WS Token 을 가진 회원" 이면 월드 밖에서도 보낼 수 있다
 - **단일 인스턴스 전제.** §8 의 한계와 같다 — 서버를 둘로 늘리면 서로의 말이 보이지 않는다
 - **신고·차단·금칙어가 없다.** 운영 인력을 전제하는 기능이라 시연 규모에 맞지 않는다
+
+---
+
+## 8-2. 부스 변경 신호 (STOMP) — `S15P21A604-727`, GitLab #193
+
+**부스가 바뀌었다는 것만 알린다.** 월드에 이미 들어와 있는 사람에게 변경을 알릴 길이 없어, A 가 입장한 뒤 B 가 게시하면 **A 와 C 가 같은 공간에서 다른 것을 보는 상태가 세션 내내** 이어졌다(`docs/HDD/부스_변경_신호_계약.md` §1).
+
+### 받기 — `SUBSCRIBE /topic/world/booths`
+
+```json
+{ "slotId": 7 }
+```
+
+**서버 → 클라이언트 단방향이다.** 클라이언트 `SEND` allowlist 는 늘지 않는다(§8-1 의 `/app/world/chat` 하나 그대로).
+
+### 신호에 데이터를 싣지 않는다
+
+Layout JSON 을 방송하지 않는다. 부스당 오브젝트 12개(헌법 22조)가 접속자 수만큼 복제되고, 받는 쪽은 어차피 간판·외관·프로젝트를 따로 읽어야 한다. **"바뀌었다" 만 알리고 재조회는 기존 REST 가 한다.**
+
+`boothId` 가 아니라 **`slotId`** 다 — 월드는 슬롯으로 말한다(`GET /booth-slots/{slotId}/layout/published`, Unity `BoothLayoutBridge.ReloadBoothSlot`). 슬롯에 서 있지 않은 부스(미임대·만료)는 월드에 보이는 것이 없으므로 신호도 나가지 않는다.
+
+### 언제 나가는가
+
+| 경로 | |
+|---|---|
+| 배치 공개 | `POST /booths/{id}/layouts/publish` |
+| 외관 | `PUT /booths/{id}/facade` — **배치 회차를 올리지 않아** 이 신호가 없으면 간판만 낡는다 |
+| 홈페이지 | `PUT /booths/{id}/homepage` |
+| 임대 | `POST /booth-slots/{slotId}/leases` — 새 임차인의 부스가 그 슬롯에 선다 |
+| 만료 | 게으른 판정·주기 배치 둘 다 같은 자리를 지난다 |
+
+### 커밋 뒤에 나간다
+
+트랜잭션 안에서 보내면 받는 쪽이 커밋 전에 재조회해 **옛 값**을 읽고 그 서명을 캐시한다 — 다음 변경이 올 때까지 낡은 부스가 굳는다. 화면에는 "게시했는데 그대로" 로만 보이고 오류는 남지 않는다.
+
+### 받는 쪽
+
+FE 가 이 토픽을 듣고 `instance.SendMessage('BoothLayoutBridge', 'ReloadBoothSlot', String(slotId))` 로 넘기면, Unity `WorldBoothPublishedBootstrap.RequestReload` 가 그 슬롯만 재조회해 간판·외관·슬롯 목록까지 갱신하고 **서명이 다를 때만** 다시 짓는다. **Unity 수정은 0이다.**
+
+### 한계
+
+- **회차를 싣지 않는다.** Unity 의 서명 비교가 이미 중복 재생성을 걸러내므로 읽을 소비자가 없다. 필요해지면 그때 필드를 더한다
+- **스냅샷이 없다.** 재연결 시 FE 가 보이는 슬롯에 같은 호출을 한 번씩 쏘는 것으로 대신한다
+- **유실은 계약이 인정한다**(§19). 놓친 신호는 다음 신호나 포탈 진입 시 재조회로 따라잡는다
+- **단일 인스턴스 전제.** §8·§8-1 과 같다
 
 ---
 
@@ -482,6 +527,7 @@ REQUESTED
 | 전달 | STOMP `CONNECT` 헤더. **URL query 는 보지 않는다** — 접속 로그·referrer 에 남기 때문이다 (FR-019) |
 | 핸드셰이크 | HTTP 인증을 타지 않는다. `/ws`·`/ws/**` 가 `permitAll` 이고 신원은 `CONNECT` 에서 본다 |
 | 만료 | 연결 성립 후에는 만료가 연결을 끊지 않는다 (FR-020) |
+| 주체 | 회원은 **id 문자열**, 게스트는 **`guest:<uuid>`** (`S15P21A604-727`). **숫자인 주체는 곧 회원**이고, 회원만 할 수 있는 일(채팅 발신·부스 대기열 구독)이 그 판정을 읽는다 — 그래서 숫자 주체를 가진 게스트 토큰은 발급 자체를 거부한다 |
 
 **연결 뒤에도 경계가 있다** (`S15P21A604-686`·`-692`). 클라이언트 `SEND` 는 allowlist 밖이면 거부되고, 개인 큐는 `/user/queue/**` 로만 구독한다 — raw `/queue/**` 직접 구독은 거부된다. 토픽별 SUBSCRIBE 자격 검증은 별도 보안 검토 범위다.
 

@@ -69,13 +69,44 @@ class WsTokenApiIntegrationTest {
                 .andExpect(jsonPath("$.expiresInSeconds").value(300));
     }
 
-    /** 게스트는 사람 상담 자체를 이용할 수 없다 (FR-014, 헌법 12조). */
+    /**
+     * <b>게스트도 받는다</b> (S15P21A604-727). 게스트가 연결하지 못하면 부스 변경 방송이 게스트
+     * 화면에 닿지 않아, 게스트는 세션 내내 낡은 부스를 본다. 받는 것은 <b>읽기 전용</b> 연결이고
+     * 그 경계는 아래 두 테스트가 잠근다.
+     */
     @Test
-    void aGuestGetsNoToken() throws Exception {
+    void aGuestGetsAReadOnlyToken() throws Exception {
         mockMvc.perform(post("/api/v1/consultation/ws-token")
                         .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("MEMBER_ONLY"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.expiresInSeconds").value(300));
+    }
+
+    /** 토큰 없는 요청은 여전히 거부다 — 게스트를 연 것이지 익명을 연 것이 아니다. */
+    @Test
+    void anAnonymousRequestGetsNoToken() throws Exception {
+        mockMvc.perform(post("/api/v1/consultation/ws-token"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * <b>게스트 주체는 숫자가 아니다.</b> 이 불변식 하나가 회원 게이트 전부를 떠받친다 — 숫자
+     * 주체를 가진 게스트 연결이 하나라도 생기면 그 연결이 남의 부스 대기열을 여는 회원 행세를
+     * 한다 ({@code WsTokenController}).
+     */
+    @Test
+    void aGuestSubjectIsNeverNumeric() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/realtime/ws-token")
+                        .header("Authorization", "Bearer " + accessTokens.issueGuestToken().token()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String wsToken = jsonMapper.readTree(response).get("token").asString();
+
+        String subject = tokens.resolve(wsToken).orElseThrow();
+
+        assertTrue(subject.startsWith("guest:"), "게스트 주체는 guest: 로 시작해야 합니다: " + subject);
+        assertThrows(NumberFormatException.class, () -> Long.valueOf(subject));
     }
 
     /** 발급마다 다른 값이다 — 같은 값을 돌려주면 한 사람의 토큰이 영영 유효해진다. */
@@ -83,7 +114,8 @@ class WsTokenApiIntegrationTest {
     void eachIssueGivesADifferentToken() {
         Long userId = createMemberWithWallet(users, wallets, "토큰중복");
 
-        assertNotEquals(tokens.issue(userId).token(), tokens.issue(userId).token());
+        assertNotEquals(tokens.issue(String.valueOf(userId)).token(),
+                tokens.issue(String.valueOf(userId)).token());
     }
 
     // ── CONNECT 검증 ────────────────────────────────────────────────────────
@@ -91,7 +123,7 @@ class WsTokenApiIntegrationTest {
     @Test
     void aValidTokenConnectsAndCarriesTheMemberId() {
         Long userId = createMemberWithWallet(users, wallets, "연결성공");
-        String token = tokens.issue(userId).token();
+        String token = tokens.issue(String.valueOf(userId)).token();
 
         Message<?> connected = interceptor.preSend(connectWith("Authorization", "Bearer " + token), null);
 
@@ -126,7 +158,7 @@ class WsTokenApiIntegrationTest {
     @Test
     void aTokenInTheQueryStringIsIgnored() {
         Long userId = createMemberWithWallet(users, wallets, "쿼리토큰");
-        String token = tokens.issue(userId).token();
+        String token = tokens.issue(String.valueOf(userId)).token();
 
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.CONNECT);
         accessor.setDestination("/ws/consultation?token=" + token);
@@ -191,7 +223,7 @@ class WsTokenApiIntegrationTest {
     @Test
     void aStompFrameWithAValidTokenConnects() {
         Long userId = createMemberWithWallet(users, wallets, "STOMP프레임");
-        String token = tokens.issue(userId).token();
+        String token = tokens.issue(String.valueOf(userId)).token();
 
         Message<?> connected = interceptor.preSend(
                 connectLike(StompCommand.STOMP, "Bearer " + token), null);
@@ -313,6 +345,43 @@ class WsTokenApiIntegrationTest {
                 () -> interceptor.preSend(frameAs(memberId, StompCommand.SUBSCRIBE, boothTopic(999_999L)), null));
     }
 
+    // ── 게스트 연결의 경계 (S15P21A604-727) ────────────────────────────────
+
+    /** 게스트 연결도 주체를 싣는다 — 그 이름이 회원인지 아닌지를 이후 게이트가 읽는다. */
+    @Test
+    void aGuestTokenConnects() {
+        String token = tokens.issue("guest:11111111-2222-3333-4444-555555555555").token();
+
+        Message<?> connected = interceptor.preSend(connectWith("Authorization", "Bearer " + token), null);
+
+        assertEquals("guest:11111111-2222-3333-4444-555555555555",
+                StompHeaderAccessor.wrap(connected).getUser().getName());
+    }
+
+    /** 게스트는 부스 구성원일 수 없다 — 대기열에는 방문자 닉네임과 AI 대화 요약이 실린다. */
+    @Test
+    void aGuestIsRefusedTheBoothTopic() {
+        Long ownerId = createMemberWithWallet(users, wallets, "토픽소유자");
+        Long boothId = booths.save(new Booth(ownerId, "토픽 부스")).getId();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frameAsSubject("guest:abc", StompCommand.SUBSCRIBE,
+                        boothTopic(boothId)), null));
+    }
+
+    /**
+     * <b>부스 변경 방송은 게스트도 구독한다</b> — 이 기능의 존재 이유다(GitLab #193).
+     *
+     * <p>거부만 고정하면 게이트를 조금 조이는 것만으로 게스트가 통째로 닫혀도 초록이 된다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"guest:abc", "42"})
+    void theBoothChangeTopicIsOpenToEveryConnection(String subject) {
+        Message<?> subscription = frameAsSubject(subject, StompCommand.SUBSCRIBE, "/topic/world/booths");
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
     private static String boothTopic(Long boothId) {
         return "/topic/booths/" + boothId + "/consultation";
     }
@@ -347,6 +416,17 @@ class WsTokenApiIntegrationTest {
 
     private Message<?> frame(StompCommand command, String destination) {
         return frameAs(null, command, destination);
+    }
+
+    /** 문자열 주체로 프레임을 만든다 — 게스트 주체는 숫자가 아니다. */
+    private Message<?> frameAsSubject(String subject, StompCommand command, String destination) {
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+        if (destination != null) {
+            accessor.setDestination(destination);
+        }
+        accessor.setUser(new StompAuthChannelInterceptor.ConsultationPrincipal(subject));
+        accessor.setLeaveMutable(true);
+        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 
     /** CONNECT 가 심어 둔 주체를 흉내낸다 — SUBSCRIBE 는 그 이름으로 구성원을 판정한다. */

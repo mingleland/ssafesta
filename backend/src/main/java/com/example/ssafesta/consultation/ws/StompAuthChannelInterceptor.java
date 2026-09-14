@@ -1,6 +1,7 @@
 package com.example.ssafesta.consultation.ws;
 
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.MemberPrincipal;
 import com.example.ssafesta.staff.StaffAccessGuard;
 import java.security.Principal;
 import java.util.List;
@@ -27,8 +28,10 @@ import org.springframework.stereotype.Component;
  * <p>토큰은 {@code Authorization: Bearer <token>} 헤더로만 받는다. <b>URL query 는 보지 않는다</b> —
  * 그 자리에 실린 토큰은 접속 로그와 referrer 에 남는다(FR-019).
  *
- * <p>검증된 회원 id 를 {@link Principal} 로 심어 {@code /user/queue/...} 가 그 사람에게만 가게
- * 한다. Spring 의 user destination 이 이 이름으로 대상을 고른다.
+ * <p>검증된 주체를 {@link Principal} 로 심어 {@code /user/queue/...} 가 그 사람에게만 가게
+ * 한다. Spring 의 user destination 이 이 이름으로 대상을 고른다. <b>주체는 회원 id 문자열이거나
+ * 게스트의 {@code guest:<uuid>} 다</b>(S15P21A604-727) — 게스트 연결은 읽기 전용이고, 회원만
+ * 할 수 있는 일은 {@link MemberPrincipal#optionalMemberId(Principal)} 로 가른다.
  *
  * <p><b>분기는 {@code SimpMessageType} 으로 한다</b>(S15P21A604-692). {@code StompCommand} 는 와이어
  * 표기일 뿐이고 브로커·핸들러가 실제로 보는 것은 simpType 이다 — command 로 가르면 같은 simpType 을
@@ -48,7 +51,8 @@ import org.springframework.stereotype.Component;
  * <p><b>raw {@code /queue/**} 구독도 거부한다.</b> 개인 알림은 반드시
  * {@code /user/queue/**} 를 통해 Spring 의 session 변환을 거친다.
  *
- * <p><b>부스 토픽 구독은 그 부스의 구성원만 한다</b>(S15P21A604-693). 신원은 {@code CONNECT} 에서
+ * <p><b>부스 토픽 구독은 그 부스의 구성원만 한다</b>(S15P21A604-693). 게스트는 구성원일 수
+ * 없으므로 여기서 먼저 걸린다. 신원은 {@code CONNECT} 에서
  * 확정되고, 구성원 여부는 {@code SUBSCRIBE} 에서 boothId 별로 본다 — {@code CONNECT} 시점에는
  * boothId 가 없어 멤버십을 검사할 수 없다. GitLab #133(2026-09-07) 에서 FE 에 약속한 동작인데
  * 구현이 빠져 있었다: WS Token 만 있으면 남의 부스 대기열(방문자 닉네임·AI 대화 요약)을 읽을 수
@@ -117,10 +121,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (!SimpMessageType.CONNECT.equals(type)) {
             return message;
         }
-        Long userId = tokens.resolve(bearerOf(accessor))
+        String subject = tokens.resolve(bearerOf(accessor))
                 .orElseThrow(() -> new IllegalArgumentException(
                         "실시간 채널 연결에는 유효한 WS Token 이 필요합니다."));
-        accessor.setUser(new ConsultationPrincipal(String.valueOf(userId)));
+        accessor.setUser(new ConsultationPrincipal(subject));
         return message;
     }
 
@@ -141,8 +145,14 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         if (user == null) {
             throw new IllegalArgumentException("부스 토픽 구독에는 인증된 연결이 필요합니다.");
         }
+        Long memberId = MemberPrincipal.optionalMemberId(user);
+        if (memberId == null) {
+            // 게스트다. 그 전에는 Long.valueOf 가 던지는 NumberFormatException 에 기대 우연히 막혔고,
+            // 거부 이유가 "권한 없음" 으로 나가 게스트에게 뜻이 통하지 않았다 (S15P21A604-727).
+            throw new IllegalArgumentException("부스 토픽 구독은 회원만 할 수 있습니다.");
+        }
         try {
-            staffGuard.requireBoothMember(Long.valueOf(topic.group(1)), Long.valueOf(user.getName()));
+            staffGuard.requireBoothMember(Long.valueOf(topic.group(1)), memberId);
         } catch (ApiException refused) {
             throw new IllegalArgumentException("부스 토픽 구독 권한이 없습니다.", refused);
         }

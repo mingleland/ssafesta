@@ -19,8 +19,10 @@ import org.springframework.stereotype.Service;
  * 클라이언트가 지정하게 하면 <b>서버가 누가 어느 채널에 있는지 몰라 검증할 수 없다</b>. 채널
  * 배정({@code S15P21A604-499})이 서면 그때 토픽을 쪼갠다.
  *
- * <p><b>회원 전용은 공짜로 성립한다.</b> STOMP 연결에 WS Token 이 필요하고 그 토큰은 회원에게만
- * 발급된다. 여기에 게이트를 따로 두지 않는다.
+ * <p><b>회원 전용은 더 이상 공짜가 아니다.</b> 예전에는 WS Token 이 회원에게만 발급돼 연결
+ * 자체가 게이트였는데, 부스 변경 방송을 게스트 화면까지 보내려고 게스트에게도 읽기 전용 연결을
+ * 열었다(S15P21A604-727). 그래서 발신 게이트는 {@code WorldChatController} 가 명시적으로 건다 —
+ * 이 서비스는 회원 id 를 받은 뒤부터를 맡는다.
  */
 @Service
 public class WorldChatService {

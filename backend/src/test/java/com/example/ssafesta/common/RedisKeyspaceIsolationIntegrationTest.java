@@ -101,7 +101,7 @@ class RedisKeyspaceIsolationIntegrationTest {
     void aWsTokenIssuedInOneEnvironmentCannotOpenTheOther() {
         WsTokenService envA = wsTokensIn(ENV_A);
         WsTokenService envB = wsTokensIn(ENV_B);
-        Long userId = 994_351L;
+        String userId = "994351";
 
         String token = envA.issue(userId).token();
 
@@ -114,7 +114,7 @@ class RedisKeyspaceIsolationIntegrationTest {
     void theWsTokenKeyStartsWithTheEnvironmentNamespace() {
         WsTokenService envA = wsTokensIn(ENV_A);
 
-        String token = envA.issue(994_352L).token();
+        String token = envA.issue("994352").token();
         String expected = ENV_A.prefix() + "consultation:ws:" + token;
 
         assertEquals(Set.of(expected), redis.keys("*consultation:ws:" + token));
