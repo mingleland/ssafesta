@@ -7,6 +7,7 @@ String repositoryUrl = "${serverUrl}/${projectOwner}/${projectPath}.git"
 
 pipelineJob('festa-unity-mr-validation') {
     description('Game MR Unity compile and EditMode validation only; never builds, packages, or deploys.')
+    quietPeriod(0)
     parameters {
         stringParam('SOURCE_SHA', '', 'Required full GitLab MR head SHA')
         stringParam('SOURCE_BRANCH', '', 'Required GitLab MR source branch')
