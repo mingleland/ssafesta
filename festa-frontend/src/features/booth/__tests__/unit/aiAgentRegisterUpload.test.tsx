@@ -101,4 +101,21 @@ describe('AI 직원 등록+문서 업로드 통합 (-724)', () => {
     await waitFor(() => expect(uploadAiDocument).toHaveBeenCalledWith(createdAgent.agentId, file));
     expect(await screen.findByText('문서 1건 업로드 완료')).toBeTruthy();
   });
+
+  it('이름·프롬프트를 비워둔 채 제출해도 기본값을 채워 등록한다 (-724)', async () => {
+    await renderTab();
+    await screen.findByText('미등록');
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 직원 등록' }));
+
+    await waitFor(() =>
+      expect(createAiAgent).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({
+          name: 'FESTA 안내 직원',
+          systemPrompt: '방문객의 질문에 친절하고 정확하게 답합니다. 모르는 내용은 모른다고 답하고, 확인되지 않은 정보를 지어내지 않습니다.',
+        }),
+      ),
+    );
+  });
 });

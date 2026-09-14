@@ -38,6 +38,13 @@ const emptyForm: FormState = {
   handoffEnabled: false,
 };
 
+// 이름·프롬프트를 비워둔 채 등록해도 막지 않는다(S15P21A604-724) — 백엔드는 두 필드를
+// 여전히 필수로 요구하므로(AiAgentService.validatedName/validatedPrompt), 빈 채로 보내면
+// 저장 직전에 이 기본값으로 채운다. 계약을 바꾸는 게 아니라 FE가 대신 채워 넣는 것이다.
+const DEFAULT_AGENT_NAME = 'FESTA 안내 직원';
+const DEFAULT_SYSTEM_PROMPT =
+  '방문객의 질문에 친절하고 정확하게 답합니다. 모르는 내용은 모른다고 답하고, 확인되지 않은 정보를 지어내지 않습니다.';
+
 function toForm(agent: AiAgent | null): FormState {
   if (!agent) return emptyForm;
   return {
@@ -99,8 +106,8 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   }, [agentQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: () => {
-      const command = toCommand(form);
+    mutationFn: (nextForm: FormState) => {
+      const command = toCommand(nextForm);
       return agentQuery.data
         ? updateAiAgent(agentQuery.data.agentId, command)
         : createAiAgent(boothId, command);
@@ -162,13 +169,18 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 교체하지 못했습니다.'),
   });
 
+  // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
+  // 저장한다. 화면에도 실제 저장되는 값을 그대로 반영해 나중에 "왜 이렇게 저장됐지"가 없게 한다.
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || !form.systemPrompt.trim()) {
-      setError('직원 이름과 시스템 프롬프트를 입력해 주세요.');
-      return;
-    }
-    saveMutation.mutate();
+    const next: FormState = {
+      ...form,
+      name: form.name.trim() || DEFAULT_AGENT_NAME,
+      systemPrompt: form.systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT,
+    };
+    setForm(next);
+    setError(null);
+    saveMutation.mutate(next);
   }
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
@@ -215,7 +227,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
       <div className="bm-agent-head">
         <div>
           <h3>AI 직원 {editing ? '설정' : '등록'}</h3>
-          <p className="ov-note">부스당 한 명만 운영할 수 있으며, 저장 후 문서를 등록해 답변 근거를 채울 수 있습니다.</p>
+          <p className="ov-note">부스당 한 명만 운영할 수 있으며, 저장 후 문서를 등록해 답변 근거를 채울 수 있습니다. 이름·프롬프트를 비워두면 기본값으로 등록됩니다.</p>
         </div>
         <span className={'bm-agent-state' + (editing ? ' bm-agent-state-on' : '')}>{editing ? '운영 설정됨' : '미등록'}</span>
       </div>
