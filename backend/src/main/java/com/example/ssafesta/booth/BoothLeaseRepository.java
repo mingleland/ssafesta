@@ -35,6 +35,30 @@ public interface BoothLeaseRepository extends JpaRepository<BoothLease, Long> {
             """)
     Optional<BoothLease> findValidByLesseeUserId(@Param("userId") Long userId, @Param("moment") Instant moment);
 
+    /**
+     * Locks the member's {@code ACTIVE} lease row so an early return can decide its fate alone
+     * (FR-020). <b>Deliberately has no time predicate</b> — this only takes the lock; validity is
+     * then re-read through {@link #findValidByLesseeUserId}, which keeps the expiry rule in the one
+     * place this interface promises it lives.
+     *
+     * <p>Binding a {@code moment} here could not work: this query <i>is</i> how the lock is taken,
+     * so the caller has no instant to pass yet, and a bound parameter would not refresh while the
+     * statement waits for the lock.
+     *
+     * <p><b>It waits rather than skipping.</b> {@link #findStaleActive} takes the same rows with
+     * {@code SKIP LOCKED}, so both orderings are defined: if the return locks first the sweeper
+     * passes the row over and the return wins; if the sweeper locks first this statement blocks,
+     * and PostgreSQL re-evaluates {@code status = ACTIVE} after the lock, so a row the expiry just
+     * committed drops out of the result and the return is refused. Skipping here would refuse a
+     * return over a sweeper transaction that may still roll back.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select l from BoothLease l
+            where l.lesseeUserId = :userId and l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
+            """)
+    Optional<BoothLease> findActiveByLesseeUserIdForUpdate(@Param("userId") Long userId);
+
     @Query("""
             select l from BoothLease l
             where l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE and l.endsAt > :moment
