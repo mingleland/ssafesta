@@ -23,7 +23,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -45,6 +48,7 @@ class GuestAuthApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private UserRepository users;
     @Autowired private JwtDecoder jwtDecoder;
+    @Autowired private JwtEncoder jwtEncoder;
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
     /**
@@ -144,14 +148,41 @@ class GuestAuthApiIntegrationTest {
                 .andExpect(status().isNoContent())
                 .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString("Max-Age=0")));
 
+        // The status alone let this slip: the filter used to answer with response.sendError,
+        // which has no body at all — the client saw a 401 with nothing to branch on
+        // (S15P21A604-693, HDD T-157).
         mockMvc.perform(get("/api/v1/users/me")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("로그인 세션이 종료되었습니다."))
+                .andExpect(jsonPath("$.requestId").isString());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .header(HttpHeaders.ORIGIN, trustedOrigin)
                         .cookie(new Cookie("refresh_token", session.refreshToken())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /**
+     * The other branch of {@code SessionRevocationFilter}: a MEMBER token whose subject is not a
+     * member id. {@code AccessTokenService} cannot mint one, so the token is signed here directly.
+     * It has to land in the envelope too, and with the code the refresh path already uses for a
+     * token that cannot identify a member (S15P21A604-693).
+     */
+    @Test
+    void aMemberTokenWhoseSubjectIsNotANumberIsRefusedInsideTheEnvelope() throws Exception {
+        Instant now = Instant.now();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(JwtClaimsSet.builder()
+                .subject("not-a-member-id").issuedAt(now).expiresAt(now.plusSeconds(60))
+                .id(UUID.randomUUID().toString()).claim("role", "MEMBER").claim("sid", "sid")
+                .build())).getTokenValue();
+
+        mockMvc.perform(get("/api/v1/users/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"))
+                .andExpect(jsonPath("$.requestId").isString());
     }
 }

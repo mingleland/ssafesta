@@ -201,6 +201,19 @@ class ConsultationApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("CONSULTATION_REQUEST_PENDING"));
     }
 
+    /**
+     * 없는 부스는 404 다 — 임대 검사만 하던 때는 {@code 409 BOOTH_LEASE_EXPIRED} 로 답해, 클라이언트가
+     * 있지도 않은 부스의 임대가 끝났다고 읽었다 (S15P21A604-693).
+     */
+    @Test
+    void anUnknownBoothIsNotFoundRatherThanExpired() throws Exception {
+        Member visitor = member("없는부스방문");
+
+        request(visitor, 999_999L)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOOTH_NOT_FOUND"));
+    }
+
     @Test
     void anExpiredBoothRefusesRequests() throws Exception {
         Fixture booth = leasedBoothWithStaff("만료부스");
