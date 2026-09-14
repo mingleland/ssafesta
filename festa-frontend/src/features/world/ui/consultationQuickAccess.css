@@ -1,11 +1,9 @@
 /* World HUD 우상단 — 상담 즉시 접근. 숫자 badge 를 쓰지 않는다(실제 데이터에 없다). */
 .cqa {
   position: absolute;
-  /* Landing·Login 의 ScreenControls 와 같은 좌표·같은 치수 토큰을 쓴다 (감사 항목 13).
-     예전에는 여기만 px 고정(40px / top·right 20px)이라 화면을 넘어오면 컨트롤이 자리도 크기도
-     달라졌고, --festa-toast-top 이 control-size 기준으로 계산돼 토스트도 어긋난 높이에서 떴다. */
-  right: 2vw;
-  top: 3vh;
+  /* 우상단 예약 영역의 첫 칸. 전체화면 토글은 worldHud.css에서 이 버튼 아래 공통 간격만큼 쌓는다. */
+  right: var(--festa-hud-margin-x);
+  top: var(--festa-hud-margin-y);
   display: flex;
   align-items: center;
   gap: 8px;
