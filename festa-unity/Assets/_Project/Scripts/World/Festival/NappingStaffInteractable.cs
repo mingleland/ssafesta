@@ -240,6 +240,7 @@ namespace Festa.World
 
         void LateUpdate()
         {
+            CheckWakeAck();
             if (!_caught) return;
 
             // 대사 시간이 지나면 사라진다. 복귀는 **서버가 정한 시각**으로 각자 센다 —
@@ -290,9 +291,47 @@ namespace Festa.World
             }
 
             var net = LocalNetwork();
-            if (net != null) { net.RequestWake(); return; }
+            if (net != null)
+            {
+                net.RequestWake();
+                // 서버 응답을 기다린다. **오지 않으면 혼자라도 처리한다** — 아래 주석 참고.
+                _wakeAckDeadline = Time.unscaledTime + WakeAckTimeout;
+                return;
+            }
 
             // 오프라인 경로 — 접속이 없어도 손으로 확인할 수 있어야 한다.
+            ApplyWake(NappingStaffNetwork.ServerNow() + _returnAfter, showLine: true);
+        }
+
+        /// <summary>
+        /// 서버가 깨우기를 확인해 줄 때까지 기다리는 시간(초). 왕복 지연이 아니라 <b>응답이 아예 없는 것</b>을
+        /// 잡기 위한 값이라 넉넉할 필요가 없다.
+        /// </summary>
+        const float WakeAckTimeout = 0.8f;
+        float _wakeAckDeadline;
+
+        /// <summary>
+        /// 보낸 깨우기 요청에 서버가 응답하지 않았다 — <b>혼자서라도 처리하고 크게 남긴다.</b>
+        ///
+        /// <para><b>왜 이 장치가 필요한가.</b> <see cref="NappingStaffNetwork"/> 와 그것을 붙인 플레이어
+        /// 프리팹은 2026-09-14 08:11(<c>ee851f23</c>)에 develop 에 들어갔는데, <b>전용 서버는 develop
+        /// 파이프라인이 배포하지 않는다</b> — <c>infra/jenkins/pipelines/develop.groovy</c> 가
+        /// "Dedicated Server deployment is infra-003" 으로 건너뛰고, 그 자동화는 GitLab #185 에서 아직
+        /// 연결 중이다. 그래서 WebGL 클라이언트만 새 코드를 받고 서버는 못 받는 구간이 생긴다.
+        /// 그 구간에서는 ServerRpc 가 받을 쪽 없이 사라져 <b>F 를 눌러도 아무 일도 일어나지 않았다</b>
+        /// (2026-09-14 사용자 보고: 에디터에서는 되는데 배포본에서는 안 됨).</para>
+        ///
+        /// <para>월드 공유가 이 기능의 취지지만, <b>아무 일도 안 일어나는 것보다 나 혼자 보는 편이 낫다.</b>
+        /// 서버가 최신이면 이 경로는 영영 타지 않는다 — 응답이 먼저 도착해 시한이 꺼진다.</para>
+        /// </summary>
+        void CheckWakeAck()
+        {
+            if (_wakeAckDeadline <= 0f || Time.unscaledTime < _wakeAckDeadline) return;
+            _wakeAckDeadline = 0f;
+            if (_caught) return;   // 응답이 와서 이미 처리됐다
+
+            Debug.LogError("[NappingStaff] 서버가 깨우기에 응답하지 않았다 — 월드 공유를 포기하고 이 화면에서만 처리한다. " +
+                           "전용 서버가 NappingStaffNetwork 를 모르는 빌드일 가능성이 크다(GitLab #185 · infra-003)");
             ApplyWake(NappingStaffNetwork.ServerNow() + _returnAfter, showLine: true);
         }
 
@@ -326,6 +365,7 @@ namespace Festa.World
 
         void ApplyWake(double returnAtServerTime, bool showLine)
         {
+            _wakeAckDeadline = 0f;   // 서버든 자체 처리든, 깨우기가 성립했으니 시한을 끈다
             if (_caught) return;
             _caught = true;
             _returnAtServerTime = returnAtServerTime;
