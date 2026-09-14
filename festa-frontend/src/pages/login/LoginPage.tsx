@@ -12,13 +12,15 @@ import { setGuestSession, useSession } from '../../features/auth/model/session';
 import { consumeReturnTo } from '../../features/auth/model/returnTo';
 import { authBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
+import { markFullscreenIntent } from '../../shared/ui/fullscreen';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
 import { DevEntryButton } from '../../features/devEntry/ui/DevEntryButton';
 import { showToast } from '../../shared/ui/toast/toastStore';
 import { authProviders, guestProvider, isConfiguredOAuth } from '../../entities/auth/providers';
 import type { AuthProviderId, AuthProviderVM } from '../../shared/contracts/auth';
-import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.png';
-import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.png';
+// WebP 전환 (S15P21A604-733) — 배경 2.86MB→328KB, 로고 1.77MB→246KB. 원본 PNG 는 남겨 둔다.
+import loginBackgroundUrl from '../../assets/festa/backgrounds/login-background.webp';
+import ssafestaLogoUrl from '../../assets/festa/brand/ssafesta-logo.webp';
 import './LoginPage.css';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
@@ -106,6 +108,9 @@ export function LoginPage() {
   function startOAuth(provider: AuthProviderId) {
     // 배선되지 않은 provider 는 여기서 멈춘다 — registry 가 유일한 판정자다(-495 이후 3종 모두 배선).
     if (!isConfiguredOAuth(provider)) return;
+    // 전체화면은 여기서 걸지 않는다 (S15P21A604-733) — 곧 제공자 도메인으로 나가므로 걸어도 풀린다.
+    // 의도만 남기고 '월드 입장' 클릭에서 시도한다(shared/ui/fullscreen.ts 주석).
+    markFullscreenIntent();
     if (USE_MOCK) {
       mockStartOAuth(provider);
       navigate('/auth/callback');
@@ -124,6 +129,7 @@ export function LoginPage() {
 
   async function handleGuestEnter() {
     setGuestPending(true);
+    markFullscreenIntent();
     try {
       // 성공 판정은 "예외 없음"이다 — BE 게스트 응답에는 status 가 없다. 실패는 catch 로 온다.
       const result = await authApi.guestEnter();
@@ -146,8 +152,9 @@ export function LoginPage() {
       <ScreenControls />
       {/* 개발자 입장구 — 제품 로그인 버튼을 빌려 쓰지 않는다. 패널 밖이라 버튼 좌표를 밀지 않는다 */}
       <DevEntryButton />
-      <img className="login-bg" src={loginBackgroundUrl} alt="" />
-      <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" />
+      <link rel="preload" as="image" href={loginBackgroundUrl} fetchPriority="high" />
+      <img className="login-bg" src={loginBackgroundUrl} alt="" width={1672} height={941} fetchPriority="high" decoding="async" />
+      <img className="login-logo" src={ssafestaLogoUrl} alt="SSAFESTA" width={1986} height={792} decoding="async" />
       <h1 className="sr-only" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>
         로그인
       </h1>

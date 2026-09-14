@@ -19,6 +19,7 @@ import { useState } from 'react';
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import { WorldGuideLauncher } from './WorldGuideLauncher';
+import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import './worldHud.css';
 
 export function WorldHud() {
@@ -34,6 +35,9 @@ export function WorldHud() {
     <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
       {/* 허용 4번 — 상담 상태 즉시 접근 */}
       <ConsultationQuickAccess />
+
+      {/* 허용 6번 — 브라우저 전체화면 토글 (S15P21A604-733, hud-decisions.md) */}
+      <FullscreenToggle />
 
       {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
       <BoothExitButton />
@@ -90,5 +94,30 @@ export function WorldHud() {
       {/* 이용 안내(무엇을 할 수 있는가) — 위 조작 안내(어떻게 움직이는가)와 다른 축이다 (-599) */}
       <WorldGuideLauncher />
     </div>
+  );
+}
+
+// 상태의 정본은 브라우저다 — F11 이나 ESC 로 빠져나가도 `fullscreenchange` 로 아이콘이 따라간다.
+// FE 가 자기 state 로 들고 있으면 그 두 경로에서 곧바로 어긋난다.
+function FullscreenToggle() {
+  const full = useFullscreen();
+  const label = full ? '전체화면 끄기' : '전체화면';
+  return (
+    <button
+      type="button"
+      className="world-hud-fullscreen"
+      onClick={() => { void toggleFullscreen(); }}
+      aria-pressed={full}
+      aria-label={label}
+      title={label}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {full ? (
+          <path d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3" />
+        ) : (
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+        )}
+      </svg>
+    </button>
   );
 }

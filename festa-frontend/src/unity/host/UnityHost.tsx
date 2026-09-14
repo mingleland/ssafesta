@@ -29,13 +29,14 @@ import { acquireUnitySession, releaseUnitySession, restartUnitySession } from '.
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
 import { requestExitWorldUi } from './worldUiBridge';
-import { syncAudioMute } from './audioBridge';
+import { syncAudioMute, syncAudioVolume } from './audioBridge';
 import { watchDevicePixelRatio } from './loader';
 import { getScreenAudioSnapshot, subscribeScreenAudio } from '../../features/audio/model/screenAudio';
 import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
+import { consumeFullscreenIntent, enterFullscreen } from '../../shared/ui/fullscreen';
 import { getWorldMount, subscribeWorldMount } from './worldMount';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
@@ -78,6 +79,12 @@ export function UnityHost() {
     subscribeScreenAudio,
     () => getScreenAudioSnapshot().muted,
     () => getScreenAudioSnapshot().muted,
+  );
+  // 볼륨도 같은 이유로 값 하나만 좁게 구독한다 (S15P21A604-733).
+  const screenVolume = useSyncExternalStore(
+    subscribeScreenAudio,
+    () => getScreenAudioSnapshot().volume,
+    () => getScreenAudioSnapshot().volume,
   );
   // 상주 월드가 지금 보이는가 (S15P21A604-643). muted 와 같은 이유로 visible 하나만 좁게 구독한다.
   const worldVisible = useSyncExternalStore(
@@ -152,6 +159,9 @@ export function UnityHost() {
     const unsubscribeLoad = subscribeWorldLoadStart(() => {
       if (cancelled) return;
       setStatus((current) => (current === 'waiting-gate' ? 'preparing-world' : current));
+      // 로그인 때 남겨 둔 전체화면 의도를 여기서 쓴다 (S15P21A604-733). 사용자가 방금 '월드 입장' 을
+      // 누른 순간이라 제스처 창 안일 가능성이 높다. 거부돼도 진입을 막지 않는다 — 수동 토글이 정본이다.
+      if (consumeFullscreenIntent()) void enterFullscreen();
     });
 
     // 접속 상태는 boot 성공 여부와 무관하게 들어올 수 있다 — 별도 구독으로 받고 여기서 판정하지 않는다.
@@ -227,14 +237,23 @@ export function UnityHost() {
     requestExitWorldUi(instance, 'overlay-closed');
   }, [instanceReady, screen]);
 
-  // #151 음소거 승계 (-557): 화면에서 끈 채로 월드에 들어가면 BGM 이 다시 나던 것. 인스턴스가 선
-  // 직후 현재 값을 한 번 — 새 인스턴스는 음소거 상태를 모른다(재시도 boot 포함). 이후에는 값이
-  // 바뀔 때만 다시 밀어 넣는다. 볼륨은 보내지 않는다 — -463 · #140 축이다(audioBridge.ts 주석).
+  // #151 음소거 승계 (-557) + 볼륨 승계 (-733): 화면에서 끄거나 줄인 채로 월드에 들어가면 Unity BGM 이
+  // 그 선호를 모른 채 나던 것. 인스턴스가 선 직후 현재 값을 한 번 — 새 인스턴스는 아무 상태도 모른다
+  // (재시도 boot 포함). 이후에는 값이 바뀔 때만 다시 밀어 넣는다. ready 전에 바꾼 값이 사라지지 않는
+  // 이유가 이것이다: 구독한 것은 store 의 현재 값이라 ready 시점의 최종 상태가 그대로 실린다.
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncAudioMute(instance, screenMuted);
   }, [instanceReady, screenMuted]);
+
+  // 볼륨은 별도 effect 다. 한 effect 에 묶으면 mute 를 끄고 켤 때마다 같은 볼륨이 다시 나간다 —
+  // 멱등이라 해는 없지만 두 채널이 독립이라는 것이 배선에서도 보여야 한다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncAudioVolume(instance, screenVolume);
+  }, [instanceReady, screenVolume]);
 
   // #143 화면 밀도 변화 반영 (-575). 렌더 해상도 상한은 부팅 때 한 번 정해지는데, 확대/축소나
   // 다른 밀도의 모니터로 창을 옮기면 그 값이 낡는다 — Unity 는 이 값을 1초 주기로 다시 읽으므로

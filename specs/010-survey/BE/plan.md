@@ -158,7 +158,7 @@ MR 3개. 각 MR이 develop에 닿을 때마다 FE가 붙일 수 있는 것이 �
 | 지원서 제출자별 상세 조회 | **C-03 미결**(기획) + 티켓 없음. 주관식 항목에 `responseId`를 실어 열쇠만 남긴다 |
 | 익명·1인1응답 토글 (FR-003) | 스키마 컬럼도 FE 토글도 없다. 항상 1인1응답·항상 익명으로 고정 |
 | `booth_daily_metrics.survey_response_count` 갱신 | 대시보드 `S15P21A604-501` 몫 |
-| `LayoutConfigResolver`에 `SURVEY_KIOSK` 검증 추가 | 설문 바인딩이 부스 기준(C-06)이라 `configId`를 쓰지 않는다. 지금은 `CONFIG_UNVERIFIED` 경고 그대로. 다중 설문이 되면 그때 |
+| ~~`LayoutConfigResolver`에 `SURVEY_KIOSK` 검증 추가~~ | **해소됨 — `S15P21A604-699`** (2026-09-14, GitLab #181). 바인딩이 부스 기준(C-06)이라는 판단은 그대로고, 그래서 `configId`가 아니라 **"그 부스에 설문이 있는가"** 를 판정한다. `CONFIG_UNVERIFIED`가 아니라 `CONFIG_NOT_LINKED` 경고이며 게시를 막지 않는다 |
 | 고급 분석 (교차·추이·AI·내보내기) | **FR-013이 명시적으로 제외** |
 | 집계 캐시 | C-04 — MVP는 실시간. 느려진 근거가 나오면 그때 |
 | `spec.md` 리뷰 서명 | **C-01·02·03·05가 열려 있다** (009 선례) |

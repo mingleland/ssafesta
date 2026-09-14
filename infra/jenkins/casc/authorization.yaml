@@ -1,6 +1,6 @@
 jenkins:
   authorizationStrategy:
-    globalMatrix:
+    projectMatrix:
       entries:
         - user:
             name: "${JENKINS_ADMIN_ID}"

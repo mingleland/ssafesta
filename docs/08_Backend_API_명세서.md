@@ -279,7 +279,10 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 }
 ```
 
-- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치). 미등록도 `null`이라 FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치).
+  - **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)로 폴백한다** (2026-09-14 결정). `booths.homepage_url`은 등록 endpoint만 있고 **화면이 없어** 실서비스에서는 늘 비어 있었고, 소유자가 실제로 주소를 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나다. 우선순위는 **등록값 > 프로젝트 `deployUrl`** — 폴백은 빈 자리만 메우므로 등록 화면이 생기면 저절로 사라진다.
+  - 둘 다 없으면 `null`이라 FE는 여전히 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+  - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### POST `/booths/{boothId}/leases/extend` — P1
@@ -445,6 +448,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - 소유자·Staff만 호출할 수 있다(facade·layout과 동일한 편집자 범위). 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 코드·rule 없음.**
 - 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
+- **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 
 ---
 

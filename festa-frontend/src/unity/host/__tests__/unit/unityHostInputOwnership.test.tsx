@@ -27,7 +27,7 @@ vi.mock('../../sessionManager', () => {
 vi.mock('../../authBridge', () => ({ syncAccessToken: () => 'cleared' }));
 // 음소거 승계(-557, #151)도 같은 인스턴스를 쓴다. 입력과 무관한 축이라 같은 이유로 뺀다 —
 // 이 파일의 마지막 단정이 "잠금 말고 다른 **입력** SendMessage 를 만들지 않는다" 이기 때문이다.
-vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {} }));
+vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {}, syncAudioVolume: () => {} }));
 
 const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi.fn(), Quit: async () => {} });
 const lockCalls = (i: UnityInstance) =>
