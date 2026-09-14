@@ -30,7 +30,8 @@ public class WorldChatService {
     /** 계약값. 오버레이 한 줄에 들어가는 길이다. */
     static final int MAX_CONTENT_LENGTH = 100;
 
-    static final String TOPIC = "/topic/world/chat";
+    /** 구독 게이트도 이 값을 읽는다 ({@code StompAuthChannelInterceptor}, S15P21A604-727). */
+    public static final String TOPIC = "/topic/world/chat";
 
     private final SimpMessagingTemplate messaging;
     private final UserRepository users;

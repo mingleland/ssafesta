@@ -1,15 +1,20 @@
 package com.example.ssafesta.consultation.ws;
 
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.MemberPrincipal;
 import com.example.ssafesta.staff.StaffAccessGuard;
+import com.example.ssafesta.world.chat.WorldChatController;
+import com.example.ssafesta.world.chat.WorldChatService;
 import java.security.Principal;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -43,10 +48,18 @@ import org.springframework.stereotype.Component;
  * 허용은 {@link #ALLOWED_SEND_DESTINATIONS} 가 전부이고, 기능이 늘 때마다 그 티켓이 정확한
  * destination 하나씩만 더한다.
  *
- * <p><b>거부는 연결을 끊는다.</b> 여기서 던진 예외는 ERROR 프레임과 함께 세션을 닫는다. 이것이
- * 의도다 — 허용 목록 밖으로 보내는 쪽은 공격자이거나 고장난 클라이언트이고, 조용히 버리면
- * 후자는 자기가 깨진 줄 모른 채 계속 돈다. 한 소켓이 상담 알림과 채팅을 함께 나르므로 대가가
- * 작지 않다는 것은 알고 있다 — 실제로 정상 클라이언트가 여기 걸리면 버리는 쪽으로 바꾼다.
+ * <p><b>거부에 두 모양이 있다.</b> 기본은 <b>연결을 끊는 것</b>이다 — 여기서 던진 예외는 ERROR
+ * 프레임과 함께 세션을 닫는다. 허용 목록 밖으로 보내는 쪽은 공격자이거나 고장난 클라이언트이고,
+ * 조용히 버리면 후자는 자기가 깨진 줄 모른 채 계속 돈다.
+ *
+ * <p>예외는 <b>게스트의 채팅 구독</b> 하나다(S15P21A604-727, GitLab #193 FE 요청). 그 프레임은
+ * 끊지 않고 <b>떨구고</b>, 사유를 채팅 오류 큐로 보낸다. 이제 한 소켓이 부스 변경 방송을 함께
+ * 나르기 때문이다 — 게스트가 채팅을 한 번 잘못 구독한 대가로 <b>월드 동기화까지 끊기면</b> 제재가
+ * 사건에 비해 크다. 같은 이유로 채팅 <i>발신</i> 거부도 인터셉터가 아니라 컨트롤러에 있다.
+ *
+ * <p><b>부스 대기열 토픽은 게스트에게도 끊는 쪽을 유지한다.</b> 채팅과 달리 그 destination 은
+ * 정상 클라이언트가 게스트 세션에서 만들어낼 일이 없고(FE 의 transport allowlist 가 먼저 막는다),
+ * 남의 부스 대기열을 겨냥한 프레임은 고장이 아니라 시도다. 비대칭은 의도다.
  *
  * <p><b>raw {@code /queue/**} 구독도 거부한다.</b> 개인 알림은 반드시
  * {@code /user/queue/**} 를 통해 Spring 의 session 변환을 거친다.
@@ -82,10 +95,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     private final WsTokenService tokens;
     private final StaffAccessGuard staffGuard;
+    /**
+     * 지연 주입이다. {@code SimpMessagingTemplate} 은 {@code clientOutboundChannel} 에 붙고 이
+     * 인터셉터는 {@code clientInboundChannel} 에 붙는데, 둘을 만드는 것이 같은 설정이라 생성자에서
+     * 바로 받으면 빈 순환이 난다.
+     */
+    private final ObjectProvider<SimpMessagingTemplate> messaging;
 
-    public StompAuthChannelInterceptor(WsTokenService tokens, StaffAccessGuard staffGuard) {
+    public StompAuthChannelInterceptor(WsTokenService tokens, StaffAccessGuard staffGuard,
+                                       ObjectProvider<SimpMessagingTemplate> messaging) {
         this.tokens = tokens;
         this.staffGuard = staffGuard;
+        this.messaging = messaging;
     }
 
     @Override
@@ -116,6 +137,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 throw new IllegalArgumentException(
                         "개인 큐는 /user/queue/** destination 으로 구독해야 합니다.");
             }
+            if (isGuestSubscribingToChat(accessor)) {
+                tellThemWhy(accessor);
+                return null;   // 프레임만 떨군다 — 연결은 살아서 부스 변경 방송을 계속 나른다   // 프레임만 떨군다 — 연결은 살아서 부스 변경 방송을 계속 나른다
+            }
             requireBoothMemberIfBoothTopic(accessor);
         }
         if (!SimpMessageType.CONNECT.equals(type)) {
@@ -126,6 +151,43 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                         "실시간 채널 연결에는 유효한 WS Token 이 필요합니다."));
         accessor.setUser(new ConsultationPrincipal(subject));
         return message;
+    }
+
+    /**
+     * 게스트가 월드 채팅을 구독하려 하는가.
+     *
+     * <p><b>WS Token 을 게스트에게 연 것은 연결 자격이지 채팅 자격이 아니다</b>(GitLab #193, FE
+     * 회신). FE 는 게스트에게 채팅 버튼을 비활성으로 보이고 누르면 로그인 안내를 띄우므로, 뒤에서
+     * 게스트가 대화를 읽고 있으면 그 화면이 거짓말이 된다.
+     */
+    private static boolean isGuestSubscribingToChat(StompHeaderAccessor accessor) {
+        return WorldChatService.TOPIC.equals(accessor.getDestination())
+                && MemberPrincipal.optionalMemberId(accessor.getUser()) == null;
+    }
+
+    /**
+     * 떨군 이유를 그 세션에만 알린다 — 채팅 <i>발신</i> 거부가 가는 큐와 같은 자리다.
+     *
+     * <p><b>조용히 떨구지 않는다.</b> 구독은 성공 응답이 없어서, 말없이 버리면 클라이언트는 구독이
+     * 됐다고 믿은 채 아무것도 오지 않는 상태로 남는다 — 실패를 기본값처럼 보이게 두는 T-24 의
+     * 모양이다.
+     *
+     * <p>보내기가 실패해도 구독 거부는 그대로다. 여기서 던지면 연결을 끊지 않으려던 선택이
+     * 뒤집힌다.
+     */
+    private void tellThemWhy(StompHeaderAccessor accessor) {
+        Principal user = accessor.getUser();
+        if (user == null) {
+            return;
+        }
+        try {
+            messaging.getObject().convertAndSendToUser(user.getName(),
+                    WorldChatController.ERROR_QUEUE,
+                    new WorldChatController.WorldChatError(ErrorCode.MEMBER_ONLY.name(),
+                            "회원 계정만 채팅을 볼 수 있습니다."));
+        } catch (RuntimeException ignored) {
+            // 알리지 못했을 뿐이고 구독은 이미 거부됐다.
+        }
     }
 
     /**

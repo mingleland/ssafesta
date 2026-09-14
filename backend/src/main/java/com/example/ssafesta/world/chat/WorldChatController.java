@@ -26,8 +26,14 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class WorldChatController {
 
-    /** 오류가 가는 자리. 다른 SEND 기능이 생겨도 겹치지 않도록 기능 이름을 경로에 넣는다. */
-    static final String ERROR_QUEUE = "/queue/world/chat/errors";
+    /**
+     * 오류가 가는 자리. 다른 SEND 기능이 생겨도 겹치지 않도록 기능 이름을 경로에 넣는다.
+     *
+     * <p>구독 거부도 같은 큐로 간다({@code StompAuthChannelInterceptor}) — 게스트가 채팅을
+     * 구독하려 할 때와 보내려 할 때가 사용자에게는 같은 사건이라, 받는 자리가 둘이면 FE 가 분기를
+     * 두 벌 관리한다.
+     */
+    public static final String ERROR_QUEUE = "/queue/world/chat/errors";
 
     private static final Logger log = LoggerFactory.getLogger(WorldChatController.class);
 

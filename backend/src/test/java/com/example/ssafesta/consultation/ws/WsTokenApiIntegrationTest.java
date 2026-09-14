@@ -3,8 +3,11 @@ package com.example.ssafesta.consultation.ws;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,8 +19,10 @@ import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.booth.BoothStaff;
 import com.example.ssafesta.booth.BoothStaffRepository;
+import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
+import com.example.ssafesta.world.chat.WorldChatController;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -32,7 +37,9 @@ import org.springframework.context.annotation.Import;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -57,6 +64,9 @@ class WsTokenApiIntegrationTest {
     @Autowired private JsonMapper jsonMapper;
     @Autowired private BoothRepository booths;
     @Autowired private BoothStaffRepository staffs;
+
+    /** 떨군 이유가 어디로 가는지 본다 — 브로커를 띄우지 않는다. */
+    @MockitoBean private SimpMessagingTemplate messaging;
 
     @Test
     void aMemberGetsAFiveMinuteToken() throws Exception {
@@ -254,10 +264,12 @@ class WsTokenApiIntegrationTest {
      */
     @Test
     void everyCommandHasAVerdict() {
+        // destination 은 **게스트도 구독할 수 있는** 토픽으로 둔다. 채팅 토픽을 쓰면 SUBSCRIBE 가
+        // "떨궈져서" 통과로 세어져(S15P21A604-727), 이 표가 무엇을 재는지 흐려진다.
         Set<StompCommand> passed = EnumSet.noneOf(StompCommand.class);
         for (StompCommand command : StompCommand.values()) {
             try {
-                interceptor.preSend(frame(command, "/topic/world/chat"), null);
+                interceptor.preSend(frame(command, "/topic/world/booths"), null);
                 passed.add(command);
             } catch (RuntimeException refused) {
                 // 거부는 판정이다.
@@ -378,6 +390,52 @@ class WsTokenApiIntegrationTest {
     @ValueSource(strings = {"guest:abc", "42"})
     void theBoothChangeTopicIsOpenToEveryConnection(String subject) {
         Message<?> subscription = frameAsSubject(subject, StompCommand.SUBSCRIBE, "/topic/world/booths");
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    // ── 게스트의 채팅 구독 (S15P21A604-727, GitLab #193 FE 요청) ──────────────
+    //
+    // WS Token 을 게스트에게 연 것은 **연결 자격**이지 **채팅 자격**이 아니다. 그리고 이 거부는
+    // 연결을 끊지 않는다 — 같은 소켓이 부스 변경 방송을 나르므로, 채팅 프레임 하나로 월드
+    // 동기화까지 죽으면 제재가 사건에 비해 크다.
+
+    @Test
+    void aGuestChatSubscriptionIsDroppedNotThrown() {
+        Message<?> subscription = frameAsSubject("guest:abc", StompCommand.SUBSCRIBE,
+                "/topic/world/chat");
+
+        assertNull(interceptor.preSend(subscription, null),
+                "게스트의 채팅 구독은 브로커에 도달하면 안 됩니다.");
+    }
+
+    /**
+     * <b>연결이 살아 있어야 한다.</b> 이 단정이 이 기능의 전부다 — 예외를 던지는 구현으로
+     * 되돌아가도 위 테스트는 (그것도 통과가 아니라 예외로) 초록이 되지 않지만, 무엇이 잘못됐는지는
+     * 여기서만 드러난다: 같은 연결로 이어지는 부스 방송 구독이 계속 성립해야 한다.
+     */
+    @Test
+    void theConnectionSurvivesARefusedChatSubscription() {
+        interceptor.preSend(frameAsSubject("guest:abc", StompCommand.SUBSCRIBE, "/topic/world/chat"), null);
+
+        Message<?> booths = frameAsSubject("guest:abc", StompCommand.SUBSCRIBE, "/topic/world/booths");
+        assertEquals(booths, interceptor.preSend(booths, null));
+    }
+
+    /** 조용히 떨구지 않는다 — 구독에는 성공 응답이 없어서, 말없이 버리면 영영 기다린다 (T-24). */
+    @Test
+    void aGuestIsToldWhyTheChatSubscriptionWasDropped() {
+        interceptor.preSend(frameAsSubject("guest:abc", StompCommand.SUBSCRIBE, "/topic/world/chat"), null);
+
+        verify(messaging).convertAndSendToUser(eq("guest:abc"), eq(WorldChatController.ERROR_QUEUE),
+                eq(new WorldChatController.WorldChatError(ErrorCode.MEMBER_ONLY.name(),
+                        "회원 계정만 채팅을 볼 수 있습니다.")));
+    }
+
+    /** 회원의 채팅 구독은 그대로 지나간다 — 게이트를 조이다 채팅을 통째로 닫으면 안 된다. */
+    @Test
+    void aMemberMaySubscribeToChat() {
+        Message<?> subscription = frameAsSubject("42", StompCommand.SUBSCRIBE, "/topic/world/chat");
 
         assertEquals(subscription, interceptor.preSend(subscription, null));
     }
