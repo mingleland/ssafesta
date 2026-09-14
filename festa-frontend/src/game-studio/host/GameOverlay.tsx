@@ -1,33 +1,51 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { closeOverlay } from '../../shared/types/overlay.ts';
 import {
+  createApiArcadeMachineRepository,
   createApiGamePortalRepository,
   GamePortalLoadError,
   gamePortalUnavailableMessage,
+  type ArcadeMachineRepository,
+  type GamePlayableResolution,
   type GamePortalRepository,
-  type GamePortalResolution,
 } from '../runtime/ports/gamePortalRepository.ts';
 import { PublishedGameSurface } from '../runtime/ui/PublishedGameSurface.tsx';
 import './GameOverlay.css';
 
-export interface GameOverlayPayload {
-  readonly boothId: number;
-  readonly objectId: string;
-  readonly configId: number;
-}
+/**
+ * 이 오버레이로 들어오는 두 경로.
+ *
+ * **`kind` 같은 꼬리표를 붙이지 않는다.** 두 모양이 공유하는 필드가 하나도 없어서 식별자 자체로
+ * 갈리고, 꼬리표를 만들면 기존 `BOOTH_GAME_INTERACT` 호출부와 그 계약 테스트를 전부 고쳐야 한다.
+ */
+export type GameOverlayPayload =
+  /** 부스 안 GAME_PORTAL — configId 로 푼다 (GitLab #56) */
+  | { readonly boothId: number; readonly objectId: string; readonly configId: number }
+  /** 광장 오락기 — 씬 canonical id 로 푼다 (S15P21A604-712, GitLab #135) */
+  | { readonly machineId: string };
+
+const isArcade = (payload: GameOverlayPayload): payload is { readonly machineId: string } => (
+  'machineId' in payload
+);
 
 interface GameOverlayProps {
   readonly payload: GameOverlayPayload;
   readonly portalRepository?: GamePortalRepository;
+  readonly arcadeRepository?: ArcadeMachineRepository;
 }
 
 type PortalState =
   | { readonly status: 'loading'; readonly attempt: number }
-  | { readonly status: 'ready'; readonly attempt: number; readonly resolution: GamePortalResolution }
+  | { readonly status: 'ready'; readonly attempt: number; readonly resolution: GamePlayableResolution }
   | { readonly status: 'error'; readonly attempt: number; readonly error: GamePortalLoadError };
 
-export const GameOverlay = ({ payload, portalRepository: repositoryProp }: GameOverlayProps) => {
-  const repository = useMemo(() => repositoryProp ?? createApiGamePortalRepository(), [repositoryProp]);
+export const GameOverlay = ({ payload, portalRepository, arcadeRepository }: GameOverlayProps) => {
+  // 화면은 두 경로가 같다 — 갈리는 것은 어디에 물어보는가 하나뿐이다.
+  const resolve = useMemo(() => (
+    isArcade(payload)
+      ? (signal: AbortSignal) => (arcadeRepository ?? createApiArcadeMachineRepository()).resolve(payload, signal)
+      : (signal: AbortSignal) => (portalRepository ?? createApiGamePortalRepository()).resolve(payload, signal)
+  ), [payload, portalRepository, arcadeRepository]);
   const [state, setState] = useState<PortalState>({ status: 'loading', attempt: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -48,7 +66,7 @@ export const GameOverlay = ({ payload, portalRepository: repositoryProp }: GameO
     let active = true;
     const attempt = state.attempt;
     setState({ status: 'loading', attempt });
-    repository.resolve(payload, controller.signal)
+    resolve(controller.signal)
       .then((resolution) => {
         if (active) setState({ status: 'ready', attempt, resolution });
       })
@@ -66,14 +84,14 @@ export const GameOverlay = ({ payload, portalRepository: repositoryProp }: GameO
       active = false;
       controller.abort();
     };
-  }, [payload, repository, state.attempt]);
+  }, [resolve, state.attempt]);
 
   const retry = () => setState((current) => ({ status: 'loading', attempt: current.attempt + 1 }));
 
   return (
     <div aria-label="FESTA 게임" aria-modal="true" className="ggo-overlay" ref={rootRef} role="dialog" tabIndex={-1}>
       {state.status === 'loading' && (
-        <section className="ggo-message" aria-live="polite"><span>F</span><h1>게임에 입장하는 중입니다</h1><p>게시 상태와 부스 연결을 확인하고 있습니다.</p></section>
+        <section className="ggo-message" aria-live="polite"><span>F</span><h1>게임에 입장하는 중입니다</h1><p>게시 상태와 게임 연결을 확인하고 있습니다.</p></section>
       )}
       {state.status === 'error' && (
         <section className="ggo-message" role="alert">

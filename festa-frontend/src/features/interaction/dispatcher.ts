@@ -42,6 +42,11 @@ function dispatch(event: UnityInteractEvent): void {
       // 두 값을 그대로 실어 둔다 — 종류가 늘면 gameId 로 갈리고, machineId 는 어느 기계였는지 되짚는 값이다.
       openVisitorOverlay('MINIGAME', { gameId: event.gameId, machineId: event.machineId });
       return;
+    case 'WORLD_ARCADE_INTERACT':
+      // 광장 오락기 (S15P21A604-712, #135). 새 overlay kind 를 만들지 않는다 — 부스 포털과
+      // 화면이 같고 식별자만 다르다. GameOverlay 가 machineId 유무로 어느 경로인지 가른다.
+      openVisitorOverlay('GAME', { machineId: event.machineId });
+      return;
     case 'WORLD_BOOTH_CONTEXT':
       // **화면을 열지 않는 유일한 case 다.** 상호작용이 아니라 위치 알림이라, 받아 둔 값을
       // 부스 나가기 버튼이 노출 조건으로 쓴다 (S15P21A604-627, #174).
