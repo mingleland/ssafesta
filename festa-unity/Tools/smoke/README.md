@@ -16,9 +16,17 @@
 ## 빌드
 
 ```bash
-Unity -batchmode -quit -projectPath festa-unity \
+Unity -batchmode -nographics -projectPath festa-unity \
   -executeMethod Festa.EditorTools.CiBuild.Build -festaTarget linux-smoke
 ```
+
+**`-quit` 을 붙이지 마라.** 유니티가 빌드 도중 종료 요청을 받아들여 셰이더 변형을 굽다 말고 내려가면,
+`BuildPipeline.BuildPlayer` 가 반환하지 않아 결과 단언이 통째로 건너뛰어지고 **종료 코드 0 에 산출물 없음**이 된다 —
+실패가 성공으로 보인다. 2026-09-14 Jenkins 첫 실행이 정확히 그랬다(`[9799s] 2784/3584 variants ready` 뒤로
+결과 로그 없음, exit 0, 산출물 없음). 종료 코드는 `CiBuild` 가 `EditorApplication.Exit` 로 직접 정한다.
+지금은 `-quit` 이 있으면 빌드를 시작하지 않고 그 이유를 찍으며 실패한다.
+
+`festa-unity/ci/build --target linux-smoke` 를 쓰면 인자를 맞출 필요가 없다 — 이 규칙이 이미 들어 있다.
 
 산출물: `festa-unity/Builds/linux-smoke/festa-world-smoke.x86_64`
 
