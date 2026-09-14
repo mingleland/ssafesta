@@ -421,105 +421,9 @@ namespace Festa.World
             if (_currentVisual == null) return;
             var visualTransform = _currentVisual.transform;
             var p = visualTransform.localPosition;
-            bool moved = !Mathf.Approximately(p.y, _baseVisualLocalY) || p.x != 0f || p.z != 0f;
-            if (!moved) return;
-            // 눕기에서 옆으로 당겨 뒀던 것도 함께 되돌린다 — 남겨 두면 일어선 뒤 몸이 옆으로 밀린 채 걷는다.
-            p.y = _baseVisualLocalY; p.x = 0f; p.z = 0f;
+            if (Mathf.Approximately(p.y, _baseVisualLocalY)) return;
+            p.y = _baseVisualLocalY;
             visualTransform.localPosition = p;
-        }
-
-        /// <summary>
-        /// 누운 몸을 <b>루트 위로 끌어온다</b> (2026-09-14 사용자 지적: "소파 위치 다 깨졌다").
-        ///
-        /// <para><b>무엇이 빠져 있었나.</b> Sleep Anim Pack 클립은 루트가 팩의 침대·소파 <b>모서리</b>에 있고 몸은
-        /// 거기서 앞으로 떨어져 있다. 실측하면 Hips 가 루트에서 <c>(-4.06, 2.03, +6.81)</c> 다.
-        /// 위 코드는 <c>LiePoseTable.MinY</c> 로 <b>높이만</b> 되돌리고 앞뒤·좌우는 손대지 않았다 —
-        /// 표에 <c>MinY</c> 는 있어도 수평 오프셋 항목이 아예 없다. 그래서 몸이 글자에서 9.5u 벗어나 걸쳐 눕고,
-        /// 머리 위 이름표는 <b>루트</b>를 따라가므로 몸과 동떨어진 자리에 떴다.</para>
-        ///
-        /// <para><b>왜 루트가 아니라 시각물을 옮기나.</b> 루트를 옮기면 이름표·충돌·네트워크 위치가 전부 따라가
-        /// 이름표 어긋남이 그대로 남는다. 보이는 몸만 제자리로 당기면 두 증상이 함께 사라진다.</para>
-        ///
-        /// <para><b>스킨메시 bounds 를 믿지 않는다</b> — 바인드포즈 범위라 자세를 반영하지 않는다(누운 몸을 재면
-        /// 20×22×21 큐브가 나온다). <c>BakeMesh</c> 로 현재 포즈를 굽고 <c>RecalculateBounds</c> 를 반드시 부른다.</para>
-        ///
-        /// <para>섞임(0.35초)이 끝난 뒤 한 번만 잰다. 루프 위상마다 조금씩 흔들리므로 여러 프레임의 평균을 쓴다 —
-        /// 한 프레임을 쓰면 팔을 뻗은 순간이 기준이 되어 몸 전체가 그만큼 밀린다.</para>
-        /// </summary>
-        System.Collections.IEnumerator CenterLieBodyOverRoot()
-        {
-            for (int i = 0; i < LieCenterSettleFrames; i++) yield return null;
-
-            Vector3 sum = Vector3.zero;
-            float bottomSum = 0f;
-            int taken = 0;
-            for (int i = 0; i < LieCenterSampleFrames; i++)
-            {
-                if (_currentVisual == null) yield break;
-                if (TryBakedBodyCenter(out var c, out float bottom))
-                {
-                    sum += c;
-                    bottomSum += bottom;
-                    taken++;
-                }
-                yield return null;
-            }
-            if (taken == 0 || _currentVisual == null) yield break;
-
-            var vt = _currentVisual.transform;
-            var p = vt.localPosition;
-
-            // 수평: 루트 기준 로컬로 바꿔 X·Z 를 뺀다.
-            var local = transform.InverseTransformPoint(sum / taken);
-            p.x -= local.x;
-            p.z -= local.z;
-
-            // 높이: 실측표(LiePoseTable.MinY)로 한 번 내렸지만 배율·클립에 따라 1u 안팎이 남는다 —
-            // 실제로 구운 바닥을 루트 높이에 맞춘다.
-            //
-            // **절대 최저점이 아니라 평균을 쓴다.** 처음엔 루프 전체의 최저점으로 맞췄다가, 팔이나 발이
-            // 늘어진 자세에서 그 끝에 기준이 잡혀 **몸통이 통째로 떠 보였다**(2026-09-14 사용자 지적).
-            // 평균이면 가장 내려간 순간에만 끝이 살짝 잠기고 몸통은 소파에 닿은 채로 보인다 —
-            // 뜨는 쪽이 잠기는 쪽보다 훨씬 눈에 띈다.
-            float sink = transform.position.y - (bottomSum / taken);
-            p.y += sink;
-
-            vt.localPosition = p;
-            Debug.Log($"[AvatarVisual] 누운 몸 보정 — 수평 ({local.x:F2}, {local.z:F2}), 높이 +{sink:F2}");
-        }
-
-        const int LieCenterSettleFrames = 24;   // 섞임 0.35초 + 여유
-        const int LieCenterSampleFrames = 10;
-
-        /// <summary>현재 포즈를 구워 보이는 몸의 월드 중심과 최저점을 낸다.</summary>
-        bool TryBakedBodyCenter(out Vector3 center, out float bottom)
-        {
-            center = Vector3.zero; bottom = float.MaxValue;
-            Vector3 lo = Vector3.one * float.MaxValue, hi = Vector3.one * float.MinValue;
-            int n = 0;
-            foreach (var smr in _currentVisual.GetComponentsInChildren<SkinnedMeshRenderer>(false))
-            {
-                if (smr.sharedMesh == null) continue;
-                var baked = new Mesh();
-                smr.BakeMesh(baked);
-                baked.RecalculateBounds();
-                var bb = baked.bounds;
-                Destroy(baked);
-                var c = bb.center; var e = bb.extents;
-                for (int x = -1; x <= 1; x += 2)
-                for (int y = -1; y <= 1; y += 2)
-                for (int z = -1; z <= 1; z += 2)
-                {
-                    // BakeMesh 는 스케일까지 적용해 굽는다 — 위치와 회전만 더한다.
-                    var w = smr.transform.position + smr.transform.rotation * (c + Vector3.Scale(e, new Vector3(x, y, z)));
-                    lo = Vector3.Min(lo, w); hi = Vector3.Max(hi, w);
-                }
-                n++;
-            }
-            if (n == 0) return false;
-            center = (lo + hi) * 0.5f;
-            bottom = lo.y;
-            return true;
         }
 
         bool TryGetVisibleGeometryBounds(out Bounds bounds)
@@ -959,7 +863,6 @@ namespace Festa.World
                     var p = vt.localPosition;
                     p.y = _baseVisualLocalY - (LiePoseTable.MinY(emote) - LiePoseTable.IdleMinY) * vt.localScale.y;
                     vt.localPosition = p;
-                    StartCoroutine(CenterLieBodyOverRoot());
                 }
             }
             else if (emote == PlayerEmoteId.Strike)
