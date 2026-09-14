@@ -185,10 +185,17 @@ namespace Festa.World
         /// 초점 모드 나가기 어포던스 — 우상단 `[Esc] 나가기` 알약. Esc 하나만 있으면 ① 키보드 없는 기기, ② 캔버스가
         /// 포커스를 잃어 Esc 가 브라우저로 가는 경우(captureAllKeyboardInput=false), ③ FE 가 잠금을 안 풀어 주는 경우에
         /// 갇힌다(QA 2026-09-08 #54). 마우스·터치로도 눌린다. IMGUI 라 씬 배선이 없다.
+        ///
+        /// <para><b>FE 임베드에서는 그리지 않는다</b> (사용자 지시 2026-09-14). 임베드에서는 같은 자리에 React
+        /// HUD 의 상담 버튼이 있고 이 알약은 Unity 캔버스라 그 <b>뒤로 깔려</b>, 반쯤 가린 흰 판때기로만 보였다.
+        /// 기능도 겹친다 — 그쪽은 오버레이의 X·배경 클릭·ESC 가 <c>RequestExitWorldUi</c> 로 초점까지 함께 끝낸다(#132).
+        /// 게이트는 토스트(#141)와 같은 <b>FE 존재 여부</b>다. 단독 실행에는 그 대체 경로가 없으므로 그대로 남는다 —
+        /// 여기서 통째로 지우면 #54 가 그대로 돌아온다.</para>
         /// </summary>
         void OnGUI()
         {
             if (!_active) return;
+            if (Festa.World.UI.ControlsHintHud.HostProvidesUi) return;
             float ui = InteractPromptUI.UiScale();
             float h = Mathf.Round(44f * ui), cap = Mathf.Round(34f * ui), pad = Mathf.Round(14f * ui), gap = Mathf.Round(10f * ui);
             const string label = "나가기";
