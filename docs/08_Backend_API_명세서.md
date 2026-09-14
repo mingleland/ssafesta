@@ -279,7 +279,10 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 }
 ```
 
-- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치). 미등록도 `null`이라 FE는 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+- `homepageUrl`: 부스 노트북이 여는 홈페이지 (spec 016 FR-003 신설). **`publishedLayoutVersion`이 `null`이면 이 값도 `null`로 내려간다** — "공개 상태"를 *공개된 Layout이 있는 상태*로 해석한다(노트북은 공개 Layout 안에만 있으므로 방문자가 URL을 쓰는 순간과 일치).
+  - **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)로 폴백한다** (2026-09-14 결정). `booths.homepage_url`은 등록 endpoint만 있고 **화면이 없어** 실서비스에서는 늘 비어 있었고, 소유자가 실제로 주소를 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나다. 우선순위는 **등록값 > 프로젝트 `deployUrl`** — 폴백은 빈 자리만 메우므로 등록 화면이 생기면 저절로 사라진다.
+  - 둘 다 없으면 `null`이라 FE는 여전히 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
+  - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### POST `/booths/{boothId}/leases/extend` — P1
