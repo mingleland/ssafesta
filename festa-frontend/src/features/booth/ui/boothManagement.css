@@ -160,6 +160,14 @@
 /* 파일 선택을 감춘 라벨 — 업로드 버튼(.bm-upload)과 같은 방식이고 행 안에 들어가도록만 작게 잡는다 */
 .bm-document-replace { position: relative; overflow: hidden; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.16); color: rgba(234, 238, 251, 0.82); font-size: 12px; }
 .bm-document-replace input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.bm-document-remove { border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; padding: 4px 8px; background: none; color: rgba(234, 238, 251, 0.82); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.bm-document-remove:hover { background: rgba(255, 255, 255, 0.06); }
+
+.bm-gate-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(6, 9, 20, 0.6); padding: 20px; }
+.bm-gate-dialog { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 16px; background: var(--festa-surface-solid); border: 1px solid rgba(255, 255, 255, 0.1); }
+.bm-gate-dialog h3 { margin: 0; font-size: 16px; color: var(--festa-ink); }
+.bm-gate-dialog p { margin: 0 0 6px; color: rgba(234, 238, 251, 0.72); font-size: 13.5px; }
+.bm-gate-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 @media (max-width: 900px) {
   .bm-hero { grid-template-columns: 1fr; }
