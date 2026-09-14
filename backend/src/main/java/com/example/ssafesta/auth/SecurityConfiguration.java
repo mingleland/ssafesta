@@ -119,7 +119,7 @@ class SecurityConfiguration {
                         .accessDeniedHandler((request, response, exception) ->
                                 errors.write(response, ErrorCode.FORBIDDEN, null)))
                 .exceptionHandling(handling -> apiErrors(handling, errors))
-                .addFilterAfter(new SessionRevocationFilter(sessions), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new SessionRevocationFilter(sessions, errors), BearerTokenAuthenticationFilter.class)
                 .build();
     }
 

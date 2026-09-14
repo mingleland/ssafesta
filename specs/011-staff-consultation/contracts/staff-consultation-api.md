@@ -104,6 +104,8 @@ Owner·`ADMIN`만. 역할 변경 / 직원 제거.
 SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이고 행동은 전부 REST 다 (C-12)
 ```
 
+**부스 토픽 구독은 그 부스의 구성원(Owner·직원, 역할 무관)만 할 수 있다** (2026-09-13, S15P21A604-693). 신원은 `CONNECT` 의 WS Token 으로 확정되고, 구성원 여부는 `SUBSCRIBE` 시점에 `boothId` 별로 검사한다 — `CONNECT` 에는 `boothId` 가 없다. 구성원이 아닌 회원·없는 부스·주체 없는 구독은 STOMP `ERROR` 프레임과 함께 **연결이 끊긴다**. 클라이언트는 자기 부스의 토픽만 구독하면 되고, 끊긴 뒤에는 WS Token 을 새로 발급받아 재연결한다. `/user/queue/consultation` 은 user destination 이 세션 주인을 고르므로 별도 검사가 없다.
+
 이벤트 봉투: `{ type, requestId, occurredAt, … }`
 
 | 구독 | `type` | 추가 필드 |
@@ -136,6 +138,7 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 |---|---|
 | `403 MEMBER_ONLY` | 게스트 |
 | `409 CONSULTATION_REQUEST_PENDING` | 이 방문자의 대기 중 요청이 이미 있다 |
+| `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 (2026-09-13, S15P21A604-693 — 이전에는 임대 검사만 해 `409 BOOTH_LEASE_EXPIRED` 로 답했다) |
 | `409 BOOTH_LEASE_EXPIRED` | 부스 임대가 만료됐다 |
 
 ### `DELETE /api/v1/consultation/requests/{requestId}`
@@ -170,7 +173,7 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 |---|---|
 | `409 CONSULTATION_ALREADY_ACTIVE` | **호출한 직원에게 활성 상담이 이미 있다**(C-06, FR-021) |
 | `409 CONSULTATION_NOT_REQUESTED` | 이미 다른 직원이 가져갔거나 만료·취소됐다 |
-| `403 BOOTH_FORBIDDEN` | 그 부스의 직원이 아니다 |
+| `403 STAFF_MANAGER_FORBIDDEN` | 그 부스의 구성원(Owner·직원)이 아니다 — 대기열 조회(`GET .../consultation/requests`)와 같은 코드다. 2026-09-13 정정(S15P21A604-693): 이전 표기 `BOOTH_FORBIDDEN` 은 `ErrorCode` 에 존재하지 않는 이름이었다 |
 
 ### `POST /api/v1/consultation/sessions/{sessionId}/end`
 
