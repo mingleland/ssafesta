@@ -50,6 +50,18 @@ job 'back-test' | grep -Fq 'TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1' \
   || fail 'back-test Testcontainers host override'
 echo 'PASS: back-only MR gate'
 
+game_rules="$(job '.game-changes')"
+[[ -n "${game_rules}" ]] || fail 'missing game change rules'
+grep -Fq 'festa-unity/**/*' <<<"${game_rules}" || fail 'game source path'
+grep -Fq 'ci/test' <<<"${game_rules}" || fail 'game test adapter path'
+! grep -Fq 'docs/**/*' <<<"${game_rules}" || fail 'docs-only MR must not select Unity gate'
+! grep -Fq 'specs/**/*' <<<"${game_rules}" || fail 'spec-only MR must not select Unity gate'
+game_dispatch="$(job 'unity-mr-validation-dispatch')"
+[[ -n "${game_dispatch}" ]] || fail 'missing Unity MR validation dispatch job'
+grep -Fq '.game-changes' <<<"${game_dispatch}" || fail 'Unity dispatch must use game change rules'
+grep -Fq 'stage: test' <<<"${game_dispatch}" || fail 'Unity dispatch must run in test stage'
+echo 'PASS: game-only MR selects Unity validation; docs-only MR does not'
+
 for jira_job in jira-key-check jira-sync-in-progress jira-sync-in-review jira-sync-ready-for-deploy; do
   job "$jira_job" | grep -Eq '^[[:space:]]+- when: never$' || fail "${jira_job} must stay disabled"
 done
