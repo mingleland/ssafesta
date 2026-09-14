@@ -24,6 +24,7 @@ import {
 import type { WorldConnectionState } from '../bridge/events';
 import { hasUnityModal, resetWorldUiState } from '../bridge/worldUiState';
 import { resetWorldContext } from '../../features/world/model/worldContext';
+import { discardPendingVisit } from '../../features/world/model/boothVisitTracker';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
 import { syncInputLock } from './inputBridge';
@@ -103,6 +104,9 @@ export function UnityHost() {
     resetWorldUiState();
     // 새 인스턴스는 부스 안에 있지 않다 — 옛 관측값이 남으면 밖인데도 나가기 버튼이
     // 유령으로 떠 있게 된다 (S15P21A604-627).
+    // 방문 경계도 함께 버린다. 순서가 중요하다 — 먼저 버려야 뒤이은 OUTSIDE 신호가 있지도 않은
+    // 퇴장으로 읽히지 않는다 (S15P21A604-690).
+    discardPendingVisit();
     resetWorldContext();
 
     // boot watchdog — 진행률이 멈춘 채 UNITY_BOOT_STALL_TIMEOUT_MS 가 지나면 실패. 진행률마다 다시 재고,

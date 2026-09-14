@@ -23,6 +23,7 @@ import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
+import { startBoothVisitTracking } from '../../features/world/model/boothVisitTracker';
 import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
@@ -69,8 +70,12 @@ export function WorldPage() {
 
   useEffect(() => {
     const unsubscribe = initInteractionDispatcher();
+    // 부스 방문 경계 추적 — dispatcher 가 WORLD_BOOTH_CONTEXT 를 나르므로 수명을 같이 둔다
+    // (S15P21A604-690). 지금은 서버로 나가는 것이 없고 경계만 잡는다.
+    const stopVisitTracking = startBoothVisitTracking();
     return () => {
       unsubscribe();
+      stopVisitTracking();
       // Overlay Bus·클라이언트 UI 는 module-level 상태라 이 화면이 unmount 돼도 남는다 —
       // 벗어날 때 명시적으로 닫아 재진입 시 과거 레이어가 즉시 떠 있지 않게 한다.
       closeOverlay();
