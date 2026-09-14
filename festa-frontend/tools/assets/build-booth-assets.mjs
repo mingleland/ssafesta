@@ -13,6 +13,7 @@ import { resolve } from 'node:path';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { BOOTH_ASSETS } from './booth-assets.config.mjs';
 import { convert, projectRoot, roundAll, warnings } from './source.mjs';
+import { INTERMEDIATE_DIR } from './compiler/paths.mjs';
 
 // GLTFExporter 의 binary 경로가 Blob→ArrayBuffer 에 FileReader 를 쓴다. Node 에는 없다.
 if (typeof globalThis.FileReader === 'undefined') {
@@ -26,7 +27,7 @@ if (typeof globalThis.FileReader === 'undefined') {
   };
 }
 
-const outDir = resolve(projectRoot, 'public/assets/booth');
+const outDir = INTERMEDIATE_DIR;
 
 const round = (n) => Number(n.toFixed(4));
 
@@ -45,7 +46,7 @@ async function main() {
       assetCode: source.assetCode,
       objectType: source.objectType,
       typeDefault: source.typeDefault === true,
-      url: `assets/booth/${file}`,
+      url: file,
       bytes: glb.length,
       triangles,
       /** 정규화 후 실측 bbox(m). 런타임이 계약 AABB 와 대조해 어긋나면 드러낸다 */

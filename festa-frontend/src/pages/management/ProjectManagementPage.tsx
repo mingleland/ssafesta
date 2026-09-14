@@ -79,6 +79,8 @@ export function ProjectManagementPage() {
         {FIELDS.map((f) => {
           const value = state.draft[f.key] ?? '';
           const dirty = state.dirty.has(f.key);
+          const fieldError = state.fieldErrors[f.key];
+          const errorId = `project-field-${f.key}-error`;
           return (
             <label key={f.key} className={'mg-field' + (dirty ? ' mg-field-dirty' : '')}>
               <span className="mg-label">
@@ -91,6 +93,8 @@ export function ProjectManagementPage() {
                   value={value}
                   disabled={saving}
                   rows={4}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError ? errorId : undefined}
                   onChange={(e) => updateField(f.key, e.target.value === '' ? null : e.target.value)}
                 />
               ) : (
@@ -100,9 +104,12 @@ export function ProjectManagementPage() {
                   value={value}
                   disabled={saving}
                   placeholder={f.hint}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError ? errorId : undefined}
                   onChange={(e) => updateField(f.key, e.target.value === '' ? null : e.target.value)}
                 />
               )}
+              {fieldError && <span id={errorId} className="mg-field-error" role="alert">{fieldError}</span>}
               {f.hint !== undefined && f.kind !== 'url' && <span className="sc-note">{f.hint}</span>}
             </label>
           );
@@ -110,7 +117,7 @@ export function ProjectManagementPage() {
 
         <div className="mg-form-foot">
           {state.save.phase === 'success' && <span className="mg-ok">저장했습니다</span>}
-          {state.save.phase === 'error' && (
+          {state.save.phase === 'error' && Object.keys(state.fieldErrors).length === 0 && (
             <span className="sc-alert" role="alert">
               저장하지 못했습니다. 잠시 후 다시 시도해 주세요.
             </span>

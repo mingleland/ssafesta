@@ -4,7 +4,7 @@
   left: 50%;
   bottom: 26px;
   transform: translateX(-50%);
-  z-index: 30;
+  z-index: var(--festa-z-world-dev);
   display: flex;
   align-items: center;
   gap: 8px;

@@ -1,12 +1,13 @@
 .world-chat {
   position: absolute;
-  left: 1rem;
-  bottom: 1rem;
-  width: min(28rem, 40vw);
+  left: var(--festa-hud-margin-x);
+  bottom: var(--festa-hud-margin-y);
+  width: min(28rem, calc(100vw - 2 * var(--festa-hud-margin-x)));
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   pointer-events: auto;
+  z-index: var(--festa-z-world-hud);
 }
 
 .world-chat-launcher {
@@ -69,4 +70,8 @@
 .world-chat-count {
   font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-height: 560px) {
+  .world-chat-log { max-height: min(8rem, 24dvh); }
 }

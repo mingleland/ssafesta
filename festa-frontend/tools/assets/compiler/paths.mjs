@@ -19,15 +19,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = resolve(here, '../../..');
 
 export const GENERATED_ROOT = resolve(PROJECT_ROOT, '.generated');
-export const INTERMEDIATE_DIR = resolve(GENERATED_ROOT, 'intermediate');
-export const RUNTIME_DIR = resolve(GENERATED_ROOT, 'runtime');
-
-/**
- * 기존 `-473` 산출물이 놓이던 자리. 지금은 **Intermediate 의 별칭**으로만 남는다 —
- * dev 서버가 static 으로 집어 주므로 R3F 가 실물을 보는 통로다. 프로덕션 경로가 아니다
- * (`.gitignore`·`.dockerignore` 양쪽에서 막혀 있다).
- */
-export const DEV_SERVE_DIR = resolve(PROJECT_ROOT, 'public/assets/booth');
+export const INTERMEDIATE_DIR = resolve(process.env.FESTA_INTERMEDIATE_DIR ?? resolve(GENERATED_ROOT, 'intermediate'));
+/** Vite가 dev와 production build 모두 같은 URL로 복사하는 최종 runtime 산출물. */
+export const RUNTIME_DIR = resolve(process.env.FESTA_RUNTIME_DIR ?? resolve(PROJECT_ROOT, 'public/assets/booth-runtime'));
 
 export function ensureDir(path) {
   mkdirSync(path, { recursive: true });

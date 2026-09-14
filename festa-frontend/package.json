@@ -4,8 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "assets:build": "node tools/assets/build-booth-assets.mjs && node tools/assets/compile-runtime-assets.mjs",
+    "assets:verify": "node tools/assets/verify-runtime-assets.mjs",
+    "dev": "npm run assets:build && vite",
+    "build": "npm run assets:build && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
