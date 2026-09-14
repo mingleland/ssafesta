@@ -14,6 +14,7 @@ import {
   reorderQuestion,
   saveSurveyBuilder,
   updateQuestion,
+  updateRewardCoin,
   updateTitle,
   useSurveyBuilder,
   validateBuilder,
@@ -70,6 +71,27 @@ function BuilderTab({ boothId }: { boothId: number }) {
             disabled={saving}
             onChange={(e) => updateTitle(e.target.value)}
           />
+        </label>
+        <label className="mg-field">
+          <span className="mg-label">응답 보상 코인 (0 = 보상 없음)</span>
+          <input
+            className="mg-input"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={state.draft.rewardCoin}
+            disabled={saving}
+            aria-invalid={state.save.fieldError?.field === 'rewardCoin' || undefined}
+            onChange={(e) => updateRewardCoin(e.target.value === '' ? 0 : Number(e.target.value))}
+          />
+          {/* C-05: 보상이 걸린 부스 설문은 게스트 403 MEMBER_ONLY — 값을 넣는 화면에서 그 사실을 말한다 */}
+          {state.draft.rewardCoin > 0 && (
+            <span className="mg-hint">보상이 있는 설문은 회원만 참여할 수 있습니다 — 게스트는 응답할 수 없습니다.</span>
+          )}
+          {state.save.fieldError?.field === 'rewardCoin' && (
+            <span className="sc-alert" role="alert">{state.save.fieldError.message}</span>
+          )}
         </label>
       </section>
 

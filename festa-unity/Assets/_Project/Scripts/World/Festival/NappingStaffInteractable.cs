@@ -268,12 +268,31 @@ namespace Festa.World
         /// </summary>
         public void Interact()
         {
-            if (_caught) return;   // 이미 들켰다 — 두 번 깨우지 않는다
+            // **이미 들킨 상태인데 조준까지 됐다면 그것 자체가 결함이다.** 사라진 사람은 조준 대상에서
+            // 빠져야 한다. 조용히 넘어가면 "F 를 눌러도 아무 반응이 없다" 로만 보인다
+            // (2026-09-14 사용자 지적). 상태가 어긋났으면 드러내고 스스로 되돌린다.
+            if (_caught)
+            {
+                bool visible = _visuals != null && _visuals.Length > 0 && _visuals[0] != null && _visuals[0].activeInHierarchy;
+                if (!visible)
+                {
+                    Debug.LogWarning("[NappingStaff] 사라진 상태인데 조준됐다 — 조준 대상에서 빠지지 않았다");
+                    return;
+                }
+                // 보이는데 들킨 상태로 남아 있다 = 복귀 처리가 어긋났다. 되돌려 다시 받을 수 있게 한다.
+                Debug.LogError("[NappingStaff] 보이는데 들킨 상태다 — 복귀가 어긋났다, 상태를 되돌린다");
+                _caught = false;
+                _lineUntil = 0f;
+                _returnAtServerTime = 0d;
+                if (_pin != null) _pin.ClearPose();
+                PlaySleep();
+                return;
+            }
 
             var net = LocalNetwork();
             if (net != null) { net.RequestWake(); return; }
 
-            // 오프라인 경로.
+            // 오프라인 경로 — 접속이 없어도 손으로 확인할 수 있어야 한다.
             ApplyWake(NappingStaffNetwork.ServerNow() + _returnAfter, showLine: true);
         }
 
