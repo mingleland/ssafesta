@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { createApiGameDraftRepository, createApiGamePublisher, createApiGameVisibilityPort } from '../../studio/ports/gameAuthoringApi.ts';
+import { createApiGameAssetRepository } from '../../studio/assets/remoteAssetRepository.ts';
+import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepository.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
 import { GameStudioShell } from '../../studio/ui/GameStudioShell.tsx';
 import { createEditorStressProject } from '../../studio/model/createEditorStressProject.ts';
@@ -27,6 +29,11 @@ export const EditGamePage = () => {
   const serverVisibilityPort = useMemo(() => (
     serverAuthoringEnabled ? createApiGameVisibilityPort() : undefined
   ), [serverAuthoringEnabled]);
+  // S15P21A604-708 — 편집 중인 Draft에는 아직 서버로 안 올라간 asset://local/ 참조가 남아
+  // 있을 수 있어(LocalPreviewSurface와 동일한 이유), 서버 저장소만 꽂으면 그 참조가 깨진다.
+  const serverAssetRepository = useMemo(() => (
+    serverAuthoringEnabled ? createApiGameAssetRepository({ local: createBrowserAssetRepository() }) : undefined
+  ), [serverAuthoringEnabled]);
   const browserPublicationPorts = useMemo(() => (
     browserPublicationEnabled ? createBrowserPublicationPorts() : null
   ), [browserPublicationEnabled]);
@@ -38,7 +45,7 @@ export const EditGamePage = () => {
   }
   return (
     <GameStudioShell
-      assetRepository={serverAuthoringEnabled ? null : undefined}
+      assetRepository={serverAuthoringEnabled ? serverAssetRepository ?? null : undefined}
       gameId={parsedGameId}
       initialProject={initialProject}
       key={parsedGameId}
