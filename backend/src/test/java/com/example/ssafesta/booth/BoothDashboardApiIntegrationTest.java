@@ -302,7 +302,7 @@ class BoothDashboardApiIntegrationTest {
 
     private void seedClosedVisit(Long boothId, Long userId, int dwellSeconds) {
         jdbc.update("INSERT INTO booth_visit_events(booth_id, visitor_user_id, world_channel,"
-                + " entered_at, exited_at) VALUES(?, ?, 'F11-CH01', now(), now() + (? || ' seconds')::interval)",
+                + " entered_at, exited_at) VALUES(?, ?, '11F-01', now(), now() + (? || ' seconds')::interval)",
                 boothId, userId, dwellSeconds);
     }
 
