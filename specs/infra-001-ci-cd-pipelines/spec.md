@@ -20,10 +20,11 @@
 
 **Acceptance Scenarios**:
 
-1. **Given** `feature/*` MR에 유효한 Front 또는 Back 변경이 제출되었을 때, **When** GitLab CI build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 dev 컴포넌트만 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
+1. **Given** `feature/*` MR에 유효한 Front·Back 또는 Game 변경이 제출되었을 때, **When** 해당 build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 dev 컴포넌트만 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
 2. **Given** `feature/*` MR의 필수 GitLab CI build 또는 test가 실패했을 때, **When** 파이프라인이 종료되면, **Then** 해당 변경은 `develop` 병합과 dev 배포가 차단되고 실패 단계와 원인을 개발자가 확인할 수 있다.
 3. **Given** 같은 `feature/*` MR 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 dev 환경을 덮어쓰지 않는다.
 4. **Given** Unity 담당자가 QA를 끝낸 최종 WebGL zip을 immutable release ID로 GitLab Generic Package Registry에 업로드했을 때, **When** 업로드 도우미가 산출물 SHA-256과 함께 Jenkins job을 호출하면, **Then** Jenkins는 패키지를 검증해 EC2 정적 release로 원자적으로 승격하고 Dedicated Server를 재시작하지 않는다.
+5. **Given** `festa-unity/**` 또는 Game CI 경로를 바꾼 MR이 제출되었을 때, **When** Jenkins Unity agent가 해당 MR head SHA에서 Unity 스크립트 컴파일과 `ci/test` EditMode를 실행하면, **Then** 성공 결과만 GitLab MR의 필수 상태로 게시되고 어떤 이미지 빌드·패키지 업로드·dev/demo 배포·컨테이너 재시작도 발생하지 않는다.
 
 ---
 
@@ -104,6 +105,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - 잘못된 탐지 규칙이 정상 로그를 이상으로 판정하거나 실제 이상 로그를 놓치는 경우
 - 수집 Agent·로그 저장소·대시보드 또는 Mattermost가 일시적으로 응답하지 않는 경우
 - 수집 로그나 알림 본문에 Secret·토큰·개인정보가 포함될 가능성이 있는 경우
+- Unity agent가 offline·대기열 초과·컴파일 또는 EditMode 실패한 경우에는 Game MR gate를 성공 또는 skip으로 표시하지 않고 merge를 차단하는 실패 상태로 남겨야 하는 경우
 
 ## Requirements *(mandatory)*
 
@@ -112,7 +114,9 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-001**: GitLab CI/Runner는 `feature/* → develop` MR의 `festa-frontend/**`, `backend/**`, 공용 계약·CI 경로를 `rules:changes`로 매핑해 필요한 Front·Back build·test job만 실행해야 한다. Front·Back 공용 경로는 두 gate를 모두 실행한다. `jira-*` job 정의는 보존하되 실행하지 않는다.
 - **FR-002**: GitLab CI의 Front gate는 `ci/test front` 및 `ci/build front`, Back gate는 `ci/test back` 및 `ci/build back`을 수행해야 한다. Back gate runner는 Testcontainers를 위해 Docker executor 또는 Docker socket 접근을 제공해야 한다.
 - **FR-003**: GitLab의 필수 MR gate가 하나라도 실패하면 `develop` 병합을 차단해야 한다. Jenkins의 `develop` 검증이 실패하면 dev 배포를 차단해야 한다.
-- **FR-003a**: 초기 MR merge gate 범위는 Front·Back이다. AI·Game의 MR gate는 해당 실행환경이 준비되는 별도 작업으로 남기며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
+- **FR-003a**: GitLab CI/Runner의 초기 MR merge gate는 Front·Back을 `rules:changes`로 수행한다. Game MR gate는 Jenkins Unity agent가 수행하며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
+- **FR-003b**: `festa-unity/**`, Game CI adapter 또는 Unity project 설정 변경 MR은 Jenkins Unity agent에서 해당 MR head SHA의 `ci/test` EditMode를 실행해야 한다. `ci/test`가 수행하는 Unity 스크립트 컴파일과 모든 EditMode 정적 검사는 이 gate의 일부다. 실행은 GitLab MR의 필수 성공 상태를 게시해야 하며, 실패·timeout·agent 미가용은 merge를 차단해야 한다.
+- **FR-003c**: MR용 Unity 검증 경로는 `ci/test`만 실행하고 이미지 build·package·Registry 업로드·Jenkins dev deploy·demo promotion·운영 컨테이너 재시작을 호출해서는 안 된다. merge 후 `develop`의 기존 build/package/deploy 흐름은 별도로 유지한다.
 - **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 개발환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
 - **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다. 하나의 MR이 여러 컴포넌트를 변경하면 모든 변경 컴포넌트의 CI가 성공한 뒤에만 dev 배포를 시작해야 하며, 배포 또는 검증이 하나라도 실패하면 같은 MR에서 이미 갱신된 컴포넌트를 이전 정상 release로 자동 복구해야 한다.
 - **FR-006**: 모든 실행은 변경 식별자, 대상 파트, 단계별 결과, 산출물 식별자, 배포 대상과 최종 상태를 추적 가능하게 기록해야 한다.
@@ -172,7 +176,8 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ### Measurable Outcomes
 
-- **SC-001**: `feature/* → develop` MR의 Front·Back 변경 100%가 수동 요청 없이 해당 GitLab CI gate를 시작하고, Front·Back 공용 경로 변경 100%가 두 gate를 모두 시작한다.
+- **SC-001**: `feature/* → develop` MR의 Front·Back 변경 100%가 수동 요청 없이 해당 GitLab CI gate를 시작하고, Game 변경 100%가 Jenkins Unity test-only gate를 시작한다. Front·Back 공용 경로 변경 100%는 두 gate를 모두 시작한다.
+- **SC-001a**: Unity 컴파일·EditMode를 의도적으로 실패시킨 Game MR 표본의 100%는 GitLab 필수 상태가 실패하고, 이미지·package·dev/demo 컨테이너 변경 건수는 0건이다.
 - **SC-002**: 빌드 또는 필수 테스트가 실패한 실행의 개발환경 배포 건수는 0건이다.
 - **SC-003**: `develop` 배포로 인해 변경 대상이 아닌 다른 컴포넌트가 재시작되는 건수와 공용 파이프라인 파일 변경으로 dev 컴포넌트가 재시작되는 건수는 각각 0건이다.
 - **SC-004**: 성공으로 기록된 demo 통합 릴리스의 100%가 웹 접속·로그인·월드 입장·AI 응답 검증 기록을 모두 가진다.
@@ -193,7 +198,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 ## Assumptions
 
 - 개발 흐름은 `feature/*` 브랜치에서 `develop`으로 Merge Request를 만들고 Squash Merge한다. 고정 `ai`/`back`/`front`/`game` 파트 브랜치는 사용하지 않는다.
-- GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단만 담당한다. Jenkins는 merge 후 네 컴포넌트의 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
+- GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단을 담당한다. Jenkins Unity agent는 merge 전 Game MR의 test-only 컴파일·EditMode 상태를 게시하며, Jenkins의 merge 후 경로는 네 컴포넌트 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
 - `develop` 병합은 변경 컴포넌트만 dev에 자동 배포한다. demo 통합 환경은 dev 검증 후 Jenkins에서 승인한 release만 배포한다.
 - 각 파트는 파이프라인이 호출할 수 있는 빌드 명령과 필수 테스트 범위를 소유하고 유지한다.
 - CI/CD 서비스는 Jenkins를 사용한다. 소스 저장소는 초기 GitHub에서 추후 GitLab으로 이전하되 Jenkins 파이프라인은 유지하고 연동 Webhook만 전환한다.

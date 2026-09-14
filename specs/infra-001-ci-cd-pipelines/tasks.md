@@ -1,7 +1,7 @@
 # Tasks: 변경 컴포넌트 CI와 dev 배포
 
 **Input**: `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`
-**Branch policy**: GitLab CI/Runner는 `feature/* → develop` MR의 Front·Back merge gate만 수행한다. Jenkins는 Squash Merge된 `develop`의 변경 컴포넌트 CI·dev 배포와 수동 demo promotion을 수행한다.
+**Branch policy**: GitLab CI/Runner는 `feature/* → develop` MR의 Front·Back merge gate를 수행한다. Game MR은 Jenkins Unity agent의 무배포 컴파일·EditMode gate가 검증한다. Jenkins `develop` job은 Squash Merge된 변경 컴포넌트 CI·dev 배포와 수동 demo promotion을 수행한다.
 
 ## Phase 1: GitLab MR merge gate
 
@@ -17,6 +17,22 @@
 
 ---
 
+## Phase 1A: Game MR Unity test-only gate
+
+**Purpose**: Game 변경 MR의 head SHA를 Jenkins Unity agent에서 `ci/test`로 검증하고, 결과를 GitLab의 필수 상태로 게시한다. `ci/test`는 Unity 스크립트 컴파일과 EditMode 정적 검사를 포함한다. 이 경로는 build·package·Registry·dev/demo 배포를 절대 호출하지 않는다.
+
+- [ ] T044 [P] `infra/tests/acceptance/us1-gitlab-mr-gate.sh`에 Game 변경이 Unity MR gate를 요구하고, docs-only MR에는 요구하지 않는 contract fixture를 추가한다
+- [ ] T045 [P] `infra/jenkins/tests/unity-mr-validation.sh`에 MR head SHA checkout, `ci/test` 실행, build/package/deploy 명령 부재와 실패 상태 게시 계약을 검사하는 fixture를 작성한다
+- [ ] T046 `infra/jenkins/pipelines/unity-mr-validation.groovy`에 Unity agent의 MR head SHA checkout → `ci/test` → GitLab commit status 게시 순서를 구현한다. 이 pipeline에는 image build, package, Compose, deploy credential 또는 promotion stage를 두지 않는다
+- [ ] T047 `infra/jenkins/jobs/gitlab-unity-mr-validation.groovy`에 Game MR만 수신하고 source SHA·MR 식별자를 전달하는 Jenkins job을 정의한다
+- [ ] T048 `.gitlab-ci.yml`에 `festa-unity/**`, Game CI adapter와 Unity project 설정 변경을 감지해 Jenkins Unity MR gate를 dispatch하고, Jenkins 결과가 GitLab pipeline의 필수 성공 상태가 되도록 연결한다
+- [ ] T049 [P] `infra/jenkins/tests/test-foundation.sh`에 MR Unity job의 Unity agent label, no-deploy 명령 집합, GitLab status context와 Jenkins credential masking을 정적 검증한다
+- [ ] T050 `infra/evidence/gitlab-unity-mr-gate.md`에 정상 EditMode, 의도적 컴파일/EditMode 실패, agent 미가용 실패가 각각 GitLab merge를 차단하고 dev/demo 컨테이너 restart delta가 0인 실측을 기록한다
+
+**Checkpoint**: Game MR의 Unity 컴파일 또는 EditMode가 실패·timeout·skip이면 merge되지 않으며, 성공·실패 어느 경우에도 dev/demo 런타임은 변경되지 않는다.
+
+---
+
 ## Phase 2: Jenkins develop 선택·배포 경계
 
 **Purpose**: Jenkins는 merge 후 `develop` range만 판별하고 dev 배포를 담당한다.
@@ -29,7 +45,7 @@
 - [X] T011 `infra/jenkins/pipelines/component.groovy`에 selected component stage summary·artifact fingerprint 기록을 추가한다
 - [X] T012 `infra/jenkins/jobs/gitlab-develop-multibranch.groovy`를 추가해 develop push 전용 Jenkins job을 정의한다
 
-**Checkpoint**: Jenkins는 MR을 재실행하지 않고 develop push의 selection 결과만 dev 배포 후보로 만든다.
+**Checkpoint**: Jenkins develop job은 MR test-only job과 분리되어 develop push의 selection 결과만 dev 배포 후보로 만든다.
 
 ---
 
@@ -143,8 +159,9 @@
 ## Dependencies & Execution Order
 
 ```text
-T001–T005 GitLab MR gate
-  → T006–T012 Jenkins develop selection
+T001–T005 GitLab Front·Back MR gate
+  ├→ T044–T050 Jenkins Unity Game MR gate
+  └→ T006–T012 Jenkins develop selection
     → T013–T022 dev batch (US1)
       ├→ T023–T025 secret verification (US4)
       ├→ T026–T030 manual demo promotion (US2)
@@ -160,7 +177,7 @@ all implementation → T038–T043 live evidence
 
 ## Implementation Strategy
 
-1. **MVP**: T001–T022 — prove GitLab MR gate and Jenkins selected dev deployment, including rollback.
+1. **MVP**: T001–T022와 T044–T050 — Front·Back GitLab gate, Game Unity MR gate, Jenkins selected dev deployment과 rollback을 검증한다.
 2. Add T023–T025 before using any new route with real credentials.
 3. Add T026–T030 to move demo only by approval.
 4. Complete traceability/observability and then record actual EC2 evidence.

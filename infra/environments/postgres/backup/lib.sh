@@ -29,7 +29,29 @@ backup_init() {
 }
 
 backup_aws() { "${AWS_CLI}" --endpoint-url "${R2_BACKUP_ENDPOINT}" s3 "$@"; }
-backup_s3api() { "${AWS_CLI}" --endpoint-url "${R2_BACKUP_ENDPOINT}" s3api "$@"; }
+backup_r2_signing_trace() {
+  local trace
+  trace="$(mktemp)"
+  "${AWS_CLI}" --debug --endpoint-url "${R2_BACKUP_ENDPOINT}" s3api head-bucket --bucket "${R2_BACKUP_BUCKET}" >/dev/null 2>"${trace}" || true
+  awk '
+    /CanonicalRequest:/ { capture = 1 }
+    capture { print }
+    /StringToSign:/ { remaining = 3; next }
+    remaining > 0 { remaining--; if (remaining == 0) exit }
+  ' "${trace}" >&2
+  rm -f "${trace}"
+}
+
+backup_s3api() {
+  local status
+  if "${AWS_CLI}" --endpoint-url "${R2_BACKUP_ENDPOINT}" s3api "$@"; then
+    return 0
+  else
+    status=$?
+  fi
+  backup_r2_signing_trace
+  return "${status}"
+}
 backup_docker_exec() { "${DOCKER_BIN}" exec -e PGPASSWORD "${POSTGRES_CONTAINER}" "$@"; }
 backup_psql() { backup_docker_exec psql -U festa_admin -d "$1" -v ON_ERROR_STOP=1 "${@:2}"; }
 backup_python() { "${PYTHON_BIN}" "$@"; }

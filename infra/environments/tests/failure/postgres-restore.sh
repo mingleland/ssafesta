@@ -81,6 +81,24 @@ assert_contains "$temp_dir/state/awscli-r2.conf" 'addressing_style = path' 'R2 r
 assert_contains "$temp_dir/bucket/$manifest_key" 'schemaSha256' 'manifest records schema fingerprint'
 assert_contains "$temp_dir/bucket/$manifest_key" 'tableRows' 'manifest records exact row counts'
 
+cat >"$temp_dir/bin/aws-trace" <<'SH'
+#!/usr/bin/env bash
+if [[ "$1" == --debug ]]; then
+  printf 'CanonicalRequest:\nHEAD\n/postgres-backups\nhost:r2.example.invalid\nStringToSign:\n20260913T155457Z\n20260913/auto/s3/aws4_request\ncanonical-request-sha256\n' >&2
+  printf 'Authorization: must-not-be-printed\n' >&2
+fi
+exit 254
+SH
+chmod +x "$temp_dir/bin/aws-trace"
+set +e
+trace_output="$(AWS_CLI="$temp_dir/bin/aws-trace" R2_BACKUP_ENDPOINT='https://r2.example.invalid' R2_BACKUP_BUCKET='postgres-backups' bash -c "source '$repo_root/infra/environments/postgres/backup/lib.sh'; backup_s3api put-object --bucket postgres-backups --key trace --body /dev/null" 2>&1)"
+trace_status=$?
+set -e
+[[ "$trace_status" -eq 254 ]] || fail 'R2 trace changed the upload failure status'
+[[ "$trace_output" == *'CanonicalRequest:'* ]] || fail 'R2 trace omitted canonical request'
+[[ "$trace_output" == *'20260913/auto/s3/aws4_request'* ]] || fail 'R2 trace omitted signing scope'
+[[ "$trace_output" != *'must-not-be-printed'* ]] || fail 'R2 trace exposed authorization data'
+
 if bash "$repo_root/infra/environments/postgres/backup/restore.sh" --target live-demo --manifest-key "$manifest_key" >/dev/null 2>&1; then
   fail 'live target was accepted'
 fi
