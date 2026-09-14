@@ -296,4 +296,29 @@ public enum ErrorCode {
     public String defaultMessage() {
         return defaultMessage;
     }
+
+    /**
+     * The code that answers a bare HTTP status.
+     *
+     * <p>Two callers need this and they have to agree: {@code GlobalExceptionHandler} for a
+     * framework rejection that carries a status and nothing else, and {@code ApiErrorController}
+     * for a container ERROR dispatch, where the exception is already gone and the status is all
+     * that is left to answer from.
+     *
+     * @param status resolved HTTP status, or {@code null} for a non-standard code
+     */
+    public static ErrorCode of(HttpStatus status) {
+        if (status == null) {
+            return VALIDATION_FAILED;
+        }
+        return switch (status) {
+            case UNAUTHORIZED -> UNAUTHORIZED;
+            case FORBIDDEN -> FORBIDDEN;
+            case NOT_FOUND -> NOT_FOUND;
+            case METHOD_NOT_ALLOWED -> METHOD_NOT_ALLOWED;
+            case BAD_REQUEST -> VALIDATION_FAILED;
+            case UNSUPPORTED_MEDIA_TYPE -> UNSUPPORTED_MEDIA_TYPE;
+            default -> status.is5xxServerError() ? INTERNAL_ERROR : VALIDATION_FAILED;
+        };
+    }
 }
