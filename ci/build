@@ -6,7 +6,15 @@ build_project() {
   case "${CI_COMPONENT}" in
     ai) (cd "${component_dir}" && python -m compileall -q .) ;;
     back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi) ;;
-    front) (cd "${component_dir}" && npm ci && npm run build) ;;
+    front) (
+      cd "${component_dir}"
+      npm ci
+      npm run assets:verify
+      npm run build
+      [[ ! -e "${CI_ARTIFACT_DIR}/front-dist" ]] || { echo 'front artifact already exists' >&2; exit 65; }
+      mkdir -p "${CI_ARTIFACT_DIR}/front-dist"
+      cp -a dist/. "${CI_ARTIFACT_DIR}/front-dist/"
+    ) ;;
     game) bash festa-unity/ci/build --target linux-server ;;
   esac
 }

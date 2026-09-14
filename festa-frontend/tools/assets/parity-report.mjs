@@ -7,6 +7,7 @@ import { readFileSync, statSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { UNITY_ASSETS_ROOT, BOOTH_ASSETS } from './booth-assets.config.mjs';
 import { resolveMaterial } from './compiler/material.mjs';
+import { INTERMEDIATE_DIR, RUNTIME_DIR } from './compiler/paths.mjs';
 import { sharedGuidIndex, projectRoot } from './source.mjs';
 
 const CONTRACT = {
@@ -32,15 +33,15 @@ function glbSummary(path) {
   return { bytes: buf.length, images: (json.images ?? []).length, materials: mats };
 }
 
-const inter = JSON.parse(readFileSync(new URL('../../public/assets/booth/manifest.json', import.meta.url), 'utf8'));
-const runtime = JSON.parse(readFileSync(new URL('../../.generated/runtime/manifest.json', import.meta.url), 'utf8'));
+const inter = JSON.parse(readFileSync(resolve(INTERMEDIATE_DIR, 'manifest.json'), 'utf8'));
+const runtime = JSON.parse(readFileSync(resolve(RUNTIME_DIR, 'manifest.json'), 'utf8'));
 const guidIndex = sharedGuidIndex();
 
 for (const entry of runtime.assets) {
   const src = BOOTH_ASSETS.find((a) => a.assetCode === entry.assetCode);
   const interEntry = inter.assets.find((a) => a.assetCode === entry.assetCode);
   const contract = CONTRACT[entry.objectType];
-  const glbPath = resolve(projectRoot, '.generated/runtime', entry.url);
+  const glbPath = resolve(RUNTIME_DIR, entry.url);
 
   console.log(`\n■ ${entry.assetCode}  (${entry.objectType})`);
   console.log(`  원본            ${src.kind === 'prefab' ? src.prefab : src.fbx}  · package ${src.sourcePackage}`);
