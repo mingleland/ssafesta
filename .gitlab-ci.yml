@@ -245,7 +245,7 @@ unity-mr-validation-dispatch:
       deadline=$(( $(date +%s) + 2400 ))
       while [ "$(date +%s)" -lt "$deadline" ]; do
         queue="$(curl --fail --silent --show-error --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" "${queue_url}api/json")"
-        test "$(printf '%s' "$queue" | jq -r '.cancelled')" = false || { printf '%s\n' "$queue" | jq -r '.why // "Jenkins queue cancelled"' >&2; exit 1; }
+        test "$(printf '%s' "$queue" | jq -r '.cancelled // false')" = false || { printf '%s\n' "$queue" | jq -r '.why // "Jenkins queue cancelled"' >&2; exit 1; }
         build_url="$(printf '%s' "$queue" | jq -r '.executable.url // empty')"
         test -n "$build_url" && break
         sleep 2
