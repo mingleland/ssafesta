@@ -21,6 +21,12 @@ namespace Festa.World
         [SerializeField] float _maxPelvisDrop = 3f;
         [SerializeField] float _weightLerp = 10f;
 
+        /// <summary>
+        /// 이보다 작은 좌우 지면 차는 단차로 보지 않는다(u). 1 m = 13.26 u 이므로 0.15 u ≈ 1 cm —
+        /// 타일 이음매·메시 미세 단차에 골반이 떨리지 않게 한다.
+        /// </summary>
+        const float GroundDeadzone = 0.15f;
+
         Animator _anim;
         float _weight;          // 정지 1 → 이동 0.35
         float _pelvisOffset;    // 현재 골반 보정(음수)
@@ -59,19 +65,26 @@ namespace Festa.World
             _lHit = Probe(AvatarIKGoal.LeftFoot, out _lPos, out _lRot);
             _rHit = Probe(AvatarIKGoal.RightFoot, out _rPos, out _rRot);
 
-            // 골반: **지면이 루트보다 낮을 때만** 내린다. 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
+            // 골반: **두 발이 딛는 지면의 높이 차**만큼만 내린다. 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
             //
-            // 전에는 `지면높이 - 애니메이션 발높이` 를 썼는데, 그러면 **애니메이션이 들어 올린 발**까지
-            // "떠 있다" 로 읽는다. 걷기 스윙이나 아이들의 무게중심 이동으로 한 발이 올라가는 순간
-            // 그 차이만큼 골반이 내려가, 평지에 그냥 서 있어도 자세가 주저앉았다 (사용자 보고 2026-09-13).
-            // 아래 `Apply` 에는 들린 발을 거르는 가드가 있는데 골반 계산에만 없었다.
+            // 두 번 틀렸던 자리다.
+            // ① `지면높이 - 애니메이션 발높이` — 애니메이션이 들어 올린 발까지 "떠 있다" 로 읽어,
+            //    걷기 스윙마다 골반이 내려갔다 (2026-09-13).
+            // ② `지면높이 - transform.position.y` — 이 스크립트는 **Animator 노드**에 붙어 있고,
+            //    그 노드는 'AvatarVisual_Modular' 아래라 오프셋·배율이 끼어 있다. 바닥 높이가 아니다.
+            //    평지 실측(2026-09-14): 지면 0.084 · 노드 0.337 → 보정 **−0.253 이 상수로** 걸려
+            //    가만히 서 있어도 무릎이 굽었다 (사용자 지적, 2번 사진).
             //
-            // 기준을 **실제 지면 높이 대 루트 높이**로 바꾼다. 평지에서는 둘이 같아 보정이 0 이 되고,
-            // 한 발이 낮은 단차 위에 있을 때만 그 깊이만큼 내려간다 — 원래 의도 그대로다.
-            float rootY = transform.position.y;
-            float lGround = _lHit ? _lPos.y - _footHeight : rootY;
-            float rGround = _rHit ? _rPos.y - _footHeight : rootY;
-            float drop = Mathf.Clamp(Mathf.Min(lGround, rGround) - rootY, -_maxPelvisDrop, 0f) * _weight;
+            // 필요한 값은 애초에 절대 높이가 아니라 **한쪽 발이 다른 쪽보다 얼마나 낮은 데 있는가** 하나다.
+            // 그것만 쓰면 노드가 어디 있든·배율이 얼마든 평지에서는 정확히 0 이 된다.
+            float drop = 0f;
+            if (_lHit && _rHit)
+            {
+                float lGround = _lPos.y - _footHeight;
+                float rGround = _rPos.y - _footHeight;
+                float diff = Mathf.Min(lGround, rGround) - Mathf.Max(lGround, rGround);   // 항상 ≤ 0
+                if (diff < -GroundDeadzone) drop = Mathf.Clamp(diff, -_maxPelvisDrop, 0f) * _weight;
+            }
             _pelvisOffset = Mathf.Lerp(_pelvisOffset, drop, Time.deltaTime * _weightLerp);
             if (Mathf.Abs(_pelvisOffset) > 0.001f)
             {
