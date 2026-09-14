@@ -96,6 +96,8 @@ assert jenkins["slaveAgentPort"] == -1
 users = {item["id"]: item for item in jenkins["securityRealm"]["local"]["users"]}
 assert "webgl-publisher" in users
 assert users["webgl-publisher"]["password"] == "${JENKINS_WEBGL_PUBLISHER_PASSWORD}"
+assert "unity-mr-validator" in users
+assert users["unity-mr-validator"]["password"] == "${JENKINS_UNITY_MR_VALIDATOR_PASSWORD}"
 nodes = {item["permanent"]["name"]: item["permanent"] for item in jenkins["nodes"]}
 assert set(nodes) == {"linux-docker", "deploy", "unity"}
 assert len({node["remoteFS"] for node in nodes.values()}) == 3
@@ -114,6 +116,8 @@ entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entri
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
 publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
 assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
+validator=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'unity-mr-validator')
+assert set(validator['permissions']) == {'Overall/Read','Job/Discover'}
 server=gitlab['unclassified']['gitLabServers']['servers'][0]
 assert server['manageWebHooks'] is True and server['manageSystemHooks'] is False
 assert server['webhookSecretCredentialsId'] == '${GITLAB_WEBHOOK_SECRET_CREDENTIALS_ID}'
@@ -236,6 +240,8 @@ grep -q 'buildWithParameters' "${webgl_publish}" || fail "publisher does not tri
   || fail "obsolete Windows WebGL agent remains wired"
 grep -q "pipelineJob('festa-unity-mr-validation')" "${unity_mr_job}" \
   || fail "Unity MR validation job is missing"
+grep -q "permission('hudson.model.Item.Build', 'unity-mr-validator')" "${unity_mr_job}" \
+  || fail "Unity MR validator cannot build its own job"
 grep -q "stringParam('SOURCE_SHA'" "${unity_mr_job}" \
   || fail "Unity MR validation job lacks source SHA input"
 grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
@@ -311,6 +317,7 @@ export NODE_RUNTIME_IMAGE="node:foundation-test"
 export PYTHON_JSONSCHEMA_VERSION="4.26.0"
 export JENKINS_ADMIN_ID="foundation-admin"
 export JENKINS_ADMIN_PASSWORD="foundation-only-value"
+export JENKINS_UNITY_MR_VALIDATOR_PASSWORD="foundation-unity-mr-validator-value"
 export JENKINS_UNITY_MR_PIPELINE_BRANCH=develop
 export JENKINS_WEBGL_PUBLISHER_PASSWORD="foundation-webgl-publisher-value"
 export JENKINS_PUBLIC_URL="https://ci.example.invalid/"

@@ -25,5 +25,9 @@ pipelineJob('festa-unity-mr-validation') {
             lightweight(true)
         }
     }
+    authorization {
+        permission('hudson.model.Item.Read', 'unity-mr-validator')
+        permission('hudson.model.Item.Build', 'unity-mr-validator')
+    }
     logRotator { numToKeep(20) }
 }
