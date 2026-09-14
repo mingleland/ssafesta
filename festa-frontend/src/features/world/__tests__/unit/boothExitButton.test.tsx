@@ -48,10 +48,10 @@ describe('노출 조건', () => {
     expect(button()).toBeNull();
   });
 
-  it('F 를 대체하지 않는다는 것을 버튼이 스스로 말한다', () => {
+  it('클릭형 나가기 버튼에 F 키 표기를 두지 않는다', () => {
     render(<BoothExitButton />);
     act(() => applyBoothContext(true, 3));
-    expect(screen.getByText('F')).toBeTruthy();
+    expect(screen.queryByText('F')).toBeNull();
   });
 });
 
