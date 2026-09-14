@@ -238,10 +238,21 @@ FURNITURE 타입 기본
 | `TRUSS_BEAM` | → `STRUCT_TRUSS_HORIZONTAL_LAMP` |
 | `TRUSS_PILLAR` | → `STRUCT_TRUSS_VERTICAL` |
 | `TRUSS_GATE` | **폐기** — 단일 모델이 없다. 기둥2+빔1 조합은 사용자가 놓는다 |
-| `PLANT` | **폐기** — 원본이 저장소에 없다 |
+| `PLANT` | → `DECOR_PLANT_01` (2026-09-10 정정. 아래 주 참고) |
 | `DECORATION_DEFAULT`·`FURNITURE_CHAIR01`·`SURVEY_KIOSK_DEFAULT`·`FURNITURE_CHAIR02_WHITE` | Compiler config 코드. §8-2·8-3 로 개명 |
 
 폐기 코드는 **예약**한다 — 저장된 layout 에 남아 있을 수 있으므로 재사용하지 않고, 조회 실패 시 타입 기본으로 떨어지는 기존 동작(`pickAsset`)을 그대로 둔다.
+
+> **`PLANT` 정정 (2026-09-10, GitLab [#154](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/154))** — *"원본이 저장소에 없다"* 는 이 표를 쓸 당시의 판단이었고, 실제로는 있다.
+> 게임 파트가 `Prefabs/Booth/Decor/PLANT.prefab` 으로 래핑해 뒀고 그 원본은
+> `Assets/Palmov Island/Low Poly Houses Free Pack/Prefabs/Trees/potted tree.prefab`(guid `312cd58e…`) 이다.
+> 그래서 폐기가 아니라 **29번째 정본 행 `DECOR_PLANT_01`** 로 정의했다 — 접두는 기존 `DISP_`·`STRUCT_`·`FURN_`
+> 규칙에 맞춘 `DECOR_` 이고 FAMILY 세그먼트 분류(§19)에 그대로 걸린다.
+> 구 코드 `PLANT` 는 이미 게시된 layout 에 남아 있을 수 있어 **한 릴리스 동안 별칭으로 유지**한다
+> (레지스트리에서 두 코드가 같은 prefab guid 를 가리킨다). FE 팔레트는 `DECOR_PLANT_01` 로 교체 완료(`!590`).
+>
+> 스튜디오 미리보기는 아직 파라메트릭 박스다 — FE 자산 파이프라인이 source pack 단위로 라이선스를 요구하는데
+> 이 팩이 `source-packs.lock.json` 에 선언돼 있지 않기 때문이다. **월드 표시에는 영향이 없다.**
 
 ### 8-6. Facade 18종
 
@@ -292,8 +303,9 @@ assetCode 의 일부가 아니다 — 그래서 코드에 `_DEFAULT` 를 넣지 
 | `DECORATION` | `STRUCT_TRUSS_BASE` | 트러스 받침 | |
 | `DECORATION` | `STRUCT_TRUSS_VERTICAL` | 트러스 기둥 | |
 | `DECORATION` | `STRUCT_TRUSS_HORIZONTAL_LAMP` | 트러스 빔 + 조명 | |
+| `DECORATION` | `DECOR_PLANT_01` | 화분 (저폴리 관엽) | |
 
-**28행이지만 지금 계약이 실제로 낼 수 있는 것은 `FURNITURE`·`DECORATION` 20행뿐이다.**
+**29행이지만 지금 계약이 실제로 낼 수 있는 것은 `FURNITURE`·`DECORATION` 21행뿐이다.**
 나머지 8타입은 계약이 `assetCode` 를 허용하지 않아 typeDefault 만 나간다 — 확장은 §19-1.
 
 #### 레거시 교체
