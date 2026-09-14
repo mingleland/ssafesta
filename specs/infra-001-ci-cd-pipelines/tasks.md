@@ -21,12 +21,12 @@
 
 **Purpose**: Game 변경 MR의 head SHA를 Jenkins Unity agent에서 `ci/test`로 검증하고, 결과를 GitLab의 필수 상태로 게시한다. `ci/test`는 Unity 스크립트 컴파일과 EditMode 정적 검사를 포함한다. 이 경로는 build·package·Registry·dev/demo 배포를 절대 호출하지 않는다.
 
-- [ ] T044 [P] `infra/tests/acceptance/us1-gitlab-mr-gate.sh`에 Game 변경이 Unity MR gate를 요구하고, docs-only MR에는 요구하지 않는 contract fixture를 추가한다
-- [ ] T045 [P] `infra/jenkins/tests/unity-mr-validation.sh`에 MR head SHA checkout, `ci/test` 실행, build/package/deploy 명령 부재와 실패 상태 게시 계약을 검사하는 fixture를 작성한다
-- [ ] T046 `infra/jenkins/pipelines/unity-mr-validation.groovy`에 Unity agent의 MR head SHA checkout → `ci/test` → GitLab commit status 게시 순서를 구현한다. 이 pipeline에는 image build, package, Compose, deploy credential 또는 promotion stage를 두지 않는다
-- [ ] T047 `infra/jenkins/jobs/gitlab-unity-mr-validation.groovy`에 Game MR만 수신하고 source SHA·MR 식별자를 전달하는 Jenkins job을 정의한다
-- [ ] T048 `.gitlab-ci.yml`에 `festa-unity/**`, Game CI adapter와 Unity project 설정 변경을 감지해 Jenkins Unity MR gate를 dispatch하고, Jenkins 결과가 GitLab pipeline의 필수 성공 상태가 되도록 연결한다
-- [ ] T049 [P] `infra/jenkins/tests/test-foundation.sh`에 MR Unity job의 Unity agent label, no-deploy 명령 집합, GitLab status context와 Jenkins credential masking을 정적 검증한다
+- [X] T044 [P] `infra/tests/acceptance/us1-gitlab-mr-gate.sh`에 Game 변경이 Unity MR gate를 요구하고, docs-only MR에는 요구하지 않는 contract fixture를 추가한다 (`S15P21A604-185`)
+- [X] T045 [P] `infra/jenkins/tests/unity-mr-validation.sh`에 MR head SHA checkout, `ci/test` 실행, build/package/deploy 명령 부재와 실패 상태 게시 계약을 검사하는 fixture를 작성한다 (`S15P21A604-185`)
+- [X] T046 `infra/jenkins/pipelines/unity-mr-validation.groovy`에 Unity agent의 MR head SHA checkout → `ci/test` → GitLab commit status 게시 순서를 구현한다. 이 pipeline에는 image build, package, Compose, deploy credential 또는 promotion stage를 두지 않는다 (`S15P21A604-185`)
+- [X] T047 `infra/jenkins/jobs/gitlab-unity-mr-validation.groovy`에 Game MR만 수신하고 source SHA·MR 식별자를 전달하는 Jenkins job을 정의한다 (`S15P21A604-185`)
+- [X] T048 `.gitlab-ci.yml`에 `festa-unity/**`, Game CI adapter와 Unity project 설정 변경을 감지해 Jenkins Unity MR gate를 dispatch하고, Jenkins 결과가 GitLab pipeline의 필수 성공 상태가 되도록 연결한다 (`S15P21A604-185`)
+- [X] T049 [P] `infra/jenkins/tests/test-foundation.sh`에 MR Unity job의 Unity agent label, no-deploy 명령 집합, GitLab status context와 Jenkins credential masking을 정적 검증한다 (`S15P21A604-185`)
 - [ ] T050 `infra/evidence/gitlab-unity-mr-gate.md`에 정상 EditMode, 의도적 컴파일/EditMode 실패, agent 미가용 실패가 각각 GitLab merge를 차단하고 dev/demo 컨테이너 restart delta가 0인 실측을 기록한다
 
 **Checkpoint**: Game MR의 Unity 컴파일 또는 EditMode가 실패·timeout·skip이면 merge되지 않으며, 성공·실패 어느 경우에도 dev/demo 런타임은 변경되지 않는다.

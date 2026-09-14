@@ -16,6 +16,8 @@ integration_compose="${repo_root}/infra/deploy/compose/integration/compose.yaml"
 component_pipeline="${repo_root}/infra/jenkins/pipelines/component.groovy"
 develop_pipeline="${repo_root}/infra/jenkins/pipelines/develop.groovy"
 develop_job="${repo_root}/infra/jenkins/jobs/gitlab-develop-multibranch.groovy"
+unity_mr_job="${repo_root}/infra/jenkins/jobs/gitlab-unity-mr-validation.groovy"
+unity_mr_pipeline="${repo_root}/infra/jenkins/pipelines/unity-mr-validation.groovy"
 webgl_job="${repo_root}/infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy"
 webgl_pipeline="${repo_root}/infra/jenkins/pipelines/webgl-package-deploy.groovy"
 webgl_deploy="${repo_root}/infra/jenkins/scripts/deploy-webgl-release.sh"
@@ -43,7 +45,7 @@ grep -Fq '${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl' "${agent_com
   || fail "deploy agent cannot mutate the host WebGL release root"
 grep -Fq '../jobs:/var/jenkins_home/job_dsl:ro' "${controller_compose}" \
   || fail "controller does not mount repository Job DSL definitions"
-for job_dsl in gitlab-develop-multibranch.groovy gitlab-webgl-package-deploy.groovy gitlab-demo-promotion.groovy; do
+for job_dsl in gitlab-develop-multibranch.groovy gitlab-unity-mr-validation.groovy gitlab-webgl-package-deploy.groovy gitlab-demo-promotion.groovy; do
   grep -Fq "/var/jenkins_home/job_dsl/${job_dsl}" "${jobs_casc}" \
     || fail "JCasC does not apply ${job_dsl}"
 done
@@ -58,6 +60,7 @@ done
 pass "Shell entrypoint executable policy"
 
 grep -qx 'timestamper:1.30' "${plugins}" || fail "Timestamper plugin is not pinned"
+grep -qx 'gitlab-plugin:1.9.11' "${plugins}" || fail "GitLab commit-status plugin is not pinned"
 grep -q 'check-agent-capabilities.sh' "${jenkinsfile}" || fail "Agent capability gate is not wired"
 grep -q 'jsonschema==' "${agent_dockerfile}" || fail "Agent image does not pin jsonschema"
 grep -q 'PYTHON_JSONSCHEMA_VERSION' "${agent_compose}" || fail "Agent Compose omits the jsonschema version pin"
@@ -226,6 +229,18 @@ grep -q 'DEPLOY-TOKEN:' "${webgl_deploy}" || fail "Registry download does not us
 grep -q 'buildWithParameters' "${webgl_publish}" || fail "publisher does not trigger Jenkins after upload"
 ! grep -q 'unity-webgl-builder' "${webgl_job}" "${webgl_pipeline}" \
   || fail "obsolete Windows WebGL agent remains wired"
+grep -q "pipelineJob('festa-unity-mr-validation')" "${unity_mr_job}" \
+  || fail "Unity MR validation job is missing"
+grep -q "stringParam('SOURCE_SHA'" "${unity_mr_job}" \
+  || fail "Unity MR validation job lacks source SHA input"
+grep -q "node('unity-6000.0.78f1')" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not use Unity agent"
+grep -q "gitlabCommitStatus(name: 'unity-mr-validation')" "${unity_mr_pipeline}" \
+  || fail "Unity MR validation does not post GitLab status"
+for forbidden in 'ci/build' 'ci/package' 'docker compose' 'deploy-component.sh' 'deploy-dev-batch.sh' 'deploy-release.sh' 'promote-release.sh'; do
+  ! grep -Fq "${forbidden}" "${unity_mr_pipeline}" \
+    || fail "Unity MR validation contains forbidden ${forbidden}"
+done
 grep -q "pipelineJob('festa-demo-promotion')" "${demo_promotion_job}" \
   || fail "manual demo promotion job is missing"
 grep -q "scriptPath('infra/jenkins/pipelines/demo-promotion.groovy')" "${demo_promotion_job}" \
