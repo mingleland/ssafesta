@@ -13,6 +13,11 @@ jenkins:
               - Job/Discover
               - Job/Read
               - Job/Build
+        - user:
+            name: unity-mr-validator
+            permissions:
+              - Overall/Read
+              - Job/Discover
         - group:
             name: infra-viewers
             permissions:
