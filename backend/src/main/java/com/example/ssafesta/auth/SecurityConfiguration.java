@@ -3,6 +3,7 @@ package com.example.ssafesta.auth;
 import com.example.ssafesta.common.ApiErrorWriter;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.RequestIdFilter;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -66,6 +67,13 @@ class SecurityConfiguration {
         return http.cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/api/v1/**", "/ws/**"))
                 .authorizeHttpRequests(requests -> requests
+                        // The container's ERROR dispatch, not a route anyone calls. Refusing it
+                        // replaced every failure that lands there with a misleading 401, and let it
+                        // through only for a request that happened to carry a session — which is
+                        // how one unregistered OAuth provider read as Whitelabel HTML for a browser
+                        // and as UNAUTHORIZED for curl. ApiErrorController answers it in the
+                        // envelope and exposes nothing the original response did not already say.
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/auth/guest", "/api/v1/auth/refresh", "/api/v1/auth/oauth/**", "/oauth2/**", "/login/**").permitAll()
                         // 상담 STOMP 핸드셰이크는 HTTP 인증을 타지 않는다 — 신원은 CONNECT 프레임의
                         // WS Token 으로 확인하고(FR-019, StompAuthChannelInterceptor), 그 검증에

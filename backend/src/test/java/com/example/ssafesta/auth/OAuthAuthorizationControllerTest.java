@@ -8,10 +8,14 @@ import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
 
 /**
  * The route that starts a social login had no test at all.
@@ -28,7 +32,8 @@ class OAuthAuthorizationControllerTest {
     private final AuthProperties properties = new AuthProperties("secret", Duration.ofMinutes(30),
             Duration.ofDays(14), Duration.ofMinutes(5), Duration.ofSeconds(60),
             "/api/v1/auth/refresh", FRONTEND, false);
-    private final OAuthAuthorizationController controller = new OAuthAuthorizationController(properties);
+    /** What the deployment actually registered — the three of {@code application.yml} when its env is complete. */
+    private final OAuthAuthorizationController controller = controllerWith("google", "kakao", "ssafy");
 
     @Test
     void everyProviderInTheEnumStartsARedirect() {
@@ -91,6 +96,42 @@ class OAuthAuthorizationControllerTest {
         assertEquals(HttpStatus.FOUND, response.getStatusCode(), "저장 여부와 무관하게 302 여야 한다.");
         return request.getSession(false) == null ? null
                 : request.getSession(false).getAttribute(OAuthLoginSuccessHandler.RETURN_ORIGIN_SESSION_ATTRIBUTE);
+    }
+
+    /**
+     * 이름은 enum 에 있는데 이 서버에 registration 이 없는 경우 (S15P21A604-357 후속).
+     *
+     * <p>배포 env 에서 {@code SSAFY_CLIENT_ID} 3종이 빠지면 실제로 이 모양이 된다. 막지 않으면
+     * 302 가 그대로 나가고 다음 홉의 Spring Security 가 {@code InvalidClientRegistrationIdException}
+     * 을 던져 500 이 되는데, 그 자리에는 FE 가 읽을 코드가 없다.
+     */
+    @Test
+    void aProviderWithNoClientRegistrationIsRefusedHereRatherThanOnTheNextHop() {
+        OAuthAuthorizationController withoutSsafy = controllerWith("google", "kakao");
+
+        ApiException refused = assertThrows(ApiException.class,
+                () -> withoutSsafy.authorize("ssafy", null, request("localhost", 5175)));
+
+        assertEquals(ErrorCode.OAUTH_PROVIDER_NOT_SUPPORTED, refused.errorCode(),
+                "등록되지 않은 provider 는 302 를 내보내지 말고 여기서 거부돼야 한다.");
+    }
+
+    private OAuthAuthorizationController controllerWith(String... registrationIds) {
+        Set<String> registered = Set.of(registrationIds);
+        ClientRegistrationRepository repository =
+                id -> registered.contains(id) ? registration(id) : null;
+        return new OAuthAuthorizationController(properties, repository);
+    }
+
+    /** 컨트롤러는 존재 여부만 보므로 값은 빌더가 요구하는 최소만 채운다. */
+    private ClientRegistration registration(String id) {
+        return ClientRegistration.withRegistrationId(id)
+                .clientId(id + "-client-id")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("http://localhost:8080/login/oauth2/code/" + id)
+                .authorizationUri("https://provider.test/authorize")
+                .tokenUri("https://provider.test/token")
+                .build();
     }
 
     private MockHttpServletRequest request(String host, int port) {
