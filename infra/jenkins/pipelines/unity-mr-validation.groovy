@@ -21,7 +21,7 @@ gitlabCommitStatus(name: 'unity-mr-validation') {
                     extensions: [[$class: 'CloneOption', shallow: false, noTags: true, honorRefspec: false]],
                     userRemoteConfigs: [[credentialsId: checkoutCredential, url: repositoryUrl]]
                 ])
-                sh "test \"$(git rev-parse HEAD)\" = '${sourceSha}'"
+                sh "test \"\$(git rev-parse HEAD)\" = '${sourceSha}'"
             }
             stage('Unity EditMode') {
                 withEnv([
