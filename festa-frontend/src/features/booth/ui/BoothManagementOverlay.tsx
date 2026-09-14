@@ -8,10 +8,12 @@
 // 진입은 World 의 Booth Management NPC + F 다. Unity 이벤트 계약(G-1)이 아직 없어 지금은
 // dev trigger 로만 열리며, 계약이 오면 dispatcher 가 openBoothManagement() 를 부르면 된다 —
 // 이 컴포넌트는 그대로다.
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
+import { getAiAgent } from '../../../entities/aiAgent/api';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
@@ -58,6 +60,7 @@ function SectionRow({
 
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
+  const [showAgentGate, setShowAgentGate] = useState(false);
 
   // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
@@ -78,11 +81,28 @@ export function BoothManagementOverlay({ onClose }: Props) {
     enabled: boothId !== null,
   });
 
+  // AI 직원 등록 여부만 본다 — 탭 내용(문서 등)은 AiAgentManagementTab 이 따로 불러온다.
+  // 미등록(data === null)이 확인됐을 때만 행 클릭을 팝업으로 가로챈다. 아직 로딩 중이거나
+  // 조회에 실패했으면 원래대로 이동시킨다 — 그 화면이 자기 로딩/에러 상태를 이미 보여준다.
+  const aiAgentQuery = useQuery({
+    queryKey: ['ai-agent', boothId],
+    queryFn: () => getAiAgent(boothId as number),
+    enabled: boothId !== null,
+  });
+
   // 관리 작업 화면으로 나간다. 그 화면들은 WORLD_RETURN_TO_MANAGEMENT 로 돌아오므로
   // World 에 도착하면 이 관리 화면이 다시 열린다(user-flow-decisions §18.3·§19).
   function go(path: string) {
     onClose();
     navigate(path);
+  }
+
+  function openAiAgentSection() {
+    if (aiAgentQuery.data === null) {
+      setShowAgentGate(true);
+      return;
+    }
+    go(`/app/booths/${boothId}/ai-agent`);
   }
 
   const body = (() => {
@@ -181,7 +201,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
           <SectionRow
             label="AI 직원"
             summary="대화 설정·답변 근거 문서 관리"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/ai-agent`)}
+            onOpen={openAiAgentSection}
           />
         </div>
 
@@ -202,8 +222,39 @@ export function BoothManagementOverlay({ onClose }: Props) {
   })();
 
   return (
-    <OverlayFrame title="내 부스 관리" subtitle="제작·콘텐츠·운영" size="xl" icon={IcBooth} onClose={onClose}>
-      {body}
-    </OverlayFrame>
+    <>
+      <OverlayFrame title="내 부스 관리" subtitle="제작·콘텐츠·운영" size="xl" icon={IcBooth} onClose={onClose}>
+        {body}
+      </OverlayFrame>
+      {showAgentGate && myBooth && (
+        <div className="bm-gate-backdrop" role="presentation" onClick={() => setShowAgentGate(false)}>
+          <div
+            className="bm-gate-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bm-gate-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="bm-gate-title">AI 직원 등록이 필요합니다.</h3>
+            <p>먼저 AI 직원을 등록해야 대화 설정과 문서를 관리할 수 있습니다.</p>
+            <div className="bm-gate-actions">
+              <button type="button" className="ov-btn" onClick={() => setShowAgentGate(false)}>
+                닫기
+              </button>
+              <button
+                type="button"
+                className="ov-btn ov-btn-primary"
+                onClick={() => {
+                  setShowAgentGate(false);
+                  go(`/app/booths/${myBooth.boothId}/ai-agent`);
+                }}
+              >
+                AI 직원 등록하러 가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
