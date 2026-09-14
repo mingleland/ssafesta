@@ -12,7 +12,7 @@
 //
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
@@ -60,6 +60,10 @@ export function WorldPage() {
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [chatHeight, setChatHeight] = useState(0);
+  const reportChatHeight = useCallback((height: number) => {
+    setChatHeight((current) => current === height ? current : height);
+  }, []);
 
   // 월드를 보여 달라고 요청한다. 화면을 떠날 때는 감추기만 하고 내리지 않는다 —
   // 부스 스튜디오·관리 상세로 나갔다 돌아오는 것이 정상 동선이고, 그때마다 다시 부팅하지
@@ -67,6 +71,12 @@ export function WorldPage() {
   useEffect(() => {
     showWorld();
     return hideWorld;
+  }, []);
+
+  // ToastHost 는 라우터 밖에 있으므로, 월드에서만 쓰는 상단 중앙 예약 영역은 body 상태로 연결한다.
+  useEffect(() => {
+    document.body.classList.add('world-active');
+    return () => document.body.classList.remove('world-active');
   }, []);
 
   // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
@@ -172,13 +182,13 @@ export function WorldPage() {
   }, []);
 
   return (
-    <div className="world-scene">
+    <div className="world-scene" style={{ '--festa-world-chat-height': `${chatHeight}px` } as CSSProperties}>
       {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
           여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
       {inWorld && <WorldHud />}
       {/* 채팅 — HUD 밖이다. HUD 의 mousedown 차단이 입력창 focus 를 막는다 (S15P21A604-648) */}
-      {inWorld && <WorldChatLayer />}
+      {inWorld && <WorldChatLayer onHeightChange={reportChatHeight} />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}

@@ -2,6 +2,7 @@
 // BE PresenceField: 키 생략 = 유지, 명시적 null = 비우기 — 그래서 전체 객체 전송이 금지다.
 import { useSyncExternalStore } from 'react';
 import { projectApi } from '../../../entities/project/api.select';
+import { isApiError } from '../../../shared/api/client';
 import type { ProjectPatch, ProjectView } from '../../../entities/project/types';
 import type { ProjectFieldKey } from '../../../shared/contracts/project';
 
@@ -12,6 +13,7 @@ export interface ProjectEditState {
   projectId: number | null;
   draft: Record<ProjectFieldKey, string | null>;
   dirty: ReadonlySet<ProjectFieldKey>;
+  fieldErrors: Partial<Record<ProjectFieldKey, string>>;
   save: { phase: 'idle' | 'submitting' | 'success' | 'error' };
 }
 
@@ -31,6 +33,7 @@ const initialState: ProjectEditState = {
   projectId: null,
   draft: EMPTY_DRAFT,
   dirty: new Set(),
+  fieldErrors: {},
   save: { phase: 'idle' },
 };
 
@@ -71,6 +74,17 @@ function draftOf(view: ProjectView): Record<ProjectFieldKey, string | null> {
   };
 }
 
+function fieldErrorsOf(error: unknown): Partial<Record<ProjectFieldKey, string>> {
+  if (!isApiError(error)) return {};
+  const errors: Partial<Record<ProjectFieldKey, string>> = {};
+  for (const detail of error.errors) {
+    if (detail.field && detail.message && Object.hasOwn(EMPTY_DRAFT, detail.field)) {
+      errors[detail.field as ProjectFieldKey] = detail.message;
+    }
+  }
+  return errors;
+}
+
 export async function loadProjectEdit(boothId: number): Promise<void> {
   setState({ ...initialState, status: 'loading', boothId });
   try {
@@ -82,6 +96,7 @@ export async function loadProjectEdit(boothId: number): Promise<void> {
       projectId: project?.projectId ?? null,
       draft: project ? draftOf(project) : EMPTY_DRAFT,
       dirty: new Set(),
+      fieldErrors: {},
     });
   } catch {
     if (state.boothId !== boothId) return;
@@ -93,9 +108,12 @@ export function updateField(key: ProjectFieldKey, value: string | null): void {
   // 저장 중 편집은 ① save.phase 리셋으로 이중 제출 가드를 해제하고(projectId null 이면 create 2회)
   // ② 저장 성공 응답이 그 편집을 조용히 덮어 유실시킨다 (-377) — 저장 완료까지 입력을 막는다
   if (state.save.phase === 'submitting') return;
+  const fieldErrors = { ...state.fieldErrors };
+  delete fieldErrors[key];
   setState({
     draft: { ...state.draft, [key]: value },
     dirty: new Set(state.dirty).add(key),
+    fieldErrors,
     save: { phase: 'idle' },
   });
 }
@@ -113,10 +131,11 @@ export async function saveProject(): Promise<void> {
       projectId: saved.projectId,
       draft: draftOf(saved),
       dirty: new Set(),
+      fieldErrors: {},
       save: { phase: 'success' },
     });
-  } catch {
-    setState({ save: { phase: 'error' } });
+  } catch (error) {
+    setState({ fieldErrors: fieldErrorsOf(error), save: { phase: 'error' } });
   }
 }
 

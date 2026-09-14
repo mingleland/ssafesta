@@ -1,8 +1,7 @@
 // 부스 나가기 버튼 (S15P21A604-627, GitLab #174).
 //
-// 사용자가 부스에서 나가는 법을 찾지 못했다(2026-09-10 감사 15). 출구는 Unity 포털 + `F`
-// 하나뿐이라 마우스만 쓰는 사람에게는 보이지 않는다. **기존 경로를 대체하지 않는다** —
-// 포털과 `F` 는 그대로 있고 이건 추가 경로다. 조작 안내의 "F — 부스 입장·나가기" 도 남는다.
+// 사용자가 부스에서 나가는 법을 찾지 못했다(2026-09-10 감사 15). 부스 안에서만 보이는 클릭형
+// 컨텍스트 액션을 제공한다. requestExitBooth와 Unity의 insideBooth:false 수신은 바꾸지 않는다.
 //
 // 상시 HUD 가 아니다. Unity 가 보낸 월드 컨텍스트가 참일 때만 뜨고 그 조건이 풀리면 사라진다
 // (hud-decisions: 컨텍스트 액션). `WorldHud` 안에 있어 `hostPhase === 'ready'` 게이트(-613)도
@@ -33,7 +32,6 @@ export function BoothExitButton() {
         <path d="M16 17l5-5-5-5M21 12H9" />
       </svg>
       부스 나가기
-      <span className="booth-exit-key">F</span>
     </button>
   );
 }

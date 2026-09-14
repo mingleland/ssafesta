@@ -25,10 +25,7 @@
   --festa-danger: #ff8f8f;
 
   /* z-index 계층 (visual-dna §3) — world < screen-ui < overlay-dim < overlay < toast < system.
-     이번에는 토큰을 세우고 Toast 만 쓴다. 기존 값 14곳의 치환은 다음 작업이 점진 이행한다 —
-     지금 일괄로 바꾸면 이 변경의 회귀 범위가 Toast 와 무관한 화면 전체로 번진다.
-     실측 현황: WorldHud 20 · MockInteractionBar 30 · ScreenControls 40 · GameMenu 80 ·
-     OverlayFrame 100 · GameOverlay 10000(계층상 system 자리를 쓰고 있다 — 별건). */
+     World HUD 소유 범위만 토큰으로 통일한다. 외부 dialog·기존 화면은 이 작업에서 건드리지 않는다. */
   /* 토스트 시작 높이. 우상단에는 화면마다 다른 주민이 있다 —
      Landing·Login 은 ScreenControls(top 3vh + clamp(48px,4vh,72px)),
      World 는 Consultation Quick Access(top 20px + 40px). 둘 다 피하는 하나의 값을 쓴다.
@@ -42,9 +39,19 @@
   --festa-toast-top: calc(3vh + clamp(48px, 4vh, 72px) + 10px);
 
   --festa-z-screen-ui: 40;
+  --festa-z-world-hud: 20;
+  --festa-z-world-dev: 30;
   --festa-z-overlay: 100;
   --festa-z-toast: 200;
   --festa-z-system: 10000;
+
+  /* 월드 화면 고정 HUD의 공통 안전 여백·스택 간격. 좌하단은 채팅 높이를 WorldPage가 실측해
+     --festa-world-chat-height 로 전달한다. */
+  --festa-hud-margin-x: max(16px, 2vw);
+  --festa-hud-margin-y: max(16px, 3vh);
+  --festa-hud-stack-gap: max(8px, 1vh);
+  --festa-hud-context-height: 44px;
+  --festa-hud-context-bottom: max(72px, calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap)));
 
   --festa-r-chip: 999px;
   --festa-r-input: 11px;
