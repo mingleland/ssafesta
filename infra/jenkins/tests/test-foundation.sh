@@ -106,7 +106,7 @@ security=yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 authorization=yaml.safe_load(pathlib.Path(sys.argv[2]).read_text(encoding='utf-8'))
 gitlab=yaml.safe_load(pathlib.Path(sys.argv[3]).read_text(encoding='utf-8'))
 assert 'credentials' not in security, 'JCasC must not overwrite UI-managed credentials'
-entries=authorization['jenkins']['authorizationStrategy']['globalMatrix']['entries']
+entries=authorization['jenkins']['authorizationStrategy']['projectMatrix']['entries']
 assert any('Credentials/ManageDomains' in item.get('group',{}).get('permissions',[]) for item in entries)
 publisher=next(item['user'] for item in entries if item.get('user',{}).get('name') == 'webgl-publisher')
 assert set(publisher['permissions']) == {'Overall/Read','Job/Discover','Job/Read','Job/Build'}
