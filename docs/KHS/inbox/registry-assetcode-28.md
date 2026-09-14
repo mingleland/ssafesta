@@ -1,5 +1,9 @@
 # BoothObjectRegistry — canonical assetCode 28행 등록 작업표 (GitLab #146, S15P21A604-509 대응)
 
+> **후속 (2026-09-10, [#154](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/154))** — 여기에 29번째 행 `DECORATION` / `DECOR_PLANT_01` 이 더해졌다.
+> 정본 표는 [`docs/LJH/ui-design/04_prototypes/booth-studio-2_5d-canonical-design.md` §8-6](../../LJH/ui-design/04_prototypes/booth-studio-2_5d-canonical-design.md) 이고 거기에 반영했다.
+> 구 코드 `PLANT` 는 게시된 layout 호환을 위해 한 릴리스 동안 별칭으로 남긴다 — 별칭 7종(`WALL_PLAIN`·`COUNTER_GRAPHIC`·`SHELF`·`TRUSS_BEAM`·`TRUSS_PILLAR`·`TRUSS_GATE`·`PLANT`)을 **같은 시점에 함께 정리**한다.
+
 > 근거: colosair 2026-09-08 21:52 회신(#146 note). FE 가 내는 `(type, assetCode)` 를 Registry 가 **같은 값으로** 받는다. 중간 변환 계층 없음.
 > 프리팹은 `Assets/_Project/Art/Booth/ExpoKit/Prefabs/**` 에 이미 있는 것을 쓴다 — 코드 이름이 그 프리팹 이름에서 나왔다.
 > 기존 부스 래퍼(`Prefabs/Booth/Furniture.prefab`)는 ExpoKit 프리팹을 **중첩 프리팹으로 감싼 것**이다. 새 코드도 같은 방식(래퍼 + `BoothRuntimeObject`)으로 만들지, ExpoKit 프리팹을 직접 등록할지는 에디터에서 Furniture.prefab 의 오버라이드(스케일·피벗)를 보고 정한다.
