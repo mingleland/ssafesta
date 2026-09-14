@@ -65,6 +65,24 @@ namespace Festa.World
             _lHit = Probe(AvatarIKGoal.LeftFoot, out _lPos, out _lRot);
             _rHit = Probe(AvatarIKGoal.RightFoot, out _rPos, out _rRot);
 
+            // 평지에서는 원본 걷기 애니메이션을 그대로 둔다. 골반 보정이 0이어도 발 목표를 지면에
+            // 강제로 고정하면 발목 높이 오차만큼 무릎이 살짝 접힌다. 양발 접촉면 차이가 미세하면
+            // 단차가 아니므로 발 위치·회전 IK까지 모두 끈다.
+            if (_lHit && _rHit)
+            {
+                float flatLeft = _lPos.y - _footHeight;
+                float flatRight = _rPos.y - _footHeight;
+                if (Mathf.Abs(flatLeft - flatRight) <= GroundDeadzone)
+                {
+                    _pelvisOffset = 0f;
+                    _anim.SetIKPositionWeight(AvatarIKGoal.LeftFoot, 0f);
+                    _anim.SetIKRotationWeight(AvatarIKGoal.LeftFoot, 0f);
+                    _anim.SetIKPositionWeight(AvatarIKGoal.RightFoot, 0f);
+                    _anim.SetIKRotationWeight(AvatarIKGoal.RightFoot, 0f);
+                    return;
+                }
+            }
+
             // 골반: **두 발이 딛는 지면의 높이 차**만큼만 내린다. 올리지는 않는다 — 올리면 캡슐 밖으로 뜬다.
             //
             // 두 번 틀렸던 자리다.
