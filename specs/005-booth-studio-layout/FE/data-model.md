@@ -51,9 +51,9 @@
 | `AI_AGENT` | 기능 | `configId` | agentId 필요 | ✅ |
 | `VIDEO_SCREEN` | 기능 | `configId` | 영상 설정 ID 필요 | ✅ |
 | `PROJECT_PANEL` | 기능 | `configId` | projectId 필요 | ✅ |
-| `SURVEY_KIOSK` | 기능 | `configId` | surveyId 필요 | ✅ |
+| `SURVEY_KIOSK` | 기능 | — | **`configId`를 쓰지 않는다.** 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 연결 요건은 "그 부스에 설문이 있는가"이고 서버가 판정한다 (`S15P21A604-699`, GitLab #181) | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `CONSULTATION_DESK` | 기능 | `configId` | 상담 설정 ID 필요 | ✅ |
-| `LAPTOP` | 기능 | `configId` | ⚠️ spec 016에서 URL 계약으로 바뀔 수 있음(정수 ID가 아닐 가능성 — spec.md 미결 표) | ✅ (요건 정의는 016 확정 후 갱신) |
+| `LAPTOP` | 기능 | — | **`configId`를 쓰지 않는다.** 016 확정([#97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/97), 2026-08-26)으로 홈페이지 주소는 `booths.homepage_url`이 소유한다. 연결 요건은 "URL이 등록됐는가"이고 서버가 판정한다(계약 §3-1). `configId`를 실어 보내면 `CONFIG_UNVERIFIED`가 붙는다 | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `RECRUITMENT_BOARD` | ⚠️ 미판정 | — | 연결 요건 자체가 spec Key Entities에 없음 | ✕ (요건 확정 전까지 경고 제외) |
 | `LIKE_VOTE` | ⚠️ 미판정 | — | 부스 자체가 대상일 가능성 — 오브젝트별 연결이 필요한지 불명 | ✕ (요건 확정 전까지 경고 제외) |
 | `FURNITURE` | 장식 | `assetCode` | 없음 — `assetCode`는 외형 선택이지 콘텐츠 연결이 아님 | ✕ |

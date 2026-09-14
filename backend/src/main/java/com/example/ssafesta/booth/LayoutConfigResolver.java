@@ -33,9 +33,15 @@ public class LayoutConfigResolver {
         }
         return switch (type) {
             case AI_AGENT -> countAgents(configId, boothId) > 0;
-            // Every other kind's content is owned by a spec that does not exist yet (009 projects,
-            // 010 surveys, 016 laptop pages). They are reported as unverifiable rather than waved
-            // through silently — see LayoutValidator.
+            // AI_AGENT is the only kind that binds its content by configId, so it is the only kind
+            // an ownership question fits. LAPTOP and SURVEY_KIOSK are answered a booth at a time,
+            // before this call (see LayoutValidator): a laptop by booths.homepage_url (spec 016
+            // C-01), a kiosk by whether the booth has a survey at all (spec 010 C-06 — the binding
+            // is per booth, so configId is not an identifier there).
+            //
+            // The rest — VIDEO_SCREEN, PROJECT_PANEL, RECRUITMENT_BOARD, CONSULTATION_DESK,
+            // LIKE_VOTE — are still not judged, and say so as CONFIG_UNVERIFIED rather than being
+            // waved through: "not looked at" must not read as "verified".
             default -> true;
         };
     }
@@ -58,6 +64,29 @@ public class LayoutConfigResolver {
         Integer count = jdbc.queryForObject(
                 "SELECT count(*) FROM booths WHERE id = ? AND homepage_url IS NOT NULL",
                 Integer.class, boothId);
+        return count != null && count > 0;
+    }
+
+    /**
+     * Whether the booth has a survey at all — what a {@code SURVEY_KIOSK} shows (spec 010 C-06).
+     *
+     * <p>The kiosk's {@code configId} is not the key. A booth holds at most one survey
+     * ({@code ux_surveys_booth}) and {@code GET /booths/{boothId}/survey/run} looks it up by booth,
+     * so the only question that decides whether the kiosk has something to show is whether that row
+     * is there.
+     *
+     * <p>Presence is the whole predicate. The run endpoint answers 200 for a survey with no
+     * questions and for a closed one, and refuses an expired lease or an unpublished layout earlier
+     * and under different codes — folding any of that in here would warn about kiosks that work.
+     *
+     * <p>Event surveys cannot be counted by accident: {@code booth_id} and {@code survey_key} are
+     * mutually exclusive by check constraint, so filtering on {@code booth_id} excludes them.
+     *
+     * <p>Counted rather than fetched, for the same reason as {@link #boothHomepageRegistered}.
+     */
+    boolean boothSurveyRegistered(Long boothId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM surveys WHERE booth_id = ?", Integer.class, boothId);
         return count != null && count > 0;
     }
 
