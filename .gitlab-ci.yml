@@ -217,11 +217,6 @@ mr-status:
         - festa-unity/**/*
         - ci/test
         - ci/lib.sh
-        - infra/jenkins/pipelines/unity-mr-validation.groovy
-        - infra/jenkins/jobs/gitlab-unity-mr-validation.groovy
-        - infra/jenkins/casc/jobs.yaml
-        - infra/jenkins/plugins.txt
-        - .gitlab-ci.yml
 
 unity-mr-validation-dispatch:
   extends: .game-changes
