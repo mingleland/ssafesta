@@ -190,6 +190,11 @@ function pushError(raw: string): void {
  */
 export function startWorldChat(): () => void {
   if (!canUseWorldChat()) return () => {};
+  // 단위 테스트에서는 소켓을 열지 않는다. 서버가 없어 `WorldPage` 를 렌더하는 테스트마다
+  // `ECONNREFUSED` 가 쌓이고, 그 잡음이 같은 러너에서 도는 무관한 테스트를 timeout 으로
+  // 밀어낸다 — pipeline 192771 에서 `overlayHostGameWiring` 이 그렇게 떨어졌다.
+  // 제품 동작은 그대로다: 월드에 들어가면 연결 직후 구독을 건다.
+  if (import.meta.env.MODE === 'test') return () => {};
 
   const stopMessages = subscribeRealtime(WORLD_CHAT_TOPIC, pushMessage);
   const stopErrors = subscribeRealtime(WORLD_CHAT_ERRORS, pushError);
