@@ -210,9 +210,12 @@ namespace Festa.Core
             if (_probing)
             {
                 _probing = false;
-                if (missRate > StepDownMissRate)
+                // **합격선은 상향 기준(2%)이다.** 처음에 하향 기준(20%)을 썼다가 미스 16.6% 짜리를
+                // "성공" 으로 붙잡아 120fps 에 눌러앉혔고, 배포본에서 p95 954ms · 최대 1.78초 정지가 났다
+                // (2026-09-14 실측). 올라간 자리를 **지킬 수 있을 때만** 남는다 — 간신히 버티는 것은 실패다.
+                if (missRate > StepUpMissRate)
                 {
-                    Apply(_probeFallback, $"탐침 실패 — 예산 {budgetMs:F1}ms 를 {missRate * 100f:F0}% 놓쳤다, 되돌린다");
+                    Apply(_probeFallback, $"탐침 실패 — 예산 {budgetMs:F1}ms 를 {missRate * 100f:F1}% 놓쳤다, 되돌린다");
                     _probeBackoff = Mathf.Min(_probeBackoff * 2f, ProbeBackoffMax);
                     _nextProbeAt = now + _probeBackoff;
                     _cooldownUntil = now + CooldownAfterDown;
