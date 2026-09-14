@@ -24,6 +24,28 @@ namespace Festa.World
     [DisallowMultipleComponent]
     public sealed class ManagementDeskInteractable : MonoBehaviour, IBoothInteractable
     {
+        /// <summary>매표소 위에 띄울 이름. 사람 닉네임과 같은 장치를 쓴다.</summary>
+        /// <remarks>
+        /// "부스 관리 NPC" 에서 사용자가 줄인 문구다 (2026-09-14). 인스펙터가 아니라 여기 둔다 —
+        /// 씬에 박으면 재직렬화 때 색·크기까지 함께 굳어 코드에서 고친 값이 먹지 않는다.
+        /// </remarks>
+        [SerializeField] string _displayName = "부스 관리";
+
+        [Tooltip("이름이 보이기 시작하는 거리(u).")]
+        [SerializeField] float _visibleDistance = 260f;
+
+        /// <summary>
+        /// 이름 색. 안내데스크와 같은 골드앰버다 — 두 NPC 이름표는 한 벌로 읽혀야 한다.
+        /// 순노랑에서 내린 이유는 <see cref="GuideDeskInteractable"/> 쪽에 적어 뒀다(밝은 배경과 밝기가 같아진다).
+        /// </summary>
+        [SerializeField] Color _nameColor = new(0.98f, 0.70f, 0.08f, 1f);
+
+        [Tooltip("글자 크기. 매표소 지붕 위라 사람 닉네임보다 멀리서 읽혀야 한다.")]
+        [SerializeField] float _characterHeight = 1.9f;
+
+        [Tooltip("외곽선 두께. 0.25 가 한글에서 획 사이가 메워지지 않는 상한이다.")]
+        [SerializeField] float _outlineWidth = 0.25f;
+
         void Awake()
         {
             // 조준 대상이 되려면 콜라이더가 있어야 한다. NPC 프리팹에 이미 있으면 건드리지 않는다.
@@ -35,6 +57,27 @@ namespace Festa.World
                 gameObject.AddComponent<BoothInteractionTarget>();
 
             BoothInteractionInput.Ensure();
+            BuildNameplate();
+        }
+
+        /// <summary>
+        /// 이름표를 세운다. 사람 이름표와 <b>같은 장치</b>(<see cref="WorldNameplate"/>)라 빌보드 회전·
+        /// 거리별 크기 보정·벽에 가리면 감추기가 그대로 따라온다.
+        ///
+        /// <para><b>기준 높이는 사람 머리가 아니라 매표소 지붕이다.</b> 이 데스크는 사람이 부스 안에
+        /// 들어가 있는 구조라, 머리 위에 붙이면 이름이 지붕에 파묻힌다 (2026-09-14 사용자 지적).
+        /// 그래서 구조물 정점에 고정한다.</para>
+        /// </summary>
+        void BuildNameplate()
+        {
+            var plate = GetComponent<WorldNameplate>();
+            if (plate == null) plate = gameObject.AddComponent<WorldNameplate>();
+
+            plate.Label = _displayName;
+            plate.SetVisibleDistance(_visibleDistance);
+            plate.SetColor(_nameColor);
+            plate.SetLegibility(_characterHeight, _outlineWidth);
+            plate.PinToStructureTop();
         }
 
         /// <summary>

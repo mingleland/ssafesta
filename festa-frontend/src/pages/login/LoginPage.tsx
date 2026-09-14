@@ -113,7 +113,13 @@ export function LoginPage() {
     }
     // 일반 API 와 다른 base 를 쓴다 — 인가 요청·provider 콜백·complete 가 같은 호스트여야
     // host-only 인 JSESSIONID·oauth_handoff 가 이어진다 (S15P21A604-564, entities/auth/api.ts).
-    window.location.href = `${authBaseUrl()}/api/v1/auth/oauth/${provider}`;
+    //
+    // `return` 은 **지금 이 FE 가 어느 origin 인지**를 BE 에 알리는 값이다 (S15P21A604-649, #177).
+    // BE 는 이 값을 그대로 믿지 않는다 — local deployment 에서 요청 자신의 origin 과 정확히 일치할
+    // 때만 세션에 보관했다가 로그인 완료 후 그 origin 의 /auth/callback 으로 돌려보내고, 그 밖에는
+    // 무시하고 기존 frontend-base-url 로 간다. 없으면 오늘과 동일하므로 어느 BE 에 붙여도 안전하다.
+    const returnOrigin = encodeURIComponent(window.location.origin);
+    window.location.href = `${authBaseUrl()}/api/v1/auth/oauth/${provider}?return=${returnOrigin}`;
   }
 
   async function handleGuestEnter() {
