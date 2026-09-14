@@ -49,6 +49,7 @@ select.mg-input option {
   margin-top: 4px;
 }
 .mg-ok { font-size: 13px; color: var(--sc-ok, #5fd39b); }
+.mg-hint { font-size: 12px; opacity: 0.75; }
 .mg-issues {
   flex: 1;
   margin: 0;
