@@ -2,7 +2,7 @@
 #
 # Jira 상태 전이는 GitLab Project Webhook → Jira Automation이 담당한다.
 # 이 파일의 jira-* job은 이관 전 기록으로만 남기며 실행하지 않는다.
-# 애플리케이션 빌드·테스트·배포는 루트 Jenkinsfile과 ci/ adapter가 담당한다.
+# GitLab CI는 develop 대상 MR의 병합 전 gate를 담당한다. Jenkins는 develop 병합 뒤 빌드·배포를 담당한다.
 #
 # 워크플로 문서: docs/jira-gitlab-workflow.md
 #
@@ -13,20 +13,36 @@
 
 workflow:
   rules:
-    # 2026-08-26: Jira Webhook 자동화와 Jenkins 전환 완료.
-    # runner 없는 legacy jira-* pipeline의 무한 pending 및 이중 전환을 방지한다.
-    - when: never
+    # docs/17의 허용 작업 type만 develop 대상 MR gate에 진입시킨다.
+    # jira-* job은 아래에서 when: never로 유지해 Jira 내장 연동과 이중 전환하지 않는다.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /^(?:feat|feature|fix|refactor|test|docs|chore|build|ci|hotfix|perf)\//'
 
-    # 아래 규칙과 job은 이관 기록이다. 다시 켜기 전에 jira-* job을 제거하고
-    # GitLab CI의 새 책임을 별도 이슈에서 정의해야 한다.
-    # MR 파이프라인과 브랜치 파이프라인 중복 실행 방지 (표준 패턴)
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"'
-      when: never
-    - if: '$CI_COMMIT_BRANCH'
+    # ⚠️ 긴급 규약 (2026-09-15, S15P21A604-185) — 파트 브랜치(ai/back/front/game) 대상 MR 에도
+    # 파이프라인을 만든다. develop 머지 슬롯이 동시 2개뿐이라 한 건씩 줄 서는 것이 병목이어서,
+    # 각 파트가 자기 브랜치에 모아 둔 뒤 한 번에 develop 으로 올리기로 했다.
+    #
+    # 설정으로는 못 푼다 — "Pipelines must succeed" 는 프로젝트 전체 스위치라 target 별로 끌 수
+    # 없고, 끄면 develop·main 까지 같이 풀린다. 그래서 파트 브랜치 MR 에는 mr-status 하나만 도는
+    # 가벼운 파이프라인을 띄워 머지 체크를 만족시킨다. 컴포넌트 CI 와 Unity 검증은 아래
+    # .{ai,back,front,game}-changes 가 develop 대상일 때만 돌리므로 이 구간에 남는 검사는
+    # secret-scan 하나다.
+    #
+    # 대가를 적어 둔다: 파트 브랜치 구간은 코드 검증이 0회다. 그 파트의 develop MR 이 첫 검증이
+    # 되고, 거기서 터지면 어느 작업이 원인인지 좁히기 어렵다. 오래 끌수록 그 비용이 커진다.
+    #
+    # 해제 조건 — 둘 중 하나라도 성립하면 이 rule 과 .*-changes 의 target 가드를 함께 지운다.
+    #   1. 러너 동시 실행 한도가 늘어 develop 직행이 다시 감당된다
+    #   2. 파트 브랜치 배칭을 끝내고 develop 직행으로 돌아간다
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|game)$/'
+
+    # 위 둘에 해당하지 않으면 파이프라인을 만들지 않는다. 브랜치 push 도 여기서 멈춘다 — MR
+    # 파이프라인과 중복 실행하지 않기 위해서다.
+    - when: never
 
 stages:
   - validate
+  - test
+  - build
   # - test      # S15P21A604-154: BE(mvn verify)·FE(vitest/build) 잡 예정
   # - build     # 이미지 빌드 잡 예정
   - sync
@@ -35,6 +51,7 @@ stages:
 variables:
   JIRA_SITE: "https://ssafy.atlassian.net"
   JIRA_KEY_REGEX: '[A-Z][A-Z0-9]+-[0-9]+'
+  JENKINS_UNITY_VALIDATION_JOB: "festa-unity-mr-validation"
 
 # ──────────────────────────────────────────────────────────────
 # validate: develop/main 을 향하는 MR 은 Jira Issue Key 가 필수다.
@@ -45,7 +62,7 @@ jira-key-check:
   stage: validate
   image: alpine:3.20
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")'
+    - when: never
   script:
     - |
       echo "MR 제목: $CI_MERGE_REQUEST_TITLE"
@@ -116,7 +133,7 @@ jira-key-check:
 jira-sync-in-progress:
   extends: .jira_sync_base
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH =~ /^(feat|feature|fix|refactor|test|docs|chore|build|ci|hotfix|perf)\/[A-Z][A-Z0-9]+-[0-9]+/'
+    - when: never
   script:
     - KEY=$(echo "$CI_COMMIT_BRANCH" | grep -oE "$JIRA_KEY_REGEX" | head -1)
     - echo "브랜치 $CI_COMMIT_BRANCH → 이슈 $KEY"
@@ -126,7 +143,7 @@ jira-sync-in-progress:
 jira-sync-in-review:
   extends: .jira_sync_base
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && ($CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")'
+    - when: never
   script:
     - |
       KEY=$(echo "$CI_MERGE_REQUEST_TITLE" | grep -oE "$JIRA_KEY_REGEX" | head -1)
@@ -145,7 +162,7 @@ jira-sync-ready-for-deploy:
     name: alpine/git:2.45.2
     entrypoint: [""]
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && ($CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main")'
+    - when: never
   script:
     - apk add --no-cache curl > /dev/null 2>&1 || true
     - |
@@ -160,4 +177,195 @@ jira-sync-ready-for-deploy:
         label "$KEY" remove in-review
         label "$KEY" add ready-for-deploy
       done
-      echo "참고: Done(완료) 전환은 production 배포 성공에만 연결한다 — 배포 파이프라인 구축 후 활성화 (docs/jira-gitlab-workflow.md §9)"
+
+.component-ci:
+  interruptible: true
+  before_script:
+    - command -v python3 >/dev/null || (apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*)
+    - bash infra/jenkins/scripts/secret-scan.sh --path .
+    - export CI_BRANCH="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_REF_NAME}"
+    - export CI_RUN_ID="${CI_PIPELINE_ID}-${CI_JOB_ID}"
+    - export CI_ARTIFACT_DIR="${CI_PROJECT_DIR}/artifacts/${CI_JOB_NAME}"
+    - mkdir -p "$CI_ARTIFACT_DIR"
+  # 리포트를 올려 두고도 파싱하지 않으면 MR 화면의 test_report 가 빈 결과로 남는다. ai 가
+  # --junitxml 로 만들던 tests.xml 이 그 상태였다. 여기 한 곳에 걸어 back·ai 를 함께 덮는다.
+  # front·game 은 매칭되는 파일이 없어 경고만 뜨고 job 은 실패하지 않는다 (GitLab #190).
+  artifacts:
+    when: always
+    paths:
+      - artifacts/
+    reports:
+      junit:
+        - artifacts/*/TEST-*.xml
+        - artifacts/*/tests.xml
+
+# A valid MR must always publish a successful pipeline status so protected
+# develop does not treat an infra/docs-only MR as a skipped pipeline.
+mr-status:
+  stage: validate
+  image: alpine:3.20
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  before_script:
+    - apk add --no-cache bash python3
+  script:
+    - bash infra/jenkins/scripts/secret-scan.sh --path .
+    - echo 'MR pipeline status only; component CI is selected by rules:changes'
+
+.front-changes:
+  rules:
+    # 긴급 규약 — 파트 브랜치 대상 MR 에서는 컴포넌트 CI 를 돌리지 않는다 (workflow rules 주석).
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - changes:
+        - festa-frontend/**/*
+        - ci/**/*
+        - .gitlab-ci.yml
+
+.back-changes:
+  rules:
+    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석).
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - changes:
+        - backend/**/*
+        - ci/**/*
+        - .gitlab-ci.yml
+
+.ai-changes:
+  rules:
+    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석).
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - changes:
+        - festa-ai/**/*
+        - ci/**/*
+        - .gitlab-ci.yml
+
+.game-changes:
+  rules:
+    # 긴급 규약 — develop 대상 MR 에서만 (workflow rules 주석). Unity dispatch 가 Jenkins 를 최대
+    # 45분 붙잡으므로 파트 브랜치 구간에서 가장 먼저 빠져야 할 잡이다.
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
+      when: never
+    - changes:
+        - festa-unity/**/*
+        - ci/test
+        - ci/lib.sh
+
+unity-mr-validation-dispatch:
+  extends: .game-changes
+  stage: test
+  image: alpine:3.20
+  timeout: 45m
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      : "${JENKINS_UNITY_VALIDATION_URL:?set GitLab CI/CD variable}"
+      : "${JENKINS_UNITY_VALIDATION_USER:?set GitLab CI/CD variable}"
+      : "${JENKINS_UNITY_VALIDATION_API_TOKEN:?set GitLab CI/CD variable}"
+      base_url="${JENKINS_UNITY_VALIDATION_URL%/}"
+      headers="$(mktemp)"
+      trap 'rm -f "$headers"' EXIT
+      curl --fail --silent --show-error --dump-header "$headers" --output /dev/null --request POST \
+        --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" \
+        --data-urlencode "SOURCE_SHA=${CI_COMMIT_SHA}" \
+        --data-urlencode "SOURCE_BRANCH=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME}" \
+        --data-urlencode "MR_IID=${CI_MERGE_REQUEST_IID}" \
+        "${base_url}/job/${JENKINS_UNITY_VALIDATION_JOB}/buildWithParameters"
+      queue_url="$(awk 'BEGIN { IGNORECASE=1 } /^Location:/ { sub(/\r$/, "", $2); print $2 }' "$headers")"
+      test -n "$queue_url"
+      case "$queue_url" in http://*|https://*) ;; *) queue_url="${base_url}${queue_url}" ;; esac
+      deadline=$(( $(date +%s) + 2400 ))
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        queue="$(curl --fail --silent --show-error --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" "${queue_url}api/json")"
+        test "$(printf '%s' "$queue" | jq -r '.cancelled // false')" = false || { printf '%s\n' "$queue" | jq -r '.why // "Jenkins queue cancelled"' >&2; exit 1; }
+        build_url="$(printf '%s' "$queue" | jq -r '.executable.url // empty')"
+        test -n "$build_url" && break
+        sleep 2
+      done
+      test -n "${build_url:-}" || { echo 'Jenkins Unity validation queue timeout' >&2; exit 1; }
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        build="$(curl --fail --silent --show-error --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" "${build_url}api/json")"
+        building="$(printf '%s' "$build" | jq -r '.building')"
+        test "$building" = false && break
+        sleep 5
+      done
+      test "${building:-true}" = false || { echo 'Jenkins Unity validation timeout' >&2; exit 1; }
+      result="$(printf '%s' "$build" | jq -r '.result // "UNKNOWN"')"
+      echo "Jenkins Unity validation: ${build_url} (${result})"
+      test "$result" = SUCCESS
+
+ai-test:
+  extends:
+    - .component-ci
+    - .ai-changes
+  stage: test
+  image: python:3.13-slim
+  variables:
+    CI_COMPONENT: ai
+  script:
+    - bash ci/test
+
+ai-build:
+  extends:
+    - .component-ci
+    - .ai-changes
+  stage: build
+  image: python:3.13-slim
+  variables:
+    CI_COMPONENT: ai
+  needs:
+    - ai-test
+  script:
+    - bash ci/build
+
+front-test:
+  extends:
+    - .component-ci
+    - .front-changes
+  stage: test
+  image: node:24-bookworm-slim
+  variables:
+    CI_COMPONENT: front
+  script:
+    - bash ci/test
+
+front-build:
+  extends:
+    - .component-ci
+    - .front-changes
+  stage: build
+  image: node:24-bookworm-slim
+  variables:
+    CI_COMPONENT: front
+  needs:
+    - front-test
+  script:
+    - bash ci/build
+
+back-test:
+  extends:
+    - .component-ci
+    - .back-changes
+  stage: test
+  image: maven:3.9-eclipse-temurin-21
+  variables:
+    CI_COMPONENT: back
+    TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+  script:
+    - bash ci/test
+
+back-build:
+  extends:
+    - .component-ci
+    - .back-changes
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  variables:
+    CI_COMPONENT: back
+  needs:
+    - back-test
+  script:
+    - bash ci/build
