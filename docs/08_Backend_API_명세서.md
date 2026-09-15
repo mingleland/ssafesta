@@ -1624,7 +1624,17 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 **감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
 
-> ⚠️ **아직 없는 것** — 계정 정지·해제, 코인 조정, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다.
+### 계정 정지·해제 및 상태 이력 (S15P21A604-165)
+
+모든 경로는 관리자 DB 판정(`AdminGuard`)을 통과한다. 상태 변경·상태 이력·`admin_actions` 감사 행은 한 트랜잭션으로 기록한다. 이미 목표 상태인 요청은 `204` no-op이며 이력·감사·세션 폐기를 추가하지 않는다. 활성 관리자를 줄이는 정지·강등은 `account_type='ADMIN' AND status='ACTIVE'` 행을 id 오름차순으로 잠근 뒤 대상 행을 잠가 마지막 활성 관리자 보호를 원자적으로 판정한다.
+
+| Method | Path | Header | Request | Response | Errors |
+|---|---|---|---|---|---|
+| `POST` | `/admin/users/{userId}/suspend` | `Authorization: Bearer` | `{ "reason": "사유" }` (`1~500`자, 필수) | `204 No Content` | `400 VALIDATION_FAILED`, `403 FORBIDDEN`/`MASTER_PROTECTED`, `409 ADMIN_LAST_ONE` |
+| `POST` | `/admin/users/{userId}/unsuspend` | `Authorization: Bearer` | 없음 | `204 No Content` | `403 FORBIDDEN`/`MASTER_PROTECTED` |
+| `GET` | `/admin/users/{userId}/status-history?page=0&size=20` | `Authorization: Bearer` | 없음 | `200` 페이지 응답 | `400 VALIDATION_FAILED`, `401 USER_NOT_FOUND`, `403 FORBIDDEN` |
+
+상태 이력 페이지 응답은 `{ "content": [{ "userId", "previousStatus", "currentStatus", "reason", "actorUserId", "createdAt" }], "page", "size", "totalElements", "totalPages" }` 모양이며 `createdAt DESC, id DESC` 최신순이다. `page`는 0 이상, `size`는 1~100이다. 정지·해제 감사 action은 각각 `SUSPEND`, `UNSUSPEND`다.
 
 ---
 

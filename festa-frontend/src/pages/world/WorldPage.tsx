@@ -182,6 +182,8 @@ export function WorldPage() {
       if (action === 'ignore') return;
       e.preventDefault();
       if (action === 'send') sendWorldChat(chat.draft);
+      // 패널은 떠 있는데 입력창이 focus 를 잃은 상태 — 새 창을 열지 않고 그 입력창으로 돌아간다
+      else if (action === 'focus') document.getElementById(WORLD_CHAT_INPUT_ID)?.focus();
       else openWorldChat();
     }
 
