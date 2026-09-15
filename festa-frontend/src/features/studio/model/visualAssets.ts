@@ -30,22 +30,46 @@ export interface PaletteSection {
   items: PaletteItem[];
 }
 
-// ── 구조(Layout) 모드 팔레트 — Reference 의 벽면 패널 / 카운터 / 트러스·프레임 / 소품 + 기능 오브젝트 ──
+// ── 기능 오브젝트 — assetCode 가 없는 8종. 팔레트에 **항상** 선다 (S15P21A604-783, GitLab #201) ──
+//
+// **왜 장식형과 갈라 두는가.** 실물 자산 목록은 runtime manifest 가 만드는데
+// (`assetLibrary.buildLibrary`) manifest 에는 assetCode 가 붙은 자산만 들어간다. 그래서 기능형은
+// 그 목록에 **구조적으로 들어올 수 없다** — 서버가 이 8종을 콘텐츠 연결로 다루지 외형 코드로
+// 다루지 않기 때문이다(`OBJECT_TYPE_INFO` 의 FUNCTIONAL).
+//
+// 예전에는 "실물이 있으면 실물만, 없으면 이 목록만" 이라는 **배타 분기**였다. `-741` 이 runtime
+// asset 을 자동 생성하게 만들면서 실물이 항상 존재하게 됐고, 그 순간 기능형 8종이 통째로 화면에서
+// 사라졌다 — AI 직원을 놓을 진입점 자체가 없어졌다(#201 실측). 배타를 걷고 **기능형은 항상,
+// 장식형만 실물 유무로 교체**한다.
+export const FUNCTIONAL_PALETTE: PaletteSection = {
+  id: 'functional',
+  title: '기능 오브젝트',
+  items: [
+    { id: 'agent', label: 'AI 직원', objectType: 'AI_AGENT', thumb: 'agent' },
+    { id: 'wall-graphic', label: '그래픽 패널', objectType: 'PROJECT_PANEL', thumb: 'panel-graphic' },
+    { id: 'kiosk', label: '설문 키오스크', objectType: 'SURVEY_KIOSK', thumb: 'kiosk' },
+    { id: 'counter-desk', label: '상담 데스크', objectType: 'CONSULTATION_DESK', thumb: 'desk' },
+    { id: 'screen', label: '영상 스크린', objectType: 'VIDEO_SCREEN', thumb: 'screen' },
+    { id: 'vote', label: '좋아요 스탠드', objectType: 'LIKE_VOTE', thumb: 'vote' },
+    { id: 'wall-board', label: '채용 보드', objectType: 'RECRUITMENT_BOARD', thumb: 'board' },
+    { id: 'laptop', label: '노트북', objectType: 'LAPTOP', thumb: 'laptop' },
+  ],
+};
+
+// ── 장식(Layout) 팔레트 — assetCode 가 붙은 외형 7종. manifest 가 실물을 주면 그쪽으로 교체된다 ──
+// 여기에 assetCode 없는 항목을 다시 넣지 마라. 넣으면 실물이 있는 환경에서 또 사라진다(#201).
 export const LAYOUT_PALETTE: PaletteSection[] = [
   {
     id: 'wall',
     title: '벽면 패널',
     items: [
       { id: 'wall-plain', label: '기본 패널', objectType: 'DECORATION', thumb: 'panel', assetCode: 'STRUCT_PANEL_01' },
-      { id: 'wall-graphic', label: '그래픽 패널', objectType: 'PROJECT_PANEL', thumb: 'panel-graphic' },
-      { id: 'wall-board', label: '채용 보드', objectType: 'RECRUITMENT_BOARD', thumb: 'board' },
     ],
   },
   {
     id: 'counter',
     title: '카운터',
     items: [
-      { id: 'counter-desk', label: '상담 데스크', objectType: 'CONSULTATION_DESK', thumb: 'desk' },
       { id: 'counter-graphic', label: '그래픽 카운터', objectType: 'FURNITURE', thumb: 'counter-graphic', assetCode: 'FURN_COUNTER_02' },
       { id: 'counter-shelf', label: '진열 선반', objectType: 'FURNITURE', thumb: 'shelf', assetCode: 'DISP_STAND_PLASTIC_01' },
     ],
@@ -60,20 +84,9 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
     ],
   },
   {
-    id: 'device',
-    title: '전자기기',
-    items: [
-      { id: 'laptop', label: '노트북', objectType: 'LAPTOP', thumb: 'laptop' },
-      { id: 'screen', label: '영상 스크린', objectType: 'VIDEO_SCREEN', thumb: 'screen' },
-      { id: 'kiosk', label: '설문 키오스크', objectType: 'SURVEY_KIOSK', thumb: 'kiosk' },
-    ],
-  },
-  {
     id: 'props',
     title: '소품',
     items: [
-      { id: 'agent', label: 'AI 직원', objectType: 'AI_AGENT', thumb: 'agent' },
-      { id: 'vote', label: '좋아요 스탠드', objectType: 'LIKE_VOTE', thumb: 'vote' },
       { id: 'plant', label: '화분', objectType: 'DECORATION', thumb: 'plant', assetCode: 'DECOR_PLANT_01' },
     ],
   },
