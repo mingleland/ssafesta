@@ -104,6 +104,16 @@
   color: rgba(234, 238, 251, 0.6);
 }
 
+/* 반납은 파괴적이라 주 동작들과 같은 무게로 보이면 안 된다 — 부스 정보 블록 안에서 조용히 선다 */
+.bm-cancel {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.bm-cancel-error {
+  color: var(--sc-danger, #ef5d6c);
+}
+
 .bm-empty {
   display: flex;
   flex-direction: column;

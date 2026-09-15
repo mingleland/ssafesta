@@ -18,6 +18,8 @@ import { formatRemaining, remainingMs } from '../../../entities/booth/remaining'
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
 import { BoothMiniPreview } from './BoothMiniPreview';
+import { LeaseCancelDialog } from './LeaseCancelDialog';
+import { isStaleViewError, useCancelLease } from '../model/cancelLease';
 import './boothManagement.css';
 
 const IcBooth = (
@@ -61,6 +63,8 @@ function SectionRow({
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
   const [showAgentGate, setShowAgentGate] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const cancelLease = useCancelLease(() => setShowCancel(false));
 
   // 게스트는 GET /booths/mine 이 403 MEMBER_ONLY 다 — 요청 자체를 만들지 않는다. 예전에는
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
@@ -216,6 +220,19 @@ export function BoothManagementOverlay({ onClose }: Props) {
             }).format(new Date(lease.endsAt))}{' '}
             종료
           </span>
+          {/* 만료된 임대에는 반납할 것이 없다 — 서버도 404 를 준다 */}
+          {!expired && (
+            <button type="button" className="ov-btn bm-cancel" onClick={() => setShowCancel(true)}>
+              부스 반납하기
+            </button>
+          )}
+          {/* 404 는 오류가 아니라 낡은 화면이라 배너를 만들지 않는다(cancelLease.ts). 그 밖의
+              실패만 말한다 — 401·403 MEMBER_ONLY 가 여기로 온다 */}
+          {cancelLease.isError && !isStaleViewError(cancelLease.error) && (
+            <span className="ov-note bm-cancel-error" role="alert">
+              반납하지 못했습니다. 잠시 후 다시 시도해 주세요.
+            </span>
+          )}
         </section>
       </div>
     );
@@ -226,6 +243,14 @@ export function BoothManagementOverlay({ onClose }: Props) {
       <OverlayFrame title="내 부스 관리" subtitle="제작·콘텐츠·운영" size="xl" icon={IcBooth} onClose={onClose}>
         {body}
       </OverlayFrame>
+      {showCancel && myBooth?.lease && (
+        <LeaseCancelDialog
+          slotCode={myBooth.lease.slotCode ?? null}
+          pending={cancelLease.isPending}
+          onConfirm={() => cancelLease.mutate(myBooth.lease!.slotId)}
+          onCancel={() => setShowCancel(false)}
+        />
+      )}
       {showAgentGate && myBooth && (
         <div className="bm-gate-backdrop" role="presentation" onClick={() => setShowAgentGate(false)}>
           <div
