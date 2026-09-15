@@ -6,9 +6,11 @@ import {
   __resetRealtimeForTests,
   connectRealtime,
   getRealtimeLastClose,
+  getRealtimeStatus,
   realtimeSocketUrl,
   sendRealtime,
   subscribeRealtime,
+  subscribeRealtimeStatus,
 } from '../../realtimeClient';
 
 class FakeSocket {
@@ -173,6 +175,45 @@ describe('끊김 진단 (S15P21A604-725)', () => {
     const giveUp = error.mock.calls.find((c) => String(c[0]).includes('재연결 중단'));
     expect(giveUp?.[0]).toMatch(/5회 연속 실패\. 마지막 원인: close code=1006/);
     expect(giveUp?.[1]).toMatchObject({ code: 1006 });
+    vi.restoreAllMocks();
+  });
+});
+
+// S15P21A604-790 — lastClose 는 지나간 사실이라 화면이 현재를 그릴 수 없었다.
+describe('연결 상태 (S15P21A604-790)', () => {
+  it('연결 전 disconnected · 시도 중 reconnecting · CONNECTED 를 받으면 connected 다', async () => {
+    const seen: string[] = [];
+    const stop = subscribeRealtimeStatus(() => seen.push(getRealtimeStatus()));
+
+    expect(getRealtimeStatus()).toBe('disconnected');
+    await connectRealtime();
+    expect(getRealtimeStatus()).toBe('reconnecting');
+    FakeSocket.last!.accept();
+    expect(getRealtimeStatus()).toBe('connected');
+
+    // 구독자는 바뀐 순간마다 한 번씩만 듣는다
+    expect(seen).toEqual(['reconnecting', 'connected']);
+    stop();
+  });
+
+  it('구독이 남아 있으면 닫힘은 reconnecting 이고, 재연결을 포기하면 disconnected 다', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    subscribeRealtime(WORLD_CHAT_TOPIC, () => {});
+
+    await connectRealtime();
+    FakeSocket.last!.accept();
+    expect(getRealtimeStatus()).toBe('connected');
+
+    FakeSocket.last!.close(1006, '', false);
+    expect(getRealtimeStatus()).toBe('reconnecting');
+
+    for (let i = 0; i < 6; i += 1) {
+      await vi.advanceTimersByTimeAsync(20_000);
+      FakeSocket.last!.close(1006, '', false);
+    }
+    expect(getRealtimeStatus()).toBe('disconnected');
     vi.restoreAllMocks();
   });
 });

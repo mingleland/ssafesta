@@ -48,6 +48,18 @@
   color: #ffd9d9;
 }
 
+/* 연결 상태 — 평상시엔 없다. 못 보내는 동안에만 작게 뜬다 (S15P21A604-790) */
+.world-chat-status {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 못 보내는 상태를 입력줄에도 드러낸다. 값은 그대로 둔다 — 연결이 돌아오면 그대로 보낸다 */
+.world-chat-input-row-offline {
+  opacity: 0.55;
+}
+
 .world-chat-input-row {
   display: flex;
   align-items: center;

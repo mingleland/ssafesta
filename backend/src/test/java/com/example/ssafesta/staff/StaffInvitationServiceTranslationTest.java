@@ -24,13 +24,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * 공개 {@code accept}·{@code invite} 가 저장 시점의 제약 위반을 <b>실제로 잡아 번역하는지</b>
- * (S15P21A604-693).
+ * 공개 {@code accept}·{@code invite} 가 경합에서 진 쪽을 <b>실제로 거절하는지</b>
+ * (S15P21A604-693, GitLab #190).
  *
  * <p>{@code StaffInvitationConstraintTranslationTest} 는 번역표만 증명한다. 동시성 통합 테스트는
- * 사전 조회가 직렬화되면 catch 를 밟지 않고도 409 가 나와 옛 코드로도 초록일 수 있다. 그래서
- * 저장소가 이름 붙은 위반을 던지도록 강제하고 결정적으로 고정한다 — 옛 코드는 {@code save} 를
- * 부르고 예외를 번역하지 않으므로 여기서 떨어진다.
+ * 사전 조회가 직렬화되면 쓰기 경로를 밟지 않고도 409 가 나와 옛 코드로도 초록일 수 있다. 그래서
+ * 저장소가 "졌다" 를 돌려주도록 강제하고 결정적으로 고정한다.
+ *
+ * <p>두 경로가 진 쪽을 다르게 안다 — {@code invite} 는 부분 유니크 인덱스 위반을 <b>예외</b>로
+ * 받고, {@code accept} 는 {@code seatIfAbsent} 의 <b>행 수 0</b> 으로 받는다. 수락 쪽이 예외를
+ * 쓸 수 없는 이유는 {@code BoothStaffRepository#seatIfAbsent} 에 적혀 있다.
  *
  * <p>컨테이너 없이 돈다.
  */
@@ -43,18 +46,25 @@ class StaffInvitationServiceTranslationTest {
     private final StaffInvitationService service =
             new StaffInvitationService(invitations, booths, staffs, users, staffGuard);
 
-    /** 같은 사람이 같은 초대를 동시에 두 번 수락했다 — 두 번째의 INSERT 가 PK 에 걸린다. */
+    /**
+     * 같은 사람이 같은 초대를 동시에 두 번 수락했고, 진 쪽이 사전 조회를 통과한 뒤 자리를 잡으러
+     * 갔다 — 자리는 이미 찼다.
+     *
+     * <p>진 쪽이 받는 것은 예외가 아니라 <b>행 수 0</b> 이다. 예외로 받으려면 쓰기가 INSERT 여야
+     * 하는데 {@code save()} 는 조립키 엔티티에서 merge 를 타 UPDATE 로 조용히 성공한다
+     * (GitLab #190). 그래서 이 단정이 {@code seatIfAbsent} 의 반환값에 걸려 있다.
+     */
     @Test
-    void acceptTranslatesTheStaffPrimaryKeyViolationIntoAlreadyMember() {
+    void acceptRefusesWhenTheSeatWasTakenBetweenTheCheckAndTheWrite() {
         StaffInvitation invitation = new StaffInvitation(7L, 42L, 1L, StaffRole.CONSULTANT, Instant.now());
         when(invitations.findById(12L)).thenReturn(Optional.of(invitation));
         when(staffs.findRole(7L, 42L)).thenReturn(Optional.empty());
-        when(staffs.saveAndFlush(any(BoothStaff.class))).thenThrow(violationOf("booth_staffs_pkey"));
+        when(staffs.seatIfAbsent(7L, 42L, "CONSULTANT")).thenReturn(0);
 
         ApiException refused = assertThrows(ApiException.class, () -> service.accept(12L, 42L));
 
         assertEquals(ErrorCode.STAFF_ALREADY_MEMBER, refused.errorCode());
-        verify(staffs).saveAndFlush(any(BoothStaff.class));
+        verify(staffs).seatIfAbsent(7L, 42L, "CONSULTANT");
     }
 
     /** 같은 대상에게 같은 부스가 동시에 두 번 초대했다 — 두 번째가 부분 유니크 인덱스에 걸린다. */

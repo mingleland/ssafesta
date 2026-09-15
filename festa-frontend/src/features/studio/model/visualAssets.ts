@@ -79,6 +79,33 @@ export const LAYOUT_PALETTE: PaletteSection[] = [
   },
 ];
 
+// ── 기능형 / 장식형 가르기 (GitLab #201, S15P21A604-783) ──────────────────────────────
+//
+// **실물 3D 자산이 기능형을 대신할 수 없다.** runtime manifest 는 장식형 자산만 담고
+// `buildLibrary()` 도 그것만 다루므로, 실자산 유무로 팔레트를 배타 분기하면 AI 직원·설문
+// 키오스크 같은 기능 오브젝트가 통째로 화면에서 사라진다. 그래서 기능형은 항상 노출한다.
+//
+// 두 목록을 손으로 한 벌 더 들지 않고 `LAYOUT_PALETTE` 에서 파생한다 — 표가 갈라지면
+// 기능형이 한쪽에만 추가돼 같은 사고가 다시 난다. 가르는 기준은 `assetCode` 유무다.
+
+/** 기능형 8종 — assetCode 가 없다. 실자산 유무와 무관하게 항상 노출한다 */
+export const FUNCTIONAL_PALETTE: PaletteSection = {
+  id: 'functional',
+  title: '기능 오브젝트',
+  items: LAYOUT_PALETTE.flatMap((section) => section.items.filter((item) => item.assetCode === undefined)),
+};
+
+/**
+ * 장식형 — assetCode 가 있다. manifest 실물이 오면 그쪽이 정본이라 이 목록은 폴백이다.
+ *
+ * 같은 objectType 이라는 이유로 실물 variant 를 지우지 않는다 — `SURVEY_KIOSK` 기능형과
+ * 실물 `BOOTH_KIOSK_SURVEY` 는 성격이 달라 둘 다 남는다.
+ */
+export const DECOR_PALETTE: PaletteSection[] = LAYOUT_PALETTE.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => item.assetCode !== undefined),
+})).filter((section) => section.items.length > 0);
+
 // ── 템플릿(Template) 모드 프리셋. 저장되는 것은 themeCode·primaryColor 뿐이고(외관 모드에서 저장),
 //    floorHex 는 캔버스 미리보기 입력이다 — 화면에는 보이지만 계약에는 없다 (S15P21A604-617).
 export interface TemplatePreset {

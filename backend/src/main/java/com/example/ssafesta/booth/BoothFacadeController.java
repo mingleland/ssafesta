@@ -33,7 +33,7 @@ public class BoothFacadeController {
         this.facades = facades;
     }
 
-    @Operation(summary = "부스 외관 수정 — 테마·대표색·간판 문구·로고",
+    @Operation(summary = "부스 이름·외관 수정 — 이름·테마·대표색·간판 문구·로고",
             description = """
                     밖에서 보이는 부스의 네 가지를 바꾼다. 배치가 아니라 **고정된 네 필드**다 — 외벽은 공용 건물
                     프리팹으로 그려지고 이 값만 달라진다 (spec 005 FR-018).
@@ -41,10 +41,19 @@ public class BoothFacadeController {
                     `PUT` 이고 본문이 값 전체다. 보내지 않은 필드는 `null` 로 저장되므로, 하나만 바꾸려면
                     나머지 현재 값도 함께 보낸다. 현재 값은 `GET /api/v1/booths/{boothId}` 의 `facade` 에 있다.
 
+                    **`name` 하나만 규칙이 다르다.** 부스 이름은 `NOT NULL` 컬럼이라 비울 수 없으므로,
+                    보내지 않거나 `null` 이면 **지워지지 않고 현재 이름이 유지된다**. 이름을 보내지 않던
+                    기존 저장 요청은 그대로 동작한다 (S15P21A604-756).
+
+                    **응답에는 `name` 이 없다.** 저장된 이름은 `GET /api/v1/booths/{boothId}` 의 `name`
+                    또는 `GET /api/v1/booths/mine` 의 `name` 에서 읽는다 — 부스 상세와 슬롯 목록의 `facade`
+                    는 4필드 그대로이고, 같은 이름이 한 응답에 두 번 실리지 않게 두었다.
+
                     **필드 규칙**
 
                     | 필드 | 규칙 |
                     |---|---|
+                    | `name` | 부스 이름. 1~100자. 생략·`null` 이면 **현재 이름 유지**, 빈 문자열·공백만 있는 값은 400 |
                     | `themeCode` | `DEFAULT`·`SSAFY_BLUE`·`WARM`·`MONO` 중 하나. 생략하면 `DEFAULT` |
                     | `primaryColor` | `#RRGGBB` 형식이고 **12색 팔레트 안**의 값이어야 한다. 형식 오류와 팔레트 이탈은 서로 다른 메시지를 받는다 |
                     | `signText` | 최대 60자 |
@@ -55,7 +64,7 @@ public class BoothFacadeController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "저장된 외관 전체"),
-            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 테마·색 형식·팔레트·간판 길이·로고 URL 위반. 사유마다 메시지가 다르다"),
+            @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — 이름 공백·길이, 테마, 색 형식·팔레트, 간판 길이, 로고 URL 위반. 사유마다 메시지가 다르다"),
             @ApiResponse(responseCode = "403", description = "`BOOTH_EDITOR_FORBIDDEN` — 내 부스도, 내가 스태프인 부스도 아니다"),
             @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = "`BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스는 외관을 고칠 수 없다")})

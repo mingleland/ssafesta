@@ -214,17 +214,26 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **Request**
 ```json
-{ "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
+{ "name": "AI 프로젝트 전시관", "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
 ```
 
 | 필드 | 규칙 |
 |---|---|
+| `name` | 부스 이름. 1~100자. **생략·`null` 이면 현재 이름 유지**(아래 비대칭 참조), 빈 문자열·공백만 있는 값은 400. **응답에는 없다** (2026-09-15 신설, S15P21A604-756) |
 | `themeCode` | ✅ 화이트리스트: **`DEFAULT` · `SSAFY_BLUE` · `WARM` · `MONO`** (#17 합의, #36에서 명문화 요청). 기본 `DEFAULT` |
 | `primaryColor` | **6자리 `#RRGGBB`만** — 축약형(`#RGB`)·알파 불허 (#17 팀 합의). **아래 12색 팔레트 안의 값이어야 한다.** 또는 `null` |
 | `signText` | 최대 60자 또는 `null` |
 | `logoUrl` | `https://` URL 최대 2048자 또는 `null` |
 
-**200**: 저장된 facade 전체. **오류**: 400 `VALIDATION_FAILED`(필드 검증 실패) · 403 · 404 · 409 `BOOTH_LEASE_EXPIRED`
+**200**: 저장된 facade 전체(4필드 — `name` 은 빠진다). **오류**: 400 `VALIDATION_FAILED`(필드 검증 실패) · 403 · 404 · 409 `BOOTH_LEASE_EXPIRED`
+
+#### `name` 의 비대칭 — 안 보내면 유지된다 (2026-09-15, S15P21A604-756)
+
+이 endpoint 는 "보내지 않은 필드는 비운다"인데 `name` 만 반대다. `booths.name` 이 `NOT NULL` 이라 비우면 500 이고, 그렇다고 필수 키로 만들면 **이름 칸이 없던 시절의 저장 요청이 전부 400** 이 된다 — 스튜디오 외관 패널은 지금도 네 키만 보낸다. 팔레트 화이트리스트를 소급하지 않기로 한 것과 같은 선택이다: 새 규칙은 앞으로 오는 값에만 건다.
+
+- 생략·`null` = 그대로 둠, 빈 문자열·공백만 = `400` (`"부스 이름을 입력해 주세요."`), 101자 이상 = `400` (`"부스 이름은 100자까지입니다."`)
+- 값은 **원문 그대로** 저장한다 — trim 없음. §1의 "BE는 값을 변형하지 않는다" 그대로이며, 대문자 정규화가 있는 `primaryColor` 와 다르다.
+- **응답 `facade` 4필드는 그대로다.** 부스 상세(§7)와 슬롯 목록은 이미 `name`·`boothName` 을 바깥에 싣고 있어서, `facade` 안에 또 넣으면 한 응답에 같은 이름이 두 벌 생기고 언젠가 갈라진다. 저장 직후 이름은 `GET /booths/{boothId}` 또는 `GET /booths/mine` 에서 읽는다.
 
 검증 실패 응답 형태 — **#17에서 확정** (2026-08-21, 구현·문구 일치):
 

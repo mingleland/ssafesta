@@ -21,11 +21,14 @@ import type { OverlayType } from '../../../shared/types/overlay';
 import {
   closeBoothManagement,
   closeGameMenu,
+  closeManagementPanel,
   getGameClientUiSnapshot,
   openBoothManagement,
   openGameMenu,
+  openManagementPanel,
   subscribeGameClientUi,
 } from './gameClientUi';
+import type { ManagementPanel } from './managementPanel';
 
 /** 월드 위에 떠 있는 것. 'world' 는 아무것도 없다 = 월드가 주인이다 */
 export type WorldScreen = 'world' | 'visitor' | 'management' | 'menu';
@@ -71,7 +74,20 @@ export function openVisitorOverlay(type: OverlayType, payload: unknown): void {
 /** Booth Management NPC 진입 */
 export function openManagement(): void {
   clearOthers('management');
+  // 상세가 떠 있는 채로 NPC 를 다시 부르면 관리 화면이 아니라 상세가 보인다 — 자식을 먼저 걷는다
+  closeManagementPanel();
   openBoothManagement();
+}
+
+/**
+ * 관리 상세 패널 진입 — 관리 화면의 **자식**이라 새 소유자를 만들지 않는다.
+ *
+ * 별도 슬롯을 쓰지 않는 이유는 `shared/types/overlay.ts` 가 적어 둔 그대로다: 배타·입력 잠금·
+ * ESC·focus 반환이 전부 이 계층에 붙어 있어서, 슬롯을 하나 더 만들면 그 넷을 새로 배선해야 한다.
+ */
+export function openManagementDetail(panel: ManagementPanel): void {
+  clearOthers('management');
+  openManagementPanel(panel);
 }
 
 /** ESC 개인/시스템 레이어 */
@@ -82,6 +98,9 @@ export function openMenu(): void {
 
 /**
  * 현재 주인 하나만 닫는다. ESC 가 쓴다 — 무엇이 떠 있는지 호출부가 알 필요가 없다.
+ *
+ * 관리 화면만 자식을 갖는다. 상세가 떠 있으면 그것부터 닫고 관리 화면으로 **돌아간다** —
+ * ESC 한 번이 두 겹을 함께 걷지 않는다.
  * @returns 닫은 것이 있으면 true. false 면 월드가 주인이었다는 뜻이다.
  */
 export function closeTopScreen(): boolean {
@@ -90,6 +109,10 @@ export function closeTopScreen(): boolean {
       closeOverlay();
       return true;
     case 'management':
+      if (getGameClientUiSnapshot().managementPanel !== null) {
+        closeManagementPanel();
+        return true;
+      }
       closeBoothManagement();
       return true;
     case 'menu':
