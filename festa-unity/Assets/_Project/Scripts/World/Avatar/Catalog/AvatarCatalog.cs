@@ -83,6 +83,37 @@ namespace Festa.Avatar
                 $"[AvatarCatalog] {category}/{gender} 에 기본 제공 항목이 하나도 없다 — 잠긴 항목으로 대체한다.");
             return any.FirstOrDefault(x => x.isDefault) ?? any[0];
         }
+
+        /// <summary>한벌옷을 입지 않을 때 상·하의가 반드시 기본 의상으로 채워지게 한다.</summary>
+        public void EnsureRequiredClothing(ref AvatarConfig config)
+        {
+            var outfit = Get(config.outfitId);
+            if (outfit && outfit.category == AvatarPartCategory.Outfit &&
+                (outfit.gender == AvatarGender.Both || outfit.gender == config.gender)) return;
+
+            if (config.outfitId != 0)
+                Debug.LogWarning($"[AvatarCatalog] 유효하지 않은 한벌옷 {config.outfitId}을 해제하고 기본 상·하의로 복구한다.");
+            config.outfitId = 0;
+
+            EnsureRequiredItem(ref config, AvatarPartCategory.Top);
+            EnsureRequiredItem(ref config, AvatarPartCategory.Bottom);
+        }
+
+        void EnsureRequiredItem(ref AvatarConfig config, AvatarPartCategory category)
+        {
+            int currentId = config.GetItem(category);
+            var current = Get(currentId);
+            if (current && current.category == category &&
+                (current.gender == AvatarGender.Both || current.gender == config.gender)) return;
+
+            var fallback = GetItems(category, config.gender).FirstOrDefault(x => x.isDefault)
+                           ?? Default(category, config.gender);
+            config.SetItem(category, fallback ? fallback.itemId : 0);
+            if (fallback)
+                Debug.LogWarning($"[AvatarCatalog] 비어 있거나 잘못된 {category} {currentId}을 기본 의상 {fallback.displayName}으로 복구했다.");
+            else
+                Debug.LogError($"[AvatarCatalog] {category}/{config.gender} 기본 의상이 없어 속옷 노출을 막을 수 없다.");
+        }
         public AvatarItemDefinition ResolveHat(int familyId, HairGroup group)
         {
             var variants = items.Where(x => x && x.category == AvatarPartCategory.Hat && x.familyId == familyId).ToArray();
@@ -102,6 +133,7 @@ namespace Festa.Avatar
             c.SetItem(AvatarPartCategory.Top,top?top.itemId:0);
             c.SetItem(AvatarPartCategory.Bottom,bottom?bottom.itemId:0);
             c.SetItem(AvatarPartCategory.Outfit,0);
+            EnsureRequiredClothing(ref c);
             c.SetItem(AvatarPartCategory.Shoes,Default(AvatarPartCategory.Shoes,gender)?.itemId??0);
             return c;
         }

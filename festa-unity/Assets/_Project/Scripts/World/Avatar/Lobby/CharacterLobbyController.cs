@@ -66,6 +66,8 @@ namespace Festa.Avatar
         float _wardrobeScrollY;
         AvatarPartCategory? _itemScrollFor;
         float _itemScrollY;
+        int _lastSeparateTopId;
+        int _lastSeparateBottomId;
 
         Text _colorTitle;
         CanvasScaler _uiScaler;
@@ -552,8 +554,38 @@ namespace Festa.Avatar
 
         void SelectWardrobeItem(AvatarPartCategory category,int itemId)
         {
-            _config.SetItem(category,itemId);
+            if(category==AvatarPartCategory.Outfit)
+            {
+                if(itemId!=0)
+                {
+                    RememberSeparateClothing();
+                    _config.SetItem(category,itemId);
+                }
+                else RestoreSeparateClothing();
+            }
+            else if(category==AvatarPartCategory.Top||category==AvatarPartCategory.Bottom)
+            {
+                if(_config.outfitId!=0)RestoreSeparateClothing();
+                _config.SetItem(category,itemId);
+            }
+            else _config.SetItem(category,itemId);
+
+            _catalog.EnsureRequiredClothing(ref _config);
             Apply();SetCamera(CategoryCameraPreset(category));RefreshAll();
+        }
+
+        void RememberSeparateClothing()
+        {
+            if(_config.topId!=0)_lastSeparateTopId=_config.topId;
+            if(_config.bottomId!=0)_lastSeparateBottomId=_config.bottomId;
+        }
+
+        void RestoreSeparateClothing()
+        {
+            _config.SetItem(AvatarPartCategory.Outfit,0);
+            _config.SetItem(AvatarPartCategory.Top,_lastSeparateTopId);
+            _config.SetItem(AvatarPartCategory.Bottom,_lastSeparateBottomId);
+            _catalog.EnsureRequiredClothing(ref _config);
         }
 
         void RefreshAll(){RefreshWardrobe();RefreshTabs();RefreshItems();RefreshColors();}
@@ -571,7 +603,8 @@ namespace Festa.Avatar
             if(keepWardrobeScroll)_wardrobeScrollY=_wardrobeGrid.anchoredPosition.y;
             _wardrobeScrollFor=_wardrobeCategory;
             foreach(Transform child in _wardrobeGrid)Destroy(child.gameObject);
-            ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
+            if(_wardrobeCategory==AvatarPartCategory.Outfit||_wardrobeCategory==AvatarPartCategory.Shoes)
+                ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
             // 서버 카탈로그에 있는 것만 그린다 — 미등록 파츠는 고를 수 있어도 저장이 거부된다 (#120 §2-1).
             var wardrobeItems=_catalog.GetCatalogedItems(_wardrobeCategory,_config.gender).ToArray();
             for(int index=0;index<wardrobeItems.Length;index++)
@@ -698,7 +731,8 @@ namespace Festa.Avatar
             // 무엇을 얻을 수 있는지 보이지 않으면 잠금이 의미가 없다.
             IEnumerable<AvatarItemDefinition> defs = _catalog.GetCatalogedItems(_category,_config.gender);
             if(_category==AvatarPartCategory.Hat) defs=defs.GroupBy(x=>x.familyId).Select(x=>x.First());
-            if(_category!=AvatarPartCategory.Head) ImageButton(_itemGrid,"없음",null,()=>{_config.SetItem(_category,0);Apply();RefreshItems();},188,150,CurrentItemId(_category)==0);
+            if(_category!=AvatarPartCategory.Head&&_category!=AvatarPartCategory.Top&&_category!=AvatarPartCategory.Bottom)
+                ImageButton(_itemGrid,"없음",null,()=>{SelectWardrobeItem(_category,0);RefreshItems();},188,150,CurrentItemId(_category)==0);
             var definitions=defs.ToArray();
             for(int index=0;index<definitions.Length;index++)
             {
@@ -706,7 +740,7 @@ namespace Festa.Avatar
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 var select=locked
                     ?new UnityEngine.Events.UnityAction(()=>ShowPurchaseOrNotice(captured,PrettyName(captured.displayName)))
-                    :new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
+                    :new UnityEngine.Events.UnityAction(()=>{SelectWardrobeItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);RefreshItems();RefreshColors();});
                 if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured),locked);
                 else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured),locked);
                 else ImageButton(_itemGrid,PrettyName(captured.displayName),captured.thumbnail,select,188,150,IsSelected(_category,captured),null,locked);
@@ -716,6 +750,8 @@ namespace Festa.Avatar
 
         void Apply()
         {
+            _catalog.EnsureRequiredClothing(ref _config);
+            if(_config.outfitId==0)RememberSeparateClothing();
             // A full outfit and separate upper/lower garments are mutually exclusive.
             // Keeping both active is the main cause of overlapping meshes and skin seams.
             if (_category == AvatarPartCategory.Outfit && _config.outfitId != 0)

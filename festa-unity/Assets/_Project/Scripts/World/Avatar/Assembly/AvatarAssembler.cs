@@ -49,6 +49,7 @@ namespace Festa.Avatar
         {
             LastError = null;
             if (!_catalog) { Fail("AvatarCatalog이 지정되지 않았습니다."); return; }
+            _catalog.EnsureRequiredClothing(ref config);
             // **비우지 말고, 실제로 파괴가 끝난 것만 지운다** (S15P21A604-334).
             // 한 프레임 안에서 Apply 가 두 번 이상 불리면(연속 클릭·프로그램 호출) 앞선 호출이
             // 파괴를 건 대상이 아직 살아 있다. 그때 통째로 비우면 뒤 호출이 그것을 다시 후보로
