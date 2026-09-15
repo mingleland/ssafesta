@@ -95,8 +95,10 @@
     - 기존 차폐 레이의 1.5u 끝점 제외를 0.1u로 줄이고 hit 용량을 8→32로 늘려 벽 바로 앞과 복잡한 부스의 누락을 막았다.
 
 17. **채팅 메시지를 해당 캐릭터 위 말풍선으로 표시**
-    - 상태: **미해결**.
-    - 프론트 채팅 이벤트의 발신자 식별자를 네트워크 플레이어와 연결하고, 일정 시간 말풍선을 표시한다.
+    - 상태: **Unity 수신부 구현·컴파일 완료/FE 한 줄 연결 대기**.
+    - `WorldChatBridge.ReceiveChat(json)` 이 `/topic/world/chat` 방송 payload를 그대로 받아 `senderUserId`로 `NetworkPlayer.UserId`를 찾고 머리 위에 말풍선을 띄운다.
+    - 표시 시간은 글자 수에 비례해 3~7초, 표시 거리 150u, 카메라 뒤쪽은 그리지 않는다.
+    - FE는 `SendMessage('WorldChatBridge','ReceiveChat', JSON.stringify(msg))` 한 줄만 추가하면 된다 — 새 필드를 만들지 않았다. 계약 확인 항목은 `docs/26`에 등록했다.
 
 18. **좌클릭 주먹질 애니메이션**
     - 상태: **구현·컴파일 완료/플레이 검증 대기**.
