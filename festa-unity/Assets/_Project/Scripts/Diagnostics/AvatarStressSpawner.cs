@@ -26,9 +26,9 @@ namespace Festa.Diagnostics
     /// </summary>
     public class AvatarStressSpawner : MonoBehaviour
     {
-        [SerializeField] KeyCode _addKey = KeyCode.F6;
-        [SerializeField] KeyCode _removeKey = KeyCode.F7;
-        [SerializeField] KeyCode _clearKey = KeyCode.F8;
+        const KeyCode _addKey = KeyCode.PageUp;        // F6 은 브라우저 툴바 포커스
+        const KeyCode _removeKey = KeyCode.PageDown;   // F7 은 캐럿 브라우징
+        const KeyCode _clearKey = KeyCode.Delete;
         [Tooltip("키 한 번에 늘리고 줄일 인원")]
         [SerializeField] int _step = 5;
         [Tooltip("스폰 격자 중심. 기본값은 11층 스폰 격자와 같은 자리다.")]
@@ -49,6 +49,11 @@ namespace Festa.Diagnostics
 
         void Awake()
         {
+
+            // 키 충돌은 조용히 넘어가면 다음 사람이 같은 함정을 밟는다 — 여기서 신고하고 DiagnosticKeys 가 에러로 드러낸다.
+            DiagnosticKeys.Claim(nameof(AvatarStressSpawner), _addKey);
+            DiagnosticKeys.Claim(nameof(AvatarStressSpawner), _removeKey);
+            DiagnosticKeys.Claim(nameof(AvatarStressSpawner), _clearKey);
             // 릴리즈 빌드에서는 살려두지 않는다 — 실사용자가 F6 으로 아바타 40기를
             // 소환할 수 있으면 안 된다 (PerfHud.ToolsEnabled 와 같은 기준).
             if (!PerfHud.ToolsEnabled) enabled = false;
@@ -60,6 +65,9 @@ namespace Festa.Diagnostics
             if (Input.GetKeyDown(_removeKey)) Remove(_step);
             if (Input.GetKeyDown(_clearKey)) Remove(_spawned.Count);
         }
+
+        /// <summary>병합 무결성 검사가 같은 카탈로그를 쓰게 한다 (S15P21A604-236).</summary>
+        public AvatarCatalog Catalog => ResolveCatalog();
 
         AvatarCatalog ResolveCatalog()
         {

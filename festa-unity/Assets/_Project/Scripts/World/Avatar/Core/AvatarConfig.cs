@@ -77,11 +77,15 @@ namespace Festa.Avatar
         {
             switch (slot)
             {
-                case AvatarColorSlot.Skin: skinColorId = value; break; case AvatarColorSlot.Hair: hairColorId = value; break;
-                case AvatarColorSlot.Iris: irisColorId = value; break; case AvatarColorSlot.Eyebrow: eyebrowColorId = value; break;
-                case AvatarColorSlot.Lips: lipsColorId = value; break; case AvatarColorSlot.Top: topColorId = value; break;
-                case AvatarColorSlot.Bottom: bottomColorId = value; break; case AvatarColorSlot.Sclera: scleraColorId = value; break;
-                case AvatarColorSlot.Pupil: pupilColorId = value; break;
+                case AvatarColorSlot.Skin: skinColorId = value; skinColor = default; break;
+                case AvatarColorSlot.Hair: hairColorId = value; hairColor = default; break;
+                case AvatarColorSlot.Iris: irisColorId = value; irisColor = default; break;
+                case AvatarColorSlot.Eyebrow: eyebrowColorId = value; eyebrowColor = default; break;
+                case AvatarColorSlot.Lips: lipsColorId = value; lipsColor = default; break;
+                case AvatarColorSlot.Top: topColorId = value; topColor = default; break;
+                case AvatarColorSlot.Bottom: bottomColorId = value; bottomColor = default; break;
+                case AvatarColorSlot.Sclera: scleraColorId = value; scleraColor = default; break;
+                case AvatarColorSlot.Pupil: pupilColorId = value; pupilColor = default; break;
             }
         }
 

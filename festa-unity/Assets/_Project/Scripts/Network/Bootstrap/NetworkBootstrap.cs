@@ -20,6 +20,9 @@ namespace Festa.Network
 
         public int MaxPlayers => _maxPlayers;
 
+        /// <summary>NGO 비분할 메시지 상한(바이트). 연결 요청 payload(회원 grant 1.1 KB + JSON)가 들어가야 한다 (S15P21A604-457).</summary>
+        public const int ConnectionRequestMtu = 4096;
+
         void Start()
         {
             var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
@@ -27,6 +30,15 @@ namespace Festa.Network
             // 브라우저는 UDP 소켓을 열 수 없으므로 WebSocket을 모든 환경에서 강제한다.
             // 배포 시 브라우저는 wss:// → ALB(TLS 종료) → ws:// 서버 순서로 연결된다.
             transport.UseWebSockets = true;
+
+            // 연결 요청(ConnectionData)은 분할되지 않는 메시지라 NGO 의 MTU(기본 1,296 → payload 약 1,114 B)가 상한이다.
+            // Spring 의 회원 grant 는 1,094자(avatarCode 클레임 411자 포함)여서 JSON payload 가 1,172 B — 회원은 접속조차
+            // 못 했다(OverflowException, 2026-09-06 실측, S15P21A604-457 / T-125). 4,096 으로 올린다 — UnityTransport 는
+            // 자기 MTU 를 넘는 payload 를 스스로 분할·재조립하므로(FragmentationPipelineStage) 서버가 옛 이미지여도 받는다.
+            // 값은 8 의 배수로 내림된다. MessageManager 는 Start* 안(Initialize)에서 만들어지므로 그 전에 대면 NRE —
+            // Start* 끝에 오는 OnClientStarted/OnServerStarted 에서 대면 전송 연결(→ 연결 요청 송신)보다 앞선다.
+            NetworkManager.Singleton.OnClientStarted += ApplyConnectionRequestMtu;
+            NetworkManager.Singleton.OnServerStarted += ApplyConnectionRequestMtu;
 
             // 자동 시작 조건 — **에디터에서는 자동으로 서버가 되지 않는다.**
             //
@@ -59,8 +71,31 @@ namespace Festa.Network
                 : "[NetworkBootstrap] 자동 시작하지 않는다 — DevConnectionHud 로 Host/Server/Client 를 고른다.");
         }
 
+        static void ApplyConnectionRequestMtu()
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null) return;
+            try
+            {
+                if (nm.MaximumTransmissionUnitSize >= ConnectionRequestMtu) return;
+                nm.MaximumTransmissionUnitSize = ConnectionRequestMtu;
+                Debug.Log($"[NetworkBootstrap] 비분할 메시지 상한 {ConnectionRequestMtu} B — 회원 grant(1.1 KB) 연결 요청 수용 (S15P21A604-457)");
+            }
+            catch (Exception ex)
+            {
+                // 여기서 실패하면 회원 접속이 T-125 로 되돌아간다 — 조용히 넘기지 않는다.
+                Debug.LogError($"[NetworkBootstrap] MTU 설정 실패: {ex.Message}");
+            }
+        }
+
         void StartDedicatedServer(UnityTransport transport)
         {
+            // 소켓을 열기 **전에** 입장 검증 준비를 확인한다 (spec infra-003 world-entry-token.md).
+            // 키가 없으면 여기서 프로세스를 끝낸다 — 검증 없이 뜬 서버는 아무나 들어온다.
+            // 원장을 못 쓰면 뜨긴 하되 모든 입장이 fail-closed 로 거부되고, 그 사실을 로그로 드러낸다.
+            WorldEntryTokenSecret.EnforceOrQuit();
+            GrantReplayLedger.Warmup();
+
             ushort port = GetArgValue("-port", _defaultPort);
             _maxPlayers = (int)GetArgValue("-maxPlayers", (ushort)_maxPlayers);
 

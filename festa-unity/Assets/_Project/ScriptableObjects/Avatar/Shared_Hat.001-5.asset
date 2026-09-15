@@ -21,8 +21,11 @@ MonoBehaviour:
   - {fileID: 527804738595469006, guid: ad91fd69f2362d14bb002c70efbead35, type: 3}
   targetBones: 0a000000
   hiddenBodyParts: 
+  forcedVisibleBodyParts: 
+  garmentColorAreaMask: 7
   thumbnail: {fileID: 21300000, guid: df9c6ff4f2ce7a14e837e8f08811269e, type: 3}
   isDefault: 0
+  isDefaultUnlocked: 1
   hairGroup: 0
   familyId: 1001
   requiredHairGroup: 5

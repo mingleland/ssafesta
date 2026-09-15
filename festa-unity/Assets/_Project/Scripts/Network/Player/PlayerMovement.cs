@@ -69,7 +69,26 @@ namespace Festa.Network
         public NetworkVariable<Vector3> ServerSpawnPosition = new(
             Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
-        const float SpawnWaitTimeout = 3f; // 값 미수신(버전 불일치 등) 시 현재 위치로 진행
+        // 값 미수신(버전 불일치 등) 시 현재 위치로 진행하는 한계선 (S15P21A604-259).
+        //
+        // **시간만으로 재면 가려진 탭에서 너무 일찍 포기한다.** 백그라운드 탭은 rAF 스로틀링으로
+        // 약 1 FPS 로 도는데, NetworkVariable 수신도 Update 를 타므로 **기다린 시간이 아니라
+        // 기다린 프레임 수**가 실제 기회 횟수다. 3초면 60 FPS 에서 180번 시도하지만 1 FPS 에서는
+        // 몇 번에 그친다.
+        //
+        // 그래서 **둘 다** 넘겨야 포기한다 — 실시간 3초 그리고 최소 시도 횟수.
+        // 시간은 `realtimeSinceStartup` 으로 잰다. `Time.time` 은 쓸 수 없다 — 유니티 문서가
+        // `Time.maximumDeltaTime` 을 "limits the increase of Time.time between two frames" 라고
+        // 규정하고 이 프로젝트 설정값이 0.333s 다. 즉 1 FPS 에서 Time.time 은 프레임당 0.333s 만
+        // 흘러 실제 경과와 3배 어긋난다 — 타임아웃 기준으로 삼을 수 없는 시계다.
+        const float SpawnWaitTimeout = 3f;
+        const int SpawnWaitMinFrames = 180;   // 60 FPS 기준 3초에 해당하는 시도 횟수
+
+        // 다만 시도 횟수만 믿으면 **얼어붙을 수 있다.** 가려진 탭은 포그라운드로 오면 프레임이
+        // 금방 채워지지만, 포그라운드인데도 계속 저프레임인 클라이언트는 180프레임을 채우는 데
+        // 수십 초가 걸린다. 그동안 플레이어는 이유도 모른 채 움직이지 못한다.
+        // 그래서 실시간 상한을 따로 둔다 — 여기까지 오면 시도 횟수와 무관하게 포기하고 알린다.
+        const float SpawnWaitHardTimeout = 30f;
 
         NetworkPlayer _player;
         PlayerCameraFollow _cameraFollow;
@@ -79,12 +98,22 @@ namespace Festa.Network
         float _verticalSpeed;
         bool _spawnPlaced;
         float _spawnWaitStart;
+        int _spawnWaitFrames;          // 실제로 시도한 횟수 — 스로틀 탭에서는 시간보다 이쪽이 진실이다
+        bool _spawnValueEverChanged;   // 값이 오긴 왔는지 (미수신과 늦은 수신을 로그에서 구분한다)
         bool _airborne;
         bool _jumped;
         float _airborneSince;
         const float AirborneAnimGrace = 0.12f;
         bool _wasShowingAirborne;
         float _landHoldUntil;
+
+        // ── 낙하 안전장치 (2026-09-06) ──────────────────────────────
+        // 바닥이 없는 곳(콜라이더 틈·포털 밖)으로 떨어지면 끝없이 추락한다 — 실측 y=-111,829.
+        // 일반적인 3인칭 게임의 kill-plane: 한계선 아래로 가면 마지막 접지 위치(없으면 서버 스폰)로 되돌린다.
+        const float FallLimitY = -150f;
+        const float GroundedRecordInterval = 0.5f;
+        Vector3? _lastGroundedPosition;
+        float _nextGroundedRecordAt;
 
         bool _jumpPending;
         float _jumpPressedAt;
@@ -158,6 +187,31 @@ namespace Festa.Network
             animator.SetFloat(MoveYHash, Mathf.Lerp(animator.GetFloat(MoveYHash), target.y, lerp));
         }
 
+        /// <summary>
+        /// 상호작용이 이동 입력보다 늦은 Update 순서에서 시작돼도 그 프레임의 걷기 자세가
+        /// 남지 않도록 이동 상태를 즉시 정지한다. 입력 재개 시점은 호출자가 InputBridge
+        /// 잠금으로 관리하며, 여기서는 물리·애니메이션의 잔류값만 정리한다.
+        /// </summary>
+        public void StopImmediatelyForInteraction()
+        {
+            if (!IsOwner) return;
+
+            _jumpPending = false;
+            _turnVelocity = 0f;
+            _noStandPushUntil = 0f;
+
+            _visual ??= GetComponent<PlayerAvatarVisual>();
+            var animator = _visual != null ? _visual.CurrentAnimator : null;
+            if (animator != null)
+            {
+                animator.SetFloat(MoveXHash, 0f);
+                animator.SetFloat(MoveYHash, 0f);
+            }
+
+            if (_player != null && _player.AnimState.Value != PlayerAnimState.Idle)
+                _player.AnimState.Value = PlayerAnimState.Idle;
+        }
+
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();
@@ -171,12 +225,25 @@ namespace Festa.Network
             // CharacterController 가 켜져 있으면 그 대입과 싸우므로 Owner 만 남긴다.
             if (_controller != null) _controller.enabled = IsOwner;
 
+            // **사람끼리 겹치지 않게 한다** (사용자 지적 2026-09-11 — 캐릭터가 서로 통째로 지나갔다).
+            //
+            // 위에서 원격의 CharacterController 를 끄는 순간 그 사람은 콜리전이 하나도 없는 상태가 된다.
+            // CharacterController 는 그 자체가 콜라이더라, 끄면 남의 Move() 가 막힐 것도 사라진다.
+            // 그래서 **원격에만** 캡슐을 켠다 — NetworkTransform 이 위치를 쓰는 것은 그대로 두고
+            // 부딪힐 몸만 세워 두는 것이다.
+            //
+            // 내 것은 끈 채로 둔다. 켜면 내 CharacterController 가 내 캡슐과 싸워 제자리에서 튄다.
+            // 즉 각 화면에서 "나는 CC, 남들은 캡슐" 이고, 막히는 판정은 내 CC 가 남의 캡슐을 미는 쪽으로 일어난다.
+            var body = GetComponent<CapsuleCollider>();
+            if (body != null) body.enabled = !IsOwner;
+
             if (IsServer)
                 ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
 
             if (IsOwner)
             {
-                _spawnWaitStart = Time.time;
+                _spawnWaitStart = Time.realtimeSinceStartup;
+                _spawnWaitFrames = 0;
                 ServerSpawnPosition.OnValueChanged += OnServerSpawnPositionChanged;
                 TryPlaceAtServerSpawn(); // 초기 동기화로 이미 와 있으면 즉시
             }
@@ -193,6 +260,7 @@ namespace Festa.Network
 
         void OnServerSpawnPositionChanged(Vector3 _, Vector3 next)
         {
+            _spawnValueEverChanged = true;
             if (!_spawnPlaced) PlaceAt(next);
         }
 
@@ -228,6 +296,8 @@ namespace Festa.Network
             _airborne = false;
             _jumped = false;
             _jumpPending = false;
+            // 텔레포트 직후 한 프레임은 CC 가 접지로 보고할 수 있다 — 바닥 없는 자리를 "마지막 접지" 로 기록하지 않게 잠시 미룬다 (2026-09-06 실측).
+            _nextGroundedRecordAt = Time.time + 1f;
         }
 
         void PlaceAt(Vector3 pos)
@@ -260,21 +330,51 @@ namespace Festa.Network
             // 중력으로 떨어지기 시작하면 배정 위치가 와도 이미 이탈해 있다.
             if (!_spawnPlaced)
             {
+                _spawnWaitFrames++;
                 TryPlaceAtServerSpawn();
-                if (!_spawnPlaced && Time.time - _spawnWaitStart > SpawnWaitTimeout)
+
+                // 시간과 시도 횟수를 **둘 다** 넘겨야 포기한다 (S15P21A604-259).
+                // 하나만 보면 가려진 탭에서 몇 번 시도해 보지도 못하고 원점에서 출발한다.
+                float waited = Time.realtimeSinceStartup - _spawnWaitStart;
+                bool waitedLongEnough = waited > SpawnWaitTimeout;
+                bool triedOftenEnough = _spawnWaitFrames >= SpawnWaitMinFrames;
+                bool gaveUp = (waitedLongEnough && triedOftenEnough) || waited > SpawnWaitHardTimeout;
+                if (!_spawnPlaced && gaveUp)
                 {
-                    Debug.LogWarning("[PlayerMovement] 서버 스폰 위치를 받지 못했다 — 현재 위치로 진행 " +
-                                     "(서버/클라이언트 빌드 버전이 같은지 확인해라)");
+                    // **재발했을 때 추측하지 않아도 되게 실측값을 남긴다.** 이 경로는 재현이
+                    // 어려워(가려진 탭·버전 불일치) 로그가 유일한 증거다. 값이 오긴 왔는지,
+                    // 몇 번 시도했는지, 실제로 몇 초였는지가 없으면 다음에도 원인을 추정만 하게 된다.
+                    Debug.LogError(
+                        "[PlayerMovement] 서버 스폰 위치를 받지 못해 현재 위치에서 시작한다 — " +
+                        "원점 근처면 허공에서 떨어진다. " +
+                        $"시도 {_spawnWaitFrames}프레임 / {waited:F1}초, " +
+                        $"변경 이벤트 {(_spawnValueEverChanged ? "수신" : "없음")}, " +
+                        $"ServerSpawnPosition={ServerSpawnPosition.Value}, 현재 위치={transform.position}. " +
+                        "서버/클라이언트 빌드 버전이 같은지 확인해라.");
                     _spawnPlaced = true;
                 }
                 if (!_spawnPlaced) return;
+            }
+
+            if (transform.position.y < FallLimitY)
+            {
+                var back = _lastGroundedPosition ?? (ServerSpawnPosition.Value != Vector3.zero ? ServerSpawnPosition.Value : transform.position);
+                back.y = Mathf.Max(back.y, 0f) + 0.5f;
+                Debug.LogWarning($"[PlayerMovement] 낙하 한계 초과(y={transform.position.y:F0}) — 마지막 접지 위치 {back} 로 복귀");
+                _lastGroundedPosition = null;   // 같은 자리에서 또 떨어지면 다음엔 서버 스폰으로
+                TeleportTo(back);
+                return;
             }
 
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
             bool running = moving && IsRunPressed();
 
-            if (moving && _player.EmoteId.Value != PlayerEmoteId.None)
+            // 이동·점프는 이모트를 끝낸다. **점프가 빠져 있었다** — 앉거나 누운 채로 Space 를 누르면
+            // 그 자세 그대로 몸이 떠올랐다 (사용자 보고 2026-09-13, 소파·바닥 앉기 둘 다).
+            // 막지 않고 해제하는 쪽을 고른 것은 이동과 같은 규칙이기 때문이다 — 사용자가 Space 를
+            // 눌렀다는 것은 그 자세를 끝내겠다는 뜻이지, 입력이 씹히길 바라는 것이 아니다.
+            if ((moving || IsJumpPressed()) && _player.EmoteId.Value != PlayerEmoteId.None)
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
             // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.
@@ -282,6 +382,11 @@ namespace Festa.Network
             if (_controller != null && _controller.enabled)
             {
                 grounded = _controller.isGrounded;
+                if (grounded && Time.time >= _nextGroundedRecordAt)
+                {
+                    _lastGroundedPosition = transform.position;
+                    _nextGroundedRecordAt = Time.time + GroundedRecordInterval;
+                }
                 // 의도한 도약 중에는 낮춘 중력을 쓴다 (위 주석). 그냥 떨어지는 것은 현실 중력.
                 float gravity = _jumped ? _jumpGravity : _gravity;
                 _verticalSpeed = grounded
@@ -408,8 +513,61 @@ namespace Festa.Network
                 return;
             }
 
-            var velocity = horizontalVelocity + Vector3.up * _verticalSpeed;
+            var velocity = horizontalVelocity + NoStandSlide() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
+        }
+
+        // ── 올라설 수 없는 표면 (2026-09-10 사용자 지시) ────────────────
+        //
+        // 슬롯머신·오락기·책상 같은 **상호작용 오브젝트 위에 올라선 채로 서 있는** 모습이 나왔다.
+        // 점프로 올라갈 수 있는 높이라 콜라이더만으로는 막히지 않는다.
+        //
+        // 막는 방법으로 위를 트리거로 만들거나 경사 캡을 씌우는 안이 있지만, 오브젝트마다 모양이 달라
+        // 일반화가 안 된다. 대신 **올라선 것이 감지되면 바깥으로 미끄러뜨린다** — 발이 닿은 순간부터
+        // 오브젝트 중심 반대 방향으로 밀려 가장자리에서 떨어진다. 입력으로 버텨도 밀림이 이긴다.
+        //
+        // 라운지 글자 소파는 예외다 — F 로 올라가 눕는 자리다(사용자 확인).
+        // 달리기(_runSpeed 65)보다 빨라야 한다. 입력에 **더해지는** 값이라 달리기보다 느리면
+        // 중심 쪽으로 달려서 계속 올라서 있을 수 있다 — 그러면 막은 것이 아니다.
+        const float NoStandSlideSpeed = 90f;
+        const float NoStandHold = 0.2f;        // 접촉이 끊겨도 이만큼은 밀어 가장자리를 넘긴다
+        Vector3 _noStandPush;
+        float _noStandPushUntil;
+        int _noStandCachedId;
+        bool _noStandCachedResult;
+
+        Vector3 NoStandSlide()
+            => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+
+        void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            // 위에 올라선 접촉만 본다. 옆면을 스치는 것(normal.y≈0)은 그냥 벽이다.
+            if (hit.normal.y < 0.5f) return;
+            if (!IsNoStandSurface(hit.collider)) return;
+
+            var away = transform.position - hit.collider.bounds.center;
+            away.y = 0f;
+            // 정확히 중심 위에 서 있으면 방향이 없다 — 보고 있는 쪽으로 내보낸다.
+            _noStandPush = away.sqrMagnitude > 0.01f ? away.normalized : transform.forward;
+            _noStandPushUntil = Time.time + NoStandHold;
+        }
+
+        /// <summary>
+        /// 올라설 수 없는 표면인가. 상호작용 오브젝트(<see cref="Festa.Booth.BoothInteractionTarget"/>) 전부가 대상이고
+        /// 라운지 소파만 예외다. 콜라이더 하나당 계층 탐색이 들어가므로 마지막 결과를 캐시한다 —
+        /// 같은 발판을 매 프레임 다시 훑지 않는다.
+        /// </summary>
+        bool IsNoStandSurface(Collider c)
+        {
+            if (c == null) return false;
+            int id = c.GetInstanceID();
+            if (id == _noStandCachedId) return _noStandCachedResult;
+
+            bool result = c.GetComponentInParent<Festa.Booth.BoothInteractionTarget>() != null
+                          && c.GetComponentInParent<Festa.World.LoungeSofaInteractable>() == null;
+            _noStandCachedId = id;
+            _noStandCachedResult = result;
+            return result;
         }
 
         // ── 합성 입력 (부하 테스트 봇 전용) ─────────────────────────
@@ -436,6 +594,8 @@ namespace Festa.Network
 
         static Vector2 ReadKeyboardInput()
         {
+            // 호스트 Overlay 가 열려 있으면 월드 입력을 읽지 않는다 (G-8, InputBridge).
+            if (Festa.Integration.InputBridge.IsLocked) return Vector2.zero;
             var kb = Keyboard.current;
             if (kb == null) return Vector2.zero;
 
@@ -449,6 +609,7 @@ namespace Festa.Network
 
         static bool IsRunKeyPressed()
         {
+            if (Festa.Integration.InputBridge.IsLocked) return false;
             var kb = Keyboard.current;
             return kb != null && (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed);
         }
@@ -459,6 +620,7 @@ namespace Festa.Network
         /// </summary>
         static bool IsJumpPressed()
         {
+            if (Festa.Integration.InputBridge.IsLocked) return false;
             var kb = Keyboard.current;
             return kb != null && kb.spaceKey.wasPressedThisFrame;
         }

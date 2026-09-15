@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 5d7f3ca9412c465c899f4863544b441c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Character_Controller/Moving/States/CrouchingState.cs
+  uploadId: 963832

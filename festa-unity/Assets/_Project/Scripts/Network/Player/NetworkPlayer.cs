@@ -39,6 +39,20 @@ namespace Festa.Network
         SitGround = 6,    // SitGround01 - Loop — 앉기 (루프)
         Drink = 7,        // Drink01_R - Loop — 건배 (루프)
         Thanks = 8,       // Reverence01 — 감사
+
+        // 2026-09-10 추가 — 11층 라운지 글자 소파 눕기 (Sleep Anim Pack, Humanoid 리타게팅).
+        // 소파 F(LoungeSofaInteractable) 가 무작위로 하나 고른다. 감정표현 휠에는 넣지 않는다.
+        // 값만 덧붙였다(기존 값·이름 불변) — 기준선 동결(헌법 27조)은 재구현·리팩터링 금지이고 이건 추가다.
+        LieSofa = 9,            // Sleep_Sofa_SleepLoop — 소파에 웅크려 눕기 (루프)
+        LieLeft = 10,           // Sleep_Bed_LeftSide_SleepLoop — 왼쪽으로 눕기 (루프)
+        LieRight = 11,          // Sleep_Bed_RightSide_SleepLoop — 오른쪽으로 눕기 (루프)
+        LieLeftRestless = 12,   // Sleep_Bed_LeftSide_RestlessLoop — 왼쪽 뒤척임 (루프)
+        LieRightRestless = 13,  // Sleep_Bed_RightSide_RestlessLoop — 오른쪽 뒤척임 (루프)
+
+        // 2026-09-10 추가 — 축제장 하이 스트라이커(망치 게임). Mine Animations 의 MineStart 를 리타게팅한 원샷.
+        // 감정표현 휠에는 넣지 않는다 — HighStrikerInteractable 만 재생한다. 재생 중에는 손에 망치가 생긴다
+        // (AvatarStrikeProp). 여기서도 값만 덧붙였다 (기준선 동결은 재구현 금지이지 확장 금지가 아니다).
+        Strike = 14,            // MineStart — 내리찍기 (원샷, 임팩트 1.16 s)
     }
 
     /// <summary>
@@ -75,14 +89,22 @@ namespace Festa.Network
                 if (session != null)
                 {
                     UserId.Value = session.userId;
-                    Nickname.Value = session.nickname ?? "Unknown";
+                    // **바이트로 재서 넣는다.** FixedString32Bytes 는 UTF-8 29바이트까지다.
+                    // 한글은 한 자가 3바이트라 10자면 30바이트 — 넘기면 대입에서 예외가 나고
+                    // 스폰 초기화가 통째로 중단된다. 그러면 그 사람은 월드에 들어와도 아바타가
+                    // 안 뜨고 움직이지도 않는다 (2026-09-08 조사).
+                    Nickname.Value = FitFixedString32(session.nickname, "Unknown", "nickname");
+
                     // AvatarCode is retained for legacy preset clients and is only
                     // 32 bytes long.  A full modular appearance is synchronized by
                     // PlayerAppearanceController.Encoded after the player object is
                     // spawned, so never truncate or assign the long `fa|...` payload
                     // here: FixedString overflow aborts the spawn initialization.
+                    //
+                    // 예전 가드는 `Length <= 31` 로 **문자 수**를 셌다 — 한글 31자는 93바이트라
+                    // 가드를 통과한 뒤 대입에서 던졌다. 같은 결함이 여기에도 있었다.
                     var legacyAvatarCode = session.avatarCode;
-                    AvatarCode.Value = !string.IsNullOrEmpty(legacyAvatarCode) && legacyAvatarCode.Length <= 31
+                    AvatarCode.Value = Utf8ByteLength(legacyAvatarCode) is > 0 and <= FixedString32Capacity
                         ? legacyAvatarCode
                         : Festa.World.AvatarAppearance.DefaultPreset;
                 }
@@ -94,6 +116,45 @@ namespace Festa.Network
         public override void OnNetworkDespawn()
         {
             Debug.Log($"[NetworkPlayer] Despawned owner={OwnerClientId}");
+        }
+
+        // ---------- FixedString 안전 대입 ----------
+
+        /// <summary><see cref="FixedString32Bytes"/> 가 담을 수 있는 UTF-8 바이트 수.</summary>
+        const int FixedString32Capacity = 29;
+
+        static int Utf8ByteLength(string s) =>
+            string.IsNullOrEmpty(s) ? 0 : System.Text.Encoding.UTF8.GetByteCount(s);
+
+        /// <summary>
+        /// UTF-8 바이트 기준으로 잘라 넣는다. 넘치면 **자르되 조용히 넘어가지 않는다** —
+        /// 스폰을 중단시켜 사람을 통째로 사라지게 하는 것보다 이름이 짧게 나오는 편이 낫고,
+        /// 왜 짧아졌는지는 로그에 남아야 다음 사람이 원인을 찾는다 (T-24).
+        ///
+        /// <para>문자 경계에서 자른다. 바이트로 자르면 한글 한 글자가 반토막 나 깨진 문자가 된다.</para>
+        /// </summary>
+        static string FitFixedString32(string value, string fallback, string what)
+        {
+            if (string.IsNullOrEmpty(value)) return fallback;
+            if (Utf8ByteLength(value) <= FixedString32Capacity) return value;
+
+            var si = new System.Globalization.StringInfo(value);
+            int keep = si.LengthInTextElements;
+            string cut = value;
+            while (keep > 0)
+            {
+                cut = System.Globalization.StringInfo.ParseCombiningCharacters(value).Length >= keep
+                    ? si.SubstringByTextElements(0, keep)
+                    : value;
+                if (Utf8ByteLength(cut) <= FixedString32Capacity) break;
+                keep--;
+            }
+            if (keep <= 0) return fallback;
+
+            Debug.LogWarning($"[NetworkPlayer] {what} 가 FixedString32 용량({FixedString32Capacity}바이트)을 넘어 잘랐다 — " +
+                             $"'{value}' ({Utf8ByteLength(value)}바이트) → '{cut}' ({Utf8ByteLength(cut)}바이트). " +
+                             "한글은 한 자가 3바이트라 10자부터 넘는다.");
+            return cut;
         }
 
         // ---------- Booth Entry (doc 16 §4 Server RPC 후보) ----------
