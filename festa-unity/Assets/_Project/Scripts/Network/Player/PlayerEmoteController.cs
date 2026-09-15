@@ -40,6 +40,28 @@ namespace Festa.Network
             PlayerEmoteId.Punch1, PlayerEmoteId.Punch2, PlayerEmoteId.Punch3
         };
 
+        /// <summary>
+        /// 주먹 한 대가 화면에 머무는 시간(초). 잘라낸 잽 길이(0.333·0.333·0.400)를 상태 speed 1.25 로 나눈 값이다.
+        ///
+        /// <para>애니메이터에서 읽지 않고 표로 두는 이유: 다음 한 대를 **언제 이어 칠지**를 클릭한 프레임에
+        /// 정해야 하는데, 상태 길이는 크로스페이드가 끝난 뒤에야 읽을 수 있다. 클립을 다시 자르면
+        /// 이 값도 같이 고친다.</para>
+        /// </summary>
+        static readonly float[] PunchSeconds = { 0.27f, 0.27f, 0.32f };
+
+        /// <summary>마지막 주먹이 끝난 뒤 이 시간 안에 다시 누르면 콤보가 이어진다.</summary>
+        const float ComboKeepAlive = 0.8f;
+
+        /// <summary>임팩트는 재생 구간의 이 지점에서 잡는다 — 잘라낸 잽의 피크가 대략 이 위치다.</summary>
+        const float ImpactRatio = 0.45f;
+
+        int _comboStep = -1;
+        float _comboExpireAt;
+        float _punchBusyUntil;
+        bool _punchQueued;
+        float _punchImpactAt;
+        PlayerPunchImpact _impact;
+
         NetworkPlayer _player;
         bool _wheelOpen;
         Vector2 _center;
@@ -79,6 +101,18 @@ namespace Festa.Network
                 _awaitingDuration = PlayerEmoteId.None;
                 return;
             }
+
+            int punch = System.Array.IndexOf(Punches, emote);
+            if (punch >= 0)
+            {
+                // 주먹은 상태 길이를 기다려 끊지 않는다. TrackOneShotDuration 은 크로스페이드가 끝난
+                // 뒤에야 길이를 읽고 최소 0.5초를 보장하는데, 잘라낸 잽은 0.27초라 그 바닥값이
+                // 다음 한 대를 늦춘다 — 콤보가 끊겨 보이는 자리다.
+                _oneShotStopAt = Time.unscaledTime + PunchSeconds[punch];
+                _awaitingDuration = PlayerEmoteId.None;
+                return;
+            }
+
             _oneShotStopAt = 0f;
             _awaitingDuration = emote;
         }
@@ -112,8 +146,19 @@ namespace Festa.Network
             }
             else if (!alt && mouse.leftButton.wasPressedThisFrame && CanPunch())
             {
-                // 효과는 없다. 애니메이션만 나간다 — 판정·데미지·넉백을 붙이지 않는다(사용자 지시).
-                PlayOneShot(Punches[Random.Range(0, Punches.Length)]);
+                // 누른 것을 버리지 않는다. 치는 중이면 예약해 두고 끝나는 순간 이어 친다 —
+                // 무작위로 골라 매번 새로 시작하면 같은 동작이 겹쳐 움찔거리기만 한다(사용자 지적).
+                if (Time.time >= _punchBusyUntil) FirePunch();
+                else _punchQueued = true;
+            }
+
+            if (_punchQueued && Time.time >= _punchBusyUntil) FirePunch();
+
+            if (_punchImpactAt > 0f && Time.time >= _punchImpactAt)
+            {
+                _punchImpactAt = 0f;
+                if (_impact == null) _impact = GetComponent<PlayerPunchImpact>();
+                if (_impact != null) _impact.Strike();
             }
 
             TrackOneShotDuration();
@@ -151,6 +196,28 @@ namespace Festa.Network
             var current = _player.EmoteId.Value;
             if (current != PlayerEmoteId.None && IsLooping(current)) return false;
             return true;
+        }
+
+        /// <summary>
+        /// 콤보 한 대를 친다. 이어서 누르면 1 → 2 → 3 → 1 로 돌고, 끊기면 다시 1 부터다.
+        ///
+        /// <para>무작위가 아니라 <b>순서</b>인 이유: 무작위는 같은 동작이 연달아 나올 수 있고, 그러면
+        /// 두 번 친 것이 한 번 친 것처럼 보인다. 순서로 돌리면 세 번이 서로 다른 동작이라 콤보로 읽힌다.
+        /// 고른 값은 <c>EmoteId</c> 로 복제되므로 남의 화면에서도 같은 순서로 나간다.</para>
+        /// </summary>
+        void FirePunch()
+        {
+            _punchQueued = false;
+
+            bool continues = _comboStep >= 0 && Time.time <= _comboExpireAt;
+            _comboStep = continues ? (_comboStep + 1) % Punches.Length : 0;
+
+            float seconds = PunchSeconds[_comboStep];
+            _punchBusyUntil = Time.time + seconds;
+            _comboExpireAt = _punchBusyUntil + ComboKeepAlive;
+            _punchImpactAt = Time.time + seconds * ImpactRatio;
+
+            PlayOneShot(Punches[_comboStep]);
         }
 
         void UpdateSelection(Vector2 pointer)

@@ -858,7 +858,10 @@ namespace Festa.World
             // 선 자세 기준으로 되돌린다(앉기 → 다른 이모트로 바로 넘어가는 경우).
             // 눕기는 선 자세→누운 자세가 멀어 0.2 초면 덜컥한다. 조금 길게 섞고, 재측정도 그만큼 뒤로.
             bool lie = LiePoseTable.IsLie(emote);
-            float fade = lie ? 0.35f : 0.2f;
+            // 주먹은 잘라낸 잽이라 재생 자체가 0.27~0.32초다. 여기에 0.2초를 섞으면 섞는 동안
+            // 주먹이 끝나 **움찔거리는 것처럼만** 보인다 (사용자 지적 2026-09-15). 짧게 끊어 붙인다.
+            bool punch = emote == PlayerEmoteId.Punch1 || emote == PlayerEmoteId.Punch2 || emote == PlayerEmoteId.Punch3;
+            float fade = lie ? 0.35f : punch ? 0.05f : 0.2f;
             if (lie)
             {
                 // 눕기는 **한 번 재지 않고 실측표로 내린다.** 클립의 루트는 팩의 침대·소파 바닥에 있고 몸은
@@ -887,7 +890,9 @@ namespace Festa.World
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
-                _animator.CrossFadeInFixedTime(stateName, fade, 0);
+                // 콤보는 같은 상태로 다시 들어오는 경우가 있다(1→2→3→1). 시작 시각을 0 으로 못 박아야
+                // 두 번째 진입이 앞 재생의 끝 프레임에서 이어지지 않는다.
+                _animator.CrossFadeInFixedTime(stateName, fade, 0, 0f);
             else
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
         }
