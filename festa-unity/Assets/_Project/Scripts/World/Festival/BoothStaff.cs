@@ -67,7 +67,8 @@ namespace Festa.World
             if (!string.IsNullOrEmpty(assembler.LastError))
                 Debug.LogError($"[BoothStaff] {name}: {assembler.LastError}");
 
-            FitHeight();
+            FitHeight(assembler);
+            StabilizeSkinnedRendering(assembler);
             SetupAnimator();
             AddFillLight();
         }
@@ -136,22 +137,93 @@ namespace Festa.World
         /// 조립 결과의 실제 높이를 재서 목표 키로 스케일한다. 상수 배율을 박으면 카탈로그
         /// 아이템이 바뀔 때 조용히 어긋난다 — 플레이어 쪽과 같은 방식이다.
         /// </summary>
-        void FitHeight()
+        void FitHeight(Festa.Avatar.AvatarAssembler assembler)
         {
             var renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             if (renderers.Length == 0 || _targetVisualHeight <= 0f) return;
 
-            var bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out var bounds)) return;
             if (bounds.size.y < 0.001f) return;
 
             _visual.transform.localScale *= _targetVisualHeight / bounds.size.y;
 
             // 발을 루트 높이에 맞춘다 — 스케일 뒤에 다시 재야 한다(스케일 전 값으로 맞추면 뜬다).
             renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out bounds)) return;
             _visual.transform.position += Vector3.up * (transform.position.y - bounds.min.y);
+        }
+
+        /// <summary>
+        /// 직원의 활성 스킨 파츠가 하나의 보수적인 전신 bounds를 공유하게 한다.
+        ///
+        /// <para>의상 렌더러마다 서로 다른 고정 bounds를 쓰면 카메라 프러스텀 가장자리에서
+        /// 몸은 보이는데 옷만 먼저 화면 밖으로 판정된다. 직원은 12명뿐이고 Animator도 이미
+        /// AlwaysAnimate이므로, 이 NPC들에는 정확한 파츠별 컬링보다 전신 표시 안정성을 우선한다.</para>
+        /// </summary>
+        void StabilizeSkinnedRendering(Festa.Avatar.AvatarAssembler assembler)
+        {
+            var renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out var worldBounds)) return;
+
+            // 프러스텀 경계에서 부동소수점 오차로 한 프레임 먼저 빠지지 않도록 전신 기준 여유를 둔다.
+            float padding = Mathf.Max(worldBounds.size.magnitude * 0.08f, 0.5f);
+            worldBounds.Expand(padding * 2f);
+
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null) continue;
+                renderer.updateWhenOffscreen = true;
+                renderer.localBounds = TransformBounds(worldBounds, renderer.transform.worldToLocalMatrix);
+            }
+        }
+
+        static bool TryCollectVisibleGeometryBounds(
+            SkinnedMeshRenderer[] renderers,
+            Festa.Avatar.AvatarAssembler assembler,
+            out Bounds bounds)
+        {
+            bounds = default;
+            bool found = false;
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+
+                var current = renderer.bounds;
+                if (assembler != null && assembler.TryGetGeometryWorldBounds(renderer, out var geometry))
+                    current = geometry;
+
+                if (!found)
+                {
+                    bounds = current;
+                    found = true;
+                }
+                else bounds.Encapsulate(current);
+            }
+            return found;
+        }
+
+        static Bounds TransformBounds(Bounds source, Matrix4x4 matrix)
+        {
+            var center = source.center;
+            var extents = source.extents;
+            var result = default(Bounds);
+            bool initialized = false;
+
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                var corner = matrix.MultiplyPoint3x4(
+                    center + Vector3.Scale(extents, new Vector3(x, y, z)));
+                if (!initialized)
+                {
+                    result = new Bounds(corner, Vector3.zero);
+                    initialized = true;
+                }
+                else result.Encapsulate(corner);
+            }
+
+            return result;
         }
     }
 }
