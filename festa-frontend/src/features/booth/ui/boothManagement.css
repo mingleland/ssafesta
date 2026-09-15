@@ -134,44 +134,126 @@
 .bm-empty strong { font-size: 16px; color: var(--festa-ink); }
 .bm-empty .ov-btn { margin-top: 6px; }
 
-.bm-agent { display: flex; flex-direction: column; gap: 14px; }
+.bm-agent { display: flex; flex-direction: column; gap: 16px; }
 .bm-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bm-step { display: flex; gap: 12px; }
+.bm-step-marker { flex: none; display: flex; flex-direction: column; align-items: center; }
+.bm-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--festa-accent), var(--festa-accent-2));
+  box-shadow: 0 2px 10px rgba(77, 107, 255, 0.35);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.bm-step-line { flex: 1; width: 2px; min-height: 16px; margin: 6px 0; background: linear-gradient(var(--festa-accent-2), rgba(255, 255, 255, 0.08)); opacity: 0.5; }
+.bm-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--festa-r-card);
+  background: var(--festa-fill);
+  border: 1px solid var(--festa-line);
+  box-shadow: 0 6px 18px rgba(4, 6, 16, 0.22);
+}
+.bm-step-title { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--festa-ink); }
 .bm-agent-head h3 { margin: 0 0 5px; font-size: 16px; color: var(--festa-ink); }
 .bm-agent-head p { margin: 0; }
-.bm-agent-state { flex: none; padding: 5px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(234, 238, 251, 0.65); font-size: 12px; }
-.bm-agent-state-on { background: rgba(104, 210, 133, 0.14); color: #83df99; }
+.bm-agent-state { flex: none; padding: 5px 10px; border-radius: 999px; background: var(--festa-fill-strong); color: rgba(234, 238, 251, 0.65); font-size: 12px; font-weight: 600; }
+.bm-agent-state-on { background: rgba(95, 211, 155, 0.16); color: var(--festa-ok); }
 .bm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: rgba(234, 238, 251, 0.84); font-size: 13px; font-weight: 600; }
 .bm-field em { color: rgba(234, 238, 251, 0.52); font-style: normal; font-weight: 400; }
-.bm-field input, .bm-field select, .bm-field textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px; padding: 10px 11px; background: rgba(9, 14, 30, 0.7); color: var(--festa-ink); font: inherit; font-size: 13px; }
+.bm-field input, .bm-field select, .bm-field textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--festa-line); border-radius: var(--festa-r-input); padding: 10px 11px; background: rgba(9, 14, 30, 0.55); color: var(--festa-ink); font: inherit; font-size: 13px; transition: border-color 0.15s ease, background 0.15s ease; }
 .bm-field textarea { resize: vertical; line-height: 1.45; }
-.bm-field input:focus, .bm-field select:focus, .bm-field textarea:focus { outline: 2px solid rgba(142, 173, 255, 0.65); outline-offset: 1px; }
+.bm-field input:hover, .bm-field select:hover, .bm-field textarea:hover { border-color: rgba(255, 255, 255, 0.24); }
+.bm-field input:focus, .bm-field select:focus, .bm-field textarea:focus { outline: 2px solid rgba(77, 107, 255, 0.5); outline-offset: 1px; border-color: var(--festa-accent); background: rgba(9, 14, 30, 0.75); }
 /* select 옵션 팝업은 OS 네이티브가 그려서 이 배경색을 안 탄다 — 명시 안 하면 흰 배경에 밝은
    글자가 상속돼 안 보인다(management.css 에서 실측한 것과 같은 버그, 여기도 선제 적용) */
 .bm-field select option { background-color: var(--festa-surface-solid); color: var(--festa-ink); }
 .bm-field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .bm-check { display: flex; align-items: center; gap: 8px; color: rgba(234, 238, 251, 0.84); font-size: 13px; cursor: pointer; }
-.bm-check input { accent-color: #8eadff; }
-.bm-agent-error { margin: -2px 0 0; color: #ff9aa2; font-size: 13px; }
-.bm-document { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 4px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
+.bm-check input { accent-color: var(--festa-accent); }
+.bm-agent-error { margin: -2px 0 0; color: var(--festa-danger); font-size: 13px; }
+.bm-document {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid var(--festa-line);
+  border-radius: var(--festa-r-panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
 .bm-document h4 { margin: 0 0 5px; color: var(--festa-ink); font-size: 14px; }
 .bm-document p { margin: 0; }
-.bm-upload { position: relative; overflow: hidden; cursor: pointer; }
+.bm-upload {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px dashed rgba(77, 107, 255, 0.5);
+  background: rgba(77, 107, 255, 0.1);
+  color: var(--festa-ink);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.bm-upload:hover { background: rgba(77, 107, 255, 0.18); border-color: var(--festa-accent); }
 .bm-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .bm-upload-disabled { opacity: 0.48; cursor: not-allowed; }
 .bm-upload-disabled input { cursor: not-allowed; }
-.bm-upload-result { color: #83df99; font-size: 13px; }
+.bm-upload-result { color: var(--festa-ok); font-size: 13px; }
 .bm-document-list-wrap { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 4px; }
 .bm-document-quota { align-self: flex-end; }
 .bm-document-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
-.bm-document-row { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); font-size: 12.5px; }
+.bm-document-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12.5px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.bm-document-row:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--festa-line); transform: translateY(-1px); }
 .bm-document-name { color: var(--festa-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bm-document-meta { color: rgba(234, 238, 251, 0.55); white-space: nowrap; }
-.bm-document-status { color: rgba(234, 238, 251, 0.75); font-weight: 600; white-space: nowrap; }
-/* 파일 선택을 감춘 라벨 — 업로드 버튼(.bm-upload)과 같은 방식이고 행 안에 들어가도록만 작게 잡는다 */
-.bm-document-replace { position: relative; overflow: hidden; white-space: nowrap; cursor: pointer; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.16); color: rgba(234, 238, 251, 0.82); font-size: 12px; }
-.bm-document-replace input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.bm-document-remove { border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 6px; padding: 4px 8px; background: none; color: rgba(234, 238, 251, 0.82); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
-.bm-document-remove:hover { background: rgba(255, 255, 255, 0.06); }
+.bm-document-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--festa-fill-strong);
+  color: rgba(234, 238, 251, 0.75);
+}
+.bm-document-status-ready { background: rgba(95, 211, 155, 0.16); color: var(--festa-ok); }
+.bm-document-status-processing, .bm-document-status-queued { background: rgba(255, 214, 107, 0.16); color: var(--festa-warn); }
+.bm-document-status-failed { background: rgba(255, 143, 143, 0.16); color: var(--festa-danger); }
+.bm-document-status-expired, .bm-document-status-disabled { background: var(--festa-fill-strong); color: rgba(234, 238, 251, 0.5); }
+.bm-document-remove {
+  border: 1px solid rgba(255, 143, 143, 0.35);
+  border-radius: 6px;
+  padding: 4px 9px;
+  background: none;
+  color: var(--festa-danger);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.bm-document-remove:hover:not(:disabled) { background: rgba(255, 143, 143, 0.14); border-color: var(--festa-danger); }
+.bm-document-remove:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .bm-gate-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(6, 9, 20, 0.6); padding: 20px; }
 .bm-gate-dialog { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 16px; background: var(--festa-surface-solid); border: 1px solid rgba(255, 255, 255, 0.1); }
