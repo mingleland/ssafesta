@@ -67,6 +67,20 @@
   animation: world-chat-fade 14s ease-in forwards;
 }
 
+/* 말 본문과 섞지 않는다. 입장 알림은 사람이 한 말이 아니라 월드 상태 변화다. */
+.world-chat-join {
+  align-self: center;
+  width: fit-content;
+  margin: 0.2rem auto;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid rgba(126, 224, 165, 0.42);
+  border-radius: 999px;
+  background: rgba(16, 50, 39, 0.56);
+  color: #a9eec2;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .world-chat:not(.world-chat-open) .world-chat-log li {
     animation: none;

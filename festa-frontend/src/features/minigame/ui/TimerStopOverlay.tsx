@@ -5,7 +5,7 @@
 // **여기서 하지 않는 것** — ESC 리스너(WorldPage 단일 중재자), `SetInputLocked` 직접 호출
 // (UnityHost 가 worldScreen 을 보고 민다), 배타 처리(worldScreen.clearOthers), focus 반환
 // (OverlayFrame). 그 넷은 이 오버레이가 `openVisitorOverlay` 로 열렸다는 사실만으로 따라온다.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { isApiError } from '../../../shared/api/client';
@@ -44,6 +44,7 @@ export function TimerStopOverlay() {
   // 제출은 판마다 한 번이다. 상태 전이만으로 막으면 같은 tick 안의 연타가 두 번 들어간다.
   const submittedRef = useRef(false);
   const phaseRef = useRef(phase);
+  const stageRef = useRef<HTMLDivElement>(null);
   phaseRef.current = phase;
 
   function goLogin() {
@@ -143,6 +144,14 @@ export function TimerStopOverlay() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [start, stopAndSubmit]);
 
+  // 오버레이를 열면 X 버튼이 먼저 focus를 가져 Space가 "닫기"로 읽히곤 했다. 게임이 시작·진행 중인
+  // 동안에는 플레이 영역을 키보드 시작점으로 둔다. 버튼을 Tab으로 찾은 사용자의 focus는 건드리지 않는다.
+  useEffect(() => {
+    if (phase.kind !== 'IDLE' && phase.kind !== 'RUNNING') return;
+    const id = requestAnimationFrame(() => stageRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [phase.kind]);
+
   // 목표 초는 부제가 아니라 플레이 영역 안에 둔다 (S15P21A604-733) — 달리는 중에 읽어야 하는 값이
   // 제목 옆 작은 글씨에 있으면 눈이 가지 않는다. 부제는 항상 같은 안내로 둔다.
   return (
@@ -168,26 +177,31 @@ export function TimerStopOverlay() {
           </button>
         </div>
       ) : (
-        <Body phase={phase} elapsed={elapsed} onRetry={() => void start()} />
+        <Body stageRef={stageRef} phase={phase} elapsed={elapsed} onRetry={() => void start()} />
       )}
     </OverlayFrame>
   );
 }
 
-function Body({ phase, elapsed, onRetry }: { phase: TimerStopPhase; elapsed: number; onRetry: () => void }) {
+function Body({ stageRef, phase, elapsed, onRetry }: {
+  stageRef: RefObject<HTMLDivElement | null>;
+  phase: TimerStopPhase;
+  elapsed: number;
+  onRetry: () => void;
+}) {
   if (phase.kind === 'IDLE') {
     return (
-      <div className="ts-stage">
+      <div ref={stageRef} className="ts-stage" tabIndex={-1}>
         <p className="ts-guide">시작을 누르면 목표 시간이 정해집니다. 그 시간에 맞춰 멈추세요.</p>
         <span className="ts-clock ts-clock-idle">0.000</span>
-        <p className="ov-note">Space 로도 시작·정지할 수 있어요.</p>
+        <p className="ts-key-hint"><kbd>Space</kbd> 로도 시작·정지할 수 있어요.</p>
       </div>
     );
   }
 
   if (phase.kind === 'ISSUING_SESSION') {
     return (
-      <div className="ts-stage">
+      <div ref={stageRef} className="ts-stage ts-stage-running" tabIndex={-1}>
         <span className="ts-clock ts-clock-idle">0.000</span>
         <p className="ov-note">판을 준비하는 중...</p>
       </div>
@@ -202,7 +216,8 @@ function Body({ phase, elapsed, onRetry }: { phase: TimerStopPhase; elapsed: num
           목표 <strong className="ts-target-value">{phase.session.targetSeconds.toFixed(3)}</strong>초
         </p>
         <span className="ts-clock" aria-live="off">{shown.toFixed(3)}</span>
-        <p className="ov-note">
+        <p className="ts-key-hint">
+          <kbd>Space</kbd>{' '}
           {phase.kind === 'RUNNING' ? `${phase.session.failAfterSeconds.toFixed(3)}초를 넘기면 실패예요` : '결과를 보내는 중...'}
         </p>
       </div>
@@ -247,13 +262,13 @@ function Body({ phase, elapsed, onRetry }: { phase: TimerStopPhase; elapsed: num
 
 function Footer({ phase, onStart, onStop }: { phase: TimerStopPhase; onStart: () => void; onStop: () => void }) {
   if (phase.kind === 'RUNNING') {
-    return <button type="button" className="ov-btn ov-btn-primary" onClick={onStop}>멈추기</button>;
+    return <button type="button" className="ov-btn ov-btn-primary ts-action" aria-label="멈추기" onClick={onStop}>멈추기 <kbd aria-hidden="true">Space</kbd></button>;
   }
   if (phase.kind === 'ISSUING_SESSION' || phase.kind === 'SUBMITTING') {
     return <button type="button" className="ov-btn ov-btn-primary" disabled>진행 중...</button>;
   }
   if (phase.kind === 'IDLE') {
-    return <button type="button" className="ov-btn ov-btn-primary" onClick={onStart}>시작</button>;
+    return <button type="button" className="ov-btn ov-btn-primary ts-action" aria-label="시작" onClick={onStart}>시작 <kbd aria-hidden="true">Space</kbd></button>;
   }
   return <button type="button" className="ov-btn ov-btn-primary" onClick={onStart}>다시 하기</button>;
 }

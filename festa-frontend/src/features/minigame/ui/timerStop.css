@@ -8,6 +8,7 @@
   gap: 10px;
   padding: 18px 0 8px;
   text-align: center;
+  outline: none;
 }
 
 .ts-guide {
@@ -45,6 +46,41 @@
 
 .ts-clock-idle { color: var(--ov-text-muted); }
 .ts-clock-done { font-size: 34px; }
+
+.ts-stage-running .ts-clock {
+  min-width: 5.6ch;
+  padding: 0.12em 0.28em;
+  border: 1px solid color-mix(in srgb, var(--ov-accent, #ffc94d) 44%, transparent);
+  border-radius: 0.45em;
+  background: color-mix(in srgb, var(--ov-accent, #ffc94d) 10%, transparent);
+}
+
+.ts-key-hint {
+  margin: 0;
+  color: var(--ov-text-muted);
+  font-size: 12px;
+}
+
+.ts-key-hint kbd,
+.ts-action kbd {
+  display: inline-block;
+  min-width: 2.8em;
+  padding: 0.1em 0.35em;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-bottom-width: 2px;
+  border-radius: 0.3em;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  font: inherit;
+  font-size: 0.88em;
+}
+
+.ts-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
 
 .ts-headline {
   font-size: 17px;
