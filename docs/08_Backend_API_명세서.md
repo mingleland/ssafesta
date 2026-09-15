@@ -467,6 +467,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
 - **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
+- **`PROJECT_PANEL`도 같은 모양이다** (`S15P21A604-765`, GitLab #194): 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다. 판정 근거는 **그 부스에 프로젝트가 없음**이고 warning `CONFIG_NOT_LINKED`("이 부스에 프로젝트가 없습니다.")로 나간다. **게시는 막지 않는다**(C-04). `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 
 ---
 

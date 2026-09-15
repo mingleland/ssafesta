@@ -86,7 +86,7 @@
 
 `configId` 소유 검증은 타입별로 대상 테이블이 다르다 — `AI_AGENT` → `ai_agents.booth_id`. **아직 판정하지 않는 타입은 검증 없이 통과시키되 warning(`CONFIG_UNVERIFIED`)으로 남긴다** (검증이 없다는 사실이 조용해지지 않게).
 
-**`LAPTOP`·`SURVEY_KIOSK`는 `configId` 소유 질문이 성립하지 않는다.** 연결 대상이 부스당 하나뿐이라 부스 단위 술어로 답한다 — 노트북은 `booths.homepage_url` 등록 여부(016 C-01), 키오스크는 `surveys`에 그 부스 행이 있는지(010 C-06). 둘 다 `CONFIG_NOT_LINKED` warning 을 쓰고 `configId` 체인을 타지 않는다 (`S15P21A604-699`, GitLab #181).
+**`LAPTOP`·`SURVEY_KIOSK`·`PROJECT_PANEL`은 `configId` 소유 질문이 성립하지 않는다.** 연결 대상이 부스당 하나뿐이라 부스 단위 술어로 답한다 — 노트북은 `booths.homepage_url` 등록 여부(016 C-01), 키오스크는 `surveys`에 그 부스 행이 있는지(010 C-06), 그래픽 패널은 `projects`에 그 부스 행이 있는지(009 C-01). 셋 다 `CONFIG_NOT_LINKED` warning 을 쓰고 `configId` 체인을 타지 않는다 (`S15P21A604-699`·`-765`, GitLab #181·#194).
 
 ---
 
