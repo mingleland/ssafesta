@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { facadeApi } from '../../../entities/booth/facadeApi.select';
-import { getAiAgent } from '../../../entities/aiAgent/api';
+import { getAiAgent } from '../../../entities/aiAgent/api.select';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
-import { getAiAgent } from '../../entities/aiAgent/api';
+import { getAiAgent } from '../../entities/aiAgent/api.select';
 import { useManagementBoothId, useManagementClose } from '../../features/booth/ui/ManagementScreen';
 import type { BoothFacade } from '../../entities/booth/types';
 import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK, ZOOM_PRESETS, clampZoom } from '../../shared/config/studio';

@@ -14,7 +14,7 @@ import {
   type AiAgentRole,
   type AiAgentTone,
   type AiDocumentStatus,
-} from '../../../entities/aiAgent/api';
+} from '../../../entities/aiAgent/api.select';
 import { isApiError } from '../../../shared/api/client';
 import { OverlayError, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 
