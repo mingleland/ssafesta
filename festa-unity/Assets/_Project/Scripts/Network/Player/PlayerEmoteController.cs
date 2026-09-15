@@ -37,7 +37,11 @@ namespace Festa.Network
         /// </summary>
         static readonly PlayerEmoteId[] Punches =
         {
-            PlayerEmoteId.Punch1, PlayerEmoteId.Punch2, PlayerEmoteId.Punch3
+            // **Punch2 는 뺐다.** 실측하면 발이 0.155 들리고 앞으로 0.495 나가는 **발차기 계열**인데
+            // (손은 0.347 뿐), 주먹은 상체 마스크 레이어에서만 재생하므로 다리가 빠져 어색하다
+            // (사용자 확인 2026-09-16 — "쓰기 애매하면 빼도 된다"). 열거형 값과 상태는 남겨 뒀다 —
+            // 전신으로 쓸 자리가 생기면 그대로 쓸 수 있고, 지우면 저장된 값과 어긋난다.
+            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3
         };
 
         /// <summary>
@@ -47,7 +51,7 @@ namespace Festa.Network
         /// 정해야 하는데, 상태 길이는 크로스페이드가 끝난 뒤에야 읽을 수 있다. 클립을 다시 자르면
         /// 이 값도 같이 고친다.</para>
         /// </summary>
-        static readonly float[] PunchSeconds = { 0.27f, 0.27f, 0.32f };
+        static readonly float[] PunchSeconds = { 0.27f, 0.32f };
 
         /// <summary>마지막 주먹이 끝난 뒤 이 시간 안에 다시 누르면 콤보가 이어진다.</summary>
         const float ComboKeepAlive = 0.8f;

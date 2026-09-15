@@ -358,7 +358,10 @@ namespace Festa.Network
             // 그 자세 그대로 몸이 떠올랐다 (사용자 보고 2026-09-13, 소파·바닥 앉기 둘 다).
             // 막지 않고 해제하는 쪽을 고른 것은 이동과 같은 규칙이기 때문이다 — 사용자가 Space 를
             // 눌렀다는 것은 그 자세를 끝내겠다는 뜻이지, 입력이 씹히길 바라는 것이 아니다.
-            if ((moving || IsJumpPressed()) && _player.EmoteId.Value != PlayerEmoteId.None)
+            // 주먹은 예외다. 상체 마스크 레이어에서만 재생하므로 다리는 그대로 걷고, 여기서 지우면
+            // 걸으면서 친 주먹이 누른 프레임에 사라진다 (사용자 지적 2026-09-16).
+            var currentEmote = _player.EmoteId.Value;
+            if ((moving || IsJumpPressed()) && currentEmote != PlayerEmoteId.None && !IsUpperBodyOnly(currentEmote))
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
             // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.
@@ -596,6 +599,10 @@ namespace Festa.Network
 
         Vector3 NoStandSlide()
             => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+
+        /// <summary>상체 레이어에서만 재생돼 이동과 함께 나갈 수 있는 이모트인가 (주먹질).</summary>
+        static bool IsUpperBodyOnly(PlayerEmoteId emote) =>
+            emote == PlayerEmoteId.Punch1 || emote == PlayerEmoteId.Punch2 || emote == PlayerEmoteId.Punch3;
 
         // ── 밖에서 들어온 밀림 (주먹질 피격, 2026-09-15) ────────────────
         //
