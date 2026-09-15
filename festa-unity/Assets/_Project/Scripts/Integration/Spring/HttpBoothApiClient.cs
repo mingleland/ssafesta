@@ -26,7 +26,7 @@ namespace Festa.Integration
         public async Task<BoothDetailDto> GetBoothDetailAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}";
-            var body = await GetAsync(url, boothId, "booth detail");
+            var body = await GetAsync(url, $"Booth {boothId}", "booth detail");
             if (body == null) return null;
 
             var detail = BoothFacadeParser.Parse(body);
@@ -38,27 +38,71 @@ namespace Festa.Integration
             return detail;
         }
 
+        public async Task<BoothProjectsDto> GetPublishedProjectsAsync(int boothId)
+        {
+            var url = $"{_baseUrl}/api/v1/booths/{boothId}/projects/published";
+            var body = await GetAsync(url, $"Booth {boothId}", "published projects");
+            // 404(미게시·부스 없음)·409(임대 만료)는 정상 경로다 — GetAsync 가 이미 null 로 접어 준다.
+            // 여기서 로그를 더 남기지 않는 이유: 축제장에 들어설 때마다 빈 부스 수만큼 경고가 쏟아진다.
+            return body == null ? null : BoothProjectParser.Parse(body);
+        }
+
+        public async Task<BoothSlotDto[]> GetSlotsAsync()
+        {
+            var url = $"{_baseUrl}/api/v1/booth-slots";
+            var body = await GetAsync(url, "Booth slots", "slot list");
+            if (body == null) return null;
+
+            var slots = BoothSlotListParser.Parse(body);
+            if (slots == null)
+            {
+                Debug.LogError("[HttpBoothApiClient] 슬롯 목록 파싱 실패");
+                return null;
+            }
+            return slots;
+        }
+
         public async Task<BoothLayoutDto> GetPublishedLayoutAsync(int boothId)
         {
             var url = $"{_baseUrl}/api/v1/booths/{boothId}/layouts/published";
-            var body = await GetAsync(url, boothId, "published layout");
+            return await GetLayoutAsync(url, $"Booth {boothId}");
+        }
+
+        public async Task<BoothLayoutDto> GetPublishedLayoutBySlotAsync(int slotId)
+        {
+            // visitor 경로 — 슬롯을 임차 중인 부스의 공개본을 서버가 풀어서 준다.
+            // 응답 스키마는 booths 경로와 동일 (BE PublishedView 가 BoothLayoutDto 필드명에 맞춰져 있다).
+            var url = $"{_baseUrl}/api/v1/booth-slots/{slotId}/layouts/published";
+            _lastTransientFailure = false;
+            var layout = await GetLayoutAsync(url, $"Slot {slotId}");
+            // 404(미게시)·409(임대 만료)·파싱 실패는 서버가 답한 확정 결과 — 재시도 루프가 다시 묻지 않게 기록한다.
+            PublishedSlotResolution.Set(slotId, _lastTransientFailure);
+            return layout;
+        }
+
+        /// <summary>직전 <see cref="GetAsync"/> 가 네트워크·타임아웃으로 끝났는가(true). HTTP 응답을 받았으면 false.</summary>
+        bool _lastTransientFailure;
+
+        async Task<BoothLayoutDto> GetLayoutAsync(string url, string who)
+        {
+            var body = await GetAsync(url, who, "published layout");
             if (body == null) return null;
 
             var layout = BoothLayoutParser.Parse(body);
             if (layout == null)
             {
-                Debug.LogError($"[HttpBoothApiClient] Booth {boothId}: 응답 JSON 파싱 실패");
+                Debug.LogError($"[HttpBoothApiClient] {who}: 응답 JSON 파싱 실패");
                 return null;
             }
 
             if (layout.objects.Length == 0)
-                Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: 빈 layout (objects 0개)");
+                Debug.LogWarning($"[HttpBoothApiClient] {who}: 빈 layout (objects 0개)");
 
             return layout;
         }
 
         /// <summary>GET 공통부. 실패는 예외 대신 null + 로그 (부스 로딩 실패가 클라이언트를 깨지 않게).</summary>
-        async Task<string> GetAsync(string url, int boothId, string what)
+        async Task<string> GetAsync(string url, string who, string what)
         {
             using var request = UnityWebRequest.Get(url);
             request.timeout = TimeoutSeconds;
@@ -82,7 +126,8 @@ namespace Festa.Integration
                     break;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404:
-                    Debug.LogWarning($"[HttpBoothApiClient] Booth {boothId}: {what} 없음 (404)");
+                    // 미게시(LAYOUT_NOT_PUBLISHED)도 404 로 온다 — 정상 경로라 warning 이면 충분하다.
+                    Debug.LogWarning($"[HttpBoothApiClient] {who}: {what} 없음 (404)");
                     return null;
 
                 case UnityWebRequest.Result.ProtocolError:
@@ -90,6 +135,7 @@ namespace Festa.Integration
                     return null;
 
                 default: // ConnectionError, DataProcessingError, timeout
+                    _lastTransientFailure = true;
                     Debug.LogError($"[HttpBoothApiClient] GET {url} 실패: {request.error} (CORS/네트워크/타임아웃 확인)");
                     return null;
             }

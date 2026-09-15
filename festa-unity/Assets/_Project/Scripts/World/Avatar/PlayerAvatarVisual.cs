@@ -51,6 +51,7 @@ namespace Festa.World
         Material _groundShadowMaterial;
         Texture2D _groundShadowTexture;
         Animator _animator;
+        CharacterController _controller;
         string _appliedEncoded;
 
         public AvatarCatalog Catalog => _catalog;
@@ -61,6 +62,7 @@ namespace Festa.World
         {
             _player = GetComponent<NetworkPlayer>();
             _appearance = GetComponent<PlayerAppearanceController>();
+            _controller = GetComponent<CharacterController>();
             _provider = new CatalogAvatarVisualProvider(_catalog, _modularCatalog);
             if (_visualRoot == null) _visualRoot = transform;
         }
@@ -71,6 +73,21 @@ namespace Festa.World
             _player.AnimState.OnValueChanged += OnAnimStateChanged;
             _player.EmoteId.OnValueChanged += OnEmoteChanged;
 
+            // 서버는 grant 에 외형이 없어(#138) 초기값을 기본 프리셋으로 채우고, 진짜 외형은 소유자 RPC 로 곧 뒤따른다.
+            // 그 기본값으로 먼저 조립하면 사람 1명 입장에 모두의 화면에서 조립이 2번 돌고(40명이면 80회), 기본 아바타가
+            // 잠깐 보였다 옷을 갈아입는다(QA 2026-09-08 #37). 기본 프리셋이면 잠깐 기다려 진짜 외형이 오면 그것만 짓는다.
+            var initial = _appearance.Encoded.Value.ToString();
+            if (initial == AvatarAppearance.DefaultPreset) DeferDefaultBuildAsync();
+            else Rebuild(initial);
+        }
+
+        /// <summary>기본 프리셋 상태에서 1.5초 기다린다. 그 안에 외형이 오면 OnEncodedChanged 가 짓고 이 호출은 물러난다.
+        /// 끝내 안 오면(게스트·구 클라이언트) 기본 외형으로 짓는다 — 안 보이는 것보다는 기본 옷이 낫다.</summary>
+        async void DeferDefaultBuildAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(1.5f);
+            if (this == null || !IsSpawned) return;
+            if (_appliedEncoded != null) return;   // 그 사이 진짜 외형이 도착해 이미 지었다
             Rebuild(_appearance.Encoded.Value.ToString());
         }
 
@@ -88,12 +105,46 @@ namespace Festa.World
 
         void OnEmoteChanged(PlayerEmoteId _, PlayerEmoteId next) => ApplyEmote(next);
 
+        /// <summary>
+        /// 아바타 한 기를 조립하는 데 실제로 몇 ms 가 드는지 — 이 값을 넘으면 로그로 남긴다.
+        ///
+        /// <para><b>왜 재는가.</b> "사람이 들어올 때마다 잔렉이 있다" 는 보고(2026-09-14)의 원인을
+        /// 추정으로 정하지 않기 위해서다. 브라우저 rAF 로는 잴 수 없다 — 탭이 숨겨지면 Chrome 이
+        /// 프레임을 1초에 한 번으로 죽여 측정값이 통째로 거짓이 된다(같은 날 실제로 그렇게 틀렸다).
+        /// <b>동기 호출을 스톱워치로 감싸면 그 문제를 우회한다</b> — 프레임이 드물게 돌아도
+        /// 그 안에서 걸린 시간은 진짜다.</para>
+        ///
+        /// <para>에디터 사전 측정에서 조립기(<c>AvatarAssembler.Apply</c>)만 떼어 재면 첫 회 208ms,
+        /// 이후 3~4ms 였다. 여기서는 <c>BakeMesh</c>·그림자 설정·<c>Animator.Rebind</c> 까지 포함한
+        /// <b>입장 1건의 전체 비용</b>을 잰다.</para>
+        /// </summary>
+        const double RebuildLogThresholdMs = 8d;
+
         void Rebuild(string encoded)
+        {
+            var __sw = System.Diagnostics.Stopwatch.StartNew();
+            try { RebuildCore(encoded); }
+            finally
+            {
+                __sw.Stop();
+                double ms = __sw.Elapsed.TotalMilliseconds;
+                if (ms >= RebuildLogThresholdMs)
+                    Debug.Log($"[AvatarVisual] 조립 비용 {ms:F1} ms (owner={OwnerClientId}) — 한 프레임에 동기로 든 값이다");
+            }
+        }
+
+        void RebuildCore(string encoded)
         {
             // 부하 테스트 봇은 외형을 만들지 않는다 — 화면이 없어 보이지 않는데
             // 스킨 메시·재질·본을 통째로 올리면 프로세스당 메모리가 커져 한 대에서
             // 띄울 수 있는 봇 수가 줄어든다. 봇의 목적은 대역폭 생성이지 렌더가 아니다.
             if (Festa.Diagnostics.LoadTestBot.IsBotProcess) return;
+
+            // 데디케이티드 서버도 같은 이유로 만들지 않는다 (S15P21A604-314). 화면이 없는데
+            // 스킨 메시·머티리얼을 올리면 접속자 수만큼 곱해져 40인 목표에서 값이 붙고,
+            // 셰이더가 스트립된 빌드라 만들 때마다 경고가 로그를 덮어 진짜 로그를 밀어낸다.
+            // 플레이어의 충돌·위치 권위는 NetworkPlayer 쪽이라 외형을 빼도 영향이 없다.
+            if (Festa.Core.HeadlessRuntime.IsHeadless) return;
 
             if (string.IsNullOrEmpty(encoded)) return;
 
@@ -114,6 +165,8 @@ namespace Festa.World
             _animator = _currentVisual.GetComponentInChildren<Animator>();
             AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
+            // 발 IK — 단차에서 한 발이 뜨거나 파묻히지 않게 (2026-09-09). 컨트롤러 Base Layer 에 IK Pass 가 켜져 있어야 OnAnimatorIK 가 불린다.
+            if (_animator != null && _animator.GetComponent<AvatarFootIK>() == null) _animator.gameObject.AddComponent<AvatarFootIK>();
 
             ApplyAnimState(_player.AnimState.Value);
             ApplyEmote(_player.EmoteId.Value);
@@ -158,6 +211,14 @@ namespace Festa.World
 
             // 선 자세 기준값. 이모트로 접지를 고쳤다가 되돌릴 때 쓴다.
             _baseVisualLocalY = visualTransform.localPosition.y;
+            _calibratedVisualLocalY = _baseVisualLocalY;   // 표류 상한의 기준 — 실측할 때만 바뀐다
+
+            // **컨트롤러가 자리잡은 뒤 한 번 더 잰다.** 조립 시점에는 캐릭터가 아직
+            // 낙하·정착 중이라 루트가 바닥에서 0.10~0.22u 사이 어디에나 있을 수 있고
+            // (CharacterController 는 skinWidth 안에서 파고들었다 밀려나기를 반복한다),
+            // 그 순간 값으로 오프셋을 굳히면 정착 후 0.12u(≈1 cm) 어긋난 채 남는다.
+            _regroundAt = Time.time + SpawnSettle;
+            _baseNeedsRefresh = true;
         }
 
         // ── 포즈별 접지 보정 ────────────────────────────────────────
@@ -177,12 +238,21 @@ namespace Festa.World
         // 선 자세와 앉은 자세의 **중간값**이 나온다.
         const float RegroundSettle = 0.32f;
 
+        /// <summary>스폰 직후 컨트롤러가 바닥에 정착할 때까지 기다리는 시간.</summary>
+        const float SpawnSettle = 0.6f;
+
+        bool _baseNeedsRefresh;
+
         /// <summary>
         /// 접지가 선 자세와 다른 이모트. 새 이모트를 추가할 때 **추측하지 말고 재서** 넣는다 —
         /// 손이 발보다 아래로 내려가는 동작(숙이기 등)에 이 보정을 걸면 손을 바닥에 붙이려고
         /// 몸이 떠오른다.
         /// </summary>
-        static bool ChangesGroundContact(PlayerEmoteId emote) => emote == PlayerEmoteId.SitGround;
+        // 내리찍기(Strike)도 포함한다 — 무릎을 꿇으며 엉덩이가 0.95 → 0.54 m 로 떨어지고 발이 원점 아래
+        // 0.04 m 까지 내려간다. 접지 보정을 그대로 돌리면 그 프레임을 "바닥에 박힌 것" 으로 읽고 몸을
+        // 끌어내려 파묻힌다(사용자 지적 2026-09-10). 원샷이라 끝나면 RestoreBaseGrounding 이 되돌린다.
+        static bool ChangesGroundContact(PlayerEmoteId emote) =>
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike || LiePoseTable.IsLie(emote);
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
@@ -194,11 +264,154 @@ namespace Festa.World
             if (!TryGetVisibleGeometryBounds(out var fitted)) return false;
 
             var visualTransform = _currentVisual.transform;
-            float bottomRelativeToRoot = fitted.min.y - transform.position.y;
+            float bottomRelativeToContact = fitted.min.y - FootContactY();
             var p = visualTransform.localPosition;
-            p.y -= bottomRelativeToRoot - _groundClearance;
+            p.y -= bottomRelativeToContact - _groundClearance;
             visualTransform.localPosition = p;
+            _rootHeightAtGrounding = RootHeightAboveGround();
             return true;
+        }
+
+        /// <summary>
+        /// 루트가 바닥에서 얼마나 떠 있는지. 못 재면 <see cref="float.NaN"/>.
+        /// </summary>
+        float RootHeightAboveGround()
+            => TryFindGroundBelowFeet(out var g) ? transform.position.y - g : float.NaN;
+
+        /// <summary>
+        /// 루트 높이가 바뀐 만큼 외형을 보정해 발을 바닥에 붙여 둔다.
+        ///
+        /// <para><b>왜 한 번 재는 것으로 부족한가.</b> CharacterController 는 캡슐 바닥을
+        /// 바닥면에 붙이지 않고 skinWidth(0.22) 안에서 파고들었다 밀려나기를 반복한다.
+        /// 실측하면 루트가 바닥 위 0.10u 일 때도 0.22u 일 때도 있고, 착지·이동 이력에 따라
+        /// 갈린다. 외형은 루트의 자식이라 그 차이를 그대로 물려받아, 스폰 때 잰 값으로
+        /// 고정하면 상태가 바뀐 뒤 0.12u(≈1 cm) 어긋난 채 남는다.</para>
+        ///
+        /// <para><b>포즈는 다시 재지 않는다.</b> 여기서 하는 것은 루트 높이 변화분을
+        /// 상쇄하는 것뿐이다. 매 프레임 포즈 최하단을 바닥에 붙이면 걷는 동안 발이 번갈아
+        /// 뜨면서 몸이 펌프질한다 — 그래서 포즈 재측정은 이모트에서만 한다.</para>
+        ///
+        /// <para>레이캐스트 한 발을 10 Hz 로만 쏜다. 접지 중일 때만 도는데, 공중에서는
+        /// 바닥까지의 거리가 발 위치와 무관하기 때문이다.</para>
+        /// </summary>
+        void HoldFeetOnGround()
+        {
+            if (_currentVisual == null || _controller == null || !_controller.isGrounded) return;
+            if (Time.time < _nextFootCheck) return;
+            _nextFootCheck = Time.time + FootCheckInterval;
+
+            float now = RootHeightAboveGround();
+            if (float.IsNaN(now) || float.IsNaN(_rootHeightAtGrounding)) return;
+
+            float drift = now - _rootHeightAtGrounding;
+            if (Mathf.Abs(drift) < 0.01f) return;
+
+            // **한 틱에 이만큼 넘게 변했으면 바닥 판독이 틀린 것이다.** 실제 표류는 skinWidth(0.22) 안팎이라
+            // 1.5u(11 cm)를 넘을 수 없다. 착지 프레임에 바닥을 놓쳐 몇 u 아래 슬래브를 잡으면 그 값이
+            // 그대로 보정으로 들어가 몸이 묻혔다 — 그런 판독은 보정하지 않고 기준만 다시 잡는다.
+            if (Mathf.Abs(drift) > MaxDriftPerTick) { _rootHeightAtGrounding = now; return; }
+
+            var t = _currentVisual.transform;
+            var p = t.localPosition;
+            p.y -= drift;
+            float nextBase = _baseVisualLocalY - drift;
+
+            // **바닥 밑으로는 절대 내려가지 않는다** (사용자 지시 2026-09-10). 보정은 누적되는 값이라
+            // 위 검사만으로는 조금씩 밀려 내려갈 수 있다. 조립·재측정 때 잡은 기준(_calibratedVisualLocalY)
+            // 에서 벗어날 수 있는 폭을 못 박아 둔다 — 정상 보정은 skinWidth 범위라 이 한계에 닿지 않는다.
+            //
+            // 접지가 달라지는 이모트(앉기·눕기)는 제외한다 — 선 자세 기준으로 잡은 한계를 그대로 걸면
+            // 앉거나 누운 몸을 도로 끌어올려 공중에 띄운다.
+            if (!ChangesGroundContact(_player.EmoteId.Value))
+            {
+                float lo = _calibratedVisualLocalY - MaxVisualCorrection;
+                float hi = _calibratedVisualLocalY + MaxVisualCorrection;
+                p.y = Mathf.Clamp(p.y, lo, hi);
+                nextBase = Mathf.Clamp(nextBase, lo, hi);
+            }
+
+            t.localPosition = p;
+            _baseVisualLocalY = nextBase;      // 이모트 복귀 기준값도 같이 옮긴다
+            _rootHeightAtGrounding = now;
+        }
+
+        /// <summary>한 번의 접지 보정이 넘을 수 없는 값. 이보다 크면 바닥 판독 오류로 본다.</summary>
+        const float MaxDriftPerTick = 1.5f;
+
+        /// <summary>조립·재측정 기준에서 외형이 벗어날 수 있는 최대 폭(위아래). 1.5u ≈ 11 cm.</summary>
+        const float MaxVisualCorrection = 1.5f;
+
+        /// <summary>
+        /// 마지막으로 **실측해서** 잡은 외형 오프셋. <see cref="_baseVisualLocalY"/> 는 접지 보정으로 조금씩
+        /// 움직이지만 이 값은 재측정할 때만 바뀐다 — 누적 표류의 상한을 여기에 건다.
+        /// </summary>
+        float _calibratedVisualLocalY;
+
+        const float FootCheckInterval = 0.1f;
+        float _nextFootCheck;
+        float _rootHeightAtGrounding = float.NaN;
+
+        /// <summary>
+        /// 발이 놓여야 할 높이 — **루트가 아니라 실제 바닥면**이다.
+        ///
+        /// <para>루트에 맞추면 뜬다. CharacterController 는 캡슐 바닥을 바닥면에 붙이지
+        /// 않고 띄운 채 정지하기 때문이다. 실측하면 루트가 바닥보다 0.10~0.22u 위에 있고
+        /// 그 값이 상황에 따라 변한다 — skinWidth(0.22) 를 상수로 빼는 것으로는 맞출 수
+        /// 없다. 여유값(0.03)까지 더해 아바타가 최대 0.25u 떠 있었다
+        /// (S15P21A604-355 사용자 지적).</para>
+        ///
+        /// <para>바닥을 못 찾으면(스폰 직후 허공 등) 캡슐 바닥으로 추정한다. 캡슐 바닥은
+        /// center.y - height/2 로 구한다 — 지금은 0 이지만 상수로 박으면 컨트롤러를
+        /// 조정할 때 조용히 어긋난다.</para>
+        /// </summary>
+        float FootContactY()
+        {
+            if (TryFindGroundBelowFeet(out var groundY)) return groundY;
+
+            float y = transform.position.y;
+            if (_controller == null) return y;
+            return y + _controller.center.y - _controller.height * 0.5f - _controller.skinWidth;
+        }
+
+        /// <summary>
+        /// 발 바로 위에서 아래로 쏴서 딛고 선 면을 찾는다.
+        ///
+        /// <para><see cref="TryFindGroundHeight"/> 를 쓰면 안 된다. 그쪽은 50u 위에서
+        /// 쏘고 <b>가장 높은 히트</b>를 고르기 때문에 실내에서는 천장·선반이 바닥으로
+        /// 잡힌다 — 접지 그림자를 대충 놓는 용도라 그래도 됐지만 발을 맞추는 데는 못 쓴다.
+        /// 여기서는 발 근처에서 시작하므로 가장 높은 히트가 곧 <b>바로 아래 면</b>이다.</para>
+        /// </summary>
+        /// <summary>발보다 이만큼 위까지는 바닥으로 인정한다 — 낮은 단차·경사에서 판독이 끊기지 않게.</summary>
+        const float GroundProbeTolerance = 2f;
+
+        bool TryFindGroundBelowFeet(out float groundY)
+        {
+            groundY = 0f;
+
+            // **머리 위에서 쏜다.** 전에는 발밑 2u 에서 쐈는데, 조금 높은 데서 뛰어내린 착지 프레임에
+            // CharacterController 가 바닥을 파고들면 광선이 바닥 콜라이더 **안에서** 시작해 그 면을 놓친다.
+            // 그러면 그 아래 다른 슬래브가 바닥으로 잡히고, HoldFeetOnGround 가 그 차이(수 u)만큼 외형을
+            // 끌어내려 몸이 바닥에 묻힌 채 굳었다 (2026-09-10 사용자 지적 — 여러 곳에서 재현).
+            float up = _controller != null ? _controller.height + 2f : 24f;
+            var origin = transform.position + Vector3.up * up;
+            float ceiling = transform.position.y + GroundProbeTolerance;
+
+            var hits = Physics.RaycastAll(origin, Vector3.down, up + 30f, ~0, QueryTriggerInteraction.Ignore);
+            var found = false;
+            var best = float.NegativeInfinity;
+
+            foreach (var hit in hits)
+            {
+                if (hit.transform == null || hit.transform.IsChildOf(transform)) continue;
+                // 발보다 위에 있는 면(옆 단상·책상 상판)은 내가 선 바닥이 아니다.
+                if (hit.point.y > ceiling) continue;
+                if (hit.point.y <= best) continue;
+                best = hit.point.y;
+                found = true;
+            }
+
+            if (found) groundY = best;
+            return found;
         }
 
         /// <summary>이모트가 끝나면 선 자세 기준으로 되돌린다.</summary>
@@ -232,6 +445,13 @@ namespace Festa.World
 
                 var baked = new Mesh();
                 skinned.BakeMesh(baked);
+                // **바운즈를 다시 계산해야 한다.** BakeMesh 는 정점만 굽고 bounds 는
+                // SkinnedMeshRenderer 의 것(바인드포즈 골격 범위)을 그대로 물고 온다 —
+                // 이 함수가 BakeMesh 를 쓰는 이유였던 바로 그 부풀린 값이다 (T-201).
+                // 재계산을 빠뜨려 신발 최하단을 1.410 대신 0.214 로 읽었고, 그만큼
+                // 아바타가 **1.32u(≈10 cm) 떠 있었다** (S15P21A604-355 사용자 지적).
+                // 재계산 결과는 정점을 전부 훑은 값과 소수점 4자리까지 같고 3 ms 면 끝난다.
+                baked.RecalculateBounds();
                 var localBounds = baked.bounds;
                 Destroy(baked);
 
@@ -260,16 +480,29 @@ namespace Festa.World
             return found;
         }
 
+        /// <summary>
+        /// 지면 탐색용 히트 버퍼. **모든 아바타가 함께 쓴다** — 한 프레임 안에서 한 번에 하나씩만
+        /// 쓰이므로 공유해도 안전하고, 이걸 공유해야 할당이 0 이 된다.
+        ///
+        /// <para>예전에는 <c>Physics.RaycastAll</c> 이었다. 그쪽은 **호출마다 배열을 새로 할당**한다.
+        /// 아바타마다 매 프레임 부르므로 40명이면 프레임당 배열 40개가 쓰레기로 나갔다 —
+        /// "사람이 많아질수록 조금씩 무거워진다" 의 정체다. 레이캐스트 횟수가 아니라 할당이 문제였다
+        /// (2026-09-08 조사).</para>
+        /// </summary>
+        static readonly RaycastHit[] s_groundHits = new RaycastHit[16];
+
         bool TryFindGroundHeight(out float groundY)
         {
             groundY = 0f;
             var origin = _visualRoot.position + Vector3.up * 50f;
-            var hits = Physics.RaycastAll(origin, Vector3.down, 100f, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.RaycastNonAlloc(origin, Vector3.down, s_groundHits, 100f, ~0,
+                                                QueryTriggerInteraction.Ignore);
             var found = false;
             var bestY = float.NegativeInfinity;
 
-            foreach (var hit in hits)
+            for (int i = 0; i < count; i++)
             {
+                var hit = s_groundHits[i];
                 if (hit.transform == null || hit.transform.IsChildOf(transform))
                     continue;
                 if (hit.point.y <= bestY)
@@ -380,8 +613,20 @@ namespace Festa.World
             if (_regroundAt > 0f && Time.time >= _regroundAt)
             {
                 _regroundAt = 0f;
-                GroundToCurrentPose();
+                if (GroundToCurrentPose() && _baseNeedsRefresh)
+                {
+                    // 정착 후 다시 잰 값이 선 자세의 진짜 기준이다. 이모트로 접지를
+                    // 고쳤다 되돌릴 때 이 값으로 돌아간다.
+                    _baseNeedsRefresh = false;
+                    if (!ChangesGroundContact(_player.EmoteId.Value))
+                    {
+                        _baseVisualLocalY = _currentVisual.transform.localPosition.y;
+                        _calibratedVisualLocalY = _baseVisualLocalY;
+                    }
+                }
             }
+
+            HoldFeetOnGround();
             if (_groundShadow == null || _groundShadowRenderer == null) return;
 
             if (!TryFindGroundHeight(out var groundY))
@@ -563,9 +808,28 @@ namespace Festa.World
                     _animator.SetFloat(SpeedHash, running ? 2f : moving ? 1f : 0f);
             }
 
-            if (_player.EmoteId.Value == PlayerEmoteId.None)
+            if (_player.EmoteId.Value == PlayerEmoteId.None && !SwingHoldsAnimator)
                 CrossFadeLocomotion(state);
         }
+
+        /// <summary>
+        /// 망치 스윙이 애니메이터를 쥐고 있는가. 참이면 로코모션으로 갈아타지 않는다.
+        ///
+        /// <para><b>왜 EmoteId 만으로는 부족한가.</b> 스윙 시작은 <c>SwingClientRpc</c> 로 <b>즉시</b> 오는데
+        /// <see cref="Festa.Network.NetworkPlayer.EmoteId"/> 는 NetworkVariable 이라 다음 틱(30tick ≈ 33 ms)에
+        /// 온다. 그 틈에 남의 화면에서는 EmoteId 가 아직 None 이라, 치는 사람이 멈추며 바뀐 AnimState 가
+        /// 방금 켠 <c>Emote_Strike</c> 를 Idle 로 덮었다 — 남들 눈에는 "움찔하고 만다" 로 보였다
+        /// (사용자 지적 2026-09-11). 클립이 빌드에서 빠진 게 아니라 한 프레임 만에 덮인 것이다.</para>
+        /// </summary>
+        bool SwingHoldsAnimator
+        {
+            get
+            {
+                if (_strikeProp == null) _strikeProp = GetComponent<AvatarStrikeProp>();
+                return _strikeProp != null && _strikeProp.IsSwinging;
+            }
+        }
+        AvatarStrikeProp _strikeProp;
 
         void ApplyEmote(PlayerEmoteId emote)
         {
@@ -573,18 +837,46 @@ namespace Festa.World
             if (emote == PlayerEmoteId.None)
             {
                 RestoreBaseGrounding();
-                CrossFadeLocomotion(_player.AnimState.Value);
+                // 스윙 중이면 로코모션으로 돌리지 않는다 — 원샷 이모트가 None 으로 복귀하는 틱이
+                // 스윙 한가운데 떨어지면 망치만 남고 몸이 Idle 로 돌아간다. 복귀는 EndSwing 이 한다.
+                if (!SwingHoldsAnimator) CrossFadeLocomotion(_player.AnimState.Value);
                 return;
             }
 
             // 접지가 바뀌는 포즈면 크로스페이드가 끝난 뒤 다시 잰다. 그렇지 않은 이모트는
             // 선 자세 기준으로 되돌린다(앉기 → 다른 이모트로 바로 넘어가는 경우).
-            if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
+            // 눕기는 선 자세→누운 자세가 멀어 0.2 초면 덜컥한다. 조금 길게 섞고, 재측정도 그만큼 뒤로.
+            bool lie = LiePoseTable.IsLie(emote);
+            float fade = lie ? 0.35f : 0.2f;
+            if (lie)
+            {
+                // 눕기는 **한 번 재지 않고 실측표로 내린다.** 클립의 루트는 팩의 침대·소파 바닥에 있고 몸은
+                // 0.3~0.5 m 위에 떠 있다(LiePoseTable). 표의 최하단은 루프 전체의 최저값 = 팩의 매트리스 면이라
+                // 그만큼 내리면 몸이 소파 윗면에 닿고, 팔을 들거나 뒤척이는 위상에서는 그 부위만 자연히 떠 있다.
+                // 한 순간을 재서 붙이면(GroundToCurrentPose) 그 순간 가장 낮았던 팔꿈치·손이 기준이 되어 나머지
+                // 위상에서 몸 전체가 소파에 0.7u(5 cm) 떠 보였다 — 2026-09-10 LieRight 실측. 외형 배율은 조립 때
+                // visualTransform.localScale 에 실려 있다(실측 13.74).
+                _regroundAt = 0f;
+                if (_currentVisual != null)
+                {
+                    var vt = _currentVisual.transform;
+                    var p = vt.localPosition;
+                    p.y = _baseVisualLocalY - (LiePoseTable.MinY(emote) - LiePoseTable.IdleMinY) * vt.localScale.y;
+                    vt.localPosition = p;
+                }
+            }
+            else if (emote == PlayerEmoteId.Strike)
+            {
+                // 망치 궤적은 서 있는 발 기준이다. 스윙 중간의 숙인 포즈로 루트를 재접지하면
+                // 팔·망치와 몸의 기준 높이가 갈라진다. 무릎 꿇는 구간은 StrikeProp에서 제외한다.
+                RestoreBaseGrounding();
+            }
+            else if (ChangesGroundContact(emote)) _regroundAt = Time.time + RegroundSettle;
             else RestoreBaseGrounding();
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
-                _animator.CrossFadeInFixedTime(stateName, 0.2f, 0);
+                _animator.CrossFadeInFixedTime(stateName, fade, 0);
             else
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
         }

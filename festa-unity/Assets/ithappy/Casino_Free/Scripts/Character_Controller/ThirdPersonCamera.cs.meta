@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 07e0ea33015d4eafa708cfa08d781690
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Character_Controller/ThirdPersonCamera.cs
+  uploadId: 963832

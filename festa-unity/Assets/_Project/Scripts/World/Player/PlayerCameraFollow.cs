@@ -57,6 +57,41 @@ namespace Festa.World
         [SerializeField] float _selfHideDistance = 7.5f;   // 이보다 가까우면 숨긴다
         [SerializeField] float _selfShowDistance = 10f;   // 이보다 멀어지면 다시 보인다
 
+        // ── 오클루전 근접 가드 (T-217 재발, 2026-09-09) ───────────────────
+        // 베이크된 오클루전 컬링은 카메라가 **정적 지오메트리에 붙어 있을 때** 카메라를 벽 너머
+        // 셀로 판정해 실내를 통째로 컬링한다 — 벽에 붙어 돌면 벽이 뚫려 하늘이 보이는 화면.
+        // 실측(로비 1,665포즈, 같은 프레임 ON/OFF 픽셀 비교): 가장 가까운 정적 콜라이더가
+        // 6u 이내일 때만 누출(≤2u 14%, ≤4u 12%, ≤6u 2%), **8u 이상에서는 700포즈 중 0건.**
+        // smallestOccluder 20→5 재베이크는 오히려 악화(18%→25%)했고 backfaceThreshold 는
+        // 무효했다 — 베이크 해상도로 고칠 수 있는 유형이 아니다.
+        // 그래서 카메라가 이 반경 안에 정적 콜라이더를 두면 그 프레임만 컬링을 끈다.
+        // 12u(0.9 m) 는 마지막 누출 버킷(6u)의 2배 여유다. 벽에 붙은 동안만 드로우콜이
+        // 오클루전 없는 값으로 돌아가고(로비 623→1,240 실측), 떨어지면 즉시 복귀한다.
+        //
+        // **바닥·천장은 세지 않는다.** 누출 실측은 벽(수평 법선) 기준이고, 카메라는 충돌 클램프로
+        // 바닥·천장에 박히지 않는다. 그런데 최대 줌아웃에서 위를 보면(불꽃놀이!) 카메라가 바닥
+        // 5u 위까지 내려와 반구 검사로는 가드가 켜져 버렸다(실측 623→1,121 드로우콜, 2배).
+        // 가장 무거운 구역에서 가장 흔한 자세에 2배 비용을 물 수는 없다 — 옆(수평)만 본다.
+        // 수평 레이 8방향으로 본다. OverlapSphere+ClosestPoint 는 못 쓴다 — 바닥·벽이 비볼록
+        // MeshCollider 라 ClosestPoint 가 입력점을 그대로 돌려줘(거리 0) 방향을 가릴 수 없었다(실측).
+        [SerializeField] float _occlusionGuardRadius = 12f;
+        bool _occlusionSuppressed;
+        static readonly Vector3[] s_guardDirs = BuildGuardDirs();
+
+        static Vector3[] BuildGuardDirs()
+        {
+            var dirs = new Vector3[8];
+            for (int i = 0; i < dirs.Length; i++)
+            {
+                float a = i * Mathf.PI * 2f / dirs.Length;
+                dirs[i] = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+            }
+            return dirs;
+        }
+
+        /// <summary>지금 프레임에 근접 가드가 오클루전을 끄고 있는가 (HUD·진단용).</summary>
+        public static bool OcclusionSuppressed { get; private set; }
+
         Camera _cam;
         float _distance;
         float _yaw;
@@ -103,6 +138,13 @@ namespace Festa.World
         /// 텔레포트 직후 카메라를 플레이어 뒤로 즉시 스냅한다. 보간에 맡기면
         /// 카메라가 맵을 가로질러 날아오며 오클루전이 셀마다 번쩍인다.
         /// </summary>
+        /// <summary>목적지가 정한 방향(yaw)으로 궤도를 돌리고 뒤로 스냅한다 — 포털 입장 뒤 부스를 바라보게 (2026-09-06).</summary>
+        public void SnapBehind(float yaw)
+        {
+            _yaw = yaw;
+            SnapBehind();
+        }
+
         public void SnapBehind()
         {
             if (_cam == null) return;
@@ -181,12 +223,85 @@ namespace Festa.World
             }
 
             var obstructed = desiredDistance < _distance - 0.001f;
-            _cam.transform.position = obstructed
+            var candidate = obstructed
                 ? targetPos
                 : Vector3.Lerp(_cam.transform.position, targetPos, _followLerp * Time.deltaTime);
+
+            // 최종 위치에도 시야선 클램프를 건다 (T-217). 위의 SphereCast 는 "목표 위치"의
+            // 방향만 검사하는데, 실제 카메라는 보간(_followLerp) 경로 위에 있다 — 벽에 붙어
+            // 회전하거나 급히 방향을 바꾸면 보간 경로가 벽을 가로질러, 단면 벽 밖에서
+            // 실내가 통째로 컬링된 화면(하늘+바닥 판)이 나온다. 목표가 아니라
+            // **오늘 프레임에 실제로 놓을 위치**가 검사 대상이어야 한다.
+            _cam.transform.position = ClampLineOfSight(lookTarget, candidate, radius);
             _cam.transform.LookAt(lookTarget);
 
-            UpdateSelfVisibility();
+            UpdateSelfVisibility(Vector3.Distance(_cam.transform.position, lookTarget));
+            ApplyOcclusionGuard();
+        }
+
+        /// <summary>
+        /// 카메라 주변 <see cref="_occlusionGuardRadius"/> 안에 정적 콜라이더가 있으면 이 프레임의
+        /// 오클루전 컬링을 끈다. 판정은 **오늘 프레임에 실제로 놓인 카메라 위치**로 한다 (T-217 교훈).
+        /// 플레이어 레이어(8)는 제외 — 자기 몸·다른 접속자는 오클루더가 아니다.
+        /// </summary>
+        void ApplyOcclusionGuard()
+        {
+            if (_cam == null || _occlusionGuardRadius <= 0f) return;
+            int mask = _collisionMask & ~(1 << 8);
+            var camPos = _cam.transform.position;
+            bool near = false;
+            for (int i = 0; i < s_guardDirs.Length; i++)
+            {
+                // 수평 레이만 — 바닥·천장은 걸리지 않고, 옆으로 붙은 벽·기둥·집기만 걸린다.
+                if (!Physics.Raycast(camPos, s_guardDirs[i], _occlusionGuardRadius, mask,
+                                     QueryTriggerInteraction.Ignore)) continue;
+                near = true;
+                break;
+            }
+            if (near != _occlusionSuppressed || _cam.useOcclusionCulling == near)
+            {
+                _occlusionSuppressed = near;
+                _cam.useOcclusionCulling = !near;
+            }
+            OcclusionSuppressed = near;
+        }
+
+        void OnDisable()
+        {
+            // 끈 채로 떠나면 다음 카메라 주인(상호작용 포커스·로비)이 오클루전 없이 돈다.
+            if (_cam != null && _occlusionSuppressed) _cam.useOcclusionCulling = true;
+            _occlusionSuppressed = false;
+            OcclusionSuppressed = false;
+        }
+
+        /// <summary>
+        /// lookTarget 에서 pos 까지 시야선이 막혀 있으면 장애물 앞으로 당긴 위치를 반환한다.
+        /// SphereCast 는 시작 구가 이미 콜라이더와 겹치면 그 콜라이더를 보고하지 않으므로
+        /// (벽에 딱 붙은 경우), 점 Linecast 를 백스톱으로 함께 건다.
+        /// </summary>
+        Vector3 ClampLineOfSight(Vector3 lookTarget, Vector3 pos, float radius)
+        {
+            var offset = pos - lookTarget;
+            float dist = offset.magnitude;
+            if (dist < 0.001f) return pos;
+            var dir = offset / dist;
+
+            float clamped = dist;
+            var hitCount = Physics.SphereCastNonAlloc(
+                lookTarget, radius, dir, _collisionHits, dist,
+                _collisionMask, QueryTriggerInteraction.Ignore);
+            for (var i = 0; i < hitCount; i++)
+            {
+                var hit = _collisionHits[i];
+                if (IsPlayerCollider(hit.collider)) continue;
+                clamped = Mathf.Min(clamped, Mathf.Max(radius, hit.distance - _collisionPadding));
+            }
+
+            if (Physics.Linecast(lookTarget, pos, out var lineHit, _collisionMask, QueryTriggerInteraction.Ignore)
+                && !IsPlayerCollider(lineHit.collider))
+                clamped = Mathf.Min(clamped, Mathf.Max(radius, lineHit.distance - _collisionPadding));
+
+            return lookTarget + dir * clamped;
         }
 
         /// <summary>근평면 모서리까지의 거리. 이보다 작은 반경으로 캐스트하면 벽이 뚫린다.</summary>
@@ -205,11 +320,14 @@ namespace Festa.World
         /// 다시 조립하므로 캐시는 곧 낡는다. 전환 순간에만 훑으므로 비용이 없다
         /// (매 프레임이 아니라 임계값을 넘을 때 한 번).
         /// </summary>
-        void UpdateSelfVisibility()
+        void UpdateSelfVisibility(float actualDistance)
         {
+            // 판정 기준은 궤도 축의 _resolvedDistance 가 아니라 **실제 카메라-시선 거리**다.
+            // 시야선 클램프(T-217)가 카메라를 더 당겼을 수 있다 — 그때도 몸통이 화면을
+            // 채우면 숨겨야 한다.
             bool shouldHide = _selfHidden
-                ? _resolvedDistance < _selfShowDistance   // 숨은 상태면 더 멀어져야 다시 보인다
-                : _resolvedDistance < _selfHideDistance;
+                ? actualDistance < _selfShowDistance   // 숨은 상태면 더 멀어져야 다시 보인다
+                : actualDistance < _selfHideDistance;
             if (shouldHide == _selfHidden) return;
 
             _selfHidden = shouldHide;

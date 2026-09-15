@@ -1,0 +1,31 @@
+fileFormatVersion: 2
+guid: dd3b17552bd44af3ae51a80330911648
+AudioImporter:
+  externalObjects: {}
+  serializedVersion: 7
+  defaultSettings:
+    serializedVersion: 2
+    loadType: 0
+    sampleRateSetting: 0
+    sampleRateOverride: 44100
+    compressionFormat: 1
+    quality: 1
+    conversionMode: 0
+    preloadAudioData: 1
+  platformSettingOverrides: {}
+  forceToMono: 0
+  normalize: 1
+  loadInBackground: 0
+  ambisonic: 0
+  3D: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Sound/Callum Donaldson - Casino Tones - Ascending
+    Win Chime.wav
+  uploadId: 963832

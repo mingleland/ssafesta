@@ -23,7 +23,7 @@ MonoBehaviour:
   hiddenBodyParts: 00000000
   forcedVisibleBodyParts: []
   garmentColorAreaMask: 1
-  thumbnail: {fileID: 21300000, guid: 878c3da01379d5e4bbdab8a0ffd2eeb8, type: 3}
+  thumbnail: {fileID: 21300000, guid: 3cd74f0b2eed6ef4e854e373c738dd58, type: 3}
   isDefault: 0
   hairGroup: 0
   familyId: 0

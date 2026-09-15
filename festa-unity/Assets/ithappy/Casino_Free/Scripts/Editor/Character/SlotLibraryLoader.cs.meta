@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 868642e13e6c417682f001afb7a4f8f9
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Editor/Character/SlotLibraryLoader.cs
+  uploadId: 963832

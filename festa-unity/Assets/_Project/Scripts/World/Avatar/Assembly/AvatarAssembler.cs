@@ -21,6 +21,20 @@ namespace Festa.Avatar
         // 딕셔너리가 원본을 살려 두므로 ID 재사용 자체가 일어나지 않는다.
         static readonly Dictionary<(Material source, int category), Material> SharedMaterials = new();
         readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
+
+        /// <summary>
+        /// 이번 프레임에 <c>Destroy</c> 를 건 오브젝트 (S15P21A604-334).
+        ///
+        /// <para>플레이 모드의 <c>Destroy</c> 는 <b>프레임 끝까지 미뤄진다.</b> 그래서 같은
+        /// <see cref="Apply"/> 안에서 나중에 도는 <see cref="CombineSameMaterialParts"/> 가
+        /// <b>죽는 중인 렌더러를 아직 살아 있는 것으로 보고 병합에 구워 넣었다.</b>
+        /// 원본은 다음 프레임에 사라지지만 <b>병합 메시에는 그 형상이 영구히 남는다</b> —
+        /// 옷을 갈아입으면 가려져야 할 속옷이 셔츠를 뚫고 나오는 검은 얼룩이 그것이다.</para>
+        ///
+        /// <para>그래서 파괴를 건 대상을 여기 모아 두고 병합에서 제외한다. T-228 과 같은 뿌리
+        /// (지연 파괴)이지만 증상과 지점이 다르다.</para>
+        /// </summary>
+        readonly HashSet<GameObject> _dying = new();
         MaterialPropertyBlock _block;
         Animator _animator;
         SkinnedMeshRenderer _reference;
@@ -35,6 +49,12 @@ namespace Festa.Avatar
         {
             LastError = null;
             if (!_catalog) { Fail("AvatarCatalog이 지정되지 않았습니다."); return; }
+            // **비우지 말고, 실제로 파괴가 끝난 것만 지운다** (S15P21A604-334).
+            // 한 프레임 안에서 Apply 가 두 번 이상 불리면(연속 클릭·프로그램 호출) 앞선 호출이
+            // 파괴를 건 대상이 아직 살아 있다. 그때 통째로 비우면 뒤 호출이 그것을 다시 후보로
+            // 삼아 병합에 삼킨다 — 실제로 10회 연속 호출에서 병합 정점이 2,573 → 247,164 로 터졌다.
+            // Unity 의 파괴된 오브젝트는 `!go` 로 판별되므로 그것만 걷어낸다.
+            _dying.RemoveWhere(go => !go);
             bool rebuild = !_animator || _config.gender != config.gender;
             _config = config;
             if (rebuild) BuildBody();
@@ -76,6 +96,7 @@ namespace Festa.Avatar
             if (_spawned.TryGetValue(category, out var old)) foreach (var go in old) if (go)
             {
                 foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) _rendererCategories.Remove(renderer);
+                _dying.Add(go);   // 이번 프레임 병합에서 제외한다 (S15P21A604-334)
                 Destroy(go);
             }
             var spawned = new List<GameObject>(); _spawned[category] = spawned;
@@ -178,19 +199,40 @@ namespace Festa.Avatar
 
         void CombineSameMaterialParts()
         {
-            // ⚠ WebGL 플레이어에서는 병합을 하지 않는다 (T-214).
-            // 런타임에 만든 병합 스킨메시가 에디터·데스크톱에서는 정상인데 **WebGL 빌드에서만**
-            // 그려지지 않아 목·손·종아리가 사라졌다. 병합 데이터 자체는 빌드 안 실측으로
-            // 정상임을 확인했으므로(정점·본·가중치·바운즈) WebGL 런타임의 스킨메시 처리와의
-            // 상성 문제다. 원본 파츠는 개별로 정상 렌더되므로 병합만 끄면 몸이 복구된다.
-            // 드로우콜 이득(아바타당 약 −4)은 원인을 확정할 때까지 포기한다 — 정확성이 먼저다.
-            if (Application.platform == RuntimePlatform.WebGLPlayer) return;
+            // 병합은 이제 모든 플랫폼에서 켜져 있다 (S15P21A604-258).
+            // 2026-08-26 부터 WebGL 에서만 꺼져 있었는데(T-214), 그 근거였던 "WebGL 에서만
+            // 안 그려진다" 가 2026-08-30 실측으로 틀렸음이 확인됐다. 경위는 AvatarMeshMerge 주석.
+            // 스위치는 A/B 계측용으로 남긴다(F10) — 값을 다시 재려면 조건을 바꿀 수 있어야 한다.
+            // **정리는 병합을 꺼도 해야 한다** (S15P21A604-334). 전에는 여기서 바로 return 해
+            // 옛 병합체가 살아남고 원본은 꺼진 채로 남았다 — 토글을 끈 순간 화면이 옛 상태로 굳는다.
+            // 이전 병합에서 꺼둔 원본을 **먼저 되살린다** (T-228).
+            //
+            // 아래에서 병합 대상을 고를 때 `r.enabled` 로 거른다. 그런데 원본은 병합될 때
+            // `enabled = false` 로 꺼지고 아무도 다시 켜지 않았다. 그래서 옷을 바꿔 두 번째
+            // 호출이 들어오면 — 이미 꺼진 원본이 후보에서 빠져 새 병합체가 만들어지지 않는데
+            // 옛 병합체는 바로 아래에서 파괴된다. **그리는 것이 아무것도 남지 않아 몸이 통째로
+            // 사라진다.** 처음 조립할 때는 멀쩡하고 옷을 갈아입는 순간 없어지는 형태다.
+            //
+            // 파괴보다 먼저 켜야 한다 — 플레이 모드의 `Destroy` 는 프레임 끝에 처리되므로
+            // 파괴 후에 훑으면 아직 살아 있는 병합체까지 다시 켜서 원본과 겹쳐 그린다.
+            foreach (var renderer in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                if (renderer && !_merged.Contains(renderer.gameObject) && !_dying.Contains(renderer.gameObject))
+                    renderer.enabled = true;
 
-            foreach (var go in _merged) if (go) DestroySafe(go);
+            // **옛 병합체도 파괴 대기로 등록한다** (S15P21A604-334). DestroySafe 역시 플레이
+            // 모드에서는 프레임 끝까지 미뤄지므로, 아래 후보 선정 시점에 옛 병합체가 아직
+            // 살아 있고 enabled 다. `_merged` 는 방금 비웠으니 걸러지지도 않는다 —
+            // 그래서 **새 병합이 옛 병합체를 통째로 다시 삼켰다.** 정점이 회차마다 배로
+            // 늘고(3962 → 8508), 그때 보이던 속옷 형상이 병합 메시에 영구히 남아
+            // 옷을 갈아입으면 셔츠를 뚫고 검은 얼룩으로 나타났다.
+            foreach (var go in _merged) if (go) { _dying.Add(go); DestroySafe(go); }
             _merged.Clear();
 
+            // 정리를 마친 뒤에 빠진다 — 위 주석 참조.
+            if (!AvatarMeshMerge.Enabled) return;
+
             var actives = GetComponentsInChildren<SkinnedMeshRenderer>(false)
-                .Where(r => r && r.enabled && r.sharedMesh &&
+                .Where(r => r && r.enabled && r.sharedMesh && !_dying.Contains(r.gameObject) &&
                             r.sharedMaterials.Length == 1 && r.sharedMaterials[0] &&
                             r.sharedMesh.subMeshCount == 1 && r.sharedMesh.blendShapeCount == 0 &&
                             r.bones != null && r.bones.Length > 0)
@@ -209,6 +251,12 @@ namespace Festa.Avatar
                 if (mergedGo == null) continue;
                 foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
                 _merged.Add(mergedGo);
+
+                // 병합 결과를 남긴다 (S15P21A604-258). WebGL 빌드에는 HUD 가 닿지 않는 화면이
+                // 있어서, 화면을 못 봐도 로그만으로 "병합체가 만들어졌는지" 를 판정할 수 있어야 한다.
+                if (Debug.isDebugBuild || Application.isEditor)
+                    Debug.Log($"[AvatarMeshMerge] 병합 생성 {mergedGo.name} " +
+                              $"— 원본 {parts.Count}개 → 1개");
             }
         }
 
@@ -433,7 +481,7 @@ namespace Festa.Avatar
                         material = new Material(garmentShader ? garmentShader : shader) { name = source.name + "_RuntimeGarment" };
                         Texture garmentMask = source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap")
                             : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap")
-                            : source.mainTexture;
+                            : MainTextureOrNull(source);
                         if (!garmentMask)
                             foreach (var property in source.GetTexturePropertyNames())
                                 if (source.GetTexture(property)) { garmentMask = source.GetTexture(property); break; }
@@ -457,13 +505,17 @@ namespace Festa.Avatar
                         converted[i] = material;
                         continue;
                     }
-                    // URP Lit 폴백(헤어·액세서리)은 Shader.Find 로 만들면 안 된다 — 빌드
-                    // 셰이더 스트리핑이 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이
-                    // 된다 (T-212, 빌드에서 헤어·피부가 사라진 원인). 카탈로그의 템플릿
-                    // 재질을 복제하면 그 키워드 상태의 배리언트 포함이 보장된다.
-                    // 헤어는 전용 셰이더로 간다 (T-212). URP Lit 런타임 생성은 빌드
-                    // 스트리핑에 좌우되는 잠재 결함이라, Skin/Face/Garment 와 같은
-                    // Always Included 패턴의 HairTint 를 쓴다.
+                    // URP Lit 을 런타임 Shader.Find 로 만들면 안 된다 — 빌드 셰이더 스트리핑이
+                    // 배리언트를 잘라내면 "존재하지만 안 그려지는" 재질이 된다 (T-213).
+                    //
+                    // 헤어는 **전용 HairTint 셰이더**로 간다. Skin/Face/Garment 틴트와 같은
+                    // Always Included Shaders 패턴이라 빌드 포함이 보장된다 — 이것이 실제로
+                    // 헤어를 되살린 해법이다.
+                    //
+                    // 나머지 액세서리는 카탈로그의 URP Lit 템플릿 재질을 복제한다. 다만
+                    // **템플릿 참조만으로는 헤어가 살아나지 않았다** — Lit 의 패스 구성까지
+                    // 복원되지는 않는다. 템플릿은 어디까지나 차선책이고, 안 그려지는 파츠가
+                    // 또 나오면 그 파츠도 전용 셰이더로 옮기는 것이 정답이다.
                     bool isHair = category == AvatarPartCategory.Hair || lowerName.Contains("hair");
                     var hairShader = isHair ? Shader.Find("Festa/Avatar/HairTint") : null;
 
@@ -485,7 +537,7 @@ namespace Festa.Avatar
                     // Body의 BaseMap은 단순 Albedo가 아니라 피부/속옷 영역을
                     // 구분하는 RGB 마스크이므로 SkinTint에도 반드시 전달한다.
                     bool preserveAlbedo = isFace || isBody || embeddedHatHair || hatVisor || lowerName.Contains("eye") || lowerName.Contains("mouth") || lowerName.Contains("eyebrow") || lowerName.Contains("lash") || lowerName.Contains("glasses");
-                    Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : source.mainTexture) : null;
+                    Texture texture = preserveAlbedo ? (source.HasProperty("_BaseMap") ? source.GetTexture("_BaseMap") : source.HasProperty("_BaseColorMap") ? source.GetTexture("_BaseColorMap") : MainTextureOrNull(source)) : null;
                     // The vendor materials do not all expose their visible map
                     // as _BaseMap.  WebGL then used a newly-created material
                     // with no source map, which made some assembled parts look
@@ -546,6 +598,14 @@ namespace Festa.Avatar
             }
             renderer.sharedMaterials = converted;
         }
+
+        /// <summary>
+        /// <c>Material.mainTexture</c> 는 셰이더에 <c>_MainTex</c> 가 없으면 **읽기만 해도 에러 로그**를 남긴다
+        /// (벤더 눈썹 <c>Unlit/Color</c>, 눈 하이라이트 ToonBasic). 아바타 한 기당 4줄이 WebGL 콘솔과 Development 빌드
+        /// 화면 콘솔을 채워 로비 입장 버튼까지 가렸다(2026-09-06). 속성이 있을 때만 읽고, 없으면 null.
+        /// </summary>
+        static Texture MainTextureOrNull(Material source) =>
+            source != null && source.HasProperty("_MainTex") ? source.GetTexture("_MainTex") : null;
 
         static bool IsGarment(AvatarPartCategory category) => category == AvatarPartCategory.Top || category == AvatarPartCategory.Bottom || category == AvatarPartCategory.Outfit || category == AvatarPartCategory.Shoes || category == AvatarPartCategory.Hat || category == AvatarPartCategory.Glasses;
 
