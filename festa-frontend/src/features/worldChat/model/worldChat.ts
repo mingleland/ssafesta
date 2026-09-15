@@ -29,10 +29,24 @@ export interface WorldChatMessage {
   sentAt: string;
 }
 
+/**
+ * 수신 순서로 매긴 로컬 식별자를 붙인 메시지 (S15P21A604-791).
+ *
+ * 서버가 message id 를 주지 않아 화면 key 가 `sentAt + senderUserId` 였는데, 같은 사람이 같은
+ * 시각에 두 줄을 보내면 겹친다. 문자열을 더 길게 잇는 대신 받은 순서를 그대로 쓴다 — 저장이
+ * 없어 세션 밖으로 나갈 값이 아니고, 순서는 우리가 이미 알고 있다.
+ */
+export interface ReceivedChatMessage extends WorldChatMessage {
+  seq: number;
+}
+
+/** 한 번 뜬 안내가 화면에 눌러앉지 않게 한다 — 게스트 안내가 영구 잔류하던 자리 */
+export const NOTICE_TTL_MS = 6_000;
+
 export interface WorldChatState {
   open: boolean;
   draft: string;
-  messages: readonly WorldChatMessage[];
+  messages: readonly ReceivedChatMessage[];
   /** 마지막 거절 사유. 보내기 전에 막은 것과 서버가 돌려준 것을 같은 자리에 둔다 */
   notice: string | null;
   cooldownUntil: number;
@@ -55,10 +69,27 @@ const EMPTY: WorldChatState = {
 
 let state: WorldChatState = EMPTY;
 const listeners = new Set<() => void>();
+let nextSeq = 1;
+let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function set(next: Partial<WorldChatState>): void {
   state = { ...state, ...next };
   for (const listener of listeners) listener();
+}
+
+/**
+ * 안내는 스스로 사라진다. 지우는 경로가 "다음 성공" 뿐이면 그 성공을 밟을 수 없는 사용자
+ * (게스트)에게는 영원히 남는다 (S15P21A604-791).
+ */
+function setNotice(notice: string | null): void {
+  if (noticeTimer !== null) clearTimeout(noticeTimer);
+  noticeTimer = null;
+  set({ notice });
+  if (notice === null) return;
+  noticeTimer = setTimeout(() => {
+    noticeTimer = null;
+    set({ notice: null });
+  }, NOTICE_TTL_MS);
 }
 
 export function countCodePoints(text: string): number {
@@ -91,25 +122,27 @@ export function setWorldChatDraft(draft: string): void {
 
 export function openWorldChat(): void {
   if (!canUseWorldChat()) {
-    set({ notice: CHAT_ERROR_MESSAGE.MEMBER_ONLY });
+    setNotice(CHAT_ERROR_MESSAGE.MEMBER_ONLY);
     return;
   }
-  set({ open: true, notice: null });
+  set({ open: true });
+  setNotice(null);
 }
 
 export function closeWorldChat(): void {
   if (!state.open) return;
   set({ open: false, draft: '' });
+  setNotice(null);
 }
 
 /** 게스트가 비활성 버튼을 눌렀을 때 — 막지 않고 왜 못 쓰는지 알려 준다 */
 export function noticeMemberOnly(): void {
-  set({ notice: CHAT_ERROR_MESSAGE.MEMBER_ONLY });
+  setNotice(CHAT_ERROR_MESSAGE.MEMBER_ONLY);
 }
 
 export type ChatRejection = 'EMPTY' | 'TOO_LONG' | 'COOLDOWN';
 
-export type EnterAction = 'ignore' | 'open' | 'send';
+export type EnterAction = 'ignore' | 'open' | 'send' | 'focus';
 
 /**
  * Enter 하나를 무엇으로 읽을지 정한다 — 판정은 `WorldPage` 의 리스너 한 곳이 쓰지만, 규칙 자체는
@@ -125,7 +158,9 @@ export function resolveEnterAction(
 ): EnterAction {
   if (event.isComposing === true || event.keyCode === 229) return 'ignore';
   if (event.shiftKey === true) return 'ignore';
-  if (context.open) return context.inputFocused ? 'send' : 'ignore';
+  // 패널은 열려 있는데 입력창이 focus 를 잃은 상태(캔버스 클릭 등)를 남기지 않는다 — Enter 로
+  // 다시 그 입력창에 들어간다. 열려 있다는 것 자체가 회원이라는 뜻이다 (S15P21A604-791).
+  if (context.open) return context.inputFocused ? 'send' : 'focus';
   return context.member ? 'open' : 'ignore';
 }
 
@@ -145,15 +180,15 @@ export function validateWorldChat(text: string, now = Date.now()): ChatRejection
 export function sendWorldChat(text: string, now = Date.now()): boolean {
   const rejection = validateWorldChat(text, now);
   if (rejection === 'EMPTY') {
-    set({ notice: null });
+    setNotice(null);
     return false;
   }
   if (rejection === 'TOO_LONG') {
-    set({ notice: MAX_CHAT_CODE_POINTS + '자까지 보낼 수 있습니다' });
+    setNotice(MAX_CHAT_CODE_POINTS + '자까지 보낼 수 있습니다');
     return false;
   }
   if (rejection === 'COOLDOWN') {
-    set({ notice: CHAT_ERROR_MESSAGE.CHAT_TOO_FAST });
+    setNotice(CHAT_ERROR_MESSAGE.CHAT_TOO_FAST);
     return false;
   }
 
@@ -171,17 +206,18 @@ export function sendWorldChat(text: string, now = Date.now()): boolean {
     // **입력값을 지우지 않는다.** 연결이 돌아오면 사용자가 그대로 다시 보낸다.
     // **자동 재전송도 하지 않는다.** 서버에 닿았는지를 알 수 없어 중복이 될 수 있다.
     console.error('[worldChat] 전송 실패 —', error);
-    set({ notice: CHAT_ERROR_MESSAGE.CHAT_UNAVAILABLE });
+    setNotice(CHAT_ERROR_MESSAGE.CHAT_UNAVAILABLE);
     return false;
   }
-  set({ draft: '', notice: null, cooldownUntil: now + CHAT_COOLDOWN_MS });
+  set({ draft: '', cooldownUntil: now + CHAT_COOLDOWN_MS });
+  setNotice(null);
   return true;
 }
 
 function pushMessage(raw: string): void {
   try {
     const message = JSON.parse(raw) as WorldChatMessage;
-    const next = [...state.messages, message];
+    const next = [...state.messages, { ...message, seq: nextSeq++ }];
     set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
   } catch {
     console.warn('[worldChat] 읽을 수 없는 메시지를 버렸다');
@@ -191,9 +227,9 @@ function pushMessage(raw: string): void {
 function pushError(raw: string): void {
   try {
     const { code } = JSON.parse(raw) as { code: string; message: string };
-    set({ notice: CHAT_ERROR_MESSAGE[code] ?? '채팅을 보내지 못했습니다' });
+    setNotice(CHAT_ERROR_MESSAGE[code] ?? '채팅을 보내지 못했습니다');
   } catch {
-    set({ notice: '채팅을 보내지 못했습니다' });
+    setNotice('채팅을 보내지 못했습니다');
   }
 }
 
@@ -224,6 +260,15 @@ export function startWorldChat(): () => void {
 
 // 테스트 전용
 export function __resetWorldChatForTests(): void {
+  if (noticeTimer !== null) clearTimeout(noticeTimer);
+  noticeTimer = null;
+  nextSeq = 1;
   state = EMPTY;
   listeners.clear();
+}
+
+/** 테스트 전용 — 서버 수신 경로를 거치지 않고 로그를 채운다 */
+export function __pushWorldChatForTests(messages: readonly WorldChatMessage[]): void {
+  const next = [...state.messages, ...messages.map((m) => ({ ...m, seq: nextSeq++ }))];
+  set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
 }
