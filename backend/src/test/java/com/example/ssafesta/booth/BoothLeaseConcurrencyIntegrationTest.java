@@ -118,10 +118,17 @@ class BoothLeaseConcurrencyIntegrationTest {
                 + " ends_at = now() - interval '1 minute' WHERE id = ?", leaseId);
 
         CountDownLatch returnStarted = new CountDownLatch(1);
+        // 배치가 행을 잠근 뒤에야 반납을 출발시킨다. 이 래치가 없으면 두 스레드가 그냥 경주하고,
+        // 반납이 먼저 잠그면 findStaleActive 의 SKIP LOCKED 가 그 행을 건너뛰어 배치가 0 을
+        // 돌려준다 — 이 테스트가 고정하려는 것과 정반대의 순서이며, 그쪽은 쌍둥이 테스트
+        // aReturnThatLocksFirstMakesTheSweeperPassTheRowOver 가 이미 덮는다 (S15P21A604-794).
+        CountDownLatch sweeperLocked = new CountDownLatch(1);
         ExecutorService pool = Executors.newSingleThreadExecutor();
         Future<Throwable> refusal;
         try {
             refusal = pool.submit(() -> {
+                assertTrue(sweeperLocked.await(10, TimeUnit.SECONDS),
+                        "배치가 행을 잠그기 전에 반납이 출발했습니다.");
                 returnStarted.countDown();
                 try {
                     leaseService.cancel(userId, slotId);
@@ -132,12 +139,15 @@ class BoothLeaseConcurrencyIntegrationTest {
             });
             transactions.executeWithoutResult(status -> {
                 assertEquals(1, leaseService.expireStaleLeases());
+                sweeperLocked.countDown();
                 awaitQuietly(returnStarted, pool);
                 // 배치가 행을 쥐고 있는 동안 반납은 끝나지 못한다.
                 assertThrows(TimeoutException.class, () -> refusal.get(400, TimeUnit.MILLISECONDS),
                         "배치가 잠근 동안 반납이 통과하면 안 됩니다.");
             });
         } finally {
+            // 위에서 실패해도 반납 스레드가 래치에 10초 매달리지 않게 한다.
+            sweeperLocked.countDown();
             pool.shutdown();
             assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS), "반납 스레드가 끝나야 합니다.");
         }
