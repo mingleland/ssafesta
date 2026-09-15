@@ -1242,7 +1242,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
 봉투        { type, requestId, occurredAt, … }
 ```
 
-방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`.
+방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`·`ended`. 종료는 양쪽으로 가며 종료를 호출한 직원 본인도 받는다 (2026-09-14, GitLab #133).
 
 > **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
 
