@@ -108,6 +108,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const [error, setError] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState<{ documentId: number; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -172,10 +173,11 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.'),
   });
 
-  function removeDocument(documentId: number, fileName: string) {
-    if (!window.confirm(`'${fileName}' 문서를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+  function confirmDeleteDocument() {
+    if (!confirmDelete) return;
     setUploadMessage(null);
-    deleteMutation.mutate(documentId);
+    deleteMutation.mutate(confirmDelete.documentId);
+    setConfirmDelete(null);
   }
 
   // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
@@ -224,6 +226,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
 
   const editing = agentQuery.data !== null;
   return (
+    <>
     <form className="bm-agent" onSubmit={submit}>
       <div className="bm-agent-head">
         <div>
@@ -325,7 +328,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                           type="button"
                           className="bm-document-remove"
                           disabled={deleteMutation.isPending && deleteMutation.variables === doc.documentId}
-                          onClick={() => removeDocument(doc.documentId, doc.fileName)}
+                          onClick={() => setConfirmDelete({ documentId: doc.documentId, fileName: doc.fileName })}
                         >
                           {deleteMutation.isPending && deleteMutation.variables === doc.documentId ? '삭제 중...' : '삭제'}
                         </button>
@@ -339,5 +342,28 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
         </div>
       </div>
     </form>
+    {confirmDelete && (
+      <div className="bm-gate-backdrop" role="presentation" onClick={() => setConfirmDelete(null)}>
+        <div
+          className="bm-gate-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bm-delete-title"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <h3 id="bm-delete-title">문서를 삭제할까요?</h3>
+          <p>&apos;{confirmDelete.fileName}&apos; 문서를 삭제합니다. 되돌릴 수 없습니다.</p>
+          <div className="bm-gate-actions">
+            <button type="button" className="ov-btn" onClick={() => setConfirmDelete(null)}>
+              취소
+            </button>
+            <button type="button" className="ov-btn ov-btn-danger" onClick={confirmDeleteDocument}>
+              삭제
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
