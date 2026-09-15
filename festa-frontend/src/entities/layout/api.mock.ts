@@ -111,6 +111,7 @@ export async function putDraft(boothId: number, body: DraftPutRequest): Promise<
       ]);
     }
     // §10-2 실물(회전 반영 AABB) 이탈 — Draft 저장에도 적용된다(계약 명시, T022·T023 mock 정합)
+    // mock 은 서버 역할이라 runtime manifest 를 보지 않는다 — 실 BE 도 자기 표를 쓴다(S15P21A604-785).
     const local = OBJECT_LOCAL_BOUNDS[obj.type];
     if (local && isAreaOutOfBounds(worldAABB(local, obj.rotationY, obj.position), BOOTH_SIZE_FALLBACK)) {
       throw apiError('LAYOUT_VALIDATION_FAILED', AREA_OUT_OF_BOUNDS_MESSAGE, [
@@ -174,7 +175,9 @@ export async function publish(boothId: number): Promise<PublishResponse> {
     .map((o) => ({ rule: 'CONFIG_NOT_LINKED', objectId: o.objectId, message: CONFIG_NOT_LINKED_MESSAGE }));
   // §10-3 통행 판정은 공개 시점 경고다(계약 명시) — 실 BE와 같은 lib(passage.ts)으로 계산해
   // FE 실시간 경고와 mock 서버 응답이 항상 같은 답을 내게 한다(T023, quickstart §6b).
-  const warnings: ApiErrorDetail[] = [...configWarnings, ...passageWarnings(stored.objects)];
+  // mock 은 **서버 쪽**이라 runtime manifest 를 모른다 — 타입 기본 표로 판정한다(passage.ts 기본 해석기).
+  // 실 BE 도 자기 표를 쓰므로 이쪽이 서버 시맨틱에 가깝다.
+  const warnings: ApiErrorDetail[] = [...configWarnings, ...passageWarnings(stored.objects, BOOTH_SIZE_FALLBACK)];
 
   const nextPublished = (stored.publishedVersion ?? 0) + 1;
   stored.publishedVersion = nextPublished;
@@ -205,7 +208,7 @@ export async function getPublished(boothId: number): Promise<PublishedLayout> {
 export async function getTemplates(): Promise<TemplateCatalog> {
   return {
     templates: [
-      { template: 'PROJECT_EXHIBITION', footprint: { width: 6, depth: 6, height: 2.72 }, maxObjects: MAX_OBJECTS },
+  { template: 'PROJECT_EXHIBITION', footprint: { width: 9.4, depth: 6, height: 5.9 }, maxObjects: MAX_OBJECTS },
     ],
   };
 }
