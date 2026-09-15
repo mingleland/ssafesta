@@ -126,6 +126,12 @@
 
 .bm-agent { display: flex; flex-direction: column; gap: 14px; }
 .bm-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.bm-step { display: flex; gap: 12px; }
+.bm-step-marker { flex: none; display: flex; flex-direction: column; align-items: center; }
+.bm-step-badge { width: 22px; height: 22px; border-radius: 50%; background: rgba(142, 173, 255, 0.16); color: #8eadff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.bm-step-line { flex: 1; width: 1px; min-height: 16px; background: rgba(255, 255, 255, 0.12); margin: 6px 0; }
+.bm-step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.bm-step-title { margin: 0; font-size: 13px; font-weight: 700; color: rgba(234, 238, 251, 0.9); }
 .bm-agent-head h3 { margin: 0 0 5px; font-size: 16px; color: var(--festa-ink); }
 .bm-agent-head p { margin: 0; }
 .bm-agent-state { flex: none; padding: 5px 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: rgba(234, 238, 251, 0.65); font-size: 12px; }
