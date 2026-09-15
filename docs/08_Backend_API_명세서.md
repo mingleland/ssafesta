@@ -285,13 +285,29 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
   - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
+### DELETE `/booth-slots/{slotId}/leases/mine` — spec 004 신설 (D12, 2026-09-14)
+
+만료를 기다리지 않고 임차인이 자리를 내놓는다 (FR-020). **`204 No Content`, 본문 없음.**
+
+- **환불 없다** (FR-021). D06의 "변심 환불 없음"이 그대로 적용되고, 반납은 자리만 비운다. 재임대는 새 결제다.
+- 반납 즉시 슬롯이 `AVAILABLE`이 되고 활성 임대 한도(D01)가 풀린다. 콘텐츠는 보존된다 (FR-010).
+- 경로의 `slotId`는 **확인용**이다. 활성 임대는 하나뿐이라 없어도 찾을 수 있지만, 낡은 화면이 엉뚱한 부스를 날리는 것을 막는다.
+
+| 코드 | 오류 코드 | 상황 |
+|---|---|---|
+| 204 | — | 반납 완료 |
+| 403 | `MEMBER_ONLY` | 게스트 토큰 |
+| 404 | `ACTIVE_LEASE_NOT_FOUND` | 이 자리에 반납할 내 임대가 없다 |
+
+> ⚠️ **재시도한 요청도 `404`다. 오류로 표시하지 않는다** — 슬롯 목록과 내 부스를 다시 읽는 신호다. `ACTIVE_LEASE_NOT_FOUND`는 "임대가 없다"·"내 임대가 다른 자리에 있다"·"방금 만료됐다"를 가르지 않는다. 셋 다 화면이 낡았다는 뜻이고 클라이언트가 할 일이 같다.
+
 ### POST `/booths/{boothId}/leases/extend` — P1
 
 임대 연장. 정확한 정책은 TBD.
 
-### Lease 만료 처리 계약
+### Lease 종료 처리 계약
 
-- `ACTIVE → EXPIRED` 전환과 `booths.current_slot_id` 해제는 하나의 트랜잭션으로 처리한다.
+- `ACTIVE`에서 나가는 전환(`EXPIRED` 만료 · `CANCELLED` 반납)과 `booths.current_slot_id` 해제는 하나의 트랜잭션으로 처리한다. **만료와 반납은 같은 경로를 지나고 기록에 남는 단어만 다르다** (D12).
 - 만료 즉시 해당 슬롯의 `entryAvailable`을 `false`로 반환한다.
 - 외부 Facade는 슬롯 응답에서 숨기고 기본 빈 슬롯으로 표시한다.
 - 기존 Published Layout은 일반 Runtime 조회 대상에서 제외하되 Owner의 Draft/보존 데이터는 삭제하지 않는다.
@@ -1576,12 +1592,49 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 ---
 
+## 17B. Admin — 관리자 권한
+
+전역 관리자 권한 모델 (`S15P21A604-742` 상위, 블록 1은 `S15P21A604-743`). 이 절은 **구현된 것만** 적는다.
+
+**판정 방식** — 관리자 여부는 `users.account_type = 'ADMIN'` 을 **매 요청 DB 조회**한다. JWT 의 `role` 클레임은 관리자에게도 `MEMBER` 다. `MemberPrincipal` 이 `"MEMBER".equals(role)` 로 판정하고 컨트롤러 20여 곳이 그것을 타므로, `role` 을 `ADMIN` 으로 발급하면 관리자 토큰이 게스트로 읽혀 본인 지갑·부스까지 `403 MEMBER_ONLY` 가 된다. 부수 효과로 **강등이 즉시 반영**된다 — 토큰 만료를 기다리지 않는다.
+
+**마스터 계정** — `users.is_master` 가 `true` 인 계정 하나(최대 1명, 부분 유니크 인덱스로 DB 가 보장). 강등·정지·탈퇴·닉네임 강제 변경·코인 조정·강제 로그아웃 등 **대상을 지정하는 모든 관리자 동작의 대상이 될 수 없다**(`MASTER_PROTECTED`). 소유 자원(부스·게임·프로젝트·문서)을 경유한 간접 조치도 같은 코드로 막는다. **마스터를 지정하는 API 는 없다** — 마이그레이션이 유일한 경로다. 조회는 막지 않는다.
+
+### GET `/admin/admins`
+
+관리자 목록. `master` 가 `true` 인 행은 보호된 계정이라 콘솔이 조치 버튼을 잠근다.
+
+```json
+[{ "userId": 1, "nickname": "구글 황덕", "master": true }]
+```
+
+### POST `/admin/admins/{userId}`
+
+관리자 승격. 본문은 선택이며 `{ "note": "사유" }` 는 감사 기록에 그대로 남는다. → `200` 승격된 계정
+
+정지 계정은 승격할 수 없다(`403`). 이미 관리자면 `409 ADMIN_ALREADY`.
+
+### DELETE `/admin/admins/{userId}`
+
+관리자 강등. `?note=` 로 사유를 남긴다. → `204`
+
+관리자가 아닌 회원을 강등하면 아무 일도 없이 `204` 다(요청이 바라는 상태가 이미 참이다). **마지막 관리자는 강등할 수 없다**(`409 ADMIN_LAST_ONE`) — 승격 API 자체가 관리자 전용이라 0명이 되면 API 로 되돌릴 수 없다.
+
+**감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
+
+> ⚠️ **아직 없는 것** — 계정 정지·해제, 코인 조정, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다.
+
+---
+
 ## 18. 주요 오류 코드
 
 | Code | 의미 |
 |---|---|
 | `UNAUTHORIZED` | 인증 실패 |
 | `FORBIDDEN` | 권한 없음 |
+| `MASTER_PROTECTED` *(742)* | 마스터 계정(또는 그 소유 자원)을 관리자 조치 대상으로 지정했다 |
+| `ADMIN_LAST_ONE` *(742)* | 마지막 관리자는 강등·정지·탈퇴할 수 없다 |
+| `ADMIN_ALREADY` *(742)* | 이미 관리자다 |
 | `USER_NOT_FOUND` | 사용자 없음 |
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |

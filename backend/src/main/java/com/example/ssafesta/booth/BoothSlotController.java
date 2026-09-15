@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -144,6 +145,44 @@ public class BoothSlotController {
             // with. Every domain refusal below it now carries its own code (S15P21A604-402).
             throw new ApiException(ErrorCode.VALIDATION_FAILED, exception.getMessage());
         }
+    }
+
+
+    @Operation(summary = "부스 반납 — 만료를 기다리지 않고 자리를 비운다",
+            description = """
+                    내가 임차 중인 자리를 지금 반납한다. 회원 전용이며 게스트는 `403` 이다.
+
+                    **코인은 돌아오지 않는다.** spec 004 D06 의 변심 환불 없음이 그대로 적용되고, 반납은 자리만 비운다 —
+                    다시 임대하면 **처음처럼 100코인을 낸다** (FR-021). 되돌릴 수 없는 요청이므로 클라이언트는 확인을 받는다.
+
+                    **되는 것은 자리와 한도뿐이다.** 반납 즉시 그 슬롯이 `AVAILABLE` 이 되고 활성 임대 한도(D01)가 풀려
+                    **곧바로 다른 자리를 임대할 수 있다.** Layout·AI·문서·설문·프로젝트는 **그대로 보존**되고
+                    (FR-010), 다시 임대하면 만료 후 재임대와 똑같이 Draft 로 시작한다 (D08).
+
+                    **만료와 같은 처리다.** 슬롯 연결 해제와 AI 문서 비활성화가 만료 때와 같은 트랜잭션·같은 경로를 지난다.
+                    기록에만 `EXPIRED` 가 아니라 `CANCELLED` 로 남는다.
+
+                    경로의 `slotId` 는 **확인용**이다. 활성 임대는 하나뿐이라 없어도 찾을 수 있지만, 화면이 낡아 엉뚱한
+                    자리를 지목하면 아무것도 하지 않고 `404` 로 거절한다.
+                    """)
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "반납 완료. 본문이 없다 — 잔액이 변하지 않으므로 돌려줄 것이 없고, 자리 상태는 `GET /api/v1/booth-slots` 가 권위다"),
+            @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트 토큰이다"),
+            @ApiResponse(responseCode = "404", description = """
+                    `ACTIVE_LEASE_NOT_FOUND` — **이 자리에 반납할 내 임대가 없다.**
+
+                    세 경우를 하나로 묶는다: 활성 임대가 아예 없다 · 내 임대가 다른 자리에 있다 · 방금 만료됐거나 이미 반납했다.
+                    셋 다 화면이 낡았다는 뜻이고 할 일이 같아서 가르지 않는다.
+
+                    ⚠️ **재시도한 요청도 여기로 온다. 오류로 표시하지 마라** — 슬롯 목록과 내 부스를 다시 읽는 신호다.
+                    """)})
+    @DeleteMapping("/{slotId}/leases/mine")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Void> cancelLease(@AuthenticationPrincipal Jwt jwt,
+                                            @Parameter(description = "반납할 자리. 지금 내가 임차 중인 슬롯이어야 한다", example = "5")
+                                            @PathVariable Long slotId) {
+        leases.cancel(BoothPrincipal.requireMemberId(jwt), slotId);
+        return ResponseEntity.noContent().build();
     }
 
     @Schema(description = "본문을 생략해도 된다 — 생략하면 1일로 본다")
