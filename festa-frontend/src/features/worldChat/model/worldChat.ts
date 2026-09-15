@@ -159,7 +159,21 @@ export function sendWorldChat(text: string, now = Date.now()): boolean {
 
   // 보낼 것은 content 하나다. 닉네임·시각·보낸 사람은 서버가 읽지 않는다 — 클라이언트가 정할
   // 수 있는 값이면 사칭이 된다.
-  sendRealtime(WORLD_CHAT_SEND, { content: text });
+  //
+  // 보낼 수 있는 상태인지의 판정은 transport 한 곳이다 — 미연결이면 `sendRealtime` 이 던진다.
+  // 여기서 연결 상태를 다시 읽으면 판정이 두 곳이 되고, 그 둘이 어긋나는 순간이 생긴다.
+  try {
+    sendRealtime(WORLD_CHAT_SEND, { content: text });
+  } catch (error) {
+    // 던진 것을 그대로 두면 Enter 를 듣는 window 리스너 밖까지 올라가고 화면에는 아무것도 남지
+    // 않는다 — 실패를 조용히 삼키지 않는다 (T-24, S15P21A604-790).
+    //
+    // **입력값을 지우지 않는다.** 연결이 돌아오면 사용자가 그대로 다시 보낸다.
+    // **자동 재전송도 하지 않는다.** 서버에 닿았는지를 알 수 없어 중복이 될 수 있다.
+    console.error('[worldChat] 전송 실패 —', error);
+    set({ notice: CHAT_ERROR_MESSAGE.CHAT_UNAVAILABLE });
+    return false;
+  }
   set({ draft: '', notice: null, cooldownUntil: now + CHAT_COOLDOWN_MS });
   return true;
 }
