@@ -11,6 +11,16 @@ server {
     ssl_certificate ${NGINX_ORIGIN_CERTIFICATE_FILE};
     ssl_certificate_key ${NGINX_ORIGIN_PRIVATE_KEY_FILE};
 
+    # nginx 기본값은 1m(1,048,576 bytes)이고, 그 한도는 앱에 닿기 전에 nginx 가 날것 413 을 돌려준다.
+    # Game Studio Draft 는 GameProjectJson.MAX_PROJECT_BYTES = 2,000,000 bytes 까지 허용하므로
+    # 기본값으로는 1,048,577 bytes 부터 저장이 막힌다 (GitLab #207 실측).
+    #
+    # 4m 은 그 상한의 두 배다. 딱 맞춰 2m(2,097,152)으로 두면 여유가 5% 미만이라, 상한이 한 번만
+    # 올라가도 같은 증상이 조용히 돌아온다. 이 값을 바꿀 때는 MAX_PROJECT_BYTES 를 함께 본다.
+    #
+    # presigned PUT(AI 문서·게임 자산)은 R2 로 직행해 이 서버를 지나지 않으므로 여기 값과 무관하다.
+    client_max_body_size 4m;
+
     location ^~ /ws {
         proxy_pass http://127.0.0.1:18081;
         proxy_http_version 1.1;
