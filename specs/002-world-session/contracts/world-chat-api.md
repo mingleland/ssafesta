@@ -31,10 +31,28 @@ STOMP 연결에 WS Token 이 필요하고 그 토큰은 회원에게만 발급�
 | 연결 | `wss://<host>/ws` (정본) · `wss://<host>/ws/consultation` (기존 계약 유지) |
 | 토큰 | `POST /api/v1/realtime/ws-token` (정본) · `POST /api/v1/consultation/ws-token` (기존 계약 유지) |
 | 보내기 | `SEND /app/world/chat` — `{ "content": "..." }` |
-| 받기 | `SUBSCRIBE /topic/world/chat` |
+| 받기 | `SUBSCRIBE /topic/world/chat` — 일반 메시지 또는 입장 시스템 알림 |
 | 오류 | `SUBSCRIBE /user/queue/world/chat/errors` — **보낸 세션에만** |
 
 **보낸 사람과 시각을 받지 않는다.** 요청 record 에 자리가 없어 JSON 에 실려 와도 변환 경계에서 사라진다. 클라이언트가 정할 수 있는 값이면 사칭이 된다.
+
+### 수신 이벤트
+
+일반 채팅은 기존 모양을 유지한다.
+
+```json
+{ "senderUserId": 7, "nickname": "황덕", "content": "안녕하세요", "sentAt": "2026-09-15T08:00:00Z" }
+```
+
+STOMP 인증 연결이 열리면 서버가 회원 행에서 조회한 이름으로 아래 시스템 이벤트를 방송한다.
+React는 이를 일반 채팅 본문이 아닌 `XXX님이 입장하셨습니다.` 알림으로 그린다.
+
+```json
+{ "type": "JOIN", "nickname": "황덕", "sentAt": "2026-09-15T08:00:00Z" }
+```
+
+`nickname`은 클라이언트 요청에서 받지 않는다. 연결의 `Principal`을 기준으로 ACTIVE 회원을 다시
+조회하며, 탈퇴·정지 계정은 입장 알림도 방송하지 않는다.
 
 ---
 

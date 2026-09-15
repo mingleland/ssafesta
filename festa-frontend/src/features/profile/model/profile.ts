@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react';
 import { userApi } from '../../../entities/user/api.select';
 import { toNicknameErrorKind, toProviderIds } from '../../../entities/user/mapper';
 import { clearSession } from '../../auth/model/session';
+import { syncNicknameToUnity } from '../../../unity/host/profileBridge';
 import type { AuthProviderId } from '../../../shared/contracts/auth';
 import type { ProfileNicknameErrorKind } from '../../../shared/contracts/profile';
 
@@ -77,6 +78,8 @@ export async function submitNickname(nickname: string): Promise<void> {
   setState({ nicknameEdit: { phase: 'submitting' } });
   try {
     const me = await userApi.changeNickname(nickname);
+    // 서버가 echo 한 값만 보낸다. 입력 draft를 먼저 밀면 거절된 이름이 월드에 잠시라도 보인다.
+    syncNicknameToUnity(me.nickname);
     setState({
       nicknameEdit: { phase: 'success' },
       account: state.account && { ...state.account, nickname: me.nickname },

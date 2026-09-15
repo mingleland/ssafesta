@@ -48,6 +48,25 @@ describe('음악 설정 화면', () => {
     expect(getScreenAudioSnapshot().volume).toBeCloseTo(0.4);
   });
 
+  it('포인터로 조절한 뒤에는 슬라이더 focus를 남기지 않는다', () => {
+    render(<MusicSettings />);
+    const control = slider();
+    control.focus();
+    fireEvent.pointerUp(control);
+
+    expect(document.activeElement).not.toBe(control);
+  });
+
+  it('Space·방향키는 슬라이더 값을 바꾸지 않고 focus를 놓는다', () => {
+    render(<MusicSettings />);
+    const control = slider();
+    control.focus();
+    fireEvent.keyDown(control, { key: 'ArrowRight' });
+
+    expect(control.value).toBe('100');
+    expect(document.activeElement).not.toBe(control);
+  });
+
   it('음소거는 화면 컨트롤과 같은 상태를 본다 — 한쪽에서 끄면 여기도 꺼져 보인다', () => {
     render(<MusicSettings />);
     act(() => setMuted(true)); // ScreenControls 가 부르는 것과 같은 함수다
