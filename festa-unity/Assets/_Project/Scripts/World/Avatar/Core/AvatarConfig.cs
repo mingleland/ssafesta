@@ -163,6 +163,44 @@ namespace Festa.Avatar
             }
         }
 
+        /// <summary>
+        /// 한 카테고리의 의상 색 설정을 비운다 — 알파 0 이면 조립기가 재질 고유색을 쓴다.
+        /// 옷을 바꿨을 때 이전 옷의 색이 새 옷에 그대로 씌워지지 않게 하는 데 쓴다 (사용자 지시 2026-09-16).
+        /// </summary>
+        public void ResetGarmentColors(AvatarPartCategory category)
+        {
+            switch (category)
+            {
+                case AvatarPartCategory.Top: topGarmentColors = default; break;
+                case AvatarPartCategory.Bottom: bottomGarmentColors = default; break;
+                case AvatarPartCategory.Outfit: outfitGarmentColors = default; break;
+                case AvatarPartCategory.Shoes: shoesGarmentColors = default; break;
+                case AvatarPartCategory.Hat: hatGarmentColors = default; break;
+                case AvatarPartCategory.Glasses: glassesGarmentColors = default; break;
+            }
+        }
+
+        /// <summary>
+        /// v0(상·하의 전체색 하나) 외형을 v1(영역별 색)로 올린다. v0 은 조립기가 <b>어떤 옷이든</b>
+        /// 전체색 하나로 덮으므로 "옷을 바꿔도 색이 같다" 가 구조적으로 난다. 지금 보이는 색을 영역 값으로
+        /// 옮겨 적은 뒤 버전을 올리면 이후 옷 교체에서 카테고리 단위로 비울 수 있다.
+        /// </summary>
+        public void UpgradeLegacyGarmentTint(AvatarCatalog catalog)
+        {
+            if (garmentColorVersion != 0) return;
+            var top = (Color32)GetColor(AvatarColorSlot.Top, catalog);
+            var bottom = (Color32)GetColor(AvatarColorSlot.Bottom, catalog);
+            for (int i = 0; i < 6; i++)
+            {
+                var slot = (AvatarGarmentColorSlot)i;
+                if (topGarmentColors.Get(slot).a == 0) topGarmentColors.Set(slot, top);
+                if (bottomGarmentColors.Get(slot).a == 0) bottomGarmentColors.Set(slot, bottom);
+                if (outfitGarmentColors.Get(slot).a == 0) outfitGarmentColors.Set(slot, top);
+                if (hatGarmentColors.Get(slot).a == 0) hatGarmentColors.Set(slot, top);
+            }
+            garmentColorVersion = 1;
+        }
+
         public Color32 GetGarmentColor(int index)
         {
             var category = index < 6 ? AvatarPartCategory.Top : index < 12 ? AvatarPartCategory.Bottom : index < 18 ? AvatarPartCategory.Outfit : index < 24 ? AvatarPartCategory.Shoes : index < 30 ? AvatarPartCategory.Hat : AvatarPartCategory.Glasses;
