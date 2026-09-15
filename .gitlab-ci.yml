@@ -172,10 +172,17 @@ jira-sync-ready-for-deploy:
     - export CI_RUN_ID="${CI_PIPELINE_ID}-${CI_JOB_ID}"
     - export CI_ARTIFACT_DIR="${CI_PROJECT_DIR}/artifacts/${CI_JOB_NAME}"
     - mkdir -p "$CI_ARTIFACT_DIR"
+  # 리포트를 올려 두고도 파싱하지 않으면 MR 화면의 test_report 가 빈 결과로 남는다. ai 가
+  # --junitxml 로 만들던 tests.xml 이 그 상태였다. 여기 한 곳에 걸어 back·ai 를 함께 덮는다.
+  # front·game 은 매칭되는 파일이 없어 경고만 뜨고 job 은 실패하지 않는다 (GitLab #190).
   artifacts:
     when: always
     paths:
       - artifacts/
+    reports:
+      junit:
+        - artifacts/*/TEST-*.xml
+        - artifacts/*/tests.xml
 
 # A valid MR must always publish a successful pipeline status so protected
 # develop does not treat an infra/docs-only MR as a skipped pipeline.

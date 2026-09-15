@@ -147,3 +147,7 @@ export function replaceAiDocument(documentId: number, file: File): Promise<Docum
     api<UploadGrant>(`/api/v1/documents/${documentId}/replacement`, { method: 'PUT', body }),
   );
 }
+
+export function deleteAiDocument(documentId: number): Promise<void> {
+  return api<void>(`/api/v1/documents/${documentId}`, { method: 'DELETE' });
+}
