@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using Festa.Integration;
 using Festa.Network;
 using Unity.Collections;
@@ -25,12 +26,20 @@ namespace Festa.World
         public readonly NetworkVariable<FixedString4096Bytes> Encoded =
             new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        /// <summary>
+        /// 월드에서 보이는 전체 닉네임. 동결된 NetworkPlayer.Nickname은 FixedString32라 30자 한글을
+        /// 담지 못하므로, 이미 프리팹에 붙은 이 확장 컨트롤러에서 서버 권위 값으로 별도 동기화한다.
+        /// </summary>
+        public readonly NetworkVariable<FixedString128Bytes> DisplayNickname =
+            new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         /// <summary>마지막 변경 요청이 거부된 이유. HUD가 표시한다. 성공 시 null.</summary>
         public string LastRequestError { get; private set; }
 
         const float ServerApplyTimeout = 2f;
         const float SceneHandoffRetryInterval = .35f;
         const float SceneHandoffRetryDeadline = 8f;
+        const int MaxNicknameUtf8Bytes = 120;
 
         NetworkPlayer _player;
         string _pendingEncoded;
@@ -58,13 +67,24 @@ namespace Festa.World
                     : initial;
             }
 
+            if (IsServer && DisplayNickname.Value.Length == 0)
+            {
+                var initialNickname = SessionDataStore.Get(OwnerClientId)?.nickname;
+                if (string.IsNullOrWhiteSpace(initialNickname)) initialNickname = _player.Nickname.Value.ToString();
+                if (IsValidNickname(initialNickname)) DisplayNickname.Value = initialNickname.Trim();
+                else Debug.LogError("[Appearance] 접속 페이로드의 닉네임이 유효하지 않아 이름표를 비워 둔다.");
+            }
+
             // Connection approval is intentionally kept small and carries only a
             // legacy preset.  The local lobby's full modular payload is applied
             // after ownership is established, through the 4096-byte appearance
             // NetworkVariable.  This avoids the transport/legacy 32-byte limits
             // dropping clothing and hair item ids during world entry.
             if (IsOwner)
+            {
                 BeginSceneHandoff();
+                ProfileNicknameBridge.TryApplyPending(this);
+            }
         }
 
         void BeginSceneHandoff()
@@ -143,6 +163,32 @@ namespace Festa.World
         }
 
         /// <summary>
+        /// 프로필 저장 성공 뒤에 호출된다. React가 이름 문자열을 서버 RPC로 넘기지 않고, 이 클라이언트가
+        /// Spring에서 새로 발급받은 서명된 world-session의 nickname 클레임만 게임 서버가 받아 쓴다.
+        /// </summary>
+        public void RequestNicknameChange()
+        {
+            if (!IsOwner)
+            {
+                Debug.LogWarning("[Appearance] Owner가 아닌 닉네임 변경 요청을 무시한다.");
+                return;
+            }
+            RequestNicknameGrantAsync();
+        }
+
+        async void RequestNicknameGrantAsync()
+        {
+            ApiServices.EnsureInitialized();
+            var session = await ApiServices.User.CreateWorldSessionAsync();
+            if (session == null || string.IsNullOrEmpty(session.connectionToken))
+            {
+                Debug.LogError("[Appearance] 닉네임 동기화용 world-session 발급 실패 — 이름표는 이전 값을 유지한다.");
+                return;
+            }
+            RequestNicknameChangeServerRpc(session.connectionToken);
+        }
+
+        /// <summary>
         /// 서버가 요청을 반영했는지 감시한다.
         /// 서버 빌드가 낡아 요청을 조용히 버리는 상황(T-24)을 사용자에게 드러내기 위함.
         /// </summary>
@@ -201,6 +247,27 @@ namespace Festa.World
             Encoded.Value = encoded;
             Debug.Log($"[Appearance] 서버 반영: client={OwnerClientId} len={encoded.Length}");
         }
+
+        [Rpc(SendTo.Server)]
+        void RequestNicknameChangeServerRpc(string connectionToken)
+        {
+            // 클라이언트가 보낸 nickname을 믿지 않는다. Spring이 현재 프로필에서 발급한 서명 grant만
+            // 검증하고, 그 grant의 playerId가 이 NetworkObject 소유자와 같을 때만 쓴다(헌법 16조).
+            if (!WorldEntryTokenVerifier.Verify(connectionToken, out var grant, out var reason)
+                || !long.TryParse(grant.PlayerId, out var playerId)
+                || playerId != _player.UserId.Value
+                || !IsValidNickname(grant.Nickname))
+            {
+                Debug.LogWarning($"[Appearance] 서명된 닉네임 변경 grant 거부: client={OwnerClientId} reason={reason}");
+                return;
+            }
+
+            DisplayNickname.Value = grant.Nickname.Trim();
+            Debug.Log($"[Appearance] 이름표 닉네임 서버 반영: client={OwnerClientId}");
+        }
+
+        static bool IsValidNickname(string nickname) =>
+            !string.IsNullOrWhiteSpace(nickname) && Encoding.UTF8.GetByteCount(nickname.Trim()) <= MaxNicknameUtf8Bytes;
 
         /// <summary>
         /// 영구 저장. 실패해도 월드 내 외형은 유지되지만, <b>그 사실을 사용자에게 알린다.</b>

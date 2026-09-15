@@ -27,6 +27,7 @@ import { resetWorldContext } from '../../features/world/model/worldContext';
 import { discardPendingVisit } from '../../features/world/model/boothVisitTracker';
 import { acquireUnitySession, releaseUnitySession, restartUnitySession } from './sessionManager';
 import { syncAccessToken } from './authBridge';
+import { syncPendingNickname } from './profileBridge';
 import { syncInputLock } from './inputBridge';
 import { requestExitWorldUi } from './worldUiBridge';
 import { syncAudioMute, syncAudioVolume } from './audioBridge';
@@ -202,6 +203,13 @@ export function UnityHost() {
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
   }, [instanceReady, status, session.kind, session.expiresAt]);
+
+  // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instanceReady || instance === null) return;
+    syncPendingNickname(instance);
+  }, [instanceReady]);
 
   // G-8 입력 소유권 (-450, #132): 오버레이 개폐를 Unity 잠금에 반영한다. 인스턴스가 선 직후에도 한 번 —
   // 재시도 boot 로 새 인스턴스가 서면 그 인스턴스는 잠금 상태를 모르기 때문이다(상태는 인스턴스마다 새로 시작).
