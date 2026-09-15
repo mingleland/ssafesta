@@ -17,4 +17,11 @@ public class AccountStatusHistory {
     public AccountStatusHistory(User user, AccountStatus previousStatus, AccountStatus currentStatus, String reason, Long actorUserId) {
         this.user=user; this.previousStatus=previousStatus; this.currentStatus=currentStatus; this.reason=reason; this.actorUserId=actorUserId;
     }
+    public Long getId() { return id; }
+    public User getUser() { return user; }
+    public AccountStatus getPreviousStatus() { return previousStatus; }
+    public AccountStatus getCurrentStatus() { return currentStatus; }
+    public String getReason() { return reason; }
+    public Long getActorUserId() { return actorUserId; }
+    public Instant getCreatedAt() { return createdAt; }
 }
