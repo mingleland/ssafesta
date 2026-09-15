@@ -3,7 +3,11 @@
 import { describe, expect, it } from 'vitest';
 import { isAreaOutOfBounds, rotateAABB, worldAABB } from '../../geometry.ts';
 import { OBJECT_LOCAL_BOUNDS } from '../../objectTypes.ts';
-import { BOOTH_SIZE_FALLBACK } from '../../../../shared/config/studio.ts';
+
+// 부스 치수를 `BOOTH_SIZE_FALLBACK` 에서 끌어오지 않는다 (S15P21A604-785). 여기서 잠그는 것은
+// **기하 규칙**이지 그때그때의 footprint 가 아니다 — footprint 가 바뀔 때마다 이 기대값이 흔들리면
+// 규칙 회귀와 치수 변경을 구분할 수 없다. 현행 footprint 판정은 assetBounds.test.ts 가 본다.
+const BOOTH_6M = { width: 6, depth: 6, height: 2.72 } as const;
 
 const DESK = OBJECT_LOCAL_BOUNDS.CONSULTATION_DESK; // { min: {-0.93,0,-1.0}, max: {0.93,0.92,0.16} } — x·z 둘 다 비대칭
 
@@ -58,24 +62,24 @@ describe('rotateAABB — 45° (표준 공식으로 독립 교차검증)', () => 
 describe('worldAABB / isAreaOutOfBounds (§10-2)', () => {
   it('회전 없이 부스 중앙이면 안전하다', () => {
     const world = worldAABB(DESK, 0, { x: 0, z: 0 });
-    expect(isAreaOutOfBounds(world, BOOTH_SIZE_FALLBACK)).toBe(false);
+    expect(isAreaOutOfBounds(world, BOOTH_6M)).toBe(false);
   });
 
   it('앵커는 안인데 회전한 실물이 걸치면 이탈로 판정한다 (실측: VIDEO_SCREEN x=2.9, rotationY=90)', () => {
     const screen = OBJECT_LOCAL_BOUNDS.VIDEO_SCREEN;
     const world = worldAABB(screen, 90, { x: 2.9, z: 0 });
-    expect(isAreaOutOfBounds(world, BOOTH_SIZE_FALLBACK)).toBe(true);
+    expect(isAreaOutOfBounds(world, BOOTH_6M)).toBe(true);
   });
 
   it('경계선상(오차 1e-9 이내)은 안이다 — 부동소수점 잡음이 판정을 뒤집지 않는다', () => {
     // half=3, DESK가 x -0.93..0.93이라 anchor를 3-0.93=2.07에 두면 world.max.x는 정확히 3.0
     const world = worldAABB(DESK, 0, { x: 2.07, z: 0 });
     expect(world.max.x).toBeCloseTo(3, 9);
-    expect(isAreaOutOfBounds(world, BOOTH_SIZE_FALLBACK)).toBe(false);
+    expect(isAreaOutOfBounds(world, BOOTH_6M)).toBe(false);
   });
 
   it('경계를 확실히 넘으면 이탈이다', () => {
     const world = worldAABB(DESK, 0, { x: 2.5, z: 0 });
-    expect(isAreaOutOfBounds(world, BOOTH_SIZE_FALLBACK)).toBe(true);
+    expect(isAreaOutOfBounds(world, BOOTH_6M)).toBe(true);
   });
 });
