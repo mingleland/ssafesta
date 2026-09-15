@@ -3,6 +3,7 @@ import { __resetSessionForTests, setGuestSession, setMemberSession } from '../..
 import {
   __resetBoothVisitTrackerForTests,
   applyWorldContextChange,
+  attachVisitId,
   discardPendingVisit,
   getPendingVisit,
   setBoothVisitSink,
@@ -50,7 +51,7 @@ describe('boothVisitTracker', () => {
     applyWorldContextChange({ insideBooth: true, boothId: 3 }, now);
 
     expect(edges).toHaveLength(1);
-    expect(getPendingVisit()).toEqual({ boothId: 3, enteredAt: AT });
+    expect(getPendingVisit()).toEqual({ boothId: 3, enteredAt: AT, visitId: null, token: 1 });
   });
 
   it('부스 밖을 거치지 않은 A→B 전환을 A 퇴장 + B 진입으로 가르고 경고를 남긴다', () => {
@@ -64,7 +65,7 @@ describe('boothVisitTracker', () => {
       ['exit', 3],
       ['enter', 7],
     ]);
-    expect(getPendingVisit()).toEqual({ boothId: 7, enteredAt: AT });
+    expect(getPendingVisit()).toEqual({ boothId: 7, enteredAt: AT, visitId: null, token: 2 });
     expect(warn).toHaveBeenCalled();
   });
 
@@ -73,7 +74,7 @@ describe('boothVisitTracker', () => {
 
     expect(edges).toHaveLength(1);
     expect(edges[0].boothId).toBeNull();
-    expect(getPendingVisit()).toEqual({ boothId: null, enteredAt: AT });
+    expect(getPendingVisit()).toEqual({ boothId: null, enteredAt: AT, visitId: null, token: 1 });
     expect(warn).toHaveBeenCalled();
   });
 
@@ -100,14 +101,29 @@ describe('boothVisitTracker', () => {
     ]);
   });
 
-  it('식별자를 만들어 내지 않는다 — visitId 는 서버만 발급한다', () => {
+  it('식별자를 만들어 내지 않는다 — visitId 는 서버가 채우기 전까지 null 이다', () => {
     member();
     applyWorldContextChange({ insideBooth: true, boothId: 3 }, now);
     applyWorldContextChange({ insideBooth: false, boothId: null }, now);
 
     for (const edge of edges) {
-      expect(Object.keys(edge).sort()).toEqual(['at', 'boothId', 'kind', 'sendable']);
+      expect(Object.keys(edge).sort()).toEqual(['at', 'boothId', 'kind', 'sendable', 'token', 'visitId']);
+      // 이 모듈은 서버를 부르지 않으므로 값을 채울 길이 없다. token 은 방문 구분용 로컬 순번이지
+      // 서버 식별자가 아니다 — 요청 경로에 들어가지 않는다.
+      expect(edge.visitId).toBeNull();
     }
     expect(Object.keys(getPendingVisit() ?? {})).toEqual([]);
+  });
+
+  it('attachVisitId 는 같은 방문에만 붙는다 — 늦게 온 응답이 다음 방문을 오염시키지 않는다', () => {
+    member();
+    applyWorldContextChange({ insideBooth: true, boothId: 3 }, now);
+    const stale = getPendingVisit()!.token;
+    applyWorldContextChange({ insideBooth: false, boothId: null }, now);
+    applyWorldContextChange({ insideBooth: true, boothId: 9 }, now);
+
+    attachVisitId(stale, 'v-old');
+
+    expect(getPendingVisit()?.visitId).toBeNull();
   });
 });
