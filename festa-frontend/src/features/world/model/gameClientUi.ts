@@ -28,9 +28,15 @@ export interface GameClientUiState {
    * 벗긴다. 이렇게 두어야 상세를 닫았을 때 관리 화면으로 **돌아온다**.
    */
   managementPanel: ManagementPanel | null;
+  myInfo: boolean;
 }
 
-const initialState: GameClientUiState = { gameMenu: false, managementOverlay: false, managementPanel: null };
+const initialState: GameClientUiState = {
+  gameMenu: false,
+  managementOverlay: false,
+  managementPanel: null,
+  myInfo: false,
+};
 
 let state: GameClientUiState = initialState;
 const listeners = new Set<() => void>();
@@ -44,7 +50,8 @@ function setState(patch: Partial<GameClientUiState>): void {
   if (
     next.gameMenu === state.gameMenu &&
     next.managementOverlay === state.managementOverlay &&
-    next.managementPanel === state.managementPanel
+    next.managementPanel === state.managementPanel &&
+    next.myInfo === state.myInfo
   ) {
     return;
   }
@@ -72,7 +79,7 @@ export function useGameClientUi(): GameClientUiState {
 
 // 둘은 서로 배타적이다 — 관리 화면 위에 게임 메뉴가 겹쳐 뜨면 ESC 의 의미가 모호해진다.
 export function openGameMenu(): void {
-  setState({ gameMenu: true, managementOverlay: false, managementPanel: null });
+  setState({ gameMenu: true, managementOverlay: false, managementPanel: null, myInfo: false });
 }
 
 export function closeGameMenu(): void {
@@ -81,7 +88,7 @@ export function closeGameMenu(): void {
 
 /** Booth Management NPC 진입 seam. Unity 이벤트 계약(G-1)이 오면 dispatcher 가 이 함수를 부른다 */
 export function openBoothManagement(): void {
-  setState({ managementOverlay: true, gameMenu: false });
+  setState({ managementOverlay: true, gameMenu: false, myInfo: false });
 }
 
 export function closeBoothManagement(): void {
@@ -110,6 +117,15 @@ export function closeManagementPanel(): void {
  * 새로고침·뒤로가기에도 같은 결과가 된다.
  */
 export const WORLD_RETURN_TO_MANAGEMENT = '/app/world?panel=management';
+
+/** ESC 내 정보 — GameMenu 의 "내 정보"가 연다 */
+export function openMyInfo(): void {
+  setState({ myInfo: true, gameMenu: false, managementOverlay: false, managementPanel: null });
+}
+
+export function closeMyInfo(): void {
+  setState({ myInfo: false });
+}
 
 /** World 를 벗어날 때 — 남은 레이어가 다음 진입에 그대로 떠 있지 않게 한다 */
 export function resetGameClientUi(): void {
