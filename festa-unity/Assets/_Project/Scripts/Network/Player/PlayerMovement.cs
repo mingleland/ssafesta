@@ -95,6 +95,11 @@ namespace Festa.Network
         CharacterController _controller;
         Unity.Netcode.Components.NetworkTransform _networkTransform;
         float _turnVelocity;
+        // 짧은 Shift 탭은 걷기 속도/모션을 유지한다. 즉시 Run으로 바꾸면 같은 프레임에
+        // 이동 속도와 네트워크 AnimState가 함께 튀어 스케이트처럼 보인다 (S15P21A604-747).
+        const float RunPressDelay = 0.18f;
+        float _runPressedAt = -1f;
+        bool _runActivated;
         float _verticalSpeed;
         bool _spawnPlaced;
         float _spawnWaitStart;
@@ -368,7 +373,10 @@ namespace Festa.Network
 
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
-            bool running = moving && IsRunPressed();
+            // 이동 여부와 무관하게 Shift 유지 시간을 잰다. 먼저 Shift를 누르고 이동을
+            // 시작하는 일반적인 조작도 0.18초가 지났다면 즉시 달리기로 들어간다.
+            bool runRequested = ResolveRunState(IsRunPressed());
+            bool running = moving && runRequested;
 
             // 이동·점프는 이모트를 끝낸다. **점프가 빠져 있었다** — 앉거나 누운 채로 Space 를 누르면
             // 그 자세 그대로 몸이 떠올랐다 (사용자 보고 2026-09-13, 소파·바닥 앉기 둘 다).
@@ -590,6 +598,22 @@ namespace Festa.Network
         {
             if (UseSyntheticInput) return SyntheticRun;
             return IsRunKeyPressed();
+        }
+
+        bool ResolveRunState(bool pressed)
+        {
+            if (!pressed)
+            {
+                _runPressedAt = -1f;
+                _runActivated = false;
+                return false;
+            }
+
+            if (_runActivated) return true;
+            if (_runPressedAt < 0f) _runPressedAt = Time.unscaledTime;
+
+            _runActivated = Time.unscaledTime - _runPressedAt >= RunPressDelay;
+            return _runActivated;
         }
 
         static Vector2 ReadKeyboardInput()
