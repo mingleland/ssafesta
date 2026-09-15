@@ -30,10 +30,10 @@
    - 어느 전환 순서에서도 속옷 단독 상태가 발생하지 않아야 한다.
 
 5. **NPC 옷이 화면 가장자리에서 사라지는 컬링 회귀** — `S15P21A604-749`
-   - 상태: **좌표계 보정 재구현·컴파일 완료/시각 검증 대기**.
+   - 상태: **전신 공통 bounds 2차 수정·컴파일 완료/시각 검증 대기**.
    - 좌·우·위 프러스텀 경계에서 NPC 의상 `SkinnedMeshRenderer`가 사라지는 현상이다.
-   - 기존 보정은 서로 다른 렌더러 로컬 공간의 bounds를 그대로 합쳤다. 원본은 프리팹 루트 공간, 신체·병합 파츠는 대상 렌더러 공간으로 변환한 뒤 합치도록 수정했다.
-   - 남은 확인: NPC 의상 조합별 좌·우·위 화면 경계 왕복과 WebGL 빌드 검증.
+   - 파츠별 bounds 보정만으로 재발해 부스 직원의 모든 활성 스킨 파츠가 동일한 전신 bounds를 공유하고 `updateWhenOffscreen`을 사용하도록 재수정했다.
+   - 남은 확인: NPC 의상 조합별 좌·우·위 및 상·하 카메라 각도 왕복과 WebGL 빌드 검증.
 
 ### P1 — 멀티플레이 충돌·상호작용
 
@@ -117,7 +117,40 @@
 
 23. **벽 근처 월드 텍스트 차폐 문제의 잔여 확인**
     - 상태: **미해결/낮은 우선순위**.
-    - 플레이어를 바라보는 회전은 유지하되 벽 뒤로 들어간 텍스트는 차폐 숨김 또는 거리 페이드로 처리한다.
+   - 플레이어를 바라보는 회전은 유지하되 벽 뒤로 들어간 텍스트는 차폐 숨김 또는 거리 페이드로 처리한다.
+
+## GitLab 열린 이슈 대조로 추가한 작업 (2026-09-15)
+
+### P0 — 진입 차단·공통 입력
+
+- **WebGL data 번들 142MB 감축 및 30초 진입 타임아웃 해소** — GitLab [#196](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/196)
+  - 콜드 진입에서 `WorldEntryGate` 제한시간을 넘기는 문제다. Unity 빌드 리포트로 미사용 에셋·중복 텍스처·오디오·씬 포함물을 분해하고, 압축 후 data 번들 및 실제 진입 시간을 다시 측정한다.
+- **React Overlay 중 Unity 월드 입력 잠금 계약·구현** — GitLab [#132](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/132)
+  - `WebGLInput.captureAllKeyboardInput`, lock/unlock 브리지, 커서 소유권을 확정하고 Overlay 중 WASD·F 차단, 종료 후 입력 복구, 한글 입력을 실 WebGL에서 검증한다.
+
+### P1 — 월드·부스 연동
+
+- **GAME_PORTAL 프리팹 LocalBounds 실측 회신** — GitLab [#157](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/157)
+  - rotationY=0, 바닥 원점, 미터 단위 AABB를 Unity에서 실측해 BE `LayoutObjectType.GAME_PORTAL` 계약을 막고 있는 값을 전달한다.
+- **부스 임대 조기 반납의 월드 실시간 전파 확인** — GitLab [#199](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/199)
+  - 기존 임대·게시 NGO 슬롯 중계가 반납까지 덮는지 확인하고, 빠지면 별도 게임 티켓으로 분리한다.
+- **비활성 탭 재접속 시 마지막 위치 복원 정책·구현** — GitLab [#200](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/200)
+  - 재접속마다 스폰으로 돌아가는 현재 동작을 유지할지, 게임 서버가 동일 신원의 마지막 좌표를 짧게 보존할지 결정한 뒤 2클라이언트로 검증한다.
+- **아바타 보유·구매·미보유 착용 차단 연동** — GitLab [#120](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/120)
+  - 서버 `owned` 값을 정본으로 잠금·구매·로그인 유도 UI와 저장 거부 복구를 연결하고, Unity 카탈로그 itemId/familyId 매핑을 확인한다.
+- **슬롯머신·타이밍 스톱 실서버 판정 클라이언트 연결** — GitLab [#134](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/134), [#205](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/205)
+  - Mock 대신 확정된 서버 계약을 연결하되 슬롯 tier 0~3·베팅 10·게스트/잔액 오류 처리와 타이밍 결과 보고를 검증한다.
+- **테스트용 부스 게시본 콘텐츠 E2E 연결** — GitLab [#137](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/137)
+  - `AI_AGENT`, `GAME_PORTAL`, `PROJECT_PANEL`의 실제 config/binding이 들어간 게시본으로 Unity 이벤트와 FE Overlay까지 왕복 검증한다.
+
+### P2 — UI·에셋 계약
+
+- **ESC 메뉴 인플레이스 아바타 설정 진입** — GitLab [#197](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/197)
+  - 월드 연결과 `NetworkPlayer`를 유지한 채 커스터마이징을 열고 닫는 브리지·모달 상태를 구현한다.
+- **부스 간판 프로젝트명·대표 이미지 실제 데이터 연결** — GitLab [#171](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/171)
+  - `booths.name`, `facade.signText`, 프로젝트명 우선순위와 이미지 CORS·요청 수를 확정해 12개 간판에 적용한다.
+- **Booth 2.5D 에셋 색상·UV 계약 정리** — GitLab [#202](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/202)
+  - `FURN_CHAIR_02_WHITE` 아틀라스 UV와 albedo 없는 단색 머티리얼 의도를 확인하고 FE 매니페스트의 컬러웨이와 일치시킨다.
 
 ## 완료된 환경 작업
 
