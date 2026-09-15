@@ -14,6 +14,12 @@ import {
   openManagementPanel,
 } from '../../../../features/world/model/gameClientUi';
 import { getWorldScreen } from '../../../../features/world/model/worldScreen';
+import { __resetSessionForTests, setMemberSession } from '../../../../features/auth/model/session';
+import {
+  WORLD_CHAT_INPUT_ID,
+  __resetWorldChatForTests,
+  getWorldChatSnapshot,
+} from '../../../../features/worldChat/model/worldChat';
 import {
   __resetWorldUiStateForTests,
   applyWorldUiStateJson,
@@ -49,6 +55,11 @@ vi.mock('../../../../features/world/ui/GameMenu', () => ({ GameMenu: () => <div 
 const pressEscape = () =>
   act(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  });
+
+const pressEnter = () =>
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
   });
 
 beforeEach(() => {
@@ -126,6 +137,42 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('management');
     pressEscape();
     expect(getWorldScreen()).toBe('world');
+  });
+});
+
+// Enter 판정도 같은 단일 중재자가 쥔다 (S15P21A604-706·-791) — 그래서 여기서 함께 잠근다.
+describe('WorldPage Enter 판정 (-791)', () => {
+  beforeEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+    setMemberSession('at', '2026-12-31T00:00:00.000Z');
+  });
+  afterEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+  });
+
+  it('월드에서 누른 Enter 는 채팅을 열고 입력창에 focus 를 준다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+
+  it('패널이 열린 채 focus 를 잃어도 Enter 가 그 입력창으로 되돌린다 — 새로 열지 않는다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    // 캔버스를 클릭한 상태를 만든다 — 패널은 그대로 떠 있고 focus 만 빠진다
+    act(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    expect(document.activeElement?.id).not.toBe(WORLD_CHAT_INPUT_ID);
+
+    pressEnter();
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
   });
 });
 

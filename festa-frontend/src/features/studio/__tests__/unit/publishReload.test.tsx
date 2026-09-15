@@ -14,8 +14,12 @@ const putDraft = vi.fn();
 vi.mock('../../../../entities/layout/api.select', () => ({
   layoutApi: { publish: (id: number) => publish(id), putDraft: (id: number, body: unknown) => putDraft(id, body) },
 }));
-const notify = vi.fn<(slotId: number) => boolean>(() => true);
-vi.mock('../../../../unity/host/boothLayoutBridge', () => ({ notifyBoothSlotChanged: (id: number) => notify(id) }));
+// bridge 를 통째로 목하지 않는다 (S15P21A604-786). 한 겹 아래인 Unity 인스턴스만 세우면
+// **slotId 조회와 SendMessage payload 까지 실제 코드가 돈다** — 알림 경로를 리팩터링해도
+// 이 테스트가 계속 같은 것을 지킨다.
+const sendMessage = vi.fn();
+let instance: { SendMessage: typeof sendMessage } | null = { SendMessage: sendMessage };
+vi.mock('../../../../unity/host/sessionManager', () => ({ getReadyUnityInstance: () => instance }));
 
 const { usePublish, useSaveDraft } = await import('../../model/useLayoutMutations');
 
@@ -31,7 +35,7 @@ function setup(myBooth: MyBooth | undefined) {
   return { wrapper, dispatch: vi.fn() };
 }
 
-beforeEach(() => { publish.mockReset(); putDraft.mockReset(); notify.mockClear(); });
+beforeEach(() => { publish.mockReset(); putDraft.mockReset(); sendMessage.mockClear(); instance = { SendMessage: sendMessage }; });
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('게시 성공', () => {
@@ -42,8 +46,8 @@ describe('게시 성공', () => {
     result.current.mutate(2);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify).toHaveBeenCalledWith(6);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith('BoothLayoutBridge', 'ReloadBoothSlot', '6');
     expect(dispatch).toHaveBeenCalledWith({ type: 'PUBLISH_SUCCESS', publishedVersion: 3 });
   });
 
@@ -54,7 +58,7 @@ describe('게시 성공', () => {
     result.current.mutate(2);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(notify).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalled(); // 게시 자체는 그대로 성공 처리된다
   });
 
@@ -65,7 +69,19 @@ describe('게시 성공', () => {
     result.current.mutate(2);
     await waitFor(() => expect(result.current.isError).toBe(true));
 
-    expect(notify).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('월드에 들어가 있지 않으면 조용히 건너뛴다 — 게시는 그대로 성공한다', async () => {
+    publish.mockResolvedValue({ publishedVersion: 3 });
+    instance = null;
+    const { wrapper, dispatch } = setup(MY_BOOTH);
+    const { result } = renderHook(() => usePublish(dispatch), { wrapper });
+    result.current.mutate(2);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({ type: 'PUBLISH_SUCCESS', publishedVersion: 3 });
   });
 });
 
@@ -77,6 +93,6 @@ describe('draft 저장', () => {
     result.current.mutate({ boothId: 2, expectedRevision: 4, template: 'PROJECT_EXHIBITION', objects: [] });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(notify).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
