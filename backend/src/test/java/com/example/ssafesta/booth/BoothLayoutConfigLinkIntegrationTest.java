@@ -99,13 +99,20 @@ class BoothLayoutConfigLinkIntegrationTest {
                 "미연결은 경고로 알려야 합니다: " + outcome.warnings());
     }
 
-    /** A type nobody can check yet says so, rather than passing as if it had been verified. */
+    /**
+     * A type nobody can check yet says so, rather than passing as if it had been verified.
+     *
+     * <p>{@code VIDEO_SCREEN} because it is one of the four that are genuinely still unjudged
+     * (with {@code RECRUITMENT_BOARD}, {@code CONSULTATION_DESK}, {@code LIKE_VOTE}). This test used
+     * {@code PROJECT_PANEL} until that type moved to a per-booth predicate (S15P21A604-765) — the
+     * warning it pins would have quietly stopped existing.
+     */
     @Test
     void anUncheckableTypeIsReportedAsUnverified() {
         Owner owner = leasedOwner("검증불가");
         layouts.saveDraft(owner.boothId(), owner.userId(), """
                 {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
-                  {"objectId":"panel-1","type":"PROJECT_PANEL","configId":4242,
+                  {"objectId":"screen-1","type":"VIDEO_SCREEN","configId":4242,
                    "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
                 """);
 
@@ -247,6 +254,90 @@ class BoothLayoutConfigLinkIntegrationTest {
 
         assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
                 "키오스크가 없으면 설문 경고를 낼 일이 없습니다: " + outcome.warnings());
+    }
+
+    /**
+     * {@code PROJECT_PANEL} moved the same way the kiosk did (spec 009 C-01, GitLab #194).
+     *
+     * <p>The failure is the kiosk's twin: the panel published, the visitor pressed F, and the
+     * overlay opened on nothing because the booth has no project. The old predicate could not see
+     * it — it only asked whether a {@code configId} was present, and the visitor contract does not
+     * even carry one.
+     */
+    @Test
+    void aPanelInABoothWithNoProjectWarns() {
+        Owner owner = leasedOwner("프로젝트없음");
+        layouts.saveDraft(owner.boothId(), owner.userId(), panelLayout(1));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        // Warn-and-allow: the owner may place the panel before registering the project.
+        assertEquals(1, outcome.publishedVersion());
+        assertTrue(outcome.warnings().stream().anyMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())
+                        && "이 부스에 프로젝트가 없습니다.".equals(w.message())),
+                "프로젝트가 없는 그래픽 패널은 경고해야 합니다: " + outcome.warnings());
+    }
+
+    @Test
+    void aPanelInABoothWithAProjectDoesNotWarn() {
+        Owner owner = leasedOwner("프로젝트있음");
+        registerProject(owner.boothId());
+        layouts.saveDraft(owner.boothId(), owner.userId(), panelLayout(1));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        // Neither warning is true of it: nothing is missing, and nothing is left unverified.
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())
+                        || "CONFIG_UNVERIFIED".equals(w.rule())),
+                "프로젝트가 있는 패널에는 경고가 남으면 안 됩니다: " + outcome.warnings());
+    }
+
+    /**
+     * The false positive this change removes.
+     *
+     * <p>A panel carries no meaningful {@code configId} — the booth holds one project and the
+     * published-projects endpoint finds it by booth. Judging the panel by the id flagged booths
+     * whose project worked.
+     */
+    @Test
+    void aPanelWithoutAConfigIdInABoothWithAProjectDoesNotWarn() {
+        Owner owner = leasedOwner("프로젝트있음configId없음");
+        registerProject(owner.boothId());
+        layouts.saveDraft(owner.boothId(), owner.userId(), panelLayout(null));
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "configId 는 그래픽 패널의 열쇠가 아닙니다: " + outcome.warnings());
+    }
+
+    /** Nothing to press, nothing to warn about — same shape as the kiosk case above. */
+    @Test
+    void aBoothWithNoPanelIsNotWarnedAboutItsMissingProject() {
+        Owner owner = leasedOwner("패널없음");
+        layouts.saveDraft(owner.boothId(), owner.userId(), """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"deco-1","type":"DECORATION","position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """);
+
+        var outcome = layouts.publish(owner.boothId(), owner.userId());
+
+        assertTrue(outcome.warnings().stream().noneMatch(w -> "CONFIG_NOT_LINKED".equals(w.rule())),
+                "패널이 없으면 프로젝트 경고를 낼 일이 없습니다: " + outcome.warnings());
+    }
+
+    /** Straight to the table for the same reason — spec 009's endpoint has its own tests. */
+    private void registerProject(Long boothId) {
+        jdbc.update("INSERT INTO projects (booth_id, name) VALUES (?, ?)", boothId, "우리 팀 프로젝트");
+    }
+
+    private String panelLayout(Integer configId) {
+        String config = configId == null ? "" : "\"configId\":%d,".formatted(configId);
+        return """
+                {"expectedRevision":0,"schemaVersion":1,"template":"PROJECT_EXHIBITION","objects":[
+                  {"objectId":"panel-1","type":"PROJECT_PANEL",%s
+                   "position":{"x":0,"y":0,"z":0},"rotationY":0}]}
+                """.formatted(config);
     }
 
     /** Written straight to the column — spec 016's endpoint has its own test for the write path. */

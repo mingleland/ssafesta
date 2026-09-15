@@ -13,7 +13,12 @@ import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +54,8 @@ class GuestAuthApiIntegrationTest {
     @Autowired private UserRepository users;
     @Autowired private JwtDecoder jwtDecoder;
     @Autowired private JwtEncoder jwtEncoder;
+    @Autowired private org.springframework.data.redis.core.StringRedisTemplate redis;
+    @Autowired private com.example.ssafesta.common.RedisKeyspaceProperties keyspace;
     @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
     /**
@@ -163,6 +170,68 @@ class GuestAuthApiIntegrationTest {
                         .cookie(new Cookie("refresh_token", session.refreshToken())))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /**
+     * 탭을 하나 더 열어 생긴 재사용은 재시도 가능한 코드로 나간다 (S15P21A604-764, GitLab #198).
+     *
+     * <p>여기가 FE 가 실제로 보는 자리다. 서비스 층 테스트는 세션이 살아 있다는 것까지만 말하고,
+     * 봉투의 {@code code} 와 쿠키 처분은 보지 않는다. 그 둘이 FE 분기의 전부다.
+     */
+    @Test
+    void aReplayInsideTheGraceWindowIsRetryableAndKeepsTheCookie() throws Exception {
+        Long userId = users.save(new User("다중탭_" + UUID.randomUUID().toString().substring(0, 6))).getId();
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+
+        // 진 쪽 탭이 옛 쿠키로 들어온다.
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .cookie(new Cookie("refresh_token", first.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_ROTATED"))
+                // 쿠키를 지우면 재시도할 것이 없어진다. Set-Cookie 자체를 내지 않는다.
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        // 갱신된 쿠키로 한 번 더 보내면 성공한다 — 그것이 이 코드가 약속하는 것이다.
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .cookie(new Cookie("refresh_token", second.refreshToken())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isString());
+    }
+
+    /** 유예 밖은 그대로 일반 401 이다 — 재시도하라는 뜻이 아니다 (spec 001 시나리오 7). */
+    @Test
+    void aReplayOutsideTheGraceWindowIsTheGenericRefusal() throws Exception {
+        Long userId = users.save(new User("유예밖_" + UUID.randomUUID().toString().substring(0, 6))).getId();
+        MemberSessionService.MemberSession first = sessions.issue(userId);
+        sessions.refresh(first.refreshToken());
+        ageRotationMarker(first.refreshToken());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .cookie(new Cookie("refresh_token", first.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /** 30초를 기다리지 않는다 — 표식의 회전 시각만 과거로 옮긴다. */
+    private void ageRotationMarker(String rawToken) {
+        String markerKey = keyspace.prefix() + "auth:refresh:used:" + sha256(rawToken);
+        String[] fields = redis.opsForValue().get(markerKey).split(":", -1);
+        assertEquals(4, fields.length, "회전 표식에 시각 칸이 없다");
+        fields[3] = String.valueOf(Instant.now().minusSeconds(600).toEpochMilli());
+        redis.opsForValue().set(markerKey, String.join(":", fields), Duration.ofMinutes(10));
+    }
+
+    private static String sha256(String value) {
+        try {
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     /**
