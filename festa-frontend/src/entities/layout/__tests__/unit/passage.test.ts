@@ -4,17 +4,22 @@ import { describe, expect, it } from 'vitest';
 import { passageWarnings } from '../../passage.ts';
 import type { LayoutObject } from '../../types.ts';
 
+// 격자가 footprint 에서 유도되도록 바뀌었다 (S15P21A604-785). 이 파일의 기대값은 전부 6m 정사각형
+// 기준의 실측이므로 **6×6 을 명시해 그대로 잠근다** — 같은 입력이 예전 120×120 과 같은 답을 내는지가
+// 이번 변경의 회귀 기준이다. 넓어진 footprint 판정은 assetBounds.test.ts 가 따로 본다.
+const BOOTH_6M = { width: 6, depth: 6 } as const;
+
 function obj(partial: Partial<LayoutObject> & Pick<LayoutObject, 'objectId' | 'type'>): LayoutObject {
   return { position: { x: 0, y: 0, z: 0 }, rotationY: 0, ...partial };
 }
 
 describe('passageWarnings — 빈 배치·안전한 배치', () => {
   it('빈 배치는 경고가 없다', () => {
-    expect(passageWarnings([])).toEqual([]);
+    expect(passageWarnings([], BOOTH_6M)).toEqual([]);
   });
 
   it('부스 중앙에 하나만 정면이 열려 있으면 경고가 없다', () => {
-    const warnings = passageWarnings([obj({ objectId: 'a', type: 'AI_AGENT' })]);
+    const warnings = passageWarnings([obj({ objectId: 'a', type: 'AI_AGENT' })], BOOTH_6M);
     expect(warnings).toEqual([]);
   });
 });
@@ -25,7 +30,7 @@ describe('passageWarnings — FRONT_BLOCKED (실측: SURVEY_KIOSK가 AI_AGENT �
       obj({ objectId: 'agent', type: 'AI_AGENT', position: { x: 0, y: 0, z: 0 } }),
       obj({ objectId: 'kiosk', type: 'SURVEY_KIOSK', position: { x: 0, y: 0, z: 0.5 } }),
     ];
-    const warnings = passageWarnings(objects);
+    const warnings = passageWarnings(objects, BOOTH_6M);
     expect(warnings).toContainEqual({
       rule: 'FRONT_BLOCKED',
       objectId: 'agent',
@@ -38,7 +43,7 @@ describe('passageWarnings — FRONT_BLOCKED (실측: SURVEY_KIOSK가 AI_AGENT �
       obj({ objectId: 'deco', type: 'DECORATION', position: { x: 0, y: 0, z: 0 } }),
       obj({ objectId: 'blocker', type: 'FURNITURE', position: { x: 0, y: 0, z: 0.5 } }),
     ];
-    expect(passageWarnings(objects).some((w) => w.objectId === 'deco')).toBe(false);
+    expect(passageWarnings(objects, BOOTH_6M).some((w) => w.objectId === 'deco')).toBe(false);
   });
 });
 
@@ -50,7 +55,7 @@ describe('passageWarnings — ISOLATED_AREA (전체 너비를 막아 뒷공간�
       obj({ objectId: 'wall-left', type: 'RECRUITMENT_BOARD', position: { x: -1.5, y: 0, z: -1 } }),
       obj({ objectId: 'wall-right', type: 'RECRUITMENT_BOARD', position: { x: 1.5, y: 0, z: -1 } }),
     ];
-    const warnings = passageWarnings(objects);
+    const warnings = passageWarnings(objects, BOOTH_6M);
     expect(warnings.some((w) => w.rule === 'ISOLATED_AREA')).toBe(true);
   });
 
@@ -61,7 +66,7 @@ describe('passageWarnings — ISOLATED_AREA (전체 너비를 막아 뒷공간�
       obj({ objectId: 'wall-right', type: 'RECRUITMENT_BOARD', position: { x: 1.5 + 1.5 + 1.5, y: 0, z: -1 } }),
     ];
     // 두 벽이 부스 밖으로 밀려나 사실상 아무것도 막지 않는 통제군 — ISOLATED_AREA가 없어야 한다.
-    const warnings = passageWarnings(objects);
+    const warnings = passageWarnings(objects, BOOTH_6M);
     expect(warnings.some((w) => w.rule === 'ISOLATED_AREA')).toBe(false);
   });
 });

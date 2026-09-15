@@ -11,7 +11,10 @@ export const PX_PER_M = 60;
 
 // 부스 크기(미터) — 정본은 GET /booth-layout-templates 응답의 footprint(§9).
 // 이 값은 서버 응답 도착 전 렌더링용 기본값일 뿐이다. 6×6×2.72 확정(#19 — 높이는 셸 벽 실측 2.725의 내림).
-export const BOOTH_SIZE_FALLBACK = { width: 6, depth: 6, height: 2.72 } as const;
+// 정본은 §9 응답의 template.footprint 다 — 이 값은 카탈로그 조회 전·실패 시의 폴백이다.
+// 9.4 × 6 × 5.9 는 BE 확정값(GitLab #181, 2026-09-15). x ±4.7 은 서쪽 실효 벽 PanelGraphic −4.804,
+// 높이 5.9 는 천장 램프가 5.94 부터 시작하는 실사용 상한이다.
+export const BOOTH_SIZE_FALLBACK = { width: 9.4, depth: 6, height: 5.9 } as const;
 
 // 오브젝트 상한 기본값 — 정본은 §9 응답의 maxObjects. 헌법 22조.
 export const MAX_OBJECTS_FALLBACK = 12;

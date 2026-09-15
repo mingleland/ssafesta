@@ -2,7 +2,9 @@
 // 2026-08-22)에서 FE·mock 서버가 동일하게 거부한 배치를 그대로 가져왔다.
 import { describe, expect, it } from 'vitest';
 import type { LayoutObject } from '../../../../entities/layout/types.ts';
-import { BOOTH_SIZE_FALLBACK } from '../../../../shared/config/studio.ts';
+// 치수는 고정 fixture 로 둔다 — 여기서 잠그는 것은 판정 규칙이지 현행 footprint 가 아니다
+// (S15P21A604-785). 현행 footprint 는 entities/layout/__tests__/unit/assetBounds.test.ts 가 본다.
+const BOOTH_SIZE_FALLBACK = { width: 6, depth: 6, height: 2.72 } as const;
 import { precheckErrors, precheckWarnings } from '../../lib/validate.ts';
 
 function obj(partial: Partial<LayoutObject> & Pick<LayoutObject, 'objectId' | 'type'>): LayoutObject {

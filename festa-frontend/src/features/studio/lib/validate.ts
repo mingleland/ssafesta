@@ -3,7 +3,8 @@
 // 출처: specs/005-booth-studio-layout/FE/tasks.md T015, data-model.md ObjectType 판정표
 
 import type { LayoutObject, ValidationDetail } from '../../../entities/layout/types';
-import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../model/useBoothAssets';
 import { isAreaOutOfBounds, worldAABB } from '../../../entities/layout/geometry';
 import { AREA_OUT_OF_BOUNDS_MESSAGE, CONFIG_NOT_LINKED_MESSAGE, OBJECTS_OVERLAP_MESSAGE, objectLimitMessage } from '../../../entities/layout/messages';
 import { overlappingObjectIds } from './overlap';
@@ -61,7 +62,8 @@ export function precheckErrors(
     seen.add(o.objectId);
 
     // 미지 타입은 실물 크기를 모르니 판정하지 않고 건너뛴다 — 서버 몫(SC-005, T026과 같은 원칙).
-    const local = OBJECT_LOCAL_BOUNDS[o.type];
+    // 크기의 정본은 runtime manifest 다 — 화면에 보이는 자산과 검증이 같은 값을 본다(S15P21A604-785).
+    const local = resolveLocalBounds(o);
     if (local && isAreaOutOfBounds(worldAABB(local, o.rotationY, o.position), boothBounds)) {
       details.push({
         rule: 'AREA_OUT_OF_BOUNDS',
