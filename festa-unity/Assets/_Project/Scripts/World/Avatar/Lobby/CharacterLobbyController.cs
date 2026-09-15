@@ -155,6 +155,7 @@ namespace Festa.Avatar
         /// </summary>
         void ShowPurchaseOrNotice(AvatarItemDefinition item, string displayName)
         {
+            CloseColorPopup();
             if (item == null) { ShowLockedNotice(); return; }
 
             if (AvatarOwnership.State == AvatarOwnershipState.Failed)
@@ -498,8 +499,8 @@ namespace Festa.Avatar
             var quickRow=Horizontal(left,740,new Vector2(.05f,1),new Vector2(.95f,1));quickRow.sizeDelta=new Vector2(0,52);
             Anchor(_wardrobeTitle.rectTransform,new Vector2(.06f,.684f),new Vector2(.94f,.739f));
             Anchor(_wardrobeColorTitle.rectTransform,new Vector2(.06f,.36f),new Vector2(.94f,.41f));
-            Button(quickRow,"성별",()=>{_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
-            Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
+            Button(quickRow,"성별",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
+            Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
             var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
             Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
             // 상태 줄 — SetStatus 가 여기에 쓴다. 이 라벨이 없던 동안 잠금 안내·조회 실패 메시지가
@@ -529,8 +530,8 @@ namespace Festa.Avatar
             BuildColorPicker(_colorPopup,92);
             BuildHexColorInput(_colorPopup,242);
             var popupActions=Horizontal(_colorPopup,374,new Vector2(.09f,1),new Vector2(.91f,1));popupActions.sizeDelta=new Vector2(0,50);popupActions.GetComponent<HorizontalLayoutGroup>().spacing=12;
-            var cancelColor=Button(popupActions,"취소",()=>_colorPopup.gameObject.SetActive(false),128,48,UiSurface);cancelColor.GetComponentInChildren<Text>().fontSize=17;
-            var finishColor=Button(popupActions,"완료",()=>_colorPopup.gameObject.SetActive(false),128,48,new Color(.30f,.20f,.07f,1));finishColor.GetComponentInChildren<Text>().fontSize=17;
+            var cancelColor=Button(popupActions,"취소",CloseColorPopup,128,48,UiSurface);cancelColor.GetComponentInChildren<Text>().fontSize=17;
+            var finishColor=Button(popupActions,"완료",CloseColorPopup,128,48,new Color(.30f,.20f,.07f,1));finishColor.GetComponentInChildren<Text>().fontSize=17;
             _colorPopup.gameObject.SetActive(false);
 
         }
@@ -554,6 +555,7 @@ namespace Festa.Avatar
 
         void SelectWardrobeItem(AvatarPartCategory category,int itemId)
         {
+            CloseColorPopup();
             if(category==AvatarPartCategory.Outfit)
             {
                 if(itemId!=0)
@@ -595,7 +597,7 @@ namespace Festa.Avatar
             foreach(var category in new[]{AvatarPartCategory.Top,AvatarPartCategory.Bottom,AvatarPartCategory.Outfit,AvatarPartCategory.Shoes})
             {
                 var captured=category;
-                WardrobeCategoryButton(_wardrobeTabs,CategoryName(category),CategoryIcon(category),()=>{_wardrobeCategory=captured;_editingGarmentColor=false;SetCamera(CategoryCameraPreset(captured));RefreshWardrobe();},83,120,_wardrobeCategory==category);
+                WardrobeCategoryButton(_wardrobeTabs,CategoryName(category),CategoryIcon(category),()=>{CloseColorPopup();_wardrobeCategory=captured;SetCamera(CategoryCameraPreset(captured));RefreshWardrobe();},83,120,_wardrobeCategory==category);
             }
             if(_wardrobeTitle)_wardrobeTitle.text=CategoryName(_wardrobeCategory)+" 선택";
             // 다시 그리기 전에 지금 보고 있던 위치를 붙잡는다 (위 필드 주석 참조).
@@ -642,7 +644,7 @@ namespace Festa.Avatar
             foreach(var category in new[]{AvatarPartCategory.Head,AvatarPartCategory.Hair,AvatarPartCategory.Hat,AvatarPartCategory.Glasses})
             {
                 var captured=category;
-                CategoryButton(_categoryTabs,CategoryName(category),CategoryIcon(category),()=>{_category=captured;_editingGarmentColor=false;SetCamera(CategoryCameraPreset(captured));RefreshAll();},96,120,_category==category);
+                CategoryButton(_categoryTabs,CategoryName(category),CategoryIcon(category),()=>{CloseColorPopup();_category=captured;SetCamera(CategoryCameraPreset(captured));RefreshAll();},96,120,_category==category);
             }
         }
 
@@ -706,6 +708,16 @@ namespace Festa.Avatar
             SyncHexColor(current);
             if(_colorPopup)_colorPopup.gameObject.SetActive(true);
             if(category==AvatarPartCategory.Hat||category==AvatarPartCategory.Glasses)RefreshColors();else RefreshWardrobeColors();
+        }
+
+        /// <summary>
+        /// 색상 편집 대상이 아닌 선택으로 이동할 때 팝업과 편집 모드를 함께 닫는다.
+        /// 팝업만 숨기면 의상 영역 편집 플래그가 남아 다음 입력이 이전 파츠에 적용될 수 있다.
+        /// </summary>
+        void CloseColorPopup()
+        {
+            _editingGarmentColor=false;
+            if(_colorPopup)_colorPopup.gameObject.SetActive(false);
         }
 
         void RefreshItems()
@@ -864,6 +876,7 @@ namespace Festa.Avatar
         }
         void Randomize()
         {
+            CloseColorPopup();
             _config=CreateRecommendedRandomConfig(_config.gender, true);
             _wardrobeCategory=_config.outfitId!=0?AvatarPartCategory.Outfit:AvatarPartCategory.Top;
             _garmentColorCategory=_wardrobeCategory;
