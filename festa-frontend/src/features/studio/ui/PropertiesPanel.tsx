@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import type { LayoutObject } from '../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
-import { clampToBooth, normalizeRotation } from '../lib/coords';
+import { clampObjectToBooth, normalizeRotation } from '../lib/coords';
 import { IcTrash } from './shell/icons';
 
 interface Props {
@@ -72,7 +72,8 @@ export function PropertiesPanel({
     const x = Number(nextXText);
     const z = Number(nextZText);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return; // 비숫자 입력단 차단 — 도달 자체를 막는다(FE 사전 검증 4)
-    const clamped = clampToBooth(x, z, bounds);
+    // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+    const clamped = clampObjectToBooth(x, z, local, object.rotationY, bounds);
     onMove(clamped.x, clamped.z);
   }
 
