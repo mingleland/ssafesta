@@ -2071,7 +2071,9 @@ Authorization: Bearer <INTERNAL_INFRA_TO_SPRING_TOKENS 의 첫 값>
   같음. 세 번째가 늦게 도착한 결과가 최신 저장 위치를 과거로 되돌리는 것을 막는다
 - 반영할 때 **`storageProvider`와 `storageBucket`을 함께** 옮긴다. 두 provider의 버킷 이름이 서로
   다른 env라 provider만 바꾸면 이후 읽기·삭제가 없는 좌표를 친다. bucket 값은 계약에 없어 Spring이
-  배포 설정에서 해석한다 — 계약에 `targetBucket`을 넣는 안은 #100 논의 중이다
+  배포 설정에서 해석한다. 계약에 `targetBucket`을 넣기로 Infra와 합의했으나 송신부
+  (`storage-failover.sh`)가 아직 없어 **미반영**이고, 요청 스키마가 `additionalProperties: false`라
+  **지금 보내면 422다.** 도입은 송신부 착수보다 먼저 한다(`S15P21A604-770`)
 - **전제**: 한 document에 진행 중인 reconcile run은 최대 하나이며 이전 run 종료 전 반대 방향 전환을
   시작하지 않는다. 이 전제가 깨지면 위 세 번째 조건만으로는 저장 위치가 원래 값으로 돌아온 경우를
   구분하지 못한다(`checkedAt`은 검증을 끝낸 시각이라 그 구분에 쓸 수 없다)
