@@ -1,7 +1,6 @@
 package com.example.ssafesta.staff;
 
 import com.example.ssafesta.booth.Booth;
-import com.example.ssafesta.booth.BoothStaff;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.booth.BoothStaffRepository;
 import com.example.ssafesta.booth.StaffRole;
@@ -97,8 +96,11 @@ public class StaffInvitationService {
     /**
      * 초대받은 본인이 수락한다 — {@code booth_staffs} 행이 여기서 처음 생긴다.
      *
-     * <p>전이와 행 생성이 한 트랜잭션이다. 갈라 두면 행만 생기고 초대가 {@code PENDING} 으로 남아
-     * 두 번째 수락이 PK 충돌로 터진다.
+     * <p>전이와 행 생성이 한 트랜잭션이다. 갈라 두면 행만 생기고 초대가 {@code PENDING} 으로 남는다.
+     *
+     * <p>같은 초대를 동시에 두 번 수락해도 자리는 하나다. 그 보장은 사전 조회가 아니라
+     * {@code seatIfAbsent} 가 돌려주는 행 수에서 온다 — 두 요청이 사전 조회를 함께 통과할 수 있고,
+     * 그때 진 쪽이 조용히 성공하던 것이 GitLab #190 이다.
      */
     @Transactional
     public void accept(Long invitationId, Long userId) {
@@ -111,30 +113,17 @@ public class StaffInvitationService {
             throw new ApiException(ErrorCode.STAFF_INVITATION_NOT_PENDING);
         }
         if (staffs.findRole(invitation.getBoothId(), userId).isPresent()) {
+            // 흔한 경우를 한 번의 읽기로 거른다. 경합의 방어는 아래가 한다 — 이 조회는 두 요청이
+            // 함께 통과할 수 있다.
             throw new ApiException(ErrorCode.STAFF_ALREADY_MEMBER);
         }
-        try {
-            // 같은 사람의 더블클릭이 위 조회를 둘 다 통과하면 두 번째 INSERT 가 booth_staffs 의
-            // PK 에 걸린다. 여기서 flush 해 그 위반을 STAFF_ALREADY_MEMBER 로 답한다 (S15P21A604-693).
-            staffs.saveAndFlush(new BoothStaff(invitation.getBoothId(), userId, invitation.getRole().name()));
-        } catch (DataIntegrityViolationException violation) {
-            throw translateAccept(violation);
+        // 자리를 잡은 쪽만 1 을 돌려받는다. 예외를 기다리지 않는 이유는 BoothStaffRepository#seatIfAbsent
+        // 에 적어 두었다 — 조립키 엔티티라 save() 가 merge 를 타고, 진 쪽이 UPDATE 로 조용히
+        // 성공해 버린다 (GitLab #190).
+        if (staffs.seatIfAbsent(invitation.getBoothId(), userId, invitation.getRole().name()) == 0) {
+            throw new ApiException(ErrorCode.STAFF_ALREADY_MEMBER);
         }
         invitation.accept(Instant.now());
-    }
-
-    /**
-     * 수락의 INSERT 가 깨뜨린 제약이 무엇인지 보고 답을 고른다.
-     *
-     * <p>PK 위반만 "이미 구성원" 이다. 다른 위반(외래키 등)은 설명할 수 없는 사건이라 원본을 그대로
-     * 올린다 — 500 이 되고 로그에 크게 남는 쪽이 조용히 틀린 409 보다 정직하다 (T-24,
-     * {@code ProjectService.translate} 와 같은 규칙).
-     */
-    static RuntimeException translateAccept(DataIntegrityViolationException violation) {
-        if (ConstraintViolations.isViolationOf(violation, "booth_staffs_pkey")) {
-            return new ApiException(ErrorCode.STAFF_ALREADY_MEMBER);
-        }
-        return violation;
     }
 
     /** 초대의 INSERT 가 깨뜨린 제약 — 부분 유니크 인덱스면 "대기 중 초대가 이미 있다". */
