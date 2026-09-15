@@ -67,7 +67,7 @@
 
 | rule | 적용 | 뜻 |
 |---|---|---|
-| `CONFIG_NOT_LINKED` | 공개만 | 기능 오브젝트에 `configId` 미연결 (C-04 확정: 경고 유지 — #45) |
+| `CONFIG_NOT_LINKED` | 공개만 | 기능 오브젝트에 `configId` 미연결 (C-04 확정: 경고 유지 — #45). **`LAPTOP`·`SURVEY_KIOSK`는 같은 rule 을 부스 단위 술어로 답한다** — 노트북은 홈페이지 URL 미등록(016 §3-1), 키오스크는 그 부스에 설문 없음(010 C-06, `S15P21A604-699`) |
 | `CONFIG_UNVERIFIED` | 공개만 | 연결 대상의 종류를 아직 서버가 확인할 수 없음 |
 | `FRONT_BLOCKED` | 공개만 | 관람 띠 도달 가능 비율 50% 미만 (§10-3, #19 ⑤) |
 | `ISOLATED_AREA` | 공개만 | 통행 불가 고립 공간 1㎡ 이상 — 배치 전체 항목이라 `objectId` 없음 (§10-3) |
@@ -105,7 +105,7 @@
 | `objects[].type` | string | ✅ | `AI_AGENT` `VIDEO_SCREEN` `PROJECT_PANEL` `SURVEY_KIOSK` `RECRUITMENT_BOARD` `CONSULTATION_DESK` `LAPTOP` `LIKE_VOTE` `FURNITURE` `DECORATION` |
 | `objects[].position` | {x,y,z} number | ✅ | **미터**. 원점 = 부스 바닥 중앙, `y=0`이 바닥, +Z가 정면 (헌법 21조). 부스는 **6×6×2.72m** (높이는 셸 벽 패널 실측 — #19 ②, 2026-08-21 확정) → 앵커는 `|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`, **실물(회전 반영 AABB)도 같은 영역 안이어야 한다** (§10) |
 | `objects[].rotationY` | number | ✅ | 도(degree), `[0,360)`. `0`이면 +Z를 바라봄 |
-| `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID — **signed Int32, `1 ~ 2,147,483,647`, 0 금지**(Unity가 필드 부재를 0으로 읽어 미연결 판정에 씀 — #45 전제, #34에서 DB `CHECK (config_id > 0)`로 강제). 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조) |
+| `objects[].configId` | int | ❌ | 연결된 콘텐츠 ID — **signed Int32, `1 ~ 2,147,483,647`, 0 금지**(Unity가 필드 부재를 0으로 읽어 미연결 판정에 씀 — #45 전제, #34에서 DB `CHECK (config_id > 0)`로 강제). 공개 시 **그 부스 소유인지 서버가 확인**한다 (헌법 16조).<br>**`LAPTOP`·`SURVEY_KIOSK`는 이 필드를 쓰지 않는다** — 연결 대상이 부스당 하나뿐이라 서버가 부스로 찾는다(노트북은 `booths.homepage_url`, 키오스크는 그 부스의 설문). 실어 보내도 서버가 읽지 않으며, 노트북에 실으면 `CONFIG_UNVERIFIED`가 붙는다 |
 | `objects[].assetCode` | string | ❌ | `FURNITURE`·`DECORATION`의 구체 자산 식별자 |
 
 **표에 없는 필드는 거부된다** — 계약에 없는 필드가 하나라도 있으면 저장 자체가 `409 LAYOUT_VALIDATION_FAILED` + `rule: MALFORMED_LAYOUT`로 실패한다(조용히 버리지 않는다 — 버리면 편집기는 저장됐다고 믿는데 서버에는 없는 T-24 모양이 된다). 필드 추가 순서는 **3파트 합의 → BE가 `schemaVersion` 올리고 배포 → 그다음 FE 전송**이다 (헌법 24조, #36 명문화 2026-08-21).
@@ -214,17 +214,26 @@ JSON 키 순서도 `jsonb`가 정규화한다. 의미에 영향이 없다.
 
 **Request**
 ```json
-{ "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
+{ "name": "AI 프로젝트 전시관", "themeCode": "SSAFY_BLUE", "primaryColor": "#3B82F6", "signText": "AI 프로젝트 전시관", "logoUrl": null }
 ```
 
 | 필드 | 규칙 |
 |---|---|
+| `name` | 부스 이름. 1~100자. **생략·`null` 이면 현재 이름 유지**(아래 비대칭 참조), 빈 문자열·공백만 있는 값은 400. **응답에는 없다** (2026-09-15 신설, S15P21A604-756) |
 | `themeCode` | ✅ 화이트리스트: **`DEFAULT` · `SSAFY_BLUE` · `WARM` · `MONO`** (#17 합의, #36에서 명문화 요청). 기본 `DEFAULT` |
 | `primaryColor` | **6자리 `#RRGGBB`만** — 축약형(`#RGB`)·알파 불허 (#17 팀 합의). **아래 12색 팔레트 안의 값이어야 한다.** 또는 `null` |
 | `signText` | 최대 60자 또는 `null` |
 | `logoUrl` | `https://` URL 최대 2048자 또는 `null` |
 
-**200**: 저장된 facade 전체. **오류**: 400 `VALIDATION_FAILED`(필드 검증 실패) · 403 · 404 · 409 `BOOTH_LEASE_EXPIRED`
+**200**: 저장된 facade 전체(4필드 — `name` 은 빠진다). **오류**: 400 `VALIDATION_FAILED`(필드 검증 실패) · 403 · 404 · 409 `BOOTH_LEASE_EXPIRED`
+
+#### `name` 의 비대칭 — 안 보내면 유지된다 (2026-09-15, S15P21A604-756)
+
+이 endpoint 는 "보내지 않은 필드는 비운다"인데 `name` 만 반대다. `booths.name` 이 `NOT NULL` 이라 비우면 500 이고, 그렇다고 필수 키로 만들면 **이름 칸이 없던 시절의 저장 요청이 전부 400** 이 된다 — 스튜디오 외관 패널은 지금도 네 키만 보낸다. 팔레트 화이트리스트를 소급하지 않기로 한 것과 같은 선택이다: 새 규칙은 앞으로 오는 값에만 건다.
+
+- 생략·`null` = 그대로 둠, 빈 문자열·공백만 = `400` (`"부스 이름을 입력해 주세요."`), 101자 이상 = `400` (`"부스 이름은 100자까지입니다."`)
+- 값은 **원문 그대로** 저장한다 — trim 없음. §1의 "BE는 값을 변형하지 않는다" 그대로이며, 대문자 정규화가 있는 `primaryColor` 와 다르다.
+- **응답 `facade` 4필드는 그대로다.** 부스 상세(§7)와 슬롯 목록은 이미 `name`·`boothName` 을 바깥에 싣고 있어서, `facade` 안에 또 넣으면 한 응답에 같은 이름이 두 벌 생기고 언젠가 갈라진다. 저장 직후 이름은 `GET /booths/{boothId}` 또는 `GET /booths/mine` 에서 읽는다.
 
 검증 실패 응답 형태 — **#17에서 확정** (2026-08-21, 구현·문구 일치):
 
@@ -324,6 +333,14 @@ BE가 보장하는 것은 **저장·조회 왕복에서 값이 바뀌지 않는�
 | `DECORATION` | (−0.30, 0, −0.30) | (0.30, 1.61, 0.30) |
 
 이 값은 **프리팹이 바뀌면 같이 바뀐다.** 타입당 프리팹이 2개 이상이 되면 타입별 최대 포락(가장 큰 프리팹)으로 갱신한다 — 서버가 보수적인 쪽.
+
+> **`GAME_PORTAL` 실측값을 받아 뒀다 — 아직 표에 넣지 않는다** (2026-09-11, `S15P21A604-545`, GitLab #157·#56).
+>
+> `(−0.37, 0, −0.35) ~ (0.37, 1.97, 0.58)`, 정면 +z, 루트 콜라이더와 동일. 게임 파트가 프리팹에서 잰 값이고 프리팹은 1종뿐이다.
+>
+> 표에 넣지 않는 이유는 **`GAME_PORTAL` 이 `objects[].type` 의 허용값이 아니기 때문**이다. 2026-09-10 결정으로 게임이 부스 내부에서 월드 공용 공간(광장)으로 옮겨가면서 `-158`(GAME_PORTAL Binding)·`-204` 가 보류가 됐고, `LayoutObjectType` 에도 이 타입이 없다. 여기 행만 늘리면 FE·BE 의 허용값과 문서가 갈린다.
+>
+> **보류가 풀리면**(광장에 해당 오락기가 놓이면) 이 값을 그대로 표에 옮기고 `LayoutObjectType`·`objectTypes.ts` 를 함께 갱신한다. 다시 재달라고 하지 않기 위해 여기 적어 둔다.
 
 **회전 규칙**: `rotationY`(0~360 연속값)를 **원점 기준으로 네 모서리에 적용한 뒤 AABB를 다시 잡는다** — 90° 단위 스왑이 아니다. 행렬은 Unity Y축 회전과 같다: `x' = x·cos + z·sin`, `z' = −x·sin + z·cos` (위에서 볼 때 시계방향 +).
 

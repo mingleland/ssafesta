@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * A member's booth and the container its content hangs off (spec 004).
@@ -20,8 +21,19 @@ import java.time.Instant;
  * (invariant I-5, SC-004).
  *
  * <p>Expiry therefore never deletes a booth — it only detaches the slot (FR-010).
+ *
+ * <p><b>{@code @DynamicUpdate} is load-bearing, not a performance tweak.</b> This row has several
+ * independent writers — the owner editing their facade or homepage through
+ * {@link BoothAccessGuard#requireActiveEditor} (which takes no row lock), a layout publish, and the
+ * expiry pass detaching the slot. With Hibernate's default full-column {@code UPDATE}, an editor
+ * that read the row before the pass committed writes {@code current_slot_id} and
+ * {@code published_layout_version} back from its own snapshot when it flushes — reviving a slot
+ * connection the pass had just released, on a lease that is already {@code EXPIRED}. Writing only
+ * the columns a transaction actually changed is what keeps those writers from undoing each other;
+ * the alternative was a lock or a version column on every editor path (S15P21A604-152).
  */
 @Entity
+@DynamicUpdate
 @Table(name = "booths")
 public class Booth {
 
@@ -106,6 +118,23 @@ public class Booth {
     public String getFacadeSignText() { return facadeSignText; }
     public String getFacadeLogoUrl() { return facadeLogoUrl; }
     public Integer getPublishedLayoutVersion() { return publishedLayoutVersion; }
+    public String getHomepageUrl() { return homepageUrl; }
+
+    /**
+     * Whether visitors can see anything of this booth at all — the one predicate every visitor gate
+     * asks (spec 005 R-02, invariant I-3).
+     *
+     * <p>Named here rather than repeated as {@code getPublishedLayoutVersion() == null} at each gate:
+     * 016 homepage ({@code BoothQueryService.visibleHomepageUrl}) and 009 project exhibition
+     * ({@code ProjectService.findPublishedByBooth}) both branch on it, and a third reading of the
+     * same column would be a third place to change when "public" is redefined.
+     *
+     * <p>Expiry is a <b>separate</b> question — a booth can be published and expired at once, and
+     * every gate asks the lease first (004 FR-019).
+     */
+    public boolean isPublished() {
+        return publishedLayoutVersion != null;
+    }
 
     /** Points visitors at a newly published version — only ever called from the publish transaction. */
     void publishLayoutVersion(int versionNo) {
@@ -122,11 +151,41 @@ public class Booth {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * The booth's own name, fixed at creation until now (S15P21A604-756).
+     *
+     * <p>Separate from {@link #changeFacade} even though one request carries both, because this is
+     * the one {@code NOT NULL} column of the set: the other four are cleared by a save that omits
+     * them and this one cannot be. Where "omitted" turns into "keep the current name" is
+     * {@link BoothFacadeService}; the entity only ever receives a value it may store.
+     *
+     * <p>Stored verbatim, like {@link #changeHomepageUrl} — no trim, no case folding.
+     */
+    void changeName(String name) {
+        this.name = name;
+        this.updatedAt = Instant.now();
+    }
+
     void changeFacade(String themeCode, String primaryColor, String signText, String logoUrl) {
         this.facadeThemeCode = themeCode;
         this.facadePrimaryColor = primaryColor;
         this.facadeSignText = signText;
         this.facadeLogoUrl = logoUrl;
+        this.updatedAt = Instant.now();
+    }
+
+    /**
+     * The page the booth's laptop opens (spec 016 FR-001, contracts/homepage-api.md §2).
+     *
+     * <p>{@code null} means unregistered, which is a visitor-facing <i>notice</i> rather than an
+     * error (FR-009) — the server never substitutes a placeholder.
+     *
+     * <p>Stored verbatim. No trim, no case folding, no normalisation: the bytes a client saves are
+     * the bytes it reads back (data-model §2). Format is the caller's to check — that decision lives
+     * in {@link BoothHomepageService} where the rejection message can say which rule was broken.
+     */
+    void changeHomepageUrl(String homepageUrl) {
+        this.homepageUrl = homepageUrl;
         this.updatedAt = Instant.now();
     }
 

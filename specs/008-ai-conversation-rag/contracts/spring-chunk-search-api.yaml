@@ -1,0 +1,127 @@
+openapi: 3.1.0
+info:
+  title: SSAFY FESTA Spring Chunk Search API
+  version: 1.0.0
+  description: FastAPI가 만든 질의 embedding으로 Spring 소유 Business DB/pgvector를 검색하는 내부 계약이다.
+servers:
+  - url: /internal/ai
+security:
+  - serviceToken: []
+paths:
+  /chunk-search:
+    post:
+      operationId: searchAiDocumentChunks
+      summary: Booth·Agent 범위의 READY Chunk 검색
+      description: |
+        Spring이 boothId, agentId, searchable=true, 부모 Document READY를 모두 강제한다.
+        timeout은 3초이며 threshold를 적용하지 않는다 — 조건에 맞는 chunk가 있는 한 topK만큼
+        채워서 돌려준다. 결과 0건도 `200 + items: []`이며, 404는 쓰지 않는다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChunkSearchRequest'
+      responses:
+        '200':
+          description: >-
+            cosine distance 오름차순 검색 결과. 조건에 맞는 chunk가 없으면 `items: []`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChunkSearchResponse'
+        '400':
+          description: >-
+            embedding 차원·값 검증 실패(비유한값, float32 표현 범위 초과, 코사인 거리를
+            정의할 수 없는 0 노름·float32 노름 overflow/underflow 포함), topK 검증 실패,
+            또는 계약에 없는 필드 포함(`code: VALIDATION_FAILED`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '401':
+          description: >-
+            AI→Spring Service Token 누락·오류(`code: UNAUTHORIZED`). `/internal/**` 체인에서
+            토큰 부재·오류로 인증 객체가 없으면 명시적 `authenticationEntryPoint`가 401을
+            반환한다. `accessDeniedHandler`의 403은 인증됐지만 authority가 부족한 경우다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+        '500':
+          description: >-
+            내부 오류 또는 3초 timeout 초과(`code: INTERNAL_ERROR`). 504는 쓰지 않는다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorResponse'
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-service-token
+  schemas:
+    ApiErrorResponse:
+      description: 프로젝트 전역 오류 봉투(docs/08 §1.3) — 이 API 전용 봉투를 따로 두지 않는다.
+      type: object
+      required: [code, message, requestId, errors, warnings]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        requestId:
+          type: string
+          description: 응답 헤더 `X-Request-Id`·서버 로그와 같은 값.
+        errors:
+          type: array
+          description: 보고할 것이 없어도 빈 배열이다 — 조건부로 키를 생략하지 않는다.
+          items: {$ref: '#/components/schemas/ApiErrorDetail'}
+        warnings:
+          type: array
+          items: {$ref: '#/components/schemas/ApiErrorDetail'}
+    ApiErrorDetail:
+      type: object
+      required: [rule, message]
+      properties:
+        rule:
+          type: string
+          description: 계약 외 필드·형식 오류는 전역 `FIELD_INVALID`를 재사용한다.
+        field: {type: string}
+        message: {type: string}
+    ChunkSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [boothId, agentId, queryEmbedding, topK]
+      properties:
+        boothId: {type: integer, format: int64, minimum: 1}
+        agentId: {type: integer, format: int64, minimum: 1}
+        queryEmbedding:
+          type: array
+          minItems: 1536
+          maxItems: 1536
+          items: {type: number, format: float}
+        topK: {type: integer, minimum: 1, maximum: 20}
+    ChunkSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: {$ref: '#/components/schemas/ChunkSearchItem'}
+    ChunkSearchItem:
+      type: object
+      additionalProperties: false
+      required: [content, chunkNo, documentId, originalFilename, distance]
+      properties:
+        content: {type: string}
+        chunkNo: {type: integer, minimum: 0}
+        pageNumber: {type: [integer, 'null'], minimum: 1}
+        section: {type: [string, 'null']}
+        documentId: {type: integer, format: int64}
+        originalFilename: {type: string}
+        distance:
+          type: number
+          format: float
+          description: Cosine distance. 값이 작을수록 질의와 가깝다.

@@ -4,7 +4,7 @@
 > 규칙의 **단일 출처는 `AGENTS.md`**다. 이 파일에는 요약만 있다.
 > Codex와 Claude Code는 **완전히 같은 규칙**을 따르며, 차이는 명령 접두사(`$` vs `/`) 하나뿐이다.
 >
-> 최종 갱신: 2026-08-13
+> 최종 갱신: 2026-09-01 (헌법 v1.3 — 11조 소셜 로그인에 SSAFY 추가)
 
 ---
 
@@ -24,8 +24,8 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
    과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
    키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
-   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 한다.
+   develop 대상 MR은 최신 GitLab pipeline이 성공해야 병합할 수 있다. MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
 5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
    - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
      이 전환한다. 손으로 옮기지 마라.
@@ -36,9 +36,9 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
    완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
    전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
-7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
-   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
-   러너 확보 시 되살릴 기록이다.
+7. GitLab CI는 같은 프로젝트의 허용된 작업 브랜치가 develop으로 향하는 MR에서 실행된다.
+   `mr-status`는 모든 유효 MR에 성공 상태를 만들고, Front/Back 또는 공통 CI 변경은 해당 test/build를 추가 실행한다.
+   실행 중·실패 pipeline은 병합하지 말고 원인을 고쳐 새 커밋으로 재실행한다. Jenkins는 develop 병합 뒤 CI/CD를 담당한다.
 8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
    정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
    git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에
@@ -69,7 +69,7 @@ SKILL.md 자체가 완전한 절차서다.
 `.specify/` · `.claude/skills/` · `.agents/skills/` · `specs/`가 **전부 커밋되어 있다.** `git pull`이면 끝이다.
 
 > ❌ `pip install specify-cli` / `specify init` **실행 금지.**
-> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+> 재설치하면 `.specify/memory/constitution.md`(우리 헌법 v1.3)가 **빈 템플릿으로 덮인다.**
 
 필요한 것: **저장소 루트에서** 실행 + **bash**(Windows는 Git Bash / WSL — 스크립트가 `.sh`다).
 
@@ -81,7 +81,7 @@ bash .specify/scripts/bash/check-prerequisites.sh --json --paths-only   # 정상
 
 ```text
 [1] AGENTS.md 전문                                ← 규칙 전문. 건너뛰지 마라
-[2] .specify/memory/constitution.md (헌법 v1.2)   ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.3)   ← 모든 결정의 최상위 근거
 [3] .specify/feature.json 에 작업할 spec 지정      ← 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27           ← 최근에 실제로 터진 것들

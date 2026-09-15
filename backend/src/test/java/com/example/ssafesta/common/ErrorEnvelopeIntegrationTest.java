@@ -5,18 +5,25 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.ssafesta.TestcontainersConfiguration;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -37,6 +44,8 @@ class ErrorEnvelopeIntegrationTest {
     @Autowired private MockMvc mockMvc;
     /** The application's own mapper — a hand-built one would not prove the shipped shape. */
     @Autowired private JsonMapper json;
+    /** {@code GuestAuthController} refuses any other Origin before it ever looks at the cookie. */
+    @Value("${app.auth.frontend-base-url}") private String trustedOrigin;
 
     @Test
     void anUnauthenticatedRequestIsRefusedInTheEnvelope() throws Exception {
@@ -71,6 +80,124 @@ class ErrorEnvelopeIntegrationTest {
         mockMvc.perform(get("/api/v1/no-such-endpoint"))
                 .andExpect(status().is4xxClientError())
                 .andExpect(jsonPath("$.code").isString());
+    }
+
+    /**
+     * The same unknown path, but past the security filter — which is where the fault was.
+     *
+     * <p>{@link #anUnknownPathIsStillAnEnvelope} sends this unauthenticated, so the filter chain
+     * answers 401 and the assertion passes without the advice ever running. That blind spot is why
+     * #113 shipped with these tests green. Authenticated, the request reaches
+     * {@code NoResourceFoundException} and came back 500 — every endpoint not yet written looked
+     * like a broken server, and INTERNAL_ERROR is a code the client is told it may retry (#104).
+     */
+    @Test
+    void anUnknownPathUnderAuthenticationIsNotFound() throws Exception {
+        // 예시 경로를 한 번 옮겼다. 원래는 /booths/{id}/staff 였는데 spec 011 이 그것을 구현하면서
+        // 404 대신 권한 거부(403)가 돌아왔다 (S15P21A604-136). 이 테스트가 재는 것은 특정 기능이
+        // 아니라 "없는 경로도 봉투를 쓴다" 이므로, 아직 아무도 쓰지 않는 이름으로 바꾼다.
+        mockMvc.perform(get("/api/v1/booths/{id}/not-an-endpoint", 1L).with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.requestId").isString());
+    }
+
+    /**
+     * A path variable that cannot be converted to its declared type.
+     *
+     * <p>Another route with its own fault: {@code MethodArgumentTypeMismatchException} does not take
+     * the {@code ErrorResponse} 4xx branch of {@code handleUnexpected}, so until
+     * {@code handleTypeMismatch} existed <b>every typed path variable in the application answered a
+     * URL typo with 500</b> — a client mistake wearing the shape of a server fault, and an ERROR
+     * line in the log for each one. Found while building the minigame result endpoint
+     * (S15P21A604-502), which is why the fix is global rather than in that one controller.
+     *
+     * <p>{@code booths/{id}} is a {@code Long} and the minigame session is a {@code UUID}: two
+     * different target types through one handler.
+     */
+    @Test
+    void aPathVariableOfTheWrongTypeIsARequestErrorRatherThanAServerFault() throws Exception {
+        mockMvc.perform(get("/api/v1/booths/{id}", "not-a-number").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").isString())
+                .andExpect(jsonPath("$.requestId").isString());
+    }
+
+    /** The offending value is client-controlled text and must not be echoed into a rendered body. */
+    @Test
+    void theRejectedValueIsNotReflectedBack() throws Exception {
+        // No slash in the payload — one would land the request on a different route and answer 404
+        // before the type mismatch is ever reached.
+        MvcResult result = mockMvc.perform(get("/api/v1/booths/{id}", "<img onerror=x>").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+
+        assertFalse(result.getResponse().getContentAsString().contains("onerror"),
+                "거부된 입력값이 응답 본문에 그대로 돌아오면 안 됩니다.");
+    }
+
+    /** 405 had a code in {@code codeFor} from the start, but nothing could reach it (#113). */
+    @Test
+    void anUnsupportedMethodIsRefusedWithItsOwnCode() throws Exception {
+        mockMvc.perform(delete(BeanValidationProbeController.PATH).with(jwt()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+    }
+
+    /**
+     * The status on the wire and the status the code declares are the same thing.
+     *
+     * <p>The client branches on {@code code}, and every {@code ErrorCode} carries a status. Answering
+     * 415 with {@code VALIDATION_FAILED} would put 400 in the body's meaning and 415 on the response,
+     * which makes {@code ErrorCode.status()} a lie for that call. The handler now answers with the
+     * code's own status, so the two cannot drift apart (raised in review of !56).
+     */
+    @Test
+    void anUnsupportedContentTypeCarriesACodeThatAgreesWithTheStatus() throws Exception {
+        mockMvc.perform(post(BeanValidationProbeController.PATH).with(jwt())
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("본문 형식이 계약과 다르다"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    /**
+     * Every code declares an error status — nothing here claims it was <i>sent</i> with one.
+     *
+     * <p>The name used to say {@code …IsTheStatusItIsSentWith}, which this does not check: it never
+     * makes a request. Send-consistency is covered where it is actually observable — the 404, 405 and
+     * 415 tests above each assert a status and the code that came with it (raised in review of !56).
+     */
+    @Test
+    void everyErrorCodeDeclaresAnErrorStatus() {
+        for (ErrorCode code : ErrorCode.values()) {
+            assertNotNull(code.status(), code + "에 status가 없습니다.");
+            assertTrue(code.status().isError(), code + "는 오류 코드인데 " + code.status() + "입니다.");
+        }
+    }
+
+    /**
+     * A visitor with no session is the ordinary case, not a server fault.
+     *
+     * <p>The frontend calls refresh once on every page load and cannot skip it: the cookie is
+     * HttpOnly, so it has no way to learn whether a session exists (헌법 13조). Answering 500 meant
+     * every guest's page load left a server error behind for a real one to hide in.
+     */
+    @Test
+    void refreshWithoutItsCookieIsRefusedNotAnInternalError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh").header(HttpHeaders.ORIGIN, trustedOrigin))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
+    }
+
+    /** Present but spent is the same event to the user, so it carries the same code. */
+    @Test
+    void refreshWithASpentCookieIsRefusedNotAnInternalError() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/refresh").header(HttpHeaders.ORIGIN, trustedOrigin)
+                        .cookie(new Cookie("refresh_token", "no-longer-a-session")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_MEMBER_TOKEN"));
     }
 
     @Test
@@ -240,6 +367,31 @@ class ErrorEnvelopeIntegrationTest {
         assertEquals(java.util.List.of(),
                 ApiErrorResponse.of(ErrorCode.BOOTH_NOT_FOUND, null, "req_test", java.util.List.of(), null).errors(),
                 "빈 목록도 null이 아니라 빈 배열이어야 합니다.");
+    }
+
+    /**
+     * 컨트롤러 밖에서 끝난 실패가 클라이언트에 닿는 <b>세 번째 경로</b> — 컨테이너 ERROR dispatch.
+     *
+     * <p>필터가 던진 예외·{@code sendError}·허용 경로의 404 가 전부 여기로 온다. 체인이 이 dispatch
+     * 를 거부하면 실제 실패와 무관한 401 이 나가고, 통과시키기만 하면 Boot 의 Whitelabel HTML 이
+     * 나간다 — SSAFY registration 이 빠졌을 때 실제로 두 모양이 동시에 관측됐다.
+     * {@code Content-Type} 단정이 HTML 회귀를 잡고, {@code requestId} 단정이 ERROR dispatch 에서
+     * MDC 가 비는 회귀를 잡는다.
+     */
+    @Test
+    void theContainerErrorDispatchIsAnsweredInTheEnvelope() throws Exception {
+        mockMvc.perform(get("/error").with(request -> {
+                    request.setDispatcherType(DispatcherType.ERROR);
+                    request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE, 500);
+                    // 이것이 있어야 OncePerRequestFilter 가 "ERROR dispatch 를 건너뛸지" 를 실제로 묻는다.
+                    request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/oauth2/authorization/ssafy");
+                    return request;
+                }))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").isString())
+                .andExpect(jsonPath("$.requestId").isString());
     }
 
     private String idOf(MvcResult result) {

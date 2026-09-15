@@ -12,4 +12,151 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9cb60c037b0abad4ca0defa41e25b4f1, type: 3}
   m_Name: BoothObjectRegistry
   m_EditorClassIdentifier: 
-  _entries: []
+  _entries:
+  - type: 1
+    assetCode: 
+    prefab: {fileID: 3801289400879457829, guid: 9f01805853f304b499f8c91ad31881eb, type: 3}
+  - type: 2
+    assetCode: 
+    prefab: {fileID: 8991486769970036086, guid: fee8ed64f9a245e4b86bee520cad224f, type: 3}
+  - type: 3
+    assetCode: 
+    prefab: {fileID: 5577734239076184959, guid: 2b8aca0d66fa038429333a4ceb98f826, type: 3}
+  - type: 4
+    assetCode: 
+    prefab: {fileID: 4581309695110984524, guid: 6caac665a81e39b4d988bbb9ae704ba5, type: 3}
+  - type: 5
+    assetCode: 
+    prefab: {fileID: 8398569853281457755, guid: 8eb70fba3a98f0845b5cd8f68696181d, type: 3}
+  - type: 6
+    assetCode: 
+    prefab: {fileID: 1337682531828213733, guid: 1f49aeda857331b4abbe846d99ce6890, type: 3}
+  - type: 7
+    assetCode: 
+    prefab: {fileID: 6227837355520101681, guid: 6da2a4ff245f98e4d876eca966b1e7c4, type: 3}
+  - type: 8
+    assetCode: 
+    prefab: {fileID: 5162731688218373322, guid: 96b76174a6bb2024b8b43db70f407ffe, type: 3}
+  - type: 9
+    assetCode: FURNITURE_DEFAULT
+    prefab: {fileID: 2297048041205122791, guid: 2b43cc1ee42d36b4fae7ae3348a46d0f, type: 3}
+  - type: 10
+    assetCode: DECORATION_DEFAULT
+    prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}
+  - type: 11
+    assetCode: 
+    prefab: {fileID: 2485468530564970264, guid: 80e835532d128f446b499157ee47035a, type: 3}
+  - type: 4
+    assetCode: BOOTH_KIOSK_SURVEY
+    prefab: {fileID: 4581309695110984524, guid: 6caac665a81e39b4d988bbb9ae704ba5, type: 3}
+  - type: 6
+    assetCode: BOOTH_DESK_CONSULT
+    prefab: {fileID: 1337682531828213733, guid: 1f49aeda857331b4abbe846d99ce6890, type: 3}
+  - type: 2
+    assetCode: BOOTH_SCREEN_VIDEO
+    prefab: {fileID: 8991486769970036086, guid: fee8ed64f9a245e4b86bee520cad224f, type: 3}
+  - type: 3
+    assetCode: BOOTH_PANEL_PROJECT
+    prefab: {fileID: 5577734239076184959, guid: 2b8aca0d66fa038429333a4ceb98f826, type: 3}
+  - type: 5
+    assetCode: BOOTH_BOARD_RECRUIT
+    prefab: {fileID: 8398569853281457755, guid: 8eb70fba3a98f0845b5cd8f68696181d, type: 3}
+  - type: 8
+    assetCode: BOOTH_STAND_LIKE
+    prefab: {fileID: 5162731688218373322, guid: 96b76174a6bb2024b8b43db70f407ffe, type: 3}
+  - type: 7
+    assetCode: BOOTH_DESK_LAPTOP
+    prefab: {fileID: 6227837355520101681, guid: 6da2a4ff245f98e4d876eca966b1e7c4, type: 3}
+  - type: 1
+    assetCode: BOOTH_AGENT_AI
+    prefab: {fileID: 3801289400879457829, guid: 9f01805853f304b499f8c91ad31881eb, type: 3}
+  - type: 9
+    assetCode: FURN_SET_TABLE_CHAIRS
+    prefab: {fileID: 2297048041205122791, guid: 2b43cc1ee42d36b4fae7ae3348a46d0f, type: 3}
+  - type: 10
+    assetCode: DISP_SET_BOX_01
+    prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}
+  - type: 9
+    assetCode: FURN_CHAIR_01_WHITE
+    prefab: {fileID: 5684758968798358995, guid: fa284bf65650dc348a32c17f972854b6, type: 3}
+  - type: 9
+    assetCode: FURN_CHAIR_01_BLUE
+    prefab: {fileID: 2344543638016210225, guid: afbe5b18292421c4ca842acc0fc3a0f5, type: 3}
+  - type: 9
+    assetCode: FURN_CHAIR_01_ORANGE
+    prefab: {fileID: 9039493908603224541, guid: 8e947dfb11ae6fc47b4faf268e95fe44, type: 3}
+  - type: 9
+    assetCode: FURN_CHAIR_02_WHITE
+    prefab: {fileID: 5574578179184299723, guid: bdb0db0cd8ffe1843aa392af58600ace, type: 3}
+  - type: 9
+    assetCode: FURN_COUNTER_01
+    prefab: {fileID: 3422290134336729461, guid: 99c7a01927d13b14d961b2bfc8b404cd, type: 3}
+  - type: 9
+    assetCode: FURN_COUNTER_01B
+    prefab: {fileID: 8147070196189747876, guid: c6952bb19baef04489bfbe5e27bc92f0, type: 3}
+  - type: 9
+    assetCode: FURN_COUNTER_02
+    prefab: {fileID: 233849845533410192, guid: a9402c4d7c830df4abc921d008500e8e, type: 3}
+  - type: 9
+    assetCode: FURN_TABLE_ROUND
+    prefab: {fileID: 47855475999154443, guid: 3dbdf4b54d003074aa86204b75596563, type: 3}
+  - type: 9
+    assetCode: FURN_TABLE_SQUARE
+    prefab: {fileID: 4273398934049364083, guid: 326b4482e858da44b98dfd87a24037e2, type: 3}
+  - type: 10
+    assetCode: DISP_BOX_01
+    prefab: {fileID: 108587347242914430, guid: 4382841f03953ce46809dff3b76cbd35, type: 3}
+  - type: 10
+    assetCode: DISP_STAND_PLASTIC_01
+    prefab: {fileID: 9013948444015054775, guid: 28a3a9aa061728c428ab5c07aaf4feac, type: 3}
+  - type: 10
+    assetCode: DEVICE_TABLET
+    prefab: {fileID: 1687001040017549448, guid: cd8147bd3dd0b614cb500e7b8f57bb50, type: 3}
+  - type: 10
+    assetCode: STRUCT_PANEL_01
+    prefab: {fileID: 4605489429035552601, guid: 249aca43df93a3f48a2491e2e82553cc, type: 3}
+  - type: 10
+    assetCode: STRUCT_PANEL_02
+    prefab: {fileID: 1969055158052476558, guid: 341c0fac954c67240b7605247b40b6ea, type: 3}
+  - type: 10
+    assetCode: STRUCT_PANEL_03
+    prefab: {fileID: 4124066402934714942, guid: 85919fbc4c84d3d4fbbee9c540575251, type: 3}
+  - type: 10
+    assetCode: STRUCT_TRUSS_BASE
+    prefab: {fileID: 6853192065166344656, guid: 5794253499cb7884ead22e718f00e8af, type: 3}
+  - type: 10
+    assetCode: STRUCT_TRUSS_VERTICAL
+    prefab: {fileID: 3262311506145060872, guid: ff208559d95c19b4dba50052d6a4cfe8, type: 3}
+  - type: 10
+    assetCode: STRUCT_TRUSS_HORIZONTAL_LAMP
+    prefab: {fileID: 6645391271421932331, guid: 9ea1c1e7c0b5928499173611d571a9f7, type: 3}
+  - type: 9
+    assetCode: 
+    prefab: {fileID: 2297048041205122791, guid: 2b43cc1ee42d36b4fae7ae3348a46d0f, type: 3}
+  - type: 10
+    assetCode: 
+    prefab: {fileID: 1507625753233589954, guid: 2e273fc00695db04eb74c29e22d7792e, type: 3}
+  - type: 10
+    assetCode: WALL_PLAIN
+    prefab: {fileID: 4605489429035552601, guid: 249aca43df93a3f48a2491e2e82553cc, type: 3}
+  - type: 9
+    assetCode: COUNTER_GRAPHIC
+    prefab: {fileID: 233849845533410192, guid: a9402c4d7c830df4abc921d008500e8e, type: 3}
+  - type: 9
+    assetCode: SHELF
+    prefab: {fileID: 9013948444015054775, guid: 28a3a9aa061728c428ab5c07aaf4feac, type: 3}
+  - type: 10
+    assetCode: TRUSS_BEAM
+    prefab: {fileID: 6645391271421932331, guid: 9ea1c1e7c0b5928499173611d571a9f7, type: 3}
+  - type: 10
+    assetCode: TRUSS_PILLAR
+    prefab: {fileID: 3262311506145060872, guid: ff208559d95c19b4dba50052d6a4cfe8, type: 3}
+  - type: 10
+    assetCode: TRUSS_GATE
+    prefab: {fileID: 6853192065166344656, guid: 5794253499cb7884ead22e718f00e8af, type: 3}
+  - type: 10
+    assetCode: PLANT
+    prefab: {fileID: 1183325711703539275, guid: 20c669534c9eb904a862740589560f7f, type: 3}
+  - type: 10
+    assetCode: DECOR_PLANT_01
+    prefab: {fileID: 1183325711703539275, guid: 20c669534c9eb904a862740589560f7f, type: 3}

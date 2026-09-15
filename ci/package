@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail; source "$(dirname "$0")/lib.sh"
+package_project() {
+  if [[ "${CI_COMPONENT}" == game ]]; then bash festa-unity/ci/package; return; fi
+  local component_dir dockerfile context
+  component_dir="$(ci_component_dir)"
+  if [[ "${CI_COMPONENT}" == front ]]; then
+    local artifact_dist expected_dir
+    artifact_dist="${CI_ARTIFACT_DIR}/front-dist"
+    expected_dir="${ci_root}/festa-frontend"
+    [[ "$(cd "${component_dir}" && pwd -P)" == "$(cd "${expected_dir}" && pwd -P)" ]] || { echo 'unexpected front component directory' >&2; return 65; }
+    [[ -f "${artifact_dist}/assets/booth-runtime/manifest.json" ]] || { echo 'front runtime artifact missing' >&2; return 66; }
+    rm -rf -- "${component_dir}/dist"
+    cp -a "${artifact_dist}" "${component_dir}/dist"
+    (cd "${component_dir}" && node tools/assets/verify-runtime-assets.mjs --dir dist/assets/booth-runtime)
+  fi
+  dockerfile="${COMPONENT_DOCKERFILE:-${component_dir}/Dockerfile}"
+  context="${COMPONENT_BUILD_CONTEXT:-${component_dir}}"
+  IMAGE_NAME="${IMAGE_NAME:-festa-${CI_COMPONENT}}" IMAGE_TAG="${CI_COMMIT_SHA}" DOCKERFILE="${dockerfile}" BUILD_CONTEXT="${context}" \
+    bash infra/deploy/scripts/package-local-image.sh
+  if [[ "${CI_COMPONENT}" == front ]]; then
+    local docker_bin="${DOCKER_BIN:-docker}"
+    local container extracted image_ref
+    docker_bin="${DOCKER_BIN:-docker}"
+    image_ref="${IMAGE_NAME:-festa-${CI_COMPONENT}}:${CI_COMMIT_SHA}"
+    container="$(${docker_bin} create "${image_ref}")"
+    extracted="$(mktemp -d)"
+    trap '"${docker_bin}" rm -f "${container}" >/dev/null 2>&1 || true; rm -rf -- "${extracted}"' RETURN
+    "${docker_bin}" cp "${container}:/usr/share/nginx/html/assets/booth-runtime/." "${extracted}"
+    (cd "${component_dir}" && node tools/assets/verify-runtime-assets.mjs --dir "${extracted}")
+  fi
+}
+ci_run package PACKAGE_FAILED ci_dispatch_or package package_project

@@ -54,7 +54,7 @@ Jira 이슈 (스프린트 편성)                          [수동] 상태: 해�
     파트 브랜치는 파트 내부 통합·실험용으로만 쓴다. 과도기·구현의 지위는 §4-1, 상세는 docs/17 §2-1.
   - main·develop 직접 작업 금지.
 - 커밋: `type(scope): 한국어 요약 (S15P21A604-123)` — **모든 커밋에 키 필수** (Jira 커밋 링크·코멘트가 키로 남는다).
-- MR 제목: `[S15P21A604-123][BE] 로그인 API 구현` — **키 필수** (MR 리뷰에서 사람이 검증 — CI 러너 없음).
+- MR 제목: `[S15P21A604-123][BE] 로그인 API 구현` — **키 필수** (현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 검증).
 - MR 설명: `.gitlab/merge_request_templates/Default.md` 템플릿 사용 (MR 작성 화면에서 Description → Choose a template → Default).
 
 ### 4-1. 분기점 개정의 과도기 처리 (✅ 2026-08-26 리드 확정)
@@ -149,39 +149,26 @@ Key 추출: 커밋 메시지·MR 제목의 `[A-Z][A-Z0-9]+-[0-9]+`. 어디에서
 - 파트 브랜치(`game`·`front`·`back`·`ai`)와 `develop`·`main` 은 필터에 걸리지 않는다 — 의도된 것.
 - 설정 주체: GitLab Webhook 은 Maintainer 1명, Jira Automation 은 프로젝트 관리자 1명. **팀원은 설정할 것이 없다.**
 - ④와 ⑤는 겹치지 않는다: ⑤는 '진행 중' 만, ④는 링크·코멘트·'완료' 만 담당한다.
-## 6. CI 구성 (.gitlab-ci.yml) — sync 잡은 휴면, 러너 확보 시 보조 경로
+## 6. GitLab MR Gate와 Jira 자동화
 
-> ⚠️ **파이프라인 생성 자체가 정지돼 있다 (2026-08-25).** `.gitlab-ci.yml` 의
-> `workflow.rules` 맨 앞에 `when: never` 를 두어 커밋마다 pending 파이프라인이
-> 쌓이지 않게 했다. Jira 상태 동기화는 §5 의 내장 연동이 담당한다.
-> **잡 정의는 삭제하지 않고 그대로 보존한다** — 러너를 확보하면 되살릴 자산이다.
-> 아래는 러너를 확보했을 때의 참고 구성이다.
+**적용 완료 (2026-09-09, GitLab #153).** 같은 프로젝트의 허용된 작업 브랜치가 `develop`으로 향하는 MR에는 GitLab pipeline이 생성된다. `develop`은 직접 push를 막고, **최신 pipeline이 성공해야만** 병합할 수 있다.
+
+| 변경 범위 | MR 검증 |
+|---|---|
+| 문서·명세·evidence-only | `mr-status` 성공 |
+| AI 변경 | `mr-status` + `ai-test` + `ai-build` |
+| Front 변경 | `mr-status` + `front-test` + `front-build` |
+| Back 변경 | `mr-status` + `back-test` + `back-build` |
+| `.gitlab-ci.yml` 또는 `ci/**` | AI·Front·Back 컴포넌트 검증 모두 |
+
+- pipeline이 실행 중이거나 실패하면 병합하지 않는다. 원인을 고쳐 새 커밋으로 재실행한다.
+- Jenkins는 MR 합격 판정 대상이 아니다. Jenkins는 `develop` 병합 뒤 빌드·배포·리허설을 담당한다.
+- 아래 `jira-key-check`, `jira-sync-*` 표는 `when: never`인 레거시 정의다. Jira 키 형식은 MR 리뷰에서 확인하며, Jira 상태 전이는 §5의 Webhook·내장 연동이 담당한다.
 >
-> 🚨 **러너를 붙일 때 반드시 먼저 정리할 것 — 이중 전환.** 러너가 생기면 sync 잡이 깨어나
-> 내장 연동과 **같은 이슈를 두 번 전환**한다. 러너 등록과 동시에 아래 중 하나를 택한다:
-> ① `.gitlab-ci.yml` 에서 `jira-sync-*` 잡 삭제 (권장) 또는
-> ② 내장 연동의 Jira issue transition 값을 비운다.
-> `jira-key-check`(MR 제목 키 검증)는 전환을 하지 않으므로 겹치지 않는다 — 그대로 둔다.
-
-
-| Job | 트리거 | 동작 | 실패 시 |
-|---|---|---|---|
-| `jira-key-check` | develop/main 대상 MR 파이프라인 | MR 제목 또는 source branch 에 Key 존재 검사 | **파이프라인 실패** (머지 차단 목적) |
-| `jira-sync-in-progress` | `{type}/{KEY}-` 브랜치 push | 이슈를 '진행 중' 전환 (멱등) | allow_failure — 개발 안 막음 |
-| `jira-sync-in-review` | develop/main 대상 MR 파이프라인 | '진행 중' 보장 + 라벨 `in-review` | allow_failure |
-| `jira-sync-ready-for-deploy` | develop/main push 중 **merge commit 만** | 라벨 `in-review`→`ready-for-deploy` | allow_failure |
-
-- stage 는 `validate → (test → build 예약) → sync` — S15P21A604-154 의 BE·FE 테스트 잡이 예약 자리에 들어온다.
-- **필요 CI/CD Variables** (Settings → CI/CD → Variables, 값은 Masked, 이름만 기재):
-  - `JIRA_SYNC_EMAIL`
-  - `JIRA_SYNC_TOKEN`
-- 변수 미설정 시 sync 잡은 경고 후 통과한다 — 연동이 꺼져도 개발은 계속된다.
-
-> ⚠️ **전제: GitLab Runner (S15P21A604-216)** — 2026-08-24 실측 기준 이 프로젝트에 활성
-> 러너가 없어 파이프라인이 pending 으로 대기한다 (lab.ssafy.com 은 공유 러너 미제공).
-> 팀 EC2 에 gitlab-runner 를 등록하기 전까지 CI 는 휴면이며, **러너 등록 전에는
-> "Pipelines must succeed" 머지 조건을 절대 켜지 않는다** (모든 머지가 무기한 차단된다).
-> pending 파이프라인은 무해하다 — Pipelines 화면에서 취소해도 된다.
+| 레거시 Job | 현재 상태 |
+|---|---|
+| `jira-key-check` | `when: never`; Jira Key는 MR 리뷰에서 확인 |
+| `jira-sync-*` | `when: never`; 상태 전이는 §5의 Webhook·내장 연동이 담당 |
 
 ## 7. GitLab 저장소 정책 (Free, 18.11.5 기준)
 
@@ -195,7 +182,7 @@ Key 추출: 커밋 메시지·MR 제목의 `[A-Z][A-Z0-9]+-[0-9]+`. 어디에서
 |---|---|---|---|
 | develop 보호 | Settings → Repository → Protected branches | Allowed to push: No one / Allowed to merge: Maintainers | 파트 브랜치는 보호하지 않는다 (직접 push 운영 유지) |
 | main 직접 push 차단 | 같은 곳, main 의 Allowed to push | No one | 현재 Maintainers 가 push 가능 — MR 전용화 |
-| Pipeline 성공 후 merge | Settings → Merge requests → Merge checks | Pipelines must succeed | **CI 안정화(1주) 후 활성** — 즉시 켜면 러너 장애가 팀 전체 머지를 막는다 |
+| Pipeline 성공 후 merge | Settings → Merge requests → Merge checks | Pipelines must succeed | **활성** — 최신 GitLab pipeline 성공이 develop MR 병합 조건 |
 | Resolved discussion 후 merge | 같은 곳 | All threads must be resolved | 팀 합의 후 |
 | Reviewer 필수(승인 규칙 강제) | — | — | **Premium 전용** — Free 에서는 문화로 운영: MR 에 Reviewer 지정 + docs/17 §8 "최소 1명 리뷰" |
 
@@ -236,11 +223,10 @@ Rule → Trigger 'Incoming webhook' 생성 → 발급 URL 을 GitLab Settings �
 
 | 증상 | 원인·조치 |
 |---|---|
-| `jira-key-check` 실패 | MR 제목 또는 브랜치에 `S15P21A604-N` 추가. 예: `[S15P21A604-123][BE] ...` |
-| 이슈 상태가 안 바뀜 | **먼저 러너 유무를 확인한다.** 활성 러너가 없으면 CI sync 잡은 영영 돌지 않는다(§6). 상태 전환은 §5 내장 연동이 담당하며, `Closes KEY` 가 **`develop` 에 도달해야** 전환된다 (완료의 기준은 develop — §1) — 파트 브랜치 push 로는 바뀌지 않는다 |
+| MR 제목·브랜치에 Jira Key가 없음 | MR 제목 또는 브랜치에 `S15P21A604-N` 추가. 예: `[S15P21A604-123][BE] ...` — 현재는 MR 리뷰에서 확인한다 |
+| 이슈 상태가 안 바뀜 | 상태 전이는 §5 내장 연동이 담당한다. `Closes KEY` 가 **`develop` 에 도달해야** 전환된다 (완료의 기준은 develop — §1) — 파트 브랜치 push 로는 바뀌지 않는다 |
 | Jira 에 커밋 링크·코멘트가 안 붙음 | Settings → Integrations 에서 **`Jira issues`(내장)** 가 켜져 있는지 확인. `GitLab for Jira Cloud app` 만 Active 인 경우가 흔한데, 그것은 Development 패널 표시만 하고 코멘트·전환을 하지 않는다 (§5 ①·④ 구분) |
 | 전환 이력이 3번씩 찍힘 | 내장 연동의 transition 값에 `11,21,31` 처럼 여러 개가 들어간 경우. `31` 하나만 남긴다 |
-| sync 잡이 "미설정 — 건너뜁니다" | Maintainer 가 `JIRA_SYNC_EMAIL`/`JIRA_SYNC_TOKEN` 변수를 등록해야 함 (§6) |
 | 이슈가 '진행 중'이 안 됨 | 브랜치명이 `{type}/{KEY}-` 패턴인지 확인. 이미 완료 상태 이슈는 전환 후보가 없어 no-op (의도된 동작) |
 | 라벨이 안 붙음 | sync 잡 로그 확인 — 401 이면 토큰 만료(재발급), 404 면 키 오타 |
 | 파이프라인이 두 번 돎 | workflow rules 로 방지되어 있음 — 재현되면 `$CI_OPEN_MERGE_REQUESTS` 상태와 함께 이슈 제보 |
@@ -266,8 +252,8 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
    과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
    키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
-   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 한다.
+   develop 대상 MR은 최신 GitLab pipeline이 성공해야 병합할 수 있다. MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
 5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
    - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
      이 전환한다. 손으로 옮기지 마라.
@@ -278,9 +264,9 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
    완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
    전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
-7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
-   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
-   러너 확보 시 되살릴 기록이다.
+7. GitLab CI는 같은 프로젝트의 허용된 작업 브랜치가 develop으로 향하는 MR에서 실행된다.
+   `mr-status`는 모든 유효 MR에 성공 상태를 만들고, Front/Back 또는 공통 CI 변경은 해당 test/build를 추가 실행한다.
+   실행 중·실패 pipeline은 병합하지 말고 원인을 고쳐 새 커밋으로 재실행한다. Jenkins는 develop 병합 뒤 CI/CD를 담당한다.
 8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
    정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
    git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에

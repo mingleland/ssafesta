@@ -5,22 +5,23 @@
 | Entry | External address | Nginx upstream | Cache | Owner |
 |---|---|---|---|---|
 | demo web | `https://demo.${ROOT_DOMAIN}` | demo front/static release | HTML revalidate, content-hash asset immutable | infra-002 |
-| backend | `https://api.${ROOT_DOMAIN}` | demo Spring | bypass/no-store | infra-002 |
+| backend | `https://api.${ROOT_DOMAIN}` (`/ws`, `/ws/consultation` included) | demo Spring | bypass/no-store; WebSocket Upgrade forwarding | infra-002 |
 | AI/SSE | `https://ai.${ROOT_DOMAIN}` | demo FastAPI | bypass/no-store, proxy buffering off | infra-002 + AI |
-| game | `wss://world.${ROOT_DOMAIN}:443` | `ws://demo-game:7777` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
-| dev | `http://${EC2_PUBLIC_IP}/__dev/{front|api|ai|world}` | selected dev service | bypass except explicit static test | infra-002 |
+| game | `wss://world.${ROOT_DOMAIN}:443` | `ws://127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}` | bypass, Upgrade forwarding | infra-002 ingress; infra-003 final validation |
+| dev | `https://dev.${ROOT_DOMAIN}{/,api/,ai/v1/,unity/,ws}` | selected dev Front/Spring/FastAPI and shared WebGL `current` | API/AI/WebSocket bypass/no-store; WebGL HTML revalidates and hashed Build assets are immutable | infra-002 |
+| dev world | `wss://world-dev.${ROOT_DOMAIN}:443` | selected dev game service | always bypass/no-store | infra-002 |
 
 `ROOT_DOMAIN`과 `EC2_PUBLIC_IP`는 runtime/preflight input이다. client build에 실제 값을 고정하지 않는다. Unity game endpoint는 world-sessions API 응답으로만 전달한다.
 
 ## Required network path
 
 ```text
-Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → Docker internal service
+Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → loopback-only demo-game listener
 ```
 
-- Nginx만 host 80/443에 bind한다. 80은 최종 demo에서 443으로 redirect한다.
+- Nginx만 public host 80/443에 bind한다. demo-game 7777은 `127.0.0.1:${DEMO_GAME_HOST_PORT:-17777}`로만 publish하고, 80은 최종 demo에서 443으로 redirect한다.
 - SSH 22는 승인된 source 범위에만 허용한다.
-- PostgreSQL 5432, Redis 6379, Unity 7777, Jenkins 8080, MinIO 9000/9001과 관측 port는 public bind하지 않는다.
+- PostgreSQL 5432, Redis 6379, Unity 7777, Jenkins 8080과 관측 port는 public bind하지 않는다.
 - Cloudflare → origin은 Full (strict) TLS다. 인증서 검증을 끄는 origin fallback을 금지한다.
 - ALB·NLB·ACM은 이 계약의 구성요소가 아니다.
 
@@ -34,7 +35,7 @@ Browser → Cloudflare DNS/Proxy → EC2 Nginx:443 → Docker internal service
 
 ## Dev limitations
 
-IP 기반 dev는 파트 기능과 Nginx routing을 제한적으로 검증하는 경로다. HTTPS, Secure Cookie, social OAuth callback, Cloudflare cache, 최종 WSS의 완료 증거로 사용할 수 없다. 필요하면 Nginx source allowlist 또는 별도 access control을 적용한다.
+승인된 source의 HTTPS dev는 Front·API·AI·WebGL 정적 경로와 Secure Cookie·social OAuth callback 계약을 검증하는 제한 경로다. WebGL은 demo와 같은 `/srv/festa/webgl/current` release를 공유한다. demo promotion의 전체 사용자 여정과 최종 WSS 완료 증거는 별도로 남긴다. Nginx source allowlist는 계속 적용한다.
 
 ## Origin validation
 

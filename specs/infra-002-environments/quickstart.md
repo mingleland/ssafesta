@@ -52,7 +52,7 @@ Expected:
 - 두 JSON schema와 dev/demo manifest가 유효하다.
 - infra-001 release/verification reference가 존재하고 target ID가 일치한다.
 - rendered Compose/log-safe report에 Secret 원문이 없다.
-- PostgreSQL/Redis/Unity/Jenkins/MinIO internal port에 public host binding이 없다.
+- PostgreSQL/Redis/Unity/Jenkins internal port에 public host binding이 없다.
 
 필수 변수 하나씩 제거해 preflight를 다시 실행한다. 누락된 변수명이 표시되고 관련 실환경 단계가 시작되지 않아야 한다. `ROOT_DOMAIN` 누락은 local/dev contract test까지 막지 않지만 DNS/TLS deployment는 막아야 한다.
 
@@ -137,11 +137,13 @@ Expected:
 외부 검증 host에서 다음을 실행한다.
 
 ```bash
-nmap -Pn -p 22,80,443,5432,6379,7777,8080,9000,9001 "$EC2_PUBLIC_IP"
+nmap -Pn -p 22,80,443,5432,6379,7777,8080 "$EC2_PUBLIC_IP"
 
 curl -fsS "https://demo.${ROOT_DOMAIN}/health"
 curl -fsS "https://api.${ROOT_DOMAIN}/health"
 curl -fsS -N "https://ai.${ROOT_DOMAIN}/health"
+curl -fsS "https://dev.${ROOT_DOMAIN}/"
+curl -fsS "https://dev.${ROOT_DOMAIN}/unity/manifest.json"
 openssl s_client -connect "demo.${ROOT_DOMAIN}:443" -servername "demo.${ROOT_DOMAIN}"
 ```
 
@@ -150,6 +152,7 @@ Expected:
 - 승인된 source의 22와 public 80/443 외 internal/data/management port 연결 성공 0건.
 - Security Group과 UFW 결과를 각각 기록해 차단 계층을 구분할 수 있다.
 - demo hosts의 DNS와 certificate chain/expiry가 유효하고 Cloudflare-origin Full (strict)이 동작한다.
+- 승인된 source에서는 `dev.${ROOT_DOMAIN}`의 `/`, `/api/`, `/ai/v1/`, `/unity/`가 HTTPS로 제공되고, `/unity/`은 demo와 같은 WebGL `current` release를 가리킨다.
 - content-hash static asset 두 번째 요청은 origin 도달이 감소한다.
 - HTML은 새 release를 재검증하고 API/auth/SSE/upload grant/WebSocket 응답은 MISS가 아니라 명시적 BYPASS/no-store다.
 
@@ -204,7 +207,7 @@ Expected:
 
 각 storage/current+projected, Class A, Class B 지표가 단독으로 임계값을 넘는 case와 다른 project bucket을 포함한 account 합계를 검증한다. snapshot은 [usage schema](./contracts/usage-guard.schema.json)에 맞아야 한다.
 
-## 10. R2 outage, MinIO fallback and reconciliation
+## 10. R2 outage and fail-closed recovery
 
 ```bash
 ./infra/environments/tests/failure/storage-fallback.sh --inject-r2-outage
@@ -212,14 +215,14 @@ Expected:
 
 Expected sequence:
 
-1. `R2_ACTIVE → UPLOAD_BLOCKED`; 자동 provider 전환 없음.
-2. 운영자 승인 없이 `FALLBACK_VALIDATING` 또는 `LOCAL_ACTIVE` 진입 거부.
-3. disk/credential/PUT/HEAD/CORS/public-port probe 통과 후에만 `LOCAL_ACTIVE`.
-4. MinIO 9000/9001 외부 접근 실패, approved HTTPS upload만 성공.
-5. R2 복귀 후 `R2_RECONCILING`; object size/type/SHA 불일치가 있으면 상태 유지.
-6. 전량 검증 뒤 metadata provider가 R2로 바뀌고 `R2_ACTIVE`.
+1. R2 probe 실패 시 신규 upload grant가 차단된다.
+2. 이 장애 시험은 신규 upload를 fail-closed한다. 자동 provider 전환·로컬 디스크 fallback은 발생하지 않는다.
+3. 기존 문서 조회와 R2 비의존 비AI 경로는 계속 동작한다.
+4. R2 복구 후 R2 contract probe와 최신 usage snapshot이 모두 성공하면 신규 upload grant가 재개된다.
 
-`LOCAL_ACTIVE` object가 EC2 유실 시 복구되지 않는다는 warning과 backlog count를 evidence에 남긴다. MinIO를 backup으로 보고하지 않는다.
+R2 장기 장애에서의 MinIO fallback은 이 probe 시험의 자동 후속 단계가 아니다. 운영자 승인 뒤 `storage-failover.sh`가 단일 lock으로 전환과 reconcile을 직렬화하며, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다.
+
+R2 원본 문서에는 2차 백업이 없으며 PostgreSQL dump만 private R2 backup bucket에 보관한다.
 
 ## 11. PostgreSQL backup and restore
 
@@ -275,5 +278,5 @@ Expected:
 - local PostgreSQL copy만 만들어 backup 성공 처리.
 - HEAD Content-Type만 보고 실제 file format 검증 처리.
 - Redis AOF가 있다는 이유로 Redis를 Source of Truth로 처리.
-- MinIO가 실행 중이라는 이유로 R2 backup이 생겼다고 처리.
+- R2 원본 문서에 별도 2차 백업이 있다고 처리.
 - 내부 port를 일시 공개한 상태로 acceptance 완료.

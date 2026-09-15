@@ -33,11 +33,9 @@ public final class LayoutJson {
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .build();
 
-    private final String raw;
     private final LayoutDocument document;
 
-    private LayoutJson(String raw, LayoutDocument document) {
-        this.raw = raw;
+    private LayoutJson(LayoutDocument document) {
         this.document = document;
     }
 
@@ -51,7 +49,7 @@ public final class LayoutJson {
         }
         try {
             LayoutDocument document = STRICT.readValue(raw, LayoutDocument.class);
-            return new LayoutJson(raw, document);
+            return new LayoutJson(document);
         } catch (JacksonException exception) {
             throw new LayoutParseException(readableReason(exception));
         }
@@ -85,10 +83,6 @@ public final class LayoutJson {
      */
     public static String write(LayoutDocument document) {
         return STRICT.writeValueAsString(document);
-    }
-
-    public String raw() {
-        return raw;
     }
 
     public LayoutDocument document() {

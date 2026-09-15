@@ -1,0 +1,32 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Booth 2.5D 에셋 산출물 — Unity 원본에서 build-time에 생성한다. runtime은 public에 두어 Vite가
+# dev/dist 양쪽으로 복사하지만 산출물 자체는 커밋하지 않는다.
+public/assets/booth-runtime/
+
+# Runtime Asset Compiler 산출물 (S15P21A604-480).
+# intermediate = Unity source 변환본(원본 구조에 가깝다). runtime은 public/assets/booth-runtime에 둔다.
+.generated/

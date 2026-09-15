@@ -30,7 +30,7 @@
 
 ## R-03. 공개 ingress·TLS·CDN
 
-**Decision**: Nginx만 80/443을 공개한다. dev는 EC2 IP의 제한된 Nginx 경로, demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
+**Decision**: Nginx만 80/443을 공개한다. dev front·api·ai·WebGL은 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`의 `/`, `/api/`, `/ai/v1/`, `/unity/`를 사용하며, WebGL은 demo와 같은 `current` release를 제공한다. URL path를 지원하지 않는 UnityTransport는 `world-dev.${ROOT_DOMAIN}` 전용 WSS host를 사용한다. demo는 `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}` host를 사용한다. 최종 경로는 Cloudflare DNS/Proxy → Nginx이며 origin mode는 Full (strict)다. content-hash 정적 asset만 장기 cache하고 HTML은 재검증, API·auth·SSE·upload grant·WebSocket은 bypass/no-store한다.
 
 **Rationale**: 헌법 6·7조의 단일 EC2 경계를 구현하고 ALB/NLB 없이 TLS와 static offload를 제공한다. host별 cache 정책이 동적 응답 혼입을 막는다.
 
@@ -77,17 +77,16 @@
 - 90%에서 read까지 차단: FR-025의 기존 문서 조회 유지에 어긋난다.
 - 가격/한도를 code constant로 고정: 공급자 정책 변경을 흡수하지 못한다.
 
-## R-07. S3-compatible 수동 emergency fallback
+## R-07. 승인된 MinIO fallback과 outage admission
 
-**Decision**: 단일 node/single drive MinIO를 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 상태로 수동 운영한다. validation은 disk·credential·PUT·HEAD·CORS·외부 port 차단을 확인한다. local object에는 provider를 기록하고 R2 복귀 시 같은 key의 size/type/SHA-256을 검증한 뒤 metadata를 전환한다. 9000/9001은 host public port로 publish하지 않는다.
+**Decision**: Cloudflare R2가 정상 운영의 primary provider다. R2 probe 실패 또는 usage guard 차단 시 새 upload grant를 먼저 fail-closed한다. R2 장기 장애에서는 운영자 승인 후 MinIO로 전환할 수 있다. `storage-failover.sh`는 전환과 reconcile 전체를 단일 lock으로 직렬화하고, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다. reconcile 결과는 target provider와 `targetBucket`을 명시한다. 기존 문서 조회와 R2 비의존 비AI 기능은 가능한 범위에서 유지한다.
 
-**Rationale**: S3-compatible adapter를 유지하면서 R2 장애 중 제한적 신규 업로드만 복구할 수 있다. MinIO 공식 single-node/single-drive 안내도 이를 개발·평가 또는 availability 요구가 낮은 용도로 설명하므로 같은 EC2의 backup이나 durability 수단으로 간주할 수 없다. [MinIO container deployment](https://min.io/docs/minio/container/index.html)
+**Rationale**: 자동 failover는 split-brain·누락 객체 위험이 있으므로 금지한다. 반면 장기 R2 장애에서 운영자 승인 fallback을 남기면 서비스 중단 선택지를 보존할 수 있다. 단일 lock과 명시적 target bucket은 A→B→A 동시 reconcile 및 설정 추론을 막는다. MinIO는 PostgreSQL backup의 대체 수단이 아니며, DB backup은 계속 private R2 bucket에 보관한다.
 
-**Alternatives considered**:
+**Alternatives rejected**:
 
-- 자동 failover: split-brain·누락 객체 위험이 있고 FR-017을 위반한다.
-- local directory 직접 저장: S3-compatible 계약을 깨뜨린다.
-- MinIO를 상시 backup으로 간주: EC2와 장애 영역이 같아 FR-018을 충족하지 못한다.
+- 자동 failover: split-brain·누락 객체 위험이 있다.
+- 로컬 디렉터리: 서버 유실 시 문서를 함께 잃고 R2 계약을 이중화한다.
 
 ## R-08. PostgreSQL database/role 격리와 backup
 
@@ -141,8 +140,8 @@
 
 | 항목 | 처리 |
 |---|---|
-| C-01 EC2 사양·SG 담당자 | `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_CHANGE_OWNER`, `SG_80_443_READY` late-bound input. 누락 시 resource/외부 network 단계 fail. |
-| C-02 실제 domain | `ROOT_DOMAIN`, domain owner late-bound input. host template은 고정하고 누락 시 DNS/TLS 단계 fail. |
+| C-01 EC2 사양·SG 담당자 | `SG_CHANGE_OWNER=정승욱(Infra)`로 확정. `EC2_VCPU`, `EC2_RAM_MB`, `EC2_DISK_GB`, `EC2_OS`, `SG_80_443_READY`는 서버 실측 전까지 late-bound input이며 누락 시 resource/외부 network 단계 fail. |
+| C-02 실제 domain | `ROOT_DOMAIN=ssafesta.world`, domain owner는 정승욱(Infra)으로 확정. host template은 그대로 사용한다. |
 | C-07 시연 정책 | 해소: 시연 중 build/deploy 허용, high-load build 최대 1, demo cgroup 우선 보호. 숫자만 C-01 실측 후 입력. |
 | R2 무료 한도 | 공급자 변경 가능 설정. 현재 공식 값과 확인일을 기록하고 월별/가격 변경 시 재확인. |
 | WSS timeout | infra-003 외부 실측으로 이관. |

@@ -19,11 +19,11 @@
 | 005 | booth-studio-layout | P0 | FE + BE | ✅ **BE 검토 완료** (FE 대기) | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 006 | booth-runtime | P0 | Unity | ✅ | ✅ | ✅ |
 | 007 | ai-agent-document | P0 | AI | ✅ | — | — |
-| 008 | ai-conversation-rag | P0 | AI + FE | ✅ | — | — |
+| 008 | ai-conversation-rag | P0 | AI + FE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 009 | project-exhibition | P0 | BE + FE | ✅ | — | — |
 | 013 | avatar-customization | **P0** | Unity + FE + BE | ✅ **확정** | ✅ +research/data-model/contracts/quickstart | ✅ |
 | 016 | booth-laptop-homepage | **P0** | FE + Unity + BE | ✅ | — | — |
-| 010 | survey | P1 | FE + BE | ✅ | — | — |
+| 010 | survey | P1 | FE + BE | ✅ | ✅ **BE분** +research/data-model/contracts/quickstart | ✅ **BE분** |
 | 011 | staff-consultation | P1 | BE + FE | ✅ | — | — |
 | 012 | economy-inventory | P1 | BE | ✅ | — | — |
 | 014 | minigame | P1 | Unity + BE | ✅ **확정** | ✅ | ✅ |
@@ -58,7 +58,7 @@
 **Codex와 Claude Code 둘 다 설치 없이 바로 동작한다.**
 
 ```text
-.specify/memory/constitution.md   ← 헌법 v1.2 (모든 명령이 참조)
+.specify/memory/constitution.md   ← 헌법 v1.3 (모든 명령이 참조)
 .specify/templates/               ← spec / plan / tasks 템플릿
 .specify/scripts/bash/            ← 명령이 호출하는 스크립트
 .agents/skills/speckit-*/         ← Codex 용
@@ -67,7 +67,7 @@ specs/                            ← 이 폴더
 ```
 
 > ❌ **`pip install specify-cli` / `specify init`을 실행하지 마라.**
-> 재설치하면 위 `constitution.md`(우리 헌법 v1.2)가 **빈 템플릿으로 덮인다.**
+> 재설치하면 위 `constitution.md`(우리 헌법 v1.3)가 **빈 템플릿으로 덮인다.**
 
 **필요한 것**: Codex CLI 또는 Claude Code를 **저장소 루트에서** 실행 +
 **bash**(Windows는 Git Bash / WSL — 스크립트가 `.sh`다).
@@ -133,7 +133,7 @@ plan은 "어떤 기술로 어떻게"라서 그 파트만 제대로 쓸 수 있�
 
 | 항목 | 확정값 |
 |---|---|
-| 로그인 | **Google + Kakao 소셜만.** 자체 가입 없음. 게스트는 둘러보기 전용(비영속) |
+| 로그인 | **Google + Kakao + SSAFY 소셜만.** 자체 가입 없음. 게스트는 둘러보기 전용(비영속) |
 | 접속 토큰 검증 | **서명 자체 검증** + 사용 토큰 식별자 기록으로 재사용 차단 |
 | Layout 좌표 | **미터 / 부스 바닥 중앙 원점 / +Z 정면 / rotationY 0=+Z, 시계방향 +** |
 | 부스 오브젝트 상한 | **12개** |

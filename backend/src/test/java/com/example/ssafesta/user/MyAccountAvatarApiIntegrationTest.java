@@ -248,7 +248,8 @@ class MyAccountAvatarApiIntegrationTest {
     }
 
     private static String newNickname() {
-        return "아바타" + SEQUENCE.incrementAndGet() + "x" + System.nanoTime();
+        // nickname VARCHAR(30) 예산. 태그는 헬퍼 구분용이다 — T-103, BoothTestSupport 참고.
+        return "아바타a" + SEQUENCE.incrementAndGet();
     }
 
     private MockHttpServletRequestBuilder saveRequest(Long userId, String avatarCode) {

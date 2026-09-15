@@ -31,6 +31,7 @@ class BoothFacadeApiIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private BoothRepository booths;
+    @Autowired private BoothSlotRepository slots;
     @Autowired private UserRepository users;
     @Autowired private WalletService wallets;
     @Autowired private MemberSessionService sessions;
@@ -149,6 +150,25 @@ class BoothFacadeApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * The eight characters {@code "https://"} — a scheme and nothing behind it.
+     *
+     * <p>The facade's own {@code startsWith("https://")} accepted this and stored it, while every
+     * other URL field in the product refused it. That gap is why the rule moved into
+     * {@link com.example.ssafesta.common.HttpUrlValidator}.
+     */
+    @Test
+    void aLogoUrlWithoutAHostIsRejected() throws Exception {
+        Owner owner = leasedOwner("호스트없는로고");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"DEFAULT","logoUrl":"https://"}
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("logoUrl"));
+    }
+
     @Test
     void anUnknownThemeIsRefused() throws Exception {
         Owner owner = leasedOwner("테마");
@@ -180,6 +200,178 @@ class BoothFacadeApiIntegrationTest {
         mockMvc.perform(facadeRequest(owner, "{\"themeCode\":\"MONO\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("BOOTH_LEASE_EXPIRED"));
+    }
+
+    /**
+     * 슬롯 목록이 같은 facade 를 싣는다 (S15P21A604-622, GitLab #171).
+     *
+     * <p>Unity 는 축제장에 들어서며 간판 12개를 한 번에 그린다. 이 필드가 없으면 목록 1회 +
+     * 부스당 상세 1회로 최대 13요청이다.
+     *
+     * <p>부스 상세와 <b>같은 값</b>인지까지 보는 이유: 두 경로가 각자 조립하면 한쪽만 갱신되는
+     * 날이 온다. 빈 슬롯이 {@code null} 인 것도 함께 본다 — 거기에 기본값이 들어가면 임대되지
+     * 않은 자리에 간판이 선다.
+     */
+    @Test
+    void theSlotListCarriesTheSameFacadeAndLeavesFreeSlotsNull() throws Exception {
+        Owner owner = leasedOwner("목록외관");
+        Long occupiedSlotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"MONO","primaryColor":"#3B82F6","signText":"목록 간판",
+                         "logoUrl":"https://cdn.example.com/list.png"}"""))
+                .andExpect(status().isOk());
+
+        int occupied = orderedIndexOf(occupiedSlotId);
+        int free = firstFreeIndex(occupiedSlotId);
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].boothId".formatted(occupied)).value(owner.boothId()))
+                .andExpect(jsonPath("$[%d].facade.themeCode".formatted(occupied)).value("MONO"))
+                .andExpect(jsonPath("$[%d].facade.primaryColor".formatted(occupied)).value("#3B82F6"))
+                .andExpect(jsonPath("$[%d].facade.signText".formatted(occupied)).value("목록 간판"))
+                .andExpect(jsonPath("$[%d].facade.logoUrl".formatted(occupied))
+                        .value("https://cdn.example.com/list.png"))
+                .andExpect(jsonPath("$[%d].status".formatted(free)).value("AVAILABLE"))
+                .andExpect(jsonPath("$[%d].facade".formatted(free))
+                        .value(org.hamcrest.Matchers.nullValue()));
+
+        // 같은 값을 부스 상세도 낸다.
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.facade.signText").value("목록 간판"))
+                .andExpect(jsonPath("$.facade.themeCode").value("MONO"));
+    }
+
+    /**
+     * 외관을 한 번도 손대지 않은 부스도 {@code facade} 객체를 받는다.
+     *
+     * <p>여기서 {@code null} 이 오면 클라이언트는 "빈 슬롯" 과 "기본 외관" 을 구별할 수 없다 —
+     * 간판이 서지 않는다. 기본값은 부스 생성 시 {@code DEFAULT} 이고 나머지는 비어 있다.
+     */
+    @Test
+    void anOccupiedSlotWithoutACustomFacadeStillCarriesTheDefault() throws Exception {
+        Owner owner = leasedOwner("기본외관");
+        int occupied = orderedIndexOf(booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId());
+
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].status".formatted(occupied)).value("OCCUPIED"))
+                .andExpect(jsonPath("$[%d].facade".formatted(occupied)).exists())
+                .andExpect(jsonPath("$[%d].facade.themeCode".formatted(occupied)).value("DEFAULT"))
+                .andExpect(jsonPath("$[%d].facade.signText".formatted(occupied))
+                        .value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    /**
+     * 임대가 끝나면 그 자리는 빈 슬롯이고 옛 간판도 함께 사라진다.
+     *
+     * <p>`status` 는 `ends_at` 을 반영해 이미 `AVAILABLE` 로 나오는데, facade 만 남으면 월드에
+     * <b>임차인이 없는 부스의 간판</b>이 선다. 부스 행은 콘텐츠 보존 때문에 그대로 살아 있으므로
+     * (FR-010) 이 자리는 lease 유무로 갈려야 한다.
+     */
+    @Test
+    void anExpiredLeaseLeavesTheSlotFreeAndHidesItsFacade() throws Exception {
+        Owner owner = leasedOwner("만료외관목록");
+        Long slotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"MONO","signText":"사라질 간판"}"""))
+                .andExpect(status().isOk());
+        BoothLayoutTestSupport.expireLease(jdbc, owner.boothId());
+
+        int index = orderedIndexOf(slotId);
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[%d].status".formatted(index)).value("AVAILABLE"))
+                .andExpect(jsonPath("$[%d].boothName".formatted(index))
+                        .value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$[%d].facade".formatted(index))
+                        .value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    /**
+     * 이름을 바꾸면 방문자·소유자·슬롯 목록이 <b>같은 이름</b>을 읽는다 (S15P21A604-756).
+     *
+     * <p>세 경로를 한 테스트에서 보는 이유는 이름을 각자 조립하기 때문이다 — 부스 상세는
+     * {@code PublicBoothView.name}, 스튜디오 첫 화면은 {@code MyBoothView.name}, 월드 간판은
+     * {@code SlotView.boothName} 이다. 한 곳만 갱신되는 날을 여기서 잡는다.
+     */
+    @Test
+    void theOwnerRenamesTheBoothAndEveryReaderSeesIt() throws Exception {
+        Owner owner = leasedOwner("이름변경");
+        Long slotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"AI 프로젝트 전시관","themeCode":"MONO"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.name").value("AI 프로젝트 전시관"));
+        mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearerFor(owner.userId())))
+                .andExpect(jsonPath("$.name").value("AI 프로젝트 전시관"));
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[%d].boothName".formatted(orderedIndexOf(slotId)))
+                        .value("AI 프로젝트 전시관"));
+    }
+
+    /**
+     * 이름을 보내지 않은 저장은 이름을 <b>지우지 않는다</b> — 이 요청이 기존 FE 가 보내는 모양이다.
+     *
+     * <p>{@code booths.name} 은 {@code NOT NULL} 이라 나머지 네 필드처럼 비웠다가는 500 이고,
+     * 반대로 필수로 막으면 이름 칸이 없는 스튜디오의 모든 외관 저장이 400 이 된다. 이 테스트가
+     * 그 절충을 고정한다.
+     */
+    @Test
+    void aSaveWithoutANameKeepsTheCurrentOne() throws Exception {
+        Owner owner = leasedOwner("이름유지");
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"유지될 이름","themeCode":"DEFAULT"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"WARM","primaryColor":"#22C55E","signText":"간판만 바꾼다"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.name").value("유지될 이름"))
+                .andExpect(jsonPath("$.facade.signText").value("간판만 바꾼다"));
+    }
+
+    /** 생략은 "그대로 두라"지만 공백은 "이걸로 하라"다 — 이름 없는 부스가 목록에 서지 않게 거절한다. */
+    @Test
+    void aBlankNameIsRefused() throws Exception {
+        Owner owner = leasedOwner("빈이름");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"   ","themeCode":"DEFAULT"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("부스 이름을 입력해 주세요."));
+    }
+
+    /** 컬럼이 {@code VARCHAR(100)} 이라 검증이 없으면 DB 제약이 500 으로 터진다. */
+    @Test
+    void aNameLongerThanTheColumnIsRefused() throws Exception {
+        Owner owner = leasedOwner("긴이름");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"%s","themeCode":"DEFAULT"}""".formatted("가".repeat(101))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("부스 이름은 100자까지입니다."));
+    }
+
+    private int orderedIndexOf(Long slotId) {
+        return slots.findAllOrdered().stream().map(BoothSlot::getId).toList().indexOf(slotId);
+    }
+
+    private int firstFreeIndex(Long occupiedSlotId) {
+        var ordered = slots.findAllOrdered();
+        for (int index = 0; index < ordered.size(); index++) {
+            if (!ordered.get(index).getId().equals(occupiedSlotId)) {
+                return index;
+            }
+        }
+        throw new IllegalStateException("빈 슬롯이 없습니다.");
     }
 
     private org.springframework.test.web.servlet.RequestBuilder facadeRequest(Owner owner, String body) {

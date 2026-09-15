@@ -1,0 +1,254 @@
+# 프로파일 중립 설정. local·infra 어느 프로파일로 뜨든 이 파일이 로드된다.
+#
+# Spring 의 application-{profile}.yml 은 프로파일 간에 누적되지 않는다. 그래서 공통 설정이
+# application-local.yml 에만 있으면 SPRING_PROFILES_ACTIVE=infra 로 띄우는 순간 datasource 부터
+# 사라져 기동이 실패한다 (S15P21A604-347, GitLab #117).
+#
+# 로컬 편의를 위한 기본값은 여기 두지 않는다 — 배포에서 env 를 빠뜨렸을 때 로컬 값으로 조용히
+# 뜨면 안 되는 것들이다. 그 기본값은 application-local.yml 이 같은 키를 덮어 제공한다.
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ssafesta}
+    username: ${POSTGRES_USER:ssafesta}
+    # 기본값 없음 — 커밋된 비밀번호로 배포가 뜨는 경로를 만들지 않는다.
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # infra-002 T015 가 Redis 기본 사용자를 비활성화하고 ACL 을 켠다. ACL 이 걸린 Redis 는
+      # 자격증명 없는 연결을 거부한다. 빈 값이면 Spring 이 AUTH 를 보내지 않아 로컬 무인증
+      # Redis 도 그대로 붙는다.
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid, profile, email
+            # 경로는 Spring 콜백 규약(/login/oauth2/code/{registrationId})에 묶여 있다.
+            # 콘솔 등록값과 한 글자라도 다르면 redirect_uri_mismatch 가 된다.
+            redirect-uri: ${GOOGLE_REDIRECT_URI}
+          kakao:
+            client-id: ${KAKAO_REST_API_KEY}
+            client-secret: ${KAKAO_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${KAKAO_REDIRECT_URI}
+            scope: profile_nickname, account_email
+          ssafy:
+            client-id: ${SSAFY_CLIENT_ID}
+            client-secret: ${SSAFY_CLIENT_SECRET}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${SSAFY_REDIRECT_URI}
+            # scope 없음 — SSAFY 인가 요청은 client_id·redirect_uri·response_type 셋만 받는다.
+            # 빈 scope 를 적으면 Spring 이 빈 파라미터를 실어 보낸다.
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+          ssafy:
+            # 인가 경로만 /oauth 아래고 나머지는 /ssafy 아래다. 대칭이 아니니 옮겨 적을 때 주의한다.
+            authorization-uri: https://project.ssafy.com/oauth/sso-check
+            token-uri: https://project.ssafy.com/ssafy/oauth2/token
+            user-info-uri: https://project.ssafy.com/ssafy/resources/userInfo
+            # userInfo 응답이 {userId, email, name} 평면 구조다. Kakao 처럼 중첩되지 않는다.
+            user-name-attribute: userId
+
+app:
+  auth:
+    jwt-secret: ${JWT_SECRET}
+    access-token-ttl: PT30M
+    refresh-token-ttl: P7D
+    oauth-state-ttl: PT5M
+    # exp 를 지난 토큰을 얼마나 더 받아 주는가. Spring 기본값과 같은 60초이고, 적어 두는 이유는
+    # SurveyGuestKeySweeper 가 같은 값을 읽기 때문이다 — 이 시간이 지나기 전에 게스트 중복 방지
+    # 키를 지우면 아직 통과하는 토큰이 한 번 더 답할 수 있다 (헌법 12조 vs 1인 1응답).
+    jwt-clock-skew: PT60S
+    refresh-cookie-path: /api/v1/auth/refresh
+    # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
+    # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.
+    frontend-base-url: ${FRONTEND_BASE_URL}
+    # 기본값 없음 — false 로 조용히 뜨면 HTTPS 배포에서 Refresh 쿠키가 Secure 없이 나간다.
+    cookie-secure: ${AUTH_COOKIE_SECURE}
+
+  # dev·demo 가 단일 EC2 의 Redis 한 인스턴스를 공유한다(infra-002 plan.md:59). 모든 키가
+  # 이 값을 맨 앞에 달아 환경끼리 덮어쓰지 않는다 — 맨 앞이라 SCAN {namespace}:* 하나로
+  # 환경 전체를 훑는다.
+  # 기본값 없음 — 빈 값으로 조용히 뜨면 두 환경이 세션과 일일 지급을 공유하고, 그 사실이
+  # 드러나는 곳이 없다. Infra 주입값은 dev|demo 다 (GitLab #117).
+  redis:
+    namespace: ${FESTA_ENVIRONMENT}
+
+  wallet:
+    initial-grant: 200
+    daily-grant: 50
+    daily-grant-zone: Asia/Seoul
+    # 잔액-원장 정합성 점검 배치 (spec 003 FR-014). 탐지·기록만 하고 보정하지 않는다.
+    reconciliation-initial-delay: PT5M
+    reconciliation-scan-interval: PT1H
+
+  # 미니게임 정산 (spec 014 C-03·C-04). 시간대는 여기 없다 — 위 daily-grant-zone 하나가
+  # "코인 정책의 하루"를 정하고, 사본을 두면 일일 지급과 미니게임 한도가 다른 달력을 쓰게 된다.
+  # C-03 이 "수치는 밸런스 조정 가능하게 데이터로 둔다" 로 확정했으므로 아래는 그 확정의 구현이지
+  # 구현자가 정한 정책이 아니다. 기획이 값을 정하면 이 블록만 바뀐다 (헌법 30조).
+  minigame:
+    daily-cap-coins: 50
+    timer-stop:
+      # FR-001a — 목표 시간을 이 범위에서 무작위로 뽑는다. 밀리초 단위까지만 쓸 수 있다
+      # (target_value 가 NUMERIC(8,3)).
+      target-min-seconds: 5.0
+      target-max-seconds: 10.0
+      # failAfterSeconds = 목표 + 이 값 (FR-001d). 리드 확정 대기 중이고, 게임 파트는 GitLab #134
+      # 에서 목표+3초에 이견 없음을 회신했다 — docs/26 "미니게임 실패 임계" 행 참조.
+      fail-margin-seconds: 3.0
+      # 신고한 정지 시각과 서버 경과 시각의 허용 오차. 양방향이다 — 위쪽은 "아직 오지 않은 시각에
+      # 멈췄다", 아래쪽은 "답을 쥐고 있다가 보냈다".
+      #
+      # ⚠️ 아래쪽은 치팅 창인 동시에 **정상 플레이의 왕복 지연 예산**이다. 클라이언트 타이머는
+      # 세션 응답을 받은 뒤 시작하므로 stoppedSeconds 는 서버 경과보다 항상 왕복 1회만큼 작다.
+      # 즉 이 값을 조이면 치팅 창이 줄지만 느린 회선의 정상 플레이가 거부되고 세션이 소진된다
+      # (재시도 불가). 둘이 같은 축에 있어 한쪽만 얻을 수 없다.
+      # 2.0 은 WebGL 실측 왕복 지연 없이 고른 잠정값이다 — docs/26 "미니게임 경과시간 허용 오차"
+      # 에 결정 요청으로 올려 뒀다. 실측 후 이 한 줄만 바꾼다.
+      elapsed-tolerance-seconds: 2.0
+      # 넓은 구간부터. tier = 인덱스 + 1 이라 더 좁은 구간을 뒤에 덧붙여도 기존 번호가 안 밀린다.
+      # 판정은 "가장 좁은 매칭 구간" 이다 (MinigameProperties.TimerStop#tierOf).
+      tiers:
+        - max-error-seconds: 0.5
+          coins: 2
+        - max-error-seconds: 0.1
+          coins: 5
+
+  # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
+  # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
+  world:
+    scheme: ${WORLD_SCHEME:ws}
+    host: ${WORLD_HOST:127.0.0.1}
+    port: ${WORLD_PORT:7777}
+    # Access Token 키(jwt-secret)와 분리된 전용 키. 게임 서버가 이 키로 서명을 자체 검증한다
+    # (헌법 14조). jwt-secret 과 같이 기본값을 두지 않는다 — 없으면 기동이 실패해야 한다.
+    connection-token-secret: ${CONNECTION_TOKEN_SECRET}
+
+  lease:
+    price-coin: 100
+    duration: PT24H
+    # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
+    # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은
+    # 막힌다. 배치가 늦어지면 아무도 원하지 않는 슬롯의 연결 해제만 늦어진다.
+    expiry-scan-interval: PT5M
+
+  # spec 010 C-01·C-02 는 기획 미결이다. 값이 정해지면 이 세 줄만 바꾼다 (헌법 30조,
+  # docs/26 row 20·21). 나머지 상한(제목 200·문구 500·별점 1~10·단답 200·장문 2000)은
+  # 컬럼 폭이나 화면에서 나온 상수라 코드에 둔다 — 바뀌지 않는 값을 설정으로 빼지 않는다.
+  # FE Builder 에는 상한이 아예 없어 이 셋이 설문이 처음 만나는 제약이다.
+  survey:
+    max-questions: 30
+    max-options: 10
+    max-reward-coin: 10
+    # 제출 트랜잭션의 실제 상한. JDBC query timeout 으로 걸리므로 부스 락 대기도 여기서 끊긴다.
+    # 이 값이 없으면 아래 유예가 무엇을 덮는지 말할 수 없다 — 대기 시간에 상한이 없기 때문이다.
+    submit-timeout-seconds: 30
+    # 게스트 토큰이 더는 통과하지 않게 된 뒤에도 중복 방지 키를 이만큼 더 남긴다.
+    # 만료 직전에 인증돼 아직 처리 중인 요청이 있을 수 있고, 그 요청이 커밋하기 전에 키가
+    # 사라지면 중복 응답이 그대로 들어간다. submit-timeout 보다 길어야 하며(기동 시 검사),
+    # 그 차이가 트랜잭션 시작 전 대기(스레드 큐 등)를 덮는 여유다.
+    guest-key-grace: PT10M
+
+  # spec 019 — 계정당 게임 상한. 둘은 독립이라 서로 잠식하지 않는다.
+  # 삭제본이 무제한이면 활성 20을 지키면서 최대 2MB Draft를 무한히 쌓을 수 있어 함께 둔다.
+  # 개수로 유계이므로 보관 기간과 sweeper가 필요 없다 — 밀어내기가 삭제 트랜잭션 안에서 끝난다.
+  game:
+    live-limit: 20
+    deleted-limit: 5
+
+  # 내부 API 인증 (GitLab #102, 2026-08-25 확정 — 방향별 2토큰). 콤마 구분 1~2개이고
+  # 송신은 첫 값, 검증은 목록 전체다. jwt-secret 과 같이 기본값을 두지 않는다 — 기본값이 있으면
+  # 배포에서 env 를 빠뜨렸을 때 공개된 토큰으로 조용히 뜬다.
+  # 여기는 FastAPI→Spring 수신분만 둔다. Spring→FastAPI 송신분은 S15P21A604-175 몫이다.
+  internal:
+    ai-to-spring-tokens: ${INTERNAL_AI_TO_SPRING_TOKENS}
+    # Spring→FastAPI 송신분 (S15P21A604-175). 송신은 첫 값 하나이고 목록은 회전용이다.
+    # AI 쪽이 두 방향 토큰 집합이 겹치면 기동을 거부하므로 ai-to-spring 과 같은 값을 쓰면 안 된다.
+    spring-to-ai-tokens: ${INTERNAL_SPRING_TO_AI_TOKENS}
+    # Infra→Spring 수신분 (S15P21A604-500). reconcile 결과만 받는 세 번째 상대이고 scope 도
+    # /internal/storage/** 하나다. 세 집합 중 둘에 같은 값이 들어가면 Spring 이 기동하지 않는다 —
+    # 값을 공유하는 순간 넓은 쪽 노출이 좁은 쪽에 닿는다.
+    infra-to-spring-tokens: ${INTERNAL_INFRA_TO_SPRING_TOKENS}
+
+  # spec 007 C-13·FR-018. per-booth-limit 은 V15 ux_ai_agents_booth 와 짝이라 1 이 아니면
+  # 기동이 실패한다 — 올리려면 인덱스 drop 마이그레이션을 함께 낸다.
+  # 뒤 둘은 S15P21A604-106(Document 업로드)이 소비한다.
+  agent:
+    per-booth-limit: 1
+    document-count-limit: 10
+    document-total-bytes: 100MB
+
+  ai:
+    # 문서 처리를 시작시킬 FastAPI 의 주소 (S15P21A604-175). 경로는 계약이 소유하므로 오리진만 둔다.
+    # 기본값 없음 — Infra manifest 가 이미 http://ai:8000 을 규약으로 적어 뒀고, localhost 로 조용히
+    # 뜨면 위임이 전부 연결 실패로 떨어져 FastAPI 가 죽은 것처럼 보인다.
+    processing:
+      base-url: ${AI_INTERNAL_BASE_URL}
+    document:
+      # spec 007 FR-026 이 운영 중 조정 가능하다고 한 유일한 값이다 — 만료 판정 "주기" 이고,
+      # 미완료 문서를 만료시키는 1시간 자체가 아니다. 1시간은 AiDocumentExpirySweeper 의 상수다.
+      # SC-010 은 "생성 후 1시간 + 다음 판정 주기 안에 100% EXPIRED" 를 요구하므로, 이 값을
+      # 늘리면 그만큼 늦어진다. 짧게 잡으면 매 주기가 ai_documents 전수 조회다 (인덱스 없음).
+      expiry-scan-interval: PT5M
+      # FR-028 — EXPIRED 원본을 24시간 복구 창이 닫힌 뒤 지우는 별도 sweep 의 주기다
+      # (AiDocumentOriginalDeleteSweeper, S15P21A604-556). 위와 달리 아무도 이 값을 기다리지
+      # 않으므로 더 느슨하게 잡는다.
+      original-delete-scan-interval: PT30M
+      # FR-028a — 같은 sweep 이 FAILED 문서의 원본을 지우기 전까지 두는 유예다
+      # (S15P21A604-637). updated_at 부터 재고, EXPIRED 의 24시간 복구 창(FR-027, 코드 상수)과는
+      # 별개 값이다 — 저쪽은 "복구할 수 있는 기간"이고 이쪽은 "사람이 실패를 들여다보고 재처리를
+      # 걸 기간"이라 같이 움직일 이유가 없다. 줄이면 조사할 시간이 줄고, 늘리면 못 쓰는 원본이
+      # 그만큼 저장소에 남는다.
+      failed-original-grace: P7D
+    # spec 007 C-07·C-10. 문서 원본 저장소 — R2(S3 호환)가 P0 의 유일한 provider 다.
+    storage:
+      # 업로드 허용 게이트 (GitLab #100, 2026-09-01 확정). 운영자가 Usage Guard 와 저장소 전환
+      # 상태를 읽고 한 칸으로 옮겨 적는다 — 서버는 상태 기계를 알지 못한다.
+      #   OPEN           정상·경고, LOCAL_ACTIVE 검증 완료
+      #   QUOTA_BLOCKED  사용량 90% 초과 → 507. 재시도해도 풀리지 않는다
+      #   UNAVAILABLE    stale 지표·R2 장애·FALLBACK_VALIDATING·R2_RECONCILING → 503. 재시도 가능
+      # 기본값을 두지 않는다. Spring 은 모르는 키를 조용히 무시하므로 오타가 "허용"으로 떨어지면
+      # 막아 뒀다고 믿는 동안 발급이 계속된다 — 안전 장치는 오타로 열려서는 안 된다.
+      upload-gate: ${AI_STORAGE_UPLOAD_GATE}
+      # 신규 업로드가 갈 곳일 뿐이다. 기존 객체의 읽기·HEAD·삭제는 문서 행의 storage_provider 를
+      # 따른다 (FR-030) — 전환 전에 올라간 파일은 옛 provider 에 남아 있다.
+      # env 인 이유: MinIO fallback 이 "설정 변경 + 재배포"라서 값이 이미지에 박히면 전환할 수 없다.
+      active-write-provider: ${AI_STORAGE_ACTIVE_WRITE_PROVIDER}
+      presign-ttl: 15m
+      providers:
+        R2:
+          endpoint: ${R2_ENDPOINT}
+          bucket: ${R2_BUCKET}
+          access-key-id: ${R2_ACCESS_KEY_ID}
+          secret-access-key: ${R2_SECRET_ACCESS_KEY}
+        # 전 필드가 비면 미구성으로 보고 목록에서 빠진다(AiStorageProperties). R2 만 쓰는 배포가
+        # MinIO 자격증명을 억지로 채우지 않아도 되고, fallback 시 Infra 가 값을 넣고
+        # active-write-provider 만 MINIO_LOCAL 로 바꾸면 된다. 부분 입력은 기동 실패다.
+        MINIO_LOCAL:
+          endpoint: ${MINIO_ENDPOINT:}
+          bucket: ${MINIO_BUCKET:}
+          access-key-id: ${MINIO_ACCESS_KEY_ID:}
+          secret-access-key: ${MINIO_SECRET_ACCESS_KEY:}

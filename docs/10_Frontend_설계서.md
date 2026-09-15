@@ -84,8 +84,7 @@ src/
 /auth/callback
 /app/home
 /app/world
-/app/booths/slots
-/app/booths/mine
+/app/booths
 /app/studio/:boothId
 /app/games/:gameId/edit
 /app/games/:gameId/play

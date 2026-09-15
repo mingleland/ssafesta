@@ -28,19 +28,19 @@ public class BoothLayoutQueryService {
     private final BoothLeaseRepository leases;
     private final BoothLayoutDraftRepository drafts;
     private final BoothLayoutPublishedVersionRepository published;
-    private final BoothEditorGuard editorGuard;
+    private final BoothAccessGuard accessGuard;
 
     public BoothLayoutQueryService(BoothRepository booths, BoothSlotRepository slots,
                                    BoothLeaseRepository leases,
                                    BoothLayoutDraftRepository drafts,
                                    BoothLayoutPublishedVersionRepository published,
-                                   BoothEditorGuard editorGuard) {
+                                   BoothAccessGuard accessGuard) {
         this.booths = booths;
         this.slots = slots;
         this.leases = leases;
         this.drafts = drafts;
         this.published = published;
-        this.editorGuard = editorGuard;
+        this.accessGuard = accessGuard;
     }
 
     /**
@@ -51,7 +51,7 @@ public class BoothLayoutQueryService {
      */
     @Transactional(readOnly = true)
     public Optional<DraftView> findDraft(Long boothId, Long userId) {
-        Booth booth = editorGuard.requireEditor(boothId, userId);
+        Booth booth = accessGuard.requireEditor(boothId, userId);
         return drafts.findById(boothId).map(draft -> DraftView.of(draft, booth));
     }
 
@@ -65,11 +65,10 @@ public class BoothLayoutQueryService {
     public PublishedView findPublished(Long boothId) {
         Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
 
-        // The expiry predicate lives in one place — spec 004's repository. A second copy here would
-        // be the fourth place it is written, and the one that eventually forgets the time condition
-        // (research R-06).
-        leases.findValidByBoothId(boothId, Instant.now())
-                .orElseThrow(() -> new BoothExpiredException(boothId));
+        // The expiry predicate lives in one place — the guard. A second copy here would be the
+        // one that eventually forgets the time condition (research R-06). No editor check: this is
+        // the visitor's path.
+        accessGuard.requireActiveLease(boothId);
 
         Integer version = booth.getPublishedLayoutVersion();
         if (version == null) {

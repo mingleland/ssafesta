@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-20
 
-**Updated**: 2026-08-23 — 독립 Web Runtime, 6종 시각 템플릿, 초보/고급 편집, 재료함·집중 모드 구현 반영
+**Updated**: 2026-08-25 — 전체 맵 탐색, 대화 흐름, 게임 완성도 점검, 애니메이션 재료 검증 구현 반영
 
 **Status**: 구현 진행 — 로컬 Authoring·Preview·Reference Runtime 완료 / Backend Draft·Publish·Portal 통합 대기
 
@@ -166,7 +166,8 @@
 - **FR-019**: 게임 화면이 열려 있는 동안 월드 연결은 유지되어야 하며 로컬 이동 입력은 차단되어야 한다.
 - **FR-020**: 게임 종료·로드 실패는 해당 게임 화면에만 영향을 주고 Unity 월드와 다른 FESTA 기능을 종료해서는 안 된다.
 - **FR-021**: 서버는 클라이언트가 주장한 게임 완료·점수·사용자 식별자를 검증 없이 보상이나 랭킹에 사용해서는 안 된다.
-- **FR-022**: 첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 하며 표시 전용 Ranking은 P1 별도 범위로 미뤄야 한다.
+- **FR-022**: ~~첫 MVP는 Coin, Reward, Ranking을 포함하지 않아야 하며~~ → **2026-08-26 개정 — Coin 은 이 금지에서 빠졌다.** [GitLab #81](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/81) 리드 확정이 유료 **입장**을 v1 범위로 채택하고 구현을 `S15P21A604-108`(BE)·`-117`(FE)로 지정했다. **Reward·Ranking 금지는 그대로다** — 입장료를 받는 것은 서버가 판정할 수 있고 게임 결과에 보상을 주는 것은 아직 아니다. 표시 전용 Ranking은 P1 별도 범위로 미뤄야 한다.
+  > **구현은 보류 상태다 (2026-09-10, `S15P21A604-598`).** 규약은 확정됐지만 코드는 0줄이다. 게임이 부스 내부에서 월드 공용 공간(광장)으로 옮겨지면서 진입 경로가 바뀌었고, 광장에 Game Studio 게임을 걸 오락기가 아직 없다. 재개 조건과 확정된 계약(#81 8항목, #56 ⓐ 광장 진입관 3파트 합의)은 `docs/26` 결정 기록 로그를 따라간다. **이 문장을 "구현됨"으로 읽지 말 것.**
 - **FR-023**: 게스트는 Published 게임을 플레이할 수 있지만 게임 생성·Draft 저장·Publish는 할 수 없어야 한다.
 - **FR-024**: GameProject 계약은 명시적인 버전을 포함하고, 소비자는 지원하는 버전 범위를 확인해야 한다.
 - **FR-025**: Draft 저장은 현재 revision의 일치를 확인하고 불일치 시 충돌 사실과 최신 revision을 알려 조용한 덮어쓰기를 금지해야 한다.
@@ -212,6 +213,10 @@
 - **FR-065**: Backend가 없어도 공식 Mock 모드에서 Draft 저장, 불변 Published Version 생성, 일반 `/app/games/{gameId}/play` 조회를 같은 port로 검증할 수 있어야 한다. 이 브라우저 저장소는 운영 공유 저장소로 간주해서는 안 된다.
 - **FR-066**: GameProject v1.1 FE candidate는 `rules.completion.mode(ALL|ANY)`, `SCORE_AT_LEAST`, `DEFEAT_ENEMIES`, `SURVIVE_SECONDS`, `playerDefeat(RESPAWN|END_GAME)`만 추가한다. Runtime tick은 120ms 결정적 시간으로 누적하고 v1.0 프로젝트는 편집 시 기본 규칙을 가진 v1.1로 명시적으로 승격한다.
 - **FR-067**: Publish preflight는 안정 Asset뿐 아니라 `rules` 목표 또는 도달 가능한 `COMPLETE_GAME` Action의 존재를 확인해야 한다. 완료 경로가 하나도 없는 프로젝트는 다른 사용자에게 게시하지 않아야 한다.
+- **FR-068**: World Canvas는 맵 크기와 무관하게 미니맵 위치 이동, 전체 맵 맞춤, 1:1 배율, 선택 Object 위치 이동을 제공해야 한다. 전체 맞춤 저배율에서는 Tile을 단일 Canvas로 합성해 10,000개 Tile DOM을 만들지 않고, 편집 배율에서는 viewport overscan을 유지해야 한다.
+- **FR-069**: Dialogue 편집기는 GameProject를 변경하지 않는 파생 분석으로 시작 노드에서 도달 가능한 Node와 선택 후 결과가 없는 Node를 한눈에 표시하고 해당 Node로 바로 이동할 수 있어야 한다.
+- **FR-070**: Project 데이터 화면은 시작 위치, 완료 경로, 상호작용 연결, 대화 분기, Scene 연결, 게시 가능 Asset을 한국어 체크리스트로 보여야 한다. 이 점검은 Backend Publish 검증을 대체하거나 새로운 wire field로 저장되어서는 안 된다.
+- **FR-071**: builtin Sprite Sheet는 제공 clip별 방향·프레임·fps를 선택해 재생/일시정지할 수 있어야 한다. 이 선택은 Editor 재료 미리보기이며 Runtime의 자동 방향 선택 의미를 바꾸거나 GameProject에 임의 animation field를 추가해서는 안 된다.
 
 ### Part Boundaries
 
@@ -254,10 +259,11 @@
 - **SC-012**: 활성 PC 브라우저 탭의 대표 TOP_DOWN·PLATFORMER Published/Preview 시나리오에서 렌더링이 55fps 아래로 3초 이상 머무르지 않는다. 백그라운드 throttling 측정은 제외한다.
 - **SC-013**: 6종 시작 템플릿의 Scene/Object/Event/Dialogue 구조 프로필이 서로 구분되고 모든 템플릿이 계약 검증과 시작 Scene 실행 검증을 100% 통과한다.
 - **SC-014**: 공식 Mock 모드의 브라우저에서 `템플릿 선택 → 저장 → 게시 v1 → 일반 /play 조회 → 동일 목표 HUD 표시` 흐름이 Backend·Unity 없이 100% 성공한다.
+- **SC-015**: 100×100, Object 500개, Tile 10,000칸 최대 fixture에서 전체 맞춤은 Tile DOM 0개인 합성 화면을 제공하고, 1:1 편집 배율은 viewport 주변 Object/Tile만 렌더하며 미니맵·레이어 선택으로 원거리 위치를 찾을 수 있다.
 
 ## Assumptions
 
-- 기존 Google/Kakao 인증과 Access/Refresh 정책을 재사용한다.
+- 기존 소셜 인증(Google·Kakao·SSAFY)과 Access/Refresh 정책을 재사용한다.
 - Game Studio는 기존 FESTA Web과 인증을 공유하는 같은 출처의 분리 영역으로 시작하며 별도 인증 앱을 만들지 않는다.
 - 편집과 Published 플레이는 서로 구분되는 인증된 게임 화면으로 제공한다.
 - 첫 MVP는 데스크톱 브라우저 편집을 우선하며 모바일은 플레이만 허용할 수 있다.

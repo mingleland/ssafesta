@@ -1,0 +1,36 @@
+meta {
+  name: AI 부스 접근 판정
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/internal/ai/booth-access?boothId={{boothId}}&agentId={{agentId}}
+  body: none
+  auth: none
+}
+
+docs {
+  ## 내부 전용 — AI 부스 접근 판정 (FastAPI가 호출한다)
+
+  FastAPI가 Conversation을 만들기 전에 "이 부스의 이 AI 직원에게 지금 말을 걸어도 되는가"를 묻는다 (spec 008 FR-024).
+
+  ### 사용자 토큰으로는 열리지 않는다
+
+  경로가 `/api/v1`이 아니라 **`/internal`**이고, 인증도 사용자 Access Token이 아니라 **방향별 서비스 토큰**이다. 이 요청은 그래서 `auth: none`으로 두고 헤더를 손으로 넣는다.
+
+  ```
+  Authorization: Bearer <INTERNAL_AI_TO_SPRING_TOKENS 의 값>
+  ```
+
+  Bruno에서 실행하려면 Headers 탭에 위 헤더를 직접 추가한다. 토큰 값은 **환경 파일에 커밋하지 않는다** — 서버를 띄운 쉘의 환경변수에서 확인해 그 자리에서만 붙인다.
+
+  ### Swagger에는 나오지 않는다
+
+  `/v3/api-docs`는 인증 없이 열리므로 이 endpoint는 일부러 숨겼다(`@Hidden`). 계약 정본은 `specs/008-ai-conversation-rag/contracts/spring-booth-access-api.yaml`이다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 판정 결과. 거절 사유도 `200` 본문으로 온다 — 판정이 곧 응답이다 |
+  | `401` | 서비스 토큰이 없거나 틀렸다. 방향이 반대인 토큰도 `401`이다 |
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "ci.failed",
+  "version": 1,
+  "name": "Notify every pipeline failure",
+  "enabled": true,
+  "source": "loki",
+  "query": "{service=\"jenkins\"} |= \"FAILED\"",
+  "scope": {
+    "environment": "integration",
+    "service": "jenkins",
+    "domain": "ci"
+  },
+  "severity": "warning",
+  "labels": {
+    "managed_by": "infra",
+    "approval_status": "draft",
+    "notify": "mattermost"
+  },
+  "annotations": {
+    "summary": "Pipeline failed",
+    "description": "This intentionally violates the approved runtime-only policy.",
+    "runbookUrl": "not-a-uri"
+  },
+  "notification": {
+    "groupBy": ["alertname"],
+    "sendResolved": true
+  },
+  "approval": {
+    "status": "draft",
+    "approvedBy": "",
+    "approvedAt": "not-a-date",
+    "changeRef": ""
+  },
+  "owner": "infra"
+}

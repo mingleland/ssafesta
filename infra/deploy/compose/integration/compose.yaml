@@ -1,0 +1,51 @@
+name: festa-integration
+services:
+  ai:
+    image: ${AI_IMAGE_REF:?AI_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    env_file:
+      - ${AI_ENV_FILE:?AI_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
+      SPRING_INTERNAL_BASE_URL: http://back:8080
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+    volumes: [ai-data:/app/data]
+  back:
+    image: ${BACK_IMAGE_REF:?BACK_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    env_file:
+      - ${BACK_ENV_FILE:?BACK_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
+      SPRING_PROFILES_ACTIVE: infra
+      AI_INTERNAL_BASE_URL: http://ai:8000
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+    volumes: [back-data:/app/data]
+  front:
+    image: ${FRONT_IMAGE_REF:?FRONT_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:?PUBLIC_API_BASE_URL is required}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:?PUBLIC_UNITY_BUILD_BASE is required}
+    ports: ["127.0.0.1:${FRONT_LOOPBACK_PORT:-18080}:80"]
+  game:
+    image: ${GAME_IMAGE_REF:?GAME_IMAGE_REF is required}
+    restart: unless-stopped
+    networks: [integration-private]
+    environment:
+      FESTA_ENVIRONMENT: ${FESTA_ENVIRONMENT:?FESTA_ENVIRONMENT is required}
+      WORLD_SESSION_ENDPOINT_MODE: dynamic
+    volumes: [game-data:/app/data]
+networks:
+  integration-private:
+    name: festa-integration-private
+volumes:
+  ai-data: {name: festa-integration-ai-data}
+  back-data: {name: festa-integration-back-data}
+  game-data: {name: festa-integration-game-data}

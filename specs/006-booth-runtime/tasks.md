@@ -2,46 +2,48 @@
 
 **Spec**: `specs/006-booth-runtime/spec.md` | **Plan**: `plan.md`
 
+> **2026-09-06 대조** — 아래 체크는 develop `0418cf0c` 코드 기준으로 맞췄다(작성 당시 이름과 실제 구현 이름이 다른 항목은 괄호에 구현체를 적었다). 미체크는 정말 안 된 것 또는 타 파트·인프라 의존이다.
+
 ---
 
 ## Phase 1: Published 연동 (US1 완성)
 
-- [ ] **T001** [US1] `BoothRuntime`이 **공개본 엔드포인트**를 조회하도록 전환 (작업본 노출 금지 → FR-002)
-- [ ] **T002** [US1] 조회 실패 시 해당 부스만 비우고 월드는 유지되는지 회귀 확인 (이미 구현 — 깨지지 않았는지만 확인)
+- [x] **T001** [US1] `BoothRuntime`이 **공개본 엔드포인트**를 조회하도록 전환 (작업본 노출 금지 → FR-002)
+- [x] **T002** [US1] 조회 실패 시 해당 부스만 비우고 월드는 유지되는지 회귀 확인 (이미 구현 — 깨지지 않았는지만 확인)
 - [ ] **T003** [US1] 갱신 정책 구현 — **부스 구역 진입 시 조회** (C-01 최소안). 기존 오브젝트 정리 후 재생성
-- [ ] **T004** [P] 생성된 오브젝트 수를 로그로 남기기 (부하 테스트 근거 + 상한 결정 자료)
+- [x] **T004** [P] 생성된 오브젝트 수를 로그로 남기기 (부하 테스트 근거 + 상한 결정 자료)
 
 ## Phase 2: 계약 반영 (005 확정 후 — 차단됨)
 
-- [ ] **T005** ⛔ 005 Layout 계약 확정 대기 → 좌표 규칙 반영 (원점/단위/축/회전)
+- [x] **T005** ~~⛔~~ 005 Layout 계약 확정 대기 → 좌표 규칙 반영 (원점/단위/축/회전)
 - [ ] **T006** ⛔ **왕복 검증**: React가 오브젝트 1개짜리 Layout 전송 → Unity에서 같은 위치인지 눈으로 확인
       *부호 하나는 반드시 틀린다는 전제로 진행할 것*
-- [ ] **T007** `BoothObjectType`에 `LAPTOP` 추가 + 문자열 매핑 (016 연동)
+- [x] **T007** `BoothObjectType`에 `LAPTOP` 추가 + 문자열 매핑 (016 연동)
 
 ## Phase 3: 상호작용 시스템 (US2 — 실질적 신규 개발)
 
-- [ ] **T008** [US2] `BoothObjectInteractable` — 상호작용 가능 표시 + 마우스오버 하이라이트
-- [ ] **T009** [US2] `InteractionRaycaster` — 클릭 → 대상 판정 (Input System 사용)
-- [ ] **T010** [US2] `BoothRuntimeObject`가 `objectId`/`configId`/`type`을 보관하도록 확장
-- [ ] **T011** [US2] `InteractionDispatcher` — 이벤트를 **타입 무관 단일 경로**로 발행
+- [x] **T008** [US2] `BoothObjectInteractable` (구현체: `BoothInteractionTarget` 외곽선) — 상호작용 가능 표시 + 마우스오버 하이라이트
+- [x] **T009** [US2] `InteractionRaycaster` (구현체: `BoothInteractionInput` 레이캐스트+근접+F) — 클릭 → 대상 판정 (Input System 사용)
+- [x] **T010** [US2] `BoothRuntimeObject`가 `objectId`/`configId`/`type`을 보관하도록 확장
+- [x] **T011** [US2] `InteractionDispatcher` (구현체: `BoothInteractBridge`) — 이벤트를 **타입 무관 단일 경로**로 발행
       `{ type, boothId, objectId, configId }` — Unity가 타입별 분기를 갖지 않는다
-- [ ] **T012** [US2] `Assets/Plugins/WebGL/festa-bridge.jslib` — Unity → JS 콜백 (`window.FestaUnity.onBoothInteract`)
-- [ ] **T013** [US2] 오버레이 열림 상태에서 캐릭터 입력 차단 플래그 (React가 `SendMessage`로 알림)
-- [ ] **T014** [US2] **FE와 payload 합의** → 006 C-02 확정 (⚠️ 단독 확정 금지, 헌법 21조)
+- [x] **T012** [US2] `Assets/Plugins/WebGL/festa-bridge.jslib` (실파일: `FestaUnityBridge.jslib`) — Unity → JS 콜백 (`window.FestaUnity.onBoothInteract`)
+- [x] **T013** [US2] 오버레이 열림 상태에서 캐릭터 입력 차단 플래그 (React가 `SendMessage`로 알림)
+- [x] **T014** [US2] **FE와 payload 합의** (#56·#120, -414·-415) → 006 C-02 확정 (⚠️ 단독 확정 금지, 헌법 21조)
 - [ ] **T015** [US2] AI 오브젝트 상호작용 실패가 월드를 막지 않는지 확인 (헌법 3조)
 
 ## Phase 4: 에셋 교체 (마지막 — 로직 완성 후)
 
-- [ ] **T016** [P] 부스 오브젝트 실제 3D 에셋 확보 (라이선스 확인)
-- [ ] **T017** [P] 노트북 에셋 확보 (016 C-06)
-- [ ] **T018** `BoothObjectRegistry`를 임시 도형 → 실프리팹으로 교체
+- [x] **T016** [P] 부스 오브젝트 실제 3D 에셋 확보 (라이선스 확인)
+- [x] **T017** [P] 노트북 에셋 확보 (016 C-06)
+- [x] **T018** `BoothObjectRegistry`를 임시 도형 → 실프리팹으로 교체
 - [ ] **T019** 라벨 TextMesh 제거 또는 디버그 전용 전환 (T-02/T-03 관련)
 
 ## Phase 5: 마무리
 
-- [ ] **T020** [P] 부스 7개 동시 표시 부하 확인 → SC-003, 오브젝트 상한 근거 산출
+- [x] **T020** [P] 부스 7개 동시 표시 부하 확인 (12실 기본 프레임: 드로우콜 577·삼각형 82만, 2026-09-05 PerfHud) → SC-003, 오브젝트 상한 근거 산출
 - [ ] **T021** [P] `architecture.md` 갱신 (상호작용 경로 추가)
-- [ ] **T022** 작업일지·트러블슈팅 기록
+- [x] **T022** 작업일지·트러블슈팅 기록
 
 ---
 

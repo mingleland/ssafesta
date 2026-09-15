@@ -4,7 +4,7 @@
 > 두 도구의 차이는 **명령 접두사 하나뿐**이고(`$` vs `/`), 결과물은 같은 `specs/`에 쌓인다.
 > **이 파일 하나로 작업을 시작할 수 있게** 쓴다. 규칙이 바뀌면 다른 문서보다 **여기를 먼저** 고친다.
 >
-> 최종 갱신: 2026-08-13 | 대상: **Codex · Claude Code** / 기타 AI 에이전트
+> 최종 갱신: 2026-09-01 (헌법 v1.3 — 11조 소셜 로그인에 SSAFY 추가) | 대상: **Codex · Claude Code** / 기타 AI 에이전트
 
 | 도구 | 자동으로 읽는 파일 | speckit 명령 | 명령 정의 위치 |
 |---|---|---|---|
@@ -32,8 +32,8 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
    과도기(기존 파트행 MR 소진 등)는 docs/jira-gitlab-workflow.md §4-1 을 따르라.
 3. 커밋은 type(scope): 한국어 요약 (JIRA-KEY) 형식. 모든 커밋에 이슈 키를 넣어라 —
    키가 있어야 Jira 에 커밋 링크·코멘트가 남는다. Secret·토큰을 커밋하지 마라.
-4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 MR 리뷰에서 사람이 한다 (CI 러너 없음).
-   MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
+4. MR 제목은 [JIRA-KEY][영역] 제목 형식. 키 검증은 현재 비활성인 `jira-key-check` 대신 MR 리뷰에서 사람이 한다.
+   develop 대상 MR은 최신 GitLab pipeline이 성공해야 병합할 수 있다. MR 설명은 Default 템플릿(작업 목적/변경 사항/테스트 방법/영향 범위)을 채워라.
 5. Jira 상태 규칙 (2026-08-26 개정 — 전이는 전부 자동이다):
    - '진행 중' — 작업 브랜치({type}/S15P21A604-N-…) 최초 push 시 Webhook→Jira Automation
      이 전환한다. 손으로 옮기지 마라.
@@ -44,9 +44,9 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 6. 파트 브랜치의 구현은 선행 조사·참고용이다. develop 에 도달하기 전에는 ① 타 파트가
    완료 근거로 소비할 수 없고 ② 계약 문서에 "구현됨"으로 인용할 수 없으며 ③ Jira 완료
    전환의 근거가 되지 않는다. 타 브랜치 코드를 인용할 때는 어느 브랜치 기준인지 명시하라.
-7. .gitlab-ci.yml 은 파이프라인 생성이 정지돼 있다(workflow.rules 의 when: never, 러너 없음).
-   pending 파이프라인이 보이면 무시하라. stage 구조와 jira-* 잡 정의는 삭제하지 마라 —
-   러너 확보 시 되살릴 기록이다.
+7. GitLab CI는 같은 프로젝트의 허용된 작업 브랜치가 develop으로 향하는 MR에서 실행된다.
+   `mr-status`는 모든 유효 MR에 성공 상태를 만들고, Front/Back 또는 공통 CI 변경은 해당 test/build를 추가 실행한다.
+   실행 중·실패 pipeline은 병합하지 말고 원인을 고쳐 새 커밋으로 재실행한다. Jenkins는 develop 병합 뒤 CI/CD를 담당한다.
 8. 공용 규약 문서(AGENTS.md·CLAUDE.md·docs/jira-gitlab-workflow.md·docs/17·docs/18)의
    정본은 develop 이다. 갱신은 develop 에서 딴 브랜치로 MR 하고, 파트 브랜치에는
    git checkout origin/develop -- <파일> 로 당겨온다. 당겨오기 전에
@@ -60,7 +60,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 ```text
 [1] 이 파일 전체를 읽는다                          ← Codex / Claude Code 공통
-[2] .specify/memory/constitution.md (헌법 v1.2)  ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.3)  ← 모든 결정의 최상위 근거
 [3] 작업할 spec 지정:  .specify/feature.json      ← §2-3. 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27          ← 최근에 실제로 터진 것들
@@ -88,7 +88,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 > ❌ `pip install specify-cli` / `specify init` 를 **다시 실행하지 마라.**
 > 재설치는 `.specify/memory/constitution.md`를 **빈 템플릿으로 덮어쓸 수 있다.**
-> 우리 헌법 v1.2가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
+> 우리 헌법 v1.3가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
 
 ### 필요한 것 (설치가 필요한 유일한 항목)
 
@@ -169,7 +169,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 ## 3. 헌법 — 반드시 걸리는 게이트
 
-전문: `.specify/memory/constitution.md` (v1.2). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
+전문: `.specify/memory/constitution.md` (v1.3). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
 
 | 조 | 내용 | 어기면 |
 |:---:|---|---|
@@ -178,7 +178,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 | 8 | **endpoint 하드코딩 금지.** 서버 주소는 world-sessions 응답으로만 | 배포에서 접속 불가 |
 | 9 | world-sessions는 **1차 MVP부터 목적 층 파라미터 포함** | 018에서 API를 다시 깬다 |
 | 10 | `ai`/`back`/`front`/`game` 파트 브랜치 개별 CI/CD, `develop`은 실사용 기준. **Merge는 Squash** | — |
-| 11·12 | 로그인은 **Google/Kakao 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
+| 11·12 | 로그인은 **Google/Kakao/SSAFY 소셜 + 게스트만.** 자체 가입 없음. 게스트는 **비영속** | 범위 초과 |
 | 13·14 | Refresh Token은 Unity·게임서버에 **절대** 전달 금지. 접속 토큰은 **서명 자체 검증** + 사용 식별자 기록 | Spring 장애가 월드 입장을 막는다 |
 | 15 | **Secret 커밋 금지.** `.env.example`만 허용 | 즉시 사고 |
 | 17 | RAG 검색은 **boothId+agentId 필터 강제.** 1건이라도 새면 릴리스 불가 | Critical Test 실패 |
@@ -234,11 +234,12 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 | 언제 | 어디에 | 어떻게 |
 |---|---|---|
-| 작업 하나가 끝날 때마다 | `docs/24_작업일지.md` | 해당 **날짜 섹션에 즉시**. 없으면 만든다(최신이 위). 👤사람 / 🤖AI 구분 |
+| 작업 하나가 끝날 때마다 | `docs/24_작업일지.md` | 해당 **날짜 섹션에 즉시**. 없으면 만든다(최신이 위). 문서 상단 **기록 규칙**을 따른다 |
 | 문제가 생길 때마다 | `docs/25_트러블슈팅.md` | **T-번호를 따서 등록** (증상/원인/해결/예방). **해결 못 했어도 등록한다** |
 | 매일 작업 종료 시 | Jira | **1회 필수** 갱신 |
 
 - 작업일지에는 **T-번호 링크만** 남긴다. 본문은 트러블슈팅에 쓴다.
+- **기록 문체**: 한 사람의 목소리로 쓰고 작업에 쓴 도구는 적지 않는다. 구두 지시·메신저 문장을 그대로 옮기지 말고 **요구사항 한 줄로 정리**해 적으며, 밖에서 들어온 입력만 `**요청**`·`**지적**`·`**결정**`·`**확인**` 같은 라벨로 구분한다. 인용부호는 로그·에러·계약 문구에만 쓴다.
 - **세션 종료 전** 위 두 문서가 이번 세션 작업을 반영하는지 확인한다.
 - AI에게 시킨 작업도 **똑같이** 기록한다.
 
@@ -350,7 +351,7 @@ SSAFESTA/
 ├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처, 두 도구 공통)
 ├── CLAUDE.md                       ← 요약 + 이 파일로 안내 (Claude Code 진입점)
 ├── .specify/
-│   ├── memory/constitution.md      ★ 헌법 v1.2
+│   ├── memory/constitution.md      ★ 헌법 v1.3
 │   ├── templates/  scripts/bash/
 │   └── feature.json                ★ 작업 중인 spec 지정 (커밋 안 됨, 각자 생성)
 ├── .agents/skills/speckit-*/       Codex 명령      ($speckit-plan)

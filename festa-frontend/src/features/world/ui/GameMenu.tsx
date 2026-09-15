@@ -1,0 +1,114 @@
+// ESC Game Menu — 플레이어 자신과 시스템에 관한 최소 메뉴 (D-08 · user-flow-decisions §12).
+//
+// Navigation Hub 가 아니다. Booth Studio·Booth Management·상담 관리·Project·Survey·GAME 은
+// 여기 없다 — 그 기능들의 진입은 World 안(F·NPC)이다. `계속하기` 항목도 두지 않는다:
+// 메뉴를 닫는 것이 곧 World 복귀다.
+//
+// 데이터는 기존 모델을 그대로 쓴다 — profile.ts(닉네임·provider·avatar) + wallet 쿼리(잔액).
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { loadProfile, useProfile } from '../../profile/model/profile';
+import { useSession } from '../../auth/model/session';
+import { logout } from '../../auth/model/logout';
+import { walletApi } from '../../../entities/wallet/api.select';
+import { MusicSettings } from '../../audio/ui/MusicSettings';
+import './gameMenu.css';
+
+const PROVIDER_LABEL: Record<string, string> = { google: 'Google', kakao: 'Kakao', ssafy: 'SSAFY', guest: '게스트' };
+
+interface Props {
+  onClose: () => void;
+  onOpenMyInfo: () => void;
+}
+
+export function GameMenu({ onClose, onOpenMyInfo }: Props) {
+  const { kind } = useSession();
+  const isMember = kind === 'member';
+  const state = useProfile();
+  const navigate = useNavigate();
+  // 설정은 같은 패널 안에서 열고 닫는다 — ESC 한 번으로 닫히는 자리를 하나 더 만들지 않는다
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const walletQuery = useQuery({
+    queryKey: ['wallet-balance'],
+    queryFn: walletApi.getWallet,
+    enabled: isMember, // 게스트는 403 — 요청 자체를 만들지 않는다
+  });
+
+  useEffect(() => {
+    if (isMember && state.status === 'idle') void loadProfile();
+  }, [isMember, state.status]);
+
+  async function handleLogout() {
+    await logout();
+    navigate('/login', { replace: true });
+  }
+
+  const account = state.account;
+  // 실패를 '불러오는 중...' 으로 위장하지 않는다 — 영원히 로딩처럼 보이던 자리다(T-24 정신).
+  const memberNickname = state.status === 'error' ? '이름을 불러오지 못했습니다' : '불러오는 중...';
+  const nickname = account?.nickname ?? (isMember ? memberNickname : '게스트');
+  const provider = account?.providers[0];
+
+  return (
+    <div className="gm-root" role="presentation">
+      <button type="button" className="gm-dim" aria-label="메뉴 닫기" onClick={onClose} />
+      <section className="gm-panel" role="dialog" aria-modal="true" aria-label="게임 메뉴">
+        <button type="button" className="gm-close" onClick={onClose} aria-label="닫기">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+
+        {/* 상단 Profile Summary — 상위 Context 박스. 닉네임 수정 폼·탈퇴·거래내역은 My Info 소관 */}
+        <div className="gm-summary">
+          <span className="gm-avatar" aria-hidden="true">
+            {nickname.slice(0, 1)}
+          </span>
+          <span className="gm-who">
+            <strong className="gm-nick">{nickname}</strong>
+            <span className="gm-sub">
+              {isMember ? (provider !== undefined ? PROVIDER_LABEL[provider] ?? provider : '회원') : '게스트로 둘러보는 중'}
+            </span>
+            {/* 잔액 실패를 침묵하지 않는다 — 0 코인처럼 보이거나 아무것도 없는 것이 더 나쁘다 */}
+            {isMember && walletQuery.isError && <span className="gm-coin">잔액을 불러오지 못했습니다</span>}
+            {isMember && walletQuery.data !== undefined && (
+              <span className="gm-coin">{walletQuery.data.balance.toLocaleString('ko-KR')} 코인</span>
+            )}
+          </span>
+          {isMember && (
+            <button type="button" className="gm-myinfo" onClick={onOpenMyInfo}>
+              내 정보
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* 의도적 여백 — 기능을 채우지 않는다(user-flow-decisions §12.2) */}
+        <div className="gm-space" aria-hidden="true" />
+
+        <div className="gm-system">
+          {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
+          <button
+            type="button"
+            className="gm-item"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            설정
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={settingsOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
+            </svg>
+          </button>
+          {settingsOpen && <MusicSettings />}
+          <button type="button" className="gm-item gm-item-out" onClick={() => void handleLogout()}>
+            로그아웃
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion":"1.0.0","id":"ci.failure","version":1,"name":"CI failure","enabled":true,
+  "source":"loki","query":"{service=\"jenkins\"}","scope":{"environment":"integration","service":"jenkins","domain":"ci"},
+  "severity":"warning","labels":{"managed_by":"infra","approval_status":"approved","notify":"mattermost"},
+  "annotations":{"summary":"CI status","description":"Must never route","runbookUrl":"https://docs.example.invalid/runbooks/ci"},
+  "notification":{"groupBy":["alertname","environment","service","severity"],"sendResolved":true},
+  "approval":{"status":"approved","approvedBy":"infra-owner","approvedAt":"2026-08-20T00:00:00Z","changeRef":"fixture"},"owner":"infra"
+}

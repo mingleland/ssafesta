@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SSAFY FESTA AI Document Processing API
-  version: 0.1.0
-  description: Spring이 업로드를 확정한 문서를 FastAPI 처리 Job으로 접수하고 내부 진단 상태를 조회하는 계약이다.
+  version: 0.7.0
+  description: Spring이 영속 Job을 만든 뒤 DB 권한이 없는 FastAPI에 문서 처리를 시작·취소시키는 계약이다.
 servers:
   - url: /ai/v1
 security:
@@ -10,9 +10,9 @@ security:
 paths:
   /documents/process:
     post:
-      operationId: enqueueDocumentProcessing
-      summary: 문서 처리 Job 접수
-      description: 동일 documentId에 활성 Job이 있으면 새 Job을 만들지 않고 기존 Job을 반환한다.
+      operationId: startDocumentProcessing
+      summary: 영속 Job의 문서 처리 시작
+      description: FastAPI는 비동기 처리를 시작하고 DB에 Job을 만들지 않는다. 같은 jobId+attemptNo 재전송은 중복 Worker 없이 멱등하게 수락한다.
       requestBody:
         required: true
         content:
@@ -21,44 +21,37 @@ paths:
               $ref: '#/components/schemas/ProcessDocumentRequest'
       responses:
         '202':
-          description: 새 Job 접수 또는 기존 활성 Job 반환
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProcessDocumentResponse'
-        '409':
-          description: 요청 snapshot이 현재 문서 개정본과 일치하지 않음
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: 비동기 처리 수락
         '422':
-          description: 문서 범위 또는 요청 형식 검증 실패
+          description: 요청 형식·크기 검증 실패
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /documents/{documentId}/status:
-    get:
-      operationId: getInternalDocumentJobStatus
-      summary: 내부 진단용 Job 상태 조회
-      description: FE 사용자 상태 조회 경로로 사용하지 않는다. 사용자 문서 상태는 Spring API가 제공한다.
-      parameters:
-        - name: documentId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류
+  /documents/cancel:
+    post:
+      operationId: cancelDocumentProcessing
+      summary: 실행 중인 문서 처리 attempt 취소
+      description: 같은 jobId+attemptNo가 이미 없거나 끝났어도 성공으로 응답한다(멱등). attemptNo가 현재 실행 중인 것과 다르면 아무것도 하지 않고 성공으로 응답한다. 취소 대상 조회는 FastAPI 프로세스 하나의 in-memory 상태만 본다 — replica가 2개 이상이면 이 API는 요청을 받은 프로세스가 아닌 다른 프로세스의 attempt를 취소하지 못한다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelDocumentProcessingRequest'
       responses:
-        '200':
-          description: 최신 Job 진단 상태
+        '204':
+          description: 취소 요청 수락(실제 취소 여부 무관 — 멱등)
+        '422':
+          description: 요청 형식 검증 실패
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DocumentJobStatusResponse'
-        '404':
-          description: Job 없음
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Spring→FastAPI Service Token 누락·오류
 components:
   securitySchemes:
     serviceToken:
@@ -66,83 +59,38 @@ components:
       scheme: bearer
       bearerFormat: opaque-service-token
   schemas:
-    JobStatus:
-      type: string
-      enum: [QUEUED, RUNNING, RETRY_WAIT, SUCCEEDED, DEAD, CANCELLED]
     ProcessDocumentRequest:
       type: object
       additionalProperties: false
-      required: [documentId, boothId, agentId, s3Key, sourceHash]
+      required: [jobId, attemptNo, documentId, boothId, agentId, originalFilename, contentType, fileSizeBytes, storageProvider, storageBucket, objectKey, sourceHash]
       properties:
-        documentId:
-          type: integer
-          format: int64
-        boothId:
-          type: integer
-          format: int64
-        agentId:
-          type: integer
-          format: int64
-        s3Key:
+        jobId: {type: integer, format: int64, minimum: 1}
+        attemptNo: {type: integer, minimum: 0}
+        documentId: {type: integer, format: int64, minimum: 1}
+        boothId: {type: integer, format: int64, minimum: 1}
+        agentId: {type: integer, format: int64, minimum: 1}
+        originalFilename: {type: string, minLength: 1, maxLength: 255}
+        contentType:
           type: string
-          minLength: 1
-        sourceHash:
+          enum: [application/pdf, text/markdown, text/plain]
+        fileSizeBytes: {type: integer, minimum: 1, maximum: 20971520}
+        storageProvider:
           type: string
-          pattern: '^[a-f0-9]{64}$'
-    ProcessDocumentResponse:
+          enum: [R2, MINIO_LOCAL]
+        storageBucket: {type: string, minLength: 1}
+        objectKey: {type: string, minLength: 1}
+        sourceHash: {type: string, pattern: '^[a-f0-9]{64}$'}
+    CancelDocumentProcessingRequest:
       type: object
       additionalProperties: false
-      required: [jobId, documentId, status, existing]
+      required: [jobId, attemptNo]
       properties:
-        jobId:
-          type: string
-          pattern: '^job_[0-9]+$'
-        documentId:
-          type: integer
-          format: int64
-        status:
-          $ref: '#/components/schemas/JobStatus'
-        existing:
-          type: boolean
-          description: 활성 Job을 재사용했으면 true
-    DocumentJobStatusResponse:
-      type: object
-      additionalProperties: false
-      required: [jobId, documentId, status, attemptNo, maxRetries, updatedAt]
-      properties:
-        jobId:
-          type: string
-        documentId:
-          type: integer
-          format: int64
-        status:
-          $ref: '#/components/schemas/JobStatus'
-        attemptNo:
-          type: integer
-          minimum: 0
-        maxRetries:
-          type: integer
-          minimum: 0
-        leaseExpiresAt:
-          type: [string, 'null']
-          format: date-time
-        nextRetryAt:
-          type: [string, 'null']
-          format: date-time
-        chunkCount:
-          type: [integer, 'null']
-          minimum: 0
-        lastErrorCode:
-          type: [string, 'null']
-        updatedAt:
-          type: string
-          format: date-time
+        jobId: {type: integer, format: int64, minimum: 1}
+        attemptNo: {type: integer, minimum: 0}
     ErrorResponse:
       type: object
       additionalProperties: false
       required: [code, message]
       properties:
-        code:
-          type: string
-        message:
-          type: string
+        code: {type: string}
+        message: {type: string}

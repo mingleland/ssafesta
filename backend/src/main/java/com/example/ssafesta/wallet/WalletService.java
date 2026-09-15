@@ -1,6 +1,11 @@
 package com.example.ssafesta.wallet;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,9 +27,21 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>This ordering assumes {@code READ COMMITTED} (PostgreSQL's default), where each statement
  * takes a fresh snapshot and therefore sees the committed entry after the lock is granted.
+ *
+ * <p><b>Why the idempotency lookup is global, and why an owner check follows it.</b> The key is
+ * {@code UNIQUE} across the whole ledger, so the lookup has to be global too — a per-wallet lookup
+ * would miss a colliding key and then hit the constraint. But a global hit can belong to
+ * <i>another</i> wallet, and answering {@code alreadyApplied} in that case hands the caller a
+ * success while nothing happened to their wallet. Every production key today carries the wallet
+ * owner or a per-owner reference ({@code userId}, {@code leaseId}, a session {@code nonce}), so a
+ * cross-wallet hit means a server-side key recipe collided. That is a defect, not a client error:
+ * it is thrown as {@code IllegalStateException} and surfaces as a 500 with the key and both wallet
+ * ids in the log (S15P21A604-695).
  */
 @Service
 public class WalletService {
+
+    private static final Logger log = LoggerFactory.getLogger(WalletService.class);
 
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
     private static final int MAX_REFERENCE_ID_LENGTH = 100;
@@ -67,7 +84,20 @@ public class WalletService {
 
     @Transactional(readOnly = true)
     public Wallet requireWallet(Long userId) {
-        return wallets.findByUserId(userId).orElseThrow(() -> new WalletNotFoundException(userId));
+        return wallets.findByUserId(userId).orElseThrow(() -> missingWallet(userId));
+    }
+
+    /**
+     * A member without a wallet is a broken state, not an expected 404: the wallet is created in
+     * the member-creation transaction. Report it, and leave a trace to investigate with.
+     *
+     * <p>The log lives here rather than at the callers because there are three throw sites and, for
+     * a while, only the one behind {@code GET /wallets/me} logged anything — booth lease and
+     * catalog purchase hit the same state and left nothing behind but a 500 (S15P21A604-402).
+     */
+    private WalletNotFoundException missingWallet(Long userId) {
+        log.error("회원에게 지갑이 없습니다 — 가입 트랜잭션을 확인해야 합니다. userId={}", userId);
+        return new WalletNotFoundException();
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +118,7 @@ public class WalletService {
      */
     @Transactional
     public void lockOwner(Long userId) {
-        wallets.findByUserIdForUpdate(userId).orElseThrow(() -> new WalletNotFoundException(userId));
+        wallets.findByUserIdForUpdate(userId).orElseThrow(() -> missingWallet(userId));
     }
 
     /** Grants coins — {@code CHARGE}, {@code REWARD} or {@code REFUND}. */
@@ -143,6 +173,43 @@ public class WalletService {
         return ledger.sumAmountByWalletId(walletId);
     }
 
+    /**
+     * Coins this member has already been granted <b>today</b> under one reason, where "today" is the
+     * grant time zone's calendar day. The basis for every daily cap (spec 014 C-04).
+     *
+     * <p>Lives here rather than in the feature that needs it so that neither the wallet id nor the
+     * day boundary leaves this package: {@code app.wallet.daily-grant-zone} is the one definition of
+     * which day a coin policy belongs to, and a second copy is how the daily grant and a feature cap
+     * end up on different calendars.
+     *
+     * <p><b>Call this while holding the member's wallet lock</b> ({@link #lockOwner}). Read outside
+     * it, two concurrent submissions at 48/50 both see 48, both grant, and the day totals 58 — the
+     * same check-then-act this class exists to prevent.
+     */
+    @Transactional(readOnly = true)
+    public int grantedTodayFor(Long userId, String reasonType) {
+        return grantedOnDateFor(userId, reasonType, LocalDate.now(properties.dailyGrantZone()));
+    }
+
+    /**
+     * {@link #grantedTodayFor} for an explicit date. Exists so the day boundary can be exercised in
+     * tests without waiting for midnight, the same reason
+     * {@code DailyCoinGrantService.hasGrantedOn} takes one.
+     */
+    @Transactional(readOnly = true)
+    public int grantedOnDateFor(Long userId, String reasonType, LocalDate date) {
+        CoinReason.validate(reasonType);
+        Wallet wallet = requireWallet(userId);
+        ZoneId zone = properties.dailyGrantZone();
+        // atStartOfDay(zone) rather than atTime(0, 0).atZone(zone): it resolves a DST gap instead of
+        // producing an instant for a wall clock that never happened. Korea has none today; the cost
+        // of writing the version that stays right is zero.
+        Instant from = date.atStartOfDay(zone).toInstant();
+        Instant to = date.plusDays(1).atStartOfDay(zone).toInstant();
+        return Math.toIntExact(
+                ledger.sumAmountByWalletAndReasonBetween(wallet.getId(), reasonType, from, to));
+    }
+
     private LedgerResult applyEntry(Long userId, LedgerEntryType entryType, int signedAmount, String reasonType,
                                     String referenceType, String referenceId, String idempotencyKey) {
         if (userId == null) {
@@ -153,11 +220,21 @@ public class WalletService {
         CoinReason.validate(reasonType);
 
         Wallet wallet = wallets.findByUserIdForUpdate(userId)
-                .orElseThrow(() -> new WalletNotFoundException(userId));
+                .orElseThrow(() -> missingWallet(userId));
 
         Optional<CoinLedgerEntry> recorded = ledger.findByIdempotencyKey(idempotencyKey);
         if (recorded.isPresent()) {
-            return LedgerResult.alreadyApplied(recorded.get());
+            CoinLedgerEntry entry = recorded.get();
+            if (!entry.getWalletId().equals(wallet.getId())) {
+                // 키는 전역 UNIQUE 라 조회도 전역이 맞다 — 그래서 주인 검사가 그 다음이다. 여기 걸리면
+                // 서버가 만든 키가 지갑 사이에서 겹친 것이다. 조용히 alreadyApplied 로 답하면 호출자는
+                // 자기 지갑에 아무 일도 없이 "반영됐다" 를 받고, 새 항목을 만들면 UNIQUE 에 걸린다.
+                // 클라이언트 잘못이 아니라 서버 결함이라 409 로 위장하지 않고 크게 던진다 (T-24).
+                throw new IllegalStateException("멱등키가 다른 지갑의 원장 항목을 가리킵니다 — key=" + idempotencyKey
+                        + ", entryWalletId=" + entry.getWalletId() + ", walletId=" + wallet.getId()
+                        + " (S15P21A604-695)");
+            }
+            return LedgerResult.alreadyApplied(entry);
         }
 
         if (signedAmount < 0 && !wallet.canAfford(-signedAmount)) {

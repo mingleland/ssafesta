@@ -1,0 +1,14 @@
+name: festa-dev
+
+# Compose merges this project definition with exactly one component overlay.
+services: {}
+
+networks:
+  ai-back:
+    name: festa-dev-ai-back-private
+  front-private:
+    name: festa-dev-front-private
+    internal: true
+  game-private:
+    name: festa-dev-game-private
+    internal: true

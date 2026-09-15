@@ -52,7 +52,7 @@ Cloudflare DNS에서 demo./api./ai./world. 서브도메인을 같은 EC2에 연�
 원본 TLS는 EC2 Nginx의 Let's Encrypt 인증서로 처리하며 Cloudflare는 Full (strict)로 연결한다.
 ```
 
-**infra-002 clarify 반영 (2026-08-21)**: dev는 EC2 IP를 유지하고 demo에만 신규 도메인과 TLS를 적용한다. 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다. 실제 루트 도메인과 Cloudflare 계정 담당자는 도메인 구매 전에 확정한다.
+**infra-002 공개 계약 (2026-09-11 갱신)**: dev front·api·ai·WebGL은 승인된 source만 접근 가능한 `https://dev.${ROOT_DOMAIN}`의 `/`, `/api/`, `/ai/v1/`, `/unity/`를 사용한다. `/unity/`은 demo와 같은 WebGL `current` release를 제공한다. UnityTransport는 URL path를 지원하지 않아 dev game만 `world-dev.${ROOT_DOMAIN}` WSS host를 사용한다. demo 서브도메인은 `demo`·`api`·`ai`·`world`로 분리한다.
 
 ## 4. infra-003 — unity-server-deploy
 

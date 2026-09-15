@@ -1,5 +1,6 @@
 package com.example.ssafesta.common;
 
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -7,10 +8,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * Turns every exception that escapes a controller into the one error shape (docs/08 §1.3).
@@ -39,22 +41,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(
                 code, exception.getMessage(), RequestIdFilter.current(),
                 exception.errors(), exception.warnings()));
-    }
-
-    /**
-     * Spring's own rejections — a missing handler (404), an unsupported method (405) — plus any
-     * remaining hand-thrown ones. They already know their status; all they lack is a code.
-     */
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<ApiErrorResponse> handleResponseStatus(ResponseStatusException exception) {
-        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-        ErrorCode code = codeFor(status);
-        // Spring writes its own reason in English ("No static resource api/v1/...", "Request method
-        // 'PUT' is not supported"). Client-facing text is Korean only, so the reason goes to the log
-        // and the client gets the code's message.
-        log.debug("프레임워크 거부 — status={} reason={}", status, exception.getReason());
-        return ResponseEntity.status(exception.getStatusCode())
-                .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
     }
 
     /** A body that could not be parsed at all — malformed JSON, wrong type in a field. */
@@ -88,6 +74,32 @@ public class GlobalExceptionHandler {
                 null));
     }
 
+    /**
+     * A path variable or query parameter that could not be converted to its declared type —
+     * {@code /surveys/abc/responses} against {@code @PathVariable Long surveyId}.
+     *
+     * <p>Needed explicitly because {@link #handleUnexpected}'s {@link ErrorResponse} branch does not
+     * catch this one, so every typed parameter in the application answered a URL typo with a
+     * <b>500</b> and an ERROR line in the log. That is the shape of a server fault, and it made a
+     * client mistake look like ours (found while building the minigame result endpoint,
+     * S15P21A604-502).
+     *
+     * <p>Reported as {@code VALIDATION_FAILED} with the parameter in {@code field}, the same
+     * envelope Bean Validation produces — a client branches on one rule, not two.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        String name = exception.getName();
+        log.debug("경로·질의 파라미터 형식 오류 — name={} value={}", name, exception.getValue());
+        // The offending value is not echoed: it is attacker-controlled text and this body is
+        // rendered by clients. The parameter name stays out of the message for the same reason
+        // messagesCarryNoDebuggingTail exists — message is for the reader, field is for the client.
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
+                ErrorCode.VALIDATION_FAILED, "요청 값의 형식이 올바르지 않습니다.",
+                RequestIdFilter.current(),
+                List.of(ApiErrorDetail.field(name, "값의 형식이 올바르지 않습니다.")), null));
+    }
+
     /** Anything without a Hangul character is a framework default and must not reach the client. */
     private String koreanOrFallback(String message) {
         if (message == null || message.chars().noneMatch(GlobalExceptionHandler::isHangul)) {
@@ -117,8 +129,20 @@ public class GlobalExceptionHandler {
                 ErrorCode.UNAUTHORIZED, ErrorCode.UNAUTHORIZED.defaultMessage(), RequestIdFilter.current()));
     }
 
+    /**
+     * Spring's own rejections carry their status on {@link ErrorResponse}, not by extending
+     * {@code ResponseStatusException} — matching on that class missed every one of them (#113).
+     * Only 4xx is answered quietly; a 5xx here is still an unknown failure (T-24).
+     */
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
+        if (exception instanceof ErrorResponse rejection && rejection.getStatusCode().is4xxClientError()) {
+            ErrorCode code = ErrorCode.of(HttpStatus.resolve(rejection.getStatusCode().value()));
+            log.debug("프레임워크 거부 — status={} reason={}", rejection.getStatusCode(), exception.getMessage());
+            // The code's status, never the exception's — the client branches on the code.
+            return ResponseEntity.status(code.status())
+                    .body(ApiErrorResponse.of(code, code.defaultMessage(), RequestIdFilter.current()));
+        }
         log.error("처리되지 않은 예외 — requestId={}", RequestIdFilter.current(), exception);
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.status()).body(ApiErrorResponse.of(
                 ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.defaultMessage(),
@@ -129,19 +153,5 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status()).body(ApiErrorResponse.of(
                 ErrorCode.VALIDATION_FAILED, message == null ? ErrorCode.VALIDATION_FAILED.defaultMessage() : message,
                 RequestIdFilter.current()));
-    }
-
-    private ErrorCode codeFor(HttpStatus status) {
-        if (status == null) {
-            return ErrorCode.INTERNAL_ERROR;
-        }
-        return switch (status) {
-            case UNAUTHORIZED -> ErrorCode.UNAUTHORIZED;
-            case FORBIDDEN -> ErrorCode.FORBIDDEN;
-            case NOT_FOUND -> ErrorCode.NOT_FOUND;
-            case METHOD_NOT_ALLOWED -> ErrorCode.METHOD_NOT_ALLOWED;
-            case BAD_REQUEST -> ErrorCode.VALIDATION_FAILED;
-            default -> status.is4xxClientError() ? ErrorCode.VALIDATION_FAILED : ErrorCode.INTERNAL_ERROR;
-        };
     }
 }

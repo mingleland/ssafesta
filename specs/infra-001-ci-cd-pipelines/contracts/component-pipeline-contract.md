@@ -1,6 +1,6 @@
 # Component Pipeline Contract v1
 
-중앙 Jenkins pipeline과 `ai`/`back`/`front`/`game` 파트 저장소 사이의 최소 계약이다. SCM provider와 무관하며 각 명령은 저장소 root에서 실행한다.
+중앙 Jenkins pipeline과 `ai`/`back`/`front`/`game` component adapter 사이의 최소 계약이다. Component는 source branch가 아니며 SCM provider와 무관하다. 각 명령은 저장소 root에서 실행한다.
 
 ## Required adapters
 
@@ -19,7 +19,7 @@
 필수:
 
 - `CI_COMPONENT`: `ai|back|front|game`
-- `CI_BRANCH`
+- `CI_BRANCH`: source branch (`feature/*` 또는 `develop`); component 선택값으로 사용 금지
 - `CI_COMMIT_SHA`: full SHA
 - `CI_RUN_ID`
 - `CI_ARTIFACT_DIR`: 실행별 쓰기 가능 디렉터리

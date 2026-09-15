@@ -19,8 +19,32 @@ public final class CoinReason {
     /** Manual administrator correction (spec 003 FR-013). */
     public static final String ADMIN_ADJUSTMENT = "ADMIN_ADJUSTMENT";
 
+    /** Catalog item purchase (spec 012 FR-003). */
+    public static final String PURCHASE = "PURCHASE";
+
+    /** Survey response reward, once per member per survey (spec 010 FR-005). */
+    public static final String SURVEY_REWARD = "SURVEY_REWARD";
+
+    /**
+     * Minigame reward, once per session (spec 014 FR-006).
+     *
+     * <p>Also the key the daily cap counts by: today's entries under this reason <i>are</i> the
+     * running total (C-04), which is why the value lives here rather than in the minigame package —
+     * {@code WalletService.grantedTodayFor} has to be handed the same literal.
+     */
+    public static final String MINIGAME_REWARD = "MINIGAME_REWARD";
+
+    /** Booth lease fee, charged to the lessee (spec 004 FR-006). */
+    public static final String LEASE_PAYMENT = "LEASE_PAYMENT";
+
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";
+
+    /** {@code reference_type} recorded alongside {@link #LEASE_PAYMENT}; the id is a lease. */
+    public static final String LEASE_REFERENCE_TYPE = "BOOTH_LEASE";
+
+    /** {@code reference_type} recorded alongside {@link #SURVEY_REWARD}; the id is a survey. */
+    public static final String SURVEY_REFERENCE_TYPE = "SURVEY";
 
     static final int MAX_LENGTH = 40;
 

@@ -1,0 +1,145 @@
+name: festa-jenkins-agents
+
+x-agent: &agent
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      JENKINS_INBOUND_AGENT_IMAGE: ${JENKINS_INBOUND_AGENT_IMAGE:?load infra/versions.env}
+      DOCKER_CLI_IMAGE: ${DOCKER_CLI_IMAGE:?load infra/versions.env}
+      NODE_RUNTIME_IMAGE: ${NODE_RUNTIME_IMAGE:?load infra/versions.env}
+      PYTHON_JSONSCHEMA_VERSION: ${PYTHON_JSONSCHEMA_VERSION:?load infra/versions.env}
+  image: festa/jenkins-agent:${JENKINS_AGENT_TAG:-local}
+  restart: unless-stopped
+  user: jenkins
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  image-transfer-init:
+    <<: *agent
+    restart: 'no'
+    user: root
+    entrypoint: [/bin/sh, -ec]
+    command: [install -d -o jenkins -g jenkins -m 0770 /var/lib/festa-image-transfer]
+    volumes:
+      - image_transfer:/var/lib/festa-image-transfer
+
+  linux-docker-agent:
+    <<: *agent
+    profiles: [linux-docker]
+    container_name: festa-jenkins-agent-linux-docker
+    network_mode: host
+    command:
+      - -url
+      - http://127.0.0.1:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_LINUX_DOCKER:?set in infra/.env}
+      - -name
+      - linux-docker
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/linux-docker
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_HOST_OVERRIDE: 127.0.0.1
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
+    volumes:
+      - linux_docker_workspace:/home/jenkins/agent/linux-docker
+      - image_transfer:/var/lib/festa-image-transfer
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+
+  deploy-agent:
+    <<: *agent
+    profiles: [deploy]
+    container_name: festa-jenkins-agent-deploy
+    # Docker daemon control is host-root equivalent; only the deploy label gets this socket.
+    user: root
+    networks:
+      - jenkins-control
+    command:
+      - -url
+      - http://jenkins-controller:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_DEPLOY:?set in infra/.env}
+      - -name
+      - deploy
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/deploy
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      ENVIRONMENT_STATE_DIR: /var/lib/festa-environments
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL:-}
+      PUBLIC_AI_API_BASE_URL: ${PUBLIC_AI_API_BASE_URL:-}
+      PUBLIC_AUTH_BASE_URL: ${PUBLIC_AUTH_BASE_URL:-https://api.${ROOT_DOMAIN:?set in infra/.env}}
+      PUBLIC_UNITY_BUILD_BASE: ${PUBLIC_UNITY_BUILD_BASE:-/unity/}
+      DEMO_VERIFY_WEB_COMMAND: ${DEMO_VERIFY_WEB_COMMAND:-}
+      DEMO_VERIFY_LOGIN_COMMAND: ${DEMO_VERIFY_LOGIN_COMMAND:-}
+      DEMO_VERIFY_WORLD_COMMAND: ${DEMO_VERIFY_WORLD_COMMAND:-}
+      DEMO_VERIFY_AI_COMMAND: ${DEMO_VERIFY_AI_COMMAND:-}
+      DEMO_PROMOTION_STATE_DIR: ${DEMO_PROMOTION_STATE_DIR:-/var/lib/festa-environments/demo}
+      WEBGL_RELEASE_ROOT: /srv/festa/webgl
+      WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
+      WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
+      R2_BACKUP_ENDPOINT: ${R2_BACKUP_ENDPOINT:-}
+      R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
+      GAME_ENV_FILE: ${GAME_ENV_FILE:-/srv/festa/config/game.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
+    depends_on:
+      image-transfer-init:
+        condition: service_completed_successfully
+    volumes:
+      - deploy_workspace:/home/jenkins/agent/deploy
+      - image_transfer:/var/lib/festa-image-transfer
+      - deploy_state:/var/lib/festa-environments
+      - ${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}:/srv/festa/webgl
+      # Dedicated Server 배포는 compose env 파일과 connection token secret 을 agent 안에서 읽는다.
+      - ${GAME_ENV_FILE:-/srv/festa/config/game.env}:${GAME_ENV_FILE:-/srv/festa/config/game.env}:ro
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  unity-agent:
+    <<: *agent
+    profiles: [unity]
+    container_name: festa-jenkins-agent-unity
+    networks:
+      - jenkins-control
+    command:
+      - -url
+      - http://jenkins-controller:8080
+      - -secret
+      - ${JENKINS_AGENT_SECRET_UNITY:?set in infra/.env}
+      - -name
+      - unity
+      - -webSocket
+      - -workDir
+      - /home/jenkins/agent/unity
+    environment:
+      DOCKER_HOST: unix:///var/run/docker.sock
+      UNITY_EDITOR_ROOT: /opt/unity
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?set in infra/.env}
+      CONNECTION_TOKEN_SECRET_FILE: ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}
+    volumes:
+      - unity_workspace:/home/jenkins/agent/unity
+      - unity_home:/home/jenkins
+      - ${UNITY_EDITOR_ROOT:-/opt/unity}:/opt/unity:ro
+      - ${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:${CONNECTION_TOKEN_SECRET_FILE:-/opt/festa/secrets/dev-game-connection-token-secret}:ro
+      - ${DOCKER_SOCKET_PATH:-/run/user/1000/docker.sock}:/var/run/docker.sock
+
+volumes:
+  linux_docker_workspace:
+  deploy_workspace:
+  deploy_state:
+  image_transfer:
+  unity_workspace:
+  unity_home:
+
+networks:
+  jenkins-control:
+    name: festa-jenkins-control
+    external: true

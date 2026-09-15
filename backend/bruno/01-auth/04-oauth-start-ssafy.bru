@@ -1,0 +1,36 @@
+meta {
+  name: 싸피 로그인
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/oauth/ssafy
+  body: none
+  auth: none
+}
+
+docs {
+  ## SSAFY OAuth 시작
+
+  SSAFY 인증 화면으로 redirect하는 브라우저 시작 endpoint다.
+
+  - 인증: 필요 없음
+  - Request body: 없음
+  - 응답: `302 Found`로 `https://project.ssafy.com/oauth/sso-check` 이동
+  - callback 뒤: 백엔드는 `oauth_handoff` HttpOnly cookie를 만들고 `/auth/callback`으로 이동한다.
+
+프론트에서는 fetch/axios가 아니라 반드시 브라우저 최상위 이동으로 시작한다.
+
+```javascript
+window.location.href = `${API_BASE_URL}/api/v1/auth/oauth/ssafy`;
+```
+
+Bruno는 SSAFY의 외부 브라우저 인증을 완료할 수 없으므로 이 요청은 URL 확인용이다. 이후 Bruno 완료 API를 검증해야 한다면, 개발자 도구에서 5분짜리 1회성 `oauth_handoff` 값을 `oauthHandoff` 환경변수에 일시적으로 넣는다.
+
+### 최초 1회 동의가 막힐 수 있다 (T-104)
+
+처음 연동하는 계정은 SSAFY 동의 화면에서 `400 OAuth 2.0 Parameter: client_id`로 막힌다. SSAFY 화면이 동의 제출을 `application/json`으로 보내는데 서버는 form 파라미터로 읽기 때문이다. 우리 쪽 요청과 무관하다.
+
+같은 요청을 `application/x-www-form-urlencoded`로 한 번 보내면 동의가 저장되고, 그 뒤로는 이 endpoint가 정상 동작한다. 절차는 `docs/25_트러블슈팅.md` T-104에 있다.
+}

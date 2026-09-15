@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "releaseId": "back-0123456789abcdef0123456789abcdef01234567-42",
+  "scm": {
+    "provider": "github",
+    "repository": "ssafy/festa",
+    "branch": "back",
+    "commit": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "jenkins": {
+    "job": "festa/back",
+    "buildNumber": 42,
+    "buildUrl": "https://ci.example.invalid/job/festa/job/back/42/"
+  },
+  "components": [
+    {
+      "name": "back",
+      "storageMode": "local-docker",
+      "imageRef": "festa-back:0123456789abcdef0123456789abcdef01234567",
+      "contentId": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sourceCommit": "0123456789abcdef0123456789abcdef01234567"
+    }
+  ],
+  "rollbackSafety": {
+    "classification": "SAFE",
+    "dataChange": "none",
+    "dbSchemaChanged": false,
+    "secretOrConfigChanged": false,
+    "evidenceRef": "evidence/rollback-safety.json"
+  },
+  "createdAt": "2026-08-19T00:00:00Z"
+}

@@ -139,7 +139,7 @@ job 테이블을 Spring Flyway에 두면 AI 파트가 재시도 필드 하나 �
 | 대상 | 방식 | 이유 |
 |---|---|---|
 | `ai_document_chunks` INSERT/DELETE | **DB 직접** | 조각 수십~수백 건. HTTP 중계는 비현실적. docs/07 §5가 이미 FastAPI 소유로 확정 |
-| `ai_documents`, `ai_agents` 조회 | **DB 직접 (읽기 전용 롤)** | 처리에 필요한 `s3_key`·`agent_id` 등. 읽기는 소유권을 흔들지 않음 |
+| `ai_documents`, `ai_agents` 조회 | **DB 직접 (읽기 전용 롤)** | 처리에 필요한 `s3_key`(R2 전환 이전 기록 — 현재 필드명은 `objectKey`/`object_key`, [Issue #51](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/51))·`agent_id` 등. 읽기는 소유권을 흔들지 않음 |
 | `ai_documents.processing_status` 갱신 | **Spring 내부 API 콜백** | Spring 소유 테이블. 두 서비스가 같은 행을 쓰면 소유권이 무너지고 Flyway 변경 시 FastAPI가 깨진다 |
 | `ai` 스키마 job 테이블 | **DB 직접** | FastAPI 소유 |
 

@@ -1,46 +1,54 @@
 # Implementation Plan: AI 직원 / 문서 파이프라인
 
-**Branch**: `ai` | **Date**: 2026-08-20 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `specs/007-ai-agent-document/spec.md`
-**Decision record**: [research.md](./research.md), [GitHub Issue #11](https://github.com/kanghyunsoon/ssafesta/issues/11)
+**Branch**: `docs/S15P21A604-647-spec007-revision` | **Date**: 2026-09-11 (개정) · 2026-09-06 (최초) | **Spec**: [spec.md](./spec.md)
+**Input**: GitLab Work Item #119의 게시 합의와 Spring Flyway V21, 2026-09-11 결정 4건(`S15P21A604-647`)
+**Decision record**: [research.md](./research.md), [GitLab #119](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/119), `docs/26_팀_결정_필요사항.md` 결정 기록 로그 2026-09-11
 
 ## Summary
 
-부스 소유자가 등록한 PDF를 비동기로 파싱·청킹·임베딩하고 `boothId + agentId`로 격리된 pgvector 청크로 저장한다. 처리 요청은 실행 전에 동일 RDS의 FastAPI 전용 `ai.document_jobs`에 영속화한다. Worker는 DB lease와 heartbeat로 작업을 소유하고, 재시작 후 sweeper가 만료된 Job을 회수한다. 사용자 문서 상태는 Spring이, 내부 Job 상태는 FastAPI가 소유하며 FastAPI가 Spring 내부 API로 결과를 비동기 전달한다.
+부스 편집자가 등록한 문서를 비동기로 파싱·청킹·임베딩해 `boothId + agentId`로 격리된 검색 자료로 만든다. AI 문서의 Document·Job·Chunk·staging과 pgvector는 Spring Business DB가 단일 소유하고, FastAPI는 DB credential 없이 문서 처리와 질의 임베딩 계산만 수행한다. Spring은 Job을 먼저 만든 뒤 FastAPI에 처리 snapshot을 push하고, FastAPI는 결과를 batch·heartbeat·finalize·failed API로 돌려준다. finalize는 Chunk 교체와 Job·Document 상태를 하나의 Spring 로컬 트랜잭션으로 확정한다.
+
+spec 007의 완료 경계는 문서가 `READY`가 되고 Spring 내부 검색 API에서 해당 scope의 Chunk를 조회할 수 있는 상태까지다. 실제 질문·답변과 SSE는 spec 008이 담당한다.
 
 ## Technical Context
 
-**Language/Version**: Python 3.12 이상
-**Primary Dependencies**: FastAPI, Uvicorn, SQLAlchemy 2.x async, psycopg 3, Alembic, Pydantic Settings, boto3, PDF parser, 관리형 Embedding Provider adapter
-**Storage**: 동일 PostgreSQL RDS + pgvector. Spring `public` 스키마와 FastAPI `ai` 스키마 분리, 원본은 S3
-**Testing**: pytest, pytest-asyncio, HTTPX ASGI client, PostgreSQL+pgvector 통합 Fixture/Testcontainers, S3·Embedding adapter fake
-**Target Platform**: Linux Docker container, 개발환경 EC2/ECS 후보
-**Project Type**: FastAPI web service + process-internal background Worker
-**Performance Goals**: Agent당 문서 10개·총 100MB에서 검색 P95 1초 이하, 정답 근거 Top-K 포함률 95% 이상
-**Constraints**: PDF 20MB, vector 1536차원, 다른 Booth/Agent 청크 유출 0건, AI 장애가 비AI 기능에 영향 없음, 영구 `PROCESSING` 0건
-**Scale/Scope**: P0 인프로세스 Worker, 문서별 청크 수십~수백 건, 부하 실측 후 SQS 전환 가능
+**Language/Version**: Java 21/Spring Boot 3.5, Python 3.12/FastAPI
+**Primary Dependencies**: Spring Data JPA/JDBC, Flyway, PostgreSQL pgvector, FastAPI, HTTPX, Pydantic, boto3, PDF parser, Embedding Provider adapter
+**Storage**: AI 문서 영속 상태는 `festa_{env}_business`의 PostgreSQL 17 + pgvector. FastAPI는 문서 DB를 사용하지 않는다. 원본은 Cloudflare R2가 기본이며 운영자 승인 시 MinIO를 사용한다.
+**Testing**: Spring 통합 테스트/Testcontainers, pytest 계약·Worker 테스트, 실제 PostgreSQL+pgvector 격리 fixture, storage·Embedding fake
+**Target Platform**: Linux Docker container
+**Project Type**: Spring 영속/API 서비스 + FastAPI 처리 Worker
+**Performance Goals**: Agent당 문서 10개·100MB(= `N_total` 145,646 chunk)에서 검색 P95 1초 이하. Top-K 포함률은 층별로 다르다 — Spring 정확 스캔 100%(SC-007a), AI 의미 회수율 95% 이상(SC-007b)
+**Constraints**: PDF·MD·TXT 20MB, vector 1536차원, scope 유출 0건, FastAPI 문서 DB credential 0개, 영구 `PROCESSING` 0건
+**Scale/Scope**: P0 push Worker, batch 최대 200 Chunk/8MB, topK 최대 20
 
 ## Constitution Check
 
-*GATE: Phase 0 전 통과, Phase 1 설계 후 재확인.*
-
 | 헌법 조항 | 검증 | 결과 |
 |---|---|---|
-| 1. Source of Truth | Document 메타데이터·사용자 상태는 Spring만 갱신하고 FastAPI는 Job·Chunk를 소유 | PASS |
-| 3. AI 장애 격리 | 사용자 상태 조회는 Spring DB에서 제공하고 Spring은 AI 결과를 동기 대기하지 않음 | PASS |
-| 10. 개별 CI/CD | AI migration·Worker는 `ai`, Spring callback·Flyway는 `back`에서 독립 배포 | PASS |
-| 15. Secret 분리 | Service Token·DB·Provider 자격증명은 Secrets Manager/CI 변수로 주입 | PASS |
-| 17. Vector 격리 | 모든 Chunk에 `booth_id`, `agent_id`; 검색 쿼리에서 필수 조건 강제 | PASS |
-| 18. Embedding 차원 | `vector(1536)`과 `embedding_model_id` 유지 | PASS |
-| 24. 계약 변경 | FastAPI↔Spring OpenAPI 계약을 문서화하고 양 파트 합의 후 구현 | PASS |
-| 27. 기준선 동결 | 기존 POC 범위를 재구현하지 않고 신규 AI 문서 파이프라인만 추가 | PASS |
+| 1. Source of Truth | AI 문서 영속 상태는 Spring DB 하나만 갱신 | PASS |
+| 3. AI 장애 격리 | 문서 상태 조회와 DB 정합성은 FastAPI 가용성에 의존하지 않음 | PASS |
+| 10. 개별 CI/CD | Spring과 FastAPI는 계약 fake로 독립 검증 후 develop에서 통합 | PASS |
+| 15. Secret 분리 | 방향별 Service Token·Provider credential은 Secret 주입, FastAPI DB credential 제거 | PASS |
+| 17. Vector 격리 | Spring 검색 API가 `boothId + agentId + searchable + READY`를 강제하고 AI가 재검증 | PASS |
+| 18. Embedding 차원 | `vector(1536)`과 `embedding_model_id` 검증 | PASS |
+| 24. 계약 변경 | #119 게시 합의와 OpenAPI를 AI·BE가 공동 검토 | PASS |
+| 27. 기준선 동결 | 기존 Unity 기준선과 무관한 서버 문서 파이프라인 변경 | PASS |
+| 30. 미정 항목 | Agent 설정 조회 형태는 S15P21A604-399에서 확정. 2026-09-11 결정 4건(교체 원본 복구 제외·SC-007 분해·FAILED 7일·FR-040a)은 `docs/26` 결정 기록 로그에 등록 후 반영 | PASS |
 
 ### 설계 후 재검증
 
-- `public.ai_documents` 직접 UPDATE를 FastAPI 권한에서 제외해 Spring SoT를 유지한다.
-- terminal Job callback을 영속 재시도해 FastAPI 재시작이 Spring 문서 상태를 고착시키지 않는다.
-- 같은 RDS를 사용하지만 schema·migration role·runtime role을 분리해 배포 독립성과 최소 권한을 유지한다.
-- Constitution 위반 없음. Complexity Tracking 항목 없음.
+- FastAPI가 Document·Job·Chunk를 직접 읽거나 쓰는 경로를 제거한다.
+- DB 커밋과 외부 callback 사이 정합성 문제가 Spring finalize 로컬 트랜잭션으로 사라진다.
+- cancel 전달 실패와 늦은 Worker 결과는 `attemptNo` fencing으로 격리한다.
+- Chunk 검색의 scope 조건은 클라이언트가 추가·삭제할 수 없는 Spring 서버 조건이다.
+
+### 2026-09-11 개정 재검증 (`S15P21A604-647`)
+
+- 상태 값을 늘리지 않고 `replaced_at` 하나로 복구 가능 여부를 가른다 → V24 CHECK·스윕 predicate·OpenAPI·FE 상태표가 그대로다.
+- `FAILED` 원본 삭제가 `EXPIRED`와 같은 스윕 경로를 재사용한다 → 새 워커·새 큐가 생기지 않는다.
+- finalize의 마지막 0행이 예외로 바뀌어 FR-040의 "하나의 트랜잭션"이 실제로 성립한다 (지금 구현은 이를 어긴다).
+- SC-007이 층별로 갈려 각 기준이 측정 가능한 주체를 갖는다 — BE는 `S15P21A604-521`, AI는 T067.
 
 ## Project Structure
 
@@ -53,275 +61,150 @@ specs/007-ai-agent-document/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
-├── checklists/
-│   └── requirements.md
+├── tasks.md
+├── checklists/requirements.md
 └── contracts/
     ├── document-processing-api.yaml
-    └── spring-document-status-api.yaml
+    ├── document-result-contract.md
+    └── spring-storage-reconciliation-api.yaml
+
+specs/008-ai-conversation-rag/contracts/
+└── spring-chunk-search-api.yaml
 ```
+
+Agent 설정 조회 계약은 S15P21A604-399에서 경로·응답·호출 빈도를 합의한 뒤 추가한다.
 
 ### Source Code
 
-AI 서비스 scaffold는 Git convention의 파트 디렉터리명에 따라 `festa-ai/`에 생성한다.
-
-```text
-festa-ai/
-├── app/
-│   ├── api/v1/documents.py
-│   ├── core/config.py
-│   ├── db/
-│   │   ├── session.py
-│   │   └── models/document_job.py
-│   ├── repositories/
-│   │   ├── document_job_repository.py
-│   │   ├── document_repository.py
-│   │   └── chunk_repository.py
-│   ├── services/
-│   │   ├── document_processing_service.py
-│   │   ├── job_recovery_service.py
-│   │   └── spring_status_callback.py
-│   ├── workers/document_worker.py
-│   └── providers/
-│       ├── storage.py
-│       ├── document_parser.py
-│       └── embedding.py
-├── migrations/
-│   └── versions/
-├── tests/
-│   ├── contract/
-│   ├── integration/
-│   └── unit/
-├── Dockerfile
-└── pyproject.toml
-```
-
-Backend 연동 구현은 `back` 브랜치의 기존 `backend/` 구조를 따른다.
-
 ```text
 backend/src/main/
-├── java/.../internal/ai/        # 상태 callback controller/service/DTO
-└── resources/db/migration/      # failure_reason 등 다음 Flyway migration
+├── java/com/example/ssafesta/ai/               # Document·Job·Chunk·staging 도메인
+├── java/com/example/ssafesta/internal/ai/      # 처리 결과·검색·설정 내부 API
+└── resources/db/migration/                     # V21 이후 forward migration
+
+festa-ai/app/
+├── api/v1/documents.py                         # Spring 처리 요청 접수
+├── clients/                                    # Spring 결과·검색·설정 client
+├── services/document_processing_service.py
+├── services/document_processing_orchestrator.py # attempt 실행·heartbeat·finalize/failed 보고
+├── workers/document_task_supervisor.py         # attempt 중복 방지·동시성·graceful shutdown
+└── providers/{storage,document_parser,embedding}.py
 ```
 
-**Structure Decision**: AI는 API·Worker·Provider를 같은 Docker 이미지에 두되 실행 책임을 모듈로 분리한다. P0에서는 FastAPI lifespan이 Worker loop를 시작한다. 이후 SQS 도입 시 API·Worker 배포 단위를 분리해도 repository와 processing service는 유지한다.
+FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코드는 cutover로 이미 제거됐다 (T092, S15P21A604-700).
 
 ## Detailed Design
 
 ### 1. 상태와 소유권
 
-- Spring `DocumentStatus`: `QUEUED / PROCESSING / READY / FAILED / DISABLED`
-- FastAPI `JobStatus`: `QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED`
-- 사용자 문서 목록·상태 조회는 Spring API가 `ai_documents`에서 제공한다.
-- `GET /ai/v1/documents/{documentId}/status`는 운영·내부 진단용으로만 유지한다.
-- 상태 전이와 필드는 [data-model.md](./data-model.md)를 따른다.
+- Spring `DocumentStatus`: `QUEUED / PROCESSING / READY / FAILED / DISABLED / EXPIRED`
+- Spring `JobStatus`: `QUEUED / RUNNING / RETRY_WAIT / SUCCEEDED / DEAD / CANCELLED`
+- Spring은 Document·Job·Chunk·staging의 유일한 영속 writer다.
+- FastAPI는 전달받은 snapshot과 메모리의 in-flight 상태만 사용한다.
+- **`EXPIRED`는 복구 가능 여부까지 말하지 않는다.** 그것은 `replaced_at`(V30 예정)이 가른다 — 값이 없으면 업로드 미완료 만료라 보존 기간 안에 복구되고, 값이 있으면 수정본 교체로 밀려난 원본이라 복구 대상이 아니다(FR-027a). 상태 값을 늘리지 않는 이유는 갈라야 할 것이 "복구 가능한가" 하나뿐이기 때문이다 — `REPLACED`를 새로 만들면 V24 CHECK 개정·스윕 predicate·OpenAPI·FE 상태표·기존 테스트가 전부 따라온다.
 
-### 2. 처리 요청 접수
+### 1-1. 원본 삭제 스윕
 
-1. Spring이 S3 업로드와 Document 메타데이터 저장을 완료한다.
-2. Spring이 Service Token으로 `POST /ai/v1/documents/process`를 호출한다.
-3. FastAPI는 DB에서 `documentId + boothId + agentId + sourceHash`를 다시 검증한다. 요청의 S3 Key만 신뢰하지 않는다.
-4. `ai.document_jobs`에 `QUEUED`를 INSERT한 뒤 202를 반환한다.
-5. 활성 Job 부분 유니크 인덱스 충돌은 오류로 노출하지 않고 기존 Job을 조회해 `existing: true`로 반환한다.
+한 경로가 세 종류의 원본을 같은 방식으로 지운다. 대상 판정은 상태와 경과 시간뿐이고 `replaced_at`은 보지 않는다.
 
-계약: [document-processing-api.yaml](./contracts/document-processing-api.yaml)
+| 대상 | 유예 기준 | 유예 | 근거 |
+|---|---|---|---|
+| `EXPIRED` (업로드 미완료) | `expired_at` | 24시간 | FR-027·FR-028 |
+| `EXPIRED` + `replaced_at` (교체된 원본) | `expired_at` | 24시간 | FR-028 — 복구 경로가 없는 행이 삭제 경로에서도 빠지면 원본만 무기한 남는다 |
+| `FAILED` | `updated_at` | **7일** | FR-028a — 조사·재처리는 유예 안에서 한다 |
 
-### 3. Worker 획득과 heartbeat
+물리 삭제는 트랜잭션 밖이라 사후 조건부 `UPDATE`로 되돌릴 수 없다. 조회와 삭제 사이에 복구·재처리가 끼는 경쟁은 **허용하고 `ERROR` 경보로 드러낸다** — 스윕 인스턴스가 하나이고 경쟁 창이 한 행의 저장소 왕복 한 번이라, 공유 claim/lock이나 영속 삭제 큐를 들이는 비용이 그 창이 막는 손해보다 크다. 경보가 실제로 울리면 그때 근거가 생긴다.
 
-- Worker는 `QUEUED`, 또는 `next_retry_at <= now()`인 `RETRY_WAIT` 행을 `FOR UPDATE SKIP LOCKED`로 한 건 획득한다.
-- 획득 트랜잭션에서 `RUNNING`, `worker_id`, `attempt_no + 1`, `lease_expires_at = now() + 90s`를 기록한다.
-- 처리 중 30초마다 별도 짧은 DB 트랜잭션으로 자신의 `worker_id`와 `RUNNING` 상태를 조건으로 lease를 90초 연장한다.
-- heartbeat UPDATE가 0행이면 Worker는 소유권을 잃은 것으로 판단하고 결과를 커밋하지 않는다.
-- 여러 Uvicorn Worker가 loop를 실행해도 row lock과 lease 조건으로 한 Job만 소유한다.
+### 2. 처리 요청과 Worker 소유권
 
-### 4. 파싱·청킹·임베딩
+1. Spring이 업로드 원본과 소유권·임대·문서 상태를 검증한다.
+2. Spring이 영속 Job을 먼저 만들고 `jobId + attemptNo`와 문서·저장소·처리 버전 snapshot을 FastAPI에 보낸다.
+3. FastAPI는 요청을 검증해 202로 접수하고 Worker가 원본을 처리한다.
+4. FastAPI는 30초마다 `jobId + attemptNo + workerId` heartbeat를 보내고 Spring은 일치할 때만 lease를 90초 연장한다.
+5. lease가 만료되면 Spring이 Job을 회수해 attempt를 증가시키고 1·5·15분 backoff로 최대 세 번 재요청한다.
 
-- S3 object metadata/크기와 Document snapshot을 검증한 뒤 PDF를 내려받는다.
-- 스캔 PDF처럼 추출 텍스트가 없으면 `UNSUPPORTED_SCAN_PDF`로 실패 처리한다.
-- chunk size와 overlap은 환경 설정으로 주입하며 코드에 고정하지 않는다.
-- Embedding adapter는 batch 입력을 사용하고 모든 결과가 1536차원인지 저장 전에 검증한다.
-- 각 Chunk는 `document_id`, `booth_id`, `agent_id`, `chunk_no`, `embedding_model_id`를 필수로 가진다.
-- 중간 청크는 검색 테이블에 부분 저장하지 않고 메모리 또는 작업 임시 영역에 유지한 뒤 마지막 트랜잭션에서 전량 반영한다.
+처리 접수·cancel 계약: [document-processing-api.yaml](./contracts/document-processing-api.yaml)
 
-### 5. 성공 커밋의 원자성
+### 3. 파싱·청킹·임베딩
 
-하나의 PostgreSQL 트랜잭션에서 다음 순서로 처리한다.
+- FastAPI는 snapshot의 Provider·bucket·object key로 원본을 읽고 실제 SHA-256을 다시 계산한다.
+- 해시 불일치는 `SOURCE_HASH_MISMATCH`로 failed를 전송하며 Chunk를 만들지 않는다.
+- PDF는 페이지 정보를, MD·TXT는 UTF-8 텍스트를 보존한다.
+- chunk size·overlap은 배포 설정이며 embedding은 1536차원을 검증한다.
 
-1. Job 행을 `FOR UPDATE`하고 현재 Worker 소유권·`RUNNING`·유효 lease를 확인한다.
-2. Spring 소유 Document를 읽어 `DISABLED` 여부와 `source_hash` 최신성을 확인한다.
-3. 정책상 취소되었으면 Job을 `CANCELLED`로 종료하고 새 Chunk를 버린다.
-4. 기존 `document_id` Chunk 전량 DELETE.
-5. 새 Chunk 전량 INSERT.
-6. Job을 `SUCCEEDED`, `chunk_count`, `finished_at`으로 갱신.
-7. 커밋 후 `READY` callback을 시도한다.
+#### 최대 부하 fixture 규모 `N_total` = 145,646 chunk
 
-트랜잭션이 실패하면 기존 Chunk 집합이 그대로 남고 새 결과는 노출되지 않는다.
+SC-007a와 `S15P21A604-521`의 Testcontainers fixture가 쓸 상수다. **보수적 상한**이며, 실제 문서는 이보다 훨씬 적은 청크를 만든다.
 
-### 6. 재시작 복구와 재시도
+| 단계 | 근거 | 값 |
+|---|---|---|
+| ① 에이전트당 원본 총량 | FR-018 / `config.py` `agent_document_max_total_bytes` | 104,857,600 B (100 MiB) |
+| ② 바이트 → 토큰 상한 | cl100k_base BPE 어휘에 256개 단일 바이트가 모두 있어 토큰 하나는 최소 1바이트다 → **토큰 수 ≤ 바이트 수** | ≤ 104,857,600 토큰 |
+| ③ 가장 조밀한 contentType | `text/markdown`·`text/plain`은 파일 바이트 = UTF-8 텍스트 바이트(비율 1.0). `application/pdf`는 컨테이너·폰트·xref 오버헤드가 있어 같은 바이트에서 추출 텍스트가 더 적다 → **TXT·MD가 최악** | 비율 1.0 채택 |
+| ④ chunk stride | `config.py` `chunk_size` 900 − `chunk_overlap` 180 (`text_chunker.chunk_pages`의 `step`) | 720 토큰 |
+| ⑤ 페이지 경계 보정 | MD·TXT는 문서 전체가 1 페이지(`document_parser._parse_plain_text`)이고, 페이지마다 마지막 부분 창이 하나 더 생긴다. 문서 수 상한은 10(FR-018) | +10 |
 
-- sweeper는 기동 시 즉시, 이후 60초마다 실행한다.
-- `RUNNING AND lease_expires_at < now()`인 Job을 잠금 획득해 회수한다.
-- 남은 재시도가 있으면 `RETRY_WAIT`로 전환하고 실패 순서에 따라 1분, 5분, 15분 backoff를 설정한다.
-- 세 번의 재시도를 모두 사용하면 `DEAD`로 전환하고 `PROCESSING_INTERRUPTED` 또는 마지막 정제 오류를 Spring에 전달한다.
-- 최초 실행 1회 + 재시도 3회로 최대 실행 횟수는 4회다.
-- 재시도 가능한 오류: Worker 상실, 네트워크/S3 일시 오류, Embedding timeout/5xx.
-- 즉시 `DEAD` 가능한 오류: 손상 PDF, 지원하지 않는 스캔 PDF, 권한·scope 불일치, 원본 없음처럼 재시도로 해결되지 않는 입력 오류. 이 경우 사용하지 않은 재시도 횟수를 소모하지 않는다.
+**`N_total` = ⌈104,857,600 / 720⌉ + 10 = 145,636 + 10 = 145,646**
 
-### 7. Spring 상태 callback
+- ②는 증명 가능한 상한이다. 한국어는 cl100k_base에서 대략 2~3 B/token, 영어는 약 4 B/token이라 실측은 이 값의 1/2~1/4 수준이 된다.
+- 한 페이지의 창 개수는 `⌈(t − 900) / 720⌉ + 1`(t ≤ 900이면 1)이다. 문서 수 상한 10을 그대로 더하면 어떤 분할에서도 이 값을 넘지 않는다 — 가장 나쁜 분할의 실측 합은 145,640이다.
+- 상한 밖으로 두는 것: **텍스트가 거의 없는 페이지를 극단적으로 많이 담은 PDF.** 페이지마다 1 청크가 나므로 산술적으로는 이 값을 넘을 수 있지만, 그 구성은 정상 문서가 아니고 부하 fixture의 기준이 되지 않는다. 실제로 문제가 되면 그때 페이지 수 상한을 별도로 정한다.
 
-- `RUNNING` 획득 후 Spring에 `PROCESSING`, terminal 전환 후 `READY/FAILED/DISABLED`를 비동기 전달한다.
-- terminal callback payload는 `jobId`, `sourceHash`, `chunkCount`, `failureCode`, 정제된 `failureReason`, 발생 시각을 포함한다.
-- callback 성공 전까지 `callback_delivered_at`을 비워 두고 지수 backoff로 다시 시도한다.
-- 기동/주기 reconciliation은 미전달 terminal Job을 찾아 재전송한다.
-- Spring은 `jobId + status` 멱등성을 보장하고 `sourceHash`가 현재 Document와 다르면 409로 거부한다. 409 stale 결과는 전달 완료로 기록하되 현재 문서 상태를 덮지 않는다.
+### 4. Batch와 finalize
 
-계약: [spring-document-status-api.yaml](./contracts/spring-document-status-api.yaml)
+- batch 상한은 200 Chunk 또는 8MB 중 먼저 도달하는 값이다.
+- Spring staging PK는 `(job_id, batch_seq, chunk_no)`이며 같은 payload 재전송은 멱등 성공한다.
+- out-of-order batch 자체는 허용한다. 같은 키의 내용 충돌과 finalize 시 누락된 `chunkNo`는 거부한다.
+- finalize는 staging 개수, 0부터 이어지는 chunk 번호, source hash, embedding model, 1536차원을 검증한다.
+- 검증 후 기존 Chunk 삭제 → 신규 Chunk 반영 → `searchable=true` → Job `SUCCEEDED` → Document `READY`를 한 트랜잭션으로 처리한다.
+- 중간 실패는 전부 rollback되어 기존 검색 가능 Chunk를 보존한다.
+- **마지막 `READY` 전환이 0행이어도 예외로 롤백한다** (FR-040a). 문서가 그 사이 `DISABLED`·`EXPIRED`가 된 경우이며, 여기서 로그만 남기고 커밋하면 검색되지 않는 문서에 새 Chunk가 붙고 Job은 `SUCCEEDED`가 되어 FR-040의 원자성이 깨진다.
+- 롤백은 `SUCCEEDED` 표시도 되돌리므로 재전송이 finalize 멱등 분기(Job `SUCCEEDED`일 때만 진입)에 닿지 못한다. 그래서 이 경로의 응답은 **`410 JOB_GONE`**이고 반복 요청도 무변화 410이다 — 워커가 attempt를 올려 다시 시도해도 결과가 같다는 뜻이라 `409`(stale attempt)와 구분된다.
+- `DISABLED`·`EXPIRED` 문서를 `PROCESSING`으로 되돌리는 복구는 이 spec 범위 밖이다.
 
-### 8. 부스 임대 만료
+결과 수신 의미 계약: [document-result-contract.md](./contracts/document-result-contract.md). Endpoint와 DTO 명칭은 Jira S15P21A604-400에서 합의한 뒤 OpenAPI로 고정한다.
 
-- Spring이 부스 임대 만료에 따라 Document를 `DISABLED`로 전환한다.
-- FastAPI Worker는 처리 시작과 성공 커밋 직전에 Document 상태를 확인한다.
-- `DISABLED`를 확인하면 Job을 `CANCELLED`로 종료하고 새 Chunk를 공개하지 않는다.
-- 재임대 후 Spring이 문서를 `QUEUED`로 활성화하고 새 처리 요청을 보내면 신규 Job으로 처음부터 처리한다.
-- Worker heartbeat lease 만료는 이 흐름과 무관하며 `RETRY_WAIT` 복구 대상이다.
+### 5. 오류·취소·늦은 결과
 
-### 9. 인증과 권한
+- 모든 결과 요청은 `jobId + attemptNo`를 사용한다.
+- stale attempt는 409, 삭제·취소된 Job 또는 비활성 문서는 410이다.
+- failed는 안정적인 failure code, 정제된 message, retryable 여부를 전달한다.
+- 문서 삭제·비활성화·임대 만료는 Spring DB에서 Job `CANCELLED`와 Chunk·staging 정리를 먼저 확정한다.
+- FastAPI cancel은 멱등이며 전달 실패가 Spring DB 정합성을 바꾸지 않는다.
 
-- FastAPI↔Spring 내부 호출은 `Authorization: Bearer <service-token>`을 사용한다.
-- 서비스 간 네트워크는 Security Group으로 제한하고 public ALB route에서 `/internal/*`를 노출하지 않는다.
-- Service Token과 DB/Provider 자격증명은 Secrets Manager 또는 CI secret으로 주입한다.
-- 로그는 Authorization header, S3 Key 전체, 원문 문서 내용, Provider raw 오류를 마스킹한다.
-- DB migration role과 runtime role을 분리한다. runtime role은 `public.ai_documents` UPDATE 권한을 갖지 않는다.
-- mTLS는 P0 이후 보안 강화 항목으로 남긴다.
+### 6. RAG 검색
 
-### 10. 설정
+- FastAPI는 Conversation이 보관한 `boothId + agentId`, 1536차원 query embedding, topK를 Spring에 보낸다.
+- Spring은 `booth_id + agent_id + searchable=true + ai_documents.status=READY`를 강제한다.
+- 요청은 임의 필터를 받지 않고 topK를 20 이하로 제한한다.
+- 응답은 출처 필드와 cosine `distance`를 제공하며 최소 임계값은 적용하지 않는다.
+- FastAPI는 응답 scope를 전건 재검증한 뒤 Context에 넣는다.
+- **검색은 정확 스캔이다.** `SET LOCAL enable_indexscan = off`로 HNSW ordered index scan을 그 문장에서만 막는다 — scope 필터와 join이 붙은 상태에서 HNSW는 후필터라 매칭 청크가 있어도 `topK`보다 적게 돌려줄 수 있고, 오류 없이 짧아진 결과는 답변이 인용을 조용히 잃는 형태로만 드러난다. SC-007a의 100%가 성립하는 근거가 이것이고, 그래서 그 층에서 95%라는 비율은 측정 대상이 아니다.
 
-저장소에는 값이 비어 있거나 안전한 기본값만 있는 `.env.example`을 둔다.
+계약: [spec 008 spring-chunk-search-api.yaml](../008-ai-conversation-rag/contracts/spring-chunk-search-api.yaml)
 
-| 설정 키 | 기본/규칙 |
-|---|---|
-| `JOB_HEARTBEAT_SECONDS` | `30` |
-| `JOB_LEASE_SECONDS` | `90`, heartbeat보다 커야 함 |
-| `JOB_SWEEPER_SECONDS` | `60` |
-| `JOB_MAX_RETRIES` | `3` |
-| `JOB_RETRY_BACKOFF_SECONDS` | `60,300,900` |
-| `DOCUMENT_MAX_BYTES` | `20971520` |
-| `AGENT_DOCUMENT_MAX_COUNT` | `10` |
-| `AGENT_DOCUMENT_MAX_TOTAL_BYTES` | `104857600` |
-| `EMBEDDING_DIMENSION` | `1536`, 변경 금지 |
-| `SPRING_INTERNAL_BASE_URL` | 환경별 내부 주소 |
-| `SPRING_SERVICE_TOKEN` | secret 주입, 기본값 없음 |
-| `DATABASE_URL` | secret 주입, 기본값 없음 |
-| `S3_BUCKET` | 환경별 값 |
+### 7. Agent 추론 설정
 
-부팅 시 `lease > heartbeat`, backoff 개수와 `max_retries` 일치, embedding dimension 1536을 검증하고 잘못된 설정이면 health ready를 실패시킨다.
+설정의 Source of Truth는 Spring `ai_agents`다. FastAPI가 Business DB를 직접 읽지 않는다는 경계는 확정됐지만, 별도 endpoint 여부·경로·응답·호출 빈도·캐시 무효화는 S15P21A604-399에서 합의한다. 확정 전에는 경로나 캐시 정책을 문서 또는 코드로 고정하지 않는다.
 
-### 11. 관측성
+### 8. 인증·관측
 
-- 구조화 로그 공통 필드: `job_id`, `document_id`, `booth_id`, `agent_id`, `worker_id`, `attempt_no`, `status`, `error_code`.
-- 지표: Job 상태별 개수, pickup 지연, 처리 시간, heartbeat 실패, lease 회수, retry 횟수, DEAD 비율, callback 미전달 개수·지연, 문서별 chunk 수, Embedding latency/cost.
-- 경고: 미전달 terminal callback, 오래된 `PROCESSING`, 반복 DEAD, queue age 증가.
-- 원문 문서와 Stack Trace는 사용자 응답에 포함하지 않는다.
+- Spring→FastAPI 처리·cancel은 `INTERNAL_SPRING_TO_AI_TOKENS`를 사용한다.
+- FastAPI→Spring 결과·검색은 `INTERNAL_AI_TO_SPRING_TOKENS`를 사용한다.
+- 수신자는 최대 두 토큰을 상수 시간으로 검증하고 반대 방향 토큰을 401로 거부한다.
+- Spring은 영속 Job 상태를 기준으로 DEAD 비율·callback 미전달을 집계·경고한다. 양쪽 로그에는 `jobId`, `documentId`, `correlationId`, `attemptNo`, `workerId`를 남기되 원문·Secret·object key를 남기지 않으며, FastAPI는 이 상태를 중복 저장·집계하지 않는다.
 
-## Migration and Deployment Order
+### 9. Cutover
 
-1. **BE/Infra**: 동일 RDS에 `ai` 스키마와 AI migration/runtime role을 생성하고 최소 권한을 부여한다.
-2. **BE**: `ai_documents`의 누락 필드(`failure_reason`, `content_sha256`, `chunk_count`, `processed_at` 등)를 현재 schema와 비교해 다음 사용 가능한 Flyway migration으로 추가한다.
-3. **BE**: Spring 내부 상태 callback과 사용자용 문서 상태 조회를 배포한다. callback은 기존 클라이언트에 영향 없는 신규 내부 API다.
-4. **AI**: Alembic으로 `ai.document_jobs`와 인덱스를 배포한다.
-5. **AI**: Job 접수 API를 배포하되 Worker 시작 feature flag는 끈다.
-6. **통합 검증**: DB 권한, Service Token, callback 멱등성, stale sourceHash 거부를 확인한다.
-7. **AI**: Worker와 sweeper를 활성화한다.
-8. **운영 확인**: 강제 종료 복구와 callback 재전송 시험 통과 후 기존 임시 처리 경로를 제거한다.
+1. V21 배포와 스키마 검증
+2. Spring 처리 결과·검색 API 배포
+3. FastAPI consumer를 Spring API로 전환
+4. 처리 중 Job 0건과 결과 API 통합 검증
+5. FastAPI DB credential·ORM·Alembic·DB pickup/recovery 코드 제거
+6. 배포 설정에서 FastAPI PostgreSQL 연결이 0건임을 검증
 
-Rollback 시 Worker pickup을 먼저 중단한다. 이미 `RUNNING`인 Job의 lease가 만료되도록 두고 이전 버전이 이해하지 못하는 상태가 있으면 배포를 되돌리지 말고 forward-fix한다. 적용된 migration 파일은 수정하지 않는다.
-
-## Test Strategy
-
-### Unit
-
-- 상태 전이 허용/거부와 retry backoff 계산
-- 오류 코드와 사용자 메시지 정제
-- chunk size/overlap 설정 검증
-- heartbeat 소유권 상실 시 커밋 중단
-
-### Repository/Integration — 실제 PostgreSQL + pgvector
-
-- 활성 Job 부분 유니크 인덱스와 기존 Job 반환
-- 두 Worker의 `SKIP LOCKED` 경쟁에서 단일 소유
-- lease 만료 회수와 attempt 증가
-- Chunk DELETE+INSERT+SUCCEEDED 원자성, 중간 오류 rollback
-- 청크 수 감소 재처리 시 오래된 꼬리 청크 0건
-- `ON DELETE CASCADE` 후 고아 Job 0건
-- runtime role의 `ai_documents` UPDATE 거부
-
-### Contract
-
-- 두 OpenAPI schema에 대한 요청·응답 검증
-- Spring callback 중복 요청의 멱등 성공
-- sourceHash 불일치 409와 최신 문서 상태 보존
-- 내부 진단 API가 FE 사용자 경로에서 호출되지 않는지 route/consumer 검사
-
-### Failure Injection
-
-- Parsing, Embedding, Chunk commit 각 단계에서 프로세스 강제 종료
-- heartbeat 3회 누락 후 sweeper 회수
-- Spring callback 전·후 강제 종료와 reconciliation 재전송
-- S3/Embedding 5xx 후 1·5·15분 backoff
-- 재시도 상한 후 `DEAD → FAILED`
-- 처리 중 Spring Document가 `DISABLED`가 될 때 `CANCELLED` 및 READY 미전환
-
-### Security/Isolation
-
-- 요청 boothId/agentId 위조 거부
-- 다른 Booth/Agent Chunk 검색 0건
-- 로그와 사용자 failureReason에 token, Stack Trace, S3 Key, Provider raw 오류가 없는지 검사
-
-검증 절차는 [quickstart.md](./quickstart.md)를 따른다.
-
-## Phase Plan
-
-### Phase 0 — 계약과 환경 준비
-
-- Issue #11 합의와 본 contracts를 BE/Infra가 확인한다.
-- 실제 back schema와 다음 Flyway 번호를 확인한다.
-- `ai` schema, DB roles, Service Token 전달 경로를 준비한다.
-
-### Phase 1 — Job 기반 처리 골격
-
-- FastAPI scaffold, 설정 검증, DB session, Alembic 구성.
-- `document_jobs` migration과 repository 구현.
-- 멱등 `POST /documents/process` 및 내부 status API 구현.
-
-### Phase 2 — Worker와 문서 처리
-
-- DB pickup, heartbeat, sweeper, retry/backoff 구현.
-- S3/PDF/Embedding adapter와 처리 pipeline 구현.
-- Chunk 전체 교체 트랜잭션 구현.
-
-### Phase 3 — Spring 연동과 정합성
-
-- Spring callback client와 영속 재전송/reconciliation 구현.
-- BE 내부 callback, 사용자 상태 조회, Flyway 변경과 통합.
-- 부스 임대 만료·개정본 sourceHash 경쟁 처리.
-
-### Phase 4 — 검증과 운영화
-
-- PostgreSQL+pgvector 통합 테스트와 장애 주입 테스트.
-- 격리 Critical Test, 성능·품질 기준 검증.
-- 지표·로그·경고와 runbook 확정.
-
-## Risks and Mitigations
-
-| 위험 | 대응 |
-|---|---|
-| Spring callback 실패로 문서가 `PROCESSING` 고착 | callback 전달 상태 영속화 + reconciliation |
-| Worker 중복 처리 | 부분 유니크 인덱스 + row lock + worker_id 조건부 heartbeat |
-| 재처리 후 오래된 Chunk 잔존 | DELETE+전량 INSERT+Job 성공을 단일 트랜잭션으로 처리 |
-| 개정본보다 오래된 Job이 늦게 완료 | Job sourceHash snapshot + Spring stale callback 거부 |
-| 같은 RDS의 파트 간 결합 | schema/migration/role 분리, 계약 기반 callback |
-| 인프로세스 Worker 부하가 API에 영향 | 동시성 제한, CPU-heavy parsing 격리, 실측 후 SQS/별도 Worker 전환 |
-| 내부 API 토큰 노출 | Secrets Manager, 로그 마스킹, SG 제한, 최소 권한 |
+실데이터가 있으면 전환 전에 환경별 Job·Chunk 수와 상태를 확인하고 export/import·해시·chunk count 대조를 추가한다.
 
 ## Complexity Tracking
 
-Constitution 위반 없음. P0에서 외부 Queue와 mTLS를 미루고, 재시작 복구에 필요한 DB Job·lease·callback 재전송만 도입한다.
+헌법 위반을 정당화하는 예외 없음.

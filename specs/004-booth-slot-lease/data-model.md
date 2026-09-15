@@ -13,7 +13,7 @@
 | `id` | BIGINT | PK | |
 | `slot_code` | VARCHAR(30) | NOT NULL, **UNIQUE** | 사람이 읽는 식별자 (`F11-R01`) |
 | `floor_no` | SMALLINT | NOT NULL | 층 |
-| `slot_type` | VARCHAR(30) | NOT NULL | `USER_RENTAL` / 관리자 유형 |
+| `slot_type` | VARCHAR(30) | NOT NULL | `USER_RENTAL` / `ADMIN` / `EVENT` |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE` | 슬롯 자체의 운영 상태 |
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
@@ -21,7 +21,7 @@
 
 - **점유 여부는 이 테이블에 두지 않는다.** 활성 임대의 존재가 곧 점유다 (research R-02). `status`는 "이 슬롯을 임대 상품으로 여는가"라는 운영 스위치이고, 임대 생명주기와 무관하다.
 - `USER_RENTAL`이 아닌 슬롯은 임대 대상이 아니다 (`SlotNotRentableException`).
-- V5 마이그레이션이 7개를 시딩하고 **V12가 12개로 확장한다** (11층, U-03). `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 V12는 id를 명시 삽입한다 (#62).
+- V5 마이그레이션이 7개를 시딩하고 **V12가 12개로 확장**하며, **V28이 1번을 `EVENT`로 바꿔 임대 가능한 것은 11개**가 된다 (11층, U-03. S15P21A604-615 · GitLab #170). 방 수는 그대로 12다 — 줄이면 Unity 앵커가 빈 방을 가리킨다. `slotId` 1~12가 Unity 앵커 `01~12`와 대응하도록 V12는 id를 명시 삽입한다 (#62).
 
 ## 2. Booth (`booths`) — 기존 테이블
 
@@ -52,7 +52,7 @@
 | `booth_id` | BIGINT | NOT NULL, FK → `booths(id)` | |
 | `slot_id` | BIGINT | NOT NULL, FK → `booth_slots(id)` | |
 | `lessee_user_id` | BIGINT | NOT NULL, FK → `users(id)` | 임차인 = Booth 소유자 |
-| `status` | VARCHAR(20) | NOT NULL | `ACTIVE` / `EXPIRED` |
+| `status` | VARCHAR(20) | NOT NULL | `ACTIVE` / `EXPIRED` / `CANCELLED` (D12 조기 반납). **CHECK 제약은 두지 않는다** — 부분 유니크 인덱스가 `status = 'ACTIVE'`만 보므로 비-`ACTIVE` 값이 늘어도 마이그레이션이 필요 없다 |
 | `starts_at` | TIMESTAMPTZ | NOT NULL | 결제 시각 |
 | `ends_at` | TIMESTAMPTZ | NOT NULL, **CHECK(ends_at > starts_at)** | `starts_at + 24h` (D02) |
 | `charged_coin` | INTEGER | NOT NULL, CHECK(>= 0) | 실제 차감액 |
@@ -69,7 +69,7 @@ CREATE UNIQUE INDEX ux_booth_leases_active_slot ON booth_leases(slot_id) WHERE s
 
 **규칙**
 
-- 임대 기록은 **수정하지 않는다.** 유일한 변경은 `ACTIVE → EXPIRED` 상태 전이다.
+- 임대 기록은 **수정하지 않는다.** 유일한 변경은 `ACTIVE`에서 나가는 상태 전이(`EXPIRED` 또는 `CANCELLED`)이며, 되돌아오지 않는다.
 - 원장 연결: 차감 원장의 멱등성 키가 `LEASE_PAYMENT:BOOTH_LEASE:{leaseId}`다 (research R-04).
 
 ### 만료 판정 술어 — 한 곳에서만 표현한다
@@ -113,10 +113,13 @@ status = 'ACTIVE' AND ends_at > now()
 ### Lease
 
 ```text
-(없음) ──임대 생성──> ACTIVE ──재임대 시점에 만료 확인──> EXPIRED
+(없음) ──임대 생성──> ACTIVE ──시간이 지나 만료 확인(재임대 시점 · sweeper)──> EXPIRED
+                         └──임차인이 직접 반납(D12)──────────────> CANCELLED
 ```
 
-`EXPIRED`에서 되돌아오지 않는다. 재임대는 **새 행**을 만든다 (D05: 연장 없음).
+`EXPIRED`·`CANCELLED` 어느 쪽에서도 되돌아오지 않는다. 재임대는 **새 행**을 만든다 (D05: 연장 없음).
+
+> **둘을 가르는 것은 상태 단어뿐이다.** 슬롯 해제·부스 연결 끊기·AI 문서 비활성화는 두 경로가 **같은 트랜잭션·같은 메서드**를 지난다 (FR-020). 반납과 만료가 경계에서 만나면 임대 행 락으로 직렬화되고 해제는 한 번만 일어난다.
 
 > `ends_at`이 지난 `ACTIVE` 행은 **논리적으로 만료**이며 읽기 판정이 그렇게 취급한다. 물리적 전이는 그 슬롯을 누군가 다시 임대할 때 일어난다.
 

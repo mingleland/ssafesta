@@ -36,6 +36,15 @@ public class BoothStaff {
     @Column(name = "joined_at", nullable = false)
     private Instant joinedAt = Instant.now();
 
+    /**
+     * Whether this member is taking consultations right now (spec 011 FR-004).
+     *
+     * <p>Stored as text rather than an enum field because the only writer today is spec 011 and the
+     * vocabulary is fixed in V33; the role above is spelled the same way for the same reason.
+     */
+    @Column(name = "consultation_status", nullable = false, length = 20)
+    private String consultationStatus = "OFFLINE";
+
     protected BoothStaff() {
     }
 
@@ -49,7 +58,12 @@ public class BoothStaff {
     public Long getBoothId() { return boothId; }
     public Long getUserId() { return userId; }
     public String getRole() { return role; }
-    public Instant getJoinedAt() { return joinedAt; }
+    public String getConsultationStatus() { return consultationStatus; }
+
+    /** Role changes are a staff-management action (spec 011 FR-002) — the guard is the caller's job. */
+    public void changeRole(String role) {
+        this.role = role;
+    }
 
     /** Composite key mirroring {@code PRIMARY KEY(booth_id, user_id)}. */
     public static class Key implements Serializable {

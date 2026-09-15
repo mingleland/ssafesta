@@ -1,0 +1,11 @@
+{
+  "description": "startSceneId가 존재하지 않는 Scene을 참조하면 거부한다.",
+  "base": "../minimal-top-down-dialogue.json",
+  "mutations": [
+    {
+      "op": "replace",
+      "path": "/startSceneId",
+      "value": "missingScene"
+    }
+  ]
+}

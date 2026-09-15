@@ -1,0 +1,1666 @@
+dist	x	z	yaw	diffPct	minDist	wall
+0.8	-190.1	-295.1	185	0.00	2	cylinder
+0.8	-190.1	-295.1	245	0.00	2	cylinder
+0.8	-190.1	-295.1	125	0.00	2	cylinder
+0.8	-190.1	-295.1	285	0.00	2	cylinder
+0.8	-190.1	-295.1	85	0.00	2	cylinder
+0.8	-196.2	-317.0	90	0.00	2	wall-windowside
+0.8	-196.2	-317.0	150	0.00	2	wall-windowside
+0.8	-196.2	-317.0	30	0.00	2	wall-windowside
+0.8	-196.2	-317.0	190	0.00	2	wall-windowside
+0.8	-196.2	-317.0	-10	0.62	2	wall-windowside
+0.8	-196.2	-310.0	90	0.00	2	wall-windowside
+0.8	-196.2	-310.0	150	0.00	2	wall-windowside
+0.8	-196.2	-310.0	30	1.35	2	wall-windowside
+0.8	-196.2	-310.0	190	0.00	2	wall-windowside
+0.8	-196.2	-310.0	-10	1.03	2	wall-windowside
+0.8	-196.2	-303.0	90	0.00	2	wall-windowside
+0.8	-196.2	-303.0	150	0.00	2	wall-windowside
+0.8	-196.2	-303.0	30	1.82	2	wall-windowside
+0.8	-196.2	-303.0	190	0.00	2	wall-windowside
+0.8	-196.2	-303.0	-10	1.41	2	wall-windowside
+0.8	-170.0	-328.8	0	0.00	2	wall-front-elevatorside (combined)
+0.8	-170.0	-328.8	60	0.00	2	wall-front-elevatorside (combined)
+0.8	-170.0	-328.8	-60	0.00	2	wall-front-elevatorside (combined)
+0.8	-170.0	-328.8	100	0.00	2	wall-front-elevatorside (combined)
+0.8	-170.0	-328.8	-100	0.00	2	wall-front-elevatorside (combined)
+0.8	-150.0	-326.1	0	0.00	2	content-education
+0.8	-150.0	-326.1	60	0.00	2	content-education
+0.8	-150.0	-326.1	-60	0.00	2	content-education
+0.8	-150.0	-326.1	100	0.00	2	content-education
+0.8	-150.0	-326.1	-100	0.00	2	content-education
+0.8	-130.0	-326.1	0	0.00	2	content-education
+0.8	-130.0	-326.1	60	0.00	2	content-education
+0.8	-130.0	-326.1	-60	0.00	2	content-education
+0.8	-130.0	-326.1	100	0.00	2	content-education
+0.8	-130.0	-326.1	-100	0.00	2	content-education
+0.8	-110.0	-328.8	0	0.00	2	wall-front-center (combined)
+0.8	-110.0	-328.8	60	0.01	2	wall-front-center (combined)
+0.8	-110.0	-328.8	-60	0.00	2	wall-front-center (combined)
+0.8	-110.0	-328.8	100	0.00	2	wall-front-center (combined)
+0.8	-110.0	-328.8	-100	0.00	2	wall-front-center (combined)
+0.8	-90.0	-328.8	0	0.00	2	wall-front-center (combined)
+0.8	-90.0	-328.8	60	0.00	2	wall-front-center (combined)
+0.8	-90.0	-328.8	-60	0.00	2	wall-front-center (combined)
+0.8	-90.0	-328.8	100	0.00	2	wall-front-center (combined)
+0.8	-90.0	-328.8	-100	0.00	2	wall-front-center (combined)
+0.8	-70.0	-328.8	0	0.00	2	wall-front-center (combined)
+0.8	-70.0	-328.8	60	0.00	2	wall-front-center (combined)
+0.8	-70.0	-328.8	-60	0.00	2	wall-front-center (combined)
+0.8	-70.0	-328.8	100	0.00	2	wall-front-center (combined)
+0.8	-70.0	-328.8	-100	0.00	2	wall-front-center (combined)
+0.8	-50.0	-324.6	0	1.82	2	content-introduction
+0.8	-50.0	-324.6	60	6.88	2	content-introduction
+0.8	-50.0	-324.6	-60	0.01	2	content-introduction
+0.8	-50.0	-324.6	100	1.29	2	content-introduction
+0.8	-50.0	-324.6	-100	0.00	2	content-introduction
+0.8	-30.0	-324.6	0	25.93	2	content-introduction
+0.8	-30.0	-324.6	60	4.96	2	content-introduction
+0.8	-30.0	-324.6	-60	23.22	2	content-introduction
+0.8	-30.0	-324.6	100	1.77	2	content-introduction
+0.8	-30.0	-324.6	-100	8.25	2	content-introduction
+0.8	3.0	-296.2	270	32.15	2	wall-elevatorside
+0.8	3.0	-296.2	330	0.00	2	wall-elevatorside
+0.8	3.0	-296.2	210	34.98	2	wall-elevatorside
+0.8	3.0	-296.2	370	0.00	2	wall-elevatorside
+0.8	3.0	-296.2	170	6.88	2	wall-elevatorside
+0.8	3.0	-310.0	270	55.85	2	wall-elevatorside
+0.8	3.0	-310.0	330	19.81	2	wall-elevatorside
+0.8	3.0	-310.0	210	32.22	2	wall-elevatorside
+0.8	3.0	-310.0	370	1.95	2	wall-elevatorside
+0.8	3.0	-310.0	170	0.00	2	wall-elevatorside
+0.8	3.0	-323.8	270	29.61	2	wall-elevatorside
+0.8	3.0	-323.8	330	38.55	2	wall-elevatorside
+0.8	3.0	-323.8	210	0.97	2	wall-elevatorside
+0.8	3.0	-323.8	370	22.05	2	wall-elevatorside
+0.8	3.0	-323.8	170	0.00	2	wall-elevatorside
+0.8	-10.0	-327.6	0	0.00	2	wall-elevatorside
+0.8	-10.0	-327.6	60	0.00	2	wall-elevatorside
+0.8	-10.0	-327.6	-60	0.81	2	wall-elevatorside
+0.8	-10.0	-327.6	100	0.00	2	wall-elevatorside
+0.8	-10.0	-327.6	-100	0.57	2	wall-elevatorside
+0.8	-186.9	-276.1	270	0.00	2	lounge-zone
+0.8	-186.9	-276.1	330	0.00	2	lounge-zone
+0.8	-186.9	-276.1	210	2.17	2	lounge-zone
+0.8	-186.9	-276.1	370	0.00	2	lounge-zone
+0.8	-186.9	-276.1	170	1.91	2	lounge-zone
+0.8	-190.1	-283.6	355	1.74	2	cylinder
+0.8	-190.1	-283.6	415	0.00	2	cylinder
+0.8	-190.1	-283.6	295	0.00	2	cylinder
+0.8	-190.1	-283.6	455	0.00	2	cylinder
+0.8	-190.1	-283.6	255	0.00	2	cylinder
+0.8	-196.2	-287.0	90	0.00	2	wall-windowside
+0.8	-196.2	-287.0	150	0.00	2	wall-windowside
+0.8	-196.2	-287.0	30	3.09	2	wall-windowside
+0.8	-196.2	-287.0	190	0.00	2	wall-windowside
+0.8	-196.2	-287.0	-10	4.14	2	wall-windowside
+0.8	-196.2	-280.0	90	0.00	2	wall-windowside
+0.8	-196.2	-280.0	150	0.00	2	wall-windowside
+0.8	-196.2	-280.0	30	0.00	2	wall-windowside
+0.8	-196.2	-280.0	190	0.00	2	wall-windowside
+0.8	-196.2	-280.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-273.0	90	11.72	2	wall-windowside
+0.8	-196.2	-273.0	150	4.73	2	wall-windowside
+0.8	-196.2	-273.0	30	0.00	2	wall-windowside
+0.8	-196.2	-273.0	190	0.34	2	wall-windowside
+0.8	-196.2	-273.0	-10	0.00	2	wall-windowside
+0.8	3.0	-293.8	270	0.00	2	wall-elevatorside
+0.8	3.0	-293.8	330	0.00	2	wall-elevatorside
+0.8	3.0	-293.8	210	0.00	2	wall-elevatorside
+0.8	3.0	-293.8	370	0.00	2	wall-elevatorside
+0.8	3.0	-293.8	170	0.00	2	wall-elevatorside
+0.8	-186.9	-246.1	270	0.00	2	lounge-zone
+0.8	-186.9	-246.1	330	0.00	2	lounge-zone
+0.8	-186.9	-246.1	210	0.89	2	lounge-zone
+0.8	-186.9	-246.1	370	0.00	2	lounge-zone
+0.8	-186.9	-246.1	170	0.00	2	lounge-zone
+0.8	-186.9	-250.0	270	0.00	2	lounge-zone
+0.8	-186.9	-250.0	330	0.00	2	lounge-zone
+0.8	-186.9	-250.0	210	0.58	2	lounge-zone
+0.8	-186.9	-250.0	370	0.00	2	lounge-zone
+0.8	-186.9	-250.0	170	0.78	2	lounge-zone
+0.8	-186.9	-253.9	270	0.00	2	lounge-zone
+0.8	-186.9	-253.9	330	0.00	2	lounge-zone
+0.8	-186.9	-253.9	210	0.12	2	lounge-zone
+0.8	-186.9	-253.9	370	0.00	2	lounge-zone
+0.8	-186.9	-253.9	170	0.44	2	lounge-zone
+0.8	-196.2	-257.0	90	0.00	2	wall-windowside
+0.8	-196.2	-257.0	150	0.00	2	wall-windowside
+0.8	-196.2	-257.0	30	0.00	2	wall-windowside
+0.8	-196.2	-257.0	190	2.07	2	wall-windowside
+0.8	-196.2	-257.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-250.0	90	0.00	2	wall-windowside
+0.8	-196.2	-250.0	150	0.00	2	wall-windowside
+0.8	-196.2	-250.0	30	0.00	2	wall-windowside
+0.8	-196.2	-250.0	190	1.37	2	wall-windowside
+0.8	-196.2	-250.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-243.0	90	0.00	2	wall-windowside
+0.8	-196.2	-243.0	150	0.00	2	wall-windowside
+0.8	-196.2	-243.0	30	0.00	2	wall-windowside
+0.8	-196.2	-243.0	190	0.00	2	wall-windowside
+0.8	-196.2	-243.0	-10	0.00	2	wall-windowside
+0.8	-183.1	-250.0	90	48.83	2	lounge-zone
+0.8	-183.1	-250.0	150	23.01	2	lounge-zone
+0.8	-183.1	-250.0	30	17.97	2	lounge-zone
+0.8	-183.1	-250.0	190	18.01	2	lounge-zone
+0.8	-183.1	-250.0	-10	4.12	2	lounge-zone
+0.8	7.2	-250.0	270	0.00	2	wall-elevatorside
+0.8	7.2	-250.0	330	0.00	2	wall-elevatorside
+0.8	7.2	-250.0	210	0.00	2	wall-elevatorside
+0.8	7.2	-250.0	370	0.00	2	wall-elevatorside
+0.8	7.2	-250.0	170	0.00	2	wall-elevatorside
+0.8	-186.9	-216.1	270	0.00	2	lounge-zone
+0.8	-186.9	-216.1	330	0.00	2	lounge-zone
+0.8	-186.9	-216.1	210	0.00	2	lounge-zone
+0.8	-186.9	-216.1	370	0.00	2	lounge-zone
+0.8	-186.9	-216.1	170	0.00	2	lounge-zone
+0.8	-186.9	-220.0	270	0.00	2	lounge-zone
+0.8	-186.9	-220.0	330	0.00	2	lounge-zone
+0.8	-186.9	-220.0	210	0.00	2	lounge-zone
+0.8	-186.9	-220.0	370	0.00	2	lounge-zone
+0.8	-186.9	-220.0	170	0.00	2	lounge-zone
+0.8	-186.9	-223.9	270	0.00	2	lounge-zone
+0.8	-186.9	-223.9	330	0.00	2	lounge-zone
+0.8	-186.9	-223.9	210	0.00	2	lounge-zone
+0.8	-186.9	-223.9	370	0.00	2	lounge-zone
+0.8	-186.9	-223.9	170	0.00	2	lounge-zone
+0.8	-196.2	-227.0	90	0.00	2	wall-windowside
+0.8	-196.2	-227.0	150	0.00	2	wall-windowside
+0.8	-196.2	-227.0	30	0.00	2	wall-windowside
+0.8	-196.2	-227.0	190	0.00	2	wall-windowside
+0.8	-196.2	-227.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-220.0	90	0.00	2	wall-windowside
+0.8	-196.2	-220.0	150	0.00	2	wall-windowside
+0.8	-196.2	-220.0	30	0.00	2	wall-windowside
+0.8	-196.2	-220.0	190	0.00	2	wall-windowside
+0.8	-196.2	-220.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-213.0	90	0.00	2	wall-windowside
+0.8	-196.2	-213.0	150	0.00	2	wall-windowside
+0.8	-196.2	-213.0	30	0.00	2	wall-windowside
+0.8	-196.2	-213.0	190	0.00	2	wall-windowside
+0.8	-196.2	-213.0	-10	0.00	2	wall-windowside
+0.8	-183.1	-220.0	90	45.48	2	lounge-zone
+0.8	-183.1	-220.0	150	14.34	2	lounge-zone
+0.8	-183.1	-220.0	30	18.19	2	lounge-zone
+0.8	-183.1	-220.0	190	1.51	2	lounge-zone
+0.8	-183.1	-220.0	-10	0.49	2	lounge-zone
+0.8	7.2	-220.0	270	0.00	2	wall-elevatorside
+0.8	7.2	-220.0	330	0.00	2	wall-elevatorside
+0.8	7.2	-220.0	210	0.00	2	wall-elevatorside
+0.8	7.2	-220.0	370	0.00	2	wall-elevatorside
+0.8	7.2	-220.0	170	0.00	2	wall-elevatorside
+0.8	-348.0	-189.7	292	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.0	-189.7	352	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.0	-189.7	232	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.0	-189.7	392	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.0	-189.7	192	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.7	-191.6	292	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.7	-191.6	352	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.7	-191.6	232	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.7	-191.6	392	0.00	2	UNS_Spruce_01_LOD3
+0.8	-348.7	-191.6	192	0.00	2	UNS_Spruce_01_LOD3
+0.8	-350.7	-196.1	293	0.00	2	UNS_Spruce_01_LOD3
+0.8	-350.7	-196.1	353	0.00	2	UNS_Spruce_01_LOD3
+0.8	-350.7	-196.1	233	0.00	2	UNS_Spruce_01_LOD3
+0.8	-350.7	-196.1	393	0.00	2	UNS_Spruce_01_LOD3
+0.8	-350.7	-196.1	193	0.00	2	UNS_Spruce_01_LOD3
+0.8	-190.3	-186.5	200	0.00	2	cylinder 1
+0.8	-190.3	-186.5	260	0.00	2	cylinder 1
+0.8	-190.3	-186.5	140	0.00	2	cylinder 1
+0.8	-190.3	-186.5	300	0.00	2	cylinder 1
+0.8	-190.3	-186.5	100	0.00	2	cylinder 1
+0.8	-186.9	-193.9	270	0.00	2	lounge-zone
+0.8	-186.9	-193.9	330	0.00	2	lounge-zone
+0.8	-186.9	-193.9	210	0.00	2	lounge-zone
+0.8	-186.9	-193.9	370	0.00	2	lounge-zone
+0.8	-186.9	-193.9	170	0.00	2	lounge-zone
+0.8	-196.2	-197.0	90	0.00	2	wall-windowside
+0.8	-196.2	-197.0	150	0.00	2	wall-windowside
+0.8	-196.2	-197.0	30	0.00	2	wall-windowside
+0.8	-196.2	-197.0	190	0.00	2	wall-windowside
+0.8	-196.2	-197.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-190.0	90	0.00	2	wall-windowside
+0.8	-196.2	-190.0	150	0.00	2	wall-windowside
+0.8	-196.2	-190.0	30	0.00	2	wall-windowside
+0.8	-196.2	-190.0	190	0.00	2	wall-windowside
+0.8	-196.2	-190.0	-10	7.50	2	wall-windowside
+0.8	-196.2	-183.0	90	0.00	2	wall-windowside
+0.8	-196.2	-183.0	150	0.00	2	wall-windowside
+0.8	-196.2	-183.0	30	18.67	2	wall-windowside
+0.8	-196.2	-183.0	190	0.00	2	wall-windowside
+0.8	-196.2	-183.0	-10	25.51	2	wall-windowside
+0.8	2.9	-176.3	270	0.00	2	wall-elevatorside
+0.8	2.9	-176.3	330	0.00	2	wall-elevatorside
+0.8	2.9	-176.3	210	0.00	2	wall-elevatorside
+0.8	2.9	-176.3	370	0.00	2	wall-elevatorside
+0.8	2.9	-176.3	170	0.00	2	wall-elevatorside
+0.8	7.2	-190.0	270	0.00	2	wall-elevatorside
+0.8	7.2	-190.0	330	0.00	2	wall-elevatorside
+0.8	7.2	-190.0	210	0.00	2	wall-elevatorside
+0.8	7.2	-190.0	370	0.00	2	wall-elevatorside
+0.8	7.2	-190.0	170	0.00	2	wall-elevatorside
+0.8	-190.3	-175.7	340	0.00	2	cylinder 1
+0.8	-190.3	-175.7	400	0.00	2	cylinder 1
+0.8	-190.3	-175.7	280	0.00	2	cylinder 1
+0.8	-190.3	-175.7	440	0.00	2	cylinder 1
+0.8	-190.3	-175.7	240	0.00	2	cylinder 1
+0.8	-196.2	-167.0	90	0.00	2	wall-windowside
+0.8	-196.2	-167.0	150	2.83	2	wall-windowside
+0.8	-196.2	-167.0	30	0.00	2	wall-windowside
+0.8	-196.2	-167.0	190	4.70	2	wall-windowside
+0.8	-196.2	-167.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-160.0	90	0.00	2	wall-windowside
+0.8	-196.2	-160.0	150	2.00	2	wall-windowside
+0.8	-196.2	-160.0	30	0.00	2	wall-windowside
+0.8	-196.2	-160.0	190	1.54	2	wall-windowside
+0.8	-196.2	-160.0	-10	0.00	2	wall-windowside
+0.8	-196.2	-153.0	90	0.00	2	wall-windowside
+0.8	-196.2	-153.0	150	1.57	2	wall-windowside
+0.8	-196.2	-153.0	30	0.00	2	wall-windowside
+0.8	-196.2	-153.0	190	1.18	2	wall-windowside
+0.8	-196.2	-153.0	-10	0.00	2	wall-windowside
+0.8	2.6	-146.6	270	72.87	2	wall-elevatorside
+0.8	2.6	-146.6	330	28.37	2	wall-elevatorside
+0.8	2.6	-146.6	210	29.36	2	wall-elevatorside
+0.8	2.6	-146.6	370	0.41	2	wall-elevatorside
+0.8	2.6	-146.6	170	16.30	2	wall-elevatorside
+0.8	2.6	-160.0	270	26.23	2	wall-elevatorside
+0.8	2.6	-160.0	330	30.65	2	wall-elevatorside
+0.8	2.6	-160.0	210	0.00	2	wall-elevatorside
+0.8	2.6	-160.0	370	10.50	2	wall-elevatorside
+0.8	2.6	-160.0	170	0.00	2	wall-elevatorside
+0.8	2.9	-173.7	270	0.00	2	wall-elevatorside
+0.8	2.9	-173.7	330	0.00	2	wall-elevatorside
+0.8	2.9	-173.7	210	0.00	2	wall-elevatorside
+0.8	2.9	-173.7	370	0.00	2	wall-elevatorside
+0.8	2.9	-173.7	170	0.00	2	wall-elevatorside
+0.8	-270.4	-126.4	211	0.00	2	UNS_Spruce_01_LOD3
+0.8	-270.4	-126.4	271	0.00	2	UNS_Spruce_01_LOD3
+0.8	-270.4	-126.4	151	0.00	2	UNS_Spruce_01_LOD3
+0.8	-270.4	-126.4	311	0.00	2	UNS_Spruce_01_LOD3
+0.8	-270.4	-126.4	111	0.00	2	UNS_Spruce_01_LOD3
+0.8	-267.8	-128.0	211	0.00	2	UNS_Spruce_01_LOD3
+0.8	-267.8	-128.0	271	0.00	2	UNS_Spruce_01_LOD3
+0.8	-267.8	-128.0	151	0.00	2	UNS_Spruce_01_LOD3
+0.8	-267.8	-128.0	311	0.00	2	UNS_Spruce_01_LOD3
+0.8	-267.8	-128.0	111	0.00	2	UNS_Spruce_01_LOD3
+0.8	-130.0	-122.0	180	0.00	2	wall-rear-elevatorside (combined)
+0.8	-130.0	-122.0	240	0.00	2	wall-rear-elevatorside (combined)
+0.8	-130.0	-122.0	120	0.00	2	wall-rear-elevatorside (combined)
+0.8	-130.0	-122.0	280	0.00	2	wall-rear-elevatorside (combined)
+0.8	-130.0	-122.0	80	0.00	2	wall-rear-elevatorside (combined)
+0.8	-131.2	-130.0	90	0.00	2	Block_Cor_W
+0.8	-131.2	-130.0	150	0.00	2	Block_Cor_W
+0.8	-131.2	-130.0	30	0.00	2	Block_Cor_W
+0.8	-131.2	-130.0	190	0.00	2	Block_Cor_W
+0.8	-131.2	-130.0	-10	0.00	2	Block_Cor_W
+0.8	-131.2	-128.0	90	0.00	2	Block_Cor_W
+0.8	-131.2	-128.0	150	0.00	2	Block_Cor_W
+0.8	-131.2	-128.0	30	0.00	2	Block_Cor_W
+0.8	-131.2	-128.0	190	0.00	2	Block_Cor_W
+0.8	-131.2	-128.0	-10	0.00	2	Block_Cor_W
+0.8	-55.8	-130.0	270	0.00	2	Block_N_East
+0.8	-55.8	-130.0	330	0.00	2	Block_N_East
+0.8	-55.8	-130.0	210	0.00	2	Block_N_East
+0.8	-55.8	-130.0	370	0.00	2	Block_N_East
+0.8	-55.8	-130.0	170	0.00	2	Block_N_East
+4	-190.3	-298.3	185	0.00	6	cylinder
+4	-190.3	-298.3	245	0.00	6	cylinder
+4	-190.3	-298.3	125	0.00	6	cylinder
+4	-190.3	-298.3	285	0.00	6	cylinder
+4	-190.3	-298.3	85	0.00	6	cylinder
+4	-190.0	-325.8	0	0.00	4	wall-front-elevatorside (combined)
+4	-190.0	-325.8	60	0.00	4	wall-front-elevatorside (combined)
+4	-190.0	-325.8	-60	0.00	4	wall-front-elevatorside (combined)
+4	-190.0	-325.8	100	0.00	4	wall-front-elevatorside (combined)
+4	-190.0	-325.8	-100	0.00	4	wall-front-elevatorside (combined)
+4	-193.0	-317.0	90	0.00	4	wall-windowside
+4	-193.0	-317.0	150	0.00	4	wall-windowside
+4	-193.0	-317.0	30	0.00	4	wall-windowside
+4	-193.0	-317.0	190	0.00	4	wall-windowside
+4	-193.0	-317.0	-10	0.00	4	wall-windowside
+4	-193.0	-310.0	90	0.00	4	wall-windowside
+4	-193.0	-310.0	150	0.00	4	wall-windowside
+4	-193.0	-310.0	30	0.00	4	wall-windowside
+4	-193.0	-310.0	190	0.00	4	wall-windowside
+4	-193.0	-310.0	-10	0.00	4	wall-windowside
+4	-193.0	-303.0	90	0.00	4	wall-windowside
+4	-193.0	-303.0	150	0.00	4	wall-windowside
+4	-193.0	-303.0	30	0.00	4	wall-windowside
+4	-193.0	-303.0	190	0.00	4	wall-windowside
+4	-193.0	-303.0	-10	0.00	4	wall-windowside
+4	-170.0	-325.6	0	0.00	4	wall-front-elevatorside (combined)
+4	-170.0	-325.6	60	0.00	4	wall-front-elevatorside (combined)
+4	-170.0	-325.6	-60	0.00	4	wall-front-elevatorside (combined)
+4	-170.0	-325.6	100	0.00	4	wall-front-elevatorside (combined)
+4	-170.0	-325.6	-100	0.00	4	wall-front-elevatorside (combined)
+4	-150.0	-322.9	0	0.00	6	content-education
+4	-150.0	-322.9	60	0.00	6	content-education
+4	-150.0	-322.9	-60	0.00	6	content-education
+4	-150.0	-322.9	100	0.00	6	content-education
+4	-150.0	-322.9	-100	0.00	6	content-education
+4	-130.0	-322.9	0	0.00	6	content-education
+4	-130.0	-322.9	60	0.00	6	content-education
+4	-130.0	-322.9	-60	0.00	6	content-education
+4	-130.0	-322.9	100	0.00	6	content-education
+4	-130.0	-322.9	-100	0.00	6	content-education
+4	-110.0	-325.6	0	0.00	4	wall-front-center (combined)
+4	-110.0	-325.6	60	0.01	4	wall-front-center (combined)
+4	-110.0	-325.6	-60	0.00	4	wall-front-center (combined)
+4	-110.0	-325.6	100	0.00	4	wall-front-center (combined)
+4	-110.0	-325.6	-100	0.00	4	wall-front-center (combined)
+4	-90.0	-325.6	0	0.01	4	wall-front-center (combined)
+4	-90.0	-325.6	60	0.00	4	wall-front-center (combined)
+4	-90.0	-325.6	-60	0.00	4	wall-front-center (combined)
+4	-90.0	-325.6	100	0.00	4	wall-front-center (combined)
+4	-90.0	-325.6	-100	0.00	4	wall-front-center (combined)
+4	-70.0	-325.6	0	0.00	4	wall-front-center (combined)
+4	-70.0	-325.6	60	0.00	4	wall-front-center (combined)
+4	-70.0	-325.6	-60	0.00	4	wall-front-center (combined)
+4	-70.0	-325.6	100	0.00	4	wall-front-center (combined)
+4	-70.0	-325.6	-100	0.00	4	wall-front-center (combined)
+4	-50.0	-321.4	0	1.96	4	content-introduction
+4	-50.0	-321.4	60	7.54	4	content-introduction
+4	-50.0	-321.4	-60	0.00	4	content-introduction
+4	-50.0	-321.4	100	1.97	4	content-introduction
+4	-50.0	-321.4	-100	0.00	4	content-introduction
+4	-30.0	-321.4	0	27.78	4	content-introduction
+4	-30.0	-321.4	60	5.67	4	content-introduction
+4	-30.0	-321.4	-60	23.95	4	content-introduction
+4	-30.0	-321.4	100	1.96	4	content-introduction
+4	-30.0	-321.4	-100	8.60	4	content-introduction
+4	-0.2	-296.2	270	0.00	6	wall-elevatorside
+4	-0.2	-296.2	330	0.00	6	wall-elevatorside
+4	-0.2	-296.2	210	0.00	6	wall-elevatorside
+4	-0.2	-296.2	370	0.00	6	wall-elevatorside
+4	-0.2	-296.2	170	0.00	6	wall-elevatorside
+4	-0.2	-310.0	270	0.00	4	wall-elevatorside
+4	-0.2	-310.0	330	0.00	4	wall-elevatorside
+4	-0.2	-310.0	210	0.00	4	wall-elevatorside
+4	-0.2	-310.0	370	0.00	4	wall-elevatorside
+4	-0.2	-310.0	170	0.00	4	wall-elevatorside
+4	-0.2	-323.8	270	0.00	6	wall-elevatorside
+4	-0.2	-323.8	330	0.00	6	wall-elevatorside
+4	-0.2	-323.8	210	0.00	6	wall-elevatorside
+4	-0.2	-323.8	370	0.00	6	wall-elevatorside
+4	-0.2	-323.8	170	0.00	6	wall-elevatorside
+4	-10.0	-324.4	0	0.00	4	wall-elevatorside
+4	-10.0	-324.4	60	0.00	4	wall-elevatorside
+4	-10.0	-324.4	-60	0.00	4	wall-elevatorside
+4	-10.0	-324.4	100	0.00	4	wall-elevatorside
+4	-10.0	-324.4	-100	0.00	4	wall-elevatorside
+4	-190.1	-276.1	270	0.00	6	lounge-zone
+4	-190.1	-276.1	330	0.00	6	lounge-zone
+4	-190.1	-276.1	210	0.00	6	lounge-zone
+4	-190.1	-276.1	370	0.00	6	lounge-zone
+4	-190.1	-276.1	170	15.89	6	lounge-zone
+4	-190.3	-280.4	355	2.90	6	cylinder
+4	-190.3	-280.4	415	0.00	6	cylinder
+4	-190.3	-280.4	295	0.00	6	cylinder
+4	-190.3	-280.4	455	0.00	6	cylinder
+4	-190.3	-280.4	255	0.00	6	cylinder
+4	-193.0	-280.0	90	0.00	4	wall-windowside
+4	-193.0	-280.0	150	0.00	4	wall-windowside
+4	-193.0	-280.0	30	0.00	4	wall-windowside
+4	-193.0	-280.0	190	0.00	4	wall-windowside
+4	-193.0	-280.0	-10	0.00	4	wall-windowside
+4	-193.0	-273.0	90	6.37	4	wall-windowside
+4	-193.0	-273.0	150	3.31	4	wall-windowside
+4	-193.0	-273.0	30	0.00	4	wall-windowside
+4	-193.0	-273.0	190	5.48	4	wall-windowside
+4	-193.0	-273.0	-10	0.00	4	wall-windowside
+4	5.0	-280.0	270	0.00	4	Block_E
+4	5.0	-280.0	330	0.00	4	Block_E
+4	5.0	-280.0	210	0.00	4	Block_E
+4	5.0	-280.0	370	0.00	4	Block_E
+4	5.0	-280.0	170	0.00	4	Block_E
+4	-0.2	-293.8	270	0.00	4	wall-elevatorside
+4	-0.2	-293.8	330	0.00	4	wall-elevatorside
+4	-0.2	-293.8	210	0.00	4	wall-elevatorside
+4	-0.2	-293.8	370	0.00	4	wall-elevatorside
+4	-0.2	-293.8	170	0.00	4	wall-elevatorside
+4	-190.1	-246.1	270	0.00	4	lounge-zone
+4	-190.1	-246.1	330	0.00	4	lounge-zone
+4	-190.1	-246.1	210	0.89	4	lounge-zone
+4	-190.1	-246.1	370	0.00	4	lounge-zone
+4	-190.1	-246.1	170	0.00	4	lounge-zone
+4	-190.1	-250.0	270	0.00	4	lounge-zone
+4	-190.1	-250.0	330	0.00	4	lounge-zone
+4	-190.1	-250.0	210	0.53	4	lounge-zone
+4	-190.1	-250.0	370	0.00	4	lounge-zone
+4	-190.1	-250.0	170	0.00	4	lounge-zone
+4	-190.1	-253.9	270	0.00	4	lounge-zone
+4	-190.1	-253.9	330	0.00	4	lounge-zone
+4	-190.1	-253.9	210	0.22	4	lounge-zone
+4	-190.1	-253.9	370	0.00	4	lounge-zone
+4	-190.1	-253.9	170	0.72	4	lounge-zone
+4	-193.0	-257.0	90	0.00	4	wall-windowside
+4	-193.0	-257.0	150	0.00	4	wall-windowside
+4	-193.0	-257.0	30	0.00	4	wall-windowside
+4	-193.0	-257.0	190	1.17	4	wall-windowside
+4	-193.0	-257.0	-10	0.00	4	wall-windowside
+4	-193.0	-250.0	90	0.00	4	wall-windowside
+4	-193.0	-250.0	150	0.00	4	wall-windowside
+4	-193.0	-250.0	30	0.00	4	wall-windowside
+4	-193.0	-250.0	190	1.13	4	wall-windowside
+4	-193.0	-250.0	-10	0.00	4	wall-windowside
+4	-193.0	-243.0	90	0.00	4	wall-windowside
+4	-193.0	-243.0	150	0.00	4	wall-windowside
+4	-193.0	-243.0	30	0.00	4	wall-windowside
+4	-193.0	-243.0	190	0.00	4	wall-windowside
+4	-193.0	-243.0	-10	0.00	4	wall-windowside
+4	-179.9	-250.0	90	0.00	4	lounge-zone
+4	-179.9	-250.0	150	0.00	4	lounge-zone
+4	-179.9	-250.0	30	0.00	4	lounge-zone
+4	-179.9	-250.0	190	0.00	4	lounge-zone
+4	-179.9	-250.0	-10	0.00	4	lounge-zone
+4	4.0	-250.0	270	0.00	4	wall-elevatorside
+4	4.0	-250.0	330	0.00	4	wall-elevatorside
+4	4.0	-250.0	210	0.00	4	wall-elevatorside
+4	4.0	-250.0	370	0.00	4	wall-elevatorside
+4	4.0	-250.0	170	0.00	4	wall-elevatorside
+4	-190.1	-216.1	270	0.00	4	lounge-zone
+4	-190.1	-216.1	330	0.00	4	lounge-zone
+4	-190.1	-216.1	210	0.00	4	lounge-zone
+4	-190.1	-216.1	370	0.00	4	lounge-zone
+4	-190.1	-216.1	170	0.00	4	lounge-zone
+4	-190.1	-220.0	270	0.00	4	lounge-zone
+4	-190.1	-220.0	330	0.00	4	lounge-zone
+4	-190.1	-220.0	210	0.00	4	lounge-zone
+4	-190.1	-220.0	370	0.00	4	lounge-zone
+4	-190.1	-220.0	170	0.00	4	lounge-zone
+4	-190.1	-223.9	270	0.00	4	lounge-zone
+4	-190.1	-223.9	330	0.00	4	lounge-zone
+4	-190.1	-223.9	210	0.00	4	lounge-zone
+4	-190.1	-223.9	370	0.00	4	lounge-zone
+4	-190.1	-223.9	170	0.00	4	lounge-zone
+4	-193.0	-227.0	90	0.00	6	wall-windowside
+4	-193.0	-227.0	150	0.00	6	wall-windowside
+4	-193.0	-227.0	30	0.00	6	wall-windowside
+4	-193.0	-227.0	190	0.00	6	wall-windowside
+4	-193.0	-227.0	-10	0.00	6	wall-windowside
+4	-193.0	-220.0	90	0.00	6	wall-windowside
+4	-193.0	-220.0	150	0.00	6	wall-windowside
+4	-193.0	-220.0	30	0.00	6	wall-windowside
+4	-193.0	-220.0	190	0.00	6	wall-windowside
+4	-193.0	-220.0	-10	0.00	6	wall-windowside
+4	-193.0	-213.0	90	0.00	6	wall-windowside
+4	-193.0	-213.0	150	0.00	6	wall-windowside
+4	-193.0	-213.0	30	0.00	6	wall-windowside
+4	-193.0	-213.0	190	0.00	6	wall-windowside
+4	-193.0	-213.0	-10	0.00	6	wall-windowside
+4	-179.9	-220.0	90	0.00	4	lounge-zone
+4	-179.9	-220.0	150	0.00	4	lounge-zone
+4	-179.9	-220.0	30	0.00	4	lounge-zone
+4	-179.9	-220.0	190	0.00	4	lounge-zone
+4	-179.9	-220.0	-10	0.00	4	lounge-zone
+4	4.0	-220.0	270	0.00	6	wall-elevatorside
+4	4.0	-220.0	330	0.00	6	wall-elevatorside
+4	4.0	-220.0	210	0.00	6	wall-elevatorside
+4	4.0	-220.0	370	0.00	6	wall-elevatorside
+4	4.0	-220.0	170	0.00	6	wall-elevatorside
+4	-350.6	-188.7	292	0.00	2	UNS_Spruce_01_LOD3
+4	-350.6	-188.7	352	0.00	2	UNS_Spruce_01_LOD3
+4	-350.6	-188.7	232	0.00	2	UNS_Spruce_01_LOD3
+4	-350.6	-188.7	392	0.00	2	UNS_Spruce_01_LOD3
+4	-350.6	-188.7	192	0.00	2	UNS_Spruce_01_LOD3
+4	-351.3	-190.6	292	0.00	4	UNS_Spruce_01_LOD3
+4	-351.3	-190.6	352	0.00	4	UNS_Spruce_01_LOD3
+4	-351.3	-190.6	232	0.00	4	UNS_Spruce_01_LOD3
+4	-351.3	-190.6	392	0.00	4	UNS_Spruce_01_LOD3
+4	-351.3	-190.6	192	0.00	4	UNS_Spruce_01_LOD3
+4	-353.9	-190.0	90	0.00	2	wall-flat
+4	-353.9	-190.0	150	0.00	2	wall-flat
+4	-353.9	-190.0	30	0.00	2	wall-flat
+4	-353.9	-190.0	190	0.00	2	wall-flat
+4	-353.9	-190.0	-10	0.00	2	wall-flat
+4	-191.4	-189.5	200	0.00	4	cylinder 1
+4	-191.4	-189.5	260	0.00	4	cylinder 1
+4	-191.4	-189.5	140	0.00	4	cylinder 1
+4	-191.4	-189.5	300	0.00	4	cylinder 1
+4	-191.4	-189.5	100	0.00	4	cylinder 1
+4	-190.1	-193.9	270	0.00	4	lounge-zone
+4	-190.1	-193.9	330	0.00	4	lounge-zone
+4	-190.1	-193.9	210	0.00	4	lounge-zone
+4	-190.1	-193.9	370	0.00	4	lounge-zone
+4	-190.1	-193.9	170	0.00	4	lounge-zone
+4	-193.0	-197.0	90	0.00	6	wall-windowside
+4	-193.0	-197.0	150	0.00	6	wall-windowside
+4	-193.0	-197.0	30	0.00	6	wall-windowside
+4	-193.0	-197.0	190	0.00	6	wall-windowside
+4	-193.0	-197.0	-10	0.00	6	wall-windowside
+4	-193.0	-190.0	90	0.00	6	wall-windowside
+4	-193.0	-190.0	150	0.00	6	wall-windowside
+4	-193.0	-190.0	30	0.00	6	wall-windowside
+4	-193.0	-190.0	190	0.00	6	wall-windowside
+4	-193.0	-190.0	-10	0.00	6	wall-windowside
+4	-0.3	-176.3	270	0.00	4	wall-elevatorside
+4	-0.3	-176.3	330	0.00	4	wall-elevatorside
+4	-0.3	-176.3	210	0.00	4	wall-elevatorside
+4	-0.3	-176.3	370	0.00	4	wall-elevatorside
+4	-0.3	-176.3	170	0.00	4	wall-elevatorside
+4	4.0	-190.0	270	0.00	4	wall-elevatorside
+4	4.0	-190.0	330	0.00	4	wall-elevatorside
+4	4.0	-190.0	210	0.00	4	wall-elevatorside
+4	4.0	-190.0	370	0.00	4	wall-elevatorside
+4	4.0	-190.0	170	0.00	4	wall-elevatorside
+4	-191.4	-172.7	340	0.00	4	cylinder 1
+4	-191.4	-172.7	400	0.00	4	cylinder 1
+4	-191.4	-172.7	280	0.00	4	cylinder 1
+4	-191.4	-172.7	440	0.00	4	cylinder 1
+4	-191.4	-172.7	240	0.00	4	cylinder 1
+4	-193.0	-167.0	90	0.00	6	wall-windowside
+4	-193.0	-167.0	150	0.00	6	wall-windowside
+4	-193.0	-167.0	30	0.00	6	wall-windowside
+4	-193.0	-167.0	190	0.00	6	wall-windowside
+4	-193.0	-167.0	-10	0.00	6	wall-windowside
+4	-193.0	-160.0	90	0.00	6	wall-windowside
+4	-193.0	-160.0	150	0.01	6	wall-windowside
+4	-193.0	-160.0	30	0.00	6	wall-windowside
+4	-193.0	-160.0	190	0.01	6	wall-windowside
+4	-193.0	-160.0	-10	0.00	6	wall-windowside
+4	-193.0	-153.0	90	0.00	6	wall-windowside
+4	-193.0	-153.0	150	0.06	6	wall-windowside
+4	-193.0	-153.0	30	0.00	6	wall-windowside
+4	-193.0	-153.0	190	0.03	6	wall-windowside
+4	-193.0	-153.0	-10	0.00	6	wall-windowside
+4	-0.6	-146.6	270	0.00	4	wall-elevatorside
+4	-0.6	-146.6	330	0.00	4	wall-elevatorside
+4	-0.6	-146.6	210	0.00	4	wall-elevatorside
+4	-0.6	-146.6	370	0.00	4	wall-elevatorside
+4	-0.6	-146.6	170	0.00	4	wall-elevatorside
+4	-0.6	-160.0	270	0.00	6	wall-elevatorside
+4	-0.6	-160.0	330	0.00	6	wall-elevatorside
+4	-0.6	-160.0	210	0.00	6	wall-elevatorside
+4	-0.6	-160.0	370	0.00	6	wall-elevatorside
+4	-0.6	-160.0	170	0.00	6	wall-elevatorside
+4	-0.3	-173.7	270	0.00	4	wall-elevatorside
+4	-0.3	-173.7	330	0.00	4	wall-elevatorside
+4	-0.3	-173.7	210	0.00	4	wall-elevatorside
+4	-0.3	-173.7	370	0.00	4	wall-elevatorside
+4	-0.3	-173.7	170	0.00	4	wall-elevatorside
+4	-271.9	-128.9	211	0.00	2	UNS_Spruce_01_LOD3
+4	-271.9	-128.9	271	0.00	2	UNS_Spruce_01_LOD3
+4	-271.9	-128.9	151	0.00	2	UNS_Spruce_01_LOD3
+4	-271.9	-128.9	311	0.00	2	UNS_Spruce_01_LOD3
+4	-271.9	-128.9	111	0.00	2	UNS_Spruce_01_LOD3
+4	-269.3	-130.5	211	0.00	2	UNS_Spruce_01_LOD3
+4	-269.3	-130.5	271	0.00	2	UNS_Spruce_01_LOD3
+4	-269.3	-130.5	151	0.00	2	UNS_Spruce_01_LOD3
+4	-269.3	-130.5	311	0.00	2	UNS_Spruce_01_LOD3
+4	-269.3	-130.5	111	0.00	2	UNS_Spruce_01_LOD3
+4	-130.0	-125.2	180	0.00	2	wall-rear-elevatorside (combined)
+4	-130.0	-125.2	240	0.00	2	wall-rear-elevatorside (combined)
+4	-130.0	-125.2	120	0.00	2	wall-rear-elevatorside (combined)
+4	-130.0	-125.2	280	0.00	2	wall-rear-elevatorside (combined)
+4	-130.0	-125.2	80	0.00	2	wall-rear-elevatorside (combined)
+4	-128.0	-130.0	90	0.00	4	Block_Cor_W
+4	-128.0	-130.0	150	0.00	4	Block_Cor_W
+4	-128.0	-130.0	30	0.00	4	Block_Cor_W
+4	-128.0	-130.0	190	0.00	4	Block_Cor_W
+4	-128.0	-130.0	-10	0.00	4	Block_Cor_W
+4	-128.0	-128.0	90	0.00	4	Block_Cor_W
+4	-128.0	-128.0	150	0.00	4	Block_Cor_W
+4	-128.0	-128.0	30	0.00	4	Block_Cor_W
+4	-128.0	-128.0	190	0.00	4	Block_Cor_W
+4	-128.0	-128.0	-10	0.00	4	Block_Cor_W
+4	-60.0	-124.0	180	0.00	4	wall-rear-windowside
+4	-60.0	-124.0	240	0.00	4	wall-rear-windowside
+4	-60.0	-124.0	120	0.00	4	wall-rear-windowside
+4	-60.0	-124.0	280	0.00	4	wall-rear-windowside
+4	-60.0	-124.0	80	0.00	4	wall-rear-windowside
+4	-59.0	-130.0	270	0.00	4	Block_N_East
+4	-59.0	-130.0	330	0.00	4	Block_N_East
+4	-59.0	-130.0	210	0.00	4	Block_N_East
+4	-59.0	-130.0	370	0.00	4	Block_N_East
+4	-59.0	-130.0	170	0.00	4	Block_N_East
+8	-190.7	-302.3	185	0.00	8	cylinder
+8	-190.7	-302.3	245	0.00	8	cylinder
+8	-190.7	-302.3	125	0.00	8	cylinder
+8	-190.7	-302.3	285	0.00	8	cylinder
+8	-190.7	-302.3	85	0.00	8	cylinder
+8	-190.0	-321.8	0	0.00	8	wall-front-elevatorside (combined)
+8	-190.0	-321.8	60	0.00	8	wall-front-elevatorside (combined)
+8	-190.0	-321.8	-60	0.00	8	wall-front-elevatorside (combined)
+8	-190.0	-321.8	100	0.00	8	wall-front-elevatorside (combined)
+8	-190.0	-321.8	-100	0.00	8	wall-front-elevatorside (combined)
+8	-189.0	-317.0	90	0.00	8	wall-windowside
+8	-189.0	-317.0	150	0.00	8	wall-windowside
+8	-189.0	-317.0	30	0.00	8	wall-windowside
+8	-189.0	-317.0	190	0.00	8	wall-windowside
+8	-189.0	-317.0	-10	0.00	8	wall-windowside
+8	-189.0	-310.0	90	0.00	8	wall-windowside
+8	-189.0	-310.0	150	0.00	8	wall-windowside
+8	-189.0	-310.0	30	0.00	8	wall-windowside
+8	-189.0	-310.0	190	0.00	8	wall-windowside
+8	-189.0	-310.0	-10	0.00	8	wall-windowside
+8	-189.0	-303.0	90	0.00	8	wall-windowside
+8	-189.0	-303.0	150	0.00	8	wall-windowside
+8	-189.0	-303.0	30	0.00	8	wall-windowside
+8	-189.0	-303.0	190	0.00	8	wall-windowside
+8	-189.0	-303.0	-10	0.00	8	wall-windowside
+8	-170.0	-321.6	0	0.00	6	wall-front-elevatorside (combined)
+8	-170.0	-321.6	60	0.00	6	wall-front-elevatorside (combined)
+8	-170.0	-321.6	-60	0.00	6	wall-front-elevatorside (combined)
+8	-170.0	-321.6	100	0.00	6	wall-front-elevatorside (combined)
+8	-170.0	-321.6	-100	0.00	6	wall-front-elevatorside (combined)
+8	-150.0	-318.9	0	0.00	8	content-education
+8	-150.0	-318.9	60	0.00	8	content-education
+8	-150.0	-318.9	-60	0.00	8	content-education
+8	-150.0	-318.9	100	0.00	8	content-education
+8	-150.0	-318.9	-100	0.00	8	content-education
+8	-130.0	-318.9	0	0.00	8	content-education
+8	-130.0	-318.9	60	0.00	8	content-education
+8	-130.0	-318.9	-60	0.00	8	content-education
+8	-130.0	-318.9	100	0.00	8	content-education
+8	-130.0	-318.9	-100	0.00	8	content-education
+8	-110.0	-321.6	0	0.00	8	wall-front-center (combined)
+8	-110.0	-321.6	60	0.00	8	wall-front-center (combined)
+8	-110.0	-321.6	-60	0.00	8	wall-front-center (combined)
+8	-110.0	-321.6	100	0.00	8	wall-front-center (combined)
+8	-110.0	-321.6	-100	0.00	8	wall-front-center (combined)
+8	-90.0	-321.6	0	0.00	8	wall-front-center (combined)
+8	-90.0	-321.6	60	0.00	8	wall-front-center (combined)
+8	-90.0	-321.6	-60	0.00	8	wall-front-center (combined)
+8	-90.0	-321.6	100	0.00	8	wall-front-center (combined)
+8	-90.0	-321.6	-100	0.00	8	wall-front-center (combined)
+8	-70.0	-321.6	0	0.00	8	wall-front-center (combined)
+8	-70.0	-321.6	60	0.00	8	wall-front-center (combined)
+8	-70.0	-321.6	-60	0.00	8	wall-front-center (combined)
+8	-70.0	-321.6	100	0.00	8	wall-front-center (combined)
+8	-70.0	-321.6	-100	0.00	8	wall-front-center (combined)
+8	-50.0	-317.4	0	0.00	8	content-introduction
+8	-50.0	-317.4	60	0.00	8	content-introduction
+8	-50.0	-317.4	-60	0.00	8	content-introduction
+8	-50.0	-317.4	100	0.00	8	content-introduction
+8	-50.0	-317.4	-100	0.00	8	content-introduction
+8	-30.0	-317.4	0	0.00	8	content-introduction
+8	-30.0	-317.4	60	0.00	8	content-introduction
+8	-30.0	-317.4	-60	0.00	8	content-introduction
+8	-30.0	-317.4	100	0.00	8	content-introduction
+8	-30.0	-317.4	-100	0.00	8	content-introduction
+8	-4.2	-296.2	270	0.00	10	wall-elevatorside
+8	-4.2	-296.2	330	0.00	10	wall-elevatorside
+8	-4.2	-296.2	210	0.00	10	wall-elevatorside
+8	-4.2	-296.2	370	0.00	10	wall-elevatorside
+8	-4.2	-296.2	170	0.00	10	wall-elevatorside
+8	-4.2	-310.0	270	0.00	8	wall-elevatorside
+8	-4.2	-310.0	330	0.00	8	wall-elevatorside
+8	-4.2	-310.0	210	0.00	8	wall-elevatorside
+8	-4.2	-310.0	370	0.00	8	wall-elevatorside
+8	-4.2	-310.0	170	0.00	8	wall-elevatorside
+8	-4.2	-323.8	270	0.00	6	wall-elevatorside
+8	-4.2	-323.8	330	0.00	6	wall-elevatorside
+8	-4.2	-323.8	210	0.00	6	wall-elevatorside
+8	-4.2	-323.8	370	0.00	6	wall-elevatorside
+8	-4.2	-323.8	170	0.00	6	wall-elevatorside
+8	-10.0	-320.4	0	0.00	8	wall-elevatorside
+8	-10.0	-320.4	60	0.00	8	wall-elevatorside
+8	-10.0	-320.4	-60	0.00	8	wall-elevatorside
+8	-10.0	-320.4	100	0.00	8	wall-elevatorside
+8	-10.0	-320.4	-100	0.00	8	wall-elevatorside
+8	-194.1	-276.1	270	0.00	4	lounge-zone
+8	-194.1	-276.1	330	0.00	4	lounge-zone
+8	-194.1	-276.1	210	0.00	4	lounge-zone
+8	-194.1	-276.1	370	0.00	4	lounge-zone
+8	-194.1	-276.1	170	11.03	4	lounge-zone
+8	-190.7	-276.4	355	0.00	6	cylinder
+8	-190.7	-276.4	415	0.00	6	cylinder
+8	-190.7	-276.4	295	0.00	6	cylinder
+8	-190.7	-276.4	455	15.21	6	cylinder
+8	-190.7	-276.4	255	0.00	6	cylinder
+8	-189.0	-280.0	90	0.00	4	wall-windowside
+8	-189.0	-280.0	150	0.00	4	wall-windowside
+8	-189.0	-280.0	30	0.47	4	wall-windowside
+8	-189.0	-280.0	190	0.00	4	wall-windowside
+8	-189.0	-280.0	-10	0.00	4	wall-windowside
+8	-189.0	-273.0	90	0.00	4	wall-windowside
+8	-189.0	-273.0	150	0.05	4	wall-windowside
+8	-189.0	-273.0	30	0.00	4	wall-windowside
+8	-189.0	-273.0	190	3.91	4	wall-windowside
+8	-189.0	-273.0	-10	0.00	4	wall-windowside
+8	1.0	-280.0	270	0.00	8	Block_E
+8	1.0	-280.0	330	0.00	8	Block_E
+8	1.0	-280.0	210	0.00	8	Block_E
+8	1.0	-280.0	370	0.00	8	Block_E
+8	1.0	-280.0	170	0.00	8	Block_E
+8	-4.2	-293.8	270	0.00	8	wall-elevatorside
+8	-4.2	-293.8	330	0.00	8	wall-elevatorside
+8	-4.2	-293.8	210	0.00	8	wall-elevatorside
+8	-4.2	-293.8	370	0.00	8	wall-elevatorside
+8	-4.2	-293.8	170	0.00	8	wall-elevatorside
+8	-194.1	-246.1	270	0.00	4	lounge-zone
+8	-194.1	-246.1	330	0.00	4	lounge-zone
+8	-194.1	-246.1	210	1.11	4	lounge-zone
+8	-194.1	-246.1	370	0.00	4	lounge-zone
+8	-194.1	-246.1	170	0.00	4	lounge-zone
+8	-194.1	-250.0	270	0.00	4	lounge-zone
+8	-194.1	-250.0	330	0.00	4	lounge-zone
+8	-194.1	-250.0	210	1.10	4	lounge-zone
+8	-194.1	-250.0	370	0.00	4	lounge-zone
+8	-194.1	-250.0	170	0.00	4	lounge-zone
+8	-194.1	-253.9	270	0.00	4	lounge-zone
+8	-194.1	-253.9	330	0.00	4	lounge-zone
+8	-194.1	-253.9	210	1.38	4	lounge-zone
+8	-194.1	-253.9	370	0.00	4	lounge-zone
+8	-194.1	-253.9	170	1.29	4	lounge-zone
+8	-189.0	-257.0	90	0.00	4	wall-windowside
+8	-189.0	-257.0	150	0.00	4	wall-windowside
+8	-189.0	-257.0	30	0.00	4	wall-windowside
+8	-189.0	-257.0	190	0.19	4	wall-windowside
+8	-189.0	-257.0	-10	0.00	4	wall-windowside
+8	-189.0	-250.0	90	0.00	4	wall-windowside
+8	-189.0	-250.0	150	0.00	4	wall-windowside
+8	-189.0	-250.0	30	0.00	4	wall-windowside
+8	-189.0	-250.0	190	0.87	4	wall-windowside
+8	-189.0	-250.0	-10	0.00	4	wall-windowside
+8	-189.0	-243.0	90	0.00	4	wall-windowside
+8	-189.0	-243.0	150	0.00	4	wall-windowside
+8	-189.0	-243.0	30	0.00	4	wall-windowside
+8	-189.0	-243.0	190	0.00	4	wall-windowside
+8	-189.0	-243.0	-10	0.00	4	wall-windowside
+8	-175.9	-250.0	90	0.00	8	lounge-zone
+8	-175.9	-250.0	150	0.00	8	lounge-zone
+8	-175.9	-250.0	30	0.00	8	lounge-zone
+8	-175.9	-250.0	190	0.00	8	lounge-zone
+8	-175.9	-250.0	-10	0.00	8	lounge-zone
+8	0.0	-250.0	270	0.00	8	wall-elevatorside
+8	0.0	-250.0	330	0.00	8	wall-elevatorside
+8	0.0	-250.0	210	0.00	8	wall-elevatorside
+8	0.0	-250.0	370	0.00	8	wall-elevatorside
+8	0.0	-250.0	170	0.00	8	wall-elevatorside
+8	-194.1	-216.1	270	0.00	4	lounge-zone
+8	-194.1	-216.1	330	0.00	4	lounge-zone
+8	-194.1	-216.1	210	0.00	4	lounge-zone
+8	-194.1	-216.1	370	0.00	4	lounge-zone
+8	-194.1	-216.1	170	0.00	4	lounge-zone
+8	-194.1	-220.0	270	0.00	4	lounge-zone
+8	-194.1	-220.0	330	0.00	4	lounge-zone
+8	-194.1	-220.0	210	0.00	4	lounge-zone
+8	-194.1	-220.0	370	0.00	4	lounge-zone
+8	-194.1	-220.0	170	0.00	4	lounge-zone
+8	-194.1	-223.9	270	0.00	4	lounge-zone
+8	-194.1	-223.9	330	0.00	4	lounge-zone
+8	-194.1	-223.9	210	0.00	4	lounge-zone
+8	-194.1	-223.9	370	0.00	4	lounge-zone
+8	-194.1	-223.9	170	0.00	4	lounge-zone
+8	-189.0	-227.0	90	0.00	4	wall-windowside
+8	-189.0	-227.0	150	0.00	4	wall-windowside
+8	-189.0	-227.0	30	0.00	4	wall-windowside
+8	-189.0	-227.0	190	0.00	4	wall-windowside
+8	-189.0	-227.0	-10	0.00	4	wall-windowside
+8	-189.0	-220.0	90	0.00	4	wall-windowside
+8	-189.0	-220.0	150	0.00	4	wall-windowside
+8	-189.0	-220.0	30	0.00	4	wall-windowside
+8	-189.0	-220.0	190	0.00	4	wall-windowside
+8	-189.0	-220.0	-10	0.00	4	wall-windowside
+8	-189.0	-213.0	90	0.00	4	wall-windowside
+8	-189.0	-213.0	150	0.00	4	wall-windowside
+8	-189.0	-213.0	30	0.00	4	wall-windowside
+8	-189.0	-213.0	190	0.00	4	wall-windowside
+8	-189.0	-213.0	-10	0.00	4	wall-windowside
+8	-175.9	-220.0	90	0.00	8	lounge-zone
+8	-175.9	-220.0	150	0.00	8	lounge-zone
+8	-175.9	-220.0	30	0.00	8	lounge-zone
+8	-175.9	-220.0	190	0.00	8	lounge-zone
+8	-175.9	-220.0	-10	0.00	8	lounge-zone
+8	0.0	-220.0	270	0.00	10	wall-elevatorside
+8	0.0	-220.0	330	0.00	10	wall-elevatorside
+8	0.0	-220.0	210	0.00	10	wall-elevatorside
+8	0.0	-220.0	370	0.00	10	wall-elevatorside
+8	0.0	-220.0	170	0.00	10	wall-elevatorside
+8	-353.8	-187.3	292	0.00	2	UNS_Spruce_01_LOD3
+8	-353.8	-187.3	352	0.00	2	UNS_Spruce_01_LOD3
+8	-353.8	-187.3	232	0.00	2	UNS_Spruce_01_LOD3
+8	-353.8	-187.3	392	0.00	2	UNS_Spruce_01_LOD3
+8	-353.8	-187.3	192	0.00	2	UNS_Spruce_01_LOD3
+8	-354.6	-189.2	292	0.00	4	UNS_Spruce_01_LOD3
+8	-354.6	-189.2	352	0.00	4	UNS_Spruce_01_LOD3
+8	-354.6	-189.2	232	0.00	4	UNS_Spruce_01_LOD3
+8	-354.6	-189.2	392	0.00	4	UNS_Spruce_01_LOD3
+8	-354.6	-189.2	192	0.00	4	UNS_Spruce_01_LOD3
+8	-356.5	-193.6	293	0.00	2	UNS_Spruce_01_LOD3
+8	-356.5	-193.6	353	0.00	2	UNS_Spruce_01_LOD3
+8	-356.5	-193.6	233	0.00	2	UNS_Spruce_01_LOD3
+8	-356.5	-193.6	393	0.00	2	UNS_Spruce_01_LOD3
+8	-356.5	-193.6	193	0.00	2	UNS_Spruce_01_LOD3
+8	-349.9	-190.0	90	0.00	2	wall-flat
+8	-349.9	-190.0	150	0.00	2	wall-flat
+8	-349.9	-190.0	30	0.00	2	wall-flat
+8	-349.9	-190.0	190	0.00	2	wall-flat
+8	-349.9	-190.0	-10	0.00	2	wall-flat
+8	-192.8	-193.3	200	0.00	6	cylinder 1
+8	-192.8	-193.3	260	0.00	6	cylinder 1
+8	-192.8	-193.3	140	0.00	6	cylinder 1
+8	-192.8	-193.3	300	0.00	6	cylinder 1
+8	-192.8	-193.3	100	0.00	6	cylinder 1
+8	-194.1	-193.9	270	0.00	4	lounge-zone
+8	-194.1	-193.9	330	0.42	4	lounge-zone
+8	-194.1	-193.9	210	0.00	4	lounge-zone
+8	-194.1	-193.9	370	0.00	4	lounge-zone
+8	-194.1	-193.9	170	0.00	4	lounge-zone
+8	-189.0	-197.0	90	0.00	4	wall-windowside
+8	-189.0	-197.0	150	0.00	4	wall-windowside
+8	-189.0	-197.0	30	0.00	4	wall-windowside
+8	-189.0	-197.0	190	0.00	4	wall-windowside
+8	-189.0	-197.0	-10	0.00	4	wall-windowside
+8	-189.0	-190.0	90	0.00	4	wall-windowside
+8	-189.0	-190.0	150	0.00	4	wall-windowside
+8	-189.0	-190.0	30	0.00	4	wall-windowside
+8	-189.0	-190.0	190	0.00	4	wall-windowside
+8	-189.0	-190.0	-10	0.00	4	wall-windowside
+8	-4.3	-176.3	270	0.00	8	wall-elevatorside
+8	-4.3	-176.3	330	0.00	8	wall-elevatorside
+8	-4.3	-176.3	210	0.00	8	wall-elevatorside
+8	-4.3	-176.3	370	0.00	8	wall-elevatorside
+8	-4.3	-176.3	170	0.00	8	wall-elevatorside
+8	0.0	-190.0	270	0.00	8	wall-elevatorside
+8	0.0	-190.0	330	0.00	8	wall-elevatorside
+8	0.0	-190.0	210	0.00	8	wall-elevatorside
+8	0.0	-190.0	370	0.00	8	wall-elevatorside
+8	0.0	-190.0	170	0.00	8	wall-elevatorside
+8	-192.8	-168.9	340	0.00	6	cylinder 1
+8	-192.8	-168.9	400	0.00	6	cylinder 1
+8	-192.8	-168.9	280	0.00	6	cylinder 1
+8	-192.8	-168.9	440	0.00	6	cylinder 1
+8	-192.8	-168.9	240	0.00	6	cylinder 1
+8	-189.0	-167.0	90	0.00	10	wall-windowside
+8	-189.0	-167.0	150	0.00	10	wall-windowside
+8	-189.0	-167.0	30	0.00	10	wall-windowside
+8	-189.0	-167.0	190	0.00	10	wall-windowside
+8	-189.0	-167.0	-10	0.00	10	wall-windowside
+8	-189.0	-160.0	90	0.00	10	wall-windowside
+8	-189.0	-160.0	150	0.00	10	wall-windowside
+8	-189.0	-160.0	30	0.00	10	wall-windowside
+8	-189.0	-160.0	190	0.00	10	wall-windowside
+8	-189.0	-160.0	-10	0.00	10	wall-windowside
+8	-189.0	-153.0	90	0.00	10	wall-windowside
+8	-189.0	-153.0	150	0.00	10	wall-windowside
+8	-189.0	-153.0	30	0.00	10	wall-windowside
+8	-189.0	-153.0	190	0.00	10	wall-windowside
+8	-189.0	-153.0	-10	0.00	10	wall-windowside
+8	-4.6	-146.6	270	0.00	8	wall-elevatorside
+8	-4.6	-146.6	330	0.00	8	wall-elevatorside
+8	-4.6	-146.6	210	0.00	8	wall-elevatorside
+8	-4.6	-146.6	370	0.00	8	wall-elevatorside
+8	-4.6	-146.6	170	0.00	8	wall-elevatorside
+8	-4.6	-160.0	270	0.00	10	wall-elevatorside
+8	-4.6	-160.0	330	0.00	10	wall-elevatorside
+8	-4.6	-160.0	210	0.00	10	wall-elevatorside
+8	-4.6	-160.0	370	0.00	10	wall-elevatorside
+8	-4.6	-160.0	170	0.00	10	wall-elevatorside
+8	-4.3	-173.7	270	0.00	8	wall-elevatorside
+8	-4.3	-173.7	330	0.00	8	wall-elevatorside
+8	-4.3	-173.7	210	0.00	8	wall-elevatorside
+8	-4.3	-173.7	370	0.00	8	wall-elevatorside
+8	-4.3	-173.7	170	0.00	8	wall-elevatorside
+8	-271.2	-133.6	211	0.00	2	UNS_Spruce_01_LOD3
+8	-271.2	-133.6	271	0.00	2	UNS_Spruce_01_LOD3
+8	-271.2	-133.6	151	0.00	2	UNS_Spruce_01_LOD3
+8	-271.2	-133.6	311	0.00	2	UNS_Spruce_01_LOD3
+8	-271.2	-133.6	111	0.00	2	UNS_Spruce_01_LOD3
+8	-130.0	-129.2	180	0.00	2	wall-rear-elevatorside (combined)
+8	-130.0	-129.2	240	0.00	2	wall-rear-elevatorside (combined)
+8	-130.0	-129.2	120	0.00	2	wall-rear-elevatorside (combined)
+8	-130.0	-129.2	280	0.00	2	wall-rear-elevatorside (combined)
+8	-130.0	-129.2	80	0.00	2	wall-rear-elevatorside (combined)
+8	-124.0	-130.0	90	0.00	8	Block_Cor_W
+8	-124.0	-130.0	150	0.00	8	Block_Cor_W
+8	-124.0	-130.0	30	0.00	8	Block_Cor_W
+8	-124.0	-130.0	190	0.00	8	Block_Cor_W
+8	-124.0	-130.0	-10	0.00	8	Block_Cor_W
+8	-124.0	-128.0	90	0.00	8	Block_Cor_W
+8	-124.0	-128.0	150	0.00	8	Block_Cor_W
+8	-124.0	-128.0	30	0.00	8	Block_Cor_W
+8	-124.0	-128.0	190	0.00	8	Block_Cor_W
+8	-124.0	-128.0	-10	0.00	8	Block_Cor_W
+8	-60.0	-128.0	180	0.00	6	wall-rear-windowside
+8	-60.0	-128.0	240	0.00	6	wall-rear-windowside
+8	-60.0	-128.0	120	0.00	6	wall-rear-windowside
+8	-60.0	-128.0	280	0.00	6	wall-rear-windowside
+8	-60.0	-128.0	80	0.00	6	wall-rear-windowside
+8	-63.0	-130.0	270	0.00	8	Block_N_East
+8	-63.0	-130.0	330	0.00	8	Block_N_East
+8	-63.0	-130.0	210	0.00	8	Block_N_East
+8	-63.0	-130.0	370	0.00	8	Block_N_East
+8	-63.0	-130.0	170	0.00	8	Block_N_East
+12	-191.0	-306.3	185	0.00	6	cylinder
+12	-191.0	-306.3	245	0.00	6	cylinder
+12	-191.0	-306.3	125	0.00	6	cylinder
+12	-191.0	-306.3	285	0.00	6	cylinder
+12	-191.0	-306.3	85	0.00	6	cylinder
+12	-190.0	-317.8	0	0.00	8	wall-front-elevatorside (combined)
+12	-190.0	-317.8	60	0.00	8	wall-front-elevatorside (combined)
+12	-190.0	-317.8	-60	0.00	8	wall-front-elevatorside (combined)
+12	-190.0	-317.8	100	0.00	8	wall-front-elevatorside (combined)
+12	-190.0	-317.8	-100	0.00	8	wall-front-elevatorside (combined)
+12	-185.0	-317.0	90	0.00	12	wall-windowside
+12	-185.0	-317.0	150	0.00	12	wall-windowside
+12	-185.0	-317.0	30	0.00	12	wall-windowside
+12	-185.0	-317.0	190	0.00	12	wall-windowside
+12	-185.0	-317.0	-10	0.00	12	wall-windowside
+12	-185.0	-310.0	90	0.00	12	wall-windowside
+12	-185.0	-310.0	150	0.00	12	wall-windowside
+12	-185.0	-310.0	30	0.00	12	wall-windowside
+12	-185.0	-310.0	190	0.00	12	wall-windowside
+12	-185.0	-310.0	-10	0.00	12	wall-windowside
+12	-185.0	-303.0	90	0.00	10	wall-windowside
+12	-185.0	-303.0	150	0.00	10	wall-windowside
+12	-185.0	-303.0	30	0.00	10	wall-windowside
+12	-185.0	-303.0	190	0.00	10	wall-windowside
+12	-185.0	-303.0	-10	0.00	10	wall-windowside
+12	-170.0	-317.6	0	0.00	10	wall-front-elevatorside (combined)
+12	-170.0	-317.6	60	0.00	10	wall-front-elevatorside (combined)
+12	-170.0	-317.6	-60	0.00	10	wall-front-elevatorside (combined)
+12	-170.0	-317.6	100	0.00	10	wall-front-elevatorside (combined)
+12	-170.0	-317.6	-100	0.00	10	wall-front-elevatorside (combined)
+12	-150.0	-314.9	0	0.00	16	content-education
+12	-150.0	-314.9	60	0.00	16	content-education
+12	-150.0	-314.9	-60	0.00	16	content-education
+12	-150.0	-314.9	100	0.00	16	content-education
+12	-150.0	-314.9	-100	0.00	16	content-education
+12	-130.0	-314.9	0	0.00	16	content-education
+12	-130.0	-314.9	60	0.00	16	content-education
+12	-130.0	-314.9	-60	0.00	16	content-education
+12	-130.0	-314.9	100	0.00	16	content-education
+12	-130.0	-314.9	-100	0.00	16	content-education
+12	-110.0	-317.6	0	0.00	12	wall-front-center (combined)
+12	-110.0	-317.6	60	0.01	12	wall-front-center (combined)
+12	-110.0	-317.6	-60	0.00	12	wall-front-center (combined)
+12	-110.0	-317.6	100	0.00	12	wall-front-center (combined)
+12	-110.0	-317.6	-100	0.00	12	wall-front-center (combined)
+12	-90.0	-317.6	0	0.00	12	wall-front-center (combined)
+12	-90.0	-317.6	60	0.00	12	wall-front-center (combined)
+12	-90.0	-317.6	-60	0.00	12	wall-front-center (combined)
+12	-90.0	-317.6	100	0.00	12	wall-front-center (combined)
+12	-90.0	-317.6	-100	0.00	12	wall-front-center (combined)
+12	-70.0	-317.6	0	0.00	12	wall-front-center (combined)
+12	-70.0	-317.6	60	0.00	12	wall-front-center (combined)
+12	-70.0	-317.6	-60	0.00	12	wall-front-center (combined)
+12	-70.0	-317.6	100	0.00	12	wall-front-center (combined)
+12	-70.0	-317.6	-100	0.00	12	wall-front-center (combined)
+12	-50.0	-313.4	0	0.00	12	content-introduction
+12	-50.0	-313.4	60	0.00	12	content-introduction
+12	-50.0	-313.4	-60	0.00	12	content-introduction
+12	-50.0	-313.4	100	0.00	12	content-introduction
+12	-50.0	-313.4	-100	0.00	12	content-introduction
+12	-30.0	-313.4	0	0.00	12	content-introduction
+12	-30.0	-313.4	60	0.00	12	content-introduction
+12	-30.0	-313.4	-60	0.00	12	content-introduction
+12	-30.0	-313.4	100	0.00	12	content-introduction
+12	-30.0	-313.4	-100	0.00	12	content-introduction
+12	-8.2	-296.2	270	0.00	16	wall-elevatorside
+12	-8.2	-296.2	330	0.00	16	wall-elevatorside
+12	-8.2	-296.2	210	0.00	16	wall-elevatorside
+12	-8.2	-296.2	370	0.00	16	wall-elevatorside
+12	-8.2	-296.2	170	0.00	16	wall-elevatorside
+12	-8.2	-310.0	270	0.00	12	wall-elevatorside
+12	-8.2	-310.0	330	0.00	12	wall-elevatorside
+12	-8.2	-310.0	210	0.00	12	wall-elevatorside
+12	-8.2	-310.0	370	0.00	12	wall-elevatorside
+12	-8.2	-310.0	170	0.00	12	wall-elevatorside
+12	-8.2	-323.8	270	0.00	6	wall-elevatorside
+12	-8.2	-323.8	330	0.00	6	wall-elevatorside
+12	-8.2	-323.8	210	0.00	6	wall-elevatorside
+12	-8.2	-323.8	370	0.00	6	wall-elevatorside
+12	-8.2	-323.8	170	0.00	6	wall-elevatorside
+12	-10.0	-316.4	0	0.00	16	wall-elevatorside
+12	-10.0	-316.4	60	0.00	16	wall-elevatorside
+12	-10.0	-316.4	-60	0.00	16	wall-elevatorside
+12	-10.0	-316.4	100	0.00	16	wall-elevatorside
+12	-10.0	-316.4	-100	0.00	16	wall-elevatorside
+12	-191.0	-272.4	355	0.00	6	cylinder
+12	-191.0	-272.4	415	0.00	6	cylinder
+12	-191.0	-272.4	295	0.00	6	cylinder
+12	-191.0	-272.4	455	2.00	6	cylinder
+12	-191.0	-272.4	255	0.00	6	cylinder
+12	-185.0	-280.0	90	0.00	2	wall-windowside
+12	-185.0	-280.0	150	0.00	2	wall-windowside
+12	-185.0	-280.0	30	15.78	2	wall-windowside
+12	-185.0	-280.0	190	0.00	2	wall-windowside
+12	-185.0	-280.0	-10	0.03	2	wall-windowside
+12	-185.0	-273.0	90	0.00	2	wall-windowside
+12	-185.0	-273.0	150	0.00	2	wall-windowside
+12	-185.0	-273.0	30	0.00	2	wall-windowside
+12	-185.0	-273.0	190	0.00	2	wall-windowside
+12	-185.0	-273.0	-10	0.00	2	wall-windowside
+12	-3.0	-280.0	270	0.00	12	Block_E
+12	-3.0	-280.0	330	0.00	12	Block_E
+12	-3.0	-280.0	210	0.00	12	Block_E
+12	-3.0	-280.0	370	0.00	12	Block_E
+12	-3.0	-280.0	170	0.00	12	Block_E
+12	-8.2	-293.8	270	0.00	12	wall-elevatorside
+12	-8.2	-293.8	330	0.00	12	wall-elevatorside
+12	-8.2	-293.8	210	0.00	12	wall-elevatorside
+12	-8.2	-293.8	370	0.00	12	wall-elevatorside
+12	-8.2	-293.8	170	0.00	12	wall-elevatorside
+12	-185.0	-257.0	90	0.00	2	wall-windowside
+12	-185.0	-257.0	150	0.00	2	wall-windowside
+12	-185.0	-257.0	30	0.00	2	wall-windowside
+12	-185.0	-257.0	190	0.00	2	wall-windowside
+12	-185.0	-257.0	-10	0.00	2	wall-windowside
+12	-185.0	-250.0	90	0.00	2	wall-windowside
+12	-185.0	-250.0	150	0.00	2	wall-windowside
+12	-185.0	-250.0	30	0.00	2	wall-windowside
+12	-185.0	-250.0	190	0.00	2	wall-windowside
+12	-185.0	-250.0	-10	0.00	2	wall-windowside
+12	-185.0	-243.0	90	0.00	2	wall-windowside
+12	-185.0	-243.0	150	0.00	2	wall-windowside
+12	-185.0	-243.0	30	0.00	2	wall-windowside
+12	-185.0	-243.0	190	0.00	2	wall-windowside
+12	-185.0	-243.0	-10	0.00	2	wall-windowside
+12	-171.9	-250.0	90	0.00	12	lounge-zone
+12	-171.9	-250.0	150	0.00	12	lounge-zone
+12	-171.9	-250.0	30	0.00	12	lounge-zone
+12	-171.9	-250.0	190	0.00	12	lounge-zone
+12	-171.9	-250.0	-10	0.00	12	lounge-zone
+12	-4.0	-250.0	270	0.00	12	wall-elevatorside
+12	-4.0	-250.0	330	0.00	12	wall-elevatorside
+12	-4.0	-250.0	210	0.00	12	wall-elevatorside
+12	-4.0	-250.0	370	0.00	12	wall-elevatorside
+12	-4.0	-250.0	170	0.00	12	wall-elevatorside
+12	-185.0	-227.0	90	0.00	2	wall-windowside
+12	-185.0	-227.0	150	0.00	2	wall-windowside
+12	-185.0	-227.0	30	0.00	2	wall-windowside
+12	-185.0	-227.0	190	0.00	2	wall-windowside
+12	-185.0	-227.0	-10	0.00	2	wall-windowside
+12	-185.0	-220.0	90	0.00	2	wall-windowside
+12	-185.0	-220.0	150	0.00	2	wall-windowside
+12	-185.0	-220.0	30	0.00	2	wall-windowside
+12	-185.0	-220.0	190	0.00	2	wall-windowside
+12	-185.0	-220.0	-10	0.00	2	wall-windowside
+12	-185.0	-213.0	90	0.00	2	wall-windowside
+12	-185.0	-213.0	150	0.00	2	wall-windowside
+12	-185.0	-213.0	30	0.00	2	wall-windowside
+12	-185.0	-213.0	190	0.00	2	wall-windowside
+12	-185.0	-213.0	-10	0.00	2	wall-windowside
+12	-171.9	-220.0	90	0.00	12	lounge-zone
+12	-171.9	-220.0	150	0.00	12	lounge-zone
+12	-171.9	-220.0	30	0.00	12	lounge-zone
+12	-171.9	-220.0	190	0.00	12	lounge-zone
+12	-171.9	-220.0	-10	0.00	12	lounge-zone
+12	-4.0	-220.0	270	0.00	16	wall-elevatorside
+12	-4.0	-220.0	330	0.00	16	wall-elevatorside
+12	-4.0	-220.0	210	0.00	16	wall-elevatorside
+12	-4.0	-220.0	370	0.00	16	wall-elevatorside
+12	-4.0	-220.0	170	0.00	16	wall-elevatorside
+12	-357.1	-186.0	292	0.00	2	UNS_Spruce_01_LOD3
+12	-357.1	-186.0	352	0.00	2	UNS_Spruce_01_LOD3
+12	-357.1	-186.0	232	0.00	2	UNS_Spruce_01_LOD3
+12	-357.1	-186.0	392	0.00	2	UNS_Spruce_01_LOD3
+12	-357.1	-186.0	192	0.00	2	UNS_Spruce_01_LOD3
+12	-359.8	-192.2	293	0.00	2	UNS_Spruce_01_LOD3
+12	-359.8	-192.2	353	0.00	2	UNS_Spruce_01_LOD3
+12	-359.8	-192.2	233	0.00	2	UNS_Spruce_01_LOD3
+12	-359.8	-192.2	393	0.00	2	UNS_Spruce_01_LOD3
+12	-359.8	-192.2	193	0.00	2	UNS_Spruce_01_LOD3
+12	-194.2	-197.0	200	0.00	4	cylinder 1
+12	-194.2	-197.0	260	0.00	4	cylinder 1
+12	-194.2	-197.0	140	0.00	4	cylinder 1
+12	-194.2	-197.0	300	0.00	4	cylinder 1
+12	-194.2	-197.0	100	0.00	4	cylinder 1
+12	-185.0	-197.0	90	0.00	2	wall-windowside
+12	-185.0	-197.0	150	0.00	2	wall-windowside
+12	-185.0	-197.0	30	0.00	2	wall-windowside
+12	-185.0	-197.0	190	0.00	2	wall-windowside
+12	-185.0	-197.0	-10	0.00	2	wall-windowside
+12	-185.0	-190.0	90	0.00	4	wall-windowside
+12	-185.0	-190.0	150	0.00	4	wall-windowside
+12	-185.0	-190.0	30	0.00	4	wall-windowside
+12	-185.0	-190.0	190	0.00	4	wall-windowside
+12	-185.0	-190.0	-10	0.00	4	wall-windowside
+12	-8.3	-176.3	270	0.00	12	wall-elevatorside
+12	-8.3	-176.3	330	0.00	12	wall-elevatorside
+12	-8.3	-176.3	210	0.00	12	wall-elevatorside
+12	-8.3	-176.3	370	0.00	12	wall-elevatorside
+12	-8.3	-176.3	170	0.00	12	wall-elevatorside
+12	-4.0	-190.0	270	0.00	12	wall-elevatorside
+12	-4.0	-190.0	330	0.00	12	wall-elevatorside
+12	-4.0	-190.0	210	0.00	12	wall-elevatorside
+12	-4.0	-190.0	370	0.00	12	wall-elevatorside
+12	-4.0	-190.0	170	0.00	12	wall-elevatorside
+12	-194.2	-165.2	340	0.00	4	cylinder 1
+12	-194.2	-165.2	400	0.00	4	cylinder 1
+12	-194.2	-165.2	280	0.00	4	cylinder 1
+12	-194.2	-165.2	440	0.00	4	cylinder 1
+12	-194.2	-165.2	240	0.00	4	cylinder 1
+12	-185.0	-167.0	90	0.00	10	wall-windowside
+12	-185.0	-167.0	150	0.00	10	wall-windowside
+12	-185.0	-167.0	30	0.00	10	wall-windowside
+12	-185.0	-167.0	190	0.00	10	wall-windowside
+12	-185.0	-167.0	-10	0.00	10	wall-windowside
+12	-185.0	-160.0	90	0.00	16	wall-windowside
+12	-185.0	-160.0	150	0.00	16	wall-windowside
+12	-185.0	-160.0	30	0.00	16	wall-windowside
+12	-185.0	-160.0	190	0.00	16	wall-windowside
+12	-185.0	-160.0	-10	0.00	16	wall-windowside
+12	-185.0	-153.0	90	0.00	16	wall-windowside
+12	-185.0	-153.0	150	0.00	16	wall-windowside
+12	-185.0	-153.0	30	0.00	16	wall-windowside
+12	-185.0	-153.0	190	0.00	16	wall-windowside
+12	-185.0	-153.0	-10	0.00	16	wall-windowside
+12	-8.6	-146.6	270	0.00	12	wall-elevatorside
+12	-8.6	-146.6	330	0.00	12	wall-elevatorside
+12	-8.6	-146.6	210	0.00	12	wall-elevatorside
+12	-8.6	-146.6	370	0.00	12	wall-elevatorside
+12	-8.6	-146.6	170	0.00	12	wall-elevatorside
+12	-8.6	-160.0	270	0.00	16	wall-elevatorside
+12	-8.6	-160.0	330	0.00	16	wall-elevatorside
+12	-8.6	-160.0	210	0.00	16	wall-elevatorside
+12	-8.6	-160.0	370	0.00	16	wall-elevatorside
+12	-8.6	-160.0	170	0.00	16	wall-elevatorside
+12	-8.3	-173.7	270	0.00	12	wall-elevatorside
+12	-8.3	-173.7	330	0.00	12	wall-elevatorside
+12	-8.3	-173.7	210	0.00	12	wall-elevatorside
+12	-8.3	-173.7	370	0.00	12	wall-elevatorside
+12	-8.3	-173.7	170	0.00	12	wall-elevatorside
+12	-273.0	-136.6	211	0.00	2	UNS_Spruce_01_LOD3
+12	-273.0	-136.6	271	0.00	2	UNS_Spruce_01_LOD3
+12	-273.0	-136.6	151	0.00	2	UNS_Spruce_01_LOD3
+12	-273.0	-136.6	311	0.00	2	UNS_Spruce_01_LOD3
+12	-273.0	-136.6	111	0.00	2	UNS_Spruce_01_LOD3
+12	-130.0	-133.2	180	0.00	4	wall-rear-elevatorside (combined)
+12	-130.0	-133.2	240	0.00	4	wall-rear-elevatorside (combined)
+12	-130.0	-133.2	120	0.00	4	wall-rear-elevatorside (combined)
+12	-130.0	-133.2	280	0.00	4	wall-rear-elevatorside (combined)
+12	-130.0	-133.2	80	0.00	4	wall-rear-elevatorside (combined)
+12	-120.0	-130.0	90	0.00	12	Block_Cor_W
+12	-120.0	-130.0	150	0.00	12	Block_Cor_W
+12	-120.0	-130.0	30	0.00	12	Block_Cor_W
+12	-120.0	-130.0	190	0.00	12	Block_Cor_W
+12	-120.0	-130.0	-10	0.00	12	Block_Cor_W
+12	-120.0	-128.0	90	0.00	10	Block_Cor_W
+12	-120.0	-128.0	150	0.00	10	Block_Cor_W
+12	-120.0	-128.0	30	0.00	10	Block_Cor_W
+12	-120.0	-128.0	190	0.00	10	Block_Cor_W
+12	-120.0	-128.0	-10	0.00	10	Block_Cor_W
+12	-60.0	-132.0	180	0.00	6	wall-rear-windowside
+12	-60.0	-132.0	240	0.00	6	wall-rear-windowside
+12	-60.0	-132.0	120	0.00	6	wall-rear-windowside
+12	-60.0	-132.0	280	0.00	6	wall-rear-windowside
+12	-60.0	-132.0	80	0.00	6	wall-rear-windowside
+12	-67.0	-130.0	270	0.00	12	Block_N_East
+12	-67.0	-130.0	330	0.00	12	Block_N_East
+12	-67.0	-130.0	210	0.00	12	Block_N_East
+12	-67.0	-130.0	370	0.00	12	Block_N_East
+12	-67.0	-130.0	170	0.00	12	Block_N_East
+16	-191.4	-310.3	185	0.00	6	cylinder
+16	-191.4	-310.3	245	0.00	6	cylinder
+16	-191.4	-310.3	125	0.00	6	cylinder
+16	-191.4	-310.3	285	0.00	6	cylinder
+16	-191.4	-310.3	85	0.00	6	cylinder
+16	-190.0	-313.8	0	0.00	8	wall-front-elevatorside (combined)
+16	-190.0	-313.8	60	0.00	8	wall-front-elevatorside (combined)
+16	-190.0	-313.8	-60	0.00	8	wall-front-elevatorside (combined)
+16	-190.0	-313.8	100	0.00	8	wall-front-elevatorside (combined)
+16	-190.0	-313.8	-100	0.00	8	wall-front-elevatorside (combined)
+16	-181.0	-317.0	90	0.00	16	wall-windowside
+16	-181.0	-317.0	150	0.00	16	wall-windowside
+16	-181.0	-317.0	30	0.00	16	wall-windowside
+16	-181.0	-317.0	190	0.00	16	wall-windowside
+16	-181.0	-317.0	-10	0.00	16	wall-windowside
+16	-181.0	-310.0	90	0.00	16	wall-windowside
+16	-181.0	-310.0	150	0.00	16	wall-windowside
+16	-181.0	-310.0	30	0.00	16	wall-windowside
+16	-181.0	-310.0	190	0.00	16	wall-windowside
+16	-181.0	-310.0	-10	0.00	16	wall-windowside
+16	-181.0	-303.0	90	0.00	12	wall-windowside
+16	-181.0	-303.0	150	0.00	12	wall-windowside
+16	-181.0	-303.0	30	0.00	12	wall-windowside
+16	-181.0	-303.0	190	0.00	12	wall-windowside
+16	-181.0	-303.0	-10	0.00	12	wall-windowside
+16	-170.0	-313.6	0	0.00	12	wall-front-elevatorside (combined)
+16	-170.0	-313.6	60	0.00	12	wall-front-elevatorside (combined)
+16	-170.0	-313.6	-60	0.00	12	wall-front-elevatorside (combined)
+16	-170.0	-313.6	100	0.00	12	wall-front-elevatorside (combined)
+16	-170.0	-313.6	-100	0.00	12	wall-front-elevatorside (combined)
+16	-150.0	-310.9	0	0.00	16	content-education
+16	-150.0	-310.9	60	0.00	16	content-education
+16	-150.0	-310.9	-60	0.00	16	content-education
+16	-150.0	-310.9	100	0.00	16	content-education
+16	-150.0	-310.9	-100	0.00	16	content-education
+16	-130.0	-310.9	0	0.00	20	content-education
+16	-130.0	-310.9	60	0.00	20	content-education
+16	-130.0	-310.9	-60	0.00	20	content-education
+16	-130.0	-310.9	100	0.00	20	content-education
+16	-130.0	-310.9	-100	0.00	20	content-education
+16	-110.0	-313.6	0	0.00	16	wall-front-center (combined)
+16	-110.0	-313.6	60	0.00	16	wall-front-center (combined)
+16	-110.0	-313.6	-60	0.00	16	wall-front-center (combined)
+16	-110.0	-313.6	100	0.00	16	wall-front-center (combined)
+16	-110.0	-313.6	-100	0.00	16	wall-front-center (combined)
+16	-90.0	-313.6	0	0.00	20	wall-front-center (combined)
+16	-90.0	-313.6	60	0.00	20	wall-front-center (combined)
+16	-90.0	-313.6	-60	0.00	20	wall-front-center (combined)
+16	-90.0	-313.6	100	0.00	20	wall-front-center (combined)
+16	-90.0	-313.6	-100	0.00	20	wall-front-center (combined)
+16	-70.0	-313.6	0	0.00	20	wall-front-center (combined)
+16	-70.0	-313.6	60	0.00	20	wall-front-center (combined)
+16	-70.0	-313.6	-60	0.00	20	wall-front-center (combined)
+16	-70.0	-313.6	100	0.00	20	wall-front-center (combined)
+16	-70.0	-313.6	-100	0.00	20	wall-front-center (combined)
+16	-50.0	-309.4	0	0.00	16	content-introduction
+16	-50.0	-309.4	60	0.00	16	content-introduction
+16	-50.0	-309.4	-60	0.00	16	content-introduction
+16	-50.0	-309.4	100	0.00	16	content-introduction
+16	-50.0	-309.4	-100	0.00	16	content-introduction
+16	-30.0	-309.4	0	0.00	16	content-introduction
+16	-30.0	-309.4	60	0.00	16	content-introduction
+16	-30.0	-309.4	-60	0.00	16	content-introduction
+16	-30.0	-309.4	100	0.00	16	content-introduction
+16	-30.0	-309.4	-100	0.00	16	content-introduction
+16	-12.2	-296.2	270	0.00	20	wall-elevatorside
+16	-12.2	-296.2	330	0.00	20	wall-elevatorside
+16	-12.2	-296.2	210	0.00	20	wall-elevatorside
+16	-12.2	-296.2	370	0.00	20	wall-elevatorside
+16	-12.2	-296.2	170	0.00	20	wall-elevatorside
+16	-12.2	-310.0	270	0.00	20	wall-elevatorside
+16	-12.2	-310.0	330	0.00	20	wall-elevatorside
+16	-12.2	-310.0	210	0.00	20	wall-elevatorside
+16	-12.2	-310.0	370	0.00	20	wall-elevatorside
+16	-12.2	-310.0	170	0.00	20	wall-elevatorside
+16	-12.2	-323.8	270	0.00	6	wall-elevatorside
+16	-12.2	-323.8	330	0.00	6	wall-elevatorside
+16	-12.2	-323.8	210	0.00	6	wall-elevatorside
+16	-12.2	-323.8	370	0.00	6	wall-elevatorside
+16	-12.2	-323.8	170	0.00	6	wall-elevatorside
+16	-10.0	-312.4	0	0.00	16	wall-elevatorside
+16	-10.0	-312.4	60	0.00	16	wall-elevatorside
+16	-10.0	-312.4	-60	0.00	16	wall-elevatorside
+16	-10.0	-312.4	100	0.00	16	wall-elevatorside
+16	-10.0	-312.4	-100	0.00	16	wall-elevatorside
+16	-191.4	-268.4	355	0.00	6	cylinder
+16	-191.4	-268.4	415	0.00	6	cylinder
+16	-191.4	-268.4	295	0.00	6	cylinder
+16	-191.4	-268.4	455	0.00	6	cylinder
+16	-191.4	-268.4	255	0.00	6	cylinder
+16	-181.0	-287.0	90	0.00	4	wall-windowside
+16	-181.0	-287.0	150	0.00	4	wall-windowside
+16	-181.0	-287.0	30	0.00	4	wall-windowside
+16	-181.0	-287.0	190	0.00	4	wall-windowside
+16	-181.0	-287.0	-10	0.00	4	wall-windowside
+16	-181.0	-280.0	90	0.00	4	wall-windowside
+16	-181.0	-280.0	150	0.00	4	wall-windowside
+16	-181.0	-280.0	30	22.22	4	wall-windowside
+16	-181.0	-280.0	190	0.00	4	wall-windowside
+16	-181.0	-280.0	-10	6.78	4	wall-windowside
+16	-7.0	-280.0	270	0.00	16	Block_E
+16	-7.0	-280.0	330	0.00	16	Block_E
+16	-7.0	-280.0	210	0.00	16	Block_E
+16	-7.0	-280.0	370	0.00	16	Block_E
+16	-7.0	-280.0	170	0.00	16	Block_E
+16	-12.2	-293.8	270	0.00	16	wall-elevatorside
+16	-12.2	-293.8	330	0.00	16	wall-elevatorside
+16	-12.2	-293.8	210	0.00	16	wall-elevatorside
+16	-12.2	-293.8	370	0.00	16	wall-elevatorside
+16	-12.2	-293.8	170	0.00	16	wall-elevatorside
+16	-181.0	-257.0	90	82.84	4	wall-windowside
+16	-181.0	-257.0	150	23.95	4	wall-windowside
+16	-181.0	-257.0	30	16.38	4	wall-windowside
+16	-181.0	-257.0	190	20.18	4	wall-windowside
+16	-181.0	-257.0	-10	1.24	4	wall-windowside
+16	-181.0	-250.0	90	44.69	4	wall-windowside
+16	-181.0	-250.0	150	23.59	4	wall-windowside
+16	-181.0	-250.0	30	20.96	4	wall-windowside
+16	-181.0	-250.0	190	19.33	4	wall-windowside
+16	-181.0	-250.0	-10	5.02	4	wall-windowside
+16	-167.9	-250.0	90	0.00	20	lounge-zone
+16	-167.9	-250.0	150	0.00	20	lounge-zone
+16	-167.9	-250.0	30	0.00	20	lounge-zone
+16	-167.9	-250.0	190	0.00	20	lounge-zone
+16	-167.9	-250.0	-10	0.00	20	lounge-zone
+16	-8.0	-250.0	270	0.00	16	wall-elevatorside
+16	-8.0	-250.0	330	0.00	16	wall-elevatorside
+16	-8.0	-250.0	210	0.00	16	wall-elevatorside
+16	-8.0	-250.0	370	0.00	16	wall-elevatorside
+16	-8.0	-250.0	170	0.00	16	wall-elevatorside
+16	-181.0	-227.0	90	44.84	4	wall-windowside
+16	-181.0	-227.0	150	14.24	4	wall-windowside
+16	-181.0	-227.0	30	20.83	4	wall-windowside
+16	-181.0	-227.0	190	1.79	4	wall-windowside
+16	-181.0	-227.0	-10	2.36	4	wall-windowside
+16	-181.0	-220.0	90	44.18	4	wall-windowside
+16	-181.0	-220.0	150	22.80	4	wall-windowside
+16	-181.0	-220.0	30	20.66	4	wall-windowside
+16	-181.0	-220.0	190	8.02	4	wall-windowside
+16	-181.0	-220.0	-10	1.45	4	wall-windowside
+16	-181.0	-213.0	90	43.09	4	wall-windowside
+16	-181.0	-213.0	150	22.97	4	wall-windowside
+16	-181.0	-213.0	30	13.52	4	wall-windowside
+16	-181.0	-213.0	190	8.42	4	wall-windowside
+16	-181.0	-213.0	-10	0.00	4	wall-windowside
+16	-167.9	-220.0	90	0.00	20	lounge-zone
+16	-167.9	-220.0	150	0.00	20	lounge-zone
+16	-167.9	-220.0	30	0.00	20	lounge-zone
+16	-167.9	-220.0	190	0.00	20	lounge-zone
+16	-167.9	-220.0	-10	0.00	20	lounge-zone
+16	-8.0	-220.0	270	0.00	16	wall-elevatorside
+16	-8.0	-220.0	330	0.00	16	wall-elevatorside
+16	-8.0	-220.0	210	0.00	16	wall-elevatorside
+16	-8.0	-220.0	370	0.00	16	wall-elevatorside
+16	-8.0	-220.0	170	0.00	16	wall-elevatorside
+16	-360.3	-184.7	292	0.00	2	UNS_Spruce_01_LOD3
+16	-360.3	-184.7	352	0.00	2	UNS_Spruce_01_LOD3
+16	-360.3	-184.7	232	0.00	2	UNS_Spruce_01_LOD3
+16	-360.3	-184.7	392	0.00	2	UNS_Spruce_01_LOD3
+16	-360.3	-184.7	192	0.00	2	UNS_Spruce_01_LOD3
+16	-361.1	-186.6	292	0.00	4	UNS_Spruce_01_LOD3
+16	-361.1	-186.6	352	0.00	4	UNS_Spruce_01_LOD3
+16	-361.1	-186.6	232	0.00	4	UNS_Spruce_01_LOD3
+16	-361.1	-186.6	392	0.00	4	UNS_Spruce_01_LOD3
+16	-361.1	-186.6	192	0.00	4	UNS_Spruce_01_LOD3
+16	-195.6	-200.8	200	0.00	2	cylinder 1
+16	-195.6	-200.8	260	0.00	2	cylinder 1
+16	-195.6	-200.8	140	0.00	2	cylinder 1
+16	-195.6	-200.8	300	0.00	2	cylinder 1
+16	-195.6	-200.8	100	0.00	2	cylinder 1
+16	-181.0	-190.0	90	0.00	6	wall-windowside
+16	-181.0	-190.0	150	0.00	6	wall-windowside
+16	-181.0	-190.0	30	0.00	6	wall-windowside
+16	-181.0	-190.0	190	0.00	6	wall-windowside
+16	-181.0	-190.0	-10	0.00	6	wall-windowside
+16	-181.0	-183.0	90	0.00	4	wall-windowside
+16	-181.0	-183.0	150	0.00	4	wall-windowside
+16	-181.0	-183.0	30	0.00	4	wall-windowside
+16	-181.0	-183.0	190	0.00	4	wall-windowside
+16	-181.0	-183.0	-10	0.00	4	wall-windowside
+16	-12.3	-176.3	270	0.00	20	wall-elevatorside
+16	-12.3	-176.3	330	0.00	20	wall-elevatorside
+16	-12.3	-176.3	210	0.00	20	wall-elevatorside
+16	-12.3	-176.3	370	0.00	20	wall-elevatorside
+16	-12.3	-176.3	170	0.00	20	wall-elevatorside
+16	-8.0	-190.0	270	0.00	16	wall-elevatorside
+16	-8.0	-190.0	330	0.00	16	wall-elevatorside
+16	-8.0	-190.0	210	0.00	16	wall-elevatorside
+16	-8.0	-190.0	370	0.00	16	wall-elevatorside
+16	-8.0	-190.0	170	0.00	16	wall-elevatorside
+16	-195.6	-161.4	340	0.00	2	cylinder 1
+16	-195.6	-161.4	400	0.00	2	cylinder 1
+16	-195.6	-161.4	280	0.00	2	cylinder 1
+16	-195.6	-161.4	440	0.00	2	cylinder 1
+16	-195.6	-161.4	240	0.00	2	cylinder 1
+16	-181.0	-167.0	90	0.00	12	wall-windowside
+16	-181.0	-167.0	150	0.00	12	wall-windowside
+16	-181.0	-167.0	30	0.00	12	wall-windowside
+16	-181.0	-167.0	190	0.00	12	wall-windowside
+16	-181.0	-167.0	-10	0.00	12	wall-windowside
+16	-181.0	-160.0	90	0.00	12	wall-windowside
+16	-181.0	-160.0	150	0.00	12	wall-windowside
+16	-181.0	-160.0	30	0.00	12	wall-windowside
+16	-181.0	-160.0	190	0.00	12	wall-windowside
+16	-181.0	-160.0	-10	0.00	12	wall-windowside
+16	-181.0	-153.0	90	0.00	16	wall-windowside
+16	-181.0	-153.0	150	0.00	16	wall-windowside
+16	-181.0	-153.0	30	0.00	16	wall-windowside
+16	-181.0	-153.0	190	0.00	16	wall-windowside
+16	-181.0	-153.0	-10	0.00	16	wall-windowside
+16	-12.6	-146.6	270	0.00	16	wall-elevatorside
+16	-12.6	-146.6	330	0.00	16	wall-elevatorside
+16	-12.6	-146.6	210	0.00	16	wall-elevatorside
+16	-12.6	-146.6	370	0.00	16	wall-elevatorside
+16	-12.6	-146.6	170	0.00	16	wall-elevatorside
+16	-12.6	-160.0	270	0.00	16	wall-elevatorside
+16	-12.6	-160.0	330	0.00	16	wall-elevatorside
+16	-12.6	-160.0	210	0.00	16	wall-elevatorside
+16	-12.6	-160.0	370	0.00	16	wall-elevatorside
+16	-12.6	-160.0	170	0.00	16	wall-elevatorside
+16	-12.3	-173.7	270	0.00	20	wall-elevatorside
+16	-12.3	-173.7	330	0.00	20	wall-elevatorside
+16	-12.3	-173.7	210	0.00	20	wall-elevatorside
+16	-12.3	-173.7	370	0.00	20	wall-elevatorside
+16	-12.3	-173.7	170	0.00	20	wall-elevatorside
+16	-130.0	-137.2	180	0.00	8	wall-rear-elevatorside (combined)
+16	-130.0	-137.2	240	0.00	8	wall-rear-elevatorside (combined)
+16	-130.0	-137.2	120	0.00	8	wall-rear-elevatorside (combined)
+16	-130.0	-137.2	280	0.00	8	wall-rear-elevatorside (combined)
+16	-130.0	-137.2	80	0.00	8	wall-rear-elevatorside (combined)
+16	-116.0	-130.0	90	0.00	16	Block_N_West
+16	-116.0	-130.0	150	0.00	16	Block_N_West
+16	-116.0	-130.0	30	0.00	16	Block_N_West
+16	-116.0	-130.0	190	0.00	16	Block_N_West
+16	-116.0	-130.0	-10	0.00	16	Block_N_West
+16	-116.0	-128.0	90	0.00	12	Block_N_West
+16	-116.0	-128.0	150	0.00	12	Block_N_West
+16	-116.0	-128.0	30	0.00	12	Block_N_West
+16	-116.0	-128.0	190	0.00	12	Block_N_West
+16	-116.0	-128.0	-10	0.00	12	Block_N_West
+16	-60.0	-136.0	180	0.00	8	wall-rear-windowside
+16	-60.0	-136.0	240	0.00	8	wall-rear-windowside
+16	-60.0	-136.0	120	0.00	8	wall-rear-windowside
+16	-60.0	-136.0	280	0.00	8	wall-rear-windowside
+16	-60.0	-136.0	80	0.00	8	wall-rear-windowside
+16	-71.0	-130.0	270	0.00	16	Block_N_East
+16	-71.0	-130.0	330	0.00	16	Block_N_East
+16	-71.0	-130.0	210	0.00	16	Block_N_East
+16	-71.0	-130.0	370	0.00	16	Block_N_East
+16	-71.0	-130.0	170	0.00	16	Block_N_East
+24	-192.0	-318.2	185	0.00	6	cylinder
+24	-192.0	-318.2	245	0.00	6	cylinder
+24	-192.0	-318.2	125	0.00	6	cylinder
+24	-192.0	-318.2	285	0.00	6	cylinder
+24	-192.0	-318.2	85	0.00	6	cylinder
+24	-190.0	-305.8	0	0.00	8	wall-front-elevatorside (combined)
+24	-190.0	-305.8	60	0.00	8	wall-front-elevatorside (combined)
+24	-190.0	-305.8	-60	0.00	8	wall-front-elevatorside (combined)
+24	-190.0	-305.8	100	0.00	8	wall-front-elevatorside (combined)
+24	-190.0	-305.8	-100	0.00	8	wall-front-elevatorside (combined)
+24	-173.0	-317.0	90	0.00	12	wall-windowside
+24	-173.0	-317.0	150	0.00	12	wall-windowside
+24	-173.0	-317.0	30	0.00	12	wall-windowside
+24	-173.0	-317.0	190	0.00	12	wall-windowside
+24	-173.0	-317.0	-10	0.00	12	wall-windowside
+24	-173.0	-310.0	90	0.00	12	wall-windowside
+24	-173.0	-310.0	150	0.00	12	wall-windowside
+24	-173.0	-310.0	30	0.00	12	wall-windowside
+24	-173.0	-310.0	190	0.00	12	wall-windowside
+24	-173.0	-310.0	-10	0.00	12	wall-windowside
+24	-173.0	-303.0	90	0.00	12	wall-windowside
+24	-173.0	-303.0	150	0.00	12	wall-windowside
+24	-173.0	-303.0	30	0.00	12	wall-windowside
+24	-173.0	-303.0	190	0.00	12	wall-windowside
+24	-173.0	-303.0	-10	0.00	12	wall-windowside
+24	-170.0	-305.6	0	0.00	12	wall-front-elevatorside (combined)
+24	-170.0	-305.6	60	0.00	12	wall-front-elevatorside (combined)
+24	-170.0	-305.6	-60	0.00	12	wall-front-elevatorside (combined)
+24	-170.0	-305.6	100	0.00	12	wall-front-elevatorside (combined)
+24	-170.0	-305.6	-100	0.00	12	wall-front-elevatorside (combined)
+24	-150.0	-302.9	0	0.00	16	content-education
+24	-150.0	-302.9	60	0.00	16	content-education
+24	-150.0	-302.9	-60	0.00	16	content-education
+24	-150.0	-302.9	100	0.00	16	content-education
+24	-150.0	-302.9	-100	0.00	16	content-education
+24	-130.0	-302.9	0	0.00	24	content-education
+24	-130.0	-302.9	60	0.00	24	content-education
+24	-130.0	-302.9	-60	0.00	24	content-education
+24	-130.0	-302.9	100	0.00	24	content-education
+24	-130.0	-302.9	-100	0.00	24	content-education
+24	-110.0	-305.6	0	0.00	24	wall-front-center (combined)
+24	-110.0	-305.6	60	0.00	24	wall-front-center (combined)
+24	-110.0	-305.6	-60	0.00	24	wall-front-center (combined)
+24	-110.0	-305.6	100	0.00	24	wall-front-center (combined)
+24	-110.0	-305.6	-100	0.00	24	wall-front-center (combined)
+24	-90.0	-305.6	0	0.00	24	wall-front-center (combined)
+24	-90.0	-305.6	60	0.00	24	wall-front-center (combined)
+24	-90.0	-305.6	-60	0.00	24	wall-front-center (combined)
+24	-90.0	-305.6	100	0.00	24	wall-front-center (combined)
+24	-90.0	-305.6	-100	0.00	24	wall-front-center (combined)
+24	-70.0	-305.6	0	0.00	24	wall-front-center (combined)
+24	-70.0	-305.6	60	0.00	24	wall-front-center (combined)
+24	-70.0	-305.6	-60	0.00	24	wall-front-center (combined)
+24	-70.0	-305.6	100	0.00	24	wall-front-center (combined)
+24	-70.0	-305.6	-100	0.00	24	wall-front-center (combined)
+24	-50.0	-301.4	0	0.00	24	content-introduction
+24	-50.0	-301.4	60	0.00	24	content-introduction
+24	-50.0	-301.4	-60	0.00	24	content-introduction
+24	-50.0	-301.4	100	0.00	24	content-introduction
+24	-50.0	-301.4	-100	0.00	24	content-introduction
+24	-30.0	-301.4	0	0.00	24	content-introduction
+24	-30.0	-301.4	60	0.00	24	content-introduction
+24	-30.0	-301.4	-60	0.00	24	content-introduction
+24	-30.0	-301.4	100	0.00	24	content-introduction
+24	-30.0	-301.4	-100	0.00	24	content-introduction
+24	-20.2	-296.2	270	0.00	24	wall-elevatorside
+24	-20.2	-296.2	330	0.00	24	wall-elevatorside
+24	-20.2	-296.2	210	0.00	24	wall-elevatorside
+24	-20.2	-296.2	370	0.00	24	wall-elevatorside
+24	-20.2	-296.2	170	0.00	24	wall-elevatorside
+24	-20.2	-310.0	270	0.00	16	wall-elevatorside
+24	-20.2	-310.0	330	0.00	16	wall-elevatorside
+24	-20.2	-310.0	210	0.00	16	wall-elevatorside
+24	-20.2	-310.0	370	0.00	16	wall-elevatorside
+24	-20.2	-310.0	170	0.00	16	wall-elevatorside
+24	-20.2	-323.8	270	9.97	2	wall-elevatorside
+24	-20.2	-323.8	330	29.59	2	wall-elevatorside
+24	-20.2	-323.8	210	0.00	2	wall-elevatorside
+24	-20.2	-323.8	370	18.25	2	wall-elevatorside
+24	-20.2	-323.8	170	0.00	2	wall-elevatorside
+24	-10.0	-304.4	0	0.00	16	wall-elevatorside
+24	-10.0	-304.4	60	0.00	16	wall-elevatorside
+24	-10.0	-304.4	-60	0.00	16	wall-elevatorside
+24	-10.0	-304.4	100	0.00	16	wall-elevatorside
+24	-10.0	-304.4	-100	0.00	16	wall-elevatorside
+24	-192.0	-260.5	355	0.00	6	cylinder
+24	-192.0	-260.5	415	0.00	6	cylinder
+24	-192.0	-260.5	295	0.00	6	cylinder
+24	-192.0	-260.5	455	0.00	6	cylinder
+24	-192.0	-260.5	255	0.00	6	cylinder
+24	-173.0	-287.0	90	0.00	12	wall-windowside
+24	-173.0	-287.0	150	0.00	12	wall-windowside
+24	-173.0	-287.0	30	0.00	12	wall-windowside
+24	-173.0	-287.0	190	0.00	12	wall-windowside
+24	-173.0	-287.0	-10	0.00	12	wall-windowside
+24	-173.0	-280.0	90	0.00	12	wall-windowside
+24	-173.0	-280.0	150	0.00	12	wall-windowside
+24	-173.0	-280.0	30	0.00	12	wall-windowside
+24	-173.0	-280.0	190	0.00	12	wall-windowside
+24	-173.0	-280.0	-10	0.00	12	wall-windowside
+24	-15.0	-280.0	270	0.00	24	Block_E
+24	-15.0	-280.0	330	0.00	24	Block_E
+24	-15.0	-280.0	210	0.00	24	Block_E
+24	-15.0	-280.0	370	0.00	24	Block_E
+24	-15.0	-280.0	170	0.00	24	Block_E
+24	-20.2	-293.8	270	0.00	24	wall-elevatorside
+24	-20.2	-293.8	330	0.00	24	wall-elevatorside
+24	-20.2	-293.8	210	0.00	24	wall-elevatorside
+24	-20.2	-293.8	370	0.00	24	wall-elevatorside
+24	-20.2	-293.8	170	0.00	24	wall-elevatorside
+24	-173.0	-257.0	90	0.00	12	wall-windowside
+24	-173.0	-257.0	150	0.00	12	wall-windowside
+24	-173.0	-257.0	30	0.00	12	wall-windowside
+24	-173.0	-257.0	190	0.00	12	wall-windowside
+24	-173.0	-257.0	-10	0.00	12	wall-windowside
+24	-173.0	-250.0	90	0.00	12	wall-windowside
+24	-173.0	-250.0	150	0.00	12	wall-windowside
+24	-173.0	-250.0	30	0.00	12	wall-windowside
+24	-173.0	-250.0	190	0.00	12	wall-windowside
+24	-173.0	-250.0	-10	0.00	12	wall-windowside
+24	-159.9	-250.0	90	0.00	20	lounge-zone
+24	-159.9	-250.0	150	0.00	20	lounge-zone
+24	-159.9	-250.0	30	0.00	20	lounge-zone
+24	-159.9	-250.0	190	0.00	20	lounge-zone
+24	-159.9	-250.0	-10	0.00	20	lounge-zone
+24	-16.0	-250.0	270	0.00	24	wall-elevatorside
+24	-16.0	-250.0	330	0.00	24	wall-elevatorside
+24	-16.0	-250.0	210	0.00	24	wall-elevatorside
+24	-16.0	-250.0	370	0.00	24	wall-elevatorside
+24	-16.0	-250.0	170	0.00	24	wall-elevatorside
+24	-173.0	-227.0	90	0.00	12	wall-windowside
+24	-173.0	-227.0	150	0.00	12	wall-windowside
+24	-173.0	-227.0	30	0.00	12	wall-windowside
+24	-173.0	-227.0	190	0.00	12	wall-windowside
+24	-173.0	-227.0	-10	0.00	12	wall-windowside
+24	-173.0	-220.0	90	0.00	12	wall-windowside
+24	-173.0	-220.0	150	0.00	12	wall-windowside
+24	-173.0	-220.0	30	0.00	12	wall-windowside
+24	-173.0	-220.0	190	0.00	12	wall-windowside
+24	-173.0	-220.0	-10	0.00	12	wall-windowside
+24	-173.0	-213.0	90	0.00	12	wall-windowside
+24	-173.0	-213.0	150	0.00	12	wall-windowside
+24	-173.0	-213.0	30	0.00	12	wall-windowside
+24	-173.0	-213.0	190	0.00	12	wall-windowside
+24	-173.0	-213.0	-10	0.00	12	wall-windowside
+24	-159.9	-220.0	90	0.00	20	lounge-zone
+24	-159.9	-220.0	150	0.00	20	lounge-zone
+24	-159.9	-220.0	30	0.00	20	lounge-zone
+24	-159.9	-220.0	190	0.00	20	lounge-zone
+24	-159.9	-220.0	-10	0.00	20	lounge-zone
+24	-16.0	-220.0	270	0.00	24	wall-elevatorside
+24	-16.0	-220.0	330	0.00	24	wall-elevatorside
+24	-16.0	-220.0	210	0.00	24	wall-elevatorside
+24	-16.0	-220.0	370	0.00	24	wall-elevatorside
+24	-16.0	-220.0	170	0.00	24	wall-elevatorside
+24	-173.0	-190.0	90	0.00	12	wall-windowside
+24	-173.0	-190.0	150	0.00	12	wall-windowside
+24	-173.0	-190.0	30	0.00	12	wall-windowside
+24	-173.0	-190.0	190	0.00	12	wall-windowside
+24	-173.0	-190.0	-10	0.00	12	wall-windowside
+24	-173.0	-183.0	90	0.00	12	wall-windowside
+24	-173.0	-183.0	150	0.00	12	wall-windowside
+24	-173.0	-183.0	30	0.00	12	wall-windowside
+24	-173.0	-183.0	190	0.00	12	wall-windowside
+24	-173.0	-183.0	-10	0.00	12	wall-windowside
+24	-20.3	-176.3	270	0.00	24	wall-elevatorside
+24	-20.3	-176.3	330	0.00	24	wall-elevatorside
+24	-20.3	-176.3	210	0.00	24	wall-elevatorside
+24	-20.3	-176.3	370	0.00	24	wall-elevatorside
+24	-20.3	-176.3	170	0.00	24	wall-elevatorside
+24	-16.0	-190.0	270	0.00	24	wall-elevatorside
+24	-16.0	-190.0	330	0.00	24	wall-elevatorside
+24	-16.0	-190.0	210	0.00	24	wall-elevatorside
+24	-16.0	-190.0	370	0.00	24	wall-elevatorside
+24	-16.0	-190.0	170	0.00	24	wall-elevatorside
+24	-173.0	-167.0	90	0.00	8	wall-windowside
+24	-173.0	-167.0	150	0.00	8	wall-windowside
+24	-173.0	-167.0	30	0.00	8	wall-windowside
+24	-173.0	-167.0	190	0.00	8	wall-windowside
+24	-173.0	-167.0	-10	0.00	8	wall-windowside
+24	-173.0	-160.0	90	0.00	6	wall-windowside
+24	-173.0	-160.0	150	0.00	6	wall-windowside
+24	-173.0	-160.0	30	0.00	6	wall-windowside
+24	-173.0	-160.0	190	0.00	6	wall-windowside
+24	-173.0	-160.0	-10	0.00	6	wall-windowside
+24	-173.0	-153.0	90	0.00	8	wall-windowside
+24	-173.0	-153.0	150	0.00	8	wall-windowside
+24	-173.0	-153.0	30	0.00	8	wall-windowside
+24	-173.0	-153.0	190	0.00	8	wall-windowside
+24	-173.0	-153.0	-10	0.00	8	wall-windowside
+24	-20.6	-146.6	270	0.00	16	wall-elevatorside
+24	-20.6	-146.6	330	0.00	16	wall-elevatorside
+24	-20.6	-146.6	210	0.00	16	wall-elevatorside
+24	-20.6	-146.6	370	0.00	16	wall-elevatorside
+24	-20.6	-146.6	170	0.00	16	wall-elevatorside
+24	-20.6	-160.0	270	0.00	24	wall-elevatorside
+24	-20.6	-160.0	330	0.00	24	wall-elevatorside
+24	-20.6	-160.0	210	0.00	24	wall-elevatorside
+24	-20.6	-160.0	370	0.00	24	wall-elevatorside
+24	-20.6	-160.0	170	0.00	24	wall-elevatorside
+24	-20.3	-173.7	270	0.00	24	wall-elevatorside
+24	-20.3	-173.7	330	0.00	24	wall-elevatorside
+24	-20.3	-173.7	210	0.00	24	wall-elevatorside
+24	-20.3	-173.7	370	0.00	24	wall-elevatorside
+24	-20.3	-173.7	170	0.00	24	wall-elevatorside
+24	-130.0	-145.2	180	0.00	16	wall-rear-elevatorside (combined)
+24	-130.0	-145.2	240	0.00	16	wall-rear-elevatorside (combined)
+24	-130.0	-145.2	120	0.00	16	wall-rear-elevatorside (combined)
+24	-130.0	-145.2	280	0.00	16	wall-rear-elevatorside (combined)
+24	-130.0	-145.2	80	0.00	16	wall-rear-elevatorside (combined)
+24	-108.0	-130.0	90	0.00	20	Block_N_West
+24	-108.0	-130.0	150	0.00	20	Block_N_West
+24	-108.0	-130.0	30	0.00	20	Block_N_West
+24	-108.0	-130.0	190	0.00	20	Block_N_West
+24	-108.0	-130.0	-10	0.00	20	Block_N_West
+24	-108.0	-128.0	90	0.00	20	Block_N_West
+24	-108.0	-128.0	150	0.00	20	Block_N_West
+24	-108.0	-128.0	30	0.00	20	Block_N_West
+24	-108.0	-128.0	190	0.00	20	Block_N_West
+24	-108.0	-128.0	-10	0.00	20	Block_N_West
+24	-60.0	-144.0	180	0.00	12	wall-rear-windowside
+24	-60.0	-144.0	240	0.00	12	wall-rear-windowside
+24	-60.0	-144.0	120	0.00	12	wall-rear-windowside
+24	-60.0	-144.0	280	0.00	12	wall-rear-windowside
+24	-60.0	-144.0	80	0.00	12	wall-rear-windowside
+24	-79.0	-130.0	270	0.00	24	Block_N_East
+24	-79.0	-130.0	330	0.00	24	Block_N_East
+24	-79.0	-130.0	210	0.00	24	Block_N_East
+24	-79.0	-130.0	370	0.00	24	Block_N_East
+24	-79.0	-130.0	170	0.00	24	Block_N_East

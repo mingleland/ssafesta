@@ -1,0 +1,115 @@
+/* Auth Processing / First Setup — 게임 진입 Transition. 일반 웹 스피너 페이지가 아니다.
+   Landing/Login 과 같은 배경 자산을 써서 같은 세계 안이라는 인상을 유지한다. */
+.boot-root {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #0b0f28;
+  font-family: var(--festa-font);
+  color: var(--festa-ink);
+}
+.boot-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(3px) brightness(0.55);
+  transform: scale(1.04);
+}
+.boot-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 34px 40px 36px;
+  min-width: min(400px, calc(100vw - 40px));
+  border-radius: 20px;
+  background: var(--festa-surface);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
+  text-align: center;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .boot-panel { background: #10142a; backdrop-filter: none; }
+}
+.boot-logo { width: 178px; height: auto; margin-bottom: 4px; }
+.boot-line { margin: 0; font-size: 15.5px; font-weight: 600; }
+.boot-sub { margin: 0; font-size: 13px; color: rgba(234, 238, 251, 0.66); }
+
+/* 진행률을 아는 척하지 않는다 — 무한 왕복 인디케이터다 */
+.boot-bar {
+  width: 190px;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.boot-bar-fill {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4d6bff, #7b4dff);
+  animation: boot-slide 1.25s ease-in-out infinite;
+}
+@keyframes boot-slide {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-bar-fill { animation: none; width: 100%; opacity: 0.6; }
+}
+
+.boot-btn {
+  margin-top: 8px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.boot-btn:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* First Setup 폼 — 필드 1개(닉네임)뿐이다. 여기에 항목을 늘리지 않는다. */
+.boot-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+  margin-top: 8px;
+}
+.boot-panel form label { font-size: 12.5px; color: rgba(234, 238, 251, 0.7); text-align: left; }
+.boot-panel form input {
+  height: 40px;
+  padding: 0 13px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 14px;
+}
+.boot-panel form input:focus { outline: 2px solid rgba(90, 140, 255, 0.55); outline-offset: 1px; }
+.boot-panel form button {
+  height: 40px;
+  border-radius: 11px;
+  border: 0;
+  background: linear-gradient(135deg, #4d6bff, #7b4dff);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.boot-panel form button:disabled { opacity: 0.55; cursor: not-allowed; }
+.boot-panel form p[role='alert'] { margin: 0; font-size: 12.5px; color: #ff9d9d; text-align: left; }

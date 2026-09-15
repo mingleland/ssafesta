@@ -1,0 +1,35 @@
+meta {
+  name: 작업본 조회
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/games/{{gameId}}/draft
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  ## 게임 작업본 조회
+
+  - 인증: **필수** (소유자)
+  - 성공: `200 OK`, `{ gameId, revision, project, updatedAt, warnings }`
+
+  ### 한 번도 저장하지 않았으면 `204`다
+
+  `404`가 아닌 이유는 그 자리가 "그런 게임 없음"이기 때문이다. 둘을 합치면 새 게임을 만들 때마다 편집기가 오류 화면으로 열린다 (#104 ①). `204`를 받은 편집기는 자기 시작 프로젝트를 그대로 쓴다.
+
+  응답의 `revision`이 **다음 저장·게시의 `expectedRevision`**이다. `project`는 저장된 바이트 그대로 실려 온다 — 서버가 재직렬화하지 않는다.
+
+  | 코드 | 상황 |
+  |---|---|
+  | `200` | 작업본 있음 |
+  | `204` | 아직 저장한 적 없음 (오류 아님) |
+  | `403 GAME_FORBIDDEN` | 내 게임이 아니다 |
+  | `404` | `GAME_NOT_FOUND` 또는 `GAME_DELETED` |
+}

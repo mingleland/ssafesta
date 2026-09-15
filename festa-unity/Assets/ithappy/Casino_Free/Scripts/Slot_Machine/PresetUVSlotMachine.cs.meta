@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: c042d60cc7664cbc88fad6b59dc22806
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 393074
+  packageName: Casino FREE - Low Poly Asset Pack
+  packageVersion: 1.0
+  assetPath: Assets/ithappy/Casino_Free/Scripts/Slot_Machine/PresetUVSlotMachine.cs
+  uploadId: 963832

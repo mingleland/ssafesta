@@ -1,0 +1,226 @@
+/* Login — 게임 메뉴형 로그인 (S15P21A604-379).
+   배경 축제 세계는 login-background.png 자산이 소유한다. React 는 중앙 패널·버튼·상태만 그린다.
+   reference: docs/LJH/ui-design/00_context/sources/login.png — 패널 반투명 다크, 좌우 배경 노출 유지.
+
+   기하는 눈대중이 아니라 레퍼런스 PNG 실측에서 나온 값이다(1920×1080 기준, 뷰포트 %):
+     버튼 가로   x 38.7% ~ 61.2% (폭 22.5%)
+     버튼 상단 y 58.8% / 66.7% / 74.6% / 82.5%  — pitch 7.9%p
+     버튼 높이   5.6%
+   세 버튼 상단에 직선을 맞춘 값이고 예측이 실측과 ±0.9%p 안에 든다.
+
+   고정 px 을 쓰지 않는 이유: 레퍼런스는 16:9 한 장의 구도라 비율이 정답이다. px 으로 박으면
+   뷰포트가 커질수록 버튼이 조밀해진다(1920 에서 pitch 가 70px 로 나와 레퍼런스 85px 과 어긋났다).
+   clamp 하한은 작은 화면에서 버튼이 뭉개지지 않게 지킨다. */
+.login-root {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #141a52;
+  color: #ffffff;
+
+  /* 레퍼런스 비율 → 뷰포트 연동. 하한·상한은 Desktop-first(D-02) 범위에서 깨지지 않을 만큼만 */
+  --login-btn-h: clamp(46px, 5.6vh, 64px);
+  --login-gap: clamp(9px, 2.3vh, 26px);
+  --login-pad-y: clamp(14px, 2.3vh, 26px);
+  --login-pad-x: clamp(18px, 2.8vw, 56px);
+  /* 첫 버튼(SSAFY) 상단이 여기 오면 나머지는 pitch 로 따라온다 — acceptance 기준점 */
+  /* 레퍼런스(login.png) 비율은 58.8% 다. 다만 그 아래 패널·푸터가 들어갈 높이가 없으면
+     패널이 푸터를 뚫는다(실측: vh 500 에서 67px 겹침). min() 으로 "레퍼런스 비율" 과
+     "아래 공간을 300px 남긴다" 중 작은 쪽을 택한다 — vh 728 이상에서는 58.8% 그대로라
+     1920x1080·1440x900·1280x800 의 확정 좌표가 바뀌지 않는다. */
+  --login-first-btn-top: min(58.8%, calc(100% - 300px));
+}
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* 자산(1672×941)과 레퍼런스(1920×1080)는 같은 16:9 지만 크롭이 다르다 — 자산 쪽이 하늘이 적다.
+     center bottom 은 세로로 긴 창에서 구도를 아래로 밀어 하늘만 남겼다. 중앙 정렬이 레퍼런스
+     프레이밍에 가장 가깝다. 정확한 일치는 레퍼런스와 같은 크롭 원본이 필요하다(별도 후속). */
+  object-position: center center;
+}
+
+.login-logo {
+  position: absolute;
+  left: 50%;
+  /* 레퍼런스 실측: 상단 13.3%, 폭 36.1% */
+  top: 13.3vh;
+  transform: translateX(-50%);
+  width: min(36vw, 64vh);
+  max-width: 760px;
+  height: auto;
+  filter: drop-shadow(0 10px 30px rgba(6, 9, 40, 0.55));
+  pointer-events: none;
+}
+
+.login-panel {
+  position: absolute;
+  left: 50%;
+  /* 패널 위치를 직접 정하지 않는다 — 첫 버튼이 레퍼런스 좌표에 오도록 역산한다.
+     border 1px + padding 만큼 위로 올려야 버튼 상단이 --login-first-btn-top 에 앉는다. */
+  top: calc(var(--login-first-btn-top) - var(--login-pad-y) - 1px);
+  transform: translateX(-50%);
+  /* 버튼 폭 22.5% + 좌우 padding → 28.1vw. 1920 에서 540px, 버튼 432px(22.5%) */
+  width: min(clamp(320px, 28.1vw, 600px), 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--login-gap);
+  padding: var(--login-pad-y) var(--login-pad-x);
+  border-radius: clamp(12px, 1.5vh, 18px);
+  /* 레퍼런스 패널은 푸른기가 아니라 중성 회색이다(합성 샘플 rgb(104,100,125)) */
+  background: rgba(30, 30, 40, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 18px 60px rgba(6, 9, 40, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+/* 투명도 감소 선호 시 유리 효과 대신 불투명 표면 (Taste a11y 지적 반영) */
+@media (prefers-reduced-transparency: reduce) {
+  .login-panel {
+    background: rgba(30, 30, 40, 0.94);
+    backdrop-filter: none;
+  }
+}
+
+.login-alert {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #ffe1e6;
+  background: rgba(160, 40, 60, 0.45);
+  border: 1px solid rgba(255, 160, 175, 0.5);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.login-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: var(--login-btn-h);
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+  position: relative; /* 배지를 흐름 밖으로 띄우기 위한 기준 */
+}
+
+.login-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.login-btn:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.login-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.login-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.login-btn-label {
+  flex-grow: 1;
+  text-align: center;
+  /* 아이콘 폭만큼 시각 중앙 보정 */
+  margin-right: 28px;
+}
+
+.login-btn-ssafy {
+  background: #2f6bff;
+  color: #ffffff;
+}
+
+.login-btn-ssafy .login-btn-icon {
+  background: #ffffff;
+  border-radius: 8px;
+  color: #2f6bff;
+  font-weight: 800;
+  font-size: 17px;
+}
+
+.login-btn-google {
+  background: #ffffff;
+  color: #1f2430;
+}
+
+.login-btn-kakao {
+  background: #fee500;
+  color: #1d1d1f;
+}
+
+.login-btn-guest {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+}
+
+/* 배지는 레이아웃 흐름에서 뺀다. flex 항목으로 두면 SSAFY 버튼의 라벨 가용 폭만 줄어들어
+   그 버튼의 글자만 왼쪽으로 밀린다 — Google·Kakao 와 중앙이 어긋난다. */
+.login-badge {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(6, 9, 40, 0.35);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.login-footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px 22px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 8px rgba(6, 9, 40, 0.9);
+}
+
+.login-footer-group {
+  display: flex;
+  gap: 22px;
+}
+
+.login-footer-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-footer-icon {
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.login-footer-sep {
+  margin: 0 10px;
+  opacity: 0.5;
+}
