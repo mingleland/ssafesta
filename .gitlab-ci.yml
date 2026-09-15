@@ -33,7 +33,7 @@ workflow:
     # 해제 조건 — 둘 중 하나라도 성립하면 이 rule 과 .*-changes 의 target 가드를 함께 지운다.
     #   1. 러너 동시 실행 한도가 늘어 develop 직행이 다시 감당된다
     #   2. 파트 브랜치 배칭을 끝내고 develop 직행으로 돌아간다
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|game)$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|frontend.*|game)$/'
 
     # 위 둘에 해당하지 않으면 파이프라인을 만들지 않는다. 브랜치 push 도 여기서 멈춘다 — MR
     # 파이프라인과 중복 실행하지 않기 위해서다.
