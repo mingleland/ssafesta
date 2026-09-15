@@ -20,6 +20,10 @@ lock_timeout_seconds="${GAME_DEPLOY_LOCK_TIMEOUT_SECONDS:-300}"
 
 [[ -f "${RELEASE_MANIFEST_PATH}" ]] || { echo 'release manifest is missing' >&2; exit 66; }
 [[ -f "${GAME_ENV_FILE}" ]] || { echo 'game environment file is missing' >&2; exit 66; }
+set -a
+# shellcheck disable=SC1090
+source "${GAME_ENV_FILE}"
+set +a
 [[ -f "${compose_file}" ]] || { echo 'game Compose file is missing' >&2; exit 66; }
 [[ "${compose_project}" == 'festa-demo-world' ]] || { echo 'unexpected game Compose project' >&2; exit 64; }
 [[ "${compose_service}" == 'demo-game' ]] || { echo 'unexpected game Compose service' >&2; exit 64; }
