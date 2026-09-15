@@ -5,8 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { layoutApi } from '../../../entities/layout/api.select';
 import type { DraftGetResponse, LayoutObject } from '../../../entities/layout/types';
-import type { MyBooth } from '../../../entities/booth/types';
-import { notifyBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
+import { notifyCurrentBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
 import type { EditorAction } from './editorReducer';
 
 interface SaveArgs {
@@ -61,10 +60,8 @@ export function usePublish(dispatch: (action: EditorAction) => void) {
     onSuccess: (result) => {
       dispatch({ type: 'PUBLISH_SUCCESS', publishedVersion: result.publishedVersion });
       // 게시본 version 이 바뀌었다 — 상주 중인 Unity 가 이 슬롯을 다시 읽게 한다 (-644).
-      // slotId 는 useOwnerGate 가 채운 ['my-booth'] 캐시에 있다(StudioPage 는 그 게이트 뒤에서만 렌더된다).
-      // 없으면 조용히 건너뛴다 — 다음 월드 진입이 읽는다.
-      const slotId = queryClient.getQueryData<MyBooth>(['my-booth'])?.lease?.slotId;
-      if (slotId !== undefined) notifyBoothSlotChanged(slotId);
+      // slotId 조회는 bridge 가 들고 있다 — FacadePanel 과 같은 함수를 쓴다(S15P21A604-786).
+      notifyCurrentBoothSlotChanged(queryClient);
       return result;
     },
   });

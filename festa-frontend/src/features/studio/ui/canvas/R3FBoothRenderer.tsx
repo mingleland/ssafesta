@@ -1,7 +1,7 @@
 // R3F 부스 렌더러 — D-05 Spike (S15P21A604-470).
 //
 // 지위: 채택 확정이 아니라 검증용 프로토타입이다. 실제 Unity 에셋(GLB)은 쓰지 않고
-// 계약의 OBJECT_LOCAL_BOUNDS 에서 파라메트릭 박스를 만든다. 실루엣 말고는 시안이 요구하는
+// resolveLocalBounds(runtime manifest → 타입 기본)에서 파라메트릭 박스를 만든다. 실루엣 말고는 시안이 요구하는
 // 것 — 실광원·그림자·PBR 재질·3축 기즈모 — 이 전부 여기서 성립하는지를 본다.
 //
 // 편집 계약은 SVG 렌더러와 같다: X/Z 이동, Y 고정, Y축 회전, snap, bounds clamp.
@@ -13,7 +13,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../../model/useBoothAssets';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
 import type { LayoutObject } from '../../../../entities/layout/types';
@@ -211,16 +211,18 @@ function ObjectMesh({
   asset: BoothAssetEntry | undefined;
   onDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
-  const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+  const box = resolveLocalBounds(obj) ?? FALLBACK_BOX;
   const { center, size } = boxPlacement(box);
   const surface = OBJECT_SURFACE[obj.type] ?? { roughness: 0.7, metalness: 0, opacity: 1 };
-  const color = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
+  // 계약 색은 **파라메트릭 박스 전용**이다 (S15P21A604-789). 실물 GLB 는 자기 색을 들고 오므로
+  // 여기서 칠하지 않는다 — 칠하면 자산이 authoring 된 색을 편집기가 지운다.
+  const boxColor = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
 
   const boxBody = (
     <mesh position={center} castShadow receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial
-        color={color}
+        color={boxColor}
         roughness={surface.roughness}
         metalness={surface.metalness}
         transparent={surface.opacity < 1}
@@ -233,20 +235,15 @@ function ObjectMesh({
     <group position={[obj.position.x, 0, obj.position.z]} rotation={[0, (obj.rotationY * Math.PI) / 180, 0]}>
       {/* 픽킹은 group 이 받는다 — 모델이 여러 mesh 로 쪼개져 있어도 한 덩어리로 잡힌다 */}
       <group onPointerDown={onDown}>
-        {asset === undefined ? (
-          boxBody
-        ) : (
-          <AssetMesh
-            entry={asset}
-            color={color}
-            roughness={surface.roughness}
-            metalness={surface.metalness}
-            fallback={boxBody}
-          />
-        )}
+        {asset === undefined ? boxBody : <AssetMesh entry={asset} fallback={boxBody} />}
       </group>
-      {selected && (
-        // 선택 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다
+      {(selected || invalid) && (
+        // 선택·금지 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다.
+        //
+        // **금지 상태를 여기서 말하는 이유** (S15P21A604-789): 예전에는 재질 색을 붉게 갈아
+        // 끼워 말했는데, 그러면 실물 GLB 가 들고 온 색을 편집기가 파괴한다. 게다가 텍스처를
+        // 든 재질은 갈아 끼우지 않아 **같은 모델 안에서도 어떤 면만 붉어졌다.** 윤곽은 재질을
+        // 건드리지 않고 같은 것을 말한다.
         <mesh position={center}>
           <boxGeometry args={[size[0] * 1.04, size[1] * 1.04, size[2] * 1.04]} />
           <meshBasicMaterial color={invalid ? '#ff5d5d' : '#5ee08a'} wireframe />
@@ -298,7 +295,7 @@ function Gizmo({
   onMoveDown: (e: ThreeEvent<PointerEvent>) => void;
   onRotateDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
-  const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+  const box = resolveLocalBounds(obj) ?? FALLBACK_BOX;
   const radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.75 + 0.45;
   const rad = (obj.rotationY * Math.PI) / 180;
 
@@ -385,7 +382,7 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
       const c = clampObjectToBooth(
         x,
         z,
-        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving === undefined ? undefined : resolveLocalBounds(moving),
         moving?.rotationY ?? 0,
         p.bounds,
       );
@@ -455,7 +452,7 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
       <BoothStage bounds={p.bounds} decor={p.decor} />
 
       {p.objects.map((obj) => {
-        const known = OBJECT_LOCAL_BOUNDS[obj.type];
+        const known = resolveLocalBounds(obj);
         const oob = known !== undefined && isAreaOutOfBounds(worldAABB(known, obj.rotationY, obj.position), p.bounds);
         return (
           <ObjectMesh

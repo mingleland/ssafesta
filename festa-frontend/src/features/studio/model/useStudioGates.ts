@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { isApiError } from '../../../shared/api/client';
 import type { ApiErrorDetail } from '../../../shared/api/client';
 import { passageWarnings } from '../../../entities/layout/passage';
+import { resolveLocalBounds } from './useBoothAssets';
 import type { EditorState } from './editorReducer';
 import { precheckErrors, precheckWarnings } from '../lib/validate';
 
@@ -38,9 +39,13 @@ export function useStudioGates({
   maxObjects,
   bounds,
 }: Params) {
-  // 통행 판정(§10-3)은 120×120 래스터라 다른 렌더(선택·입력 중 텍스트 변경)마다 다시 돌리지 않는다 —
+  // 통행 판정(§10-3)은 188×120 래스터라 다른 렌더(선택·입력 중 텍스트 변경)마다 다시 돌리지 않는다 —
   // 12개 규모라 배치가 실제로 바뀔 때만 재계산해도 충분하다(계약 명시, T023).
-  const passage = useMemo(() => passageWarnings(state.objects), [state.objects]);
+  // 격자는 부스 footprint 에서 유도되므로 bounds 도 의존성이다(S15P21A604-785).
+  const passage = useMemo(
+    () => passageWarnings(state.objects, bounds, resolveLocalBounds),
+    [state.objects, bounds],
+  );
 
   const draftLeaseExpired = isLeaseExpired(draftError);
   const leaseExpired = isLeaseExpired(saveError, publishError);
