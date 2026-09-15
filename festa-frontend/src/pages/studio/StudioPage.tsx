@@ -2,10 +2,11 @@
 // 기능층(draft 쿼리·저장/게시 mutation·게이트·reducer)은 그대로, 표현은 BoothStudioShell 로 조립한다(S15P21A604-405).
 import { useEffect, useMemo, useReducer, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { isApiError } from '../../shared/api/client';
 import { layoutApi } from '../../entities/layout/api.select';
 import { getAiAgent } from '../../entities/aiAgent/api';
+import { useManagementBoothId, useManagementClose } from '../../features/booth/ui/ManagementScreen';
 import type { BoothFacade } from '../../entities/booth/types';
 import { BOOTH_SIZE_FALLBACK, MAX_OBJECTS_FALLBACK, ZOOM_PRESETS, clampZoom } from '../../shared/config/studio';
 import { createInitialState, editorReducer } from '../../features/studio/model/editorReducer';
@@ -40,9 +41,9 @@ import type { BoothTemplate } from '../../features/studio/model/boothTemplates';
 const CATALOG_TYPE = 'BOOTH_DECOR';
 
 export function StudioPage() {
-  const { boothId } = useParams<{ boothId: string }>();
-  const navigate = useNavigate();
-  const boothIdNum = Number(boothId);
+  // route 로 들어오면 URL 에서, 관리 오버레이에서 열리면 payload 에서 온다 (S15P21A604-755)
+  const boothIdNum = useManagementBoothId();
+  const backToManagement = useManagementClose();
   const [state, dispatch] = useReducer(editorReducer, boothIdNum, createInitialState);
 
   // ── Shell 표현 상태 (계약과 무관 — 저장 안 됨) ──
@@ -374,7 +375,9 @@ export function StudioPage() {
           publishing={publishMutation.isPending}
           publishedVersion={state.publishedVersion ?? null}
           zoomPercent={Math.round(zoom * 100)}
-          onBack={() => navigate(WORLD_RETURN_TO_MANAGEMENT)}
+          // 저장을 대신 눌러 주지 않는다 — 저장 성공만이 저장이고, 실패·revision conflict 에서
+          // 화면이 사라지면 사용자가 무엇을 잃었는지 알 길이 없다.
+          onBack={backToManagement}
           onSave={handleSave}
           onPublish={() => publishMutation.mutate(boothIdNum)}
           onZoomToggle={() =>

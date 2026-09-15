@@ -17,7 +17,7 @@ import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
 import type { LayoutObject } from '../../../../entities/layout/types';
-import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
+import { clampObjectToBooth, normalizeRotation, snap } from '../../lib/coords';
 import type { BoothRendererProps } from './canvasTypes';
 import { boxPlacement, canRotateFrom, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
 import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
@@ -380,7 +380,15 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
         x = snap(x);
         z = snap(z);
       }
-      const c = clampToBooth(x, z, p.bounds);
+      // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+      const moving = p.objects.find((o) => o.objectId === d.objectId);
+      const c = clampObjectToBooth(
+        x,
+        z,
+        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving?.rotationY ?? 0,
+        p.bounds,
+      );
       p.onMove(d.objectId, Number(c.x.toFixed(3)), Number(c.z.toFixed(3)));
     } else {
       let deg = rotationFromDrag(d.origin, d.grab, w, d.startRotation);

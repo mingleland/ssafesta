@@ -1,10 +1,13 @@
-// 부스 방문 경계 추적 — Unity 가 보내는 "부스 안/밖" 관측을 입장·퇴장 edge 로 바꿔 두는 자리다
+// 부스 방문 경계 추적 — Unity 가 보내는 "부스 안/밖" 관측을 입장·퇴장 edge 로 바꾸는 자리다
 // (S15P21A604-690, GitLab #186).
 //
-// **서버를 부르지 않는다.** BE 가 `worldChannel` 필수 검증을 걷어내기 전까지 방문 API 를 부를 수
-// 없다 — 2026-09-14 기준 develop 의 `BoothVisitService.requireWorldChannel` 이 아직 살아 있다.
-// 그래서 **`visitId` 를 만들지 않는다.** 그 값은 서버만 발급하고, 로컬 임시값을 두면 나중에 진짜
-// id 와 섞여 어느 쪽이 서버 것인지 알 수 없게 된다. 지금 남기는 것은 경계 판정과 pending 뿐이다.
+// **이 모듈은 여전히 서버를 부르지 않는다.** 경계만 판정하고 발신은 sink 가 한다
+// (`features/world/model/boothVisitReporter.ts`). 그 분리 덕분에 경계 규칙을 네트워크 없이
+// 테스트할 수 있다.
+//
+// **`visitId` 를 만들지 않는다.** 그 값은 서버만 발급한다. sink 가 입장 응답에서 받아
+// `attachVisitId` 로 얹고, 퇴장 edge 가 그것을 실어 내보낸다 — 로컬 임시값을 두면 나중에 진짜
+// id 와 섞여 어느 쪽이 서버 것인지 알 수 없게 된다.
 //
 // **판정을 `insideBooth` 불리언 하나로 하지 않는다.** `(insideBooth, boothId)` 쌍의 전이로 본다 —
 // 밖으로 나가지 않고 A→B 로 바뀌면 불리언은 true 그대로라 새 방문을 통째로 놓친다.
@@ -16,6 +19,21 @@ export interface BoothVisitEdge {
   /** 어느 부스였나. Unity 가 번호를 안 실어 보낸 경우 null 이다 */
   boothId: number | null;
   at: string;
+  /**
+   * 이 경계가 속한 방문의 식별 토큰 — 방문마다 하나씩 올라간다.
+   *
+   * **시각으로 방문을 구분하지 않는다.** 들어갔다 바로 나갔다 다시 들어오면 세 전이가 같은
+   * 밀리초에 일어나 `enteredAt` 이 전부 같아진다. 그러면 늦게 온 입장 응답의 `visitId` 가
+   * 다음 방문에 붙는다(테스트로 잡았다).
+   */
+  token: number;
+  /**
+   * 퇴장 edge 에만 실린다 — 닫을 방문의 서버 발급 id.
+   *
+   * `closeVisit` 이 pending 을 비운 뒤에 emit 하므로 sink 가 나중에 읽을 수 없다. 그래서 값을
+   * edge 에 실어 보낸다. 입장이 실패해 id 가 없으면 `null` 이고, 그때는 닫을 것도 없다.
+   */
+  visitId: string | null;
   /**
    * 서버로 보낼 수 있는 경계인가.
    *
@@ -29,6 +47,10 @@ export interface BoothVisitEdge {
 export interface PendingVisit {
   boothId: number | null;
   enteredAt: string;
+  /** 입장 응답이 도착하면 sink 가 채운다. 도착 전·실패면 null 이다 */
+  visitId: string | null;
+  /** 이 방문의 식별 토큰. `attachVisitId` 가 같은 방문인지 가리는 값이다 */
+  token: number;
 }
 
 const OUTSIDE: WorldContext = { insideBooth: false, boothId: null };
@@ -36,6 +58,7 @@ const OUTSIDE: WorldContext = { insideBooth: false, boothId: null };
 let previous: WorldContext = OUTSIDE;
 let pending: PendingVisit | null = null;
 let sink: ((edge: BoothVisitEdge) => void) | null = null;
+let visitSeq = 0;
 
 /**
  * 경계가 나가는 유일한 출구 — BE 가 도착하면 여기에 방문 API 어댑터를 붙인다.
@@ -52,20 +75,40 @@ export function getPendingVisit(): PendingVisit | null {
   return pending;
 }
 
-function emit(kind: 'enter' | 'exit', boothId: number | null, at: string): void {
+function emit(
+  kind: 'enter' | 'exit',
+  boothId: number | null,
+  at: string,
+  visitId: string | null,
+  token: number,
+): void {
   const sendable = kind === 'enter' || getSessionSnapshot().kind === 'member';
-  sink?.({ kind, boothId, at, sendable });
+  sink?.({ kind, boothId, at, visitId, token, sendable });
 }
 
 function openVisit(boothId: number | null, at: string): void {
-  pending = { boothId, enteredAt: at };
-  emit('enter', boothId, at);
+  visitSeq += 1;
+  pending = { boothId, enteredAt: at, visitId: null, token: visitSeq };
+  emit('enter', boothId, at, null, visitSeq);
 }
 
 function closeVisit(at: string): void {
   const boothId = pending?.boothId ?? previous.boothId;
+  const visitId = pending?.visitId ?? null;
+  const token = pending?.token ?? visitSeq;
   pending = null;
-  emit('exit', boothId, at);
+  emit('exit', boothId, at, visitId, token);
+}
+
+/**
+ * 입장 응답의 `visitId` 를 열려 있는 방문에 얹는다. sink 만 부른다.
+ *
+ * `token` 으로 같은 방문인지 확인하는 것이 핵심이다 — 응답이 늦게 도착하는 사이 사용자가
+ * 이미 나갔다 다시 들어왔을 수 있고, 그때 무턱대고 쓰면 **옛 방문의 id 가 새 방문에 붙는다.**
+ */
+export function attachVisitId(token: number, visitId: string): void {
+  if (pending === null || pending.token !== token) return;
+  pending = { ...pending, visitId };
 }
 
 /**
@@ -136,4 +179,5 @@ export function __resetBoothVisitTrackerForTests(): void {
   previous = OUTSIDE;
   pending = null;
   sink = null;
+  visitSeq = 0;
 }
