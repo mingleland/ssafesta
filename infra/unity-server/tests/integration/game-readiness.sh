@@ -11,6 +11,7 @@ trap 'rm -rf "${fixture}"' EXIT
 
 content_id='sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 mkdir -p "${fixture}/bin" "${fixture}/state/releases" "${fixture}/artifacts"
+mkdir -p "${fixture}/env/dev/batches/known-good"
 : >"${fixture}/game.env"
 printf 'PASS\n' >"${fixture}/approval.txt"
 cat >"${fixture}/state/candidate.json" <<JSON
@@ -37,9 +38,21 @@ SH
 cat >"${fixture}/verify-public-wss.sh" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ "$1" == '--approval-evidence' && "$3" == '--output' ]]
-printf 'websocketUpgrade=PASS\napprovedAdmission=PASS\n' >"$4"
+if [[ $# -eq 4 && "$1" == '--approval-evidence' && "$3" == '--output' ]]; then
+  printf 'websocketUpgrade=PASS\napprovedAdmission=PASS\n' >"$4"
+elif [[ $# -eq 2 && "$1" == '--output' ]]; then
+  printf 'websocketUpgrade=PASS\napprovedAdmission=SKIPPED\n' >"$2"
+else
+  exit 64
+fi
 SH
+if ! command -v flock >/dev/null 2>&1; then
+  cat >"${fixture}/bin/flock" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  chmod +x "${fixture}/bin/flock"
+fi
 chmod +x "${fixture}/bin/docker" "${fixture}/verify-public-wss.sh"
 
 export PATH="${fixture}/bin:${PATH}"
@@ -51,6 +64,7 @@ export APPROVAL_EVIDENCE_FILE="${fixture}/approval.txt"
 export PUBLIC_WSS_VERIFY_SCRIPT="${fixture}/verify-public-wss.sh"
 export GAME_COMPOSE_FILE="${unity_server_dir}/compose.yaml"
 export GAME_READINESS_SKIP_LISTENER_CONNECT=1
+export ENVIRONMENT_STATE_DIR="${fixture}/env"
 
 bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null
 
@@ -62,6 +76,17 @@ printf '{}' >"${fixture}/state/releases/game-ready.json"
 bash "${unity_server_dir}/scripts/promote-game.sh"
 assert_contains "${fixture}/state/current.json" '"state": "CURRENT/KNOWN_GOOD"' 'promotion must update current only after all gates pass'
 assert_contains "${fixture}/state/known-good.json" '"releaseId": "game-ready"' 'promotion must update known-good with the verified candidate'
+assert_file "${fixture}/env/dev/batches/known-good/game.json"
+
+# Test transport-only readiness when approval evidence is omitted
+unset APPROVAL_EVIDENCE_FILE
+cat >"${fixture}/state/candidate.json" <<JSON
+{"targetId":"demo/game","releaseId":"game-ready","contentId":"${content_id}","state":"CANDIDATE"}
+JSON
+transport_output="${fixture}/artifacts/transport-readiness.json"
+GAME_READINESS_PATH="${transport_output}" bash "${unity_server_dir}/scripts/game-readiness.sh" >/dev/null
+assert_contains "${transport_output}" '"approvedAdmission": "SKIPPED"' 'readiness must record skipped admission when approval evidence is omitted'
+GAME_READINESS_PATH="${transport_output}" bash "${unity_server_dir}/scripts/promote-game.sh"
 
 mkdir -p "${fixture}/failed-state/releases"
 cp "${fixture}/state/releases/game-ready.json" "${fixture}/failed-state/releases/game-ready.json"
