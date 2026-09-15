@@ -5,6 +5,7 @@ import {
   __configureRealtimeForTests,
   __resetRealtimeForTests,
   connectRealtime,
+  getRealtimeLastClose,
   realtimeSocketUrl,
   sendRealtime,
   subscribeRealtime,
@@ -15,7 +16,8 @@ class FakeSocket {
   sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number; reason: string; wasClean: boolean }) => void) | null = null;
+  onerror: ((event: { type: string }) => void) | null = null;
   url: string;
   constructor(url: string) {
     this.url = url;
@@ -24,8 +26,8 @@ class FakeSocket {
   send(raw: string) {
     this.sent.push(raw);
   }
-  close() {
-    this.onclose?.();
+  close(code = 1000, reason = '', wasClean = true) {
+    this.onclose?.({ code, reason, wasClean });
   }
   /** 서버가 CONNECTED 를 돌려준 상태로 만든다 */
   accept() {
@@ -112,5 +114,65 @@ describe('realtimeClient', () => {
     second.accept();
 
     expect(second.frames().filter((f) => f?.command === 'SUBSCRIBE')).toHaveLength(1);
+  });
+});
+
+// S15P21A604-725 — 끊김의 원인이 콘솔과 진단값에 남는다. 토스트만 뜨고 아무것도 없던 자리.
+describe('끊김 진단 (S15P21A604-725)', () => {
+  it('소켓이 닫히면 close code·reason 과 직전 서버 ERROR 가 콘솔과 lastClose 에 남는다', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    subscribeRealtime(WORLD_CHAT_TOPIC, () => {});
+    await connectRealtime();
+    FakeSocket.last!.accept();
+    FakeSocket.last!.onmessage?.({ data: 'ERROR\nmessage:unauthorized\n\nbad token\u0000' });
+    FakeSocket.last!.close(1008, 'policy violation', false);
+
+    expect(error).toHaveBeenCalledWith('[realtime] 서버가 ERROR 프레임을 보냈다 —', 'unauthorized', expect.anything());
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/소켓이 닫혔다 — code=1008 reason="policy violation" clean=false 서버 ERROR="unauthorized"/);
+    expect(getRealtimeLastClose()).toMatchObject({ code: 1008, reason: 'policy violation', wasClean: false, serverError: 'unauthorized' });
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
+  it('ws-token 발급 실패는 던지지 않고 원인을 적은 뒤 재연결 절차를 탄다', async () => {
+    vi.useFakeTimers();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let calls = 0;
+    __configureRealtimeForTests({
+      fetchToken: async () => {
+        calls += 1;
+        if (calls === 1) throw { code: 'UNAUTHORIZED', message: '로그인이 필요합니다.', status: 401, errors: [], warnings: [] };
+        return { token: 'ws-token-2', expiresInSeconds: 300 };
+      },
+    });
+    subscribeRealtime(WORLD_CHAT_TOPIC, () => {});
+    await expect(connectRealtime()).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith('[realtime] ws-token 발급 실패 —', 'UNAUTHORIZED (401): 로그인이 필요합니다.');
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toMatch(/재연결 1\/5/);
+
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(calls).toBe(2);
+    expect(FakeSocket.last).not.toBeNull();
+    error.mockRestore();
+    warn.mockRestore();
+  });
+
+  it('재연결을 포기할 때 마지막 원인을 남긴다', async () => {
+    vi.useFakeTimers();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    subscribeRealtime(WORLD_CHAT_TOPIC, () => {});
+    await connectRealtime();
+    for (let i = 0; i < 6; i += 1) {
+      FakeSocket.last!.close(1006, '', false);
+      await vi.advanceTimersByTimeAsync(20_000);
+    }
+    const giveUp = error.mock.calls.find((c) => String(c[0]).includes('재연결 중단'));
+    expect(giveUp?.[0]).toMatch(/5회 연속 실패\. 마지막 원인: close code=1006/);
+    expect(giveUp?.[1]).toMatchObject({ code: 1006 });
+    vi.restoreAllMocks();
   });
 });
