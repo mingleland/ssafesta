@@ -216,24 +216,34 @@ namespace Festa.World
         /// </summary>
         System.Collections.IEnumerator CalibrateHeightWhenPosed(Festa.Avatar.AvatarAssembler assembler)
         {
+            // 첫 프레임부터 맞는 크기로 보이게 컨트롤러의 첫 상태를 지금 평가해 바로 잰다.
+            // 작았다가 한 프레임 뒤 커지는 것이 눈에 띈다(사용자 지적 2026-09-16).
+            var animator = _visual != null ? _visual.GetComponentInChildren<Animator>() : null;
+            if (animator != null && animator.runtimeAnimatorController != null) animator.Update(0f);
+            if (TryCalibrateHeightOnce(assembler)) yield break;
+
+            // 아직 포즈가 없으면 한 프레임만 기다려 다시 잰다.
             yield return null;
             yield return new WaitForEndOfFrame();
-            if (_visual == null || _targetVisualHeight <= 0f) yield break;
+            TryCalibrateHeightOnce(assembler);
+        }
 
-            if (!TryCollectBakedBounds(out var posed) || posed.size.y < 0.001f) yield break;
+        bool TryCalibrateHeightOnce(Festa.Avatar.AvatarAssembler assembler)
+        {
+            if (_visual == null || _targetVisualHeight <= 0f) return true;   // 할 일이 없다
+            if (!TryCollectBakedBounds(out var posed) || posed.size.y < 0.001f) return false;
 
-            float correction = _targetVisualHeight / posed.size.y;
-            correction = Mathf.Clamp(correction, 0.5f, 2f);   // 측정이 튀어도 터무니없이 커지지 않게
-            if (Mathf.Abs(correction - 1f) < 0.01f) yield break;
-
-            _visual.transform.localScale *= correction;
-
-            // 배율이 바뀌었으니 발을 다시 바닥에 놓는다 — 스케일 전 값으로 두면 뜨거나 묻힌다.
-            if (TryCollectBakedBounds(out var grounded))
-                _visual.transform.position += Vector3.up * (transform.position.y - grounded.min.y);
-
-            // 컬링용 공유 bounds 도 새 크기로 다시 잡는다.
-            StabilizeSkinnedRendering(assembler);
+            float correction = Mathf.Clamp(_targetVisualHeight / posed.size.y, 0.5f, 2f);   // 측정이 튀어도 터무니없이 커지지 않게
+            if (Mathf.Abs(correction - 1f) >= 0.01f)
+            {
+                _visual.transform.localScale *= correction;
+                // 배율이 바뀌었으니 발을 다시 바닥에 놓는다 — 스케일 전 값으로 두면 뜨거나 묻힌다.
+                if (TryCollectBakedBounds(out var grounded))
+                    _visual.transform.position += Vector3.up * (transform.position.y - grounded.min.y);
+                // 컬링용 공유 bounds 도 새 크기로 다시 잡는다.
+                StabilizeSkinnedRendering(assembler);
+            }
+            return true;
         }
 
         /// <summary>현재 자세를 구워서 실제 형상의 월드 bounds 를 구한다.</summary>
