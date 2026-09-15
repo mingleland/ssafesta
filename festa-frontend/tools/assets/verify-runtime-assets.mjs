@@ -1,4 +1,8 @@
 // Runtime asset 배포 전 무결성과 같은 입력의 변환 안정성을 확인한다 (S15P21A604-741).
+//
+// 치수 정본은 **커밋된 `asset-bounds.lock.json`** 이다 (S15P21A604-785, GitLab #181).
+// manifest 는 커밋되지 않는 빌드 산출물이라 CI·fresh clone 에서 대조 대상이 사라진다 —
+// 그래서 lock 을 정본으로 두고 manifest 가 거기서 벗어나면 여기서 멈춘다.
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, resolve } from 'node:path';
@@ -7,6 +11,8 @@ import { createIO, measure } from './compiler/toolchain/gltfPipeline.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 
+const BOUNDS_LOCK = JSON.parse(readFileSync(resolve(import.meta.dirname, 'asset-bounds.lock.json'), 'utf8'));
+
 function fail(message) {
   throw new Error(`[assets:verify] ${message}`);
 }
@@ -14,6 +20,24 @@ function fail(message) {
 function safeAssetFile(value, kind) {
   if (typeof value !== 'string' || basename(value) !== value || !value) fail(`${kind} 경로가 안전한 파일명이 아니다`);
   return value;
+}
+
+/**
+ * manifest 의 치수를 lock 과 대조한다.
+ *
+ * 정확히 같아야 한다. manifest 치수는 이미 소수 4자리로 반올림돼 있고, 같은 입력이면 같은 값이
+ * 나온다는 것은 아래 deterministic 검사가 따로 보장한다. 그래서 여기서 오차를 허용하면
+ * "언제 바뀐 것인지" 를 놓친다 — 값이 바뀌면 파이프라인이나 프리팹이 바뀐 것이고 사람이 볼 일이다.
+ */
+function verifyBounds(assetCode, bounds) {
+  const locked = BOUNDS_LOCK.assets[assetCode];
+  if (locked === undefined) {
+    fail(`${assetCode} 가 asset-bounds.lock.json 에 없다 — 새 자산이면 실측값을 lock 에 추가하라`);
+  }
+  const same = JSON.stringify(bounds) === JSON.stringify(locked);
+  if (!same) {
+    fail(`${assetCode} 치수가 lock 과 다르다. lock=${JSON.stringify(locked)} manifest=${JSON.stringify(bounds)}`);
+  }
 }
 
 export async function readRuntimeAssetSummary(dir) {
@@ -35,6 +59,7 @@ export async function readRuntimeAssetSummary(dir) {
     if (!existsSync(glbPath) || statSync(glbPath).size === 0) fail(`${asset.assetCode} GLB가 없다`);
     if (!existsSync(thumbnailPath) || statSync(thumbnailPath).size === 0) fail(`${asset.assetCode} WebP가 없다`);
     const document = await io.readBinary(readFileSync(glbPath));
+    verifyBounds(asset.assetCode, asset.bounds);
     assets.push({
       assetCode: asset.assetCode,
       geometry: measure(document),
@@ -43,6 +68,10 @@ export async function readRuntimeAssetSummary(dir) {
       triangles: asset.triangles,
     });
   }
+  // 반대 방향도 본다 — lock 에만 있고 산출물에 없는 자산은 파이프라인에서 빠진 것이다.
+  const built = new Set(manifest.assets.map((a) => a.assetCode));
+  const missing = Object.keys(BOUNDS_LOCK.assets).filter((code) => !built.has(code));
+  if (missing.length > 0) fail(`lock 에 있으나 산출물에 없는 자산: ${missing.join(', ')}`);
   return assets.sort((a, b) => a.assetCode.localeCompare(b.assetCode));
 }
 
