@@ -66,6 +66,15 @@ public enum ErrorCode {
     // ── 지갑 (spec 003) ─────────────────────────────────────────────────────
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다."),
     INSUFFICIENT_COIN(HttpStatus.CONFLICT, "코인이 부족합니다."),
+    /**
+     * 같은 멱등키로 다른 내용의 요청이 왔다. 재시도는 <b>같은 요청</b>을 다시 보내는 것이라,
+     * 금액이나 사유가 달라졌다면 그건 재시도가 아니라 키를 재사용한 새 요청이다.
+     */
+    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등성 키로 다른 요청이 이미 처리됐습니다."),
+    /** 관리자 동작의 대상 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    ADMIN_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "대상 회원을 찾을 수 없습니다."),
+    /** 지급 후 잔액이 int 표현 범위를 넘는다. 잔액 부족의 반대쪽이라 같은 409 다. */
+    COIN_BALANCE_OVERFLOW(HttpStatus.CONFLICT, "지급 후 잔액이 표현 범위를 넘습니다."),
 
     // ── 카탈로그 · 인벤토리 (spec 012) ──────────────────────────────────────
     CATALOG_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "카탈로그 품목을 찾을 수 없습니다."),

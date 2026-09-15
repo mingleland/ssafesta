@@ -1,8 +1,11 @@
 package com.example.ssafesta.wallet;
 
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -234,17 +237,57 @@ public class WalletService {
                         + ", entryWalletId=" + entry.getWalletId() + ", walletId=" + wallet.getId()
                         + " (S15P21A604-695)");
             }
+            requireSameRequest(entry, entryType, signedAmount, reasonType, referenceType, referenceId);
             return LedgerResult.alreadyApplied(entry);
         }
 
-        if (signedAmount < 0 && !wallet.canAfford(-signedAmount)) {
-            throw new InsufficientCoinException(-signedAmount, wallet.getBalance());
+        // long 으로 더한다. int 로 부호를 뒤집으면 Integer.MIN_VALUE 가 다시 음수로 넘쳐
+        // 이 관문을 그냥 통과하고, 마지막 방어선인 Wallet.apply 가 500 으로 터진다
+        // (S15P21A604-806). 증액 쪽도 같은 자리에서 터지던 것을 여기서 함께 받는다.
+        long next = (long) wallet.getBalance() + signedAmount;
+        if (next < 0) {
+            // 필요액은 메시지용 숫자라 표현 범위로 자른다 — 2^31 회수는 어차피 잔액을 넘는다.
+            throw new InsufficientCoinException(
+                    (int) Math.min(-(long) signedAmount, Integer.MAX_VALUE), wallet.getBalance());
+        }
+        if (next > Integer.MAX_VALUE) {
+            throw new ApiException(ErrorCode.COIN_BALANCE_OVERFLOW);
         }
 
         wallet.apply(signedAmount);
         CoinLedgerEntry entry = ledger.save(new CoinLedgerEntry(wallet.getId(), entryType, signedAmount,
                 wallet.getBalance(), reasonType, referenceType, referenceId, idempotencyKey));
         return LedgerResult.applied(entry);
+    }
+
+    /**
+     * The recorded entry has to be the same request, not just the same key.
+     *
+     * <p>Returning {@code alreadyApplied} on a key whose payload differs would answer "이미
+     * 반영됐다" to a caller whose request never happened, and hand back the earlier entry's
+     * {@code balanceAfter} as if it were theirs. Every caller that derives its key from the
+     * referenced row (lease, purchase, minigame) can never reach this — the guard exists for the
+     * paths where a client supplies the key, starting with administrator adjustment
+     * (S15P21A604-806).
+     *
+     * <p>A mismatched {@code walletId} is deliberately <b>not</b> routed here: that one means a
+     * server-made key collided across wallets, which is a defect rather than a client error, and
+     * the caller above keeps throwing loudly (T-24, S15P21A604-695).
+     */
+    private void requireSameRequest(CoinLedgerEntry entry, LedgerEntryType entryType, int signedAmount,
+                                    String reasonType, String referenceType, String referenceId) {
+        if (entry.getEntryType() == entryType
+                && entry.getAmount() == signedAmount
+                && Objects.equals(entry.getReasonType(), reasonType)
+                && Objects.equals(entry.getReferenceType(), referenceType)
+                && Objects.equals(entry.getReferenceId(), referenceId)) {
+            return;
+        }
+        log.warn("같은 멱등키에 다른 요청이 도착했습니다 — key={}, 저장={}/{}/{}/{}/{}, 도착={}/{}/{}/{}/{}",
+                entry.getIdempotencyKey(), entry.getEntryType(), entry.getAmount(), entry.getReasonType(),
+                entry.getReferenceType(), entry.getReferenceId(),
+                entryType, signedAmount, reasonType, referenceType, referenceId);
+        throw new ApiException(ErrorCode.IDEMPOTENCY_CONFLICT);
     }
 
     private void validateIdempotencyKey(String idempotencyKey) {
