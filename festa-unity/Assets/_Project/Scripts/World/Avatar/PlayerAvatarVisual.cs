@@ -679,18 +679,29 @@ namespace Festa.World
             bounds = default;
             var found = false;
 
+            // ⚠ Renderer.bounds 를 그대로 쓰면 안 된다 (S15P21A604-801 / T-222).
+            // 런타임 조립 아바타는 화면 가장자리 컬링을 막으려고 localBounds 를 의도적으로
+            // 부풀려 둔다(S15P21A604-749). 그 값으로 키를 재면 heightScale 이
+            // _targetVisualHeight / (실제높이 + 패딩) 이 돼 아바타가 패딩만큼 작아진다.
+            // 조립기가 패딩 전 형상 bounds 를 들고 있으면 그것을 쓴다.
+            var assembler = _currentVisual.GetComponentInChildren<Festa.Avatar.AvatarAssembler>(true);
+
             foreach (var renderer in renderers)
             {
                 if (renderer == null) continue;
 
+                var rendererBounds = renderer.bounds;
+                if (assembler != null && assembler.TryGetGeometryWorldBounds(renderer, out var geometry))
+                    rendererBounds = geometry;
+
                 if (!found)
                 {
-                    bounds = renderer.bounds;
+                    bounds = rendererBounds;
                     found = true;
                 }
                 else
                 {
-                    bounds.Encapsulate(renderer.bounds);
+                    bounds.Encapsulate(rendererBounds);
                 }
             }
 
