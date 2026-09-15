@@ -29,6 +29,17 @@ namespace Festa.Network
             "웃음", "앉기", "건배", "감사"
         };
 
+        /// <summary>
+        /// 좌클릭 주먹질에 쓰는 원샷 셋 (사용자 지시 2026-09-15 — "세 개가 랜덤으로 나오게").
+        ///
+        /// <para><b>뽑는 것은 소유자다.</b> 뽑은 값이 <see cref="NetworkPlayer.EmoteId"/> 로 복제되므로
+        /// 모두가 같은 주먹을 본다. 값 하나로 두고 각자 클립을 고르면 화면마다 다른 동작이 나간다.</para>
+        /// </summary>
+        static readonly PlayerEmoteId[] Punches =
+        {
+            PlayerEmoteId.Punch1, PlayerEmoteId.Punch2, PlayerEmoteId.Punch3
+        };
+
         NetworkPlayer _player;
         bool _wheelOpen;
         Vector2 _center;
@@ -99,6 +110,11 @@ namespace Festa.Network
                     if (mouse.leftButton.wasReleasedThisFrame) CloseWheel(true);
                 }
             }
+            else if (!alt && mouse.leftButton.wasPressedThisFrame && CanPunch())
+            {
+                // 효과는 없다. 애니메이션만 나간다 — 판정·데미지·넉백을 붙이지 않는다(사용자 지시).
+                PlayOneShot(Punches[Random.Range(0, Punches.Length)]);
+            }
 
             TrackOneShotDuration();
 
@@ -118,6 +134,23 @@ namespace Festa.Network
             return new Vector2(
                 Mathf.Clamp(pointer.x, margin, Screen.width - margin),
                 Mathf.Clamp(pointer.y, margin, Screen.height - margin));
+        }
+
+        /// <summary>
+        /// 지금 좌클릭을 주먹질로 읽어도 되는가.
+        ///
+        /// <para>좌클릭은 부스 상호작용과 겹치지 않는다 — 그쪽 실행 입력은 F 하나이고 클릭은 조준·호버에만 쓴다
+        /// (<c>BoothInteractionInput.InteractKeyPressedThisFrame</c>). 남는 충돌원은 UI 클릭과, 이미 재생 중인
+        /// 연출이다. 루프 이모트(앉기·눕기)는 <see cref="PlayOneShot"/> 가 걸러 주지만 그건 "넣으려는 값" 기준이라
+        /// <b>지금 재생 중인 것</b>은 여기서 본다 — 눕거나 앉은 채로 주먹이 나가면 자세가 튄다.</para>
+        /// </summary>
+        bool CanPunch()
+        {
+            var es = UnityEngine.EventSystems.EventSystem.current;
+            if (es != null && es.IsPointerOverGameObject()) return false;
+            var current = _player.EmoteId.Value;
+            if (current != PlayerEmoteId.None && IsLooping(current)) return false;
+            return true;
         }
 
         void UpdateSelection(Vector2 pointer)
