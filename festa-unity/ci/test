@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# 게임 파트 CI 테스트 어댑터 — Unity EditMode 테스트를 돌린다.
+#
+# 현재 테스트는 에셋 무결성 회귀 방지가 중심이다. 둘 다 실제로 터졌고
+# 유니티가 에러를 내지 않아 사람 눈으로만 발견됐던 것들이다:
+#   · 서브메시 소실로 재질이 조용히 미출력 (T-223 / S15P21A604-320)
+#   · .cs 는 커밋됐는데 .meta 누락 → 받는 쪽에서 Missing Script (T-221)
+set -euo pipefail
+
+project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+unity_version="$(sed -n 's/^m_EditorVersion: //p' "${project_dir}/ProjectSettings/ProjectVersion.txt")"
+: "${UNITY_EXECUTABLE:=/opt/unity/editors/${unity_version}/Editor/Unity}"
+
+if [[ ! -x "${UNITY_EXECUTABLE}" ]]; then
+  echo "Unity 실행 파일을 찾을 수 없다: ${UNITY_EXECUTABLE}" >&2
+  echo "UNITY_EXECUTABLE 로 경로를 넘겨라 (프로젝트 버전 ${unity_version})." >&2
+  exit 69
+fi
+
+artifact_dir="${CI_ARTIFACT_DIR:-${project_dir}/Builds}"
+mkdir -p "${artifact_dir}"
+results="${artifact_dir}/unity-editmode-results.xml"
+log_file="${artifact_dir}/unity-test.log"
+
+echo "Unity ${unity_version} EditMode 테스트"
+echo "결과: ${results}"
+
+set +e
+"${UNITY_EXECUTABLE}" \
+  -batchmode -nographics \
+  -projectPath "${project_dir}" \
+  -runTests -testPlatform EditMode \
+  -testResults "${results}" \
+  -logFile "${log_file}"
+status=$?
+set -e
+
+if [[ ${status} -ne 0 ]]; then
+  echo "EditMode 테스트 실패 (종료 코드 ${status})." >&2
+  # 실패한 테스트 이름만 뽑아 준다 — XML 전문을 CI 로그에 쏟지 않는다.
+  if [[ -f "${results}" ]]; then
+    grep -o 'name="[^"]*" *result="Failed"' "${results}" | head -n 20 >&2 || true
+  fi
+  tail -n 40 "${log_file}" >&2 || true
+  exit "${status}"
+fi
+
+echo "EditMode 테스트 통과"

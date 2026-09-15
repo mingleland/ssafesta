@@ -12,46 +12,87 @@ namespace Festa.Integration
         public static IBoothApiClient Booth { get; private set; }
         public static IUserApiClient User { get; private set; }
         public static IAiAgentClient Ai { get; private set; }
+        public static IGameResultClient Game { get; private set; }
+        /// <summary>코인 잔액 (spec 003). 실서버는 GET /wallets/me, Mock 은 100 고정.</summary>
+        public static IWalletClient Wallet { get; private set; }
+        /// <summary>slot machine 판정 (S15P21A604-439). BE 계약 전이라 두 모드 모두 Mock — 결과 DTO 의 simulated 가 그 사실을 실어 나른다.</summary>
+        public static ISlotMachineClient Slot { get; private set; }
         public static IAccessTokenProvider TokenProvider { get; private set; }
 
         public static bool IsMock { get; private set; }
 
-        /// <summary>ApiConfig(SO) 기반 초기화 — 권장 경로.</summary>
+        /// <summary>
+        /// ApiConfig(SO) 기반 초기화 — 권장 경로.
+        ///
+        /// <para>호스트가 <c>window.__FESTA_CONFIG__.apiBaseUrl</c> 를 주입했으면 그 값이 **빌드 타임 값을 이긴다**
+        /// (S15P21A604-459). 같은 릴리스 산출물을 local·dev·demo 에 그대로 올리기 위해서다 — FE 가 이미 같은 값으로
+        /// 자기 API base 를 정한다. Mock 모드에서는 무시한다(네트워크를 쓰지 않는다).</para>
+        /// </summary>
         public static void Init(ApiConfig config)
         {
             var entry = config != null ? config.Active : null;
-            Init(config == null || config.useMockApi,
-                 entry?.springBaseUrl ?? "",
-                 entry?.aiBaseUrl ?? "");
+            bool useMock = config == null || config.useMockApi;
+            var spring = entry?.springBaseUrl ?? "";
+
+            var injected = useMock ? null : HostRuntimeConfig.ApiBaseUrl;
+            if (!string.IsNullOrEmpty(injected) && injected != spring)
+            {
+                Debug.Log($"[ApiServices] 호스트 주입 apiBaseUrl 사용 — 빌드 타임 '{spring}' → '{injected}'");
+                spring = injected;
+            }
+
+            Init(useMock, spring, entry?.aiBaseUrl ?? "");
         }
 
         public static void Init(bool useMock, string springBaseUrl, string aiBaseUrl)
         {
             IsMock = useMock;
-            TokenProvider = new EmptyAccessTokenProvider(); // Auth spec 확정 시 실제 구현으로 교체
+            // 실서버 경로는 WebGL 호스트가 SendMessage 로 밀어 넣은 Access Token 을 쓴다 (AuthBridge).
+            // Mock 경로는 헤더를 붙이지 않는다 — Mock 서버는 인증을 요구하지 않는다.
+            TokenProvider = useMock ? new EmptyAccessTokenProvider() : new HostAccessTokenProvider();
 
             if (useMock)
             {
                 Booth = new MockBoothApiClient();
                 User = new MockUserApiClient();
                 Ai = new MockAiAgentClient();
+                Game = new MockGameResultClient();
+                Wallet = new MockWalletClient();
+                Slot = new MockSlotMachineClient();
             }
             else
             {
                 Booth = new HttpBoothApiClient(springBaseUrl, TokenProvider);
-                // TODO: HttpUserApiClient / SseAiAgentClient — 해당 기능 spec 작성 후 구현
-                User = new MockUserApiClient();
+                User = new HttpUserApiClient(springBaseUrl, TokenProvider);
+                // TODO: SseAiAgentClient — spec 008 SSE 계약 확정 후 구현
                 Ai = new MockAiAgentClient();
-                Debug.LogWarning("[ApiServices] User/Ai HTTP 구현 전 — Mock으로 대체 중");
+                Debug.LogWarning("[ApiServices] Ai HTTP 구현 전 — Mock으로 대체 중");
+                // 미니게임 판정 2종은 **서버 우선** — GitLab #134 에 게시한 계약대로 BE 에 먼저 묻고, BE 가 아직 경로를
+                // 만들지 않았을 때(404)만 Mock 대역으로 넘긴다. 폴백은 경고를 남기고 HUD 는 "체험판" 을 표시한다 —
+                // 조용한 대체가 아니다 (T-24). BE 가 붙는 순간 Unity 는 변경 없이 실판정으로 바뀐다 (S15P21A604-294·-439).
+                Game = new ServerFirstGameResultClient(new HttpGameResultClient(springBaseUrl, TokenProvider), new MockGameResultClient());
+                Wallet = new HttpWalletClient(springBaseUrl, TokenProvider);
+                Slot = new ServerFirstSlotMachineClient(new HttpSlotMachineClient(springBaseUrl, TokenProvider), new MockSlotMachineClient());
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");
         }
 
-        /// <summary>Bootstrap 없이 씬을 단독 실행할 때의 안전장치.</summary>
+        /// <summary>
+        /// Bootstrap 없이 씬을 단독 실행할 때의 안전장치.
+        ///
+        /// <para><b>여기로 떨어지면 소리를 낸다.</b> 이 폴백은 에디터에서 씬 하나만 띄워 볼 때를
+        /// 위한 것인데, 실제로는 CharacterLobby(빌드 첫 씬)에 GameBootstrap 이 없어서 WebGL 도
+        /// 이 경로로 시작했다 — 로비가 Mock 프로필·Mock 카탈로그로 돌고, main 에 들어가서야
+        /// 실서버로 바뀌었다 (S15P21A604-418). 조용히 Mock 이 되면 아무도 모른다(T-24 와 같은
+        /// 실패 양상). 경고가 아니라 에러로 남겨 콘솔에서 바로 보이게 한다.</para>
+        /// </summary>
         public static void EnsureInitialized()
         {
-            if (Booth == null) Init(true, "", "");
+            if (Booth != null) return;
+            Debug.LogError("[ApiServices] GameBootstrap 없이 시작됐다 — Mock API 로 동작한다. " +
+                           "첫 씬에 @GameBootstrap(ApiConfig) 이 있어야 실서버에 붙는다 (S15P21A604-418).");
+            Init(true, "", "");
         }
     }
 }

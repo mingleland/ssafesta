@@ -78,6 +78,8 @@ namespace Festa.World
             TryApplySceneHandoff();
         }
 
+        bool _handoffSaved;
+
         void TryApplySceneHandoff()
         {
             if (string.IsNullOrEmpty(_sceneHandoffEncoded)) return;
@@ -85,6 +87,16 @@ namespace Festa.World
             {
                 _sceneHandoffEncoded = null;
                 return;
+            }
+
+            // **로비에서 고른 외형을 프로필에도 저장한다** (S15P21A604-168, T-124).
+            // 전에는 월드 진입 시 서버 RPC 로 동기화만 하고 PUT /users/me/avatar 는 월드 안 "적용" 버튼 경로에서만 불렀다 —
+            // 정상 흐름(로비 커스터마이징 → 월드 입장)으로는 외형이 영영 저장되지 않아 다음 로그인에 기본 외형이 떴다.
+            // 회원 토큰이 있을 때만(게스트 403·미주입 401 은 뻔한 실패라 호출하지 않는다), 진입당 한 번.
+            if (!_handoffSaved && Festa.Integration.AuthBridge.HasToken && !Festa.Integration.AuthBridge.IsGuest)
+            {
+                _handoffSaved = true;
+                SaveToProfileAsync(_sceneHandoffEncoded);
             }
 
             // A host owns both sides of the connection.  Writing directly here
@@ -190,12 +202,30 @@ namespace Festa.World
             Debug.Log($"[Appearance] 서버 반영: client={OwnerClientId} len={encoded.Length}");
         }
 
-        /// <summary>영구 저장. 실패해도 월드 내 외형은 유지된다.</summary>
+        /// <summary>
+        /// 영구 저장. 실패해도 월드 내 외형은 유지되지만, <b>그 사실을 사용자에게 알린다.</b>
+        ///
+        /// <para>예전에는 <c>LogWarning</c> 한 줄이 전부였다. 사용자는 저장된 줄 알고 나가고,
+        /// 다음 로그인에 외형이 사라진 것을 보고서야 안다 — 그때는 무엇이 잘못됐는지 알 수 없다.
+        /// 조용한 실패를 만들지 않는다는 것이 이 프로젝트의 규칙이다 (헌법, T-24). 게스트는
+        /// 애초에 프로필이 없으므로 알릴 것도 없다.</para>
+        /// </summary>
         async void SaveToProfileAsync(string encoded)
         {
             ApiServices.EnsureInitialized();
             bool ok = await ApiServices.User.UpdateMyAvatarAsync(encoded);
-            if (!ok) Debug.LogWarning("[Appearance] 프로필 저장 실패 — 이번 세션에만 적용");
+            if (ok) return;
+
+            if (AuthBridge.IsGuest)
+            {
+                Debug.Log("[Appearance] 게스트라 프로필 저장을 건너뛴다 — 이번 세션에만 적용");
+                return;
+            }
+
+            Debug.LogError("[Appearance] 프로필 저장 실패 — 이번 세션에만 적용된다. " +
+                           "다음 접속에는 이전 외형으로 돌아간다.");
+            Festa.Content.BoothInteractionInput.Toast(
+                "아바타를 저장하지 못했어요. 이번 접속에만 적용됩니다.", 4f);
         }
     }
 }

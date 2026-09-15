@@ -49,8 +49,15 @@ namespace Festa.Booth
                 for (var i = 0; i < mats.Length; i++)
                 {
                     if (mats[i] == null || !IsTarget(mats[i].name)) continue;
-                    mats[i] = GetTinted(mats[i], color);
                     applied++;
+
+                    // 서버는 그리지 않으므로 틴트 인스턴스를 만들지 않는다 (S15P21A604-314).
+                    // 다만 **개수는 그대로 센다** — 여기서 0 을 반환해버리면 호출부가
+                    // "대상 머티리얼을 못 찾았다"고 경고한다. 서버에서만 뜨는 가짜 경고를
+                    // 만들면 진짜 계약 불일치를 찾을 때 방해가 된다.
+                    if (Festa.Core.HeadlessRuntime.IsHeadless) continue;
+
+                    mats[i] = GetTinted(mats[i], color);
                     changed = true;
                 }
 

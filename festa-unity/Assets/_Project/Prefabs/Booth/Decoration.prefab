@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4530350281110784283}
   - component: {fileID: 1758528346752944110}
+  - component: {fileID: 5791290697061398489}
   m_Layer: 0
   m_Name: Decoration
   m_TagString: Untagged
@@ -45,6 +46,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5eff330b02db34240ab3dd551f81c2be, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!65 &5791290697061398489
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1507625753233589954}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.6, y: 1.6, z: 0.6}
+  m_Center: {x: 0, y: 0.8, z: 0}
 --- !u!1001 &7932657760344936649
 PrefabInstance:
   m_ObjectHideFlags: 0
