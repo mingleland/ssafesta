@@ -5,7 +5,7 @@ set -euo pipefail
 : "${JENKINS_JOB:?}" "${JENKINS_BUILD_NUMBER:?}" "${COMPONENT_METADATA_DIR:?}" "${RELEASE_MANIFEST_PATH:?}"
 [[ "${CI_COMMIT_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'full lowercase commit SHA required' >&2; exit 64; }
 [[ "${SCM_PROVIDER}" =~ ^(github|gitlab)$ ]] || { echo 'SCM_PROVIDER must be github or gitlab' >&2; exit 64; }
-python_bin="$(command -v python3 || command -v python || true)"
+python_bin="${PYTHON_BIN:-$(command -v python3 || command -v python || true)}"
 [[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }
 
 components_csv="${DEPLOY_COMPONENTS:-ai,back,front,game}"
