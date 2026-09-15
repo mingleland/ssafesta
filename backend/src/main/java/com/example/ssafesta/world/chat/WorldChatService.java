@@ -1,6 +1,7 @@
 package com.example.ssafesta.world.chat;
 
 import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ProfanityFilter;
 import com.example.ssafesta.user.AccountStatus;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -69,6 +70,11 @@ public class WorldChatService {
      *
      * <p>방송되는 것은 {@code strip()} 을 거친 값이다. 앞뒤 공백을 그대로 실어 나르면 같은 말이
      * 사람마다 다르게 보이고, 공백만으로 줄을 밀어 올리는 도배가 가능해진다.
+     *
+     * <p><b>금칙어는 정규화본으로 보고 원문을 방송한다</b> (S15P21A604-792). 마스킹하지 않는
+     * 이유가 그것이다 — 정규화에서 공백과 기호가 지워져 일치 위치를 원문으로 되돌릴 수 없고,
+     * {@code 씨---1---발} 같은 우회 표기는 원문에 가릴 자리 자체가 없다. 걸린 단어를 알려 주지도
+     * 않는다. 알려 주면 통과하는 표기를 찾는 데 쓰인다({@code nickname-policy.md} 4항).
      */
     private static String normalized(WorldChatSend command) {
         String content = command == null || command.content() == null ? "" : command.content().strip();
@@ -77,6 +83,9 @@ public class WorldChatService {
         }
         if (content.codePointCount(0, content.length()) > MAX_CONTENT_LENGTH) {
             throw ApiException.fieldInvalid("content", MAX_CONTENT_LENGTH + "자 이하여야 합니다.");
+        }
+        if (ProfanityFilter.contains(content)) {
+            throw ApiException.fieldInvalid("content", "보낼 수 없는 표현이 있습니다.");
         }
         return content;
     }
