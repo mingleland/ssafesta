@@ -23,6 +23,17 @@ namespace Festa.Avatar
         readonly Dictionary<Renderer, AvatarPartCategory> _rendererCategories = new();
 
         /// <summary>
+        /// 패딩을 더하기 <b>전</b>의 실제 형상 bounds — 렌더러 자신의 transform 공간이다.
+        ///
+        /// <para>런타임 렌더러의 <c>localBounds</c> 는 화면 가장자리 컬링을 막으려고 일부러
+        /// 부풀려 둔다(S15P21A604-749). 그런데 아바타 키 정규화는 렌더러 bounds 높이로
+        /// 배율을 정하므로, 부푼 값을 그대로 읽으면 <b>패딩만큼 아바타가 작아진다</b>
+        /// (S15P21A604-801 / T-222). 컬링용 값과 형상 측정용 값을 갈라 둔다 —
+        /// 컬링은 부푼 쪽을, 측정은 이쪽을 쓴다.</para>
+        /// </summary>
+        readonly Dictionary<Renderer, Bounds> _geometryLocalBounds = new();
+
+        /// <summary>
         /// 이번 프레임에 <c>Destroy</c> 를 건 오브젝트 (S15P21A604-334).
         ///
         /// <para>플레이 모드의 <c>Destroy</c> 는 <b>프레임 끝까지 미뤄진다.</b> 그래서 같은
@@ -64,6 +75,9 @@ namespace Festa.Avatar
             _config = config;
             if (rebuild) BuildBody();
             if (!_animator) return;
+            // 이번 Apply 에서 의상·병합 렌더러가 전부 새로 만들어진다. 앞선 Apply 의 항목은
+            // 대상이 파괴돼 의미가 없으므로 여기서 버린다.
+            _geometryLocalBounds.Clear();
             foreach (AvatarPartCategory c in Enum.GetValues(typeof(AvatarPartCategory))) Equip(c);
             UpdateHairVisibilityForHat();
             UpdateBodyVisibility();
@@ -121,7 +135,9 @@ namespace Festa.Avatar
                 var r = go.AddComponent<SkinnedMeshRenderer>();
                 r.rootBone = _reference.rootBone; r.bones = _reference.bones;
                 r.sharedMesh = source.sharedMesh; r.sharedMaterials = source.sharedMaterials;
-                r.localBounds = RuntimeGarmentBounds(source, _reference, r.transform);
+                var garmentGeometry = RuntimeGarmentBounds(source, _reference, r.transform);
+                _geometryLocalBounds[r] = garmentGeometry;
+                r.localBounds = WithBoundsPadding(garmentGeometry);
                 _rendererCategories[r] = category;
                 PrepareMaterials(r, category);
                 spawned.Add(go);
@@ -340,7 +356,9 @@ namespace Festa.Avatar
             smr.bones = first.bones;
             smr.rootBone = first.rootBone;
             smr.sharedMaterial = first.sharedMaterials[0];
-            smr.localBounds = CombinedRuntimeBounds(parts, smr.transform);
+            var mergedGeometry = CombinedRuntimeBounds(parts, smr.transform);
+            _geometryLocalBounds[smr] = mergedGeometry;
+            smr.localBounds = WithBoundsPadding(mergedGeometry);
             smr.shadowCastingMode = first.shadowCastingMode;
             smr.updateWhenOffscreen = first.updateWhenOffscreen;
             smr.quality = first.quality;
@@ -373,10 +391,11 @@ namespace Festa.Avatar
                 EncapsulateTransformed(ref bounds, ref initialized, reference.localBounds, referenceToTarget);
             }
 
-            return WithBoundsPadding(initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f)));
+            // 패딩은 호출부에서 더한다 — 여기서는 형상 그대로를 돌려준다.
+            return initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f));
         }
 
-        static Bounds CombinedRuntimeBounds(List<SkinnedMeshRenderer> parts, Transform target)
+        Bounds CombinedRuntimeBounds(List<SkinnedMeshRenderer> parts, Transform target)
         {
             bool initialized = false;
             var bounds = default(Bounds);
@@ -384,11 +403,17 @@ namespace Festa.Avatar
             {
                 if (!part) continue;
                 var partToTarget = target.worldToLocalMatrix * part.transform.localToWorldMatrix;
-                EncapsulateTransformed(ref bounds, ref initialized, part.localBounds, partToTarget);
+                // 파츠가 이미 컬링 패딩을 달고 있으면 그 값을 쓰지 않는다 — 패딩이 병합체에
+                // 누적돼 키 정규화가 더 크게 어긋난다. 기록해 둔 형상 bounds 를 우선한다.
+                var partBounds = _geometryLocalBounds.TryGetValue(part, out var partGeometry)
+                    ? partGeometry
+                    : part.localBounds;
+                EncapsulateTransformed(ref bounds, ref initialized, partBounds, partToTarget);
                 if (part.sharedMesh)
                     EncapsulateTransformed(ref bounds, ref initialized, part.sharedMesh.bounds, partToTarget);
             }
-            return WithBoundsPadding(initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f)));
+            // 패딩은 호출부에서 더한다 — 여기서는 형상 그대로를 돌려준다.
+            return initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f));
         }
 
         static void EncapsulateTransformed(
@@ -419,6 +444,31 @@ namespace Festa.Avatar
                                       SkinnedBoundsMinimumPadding);
             bounds.Expand(padding * 2f);
             return bounds;
+        }
+
+        /// <summary>
+        /// 컬링 패딩을 뺀 실제 형상 bounds를 월드 공간으로 돌려준다 — 키 정규화가 쓴다.
+        /// 기록이 없는 렌더러(신체 프리팹 원본 등)는 패딩이 없으므로 <see cref="Renderer.bounds"/>를 그대로 쓴다.
+        /// </summary>
+        public bool TryGetGeometryWorldBounds(Renderer renderer, out Bounds worldBounds)
+        {
+            worldBounds = default;
+            if (!renderer) return false;
+
+            if (!_geometryLocalBounds.TryGetValue(renderer, out var local))
+            {
+                worldBounds = renderer.bounds;
+                return true;
+            }
+
+            // 기록은 렌더러 자신의 transform 공간이다 (RuntimeGarmentBounds·CombinedRuntimeBounds 의 target).
+            var toWorld = renderer.transform.localToWorldMatrix;
+            bool initialized = false;
+            var accumulated = default(Bounds);
+            EncapsulateTransformed(ref accumulated, ref initialized, local, toWorld);
+            if (!initialized) return false;
+            worldBounds = accumulated;
+            return true;
         }
 
         static void DestroySafe(UnityEngine.Object o)
