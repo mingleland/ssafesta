@@ -61,6 +61,10 @@ namespace Festa.World
                 return;
             }
 
+            // 서버 왕복 전에 먼저 멈춘다. PlayerMovement와 이 컴포넌트의 Update 순서에 따라
+            // 걷기 블렌드가 한 프레임 남을 수 있으므로 입력 잠금만 하지 않고 잔류값도 즉시 0으로 만든다.
+            striker.BeginLocalInteractionLock();
+
             // 내 화면은 먼저 잠근다 — 서버 왕복을 기다리는 동안 연타되면 이모트만 여러 번 나간다.
             // 남들은 SwingClientRpc 를 받는 순간 잠긴다.
             machine.BeginBusy(HighStrikerNetwork.ImpactDelay + machine.SequenceSeconds);
