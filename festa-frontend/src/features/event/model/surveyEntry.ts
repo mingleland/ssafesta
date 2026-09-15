@@ -9,9 +9,8 @@
 //
 // key 는 이벤트 하나를 가리킨다. 서버가 `surveys.survey_key` 에 unique 를 걸어 **이벤트당 설문
 // 하나**를 보장하므로, 여기서 고를 것이 없고 상수 하나면 된다.
+import { EVENT_SURVEY_KEY } from '../../../shared/contracts/survey';
 import type { SurveySource } from '../../../shared/contracts/survey';
-
-export const EVENT_SURVEY_KEY = 'SSAFESTA_2026';
 
 export function resolveEventSurveyTarget(): SurveySource {
   return { kind: 'event', surveyKey: EVENT_SURVEY_KEY };
