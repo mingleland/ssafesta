@@ -126,14 +126,14 @@ namespace Festa.World
 
             bool known = TryGetPlayer(out var player);
             bool allowed = known && Available(player);
-            if (IsOpen && !allowed) Close();
-
             var kb = Keyboard.current;
-            if (kb != null && allowed && !Blocked() && (kb.tabKey.wasPressedThisFrame || kb.mKey.wasPressedThisFrame))
-            {
-                if (IsOpen) Close(); else Open();
-            }
-            if (IsOpen && kb != null && kb.escapeKey.wasPressedThisFrame) Close();
+            // 지도는 토글하지 않는다. Tab을 잠깐 눌렀다가 놓은 뒤에도 화면과 입력 잠금이
+            // 남는 것은 일반적인 게임 미니맵 조작과 어긋난다. 브라우저가 Tab을 가져가는
+            // 환경의 대체키 M도 같은 hold 규칙을 써서 입력 방식이 둘로 갈리지 않게 한다.
+            bool held = kb != null && (kb.tabKey.isPressed || kb.mKey.isPressed);
+            bool shouldOpen = held && allowed && !Blocked();
+            if (shouldOpen && !IsOpen) Open();
+            else if (!shouldOpen && IsOpen) Close();
 
             if (IsOpen) { RefreshCells(); PlaceDot(player); }
         }
