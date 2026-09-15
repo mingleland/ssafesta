@@ -12,7 +12,9 @@ import { loadProfile, useProfile } from '../../profile/model/profile';
 import { useSession } from '../../auth/model/session';
 import { logout } from '../../auth/model/logout';
 import { walletApi } from '../../../entities/wallet/api.select';
+import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { MusicSettings } from '../../audio/ui/MusicSettings';
+import { openManagement } from '../model/worldScreen';
 import './gameMenu.css';
 
 const PROVIDER_LABEL: Record<string, string> = { google: 'Google', kakao: 'Kakao', ssafy: 'SSAFY', guest: '게스트' };
@@ -34,6 +36,12 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
     queryKey: ['wallet-balance'],
     queryFn: walletApi.getWallet,
     enabled: isMember, // 게스트는 403 — 요청 자체를 만들지 않는다
+  });
+
+  const myBoothQuery = useQuery({
+    queryKey: ['my-booth'], // SlotListPage·useOwnerGate와 키 공유 — 캐시 재사용
+    queryFn: leaseApi.getMyBooth,
+    enabled: isMember,
   });
 
   useEffect(() => {
@@ -93,6 +101,19 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
         <div className="gm-space" aria-hidden="true" />
 
         <div className="gm-system">
+          {myBoothQuery.data && (
+            <button
+              type="button"
+              className="gm-item"
+              onClick={() => {
+                onClose();
+                openManagement();
+              }}
+            >
+              부스관리
+            </button>
+          )}
+
           {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
           <button
             type="button"
