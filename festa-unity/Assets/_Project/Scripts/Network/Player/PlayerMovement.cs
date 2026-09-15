@@ -94,6 +94,7 @@ namespace Festa.Network
         PlayerCameraFollow _cameraFollow;
         CharacterController _controller;
         Unity.Netcode.Components.NetworkTransform _networkTransform;
+        readonly RaycastHit[] _wallSweepHits = new RaycastHit[32];
         float _turnVelocity;
         // 짧은 Shift 탭은 걷기 속도/모션을 유지한다. 즉시 Run으로 바꾸면 같은 프레임에
         // 이동 속도와 네트워크 AnimState가 함께 튀어 스케이트처럼 보인다 (S15P21A604-747).
@@ -496,8 +497,82 @@ namespace Festa.Network
                 return;
             }
 
+            var before = transform.position;
             var velocity = horizontalVelocity + NoStandSlide() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
+            PreventPlayerPushThroughWall(before);
+        }
+
+        /// <summary>
+        /// 원격 플레이어의 CapsuleCollider가 겹치며 만든 CharacterController 디페네트레이션이
+        /// 정적 벽 반대편까지 넘어갔으면 이동 전 쪽의 벽 표면으로 되돌린다.
+        /// </summary>
+        void PreventPlayerPushThroughWall(Vector3 before)
+        {
+            var after = transform.position;
+            var horizontal = after - before;
+            horizontal.y = 0f;
+            float distance = horizontal.magnitude;
+            if (distance < 0.001f) return;
+
+            GetControllerCapsuleAt(before, out var bottom, out var top, out float radius, out float skinWidth);
+            var direction = horizontal / distance;
+            int count = Physics.CapsuleCastNonAlloc(
+                bottom,
+                top,
+                radius,
+                direction,
+                _wallSweepHits,
+                distance + skinWidth,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            float nearestWall = float.PositiveInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = _wallSweepHits[i];
+                var collider = hit.collider;
+                if (collider == null || collider == _controller || collider.transform.IsChildOf(transform)) continue;
+                if (collider.GetComponentInParent<NetworkPlayer>() != null) continue;
+                if (collider.attachedRigidbody != null && !collider.attachedRigidbody.isKinematic) continue;
+                if (Mathf.Abs(hit.normal.y) > 0.55f) continue;
+                if (Vector3.Dot(direction, hit.normal) >= -0.01f) continue;
+                nearestWall = Mathf.Min(nearestWall, hit.distance);
+            }
+
+            if (float.IsPositiveInfinity(nearestWall)) return;
+
+            float allowed = Mathf.Max(0f, nearestWall - skinWidth);
+            if (distance <= allowed + 0.001f) return;
+
+            var corrected = before + direction * allowed;
+            corrected.y = after.y;
+            bool wasEnabled = _controller.enabled;
+            _controller.enabled = false;
+            transform.position = corrected;
+            Physics.SyncTransforms();
+            _controller.enabled = wasEnabled;
+        }
+
+        void GetControllerCapsuleAt(
+            Vector3 position,
+            out Vector3 bottom,
+            out Vector3 top,
+            out float radius,
+            out float skinWidth)
+        {
+            var scale = transform.lossyScale;
+            float verticalScale = Mathf.Abs(scale.y);
+            float horizontalScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+            skinWidth = _controller.skinWidth * horizontalScale;
+            radius = Mathf.Max(0.01f, _controller.radius * horizontalScale - skinWidth);
+            float height = Mathf.Max(radius * 2f, _controller.height * verticalScale);
+            float halfSegment = Mathf.Max(0f, height * 0.5f - radius);
+            var centerOffset = transform.TransformVector(_controller.center);
+            var center = position + centerOffset;
+            var up = transform.up;
+            bottom = center - up * halfSegment;
+            top = center + up * halfSegment;
         }
 
         // ── 올라설 수 없는 표면 (2026-09-10 사용자 지시) ────────────────
