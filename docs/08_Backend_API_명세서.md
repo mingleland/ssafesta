@@ -1624,7 +1624,45 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 **감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
 
-> ⚠️ **아직 없는 것** — 계정 정지·해제, 코인 조정, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다.
+> ⚠️ **아직 없는 것** — 계정 정지·해제, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다. 코인 조정은 아래 17C 로 나갔다.
+
+---
+
+## 17C. Admin — 회원 지갑
+
+관리자가 다른 회원의 코인을 보고 조정한다 (`S15P21A604-806`, 상위 `S15P21A604-742` 블록 2). 판정은 17B 의 `AdminGuard` 를 그대로 쓴다.
+
+**조회는 조치가 아니다** — 잔액·거래내역은 마스터 계정도 대상이 된다. 조정만 `MASTER_PROTECTED` 로 막힌다.
+
+### POST `/admin/wallets/{userId}/adjustments`
+
+코인 지급·회수. 헤더 `Idempotency-Key` **필수**, 본문 `{ "signedAmount": 100, "note": "사유" }`.
+
+`signedAmount` 는 **양수면 지급, 음수면 회수**이고 `0` 은 `400` 이다. 원장에 `ADMIN_ADJUSTMENT` 사유로 한 행이 남고, 참조 칸에는 **수행한 관리자**(`ADMIN_USER` / actorUserId)가 들어간다.
+
+→ `200 { userId, entryId, balanceAfter, alreadyApplied }`
+
+**`Idempotency-Key` 는 조정 한 건의 이름이다.** UUID 여야 하며(`400` 아니면), 같은 조정을 다시 보낼 때는 **같은 값을 그대로** 보낸다. 매번 새로 만들면 재시도가 아니라 새 조정이 되어 두 번 반영된다.
+
+| 재요청 | 결과 |
+|---|---|
+| 같은 키 + 같은 내용 | `200`, `alreadyApplied: true`. 원장도 감사도 늘지 않는다 |
+| 같은 키 + 다른 금액 | `409 IDEMPOTENCY_CONFLICT`. 재시도가 아니라 키 재사용이다 |
+| 같은 키 + 다른 `note` | `200`. `note` 는 동일성 비교에 넣지 않는다 — 원장에 저장되지 않아 비교할 근거가 없다. **처음 문구가 남는다** |
+
+**멱등 범위는 대상 회원별**이다. 서버가 저장하는 키는 `ADMIN_ADJUSTMENT:{userId}:{Idempotency-Key}` 라, 대상이 다르면 같은 UUID 를 써도 별개의 조정이다. 관리자별이 아닌 이유는 그렇게 하면 **한 관리자의 두 번째 조정부터 전부 첫 요청으로 흡수**되기 때문이다.
+
+오류: `403 MASTER_PROTECTED` · `404 ADMIN_TARGET_NOT_FOUND`(회원 없음) · `404 WALLET_NOT_FOUND`(회원인데 지갑 행 없음) · `409 INSUFFICIENT_COIN`(잔액보다 많이 회수) · `409 COIN_BALANCE_OVERFLOW`(지급 후 잔액이 `int` 표현 범위 초과)
+
+### GET `/admin/wallets/{userId}`
+
+잔액. → `200 { userId, balance, updatedAt }`
+
+### GET `/admin/wallets/{userId}/ledger`
+
+거래내역. `page`(0부터)·`size`(1~100). 회원 본인이 `/wallets/me/transactions` 로 보는 것과 같은 원장이다. → `200 { content, page, size, totalElements, totalPages }`
+
+**감사** — 조정은 `admin_actions` 에 `COIN_ADJUST` 로 남는다. 멱등 재요청은 원장이 안 움직이므로 **감사도 안 남긴다** — 그러지 않으면 "몇 번 조정했는가" 를 원장과 감사가 다르게 답한다.
 
 ---
 
@@ -1637,6 +1675,9 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `MASTER_PROTECTED` *(742)* | 마스터 계정(또는 그 소유 자원)을 관리자 조치 대상으로 지정했다 |
 | `ADMIN_LAST_ONE` *(742)* | 마지막 관리자는 강등·정지·탈퇴할 수 없다 |
 | `ADMIN_ALREADY` *(742)* | 이미 관리자다 |
+| `ADMIN_TARGET_NOT_FOUND` *(806)* | 관리자 동작의 대상 회원이 없다. `USER_NOT_FOUND` 는 401 이라 이 자리에 쓸 수 없다 |
+| `IDEMPOTENCY_CONFLICT` *(806)* | 같은 멱등키로 **다른 내용**의 요청이 왔다. 재시도가 아니라 키 재사용이다 |
+| `COIN_BALANCE_OVERFLOW` *(806)* | 지급 후 잔액이 `int` 표현 범위를 넘는다. 잔액 부족의 반대쪽이라 같은 409 다 |
 | `USER_NOT_FOUND` | 사용자 없음 |
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |

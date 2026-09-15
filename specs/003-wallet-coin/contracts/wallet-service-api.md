@@ -88,7 +88,8 @@ record CoinAdminAdjustCommand(
 - 원장에 `reason_type = ADMIN_ADJUSTMENT`, `reference_type = ADMIN_USER`, `reference_id = actorUserId`로 기록한다
 - `entry_type`은 부호에 따라 `CHARGE`(+) / `SPEND`(−)
 - 감액이 잔액을 음수로 만들면 `InsufficientCoinException` — 관리자라도 I-2를 깨지 않는다
-- **HTTP 노출 없음** (U-01 확정까지 보류)
+- **HTTP 노출됨** — `POST /api/v1/admin/wallets/{userId}/adjustments` (`S15P21A604-806`). U-01 보류는 `S15P21A604-743` 이 admin 권한 모델을 확정하며 풀렸다
+- **멱등키는 컨트롤러가 만든다** — 호출자가 보낸 `Idempotency-Key`(UUID)를 `ADMIN_ADJUSTMENT:{userId}:{operationId}` 로 대상에 묶는다. `idempotencyKey` 에 `reference_id`(= actorUserId)를 그대로 쓰면 한 관리자의 조정이 전부 한 건으로 합쳐진다
 
 ### `Page<CoinLedgerEntryView> history(Long userId, Pageable pageable)`
 

@@ -22,6 +22,7 @@ public class AdminActionRecorder {
 
     public static final String ADMIN_GRANT = "ADMIN_GRANT";
     public static final String ADMIN_REVOKE = "ADMIN_REVOKE";
+    public static final String COIN_ADJUST = "COIN_ADJUST";
 
     public static final String TARGET_USER = "USER";
 
