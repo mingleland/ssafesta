@@ -24,6 +24,7 @@ import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementO
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
 import { startBoothVisitTracking } from '../../features/world/model/boothVisitTracker';
+import { startBoothVisitReporting } from '../../features/world/model/boothVisitReporter';
 import { WorldChatLayer } from '../../features/worldChat/ui/WorldChatLayer';
 import {
   WORLD_CHAT_INPUT_ID,
@@ -92,10 +93,13 @@ export function WorldPage() {
   useEffect(() => {
     const unsubscribe = initInteractionDispatcher();
     // 부스 방문 경계 추적 — dispatcher 가 WORLD_BOOTH_CONTEXT 를 나르므로 수명을 같이 둔다
-    // (S15P21A604-690). 지금은 서버로 나가는 것이 없고 경계만 잡는다.
+    // (S15P21A604-690). 경계를 잡는 쪽과 서버로 보내는 쪽이 갈려 있고, 둘 다 이 화면이 사는
+    // 동안만 산다 — 월드를 떠난 뒤 늦게 도착한 전이가 요청을 만들지 않게.
     const stopVisitTracking = startBoothVisitTracking();
+    const stopVisitReporting = startBoothVisitReporting();
     return () => {
       unsubscribe();
+      stopVisitReporting();
       stopVisitTracking();
       // Overlay Bus·클라이언트 UI 는 module-level 상태라 이 화면이 unmount 돼도 남는다 —
       // 벗어날 때 명시적으로 닫아 재진입 시 과거 레이어가 즉시 떠 있지 않게 한다.
