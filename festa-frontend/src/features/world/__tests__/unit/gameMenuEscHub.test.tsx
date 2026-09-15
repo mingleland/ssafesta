@@ -73,3 +73,26 @@ describe('ESC 부스관리 항목', () => {
     expect(getWorldScreen()).toBe('management');
   });
 });
+
+describe('ESC 아바타설정 스텁', () => {
+  it('누를 수 없고 준비 중 배지가 있다 — 진입점 미정', () => {
+    renderMenu();
+    const button = screen.getByRole('button', { name: /아바타설정/ });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText('준비 중')).toBeTruthy();
+  });
+});
+
+describe('ESC 조작안내 항목', () => {
+  it('열면 조작 목록이 나오고, 다시 누르면 닫힌다', () => {
+    renderMenu();
+    const button = screen.getByRole('button', { name: '조작안내' });
+    expect(screen.queryByText('이동')).toBeNull();
+
+    fireEvent.click(button);
+    expect(screen.getAllByText('이동').length).toBeGreaterThan(0);
+
+    fireEvent.click(button);
+    expect(screen.queryByText('이동')).toBeNull();
+  });
+});

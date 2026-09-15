@@ -45,14 +45,15 @@ afterEach(() => {
 describe('ESC 설정', () => {
   it('누를 수 있다 — "준비 중" 이 아니다', () => {
     renderMenu();
-    const button = screen.getByRole('button', { name: /설정/ });
+    const button = screen.getByRole('button', { name: '설정' });
     expect(button.hasAttribute('disabled')).toBe(false);
-    expect(screen.queryByText('준비 중')).toBeNull();
+    // 전역이 아니라 이 버튼 안에서만 본다 — 아바타설정 스텁도 같은 문구를 쓴다(S15P21A604-798)
+    expect(button.textContent).not.toContain('준비 중');
   });
 
   it('열면 음악 항목이 나오고, 다시 누르면 닫힌다', () => {
     renderMenu();
-    const button = screen.getByRole('button', { name: /설정/ });
+    const button = screen.getByRole('button', { name: '설정' });
     expect(screen.queryByRole('switch', { name: '음악' })).toBeNull();
 
     fireEvent.click(button);

@@ -14,6 +14,7 @@ import { logout } from '../../auth/model/logout';
 import { walletApi } from '../../../entities/wallet/api.select';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { MusicSettings } from '../../audio/ui/MusicSettings';
+import { ControlGuideList } from './ControlGuideList';
 import { openManagement } from '../model/worldScreen';
 import './gameMenu.css';
 
@@ -31,6 +32,7 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
   const navigate = useNavigate();
   // 설정은 같은 패널 안에서 열고 닫는다 — ESC 한 번으로 닫히는 자리를 하나 더 만들지 않는다
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const walletQuery = useQuery({
     queryKey: ['wallet-balance'],
@@ -101,6 +103,19 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
         <div className="gm-space" aria-hidden="true" />
 
         <div className="gm-system">
+          <button
+            type="button"
+            className="gm-item"
+            aria-expanded={guideOpen}
+            onClick={() => setGuideOpen((open) => !open)}
+          >
+            조작안내
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d={guideOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
+            </svg>
+          </button>
+          {guideOpen && <ControlGuideList />}
+
           {myBoothQuery.data && (
             <button
               type="button"
@@ -113,6 +128,11 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
               부스관리
             </button>
           )}
+
+          <button type="button" className="gm-item" disabled title="준비 중입니다">
+            아바타설정
+            <span className="gm-badge">준비 중</span>
+          </button>
 
           {/* 설정에 있는 것은 음악뿐이다 — 없는 항목을 만들지 않는다(S15P21A604-618) */}
           <button
