@@ -21,6 +21,7 @@ import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
+import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
 import { startBoothVisitTracking } from '../../features/world/model/boothVisitTracker';
@@ -39,6 +40,7 @@ import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
   closeBoothManagement,
+  closeManagementPanel,
   closeGameMenu,
   resetGameClientUi,
   useGameClientUi,
@@ -128,6 +130,11 @@ export function WorldPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      // 네이티브 <dialog> 는 ESC 를 자기가 소비해 닫지만 keydown 은 window 까지 올라온다.
+      // 그대로 두면 확인 모달이 닫히면서 그 아래 레이어까지 같이 닫힌다 — 리스너를 새로 만들지
+      // 않고 판정자 맨 앞에서 한 번 비켜 준다. 텍스트 입력 중 ESC 도 같은 경로로 dialog 가 먼저
+      // 먹는다.
+      if (document.querySelector('dialog[open]') !== null) return;
       // 채팅이 열려 있으면 그것부터 닫는다. 입력창을 두고 Game Menu 가 열리면 글을 쓰다 말고
       // 메뉴가 덮는다.
       if (getWorldChatSnapshot().open) {
@@ -195,6 +202,10 @@ export function WorldPage() {
       <OverlayHost />
       {/* Booth Management Layer — World 의 관리 NPC 가 연다(계약 G-1 전까지 dev trigger) */}
       {ui.managementOverlay && <BoothManagementOverlay onClose={closeBoothManagement} />}
+      {/* 관리 상세는 관리 화면의 자식이다 — 위에 얹히고, 닫으면 관리 화면이 다시 드러난다 */}
+      {ui.managementPanel !== null && (
+        <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
+      )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
       {ui.gameMenu && (
         <GameMenu

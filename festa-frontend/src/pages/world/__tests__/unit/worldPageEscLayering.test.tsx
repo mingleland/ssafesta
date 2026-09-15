@@ -11,6 +11,7 @@ import {
   __resetGameClientUiForTests,
   getGameClientUiSnapshot,
   openBoothManagement,
+  openManagementPanel,
 } from '../../../../features/world/model/gameClientUi';
 import { getWorldScreen } from '../../../../features/world/model/worldScreen';
 import {
@@ -37,6 +38,9 @@ vi.mock('../../../../features/world/ui/WorldSurface.select', () => ({
 vi.mock('../../../../features/overlay/OverlayHost', () => ({ OverlayHost: () => null }));
 vi.mock('../../../../features/booth/ui/BoothManagementOverlay', () => ({
   BoothManagementOverlay: () => <div data-testid="management" />,
+}));
+vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
+  ManagementPanelHost: () => <div data-testid="management-panel" />,
 }));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
@@ -184,5 +188,33 @@ describe('WorldPage ESC 중재 — Unity 모달 (-450, #132)', () => {
 
     expect(requestExitWorldUi).not.toHaveBeenCalled();
     expect(getWorldScreen()).toBe('menu');
+  });
+
+  // -755: 관리 상세가 관리 화면의 자식이 됐다. ESC 한 번이 두 겹을 함께 걷으면 상세를 닫았을 때
+  // 관리 화면이 아니라 월드로 떨어진다.
+  it('관리 상세가 떠 있으면 그것만 닫고 관리 화면으로 돌아온다', async () => {
+    await renderWorld();
+    act(() => { openManagementPanel({ kind: 'project', boothId: 42 }); });
+
+    pressEscape();
+
+    expect(getGameClientUiSnapshot().managementPanel).toBeNull();
+    expect(getWorldScreen()).toBe('management');
+  });
+
+  // 네이티브 <dialog> 는 ESC 를 자기가 소비해 닫지만 keydown 은 window 까지 올라온다. 비켜 주지
+  // 않으면 확인 모달이 닫히면서 그 아래 레이어까지 같이 사라진다.
+  it('열린 dialog 가 있으면 ESC 가 상위 레이어를 닫지 않는다', async () => {
+    await renderWorld();
+    act(() => { openBoothManagement(); });
+
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('open', '');
+    document.body.appendChild(dialog);
+
+    pressEscape();
+
+    expect(getWorldScreen()).toBe('management');
+    dialog.remove();
   });
 });

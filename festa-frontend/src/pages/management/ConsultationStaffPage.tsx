@@ -14,8 +14,8 @@ import {
   loadStaffQueue,
   useStaffConsultation,
 } from '../../features/consultation/model/staff';
-import { WORLD_RETURN_TO_MANAGEMENT } from '../../features/world/model/gameClientUi';
-import { PageShell, ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import { ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import { ManagementScreen } from '../../features/booth/ui/ManagementScreen';
 import './management.css';
 
 function when(iso: string): string {
@@ -32,10 +32,9 @@ export function ConsultationStaffPage() {
   const acceptable = canAccept();
 
   return (
-    <PageShell
+    <ManagementScreen
       title="상담 운영"
       subtitle="방문자가 보낸 상담 요청을 처리합니다"
-      backTo={WORLD_RETURN_TO_MANAGEMENT}
       actions={
         <button type="button" className="sc-btn sc-btn-sm" disabled={state.status === 'loading'} onClick={() => void loadStaffQueue()}>
           새로고침
@@ -110,6 +109,6 @@ export function ConsultationStaffPage() {
           </section>
         </>
       )}
-    </PageShell>
+    </ManagementScreen>
   );
 }
