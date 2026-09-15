@@ -4,18 +4,23 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.example.ssafesta.TestcontainersConfiguration;
+import com.example.ssafesta.common.ApiException;
+import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -40,13 +45,122 @@ class MemberSessionServiceIntegrationTest {
     @Autowired
     private RedisKeyspaceProperties keyspace;
 
+    /**
+     * 유예 밖의 재사용은 계보째 끊는다 - spec 001 시나리오 7 은 그대로다 (S15P21A604-660).
+     *
+     * <p>30초를 기다리지 않는다. 표식의 회전 시각을 과거로 되돌리는 것이 같은 상태이고, 구형 값을
+     * 직접 심는 기존 테스트와 같은 방식이다.
+     */
     @Test
-    void reusedRotatedRefreshTokenRevokesTheActiveSession() {
+    void aReplayOutsideTheGraceWindowStillRevokesTheFamily() {
         MemberSessionService.MemberSession first = sessions.issue(991_234L);
         MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+        ageRotationMarker(first.refreshToken(), Duration.ofMinutes(5));
 
         assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(first.refreshToken()));
-        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(second.refreshToken()));
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(second.refreshToken()),
+                "유예 밖 재사용은 계보를 끊어야 한다");
+    }
+
+    /**
+     * 유예 안의 재사용은 끊지 않는다 - 탭을 하나 더 연 것이지 도난이 아니다 (S15P21A604-764).
+     *
+     * <p>진 쪽은 401 을 받되 {@code REFRESH_TOKEN_ROTATED} 다. 쿠키는 이미 새 값으로 교체돼 있으므로
+     * 한 번 더 보내면 성공한다는 뜻이고, 그 구분이 없으면 FE 가 로그인 화면으로 보낸다.
+     */
+    @Test
+    void aReplayInsideTheGraceWindowKeepsTheWinningSession() {
+        MemberSessionService.MemberSession first = sessions.issue(991_246L);
+        MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+
+        ApiException refused = assertThrows(ApiException.class, () -> sessions.refresh(first.refreshToken()));
+
+        assertEquals(ErrorCode.REFRESH_TOKEN_ROTATED, refused.errorCode(),
+                "유예 안 재사용은 재시도 가능한 코드로 갈라져야 한다");
+        assertDoesNotThrow(() -> sessions.refresh(second.refreshToken()),
+                "늦게 도착한 두 번째 탭이 방금 발급된 세션을 끊었다");
+    }
+
+    /**
+     * 회전 시각이 손상돼도 탐지는 계속 돈다.
+     *
+     * <p>숫자가 아니면 유예 정보가 없는 것으로 접고 {@code Used} 자체를 버리지 않는다 - 버리면
+     * 사유와 계보까지 잃어 계보 폐기가 조용히 꺼진다.
+     */
+    @Test
+    void aMarkerWithAnUnparseableRotationTimeStillRevokes() {
+        MemberSessionService.MemberSession first = sessions.issue(991_247L);
+        MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+        rewriteRotationField(first.refreshToken(), "not-a-number");
+
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(first.refreshToken()));
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(second.refreshToken()),
+                "회전 시각을 못 읽으면 유예가 아니라 폐기다");
+    }
+
+    /** 미래 시각은 상한만 보면 영원히 유예를 통과한다. 두 방향을 다 본다. */
+    @Test
+    void aMarkerDatedInTheFutureIsNotInsideTheGraceWindow() {
+        MemberSessionService.MemberSession first = sessions.issue(991_248L);
+        MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
+        ageRotationMarker(first.refreshToken(), Duration.ofHours(-1));
+
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(first.refreshToken()));
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(second.refreshToken()),
+                "미래 시각이 유예로 읽히면 재사용 탐지가 영영 꺼진다");
+    }
+
+    /**
+     * 구형 2칸 토큰도 동시 회전에서 두 탭이 함께 죽지 않는다.
+     *
+     * <p>구형 값에는 계보가 없어 {@code auth:family} 키도 없다. 표식에만 후보 계보를 적으면 진 쪽이
+     * 계보 대조에서 떨어져 일반 401 을 받는다 - {@code refresh-token-ttl} 이 {@code P7D} 라 배포 후
+     * 7일 동안 구형 토큰이 바로 그 상태가 된다. 소비와 함께 계보 키를 만들어야 닫힌다.
+     */
+    @Test
+    void aLegacyTokenRotatedByTwoTabsAtOnceKeepsTheWinner() throws Exception {
+        long userId = 991_249L;
+        String legacyToken = UUID.randomUUID().toString();
+        String sessionId = UUID.randomUUID().toString();
+        // 구형 포맷 - 계보 칸이 없다.
+        redis.opsForValue().set(key("auth:refresh:" + sha256(legacyToken)), userId + ":" + sessionId, TTL);
+        redis.opsForValue().set(key("auth:session:" + userId), sessionId, TTL);
+        redis.opsForValue().set(key("auth:active:" + userId), sha256(legacyToken), TTL);
+
+        Outcome outcome = raceTwoRefreshes(legacyToken);
+
+        assertEquals(1, outcome.succeeded(), "같은 토큰으로 두 세션이 발급되면 안 된다");
+        assertEquals(List.of(ErrorCode.REFRESH_TOKEN_ROTATED), outcome.refusals(),
+                "구형 토큰의 진 쪽도 재시도 가능한 코드를 받아야 한다");
+        assertNotNull(redis.opsForValue().get(key("auth:family:" + userId)),
+                "구형 회전은 그 자리에서 계보를 만들어야 한다");
+        assertDoesNotThrow(() -> sessions.refresh(outcome.winner().refreshToken()),
+                "이긴 쪽 세션이 살아 있어야 한다");
+    }
+
+    /**
+     * 고아 3칸 키가 현재 계보를 과거로 되돌리지 않는다.
+     *
+     * <p>{@code issue} 의 네 SET 이 원자적이지 않아 옛 계보를 단 3칸 키가 남을 수 있다. 소비 스크립트가
+     * 계보를 무조건 쓰면 그 키 하나가 현재 계보를 덮어써 이후 재사용 탐지가 틀린다. 그래서 계보 쓰기는
+     * 구형 2칸일 때만, 그것도 {@code NX} 다.
+     */
+    @Test
+    void anOrphanedTokenFromAnOldFamilyDoesNotRewindTheCurrentFamily() {
+        long userId = 991_250L;
+        MemberSessionService.MemberSession current = sessions.issue(userId);
+        String currentFamily = redis.opsForValue().get(key("auth:family:" + userId));
+
+        String orphanToken = UUID.randomUUID().toString();
+        redis.opsForValue().set(key("auth:refresh:" + sha256(orphanToken)),
+                userId + ":" + UUID.randomUUID() + ":" + UUID.randomUUID(), TTL);
+
+        assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(orphanToken));
+
+        assertEquals(currentFamily, redis.opsForValue().get(key("auth:family:" + userId)),
+                "고아 키가 현재 계보를 되돌렸다");
+        assertDoesNotThrow(() -> sessions.refresh(current.refreshToken()),
+                "고아 키 소비가 현재 세션을 끊었다");
     }
 
     /**
@@ -58,26 +172,18 @@ class MemberSessionServiceIntegrationTest {
      */
     @Test
     void twoSimultaneousRefreshesWithOneTokenIssueOnce() throws Exception {
-        MemberSessionService.MemberSession issued = sessions.issue(991_235L);
-        String token = issued.refreshToken();
+        // 완전 동시를 실제로 만들어야 표식 공백이 재현된다. invokeAll 만으로는 한쪽이 먼저 끝나는
+        // 경우가 섞여, 소비와 표식 기록이 갈라진 구현에서도 초록일 수 있다.
+        for (long userId = 991_251L; userId <= 991_255L; userId++) {
+            MemberSessionService.MemberSession issued = sessions.issue(userId);
 
-        List<Callable<MemberSessionService.MemberSession>> attempts = new ArrayList<>();
-        attempts.add(() -> sessions.refresh(token));
-        attempts.add(() -> sessions.refresh(token));
+            Outcome outcome = raceTwoRefreshes(issued.refreshToken());
 
-        int succeeded = 0;
-        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
-            for (Future<MemberSessionService.MemberSession> attempt : pool.invokeAll(attempts)) {
-                try {
-                    attempt.get();
-                    succeeded++;
-                } catch (Exception refused) {
-                    // 진 쪽은 GETDEL 이 null 을 준다 — 이 분기가 곧 재사용 판정이다.
-                }
-            }
+            assertEquals(1, outcome.succeeded(),
+                    "같은 토큰으로 두 세션이 발급되면 재사용 감지가 우회된다 - userId=" + userId);
+            assertEquals(List.of(ErrorCode.REFRESH_TOKEN_ROTATED), outcome.refusals(),
+                    "진 쪽이 일반 401 을 받으면 FE 는 그것을 세션 종료로 읽는다 - userId=" + userId);
         }
-
-        assertEquals(1, succeeded, "같은 토큰으로 두 세션이 발급되면 재사용 감지가 우회된다");
     }
 
     /**
@@ -124,6 +230,11 @@ class MemberSessionServiceIntegrationTest {
      * 활성 계보라서 대조가 그대로 통과하기 때문이다. 회전마다 계보를 새로 발급하도록 변이시켜
      * 확인했고, 그때 빨개진 것은 이 테스트 하나뿐이었다 — 기존
      * {@code reusedRotatedRefreshTokenRevokesTheActiveSession} 은 초록으로 남았다.
+     *
+     * <p>회전 표식을 유예 밖으로 밀어 두고 본다 (S15P21A604-764). 이 테스트가 묻는 것은 <b>계보가
+     * 회전을 넘어 이어지는가</b>이지 유예 창이 아니다. 밀어 두지 않으면 방금 회전한 토큰이라
+     * 유예에 걸려, 계보를 새로 발급하는 변이를 넣어도 초록이 된다 — 이 테스트가 존재하는 이유가
+     * 그 변이를 잡는 것이다.
      */
     @Test
     void aFamilySurvivesRepeatedRotationSoTheFirstTokenStillClosesIt() {
@@ -131,6 +242,7 @@ class MemberSessionServiceIntegrationTest {
         MemberSessionService.MemberSession first = sessions.issue(userId);
         MemberSessionService.MemberSession second = sessions.refresh(first.refreshToken());
         MemberSessionService.MemberSession third = sessions.refresh(second.refreshToken());
+        ageRotationMarker(first.refreshToken(), Duration.ofMinutes(5));
 
         assertThrows(InvalidRefreshTokenException.class, () -> sessions.refresh(first.refreshToken()));
 
@@ -206,8 +318,14 @@ class MemberSessionServiceIntegrationTest {
                     () -> {
                         try {
                             return sessions.refresh(first.refreshToken());
-                        } catch (InvalidRefreshTokenException refused) {
-                            return null; // 재사용은 언제나 거부된다 — 관심사는 그 부수효과다
+                        } catch (ApiException refused) {
+                            // 재사용은 언제나 거부된다 - 관심사는 그 부수효과다. 경합 결과에 따라
+                            // 코드가 갈린다: 계보가 이미 닫혔으면 INVALID_MEMBER_TOKEN, 회전 직후면
+                            // REFRESH_TOKEN_ROTATED 다. 둘 다 거부이므로 코드만 확인한다.
+                            assertTrue(refused.errorCode() == ErrorCode.INVALID_MEMBER_TOKEN
+                                            || refused.errorCode() == ErrorCode.REFRESH_TOKEN_ROTATED,
+                                    "예상 밖의 거부 코드: " + refused.errorCode());
+                            return null;
                         }
                     },
                     () -> sessions.issue(id));
@@ -227,6 +345,50 @@ class MemberSessionServiceIntegrationTest {
             assertDoesNotThrow(() -> sessions.refresh(issued.refreshToken()),
                     "재사용 판정이 동시에 들어온 새 로그인의 세션을 끊었다 — userId=" + id);
         }
+    }
+
+    /** 두 요청의 시작을 맞춰 완전 동시를 만든다. */
+    private Outcome raceTwoRefreshes(String token) throws Exception {
+        CyclicBarrier start = new CyclicBarrier(2);
+        List<Callable<MemberSessionService.MemberSession>> attempts = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            attempts.add(() -> {
+                start.await();
+                return sessions.refresh(token);
+            });
+        }
+        int succeeded = 0;
+        MemberSessionService.MemberSession winner = null;
+        List<ErrorCode> refusals = new ArrayList<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(2)) {
+            for (Future<MemberSessionService.MemberSession> attempt : pool.invokeAll(attempts)) {
+                try {
+                    winner = attempt.get();
+                    succeeded++;
+                } catch (Exception refused) {
+                    Throwable cause = refused.getCause() != null ? refused.getCause() : refused;
+                    refusals.add(((ApiException) cause).errorCode());
+                }
+            }
+        }
+        return new Outcome(succeeded, winner, refusals);
+    }
+
+    private record Outcome(int succeeded, MemberSessionService.MemberSession winner,
+                           List<ErrorCode> refusals) {
+    }
+
+    /** 유예 밖(또는 미래)을 만든다 - 실제로 기다리지 않고 표식의 회전 시각만 옮긴다. */
+    private void ageRotationMarker(String rawToken, Duration age) {
+        rewriteRotationField(rawToken, String.valueOf(Instant.now().minus(age).toEpochMilli()));
+    }
+
+    private void rewriteRotationField(String rawToken, String value) {
+        String markerKey = key("auth:refresh:used:" + sha256(rawToken));
+        String[] fields = redis.opsForValue().get(markerKey).split(":", -1);
+        assertEquals(4, fields.length, "회전 표식에 시각 칸이 없다: " + String.join(":", fields));
+        fields[3] = value;
+        redis.opsForValue().set(markerKey, String.join(":", fields), TTL);
     }
 
     private String key(String suffix) {
