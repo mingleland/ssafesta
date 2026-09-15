@@ -145,7 +145,7 @@ public class ConsultationService {
             throw new ApiException(ErrorCode.CONSULTATION_NOT_REQUESTED);
         }
         consultation.end(Instant.now());
-        events.ended(consultation.getVisitorUserId(), consultation.getId());
+        events.ended(consultation.getBoothId(), consultation.getVisitorUserId(), consultation.getId());
     }
 
     /**

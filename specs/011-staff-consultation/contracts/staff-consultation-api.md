@@ -113,7 +113,7 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 | 방문자 | `accepted` | `staffName` |
 | 방문자 | `expired` · `ended` | — |
 | 직원 | `requested` | `visitorNickname`, `requestedAt`, `handoffSummary` |
-| 직원 | `cancelled` · `expired` | — |
+| 직원 | `cancelled` · `expired` · `ended` | — |
 | 직원 | `taken` | `staffName` — 다른 직원이 먼저 수락했다 |
 
 > **이벤트 재전송은 P1에 없다.** 끊긴 사이의 변화는 유실되며, 클라이언트는 재연결 직후 `getQueue`(직원)·요청 상태(방문자)를 REST로 다시 읽는다. `occurredAt` 이 그때 순서를 가른다. **정본은 REST이고 STOMP는 알림이다.**
@@ -177,7 +177,9 @@ SEND        없다. P1 은 서버→클라이언트 단방향 알림 전용이�
 
 ### `POST /api/v1/consultation/sessions/{sessionId}/end`
 
-방문자·직원 **누구나** 종료할 수 있다. 상대에게 `ended` 이벤트가 간다(FR-010). → `204`
+방문자·직원 **누구나** 종료할 수 있다. `ended` 이벤트는 **방문자 큐와 그 부스 직원 토픽 양쪽**으로 간다(FR-010). → `204`
+
+> 직원 토픽으로 보내므로 **종료를 호출한 직원 본인도 받는다** — `taken`(수락한 본인도 받는다)과 같은 성질이다. 예전에는 이 절이 "상대에게" 라고 적고 이벤트 표에는 직원 행이 없어 자기모순이었고, 구현은 표를 따라 방문자가 나간 뒤에도 직원 화면에 "진행 중" 이 남았다. 2026-09-14 FE 회신으로 양쪽 발행으로 확정했다 (GitLab [#133](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/133), S15P21A604-719).
 
 | 오류 | 조건 |
 |---|---|
