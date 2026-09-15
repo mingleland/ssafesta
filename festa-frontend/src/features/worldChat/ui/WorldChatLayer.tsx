@@ -5,7 +5,8 @@
 // 그래서 `.world-scene` 의 형제 레이어로 둔다.
 //
 // Enter 는 여기서 듣지 않는다 — 판정자는 `WorldPage` 하나다.
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
+import { getRealtimeStatus, subscribeRealtimeStatus } from '../../../shared/realtime/realtimeClient';
 import {
   MAX_CHAT_CODE_POINTS,
   WORLD_CHAT_INPUT_ID,
@@ -23,6 +24,9 @@ const VISIBLE_WHEN_CLOSED = 4;
 export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: number) => void }) {
   const { open, draft, messages, notice } = useWorldChat();
   const member = canUseWorldChat();
+  // 연결 상태는 transport 가 정본이다 — 화면은 읽기만 한다 (S15P21A604-790)
+  const status = useSyncExternalStore(subscribeRealtimeStatus, getRealtimeStatus, getRealtimeStatus);
+  const offline = status !== 'connected';
   const layerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wasOpen = useRef(false);
@@ -83,7 +87,14 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
       {notice !== null && <p className="world-chat-notice">{notice}</p>}
 
       {open && (
-        <div className="world-chat-input-row">
+        <>
+          {/* 게스트는 연결 자체를 시도하지 않는다 — 그 상태를 끊김으로 알리면 거짓말이 된다 */}
+          {member && offline && (
+            <p className="world-chat-status" role="status">
+              {status === 'reconnecting' ? '채팅 연결 중…' : '채팅 연결이 끊어졌습니다'}
+            </p>
+          )}
+          <div className={offline ? 'world-chat-input-row world-chat-input-row-offline' : 'world-chat-input-row'}>
           <input
             id={WORLD_CHAT_INPUT_ID}
             ref={inputRef}
@@ -97,7 +108,8 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
           <span className="world-chat-count">
             {countCodePoints(draft)}/{MAX_CHAT_CODE_POINTS}
           </span>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
