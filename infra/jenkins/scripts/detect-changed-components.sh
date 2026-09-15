@@ -48,6 +48,9 @@ source_roots = {
     "backend/": "back",
     "festa-frontend/": "front",
     "festa-unity/": "game",
+    # Dedicated Server 의 배포 경로다. 게임 하나만 고르고 ai·back·front 를 끌고 오지 않는다 —
+    # deploy-game.sh / compose / nginx 가 바뀌면 재배포로 검증되어야 하고, 그것이 game 선택이다.
+    "infra/unity-server/": "game",
 }
 component_config = {
     "infra/environments/compose/dev/ai.yaml": "ai",
@@ -62,6 +65,9 @@ component_config = {
 shared_exact = {
     "Jenkinsfile",
     ".gitlab-ci.yml",
+    # 도커 빌드 컨텍스트 제외 규칙이라 이미지 내용에 영향을 줄 수 있다. 문서 취급하면 검증 없이
+    # 통과하므로 전체 재빌드로 둔다.
+    ".dockerignore",
     "infra/environments/compose/dev/base.yaml",
     "infra/environments/config/manifests/dev.json",
     "infra/environments/config/environments/dev.env.example",
@@ -71,13 +77,27 @@ shared_exact = {
 shared_prefixes = (
     "ci/",
     "infra/jenkins/",
-    "infra/deploy/scripts/",
-    "infra/environments/scripts/",
-    "infra/environments/nginx/",
-    "infra/environments/tests/",
+    # 아래 둘은 전 컴포넌트의 런타임 설정이라 전체 재빌드가 맞다. 하위의 dev component compose
+    # 파일은 component_config 가 먼저 잡으므로 여기 포함돼도 component 선택이 유지된다.
+    "infra/deploy/",
+    "infra/environments/",
     "infra/tests/",
 )
-docs_prefixes = ("docs/", "specs/", "infra/evidence/")
+# 빌드 산출물에 들어가지 않는 경로. 아래 판정을 source_roots 보다 먼저 두어 runbook 한 줄 수정이
+# Unity 빌드를 끌고 오지 않게 한다. 반대로 festa-*/README.md 는 여기 없으므로 그대로 component
+# 변경으로 잡힌다 — 긴급 재빌드 수단(INFRA-T-097)을 남겨 둔다.
+docs_prefixes = (
+    "docs/",
+    "specs/",
+    "infra/evidence/",
+    "infra/unity-server/runbooks/",
+    "spikes/",
+    ".claude/",
+)
+docs_exact = {
+    ".gitignore",
+    ".gitattributes",
+}
 
 components = set()
 deploy_components = set()
@@ -85,6 +105,9 @@ reasons = set()
 unknown = []
 shared = False
 for path in paths:
+    if path in docs_exact or path.startswith(docs_prefixes):
+        reasons.add("docs-only")
+        continue
     component = next((value for prefix, value in source_roots.items() if path.startswith(prefix)), None)
     if component:
         components.add(component)
