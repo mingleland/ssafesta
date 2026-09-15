@@ -33,6 +33,8 @@ namespace Festa.Avatar
         int _price;
         string _itemName;
         System.Action<int> _onPurchased;
+        System.Action<bool> _onClosed;
+        bool _purchased;
 
         long? _balance;          // null = 아직 모름
         bool _inFlight;
@@ -46,7 +48,12 @@ namespace Festa.Avatar
         /// 창을 띄운다. 이미 떠 있으면 그것을 쓴다 — 잠긴 항목을 여러 번 눌러도 창이 겹치지 않는다.
         /// </summary>
         /// <param name="onPurchased">구매가 실제로 끝났을 때 소유 단위 키를 돌려준다(팔레트 새로고침용).</param>
-        public static void Open(string itemName, int price, long itemId, int ownershipKey, System.Action<int> onPurchased)
+        /// <param name="onClosed">
+        /// 창이 닫힐 때 <b>반드시 한 번</b> 불린다. 인자는 구매 성공 여부다 — 호출자가 실착 미리보기를
+        /// 되돌릴지 그대로 둘지 여기서 판단한다. 닫기·취소·창 파괴 어느 경로로 끝나도 불린다.
+        /// </param>
+        public static void Open(string itemName, int price, long itemId, int ownershipKey, System.Action<int> onPurchased,
+                                System.Action<bool> onClosed = null)
         {
             var existing = FindFirstObjectByType<AvatarPurchaseDialog>();
             if (existing != null) Destroy(existing.gameObject);
@@ -58,19 +65,40 @@ namespace Festa.Avatar
             dialog._itemId = itemId;
             dialog._ownershipKey = ownershipKey;
             dialog._onPurchased = onPurchased;
+            dialog._onClosed = onClosed;
             dialog.Build();
             _ = dialog.LoadBalanceAsync();
+        }
+
+        /// <summary>
+        /// 떠 있는 창이 있으면 <b>지금</b> 닫는다 — <c>onClosed</c> 가 이 호출 안에서 끝난다.
+        ///
+        /// <para>파괴는 프레임 끝으로 미뤄지므로, 새 창을 연 뒤에 옛 창이 정리되면 옛 창의 되돌리기가
+        /// <b>새 미리보기를 지운다.</b> 잠긴 항목을 연달아 누를 때 나는 순서 문제라, 호출자가 새
+        /// 미리보기를 입히기 전에 이것을 먼저 부른다.</para>
+        /// </summary>
+        public static void CloseExisting()
+        {
+            var existing = FindFirstObjectByType<AvatarPurchaseDialog>();
+            if (existing != null) existing.Close();
         }
 
         void Build()
         {
             var canvas = FestaUiKit.OverlayCanvas(transform, "Canvas", 700);
             var root = canvas.transform;
-            FestaUiKit.Backdrop(root);
+            // 배경을 덜 어둡게 한다 — 이 창이 떠 있는 동안 아바타가 그 옷을 입고 서 있고,
+            // 그것을 보고 살지 말지 정하는 창이다. 화면을 평소만큼 덮으면 볼 것이 가려진다.
+            var backdrop = FestaUiKit.Backdrop(root);
+            var dim = backdrop.color;
+            dim.a *= 0.45f;
+            backdrop.color = dim;
 
             var panel = FestaUiKit.Panel(root, "Card");
             var pr = panel.rectTransform;
-            FestaUiKit.Place(pr, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(560f, 380f));
+            // **화면 가운데가 아니라 오른쪽으로 치운다.** 가운데는 아바타가 서 있는 자리다
+            // (사용자 지시 2026-09-15 — "실착용 모습을 잘 볼 수 있게 옆으로").
+            FestaUiKit.Place(pr, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-36f, 0f), new Vector2(560f, 380f));
 
             FestaUiKit.TitleBanner(pr, "아이템 구매", new Vector2(0f, 22f), new Vector2(200f, 46f), 22f);
             FestaUiKit.CloseButton(pr, new Vector2(-14f, -14f), 40f, Close);
@@ -179,6 +207,7 @@ namespace Festa.Avatar
                 _noticeText.text = "구매가 완료됐어요. 바로 입어 볼 수 있어요.";
                 _noticeText.color = FestaUiKit.Good;
                 SetBuy("완료", false);
+                _purchased = true;
                 if (_balance != null) { _balance -= _price; _balanceText.text = $"내 코인  {_balance.Value:N0}"; }
                 _onPurchased?.Invoke(_ownershipKey);
                 await CloseAfterAsync(1.1f);
@@ -202,6 +231,7 @@ namespace Festa.Avatar
                     _noticeText.text = "이미 보유한 아이템이에요.";
                     _noticeText.color = FestaUiKit.Good;
                     SetBuy("완료", false);
+                    _purchased = true;
                     _onPurchased?.Invoke(_ownershipKey);
                     await CloseAfterAsync(1.1f);
                     break;
@@ -252,6 +282,9 @@ namespace Festa.Avatar
             if (_released) return;
             _released = true;
             InputBridge.SetLocked(false, LockOwner);
+            var closed = _onClosed;
+            _onClosed = null;
+            closed?.Invoke(_purchased);
         }
     }
 }
