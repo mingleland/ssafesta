@@ -177,7 +177,7 @@ R2_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE
 UPLOAD_BLOCKED → MINIO_WRITABLE → UPLOAD_BLOCKED → R2_WRITABLE
 ```
 
-active provider가 R2일 때 R2 장애·90% 사용량·stale snapshot은 `UPLOAD_BLOCKED`로 전환한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 `R2_WRITABLE`로 복귀한다. R2 장기 장애의 `MINIO_WRITABLE` 전환과 R2 복귀는 운영자 승인 `storage-failover.sh`가 단일 lock으로 수행하며, reconcile run과 `targetBucket`은 spec 007 C-10/FR-035 계약에서 기록한다.
+active provider가 R2일 때 R2 장애·90% 사용량·stale snapshot은 `UPLOAD_BLOCKED`로 전환한다. R2 contract probe와 최신 usage snapshot이 모두 성공하면 `R2_WRITABLE`로 복귀한다. R2 장기 장애의 `MINIO_WRITABLE` 전환과 R2 복귀는 운영자 승인 `storage-failover.sh`가 단일 lock으로 수행하며, reconcile run과 `targetBucket`은 spec 007 C-10/FR-035 계약에서 기록한다. `targetBucket` 필드 자체는 계약 `0.3.0`에서 도입되며, 현재 `0.2.0`에 보내면 `422 RECONCILIATION_INVALID`로 거절된다 — 계약 개정이 `storage-failover.sh` 구현보다 앞선다.
 
 ## 9. Redis Cache Class
 

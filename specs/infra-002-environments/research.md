@@ -79,7 +79,7 @@
 
 ## R-07. 승인된 MinIO fallback과 outage admission
 
-**Decision**: Cloudflare R2가 정상 운영의 primary provider다. R2 probe 실패 또는 usage guard 차단 시 새 upload grant를 먼저 fail-closed한다. R2 장기 장애에서는 운영자 승인 후 MinIO로 전환할 수 있다. `storage-failover.sh`는 전환과 reconcile 전체를 단일 lock으로 직렬화하고, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다. reconcile 결과는 target provider와 `targetBucket`을 명시한다. 기존 문서 조회와 R2 비의존 비AI 기능은 가능한 범위에서 유지한다.
+**Decision**: Cloudflare R2가 정상 운영의 primary provider다. R2 probe 실패 또는 usage guard 차단 시 새 upload grant를 먼저 fail-closed한다. R2 장기 장애에서는 운영자 승인 후 MinIO로 전환할 수 있다. `storage-failover.sh`는 전환과 reconcile 전체를 단일 lock으로 직렬화하고, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다. reconcile 결과는 target provider와 `targetBucket`을 명시한다. 단 `targetBucket` 전송은 spec 007 계약 `0.3.0` 개정이 선행하며, 현재 `0.2.0`에 보내면 `422 RECONCILIATION_INVALID`로 거절된다. 기존 문서 조회와 R2 비의존 비AI 기능은 가능한 범위에서 유지한다.
 
 **Rationale**: 자동 failover는 split-brain·누락 객체 위험이 있으므로 금지한다. 반면 장기 R2 장애에서 운영자 승인 fallback을 남기면 서비스 중단 선택지를 보존할 수 있다. 단일 lock과 명시적 target bucket은 A→B→A 동시 reconcile 및 설정 추론을 막는다. MinIO는 PostgreSQL backup의 대체 수단이 아니며, DB backup은 계속 private R2 bucket에 보관한다.
 

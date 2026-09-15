@@ -82,6 +82,7 @@ Presigned URL은 “단일 object·operation·expiry 범위”이지 one-time to
 - R2 probe 실패 또는 Usage Guard 차단 상태에서는 신규 PUT grant를 발급하지 않는다.
 - 자동 provider 전환과 로컬 디스크 fallback은 허용하지 않는다. R2 장기 장애의 MinIO 전환·reconciliation은 운영자 승인 후에만 `storage-failover.sh`로 수행한다.
 - `storage-failover.sh`는 상태 전환과 reconcile 실행 전체를 단일 lock으로 직렬화하며, 진행 중 run이 있으면 다음 전환·reconcile 시작을 거부한다. reconcile 요청은 target provider와 `targetBucket`을 명시한다.
+- ⚠️ **`targetBucket`은 아직 보낼 수 없다 — 계약 개정이 선행이다.** spec 007 계약은 현재 `0.2.0`이고 reconcile 요청 스키마가 `additionalProperties: false`라, 이 필드를 실으면 무시가 아니라 `422 RECONCILIATION_INVALID`로 거절된다(`StorageReconciliationControllerIntegrationTest#anUndefinedFieldIsRejected`가 `errors[0].field = targetBucket`으로 고정). 계약 `0.3.0`(`targetBucket` required)과 Spring 수신단 구현이 `storage-failover.sh` 착수(spec 007 T076)보다 먼저다. 방향은 GitLab #100에서 합의됐고 남은 것은 시점뿐이다 — Jira `S15P21A604-770`.
 - 기존 문서 조회와 정상 비AI 경로는 R2 의존 범위 밖에서 계속 제공한다.
 - active provider가 R2인 차단 상태는 R2 contract probe와 최신 usage snapshot이 모두 성공해야 업로드를 재개한다. MinIO fallback 중 R2로의 복귀는 자동 전환하지 않고, 운영자 승인과 같은 단일 lock 절차를 다시 거친다.
 - R2 원본 문서는 별도 2차 백업이 없으며 PostgreSQL dump만 private R2 backup bucket에 보관한다.
