@@ -156,6 +156,8 @@
   cursor: pointer;
   transition: filter 0.12s ease, transform 0.08s ease;
 }
+/* <Link> 로 만든 버튼이 밑줄을 달고 나오지 않게 한다 (S15P21A604-784) */
+.studio-btn { text-decoration: none; }
 .studio-btn:hover:not(:disabled) { filter: brightness(1.12); }
 .studio-btn:active:not(:disabled) { transform: translateY(1px); }
 .studio-btn:disabled { opacity: 0.45; cursor: default; }
@@ -570,7 +572,10 @@
   font-size: 14px;
   line-height: 1.6;
 }
-.studio-gate-card a { color: var(--studio-accent); }
+/* 카드 본문의 평범한 링크만 강조색으로 둔다 — 버튼 클래스를 쓴 <Link> 는 제외한다.
+   제외하지 않으면 이 규칙이 .studio-btn-primary 의 글자색을 이겨서 글자가 배경과 같아진다
+   (S15P21A604-784). */
+.studio-gate-card a:not(.studio-btn) { color: var(--studio-accent); }
 /* Gate 는 카드만 그려 툴바의 '뒤로'가 없다 — 탈출구를 카드 안에 둔다 (S15P21A604-588) */
 .studio-gate-actions {
   display: flex;
