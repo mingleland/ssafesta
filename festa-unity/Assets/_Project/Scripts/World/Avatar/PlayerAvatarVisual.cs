@@ -309,9 +309,14 @@ namespace Festa.World
                 if (Time.time < _heightCalibrateDeadline) { _regroundAt = Time.time + RegroundSettle; return; }
             }
 
-            if (!TryGetVisibleGeometryBounds(out var posed)) return;
+            // 굽기에 실패하면(렌더러가 아직 없는 프레임 등) 포기하지 않고 다음 정착 시점에 다시 잰다 —
+            // 여기서 그냥 return 하면 영영 76% 로 남는다.
+            if (!TryGetVisibleGeometryBounds(out var posed) || posed.size.y < 0.01f)
+            {
+                _regroundAt = Time.time + RegroundSettle;
+                return;
+            }
             float posedHeight = posed.size.y;
-            if (posedHeight < 0.01f) return;
 
             _heightCalibrated = true;
             float correction = _targetVisualHeight / posedHeight;
