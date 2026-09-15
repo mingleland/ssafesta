@@ -24,6 +24,22 @@ public enum ErrorCode {
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
     UNTRUSTED_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다."),
 
+    // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
+    /**
+     * The master account, or something it owns, was named as the target of an admin action
+     * (S15P21A604-743). Distinct from {@link #FORBIDDEN} on purpose: the caller <i>is</i> an admin,
+     * so a generic refusal would read as "your session is wrong" rather than "this target is
+     * off-limits", and the console cannot tell the two apart to explain either.
+     */
+    MASTER_PROTECTED(HttpStatus.FORBIDDEN, "보호된 계정입니다."),
+    /**
+     * Demoting, suspending or deleting this admin would leave the service with none — and the
+     * promotion API itself is behind the admin gate, so there would be no way back in short of a
+     * migration.
+     */
+    ADMIN_LAST_ONE(HttpStatus.CONFLICT, "마지막 관리자는 해제할 수 없습니다."),
+    ADMIN_ALREADY(HttpStatus.CONFLICT, "이미 관리자입니다."),
+
     // ── OAuth ───────────────────────────────────────────────────────────────
     OAUTH_PROVIDER_NOT_SUPPORTED(HttpStatus.NOT_FOUND, "지원하지 않는 소셜 로그인 제공자입니다."),
     OAUTH_HANDOFF_MISSING(HttpStatus.BAD_REQUEST, "OAuth 로그인 handoff cookie가 없습니다."),
@@ -51,7 +67,16 @@ public enum ErrorCode {
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_RENTABLE(HttpStatus.CONFLICT, "임대할 수 없는 슬롯입니다."),
     BOOTH_SLOT_ALREADY_LEASED(HttpStatus.CONFLICT, "이미 임대 중인 슬롯입니다."),
-    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 만료 후 다시 임대할 수 있습니다."),
+    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 반납하거나 만료된 뒤 다시 임대할 수 있습니다."),
+    /**
+     * Nothing of the caller's to hand back here (FR-020).
+     *
+     * <p>Deliberately does not separate "you hold no lease" from "your lease is on another
+     * slot": both mean the caller's screen is stale, and the client does the same thing about
+     * either — re-read the slot list. Which one it was is in the server log. A retried
+     * {@code DELETE} lands here too, and that is not an error worth showing.
+     */
+    ACTIVE_LEASE_NOT_FOUND(HttpStatus.NOT_FOUND, "반납할 활성 임대가 없습니다."),
     /**
      * Reused by the AI conversation contract (spec 008): "booth entry refused" and "AI question
      * refused" are the same event to a user, so they must not carry two different names

@@ -193,7 +193,8 @@ public class OpenApiConfiguration {
                 tag("Consultation", "사람 상담 요청·수락·종료. 회원 전용이고 요청은 10분 뒤 만료된다"),
                 tag("Realtime", "STOMP 연결용 5분 토큰. 한 소켓이 상담 알림과 월드 채팅을 함께 나른다"),
                 tag("Booth Staff", "부스 직원 목록과 역할 관리. 소유자는 읽기 전용 행으로 함께 나온다"),
-                tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"));
+                tag("World Session", "Unity 월드 접속 주소와 1회용 입장 토큰 발급"),
+                tag("Admin", "관리자 권한 관리. 관리자만 관리자를 만들 수 있고, 마스터 계정은 어떤 조치의 대상도 되지 않는다"));
     }
 
     private Tag tag(String name, String description) {
