@@ -86,6 +86,20 @@ class WorldChatIntegrationTest {
         assertEquals("안녕하세요", sent.content());
     }
 
+    @Test
+    void aJoinIsBroadcastAsASystemNoticeWithTheServerLookedUpNickname() {
+        Long userId = member("입장하는이");
+
+        chat.announceJoin(userId);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        org.mockito.Mockito.verify(messaging).convertAndSend(
+                org.mockito.Mockito.eq(WorldChatService.TOPIC), captor.capture());
+        WorldChatJoinNotice sent = assertInstanceOf(WorldChatJoinNotice.class, captor.getValue());
+        assertEquals(WorldChatJoinNotice.TYPE, sent.type());
+        assertEquals(users.findById(userId).orElseThrow().getNickname(), sent.nickname());
+    }
+
     /**
      * 앞뒤 공백은 다듬어 내보낸다.
      *

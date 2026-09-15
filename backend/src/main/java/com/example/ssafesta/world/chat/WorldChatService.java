@@ -57,6 +57,11 @@ public class WorldChatService {
                 senderUserId, nicknameOf(senderUserId), content, Instant.now()));
     }
 
+    /** 인증된 STOMP 연결이 열린 사실을 시스템 알림으로 방송한다. 일반 채팅 rate limit은 적용하지 않는다. */
+    public void announceJoin(Long userId) {
+        messaging.convertAndSend(TOPIC, (Object) WorldChatJoinNotice.of(nicknameOf(userId), Instant.now()));
+    }
+
     /**
      * 보낸 내용을 다듬고 길이를 본다.
      *

@@ -50,7 +50,7 @@
 |---|---|---|---|---|
 | `AI_AGENT` | 기능 | `configId` | agentId 필요 | ✅ |
 | `VIDEO_SCREEN` | 기능 | `configId` | 영상 설정 ID 필요 | ✅ |
-| `PROJECT_PANEL` | 기능 | `configId` | projectId 필요 | ✅ |
+| `PROJECT_PANEL` | 기능 | — | **`configId`를 쓰지 않는다.** 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다(GitLab #110). 연결 요건은 "그 부스에 프로젝트가 있는가"이고 서버가 판정한다 (`S15P21A604-765`, GitLab #194) | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `SURVEY_KIOSK` | 기능 | — | **`configId`를 쓰지 않는다.** 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 연결 요건은 "그 부스에 설문이 있는가"이고 서버가 판정한다 (`S15P21A604-699`, GitLab #181) | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `CONSULTATION_DESK` | 기능 | `configId` | 상담 설정 ID 필요 | ✅ |
 | `LAPTOP` | 기능 | — | **`configId`를 쓰지 않는다.** 016 확정([#97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/97), 2026-08-26)으로 홈페이지 주소는 `booths.homepage_url`이 소유한다. 연결 요건은 "URL이 등록됐는가"이고 서버가 판정한다(계약 §3-1). `configId`를 실어 보내면 `CONFIG_UNVERIFIED`가 붙는다 | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |

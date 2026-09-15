@@ -40,6 +40,19 @@ export type SurveySource =
   | { kind: 'booth'; boothId: number }
   | { kind: 'event'; surveyKey: string };
 
+/**
+ * 이벤트 설문 열쇠의 **단일 정본** (S15P21A604-619, GitLab #173 Q4 확정).
+ *
+ * 서버가 `surveys.survey_key` 에 unique 를 걸어 이벤트당 설문 하나를 보장하므로 고를 것이 없고
+ * 상수 하나면 된다. 값이 여러 곳에 적혀 있으면 한쪽만 바뀔 때 **조용히** 어긋나므로 — mock 은
+ * 404 만 보이고 앱은 멀쩡해 보인다 — 여기 한 곳에만 둔다.
+ *
+ * 자리가 여기인 이유: 앱(`features/event`)과 mock 어댑터(`entities/survey`)가 둘 다 써야 하는데
+ * entities 가 features 를 참조하면 의존 방향이 뒤집힌다. 이 파일은 이미 `surveyKey` 가 무엇인지
+ * 정의한 계약 정본이고 양쪽이 이미 여기서 타입을 가져온다.
+ */
+export const EVENT_SURVEY_KEY = 'SSAFESTA_2026';
+
 /** 같은 설문을 가리키는가 — run 상태의 늦은 응답 가드가 쓴다 */
 export function isSameSurveySource(a: SurveySource | null, b: SurveySource | null): boolean {
   if (a === null || b === null) return a === b;
