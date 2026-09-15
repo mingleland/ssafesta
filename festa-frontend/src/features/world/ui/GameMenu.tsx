@@ -55,11 +55,13 @@ export function GameMenu({ onClose, onOpenMyInfo }: Props) {
     <div className="gm-root" role="presentation">
       <button type="button" className="gm-dim" aria-label="메뉴 닫기" onClick={onClose} />
       <section className="gm-panel" role="dialog" aria-modal="true" aria-label="게임 메뉴">
-        <button type="button" className="gm-close" onClick={onClose} aria-label="닫기">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
+        <div className="gm-head">
+          <button type="button" className="gm-close" onClick={onClose} aria-label="닫기">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
 
         {/* 상단 Profile Summary — 상위 Context 박스. 닉네임 수정 폼·탈퇴·거래내역은 My Info 소관 */}
         <div className="gm-summary">
