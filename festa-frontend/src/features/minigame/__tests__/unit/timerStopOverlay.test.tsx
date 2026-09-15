@@ -102,6 +102,16 @@ describe('세션 발급과 진행', () => {
     await waitFor(() => expect(screen.getByText('보상 게임은 회원만 참여할 수 있어요')).toBeTruthy());
     expect(submit).not.toHaveBeenCalled();
   });
+
+  it('Space로 시작하고 다시 누르면 멈춘다', async () => {
+    renderOverlay();
+
+    fireEvent.keyDown(window, { code: 'Space' });
+    await waitFor(() => expect(screen.getByRole('button', { name: '멈추기' })).toBeTruthy());
+    fireEvent.keyDown(window, { code: 'Space' });
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  });
 });
 
 describe('제출', () => {

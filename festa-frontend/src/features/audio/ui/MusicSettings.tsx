@@ -43,6 +43,14 @@ export function MusicSettings() {
           value={percent}
           // 음소거 중에는 끌 수 없게 막지 않는다 — 미리 맞춰 두고 켜는 순서가 자연스럽다
           onChange={(e) => setMusicVolume(Number(e.target.value) / 100)}
+          // 포인터 조절 뒤 range에 focus가 남으면 이후 Space/방향키가 월드 조작 대신 음량을 바꾼다.
+          onPointerUp={(e) => e.currentTarget.blur()}
+          onKeyDown={(e) => {
+            if (e.key !== ' ' && e.key !== 'Spacebar' && !e.key.startsWith('Arrow')) return;
+            // 의도치 않은 키 입력으로 음량을 바꾸지 않고, 이벤트는 상위 월드 단축키가 계속 처리하게 둔다.
+            e.preventDefault();
+            e.currentTarget.blur();
+          }}
         />
         <span className="ms-value">{percent}%</span>
       </div>
