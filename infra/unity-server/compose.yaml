@@ -4,7 +4,7 @@ services:
   demo-game:
     image: ${GAME_IMAGE_REF:?immutable GAME_IMAGE_REF is required}
     restart: unless-stopped
-    user: "${GAME_CONTAINER_UID:-10001}:${GAME_CONTAINER_GID:-10001}"
+    user: "${GAME_CONTAINER_UID:-1000}:${GAME_CONTAINER_GID:-1000}"
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
