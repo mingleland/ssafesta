@@ -105,7 +105,7 @@
 - **FR-012**: 소유자는 문서를 삭제할 수 있어야 하며, 삭제 후 답변에 사용되지 않아야 한다.
 - **FR-013**: 처리 실패나 중단이 **월드·부스·비AI 기능을 중단시켜서는 안 된다** (헌법 3조).
 - **FR-014**: LLM/Embedding 호출은 **어댑터 뒤에** 두어 제공자 교체가 구현 교체로 끝나야 한다 (헌법 15조).
-- **FR-015**: 임대 만료 시 문서 원본·메타데이터는 보존하되 문서를 `DISABLED`, 실행 중인 처리 작업을 `CANCELLED`로 전환해야 하며, 만료된 문서가 `READY`로 전환되어서는 안 된다.
+- **FR-015**: **임대가 유효하지 않게 될 때**(만료 또는 임차인의 조기 반납 — spec 004 D12) 문서 원본·메타데이터는 보존하되 문서를 `DISABLED`, 실행 중인 처리 작업을 `CANCELLED`로 전환해야 하며, 그 문서가 `READY`로 전환되어서는 안 된다. **두 경우의 처리는 같다** — Job 취소 사유 코드 `BOOTH_LEASE_EXPIRED` 는 "유효한 임대가 없음" 을 뜻하며 반납에도 그대로 쓴다 (2026-09-14 확정).
 - **FR-016**: 문서 처리 작업은 **`JobStatus`(`QUEUED`/`RUNNING`/`RETRY_WAIT`/`SUCCEEDED`/`DEAD`/`CANCELLED`)** 를 가져야 한다.
 - **FR-017**: RAG 검색은 FastAPI의 직접 DB 조회가 아니라 Spring 내부 검색 경로만 사용해야 한다. Spring은 `boothId + agentId + searchable=true + DocumentStatus.READY`를 서버에서 강제하고, FastAPI는 반환된 모든 Chunk의 scope를 Context 조립 전에 다시 검증해야 한다.
 - **FR-018**: AI 직원 한 명이 등록할 수 있는 문서는 최대 10개, 총 원본 크기는 100MB로 제한해야 한다.
@@ -149,7 +149,7 @@
 - **FR-040a**: **`READY` 전환이 0행이면 finalize 전체를 롤백해야 한다.** 문서가 그 사이 `DISABLED`·`EXPIRED`가 되어 `PROCESSING`이 아니면 `READY`로 올릴 수 없고, 이때 Chunk 교체와 Job `SUCCEEDED`만 커밋되면 **FR-040이 요구한 "하나의 트랜잭션"이 깨진다** — 검색되지 않는 문서에 새 Chunk가 붙고 Job은 성공했다고 말한다. 경고 로그만 남기고 나머지를 커밋해서는 안 된다.
   롤백하면 `SUCCEEDED` 표시도 취소되므로 재전송이 finalize 멱등 분기(Job이 `SUCCEEDED`일 때만 진입)로 들어가지 못한다. 따라서 이 실패의 응답은 **`410 JOB_GONE`** 이고, **같은 요청을 반복해도 아무것도 바뀌지 않은 채 같은 410** 이어야 한다. 워커가 재시도로 해결할 수 있는 상황이 아니라는 뜻을 그대로 전달하는 코드이며, `409`(stale attempt)와 달리 attempt를 올려 다시 시도해도 결과가 같다.
   **`DISABLED`·`EXPIRED`가 된 문서를 `PROCESSING`으로 되돌리는 복구 정책은 이 spec의 범위 밖이다.** 임대 만료·업로드 만료는 각각 FR-015·FR-026이 정한 비즈니스 판정이며, finalize가 그것을 뒤집을 자리가 아니다.
-- **FR-041**: 문서 삭제·비활성화·임대 만료 시 Spring은 로컬 DB 트랜잭션에서 활성 Job을 `CANCELLED`로 전환하고 Chunk·staging을 정리해야 한다. 실행 중 FastAPI 작업에는 멱등 cancel을 전송하되 전달 실패가 DB 정합성을 막아서는 안 되며, 늦은 결과는 fencing으로 거부해야 한다.
+- **FR-041**: 문서 삭제·비활성화·**임대가 유효하지 않게 될 때**(만료 또는 조기 반납, spec 004 D12) Spring은 로컬 DB 트랜잭션에서 활성 Job을 `CANCELLED`로 전환하고 Chunk·staging을 정리해야 한다. 실행 중 FastAPI 작업에는 멱등 cancel을 전송하되 전달 실패가 DB 정합성을 막아서는 안 되며, 늦은 결과는 fencing으로 거부해야 한다.
 - **FR-042**: FastAPI는 query embedding과 서버가 보관한 `boothId + agentId`, `topK`를 Spring 내부 검색 API에 전달해야 한다. Spring은 `boothId + agentId + searchable=true + DocumentStatus.READY`를 강제하고 `topK`를 최대 20으로 제한하며, cosine distance(`distance`, 낮을수록 유사)를 반환해야 한다. 최소 유사도 임계값은 적용하지 않는다.
 
 ### State Model
