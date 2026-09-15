@@ -23,7 +23,11 @@ backup_init() {
   mkdir -p "${BACKUP_STATE_DIR}"
   AWS_CONFIG_FILE="${BACKUP_STATE_DIR}/awscli-r2.conf"
   local config_tmp="${AWS_CONFIG_FILE}.$$"
-  printf '[default]\nregion = %s\ns3 =\n    addressing_style = path\n' "${AWS_DEFAULT_REGION}" >"${config_tmp}"
+  # AWS CLI >= 2.23 은 업로드에 CRC32 trailer checksum 을 기본으로 붙인다. 그러면 요청이
+  # aws-chunked + STREAMING-UNSIGNED-PAYLOAD-TRAILER 로 나가고 R2 가 그 서명을
+  # SignatureDoesNotMatch 로 거절한다(INFRA-T-095). 본문 없는 HEAD 는 영향을 받지 않아
+  # credential 검증만으로는 드러나지 않는다. 무결성은 manifest 의 SHA-256 이 따로 보장한다.
+  printf '[default]\nregion = %s\nrequest_checksum_calculation = when_required\nresponse_checksum_validation = when_required\ns3 =\n    addressing_style = path\n' "${AWS_DEFAULT_REGION}" >"${config_tmp}"
   mv "${config_tmp}" "${AWS_CONFIG_FILE}"
   export AWS_DEFAULT_REGION AWS_CONFIG_FILE
 }
