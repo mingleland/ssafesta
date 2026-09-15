@@ -46,7 +46,7 @@ import {
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -192,6 +192,22 @@ export function WorldPage() {
       window.removeEventListener('keydown', onKeyDown);
       stopChat();
     };
+  }, []);
+
+  // Tab 잠금 (S15P21A604-450) — 브라우저 기본 동작은 Tab 에서 다음 포커스 가능 요소로 옮긴다.
+  // Unity 6 WebGL 은 키보드 타깃을 canvas 로 잡으므로(captureAllKeyboardInput=false, !279),
+  // 포커스가 캔버스를 벗어나면 그 뒤 Tab keydown 이 Unity 에 안 들어가 자체 미니맵 토글이
+  // 죽는다. 실제 canvas가 키보드 타깃일 때만 막는다. HUD·오버레이 등 DOM 요소에서는
+  // 접근성을 위해 브라우저의 Tab 탐색을 그대로 둔다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      if (getWorldScreen() !== 'world') return;
+      if (e.target !== document.getElementById('unity-canvas')) return;
+      e.preventDefault();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   return (
