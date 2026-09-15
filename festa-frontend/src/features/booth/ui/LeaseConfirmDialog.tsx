@@ -46,7 +46,11 @@ export function LeaseConfirmDialog({ slot, pending, onConfirm, onCancel }: Props
         <p className="lease-confirm-alert" role="alert">보유 코인이 부족해 보입니다. 요청은 서버 잔액으로 다시 판정됩니다.</p>
       )}
       {walletQuery.isError && <p className="lease-confirm-alert" role="alert">잔액을 불러오지 못했습니다. 차감 후 내역에서 확인해 주세요.</p>}
-      <p className="lease-confirm-note">임대 후에는 변심에 의한 환불이 되지 않습니다.</p>
+      {/* 조기 반납이 열리기 전에는 이 줄이 "되돌릴 수 없다" 는 뜻으로 읽혔다(S15P21A604-590).
+          이제 되돌릴 수는 있고 코인만 안 돌아온다 — 그 차이를 말한다 (S15P21A604-735, GitLab #199) */}
+      <p className="lease-confirm-note">
+        만료 전에 반납할 수 있지만 <strong>차감한 코인은 돌려받지 못합니다.</strong> 다시 임대하려면 {LEASE_COIN_COST}코인을 또 냅니다.
+      </p>
       <div className="lease-confirm-actions">
         <button type="button" className="sc-btn" onClick={onCancel} disabled={pending}>
           취소
