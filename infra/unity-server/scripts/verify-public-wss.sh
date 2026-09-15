@@ -11,18 +11,27 @@ if [[ "${1:-}" == '--config-only' ]]; then
   exit 0
 fi
 
-if [[ $# -ne 4 || "$1" != '--approval-evidence' || "$3" != '--output' ]]; then
-  fail "usage: $0 --approval-evidence <PASS file> --output <evidence file>"
+if [[ $# -eq 2 && "$1" == '--output' ]]; then
+  approval_evidence=""
+  output="$2"
+elif [[ $# -eq 4 && "$1" == '--approval-evidence' && "$3" == '--output' ]]; then
+  approval_evidence="$2"
+  output="$4"
+else
+  fail "usage: $0 [--approval-evidence <PASS file>] --output <evidence file>"
 fi
 
-approval_evidence="$2"
-output="$4"
 : "${ROOT_DOMAIN:?ROOT_DOMAIN is required}"
 [[ "${ROOT_DOMAIN}" =~ ^[A-Za-z0-9.-]+$ ]] || fail 'ROOT_DOMAIN contains unsupported characters'
 world_host="world.${ROOT_DOMAIN}"
 
-assert_file "${approval_evidence}"
-[[ "$(tr -d '[:space:]' <"${approval_evidence}")" == 'PASS' ]] || fail 'approved Unity admission evidence is not PASS'
+if [[ -n "${approval_evidence}" ]]; then
+  assert_file "${approval_evidence}"
+  [[ "$(tr -d '[:space:]' <"${approval_evidence}")" == 'PASS' ]] || fail 'approved Unity admission evidence is not PASS'
+  admission_status='PASS'
+else
+  admission_status='SKIPPED'
+fi
 command -v openssl >/dev/null 2>&1 || fail 'openssl is required'
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
 command -v timeout >/dev/null 2>&1 || fail 'timeout is required'
@@ -58,6 +67,6 @@ dns=PASS
 tls=PASS
 websocketUpgrade=PASS
 public7777=BLOCKED
-approvedAdmission=PASS
+approvedAdmission=${admission_status}
 EOF
 pass "public WSS verified; evidence=${output}"

@@ -3,9 +3,9 @@
 // **설정 UI 가 사용자 선호의 정본이고 재생 쪽은 그 값을 소비한다.** 그래서 화면 우상단
 // 컨트롤(ScreenControls)과 같은 store 를 읽고 쓴다 — 한쪽에서 끄면 다른 쪽도 꺼져 보인다.
 //
-// 여기서 조절하는 것은 **FE 가 소유한 화면 오디오**(Landing·Login)뿐이다. World BGM 은 Unity
-// 소관이고 AudioBridge 가 아직 SetMuted 만 받는다. volume 계약이 오면 이 UI 를 그대로 두고
-// 연결 지점만 는다 — 그래서 Master/Screen/World 로 미리 쪼개지 않는다.
+// **2026-09-14 (S15P21A604-733) — 이제 월드 BGM 에도 닿는다.** 여기 적혀 있던 "AudioBridge 가 아직
+// SetMuted 만 받는다" 는 사실이 아니었다. `UnityHost` 가 mute 와 함께 volume 도 Unity 로 보낸다.
+// 값 하나가 화면 오디오와 월드 BGM 둘 다를 움직이므로 Master/Screen/World 로 쪼개지 않는다.
 import { setMusicVolume, setMuted, useScreenAudio } from '../model/screenAudio';
 import './musicSettings.css';
 
@@ -47,7 +47,7 @@ export function MusicSettings() {
         <span className="ms-value">{percent}%</span>
       </div>
 
-      <p className="ms-note">지금은 로그인·시작 화면의 음악에 적용됩니다.</p>
+      <p className="ms-note">로그인·시작 화면과 월드 음악에 함께 적용됩니다.</p>
     </div>
   );
 }

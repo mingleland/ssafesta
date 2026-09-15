@@ -2,7 +2,10 @@
 
 `S15P21A604-126` — `POST /conversations` (spec 008 FR-024~027). `S15P21A604-140`
 adds `POST /conversations/{id}/messages` (FR-005a, C-07). `S15P21A604-127`
-adds `DELETE /conversations/{id}` (FR-014/FR-028, D11).
+adds `DELETE /conversations/{id}` (FR-014/FR-028, D11). `S15P21A604-139` adds
+`POST /conversations/{id}/handoff-summary` (spec 011 FR-008/FR-012) — the only
+route on this router Spring calls directly (not an end-user), so it alone
+carries `require_spring_service_token` instead of `require_member`.
 """
 
 from __future__ import annotations
@@ -12,10 +15,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import StreamingResponse
 
+from app.api.dependencies.internal_auth import require_spring_service_token
 from app.api.errors import ApiError
 from app.api.schemas.conversations import (
     ConversationResponse,
     CreateConversationRequest,
+    HandoffSummaryResponse,
     MessageRequest,
 )
 from app.api.schemas.documents import ErrorResponse
@@ -29,6 +34,10 @@ from app.services.conversation_service import (
     ConversationService,
 )
 from app.services.context_service import PromptBuilder
+from app.services.handoff_summary_service import (
+    HandoffSummaryGenerationFailed,
+    HandoffSummaryService,
+)
 from app.services.rag_service import RagContextService
 from app.services.stream_service import (
     BoothLeaseExpired,
@@ -87,6 +96,18 @@ async def get_stream_service(request: Request) -> ConversationStreamService:
         ttl_seconds=settings.conversation_ttl_seconds,
         ttft_timeout_seconds=settings.llm_ttft_timeout_seconds,
         total_timeout_seconds=settings.llm_total_timeout_seconds,
+    )
+
+
+async def get_handoff_summary_service(request: Request) -> HandoffSummaryService:
+    settings = request.app.state.settings
+    repository = ConversationRepository(
+        request.app.state.redis, ttl_seconds=settings.conversation_ttl_seconds
+    )
+    return HandoffSummaryService(
+        repository=repository,
+        llm_provider=request.app.state.llm_provider,
+        timeout_seconds=settings.handoff_summary_timeout_seconds,
     )
 
 
@@ -225,3 +246,51 @@ async def close_conversation(
             code="CONVERSATION_OWNERSHIP_MISMATCH",
             message="다른 사용자의 Conversation입니다.",
         ) from exc
+
+
+@router.post(
+    "/{conversationId}/handoff-summary",
+    response_model=HandoffSummaryResponse,
+    operation_id="createHandoffSummary",
+    summary="AI 대화 요약을 생성해 Spring에 전달(사람 상담 인계)",
+    dependencies=[Depends(require_spring_service_token)],
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {
+            "description": "Spring→FastAPI Service Token 누락·오류",
+        },
+        status.HTTP_404_NOT_FOUND: {
+            "description": "Conversation 없음/TTL 만료",
+            "model": ErrorResponse,
+        },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {
+            "description": "LLM 요약 생성 실패(timeout·provider 오류·JSON 파싱 실패)",
+            "model": ErrorResponse,
+        },
+    },
+)
+async def create_handoff_summary(
+    conversationId: str,
+    service: Annotated[HandoffSummaryService, Depends(get_handoff_summary_service)],
+) -> HandoffSummaryResponse:
+    """D11 — 응답에는 summary/topics/lastUserIntent만 담고 대화 원문은 절대 담지 않는다."""
+    try:
+        result = await service.summarize(conversationId)
+    except ConversationNotFound as exc:
+        raise ApiError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            code="CONVERSATION_NOT_FOUND",
+            message="Conversation을 찾을 수 없습니다.",
+        ) from exc
+    except HandoffSummaryGenerationFailed as exc:
+        raise ApiError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            code=exc.code,
+            message="AI 요약 생성에 실패했습니다.",
+        ) from exc
+
+    return HandoffSummaryResponse(
+        conversation_id=conversationId,
+        summary=result.summary,
+        topics=list(result.topics),
+        last_user_intent=result.last_user_intent,
+    )

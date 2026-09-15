@@ -52466,8 +52466,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f96da7a691b7d1144b9352a724fa5896, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _bubbleHeight: 24
+  _displayName: "\uC548\uB0B4 \uB370\uC2A4\uD06C"
   _visibleDistance: 260
+  _nameColor: {r: 0.98, g: 0.7, b: 0.08, a: 1}
+  _characterHeight: 1.9
+  _outlineWidth: 0.25
 --- !u!114 &1002336963
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -73634,6 +73637,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 64a8ea44e2d0491f8886f266978a5c25, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _displayName: "\uBD80\uC2A4 \uAD00\uB9AC"
+  _visibleDistance: 260
+  _nameColor: {r: 0.98, g: 0.7, b: 0.08, a: 1}
+  _characterHeight: 1.9
+  _outlineWidth: 0.25
 --- !u!114 &1469696860
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -107835,6 +107843,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 16b629ff3cba1034a90d22c18c39b6b1, type: 2}
+    - target: {fileID: 2392320760922940714, guid: e6338385521bd1e44aa01cc0ffcdae0b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2599277211137544469, guid: e6338385521bd1e44aa01cc0ffcdae0b, type: 3}
       propertyPath: m_Mesh
       value: 
@@ -107993,6 +108005,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6432408882514221979, guid: e6338385521bd1e44aa01cc0ffcdae0b, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6655492079542684805, guid: e6338385521bd1e44aa01cc0ffcdae0b, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8320919004509750733, guid: e6338385521bd1e44aa01cc0ffcdae0b, type: 3}

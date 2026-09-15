@@ -9,6 +9,11 @@ from typing import Literal, Protocol, runtime_checkable
 
 type LLMRole = Literal["system", "user", "assistant"]
 
+# S15P21A604-139 — handoff-summary 프롬프트가 심는 태그 이름이자, MockLLMProvider가
+# "이건 요약 요청이다"를 판별하는 유일한 신호다. providers는 services를 import할 수
+# 없으므로(레이어링), 이 상수를 여기(공용 계약 모듈)에 두고 양쪽이 가져다 쓴다.
+HANDOFF_SUMMARY_MARKER = "handoff_summary_turn"
+
 
 @dataclass(frozen=True, slots=True)
 class LLMMessage:

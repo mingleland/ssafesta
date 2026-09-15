@@ -12,20 +12,19 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * 초대 수락·생성의 INSERT 가 깨뜨린 제약이 <b>무엇인지</b> 보고 답을 고르는지 (S15P21A604-693).
+ * 초대 생성의 INSERT 가 깨뜨린 제약이 <b>무엇인지</b> 보고 답을 고르는지 (S15P21A604-693).
  *
  * <p>{@code DataIntegrityViolationException} 을 무조건 409 로 번역하면 외래키가 깨진 경우까지
- * "이미 구성원입니다" 가 된다. 컨테이너 없이 도는 단위 테스트다 —
+ * "대기 중 초대가 있습니다" 가 된다. 컨테이너 없이 도는 단위 테스트다 —
  * {@code ProjectConstraintTranslationTest} 와 같은 모양.
+ *
+ * <p><b>수락 경로는 여기에 없다.</b> 그쪽의 쓰기는 {@code seatIfAbsent} 라 위반이 아니라 행 수 0
+ * 으로 거절을 알린다 — 번역할 예외가 없다 (GitLab #190,
+ * {@code BoothStaffRepository#seatIfAbsent}). 그 거절은
+ * {@code StaffInvitationServiceTranslationTest} 와
+ * {@code StaffInvitationConcurrencyIntegrationTest} 가 본다.
  */
 class StaffInvitationConstraintTranslationTest {
-
-    @Test
-    void theStaffPrimaryKeyMeansTheMemberAlreadyHoldsASeat() {
-        RuntimeException translated = StaffInvitationService.translateAccept(violationOf("booth_staffs_pkey"));
-
-        assertEquals(ErrorCode.STAFF_ALREADY_MEMBER, assertInstanceOf(ApiException.class, translated).errorCode());
-    }
 
     @Test
     void thePendingUniqueIndexMeansAnInvitationIsAlreadyWaiting() {
@@ -38,7 +37,6 @@ class StaffInvitationConstraintTranslationTest {
     /** 대소문자는 드라이버·DB 마다 다르게 온다. 판정이 그것에 걸리면 안 된다. */
     @Test
     void constraintNamesAreMatchedCaseInsensitively() {
-        assertInstanceOf(ApiException.class, StaffInvitationService.translateAccept(violationOf("BOOTH_STAFFS_PKEY")));
         assertInstanceOf(ApiException.class,
                 StaffInvitationService.translateInvite(violationOf("UX_STAFF_INVITATIONS_PENDING")));
     }
@@ -46,10 +44,8 @@ class StaffInvitationConstraintTranslationTest {
     /** 외래키 위반은 중복이 아니다 — 삼키지 않고 원본을 그대로 올린다 (T-24). */
     @Test
     void aForeignKeyViolationIsNotTranslated() {
-        DataIntegrityViolationException accept = violationOf("booth_staffs_user_id_fkey");
         DataIntegrityViolationException invite = violationOf("staff_invitations_booth_id_fkey");
 
-        assertSame(accept, StaffInvitationService.translateAccept(accept));
         assertSame(invite, StaffInvitationService.translateInvite(invite));
     }
 
@@ -58,17 +54,14 @@ class StaffInvitationConstraintTranslationTest {
     void anUnnamedViolationIsNotTranslated() {
         DataIntegrityViolationException unnamed = new DataIntegrityViolationException("이름 없는 위반");
 
-        assertSame(unnamed, StaffInvitationService.translateAccept(unnamed));
         assertSame(unnamed, StaffInvitationService.translateInvite(unnamed));
     }
 
-    /** 수락의 표와 초대의 표는 섞이지 않는다 — 서로의 제약을 번역하면 틀린 409 가 된다. */
+    /** 남의 제약은 번역하지 않는다 — 자리 PK 를 초대 경로가 집으면 틀린 409 가 된다. */
     @Test
-    void eachPathTranslatesOnlyItsOwnConstraint() {
-        DataIntegrityViolationException pending = violationOf("ux_staff_invitations_pending");
+    void theSeatConstraintIsNotTranslatedByTheInvitePath() {
         DataIntegrityViolationException seat = violationOf("booth_staffs_pkey");
 
-        assertSame(pending, StaffInvitationService.translateAccept(pending));
         assertSame(seat, StaffInvitationService.translateInvite(seat));
     }
 

@@ -86,12 +86,13 @@ def call() {
         }
     }
 
-    if (deployComponents.isEmpty()) {
+    if (deployComponents.isEmpty() && !components.contains('game')) {
         echo 'NO_OP: game deployment remains on the Phase 3 WebGL path; Dedicated Server deployment is infra-003'
         return
     }
 
-    stage('Deploy Selected Components') {
+    if (!deployComponents.isEmpty()) {
+        stage('Deploy Selected Components') {
         node('deploy') {
             ws('/home/jenkins/agent/deploy/workspaces/develop-dev-batch') {
                 checkout scm
@@ -145,6 +146,36 @@ def call() {
                     'PUBLIC_UNITY_BUILD_BASE=/unity/'
                 ]) {
                     if (credentialBindings.isEmpty()) { deployBatch() } else { withCredentials(credentialBindings) { deployBatch() } }
+                }
+            }
+        }
+    }
+    }
+
+    if (components.contains('game')) {
+        stage('Deploy Dedicated Server') {
+            node('deploy') {
+                ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
+                    checkout scm
+                    sh "git checkout --detach '${headSha}'"
+                    unstash 'candidate-release-manifest'
+                    final String gameEnvFile = env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'
+                    final String gameSecretFile = env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'
+                    final String gameDeployStateDir = env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'
+                    sh """
+                        export RELEASE_MANIFEST_PATH='${releaseManifest}'
+                        export GAME_ENV_FILE='${gameEnvFile}'
+                        export CONNECTION_TOKEN_SECRET_FILE='${gameSecretFile}'
+                        export GAME_DEPLOY_STATE_DIR='${gameDeployStateDir}'
+                        export CI_ARTIFACT_DIR='${artifactRoot}'
+                        bash infra/unity-server/scripts/deploy-game.sh
+                        if bash infra/unity-server/scripts/game-readiness.sh; then
+                            bash infra/unity-server/scripts/promote-game.sh
+                        else
+                            bash infra/unity-server/scripts/rollback-game.sh
+                            error('Dedicated Server deployment verification failed')
+                        fi
+                    """
                 }
             }
         }

@@ -80,6 +80,8 @@ export type WorldInteractEvent =
        * `gameId` 로 "어떤 기능인가"가 축이다. 합치면 소비처가 `gameId` 유무로 다시 갈라야 해서
        * dispatcher 의 `switch (event.type)` 하나로 끝나는 성질을 잃는다.
        *
+       * 그 `WORLD_ARCADE_INTERACT` 수신부는 이제 바로 아래에 서 있다(S15P21A604-712).
+       *
        * `gameId` 는 내장 미니게임 식별자(지금은 `TIMER_STOP` 하나)이고 화면 선택에 쓴다.
        * `machineId` 는 씬 canonical id 로 로그·분석용이다 — FE 는 해석하지 않는다.
        *
@@ -90,6 +92,26 @@ export type WorldInteractEvent =
       type: 'WORLD_MINIGAME_INTERACT';
       gameId: string;
       machineId?: string;
+    }
+  | {
+      /**
+       * 광장 오락기 상호작용 — Game Studio 게시 게임 (S15P21A604-712, GitLab #135 · #56 ⓐ).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. 같은 `onBoothInteract` 채널로 온다.
+       *
+       * **`machineId` 는 씬이 정한 canonical id 다** — 서버가 발급하지 않는다. 현재 실값은
+       * `plaza-arcade-01`·`plaza-arcade-02` 이고, Unity 는 이 값만 알고 `gameId` 를 모른다.
+       * 큐레이션이 바뀌어도 Unity 빌드가 바뀌지 않게 한 분담이다(spec 019 FR-017).
+       * FE 가 `GET /api/v1/arcade-machines/{machineId}` 로 어떤 게임인지 푼다.
+       *
+       * 위 `WORLD_MINIGAME_INTERACT`(#166)와 **다른 타입인 이유**는 그 주석에 적어 둔 그대로다 —
+       * 이쪽은 "어느 게임기인가"가 식별 축이고 게임 내용이 서버에서 온다.
+       *
+       * 입력 잠금은 Unity 가 F 를 받은 시점에 스스로 건다. FE 는 오버레이를 닫을 때
+       * `SetInputLocked('0')` 을 보내면 되고 그건 `UnityHost` 가 이미 하고 있다(-428·-450).
+       */
+      type: 'WORLD_ARCADE_INTERACT';
+      machineId: string;
     }
   | {
       /**

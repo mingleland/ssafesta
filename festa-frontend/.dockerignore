@@ -1,14 +1,12 @@
 # 빌드 컨텍스트가 festa-frontend/ 라 저장소 루트의 .dockerignore 는 적용되지 않는다 — 여기 따로 둔다.
 node_modules
-dist
 coverage
 .env*
 !.env.example
 *.log
 
-# Booth 2.5D 에셋 산출물 (S15P21A604-473) — 벤더 에셋 웹 재배포 확인 전까지 이미지에 넣지 않는다.
-# .gitignore 로 저장소에는 이미 안 들어가지만, 로컬에서 docker build 하면 작업 트리가 그대로 복사된다.
-public/assets/booth/
+# Runtime asset 원본은 CI build에서 dist에 이미 복사된다. Docker는 dist 하나만 소비한다.
+public/assets/booth-runtime/
 
-# Runtime Asset Compiler 산출물 (S15P21A604-480) — 이미지에 넣지 않는다.
+# Intermediate 산출물은 이미지에 넣지 않는다.
 .generated/

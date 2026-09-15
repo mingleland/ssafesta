@@ -19,9 +19,18 @@ test_project() {
       export GOOGLE_REDIRECT_URI=http://localhost:8080/login/oauth2/code/google
       export KAKAO_REST_API_KEY=test-kakao-rest-api-key KAKAO_CLIENT_SECRET=test-kakao-client-secret
       export KAKAO_REDIRECT_URI=http://localhost:8080/login/oauth2/code/kakao
-      if [[ -x ./gradlew ]]; then ./gradlew test; else ./mvnw test; fi
+      # 실패해도 리포트를 꺼내야 한다. set -e 아래에서 그냥 두면 여기서 빠져나가고,
+      # job 로그는 4MB에서 잘리므로 실패한 테스트 이름이 어디에도 남지 않는다 (GitLab #190).
+      status=0
+      if [[ -x ./gradlew ]]; then ./gradlew test || status=$?; else ./mvnw test || status=$?; fi
+      cp target/surefire-reports/TEST-*.xml "${CI_ARTIFACT_DIR}/" 2>/dev/null || true
+      cp build/test-results/test/TEST-*.xml "${CI_ARTIFACT_DIR}/" 2>/dev/null || true
+      exit "${status}"
     ) ;;
-    front) (cd "${component_dir}" && npm ci && npm test -- --run) ;;
+    # S15P21A604-696 — Game Studio 테스트(src/game-studio/**, 전체 스위트의 28~38%)가 QA
+    # 사이클마다 늘어나며 front-test 실행 시간을 지연시킨다는 지적(#180)에 따라, 원격 CI에서만
+    # 제외한다. 로컬 npm test(package.json)는 이 exclude를 안 거치므로 그대로 전체 실행된다.
+    front) (cd "${component_dir}" && npm ci && npm test -- --run --exclude 'src/game-studio/**') ;;
     game) bash festa-unity/ci/test ;;
   esac
 }

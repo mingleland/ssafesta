@@ -5,7 +5,6 @@
 // 저장 중 입력 차단, projectId null 이면 create 는 전부 그 모델의 계약이고 여기서 바꾸지 않는다.
 // 모델에 없는 필드·조회수 같은 지표를 추가하지 않는다.
 import { useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
   loadProjectEdit,
   saveProject,
@@ -13,8 +12,12 @@ import {
   useProjectEdit,
 } from '../../features/project/model/edit';
 import type { ProjectFieldKey } from '../../shared/contracts/project';
-import { WORLD_RETURN_TO_MANAGEMENT } from '../../features/world/model/gameClientUi';
-import { PageShell, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import { ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import {
+  ManagementScreen,
+  useManagementBoothId,
+  useManagementClose,
+} from '../../features/booth/ui/ManagementScreen';
 import './management.css';
 
 /** 실제 모델의 필드만 — 라벨과 입력 종류만 여기서 정한다 */
@@ -29,9 +32,8 @@ const FIELDS: { key: ProjectFieldKey; label: string; kind: 'text' | 'area' | 'ur
 ];
 
 export function ProjectManagementPage() {
-  const { boothId } = useParams<{ boothId: string }>();
-  const navigate = useNavigate();
-  const boothIdNum = Number(boothId);
+  const boothIdNum = useManagementBoothId();
+  const backToManagement = useManagementClose();
   const state = useProjectEdit();
 
   useEffect(() => {
@@ -42,28 +44,27 @@ export function ProjectManagementPage() {
 
   if (state.status === 'idle' || state.status === 'loading') {
     return (
-      <PageShell title="프로젝트 관리" backTo={WORLD_RETURN_TO_MANAGEMENT}>
+      <ManagementScreen title="프로젝트 관리">
         <ScreenLoading label="프로젝트를 불러오는 중..." />
-      </PageShell>
+      </ManagementScreen>
     );
   }
   if (state.status === 'error') {
     return (
-      <PageShell title="프로젝트 관리" backTo={WORLD_RETURN_TO_MANAGEMENT}>
+      <ManagementScreen title="프로젝트 관리">
         <ScreenError
           title="프로젝트를 불러오지 못했습니다"
           message="잠시 후 다시 시도해 주세요."
           onRetry={() => void loadProjectEdit(boothIdNum)}
         />
-      </PageShell>
+      </ManagementScreen>
     );
   }
 
   return (
-    <PageShell
+    <ManagementScreen
       title="프로젝트 관리"
       subtitle={state.projectId === null ? '아직 등록한 프로젝트가 없습니다 — 저장하면 새로 만들어집니다' : '방문자에게 보이는 전시 내용'}
-      backTo={WORLD_RETURN_TO_MANAGEMENT}
       actions={
         <button
           type="button"
@@ -79,6 +80,8 @@ export function ProjectManagementPage() {
         {FIELDS.map((f) => {
           const value = state.draft[f.key] ?? '';
           const dirty = state.dirty.has(f.key);
+          const fieldError = state.fieldErrors[f.key];
+          const errorId = `project-field-${f.key}-error`;
           return (
             <label key={f.key} className={'mg-field' + (dirty ? ' mg-field-dirty' : '')}>
               <span className="mg-label">
@@ -91,6 +94,8 @@ export function ProjectManagementPage() {
                   value={value}
                   disabled={saving}
                   rows={4}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError ? errorId : undefined}
                   onChange={(e) => updateField(f.key, e.target.value === '' ? null : e.target.value)}
                 />
               ) : (
@@ -100,9 +105,12 @@ export function ProjectManagementPage() {
                   value={value}
                   disabled={saving}
                   placeholder={f.hint}
+                  aria-invalid={fieldError ? true : undefined}
+                  aria-describedby={fieldError ? errorId : undefined}
                   onChange={(e) => updateField(f.key, e.target.value === '' ? null : e.target.value)}
                 />
               )}
+              {fieldError && <span id={errorId} className="mg-field-error" role="alert">{fieldError}</span>}
               {f.hint !== undefined && f.kind !== 'url' && <span className="sc-note">{f.hint}</span>}
             </label>
           );
@@ -110,16 +118,16 @@ export function ProjectManagementPage() {
 
         <div className="mg-form-foot">
           {state.save.phase === 'success' && <span className="mg-ok">저장했습니다</span>}
-          {state.save.phase === 'error' && (
+          {state.save.phase === 'error' && Object.keys(state.fieldErrors).length === 0 && (
             <span className="sc-alert" role="alert">
               저장하지 못했습니다. 잠시 후 다시 시도해 주세요.
             </span>
           )}
-          <button type="button" className="sc-btn" onClick={() => navigate(WORLD_RETURN_TO_MANAGEMENT)}>
+          <button type="button" className="sc-btn" onClick={backToManagement}>
             부스 관리로
           </button>
         </div>
       </form>
-    </PageShell>
+    </ManagementScreen>
   );
 }

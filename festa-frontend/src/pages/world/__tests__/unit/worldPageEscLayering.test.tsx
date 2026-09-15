@@ -11,8 +11,15 @@ import {
   __resetGameClientUiForTests,
   getGameClientUiSnapshot,
   openBoothManagement,
+  openManagementPanel,
 } from '../../../../features/world/model/gameClientUi';
 import { getWorldScreen } from '../../../../features/world/model/worldScreen';
+import { __resetSessionForTests, setMemberSession } from '../../../../features/auth/model/session';
+import {
+  WORLD_CHAT_INPUT_ID,
+  __resetWorldChatForTests,
+  getWorldChatSnapshot,
+} from '../../../../features/worldChat/model/worldChat';
 import {
   __resetWorldUiStateForTests,
   applyWorldUiStateJson,
@@ -38,6 +45,9 @@ vi.mock('../../../../features/overlay/OverlayHost', () => ({ OverlayHost: () => 
 vi.mock('../../../../features/booth/ui/BoothManagementOverlay', () => ({
   BoothManagementOverlay: () => <div data-testid="management" />,
 }));
+vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
+  ManagementPanelHost: () => <div data-testid="management-panel" />,
+}));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
 vi.mock('../../../../features/world/ui/GameMenu', () => ({ GameMenu: () => <div data-testid="game-menu" /> }));
@@ -45,6 +55,11 @@ vi.mock('../../../../features/world/ui/GameMenu', () => ({ GameMenu: () => <div 
 const pressEscape = () =>
   act(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  });
+
+const pressEnter = () =>
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
   });
 
 beforeEach(() => {
@@ -77,6 +92,11 @@ async function renderWorld() {
 }
 
 describe('WorldPage ESC 계층 (-450)', () => {
+  it('월드일 때만 Toast 상단 중앙 예약 상태를 붙인다', async () => {
+    await renderWorld();
+    expect(document.body.classList.contains('world-active')).toBe(true);
+  });
+
   it('아무것도 없으면 Game Menu 를 연다 — ESC 는 나/시스템이다', async () => {
     await renderWorld();
     pressEscape();
@@ -117,6 +137,42 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('management');
     pressEscape();
     expect(getWorldScreen()).toBe('world');
+  });
+});
+
+// Enter 판정도 같은 단일 중재자가 쥔다 (S15P21A604-706·-791) — 그래서 여기서 함께 잠근다.
+describe('WorldPage Enter 판정 (-791)', () => {
+  beforeEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+    setMemberSession('at', '2026-12-31T00:00:00.000Z');
+  });
+  afterEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+  });
+
+  it('월드에서 누른 Enter 는 채팅을 열고 입력창에 focus 를 준다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+
+  it('패널이 열린 채 focus 를 잃어도 Enter 가 그 입력창으로 되돌린다 — 새로 열지 않는다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    // 캔버스를 클릭한 상태를 만든다 — 패널은 그대로 떠 있고 focus 만 빠진다
+    act(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    expect(document.activeElement?.id).not.toBe(WORLD_CHAT_INPUT_ID);
+
+    pressEnter();
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
   });
 });
 
@@ -179,5 +235,33 @@ describe('WorldPage ESC 중재 — Unity 모달 (-450, #132)', () => {
 
     expect(requestExitWorldUi).not.toHaveBeenCalled();
     expect(getWorldScreen()).toBe('menu');
+  });
+
+  // -755: 관리 상세가 관리 화면의 자식이 됐다. ESC 한 번이 두 겹을 함께 걷으면 상세를 닫았을 때
+  // 관리 화면이 아니라 월드로 떨어진다.
+  it('관리 상세가 떠 있으면 그것만 닫고 관리 화면으로 돌아온다', async () => {
+    await renderWorld();
+    act(() => { openManagementPanel({ kind: 'project', boothId: 42 }); });
+
+    pressEscape();
+
+    expect(getGameClientUiSnapshot().managementPanel).toBeNull();
+    expect(getWorldScreen()).toBe('management');
+  });
+
+  // 네이티브 <dialog> 는 ESC 를 자기가 소비해 닫지만 keydown 은 window 까지 올라온다. 비켜 주지
+  // 않으면 확인 모달이 닫히면서 그 아래 레이어까지 같이 사라진다.
+  it('열린 dialog 가 있으면 ESC 가 상위 레이어를 닫지 않는다', async () => {
+    await renderWorld();
+    act(() => { openBoothManagement(); });
+
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('open', '');
+    document.body.appendChild(dialog);
+
+    pressEscape();
+
+    expect(getWorldScreen()).toBe('management');
+    dialog.remove();
   });
 });
