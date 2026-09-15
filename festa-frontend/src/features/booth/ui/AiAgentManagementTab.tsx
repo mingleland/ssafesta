@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createAiAgent,
+  deleteAiDocument,
   getAiAgent,
   listAiDocuments,
   uploadAiDocument,
@@ -161,6 +162,22 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 업로드하지 못했습니다.'),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (documentId: number) => deleteAiDocument(documentId),
+    onSuccess: async () => {
+      setUploadMessage('문서를 삭제했습니다.');
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
+    },
+    onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 삭제하지 못했습니다.'),
+  });
+
+  function removeDocument(documentId: number, fileName: string) {
+    if (!window.confirm(`'${fileName}' 문서를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setUploadMessage(null);
+    deleteMutation.mutate(documentId);
+  }
+
   // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
   // 저장한다. 화면에도 실제 저장되는 값을 그대로 반영해 나중에 "왜 이렇게 저장됐지"가 없게 한다.
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -304,16 +321,13 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                         <span className="bm-document-name">{doc.fileName}</span>
                         <span className="bm-document-meta">{formatBytes(doc.sizeBytes)}</span>
                         <span className={'bm-document-status ' + STATUS_CLASS[doc.status]}>{STATUS_LABEL[doc.status]}</span>
-                        {/* 삭제 API가 아직 없다(S15P21A604-758과 별개 — BE DELETE 엔드포인트 GitLab
-                            이슈로 분리). 버튼을 숨기지 않고 이유와 함께 비활성 표시한다 — 조용히
-                            아무 동작도 안 하는 컨트롤은 T-24와 같은 모양이 된다. */}
                         <button
                           type="button"
                           className="bm-document-remove"
-                          disabled
-                          title="문서 삭제는 아직 지원하지 않습니다. 백엔드 삭제 API 준비 중입니다."
+                          disabled={deleteMutation.isPending && deleteMutation.variables === doc.documentId}
+                          onClick={() => removeDocument(doc.documentId, doc.fileName)}
                         >
-                          삭제
+                          {deleteMutation.isPending && deleteMutation.variables === doc.documentId ? '삭제 중...' : '삭제'}
                         </button>
                       </li>
                     ))}
