@@ -39,6 +39,10 @@ namespace Festa.Avatar
         Animator _animator;
         SkinnedMeshRenderer _reference;
         AvatarConfig _config;
+        // 의상 원본과 런타임 렌더러는 Transform 계층이 다르다. localBounds를 그대로
+        // 복사하면 중심이 어긋나 화면 가장자리에서 의상만 먼저 컬링된다.
+        const float SkinnedBoundsPaddingRatio = 0.1f;
+        const float SkinnedBoundsMinimumPadding = 0.08f;
         public AvatarConfig Config => _config;
         public string LastError { get; private set; }
         public AvatarCatalog Catalog { get => _catalog; set => _catalog = value; }
@@ -115,8 +119,9 @@ namespace Festa.Avatar
                 var go = new GameObject(source.name);
                 go.transform.SetParent(_animator.transform, false);
                 var r = go.AddComponent<SkinnedMeshRenderer>();
-                r.rootBone = _reference.rootBone; r.bones = _reference.bones; r.localBounds = _reference.localBounds;
+                r.rootBone = _reference.rootBone; r.bones = _reference.bones;
                 r.sharedMesh = source.sharedMesh; r.sharedMaterials = source.sharedMaterials;
+                r.localBounds = RuntimeGarmentBounds(source, _reference, r.transform);
                 _rendererCategories[r] = category;
                 PrepareMaterials(r, category);
                 spawned.Add(go);
@@ -335,11 +340,85 @@ namespace Festa.Avatar
             smr.bones = first.bones;
             smr.rootBone = first.rootBone;
             smr.sharedMaterial = first.sharedMaterials[0];
-            smr.localBounds = first.localBounds;
+            smr.localBounds = CombinedRuntimeBounds(parts, smr.transform);
             smr.shadowCastingMode = first.shadowCastingMode;
             smr.updateWhenOffscreen = first.updateWhenOffscreen;
             smr.quality = first.quality;
             return go;
+        }
+
+        static Bounds RuntimeGarmentBounds(
+            SkinnedMeshRenderer source,
+            SkinnedMeshRenderer reference,
+            Transform target)
+        {
+            bool initialized = false;
+            var bounds = default(Bounds);
+
+            // 카탈로그의 원본 렌더러는 프리팹 루트 기준으로 런타임 Animator 아래에 붙는다.
+            // 에셋의 월드 위치와 플레이 중인 아바타의 월드 위치를 직접 섞지 않는다.
+            if (source)
+            {
+                var sourceRoot = source.transform.root;
+                var sourceToRoot = sourceRoot.worldToLocalMatrix * source.transform.localToWorldMatrix;
+                EncapsulateTransformed(ref bounds, ref initialized, source.localBounds, sourceToRoot);
+                if (source.sharedMesh)
+                    EncapsulateTransformed(ref bounds, ref initialized, source.sharedMesh.bounds, sourceToRoot);
+            }
+
+            // 신체 bounds는 같은 런타임 인스턴스이므로 target 로컬 공간으로 정확히 변환한다.
+            if (reference)
+            {
+                var referenceToTarget = target.worldToLocalMatrix * reference.transform.localToWorldMatrix;
+                EncapsulateTransformed(ref bounds, ref initialized, reference.localBounds, referenceToTarget);
+            }
+
+            return WithBoundsPadding(initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f)));
+        }
+
+        static Bounds CombinedRuntimeBounds(List<SkinnedMeshRenderer> parts, Transform target)
+        {
+            bool initialized = false;
+            var bounds = default(Bounds);
+            foreach (var part in parts)
+            {
+                if (!part) continue;
+                var partToTarget = target.worldToLocalMatrix * part.transform.localToWorldMatrix;
+                EncapsulateTransformed(ref bounds, ref initialized, part.localBounds, partToTarget);
+                if (part.sharedMesh)
+                    EncapsulateTransformed(ref bounds, ref initialized, part.sharedMesh.bounds, partToTarget);
+            }
+            return WithBoundsPadding(initialized ? bounds : new Bounds(Vector3.up, new Vector3(2f, 3f, 2f)));
+        }
+
+        static void EncapsulateTransformed(
+            ref Bounds destination,
+            ref bool initialized,
+            Bounds source,
+            Matrix4x4 matrix)
+        {
+            var center = source.center;
+            var extents = source.extents;
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                var corner = matrix.MultiplyPoint3x4(center + Vector3.Scale(extents, new Vector3(x, y, z)));
+                if (!initialized)
+                {
+                    destination = new Bounds(corner, Vector3.zero);
+                    initialized = true;
+                }
+                else destination.Encapsulate(corner);
+            }
+        }
+
+        static Bounds WithBoundsPadding(Bounds bounds)
+        {
+            float padding = Mathf.Max(bounds.size.magnitude * SkinnedBoundsPaddingRatio,
+                                      SkinnedBoundsMinimumPadding);
+            bounds.Expand(padding * 2f);
+            return bounds;
         }
 
         static void DestroySafe(UnityEngine.Object o)
