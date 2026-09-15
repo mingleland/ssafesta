@@ -1,9 +1,8 @@
 // Toast 렌더 (S15P21A604-465). AppProviders 에 마운트한다 — 라우터 **밖**이라
 // / → /login → /app/world 전환에도 살아 있고, 어느 화면에서 띄우든 같은 자리에 뜬다.
 //
-// 이 컴포넌트는 자기가 어느 화면에 있는지 모른다. 우상단에는 화면마다 다른 주민이
-// 있어(로그인은 ScreenControls, 월드는 Consultation Quick Access) 시작 높이가 다른데,
-// 그 차이는 각 화면이 `--festa-toast-top` 을 덮어써서 흡수한다.
+// 이 컴포넌트는 자기가 어느 화면에 있는지 모른다. 기본 화면은 우상단을 쓰고, 월드는 WorldPage가
+// body 상태를 붙여 상단 중앙 예약 영역을 선택한다.
 import { dismissToast, useToasts } from './toastStore';
 import './toast.css';
 

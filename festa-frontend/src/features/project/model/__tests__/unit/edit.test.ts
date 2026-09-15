@@ -63,4 +63,14 @@ describe('project edit', () => {
     expect(s.draft.name).toBe('FAIL');
     expect(s.dirty.has('name')).toBe(true);
   });
+
+  it('서버 field 오류는 그대로 보관하고 해당 필드를 고치면 즉시 지운다', async () => {
+    await loadProjectEdit(1);
+    updateField('name', 'INVALID_NAME');
+    await saveProject();
+    expect(getProjectEditSnapshot().fieldErrors.name).toBe('프로젝트 이름을 입력해 주세요.');
+
+    updateField('name', '수정한 이름');
+    expect(getProjectEditSnapshot().fieldErrors.name).toBeUndefined();
+  });
 });
