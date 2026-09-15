@@ -587,6 +587,7 @@ namespace Festa.Avatar
         void SelectWardrobeItem(AvatarPartCategory category,int itemId)
         {
             CloseColorPopup();
+            var before=_config;
             if(category==AvatarPartCategory.Outfit)
             {
                 if(itemId!=0)
@@ -604,7 +605,46 @@ namespace Festa.Avatar
             else _config.SetItem(category,itemId);
 
             _catalog.EnsureRequiredClothing(ref _config);
+            ResetColorsOfChangedGarments(before);
             Apply();SetCamera(CategoryCameraPreset(category));RefreshAll();
+        }
+
+        static readonly AvatarPartCategory[] GarmentCategories=
+        {
+            AvatarPartCategory.Top,AvatarPartCategory.Bottom,AvatarPartCategory.Outfit,
+            AvatarPartCategory.Shoes,AvatarPartCategory.Hat,AvatarPartCategory.Glasses
+        };
+
+        /// <summary>
+        /// 옷이 바뀌면 그 옷의 색 설정을 비워 **재질 고유색**으로 돌아가게 한다 (사용자 지시 2026-09-16 —
+        /// "옷별로 색깔이 다 똑같다"). 색 설정은 카테고리 단위로 남아 있어서, 그대로 두면 새 옷에 이전 옷의
+        /// 색이 그대로 씌워진다. 바뀐 카테고리만 비운다 — 같이 입고 있는 다른 옷의 색은 그대로다.
+        ///
+        /// <para>v0 외형(전체색 하나)은 조립기가 어떤 옷이든 그 색으로 덮으므로 먼저 v1 으로 올린다.
+        /// 그래야 "비웠다" 가 실제로 고유색으로 이어진다.</para>
+        /// </summary>
+        void ResetColorsOfChangedGarments(in AvatarConfig before)
+        {
+            bool changed=false;
+            foreach(var cat in GarmentCategories) if(before.GetItem(cat)!=_config.GetItem(cat)){changed=true;break;}
+            if(!changed)return;
+            _config.UpgradeLegacyGarmentTint(_catalog);
+            foreach(var cat in GarmentCategories)
+                if(before.GetItem(cat)!=_config.GetItem(cat))_config.ResetGarmentColors(cat);
+        }
+
+        void RememberSeparateClothing()
+        {
+            if(_config.topId!=0)_lastSeparateTopId=_config.topId;
+            if(_config.bottomId!=0)_lastSeparateBottomId=_config.bottomId;
+        }
+
+        void RestoreSeparateClothing()
+        {
+            _config.SetItem(AvatarPartCategory.Outfit,0);
+            _config.SetItem(AvatarPartCategory.Top,_lastSeparateTopId);
+            _config.SetItem(AvatarPartCategory.Bottom,_lastSeparateBottomId);
+            _catalog.EnsureRequiredClothing(ref _config);
         }
 
         void RefreshAll(){RefreshWardrobe();RefreshTabs();RefreshItems();RefreshColors();}
