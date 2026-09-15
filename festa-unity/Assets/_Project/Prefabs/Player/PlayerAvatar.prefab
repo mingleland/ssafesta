@@ -240,8 +240,8 @@ MonoBehaviour:
   _maxPitch: 65
   _collisionReturnLerp: 5
   _collisionPullLerp: 8
-  _lookHeight: 17.4
-  _lookHeightNear: 19.5
+  _lookHeight: 16.8
+  _lookHeightNear: 18.9
   _selfHideDistance: 7.5
   _selfShowDistance: 10
   _occlusionGuardRadius: 12
