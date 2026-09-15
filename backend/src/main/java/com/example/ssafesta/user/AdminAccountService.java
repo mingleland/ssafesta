@@ -71,14 +71,17 @@ public class AdminAccountService {
      */
     @Transactional
     public void demote(Long targetUserId, Long actorUserId, String note) {
-        User target = require(targetUserId);
+        // Lock the active administrator set before the target, matching suspension's order.
+        List<User> activeAdmins = users.findByAccountTypeAndStatusForUpdate(User.ADMIN, AccountStatus.ACTIVE);
+        User target = users.findByIdForUpdate(targetUserId)
+                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
         guard.requireTargetNotMaster(targetUserId);
         if (!target.isAdmin()) {
             return;
         }
         // The promotion endpoint is itself behind the admin gate, so an empty roster cannot be
         // refilled through the API at all — recovery would be a migration.
-        if (users.countByAccountType(User.ADMIN) <= 1) {
+        if (target.getStatus() == AccountStatus.ACTIVE && activeAdmins.size() <= 1) {
             throw new ApiException(ErrorCode.ADMIN_LAST_ONE);
         }
         target.demoteToMember();

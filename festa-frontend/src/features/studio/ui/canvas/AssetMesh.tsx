@@ -11,31 +11,35 @@ import { boothAssetBaseUrl } from '../../model/boothAssetManifest';
 import { resolveAssetUrl } from '../../../../shared/assets/resolveAssetUrl';
 import { loadGlb } from './boothAssetCache';
 
-/** Compiler 가 넣는 세 채널 중 하나라도 붙어 있으면 "텍스처를 든 재질" 로 본다 */
-export function hasTexture(material: THREE.Material | THREE.Material[]): boolean {
-  const list = Array.isArray(material) ? material : [material];
-  return list.some((m) => {
-    const standard = m as THREE.MeshStandardMaterial;
-    return standard.map != null || standard.normalMap != null || standard.metalnessMap != null;
-  });
-}
-
 type LoadState =
   | { kind: 'loading' }
   | { kind: 'ready'; scene: THREE.Group }
   | { kind: 'error'; reason: string };
 
+/**
+ * 장면 하나를 인스턴스로 뜬다 — **재질은 손대지 않는다** (S15P21A604-789).
+ *
+ * 순수 함수로 떼어 둔 것은 이 규칙을 R3F 없이 잠그기 위해서다. 재질을 다시 갈아 끼우는
+ * 변경이 들어오면 테스트가 먼저 깨진다.
+ */
+export function prepareInstance(scene: THREE.Group): THREE.Group {
+  const clone = scene.clone(true);
+  clone.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  });
+  return clone;
+}
+
 interface Props {
   entry: BoothAssetEntry;
-  /** 계약 색 — 텍스처를 안 가져오므로 재질 색은 런타임이 준다 */
-  color: string;
-  roughness: number;
-  metalness: number;
   /** 로딩·실패 동안 대신 보여 줄 것(파라메트릭 박스) */
   fallback: React.ReactNode;
 }
 
-export function AssetMesh({ entry, color, roughness, metalness, fallback }: Props) {
+export function AssetMesh({ entry, fallback }: Props) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const url = useMemo(() => resolveAssetUrl(entry.url, boothAssetBaseUrl()), [entry.url]);
 
@@ -59,29 +63,21 @@ export function AssetMesh({ entry, color, roughness, metalness, fallback }: Prop
   }, [url, entry.assetCode]);
 
   /**
-   * 인스턴스마다 재질을 따로 준다 — 하나를 공유하면 색을 바꿀 때 전부 같이 바뀐다.
+   * **GLB 가 들고 온 재질을 그대로 쓴다** (S15P21A604-789).
    *
-   * **텍스처가 있는 재질은 덮어쓰지 않는다.** `-473` 시점의 GLB 는 텍스처가 없어서 런타임이
-   * 계약 색을 통째로 씌웠는데, `-480` Runtime Asset Compiler 가 baseColor·normal·
-   * metallicRoughness 를 GLB 안에 넣은 뒤에도 그 덮어쓰기가 남아 **받은 텍스처를 버리고 있었다**
-   * (79,832 B 를 내려받고 흰 덩어리로 그렸다).
+   * 전에는 "맵을 든 재질은 두고 맵이 없는 재질만 계약 색으로 채운다" 였다. 그 판정은 축이
+   * 틀렸다 — Runtime Asset Compiler 가 굽는 GLB 는 원본 `.mat` 의 `_BaseColor` 를 항상
+   * `baseColorFactor` 로 옮겨 담는다. 즉 **맵이 없어도 색은 있다.**
    *
-   * 그래서 판정을 재질별로 한다 — 맵을 하나라도 든 재질은 그대로 두고, 맵이 없는 재질만
-   * 계약 색으로 채운다. 계약 색은 "텍스처가 없을 때의 기본값" 이지 텍스처를 이기는 값이 아니다.
+   * 그런데 벤더 원본 중에는 albedo 맵 없이 normal·metallicRoughness 만 든 재질이 많다
+   * (`PlasticWhite.mat` 의 `_BaseMap`·`_MainTex` 가 둘 다 fileID 0). 그래서 옛 판정으로는
+   * 그 재질만 계약 색을 건너뛰고, 맵이 하나도 없는 형제 재질은 덮어써서 **한 모델 안에서
+   * 면마다 색이 갈렸다** (`FURN_COUNTER_02` 는 재질 3개가 정확히 그 상태다).
+   *
+   * 계약 색은 자산이 없을 때 그리는 파라메트릭 박스의 색이지 실물 자산에 씌우는 색이 아니다.
+   * 금지 상태 표시는 재질이 아니라 윤곽이 맡는다(`ObjectMesh`).
    */
-  const instance = useMemo(() => {
-    if (state.kind !== 'ready') return null;
-    const clone = state.scene.clone(true);
-    const flat = new THREE.MeshStandardMaterial({ color, roughness, metalness });
-    clone.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      if (!hasTexture(mesh.material)) mesh.material = flat;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-    });
-    return clone;
-  }, [state, color, roughness, metalness]);
+  const instance = useMemo(() => (state.kind === 'ready' ? prepareInstance(state.scene) : null), [state]);
 
   if (state.kind === 'error') {
     // 실패는 빨간 윤곽으로 드러낸다. 박스가 그대로 있으면 "원래 이런 것" 으로 읽힌다

@@ -3,10 +3,14 @@ import { __resetSessionForTests, setGuestSession, setMemberSession } from '../..
 import {
   CHAT_ERROR_MESSAGE,
   MAX_CHAT_CODE_POINTS,
+  NOTICE_TTL_MS,
+  __pushWorldChatForTests,
   __resetWorldChatForTests,
   canUseWorldChat,
+  closeWorldChat,
   countCodePoints,
   getWorldChatSnapshot,
+  noticeMemberOnly,
   openWorldChat,
   resolveEnterAction,
   sendWorldChat,
@@ -110,8 +114,88 @@ describe('Enter 판정', () => {
     expect(resolveEnterAction({}, { open: false, inputFocused: false, member: false })).toBe('ignore');
   });
 
-  it('열려 있어도 입력창 밖이면 전송하지 않는다', () => {
-    expect(resolveEnterAction({}, { open: true, inputFocused: false, member: true })).toBe('ignore');
+  // S15P21A604-791 — 패널은 떠 있는데 입력창이 focus 를 잃은 상태를 남기지 않는다.
+  it('열려 있는데 입력창 밖이면 전송하지 않고 그 입력창으로 돌아간다', () => {
+    expect(resolveEnterAction({}, { open: true, inputFocused: false, member: true })).toBe('focus');
+  });
+});
+
+// S15P21A604-790 — 예외가 window 까지 올라가고 화면에는 아무것도 남지 않던 자리.
+describe('전송 실패 (S15P21A604-790)', () => {
+  it('transport 가 던져도 밖으로 새지 않고, 안내를 남기며 입력값을 지키고, 쿨다운을 걸지 않는다', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const send = vi.spyOn(realtime, 'sendRealtime').mockImplementation(() => {
+      throw new Error('[realtime] 연결되지 않았다');
+    });
+    setWorldChatDraft('연결이 끊긴 동안 쓴 말');
+
+    let result: boolean | undefined;
+    expect(() => {
+      result = sendWorldChat('연결이 끊긴 동안 쓴 말', 1_000);
+    }).not.toThrow();
+
+    expect(result).toBe(false);
+    expect(getWorldChatSnapshot().notice).toBe(CHAT_ERROR_MESSAGE.CHAT_UNAVAILABLE);
+    // 입력값은 살아 있어야 한다 — 연결이 돌아오면 그대로 다시 보낸다
+    expect(getWorldChatSnapshot().draft).toBe('연결이 끊긴 동안 쓴 말');
+    // 보내지 못한 것에 도배 제한을 걸지 않는다
+    expect(getWorldChatSnapshot().cooldownUntil).toBe(0);
+    // 자동 재전송 금지 — 서버 도달 여부를 알 수 없어 중복이 된다
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('연결이 돌아오면 사용자가 같은 말을 손으로 다시 보낼 수 있다', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const send = vi.spyOn(realtime, 'sendRealtime').mockImplementation(() => {
+      throw new Error('[realtime] 연결되지 않았다');
+    });
+    expect(sendWorldChat('다시 보낼 말', 1_000)).toBe(false);
+
+    send.mockImplementation((_d, body) => {
+      sent.push(body);
+    });
+    expect(sendWorldChat('다시 보낼 말', 2_000)).toBe(true);
+    expect(sent).toEqual([{ content: '다시 보낼 말' }]);
+  });
+});
+
+// S15P21A604-791 — 안내가 화면에 눌러앉던 자리. 게스트는 지우는 경로(성공)를 밟을 수 없었다.
+describe('안내 수명 (S15P21A604-791)', () => {
+  it('안내는 스스로 사라진다', () => {
+    vi.useFakeTimers();
+    noticeMemberOnly();
+    expect(getWorldChatSnapshot().notice).toBe(CHAT_ERROR_MESSAGE.MEMBER_ONLY);
+
+    vi.advanceTimersByTime(NOTICE_TTL_MS - 1);
+    expect(getWorldChatSnapshot().notice).toBe(CHAT_ERROR_MESSAGE.MEMBER_ONLY);
+
+    vi.advanceTimersByTime(1);
+    expect(getWorldChatSnapshot().notice).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('패널을 닫으면 남아 있던 안내도 함께 걷는다', () => {
+    openWorldChat();
+    sendWorldChat('가'.repeat(MAX_CHAT_CODE_POINTS + 1));
+    expect(getWorldChatSnapshot().notice).not.toBeNull();
+
+    closeWorldChat();
+    expect(getWorldChatSnapshot().notice).toBeNull();
+  });
+});
+
+describe('메시지 식별자 (S15P21A604-791)', () => {
+  it('같은 사람이 같은 시각에 보낸 두 줄도 서로 다른 key 를 받는다', () => {
+    const same = { senderUserId: 7, nickname: '정헌', sentAt: '2026-09-15T05:00:00.000Z' };
+    __pushWorldChatForTests([
+      { ...same, content: '첫 줄' },
+      { ...same, content: '둘째 줄' },
+    ]);
+
+    const seqs = getWorldChatSnapshot().messages.map((m) => m.seq);
+    expect(seqs).toEqual([1, 2]);
+    expect(new Set(seqs).size).toBe(2);
   });
 });
 

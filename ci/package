@@ -19,15 +19,15 @@ package_project() {
   IMAGE_NAME="${IMAGE_NAME:-festa-${CI_COMPONENT}}" IMAGE_TAG="${CI_COMMIT_SHA}" DOCKERFILE="${dockerfile}" BUILD_CONTEXT="${context}" \
     bash infra/deploy/scripts/package-local-image.sh
   if [[ "${CI_COMPONENT}" == front ]]; then
-    local docker_bin="${DOCKER_BIN:-docker}"
-    local container extracted image_ref
-    docker_bin="${DOCKER_BIN:-docker}"
-    image_ref="${IMAGE_NAME:-festa-${CI_COMPONENT}}:${CI_COMMIT_SHA}"
-    container="$(${docker_bin} create "${image_ref}")"
-    extracted="$(mktemp -d)"
-    trap '"${docker_bin}" rm -f "${container}" >/dev/null 2>&1 || true; rm -rf -- "${extracted}"' RETURN
-    "${docker_bin}" cp "${container}:/usr/share/nginx/html/assets/booth-runtime/." "${extracted}"
-    (cd "${component_dir}" && node tools/assets/verify-runtime-assets.mjs --dir "${extracted}")
+    (
+      docker_bin="${DOCKER_BIN:-docker}"
+      image_ref="${IMAGE_NAME:-festa-${CI_COMPONENT}}:${CI_COMMIT_SHA}"
+      container="$("${docker_bin}" create "${image_ref}")"
+      extracted="$(mktemp -d)"
+      trap '"${docker_bin}" rm -f "${container}" >/dev/null 2>&1 || true; rm -rf -- "${extracted}"' EXIT
+      "${docker_bin}" cp "${container}:/usr/share/nginx/html/assets/booth-runtime/." "${extracted}"
+      cd "${component_dir}" && node tools/assets/verify-runtime-assets.mjs --dir "${extracted}"
+    )
   fi
 }
 ci_run package PACKAGE_FAILED ci_dispatch_or package package_project
