@@ -422,10 +422,11 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 
 ### PUT `/booths/{boothId}/facade` — spec 005 신설
 
-부스 외부 표현 수정. 내부 Layout과 달리 자유 배치가 아니라 정해진 4필드다.
+부스 이름과 외부 표현 수정. 내부 Layout과 달리 자유 배치가 아니라 정해진 5필드다.
 
 ```json
 {
+  "name": "AI 프로젝트 전시관",
   "themeCode": "SSAFY_BLUE",
   "primaryColor": "#3B82F6",
   "signText": "AI 프로젝트 전시관",
@@ -433,6 +434,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 }
 ```
 
+- `name`: 부스 이름. 1~100자. **생략하거나 `null`이면 현재 이름을 유지한다** — 나머지 네 필드가 "안 보내면 비운다"인 것과 반대다(`booths.name`이 `NOT NULL`이라 비울 수 없고, 필수로 막으면 이름 칸이 없던 기존 저장이 전부 400이 된다). 빈 문자열·공백만 있는 값은 `400`. **응답에는 포함되지 않는다** — 저장된 이름은 `GET /booths/{boothId}`·`GET /booths/mine`의 `name`에서 읽는다 (2026-09-15 신설, S15P21A604-756)
 - `themeCode`: `DEFAULT` / `SSAFY_BLUE` / `WARM` / `MONO`
 - `primaryColor`: `#RRGGBB` 또는 null. **12색 팔레트 안의 값만 허용**하고 저장 시 **대문자로 정규화**한다 (#17, 2026-08-23 확정 — 값의 정본은 `specs/005-booth-studio-layout/contracts/layout-api.md` §6. 팔레트는 테마와 무관한 전역 1개)
 - `signText`: 60자 이하 또는 null
