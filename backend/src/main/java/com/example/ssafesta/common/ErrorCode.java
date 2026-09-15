@@ -51,7 +51,16 @@ public enum ErrorCode {
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_RENTABLE(HttpStatus.CONFLICT, "임대할 수 없는 슬롯입니다."),
     BOOTH_SLOT_ALREADY_LEASED(HttpStatus.CONFLICT, "이미 임대 중인 슬롯입니다."),
-    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 만료 후 다시 임대할 수 있습니다."),
+    ACTIVE_LEASE_LIMIT(HttpStatus.CONFLICT, "이미 임대 중인 부스가 있습니다. 반납하거나 만료된 뒤 다시 임대할 수 있습니다."),
+    /**
+     * Nothing of the caller's to hand back here (FR-020).
+     *
+     * <p>Deliberately does not separate "you hold no lease" from "your lease is on another
+     * slot": both mean the caller's screen is stale, and the client does the same thing about
+     * either — re-read the slot list. Which one it was is in the server log. A retried
+     * {@code DELETE} lands here too, and that is not an error worth showing.
+     */
+    ACTIVE_LEASE_NOT_FOUND(HttpStatus.NOT_FOUND, "반납할 활성 임대가 없습니다."),
     /**
      * Reused by the AI conversation contract (spec 008): "booth entry refused" and "AI question
      * refused" are the same event to a user, so they must not carry two different names

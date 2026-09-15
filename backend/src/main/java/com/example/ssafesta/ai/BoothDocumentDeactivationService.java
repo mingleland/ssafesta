@@ -35,6 +35,32 @@ public class BoothDocumentDeactivationService {
     /** Same vocabulary the AI side sends back on its own lease check (FR-041, GitLab #162). */
     private static final String CANCEL_REASON_CODE = "BOOTH_LEASE_EXPIRED";
 
+    /**
+     * Why a booth's documents are being turned off.
+     *
+     * <p>The two are the same transition through the same statements — only the audit wording
+     * differs, so that a Job cancelled by an early return does not claim the lease ran out
+     * (spec 004 D12).
+     *
+     * <p><b>The machine-readable code is shared with both.</b> {@code BOOTH_LEASE_EXPIRED} is the
+     * vocabulary the AI side already sends back on its own lease check (FR-041, GitLab #162), and
+     * it was redefined on 2026-09-14 to mean "no valid lease" rather than "the clock ran out", so
+     * an early return reuses it instead of introducing a value the AI side cannot read.
+     */
+    public enum Cause {
+
+        EXPIRED("임대가 만료돼 처리를 취소했습니다.", "임대 만료로 문서를 껐습니다"),
+        CANCELLED("임대를 반납해 처리를 취소했습니다.", "임대 반납으로 문서를 껐습니다");
+
+        private final String jobError;
+        private final String logPrefix;
+
+        Cause(String jobError, String logPrefix) {
+            this.jobError = jobError;
+            this.logPrefix = logPrefix;
+        }
+    }
+
     private final JdbcTemplate jdbc;
     private final DocumentProcessingClient client;
 
@@ -55,9 +81,10 @@ public class BoothDocumentDeactivationService {
      * registration below throws if there is none, which is the loud failure we want rather than a
      * quiet half-transition.
      *
-     * @param boothId the booth whose lease has just expired
+     * @param boothId the booth whose lease has just ended
+     * @param cause  which ending it was — it only changes the audit wording, never the statements
      */
-    public void deactivate(long boothId) {
+    public void deactivate(long boothId, Cause cause) {
         // Before the UPDATE below, while the active set is still named by status — V21:94 says there
         // is no staging TTL sweeper because the terminal transitions clear it, and CANCELLED is one
         // of the three it names. Deleting first is what keeps this one statement instead of an id
@@ -81,12 +108,12 @@ public class BoothDocumentDeactivationService {
                 UPDATE ai_document_jobs
                    SET status = 'CANCELLED', finished_at = now(), updated_at = now(),
                        next_retry_at = NULL,
-                       last_error_code = ?, last_error = '임대가 만료돼 처리를 취소했습니다.'
+                       last_error_code = ?, last_error = ?
                  WHERE booth_id = ? AND status IN ('QUEUED', 'RUNNING', 'RETRY_WAIT')
                 RETURNING id, attempt_no
                 """,
                 (row, index) -> new CancelRequest(row.getLong("id"), row.getInt("attempt_no")),
-                CANCEL_REASON_CODE, boothId);
+                CANCEL_REASON_CODE, cause.jobError, boothId);
 
         // FR-041 asks for the chunks too, and spec.md:71 makes them dead weight either way: a
         // re-lease starts a new Job from QUEUED rather than reusing what this one embedded. The
@@ -123,8 +150,8 @@ public class BoothDocumentDeactivationService {
         if (live.isEmpty() && disabled == 0 && chunks == 0) {
             return;
         }
-        log.info("임대 만료로 문서를 껐습니다 — boothId={}, 취소 Job={}건, DISABLED 문서={}건, 삭제 chunk={}건",
-                boothId, live.size(), disabled, chunks);
+        log.info("{} — boothId={}, 취소 Job={}건, DISABLED 문서={}건, 삭제 chunk={}건",
+                cause.logPrefix, boothId, live.size(), disabled, chunks);
         // ponytail: a Job the dispatch sweeper claimed a moment ago can still be delegated after this
         // cancel goes out — DocumentJobDispatchSweeper is deliberately not transactional, so its claim
         // and its HTTP call straddle this transition. The worker that starts then is refused at its
