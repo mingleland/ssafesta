@@ -64,6 +64,7 @@ MonoBehaviour:
   _highlightEnabled: 1
   _highlightColor: {r: 1, g: 0.82, b: 0.35, a: 1}
   _highlightStrength: 0.9
+  _interactionBoundsRoot: {fileID: 726740402577590553}
   _highlightRoot: {fileID: 726740402577590553}
   _outlineWidth: 0.35
 --- !u!65 &8135946431016336419
