@@ -214,13 +214,15 @@ function ObjectMesh({
   const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
   const { center, size } = boxPlacement(box);
   const surface = OBJECT_SURFACE[obj.type] ?? { roughness: 0.7, metalness: 0, opacity: 1 };
-  const color = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
+  // 계약 색은 **파라메트릭 박스 전용**이다 (S15P21A604-789). 실물 GLB 는 자기 색을 들고 오므로
+  // 여기서 칠하지 않는다 — 칠하면 자산이 authoring 된 색을 편집기가 지운다.
+  const boxColor = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
 
   const boxBody = (
     <mesh position={center} castShadow receiveShadow>
       <boxGeometry args={size} />
       <meshStandardMaterial
-        color={color}
+        color={boxColor}
         roughness={surface.roughness}
         metalness={surface.metalness}
         transparent={surface.opacity < 1}
@@ -233,20 +235,15 @@ function ObjectMesh({
     <group position={[obj.position.x, 0, obj.position.z]} rotation={[0, (obj.rotationY * Math.PI) / 180, 0]}>
       {/* 픽킹은 group 이 받는다 — 모델이 여러 mesh 로 쪼개져 있어도 한 덩어리로 잡힌다 */}
       <group onPointerDown={onDown}>
-        {asset === undefined ? (
-          boxBody
-        ) : (
-          <AssetMesh
-            entry={asset}
-            color={color}
-            roughness={surface.roughness}
-            metalness={surface.metalness}
-            fallback={boxBody}
-          />
-        )}
+        {asset === undefined ? boxBody : <AssetMesh entry={asset} fallback={boxBody} />}
       </group>
-      {selected && (
-        // 선택 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다
+      {(selected || invalid) && (
+        // 선택·금지 윤곽 — 계약 AABB 를 살짝 키운 wireframe. 모델이 아니라 도메인을 보여 준다.
+        //
+        // **금지 상태를 여기서 말하는 이유** (S15P21A604-789): 예전에는 재질 색을 붉게 갈아
+        // 끼워 말했는데, 그러면 실물 GLB 가 들고 온 색을 편집기가 파괴한다. 게다가 텍스처를
+        // 든 재질은 갈아 끼우지 않아 **같은 모델 안에서도 어떤 면만 붉어졌다.** 윤곽은 재질을
+        // 건드리지 않고 같은 것을 말한다.
         <mesh position={center}>
           <boxGeometry args={[size[0] * 1.04, size[1] * 1.04, size[2] * 1.04]} />
           <meshBasicMaterial color={invalid ? '#ff5d5d' : '#5ee08a'} wireframe />
