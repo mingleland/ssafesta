@@ -523,7 +523,7 @@ namespace Festa.Network
             }
 
             var before = transform.position;
-            var velocity = horizontalVelocity + NoStandSlide() + Vector3.up * _verticalSpeed;
+            var velocity = horizontalVelocity + NoStandSlide() + ExternalPush() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
             PreventPlayerPushThroughWall(before);
         }
@@ -621,6 +621,31 @@ namespace Festa.Network
 
         Vector3 NoStandSlide()
             => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+
+        // ── 밖에서 들어온 밀림 (주먹질 피격, 2026-09-15) ────────────────
+        //
+        // 남이 나를 미는 것이 아니라 **내 컨트롤러가 나를 민다.** 이동이 클라이언트 권위라
+        // 남이 내 transform 을 옮기면 NetworkTransform 이 곧 내 값으로 되돌리고, 그 사이 두 화면이
+        // 어긋난다. 때린 쪽은 부탁만 하고(PlayerPunchImpact) 실제 이동은 여기서 한다.
+        //
+        // 입력에 **더해지는** 값이라 맞으면서 반대로 걸어 버티는 것이 가능하다 — 의도한 것이다.
+        // 아주 살짝 밀리는 연출이지 경직이 아니다.
+        Vector3 _externalPush;
+        float _externalPushSpeed;
+        float _externalPushUntil;
+
+        /// <summary>바깥에서 요청한 밀림. 수평 성분만 쓴다 — 위로 밀면 발이 뜬다.</summary>
+        public void ApplyExternalPush(Vector3 direction, float speed, float seconds)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 1e-4f || speed <= 0f || seconds <= 0f) return;
+            _externalPush = direction.normalized;
+            _externalPushSpeed = speed;
+            _externalPushUntil = Time.time + seconds;
+        }
+
+        Vector3 ExternalPush()
+            => Time.time < _externalPushUntil ? _externalPush * _externalPushSpeed : Vector3.zero;
 
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
