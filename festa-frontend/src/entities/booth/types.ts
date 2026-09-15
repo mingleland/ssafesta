@@ -38,8 +38,12 @@ export interface BoothFacade {
   logoUrl: string | null; // https:// 최대 2048자, 업로드 아닌 URL 참조
 }
 
-// PUT /booths/{boothId}/facade 요청 본문 — 4필드 전부 nullable(§6)
-export type FacadePutRequest = BoothFacade;
+// PUT /booths/{boothId}/facade 요청 본문 (§6).
+//
+// facade 4필드는 전부 nullable 이고, `name` 은 S15P21A604-756 / !890 으로 더해진 **선택** 필드다.
+// 응답에는 없다 — 저장된 이름은 GET /booths/{boothId} 의 `name` 에서 읽는다.
+// **생략 = 현재 이름 유지**이지 "비우기" 가 아니다(`booths.name` 이 NOT NULL).
+export type FacadePutRequest = BoothFacade & { name?: string };
 
 // 1일 임대료. 서버가 실제 차감액의 권위이고(LeaseResponse.chargedCoin) 이 값은 **요청 전 안내용**이다 —
 // 확인 모달과 버튼 라벨이 같은 숫자를 말하게 하려고 한 곳에 둔다. 계약 예시도 100(lease-api.md §응답).
