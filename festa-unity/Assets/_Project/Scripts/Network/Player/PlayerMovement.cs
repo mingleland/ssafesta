@@ -526,9 +526,68 @@ namespace Festa.Network
             }
 
             var before = transform.position;
-            var velocity = horizontalVelocity + NoStandSlide() + ExternalPush() + Vector3.up * _verticalSpeed;
+            var velocity = horizontalVelocity + NoStandSlide() + ExternalPush() + SoftSeparation() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
             PreventPlayerPushThroughWall(before);
+        }
+
+        // ── 사람끼리 부드럽게 밀어내기 (S15P21A604-761, 2026-09-16 재설계) ──────
+        //
+        // **왜 물리 충돌을 끄고 속도로 미는가.** 원격 캡슐을 단단한 콜라이더로 두면 상대가 밀고 들어올 때
+        // CharacterController 의 디페네트레이션이 나를 **임의 거리**로 튕겨낸다. 그 방향에 벽이 있으면
+        // 얇은 벽은 그대로 통과한다 — "벽에서 서로 밀면 밖으로 빠진다" 의 정체다. 이동 뒤 벽을 스윕해
+        // 되돌리는 보정(PreventPlayerPushThroughWall)은 그 결과를 사후에 잡는 것이라 시작점이 이미
+        // 벽 안에 있으면 놓친다.
+        //
+        // 대신 Player↔Player 물리 충돌은 끄고(PlayerCollisionPolicy), 겹친 만큼을 **속도**로 넣는다.
+        // 이 속도는 다른 입력과 같이 Move() 를 거치므로 벽에서는 벽 판정이 이긴다 — 벽에 붙은 사람을
+        // 아무리 밀어도 벽 앞에서 멈춘다. 뚫을 수 없는 이유가 검사가 아니라 **구조**에 있다.
+        //
+        // 상한을 달리기(65)보다 높게 둔다. 낮으면 달려서 남을 관통한다 — 밀어내는 힘이 파고드는 힘을
+        // 이겨야 겹침이 벌어지지 않는다.
+        const float SeparationMaxSpeed = 90f;
+        const float SeparationProbe = 0.5f;   // 겹치기 직전까지 잡아 떨림 없이 벌어지게
+        static readonly Collider[] s_bodyHits = new Collider[16];
+
+        Vector3 SoftSeparation()
+        {
+            if (_controller == null || !_controller.enabled) return Vector3.zero;
+
+            GetControllerCapsuleAt(transform.position, out var bottom, out var top, out float radius, out float skin);
+            float mine = radius + skin;
+            int mask = 1 << gameObject.layer;
+            int count = Physics.OverlapCapsuleNonAlloc(bottom, top, mine + SeparationProbe, s_bodyHits, mask, QueryTriggerInteraction.Ignore);
+            if (count == 0) return Vector3.zero;
+
+            var push = Vector3.zero;
+            for (int i = 0; i < count; i++)
+            {
+                var c = s_bodyHits[i];
+                if (c == null || c == _controller || c.transform.IsChildOf(transform)) continue;
+
+                float theirs = 2.85f;
+                if (c is CapsuleCollider capsule)
+                {
+                    var ls = capsule.transform.lossyScale;
+                    theirs = capsule.radius * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z));
+                }
+                else if (c is CharacterController cc) theirs = cc.radius;
+
+                var delta = transform.position - c.transform.position;
+                delta.y = 0f;
+                float distance = delta.magnitude;
+                float minDistance = mine + theirs;
+                if (distance >= minDistance) continue;
+
+                // 정확히 겹치면 방향이 없다 — 보고 있는 반대쪽으로 빠진다
+                var dir = distance > 0.01f ? delta / distance : -transform.forward;
+                push += dir * (minDistance - distance);
+            }
+
+            if (push.sqrMagnitude < 1e-6f) return Vector3.zero;
+            // 겹친 거리를 이 프레임에 다 풀되 상한을 넘기지 않는다
+            float speed = Mathf.Min(push.magnitude / Mathf.Max(Time.deltaTime, 1e-4f), SeparationMaxSpeed);
+            return push.normalized * speed;
         }
 
         /// <summary>
@@ -545,6 +604,9 @@ namespace Festa.Network
 
             GetControllerCapsuleAt(before, out var bottom, out var top, out float radius, out float skinWidth);
             var direction = horizontal / distance;
+            // 플레이어 레이어는 벽이 아니다 — 겹친 사람 캡슐 안에서 캐스트가 시작되면 거리 0 히트가 나와
+            // 이동이 통째로 취소된다(2026-09-16 실측: 더미 캡슐이 겹치자 매 프레임 제자리로 되돌아갔다).
+            // 사람끼리는 SoftSeparation 이 속도로 푸니 여기서는 정적 지형만 본다.
             int count = Physics.CapsuleCastNonAlloc(
                 bottom,
                 top,
@@ -552,7 +614,7 @@ namespace Festa.Network
                 direction,
                 _wallSweepHits,
                 distance + skinWidth,
-                ~0,
+                ~(1 << gameObject.layer),
                 QueryTriggerInteraction.Ignore);
 
             float nearestWall = float.PositiveInfinity;

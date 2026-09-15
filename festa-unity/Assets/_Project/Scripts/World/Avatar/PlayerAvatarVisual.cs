@@ -165,6 +165,10 @@ namespace Festa.World
             _animator = _currentVisual.GetComponentInChildren<Animator>();
             AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
+            // **첫 프레임에 바로 맞는 크기로 나온다.** 정착 뒤 보정(CalibrateHeightToPose)만 두면
+            // 0.6초 동안 76% 크기로 보이다 커지는 것이 눈에 띈다(사용자 지적 2026-09-16). 컨트롤러가 붙은 지금
+            // Idle 첫 프레임을 강제로 평가해 실제 선 자세를 만들고 그 자리에서 잰다. 원격 아바타도 같은 경로다.
+            CalibrateHeightImmediately();
             // 발 IK — 단차에서 한 발이 뜨거나 파묻히지 않게 (2026-09-09). 컨트롤러 Base Layer 에 IK Pass 가 켜져 있어야 OnAnimatorIK 가 불린다.
             if (_animator != null && _animator.GetComponent<AvatarFootIK>() == null) _animator.gameObject.AddComponent<AvatarFootIK>();
 
@@ -194,6 +198,8 @@ namespace Festa.World
             // 여기서 나온 값은 **임시다.** 아래 CalibrateHeightToPose 주석 참고 — 조립 직후에는
             // 포즈가 없어 바인드포즈 범위로 잴 수밖에 없고, 그 값은 실제 선 자세보다 크다.
             _heightCalibrated = false;
+            _heightCalibrateDeadline = 0f;
+            _heightCalibrateAt = Time.time + SpawnSettle;   // 접지 타이머와 별개 — 아래 CalibrateHeightToPose 주석
             _punchLayer = -1;          // 애니메이터가 새로 만들어졌다 — 레이어 번호를 다시 찾는다
             _punchWeightTarget = 0f;
 
@@ -306,14 +312,14 @@ namespace Festa.World
             if (!standing)
             {
                 if (_heightCalibrateDeadline <= 0f) _heightCalibrateDeadline = Time.time + HeightCalibrateWait;
-                if (Time.time < _heightCalibrateDeadline) { _regroundAt = Time.time + RegroundSettle; return; }
+                if (Time.time < _heightCalibrateDeadline) { _heightCalibrateAt = Time.time + RegroundSettle; return; }
             }
 
-            // 굽기에 실패하면(렌더러가 아직 없는 프레임 등) 포기하지 않고 다음 정착 시점에 다시 잰다 —
+            // 굽기에 실패하면(렌더러가 아직 없는 프레임 등) 포기하지 않고 잠시 뒤 다시 잰다 —
             // 여기서 그냥 return 하면 영영 76% 로 남는다.
             if (!TryGetVisibleGeometryBounds(out var posed) || posed.size.y < 0.01f)
             {
-                _regroundAt = Time.time + RegroundSettle;
+                _heightCalibrateAt = Time.time + RegroundSettle;
                 return;
             }
             float posedHeight = posed.size.y;
@@ -325,12 +331,51 @@ namespace Festa.World
             if (Mathf.Abs(correction - 1f) < 0.01f) return;
 
             _currentVisual.transform.localScale *= correction;
-            _baseNeedsRefresh = true;   // 배율이 바뀌었으니 선 자세 기준값을 다시 잡아야 한다
+            Debug.Log($"[AvatarVisual] 키 보정 {posedHeight:F2} → {_targetVisualHeight:F2}u (×{correction:F3}, owner={OwnerClientId})");
+            // 배율이 바뀌었으니 발을 다시 바닥에 놓고 선 자세 기준값을 다시 잡는다.
+            _baseNeedsRefresh = true;
+            _regroundAt = Time.time;
+        }
+
+        /// <summary>
+        /// 조립 직후 같은 프레임에 키를 맞춘다. <see cref="Animator.Update(float)"/> 로 컨트롤러의 첫 상태(Idle)를
+        /// 지금 평가하면 스킨 메시가 바인드포즈가 아닌 선 자세가 되고, 그걸 구워 재면 정착을 기다릴 필요가 없다.
+        /// 실패하면 예약된 지연 보정이 이어받는다.
+        /// </summary>
+        void CalibrateHeightImmediately()
+        {
+            if (_animator == null || _currentVisual == null || _targetVisualHeight <= 0f) return;
+            if (_animator.runtimeAnimatorController == null) return;   // 컨트롤러가 없으면 포즈도 없다 — 지연 보정에 맡긴다
+
+            _animator.Update(0f);
+            if (!TryGetVisibleGeometryBounds(out var posed) || posed.size.y < 0.01f) return;
+
+            float correction = Mathf.Clamp(_targetVisualHeight / posed.size.y, 0.5f, 2f);
+            var vt = _currentVisual.transform;
+            if (Mathf.Abs(correction - 1f) >= 0.01f) vt.localScale *= correction;
+            _heightCalibrated = true;
+            _heightCalibrateAt = 0f;
+
+            // 배율이 바뀌었으니 발을 다시 바닥에 놓고 선 자세 기준값을 지금 값으로 잡는다.
+            if (GroundToCurrentPose())
+            {
+                _baseVisualLocalY = vt.localPosition.y;
+                _calibratedVisualLocalY = _baseVisualLocalY;
+            }
+            Debug.Log($"[AvatarVisual] 키 즉시 보정 {posed.size.y:F2} → {_targetVisualHeight:F2}u (×{correction:F3}, owner={OwnerClientId})");
         }
 
         /// <summary>선 자세를 기다려 주는 시간(초). 이보다 오래 걸리면 지금 자세로 잰다.</summary>
         const float HeightCalibrateWait = 3f;
         float _heightCalibrateDeadline;
+
+        /// <summary>
+        /// 키 보정을 시도할 시각. **접지 타이머(<see cref="_regroundAt"/>)와 분리한다.** 처음에는 그 타이머에
+        /// 얹었는데, 스폰 직후 <c>ApplyEmote(None)</c> 이 <c>RestoreBaseGrounding</c> 으로 <c>_regroundAt</c> 을
+        /// 0 으로 지워 정착 시점 자체가 사라졌다 — 두 세션 연속 보정이 한 번도 돌지 않았고(라이브 실측:
+        /// calibrated=False, 17.3u), 수동으로 불렀을 때만 22.4u 가 됐다. 0 이면 예약 없음.
+        /// </summary>
+        float _heightCalibrateAt;
 
         /// <summary>
         /// 루트가 바닥에서 얼마나 떠 있는지. 못 재면 <see cref="float.NaN"/>.
@@ -671,10 +716,15 @@ namespace Festa.World
             UpdateRemoteMoveParams();
             UpdatePunchLayerWeight();
 
+            if (_heightCalibrateAt > 0f && Time.time >= _heightCalibrateAt)
+            {
+                _heightCalibrateAt = 0f;
+                CalibrateHeightToPose();   // 다시 재야 하면 스스로 _heightCalibrateAt 을 다시 건다
+            }
+
             if (_regroundAt > 0f && Time.time >= _regroundAt)
             {
                 _regroundAt = 0f;
-                CalibrateHeightToPose();
                 if (GroundToCurrentPose() && _baseNeedsRefresh)
                 {
                     // 정착 후 다시 잰 값이 선 자세의 진짜 기준이다. 이모트로 접지를
