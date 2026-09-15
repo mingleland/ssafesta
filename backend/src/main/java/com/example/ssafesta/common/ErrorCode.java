@@ -19,6 +19,17 @@ public enum ErrorCode {
     // ── 인증 · 권한 ──────────────────────────────────────────────────────────
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Access Token이 필요합니다."),
     INVALID_MEMBER_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 회원 토큰입니다."),
+    /**
+     * Distinguished from {@link #INVALID_MEMBER_TOKEN} on purpose — one is retryable, one is not
+     * (S15P21A604-764, GitLab #198), the same split {@link #OAUTH_HANDOFF_EXPIRED} makes.
+     *
+     * <p>The Refresh Token was rotated a moment ago and this request carried the one it replaced —
+     * a second tab that bootstrapped at the same time, not a stolen token. The session is alive and
+     * the cookie has already been refreshed, so sending it again succeeds; the client must not show
+     * "로그인이 끝났다". {@code INVALID_MEMBER_TOKEN} is deliberately not reused: it means
+     * "you are not logged in", and a client cannot tell the two apart from the status alone.
+     */
+    REFRESH_TOKEN_ROTATED(HttpStatus.UNAUTHORIZED, "로그인 정보가 방금 갱신되었습니다. 다시 시도해 주세요."),
     USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),

@@ -69,14 +69,24 @@ public class GuestAuthController {
                     그것이 설계 의도다(헌법 13조). 따라서 **비로그인·게스트 방문자는 매번 `401` 을 받으며 그것이 정상 상태다** —
                     서버 오류로 취급하면 안 된다.
 
-                    쿠키가 **없는 경우·만료된 경우·이미 쓰인 경우**가 모두 같은 `401 INVALID_MEMBER_TOKEN` 이다.
+                    쿠키가 **없는 경우·만료된 경우·계보가 폐기된 경우**가 모두 같은 `401 INVALID_MEMBER_TOKEN` 이다.
                     사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 이름을 나누지 않았다.
+
+                    **한 가지만 갈라져 있다 — `401 REFRESH_TOKEN_ROTATED`.** 방금 회전된 토큰이 다시 온 경우이고
+                    (탭을 하나 더 열면 그 탭도 부트스트랩에서 이 endpoint 를 부른다), **세션은 살아 있다.**
+                    쿠키는 이미 새 값으로 교체돼 있으므로 **한 번 더 보내면 성공한다** — 로그인 화면으로 보내면 안 된다.
+
+                    다만 **즉시 한 번이 아니라 짧은 backoff 를 둔 제한 재시도**로 붙여야 한다. 이 401 이 이긴 쪽의
+                    `Set-Cookie` 보다 먼저 도착할 수 있고, 그때 곧바로 재시도하면 옛 쿠키를 다시 보내게 된다.
+                    서버가 보장하는 것은 "이 401 은 재시도 가능하다" 까지이고, 언제 재시도할지는 클라이언트 몫이다
+                    (S15P21A604-764, GitLab #198).
 
                     Bruno 로 시험할 때는 쿠키 jar 에 저장된 값이 자동 전송된다. Refresh Token 을 본문이나 환경변수에 넣지 않는다.
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "새 Access Token 발급. 응답의 `Set-Cookie` 로 refresh 쿠키가 교체된다"),
-            @ApiResponse(responseCode = "401", description = "`INVALID_MEMBER_TOKEN` — 쿠키가 없거나 만료·이미 사용됐다. 비로그인 방문자의 정상 응답이다"),
+            @ApiResponse(responseCode = "401", description = """
+                    `INVALID_MEMBER_TOKEN` — 쿠키가 없거나 만료·계보가 폐기됐다. 비로그인 방문자의 정상 응답이다.                     `REFRESH_TOKEN_ROTATED` — 방금 회전된 토큰이 다시 왔다. 세션은 살아 있고, 짧은 backoff 뒤 재시도하면 성공한다"""),
             @ApiResponse(responseCode = "403", description = "`UNTRUSTED_ORIGIN` — `Origin` 이 허용된 프론트 주소가 아니다. 쿠키를 보기 전에 먼저 거절한다")})
     @PostMapping("/refresh")
     public ResponseEntity<GuestTokenResponse> refresh(@Parameter(hidden = true) @CookieValue(name = "refresh_token", required = false) String refreshToken,
