@@ -1,0 +1,77 @@
+.world-chat {
+  position: absolute;
+  left: var(--festa-hud-margin-x);
+  bottom: var(--festa-hud-margin-y);
+  width: min(28rem, calc(100vw - 2 * var(--festa-hud-margin-x)));
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  pointer-events: auto;
+  z-index: var(--festa-z-world-hud);
+}
+
+.world-chat-launcher {
+  align-self: flex-start;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 14, 34, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+/* 게스트 — 표현만 비활성이다. 클릭은 그대로 받아 안내를 띄운다 */
+.world-chat-launcher[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.world-chat-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.world-chat:not(.world-chat-open) .world-chat-log {
+  opacity: 0.6;
+}
+
+.world-chat-notice {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #ffd9d9;
+}
+
+.world-chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.world-chat-input {
+  flex: 1;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(10, 14, 34, 0.85);
+  color: #fff;
+}
+
+.world-chat-input-over {
+  border-color: #ff8a8a;
+}
+
+.world-chat-count {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-height: 560px) {
+  .world-chat-log { max-height: min(8rem, 24dvh); }
+}

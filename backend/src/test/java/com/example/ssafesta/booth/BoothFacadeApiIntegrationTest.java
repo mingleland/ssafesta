@@ -288,6 +288,78 @@ class BoothFacadeApiIntegrationTest {
                         .value(org.hamcrest.Matchers.nullValue()));
     }
 
+    /**
+     * 이름을 바꾸면 방문자·소유자·슬롯 목록이 <b>같은 이름</b>을 읽는다 (S15P21A604-756).
+     *
+     * <p>세 경로를 한 테스트에서 보는 이유는 이름을 각자 조립하기 때문이다 — 부스 상세는
+     * {@code PublicBoothView.name}, 스튜디오 첫 화면은 {@code MyBoothView.name}, 월드 간판은
+     * {@code SlotView.boothName} 이다. 한 곳만 갱신되는 날을 여기서 잡는다.
+     */
+    @Test
+    void theOwnerRenamesTheBoothAndEveryReaderSeesIt() throws Exception {
+        Owner owner = leasedOwner("이름변경");
+        Long slotId = booths.findById(owner.boothId()).orElseThrow().getCurrentSlotId();
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"AI 프로젝트 전시관","themeCode":"MONO"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.name").value("AI 프로젝트 전시관"));
+        mockMvc.perform(get("/api/v1/booths/mine").header("Authorization", bearerFor(owner.userId())))
+                .andExpect(jsonPath("$.name").value("AI 프로젝트 전시관"));
+        mockMvc.perform(get("/api/v1/booth-slots"))
+                .andExpect(jsonPath("$[%d].boothName".formatted(orderedIndexOf(slotId)))
+                        .value("AI 프로젝트 전시관"));
+    }
+
+    /**
+     * 이름을 보내지 않은 저장은 이름을 <b>지우지 않는다</b> — 이 요청이 기존 FE 가 보내는 모양이다.
+     *
+     * <p>{@code booths.name} 은 {@code NOT NULL} 이라 나머지 네 필드처럼 비웠다가는 500 이고,
+     * 반대로 필수로 막으면 이름 칸이 없는 스튜디오의 모든 외관 저장이 400 이 된다. 이 테스트가
+     * 그 절충을 고정한다.
+     */
+    @Test
+    void aSaveWithoutANameKeepsTheCurrentOne() throws Exception {
+        Owner owner = leasedOwner("이름유지");
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"유지될 이름","themeCode":"DEFAULT"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"themeCode":"WARM","primaryColor":"#22C55E","signText":"간판만 바꾼다"}"""))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/booths/{id}", owner.boothId()))
+                .andExpect(jsonPath("$.name").value("유지될 이름"))
+                .andExpect(jsonPath("$.facade.signText").value("간판만 바꾼다"));
+    }
+
+    /** 생략은 "그대로 두라"지만 공백은 "이걸로 하라"다 — 이름 없는 부스가 목록에 서지 않게 거절한다. */
+    @Test
+    void aBlankNameIsRefused() throws Exception {
+        Owner owner = leasedOwner("빈이름");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"   ","themeCode":"DEFAULT"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("부스 이름을 입력해 주세요."));
+    }
+
+    /** 컬럼이 {@code VARCHAR(100)} 이라 검증이 없으면 DB 제약이 500 으로 터진다. */
+    @Test
+    void aNameLongerThanTheColumnIsRefused() throws Exception {
+        Owner owner = leasedOwner("긴이름");
+
+        mockMvc.perform(facadeRequest(owner, """
+                        {"name":"%s","themeCode":"DEFAULT"}""".formatted("가".repeat(101))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.message").value("부스 이름은 100자까지입니다."));
+    }
+
     private int orderedIndexOf(Long slotId) {
         return slots.findAllOrdered().stream().map(BoothSlot::getId).toList().indexOf(slotId);
     }

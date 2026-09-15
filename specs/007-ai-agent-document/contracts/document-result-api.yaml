@@ -166,6 +166,55 @@ paths:
           description: 끝났거나 없는 Job (`JOB_GONE`)
           content:
             application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+  /document-jobs/{jobId}/project-facts:
+    post:
+      operationId: reportAiProjectFacts
+      summary: 문서에서 뽑은 프로젝트 정형 정보 보고
+      description: |
+        AI 가 문서 임베딩을 끝낸 뒤 추출한 대상 사용자·사용 기술을 보낸다
+        (spec 009, S15P21A604-597 / GitLab #169, 소비자는 `-396` 의 rule-based 단축 응답).
+
+        **이 경로만 `SUCCEEDED` Job 을 받는다.** 추출은 임베딩이 *끝난 뒤*에 오기 때문이다. 다른
+        네 경로처럼 성공한 Job 을 끝난 Job 으로 막으면 이 경로는 한 번도 동작하지 않는다. 버려진
+        Job(`DEAD`·`CANCELLED`)만 `410` 이다 — 취소는 "이 처리 결과를 쓰지 말라" 는 뜻이다.
+
+        **최신성은 `jobId` 로만 판정한다.** `jobId` 는 단조 증가하므로 그 자체가 순서다. 도착
+        순서로 판정하면 재시도·재전송이 오래된 추출을 최신 값 위에 덮는다.
+
+        `204` 로 끝나지만 아무것도 쓰지 않는 경우가 둘 있다. 둘 다 보낸 쪽이 고칠 수 있는 잘못이
+        아니라 실패로 답하지 않는다.
+
+        - 지금 값보다 **오래되거나 같은** `jobId` — 재전송 포함
+        - 그 부스에 **프로젝트가 없다** — 정형 정보를 담을 곳이 없다
+
+        두 값은 **함께** 갈아끼운다. 한 문서에서 나온 한 번의 추출이라, 한쪽만 보내 나머지를 남겨
+        두면 서로 다른 문서에서 온 두 값이 한 프로젝트에 섞인다. 그래서 둘 다 비어 있는 요청은
+        `400` 이다 — 정말 둘 다 없는 문서라면 보내지 않으면 된다.
+      parameters:
+        - { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectFactsRequest'
+      responses:
+        '204': { description: 접수됨 (반영했거나, 오래되어 무시했거나, 담을 프로젝트가 없다) }
+        '400':
+          description: |
+            검증 실패 (`VALIDATION_FAILED`). `sourceHash` 가 Job 과 다름 · `documentId` 가 Job 의
+            문서와 다름 · 두 값 모두 비어 있음 · 2000자 초과.
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '401': { description: Service Token 실패 }
+        '409':
+          description: 지난 attempt (`JOB_ATTEMPT_STALE`)
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
+        '410':
+          description: 버려졌거나 없는 Job (`JOB_GONE`). **`SUCCEEDED` 는 여기 해당하지 않는다.**
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ApiErrorResponse' } }
 components:
   securitySchemes:
     serviceToken:
@@ -243,6 +292,38 @@ components:
           type: boolean
           description: 다시 해 볼 만한지에 대한 워커의 판단. 최종 결정은 Spring 이 한다.
         message: { type: [string, 'null'], description: 사람이 읽을 설명. 분기에 쓰지 않는다. }
+    ProjectFactsRequest:
+      type: object
+      additionalProperties: false
+      required: [attemptNo, sourceHash]
+      description: |
+        `targetAudience` 와 `techStack` 은 각각 선택이지만 **둘 다 없으면 `400`** 이다.
+      properties:
+        attemptNo: { type: integer, minimum: 0 }
+        documentId:
+          type: [integer, 'null']
+          format: int64
+          description: |
+            선택이다 — Job 이 이미 문서를 가리키므로 서버가 쓰는 값은 Job 쪽이다. 보내면
+            교차 검증에 쓰고, Job 의 문서와 다르면 `400` 이다.
+        sourceHash:
+          type: string
+          description: |
+            추출한 원본의 해시. Job 의 `source_hash` 와 같아야 한다 — 다르면 같은 `jobId` 인데
+            다른 파일에서 뽑았다는 뜻이라 `400` 이다 (finalize 와 같은 판단).
+
+            **티켓(#169)은 이것을 `sourceRevision` 이라 부른다.** 이 컨트롤러의 다른 네 경로가
+            모두 `sourceHash` 라 이름을 맞췄다 — AI 파트가 `sourceRevision` 을 원하면 한 줄이다.
+        targetAudience:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 2000
+          description: 이 프로젝트가 누구를 위한 것인가. 빈 문자열은 `400` 이다.
+        techStack:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 2000
+          description: 무엇으로 만들었는가. 빈 문자열은 `400` 이다.
     ApiErrorResponse:
       description: 프로젝트 전역 오류 봉투(docs/08 §1.3) — 이 API 전용 봉투를 따로 두지 않는다.
       type: object

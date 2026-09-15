@@ -105,7 +105,35 @@ namespace Festa.World
 
         void OnEmoteChanged(PlayerEmoteId _, PlayerEmoteId next) => ApplyEmote(next);
 
+        /// <summary>
+        /// 아바타 한 기를 조립하는 데 실제로 몇 ms 가 드는지 — 이 값을 넘으면 로그로 남긴다.
+        ///
+        /// <para><b>왜 재는가.</b> "사람이 들어올 때마다 잔렉이 있다" 는 보고(2026-09-14)의 원인을
+        /// 추정으로 정하지 않기 위해서다. 브라우저 rAF 로는 잴 수 없다 — 탭이 숨겨지면 Chrome 이
+        /// 프레임을 1초에 한 번으로 죽여 측정값이 통째로 거짓이 된다(같은 날 실제로 그렇게 틀렸다).
+        /// <b>동기 호출을 스톱워치로 감싸면 그 문제를 우회한다</b> — 프레임이 드물게 돌아도
+        /// 그 안에서 걸린 시간은 진짜다.</para>
+        ///
+        /// <para>에디터 사전 측정에서 조립기(<c>AvatarAssembler.Apply</c>)만 떼어 재면 첫 회 208ms,
+        /// 이후 3~4ms 였다. 여기서는 <c>BakeMesh</c>·그림자 설정·<c>Animator.Rebind</c> 까지 포함한
+        /// <b>입장 1건의 전체 비용</b>을 잰다.</para>
+        /// </summary>
+        const double RebuildLogThresholdMs = 8d;
+
         void Rebuild(string encoded)
+        {
+            var __sw = System.Diagnostics.Stopwatch.StartNew();
+            try { RebuildCore(encoded); }
+            finally
+            {
+                __sw.Stop();
+                double ms = __sw.Elapsed.TotalMilliseconds;
+                if (ms >= RebuildLogThresholdMs)
+                    Debug.Log($"[AvatarVisual] 조립 비용 {ms:F1} ms (owner={OwnerClientId}) — 한 프레임에 동기로 든 값이다");
+            }
+        }
+
+        void RebuildCore(string encoded)
         {
             // 부하 테스트 봇은 외형을 만들지 않는다 — 화면이 없어 보이지 않는데
             // 스킨 메시·재질·본을 통째로 올리면 프로세스당 메모리가 커져 한 대에서

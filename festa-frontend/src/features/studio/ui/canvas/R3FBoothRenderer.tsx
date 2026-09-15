@@ -17,12 +17,12 @@ import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
 import type { LayoutObject } from '../../../../entities/layout/types';
-import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
+import { clampObjectToBooth, normalizeRotation, snap } from '../../lib/coords';
 import type { BoothRendererProps } from './canvasTypes';
-import { boxPlacement, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
+import { boxPlacement, canRotateFrom, fitZoom, isoCameraPosition, isoTarget, rotationFromDrag } from './isoCamera';
 import { IS_VISUAL_ACCEPTANCE, VISUAL_ACCEPTANCE_FRAME_MS } from './canvasRenderer';
 import { AssetMesh } from './AssetMesh';
-import { dragKind } from '../../model/studioMode';
+import { dragKind, exceedsDragThreshold } from '../../model/studioMode';
 import { pickAsset } from '../../model/boothAssetManifest';
 import type { BoothAssetEntry } from '../../model/boothAssetManifest';
 import { useBoothAssets } from '../../model/useBoothAssets';
@@ -38,6 +38,10 @@ interface DragState {
   origin: { x: number; z: number };
   grab: { x: number; z: number };
   startRotation: number;
+  /** pointerdown 이 일어난 화면 좌표 — 손떨림과 진짜 드래그를 가르는 기준점 (S15P21A604-689) */
+  startClient: { x: number; y: number };
+  /** 임계값을 한 번 넘었는가. 넘기 전에는 선택만이고 좌표는 커밋되지 않는다 */
+  armed: boolean;
 }
 
 /**
@@ -343,12 +347,17 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
     p.onSelect(obj.objectId);
     const w = pick(e.clientX, e.clientY);
     if (w === null) return;
+    // 피벗 위를 잡은 회전은 시작하지 않는다 — 각도가 정의되지 않아 1 px 흔들림이 수십 도로 커밋된다.
+    // 회전은 오브젝트 가장자리나 기즈모 링에서 시작한다 (S15P21A604-689).
+    if (kind === 'rotate' && !canRotateFrom({ x: obj.position.x, z: obj.position.z }, w)) return;
     drag.current = {
       kind,
       objectId: obj.objectId,
       origin: { x: obj.position.x, z: obj.position.z },
       grab: w,
       startRotation: obj.rotationY,
+      startClient: { x: e.clientX, y: e.clientY },
+      armed: false,
     };
     setDragging(true);
   }
@@ -356,6 +365,12 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
   function move(e: ThreeEvent<PointerEvent>) {
     const d = drag.current;
     if (d === null) return;
+    // 임계값을 넘기 전에는 선택만 한 것으로 본다. 사람의 클릭은 1~3 px 흔들리고, 그 한 번의 pointermove 가
+    // 곧바로 커밋되면 스냅이 켜진 상태에서 격자에 맞지 않던 좌표가 통째로 끌려간다 (S15P21A604-689).
+    if (!d.armed) {
+      if (!exceedsDragThreshold(d.startClient, { x: e.clientX, y: e.clientY })) return;
+      d.armed = true;
+    }
     const w = pick(e.clientX, e.clientY);
     if (w === null) return;
     if (d.kind === 'move') {
@@ -365,7 +380,15 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
         x = snap(x);
         z = snap(z);
       }
-      const c = clampToBooth(x, z, p.bounds);
+      // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+      const moving = p.objects.find((o) => o.objectId === d.objectId);
+      const c = clampObjectToBooth(
+        x,
+        z,
+        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving?.rotationY ?? 0,
+        p.bounds,
+      );
       p.onMove(d.objectId, Number(c.x.toFixed(3)), Number(c.z.toFixed(3)));
     } else {
       let deg = rotationFromDrag(d.origin, d.grab, w, d.startRotation);
@@ -378,6 +401,22 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
     drag.current = null;
     setDragging(false);
   };
+
+  // 드래그 종료를 window 에서도 받는다 (S15P21A604-689).
+  //
+  // 바닥 평면의 onPointerUp 은 커서가 캔버스 안에 있을 때만 온다. 속성 패널·팔레트 위에서 버튼을 떼면
+  // 그 신호가 없어 drag 상태가 그대로 남고, 다음에 커서가 캔버스로 돌아오는 순간 버튼을 누르지 않았는데도
+  // pointermove 가 좌표를 커밋한다 — 실측에서 오브젝트가 6 m 를 건너뛰었다. pointercancel 도 같이 받는다
+  // (브라우저가 제스처를 가로채면 up 이 아니라 cancel 로 끝난다).
+  useEffect(() => {
+    const onUp = () => end();
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, []);
 
   return (
     <group>

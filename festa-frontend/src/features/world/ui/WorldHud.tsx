@@ -1,6 +1,6 @@
 // World 위 React HUD — hud-decisions.md 가 허용한 것만 그린다 (S15P21A604-406).
-// 허용 4종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
-//          Consultation Quick Access(우상단, 상시 — 상담만의 예외).
+// 허용 6종: 이동·조작 안내 / 미니게임 score·progress(해당 콘텐츠 중에만) / Toast·Notification /
+//          Consultation Quick Access / 월드 채팅 / 전체화면.
 // 금지: minimap · HP · quest tracker · hotbar · crosshair · mission panel · 기능 launcher.
 // F 상호작용 prompt·하이라이트·이름표는 Unity 소관이라 여기서 만들지 않는다.
 //
@@ -12,13 +12,13 @@
 // 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 손에 익는 것이라
 // 목록에 있어도 읽히지 않아 뺐다.
 //
-// F 에서 "부스 입장·나가기" 를 뺀 근거: -592 가 그 말을 넣은 이유는 **나가는 방법을 안내 말고는
-// 알 곳이 없었기** 때문이다. 지금은 부스 안에 있으면 나가기 버튼이 직접 뜨고(-627) 그 버튼에
-// F 키 배지도 함께 있어, 화면이 스스로 말하는 것을 안내가 반복할 필요가 없다.
+// F 에서 "부스 입장·나가기" 를 뺀 근거: 부스 안에서는 클릭형 나가기 버튼이 직접 떠서 안내가
+// 같은 동작을 반복할 필요가 없다(S15P21A604-740).
 import { useState } from 'react';
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
 import { WorldGuideLauncher } from './WorldGuideLauncher';
+import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import './worldHud.css';
 
 export function WorldHud() {
@@ -34,6 +34,9 @@ export function WorldHud() {
     <div className="world-hud" onMouseDown={(event) => event.preventDefault()}>
       {/* 허용 4번 — 상담 상태 즉시 접근 */}
       <ConsultationQuickAccess />
+
+      {/* 허용 6번 — 브라우저 전체화면 토글 (S15P21A604-733, hud-decisions.md) */}
+      <FullscreenToggle />
 
       {/* 컨텍스트 액션 — 부스 안일 때만 뜬다. 상시 HUD 가 아니다 (S15P21A604-627, #174) */}
       <BoothExitButton />
@@ -90,5 +93,30 @@ export function WorldHud() {
       {/* 이용 안내(무엇을 할 수 있는가) — 위 조작 안내(어떻게 움직이는가)와 다른 축이다 (-599) */}
       <WorldGuideLauncher />
     </div>
+  );
+}
+
+// 상태의 정본은 브라우저다 — F11 이나 ESC 로 빠져나가도 `fullscreenchange` 로 아이콘이 따라간다.
+// FE 가 자기 state 로 들고 있으면 그 두 경로에서 곧바로 어긋난다.
+function FullscreenToggle() {
+  const full = useFullscreen();
+  const label = full ? '전체화면 끄기' : '전체화면';
+  return (
+    <button
+      type="button"
+      className="world-hud-fullscreen"
+      onClick={() => { void toggleFullscreen(); }}
+      aria-pressed={full}
+      aria-label={label}
+      title={label}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {full ? (
+          <path d="M3 8h3a2 2 0 0 0 2-2V3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M21 16h-3a2 2 0 0 0-2 2v3" />
+        ) : (
+          <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+        )}
+      </svg>
+    </button>
   );
 }

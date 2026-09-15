@@ -9,6 +9,7 @@
 // 장기 Overlay Stack(game-client-experience-draft §4)은 여기서 구현하지 않는다 — 필요한 최소
 // 상태 분리만 한다. Overlay Bus 와 같은 module-level store + useSyncExternalStore 관례를 따른다.
 import { useSyncExternalStore } from 'react';
+import type { ManagementPanel } from './managementPanel';
 
 /**
  * World 하단 개발용 상호작용 트리거(DEV_ONLY)를 켤지 — dev 빌드 + 명시적 플래그를 동시에 요구한다.
@@ -21,9 +22,15 @@ export const IS_DEV_INTERACTION_BAR =
 export interface GameClientUiState {
   gameMenu: boolean;
   managementOverlay: boolean;
+  /**
+   * 관리 오버레이 **안에서** 열린 상세 패널. 별도 소유자가 아니라 자식이다 —
+   * `worldScreen` 은 이때도 `'management'` 를 말하고, ESC 만 상세 → 관리 → 월드 순으로 한 겹씩
+   * 벗긴다. 이렇게 두어야 상세를 닫았을 때 관리 화면으로 **돌아온다**.
+   */
+  managementPanel: ManagementPanel | null;
 }
 
-const initialState: GameClientUiState = { gameMenu: false, managementOverlay: false };
+const initialState: GameClientUiState = { gameMenu: false, managementOverlay: false, managementPanel: null };
 
 let state: GameClientUiState = initialState;
 const listeners = new Set<() => void>();
@@ -34,7 +41,13 @@ function emit(): void {
 
 function setState(patch: Partial<GameClientUiState>): void {
   const next = { ...state, ...patch };
-  if (next.gameMenu === state.gameMenu && next.managementOverlay === state.managementOverlay) return;
+  if (
+    next.gameMenu === state.gameMenu &&
+    next.managementOverlay === state.managementOverlay &&
+    next.managementPanel === state.managementPanel
+  ) {
+    return;
+  }
   state = next;
   emit();
 }
@@ -59,7 +72,7 @@ export function useGameClientUi(): GameClientUiState {
 
 // 둘은 서로 배타적이다 — 관리 화면 위에 게임 메뉴가 겹쳐 뜨면 ESC 의 의미가 모호해진다.
 export function openGameMenu(): void {
-  setState({ gameMenu: true, managementOverlay: false });
+  setState({ gameMenu: true, managementOverlay: false, managementPanel: null });
 }
 
 export function closeGameMenu(): void {
@@ -72,7 +85,21 @@ export function openBoothManagement(): void {
 }
 
 export function closeBoothManagement(): void {
-  setState({ managementOverlay: false });
+  // 관리 화면이 닫히면 그 자식도 같이 사라진다 — 부모 없는 상세가 월드 위에 남으면 ESC 가
+  // 닫을 대상을 잃는다.
+  setState({ managementOverlay: false, managementPanel: null });
+}
+
+/**
+ * 관리 상세를 연다. 관리 오버레이가 닫혀 있으면 함께 연다 — 상세는 그 위에 얹히는 자식이고,
+ * 닫으면 관리 화면으로 돌아가야 하기 때문이다.
+ */
+export function openManagementPanel(panel: ManagementPanel): void {
+  setState({ managementOverlay: true, gameMenu: false, managementPanel: panel });
+}
+
+export function closeManagementPanel(): void {
+  setState({ managementPanel: null });
 }
 
 /**

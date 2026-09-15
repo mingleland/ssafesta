@@ -12,7 +12,7 @@
 //
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
@@ -21,12 +21,27 @@ import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
+import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
+import { startBoothVisitTracking } from '../../features/world/model/boothVisitTracker';
+import { startBoothVisitReporting } from '../../features/world/model/boothVisitReporter';
+import { WorldChatLayer } from '../../features/worldChat/ui/WorldChatLayer';
+import {
+  WORLD_CHAT_INPUT_ID,
+  canUseWorldChat,
+  closeWorldChat,
+  getWorldChatSnapshot,
+  openWorldChat,
+  resolveEnterAction,
+  sendWorldChat,
+  startWorldChat,
+} from '../../features/worldChat/model/worldChat';
 import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
   closeBoothManagement,
+  closeManagementPanel,
   closeGameMenu,
   resetGameClientUi,
   useGameClientUi,
@@ -48,6 +63,10 @@ export function WorldPage() {
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const [chatHeight, setChatHeight] = useState(0);
+  const reportChatHeight = useCallback((height: number) => {
+    setChatHeight((current) => current === height ? current : height);
+  }, []);
 
   // 월드를 보여 달라고 요청한다. 화면을 떠날 때는 감추기만 하고 내리지 않는다 —
   // 부스 스튜디오·관리 상세로 나갔다 돌아오는 것이 정상 동선이고, 그때마다 다시 부팅하지
@@ -55,6 +74,12 @@ export function WorldPage() {
   useEffect(() => {
     showWorld();
     return hideWorld;
+  }, []);
+
+  // ToastHost 는 라우터 밖에 있으므로, 월드에서만 쓰는 상단 중앙 예약 영역은 body 상태로 연결한다.
+  useEffect(() => {
+    document.body.classList.add('world-active');
+    return () => document.body.classList.remove('world-active');
   }, []);
 
   // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
@@ -69,8 +94,15 @@ export function WorldPage() {
 
   useEffect(() => {
     const unsubscribe = initInteractionDispatcher();
+    // 부스 방문 경계 추적 — dispatcher 가 WORLD_BOOTH_CONTEXT 를 나르므로 수명을 같이 둔다
+    // (S15P21A604-690). 경계를 잡는 쪽과 서버로 보내는 쪽이 갈려 있고, 둘 다 이 화면이 사는
+    // 동안만 산다 — 월드를 떠난 뒤 늦게 도착한 전이가 요청을 만들지 않게.
+    const stopVisitTracking = startBoothVisitTracking();
+    const stopVisitReporting = startBoothVisitReporting();
     return () => {
       unsubscribe();
+      stopVisitReporting();
+      stopVisitTracking();
       // Overlay Bus·클라이언트 UI 는 module-level 상태라 이 화면이 unmount 돼도 남는다 —
       // 벗어날 때 명시적으로 닫아 재진입 시 과거 레이어가 즉시 떠 있지 않게 한다.
       closeOverlay();
@@ -102,6 +134,17 @@ export function WorldPage() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      // 네이티브 <dialog> 는 ESC 를 자기가 소비해 닫지만 keydown 은 window 까지 올라온다.
+      // 그대로 두면 확인 모달이 닫히면서 그 아래 레이어까지 같이 닫힌다 — 리스너를 새로 만들지
+      // 않고 판정자 맨 앞에서 한 번 비켜 준다. 텍스트 입력 중 ESC 도 같은 경로로 dialog 가 먼저
+      // 먹는다.
+      if (document.querySelector('dialog[open]') !== null) return;
+      // 채팅이 열려 있으면 그것부터 닫는다. 입력창을 두고 Game Menu 가 열리면 글을 쓰다 말고
+      // 메뉴가 덮는다.
+      if (getWorldChatSnapshot().open) {
+        closeWorldChat();
+        return;
+      }
       if (closeTopScreen()) return;
 
       if (hasUnityModal()) {
@@ -121,18 +164,52 @@ export function WorldPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // Enter 판정자도 한 곳이다 — ESC 와 같은 이유다. 채팅 화면이 자기 리스너를 걸면 등록 순서로만
+  // 갈리는 그 계열의 버그가 돌아온다 (S15P21A604-706).
+  useEffect(() => {
+    const stopChat = startWorldChat();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Enter') return;
+      // 조합 중 Enter·Shift+Enter 를 거르는 규칙까지 resolveEnterAction 이 갖는다 — 규칙을 두
+      // 곳에 두면 갈린다.
+      const chat = getWorldChatSnapshot();
+      const action = resolveEnterAction(e, {
+        open: chat.open,
+        inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
+        member: canUseWorldChat(),
+      });
+      if (action === 'ignore') return;
+      e.preventDefault();
+      if (action === 'send') sendWorldChat(chat.draft);
+      else openWorldChat();
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      stopChat();
+    };
+  }, []);
+
   return (
-    <div className="world-scene">
+    <div className="world-scene" style={{ '--festa-world-chat-height': `${chatHeight}px` } as CSSProperties}>
       {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
           여기서 그리면 화면을 떠날 때 Unity 가 함께 죽어 돌아올 때마다 50~84초를 다시 기다린다. */}
       {/* React HUD — hud-decisions 가 허용한 것만 (조작 안내 · 상담 Quick Access) */}
       {inWorld && <WorldHud />}
+      {/* 채팅 — HUD 밖이다. HUD 의 mousedown 차단이 입력창 focus 를 막는다 (S15P21A604-648) */}
+      {inWorld && <WorldChatLayer onHeightChange={reportChatHeight} />}
       {/* DEV_ONLY — 제품 HUD 가 아니다. dev 빌드 + VITE_DEV_INTERACTION_BAR=true 에서만 뜬다 */}
       {IS_DEV_INTERACTION_BAR && <MockInteractionBar />}
       {/* Visitor Overlay Layer — Unity 상호작용이 연다 */}
       <OverlayHost />
       {/* Booth Management Layer — World 의 관리 NPC 가 연다(계약 G-1 전까지 dev trigger) */}
       {ui.managementOverlay && <BoothManagementOverlay onClose={closeBoothManagement} />}
+      {/* 관리 상세는 관리 화면의 자식이다 — 위에 얹히고, 닫으면 관리 화면이 다시 드러난다 */}
+      {ui.managementPanel !== null && (
+        <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
+      )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
       {ui.gameMenu && (
         <GameMenu

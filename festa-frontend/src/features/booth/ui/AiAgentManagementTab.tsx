@@ -6,6 +6,7 @@ import {
   getAiAgent,
   listAiDocuments,
   uploadAiDocument,
+  replaceAiDocument,
   updateAiAgent,
   type AiAgent,
   type AiAgentCommand,
@@ -36,6 +37,13 @@ const emptyForm: FormState = {
   forbiddenTopics: '',
   handoffEnabled: false,
 };
+
+// 이름·프롬프트를 비워둔 채 등록해도 막지 않는다(S15P21A604-724) — 백엔드는 두 필드를
+// 여전히 필수로 요구하므로(AiAgentService.validatedName/validatedPrompt), 빈 채로 보내면
+// 저장 직전에 이 기본값으로 채운다. 계약을 바꾸는 게 아니라 FE가 대신 채워 넣는 것이다.
+const DEFAULT_AGENT_NAME = 'FESTA 안내 직원';
+const DEFAULT_SYSTEM_PROMPT =
+  '방문객의 질문에 친절하고 정확하게 답합니다. 모르는 내용은 모른다고 답하고, 확인되지 않은 정보를 지어내지 않습니다.';
 
 function toForm(agent: AiAgent | null): FormState {
   if (!agent) return emptyForm;
@@ -90,6 +98,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [uploadMessage, setUploadMessage] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -97,15 +106,35 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
   }, [agentQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: () => {
-      const command = toCommand(form);
+    mutationFn: (nextForm: FormState) => {
+      const command = toCommand(nextForm);
       return agentQuery.data
         ? updateAiAgent(agentQuery.data.agentId, command)
         : createAiAgent(boothId, command);
     },
-    onSuccess: async () => {
+    // 등록 폼에서 미리 골라둔 문서를 저장 직후 같은 agentId 로 순차 업로드한다 —
+    // "저장 먼저, 업로드는 그다음 화면에서" 두 단계를 사용자가 거치지 않게 한다.
+    onSuccess: async (agent) => {
       await queryClient.invalidateQueries({ queryKey: ['ai-agent', boothId] });
       setError(null);
+      if (pendingFiles.length > 0) {
+        const files = pendingFiles;
+        setPendingFiles([]);
+        setUploadMessage(`문서 ${files.length}건 업로드 중...`);
+        let uploaded = 0;
+        for (const file of files) {
+          try {
+            await uploadAiDocument(agent.agentId, file);
+            uploaded += 1;
+          } catch {
+            // 개별 문서 업로드 실패는 등록 자체를 무효화하지 않는다 — 건너뛰고 계속한다
+          }
+        }
+        setUploadMessage(
+          uploaded === files.length ? `문서 ${uploaded}건 업로드 완료` : `문서 ${uploaded}/${files.length}건 업로드 완료 (일부 실패)`,
+        );
+        await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agent.agentId] });
+      }
     },
     onError: (cause) => setError(isApiError(cause) ? cause.message : 'AI 직원 설정을 저장하지 못했습니다.'),
   });
@@ -124,13 +153,34 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 업로드하지 못했습니다.'),
   });
 
+  // 교체는 업로드와 같은 3단계를 타지만 1단계가 원본 문서를 지목한다 (S15P21A604-691, #179).
+  // 원본은 새 문서가 준비 완료가 될 때까지 그대로 답변에 쓰이므로, 실패해도 근거가 비지 않는다.
+  const replaceMutation = useMutation({
+    mutationFn: ({ documentId, file }: { documentId: number; file: File }) => replaceAiDocument(documentId, file),
+    onSuccess: async (result) => {
+      setUploadMessage(
+        result.duplicate
+          ? '같은 내용이라 교체하지 않았습니다.'
+          : `교체 접수: 처리 대기(${result.processingStatus}) · 준비가 끝나면 기존 문서를 대신합니다`,
+      );
+      setError(null);
+      await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
+    },
+    onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 교체하지 못했습니다.'),
+  });
+
+  // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
+  // 저장한다. 화면에도 실제 저장되는 값을 그대로 반영해 나중에 "왜 이렇게 저장됐지"가 없게 한다.
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim() || !form.systemPrompt.trim()) {
-      setError('직원 이름과 시스템 프롬프트를 입력해 주세요.');
-      return;
-    }
-    saveMutation.mutate();
+    const next: FormState = {
+      ...form,
+      name: form.name.trim() || DEFAULT_AGENT_NAME,
+      systemPrompt: form.systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT,
+    };
+    setForm(next);
+    setError(null);
+    saveMutation.mutate(next);
   }
 
   function selectFile(event: ChangeEvent<HTMLInputElement>) {
@@ -138,6 +188,32 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     if (!file) return;
     setUploadMessage(null);
     uploadMutation.mutate(file);
+  }
+
+  // 등록 전(agentId 없음) 단계 — 선택만 해두고 실제 업로드는 저장 성공 뒤 saveMutation.onSuccess 가 한다
+  function stagePendingFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    setPendingFiles((prev) => {
+      const next = [...prev];
+      for (const file of Array.from(files)) {
+        if (!next.some((existing) => existing.name === file.name && existing.size === file.size)) next.push(file);
+      }
+      return next;
+    });
+    event.target.value = '';
+  }
+
+  function removePendingFile(index: number) {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function selectReplacement(documentId: number, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadMessage(null);
+    replaceMutation.mutate({ documentId, file });
+    event.target.value = '';
   }
 
   if (agentQuery.isLoading) return <OverlayLoading label="AI 직원 설정을 불러오는 중..." />;
@@ -151,7 +227,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
       <div className="bm-agent-head">
         <div>
           <h3>AI 직원 {editing ? '설정' : '등록'}</h3>
-          <p className="ov-note">부스당 한 명만 운영할 수 있으며, 저장 후 문서를 등록해 답변 근거를 채울 수 있습니다.</p>
+          <p className="ov-note">부스당 한 명만 운영할 수 있으며, 저장 후 문서를 등록해 답변 근거를 채울 수 있습니다. 이름·프롬프트를 비워두면 기본값으로 등록됩니다.</p>
         </div>
         <span className={'bm-agent-state' + (editing ? ' bm-agent-state-on' : '')}>{editing ? '운영 설정됨' : '미등록'}</span>
       </div>
@@ -175,11 +251,35 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
           <h4 id="ai-document-title">답변 근거 문서</h4>
           <p className="ov-note">PDF, Markdown, 텍스트 파일을 최대 20MB까지 올릴 수 있습니다. 업로드 후 처리 완료 전까지는 답변 근거에 쓰이지 않습니다.</p>
         </div>
-        <label className={'ov-btn bm-upload' + (!editing || uploadMutation.isPending ? ' bm-upload-disabled' : '')}>
-          {uploadMutation.isPending ? '업로드 중...' : '문서 업로드'}
-          <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" disabled={!editing || uploadMutation.isPending} onChange={selectFile} />
-        </label>
-        {!editing && <p className="ov-note">AI 직원 설정을 먼저 저장하면 문서를 등록할 수 있습니다.</p>}
+        {!editing && (
+          <>
+            <label className="ov-btn bm-upload">
+              파일 선택
+              <input type="file" multiple accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" onChange={stagePendingFiles} />
+            </label>
+            <p className="ov-note">선택한 문서는 &apos;AI 직원 등록&apos; 저장과 함께 업로드됩니다.</p>
+            {pendingFiles.length > 0 && (
+              <ul className="bm-document-list">
+                {pendingFiles.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${index}`} className="bm-document-row">
+                    <span className="bm-document-name">{file.name}</span>
+                    <span className="bm-document-meta">{formatBytes(file.size)}</span>
+                    <button type="button" className="bm-document-remove" onClick={() => removePendingFile(index)}>
+                      제거
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+
+        {editing && (
+          <label className={'ov-btn bm-upload' + (uploadMutation.isPending ? ' bm-upload-disabled' : '')}>
+            {uploadMutation.isPending ? '업로드 중...' : '문서 업로드'}
+            <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" disabled={uploadMutation.isPending} onChange={selectFile} />
+          </label>
+        )}
         {uploadMessage && <p className="bm-upload-result" role="status">{uploadMessage}</p>}
 
         {editing && (
@@ -202,6 +302,19 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                     <span className="bm-document-name">{doc.fileName}</span>
                     <span className="bm-document-meta">{formatBytes(doc.sizeBytes)}</span>
                     <span className="bm-document-status">{STATUS_LABEL[doc.status]}</span>
+                    {/* 교체는 준비 완료된 문서에만 연다 — 서버도 그 상태만 받는다(DOCUMENT_NOT_REPLACEABLE) */}
+                    {doc.status === 'READY' && (
+                      <label className={'bm-document-replace' + (replaceMutation.isPending ? ' bm-upload-disabled' : '')}>
+                        {replaceMutation.isPending && replaceMutation.variables?.documentId === doc.documentId ? '교체 중...' : '수정본 교체'}
+                        <input
+                          type="file"
+                          accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
+                          disabled={replaceMutation.isPending}
+                          aria-label={`${doc.fileName} 수정본 교체`}
+                          onChange={(event) => selectReplacement(doc.documentId, event)}
+                        />
+                      </label>
+                    )}
                   </li>
                 ))}
               </ul>

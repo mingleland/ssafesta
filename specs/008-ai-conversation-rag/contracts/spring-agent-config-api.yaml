@@ -58,6 +58,30 @@ components:
         responseLength: { type: string, enum: [SHORT, MEDIUM, LONG] }
         systemPrompt: { type: string }
         forbiddenTopics: { type: array, items: { type: string } }
+        projectFacts:
+          $ref: '#/components/schemas/ProjectFacts'
+          description: |
+            rule-based 단축 응답이 쓰는 프로젝트 정형 정보 (S15P21A604-597·-396).
+
+            **부스에 프로젝트가 없으면 이 필드 자체가 없다.** 안의 세 값도 각각 없을 수 있다 —
+            소개는 운영자가 안 썼을 수 있고, 나머지 둘은 아직 추출되지 않았을 수 있다. 없는 것을
+            빈 문자열로 채우지 않는 이유는 "소개가 없는 부스"와 "소개가 빈 문자열인 부스"를
+            받는 쪽이 구분할 수 있어야 하기 때문이다.
+
+    ProjectFacts:
+      type: object
+      additionalProperties: false
+      description: 모든 필드가 선택이다. 없으면 키가 없다(`null`이 아니라 부재).
+      properties:
+        introduction:
+          type: string
+          description: 운영자가 직접 쓴 프로젝트 소개 (`projects.description`)
+        targetAudience:
+          type: string
+          description: AI가 문서에서 추출한 대상 사용자. 최대 2000자
+        techStack:
+          type: string
+          description: AI가 문서에서 추출한 사용 기술. 최대 2000자
 
     AgentConfigAgentNotInBooth:
       type: object

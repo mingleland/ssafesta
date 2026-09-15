@@ -29,6 +29,7 @@
   font-size: 13.5px;
 }
 .mg-input:focus { outline: 2px solid rgba(90, 140, 255, 0.55); outline-offset: 1px; }
+.mg-field-error { font-size: 12px; color: #ff9d9d; }
 /* select 는 팝업(옵션 목록)을 OS 네이티브가 그린다 — .mg-input 의 밝은 글자색이 그 팝업에도
    상속되는데, 팝업 배경은 이 다크 테마를 안 타서 흰 배경에 흰 글씨로 안 보이는 문제가 있었다
    (실측 보고). option 에 배경·글자색을 명시해 팝업 자체를 다크로 강제한다. */
@@ -49,6 +50,7 @@ select.mg-input option {
   margin-top: 4px;
 }
 .mg-ok { font-size: 13px; color: var(--sc-ok, #5fd39b); }
+.mg-hint { font-size: 12px; opacity: 0.75; }
 .mg-issues {
   flex: 1;
   margin: 0;

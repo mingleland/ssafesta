@@ -6,7 +6,6 @@
 // spec 010 FR-002 확정분이며 새 유형을 만들지 않고, 결과도 모델에 있는 집계만 보여준다 —
 // 응답률·이탈률 같은 지표를 발명하지 않는다.
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   addQuestion,
   loadSurveyBuilder,
@@ -14,14 +13,15 @@ import {
   reorderQuestion,
   saveSurveyBuilder,
   updateQuestion,
+  updateRewardCoin,
   updateTitle,
   useSurveyBuilder,
   validateBuilder,
 } from '../../features/survey/model/builder';
 import { loadNextTextPage, loadSurveyResult, useSurveyResult } from '../../features/survey/model/result';
 import type { SurveyQuestionType } from '../../shared/contracts/survey';
-import { WORLD_RETURN_TO_MANAGEMENT } from '../../features/world/model/gameClientUi';
-import { PageShell, ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import { ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
+import { ManagementScreen, useManagementBoothId } from '../../features/booth/ui/ManagementScreen';
 import './management.css';
 
 const TYPE_LABEL: Record<SurveyQuestionType, string> = {
@@ -70,6 +70,27 @@ function BuilderTab({ boothId }: { boothId: number }) {
             disabled={saving}
             onChange={(e) => updateTitle(e.target.value)}
           />
+        </label>
+        <label className="mg-field">
+          <span className="mg-label">응답 보상 코인 (0 = 보상 없음)</span>
+          <input
+            className="mg-input"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            value={state.draft.rewardCoin}
+            disabled={saving}
+            aria-invalid={state.save.fieldError?.field === 'rewardCoin' || undefined}
+            onChange={(e) => updateRewardCoin(e.target.value === '' ? 0 : Number(e.target.value))}
+          />
+          {/* C-05: 보상이 걸린 부스 설문은 게스트 403 MEMBER_ONLY — 값을 넣는 화면에서 그 사실을 말한다 */}
+          {state.draft.rewardCoin > 0 && (
+            <span className="mg-hint">보상이 있는 설문은 회원만 참여할 수 있습니다 — 게스트는 응답할 수 없습니다.</span>
+          )}
+          {state.save.fieldError?.field === 'rewardCoin' && (
+            <span className="sc-alert" role="alert">{state.save.fieldError.message}</span>
+          )}
         </label>
       </section>
 
@@ -302,9 +323,8 @@ function ResultTab({ boothId }: { boothId: number }) {
 }
 
 export function SurveyManagementPage() {
-  const { boothId: boothIdParam } = useParams<{ boothId: string }>();
+  const boothId = useManagementBoothId();
   const [tab, setTab] = useState<'builder' | 'result'>('builder');
-  const boothId = Number(boothIdParam);
 
   // 라우트가 :boothId 없이 매칭될 수 없지만, 숫자가 아닌 값이 오면 조회 경로가 조용히 깨진다 —
   // 합성 id 를 만들어 덮던 자리(`booth-${boothId ?? '1'}`)를 없앤 대신 여기서 드러낸다
@@ -313,10 +333,9 @@ export function SurveyManagementPage() {
   }
 
   return (
-    <PageShell
+    <ManagementScreen
       title="설문 관리"
       subtitle="방문자에게 보여줄 설문을 만들고 응답을 확인합니다"
-      backTo={WORLD_RETURN_TO_MANAGEMENT}
       actions={
         <div className="mg-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'builder'} className={'mg-tab' + (tab === 'builder' ? ' mg-tab-on' : '')} onClick={() => setTab('builder')}>
@@ -329,6 +348,6 @@ export function SurveyManagementPage() {
       }
     >
       {tab === 'builder' ? <BuilderTab boothId={boothId} /> : <ResultTab boothId={boothId} />}
-    </PageShell>
+    </ManagementScreen>
   );
 }

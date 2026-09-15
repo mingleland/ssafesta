@@ -30,7 +30,7 @@ vi.mock('../../sessionManager', () => {
 });
 // 이 파일의 관심사는 종료 동반 하나다 — 같은 인스턴스를 쓰는 다른 축은 호출만 지운다.
 vi.mock('../../authBridge', () => ({ syncAccessToken: () => 'cleared' }));
-vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {} }));
+vi.mock('../../audioBridge', () => ({ syncAudioMute: () => {}, syncAudioVolume: () => {} }));
 
 const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi.fn(), Quit: async () => {} });
 const exitCalls = (i: UnityInstance) =>

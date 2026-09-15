@@ -9,8 +9,10 @@ import type { UnityInstance, UnityProgressListener } from '../../types';
 import { AUDIO_BRIDGE_OBJECT } from '../../audioBridge';
 import {
   MUSIC_MUTED_STORAGE_KEY,
+  MUSIC_VOLUME_STORAGE_KEY,
   __resetScreenAudioForTests,
   setMuted,
+  setMusicVolume,
 } from '../../../../features/audio/model/screenAudio';
 
 type Boot = { resolve: (i: UnityInstance) => void };
@@ -25,6 +27,7 @@ vi.mock('../../sessionManager', () => {
 const instance = (): UnityInstance => ({ SendMessage: vi.fn(), SetFullscreen: vi.fn(), Quit: async () => {} });
 const calls = (i: UnityInstance) => (i.SendMessage as ReturnType<typeof vi.fn>).mock.calls;
 const muteCalls = (i: UnityInstance) => calls(i).filter((c) => c[1] === 'SetMuted');
+const volumeCalls = (i: UnityInstance) => calls(i).filter((c) => c[1] === 'SetVolume');
 
 beforeEach(() => {
   boots.length = 0;
@@ -108,11 +111,57 @@ describe('음소거 승계 배선 (-557, #151)', () => {
     expect(muteCalls(inst)).toHaveLength(afterChange);
   });
 
-  it('볼륨은 보내지 않는다 — -463 · #140 축을 이 배선이 건드리지 않는다', async () => {
+  // 2026-09-14 (S15P21A604-733) 계약 변경. 여기 있던 '볼륨은 보내지 않는다' 는 폐기했다 —
+  // Unity AudioBridge.SetVolume 이 이미 있었고 FE 호출만 빠져 있었다.
+  it('mute 를 바꿔도 SetVolume 이 덩달아 늘지 않는다 — 두 채널은 독립이다', async () => {
     const { inst } = await renderBooted();
+    const before = volumeCalls(inst).length;
     act(() => { setMuted(true); });
     act(() => { setMuted(false); });
-    expect(calls(inst).some((c) => c[1] === 'SetVolume')).toBe(false);
+    expect(volumeCalls(inst)).toHaveLength(before);
+  });
+});
+
+describe('볼륨 승계 배선 (-733)', () => {
+  it('인스턴스가 서면 현재 볼륨을 먼저 알린다 — 기본값은 1 이다', async () => {
+    const { inst } = await renderBooted();
+    expect(volumeCalls(inst)).toEqual([[AUDIO_BRIDGE_OBJECT, 'SetVolume', '1']]);
+  });
+
+  it('화면에서 줄인 채로 진입하면 그 값이 넘어간다', async () => {
+    window.localStorage.setItem(MUSIC_VOLUME_STORAGE_KEY, '0.4');
+    __resetScreenAudioForTests();
+    const { inst } = await renderBooted();
+    expect(volumeCalls(inst)).toEqual([[AUDIO_BRIDGE_OBJECT, 'SetVolume', '0.4']]);
+  });
+
+  it('0~1 을 그대로 보낸다 — Unity 가 Mathf.Clamp01 로 받는다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { setMusicVolume(0.25); });
+    expect(volumeCalls(inst).at(-1)).toEqual([AUDIO_BRIDGE_OBJECT, 'SetVolume', '0.25']);
+  });
+
+  it('미준비 중에 바뀐 값은 인스턴스가 선 뒤 최신값 하나로만 전달된다', async () => {
+    const { UnityHost } = await import('../../UnityHost');
+    const inst = instance();
+    render(<UnityHost />);
+    act(() => { setMusicVolume(0.2); });
+    act(() => { setMusicVolume(0.6); });
+    await act(async () => { boots[0].resolve(inst); });
+    expect(volumeCalls(inst)).toEqual([[AUDIO_BRIDGE_OBJECT, 'SetVolume', '0.6']]);
+  });
+
+  it('인스턴스가 서기 전에는 보내지 않는다', async () => {
+    const { inst } = await renderBooting();
+    act(() => { setMusicVolume(0.5); });
+    expect(calls(inst)).toHaveLength(0);
+  });
+
+  it('음소거 중에 바꾼 값도 그대로 보낸다 — 복원은 Unity Apply() 몫이라 FE 가 막지 않는다', async () => {
+    const { inst } = await renderBooted();
+    act(() => { setMuted(true); });
+    act(() => { setMusicVolume(0.3); });
+    expect(volumeCalls(inst).at(-1)).toEqual([AUDIO_BRIDGE_OBJECT, 'SetVolume', '0.3']);
   });
 
   it('기존 bridge 에 회귀가 없다 — 토큰·입력 잠금 통지가 그대로 나간다', async () => {

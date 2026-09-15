@@ -211,9 +211,20 @@ public class LayoutValidator {
      *       <p>{@code requiresConfig} is deliberately left {@code true} for it —
      *       {@link LayoutPassageChecker} reads the same flag to decide which objects need a viewing
      *       band, and clearing it would drop laptops out of that check entirely (research R-10).
-     *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the kind of content cannot be checked yet
-     *       because the spec that owns it does not exist. Said out loud so "no error" is not
-     *       mistaken for "verified".
+     *       <p>{@code SURVEY_KIOSK} moved the same way (spec 010 C-06: the binding is per booth).
+     *       A booth holds at most one survey and {@code GET /booths/{boothId}/survey/run} finds it
+     *       by booth, so the kiosk's {@code configId} is a value nobody reads — judging the kiosk by
+     *       it warned about correctly configured booths and stayed quiet about the one case that
+     *       actually breaks: published kiosk, no survey, visitor gets "설문을 찾을 수 없습니다"
+     *       (GitLab #181). The predicate is now "does this booth have a survey".
+     *       <p>It leaves the chain outright rather than falling through like {@code LAPTOP}: with no
+     *       identifier to own, neither {@code CONFIG_NOT_OWNED} nor {@code CONFIG_UNVERIFIED} is
+     *       true of it any more. {@code requiresConfig} stays {@code true} for the same viewing-band
+     *       reason as above.
+     *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the server does not judge this kind of
+     *       content yet. Said out loud so "no error" is not mistaken for "verified". What is left
+     *       here is not a missing spec any more but a missing check: each kind gets its own line in
+     *       {@link LayoutConfigResolver} as its ownership question is settled.
      * </ul>
      */
     private void checkContentLinks(LayoutJson.LayoutDocument document, Long boothId,
@@ -233,6 +244,14 @@ public class LayoutValidator {
                 }
                 // Falls through to the configId chain on purpose: a LAPTOP should not carry one, and
                 // if it does, CONFIG_UNVERIFIED is how FE hears about it (계약 §3-1 통보 1).
+            } else if (type == LayoutObjectType.SURVEY_KIOSK) {
+                if (!configResolver.boothSurveyRegistered(boothId)) {
+                    result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
+                            "이 부스에 설문이 없습니다.");
+                }
+                // Unlike LAPTOP this does not fall through: the kiosk's configId identifies nothing
+                // (spec 010 C-06), so there is no owner to check and nothing left unverified.
+                continue;
             } else if (type.requiresConfig() && object.configId() == null) {
                 result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
                         type.name() + "에 연결된 콘텐츠가 없습니다.");

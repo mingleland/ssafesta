@@ -80,6 +80,8 @@ export type WorldInteractEvent =
        * `gameId` 로 "어떤 기능인가"가 축이다. 합치면 소비처가 `gameId` 유무로 다시 갈라야 해서
        * dispatcher 의 `switch (event.type)` 하나로 끝나는 성질을 잃는다.
        *
+       * 그 `WORLD_ARCADE_INTERACT` 수신부는 이제 바로 아래에 서 있다(S15P21A604-712).
+       *
        * `gameId` 는 내장 미니게임 식별자(지금은 `TIMER_STOP` 하나)이고 화면 선택에 쓴다.
        * `machineId` 는 씬 canonical id 로 로그·분석용이다 — FE 는 해석하지 않는다.
        *
@@ -90,6 +92,26 @@ export type WorldInteractEvent =
       type: 'WORLD_MINIGAME_INTERACT';
       gameId: string;
       machineId?: string;
+    }
+  | {
+      /**
+       * 광장 오락기 상호작용 — Game Studio 게시 게임 (S15P21A604-712, GitLab #135 · #56 ⓐ).
+       *
+       * 부스에 속하지 않아 `boothId`·`objectId` 가 없다. 같은 `onBoothInteract` 채널로 온다.
+       *
+       * **`machineId` 는 씬이 정한 canonical id 다** — 서버가 발급하지 않는다. 현재 실값은
+       * `plaza-arcade-01`·`plaza-arcade-02` 이고, Unity 는 이 값만 알고 `gameId` 를 모른다.
+       * 큐레이션이 바뀌어도 Unity 빌드가 바뀌지 않게 한 분담이다(spec 019 FR-017).
+       * FE 가 `GET /api/v1/arcade-machines/{machineId}` 로 어떤 게임인지 푼다.
+       *
+       * 위 `WORLD_MINIGAME_INTERACT`(#166)와 **다른 타입인 이유**는 그 주석에 적어 둔 그대로다 —
+       * 이쪽은 "어느 게임기인가"가 식별 축이고 게임 내용이 서버에서 온다.
+       *
+       * 입력 잠금은 Unity 가 F 를 받은 시점에 스스로 건다. FE 는 오버레이를 닫을 때
+       * `SetInputLocked('0')` 을 보내면 되고 그건 `UnityHost` 가 이미 하고 있다(-428·-450).
+       */
+      type: 'WORLD_ARCADE_INTERACT';
+      machineId: string;
     }
   | {
       /**
@@ -113,6 +135,25 @@ export type WorldInteractEvent =
       type: 'WORLD_BOOTH_CONTEXT';
       insideBooth: boolean;
       boothId?: number;
+    }
+  | {
+      /**
+       * 안내데스크 NPC — 이용 안내 화면 (S15P21A604-688, GitLab #184).
+       *
+       * **payload 가 없다.** 화면이 `boothId` 도 `npcId` 도 소비하지 않는다 — 안내 데스크가
+       * 하나뿐이고, 열리는 것은 부스에 속하지 않는 `WORLD_GUIDE` 오버레이다. 여러 곳이 생기면
+       * 그때 식별자를 싣는다(게임 파트도 같은 판단, #184).
+       *
+       * `WORLD_` 접두사인 이유는 `WORLD_EVENT_INTERACT`(-599)·`WORLD_MINIGAME_INTERACT`(#166)와
+       * 같다 — 부스 컨텍스트를 쓰지 않는 월드 상호작용이다.
+       *
+       * 말풍선("F 를 눌러 이용 안내를 보세요")은 Unity 가 월드 안에 그린다. FE 계약을 늘리지
+       * 않으려는 것이고 부스 간판·이름표와 같은 방식이다.
+       *
+       * ⚠️ Unity 송신부는 아직 develop 에 없다. `WORLD_EVENT_INTERACT` 와 같이 **FE 수신부가
+       * 먼저 서 있는** 상태이고, 게임 파트가 보내기 시작하면 이 자리가 그대로 실경로가 된다.
+       */
+      type: 'WORLD_GUIDE_INTERACT';
     };
 
 /** onBoothInteract 채널로 들어오는 모든 이벤트 */

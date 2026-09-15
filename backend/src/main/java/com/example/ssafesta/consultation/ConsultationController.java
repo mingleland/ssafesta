@@ -65,6 +65,7 @@ public class ConsultationController {
             @ApiResponse(responseCode = "201", description = "`requestId` 와 `expiresInSeconds`"),
             @ApiResponse(responseCode = "400", description = "`VALIDATION_FAILED` — `boothId` 누락"),
             @ApiResponse(responseCode = "403", description = "`MEMBER_ONLY` — 게스트다"),
+            @ApiResponse(responseCode = "404", description = "`BOOTH_NOT_FOUND` — 그런 부스가 없다"),
             @ApiResponse(responseCode = "409", description = "`CONSULTATION_REQUEST_PENDING` — 이 부스에 걸어 둔 요청이 이미 있다 · `BOOTH_LEASE_EXPIRED` — 임대가 끝난 부스다")})
     @PostMapping("/consultation/requests")
     @ResponseStatus(HttpStatus.CREATED)

@@ -5,17 +5,19 @@
   pointer-events: none;
   font-family: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
   color: #eaeefb;
-  z-index: 20;
+  z-index: var(--festa-z-world-hud);
 }
 .world-hud > * { pointer-events: auto; }
 
 .world-hud-guide {
   position: absolute;
-  left: 20px;
-  /* 좌하단 — Unity ControlsHintHud 가 단독 실행에서 그리는 자리와 같다(감사 항목 12).
-     두 실행 모드에서 안내가 다른 자리에 뜨면 같은 화면으로 읽히지 않는다. */
-  bottom: 20px;
-  width: 246px;
+  left: var(--festa-hud-margin-x);
+  /* 화면 하단 → 안전 여백 → 채팅 실제 높이 → 공통 간격 → 조작 안내 순서다. 채팅은 형제
+     레이어라 WorldPage가 --festa-world-chat-height 하나로만 연결한다(S15P21A604-740). */
+  bottom: calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap));
+  width: min(246px, calc(100vw - 2 * var(--festa-hud-margin-x)));
+  max-height: calc(100dvh - var(--festa-hud-margin-y) - var(--festa-world-chat-height, 0px) - var(--festa-hud-stack-gap));
+  overflow-y: auto;
   padding: 12px 14px 13px;
   border-radius: 14px;
   background: rgba(12, 16, 34, 0.72);
@@ -79,8 +81,8 @@
 
 .world-hud-guide-open {
   position: absolute;
-  left: 20px;
-  bottom: 20px;
+  left: var(--festa-hud-margin-x);
+  bottom: calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap));
   height: 32px;
   padding: 0 14px;
   border-radius: 999px;
@@ -100,8 +102,8 @@
    좌하단 중앙은 dev 상호작용 바, 우상단은 상담 Quick Access 다 — 남는 모서리가 여기 하나다. */
 .world-hud-help {
   position: absolute;
-  right: 20px;
-  bottom: 20px;
+  right: var(--festa-hud-margin-x);
+  bottom: var(--festa-hud-margin-y);
   width: 40px;
   height: 40px;
   display: grid;
@@ -117,4 +119,42 @@
 .world-hud-help:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
 @media (prefers-reduced-transparency: reduce) {
   .world-hud-help { background: #10142a; backdrop-filter: none; }
+}
+
+/* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 **같은 우상단 열**에 한 칸 아래로 쌓는다 —
+   좌표·크기를 같은 토큰으로 잡아야 화면이 커져도 둘이 어긋나지 않는다(consultationQuickAccess.css 와
+   같은 근거). `.world-hud` 는 클릭을 통과시키므로 버튼만 다시 받는다. */
+.world-hud-fullscreen {
+  position: absolute;
+  right: var(--festa-hud-margin-x);
+  top: calc(var(--festa-hud-margin-y) + var(--festa-control-size) + var(--festa-hud-stack-gap));
+  width: var(--festa-control-size);
+  height: var(--festa-control-size);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(12, 16, 34, 0.72);
+  backdrop-filter: blur(8px);
+  color: #eaeefb;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.world-hud-fullscreen svg { width: 48%; height: 48%; }
+.world-hud-fullscreen:hover { background: rgba(20, 26, 52, 0.85); }
+.world-hud-fullscreen:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
+@media (prefers-reduced-transparency: reduce) {
+  .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
+}
+
+/* 좁은 화면은 하단 중앙 Exit가 넓어진 채팅과 가로로 공존할 수 없다. 채팅 위 Exit, 그 위
+   조작 안내로 한 줄씩 쌓고, 안내는 남은 높이만 쓴다. */
+@media (max-width: 720px) {
+  .world-hud-guide,
+  .world-hud-guide-open {
+    bottom: calc(var(--festa-hud-context-bottom) + var(--festa-hud-context-height) + var(--festa-hud-stack-gap));
+  }
+  .world-hud-guide {
+    max-height: calc(100dvh - var(--festa-hud-context-bottom) - var(--festa-hud-context-height) - var(--festa-hud-stack-gap));
+  }
 }

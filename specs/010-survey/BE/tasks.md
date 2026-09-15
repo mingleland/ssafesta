@@ -29,7 +29,7 @@
 | 익명 여부·1인1응답 **토글** (FR-003) | 스키마 컬럼도 FE 토글도 없다. 항상 1인1응답·항상 익명 고정으로 FR-009·SC-003을 구조적으로 충족한다 |
 | 지원서 제출자별 상세 조회 | **C-03 미결** + 티켓 없음. 주관식 항목에 `responseId`만 실어 열쇠를 남긴다 |
 | 집계 캐시·집계 테이블 | C-04 — MVP는 원본 실시간. 캐시는 SC-001을 지킬 자리를 하나 늘린다 |
-| `LayoutConfigResolver`에 `SURVEY_KIOSK` 검증 추가 | 설문 바인딩이 부스 기준(C-06)이라 `configId`를 쓰지 않는다. `CONFIG_UNVERIFIED` 경고 그대로 |
+| ~~`LayoutConfigResolver`에 `SURVEY_KIOSK` 검증 추가~~ | **해소됨 — `S15P21A604-699`** (2026-09-14). 부스 기준(C-06) 그대로지만 판정은 `configId`가 아니라 **그 부스의 설문 존재 여부**다. `CONFIG_NOT_LINKED` 경고, 게시는 통과 |
 | `booth_daily_metrics.survey_response_count` 갱신 | 대시보드 `S15P21A604-501` 몫 |
 | 고급 분석 (교차·추이·AI·상관·전환율·내보내기) | **FR-013이 명시적으로 제외** |
 | `ProjectService`·`BoothQueryService`·`BoothLayoutQueryService`의 방문자 게이트 복제본 리팩터링 | 가드에 `requireVisitorVisible`을 **추가**하고 설문만 쓴다. 동결된 세 곳을 건드리면 회귀 위험만 늘어난다 (R-07) |

@@ -21,6 +21,7 @@
 코드는 그대로고 이미지만 다시 말면 되면 **`Festa/배포/Docker 이미지만 갱신`** 을 쓴다.
 
 ---
+<!-- CI rebuild trigger: this note has no runtime or build effect. -->
 
 ## (참고) 수동 절차
 

@@ -86,6 +86,8 @@ services:
       WEBGL_RELEASE_ROOT: /srv/festa/webgl
       WEBGL_PUBLIC_BASE_URL: ${WEBGL_PUBLIC_BASE_URL:-https://demo.ssafesta.world/unity}
       WEBGL_RETENTION_COUNT: ${WEBGL_RETENTION_COUNT:-5}
+      R2_BACKUP_ENDPOINT: ${R2_BACKUP_ENDPOINT:-}
+      R2_BACKUP_BUCKET: ${R2_BACKUP_BUCKET:-}
     depends_on:
       image-transfer-init:
         condition: service_completed_successfully

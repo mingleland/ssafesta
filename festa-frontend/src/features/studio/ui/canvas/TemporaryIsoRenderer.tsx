@@ -7,8 +7,9 @@ import type { LayoutObject } from '../../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
-import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
-import { dragKind } from '../../model/studioMode';
+import { clampObjectToBooth, normalizeRotation, snap } from '../../lib/coords';
+import { dragKind, exceedsDragThreshold } from '../../model/studioMode';
+import { canRotateFrom } from './isoCamera';
 import type { BoothRendererProps } from './canvasTypes';
 import { FALLBACK_BOX, OBJECT_FILL, OBJECT_LABEL, shade } from './objectAppearance';
 import './isoRenderer.css';
@@ -50,11 +51,15 @@ interface DragState {
   origin: { x: number; z: number };
   grab: { x: number; z: number };
   startRotation: number;
+  /** pointerdown 이 일어난 화면 좌표 — 손떨림과 진짜 드래그를 가르는 기준점 (S15P21A604-689) */
+  startClient: { x: number; y: number };
 }
 
 export function TemporaryIsoRenderer(p: BoothRendererProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
+  // 임계값을 넘었는지는 렌더에 영향이 없으므로 ref 로 둔다 — state 로 두면 드래그 첫 프레임마다 한 번 더 그린다
+  const armed = useRef(false);
   // 겹침은 배치가 바뀔 때만 다시 센다 — R3F 렌더러와 같은 함수를 쓴다(표시가 갈리면 안 된다)
   const overlapping = useMemo(() => overlappingObjectIds(p.objects), [p.objects]);
 
@@ -83,12 +88,27 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
     p.onSelect(obj.objectId);
     const w = toWorld(e);
     if (!w) return;
+    // 피벗 위를 잡은 회전은 각도가 정의되지 않아 미세 이동이 수십 도로 커밋된다 (S15P21A604-689)
+    if (kind === 'rotate' && !canRotateFrom({ x: obj.position.x, z: obj.position.z }, w)) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    setDrag({ kind, objectId: obj.objectId, origin: { x: obj.position.x, z: obj.position.z }, grab: w, startRotation: obj.rotationY });
+    armed.current = false;
+    setDrag({
+      kind,
+      objectId: obj.objectId,
+      origin: { x: obj.position.x, z: obj.position.z },
+      grab: w,
+      startRotation: obj.rotationY,
+      startClient: { x: e.clientX, y: e.clientY },
+    });
   }
 
   function onPointerMove(e: ReactPointerEvent) {
     if (!drag) return;
+    // 임계값을 넘기 전에는 선택만 한 것으로 본다 (S15P21A604-689)
+    if (!armed.current) {
+      if (!exceedsDragThreshold(drag.startClient, { x: e.clientX, y: e.clientY })) return;
+      armed.current = true;
+    }
     const w = toWorld(e);
     if (!w) return;
     if (drag.kind === 'move') {
@@ -98,7 +118,15 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
         x = snap(x);
         z = snap(z);
       }
-      const c = clampToBooth(x, z, p.bounds);
+      // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+      const moving = p.objects.find((o) => o.objectId === drag.objectId);
+      const c = clampObjectToBooth(
+        x,
+        z,
+        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving?.rotationY ?? 0,
+        p.bounds,
+      );
       p.onMove(drag.objectId, Number(c.x.toFixed(3)), Number(c.z.toFixed(3)));
     } else {
       // 월드 평면상의 각도로 잰다 — 화면 각도로 재면 아이소 왜곡이 그대로 들어간다
@@ -110,7 +138,10 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
     }
   }
 
-  const endDrag = () => setDrag(null);
+  const endDrag = () => {
+    armed.current = false;
+    setDrag(null);
+  };
 
   // ── 정적 지오메트리 ──
   const floor = [proj(-halfW, 0, -halfD), proj(halfW, 0, -halfD), proj(halfW, 0, halfD), proj(-halfW, 0, halfD)];

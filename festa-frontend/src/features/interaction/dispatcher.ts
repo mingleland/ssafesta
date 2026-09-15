@@ -42,6 +42,11 @@ function dispatch(event: UnityInteractEvent): void {
       // 두 값을 그대로 실어 둔다 — 종류가 늘면 gameId 로 갈리고, machineId 는 어느 기계였는지 되짚는 값이다.
       openVisitorOverlay('MINIGAME', { gameId: event.gameId, machineId: event.machineId });
       return;
+    case 'WORLD_ARCADE_INTERACT':
+      // 광장 오락기 (S15P21A604-712, #135). 새 overlay kind 를 만들지 않는다 — 부스 포털과
+      // 화면이 같고 식별자만 다르다. GameOverlay 가 machineId 유무로 어느 경로인지 가른다.
+      openVisitorOverlay('GAME', { machineId: event.machineId });
+      return;
     case 'WORLD_BOOTH_CONTEXT':
       // **화면을 열지 않는 유일한 case 다.** 상호작용이 아니라 위치 알림이라, 받아 둔 값을
       // 부스 나가기 버튼이 노출 조건으로 쓴다 (S15P21A604-627, #174).
@@ -52,6 +57,12 @@ function dispatch(event: UnityInteractEvent): void {
       // 관리 화면은 사용자가 직접 여는 별도 레이어다(gameClientUi) — !240 설계 그대로.
       // 대상 부스는 이 화면이 GET /booths/mine 으로 resolve 한다.
       openManagement();
+      return;
+    case 'WORLD_GUIDE_INTERACT':
+      // 안내데스크 NPC (S15P21A604-688, #184). 새 화면을 만들지 않는다 — 월드 첫 진입에서
+      // WorldGuideLauncher 가 1회 자동으로 여는 그 오버레이를 같은 키로 다시 연다.
+      // payload 를 넘기지 않는 이유는 WORLD_EVENT_INTERACT 와 같다: 화면이 읽을 값이 없다.
+      openVisitorOverlay('WORLD_GUIDE', {});
       return;
     default:
       return;

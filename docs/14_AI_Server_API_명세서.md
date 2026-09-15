@@ -353,6 +353,14 @@ Spring은 FastAPI 처리 요청에서 반환받은 `jobId`를 다른 후속 처�
 
 FastAPI는 Summary만 생성하며 Staff 선택·상담방 생성은 Spring이 담당한다.
 
+#### 오류
+
+| 응답 | 코드 | 설명 |
+|---|---|---|
+| `401` | `INVALID_SERVICE_TOKEN` | Spring→FastAPI Service Token 누락·오류 |
+| `404` | `CONVERSATION_NOT_FOUND` | Conversation 없음/TTL 만료 |
+| `503` | `LLM_TIMEOUT` / `LLM_PROVIDER_ERROR` / `HANDOFF_SUMMARY_PARSE_FAILED` | 요약 생성 실패 |
+
 ---
 
 ## 10. Agent Test — P2
@@ -458,6 +466,7 @@ Codec, Streaming, Provider는 TBD다.
 | `LLM_PROVIDER_ERROR` | Provider 오류 | `true` |
 | `STREAM_CLOSED` | Streaming 비정상 종료 | `true` |
 | `RATE_LIMITED` | 요청 제한 — `Retry-After` 또는 `retryAfterSeconds` 제공 | `true` |
+| `HANDOFF_SUMMARY_PARSE_FAILED` | Handoff Summary 생성 시 LLM 응답이 지정된 JSON 형식이 아님 | `true` |
 | `INTERNAL_ERROR` | 내부 오류 | `true` |
 
 ---

@@ -22,6 +22,30 @@
 | `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT now` | `Instant createdAt` | `updatable = false` |
 | `updated_at` | `TIMESTAMPTZ NOT NULL DEFAULT now` | `Instant updatedAt` | **애플리케이션이 갱신한다** (§5) |
 
+### AI 가 추출해 채우는 칼럼 (V35, `S15P21A604-597`)
+
+사람이 입력하는 필드가 아니다. 문서 임베딩이 끝난 뒤 AI 가 뽑아 보내며, **프로젝트 등록·수정
+API 로는 바뀌지 않고 공개 응답에도 실리지 않는다** — 지금의 소비자는 AI 의 rule-based 단축
+응답 하나뿐이라(`spring-agent-config-api.yaml`), 공개 계약에 필드를 더하면 다른 파트가 반응해야
+한다. FE 가 화면에 쓰겠다고 하면 그때 연다.
+
+| 칼럼 (V35) | 타입 | Java | 규칙 |
+|---|---|---|---|
+| `target_audience` | `TEXT` | `String targetAudience` | AI 추출. 2000자 상한은 **서버가** 본다 |
+| `tech_stack` | `TEXT` | `String techStack` | AI 추출. 위와 같다 |
+| `facts_document_id` | `BIGINT REFERENCES ai_documents(id) ON DELETE SET NULL` | `Long factsDocumentId` | 근거 문서. 문서가 지워져도 값은 남는다 |
+| `facts_job_id` | `BIGINT` | `Long factsJobId` | **최신성 판정의 전부.** `jobId` 가 단조 증가하므로 그 자체가 순서다 |
+| `facts_updated_at` | `TIMESTAMPTZ` | `Instant factsUpdatedAt` | 언제 갱신됐나 |
+
+**`VARCHAR` 이 아니라 `TEXT` 인 이유**: AI 가 뽑아 보내는 자유 텍스트라 상한을 DB 에 박으면
+언젠가 조용히 잘린다 — 아바타 코드에서 겪은 것과 같은 실패다(헌법 23조, T-24). 길이는 서버가
+보고 넘치면 `400` 으로 답한다.
+
+| # | 불변식 | 무엇이 지키나 |
+|:--:|---|---|
+| I-5 | 오래된 Job 의 추출이 최신 값을 덮지 않는다 | `Project.factsAreOlderThan(jobId)`. 도착 순서가 아니라 `facts_job_id` 비교 |
+| I-6 | 두 값은 한 문서에서 함께 온다 | `applyFacts` 가 둘을 같이 갈아끼운다. 한쪽만 보낸 요청도 나머지를 남기지 않는다 |
+
 **`project_links` 테이블은 만들지 않는다** (C-05, R-01). 링크는 위 3칼럼이다.
 
 **`project_likes`는 이 작업 범위 밖이다.** V1에 테이블이 있지만 좋아요 수는

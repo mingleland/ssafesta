@@ -86,11 +86,12 @@ festa-ai/app/
 ├── api/v1/documents.py                         # Spring 처리 요청 접수
 ├── clients/                                    # Spring 결과·검색·설정 client
 ├── services/document_processing_service.py
-├── workers/document_worker.py
+├── services/document_processing_orchestrator.py # attempt 실행·heartbeat·finalize/failed 보고
+├── workers/document_task_supervisor.py         # attempt 중복 방지·동시성·graceful shutdown
 └── providers/{storage,document_parser,embedding}.py
 ```
 
-FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코드는 cutover 후 제거한다.
+FastAPI의 `app/db`, Alembic migration, DB repository 기반 pickup/recovery 코드는 cutover로 이미 제거됐다 (T092, S15P21A604-700).
 
 ## Detailed Design
 

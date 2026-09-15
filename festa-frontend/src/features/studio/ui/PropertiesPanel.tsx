@@ -7,12 +7,15 @@ import { useEffect, useState } from 'react';
 import type { LayoutObject } from '../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
-import { clampToBooth, normalizeRotation } from '../lib/coords';
+import { clampObjectToBooth, normalizeRotation } from '../lib/coords';
 import { IcTrash } from './shell/icons';
 
 interface Props {
   object: LayoutObject;
   bounds: { width: number; depth: number };
+  // 부스의 등록된 AI 직원 — AI_AGENT 타입은 이 값으로 자동 연결되고 숫자 입력을 보여주지 않는다(S15P21A604-732)
+  aiAgent?: { agentId: number; name: string } | null;
+  aiAgentLoading?: boolean;
   onMove: (x: number, z: number) => void;
   onRotate: (rotationY: number) => void;
   onLinkContent: (configId: number | undefined) => void;
@@ -33,7 +36,17 @@ const TYPE_LABEL: Record<string, string> = {
   DECORATION: '장식',
 };
 
-export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkContent, onSetAssetCode, onRemove }: Props) {
+export function PropertiesPanel({
+  object,
+  bounds,
+  aiAgent = null,
+  aiAgentLoading = false,
+  onMove,
+  onRotate,
+  onLinkContent,
+  onSetAssetCode,
+  onRemove,
+}: Props) {
   // 서버가 이 편집기가 모르는 타입을 보낼 수 있다(#56 GAME_PORTAL 등) — 판정 대신 안내만 하고
   // 위치·회전 편집은 계속 허용한다(SC-005: 미지 타입이 있어도 나머지는 정상 동작해야 한다, T026)
   const info = OBJECT_TYPE_INFO[object.type];
@@ -59,7 +72,8 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
     const x = Number(nextXText);
     const z = Number(nextZText);
     if (!Number.isFinite(x) || !Number.isFinite(z)) return; // 비숫자 입력단 차단 — 도달 자체를 막는다(FE 사전 검증 4)
-    const clamped = clampToBooth(x, z, bounds);
+    // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+    const clamped = clampObjectToBooth(x, z, local, object.rotationY, bounds);
     onMove(clamped.x, clamped.z);
   }
 
@@ -130,6 +144,19 @@ export function PropertiesPanel({ object, bounds, onMove, onRotate, onLinkConten
             <label className="studio-input">
               <input type="text" value={object.assetCode ?? ''} aria-label="자산 코드" placeholder="외형 코드" onChange={(e) => onSetAssetCode(e.target.value.trim() === '' ? undefined : e.target.value)} />
             </label>
+          </>
+        ) : object.type === 'AI_AGENT' ? (
+          // 부스당 AI 직원은 한 명뿐이라 고를 게 없다 — 숫자를 직접 입력받는 대신 등록된
+          // AI 직원으로 항상 자동 연결한다(StudioPage의 자가치유 effect). 여기서는 그 결과만 보여준다.
+          <>
+            <span className="studio-field-label">연결된 AI 직원</span>
+            {aiAgent ? (
+              <p className="studio-kv"><span className="studio-kv-label">이름</span><span>{aiAgent.name}</span></p>
+            ) : aiAgentLoading ? (
+              <p className="studio-note">확인하는 중...</p>
+            ) : (
+              <p className="studio-note">등록된 AI 직원이 없습니다 — 내 부스 관리에서 AI 직원을 먼저 등록하세요.</p>
+            )}
           </>
         ) : info.linksConfigId ? (
           <>

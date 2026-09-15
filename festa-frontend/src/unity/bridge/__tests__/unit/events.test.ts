@@ -38,4 +38,14 @@ describe('unity bridge — onBoothInteract', () => {
     expect(received).toEqual([]);
     unsubscribe();
   });
+
+  it('WORLD_ARCADE_INTERACT를 machineId 하나만으로 전달한다 — 부스 필드를 붙이지 않는다(S15P21A604-712, #135)', () => {
+    const received: UnityInteractEvent[] = [];
+    const unsubscribe = subscribeBoothInteract((event) => received.push(event));
+
+    emit(JSON.stringify({ type: 'WORLD_ARCADE_INTERACT', machineId: 'plaza-arcade-01' }));
+
+    expect(received).toEqual([{ type: 'WORLD_ARCADE_INTERACT', machineId: 'plaza-arcade-01' }]);
+    unsubscribe();
+  });
 });
