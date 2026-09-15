@@ -17,6 +17,8 @@ import { getAiAgent } from '../../../entities/aiAgent/api';
 import { formatRemaining, remainingMs } from '../../../entities/booth/remaining';
 import { OverlayEmpty, OverlayError, OverlayFrame, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { useSession } from '../../auth/model/session';
+import { openManagementDetail } from '../../world/model/worldScreen';
+import type { ManagementPanel, ManagementPanelKind } from '../../world/model/managementPanel';
 import { BoothMiniPreview } from './BoothMiniPreview';
 import { LeaseCancelDialog } from './LeaseCancelDialog';
 import { isStaleViewError, useCancelLease } from '../model/cancelLease';
@@ -94,8 +96,14 @@ export function BoothManagementOverlay({ onClose }: Props) {
     enabled: boothId !== null,
   });
 
-  // 관리 작업 화면으로 나간다. 그 화면들은 WORLD_RETURN_TO_MANAGEMENT 로 돌아오므로
-  // World 에 도착하면 이 관리 화면이 다시 열린다(user-flow-decisions §18.3·§19).
+  // 관리 상세로 들어간다. **route 로 나가지 않는다** (S15P21A604-755) — 나가면 월드가 화면에서
+  // 사라지고, 돌아오는 길을 URL 로 다시 만들어야 했다. 지금은 이 화면 위에 얹히고 ESC 한 번이면
+  // 여기로 돌아온다. deep-link 는 route 가 그대로 받는다.
+  function openPanel(kind: ManagementPanelKind, boothId: number) {
+    openManagementDetail({ kind, boothId } as ManagementPanel);
+  }
+
+  // 부스가 없을 때 임대 화면처럼 월드 밖으로 나가는 자리는 그대로 route 다
   function go(path: string) {
     onClose();
     navigate(path);
@@ -106,7 +114,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
       setShowAgentGate(true);
       return;
     }
-    go(`/app/booths/${boothId}/ai-agent`);
+    openPanel('ai-agent', boothId as number);
   }
 
   const body = (() => {
@@ -177,7 +185,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
             <button
               type="button"
               className="ov-btn ov-btn-primary bm-studio"
-              onClick={() => go(`/app/studio/${myBooth.boothId}`)}
+              onClick={() => openPanel('studio', myBooth.boothId)}
             >
               부스 스튜디오 열기
             </button>
@@ -188,17 +196,17 @@ export function BoothManagementOverlay({ onClose }: Props) {
           <SectionRow
             label="PROJECT"
             summary="전시 프로젝트 등록·수정"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/project`)}
+            onOpen={() => openPanel('project', myBooth.boothId)}
           />
           <SectionRow
             label="SURVEY"
             summary="설문 편집·응답 결과"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/survey`)}
+            onOpen={() => openPanel('survey', myBooth.boothId)}
           />
           <SectionRow
             label="CONSULTATION"
             summary="상담 요청 운영"
-            onOpen={() => go(`/app/booths/${myBooth.boothId}/consultation`)}
+            onOpen={() => openPanel('consultation', myBooth.boothId)}
           />
           {/* AI 직원도 다른 세 항목과 같은 drill-down — 문서 업로드가 있어 화면이 길어지므로
               내 부스 관리 카드 안에 펼치지 않고 별도 화면으로 연다. */}
@@ -271,7 +279,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
                 className="ov-btn ov-btn-primary"
                 onClick={() => {
                   setShowAgentGate(false);
-                  go(`/app/booths/${myBooth.boothId}/ai-agent`);
+                  openPanel('ai-agent', myBooth.boothId);
                 }}
               >
                 AI 직원 등록하러 가기

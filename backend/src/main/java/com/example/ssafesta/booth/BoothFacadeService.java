@@ -22,6 +22,8 @@ public class BoothFacadeService {
     private static final Set<String> THEME_CODES = Set.of("DEFAULT", "SSAFY_BLUE", "WARM", "MONO");
     private static final Pattern HEX_COLOR = Pattern.compile("#[0-9A-Fa-f]{6}");
     private static final int MAX_SIGN_TEXT = 60;
+    /** {@code booths.name} is {@code VARCHAR(100)} — the same limit the column already enforces. */
+    private static final int MAX_NAME = 100;
 
     private final BoothAccessGuard accessGuard;
 
@@ -35,6 +37,7 @@ public class BoothFacadeService {
         // changing something nobody can see — and the same predicate decides both.
         Booth booth = accessGuard.requireActiveEditor(boothId, userId);
 
+        String name = validatedName(command.name());
         String themeCode = command.themeCode() == null ? "DEFAULT" : command.themeCode();
         if (!THEME_CODES.contains(themeCode)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "지원하지 않는 테마입니다: " + themeCode);
@@ -46,8 +49,36 @@ public class BoothFacadeService {
         }
         HttpUrlValidator.validateHttpsOnly(command.logoUrl(), "logoUrl", "로고");
 
+        if (name != null) {
+            booth.changeName(name);
+        }
         booth.changeFacade(themeCode, primaryColor, command.signText(), command.logoUrl());
         return FacadeView.of(booth);
+    }
+
+    /**
+     * {@code null} means "leave the name alone". Every other value is checked and saved.
+     *
+     * <p><b>The one field of this request an omission does not clear</b>, and deliberately so.
+     * {@code booths.name} is {@code NOT NULL}, so clearing it on omission is a 500; demanding the key
+     * instead would turn every save from the studio panel that shipped before this field existed —
+     * four keys, no name — into a 400 until FE catches up. The asymmetry buys both, and the contract
+     * says so out loud (contracts/layout-api.md §6).
+     *
+     * <p>An explicit blank is a different statement from an omission, and is refused: the slot list
+     * and staff invitations put this string in front of people who never opened the booth.
+     */
+    private String validatedName(String name) {
+        if (name == null) {
+            return null;
+        }
+        if (name.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "부스 이름을 입력해 주세요.");
+        }
+        if (name.length() > MAX_NAME) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "부스 이름은 " + MAX_NAME + "자까지입니다.");
+        }
+        return name;
     }
 
     /**
@@ -76,8 +107,12 @@ public class BoothFacadeService {
         return normalized;
     }
 
-    @Schema(description = "외관 값 전체. 보내지 않은 필드는 비워진다")
+    @Schema(description = "외관 값 전체. 보내지 않은 필드는 비워진다 — **`name` 만 예외로 유지된다**")
     public record FacadeCommand(
+            @Schema(description = "부스 이름. 1~100자. **생략하거나 `null` 이면 현재 이름을 그대로 둔다** — "
+                    + "비워지는 다른 네 필드와 규칙이 다르다. 빈 문자열·공백만 있는 값은 400",
+                    maxLength = 100, example = "AI 프로젝트 전시관")
+            String name,
             @Schema(description = "외벽 테마. 생략하면 `DEFAULT`",
                     allowableValues = {"DEFAULT", "SSAFY_BLUE", "WARM", "MONO"}, example = "SSAFY_BLUE")
             String themeCode,

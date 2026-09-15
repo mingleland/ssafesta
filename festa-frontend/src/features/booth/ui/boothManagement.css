@@ -185,3 +185,11 @@
   .bm-row-summary { grid-column: 1 / -1; }
   .bm-field-grid { grid-template-columns: 1fr; }
 }
+
+/* Studio 는 자기 Shell 이 화면 전체를 쓴다 — OverlayFrame 에 넣으면 캔버스가 갇힌다.
+   월드 위 최상단 레이어로 띄우고 프레임은 씌우지 않는다 (S15P21A604-755). */
+.bm-panel-full {
+  position: fixed;
+  inset: 0;
+  z-index: var(--festa-z-overlay, 60);
+}

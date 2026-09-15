@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { __resetSessionForTests, setMemberSession } from '../../../auth/model/session';
+import { __resetGameClientUiForTests, getGameClientUiSnapshot } from '../../../world/model/gameClientUi';
 
 const getMyBooth = vi.fn();
 const getBooth = vi.fn();
@@ -42,6 +43,7 @@ beforeEach(() => {
   getBooth.mockReset().mockResolvedValue({ facade: null });
   getAiAgent.mockReset();
   navigate.mockReset();
+  __resetGameClientUiForTests();
   setMemberSession('member-token', future());
 });
 afterEach(() => {
@@ -81,25 +83,32 @@ describe('AI 직원 행 — 미등록 게이트 (-724)', () => {
     await openGate(client);
 
     expect(navigate).not.toHaveBeenCalled();
+    expect(getGameClientUiSnapshot().managementPanel).toBeNull();
   });
 
-  it('팝업의 등록 버튼은 기존 등록 페이지로 보낸다', async () => {
+  // -755 로 상세가 route 에서 오버레이 패널로 옮겨졌다. 게이트가 지키는 것은 그대로다 —
+  // 미등록이면 막고, 통과하면 AI 직원 화면을 연다. 여는 수단만 navigate 에서 패널로 바뀌었다.
+  it('팝업의 등록 버튼은 AI 직원 패널을 연다', async () => {
     getAiAgent.mockResolvedValue(null);
     const { client } = await renderOverlay();
 
     await openGate(client);
     fireEvent.click(screen.getByRole('button', { name: 'AI 직원 등록하러 가기' }));
 
-    expect(navigate).toHaveBeenCalledWith('/app/booths/42/ai-agent');
+    expect(getGameClientUiSnapshot().managementPanel).toEqual({ kind: 'ai-agent', boothId: 42 });
+    // 월드를 떠나지 않는다 — 그것이 이 변경의 목적이다
+    expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('등록돼 있으면 팝업 없이 바로 이동한다', async () => {
+  it('등록돼 있으면 팝업 없이 바로 연다', async () => {
     getAiAgent.mockResolvedValue({ agentId: 1, boothId: 42 });
     await renderOverlay();
 
     fireEvent.click(await screen.findByText('AI 직원'));
 
-    expect(navigate).toHaveBeenCalledWith('/app/booths/42/ai-agent');
+    await waitFor(() =>
+      expect(getGameClientUiSnapshot().managementPanel).toEqual({ kind: 'ai-agent', boothId: 42 }),
+    );
     expect(screen.queryByText('AI 직원 등록이 필요합니다.')).toBeNull();
   });
 });
