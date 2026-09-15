@@ -435,8 +435,10 @@ namespace Festa.World
             float d = delta.magnitude;
             if (d < 0.05f) { _occluded = false; return false; }
 
-            // 끝점을 살짝 당긴다 — 머리 바로 옆 벽에 스치는 것까지 가림으로 치면 붙어 설 때 깜빡인다.
-            int n = Physics.RaycastNonAlloc(origin, delta / d, _occlusionHits, d - 1.5f, ~0, QueryTriggerInteraction.Ignore);
+            // 접촉 오차만 제외한다. 1.5u를 빼면 이름표가 벽 가까이에 있을 때
+            // 그 벽 자체가 광선 범위에서 빠져 글자가 벽을 뚫고 남는다.
+            float rayDistance = Mathf.Max(0.05f, d - OcclusionEndpointInset);
+            int n = Physics.RaycastNonAlloc(origin, delta / d, _occlusionHits, rayDistance, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < n; i++)
             {
                 var t = _occlusionHits[i].transform;
@@ -454,7 +456,8 @@ namespace Festa.World
 
         /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
         const int OcclusionInterval = 3;
-        static readonly RaycastHit[] _occlusionHits = new RaycastHit[8];
+        const float OcclusionEndpointInset = 0.1f;
+        static readonly RaycastHit[] _occlusionHits = new RaycastHit[32];
         int _occlusionFrame = -100;
         bool _occluded;
 
@@ -472,7 +475,7 @@ namespace Festa.World
             {
                 var list = new System.Collections.Generic.List<Renderer>();
                 foreach (var r in GetComponentsInChildren<Renderer>(true))
-                    if (r != null && !(r is TMPro.TMP_SubMesh) && !r.transform.IsChildOf(_root) && r.gameObject.name != "__FestaOutline") list.Add(r);
+                    if (r != null && !r.transform.IsChildOf(_root) && r.gameObject.name != "__FestaOutline") list.Add(r);
                 _bodyRenderers = list.ToArray();
                 _bodyRefreshFrame = Time.frameCount;
             }
