@@ -151,6 +151,21 @@ public class Booth {
         this.updatedAt = Instant.now();
     }
 
+    /**
+     * The booth's own name, fixed at creation until now (S15P21A604-756).
+     *
+     * <p>Separate from {@link #changeFacade} even though one request carries both, because this is
+     * the one {@code NOT NULL} column of the set: the other four are cleared by a save that omits
+     * them and this one cannot be. Where "omitted" turns into "keep the current name" is
+     * {@link BoothFacadeService}; the entity only ever receives a value it may store.
+     *
+     * <p>Stored verbatim, like {@link #changeHomepageUrl} — no trim, no case folding.
+     */
+    void changeName(String name) {
+        this.name = name;
+        this.updatedAt = Instant.now();
+    }
+
     void changeFacade(String themeCode, String primaryColor, String signText, String logoUrl) {
         this.facadeThemeCode = themeCode;
         this.facadePrimaryColor = primaryColor;
