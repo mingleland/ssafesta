@@ -154,6 +154,9 @@ namespace Festa.Avatar
         void ShowPurchaseOrNotice(AvatarItemDefinition item, string displayName)
         {
             CloseColorPopup();
+            // 이미 떠 있는 구매 창이 있으면 먼저 닫아 그쪽 미리보기를 되돌린다 — 그래야
+            // 아래에서 찍는 스냅샷이 "미리보기 이전" 의 내 외형이 된다.
+            AvatarPurchaseDialog.CloseExisting();
             if (item == null) { ShowLockedNotice(); return; }
 
             if (AvatarOwnership.State == AvatarOwnershipState.Failed)
@@ -179,13 +182,43 @@ namespace Festa.Avatar
 
             string label = !string.IsNullOrEmpty(entry.Name) ? entry.Name : displayName;
             int key = AvatarOwnership.OwnershipKey(item);
+            // **사기 전에 입혀 본다** (사용자 지시 2026-09-15). 썸네일만 보고 결제하게 두면
+            // 실제 착용 모습과 다른 것을 사게 된다. 구매 창이 열려 있는 동안만 임시로 입히고,
+            // 사지 않고 닫으면 원래 외형으로 정확히 되돌린다.
+            var beforePreview = _config;
+            bool previewing = TryPreviewItem(item);
             AvatarPurchaseDialog.Open(label, entry.Price, entry.ItemId, key, _ =>
             {
                 // 산 즉시 팔레트를 다시 그린다 — 자물쇠가 풀린 것이 바로 보여야 한다.
                 RefreshWardrobe();
                 RefreshItems();
                 SetStatus($"{label} 을(를) 구매했어요. 이제 입어 볼 수 있어요.");
+            },
+            purchased =>
+            {
+                // 샀으면 입어 본 그대로 둔다 — 이미 내 것이다. 안 샀으면 되돌린다.
+                if (!previewing || purchased) return;
+                _config = beforePreview;
+                Apply();
+                RefreshAll();
+                SetStatus("구매를 취소했어요. 원래 모습으로 되돌렸습니다.");
             });
+        }
+
+        /// <summary>
+        /// 잠긴 항목을 구매 창이 떠 있는 동안만 임시로 입힌다.
+        ///
+        /// <para>잠긴 것을 <c>_config</c> 에 넣는 것은 여기뿐이고, 되돌리기는 호출자가 찍어 둔
+        /// 스냅샷으로 한다. 저장·월드 입장 경로에는 <see cref="SanitizeLocked"/> 가 있어
+        /// 사지 않은 것이 그대로 나가지 않는다 — 미리보기가 소유 판정을 흔들지 않는다.</para>
+        /// </summary>
+        bool TryPreviewItem(AvatarItemDefinition item)
+        {
+            if (item == null || _assembler == null) return false;
+            int id = item.category == AvatarPartCategory.Hat ? item.familyId : item.itemId;
+            if (id == 0) return false;
+            SelectWardrobeItem(item.category, id);
+            return true;
         }
         static readonly Color[] NaturalHairColors = {new(.08f,.065f,.06f),new(.16f,.105f,.08f),new(.28f,.17f,.11f),new(.42f,.25f,.15f),new(.34f,.17f,.12f),new(.62f,.49f,.33f)};
         static readonly Color[] NaturalIrisColors = {new(.20f,.12f,.08f),new(.34f,.23f,.12f),new(.17f,.29f,.39f),new(.24f,.35f,.29f),new(.29f,.31f,.33f)};
