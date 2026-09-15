@@ -236,10 +236,12 @@ raw `/queue/**` 구독은 거부한다. 토픽별 SUBSCRIBE 자격 검증은 별
 | 구독 | `type` |
 |---|---|
 | 방문자 | `accepted`(+`staffName`) · `expired` · `ended` |
-| 직원 | `requested` · `cancelled` · `expired` · `taken`(+`staffName`) |
+| 직원 | `requested` · `cancelled` · `expired` · `taken`(+`staffName`) · `ended` |
 
 `taken` 이 있는 이유는 **진 직원의 대기열에서 카드를 내리기 위해서**다. 없으면 그 카드가 화면에
-남아 있다가 누를 때 409 로 터진다.
+남아 있다가 누를 때 409 로 터진다. 직원 쪽 `ended` 는 같은 사정의 종료판이다 — **상대가 나간 카드를
+내리는 신호**로, 없으면 방문자가 나간 뒤에도 직원 화면에 "진행 중" 이 남는다. 직원 토픽이라
+종료를 호출한 직원 본인도 받는다 (2026-09-14 확정, GitLab #133).
 
 ### 유실은 계약이 인정한다
 
