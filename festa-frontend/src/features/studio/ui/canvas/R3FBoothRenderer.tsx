@@ -1,7 +1,7 @@
 // R3F 부스 렌더러 — D-05 Spike (S15P21A604-470).
 //
 // 지위: 채택 확정이 아니라 검증용 프로토타입이다. 실제 Unity 에셋(GLB)은 쓰지 않고
-// 계약의 OBJECT_LOCAL_BOUNDS 에서 파라메트릭 박스를 만든다. 실루엣 말고는 시안이 요구하는
+// resolveLocalBounds(runtime manifest → 타입 기본)에서 파라메트릭 박스를 만든다. 실루엣 말고는 시안이 요구하는
 // 것 — 실광원·그림자·PBR 재질·3축 기즈모 — 이 전부 여기서 성립하는지를 본다.
 //
 // 편집 계약은 SVG 렌더러와 같다: X/Z 이동, Y 고정, Y축 회전, snap, bounds clamp.
@@ -13,7 +13,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
-import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../../model/useBoothAssets';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
 import type { LayoutObject } from '../../../../entities/layout/types';
@@ -211,7 +211,7 @@ function ObjectMesh({
   asset: BoothAssetEntry | undefined;
   onDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
-  const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+  const box = resolveLocalBounds(obj) ?? FALLBACK_BOX;
   const { center, size } = boxPlacement(box);
   const surface = OBJECT_SURFACE[obj.type] ?? { roughness: 0.7, metalness: 0, opacity: 1 };
   const color = invalid ? '#ff8a8a' : (OBJECT_FILL[obj.type] ?? '#e5e9f2');
@@ -298,7 +298,7 @@ function Gizmo({
   onMoveDown: (e: ThreeEvent<PointerEvent>) => void;
   onRotateDown: (e: ThreeEvent<PointerEvent>) => void;
 }) {
-  const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+  const box = resolveLocalBounds(obj) ?? FALLBACK_BOX;
   const radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.75 + 0.45;
   const rad = (obj.rotationY * Math.PI) / 180;
 
@@ -385,7 +385,7 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
       const c = clampObjectToBooth(
         x,
         z,
-        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving === undefined ? undefined : resolveLocalBounds(moving),
         moving?.rotationY ?? 0,
         p.bounds,
       );
@@ -455,7 +455,7 @@ function Scene(p: BoothRendererProps & { assets: BoothAssetEntry[] }) {
       <BoothStage bounds={p.bounds} decor={p.decor} />
 
       {p.objects.map((obj) => {
-        const known = OBJECT_LOCAL_BOUNDS[obj.type];
+        const known = resolveLocalBounds(obj);
         const oob = known !== undefined && isAreaOutOfBounds(worldAABB(known, obj.rotationY, obj.position), p.bounds);
         return (
           <ObjectMesh
