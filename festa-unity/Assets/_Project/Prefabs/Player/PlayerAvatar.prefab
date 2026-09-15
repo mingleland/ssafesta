@@ -29,6 +29,7 @@ GameObject:
   - component: {fileID: 403387360215051380}
   - component: {fileID: 9114138493320667276}
   - component: {fileID: 7991853783431578192}
+  - component: {fileID: 5057290560676765375}
   m_Layer: 8
   m_Name: PlayerAvatar
   m_TagString: Untagged
@@ -466,6 +467,19 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bb394cb60ab53b848917769c91a4b590, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &5057290560676765375
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8589622438861398775}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1274315bcd9f17f4187c63198b6c8b8d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
