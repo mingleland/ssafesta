@@ -7,7 +7,7 @@ import type { LayoutObject } from '../../../../entities/layout/types';
 import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
-import { clampToBooth, normalizeRotation, snap } from '../../lib/coords';
+import { clampObjectToBooth, normalizeRotation, snap } from '../../lib/coords';
 import { dragKind, exceedsDragThreshold } from '../../model/studioMode';
 import { canRotateFrom } from './isoCamera';
 import type { BoothRendererProps } from './canvasTypes';
@@ -118,7 +118,15 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
         x = snap(x);
         z = snap(z);
       }
-      const c = clampToBooth(x, z, p.bounds);
+      // 몸체째로 막는다 — 중심만 막으면 회전한 끝이 벽을 넘어 검증에서만 걸린다 (-754)
+      const moving = p.objects.find((o) => o.objectId === drag.objectId);
+      const c = clampObjectToBooth(
+        x,
+        z,
+        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving?.rotationY ?? 0,
+        p.bounds,
+      );
       p.onMove(drag.objectId, Number(c.x.toFixed(3)), Number(c.z.toFixed(3)));
     } else {
       // 월드 평면상의 각도로 잰다 — 화면 각도로 재면 아이소 왜곡이 그대로 들어간다
