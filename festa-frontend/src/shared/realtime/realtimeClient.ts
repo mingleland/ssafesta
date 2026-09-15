@@ -40,6 +40,35 @@ export interface RealtimeCloseInfo {
 }
 let lastClose: RealtimeCloseInfo | null = null;
 
+/**
+ * 지금 연결이 어떤 상태인가 (S15P21A604-790). `lastClose` 는 이미 지나간 사실이라 화면이 현재를
+ * 그릴 수 없었다 — 채팅은 "지금 보낼 수 있는가" 를 물어야 해서 반응형 값이 따로 필요하다.
+ *
+ * `reconnecting` 은 **연결을 시도하는 중** 전부다. 최초 연결과 재연결을 가르지 않는 이유는
+ * 화면이 둘을 다르게 대할 이유가 없어서다 — 어느 쪽이든 아직 못 보낸다.
+ */
+export type RealtimeStatus = 'connected' | 'reconnecting' | 'disconnected';
+let status: RealtimeStatus = 'disconnected';
+const statusListeners = new Set<() => void>();
+
+function setStatus(next: RealtimeStatus): void {
+  if (status === next) return;
+  status = next;
+  for (const listener of statusListeners) listener();
+}
+
+/** 화면이 읽는 현재 연결 상태 */
+export function getRealtimeStatus(): RealtimeStatus {
+  return status;
+}
+
+export function subscribeRealtimeStatus(listener: () => void): () => void {
+  statusListeners.add(listener);
+  return () => {
+    statusListeners.delete(listener);
+  };
+}
+
 const subscriptions = new Map<string, Subscription>();
 let socket: WebSocket | null = null;
 let connected = false;
@@ -82,6 +111,7 @@ function handleFrame(frame: ReturnType<typeof decodeFrame>): void {
   if (frame.command === 'CONNECTED') {
     connected = true;
     attempts = 0;
+    setStatus('connected');
     // 재연결이면 구독을 다시 건다 — 서버는 끊긴 사이의 이벤트를 재전송하지 않는다.
     for (const sub of subscriptions.values()) sendSubscribe(sub);
     return;
@@ -108,17 +138,20 @@ function handleFrame(frame: ReturnType<typeof decodeFrame>): void {
 
 function scheduleReconnect(why: string): void {
   if (stopped || subscriptions.size === 0) {
+    setStatus('disconnected');
     if (stopped) console.warn('[realtime] 재연결하지 않는다 — 이미 멈춘 상태:', why);
     return;
   }
   attempts += 1;
   if (attempts > MAX_ATTEMPTS) {
     stopped = true;
+    setStatus('disconnected');
     console.error(`[realtime] 재연결 중단 — ${MAX_ATTEMPTS}회 연속 실패. 마지막 원인: ${why}`, lastClose);
     showToast('실시간 연결이 끊겼습니다. 새로고침해 주세요', 'error');
     return;
   }
   const delay = Math.min(1000 * 2 ** (attempts - 1), 15_000);
+  setStatus('reconnecting');
   console.warn(`[realtime] 재연결 ${attempts}/${MAX_ATTEMPTS} — ${delay}ms 뒤 (${why})`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -130,6 +163,7 @@ function scheduleReconnect(why: string): void {
 export async function connectRealtime(): Promise<void> {
   if (socket !== null) return;
   stopped = false;
+  setStatus('reconnecting');
 
   let token: string;
   try {
@@ -220,6 +254,7 @@ export function disconnectRealtime(): void {
   socket?.close();
   socket = null;
   connected = false;
+  setStatus('disconnected');
 }
 
 // 테스트 전용
@@ -242,4 +277,5 @@ export function __resetRealtimeForTests(): void {
   lastErrorMessage = null;
   lastClose = null;
   nextId = 1;
+  status = 'disconnected';
 }

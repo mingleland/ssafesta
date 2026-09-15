@@ -5,13 +5,13 @@
 //
 // 미지 타입은 건너뛴다. 실물 크기를 모르면 겹침도 판정할 수 없고, 그 판정은 서버 몫이다
 // (SC-005 — 미지 타입이 있어도 나머지는 정상 동작해야 한다).
-import { OBJECT_LOCAL_BOUNDS } from '../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../model/useBoothAssets';
 import { overlappingIds, worldAABB } from '../../../entities/layout/geometry';
 import type { LayoutObject } from '../../../entities/layout/types';
 
 export function overlappingObjectIds(objects: ReadonlyArray<LayoutObject>): Set<string> {
   const items = objects.flatMap((o) => {
-    const local = OBJECT_LOCAL_BOUNDS[o.type];
+    const local = resolveLocalBounds(o);
     if (local === undefined) return [];
     return [{ objectId: o.objectId, area: worldAABB(local, o.rotationY, o.position) }];
   });

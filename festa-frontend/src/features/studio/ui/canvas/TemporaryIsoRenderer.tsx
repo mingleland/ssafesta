@@ -4,7 +4,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { LayoutObject } from '../../../../entities/layout/types';
-import { OBJECT_LOCAL_BOUNDS } from '../../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../../model/useBoothAssets';
 import { isAreaOutOfBounds, worldAABB } from '../../../../entities/layout/geometry';
 import { overlappingObjectIds } from '../../lib/overlap';
 import { clampObjectToBooth, normalizeRotation, snap } from '../../lib/coords';
@@ -29,7 +29,7 @@ const unproj = (sx: number, sy: number) => ({ x: (sx / C + sy / H) / 2, z: (sy /
 
 /** rotationY 를 적용한 바닥 사각형 4점(월드) */
 function footprintCorners(obj: LayoutObject) {
-  const b = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+  const b = resolveLocalBounds(obj) ?? FALLBACK_BOX;
   const rad = (obj.rotationY * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -123,7 +123,7 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
       const c = clampObjectToBooth(
         x,
         z,
-        moving === undefined ? undefined : OBJECT_LOCAL_BOUNDS[moving.type],
+        moving === undefined ? undefined : resolveLocalBounds(moving),
         moving?.rotationY ?? 0,
         p.bounds,
       );
@@ -253,14 +253,14 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
       ))}
 
       {ordered.map((obj) => {
-        const box = OBJECT_LOCAL_BOUNDS[obj.type] ?? FALLBACK_BOX;
+        const box = resolveLocalBounds(obj) ?? FALLBACK_BOX;
         const h = box.max.y;
         const base = footprintCorners(obj);
         const bottom = base.map((c) => proj(c.x, 0, c.z));
         const top = base.map((c) => proj(c.x, h, c.z));
         const fill = OBJECT_FILL[obj.type] ?? '#e5e9f2';
         const isSel = obj.objectId === p.selectedObjectId;
-        const known = OBJECT_LOCAL_BOUNDS[obj.type];
+        const known = resolveLocalBounds(obj);
         const oob = known !== undefined && isAreaOutOfBounds(worldAABB(known, obj.rotationY, obj.position), p.bounds);
         const invalid = oob || overlapping.has(obj.objectId);
         const sides = [0, 1, 2, 3]
@@ -301,7 +301,7 @@ export function TemporaryIsoRenderer(p: BoothRendererProps) {
       })}
 
       {selected !== null && (() => {
-        const box = OBJECT_LOCAL_BOUNDS[selected.type] ?? FALLBACK_BOX;
+        const box = resolveLocalBounds(selected) ?? FALLBACK_BOX;
         const r = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.75 + 0.45;
         const c0 = proj(selected.position.x, 0, selected.position.z);
         const ring = Array.from({ length: 48 }, (_, i) => {

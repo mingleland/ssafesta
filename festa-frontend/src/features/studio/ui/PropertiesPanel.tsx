@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import type { LayoutObject } from '../../../entities/layout/types';
-import { OBJECT_LOCAL_BOUNDS, OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { OBJECT_TYPE_INFO } from '../../../entities/layout/objectTypes';
+import { resolveLocalBounds } from '../model/useBoothAssets';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
 import { clampObjectToBooth, normalizeRotation } from '../lib/coords';
 import { IcTrash } from './shell/icons';
@@ -51,7 +52,7 @@ export function PropertiesPanel({
   // 위치·회전 편집은 계속 허용한다(SC-005: 미지 타입이 있어도 나머지는 정상 동작해야 한다, T026)
   const info = OBJECT_TYPE_INFO[object.type];
   const isDecorative = info?.category === 'DECORATIVE';
-  const local = OBJECT_LOCAL_BOUNDS[object.type];
+  const local = resolveLocalBounds(object);
 
   // 입력 중 빈 문자열·"-"까지 허용하기 위해 로컬 문자열 상태를 두고, 유효한 숫자일 때만 dispatch한다.
   const [xText, setXText] = useState(String(object.position.x));

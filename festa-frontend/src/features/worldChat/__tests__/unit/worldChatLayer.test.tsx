@@ -5,11 +5,21 @@ import { __resetSessionForTests, setGuestSession, setMemberSession } from '../..
 import { CHAT_ERROR_MESSAGE, __resetWorldChatForTests, getWorldChatSnapshot } from '../../model/worldChat';
 import { WorldChatLayer } from '../../ui/WorldChatLayer';
 
+// 연결 상태만 화면이 읽는 값으로 바꿔 끼운다. transport 의 나머지 동작은 실제 것을 그대로 쓴다
+// — 소켓을 세우지 않고도 화면이 상태를 어떻게 그리는지만 본다 (S15P21A604-790).
+const transport = vi.hoisted(() => ({ status: 'disconnected' as 'connected' | 'reconnecting' | 'disconnected' }));
+vi.mock('../../../../shared/realtime/realtimeClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../shared/realtime/realtimeClient')>()),
+  getRealtimeStatus: () => transport.status,
+  subscribeRealtimeStatus: () => () => {},
+}));
+
 const FUTURE = '2026-12-31T00:00:00.000Z';
 
 beforeEach(() => {
   __resetWorldChatForTests();
   __resetSessionForTests();
+  transport.status = 'connected';
 });
 
 afterEach(() => {
@@ -67,5 +77,43 @@ describe('WorldChatLayer', () => {
 
     render(<WorldChatLayer onHeightChange={onHeightChange} />);
     expect(onHeightChange).toHaveBeenLastCalledWith(112);
+  });
+});
+
+describe('연결 상태 표시 (S15P21A604-790)', () => {
+  function openAsMember() {
+    setMemberSession('at', FUTURE);
+    const view = render(<WorldChatLayer />);
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
+    return view;
+  }
+
+  it('연결돼 있으면 아무 말도 하지 않는다 — 평상시에 군더더기를 두지 않는다', () => {
+    const { container } = openAsMember();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(container.querySelector('.world-chat-input-row-offline')).toBeNull();
+  });
+
+  it('끊겼으면 그렇게 말하고 입력줄을 흐리게 둔다', () => {
+    transport.status = 'disconnected';
+    const { container } = openAsMember();
+    expect(screen.getByRole('status').textContent).toBe('채팅 연결이 끊어졌습니다');
+    expect(container.querySelector('.world-chat-input-row-offline')).not.toBeNull();
+    // 입력창은 그대로 둔다 — 쓰던 값을 지키기 위해서다
+    expect(screen.getByLabelText('채팅 입력')).toBeTruthy();
+  });
+
+  it('연결을 시도하는 중이면 끊겼다고 하지 않는다', () => {
+    transport.status = 'reconnecting';
+    openAsMember();
+    expect(screen.getByRole('status').textContent).toBe('채팅 연결 중…');
+  });
+
+  it('게스트에게는 연결 상태를 말하지 않는다 — 연결을 시도조차 하지 않는다', () => {
+    transport.status = 'disconnected';
+    setGuestSession('at', FUTURE);
+    render(<WorldChatLayer />);
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });
