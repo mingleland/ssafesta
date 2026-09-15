@@ -29,7 +29,9 @@ paths:
         - 문서의 현재 objectKey가 요청의 objectKey와 같다
         - **문서의 현재 storageProvider가 요청의 sourceProvider와 같다.** 늦게 도착한 결과가 그 사이 옮겨진 최신 저장 위치를 과거 위치로 되돌리지 않게 하기 위한 조건이다
 
-        Spring은 문서의 storageProvider와 함께 storageBucket도 targetProvider의 배포 설정 값으로 갱신한다. 두 provider의 버킷 이름이 다른 배포에서 provider만 바꾸면 이후 읽기·삭제가 존재하지 않는 좌표를 친다. 요청에 targetBucket을 넣어 이 추론을 없애는 안은 #100에서 논의 중이다.
+        Spring은 문서의 storageProvider와 함께 storageBucket도 targetProvider의 배포 설정 값으로 갱신한다. 두 provider의 버킷 이름이 다른 배포에서 provider만 바꾸면 이후 읽기·삭제가 존재하지 않는 좌표를 친다.
+
+        **요청의 targetBucket은 이 버전에 없다.** 넣는 방향으로 Infra와 합의했으나(GitLab #100, 2026-09-11) 송신부인 `storage-failover.sh`(spec 007 T076)가 아직 없어 미반영이다. 위 요청 스키마가 additionalProperties: false라 **지금 targetBucket을 실어 보내면 422 RECONCILIATION_INVALID다.** 도입은 T076 착수보다 먼저 한다 — 뒤로 가면 이미 보내고 있는 요청의 계약을 바꾸는 일이 된다 (S15P21A604-770).
 
         ## 전제 — 한 문서에 동시 진행 run은 하나다
 
