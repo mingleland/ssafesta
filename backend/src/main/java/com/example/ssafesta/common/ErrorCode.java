@@ -24,6 +24,22 @@ public enum ErrorCode {
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
     UNTRUSTED_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다."),
 
+    // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
+    /**
+     * The master account, or something it owns, was named as the target of an admin action
+     * (S15P21A604-743). Distinct from {@link #FORBIDDEN} on purpose: the caller <i>is</i> an admin,
+     * so a generic refusal would read as "your session is wrong" rather than "this target is
+     * off-limits", and the console cannot tell the two apart to explain either.
+     */
+    MASTER_PROTECTED(HttpStatus.FORBIDDEN, "보호된 계정입니다."),
+    /**
+     * Demoting, suspending or deleting this admin would leave the service with none — and the
+     * promotion API itself is behind the admin gate, so there would be no way back in short of a
+     * migration.
+     */
+    ADMIN_LAST_ONE(HttpStatus.CONFLICT, "마지막 관리자는 해제할 수 없습니다."),
+    ADMIN_ALREADY(HttpStatus.CONFLICT, "이미 관리자입니다."),
+
     // ── OAuth ───────────────────────────────────────────────────────────────
     OAUTH_PROVIDER_NOT_SUPPORTED(HttpStatus.NOT_FOUND, "지원하지 않는 소셜 로그인 제공자입니다."),
     OAUTH_HANDOFF_MISSING(HttpStatus.BAD_REQUEST, "OAuth 로그인 handoff cookie가 없습니다."),
