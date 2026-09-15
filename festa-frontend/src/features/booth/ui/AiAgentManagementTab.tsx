@@ -6,7 +6,6 @@ import {
   getAiAgent,
   listAiDocuments,
   uploadAiDocument,
-  replaceAiDocument,
   updateAiAgent,
   type AiAgent,
   type AiAgentCommand,
@@ -78,6 +77,15 @@ const STATUS_LABEL: Record<AiDocumentStatus, string> = {
   FAILED: '실패',
   EXPIRED: '만료',
   DISABLED: '비활성화',
+};
+
+const STATUS_CLASS: Record<AiDocumentStatus, string> = {
+  QUEUED: 'bm-document-status-queued',
+  PROCESSING: 'bm-document-status-processing',
+  READY: 'bm-document-status-ready',
+  FAILED: 'bm-document-status-failed',
+  EXPIRED: 'bm-document-status-expired',
+  DISABLED: 'bm-document-status-disabled',
 };
 
 function formatBytes(bytes: number): string {
@@ -153,22 +161,6 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 업로드하지 못했습니다.'),
   });
 
-  // 교체는 업로드와 같은 3단계를 타지만 1단계가 원본 문서를 지목한다 (S15P21A604-691, #179).
-  // 원본은 새 문서가 준비 완료가 될 때까지 그대로 답변에 쓰이므로, 실패해도 근거가 비지 않는다.
-  const replaceMutation = useMutation({
-    mutationFn: ({ documentId, file }: { documentId: number; file: File }) => replaceAiDocument(documentId, file),
-    onSuccess: async (result) => {
-      setUploadMessage(
-        result.duplicate
-          ? '같은 내용이라 교체하지 않았습니다.'
-          : `교체 접수: 처리 대기(${result.processingStatus}) · 준비가 끝나면 기존 문서를 대신합니다`,
-      );
-      setError(null);
-      await queryClient.invalidateQueries({ queryKey: ['ai-agent-documents', agentId] });
-    },
-    onError: (cause) => setError(isApiError(cause) ? cause.message : cause instanceof Error ? cause.message : '문서를 교체하지 못했습니다.'),
-  });
-
   // 이름·프롬프트를 비워도 막지 않는다 — 비워둔 채 제출하면 기본값을 채워 넣고 그 값으로
   // 저장한다. 화면에도 실제 저장되는 값을 그대로 반영해 나중에 "왜 이렇게 저장됐지"가 없게 한다.
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -206,14 +198,6 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
 
   function removePendingFile(index: number) {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function selectReplacement(documentId: number, event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploadMessage(null);
-    replaceMutation.mutate({ documentId, file });
-    event.target.value = '';
   }
 
   if (agentQuery.isLoading) return <OverlayLoading label="AI 직원 설정을 불러오는 중..." />;
@@ -319,20 +303,18 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
                       <li key={doc.documentId} className="bm-document-row">
                         <span className="bm-document-name">{doc.fileName}</span>
                         <span className="bm-document-meta">{formatBytes(doc.sizeBytes)}</span>
-                        <span className="bm-document-status">{STATUS_LABEL[doc.status]}</span>
-                        {/* 교체는 준비 완료된 문서에만 연다 — 서버도 그 상태만 받는다(DOCUMENT_NOT_REPLACEABLE) */}
-                        {doc.status === 'READY' && (
-                          <label className={'bm-document-replace' + (replaceMutation.isPending ? ' bm-upload-disabled' : '')}>
-                            {replaceMutation.isPending && replaceMutation.variables?.documentId === doc.documentId ? '교체 중...' : '수정본 교체'}
-                            <input
-                              type="file"
-                              accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain"
-                              disabled={replaceMutation.isPending}
-                              aria-label={`${doc.fileName} 수정본 교체`}
-                              onChange={(event) => selectReplacement(doc.documentId, event)}
-                            />
-                          </label>
-                        )}
+                        <span className={'bm-document-status ' + STATUS_CLASS[doc.status]}>{STATUS_LABEL[doc.status]}</span>
+                        {/* 삭제 API가 아직 없다(S15P21A604-758과 별개 — BE DELETE 엔드포인트 GitLab
+                            이슈로 분리). 버튼을 숨기지 않고 이유와 함께 비활성 표시한다 — 조용히
+                            아무 동작도 안 하는 컨트롤은 T-24와 같은 모양이 된다. */}
+                        <button
+                          type="button"
+                          className="bm-document-remove"
+                          disabled
+                          title="문서 삭제는 아직 지원하지 않습니다. 백엔드 삭제 API 준비 중입니다."
+                        >
+                          삭제
+                        </button>
                       </li>
                     ))}
                   </ul>
