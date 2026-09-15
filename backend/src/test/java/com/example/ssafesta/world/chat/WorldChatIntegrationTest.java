@@ -176,6 +176,58 @@ class WorldChatIntegrationTest {
         assertNothingSent();
     }
 
+    /**
+     * 비속어가 든 줄은 <b>토픽에 나가지 않는다</b> (S15P21A604-792).
+     *
+     * <p>우회 표기까지 본다 — 닉네임과 같은 정규화({@code ProfanityFilter})를 거치므로
+     * {@code 씨---1---발} 과 {@code F_U_C_K} 가 각각 {@code 씨i발}·{@code fuck} 이 되어 걸린다.
+     *
+     * <p>코드를 새로 만들지 않았다. 길이·빈 내용과 같은 {@code VALIDATION_FAILED} 라 프런트엔드가
+     * 이미 "보낼 수 없는 내용입니다" 로 그린다 — 어느 단어가 걸렸는지는 알려 주지 않는다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"씨발", "씨---1---발", "F_U_C_K", "이 개새끼야"})
+    void aProfaneMessageIsRefusedAndNeverBroadcast(String content) {
+        Long sender = member("욕설" + content.length());
+
+        ApiException refused = assertThrows(ApiException.class,
+                () -> chat.say(sender, new WorldChatSend(content)));
+
+        assertEquals("VALIDATION_FAILED", refused.errorCode().name());
+        assertNothingSent();
+    }
+
+    /**
+     * 금칙어를 품고 있지만 욕이 아닌 말은 통과한다.
+     *
+     * <p>정규화가 공백까지 지우기 때문에 {@code 고추장} 이 {@code 고추} 에, {@code 해보지} 가
+     * {@code 보지} 에 걸린다 — 닉네임에서는 드물지만 100자 문장에서는 흔하다. 예외 목록이 없으면
+     * 이 두 줄이 막히고, 그건 축제 광장에서 매일 나오는 말이다.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"고추장 파는 부스 어디예요", "한번 해보지 뭐", "analysis 자료 올렸어요"})
+    void anOrdinaryMessageThatLooksLikeAProfanityStillGoesOut(String content) {
+        chat.say(member("오탐" + content.length()), new WorldChatSend(content));
+
+        assertEquals(content, captured().content(), "예외 목록에 있는 말이 막혔습니다.");
+    }
+
+    /**
+     * 거절된 줄은 3초 제한을 <b>소비하지 않는다</b>.
+     *
+     * <p>내용 검증이 도배 판정보다 먼저이기 때문이다. 순서가 뒤집히면 오탐 한 번에 3초를 기다려야
+     * 한다 — 막힌 이유를 모르는 사람은 그 3초 동안 같은 말을 다시 친다.
+     */
+    @Test
+    void aRefusedProfanityDoesNotConsumeTheCooldown() {
+        Long sender = member("쿨다운");
+
+        assertThrows(ApiException.class, () -> chat.say(sender, new WorldChatSend("씨발")));
+        chat.say(sender, new WorldChatSend("죄송합니다"));
+
+        assertEquals(1, allCaptured().size());
+    }
+
     // ── 도우미 ──────────────────────────────────────────────────────────────
 
     private Long member(String prefix) {
