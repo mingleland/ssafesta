@@ -39,6 +39,12 @@ namespace Festa.Avatar
         Animator _animator;
         SkinnedMeshRenderer _reference;
         AvatarConfig _config;
+
+        // 런타임 의상은 신체 프리팹의 bounds를 그대로 쓰면 안 된다. 의상 메시가 신체보다
+        // 화면 바깥으로 먼저 나가는 자세에서 프러스텀 컬링되어 옷만 사라질 수 있다.
+        // 메시 고유 bounds와 렌더러 bounds를 합친 뒤 작은 여유를 둬 경계 프레임을 보호한다.
+        const float SkinnedBoundsPaddingRatio = 0.025f;
+        const float SkinnedBoundsMinimumPadding = 0.02f;
         public AvatarConfig Config => _config;
         public string LastError { get; private set; }
         public AvatarCatalog Catalog { get => _catalog; set => _catalog = value; }
@@ -114,8 +120,9 @@ namespace Festa.Avatar
                 var go = new GameObject(source.name);
                 go.transform.SetParent(_animator.transform, false);
                 var r = go.AddComponent<SkinnedMeshRenderer>();
-                r.rootBone = _reference.rootBone; r.bones = _reference.bones; r.localBounds = _reference.localBounds;
+                r.rootBone = _reference.rootBone; r.bones = _reference.bones;
                 r.sharedMesh = source.sharedMesh; r.sharedMaterials = source.sharedMaterials;
+                r.localBounds = RuntimeBounds(source, _reference);
                 _rendererCategories[r] = category;
                 PrepareMaterials(r, category);
                 spawned.Add(go);
@@ -334,11 +341,51 @@ namespace Festa.Avatar
             smr.bones = first.bones;
             smr.rootBone = first.rootBone;
             smr.sharedMaterial = first.sharedMaterials[0];
-            smr.localBounds = first.localBounds;
+            smr.localBounds = CombinedRuntimeBounds(parts);
             smr.shadowCastingMode = first.shadowCastingMode;
             smr.updateWhenOffscreen = first.updateWhenOffscreen;
             smr.quality = first.quality;
             return go;
+        }
+
+        /// <summary>
+        /// 원본 의상 렌더러의 bounds를 기준으로 런타임 렌더러의 컬링 범위를 만든다.
+        ///
+        /// <para>기존 코드는 모든 의상에 신체 첫 렌더러의 <c>localBounds</c>를 복사했다.
+        /// 이 값은 신체 기준이라 치맛자락·소매·머리 장식처럼 신체보다 넓거나 긴 파츠가
+        /// 카메라 프러스텀 가장자리에서 먼저 잘렸다. 원본 렌더러와 메시 bounds를 함께
+        /// 포함하면 파츠별 실제 범위를 보존하면서도 원본 데이터가 한쪽만 부정확한 경우를
+        /// 흡수할 수 있다.</para>
+        /// </summary>
+        static Bounds RuntimeBounds(SkinnedMeshRenderer source, SkinnedMeshRenderer reference)
+        {
+            var bounds = source ? source.localBounds : new Bounds(Vector3.zero, Vector3.one);
+            if (source && source.sharedMesh) bounds.Encapsulate(source.sharedMesh.bounds);
+            if (reference) bounds.Encapsulate(reference.localBounds);
+            return WithBoundsPadding(bounds);
+        }
+
+        /// <summary>병합 메시의 모든 원본 파츠 bounds를 포함해 병합 렌더러의 컬링 범위를 만든다.</summary>
+        static Bounds CombinedRuntimeBounds(List<SkinnedMeshRenderer> parts)
+        {
+            var bounds = new Bounds(Vector3.zero, Vector3.zero);
+            bool initialized = false;
+            foreach (var part in parts)
+            {
+                if (!part) continue;
+                if (!initialized) { bounds = part.localBounds; initialized = true; }
+                else bounds.Encapsulate(part.localBounds);
+                if (part.sharedMesh) bounds.Encapsulate(part.sharedMesh.bounds);
+            }
+            return WithBoundsPadding(initialized ? bounds : new Bounds(Vector3.zero, Vector3.one));
+        }
+
+        static Bounds WithBoundsPadding(Bounds bounds)
+        {
+            float padding = Mathf.Max(bounds.size.magnitude * SkinnedBoundsPaddingRatio,
+                                      SkinnedBoundsMinimumPadding);
+            bounds.Expand(padding);
+            return bounds;
         }
 
         static void DestroySafe(UnityEngine.Object o)
