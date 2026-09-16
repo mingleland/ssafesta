@@ -29,6 +29,28 @@ export function requestExitWorldUi(instance: UnityInstance, reason: ExitWorldUiR
 }
 
 /**
+ * 월드를 떠나지 않고 아바타 커스터마이징 화면을 열어 달라고 요청한다
+ * (S15P21A604-820, GitLab #197 게임 파트 회신 2026-09-16).
+ *
+ * **`RequestExitWorldUi` 와 합치지 않는다.** 그건 "네가 연 화면을 닫아 달라" 이고 이것은
+ * "아바타 화면을 열어 달라" 다 — `requestExitBooth` 를 따로 둔 것과 같은 이유다.
+ *
+ * Unity 는 `CharacterLobby` 를 additive 로 얹고 무대를 월드 밖으로 옮겨 그린다. World Scene·NGO
+ * 연결·Player NetworkObject·좌표가 그대로 살아 있고 외형만 바뀐다 — 옛 `ReturnToCustomization`
+ * 경로(연결을 끊고 로비로 나갔다 돌아오는 길)는 쓰지 않는다.
+ *
+ * 열리면 Unity 가 `onWorldUiState` 로 `avatar:true` 를 밀어 준다. **닫는 명령은 따로 없다** —
+ * `bridge/worldUiState` 가 그것을 받아 `hasUnityModal()` 이 true 가 되고, WorldPage 의 ESC
+ * 중재 2단계가 기존 `RequestExitWorldUi('esc')` 를 보낸다.
+ *
+ * 게스트는 커스터마이징 대상이 아니라(S15P21A604-437) Unity 가 거부하고 로그만 남긴다. 부르는
+ * 화면에서 회원 여부를 먼저 보는 쪽이 맞다.
+ */
+export function requestAvatarCustomization(instance: UnityInstance): void {
+  instance.SendMessage(WORLD_UI_BRIDGE_OBJECT, 'RequestAvatarCustomization', 'esc-menu');
+}
+
+/**
  * 부스 밖으로 내보내 달라고 요청한다 (S15P21A604-627, GitLab #174).
  *
  * **`RequestExitWorldUi` 와 합치지 않는다.** 그건 "네가 연 화면을 닫아 달라" 이고 이것은

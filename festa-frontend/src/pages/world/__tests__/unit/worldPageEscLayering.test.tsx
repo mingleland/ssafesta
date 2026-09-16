@@ -77,9 +77,9 @@ afterEach(() => {
 });
 
 /** Unity 가 모달을 쥐었다고 알려 온 상태를 만든다 — 실제 경로와 같은 수신부를 탄다. */
-const unityModal = (patch: { focus?: boolean; minigame?: boolean }) =>
+const unityModal = (patch: { focus?: boolean; minigame?: boolean; avatar?: boolean }) =>
   act(() => {
-    applyWorldUiStateJson(JSON.stringify({ focus: false, minigame: false, ...patch }));
+    applyWorldUiStateJson(JSON.stringify({ focus: false, minigame: false, avatar: false, ...patch }));
   });
 
 async function renderWorld() {
@@ -198,6 +198,19 @@ describe('WorldPage ESC 중재 — Unity 모달 (-450, #132)', () => {
     pressEscape();
 
     expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(getWorldScreen()).toBe('world');
+  });
+
+  // S15P21A604-820, GitLab #197 — 월드를 떠나지 않는 아바타 커스터마이징. 이 필드를 판정에
+  // 넣지 않으면 ESC 가 아바타 화면 위에 Game Menu 를 연다.
+  it('아바타 커스터마이징도 같은 판정을 받는다 — Game Menu 를 덧열지 않는다', async () => {
+    await renderWorld();
+    unityModal({ avatar: true });
+
+    pressEscape();
+
+    expect(requestExitWorldUi).toHaveBeenCalledTimes(1);
+    expect(requestExitWorldUi).toHaveBeenCalledWith(fakeInstance, 'esc');
     expect(getWorldScreen()).toBe('world');
   });
 
