@@ -169,7 +169,7 @@
 ### P1 — 월드·부스 연동
 
 - **GAME_PORTAL 프리팹 LocalBounds 실측 회신** — GitLab [#157](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/157)
-  - rotationY=0, 바닥 원점, 미터 단위 AABB를 Unity에서 실측해 BE `LayoutObjectType.GAME_PORTAL` 계약을 막고 있는 값을 전달한다.
+  - 상태: **회신 완료(09-16)** — `LocalBounds(-0.37, 0, -0.35, 0.37, 1.97, 0.58)`.
 - **부스 임대 조기 반납의 월드 실시간 전파 확인** — GitLab [#199](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/199)
   - 기존 임대·게시 NGO 슬롯 중계가 반납까지 덮는지 확인하고, 빠지면 별도 게임 티켓으로 분리한다.
 - **비활성 탭 재접속 시 마지막 위치 복원 정책·구현** — GitLab [#200](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/200)
@@ -184,7 +184,7 @@
 ### P2 — UI·에셋 계약
 
 - **ESC 메뉴 인플레이스 아바타 설정 진입** — GitLab [#197](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/197)
-  - 월드 연결과 `NetworkPlayer`를 유지한 채 커스터마이징을 열고 닫는 브리지·모달 상태를 구현한다.
+  - 상태: **구현·에디터 실측 완료(09-16)/WebGL 빌드 확인 대기**. `WorldUiBridge.RequestAvatarCustomization`, `onWorldUiState.avatar`, 로비 씬 additive. FE 는 ESC 메뉴 버튼만 붙이면 된다.
 - **부스 간판 프로젝트명·대표 이미지 실제 데이터 연결** — GitLab [#171](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/171)
   - `booths.name`, `facade.signText`, 프로젝트명 우선순위와 이미지 CORS·요청 수를 확정해 12개 간판에 적용한다.
 - **Booth 2.5D 에셋 색상·UV 계약 정리** — GitLab [#202](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/202)
