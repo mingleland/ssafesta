@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.unit.DataSize;
@@ -76,13 +77,14 @@ public class AiDocumentService {
     private final ObjectStorage storage;
     private final DocumentJobDispatchService dispatcher;
     private final TransactionTemplate transactions;
+    private final JdbcTemplate jdbc;
 
     public AiDocumentService(AiDocumentRepository documents, AiAgentRepository agents,
                              BoothAccessGuard accessGuard,
                              AiAgentProperties agentProperties,
                              ObjectStorageProperties storageProperties, ObjectStorage storage,
                              DocumentJobDispatchService dispatcher,
-                             TransactionTemplate transactions) {
+                             TransactionTemplate transactions, JdbcTemplate jdbc) {
         this.documents = documents;
         this.agents = agents;
         this.accessGuard = accessGuard;
@@ -91,6 +93,7 @@ public class AiDocumentService {
         this.storage = storage;
         this.dispatcher = dispatcher;
         this.transactions = transactions;
+        this.jdbc = jdbc;
     }
 
     // ── 업로드 URL 발급 ─────────────────────────────────────────────────────
@@ -481,6 +484,53 @@ public class AiDocumentService {
         // than a lock held across somebody else's network (S15P21A604-175).
         settled.dispatch().ifPresent(dispatcher::dispatchQuietly);
         return settled.view();
+    }
+
+    // ── 삭제 ────────────────────────────────────────────────────────────────
+
+    /**
+     * 부스 편집자가 누른 삭제 버튼 (FR-012, C-15, S15P21A604-831).
+     *
+     * <p><b>하드 삭제다.</b> {@code AccountDeletionService} 가 회원 탈퇴에서 이미 같은 일을 한다 —
+     * {@code ai_document_jobs}·{@code ai_document_chunks}·{@code storage_reconciliation_log} 는
+     * {@code ai_documents} 에 {@code ON DELETE CASCADE} 로 걸려 있어(V21·V25) 행 하나만 지우면
+     * 나머지는 스키마가 정리한다. R2 원본은 이 트랜잭션 안에서 지우지 않는다 — 네트워크 호출을 행
+     * 잠금 밑에 두지 않는 것은 이 클래스의 다른 모든 메서드와 같은 규칙이고, {@code AiDocumentService}
+     * 밖에서 이미 걷는 경로({@code AccountDeletionService})를 그대로 따라 {@code game_asset_delete_queue}
+     * 에 적어 넣는다 — R2 삭제는 그 큐의 기존 워커가 비동기로 처리한다.
+     *
+     * <p><b>업로드가 끝난 {@code QUEUED}·{@code PROCESSING}만 거부한다(409).</b> 이 둘은 살아 있는
+     * {@code ai_document_jobs} 행을 가질 수 있어, 여기서 지우면 CASCADE가 그 행을 워커의 다음 callback
+     * 전에 걷어 간다. 반면 {@code QUEUED}라도 {@link AiDocument#isAwaitingUpload()}이면 아직 Job이 없어
+     * 삭제할 수 있다. {@code READY}·{@code FAILED}·{@code EXPIRED}·{@code DISABLED}도 Job이 없거나 이미
+     * 끝난 상태라 안전하다.
+     *
+     * <p><b>활성 임대는 요구하지 않는다.</b> 임대 만료·반납으로 {@code DISABLED}가 된 보존 문서를
+     * 편집자가 정리할 수 있어야 하므로 권한만 검사한다. 변경 권한과 관리자 감사 기록은
+     * {@code requireModifier}가 맡는다.
+     */
+    public void delete(Long documentId, Long userId) {
+        transactions.executeWithoutResult(status -> {
+            AiDocument document = documents.findWithLockById(documentId)
+                    .orElseThrow(() -> new AiDocumentNotFoundException(documentId));
+            accessGuard.requireModifier(document.getBoothId(), userId);
+
+            if ((AiDocument.QUEUED.equals(document.getProcessingStatus())
+                    && !document.isAwaitingUpload())
+                    || AiDocument.PROCESSING.equals(document.getProcessingStatus())) {
+                throw new ApiException(ErrorCode.DOCUMENT_NOT_DELETABLE,
+                        "처리 중인 문서는 삭제할 수 없습니다. 완료된 뒤 다시 시도해 주세요. 현재 상태: "
+                                + document.getProcessingStatus());
+            }
+
+            jdbc.update("""
+                    INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT (provider, storage_bucket, object_key) DO NOTHING
+                    """, document.getStorageProvider(), document.getStorageBucket(),
+                    document.getObjectKey());
+            documents.delete(document);
+        });
     }
 
     private Snapshot readSnapshot(Long documentId, Long userId) {
