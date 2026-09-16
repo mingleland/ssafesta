@@ -145,12 +145,8 @@ export function WorldPage() {
       // 않고 판정자 맨 앞에서 한 번 비켜 준다. 텍스트 입력 중 ESC 도 같은 경로로 dialog 가 먼저
       // 먹는다.
       if (document.querySelector('dialog[open]') !== null) return;
-      // 채팅이 열려 있으면 그것부터 닫는다. 입력창을 두고 Game Menu 가 열리면 글을 쓰다 말고
-      // 메뉴가 덮는다.
-      if (getWorldChatSnapshot().open) {
-        closeWorldChat();
-        return;
-      }
+      // 채팅은 여기서 다루지 않는다 — 열기·전송·닫기가 전부 Enter 다(worldChat.resolveEnterAction).
+      // ESC 는 오버레이·메뉴 계층만 본다.
       if (closeTopScreen()) return;
 
       if (hasUnityModal()) {
@@ -187,10 +183,13 @@ export function WorldPage() {
         open: chat.open,
         inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
         member: canUseWorldChat(),
+        // 보낼 것이 없을 때 누른 Enter 는 닫기다 — 채팅을 닫는 유일한 키가 Enter 이기 때문이다
+        draftEmpty: chat.draft.trim() === '',
       });
       if (action === 'ignore') return;
       e.preventDefault();
       if (action === 'send') sendWorldChat(chat.draft);
+      else if (action === 'close') closeWorldChat();
       // 패널은 떠 있는데 입력창이 focus 를 잃은 상태 — 새 창을 열지 않고 그 입력창으로 돌아간다
       else if (action === 'focus') document.getElementById(WORLD_CHAT_INPUT_ID)?.focus();
       else openWorldChat();
