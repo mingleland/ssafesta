@@ -344,7 +344,9 @@ export function UnityHost() {
         </div>
       )}
       {!connectionNotice && status === 'preparing-world' && (
-        <div className="uh-status" role="status" aria-live="polite">
+        // 씬 전환 중이라 dim을 불투명하게 — 반투명이면 Unity가 아직 지우지 않은 직전 씬(커스터마이징 등)의
+        // 마지막 canvas 프레임이 그 뒤로 비쳐 보인다(S15P21A604-733, 실 데모 녹화로 확인).
+        <div className="uh-status uh-status--opaque" role="status" aria-live="polite">
           {/* 진행률 신호가 없는 구간이다 — indeterminate 로 두고 가짜 백분율을 만들지 않는다 */}
           <span className="uh-status-spinner" aria-hidden="true" />
           <strong className="uh-status-title">
