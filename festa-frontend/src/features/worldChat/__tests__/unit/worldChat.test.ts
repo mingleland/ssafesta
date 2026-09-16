@@ -96,6 +96,12 @@ describe('Enter 판정', () => {
     expect(resolveEnterAction({}, openFocused)).toBe('send');
   });
 
+  // 채팅을 닫는 키도 Enter 다 — ESC 는 오버레이·메뉴 계층만 본다(2026-09-16).
+  it('보낼 것이 없을 때 누른 Enter 는 닫는다', () => {
+    expect(resolveEnterAction({}, { ...openFocused, draftEmpty: true })).toBe('close');
+    expect(resolveEnterAction({}, { ...openFocused, draftEmpty: false })).toBe('send');
+  });
+
   it('한글 조합 중 Enter 는 토글도 전송도 하지 않는다', () => {
     expect(resolveEnterAction({ isComposing: true }, openFocused)).toBe('ignore');
     expect(resolveEnterAction({ isComposing: true }, closedMember)).toBe('ignore');

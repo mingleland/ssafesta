@@ -37,7 +37,6 @@ import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
-import { consumeFullscreenIntent, enterFullscreen } from '../../shared/ui/fullscreen';
 import { getWorldMount, subscribeWorldMount } from './worldMount';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
@@ -160,9 +159,6 @@ export function UnityHost() {
     const unsubscribeLoad = subscribeWorldLoadStart(() => {
       if (cancelled) return;
       setStatus((current) => (current === 'waiting-gate' ? 'preparing-world' : current));
-      // 로그인 때 남겨 둔 전체화면 의도를 여기서 쓴다 (S15P21A604-733). 사용자가 방금 '월드 입장' 을
-      // 누른 순간이라 제스처 창 안일 가능성이 높다. 거부돼도 진입을 막지 않는다 — 수동 토글이 정본이다.
-      if (consumeFullscreenIntent()) void enterFullscreen();
     });
 
     // 접속 상태는 boot 성공 여부와 무관하게 들어올 수 있다 — 별도 구독으로 받고 여기서 판정하지 않는다.
