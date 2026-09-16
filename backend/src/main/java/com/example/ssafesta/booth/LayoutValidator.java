@@ -31,18 +31,34 @@ public class LayoutValidator {
     static final int MAX_OBJECTS = 12;
 
     /**
-     * Booth extent: <b>6m × 6m × 2.72m</b>, origin at the centre of the floor (헌법 21조).
+     * Booth extent: <b>9.4m × 6m × 5.9m</b>, origin at the centre of the floor (헌법 21조).
      *
-     * <p>The origin being central is why the horizontal limit is half the width: x and z run from
-     * −3 to +3. Height is not halved — {@code y = 0} is the floor. 높이는 대칭 가정의 6이었다가
-     * 셸 프리팹 실측(벽 패널 상단 y = 2.725)으로 <b>2.72</b>가 됐다 (#19 ②, 2026-08-21 확정).
-     * 최고 파츠 두 종(PROJECT_PANEL·RECRUITMENT_BOARD)이 정확히 2.72라 이 둘은 y = 0에서만
-     * 놓일 수 있다 — 의도된 결과다.
+     * <p>The origin being central is why the horizontal limits are half the width: x runs from
+     * −4.7 to +4.7 and z from −3 to +3. Height is not halved — {@code y = 0} is the floor.
+     *
+     * <p><b>x·z가 갈라진 이유</b> (S15P21A604-698, GitLab #181, 2026-09-15 확정): 실제 셸 내부는
+     * x −4.804 ~ +4.926 · z −3.719 ~ +6.875 (중심 x +0.061 · z +1.578)인데 배치 가능 범위는
+     * 6×6이었다 — 방의 34%만 쓰고 있었다. 대칭 {@code footprint {width, depth}} 스키마를 유지하면서
+     * 넓힐 수 있는 축이 x다. <b>z는 6을 유지</b>한다: 입구 쪽 여백은 추적 카메라(기본 1.7m·최대 3.4m)가
+     * 벽에 눌리지 않게 두는 의도된 공간이고, z를 더 쓰려면 방의 z 중심이 +1.578이라 비대칭 범위가 돼
+     * 대칭 스키마로 표현할 수 없다. 비대칭 min/max 계약이 필요해지면 그때 위 네 값을 쓴다.
+     *
+     * <p>x가 ±4.8이 아니라 <b>±4.7</b>인 이유: 서쪽에서 실제로 닿는 면은 구조 벽이 아니라
+     * {@code PanelGraphic} −4.804라 ±4.8은 여유가 4mm다 — {@code DEVICE_TABLET}(half-x 0.087)조차
+     * 놓을 수 없으면서 편집기에는 빈자리로 보인다.
+     *
+     * <p>높이는 대칭 가정의 6이었다가 셸 프리팹 실측으로 2.72(벽 패널 상단 y = 2.725)가 됐고,
+     * 셸 교체 뒤 <b>5.9</b>가 됐다 — 2.72는 방 높이가 아니라 <i>옛</i> 벽 패널 높이였다. 방 내부는
+     * 6.0이고 천장 램프가 5.94부터라 실사용 상한 5.9를 쓴다 (6.0으로 두면 램프와 겹치는 배치가
+     * 통과한다). 서버에 지지대 검사가 없어 공중에 뜬 집기가 통과하는 범위도 함께 넓어지는데,
+     * 램프 트러스를 매달려면 필요한 자유도라 이번에 막지 않기로 FE와 합의했다 (#181 §5, 별건).
      */
-    static final BigDecimal MAX_HORIZONTAL = new BigDecimal("3");
-    static final BigDecimal MAX_HEIGHT = new BigDecimal("2.72");
+    static final BigDecimal MAX_X = new BigDecimal("4.7");
+    static final BigDecimal MAX_Z = new BigDecimal("3");
+    static final BigDecimal MAX_HEIGHT = new BigDecimal("5.9");
 
-    private static final double HALF_WIDTH = MAX_HORIZONTAL.doubleValue();
+    private static final double HALF_WIDTH = MAX_X.doubleValue();
+    private static final double HALF_DEPTH = MAX_Z.doubleValue();
     private static final double HEIGHT = MAX_HEIGHT.doubleValue();
 
     /**
@@ -143,9 +159,9 @@ public class LayoutValidator {
             result.addError("MISSING_POSITION", objectId, "position의 x·y·z가 모두 필요합니다.");
             return false;
         }
-        if (outsideHorizontal(position.x()) || outsideHorizontal(position.z())) {
+        if (outside(position.x(), MAX_X) || outside(position.z(), MAX_Z)) {
             result.addError("POSITION_OUT_OF_BOUNDS", objectId,
-                    "부스 영역을 벗어났습니다. x·z는 ±" + MAX_HORIZONTAL + "m 이내여야 합니다.");
+                    "부스 영역을 벗어났습니다. x는 ±" + MAX_X + "m, z는 ±" + MAX_Z + "m 이내여야 합니다.");
         }
         if (position.y().signum() < 0 || position.y().compareTo(MAX_HEIGHT) > 0) {
             result.addError("POSITION_OUT_OF_BOUNDS", objectId,
@@ -182,13 +198,13 @@ public class LayoutValidator {
                 object.rotationY().doubleValue());
         boolean outHorizontal = box.minX() < -HALF_WIDTH - EXTENT_EPS
                 || box.maxX() > HALF_WIDTH + EXTENT_EPS
-                || box.minZ() < -HALF_WIDTH - EXTENT_EPS
-                || box.maxZ() > HALF_WIDTH + EXTENT_EPS;
+                || box.minZ() < -HALF_DEPTH - EXTENT_EPS
+                || box.maxZ() > HALF_DEPTH + EXTENT_EPS;
         boolean outVertical = box.minY() < -EXTENT_EPS || box.maxY() > HEIGHT + EXTENT_EPS;
         if (outHorizontal || outVertical) {
             result.addError("AREA_OUT_OF_BOUNDS", objectId,
-                    "오브젝트 실물(회전 반영)이 부스 영역을 벗어났습니다. x·z는 ±" + MAX_HORIZONTAL
-                            + "m, 높이는 " + MAX_HEIGHT + "m 이내여야 합니다.");
+                    "오브젝트 실물(회전 반영)이 부스 영역을 벗어났습니다. x는 ±" + MAX_X + "m, z는 ±"
+                            + MAX_Z + "m, 높이는 " + MAX_HEIGHT + "m 이내여야 합니다.");
         }
     }
 
@@ -289,7 +305,7 @@ public class LayoutValidator {
         }
     }
 
-    private boolean outsideHorizontal(BigDecimal value) {
-        return value.abs().compareTo(MAX_HORIZONTAL) > 0;
+    private boolean outside(BigDecimal value, BigDecimal limit) {
+        return value.abs().compareTo(limit) > 0;
     }
 }

@@ -783,17 +783,17 @@ export const GameStudioShell = ({
     }
   }, [store, uploadAsset]);
 
-  // S15P21A604-561 — 저장소 삭제(assetRepository.delete)와 프로젝트 참조 제거
-  // (removeAssetReference)를 한 동작으로 묶는다. removeAssetReference는 여전히 참조
-  // 중인 자산이면 validated()가 던지므로, 그 경우 저장소 쪽 삭제는 되돌리지 않고 그대로
-  // 두고(멱등이라 다음 시도에서 다시 지우면 됨) 에러만 보여준다 — 조용히 절반만 지운 채
-  // 넘어가지 않는다.
+  // S15P21A604-561/709 — 저장소 삭제(assetRepository.delete)를 먼저 확정하고, 성공했을 때만
+  // 로컬 참조를 지운다. 원래는 순서가 반대였다 — 로컬을 먼저 지우고 저장소 삭제가 실패해도
+  // 되돌리지 않았는데, 그러면 화면에서는 자산이 사라졌지만 서버·스토리지엔 그대로 남는
+  // 상태 불일치가 생겼다(709에서 서버 DELETE endpoint 부재로 실제 재현됨). 서버가 먼저이므로
+  // GAME_ASSET_IN_USE로 거부되면 로컬 상태는 전혀 건드리지 않는다.
   const deleteAsset = useCallback(async (assetId: string): Promise<void> => {
     const asset = store.getState().project.assets.find((candidate) => candidate.id === assetId);
     if (asset === undefined) return;
     try {
-      apply(removeAssetReference(store.getState().project, assetId));
       if (assetRepository !== null) await assetRepository.delete(asset.source);
+      apply(removeAssetReference(store.getState().project, assetId));
       setNotice(`${assetDisplayLabel(asset)} 자산을 삭제했습니다.`);
     } catch (error) {
       setSaveStatus('error');

@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -62,6 +64,17 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class MemberSessionService {
+
+    /**
+     * 거절의 사유를 남긴다 — 봉투로는 갈리지 않는 갈래가 있기 때문이다 (GitLab #211).
+     *
+     * <p>refresh 401 은 밖에서 보면 {@code INVALID_MEMBER_TOKEN} 하나인데, 안에서는 "쿠키가 안
+     * 왔다" · "키가 없다" · "토큰은 멀쩡한데 세션이 없다" 가 전부 여기로 접힌다. 원인이 서로 다른데
+     * 사후에 구분할 방법이 없었다. 판정은 바꾸지 않고 사유만 적는다.
+     *
+     * <p><b>해시도 원문도 적지 않는다</b> (헌법 13조). 남기는 것은 사유와 {@code userId} 까지다.
+     */
+    private static final Logger log = LoggerFactory.getLogger(MemberSessionService.class);
 
     /** 새 로그인·로그아웃에 밀려난 토큰. 재사용해도 현재 세션을 건드리지 않는다. */
     private static final String SUPERSEDED = "SUPERSEDED";
@@ -197,13 +210,27 @@ public class MemberSessionService {
                 familyKeyPrefix(), candidateFamilyId, String.valueOf(Instant.now().toEpochMilli()),
                 String.valueOf(properties.refreshTokenTtl().toSeconds()));
         if (stored == null) {
-            if (revokeReusedFamily(redis.opsForValue().get(reusedKey(hash))) == Replay.WITHIN_GRACE) {
+            // 표식을 한 번만 읽고 판정과 로그가 같은 값을 본다. 두 번 읽으면 그 사이에 바뀐 값이
+            // 로그에 남아 서로 다른 사실을 가리킨다 — 진단을 위해 넣은 줄이 진단을 틀리게 한다.
+            String usedValue = redis.opsForValue().get(reusedKey(hash));
+            if (revokeReusedFamily(usedValue) == Replay.WITHIN_GRACE) {
+                log.warn("refresh 거절 — 회전 직후 재생이다. 세션은 살아 있고 다시 보내면 성공한다: {}",
+                        describeUsed(usedValue));
                 throw new ApiException(ErrorCode.REFRESH_TOKEN_ROTATED);
             }
+            // 표식이 없다는 것은 이 해시가 발급된 적이 없거나, 있었는데 저장소에서 사라졌다는
+            // 뜻이다. 후자가 #211 의 유력한 후보이고, 그때는 같은 시각에 여러 사람이 이 줄을 낸다.
+            log.warn("refresh 거절 — refresh 키가 없다. 재사용 표식={}", describeUsed(usedValue));
             throw new InvalidRefreshTokenException();
         }
         Session session = Session.parse(stored);
-        if (session == null || !isActive(session.userId(), session.sessionId())) {
+        if (session == null) {
+            log.warn("refresh 거절 — 저장된 세션 값을 해석할 수 없다. 우리가 쓴 값이므로 정상 경로가 아니다");
+            throw new InvalidRefreshTokenException();
+        }
+        SessionCheck check = check(session.userId(), session.sessionId());
+        if (check != SessionCheck.ACTIVE) {
+            log.warn("refresh 거절 — 토큰은 살아 있는데 세션이 없다: userId={} 사유={}", session.userId(), check);
             throw new InvalidRefreshTokenException();
         }
         String familyId = session.familyId() != null ? session.familyId() : candidateFamilyId;
@@ -227,8 +254,32 @@ public class MemberSessionService {
         redis.delete(familyKey(userId));
     }
 
-    public boolean isActive(Long userId, String sessionId) {
-        return sessionId != null && sessionId.equals(redis.opsForValue().get(sessionKey(userId)));
+    /**
+     * 이 Access Token 이 가리키는 세션이 아직 그 사람의 현행 세션인가.
+     *
+     * <p><b>거절을 두 갈래로 가른다.</b> 저장소에 세션 키 자체가 없는 것과, 키는 있는데 다른
+     * {@code sessionId} 인 것은 원인이 완전히 다르다 — 앞은 세션이 사라진 것이고(로그아웃·탈퇴·
+     * 저장소 소실), 뒤는 어딘가에서 새로 로그인해 밀려난 것이다. 하나의 {@code boolean} 으로 접으면
+     * 거절 로그를 봐도 둘을 구분할 수 없다 (GitLab #211).
+     *
+     * <p>읽기는 한 번 그대로다. 갈래는 그 한 번의 결과로 정한다.
+     */
+    public SessionCheck check(Long userId, String sessionId) {
+        String current = redis.opsForValue().get(sessionKey(userId));
+        if (current == null) {
+            return SessionCheck.NO_SESSION;
+        }
+        return current.equals(sessionId) ? SessionCheck.ACTIVE : SessionCheck.SID_MISMATCH;
+    }
+
+    /** {@link #check} 의 결과. 거절 로그가 이 이름을 그대로 적는다. */
+    public enum SessionCheck {
+        /** 현행 세션이다. 통과시킨다. */
+        ACTIVE,
+        /** 세션 키가 없다 — 폐기됐거나 저장소에서 사라졌다. 같은 시각 여러 사람이면 후자다. */
+        NO_SESSION,
+        /** 세션 키는 있는데 다른 것이다 — 새 로그인에 밀려난 옛 Access Token 이다. */
+        SID_MISMATCH
     }
 
     /**
@@ -303,6 +354,20 @@ public class MemberSessionService {
     private String familyKeyPrefix() { return keyspace + "auth:family:"; }
     private String refreshKeyPrefix() { return keyspace + "auth:refresh:"; }
     private String reusedKeyPrefix() { return keyspace + "auth:refresh:used:"; }
+
+    /**
+     * 재사용 표식을 로그 한 조각으로 만든다.
+     *
+     * <p>적는 것은 사유와 주체까지다 — 해시는 Refresh Token 에서 바로 나오는 값이라 로그에 남기지
+     * 않고, 계보 식별자는 사람이 읽을 때 쓸모가 없어 뺀다 (헌법 13조).
+     */
+    private static String describeUsed(String usedValue) {
+        if (usedValue == null) {
+            return "없음";
+        }
+        Used used = Used.parse(usedValue);
+        return used == null ? "구형·손상" : used.reason() + " userId=" + used.userId();
+    }
 
     /** 살아 있는 토큰을 "밀려남" 으로 적는다. 이미 소비된 해시라면 기록이 없으므로 아무것도 안 한다. */
     private void markSuperseded(String hash) {

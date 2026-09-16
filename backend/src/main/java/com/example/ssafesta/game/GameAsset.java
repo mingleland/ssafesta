@@ -156,6 +156,15 @@ public class GameAsset {
         return deletedAt != null;
     }
 
+    /**
+     * Soft delete (contract §7). Only {@code deleted_at} moves — the object stays in storage, because
+     * a Published Version may still reference it and Published is immutable.
+     */
+    void markDeleted() {
+        this.deletedAt = Instant.now();
+        this.updatedAt = this.deletedAt;
+    }
+
     boolean isGrantExpired(Instant now) {
         return !uploadExpiresAt.isAfter(now);
     }

@@ -6,6 +6,7 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.storage.ObjectStorage;
 import com.example.ssafesta.storage.StorageUnavailableException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -63,18 +64,20 @@ public class GameAssetService {
     private final GameAssetRepository assets;
     private final GameRepository games;
     private final GamePublishedVersionRepository publishedVersions;
+    private final GameDraftRepository drafts;
     private final GameAccessGuard guard;
     private final GameAssetImageValidator imageValidator;
     private final ObjectStorage storage;
     private final GameAssetDeleteQueue deleteQueue;
 
     public GameAssetService(GameAssetRepository assets, GameRepository games,
-                            GamePublishedVersionRepository publishedVersions, GameAccessGuard guard,
-                            GameAssetImageValidator imageValidator, ObjectStorage storage,
-                            GameAssetDeleteQueue deleteQueue) {
+                            GamePublishedVersionRepository publishedVersions, GameDraftRepository drafts,
+                            GameAccessGuard guard, GameAssetImageValidator imageValidator,
+                            ObjectStorage storage, GameAssetDeleteQueue deleteQueue) {
         this.assets = assets;
         this.games = games;
         this.publishedVersions = publishedVersions;
+        this.drafts = drafts;
         this.guard = guard;
         this.imageValidator = imageValidator;
         this.storage = storage;
@@ -184,6 +187,61 @@ public class GameAssetService {
         }
         asset.markReady(verified);
         return AssetView.of(asset);
+    }
+
+    /**
+     * Soft-deletes an asset (contract §7).
+     *
+     * <p>Two safety nets, in order: a repeat call on an already-deleted row is refused rather than
+     * silently accepted — {@code GAME_ASSET_DELETED} tells the caller nothing changed, matching how
+     * every other {@code GAME_ASSET_*} state conflict in this file already reports "not what you
+     * expected" rather than "done" (contract §6, {@code complete()} above does the same for a
+     * non-{@code UPLOADING} row of a different kind). Then, unless the caller passes {@code force},
+     * a row still named anywhere in the saved Draft is refused with {@code GAME_ASSET_IN_USE} — the
+     * FE already blocks this locally by walking the Draft's actual scene graph
+     * ({@code removeAssetReference}, authoringCommands.ts), so reaching this check at all means that
+     * local guard was bypassed or raced, not that a normal click hit it.
+     *
+     * <p>The object itself is never touched here — no queue, no storage call. §7 requires the bytes to
+     * survive as long as a Published Version might still reference them, and only member withdrawal
+     * (a different, hard-delete path) is allowed to remove them.
+     */
+    @Transactional
+    public void delete(Long gameId, String assetId, Long userId, boolean force) {
+        guard.requireOwnedLive(gameId, userId);
+        GameAsset asset = assets.findForUpdate(gameId, assetId)
+                .orElseThrow(() -> new ApiException(ErrorCode.GAME_ASSET_NOT_FOUND));
+        if (asset.isDeleted()) {
+            throw new ApiException(ErrorCode.GAME_ASSET_DELETED);
+        }
+        if (!force && isReferencedByDraft(gameId, assetId)) {
+            throw new ApiException(ErrorCode.GAME_ASSET_IN_USE);
+        }
+        asset.markDeleted();
+    }
+
+    /**
+     * A cheap backstop, not the primary UX — see {@link #delete}. Every registered asset names itself
+     * twice in its own {@code assets[]} entry ({@code id} and inside {@code source}), so a plain
+     * substring search over the whole Draft would call every registered asset "in use" whether or not
+     * anything actually places it — the registry entry alone would always match. Dropping the
+     * {@code assets} array before searching is what leaves only real usage: a Scene background, a
+     * Sprite component, a Tile Layer's {@code tilesetAssetId}, an Item's {@code assetId}, a Dialogue
+     * portrait — every one of those shapes stores the bare id, never the full {@code asset://} source,
+     * so the id alone is still the right needle. Walking the schema to name which of those it is would
+     * duplicate the FE's own {@code find*UsageLocations} helpers for a path that is not the normal UX.
+     */
+    private boolean isReferencedByDraft(Long gameId, String assetId) {
+        return drafts.findById(gameId)
+                .map(GameDraft::getProjectJson)
+                .map(projectJson -> referencedOutsideRegistry(projectJson, assetId))
+                .orElse(false);
+    }
+
+    private boolean referencedOutsideRegistry(String projectJson, String assetId) {
+        ObjectNode project = (ObjectNode) GameProjectJson.parse(projectJson);
+        project.remove("assets");
+        return project.toString().contains(assetId);
     }
 
     /**
