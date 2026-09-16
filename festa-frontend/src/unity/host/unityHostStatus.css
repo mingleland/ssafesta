@@ -22,6 +22,13 @@
   pointer-events: none;
 }
 
+/* 씬 전환 구간(preparing-world) 전용 — 반투명이면 Unity가 아직 안 지운 직전 씬의 마지막
+   canvas 프레임이 비쳐 보인다(S15P21A604-733). 이 구간은 클릭할 월드가 아직 없어 완전히
+   가려도 위 pointer-events:none 설계 의도(월드 클릭 안 가로막기)와 부딪히지 않는다. */
+.uh-status--opaque {
+  background: #0a0e1c;
+}
+
 .uh-status-title {
   font-size: 16px;
   font-weight: 600;
