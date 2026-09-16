@@ -36,12 +36,17 @@ for state in (candidate, known_good):
 if candidate.get('state') != 'CANDIDATE' or known_good.get('state') != 'CURRENT/KNOWN_GOOD':
     raise SystemExit('candidate or known-good state is not eligible for rollback')
 if candidate['releaseId'] == known_good['releaseId']:
-    raise SystemExit('candidate is already the known-good release')
+    print('NO_OP', candidate['releaseId'], known_good['releaseId'], '', '', sep='\t')
+    sys.exit(0)
 if not isinstance(known_good.get('imageRef'), str) or not isinstance(known_good.get('contentId'), str):
     raise SystemExit('known-good image identity is missing')
 print(candidate['releaseId'], candidate.get('imageRef', ''), known_good['releaseId'], known_good['imageRef'], known_good['contentId'], sep='\t')
 PY
 )
+if [[ "${candidate_release}" == 'NO_OP' ]]; then
+  echo 'rollback no-op: candidate is already the known-good release'
+  exit 0
+fi
 [[ "${known_good_ref}" =~ @sha256:[0-9a-f]{64}$ || "${known_good_ref}" =~ :[0-9a-f]{40}$ ]] || { echo 'known-good image ref must be immutable' >&2; exit 65; }
 [[ "${known_good_id}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'known-good content ID is invalid' >&2; exit 65; }
 actual_id="$("${docker_bin}" image inspect --format '{{.Id}}' "${known_good_ref}")"

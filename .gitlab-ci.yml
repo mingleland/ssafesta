@@ -86,9 +86,11 @@ mr-status:
     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
       when: never
     - changes:
-        - festa-frontend/**/*
-        - ci/**/*
-        - .gitlab-ci.yml
+        compare_to: 'refs/heads/develop'
+        paths:
+          - festa-frontend/**/*
+          - ci/**/*
+          - .gitlab-ci.yml
 
 .back-changes:
   rules:
@@ -96,9 +98,11 @@ mr-status:
     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
       when: never
     - changes:
-        - backend/**/*
-        - ci/**/*
-        - .gitlab-ci.yml
+        compare_to: 'refs/heads/develop'
+        paths:
+          - backend/**/*
+          - ci/**/*
+          - .gitlab-ci.yml
 
 .ai-changes:
   rules:
@@ -106,9 +110,11 @@ mr-status:
     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
       when: never
     - changes:
-        - festa-ai/**/*
-        - ci/**/*
-        - .gitlab-ci.yml
+        compare_to: 'refs/heads/develop'
+        paths:
+          - festa-ai/**/*
+          - ci/**/*
+          - .gitlab-ci.yml
 
 .game-changes:
   rules:
@@ -117,10 +123,12 @@ mr-status:
     - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME != "develop"'
       when: never
     - changes:
-        - festa-unity/**/*
-        - infra/unity-server/**/*
-        - ci/test
-        - ci/lib.sh
+        compare_to: 'refs/heads/develop'
+        paths:
+          - festa-unity/**/*
+          - infra/unity-server/**/*
+          - ci/test
+          - ci/lib.sh
 
 unity-mr-validation-dispatch:
   extends: .game-changes
