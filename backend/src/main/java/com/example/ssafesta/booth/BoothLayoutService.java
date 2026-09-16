@@ -42,7 +42,7 @@ public class BoothLayoutService {
      */
     @Transactional
     public SaveOutcome saveDraft(Long boothId, Long userId, String requestBody) {
-        accessGuard.requireEditor(boothId, userId);
+        accessGuard.requireModifier(boothId, userId);
 
         LayoutJson.SaveRequest request = readRequest(requestBody);
         if (request.expectedRevision() == null) {
@@ -75,7 +75,7 @@ public class BoothLayoutService {
      */
     @Transactional
     public PublishOutcome publish(Long boothId, Long userId) {
-        accessGuard.requireEditor(boothId, userId);
+        accessGuard.requireModifier(boothId, userId);
 
         // Locked before validating, not after: the agents this publish is about to approve can be
         // deleted concurrently, and the layout's reference to them is JSON with no foreign key to
