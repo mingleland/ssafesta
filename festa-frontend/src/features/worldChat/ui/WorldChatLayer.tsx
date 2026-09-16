@@ -17,6 +17,7 @@ import {
   setWorldChatDraft,
   useWorldChat,
 } from '../model/worldChat';
+import type { ReceivedChatMessage, WorldChatJoinNotice } from '../model/worldChat';
 import './worldChat.css';
 
 const VISIBLE_WHEN_CLOSED = 4;
@@ -27,6 +28,10 @@ const BOTTOM_SLACK_PX = 24;
 
 function isAtBottom(log: HTMLElement): boolean {
   return log.scrollHeight - log.scrollTop - log.clientHeight <= BOTTOM_SLACK_PX;
+}
+
+function isJoinNotice(message: ReceivedChatMessage): message is WorldChatJoinNotice & { seq: number } {
+  return 'type' in message && message.type === 'JOIN';
 }
 
 export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: number) => void }) {
@@ -44,6 +49,11 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
   const wasOpen = useRef(false);
   const shown = open ? messages : messages.slice(-VISIBLE_WHEN_CLOSED);
   const latest = messages[messages.length - 1];
+  const latestAnnouncement = latest === undefined
+    ? ''
+    : isJoinNotice(latest)
+      ? latest.nickname + '님이 입장하셨습니다.'
+      : latest.nickname + ': ' + latest.content;
 
   useEffect(() => {
     if (open) {
@@ -120,7 +130,7 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
 
       {/* 로그 전체에 aria-live 를 걸면 새 줄 하나마다 전부가 다시 읽힌다 — 새로 온 것만 따로 알린다 */}
       <p className="world-chat-sr" aria-live="polite">
-        {latest === undefined ? '' : latest.nickname + ': ' + latest.content}
+        {latestAnnouncement}
       </p>
 
       {/* 받은 말이 없으면 상자를 그리지 않는다. 게스트에게 빈 상자만 남던 자리이고, 회원도 첫 말이
@@ -135,7 +145,11 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
             if (atBottomRef.current) setUnread(0);
           }}
         >
-          {shown.map((message) => (
+          {shown.map((message) => isJoinNotice(message) ? (
+            <li key={message.seq} className="world-chat-join" role="status">
+              {message.nickname}님이 입장하셨습니다.
+            </li>
+          ) : (
             <li key={message.seq}>
               <b>{message.nickname}</b> {message.content}
             </li>

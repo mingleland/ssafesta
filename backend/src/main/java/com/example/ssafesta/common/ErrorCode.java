@@ -19,6 +19,17 @@ public enum ErrorCode {
     // ── 인증 · 권한 ──────────────────────────────────────────────────────────
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Access Token이 필요합니다."),
     INVALID_MEMBER_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 회원 토큰입니다."),
+    /**
+     * Distinguished from {@link #INVALID_MEMBER_TOKEN} on purpose — one is retryable, one is not
+     * (S15P21A604-764, GitLab #198), the same split {@link #OAUTH_HANDOFF_EXPIRED} makes.
+     *
+     * <p>The Refresh Token was rotated a moment ago and this request carried the one it replaced —
+     * a second tab that bootstrapped at the same time, not a stolen token. The session is alive and
+     * the cookie has already been refreshed, so sending it again succeeds; the client must not show
+     * "로그인이 끝났다". {@code INVALID_MEMBER_TOKEN} is deliberately not reused: it means
+     * "you are not logged in", and a client cannot tell the two apart from the status alone.
+     */
+    REFRESH_TOKEN_ROTATED(HttpStatus.UNAUTHORIZED, "로그인 정보가 방금 갱신되었습니다. 다시 시도해 주세요."),
     USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "존재하지 않는 회원입니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다."),
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
@@ -55,6 +66,15 @@ public enum ErrorCode {
     // ── 지갑 (spec 003) ─────────────────────────────────────────────────────
     WALLET_NOT_FOUND(HttpStatus.NOT_FOUND, "지갑을 찾을 수 없습니다."),
     INSUFFICIENT_COIN(HttpStatus.CONFLICT, "코인이 부족합니다."),
+    /**
+     * 같은 멱등키로 다른 내용의 요청이 왔다. 재시도는 <b>같은 요청</b>을 다시 보내는 것이라,
+     * 금액이나 사유가 달라졌다면 그건 재시도가 아니라 키를 재사용한 새 요청이다.
+     */
+    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등성 키로 다른 요청이 이미 처리됐습니다."),
+    /** 관리자 동작의 대상 회원이 없다. {@code USER_NOT_FOUND} 는 401 이라 이 자리에 쓸 수 없다. */
+    ADMIN_TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "대상 회원을 찾을 수 없습니다."),
+    /** 지급 후 잔액이 int 표현 범위를 넘는다. 잔액 부족의 반대쪽이라 같은 409 다. */
+    COIN_BALANCE_OVERFLOW(HttpStatus.CONFLICT, "지급 후 잔액이 표현 범위를 넘습니다."),
 
     // ── 카탈로그 · 인벤토리 (spec 012) ──────────────────────────────────────
     CATALOG_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "카탈로그 품목을 찾을 수 없습니다."),

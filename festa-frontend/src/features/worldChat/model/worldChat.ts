@@ -29,6 +29,15 @@ export interface WorldChatMessage {
   sentAt: string;
 }
 
+/** 채팅 본문과 구분해 렌더할 월드 입장 알림. 이름은 서버가 조회해 넣는다. */
+export interface WorldChatJoinNotice {
+  type: 'JOIN';
+  nickname: string;
+  sentAt: string;
+}
+
+export type WorldChatEntry = WorldChatMessage | WorldChatJoinNotice;
+
 /**
  * 수신 순서로 매긴 로컬 식별자를 붙인 메시지 (S15P21A604-791).
  *
@@ -36,9 +45,9 @@ export interface WorldChatMessage {
  * 시각에 두 줄을 보내면 겹친다. 문자열을 더 길게 잇는 대신 받은 순서를 그대로 쓴다 — 저장이
  * 없어 세션 밖으로 나갈 값이 아니고, 순서는 우리가 이미 알고 있다.
  */
-export interface ReceivedChatMessage extends WorldChatMessage {
+export type ReceivedChatMessage = WorldChatEntry & {
   seq: number;
-}
+};
 
 /** 한 번 뜬 안내가 화면에 눌러앉지 않게 한다 — 게스트 안내가 영구 잔류하던 자리 */
 export const NOTICE_TTL_MS = 6_000;
@@ -214,9 +223,27 @@ export function sendWorldChat(text: string, now = Date.now()): boolean {
   return true;
 }
 
+function isJoinNotice(value: unknown): value is WorldChatJoinNotice {
+  if (value === null || typeof value !== 'object') return false;
+  const event = value as Partial<WorldChatJoinNotice>;
+  return event.type === 'JOIN' && typeof event.nickname === 'string' && typeof event.sentAt === 'string';
+}
+
+function isChatMessage(value: unknown): value is WorldChatMessage {
+  if (value === null || typeof value !== 'object') return false;
+  const message = value as Partial<WorldChatMessage>;
+  return typeof message.senderUserId === 'number'
+    && typeof message.nickname === 'string'
+    && typeof message.content === 'string'
+    && typeof message.sentAt === 'string';
+}
+
 function pushMessage(raw: string): void {
   try {
-    const message = JSON.parse(raw) as WorldChatMessage;
+    const message: unknown = JSON.parse(raw);
+    if (!isJoinNotice(message) && !isChatMessage(message)) {
+      throw new Error('unknown chat event');
+    }
     const next = [...state.messages, { ...message, seq: nextSeq++ }];
     set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
   } catch {
@@ -268,7 +295,7 @@ export function __resetWorldChatForTests(): void {
 }
 
 /** 테스트 전용 — 서버 수신 경로를 거치지 않고 로그를 채운다 */
-export function __pushWorldChatForTests(messages: readonly WorldChatMessage[]): void {
+export function __pushWorldChatForTests(messages: readonly WorldChatEntry[]): void {
   const next = [...state.messages, ...messages.map((m) => ({ ...m, seq: nextSeq++ }))];
   set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
 }

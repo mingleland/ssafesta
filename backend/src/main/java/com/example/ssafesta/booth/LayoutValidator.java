@@ -221,6 +221,18 @@ public class LayoutValidator {
      *       identifier to own, neither {@code CONFIG_NOT_OWNED} nor {@code CONFIG_UNVERIFIED} is
      *       true of it any more. {@code requiresConfig} stays {@code true} for the same viewing-band
      *       reason as above.
+     *       <p>{@code PROJECT_PANEL} is the third to move, on the same grounds (spec 009 C-01,
+     *       GitLab #194). A booth holds at most one project ({@code ux_projects_booth}) and the
+     *       visitor contract carries no id at all — {@code BOOTH_PROJECT_INTERACT} is
+     *       {@code {boothId, objectId}}. The failure it closes is the kiosk's twin: panel published,
+     *       booth has no project, the visitor presses F and gets an empty overlay. The predicate is
+     *       "does this booth have a project".
+     *       <p>Three types now take this exception, and it is still one flag. Splitting
+     *       {@code requiresConfig} into a second "needs a viewing band" flag was considered and
+     *       dropped: the flag has exactly two readers — the branch below and
+     *       {@link LayoutPassageChecker} — and each of these types leaves the chain before reaching
+     *       the branch, so the passage check keeps seeing them with nothing to split. A fourth type
+     *       ({@code VIDEO_SCREEN}, pending a game-side decision) does not change that.
      *   <li><b>warning</b> {@code CONFIG_UNVERIFIED} — the server does not judge this kind of
      *       content yet. Said out loud so "no error" is not mistaken for "verified". What is left
      *       here is not a missing spec any more but a missing check: each kind gets its own line in
@@ -251,6 +263,13 @@ public class LayoutValidator {
                 }
                 // Unlike LAPTOP this does not fall through: the kiosk's configId identifies nothing
                 // (spec 010 C-06), so there is no owner to check and nothing left unverified.
+                continue;
+            } else if (type == LayoutObjectType.PROJECT_PANEL) {
+                if (!configResolver.boothProjectRegistered(boothId)) {
+                    result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
+                            "이 부스에 프로젝트가 없습니다.");
+                }
+                // Leaves the chain like SURVEY_KIOSK, and for the same reason (spec 009 C-01).
                 continue;
             } else if (type.requiresConfig() && object.configId() == null) {
                 result.addWarning("CONFIG_NOT_LINKED", object.objectId(),
