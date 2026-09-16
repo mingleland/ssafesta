@@ -151,6 +151,28 @@ export const routes = [
       };
     },
   },
+  {
+    // 관리자 콘솔 (S15P21A604-828) — 회원 전용 위에 관리자 판정을 한 번 더 건다. 월드 오버레이가 아니라
+    // 독립 화면이다: 표·페이지·긴 폼이라 Unity 를 뒤에 깔 이유가 없다. lazy — 관리자가 아니면 받을 이유가 없다.
+    path: '/app/admin',
+    element: <Navigate to="/app/admin/overview" replace />,
+  },
+  {
+    path: '/app/admin/:section',
+    lazy: async () => {
+      const [{ AdminPage }, { RequireAdmin }] = await Promise.all([
+        import('../../pages/admin/AdminPage.tsx'),
+        import('./RequireAdmin.tsx'),
+      ]);
+      return {
+        Component: () => (
+          <RequireAdmin>
+            <AdminPage />
+          </RequireAdmin>
+        ),
+      };
+    },
+  },
 ];
 
 export const router = createBrowserRouter(routes);
