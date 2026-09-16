@@ -17,6 +17,7 @@ public class ApiException extends RuntimeException {
     private final transient ErrorCode errorCode;
     private final transient List<ApiErrorDetail> errors;
     private final transient List<ApiErrorDetail> warnings;
+    private final transient Integer balance;
 
     public ApiException(ErrorCode errorCode) {
         this(errorCode, errorCode.defaultMessage());
@@ -28,10 +29,23 @@ public class ApiException extends RuntimeException {
 
     public ApiException(ErrorCode errorCode, String message,
                         List<ApiErrorDetail> errors, List<ApiErrorDetail> warnings) {
+        this(errorCode, message, errors, warnings, null);
+    }
+
+    /**
+     * @param balance the wallet balance to put in the envelope, or {@code null} for the errors that
+     *                are not about coins — which is all of them but
+     *                {@code InsufficientCoinException}. It rides on the exception rather than on a
+     *                second {@code @RestControllerAdvice} so that the envelope keeps being built in
+     *                exactly one place
+     */
+    protected ApiException(ErrorCode errorCode, String message, List<ApiErrorDetail> errors,
+                           List<ApiErrorDetail> warnings, Integer balance) {
         super(message == null ? errorCode.defaultMessage() : message);
         this.errorCode = errorCode;
         this.errors = errors == null ? List.of() : List.copyOf(errors);
         this.warnings = warnings == null ? List.of() : List.copyOf(warnings);
+        this.balance = balance;
     }
 
     /**
@@ -61,5 +75,10 @@ public class ApiException extends RuntimeException {
 
     public List<ApiErrorDetail> warnings() {
         return warnings;
+    }
+
+    /** The wallet balance to report alongside this error, or {@code null} — see the constructor. */
+    public Integer balance() {
+        return balance;
     }
 }

@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +27,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 @Tag(name = "Auth")
 public class GuestAuthController {
+
+    /**
+     * 쿠키가 아예 안 온 것과, 와서 거절된 것을 로그에서 갈라야 한다 (GitLab #211). 이 갈래만
+     * {@code INFO} 인 이유는 <b>이것이 정상 상태이기 때문</b>이다 — 비로그인 방문자는 페이지를 열
+     * 때마다 여기로 떨어진다. {@code WARN} 으로 올리면 정상 트래픽이 경고를 채우고, 진짜 경고가
+     * 그 사이에 묻힌다.
+     */
+    private static final Logger log = LoggerFactory.getLogger(GuestAuthController.class);
 
     private final AccessTokenService accessTokenService;
     private final MemberSessionService memberSessionService;
@@ -94,6 +104,7 @@ public class GuestAuthController {
                                                         HttpServletRequest request) {
         requireTrustedOrigin(request, origin);
         if (refreshToken == null) {
+            log.info("refresh 거절 — refresh_token 쿠키가 요청에 없다");
             throw new InvalidRefreshTokenException();
         }
         MemberSessionService.MemberSession session = memberSessionService.refresh(refreshToken);

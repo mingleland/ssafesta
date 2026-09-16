@@ -31,8 +31,8 @@ public class BoothDashboardController {
 
     @Operation(summary = "부스 운영 요약",
             description = """
-                    부스 운영자가 자기 부스의 한 기간을 한 번에 본다. Owner·`ADMIN`·`CONTENT_EDITOR`
-                    만 볼 수 있다 — `CONSULTANT` 는 상담을 하지 운영 지표를 보지 않는다.
+                    부스 운영자가 한 기간을 한 번에 본다. Owner·부스 Staff `ADMIN`·`CONTENT_EDITOR`와
+                    전역 Admin이 볼 수 있다 — `CONSULTANT` 는 상담을 하지 운영 지표를 보지 않는다.
 
                     **코인 칸은 "수익" 이 아니다.** 부스로 코인이 *들어오는* 경로가 없기 때문이다 —
                     원장에서 부스와 닿는 사유는 둘뿐이고 둘 다 수익이 아니다. 그래서 이 부스가

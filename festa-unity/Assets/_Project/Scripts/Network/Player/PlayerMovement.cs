@@ -69,6 +69,16 @@ namespace Festa.Network
         public NetworkVariable<Vector3> ServerSpawnPosition = new(
             Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        /// <summary>
+        /// 서버가 배정한 스폰 방향(yaw, 도). 음수면 지정 없음 — 재접속 위치 복원(#200)일 때만 채운다.
+        /// 위치와 같은 이유로 Owner 가 스스로 적용한다.
+        /// </summary>
+        public NetworkVariable<float> ServerSpawnYaw = new(
+            -1f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+        /// <summary>서버에서만 채운다 — 이 접속의 grant subject. 재접속 위치 보관/복원의 키 (<see cref="PlayerPositionMemory"/>).</summary>
+        string _identitySubject;
+
         // 값 미수신(버전 불일치 등) 시 현재 위치로 진행하는 한계선 (S15P21A604-259).
         //
         // **시간만으로 재면 가려진 탭에서 너무 일찍 포기한다.** 백그라운드 탭은 rAF 스로틀링으로
@@ -94,7 +104,13 @@ namespace Festa.Network
         PlayerCameraFollow _cameraFollow;
         CharacterController _controller;
         Unity.Netcode.Components.NetworkTransform _networkTransform;
+        readonly RaycastHit[] _wallSweepHits = new RaycastHit[32];
         float _turnVelocity;
+        // 짧은 Shift 탭은 걷기 속도/모션을 유지한다. 즉시 Run으로 바꾸면 같은 프레임에
+        // 이동 속도와 네트워크 AnimState가 함께 튀어 스케이트처럼 보인다 (S15P21A604-747).
+        const float RunPressDelay = 0.18f;
+        float _runPressedAt = -1f;
+        bool _runActivated;
         float _verticalSpeed;
         bool _spawnPlaced;
         float _spawnWaitStart;
@@ -213,7 +229,25 @@ namespace Festa.Network
             if (body != null) body.enabled = !IsOwner;
 
             if (IsServer)
-                ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
+            {
+                // 승인 위치 그대로 — 단, 같은 신원이 방금 끊겼다 돌아온 것이면 그 자리로 (GitLab #200 B안).
+                // 승인(ConnectionManager, 동결)은 손대지 않고 그 뒤에서 스폰 목표만 바꾼다.
+                var spawn = transform.position;
+                _identitySubject = Festa.Network.WorldSessionRegistry.SubjectOf(OwnerClientId);
+                if (Festa.Network.PlayerPositionMemory.TryTake(_identitySubject, out var remembered))
+                {
+                    spawn = remembered.Position;
+                    transform.SetPositionAndRotation(spawn, Quaternion.Euler(0f, remembered.Yaw, 0f));
+                    ServerSpawnYaw.Value = remembered.Yaw;
+                    Debug.Log($"[PlayerMovement] 재접속 위치 복원 — sub={_identitySubject} 스폰 대신 {spawn} (끊긴 지 {Time.realtimeSinceStartupAsDouble - remembered.SavedAt:F0}s)");
+                }
+                else
+                {
+                    // 헌 접속이 아직 정리되지 않았을 수 있다(ReplacedBySameUser) — 몇 초간 늦은 기록을 기다린다.
+                    Festa.Network.PlayerPositionMemory.WatchLateArrival(_identitySubject, OnLateRememberedPosition);
+                }
+                ServerSpawnPosition.Value = spawn;
+            }
 
             if (IsOwner)
             {
@@ -231,6 +265,38 @@ namespace Festa.Network
         public override void OnNetworkDespawn()
         {
             if (IsOwner) ServerSpawnPosition.OnValueChanged -= OnServerSpawnPositionChanged;
+            if (IsServer && !string.IsNullOrEmpty(_identitySubject))
+            {
+                // 끊기는 자리를 신원별로 잠시 보관한다 — 재접속하면 여기서 다시 선다 (#200).
+                Festa.Network.PlayerPositionMemory.Unwatch(_identitySubject);
+                Festa.Network.PlayerPositionMemory.Remember(_identitySubject, transform.position, transform.eulerAngles.y);
+            }
+        }
+
+        /// <summary>서버: 새 스폰 뒤에 헌 접속의 기록이 도착했다 — Owner 에게 그 자리로 옮기라고 보낸다.</summary>
+        void OnLateRememberedPosition(Festa.Network.PlayerPositionMemory.Entry entry)
+        {
+            if (!IsServer || !IsSpawned) return;
+            ServerSpawnYaw.Value = entry.Yaw;
+            RestorePositionOwnerRpc(entry.Position, entry.Yaw);
+        }
+
+        /// <summary>
+        /// Owner: 서버가 늦게 찾아낸 이전 자리로 옮긴다. 이미 스폰 지점을 벗어나 걷기 시작했으면 옮기지 않는다 —
+        /// 사람이 움직이는 중에 끌어당기는 것이 자리를 잃는 것보다 나쁘다.
+        /// </summary>
+        [Rpc(SendTo.Owner)]
+        void RestorePositionOwnerRpc(Vector3 position, float yaw)
+        {
+            float fromSpawn = Vector3.Distance(transform.position, ServerSpawnPosition.Value);
+            if (fromSpawn > 3f)
+            {
+                Debug.Log($"[PlayerMovement] 늦은 위치 복원 건너뜀 — 이미 스폰에서 {fromSpawn:F1}u 이동");
+                return;
+            }
+            TeleportTo(position);
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            Debug.Log($"[PlayerMovement] 늦은 위치 복원 — {position} yaw={yaw:F0}");
         }
 
         void OnServerSpawnPositionChanged(Vector3 _, Vector3 next)
@@ -295,6 +361,10 @@ namespace Festa.Network
 
             if (controllerWasEnabled) _controller.enabled = true;
             _verticalSpeed = 0f;
+
+            // 재접속 복원이면 바라보던 방향도 돌려준다 (#200). 일반 스폰은 -1 이라 건드리지 않는다.
+            if (ServerSpawnYaw.Value >= 0f)
+                transform.rotation = Quaternion.Euler(0f, ServerSpawnYaw.Value, 0f);
         }
 
         void Update()
@@ -343,13 +413,19 @@ namespace Festa.Network
 
             var input = ReadMoveInput();
             bool moving = input.sqrMagnitude > 0.0001f;
-            bool running = moving && IsRunPressed();
+            // 이동 여부와 무관하게 Shift 유지 시간을 잰다. 먼저 Shift를 누르고 이동을
+            // 시작하는 일반적인 조작도 0.18초가 지났다면 즉시 달리기로 들어간다.
+            bool runRequested = ResolveRunState(IsRunPressed());
+            bool running = moving && runRequested;
 
             // 이동·점프는 이모트를 끝낸다. **점프가 빠져 있었다** — 앉거나 누운 채로 Space 를 누르면
             // 그 자세 그대로 몸이 떠올랐다 (사용자 보고 2026-09-13, 소파·바닥 앉기 둘 다).
             // 막지 않고 해제하는 쪽을 고른 것은 이동과 같은 규칙이기 때문이다 — 사용자가 Space 를
             // 눌렀다는 것은 그 자세를 끝내겠다는 뜻이지, 입력이 씹히길 바라는 것이 아니다.
-            if ((moving || IsJumpPressed()) && _player.EmoteId.Value != PlayerEmoteId.None)
+            // 주먹은 예외다. 상체 마스크 레이어에서만 재생하므로 다리는 그대로 걷고, 여기서 지우면
+            // 걸으면서 친 주먹이 누른 프레임에 사라진다 (사용자 지적 2026-09-16).
+            var currentEmote = _player.EmoteId.Value;
+            if ((moving || IsJumpPressed()) && currentEmote != PlayerEmoteId.None && !IsUpperBodyOnly(currentEmote))
                 _player.EmoteId.Value = PlayerEmoteId.None;
 
             // 중력은 정지 중에도 적용한다 — 그러지 않으면 발판에서 벗어나도 공중에 선다.
@@ -488,8 +564,168 @@ namespace Festa.Network
                 return;
             }
 
-            var velocity = horizontalVelocity + NoStandSlide() + Vector3.up * _verticalSpeed;
+            var before = transform.position;
+            var velocity = horizontalVelocity + NoStandSlide() + ExternalPush() + SoftSeparation() + Vector3.up * _verticalSpeed;
             _controller.Move(velocity * Time.deltaTime);
+            PreventPlayerPushThroughWall(before);
+        }
+
+        // ── 사람끼리 부드럽게 밀어내기 (S15P21A604-761, 2026-09-16 재설계) ──────
+        //
+        // **왜 물리 충돌을 끄고 속도로 미는가.** 원격 캡슐을 단단한 콜라이더로 두면 상대가 밀고 들어올 때
+        // CharacterController 의 디페네트레이션이 나를 **임의 거리**로 튕겨낸다. 그 방향에 벽이 있으면
+        // 얇은 벽은 그대로 통과한다 — "벽에서 서로 밀면 밖으로 빠진다" 의 정체다. 이동 뒤 벽을 스윕해
+        // 되돌리는 보정(PreventPlayerPushThroughWall)은 그 결과를 사후에 잡는 것이라 시작점이 이미
+        // 벽 안에 있으면 놓친다.
+        //
+        // 대신 Player↔Player 물리 충돌은 끄고(PlayerCollisionPolicy), 겹친 만큼을 **속도**로 넣는다.
+        // 이 속도는 다른 입력과 같이 Move() 를 거치므로 벽에서는 벽 판정이 이긴다 — 벽에 붙은 사람을
+        // 아무리 밀어도 벽 앞에서 멈춘다. 뚫을 수 없는 이유가 검사가 아니라 **구조**에 있다.
+        //
+        // 겹침을 한 프레임에 전부 해소하면 네트워크로 늦게 보인 상대가 가까이 나타나는 순간
+        // 90u/s로 튕겨 나간다. 겹침은 허용하되 0.18초에 걸쳐 풀고, 달리기 속도의 절반보다
+        // 낮은 속도로 제한한다. 두 플레이어가 각자 절반씩 물러나므로 체감 분리는 더 빠르다.
+        const float SeparationMaxSpeed = 24f;
+        const float SeparationRelaxTime = 0.18f;
+        const float SeparationResponse = 14f;
+        const float SeparationProbe = 0.5f;   // 겹치기 직전까지 잡아 떨림 없이 벌어지게
+        static readonly Collider[] s_bodyHits = new Collider[16];
+        Vector3 _separationVelocity;
+
+        Vector3 SoftSeparation()
+        {
+            if (_controller == null || !_controller.enabled) return Vector3.zero;
+
+            GetControllerCapsuleAt(transform.position, out var bottom, out var top, out float radius, out float skin);
+            float mine = radius + skin;
+            int mask = 1 << gameObject.layer;
+            int count = Physics.OverlapCapsuleNonAlloc(bottom, top, mine + SeparationProbe, s_bodyHits, mask, QueryTriggerInteraction.Ignore);
+            if (count == 0)
+            {
+                _separationVelocity = Vector3.Lerp(
+                    _separationVelocity, Vector3.zero,
+                    1f - Mathf.Exp(-SeparationResponse * Time.deltaTime));
+                return _separationVelocity;
+            }
+
+            var push = Vector3.zero;
+            for (int i = 0; i < count; i++)
+            {
+                var c = s_bodyHits[i];
+                if (c == null || c == _controller || c.transform.IsChildOf(transform)) continue;
+
+                // Player 레이어의 장식/상호작용 콜라이더가 밀어내기에 섞이지 않게 실제
+                // 네트워크 플레이어의 몸 캡슐만 대상으로 삼는다.
+                var other = c.GetComponentInParent<PlayerMovement>();
+                if (other == null || other == this || !other.IsSpawned) continue;
+
+                float theirs = 2.85f;
+                if (c is CapsuleCollider capsule)
+                {
+                    var ls = capsule.transform.lossyScale;
+                    theirs = capsule.radius * Mathf.Max(Mathf.Abs(ls.x), Mathf.Abs(ls.z));
+                }
+                else if (c is CharacterController cc) theirs = cc.radius;
+
+                var delta = transform.position - c.transform.position;
+                delta.y = 0f;
+                float distance = delta.magnitude;
+                float minDistance = mine + theirs;
+                if (distance >= minDistance) continue;
+
+                // 정확히 겹치면 방향이 없다 — 보고 있는 반대쪽으로 빠진다
+                var dir = distance > 0.01f ? delta / distance : -transform.forward;
+                push += dir * (minDistance - distance);
+            }
+
+            Vector3 target = Vector3.zero;
+            if (push.sqrMagnitude >= 1e-6f)
+            {
+                // 프레임 시간이 아니라 완화 시간으로 나눈다. 저 FPS/백그라운드 복귀에서도
+                // 한 프레임짜리 큰 속도가 생기지 않는다.
+                float speed = Mathf.Min(push.magnitude / SeparationRelaxTime, SeparationMaxSpeed);
+                target = push.normalized * speed;
+            }
+
+            _separationVelocity = Vector3.Lerp(
+                _separationVelocity, target,
+                1f - Mathf.Exp(-SeparationResponse * Time.deltaTime));
+            return _separationVelocity;
+        }
+
+        /// <summary>
+        /// 원격 플레이어의 CapsuleCollider가 겹치며 만든 CharacterController 디페네트레이션이
+        /// 정적 벽 반대편까지 넘어갔으면 이동 전 쪽의 벽 표면으로 되돌린다.
+        /// </summary>
+        void PreventPlayerPushThroughWall(Vector3 before)
+        {
+            var after = transform.position;
+            var horizontal = after - before;
+            horizontal.y = 0f;
+            float distance = horizontal.magnitude;
+            if (distance < 0.001f) return;
+
+            GetControllerCapsuleAt(before, out var bottom, out var top, out float radius, out float skinWidth);
+            var direction = horizontal / distance;
+            // 플레이어 레이어는 벽이 아니다 — 겹친 사람 캡슐 안에서 캐스트가 시작되면 거리 0 히트가 나와
+            // 이동이 통째로 취소된다(2026-09-16 실측: 더미 캡슐이 겹치자 매 프레임 제자리로 되돌아갔다).
+            // 사람끼리는 SoftSeparation 이 속도로 푸니 여기서는 정적 지형만 본다.
+            int count = Physics.CapsuleCastNonAlloc(
+                bottom,
+                top,
+                radius,
+                direction,
+                _wallSweepHits,
+                distance + skinWidth,
+                ~(1 << gameObject.layer),
+                QueryTriggerInteraction.Ignore);
+
+            float nearestWall = float.PositiveInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                var hit = _wallSweepHits[i];
+                var collider = hit.collider;
+                if (collider == null || collider == _controller || collider.transform.IsChildOf(transform)) continue;
+                if (collider.GetComponentInParent<NetworkPlayer>() != null) continue;
+                if (collider.attachedRigidbody != null && !collider.attachedRigidbody.isKinematic) continue;
+                if (Mathf.Abs(hit.normal.y) > 0.55f) continue;
+                if (Vector3.Dot(direction, hit.normal) >= -0.01f) continue;
+                nearestWall = Mathf.Min(nearestWall, hit.distance);
+            }
+
+            if (float.IsPositiveInfinity(nearestWall)) return;
+
+            float allowed = Mathf.Max(0f, nearestWall - skinWidth);
+            if (distance <= allowed + 0.001f) return;
+
+            var corrected = before + direction * allowed;
+            corrected.y = after.y;
+            bool wasEnabled = _controller.enabled;
+            _controller.enabled = false;
+            transform.position = corrected;
+            Physics.SyncTransforms();
+            _controller.enabled = wasEnabled;
+        }
+
+        void GetControllerCapsuleAt(
+            Vector3 position,
+            out Vector3 bottom,
+            out Vector3 top,
+            out float radius,
+            out float skinWidth)
+        {
+            var scale = transform.lossyScale;
+            float verticalScale = Mathf.Abs(scale.y);
+            float horizontalScale = Mathf.Max(Mathf.Abs(scale.x), Mathf.Abs(scale.z));
+            skinWidth = _controller.skinWidth * horizontalScale;
+            radius = Mathf.Max(0.01f, _controller.radius * horizontalScale - skinWidth);
+            float height = Mathf.Max(radius * 2f, _controller.height * verticalScale);
+            float halfSegment = Mathf.Max(0f, height * 0.5f - radius);
+            var centerOffset = transform.TransformVector(_controller.center);
+            var center = position + centerOffset;
+            var up = transform.up;
+            bottom = center - up * halfSegment;
+            top = center + up * halfSegment;
         }
 
         // ── 올라설 수 없는 표면 (2026-09-10 사용자 지시) ────────────────
@@ -513,6 +749,35 @@ namespace Festa.Network
 
         Vector3 NoStandSlide()
             => Time.time < _noStandPushUntil ? _noStandPush * NoStandSlideSpeed : Vector3.zero;
+
+        /// <summary>상체 레이어에서만 재생돼 이동과 함께 나갈 수 있는 이모트인가 (주먹질).</summary>
+        static bool IsUpperBodyOnly(PlayerEmoteId emote) =>
+            emote == PlayerEmoteId.Punch1 || emote == PlayerEmoteId.Punch2 || emote == PlayerEmoteId.Punch3;
+
+        // ── 밖에서 들어온 밀림 (주먹질 피격, 2026-09-15) ────────────────
+        //
+        // 남이 나를 미는 것이 아니라 **내 컨트롤러가 나를 민다.** 이동이 클라이언트 권위라
+        // 남이 내 transform 을 옮기면 NetworkTransform 이 곧 내 값으로 되돌리고, 그 사이 두 화면이
+        // 어긋난다. 때린 쪽은 부탁만 하고(PlayerPunchImpact) 실제 이동은 여기서 한다.
+        //
+        // 입력에 **더해지는** 값이라 맞으면서 반대로 걸어 버티는 것이 가능하다 — 의도한 것이다.
+        // 아주 살짝 밀리는 연출이지 경직이 아니다.
+        Vector3 _externalPush;
+        float _externalPushSpeed;
+        float _externalPushUntil;
+
+        /// <summary>바깥에서 요청한 밀림. 수평 성분만 쓴다 — 위로 밀면 발이 뜬다.</summary>
+        public void ApplyExternalPush(Vector3 direction, float speed, float seconds)
+        {
+            direction.y = 0f;
+            if (direction.sqrMagnitude < 1e-4f || speed <= 0f || seconds <= 0f) return;
+            _externalPush = direction.normalized;
+            _externalPushSpeed = speed;
+            _externalPushUntil = Time.time + seconds;
+        }
+
+        Vector3 ExternalPush()
+            => Time.time < _externalPushUntil ? _externalPush * _externalPushSpeed : Vector3.zero;
 
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
@@ -565,6 +830,22 @@ namespace Festa.Network
         {
             if (UseSyntheticInput) return SyntheticRun;
             return IsRunKeyPressed();
+        }
+
+        bool ResolveRunState(bool pressed)
+        {
+            if (!pressed)
+            {
+                _runPressedAt = -1f;
+                _runActivated = false;
+                return false;
+            }
+
+            if (_runActivated) return true;
+            if (_runPressedAt < 0f) _runPressedAt = Time.unscaledTime;
+
+            _runActivated = Time.unscaledTime - _runPressedAt >= RunPressDelay;
+            return _runActivated;
         }
 
         static Vector2 ReadKeyboardInput()

@@ -19,8 +19,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>{@link BigDecimal} rather than {@code double} throughout, so the yml text <i>is</i> the policy
  * and no {@code 0.30000000000000004} ever reaches a comparison against a ±0.1s band.
  *
- * @param dailyCapCoins the most a member can earn from minigames in one day (C-04 — 50)
- * @param timerStop     the one minigame spec 014 FR-009 allows
+ * @param dailyCapCoins the most a member can earn from <b>timing-stop</b> in one day (C-04 — 50).
+ *                      Counted by {@code MINIGAME_REWARD}, so the slot machine's own
+ *                      {@code SLOT_PAYOUT} entries never touch it (#205 확정값 2)
+ * @param timerStop     the timing-stop game, the only one spec 014 covers. The slot machine has its
+ *                      own root ({@link SlotMachineProperties}, spec 021) so the two balance tables
+ *                      cannot be edited into each other
  */
 @ConfigurationProperties("app.minigame")
 public record MinigameProperties(int dailyCapCoins, TimerStop timerStop) {

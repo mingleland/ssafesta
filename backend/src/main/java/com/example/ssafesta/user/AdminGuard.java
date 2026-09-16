@@ -56,6 +56,18 @@ public class AdminGuard {
     }
 
     /**
+     * A non-throwing authority check for another domain's established error contract.
+     *
+     * <p>For example, a non-editor on a booth must still receive that domain's
+     * {@code BOOTH_EDITOR_FORBIDDEN}, not the generic admin API error. Callers that expose the
+     * admin surface itself use {@link #requireAdmin(Long)} instead.
+     */
+    @Transactional(readOnly = true)
+    public boolean isAdmin(Long userId) {
+        return users.findById(userId).map(User::isAdmin).orElse(false);
+    }
+
+    /**
      * Refuses an admin action aimed at the master account.
      *
      * <p>Reading is not acting — member lookups and ledgers still show the master. What this blocks

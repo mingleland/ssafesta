@@ -4,7 +4,7 @@
 > 두 도구의 차이는 **명령 접두사 하나뿐**이고(`$` vs `/`), 결과물은 같은 `specs/`에 쌓인다.
 > **이 파일 하나로 작업을 시작할 수 있게** 쓴다. 규칙이 바뀌면 다른 문서보다 **여기를 먼저** 고친다.
 >
-> 최종 갱신: 2026-09-01 (헌법 v1.3 — 11조 소셜 로그인에 SSAFY 추가) | 대상: **Codex · Claude Code** / 기타 AI 에이전트
+> 최종 갱신: 2026-09-16 (헌법 v1.4 — 28조 "미니게임 1종만" 삭제) | 대상: **Codex · Claude Code** / 기타 AI 에이전트
 
 | 도구 | 자동으로 읽는 파일 | speckit 명령 | 명령 정의 위치 |
 |---|---|---|---|
@@ -60,7 +60,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 ```text
 [1] 이 파일 전체를 읽는다                          ← Codex / Claude Code 공통
-[2] .specify/memory/constitution.md (헌법 v1.3)  ← 모든 결정의 최상위 근거
+[2] .specify/memory/constitution.md (헌법 v1.4)  ← 모든 결정의 최상위 근거
 [3] 작업할 spec 지정:  .specify/feature.json      ← §2-3. 안 하면 명령이 실패한다
 [4] specs/NNN-*/spec.md + plan.md + tasks.md      ← 목록은 specs/README.md
 [5] docs/25_트러블슈팅.md 의 T-24 ~ T-27          ← 최근에 실제로 터진 것들
@@ -88,7 +88,7 @@ docs/18_Jira_운영_가이드.md 를 읽고 그 규칙 아래에서 동작하라
 
 > ❌ `pip install specify-cli` / `specify init` 를 **다시 실행하지 마라.**
 > 재설치는 `.specify/memory/constitution.md`를 **빈 템플릿으로 덮어쓸 수 있다.**
-> 우리 헌법 v1.3가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
+> 우리 헌법 v1.4가 거기 들어 있다. 날아가면 전 파트가 근거를 잃는다.
 
 ### 필요한 것 (설치가 필요한 유일한 항목)
 
@@ -169,7 +169,7 @@ echo '{ "feature_directory": "specs/013-avatar-customization" }' > .specify/feat
 
 ## 3. 헌법 — 반드시 걸리는 게이트
 
-전문: `.specify/memory/constitution.md` (v1.3). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
+전문: `.specify/memory/constitution.md` (v1.4). 아래는 **실제로 사고가 났거나 나기 쉬운** 조항이다.
 
 | 조 | 내용 | 어기면 |
 |:---:|---|---|
@@ -351,7 +351,7 @@ SSAFESTA/
 ├── AGENTS.md                       ← 이 파일 (에이전트 규칙의 단일 출처, 두 도구 공통)
 ├── CLAUDE.md                       ← 요약 + 이 파일로 안내 (Claude Code 진입점)
 ├── .specify/
-│   ├── memory/constitution.md      ★ 헌법 v1.3
+│   ├── memory/constitution.md      ★ 헌법 v1.4
 │   ├── templates/  scripts/bash/
 │   └── feature.json                ★ 작업 중인 spec 지정 (커밋 안 됨, 각자 생성)
 ├── .agents/skills/speckit-*/       Codex 명령      ($speckit-plan)
