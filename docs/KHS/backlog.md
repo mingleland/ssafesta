@@ -177,7 +177,7 @@
 - **아바타 보유·구매·미보유 착용 차단 연동** — GitLab [#120](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/120)
   - 서버 `owned` 값을 정본으로 잠금·구매·로그인 유도 UI와 저장 거부 복구를 연결하고, Unity 카탈로그 itemId/familyId 매핑을 확인한다.
 - **슬롯머신·타이밍 스톱 실서버 판정 클라이언트 연결** — GitLab [#134](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/134), [#205](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/205)
-  - Mock 대신 확정된 서버 계약을 연결하되 슬롯 tier 0~3·베팅 10·게스트/잔액 오류 처리와 타이밍 결과 보고를 검증한다.
+  - 상태: **Unity 쪽 완료(09-16)/BE 배포 후 실서버 확인 대기**. 서버 우선 클라이언트가 이미 있었고 #205 확정 코드(404 SLOT_MACHINE_NOT_FOUND·400)만 보강. BE 가 붙으면 Unity 변경 없이 실판정으로 전환된다.
 - **테스트용 부스 게시본 콘텐츠 E2E 연결** — GitLab [#137](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/work_items/137)
   - `AI_AGENT`, `GAME_PORTAL`, `PROJECT_PANEL`의 실제 config/binding이 들어간 게시본으로 Unity 이벤트와 FE Overlay까지 왕복 검증한다.
 
