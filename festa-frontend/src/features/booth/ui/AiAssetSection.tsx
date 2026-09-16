@@ -27,19 +27,22 @@ export function AiAssetSection() {
         <span className="bm-ai-lock">{IcLock}</span>
       </div>
       <p className="ov-note">AI로 생성한 전시 에셋을 부스에 배치하여 더욱 풍성한 부스를 만들어보세요.</p>
-      <div className="bm-ai-cases">
-        {CASES.map((state, i) => (
-          <div key={i} className="bm-ai-case">
-            {IcCube}
-            <span>케이스 {i + 1}</span>
-            <em>{state}</em>
-          </div>
-        ))}
-        <p className="bm-ai-locked">AI 에셋 기능은 추후 제공 예정입니다.</p>
-      </div>
-      <div className="bm-ai-actions">
-        <button type="button" className="ov-btn" disabled aria-disabled="true">AI 에셋 생성</button>
-        <button type="button" className="ov-btn" disabled aria-disabled="true">케이스에 배치</button>
+      {/* 케이스와 동작을 한 줄에 둔다 — 케이스가 남는 너비를 먹고 버튼은 그 오른쪽에 선다 */}
+      <div className="bm-ai-body">
+        <div className="bm-ai-cases">
+          {CASES.map((state, i) => (
+            <div key={i} className="bm-ai-case">
+              {IcCube}
+              <span>케이스 {i + 1}</span>
+              <em>{state}</em>
+            </div>
+          ))}
+          <p className="bm-ai-locked">AI 에셋 기능은 추후 제공 예정입니다.</p>
+        </div>
+        <div className="bm-ai-actions">
+          <button type="button" className="ov-btn" disabled aria-disabled="true">AI 에셋 생성</button>
+          <button type="button" className="ov-btn" disabled aria-disabled="true">케이스에 배치</button>
+        </div>
       </div>
     </section>
   );
