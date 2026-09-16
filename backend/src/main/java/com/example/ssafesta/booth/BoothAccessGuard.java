@@ -1,5 +1,7 @@
 package com.example.ssafesta.booth;
 
+import com.example.ssafesta.user.AdminActionRecorder;
+import com.example.ssafesta.user.AdminGuard;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +31,17 @@ public class BoothAccessGuard {
     private final BoothRepository booths;
     private final BoothStaffRepository staffs;
     private final BoothLeaseRepository leases;
+    private final AdminGuard admins;
+    private final AdminActionRecorder adminActions;
 
     public BoothAccessGuard(BoothRepository booths, BoothStaffRepository staffs,
-                            BoothLeaseRepository leases) {
+                            BoothLeaseRepository leases, AdminGuard admins,
+                            AdminActionRecorder adminActions) {
         this.booths = booths;
         this.staffs = staffs;
         this.leases = leases;
+        this.admins = admins;
+        this.adminActions = adminActions;
     }
 
     /**
@@ -52,10 +59,40 @@ public class BoothAccessGuard {
     @Transactional(readOnly = true)
     public Booth requireEditor(Long boothId, Long userId) {
         Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
-        if (!booth.isOwnedBy(userId) && !mayEditAsStaff(boothId, userId)) {
+        // 전역 관리자는 부스의 읽기·운영 정보를 본다. 마스터 보호는 "조회"가 아니라
+        // 관리자로서 대상을 바꾸는 행위를 막는 규칙이라 변경 전용 게이트에 둔다.
+        if (!isOrdinaryEditor(booth, userId) && !admins.isAdmin(userId)) {
             throw new BoothEditorForbiddenException();
         }
         return booth;
+    }
+
+    /**
+     * An editor who is about to change booth state.
+     *
+     * <p>Owner and booth staff keep their original authority. Only the global-admin fallback is
+     * an administrative action: it cannot target the master's booth and it leaves an audit row in
+     * the caller's transaction. A failed validation rolls both the attempted change and this row
+     * back together.
+     */
+    @Transactional
+    public Booth requireModifier(Long boothId, Long userId) {
+        Booth booth = booths.findById(boothId).orElseThrow(() -> new BoothNotFoundException(boothId));
+        if (isOrdinaryEditor(booth, userId)) {
+            return booth;
+        }
+
+        if (!admins.isAdmin(userId)) {
+            throw new BoothEditorForbiddenException();
+        }
+        admins.requireOwnerNotMaster(booth.getOwnerUserId());
+        adminActions.record(userId, AdminActionRecorder.BOOTH_EDIT,
+                AdminActionRecorder.TARGET_BOOTH, boothId, null);
+        return booth;
+    }
+
+    private boolean isOrdinaryEditor(Booth booth, Long userId) {
+        return booth.isOwnedBy(userId) || mayEditAsStaff(booth.getId(), userId);
     }
 
     /** Absent row, unknown role and non-editing role all answer the same way: no. */
@@ -126,9 +163,9 @@ public class BoothAccessGuard {
      *
      * @return the booth, so callers do not load it a second time
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Booth requireActiveEditor(Long boothId, Long userId) {
-        Booth booth = requireEditor(boothId, userId);
+        Booth booth = requireModifier(boothId, userId);
         requireActiveLease(boothId);
         return booth;
     }
