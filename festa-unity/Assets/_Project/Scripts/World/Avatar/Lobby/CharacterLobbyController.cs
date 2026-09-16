@@ -253,6 +253,7 @@ namespace Festa.Avatar
             if (!_assembler) _assembler = GetComponentInChildren<AvatarAssembler>();
             if (!_previewCamera) _previewCamera = Camera.main;
             if (!_catalog || !_assembler || !_previewCamera) { Debug.LogError("[CharacterLobby] 필수 참조가 비어 있습니다.", this); enabled = false; return; }
+            PrepareInPlaceMode();
             _assembler.Catalog = _catalog;
             _assembler.transform.localRotation = Quaternion.Euler(0, 180f, 0);
             _config = TryGetLiveAppearance(out var liveConfig)
@@ -263,6 +264,14 @@ namespace Festa.Avatar
             SanitizeLocked(ref _config);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
+            if (_inPlace)
+            {
+                // 카메라를 옮긴 무대에 바로 스냅한다 — Lerp 로 원점에서 4000u 를 내려오는 첫 프레임을 보이지 않게.
+                _previewCamera.transform.position=_cameraTarget;_previewCamera.transform.LookAt(_cameraLook);
+                SetStatus("월드 아바타를 수정합니다. 적용하면 그 자리에서 바로 반영됩니다.");
+                InitializeFromServerAsync();
+                return;
+            }
             // 게스트는 커스터마이징을 쓰지 않는다 — 바로 월드로 (S15P21A604-437). 토큰은 호스트가
             // 인스턴스 생성 뒤에 밀어 넣으므로 지금 없을 수 있다 → 들어오는 순간에도 다시 본다.
             Festa.Integration.AuthBridge.TokenChanged += OnAuthTokenChanged;
@@ -272,6 +281,30 @@ namespace Festa.Avatar
         void OnDestroy() => Festa.Integration.AuthBridge.TokenChanged -= OnAuthTokenChanged;
         bool _guestEntered;
         bool _ownershipRetrying;
+
+        /// <summary>월드 위에 additive 로 얹힌 인플레이스 모드인가 (GitLab #197). <see cref="Festa.World.AvatarInPlaceCustomization"/>.</summary>
+        bool _inPlace;
+        /// <summary>무대 원점. 인플레이스 모드에서는 월드 지오메트리와 겹치지 않게 옮겨 둔 자리, 아니면 0.</summary>
+        Vector3 _stageOrigin;
+
+        /// <summary>
+        /// 인플레이스 모드면 이 씬의 루트 전부를 <see cref="Festa.World.AvatarInPlaceCustomization.StageOrigin"/> 으로 옮기고,
+        /// 프리뷰 카메라의 AudioListener 를 끈다(월드 리스너가 이미 있다). 카메라 궤도 계산은 <see cref="SetCamera"/> 가
+        /// <see cref="_stageOrigin"/> 을 더해 따라온다.
+        /// </summary>
+        void PrepareInPlaceMode()
+        {
+            _inPlace = Festa.World.AvatarInPlaceCustomization.IsOpen && gameObject.scene.name == Festa.World.AvatarSceneHandoff.LobbySceneName
+                       && SceneManager.sceneCount > 1;
+            if (!_inPlace) return;
+            _stageOrigin = Festa.World.AvatarInPlaceCustomization.StageOrigin;
+            foreach (var root in gameObject.scene.GetRootGameObjects())
+                root.transform.position += _stageOrigin;
+            var listener = _previewCamera.GetComponent<AudioListener>();
+            if (listener) listener.enabled = false;
+            Festa.World.AvatarInPlaceCustomization.OnLobbyAwake();
+            Debug.Log($"[CharacterLobby] 인플레이스 모드 — 무대를 {_stageOrigin} 으로 옮기고 월드 카메라를 넘겨받았다");
+        }
 
         /// <summary>
         /// 호스트가 토큰을 밀어 넣은 순간. 게스트면 바로 입장하고, <b>회원이면 보유 조회를 다시 돌린다.</b>
@@ -304,7 +337,7 @@ namespace Festa.Avatar
         }
         bool TryEnterWorldAsGuest()
         {
-            if (_guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
+            if (_inPlace || _guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
             _guestEntered = true;
             SetStatus("게스트는 기본 외형으로 바로 입장합니다.");
             Debug.Log("[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장");
@@ -532,8 +565,19 @@ namespace Festa.Avatar
             Anchor(_wardrobeColorTitle.rectTransform,new Vector2(.06f,.36f),new Vector2(.94f,.41f));
             Button(quickRow,"성별",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
             Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
-            var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
-            Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            if (_inPlace)
+            {
+                // 인플레이스: 월드로 "입장" 하는 게 아니라 이미 서 있는 자리에 외형만 반영하고 돌아간다 (GitLab #197).
+                var apply=Button(left,"적용하고 돌아가기",()=>{CloseColorPopup();ApplyToWorld();Festa.World.AvatarInPlaceCustomization.Close("apply");},250,48,UiCardSelected);
+                Anchor(apply.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.62f,.085f));
+                var cancel=Button(left,"취소",()=>{CloseColorPopup();Festa.World.AvatarInPlaceCustomization.Close("cancel");},120,48);
+                Anchor(cancel.GetComponent<RectTransform>(),new Vector2(.66f,.025f),new Vector2(.94f,.085f));
+            }
+            else
+            {
+                var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
+                Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            }
             // 상태 줄 — SetStatus 가 여기에 쓴다. 이 라벨이 없던 동안 잠금 안내·조회 실패 메시지가
             // 전부 로그에만 남고 화면에는 아무것도 안 떴다 (S15P21A604-412 검증에서 발견).
             _status=Label(_responsiveFrame,"",17,34,new Vector2(.22f,.006f),new Vector2(.78f,.05f));
@@ -1069,7 +1113,7 @@ namespace Festa.Avatar
         public void VerifyColorIsolation(int slot,int colorId){_config.SetColor((AvatarColorSlot)Mathf.Clamp(slot,0,8),(byte)Mathf.Clamp(colorId,1,Palette.Length));Apply();}
         public void VerifyFirstItem(int category){_category=(AvatarPartCategory)Mathf.Clamp(category,0,7);var d=_catalog.GetItems(_category,_config.gender).FirstOrDefault();if(d){_config.SetItem(_category,_category==AvatarPartCategory.Hat?d.familyId:d.itemId);Apply();RefreshItems();}}
         public string VerificationState()=>$"gender={_config.gender}; head={_config.headId}; hair={_config.hairId}; hat={_config.hatId}; top={_config.topId}; bottom={_config.bottomId}; outfit={_config.outfitId}; error={_assembler.LastError}";
-        void SetCamera(int preset){_cameraDistance=preset==0?3.55f:preset==1?1.45f:.78f;_lookHeight=preset==0?.92f:preset==1?1.16f:1.42f;_cameraFocus=new Vector3(0,_lookHeight,0);_cameraLook=_cameraFocus;_cameraYaw=0f;_cameraPitch=0f;SetCameraPosition();}
+        void SetCamera(int preset){_cameraDistance=preset==0?3.55f:preset==1?1.45f:.78f;_lookHeight=preset==0?.92f:preset==1?1.16f:1.42f;_cameraFocus=_stageOrigin+new Vector3(0,_lookHeight,0);_cameraLook=_cameraFocus;_cameraYaw=0f;_cameraPitch=0f;SetCameraPosition();}
         void SetCameraPosition(){var orbit=Quaternion.Euler(_cameraPitch,_cameraYaw,0);_cameraTarget=_cameraFocus+orbit*new Vector3(.12f,0,-_cameraDistance);}
         void ZoomAt(Vector2 screenPosition,float wheel)
         {
