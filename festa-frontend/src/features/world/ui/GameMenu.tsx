@@ -14,6 +14,7 @@ import { logout } from '../../auth/model/logout';
 import { walletApi } from '../../../entities/wallet/api.select';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { openManagement } from '../model/worldScreen';
+import { useAdminCapability } from '../../admin/model/capability';
 import type { MenuPanel } from '../model/gameClientUi';
 import './gameMenu.css';
 
@@ -85,6 +86,10 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
     enabled: isMember,
   });
 
+  // 관리자에게만 보이는 항목 하나. 판정은 서버가 하고(entities/admin getCapability) 회원이
+  // 아니면 질의조차 하지 않는다.
+  const capability = useAdminCapability();
+
   useEffect(() => {
     if (isMember && state.status === 'idle') void loadProfile();
   }, [isMember, state.status]);
@@ -131,6 +136,13 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
           {myBoothQuery.data && (
             <button type="button" className="gm-item" onClick={openManagement}>
               부스 관리
+              {IcChevron}
+            </button>
+          )}
+
+          {capability.isSuccess && capability.data.admin && (
+            <button type="button" className="gm-item" onClick={() => onOpenPanel('admin')}>
+              관리자 콘솔
               {IcChevron}
             </button>
           )}

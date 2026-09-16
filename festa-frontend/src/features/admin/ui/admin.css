@@ -1,24 +1,31 @@
-/* 관리자 콘솔 — PageShell 의 sc-* 위에 얹는 콘솔 고유 배치. 좌측 내비 + 우측 작업 영역. */
-.ad-shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+/* 관리자 콘솔 — OverlayFrame 안에서 사는 좌측 내비 + 우측 작업 영역.
+   바깥 폭·스크롤은 프레임이 갖는다(festa-overlay-body). 여기서는 두 칸 배치만 정한다. */
+.ad-shell { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 860px) { .ad-shell { grid-template-columns: 1fr; } .ad-nav { flex-direction: row; overflow-x: auto; } }
 
-.ad-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
-.ad-nav a {
-  display: flex; flex-direction: column; gap: 1px; padding: 10px 12px; border-radius: 10px;
-  color: var(--festa-ink); text-decoration: none; border: 1px solid transparent; white-space: nowrap;
+.ad-nav { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; }
+.ad-nav-item {
+  display: flex; flex-direction: column; gap: 1px; padding: 9px 11px; border-radius: 10px;
+  color: var(--festa-ink); border: 1px solid transparent; white-space: nowrap;
+  background: transparent; font: inherit; text-align: left; cursor: pointer;
 }
-.ad-nav a:hover { background: rgba(255, 255, 255, 0.05); }
-.ad-nav a[aria-current='page'] { background: rgba(77, 141, 255, 0.16); border-color: rgba(77, 141, 255, 0.35); }
-.ad-nav a small { color: var(--sc-text-muted); font-size: 11.5px; }
+.ad-nav-item:hover { background: rgba(255, 255, 255, 0.05); }
+.ad-nav-item[aria-current='page'] { background: rgba(77, 141, 255, 0.16); border-color: rgba(77, 141, 255, 0.35); }
+.ad-nav-item small { color: var(--sc-text-muted); font-size: 11.5px; }
 
 .ad-work { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .ad-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .ad-head h2 { margin: 0; font-size: 18px; }
 .ad-head p { margin: 0; color: var(--sc-text-muted); font-size: 13px; }
 
-/* 목록 → 선택 → 상세: 넓으면 나란히, 좁으면 위아래 */
-.ad-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .ad-split { grid-template-columns: 1fr; } }
+/* 목록 → 선택 → 상세: 넓으면 나란히, 좁으면 위아래.
+   프레임 폭(xl, 1180px)에서 내비를 뺀 나머지를 둘로 가르므로 컨테이너 질의로 판단한다 —
+   화면 폭으로 재면 오버레이가 좁아도 두 칸을 유지해 표가 뭉갠다. */
+/* 컨테이너는 콘솔의 오른쪽 칸 하나다. `.ad-work` 는 섹션 카드도 함께 쓰는 배치 클래스라
+   거기에 걸면 @container 가 카드 자신을 기준으로 잡혀 판단이 뒤집힌다. */
+.ad-workspace { container-type: inline-size; }
+.ad-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@container (max-width: 760px) { .ad-split { grid-template-columns: 1fr; } }
 
 .ad-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ad-toolbar input, .ad-toolbar select { height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--festa-line); background: rgba(255,255,255,0.05); color: var(--festa-ink); }
@@ -82,4 +89,3 @@
 .ad-bar i { display: block; height: 8px; border-radius: 4px; background: rgba(77, 141, 255, 0.6); min-width: 2px; }
 .ad-bar-track { flex: 1; background: rgba(255,255,255,0.06); border-radius: 4px; }
 .ad-badge-fe { font-size: 11px; color: var(--sc-gold); border: 1px solid rgba(255,206,77,0.4); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
-
