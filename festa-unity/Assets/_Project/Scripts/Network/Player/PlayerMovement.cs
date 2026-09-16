@@ -69,6 +69,16 @@ namespace Festa.Network
         public NetworkVariable<Vector3> ServerSpawnPosition = new(
             Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        /// <summary>
+        /// 서버가 배정한 스폰 방향(yaw, 도). 음수면 지정 없음 — 재접속 위치 복원(#200)일 때만 채운다.
+        /// 위치와 같은 이유로 Owner 가 스스로 적용한다.
+        /// </summary>
+        public NetworkVariable<float> ServerSpawnYaw = new(
+            -1f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+        /// <summary>서버에서만 채운다 — 이 접속의 grant subject. 재접속 위치 보관/복원의 키 (<see cref="PlayerPositionMemory"/>).</summary>
+        string _identitySubject;
+
         // 값 미수신(버전 불일치 등) 시 현재 위치로 진행하는 한계선 (S15P21A604-259).
         //
         // **시간만으로 재면 가려진 탭에서 너무 일찍 포기한다.** 백그라운드 탭은 rAF 스로틀링으로
@@ -219,7 +229,25 @@ namespace Festa.Network
             if (body != null) body.enabled = !IsOwner;
 
             if (IsServer)
-                ServerSpawnPosition.Value = transform.position; // 승인 위치 그대로
+            {
+                // 승인 위치 그대로 — 단, 같은 신원이 방금 끊겼다 돌아온 것이면 그 자리로 (GitLab #200 B안).
+                // 승인(ConnectionManager, 동결)은 손대지 않고 그 뒤에서 스폰 목표만 바꾼다.
+                var spawn = transform.position;
+                _identitySubject = Festa.Network.WorldSessionRegistry.SubjectOf(OwnerClientId);
+                if (Festa.Network.PlayerPositionMemory.TryTake(_identitySubject, out var remembered))
+                {
+                    spawn = remembered.Position;
+                    transform.SetPositionAndRotation(spawn, Quaternion.Euler(0f, remembered.Yaw, 0f));
+                    ServerSpawnYaw.Value = remembered.Yaw;
+                    Debug.Log($"[PlayerMovement] 재접속 위치 복원 — sub={_identitySubject} 스폰 대신 {spawn} (끊긴 지 {Time.realtimeSinceStartupAsDouble - remembered.SavedAt:F0}s)");
+                }
+                else
+                {
+                    // 헌 접속이 아직 정리되지 않았을 수 있다(ReplacedBySameUser) — 몇 초간 늦은 기록을 기다린다.
+                    Festa.Network.PlayerPositionMemory.WatchLateArrival(_identitySubject, OnLateRememberedPosition);
+                }
+                ServerSpawnPosition.Value = spawn;
+            }
 
             if (IsOwner)
             {
@@ -237,6 +265,38 @@ namespace Festa.Network
         public override void OnNetworkDespawn()
         {
             if (IsOwner) ServerSpawnPosition.OnValueChanged -= OnServerSpawnPositionChanged;
+            if (IsServer && !string.IsNullOrEmpty(_identitySubject))
+            {
+                // 끊기는 자리를 신원별로 잠시 보관한다 — 재접속하면 여기서 다시 선다 (#200).
+                Festa.Network.PlayerPositionMemory.Unwatch(_identitySubject);
+                Festa.Network.PlayerPositionMemory.Remember(_identitySubject, transform.position, transform.eulerAngles.y);
+            }
+        }
+
+        /// <summary>서버: 새 스폰 뒤에 헌 접속의 기록이 도착했다 — Owner 에게 그 자리로 옮기라고 보낸다.</summary>
+        void OnLateRememberedPosition(Festa.Network.PlayerPositionMemory.Entry entry)
+        {
+            if (!IsServer || !IsSpawned) return;
+            ServerSpawnYaw.Value = entry.Yaw;
+            RestorePositionOwnerRpc(entry.Position, entry.Yaw);
+        }
+
+        /// <summary>
+        /// Owner: 서버가 늦게 찾아낸 이전 자리로 옮긴다. 이미 스폰 지점을 벗어나 걷기 시작했으면 옮기지 않는다 —
+        /// 사람이 움직이는 중에 끌어당기는 것이 자리를 잃는 것보다 나쁘다.
+        /// </summary>
+        [Rpc(SendTo.Owner)]
+        void RestorePositionOwnerRpc(Vector3 position, float yaw)
+        {
+            float fromSpawn = Vector3.Distance(transform.position, ServerSpawnPosition.Value);
+            if (fromSpawn > 3f)
+            {
+                Debug.Log($"[PlayerMovement] 늦은 위치 복원 건너뜀 — 이미 스폰에서 {fromSpawn:F1}u 이동");
+                return;
+            }
+            TeleportTo(position);
+            transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            Debug.Log($"[PlayerMovement] 늦은 위치 복원 — {position} yaw={yaw:F0}");
         }
 
         void OnServerSpawnPositionChanged(Vector3 _, Vector3 next)
@@ -301,6 +361,10 @@ namespace Festa.Network
 
             if (controllerWasEnabled) _controller.enabled = true;
             _verticalSpeed = 0f;
+
+            // 재접속 복원이면 바라보던 방향도 돌려준다 (#200). 일반 스폰은 -1 이라 건드리지 않는다.
+            if (ServerSpawnYaw.Value >= 0f)
+                transform.rotation = Quaternion.Euler(0f, ServerSpawnYaw.Value, 0f);
         }
 
         void Update()
