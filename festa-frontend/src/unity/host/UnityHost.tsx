@@ -195,14 +195,19 @@ export function UnityHost() {
     return () => clearTimeout(id);
   }, [status]);
 
-  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, 세션 종류·만료(refresh)가
-  // 바뀔 때마다 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
+  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, **토큰이 바뀔 때마다**
+  // 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
   // 때의 보험(멱등). 회원·게스트 모두 전달하고 비로그인만 Clear 다(#128 §2).
+  //
+  // 의존성이 `expiresAt` 이던 것을 `tokenVersion` 으로 바꿨다 (S15P21A604-828). 만료 시각이 같은
+  // 갱신은 이 효과를 깨우지 못해 Unity 가 옛 토큰을 계속 들고 있었다. 서버는 refresh 마다 `sid` 를
+  // 회전시키고 그 순간 옛 토큰을 즉시 폐기하므로(MemberSessionService.issue), 재주입을 한 번 놓치면
+  // Unity 의 모든 호출이 401 이 된다.
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
-  }, [instanceReady, status, session.kind, session.expiresAt]);
+  }, [instanceReady, status, session.kind, session.tokenVersion]);
 
   // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
   useEffect(() => {
