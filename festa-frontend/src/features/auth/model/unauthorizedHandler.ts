@@ -49,7 +49,13 @@ function logRefreshFailure(stage: '최초' | '회전 재시도', error: unknown)
  */
 const ROTATED = 'REFRESH_TOKEN_ROTATED';
 
-async function attemptRefresh(): Promise<boolean> {
+/**
+ * 세션을 지금 갱신한다. 401 인터셉트와 **만료 전 예약 갱신**(refreshScheduler)이 함께 쓴다.
+ *
+ * single-flight 라 두 경로가 동시에 불러도 요청은 하나다 — 서버가 refresh 마다 계보를 회전시키므로
+ * 중복 호출은 그 자체로 재사용 감지에 걸린다.
+ */
+export async function refreshSessionNow(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     try {
@@ -86,7 +92,7 @@ async function attemptRefresh(): Promise<boolean> {
 export async function handleUnauthorized(): Promise<boolean> {
   const { kind } = getSessionSnapshot();
   if (kind === 'member') {
-    const recovered = await attemptRefresh();
+    const recovered = await refreshSessionNow();
     if (recovered) return true;
     clearSession('session-expired');
     return false;
