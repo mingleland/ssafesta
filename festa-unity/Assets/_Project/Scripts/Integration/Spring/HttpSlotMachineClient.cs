@@ -16,16 +16,15 @@ namespace Festa.Integration
     /// → 409 INSUFFICIENT_COIN { balance }
     /// </code>
     ///
-    /// <para>BE 가 경로를 아직 배포하지 않았을 때(본문에 오류 <c>code</c> 가 없는 404·405)만 <see cref="EndpointMissing"/> 으로
-    /// 돌려준다 — <see cref="ServerFirstSlotMachineClient"/> 가 그 경우에만 체험판(Mock)으로 넘긴다. 확정 계약의
-    /// <c>404 SLOT_MACHINE_NOT_FOUND</c> 는 서버가 멀쩡한데 machineId 를 모르는 것이라 폴백하지 않고 표면화한다
-    /// (타이밍 스톱 <see cref="HttpGameResultClient"/> 와 같은 규칙). 다른 실패(401·409·5xx·네트워크)도 그대로 표면화한다 (T-24).</para>
+    /// <para><b>체험판 폴백은 없다 (2026-09-16).</b> BE 가 spec 021 계약을 구현해 develop 에 올렸으므로
+    /// 판정은 언제나 서버가 한다. 전에는 본문에 <c>code</c> 가 없는 404·405 를 "경로 미배포" 로 보고 Mock 으로
+    /// 넘겼는데, 그 경로가 살아 있으면 <b>서버가 잠깐 죽거나 라우팅이 어긋난 순간에 가짜 판정이 나간다</b> —
+    /// 코인 원장과 화면이 갈라지는 자리다. 모든 실패는 그대로 표면화한다 (T-24).</para>
     ///
     /// <para>응답 필드는 #205 확정 계약과 같다. 바뀌면 이 파일의 DTO 매핑만 고친다 — 게임 파트는 BE 계약을 우선한다.</para>
     /// </summary>
     public sealed class HttpSlotMachineClient : ISlotMachineClient
     {
-        public const string EndpointMissing = "ENDPOINT_MISSING";
         const int TimeoutSeconds = 10;
 
         readonly string _baseUrl;
@@ -93,9 +92,9 @@ namespace Festa.Integration
                     }
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404 || request.responseCode == 405:
-                    // 404 는 두 뜻이다 (#205 확정). 본문 code 로 가른다 — 전역 오류 봉투 { code, message, ... } 는 code 가 항상 있다.
-                    //   · SLOT_MACHINE_NOT_FOUND → 서버는 살아 있고 machineId 를 모른다 → 표면화, Mock 폴백 금지
-                    //   · code 없음              → 경로 미배포 → EndpointMissing (호출자가 체험판으로 넘길지 결정)
+                    // 404 는 두 뜻이지만 **어느 쪽도 체험판으로 넘기지 않는다** (#205 확정 + 2026-09-16 폴백 제거).
+                    //   · SLOT_MACHINE_NOT_FOUND → 서버는 살아 있고 machineId 를 모른다 → 씬과 화이트리스트를 맞춰야 한다
+                    //   · code 없음              → 경로가 없다 → 배포가 어긋난 것이고, 가짜 판정으로 덮으면 안 된다
                     var code404 = ParseCode(body);
                     if (!string.IsNullOrEmpty(code404))
                     {
@@ -103,7 +102,9 @@ namespace Festa.Integration
                         Debug.LogError($"[HttpSlotMachine] 404 {code404} — 서버가 machineId '{machineId}' 를 모른다. 씬 machineId 와 서버 화이트리스트를 맞춰라.");
                         return fail;
                     }
-                    fail.error = EndpointMissing;
+                    fail.error = "ENDPOINT_MISSING";
+                    Debug.LogError($"[HttpSlotMachine] {request.responseCode} — 슬롯 스핀 경로가 응답하지 않는다 ({url}). " +
+                                   "BE 배포 상태를 확인해라. 체험판으로 대체하지 않는다.");
                     return fail;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 400:
@@ -166,51 +167,5 @@ namespace Festa.Integration
     public interface IBalanceSeedable
     {
         void SeedBalance(int balance);
-    }
-
-    /// <summary>
-    /// **서버 우선, 없으면 체험판.** 실서버 모드에서 slot machine 판정을 먼저 BE 에 묻고,
-    /// BE 가 경로를 아직 만들지 않았을 때(<see cref="HttpSlotMachineClient.EndpointMissing"/>)만 Mock 으로 넘긴다.
-    ///
-    /// <para>이렇게 두는 이유 — BE 엔드포인트가 사용자 테스트 직전에 붙을 수 있다(GitLab #134). 붙는 순간 Unity 는
-    /// 코드·설정 변경 없이 실판정으로 넘어가야 하고, 그 전에는 "체험판 · 코인 미반영" 배지가 계속 보여야 한다
-    /// (Mock 결과의 <c>simulated=true</c> 가 HUD 배지를 켠다). 조용한 대체가 아니다: 첫 폴백 때 경고를 남기고,
-    /// 다른 실패(401·409·5xx)는 폴백하지 않고 그대로 사용자에게 보인다 (T-24).</para>
-    /// </summary>
-    public sealed class ServerFirstSlotMachineClient : ISlotMachineClient, IBalanceSeedable
-    {
-        readonly ISlotMachineClient _server;
-        readonly MockSlotMachineClient _mock;
-        bool _warned;
-
-        /// <summary>마지막 호출이 체험판으로 처리됐는가(진단용).</summary>
-        public bool LastWasSimulated { get; private set; }
-
-        public ServerFirstSlotMachineClient(ISlotMachineClient server, MockSlotMachineClient mock)
-        {
-            _server = server ?? throw new System.ArgumentNullException(nameof(server));
-            _mock = mock ?? throw new System.ArgumentNullException(nameof(mock));
-        }
-
-        public void SeedBalance(int balance) => _mock.SeedBalance(balance);
-
-        public async Task<SlotSpinResultDto> SpinAsync(string machineId, int bet)
-        {
-            var result = await _server.SpinAsync(machineId, bet);
-            if (result != null && result.error == HttpSlotMachineClient.EndpointMissing)
-            {
-                if (!_warned)
-                {
-                    _warned = true;
-                    Debug.LogWarning("[ServerFirstSlotMachine] BE 에 slot machine 스핀 API 가 아직 없다(404) — 체험판(Mock) 판정으로 진행한다. " +
-                                     "코인 원장에는 반영되지 않는다. BE 가 GitLab #134 계약을 올리면 자동으로 실판정으로 바뀐다 (S15P21A604-439).");
-                }
-                LastWasSimulated = true;
-                return await _mock.SpinAsync(machineId, bet);
-            }
-
-            LastWasSimulated = false;
-            return result;
-        }
     }
 }
