@@ -46,7 +46,7 @@ import {
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -175,6 +175,9 @@ export function WorldPage() {
       // 곳에 두면 갈린다.
       const chat = getWorldChatSnapshot();
       const action = resolveEnterAction(e, {
+        // 오버레이·관리·메뉴가 떠 있으면 Enter 는 그 화면의 것이다. 판정 시점에 읽는다 —
+        // 이 리스너는 한 번만 등록되므로 렌더 시점 값을 가둬 두면 계속 'world' 로 굳는다.
+        worldOwnsScreen: getWorldScreen() === 'world',
         open: chat.open,
         inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
         member: canUseWorldChat(),
