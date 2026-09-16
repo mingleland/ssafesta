@@ -152,26 +152,11 @@ export const routes = [
     },
   },
   {
-    // 관리자 콘솔 (S15P21A604-828) — 회원 전용 위에 관리자 판정을 한 번 더 건다. 월드 오버레이가 아니라
-    // 독립 화면이다: 표·페이지·긴 폼이라 Unity 를 뒤에 깔 이유가 없다. lazy — 관리자가 아니면 받을 이유가 없다.
-    path: '/app/admin',
-    element: <Navigate to="/app/admin/overview" replace />,
-  },
-  {
-    path: '/app/admin/:section',
-    lazy: async () => {
-      const [{ AdminPage }, { RequireAdmin }] = await Promise.all([
-        import('../../pages/admin/AdminPage.tsx'),
-        import('./RequireAdmin.tsx'),
-      ]);
-      return {
-        Component: () => (
-          <RequireAdmin>
-            <AdminPage />
-          </RequireAdmin>
-        ),
-      };
-    },
+    // 관리자 콘솔은 화면이 아니라 월드 위 오버레이다 (S15P21A604-828) — 이 서비스는 월드가 상주
+    // 화면이고 나머지는 그 위에 잠깐 뜬다. 경로를 지우지 않는 이유는 북마크·옛 링크가 404 로
+    // 떨어지지 않게 하기 위해서다. 목적지에서 WorldPage 가 `?panel` 을 읽어 오버레이를 연다.
+    path: '/app/admin/*',
+    element: <Navigate to="/app/world?panel=admin" replace />,
   },
 ];
 
