@@ -66,6 +66,8 @@ namespace Festa.Avatar
         float _wardrobeScrollY;
         AvatarPartCategory? _itemScrollFor;
         float _itemScrollY;
+        int _lastSeparateTopId;
+        int _lastSeparateBottomId;
 
         Text _colorTitle;
         CanvasScaler _uiScaler;
