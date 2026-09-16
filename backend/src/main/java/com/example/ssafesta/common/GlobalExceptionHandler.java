@@ -40,7 +40,7 @@ public class GlobalExceptionHandler {
         log.debug("거부 — code={} message={}", code, exception.getMessage());
         return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(
                 code, exception.getMessage(), RequestIdFilter.current(),
-                exception.errors(), exception.warnings()));
+                exception.errors(), exception.warnings(), exception.balance()));
     }
 
     /** A body that could not be parsed at all — malformed JSON, wrong type in a field. */

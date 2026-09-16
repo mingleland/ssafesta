@@ -83,6 +83,9 @@ export GAME_DEPLOY_STATE_DIR="${fixture}/state"
 export CI_ARTIFACT_DIR="${fixture}/artifacts"
 export GAME_COMPOSE_FILE="${unity_server_dir}/compose.yaml"
 export DEMO_NETWORK_NAME='festa-demo'
+# 이 시험의 범위는 "demo-game 만 교체되는가" 다. WebGL 프리팹 guard 는 game-webgl-prefab-guard.sh 가
+# 따로 본다 — 여기서는 배포된 클라이언트가 없는 상태로 고정해 guard 를 건너뛰게 한다.
+export WEBGL_MANIFEST_PATH="${fixture}/no-deployed-webgl.json"
 
 bash "${deploy_script}" >/dev/null
 
