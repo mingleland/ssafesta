@@ -273,6 +273,8 @@ grep -q 'SPRING_PROFILES_ACTIVE: infra' "${integration_compose}" || fail "demo b
   || fail "shared Spring-to-AI token must reach exactly AI and backend"
 grep -q 'AI_INTERNAL_BASE_URL: http://ai:8000' "${integration_compose}" || fail "demo backend lacks AI service DNS"
 grep -q 'SPRING_INTERNAL_BASE_URL: http://back:8080' "${integration_compose}" || fail "demo AI lacks backend service DNS"
+grep -Fq '127.0.0.1:${AI_LOOPBACK_PORT:-18082}:8000' "${integration_compose}" \
+  || fail "demo AI lacks the loopback ingress the same-origin /ai/v1 route proxies to"
 pass "runtime credential binding and least-privilege Compose wiring"
 
 stage_summary_dir="$(mktemp -d)"
