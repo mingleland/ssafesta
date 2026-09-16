@@ -98,6 +98,10 @@ namespace Festa.Network
         public void PlayOneShot(PlayerEmoteId emote)
         {
             if (!IsOwner || emote == PlayerEmoteId.None || IsLooping(emote)) return;
+            // 주먹이 아닌 연출로 넘어가면 **예약된 주먹을 버린다.** 안 버리면 스윙 한가운데에서 큐가
+            // 풀려 EmoteId 를 주먹으로 덮어쓴다 — 망치를 치는 도중에 주먹이 끼어들어 동작이
+            // 뒤엉킨다(사용자 영상 2026-09-16).
+            if (System.Array.IndexOf(Punches, emote) < 0) CancelPendingPunches();
             _player.EmoteId.Value = emote;
             if (emote == PlayerEmoteId.Strike)
             {
@@ -159,6 +163,9 @@ namespace Festa.Network
 
             if (_queuedPunches > 0 && Time.time >= _punchBusyUntil) FirePunch();
 
+            // 점프하면 남은 예약을 버린다 — 착지하는 순간 밀린 주먹이 몰아서 터지지 않게.
+            if (IsAirborne()) _queuedPunches = 0;
+
             if (_punchImpactAt > 0f && Time.time >= _punchImpactAt)
             {
                 _punchImpactAt = 0f;
@@ -200,7 +207,33 @@ namespace Festa.Network
             if (es != null && es.IsPointerOverGameObject()) return false;
             var current = _player.EmoteId.Value;
             if (current != PlayerEmoteId.None && IsLooping(current)) return false;
+            // 망치 스윙은 원샷이라 IsLooping 에 걸리지 않는다. 그대로 두면 스윙 도중 좌클릭이
+            // 주먹으로 읽혀 두 연출이 겹친다 (사용자 영상 2026-09-16).
+            if (current == PlayerEmoteId.Strike) return false;
+            // 공중에서는 치지 않는다. 상체 레이어만 바뀌므로 다리는 점프 클립 그대로인데
+            // 상체만 복싱이라 자세가 어긋나 보인다 (사용자 지시 2026-09-16).
+            if (IsAirborne()) return false;
             return true;
+        }
+
+        /// <summary>
+        /// 도약·체공 중인가. 착지 복귀(<see cref="PlayerAnimState.JumpLand"/>)는 이미 발이 땅에 있으므로
+        /// 포함하지 않는다 — 내려서자마자 칠 수 있어야 조작이 답답하지 않다.
+        /// </summary>
+        bool IsAirborne()
+        {
+            var state = _player.AnimState.Value;
+            return state == PlayerAnimState.Jump || state == PlayerAnimState.JumpLaunch;
+        }
+
+        /// <summary>예약·콤보·임팩트를 한꺼번에 버린다. 다른 연출이 끼어들 때 주먹의 잔여 일정이 살아남지 않게 한다.</summary>
+        void CancelPendingPunches()
+        {
+            _queuedPunches = 0;
+            _punchImpactAt = 0f;
+            _punchBusyUntil = 0f;
+            _comboStep = -1;
+            _comboExpireAt = 0f;
         }
 
         /// <summary>

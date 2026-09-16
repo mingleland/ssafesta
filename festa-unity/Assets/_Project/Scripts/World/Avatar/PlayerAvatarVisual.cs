@@ -978,7 +978,9 @@ namespace Festa.World
                 else Debug.LogWarning("[AvatarVisual] Punch 레이어를 찾지 못해 주먹을 재생하지 못했다");
                 return;
             }
-            ReleasePunchLayer();
+            // 다른 연출로 넘어가는 자리면 상체를 즉시 비운다. None 으로 돌아가는 평상시 종료는
+            // 종전처럼 짧게 섞어 상체가 튀지 않게 둔다.
+            ReleasePunchLayer(emote != PlayerEmoteId.None);
 
             if (emote == PlayerEmoteId.None)
             {
@@ -1046,11 +1048,19 @@ namespace Festa.World
         }
 
         /// <summary>주먹이 끝나면 상체를 Base Layer 에 돌려준다 — 안 돌리면 마지막 포즈가 남는다.</summary>
-        void ReleasePunchLayer()
+        void ReleasePunchLayer(bool immediate = false)
         {
             int layer = PunchLayer();
             if (layer <= 0 || _animator == null) return;
             _punchWeightTarget = 0f;
+            if (immediate)
+            {
+                // 0.05 초라도 섞으면 주먹의 마지막 포즈가 다음 동작 첫 프레임에 겹쳐 뒤엉켜 보인다
+                // (망치 스윙 중 주먹, 사용자 영상 2026-09-16). 가중치와 상태를 같은 프레임에 끊는다.
+                _animator.SetLayerWeight(layer, 0f);
+                _animator.Play("Empty", layer, 0f);
+                return;
+            }
             var cur = _animator.GetCurrentAnimatorStateInfo(layer);
             if (cur.shortNameHash == EmptyStateHash) return;
             _animator.CrossFadeInFixedTime("Empty", PunchFade, layer, 0f);
