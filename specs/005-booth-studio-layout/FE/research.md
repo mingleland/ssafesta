@@ -39,10 +39,10 @@
 
 ## R-05. 부스 크기·template 화이트리스트
 
-**✅ 해소 — 부스 6m × 6m × 2.72m, `PROJECT_EXHIBITION` 단독 확정 ([#19](https://github.com/kanghyunsoon/ssafesta/issues/19)·[#45](https://github.com/kanghyunsoon/ssafesta/issues/45), 2026-08-21)**
+**✅ 해소 — 부스 9.4m × 6m × 5.9m, `PROJECT_EXHIBITION` 단독 확정 ([#19](https://github.com/kanghyunsoon/ssafesta/issues/19)·[#45](https://github.com/kanghyunsoon/ssafesta/issues/45), 2026-08-21 · 치수는 GitLab #181 `S15P21A604-698`로 2026-09-15 개정)**
 
-- **Decision**: `BOOTH_SIZE = { width: 6, depth: 6, height: 2.72 }`. 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`. 숫자를 검증식에 직접 박아 넣지 않는다. `template`은 **`PROJECT_EXHIBITION` 단독**이다 — `DEFAULT`는 제거됐고 기존 저장분은 BE V11 마이그레이션이 이관한다.
-- **Rationale**: **서버 `LayoutValidator`가 이미 이 값으로 검증한다** — `|x|,|z| ≤ 3`, `0 ≤ y ≤ 2.72`(`contracts/layout-api.md` §1·§9, `data-model.md` §3). FE가 다른 값을 쓰면 저장이 서버에서 거부되므로 선택지가 아니라 계약이다. 높이는 셸 벽 패널 실측 `2.725`의 내림(#19 ②) — "6×6×6"의 세 번째 6은 x·z와 대칭으로 잡은 값이고 셸 근거가 없었다(리드, #45). 정면 트러스(z 2.85~3.15 띠, y 1.85↑)는 부스 경계 밖이라 배치 공간을 제약하지 않는다. `template` 1종은 셸 프리팹이 `BoothShell.prefab` 하나뿐이라 확정(`template → 셸 1:1`).
+- **Decision**: `BOOTH_SIZE = { width: 9.4, depth: 6, height: 5.9 }` (2026-08-21 `{6, 6, 2.72}`에서 개정 — `S15P21A604-698`·`-785`). 경계 검증은 이 상수에서 **도출**한다 — `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`. 숫자를 검증식에 직접 박아 넣지 않는다. `template`은 **`PROJECT_EXHIBITION` 단독**이다 — `DEFAULT`는 제거됐고 기존 저장분은 BE V11 마이그레이션이 이관한다.
+- **Rationale**: **서버 `LayoutValidator`가 이미 이 값으로 검증한다** — `|x| ≤ 4.7`, `|z| ≤ 3`, `0 ≤ y ≤ 5.9`(`contracts/layout-api.md` §1·§9, `data-model.md` §3). **x와 z의 한계가 다르므로 한 값을 양축에 쓰지 않는다.** FE가 다른 값을 쓰면 저장이 서버에서 거부되므로 선택지가 아니라 계약이다. 높이는 셸 벽 패널 실측 `2.725`의 내림(#19 ②) — "6×6×6"의 세 번째 6은 x·z와 대칭으로 잡은 값이고 셸 근거가 없었다(리드, #45). 정면 트러스(z 2.85~3.15 띠, y 1.85↑)는 부스 경계 밖이라 배치 공간을 제약하지 않는다. `template` 1종은 셸 프리팹이 `BoothShell.prefab` 하나뿐이라 확정(`template → 셸 1:1`).
 - **FE 실질 영향**: 높이는 편집기가 2D 톱뷰라 `y`를 노출하지 않고 `0`으로 고정 기록하므로 검증은 사실상 통과 보장이다. `template`도 선택지가 1개라 UI는 고정 라벨.
 - **미리 배치된 오브젝트 세트는 반대**(리드, #45) — 12개 상한(헌법 22조)을 잠식하고, 새 부스가 `CONFIG_NOT_LINKED` 경고를 안고 태어난다(C-04가 "경고 허용"인 것과 겹치면 경고가 기본 상태가 되어 의미를 잃는다). 필요해지면 "시작 템플릿"(편집기가 초기 배치를 채워주는 UX 기능)으로 별도 처리 — 저장 계약이 아니라 서버 enum과 무관.
 - **template 목록 제공**: `GET /api/v1/booth-layout-templates` 신설(#19 ④, `bearerAuth` 필요) — `{templates:[{template, footprint:{width,depth,height}, maxObjects}]}`. 편집기는 `BOOTH_SIZE`·`maxObjects`를 상수로 두지 않고 **이 응답을 소비**한다. 응답값은 BE 검증 상수에서 유도되므로 검증과 카탈로그가 어긋날 자리가 없다(#19에서 "12가 세 곳에 흩어져 있다"는 지적 반영).
