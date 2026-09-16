@@ -32,6 +32,7 @@
 | ~~018~~ | ~~world-floors~~ | ⛔ 폐기 | — | — | — | — |
 | 019 | game-studio | **P2** | Game Studio FE + BE / Unity 선택 연동 | ✅ Draft | ✅ | ✅ |
 | 020 | erd-schema | — | BE | ✅ (V1 스키마 구현 완료, 구 019에서 개명) | ✅ | ✅ |
+| 021 | slot-machine | P1 | BE + Unity | ✅ **확정** (2026-09-16, GitLab #205) | — | — |
 
 > **018 폐기** (2026-08-21, [#31](https://github.com/kanghyunsoon/ssafesta/issues/31)) — 1층을 폐기하고 월드를 11층 단일로 확정해 전제가 소멸했다.
 > 엘리베이터는 11층에 붙여 **입장 게이트**(접속 로딩 대기실)로 재활용한다. 살아남은 FR 2개(진행 표시·갇힘 방지)는
