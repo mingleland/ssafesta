@@ -20,5 +20,8 @@ assert_contains "${site}" '\(br\|unityweb\)' 'Nginx must serve both native Brotl
 assert_contains "${site}" 'max-age=31536000, immutable' 'hashed Unity build files need immutable caching'
 assert_contains "${site}" 'Cache-Control "no-cache"' 'manifest and entry files must be revalidated'
 assert_contains "${site}" 'proxy_pass http://127\.0\.0\.1:18080;' 'frontend must remain loopback-only behind Nginx'
+assert_contains "${site}" 'location /ai/v1/' 'AI must answer same-origin before the frontend fallback'
+assert_contains "${site}" 'proxy_pass http://127\.0\.0\.1:18082;' 'AI must remain loopback-only behind Nginx'
+assert_contains "${site}" 'Cache-Control "no-store"' 'AI responses must never be cached'
 
 pass 'demo serves same-origin Unity WebGL before the frontend fallback'

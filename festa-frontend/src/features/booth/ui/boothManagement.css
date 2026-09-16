@@ -255,7 +255,10 @@
 .bm-document-remove:hover:not(:disabled) { background: rgba(255, 143, 143, 0.14); border-color: var(--festa-danger); }
 .bm-document-remove:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.bm-gate-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(6, 9, 20, 0.6); padding: 20px; }
+/* 이 팝업이 뜨는 내 부스 관리 OverlayFrame 자체가 z-index: var(--festa-z-overlay)(100)다 —
+   그보다 낮으면 팝업이 뒤에 깔려 클릭은 되는데(state는 바뀐다) 화면엔 전혀 안 보인다
+   (S15P21A604-763). 그 OverlayFrame 위에 뜨는 중첩 다이얼로그라 한 단만 더 높인다. */
+.bm-gate-backdrop { position: fixed; inset: 0; z-index: 101; display: grid; place-items: center; background: rgba(6, 9, 20, 0.6); padding: 20px; }
 .bm-gate-dialog { width: min(360px, 100%); display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 16px; background: var(--festa-surface-solid); border: 1px solid rgba(255, 255, 255, 0.1); }
 .bm-gate-dialog h3 { margin: 0; font-size: 16px; color: var(--festa-ink); }
 .bm-gate-dialog p { margin: 0 0 6px; color: rgba(234, 238, 251, 0.72); font-size: 13.5px; }
