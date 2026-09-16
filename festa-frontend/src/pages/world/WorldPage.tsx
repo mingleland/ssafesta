@@ -172,6 +172,15 @@ export function WorldPage() {
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Enter') return;
+      // 다른 텍스트 입력(AI 직원 채팅 등)이 focus 를 쥔 동안은 그 입력의 네이티브 form
+      // submit 에 맡긴다 — World Chat 의 Enter 판정자는 자기 입력창 밖의 텍스트 입력까지
+      // 가로챌 권한이 없다 (S15P21A604-823).
+      const active = document.activeElement;
+      const otherInputFocused =
+        active instanceof HTMLElement &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+        active.id !== WORLD_CHAT_INPUT_ID;
+      if (otherInputFocused) return;
       // 조합 중 Enter·Shift+Enter 를 거르는 규칙까지 resolveEnterAction 이 갖는다 — 규칙을 두
       // 곳에 두면 갈린다.
       const chat = getWorldChatSnapshot();
