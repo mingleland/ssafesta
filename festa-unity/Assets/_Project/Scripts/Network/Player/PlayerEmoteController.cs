@@ -37,11 +37,10 @@ namespace Festa.Network
         /// </summary>
         static readonly PlayerEmoteId[] Punches =
         {
-            // **Punch2 는 뺐다.** 실측하면 발이 0.155 들리고 앞으로 0.495 나가는 **발차기 계열**인데
-            // (손은 0.347 뿐), 주먹은 상체 마스크 레이어에서만 재생하므로 다리가 빠져 어색하다
-            // (사용자 확인 2026-09-16 — "쓰기 애매하면 빼도 된다"). 열거형 값과 상태는 남겨 뒀다 —
-            // 전신으로 쓸 자리가 생기면 그대로 쓸 수 있고, 지우면 저장된 값과 어긋난다.
-            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3
+            // 기존 Punch2(발차기 계열)는 상태에서 빼고, 사용자가 추가한 Punching 클립을
+            // 같은 안정 ID에 연결했다. NetworkPlayer 열거형을 늘리지 않아 동결 네트워크 계약과
+            // 저장된 값은 그대로 유지하면서 화면에는 세 종류 주먹이 순서대로 나온다.
+            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3, PlayerEmoteId.Punch2
         };
 
         /// <summary>
@@ -51,7 +50,7 @@ namespace Festa.Network
         /// 정해야 하는데, 상태 길이는 크로스페이드가 끝난 뒤에야 읽을 수 있다. 클립을 다시 자르면
         /// 이 값도 같이 고친다.</para>
         /// </summary>
-        static readonly float[] PunchSeconds = { 0.27f, 0.32f };
+        static readonly float[] PunchSeconds = { 0.27f, 0.32f, 0.58f };
 
         /// <summary>마지막 주먹이 끝난 뒤 이 시간 안에 다시 누르면 콤보가 이어진다.</summary>
         const float ComboKeepAlive = 0.8f;
@@ -62,7 +61,9 @@ namespace Festa.Network
         int _comboStep = -1;
         float _comboExpireAt;
         float _punchBusyUntil;
-        bool _punchQueued;
+        // 연타를 bool 하나로 기억하면 재생 중 두 번 이상 누른 입력이 하나로 합쳐진다.
+        // 최대 한 사이클(3타)까지 개수로 보관해 누른 만큼 순서대로 이어 친다.
+        int _queuedPunches;
         float _punchImpactAt;
         PlayerPunchImpact _impact;
 
@@ -153,10 +154,10 @@ namespace Festa.Network
                 // 누른 것을 버리지 않는다. 치는 중이면 예약해 두고 끝나는 순간 이어 친다 —
                 // 무작위로 골라 매번 새로 시작하면 같은 동작이 겹쳐 움찔거리기만 한다(사용자 지적).
                 if (Time.time >= _punchBusyUntil) FirePunch();
-                else _punchQueued = true;
+                else _queuedPunches = Mathf.Min(_queuedPunches + 1, Punches.Length);
             }
 
-            if (_punchQueued && Time.time >= _punchBusyUntil) FirePunch();
+            if (_queuedPunches > 0 && Time.time >= _punchBusyUntil) FirePunch();
 
             if (_punchImpactAt > 0f && Time.time >= _punchImpactAt)
             {
@@ -211,7 +212,7 @@ namespace Festa.Network
         /// </summary>
         void FirePunch()
         {
-            _punchQueued = false;
+            if (_queuedPunches > 0) _queuedPunches--;
 
             bool continues = _comboStep >= 0 && Time.time <= _comboExpireAt;
             _comboStep = continues ? (_comboStep + 1) % Punches.Length : 0;
