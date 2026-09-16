@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { createApiGameDraftRepository, createApiGamePublisher } from '../../studio/ports/gameAuthoringApi.ts';
+import { createApiGameDraftRepository, createApiGamePublisher, createApiGameVisibilityPort } from '../../studio/ports/gameAuthoringApi.ts';
 import { createBrowserAssetRepository } from '../../studio/assets/localAssetRepository.ts';
 import { createApiGameAssetRepository } from '../../studio/assets/remoteAssetRepository.ts';
 import { createBrowserPublicationPorts } from '../../studio/ports/localPublicationRepository.ts';
@@ -25,6 +25,9 @@ export const EditGamePage = () => {
   ), [serverAuthoringEnabled]);
   const serverPublisher = useMemo(() => (
     serverAuthoringEnabled ? createApiGamePublisher() : undefined
+  ), [serverAuthoringEnabled]);
+  const serverVisibilityPort = useMemo(() => (
+    serverAuthoringEnabled ? createApiGameVisibilityPort() : undefined
   ), [serverAuthoringEnabled]);
   // S15P21A604-116 — 서버 저작이 켜지면 자산도 서버로 간다. 여기가 비어 있던 동안 편집기는
   // assetRepository=null 을 받아 업로드가 "로컬 저장소를 사용할 수 없습니다" 로 막혔다 —
@@ -54,6 +57,7 @@ export const EditGamePage = () => {
       persistenceLabel={stressFixtureEnabled ? '최대 부하 검증' : serverAuthoringEnabled ? '서버' : browserPublicationEnabled ? '브라우저(Mock)' : '브라우저'}
       publisher={stressFixtureEnabled ? null : serverPublisher ?? browserPublicationPorts?.publisher}
       repository={stressFixtureEnabled ? null : serverDraftRepository}
+      visibilityPort={stressFixtureEnabled ? null : serverVisibilityPort ?? null}
     />
   );
 };
