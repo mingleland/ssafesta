@@ -50,17 +50,17 @@ vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
 }));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
-// onOpenMyInfo 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
+// onOpenPanel 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
 vi.mock('../../../../features/world/ui/GameMenu', () => ({
-  GameMenu: ({ onOpenMyInfo }: { onOpenMyInfo: () => void }) => (
+  GameMenu: ({ onOpenPanel }: { onOpenPanel: (panel: 'myInfo') => void }) => (
     <div data-testid="game-menu">
-      <button type="button" onClick={onOpenMyInfo}>내 정보</button>
+      <button type="button" onClick={() => onOpenPanel('myInfo')}>내 정보</button>
     </div>
   ),
 }));
-// MyInfoOverlay 는 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 닫히는가)만 본다.
-vi.mock('../../../../features/profile/ui/MyInfoOverlay', () => ({
-  MyInfoOverlay: () => <div data-testid="my-info-overlay" />,
+// 메뉴 자식 화면은 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 메뉴로 돌아가는가)만 본다.
+vi.mock('../../../../features/world/ui/MenuPanelHost', () => ({
+  MenuPanelHost: () => <div data-testid="my-info-overlay" />,
 }));
 
 const pressEscape = () =>
@@ -150,13 +150,17 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('world');
   });
 
-  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 닫힌다', async () => {
+  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 메뉴로 돌아온다', async () => {
     await renderWorld();
     pressEscape();
 
     fireEvent.click(screen.getByRole('button', { name: '내 정보' }));
     expect(screen.getByTestId('my-info-overlay')).toBeTruthy();
-    expect(getWorldScreen()).toBe('myInfo');
+    expect(getWorldScreen()).toBe('menuPanel');
+
+    // 메뉴가 배경에 남아 있다 — 자식을 닫으면 월드가 아니라 메뉴가 드러난다
+    pressEscape();
+    expect(getWorldScreen()).toBe('menu');
 
     pressEscape();
     expect(getWorldScreen()).toBe('world');
