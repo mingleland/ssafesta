@@ -92461,7 +92461,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _displayName: "\uC548\uB0B4 \uB370\uC2A4\uD06C"
-  _visibleDistance: 260
+  _visibleDistance: 0
   _nameColor: {r: 0.98, g: 0.7, b: 0.08, a: 1}
   _characterHeight: 1.9
   _outlineWidth: 0.25
@@ -133110,7 +133110,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _displayName: "\uBD80\uC2A4 \uAD00\uB9AC"
-  _visibleDistance: 260
+  _visibleDistance: 0
   _nameColor: {r: 0.98, g: 0.7, b: 0.08, a: 1}
   _characterHeight: 1.9
   _outlineWidth: 0.25
