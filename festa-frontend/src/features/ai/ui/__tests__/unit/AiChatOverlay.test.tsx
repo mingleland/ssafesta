@@ -60,16 +60,16 @@ function ask(question: string): void {
 
 function askFirstSuggestion(): void {
   renderOverlay({ boothId: 7, agentId: 3 });
-  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트를 전시하나요?' }));
+  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트인가요?' }));
 }
 
 describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
-  it('token 누적 답변과 source 문서명을 done 뒤 표시한다', async () => {
+  it('token 누적 답변을 done 뒤 표시하고 출처 문서명은 화면에 그리지 않는다', async () => {
     streamMessage.mockReturnValue(mockStreamSuccess());
     askFirstSuggestion();
 
     expect(await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/)).toBeTruthy();
-    expect(await screen.findByText('프로젝트_기획서.pdf')).toBeTruthy();
+    expect(screen.queryByText('프로젝트_기획서.pdf')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(createConversation).toHaveBeenCalledWith(7, 3);
   });
@@ -199,5 +199,16 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
 
     ask('두 번째 질문');
     await waitFor(() => expect(createConversation).toHaveBeenCalledTimes(2));
+  });
+
+  it('사용자 질문은 마크다운 문법처럼 보여도 원문 그대로 표시한다', async () => {
+    streamMessage.mockReturnValue(mockStreamSuccess());
+    renderOverlay({ boothId: 7, agentId: 3 });
+
+    ask('**굵게가 아닌 질문**');
+
+    expect(await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/)).toBeTruthy();
+    const question = screen.getByText('**굵게가 아닌 질문**');
+    expect(question.closest('.ai-bubble')?.querySelector('strong')).toBeNull();
   });
 });

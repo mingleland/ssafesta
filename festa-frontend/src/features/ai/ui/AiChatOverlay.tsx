@@ -18,6 +18,7 @@ import { saveReturnTo } from '../../auth/model/returnTo';
 import { aiHandoffContext } from '../../consultation/model/startContext';
 import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
+import { renderMarkdown } from './renderMarkdown';
 import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
@@ -44,7 +45,7 @@ const IcAgent = (
   </svg>
 );
 
-const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요'];
+const SUGGESTIONS = ['어떤 프로젝트인가요?', '누구를 대상으로 한 서비스인가요?', '기술 스택이 궁금해요'];
 
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
@@ -273,17 +274,8 @@ export function AiChatOverlay({ payload }: Props) {
             <div key={i} className={'ai-turn ai-turn-' + t.role}>
               {t.role === 'agent' && <span className="ai-avatar">AI</span>}
               <div className="ai-bubble">
-                {t.text}
+                {t.role === 'agent' ? renderMarkdown(t.text) : t.text}
                 {t.streaming && <span className="ai-caret" />}
-                {t.sources !== undefined && t.sources.length > 0 && !t.streaming && (
-                  <span className="ai-sources">
-                    {t.sources.map((s) => (
-                      <span key={s} className="ov-chip">
-                        {s}
-                      </span>
-                    ))}
-                  </span>
-                )}
                 {(t.status === 'error' || t.status === 'truncated') && (
                   <span className="ai-stream-error" role="alert">
                     {t.errorMessage}
