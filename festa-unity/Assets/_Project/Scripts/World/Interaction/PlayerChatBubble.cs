@@ -24,8 +24,8 @@ namespace Festa.World
         /// <summary>이름표와 같은 SDF 폰트를 쓴다 — 한글이 깨지지 않게 프로젝트 폰트로 구운 것이다.</summary>
         const string FontResourcePath = "Fonts/NotoSansKRBold_SDF";
 
-        /// <summary>이 거리(월드 유닛) 밖에서는 그리지 않는다. 이름표(190)보다 짧다 — 말은 가까이서만 읽는다.</summary>
-        const float VisibleDistance = 150f;
+        /// <summary>이 거리(월드 유닛) 밖에서는 그리지 않는다. 이름표(260)보다 짧다 — 말은 가까이서만 읽는다.</summary>
+        const float VisibleDistance = 220f;
 
         /// <summary>정수리에서 말풍선까지 띄울 거리(월드 유닛). 이름표가 그 사이에 들어간다.</summary>
         const float HeadroomAboveNameplate = 7.5f;
@@ -96,6 +96,7 @@ namespace Festa.World
             _root.pivot = new Vector2(0.5f, 0f);
 
             var material = _text.fontMaterial;                    // 공유본을 건드리면 UI 글자까지 물든다
+            WorldTextOcclusion.ApplyOverlayShader(material, "ChatBubble");   // 이름표와 같이 벽 위에 그린다 — 반 토막 방지
             material.EnableKeyword("OUTLINE_ON");
             material.SetFloat(ShaderUtilities.ID_OutlineWidth, 0.22f);
             material.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0.02f, 0.02f, 0.04f, 1f));
@@ -117,7 +118,7 @@ namespace Festa.World
 
         void LateUpdate()
         {
-            if (_renderer == null || !_renderer.enabled) return;
+            if (_renderer == null) return;
 
             if (Time.time >= _hideAt)
             {
@@ -126,12 +127,14 @@ namespace Festa.World
             }
 
             var cam = Camera.main;
-            if (cam == null) return;
+            if (cam == null) { _renderer.enabled = false; return; }
 
             var anchor = transform.position + Vector3.up * (_height + HeadroomAboveNameplate);
             var toCamera = cam.transform.position - anchor;
 
             // 카메라 뒤로 지나간 대상까지 그리면 화면이 말풍선으로 덮인다.
+            // 여기서 끈 것은 "이번 프레임만" 이다 — 표시 시간이 남아 있으면 다음 프레임에 다시 판정한다.
+            // (예전에는 한 번 꺼지면 LateUpdate 첫 줄에서 빠져 시간이 남아도 영영 안 켜졌다.)
             if (Vector3.Dot(cam.transform.forward, anchor - cam.transform.position) <= 0f) { _renderer.enabled = false; return; }
 
             float distance = toCamera.magnitude;
@@ -144,7 +147,21 @@ namespace Festa.World
             float scale = BaseFontWorldScale * Mathf.Clamp(distance / ReferenceDistance, 0.6f, 3f);
             var ls = transform.lossyScale;
             _root.localScale = new Vector3(scale / Mathf.Max(ls.x, 1e-4f), scale / Mathf.Max(ls.y, 1e-4f), scale / Mathf.Max(ls.z, 1e-4f));
+
+            // 이름표와 같은 기준으로 벽 차폐를 본다 — 대부분 벽 뒤면 감추고, 일부만 뒤면 Overlay 로 통째로 그린다.
+            // 위치·회전·크기를 다 맞춘 뒤에 재야 이번 프레임의 글자 사각형이 기준이 된다.
+            if (Time.frameCount - _occlusionFrame >= OcclusionInterval)
+            {
+                _occlusionFrame = Time.frameCount;
+                _occluded = WorldTextOcclusion.IsMostlyOccluded(cam, _text, transform);
+            }
+            _renderer.enabled = !_occluded;
         }
+
+        /// <summary>가림 판정 간격(프레임). 이름표(<see cref="WorldNameplate"/>)와 같다.</summary>
+        const int OcclusionInterval = 3;
+        int _occlusionFrame = -100;
+        bool _occluded;
 
         void OnDestroy()
         {
