@@ -8,6 +8,29 @@ import org.springframework.data.repository.query.Param;
 
 public interface SurveyAnswerRepository extends JpaRepository<SurveyAnswer, Long> {
 
+    /** One response's answers, in question order — the admin response-detail view (S15P21A604-832). */
+    List<SurveyAnswer> findByResponseIdOrderByQuestionIdAsc(Long responseId);
+
+    /**
+     * The chosen option labels for a set of choice answers, one row per pick.
+     *
+     * <p>{@code survey_answer_options} has no entity (see the class javadoc), so this reads it by
+     * name the same way {@link #insertSelectedOption} writes it.
+     */
+    @Query(value = """
+            SELECT ao.answer_id AS answer_id, so.option_text AS option_text
+            FROM survey_answer_options ao
+            JOIN survey_options so ON so.id = ao.option_id
+            WHERE ao.answer_id IN :answerIds
+            """, nativeQuery = true)
+    List<SelectedOptionRow> findSelectedOptionLabels(@Param("answerIds") List<Long> answerIds);
+
+    interface SelectedOptionRow {
+        Long getAnswerId();
+
+        String getOptionText();
+    }
+
     /**
      * Records one pick on a choice answer.
      *

@@ -72,7 +72,10 @@ namespace Festa.Integration
                 // 조용한 대체가 아니다 (T-24). BE 가 붙는 순간 Unity 는 변경 없이 실판정으로 바뀐다 (S15P21A604-294·-439).
                 Game = new ServerFirstGameResultClient(new HttpGameResultClient(springBaseUrl, TokenProvider), new MockGameResultClient());
                 Wallet = new HttpWalletClient(springBaseUrl, TokenProvider);
-                Slot = new ServerFirstSlotMachineClient(new HttpSlotMachineClient(springBaseUrl, TokenProvider), new MockSlotMachineClient());
+                // 슬롯은 **서버 단일 경로**다 (2026-09-16). BE 가 spec 021 계약을 구현해 develop 에 올렸으므로
+                // 체험판 대역을 둘 이유가 없어졌다. 폴백을 남겨 두면 서버가 잠깐 죽거나 라우팅이 어긋난 순간에
+                // 가짜 판정이 나가 코인 원장과 화면이 갈라진다 — 실패는 그대로 사용자에게 보인다 (T-24).
+                Slot = new HttpSlotMachineClient(springBaseUrl, TokenProvider);
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");

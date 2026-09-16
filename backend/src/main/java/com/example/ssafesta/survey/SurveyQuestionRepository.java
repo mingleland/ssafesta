@@ -11,6 +11,9 @@ public interface SurveyQuestionRepository extends JpaRepository<SurveyQuestion, 
     /** Display order is the contract order — the API array and this list are the same sequence. */
     List<SurveyQuestion> findBySurveyIdOrderByDisplayOrderAsc(Long surveyId);
 
+    /** The admin event-survey roster's per-row question count (S15P21A604-832) — no rows loaded. */
+    long countBySurveyId(Long surveyId);
+
     /**
      * Whether this question belongs to this survey — the guard on the {@code questionId} filter of
      * {@code GET /surveys/{id}/text-answers}.

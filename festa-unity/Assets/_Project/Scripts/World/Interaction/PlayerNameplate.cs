@@ -19,8 +19,9 @@ namespace Festa.World
     [DisallowMultipleComponent]
     public sealed class PlayerNameplate : NetworkBehaviour
     {
-        [Tooltip("이 거리(월드 유닛) 안에서만 보인다. 사람은 많고 겹치기 쉬워 짧게 둔다.")]
-        [SerializeField] float _visibleDistance = 190f;
+        [Tooltip("이 거리(월드 유닛) 안에서만 보인다. 0 = 제한 없음. "
+               + "190 은 복도 건너편 이름이 안 읽혔고, 2026-09-16 사용자 결정으로 어디서든 보이게 0.")]
+        [SerializeField] float _visibleDistance = 0f;
 
         [Tooltip("본인 이름표 색. 남들과 달라야 이름을 읽지 않고도 내 캐릭터를 찾는다.")]
         [SerializeField] Color _ownColor = new(0.66f, 0.82f, 0.28f, 1f);      // 연둣빛

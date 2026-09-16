@@ -36,8 +36,9 @@ namespace Festa.World
         [Tooltip("표시할 이름. 비어 있으면 그리지 않는다.")]
         [SerializeField] string _label;
 
-        [Tooltip("이 거리(월드 유닛) 안에서만 보인다.")]
-        [SerializeField] float _visibleDistance = 260f;
+        [Tooltip("이 거리(월드 유닛) 안에서만 보인다. 0 이하 = 거리 제한 없음. "
+               + "2026-09-16 사용자 결정: 어느 위치에서든 시야에 들어오면 표시한다 — 기본 0.")]
+        [SerializeField] float _visibleDistance = 0f;
 
 
         [Tooltip("머리 위 간격 — 이름표 자체 크기의 배수다. 월드 고정값이 아니라 비율이라야 "
@@ -47,7 +48,7 @@ namespace Festa.World
         [Tooltip("기준 거리에서의 글자 크기(월드 유닛).")]
         [SerializeField] float _baseCharacterHeight = 1.35f;
 
-        [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(0.6~3배).")]
+        [Tooltip("이 거리에서 위 크기 그대로 보인다. 멀면 커지고 가까우면 작아진다(하한 0.6배, 상한 없음 — 화면상 크기 일정).")]
         [SerializeField] float _referenceDistance = 55f;
 
         [SerializeField] Color _color = new(1f, 0.99f, 0.95f, 1f);
@@ -84,7 +85,8 @@ namespace Festa.World
         }
 
         /// <summary>런타임에 붙이는 쪽(플레이어 등)이 표시 거리를 정할 수 있게 한다.</summary>
-        public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(1f, distance);
+        /// <summary>표시 거리(월드 유닛). 0 이하면 거리 제한 없음.</summary>
+        public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(0f, distance);
 
         /// <summary>
         /// 글자 크기와 외곽선 두께를 올려 <b>배경이 무엇이든 읽히게</b> 한다. NPC 안내 이름표용.
@@ -166,6 +168,10 @@ namespace Festa.World
         void ApplyOutline()
         {
             _material = _text.fontMaterial;      // 인스턴스 생성
+
+            // 벽 위에 그린다(ZTest Always). 차폐 판정(IsOccluded)이 "대부분 가려짐" 을 걸러 주므로, 여기까지 온
+            // 글자는 일부가 벽 뒤여도 통째로 보이는 편이 반 토막보다 낫다 (S15P21A604-703 잔여, 2026-09-16).
+            WorldTextOcclusion.ApplyOverlayShader(_material, _label);
 
             // 프로젝트 폰트가 Light 한 벌뿐이라 그대로 쓰면 획이 가늘어 배경에 묻힌다.
             // SDF 는 거리장을 부풀려 굵기를 만들 수 있다 — 합성 볼드처럼 획이 뭉개지지 않고
@@ -377,7 +383,9 @@ namespace Festa.World
 
             // 멀어져도 화면에서 비슷한 크기로 읽히게 한다.
             float camDist = Vector3.Distance(cam.transform.position, transform.position);
-            float scale = Mathf.Clamp(camDist / Mathf.Max(1f, _referenceDistance), 0.6f, 3f);
+            // 상한을 두지 않는다: 거리 제한이 없으므로 어디서 봐도 화면상 같은 크기로 읽혀야 한다.
+            // (3배 상한은 165u 에서 포화해 그 너머 글자가 줄었다 — 2026-09-16.)
+            float scale = Mathf.Max(0.6f, camDist / Mathf.Max(1f, _referenceDistance));
             float size = _baseCharacterHeight * scale;
             // 부모가 스케일된 NPC(부스 앵커 13.26배)에서는 그만큼 되돌린다 — 플레이어(lossy 1)는 종전과 같다.
             var ls = transform.lossyScale;
@@ -392,8 +400,16 @@ namespace Festa.World
             var toCam = cam.transform.position - _root.position;
             float dist = toCam.magnitude;
 
+            // 빌보드는 Y 축만 돌린다 — 기울기까지 따라가면 글자가 누워 읽기 어렵다.
+            // 차폐 판정보다 **먼저** 돌린다: 판정이 글자 사각형의 모서리를 재므로 이번 프레임의 회전이 기준이어야 한다.
+            var flat = cam.transform.position - _root.position;
+            flat.y = 0f;
+            if (flat.sqrMagnitude > 0.0001f)
+                _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
+
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
-            bool show = inFront && dist <= _visibleDistance && !string.IsNullOrEmpty(_label)
+            bool withinDistance = _visibleDistance <= 0f || dist <= _visibleDistance;
+            bool show = inFront && withinDistance && !string.IsNullOrEmpty(_label)
                         && IsBodyVisible() && !IsOccluded(cam);
             _renderer.enabled = show;
             if (!show) return;
@@ -403,24 +419,21 @@ namespace Festa.World
             // (S15P21A604-355 사용자 지적). 보이거나 안 보이거나 둘 중 하나로 둔다 —
             // 표시 거리(_visibleDistance)를 넘으면 그냥 끈다.
             _text.color = _color;
-
-            // 빌보드는 Y 축만 돌린다 — 기울기까지 따라가면 글자가 누워 읽기 어렵다.
-            var flat = cam.transform.position - _root.position;
-            flat.y = 0f;
-            if (flat.sqrMagnitude > 0.0001f)
-                _root.rotation = Quaternion.LookRotation(-flat.normalized, Vector3.up);
         }
 
         /// <summary>
-        /// 카메라와 몸 사이에 **단단한 것**이 있는가. 있으면 이름표를 감춘다.
+        /// 카메라와 글자 사이에 **단단한 것**이 있는가. 있으면 이름표를 감춘다.
         ///
         /// <para><b>왜 <see cref="Renderer.isVisible"/> 로는 안 되나.</b> 그 값은
         /// "어느 카메라에든 보이는가" 다 — 에디터에서는 **씬 뷰 카메라에만 보여도 true** 라
         /// 게임 뷰에서 벽 뒤에 있어도 이름표가 뜬다. 빌드에서도 그 벽이 베이크된 오클루더가
         /// 아니면 걸리지 않는다. 사용자가 반복해서 지적한 "벽 쪽으로 가면 닉네임만 뜬다" 가 이것이다.</para>
         ///
-        /// <para>그래서 <b>카메라에서 머리까지 선분을 직접 쏜다.</b> 자기 몸(자식 콜라이더)은 건너뛰고,
-        /// 트리거는 무시한다. 매 프레임 쏘면 사람 수만큼 늘어나므로 <c>OcclusionInterval</c> 프레임마다
+        /// <para>그래서 <b>카메라에서 글자 사각형(중심·네 모서리)까지 선분을 직접 쏘고 과반이 막히면 감춘다</b>
+        /// (<see cref="WorldTextOcclusion"/>). 바닥 중앙 한 점만 재던 때는 줄전구 하나가 중앙을 스쳐도 라벨이
+        /// 꺼졌고, 반대로 한쪽 끝만 벽에 박힌 경우는 못 걸러 글자가 잘린 채 남았다("ㅂ스 관리", 2026-09-16).
+        /// 잘림 자체는 Overlay 셰이더(<see cref="ApplyOutline"/>)가 없앤다. 자기 몸(자식 콜라이더)은
+        /// 건너뛰고, 트리거는 무시한다. 매 프레임 쏘면 사람 수만큼 늘어나므로 <c>OcclusionInterval</c> 프레임마다
         /// 한 번만 재고 그 사이는 직전 값을 쓴다 — 이름표가 깜빡일 만큼 빠른 변화가 아니다.</para>
         /// </summary>
         bool IsOccluded(Camera cam)
@@ -429,24 +442,8 @@ namespace Festa.World
             if (Time.frameCount - _occlusionFrame < OcclusionInterval) return _occluded;
             _occlusionFrame = Time.frameCount;
 
-            var head = _root != null ? _root.position : transform.position;
-            var origin = cam.transform.position;
-            var delta = head - origin;
-            float d = delta.magnitude;
-            if (d < 0.05f) { _occluded = false; return false; }
-
-            // 끝점을 살짝 당긴다 — 머리 바로 옆 벽에 스치는 것까지 가림으로 치면 붙어 설 때 깜빡인다.
-            int n = Physics.RaycastNonAlloc(origin, delta / d, _occlusionHits, d - 1.5f, ~0, QueryTriggerInteraction.Ignore);
-            for (int i = 0; i < n; i++)
-            {
-                var t = _occlusionHits[i].transform;
-                if (t == null) continue;
-                if (t.IsChildOf(transform) || transform.IsChildOf(t)) continue;   // 자기 몸은 가림이 아니다
-                _occluded = true;
-                return true;
-            }
-            _occluded = false;
-            return false;
+            _occluded = WorldTextOcclusion.IsMostlyOccluded(cam, _text, transform);
+            return _occluded;
         }
 
         [Tooltip("몸이 가려지면 이름표도 감춘다. 끄면 벽 너머로 이름만 떠 보인다")]
@@ -454,7 +451,6 @@ namespace Festa.World
 
         /// <summary>가림 판정 간격(프레임). 사람이 많을수록 레이 수가 늘어나므로 매 프레임 쏘지 않는다.</summary>
         const int OcclusionInterval = 3;
-        static readonly RaycastHit[] _occlusionHits = new RaycastHit[8];
         int _occlusionFrame = -100;
         bool _occluded;
 

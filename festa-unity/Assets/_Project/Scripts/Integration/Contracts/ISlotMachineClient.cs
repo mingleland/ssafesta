@@ -9,8 +9,11 @@ namespace Festa.Integration
     /// <b>Unity 는 결과를 정하지 않는다.</b> 베팅을 보내고 서버 판정(당첨 등급·지급액·잔액)을 받아
     /// 릴 연출만 맞춘다 — spec 014 의 "지급 판단·원장은 서버" 원칙 그대로다.
     ///
-    /// BE 엔드포인트는 아직 없다(docs/26 ③ 제안: <c>POST /api/v1/minigames/slot-machines/{machineId}/spins</c>).
-    /// 그때까지 <see cref="MockSlotMachineClient"/> 가 같은 모양으로 동작하고, 결과 DTO 의
+    /// BE 엔드포인트는 <c>POST /api/v1/minigames/slot-machines/{machineId}/spins</c> 이고
+    /// spec 021 계약으로 확정·구현됐다(2026-09-16). 실서버 모드에서는 <see cref="HttpSlotMachineClient"/> 단일 경로이며
+    /// <b>체험판 폴백이 없다</b> — 서버가 답하지 않으면 실패를 그대로 드러낸다.
+    ///
+    /// <see cref="MockSlotMachineClient"/> 는 <c>useMockApi</c> 로 띄우는 로컬 개발 모드에서만 쓰인다. 그때는 결과 DTO 의
     /// <see cref="SlotSpinResultDto.simulated"/> 가 true 라 HUD 가 "체험판" 임을 드러낸다 — 조용히 실서버인 척하지 않는다.
     /// </summary>
     public interface ISlotMachineClient
