@@ -141,6 +141,31 @@ app:
           coins: 2
         - max-error-seconds: 0.1
           coins: 5
+    # 광장 슬롯머신 (spec 021, GitLab #205 확정값 1·2). daily-cap-coins 는 여기에 걸리지 않는다 —
+    # 한도는 MINIGAME_REWARD 사유로 집계되고 슬롯은 SLOT_BET·SLOT_PAYOUT 이라 서로 섞이지 않는다.
+    slot-machine:
+      # 서버가 정하는 값이고 요청의 bet 은 일치 검증만 한다 (헌법 16조). Unity 는
+      # SlotMachineSession.Bet = 10 상수이고 가변 베팅 계획이 없음을 게임 파트가 회신했다.
+      bet-coins: 10
+      # 씬 실측값 (#205 게임 파트 회신 1 — Arcade_01_Slot_Machine_01·Arcade_02_Slot_Machine_02).
+      # 모르는 id 로 온 스핀은 404 다. 기계가 늘면 이 목록만 고치면 된다.
+      machine-ids:
+        - plaza-slot-01
+        - plaza-slot-02
+      # 배수 오름차순. tier = 인덱스 + 1 이고 0 은 낙첨이다 — 낙첨에는 행이 없고 남는 가중치가
+      # 그대로 낙첨 확률이다(0.78). 합 1.00, RTP = 0.15×2 + 0.05×3 + 0.02×5 = 0.55 이라
+      # 10코인 한 판 기대 손실 4.5코인, 즉 이 기계는 코인 소각처다.
+      #
+      # ⚠️ 4번째 tier 를 붙이지 마라. Unity 가 tier 를 0..3 으로 자르고(HttpSlotMachineClient)
+      # 릴 당첨 프리셋도 3개뿐이라, 코인은 나가는데 화면은 다른 등급을 보여 준다. 설정 검증이
+      # 기동 시 거부하므로 여기서 조용히 어긋나지는 않는다.
+      tiers:
+        - multiplier: 2
+          weight: 0.15
+        - multiplier: 3
+          weight: 0.05
+        - multiplier: 5
+          weight: 0.02
 
   # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
   # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
