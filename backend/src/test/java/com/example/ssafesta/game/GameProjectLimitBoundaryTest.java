@@ -65,6 +65,22 @@ class GameProjectLimitBoundaryTest {
                 project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
+    /**
+     * 리뷰 발견(!993 note_2813554) — PLAYER_SPAWN까지 열어버려 FE(gameProject.ts
+     * validateObjectShape)는 거부하는데 BE는 저장을 받아주는 새 드리프트가 생겼었다. 저장은
+     * 성공하고 다음 로드에서 에디터 파서가 throw하는 실패라 여기서 막는다.
+     */
+    @Test
+    void playerSpawnWithNameOrShowNameInPlayIsRejected() {
+        ObjectNode project = valid();
+        ObjectNode playerSpawn = firstObject(project);
+        playerSpawn.put("name", "me");
+        playerSpawn.put("showNameInPlay", true);
+
+        assertThrows(GameValidationFailedException.class, () -> validator.validateForDraft(
+                project, GameTestSupport.write(project), GAME_ID, Map.of()));
+    }
+
     /** BE가 자기 설계(specs 원본)보다 느슨하게 검증하고 있던 자리 — 타입별 상한이 실제로 걸리는지. */
     @Test
     void defeatEnemiesObjectiveOverItsOwnCapIsRefusedEvenThoughUnderTheGlobalCap() {
