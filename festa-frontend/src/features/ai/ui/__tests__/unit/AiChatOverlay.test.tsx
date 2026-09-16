@@ -64,12 +64,12 @@ function askFirstSuggestion(): void {
 }
 
 describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
-  it('token 누적 답변과 source 문서명을 done 뒤 표시한다', async () => {
+  it('token 누적 답변을 done 뒤 표시하고 출처 문서명은 화면에 그리지 않는다', async () => {
     streamMessage.mockReturnValue(mockStreamSuccess());
     askFirstSuggestion();
 
     expect(await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/)).toBeTruthy();
-    expect(await screen.findByText('프로젝트_기획서.pdf')).toBeTruthy();
+    expect(screen.queryByText('프로젝트_기획서.pdf')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(createConversation).toHaveBeenCalledWith(7, 3);
   });

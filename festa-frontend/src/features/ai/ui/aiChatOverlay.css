@@ -64,7 +64,6 @@
 }
 @keyframes ai-blink { 50% { opacity: 0.2; } }
 @media (prefers-reduced-motion: reduce) { .ai-caret { animation: none; } }
-.ai-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ai-stream-error {
   display: flex;
   flex-direction: column;

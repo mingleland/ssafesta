@@ -275,15 +275,6 @@ export function AiChatOverlay({ payload }: Props) {
               <div className="ai-bubble">
                 {t.text}
                 {t.streaming && <span className="ai-caret" />}
-                {t.sources !== undefined && t.sources.length > 0 && !t.streaming && (
-                  <span className="ai-sources">
-                    {t.sources.map((s) => (
-                      <span key={s} className="ov-chip">
-                        {s}
-                      </span>
-                    ))}
-                  </span>
-                )}
                 {(t.status === 'error' || t.status === 'truncated') && (
                   <span className="ai-stream-error" role="alert">
                     {t.errorMessage}
