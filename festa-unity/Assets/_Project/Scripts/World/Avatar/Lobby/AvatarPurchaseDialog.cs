@@ -98,25 +98,25 @@ namespace Festa.Avatar
             var pr = panel.rectTransform;
             // **화면 가운데가 아니라 오른쪽으로 치운다.** 가운데는 아바타가 서 있는 자리다
             // (사용자 지시 2026-09-15 — "실착용 모습을 잘 볼 수 있게 옆으로").
-            FestaUiKit.Place(pr, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-36f, 0f), new Vector2(560f, 380f));
+            FestaUiKit.Place(pr, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-36f, 0f), new Vector2(560f, 430f));
 
             FestaUiKit.TitleBanner(pr, "아이템 구매", new Vector2(0f, 22f), new Vector2(200f, 46f), 22f);
             FestaUiKit.CloseButton(pr, new Vector2(-14f, -14f), 40f, Close);
 
-            FestaUiKit.Title(pr, _itemName, 26f, new Vector2(0f, -84f), new Vector2(480f, 40f));
+            FestaUiKit.Title(pr, _itemName, 26f, new Vector2(0f, -86f), new Vector2(480f, 40f));
 
             // 가격 — 어두운 표시창에 금색 숫자. 슬롯머신·타이밍 스톱과 같은 화면 언어.
             var display = FestaUiKit.Panel(pr, "Price", FestaUiKit.Card.Charcoal, 20);
-            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -130f), new Vector2(300f, 78f));
+            FestaUiKit.Place(display.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -138f), new Vector2(300f, 78f));
             _priceText = FestaUiKit.Label(display.rectTransform, $"{_price:N0} 코인", 34f, Vector2.zero, Vector2.zero, FestaUiKit.Gold, FontStyles.Bold);
             FestaUiKit.Stretch(_priceText.rectTransform);
 
-            _balanceText = FestaUiKit.Label(pr, "내 코인을 확인하는 중…", 17f, new Vector2(0f, -224f), new Vector2(480f, 26f), FestaUiKit.Muted);
-            _noticeText = FestaUiKit.Label(pr, "구매하시겠습니까?", 17f, new Vector2(0f, -252f), new Vector2(480f, 26f), FestaUiKit.Text);
+            _balanceText = FestaUiKit.Label(pr, "내 코인을 확인하는 중…", 17f, new Vector2(0f, -238f), new Vector2(480f, 30f), FestaUiKit.Muted);
+            _noticeText = FestaUiKit.Label(pr, "구매하시겠습니까?", 17f, new Vector2(0f, -282f), new Vector2(480f, 34f), FestaUiKit.Text);
 
-            _buyButton = FestaUiKit.PillButton(pr, "구매", new Vector2(84f, -318f), new Vector2(190f, 56f), OnBuy, true, 21f);
+            _buyButton = FestaUiKit.PillButton(pr, "구매", new Vector2(84f, -362f), new Vector2(190f, 56f), OnBuy, true, 21f);
             _buyLabel = FestaUiKit.ButtonLabel(_buyButton);
-            FestaUiKit.PillButton(pr, "취소", new Vector2(-84f, -318f), new Vector2(190f, 56f), Close, false, 21f);
+            FestaUiKit.PillButton(pr, "취소", new Vector2(-84f, -362f), new Vector2(190f, 56f), Close, false, 21f);
 
             InputBridge.SetLocked(true, LockOwner);
         }
