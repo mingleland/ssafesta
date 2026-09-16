@@ -151,7 +151,7 @@ export function noticeMemberOnly(): void {
 
 export type ChatRejection = 'EMPTY' | 'TOO_LONG' | 'COOLDOWN';
 
-export type EnterAction = 'ignore' | 'open' | 'send' | 'focus';
+export type EnterAction = 'ignore' | 'open' | 'send' | 'focus' | 'close';
 
 /**
  * Enter 하나를 무엇으로 읽을지 정한다 — 판정은 `WorldPage` 의 리스너 한 곳이 쓰지만, 규칙 자체는
@@ -166,17 +166,24 @@ export type EnterAction = 'ignore' | 'open' | 'send' | 'focus';
  * 호출부가 `preventDefault` 조차 하지 않으므로 그 화면의 기본 동작이 그대로 산다. ESC 가 위 레이어
  * 부터 한 겹씩 걷는 것과 같은 규칙을 Enter 에도 적용하는 것이고, 오버레이가 자기 리스너를 걸어
  * 가로채는 방식은 쓰지 않는다 — 같은 target 이라 등록 순서로만 갈리는 그 계열의 버그가 돌아온다.
+ *
+ * **채팅은 Enter 하나로만 제어한다.** 열기·전송·닫기가 전부 이 키다. 예전에는 닫기만 ESC 였는데,
+ * 그러면 같은 창을 여는 키와 닫는 키가 달라지고 ESC 계층(오버레이·메뉴)과도 뒤섞인다. 빈 입력에서
+ * 누른 Enter 를 닫기로 읽는다 — 보낼 것이 없을 때 그 키가 할 일은 그것뿐이다.
  */
 export function resolveEnterAction(
   event: { isComposing?: boolean; keyCode?: number; shiftKey?: boolean },
-  context: { worldOwnsScreen: boolean; open: boolean; inputFocused: boolean; member: boolean },
+  context: { worldOwnsScreen: boolean; open: boolean; inputFocused: boolean; member: boolean; draftEmpty?: boolean },
 ): EnterAction {
   if (event.isComposing === true || event.keyCode === 229) return 'ignore';
   if (event.shiftKey === true) return 'ignore';
   if (!context.worldOwnsScreen) return 'ignore';
   // 패널은 열려 있는데 입력창이 focus 를 잃은 상태(캔버스 클릭 등)를 남기지 않는다 — Enter 로
   // 다시 그 입력창에 들어간다. 열려 있다는 것 자체가 회원이라는 뜻이다 (S15P21A604-791).
-  if (context.open) return context.inputFocused ? 'send' : 'focus';
+  if (context.open) {
+    if (!context.inputFocused) return 'focus';
+    return context.draftEmpty === true ? 'close' : 'send';
+  }
   return context.member ? 'open' : 'ignore';
 }
 

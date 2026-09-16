@@ -38,9 +38,9 @@ function renderWorld() {
   );
 }
 
-/** 사용자가 지적한 3종 — 조작 안내 · 상담(알림) · 도움말 */
+/** 상시 HUD 요소 하나로 판정한다. 조작 안내 카드는 ESC 메뉴로 옮겨 가 더 이상 HUD 에 없다. */
 function hudVisible(): boolean {
-  return screen.queryByLabelText('조작 안내') !== null;
+  return screen.queryByLabelText('전체화면') !== null;
 }
 
 beforeEach(() => {
