@@ -200,4 +200,15 @@ describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {
     ask('두 번째 질문');
     await waitFor(() => expect(createConversation).toHaveBeenCalledTimes(2));
   });
+
+  it('사용자 질문은 마크다운 문법처럼 보여도 원문 그대로 표시한다', async () => {
+    streamMessage.mockReturnValue(mockStreamSuccess());
+    renderOverlay({ boothId: 7, agentId: 3 });
+
+    ask('**굵게가 아닌 질문**');
+
+    expect(await screen.findByText(/안녕하세요, 무엇을 도와드릴까요?/)).toBeTruthy();
+    const question = screen.getByText('**굵게가 아닌 질문**');
+    expect(question.closest('.ai-bubble')?.querySelector('strong')).toBeNull();
+  });
 });

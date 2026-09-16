@@ -18,6 +18,7 @@ import { saveReturnTo } from '../../auth/model/returnTo';
 import { aiHandoffContext } from '../../consultation/model/startContext';
 import { requestConsultation, useVisitorConsultation } from '../../consultation/model/visitor';
 import './aiChatOverlay.css';
+import { renderMarkdown } from './renderMarkdown';
 import { openVisitorOverlay } from '../../world/model/worldScreen';
 
 interface Props {
@@ -273,7 +274,7 @@ export function AiChatOverlay({ payload }: Props) {
             <div key={i} className={'ai-turn ai-turn-' + t.role}>
               {t.role === 'agent' && <span className="ai-avatar">AI</span>}
               <div className="ai-bubble">
-                {t.text}
+                {t.role === 'agent' ? renderMarkdown(t.text) : t.text}
                 {t.streaming && <span className="ai-caret" />}
                 {(t.status === 'error' || t.status === 'truncated') && (
                   <span className="ai-stream-error" role="alert">
