@@ -1,7 +1,15 @@
 /* Screen Local Baseline v0 — World 밖 React 화면(부스·프로필·홈)의 공통 껍데기 (S15P21A604-406).
    전역 Foundation SSOT 가 아니다. Overlay(.festa-overlay)·Booth Studio(.booth-studio) 와 같은
    제품으로 보이되 스코프는 분리한다 — 승격 여부는 Foundation Extraction 에서 판단한다. */
-.festa-screen {
+/* 토큰 선언과 화면 골격을 가른다 (2026-09-16).
+
+   관리 상세 3화면은 route(.festa-screen)와 월드 오버레이(.festa-overlay) 양쪽에 같은 본문을
+   올리면서 sc-* 유틸(카드·버튼·칩·note)을 쓴다. 그런데 값이 전부 이 블록의 --sc-* 에 묶여 있어
+   오버레이 표면에서는 background·border 가 통째로 무효가 됐다 — 카드가 배경 없이, 버튼이 맨
+   텍스트로 보이던 원인이다. 토큰만 두 표면에 함께 내려 주고, 레이아웃 속성은 .festa-screen 에
+   그대로 둔다(오버레이에 min-height·배경이 걸리면 월드를 덮는다). */
+.festa-screen,
+.festa-overlay {
   --sc-bg: #0f1430;
   --sc-panel: rgba(21, 27, 51, 0.92);
   --sc-panel-sunken: #141a34;
@@ -16,7 +24,9 @@
   --sc-radius: 16px;
   --sc-radius-control: 10px;
   --sc-font: 'Pretendard', 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
+}
 
+.festa-screen {
   position: relative;
   min-height: 100vh;
   background: var(--sc-bg);

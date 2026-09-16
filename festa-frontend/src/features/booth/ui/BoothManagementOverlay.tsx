@@ -13,7 +13,7 @@
 // 정본이라 관리창에서 부스 스튜디오로 가는 길만 끊었다. 스튜디오·2.5D·게시 파이프라인은 코드째
 // 보존돼 있고 deep-link(/app/studio/:boothId)·ManagementPanel 'studio' 멤버는 그대로 남아 있다.
 // 이 화면은 layout publish/rebuild 를 부르지 않는다. 외관 편집은 부스 이름만 인라인으로 남겼다.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
@@ -86,7 +86,12 @@ interface Props {
   onClose: () => void;
 }
 
-/** 운영 관리 카드 하나 — 아이콘 타일 + 제목 + 부제 + chevron. 상세는 별도 화면이다 */
+/**
+ * 운영 관리 카드 하나 — 아이콘 타일 + 제목 + 부제 + chevron. 상세는 별도 화면이다.
+ *
+ * `summary` 를 배열로 받는 이유는 줄바꿈 때문이다. 한 문자열로 두면 열 너비가 좁을 때
+ * "근거 문/서 관리" 처럼 낱말 가운데가 끊긴다 — 어디서 끊을지를 값이 정하게 한다.
+ */
 function OpsCard({
   kind,
   label,
@@ -95,7 +100,7 @@ function OpsCard({
 }: {
   kind: keyof typeof OPS_ICONS;
   label: string;
-  summary: string;
+  summary: string[];
   onOpen: () => void;
 }) {
   return (
@@ -103,7 +108,12 @@ function OpsCard({
       <span className="bm-card-icon">{OPS_ICONS[kind]}</span>
       <span className="bm-card-text">
         <strong>{label}</strong>
-        <span>{summary}</span>
+        {/* 부제를 한 덩어리로 묶는다 — 2줄 높이를 예약해 네 카드의 제목 줄이 같은 높이에 선다 */}
+        <span className="bm-card-sub">
+          {summary.map((line) => (
+            <span key={line}>{line}</span>
+          ))}
+        </span>
       </span>
       {IcChevron}
     </button>
@@ -120,6 +130,13 @@ export function BoothManagementOverlay({ onClose }: Props) {
   // 이 가드가 없어 확정 거절을 재시도했고, 스피너만 도는 채로 요청 폭풍이 났다(GitLab #139).
   const { kind } = useSession();
   const isMember = kind === 'member';
+  // 임대 남은 시간을 1초마다 다시 그린다 — endsAt 절대시각 기준이라 백그라운드 복귀에도 어긋나지
+  // 않는다(SlotListPage.RemainingTime 과 같은 방식, FR-007). 만료 "판정"의 권위는 서버 status 다.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const myBoothQuery = useQuery({
     queryKey: ['my-booth'],
     queryFn: leaseApi.getMyBooth,
@@ -212,7 +229,6 @@ export function BoothManagementOverlay({ onClose }: Props) {
     }
 
     const lease = myBooth.lease;
-    const now = Date.now();
     const expired = remainingMs(lease.endsAt, now) === 0;
     const endsAt = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul',
@@ -222,8 +238,11 @@ export function BoothManagementOverlay({ onClose }: Props) {
 
     return (
       <div className="bm-body">
-        {/* key — 슬롯이 바뀌면 폴백 단계를 처음부터 */}
-        <BoothPreview key={lease.slotCode ?? ''} slotCode={lease.slotCode} />
+        <div className="bm-main">
+          {/* key — 슬롯이 바뀌면 폴백 단계를 처음부터 */}
+          <BoothPreview key={lease.slotCode ?? ''} slotCode={lease.slotCode} />
+          {SHOW_AI_ASSET_SECTION && <AiAssetSection />}
+        </div>
 
         <div className="bm-side">
           <section className="bm-identity">
@@ -244,7 +263,7 @@ export function BoothManagementOverlay({ onClose }: Props) {
                   {IcClock}
                   {expired ? '임대가 끝났습니다' : `임대 ${formatRemaining(remainingMs(lease.endsAt, now))} 남음`}
                   <br />
-                  (~ {endsAt} 종료)
+                  ({endsAt} 종료)
                 </span>
               </div>
             </div>
@@ -255,17 +274,15 @@ export function BoothManagementOverlay({ onClose }: Props) {
             />
           </section>
 
-          {SHOW_AI_ASSET_SECTION && <AiAssetSection />}
-
           <section className="bm-ops">
             <h3 className="bm-card-title">부스 운영 관리</h3>
             <p className="ov-note">방문객과의 소통을 위한 주요 부스 운영 기능을 설정하고 관리하세요.</p>
             <div className="bm-ops-grid">
-              <OpsCard kind="project" label="프로젝트" summary="등록 · 수정" onOpen={() => openPanel('project', myBooth.boothId)} />
-              <OpsCard kind="survey" label="설문" summary="설문 편집 · 응답 결과" onOpen={() => openPanel('survey', myBooth.boothId)} />
-              <OpsCard kind="consultation" label="상담" summary="상담 요청 운영" onOpen={() => openPanel('consultation', myBooth.boothId)} />
+              <OpsCard kind="project" label="프로젝트" summary={['등록 · 수정']} onOpen={() => openPanel('project', myBooth.boothId)} />
+              <OpsCard kind="survey" label="설문" summary={['설문 편집', '응답 결과']} onOpen={() => openPanel('survey', myBooth.boothId)} />
+              <OpsCard kind="consultation" label="상담" summary={['상담 요청 운영']} onOpen={() => openPanel('consultation', myBooth.boothId)} />
               {/* AI 직원도 같은 drill-down — 문서 업로드가 있어 화면이 길어지므로 별도 화면으로 연다 */}
-              <OpsCard kind="ai-agent" label="AI 직원" summary="답변 설정 · 근거 문서 관리" onOpen={openAiAgentSection} />
+              <OpsCard kind="ai-agent" label="AI 직원" summary={['답변 설정', '근거 문서 관리']} onOpen={openAiAgentSection} />
             </div>
           </section>
 
@@ -323,18 +340,18 @@ export function BoothManagementOverlay({ onClose }: Props) {
             <h3 id="bm-gate-title">AI 직원 등록이 필요합니다.</h3>
             <p>먼저 AI 직원을 등록해야 대화 설정과 문서를 관리할 수 있습니다.</p>
             <div className="bm-gate-actions">
-              <button type="button" className="ov-btn" onClick={() => setShowAgentGate(false)}>
-                닫기
-              </button>
               <button
                 type="button"
-                className="ov-btn ov-btn-primary"
+                className="bm-gate-btn bm-gate-btn-primary"
                 onClick={() => {
                   setShowAgentGate(false);
                   openPanel('ai-agent', myBooth.boothId);
                 }}
               >
-                AI 직원 등록하러 가기
+                직원 등록
+              </button>
+              <button type="button" className="bm-gate-btn" onClick={() => setShowAgentGate(false)}>
+                닫기
               </button>
             </div>
           </div>

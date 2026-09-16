@@ -6,8 +6,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(320px, 1fr);
   gap: 16px;
-  align-items: start;
+  /* 두 열의 바닥을 맞춘다. 남는 높이는 각 열 안에서 분배하고(카드 자체는 늘리지 않는다),
+     열에는 배경이 없어 빈 공간이 보이지 않는다. */
+  align-items: stretch;
 }
+.bm-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .bm-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
 .bm-preview-card,
@@ -163,12 +166,15 @@
   font-weight: 600;
 }
 .bm-ai-lock { color: rgba(234, 238, 251, 0.45); }
+/* 케이스(남는 너비) + 동작 버튼(오른쪽 고정) 한 줄 */
+.bm-ai-body { display: flex; align-items: stretch; gap: 10px; margin-top: 8px; }
 .bm-ai-cases {
   position: relative;
+  flex: 1;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-top: 8px;
 }
 .bm-ai-case {
   display: flex;
@@ -194,17 +200,31 @@
   font-size: 13px;
   font-weight: 600;
 }
-.bm-ai-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.bm-ai-actions {
+  flex: none;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
 .bm-ai-actions .ov-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* 운영 관리 — 2×2 카드. 남는 높이를 채운다 */
+/* 운영 관리 — 2×2 카드. 섹션의 남는 높이를 격자가 먹고 두 행이 똑같이 나눠 갖는다 */
 .bm-ops { flex: 1; }
-.bm-ops-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.bm-ops-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
 .bm-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px;
+  gap: 13px;
+  padding: 14px 15px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
@@ -219,23 +239,29 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
+.bm-card-icon svg { width: 25px; height: 25px; }
 .bm-card[data-kind='project'] .bm-card-icon { background: #5b5cf0; }
 .bm-card[data-kind='survey'] .bm-card-icon { background: #22b573; }
 .bm-card[data-kind='consultation'] .bm-card-icon { background: #f2892b; }
 .bm-card[data-kind='ai-agent'] .bm-card-icon { background: #b13bd6; }
-.bm-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.bm-card-text strong { font-size: 15px; }
-.bm-card-text span { font-size: 12.5px; color: rgba(234, 238, 251, 0.62); }
+/* 카드가 세로로 늘어나도 내용은 가운데 — 위로 몰리지 않는다 */
+.bm-card-text { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; flex: 1; }
+.bm-card-text strong { font-size: 15.5px; }
+/* 부제는 값이 정한 줄 수만큼 쌓인다. keep-all 은 그래도 넘칠 때 낱말 가운데가 끊기지 않게 하는 보루다 */
+.bm-card-text > span { font-size: 13px; line-height: 1.35; color: rgba(234, 238, 251, 0.62); word-break: keep-all; }
+/* 2줄치를 비워 둔다 — 한 줄짜리 카드(상담)도 제목이 같은 높이에 서게 하는 장치다 */
+.bm-card-sub { display: flex; flex-direction: column; gap: 1px; min-height: 2.7em; }
 .bm-card > svg { flex: none; color: rgba(234, 238, 251, 0.55); }
 
-/* 반납은 파괴적이라 주 동작들과 같은 무게로 보이면 안 된다 — 맨 아래 한 줄로 조용히 선다 */
-.bm-return { width: 100%; }
+/* 반납은 파괴적이라 주 동작들과 같은 무게로 보이면 안 된다 — 열 맨 아래에 붙여 조용히 선다.
+   남는 높이가 여기로 모이므로 왼쪽 열 바닥과 같은 선에서 끝난다. */
+.bm-return { width: 100%; margin-top: auto; }
 
 .bm-cancel-error {
   color: var(--sc-danger, #ef5d6c);
@@ -390,10 +416,39 @@
 .bm-gate-dialog h3 { margin: 0; font-size: 16px; color: var(--festa-ink); }
 .bm-gate-dialog p { margin: 0 0 6px; color: rgba(234, 238, 251, 0.72); font-size: 13.5px; }
 .bm-gate-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* 이 팝업은 OverlayFrame 의 **형제**라 .festa-overlay 안이 아니다 — 거기 스코프된 --ov-* 를 못 받아
+   .ov-btn 을 쓰면 테두리·배경·반경이 전부 빈 값이 된다(2026-09-16 실측). 다이얼로그 본체가 이미
+   쓰는 전역 --festa-* 토큰으로 여기서 직접 세운다. */
+.bm-gate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid var(--festa-line, rgba(255, 255, 255, 0.12));
+  border-radius: var(--festa-r-input, 10px);
+  background: var(--festa-fill, rgba(255, 255, 255, 0.06));
+  color: var(--festa-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.08s ease;
+}
+.bm-gate-btn:hover { filter: brightness(1.15); }
+.bm-gate-btn:active { transform: translateY(1px); }
+.bm-gate-btn:focus-visible { outline: 2px solid var(--festa-accent); outline-offset: 2px; }
+.bm-gate-btn-primary {
+  background: var(--festa-accent);
+  border-color: var(--festa-accent);
+  color: #fff;
+}
 
 @media (max-width: 900px) {
   .bm-body { grid-template-columns: 1fr; }
   .bm-ops-grid { grid-template-columns: 1fr; }
+  .bm-ai-body { flex-direction: column; }
+  .bm-ai-actions { width: auto; }
   .bm-field-grid { grid-template-columns: 1fr; }
 }
 
