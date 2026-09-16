@@ -4,6 +4,7 @@
 // 그 호출은 지금 404 로 떨어지고 화면은 오류 상태를 그린다 — BE 가 그 경로를 채우면 여기서 바꿀 것이 없다.
 // 응답 모양이 다르게 오면 이 파일의 매핑만 고친다.
 import { api } from '../../shared/api/client';
+import { IS_DEV_ENTRY } from '../../features/devEntry/model/devEntry';
 import type { MyAccountResponse } from '../user/types';
 import type { SlotView } from '../booth/types';
 import type { EventSurveyRunWire } from '../survey/types';
@@ -35,6 +36,11 @@ export const KNOWN_EVENT_SURVEY_KEYS = ['SSAFESTA_2026'] as const;
 async function getCapability(): Promise<AdminCapability> {
   // [FE contract] admin·master 가 오면 읽고, 없으면 false. 없다고 관리자로 가정하지 않는다.
   const me = await api<MyAccountResponse & { admin?: unknown; master?: unknown }>('/api/v1/users/me');
+  // 로컬 개발 진입(DEV_ONLY, VITE_DEV_ENTRY). BE 가 admin 칸을 주기 전까지 실 BE 로컬 스택에서
+  // 콘솔을 여는 유일한 길이다 — V36 시드로 이미 관리자인 계정이 FE 판정에서만 막히는 상태를 푼다.
+  // 서버 판정을 우회하지 않는다: 화면만 열리고 실제 조치는 그대로 BE AdminGuard 가 거절한다.
+  // import.meta.env.DEV 와 AND 라 프로덕션 번들에서는 이 분기가 사라진다(devEntry.ts 와 같은 관례).
+  if (IS_DEV_ENTRY) return { admin: true, master: me.master === true };
   return { admin: me.admin === true, master: me.master === true };
 }
 
