@@ -112,7 +112,7 @@ describe('GamesListPage — S15P21A604-824', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '복원' }));
 
-    await screen.findByRole('button', { name: '공개 전환' });
+    await screen.findByRole('button', { name: '🔒 비공개' });
     expect(restore).toHaveBeenCalledWith(2);
   });
 
@@ -124,9 +124,9 @@ describe('GamesListPage — S15P21A604-824', () => {
     renderPage();
     await screen.findByText('토글 게임');
 
-    fireEvent.click(screen.getByRole('button', { name: '공개 전환' }));
+    fireEvent.click(screen.getByRole('button', { name: '🔒 비공개' }));
 
-    await screen.findByRole('button', { name: '비공개 전환' });
+    await screen.findByRole('button', { name: '🌐 공개됨' });
     expect(setVisibility).toHaveBeenCalledWith(3, 'PUBLIC');
   });
 });

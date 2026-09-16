@@ -38,9 +38,10 @@ export const routes = [
   },
   {
     // 구 진입 허브. 제품 Home 은 없어졌다(D-08 — World 가 기본 상주 상태) — 다만 경로를
-    // 지우지는 않는다. 외부 링크·북마크와 Game Studio(protected, GameStudioShell 의 홈 버튼)가
-    // 아직 이 경로를 가리킨다. 가드를 걸지 않는 이유: 목적지인 /app/world 가 같은 등급의
-    // 가드를 이미 갖고 있어 여기서 한 번 더 판정하면 redirect 가 두 번 일어난다.
+    // 지우지는 않는다. 외부 링크·북마크가 아직 이 경로를 가리킬 수 있다(Game Studio의 뒤로가기는
+    // S15P21A604-824부터 /app/games를 가리켜 더 이상 이 경로를 쓰지 않는다). 가드를 걸지 않는
+    // 이유: 목적지인 /app/world 가 같은 등급의 가드를 이미 갖고 있어 여기서 한 번 더 판정하면
+    // redirect 가 두 번 일어난다.
     path: '/app/home',
     element: <Navigate to="/app/world" replace />,
   },

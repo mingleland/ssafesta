@@ -130,13 +130,20 @@ export function GamesListPage() {
                 <button
                   type="button"
                   className="sc-btn"
+                  aria-pressed={game.visibility === 'PUBLIC'}
                   disabled={visibilityMutation.isPending}
+                  title={game.visibility === 'PUBLIC'
+                    ? '클릭하면 비공개로 전환합니다. 게스트가 더 이상 플레이할 수 없습니다.'
+                    : '클릭하면 공개로 전환합니다. 게시된 버전을 게스트도 플레이할 수 있게 됩니다.'}
                   onClick={() => visibilityMutation.mutate({
                     gameId: game.gameId,
                     next: game.visibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC',
                   })}
                 >
-                  {game.visibility === 'PUBLIC' ? '비공개 전환' : '공개 전환'}
+                  {/* 편집기(GameStudioShell, 701)와 라벨·아이콘·툴팁을 그대로 통일한다 — "지금
+                      상태"를 보여주는 표기다, "누르면 될 상태"가 아니다. 둘이 반대로 읽히면
+                      같은 게임을 목록과 편집기 어느 쪽에서 보든 헷갈린다. */}
+                  {game.visibility === 'PUBLIC' ? '🌐 공개됨' : '🔒 비공개'}
                 </button>
                 <Link className="sc-btn sc-btn-primary" to={`/app/games/${game.gameId}/edit`}>
                   편집하기
