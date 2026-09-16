@@ -18,21 +18,25 @@
 .gm-panel {
   position: relative;
   width: min(360px, calc(100vw - 40px));
+  max-height: calc(100dvh - 40px);
   border-radius: 18px;
   background: rgba(14, 18, 40, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.13);
   box-shadow: 0 28px 70px rgba(3, 5, 18, 0.6);
   color: var(--festa-ink);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 @media (prefers-reduced-transparency: reduce) {
   .gm-panel { background: #0e1228; }
   .gm-dim { background: rgba(5, 7, 20, 0.78); }
 }
+.gm-head {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 10px 0;
+}
 .gm-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   width: 28px;
   height: 28px;
   display: grid;

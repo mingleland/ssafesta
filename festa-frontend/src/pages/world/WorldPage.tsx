@@ -13,13 +13,14 @@
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
 import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
+import { MyInfoOverlay } from '../../features/profile/ui/MyInfoOverlay';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
@@ -43,10 +44,11 @@ import {
   closeBoothManagement,
   closeManagementPanel,
   closeGameMenu,
+  closeMyInfo,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, getWorldScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMyInfoScreen } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -61,7 +63,6 @@ export function WorldPage() {
   // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
   const hostPhase = useHostPhase();
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [chatHeight, setChatHeight] = useState(0);
   const reportChatHeight = useCallback((height: number) => {
@@ -229,15 +230,9 @@ export function WorldPage() {
         <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
       )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
-      {ui.gameMenu && (
-        <GameMenu
-          onClose={closeGameMenu}
-          onOpenMyInfo={() => {
-            closeGameMenu();
-            navigate('/app/profile');
-          }}
-        />
-      )}
+      {ui.gameMenu && <GameMenu onClose={closeGameMenu} onOpenMyInfo={openMyInfoScreen} />}
+      {/* 내 정보 — GameMenu 의 "내 정보"가 연다. 오버레이라 월드 위에 뜬다(페이지 이동 아님) */}
+      {ui.myInfo && <MyInfoOverlay onClose={closeMyInfo} />}
     </div>
   );
 }
