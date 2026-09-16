@@ -285,6 +285,28 @@ class GameNamedRuleTest {
                 () -> "상한 초과에 target rule 을 붙이면 안 된다: " + rules);
     }
 
+    /**
+     * 리뷰 발견(!993 note_2813554) — 타입별 상한 세 {@code if}에 {@code required: ["type"]}이
+     * 빠져 있으면 {@code type}이 없는 objective에서 세 {@code if}가 전부 공허참이 되어 세
+     * {@code then}이 동시에 적용된다. 진짜 원인은 {@code type} 누락(MALFORMED_PROJECT)인데
+     * 멀쩡한 {@code target}에 {@code OBJECTIVE_TARGET_INVALID}가 중복으로 붙는 게 실제
+     * 증상이었다 — {@code required} 보강 후에는 그 {@code then}들이 아예 평가되지 않아야 한다.
+     */
+    @Test
+    void objectiveMissingTypeStaysMalformedWithoutSpuriousTargetRule() {
+        ObjectNode project = withRules(valid());
+        ArrayNode objectives = objectives(project);
+        objectives.removeAll();
+        objectives.addObject().put("target", 5_000_000);
+
+        GameValidationFailedException thrown = assertThrows(GameValidationFailedException.class,
+                () -> validator.validateForPublish(project, GameTestSupport.write(project), GAME_ID, Map.of()));
+        List<String> rules = ruleNames(thrown);
+        assertTrue(rules.contains("MALFORMED_PROJECT"), () -> "MALFORMED_PROJECT 여야 하는데 " + rules);
+        assertTrue(!rules.contains("OBJECTIVE_TARGET_INVALID"),
+                () -> "type 누락인데 target rule 이 붙으면 안 된다(중복 발생 원인): " + rules);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────
 
     private ObjectNode valid() {
