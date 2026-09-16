@@ -3,11 +3,37 @@
 // guest: 재발급 시도 없이 즉시 게스트 재입장 안내(FR-009a — 자동 재발급 금지). 인터셉트는 client.ts가
 // skipAuthRetry로 상한 1회를 보장하므로 여기서는 재시도 루프를 만들지 않는다.
 
-import { isApiError, setUnauthorizedHandler } from '../../../shared/api/client';
+import { getAccessToken, isApiError, setUnauthorizedHandler } from '../../../shared/api/client';
 import { authApi } from '../../../entities/auth/api.select';
 import { getSessionSnapshot, setMemberSession, clearSession } from './session';
 
 let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * refresh 가 왜 실패했는지 콘솔에 남긴다 (S15P21A604-819, GitLab #211).
+ *
+ * 여기서 오류를 통째로 버리고 있어서, 실제 강제 로그아웃이 났을 때 `INVALID_MEMBER_TOKEN`
+ * (쿠키가 없거나 서버에 키가 없다)과 `REFRESH_TOKEN_ROTATED`(회전 경합)를 사후에 가를 방법이
+ * 없었다. 화면에는 `session-expired` 안내만 남고 원인은 사라진다 — 실패를 조용히 삼키지
+ * 않는다(T-24).
+ *
+ * `requestId` 를 함께 적는 이유는 그 값 하나로 서버 로그(S15P21A604-816)와 맞붙기 때문이다.
+ *
+ * **토큰 값은 남기지 않는다**(헌법 13조·15조). `hasAccessToken` 은 있었는지만 말한다 — 401 이
+ * "AT 가 거절됐다" 인지 "AT 를 아예 안 실었다" 인지 지금 로그로 갈리지 않아서다. `getAccessToken`
+ * 은 FE 내부 read boundary 로만 쓰고 Unity 로 넘기지 않는다(client.ts TODO(013a-AT)).
+ */
+function logRefreshFailure(stage: '최초' | '회전 재시도', error: unknown): void {
+  const detail = isApiError(error)
+    ? `${error.code}${error.status === undefined ? '' : ` (${error.status})`}: ${error.message}` +
+      (error.requestId === undefined ? '' : ` requestId=${error.requestId}`)
+    : error instanceof Error
+      ? error.message
+      : String(error);
+  console.warn(
+    `[auth] refresh 실패 (${stage}) — ${detail} · hasAccessToken=${getAccessToken() !== null}`,
+  );
+}
 
 /**
  * 다른 탭이 방금 회전시킨 것뿐이다 (S15P21A604-812, GitLab #198).
@@ -36,12 +62,16 @@ async function attemptRefresh(): Promise<boolean> {
       // 회전 경합이면 한 번만 더 본다. 두 번째도 같은 코드면 유예를 넘겼거나 계보가 정말
       // 끊긴 것이라 더 돌지 않는다 — 원인이 경합이라 1회로 충분하고, 루프는 만료된 세션에
       // 대고 무한히 두드리는 길이 된다.
-      if (!isApiError(error) || error.code !== ROTATED) return false;
+      if (!isApiError(error) || error.code !== ROTATED) {
+        logRefreshFailure('최초', error);
+        return false;
+      }
       try {
         const retried = await authApi.refresh();
         setMemberSession(retried.accessToken, retried.expiresAt);
         return true;
-      } catch {
+      } catch (retryError) {
+        logRefreshFailure('회전 재시도', retryError);
         return false;
       }
     }
