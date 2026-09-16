@@ -259,7 +259,8 @@
           "required": ["type", "prompt"],
           "properties": {
             "type": { "const": "INTERACTABLE" },
-            "prompt": { "type": "string", "minLength": 1, "maxLength": 80 }
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "range": { "type": "integer", "minimum": 1, "maximum": 100 }
           }
         },
         {
@@ -392,6 +393,14 @@
           "type": "array",
           "items": { "$ref": "#/$defs/component" },
           "maxItems": 10
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "showNameInPlay": {
+          "type": "boolean"
         }
       }
     },
