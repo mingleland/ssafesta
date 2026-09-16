@@ -31,8 +31,8 @@ namespace Festa.World
         /// </remarks>
         [SerializeField] string _displayName = "부스 관리";
 
-        [Tooltip("이름이 보이기 시작하는 거리(u).")]
-        [SerializeField] float _visibleDistance = 260f;
+        [Tooltip("이름이 보이기 시작하는 거리(u). 0 = 제한 없음 (2026-09-16 사용자 결정).")]
+        [SerializeField] float _visibleDistance = 0f;
 
         /// <summary>
         /// 이름 색. 안내데스크와 같은 골드앰버다 — 두 NPC 이름표는 한 벌로 읽혀야 한다.

@@ -373,7 +373,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShowTopMostFoldoutHeaderGroup: 1
-  _visibleDistance: 190
+  _visibleDistance: 0
   _ownColor: {r: 0.66, g: 0.82, b: 0.28, a: 1}
   _otherColor: {r: 1, g: 0.99, b: 0.95, a: 1}
 --- !u!114 &6804392290677801411
