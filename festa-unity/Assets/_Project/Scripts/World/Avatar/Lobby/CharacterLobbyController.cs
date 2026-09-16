@@ -66,6 +66,8 @@ namespace Festa.Avatar
         float _wardrobeScrollY;
         AvatarPartCategory? _itemScrollFor;
         float _itemScrollY;
+        int _lastSeparateTopId;
+        int _lastSeparateBottomId;
 
         Text _colorTitle;
         CanvasScaler _uiScaler;
@@ -153,6 +155,10 @@ namespace Festa.Avatar
         /// </summary>
         void ShowPurchaseOrNotice(AvatarItemDefinition item, string displayName)
         {
+            CloseColorPopup();
+            // 이미 떠 있는 구매 창이 있으면 먼저 닫아 그쪽 미리보기를 되돌린다 — 그래야
+            // 아래에서 찍는 스냅샷이 "미리보기 이전" 의 내 외형이 된다.
+            AvatarPurchaseDialog.CloseExisting();
             if (item == null) { ShowLockedNotice(); return; }
 
             if (AvatarOwnership.State == AvatarOwnershipState.Failed)
@@ -178,13 +184,43 @@ namespace Festa.Avatar
 
             string label = !string.IsNullOrEmpty(entry.Name) ? entry.Name : displayName;
             int key = AvatarOwnership.OwnershipKey(item);
+            // **사기 전에 입혀 본다** (사용자 지시 2026-09-15). 썸네일만 보고 결제하게 두면
+            // 실제 착용 모습과 다른 것을 사게 된다. 구매 창이 열려 있는 동안만 임시로 입히고,
+            // 사지 않고 닫으면 원래 외형으로 정확히 되돌린다.
+            var beforePreview = _config;
+            bool previewing = TryPreviewItem(item);
             AvatarPurchaseDialog.Open(label, entry.Price, entry.ItemId, key, _ =>
             {
                 // 산 즉시 팔레트를 다시 그린다 — 자물쇠가 풀린 것이 바로 보여야 한다.
                 RefreshWardrobe();
                 RefreshItems();
                 SetStatus($"{label} 을(를) 구매했어요. 이제 입어 볼 수 있어요.");
+            },
+            purchased =>
+            {
+                // 샀으면 입어 본 그대로 둔다 — 이미 내 것이다. 안 샀으면 되돌린다.
+                if (!previewing || purchased) return;
+                _config = beforePreview;
+                Apply();
+                RefreshAll();
+                SetStatus("구매를 취소했어요. 원래 모습으로 되돌렸습니다.");
             });
+        }
+
+        /// <summary>
+        /// 잠긴 항목을 구매 창이 떠 있는 동안만 임시로 입힌다.
+        ///
+        /// <para>잠긴 것을 <c>_config</c> 에 넣는 것은 여기뿐이고, 되돌리기는 호출자가 찍어 둔
+        /// 스냅샷으로 한다. 저장·월드 입장 경로에는 <see cref="SanitizeLocked"/> 가 있어
+        /// 사지 않은 것이 그대로 나가지 않는다 — 미리보기가 소유 판정을 흔들지 않는다.</para>
+        /// </summary>
+        bool TryPreviewItem(AvatarItemDefinition item)
+        {
+            if (item == null || _assembler == null) return false;
+            int id = item.category == AvatarPartCategory.Hat ? item.familyId : item.itemId;
+            if (id == 0) return false;
+            SelectWardrobeItem(item.category, id);
+            return true;
         }
         static readonly Color[] NaturalHairColors = {new(.08f,.065f,.06f),new(.16f,.105f,.08f),new(.28f,.17f,.11f),new(.42f,.25f,.15f),new(.34f,.17f,.12f),new(.62f,.49f,.33f)};
         static readonly Color[] NaturalIrisColors = {new(.20f,.12f,.08f),new(.34f,.23f,.12f),new(.17f,.29f,.39f),new(.24f,.35f,.29f),new(.29f,.31f,.33f)};
@@ -219,6 +255,7 @@ namespace Festa.Avatar
             if (!_assembler) _assembler = GetComponentInChildren<AvatarAssembler>();
             if (!_previewCamera) _previewCamera = Camera.main;
             if (!_catalog || !_assembler || !_previewCamera) { Debug.LogError("[CharacterLobby] 필수 참조가 비어 있습니다.", this); enabled = false; return; }
+            PrepareInPlaceMode();
             _assembler.Catalog = _catalog;
             _assembler.transform.localRotation = Quaternion.Euler(0, 180f, 0);
             _config = TryGetLiveAppearance(out var liveConfig)
@@ -229,6 +266,14 @@ namespace Festa.Avatar
             SanitizeLocked(ref _config);
             _assembler.Apply(_config);
             BuildUi(); SetCamera(1); RefreshAll();
+            if (_inPlace)
+            {
+                // 카메라를 옮긴 무대에 바로 스냅한다 — Lerp 로 원점에서 4000u 를 내려오는 첫 프레임을 보이지 않게.
+                _previewCamera.transform.position=_cameraTarget;_previewCamera.transform.LookAt(_cameraLook);
+                SetStatus("월드 아바타를 수정합니다. 적용하면 그 자리에서 바로 반영됩니다.");
+                InitializeFromServerAsync();
+                return;
+            }
             // 게스트는 커스터마이징을 쓰지 않는다 — 바로 월드로 (S15P21A604-437). 토큰은 호스트가
             // 인스턴스 생성 뒤에 밀어 넣으므로 지금 없을 수 있다 → 들어오는 순간에도 다시 본다.
             Festa.Integration.AuthBridge.TokenChanged += OnAuthTokenChanged;
@@ -238,6 +283,30 @@ namespace Festa.Avatar
         void OnDestroy() => Festa.Integration.AuthBridge.TokenChanged -= OnAuthTokenChanged;
         bool _guestEntered;
         bool _ownershipRetrying;
+
+        /// <summary>월드 위에 additive 로 얹힌 인플레이스 모드인가 (GitLab #197). <see cref="Festa.World.AvatarInPlaceCustomization"/>.</summary>
+        bool _inPlace;
+        /// <summary>무대 원점. 인플레이스 모드에서는 월드 지오메트리와 겹치지 않게 옮겨 둔 자리, 아니면 0.</summary>
+        Vector3 _stageOrigin;
+
+        /// <summary>
+        /// 인플레이스 모드면 이 씬의 루트 전부를 <see cref="Festa.World.AvatarInPlaceCustomization.StageOrigin"/> 으로 옮기고,
+        /// 프리뷰 카메라의 AudioListener 를 끈다(월드 리스너가 이미 있다). 카메라 궤도 계산은 <see cref="SetCamera"/> 가
+        /// <see cref="_stageOrigin"/> 을 더해 따라온다.
+        /// </summary>
+        void PrepareInPlaceMode()
+        {
+            _inPlace = Festa.World.AvatarInPlaceCustomization.IsOpen && gameObject.scene.name == Festa.World.AvatarSceneHandoff.LobbySceneName
+                       && SceneManager.sceneCount > 1;
+            if (!_inPlace) return;
+            _stageOrigin = Festa.World.AvatarInPlaceCustomization.StageOrigin;
+            foreach (var root in gameObject.scene.GetRootGameObjects())
+                root.transform.position += _stageOrigin;
+            var listener = _previewCamera.GetComponent<AudioListener>();
+            if (listener) listener.enabled = false;
+            Festa.World.AvatarInPlaceCustomization.OnLobbyAwake();
+            Debug.Log($"[CharacterLobby] 인플레이스 모드 — 무대를 {_stageOrigin} 으로 옮기고 월드 카메라를 넘겨받았다");
+        }
 
         /// <summary>
         /// 호스트가 토큰을 밀어 넣은 순간. 게스트면 바로 입장하고, <b>회원이면 보유 조회를 다시 돌린다.</b>
@@ -270,7 +339,7 @@ namespace Festa.Avatar
         }
         bool TryEnterWorldAsGuest()
         {
-            if (_guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
+            if (_inPlace || _guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
             _guestEntered = true;
             SetStatus("게스트는 기본 외형으로 바로 입장합니다.");
             Debug.Log("[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장");
@@ -496,10 +565,21 @@ namespace Festa.Avatar
             var quickRow=Horizontal(left,740,new Vector2(.05f,1),new Vector2(.95f,1));quickRow.sizeDelta=new Vector2(0,52);
             Anchor(_wardrobeTitle.rectTransform,new Vector2(.06f,.684f),new Vector2(.94f,.739f));
             Anchor(_wardrobeColorTitle.rectTransform,new Vector2(.06f,.36f),new Vector2(.94f,.41f));
-            Button(quickRow,"성별",()=>{_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
-            Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
-            var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
-            Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            Button(quickRow,"성별",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender==AvatarGender.Female?AvatarGender.Male:AvatarGender.Female);Apply();RefreshAll();},90,46,UiCardSelected);
+            Button(quickRow,"무작위",Randomize,90,46);Button(quickRow,"초기화",()=>{CloseColorPopup();_config=_catalog.CreateDefault(_config.gender);Apply();RefreshAll();},90,46);
+            if (_inPlace)
+            {
+                // 인플레이스: 월드로 "입장" 하는 게 아니라 이미 서 있는 자리에 외형만 반영하고 돌아간다 (GitLab #197).
+                var apply=Button(left,"적용하고 돌아가기",()=>{CloseColorPopup();ApplyToWorld();Festa.World.AvatarInPlaceCustomization.Close("apply");},250,48,UiCardSelected);
+                Anchor(apply.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.62f,.085f));
+                var cancel=Button(left,"취소",()=>{CloseColorPopup();Festa.World.AvatarInPlaceCustomization.Close("cancel");},120,48);
+                Anchor(cancel.GetComponent<RectTransform>(),new Vector2(.66f,.025f),new Vector2(.94f,.085f));
+            }
+            else
+            {
+                var enterWorld=Button(left,"월드 입장",EnterWorld,250,48,UiCardSelected);
+                Anchor(enterWorld.GetComponent<RectTransform>(),new Vector2(.06f,.025f),new Vector2(.94f,.085f));
+            }
             // 상태 줄 — SetStatus 가 여기에 쓴다. 이 라벨이 없던 동안 잠금 안내·조회 실패 메시지가
             // 전부 로그에만 남고 화면에는 아무것도 안 떴다 (S15P21A604-412 검증에서 발견).
             _status=Label(_responsiveFrame,"",17,34,new Vector2(.22f,.006f),new Vector2(.78f,.05f));
@@ -527,8 +607,8 @@ namespace Festa.Avatar
             BuildColorPicker(_colorPopup,92);
             BuildHexColorInput(_colorPopup,242);
             var popupActions=Horizontal(_colorPopup,374,new Vector2(.09f,1),new Vector2(.91f,1));popupActions.sizeDelta=new Vector2(0,50);popupActions.GetComponent<HorizontalLayoutGroup>().spacing=12;
-            var cancelColor=Button(popupActions,"취소",()=>_colorPopup.gameObject.SetActive(false),128,48,UiSurface);cancelColor.GetComponentInChildren<Text>().fontSize=17;
-            var finishColor=Button(popupActions,"완료",()=>_colorPopup.gameObject.SetActive(false),128,48,new Color(.30f,.20f,.07f,1));finishColor.GetComponentInChildren<Text>().fontSize=17;
+            var cancelColor=Button(popupActions,"취소",CloseColorPopup,128,48,UiSurface);cancelColor.GetComponentInChildren<Text>().fontSize=17;
+            var finishColor=Button(popupActions,"완료",CloseColorPopup,128,48,new Color(.30f,.20f,.07f,1));finishColor.GetComponentInChildren<Text>().fontSize=17;
             _colorPopup.gameObject.SetActive(false);
 
         }
@@ -552,8 +632,65 @@ namespace Festa.Avatar
 
         void SelectWardrobeItem(AvatarPartCategory category,int itemId)
         {
-            _config.SetItem(category,itemId);
+            CloseColorPopup();
+            var before=_config;
+            if(category==AvatarPartCategory.Outfit)
+            {
+                if(itemId!=0)
+                {
+                    RememberSeparateClothing();
+                    _config.SetItem(category,itemId);
+                }
+                else RestoreSeparateClothing();
+            }
+            else if(category==AvatarPartCategory.Top||category==AvatarPartCategory.Bottom)
+            {
+                if(_config.outfitId!=0)RestoreSeparateClothing();
+                _config.SetItem(category,itemId);
+            }
+            else _config.SetItem(category,itemId);
+
+            _catalog.EnsureRequiredClothing(ref _config);
+            ResetColorsOfChangedGarments(before);
             Apply();SetCamera(CategoryCameraPreset(category));RefreshAll();
+        }
+
+        static readonly AvatarPartCategory[] GarmentCategories=
+        {
+            AvatarPartCategory.Top,AvatarPartCategory.Bottom,AvatarPartCategory.Outfit,
+            AvatarPartCategory.Shoes,AvatarPartCategory.Hat,AvatarPartCategory.Glasses
+        };
+
+        /// <summary>
+        /// 옷이 바뀌면 그 옷의 색 설정을 비워 **재질 고유색**으로 돌아가게 한다 (사용자 지시 2026-09-16 —
+        /// "옷별로 색깔이 다 똑같다"). 색 설정은 카테고리 단위로 남아 있어서, 그대로 두면 새 옷에 이전 옷의
+        /// 색이 그대로 씌워진다. 바뀐 카테고리만 비운다 — 같이 입고 있는 다른 옷의 색은 그대로다.
+        ///
+        /// <para>v0 외형(전체색 하나)은 조립기가 어떤 옷이든 그 색으로 덮으므로 먼저 v1 으로 올린다.
+        /// 그래야 "비웠다" 가 실제로 고유색으로 이어진다.</para>
+        /// </summary>
+        void ResetColorsOfChangedGarments(in AvatarConfig before)
+        {
+            bool changed=false;
+            foreach(var cat in GarmentCategories) if(before.GetItem(cat)!=_config.GetItem(cat)){changed=true;break;}
+            if(!changed)return;
+            _config.UpgradeLegacyGarmentTint(_catalog);
+            foreach(var cat in GarmentCategories)
+                if(before.GetItem(cat)!=_config.GetItem(cat))_config.ResetGarmentColors(cat);
+        }
+
+        void RememberSeparateClothing()
+        {
+            if(_config.topId!=0)_lastSeparateTopId=_config.topId;
+            if(_config.bottomId!=0)_lastSeparateBottomId=_config.bottomId;
+        }
+
+        void RestoreSeparateClothing()
+        {
+            _config.SetItem(AvatarPartCategory.Outfit,0);
+            _config.SetItem(AvatarPartCategory.Top,_lastSeparateTopId);
+            _config.SetItem(AvatarPartCategory.Bottom,_lastSeparateBottomId);
+            _catalog.EnsureRequiredClothing(ref _config);
         }
 
         void RefreshAll(){RefreshWardrobe();RefreshTabs();RefreshItems();RefreshColors();}
@@ -563,7 +700,7 @@ namespace Festa.Avatar
             foreach(var category in new[]{AvatarPartCategory.Top,AvatarPartCategory.Bottom,AvatarPartCategory.Outfit,AvatarPartCategory.Shoes})
             {
                 var captured=category;
-                WardrobeCategoryButton(_wardrobeTabs,CategoryName(category),CategoryIcon(category),()=>{_wardrobeCategory=captured;_editingGarmentColor=false;SetCamera(CategoryCameraPreset(captured));RefreshWardrobe();},83,120,_wardrobeCategory==category);
+                WardrobeCategoryButton(_wardrobeTabs,CategoryName(category),CategoryIcon(category),()=>{CloseColorPopup();_wardrobeCategory=captured;SetCamera(CategoryCameraPreset(captured));RefreshWardrobe();},83,120,_wardrobeCategory==category);
             }
             if(_wardrobeTitle)_wardrobeTitle.text=CategoryName(_wardrobeCategory)+" 선택";
             // 다시 그리기 전에 지금 보고 있던 위치를 붙잡는다 (위 필드 주석 참조).
@@ -609,7 +746,7 @@ namespace Festa.Avatar
             foreach(var category in new[]{AvatarPartCategory.Head,AvatarPartCategory.Hair,AvatarPartCategory.Hat,AvatarPartCategory.Glasses})
             {
                 var captured=category;
-                CategoryButton(_categoryTabs,CategoryName(category),CategoryIcon(category),()=>{_category=captured;_editingGarmentColor=false;SetCamera(CategoryCameraPreset(captured));RefreshAll();},96,120,_category==category);
+                CategoryButton(_categoryTabs,CategoryName(category),CategoryIcon(category),()=>{CloseColorPopup();_category=captured;SetCamera(CategoryCameraPreset(captured));RefreshAll();},96,120,_category==category);
             }
         }
 
@@ -673,6 +810,16 @@ namespace Festa.Avatar
             SyncHexColor(current);
             if(_colorPopup)_colorPopup.gameObject.SetActive(true);
             if(category==AvatarPartCategory.Hat||category==AvatarPartCategory.Glasses)RefreshColors();else RefreshWardrobeColors();
+        }
+
+        /// <summary>
+        /// 색상 편집 대상이 아닌 선택으로 이동할 때 팝업과 편집 모드를 함께 닫는다.
+        /// 팝업만 숨기면 의상 영역 편집 플래그가 남아 다음 입력이 이전 파츠에 적용될 수 있다.
+        /// </summary>
+        void CloseColorPopup()
+        {
+            _editingGarmentColor=false;
+            if(_colorPopup)_colorPopup.gameObject.SetActive(false);
         }
 
         void RefreshItems()
@@ -828,6 +975,7 @@ namespace Festa.Avatar
         }
         void Randomize()
         {
+            CloseColorPopup();
             _config=CreateRecommendedRandomConfig(_config.gender, true);
             _wardrobeCategory=_config.outfitId!=0?AvatarPartCategory.Outfit:AvatarPartCategory.Top;
             _garmentColorCategory=_wardrobeCategory;
@@ -967,7 +1115,7 @@ namespace Festa.Avatar
         public void VerifyColorIsolation(int slot,int colorId){_config.SetColor((AvatarColorSlot)Mathf.Clamp(slot,0,8),(byte)Mathf.Clamp(colorId,1,Palette.Length));Apply();}
         public void VerifyFirstItem(int category){_category=(AvatarPartCategory)Mathf.Clamp(category,0,7);var d=_catalog.GetItems(_category,_config.gender).FirstOrDefault();if(d){_config.SetItem(_category,_category==AvatarPartCategory.Hat?d.familyId:d.itemId);Apply();RefreshItems();}}
         public string VerificationState()=>$"gender={_config.gender}; head={_config.headId}; hair={_config.hairId}; hat={_config.hatId}; top={_config.topId}; bottom={_config.bottomId}; outfit={_config.outfitId}; error={_assembler.LastError}";
-        void SetCamera(int preset){_cameraDistance=preset==0?3.55f:preset==1?1.45f:.78f;_lookHeight=preset==0?.92f:preset==1?1.16f:1.42f;_cameraFocus=new Vector3(0,_lookHeight,0);_cameraLook=_cameraFocus;_cameraYaw=0f;_cameraPitch=0f;SetCameraPosition();}
+        void SetCamera(int preset){_cameraDistance=preset==0?3.55f:preset==1?1.45f:.78f;_lookHeight=preset==0?.92f:preset==1?1.16f:1.42f;_cameraFocus=_stageOrigin+new Vector3(0,_lookHeight,0);_cameraLook=_cameraFocus;_cameraYaw=0f;_cameraPitch=0f;SetCameraPosition();}
         void SetCameraPosition(){var orbit=Quaternion.Euler(_cameraPitch,_cameraYaw,0);_cameraTarget=_cameraFocus+orbit*new Vector3(.12f,0,-_cameraDistance);}
         void ZoomAt(Vector2 screenPosition,float wheel)
         {

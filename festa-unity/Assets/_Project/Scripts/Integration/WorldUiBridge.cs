@@ -17,8 +17,9 @@ namespace Festa.Integration
     /// 가 09-08 슬롯머신 자동 종료 사고였다 — <see cref="InputBridge"/> 의 owner-set 은 건드리지 않는다.</para>
     ///
     /// <code>
-    /// Unity → FE : window.FestaUnity.onWorldUiState('{"focus":true,"minigame":false}')
+    /// Unity → FE : window.FestaUnity.onWorldUiState('{"focus":true,"minigame":false,"avatar":false}')
     /// FE → Unity : unityInstance.SendMessage('WorldUiBridge', 'RequestExitWorldUi', 'esc')
+    /// FE → Unity : unityInstance.SendMessage('WorldUiBridge', 'RequestAvatarCustomization', 'esc-menu')
     /// </code>
     ///
     /// <para>씬을 고치지 않는다 — InputBridge·AuthBridge 와 같은 자동 등록 오브젝트다.</para>
@@ -38,7 +39,7 @@ namespace Festa.Integration
         /// <summary>미니게임 HUD 를 닫는 명령 — HUD 가 열릴 때 등록하고 닫힐 때 비운다. 없으면 초점만 닫는다.</summary>
         public static System.Action CloseMinigame;
 
-        static bool s_lastFocus, s_lastMinigame, s_published;
+        static bool s_lastFocus, s_lastMinigame, s_lastAvatar, s_published;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void AutoRegister()
@@ -61,10 +62,12 @@ namespace Festa.Integration
         {
             bool focus = Festa.World.InteractionFocusCamera.IsFocused;
             bool minigame = MinigameOpen != null && MinigameOpen();
-            if (s_published && focus == s_lastFocus && minigame == s_lastMinigame) return;
-            s_published = true; s_lastFocus = focus; s_lastMinigame = minigame;
+            bool avatar = Festa.World.AvatarInPlaceCustomization.IsOpen;
+            if (s_published && focus == s_lastFocus && minigame == s_lastMinigame && avatar == s_lastAvatar) return;
+            s_published = true; s_lastFocus = focus; s_lastMinigame = minigame; s_lastAvatar = avatar;
 
-            string json = "{\"focus\":" + (focus ? "true" : "false") + ",\"minigame\":" + (minigame ? "true" : "false") + "}";
+            string json = "{\"focus\":" + (focus ? "true" : "false") + ",\"minigame\":" + (minigame ? "true" : "false")
+                        + ",\"avatar\":" + (avatar ? "true" : "false") + "}";
 #if UNITY_WEBGL && !UNITY_EDITOR && !UNITY_SERVER
             try { FestaNotifyWorldUiState(json); }
             catch (System.Exception ex) { Debug.LogError($"[WorldUiBridge] onWorldUiState 송신 실패: {ex.Message}"); }
@@ -74,12 +77,18 @@ namespace Festa.Integration
         }
 
         /// <summary>
-        /// 호스트 → Unity. <b>최상위 모달 하나만</b> 닫는다: 미니게임 HUD 가 있으면 그것, 없으면 초점 카메라.
+        /// 호스트 → Unity. <b>최상위 모달 하나만</b> 닫는다: 아바타 설정 화면 → 미니게임 HUD → 초점 카메라 순.
         /// 둘 다 없으면 아무 일도 없다 — FE 가 3단계 중재(FE 레이어 → Unity 모달 → GameMenu)에서 2단계일 때만 부른다.
         /// 닫힌 쪽이 <see cref="Publish"/> 를 부르므로 상태는 따로 밀지 않는다.
         /// </summary>
         public void RequestExitWorldUi(string reason)
         {
+            if (Festa.World.AvatarInPlaceCustomization.IsOpen)
+            {
+                Debug.Log($"[WorldUiBridge] RequestExitWorldUi({reason}) → 아바타 설정 닫기(적용 없음)");
+                Festa.World.AvatarInPlaceCustomization.Close(reason);
+                return;
+            }
             if (MinigameOpen != null && MinigameOpen() && CloseMinigame != null)
             {
                 Debug.Log($"[WorldUiBridge] RequestExitWorldUi({reason}) → 미니게임 HUD 닫기");
@@ -93,6 +102,20 @@ namespace Festa.Integration
                 return;
             }
             Debug.Log($"[WorldUiBridge] RequestExitWorldUi({reason}) — 닫을 Unity 모달이 없다");
+        }
+
+        /// <summary>
+        /// 호스트 → Unity. ESC 메뉴 '아바타 설정' — <b>월드를 떠나지 않고</b> 커스터마이징 화면을 연다 (GitLab #197).
+        /// 씬·NGO 연결·Player NetworkObject·위치는 그대로, 외형만 바뀐다. 열리면 <c>onWorldUiState</c> 에 <c>avatar:true</c> 가
+        /// 나가므로 FE 의 ESC 2단계(<see cref="RequestExitWorldUi"/>)로 닫힌다.
+        /// 게스트·미접속이면 열지 않고 이유를 로그로 남긴다 — FE 는 게스트에게 버튼을 보이지 않는 편이 맞다.
+        /// </summary>
+        public void RequestAvatarCustomization(string reason)
+        {
+            if (Festa.World.AvatarInPlaceCustomization.TryOpen(reason, out var error))
+                Debug.Log($"[WorldUiBridge] RequestAvatarCustomization({reason}) → 인플레이스 커스터마이징 열기");
+            else
+                Debug.LogWarning($"[WorldUiBridge] RequestAvatarCustomization({reason}) 거부 — {error}");
         }
 
         /// <summary>
