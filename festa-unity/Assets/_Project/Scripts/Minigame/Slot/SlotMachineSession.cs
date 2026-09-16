@@ -99,6 +99,10 @@ namespace Festa.Minigame.Slot
                     return "로그인이 필요해요. 다시 로그인해 주세요.";
                 case "DAILY_LIMIT":
                     return "오늘은 더 돌릴 수 없어요. 내일 다시 와 주세요.";
+                case "SLOT_MACHINE_NOT_FOUND":
+                    return "이 기계는 아직 등록되지 않았어요. 잠시 후 다시 시도해 주세요.";
+                case "VALIDATION_FAILED":
+                    return $"베팅액이 맞지 않아요 (필요 {Bet}). 잠시 후 다시 시도해 주세요.";
                 default:
                     return "판정을 받지 못했어요. 잠시 후 다시 시도해 주세요.";
             }
