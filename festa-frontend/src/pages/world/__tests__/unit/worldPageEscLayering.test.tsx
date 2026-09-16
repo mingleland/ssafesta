@@ -4,7 +4,7 @@
 // 예전에는 이 화면이 두 store 를 각각 읽어 우선순위를 손으로 합성했다. 그 판정을 worldScreen 으로
 // 옮겼으므로, 여기서 잠그는 것은 "WorldPage 가 그 계층을 통해 동작한다" 는 배선이다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { closeOverlay, getCurrentOverlay, openOverlay } from '../../../../shared/types/overlay';
 import {
@@ -50,7 +50,18 @@ vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
 }));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
-vi.mock('../../../../features/world/ui/GameMenu', () => ({ GameMenu: () => <div data-testid="game-menu" /> }));
+// onOpenMyInfo 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
+vi.mock('../../../../features/world/ui/GameMenu', () => ({
+  GameMenu: ({ onOpenMyInfo }: { onOpenMyInfo: () => void }) => (
+    <div data-testid="game-menu">
+      <button type="button" onClick={onOpenMyInfo}>내 정보</button>
+    </div>
+  ),
+}));
+// MyInfoOverlay 는 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 닫히는가)만 본다.
+vi.mock('../../../../features/profile/ui/MyInfoOverlay', () => ({
+  MyInfoOverlay: () => <div data-testid="my-info-overlay" />,
+}));
 
 const pressEscape = () =>
   act(() => {
@@ -135,6 +146,18 @@ describe('WorldPage ESC 계층 (-450)', () => {
     });
     pressEscape();
     expect(getWorldScreen()).toBe('management');
+    pressEscape();
+    expect(getWorldScreen()).toBe('world');
+  });
+
+  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 닫힌다', async () => {
+    await renderWorld();
+    pressEscape();
+
+    fireEvent.click(screen.getByRole('button', { name: '내 정보' }));
+    expect(screen.getByTestId('my-info-overlay')).toBeTruthy();
+    expect(getWorldScreen()).toBe('myInfo');
+
     pressEscape();
     expect(getWorldScreen()).toBe('world');
   });

@@ -22,24 +22,27 @@ import {
   closeBoothManagement,
   closeGameMenu,
   closeManagementPanel,
+  closeMyInfo,
   getGameClientUiSnapshot,
   openBoothManagement,
   openGameMenu,
   openManagementPanel,
+  openMyInfo,
   subscribeGameClientUi,
 } from './gameClientUi';
 import type { ManagementPanel } from './managementPanel';
 
 /** 월드 위에 떠 있는 것. 'world' 는 아무것도 없다 = 월드가 주인이다 */
-export type WorldScreen = 'world' | 'visitor' | 'management' | 'menu';
+export type WorldScreen = 'world' | 'visitor' | 'management' | 'menu' | 'myInfo';
 
 // 겹칠 수 없으므로 실질은 "현재 주인" 판정이다. 그래도 순서를 명시해 두는 이유는, 배타 진입을
 // 우회해 두 레이어가 동시에 켜지는 경로가 생기더라도 판정이 흔들리지 않게 하기 위해서다.
 export function getWorldScreen(): WorldScreen {
   if (getCurrentOverlay() !== null) return 'visitor';
-  const { managementOverlay, gameMenu } = getGameClientUiSnapshot();
+  const { managementOverlay, gameMenu, myInfo } = getGameClientUiSnapshot();
   if (managementOverlay) return 'management';
   if (gameMenu) return 'menu';
+  if (myInfo) return 'myInfo';
   return 'world';
 }
 
@@ -63,6 +66,7 @@ function clearOthers(keep: Exclude<WorldScreen, 'world'>): void {
   if (keep !== 'visitor') closeOverlay();
   if (keep !== 'management') closeBoothManagement();
   if (keep !== 'menu') closeGameMenu();
+  if (keep !== 'myInfo') closeMyInfo();
 }
 
 /** Unity 상호작용이 여는 Visitor Overlay. dispatcher 와 오버레이 내부 전환이 쓴다 */
@@ -96,6 +100,12 @@ export function openMenu(): void {
   openGameMenu();
 }
 
+/** ESC 내 정보 — GameMenu 의 "내 정보"가 연다 */
+export function openMyInfoScreen(): void {
+  clearOthers('myInfo');
+  openMyInfo();
+}
+
 /**
  * 현재 주인 하나만 닫는다. ESC 가 쓴다 — 무엇이 떠 있는지 호출부가 알 필요가 없다.
  *
@@ -117,6 +127,9 @@ export function closeTopScreen(): boolean {
       return true;
     case 'menu':
       closeGameMenu();
+      return true;
+    case 'myInfo':
+      closeMyInfo();
       return true;
     default:
       return false;
