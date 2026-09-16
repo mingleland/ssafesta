@@ -209,6 +209,10 @@
         "integrity": {
           "type": "string",
           "maxLength": 128
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
         }
       }
     },
