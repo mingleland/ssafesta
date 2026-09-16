@@ -91,6 +91,40 @@ namespace Festa.Avatar
                 ?? variants.FirstOrDefault();
         }
 
+        /// <summary>한벌옷을 입지 않을 때 상·하의가 반드시 기본 의상으로 채워지게 한다.</summary>
+        public void EnsureRequiredClothing(ref AvatarConfig config)
+        {
+            var outfit = Get(config.outfitId);
+            if (outfit && outfit.category == AvatarPartCategory.Outfit &&
+                (outfit.gender == AvatarGender.Both || outfit.gender == config.gender)) return;
+
+            if (config.outfitId != 0)
+                UnityEngine.Debug.LogWarning(
+                    $"[AvatarCatalog] 유효하지 않은 한벌옷 {config.outfitId}을 해제하고 기본 상·하의로 복구한다.");
+            config.outfitId = 0;
+
+            EnsureRequiredItem(ref config, AvatarPartCategory.Top);
+            EnsureRequiredItem(ref config, AvatarPartCategory.Bottom);
+        }
+
+        void EnsureRequiredItem(ref AvatarConfig config, AvatarPartCategory category)
+        {
+            int currentId = config.GetItem(category);
+            var current = Get(currentId);
+            if (current && current.category == category &&
+                (current.gender == AvatarGender.Both || current.gender == config.gender)) return;
+
+            var fallback = GetItems(category, config.gender).FirstOrDefault(x => x.isDefault)
+                           ?? Default(category, config.gender);
+            config.SetItem(category, fallback ? fallback.itemId : 0);
+            if (fallback)
+                UnityEngine.Debug.LogWarning(
+                    $"[AvatarCatalog] 비어 있거나 잘못된 {category} {currentId}을 기본 의상 {fallback.displayName}으로 복구했다.");
+            else
+                UnityEngine.Debug.LogError(
+                    $"[AvatarCatalog] {category}/{config.gender} 기본 의상이 없어 속옷 노출을 막을 수 없다.");
+        }
+
         public AvatarConfig CreateDefault(AvatarGender gender)
         {
             var c = new AvatarConfig { gender = gender, skinColorId = 1, hairColorId = 6, irisColorId = 8, eyebrowColorId = 6, lipsColorId = 10, topColorId = 12, bottomColorId = 15, scleraColorId = 16, pupilColorId = 6, garmentColorVersion = 1 };

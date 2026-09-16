@@ -67,7 +67,9 @@ namespace Festa.World
             if (!string.IsNullOrEmpty(assembler.LastError))
                 Debug.LogError($"[BoothStaff] {name}: {assembler.LastError}");
 
-            FitHeight();
+            FitHeight(assembler);
+            StabilizeSkinnedRendering(assembler);
+            StartCoroutine(CalibrateHeightWhenPosed(assembler));
             SetupAnimator();
             AddFillLight();
         }
@@ -136,22 +138,167 @@ namespace Festa.World
         /// 조립 결과의 실제 높이를 재서 목표 키로 스케일한다. 상수 배율을 박으면 카탈로그
         /// 아이템이 바뀔 때 조용히 어긋난다 — 플레이어 쪽과 같은 방식이다.
         /// </summary>
-        void FitHeight()
+        void FitHeight(Festa.Avatar.AvatarAssembler assembler)
         {
             var renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             if (renderers.Length == 0 || _targetVisualHeight <= 0f) return;
 
-            var bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out var bounds)) return;
             if (bounds.size.y < 0.001f) return;
 
             _visual.transform.localScale *= _targetVisualHeight / bounds.size.y;
 
             // 발을 루트 높이에 맞춘다 — 스케일 뒤에 다시 재야 한다(스케일 전 값으로 맞추면 뜬다).
             renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            bounds = renderers[0].bounds;
-            for (int i = 1; i < renderers.Length; i++) bounds.Encapsulate(renderers[i].bounds);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out bounds)) return;
             _visual.transform.position += Vector3.up * (transform.position.y - bounds.min.y);
+        }
+
+        /// <summary>
+        /// 직원의 활성 스킨 파츠가 하나의 보수적인 전신 bounds를 공유하게 한다.
+        ///
+        /// <para>의상 렌더러마다 서로 다른 고정 bounds를 쓰면 카메라 프러스텀 가장자리에서
+        /// 몸은 보이는데 옷만 먼저 화면 밖으로 판정된다. 직원은 12명뿐이고 Animator도 이미
+        /// AlwaysAnimate이므로, 이 NPC들에는 정확한 파츠별 컬링보다 전신 표시 안정성을 우선한다.</para>
+        /// </summary>
+        void StabilizeSkinnedRendering(Festa.Avatar.AvatarAssembler assembler)
+        {
+            var renderers = _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            if (!TryCollectVisibleGeometryBounds(renderers, assembler, out var worldBounds)) return;
+
+            // 프러스텀 경계에서 부동소수점 오차로 한 프레임 먼저 빠지지 않도록 전신 기준 여유를 둔다.
+            float padding = Mathf.Max(worldBounds.size.magnitude * 0.08f, 0.5f);
+            worldBounds.Expand(padding * 2f);
+
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null) continue;
+                renderer.updateWhenOffscreen = true;
+                renderer.localBounds = TransformBounds(worldBounds, renderer.transform.worldToLocalMatrix);
+            }
+        }
+
+        static bool TryCollectVisibleGeometryBounds(
+            SkinnedMeshRenderer[] renderers,
+            Festa.Avatar.AvatarAssembler assembler,
+            out Bounds bounds)
+        {
+            bounds = default;
+            bool found = false;
+            foreach (var renderer in renderers)
+            {
+                if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+
+                var current = renderer.bounds;
+                if (assembler != null && assembler.TryGetGeometryWorldBounds(renderer, out var geometry))
+                    current = geometry;
+
+                if (!found)
+                {
+                    bounds = current;
+                    found = true;
+                }
+                else bounds.Encapsulate(current);
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// 포즈가 잡힌 뒤 **실제로 서 있는 몸**의 키를 다시 맞춘다.
+        ///
+        /// <para><see cref="FitHeight"/> 가 쓰는 <see cref="Renderer.bounds"/> 는 스킨 메시의
+        /// <b>바인드포즈 골격 범위</b>라 실제 선 자세보다 크다. 에디터 실측에서 그 값으로 맞춘 아바타의
+        /// 구운 선 자세 키가 목표의 <b>76%</b> 였다 — 플레이어와 같은 편향이고, 한쪽만 고치면 사람과 직원의
+        /// 키가 갈린다.</para>
+        ///
+        /// <para>조립 직후에는 Animator 가 아직 포즈를 만들지 않아 여기서 잴 수 없다. 한 프레임 기다린 뒤
+        /// <c>BakeMesh</c> 로 현재 자세를 굽고 그 키로 배율을 고친 다음, 발을 다시 바닥에 맞춘다.</para>
+        /// </summary>
+        System.Collections.IEnumerator CalibrateHeightWhenPosed(Festa.Avatar.AvatarAssembler assembler)
+        {
+            // 첫 프레임부터 맞는 크기로 보이게 컨트롤러의 첫 상태를 지금 평가해 바로 잰다.
+            // 작았다가 한 프레임 뒤 커지는 것이 눈에 띈다(사용자 지적 2026-09-16).
+            var animator = _visual != null ? _visual.GetComponentInChildren<Animator>() : null;
+            if (animator != null && animator.runtimeAnimatorController != null) animator.Update(0f);
+            if (TryCalibrateHeightOnce(assembler)) yield break;
+
+            // 아직 포즈가 없으면 한 프레임만 기다려 다시 잰다.
+            yield return null;
+            yield return new WaitForEndOfFrame();
+            TryCalibrateHeightOnce(assembler);
+        }
+
+        bool TryCalibrateHeightOnce(Festa.Avatar.AvatarAssembler assembler)
+        {
+            if (_visual == null || _targetVisualHeight <= 0f) return true;   // 할 일이 없다
+            if (!TryCollectBakedBounds(out var posed) || posed.size.y < 0.001f) return false;
+
+            float correction = Mathf.Clamp(_targetVisualHeight / posed.size.y, 0.5f, 2f);   // 측정이 튀어도 터무니없이 커지지 않게
+            if (Mathf.Abs(correction - 1f) >= 0.01f)
+            {
+                _visual.transform.localScale *= correction;
+                // 배율이 바뀌었으니 발을 다시 바닥에 놓는다 — 스케일 전 값으로 두면 뜨거나 묻힌다.
+                if (TryCollectBakedBounds(out var grounded))
+                    _visual.transform.position += Vector3.up * (transform.position.y - grounded.min.y);
+                // 컬링용 공유 bounds 도 새 크기로 다시 잡는다.
+                StabilizeSkinnedRendering(assembler);
+            }
+            return true;
+        }
+
+        /// <summary>현재 자세를 구워서 실제 형상의 월드 bounds 를 구한다.</summary>
+        bool TryCollectBakedBounds(out Bounds bounds)
+        {
+            bounds = default;
+            bool found = false;
+            foreach (var smr in _visual.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (smr == null || smr.sharedMesh == null || !smr.enabled || !smr.gameObject.activeInHierarchy) continue;
+
+                var baked = new Mesh();
+                smr.BakeMesh(baked);
+                // BakeMesh 는 정점만 굽고 bounds 는 바인드포즈 값을 물고 온다 — 반드시 다시 계산한다 (T-201).
+                baked.RecalculateBounds();
+                var local = baked.bounds;
+                Destroy(baked);
+
+                // BakeMesh 결과에는 렌더러 스케일이 이미 적용돼 있다 — 위치·회전만 더한다.
+                var center = local.center;
+                var extents = local.extents;
+                for (int x = -1; x <= 1; x += 2)
+                for (int y = -1; y <= 1; y += 2)
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    var corner = smr.transform.position + smr.transform.rotation * (center + Vector3.Scale(extents, new Vector3(x, y, z)));
+                    if (!found) { bounds = new Bounds(corner, Vector3.zero); found = true; }
+                    else bounds.Encapsulate(corner);
+                }
+            }
+            return found;
+        }
+
+        static Bounds TransformBounds(Bounds source, Matrix4x4 matrix)
+        {
+            var center = source.center;
+            var extents = source.extents;
+            var result = default(Bounds);
+            bool initialized = false;
+
+            for (int x = -1; x <= 1; x += 2)
+            for (int y = -1; y <= 1; y += 2)
+            for (int z = -1; z <= 1; z += 2)
+            {
+                var corner = matrix.MultiplyPoint3x4(
+                    center + Vector3.Scale(extents, new Vector3(x, y, z)));
+                if (!initialized)
+                {
+                    result = new Bounds(corner, Vector3.zero);
+                    initialized = true;
+                }
+                else result.Encapsulate(corner);
+            }
+
+            return result;
         }
     }
 }

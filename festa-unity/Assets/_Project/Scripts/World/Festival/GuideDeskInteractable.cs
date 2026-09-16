@@ -35,8 +35,8 @@ namespace Festa.World
         /// </remarks>
         [SerializeField] string _displayName = "안내 데스크";
 
-        [Tooltip("이름이 보이기 시작하는 거리(u).")]
-        [SerializeField] float _visibleDistance = 260f;
+        [Tooltip("이름이 보이기 시작하는 거리(u). 0 = 제한 없음 (2026-09-16 사용자 결정).")]
+        [SerializeField] float _visibleDistance = 0f;
 
         /// <summary>
         /// 이름 색. 사람과 구분되는 노란 계열이되 <b>샛노랑이 아니라 골드앰버</b>다.

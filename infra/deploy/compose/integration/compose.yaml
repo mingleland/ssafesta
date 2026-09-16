@@ -4,6 +4,7 @@ services:
     image: ${AI_IMAGE_REF:?AI_IMAGE_REF is required}
     restart: unless-stopped
     networks: [integration-private]
+    ports: ["127.0.0.1:${AI_LOOPBACK_PORT:-18082}:8000"]
     env_file:
       - ${AI_ENV_FILE:?AI_ENV_FILE is required}
     environment:
