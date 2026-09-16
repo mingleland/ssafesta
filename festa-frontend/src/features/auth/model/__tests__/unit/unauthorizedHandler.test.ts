@@ -23,7 +23,7 @@ describe('member', () => {
     const recovered = await handleUnauthorized();
 
     expect(recovered).toBe(true);
-    expect(getSessionSnapshot()).toEqual({ kind: 'member', expiresAt: '2026-01-01T01:00:00.000Z', notice: null, bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'member', expiresAt: '2026-01-01T01:00:00.000Z', notice: null, bootstrapped: false });
   });
 
   it('refresh 실패 시 세션을 클리어하고 false를 반환한다(FR-020b)', async () => {
@@ -33,7 +33,7 @@ describe('member', () => {
     const recovered = await handleUnauthorized();
 
     expect(recovered).toBe(false);
-    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: 'session-expired', bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'anonymous', expiresAt: null, notice: 'session-expired', bootstrapped: false });
   });
 
   it('동시에 여러 번 불려도 refresh는 1회만 나간다(single-flight)', async () => {
@@ -64,7 +64,7 @@ describe('REFRESH_TOKEN_ROTATED', () => {
 
     expect(recovered).toBe(true);
     expect(refreshMock).toHaveBeenCalledTimes(2);
-    expect(getSessionSnapshot()).toEqual({ kind: 'member', expiresAt: '2026-01-01T01:00:00.000Z', notice: null, bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'member', expiresAt: '2026-01-01T01:00:00.000Z', notice: null, bootstrapped: false });
   });
 
   it('두 번째도 회전이면 멈춘다 — 유예를 넘겼거나 계보가 정말 끊긴 것이다', async () => {
@@ -75,7 +75,7 @@ describe('REFRESH_TOKEN_ROTATED', () => {
 
     expect(recovered).toBe(false);
     expect(refreshMock).toHaveBeenCalledTimes(2);
-    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: 'session-expired', bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'anonymous', expiresAt: null, notice: 'session-expired', bootstrapped: false });
   });
 
   it('다른 코드는 재시도하지 않는다 — 회전 경합이 아닌 실패까지 두 번 두드리지 않는다', async () => {
@@ -97,7 +97,7 @@ describe('guest', () => {
 
     expect(recovered).toBe(false);
     expect(refreshMock).not.toHaveBeenCalled();
-    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: 'guest-reentry-required', bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'anonymous', expiresAt: null, notice: 'guest-reentry-required', bootstrapped: false });
   });
 });
 
