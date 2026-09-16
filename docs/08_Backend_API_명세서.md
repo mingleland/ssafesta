@@ -1642,6 +1642,12 @@ Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개
 
 오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
 
+### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
+
+이벤트 설문 참여 회원만 최신 제출순으로 페이지 조회한다 (`S15P21A604-742` #59). 전역 Admin 전용이고, 응답은 `{ content: [{ responseId, userId, nickname, submittedAt }], page, size, totalElements, totalPages }`다. 이벤트 설문은 회원 전용이라 게스트 식별자가 섞이지 않는다.
+
+이 식별 정보는 이벤트 운영 목록에만 허용한 예외다. 부스 설문의 결과·주관식 응답 API는 계속 익명이며, 이 경로는 추첨·당첨자 선정·경품 지급·코인 변경을 수행하지 않는다. 오류: `400 VALIDATION_FAILED`(page/size) · `403 FORBIDDEN` · `404 SURVEY_NOT_FOUND`.
+
 **감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
 
 ### 기존 부스 운영 API의 전역 Admin 접근 (S15P21A604-742)
