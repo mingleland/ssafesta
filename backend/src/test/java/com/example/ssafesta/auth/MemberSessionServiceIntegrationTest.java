@@ -301,6 +301,38 @@ class MemberSessionServiceIntegrationTest {
     }
 
     /**
+     * 세션 거절이 두 갈래로 갈린다 (S15P21A604-816, GitLab #211).
+     *
+     * <p>{@code boolean} 하나로 접으면 거절 로그를 봐도 <b>세션이 사라진 것</b>과 <b>새 로그인에
+     * 밀려난 것</b>을 구분할 수 없다. 앞은 저장소가 비워졌을 때 여러 사람에게 동시에 나고, 뒤는 한
+     * 사람에게만 난다 — 원인 추적에서 이 차이가 전부다.
+     *
+     * <p>거절 여부 자체는 바뀌지 않아야 한다. {@code ACTIVE} 가 아닌 두 갈래 모두 호출자가 401 을
+     * 내는 것은 그대로다.
+     */
+    @Test
+    void aSessionRefusalTellsAMissingSessionApartFromASupersededOne() {
+        long userId = 991_260L;
+        MemberSessionService.MemberSession session = sessions.issue(userId);
+        String sessionId = redis.opsForValue().get(key("auth:session:" + userId));
+
+        assertEquals(MemberSessionService.SessionCheck.ACTIVE, sessions.check(userId, sessionId));
+
+        // 새 로그인에 밀려난 옛 Access Token — 세션 키는 있고 값이 다르다.
+        sessions.issue(userId);
+        assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, sessionId));
+
+        // 세션 키가 통째로 사라진 자리 — 로그아웃·탈퇴, 그리고 저장소 소실이 여기로 온다.
+        redis.delete(key("auth:session:" + userId));
+        assertEquals(MemberSessionService.SessionCheck.NO_SESSION, sessions.check(userId, sessionId));
+
+        // sid 클레임이 없는 토큰도 통과시키지 않는다 — 세션 키가 살아 있어도 마찬가지다.
+        MemberSessionService.MemberSession revived = sessions.issue(userId);
+        assertNotNull(revived.accessToken());
+        assertEquals(MemberSessionService.SessionCheck.SID_MISMATCH, sessions.check(userId, null));
+    }
+
+    /**
      * 재사용 판정과 새 로그인이 겹쳐도 새 세션이 남는다 (S15P21A604-660).
      *
      * <p>계보 대조와 삭제가 갈라져 있으면 대조를 통과한 직후 도착한 로그인의 키를 뒤이은 삭제가

@@ -38,7 +38,7 @@
 
 **불변식**:
 - 좌표 3필드는 전부 finite(FE 검증 4번 — 입력단에서 비숫자를 차단해 도달 자체를 막는다)
-- 앵커 위치가 `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`(=2.72) 안 (research.md R-05 — 상수에서 도출, 하드코딩 금지)
+- 앵커 위치가 `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`(=5.9) 안 (research.md R-05 — 상수에서 도출, 하드코딩 금지). `width`와 `depth`가 다르다 (9.4 vs 6)
 - **앵커가 안이어도 실물이 밖일 수 있다** — 타입별 크기가 원점 기준 비대칭이라(`contracts/layout-api.md` §10-1), 회전 적용 후 AABB가 부스 밖으로 나가면 서버가 `AREA_OUT_OF_BOUNDS`로 거부한다. FE 사전 검증도 같은 회전식(`x' = x·cos + z·sin`, `z' = −x·sin + z·cos`)을 써야 서버와 답이 갈리지 않는다 — 아래 "서버 검증 규칙" 표 참조
 - 좌표 직렬화는 FE가 환산한 값을 그대로 보내고 BE가 값을 고치지 않는다. 단 `-0.0`→`0.0`, `1e2`→`100`처럼 **표기**가 바뀔 수 있음(PostgreSQL `numeric` 동작, #36) — 값 자체가 다른 게 아니므로 버그로 취급하지 않는다
 

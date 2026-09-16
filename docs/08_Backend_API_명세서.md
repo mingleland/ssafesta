@@ -418,7 +418,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
   "templates": [
     {
       "template": "PROJECT_EXHIBITION",
-      "footprint": {"width": 6.0, "depth": 6.0, "height": 2.72},
+      "footprint": {"width": 9.4, "depth": 6.0, "height": 5.9},
       "maxObjects": 12
     }
   ]
@@ -426,7 +426,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 ```
 
 - `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관, #19 ④·#45 C-06).
-- `height` 2.72는 셸 벽 패널 실측이다. Layout 좌표·실물 검증도 같은 값을 쓴다 (`0 ≤ y ≤ 2.72`).
+- **치수는 `9.4 × 6 × 5.9`로 개정됐다** (`S15P21A604-698`, GitLab #181, 2026-09-15). `width`(x)와 `depth`(z)가 다르므로 **한 값을 양축에 쓰지 않는다** — Layout 좌표·실물 검증도 같은 값을 쓴다 (`|x| ≤ 4.7`, `|z| ≤ 3`, `0 ≤ y ≤ 5.9`). 옛 `6 × 6 × 2.72`의 높이는 방 높이가 아니라 셸 교체 이전 벽 패널 높이였다. 값은 서버 검증 상수에서 유도되므로 검증과 카탈로그가 어긋나지 않는다.
 - 검증 오류·경고 rule 추가분: 실물 영역 이탈 `AREA_OUT_OF_BOUNDS`(error), 통행 판정
   `FRONT_BLOCKED`·`ISOLATED_AREA`(warning, 공개 시점만). 기하 계약 상세는
   `specs/005-booth-studio-layout/contracts/layout-api.md` §10.
@@ -1656,7 +1656,7 @@ Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개
 
 관리자 자격만으로 타 부스를 **변경**할 때는 `admin_actions`에 `action=BOOTH_EDIT`, `target_type=BOOTH`, `target_id=부스 ID`를 같은 트랜잭션으로 남긴다. Owner·허용 Staff가 자신의 기존 권한으로 성공한 요청에는 이 행을 남기지 않는다. 마스터 소유 부스는 열람은 가능하지만 다른 Admin의 변경·게시는 `403 MASTER_PROTECTED`다. 일반 회원·CONSULTANT의 타 부스 요청은 기존 `403 BOOTH_EDITOR_FORBIDDEN`을 유지한다.
 
-> ⚠️ **아직 없는 것** — 계정 정지·해제, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다. 코인 조정은 아래 17C 로 나갔다.
+> ⚠️ **아직 없는 것** — 신고·모더레이션, 이벤트 경품·추첨·지급, 전역 운영 대시보드는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다. 코인 조정은 아래 17C 로 나갔다.
 
 ---
 
