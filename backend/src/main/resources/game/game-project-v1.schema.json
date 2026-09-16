@@ -119,8 +119,22 @@
                 "required": ["type", "target"],
                 "properties": {
                   "type": { "enum": ["SCORE_AT_LEAST", "DEFEAT_ENEMIES", "SURVIVE_SECONDS"] },
-                  "target": { "type": "integer", "minimum": 1, "maximum": 999999999 }
-                }
+                  "target": { "type": "integer", "minimum": 1 }
+                },
+                "allOf": [
+                  {
+                    "if": { "properties": { "type": { "const": "SCORE_AT_LEAST" } } },
+                    "then": { "properties": { "target": { "maximum": 999999999 } } }
+                  },
+                  {
+                    "if": { "properties": { "type": { "const": "DEFEAT_ENEMIES" } } },
+                    "then": { "properties": { "target": { "maximum": 10000 } } }
+                  },
+                  {
+                    "if": { "properties": { "type": { "const": "SURVIVE_SECONDS" } } },
+                    "then": { "properties": { "target": { "maximum": 3600 } } }
+                  }
+                ]
               }
             }
           }
@@ -195,6 +209,10 @@
         "integrity": {
           "type": "string",
           "maxLength": 128
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 255
         }
       }
     },
@@ -241,7 +259,8 @@
           "required": ["type", "prompt"],
           "properties": {
             "type": { "const": "INTERACTABLE" },
-            "prompt": { "type": "string", "minLength": 1, "maxLength": 80 }
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "range": { "type": "integer", "minimum": 1, "maximum": 100 }
           }
         },
         {
@@ -374,6 +393,14 @@
           "type": "array",
           "items": { "$ref": "#/$defs/component" },
           "maxItems": 10
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "showNameInPlay": {
+          "type": "boolean"
         }
       }
     },

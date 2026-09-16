@@ -20,8 +20,11 @@ public class InsufficientCoinException extends ApiException {
     private final transient int balance;
 
     public InsufficientCoinException(int required, int balance) {
+        // balance also goes into the error envelope's own field: the sentence is for a human and
+        // a client should not have to parse Korean prose to show the number (GitLab #205 계약,
+        // Unity HttpSlotMachineClient.ErrorBody).
         super(ErrorCode.INSUFFICIENT_COIN,
-                "코인이 부족합니다. 필요: " + required + ", 잔액: " + balance);
+                "코인이 부족합니다. 필요: " + required + ", 잔액: " + balance, null, null, balance);
         this.required = required;
         this.balance = balance;
     }

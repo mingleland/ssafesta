@@ -35,8 +35,7 @@ Unity는 이 코드를 실행하거나 GameProject를 해석하지 않는다.
 
 ## 아직 연결하지 않은 외부 경계
 
-- 서버 소유 Asset upload/reference resolver
-- Booth Portal API 구현과 Draft/Publish/Published 서버 endpoint
+- Booth Portal API 구현
 - Coin/Reward나 서버 권위 점수
 
 외부 경계는 `studio/ports`, `runtime/ports` adapter로 교체한다. GameProject를 Unity WebGL에 넘기거나
