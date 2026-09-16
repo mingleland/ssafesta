@@ -32,7 +32,11 @@ export interface ObjectTypeInfo {
 export const OBJECT_TYPE_INFO: Record<ObjectType, ObjectTypeInfo> = {
   AI_AGENT: { category: 'FUNCTIONAL', warnOnMissingConfig: true, linksConfigId: true },
   VIDEO_SCREEN: { category: 'FUNCTIONAL', warnOnMissingConfig: true, linksConfigId: true },
-  PROJECT_PANEL: { category: 'FUNCTIONAL', warnOnMissingConfig: true, linksConfigId: true },
+  // 2026-09-16 (S15P21A604-811, GitLab #194) — configId 를 쓰지 않는다. 서버가 게시 검증을
+  // **부스 단위**로 옮겼다(S15P21A604-765): 프로젝트가 있는 부스면 configId 유무와 무관하게
+  // 경고가 없고, 없는 부스에만 CONFIG_NOT_LINKED 가 붙는다. 그 판정은 부스의 프로젝트 유무를
+  // 아는 서버만 할 수 있어 편집기가 흉내 내지 않는다 — LAPTOP 이 URL 소유를 booths 에 넘긴 것과 같다.
+  PROJECT_PANEL: { category: 'FUNCTIONAL', warnOnMissingConfig: false, linksConfigId: false },
   SURVEY_KIOSK: { category: 'FUNCTIONAL', warnOnMissingConfig: true, linksConfigId: true },
   RECRUITMENT_BOARD: { category: 'UNDETERMINED', warnOnMissingConfig: false, linksConfigId: true }, // 요건 자체가 spec Key Entities에 없음
   CONSULTATION_DESK: { category: 'FUNCTIONAL', warnOnMissingConfig: true, linksConfigId: true },

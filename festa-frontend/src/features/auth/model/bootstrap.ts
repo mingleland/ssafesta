@@ -6,6 +6,7 @@
 
 import { authApi } from '../../../entities/auth/api.select';
 import { markBootstrapped, setMemberSession } from './session';
+import { startRefreshScheduler } from './refreshScheduler';
 import { installUnauthorizedHandler } from './unauthorizedHandler';
 
 let started = false;
@@ -14,6 +15,8 @@ export async function bootstrapAuth(): Promise<void> {
   if (started) return; // StrictMode 이중 mount 방어 — 페이지를 벗어나면 어차피 전체 리로드로 초기화된다
   started = true;
   installUnauthorizedHandler();
+  // 만료 전에 미리 갱신한다 — 401 을 맞고 나서야 갱신하면 Unity 가 그 401 을 먼저 먹는다
+  startRefreshScheduler();
   try {
     // 로컬 E2E에서만 Spring이 발급한 회원 access token을 주입한다. 배포 번들에서는
     // DEV가 false라 절대 실행되지 않으며, 토큰은 .env(커밋 안 됨)에만 둔다.

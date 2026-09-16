@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-// ESC 메뉴 허브 편입 — 부스관리(소유자만)·아바타설정(스텁)·조작안내 (S15P21A604-798).
+// ESC 메뉴 허브 편입 — 부스 관리(소유자만)·아바타 변경(스텁)·조작 안내 (S15P21A604-798).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 const getMyBooth = vi.fn();
+const openPanel = vi.fn();
 vi.mock('../../../../entities/booth/leaseApi.select', () => ({
   leaseApi: { getMyBooth: () => getMyBooth() },
 }));
@@ -30,7 +31,7 @@ function renderMenu() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <GameMenu onClose={() => {}} onOpenMyInfo={() => {}} />
+        <GameMenu onClose={() => {}} onOpenPanel={openPanel} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -38,6 +39,7 @@ function renderMenu() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  openPanel.mockReset();
   __resetSessionForTests();
   __resetProfileForTests();
   __resetScreenAudioForTests();
@@ -61,38 +63,45 @@ describe('ESC 부스관리 항목', () => {
     getMyBooth.mockResolvedValue(null);
     renderMenu();
     await waitFor(() => expect(getMyBooth).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: '부스관리' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '부스 관리' })).toBeNull();
   });
 
   it('내 부스가 있으면 항목이 보이고, 누르면 관리 화면이 열린다', async () => {
     getMyBooth.mockResolvedValue({ boothId: 1, name: '테스트 부스', status: 'ACTIVE', lease: null });
     renderMenu();
-    const button = await screen.findByRole('button', { name: '부스관리' });
+    const button = await screen.findByRole('button', { name: '부스 관리' });
     fireEvent.click(button);
     const { getWorldScreen } = await import('../../model/worldScreen');
     expect(getWorldScreen()).toBe('management');
   });
 });
 
-describe('ESC 아바타설정 스텁', () => {
+describe('ESC 아바타 변경 스텁', () => {
   it('누를 수 없고 준비 중 배지가 있다 — 진입점 미정', () => {
     renderMenu();
-    const button = screen.getByRole('button', { name: /아바타설정/ });
+    const button = screen.getByRole('button', { name: /아바타 변경/ });
     expect(button.hasAttribute('disabled')).toBe(true);
     expect(screen.getByText('준비 중')).toBeTruthy();
   });
 });
 
-describe('ESC 조작안내 항목', () => {
-  it('열면 조작 목록이 나오고, 다시 누르면 닫힌다', () => {
+// 패널 안에서 접었다 펴는 대신 자식 오버레이로 연다 — 메뉴 높이가 튀지 않고, 닫는 방법이
+// ESC 하나로 통일된다.
+describe('ESC 하위 화면 진입', () => {
+  it('조작 안내·설정은 목록을 펼치지 않고 오버레이 요청만 보낸다', () => {
     renderMenu();
-    const button = screen.getByRole('button', { name: '조작안내' });
+    fireEvent.click(screen.getByRole('button', { name: '조작 안내' }));
+    expect(openPanel).toHaveBeenCalledWith('guide');
     expect(screen.queryByText('이동')).toBeNull();
 
-    fireEvent.click(button);
-    expect(screen.getAllByText('이동').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: '설정' }));
+    expect(openPanel).toHaveBeenCalledWith('settings');
+    expect(screen.queryByRole('switch', { name: '음악' })).toBeNull();
+  });
 
-    fireEvent.click(button);
-    expect(screen.queryByText('이동')).toBeNull();
+  it('회원이면 프로필 요약 행 자체가 내 정보 진입이다', () => {
+    renderMenu();
+    fireEvent.click(screen.getByRole('button', { name: '내 정보' }));
+    expect(openPanel).toHaveBeenCalledWith('myInfo');
   });
 });

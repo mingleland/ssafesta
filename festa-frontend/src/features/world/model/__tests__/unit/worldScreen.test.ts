@@ -15,7 +15,7 @@ import {
   getWorldScreen,
   openManagement,
   openMenu,
-  openMyInfoScreen,
+  openMenuPanelScreen,
   openVisitorOverlay,
 } from '../../worldScreen';
 
@@ -40,9 +40,9 @@ describe('getWorldScreen — 두 store 를 하나의 값으로', () => {
     expect(getWorldScreen()).toBe('menu');
   });
 
-  it('myInfo 레이어를 그 이름으로 판정한다', () => {
-    openMyInfoScreen();
-    expect(getWorldScreen()).toBe('myInfo');
+  it('menuPanel 레이어를 그 이름으로 판정한다', () => {
+    openMenuPanelScreen('myInfo');
+    expect(getWorldScreen()).toBe('menuPanel');
   });
 
   it('배타 진입을 우회해 둘이 켜져도 판정이 흔들리지 않는다 — visitor 가 앞선다', () => {
@@ -85,12 +85,24 @@ describe('배타 진입 — 여는 쪽이 나머지를 걷는다', () => {
     expect(getWorldScreen()).toBe('visitor');
   });
 
-  it('메뉴 위에 내 정보를 열면 메뉴가 닫힌다', () => {
+  // 메뉴는 자식 화면의 배경으로 남는다 — 닫았을 때 월드가 아니라 메뉴로 돌아가야 한다.
+  it('메뉴에서 연 화면은 메뉴를 배경에 남기고, 닫으면 메뉴로 돌아간다', () => {
     openMenu();
-    openMyInfoScreen();
+    openMenuPanelScreen('myInfo');
+    expect(getGameClientUiSnapshot().gameMenu).toBe(true);
+    expect(getWorldScreen()).toBe('menuPanel');
 
-    expect(getGameClientUiSnapshot().gameMenu).toBe(false);
-    expect(getWorldScreen()).toBe('myInfo');
+    expect(closeTopScreen()).toBe(true);
+    expect(getWorldScreen()).toBe('menu');
+  });
+
+  it('메뉴에서 연 부스 관리도 닫으면 메뉴로 돌아간다', () => {
+    openMenu();
+    openManagement();
+    expect(getWorldScreen()).toBe('management');
+
+    expect(closeTopScreen()).toBe(true);
+    expect(getWorldScreen()).toBe('menu');
   });
 
   it('Visitor 를 연달아 열면 슬롯 하나로 유지된다 — F 연타에도 창은 하나다', () => {
@@ -115,7 +127,7 @@ describe('closeTopScreen — 현재 주인 하나만', () => {
   });
 
   it('떠 있는 것을 닫고 월드로 돌려준다', () => {
-    for (const open of [() => openVisitorOverlay('LAPTOP', { boothId: 1 }), openManagement, openMenu, openMyInfoScreen]) {
+    for (const open of [() => openVisitorOverlay('LAPTOP', { boothId: 1 }), openManagement, openMenu, () => openMenuPanelScreen('myInfo')]) {
       open();
       expect(closeTopScreen()).toBe(true);
       expect(getWorldScreen()).toBe('world');

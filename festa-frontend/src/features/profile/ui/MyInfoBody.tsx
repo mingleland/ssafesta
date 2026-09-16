@@ -15,6 +15,7 @@ import { walletApi } from '../../../entities/wallet/api.select';
 import { useSession } from '../../auth/model/session';
 import { TransactionsSection } from '../../wallet/ui/TransactionsSection';
 import { ScreenError, ScreenLoading } from '../../shell/ui/PageShell';
+import { AdminConsoleLink } from '../../admin/ui/AdminConsoleLink';
 import '../../../pages/profile/profilePage.css';
 
 const PROVIDER_LABEL: Record<string, string> = { google: 'Google', kakao: 'Kakao', ssafy: 'SSAFY', guest: '게스트' };
@@ -124,6 +125,9 @@ export function MyInfoBody() {
           )}
         </section>
       </div>
+
+      {/* 관리자에게만 보인다. 코인 내역 아래로 내리면 표 10여 줄에 묻혀 스크롤해야 찾는다 */}
+      <AdminConsoleLink />
 
       {kind === 'member' && (
         <section className="sc-card pf-tx">

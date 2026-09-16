@@ -168,7 +168,12 @@ export function PropertiesPanel({
             {info.warnOnMissingConfig && configText === '' && <p className="studio-note">연결이 없으면 게시 시 경고 대상입니다.</p>}
           </>
         ) : (
-          <p className="studio-note">홈페이지 주소는 부스 설정(외관 모드)에서 등록합니다.</p>
+          // 연결이 필요한데 configId 로 하지 않는 타입들 — 어디서 등록하는지가 타입마다 다르다.
+          <p className="studio-note">
+            {object.type === 'PROJECT_PANEL'
+              ? '전시 프로젝트는 부스 관리 › 프로젝트에서 등록합니다.'
+              : '홈페이지 주소는 부스 설정(외관 모드)에서 등록합니다.'}
+          </p>
         )}
       </div>
 
