@@ -1,7 +1,15 @@
 fileFormatVersion: 2
 guid: 8715c85c3cdfcf94781731d96994d4ef
+AssetOrigin:
+  serializedVersion: 1
+  productId: 398112
+  packageName: Carnival & Funfair Stalls - Game Booths, Food Carts, Circus & Festival
+    Props
+  packageVersion: 1.0
+  assetPath: Assets/_Project/Art/Booth/CarnivalKit/Models/SM_Balloon_Dart_Board_Frame_V1.fbx
+  uploadId: 967672
 ModelImporter:
-  serializedVersion: 24200
+  serializedVersion: 22200
   internalIDToNameTable: []
   externalObjects:
   - first:
@@ -39,7 +47,7 @@ ModelImporter:
   meshes:
     lODScreenPercentages: []
     globalScale: 1
-    meshCompression: 0
+    meshCompression: 2
     addColliders: 0
     useSRGBMaterialColor: 1
     sortHierarchyByName: 1
@@ -61,9 +69,6 @@ ModelImporter:
     maxBonesPerVertex: 4
     minBoneWeight: 0.001
     optimizeBones: 1
-    generateMeshLods: 0
-    meshLodGenerationFlags: 0
-    maximumMeshLod: -1
     meshOptimizationFlags: -1
     indexFormat: 0
     secondaryUVAngleDistortion: 8
@@ -113,11 +118,3 @@ ModelImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 398112
-  packageName: Carnival & Funfair Stalls - Game Booths, Food Carts, Circus & Festival
-    Props
-  packageVersion: 1.0
-  assetPath: Assets/_Project/Art/Booth/CarnivalKit/Models/SM_Balloon_Dart_Board_Frame_V1.fbx
-  uploadId: 967672
