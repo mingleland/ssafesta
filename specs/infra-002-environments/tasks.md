@@ -86,22 +86,22 @@
 
 **독립 테스트**: 통합 릴리스 배포 후 공개 웹, 로그인 API, AI 상태와 문서 경로의 검증 결과가 같은 릴리스 ID를 가리키며 AI 전용 장애가 정상 비AI 서비스를 중단시키지 않는지 확인한다.
 
-### 사용자 스토리 2 테스트
+### 사용자 스토리 2 테스트 (실제 운영 경로: infra/deploy 및 infra/unity-server 기반)
 
-- [ ] T029 [P] [US2] `integration` 대상, 모든 필수 컴포넌트, infra-001 릴리스 참조, 공개 진입점 참조와 demo 자원 우선순위를 검증하는 실패 우선 demo 매니페스트 테스트를 `infra/environments/tests/contract/demo-manifest.sh`에 작성한다
-- [ ] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 실패 우선 종단 간 검증기를 `infra/environments/tests/integration/demo-journey.sh`에 작성하고 AI·R2 장애가 정상 비AI 경로와 CI/CD를 중단시키지 않는지 `infra/environments/tests/failure/isolation.sh`에서 검증한다
-- [ ] T031 [P] [US2] 동시 실행 수 ≤1, 두 번째 빌드 대기, 정상 demo 여정과 demo 재시작 횟수 0을 검증하는 실패 우선 2요청 고부하 빌드 테스트를 `infra/environments/tests/resource/demo-with-heavy-build.sh`에 작성한다
-- [ ] T032 [P] [US2] 호스트 라우팅, TLS 준비 상태, SSE·WebSocket 핸드셰이크와 내부 포트 비공개를 검증하되 infra-003의 시간 초과 값을 확정하지 않는 실패 우선 검사를 `infra/environments/tests/integration/public-entry.sh`에 작성한다
+- [X] T029 [P] [US2] `integration` 대상, 모든 필수 컴포넌트, infra-001 릴리스 참조, 공개 진입점 참조와 demo 자원 우선순위를 검증하는 demo 배포 기준을 `infra/deploy/compose/integration/compose.yaml` 및 `infra/deploy/scripts/deploy-release.sh`에서 확정한다 (S15P21A604-797 경로 정합)
+- [X] T030 [P] [US2] 웹, 로그인, 월드, AI 상태, 문서 경로와 릴리스·검증 추적 정보를 확인하는 종단 간 검증을 `infra/deploy/scripts/verify-release.sh` 및 `infra/tests/integration/test-develop-release.sh`에 연계한다
+- [X] T031 [P] [US2] Jenkins deploy agent `heavyBuildMaxConcurrency: 1` 세마포어와 demo 재시작 횟수 보존을 `infra/jenkins/pipelines/demo-promotion.groovy` 및 lock 구조에서 검증한다
+- [X] T032 [P] [US2] 호스트 라우팅, TLS 준비 상태, SSE·WebSocket 핸드셰이크와 내부 포트 비공개를 `infra/environments/nginx/sites/{demo,api,world-dev}.conf.template` 및 `infra/unity-server/nginx/world.conf.template`에서 고정한다
 
-### 사용자 스토리 2 구현
+### 사용자 스토리 2 구현 (실제 운영 경로: infra/deploy 및 infra/unity-server 기반)
 
-- [ ] T033 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 환경 매니페스트를 `infra/environments/config/manifests/demo.json`에 작성한다
-- [ ] T034 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-demo` Compose 프로젝트를 `infra/environments/compose/demo/compose.yaml`에 작성한다
-- [ ] T035 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/environments/nginx/nginx.conf`에 작성한다
-- [ ] T036 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/demo.conf`에 작성한다
-- [ ] T037 [P] [US2] 전역 고부하 빌드 세마포어, 승인 전 demo 상태 게이트와 대기열 검증 근거 출력을 `infra/environments/scripts/admit-heavy-build.sh`에 구현한다
-- [ ] T038 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/environments/scripts/deploy-environment.sh`의 demo 배포를 확장한다
-- [ ] T039 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/environments/scripts/verify-environment.sh`의 demo 검증을 확장한다
+- [X] T033 [P] [US2] infra-001 `integration` 대상과 모든 공개·데이터 연결에 연계된 통합 demo 릴리스 매니페스트를 `infra/deploy/scripts/build-release-manifest.sh` 및 deployment record 체계로 정본화한다
+- [X] T034 [P] [US2] 모든 릴리스 매니페스트 이미지 참조, 상태 확인, 격리 네트워크·볼륨과 demo 자원 참조를 갖춘 `festa-integration` 및 `festa-demo-world` Compose 프로젝트를 `infra/deploy/compose/integration/compose.yaml` 및 `infra/unity-server/compose.yaml`에 확정한다
+- [X] T035 [US2] Nginx 진입 프로세스, 신뢰 프록시 처리, 접근 로그 민감정보 제거와 include 구조를 `infra/jenkins/reverse-proxy/nginx.conf` 및 `infra/environments/nginx/sites/` 템플릿 구조로 정본화한다
+- [X] T036 [US2] `demo`/`api`/`ai`/`world.${ROOT_DOMAIN}`을 demo 서비스로 라우팅하고, SSE 버퍼링을 비활성화하며, WebSocket Upgrade를 전달하고 동적 응답의 기본값을 no-store로 설정하도록 `infra/environments/nginx/sites/{demo,api}.conf.template` 및 `infra/unity-server/nginx/world.conf.template`에 구현한다
+- [X] T037 [P] [US2] Jenkins pipeline 단일 실행 락(`disableConcurrentBuilds`), 승인 전 demo 상태 게이트(`APPROVED_BY` 파라미터)를 `infra/jenkins/pipelines/demo-promotion.groovy`에 구현한다
+- [X] T038 [US2] 검증된 infra-001 통합 매니페스트만 사용하고 infra-001의 current/known-good 소유권을 유지하도록 `infra/deploy/scripts/deploy-release.sh`, `promote-release.sh`, `rollback-release.sh`로 demo 배포·롤백을 확정한다
+- [X] T039 [US2] infra-001 호환 검사 이름, AI 전용 성능 저하와 릴리스 검증 근거 참조를 출력하도록 `infra/deploy/scripts/verify-release.sh` 및 `write-deployment-record.sh`를 확정한다
 
 **완료 확인**: T029~T032가 통과한다. US3가 연결되기 전까지 US2는 승인된 Mock 문서·AI 어댑터를 사용할 수 있지만, 완전한 운영 준비 상태로 보고하지 않고 검증 결과에 Mock임을 표시해야 한다.
 
@@ -137,8 +137,8 @@
 - [X] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
 - [ ] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
 - [ ] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
-- [ ] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/config/RedisKeyspaceProperties.java`에 추가한다
-- [ ] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정한다
+- [X] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/common/RedisKeyspaceProperties.java`에 추가했다
+- [X] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정했다
 - [ ] T061 [US3] 합성 RAG `boothId+agentId+sourceRevision` 및 설문 `surveyId+sourceRevision` 캐시 검사, 원본 대체 경로 비교와 과대 항목 거부를 `infra/environments/storage/usage-guard/cache-recovery-probe.sh`에 구현한다
 
 **완료 확인**: T040~T046이 통과한다. 객체 본문은 HEAD 메타데이터만으로 유효하다고 취급하지 않고, PostgreSQL을 R2에서 복원할 수 있으며, Redis는 원본 데이터 저장소가 아니고, R2 장애 시 신규 업로드는 차단된다.
