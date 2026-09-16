@@ -4,12 +4,14 @@
 // 메뉴를 켜 둔 채로 두는 것으로 성립하므로 여기서는 프레임만 씌운다.
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
 import { MyInfoOverlay } from '../../profile/ui/MyInfoOverlay';
+import { AdminOverlay } from '../../admin/ui/AdminOverlay';
 import { MusicSettings } from '../../audio/ui/MusicSettings';
 import { ControlGuideList } from './ControlGuideList';
 import type { MenuPanel } from '../model/gameClientUi';
 
 export function MenuPanelHost({ panel, onClose }: { panel: MenuPanel; onClose: () => void }) {
   if (panel === 'myInfo') return <MyInfoOverlay onClose={onClose} />;
+  if (panel === 'admin') return <AdminOverlay onClose={onClose} />;
   if (panel === 'guide') {
     return (
       <OverlayFrame title="조작 안내" subtitle="월드에서 쓰는 키" size="s" onClose={onClose}>

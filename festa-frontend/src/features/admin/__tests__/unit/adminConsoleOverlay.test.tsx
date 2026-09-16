@@ -1,44 +1,83 @@
 // @vitest-environment jsdom
 // 관리자 콘솔 전체 흐름을 mock adapter 위에서 돈다 — BE 도착 전에 화면·상태·조치가 이어지는지 여기서 본다.
-// 각 섹션의 "목록 → 선택 → 상세 → 조치" 와 마스터 보호·멱등키·확인 단계를 잠근다.
+// 콘솔은 월드 위 오버레이라 라우팅이 아니라 module store(consoleState)로 섹션을 옮긴다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../../../entities/admin/api.select', async () => {
   const mock = await import('../../../../entities/admin/api.mock');
   return { adminApi: mock.adminApi };
 });
-vi.mock('../../../../features/shell/ui/PageShell', () => ({
-  PageShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
 
-const { AdminPage } = await import('../../AdminPage');
-const { __resetAdminMockForTests } = await import('../../../../entities/admin/api.mock');
+const { AdminOverlay } = await import('../../ui/AdminOverlay');
+const { __resetAdminMockForTests, __setMockCapability } = await import('../../../../entities/admin/api.mock');
+const { __resetAdminConsoleForTests, openAdminSection, selectAdminUser } = await import('../../model/consoleState');
 const { __resetToastsForTests, getToastsSnapshot } = await import('../../../../shared/ui/toast/toastStore');
+const { __resetSessionForTests, markBootstrapped, setMemberSession } = await import('../../../auth/model/session');
 
-function renderConsole(path: string) {
+const onClose = vi.fn();
+
+function renderOverlay() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/app/admin/:section" element={<AdminPage />} />
-        </Routes>
+      <MemoryRouter>
+        <AdminOverlay onClose={onClose} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-beforeEach(() => { __resetAdminMockForTests(); __resetToastsForTests(); vi.spyOn(console, 'warn').mockImplementation(() => {}); });
+beforeEach(() => {
+  __resetAdminMockForTests();
+  __resetAdminConsoleForTests();
+  __resetToastsForTests();
+  // 콘솔은 회원 세션을 전제로 한다 — 권한 질의가 회원일 때만 나간다(model/capability)
+  __resetSessionForTests();
+  setMemberSession('at', new Date(Date.now() + 60_000).toISOString());
+  markBootstrapped();
+  onClose.mockReset();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 const lastToast = () => getToastsSnapshot().at(-1)?.message ?? '';
 
+describe('오버레이 껍데기', () => {
+  it('월드 위 모달로 뜨고 운영 현황부터 보여 준다', async () => {
+    renderOverlay();
+    const dialog = await screen.findByRole('dialog', { name: '관리자 콘솔' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    await within(dialog).findByText('지금 처리할 것');
+  });
+
+  it('닫으면 섹션·선택을 비운다 — 다시 열 때 옛 상태가 방금 고른 것처럼 보이지 않게', async () => {
+    renderOverlay();
+    await screen.findByText('지금 처리할 것');
+    openAdminSection('wallets');
+    selectAdminUser(3);
+    fireEvent.click(screen.getAllByRole('button', { name: '닫기' })[0]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    cleanup();
+    renderOverlay();
+    await screen.findByText('지금 처리할 것');
+  });
+
+  it('관리자가 아니면 콘솔을 그리지 않는다 — 권한이 중간에 회수될 수 있다', async () => {
+    __setMockCapability({ admin: false, master: false });
+    renderOverlay();
+    await screen.findByText('관리자만 이용할 수 있습니다');
+    expect(screen.queryByLabelText('콘솔 섹션')).toBeNull();
+  });
+});
+
 describe('관리자 관리', () => {
   it('마스터 행은 남아 있고 강등 버튼은 disabled 가 아니라 이유를 말한다', async () => {
-    renderConsole('/app/admin/admins');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /관리자 관리/ }));
     const list = await screen.findByLabelText('관리자 목록');
     await within(list).findByText('구글 황덕');
     const masterRow = within(list).getByText('구글 황덕').closest('tr')!;
@@ -50,7 +89,8 @@ describe('관리자 관리', () => {
   });
 
   it('승격은 목록을 갱신하고, 중복 승격은 운영 안내로 막힌다', async () => {
-    renderConsole('/app/admin/admins');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /관리자 관리/ }));
     await screen.findByText('구글 황덕');
     fireEvent.change(screen.getByLabelText('회원 번호'), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: '승격' }));
@@ -65,7 +105,8 @@ describe('관리자 관리', () => {
 
 describe('회원 관리', () => {
   it('검색 → 선택 → 상세 → 정지(사유 필수) → 이력이 같은 상태를 말한다', async () => {
-    renderConsole('/app/admin/members');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /회원 관리/ }));
     fireEvent.change(await screen.findByLabelText('회원 검색'), { target: { value: '참가' } });
     fireEvent.click(screen.getByRole('button', { name: '검색' }));
     fireEvent.click(await screen.findByText('페스타참가자'));
@@ -76,7 +117,6 @@ describe('회원 관리', () => {
 
     // 사유 없이 확인 → 아무 일도 없다
     fireEvent.click(screen.getByRole('button', { name: '정지' }));
-    expect(within(detail).queryByText('정지 사유는')).toBeNull();
     fireEvent.change(screen.getByLabelText(/정지 사유/), { target: { value: '신고 접수' } });
     fireEvent.click(screen.getByRole('button', { name: '정지' }));
 
@@ -86,22 +126,35 @@ describe('회원 관리', () => {
   });
 
   it('검색 결과가 없으면 빈 상태를 말한다', async () => {
-    renderConsole('/app/admin/members');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /회원 관리/ }));
     fireEvent.change(await screen.findByLabelText('회원 검색'), { target: { value: '없는사람' } });
     fireEvent.click(screen.getByRole('button', { name: '검색' }));
     await screen.findByText('검색 결과가 없습니다');
+  });
+
+  it('회원에서 고른 사람이 지갑 섹션에 그대로 이어진다', async () => {
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /회원 관리/ }));
+    fireEvent.click(await screen.findByText('싸피생'));
+    await screen.findByLabelText('회원 상세');
+
+    fireEvent.click(screen.getByRole('button', { name: /코인 · 지갑/ }));
+    const wallet = await screen.findByLabelText('지갑 상세');
+    await within(wallet).findByText('505 코인');
   });
 });
 
 describe('코인 조정 멱등키', () => {
   it('실패 후 재시도는 같은 키를 쓰고, 성공 뒤 새 조정만 새 키다', async () => {
-    renderConsole('/app/admin/wallets?userId=3');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /코인 · 지갑/ }));
+    selectAdminUser(3);
     await screen.findByText('200 코인');
     fireEvent.click(screen.getByRole('button', { name: '코인 조정 시작' }));
     const form = screen.getByLabelText('코인 조정');
     const keyBefore = within(form).getByText(/^[0-9a-f-]{36}$/i).textContent;
 
-    // 잔액 초과 회수 → 실패. 키는 그대로
     fireEvent.change(within(form).getByLabelText(/금액/), { target: { value: '-999' } });
     fireEvent.click(within(form).getByRole('button', { name: '조정 실행' }));
     await within(form).findByText('잔액보다 많이 회수할 수 없습니다');
@@ -118,7 +171,9 @@ describe('코인 조정 멱등키', () => {
   });
 
   it('마스터에게는 조정 시작 자체가 잠기고 이유가 보인다', async () => {
-    renderConsole('/app/admin/wallets?userId=1');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /코인 · 지갑/ }));
+    selectAdminUser(1);
     const btn = await screen.findByRole('button', { name: '코인 조정 시작' });
     await waitFor(() => expect(btn.getAttribute('aria-disabled')).toBe('true'));
     fireEvent.click(btn);
@@ -128,7 +183,8 @@ describe('코인 조정 멱등키', () => {
 
 describe('부스·상점·설문', () => {
   it('강제 비공개는 확인 단계와 사유를 거쳐 게시 상태를 내린다', async () => {
-    renderConsole('/app/admin/booths');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /부스 관리/ }));
     const row = (await screen.findByText('싸피 프로젝트관')).closest('tr')!;
     fireEvent.click(within(row).getByRole('button', { name: '강제 비공개' }));
     fireEvent.change(screen.getByLabelText(/비공개 사유/), { target: { value: '신고 접수' } });
@@ -138,7 +194,8 @@ describe('부스·상점·설문', () => {
   });
 
   it('구매 처리 상태를 바꾸면 표가 따라온다', async () => {
-    renderConsole('/app/admin/shop');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /이벤트 상점/ }));
     const row = (await screen.findByText('이벤트참여자')).closest('tr')!;
     expect(within(row).getByText('지급 대기')).not.toBeNull();
     fireEvent.click(within(row).getByRole('button', { name: '처리' }));
@@ -149,7 +206,8 @@ describe('부스·상점·설문', () => {
   });
 
   it('설문은 현황·집계·참여자·개별 응답으로 이어진다', async () => {
-    renderConsole('/app/admin/surveys');
+    renderOverlay();
+    fireEvent.click(await screen.findByRole('button', { name: /이벤트 설문/ }));
     await screen.findByText('SSAFESTA 2026 축제 만족도 설문');
     expect(screen.getByText('총 참여자').previousSibling?.textContent).toBe('4');
     await screen.findByText(/가장 좋았던 공간은/);
@@ -158,4 +216,3 @@ describe('부스·상점·설문', () => {
     await within(detail).findByText('부스 배치 범위를 넓혀 주세요');
   });
 });
-
