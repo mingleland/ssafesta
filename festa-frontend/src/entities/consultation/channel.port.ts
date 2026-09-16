@@ -60,21 +60,21 @@ export type VisitorChannelEvent =
  * 대기열에 남아 있다가 `accept` 에서 409 로 터진다. 실시간 구독을 붙일 때 이 봉투를 다시
  * 발명하지 않도록 확정본을 코드에 고정해 둔다(#133).
  *
- * **`ended` 가 빠져 있는 것은 실수가 아니라 계약 그대로다.** 방문자가 먼저 종료하면 직원
- * 토픽으로는 아무 알림도 가지 않아서 직원 화면에 "진행 중" 이 남는다. BE 가 2026-09-14 에
- * 이 모순을 찾아 결정을 요청했고(#133), FE 는 **직원 토픽에 `ended` 를 추가하는 쪽**으로
- * 답했다 — 봉투는 `{ type: 'ended', requestId, occurredAt }`, 추가 필드 없음.
+ * **`ended` 는 2026-09-16 에 들어왔다** (S15P21A604-719, `!974`). 그 전까지는 방문자가 먼저
+ * 종료하면 직원 토픽으로 아무 알림도 가지 않아 직원 화면에 "진행 중" 이 남았다. BE 가 09-14 에
+ * 이 모순을 찾아 결정을 요청했고(#133), FE 가 **직원 토픽에 추가하는 쪽**으로 답한 결과다.
  *
- * 타입을 아직 안 늘린 이유는 서버가 그 이벤트를 아직 보내지 않기 때문이다. 안 오는 이벤트를
- * 먼저 올리면 한 번도 안 타는 분기가 생기고, 그게 `BOOTH_FORBIDDEN` 이 났던 자리다.
- * BE 구현이 develop 에 닿으면 여기 한 줄을 더한다.
+ * **종료한 직원 본인도 받는다.** 개인 큐가 아니라 부스 토픽으로 나가기 때문이고 `taken` 이
+ * 이미 같은 성질이다. 화면에서 자기 행동의 메아리를 걸러야 하면 `requestId` 로 가른다.
  */
 export type StaffChannelEvent =
   | { type: 'requested'; visitorNickname: string; requestedAt: string; handoffSummary: string | null }
   | { type: 'cancelled' }
   | { type: 'expired' }
   /** 다른 직원이 먼저 수락 — 대기열에서 카드를 내린다 */
-  | { type: 'taken'; staffName: string };
+  | { type: 'taken'; staffName: string }
+  /** 상담 종료 — 방문자·직원 누가 끝냈든 같은 봉투가 온다 (S15P21A604-813) */
+  | { type: 'ended'; requestId: string; occurredAt: string };
 
 export interface ConsultationRequestCard {
   requestId: string;
