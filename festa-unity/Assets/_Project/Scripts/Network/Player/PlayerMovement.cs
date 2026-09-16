@@ -607,11 +607,15 @@ namespace Festa.Network
         // 이 속도는 다른 입력과 같이 Move() 를 거치므로 벽에서는 벽 판정이 이긴다 — 벽에 붙은 사람을
         // 아무리 밀어도 벽 앞에서 멈춘다. 뚫을 수 없는 이유가 검사가 아니라 **구조**에 있다.
         //
-        // 상한을 달리기(65)보다 높게 둔다. 낮으면 달려서 남을 관통한다 — 밀어내는 힘이 파고드는 힘을
-        // 이겨야 겹침이 벌어지지 않는다.
-        const float SeparationMaxSpeed = 90f;
+        // 겹침을 한 프레임에 전부 해소하면 네트워크로 늦게 보인 상대가 가까이 나타나는 순간
+        // 90u/s로 튕겨 나간다. 겹침은 허용하되 0.18초에 걸쳐 풀고, 달리기 속도의 절반보다
+        // 낮은 속도로 제한한다. 두 플레이어가 각자 절반씩 물러나므로 체감 분리는 더 빠르다.
+        const float SeparationMaxSpeed = 24f;
+        const float SeparationRelaxTime = 0.18f;
+        const float SeparationResponse = 14f;
         const float SeparationProbe = 0.5f;   // 겹치기 직전까지 잡아 떨림 없이 벌어지게
         static readonly Collider[] s_bodyHits = new Collider[16];
+        Vector3 _separationVelocity;
 
         Vector3 SoftSeparation()
         {
@@ -621,13 +625,24 @@ namespace Festa.Network
             float mine = radius + skin;
             int mask = 1 << gameObject.layer;
             int count = Physics.OverlapCapsuleNonAlloc(bottom, top, mine + SeparationProbe, s_bodyHits, mask, QueryTriggerInteraction.Ignore);
-            if (count == 0) return Vector3.zero;
+            if (count == 0)
+            {
+                _separationVelocity = Vector3.Lerp(
+                    _separationVelocity, Vector3.zero,
+                    1f - Mathf.Exp(-SeparationResponse * Time.deltaTime));
+                return _separationVelocity;
+            }
 
             var push = Vector3.zero;
             for (int i = 0; i < count; i++)
             {
                 var c = s_bodyHits[i];
                 if (c == null || c == _controller || c.transform.IsChildOf(transform)) continue;
+
+                // Player 레이어의 장식/상호작용 콜라이더가 밀어내기에 섞이지 않게 실제
+                // 네트워크 플레이어의 몸 캡슐만 대상으로 삼는다.
+                var other = c.GetComponentInParent<PlayerMovement>();
+                if (other == null || other == this || !other.IsSpawned) continue;
 
                 float theirs = 2.85f;
                 if (c is CapsuleCollider capsule)
@@ -648,10 +663,19 @@ namespace Festa.Network
                 push += dir * (minDistance - distance);
             }
 
-            if (push.sqrMagnitude < 1e-6f) return Vector3.zero;
-            // 겹친 거리를 이 프레임에 다 풀되 상한을 넘기지 않는다
-            float speed = Mathf.Min(push.magnitude / Mathf.Max(Time.deltaTime, 1e-4f), SeparationMaxSpeed);
-            return push.normalized * speed;
+            Vector3 target = Vector3.zero;
+            if (push.sqrMagnitude >= 1e-6f)
+            {
+                // 프레임 시간이 아니라 완화 시간으로 나눈다. 저 FPS/백그라운드 복귀에서도
+                // 한 프레임짜리 큰 속도가 생기지 않는다.
+                float speed = Mathf.Min(push.magnitude / SeparationRelaxTime, SeparationMaxSpeed);
+                target = push.normalized * speed;
+            }
+
+            _separationVelocity = Vector3.Lerp(
+                _separationVelocity, target,
+                1f - Mathf.Exp(-SeparationResponse * Time.deltaTime));
+            return _separationVelocity;
         }
 
         /// <summary>
