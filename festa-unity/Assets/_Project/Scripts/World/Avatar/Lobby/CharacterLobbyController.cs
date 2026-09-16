@@ -329,7 +329,6 @@ namespace Festa.Avatar
             try
             {
                 Debug.Log("[CharacterLobby] 토큰이 늦게 도착했다 — 파츠 보유 조회를 다시 돌린다");
-                SetStatus("로그인 정보를 확인하는 중입니다…");
                 await LoadOwnershipAsync();
                 SanitizeLocked(ref _config);
                 Apply(); RefreshAll();
