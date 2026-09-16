@@ -13,13 +13,14 @@
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
 import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
+import { MyInfoOverlay } from '../../features/profile/ui/MyInfoOverlay';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
@@ -43,10 +44,11 @@ import {
   closeBoothManagement,
   closeManagementPanel,
   closeGameMenu,
+  closeMyInfo,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMyInfoScreen } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -61,7 +63,6 @@ export function WorldPage() {
   // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
   const hostPhase = useHostPhase();
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [chatHeight, setChatHeight] = useState(0);
   const reportChatHeight = useCallback((height: number) => {
@@ -203,6 +204,22 @@ export function WorldPage() {
     };
   }, []);
 
+  // Tab 잠금 (S15P21A604-450) — 브라우저 기본 동작은 Tab 에서 다음 포커스 가능 요소로 옮긴다.
+  // Unity 6 WebGL 은 키보드 타깃을 canvas 로 잡으므로(captureAllKeyboardInput=false, !279),
+  // 포커스가 캔버스를 벗어나면 그 뒤 Tab keydown 이 Unity 에 안 들어가 자체 미니맵 토글이
+  // 죽는다. 실제 canvas가 키보드 타깃일 때만 막는다. HUD·오버레이 등 DOM 요소에서는
+  // 접근성을 위해 브라우저의 Tab 탐색을 그대로 둔다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      if (getWorldScreen() !== 'world') return;
+      if (e.target !== document.getElementById('unity-canvas')) return;
+      e.preventDefault();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   return (
     <div className="world-scene" style={{ '--festa-world-chat-height': `${chatHeight}px` } as CSSProperties}>
       {/* World Layer 는 이 트리에 없다 — 라우트 밖 PersistentWorld 가 그린다 (S15P21A604-620).
@@ -222,15 +239,9 @@ export function WorldPage() {
         <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
       )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
-      {ui.gameMenu && (
-        <GameMenu
-          onClose={closeGameMenu}
-          onOpenMyInfo={() => {
-            closeGameMenu();
-            navigate('/app/profile');
-          }}
-        />
-      )}
+      {ui.gameMenu && <GameMenu onClose={closeGameMenu} onOpenMyInfo={openMyInfoScreen} />}
+      {/* 내 정보 — GameMenu 의 "내 정보"가 연다. 오버레이라 월드 위에 뜬다(페이지 이동 아님) */}
+      {ui.myInfo && <MyInfoOverlay onClose={closeMyInfo} />}
     </div>
   );
 }

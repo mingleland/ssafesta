@@ -9,14 +9,15 @@
 // 항목은 사용자 테스트에서 실제로 묻는 것만 고른다(GitLab #132, S15P21A604-460).
 //
 // **설명은 한 단어로 끝낸다** (S15P21A604-631). 이 카드는 키를 처음 익힐 때 훑는 것이지 읽는
-// 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 손에 익는 것이라
-// 목록에 있어도 읽히지 않아 뺐다.
+// 문서가 아니다 — 설명이 길수록 훑기가 느려진다. 시야 조작(마우스 우클릭)은 -631 이 "손에 익어
+// 안 읽힌다"며 뺐던 항목이나, S15P21A604-798 에서 요청자 확인 하에 결정을 번복해 다시 넣었다.
 //
 // F 에서 "부스 입장·나가기" 를 뺀 근거: 부스 안에서는 클릭형 나가기 버튼이 직접 떠서 안내가
 // 같은 동작을 반복할 필요가 없다(S15P21A604-740).
 import { useState } from 'react';
 import { BoothExitButton } from './BoothExitButton';
 import { ConsultationQuickAccess } from './ConsultationQuickAccess';
+import { ControlGuideList } from './ControlGuideList';
 import { WorldGuideLauncher } from './WorldGuideLauncher';
 import { toggleFullscreen, useFullscreen } from '../../../shared/ui/fullscreen';
 import './worldHud.css';
@@ -51,36 +52,7 @@ export function WorldHud() {
               </svg>
             </button>
           </header>
-          <ul className="world-hud-keys">
-            <li>
-              <span className="world-key">W</span>
-              <span className="world-key">A</span>
-              <span className="world-key">S</span>
-              <span className="world-key">D</span>
-              이동
-            </li>
-            <li>
-              <span className="world-key">Shift</span>
-              달리기
-            </li>
-            <li>
-              <span className="world-key">Space</span>
-              점프
-            </li>
-            <li>
-              <span className="world-key">F</span>
-              상호작용
-            </li>
-            <li>
-              <span className="world-key">Alt</span>
-              <span className="world-key">클릭</span>
-              감정
-            </li>
-            <li>
-              <span className="world-key">Esc</span>
-              메뉴
-            </li>
-          </ul>
+          <ControlGuideList />
         </section>
       )}
 
