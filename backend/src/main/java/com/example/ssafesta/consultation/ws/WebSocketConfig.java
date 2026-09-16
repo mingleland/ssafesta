@@ -1,8 +1,11 @@
 package com.example.ssafesta.consultation.ws;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -31,15 +34,23 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  *
  * <p>유실은 계약이 이미 인정한다 — 이벤트 재전송이 P1 에 없고, 클라이언트는 재연결 직후 대기열과
  * 요청 상태를 REST 로 다시 읽는다. <b>정본은 REST 이고 이것은 알림이다.</b>
+ *
+ * <p><b>유휴 연결도 실제 트래픽을 낸다.</b> simple broker 는 25초마다 heartbeat 를 보내 Cloudflare
+ * 계층이 조용히 연결을 정리하지 않게 한다(S15P21A604-825). FE 가 수신 희망값을 20초로 협상하므로
+ * 실제 송신 주기는 {@code max(25초, 20초)}인 25초다.
  */
 @Configuration
 @EnableWebSocketMessageBroker
 class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final StompAuthChannelInterceptor authInterceptor;
+    private final ObjectProvider<TaskScheduler> heartbeatScheduler;
 
-    WebSocketConfig(StompAuthChannelInterceptor authInterceptor) {
+    WebSocketConfig(
+            StompAuthChannelInterceptor authInterceptor,
+            @Qualifier("messageBrokerTaskScheduler") ObjectProvider<TaskScheduler> heartbeatScheduler) {
         this.authInterceptor = authInterceptor;
+        this.heartbeatScheduler = heartbeatScheduler;
     }
 
     @Override
@@ -55,7 +66,9 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // 클라이언트가 보낼 수 있는 유일한 접두. 무엇이 실제로 열려 있는지는 인터셉터가 정한다.
         registry.setApplicationDestinationPrefixes("/app");
         // /topic — 부스 대기열(직원 여럿), /queue — 방문자 개인 (/user 접두와 함께 쓴다).
-        registry.enableSimpleBroker("/topic", "/queue");
+        registry.enableSimpleBroker("/topic", "/queue")
+                .setTaskScheduler(heartbeatScheduler.getObject())
+                .setHeartbeatValue(new long[] {25_000, 0});
         registry.setUserDestinationPrefix("/user");
     }
 
