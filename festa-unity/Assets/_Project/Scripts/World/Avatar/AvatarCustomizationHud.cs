@@ -44,6 +44,14 @@ namespace Festa.World
             var toggleRect = new Rect(Screen.width - 190, 10, 180, 28);
             if (GUI.Button(toggleRect, _open ? "Close (C)" : "Customize (C)")) _open = !_open;
 
+            // 에디터 전용 — ESC 메뉴 '아바타 설정' 인플레이스 경로(GitLab #197)를 호스트 없이 눌러 본다.
+            var inPlaceRect = new Rect(Screen.width - 190, 42, 180, 28);
+            if (!AvatarInPlaceCustomization.IsOpen && GUI.Button(inPlaceRect, "아바타 설정 (in-place)"))
+            {
+                if (!AvatarInPlaceCustomization.TryOpen("editor-hud", out var error))
+                    Debug.LogWarning($"[AvatarCustomizationHud] 인플레이스 열기 거부 — {error}");
+            }
+
             if (_open) DrawPanel(controller);
         }
 
