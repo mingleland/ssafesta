@@ -174,6 +174,28 @@ describe('WorldPage Enter 판정 (-791)', () => {
     expect(getWorldChatSnapshot().open).toBe(true);
     expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
   });
+
+  it('다른 텍스트 입력에 focus 가 있으면 Enter 를 가로채지 않는다 — 그 입력의 form submit 에 맡긴다', async () => {
+    await renderWorld();
+    const otherInput = document.createElement('input');
+    otherInput.id = 'ai-chat-input-probe';
+    document.body.appendChild(otherInput);
+    otherInput.focus();
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(getWorldChatSnapshot().open).toBe(false);
+    expect(document.activeElement).toBe(otherInput);
+    expect(event.defaultPrevented).toBe(false);
+    otherInput.remove();
+  });
 });
 
 // Unity 가 쥔 모달까지 함께 중재한다 (-450 2차, GitLab #132).
