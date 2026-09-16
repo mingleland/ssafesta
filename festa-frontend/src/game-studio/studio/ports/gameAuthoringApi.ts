@@ -161,3 +161,57 @@ export const createApiGamePublisher = (
     }
   },
 });
+
+export type GameVisibility = 'PRIVATE' | 'PUBLIC';
+
+export interface GameVisibilitySummary {
+  readonly gameId: number;
+  readonly visibility: GameVisibility;
+}
+
+export interface GameVisibilityPort {
+  /** `GET /mine` 목록에서 이 게임을 찾아 현재 공개설정을 읽는다 — 단건 조회 API가 없다. */
+  get(gameId: number): Promise<GameVisibilitySummary>;
+  set(gameId: number, visibility: GameVisibility): Promise<GameVisibilitySummary>;
+}
+
+const gameVisibilityValue = (value: unknown, field: string): GameVisibility => {
+  if (value !== 'PRIVATE' && value !== 'PUBLIC') throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', `${field} 값이 올바르지 않습니다.`);
+  return value;
+};
+
+const parseVisibilitySummary = (input: unknown, expectedGameId: number): GameVisibilitySummary => {
+  if (!isRecord(input)) throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '게임 응답 형식이 올바르지 않습니다.');
+  const gameId = positiveInteger(input.gameId, 'gameId');
+  if (gameId !== expectedGameId) throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '요청한 게임과 응답이 일치하지 않습니다.');
+  return { gameId, visibility: gameVisibilityValue(input.visibility, 'visibility') };
+};
+
+export const createApiGameVisibilityPort = (
+  request: GameApiRequest = api,
+): GameVisibilityPort => ({
+  get: async (gameId) => {
+    try {
+      const response = await request<unknown>('/api/v1/games/mine');
+      if (!isRecord(response) || !Array.isArray(response.games)) {
+        throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '내 게임 목록 응답 형식이 올바르지 않습니다.');
+      }
+      const match = response.games.find((entry) => isRecord(entry) && entry.gameId === gameId);
+      if (match === undefined) throw new GameAuthoringApiError('GAME_NOT_FOUND', '게임을 찾을 수 없습니다.');
+      return parseVisibilitySummary(match, gameId);
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+  set: async (gameId, visibility) => {
+    try {
+      const response = await request<unknown>(`/api/v1/games/${gameId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ visibility }),
+      });
+      return parseVisibilitySummary(response, gameId);
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+});
