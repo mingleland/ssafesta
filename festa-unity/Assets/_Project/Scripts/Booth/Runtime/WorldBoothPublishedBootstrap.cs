@@ -40,6 +40,12 @@ namespace Festa.Booth
         public static event System.Action BoothsRebuilt;
 
         /// <summary>
+        /// 슬롯의 실제 게시 레이아웃이 적용된 직후 알린다. 씬에 직접 배치한 전시 오브젝트가
+        /// 같은 boothId/objectId/configId를 받아 FE 이벤트 계약에 참여할 때 쓴다.
+        /// </summary>
+        public static event System.Action<int, BoothLayoutDto> PublishedLayoutApplied;
+
+        /// <summary>
         /// 아직 못 채운 방만 다시 시도하는 주기. 조회가 한 번 실패하면 그 방은 세션 내내
         /// <see cref="BoothRuntime.IsLoaded"/> false 로 남아, 실제로는 게시돼 있는 부스인데도 포털이
         /// "아직 준비 중" 으로 막았다 (2026-09-08 조사). 채워진 방은 다시 부르지 않으므로
@@ -109,6 +115,7 @@ namespace Festa.Booth
                 if (s_appliedSignature.TryGetValue(slotId, out var prev) && prev == sig) return;   // 변화 없음
                 target.Rebuild(layout);
                 s_appliedSignature[slotId] = sig;
+                PublishedLayoutApplied?.Invoke(slotId, layout);
                 Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본 변경 감지 → 다시 지음 (v{layout.version}, 오브젝트 {layout.objects?.Length ?? 0})");
                 BoothsRebuilt?.Invoke();
             }
@@ -194,6 +201,7 @@ namespace Festa.Booth
                     if (runtime == null) continue;             // 씬 전환으로 파괴된 앵커
                     runtime.Rebuild(layout);
                     s_appliedSignature[slotId] = Signature(layout);   // 첫 입장 때 같은 것을 다시 짓지 않게
+                    PublishedLayoutApplied?.Invoke(slotId, layout);
                     built++;
                 }
                 Debug.Log($"[WorldBoothPublishedBootstrap] {slotIds.Count}실 중 {built}실 게시 렌더, 나머지는 기본 프레임");
