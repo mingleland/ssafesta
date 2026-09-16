@@ -27,12 +27,23 @@ fi
 
 python_bin="${PYTHON_BIN:-python3}"
 command -v "${python_bin}" >/dev/null 2>&1 || { echo 'Python 3 is required' >&2; exit 69; }
-"${python_bin}" - "${candidate_path}" <<'PY'
+# compose.yaml 의 image 는 `${GAME_IMAGE_REF:?...}` 라 **이 스크립트에서도** 값이 있어야 한다.
+# deploy-game.sh 는 export 로 넣지만 그건 별개의 셸 스텝이라 여기까지 오지 않는다 —
+# 그래서 배포와 헬스체크가 모두 성공한 뒤 이 줄의 compose ps 가
+# "required variable GAME_IMAGE_REF is missing a value" 로 죽고, 멀쩡히 뜬 월드를
+# 파이프라인만 FAILED 로 뒤집었다(develop #379·#381~#385). 값은 방금 쓴 영수증에 있다.
+candidate_image_ref="$("${python_bin}" - "${candidate_path}" <<'PY'
 import json, pathlib, sys
 candidate = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
 if candidate.get('targetId') != 'demo/game' or candidate.get('state') != 'CANDIDATE':
     raise SystemExit('current candidate is not a demo/game candidate')
+image_ref = candidate.get('imageRef')
+if not isinstance(image_ref, str) or not image_ref:
+    raise SystemExit('current candidate has no imageRef')
+print(image_ref)
 PY
+)"
+export GAME_IMAGE_REF="${GAME_IMAGE_REF:-${candidate_image_ref}}"
 
 container_id="$("${docker_bin}" compose --env-file "${GAME_ENV_FILE}" --project-name "${compose_project}" --file "${compose_file}" ps -q "${compose_service}")"
 [[ -n "${container_id}" ]] || { echo 'demo-game container is missing' >&2; exit 1; }
