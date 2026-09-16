@@ -125,8 +125,8 @@ Web app — 백엔드는 `backend/src/main/java/com/example/ssafesta/`, 테스�
 - [x] T035 [P] [US1] `backend/src/main/java/com/example/ssafesta/consultation/ws/WsTokenController.java` — `POST /consultation/ws-token`
 - [x] T036 [US1] `backend/src/main/java/com/example/ssafesta/consultation/ws/WebSocketConfig.java` — `/ws/consultation` native WebSocket + STOMP 등록, **SockJS 미등록**, in-memory simple broker (C-05, research R-05)
 - [x] T037 [US1] `backend/src/main/java/com/example/ssafesta/consultation/ws/StompAuthChannelInterceptor.java` — `CONNECT` 의 `Authorization: Bearer` 검증, 실패 시 연결 거부
-- [x] T038 [US1] `backend/src/main/java/com/example/ssafesta/consultation/ws/ConsultationEventPublisher.java` — 방문자 `/user/queue/consultation`(`accepted`·`expired`·`ended`), 직원 `/topic/booths/{boothId}/consultation`(`requested`·`cancelled`·`expired`·`taken`). 봉투 `{type, requestId, occurredAt, …}`
-- [x] T039 [P] [US1] `backend/src/test/java/com/example/ssafesta/consultation/ws/ConsultationEventPublisherTest.java` — 수락 시 **진 직원들에게 `taken`** 이 가고 방문자에게 `accepted` 가 간다
+- [x] T038 [US1] `backend/src/main/java/com/example/ssafesta/consultation/ws/ConsultationEventPublisher.java` — 방문자 `/user/queue/consultation`(`accepted`·`expired`·`ended`), 직원 `/topic/booths/{boothId}/consultation`(`requested`·`cancelled`·`expired`·`taken`·`ended`). 봉투 `{type, requestId, occurredAt, …}`. 직원 쪽 `ended` 는 2026-09-14 확정(GitLab #133, `S15P21A604-719`)
+- [x] T039 [P] [US1] `backend/src/test/java/com/example/ssafesta/consultation/ws/ConsultationEventPublisherTest.java` — 수락 시 **진 직원들에게 `taken`** 이 가고 방문자에게 `accepted` 가 간다. **종료는 직원 토픽·방문자 큐 양쪽 destination 과 봉투 3필드를 단정한다**(`S15P21A604-719`)
 
 ### 5-3. 요약 조달 (`S15P21A604-139` 도착 후)
 

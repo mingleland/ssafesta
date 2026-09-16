@@ -228,4 +228,14 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
     act(() => __pushWorldChatForTests([{ senderUserId: 7, nickname: '정헌', sentAt: '2026-09-15T05:00:00.000Z', content: '첫 말' }]));
     expect(container.querySelector('.world-chat-hint')).toBeNull();
   });
+
+  it('입장 이벤트는 채팅 본문과 분리된 시스템 알림으로 표시한다', () => {
+    setMemberSession('at', FUTURE);
+    const { container } = render(<WorldChatLayer />);
+
+    act(() => __pushWorldChatForTests([{ type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' }]));
+
+    expect(container.querySelector('.world-chat-join')?.textContent).toBe('황덕님이 입장하셨습니다.');
+    expect(container.querySelector('.world-chat-sr')?.textContent).toBe('황덕님이 입장하셨습니다.');
+  });
 });

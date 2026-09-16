@@ -4,8 +4,8 @@ build_project() {
   local component_dir
   component_dir="$(ci_component_dir)"
   case "${CI_COMPONENT}" in
-    ai) (cd "${component_dir}" && python -m compileall -q .) ;;
-    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw package -DskipTests; fi) ;;
+    ai) (cd "${component_dir}" && python -m compileall -q -x '\.venv' .) ;;
+    back) (cd "${component_dir}" && if [[ -x ./gradlew ]]; then ./gradlew clean build -x test; else ./mvnw clean package -DskipTests; fi) ;;
     front) (
       cd "${component_dir}"
       npm ci
