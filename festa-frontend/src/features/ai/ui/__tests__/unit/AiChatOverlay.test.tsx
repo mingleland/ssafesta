@@ -60,7 +60,7 @@ function ask(question: string): void {
 
 function askFirstSuggestion(): void {
   renderOverlay({ boothId: 7, agentId: 3 });
-  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트를 전시하나요?' }));
+  fireEvent.click(screen.getByRole('button', { name: '어떤 프로젝트인가요?' }));
 }
 
 describe('AiChatOverlay 실서버 결선·SSE 렌더링', () => {

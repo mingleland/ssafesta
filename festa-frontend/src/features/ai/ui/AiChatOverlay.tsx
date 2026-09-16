@@ -45,7 +45,7 @@ const IcAgent = (
   </svg>
 );
 
-const SUGGESTIONS = ['어떤 프로젝트를 전시하나요?', '팀을 소개해 주세요', '기술 스택이 궁금해요'];
+const SUGGESTIONS = ['어떤 프로젝트인가요?', '누구를 대상으로 한 서비스인가요?', '기술 스택이 궁금해요'];
 
 export function AiChatOverlay({ payload }: Props) {
   const { kind } = useSession();
