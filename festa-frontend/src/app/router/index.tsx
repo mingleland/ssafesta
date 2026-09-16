@@ -126,6 +126,21 @@ export const routes = [
     },
   },
   {
+    // 내 게임 목록·생성 — S15P21A604-824. 진입점(어디서 이 경로로 오는지)은 아직 미정이라
+    // 지금은 URL 직접 접근으로만 열린다.
+    path: '/app/games',
+    lazy: async () => {
+      const { GamesListPage } = await import('../../game-studio/app/routes/GamesListPage.tsx');
+      return {
+        Component: () => (
+          <RequireAuth level="member-only">
+            <GamesListPage />
+          </RequireAuth>
+        ),
+      };
+    },
+  },
+  {
     path: '/app/games/:gameId/edit',
     lazy: async () => {
       const { EditGamePage } = await import('../../game-studio/app/routes/EditGamePage.tsx');
