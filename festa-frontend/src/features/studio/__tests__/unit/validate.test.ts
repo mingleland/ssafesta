@@ -26,6 +26,12 @@ describe('precheckWarnings — CONFIG_NOT_LINKED', () => {
     expect(precheckWarnings([obj({ objectId: 'a', type: 'LAPTOP' })])).toEqual([]);
   });
 
+  // #194 확정(S15P21A604-811) 회귀 — LAPTOP 과 같은 부류다. 연결은 필요한데 configId 로 하지
+  // 않는다. 서버가 판정을 부스 단위로 옮겨(프로젝트 유무) 편집기는 그 판정을 흉내 내지 않는다.
+  it('PROJECT_PANEL은 판정이 부스 단위라 configId 없어도 경고하지 않는다', () => {
+    expect(precheckWarnings([obj({ objectId: 'a', type: 'PROJECT_PANEL' })])).toEqual([]);
+  });
+
   it('장식형(FURNITURE·DECORATION)은 연결 요건이 없어 경고하지 않는다', () => {
     expect(precheckWarnings([obj({ objectId: 'a', type: 'FURNITURE' })])).toEqual([]);
   });
