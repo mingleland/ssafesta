@@ -96,7 +96,7 @@ class GameProjectLimitBoundaryTest {
         ObjectNode project = withRules(valid());
         ((ObjectNode) objectives(project).get(0)).put("type", "DEFEAT_ENEMIES").put("target", 10_000);
 
-        assertDoesNotThrow(() -> validator.validateForPublish(
+        assertDoesNotThrow(() -> validator.validateForDraft(
                 project, GameTestSupport.write(project), GAME_ID, Map.of()));
     }
 
@@ -276,7 +276,7 @@ class GameProjectLimitBoundaryTest {
 
     private ObjectNode projectWithDialogueNodes(int count) {
         ObjectNode project = valid();
-        ObjectNode scene = MAPPER().createObjectNode();
+        ObjectNode scene = MAPPER.createObjectNode();
         scene.put("id", "boundaryDialogue");
         scene.put("type", "DIALOGUE");
         scene.put("name", "경계값 대화");
@@ -306,7 +306,7 @@ class GameProjectLimitBoundaryTest {
      * 관심사가 아닌 event·tileLayer 경계 테스트용).
      */
     private ObjectNode minimalTopDownScene(String id, int objectCount, int eventCount) {
-        ObjectNode scene = MAPPER().createObjectNode();
+        ObjectNode scene = MAPPER.createObjectNode();
         scene.put("id", id);
         scene.put("type", "TOP_DOWN");
         scene.put("name", "경계값 Scene");
@@ -332,7 +332,7 @@ class GameProjectLimitBoundaryTest {
     }
 
     private ObjectNode minimalPlayerSpawn(String id) {
-        ObjectNode object = MAPPER().createObjectNode();
+        ObjectNode object = MAPPER.createObjectNode();
         object.put("id", id);
         object.put("preset", "PLAYER_SPAWN");
         ObjectNode position = object.putObject("position");
@@ -344,7 +344,7 @@ class GameProjectLimitBoundaryTest {
     }
 
     private ObjectNode minimalDecoration(String id) {
-        ObjectNode object = MAPPER().createObjectNode();
+        ObjectNode object = MAPPER.createObjectNode();
         object.put("id", id);
         object.put("preset", "DECORATION");
         ObjectNode position = object.putObject("position");
@@ -355,9 +355,8 @@ class GameProjectLimitBoundaryTest {
         return object;
     }
 
-    private com.fasterxml.jackson.databind.ObjectMapper MAPPER() {
-        return new com.fasterxml.jackson.databind.ObjectMapper();
-    }
+    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
 
     private ObjectNode valid() {
         return GameTestSupport.validProjectFor(GAME_ID);

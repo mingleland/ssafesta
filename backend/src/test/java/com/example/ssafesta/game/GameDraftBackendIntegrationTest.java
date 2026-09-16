@@ -126,20 +126,32 @@ class GameDraftBackendIntegrationTest {
         ArrayNode currentObjects = newPadScene(scenes, sceneIndex);
         java.util.List<ObjectNode> padObjects = new java.util.ArrayList<>();
 
-        // 넉넉한 여유(2,000 byte)를 남기고 멈춘다 — 그래야 다음 단계(오브젝트당 최대 39byte짜리
-        // name 패딩)로 오버슈트 없이 정확히 맞출 수 있다.
-        while (jacksonByteSize(project) < targetBytes - 2_000) {
-            if (currentObjects.size() >= 500) {
-                sceneIndex++;
-                if (scenes.size() >= 50) {
-                    throw new IllegalStateException("scenes 상한(50)을 넘어서게 된다: " + scenes.size());
-                }
-                currentObjects = newPadScene(scenes, sceneIndex);
+        // 오브젝트 하나 추가할 때마다 문서 전체를 재직렬화하면 19,000개 근처에서 O(n²)가 된다
+        // (실측 120초, 리뷰 note_2813554). 목표까지 남은 여유를 "오브젝트당 최대 150 byte"로
+        // 보수적으로 나눠 배치 크기를 정하면, 여유가 넉넉한 동안은 최대 500개씩 묶어 추가하고
+        // 재측정 한 번으로 끝내면서도, 여유가 줄어들수록 배치가 자연히 좁아져 목표(2,000 byte
+        // 여유)를 넘기지 않는다. 넉넉한 여유(2,000 byte)를 남기고 멈추는 건 기존과 같다 — 그래야
+        // 다음 단계(오브젝트당 최대 39byte짜리 name 패딩)로 오버슈트 없이 정확히 맞출 수 있다.
+        final int MAX_BYTES_PER_OBJECT = 150;
+        while (true) {
+            int headroom = targetBytes - 2_000 - jacksonByteSize(project);
+            if (headroom <= 0) {
+                break;
             }
-            ObjectNode object = decoration("pad" + sceneIndex + "-obj" + objectIndex, "DECORATION");
-            currentObjects.add(object);
-            padObjects.add(object);
-            objectIndex++;
+            int batch = Math.max(1, Math.min(500, headroom / MAX_BYTES_PER_OBJECT));
+            for (int i = 0; i < batch; i++) {
+                if (currentObjects.size() >= 500) {
+                    sceneIndex++;
+                    if (scenes.size() >= 50) {
+                        throw new IllegalStateException("scenes 상한(50)을 넘어서게 된다: " + scenes.size());
+                    }
+                    currentObjects = newPadScene(scenes, sceneIndex);
+                }
+                ObjectNode object = decoration("pad" + sceneIndex + "-obj" + objectIndex, "DECORATION");
+                currentObjects.add(object);
+                padObjects.add(object);
+                objectIndex++;
+            }
         }
 
         // 이미 넣어둔 패딩 오브젝트들의 name(1~40자)을 하나씩 최대로 채워가며 잔여 byte를 정확히
