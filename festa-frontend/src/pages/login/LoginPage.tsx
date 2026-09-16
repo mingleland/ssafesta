@@ -59,8 +59,14 @@ function providerIcon(provider: AuthProviderVM) {
   }
 }
 
-/* 푸터 좌측 그룹 아이콘 — 레퍼런스(login.png)의 안내·이벤트·문의 3종.
-   링크 대상이 아직 없어 span 그대로 두고 표시만 맞춘다(대상이 생기면 a 로 바꾼다). */
+/* 푸터 5항목(축제 안내·이벤트·고객센터·개인정보처리방침·이용약관)을 숨겼다 (S15P21A604-815).
+
+   레퍼런스(login.png) 를 맞추려고 표시만 해 둔 것인데 다섯 개 다 갈 곳이 없다. 눌러도 아무 일이
+   없는 것을 사용자가 먼저 발견하는 것보다 안 보이는 편이 낫다.
+
+   지우지 않고 주석으로 두는 이유: 레퍼런스 대조 근거이고, 대상이 생기면 span 을 a 로 바꿔
+   그대로 되살린다. CSS(.login-footer*)도 남겨 둔다.
+
 const footerIcon = (path: string) => (
   <svg
     className="login-footer-icon"
@@ -83,6 +89,7 @@ const footerLinks = [
   { label: '이벤트', icon: footerIcon('M12 3l2.1 5.4L20 9.3l-4 3.9 1 5.8-5-2.7-5 2.7 1-5.8-4-3.9 5.9-.9z') },
   { label: '고객센터', icon: footerIcon('M11 4a7 7 0 100 14 7 7 0 000-14M20 21l-4.2-4.2') },
 ];
+*/
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -185,6 +192,7 @@ export function LoginPage() {
         </button>
       </div>
 
+      {/* 링크 대상이 생기면 되살린다 (S15P21A604-815)
       <footer className="login-footer">
         <div className="login-footer-group">
           {footerLinks.map((link) => (
@@ -200,6 +208,7 @@ export function LoginPage() {
           <span>이용약관</span>
         </div>
       </footer>
+      */}
     </div>
   );
 }
