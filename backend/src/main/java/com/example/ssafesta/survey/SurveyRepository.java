@@ -1,5 +1,6 @@
 package com.example.ssafesta.survey;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -24,6 +25,9 @@ public interface SurveyRepository extends JpaRepository<Survey, Long> {
      * {@code ux_surveys_booth} does for {@link #findByBoothId}.
      */
     Optional<Survey> findBySurveyKey(String surveyKey);
+
+    /** The admin console's event-survey roster (S15P21A604-832) — every row has a {@code surveyKey}. */
+    List<Survey> findBySurveyKeyIsNotNullOrderByIdAsc();
 
     /**
      * Which booth a survey belongs to, <b>without loading the survey</b>.

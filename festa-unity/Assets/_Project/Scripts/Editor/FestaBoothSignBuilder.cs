@@ -36,6 +36,9 @@ namespace Festa.EditorTools
         const string MatDir = "Assets/_Project/Art/Materials/Generated";
         const string SignPrefab = "Assets/_Project/Art/Booth/CarnivalKit/Prefabs/PF_A_Frame_Sign.prefab";
 
+        /// <summary>A 자 판 두 장의 메시 이름 앞머리. 몸이 걸리는 콜라이더는 이 둘에만 붙인다.</summary>
+        const string BoardMeshPrefix = "SM_A_Frame_Sign_";
+
         /// <summary>통로 z. 이 값보다 북쪽에 있는 칸이 "북쪽 줄"이다 (실측: 북 z≈230 · 남 z≈60).</summary>
         const float AisleZ = 145f;
 
@@ -198,25 +201,32 @@ namespace Festa.EditorTools
             sign.transform.localScale = Vector3.one * SignScale;
             foreach (var t in sign.GetComponentsInChildren<Transform>(true)) Loose(t.gameObject);
 
-            // **몸이 걸리는 콜라이더.** 프리팹에는 콜라이더가 없어 사람이 입간판을 그냥 뚫고 지나갔다
-            // (2026-09-11 지적). 렌더러 경계를 실측해 상자 하나로 감싼다 — A 자 두 판을 따로 감쌀 만큼
-            // 정밀할 필요가 없고, 플레이어 캡슐 반경이 4.8 이라 상자 하나가 오히려 덜 걸린다.
-            // 카드·글자 등 나머지 자식은 콜라이더를 지운 채 두어(Box/Slab) 걸리는 것은 이 상자 하나다.
+            // **몸이 걸리는 콜라이더는 A 자 판 두 장의 메시를 그대로 쓴다.**
+            //
+            // 처음에는 렌더러 경계를 상자 하나로 감쌌는데(2026-09-11), 그 상자의 윗면이 지면 1.1 m 위에
+            // 깔린 9.1×15.0 짜리 평평한 뚜껑이 됐다. A 자는 위로 갈수록 좁아지는데 상자는 그대로라,
+            // 간판 근처에 올라선 사람이 보이는 것 없이 공중에 서 있었다 (사용자 지적 2026-09-15).
+            //
+            // 판 두 장은 합쳐 408 삼각형뿐이라 정적 MeshCollider 로 두는 편이 싸고 정확하다. 경사면이
+            // 수평에서 62° 라 slopeLimit(45°) 를 넘어 판 위에 설 수도 없다. 글자·카드 등 나머지 자식은
+            // 콜라이더 없이 둔다 — 몸이 걸리는 것은 이 두 판뿐이다.
             {
-                var bounds = new Bounds();
-                bool any = false;
-                foreach (var r in sign.GetComponentsInChildren<Renderer>(true))
+                int boards = 0;
+                foreach (var mf in sign.GetComponentsInChildren<MeshFilter>(true))
                 {
-                    if (!any) { bounds = r.bounds; any = true; }
-                    else bounds.Encapsulate(r.bounds);
+                    if (!mf.name.StartsWith(BoardMeshPrefix)) continue;
+                    if (mf.sharedMesh == null)
+                    {
+                        Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 판 '{mf.name}' 에 메시가 없어 콜라이더를 못 만들었다.");
+                        continue;
+                    }
+                    var mc = mf.GetComponent<MeshCollider>();
+                    if (mc == null) mc = mf.gameObject.AddComponent<MeshCollider>();
+                    mc.sharedMesh = mf.sharedMesh;
+                    mc.convex = false;   // 정적 오브젝트다. convex 로 두면 WebGL 로드 때 헐 생성 비용만 낸다
+                    boards++;
                 }
-                if (any)
-                {
-                    var box = go.AddComponent<BoxCollider>();
-                    box.center = go.transform.InverseTransformPoint(bounds.center);
-                    box.size = bounds.size;   // 루트 스케일이 1 이라 월드 크기가 곧 로컬 크기다
-                }
-                else Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 입간판 렌더러가 없어 콜라이더를 못 만들었다.");
+                if (boards == 0) Debug.LogWarning($"[BoothSign] 슬롯 {slot:00} 입간판 판 메시('{BoardMeshPrefix}…')를 못 찾아 콜라이더가 없다.");
             }
 
             // 판 두 장의 위치·크기를 **실측해서** 글자를 얹는다 — 프리팹이 바뀌어도 따라간다.

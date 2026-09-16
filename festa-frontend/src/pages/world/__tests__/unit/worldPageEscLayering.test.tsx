@@ -4,7 +4,7 @@
 // 예전에는 이 화면이 두 store 를 각각 읽어 우선순위를 손으로 합성했다. 그 판정을 worldScreen 으로
 // 옮겼으므로, 여기서 잠그는 것은 "WorldPage 가 그 계층을 통해 동작한다" 는 배선이다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { closeOverlay, getCurrentOverlay, openOverlay } from '../../../../shared/types/overlay';
 import {
@@ -50,7 +50,18 @@ vi.mock('../../../../features/booth/ui/ManagementPanelHost', () => ({
 }));
 vi.mock('../../../../features/world/ui/WorldHud', () => ({ WorldHud: () => null }));
 // GameMenu 는 프로필·지갑 쿼리를 끌고 온다 — ESC 배선 테스트에 QueryClientProvider 를 세우지 않는다.
-vi.mock('../../../../features/world/ui/GameMenu', () => ({ GameMenu: () => <div data-testid="game-menu" /> }));
+// onOpenMyInfo 만 눌러 볼 수 있게 최소한의 버튼을 낸다.
+vi.mock('../../../../features/world/ui/GameMenu', () => ({
+  GameMenu: ({ onOpenMyInfo }: { onOpenMyInfo: () => void }) => (
+    <div data-testid="game-menu">
+      <button type="button" onClick={onOpenMyInfo}>내 정보</button>
+    </div>
+  ),
+}));
+// MyInfoOverlay 는 프로필·지갑 쿼리를 끌고 온다 — 배선(뜨는가·ESC 로 닫히는가)만 본다.
+vi.mock('../../../../features/profile/ui/MyInfoOverlay', () => ({
+  MyInfoOverlay: () => <div data-testid="my-info-overlay" />,
+}));
 
 const pressEscape = () =>
   act(() => {
@@ -137,6 +148,76 @@ describe('WorldPage ESC 계층 (-450)', () => {
     expect(getWorldScreen()).toBe('management');
     pressEscape();
     expect(getWorldScreen()).toBe('world');
+  });
+
+  it('GameMenu의 내 정보를 누르면 오버레이가 열리고 ESC 한 번으로 닫힌다', async () => {
+    await renderWorld();
+    pressEscape();
+
+    fireEvent.click(screen.getByRole('button', { name: '내 정보' }));
+    expect(screen.getByTestId('my-info-overlay')).toBeTruthy();
+    expect(getWorldScreen()).toBe('myInfo');
+
+    pressEscape();
+    expect(getWorldScreen()).toBe('world');
+  });
+});
+
+// Enter 판정도 같은 단일 중재자가 쥔다 (S15P21A604-706·-791) — 그래서 여기서 함께 잠근다.
+describe('WorldPage Enter 판정 (-791)', () => {
+  beforeEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+    setMemberSession('at', '2026-12-31T00:00:00.000Z');
+  });
+  afterEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+  });
+
+  it('월드에서 누른 Enter 는 채팅을 열고 입력창에 focus 를 준다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+
+  it('패널이 열린 채 focus 를 잃어도 Enter 가 그 입력창으로 되돌린다 — 새로 열지 않는다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    // 캔버스를 클릭한 상태를 만든다 — 패널은 그대로 떠 있고 focus 만 빠진다
+    act(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    expect(document.activeElement?.id).not.toBe(WORLD_CHAT_INPUT_ID);
+
+    pressEnter();
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+
+  it('다른 텍스트 입력에 focus 가 있으면 Enter 를 가로채지 않는다 — 그 입력의 form submit 에 맡긴다', async () => {
+    await renderWorld();
+    const otherInput = document.createElement('input');
+    otherInput.id = 'ai-chat-input-probe';
+    document.body.appendChild(otherInput);
+    otherInput.focus();
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+
+    expect(getWorldChatSnapshot().open).toBe(false);
+    expect(document.activeElement).toBe(otherInput);
+    expect(event.defaultPrevented).toBe(false);
+    otherInput.remove();
   });
 });
 

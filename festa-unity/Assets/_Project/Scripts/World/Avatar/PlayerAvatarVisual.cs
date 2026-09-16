@@ -165,6 +165,10 @@ namespace Festa.World
             _animator = _currentVisual.GetComponentInChildren<Animator>();
             AvatarAnimationLod.Register(_animator);
             EnsureAnimatorController();
+            // **첫 프레임에 바로 맞는 크기로 나온다.** 정착 뒤 보정(CalibrateHeightToPose)만 두면
+            // 0.6초 동안 76% 크기로 보이다 커지는 것이 눈에 띈다(사용자 지적 2026-09-16). 컨트롤러가 붙은 지금
+            // Idle 첫 프레임을 강제로 평가해 실제 선 자세를 만들고 그 자리에서 잰다. 원격 아바타도 같은 경로다.
+            CalibrateHeightImmediately();
             // 발 IK — 단차에서 한 발이 뜨거나 파묻히지 않게 (2026-09-09). 컨트롤러 Base Layer 에 IK Pass 가 켜져 있어야 OnAnimatorIK 가 불린다.
             if (_animator != null && _animator.GetComponent<AvatarFootIK>() == null) _animator.gameObject.AddComponent<AvatarFootIK>();
 
@@ -190,6 +194,14 @@ namespace Festa.World
                     visualTransform.localScale *= heightScale;
                 }
             }
+
+            // 여기서 나온 값은 **임시다.** 아래 CalibrateHeightToPose 주석 참고 — 조립 직후에는
+            // 포즈가 없어 바인드포즈 범위로 잴 수밖에 없고, 그 값은 실제 선 자세보다 크다.
+            _heightCalibrated = false;
+            _heightCalibrateDeadline = 0f;
+            _heightCalibrateAt = Time.time + SpawnSettle;   // 접지 타이머와 별개 — 아래 CalibrateHeightToPose 주석
+            _punchLayer = -1;          // 애니메이터가 새로 만들어졌다 — 레이어 번호를 다시 찾는다
+            _punchWeightTarget = 0f;
 
             // ── 발을 루트 높이에 맞춘다 (측정 기반) ─────────────────────
             // 이전에는 바닥 레이캐스트로 맞춘 뒤 `position.y = 12.5` 로 **덮어썼다.**
@@ -271,6 +283,99 @@ namespace Festa.World
             _rootHeightAtGrounding = RootHeightAboveGround();
             return true;
         }
+
+        /// <summary>조립 뒤 실제 포즈로 키를 다시 맞췄는가. 조립 한 번에 한 번만 한다.</summary>
+        bool _heightCalibrated;
+
+        /// <summary>
+        /// **실제로 서 있는 몸**의 키를 <see cref="_targetVisualHeight"/> 에 맞춘다.
+        ///
+        /// <para><b>왜 조립 시점의 계산으로 부족한가.</b> <see cref="FitVisualToWorld"/> 는
+        /// <see cref="Renderer.bounds"/>(스킨 메시는 <b>바인드포즈 골격 범위</b>)로 키를 잰다. 그 범위는
+        /// 실제 선 자세보다 크다 — 에디터 실측에서 바인드포즈 2.121 로 맞춘 아바타의 구운 선 자세 키가
+        /// <b>17.06</b> 이었다. 목표 22.375 의 <b>76%</b> 다. 월드·카메라·캡슐이 모두 22.375 를 전제로
+        /// 만들어져 있어(시선 높이 17.4/19.5 는 그 키의 어깨·목이다) 이 어긋남이 "캐릭터가 작다" 로 보였다
+        /// (사용자 지적 2026-09-15·16).</para>
+        ///
+        /// <para>그래서 포즈가 자리잡은 뒤 <see cref="TryGetVisibleGeometryBounds"/>(BakeMesh 로 현재 자세를
+        /// 굽는다)로 한 번 더 재서 배율을 곱한다. 접지는 호출자가 곧바로 다시 잡는다.</para>
+        ///
+        /// <para>선 자세가 아닐 때는 미룬다 — 앉거나 누운 몸을 기준으로 맞추면 키가 통째로 틀어진다.
+        /// 오래 기다려도 선 자세가 오지 않으면(계속 걷는 중 등) 그때는 그대로 잰다. 영영 76% 로 두는 것보다 낫다.</para>
+        /// </summary>
+        void CalibrateHeightToPose()
+        {
+            if (_heightCalibrated || _currentVisual == null || _targetVisualHeight <= 0f) return;
+
+            bool standing = _player == null
+                            || (_player.EmoteId.Value == PlayerEmoteId.None && _player.AnimState.Value == PlayerAnimState.Idle);
+            if (!standing)
+            {
+                if (_heightCalibrateDeadline <= 0f) _heightCalibrateDeadline = Time.time + HeightCalibrateWait;
+                if (Time.time < _heightCalibrateDeadline) { _heightCalibrateAt = Time.time + RegroundSettle; return; }
+            }
+
+            // 굽기에 실패하면(렌더러가 아직 없는 프레임 등) 포기하지 않고 잠시 뒤 다시 잰다 —
+            // 여기서 그냥 return 하면 영영 76% 로 남는다.
+            if (!TryGetVisibleGeometryBounds(out var posed) || posed.size.y < 0.01f)
+            {
+                _heightCalibrateAt = Time.time + RegroundSettle;
+                return;
+            }
+            float posedHeight = posed.size.y;
+
+            _heightCalibrated = true;
+            float correction = _targetVisualHeight / posedHeight;
+            // 측정이 튀어도 몸이 터무니없이 커지거나 사라지지 않게 가둔다.
+            correction = Mathf.Clamp(correction, 0.5f, 2f);
+            if (Mathf.Abs(correction - 1f) < 0.01f) return;
+
+            _currentVisual.transform.localScale *= correction;
+            Debug.Log($"[AvatarVisual] 키 보정 {posedHeight:F2} → {_targetVisualHeight:F2}u (×{correction:F3}, owner={OwnerClientId})");
+            // 배율이 바뀌었으니 발을 다시 바닥에 놓고 선 자세 기준값을 다시 잡는다.
+            _baseNeedsRefresh = true;
+            _regroundAt = Time.time;
+        }
+
+        /// <summary>
+        /// 조립 직후 같은 프레임에 키를 맞춘다. <see cref="Animator.Update(float)"/> 로 컨트롤러의 첫 상태(Idle)를
+        /// 지금 평가하면 스킨 메시가 바인드포즈가 아닌 선 자세가 되고, 그걸 구워 재면 정착을 기다릴 필요가 없다.
+        /// 실패하면 예약된 지연 보정이 이어받는다.
+        /// </summary>
+        void CalibrateHeightImmediately()
+        {
+            if (_animator == null || _currentVisual == null || _targetVisualHeight <= 0f) return;
+            if (_animator.runtimeAnimatorController == null) return;   // 컨트롤러가 없으면 포즈도 없다 — 지연 보정에 맡긴다
+
+            _animator.Update(0f);
+            if (!TryGetVisibleGeometryBounds(out var posed) || posed.size.y < 0.01f) return;
+
+            float correction = Mathf.Clamp(_targetVisualHeight / posed.size.y, 0.5f, 2f);
+            var vt = _currentVisual.transform;
+            if (Mathf.Abs(correction - 1f) >= 0.01f) vt.localScale *= correction;
+            _heightCalibrated = true;
+            _heightCalibrateAt = 0f;
+
+            // 배율이 바뀌었으니 발을 다시 바닥에 놓고 선 자세 기준값을 지금 값으로 잡는다.
+            if (GroundToCurrentPose())
+            {
+                _baseVisualLocalY = vt.localPosition.y;
+                _calibratedVisualLocalY = _baseVisualLocalY;
+            }
+            Debug.Log($"[AvatarVisual] 키 즉시 보정 {posed.size.y:F2} → {_targetVisualHeight:F2}u (×{correction:F3}, owner={OwnerClientId})");
+        }
+
+        /// <summary>선 자세를 기다려 주는 시간(초). 이보다 오래 걸리면 지금 자세로 잰다.</summary>
+        const float HeightCalibrateWait = 3f;
+        float _heightCalibrateDeadline;
+
+        /// <summary>
+        /// 키 보정을 시도할 시각. **접지 타이머(<see cref="_regroundAt"/>)와 분리한다.** 처음에는 그 타이머에
+        /// 얹었는데, 스폰 직후 <c>ApplyEmote(None)</c> 이 <c>RestoreBaseGrounding</c> 으로 <c>_regroundAt</c> 을
+        /// 0 으로 지워 정착 시점 자체가 사라졌다 — 두 세션 연속 보정이 한 번도 돌지 않았고(라이브 실측:
+        /// calibrated=False, 17.3u), 수동으로 불렀을 때만 22.4u 가 됐다. 0 이면 예약 없음.
+        /// </summary>
+        float _heightCalibrateAt;
 
         /// <summary>
         /// 루트가 바닥에서 얼마나 떠 있는지. 못 재면 <see cref="float.NaN"/>.
@@ -609,6 +714,13 @@ namespace Festa.World
         void LateUpdate()
         {
             UpdateRemoteMoveParams();
+            UpdatePunchLayerWeight();
+
+            if (_heightCalibrateAt > 0f && Time.time >= _heightCalibrateAt)
+            {
+                _heightCalibrateAt = 0f;
+                CalibrateHeightToPose();   // 다시 재야 하면 스스로 _heightCalibrateAt 을 다시 건다
+            }
 
             if (_regroundAt > 0f && Time.time >= _regroundAt)
             {
@@ -679,18 +791,29 @@ namespace Festa.World
             bounds = default;
             var found = false;
 
+            // ⚠ Renderer.bounds 를 그대로 쓰면 안 된다 (S15P21A604-801 / T-222).
+            // 런타임 조립 아바타는 화면 가장자리 컬링을 막으려고 localBounds 를 의도적으로
+            // 부풀려 둔다(S15P21A604-749). 그 값으로 키를 재면 heightScale 이
+            // _targetVisualHeight / (실제높이 + 패딩) 이 돼 아바타가 패딩만큼 작아진다.
+            // 조립기가 패딩 전 형상 bounds 를 들고 있으면 그것을 쓴다.
+            var assembler = _currentVisual.GetComponentInChildren<Festa.Avatar.AvatarAssembler>(true);
+
             foreach (var renderer in renderers)
             {
                 if (renderer == null) continue;
 
+                var rendererBounds = renderer.bounds;
+                if (assembler != null && assembler.TryGetGeometryWorldBounds(renderer, out var geometry))
+                    rendererBounds = geometry;
+
                 if (!found)
                 {
-                    bounds = renderer.bounds;
+                    bounds = rendererBounds;
                     found = true;
                 }
                 else
                 {
-                    bounds.Encapsulate(renderer.bounds);
+                    bounds.Encapsulate(rendererBounds);
                 }
             }
 
@@ -834,6 +957,31 @@ namespace Festa.World
         void ApplyEmote(PlayerEmoteId emote)
         {
             if (_animator == null || _animator.runtimeAnimatorController == null) return;
+
+            // ── 주먹은 상체 레이어에서만 친다 ────────────────────────────
+            //
+            // 전신으로 재생하면 **복싱 스텝의 하체가 그대로 나온다.** 제자리에 선 캐릭터의 발이
+            // 0.3초 동안 들썩였다 원위치로 튕겨 "움찔거린다" 로 보였다 (사용자 지적 2026-09-16).
+            // 상체 마스크 레이어로 올리면 다리는 Base Layer 의 서기·걷기를 그대로 유지한다 —
+            // 발이 흔들리지 않고, 걸으면서 쳐도 다리가 어긋나지 않는다.
+            if (IsPunch(emote))
+            {
+                int layer = PunchLayer();
+                if (layer > 0)
+                {
+                    // 레이어 가중치는 칠 때만 올린다 — 항상 1 로 두면 모션이 없는 Empty 상태가
+                    // 상체를 덮어 인사·박수 같은 다른 이모트가 깨진다.
+                    _punchWeightTarget = 1f;
+                    _animator.SetLayerWeight(layer, 1f);
+                    _animator.CrossFadeInFixedTime($"Emote_{emote}", PunchFade, layer, 0f);
+                }
+                else Debug.LogWarning("[AvatarVisual] Punch 레이어를 찾지 못해 주먹을 재생하지 못했다");
+                return;
+            }
+            // 다른 연출로 넘어가는 자리면 상체를 즉시 비운다. None 으로 돌아가는 평상시 종료는
+            // 종전처럼 짧게 섞어 상체가 튀지 않게 둔다.
+            ReleasePunchLayer(emote != PlayerEmoteId.None);
+
             if (emote == PlayerEmoteId.None)
             {
                 RestoreBaseGrounding();
@@ -876,9 +1024,65 @@ namespace Festa.World
 
             var stateName = $"Emote_{emote}";
             if (_animator.HasState(0, Animator.StringToHash(stateName)))
-                _animator.CrossFadeInFixedTime(stateName, fade, 0);
+                _animator.CrossFadeInFixedTime(stateName, fade, 0, 0f);
             else
                 Debug.LogWarning($"[AvatarVisual] 감정표현 상태를 찾지 못했습니다: {stateName}");
+        }
+
+        /// <summary>잘라낸 잽은 0.27~0.32초다. 0.2초를 섞으면 섞는 동안 동작이 끝난다.</summary>
+        const float PunchFade = 0.05f;
+
+        static bool IsPunch(PlayerEmoteId emote) =>
+            emote == PlayerEmoteId.Punch1 || emote == PlayerEmoteId.Punch2 || emote == PlayerEmoteId.Punch3;
+
+        int _punchLayer = -1;
+
+        /// <summary>상체 주먹 레이어 번호. 컨트롤러가 바뀌어도 이름으로 찾는다.</summary>
+        int PunchLayer()
+        {
+            if (_punchLayer >= 0) return _punchLayer;
+            if (_animator == null) return -1;
+            for (int i = 0; i < _animator.layerCount; i++)
+                if (_animator.GetLayerName(i) == "Punch") { _punchLayer = i; return i; }
+            return -1;
+        }
+
+        /// <summary>주먹이 끝나면 상체를 Base Layer 에 돌려준다 — 안 돌리면 마지막 포즈가 남는다.</summary>
+        void ReleasePunchLayer(bool immediate = false)
+        {
+            int layer = PunchLayer();
+            if (layer <= 0 || _animator == null) return;
+            _punchWeightTarget = 0f;
+            if (immediate)
+            {
+                // 0.05 초라도 섞으면 주먹의 마지막 포즈가 다음 동작 첫 프레임에 겹쳐 뒤엉켜 보인다
+                // (망치 스윙 중 주먹, 사용자 영상 2026-09-16). 가중치와 상태를 같은 프레임에 끊는다.
+                _animator.SetLayerWeight(layer, 0f);
+                _animator.Play("Empty", layer, 0f);
+                return;
+            }
+            var cur = _animator.GetCurrentAnimatorStateInfo(layer);
+            if (cur.shortNameHash == EmptyStateHash) return;
+            _animator.CrossFadeInFixedTime("Empty", PunchFade, layer, 0f);
+        }
+
+        static readonly int EmptyStateHash = Animator.StringToHash("Empty");
+
+        /// <summary>주먹 레이어 목표 가중치. 0 이면 상체를 Base Layer 에 완전히 돌려준 상태다.</summary>
+        float _punchWeightTarget;
+
+        /// <summary>
+        /// 주먹 레이어 가중치를 목표로 옮긴다. 끝나는 순간 0 으로 뚝 떨어뜨리면 상체가 튀므로
+        /// 짧게 내린다. 올릴 때는 즉시다 — 주먹은 첫 프레임부터 보여야 한다.
+        /// </summary>
+        void UpdatePunchLayerWeight()
+        {
+            if (_animator == null) return;
+            int layer = PunchLayer();
+            if (layer <= 0) return;
+            float now = _animator.GetLayerWeight(layer);
+            if (Mathf.Approximately(now, _punchWeightTarget)) return;
+            _animator.SetLayerWeight(layer, Mathf.MoveTowards(now, _punchWeightTarget, Time.deltaTime * 10f));
         }
 
         // 나올 때의 블렌드 길이를 정하려면 직전 상태를 알아야 한다 (착지 처리).

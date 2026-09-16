@@ -69,6 +69,7 @@ public class User {
     public String getNickname() { return nickname; }
     public AccountStatus getStatus() { return status; }
     public String getAccountType() { return accountType; }
+    public Instant getCreatedAt() { return createdAt; }
 
     /** Whether this account may use the admin API at all. A master is an admin too. */
     public boolean isAdmin() { return ADMIN.equals(accountType); }

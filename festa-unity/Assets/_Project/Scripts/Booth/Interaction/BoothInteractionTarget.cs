@@ -24,6 +24,10 @@ namespace Festa.Booth
         [Tooltip("발광 세기 — 너무 높이면 재질 색이 날아가 형태를 알아볼 수 없다.")]
         [SerializeField, Range(0.1f, 3f)] float _highlightStrength = 0.9f;
 
+        [Tooltip("거리 판정에 사용할 실물 루트. 비우면 이 오브젝트 전체를 사용한다. 테이블 위 노트북처럼 " +
+                 "상호작용 물체와 받침 가구가 한 프리팹인 경우 노트북 루트를 지정한다.")]
+        [SerializeField] Transform _interactionBoundsRoot;
+
         readonly List<Renderer> _renderers = new();
         bool _highlighted;
 
@@ -33,7 +37,12 @@ namespace Festa.Booth
         // 스스로 등록·해제한다. 월드 전체 대상은 수십 개 규모라 선형 탐색로 충분하다.
         public static readonly List<BoothInteractionTarget> Active = new();
 
-        void OnEnable() => Active.Add(this);
+        void OnEnable()
+        {
+            // Enter Play Mode Options에서 도메인 리로드를 끄거나 오브젝트를 재활성화해도
+            // 같은 대상이 중복 등록되지 않게 한다. 중복 항목은 한 번의 OnDisable로 다 빠지지 않는다.
+            if (!Active.Contains(this)) Active.Add(this);
+        }
         void OnDisable() => Active.Remove(this);
 
         public float MaxDistance => _maxDistance;
@@ -108,10 +117,11 @@ namespace Festa.Booth
         /// <summary>콜라이더 우선, 없으면 렌더러로 만든 월드 바운즈. 트랜스폼이 그대로면 캐시를 쓴다.</summary>
         Bounds? WorldBounds()
         {
-            var m = transform.localToWorldMatrix;
+            var boundsRoot = _interactionBoundsRoot != null ? _interactionBoundsRoot : transform;
+            var m = boundsRoot.localToWorldMatrix;
             if (_boundsValid && m == _boundsMatrix) return _cachedBounds;
 
-            _cachedBounds = ComputeWorldBounds();
+            _cachedBounds = ComputeWorldBounds(boundsRoot);
             _boundsMatrix = m;
             _boundsValid = true;
             return _cachedBounds;
@@ -120,16 +130,16 @@ namespace Festa.Booth
         /// <summary>레이아웃 재적용처럼 **자식 구성이 바뀐** 경우 호출한다 — 트랜스폼 비교로는 못 잡는다.</summary>
         public void InvalidateBounds() => _boundsValid = false;
 
-        Bounds? ComputeWorldBounds()
+        Bounds? ComputeWorldBounds(Transform boundsRoot)
         {
             Bounds? acc = null;
-            foreach (var c in GetComponentsInChildren<Collider>(true))
+            foreach (var c in boundsRoot.GetComponentsInChildren<Collider>(true))
             {
                 if (c == null || c.isTrigger) continue;
                 if (acc == null) acc = c.bounds; else { var v = acc.Value; v.Encapsulate(c.bounds); acc = v; }
             }
             if (acc != null) return acc;
-            foreach (var r in GetComponentsInChildren<Renderer>(true))
+            foreach (var r in boundsRoot.GetComponentsInChildren<Renderer>(true))
             {
                 if (r == null) continue;
                 if (acc == null) acc = r.bounds; else { var v = acc.Value; v.Encapsulate(r.bounds); acc = v; }
@@ -234,11 +244,24 @@ namespace Festa.Booth
         /// <summary>외곽선을 걸 트랜스폼을 코드에서 정한다(팩토리·씬 배치 양쪽).</summary>
         public void SetHighlightRoot(Transform root) => _highlightRoot = root;
 
+        /// <summary>거리 판정에 사용할 실물 루트를 정한다. 지정 즉시 월드 바운즈 캐시를 버린다.</summary>
+        public void SetInteractionBoundsRoot(Transform root)
+        {
+            _interactionBoundsRoot = root;
+            InvalidateBounds();
+        }
+
         void ApplyHighlightMaterials()
             => _outline.Show(_highlightRoot != null ? _highlightRoot : transform, _highlightColor, _outlineWidth);
 
         void RestoreMaterials() => _outline.Hide();
 
-        void OnDestroy() => _outline.Dispose();
+        void OnDestroy()
+        {
+            // Destroy는 프레임 끝에 처리된다. 도메인 리로드 설정과 관계없이 정적 레지스트리에
+            // 파괴된 대상이 남지 않게 마지막 방어선을 둔다.
+            Active.Remove(this);
+            _outline.Dispose();
+        }
     }
 }
