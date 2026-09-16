@@ -3,7 +3,7 @@
 // 존재하는 endpoint 는 그대로 부르고, BE 가 아직 없는 것은 types.ts 의 [FE contract] 경로를 부른다.
 // 그 호출은 지금 404 로 떨어지고 화면은 오류 상태를 그린다 — BE 가 그 경로를 채우면 여기서 바꿀 것이 없다.
 // 응답 모양이 다르게 오면 이 파일의 매핑만 고친다.
-import { api } from '../../shared/api/client';
+import { api, isApiError } from '../../shared/api/client';
 import type { MyAccountResponse } from '../user/types';
 import type { SlotView } from '../booth/types';
 import type { EventSurveyRunWire } from '../survey/types';
@@ -32,10 +32,34 @@ const q = (s: string) => encodeURIComponent(s);
 /** 공식 이벤트 설문 key. 목록 API 가 없어 알려진 key 를 들고 있다 — BE 가 목록을 주면 이 상수를 지운다 */
 export const KNOWN_EVENT_SURVEY_KEYS = ['SSAFESTA_2026'] as const;
 
+/**
+ * 내가 관리자인가 — **관리자 API 에 직접 물어서** 답한다.
+ *
+ * `/users/me` 에는 이 답이 없다. 토큰의 `role` 도 관리자가 `MEMBER` 라(AdminGuard 의 의도된 설계)
+ * FE 가 스스로 알 길이 없어서, `GET /admin/admins` 의 응답 자체를 근거로 쓴다 — 그 경로는
+ * `AdminGuard.requireAdmin` 뒤에 있으므로 **200 이 온 것이 곧 관리자라는 서버 판정**이다.
+ *
+ * 회원 목록을 상시 긁지 않는다: 이 질의는 콘솔 가드와 진입 링크만 부르고, 관리자가 아니면 403 한 번으로
+ * 끝난다. 403 은 401 인터셉트를 타지 않아 refresh 를 건드리지 않는다.
+ *
+ * `master` 는 그 목록에서 내 행을 찾아 읽는다. 목록에 내가 없어도(있을 수 없지만) 200 을 받은 사실은
+ * 그대로 유효해 `admin` 은 참으로 둔다 — 판정의 근거는 목록이 아니라 서버가 통과시켰다는 것이다.
+ *
+ * `/users/me` 가 나중에 `admin`·`master` 를 실어 주면 그 값을 먼저 읽는다(`#217` 1번). 그때 이 왕복은
+ * 사라진다.
+ */
 async function getCapability(): Promise<AdminCapability> {
-  // [FE contract] admin·master 가 오면 읽고, 없으면 false. 없다고 관리자로 가정하지 않는다.
   const me = await api<MyAccountResponse & { admin?: unknown; master?: unknown }>('/api/v1/users/me');
-  return { admin: me.admin === true, master: me.master === true };
+  if (typeof me.admin === 'boolean') return { admin: me.admin, master: me.master === true };
+  try {
+    const admins = await listAdmins();
+    return { admin: true, master: admins.find((a) => a.userId === me.userId)?.master === true };
+  } catch (error) {
+    // 403 은 "관리자가 아니다" 라는 정상 답이다(FORBIDDEN·MEMBER_ONLY). 그 밖의 실패는 판정 불가라 던진다 —
+    // 서버가 죽었는데 조용히 false 로 접으면 관리자에게 "권한 없음" 을 보여 주게 된다.
+    if (isApiError(error) && error.status === 403) return { admin: false, master: false };
+    throw error;
+  }
 }
 
 function listAdmins(): Promise<AdminView[]> {
