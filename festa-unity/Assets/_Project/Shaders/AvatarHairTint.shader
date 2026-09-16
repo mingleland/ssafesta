@@ -65,8 +65,12 @@ Shader "Festa/Avatar/HairTint"
                 Light mainLight=GetMainLight();
                 half ndotl=saturate(dot(normalize(input.normalWS),mainLight.direction));
                 half lighting=.70h+.30h*ndotl;
-                // 벤더 RGB 맵은 다발의 음영을 담는다 — 염색 색과 곱해 결을 살린다.
-                half3 detail=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,input.uv).rgb;
+                // 벤더의 Hair RGB Map은 완성된 알베도가 아니라 색상 영역 마스크다.
+                // 대부분 R 채널에만 값이 있어서 RGB를 선택 색과 채널별로 곱하면
+                // 초록/파랑처럼 R이 낮은 색은 검게 사라진다. 가장 강한 채널을
+                // 명암으로 사용하면 원본 결은 유지하면서 선택한 색조를 보존한다.
+                half3 mask=SAMPLE_TEXTURE2D(_BaseMap,sampler_BaseMap,input.uv).rgb;
+                half detail=max(mask.r,max(mask.g,mask.b));
                 return half4(detail*_BaseColor.rgb*lighting,1.0h);
             }
             ENDHLSL

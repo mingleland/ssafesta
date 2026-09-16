@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: a0c18e3ffb8abcd4a974691b8c6b398f
+timeCreated: 1507768097
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Prefabs/Truss/TrussHorizontal.prefab
+  uploadId: 237227

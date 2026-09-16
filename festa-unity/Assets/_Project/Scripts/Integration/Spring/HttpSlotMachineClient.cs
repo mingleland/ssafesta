@@ -6,13 +6,22 @@ using UnityEngine.Networking;
 namespace Festa.Integration
 {
     /// <summary>
-    /// <c>POST /api/v1/minigames/slot-machines/{machineId}/spins</c> — GitLab #134 §1 에 게시한 제안 계약 (S15P21A604-439).
+    /// <c>POST /api/v1/minigames/slot-machines/{machineId}/spins</c> — GitLab #134 §1 제안 → <b>#205 에서 확정</b> (S15P21A604-439).
     ///
-    /// <para>BE 가 아직 이 경로를 만들지 않았다(2026-09-06 로컬 Spring: <c>404 NOT_FOUND</c>). 그래서 이 클라이언트는
-    /// 404·405 를 <see cref="EndpointMissing"/> 오류 코드로 **구분해** 돌려준다 — <see cref="ServerFirstSlotMachineClient"/> 가
-    /// 그 경우에만 체험판(Mock)으로 넘긴다. 다른 실패(401·409·5xx·네트워크)는 그대로 표면화한다 (T-24).</para>
+    /// <code>
+    /// → 200 { sessionId, bet, payout, tier(0~3), balanceAfter }
+    /// → 400 VALIDATION_FAILED       bet 이 서버 설정값(10)과 다르다
+    /// → 403 MEMBER_ONLY             게스트
+    /// → 404 SLOT_MACHINE_NOT_FOUND  모르는 machineId (서버는 살아 있다 — Mock 폴백 금지)
+    /// → 409 INSUFFICIENT_COIN { balance }
+    /// </code>
     ///
-    /// <para>필드명이 BE 확정 계약과 다르면 이 파일의 DTO 매핑만 고친다 — 게임 파트는 BE 계약을 우선한다.</para>
+    /// <para>BE 가 경로를 아직 배포하지 않았을 때(본문에 오류 <c>code</c> 가 없는 404·405)만 <see cref="EndpointMissing"/> 으로
+    /// 돌려준다 — <see cref="ServerFirstSlotMachineClient"/> 가 그 경우에만 체험판(Mock)으로 넘긴다. 확정 계약의
+    /// <c>404 SLOT_MACHINE_NOT_FOUND</c> 는 서버가 멀쩡한데 machineId 를 모르는 것이라 폴백하지 않고 표면화한다
+    /// (타이밍 스톱 <see cref="HttpGameResultClient"/> 와 같은 규칙). 다른 실패(401·409·5xx·네트워크)도 그대로 표면화한다 (T-24).</para>
+    ///
+    /// <para>응답 필드는 #205 확정 계약과 같다. 바뀌면 이 파일의 DTO 매핑만 고친다 — 게임 파트는 BE 계약을 우선한다.</para>
     /// </summary>
     public sealed class HttpSlotMachineClient : ISlotMachineClient
     {
@@ -84,8 +93,22 @@ namespace Festa.Integration
                     }
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 404 || request.responseCode == 405:
-                    // BE 가 아직 경로를 만들지 않았다. 호출자가 체험판으로 넘길지 결정한다.
+                    // 404 는 두 뜻이다 (#205 확정). 본문 code 로 가른다 — 전역 오류 봉투 { code, message, ... } 는 code 가 항상 있다.
+                    //   · SLOT_MACHINE_NOT_FOUND → 서버는 살아 있고 machineId 를 모른다 → 표면화, Mock 폴백 금지
+                    //   · code 없음              → 경로 미배포 → EndpointMissing (호출자가 체험판으로 넘길지 결정)
+                    var code404 = ParseCode(body);
+                    if (!string.IsNullOrEmpty(code404))
+                    {
+                        fail.error = code404;
+                        Debug.LogError($"[HttpSlotMachine] 404 {code404} — 서버가 machineId '{machineId}' 를 모른다. 씬 machineId 와 서버 화이트리스트를 맞춰라.");
+                        return fail;
+                    }
                     fail.error = EndpointMissing;
+                    return fail;
+
+                case UnityWebRequest.Result.ProtocolError when request.responseCode == 400:
+                    fail.error = "VALIDATION_FAILED";
+                    Debug.LogError($"[HttpSlotMachine] 400 — 베팅액이 서버 설정과 다르다 (bet={bet}): {body}");
                     return fail;
 
                 case UnityWebRequest.Result.ProtocolError when request.responseCode == 409:
@@ -126,6 +149,13 @@ namespace Festa.Integration
             if (string.IsNullOrEmpty(body)) return -1;
             try { return JsonUtility.FromJson<ErrorBody>(body)?.balance ?? -1; }
             catch { return -1; }
+        }
+
+        static string ParseCode(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return null;
+            try { return JsonUtility.FromJson<ErrorBody>(body)?.code; }
+            catch { return null; }
         }
     }
 

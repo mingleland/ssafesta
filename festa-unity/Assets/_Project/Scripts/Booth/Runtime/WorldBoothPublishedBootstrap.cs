@@ -40,6 +40,12 @@ namespace Festa.Booth
         public static event System.Action BoothsRebuilt;
 
         /// <summary>
+        /// 슬롯의 실제 게시 레이아웃이 적용된 직후 알린다. 씬에 직접 배치한 전시 오브젝트가
+        /// 같은 boothId/objectId/configId를 받아 FE 이벤트 계약에 참여할 때 쓴다.
+        /// </summary>
+        public static event System.Action<int, BoothLayoutDto> PublishedLayoutApplied;
+
+        /// <summary>
         /// 아직 못 채운 방만 다시 시도하는 주기. 조회가 한 번 실패하면 그 방은 세션 내내
         /// <see cref="BoothRuntime.IsLoaded"/> false 로 남아, 실제로는 게시돼 있는 부스인데도 포털이
         /// "아직 준비 중" 으로 막았다 (2026-09-08 조사). 채워진 방은 다시 부르지 않으므로
@@ -89,11 +95,27 @@ namespace Festa.Booth
             try
             {
                 var layout = await Festa.Integration.ApiServices.Booth.GetPublishedLayoutBySlotAsync(slotId);
-                if (layout == null || target == null) return;
+                if (target == null) return;
+                if (layout == null)
+                {
+                    // 서버가 "게시본 없음" 을 **확정**으로 답했고(404 미게시·409 임대 만료·반납 — 네트워크 실패가 아님)
+                    // 이 칸이 아직 지어져 있으면 임차인이 반납한 것이다 (GitLab #199, S15P21A604-735).
+                    // 내부를 비우고 IsLoaded 를 내려야 BoothVacancyPresenter 가 직원·조명·포털을 끈다 —
+                    // 종전에는 여기서 그냥 돌아가 새로고침 전까지 "임대 중" 모습이 남았다.
+                    if (target.IsLoaded && !PublishedSlotResolution.NeedsRetry(slotId))
+                    {
+                        target.Clear();
+                        s_appliedSignature.Remove(slotId);
+                        Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본이 사라짐(반납·만료) → 내부 비움, 빈 칸으로 전환");
+                        BoothsRebuilt?.Invoke();
+                    }
+                    return;
+                }
                 string sig = Signature(layout);
                 if (s_appliedSignature.TryGetValue(slotId, out var prev) && prev == sig) return;   // 변화 없음
                 target.Rebuild(layout);
                 s_appliedSignature[slotId] = sig;
+                PublishedLayoutApplied?.Invoke(slotId, layout);
                 Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본 변경 감지 → 다시 지음 (v{layout.version}, 오브젝트 {layout.objects?.Length ?? 0})");
                 BoothsRebuilt?.Invoke();
             }
@@ -179,6 +201,7 @@ namespace Festa.Booth
                     if (runtime == null) continue;             // 씬 전환으로 파괴된 앵커
                     runtime.Rebuild(layout);
                     s_appliedSignature[slotId] = Signature(layout);   // 첫 입장 때 같은 것을 다시 짓지 않게
+                    PublishedLayoutApplied?.Invoke(slotId, layout);
                     built++;
                 }
                 Debug.Log($"[WorldBoothPublishedBootstrap] {slotIds.Count}실 중 {built}실 게시 렌더, 나머지는 기본 프레임");
