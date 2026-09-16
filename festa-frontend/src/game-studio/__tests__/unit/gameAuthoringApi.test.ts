@@ -3,6 +3,7 @@ import type { GameApiRequest } from '../../runtime/ports/publishedGameRepository
 import {
   createApiGameDraftRepository,
   createApiGamePublisher,
+  createApiGameVisibilityPort,
   normalizeGameAuthoringError,
 } from '../../studio/ports/gameAuthoringApi.ts';
 import { cloneMinimalGameProject } from '../fixtures/minimalGameProject.ts';
@@ -81,5 +82,39 @@ describe('Game authoring API adapter', () => {
     const result = await createApiGamePublisher(request).publish(123, 8);
     expect(body).toEqual({ expectedRevision: 8 });
     expect(result).toMatchObject({ gameId: 123, publishedVersion: 4, warnings: ['확인'] });
+  });
+
+  // S15P21A604-701 — 단건 조회 API가 없어 /mine 목록에서 찾는다. 여러 게임 중 정확히
+  // 요청한 gameId를 골라내는지가 핵심 회귀 지점이다.
+  it('finds the matching game in /mine and reads its visibility', async () => {
+    const request: GameApiRequest = async <T>(): Promise<T> => ({
+      games: [
+        { gameId: 1, title: 'A', visibility: 'PRIVATE', publishedVersion: null, updatedAt: 't', deletedAt: null },
+        { gameId: 701, title: 'B', visibility: 'PUBLIC', publishedVersion: 2, updatedAt: 't', deletedAt: null },
+      ],
+    } as T);
+    await expect(createApiGameVisibilityPort(request).get(701)).resolves.toEqual({ gameId: 701, visibility: 'PUBLIC' });
+  });
+
+  it('rejects with GAME_NOT_FOUND when the game is missing from /mine', async () => {
+    const request: GameApiRequest = async <T>(): Promise<T> => ({ games: [] } as T);
+    await expect(createApiGameVisibilityPort(request).get(701)).rejects.toMatchObject({ code: 'GAME_NOT_FOUND' });
+  });
+
+  it('sends the requested visibility via PATCH and returns the server value', async () => {
+    let path: string | undefined;
+    let body: unknown;
+    const request: GameApiRequest = async <T>(
+      requestedPath: string,
+      init?: Parameters<GameApiRequest>[1],
+    ): Promise<T> => {
+      path = requestedPath;
+      body = JSON.parse(String(init?.body));
+      return { gameId: 701, title: 'B', visibility: 'PUBLIC', publishedVersion: 2, updatedAt: 't', deletedAt: null } as T;
+    };
+    const result = await createApiGameVisibilityPort(request).set(701, 'PUBLIC');
+    expect(path).toBe('/api/v1/games/701');
+    expect(body).toEqual({ visibility: 'PUBLIC' });
+    expect(result).toEqual({ gameId: 701, visibility: 'PUBLIC' });
   });
 });

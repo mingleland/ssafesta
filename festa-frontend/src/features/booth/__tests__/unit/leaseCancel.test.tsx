@@ -79,7 +79,8 @@ async function renderOverlay() {
 }
 
 async function openCancelDialog() {
-  fireEvent.click(await screen.findByRole('button', { name: '부스 반납하기' }));
+  // 반납 행은 제목+부제가 한 버튼이라(-817) 접근 이름이 문장으로 길다 — 앞부분만 본다
+  fireEvent.click(await screen.findByRole('button', { name: /^부스 반납하기/ }));
   return screen.findByRole('button', { name: '반납하기' });
 }
 
@@ -87,7 +88,7 @@ describe('부스 반납 (-753)', () => {
   it('확인 모달을 거치기 전에는 요청이 나가지 않는다', async () => {
     await renderOverlay();
 
-    fireEvent.click(await screen.findByRole('button', { name: '부스 반납하기' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^부스 반납하기/ }));
 
     expect(cancelMyLease).not.toHaveBeenCalled();
   });

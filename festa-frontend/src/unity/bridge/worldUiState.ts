@@ -21,10 +21,18 @@ export interface WorldUiState {
   focus: boolean;
   /** Unity 자체 미니게임 HUD 활성 — `TimerStopGameHud`. 초점 없이도 열려 `focus` 로 유도되지 않는다 */
   minigame: boolean;
+  /**
+   * 월드 안 아바타 커스터마이징 화면 활성 (S15P21A604-820, GitLab #197).
+   *
+   * `CharacterLobby` 씬을 additive 로 얹어 여는 것이라 월드·NGO·Player 는 그대로 살아 있다.
+   * FE 에게는 `'world'` 로 보이므로, 이 필드가 없으면 ESC 가 아바타 화면 위에 GameMenu 를
+   * 연다 — `focus`·`minigame` 을 여기 둔 것과 같은 이유다.
+   */
+  avatar: boolean;
 }
 
 // 신호가 오기 전의 값. Unity 가 이 채널을 아직 안 보내도 FE 는 예전과 똑같이 동작한다.
-const NONE: WorldUiState = Object.freeze({ focus: false, minigame: false });
+const NONE: WorldUiState = Object.freeze({ focus: false, minigame: false, avatar: false });
 
 let state: WorldUiState = NONE;
 const listeners = new Set<() => void>();
@@ -47,7 +55,7 @@ export function subscribeWorldUiState(listener: () => void): () => void {
 
 /** Unity 모달이 하나라도 떠 있는가 — ESC 중재가 쓰는 유일한 판정. */
 export function hasUnityModal(snapshot: WorldUiState = state): boolean {
-  return snapshot.focus || snapshot.minigame;
+  return snapshot.focus || snapshot.minigame || snapshot.avatar;
 }
 
 /**
@@ -83,9 +91,12 @@ export function applyWorldUiStateJson(json: string): void {
   const next: WorldUiState = {
     focus: readFlag(raw.focus, state.focus, 'focus'),
     minigame: readFlag(raw.minigame, state.minigame, 'minigame'),
+    avatar: readFlag(raw.avatar, state.avatar, 'avatar'),
   };
 
-  if (next.focus === state.focus && next.minigame === state.minigame) return;
+  if (next.focus === state.focus && next.minigame === state.minigame && next.avatar === state.avatar) {
+    return;
+  }
   state = next;
   emit();
 }
