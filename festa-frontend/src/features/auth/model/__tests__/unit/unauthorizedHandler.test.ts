@@ -108,3 +108,73 @@ describe('anonymous', () => {
     expect(refreshMock).not.toHaveBeenCalled();
   });
 });
+
+// 실패 원인을 남긴다 (S15P21A604-819, GitLab #211). 강제 로그아웃이 났을 때 서버 오류 코드가
+// 어디에도 안 남아 INVALID_MEMBER_TOKEN 과 REFRESH_TOKEN_ROTATED 를 가를 수 없던 자리.
+describe('refresh 실패 진단', () => {
+  function captureWarn() {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    return () => warn.mock.calls.map((c) => String(c[0])).join('\n');
+  }
+
+  it('ApiError 면 code·status·requestId 와 AT 보유 여부를 남긴다', async () => {
+    const lines = captureWarn();
+    setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
+    refreshMock.mockRejectedValue({
+      code: 'INVALID_MEMBER_TOKEN',
+      message: '로그인이 필요합니다.',
+      status: 401,
+      requestId: 'req-42',
+      errors: [],
+      warnings: [],
+    });
+
+    expect(await handleUnauthorized()).toBe(false);
+
+    const text = lines();
+    expect(text).toMatch(/refresh 실패 \(최초\)/);
+    expect(text).toMatch(/INVALID_MEMBER_TOKEN \(401\): 로그인이 필요합니다\./);
+    expect(text).toMatch(/requestId=req-42/);
+    expect(text).toMatch(/hasAccessToken=true/);
+    // 토큰 값은 절대 남기지 않는다 (헌법 13조·15조)
+    expect(text).not.toContain('at-old');
+    vi.restoreAllMocks();
+  });
+
+  it('회전 재시도 실패는 최초 실패와 다른 지점으로 구분되어 남는다', async () => {
+    const lines = captureWarn();
+    setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
+    refreshMock.mockRejectedValue({ code: 'REFRESH_TOKEN_ROTATED', message: 'x', status: 401, errors: [], warnings: [] });
+
+    expect(await handleUnauthorized()).toBe(false);
+
+    const text = lines();
+    expect(text).toMatch(/refresh 실패 \(회전 재시도\)/);
+    expect(text).not.toMatch(/refresh 실패 \(최초\)/);
+    vi.restoreAllMocks();
+  });
+
+  it('오류 봉투가 아닌 실패(네트워크·타임아웃)도 같은 형식으로 남는다', async () => {
+    const lines = captureWarn();
+    setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
+    refreshMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    expect(await handleUnauthorized()).toBe(false);
+
+    expect(lines()).toMatch(/refresh 실패 \(최초\) — Failed to fetch · hasAccessToken=true/);
+    vi.restoreAllMocks();
+  });
+
+  it('회전 재시도가 성공하면 아무것도 남기지 않는다 — 정상 경로는 조용하다', async () => {
+    const lines = captureWarn();
+    setMemberSession('at-old', '2026-01-01T00:00:00.000Z');
+    refreshMock
+      .mockRejectedValueOnce({ code: 'REFRESH_TOKEN_ROTATED', message: 'x', status: 401, errors: [], warnings: [] })
+      .mockResolvedValueOnce({ accessToken: 'at-new', expiresAt: '2026-01-01T01:00:00.000Z' });
+
+    expect(await handleUnauthorized()).toBe(true);
+
+    expect(lines()).toBe('');
+    vi.restoreAllMocks();
+  });
+});
