@@ -1,6 +1,7 @@
 package com.example.ssafesta.booth;
 
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
+import static com.example.ssafesta.booth.BoothLayoutTestSupport.publishLayout;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.saveRequest;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,6 +46,10 @@ class AdminBoothAccessIntegrationTest {
     @BeforeEach
     void freeSlots() {
         BoothTestSupport.releaseAllSlots(jdbc);
+        // Spring's shared test context keeps the previous test's users. The production partial
+        // unique index deliberately permits one master only, so each scenario must start without
+        // the master it may create itself.
+        jdbc.update("UPDATE users SET is_master=FALSE WHERE is_master=TRUE");
     }
 
     @Test
@@ -119,6 +124,63 @@ class AdminBoothAccessIntegrationTest {
                 .andExpect(jsonPath("$.code").value("BOOTH_EDITOR_FORBIDDEN"));
     }
 
+    @Test
+    void administratorCanUnpublishWithoutDeletingTheDraftOrHistoryAndReplayIsNoOp() throws Exception {
+        Owner owner = leasedOwner("비공개대상");
+        Long administrator = administrator("비공개운영자");
+        publishLayout(mockMvc, owner.boothId(), bearer(owner.userId()));
+
+        mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", owner.boothId())
+                        .header("Authorization", bearer(administrator))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"운영상 비공개\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/booths/{id}/layouts/published", owner.boothId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("LAYOUT_NOT_PUBLISHED"));
+        org.junit.jupiter.api.Assertions.assertEquals(1, count("booth_layout_drafts", "booth_id", owner.boothId()));
+        org.junit.jupiter.api.Assertions.assertEquals(1,
+                count("booth_layout_published_versions", "booth_id", owner.boothId()));
+        assertActionCount(administrator, "BOOTH_UNPUBLISH", owner.boothId(), 1);
+
+        mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", owner.boothId())
+                        .header("Authorization", bearer(administrator))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"재시도\"}"))
+                .andExpect(status().isNoContent());
+        assertActionCount(administrator, "BOOTH_UNPUBLISH", owner.boothId(), 1);
+    }
+
+    @Test
+    void ordinaryMemberAndMasterProtectionCannotUseForcedUnpublish() throws Exception {
+        Owner owner = leasedOwner("비공개권한");
+        publishLayout(mockMvc, owner.boothId(), bearer(owner.userId()));
+        Long ordinary = createMemberWithWallet(users, wallets, "일반회원");
+
+        mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", owner.boothId())
+                        .header("Authorization", bearer(ordinary))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"권한없음\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        Owner master = leasedOwner("비공개마스터");
+        publishLayout(mockMvc, master.boothId(), bearer(master.userId()));
+        jdbc.update("UPDATE users SET account_type='ADMIN', is_master=TRUE WHERE id=?", master.userId());
+        Long administrator = administrator("다른비공개운영자");
+
+        mockMvc.perform(post("/api/v1/admin/booths/{id}/unpublish", master.boothId())
+                        .header("Authorization", bearer(administrator))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"마스터대상\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("MASTER_PROTECTED"));
+        mockMvc.perform(get("/api/v1/booths/{id}/layouts/published", master.boothId()))
+                .andExpect(status().isOk());
+        assertActionCount(administrator, "BOOTH_UNPUBLISH", master.boothId(), 0);
+    }
+
     private Owner leasedOwner(String prefix) {
         Long userId = createMemberWithWallet(users, wallets, prefix);
         Long boothId = booths.save(new Booth(userId, prefix + " 부스")).getId();
@@ -137,11 +199,20 @@ class AdminBoothAccessIntegrationTest {
     }
 
     private void assertAuditCount(Long actorUserId, Long boothId, int expected) {
+        assertActionCount(actorUserId, "BOOTH_EDIT", boothId, expected);
+    }
+
+    private void assertActionCount(Long actorUserId, String action, Long boothId, int expected) {
         Integer count = jdbc.queryForObject("""
                 SELECT count(*) FROM admin_actions
-                 WHERE actor_user_id=? AND action='BOOTH_EDIT' AND target_type='BOOTH' AND target_id=?
-                """, Integer.class, actorUserId, boothId);
+                 WHERE actor_user_id=? AND action=? AND target_type='BOOTH' AND target_id=?
+                """, Integer.class, actorUserId, action, boothId);
         org.junit.jupiter.api.Assertions.assertEquals(expected, count);
+    }
+
+    private int count(String table, String column, Long value) {
+        return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE " + column + "=?",
+                Integer.class, value);
     }
 
     private record Owner(Long userId, Long boothId) { }

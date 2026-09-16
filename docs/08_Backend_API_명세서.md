@@ -1634,6 +1634,14 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 관리자가 아닌 회원을 강등하면 아무 일도 없이 `204` 다(요청이 바라는 상태가 이미 참이다). **마지막 관리자는 강등할 수 없다**(`409 ADMIN_LAST_ONE`) — 승격 API 자체가 관리자 전용이라 0명이 되면 API 로 되돌릴 수 없다.
 
+### POST `/admin/booths/{boothId}/unpublish`
+
+부스의 현재 공개 배치 포인터를 즉시 해제한다 (`S15P21A604-742` #40). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+
+Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개 배치 조회만 즉시 `404 LAYOUT_NOT_PUBLISHED`가 되며, 임대·코인·부스 콘텐츠에도 영향을 주지 않는다. 이미 비공개면 `204` no-op이고 감사 행도 더 만들지 않는다. 성공만 `admin_actions`에 `BOOTH_UNPUBLISH`·`BOOTH`·사유를 남긴다.
+
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
+
 **감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
 
 ### 기존 부스 운영 API의 전역 Admin 접근 (S15P21A604-742)
