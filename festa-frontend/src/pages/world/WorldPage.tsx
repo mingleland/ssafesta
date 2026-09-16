@@ -20,7 +20,7 @@ import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
-import { MyInfoOverlay } from '../../features/profile/ui/MyInfoOverlay';
+import { MenuPanelHost } from '../../features/world/ui/MenuPanelHost';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
@@ -44,11 +44,11 @@ import {
   closeBoothManagement,
   closeManagementPanel,
   closeGameMenu,
-  closeMyInfo,
+  closeMenuPanel,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMyInfoScreen } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -233,9 +233,9 @@ export function WorldPage() {
         <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
       )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
-      {ui.gameMenu && <GameMenu onClose={closeGameMenu} onOpenMyInfo={openMyInfoScreen} />}
-      {/* 내 정보 — GameMenu 의 "내 정보"가 연다. 오버레이라 월드 위에 뜬다(페이지 이동 아님) */}
-      {ui.myInfo && <MyInfoOverlay onClose={closeMyInfo} />}
+      {ui.gameMenu && <GameMenu onClose={closeGameMenu} onOpenPanel={openMenuPanelScreen} />}
+      {/* 메뉴의 자식 화면들 — 닫으면 메뉴로 돌아간다(gameClientUi 가 메뉴를 켜 둔 채로 둔다) */}
+      {ui.menuPanel !== null && <MenuPanelHost panel={ui.menuPanel} onClose={closeMenuPanel} />}
     </div>
   );
 }
