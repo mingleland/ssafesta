@@ -89,7 +89,22 @@ namespace Festa.Booth
             try
             {
                 var layout = await Festa.Integration.ApiServices.Booth.GetPublishedLayoutBySlotAsync(slotId);
-                if (layout == null || target == null) return;
+                if (target == null) return;
+                if (layout == null)
+                {
+                    // 서버가 "게시본 없음" 을 **확정**으로 답했고(404 미게시·409 임대 만료·반납 — 네트워크 실패가 아님)
+                    // 이 칸이 아직 지어져 있으면 임차인이 반납한 것이다 (GitLab #199, S15P21A604-735).
+                    // 내부를 비우고 IsLoaded 를 내려야 BoothVacancyPresenter 가 직원·조명·포털을 끈다 —
+                    // 종전에는 여기서 그냥 돌아가 새로고침 전까지 "임대 중" 모습이 남았다.
+                    if (target.IsLoaded && !PublishedSlotResolution.NeedsRetry(slotId))
+                    {
+                        target.Clear();
+                        s_appliedSignature.Remove(slotId);
+                        Debug.Log($"[WorldBoothPublishedBootstrap] 슬롯 {slotId} 게시본이 사라짐(반납·만료) → 내부 비움, 빈 칸으로 전환");
+                        BoothsRebuilt?.Invoke();
+                    }
+                    return;
+                }
                 string sig = Signature(layout);
                 if (s_appliedSignature.TryGetValue(slotId, out var prev) && prev == sig) return;   // 변화 없음
                 target.Rebuild(layout);
