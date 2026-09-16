@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,6 +19,7 @@ import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.user.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -664,6 +666,105 @@ class GameAssetApiIntegrationTest {
                 start(owner, 64).get("assetId").asText());
     }
 
+    // ── 삭제 (contract §7) ────────────────────────────────────────────────
+
+    /** Soft delete: the row moves, the object does not. */
+    @Test
+    void deletingAnUnreferencedAssetSoftDeletesTheRowAndKeepsTheObject() throws Exception {
+        Owner owner = owner("삭제");
+        Uploaded uploaded = upload(owner, png(8, 8));
+
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId()))
+                .andExpect(status().isNoContent());
+
+        assertTrue(isDeleted(owner, uploaded.assetId()), "deleted_at 이 세팅되지 않았다");
+        assertTrue(storage.hasObject(objectKey(owner.gameId(), uploaded.assetId())),
+                "soft delete 인데 객체가 지워졌다 — Published 가 참조할 수 있다(§7)");
+    }
+
+    /**
+     * Being named in the registry is not "in use" — every registered asset names itself there, so
+     * treating that alone as usage would make every asset permanently undeletable without
+     * {@code force}. This is the exact shape a plain substring-over-the-whole-Draft check gets wrong,
+     * and the one manual QA caught against the real stack before this test existed.
+     */
+    @Test
+    void anAssetRegisteredButNotPlacedAnywhereIsNotInUse() throws Exception {
+        Owner owner = owner("등록만");
+        Uploaded uploaded = upload(owner, png(8, 8));
+        mockMvc.perform(saveDraft(owner, 0, sourced(owner.gameId(), uploaded.source())))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId()))
+                .andExpect(status().isNoContent());
+    }
+
+    /**
+     * The saved Draft actually placing this id is the backstop's whole job — see
+     * {@link GameAssetService#delete}. The FE's own local check (removeAssetReference) is what stops
+     * a normal click from ever reaching this, so this test calls the endpoint directly the way a
+     * bypass or a race would.
+     */
+    @Test
+    void deletingAnAssetTheSavedDraftPlacesIsRefusedWithoutForce() throws Exception {
+        Owner owner = owner("사용중");
+        Uploaded uploaded = upload(owner, png(8, 8));
+        mockMvc.perform(saveDraft(owner, 0, placedAsPlayerSprite(owner.gameId(), uploaded)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_IN_USE"));
+
+        assertFalse(isDeleted(owner, uploaded.assetId()), "거부됐는데 지워졌다");
+    }
+
+    @Test
+    void forceDeletesEvenWhenTheSavedDraftPlacesIt() throws Exception {
+        Owner owner = owner("강제삭제");
+        Uploaded uploaded = upload(owner, png(8, 8));
+        mockMvc.perform(saveDraft(owner, 0, placedAsPlayerSprite(owner.gameId(), uploaded)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId()).param("force", "true"))
+                .andExpect(status().isNoContent());
+
+        assertTrue(isDeleted(owner, uploaded.assetId()));
+    }
+
+    /** "삭제됨" is a state to report, not a success to repeat (§6 — every other GAME_ASSET_* state conflict answers the same way). */
+    @Test
+    void deletingAnAlreadyDeletedAssetIsRefused() throws Exception {
+        Owner owner = owner("재삭제");
+        Uploaded uploaded = upload(owner, png(8, 8));
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId())).andExpect(status().isNoContent());
+
+        mockMvc.perform(deleteRequest(owner, uploaded.assetId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_DELETED"));
+    }
+
+    @Test
+    void aStrangerMayNotDeleteAnAsset() throws Exception {
+        Owner owner = owner("삭제소유자");
+        Owner stranger = owner("삭제남");
+        Uploaded uploaded = upload(owner, png(8, 8));
+
+        mockMvc.perform(delete("/api/v1/games/" + owner.gameId() + "/assets/" + uploaded.assetId())
+                        .header("Authorization", bearerFor(stranger.userId())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GAME_FORBIDDEN"));
+    }
+
+    @Test
+    void deletingAnAssetIdThatWasNeverIssuedIs404() throws Exception {
+        Owner owner = owner("삭제없음");
+
+        mockMvc.perform(deleteRequest(owner, "aNeverIssuedAssetIdentifier"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("GAME_ASSET_NOT_FOUND"));
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────
 
     private Uploaded upload(Owner owner, byte[] image) throws Exception {
@@ -716,6 +817,18 @@ class GameAssetApiIntegrationTest {
                 .header("Authorization", bearerFor(owner.userId()));
     }
 
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder deleteRequest(
+            Owner owner, String assetId) {
+        return delete("/api/v1/games/" + owner.gameId() + "/assets/" + assetId)
+                .header("Authorization", bearerFor(owner.userId()));
+    }
+
+    private boolean isDeleted(Owner owner, String assetId) {
+        return jdbc.queryForObject("""
+                SELECT deleted_at IS NOT NULL FROM game_assets WHERE game_id = ? AND asset_id = ?
+                """, Boolean.class, owner.gameId(), assetId);
+    }
+
     private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder saveDraft(
             Owner owner, int expectedRevision, ObjectNode project) {
         return put("/api/v1/games/" + owner.gameId() + "/draft")
@@ -727,6 +840,22 @@ class GameAssetApiIntegrationTest {
     private ObjectNode sourced(Long gameId, String source) {
         ObjectNode project = GameTestSupport.validProjectFor(gameId);
         ((ObjectNode) project.withArray("assets").get(0)).put("source", source);
+        return project;
+    }
+
+    /**
+     * Registers the uploaded asset under its real id and points the player's {@code SPRITE} component
+     * at that same id — real placement, not just a registry entry (see {@code sourced}, which is only
+     * the latter).
+     */
+    private ObjectNode placedAsPlayerSprite(Long gameId, Uploaded uploaded) {
+        ObjectNode project = GameTestSupport.validProjectFor(gameId);
+        ObjectNode playerImageEntry = (ObjectNode) project.withArray("assets").get(1);
+        playerImageEntry.put("id", uploaded.assetId());
+        playerImageEntry.put("source", uploaded.source());
+        ArrayNode objects = (ArrayNode) project.withArray("scenes").get(0).withArray("objects");
+        ArrayNode playerSpawnComponents = (ArrayNode) objects.get(0).withArray("components");
+        ((ObjectNode) playerSpawnComponents.get(0)).put("assetId", uploaded.assetId());
         return project;
     }
 
