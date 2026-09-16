@@ -82,7 +82,4 @@ public class Wallet {
         apply(-positiveAmount);
     }
 
-    boolean canAfford(int positiveAmount) {
-        return balance >= positiveAmount;
-    }
 }

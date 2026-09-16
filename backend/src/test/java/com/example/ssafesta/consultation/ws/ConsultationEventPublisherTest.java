@@ -84,12 +84,27 @@ class ConsultationEventPublisherTest {
         assertEquals("cancelled", payloadOf(0).get("type"));
     }
 
+    /**
+     * 종료는 <b>양쪽</b>에서 카드를 내린다 — 직원 토픽이 빠지면 방문자가 나간 뒤에도 직원
+     * 화면에 "진행 중" 이 남는다 (GitLab #133, 2026-09-14 FE 확정).
+     */
     @Test
-    void endingTellsTheVisitor() {
-        publisher.ended(42L, 901L);
+    void endingReachesBothSides() {
+        publisher.ended(7L, 42L, 901L);
 
-        assertTrue(destinationOf(0).contains("/queue/consultation"));
-        assertEquals("ended", payloadOf(0).get("type"));
+        assertEquals(2, sent.size(), "직원 토픽과 방문자 양쪽에 가야 합니다.");
+        assertEquals("/topic/booths/7/consultation", destinationOf(0));
+        assertTrue(destinationOf(1).contains("/queue/consultation"),
+                "방문자 개인 큐로 가야 한다. 실제 destination: " + destinationOf(1));
+        for (int side = 0; side < 2; side++) {
+            assertEquals("ended", payloadOf(side).get("type"));
+            assertEquals("901", payloadOf(side).get("requestId"),
+                    "id 는 문자열이다 — 계약이 string 으로 적는다.");
+            assertTrue(payloadOf(side).get("occurredAt") instanceof String,
+                    "재연결 직후 순서를 가르는 값이라 항상 실린다.");
+            assertEquals(3, payloadOf(side).size(),
+                    "추가 필드 없음 — type·requestId·occurredAt 뿐이다 (#133).");
+        }
     }
 
     /** 만료는 양쪽에서 사라진다 — 한쪽만 보내면 남은 화면에 죽은 카드가 남는다. */

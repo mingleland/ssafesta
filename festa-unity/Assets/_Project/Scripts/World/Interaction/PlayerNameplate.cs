@@ -11,9 +11,9 @@ namespace Festa.World
     /// 여러 아바타가 같은 복장으로 서 있을 때 내 캐릭터를 잃지 않게 해준다. 이름표가 머리 위
     /// 작은 외곽선 글자라 실제로 가리는 면적도 없다 (S15P21A604-355).</para>
     ///
-    /// <para>닉네임은 <see cref="Festa.Network.NetworkPlayer.Nickname"/> 이 정본이며 서버가
-    /// 승인된 세션에서만 기록한다 — 클라이언트가 보낸 값을 쓰지 않는다(헌법 16조).
-    /// 값이 늦게 도착할 수 있으므로 변경 이벤트를 구독해 그때 갱신한다.</para>
+    /// <para>최초값은 <see cref="Festa.Network.NetworkPlayer.Nickname"/>이고, 이후 전체 길이 이름은
+    /// <see cref="PlayerAppearanceController.DisplayNickname"/>에서 받는다. 둘 다 서버가 서명된
+    /// world-session으로 기록한다 — 클라이언트가 보낸 문자열을 쓰지 않는다(헌법 16조).</para>
     /// </summary>
     [RequireComponent(typeof(Festa.Network.NetworkPlayer))]
     [DisallowMultipleComponent]
@@ -29,11 +29,13 @@ namespace Festa.World
         [SerializeField] Color _otherColor = new(1f, 0.99f, 0.95f, 1f);       // 흰색
 
         Festa.Network.NetworkPlayer _player;
+        PlayerAppearanceController _appearance;
         WorldNameplate _plate;
 
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<Festa.Network.NetworkPlayer>();
+            _appearance = GetComponent<PlayerAppearanceController>();
 
             _plate = gameObject.GetComponent<WorldNameplate>();
             if (_plate == null) _plate = gameObject.AddComponent<WorldNameplate>();
@@ -41,19 +43,29 @@ namespace Festa.World
             // 본인은 연두, 남은 흰색 — 이름을 읽기 전에 색으로 먼저 구분된다.
             _plate.SetColor(IsOwner ? _ownColor : _otherColor);
 
-            Apply(_player.Nickname.Value);
+            Apply(_appearance != null && _appearance.DisplayNickname.Value.Length > 0
+                ? _appearance.DisplayNickname.Value.ToString()
+                : _player.Nickname.Value.ToString());
             _player.Nickname.OnValueChanged += OnNicknameChanged;
+            if (_appearance != null) _appearance.DisplayNickname.OnValueChanged += OnDisplayNicknameChanged;
         }
 
         public override void OnNetworkDespawn()
         {
             if (_player != null) _player.Nickname.OnValueChanged -= OnNicknameChanged;
+            if (_appearance != null) _appearance.DisplayNickname.OnValueChanged -= OnDisplayNicknameChanged;
         }
 
         void OnNicknameChanged(Unity.Collections.FixedString32Bytes _, Unity.Collections.FixedString32Bytes now)
-            => Apply(now);
+        {
+            // 전체 이름표 값이 있으면 동결된 legacy 필드의 늦은 변경으로 되돌리지 않는다.
+            if (_appearance == null || _appearance.DisplayNickname.Value.Length == 0) Apply(now.ToString());
+        }
 
-        void Apply(Unity.Collections.FixedString32Bytes value)
+        void OnDisplayNicknameChanged(Unity.Collections.FixedString128Bytes _, Unity.Collections.FixedString128Bytes now)
+            => Apply(now.ToString());
+
+        void Apply(string value)
         {
             if (_plate == null) return;
             var text = value.ToString();
