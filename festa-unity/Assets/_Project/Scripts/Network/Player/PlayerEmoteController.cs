@@ -37,10 +37,11 @@ namespace Festa.Network
         /// </summary>
         static readonly PlayerEmoteId[] Punches =
         {
-            // 기존 Punch2(발차기 계열)는 상태에서 빼고, 사용자가 추가한 Punching 클립을
-            // 같은 안정 ID에 연결했다. NetworkPlayer 열거형을 늘리지 않아 동결 네트워크 계약과
-            // 저장된 값은 그대로 유지하면서 화면에는 세 종류 주먹이 순서대로 나온다.
-            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3, PlayerEmoteId.Punch2
+            // **위빙이 섞인 클립은 뺐다** (사용자 지시 2026-09-16). Punch2 에 걸린 Punching 클립은
+            // 재생 구간이 1.28초라 주먹 사이에 상체를 좌우로 흘리는 동작이 들어간다 — 한 대 치는
+            // 것으로 읽히지 않는다. 남긴 둘은 0.33초로 잘라낸 잽이라 위빙이 들어갈 여지가 없다.
+            // 열거형과 애니메이터 상태는 건드리지 않는다 — 동결 네트워크 계약과 저장값을 지킨다.
+            PlayerEmoteId.Punch1, PlayerEmoteId.Punch3
         };
 
         /// <summary>
@@ -50,22 +51,17 @@ namespace Festa.Network
         /// 정해야 하는데, 상태 길이는 크로스페이드가 끝난 뒤에야 읽을 수 있다. 클립을 다시 자르면
         /// 이 값도 같이 고친다.</para>
         /// </summary>
-        static readonly float[] PunchSeconds = { 0.27f, 0.32f, 0.58f };
+        static readonly float[] PunchSeconds = { 0.27f, 0.32f };
 
         /// <summary>마지막 주먹이 끝난 뒤 이 시간 안에 다시 누르면 콤보가 이어진다.</summary>
         const float ComboKeepAlive = 0.8f;
-
-        /// <summary>임팩트는 재생 구간의 이 지점에서 잡는다 — 잘라낸 잽의 피크가 대략 이 위치다.</summary>
-        const float ImpactRatio = 0.45f;
 
         int _comboStep = -1;
         float _comboExpireAt;
         float _punchBusyUntil;
         // 연타를 bool 하나로 기억하면 재생 중 두 번 이상 누른 입력이 하나로 합쳐진다.
-        // 최대 한 사이클(3타)까지 개수로 보관해 누른 만큼 순서대로 이어 친다.
+        // 최대 한 사이클까지 개수로 보관해 누른 만큼 순서대로 이어 친다.
         int _queuedPunches;
-        float _punchImpactAt;
-        PlayerPunchImpact _impact;
 
         NetworkPlayer _player;
         bool _wheelOpen;
@@ -166,13 +162,6 @@ namespace Festa.Network
             // 점프하면 남은 예약을 버린다 — 착지하는 순간 밀린 주먹이 몰아서 터지지 않게.
             if (IsAirborne()) _queuedPunches = 0;
 
-            if (_punchImpactAt > 0f && Time.time >= _punchImpactAt)
-            {
-                _punchImpactAt = 0f;
-                if (_impact == null) _impact = GetComponent<PlayerPunchImpact>();
-                if (_impact != null) _impact.Strike();
-            }
-
             TrackOneShotDuration();
 
             if (_oneShotStopAt > 0f && Time.unscaledTime >= _oneShotStopAt)
@@ -226,18 +215,17 @@ namespace Festa.Network
             return state == PlayerAnimState.Jump || state == PlayerAnimState.JumpLaunch;
         }
 
-        /// <summary>예약·콤보·임팩트를 한꺼번에 버린다. 다른 연출이 끼어들 때 주먹의 잔여 일정이 살아남지 않게 한다.</summary>
+        /// <summary>예약과 콤보를 한꺼번에 버린다. 다른 연출이 끼어들 때 주먹의 잔여 일정이 살아남지 않게 한다.</summary>
         void CancelPendingPunches()
         {
             _queuedPunches = 0;
-            _punchImpactAt = 0f;
             _punchBusyUntil = 0f;
             _comboStep = -1;
             _comboExpireAt = 0f;
         }
 
         /// <summary>
-        /// 콤보 한 대를 친다. 이어서 누르면 1 → 2 → 3 → 1 로 돌고, 끊기면 다시 1 부터다.
+        /// 콤보 한 대를 친다. 이어서 누르면 1 → 2 → 1 로 돌고, 끊기면 다시 1 부터다.
         ///
         /// <para>무작위가 아니라 <b>순서</b>인 이유: 무작위는 같은 동작이 연달아 나올 수 있고, 그러면
         /// 두 번 친 것이 한 번 친 것처럼 보인다. 순서로 돌리면 세 번이 서로 다른 동작이라 콤보로 읽힌다.
@@ -253,7 +241,7 @@ namespace Festa.Network
             float seconds = PunchSeconds[_comboStep];
             _punchBusyUntil = Time.time + seconds;
             _comboExpireAt = _punchBusyUntil + ComboKeepAlive;
-            _punchImpactAt = Time.time + seconds * ImpactRatio;
+            // 피격 밀림은 걷어냈다 (사용자 지시 2026-09-16) — 주먹은 연출이고 남을 움직이지 않는다.
 
             PlayOneShot(Punches[_comboStep]);
         }
