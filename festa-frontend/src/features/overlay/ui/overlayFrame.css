@@ -234,7 +234,9 @@
 
 .ov-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  /* auto-fit(고정: auto-fill 아님) — 아이템 수가 열 수보다 적을 때 빈 트랙이 폭을 잡아먹지
+     않는다. 안 그러면 상품 3개인데 6칸 잡혀서 카드가 왜소해지고 오른쪽이 통째로 빈다(S15P21A604-842) */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
   margin: 0;
   padding: 0;

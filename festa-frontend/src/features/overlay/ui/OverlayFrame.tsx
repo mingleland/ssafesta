@@ -15,10 +15,12 @@ interface Props {
   children: ReactNode;
   footer?: ReactNode;
   status?: ReactNode;
+  /** 제목 옆·닫기 버튼 앞 — 코인 배지처럼 항상 눈에 띄어야 하는 것(S15P21A604-842) */
+  headerAction?: ReactNode;
   onClose: () => void;
 }
 
-export function OverlayFrame({ title, subtitle, size = 'l', icon, children, footer, status, onClose }: Props) {
+export function OverlayFrame({ title, subtitle, size = 'l', icon, children, footer, status, headerAction, onClose }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
 
   // **Esc 리스너를 여기 두지 않는다** (-450, #132). 예전에는 이 프레임도 `window` 에 걸었는데,
@@ -64,6 +66,7 @@ export function OverlayFrame({ title, subtitle, size = 'l', icon, children, foot
             <h2 className="festa-overlay-title">{title}</h2>
             {subtitle !== undefined && <span className="festa-overlay-subtitle">{subtitle}</span>}
           </span>
+          {headerAction}
           <button type="button" className="festa-overlay-close" onClick={onClose} aria-label="닫기">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <path d="M6 6l12 12M18 6L6 18" />

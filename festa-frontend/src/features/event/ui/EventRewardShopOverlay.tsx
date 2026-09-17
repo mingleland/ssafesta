@@ -22,7 +22,7 @@ import { OverlayFrame, OverlayError, OverlayLoading } from '../../overlay/ui/Ove
 import { OverlayNotice } from '../../overlay/ui/OverlayNotice';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
 import { PurchaseResultDialog } from './PurchaseResultDialog';
-import { drawTimeLabel, imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
+import { drawTimeChipLabel, drawTimeLabel, imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 
@@ -149,7 +149,7 @@ export function EventRewardShopOverlay() {
         <>
           <span className="ov-chip ov-chip-coin">{raffle.priceCoin.toLocaleString()} C / 1장</span>
           <span className="ov-chip">{stockLabel(raffle.stock)}</span>
-          <span className="ov-chip">{drawTimeLabel(raffle.drawAt)}</span>
+          <span className="ov-chip">{drawTimeChipLabel(raffle.drawAt)}</span>
         </>
       ),
       action: (
@@ -178,7 +178,7 @@ export function EventRewardShopOverlay() {
       size="xl"
       icon={IcGift}
       onClose={closeOverlay}
-      status={<WalletBadge />}
+      headerAction={<WalletBadge />}
     >
       {prizesQuery.isPending && <OverlayLoading label="경품 목록을 불러오는 중..." />}
       {prizesQuery.isError && <OverlayError title="경품 목록을 불러오지 못했습니다" onRetry={() => void prizesQuery.refetch()} />}
