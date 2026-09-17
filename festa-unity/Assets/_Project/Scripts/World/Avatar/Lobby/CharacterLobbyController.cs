@@ -534,7 +534,20 @@ namespace Festa.Avatar
             _pointerEventData.position = pointer;
             _uiRaycastResults.Clear();
             EventSystem.current.RaycastAll(_pointerEventData, _uiRaycastResults);
-            return _uiRaycastResults.Count == 0;
+
+            // **전체 화면 배경(Backdrop)은 막는 것으로 치지 않는다.**
+            // 배경의 일은 "뒤쪽 UI 를 잘못 누르지 못하게" 지 미리보기를 덮는 것이 아니다.
+            // 특히 구매 창은 아바타가 그 옷을 입은 모습을 보라고 띄우는 창이라 배경을 45% 로 낮추고
+            // 패널도 오른쪽으로 치워 뒀는데, 배경이 레이캐스트를 먹는 바람에 정작 돌려 볼 수가 없었다
+            // (사용자 지시 2026-09-17). 이 함수는 드래그 회전·궤도·줌에만 쓰이므로 여기서 통과시켜도
+            // 클릭 차단은 그대로다 — 배경은 여전히 버튼 클릭을 삼킨다.
+            for (int i = 0; i < _uiRaycastResults.Count; i++)
+            {
+                var hit = _uiRaycastResults[i].gameObject;
+                if (hit != null && hit.name == Festa.World.UI.FestaUiKit.BackdropName) continue;
+                return false;
+            }
+            return true;
         }
 
         void BuildUi()
