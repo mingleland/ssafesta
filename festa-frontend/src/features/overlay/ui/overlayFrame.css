@@ -276,8 +276,9 @@
 .ov-card-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1; justify-content: center; }
 .ov-card-body .ov-card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 코인·재고 chip 가로 폭 20% 축소(S15P21A604-842 후속) — 이벤트 상점 카드 안에서만.
-   .ov-chip은 ConsultationOverlay 등 다른 화면도 쓰는 공용 클래스라 전역으로 안 건드린다. */
-.ov-card-body .ov-chip { padding: 0 8px; }
+   .ov-chip은 ConsultationOverlay 등 다른 화면도 쓰는 공용 클래스라 전역으로 안 건드린다.
+   패딩 10px→8px(약 9% 축소)은 체감이 안 나서 5px로 더 줄인다(원래 대비 전체 폭 약 20%). */
+.ov-card-body .ov-chip { padding: 0 5px; }
 
 /* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
 .ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
