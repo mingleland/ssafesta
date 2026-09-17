@@ -505,6 +505,16 @@ public class AiDocumentService {
      * 삭제할 수 있다. {@code READY}·{@code FAILED}·{@code EXPIRED}·{@code DISABLED}도 Job이 없거나 이미
      * 끝난 상태라 안전하다.
      *
+     * <p><b>이 문서를 대상으로 진행 중인 교체(FR-019)가 있으면 거부한다(409).</b>
+     * {@code replaces_document_id} 는 {@code ON DELETE SET NULL}(V30)이라 여기서 원본을 지우면 교체본의
+     * 그 컬럼이 조용히 비고, {@code AiDocumentJobRepository.retireReplacedOriginal} 은 나중에 finalize가
+     * 끝나도 물릴 원본을 찾지 못해 아무 일도 하지 않는다 — 원본이 이미 사라졌으니 데이터가 깨지지는
+     * 않지만(교체본은 {@code markDocumentReady} 로 독립적으로 READY 가 된다), FR-019 가 약속하는 "교체가
+     * 끝날 때까지 원본은 살아 있다"를 사용자가 지워서 깨는 셈이라 미리 막는다. 교체본이 이미
+     * {@code READY} 라면(=이미 끝나 원본을 물렸거나 물릴 수 없는 상태였던 경우) 막지 않는다 — 안 그러면
+     * 물려난 원본이 영원히 삭제 불가능해진다({@code findActiveReplacementOf} 는 상태와 무관하게 계속
+     * 이 문서를 가리킨다).
+     *
      * <p><b>활성 임대는 요구하지 않는다.</b> 임대 만료·반납으로 {@code DISABLED}가 된 보존 문서를
      * 편집자가 정리할 수 있어야 하므로 권한만 검사한다. 변경 권한과 관리자 감사 기록은
      * {@code requireModifier}가 맡는다.
@@ -522,6 +532,12 @@ public class AiDocumentService {
                         "처리 중인 문서는 삭제할 수 없습니다. 완료된 뒤 다시 시도해 주세요. 현재 상태: "
                                 + document.getProcessingStatus());
             }
+            documents.findActiveReplacementOf(documentId)
+                    .filter(replacement -> !AiDocument.READY.equals(replacement.getProcessingStatus()))
+                    .ifPresent(replacement -> {
+                        throw new ApiException(ErrorCode.DOCUMENT_NOT_DELETABLE,
+                                "이 문서를 교체하는 작업이 진행 중입니다. 완료된 뒤 다시 시도해 주세요.");
+                    });
 
             jdbc.update("""
                     INSERT INTO game_asset_delete_queue (provider, storage_bucket, object_key)

@@ -143,6 +143,35 @@ class AiDocumentDeleteIntegrationTest {
     }
 
     @Test
+    void deletingAnOriginalWithAnInFlightReplacementIsRefused() throws Exception {
+        long agentId = agent("교체중삭제");
+        long originalId = seedDocument(agentId, "READY", "docs/being-replaced/" + agentId);
+        seedReplacement(agentId, originalId, "QUEUED", "docs/replacement-upload/" + agentId);
+
+        mockMvc.perform(delete("/api/v1/documents/{id}", originalId)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DOCUMENT_NOT_DELETABLE"));
+
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ai_documents WHERE id = ?", Integer.class, originalId));
+    }
+
+    @Test
+    void ownerCanDeleteAnOriginalOnceItsReplacementIsAlreadyReady() throws Exception {
+        long agentId = agent("교체완료후삭제");
+        long originalId = seedDocument(agentId, "READY", "docs/superseded/" + agentId);
+        seedReplacement(agentId, originalId, "READY", "docs/replacement-ready/" + agentId);
+
+        mockMvc.perform(delete("/api/v1/documents/{id}", originalId)
+                        .header("Authorization", bearer()))
+                .andExpect(status().isNoContent());
+
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM ai_documents WHERE id = ?", Integer.class, originalId));
+    }
+
+    @Test
     void deletingANonexistentDocumentIs404() throws Exception {
         agent("존재안함");
 
@@ -183,6 +212,19 @@ class AiDocumentDeleteIntegrationTest {
                   FROM ai_agents WHERE id = ?
                 RETURNING id
                 """, Long.class, objectKey, status, userId, uploaded, agentId);
+    }
+
+    private long seedReplacement(long agentId, long replacesDocumentId, String status, String objectKey) {
+        return jdbc.queryForObject("""
+                INSERT INTO ai_documents (booth_id, agent_id, original_filename, content_type,
+                    size_bytes, s3_key, processing_status, uploaded_by_user_id, content_sha256,
+                    storage_provider, storage_bucket, uploaded_at, replaces_document_id)
+                SELECT booth_id, id, 'v2.pdf', 'application/pdf', 1048576, ?, ?, ?,
+                       '3333333333333333333333333333333333333333333333333333333333333333',
+                       'R2', 'test-ai-documents', now(), ?
+                  FROM ai_agents WHERE id = ?
+                RETURNING id
+                """, Long.class, objectKey, status, userId, replacesDocumentId, agentId);
     }
 
     private void seedSearchableChunk(long documentId, long agentId) {
