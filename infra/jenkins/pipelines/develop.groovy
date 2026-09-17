@@ -152,7 +152,7 @@ def call() {
     }
     }
 
-    if (components.contains('game')) {
+    if ((selection.deployComponents as List).contains('game')) {
         stage('Deploy Dedicated Server') {
             node('deploy') {
                 ws('/home/jenkins/agent/deploy/workspaces/develop-game-deploy') {
