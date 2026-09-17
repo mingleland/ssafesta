@@ -32,6 +32,9 @@ namespace Festa.World
         /// <summary>측정·비교용 전역 스위치. 끄면 모든 아바타가 매 프레임 평가된다.</summary>
         public static bool Enabled = true;
 
+        /// <summary>표시 상한 A/B 스위치. 끄면 모든 아바타를 그린다.</summary>
+        public static bool RenderCapEnabled = true;
+
         [Tooltip("이 거리(월드 유닛) 안쪽은 매 프레임 갱신한다. 1 m = 13.26 유닛 → 220 u ≈ 16.6 m.")]
         [SerializeField] float _nearDistance = 220f;
         [Tooltip("이 거리 안쪽은 midInterval 프레임마다 갱신한다.")]
@@ -52,6 +55,27 @@ namespace Festa.World
         [Tooltip("등록된 아바타가 이 수 이하면 간격 갱신을 걸지 않는다 — 적은 인원에서는 아끼는 값보다 끊김이 크다")]
         [SerializeField] int _minAvatarsToThrottle = 8;
 
+        /// <summary>
+        /// 화면에 동시에 그릴 아바타 수의 상한.
+        ///
+        /// <para>왜 필요한가 — WebGL 실측(2026-09-09)에서 병목은 픽셀이 아니라 <b>드로우콜 제출</b>이었다.
+        /// 아바타 0기 219콜 101 FPS / 20기 719콜 49 FPS / 40기 990콜 25.7 FPS. 해상도를 1/9로 줄여도
+        /// 40기에서 12%만 올랐다 — CPU 쪽이다. 아바타 1기가 20~25콜을 더한다.</para>
+        ///
+        /// <para>그래서 <b>먼 순서대로 그리기를 멈춘다.</b> 애니메이터 간격 갱신(위)은 평가 비용만 줄이고
+        /// 드로우콜은 그대로 나가므로, 이 상한이 그 몫을 직접 없앤다.</para>
+        ///
+        /// <para>보이던 사람이 사라지는 것은 사용자가 가장 싫어하는 증상이다(2026-09-16 "투명으로 보임").
+        /// 그래서 두 겹으로 막는다 — ① <see cref="_nearDistance"/> 안쪽은 <b>절대</b> 숨기지 않는다.
+        /// ② 숨김/복귀 경계를 <see cref="_renderCapMargin"/> 만큼 벌려 경계에서 깜빡이지 않게 한다.
+        /// 즉 "16.6 m 밖에 있으면서 동시에 N번째보다 먼 사람"만 대상이다. 닉네임·말풍선은 플레이어
+        /// 루트에 붙어 있어 그대로 남는다 — 누가 거기 있다는 사실은 계속 보인다.</para>
+        /// </summary>
+        [Tooltip("동시에 그릴 아바타 수 상한 — 가까운 순으로 이 수까지만 그린다")]
+        [SerializeField] int _maxVisibleAvatars = 24;
+        [Tooltip("숨김과 복귀 경계를 벌리는 폭(기수) — 경계에서 깜빡이는 것을 막는다")]
+        [SerializeField] int _renderCapMargin = 4;
+
         static AvatarAnimationLod _instance;
 
         struct Entry
@@ -59,12 +83,18 @@ namespace Festa.World
             public Animator Animator;
             public Renderer Probe;                 // 가시성 판정용 대표 렌더러
             public SkinnedMeshRenderer[] Skins;    // 본 가중치를 낮출 대상
+            public Renderer[] Visuals;             // 표시 상한으로 끄고 켤 대상(아바타 하위 전부)
+            public bool[] VisualWasEnabled;        // 끄기 직전 상태 — 병합이 끈 렌더러를 되살리지 않으려고 기억한다
+            public bool Hidden;                    // 표시 상한으로 숨긴 상태인가
             public float Pending;                  // 아직 애니메이터에 넘기지 않은 시간
             public int Phase;                      // 프레임 분산용 위상
             public int Band;                       // 0 근 / 1 중 / 2 원 — 전환 시에만 품질을 바꾼다
         }
 
         readonly List<Entry> _entries = new();
+
+        // 거리 순위를 매기는 데 쓰는 재사용 버퍼 — 매 프레임 할당하지 않으려고 필드로 둔다.
+        float[] _sortBuffer = new float[64];
 
         public static void Register(Animator animator)
         {
@@ -79,6 +109,12 @@ namespace Festa.World
                 Animator = animator,
                 Probe = PickLiveProbe(skins),
                 Skins = skins,
+                // 모자·소품처럼 스킨이 아닌 렌더러가 섞여 있다. 하나만 빼먹으면 "옷만 벗겨진" 모습이 되므로
+                // 아바타 하위 렌더러를 종류 구분 없이 전부 잡는다. 닉네임·말풍선은 애니메이터보다 위(플레이어
+                // 루트)에 있어 여기 들어오지 않는다.
+                Visuals = animator.GetComponentsInChildren<Renderer>(true),
+                VisualWasEnabled = null,
+                Hidden = false,
                 Pending = 0f,
                 Phase = _instance._entries.Count,
                 Band = -1,   // 첫 프레임에 반드시 한 번 적용되도록
@@ -107,6 +143,7 @@ namespace Festa.World
                 if (_instance._entries[i].Animator != animator) continue;
                 // 원래 상태로 돌려놓고 뺀다 — 남겨두면 애니메이터가 멈춘 채로 방치된다.
                 if (animator) animator.enabled = true;
+                ShowVisuals(_instance._entries[i]);
                 _instance._entries.RemoveAt(i);
                 return;
             }
@@ -124,6 +161,35 @@ namespace Festa.World
             var camera = Camera.main;
             float dt = Time.deltaTime;
 
+            // ── 표시 상한: 이번 프레임의 숨김/복귀 경계 거리를 먼저 구한다 ──
+            // 순위가 아니라 "경계 거리"로 바꿔 두면 아래 루프에서 비교 한 번으로 끝난다.
+            float hideBeyondSqr = float.PositiveInfinity;   // 이보다 멀면 숨긴다
+            float showWithinSqr = float.PositiveInfinity;   // 이보다 가까우면 되살린다
+            bool capActive = RenderCapEnabled && camera != null && _maxVisibleAvatars > 0
+                             && _entries.Count > _maxVisibleAvatars;
+            if (capActive)
+            {
+                if (_sortBuffer.Length < _entries.Count) _sortBuffer = new float[_entries.Count * 2];
+                int n = 0;
+                var camPos = camera.transform.position;
+                for (var i = 0; i < _entries.Count; i++)
+                {
+                    var a = _entries[i].Animator;
+                    if (a == null) continue;
+                    _sortBuffer[n++] = (a.transform.position - camPos).sqrMagnitude;
+                }
+                if (n > _maxVisibleAvatars)
+                {
+                    System.Array.Sort(_sortBuffer, 0, n);
+                    int showRank = _maxVisibleAvatars - 1;
+                    int hideRank = Mathf.Min(n - 1, _maxVisibleAvatars + Mathf.Max(0, _renderCapMargin) - 1);
+                    showWithinSqr = _sortBuffer[showRank];
+                    hideBeyondSqr = _sortBuffer[hideRank];
+                }
+                else capActive = false;
+            }
+            float neverHideSqr = _nearDistance * _nearDistance;
+
             for (var i = _entries.Count - 1; i >= 0; i--)
             {
                 var e = _entries[i];
@@ -134,11 +200,16 @@ namespace Festa.World
                 {
                     if (!e.Animator.enabled) { e.Animator.enabled = true; e.Pending = 0f; }
                     if (e.Band != 0) { ApplySkinQuality(e, 0); e.Band = 0; }
+                    if (e.Hidden && !capActive) ShowVisuals(ref e);
+                    if (capActive) ApplyRenderCap(ref e, (e.Animator.transform.position - camera.transform.position).sqrMagnitude, neverHideSqr, hideBeyondSqr, showWithinSqr);
                     _entries[i] = e;
                     continue;
                 }
 
                 float sqrDistance = (e.Animator.transform.position - camera.transform.position).sqrMagnitude;
+
+                if (capActive) ApplyRenderCap(ref e, sqrDistance, neverHideSqr, hideBeyondSqr, showWithinSqr);
+                else if (e.Hidden) ShowVisuals(ref e);
 
                 int band = sqrDistance <= _nearDistance * _nearDistance ? 0
                          : sqrDistance <= _midDistance * _midDistance ? 1 : 2;
@@ -190,12 +261,66 @@ namespace Festa.World
                 if (e.Skins[i]) e.Skins[i].quality = q;
         }
 
+        /// <summary>
+        /// 거리 순위에 따라 아바타 렌더러를 끄고 켠다.
+        ///
+        /// <para>숨김 조건은 둘을 <b>모두</b> 만족할 때다 — ① 근거리 밖 ② 상한+여유 순위 밖.
+        /// 복귀는 상한 순위 안으로 들어오거나 근거리 안으로 들어오면 즉시.</para>
+        /// </summary>
+        static void ApplyRenderCap(ref Entry e, float sqrDistance, float neverHideSqr, float hideBeyondSqr, float showWithinSqr)
+        {
+            if (e.Visuals == null || e.Visuals.Length == 0) return;
+
+            if (!e.Hidden)
+            {
+                if (sqrDistance > neverHideSqr && sqrDistance > hideBeyondSqr) HideVisuals(ref e);
+                return;
+            }
+            if (sqrDistance <= neverHideSqr || sqrDistance <= showWithinSqr) ShowVisuals(ref e);
+        }
+
+        /// <summary>
+        /// 렌더러를 끄되 <b>끄기 직전에 켜져 있던 것만</b> 기억한다.
+        /// 병합(<c>AvatarMeshMerge</c>)이 원본 렌더러를 꺼 둔 상태라, 되살릴 때 전부 켜면
+        /// 같은 몸이 두 번 그려지고 옷이 겹쳐 보인다 — 반드시 원래 상태로만 되돌린다.
+        /// </summary>
+        static void HideVisuals(ref Entry e)
+        {
+            if (e.VisualWasEnabled == null || e.VisualWasEnabled.Length != e.Visuals.Length)
+                e.VisualWasEnabled = new bool[e.Visuals.Length];
+            for (var i = 0; i < e.Visuals.Length; i++)
+            {
+                var r = e.Visuals[i];
+                if (r == null) { e.VisualWasEnabled[i] = false; continue; }
+                e.VisualWasEnabled[i] = r.enabled;
+                if (r.enabled) r.enabled = false;
+            }
+            e.Hidden = true;
+        }
+
+        static void ShowVisuals(ref Entry e)
+        {
+            if (e.Visuals != null && e.VisualWasEnabled != null)
+            {
+                for (var i = 0; i < e.Visuals.Length && i < e.VisualWasEnabled.Length; i++)
+                {
+                    var r = e.Visuals[i];
+                    if (r != null && e.VisualWasEnabled[i]) r.enabled = true;
+                }
+            }
+            e.Hidden = false;
+        }
+
+        /// <summary>목록에서 뺄 때처럼 참조로 되돌릴 수 없는 자리에서 쓰는 형태.</summary>
+        static void ShowVisuals(Entry e) => ShowVisuals(ref e);
+
         void OnDestroy()
         {
             foreach (var e in _entries)
             {
                 if (e.Animator) e.Animator.enabled = true;
                 ApplySkinQuality(e, 0);
+                ShowVisuals(e);
             }
             if (_instance == this) _instance = null;
         }
@@ -214,7 +339,10 @@ namespace Festa.World
                 else if (d <= _instance._midDistance) mid++;
                 else far++;
             }
-            return $"등록 {_instance._entries.Count}기 — 근 {near} / 중 {mid} / 원 {far}, 스위치={Enabled}";
+            int hidden = 0;
+            foreach (var e in _instance._entries) if (e.Hidden) hidden++;
+            return $"등록 {_instance._entries.Count}기 — 근 {near} / 중 {mid} / 원 {far}, "
+                 + $"표시상한 {(RenderCapEnabled ? _instance._maxVisibleAvatars.ToString() : "끔")} 숨김 {hidden}기, 스위치={Enabled}";
         }
     }
 }
