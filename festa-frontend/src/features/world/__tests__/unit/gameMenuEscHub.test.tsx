@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-// ESC 메뉴 허브 편입 — 부스 관리(소유자만)·아바타 변경(스텁)·조작 안내 (S15P21A604-798).
+// ESC 메뉴 허브 편입 — 부스 관리(소유자만)·아바타 변경(회원만)·조작 안내
+// (S15P21A604-798, 아바타 연결은 -852 / GitLab #197).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -22,16 +23,20 @@ vi.mock('../../../../entities/user/api.select', () => ({
 // vi.mock 팩토리가 먼저 등록된 뒤 소비자를 불러온다 — top-level const의 초기화 전 접근을 피한다.
 const { GameMenu } = await import('../../ui/GameMenu');
 const { __resetSessionForTests, markBootstrapped, setMemberSession } = await import('../../../auth/model/session');
+const { setGuestSession } = await import('../../../auth/model/session');
+const sessionManager = await import('../../../../unity/host/sessionManager');
 const { __resetScreenAudioForTests } = await import('../../../audio/model/screenAudio');
 const { __resetGameClientUiForTests } = await import('../../model/gameClientUi');
 const { __resetProfileForTests } = await import('../../../profile/model/profile');
+
+const onClose = vi.fn();
 
 function renderMenu() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <GameMenu onClose={() => {}} onOpenPanel={openPanel} />
+        <GameMenu onClose={onClose} onOpenPanel={openPanel} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -40,6 +45,7 @@ function renderMenu() {
 beforeEach(() => {
   window.localStorage.clear();
   openPanel.mockReset();
+  onClose.mockReset();
   __resetSessionForTests();
   __resetProfileForTests();
   __resetScreenAudioForTests();
@@ -53,6 +59,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  vi.restoreAllMocks();
   __resetSessionForTests();
   __resetProfileForTests();
   __resetScreenAudioForTests();
@@ -76,12 +83,34 @@ describe('ESC 부스관리 항목', () => {
   });
 });
 
-describe('ESC 아바타 변경 스텁', () => {
-  it('누를 수 없고 준비 중 배지가 있다 — 진입점 미정', () => {
+// 게임 파트 수신부(WorldUiBridge.RequestAvatarCustomization)가 develop 에 도달해 스텁을 풀었다.
+describe('ESC 아바타 변경', () => {
+  it('회원이 누르면 Unity 에 요청하고 메뉴를 닫는다 — 아바타 화면을 덮지 않게', () => {
+    const SendMessage = vi.fn();
+    vi.spyOn(sessionManager, 'getReadyUnityInstance').mockReturnValue({ SendMessage } as never);
     renderMenu();
-    const button = screen.getByRole('button', { name: /아바타 변경/ });
-    expect(button.hasAttribute('disabled')).toBe(true);
-    expect(screen.getByText('준비 중')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /아바타 변경/ }));
+
+    expect(SendMessage).toHaveBeenCalledWith('WorldUiBridge', 'RequestAvatarCustomization', 'esc-menu');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('게스트에게는 항목이 아예 없다 — Unity 가 거부하므로 눌리는 버튼을 두지 않는다', () => {
+    __resetSessionForTests();
+    setGuestSession('at', new Date(Date.now() + 60_000).toISOString());
+    markBootstrapped();
+    renderMenu();
+
+    expect(screen.queryByRole('button', { name: /아바타 변경/ })).toBeNull();
+  });
+
+  it('월드가 안 떠 있으면 아무 일도 하지 않는다 — 메뉴도 닫지 않는다', () => {
+    vi.spyOn(sessionManager, 'getReadyUnityInstance').mockReturnValue(null);
+    renderMenu();
+
+    expect(() => fireEvent.click(screen.getByRole('button', { name: /아바타 변경/ }))).not.toThrow();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
