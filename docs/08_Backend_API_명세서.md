@@ -639,6 +639,70 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 `403 BOOTH_EDITOR_FORBIDDEN`(**타 부스 프로젝트 수정 차단**) · **`404 PROJECT_NOT_FOUND`** ·
 `409 BOOTH_LEASE_EXPIRED`.
 
+### POST `/booths/{boothId}/project-logos` · POST `.../{logoId}/complete` · GET `.../{logoId}/content`
+
+대표 이미지를 **파일로 올린다** (2026-09-18 개정 — spec 009 C-03, GitLab #241, `S15P21A604-895`).
+개정 전에는 "업로드 미지원, URL 참조"였다. 외부 `http(s)` URL은 **계속 받는다** — 선택지가 늘었을
+뿐이고 기존 값은 무효가 되지 않는다.
+
+**세 단계다. 가운데는 서버를 지나지 않는다.**
+
+```text
+POST /booths/{boothId}/project-logos      { contentType, byteSize }
+  → { logoId, uploadUrl, requiredContentType, expiresAt }
+PUT  uploadUrl (브라우저 → 객체 저장소)     Content-Type = requiredContentType
+POST /booths/{boothId}/project-logos/{logoId}/complete
+  → { logoId, status, url, contentType, byteSize, width, height, failureRule }
+PATCH /projects/{projectId}               { "thumbnailUrl": url }
+```
+
+`PUT`의 `Content-Type`은 **`requiredContentType`과 같아야 한다** — 서명에 박혀 있어 다른 값이면
+저장소가 403을 낸다. `uploadUrl`은 10분을 산다.
+
+**선언한 `contentType`·`byteSize`는 거절에만 쓴다.** 통과는 `complete`가 실제 바이트를 읽어
+정한다 — 위장한 MIME은 시작에서 통과해도 완료에서 `FAILED`가 된다. 허용은 PNG · JPEG · GIF ·
+WebP · 5MB · 한 변 4096px이고 애니메이션 WebP는 거부다(게임 Asset과 **같은 검증기**를 쓴다).
+
+**`complete`의 검증 실패도 `200`이다.** `status`가 `FAILED`이고 `failureRule`이 사유다
+(`MIME_NOT_ALLOWED` · `SIZE_EXCEEDED` · `DIMENSION_EXCEEDED` · `DECODE_FAILED` ·
+`UPLOAD_MISSING` · `GRANT_EXPIRED`). 던지지 않는 이유는 게임 Asset과 같다 — 예외는 실패 기록을
+되돌려 행을 영원히 재시도 상태로 남긴다. 실패한 자리는 되살아나지 않고 재시도는 새 업로드다.
+같은 `logoId`로 다시 불러도 안전하다(멱등).
+
+**저장 계약은 신설하지 않았다.** `complete`가 준 `url`을 기존 `PATCH /projects/{projectId}`의
+`thumbnailUrl`에 그대로 넣는다. 그 값은 **절대 URL이 아니라 경로**
+(`/api/v1/booths/{boothId}/project-logos/{logoId}/content`)다 — 절대 URL로 만들려면 "이 배포의
+공개 API origin"이라는 새 설정이 필요하고, 그것이 환경마다 틀리면 DB에 남은 URL이 다른 환경에서
+깨진다. 그래서 `thumbnailUrl`의 `http(s)` 규칙에 **이 형식 하나만 예외**이고 다른 상대 경로는
+계속 거부된다.
+
+**grant는 `projectId`가 아니라 `boothId` 기준이다** — 프로젝트를 만들기 전에 로고를 올리는 흐름이
+요구사항이고(#241 ①), 부스 편집 권한은 `BoothAccessGuard` 하나가 답한다.
+
+**`GET .../content`는 인증 없이 열린 경로이고 판정은 서버가 한다** (게임 Asset의 `/content`와 같은
+구조). 세 갈래다.
+
+| 조건 | 결과 |
+|---|---|
+| 게시된 프로젝트가 이 로고를 참조 + 임대 유효 | 누구나 — 방문자의 `<img>`가 이 경로로 들어온다 |
+| 그 밖의 `READY` 로고 | **그 부스 편집자만** — `complete`와 저장 사이, 저장 실패 후 재확인 경로 |
+| 그 밖 | `404 PROJECT_LOGO_NOT_FOUND` |
+
+두 번째 갈래가 없으면 업로드 직후 새로고침한 작성자가 자기 이미지를 못 본다. 없는 것과 볼 권한이
+없는 것에 **같은 404**를 주는 이유: 있는지 여부가 남의 부스 편집 상태를 알려 주는 신호가 되면
+안 된다. `Content-Type`은 **검증으로 확정한 값**이고 선언값을 되돌려주지 않는다 —
+`X-Content-Type-Options: nosniff`가 함께 나간다.
+
+**올려 두고 저장하지 않은 이미지는 남지 않는다.** 참조가 끊긴 로고는 표식만 남기고 유예 뒤에
+지우며, **삭제 직전에 참조를 다시 확인한다** — A → B → 다시 A로 되돌린 사용자의 살아 있는 이미지를
+지우지 않는다. 완료 후 24시간 동안 아무도 참조하지 않은 로고도 정리되고, 부스당 미참조 `READY`
+로고 수에는 상한이 있다(`409 PROJECT_LOGO_QUOTA_EXCEEDED`).
+
+실패: `403 MEMBER_ONLY`·`403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND`·`404
+PROJECT_LOGO_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`·`409 PROJECT_LOGO_QUOTA_EXCEEDED` ·
+`413 PROJECT_LOGO_TOO_LARGE` · `415 PROJECT_LOGO_TYPE_UNSUPPORTED` · `503 STORAGE_UNAVAILABLE`
+(저장소가 답하지 않는다 — 다시 부르면 된다. 이 경우 행은 `PENDING`으로 남는다).
+
 ### PUT `/projects/{projectId}/like` · DELETE `/projects/{projectId}/like`
 
 방문자가 전시에 좋아요를 누르고 취소한다 (009 §8, `S15P21A604-135`). **회원만** — 게스트는
