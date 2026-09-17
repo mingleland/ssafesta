@@ -7,7 +7,7 @@ import { THEME_CODES, isPaletteColor } from './types';
 import type { BoothDetail, BoothFacade, FacadePutRequest } from './types';
 import { getMockHomepageUrl } from './homepageApi.mock';
 
-// layout mock(entities/layout/api.mock.ts)과 같은 sentinel 값 — 임대 만료 UX 수동 검증용.
+// 999 sentinel — 임대 만료 UX 수동 검증용 (옛 layout mock 과 같은 관용구).
 // 실 BE에는 없는 값이라 real facadeApi.ts에는 이 분기가 없다.
 const LEASE_EXPIRED_BOOTH_ID = 999;
 

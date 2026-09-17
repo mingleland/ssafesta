@@ -150,9 +150,15 @@ function writeMutedPreference(muted: boolean): void {
   }
 }
 
-// element 는 첫 재생 시도까지 만들지 않는다 — 그때까지 4.5MB 를 받을 이유가 없고, Landing 의
-// 첫 페인트·Unity warm-up 과 회선을 다투지 않는다. preload 세부(auto/metadata/none)는 실브라우저
-// 경합 실측 뒤 조정한다.
+// element 는 **사용자 제스처가 있은 뒤** 에만 만든다 (S15P21A604-848). "첫 재생 시도까지" 로는 부족했다 —
+// 첫 시도가 Landing 마운트 시점(enterScreen)이라 자동재생이 거부돼도 new Audio + preload=auto 가
+// 4.66MB 를 그 자리에서 받았고, 그것이 Landing 최장 요청(2.3~3.2s)이었다. 제스처 전에는 element 자체가
+// 없으니 요청도 없다. 제스처 여부는 navigator.userActivation.hasBeenActive 로 본다 — SPA 이동 뒤(Landing
+// 클릭 → Login)는 true 라 예전처럼 바로 시작하고, API 가 없는 브라우저는 제스처를 기다리는 쪽으로 둔다.
+function hasUserActivation(): boolean {
+  return (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive === true;
+}
+
 function ensureElement(): HTMLAudioElement | null {
   if (element !== null) return element;
   if (typeof Audio !== 'function') return null; // 테스트 node 환경 등
@@ -176,6 +182,11 @@ function clearFade(): void {
  */
 export function unlockAndPlay(): void {
   if (state.muted || state.transitionPending || state.handedOff || state.playing) return;
+  if (element === null && !hasUserActivation()) {
+    // 제스처 전 — element 를 만들지 않는다(다운로드 0). 컨트롤러의 pointerdown/keydown 재시도가 다음 제스처에서 다시 부른다.
+    setState({ playing: false, pendingGesture: true });
+    return;
+  }
   const audio = ensureElement();
   if (audio === null) return;
   clearFade();

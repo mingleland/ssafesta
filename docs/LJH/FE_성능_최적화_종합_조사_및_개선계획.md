@@ -42,11 +42,11 @@ FE 성능 조사는 "Webpack 용어를 찾는 것"이 아니라 각 개념(번�
 |---|---|---|---|
 | `pages/studio/StudioPage.tsx` (505 LOC) | 존재. route `/app/studio/:boothId` lazy | **A** | 관리창 진입 버튼만 제거됐고 deep-link·코드 보존 상태 |
 | `features/studio/**` (39파일 4,214 LOC + 테스트 24) | 존재 | **A** | 외부 import 0건(`game-studio/studio`는 이름만 같은 별개 모듈) |
-| `features/studio/ui/canvas/R3FBoothRenderer`·`AssetMesh`·`boothAssetCache` | 존재. dyn chunk 904.6KB | **A** | three 소비자 이 3파일뿐 |
-| npm `three` `@react-three/fiber` `@types/three` | 존재 | **A** | 위 3파일 외 참조 0 |
+| `features/studio/ui/canvas/R3FBoothRenderer`·`AssetMesh`·`boothAssetCache` | 존재. **`7a0b440c`(`-844`) 이후 route 리다이렉트로 dynamic import 가 사라져 chunk 자체가 산출물에서 소멸** | **A** | three 의 src 소비자 이 3파일뿐 |
+| npm `three` `@react-three/fiber` `@types/three` | 존재, 번들 0바이트 | **A**(fiber·@types) / **D**(`three` → devDependencies) | `tools/assets/*.mjs`(booth-runtime 파이프라인)가 `three` 를 빌드타임에 쓴다 |
 | `features/studio/ui/FacadePanel` (테마·대표색·간판·로고) | Studio 안에 있어 함께 숨음 | **A** (기능 이관 필요 시 C) | 이름 편집은 `BoothNameField`로 이미 이관됨 |
 | `entities/booth/facadeApi*` | 존재 | **C** | `BoothNameField`·`BoothManagementOverlay`·`laptopHomepage`가 사용 |
-| `entities/layout/api.ts`·`types.ts` | 존재 | **C** | `unity/host/boothLayoutBridge`·`features/booth/model/*`가 참조 |
+| `entities/layout/api.ts`·`types.ts` | 존재 | **A** (정정) | `7a0b440c` 기준 비테스트 import 0 — `boothLayoutBridge` 는 `sessionManager`·`booth/types` 만 참조 |
 | `entities/layout/geometry`·`objectTypes`·`passage`·`messages`·`api.mock` | 존재 | **A** | Studio 밖 소비자 0 |
 | `entities/catalog/**` (5파일) | 존재 | **A** | Studio 카탈로그 전용 |
 | `ManagementPanel` `'studio'` 멤버 · `ManagementPanelHost` lazy 분기 · router `/app/studio` | 존재 | **A** | 폐기 시 같이 제거 |
@@ -229,10 +229,10 @@ manifest 기준 그래프(현 develop):
 | `src/entities/layout/{geometry,objectTypes,passage,messages,api.mock}` | 부분 | `layout/api.mock` 삭제. `api.ts`·`types.ts`는 C로 유지 |
 | `ManagementPanel` `'studio'` · `ManagementPanelHost` 분기 · `BoothManagementOverlay` 주석 | 소량 | 초기 번들 미미 |
 | `features/booth/ui/BoothMiniPreview.tsx` | 소비자 0 | 이미 dead |
-| npm `three` `@react-three/fiber` `@types/three` | 3종 | lockfile 축소, `npm ci` 시간 감소 |
+| npm `@react-three/fiber` `@types/three` (`three` 는 devDependencies 로 이동) | 2종 | lockfile 축소, `npm ci` 시간 감소 |
 | hash churn | 4/27 → 1~2 | `StudioPage`·`R3F`의 `index` import 연쇄 소멸 |
 
-초기 번들(418K raw)은 변하지 않는다. 제거되는 990KB는 전부 lazy chunk라 Studio를 열지 않는 사용자에게는 원래 내려가지 않았다. 폐기의 실제 이득은 의존성·유지보수 범위·churn이지 첫 진입 속도가 아니다.
+초기 번들(408K raw)은 변하지 않는다. 990KB lazy chunk 는 `-844`(`7a0b440c`)가 route 를 리다이렉트로 바꾼 시점에 이미 산출물에서 사라졌다 — 폐기 MR(`-846`)의 이득은 소스 ~5.5K LOC·테스트 31파일·의존성 2종·`npm ci` 시간이지 번들이 아니다. hash churn 연쇄(`StudioPage`→`index`)도 같은 시점에 끊겼다.
 
 ## 16. 유지해야 할 Runtime / WebGL 구조
 
@@ -274,7 +274,8 @@ manifest 기준 그래프(현 develop):
 ### Booth Studio 폐기로 새롭게 중요해진 결론
 - 관리창 미리보기 `booth-preview/default.png` 1.4MB가 부스 관리의 유일한 시각 자산이 된다 → WebP 전환 우선순위 상향.
 - booth-runtime 파이프라인은 "Studio를 위한 자산"에서 "다음 소비자를 기다리는 자산"이 된다. 소비자 결정은 팀 결정 사항(헌법 30조).
-- `entities/layout/api.ts`·`types.ts`와 `facadeApi`는 Studio 밖 소비자가 있어 폐기 MR에서 건드리면 안 된다.
+- `facadeApi`·`homepageApi`는 Studio 밖 소비자(`BoothNameField`·`BoothManagementOverlay`·`laptopHomepage`)가 있어 폐기 MR에서 건드리면 안 된다. `entities/layout/api.ts`·`types.ts` 는 `7a0b440c` 재검증에서 외부 import 0 으로 확인돼 삭제 대상으로 정정했다.
+- `three` 는 `tools/assets/*.mjs`(booth-runtime 파이프라인)가 빌드타임에 쓰므로 devDependencies 로 남긴다. src 에서는 0 참조.
 
 ### 아직 확인되지 않은 항목
 §21 참조.
@@ -297,7 +298,7 @@ manifest 기준 그래프(현 develop):
 ## 19. 단계별 개선 계획
 
 ### Phase 0 — Booth Studio 잔재 제거
-- 변경 대상: §15 목록. `features/studio`·`pages/studio`·`entities/catalog`·`entities/layout` Studio 전용 4파일+mock·`BoothMiniPreview`·router·`ManagementPanel` `'studio'`·npm 3종. `entities/layout/api.ts`·`types.ts`·`facadeApi*`·`tools/assets`·`booth-runtime`은 건드리지 않는다.
+- 변경 대상: §15 목록. `features/studio`·`pages/studio`·`entities/catalog`·`entities/layout` 전체·`BoothMiniPreview`·`tools/paletteAssetCodes.test.mjs`·npm `@react-three/fiber`·`@types/three`(`three` 는 devDependencies 로). `facadeApi*`·`tools/assets`·`booth-runtime`은 건드리지 않는다. → `S15P21A604-846` 로 실행.
 - 담당: FE. Jira 신규 1키. `refactor/` 브랜치, MR 1건, squash.
 - 선행 조건: FacadePanel의 테마·대표색·간판·로고 편집을 어디로 옮길지(또는 버릴지) 결정. 관리창 이름 편집만 이관돼 있다.
 - 예상 효과: lazy chunk 990KB·CSS 19K·의존 3종 제거, churn 4→1~2, 테스트 28파일 감소.

@@ -19,7 +19,7 @@ class MemoryStorage {
 (globalThis as unknown as { sessionStorage: Storage }).sessionStorage = new MemoryStorage() as unknown as Storage;
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { consumeReturnTo, isSafeReturnTo, saveReturnTo } from '../../returnTo';
+import { consumeReturnTo, isSafeReturnTo, peekReturnTo, saveReturnTo } from '../../returnTo';
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -55,6 +55,16 @@ describe('isSafeReturnTo', () => {
 });
 
 describe('saveReturnTo·consumeReturnTo', () => {
+  it('peekReturnTo 는 소비하지 않는다 — 읽은 뒤에도 consume 이 같은 값을 돌려준다', () => {
+    saveReturnTo('/app/games/7/edit');
+    expect(peekReturnTo()).toBe('/app/games/7/edit');
+    expect(consumeReturnTo()).toBe('/app/games/7/edit');
+  });
+
+  it('peekReturnTo 는 저장된 값이 없으면 기본 목적지(/app/world)다', () => {
+    expect(peekReturnTo()).toBe('/app/world');
+  });
+
   it('안전한 경로를 저장했다가 1회 소비하고, 소비 후에는 남지 않는다', () => {
     saveReturnTo('/app/studio/abc');
     expect(consumeReturnTo()).toBe('/app/studio/abc');
