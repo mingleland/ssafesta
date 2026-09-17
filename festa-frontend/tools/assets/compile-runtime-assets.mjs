@@ -16,8 +16,8 @@ import { planTextureOptimization, resolveMaterial } from './compiler/material.mj
 import { RUNTIME_DIR, ensureDir } from './compiler/paths.mjs';
 
 /** v1 대표 — 조립체 하나 + 텍스처 worst case 하나. 늘리지 않는다 */
-// 팔레트가 참조하는 코드는 전부 여기 있어야 한다 — -509 완료조건 ②.
-// 그 1:1 은 tools/paletteAssetCodes.test.mjs 가 지킨다.
+// 팔레트가 참조하던 코드는 전부 여기 있어야 했다 — -509 완료조건 ②. 팔레트(Booth Studio)는 -846 으로
+// 삭제됐고 이 목록은 런타임 자산 산출의 정본으로 남는다. 다음 소비자가 정해지면 그쪽과 1:1 을 다시 잠근다.
 const TARGET_ASSET_CODES = [
   'BOOTH_KIOSK_SURVEY', 'FURN_CHAIR_02_WHITE', 'DISP_BOX_01', 'FURN_CHAIR_01_WHITE',
   // #154 팔레트 정합으로 들어온 6종
