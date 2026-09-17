@@ -7,6 +7,7 @@ import {
   __pushWorldChatForTests,
   __resetWorldChatForTests,
   getWorldChatSnapshot,
+  openWorldChat,
   setWorldChatDraft,
 } from '../../model/worldChat';
 import { WorldChatLayer } from '../../ui/WorldChatLayer';
@@ -230,14 +231,31 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
     expect(container.querySelector('.world-chat-hint')).toBeNull();
   });
 
-  it('입장 이벤트는 채팅 본문과 분리된 시스템 알림으로 표시한다', () => {
+  it('입장 이벤트는 닫힌 상태에서는 보이지 않고, 열면 채팅 본문과 분리된 시스템 알림으로 보인다', () => {
+    setMemberSession('at', FUTURE);
+    const { container } = render(<WorldChatLayer />);
+
+    act(() => __pushWorldChatForTests([
+      { senderUserId: 7, nickname: '정헌', sentAt: '2026-09-15T04:59:00.000Z', content: '먼저 한 말' },
+      { type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' },
+    ]));
+
+    // 닫힌 상태 — 연결 사건은 옅은 줄에도, 읽기 알림에도 오르지 않는다. 마지막 **말**이 기준이다 (S15P21A604-855)
+    expect(container.querySelector('.world-chat-join')).toBeNull();
+    expect(container.querySelector('.world-chat-sr')?.textContent).toBe('정헌: 먼저 한 말');
+
+    act(() => openWorldChat());
+    expect(container.querySelector('.world-chat-join')?.textContent).toBe('황덕님이 입장하셨습니다.');
+  });
+
+  it('닫힌 상태에 입장 알림만 도착하면 아무것도 그리지 않는다', () => {
     setMemberSession('at', FUTURE);
     const { container } = render(<WorldChatLayer />);
 
     act(() => __pushWorldChatForTests([{ type: 'JOIN', nickname: '황덕', sentAt: '2026-09-15T05:00:00.000Z' }]));
 
-    expect(container.querySelector('.world-chat-join')?.textContent).toBe('황덕님이 입장하셨습니다.');
-    expect(container.querySelector('.world-chat-sr')?.textContent).toBe('황덕님이 입장하셨습니다.');
+    expect(container.querySelector('.world-chat-log')).toBeNull();
+    expect(container.querySelector('.world-chat-sr')?.textContent).toBe('');
   });
 });
 
