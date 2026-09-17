@@ -27,6 +27,12 @@ d=json.load(open(sys.argv[1])); item=next(x for x in d['manifest']['databases'] 
 for row in item['tableRows']: print(row['table'], row['rows'], sep='\t')
 PY
 )
+  # T057: If restored database contains ai_documents, verify document records exist without logging sensitive titles/bodies
+  has_documents="$(backup_psql "$restore_db" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='ai_documents'")"
+  if [[ "$has_documents" -gt 0 ]]; then
+    doc_count="$(backup_psql "$restore_db" -Atc "SELECT count(*) FROM ai_documents")"
+    [[ "$doc_count" =~ ^[0-9]+$ ]] || backup_die "invalid document count in $restore_db"
+  fi
 done < <(backup_python - "$state" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1])); targets={x['sourceDatabase']:x['targetDatabase'] for x in d['targets']}
@@ -34,7 +40,34 @@ for item in d['manifest']['databases']:
  print(item['database'],targets[item['database']],item['pgvectorVersion'],item['tableCount'],item['schemaSha256'],sep='\t')
 PY
 )
+
+inventory_ref="$(backup_python - "$state" <<'PY'
+import json,sys
+print(json.load(open(sys.argv[1]))['manifest']['documentInventoryRef'])
+PY
+)"
+backup_set_id="$(backup_python - "$state" <<'PY'
+import json,sys
+print(json.load(open(sys.argv[1]))['backupSetId'])
+PY
+)"
+
+# Record evidence if write-evidence script is available
+evidence_file="${BACKUP_STATE_DIR}/evidence/${target}-verification.json"
+mkdir -p "${BACKUP_STATE_DIR}/evidence"
+if [[ -x "${script_dir}/../../scripts/write-evidence.sh" ]]; then
+  "${script_dir}/../../scripts/write-evidence.sh" \
+    --output "$evidence_file" \
+    --scenario "SC-012" \
+    --environment "$("${PYTHON_BIN:-python3}" -c "import json; print(json.load(open('$state'))['manifest']['environment'])")" \
+    --release-id "$("${PYTHON_BIN:-python3}" -c "import json; print(json.load(open('$state'))['manifest'].get('sourceReleaseId') or 'unspecified')")" \
+    --result "PASS" \
+    --command "verify.sh --target $target" \
+    --evidence-ref "$inventory_ref" >/dev/null 2>&1 || true
+fi
+
 printf '{"backupSetId":"%s","target":"%s","status":"RESTORE_VERIFIED","documentInventoryRef":"%s"}\n' \
+  "$backup_set_id" "$target" "$inventory_ref"
   "$(backup_python - "$state" <<'PY'
 import json,sys
 print(json.load(open(sys.argv[1]))['backupSetId'])

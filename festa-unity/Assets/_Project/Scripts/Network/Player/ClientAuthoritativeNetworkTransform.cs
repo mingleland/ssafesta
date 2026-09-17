@@ -20,6 +20,12 @@ namespace Festa.Network
             UseUnreliableDeltas = true;
             PositionInterpolationType = InterpolationTypes.Lerp;
             RotationInterpolationType = InterpolationTypes.Lerp;
+
+            // 프리팹에 남아 있는 기본 임계값(위치 0.05u / 회전 1도)은 걷는 동안 작은 델타를
+            // 여러 틱 건너뛰게 한다. 월드가 1m=10u라 위치 0.01u도 충분히 큰 노이즈 필터이고,
+            // 30 tick 기준으로는 입력 후 첫 패킷이 한 틱 안에 나가도록 더 낮춘다.
+            PositionThreshold = 0.01f;
+            RotAngleThreshold = 0.25f;
             base.Awake();
         }
 

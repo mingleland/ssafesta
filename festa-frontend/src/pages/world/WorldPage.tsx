@@ -13,13 +13,14 @@
 // Dispatcher 구독은 이 화면 생명주기에 종속시킨다 — 전역 상시 구독이면 월드 밖에서도 Unity
 // 이벤트가 오버레이를 열 수 있고 StrictMode에서 leak된다.
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { IS_MOCK_WORLD } from '../../features/world/ui/WorldSurface.select';
 import { useHostPhase } from '../../unity/host/hostPhase';
 import { hideWorld, showWorld } from '../../unity/host/worldMount';
 import { WorldHud } from '../../features/world/ui/WorldHud';
 import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
+import { MenuPanelHost } from '../../features/world/ui/MenuPanelHost';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
 import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
@@ -43,10 +44,11 @@ import {
   closeBoothManagement,
   closeManagementPanel,
   closeGameMenu,
+  closeMenuPanel,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, openManagement, openMenu } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -61,7 +63,6 @@ export function WorldPage() {
   // 훅은 항상 부른다 — `IS_MOCK_WORLD ||` 뒤에 두면 단축 평가로 호출이 건너뛰어진다
   const hostPhase = useHostPhase();
   const inWorld = IS_MOCK_WORLD || hostPhase === 'ready';
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [chatHeight, setChatHeight] = useState(0);
   const reportChatHeight = useCallback((height: number) => {
@@ -85,9 +86,14 @@ export function WorldPage() {
   // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
   // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서
   // 같은 결과가 나오는 유일한 방법이다.
+  //
+  // `?panel=admin` 도 같은 자리를 쓴다 — 관리자 콘솔은 오버레이라 제 주소가 없고, 월드 밖에서
+  // 여는 유일한 길이 이 파라미터다(AdminConsoleLink).
   useEffect(() => {
-    if (params.get('panel') !== 'management') return;
-    openManagement();
+    const panel = params.get('panel');
+    if (panel !== 'management' && panel !== 'admin') return;
+    if (panel === 'admin') openMenuPanelScreen('admin');
+    else openManagement();
     // 한 번 열고 나면 쿼리는 지운다 — 이후 새로고침이 같은 화면을 강제로 다시 열지 않게
     setParams({}, { replace: true });
   }, [params, setParams]);
@@ -139,12 +145,8 @@ export function WorldPage() {
       // 않고 판정자 맨 앞에서 한 번 비켜 준다. 텍스트 입력 중 ESC 도 같은 경로로 dialog 가 먼저
       // 먹는다.
       if (document.querySelector('dialog[open]') !== null) return;
-      // 채팅이 열려 있으면 그것부터 닫는다. 입력창을 두고 Game Menu 가 열리면 글을 쓰다 말고
-      // 메뉴가 덮는다.
-      if (getWorldChatSnapshot().open) {
-        closeWorldChat();
-        return;
-      }
+      // 채팅은 여기서 다루지 않는다 — 열기·전송·닫기가 전부 Enter 다(worldChat.resolveEnterAction).
+      // ESC 는 오버레이·메뉴 계층만 본다.
       if (closeTopScreen()) return;
 
       if (hasUnityModal()) {
@@ -171,17 +173,32 @@ export function WorldPage() {
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Enter') return;
+      // 다른 텍스트 입력(AI 직원 채팅 등)이 focus 를 쥔 동안은 그 입력의 네이티브 form
+      // submit 에 맡긴다 — World Chat 의 Enter 판정자는 자기 입력창 밖의 텍스트 입력까지
+      // 가로챌 권한이 없다 (S15P21A604-823).
+      const active = document.activeElement;
+      const otherInputFocused =
+        active instanceof HTMLElement &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+        active.id !== WORLD_CHAT_INPUT_ID;
+      if (otherInputFocused) return;
       // 조합 중 Enter·Shift+Enter 를 거르는 규칙까지 resolveEnterAction 이 갖는다 — 규칙을 두
       // 곳에 두면 갈린다.
       const chat = getWorldChatSnapshot();
       const action = resolveEnterAction(e, {
+        // 오버레이·관리·메뉴가 떠 있으면 Enter 는 그 화면의 것이다. 판정 시점에 읽는다 —
+        // 이 리스너는 한 번만 등록되므로 렌더 시점 값을 가둬 두면 계속 'world' 로 굳는다.
+        worldOwnsScreen: getWorldScreen() === 'world',
         open: chat.open,
         inputFocused: document.activeElement?.id === WORLD_CHAT_INPUT_ID,
         member: canUseWorldChat(),
+        // 보낼 것이 없을 때 누른 Enter 는 닫기다 — 채팅을 닫는 유일한 키가 Enter 이기 때문이다
+        draftEmpty: chat.draft.trim() === '',
       });
       if (action === 'ignore') return;
       e.preventDefault();
       if (action === 'send') sendWorldChat(chat.draft);
+      else if (action === 'close') closeWorldChat();
       // 패널은 떠 있는데 입력창이 focus 를 잃은 상태 — 새 창을 열지 않고 그 입력창으로 돌아간다
       else if (action === 'focus') document.getElementById(WORLD_CHAT_INPUT_ID)?.focus();
       else openWorldChat();
@@ -192,6 +209,22 @@ export function WorldPage() {
       window.removeEventListener('keydown', onKeyDown);
       stopChat();
     };
+  }, []);
+
+  // Tab 잠금 (S15P21A604-450) — 브라우저 기본 동작은 Tab 에서 다음 포커스 가능 요소로 옮긴다.
+  // Unity 6 WebGL 은 키보드 타깃을 canvas 로 잡으므로(captureAllKeyboardInput=false, !279),
+  // 포커스가 캔버스를 벗어나면 그 뒤 Tab keydown 이 Unity 에 안 들어가 자체 미니맵 토글이
+  // 죽는다. 실제 canvas가 키보드 타깃일 때만 막는다. HUD·오버레이 등 DOM 요소에서는
+  // 접근성을 위해 브라우저의 Tab 탐색을 그대로 둔다.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Tab') return;
+      if (getWorldScreen() !== 'world') return;
+      if (e.target !== document.getElementById('unity-canvas')) return;
+      e.preventDefault();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   return (
@@ -213,15 +246,9 @@ export function WorldPage() {
         <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />
       )}
       {/* Personal / System Layer — 사용자가 ESC 로 연다 */}
-      {ui.gameMenu && (
-        <GameMenu
-          onClose={closeGameMenu}
-          onOpenMyInfo={() => {
-            closeGameMenu();
-            navigate('/app/profile');
-          }}
-        />
-      )}
+      {ui.gameMenu && <GameMenu onClose={closeGameMenu} onOpenPanel={openMenuPanelScreen} />}
+      {/* 메뉴의 자식 화면들 — 닫으면 메뉴로 돌아간다(gameClientUi 가 메뉴를 켜 둔 채로 둔다) */}
+      {ui.menuPanel !== null && <MenuPanelHost panel={ui.menuPanel} onClose={closeMenuPanel} />}
     </div>
   );
 }

@@ -64,6 +64,24 @@ describe('project edit', () => {
     expect(s.dirty.has('name')).toBe(true);
   });
 
+  // 내 부스 관리창은 이 편집 패널 뒤에 그대로 마운트돼 있어 재조회 계기가 없다 —
+  // 저장 쪽이 무효화하지 않으면 정체성 카드가 옛 프로젝트 이름을 계속 보여준다 (S15P21A604-817).
+  it('저장 성공은 관리창의 프로젝트 조회를 무효화한다', async () => {
+    const invalidateQueries = vi.fn();
+    await loadProjectEdit(1);
+    updateField('name', '새 프로젝트 이름');
+    await saveProject({ invalidateQueries } as never);
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['booth-projects', 1] });
+  });
+
+  it('저장 실패는 무효화하지 않는다 — 바뀐 것이 없다', async () => {
+    const invalidateQueries = vi.fn();
+    await loadProjectEdit(1);
+    updateField('name', 'FAIL');
+    await saveProject({ invalidateQueries } as never);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+  });
+
   it('서버 field 오류는 그대로 보관하고 해당 필드를 고치면 즉시 지운다', async () => {
     await loadProjectEdit(1);
     updateField('name', 'INVALID_NAME');

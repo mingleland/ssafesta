@@ -37,7 +37,6 @@ import { useWorldScreen } from '../../features/world/model/worldScreen';
 import { useSession } from '../../features/auth/model/session';
 import { UNITY_BOOT_STALL_TIMEOUT_MS, WORLD_PREPARING_LONG_WAIT_MS } from '../../shared/config/unity';
 import { setHostPhase } from './hostPhase';
-import { consumeFullscreenIntent, enterFullscreen } from '../../shared/ui/fullscreen';
 import { getWorldMount, subscribeWorldMount } from './worldMount';
 import './unityHostStatus.css';
 import type { UnityInstance } from './types';
@@ -160,9 +159,6 @@ export function UnityHost() {
     const unsubscribeLoad = subscribeWorldLoadStart(() => {
       if (cancelled) return;
       setStatus((current) => (current === 'waiting-gate' ? 'preparing-world' : current));
-      // 로그인 때 남겨 둔 전체화면 의도를 여기서 쓴다 (S15P21A604-733). 사용자가 방금 '월드 입장' 을
-      // 누른 순간이라 제스처 창 안일 가능성이 높다. 거부돼도 진입을 막지 않는다 — 수동 토글이 정본이다.
-      if (consumeFullscreenIntent()) void enterFullscreen();
     });
 
     // 접속 상태는 boot 성공 여부와 무관하게 들어올 수 있다 — 별도 구독으로 받고 여기서 판정하지 않는다.
@@ -195,14 +191,19 @@ export function UnityHost() {
     return () => clearTimeout(id);
   }, [status]);
 
-  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, 세션 종류·만료(refresh)가
-  // 바뀔 때마다 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
+  // 013a-AT(-91): 인스턴스가 서면 현재 세션의 Access Token 을 Unity 에 반영하고, **토큰이 바뀔 때마다**
+  // 다시 밀어 넣는다. 입장 게이트 ready 에서도 한 번 더 — 초기 SendMessage 가 씬 로드보다 앞섰을
   // 때의 보험(멱등). 회원·게스트 모두 전달하고 비로그인만 Clear 다(#128 §2).
+  //
+  // 의존성이 `expiresAt` 이던 것을 `tokenVersion` 으로 바꿨다 (S15P21A604-828). 만료 시각이 같은
+  // 갱신은 이 효과를 깨우지 못해 Unity 가 옛 토큰을 계속 들고 있었다. 서버는 refresh 마다 `sid` 를
+  // 회전시키고 그 순간 옛 토큰을 즉시 폐기하므로(MemberSessionService.issue), 재주입을 한 번 놓치면
+  // Unity 의 모든 호출이 401 이 된다.
   useEffect(() => {
     const instance = instanceRef.current;
     if (!instanceReady || instance === null) return;
     syncAccessToken(instance);
-  }, [instanceReady, status, session.kind, session.expiresAt]);
+  }, [instanceReady, status, session.kind, session.tokenVersion]);
 
   // 프로필에서 이름을 바꾼 뒤 Unity가 재시도 boot를 하면, 새 인스턴스에도 마지막 확정 이름을 준다.
   useEffect(() => {
@@ -344,7 +345,9 @@ export function UnityHost() {
         </div>
       )}
       {!connectionNotice && status === 'preparing-world' && (
-        <div className="uh-status" role="status" aria-live="polite">
+        // 씬 전환 중이라 dim을 불투명하게 — 반투명이면 Unity가 아직 지우지 않은 직전 씬(커스터마이징 등)의
+        // 마지막 canvas 프레임이 그 뒤로 비쳐 보인다(S15P21A604-733, 실 데모 녹화로 확인).
+        <div className="uh-status uh-status--opaque" role="status" aria-live="polite">
           {/* 진행률 신호가 없는 구간이다 — indeterminate 로 두고 가짜 백분율을 만들지 않는다 */}
           <span className="uh-status-spinner" aria-hidden="true" />
           <strong className="uh-status-title">

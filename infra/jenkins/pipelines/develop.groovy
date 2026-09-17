@@ -159,23 +159,33 @@ def call() {
                     checkout scm
                     sh "git checkout --detach '${headSha}'"
                     unstash 'candidate-release-manifest'
-                    final String gameEnvFile = env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'
-                    final String gameSecretFile = env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'
-                    final String gameDeployStateDir = env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'
-                    sh """
-                        export RELEASE_MANIFEST_PATH='${releaseManifest}'
-                        export GAME_ENV_FILE='${gameEnvFile}'
-                        export CONNECTION_TOKEN_SECRET_FILE='${gameSecretFile}'
-                        export GAME_DEPLOY_STATE_DIR='${gameDeployStateDir}'
-                        export CI_ARTIFACT_DIR='${artifactRoot}'
-                        bash infra/unity-server/scripts/deploy-game.sh
-                        if bash infra/unity-server/scripts/game-readiness.sh; then
-                            bash infra/unity-server/scripts/promote-game.sh
-                        else
-                            bash infra/unity-server/scripts/rollback-game.sh
+                    withEnv([
+                        "RELEASE_MANIFEST_PATH=${releaseManifest}",
+                        "GAME_ENV_FILE=${env.GAME_ENV_FILE ?: '/srv/festa/config/game.env'}",
+                        "CONNECTION_TOKEN_SECRET_FILE=${env.CONNECTION_TOKEN_SECRET_FILE ?: '/opt/festa/secrets/dev-game-connection-token-secret'}",
+                        "GAME_DEPLOY_STATE_DIR=${env.GAME_DEPLOY_STATE_DIR ?: '/var/lib/festa-environments/demo/game'}",
+                        "CI_ARTIFACT_DIR=${artifactRoot}"
+                    ]) {
+                        // deploy-game.sh 의 75 는 "배포된 WebGL 과 NGO 프리팹이 어긋나 교체하지 않았다" 는 뜻이다.
+                        // 실패가 아니라 건너뜀이다 — 돌고 있는 월드는 그대로이고, 무관한 커밋마다 빨간 빌드가 쌓이면
+                        // 사람이 검사를 꺼 버린다. deploy-dev-batch.sh 의 superseded 와 같은 관례를 쓴다.
+                        //
+                        // 각 스크립트를 개별 sh 스텝으로 부른다. 이전에는 한 덩어리 sh 문자열 안에 Groovy 의
+                        // error(...) 가 들어 있어 셸이 그것을 명령으로 실행했다 — 단계는 우연히 실패했지만
+                        // 의도한 메시지는 한 번도 나온 적이 없다.
+                        int deployStatus = sh(returnStatus: true, script: 'bash infra/unity-server/scripts/deploy-game.sh')
+                        if (deployStatus == 75) {
+                            currentBuild.result = 'NOT_BUILT'
+                            echo 'SKIPPED: deployed WebGL client and this game candidate disagree on the NGO prefab set; the running demo world was left untouched'
+                        } else if (deployStatus != 0) {
+                            error("Dedicated Server deployment failed with exit ${deployStatus}")
+                        } else if (sh(returnStatus: true, script: 'bash infra/unity-server/scripts/game-readiness.sh') == 0) {
+                            sh 'bash infra/unity-server/scripts/promote-game.sh'
+                        } else {
+                            sh 'bash infra/unity-server/scripts/rollback-game.sh'
                             error('Dedicated Server deployment verification failed')
-                        fi
-                    """
+                        }
+                    }
                 }
             }
         }

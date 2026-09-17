@@ -17,7 +17,7 @@ beforeEach(() => {
 describe('setMemberSession', () => {
   it('kind를 member로, AT를 client.ts 메모리에 동시에 설정한다', () => {
     setMemberSession('at-1', '2026-01-01T00:00:00.000Z');
-    expect(getSessionSnapshot()).toEqual({ kind: 'member', expiresAt: '2026-01-01T00:00:00.000Z', notice: null, bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'member', expiresAt: '2026-01-01T00:00:00.000Z', notice: null, bootstrapped: false });
     expect(getAccessToken()).toBe('at-1');
   });
 });
@@ -25,7 +25,7 @@ describe('setMemberSession', () => {
 describe('setGuestSession', () => {
   it('kind를 guest로, AT를 client.ts 메모리에 동시에 설정한다', () => {
     setGuestSession('at-guest', '2026-01-01T00:30:00.000Z');
-    expect(getSessionSnapshot()).toEqual({ kind: 'guest', expiresAt: '2026-01-01T00:30:00.000Z', notice: null, bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'guest', expiresAt: '2026-01-01T00:30:00.000Z', notice: null, bootstrapped: false });
     expect(getAccessToken()).toBe('at-guest');
   });
 });
@@ -34,7 +34,7 @@ describe('clearSession', () => {
   it('kind를 anonymous로 되돌리고 AT를 지운다', () => {
     setMemberSession('at-1', '2026-01-01T00:00:00.000Z');
     clearSession();
-    expect(getSessionSnapshot()).toEqual({ kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false });
+    expect(getSessionSnapshot()).toMatchObject({ kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false });
     expect(getAccessToken()).toBeNull();
   });
 

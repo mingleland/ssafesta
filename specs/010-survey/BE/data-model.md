@@ -120,7 +120,7 @@ DROP INDEX ux_surveys_booth;
 3. **보상은 응답 1건에 원장 1건** — `reward_ledger_entry_id UNIQUE` + 멱등키 `SURVEY_REWARD:{surveyId}:{userId}`. 게스트 응답은 항상 `NULL`.
 4. **응답이 있으면 문항 구조는 불변** — 애플리케이션이 409로 거부하고, 뚫려도 `survey_answers.question_id` FK(RESTRICT)가 막는다 (R-11).
 5. **`created_by_user_id` = 부스 소유자** — 탈퇴 삭제 SQL이 `booth_id IN (owner)`로 키를 잡는 것과 같은 것을 가리켜야 한다 (R-09).
-6. **응답자 식별 정보는 어떤 응답 DTO에도 없다** — FR-009·SC-003. `responseId`만 나가고 그것은 같은 사람의 답을 묶는 열쇠일 뿐이다.
+6. **부스 설문 결과 DTO에는 응답자 식별 정보가 없다** — FR-009·SC-003. `responseId`만 나가고 그것은 같은 사람의 답을 묶는 열쇠일 뿐이다. 예외는 전역 Admin 전용 이벤트 참여자 목록(`S15P21A604-742`) 하나로, 이벤트 `surveyKey` 경로에서만 회원 id·닉네임을 낸다.
 7. **문항 `displayOrder`는 0부터 연속** — 배열 순서와 항상 같다.
 
 ### 상태

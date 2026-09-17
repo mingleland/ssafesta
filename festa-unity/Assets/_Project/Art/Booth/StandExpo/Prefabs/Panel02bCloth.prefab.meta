@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 2ffe459c494176a408f14475b155a26c
+timeCreated: 1507769977
+licenseType: Store
+NativeFormatImporter:
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 114974
+  packageName: Stand Expo Pack
+  packageVersion: 1.0
+  assetPath: Assets/StandExpoPack/Prefabs/Panels/Panel02bCloth.prefab
+  uploadId: 237227
