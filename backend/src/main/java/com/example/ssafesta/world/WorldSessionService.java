@@ -2,6 +2,7 @@ package com.example.ssafesta.world;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
+import com.example.ssafesta.mission.WorldMissionProgressService;
 import com.example.ssafesta.user.AccountStatus;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -38,11 +39,14 @@ public class WorldSessionService {
     private final UserRepository users;
     private final WorldEntryTokenIssuer tokens;
     private final WorldProperties properties;
+    private final WorldMissionProgressService worldMissionProgress;
 
-    public WorldSessionService(UserRepository users, WorldEntryTokenIssuer tokens, WorldProperties properties) {
+    public WorldSessionService(UserRepository users, WorldEntryTokenIssuer tokens, WorldProperties properties,
+                               WorldMissionProgressService worldMissionProgress) {
         this.users = users;
         this.tokens = tokens;
         this.properties = properties;
+        this.worldMissionProgress = worldMissionProgress;
     }
 
     @Transactional(readOnly = true)
@@ -53,6 +57,12 @@ public class WorldSessionService {
         String sessionId = "ws_" + UUID.randomUUID();
         WorldEntryTokenIssuer.WorldIdentity identity = identityOf(jwt);
         WorldEntryTokenIssuer.IssuedGrant grant = tokens.issue(identity, sessionId);
+
+        // GitLab #233 defines WORLD_ENTER as a successful world-session issuance. It is not the
+        // daily-grant cache: only this endpoint may set the member's KST-day mission marker.
+        if (MEMBER_ROLE.equals(identity.role())) {
+            worldMissionProgress.markEntered(Long.valueOf(identity.playerId()));
+        }
 
         // Never the grant itself, the secret, or the nickname (FR-023). The pair below is what an
         // operator needs to line a refused admission on the game server up with its issue here.
