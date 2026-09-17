@@ -65,16 +65,38 @@ namespace Festa.World
         /// <para>그래서 <b>먼 순서대로 그리기를 멈춘다.</b> 애니메이터 간격 갱신(위)은 평가 비용만 줄이고
         /// 드로우콜은 그대로 나가므로, 이 상한이 그 몫을 직접 없앤다.</para>
         ///
+        /// <para><b>상한은 고정값이 아니라 프레임이 정한다.</b> 축제는 북적여야 제 맛이라, 기계가
+        /// 버티는 동안에는 <b>한 명도 숨기지 않는다</b>. 고정 상한을 두면 잘 도는 PC 에서도 뒤쪽
+        /// 사람들이 미리 지워져 인원이 실제보다 적어 보인다 — 얻는 것보다 잃는 것이 크다.
+        /// 그래서 프레임 시간을 재서 <see cref="_targetFrameMs"/> 를 넘길 때만 먼 쪽부터 조금씩
+        /// 덜어내고, 여유가 돌아오면 다시 채운다. 사양이 좋은 기기에서는 이 장치가 아무 일도 하지
+        /// 않는다 (사용자 지시 2026-09-18).</para>
+        ///
         /// <para>보이던 사람이 사라지는 것은 사용자가 가장 싫어하는 증상이다(2026-09-16 "투명으로 보임").
         /// 그래서 두 겹으로 막는다 — ① <see cref="_nearDistance"/> 안쪽은 <b>절대</b> 숨기지 않는다.
         /// ② 숨김/복귀 경계를 <see cref="_renderCapMargin"/> 만큼 벌려 경계에서 깜빡이지 않게 한다.
         /// 즉 "16.6 m 밖에 있으면서 동시에 N번째보다 먼 사람"만 대상이다. 닉네임·말풍선은 플레이어
         /// 루트에 붙어 있어 그대로 남는다 — 누가 거기 있다는 사실은 계속 보인다.</para>
         /// </summary>
-        [Tooltip("동시에 그릴 아바타 수 상한 — 가까운 순으로 이 수까지만 그린다")]
-        [SerializeField] int _maxVisibleAvatars = 24;
+        [Tooltip("프레임이 버거울 때 줄여 내려가는 하한 — 이 수보다 적게 그리지는 않는다")]
+        [SerializeField] int _renderCapFloor = 16;
+        [Tooltip("한 번에 그릴 수 있는 최대 — 이 값에 닿으면 아무도 숨기지 않는다")]
+        [SerializeField] int _renderCapCeiling = 128;
+        [Tooltip("이 프레임 시간(ms)을 넘기면 상한을 줄인다. 22 ms ≈ 45 FPS")]
+        [SerializeField] float _targetFrameMs = 22f;
+        [Tooltip("이 프레임 시간(ms) 아래로 내려오면 상한을 다시 늘린다. 16 ms ≈ 62 FPS")]
+        [SerializeField] float _recoverFrameMs = 16f;
+        [Tooltip("상한을 조정하는 간격(프레임). 너무 자주 바꾸면 인원이 출렁인다")]
+        [SerializeField] int _capAdjustInterval = 45;
+        [Tooltip("한 번에 늘리고 줄이는 폭(기수)")]
+        [SerializeField] int _capAdjustStep = 2;
         [Tooltip("숨김과 복귀 경계를 벌리는 폭(기수) — 경계에서 깜빡이는 것을 막는다")]
         [SerializeField] int _renderCapMargin = 4;
+
+        // 지금 적용 중인 상한. 처음에는 천장에서 시작한다 — 즉 기본 동작은 "전부 그린다" 다.
+        int _renderCap = int.MaxValue;
+        float _smoothedFrameMs;
+        int _nextCapAdjustFrame;
 
         static AvatarAnimationLod _instance;
 
@@ -95,6 +117,38 @@ namespace Festa.World
 
         // 거리 순위를 매기는 데 쓰는 재사용 버퍼 — 매 프레임 할당하지 않으려고 필드로 둔다.
         float[] _sortBuffer = new float[64];
+
+        /// <summary>
+        /// 프레임 시간을 보고 상한을 올리거나 내린다.
+        ///
+        /// <para>한 프레임만 보고 움직이면 로딩·GC 처럼 일시적인 튐에 인원이 출렁인다. 지수이동평균으로
+        /// 다듬고, 조정도 <see cref="_capAdjustInterval"/> 프레임에 한 번만 한다. 늘릴 때와 줄일 때의
+        /// 문턱을 따로 둬(<see cref="_targetFrameMs"/> / <see cref="_recoverFrameMs"/>) 경계에서
+        /// 왕복하지 않게 했다.</para>
+        /// </summary>
+        void UpdateAdaptiveCap(float deltaTime, int liveCount)
+        {
+            float frameMs = deltaTime * 1000f;
+            _smoothedFrameMs = _smoothedFrameMs <= 0f ? frameMs : Mathf.Lerp(_smoothedFrameMs, frameMs, .05f);
+
+            int ceiling = Mathf.Max(_renderCapFloor, _renderCapCeiling);
+            if (_renderCap > ceiling) _renderCap = ceiling;
+
+            if (Time.frameCount < _nextCapAdjustFrame) return;
+            _nextCapAdjustFrame = Time.frameCount + Mathf.Max(5, _capAdjustInterval);
+
+            int step = Mathf.Max(1, _capAdjustStep);
+            if (_smoothedFrameMs > _targetFrameMs)
+            {
+                // 지금 그리고 있는 수보다 낮춰야 실제로 덜어진다 — 천장에 걸려 있으면 인원 수에서 시작한다.
+                int current = Mathf.Min(_renderCap, Mathf.Max(liveCount, _renderCapFloor));
+                _renderCap = Mathf.Max(_renderCapFloor, current - step);
+            }
+            else if (_smoothedFrameMs < _recoverFrameMs)
+            {
+                _renderCap = Mathf.Min(ceiling, _renderCap + step);
+            }
+        }
 
         public static void Register(Animator animator)
         {
@@ -165,8 +219,8 @@ namespace Festa.World
             // 순위가 아니라 "경계 거리"로 바꿔 두면 아래 루프에서 비교 한 번으로 끝난다.
             float hideBeyondSqr = float.PositiveInfinity;   // 이보다 멀면 숨긴다
             float showWithinSqr = float.PositiveInfinity;   // 이보다 가까우면 되살린다
-            bool capActive = RenderCapEnabled && camera != null && _maxVisibleAvatars > 0
-                             && _entries.Count > _maxVisibleAvatars;
+            UpdateAdaptiveCap(dt, _entries.Count);
+            bool capActive = RenderCapEnabled && camera != null && _entries.Count > _renderCap;
             if (capActive)
             {
                 if (_sortBuffer.Length < _entries.Count) _sortBuffer = new float[_entries.Count * 2];
@@ -178,11 +232,11 @@ namespace Festa.World
                     if (a == null) continue;
                     _sortBuffer[n++] = (a.transform.position - camPos).sqrMagnitude;
                 }
-                if (n > _maxVisibleAvatars)
+                if (n > _renderCap)
                 {
                     System.Array.Sort(_sortBuffer, 0, n);
-                    int showRank = _maxVisibleAvatars - 1;
-                    int hideRank = Mathf.Min(n - 1, _maxVisibleAvatars + Mathf.Max(0, _renderCapMargin) - 1);
+                    int showRank = Mathf.Clamp(_renderCap - 1, 0, n - 1);
+                    int hideRank = Mathf.Min(n - 1, _renderCap + Mathf.Max(0, _renderCapMargin) - 1);
                     showWithinSqr = _sortBuffer[showRank];
                     hideBeyondSqr = _sortBuffer[hideRank];
                 }
@@ -341,8 +395,11 @@ namespace Festa.World
             }
             int hidden = 0;
             foreach (var e in _instance._entries) if (e.Hidden) hidden++;
+            string cap = !RenderCapEnabled ? "끔"
+                       : _instance._renderCap >= _instance._renderCapCeiling ? "제한 없음"
+                       : _instance._renderCap.ToString();
             return $"등록 {_instance._entries.Count}기 — 근 {near} / 중 {mid} / 원 {far}, "
-                 + $"표시상한 {(RenderCapEnabled ? _instance._maxVisibleAvatars.ToString() : "끔")} 숨김 {hidden}기, 스위치={Enabled}";
+                 + $"표시상한 {cap} 숨김 {hidden}기 ({_instance._smoothedFrameMs:F1} ms), 스위치={Enabled}";
         }
     }
 }
