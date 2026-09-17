@@ -196,7 +196,11 @@ class BoothLeaseServiceIntegrationTest {
         Long adminSlotId = jdbc.queryForObject(
                 "SELECT id FROM booth_slots WHERE slot_type = 'ADMIN' ORDER BY id DESC LIMIT 1", Long.class);
 
-        assertThrows(SlotNotRentableException.class, () -> leaseService.lease(userId, adminSlotId, 1));
+        try {
+            assertThrows(SlotNotRentableException.class, () -> leaseService.lease(userId, adminSlotId, 1));
+        } finally {
+            jdbc.update("DELETE FROM booth_slots WHERE id = ?", adminSlotId);
+        }
     }
 
     @Test

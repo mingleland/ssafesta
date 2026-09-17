@@ -320,7 +320,7 @@ class BoothLayoutApiIntegrationTest {
     @Test
     void theSeedFixesTwelveRoomsToAnchorNumbers() {
         assertEquals(12, jdbc.queryForObject(
-                "SELECT count(*) FROM booth_slots WHERE floor_no = 11", Integer.class));
+                "SELECT count(*) FROM booth_slots WHERE floor_no = 11 AND slot_code LIKE 'F11-R%'", Integer.class));
         assertEquals("EVENT", jdbc.queryForObject(
                 "SELECT slot_type FROM booth_slots WHERE id = 1", String.class),
                 "1번 방은 이벤트 자리다 (V28)");
