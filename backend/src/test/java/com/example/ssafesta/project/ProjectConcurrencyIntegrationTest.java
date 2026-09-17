@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -39,6 +40,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class ProjectConcurrencyIntegrationTest {
 
     private static final int REPEATS = 5;

@@ -16,12 +16,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Saving and publishing (spec 005 US1, data-model §4). */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class BoothLayoutServiceIntegrationTest {
 
     @Autowired private BoothLayoutService layouts;

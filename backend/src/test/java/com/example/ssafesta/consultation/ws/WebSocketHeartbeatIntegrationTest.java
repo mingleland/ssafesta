@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.messaging.simp.broker.SimpleBrokerMessageHandler;
@@ -21,6 +22,7 @@ import org.springframework.scheduling.TaskScheduler;
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class WebSocketHeartbeatIntegrationTest {
 
     @Autowired private ApplicationContext applicationContext;

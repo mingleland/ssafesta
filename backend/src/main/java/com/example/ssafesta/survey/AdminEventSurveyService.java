@@ -5,6 +5,7 @@ import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.user.AdminGuard;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -174,9 +175,11 @@ public class AdminEventSurveyService {
     public record EventSurveyView(String surveyKey, Long surveyId, String title, boolean closed,
                                   int rewardCoin, int questionCount, long entrantCount) { }
 
+    @Schema(name = "AdminEventSurveyQuestionAggregate")
     public record QuestionAggregateView(Long questionId, String type, String prompt, long answered,
                                         List<OptionCountView> options, List<String> textSamples) { }
 
+    @Schema(name = "AdminEventSurveyOptionCount")
     public record OptionCountView(String label, long count) { }
 
     public record EventResponseView(Long responseId, Long userId, String nickname, Instant submittedAt,
