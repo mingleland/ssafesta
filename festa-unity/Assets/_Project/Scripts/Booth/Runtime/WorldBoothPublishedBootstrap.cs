@@ -61,11 +61,45 @@ namespace Festa.Booth
         {
             if (Application.isBatchMode) return;   // 데디케이티드 서버 — 로컬 비주얼 없음
             SceneManager.sceneLoaded += (_, _) => { s_retries = 0; PublishedSlotResolution.Clear(); TryLoad(); };
+            Festa.Integration.AuthBridge.TokenChanged += OnAccessTokenChanged;
             TryLoad();   // 첫 씬이 이미 월드인 경우 (에디터에서 main 직접 실행)
             RetryLoopAsync();
         }
 
         static int s_retries;
+
+        /// <summary>
+        /// 새 Access Token 이 들어오면 <b>못 채운 방만</b> 곧바로 다시 묻는다 (GitLab #216).
+        ///
+        /// <para>왜 필요한가 — AT 는 React 와 Unity 가 나눠 쓰는데, 서버가 refresh 마다 <c>sid</c> 를
+        /// 회전시켜 직전 토큰을 즉시 폐기한다. 그 순간 Unity 가 던진 12슬롯 조회가 한꺼번에 401 을 맞고,
+        /// 부스는 기본 프레임으로 간판은 "N번 부스" 로 남았다 (FE 실측 2026-09-16).</para>
+        ///
+        /// <para>주기 재시도 루프만으로는 닫히지 않는다. 상한이 <see cref="MaxRetries"/> 회라 이미
+        /// 소진됐을 수 있고, 무엇보다 토큰이 도착한 시점과 무관하게 돈다 — 유효한 토큰을 들고도
+        /// 다음 주기까지 기다리거나 아예 안 묻는다.</para>
+        ///
+        /// <para>못 채운 방의 판정을 <b>일시 실패로 되돌린다.</b> 401 은 서버가 답을 준 것이라
+        /// 확정으로 기록될 수 있는데, 토큰이 바뀐 뒤에는 그 답이 더 이상 유효하지 않기 때문이다.
+        /// 이미 채워진 방과 미게시(404)로 확정된 방은 건드리지 않아 헛조회가 늘지 않는다.</para>
+        /// </summary>
+        static void OnAccessTokenChanged()
+        {
+            if (!Enabled || Application.isBatchMode) return;
+
+            int pending = 0;
+            foreach (var r in Object.FindObjectsByType<BoothRuntime>(FindObjectsSortMode.None))
+            {
+                if (r == null || r.IsLoaded) continue;
+                PublishedSlotResolution.Set(r.BoothId, transientFailure: true);
+                pending++;
+            }
+            if (pending == 0) return;
+
+            s_retries = 0;
+            Debug.Log($"[WorldBoothPublishedBootstrap] Access Token 이 새로 들어왔다 — 못 채운 {pending}실을 다시 조회한다 (GitLab #216)");
+            TryLoad(onlyUnresolved: true);
+        }
 
         /// <summary>슬롯별로 마지막에 적용한 레이아웃의 서명. 같은 서명이면 다시 짓지 않는다.</summary>
         static readonly Dictionary<int, string> s_appliedSignature = new();

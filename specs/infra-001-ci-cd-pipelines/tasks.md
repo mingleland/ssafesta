@@ -70,9 +70,9 @@
 - [X] T017 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 DB·secret/config·비가역·unknown 실패의 자동 rollback 금지 및 `MANUAL_ACTION_REQUIRED` evidence 출력을 구현한다
 - [X] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
 - [X] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
-- [ ] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
+- [X] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
 - [X] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
-- [ ] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
+- [X] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
 - [X] T022A [P] [US1] `infra/jenkins/tests/deploy-webgl-release.sh`에 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패 rollback과 retention fixture를 작성한다
 - [X] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
 - [X] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`에 Registry download, SHA-256·안전한 ZIP·manifest 검증, immutable release 설치, 원자적 `current`, 공개 HTTP 검증과 실패 rollback을 구현하고 Nginx가 `.br`·`.unityweb`을 동일한 Brotli 계약으로 제공하게 한다
@@ -147,8 +147,8 @@
 
 **Purpose**: 구현이 아닌 실제 Jenkins/GitLab/EC2에서만 확인 가능한 항목을 기록한다.
 
-- [ ] T038 [P] `infra/evidence/server-preflight.md`에 EC2, Docker/rootless, UFW, DNS/TLS, webhook, 관리 포트, disk baseline 실측을 기록한다
-- [ ] T039 [P] `infra/evidence/unity-agent-preflight.md`에 영속 Unity license, agent 재생성 유지, Editor/module, credential 없는 batch smoke evidence를 기록한다
+- [X] T038 [P] `infra/evidence/server-preflight.md`에 EC2, Docker/rootless, UFW, DNS/TLS, webhook, 관리 포트, disk baseline 실측을 기록한다
+- [X] T039 [P] `infra/evidence/unity-agent-preflight.md`에 영속 Unity license, agent 재생성 유지, Editor/module, credential 없는 batch smoke evidence를 기록한다
 - [ ] T040 `infra/evidence/gitlab-component-pipeline-rehearsal.md`에 GitLab MR gate와 Jenkins develop selected dev deployment 실측을 기록한다
 - [ ] T041 `infra/evidence/demo-promotion-rehearsal.md`에 승인 release의 demo 통합 deploy/verification/rollback evidence를 기록한다
 - [ ] T042 `infra/evidence/quickstart-results.md`에 `specs/infra-001-ci-cd-pipelines/quickstart.md` 전체 실행 결과를 연결한다
