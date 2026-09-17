@@ -13,6 +13,13 @@ type State =
 
 let state: State = { phase: 'idle' };
 let pendingRelease: ReturnType<typeof setTimeout> | null = null;
+let progressListener: UnityProgressListener | null = null;
+let latestProgress = 0;
+
+function publishProgress(progress: number): void {
+  latestProgress = progress;
+  progressListener?.(progress);
+}
 
 function cancelPendingRelease(): void {
   if (pendingRelease !== null) {
@@ -30,13 +37,21 @@ export function acquireUnitySession(
 ): Promise<UnityInstance> {
   cancelPendingRelease();
 
-  if (state.phase === 'creating') return state.promise;
+  // StrictMode 재마운트는 생성 중 promise를 재사용한다. 콜백도 최신 mount 것으로 바꾸지 않으면
+  // 첫 mount의 cancelled 콜백만 남아 로딩 표시가 시작값에 고정된다.
+  progressListener = onProgress;
+
+  if (state.phase === 'creating') {
+    onProgress(latestProgress);
+    return state.promise;
+  }
   if (state.phase === 'ready') return Promise.resolve(state.instance);
   if (state.phase === 'quitting') {
     return state.promise.then(() => acquireUnitySession(canvas, onProgress));
   }
 
-  const promise = loadUnityBuild(canvas, onProgress)
+  latestProgress = 0;
+  const promise = loadUnityBuild(canvas, publishProgress)
     .then((instance) => {
       state = { phase: 'ready', instance };
       return instance;
@@ -113,4 +128,6 @@ export function getReadyUnityInstance(): UnityInstance | null {
 export function __resetForTests(): void {
   cancelPendingRelease();
   state = { phase: 'idle' };
+  progressListener = null;
+  latestProgress = 0;
 }
