@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Promotes only a fully verified demo-game candidate to current and known-good.
+# Promotes a fully verified demo-game candidate to CURRENT.
+# known-good 승격은 사람이 approve-known-good.sh 로 별도 수행한다 (spec infra-001/003 §Session 2026-09-17).
 set -euo pipefail
 
 : "${GAME_DEPLOY_STATE_DIR:?GAME_DEPLOY_STATE_DIR is required}"
@@ -35,17 +36,20 @@ if any(readiness.get(key) != candidate.get(key) for key in ('targetId', 'release
 if not (state_dir / 'releases' / f"{candidate['releaseId']}.json").is_file():
     raise SystemExit('candidate release archive is missing')
 document = dict(candidate)
-document.update({'state': 'CURRENT/KNOWN_GOOD', 'promotedAt': datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')})
-for name in ('current.json', 'known-good.json', 'candidate.json'):
+document.update({'state': 'CURRENT', 'promotedAt': datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')})
+# candidate.json 도 CURRENT 로 갱신 — 다음 배포가 새 CANDIDATE 로 덮을 때까지 마지막 배치 상태를 보존한다.
+for name in ('current.json', 'candidate.json'):
     path = state_dir / name; temporary = path.with_suffix('.tmp')
     temporary.write_text(json.dumps(document, indent=2) + '\n', encoding='utf-8'); temporary.replace(path)
 
-# Atomic sync to infra-001 active dev known-good if environment directory exists
+# Atomic sync to infra-001 active dev **current** if release archive exists.
+# known-good 승격은 사람이 approve-known-good.sh 를 호출할 때 별도로 이뤄진다.
 env_state_root = os.environ.get('ENVIRONMENT_STATE_DIR') or os.environ.get('DEV_BATCH_STATE_DIR') or '/var/lib/festa-environments'
-known_good_dir = pathlib.Path(env_state_root) / 'dev' / 'batches' / 'known-good'
+current_dir = pathlib.Path(env_state_root) / 'dev' / 'batches' / 'current'
 release_archive = state_dir / 'releases' / f"{candidate['releaseId']}.json"
-if known_good_dir.is_dir() and release_archive.is_file():
-    target = known_good_dir / 'game.json'
+if release_archive.is_file():
+    current_dir.mkdir(parents=True, exist_ok=True)
+    target = current_dir / 'game.json'
     tmp_target = target.with_suffix('.tmp')
     tmp_target.write_bytes(release_archive.read_bytes())
     tmp_target.replace(target)
