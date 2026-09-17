@@ -42,3 +42,17 @@
 ## 5. 동시성
 
 낙관적 잠금을 **걸지 않는다.** 같은 계정의 마지막 저장이 이기는 last-write-wins로 충분하다 — 편집 주체가 본인 1명이고(부스 Layout처럼 협업 편집이 아니다), 잃는 것이 "방금 고른 외형" 하나라 revision 충돌 UI를 만들 대상이 아니다. 005가 revision을 둔 이유(여러 기기 편집 유실)와 대가가 다르다.
+
+## 6. 프리셋 3슬롯 (S15P21A604-858)
+
+`avatar_presets`는 현재 외형을 대체하지 않는 회원별 저장 공간이다.
+
+| 컬럼 | 타입·제약 | 의미 |
+|---|---|---|
+| `user_id` | BIGINT FK → `users(id)` `ON DELETE CASCADE` | 프리셋 소유자 |
+| `slot` | SMALLINT `CHECK 1..3` | 화면에 노출하는 고정 슬롯 번호 |
+| `avatar_code` | **TEXT NOT NULL** | 검증된 전체 외형 문자열. 변형 금지 |
+| `updated_at` | TIMESTAMPTZ NOT NULL | 마지막 저장 시각 |
+
+`PRIMARY KEY (user_id, slot)`은 한 회원이 같은 슬롯을 두 번 갖지 못하게 한다. 같은 슬롯의 저장은
+last-write-wins 덮어쓰기이며, 빈 슬롯 삭제는 멱등이다.
