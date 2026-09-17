@@ -86,6 +86,8 @@ namespace Festa.Booth
                     break;
                 case BoothObjectType.ProjectPanel:
                     if (target.GetComponent<ProjectPanelInteractable>() == null) target.gameObject.AddComponent<ProjectPanelInteractable>();
+                    // 부스 안의 큰 검은 화면이 이것이다 — 영상 → 로고 → 썸네일 → 검은 화면 (2026-09-18).
+                    BoothScreenSurface.Attach(target.gameObject, allowVideo: true);
                     break;
             }
 
