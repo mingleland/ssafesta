@@ -109,8 +109,8 @@ class TimerStopJudgeTest {
 
     @Test
     void anInvertedTargetRangeIsRefused() {
-        assertThrows(IllegalStateException.class, () -> new TimerStop(new BigDecimal("10.0"),
-                new BigDecimal("5.0"), BigDecimal.ONE, BigDecimal.ONE, List.of(tier("0.5", 2))));
+        assertThrows(IllegalStateException.class, () -> new TimerStop(new BigDecimal("4.0"),
+                new BigDecimal("2.0"), BigDecimal.ONE, BigDecimal.ONE, List.of(tier("0.5", 2))));
     }
 
     @Test
@@ -118,19 +118,19 @@ class TimerStopJudgeTest {
         // target_value is NUMERIC(8,3) and the draw uses longValueExact, so a four-decimal bound
         // would blow up at the first session rather than at boot.
         IllegalStateException failure = assertThrows(IllegalStateException.class,
-                () -> new TimerStop(new BigDecimal("5.0001"), new BigDecimal("10.0"),
+                () -> new TimerStop(new BigDecimal("2.0001"), new BigDecimal("4.0"),
                         BigDecimal.ONE, BigDecimal.ONE, List.of(tier("0.5", 2))));
         assertTrue(failure.getMessage().contains("밀리초"), failure.getMessage());
     }
 
     @Test
     void aNonPositiveToleranceIsRefused() {
-        assertThrows(IllegalStateException.class, () -> new TimerStop(new BigDecimal("5.0"),
-                new BigDecimal("10.0"), BigDecimal.ONE, BigDecimal.ZERO, List.of(tier("0.5", 2))));
+        assertThrows(IllegalStateException.class, () -> new TimerStop(new BigDecimal("2.0"),
+                new BigDecimal("4.0"), BigDecimal.ONE, BigDecimal.ZERO, List.of(tier("0.5", 2))));
     }
 
     private static TimerStop timerStop(Tier... tiers) {
-        return new TimerStop(new BigDecimal("5.0"), new BigDecimal("10.0"), new BigDecimal("3.0"),
+        return new TimerStop(new BigDecimal("2.0"), new BigDecimal("4.0"), new BigDecimal("3.0"),
                 new BigDecimal("2.0"), List.of(tiers));
     }
 

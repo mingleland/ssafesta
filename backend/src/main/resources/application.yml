@@ -126,8 +126,12 @@ app:
     timer-stop:
       # FR-001a — 목표 시간을 이 범위에서 무작위로 뽑는다. 밀리초 단위까지만 쓸 수 있다
       # (target_value 가 NUMERIC(8,3)).
-      target-min-seconds: 5.0
-      target-max-seconds: 10.0
+      #
+      # 2026-09-18 에 5~10초에서 2~4초로 당겼다 (GitLab #214, S15P21A604-888) — 실플레이에서 한 판
+      # 대기가 지루하다는 FE 요청이다. 하한 2초는 준비 시간 보장이다: 목표는 세션 응답이 온 뒤에야
+      # 화면에 뜨고 그 순간 이미 초시계가 돈다. 실패 임계도 아래 margin 을 타고 5~7초로 함께 짧아진다.
+      target-min-seconds: 2.0
+      target-max-seconds: 4.0
       # failAfterSeconds = 목표 + 이 값 (FR-001d). 리드 확정 대기 중이고, 게임 파트는 GitLab #134
       # 에서 목표+3초에 이견 없음을 회신했다 — docs/26 "미니게임 실패 임계" 행 참조.
       fail-margin-seconds: 3.0
