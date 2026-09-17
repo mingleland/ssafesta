@@ -47,7 +47,7 @@ describe('ESC 설정', () => {
     renderMenu();
     const button = screen.getByRole('button', { name: '설정' });
     expect(button.hasAttribute('disabled')).toBe(false);
-    // 전역이 아니라 이 버튼 안에서만 본다 — 아바타설정 스텁도 같은 문구를 쓴다(S15P21A604-798)
+    // 전역이 아니라 이 버튼 안에서만 본다 — 다른 항목이 같은 문구를 쓸 수 있다
     expect(button.textContent).not.toContain('준비 중');
   });
 
