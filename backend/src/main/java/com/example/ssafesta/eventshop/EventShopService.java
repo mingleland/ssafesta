@@ -63,6 +63,16 @@ public class EventShopService {
         }
         String idempotencyKey = purchaseKey(userId, operationId);
 
+        // Wallet lock first, matching InventoryService.purchase — every coin-spending purchase in
+        // this codebase serializes on the buyer's wallet before touching the thing being bought.
+        //
+        // The idempotency replay check has to happen AFTER this lock, not before: two truly
+        // concurrent requests with the same key would otherwise both see "not recorded yet", both
+        // proceed, and the second would collide on event_purchases' unique idempotency_key
+        // constraint instead of returning the first request's result. Locking first serializes them,
+        // so the second request's check runs only after the first has committed and is visible.
+        wallets.lockOwner(userId);
+
         var replay = purchases.findByIdempotencyKey(idempotencyKey);
         if (replay.isPresent()) {
             EventPurchase existing = replay.get();
@@ -73,9 +83,6 @@ public class EventShopService {
             return viewOf(existing, prizeNameOf(existing.getPrizeId()));
         }
 
-        // Wallet lock first, matching InventoryService.purchase — every coin-spending purchase in
-        // this codebase serializes on the buyer's wallet before touching the thing being bought.
-        wallets.lockOwner(userId);
         EventPrize prize = prizes.findByIdForUpdate(prizeId)
                 .orElseThrow(() -> new ApiException(ErrorCode.EVENT_PRIZE_NOT_FOUND));
         if (!prize.isActive()) {
