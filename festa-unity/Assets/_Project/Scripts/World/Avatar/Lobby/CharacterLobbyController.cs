@@ -270,7 +270,6 @@ namespace Festa.Avatar
             {
                 // 카메라를 옮긴 무대에 바로 스냅한다 — Lerp 로 원점에서 4000u 를 내려오는 첫 프레임을 보이지 않게.
                 _previewCamera.transform.position=_cameraTarget;_previewCamera.transform.LookAt(_cameraLook);
-                SetStatus("월드 아바타를 수정합니다. 적용하면 그 자리에서 바로 반영됩니다.");
                 InitializeFromServerAsync();
                 return;
             }
@@ -341,7 +340,6 @@ namespace Festa.Avatar
         {
             if (_inPlace || _guestEntered || !Festa.Integration.AuthBridge.IsGuest) return false;
             _guestEntered = true;
-            SetStatus("게스트는 기본 외형으로 바로 입장합니다.");
             Debug.Log("[CharacterLobby] 게스트 — 커스터마이징 생략, 월드 입장");
             EnterWorld();
             return true;
@@ -822,9 +820,34 @@ namespace Festa.Avatar
             if (_responsiveFrame) LayoutRebuilder.ForceRebuildLayoutImmediate(_responsiveFrame);
         }
 
+        /// <summary>상태 줄이 화면에 남아 있는 시간(초). 지나면 스스로 지운다.</summary>
+        const float StatusSeconds = 5f;
+
+        Coroutine _statusClear;
+
+        /// <summary>
+        /// 상태 줄에 한 줄 띄우고 <b>잠시 뒤 스스로 지운다</b> (사용자 지시 2026-09-17).
+        ///
+        /// <para>전에는 한 번 쓰면 화면 하단에 계속 남아 아바타를 가렸다. 그렇다고 라벨을 없애면
+        /// 잠금 안내·조회 실패가 로그에만 남고 화면에는 아무것도 안 뜬다 — 이 라벨은 바로 그래서
+        /// 생겼다(S15P21A604-412). 그래서 없애는 대신 <b>시간이 지나면 사라지게</b> 했다.</para>
+        ///
+        /// <para>평상시 안내("수정합니다"·"적용했습니다"·"게스트는 바로 입장합니다")는 호출 자체를 없앴다 —
+        /// 아바타가 눈앞에서 바뀌는데 같은 말을 글자로 또 할 이유가 없다.</para>
+        /// </summary>
         void SetStatus(string message)
         {
-            if(_status)_status.text=message;
+            if(!_status)return;
+            _status.text=message;
+            if(_statusClear!=null){StopCoroutine(_statusClear);_statusClear=null;}
+            if(!string.IsNullOrEmpty(message))_statusClear=StartCoroutine(ClearStatusAfter());
+        }
+
+        System.Collections.IEnumerator ClearStatusAfter()
+        {
+            yield return new WaitForSecondsRealtime(StatusSeconds);
+            if(_status)_status.text=string.Empty;
+            _statusClear=null;
         }
 
         void SelectWardrobeItem(AvatarPartCategory category,int itemId)
@@ -1157,8 +1180,8 @@ namespace Festa.Avatar
             var nm = Unity.Netcode.NetworkManager.Singleton;
             var player = nm != null && nm.IsClient ? nm.LocalClient?.PlayerObject : null;
             var controller = player ? player.GetComponent<Festa.World.PlayerAppearanceController>() : null;
-            if (controller) { controller.RequestChange(Festa.World.AvatarAppearance.FromModularConfig(_config)); SetStatus("월드 아바타에 적용했습니다."); }
-            else SetStatus("외형이 준비되었습니다. 월드 접속 후 자동 적용할 수 있습니다.");
+            // 적용 결과는 아바타가 그 자리에서 바뀌는 것으로 보인다 — 같은 말을 글자로 또 하지 않는다.
+            if (controller) controller.RequestChange(Festa.World.AvatarAppearance.FromModularConfig(_config));
         }
         void EnterWorld()
         {
