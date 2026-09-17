@@ -363,10 +363,14 @@ namespace Festa.Content
             if (ro == null) return "전시물 · 준비 중";
             switch (ro.Type)
             {
-                case Festa.Booth.BoothObjectType.VideoScreen:      return "영상 화면 · 준비 중";
                 case Festa.Booth.BoothObjectType.LikeVote:         return "좋아요 투표 · 준비 중";
                 case Festa.Booth.BoothObjectType.ConsultationDesk: return "상담 데스크 · 준비 중";
                 case Festa.Booth.BoothObjectType.RecruitmentBoard: return "채용 게시판 · 준비 중";
+                // 영상 화면은 **장식으로 확정**됐다 (GitLab #194 ② — B안, 2026-09-17).
+                // 기능화(A)는 영상 호스팅 결정을 건너뛸 수 없다: projects.video_url 은 YouTube 링크가
+                // 들어오는 자리이고 Unity VideoPlayer 는 그것을 재생하지 못한다. 결정이 났으므로
+                // "준비 중" 을 계속 말하지 않는다 — 장식인데 준비 중이라고 하면 곧 될 것으로 읽힌다.
+                case Festa.Booth.BoothObjectType.VideoScreen:
                 case Festa.Booth.BoothObjectType.Furniture:
                 case Festa.Booth.BoothObjectType.Decoration:       return null;   // 가구·장식은 원래 아무 반응이 없어야 한다
                 default: return "전시물 · 준비 중";
