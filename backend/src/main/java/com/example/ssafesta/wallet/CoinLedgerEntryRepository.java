@@ -38,6 +38,16 @@ public interface CoinLedgerEntryRepository extends JpaRepository<CoinLedgerEntry
                                            @Param("reasonType") String reasonType,
                                            @Param("from") Instant from, @Param("to") Instant to);
 
+    /** Counts slot spins from their existing bet or payout ledger facts; no parallel spin table exists. */
+    @Query("""
+            select count(e) from CoinLedgerEntry e join Wallet w on w.id = e.walletId
+            where w.userId = :userId and e.reasonType = :reasonType and e.referenceType = :referenceType
+              and e.createdAt >= :from and e.createdAt < :to
+            """)
+    long countSlotSpinsBetween(@Param("userId") Long userId, @Param("reasonType") String reasonType,
+                               @Param("referenceType") String referenceType,
+                               @Param("from") Instant from, @Param("to") Instant to);
+
     /**
      * Per-wallet ledger totals for reconciliation (spec 003 FR-014). Wallets with no entries are
      * absent from the result, so the caller must treat a missing row as a ledger sum of 0 rather
