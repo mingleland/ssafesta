@@ -131,4 +131,25 @@ public interface BoothLeaseRepository extends JpaRepository<BoothLease, Long> {
             limit :max
             """)
     List<BoothLease> findStaleActive(@Param("moment") Instant moment, @Param("max") int max);
+
+    /**
+     * Active leases that crossed the D07 one-hour warning boundary but have not yet claimed it.
+     *
+     * <p>The lock and {@code SKIP LOCKED} make two application instances divide the work instead
+     * of both notifying the same tenant. A late pass still notifies while time remains; a passed
+     * end time is excluded because expiry, not a warning, is then the truthful state.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @Query("""
+            select l from BoothLease l
+            where l.status = com.example.ssafesta.booth.LeaseStatus.ACTIVE
+              and l.endsAt > :now and l.endsAt <= :warningDeadline
+              and l.expiryWarningSentAt is null
+            order by l.endsAt, l.id
+            limit :max
+            """)
+    List<BoothLease> findUnwarnedExpiring(@Param("now") Instant now,
+                                          @Param("warningDeadline") Instant warningDeadline,
+                                          @Param("max") int max);
 }

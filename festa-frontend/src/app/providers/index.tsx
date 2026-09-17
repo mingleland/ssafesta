@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
 import { bootstrapAuth } from '../../features/auth/model/bootstrap';
 import { ScreenAudioController } from '../../features/audio/ui/ScreenAudioController';
+import { LeaseExpiryNotificationListener } from '../../features/booth/ui/LeaseExpiryNotificationListener';
 import { installImageDragGuard } from '../../shared/ui/imageDragGuard';
 import { ToastHost } from '../../shared/ui/toast/ToastHost';
 import { queryClient } from './queryClient';
@@ -20,6 +21,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       {/* 화면 BGM 은 라우터 밖에 산다 — / → /login → /app/world 에서 끊기지 않게 (S15P21A604-463) */}
       <ScreenAudioController />
+      {/* D07 알림도 화면 전환과 무관해야 한다 — 내 부스가 있는 회원만 개인 STOMP 큐를 구독한다. */}
+      <LeaseExpiryNotificationListener />
       {children}
       {/* 알림은 레이아웃 밖 공통층이다 — 라우터 밖에 둬야 화면이 바뀌어도 같은 자리에 뜬다 (S15P21A604-465) */}
       <ToastHost />
