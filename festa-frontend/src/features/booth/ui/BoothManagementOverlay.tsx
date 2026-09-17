@@ -11,8 +11,8 @@
 //
 // 2026-09-16 개편 (S15P21A604-817): 부스 공간·기능형 에셋 배치는 Unity 의 부스별 고정 구성이
 // 정본이라 관리창에서 부스 스튜디오로 가는 길을 끊었다. 2026-09-17 에는 deep-link 와
-// ManagementPanel 'studio' 멤버까지 걷어 **사용자가 들어갈 길이 하나도 없다** — 편집기 코드와
-// 2.5D·게시 파이프라인은 코드째 보존돼 있다(부스 런타임 자동화는 그대로 돈다).
+// ManagementPanel 'studio' 멤버를 걷고, 편집기 코드(features/studio·entities/layout·catalog)도 삭제했다
+// (S15P21A604-846). 부스 런타임 자동화(tools/assets·assets:build)는 그대로 돈다.
 // 이 화면은 layout publish/rebuild 를 부르지 않는다. 외관 편집은 부스 이름만 인라인으로 남겼다.
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';

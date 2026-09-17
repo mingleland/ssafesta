@@ -94,9 +94,10 @@ export const routes = [
     ),
   },
   {
-    // Booth Studio 는 사용자 흐름에서 폐기했다 (2026-09-17). 편집기 코드는 `features/studio`·
-    // `pages/studio` 에 숨김 보존하되 **들어갈 길을 두지 않는다** — 옛 주소는 월드로 보낸다.
-    // 부스 런타임을 만드는 자동화(assets:build·manifest·ReloadBoothSlot)는 그대로다.
+    // Booth Studio 는 폐기됐다 (2026-09-17, 편집기 코드 삭제 S15P21A604-846). 옛 주소는 북마크·외부
+    // 링크가 404 로 떨어지지 않게 월드로 보낸다. 부스 런타임을 만드는 자동화(assets:build·manifest·
+    // ReloadBoothSlot)는 그대로다. 테마·대표색·간판·로고 편집이 다시 필요해지면 Studio 를 복원하지 않고
+    // Booth Management 에서 새로 짠다.
     path: '/app/studio/:boothId',
     element: <Navigate to="/app/world" replace />,
   },
