@@ -41,7 +41,9 @@ const emptyForm: FormState = {
 // 이름·프롬프트를 비워둔 채 등록해도 막지 않는다(S15P21A604-724) — 백엔드는 두 필드를
 // 여전히 필수로 요구하므로(AiAgentService.validatedName/validatedPrompt), 빈 채로 보내면
 // 저장 직전에 이 기본값으로 채운다. 계약을 바꾸는 게 아니라 FE가 대신 채워 넣는 것이다.
-const DEFAULT_AGENT_NAME = 'FESTA 안내 직원';
+// 부스마다 기본 직원명이 갈리도록 부스 번호를 붙인다(S15P21A604-823) — 여러 부스를
+// 운영할 때 전부 'FESTA 안내 직원'이면 구분이 안 된다. 번호는 이 탭이 가진 boothId 다.
+const defaultAgentName = (boothId: number) => `FESTA 안내 직원 #${boothId}`;
 const DEFAULT_SYSTEM_PROMPT =
   '방문객의 질문에 친절하고 정확하게 답합니다. 모르는 내용은 모른다고 답하고, 확인되지 않은 정보를 지어내지 않습니다.';
 
@@ -184,7 +186,7 @@ export function AiAgentManagementTab({ boothId }: { boothId: number }) {
     event.preventDefault();
     const next: FormState = {
       ...form,
-      name: form.name.trim() || DEFAULT_AGENT_NAME,
+      name: form.name.trim() || defaultAgentName(boothId),
       systemPrompt: form.systemPrompt.trim() || DEFAULT_SYSTEM_PROMPT,
     };
     setForm(next);

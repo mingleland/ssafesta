@@ -7,6 +7,7 @@
 // 갈아끼우므로 Esc·배경 클릭·X·외부 closeOverlay()·다른 오버레이 전환이 전부 여기로 수렴한다.
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { facadeApi } from '../../../entities/booth/facadeApi.select';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { closeConversation, createConversation, isAiHttpError, streamMessage } from '../../../entities/conversation/api';
 import { describeHttpError, shouldResetConversation } from '../../../entities/conversation/errorMessages';
@@ -54,6 +55,10 @@ export function AiChatOverlay({ payload }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const consultation = useVisitorConsultation();
+  // 제목에는 사람이 읽는 부스 이름을 쓴다 — payload.boothId 는 DB PK 라 그대로 노출하면
+  // 슬롯 번호처럼 읽힌다(S15P21A604-823). 방문자도 부를 수 있는 GET /booths/{id} 로 이름을 얻는다.
+  // 실패하면 조용히 이름 없이 '부스'로만 둔다(제목 장식이라 대화 흐름을 막지 않는다).
+  const [boothName, setBoothName] = useState<string | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -84,6 +89,19 @@ export function AiChatOverlay({ payload }: Props) {
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
   }, [turns]);
+
+  useEffect(() => {
+    let alive = true;
+    void facadeApi
+      .getBooth(payload.boothId)
+      .then((booth) => {
+        if (alive) setBoothName(booth.name);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [payload.boothId]);
 
   // 게스트·비로그인은 Conversation 생성 진입점 자체를 보이지 않는다(spec 008 FR-027·SC-011).
   function goLogin() {
@@ -202,7 +220,7 @@ export function AiChatOverlay({ payload }: Props) {
   return (
     <OverlayFrame
       title="AI 직원"
-      subtitle={'부스 #' + payload.boothId}
+      subtitle={boothName ?? '부스'}
       size="l"
       icon={IcAgent}
       onClose={closeOverlay}
