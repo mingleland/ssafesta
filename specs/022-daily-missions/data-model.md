@@ -6,8 +6,8 @@
 |---|---|---|
 | AI_CONSULT | `consultations.requested_at` | 오늘 1회 이상 |
 | SURVEY_ANSWER | `survey_responses.submitted_at` | 오늘 1회 이상 |
-| STRIKER_PLAY_3 | `minigame_sessions.started_at` | 오늘 3회 이상 |
-| STRIKER_SCORE | `minigame_sessions` | COMPLETED 및 reward_coin > 0 1회 이상 |
+| STRIKER_PLAY_3 | `minigame_sessions.started_at` | 오늘 `game_type=HIGH_STRIKER` 3회 이상 |
+| STRIKER_SCORE | `minigame_sessions` | 오늘 `HIGH_STRIKER`, COMPLETED, `result_value >= 400` 1회 이상 |
 | SLOT_PLAY_3 | `coin_ledger_entries` | `SLOT_BET` 3회 이상 |
 | SLOT_WIN | `coin_ledger_entries` | `SLOT_PAYOUT` 1회 이상 |
 | BOOTH_VISIT_3 | `booth_visits` | 서로 다른 booth 3곳 이상 |

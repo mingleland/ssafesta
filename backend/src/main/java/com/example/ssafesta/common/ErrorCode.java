@@ -293,6 +293,10 @@ public enum ErrorCode {
      * 모르는 경우를 갈라야 하고, 그 분기가 code 하나에 달려 있다 (GitLab #205 게임 파트 회신).
      */
     SLOT_MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯머신을 찾을 수 없습니다."),
+    /** 하이스트라이커 월드 기계 id가 서버가 아는 기계와 다르다 (GitLab #233). */
+    HIGH_STRIKER_NOT_FOUND(HttpStatus.NOT_FOUND, "하이스트라이커 게임기를 찾을 수 없습니다."),
+    /** 승인된 스윙보다 빠른 클라이언트 재전송은 미션 사실로 남기지 않는다. */
+    HIGH_STRIKER_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "하이스트라이커 기록 요청이 너무 빠릅니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

@@ -12,6 +12,7 @@ Spring Boot 3 / Java 21 / PostgreSQL 17 / Redis를 사용한다. 기존 원장�
 2. `WORLD_ENTER`만 게임 서버의 영구 상태가 될 수 없으므로 Spring의 성공 세션 발급 시점에 Redis KST 키로 기록한다. 이는 하루 동안의 사실 마커일 뿐 Coin 원장이 아니다.
 3. 수령 트랜잭션은 지갑 행을 잠그고 원장 키 재확인→완료 판정→일일 한도→credit 순서로 수행한다.
 4. API는 `missionId`를 안정적인 enum 문자열로 노출한다. 새 상태값을 추가하지 않고 `LOCKED`/`CLAIMABLE`/`CLAIMED`로 표시한다.
+5. 하이스트라이커 화면의 점수 권위는 Netcode에 남긴다. Spring은 승인 뒤 전송된 결과만 `HIGH_STRIKER` 세션으로 저장하고, 기계 화이트리스트·1~999 점수 제한·3.2초 쿨다운으로 미션 근거의 과도한 재전송을 막는다.
 
 ## 헌법 점검
 
@@ -27,6 +28,9 @@ backend/src/main/java/com/example/ssafesta/mission/
   DailyMissionController.java
   DailyMissionService.java
   WorldMissionProgressService.java
+backend/src/main/java/com/example/ssafesta/minigame/
+  HighStrikerController.java
+  HighStrikerService.java
 backend/src/test/java/com/example/ssafesta/mission/
   DailyMissionServiceTest.java
 specs/022-daily-missions/contracts/daily-mission-api.md

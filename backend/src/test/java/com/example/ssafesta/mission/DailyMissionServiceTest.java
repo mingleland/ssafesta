@@ -3,7 +3,6 @@ package com.example.ssafesta.mission;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -22,6 +21,7 @@ import com.example.ssafesta.wallet.CoinCreditCommand;
 import com.example.ssafesta.wallet.LedgerResult;
 import com.example.ssafesta.wallet.WalletProperties;
 import com.example.ssafesta.wallet.WalletService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -50,8 +50,8 @@ class DailyMissionServiceTest {
                 anyLong(), any(), any())).thenReturn(1L);
         when(minigames.countByUserIdAndGameTypeAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                 anyLong(), anyString(), any(), any())).thenReturn(3L);
-        when(minigames.countByUserIdAndGameTypeAndStatusAndRewardCoinGreaterThanAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
-                anyLong(), anyString(), any(), anyInt(), any(), any())).thenReturn(1L);
+        when(minigames.countByUserIdAndGameTypeAndStatusAndResultValueGreaterThanEqualAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
+                anyLong(), anyString(), any(), any(BigDecimal.class), any(), any())).thenReturn(1L);
         when(ledger.countSlotSpinsBetween(anyLong(), anyString(), anyString(), any(), any()))
                 .thenReturn(3L, 1L);
         when(visits.countDistinctBoothsVisitedByUserBetween(anyLong(), any(), any())).thenReturn(6L);

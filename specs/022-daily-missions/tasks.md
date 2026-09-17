@@ -27,3 +27,4 @@ US1(조회)과 US2(수령)는 활동 집계와 월드 입장 마커를 공통으
 - [X] T010 `backend/src/test/java/com/example/ssafesta/world/WorldSessionApiIntegrationTest.java`에 회원 월드 입장 마커 검증을 추가한다.
 - [X] T011 `backend/src/test/java/com/example/ssafesta/mission/DailyMissionServiceTest.java`와 `DailyMissionApiIntegrationTest.java`에서 지급·중복·한도·API 계약을 검증한다.
 - [X] T012 `docs/24_작업일지.md`에 완료 기록을 남기고 관련 Maven 테스트를 실행한다.
+- [X] T013 [US1] Unity 하이스트라이커의 서버 승인 스윙을 `HIGH_STRIKER` 세션으로 기록하는 API와 3.2초 재전송 방어를 추가하고, 3회·400점 진행도 근거를 그 기록으로 전환한다.

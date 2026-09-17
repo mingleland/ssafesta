@@ -29,7 +29,8 @@ public class DailyMissionController {
         this.missions = missions;
     }
 
-    @Operation(summary = "오늘의 일일 미션 진행도 조회")
+    @Operation(summary = "오늘의 일일 미션 진행도 조회",
+            description = "KST 기준 오늘의 아홉 가지 활동 사실을 조회 시점에 계산한다. 진행도 전용 테이블이나 클라이언트 신고 값은 사용하지 않으며, `WORLD_ENTER`만 성공한 월드 세션 발급의 Redis 사실 마커를 읽는다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "KST 기준 오늘의 미션·진행도·수령 상태"),
             @ApiResponse(responseCode = "403", description = "MEMBER_ONLY — 게스트에게는 코인 지갑이 없다")})
@@ -38,7 +39,8 @@ public class DailyMissionController {
         return missions.findToday(memberId(jwt));
     }
 
-    @Operation(summary = "완료한 일일 미션 보상 수령")
+    @Operation(summary = "완료한 일일 미션 보상 수령",
+            description = "완료한 미션 하나의 15 Coin을 수령한다. 지갑 행 잠금과 `DAILY_MISSION:{userId}:{missionId}:{KST 날짜}` 원장 멱등성 키로 동시 요청도 한 번만 지급하며, 하루 합계는 135 Coin을 넘지 않는다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "15 Coin 보상과 수령 뒤 잔액"),
             @ApiResponse(responseCode = "400", description = "NOT_COMPLETED"),

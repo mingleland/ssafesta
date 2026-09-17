@@ -4,6 +4,7 @@ import com.example.ssafesta.booth.BoothVisitRepository;
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.common.ErrorCode;
 import com.example.ssafesta.consultation.ConsultationRepository;
+import com.example.ssafesta.minigame.HighStrikerService;
 import com.example.ssafesta.minigame.MinigameSessionRepository;
 import com.example.ssafesta.minigame.MinigameSessionStatus;
 import com.example.ssafesta.wallet.CoinCreditCommand;
@@ -30,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DailyMissionService {
 
-    private static final String TIMER_STOP_GAME_TYPE = "TIMER_STOP";
     private static final String SLOT_REFERENCE_TYPE = "SLOT_SPIN";
 
     private final ConsultationRepository consultations;
@@ -113,10 +113,11 @@ public class DailyMissionService {
                     .countByRespondentUserIdAndSubmittedAtGreaterThanEqualAndSubmittedAtLessThan(userId, from, to));
             case STRIKER_PLAY_3 -> asProgress(minigameSessions
                     .countByUserIdAndGameTypeAndStartedAtGreaterThanEqualAndStartedAtLessThan(
-                            userId, TIMER_STOP_GAME_TYPE, from, to));
+                            userId, HighStrikerService.GAME_TYPE, from, to));
             case STRIKER_SCORE -> asProgress(minigameSessions
-                    .countByUserIdAndGameTypeAndStatusAndRewardCoinGreaterThanAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
-                            userId, TIMER_STOP_GAME_TYPE, MinigameSessionStatus.COMPLETED, 0, from, to));
+                    .countByUserIdAndGameTypeAndStatusAndResultValueGreaterThanEqualAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
+                            userId, HighStrikerService.GAME_TYPE, MinigameSessionStatus.COMPLETED,
+                            HighStrikerService.MISSION_SCORE, from, to));
             case SLOT_PLAY_3 -> asProgress(ledger.countSlotSpinsBetween(userId, CoinReason.SLOT_BET,
                     SLOT_REFERENCE_TYPE, from, to));
             case SLOT_WIN -> asProgress(ledger.countSlotSpinsBetween(userId, CoinReason.SLOT_PAYOUT,

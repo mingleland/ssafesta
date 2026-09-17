@@ -22,12 +22,12 @@
 ## 기능 요구사항
 
 - FR-001: 미션은 `AI_CONSULT`, `SURVEY_ANSWER`, `STRIKER_PLAY_3`, `STRIKER_SCORE`, `SLOT_PLAY_3`, `SLOT_WIN`, `BOOTH_VISIT_3`, `BOOTH_VISIT_6`, `WORLD_ENTER` 9종이다.
-- FR-002: 상담·설문·타이머 스톱·슬롯·부스 방문은 기존 DB 사실 기록에서 요청 시 계산한다.
+- FR-002: 상담·설문·하이스트라이커·슬롯·부스 방문은 기존 DB 사실 기록에서 요청 시 계산한다. 하이스트라이커는 Unity가 서버 승인 스윙 뒤 전송한 `HIGH_STRIKER` 기록만 센다.
 - FR-003: `WORLD_ENTER`는 회원의 성공한 `POST /api/v1/world-sessions` 뒤 Redis에 KST 일자 마커를 기록해 판정한다. 일일 지급 캐시 키와 공유하지 않는다.
 - FR-004: Redis 기록/조회가 실패하면 월드 세션 발급 또는 해당 미션 조회는 재시도로 회복 가능한 503으로 실패한다. 누락된 활동을 완료로 추정하지 않는다.
 - FR-005: 수령은 지갑 잠금과 `DAILY_MISSION:{userId}:{missionId}:{yyyy-MM-dd}` 원장 키로 보호하고, `DAILY_MISSION` 사유로 15 Coin을 지급한다.
 - FR-006: 미완료는 `400 NOT_COMPLETED`, 중복 수령 및 하루 상한은 `409 ALREADY_CLAIMED` / `409 DAILY_CAP_REACHED`다. 게스트는 기존 회원 전용 403 규칙을 따른다.
-- FR-007: `STRIKER_SCORE`는 기존 완료 세션 중 Coin 보상(정상 성공) 기록이 있는 횟수를 센다. 미니게임 일일 보상 상한 때문에 성공 기록이 사라지지 않도록 이 기준을 바꾸려면 minigame 결과 모델을 먼저 확장한다.
+- FR-007: `STRIKER_PLAY_3`은 오늘 `HIGH_STRIKER` 기록 3회를, `STRIKER_SCORE`는 완료된 `HIGH_STRIKER` 기록 중 점수 400 이상 1회를 센다. 기록 API는 `plaza-high-striker-01`만 받고 점수는 1~999로 제한하며 3.2초 쿨다운으로 재전송을 사실로 남기지 않는다.
 
 ## 범위 제외
 
