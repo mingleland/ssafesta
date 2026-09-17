@@ -67,7 +67,9 @@ namespace Festa.Diagnostics
 
             var message = Samples[_next % Samples.Length];
             _next++;
-            Festa.World.PlayerChatBubble.Show(me.gameObject, message);
+            // 닉네임은 null 로 넘긴다 — 말풍선이 이름표(PlayerNameplate.DisplayLabel)에서 실제 표시명을
+            // 가져오므로, 표본에도 내 진짜 닉네임이 헤더에 뜬다. 실제 채팅과 같은 경로를 보게 된다.
+            Festa.World.PlayerChatBubble.Show(me.gameObject, null, message);
             Debug.Log($"[ChatBubbleProbe] 표본 말풍선 — \"{message}\" (내 화면에만 보인다, {_next}/{Samples.Length} 순환)");
         }
     }
