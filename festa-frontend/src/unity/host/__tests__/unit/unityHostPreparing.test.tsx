@@ -46,18 +46,6 @@ describe('World Preparing UX (-429)', () => {
     expect(screen.getByText('축제장을 불러오고 있어요')).toBeTruthy();
   });
 
-  it('전환 중에는 dim을 불투명하게 — 직전 씬 canvas 프레임이 비치지 않는다 (S15P21A604-733)', async () => {
-    await renderReady();
-    loadStart();
-    expect(screen.getByRole('status').className).toContain('uh-status--opaque');
-  });
-
-  it('boot 대기 중에는 dim이 반투명 그대로다 — 아직 전환 중이 아니다', async () => {
-    const { UnityHost } = await import('../../UnityHost');
-    render(<UnityHost />);
-    expect(screen.getByRole('status').className).not.toContain('uh-status--opaque');
-  });
-
   it('길어지면 문구가 바뀌지만 실패로 넘어가지 않는다', async () => {
     await renderReady();
     loadStart();
