@@ -190,6 +190,8 @@
 .ov-btn:focus-visible { outline: 2px solid var(--ov-accent); outline-offset: 2px; }
 .ov-btn-primary { background: var(--ov-accent); border-color: var(--ov-accent); color: var(--ov-accent-ink); }
 .ov-btn-danger { background: rgba(239, 93, 108, 0.14); border-color: rgba(239, 93, 108, 0.45); color: #ff9aa5; }
+/* 응모권 전용 강조색 — 즉시교환(파랑)과 성격이 다른 액션임을 표시(S15P21A604-842) */
+.ov-btn-raffle { background: #ffb84d; border-color: #ffb84d; color: #1c1300; }
 
 /* ── 공통 조각 ── */
 .ov-alert {
@@ -215,6 +217,15 @@
   font-size: 12px;
   font-weight: 600;
 }
+/* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
+.ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
+
+/* ── 화면 내 섹션 구분 (S15P21A604-842) ──
+   한 오버레이 본문 안에 성격이 다른 카드 그룹이 여럿일 때(이벤트 상점의 즉시교환/응모권) 쓴다. */
+.ov-section + .ov-section { margin-top: 22px; }
+.ov-section-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.ov-section-title { font-size: 14px; font-weight: 700; color: var(--ov-text); }
+.ov-section-desc { font-size: 12px; color: var(--ov-text-muted); }
 
 /* ── 카드 그리드 (S15P21A604-599) ──
    가이드 카드와 상점 상품 카드가 같은 어휘를 쓴다. 화면마다 카드 CSS 를 복제하지 않는 것이 요점이다.
@@ -241,6 +252,28 @@
   background: var(--ov-surface-raised);
 }
 .ov-card[data-disabled] { opacity: 0.55; }
+
+/* ── 큰 사진 카드 레이아웃 (S15P21A604-842) ──
+   실물 상품 사진이 핵심인 화면(이벤트 상점)용. 세로(아이콘+제목...) 대신 가로(사진|본문)로 짠다.
+   같은 .ov-card-grid/.ov-card 위에 얹는 변형이라 카드 CSS를 통째로 복제하지 않는다. */
+.ov-card[data-layout='media'] { flex-direction: row; align-items: stretch; gap: 12px; }
+.ov-card-media {
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  background: var(--ov-surface-sunken);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ov-card-media img { width: 84%; height: 84%; object-fit: contain; }
+.ov-card-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1; justify-content: center; }
+.ov-card-body .ov-card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
+.ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
 /* 헤더 배지와 같은 처방 — 아이콘 어휘를 한 벌로 유지한다 */
 .ov-card-icon {
   display: inline-flex;
