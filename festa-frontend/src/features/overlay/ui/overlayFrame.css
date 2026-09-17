@@ -247,7 +247,7 @@
   border: 1px solid var(--ov-border);
   border-radius: var(--ov-radius-control);
   background: var(--ov-surface-raised);
-  /* grid item 기본 최소폭은 내용의 min-content다 — 긴 상품명(예: "교보 기프트카드 10000원권")이
+  /* grid item 기본 최소폭은 내용의 min-content다 — 긴 상품명(예: "교보문고 10000원권")이
      그리드 트랙 자체를 넓혀서 프레임 밖으로 카드가 삐져나가는 걸 막는다. 0으로 풀어야 안의
      .ov-card-title(nowrap+ellipsis)이 실제로 줄어들 수 있다(S15P21A604-842 후속) */
   min-width: 0;

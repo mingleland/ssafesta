@@ -13,13 +13,13 @@ import chickenUrl from '../../../assets/festa/eventShop/chicken.png';
 
 // 서버 응답엔 이미지가 없다(EventPrize·RafflePrize 둘 다 imageUrl 필드가 없음) — 상품명으로 매핑한다.
 // 매핑에 없는 이름은 undefined를 돌려주고, 화면은 기본 아이콘으로 대신한다.
-// 말랑이·교보 기프트카드는 응모권에서 즉시교환으로 옮겨졌다(2026-09-17, S15P21A604-842 후속).
+// 말랑이·교보문고 10000원권은 응모권에서 즉시교환으로 옮겨졌다(2026-09-17, S15P21A604-842 후속).
 const PRIZE_IMAGES: Record<string, string> = {
   마이구미: mygummyUrl,
   초코송이: chocosongiUrl,
-  커피: coffeeUrl,
+  아이스아메리카노: coffeeUrl,
   말랑이: mallangiUrl,
-  '교보 기프트카드 10000원권': kyoboUrl,
+  '교보문고 10000원권': kyoboUrl,
 };
 
 const RAFFLE_IMAGES: Record<string, string> = {
@@ -40,7 +40,7 @@ const IMAGE_SCALE: Record<string, number> = {
   초코송이: 1.2,
   // 기프트카드는 가로가 긴 사진이라 84% contain 박스에서 세로가 짧게 남아 다른 카드보다
   // 작아 보인다 — 다른 상품·응모권 카드와 체감 크기를 맞추려고 더 크게 키운다.
-  '교보 기프트카드 10000원권': 1.7,
+  '교보문고 10000원권': 1.7,
 };
 
 export function imageScaleFor(name: string): number {

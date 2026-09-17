@@ -13,9 +13,9 @@ function apiError(code: string, message: string): ApiError {
 const prizes: EventPrize[] = [
   { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
   { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 15, active: true },
-  { prizeId: 3, name: '커피', priceCoin: 600, stock: 4, active: true },
+  { prizeId: 3, name: '아이스아메리카노', priceCoin: 600, stock: 4, active: true },
   { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true },
-  { prizeId: 5, name: '교보 기프트카드 10000원권', priceCoin: 1000, stock: 3, active: true },
+  { prizeId: 5, name: '교보문고 10000원권', priceCoin: 1000, stock: 3, active: true },
 ];
 
 export async function listPrizes(): Promise<EventPrize[]> {
