@@ -158,9 +158,20 @@ describe('경품이 들어온 뒤', () => {
 
 describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
   const raffles = [
-    { raffleId: 101, name: '말랑이', priceCoin: 250, stock: 47, active: true },
-    { raffleId: 102, name: '교보 기프트카드', priceCoin: 250, stock: 0, active: true },
+    { raffleId: 101, name: '말랑이', priceCoin: 250, stock: 47, active: true, drawAt: null },
+    { raffleId: 102, name: '교보 기프트카드', priceCoin: 250, stock: 0, active: true, drawAt: null },
   ];
+
+  it('추첨 시각을 아직 모르면 지어내지 않고 그렇게 말한다', async () => {
+    listPrizes.mockResolvedValue([]);
+    listRaffles.mockResolvedValue(raffles);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    renderOverlay();
+
+    await screen.findByText('말랑이');
+    expect(screen.getAllByText('추첨 일정은 추후 공지됩니다').length).toBeGreaterThan(0);
+  });
 
   it('소진되지 않은 응모권은 응모할 수 있다', async () => {
     listPrizes.mockResolvedValue([]);
@@ -197,6 +208,7 @@ describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
       raffleName: '말랑이',
       coinSpent: 250,
       enteredAt: new Date().toISOString(),
+      drawAt: '2026-09-20T11:00:00+09:00',
     });
 
     renderOverlay();
@@ -210,5 +222,6 @@ describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
 
     await screen.findByText('응모 완료');
     expect(screen.getByText('250 C 사용')).toBeTruthy();
+    expect(screen.getByText(/추첨 9월 20일/)).toBeTruthy();
   });
 });

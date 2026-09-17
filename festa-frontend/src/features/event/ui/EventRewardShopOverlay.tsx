@@ -22,7 +22,7 @@ import { OverlayFrame, OverlayError, OverlayLoading } from '../../overlay/ui/Ove
 import { OverlayNotice } from '../../overlay/ui/OverlayNotice';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
 import { PurchaseResultDialog } from './PurchaseResultDialog';
-import { imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
+import { drawTimeLabel, imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 
@@ -30,6 +30,8 @@ interface ResultDialogState {
   title: string;
   itemName: string;
   coinSpent: number;
+  /** 응모 완료일 때만 — 언제 추첨하는지. 즉시교환엔 없다(그 자리에서 바로 받는다) */
+  note?: string;
 }
 
 const IcGift = (
@@ -81,7 +83,12 @@ export function EventRewardShopOverlay() {
   const enter = useMutation({
     mutationFn: (raffle: RafflePrize) => raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID()),
     onSuccess: (result) => {
-      setResultDialog({ title: '응모 완료', itemName: result.raffleName, coinSpent: result.coinSpent });
+      setResultDialog({
+        title: '응모 완료',
+        itemName: result.raffleName,
+        coinSpent: result.coinSpent,
+        note: drawTimeLabel(result.drawAt),
+      });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
@@ -142,6 +149,7 @@ export function EventRewardShopOverlay() {
         <>
           <span className="ov-chip ov-chip-coin">{raffle.priceCoin.toLocaleString()} C / 1장</span>
           <span className="ov-chip">{stockLabel(raffle.stock)}</span>
+          <span className="ov-chip">{drawTimeLabel(raffle.drawAt)}</span>
         </>
       ),
       action: (
@@ -215,6 +223,7 @@ export function EventRewardShopOverlay() {
           title={resultDialog.title}
           itemName={resultDialog.itemName}
           coinSpent={resultDialog.coinSpent}
+          note={resultDialog.note}
           onClose={() => setResultDialog(null)}
         />
       )}

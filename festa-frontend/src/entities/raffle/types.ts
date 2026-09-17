@@ -10,6 +10,8 @@ export interface RafflePrize {
   active: boolean;
   /** 응모 마감 시각(ISO-8601). 없으면 상시 응모 */
   closesAt?: string | null;
+  /** 추첨 실시 시각(ISO-8601). 실제 일정이 팀 결정 전이라 null이면 "추후 공지"로 보여준다(docs/26) */
+  drawAt: string | null;
 }
 
 export interface RaffleEntryResult {
@@ -18,4 +20,6 @@ export interface RaffleEntryResult {
   raffleName: string;
   coinSpent: number;
   enteredAt: string;
+  /** 이 응모가 속한 회차의 추첨 시각. 서버가 모르면 null */
+  drawAt: string | null;
 }

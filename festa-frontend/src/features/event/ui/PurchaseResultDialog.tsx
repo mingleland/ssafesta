@@ -7,10 +7,12 @@ interface Props {
   title: string;
   itemName: string;
   coinSpent: number;
+  /** 응모 완료일 때 추첨 시각 등 덧붙일 한 줄. 없으면 안 그린다 */
+  note?: string;
   onClose: () => void;
 }
 
-export function PurchaseResultDialog({ title, itemName, coinSpent, onClose }: Props) {
+export function PurchaseResultDialog({ title, itemName, coinSpent, note, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   // <dialog>를 쓰는 이유는 LeaseConfirmDialog와 같다 — Esc·포커스 가둠·backdrop을 직접 구현하지 않는다.
@@ -25,6 +27,7 @@ export function PurchaseResultDialog({ title, itemName, coinSpent, onClose }: Pr
         <strong>{itemName}</strong>
       </p>
       <span className="ov-chip ov-chip-coin ov-result-chip">{coinSpent.toLocaleString()} C 사용</span>
+      {note !== undefined && <p className="ov-result-note">{note}</p>}
       <div className="ov-result-actions">
         {/* dialog.close()를 부르지 않는다 — 부모가 상태를 지워 이 컴포넌트를 언마운트하는 것만으로
             충분하다. Esc로 닫히는 경로는 네이티브 'close' 이벤트(위 onClose)가 따로 받는다 */}

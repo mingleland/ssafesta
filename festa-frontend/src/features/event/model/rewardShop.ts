@@ -42,3 +42,17 @@ export function stockLabel(stock: number | null): string {
 export function isSoldOut(item: { stock: number | null }): boolean {
   return item.stock !== null && item.stock <= 0;
 }
+
+// 추첨 시각을 모르는 채로(null) 응모만 받고 끝나면 "응모했는데 언제 결과가 나오는지" 가 안 남는다.
+// 실제 일정은 팀이 아직 안 정했다(docs/26) — null이면 날짜를 지어내지 않고 그렇게 말한다.
+export function drawTimeLabel(drawAt: string | null): string {
+  if (drawAt === null) return '추첨 일정은 추후 공지됩니다';
+  const date = new Date(drawAt);
+  const formatted = new Intl.DateTimeFormat('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
+  return `추첨 ${formatted}`;
+}
