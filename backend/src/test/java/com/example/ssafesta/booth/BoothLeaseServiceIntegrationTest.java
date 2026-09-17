@@ -21,12 +21,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /** Leasing a slot (spec 004 User Story 1). */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class BoothLeaseServiceIntegrationTest {
 
     @Autowired private BoothLeaseService leaseService;
@@ -194,7 +196,11 @@ class BoothLeaseServiceIntegrationTest {
         Long adminSlotId = jdbc.queryForObject(
                 "SELECT id FROM booth_slots WHERE slot_type = 'ADMIN' ORDER BY id DESC LIMIT 1", Long.class);
 
-        assertThrows(SlotNotRentableException.class, () -> leaseService.lease(userId, adminSlotId, 1));
+        try {
+            assertThrows(SlotNotRentableException.class, () -> leaseService.lease(userId, adminSlotId, 1));
+        } finally {
+            jdbc.update("DELETE FROM booth_slots WHERE id = ?", adminSlotId);
+        }
     }
 
     @Test

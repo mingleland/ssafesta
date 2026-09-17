@@ -13,7 +13,6 @@ import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.booth.Booth;
 import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import com.example.ssafesta.storage.StorageUnavailableException;
 import com.example.ssafesta.user.User;
 import com.example.ssafesta.user.UserRepository;
@@ -42,7 +41,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * status plus elapsed time and nothing else — it never reads {@code replaced_at}. The column
  * arrives with V30 (S15P21A604-386); the assertion goes in once that merges.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class AiDocumentOriginalDeleteSweeperIntegrationTest {
 

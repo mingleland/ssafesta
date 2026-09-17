@@ -38,7 +38,7 @@ public class AdminAccountService {
     /**
      * Grants admin rights to a member.
      *
-     * @throws ApiException {@code USER_NOT_FOUND} no such member, {@code ADMIN_ALREADY} they
+     * @throws ApiException {@code ADMIN_TARGET_NOT_FOUND} no such member, {@code ADMIN_ALREADY} they
      *                      already have them, {@code FORBIDDEN} the account is suspended
      */
     @Transactional
@@ -66,7 +66,7 @@ public class AdminAccountService {
      * <p>Demoting someone who is not an administrator succeeds and changes nothing: {@code DELETE}
      * says what the caller wanted the world to look like afterwards, and it already does.
      *
-     * @throws ApiException {@code USER_NOT_FOUND} no such member, {@code MASTER_PROTECTED} the
+     * @throws ApiException {@code ADMIN_TARGET_NOT_FOUND} no such member, {@code MASTER_PROTECTED} the
      *                      master account, {@code ADMIN_LAST_ONE} the only administrator left
      */
     @Transactional
@@ -74,7 +74,7 @@ public class AdminAccountService {
         // Lock the active administrator set before the target, matching suspension's order.
         List<User> activeAdmins = users.findByAccountTypeAndStatusForUpdate(User.ADMIN, AccountStatus.ACTIVE);
         User target = users.findByIdForUpdate(targetUserId)
-                .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new ApiException(ErrorCode.ADMIN_TARGET_NOT_FOUND));
         guard.requireTargetNotMaster(targetUserId);
         if (!target.isAdmin()) {
             return;
@@ -91,7 +91,7 @@ public class AdminAccountService {
     }
 
     private User require(Long userId) {
-        return users.findById(userId).orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
+        return users.findById(userId).orElseThrow(() -> new ApiException(ErrorCode.ADMIN_TARGET_NOT_FOUND));
     }
 
     /** @param master the protected account — the console greys out every action on this row */

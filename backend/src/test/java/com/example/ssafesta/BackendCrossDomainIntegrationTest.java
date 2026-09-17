@@ -14,12 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
-import com.example.ssafesta.ai.FakeDocumentProcessingClientConfiguration;
 import com.example.ssafesta.auth.AccessTokenService;
 import com.example.ssafesta.auth.MemberSessionService;
 import com.example.ssafesta.inventory.InventoryService;
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import com.example.ssafesta.survey.SurveyResponseService;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
@@ -65,12 +63,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>OAuth 실 왕복</b> — 로그인은 {@link MemberSessionService#issue} 로 토큰만 발급한다.
  *       인가 코드 교환과 최초 가입은 {@code OAuthCompletionApiIntegrationTest} 소관이다.</li>
  * </ul>
- *
- * <p>컨텍스트는 {@code AiDocumentUploadIntegrationTest} 와 같은 조합을 쓴다 — 같아야 하나를 함께
- * 쓰고, 어긋나면 전체 실행에 컨텍스트가 하나 더 뜬다.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class,
-        FakeDocumentProcessingClientConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class BackendCrossDomainIntegrationTest {
