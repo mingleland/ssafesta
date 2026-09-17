@@ -25,6 +25,16 @@ if [[ "$operation" == put-object ]]; then
     esac
   done
   destination="s3://${R2_BACKUP_BUCKET}/${key}"
+elif [[ "$operation" == delete-object ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --key) key="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  target_file="${FAKE_BUCKET}/${key}"
+  rm -f "$target_file"
+  exit 0
 else
   source="$1"; destination="$2"
 fi
@@ -35,6 +45,14 @@ map_path() {
     printf '%s\n' "$1"
   fi
 }
+if [[ "$operation" == ls ]]; then
+  target_prefix="${1#s3://${R2_BACKUP_BUCKET}/}"
+  target_dir="${FAKE_BUCKET}/${target_prefix}"
+  if [[ -d "${target_dir}" ]]; then
+    (cd "${FAKE_BUCKET}" && find "${target_prefix}" -type f -printf "2026-09-16 00:00:00 1234 %p\n")
+  fi
+  exit 0
+fi
 source="$(map_path "$source")"; destination="$(map_path "$destination")"
 mkdir -p "$(dirname "$destination")"; cp "$source" "$destination"
 SH
@@ -112,3 +130,42 @@ fi
 [[ ! -f "$temp_dir/calls" ]] || fail 'pg_restore ran after checksum mismatch'
 
 pass 'PostgreSQL backup rejects live targets and checksum corruption before restoring disposable databases'
+
+# --------------------------------------------------------------------------
+# Test T058: retention policy (daily 7, weekly 4, simulation / dry-run)
+# --------------------------------------------------------------------------
+retention_work="$temp_dir/retention_test"
+mkdir -p "$retention_work"
+
+# Mock multiple daily manifests in FAKE_BUCKET
+for i in $(seq -w 1 10); do
+  m_dir="$temp_dir/bucket/postgresql/demo/daily/2026/09/${i}/demo-daily-202609${i}T000000Z"
+  mkdir -p "$m_dir"
+  echo '{"manifest":true}' > "$m_dir/manifest.json"
+  echo "dump ${i}" > "$m_dir/festa_demo_business.dump"
+done
+
+# Run retention in dry-run mode
+dry_run_out="$(bash "$repo_root/infra/environments/postgres/backup/retention.sh" --environment demo --tier daily --dry-run)"
+assert_contains "$dry_run_out" '"tier":"daily"' 'retention reports daily tier'
+assert_contains "$dry_run_out" '"totalFound":10' 'retention finds all 10 manifests'
+assert_contains "$dry_run_out" '"kept":7' 'retention keeps 7 newest'
+assert_contains "$dry_run_out" '"deletedCount":6' 'retention plans deletion of 3 sets * 2 files = 6 objects'
+assert_contains "$dry_run_out" '"mode":"dry-run"' 'retention reports dry-run mode'
+
+# Verify files still exist after dry-run
+assert_file "$temp_dir/bucket/postgresql/demo/daily/2026/09/01/demo-daily-20260901T000000Z/manifest.json"
+
+# Run retention in apply mode
+apply_out="$(bash "$repo_root/infra/environments/postgres/backup/retention.sh" --environment demo --tier daily --apply)"
+assert_contains "$apply_out" '"mode":"apply"' 'retention runs in apply mode'
+
+# The oldest 3 sets (01, 02, 03) should be deleted
+if [[ -f "$temp_dir/bucket/postgresql/demo/daily/2026/09/01/demo-daily-20260901T000000Z/manifest.json" ]]; then
+  fail 'oldest daily backup was not deleted in apply mode'
+fi
+# The 7 newest sets (04..10) should still exist
+assert_file "$temp_dir/bucket/postgresql/demo/daily/2026/09/10/demo-daily-20260910T000000Z/manifest.json"
+assert_file "$temp_dir/bucket/postgresql/demo/daily/2026/09/04/demo-daily-20260904T000000Z/manifest.json"
+
+pass 'PostgreSQL backup retention enforces daily 7 limit with simulated and real deletion'
