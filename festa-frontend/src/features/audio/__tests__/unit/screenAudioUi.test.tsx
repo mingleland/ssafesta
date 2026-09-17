@@ -39,6 +39,8 @@ class FakeAudio {
 beforeEach(() => {
   FakeAudio.rejectPlay = false;
   vi.stubGlobal('Audio', FakeAudio);
+  // 제스처 뒤 상태 — 제스처 전 동작은 screenAudio.test.ts 가 잠근다
+  Object.defineProperty(navigator, 'userActivation', { value: { hasBeenActive: true }, configurable: true });
   window.localStorage.clear();
   __resetScreenAudioForTests();
 });
