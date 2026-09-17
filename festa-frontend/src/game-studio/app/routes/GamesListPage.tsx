@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createApiGameLibraryPort,
   createApiGameVisibilityPort,
+  GameAuthoringApiError,
   type GameSummary,
   type GameVisibility,
 } from '../../studio/ports/gameAuthoringApi.ts';
@@ -20,16 +21,47 @@ const visibilityApi = createApiGameVisibilityPort();
 
 const GAMES_QUERY_KEY = ['games-mine'];
 
+/** 두 번째 코드는 절대 되찾지 않은 게 아니라 삭제 재시도가 정상 도달하는 자리다(BE 계약). */
+const GAME_DELETED_CODE = 'GAME_DELETED';
+
+// 이 화면의 mutation은 전부 gameAuthoringApi 포트를 거치고, 그 포트는 항상
+// normalizeGameAuthoringError로 감싸서 GameAuthoringApiError만 던진다(raw ApiError가 아니다) —
+// isApiError만으로 걸러내면 실제로는 절대 안 걸리고 매번 fallback 문구만 뜬다(!1029 리뷰).
+function codeOf(error: unknown): { code: string; message: string } | null {
+  if (error instanceof GameAuthoringApiError) return error;
+  if (isApiError(error)) return error;
+  return null;
+}
+
 function createErrorText(error: unknown): string {
-  if (!isApiError(error)) return '게임을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  const info = codeOf(error);
+  if (info === null) return '게임을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.';
   // GAME_LIMIT_EXCEEDED의 상한 값은 서버 message에만 있다(계약) — 그대로 보여준다.
-  if (error.code === 'GAME_LIMIT_EXCEEDED') return error.message;
-  if (error.code === 'VALIDATION_FAILED') return '제목은 1~100자여야 합니다.';
-  return error.message;
+  if (info.code === 'GAME_LIMIT_EXCEEDED') return info.message;
+  if (info.code === 'VALIDATION_FAILED') return '제목은 1~100자여야 합니다.';
+  return info.message;
 }
 
 function actionErrorText(error: unknown, fallback: string): string {
-  return isApiError(error) ? error.message : fallback;
+  return codeOf(error)?.message ?? fallback;
+}
+
+/** 실패한 mutation이 어느 게임을 대상으로 했는지 — 배너에 이름을 붙이기 위해서다. */
+function gameTitleFor(games: readonly GameSummary[], gameId: number | undefined): string | null {
+  if (gameId === undefined) return null;
+  return games.find((game) => game.gameId === gameId)?.title ?? null;
+}
+
+/** 목록에 카드가 여러 개일 때 "어느 게임이 실패했는지"를 배너 문구 앞에 붙인다. */
+function formatActionError(
+  games: readonly GameSummary[],
+  gameId: number | undefined,
+  error: unknown,
+  fallback: string,
+): string {
+  const title = gameTitleFor(games, gameId);
+  const message = actionErrorText(error, fallback);
+  return title !== null ? `${title} — ${message}` : message;
 }
 
 function formatDateTime(iso: string): string {
@@ -50,7 +82,15 @@ export function GamesListPage() {
       invalidate();
     },
   });
-  const removeMutation = useMutation({ mutationFn: (gameId: number) => libraryApi.remove(gameId), onSuccess: invalidate });
+  const removeMutation = useMutation({
+    mutationFn: (gameId: number) => libraryApi.remove(gameId),
+    onSuccess: invalidate,
+    // 재시도(중복 클릭·끊긴 응답)가 여기로 들어온다 — 실패가 아니라 "이미 됨"이다(BE 계약,
+    // GameController.java:142). 배너를 안 띄우는 대신 목록은 갱신해서 사라진 걸 보여준다.
+    onError: (error) => {
+      if (codeOf(error)?.code === GAME_DELETED_CODE) invalidate();
+    },
+  });
   const restoreMutation = useMutation({ mutationFn: (gameId: number) => libraryApi.restore(gameId), onSuccess: invalidate });
   const visibilityMutation = useMutation({
     mutationFn: ({ gameId, next }: { gameId: number; next: GameVisibility }) => visibilityApi.set(gameId, next),
@@ -109,7 +149,11 @@ export function GamesListPage() {
       )}
 
       {liveGames.length === 0 ? (
-        <p className="sc-note games-empty">아직 만든 게임이 없습니다. 위에서 제목을 입력해 첫 게임을 만들어보세요.</p>
+        <p className="sc-note games-empty">
+          {deletedGames.length > 0
+            ? '제작 중인 게임이 없습니다. 위에서 새로 만들거나, 아래 삭제한 게임을 복원할 수 있습니다.'
+            : '아직 만든 게임이 없습니다. 위에서 제목을 입력해 첫 게임을 만들어보세요.'}
+        </p>
       ) : (
         <ul className="games-list">
           {liveGames.map((game) => (
@@ -131,7 +175,7 @@ export function GamesListPage() {
                   type="button"
                   className="sc-btn"
                   aria-pressed={game.visibility === 'PUBLIC'}
-                  disabled={visibilityMutation.isPending}
+                  disabled={visibilityMutation.isPending && visibilityMutation.variables?.gameId === game.gameId}
                   title={game.visibility === 'PUBLIC'
                     ? '클릭하면 비공개로 전환합니다. 게스트가 더 이상 플레이할 수 없습니다.'
                     : '클릭하면 공개로 전환합니다. 게시된 버전을 게스트도 플레이할 수 있게 됩니다.'}
@@ -151,7 +195,7 @@ export function GamesListPage() {
                 <button
                   type="button"
                   className="sc-btn games-danger"
-                  disabled={removeMutation.isPending}
+                  disabled={removeMutation.isPending && removeMutation.variables === game.gameId}
                   onClick={() => removeMutation.mutate(game.gameId)}
                 >
                   삭제
@@ -161,11 +205,16 @@ export function GamesListPage() {
           ))}
         </ul>
       )}
-      {removeMutation.isError && (
-        <p className="sc-alert" role="alert">{actionErrorText(removeMutation.error, '게임을 삭제하지 못했습니다.')}</p>
+      {/* GAME_DELETED는 실패가 아니라 "이미 삭제됨"이다(onError에서 이미 처리) — 배너를 안 띄운다. */}
+      {removeMutation.isError && codeOf(removeMutation.error)?.code !== GAME_DELETED_CODE && (
+        <p className="sc-alert" role="alert">
+          {formatActionError(games, removeMutation.variables, removeMutation.error, '게임을 삭제하지 못했습니다.')}
+        </p>
       )}
       {visibilityMutation.isError && (
-        <p className="sc-alert" role="alert">{actionErrorText(visibilityMutation.error, '공개설정을 변경하지 못했습니다.')}</p>
+        <p className="sc-alert" role="alert">
+          {formatActionError(games, visibilityMutation.variables?.gameId, visibilityMutation.error, '공개설정을 변경하지 못했습니다.')}
+        </p>
       )}
 
       {deletedGames.length > 0 && (
@@ -184,7 +233,7 @@ export function GamesListPage() {
                   <button
                     type="button"
                     className="sc-btn sc-btn-primary"
-                    disabled={restoreMutation.isPending}
+                    disabled={restoreMutation.isPending && restoreMutation.variables === game.gameId}
                     onClick={() => restoreMutation.mutate(game.gameId)}
                   >
                     복원
@@ -194,7 +243,9 @@ export function GamesListPage() {
             ))}
           </ul>
           {restoreMutation.isError && (
-            <p className="sc-alert" role="alert">{actionErrorText(restoreMutation.error, '게임을 복원하지 못했습니다.')}</p>
+            <p className="sc-alert" role="alert">
+              {formatActionError(games, restoreMutation.variables, restoreMutation.error, '게임을 복원하지 못했습니다.')}
+            </p>
           )}
         </>
       )}
