@@ -259,3 +259,27 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 | ① Clarification 답변 | ✅ 2026-08-18 확정: Jenkins+초기 단일 EC2 논리 분리, Unity Personal 영속 Agent 활성화, 파트별 컨테이너 격리, 실패 유형별 조건부 자동 복구. 상세 결정과 근거는 Clarifications 참조. |
 | ② 틀린 요구사항 지적 | ✅ 기존 User Story 3이 단순 파이프라인 로그 열람을 독립 기능처럼 오해하게 만들 수 있었다. 단계별 원본 로그 확인은 P0 기본 기능으로 두고, Story 3을 변경→산출물→배포→복구→현재 버전의 연결 이력 추적으로 교정했다. 그 외 현재 확인된 잘못된 운영 전제는 없다. |
 | ③ 빠진 요구사항 추가 | ✅ P1로 수집 Agent 기반 로그·서버 지표 관측, Infra 승인 규칙 기반 Mattermost 선택 알림, Grafana 서버 사용량 대시보드와 장애 격리를 추가했다. 세부 규칙·임계치·보존 기간·패널 구성은 후속 설계에서 확정한다. |
+
+## 아직 MVP까지 해야 하는 점
+
+현재 핵심 CI/CD 파이프라인(GitLab MR gate, Jenkins develop 선택적 배포, WebGL 릴리스 패키지 배포, demo 프로모션 수동 파이프라인, 시크릿 마스킹)의 코드 및 스크립트 구현은 대부분 완료되었다.
+그러나 **MVP 기준 배포 안정성 확보와 릴리스 보증을 완료하기 위해 남아 있는 필수 작업(P0)** 및 후속 과제는 다음과 같다.
+
+### 1. 실환경 격리 및 안정성 리허설 (P0)
+- **컴포넌트 독립 배포 격리 실측 (T020)**: `dev-component-isolation.sh`를 통해 단일 컴포넌트(Front 또는 Back) 배포 시 나머지 서비스 컨테이너의 restart delta가 0임을 EC2 실환경에서 검증하고 리허설 증적 확보.
+- **Unity MR Gate 실측 검증 (T050)**: Unity 변경 MR에 대해 Jenkins Unity Agent가 `ci/test` EditMode를 실행하여 성공 시 GitLab merge 허용, 실패 시 merge 차단 및 컨테이너 무영향 상태를 `gitlab-unity-mr-gate.md`에 실측 기록.
+
+### 2. 인프라 환경 사전 실측 및 기준선 문서화 (P0)
+- **서버 호스트 Preflight 실측 (T038)**: EC2 단일 인스턴스의 Docker rootless/rootful 권한 분리, UFW 방화벽 규칙, 루프백 전용 바인딩(18080, 18081, 18082 등), DNS/TLS 및 디스크 사용량 기준선을 `server-preflight.md`에 기록.
+- **Unity 빌드 에이전트 Preflight 실측 (T039)**: Unity Personal 라이선스 1회 영속 활성화 상태 유지, agent 컨테이너/프로세스 재시작 시 라이선스 보존 여부 검증 및 `unity-agent-preflight.md` 기록.
+
+### 3. 파이프라인 통합 리허설 및 운영 매뉴얼 최신화 (P0)
+- **GitLab-Jenkins 통합 리허설 (T040)**: `feature/*` MR 생성부터 merge gate 통과, `develop` Squash Merge 후 변경 컴포넌트 선별 배포까지의 전 과정 실측 기록 (`gitlab-component-pipeline-rehearsal.md`).
+- **Demo 승인 프로모션 및 롤백 리허설 (T041)**: dev 검증 릴리스 승인 후 demo 배포, E2E 헬스체크 성공 확인, 가역 실패 시 자동 롤백 동작 실측 (`demo-promotion-rehearsal.md`).
+- **운영 퀵스타트 및 작업일지 동기화 (T022, T042, T043)**: `quickstart.md`에 최신 배포/롤백 절차를 반영하고, `docs/24_작업일지.md`, `docs/25_트러블슈팅.md`, `docs/26_팀_결정_필요사항.md`의 미해결 게이트 현황을 최종 동기화.
+
+---
+
+### 참고: MVP 이후 후속 과제 (P1)
+- **배포 이력 및 추적성 관리 (US3 / T031~T034)**: `provenance.sh` 및 `show-release.sh` 구현으로 현재 실행 중인 릴리스와 직전 정상 버전의 산출물 SHA/커밋 역추적 CLI 지원.
+- **운영 관측성 및 알림 연동 (US5 / T035~T037)**: Prometheus/Grafana 기반 자원(CPU, Memory, Disk) 대시보드 구축 및 Mattermost 이상 탐지 Webhook 알림 연동.
