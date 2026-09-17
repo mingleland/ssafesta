@@ -146,6 +146,15 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
             {IcChevron}
           </button>
 
+          {/* 게스트에게는 감춘다 — 보상 수령이 `403 MEMBER_ONLY` 이고(GitLab #233), 헌법 12조상
+              게스트는 비영속이라 코인을 줄 자리가 없다. 눌리는 버튼을 두면 열어 놓고 전부 막는 화면이 된다. */}
+          {isMember && (
+            <button type="button" className="gm-item" onClick={() => onOpenPanel('missions')}>
+              미션
+              {IcChevron}
+            </button>
+          )}
+
           {myBoothQuery.data && (
             <button type="button" className="gm-item" onClick={openManagement}>
               부스 관리
