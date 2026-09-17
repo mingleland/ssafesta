@@ -5,6 +5,7 @@
 // entities/raffle/api.select 너머를 모르므로 건드릴 필요가 없다. 전환은 api.select.ts에서
 // `raffleApi = mockApi` 를 `raffleApi = realApi` 로 바꾸는 한 줄이 전부다.
 import { api } from '../../shared/api/client';
+import type { PurchaseRecipient } from '../../shared/contracts/purchaseRecipient';
 import type { RaffleEntryResult, RafflePrize } from './types';
 
 export async function listRaffles(): Promise<RafflePrize[]> {
@@ -12,9 +13,14 @@ export async function listRaffles(): Promise<RafflePrize[]> {
   return res.raffles;
 }
 
-export async function enterRaffle(raffleId: number, idempotencyKey: string): Promise<RaffleEntryResult> {
+export async function enterRaffle(
+  raffleId: number,
+  idempotencyKey: string,
+  recipient?: PurchaseRecipient,
+): Promise<RaffleEntryResult> {
   return api<RaffleEntryResult>(`/api/v1/event-shop/raffles/${raffleId}/entries`, {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ ...recipient }),
   });
 }

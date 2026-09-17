@@ -22,6 +22,8 @@ import { OverlayFrame, OverlayError, OverlayLoading } from '../../overlay/ui/Ove
 import { OverlayNotice } from '../../overlay/ui/OverlayNotice';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
 import { PurchaseResultDialog } from './PurchaseResultDialog';
+import { PurchaseRecipientForm } from './PurchaseRecipientForm';
+import type { PurchaseRecipient } from '../../../shared/contracts/purchaseRecipient';
 import { drawTimeChipLabel, drawTimeLabel, imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
@@ -33,6 +35,10 @@ interface ResultDialogState {
   /** 응모 완료일 때만 — 언제 추첨하는지. 즉시교환엔 없다(그 자리에서 바로 받는다) */
   note?: string;
 }
+
+// 카드를 눌렀을 때 바로 mutate하지 않는다 — 실물 지급이라 받는 자 정보(캠퍼스·조 이름·이름)를
+// 먼저 받아야 한다(S15P21A604-842 후속). 그 폼이 뜨는 동안 "무엇을 하려던 참이었는지"를 들고 있는 상태.
+type PendingAction = { kind: 'purchase'; prize: EventPrize } | { kind: 'raffle'; raffle: RafflePrize };
 
 const IcGift = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -63,15 +69,19 @@ export function EventRewardShopOverlay() {
   const surveyTarget = resolveEventSurveyTarget();
 
   const [resultDialog, setResultDialog] = useState<ResultDialogState | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
   const purchase = useMutation({
-    mutationFn: (prize: EventPrize) => eventShopApi.purchasePrize(prize.prizeId, crypto.randomUUID()),
+    mutationFn: ({ prize, recipient }: { prize: EventPrize; recipient: PurchaseRecipient }) =>
+      eventShopApi.purchasePrize(prize.prizeId, crypto.randomUUID(), 1, recipient),
     onSuccess: (result) => {
+      setPendingAction(null);
       setResultDialog({ title: '교환 완료', itemName: result.prizeName, coinSpent: result.coinSpent });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
+      setPendingAction(null);
       const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '교환에 실패했습니다.';
       showToast(message, 'error');
       // 재고·잔액이 틀어진 채 남지 않게 최신 상태로 다시 맞춘다
@@ -81,8 +91,10 @@ export function EventRewardShopOverlay() {
   });
 
   const enter = useMutation({
-    mutationFn: (raffle: RafflePrize) => raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID()),
+    mutationFn: ({ raffle, recipient }: { raffle: RafflePrize; recipient: PurchaseRecipient }) =>
+      raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID(), recipient),
     onSuccess: (result) => {
+      setPendingAction(null);
       setResultDialog({
         title: '응모 완료',
         itemName: result.raffleName,
@@ -93,6 +105,7 @@ export function EventRewardShopOverlay() {
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
+      setPendingAction(null);
       const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '응모에 실패했습니다.';
       showToast(message, 'error');
       void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
@@ -101,13 +114,9 @@ export function EventRewardShopOverlay() {
   });
   const rafflesQuery = useQuery({ queryKey: ['event-shop-raffles'], queryFn: raffleApi.listRaffles });
 
-  const [pendingPrizeId, setPendingPrizeId] = useState<number | null>(null);
-  const [pendingRaffleId, setPendingRaffleId] = useState<number | null>(null);
-
   function toInstantCard(prize: EventPrize): OverlayCard {
     const soldOut = isSoldOut(prize);
     const imageUrl = imageForPrize(prize.name);
-    const isPending = purchase.isPending && pendingPrizeId === prize.prizeId;
     return {
       id: `prize-${prize.prizeId}`,
       media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
@@ -122,13 +131,10 @@ export function EventRewardShopOverlay() {
         <button
           type="button"
           className="ov-btn ov-btn-primary"
-          disabled={soldOut || purchase.isPending}
-          onClick={() => {
-            setPendingPrizeId(prize.prizeId);
-            purchase.mutate(prize);
-          }}
+          disabled={soldOut}
+          onClick={() => setPendingAction({ kind: 'purchase', prize })}
         >
-          {isPending ? '교환 중...' : '교환'}
+          교환
         </button>
       ),
       disabled: soldOut,
@@ -140,7 +146,6 @@ export function EventRewardShopOverlay() {
   function toRaffleCard(raffle: RafflePrize): OverlayCard {
     const soldOut = isSoldOut(raffle);
     const imageUrl = imageForRaffle(raffle.name);
-    const isPending = enter.isPending && pendingRaffleId === raffle.raffleId;
     return {
       id: `raffle-${raffle.raffleId}`,
       media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
@@ -156,13 +161,10 @@ export function EventRewardShopOverlay() {
         <button
           type="button"
           className="ov-btn ov-btn-raffle"
-          disabled={soldOut || enter.isPending}
-          onClick={() => {
-            setPendingRaffleId(raffle.raffleId);
-            enter.mutate(raffle);
-          }}
+          disabled={soldOut}
+          onClick={() => setPendingAction({ kind: 'raffle', raffle })}
         >
-          {isPending ? '응모 중...' : '응모'}
+          응모
         </button>
       ),
       disabled: soldOut,
@@ -220,6 +222,24 @@ export function EventRewardShopOverlay() {
         {rafflesQuery.isError && <OverlayError title="응모권 목록을 불러오지 못했습니다" onRetry={() => void rafflesQuery.refetch()} />}
         {rafflesQuery.isSuccess && <OverlayCardGrid cards={raffleCards} label="응모권 목록" />}
       </div>
+
+      {pendingAction !== null && (
+        <PurchaseRecipientForm
+          actionLabel={pendingAction.kind === 'purchase' ? '교환' : '응모'}
+          itemName={pendingAction.kind === 'purchase' ? pendingAction.prize.name : pendingAction.raffle.name}
+          priceLabel={
+            pendingAction.kind === 'purchase'
+              ? `${pendingAction.prize.priceCoin.toLocaleString()} C`
+              : `${pendingAction.raffle.priceCoin.toLocaleString()} C / 1장`
+          }
+          pending={purchase.isPending || enter.isPending}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={(recipient) => {
+            if (pendingAction.kind === 'purchase') purchase.mutate({ prize: pendingAction.prize, recipient });
+            else enter.mutate({ raffle: pendingAction.raffle, recipient });
+          }}
+        />
+      )}
 
       {resultDialog !== null && (
         <PurchaseResultDialog
