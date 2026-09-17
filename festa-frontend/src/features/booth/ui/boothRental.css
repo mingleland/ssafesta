@@ -1,0 +1,72 @@
+/* 부스 임대 오버레이 — 맵이 주인공이고 오른쪽은 고른 자리 하나만 말한다.
+   비율은 지시문대로 80 : 20 이다. */
+.br-body {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(190px, 1fr);
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+.br-map {
+  min-width: 0;
+  min-height: 0;
+}
+
+.br-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--sc-radius, 16px);
+  background: var(--sc-panel, rgba(21, 27, 51, 0.92));
+  border: 1px solid var(--sc-border, rgba(255, 255, 255, 0.11));
+  align-self: start;
+}
+
+.br-empty {
+  margin: 0;
+  color: var(--sc-text-muted, #98a0c0);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.br-code {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--sc-text, #eaeefb);
+}
+
+.br-state {
+  font-size: 13px;
+  font-weight: 700;
+}
+.br-state-ok { color: var(--sc-ok, #5fd39b); }
+.br-state-mine { color: var(--sc-accent, #4d8dff); }
+.br-state-off { color: var(--sc-text-muted, #98a0c0); }
+
+.br-price {
+  color: var(--sc-text-muted, #98a0c0);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.br-cta { margin-top: 4px; }
+
+.br-note,
+.br-error {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.br-note { color: var(--sc-text-muted, #98a0c0); }
+.br-error { color: var(--sc-danger, #ef5d6c); }
+
+/* 좁은 화면에서는 패널이 맵 아래로 내려간다 — 맵을 좁히면 격자가 먼저 읽히지 않는다 */
+@media (max-width: 860px) {
+  .br-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}

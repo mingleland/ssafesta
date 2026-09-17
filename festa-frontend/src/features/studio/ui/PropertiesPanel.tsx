@@ -10,6 +10,7 @@ import { resolveLocalBounds } from '../model/useBoothAssets';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
 import { clampObjectToBooth, normalizeRotation } from '../lib/coords';
 import { IcTrash } from './shell/icons';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 interface Props {
   object: LayoutObject;
@@ -102,9 +103,11 @@ export function PropertiesPanel({
           <label className="studio-input"><span className="studio-input-axis" data-axis="x">X</span>
             <input type="number" step={0.25} value={xText} aria-label="x" onChange={(e) => setXText(e.target.value)} onBlur={() => commitPosition(xText, zText)} />
           </label>
-          <label className="studio-input" title="편집기는 바닥 높이 0 으로 고정 기록한다"><span className="studio-input-axis" data-axis="y">Y</span>
-            <input type="number" value={0} aria-label="y" readOnly />
-          </label>
+          <Tooltip content="편집기는 바닥 높이 0 으로 고정 기록한다">
+            <label className="studio-input"><span className="studio-input-axis" data-axis="y">Y</span>
+              <input type="number" value={0} aria-label="y" readOnly />
+            </label>
+          </Tooltip>
           <label className="studio-input"><span className="studio-input-axis" data-axis="z">Z</span>
             <input type="number" step={0.25} value={zText} aria-label="z" onChange={(e) => setZText(e.target.value)} onBlur={() => commitPosition(xText, zText)} />
           </label>

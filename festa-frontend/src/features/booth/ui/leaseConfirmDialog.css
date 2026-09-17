@@ -1,7 +1,11 @@
-/* 임대 확인 모달 — Screen Local Baseline(--sc-*) 위에 얹는다 (감사 항목 1).
+/* 임대·반납 확인 모달 — Screen Local Baseline(--sc-*) 위에 얹는다 (감사 항목 1).
    이 화면(SlotListPage)이 PageShell 로 이관될 때 모달만 빠져 브라우저 기본 <dialog> 스타일로
-   떴다. <dialog> 는 top layer 로 승격되지만 커스텀 속성 상속은 DOM 트리 기준이라
-   .festa-screen 안에 있는 한 --sc-* 는 그대로 닿는다 — 토큰을 다시 정의하지 않는다. */
+   떴다. <dialog> 는 top layer 로 승격되지만 커스텀 속성 상속은 DOM 트리 기준이다.
+
+   2026-09-17 — "화면 안에 있으니 토큰은 닿는다" 는 전제가 반납 모달에서 깨졌다. 그쪽은
+   BoothManagementOverlay 가 OverlayFrame 의 형제로 그려서 .festa-screen 도 .festa-overlay 도
+   조상이 아니다. 그래서 토큰 선언부(pageShell.css)가 .lease-confirm 을 직접 받는다 —
+   값은 거기 한 벌이고 여기서 다시 정의하지 않는다는 것은 그대로다. */
 .lease-confirm {
   width: min(420px, calc(100vw - 32px));
   padding: 22px 24px 20px;
@@ -82,4 +86,60 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* 반납 확인 (2026-09-17) — 표면은 임대 모달과 같고 내용만 셋이라 더 좁고 낮다.
+   임대 모달의 치수를 건드리지 않으려고 수식자로 얹는다. */
+.lease-confirm.lease-cancel {
+  width: min(380px, calc(100vw - 32px));
+  padding: 26px 30px 22px;
+}
+
+.lease-cancel-title {
+  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* 반납 대상 — 모달에서 가장 먼저 읽혀야 하는 정보다 */
+.lease-cancel-target {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: var(--sc-radius-control);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--sc-border);
+}
+.lease-cancel-booth {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--sc-text);
+  overflow-wrap: anywhere;
+}
+.lease-cancel-effect {
+  font-size: 13px;
+  color: var(--sc-text-muted);
+}
+
+/* 돈 얘기만 경고색을 쓴다 — 박스로 키우면 대상 카드보다 먼저 읽힌다 */
+.lease-cancel-warn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 24px;
+  color: var(--sc-danger);
+  font-size: 13px;
+}
+
+.lease-cancel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.lease-cancel-danger {
+  background: rgba(239, 93, 108, 0.14);
+  border-color: rgba(239, 93, 108, 0.42);
+  color: var(--sc-danger);
 }

@@ -1,0 +1,55 @@
+/* S15P21A604-824 — 내 게임 목록·생성 화면. sc-* 공용 클래스(features/shell/ui/pageShell.css)를
+   기본으로 쓰고, 여기서는 이 화면 전용 레이아웃만 정의한다. */
+
+.games-create {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.games-create-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--sc-radius-control);
+  border: 1px solid var(--sc-border);
+  background: var(--sc-panel-sunken);
+  color: var(--sc-text);
+  font-size: 13.5px;
+}
+
+.games-empty {
+  padding: 24px 0;
+  text-align: center;
+}
+
+.games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.games-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.games-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.games-danger {
+  color: var(--sc-danger);
+}
+
+.games-section-title {
+  margin-top: 8px;
+}
