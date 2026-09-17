@@ -16,6 +16,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.auth.MemberSessionService;
+import com.example.ssafesta.storage.FakeObjectStorage;
+import com.example.ssafesta.storage.ObjectDeleteQueue;
+import com.example.ssafesta.storage.StorageUnavailableException;
+import com.example.ssafesta.storage.image.ImageBytesValidator;
 import com.example.ssafesta.user.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,16 +35,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
-import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.StorageUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -69,7 +71,7 @@ class GameAssetApiIntegrationTest {
     @Autowired private MemberSessionService sessions;
     @Autowired private FakeObjectStorage storage;
     @Autowired private JdbcTemplate jdbc;
-    @Autowired private GameAssetDeleteQueue deleteQueue;
+    @Autowired private ObjectDeleteQueue deleteQueue;
 
     @BeforeEach
     void resetStorage() {
@@ -151,7 +153,7 @@ class GameAssetApiIntegrationTest {
      * The declared type is refused early when it is one we would never accept anyway.
      *
      * <p>Early, and only early: this decides nothing about what is stored — {@link
-     * GameAssetImageValidator} re-reads the bytes at {@code complete}. Refusing here saves the
+     * ImageBytesValidator} re-reads the bytes at {@code complete}. Refusing here saves the
      * round trip for the cases that cannot possibly pass, and {@code image/svg+xml} is the one that
      * matters because SVG carries script.
      */
@@ -177,7 +179,7 @@ class GameAssetApiIntegrationTest {
     @Test
     void aDeclaredSizeOutsideTheBoundsIsRefused() throws Exception {
         Owner owner = owner("선언크기");
-        String overLimit = String.valueOf(GameAssetImageValidator.MAX_BYTES + 1);
+        String overLimit = String.valueOf(ImageBytesValidator.MAX_BYTES + 1);
 
         for (String declared : List.of("0", "-1", "null", overLimit)) {
             mockMvc.perform(startRequest(owner, "\"IMAGE\"", "\"image/png\"", declared))
@@ -432,7 +434,7 @@ class GameAssetApiIntegrationTest {
         String assetId = grant.get("assetId").asText();
 
         storage.putBytes(objectKey(owner.gameId(), assetId),
-                new byte[(int) GameAssetImageValidator.MAX_BYTES + 1]);
+                new byte[(int) ImageBytesValidator.MAX_BYTES + 1]);
 
         mockMvc.perform(completeRequest(owner, assetId))
                 .andExpect(status().isOk())
