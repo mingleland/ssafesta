@@ -10,24 +10,22 @@ using UnityEngine.Networking;
 namespace Festa.Content
 {
     /// <summary>
-    /// 화면을 채우는 순서 — <b>영상 → 부스 로고 → 프로젝트 썸네일 → 검은 화면</b>.
+    /// 화면을 채우는 순서 — <b>유튜브 썸네일 → 프로젝트 대표이미지 → 부스 로고 → 검은 화면</b>.
     ///
-    /// <para>영상은 <see cref="BoothScreenBillboard"/> 가 그 위에 띄운다(유튜브 iframe). 정지 이미지는
-    /// 영상이 있어도 <b>함께 깐다</b> — 전광판이 가려지거나 멀어져 숨을 때 검은 상자로 돌아가지 않게 하는
-    /// 바닥판이다.</para>
+    /// <para><b>영상 재생(iframe)은 걷어냈다</b> (사용자 지시 2026-09-18). DOM 오버레이는 WebGL 캔버스
+    /// <b>위에</b> 얹히므로 깊이 버퍼에 참여하지 않는다 — 화면과 나 사이에 사람이 서도 가려 주지 못하고,
+    /// 에디터에는 DOM 이 아예 없어 확인도 빌드로만 가능했다. 실제로 링크와 대표이미지를 둘 다 걸어 둔
+    /// 부스가 검은 화면으로 남았다. 정지 이미지 한 장은 이 셋 중 어느 것도 문제가 되지 않는다.</para>
     ///
-    /// <para><b>새 계약이 없다.</b> 부스 간판이 이미 읽는 <c>facade.logoUrl</c> 과 전시 조회의
-    /// <c>thumbnailUrl</c>·<c>videoUrl</c> 을 그대로 쓴다.</para>
+    /// <para>영상 링크가 있으면 그 <b>유튜브 썸네일</b>을 쓴다 — 무엇에 대한 전시인지 대표이미지보다
+    /// 잘 드러내는 경우가 많고, 링크를 건 사람의 의도에 더 가깝다.</para>
     ///
-    /// <para><see cref="AllowVideo"/> 는 붙이는 쪽이 정한다. 한 부스에 화면이 둘이면 둘 다 영상을 틀려 해
-    /// 서로 깜빡인다 — 영상은 <b>프로젝트 전시 패널에만</b> 준다.</para>
+    /// <para><b>새 계약이 없다.</b> 전시 조회의 <c>videoUrl</c>·<c>thumbnailUrl</c> 과 부스 간판이 이미
+    /// 읽는 <c>facade.logoUrl</c> 을 그대로 쓴다.</para>
     /// </summary>
     [RequireComponent(typeof(BoothRuntimeObject))]
     public sealed class BoothScreenSurface : MonoBehaviour
     {
-        /// <summary>이 화면이 영상을 틀 수 있는가. 붙이는 쪽이 <see cref="Attach"/> 로 정한다.</summary>
-        public bool AllowVideo;
-
         const float SurfaceOffset = 0.02f;   // 같은 평면이면 z-fighting 으로 지직거린다
         const float Inset = 0.94f;           // 테두리를 남겨 프레임을 덮지 않는다
 
@@ -37,14 +35,10 @@ namespace Festa.Content
         bool _painted;
 
         /// <summary>이 오브젝트에 화면 내용을 붙인다. 이미 있으면 설정만 갱신한다.</summary>
-        public static void Attach(GameObject target, bool allowVideo)
+        public static void Attach(GameObject target)
         {
             if (target == null) return;
-            var surface = target.GetComponent<BoothScreenSurface>();
-            if (surface == null) surface = target.AddComponent<BoothScreenSurface>();
-            surface.AllowVideo = allowVideo;
-            if (allowVideo && target.GetComponent<BoothScreenBillboard>() == null)
-                target.AddComponent<BoothScreenBillboard>();
+            if (target.GetComponent<BoothScreenSurface>() == null) target.AddComponent<BoothScreenSurface>();
         }
 
         void Start() => FillAsync(GetComponent<BoothRuntimeObject>().BoothId);
@@ -66,12 +60,6 @@ namespace Festa.Content
             }
             if (this == null) return;
 
-            if (AllowVideo)
-            {
-                var billboard = GetComponent<BoothScreenBillboard>();
-                if (billboard != null) billboard.SetVideoUrl(first?.videoUrl);
-            }
-
             Texture texture = null;
             try { texture = await ResolveImageAsync(boothId, first); }
             catch (System.Exception e)
@@ -83,9 +71,15 @@ namespace Festa.Content
             Paint(texture);
         }
 
-        /// <summary>부스 로고 → 프로젝트 썸네일 순. 둘 다 없으면 null.</summary>
+        /// <summary>유튜브 썸네일 → 프로젝트 대표이미지 → 부스 로고 순. 셋 다 없으면 null.</summary>
         static async Task<Texture> ResolveImageAsync(int boothId, BoothProjectDto project)
         {
+            var youtube = await LoadYouTubeThumbnailAsync(project?.videoUrl, boothId);
+            if (youtube != null) return youtube;
+
+            var cover = await LoadAsync(project?.thumbnailUrl, boothId, "프로젝트 대표이미지");
+            if (cover != null) return cover;
+
             var slots = await BoothSlotDirectory.GetAsync();
             if (slots != null)
                 foreach (var slot in slots)
@@ -95,10 +89,85 @@ namespace Festa.Content
                         if (logo != null) return logo;
                         break;
                     }
-            return await LoadAsync(project?.thumbnailUrl, boothId, "프로젝트 썸네일");
+            return null;
         }
 
-        static async Task<Texture> LoadAsync(string url, int boothId, string label)
+        /// <summary>
+        /// 영상 링크의 유튜브 썸네일. 유튜브가 아니거나 못 받으면 null 이라 다음 후보로 넘어간다.
+        ///
+        /// <para>해상도를 높은 것부터 시도한다 — <c>maxresdefault</c> 는 올린 사람이 고화질 원본을 넣지
+        /// 않았으면 <b>404</b> 다(실측 2026-09-18). <c>hqdefault</c> 는 항상 있지만 4:3 이라 16:9 영상이면
+        /// 위아래에 검은 띠가 남는다 — 그래서 마지막 후보다.</para>
+        ///
+        /// <para>WebGL 에서 쓸 수 있는 근거는 실측이다 — <c>img.youtube.com</c> 은 썸네일에
+        /// <c>Access-Control-Allow-Origin: *</c> 를 준다(2026-09-18 확인). CORS 가 막혔다면 에디터에서만
+        /// 되고 빌드에서 깨졌을 것이다.</para>
+        /// </summary>
+        static async Task<Texture> LoadYouTubeThumbnailAsync(string videoUrl, int boothId)
+        {
+            var id = ParseYouTubeId(videoUrl);
+            if (string.IsNullOrEmpty(id))
+            {
+                if (!string.IsNullOrWhiteSpace(videoUrl))
+                    Debug.Log($"[BoothScreen] booth={boothId} 영상 링크가 유튜브 형식이 아니다 ('{videoUrl}') — 대표이미지로 넘어간다.");
+                return null;
+            }
+            foreach (var quality in YouTubeThumbnailQualities)
+            {
+                // 마지막 후보만 시끄럽게 말한다. 앞의 404 는 "그 해상도를 안 올렸다" 는 정상 경로라
+                // 경고로 남기면 진짜 실패와 구분이 안 된다.
+                bool last = quality == YouTubeThumbnailQualities[YouTubeThumbnailQualities.Length - 1];
+                var texture = await LoadAsync($"https://img.youtube.com/vi/{id}/{quality}.jpg", boothId,
+                                              $"유튜브 썸네일({quality})", quiet: !last);
+                if (texture != null) return texture;
+            }
+            return null;
+        }
+
+        static readonly string[] YouTubeThumbnailQualities = { "maxresdefault", "sddefault", "hqdefault" };
+
+        /// <summary>
+        /// 유튜브 주소에서 영상 id 를 뽑는다. FE 의 <c>videoEmbed.ts</c> 와 같은 표기를 받는다 —
+        /// <c>watch?v=</c> · <c>youtu.be/</c> · <c>/embed/</c> · <c>/shorts/</c>. 유튜브가 아니면 null.
+        /// </summary>
+        public static string ParseYouTubeId(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            if (!System.Uri.TryCreate(url.Trim(), System.UriKind.Absolute, out var uri)) return null;
+
+            var host = uri.Host.ToLowerInvariant();
+            if (host.StartsWith("www.")) host = host.Substring(4);
+            if (host.StartsWith("m.")) host = host.Substring(2);
+
+            string id = null;
+            if (host == "youtu.be")
+            {
+                id = uri.AbsolutePath.Trim('/');
+            }
+            else if (host == "youtube.com" || host == "music.youtube.com" || host == "youtube-nocookie.com")
+            {
+                var path = uri.AbsolutePath;
+                if (path.StartsWith("/embed/")) id = path.Substring(7);
+                else if (path.StartsWith("/shorts/")) id = path.Substring(8);
+                else
+                {
+                    foreach (var pair in uri.Query.TrimStart('?').Split('&'))
+                        if (pair.StartsWith("v=")) { id = pair.Substring(2); break; }
+                }
+            }
+            if (string.IsNullOrEmpty(id)) return null;
+
+            int slash = id.IndexOf('/');
+            if (slash >= 0) id = id.Substring(0, slash);
+
+            // 유튜브 영상 id 는 11자 [A-Za-z0-9_-] 다. 다른 것이 오면 썸네일 주소를 만들지 않는다.
+            if (id.Length != 11) return null;
+            foreach (var c in id)
+                if (!char.IsLetterOrDigit(c) && c != '_' && c != '-') return null;
+            return id;
+        }
+
+        static async Task<Texture> LoadAsync(string url, int boothId, string label, bool quiet = false)
         {
             if (string.IsNullOrWhiteSpace(url)) return null;
             if (TextureCache.TryGetValue(url, out var cached)) return cached;
@@ -115,8 +184,9 @@ namespace Festa.Content
             await request.SendWebRequest();
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning($"[BoothScreen] booth={boothId} {label} 로드 실패 ({request.result}) — {url}\n" +
-                                 "WebGL 이면 CORS 헤더(Access-Control-Allow-Origin)를 먼저 의심하라 (#171).");
+                if (!quiet)
+                    Debug.LogWarning($"[BoothScreen] booth={boothId} {label} 로드 실패 ({request.result}) — {url}\n" +
+                                     "WebGL 이면 CORS 헤더(Access-Control-Allow-Origin)를 먼저 의심하라 (#171).");
                 return null;
             }
 
