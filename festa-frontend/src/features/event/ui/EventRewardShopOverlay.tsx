@@ -76,13 +76,13 @@ export function EventRewardShopOverlay() {
       eventShopApi.purchasePrize(prize.prizeId, crypto.randomUUID(), 1, recipient),
     onSuccess: (result) => {
       setPendingAction(null);
-      setResultDialog({ title: '교환 완료', itemName: result.prizeName, coinSpent: result.coinSpent });
+      setResultDialog({ title: '구매 완료', itemName: result.prizeName, coinSpent: result.coinSpent });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
     onError: (error) => {
       setPendingAction(null);
-      const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '교환에 실패했습니다.';
+      const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '구매에 실패했습니다.';
       showToast(message, 'error');
       // 재고·잔액이 틀어진 채 남지 않게 최신 상태로 다시 맞춘다
       void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
@@ -120,6 +120,8 @@ export function EventRewardShopOverlay() {
     return {
       id: `prize-${prize.prizeId}`,
       media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
+      // 말랑이는 서울캠퍼스에서만 지급 가능 — 사진 아래 바로 표기한다(2026-09-17 확정)
+      mediaNote: prize.name === '말랑이' ? '서울캠퍼스 한정' : undefined,
       title: prize.name,
       chips: (
         <>
@@ -134,7 +136,7 @@ export function EventRewardShopOverlay() {
           disabled={soldOut}
           onClick={() => setPendingAction({ kind: 'purchase', prize })}
         >
-          교환
+          구매
         </button>
       ),
       disabled: soldOut,
@@ -173,65 +175,64 @@ export function EventRewardShopOverlay() {
 
   const raffleCards = rafflesQuery.isSuccess ? rafflesQuery.data.map(toRaffleCard) : [];
 
+  // 즉시구매·응모권을 구역으로 나누지 않고 한 격자에 3/3으로 같이 둔다(2026-09-17 확정) — 둘 다
+  // 준비돼야 그릴 수 있으므로 로딩·에러도 합쳐서 본다.
+  const isPending = prizesQuery.isPending || rafflesQuery.isPending;
+  const isError = prizesQuery.isError || rafflesQuery.isError;
+  const allCards = [...instantCards, ...raffleCards];
+
   return (
     <OverlayFrame
       title="이벤트 상점"
-      subtitle="이벤트 코인으로 한정 수량 경품을 교환하세요"
+      subtitle="이벤트 코인으로 한정 수량 경품을 구매하세요"
       size="xl"
       icon={IcGift}
       onClose={closeOverlay}
       headerAction={<WalletBadge />}
     >
-      {prizesQuery.isPending && <OverlayLoading label="경품 목록을 불러오는 중..." />}
-      {prizesQuery.isError && <OverlayError title="경품 목록을 불러오지 못했습니다" onRetry={() => void prizesQuery.refetch()} />}
+      {isPending && <OverlayLoading label="상품 목록을 불러오는 중..." />}
+      {!isPending && isError && (
+        <OverlayError
+          title="상품 목록을 불러오지 못했습니다"
+          onRetry={() => {
+            void prizesQuery.refetch();
+            void rafflesQuery.refetch();
+          }}
+        />
+      )}
 
-      {prizesQuery.isSuccess && (
-        <div className="ov-section">
-          <div className="ov-section-head">
-            <span className="ov-section-title">즉시 교환</span>
-            <span className="ov-section-desc">코인으로 바로 받는 상품</span>
-          </div>
-          {instantCards.length === 0 ? (
-            // 빈 목록일 때만 안내판이 얹힐 자리(min-height)가 필요하다 — 상품이 있으면
-            // 그 예약 공간이 카드 밑에 빈 틈으로 남는다(S15P21A604-842 QA)
-            <div className="ov-grid-wrap">
-              <OverlayCardGrid cards={instantCards} label="즉시 교환 경품 목록" />
-              <OverlayNotice
-                title="경품 상점 준비 중"
-                message="설문 참여 시 추첨을 통해 경품을 드립니다."
-                action={
-                  // 부스 설문과 같은 오버레이로 간다 — 다른 것은 payload의 source 하나다 (-608)
-                  <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
-                    설문 참여하기
-                  </button>
-                }
-              />
-            </div>
-          ) : (
-            <OverlayCardGrid cards={instantCards} label="즉시 교환 경품 목록" />
+      {!isPending && !isError && (
+        // 그리드는 빈 목록에서도 걷지 않는다 — 안내판이 그 위에 얹히는 구조라서다
+        <div className="ov-grid-wrap">
+          <OverlayCardGrid cards={allCards} label="이벤트 상점 상품 목록" columns={3} />
+          {allCards.length === 0 && (
+            <OverlayNotice
+              title="경품 상점 준비 중"
+              message="설문 참여 시 추첨을 통해 경품을 드립니다."
+              action={
+                // 부스 설문과 같은 오버레이로 간다 — 다른 것은 payload의 source 하나다 (-608)
+                <button type="button" className="ov-btn ov-btn-primary" onClick={() => openVisitorOverlay('SURVEY', surveyTarget)}>
+                  설문 참여하기
+                </button>
+              }
+            />
           )}
         </div>
       )}
 
-      <div className="ov-section">
-        <div className="ov-section-head">
-          <span className="ov-section-title">응모권</span>
-          <span className="ov-section-desc">코인으로 응모권을 사서 추첨에 참여</span>
-        </div>
-        {rafflesQuery.isPending && <OverlayLoading label="응모권 목록을 불러오는 중..." />}
-        {rafflesQuery.isError && <OverlayError title="응모권 목록을 불러오지 못했습니다" onRetry={() => void rafflesQuery.refetch()} />}
-        {rafflesQuery.isSuccess && <OverlayCardGrid cards={raffleCards} label="응모권 목록" />}
-      </div>
-
       {pendingAction !== null && (
         <PurchaseRecipientForm
-          actionLabel={pendingAction.kind === 'purchase' ? '교환' : '응모'}
+          actionLabel={pendingAction.kind === 'purchase' ? '구매' : '응모'}
           itemName={pendingAction.kind === 'purchase' ? pendingAction.prize.name : pendingAction.raffle.name}
           priceLabel={
             pendingAction.kind === 'purchase'
               ? `${pendingAction.prize.priceCoin.toLocaleString()} C`
               : `${pendingAction.raffle.priceCoin.toLocaleString()} C / 1장`
           }
+          deliveryNote={
+            pendingAction.kind === 'purchase' ? 'MM으로 기프티콘을 보내드립니다.' : '당첨 시 MM으로 기프티콘을 보내드립니다.'
+          }
+          lockedCampus={pendingAction.kind === 'purchase' && pendingAction.prize.name === '말랑이' ? '서울' : undefined}
           pending={purchase.isPending || enter.isPending}
           onCancel={() => setPendingAction(null)}
           onConfirm={(recipient) => {

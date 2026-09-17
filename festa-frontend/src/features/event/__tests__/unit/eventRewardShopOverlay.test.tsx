@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-// 이벤트 상점 — 즉시교환 실 연동(S15P21A604-842/836) 이후의 shell.
+// 이벤트 상점 — 즉시구매 실 연동(S15P21A604-842/836) 이후의 shell.
 //
 // 지키는 것: 상품이 없을 때(PREPARING과 같은 모양) 격자가 살아있고 안내가 얹히는가, 상품이
-// 오면 안내만 사라지고 같은 격자에 상품이 차는가, 품절/구매 흐름이 실제 API와 맞물리는가,
-// 실물 지급이라 캠퍼스·조 이름·이름을 먼저 받는가(S15P21A604-842 후속).
+// 오면 안내만 사라지고 같은 격자에 상품이 차는가(구역 구분 없이 3/3으로), 품절/구매 흐름이
+// 실제 API와 맞물리는가, 실물 지급이라 캠퍼스·조 이름·이름을 먼저 받는가(S15P21A604-842 후속).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -62,8 +62,8 @@ function renderOverlay() {
 }
 
 // 받는 자 정보 폼을 채우고 확정 버튼을 누른다 — 캠퍼스는 기본값(서울)을 그대로 쓴다.
-function fillRecipientForm(actionLabel: '교환' | '응모') {
-  fireEvent.change(screen.getByLabelText('조 이름'), { target: { value: '1조' } });
+function fillRecipientForm(actionLabel: '구매' | '응모') {
+  fireEvent.change(screen.getByLabelText('조 이름'), { target: { value: 'A101' } });
   fireEvent.change(screen.getByLabelText('이름'), { target: { value: '홍길동' } });
   fireEvent.click(screen.getByRole('button', { name: `${actionLabel} 확정` }));
 }
@@ -76,7 +76,7 @@ describe('경품이 아직 없다', () => {
     const { container } = renderOverlay();
 
     await waitFor(() => expect(container.querySelector('.ov-notice')).not.toBeNull());
-    expect(container.querySelector('[aria-label="즉시 교환 경품 목록"]')?.children.length).toBe(0);
+    expect(container.querySelector('[aria-label="이벤트 상점 상품 목록"]')?.children.length).toBe(0);
   });
 
   it('CTA가 기존 Survey 오버레이로 간다 — 이벤트 설문용 새 OverlayType을 만들지 않는다', async () => {
@@ -117,7 +117,7 @@ describe('경품이 들어온 뒤', () => {
     expect(screen.getByText('재고 32개')).toBeTruthy();
   });
 
-  it('품절 상품은 교환할 수 없다', async () => {
+  it('품절 상품은 구매할 수 없다', async () => {
     listPrizes.mockResolvedValue(prizes);
     resolveEventSurveyTarget.mockReturnValue(null);
 
@@ -130,7 +130,7 @@ describe('경품이 들어온 뒤', () => {
     expect(button?.disabled).toBe(true);
   });
 
-  it('교환을 누르면 받는 자 정보를 먼저 받고, 그다음 idempotency key를 붙여 구매를 보낸다', async () => {
+  it('구매를 누르면 받는 자 정보를 먼저 받고, 그다음 idempotency key를 붙여 구매를 보낸다', async () => {
     listPrizes.mockResolvedValue(prizes);
     resolveEventSurveyTarget.mockReturnValue(null);
     purchasePrize.mockResolvedValue({
@@ -144,27 +144,27 @@ describe('경품이 들어온 뒤', () => {
     });
 
     renderOverlay();
-    const buyable = (await screen.findAllByRole('button', { name: '교환' })).find((b) => !(b as HTMLButtonElement).disabled);
+    const buyable = (await screen.findAllByRole('button', { name: '구매' })).find((b) => !(b as HTMLButtonElement).disabled);
     fireEvent.click(buyable!);
 
     // 폼이 뜬다 — 아직 API는 안 탔다
-    await screen.findByRole('button', { name: '교환 확정' });
+    await screen.findByRole('button', { name: '구매 확정' });
     expect(purchasePrize).not.toHaveBeenCalled();
 
-    fillRecipientForm('교환');
+    fillRecipientForm('구매');
 
     await waitFor(() => expect(purchasePrize).toHaveBeenCalledTimes(1));
     const [prizeId, idempotencyKey, quantity, recipient] = purchasePrize.mock.calls[0] as [number, string, number, Record<string, string>];
     expect(prizeId).toBe(1);
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(quantity).toBe(1);
-    expect(recipient).toEqual({ campus: '서울', teamName: '1조', recipientName: '홍길동' });
+    expect(recipient).toEqual({ campus: '서울', teamName: 'A101', recipientName: '홍길동' });
 
-    await screen.findByText('교환 완료');
+    await screen.findByText('구매 완료');
     expect(screen.getByText('400 C 사용')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '확인' }));
-    await waitFor(() => expect(screen.queryByText('교환 완료')).toBeNull());
+    await waitFor(() => expect(screen.queryByText('구매 완료')).toBeNull());
   });
 
   it('취소하면 폼만 닫히고 API는 안 탄다', async () => {
@@ -172,13 +172,111 @@ describe('경품이 들어온 뒤', () => {
     resolveEventSurveyTarget.mockReturnValue(null);
 
     renderOverlay();
-    const buyable = (await screen.findAllByRole('button', { name: '교환' })).find((b) => !(b as HTMLButtonElement).disabled);
+    const buyable = (await screen.findAllByRole('button', { name: '구매' })).find((b) => !(b as HTMLButtonElement).disabled);
     fireEvent.click(buyable!);
 
     fireEvent.click(await screen.findByRole('button', { name: '취소' }));
 
-    expect(screen.queryByRole('button', { name: '교환 확정' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '구매 확정' })).toBeNull();
     expect(purchasePrize).not.toHaveBeenCalled();
+  });
+
+  it('말랑이는 사진 아래에 서울캠퍼스 한정 표기가 붙고, 다른 상품엔 없다', async () => {
+    listPrizes.mockResolvedValue([
+      { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true },
+      { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
+    ]);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    renderOverlay();
+
+    const mallangiCard = (await screen.findByText('말랑이')).closest('.ov-card');
+    expect(mallangiCard?.textContent).toContain('서울캠퍼스 한정');
+
+    const mygummyCard = screen.getByText('마이구미').closest('.ov-card');
+    expect(mygummyCard?.textContent).not.toContain('서울캠퍼스 한정');
+  });
+
+  it('말랑이는 캠퍼스가 서울로 고정되고 바꿀 수 없다', async () => {
+    listPrizes.mockResolvedValue([
+      { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true },
+      ...prizes,
+    ]);
+    resolveEventSurveyTarget.mockReturnValue(null);
+    purchasePrize.mockResolvedValue({
+      purchaseId: 1,
+      prizeId: 4,
+      prizeName: '말랑이',
+      quantity: 1,
+      coinSpent: 700,
+      fulfillment: 'PURCHASED',
+      purchasedAt: new Date().toISOString(),
+    });
+
+    renderOverlay();
+    const mallangiCard = (await screen.findByText('말랑이')).closest('.ov-card')!;
+    fireEvent.click(mallangiCard.querySelector('button')!);
+
+    const campusSelect = (await screen.findByLabelText('캠퍼스')) as HTMLSelectElement;
+    expect(campusSelect.disabled).toBe(true);
+    expect(campusSelect.value).toBe('서울');
+
+    fireEvent.change(screen.getByLabelText('조 이름'), { target: { value: 'A101' } });
+    fireEvent.change(screen.getByLabelText('이름'), { target: { value: '홍길동' } });
+    fireEvent.click(screen.getByRole('button', { name: '구매 확정' }));
+
+    await waitFor(() => expect(purchasePrize).toHaveBeenCalledTimes(1));
+    const [, , , recipient] = purchasePrize.mock.calls[0] as [number, string, number, Record<string, string>];
+    expect(recipient.campus).toBe('서울');
+  });
+
+  it('말랑이가 아닌 다른 상품은 캠퍼스를 고를 수 있다', async () => {
+    listPrizes.mockResolvedValue(prizes);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    renderOverlay();
+    const buyable = (await screen.findAllByRole('button', { name: '구매' })).find((b) => !(b as HTMLButtonElement).disabled);
+    fireEvent.click(buyable!);
+
+    const campusSelect = (await screen.findByLabelText('캠퍼스')) as HTMLSelectElement;
+    expect(campusSelect.disabled).toBe(false);
+  });
+});
+
+describe('구역 구분 없이 즉시구매·응모권이 한 격자에 3/3으로 같이 뜬다', () => {
+  const prizes = [
+    { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
+    { prizeId: 2, name: '프링글스', priceCoin: 500, stock: 15, active: true },
+  ];
+  const raffles = [{ raffleId: 103, name: '치킨', priceCoin: 50, stock: 21, active: true, drawAt: null }];
+
+  it('"즉시 교환"·"응모권" 같은 구역 제목 없이 한 목록에 다 들어간다', async () => {
+    listPrizes.mockResolvedValue(prizes);
+    listRaffles.mockResolvedValue(raffles);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    const { container } = renderOverlay();
+
+    await screen.findByText('치킨');
+    expect(screen.queryByText('즉시 교환')).toBeNull();
+    expect(screen.queryByText('응모권')).toBeNull();
+    const list = container.querySelector('[aria-label="이벤트 상점 상품 목록"]');
+    expect(list?.children.length).toBe(3);
+    expect(list?.textContent).toContain('마이구미');
+    expect(list?.textContent).toContain('프링글스');
+    expect(list?.textContent).toContain('치킨');
+  });
+
+  it('3열로 고정한다', async () => {
+    listPrizes.mockResolvedValue(prizes);
+    listRaffles.mockResolvedValue(raffles);
+    resolveEventSurveyTarget.mockReturnValue(null);
+
+    const { container } = renderOverlay();
+
+    await screen.findByText('치킨');
+    const list = container.querySelector('[aria-label="이벤트 상점 상품 목록"]') as HTMLElement;
+    expect(list.style.gridTemplateColumns).toBe('repeat(3, 1fr)');
   });
 });
 
@@ -250,7 +348,7 @@ describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
     const [raffleId, idempotencyKey, recipient] = enterRaffle.mock.calls[0] as [number, string, Record<string, string>];
     expect(raffleId).toBe(103);
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
-    expect(recipient).toEqual({ campus: '서울', teamName: '1조', recipientName: '홍길동' });
+    expect(recipient).toEqual({ campus: '서울', teamName: 'A101', recipientName: '홍길동' });
 
     await screen.findByText('응모 완료');
     expect(screen.getByText('50 C 사용')).toBeTruthy();

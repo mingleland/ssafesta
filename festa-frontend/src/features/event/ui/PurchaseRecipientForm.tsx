@@ -9,14 +9,27 @@ interface Props {
   actionLabel: string;
   itemName: string;
   priceLabel: string;
+  /** 구매/응모별로 다른 안내 한 줄 — "MM으로 기프티콘을 보내드립니다." 계열(S15P21A604-842 후속) */
+  deliveryNote: string;
+  /** 지정하면 캠퍼스가 이 값으로 고정되고 선택을 막는다 — 말랑이(서울캠퍼스 한정) 전용(S15P21A604-842 후속) */
+  lockedCampus?: PurchaseRecipient['campus'];
   pending: boolean;
   onConfirm: (recipient: PurchaseRecipient) => void;
   onCancel: () => void;
 }
 
-export function PurchaseRecipientForm({ actionLabel, itemName, priceLabel, pending, onConfirm, onCancel }: Props) {
+export function PurchaseRecipientForm({
+  actionLabel,
+  itemName,
+  priceLabel,
+  deliveryNote,
+  lockedCampus,
+  pending,
+  onConfirm,
+  onCancel,
+}: Props) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [campus, setCampus] = useState<PurchaseRecipient['campus']>(CAMPUS_OPTIONS[0]);
+  const [campus, setCampus] = useState<PurchaseRecipient['campus']>(lockedCampus ?? CAMPUS_OPTIONS[0]);
   const [teamName, setTeamName] = useState('');
   const [recipientName, setRecipientName] = useState('');
 
@@ -30,7 +43,7 @@ export function PurchaseRecipientForm({ actionLabel, itemName, priceLabel, pendi
   return (
     <dialog ref={ref} className="ov-recipient" onClose={onCancel} aria-labelledby="ov-recipient-title">
       <h2 id="ov-recipient-title" className="ov-recipient-title">{itemName} {actionLabel}</h2>
-      <p className="ov-recipient-lead">{priceLabel} — 실물 경품이라 받는 사람 정보가 필요합니다.</p>
+      <p className="ov-recipient-lead">{priceLabel} — {deliveryNote}</p>
 
       <label className="ov-recipient-field" htmlFor="recipient-campus">
         <span>캠퍼스</span>
@@ -38,7 +51,7 @@ export function PurchaseRecipientForm({ actionLabel, itemName, priceLabel, pendi
           id="recipient-campus"
           value={campus}
           onChange={(e) => setCampus(e.target.value as PurchaseRecipient['campus'])}
-          disabled={pending}
+          disabled={pending || lockedCampus !== undefined}
         >
           {CAMPUS_OPTIONS.map((c) => (
             <option key={c} value={c}>{c}</option>
@@ -53,7 +66,7 @@ export function PurchaseRecipientForm({ actionLabel, itemName, priceLabel, pendi
           type="text"
           value={teamName}
           maxLength={50}
-          placeholder="예: 1조"
+          placeholder="예: A101"
           onChange={(e) => setTeamName(e.target.value)}
           disabled={pending}
         />

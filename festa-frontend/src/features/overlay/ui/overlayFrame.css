@@ -220,13 +220,6 @@
 /* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
 .ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
 
-/* ── 화면 내 섹션 구분 (S15P21A604-842) ──
-   한 오버레이 본문 안에 성격이 다른 카드 그룹이 여럿일 때(이벤트 상점의 즉시교환/응모권) 쓴다. */
-.ov-section + .ov-section { margin-top: 22px; }
-.ov-section-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-.ov-section-title { font-size: 14px; font-weight: 700; color: var(--ov-text); }
-.ov-section-desc { font-size: 12px; color: var(--ov-text-muted); }
-
 /* ── 카드 그리드 (S15P21A604-599) ──
    가이드 카드와 상점 상품 카드가 같은 어휘를 쓴다. 화면마다 카드 CSS 를 복제하지 않는 것이 요점이다.
    빈 목록에서도 격자를 걷지 않는다 — 그 위에 .ov-notice 를 얹기 위해서다. */
@@ -273,6 +266,9 @@
   flex-shrink: 0;
 }
 .ov-card-media img { width: 84%; height: 84%; object-fit: contain; }
+.ov-card-media-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+/* 사진 아래 붙는 한정·주의 표기(예: "서울캠퍼스 한정") — 응모권 강조색(accent-2)을 그대로 쓴다 */
+.ov-card-media-note { font-size: 10px; font-weight: 700; color: #ffb84d; text-align: center; max-width: 96px; line-height: 1.3; }
 .ov-card-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1; justify-content: center; }
 .ov-card-body .ov-card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

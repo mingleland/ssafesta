@@ -18,11 +18,13 @@ export interface OverlayCard {
    * 그려진다. 이벤트 상점처럼 실물 상품 사진이 핵심인 화면 전용. `icon`과는 동시에 안 쓴다.
    */
   media?: ReactNode;
+  /** 사진 바로 아래 붙는 한 줄 표기(예: "서울캠퍼스 한정"). media가 없으면 무시된다 */
+  mediaNote?: ReactNode;
   title: string;
   desc?: string;
   /** `.ov-chip` 묶음 — 상점의 "남은 N개"·"N C" 가 여기 온다 */
   chips?: ReactNode;
-  /** 카드 하단 액션. 가이드 카드에는 없고 상점 카드에는 [교환] 이 온다 */
+  /** 카드 하단 액션. 가이드 카드에는 없고 상점 카드에는 [구매] 가 온다 */
   action?: ReactNode;
   disabled?: boolean;
 }
@@ -31,15 +33,24 @@ interface Props {
   cards: OverlayCard[];
   /** 스크린 리더용 목록 이름 */
   label: string;
+  /** 지정하면 auto-fit 대신 정확히 이 열 수로 고정한다(예: 상품 6개를 3/3으로, S15P21A604-842 후속) */
+  columns?: number;
 }
 
-export function OverlayCardGrid({ cards, label }: Props) {
+export function OverlayCardGrid({ cards, label, columns }: Props) {
   return (
-    <ul className="ov-card-grid" aria-label={label}>
+    <ul
+      className="ov-card-grid"
+      aria-label={label}
+      style={columns !== undefined ? { gridTemplateColumns: `repeat(${columns}, 1fr)` } : undefined}
+    >
       {cards.map((card) =>
         card.media !== undefined ? (
           <li key={card.id} className="ov-card" data-layout="media" data-disabled={card.disabled === true ? '' : undefined}>
-            <span className="ov-card-media">{card.media}</span>
+            <span className="ov-card-media-col">
+              <span className="ov-card-media">{card.media}</span>
+              {card.mediaNote !== undefined && <span className="ov-card-media-note">{card.mediaNote}</span>}
+            </span>
             <span className="ov-card-body">
               <span className="ov-card-title">{card.title}</span>
               {card.desc !== undefined && <span className="ov-card-desc">{card.desc}</span>}
