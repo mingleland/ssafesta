@@ -15,7 +15,7 @@ const prizes: EventPrize[] = [
   { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 15, active: true },
   { prizeId: 3, name: '커피', priceCoin: 600, stock: 4, active: true },
   { prizeId: 4, name: '말랑이', priceCoin: 700, stock: 47, active: true },
-  { prizeId: 5, name: '교보 기프트카드', priceCoin: 1000, stock: 3, active: true },
+  { prizeId: 5, name: '교보 기프트카드 10000원권', priceCoin: 1000, stock: 3, active: true },
 ];
 
 export async function listPrizes(): Promise<EventPrize[]> {

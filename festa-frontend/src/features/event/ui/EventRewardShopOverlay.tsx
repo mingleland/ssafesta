@@ -24,7 +24,15 @@ import { WalletBadge } from '../../wallet/ui/WalletBadge';
 import { PurchaseResultDialog } from './PurchaseResultDialog';
 import { PurchaseRecipientForm } from './PurchaseRecipientForm';
 import type { PurchaseRecipient } from '../../../shared/contracts/purchaseRecipient';
-import { drawTimeChipLabel, drawTimeLabel, imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
+import {
+  drawTimeChipLabel,
+  drawTimeLabel,
+  imageForPrize,
+  imageForRaffle,
+  imageScaleFor,
+  isSoldOut,
+  stockLabel,
+} from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 
@@ -127,12 +135,12 @@ export function EventRewardShopOverlay() {
     const imageUrl = imageForPrize(prize.name);
     return {
       id: `prize-${prize.prizeId}`,
+      // 원본 사진 여백·비율이 제각각이라 상품별 개별 배율(imageScaleFor)로 체감 크기를 맞춘다
       media:
         imageUrl === undefined ? (
           IcRewardFallback
         ) : (
-          // 초코송이 원본 사진이 다른 상품보다 작게 나와 20% 키운다(2026-09-18)
-          <img src={imageUrl} alt="" className={prize.name === '초코송이' ? 'ov-img-boost' : undefined} />
+          <img src={imageUrl} alt="" style={{ transform: `scale(${imageScaleFor(prize.name)})` }} />
         ),
       // 말랑이는 서울캠퍼스에서만 지급 가능 — 사진 아래 바로 표기한다(2026-09-17 확정)
       mediaNote: prize.name === '말랑이' ? '서울캠퍼스 한정' : undefined,

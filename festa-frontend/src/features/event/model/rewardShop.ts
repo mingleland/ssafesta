@@ -19,7 +19,7 @@ const PRIZE_IMAGES: Record<string, string> = {
   초코송이: chocosongiUrl,
   커피: coffeeUrl,
   말랑이: mallangiUrl,
-  '교보 기프트카드': kyoboUrl,
+  '교보 기프트카드 10000원권': kyoboUrl,
 };
 
 const RAFFLE_IMAGES: Record<string, string> = {
@@ -32,6 +32,19 @@ export function imageForPrize(name: string): string | undefined {
 
 export function imageForRaffle(name: string): string | undefined {
   return RAFFLE_IMAGES[name];
+}
+
+// 원본 사진 크기·여백이 제각각이라 같은 96px 박스 안에서도 체감 크기가 다르다 — 상품별로
+// 개별 보정한다(S15P21A604-842 후속). 1이면 보정 없음.
+const IMAGE_SCALE: Record<string, number> = {
+  초코송이: 1.2,
+  // 기프트카드는 가로가 긴 사진이라 84% contain 박스에서 세로가 짧게 남아 다른 카드보다
+  // 작아 보인다 — 다른 상품·응모권 카드와 체감 크기를 맞추려고 더 크게 키운다.
+  '교보 기프트카드 10000원권': 1.7,
+};
+
+export function imageScaleFor(name: string): number {
+  return IMAGE_SCALE[name] ?? 1;
 }
 
 export function stockLabel(stock: number | null): string {

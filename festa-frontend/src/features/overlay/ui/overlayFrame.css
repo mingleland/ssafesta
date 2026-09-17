@@ -247,6 +247,10 @@
   border: 1px solid var(--ov-border);
   border-radius: var(--ov-radius-control);
   background: var(--ov-surface-raised);
+  /* grid item 기본 최소폭은 내용의 min-content다 — 긴 상품명(예: "교보 기프트카드 10000원권")이
+     그리드 트랙 자체를 넓혀서 프레임 밖으로 카드가 삐져나가는 걸 막는다. 0으로 풀어야 안의
+     .ov-card-title(nowrap+ellipsis)이 실제로 줄어들 수 있다(S15P21A604-842 후속) */
+  min-width: 0;
 }
 .ov-card[data-disabled] { opacity: 0.55; }
 
@@ -266,8 +270,6 @@
   flex-shrink: 0;
 }
 .ov-card-media img { width: 84%; height: 84%; object-fit: contain; }
-/* 상품별 사진 원본이 유독 작게 나올 때 개별 보정 — 박스 크기는 그대로 두고 사진만 키운다(S15P21A604-842 후속) */
-.ov-card-media img.ov-img-boost { transform: scale(1.2); }
 .ov-card-media-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
 /* 사진 아래 붙는 한정·주의 표기(예: "서울캠퍼스 한정") — 응모권 강조색(accent-2)을 그대로 쓴다 */
 .ov-card-media-note { font-size: 10px; font-weight: 700; color: #ffb84d; text-align: center; max-width: 96px; line-height: 1.3; }
