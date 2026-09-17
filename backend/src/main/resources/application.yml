@@ -178,7 +178,7 @@ app:
     connection-token-secret: ${CONNECTION_TOKEN_SECRET}
 
   lease:
-    price-coin: 100
+    price-coin: 50
     duration: PT24H
     # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
     # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은

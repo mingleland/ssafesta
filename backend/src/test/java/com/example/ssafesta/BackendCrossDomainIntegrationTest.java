@@ -74,7 +74,7 @@ class BackendCrossDomainIntegrationTest {
     /** {@code app.wallet.daily-grant} — 그날 첫 인증 요청에 붙는다. */
     private static final int DAILY_GRANT = 50;
     /** {@code app.lease.price-coin}. */
-    private static final int LEASE_PRICE = 100;
+    private static final int LEASE_PRICE = 50;
     private static final int SURVEY_REWARD = 5;
 
     /** {@code src/test/resources/application-local.properties} 가 넣는 값과 같아야 한다. */
