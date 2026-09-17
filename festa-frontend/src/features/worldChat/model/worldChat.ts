@@ -12,6 +12,7 @@ import {
   WORLD_CHAT_TOPIC,
 } from '../../../shared/realtime/destinations';
 import { connectRealtime, sendRealtime, subscribeRealtime } from '../../../shared/realtime/realtimeClient';
+import { notifyWorldChatMessage } from '../../../unity/host/worldChatBridge';
 import { getSessionSnapshot } from '../../auth/model/session';
 
 /** 서버와 같은 기준으로 센다 — `String.length` 는 UTF-16 단위라 이모지 하나가 2자가 된다 */
@@ -260,6 +261,10 @@ function pushMessage(raw: string): void {
     }
     const next = [...state.messages, { ...message, seq: nextSeq++ }];
     set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
+    // 말한 사람 머리 위 말풍선 (S15P21A604-851, #203). **`raw` 를 그대로 넘긴다** — 파싱한 객체를
+    // 다시 문자열로 만들면 계약에 없는 필드가 조용히 빠질 수 있고, 게임 파트가 요청한 것은 "받으신 걸
+    // 손대지 말고 그대로" 다. 입장 알림(JOIN)은 보내지 않는다 — 말이 아니라 사건이라 띄울 자리가 없다.
+    if (isChatMessage(message)) notifyWorldChatMessage(raw);
   } catch {
     console.warn('[worldChat] 읽을 수 없는 메시지를 버렸다');
   }
@@ -313,3 +318,9 @@ export function __pushWorldChatForTests(messages: readonly WorldChatEntry[]): vo
   const next = [...state.messages, ...messages.map((m) => ({ ...m, seq: nextSeq++ }))];
   set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
 }
+
+/**
+ * 테스트 전용 — 소켓 수신 콜백을 직접 부른다. `startWorldChat` 이 test 모드에서 구독을 걸지 않아
+ * (서버가 없어 `ECONNREFUSED` 가 쌓인다) 구독을 spy 로 가로챌 수 없다.
+ */
+export const __receiveWorldChatRawForTests = pushMessage;
