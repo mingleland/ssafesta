@@ -53,6 +53,15 @@ const IcClock = (
   </svg>
 );
 
+/** 프로젝트 미등록 자리의 글리프 — 문구 없이 "여기에 이미지가 올 자리" 만 말한다 */
+const IcImage = (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <circle cx="8.5" cy="10" r="1.6" />
+    <path d="M21 16l-5-5-8 8" />
+  </svg>
+);
+
 const IcReturn = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3" />
@@ -248,11 +257,15 @@ export function BoothManagementOverlay({ onClose }: Props) {
         <div className="bm-side">
           <section className="bm-identity">
             <div className="bm-identity-head">
-              <img
-                className="bm-thumb"
-                src={project?.thumbnailUrl ?? '/favicon.png'}
-                alt=""
-              />
+              {project?.thumbnailUrl ? (
+                <img className="bm-thumb" src={project.thumbnailUrl} alt="" />
+              ) : (
+                // 등록된 프로젝트가 없으면 빈 자리로 둔다. 파비콘을 채워 넣으면 "SSAFESTA 라는 프로젝트가
+                // 등록된 것" 처럼 읽힌다 (S15P21A604-855).
+                <span className="bm-thumb bm-thumb-empty" aria-hidden="true">
+                  {IcImage}
+                </span>
+              )}
               <div className="bm-identity-text">
                 <h3 className="bm-name">{project?.name ?? '프로젝트 미등록'}</h3>
                 <span className="bm-slot">부스 번호 {lease.slotCode ?? '미연결'}</span>
