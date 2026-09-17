@@ -4,7 +4,7 @@
 // 적어 둔 이상, 서버가 필드를 늘리거나 이름을 바꿨을 때 **조용히 어긋난다** — 응답은 200 이고
 // 화면만 빈다. 그래서 계약 파일을 직접 읽어 대조한다.
 //
-// `tools/runtimeConfigKeys.test.mjs`·`tools/paletteAssetCodes.test.mjs` 와 같은 패턴이다:
+// `tools/runtimeConfigKeys.test.mjs` 와 같은 패턴이다:
 // FE 에 목록을 복제해 두고 그것과 비교하는 것이 아니라 **정본 파일 자체를 파싱**한다.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

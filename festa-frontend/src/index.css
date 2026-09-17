@@ -83,17 +83,102 @@ body {
   user-select: none;
 }
 
-a,
-button:not(:disabled),
-summary,
-label,
-[role='button']:not([aria-disabled='true']),
-[role='link'],
-input[type='button']:not(:disabled),
-input[type='submit']:not(:disabled),
-input[type='reset']:not(:disabled) {
-  cursor: url('/cursors/festa-pointer.png') 7 2, pointer !important;
-  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, pointer !important;
+/* 브랜드 포인터는 예외 없이 화면 전체에 깐다 (2026-09-17).
+ *
+ * body 상속만으로는 부족하다 — 화면마다 `cursor: pointer | default | not-allowed` 를 따로 적어
+ * 두고 있어서 그 규칙을 타는 자리(비활성 상담 버튼 등)에서만 시스템 커서로 돌아갔다. 대상 목록을
+ * 늘려 가며 쫓으면 새 화면이 생길 때마다 같은 구멍이 다시 난다. 여기서 한 번 못 박는다.
+ *
+ * 되돌리는 것은 **모양 자체가 사용법인 자리**뿐이다: 글자를 넣는 칸(I빔)과 끌어 쓰는 손잡이. */
+:where(*) {
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
+input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+textarea,
+[contenteditable='true'] {
+  cursor: text !important;
+}
+/* Game Studio 는 저작 도구라 커서가 곧 사용법이다 — 끌 수 있는지, 지금 끌고 있는지, 크기를 바꿀 수
+ * 있는지, 어디를 찍는지를 알려 주는 신호가 이것뿐이다. 위 전역 규칙이 `!important` 라 여기서
+ * 되돌리지 않으면 전부 브랜드 포인터로 덮인다(S15P21A604-854).
+ *
+ * 비활성(`not-allowed`)은 되돌리지 않는다 — 그쪽은 `disabled` 속성이 이미 뜻을 갖고 있고,
+ * 브랜드 포인터로 통일하는 것이 -835 의 판단이다. */
+.gss-panel-divider { cursor: col-resize !important; }
+.gss-floating-panel-resize-handle { cursor: nwse-resize !important; }
+
+.gss-canvas-minimap,
+.gss-map-canvas.is-placing {
+  cursor: crosshair !important;
+}
+
+.gss-object-palette button,
+.gss-map-object,
+.gss-map-canvas.is-pan-tool,
+.gss-drag-handle,
+.gss-floating-panel-titlebar,
+.gss-flow-graph-viewport {
+  cursor: grab !important;
+}
+
+.gss-canvas-scroll.is-panning,
+.gss-canvas-scroll.is-panning .gss-map-canvas.is-pan-tool,
+.gss-drag-handle:active,
+.gss-floating-panel-titlebar:active,
+.gss-flow-graph-viewport.is-panning {
+  cursor: grabbing !important;
+}
+
+/* Unity WebGL 캔버스만 브랜드 포인터가 사라지던 자리.
+ *
+ * 런타임이 `Cursor.visible` 이 바뀔 때마다 캔버스에 직접 쓴다 —
+ * `_JS_Cursor_SetShow(show){ Module.canvas.style.cursor = show ? "default" : "none" }`
+ * (`Cursor.SetCursor` 는 같은 자리에 `url(data:image/cur;...)` 를 쓴다). 인라인 선언이라
+ * body 에서 내려오던 포인터를 덮어쓴다. author `!important` 는 인라인 normal 선언을 이기므로
+ * 여기서 되돌린다. 바꾸는 것은 커서 그림 하나뿐이다 — 입력·포커스·포인터 락은 그대로이고,
+ * 락이 걸린 동안에는 어차피 브라우저가 커서를 감춘다. */
+#unity-canvas {
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
+/* 어두운 표면의 기본 스크롤바 (2026-09-17).
+ *
+ * 손대지 않으면 Windows 기본 막대가 그대로 나온다 — 흰 트랙에 위아래 화살표까지 붙어서, 어두운
+ * 월드 채팅·ESC 메뉴 위에 혼자 밝은 띠로 뜬다. 오버레이 본문(`overlayFrame.css`)과 Booth Studio
+ * 패널은 이미 각자 `scrollbar-width: thin` 을 적어 두었는데, 그 둘 밖의 스크롤러가 빠져 있었다.
+ *
+ * 파일마다 같은 두 줄을 복사하는 대신 어두운 뿌리 셋 아래의 스크롤러에 한 번에 준다.
+ * `:where()` 는 특이도가 0 이라 이미 값을 정해 둔 곳(오버레이·스튜디오)은 그대로 이긴다.
+ * Booth Studio 편집기·Game Studio 의 밝은 패널은 이 뿌리 밖이라 영향을 받지 않는다 —
+ * 밝은 배경에 반투명 흰 thumb 을 주면 막대가 보이지 않는다. */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+/* 표준 속성을 모르는 엔진(구형 Chromium 계열)도 같은 그림이 되게 한다. 올려 준 화면의 막대에
+   위아래 화살표가 붙어 있었는데, 표준 `thin` 막대에는 화살표가 없다 — 그쪽 경로로 그려졌다는
+   뜻이라 webkit 규칙을 함께 둔다. 표준을 아는 엔진에서는 위 선언이 이긴다. */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-track {
+  background: transparent;
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+/* 화살표 버튼은 만들지 않는다 — 기본 막대가 밝은 띠로 보이던 원인의 절반이 이것이다 */
+:where(.world-scene, .festa-overlay, .festa-screen) :where(*)::-webkit-scrollbar-button {
+  display: none;
 }
 
 /* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.

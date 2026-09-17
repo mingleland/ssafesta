@@ -74,9 +74,28 @@ infra/jenkins/scripts/publish-webgl-release.sh \
 7. 공개 검증은 다음 기준을 모두 만족해야 한다: `/manifest.json` JSON + `no-cache`, `/index.html` HTML + `no-cache`, manifest의 Build 4종 HTTP 200, 확장자별 MIME, 압축 파일 `Content-Encoding: br`, Build 파일 `public, max-age=31536000, immutable`.
 8. 공개 검증을 의도적으로 실패시킨 rehearsal에서는 job이 실패하고 `current`가 실행 전 release로 복원되어야 한다. Dedicated Server 컨테이너 ID와 시작 시각은 바뀌지 않아야 한다.
 
-로컬 계약 검증:
+## 8. 실측 및 계약 검증 명령 (Verification Commands)
+
+CI/CD 실행 전후 또는 로컬/호스트 환경에서 파이프라인 불변식과 격리성을 검증하는 명령어 집합:
 
 ```bash
+# 1. GitLab MR Gate 및 변경 감지 계약 검증
+infra/tests/acceptance/us1-gitlab-mr-gate.sh
+infra/jenkins/tests/detect-changed-components.sh
+
+# 2. Unity MR test-only 및 WebGL 배포 계약 검증
+infra/jenkins/tests/unity-mr-validation.sh
 infra/jenkins/tests/deploy-webgl-release.sh
 infra/jenkins/tests/test-foundation.sh
+
+# 3. Develop 단일 컴포넌트 배포 및 타 서비스 무영향 격리 실측 (EC2 / 로컬)
+bash infra/environments/tests/integration/dev-component-isolation.sh
+
+# 4. 다중 컴포넌트 배포 실패 시 스냅샷 자동 롤백 실측 (EC2 / 로컬)
+bash infra/environments/tests/failure/dev-deploy-failure.sh
+infra/jenkins/tests/deploy-dev-batch.sh
+
+# 5. 비밀정보 누출 방지 및 보안 검증 (US4)
+infra/tests/security/test-secret-leak.sh
+infra/tests/acceptance/us4-secret-safety.sh
 ```

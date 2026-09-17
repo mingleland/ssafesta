@@ -47,3 +47,15 @@ export function consumeReturnTo(): string {
   }
   return DEFAULT_RETURN_TO;
 }
+
+// 소비하지 않고 본다 — 로그인 화면이 "이 사용자는 어디로 가는가" 를 미리 알아야 할 때(S15P21A604-850,
+// WorldPage chunk 선로드). consumeReturnTo 와 같은 판정이라 둘이 다른 답을 내지 않는다.
+export function peekReturnTo(): string {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored && isSafeReturnTo(stored)) return stored;
+  } catch {
+    // sessionStorage 미가용 — 기본 목적지로
+  }
+  return DEFAULT_RETURN_TO;
+}

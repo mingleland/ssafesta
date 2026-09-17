@@ -46,6 +46,23 @@ namespace Festa.World
         [Tooltip("외곽선 두께. 0.25 가 한글에서 획 사이가 메워지지 않는 상한이다.")]
         [SerializeField] float _outlineWidth = 0.25f;
 
+        /// <summary>F 가 뜨기 시작하는 거리(월드 유닛). 구조물 <b>표면</b> 기준이다.</summary>
+        /// <remarks>
+        /// 씬에는 <see cref="BoothInteractionTarget"/> 기본값 10u 가 그대로 굳어 있었다 —
+        /// 1 m ≈ 13.26 u 라 <b>0.75 m</b> 다. 티켓 부스 창구까지 거의 붙어야 프롬프트가 떠서
+        /// "인식 거리가 너무 짧다" 는 지적을 받았다 (2026-09-17).
+        ///
+        /// <para>기준은 같은 월드 NPC 인 안내 데스크다 — 씬 실측값이 24u(약 1.8 m)이고 그쪽은
+        /// 거리 불만이 없었다. 두 NPC 는 이름표도 한 벌로 맞춰 둔 사이라(위 <c>_nameColor</c> 참고)
+        /// 사거리도 같은 기준으로 두는 게 맞다.</para>
+        ///
+        /// <para>인스펙터가 아니라 여기서 <see cref="BoothInteractionTarget.Configure"/> 로 넣는다.
+        /// 씬에 이미 10u 가 직렬화돼 있어, 코드 기본값만 바꾸면 씬 값이 이긴다 —
+        /// 이름표를 코드로 고정한 것과 같은 이유다.</para>
+        /// </remarks>
+        [Tooltip("상호작용 사거리(월드 유닛, 구조물 표면 기준). 1 m ≈ 13.26 u.")]
+        [SerializeField, Min(0.5f)] float _interactDistance = 24f;
+
         void Awake()
         {
             // 조준 대상이 되려면 콜라이더가 있어야 한다. NPC 프리팹에 이미 있으면 건드리지 않는다.
@@ -53,8 +70,9 @@ namespace Festa.World
                 gameObject.AddComponent<BoxCollider>();
 
             // 사거리·하이라이트 판정을 다른 상호작용과 같은 경로로 태운다.
-            if (GetComponent<BoothInteractionTarget>() == null)
-                gameObject.AddComponent<BoothInteractionTarget>();
+            var interaction = GetComponent<BoothInteractionTarget>();
+            if (interaction == null) interaction = gameObject.AddComponent<BoothInteractionTarget>();
+            interaction.Configure(_interactDistance, true);
 
             BoothInteractionInput.Ensure();
             BuildNameplate();

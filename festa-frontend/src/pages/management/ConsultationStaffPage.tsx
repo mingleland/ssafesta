@@ -16,6 +16,7 @@ import {
 } from '../../features/consultation/model/staff';
 import { ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
 import { ManagementScreen } from '../../features/booth/ui/ManagementScreen';
+import { Tooltip } from '../../shared/ui/tooltip/Tooltip';
 import './management.css';
 
 function when(iso: string): string {
@@ -110,15 +111,16 @@ export function ConsultationStaffPage() {
                       </div>
                       {card.handoffSummary !== null && <p className="mg-req-summary">{card.handoffSummary}</p>}
                     </div>
-                    <button
-                      type="button"
-                      className="sc-btn sc-btn-primary sc-btn-sm"
-                      disabled={!acceptable}
-                      title={state.active !== null ? '이미 진행 중인 상담이 있습니다' : undefined}
-                      onClick={() => void acceptRequest(card.requestId)}
-                    >
-                      {state.accepting ? '처리 중...' : '상담 수락'}
-                    </button>
+                    <Tooltip content={state.active !== null ? '이미 진행 중인 상담이 있습니다' : null}>
+                      <button
+                        type="button"
+                        className="sc-btn sc-btn-primary sc-btn-sm"
+                        disabled={!acceptable}
+                        onClick={() => void acceptRequest(card.requestId)}
+                      >
+                        {state.accepting ? '처리 중...' : '상담 수락'}
+                      </button>
+                    </Tooltip>
                   </li>
                 ))}
               </ul>

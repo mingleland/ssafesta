@@ -9,7 +9,7 @@ import { isApiError } from '../../shared/api/client';
 import { authApi } from '../../entities/auth/api.select';
 import { mockStartOAuth } from '../../entities/auth/api.mock';
 import { setGuestSession, useSession } from '../../features/auth/model/session';
-import { consumeReturnTo } from '../../features/auth/model/returnTo';
+import { consumeReturnTo, peekReturnTo } from '../../features/auth/model/returnTo';
 import { authBaseUrl } from '../../shared/config/runtime';
 import { warmUpUnityAssets } from '../../unity/host/warmup';
 import { ScreenControls } from '../../features/audio/ui/ScreenControls';
@@ -99,6 +99,13 @@ export function LoginPage() {
   // framework 까지 넓힌다. 소셜 로그인은 전체 페이지 이동이라 그 순간 요청이 끊기지만, 받아 둔 만큼은
   // HTTP 캐시에 남아 복귀 후 다시 쓰인다. 게스트 입장은 SPA 이동이라 그대로 이어진다.
   useEffect(() => warmUpUnityAssets('intent'), []);
+
+  // WorldPage chunk 선로드 (S15P21A604-850). 인증 뒤 목적지는 저장된 returnTo 아니면 /app/world 라, 월드로
+  // 갈 사용자에게만 route 도달 전에 받아 둔다 — 실측에서 이 chunk 가 route 전환 뒤에야 시작돼 1.3s 를 더 썼다.
+  // 다른 화면 딥링크(게임 편집 등)로 가는 사용자는 받지 않는다. 실패해도 route 가 다시 요청하므로 결과를 버린다.
+  useEffect(() => {
+    if (peekReturnTo().startsWith('/app/world')) void import('../world/WorldPage').catch(() => undefined);
+  }, []);
 
   // 진입 맥락 안내(세션 만료·게스트 재입장)를 패널 안에 두면 버튼이 아래로 밀린다 —
   // 낮은 화면에서는 그것만으로 푸터를 뚫는다. 알림은 레이아웃 밖으로 보낸다 (S15P21A604-465).

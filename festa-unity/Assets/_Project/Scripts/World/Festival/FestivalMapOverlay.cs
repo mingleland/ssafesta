@@ -126,14 +126,14 @@ namespace Festa.World
 
             bool known = TryGetPlayer(out var player);
             bool allowed = known && Available(player);
-            if (IsOpen && !allowed) Close();
-
             var kb = Keyboard.current;
-            if (kb != null && allowed && !Blocked() && (kb.tabKey.wasPressedThisFrame || kb.mKey.wasPressedThisFrame))
-            {
-                if (IsOpen) Close(); else Open();
-            }
-            if (IsOpen && kb != null && kb.escapeKey.wasPressedThisFrame) Close();
+            // 지도는 토글하지 않는다. Tab 을 잠깐 눌렀다 놓은 뒤에도 화면과 입력 잠금이 남는 것은
+            // 일반적인 게임 미니맵 조작과 어긋난다 (사용자 지시 2026-09-15).
+            // 브라우저가 Tab 을 가져가는 환경의 대체키 M 도 같은 hold 규칙을 써서 입력 방식이 둘로 갈리지 않게 한다.
+            bool held = kb != null && (kb.tabKey.isPressed || kb.mKey.isPressed);
+            bool shouldOpen = held && allowed && !Blocked();
+            if (shouldOpen && !IsOpen) Open();
+            else if (!shouldOpen && IsOpen) Close();
 
             if (IsOpen) { RefreshCells(); PlaceDot(player); }
         }
@@ -243,7 +243,7 @@ namespace Festa.World
 
             FestaUiKit.Label(root, "입구 아래 · 안쪽 위", 16f, new Vector2(-44f, -36f), new Vector2(300f, 22f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Right, new Vector2(1f, 1f));
-            FestaUiKit.Label(root, "Tab · Esc 닫기", 16f, new Vector2(-44f, -60f), new Vector2(300f, 22f),
+            FestaUiKit.Label(root, "Tab 누르고 있는 동안", 16f, new Vector2(-44f, -60f), new Vector2(300f, 22f),
                              Muted, FontStyles.Normal, TextAlignmentOptions.Right, new Vector2(1f, 1f));
 
             var rule = FestaUiKit.Rect(root, "Rule", Hairline, 1);

@@ -44,10 +44,16 @@ function currentAudio(): FakeAudio {
   return audio;
 }
 
+// 제스처 뒤 상태를 기본으로 둔다 — 실브라우저에서는 SPA 이동·클릭이 이 값을 올린다. 제스처 전 동작은 아래 별도 describe.
+function setUserActivation(hasBeenActive: boolean): void {
+  Object.defineProperty(navigator, 'userActivation', { value: { hasBeenActive }, configurable: true });
+}
+
 beforeEach(() => {
   FakeAudio.instances = [];
   FakeAudio.rejectPlay = false;
   vi.stubGlobal('Audio', FakeAudio);
+  setUserActivation(true);
   window.localStorage.clear();
   __resetScreenAudioForTests();
 });
@@ -76,6 +82,33 @@ describe('재생 시작', () => {
     await vi.waitFor(() => expect(getScreenAudioSnapshot().playing).toBe(true));
     unlockAndPlay();
     expect(FakeAudio.instances).toHaveLength(1);
+  });
+});
+
+describe('사용자 제스처 전 (S15P21A604-848)', () => {
+  it('마운트 시점에는 element 를 만들지 않는다 — 4.66MB 요청 자체가 없다', () => {
+    setUserActivation(false);
+    enterScreen();
+    expect(FakeAudio.instances).toHaveLength(0);
+    expect(getScreenAudioSnapshot().pendingGesture).toBe(true);
+    expect(getScreenAudioSnapshot().playing).toBe(false);
+  });
+
+  it('제스처가 생기면 그때 만들고 재생한다', async () => {
+    setUserActivation(false);
+    enterScreen();
+    setUserActivation(true);
+    unlockAndPlay();
+    await vi.waitFor(() => expect(getScreenAudioSnapshot().playing).toBe(true));
+    expect(FakeAudio.instances).toHaveLength(1);
+    expect(currentAudio().loop).toBe(true);
+  });
+
+  it('userActivation API 가 없는 브라우저는 제스처 대기로 본다', () => {
+    Object.defineProperty(navigator, 'userActivation', { value: undefined, configurable: true });
+    unlockAndPlay();
+    expect(FakeAudio.instances).toHaveLength(0);
+    expect(getScreenAudioSnapshot().pendingGesture).toBe(true);
   });
 });
 

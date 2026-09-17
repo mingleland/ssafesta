@@ -215,3 +215,91 @@ export const createApiGameVisibilityPort = (
     }
   },
 });
+
+// S15P21A604-824 — 목록·생성 화면(GamesListPage)이 쓰는 전체 요약. GameVisibilitySummary와
+// 필드가 겹치지만(gameId·visibility) 별도 타입으로 둔다 — 저 쪽은 "단건 공개설정"만 있으면 되는
+// 자리라 title·publishedVersion·updatedAt·deletedAt까지 실어 나를 이유가 없다.
+export interface GameSummary {
+  readonly gameId: number;
+  readonly title: string;
+  readonly visibility: GameVisibility;
+  /** 한 번도 게시한 적 없으면 null(BE `Integer publishedVersion`, contracts §내 게임 목록). */
+  readonly publishedVersion: number | null;
+  readonly updatedAt: string;
+  /** 소프트 삭제 시각. null이면 살아 있는 게임이다. */
+  readonly deletedAt: string | null;
+}
+
+export interface GameLibraryPort {
+  /** 삭제한 것까지 포함한 전체 목록 — `deletedAt`으로 가른다(BE `GET /mine` 계약). */
+  list(): Promise<readonly GameSummary[]>;
+  create(title: string): Promise<GameSummary>;
+  remove(gameId: number): Promise<void>;
+  restore(gameId: number): Promise<GameSummary>;
+}
+
+const nullableInteger = (value: unknown, field: string): number | null => (
+  value === null || value === undefined ? null : positiveInteger(value, field)
+);
+
+const nullableStringValue = (value: unknown, field: string): string | null => (
+  value === null || value === undefined ? null : stringValue(value, field)
+);
+
+const parseGameSummary = (input: unknown): GameSummary => {
+  if (!isRecord(input)) throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '게임 응답 형식이 올바르지 않습니다.');
+  return {
+    gameId: positiveInteger(input.gameId, 'gameId'),
+    title: stringValue(input.title, 'title'),
+    visibility: gameVisibilityValue(input.visibility, 'visibility'),
+    publishedVersion: nullableInteger(input.publishedVersion, 'publishedVersion'),
+    updatedAt: stringValue(input.updatedAt, 'updatedAt'),
+    deletedAt: nullableStringValue(input.deletedAt, 'deletedAt'),
+  };
+};
+
+export const createApiGameLibraryPort = (
+  request: GameApiRequest = api,
+): GameLibraryPort => ({
+  list: async () => {
+    try {
+      const response = await request<unknown>('/api/v1/games/mine');
+      if (!isRecord(response) || !Array.isArray(response.games)) {
+        throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '내 게임 목록 응답 형식이 올바르지 않습니다.');
+      }
+      return response.games.map(parseGameSummary);
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+  create: async (title) => {
+    try {
+      const response = await request<unknown>('/api/v1/games', {
+        method: 'POST',
+        body: JSON.stringify({ title }),
+      });
+      return parseGameSummary(response);
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+  remove: async (gameId) => {
+    try {
+      await request<undefined>(`/api/v1/games/${gameId}`, { method: 'DELETE' });
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+  restore: async (gameId) => {
+    try {
+      const response = await request<unknown>(`/api/v1/games/${gameId}/restore`, { method: 'POST' });
+      const summary = parseGameSummary(response);
+      if (summary.gameId !== gameId) {
+        throw new GameAuthoringApiError('GAME_API_RESPONSE_INVALID', '요청한 게임과 복원 응답이 일치하지 않습니다.');
+      }
+      return summary;
+    } catch (error) {
+      throw normalizeGameAuthoringError(error);
+    }
+  },
+});
