@@ -143,6 +143,13 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 유예는 `app.auth.refresh-reuse-grace`(기본 `PT30S`)다. 그 창 밖의 재사용은 그대로 계보째 끊는다(spec 001 시나리오 7).
 
+**갱신은 직전 Access Token 을 즉시 죽이지 않는다** (`S15P21A604-887`, GitLab #216). 갱신마다 Access Token 의
+`sid` 클레임이 새로 서지만, **밀려난 `sid` 도 `app.auth.session-rotation-grace`(기본 `PT30S`) 동안은 통과한다.**
+React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유예가 없으면 한쪽의 정상 갱신이 다른 쪽이 들고
+있는 토큰을 즉사시키고, 월드가 12슬롯 게시본·`world-sessions`·`catalog` 를 한꺼번에 401 로 잃는다. 그래도
+**새 로그인·로그아웃·계보 폐기는 이 유예를 즉시 끝낸다** — 다른 기기에서 로그인하면 옛 토큰은 그 자리에서
+무효다(spec 001 시나리오 4). 유예는 "같은 사람의 갱신" 에만 열린다.
+
 - 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
   FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
   받으며, 이것을 서버 오류로 취급하면 안 된다.
@@ -1371,7 +1378,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
   "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+목표 시간은 **서버가 2~4초에서 무작위로 발급**한다 (FR-001a, 2026-09-18 개정 — GitLab #214). 일일 한도에 도달한 회원에게도
 세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
 
 ### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`
