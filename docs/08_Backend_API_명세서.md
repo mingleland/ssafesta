@@ -1370,7 +1370,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
   "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+목표 시간은 **서버가 2~4초에서 무작위로 발급**한다 (FR-001a, 2026-09-18 개정 — GitLab #214). 일일 한도에 도달한 회원에게도
 세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
 
 ### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`
