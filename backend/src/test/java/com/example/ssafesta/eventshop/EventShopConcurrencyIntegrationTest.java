@@ -86,7 +86,7 @@ class EventShopConcurrencyIntegrationTest {
 
     private Result attempt(Long userId, Long prizeId, String operationId) {
         try {
-            shop.purchase(userId, prizeId, 1, operationId);
+            shop.purchase(userId, prizeId, 1, new PurchaseRecipient("대전", "A604", "황덕"), operationId);
             return new Result(true);
         } catch (ApiException refused) {
             return new Result(false);
