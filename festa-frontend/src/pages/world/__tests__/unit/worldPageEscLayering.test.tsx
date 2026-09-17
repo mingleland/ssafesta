@@ -221,6 +221,42 @@ describe('WorldPage Enter 판정 (-791)', () => {
   });
 });
 
+// Enter 판정도 같은 단일 중재자가 쥔다 (S15P21A604-706·-791) — 그래서 여기서 함께 잠근다.
+describe('WorldPage Enter 판정 (-791)', () => {
+  beforeEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+    setMemberSession('at', '2026-12-31T00:00:00.000Z');
+  });
+  afterEach(() => {
+    __resetWorldChatForTests();
+    __resetSessionForTests();
+  });
+
+  it('월드에서 누른 Enter 는 채팅을 열고 입력창에 focus 를 준다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+
+  it('패널이 열린 채 focus 를 잃어도 Enter 가 그 입력창으로 되돌린다 — 새로 열지 않는다', async () => {
+    await renderWorld();
+    pressEnter();
+
+    // 캔버스를 클릭한 상태를 만든다 — 패널은 그대로 떠 있고 focus 만 빠진다
+    act(() => {
+      (document.activeElement as HTMLElement | null)?.blur();
+    });
+    expect(document.activeElement?.id).not.toBe(WORLD_CHAT_INPUT_ID);
+
+    pressEnter();
+    expect(getWorldChatSnapshot().open).toBe(true);
+    expect(document.activeElement?.id).toBe(WORLD_CHAT_INPUT_ID);
+  });
+});
+
 // Unity 가 쥔 모달까지 함께 중재한다 (-450 2차, GitLab #132).
 // 전에는 이 판정의 입력값이 FE store 둘뿐이라, 줌만 켜진 상태의 ESC 가 "떠 있는 게 없다" 로 읽혀
 // 줌은 풀리는데 Game Menu 가 같이 떴다.

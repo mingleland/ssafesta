@@ -82,6 +82,17 @@ public enum ErrorCode {
     ITEM_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 품목입니다."),
     AVATAR_ITEM_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 파츠가 있습니다."),
 
+    // ── 이벤트 상점 (S15P21A604-832 후속, GitLab #217) ──────────────────────
+    EVENT_PRIZE_NOT_FOUND(HttpStatus.NOT_FOUND, "경품을 찾을 수 없습니다."),
+    /** 관리자가 판매를 내린 경품이다 — 삭제하지 않고 {@code active=false} 로 내린다. */
+    EVENT_PRIZE_INACTIVE(HttpStatus.CONFLICT, "현재 판매 중인 경품이 아닙니다."),
+    EVENT_PRIZE_OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+    /**
+     * 처리 상태 전이 규칙(PURCHASED→PENDING/FULFILLED/CANCELLED, PENDING→FULFILLED/CANCELLED)을
+     * 벗어난 요청이다. {@code FULFILLED}·{@code CANCELLED} 는 종단 상태라 되돌리지 않는다.
+     */
+    EVENT_PURCHASE_FULFILLMENT_INVALID(HttpStatus.CONFLICT, "허용되지 않는 처리 상태 전이입니다."),
+
     // ── 부스 · 임대 (spec 004) ──────────────────────────────────────────────
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, "부스를 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),

@@ -230,6 +230,13 @@ namespace Festa.World
             // (CharacterController 는 skinWidth 안에서 파고들었다 밀려나기를 반복한다),
             // 그 순간 값으로 오프셋을 굳히면 정착 후 0.12u(≈1 cm) 어긋난 채 남는다.
             _regroundAt = Time.time + SpawnSettle;
+            // **이모트가 지울 수 없는 별도 타이머로도 건다.** 조립 직후 이어지는 ApplyEmote(None) 이
+            // RestoreBaseGrounding 으로 위 _regroundAt 을 0 으로 지워, 정착 후 재측정이 한 번도 돌지
+            // 않았다 — 아직 낙하 중일 때 잡은 오프셋이 그대로 굳어 발이 바닥에 파묻힌 채 남는다
+            // (사용자 지적 2026-09-16). 얼마나 파묻히는지는 그 순간 루트가 바닥에서 얼마나 떠 있었는지에
+            // 달려 있어 **화면마다 다르게 보인다.** 앉기 같은 이모트는 자기 타이머를 다시 걸기 때문에
+            // 그때만 정상으로 맞는다. 키 보정(_heightCalibrateAt)이 같은 이유로 이미 분리돼 있다.
+            _spawnRegroundAt = Time.time + SpawnSettle;
             _baseNeedsRefresh = true;
         }
 
@@ -245,6 +252,19 @@ namespace Festa.World
         // 다시 잰다.
         float _baseVisualLocalY;
         float _regroundAt;
+
+        /// <summary>스폰 정착 뒤 접지를 다시 잴 시각. <see cref="RestoreBaseGrounding"/> 이 지우지 않는다.</summary>
+        float _spawnRegroundAt;
+
+        /// <summary>예약된 접지 재측정 한 번. 정착 후 값이 선 자세의 진짜 기준이 된다.</summary>
+        void RunScheduledReground()
+        {
+            if (!GroundToCurrentPose() || !_baseNeedsRefresh) return;
+            _baseNeedsRefresh = false;
+            if (ChangesGroundContact(_player.EmoteId.Value)) return;
+            _baseVisualLocalY = _currentVisual.transform.localPosition.y;
+            _calibratedVisualLocalY = _baseVisualLocalY;
+        }
 
         // 크로스페이드(0.2초)가 끝나 포즈가 자리잡은 뒤에 재야 한다. 섞이는 중에 재면
         // 선 자세와 앉은 자세의 **중간값**이 나온다.
@@ -725,17 +745,15 @@ namespace Festa.World
             if (_regroundAt > 0f && Time.time >= _regroundAt)
             {
                 _regroundAt = 0f;
-                if (GroundToCurrentPose() && _baseNeedsRefresh)
-                {
-                    // 정착 후 다시 잰 값이 선 자세의 진짜 기준이다. 이모트로 접지를
-                    // 고쳤다 되돌릴 때 이 값으로 돌아간다.
-                    _baseNeedsRefresh = false;
-                    if (!ChangesGroundContact(_player.EmoteId.Value))
-                    {
-                        _baseVisualLocalY = _currentVisual.transform.localPosition.y;
-                        _calibratedVisualLocalY = _baseVisualLocalY;
-                    }
-                }
+                RunScheduledReground();
+            }
+
+            // 스폰 정착 재측정은 이모트가 지울 수 없는 타이머다 — 위 _regroundAt 은
+            // RestoreBaseGrounding 이 0 으로 지운다.
+            if (_spawnRegroundAt > 0f && Time.time >= _spawnRegroundAt)
+            {
+                _spawnRegroundAt = 0f;
+                RunScheduledReground();
             }
 
             HoldFeetOnGround();

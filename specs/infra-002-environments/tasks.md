@@ -154,7 +154,7 @@
 ### 사용자 스토리 4 테스트
 
 - [ ] T062 [P] [US4] 22/80/443과 5432/6379/7777/8080을 비교하고 계층별 SG/UFW 진단을 수행하는 실패 우선 외부 검사를 `infra/environments/tests/security/port-exposure.sh`에 작성한다
-- [ ] T063 [P] [US4] dev→demo 및 demo→dev Docker DNS·네트워크, PostgreSQL, Redis와 Secret Reference 접근 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/security/cross-environment.sh`에 작성한다
+- [X] T063 [P] [US4] dev→demo 및 demo→dev Docker DNS·네트워크, PostgreSQL, Redis와 Secret Reference 접근 사례를 검증하는 실패 우선 테스트를 `infra/environments/tests/security/cross-environment.sh`에 작성한다
 - [ ] T064 [P] [US4] 저장소, 렌더링된 Compose, 앱·Nginx·CI 로그, 릴리스 검증 근거, 서명 URL, 쿠키와 TLS 키를 검사하는 실패 우선 스캐너를 `infra/environments/tests/security/secret-scan.sh`에 작성한다
 
 ### 사용자 스토리 4 구현

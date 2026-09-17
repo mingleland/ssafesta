@@ -69,6 +69,10 @@
 body {
   margin: 0;
   min-height: 100vh;
+  /* 브랜드 포인터. 32px 기준이라 hotspot 은 화살촉 끝(7 2)이고, 고밀도 화면은 아래 image-set 이
+     @2x 를 집는다 — image-set 을 모르는 브라우저는 위 줄에 머문다. 원본은 docs/LJH/assets. */
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto;
   /* 게임 클라이언트의 바닥색. `.world-scene` 이 배경을 칠하지 않게 된 뒤(worldPage.css) 월드
      진입 첫 프레임 — `PersistentWorld` 가 아직 마운트되기 전 — 에 흰 화면이 비치는 것을 막는다.
      화면들은 각자 전면 배경을 그리므로 이 값이 보이는 구간은 그 한 프레임뿐이다. */
@@ -77,6 +81,19 @@ body {
      웹 문서의 기본값일 뿐 여기서 원하는 동작이 아니다 — 끄고, 필요한 곳만 아래에서 연다. */
   -webkit-user-select: none;
   user-select: none;
+}
+
+a,
+button:not(:disabled),
+summary,
+label,
+[role='button']:not([aria-disabled='true']),
+[role='link'],
+input[type='button']:not(:disabled),
+input[type='submit']:not(:disabled),
+input[type='reset']:not(:disabled) {
+  cursor: url('/cursors/festa-pointer.png') 7 2, pointer !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, pointer !important;
 }
 
 /* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.

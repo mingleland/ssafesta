@@ -13,7 +13,6 @@ import com.example.ssafesta.booth.BoothRepository;
 import com.example.ssafesta.common.RedisKeyspaceProperties;
 import com.example.ssafesta.game.GameAssetDeleteQueue;
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import com.example.ssafesta.wallet.WalletService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -35,7 +34,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 그 사용자의 provider 토큰을 요구한다. 우리는 로그인 교환 순간 말고는 그 토큰을 갖지 않는다.
  * 결정 요청은 {@code docs/26} 에 있다 ({@code S15P21A604-199} 가 그 결정을 기다린다).
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class AccountWithdrawalResourceCleanupIntegrationTest {
 

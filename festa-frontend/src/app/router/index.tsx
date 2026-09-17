@@ -151,6 +151,13 @@ export const routes = [
       };
     },
   },
+  {
+    // 관리자 콘솔은 화면이 아니라 월드 위 오버레이다 (S15P21A604-828) — 이 서비스는 월드가 상주
+    // 화면이고 나머지는 그 위에 잠깐 뜬다. 경로를 지우지 않는 이유는 북마크·옛 링크가 404 로
+    // 떨어지지 않게 하기 위해서다. 목적지에서 WorldPage 가 `?panel` 을 읽어 오버레이를 연다.
+    path: '/app/admin/*',
+    element: <Navigate to="/app/world?panel=admin" replace />,
+  },
 ];
 
 export const router = createBrowserRouter(routes);

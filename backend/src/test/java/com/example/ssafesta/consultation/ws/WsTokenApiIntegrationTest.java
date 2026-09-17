@@ -317,6 +317,37 @@ class WsTokenApiIntegrationTest {
         return "/topic/booths/" + boothId + "/consultation";
     }
 
+    // ── 이벤트 상점 알림 토픽 구독 게이트 (S15P21A604-836) ───────────────────
+    //
+    // 부스 토픽과 달리 경로에 자원 id 가 없는 전역 토픽이다. 판정은 "이 회원이 관리자인가" 하나다.
+
+    private static final String ADMIN_EVENT_SHOP_TOPIC = "/topic/admin/event-shop";
+
+    @Test
+    void anAdministratorMaySubscribeToTheEventShopTopic() {
+        Long adminId = createMemberWithWallet(users, wallets, "상점알림관리자");
+        var admin = users.findById(adminId).orElseThrow();
+        admin.promoteToAdmin();
+        users.save(admin);
+        Message<?> subscription = frameAs(adminId, StompCommand.SUBSCRIBE, ADMIN_EVENT_SHOP_TOPIC);
+
+        assertEquals(subscription, interceptor.preSend(subscription, null));
+    }
+
+    @Test
+    void aPlainMemberIsRefusedTheEventShopTopic() {
+        Long memberId = createMemberWithWallet(users, wallets, "상점알림일반");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frameAs(memberId, StompCommand.SUBSCRIBE, ADMIN_EVENT_SHOP_TOPIC), null));
+    }
+
+    @Test
+    void aSubscriptionWithoutAPrincipalIsRefusedTheEventShopTopic() {
+        assertThrows(IllegalArgumentException.class,
+                () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, ADMIN_EVENT_SHOP_TOPIC), null));
+    }
+
     /** 구독 해제와 정상 종료는 destination 정책의 대상이 아니다. */
     @ParameterizedTest
     @EnumSource(value = StompCommand.class, names = {"UNSUBSCRIBE", "DISCONNECT"})
