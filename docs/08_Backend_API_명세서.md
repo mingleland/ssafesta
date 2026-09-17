@@ -143,6 +143,13 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 유예는 `app.auth.refresh-reuse-grace`(기본 `PT30S`)다. 그 창 밖의 재사용은 그대로 계보째 끊는다(spec 001 시나리오 7).
 
+**갱신은 직전 Access Token 을 즉시 죽이지 않는다** (`S15P21A604-887`, GitLab #216). 갱신마다 Access Token 의
+`sid` 클레임이 새로 서지만, **밀려난 `sid` 도 `app.auth.session-rotation-grace`(기본 `PT30S`) 동안은 통과한다.**
+React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유예가 없으면 한쪽의 정상 갱신이 다른 쪽이 들고
+있는 토큰을 즉사시키고, 월드가 12슬롯 게시본·`world-sessions`·`catalog` 를 한꺼번에 401 로 잃는다. 그래도
+**새 로그인·로그아웃·계보 폐기는 이 유예를 즉시 끝낸다** — 다른 기기에서 로그인하면 옛 토큰은 그 자리에서
+무효다(spec 001 시나리오 4). 유예는 "같은 사람의 갱신" 에만 열린다.
+
 - 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
   FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
   받으며, 이것을 서버 오류로 취급하면 안 된다.
@@ -502,6 +509,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
 - **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 - **`PROJECT_PANEL`도 같은 모양이다** (`S15P21A604-765`, GitLab #194): 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다. 판정 근거는 **그 부스에 프로젝트가 없음**이고 warning `CONFIG_NOT_LINKED`("이 부스에 프로젝트가 없습니다.")로 나간다. **게시는 막지 않는다**(C-04). `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
+- **`VIDEO_SCREEN` 은 네 번째지만 이유가 다르다** (`S15P21A604-889`, GitLab #194 ②, 2026-09-18): 부스 단위 술어로 옮긴 것이 아니라 **장식으로 내려갔다**. 영상 기능화를 이번 축제에서 하지 않기로 확정했으므로 가리킬 콘텐츠가 없다. `configId` 를 실어 보내도 저장만 하고 무시하며 `CONFIG_NOT_LINKED`·`CONFIG_UNVERIFIED` 둘 다 붙지 않는다. 관람 정면(`FRONT_BLOCKED`) 검사에서도 빠진다.
 
 ---
 
@@ -1370,7 +1378,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
   "failAfterSeconds": 10.381, "serverStartedAt": "2026-09-10T02:11:04.117Z" }
 ```
 
-목표 시간은 **서버가 5~10초에서 무작위로 발급**한다 (FR-001a). 일일 한도에 도달한 회원에게도
+목표 시간은 **서버가 2~4초에서 무작위로 발급**한다 (FR-001a, 2026-09-18 개정 — GitLab #214). 일일 한도에 도달한 회원에게도
 세션은 발급된다 — 게임은 할 수 있고 보상만 없다 (Acceptance Scenario 4).
 
 ### POST `/minigames/timer-stop/sessions/{sessionId}/result` → `200`
