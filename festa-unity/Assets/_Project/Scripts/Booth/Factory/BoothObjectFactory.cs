@@ -257,9 +257,9 @@ namespace Festa.Booth
                 case BoothObjectType.VideoScreen:
                     if (go.GetComponent<VideoScreenPlaceholder>() == null)
                         go.AddComponent<VideoScreenPlaceholder>();
-                    // 전광판 시제품 (2026-09-18) — WebGL 빌드에서만 동작하고 에디터에서는 스스로 꺼진다.
-                    if (go.GetComponent<BoothScreenBillboard>() == null)
-                        go.AddComponent<BoothScreenBillboard>();
+                    // 영상 스크린은 **장식**이라 이미지까지만 — 영상은 전시 패널이 튼다.
+                    // 한 부스에 화면이 둘이면 둘 다 틀려 해서 서로 깜빡인다.
+                    BoothScreenSurface.Attach(go, allowVideo: false);
                     break;
                 case BoothObjectType.Laptop:
                     if (go.GetComponent<LaptopInteractable>() == null)
@@ -268,6 +268,8 @@ namespace Festa.Booth
                 case BoothObjectType.ProjectPanel:
                     if (go.GetComponent<ProjectPanelInteractable>() == null)
                         go.AddComponent<ProjectPanelInteractable>();
+                    // 전시 패널이 부스의 큰 화면이다 — 영상 → 로고 → 썸네일 → 검은 화면.
+                    BoothScreenSurface.Attach(go, allowVideo: true);
                     break;
                 case BoothObjectType.SurveyKiosk:
                     if (go.GetComponent<SurveyKioskInteractable>() == null)
