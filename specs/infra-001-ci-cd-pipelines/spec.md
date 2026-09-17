@@ -111,7 +111,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ### Functional Requirements
 
-- **FR-001**: GitLab CI/Runner는 `feature/* → develop` MR의 `festa-frontend/**`, `backend/**`, 공용 계약·CI 경로를 `rules:changes`로 매핑해 필요한 Front·Back build·test job만 실행해야 한다. Front·Back 공용 경로는 두 gate를 모두 실행한다. `jira-*` job 정의는 보존하되 실행하지 않는다.
+- **FR-001**: GitLab CI/Runner는 `develop` 대상 MR의 소스 브랜치 명명 제한 없이 `festa-frontend/**`, `backend/**`, 공용 계약·CI 경로를 `rules:changes`의 `compare_to: 'refs/heads/develop'` (Net Diff)로 매핑해 실제로 변경된 컴포넌트 build·test job만 선별 실행해야 한다 (Phase 1, Phase 2). Front·Back 공용 경로는 두 gate를 모두 실행한다. `jira-*` job 정의는 보존하되 실행하지 않는다.
 - **FR-002**: GitLab CI의 Front gate는 `ci/test front` 및 `ci/build front`, Back gate는 `ci/test back` 및 `ci/build back`을 수행해야 한다. Back gate runner는 Testcontainers를 위해 Docker executor 또는 Docker socket 접근을 제공해야 한다.
 - **FR-003**: GitLab의 필수 MR gate가 하나라도 실패하면 `develop` 병합을 차단해야 한다. Jenkins의 `develop` 검증이 실패하면 dev 배포를 차단해야 한다.
 - **FR-003a**: GitLab CI/Runner의 초기 MR merge gate는 Front·Back을 `rules:changes`로 수행한다. Game MR gate는 Jenkins Unity agent가 수행하며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
@@ -120,7 +120,7 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 개발환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
 - **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다. 하나의 MR이 여러 컴포넌트를 변경하면 모든 변경 컴포넌트의 CI가 성공한 뒤에만 dev 배포를 시작해야 하며, 배포 또는 검증이 하나라도 실패하면 같은 MR에서 이미 갱신된 컴포넌트를 이전 정상 release로 자동 복구해야 한다.
 - **FR-006**: 모든 실행은 변경 식별자, 대상 파트, 단계별 결과, 산출물 식별자, 배포 대상과 최종 상태를 추적 가능하게 기록해야 한다.
-- **FR-007**: 승인된 `develop` release만 모든 서버 컴포넌트를 하나의 통합 릴리스 단위로 demo에 배포해야 한다.
+- **FR-007**: 승인된 `develop` release만 모든 서버 컴포넌트를 하나의 통합 릴리스 단위로 demo에 배포해야 한다. 데모 승격 주기는 매일 퇴근 전 1회 고정 승격(C안)을 기본선으로 하되, 업무시간 중에는 사용자 시나리오 완결 및 E2E/Smoke Gate를 통과한 건에 한해 예외 승격(B안)을 허용한다. 긴급 핫픽스는 시간 무관 즉시 승격한다 (GitLab 이슈 #220).
 - **FR-008**: demo 통합 배포는 웹 접속 → 로그인 → 월드 입장 → AI 응답의 핵심 사용자 여정을 순서대로 검증해야 한다.
 - **FR-009**: demo 통합 배포는 모든 필수 배포 단계와 핵심 사용자 여정이 통과한 경우에만 성공으로 기록해야 한다.
 - **FR-010**: 통합 배포 실패 시 시스템은 실패 릴리스의 승격을 막고 마지막 정상 릴리스를 식별·복구할 수 있는 상태를 보존해야 한다.
@@ -197,8 +197,8 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 ## Assumptions
 
-- 개발 흐름은 `feature/*` 브랜치에서 `develop`으로 Merge Request를 만들고 Squash Merge한다. 고정 `ai`/`back`/`front`/`game` 파트 브랜치는 사용하지 않는다.
-- GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단을 담당한다. Jenkins Unity agent는 merge 전 Game MR의 test-only 컴파일·EditMode 상태를 게시하며, Jenkins의 merge 후 경로는 네 컴포넌트 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
+- 개발 흐름은 소스 브랜치 이름(`feature/*`, `fix/*`, `chore/*` 등) 제한 없이 `develop`으로 Merge Request를 만들고 Squash Merge한다. 대규모 테스트 슈트(예: 백엔드 Testcontainers) 또는 다수의 자잘한 커밋이 발생하는 파트의 경우 #206 배칭 규약에 따라 파트 브랜치(`back`, `front` 등)에서 작업을 취합한 뒤 `develop`으로 올리는 배치 MR을 병행 허용하며, Net Diff 판정(`compare_to: refs/heads/develop`)을 통해 타 파트 CI 오폭 없이 변경된 파트만 격리 실행한다.
+  - GitLab CI/Runner는 merge 전 Front·Back build·test와 GitLab merge 차단을 담당한다. Jenkins Unity agent는 merge 전 Game MR의 test-only 컴파일·EditMode 상태를 게시하며, Jenkins의 merge 후 경로는 네 컴포넌트 selected CI, dev batch 배포·rollback, 수동 demo promotion을 담당한다.
 - `develop` 병합은 변경 컴포넌트만 dev에 자동 배포한다. demo 통합 환경은 dev 검증 후 Jenkins에서 승인한 release만 배포한다.
 - 각 파트는 파이프라인이 호출할 수 있는 빌드 명령과 필수 테스트 범위를 소유하고 유지한다.
 - CI/CD 서비스는 Jenkins를 사용한다. 소스 저장소는 초기 GitHub에서 추후 GitLab으로 이전하되 Jenkins 파이프라인은 유지하고 연동 Webhook만 전환한다.
@@ -236,12 +236,24 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 
 - Q: Front·Back 경로가 아닌 Infra·문서 MR은 component gate가 없는데, protected `develop`의 성공 pipeline 요구를 어떻게 만족할까? → A: 모든 유효 MR은 build·test·deploy를 수행하지 않는 `mr-status` job을 하나 실행한다. Front·Back component gate는 기존 `rules:changes`로만 추가되며, Jenkins의 merge 후 선택 CI와 중복되지 않는다.
 
+### Session 2026-09-17 (GitLab 이슈 #220 CI/CD 구조 개편)
+
+- Q: 소스 브랜치 명명 규칙(`feature/*` 등)에 따라 파이프라인 생성이 누락되는 문제를 어떻게 해결할까? → A: `workflow.rules`의 브랜치 접두어 정규식 가드를 해제하여 소스 브랜치명과 무관하게 `develop` 대상 MR이면 정상 파이프라인을 생성한다 (Phase 1).
+- Q: 장수 파트 브랜치 및 스쿼시 머지 구조에서 과거 커밋 이력으로 인해 불필요한 타 파트 CI가 딸려 도는 문제를 어떻게 방지할까? → A: `rules:changes`에 `compare_to: 'refs/heads/develop'`를 적용하여 `develop` 최신 트리와의 순수 Net Diff 기준으로만 컴포넌트 CI를 선별 실행한다 (Phase 2).
+- Q: 백엔드 등 대규모 통합 테스트(1,400여 건)를 가진 파트의 러너 병목을 어떻게 완화할까? → A: `#206` 파트 브랜치 배칭 규약을 유지하여 가벼운 수정은 직통 MR(`feat/*`, `fix/*` → `develop`), 대규모/자잘한 커밋은 파트 브랜치 집약 후 배치 MR(`back` → `develop`)을 병행 허용한다. Net Diff 덕분에 배치 MR에서도 타 파트 CI 오폭 없이 안전하게 격리된다.
+- Q: Unity MR 검증 시 러너 슬롯 45분 점유 병목을 어떻게 해소할까? → A: GitLab Runner가 Jenkins를 동기 폴링하지 않고, 비동기 디스패치 및 GitLab Commit Status 비동기 통보 구조로 전환한다 (Phase 3).
+- Q: 데모 통합 배포 승격 주기는 어떻게 운영할까? → A: 매일 퇴근 전 1회 고정 승격(C안)을 기본선으로 하되, 사용자 시나리오 완결 및 E2E/Smoke Gate를 통과한 건에 한해 업무시간 중 예외 승격(B안)을 허용한다. 핫픽스는 즉시 승격한다.
+
 | ID | 질문/결정 | 결정 주체 | 결정 시점 |
 |---|---|---|---|
 | C-01 | **확정**: Jenkins 사용. 초기 단일 EC2 내 Controller/Agent 분리, 추후 Agent 별도 EC2 이전 가능. GitHub에서 GitLab 이전 시 Jenkins Webhook 연동 전환. | Infra | 2026-08-18 |
 | C-02 | **확정**: Unity Personal 라이선스를 영속 Unity Agent에서 Unity Hub로 1회 활성화. 계정 인증정보는 Jenkins에 저장하지 않고 Agent 폐기·교체 시 관리자 반납. | Infra + Unity | 2026-08-18 |
 | C-03 | **확정**: 초기 단일 EC2에서 Jenkins와 파트별 개발환경을 함께 운영하되 컨테이너·네트워크·배포 단위를 논리적으로 분리. 추후 파트별 별도 EC2 이전 가능. | Infra | 2026-08-18 |
 | C-04 | **확정**: 되돌릴 수 있는 컨테이너 시작·비AI 핵심 헬스체크 실패는 자동 복구. DB·Secret·환경 설정·비가역 데이터 변경 및 AI 외부 장애는 상태 보존 후 수동 판단. | Infra + 팀 | 2026-08-18 |
+| C-05 | **확정**: develop MR 브랜치명 제한 해제 (Phase 1) 및 Net Diff (`compare_to: 'refs/heads/develop'`) 적용 (Phase 2). | Infra + 팀 | 2026-09-17 |
+| C-06 | **확정**: #206 파트 브랜치 배칭 규약 병행 유지 (직통 MR + 파트 배치 MR 혼용). | Infra + 팀 | 2026-09-17 |
+| C-07 | **확정**: Unity MR 검증 비동기화로 러너 독점 방지 (Phase 3). | Infra + Game | 2026-09-17 |
+| C-08 | **확정**: 데모 승격 주기 확정 (퇴근 전 1회 C안 기본 + E2E 게이트 통과 시 B안 예외 승격 + 핫픽스 즉시). | Infra + 팀 | 2026-09-17 |
 
 ## Out of Scope
 
