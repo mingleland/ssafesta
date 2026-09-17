@@ -211,16 +211,12 @@ export function WorldPage() {
     };
   }, []);
 
-  // Tab 잠금 (S15P21A604-450) — 브라우저 기본 동작은 Tab 에서 다음 포커스 가능 요소로 옮긴다.
-  // Unity 6 WebGL 은 키보드 타깃을 canvas 로 잡으므로(captureAllKeyboardInput=false, !279),
-  // 포커스가 캔버스를 벗어나면 그 뒤 Tab keydown 이 Unity 에 안 들어가 자체 미니맵 토글이
-  // 죽는다. 실제 canvas가 키보드 타깃일 때만 막는다. HUD·오버레이 등 DOM 요소에서는
-  // 접근성을 위해 브라우저의 Tab 탐색을 그대로 둔다.
+  // Tab 잠금 (S15P21A604-450, S15P21A604-838) — WorldPage가 활성화된 동안에는
+  // canvas·HUD·메뉴·입력창을 가리지 않고 브라우저의 Tab 기본 동작(포커스 이동)을 막는다.
+  // Unity 내부의 Tab 입력 처리는 게임 파트 소관이므로 이벤트 전파는 막지 않는다.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Tab') return;
-      if (getWorldScreen() !== 'world') return;
-      if (e.target !== document.getElementById('unity-canvas')) return;
       e.preventDefault();
     }
     window.addEventListener('keydown', onKeyDown);
