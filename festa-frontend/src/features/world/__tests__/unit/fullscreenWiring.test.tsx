@@ -1,12 +1,10 @@
 // @vitest-environment jsdom
-// 전체화면 배선 (S15P21A604-733) — 의도가 어디서 남고 어디서 쓰이는가.
+// 전체화면 배선 (S15P21A604-733) — 진입 경로는 HUD 토글 하나다.
 //
-// 자동 진입을 캔버스의 아무 클릭에 걸면 아바타 파츠를 고르다 갑자기 전체화면이 된다. 그래서
-// 쓰는 자리는 `onWorldLoadStart` 하나다 — Unity 가 '월드 입장' 을 누른 직후에만 보낸다.
+// 월드 입장에서 자동으로 걸지 않는다. 요청하지 않은 전체화면은 화면이 갑자기 바뀌는 것으로만 보인다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { WorldHud } from '../../ui/WorldHud';
-import { markFullscreenIntent } from '../../../../shared/ui/fullscreen';
 import type { UnityInstance, UnityProgressListener } from '../../../../unity/host/types';
 
 const boots: { resolve: (i: UnityInstance) => void }[] = [];
@@ -59,7 +57,7 @@ describe('HUD 전체화면 토글 (-733)', () => {
   });
 });
 
-describe('자동 진입 시점 (-733)', () => {
+describe('자동 진입 없음 (-733)', () => {
   async function bootHost() {
     const { UnityHost } = await import('../../../../unity/host/UnityHost');
     render(<UnityHost />);
@@ -68,34 +66,10 @@ describe('자동 진입 시점 (-733)', () => {
     });
   }
 
-  it('의도가 없으면 월드 입장에서도 부르지 않는다', async () => {
+  it('월드 입장 신호는 전체화면을 부르지 않는다', async () => {
     await bootHost();
+    act(() => { window.FestaUnity?.onWorldLoadStart?.(); });
     act(() => { window.FestaUnity?.onWorldLoadStart?.(); });
     expect(request).not.toHaveBeenCalled();
-  });
-
-  it('의도가 있으면 월드 입장 신호에서 한 번 부른다', async () => {
-    markFullscreenIntent();
-    await bootHost();
-    act(() => { window.FestaUnity?.onWorldLoadStart?.(); });
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-
-  it('두 번째 진입에서는 다시 부르지 않는다 — 의도는 한 번만 쓰인다', async () => {
-    markFullscreenIntent();
-    await bootHost();
-    act(() => { window.FestaUnity?.onWorldLoadStart?.(); });
-    act(() => { window.FestaUnity?.onWorldLoadStart?.(); });
-    expect(request).toHaveBeenCalledTimes(1);
-  });
-
-  it('브라우저가 거부해도 월드 진입을 막지 않는다', async () => {
-    Object.defineProperty(document.documentElement, 'requestFullscreen', {
-      value: () => Promise.reject(new Error('gesture required')),
-      configurable: true,
-    });
-    markFullscreenIntent();
-    await bootHost();
-    expect(() => { act(() => { window.FestaUnity?.onWorldLoadStart?.(); }); }).not.toThrow();
   });
 });

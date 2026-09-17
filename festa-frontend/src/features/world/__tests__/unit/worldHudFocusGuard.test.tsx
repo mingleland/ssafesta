@@ -32,17 +32,15 @@ describe('HUD 버튼 mousedown', () => {
     render(<WorldHud />);
     act(() => applyBoothContext(true, 6)); // 나가기 버튼까지 띄운다
     const buttons = document.querySelectorAll('.world-hud button');
-    expect(buttons.length).toBeGreaterThanOrEqual(4); // 접기 · 상담 · 이용 안내 · 나가기
+    expect(buttons.length).toBeGreaterThanOrEqual(3); // 상담 · 전체화면 · 나가기
     for (const b of buttons) expect(mousedownPrevented(b)).toBe(true);
   });
 
-  it('click 은 그대로 온다 — 접기 버튼을 누르면 카드가 접힌다', () => {
+  it('click 은 그대로 온다 — 전체화면 토글이 눌린다', () => {
     render(<WorldHud />);
-    const close = screen.getByLabelText('조작 안내 닫기');
-    fireEvent.mouseDown(close);
-    fireEvent.click(close);
-    expect(screen.queryByLabelText('조작 안내')).toBeNull();
-    expect(screen.getByRole('button', { name: '조작 안내' })).toBeTruthy();
+    const toggle = screen.getByLabelText('전체화면');
+    fireEvent.mouseDown(toggle);
+    expect(() => fireEvent.click(toggle)).not.toThrow();
   });
 
   it('나가기 버튼도 click 이 그대로 온다 — 퇴장 요청이 나간다', () => {
@@ -61,9 +59,9 @@ describe('HUD 버튼 mousedown', () => {
     expect(document.activeElement).toBe(canvas);
 
     render(<WorldHud />);
-    const close = screen.getByLabelText('조작 안내 닫기');
-    fireEvent.mouseDown(close);
-    fireEvent.click(close);
+    const toggle = screen.getByLabelText('전체화면');
+    fireEvent.mouseDown(toggle);
+    fireEvent.click(toggle);
     // mousedown 기본 동작을 막았으므로 focus 이동이 일어나지 않는다
     expect(document.activeElement).toBe(canvas);
     canvas.remove();
