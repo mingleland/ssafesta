@@ -332,6 +332,7 @@ namespace Festa.Avatar
                 SanitizeLocked(ref _config);
                 Apply(); RefreshAll();
                 if (!_restoredExistingAppearance) await LoadPersistedAppearanceAsync();
+                LoadPresetsAsync();   // 토큰이 없던 동안 비어 있던 저장 칸을 이제 채운다 (GitLab #237)
             }
             finally { _ownershipRetrying = false; }
         }
@@ -486,6 +487,189 @@ namespace Festa.Avatar
             => config.headId != 0 && config.hairId != 0 && config.shoesId != 0
                && (config.outfitId != 0 || (config.topId != 0 && config.bottomId != 0));
 
+        /// <summary>
+        /// 외형을 세 칸에 담아 두고 꺼내 쓴다 (QA 요청 2026-09-17, GitLab #237).
+        ///
+        /// <para><b>썸네일은 일부러 넣지 않는다.</b> 프리뷰 카메라가 한 대뿐이라 세 칸을 동시에 찍을 수
+        /// 없고, 칸마다 렌더 타깃을 잡으면 WebGL 번들·메모리가 늘어난다. 칸 번호와 저장 시각으로
+        /// 구분한다 — 세 칸이면 사람이 기억할 수 있는 개수다.</para>
+        ///
+        /// <para>담기는 값은 월드 입장에 쓰는 <c>avatar_code</c> 한 줄 그대로다. 칸 전용 포맷을 만들지
+        /// 않았으므로 꺼낸 것을 바로 월드로 보낼 수 있고, 인코딩이 바뀌어도 따라갈 곳이 한 군데다.</para>
+        /// </summary>
+        const int PresetSlotCount = 3;
+        readonly Button[] _presetButtons = new Button[PresetSlotCount];
+        readonly string[] _presetCodes = new string[PresetSlotCount];
+        readonly string[] _presetStamps = new string[PresetSlotCount];
+        Text _presetTitle;
+        Button _presetSaveToggle;
+        bool _presetSaveMode;
+        bool _presetBusy;
+
+        /// <summary>우측 패널 하단 — <c>ColorList</c> 가 높이 .20 까지만 쓰므로 그 아래가 비어 있다.</summary>
+        void BuildPresetSlots(RectTransform right)
+        {
+            _presetTitle = Label(right, "저장된 외형", 18, 34, new Vector2(.055f, .148f), new Vector2(.60f, .196f));
+            _presetTitle.alignment = TextAnchor.MiddleLeft; _presetTitle.color = UiText;
+
+            _presetSaveToggle = Button(right, "저장", TogglePresetSaveMode, 120, 40);
+            Anchor(_presetSaveToggle.GetComponent<RectTransform>(), new Vector2(.62f, .146f), new Vector2(.945f, .198f));
+            _presetSaveToggle.GetComponentInChildren<Text>().fontSize = 16;
+
+            for (int i = 0; i < PresetSlotCount; i++)
+            {
+                int slot = i + 1;
+                var button = Button(right, slot.ToString(), () => OnPresetSlotClicked(slot), 130, 62);
+                float x0 = .055f + i * .300f;
+                Anchor(button.GetComponent<RectTransform>(), new Vector2(x0, .042f), new Vector2(x0 + .280f, .134f));
+                var caption = button.GetComponentInChildren<Text>();
+                caption.fontSize = 15; caption.lineSpacing = .95f;
+                _presetButtons[i] = button;
+            }
+            RefreshPresetSlots();
+            LoadPresetsAsync();
+        }
+
+        void TogglePresetSaveMode()
+        {
+            _presetSaveMode = !_presetSaveMode;
+            if (_presetSaveToggle) _presetSaveToggle.image.color = _presetSaveMode ? UiCardSelected : UiCard;
+            RefreshPresetSlots();
+            SetStatus(_presetSaveMode
+                ? "저장할 칸을 고르세요. 이미 찬 칸을 고르면 덮어씁니다."
+                : "칸을 누르면 그 외형으로 갈아입습니다.");
+        }
+
+        void RefreshPresetSlots()
+        {
+            if (_presetTitle) _presetTitle.text = _presetSaveMode ? "저장할 칸 고르기" : "저장된 외형";
+            for (int i = 0; i < PresetSlotCount; i++)
+            {
+                var button = _presetButtons[i];
+                if (!button) continue;
+                bool filled = !string.IsNullOrEmpty(_presetCodes[i]);
+                button.GetComponentInChildren<Text>().text = filled
+                    ? (i + 1) + "\n" + _presetStamps[i]
+                    : (i + 1) + "\n비어 있음";
+                button.image.color = _presetSaveMode ? UiCard : filled ? UiCardSelected : UiSurface;
+            }
+        }
+
+        /// <summary>
+        /// 게스트·비로그인은 서버에 담아 둘 신원이 없다 — 회원 전용이라 403 <c>MEMBER_ONLY</c> 가
+        /// 정상 응답이다. 눌러서 실패하게 두지 않고 화면에서 먼저 걸러 안내한다 (#175 와 같은 결).
+        /// </summary>
+        static bool PresetsAvailable(out string reason)
+        {
+            reason = null;
+            if (Festa.Integration.ApiServices.IsMock) return true;
+            if (Festa.Integration.AuthBridge.IsGuest || !Festa.Integration.AuthBridge.HasToken)
+            {
+                reason = "로그인하면 외형을 세 칸에 저장할 수 있어요.";
+                return false;
+            }
+            return true;
+        }
+
+        async void LoadPresetsAsync()
+        {
+            if (!PresetsAvailable(out _)) return;
+            try
+            {
+                Festa.Integration.ApiServices.EnsureInitialized();
+                var presets = await Festa.Integration.ApiServices.User.GetAvatarPresetsAsync();
+                for (int i = 0; i < PresetSlotCount; i++) { _presetCodes[i] = null; _presetStamps[i] = null; }
+                if (presets != null)
+                    foreach (var preset in presets)
+                    {
+                        if (preset == null) continue;
+                        int index = preset.slot - 1;
+                        if (index < 0 || index >= PresetSlotCount) continue;
+                        _presetCodes[index] = preset.avatarCode;
+                        _presetStamps[index] = FormatPresetStamp(preset.updatedAt);
+                    }
+                RefreshPresetSlots();
+            }
+            catch (Exception exception)
+            {
+                // 목록을 못 받은 것으로 화면을 막지 않는다 — 저장 칸은 부가 기능이고 커스터마이징
+                // 본체는 그대로 써야 한다. 대신 조용히 삼키지 않고 로그에 남긴다 (T-24).
+                Debug.LogWarning($"[CharacterLobby] 저장 칸 목록을 불러오지 못했습니다: {exception.Message}", this);
+            }
+        }
+
+        static string FormatPresetStamp(string updatedAt)
+            => DateTime.TryParse(updatedAt, System.Globalization.CultureInfo.InvariantCulture,
+                                 System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+                                 out var parsed)
+                ? parsed.ToLocalTime().ToString("MM/dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)
+                : "저장됨";
+
+        void OnPresetSlotClicked(int slot)
+        {
+            if (_presetBusy) return;
+            if (!PresetsAvailable(out var reason)) { SetStatus(reason); return; }
+            if (_presetSaveMode) { SavePresetAsync(slot); return; }
+
+            var code = _presetCodes[slot - 1];
+            if (string.IsNullOrEmpty(code))
+            {
+                SetStatus($"{slot}번 칸은 비어 있어요. 저장 버튼을 누른 뒤 칸을 고르면 지금 외형이 들어갑니다.");
+                return;
+            }
+            if (!TryApplyPresetCode(code))
+            {
+                SetStatus($"{slot}번 칸의 외형을 지금 규격으로 읽을 수 없어요. 다시 저장해 주세요.");
+                return;
+            }
+            SetStatus($"{slot}번 칸의 외형을 불러왔습니다.");
+        }
+
+        /// <summary>저장 외형 복원과 같은 경로를 탄다 (<see cref="LoadPersistedAppearanceAsync"/>).</summary>
+        bool TryApplyPresetCode(string code)
+        {
+            var appearance = Festa.World.AvatarAppearance.Decode(code);
+            if (!appearance.IsModular || !IsUsableAppearance(appearance.ModularConfig)) return false;
+            CloseColorPopup();
+            _config = appearance.ModularConfig;
+            SanitizeLocked(ref _config);
+            _wardrobeCategory = _config.outfitId != 0 ? AvatarPartCategory.Outfit : AvatarPartCategory.Top;
+            _garmentColorCategory = _wardrobeCategory;
+            Apply(); RefreshAll(); RefreshPresetSlots();
+            return true;
+        }
+
+        async void SavePresetAsync(int slot)
+        {
+            // 잠긴 것을 걸러서 담는다 — 구매 미리보기 중에 저장을 누르면 안 산 옷이 칸에 박힌다.
+            var snapshot = _config;
+            SanitizeLocked(ref snapshot);
+            string code = Festa.World.AvatarAppearance.FromModularConfig(snapshot).Encode();
+
+            _presetBusy = true;
+            SetStatus($"{slot}번 칸에 저장하는 중입니다.");
+            try
+            {
+                bool saved = await Festa.Integration.ApiServices.User.SaveAvatarPresetAsync(slot, code);
+                if (!saved)
+                {
+                    SetStatus($"{slot}번 칸에 저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+                    return;
+                }
+                _presetCodes[slot - 1] = code;
+                _presetStamps[slot - 1] = DateTime.Now.ToString("MM/dd HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+                _presetSaveMode = false;
+                if (_presetSaveToggle) _presetSaveToggle.image.color = UiCard;
+                RefreshPresetSlots();
+                SetStatus($"{slot}번 칸에 지금 외형을 저장했습니다.");
+            }
+            catch (Exception exception)
+            {
+                SetStatus($"{slot}번 칸에 저장하지 못했어요: {exception.Message}");
+            }
+            finally { _presetBusy = false; }
+        }
+
         void Update()
         {
             UpdateResponsiveLayout();
@@ -532,7 +716,20 @@ namespace Festa.Avatar
             _pointerEventData.position = pointer;
             _uiRaycastResults.Clear();
             EventSystem.current.RaycastAll(_pointerEventData, _uiRaycastResults);
-            return _uiRaycastResults.Count == 0;
+
+            // **전체 화면 배경(Backdrop)은 막는 것으로 치지 않는다.**
+            // 배경의 일은 "뒤쪽 UI 를 잘못 누르지 못하게" 지 미리보기를 덮는 것이 아니다.
+            // 특히 구매 창은 아바타가 그 옷을 입은 모습을 보라고 띄우는 창이라 배경을 45% 로 낮추고
+            // 패널도 오른쪽으로 치워 뒀는데, 배경이 레이캐스트를 먹는 바람에 정작 돌려 볼 수가 없었다
+            // (사용자 지시 2026-09-17). 이 함수는 드래그 회전·궤도·줌에만 쓰이므로 여기서 통과시켜도
+            // 클릭 차단은 그대로다 — 배경은 여전히 버튼 클릭을 삼킨다.
+            for (int i = 0; i < _uiRaycastResults.Count; i++)
+            {
+                var hit = _uiRaycastResults[i].gameObject;
+                if (hit != null && hit.name == Festa.World.UI.FestaUiKit.BackdropName) continue;
+                return false;
+            }
+            return true;
         }
 
         void BuildUi()
@@ -593,6 +790,7 @@ namespace Festa.Avatar
             _colorTitle=Label(right,"얼굴 색상",20,38,new Vector2(.055f,.47f),new Vector2(.945f,.52f));_colorTitle.alignment=TextAnchor.MiddleLeft;_colorTitle.fontStyle=FontStyle.Bold;_colorTitle.color=UiText;
             _colorSlots=ColorList(right);
             Anchor(_categoryTitle.rectTransform,new Vector2(.055f,.684f),new Vector2(.945f,.739f));
+            BuildPresetSlots(right);
 
             _colorPopup=Panel(_responsiveFrame,"Color Popup",new Vector2(.60f,.245f),new Vector2(.84f,.755f),UiPanel);
             _previewInputBlockers.Add(_colorPopup);
@@ -634,7 +832,7 @@ namespace Festa.Avatar
         /// 잠금 안내·조회 실패가 로그에만 남고 화면에는 아무것도 안 뜬다 — 이 라벨은 바로 그래서
         /// 생겼다(S15P21A604-412). 그래서 없애는 대신 <b>시간이 지나면 사라지게</b> 했다.</para>
         ///
-        /// <para>평상시 안내("수정합니다"·"확인하는 중입니다"·"적용했습니다")는 호출 자체를 없앴다 —
+        /// <para>평상시 안내("수정합니다"·"적용했습니다"·"게스트는 바로 입장합니다")는 호출 자체를 없앴다 —
         /// 아바타가 눈앞에서 바뀌는데 같은 말을 글자로 또 할 이유가 없다.</para>
         /// </summary>
         void SetStatus(string message)
@@ -730,8 +928,7 @@ namespace Festa.Avatar
             if(keepWardrobeScroll)_wardrobeScrollY=_wardrobeGrid.anchoredPosition.y;
             _wardrobeScrollFor=_wardrobeCategory;
             foreach(Transform child in _wardrobeGrid)Destroy(child.gameObject);
-            if(_wardrobeCategory==AvatarPartCategory.Outfit||_wardrobeCategory==AvatarPartCategory.Shoes)
-                ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
+            ImageButton(_wardrobeGrid,"없음",null,()=>SelectWardrobeItem(_wardrobeCategory,0),158,148,CurrentItemId(_wardrobeCategory)==0);
             // 서버 카탈로그에 있는 것만 그린다 — 미등록 파츠는 고를 수 있어도 저장이 거부된다 (#120 §2-1).
             var wardrobeItems=_catalog.GetCatalogedItems(_wardrobeCategory,_config.gender).ToArray();
             for(int index=0;index<wardrobeItems.Length;index++)
@@ -868,8 +1065,7 @@ namespace Festa.Avatar
             // 무엇을 얻을 수 있는지 보이지 않으면 잠금이 의미가 없다.
             IEnumerable<AvatarItemDefinition> defs = _catalog.GetCatalogedItems(_category,_config.gender);
             if(_category==AvatarPartCategory.Hat) defs=defs.GroupBy(x=>x.familyId).Select(x=>x.First());
-            if(_category!=AvatarPartCategory.Head&&_category!=AvatarPartCategory.Top&&_category!=AvatarPartCategory.Bottom)
-                ImageButton(_itemGrid,"없음",null,()=>{SelectWardrobeItem(_category,0);RefreshItems();},188,150,CurrentItemId(_category)==0);
+            if(_category!=AvatarPartCategory.Head) ImageButton(_itemGrid,"없음",null,()=>{_config.SetItem(_category,0);Apply();RefreshItems();},188,150,CurrentItemId(_category)==0);
             var definitions=defs.ToArray();
             for(int index=0;index<definitions.Length;index++)
             {
@@ -877,7 +1073,7 @@ namespace Festa.Avatar
                 bool locked=!AvatarOwnership.IsUnlocked(captured);
                 var select=locked
                     ?new UnityEngine.Events.UnityAction(()=>ShowPurchaseOrNotice(captured,PrettyName(captured.displayName)))
-                    :new UnityEngine.Events.UnityAction(()=>{SelectWardrobeItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);RefreshItems();RefreshColors();});
+                    :new UnityEngine.Events.UnityAction(()=>{_config.SetItem(_category,_category==AvatarPartCategory.Hat?captured.familyId:captured.itemId);Apply();RefreshItems();RefreshColors();});
                 if(face)FaceCardButton(_itemGrid,FaceDisplayName(index),FaceThumbnail(index)??captured.thumbnail,select,188,142,IsSelected(_category,captured),locked);
                 else if(_category==AvatarPartCategory.Hair)HairCardButton(_itemGrid,HairDisplayName(index),HairThumbnail(index)??captured.thumbnail,select,188,156,IsSelected(_category,captured),locked);
                 else ImageButton(_itemGrid,PrettyName(captured.displayName),captured.thumbnail,select,188,150,IsSelected(_category,captured),null,locked);
@@ -887,8 +1083,6 @@ namespace Festa.Avatar
 
         void Apply()
         {
-            _catalog.EnsureRequiredClothing(ref _config);
-            if(_config.outfitId==0)RememberSeparateClothing();
             // A full outfit and separate upper/lower garments are mutually exclusive.
             // Keeping both active is the main cause of overlapping meshes and skin seams.
             if (_category == AvatarPartCategory.Outfit && _config.outfitId != 0)
