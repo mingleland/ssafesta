@@ -17,7 +17,7 @@ cat >"${fixture}/state/candidate.json" <<JSON
 {"targetId":"demo/game","releaseId":"candidate-1","imageRef":"festa-world:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","contentId":"${candidate_id}","state":"CANDIDATE"}
 JSON
 cat >"${fixture}/state/known-good.json" <<JSON
-{"targetId":"demo/game","releaseId":"known-good-1","imageRef":"festa-world:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","contentId":"${known_good_id}","state":"CURRENT/KNOWN_GOOD"}
+{"targetId":"demo/game","releaseId":"known-good-1","imageRef":"festa-world:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","contentId":"${known_good_id}","state":"KNOWN_GOOD"}
 JSON
 
 cat >"${fixture}/bin/docker" <<SH

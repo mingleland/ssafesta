@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 선택된 dev component를 하나의 batch로 배포하고, 실패 시 이 batch의 known-good snapshot만 복구한다.
+# 성공 시 CURRENT 만 자동 갱신하며, KNOWN_GOOD 승격은 사람이 approve-known-good.sh 로 별도 수행한다 (spec §Session 2026-09-17).
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -207,7 +208,9 @@ for component in "${components[@]}"; do
 done
 
 for component in "${components[@]}"; do
-  target="${state_root}/known-good/${component}.json"
+  # 자동 승격은 CURRENT 까지만. KNOWN_GOOD 은 사람이 approve-known-good.sh 로 승인해야 갱신된다.
+  mkdir -p "${state_root}/current"
+  target="${state_root}/current/${component}.json"
   temp="${target}.tmp"
   cp "${RELEASE_MANIFEST_PATH}" "${temp}"
   mv -f "${temp}" "${target}"
