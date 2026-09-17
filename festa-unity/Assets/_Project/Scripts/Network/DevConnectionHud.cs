@@ -182,8 +182,8 @@ namespace Festa.Network
                     _connection.Shutdown();
                 }
 
-                if (nm.IsClient && !nm.IsServer && GUILayout.Button("커스터마이징으로 돌아가기"))
-                    ReturnToCustomization(nm);
+                if (nm.IsClient && !nm.IsServer && GUILayout.Button("아바타 설정"))
+                    OpenInPlaceCustomization();
             }
 
             GUILayout.EndArea();
@@ -230,15 +230,20 @@ namespace Festa.Network
             WorldLoadTimeline.Record(WorldLoadTimeline.StartClient);
         }
 
-        void ReturnToCustomization(Unity.Netcode.NetworkManager networkManager)
+        /// <summary>
+        /// 월드 연결과 Player NetworkObject를 유지한 채 커스터마이징을 연다 (GitLab #240).
+        ///
+        /// <para>구형 구현은 현재 외형을 저장한 뒤 NGO를 종료하고 CharacterLobby를 단독 로드했다.
+        /// 그래서 화면이 인플레이스용 '적용하고 돌아가기'가 아니라 '월드 입장'으로 만들어졌고,
+        /// 종료 중인 DontDestroyOnLoad 플레이어가 로비 프리뷰와 한 프레임 이상 겹쳐 마젠타 잔상도
+        /// 만들었다. 정식 ESC 메뉴와 같은 단일 진입점으로 통일한다.</para>
+        /// </summary>
+        void OpenInPlaceCustomization()
         {
-            var player = networkManager.LocalClient?.PlayerObject;
-            var appearance = player ? player.GetComponent<PlayerAppearanceController>() : null;
-            if (appearance != null) AvatarSceneHandoff.Save(appearance.Current);
-
-            WorldReconnector.MarkUserInitiatedShutdown();   // 사용자가 끊는 것 — 자동 재접속 대상 아님 (-432)
-            _connection.Shutdown();
-            SceneManager.LoadScene(AvatarSceneHandoff.LobbySceneName);
+            if (AvatarInPlaceCustomization.TryOpen("dev-connection-hud", out var error))
+                Debug.Log("[DevConnectionHud] 월드 연결을 유지하고 인플레이스 커스터마이징을 열었다");
+            else
+                Debug.LogWarning($"[DevConnectionHud] 인플레이스 커스터마이징 열기 거부 — {error}");
         }
     }
 }
