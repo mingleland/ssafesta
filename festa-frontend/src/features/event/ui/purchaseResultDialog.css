@@ -1,0 +1,26 @@
+/* 교환·응모 완료 팝업 — Overlay Local Baseline(--ov-*) 위에 얹는다. <dialog>는 top layer로
+   승격되지만 커스텀 속성 상속은 DOM 트리 기준이라 .festa-overlay 안에 있는 한 --ov-*가 그대로 닿는다. */
+.ov-result {
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px 24px 20px;
+  border: 1px solid var(--ov-border-strong);
+  border-radius: var(--ov-radius);
+  background: var(--ov-surface-raised);
+  color: var(--ov-text);
+  font-family: var(--ov-font);
+  font-size: 14px;
+  line-height: 1.6;
+  box-shadow: var(--ov-shadow);
+}
+
+/* 브라우저 기본 backdrop은 거의 투명해 뒤 화면과 구분이 안 된다 */
+.ov-result::backdrop {
+  background: rgba(6, 9, 26, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.ov-result-title { margin: 0 0 6px; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.ov-result-lead { margin: 0 0 12px; color: var(--ov-text-muted); }
+.ov-result-lead strong { color: var(--ov-text); font-weight: 700; }
+.ov-result-chip { margin-bottom: 18px; }
+.ov-result-actions { display: flex; justify-content: flex-end; }

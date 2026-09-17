@@ -38,6 +38,12 @@ const { EventRewardShopOverlay } = await import('../../ui/EventRewardShopOverlay
 // 응모권 흐름을 안 보는 테스트는 rafflesQuery가 매달리지 않게 빈 목록으로 기본값을 준다
 beforeEach(() => {
   listRaffles.mockResolvedValue([]);
+  // jsdom에는 <dialog>가 없다 — 완료 팝업이 뜨는지만 보므로 showModal을 no-op으로 채운다
+  if (!HTMLDialogElement.prototype.showModal) {
+    HTMLDialogElement.prototype.showModal = function showModal() {
+      this.setAttribute('open', '');
+    };
+  }
 });
 
 afterEach(() => {
@@ -141,6 +147,12 @@ describe('경품이 들어온 뒤', () => {
     const [prizeId, idempotencyKey] = purchasePrize.mock.calls[0] as [number, string];
     expect(prizeId).toBe(1);
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+
+    await screen.findByText('교환 완료');
+    expect(screen.getByText('450 C 사용')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    await waitFor(() => expect(screen.queryByText('교환 완료')).toBeNull());
   });
 });
 
@@ -195,5 +207,8 @@ describe('응모권 — 실 계약 전이라 mock으로 동작한다', () => {
     const [raffleId, idempotencyKey] = enterRaffle.mock.calls[0] as [number, string];
     expect(raffleId).toBe(101);
     expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+
+    await screen.findByText('응모 완료');
+    expect(screen.getByText('250 C 사용')).toBeTruthy();
   });
 });

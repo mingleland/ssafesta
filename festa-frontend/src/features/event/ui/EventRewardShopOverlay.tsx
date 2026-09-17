@@ -21,9 +21,16 @@ import type { OverlayCard } from '../../overlay/ui/OverlayCardGrid';
 import { OverlayFrame, OverlayError, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { OverlayNotice } from '../../overlay/ui/OverlayNotice';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
+import { PurchaseResultDialog } from './PurchaseResultDialog';
 import { imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
+
+interface ResultDialogState {
+  title: string;
+  itemName: string;
+  coinSpent: number;
+}
 
 const IcGift = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -53,10 +60,12 @@ export function EventRewardShopOverlay() {
   const prizesQuery = useQuery({ queryKey: ['event-shop-prizes'], queryFn: eventShopApi.listPrizes });
   const surveyTarget = resolveEventSurveyTarget();
 
+  const [resultDialog, setResultDialog] = useState<ResultDialogState | null>(null);
+
   const purchase = useMutation({
     mutationFn: (prize: EventPrize) => eventShopApi.purchasePrize(prize.prizeId, crypto.randomUUID()),
     onSuccess: (result) => {
-      showToast(`${result.prizeName} 교환 완료 — ${result.coinSpent.toLocaleString()}C 사용`, 'success');
+      setResultDialog({ title: '교환 완료', itemName: result.prizeName, coinSpent: result.coinSpent });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-prizes'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
@@ -72,7 +81,7 @@ export function EventRewardShopOverlay() {
   const enter = useMutation({
     mutationFn: (raffle: RafflePrize) => raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID()),
     onSuccess: (result) => {
-      showToast(`${result.raffleName} 응모 완료 — ${result.coinSpent.toLocaleString()}C 사용`, 'success');
+      setResultDialog({ title: '응모 완료', itemName: result.raffleName, coinSpent: result.coinSpent });
       void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
       void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
     },
@@ -200,6 +209,15 @@ export function EventRewardShopOverlay() {
         {rafflesQuery.isError && <OverlayError title="응모권 목록을 불러오지 못했습니다" onRetry={() => void rafflesQuery.refetch()} />}
         {rafflesQuery.isSuccess && <OverlayCardGrid cards={raffleCards} label="응모권 목록" />}
       </div>
+
+      {resultDialog !== null && (
+        <PurchaseResultDialog
+          title={resultDialog.title}
+          itemName={resultDialog.itemName}
+          coinSpent={resultDialog.coinSpent}
+          onClose={() => setResultDialog(null)}
+        />
+      )}
     </OverlayFrame>
   );
 }
