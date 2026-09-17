@@ -1444,7 +1444,13 @@ class AiDocumentUploadIntegrationTest {
                 + " WHERE document_id = ?", idOf(grant));
         sweeper.dispatchDueJobs();
 
-        DocumentProcessingClient.ProcessingRequest resent = processing.onlyRequest();
+        // 다른 테스트가 남긴 QUEUED Job 도 sweeper가 정상적으로 함께 보낼 수 있다. 이 시나리오는
+        // 이 문서가 같은 attempt로 재배차됐는지만 책임진다.
+        List<DocumentProcessingClient.ProcessingRequest> resentForThisDocument = processing.received().stream()
+                .filter(request -> request.documentId() == idOf(grant))
+                .toList();
+        assertEquals(1, resentForThisDocument.size(), "이 문서는 재배차를 정확히 한 번 받아야 한다");
+        DocumentProcessingClient.ProcessingRequest resent = resentForThisDocument.getFirst();
         assertEquals(0, resent.attemptNo(), "재배차는 attempt 를 올리지 않는다");
         assertEquals(idOf(grant), resent.documentId());
         assertEquals(0, jdbc.queryForObject(
