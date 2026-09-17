@@ -86,7 +86,12 @@ namespace Festa.Minigame.Slot
             _spin = FestaUiKit.PillButton(cr, $"{SlotMachineSession.Bet}코인 넣고 돌리기", new Vector2(0f, -324f), new Vector2(300f, 66f),
                                           () => _session.Spin(), true, 22f);
 
-            FestaUiKit.Label(cr, "최대 50코인 · 결과는 서버가 판정합니다", 13f, new Vector2(0f, -410f), new Vector2(320f, 22f), FestaUiKit.Muted);
+            // **최대 배당액을 여기 적지 않는다.** 전에는 "최대 50코인" 이었는데, 그 50 은 서버 설정
+            // (app.minigame.slot-machine.tiers 의 ×5 × bet 10)에서 나온 값이지 클라이언트가 아는 값이 아니다.
+            // 배당표는 yml 편집만으로 바뀌도록 설계돼 있어(#205), 숫자를 여기 박아 두면 서버가 조정하는 순간
+            // 조용히 거짓말이 된다 — 잭팟을 100 코인으로 올리기로 한 지금이 그 경우다(GitLab#235).
+            // 표시할 값이 필요하면 스핀 응답이 아니라 별도 계약으로 서버에서 받아야 한다.
+            FestaUiKit.Label(cr, "결과는 서버가 판정합니다", 13f, new Vector2(0f, -410f), new Vector2(320f, 22f), FestaUiKit.Muted);
             FestaUiKit.Label(cr, "Esc  나가기", 14f, new Vector2(0f, -470f), new Vector2(320f, 22f), FestaUiKit.Muted);
 
             // 팝업 — 코인 부족 등. 본 카드와 겹쳐 한 화면처럼 뭉개지지 않도록 화면 중앙의 독립 카드로 둔다.

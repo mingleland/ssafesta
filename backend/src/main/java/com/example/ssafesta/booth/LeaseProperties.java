@@ -4,7 +4,7 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Lease pricing and duration (spec 004 D02, BE brief "100 Coin/1일").
+ * Lease pricing and duration (spec 004 D02, BE brief "50 Coin/1일").
  *
  * <p>Externalised because 기획 owns these numbers. The server is the only source of them: a lease
  * request never carries a price or an end time (헌법 16조).
