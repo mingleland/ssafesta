@@ -55,9 +55,10 @@ interface Props {
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
+  size?: 's' | 'm' | 'l' | 'xl';
 }
 
-export function ManagementScreen({ title, subtitle, actions, children }: Props) {
+export function ManagementScreen({ title, subtitle, actions, children, size = 'l' }: Props) {
   const surface = useContext(SurfaceContext);
 
   if (surface === null) {
@@ -69,7 +70,7 @@ export function ManagementScreen({ title, subtitle, actions, children }: Props) 
   }
 
   return (
-    <OverlayFrame title={title} subtitle={subtitle} size="xl" onClose={surface.onClose} footer={actions}>
+    <OverlayFrame title={title} subtitle={subtitle} size={size} onClose={surface.onClose} footer={actions}>
       {children}
     </OverlayFrame>
   );
