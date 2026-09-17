@@ -13,8 +13,9 @@ export function useLeaseSlot() {
       queryClient.invalidateQueries({ queryKey: ['booth-slots'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
       queryClient.invalidateQueries({ queryKey: ['my-booth'] });
-      // 임대하면 BE 가 그 슬롯의 게시본을 만든다 — 상주 중인 Unity 가 그 슬롯을 다시 읽게 한다 (-644).
-      // 월드 밖(mock·미진입)이면 아무 일도 없다: 다음 진입이 읽는다.
+      // 임대만으로는 게시본이 생기지 않는다(BE 는 미게시를 LAYOUT_NOT_PUBLISHED 404 로 답한다). 그래도
+      // 상주 중인 Unity 가 이 슬롯의 간판·점유 상태를 다시 읽게 알린다 (-644). 월드 밖(mock·미진입)이면
+      // 아무 일도 없다: 다음 진입이 읽는다.
       notifyBoothSlotChanged(slotId);
     },
     onError: (error) => {

@@ -33,7 +33,7 @@ cd backend; .\mvnw.cmd test
 
 | 테스트 | 증명 |
 |---|---|
-| 빈 슬롯 임대 → 코인 100 차감 + 임대 생성 + Booth가 슬롯에 연결 | FR-002·FR-003, AS1-2 |
+| 빈 슬롯 임대 → 코인 50 차감 + 임대 생성 + Booth가 슬롯에 연결 | FR-002·FR-003, AS1-2 |
 | 임대 후 원장에 `LEASE_PAYMENT` 음수 1행, 잔액-원장 일치 | 003 I-1 |
 | 잔액 부족 → 거부되고 **임대도 코인도 변화 없음** | FR-003, AS1-3 |
 | 이미 활성 임대가 있는 사용자의 추가 임대 → 거부 | FR-005, D01, AS1-4 |
@@ -72,8 +72,8 @@ cd backend && ./mvnw spring-boot:run
 1. `01-auth` — 로그인해 Access Token 확보
 2. `03-wallet/내 지갑 조회` → 신규 계정이면 **250**
 3. `04-booth-lease/슬롯 목록 조회` → 12개, 전부 `AVAILABLE`. 1번은 `type: "EVENT"`라 임대하면 `409 BOOTH_SLOT_NOT_RENTABLE`이다
-4. `04-booth-lease/부스 임대` → `201`, `chargedCoin: 100`, `balanceAfter: 150`
-5. `03-wallet/내 거래 내역 조회` → `LEASE_PAYMENT` `-100` 1행
+4. `04-booth-lease/부스 임대` → `201`, `chargedCoin: 50`, `balanceAfter: 200`
+5. `03-wallet/내 거래 내역 조회` → `LEASE_PAYMENT` `-50` 1행
 6. `04-booth-lease/슬롯 목록 조회` → 그 슬롯이 `OCCUPIED`, `remainingSeconds`가 줄어든다
 7. **같은 슬롯을 다시 임대** → `200` + 기존 임대 (추가 차감 없음, FR-018)
 8. `04-booth-lease/내 부스 조회` → 임대 정보와 남은 시간

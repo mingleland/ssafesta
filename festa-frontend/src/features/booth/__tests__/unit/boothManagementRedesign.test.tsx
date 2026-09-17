@@ -110,9 +110,11 @@ describe('내 부스 관리창 개편 (-817)', () => {
     expect((document.querySelector('.bm-thumb') as HTMLImageElement).src).toBe('https://x/t.png');
   });
 
-  it('프로젝트 0건이면 프로젝트 미등록', async () => {
+  it('프로젝트 0건이면 프로젝트 미등록 — 파비콘 대신 빈 자리를 둔다', async () => {
     await renderOverlay();
     expect(await screen.findByText('프로젝트 미등록')).toBeTruthy();
+    expect(document.querySelector('img.bm-thumb')).toBeNull();
+    expect(document.querySelector('.bm-thumb.bm-thumb-empty')).not.toBeNull();
   });
 
   describe('부스 이름 편집', () => {
