@@ -6,6 +6,10 @@ import './index.css'
 import { AppProviders } from './app/providers'
 import { PersistentWorld } from './unity/host/PersistentWorld'
 import { router } from './app/router'
+import { installPreloadRecovery } from './shared/ui/preloadRecovery'
+
+// 배포 뒤 옛 chunk 요청 실패 → 한 번만 새로고침 (S15P21A604-847). 근거는 preloadRecovery.ts 에.
+installPreloadRecovery()
 
 // 브라우저 우클릭 메뉴를 앱 전역에서 막는다 (2026-09-16).
 //
