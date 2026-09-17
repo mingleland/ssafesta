@@ -34,26 +34,25 @@ afterEach(() => {
 });
 
 describe('WorldChatLayer', () => {
-  it('게스트 입력칸은 disabled 가 아니라 readOnly 다 — focus 가 와야 이유를 말할 수 있다', () => {
+  it('게스트 버튼은 disabled 속성 없이 표현만 비활성이고, 눌러야 이유를 알려 준다', () => {
     setGuestSession('at', FUTURE);
     render(<WorldChatLayer />);
 
-    const input = screen.getByLabelText('채팅 입력');
-    // 실제 disabled 면 focus 가 오지 않아 왜 못 쓰는지 말할 자리가 없다
-    expect(input.hasAttribute('disabled')).toBe(false);
-    expect(input.hasAttribute('readonly')).toBe(true);
+    const button = screen.getByRole('button', { name: '채팅' });
+    // 실제 disabled 면 click 이 오지 않아 왜 못 쓰는지 말할 자리가 없다
+    expect(button.hasAttribute('disabled')).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('true');
 
-    fireEvent.focus(input);
+    fireEvent.click(button);
     expect(getWorldChatSnapshot().open).toBe(false);
     expect(screen.getByText(CHAT_ERROR_MESSAGE.MEMBER_ONLY)).toBeTruthy();
   });
 
-  it('입력창은 늘 떠 있고, 회원이 focus 하면 Active 로 들어간다', () => {
+  it('회원이 누르면 입력창이 열린다', () => {
     setMemberSession('at', FUTURE);
     render(<WorldChatLayer />);
 
-    expect(getWorldChatSnapshot().open).toBe(false);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
     expect(getWorldChatSnapshot().open).toBe(true);
     expect(screen.getByLabelText('채팅 입력')).toBeTruthy();
   });
@@ -91,7 +90,7 @@ describe('연결 상태 표시 (S15P21A604-790)', () => {
   function openAsMember() {
     setMemberSession('at', FUTURE);
     const view = render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
     return view;
   }
 
@@ -120,7 +119,7 @@ describe('연결 상태 표시 (S15P21A604-790)', () => {
     transport.status = 'disconnected';
     setGuestSession('at', FUTURE);
     render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
     expect(screen.queryByRole('status')).toBeNull();
   });
 });
@@ -140,7 +139,7 @@ describe('로그 스크롤·새 메시지 (S15P21A604-791)', () => {
   function openWithLog() {
     setMemberSession('at', FUTURE);
     const view = render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
     act(() => __pushWorldChatForTests([{ ...speaker, content: '먼저 와 있던 말' }]));
     return view.container.querySelector('.world-chat-log') as HTMLElement;
   }
@@ -194,7 +193,7 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
   it('보내지 못한 이유는 즉시 알린다', () => {
     setGuestSession('at', FUTURE);
     render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
 
     const alert = screen.getByRole('alert');
     expect(alert.textContent).toBe(CHAT_ERROR_MESSAGE.MEMBER_ONLY);
@@ -203,7 +202,7 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
   it('글자 수는 상한이 가까워질 때만 보인다', () => {
     setMemberSession('at', FUTURE);
     render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
 
     act(() => setWorldChatDraft('가'.repeat(79)));
     expect(screen.queryByText('79/100')).toBeNull();
@@ -222,7 +221,7 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
   it('열었는데 아직 받은 말이 없으면 저장이 없다는 것만 한 줄로 알린다', () => {
     setMemberSession('at', FUTURE);
     const { container } = render(<WorldChatLayer />);
-    fireEvent.focus(screen.getByLabelText('채팅 입력'));
+    fireEvent.click(screen.getByRole('button', { name: '채팅' }));
 
     expect(container.querySelector('.world-chat-hint')?.textContent).toBe('월드 채팅은 접속 중인 동안만 표시됩니다');
 
@@ -240,4 +239,3 @@ describe('접근성·표시 규칙 (S15P21A604-791)', () => {
     expect(container.querySelector('.world-chat-sr')?.textContent).toBe('황덕님이 입장하셨습니다.');
   });
 });
-

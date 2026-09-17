@@ -85,8 +85,8 @@ describe('worldChat 게스트', () => {
 });
 
 describe('Enter 판정', () => {
-  const closedMember = { worldOwnsScreen: true, open: false, inputFocused: false, member: true };
-  const openFocused = { worldOwnsScreen: true, open: true, inputFocused: true, member: true };
+  const closedMember = { open: false, inputFocused: false, member: true };
+  const openFocused = { open: true, inputFocused: true, member: true };
 
   it('월드에서 누른 Enter 는 채팅을 연다', () => {
     expect(resolveEnterAction({}, closedMember)).toBe('open');
@@ -94,12 +94,6 @@ describe('Enter 판정', () => {
 
   it('입력창에서 누른 Enter 는 보낸다', () => {
     expect(resolveEnterAction({}, openFocused)).toBe('send');
-  });
-
-  // 채팅을 닫는 키도 Enter 다 — ESC 는 오버레이·메뉴 계층만 본다(2026-09-16).
-  it('보낼 것이 없을 때 누른 Enter 는 닫는다', () => {
-    expect(resolveEnterAction({}, { ...openFocused, draftEmpty: true })).toBe('close');
-    expect(resolveEnterAction({}, { ...openFocused, draftEmpty: false })).toBe('send');
   });
 
   it('한글 조합 중 Enter 는 토글도 전송도 하지 않는다', () => {
@@ -117,21 +111,12 @@ describe('Enter 판정', () => {
   });
 
   it('게스트의 Enter 는 채팅을 열지 않는다', () => {
-    expect(resolveEnterAction({}, { ...closedMember, member: false })).toBe('ignore');
+    expect(resolveEnterAction({}, { open: false, inputFocused: false, member: false })).toBe('ignore');
   });
 
   // S15P21A604-791 — 패널은 떠 있는데 입력창이 focus 를 잃은 상태를 남기지 않는다.
   it('열려 있는데 입력창 밖이면 전송하지 않고 그 입력창으로 돌아간다', () => {
-    expect(resolveEnterAction({}, { ...openFocused, inputFocused: false })).toBe('focus');
-  });
-
-  // 2026-09-16 — 오버레이 위에서 Enter 가 채팅을 열어 폼 제출을 가로채던 자리.
-  it('오버레이·메뉴가 떠 있으면 Enter 는 채팅으로 가지 않는다', () => {
-    expect(resolveEnterAction({}, { ...closedMember, worldOwnsScreen: false })).toBe('ignore');
-  });
-
-  it('채팅이 열린 채로 오버레이가 떠도 전송하지 않는다 — 그 Enter 는 오버레이의 것이다', () => {
-    expect(resolveEnterAction({}, { ...openFocused, worldOwnsScreen: false })).toBe('ignore');
+    expect(resolveEnterAction({}, { open: true, inputFocused: false, member: true })).toBe('focus');
   });
 });
 

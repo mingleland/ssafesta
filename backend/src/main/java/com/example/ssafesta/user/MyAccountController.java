@@ -142,7 +142,7 @@ public class MyAccountController {
         List<String> providers = identities.findAllByUser_Id(user.getId()).stream()
                 .map(identity -> identity.getProvider().name()).toList();
         return new MyAccountResponse(user.getId(), user.getNickname(), user.getStatus().name(), providers,
-                user.getAvatarCode());
+                user.getAvatarCode(), user.isAdmin(), user.isMaster());
     }
 
     @Operation(summary = "회원 탈퇴 — 즉시 삭제되고 되돌릴 수 없다",
@@ -218,5 +218,10 @@ public class MyAccountController {
             List<String> providers,
             @Schema(description = "저장된 아바타 외형 인코딩. 한 번도 저장하지 않았으면 `null` 이다 — 키는 항상 있다",
                     nullable = true, example = "fa|3=SK_Hair_Long_01|c=FF8800")
-            String avatarCode) { }
+            String avatarCode,
+            @Schema(description = "관리자 권한 보유 여부. 토큰의 `role` 은 관리자도 `MEMBER` 라 클라이언트가 "
+                    + "관리자 메뉴 노출 여부를 판단할 근거가 이 칸뿐이다 — 실제 조치 권한은 매 요청 `AdminGuard` 가 따로 판정한다",
+                    example = "false") boolean admin,
+            @Schema(description = "보호된 마스터 계정 여부. `admin` 이 `false` 면 항상 `false` 다", example = "false")
+            boolean master) { }
 }
