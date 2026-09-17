@@ -211,6 +211,18 @@
 
 ---
 
+## 9단계: 후속 확장(P1/장애 대비) - MinIO 수동 Fallback 및 Reconcile (S15P21A604-215 / 007 T076)
+
+**목적**: R2 장기 장애 발생 시 운영자 승인에 기반한 S3-compatible MinIO 단일 노드 fallback과 복구 후 R2 데이터 정합성(Reconcile) 복원 절차를 제공한다. (P0 정상 운영 범위 외 후속 구축 과제)
+
+- [ ] T088 [P] 영속 로컬 볼륨을 사용하고 9000/9001 호스트 포트를 외부에 공개하지 않는 내부 전용 단일 노드 MinIO 긴급 Compose 프로필을 `infra/environments/compose/emergency/minio.yaml`에 작성한다
+- [ ] T089 [P] 정확한 수동 상태 머신, 운영자 승인(`APPROVED_BY`), MinIO 포트 비공개 차단, 체크섬 불일치와 R2 복귀를 검증하는 실패 우선 R2 장애 전환 테스트를 `infra/environments/tests/failure/storage-fallback.sh`에 작성한다
+- [ ] T090 운영자 승인 전용 `R2_ACTIVE → UPLOAD_BLOCKED → FALLBACK_VALIDATING → LOCAL_ACTIVE → R2_RECONCILING → R2_ACTIVE` 전이 및 단일 실행 lock을 `infra/environments/storage/fallback/transition.sh`에 구현한다
+- [ ] T091 MinIO 대기 객체 목록과 크기·형식·SHA-256 검증 후 R2 복사를 구현하고 불일치 시 메타데이터를 전환하지 않는 정합성 스크립트를 `infra/environments/storage/fallback/reconcile.sh`에 구현한다
+- [ ] T092 [P] R2 차단·MinIO 승인 전환·rollback·reconcile 및 targetBucket 연동 운영 절차를 `infra/environments/runbooks/r2-fallback.md`에 문서화한다
+
+---
+
 ## 의존성과 실행 순서
 
 ### 단계별 의존성
