@@ -43,6 +43,39 @@ function respondedAt(iso: string): string {
   );
 }
 
+/** 문항 추가 — 6유형 버튼을 늘 펼쳐 두지 않고 누른 뒤 고르게 한다 (유형은 spec 010 FR-002 확정분) */
+function AddQuestion({ disabled, onAdd }: { disabled: boolean; onAdd: (type: SurveyQuestionType) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button type="button" className="sc-btn sc-btn-sm" disabled={disabled} onClick={() => setOpen(true)}>
+        + 문항 추가
+      </button>
+    );
+  }
+  return (
+    <div className="mg-add-types" role="group" aria-label="문항 유형 선택">
+      {ADDABLE.map((t) => (
+        <button
+          key={t}
+          type="button"
+          className="sc-btn sc-btn-sm"
+          disabled={disabled}
+          onClick={() => {
+            onAdd(t);
+            setOpen(false);
+          }}
+        >
+          {TYPE_LABEL[t]}
+        </button>
+      ))}
+      <button type="button" className="sc-btn sc-btn-sm" onClick={() => setOpen(false)}>
+        취소
+      </button>
+    </div>
+  );
+}
+
 function BuilderTab({ boothId }: { boothId: number }) {
   const state = useSurveyBuilder();
 
@@ -55,7 +88,6 @@ function BuilderTab({ boothId }: { boothId: number }) {
     return <ScreenError title="설문을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadSurveyBuilder(boothId)} />;
   }
 
-  const issues = validateBuilder();
   const saving = state.save.phase === 'submitting';
   const questions = state.draft.questions;
 
@@ -95,14 +127,22 @@ function BuilderTab({ boothId }: { boothId: number }) {
       </section>
 
       {questions.length === 0 ? (
-        <ScreenEmpty title="아직 문항이 없습니다" hint="아래에서 유형을 골라 문항을 추가하세요." />
+        <div className="mg-empty-action">
+          <ScreenEmpty title="아직 문항이 없습니다" hint="첫 문항을 추가해 설문을 시작하세요." />
+          <AddQuestion disabled={saving} onAdd={addQuestion} />
+        </div>
       ) : (
+        <>
+        <div className="mg-list-head">
+          <span className="sc-section-title">문항 {questions.length}개</span>
+          <AddQuestion disabled={saving} onAdd={addQuestion} />
+        </div>
         <ol className="mg-qlist">
           {questions.map((q, i) => (
             <li key={q.id} className="sc-card mg-q">
               <div className="mg-q-head">
+                <span className="mg-q-no">{String(i + 1).padStart(2, '0')}</span>
                 <span className="sc-chip">{TYPE_LABEL[q.type]}</span>
-                <span className="mg-q-index">{i + 1}번</span>
                 <div className="mg-q-actions">
                   <button type="button" className="sc-btn sc-btn-sm" disabled={i === 0 || saving} onClick={() => reorderQuestion(i, i - 1)}>
                     위로
@@ -178,42 +218,47 @@ function BuilderTab({ boothId }: { boothId: number }) {
             </li>
           ))}
         </ol>
+        </>
       )}
+    </div>
+  );
+}
 
-      <section className="sc-card mg-add">
-        <span className="sc-section-title">문항 추가</span>
-        <div className="mg-add-types">
-          {ADDABLE.map((t) => (
-            <button key={t} type="button" className="sc-btn sc-btn-sm" disabled={saving} onClick={() => addQuestion(t)}>
-              {TYPE_LABEL[t]}
-            </button>
-          ))}
-        </div>
-      </section>
+/**
+ * 편집 탭의 저장 동작 — 화면 공통 footer 에 선다.
+ *
+ * 본문이 아니라 여기 두는 이유는 §4 공통 골격이다: 주요 액션은 화면마다 같은 자리에 있어야 한다.
+ * builder 는 module store(useSyncExternalStore)라 부모도 그대로 구독할 수 있어, 자식이 부모에게
+ * 노드를 올려보내는 배선을 만들지 않는다.
+ */
+function BuilderSaveAction() {
+  const state = useSurveyBuilder();
+  if (state.status !== 'ready') return null;
 
-      <div className="mg-form-foot">
-        {issues.length > 0 && (
-          <ul className="mg-issues" role="alert">
-            {issues.map((issue, i) => (
-              <li key={i}>{issue.message}</li>
-            ))}
-          </ul>
-        )}
-        {state.save.phase === 'success' && <span className="mg-ok">저장했습니다</span>}
-        {/* 서버 문장을 그대로 쓴다 (docs/08 §1.3-1) — SURVEY_LOCKED 처럼 사유를 알아야 다음
-            행동이 정해지는 오류가 여기로 온다. 없을 때만 일반 문구다 */}
-        {state.save.phase === 'error' && (
-          <span className="sc-alert">{state.save.errorMessage ?? '저장하지 못했습니다.'}</span>
-        )}
-        <button
-          type="button"
-          className="sc-btn sc-btn-primary"
-          disabled={saving || issues.length > 0 || !state.dirty}
-          onClick={() => void saveSurveyBuilder()}
-        >
-          {saving ? '저장 중...' : '설문 저장'}
-        </button>
-      </div>
+  const issues = validateBuilder();
+  const saving = state.save.phase === 'submitting';
+  return (
+    <div className="mg-foot">
+      {issues.length > 0 && (
+        <span className="sc-alert" role="alert">
+          {issues[0].message}
+          {issues.length > 1 && ` 외 ${issues.length - 1}건`}
+        </span>
+      )}
+      {state.save.phase === 'success' && <span className="mg-ok">저장했습니다</span>}
+      {/* 서버 문장을 그대로 쓴다 (docs/08 §1.3-1) — SURVEY_LOCKED 처럼 사유를 알아야 다음
+          행동이 정해지는 오류가 여기로 온다. 없을 때만 일반 문구다 */}
+      {state.save.phase === 'error' && (
+        <span className="sc-alert" role="alert">{state.save.errorMessage ?? '저장하지 못했습니다.'}</span>
+      )}
+      <button
+        type="button"
+        className="sc-btn sc-btn-primary"
+        disabled={saving || issues.length > 0 || !state.dirty}
+        onClick={() => void saveSurveyBuilder()}
+      >
+        {saving ? '저장 중...' : '설문 저장'}
+      </button>
     </div>
   );
 }
@@ -233,16 +278,26 @@ function ResultTab({ boothId }: { boothId: number }) {
 
   return (
     <div className="mg-result">
-      <p className="sc-note">
-        전체 응답 {state.totalResponses}건
+      {/* 화면을 열자마자 읽어야 할 것은 문항별 분포가 아니라 "얼마나 왔나" 다 */}
+      <section className="mg-summary-row">
+        <div className="mg-stat">
+          <strong>{state.totalResponses}</strong>
+          <span className="sc-note">전체 응답</span>
+        </div>
         {/* spec 010 US2 시나리오 1 — 응답 수와 함께 최초·최근 응답 시각을 보인다 */}
         {state.firstRespondedAt !== null && state.lastRespondedAt !== null && (
           <>
-            {' · '}최초 {respondedAt(state.firstRespondedAt)}
-            {' · '}최근 {respondedAt(state.lastRespondedAt)}
+            <div className="mg-stat">
+              <strong>{respondedAt(state.firstRespondedAt)}</strong>
+              <span className="sc-note">최초 응답</span>
+            </div>
+            <div className="mg-stat">
+              <strong>{respondedAt(state.lastRespondedAt)}</strong>
+              <span className="sc-note">최근 응답</span>
+            </div>
           </>
         )}
-      </p>
+      </section>
       {state.perQuestion.map((agg) => (
         <section key={agg.questionId} className="sc-card mg-agg">
           {agg.kind === 'choice' ? (
@@ -336,17 +391,17 @@ export function SurveyManagementPage() {
     <ManagementScreen
       title="설문 관리"
       subtitle="방문자에게 보여줄 설문을 만들고 응답을 확인합니다"
-      actions={
-        <div className="mg-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'builder'} className={'mg-tab' + (tab === 'builder' ? ' mg-tab-on' : '')} onClick={() => setTab('builder')}>
-            설문 편집
-          </button>
-          <button type="button" role="tab" aria-selected={tab === 'result'} className={'mg-tab' + (tab === 'result' ? ' mg-tab-on' : '')} onClick={() => setTab('result')}>
-            결과
-          </button>
-        </div>
-      }
+      actions={tab === 'builder' ? <BuilderSaveAction /> : undefined}
     >
+      {/* 탭은 본문 맨 위다 — actions 는 footer 로 내려가므로 거기 두면 화면 전환이 바닥에 숨는다 */}
+      <div className="mg-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'builder'} className={'mg-tab' + (tab === 'builder' ? ' mg-tab-on' : '')} onClick={() => setTab('builder')}>
+          설문 편집
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'result'} className={'mg-tab' + (tab === 'result' ? ' mg-tab-on' : '')} onClick={() => setTab('result')}>
+          응답 결과
+        </button>
+      </div>
       {tab === 'builder' ? <BuilderTab boothId={boothId} /> : <ResultTab boothId={boothId} />}
     </ManagementScreen>
   );

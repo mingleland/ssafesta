@@ -39,11 +39,11 @@ describe('three 는 lazy 경계 뒤에만 있다', () => {
     expect(src).not.toMatch(/^import .*from '\.\/R3FBoothRenderer'/m);
   });
 
-  it('three·@react-three 를 static import 하는 파일은 R3FBoothRenderer 하나뿐이다', () => {
+  it('라우터는 Studio 를 아예 싣지 않는다 — three 가 어느 청크에도 딸려 오지 않는다', () => {
     const src = readFileSync(resolve(here, '../../../../..', 'src/app/router/index.tsx'), 'utf8');
-    // Studio 라우트도 lazy 다 — 여기서 static 으로 되돌아가면 three 가 main 으로 딸려 온다
-    expect(src).toContain("await import('../../pages/studio/StudioPage.tsx')");
-    expect(src).not.toContain("from '../../pages/studio/StudioPage'");
+    // 2026-09-17 — Studio 는 사용자 흐름에서 폐기됐고 라우트가 월드로 보내는 Navigate 로 바뀌었다.
+    // 예전에는 lazy import 로 경계를 지켰는데, 이제는 import 자체가 없는 것이 더 강한 보장이다.
+    expect(src).not.toContain('pages/studio/StudioPage');
   });
 });
 

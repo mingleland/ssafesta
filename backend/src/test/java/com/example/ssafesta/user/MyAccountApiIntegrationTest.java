@@ -55,6 +55,21 @@ class MyAccountApiIntegrationTest {
     }
 
     /**
+     * A plain member reads {@code false} on both flags (S15P21A604-832) — the token's own
+     * {@code role} claim never says {@code ADMIN}, so this pair is the only place the console can
+     * read it from.
+     */
+    @Test
+    void aPlainMemberReadsFalseOnBothAdminFlags() throws Exception {
+        Long userId = newMember("일반계정");
+
+        mockMvc.perform(get("/api/v1/users/me").header("Authorization", bearerFor(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.admin").value(false))
+                .andExpect(jsonPath("$.master").value(false));
+    }
+
+    /**
      * A structurally valid member token whose subject has no row is refused as 401, not 500.
      *
      * <p>Sessions live in Redis and users in PostgreSQL, so the two can disagree — a restored Redis

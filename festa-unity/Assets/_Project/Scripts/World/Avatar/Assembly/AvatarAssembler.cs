@@ -137,7 +137,7 @@ namespace Festa.Avatar
                 r.sharedMesh = source.sharedMesh; r.sharedMaterials = source.sharedMaterials;
                 var garmentGeometry = RuntimeGarmentBounds(source, _reference, r.transform);
                 _geometryLocalBounds[r] = garmentGeometry;
-                r.localBounds = WithBoundsPadding(garmentGeometry);
+                r.localBounds = WithBoundsPadding(ToRootBoneSpace(garmentGeometry, r));
                 _rendererCategories[r] = category;
                 PrepareMaterials(r, category);
                 spawned.Add(go);
@@ -274,6 +274,24 @@ namespace Festa.Avatar
                 foreach (var p in parts) p.enabled = false;   // 원본은 끄기만 한다 (파괴 금지 — 가시성 로직이 참조)
                 _merged.Add(mergedGo);
 
+                // **병합체에도 카테고리를 물려준다.** ApplyColors 는 _rendererCategories 로 의상 여부를
+                // 가리는데, 병합으로 새로 만든 렌더러는 그 사전에 없어 ApplyGarmentColors 가 통째로
+                // 건너뛰어졌다 — 사용자가 고른 옷 색이 적용되지 않고 카탈로그 기본색으로 남는다.
+                //
+                // 병합이 일어날지는 어떤 옷을 입었는지에 따라 갈리고 병합 자체가 **클라이언트마다 로컬로**
+                // 수행되므로, 같은 사람이 화면마다 다른 옷 색으로 보인다 (사용자 지적 2026-09-16).
+                //
+                // 묶음은 (재질, 루트본, 본 수) 로 나뉘고 런타임 재질 캐시 키에 카테고리가 들어가 있어
+                // 한 묶음의 파츠는 카테고리가 같다 — 첫 값을 그대로 쓴다.
+                var mergedRenderer = mergedGo.GetComponent<SkinnedMeshRenderer>();
+                if (mergedRenderer != null)
+                    foreach (var p in parts)
+                        if (_rendererCategories.TryGetValue(p, out var mergedCategory))
+                        {
+                            _rendererCategories[mergedRenderer] = mergedCategory;
+                            break;
+                        }
+
                 // 병합 결과를 남긴다 (S15P21A604-258). WebGL 빌드에는 HUD 가 닿지 않는 화면이
                 // 있어서, 화면을 못 봐도 로그만으로 "병합체가 만들어졌는지" 를 판정할 수 있어야 한다.
                 if (Debug.isDebugBuild || Application.isEditor)
@@ -358,7 +376,7 @@ namespace Festa.Avatar
             smr.sharedMaterial = first.sharedMaterials[0];
             var mergedGeometry = CombinedRuntimeBounds(parts, smr.transform);
             _geometryLocalBounds[smr] = mergedGeometry;
-            smr.localBounds = WithBoundsPadding(mergedGeometry);
+            smr.localBounds = WithBoundsPadding(ToRootBoneSpace(mergedGeometry, smr));
             smr.shadowCastingMode = first.shadowCastingMode;
             smr.updateWhenOffscreen = first.updateWhenOffscreen;
             smr.quality = first.quality;
@@ -444,6 +462,36 @@ namespace Festa.Avatar
                                       SkinnedBoundsMinimumPadding);
             bounds.Expand(padding * 2f);
             return bounds;
+        }
+
+        /// <summary>
+        /// 렌더러 transform 공간의 형상 bounds를 <b>루트 본 공간</b>으로 옮긴다.
+        ///
+        /// <para><b>왜 필요한가 — 실측으로 확인했다(2026-09-16).</b> <c>SkinnedMeshRenderer.localBounds</c> 는
+        /// 렌더러 자신의 transform 이 아니라 <c>rootBone</c> 기준으로 해석된다. 루트 본을 +X 100 에 두고
+        /// 렌더러를 원점에 둔 채 <c>localBounds</c> 중심을 0 으로 주면 <c>renderer.bounds.center</c> 가
+        /// (100, 0, 0) 으로 나온다.</para>
+        ///
+        /// <para>런타임 조립 아바타는 의상 렌더러를 Animator 아래(항등 로컬)에 만들고 본만 신체에서
+        /// 빌려 쓴다. 그래서 렌더러 transform 과 rootBone(Hips) 이 서로 떨어져 있고, 렌더러 공간으로 잰
+        /// 값을 그대로 넣으면 <b>컬링 상자가 그 차이만큼 밀린다.</b> 몸은 화면 안에 있는데 상자가 밖으로
+        /// 나가면 통째로 잘린다 — 이름표와 접지 그림자는 별도 렌더러라 그대로 보이고, 판정이 카메라마다
+        /// 달라 <b>접속자별로 누가 안 보이는지가 달라진다</b>(사용자 보고 2026-09-16).</para>
+        ///
+        /// <para>측정용 <c>_geometryLocalBounds</c> 는 렌더러 공간 그대로 둔다 — 키 정규화가 같은 공간의
+        /// 행렬로 되돌리므로 건드리면 T-222 가 재발한다. 여기서 바꾸는 것은 컬링용 값 하나다.</para>
+        /// </summary>
+        static Bounds ToRootBoneSpace(Bounds rendererLocal, SkinnedMeshRenderer smr)
+        {
+            if (!smr) return rendererLocal;
+            var rootBone = smr.rootBone;
+            if (!rootBone || rootBone == smr.transform) return rendererLocal;
+
+            var toRootBone = rootBone.worldToLocalMatrix * smr.transform.localToWorldMatrix;
+            bool initialized = false;
+            var converted = default(Bounds);
+            EncapsulateTransformed(ref converted, ref initialized, rendererLocal, toRootBone);
+            return initialized ? converted : rendererLocal;
         }
 
         /// <summary>

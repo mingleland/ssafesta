@@ -20,25 +20,33 @@ import {
 import type { OverlayType } from '../../../shared/types/overlay';
 import {
   closeBoothManagement,
+  closeBoothRental,
   closeGameMenu,
   closeManagementPanel,
+  closeMenuPanel,
   getGameClientUiSnapshot,
   openBoothManagement,
+  openBoothRental,
   openGameMenu,
   openManagementPanel,
+  openMenuPanel,
   subscribeGameClientUi,
 } from './gameClientUi';
 import type { ManagementPanel } from './managementPanel';
+import type { MenuPanel } from './gameClientUi';
 
 /** 월드 위에 떠 있는 것. 'world' 는 아무것도 없다 = 월드가 주인이다 */
-export type WorldScreen = 'world' | 'visitor' | 'management' | 'menu';
+export type WorldScreen = 'world' | 'visitor' | 'management' | 'rental' | 'menu' | 'menuPanel';
 
 // 겹칠 수 없으므로 실질은 "현재 주인" 판정이다. 그래도 순서를 명시해 두는 이유는, 배타 진입을
 // 우회해 두 레이어가 동시에 켜지는 경로가 생기더라도 판정이 흔들리지 않게 하기 위해서다.
 export function getWorldScreen(): WorldScreen {
   if (getCurrentOverlay() !== null) return 'visitor';
-  const { managementOverlay, gameMenu } = getGameClientUiSnapshot();
+  const { managementOverlay, boothRental, gameMenu, menuPanel } = getGameClientUiSnapshot();
+  // 자식이 먼저다 — 메뉴는 그 아래 배경으로 남아 있고, 자식을 닫으면 다시 드러난다
+  if (menuPanel !== null) return 'menuPanel';
   if (managementOverlay) return 'management';
+  if (boothRental) return 'rental';
   if (gameMenu) return 'menu';
   return 'world';
 }
@@ -57,12 +65,16 @@ export function useWorldScreen(): WorldScreen {
   return useSyncExternalStore(subscribeWorldScreen, getWorldScreen);
 }
 
-// 월드 위에는 한 번에 하나만 뜬다. 여는 쪽이 나머지를 걷는 것이 이 계층의 계약이다 —
-// 각 레이어가 서로를 알 필요가 없어진다.
+// 여는 쪽이 나머지를 걷는 것이 이 계층의 계약이다 — 각 레이어가 서로를 알 필요가 없어진다.
+//
+// **ESC 메뉴만 예외로 배경에 남는다.** 관리·내 정보·조작 안내·설정은 메뉴에서 여는 자식이라,
+// 닫았을 때 월드가 아니라 메뉴로 돌아가야 한다. Unity 가 여는 visitor 층만 메뉴를 걷는다.
 function clearOthers(keep: Exclude<WorldScreen, 'world'>): void {
   if (keep !== 'visitor') closeOverlay();
   if (keep !== 'management') closeBoothManagement();
-  if (keep !== 'menu') closeGameMenu();
+  if (keep !== 'rental') closeBoothRental();
+  if (keep !== 'menuPanel') closeMenuPanel();
+  if (keep === 'visitor') closeGameMenu();
 }
 
 /** Unity 상호작용이 여는 Visitor Overlay. dispatcher 와 오버레이 내부 전환이 쓴다 */
@@ -90,10 +102,22 @@ export function openManagementDetail(panel: ManagementPanel): void {
   openManagementPanel(panel);
 }
 
+/** 부스 임대 오버레이 — 월드를 떠나지 않는다(옛 `/app/booths` 페이지 대체) */
+export function openRental(): void {
+  clearOthers('rental');
+  openBoothRental();
+}
+
 /** ESC 개인/시스템 레이어 */
 export function openMenu(): void {
   clearOthers('menu');
   openGameMenu();
+}
+
+/** ESC 메뉴의 하위 화면 — 메뉴 항목들이 연다. 닫으면 메뉴로 돌아간다 */
+export function openMenuPanelScreen(panel: MenuPanel): void {
+  clearOthers('menuPanel');
+  openMenuPanel(panel);
 }
 
 /**
@@ -115,8 +139,14 @@ export function closeTopScreen(): boolean {
       }
       closeBoothManagement();
       return true;
+    case 'rental':
+      closeBoothRental();
+      return true;
     case 'menu':
       closeGameMenu();
+      return true;
+    case 'menuPanel':
+      closeMenuPanel();
       return true;
     default:
       return false;

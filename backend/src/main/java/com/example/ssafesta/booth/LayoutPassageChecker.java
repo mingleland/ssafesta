@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
  * 숫자를 바꾸는 것은 코드 수정이 아니라 계약 변경이다(헌법 24조):
  *
  * <ul>
- *   <li>래스터 해상도 0.05 m — 부스 로컬 x·z ∈ [−3, +3], 셀 중심 −2.975 + 0.05k (k = 0…119),
- *       120×120
+ *   <li>래스터 해상도 0.05 m — 부스 로컬 x ∈ [−4.7, +4.7] · z ∈ [−3, +3], 셀 중심
+ *       x −4.675 + 0.05k (k = 0…187) · z −2.975 + 0.05k (k = 0…119), <b>188×120</b>
  *   <li>점유 = 회전 적용 후 AABB와 셀 중심의 포함 검사, 경계선상은 점유(보수적)
  *   <li>아바타 침식 = 점유 셀을 유클리드 반경 0.22 m 팽창 ({@code PlayerAvatar} 캡슐 반지름
  *       2.2 world unit ÷ 10)
@@ -27,13 +27,24 @@ import org.springframework.stereotype.Component;
  *       {@code FRONT_BLOCKED}
  *   <li>침식 후 비점유인데 flood fill이 못 닿는 셀이 1 ㎡ 이상이면 {@code ISOLATED_AREA}
  * </ul>
+ *
+ * <p><b>격자는 {@link LayoutValidator}의 경계 상수에서 유도한다</b> (S15P21A604-698, GitLab #181).
+ * 예전에는 6 m 정사각형(120×120·±3)을 여기에 독립으로 박아 뒀는데, x 경계가 4.7로 넓어지자 그
+ * 상수가 검증과 갈라졌다 — 그러면 검증은 통과시킨 자리가 통행 판정에서는 <b>바닥으로 존재하지도
+ * 않고</b>(양옆 1.7 m 띠), 거기 놓인 오브젝트는 점유 0으로 계산돼 고립 경고가 조용히 사라진다.
+ * FE도 같은 유도를 쓴다 ({@code entities/layout/passage.ts}의 {@code gridOf},
+ * {@code S15P21A604-785}).
  */
 @Component
 public class LayoutPassageChecker {
 
     static final double CELL = 0.05;
-    static final int GRID = 120;
-    static final double FIRST_CENTER = -2.975;
+    /** 셀 수는 전폭 ÷ 셀이다 — x 9.4 ÷ 0.05 = 188, z 6 ÷ 0.05 = 120. */
+    static final int GRID_X = (int) Math.round(LayoutValidator.MAX_X.doubleValue() * 2 / CELL);
+    static final int GRID_Z = (int) Math.round(LayoutValidator.MAX_Z.doubleValue() * 2 / CELL);
+    /** 0번 셀의 중심 — 경계에서 반 셀 안쪽이다 (x −4.675, z −2.975). */
+    static final double FIRST_CENTER_X = -LayoutValidator.MAX_X.doubleValue() + CELL / 2;
+    static final double FIRST_CENTER_Z = -LayoutValidator.MAX_Z.doubleValue() + CELL / 2;
     static final double EROSION_RADIUS = 0.22;
     static final double BAND_DEPTH = 0.7;
     static final double MIN_REACHABLE_RATIO = 0.5;
@@ -44,7 +55,7 @@ public class LayoutPassageChecker {
     private static final double EPS = 1e-9;
 
     void check(List<LayoutJson.LayoutObject> objects, LayoutValidationResult result) {
-        boolean[][] occupied = new boolean[GRID][GRID];
+        boolean[][] occupied = new boolean[GRID_X][GRID_Z];
         List<PlacedObject> placed = new ArrayList<>();
         for (LayoutJson.LayoutObject object : objects) {
             LayoutObjectType type = LayoutObjectType.from(object.type()).orElse(null);
@@ -62,8 +73,8 @@ public class LayoutPassageChecker {
         boolean[][] reached = floodFromFront(blocked);
 
         int strandedCells = 0;
-        for (int ix = 0; ix < GRID; ix++) {
-            for (int iz = 0; iz < GRID; iz++) {
+        for (int ix = 0; ix < GRID_X; ix++) {
+            for (int iz = 0; iz < GRID_Z; iz++) {
                 if (!blocked[ix][iz] && !reached[ix][iz]) {
                     strandedCells++;
                 }
@@ -86,12 +97,12 @@ public class LayoutPassageChecker {
     private void markOccupied(PlacedObject placement, boolean[][] occupied) {
         LayoutGeometry.WorldAabb box = LayoutGeometry.worldAabb(placement.type().localBounds(),
                 placement.x(), 0, placement.z(), placement.rotationY());
-        int fromX = lowestCellAtOrAbove(box.minX());
-        int toX = highestCellAtOrBelow(box.maxX());
-        int fromZ = lowestCellAtOrAbove(box.minZ());
-        int toZ = highestCellAtOrBelow(box.maxZ());
-        for (int ix = Math.max(fromX, 0); ix <= Math.min(toX, GRID - 1); ix++) {
-            for (int iz = Math.max(fromZ, 0); iz <= Math.min(toZ, GRID - 1); iz++) {
+        int fromX = lowestCellAtOrAbove(box.minX(), FIRST_CENTER_X);
+        int toX = highestCellAtOrBelow(box.maxX(), FIRST_CENTER_X);
+        int fromZ = lowestCellAtOrAbove(box.minZ(), FIRST_CENTER_Z);
+        int toZ = highestCellAtOrBelow(box.maxZ(), FIRST_CENTER_Z);
+        for (int ix = Math.max(fromX, 0); ix <= Math.min(toX, GRID_X - 1); ix++) {
+            for (int iz = Math.max(fromZ, 0); iz <= Math.min(toZ, GRID_Z - 1); iz++) {
                 occupied[ix][iz] = true;
             }
         }
@@ -109,16 +120,16 @@ public class LayoutPassageChecker {
                 }
             }
         }
-        boolean[][] blocked = new boolean[GRID][GRID];
-        for (int ix = 0; ix < GRID; ix++) {
-            for (int iz = 0; iz < GRID; iz++) {
+        boolean[][] blocked = new boolean[GRID_X][GRID_Z];
+        for (int ix = 0; ix < GRID_X; ix++) {
+            for (int iz = 0; iz < GRID_Z; iz++) {
                 if (!occupied[ix][iz]) {
                     continue;
                 }
                 for (int[] offset : mask) {
                     int nx = ix + offset[0];
                     int nz = iz + offset[1];
-                    if (nx >= 0 && nx < GRID && nz >= 0 && nz < GRID) {
+                    if (nx >= 0 && nx < GRID_X && nz >= 0 && nz < GRID_Z) {
                         blocked[nx][nz] = true;
                     }
                 }
@@ -128,10 +139,10 @@ public class LayoutPassageChecker {
     }
 
     private boolean[][] floodFromFront(boolean[][] blocked) {
-        boolean[][] reached = new boolean[GRID][GRID];
+        boolean[][] reached = new boolean[GRID_X][GRID_Z];
         Deque<int[]> queue = new ArrayDeque<>();
-        int frontRow = GRID - 1; // z = +2.975, 정면(+z) 경계 쪽 줄
-        for (int ix = 0; ix < GRID; ix++) {
+        int frontRow = GRID_Z - 1; // z = +2.975, 정면(+z) 경계 쪽 줄
+        for (int ix = 0; ix < GRID_X; ix++) {
             if (!blocked[ix][frontRow]) {
                 reached[ix][frontRow] = true;
                 queue.add(new int[] {ix, frontRow});
@@ -143,7 +154,7 @@ public class LayoutPassageChecker {
             for (int[] step : steps) {
                 int nx = cell[0] + step[0];
                 int nz = cell[1] + step[1];
-                if (nx >= 0 && nx < GRID && nz >= 0 && nz < GRID
+                if (nx >= 0 && nx < GRID_X && nz >= 0 && nz < GRID_Z
                         && !blocked[nx][nz] && !reached[nx][nz]) {
                     reached[nx][nz] = true;
                     queue.add(new int[] {nx, nz});
@@ -163,10 +174,10 @@ public class LayoutPassageChecker {
         LayoutObjectType.LocalBounds bounds = placement.type().localBounds();
         int total = 0;
         int reachable = 0;
-        for (int ix = 0; ix < GRID; ix++) {
-            for (int iz = 0; iz < GRID; iz++) {
-                double centerX = FIRST_CENTER + CELL * ix;
-                double centerZ = FIRST_CENTER + CELL * iz;
+        for (int ix = 0; ix < GRID_X; ix++) {
+            for (int iz = 0; iz < GRID_Z; iz++) {
+                double centerX = FIRST_CENTER_X + CELL * ix;
+                double centerZ = FIRST_CENTER_Z + CELL * iz;
                 LayoutGeometry.LocalPoint local = LayoutGeometry.toLocal(centerX, centerZ,
                         placement.x(), placement.z(), placement.rotationY());
                 boolean inBand = local.x() >= bounds.minX() - EPS && local.x() <= bounds.maxX() + EPS
@@ -193,12 +204,12 @@ public class LayoutPassageChecker {
     }
 
     /** 경계선상 셀 중심은 포함(점유·띠 모두 보수적) — EPS는 부동소수점 잡음만 흡수한다. */
-    private int lowestCellAtOrAbove(double coordinate) {
-        return (int) Math.ceil((coordinate - FIRST_CENTER) / CELL - EPS);
+    private int lowestCellAtOrAbove(double coordinate, double firstCenter) {
+        return (int) Math.ceil((coordinate - firstCenter) / CELL - EPS);
     }
 
-    private int highestCellAtOrBelow(double coordinate) {
-        return (int) Math.floor((coordinate - FIRST_CENTER) / CELL + EPS);
+    private int highestCellAtOrBelow(double coordinate, double firstCenter) {
+        return (int) Math.floor((coordinate - firstCenter) / CELL + EPS);
     }
 
     private record PlacedObject(LayoutObjectType type, String objectId,

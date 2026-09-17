@@ -401,7 +401,7 @@ FE `getTextAnswers(surveyId, page)`. §7의 `textAnswers`가 첫 페이지이고
 
 | 넣은 것 | 결과 |
 |---|---|
-| 이벤트 `surveyId` → §7 결과 · §8 주관식 | `404 SURVEY_NOT_FOUND`. 응답자 식별은 이벤트 축에만 두므로 이 경로에 그 자원은 없다 (§7의 익명 계약 FR-009·SC-003은 부스 쪽에 그대로) |
+| 이벤트 `surveyId` → §7 결과 · §8 주관식 | `404 SURVEY_NOT_FOUND`. 응답자 식별은 이벤트 축의 **전역 Admin 참여자 목록**에만 있고, 이 경로에 그 자원은 없다 (§7의 익명 계약 FR-009·SC-003은 부스 쪽에 그대로) |
 | 부스 `surveyId` → 이 경로 | 도달 불가. 부스 설문에는 `surveyKey`가 없다 |
 
 DB가 그것을 지킨다 — `ck_surveys_scope`가 `booth_id`와 `survey_key` 중 **정확히 하나**를 요구하고, 동시에 부스 설문의 "작성자는 반드시 있다"를 유지한다. `ux_surveys_key`가 이벤트 하나당 설문 하나를 보장한다(부스 쪽 `ux_surveys_booth`와 같은 역할).
@@ -418,8 +418,8 @@ DB가 그것을 지킨다 — `ck_surveys_scope`가 `booth_id`와 `survey_key` �
 
 ### 이번 범위 밖
 
-- **운영 조회**(`/internal/event-surveys/**` 집계·응답 원본). 후속 순서는 관리자 인증 → 운영 API → 운영 UI → 추첨 대상 조회다 (GitLab #173 Q1).
-- 추첨 알고리즘·당첨자 선정·경품 지급. 이번에 남기는 `surveyKey / responseId / userId / submittedAt / answers`를 후속이 읽는다.
+- **참여자 목록만** `GET /api/v1/admin/event-surveys/{surveyKey}/entrants`로 열렸다 (`S15P21A604-742` #59). 전역 Admin 전용, 최신 제출순 `page`(0 이상)·`size`(1~100)이며 `{ responseId, userId, nickname, submittedAt }`만 반환한다. 부스 설문·기존 결과·주관식 API의 익명 계약은 바꾸지 않는다.
+- 운영 집계·응답 원본 상세, 추첨 알고리즘·당첨자 선정·경품 지급은 여전히 범위 밖이다. 이번에 남기는 `surveyKey / responseId / userId / submittedAt / answers`를 후속이 읽는다.
 - **문항 시드.** 기획 문구 도착 후 별도 마이그레이션으로 얹는다 — 그때까지 `questions`는 `[]`다.
 - **탈퇴 시 응답 보존 예외를 만들지 않았다.** 현행대로 탈퇴하면 이벤트 설문 응답도 지워지고 추첨 대상에서 빠진다. 유지할지 보존할지는 기획 결정이고 `docs/26`에 등재돼 있다 (GitLab #173 Q2, MR !629) — 구현 blocker가 아니다.
 

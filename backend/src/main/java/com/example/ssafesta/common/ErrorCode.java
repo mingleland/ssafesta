@@ -82,6 +82,17 @@ public enum ErrorCode {
     ITEM_ALREADY_OWNED(HttpStatus.CONFLICT, "이미 보유한 품목입니다."),
     AVATAR_ITEM_NOT_OWNED(HttpStatus.CONFLICT, "보유하지 않은 파츠가 있습니다."),
 
+    // ── 이벤트 상점 (S15P21A604-832 후속, GitLab #217) ──────────────────────
+    EVENT_PRIZE_NOT_FOUND(HttpStatus.NOT_FOUND, "경품을 찾을 수 없습니다."),
+    /** 관리자가 판매를 내린 경품이다 — 삭제하지 않고 {@code active=false} 로 내린다. */
+    EVENT_PRIZE_INACTIVE(HttpStatus.CONFLICT, "현재 판매 중인 경품이 아닙니다."),
+    EVENT_PRIZE_OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+    /**
+     * 처리 상태 전이 규칙(PURCHASED→PENDING/FULFILLED/CANCELLED, PENDING→FULFILLED/CANCELLED)을
+     * 벗어난 요청이다. {@code FULFILLED}·{@code CANCELLED} 는 종단 상태라 되돌리지 않는다.
+     */
+    EVENT_PURCHASE_FULFILLMENT_INVALID(HttpStatus.CONFLICT, "허용되지 않는 처리 상태 전이입니다."),
+
     // ── 부스 · 임대 (spec 004) ──────────────────────────────────────────────
     BOOTH_NOT_FOUND(HttpStatus.NOT_FOUND, "부스를 찾을 수 없습니다."),
     BOOTH_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯을 찾을 수 없습니다."),
@@ -263,11 +274,18 @@ public enum ErrorCode {
     /** 응답이 있는 설문은 문항 구조가 잠긴다 (C-08). 제목·설명·보상·마감은 수정된다. */
     SURVEY_LOCKED(HttpStatus.CONFLICT, "응답이 있는 설문은 문항을 바꿀 수 없습니다."),
 
-    // ── 미니게임 (014) ──────────────────────────────────────────────────────
-    // 하나뿐이다. 판정 거부·일일 한도 도달·재제출은 전부 200 이라 오류 어휘가 필요 없고
+    // ── 미니게임 (014 타이밍 스톱 · 021 슬롯머신) ───────────────────────────
+    // 타이밍 스톱은 판정 거부·일일 한도 도달·재제출이 전부 200 이라 오류 어휘가 거의 없고
     // (spec 014 Acceptance Scenario 4), 게스트·요청 값 오류는 MEMBER_ONLY·VALIDATION_FAILED 를
     // 재사용한다. 남의 세션도 이 코드로 답한다 — 구분하면 세션의 존재를 알려주게 된다.
     MINIGAME_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "게임 세션을 찾을 수 없습니다."),
+    /**
+     * 서버 화이트리스트에 없는 슬롯머신이다 (spec 021 FR-002).
+     *
+     * <p>{@code NOT_FOUND} 를 재사용하지 않는다 — Unity 는 경로가 아직 배포되지 않은 경우와 기계를
+     * 모르는 경우를 갈라야 하고, 그 분기가 code 하나에 달려 있다 (GitLab #205 게임 파트 회신).
+     */
+    SLOT_MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯머신을 찾을 수 없습니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

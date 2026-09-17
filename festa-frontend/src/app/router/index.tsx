@@ -2,7 +2,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { LandingPage } from '../../pages/landing/LandingPage';
 import { ProfilePage } from '../../pages/profile/ProfilePage';
-import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
 import { SurveyManagementPage } from '../../pages/management/SurveyManagementPage';
 import { ConsultationStaffPage } from '../../pages/management/ConsultationStaffPage';
@@ -38,9 +37,10 @@ export const routes = [
   },
   {
     // 구 진입 허브. 제품 Home 은 없어졌다(D-08 — World 가 기본 상주 상태) — 다만 경로를
-    // 지우지는 않는다. 외부 링크·북마크와 Game Studio(protected, GameStudioShell 의 홈 버튼)가
-    // 아직 이 경로를 가리킨다. 가드를 걸지 않는 이유: 목적지인 /app/world 가 같은 등급의
-    // 가드를 이미 갖고 있어 여기서 한 번 더 판정하면 redirect 가 두 번 일어난다.
+    // 지우지는 않는다. 외부 링크·북마크가 아직 이 경로를 가리킬 수 있다(Game Studio의 뒤로가기는
+    // S15P21A604-824부터 /app/games를 가리켜 더 이상 이 경로를 쓰지 않는다). 가드를 걸지 않는
+    // 이유: 목적지인 /app/world 가 같은 등급의 가드를 이미 갖고 있어 여기서 한 번 더 판정하면
+    // redirect 가 두 번 일어난다.
     path: '/app/home',
     element: <Navigate to="/app/world" replace />,
   },
@@ -54,13 +54,10 @@ export const routes = [
     ),
   },
   {
-    // spec 004 — 슬롯 조회는 공개 API라 guest-allowed. 임대 버튼은 페이지가 member만 연다(FR-016)
+    // spec 004 — 임대는 2026-09-17 부터 **월드 위 오버레이**다. 옛 전체 페이지는 route 를 갈아타
+    // 월드를 떠났고, 그때마다 Unity 가 언마운트됐다. 옛 주소는 살려 두고 오버레이로 보낸다.
     path: '/app/booths',
-    element: (
-      <RequireAuth level="guest-allowed">
-        <SlotListPage />
-      </RequireAuth>
-    ),
+    element: <Navigate to="/app/world?panel=rental" replace />,
   },
   {
     // Booth Management 하위 상세 화면 3종 — 전부 소유자 전용 상태 변경 기능이라 member-only.
@@ -97,19 +94,11 @@ export const routes = [
     ),
   },
   {
-    // Booth Studio — WorldPage 와 같은 이유로 lazy 다. 2.5D 렌더러(three)가 이 아래에 달리므로
-    // static import 로 두면 Studio 를 열지 않는 사용자도 3D 런타임을 받는다 (S15P21A604-470)
+    // Booth Studio 는 사용자 흐름에서 폐기했다 (2026-09-17). 편집기 코드는 `features/studio`·
+    // `pages/studio` 에 숨김 보존하되 **들어갈 길을 두지 않는다** — 옛 주소는 월드로 보낸다.
+    // 부스 런타임을 만드는 자동화(assets:build·manifest·ReloadBoothSlot)는 그대로다.
     path: '/app/studio/:boothId',
-    lazy: async () => {
-      const { StudioPage } = await import('../../pages/studio/StudioPage.tsx');
-      return {
-        Component: () => (
-          <RequireAuth level="member-only">
-            <StudioPage />
-          </RequireAuth>
-        ),
-      };
-    },
+    element: <Navigate to="/app/world" replace />,
   },
   {
     // spec 013a — Unity WebGL Host. 무거운 로더 코드를 메인 번들에서 뺀다(lazy)
@@ -120,6 +109,21 @@ export const routes = [
         Component: () => (
           <RequireAuth level="guest-allowed">
             <WorldPage />
+          </RequireAuth>
+        ),
+      };
+    },
+  },
+  {
+    // 내 게임 목록·생성 — S15P21A604-824. 진입점(어디서 이 경로로 오는지)은 아직 미정이라
+    // 지금은 URL 직접 접근으로만 열린다.
+    path: '/app/games',
+    lazy: async () => {
+      const { GamesListPage } = await import('../../game-studio/app/routes/GamesListPage.tsx');
+      return {
+        Component: () => (
+          <RequireAuth level="member-only">
+            <GamesListPage />
           </RequireAuth>
         ),
       };
@@ -150,6 +154,13 @@ export const routes = [
         ),
       };
     },
+  },
+  {
+    // 관리자 콘솔은 화면이 아니라 월드 위 오버레이다 (S15P21A604-828) — 이 서비스는 월드가 상주
+    // 화면이고 나머지는 그 위에 잠깐 뜬다. 경로를 지우지 않는 이유는 북마크·옛 링크가 404 로
+    // 떨어지지 않게 하기 위해서다. 목적지에서 WorldPage 가 `?panel` 을 읽어 오버레이를 연다.
+    path: '/app/admin/*',
+    element: <Navigate to="/app/world?panel=admin" replace />,
   },
 ];
 

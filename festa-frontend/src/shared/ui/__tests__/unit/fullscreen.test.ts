@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 // 전체화면 유틸 (S15P21A604-733).
 //
-// 잠그는 것 셋 — ① 의도는 **한 번만** 쓰인다(다음 진입에 또 걸리면 안 된다) ② 브라우저가 거부해도
-// 던지지 않는다(부르는 쪽이 월드 진입을 멈추면 안 된다) ③ 상태의 정본은 브라우저다.
+// 잠그는 것 둘 — ① 브라우저가 거부해도 던지지 않는다(부르는 쪽이 멈추면 안 된다)
+// ② 상태의 정본은 브라우저다.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  consumeFullscreenIntent,
   enterFullscreen,
   exitFullscreen,
   isFullscreen,
-  markFullscreenIntent,
   subscribeFullscreen,
 } from '../../fullscreen';
 
@@ -21,25 +19,6 @@ beforeEach(() => {
 afterEach(() => {
   window.sessionStorage.clear();
   vi.restoreAllMocks();
-});
-
-describe('전체화면 의도 (-733)', () => {
-  it('표시하지 않으면 소비되지 않는다', () => {
-    expect(consumeFullscreenIntent()).toBe(false);
-  });
-
-  it('표시하면 한 번만 소비된다 — 다음 월드 진입에 다시 걸리면 안 된다', () => {
-    markFullscreenIntent();
-    expect(consumeFullscreenIntent()).toBe(true);
-    expect(consumeFullscreenIntent()).toBe(false);
-  });
-
-  it('표시 자체가 전체화면을 걸지 않는다 — 그 자리는 곧 OAuth 로 나간다', () => {
-    const req = vi.fn();
-    Object.defineProperty(document.documentElement, 'requestFullscreen', { value: req, configurable: true });
-    markFullscreenIntent();
-    expect(req).not.toHaveBeenCalled();
-  });
 });
 
 describe('전체화면 진입·해제 (-733)', () => {

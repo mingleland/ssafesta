@@ -11,6 +11,9 @@
 import { useSyncExternalStore } from 'react';
 import type { ManagementPanel } from './managementPanel';
 
+/** ESC 메뉴가 여는 하위 화면 */
+export type MenuPanel = 'myInfo' | 'guide' | 'settings' | 'admin';
+
 /**
  * World 하단 개발용 상호작용 트리거(DEV_ONLY)를 켤지 — dev 빌드 + 명시적 플래그를 동시에 요구한다.
  * 제품 HUD 가 아니라서(hud-decisions: 기능 Launcher 금지) 프로덕션에서는 상수 false 가 되어
@@ -22,15 +25,28 @@ export const IS_DEV_INTERACTION_BAR =
 export interface GameClientUiState {
   gameMenu: boolean;
   managementOverlay: boolean;
+  /** 부스 임대 — 월드 위 오버레이다(2026-09-17). 옛 `/app/booths` 페이지를 대체한다 */
+  boothRental: boolean;
   /**
    * 관리 오버레이 **안에서** 열린 상세 패널. 별도 소유자가 아니라 자식이다 —
    * `worldScreen` 은 이때도 `'management'` 를 말하고, ESC 만 상세 → 관리 → 월드 순으로 한 겹씩
    * 벗긴다. 이렇게 두어야 상세를 닫았을 때 관리 화면으로 **돌아온다**.
    */
   managementPanel: ManagementPanel | null;
+  /**
+   * ESC 메뉴 **안에서** 열린 화면. 관리 상세와 같은 부모-자식 관계다 — 이것이 떠 있는 동안
+   * `gameMenu` 는 켜진 채로 남고, 닫으면 메뉴가 다시 드러난다.
+   */
+  menuPanel: MenuPanel | null;
 }
 
-const initialState: GameClientUiState = { gameMenu: false, managementOverlay: false, managementPanel: null };
+const initialState: GameClientUiState = {
+  gameMenu: false,
+  managementOverlay: false,
+  boothRental: false,
+  managementPanel: null,
+  menuPanel: null,
+};
 
 let state: GameClientUiState = initialState;
 const listeners = new Set<() => void>();
@@ -44,7 +60,9 @@ function setState(patch: Partial<GameClientUiState>): void {
   if (
     next.gameMenu === state.gameMenu &&
     next.managementOverlay === state.managementOverlay &&
-    next.managementPanel === state.managementPanel
+    next.boothRental === state.boothRental &&
+    next.managementPanel === state.managementPanel &&
+    next.menuPanel === state.menuPanel
   ) {
     return;
   }
@@ -70,9 +88,8 @@ export function useGameClientUi(): GameClientUiState {
   return useSyncExternalStore(subscribe, getGameClientUiSnapshot);
 }
 
-// 둘은 서로 배타적이다 — 관리 화면 위에 게임 메뉴가 겹쳐 뜨면 ESC 의 의미가 모호해진다.
 export function openGameMenu(): void {
-  setState({ gameMenu: true, managementOverlay: false, managementPanel: null });
+  setState({ gameMenu: true, managementOverlay: false, managementPanel: null, menuPanel: null, boothRental: false });
 }
 
 export function closeGameMenu(): void {
@@ -81,7 +98,9 @@ export function closeGameMenu(): void {
 
 /** Booth Management NPC 진입 seam. Unity 이벤트 계약(G-1)이 오면 dispatcher 가 이 함수를 부른다 */
 export function openBoothManagement(): void {
-  setState({ managementOverlay: true, gameMenu: false });
+  // gameMenu 를 끄지 않는다 — 메뉴에서 열었으면 닫을 때 메뉴로 돌아가야 한다. NPC 로 열 때는
+  // 애초에 메뉴가 꺼져 있어 영향이 없다.
+  setState({ managementOverlay: true, menuPanel: null });
 }
 
 export function closeBoothManagement(): void {
@@ -95,11 +114,20 @@ export function closeBoothManagement(): void {
  * 닫으면 관리 화면으로 돌아가야 하기 때문이다.
  */
 export function openManagementPanel(panel: ManagementPanel): void {
-  setState({ managementOverlay: true, gameMenu: false, managementPanel: panel });
+  setState({ managementOverlay: true, managementPanel: panel, menuPanel: null });
 }
 
 export function closeManagementPanel(): void {
   setState({ managementPanel: null });
+}
+
+/** 부스 임대 진입 seam — 월드의 임대 NPC·상호작용이 부른다 */
+export function openBoothRental(): void {
+  setState({ boothRental: true, managementOverlay: false, managementPanel: null, menuPanel: null });
+}
+
+export function closeBoothRental(): void {
+  setState({ boothRental: false });
 }
 
 /**
@@ -110,6 +138,15 @@ export function closeManagementPanel(): void {
  * 새로고침·뒤로가기에도 같은 결과가 된다.
  */
 export const WORLD_RETURN_TO_MANAGEMENT = '/app/world?panel=management';
+
+/** ESC 메뉴의 하위 화면을 연다 — 메뉴는 켜진 채로 둔다(닫으면 돌아간다) */
+export function openMenuPanel(panel: MenuPanel): void {
+  setState({ menuPanel: panel, managementOverlay: false, managementPanel: null });
+}
+
+export function closeMenuPanel(): void {
+  setState({ menuPanel: null });
+}
 
 /** World 를 벗어날 때 — 남은 레이어가 다음 진입에 그대로 떠 있지 않게 한다 */
 export function resetGameClientUi(): void {

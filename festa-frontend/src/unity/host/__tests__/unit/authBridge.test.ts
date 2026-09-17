@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_BRIDGE_OBJECT, syncAccessToken } from '../../authBridge';
-import { __resetSessionForTests, setGuestSession, setMemberSession, clearSession } from '../../../../features/auth/model/session';
+import {
+  __resetSessionForTests,
+  clearSession,
+  getSessionSnapshot,
+  setGuestSession,
+  setMemberSession,
+} from '../../../../features/auth/model/session';
 import type { UnityInstance } from '../../types';
 
 const FUTURE = () => new Date(Date.now() + 60_000).toISOString();
@@ -16,6 +22,21 @@ beforeEach(() => {
 });
 
 describe('syncAccessToken (-91, #60, #128 §2)', () => {
+  // S15P21A604-828 — UnityHost 는 이 값이 바뀔 때만 재주입한다. 만료 시각이 같은 갱신에서
+  // 값이 그대로면 Unity 가 죽은 토큰을 계속 들고 있게 된다(서버는 refresh 마다 sid 를 회전시켜
+  // 옛 토큰을 즉시 폐기한다). 토큰이 바뀌는 모든 경로가 이 값을 올려야 한다.
+  it('토큰이 바뀌면 만료 시각이 같아도 tokenVersion 이 오른다 — 재주입 신호', () => {
+    const sameExpiry = FUTURE();
+    setMemberSession('at-1', sameExpiry);
+    const first = getSessionSnapshot().tokenVersion;
+
+    setMemberSession('at-2', sameExpiry);
+    expect(getSessionSnapshot().tokenVersion).toBe(first + 1);
+
+    clearSession();
+    expect(getSessionSnapshot().tokenVersion).toBe(first + 2);
+  });
+
   it('회원 세션이면 Access Token 원본을 AuthBridge.SetAccessToken 으로 밀어 넣는다', () => {
     setMemberSession('at-member', FUTURE());
     const unity = instance();

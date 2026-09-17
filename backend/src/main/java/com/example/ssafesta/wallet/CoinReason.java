@@ -34,8 +34,27 @@ public final class CoinReason {
      */
     public static final String MINIGAME_REWARD = "MINIGAME_REWARD";
 
+    /**
+     * Slot machine stake, charged at the start of a spin (spec 021 FR-004).
+     *
+     * <p>Deliberately <b>not</b> {@link #MINIGAME_REWARD}'s counterpart: the timing-stop cap counts
+     * by reason, so a slot payout recorded under that name would eat a player's timing-stop
+     * allowance. Keeping the two games on separate reasons is what keeps the caps separate without
+     * either feature knowing about the other (#205 확정값 2).
+     */
+    public static final String SLOT_BET = "SLOT_BET";
+
+    /** Slot machine payout, granted in the same transaction as {@link #SLOT_BET} (spec 021 FR-004). */
+    public static final String SLOT_PAYOUT = "SLOT_PAYOUT";
+
     /** Booth lease fee, charged to the lessee (spec 004 FR-006). */
     public static final String LEASE_PAYMENT = "LEASE_PAYMENT";
+
+    /** Event-shop prize purchase (S15P21A604-832 후속, GitLab #217). */
+    public static final String PRIZE_PURCHASE = "PRIZE_PURCHASE";
+
+    /** {@code reference_type} recorded alongside {@link #PRIZE_PURCHASE}; the id is a prize. */
+    public static final String EVENT_PRIZE_REFERENCE_TYPE = "EVENT_PRIZE";
 
     /** {@code reference_type} recorded alongside {@link #ADMIN_ADJUSTMENT}. */
     public static final String ADMIN_ACTOR_REFERENCE_TYPE = "ADMIN_USER";

@@ -121,3 +121,11 @@ US1~US4 완료 → Polish (T022-T025)
 ## Implementation Strategy
 
 **MVP = Phase 1~3 (T001~T013)** — "Unity 없이 3D 공간을 만든다"는 정체성 그 자체(spec US1). 여기까지 mock으로 완결 검증 후 실 BE 연결. US2가 그다음(P0), US3·US4·Polish 순.
+
+---
+
+## 후속: 배치 범위 `9.4 × 6 × 5.9` (`S15P21A604-698` · `S15P21A604-785`)
+
+- [x] T026 **배치 범위 확장 반영** (`S15P21A604-785`, develop `d8671676`·`2c056540`) — `BOOTH_SIZE_FALLBACK`·`api.mock.ts` 를 `9.4 × 6 × 5.9` 로, `resolveLocalBounds` 도입(assetCode 정확일치 → `typeDefault` → 타입 표), `OBJECT_LOCAL_BOUNDS` 직접 조회 프로덕션 13곳 제거, `passageWarnings` 에 bounds 인자, 통행 격자 x/z 분리(`188 × 120`, x 첫 셀 중심 −4.675), flood fill 큐 `head` 인덱스화. **T001 의 `BOOTH_SIZE_FALLBACK={width:6,depth:6,height:2.72}`·T023 의 `120×120` 을 이 항목이 대체한다**
+- [x] T027 **치수 정본을 저장소 안으로** (`S15P21A604-785`, `!936`) — `tools/assets/asset-bounds.lock.json` 커밋. `assets:verify`(front-build)가 manifest 와 lock 의 정확 일치를, `assetBoundsLock.test.mjs`(front-test)가 lock 자체의 정합을 본다. manifest 는 커밋되지 않는 빌드 산출물이라 parity 정본이 될 수 없다 — CI 에서 대조가 아예 안 돌고 그 사실이 green 으로 보인다
+- [ ] T028 **축별 허용오차 확정** — lock 의 값은 파이프라인 산출물(GLB 변환 후) 실측이고 정본은 Unity 프리팹 실측이다. 축당 몇 mm 까지를 "같다" 로 볼지 정해지면 lock 을 프리팹 실측으로 갈아끼우고 `boundsDelta` 델타 상한을 red 로 건다. BE `T061`(서버 표)과 짝이다
