@@ -219,11 +219,13 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 ### Session 2026-09-17
 
 - Q: `dev.ssafesta.world` 와 `demo.ssafesta.world` 의 환경 역할 분리와 실제 통합 검증 대상을 어떻게 정합화할 것인가? → A: 별도의 `dev.ssafesta.world` 환경은 운영하지 않으며, `demo.ssafesta.world` 가 `develop` 브랜치의 최신 통합 결과를 지속적으로 검증하는 통합 환경(Staging) 역할을 전담한다. `develop` 에 머지된 변경은 Jenkins develop 파이프라인을 통해 컴포넌트별 필수 검증 후 `demo.ssafesta.world` 에 자동 배포된다.
-- Q: 수동 승격(Production Promotion)의 개념과 최종 운영 환경 대상은 무엇인가? → A: 수동 승격은 가상의 dev→demo가 아니라 **`develop → main` 승격 정책**으로 전환하며, `main` 브랜치는 `https://ssafesta.world` 에서 서비스되는 실제 사용자 프로덕션(Production) 운영 환경을 나타낸다. 팀이 `demo.ssafesta.world` 에서 특정 release 를 충분히 검증한 뒤 수동 Production Promotion 을 수행한다.
+- Q: Demo 릴리스 상태 모델(3단계)과 롤백 기준은 어떻게 정의하는가? → A: Demo 릴리스 상태를 candidate(배포 및 자동 검증 진행 중) → current(자동 readiness 성공, 실제 demo 서비스 중) → known-good(사람의 실제 서비스 검증 통과) 3단계로 엄격히 분리한다. Jenkins CI/readiness 성공만으로 known-good 을 자동 갱신해서는 안 되며(current ≠ known-good), 자동 readiness 실패는 candidate 자동 롤백, 이후 실제 서비스 장애 발견 시 수동 롤백은 미검증 current 가 아닌 마지막 정상 확인된 known-good 스냅샷을 재빌드 없이 복원한다.
+- Q: 수동 승격(Production Promotion)의 개념과 최종 운영 환경 대상은 무엇인가? → A: 수동 승격은 가상의 dev→demo가 아니라 **`develop → main` 승격 정책**으로 전환하며, `main` 브랜치는 `https://ssafesta.world` 에서 서비스되는 실제 사용자 프로덕션(Production) 운영 환경을 나타낸다. 팀이 `demo.ssafesta.world` 에서 특정 release 를 실제 사용자 검증까지 완료하여 known-good 으로 승인한 릴리스만 수동 Production Promotion 대상이 된다 (미검증 current 승격 금지).
 - Q: `develop → main` 승격 시 소스 반영 및 아티팩트 승격 원칙은 무엇인가? → A: 
   1. **Source Promotion & Architecture Invariant**: demo 에서 검증 완료된 정확한 develop commit SHA 를 main 에 반영하며, **develop → main 승격 MR 은 절대 Squash Merge 를 금지한다 (`squash=false` 강제).** develop 의 커밋 계보(ancestry)를 그대로 보존하여 차기 승격 시 전체 커밋이 다시 diff 로 잡히는 문제를 원천 차단한다.
   2. **Artifact Promotion**: Production 에서는 demo 에서 검증한 동일 artifact 를 그대로 승격하여 재사용하며(`Demo Artifact == Production Artifact`), main 반영 시 새로운 빌드 아티팩트를 재생성하지 않는다.
 - Q: Game Dedicated Server 및 WebGL 의 배포 흐름과 정합성은 어떻게 규정하는가? → A: Game Dedicated Server 는 Jenkins develop 파이프라인의 demo 자동 배포 흐름에 포함하되, 스모크 러너 의존성은 제거하고 1~3단계(`processRunning`, `internalListener`, `externalWebSocket`) 통과로 known-good 승격한다. WebGL 클라이언트 배포는 독립적인 릴리스 패키지/수동 배포 경로를 유지하며, `deploy-game.sh` 의 프리팹 트리 대조 가드로 클라이언트-서버 정합성을 보장한다.
+- Q: Redis 데이터 영속성 및 메모리 상한 기준을 어떻게 확정할 것인가? → A: 실측 결과 40명 동시 접속 시 Redis 메모리 피크가 1.27MiB 로 확인되었으므로, 컨테이너 OOM 방지를 위해 `mem_limit: 256m` 상한을 compose 에 강제한다. 또한 컨테이너 재시작 시 로그인 세션 키 일괄 소멸을 방지하기 위해 `appendonly yes` AOF 영속성을 적용한다.
 
 ### Session 2026-08-18
 
