@@ -135,8 +135,9 @@
 - [ ] T054 [US3] R2 장애 복구 뒤 probe와 usage snapshot을 다시 수집·평가하고, 성공 전에는 uploadEnabled를 복구하지 않는 절차를 `infra/environments/storage/usage-guard/recover.sh`에 구현한다
 - [X] T055 [P] [US3] 사용자 지정 형식 데이터베이스 덤프, 릴리스·스키마·버전 매니페스트, SHA-256과 비공개 R2 업로드를 `infra/environments/postgres/backup/dump.sh`에 구현한다
 - [X] T056 [US3] 체크섬을 검증한 다운로드와 명시적으로 폐기 가능한 대상 데이터베이스로의 복원을 `infra/environments/postgres/backup/restore.sh`에 구현한다
+
 - [x] T057 [US3] 복원된 스키마·행·벡터·문서 목록 검증과 민감정보 제거 검증 근거 출력을 `infra/environments/postgres/backup/verify.sh`에 구현한다
-- [ ] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
+- [x] T058 [P] [US3] 일간 7개, 주간 4개, 마이그레이션 전 보존과 모의 삭제 보고를 `infra/environments/postgres/backup/retention.sh`에 구현한다
 - [X] T059 [US3] 환경 ID, Redis 사용자 이름·비밀번호 참조, 자격증명 누락 시 조기 실패와 키 공간 연결을 갖춘 `infra` Spring 프로필을 `backend/src/main/resources/application-infra.yml`과 `backend/src/main/java/com/example/ssafesta/common/RedisKeyspaceProperties.java`에 추가했다
 - [X] T060 [US3] 기존 TTL·대체 동작을 유지하면서 인증, OAuth 전달과 지갑 캐시 키 앞에 주입된 환경 네임스페이스를 붙이도록 `backend/src/main/java/com/example/ssafesta/auth/MemberSessionService.java`, `backend/src/main/java/com/example/ssafesta/auth/OAuthHandoffService.java`, `backend/src/main/java/com/example/ssafesta/wallet/DailyCoinGrantService.java`를 수정했다
 - [ ] T061 [US3] 합성 RAG `boothId+agentId+sourceRevision` 및 설문 `surveyId+sourceRevision` 캐시 검사, 원본 대체 경로 비교와 과대 항목 거부를 `infra/environments/storage/usage-guard/cache-recovery-probe.sh`에 구현한다
