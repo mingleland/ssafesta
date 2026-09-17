@@ -49,6 +49,36 @@ public interface CoinLedgerEntryRepository extends JpaRepository<CoinLedgerEntry
                                @Param("from") Instant from, @Param("to") Instant to);
 
     /**
+     * Latest slot outcomes from the ledger facts that already settle every spin.
+     *
+     * <p>Each returned row is one {@code SLOT_BET}; {@code true} means its shared spin reference
+     * has a {@code SLOT_PAYOUT}, and {@code false} means the spin lost. The caller reads only a
+     * small suffix while holding the member wallet lock, so no separate pity counter can drift from
+     * the economic record (spec 021 FR-011).
+     */
+    @Query(value = """
+            select exists (
+                select 1 from coin_ledger_entries payout
+                 where payout.wallet_id = bet.wallet_id
+                   and payout.reason_type = :payoutReason
+                   and payout.reference_type = :referenceType
+                   and payout.reference_id = bet.reference_id
+            )
+              from coin_ledger_entries bet
+              join wallets w on w.id = bet.wallet_id
+             where w.user_id = :userId
+               and bet.reason_type = :betReason
+               and bet.reference_type = :referenceType
+             order by bet.created_at desc, bet.id desc
+             limit :limit
+            """, nativeQuery = true)
+    List<Boolean> findRecentSlotWinFlags(@Param("userId") Long userId,
+                                         @Param("betReason") String betReason,
+                                         @Param("payoutReason") String payoutReason,
+                                         @Param("referenceType") String referenceType,
+                                         @Param("limit") int limit);
+
+    /**
      * Per-wallet ledger totals for reconciliation (spec 003 FR-014). Wallets with no entries are
      * absent from the result, so the caller must treat a missing row as a ledger sum of 0 rather
      * than skipping the wallet — a wallet with a non-zero balance and no entries is exactly the
