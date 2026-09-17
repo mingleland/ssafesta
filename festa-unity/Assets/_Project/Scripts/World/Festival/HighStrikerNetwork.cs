@@ -22,6 +22,8 @@ namespace Festa.World
     [RequireComponent(typeof(NetworkPlayer))]
     public sealed class HighStrikerNetwork : NetworkBehaviour
     {
+        const string MovementLockOwner = "HighStriker";
+        const float RequestLockTimeout = 1.5f;
         /// <summary>
         /// 망치 궤적의 접촉 시점. 실제 표시에서는 AvatarStrikeProp의 접촉 프레임을 기다린다.
         /// </summary>
@@ -42,6 +44,7 @@ namespace Festa.World
         static readonly Dictionary<string, Record> s_records = new();
 
         NetworkPlayer _player;
+        Coroutine _localUnlockRoutine;
 
         void Awake() => _player = GetComponent<NetworkPlayer>();
 
@@ -53,6 +56,7 @@ namespace Festa.World
 
         public override void OnNetworkDespawn()
         {
+            ReleaseLocalInteractionLock();
             // 서버가 내려가면 기록도 사라진다(사용자 확정: 마지막 기록만, 영속 저장 없음).
             if (IsServer && NetworkManager != null && !NetworkManager.IsListening) s_records.Clear();
         }
@@ -62,6 +66,18 @@ namespace Festa.World
         {
             if (!IsOwner) return;
             RequestSwingServerRpc(new FixedString32Bytes(machineId ?? string.Empty));
+        }
+
+        /// <summary>
+        /// F를 누른 즉시 소유자 이동을 멈춘다. 아직 서버 승인 전이므로 응답이 유실되거나
+        /// 쿨다운으로 거절돼도 영구 잠금되지 않도록 짧은 제한시간을 건다.
+        /// </summary>
+        public void BeginLocalInteractionLock()
+        {
+            if (!IsOwner) return;
+            GetComponent<PlayerMovement>()?.StopImmediatelyForInteraction();
+            Festa.Integration.InputBridge.SetLocked(true, MovementLockOwner);
+            RestartLocalUnlock(null, RequestLockTimeout);
         }
 
         [ServerRpc]
@@ -97,10 +113,47 @@ namespace Festa.World
             if (IsOwner) GetComponent<PlayerEmoteController>()?.PlayOneShot(PlayerEmoteId.Strike);
             var prop = GetComponent<AvatarStrikeProp>();
             bool hasVisual = prop != null && prop.BeginSwing(machine);
+            if (IsOwner)
+            {
+                // 승인된 Strike가 끝나는 실제 시점까지 연장한다. 시간 상수만 기다리지 않아
+                // 아바타 재조립 등으로 애니메이션이 일찍 끝난 경우에도 즉시 이동을 돌려준다.
+                GetComponent<PlayerMovement>()?.StopImmediatelyForInteraction();
+                Festa.Integration.InputBridge.SetLocked(true, MovementLockOwner);
+                RestartLocalUnlock(hasVisual ? prop : null, AvatarStrikeProp.SwingDuration + 0.5f);
+            }
             // 받는 즉시 잠근다 — 임팩트를 기다리는 사이에 옆 사람이 F 를 누르면 스윙이 겹친다.
             machine.BeginBusy(ImpactDelay + machine.SequenceSeconds);
             // 스윙 애니메이션이 내려찍는 순간에 퍽이 튀어 오르게 — 받은 시점부터 임팩트까지 기다린다.
             StartCoroutine(PlayAtImpact(machine, hasVisual ? prop : null, power, score, nickname.ToString()));
+        }
+
+        void RestartLocalUnlock(AvatarStrikeProp prop, float timeout)
+        {
+            if (_localUnlockRoutine != null) StopCoroutine(_localUnlockRoutine);
+            _localUnlockRoutine = StartCoroutine(UnlockLocalMovement(prop, timeout));
+        }
+
+        IEnumerator UnlockLocalMovement(AvatarStrikeProp prop, float timeout)
+        {
+            float deadline = Time.time + timeout;
+            if (prop == null)
+            {
+                while (Time.time < deadline) yield return null;
+            }
+            else
+            {
+                while (prop != null && prop.IsSwinging && Time.time < deadline) yield return null;
+            }
+            _localUnlockRoutine = null;
+            Festa.Integration.InputBridge.SetLocked(false, MovementLockOwner);
+        }
+
+        void ReleaseLocalInteractionLock()
+        {
+            if (!IsOwner) return;
+            if (_localUnlockRoutine != null) StopCoroutine(_localUnlockRoutine);
+            _localUnlockRoutine = null;
+            Festa.Integration.InputBridge.SetLocked(false, MovementLockOwner);
         }
 
         static IEnumerator PlayAtImpact(HighStrikerMachine machine, AvatarStrikeProp prop, float power, int score, string nickname)
