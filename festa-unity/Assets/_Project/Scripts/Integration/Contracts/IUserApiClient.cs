@@ -42,5 +42,26 @@ namespace Festa.Integration
         /// <para>게스트는 <c>MEMBER_ONLY</c> 로 거부된다 — 호출 전에 화면에서 걸러야 한다.</para>
         /// </summary>
         Task<PurchaseResult> PurchaseAvatarPartAsync(long itemId);
+
+        /// <summary>
+        /// 저장해 둔 아바타 프리셋 목록 — <c>GET /api/v1/users/me/avatar/presets</c> (GitLab#237).
+        ///
+        /// <para><b>빈 칸은 오지 않는다.</b> 세 칸 중 저장된 것만 담겨 오므로 길이가 0~3 이다.
+        /// 실패하면 <c>null</c> 이다 — 호출자는 null 을 "세 칸 다 비었다" 로 읽어서는 안 된다.
+        /// 조용히 비어 있는 것으로 그리면 사용자가 저장한 외형이 사라진 것처럼 보이고,
+        /// 거기에 덮어쓰면 실제로 사라진다(T-24 와 같은 부류).</para>
+        /// </summary>
+        Task<AvatarPresetDto[]> GetAvatarPresetsAsync();
+
+        /// <summary>
+        /// 프리셋 한 칸 저장(덮어쓰기 포함) — <c>PUT /api/v1/users/me/avatar/presets/{slot}</c>.
+        ///
+        /// <para><paramref name="slot"/> 은 1·2·3 만 유효하다. 게스트는 서버가
+        /// <c>MEMBER_ONLY</c> 로 거부한다(헌법 12조 — 게스트는 비영속).</para>
+        /// </summary>
+        Task<bool> SaveAvatarPresetAsync(int slot, string encodedAppearance);
+
+        /// <summary>프리셋 한 칸 비우기 — <c>DELETE /api/v1/users/me/avatar/presets/{slot}</c>.</summary>
+        Task<bool> DeleteAvatarPresetAsync(int slot);
     }
 }
