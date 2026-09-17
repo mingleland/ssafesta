@@ -23,6 +23,7 @@ import com.example.ssafesta.wallet.WalletProperties;
 import com.example.ssafesta.wallet.WalletService;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
 import org.mockito.ArgumentCaptor;
@@ -94,7 +95,8 @@ class DailyMissionServiceTest {
         assertEquals(215, claim.balanceAfter());
         ArgumentCaptor<CoinCreditCommand> credit = ArgumentCaptor.forClass(CoinCreditCommand.class);
         verify(wallets).credit(credit.capture());
-        assertEquals("DAILY_MISSION:42:AI_CONSULT:2026-09-17", credit.getValue().idempotencyKey());
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).toString();
+        assertEquals("DAILY_MISSION:42:AI_CONSULT:" + today, credit.getValue().idempotencyKey());
 
         when(ledger.findByIdempotencyKey(anyString())).thenReturn(Optional.of(entry));
         ApiException error = assertThrows(ApiException.class, () -> service.claim(42L, "AI_CONSULT"));
