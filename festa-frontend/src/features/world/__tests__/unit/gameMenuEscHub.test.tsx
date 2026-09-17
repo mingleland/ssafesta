@@ -134,3 +134,21 @@ describe('ESC 하위 화면 진입', () => {
     expect(openPanel).toHaveBeenCalledWith('myInfo');
   });
 });
+
+// 일일 미션 (S15P21A604-859, GitLab #234)
+describe('ESC 미션 항목', () => {
+  it('회원이 누르면 미션 패널 요청만 보낸다', () => {
+    renderMenu();
+    fireEvent.click(screen.getByRole('button', { name: '미션' }));
+    expect(openPanel).toHaveBeenCalledWith('missions');
+  });
+
+  it('게스트에게는 항목이 없다 — 수령이 403 MEMBER_ONLY 라 열어 놓고 전부 막는 화면이 된다', () => {
+    __resetSessionForTests();
+    setGuestSession('at', new Date(Date.now() + 60_000).toISOString());
+    markBootstrapped();
+    renderMenu();
+
+    expect(screen.queryByRole('button', { name: '미션' })).toBeNull();
+  });
+});
