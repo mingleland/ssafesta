@@ -257,6 +257,9 @@ namespace Festa.Booth
                 case BoothObjectType.VideoScreen:
                     if (go.GetComponent<VideoScreenPlaceholder>() == null)
                         go.AddComponent<VideoScreenPlaceholder>();
+                    // 전광판 시제품 (2026-09-18) — WebGL 빌드에서만 동작하고 에디터에서는 스스로 꺼진다.
+                    if (go.GetComponent<BoothScreenBillboard>() == null)
+                        go.AddComponent<BoothScreenBillboard>();
                     break;
                 case BoothObjectType.Laptop:
                     if (go.GetComponent<LaptopInteractable>() == null)
