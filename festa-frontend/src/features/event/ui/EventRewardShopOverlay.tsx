@@ -53,6 +53,14 @@ const IcRewardFallback = (
   </svg>
 );
 
+// 지급 방식 안내 — 대부분은 메신저(MM)로 기프티콘을 보내지만, 말랑이는 서울캠퍼스 한정이라
+// 직접 가져다 준다(2026-09-17 확정, lockedCampus와 같은 조건).
+function deliveryNoteFor(action: PendingAction): string {
+  if (action.kind === 'raffle') return '당첨 시 MM으로 기프티콘을 보내드립니다.';
+  if (action.prize.name === '말랑이') return '직접 가져다 드립니다.';
+  return 'MM으로 기프티콘을 보내드립니다.';
+}
+
 // 서버 코드 → 화면 문구. 모르는 코드는 서버 message 그대로 보여준다(SC-005와 같은 이유 — 숨기지 않는다).
 const PURCHASE_ERROR_LABELS: Record<string, string> = {
   EVENT_PRIZE_OUT_OF_STOCK: '방금 재고가 소진됐습니다.',
@@ -229,9 +237,7 @@ export function EventRewardShopOverlay() {
               ? `${pendingAction.prize.priceCoin.toLocaleString()} C`
               : `${pendingAction.raffle.priceCoin.toLocaleString()} C / 1장`
           }
-          deliveryNote={
-            pendingAction.kind === 'purchase' ? 'MM으로 기프티콘을 보내드립니다.' : '당첨 시 MM으로 기프티콘을 보내드립니다.'
-          }
+          deliveryNote={deliveryNoteFor(pendingAction)}
           lockedCampus={pendingAction.kind === 'purchase' && pendingAction.prize.name === '말랑이' ? '서울' : undefined}
           pending={purchase.isPending || enter.isPending}
           onCancel={() => setPendingAction(null)}

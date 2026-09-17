@@ -220,6 +220,8 @@ describe('경품이 들어온 뒤', () => {
     const campusSelect = (await screen.findByLabelText('캠퍼스')) as HTMLSelectElement;
     expect(campusSelect.disabled).toBe(true);
     expect(campusSelect.value).toBe('서울');
+    // 서울캠퍼스 한정이라 메신저(MM) 발송이 아니라 직접 가져다 준다
+    expect(screen.getByText(/직접 가져다 드립니다\./)).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('조 이름'), { target: { value: 'A101' } });
     fireEvent.change(screen.getByLabelText('이름'), { target: { value: '홍길동' } });
@@ -240,6 +242,7 @@ describe('경품이 들어온 뒤', () => {
 
     const campusSelect = (await screen.findByLabelText('캠퍼스')) as HTMLSelectElement;
     expect(campusSelect.disabled).toBe(false);
+    expect(screen.getByText(/MM으로 기프티콘을 보내드립니다\./)).toBeTruthy();
   });
 });
 
