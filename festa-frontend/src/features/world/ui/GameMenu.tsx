@@ -147,7 +147,8 @@ export function GameMenu({ onClose, onOpenPanel }: Props) {
             </button>
           )}
 
-          <button type="button" className="gm-item" disabled title="준비 중입니다">
+          {/* 툴팁을 달지 않는다 — 같은 줄의 `준비 중` 배지가 이미 그 말을 하고 있다 */}
+          <button type="button" className="gm-item" disabled>
             아바타 변경
             <span className="gm-badge">준비 중</span>
           </button>

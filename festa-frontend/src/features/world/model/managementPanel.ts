@@ -11,13 +11,11 @@ export type ManagementPanel =
   | { kind: 'project'; boothId: number }
   | { kind: 'survey'; boothId: number }
   | { kind: 'consultation'; boothId: number }
-  | { kind: 'ai-agent'; boothId: number }
-  | { kind: 'studio'; boothId: number };
+  | { kind: 'ai-agent'; boothId: number };
 
 export type ManagementPanelKind = ManagementPanel['kind'];
 
 /** deep-link 경로 — 오버레이로 열든 URL 로 열든 같은 화면이 뜬다 */
 export function managementPanelPath(panel: ManagementPanel): string {
-  if (panel.kind === 'studio') return `/app/studio/${panel.boothId}`;
   return `/app/booths/${panel.boothId}/${panel.kind}`;
 }
