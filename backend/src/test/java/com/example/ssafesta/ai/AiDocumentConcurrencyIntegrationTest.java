@@ -1,7 +1,6 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
 import static com.example.ssafesta.booth.BoothTestSupport.releaseAllSlots;
@@ -36,7 +35,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 인덱스가 잡지 못한다 — 각자 "아홉 개"를 읽고 각자 INSERT 하면 열한 개가 된다. 그쪽을 막는 것은
  * agent 행 잠금 하나뿐이라 테스트가 있어야 한다.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class AiDocumentConcurrencyIntegrationTest {
 
