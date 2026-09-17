@@ -17,9 +17,18 @@ export interface SessionState {
   // 부트스트랩(새로고침 복원 refresh)이 끝나기 전에는 가드가 redirect를 확정하면 안 된다 —
   // 초기 anonymous는 "미확인"이지 "비로그인 확정"이 아니다(T012 레이스, quickstart §6 실측으로 발견).
   bootstrapped: boolean;
+  /**
+   * Access Token 이 바뀔 때마다 1 증가한다 (S15P21A604-828).
+   *
+   * 토큰 값 자체는 이 store 에 두지 않는다(헌법 13조 — 넘길 곳이 늘면 새는 곳도 늘어난다).
+   * 그런데 구독자가 "토큰이 바뀌었다" 를 알 방법이 `expiresAt` 변화뿐이라, 만료 시각이 같은
+   * 갱신은 아무에게도 전달되지 않았다. Unity 는 그 신호 하나로 재주입을 결정하므로 놓치면
+   * 죽은 토큰을 계속 들고 있게 된다. 세는 값 하나면 값을 내보내지 않고도 변화를 알릴 수 있다.
+   */
+  tokenVersion: number;
 }
 
-let state: SessionState = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false };
+let state: SessionState = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false, tokenVersion: 0 };
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -29,6 +38,11 @@ function emit(): void {
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** React 밖에서 세션 변화를 구독한다 — 만료 전 예약 갱신(refreshScheduler)이 쓴다 */
+export function subscribeSession(listener: () => void): () => void {
+  return subscribe(listener);
 }
 
 function getSnapshot(): SessionState {
@@ -44,19 +58,19 @@ export function getSessionSnapshot(): SessionState {
 // setAccessToken을 직접 부르지 않는다(T005 완료조건: 토큰과 kind가 어긋나는 경로 없음).
 export function setMemberSession(accessToken: string, expiresAt: string): void {
   setAccessToken(accessToken);
-  state = { ...state, kind: 'member', expiresAt, notice: null };
+  state = { ...state, kind: 'member', expiresAt, notice: null, tokenVersion: state.tokenVersion + 1 };
   emit();
 }
 
 export function setGuestSession(accessToken: string, expiresAt: string): void {
   setAccessToken(accessToken);
-  state = { ...state, kind: 'guest', expiresAt, notice: null };
+  state = { ...state, kind: 'guest', expiresAt, notice: null, tokenVersion: state.tokenVersion + 1 };
   emit();
 }
 
 export function clearSession(notice: SessionNotice = null): void {
   setAccessToken(null);
-  state = { ...state, kind: 'anonymous', expiresAt: null, notice };
+  state = { ...state, kind: 'anonymous', expiresAt: null, notice, tokenVersion: state.tokenVersion + 1 };
   emit();
 }
 
@@ -75,6 +89,6 @@ export function useSession(): SessionState {
 // 프로덕션 코드에서는 호출하지 않는다.
 export function __resetSessionForTests(): void {
   setAccessToken(null);
-  state = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false };
+  state = { kind: 'anonymous', expiresAt: null, notice: null, bootstrapped: false, tokenVersion: 0 };
   listeners.clear();
 }

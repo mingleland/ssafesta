@@ -9,46 +9,8 @@
 }
 .world-hud > * { pointer-events: auto; }
 
-.world-hud-guide {
-  position: absolute;
-  left: var(--festa-hud-margin-x);
-  /* 화면 하단 → 안전 여백 → 채팅 실제 높이 → 공통 간격 → 조작 안내 순서다. 채팅은 형제
-     레이어라 WorldPage가 --festa-world-chat-height 하나로만 연결한다(S15P21A604-740). */
-  bottom: calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap));
-  width: min(246px, calc(100vw - 2 * var(--festa-hud-margin-x)));
-  max-height: calc(100dvh - var(--festa-hud-margin-y) - var(--festa-world-chat-height, 0px) - var(--festa-hud-stack-gap));
-  overflow-y: auto;
-  padding: 12px 14px 13px;
-  border-radius: 14px;
-  background: rgba(12, 16, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 34px rgba(4, 6, 20, 0.45);
-  backdrop-filter: blur(8px);
-}
-@media (prefers-reduced-transparency: reduce) {
-  .world-hud-guide { background: #10142a; backdrop-filter: none; }
-}
-.world-hud-guide-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.world-hud-guide-head button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(234, 238, 251, 0.7);
-  cursor: pointer;
-}
-.world-hud-guide-head button:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+/* 조작 안내 상시 카드는 2026-09-16 에 걷었다 — 목록은 ESC 메뉴의 조작 안내 오버레이가 그린다.
+   항목 배지 스타일(.world-hud-keys·.world-key)은 그 오버레이가 그대로 쓰므로 아래에 남긴다. */
 
 .world-hud-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .world-hud-keys li {
@@ -79,60 +41,19 @@
   color: rgba(234, 238, 251, 0.6);
 }
 
-.world-hud-guide-open {
-  position: absolute;
-  left: var(--festa-hud-margin-x);
-  bottom: calc(var(--festa-hud-margin-y) + var(--festa-world-chat-height, 0px) + var(--festa-hud-stack-gap));
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: rgba(12, 16, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #eaeefb;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-}
-.world-hud-guide-open:hover { background: rgba(20, 26, 52, 0.85); }
-
-/* 이용 안내 진입 (S15P21A604-599) — 우하단.
-   좌하단은 조작 안내 카드(펼침 246px)와 접힘 버튼이 번갈아 쓰는 자리라 겹친다.
-   좌하단 중앙은 dev 상호작용 바, 우상단은 상담 Quick Access 다 — 남는 모서리가 여기 하나다. */
-.world-hud-help {
-  position: absolute;
-  right: var(--festa-hud-margin-x);
-  bottom: var(--festa-hud-margin-y);
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(12, 16, 34, 0.72);
-  backdrop-filter: blur(8px);
-  color: #eaeefb;
-  cursor: pointer;
-}
-.world-hud-help:hover { background: rgba(20, 26, 52, 0.85); }
-.world-hud-help:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.9); outline-offset: 2px; }
-@media (prefers-reduced-transparency: reduce) {
-  .world-hud-help { background: #10142a; backdrop-filter: none; }
-}
-
-/* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 **같은 우상단 열**에 한 칸 아래로 쌓는다 —
-   좌표·크기를 같은 토큰으로 잡아야 화면이 커져도 둘이 어긋나지 않는다(consultationQuickAccess.css 와
-   같은 근거). `.world-hud` 는 클릭을 통과시키므로 버튼만 다시 받는다. */
 .world-hud-fullscreen {
   position: absolute;
+  /* 전체화면 토글 (S15P21A604-733). 상담 퀵액세스와 우상단 한 줄에 나란히 서고, 오른쪽 끝은
+     이 버튼이 쓴다 — 상담이 왼쪽 칸이다(2026-09-16). `.world-hud` 는 클릭을 통과시키므로
+     버튼만 다시 받는다. */
   right: var(--festa-hud-margin-x);
-  top: calc(var(--festa-hud-margin-y) + var(--festa-control-size) + var(--festa-hud-stack-gap));
+  top: var(--festa-hud-margin-y);
   width: var(--festa-control-size);
   height: var(--festa-control-size);
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  /* 상담 버튼과 같은 모서리 반경을 쓴다 — 한 줄에 원형과 사각형이 섞이면 둘이 다른 종류로 보인다 */
+  border-radius: var(--festa-control-radius);
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(12, 16, 34, 0.72);
   backdrop-filter: blur(8px);
@@ -147,14 +68,3 @@
   .world-hud-fullscreen { background: #10142a; backdrop-filter: none; }
 }
 
-/* 좁은 화면은 하단 중앙 Exit가 넓어진 채팅과 가로로 공존할 수 없다. 채팅 위 Exit, 그 위
-   조작 안내로 한 줄씩 쌓고, 안내는 남은 높이만 쓴다. */
-@media (max-width: 720px) {
-  .world-hud-guide,
-  .world-hud-guide-open {
-    bottom: calc(var(--festa-hud-context-bottom) + var(--festa-hud-context-height) + var(--festa-hud-stack-gap));
-  }
-  .world-hud-guide {
-    max-height: calc(100dvh - var(--festa-hud-context-bottom) - var(--festa-hud-context-height) - var(--festa-hud-stack-gap));
-  }
-}

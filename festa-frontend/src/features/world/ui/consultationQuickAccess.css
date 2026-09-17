@@ -1,8 +1,8 @@
 /* World HUD 우상단 — 상담 즉시 접근. 숫자 badge 를 쓰지 않는다(실제 데이터에 없다). */
 .cqa {
   position: absolute;
-  /* 우상단 예약 영역의 첫 칸. 전체화면 토글은 worldHud.css에서 이 버튼 아래 공통 간격만큼 쌓는다. */
-  right: var(--festa-hud-margin-x);
+  /* 우상단 한 줄에서 왼쪽 칸이다 — 전체화면(worldHud.css)이 오른쪽 끝을 쓴다 (2026-09-16). */
+  right: calc(var(--festa-hud-margin-x) + var(--festa-control-size) + var(--festa-hud-stack-gap));
   top: var(--festa-hud-margin-y);
   display: flex;
   align-items: center;

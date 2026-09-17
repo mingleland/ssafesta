@@ -93,7 +93,7 @@ describe('AI 직원 행 — 미등록 게이트 (-724)', () => {
     const { client } = await renderOverlay();
 
     await openGate(client);
-    fireEvent.click(screen.getByRole('button', { name: 'AI 직원 등록하러 가기' }));
+    fireEvent.click(screen.getByRole('button', { name: '직원 등록' }));
 
     expect(getGameClientUiSnapshot().managementPanel).toEqual({ kind: 'ai-agent', boothId: 42 });
     // 월드를 떠나지 않는다 — 그것이 이 변경의 목적이다
