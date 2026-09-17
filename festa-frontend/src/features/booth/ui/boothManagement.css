@@ -70,6 +70,14 @@
   object-fit: cover;
   background: rgba(255, 255, 255, 0.06);
 }
+/* 프로젝트 미등록 — 채우지 않고 비워 둔다. boothMiniPreview 의 bmp-logo-fallback 과 같은 결 */
+.bm-thumb-empty {
+  display: grid;
+  place-items: center;
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.35);
+}
 .bm-identity-text {
   display: flex;
   flex-direction: column;

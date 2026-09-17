@@ -6,6 +6,7 @@
 //
 // 마스터·관리자 판정: userId 1 이 마스터, 2 가 관리자, 나머지는 회원. 콘솔을 여는 나(mock 세션)는 2 다.
 import type { ApiError } from '../../shared/api/client';
+import { nextFulfillmentOptions } from './types';
 import type {
   AccountStatusHistoryView,
   AdjustmentResult,
@@ -249,8 +250,9 @@ export const adminApi: AdminRepository = {
   async updateFulfillment(purchaseId, status, note) {
     const purchase = purchases.find((p) => p.purchaseId === purchaseId);
     if (purchase === undefined) throw apiError('PURCHASE_NOT_FOUND', 404, '구매 내역을 찾을 수 없습니다.');
-    if (purchase.fulfillment === 'CANCELLED' && status !== 'CANCELLED') {
-      throw apiError('PURCHASE_ALREADY_CANCELLED', 409, '취소된 구매는 되돌릴 수 없습니다.');
+    // BE `PurchaseFulfillment.canTransitionTo` 와 같은 표다 — 둘이 갈리면 mock 에서만 도는 흐름이 생긴다.
+    if (!nextFulfillmentOptions(purchase.fulfillment).includes(status)) {
+      throw apiError('EVENT_PURCHASE_FULFILLMENT_INVALID', 409, '허용되지 않는 처리 상태 전이입니다.');
     }
     purchase.fulfillment = status;
     purchase.note = note?.trim() ? note.trim() : purchase.note;

@@ -2,7 +2,7 @@
 // 축제 세계를 배경으로 얇게 남겨 "게임 안의 화면"이라는 인상을 유지한다. 전역 Foundation 아님.
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import worldMockUrl from '../../../assets/festa/world/world-mock-background.png';
+import worldMockUrl from '../../../assets/festa/world/world-mock-background.webp';
 import './pageShell.css';
 
 interface Props {

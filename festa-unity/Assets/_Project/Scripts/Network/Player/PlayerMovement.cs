@@ -203,6 +203,31 @@ namespace Festa.Network
             animator.SetFloat(MoveYHash, Mathf.Lerp(animator.GetFloat(MoveYHash), target.y, lerp));
         }
 
+        /// <summary>
+        /// 상호작용이 이동 입력보다 늦은 Update 순서에서 시작돼도 그 프레임의 걷기 자세가
+        /// 남지 않도록 이동 상태를 즉시 정지한다. 입력 재개 시점은 호출자가 InputBridge
+        /// 잠금으로 관리하며, 여기서는 물리·애니메이션의 잔류값만 정리한다.
+        /// </summary>
+        public void StopImmediatelyForInteraction()
+        {
+            if (!IsOwner) return;
+
+            _jumpPending = false;
+            _turnVelocity = 0f;
+            _noStandPushUntil = 0f;
+
+            _visual ??= GetComponent<PlayerAvatarVisual>();
+            var animator = _visual != null ? _visual.CurrentAnimator : null;
+            if (animator != null)
+            {
+                animator.SetFloat(MoveXHash, 0f);
+                animator.SetFloat(MoveYHash, 0f);
+            }
+
+            if (_player != null && _player.AnimState.Value != PlayerAnimState.Idle)
+                _player.AnimState.Value = PlayerAnimState.Idle;
+        }
+
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<NetworkPlayer>();

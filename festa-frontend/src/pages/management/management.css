@@ -11,16 +11,56 @@
 /* 화면 공통 footer 안의 배치 — 상태 문구가 주요 액션 바로 옆에 선다 */
 .mg-foot { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
 
-/* 대표 이미지 확인 — 주소 문자열만으로는 맞게 넣었는지 알 수 없다 */
-.mg-thumb {
-  width: 148px;
-  height: 83px;
-  object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid var(--festa-line);
-  background: rgba(255, 255, 255, 0.04);
+/* 프로젝트 기본 정보 — 대표 이미지는 고정 폭, 이름·소개는 남은 폭을 쓴다. */
+.mg-project-identity {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: start;
+  gap: 22px;
 }
-.mg-thumb-note { color: #ff9d9d; }
+.mg-project-copy { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.mg-logo-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.mg-logo-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--festa-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+.mg-logo-preview,
+.mg-logo-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+}
+.mg-logo-preview { display: block; object-fit: cover; }
+.mg-logo-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: rgba(234, 238, 251, 0.62);
+  text-align: center;
+}
+.mg-logo-placeholder svg { width: 34px; height: 34px; }
+.mg-logo-placeholder strong { font-size: 12.5px; font-weight: 600; }
+.mg-logo-select { position: relative; justify-content: center; width: 100%; overflow: hidden; cursor: pointer; }
+.mg-logo-select input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.mg-logo-select:focus-within { outline: 2px solid rgba(90, 140, 255, 0.55); outline-offset: 2px; }
+.mg-logo-contract-note {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #ffd66b;
+}
+
+@media (max-width: 720px) {
+  .mg-project-identity { grid-template-columns: 1fr; }
+  .mg-logo-field { width: min(100%, 220px); }
+}
 
 /* 요약 줄 — 화면을 열자마자 읽는 현재 상태 */
 .mg-summary-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }

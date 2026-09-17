@@ -93,5 +93,48 @@ namespace Festa.Integration
                 expiresAt = "2999-12-31T00:00:00+09:00"
             };
         }
+
+        // ── 아바타 프리셋 (GitLab#237) ────────────────────────────────────────
+        //
+        // BE 엔드포인트가 아직 없어 UI 를 먼저 만들고 여기서 확인한다. **프로세스 메모리 한정**이고
+        // 에디터를 닫으면 사라진다 — 영속하는 척하지 않는다. 실서버가 붙으면 이 구현은 그대로 두고
+        // HttpUserApiClient 쪽만 쓰인다.
+        static readonly System.Collections.Generic.Dictionary<int, AvatarPresetDto> s_presets = new();
+
+        public async Task<AvatarPresetDto[]> GetAvatarPresetsAsync()
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            var list = new System.Collections.Generic.List<AvatarPresetDto>();
+            for (int slot = 1; slot <= 3; slot++)
+                if (s_presets.TryGetValue(slot, out var p)) list.Add(p);
+            Debug.Log($"[MockUserApi] 프리셋 조회(모의) — {list.Count}칸 사용 중");
+            return list.ToArray();
+        }
+
+        public async Task<bool> SaveAvatarPresetAsync(int slot, string encodedAppearance)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            if (slot < 1 || slot > 3 || string.IsNullOrEmpty(encodedAppearance))
+            {
+                Debug.LogWarning($"[MockUserApi] 프리셋 저장 거부 — slot={slot} 길이={encodedAppearance?.Length ?? -1}");
+                return false;
+            }
+            s_presets[slot] = new AvatarPresetDto
+            {
+                slot = slot,
+                avatarCode = encodedAppearance,
+                updatedAt = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            };
+            Debug.Log($"[MockUserApi] 프리셋 {slot}번 저장(모의): 길이 {encodedAppearance.Length}");
+            return true;
+        }
+
+        public async Task<bool> DeleteAvatarPresetAsync(int slot)
+        {
+            await Awaitable.WaitForSecondsAsync(0.05f);
+            bool removed = s_presets.Remove(slot);
+            Debug.Log($"[MockUserApi] 프리셋 {slot}번 비우기(모의): {(removed ? "있었음" : "이미 비어 있었음")}");
+            return true;
+        }
     }
 }

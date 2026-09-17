@@ -70,4 +70,44 @@ describe('브랜드 포인터', () => {
     expect(canvas).toContain('image-set(');
     expect(canvas.match(/!important/g)).toHaveLength(2);
   });
+
+  // 비활성 버튼 위에서만 시스템 화살표로 돌아가던 자리(2026-09-17). 화면마다 적어 둔
+  // pointer·default·not-allowed 를 하나하나 쫓지 않고 전역 규칙으로 덮는다.
+  it('전역 규칙 하나가 모든 요소를 덮는다 — 비활성도 예외가 아니다', () => {
+    const all = blockFor(':where(*) {');
+    expect(all).toContain("cursor:url('/cursors/festa-pointer.png')72,auto!important");
+    expect(all).toContain('image-set(');
+    expect(css).not.toContain('button:not(:disabled)');
+  });
+
+  it('모양이 곧 사용법인 자리만 되돌린다 — 입력칸의 I빔과 끌기 손잡이', () => {
+    expect(css).toContain('cursor: text !important');
+    expect(css).toContain('cursor: col-resize !important');
+    expect(css).toContain('cursor: grabbing !important');
+  });
+
+  // 전역 규칙이 `!important` 라 Game Studio 의 커서가 통째로 덮였다(S15P21A604-854). 저작 도구에서는
+  // 이 커서가 "끌 수 있다·크기를 바꾼다·여기를 찍는다" 를 알려 주는 유일한 신호다. 예외를 하나라도
+  // 빠뜨리면 그 자리만 조용히 브랜드 포인터가 되므로 셀렉터 단위로 잠근다.
+  it.each([
+    ['.gss-object-palette button', 'grab'],
+    ['.gss-map-object', 'grab'],
+    ['.gss-map-canvas.is-pan-tool', 'grab'],
+    ['.gss-drag-handle', 'grab'],
+    ['.gss-floating-panel-titlebar', 'grab'],
+    ['.gss-flow-graph-viewport', 'grab'],
+    ['.gss-canvas-minimap', 'crosshair'],
+    ['.gss-map-canvas.is-placing', 'crosshair'],
+    ['.gss-panel-divider', 'col-resize'],
+    ['.gss-floating-panel-resize-handle', 'nwse-resize'],
+    ['.gss-drag-handle:active', 'grabbing'],
+    ['.gss-floating-panel-titlebar:active', 'grabbing'],
+    ['.gss-flow-graph-viewport.is-panning', 'grabbing'],
+  ])('%s 는 %s 를 지킨다', (selector) => {
+    expect(css, `전역 포인터에 덮인다: ${selector}`).toContain(selector);
+  });
+
+  it('Game Studio 커서 예외가 전역 규칙보다 뒤에 온다 — 앞에 두면 덮인다', () => {
+    expect(css.indexOf('.gss-flow-graph-viewport')).toBeGreaterThan(css.indexOf(':where(*) {'));
+  });
 });

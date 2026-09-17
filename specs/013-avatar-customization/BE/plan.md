@@ -108,6 +108,13 @@ GET /api/v1/users/me
 
 없음. 신규 층·신규 오류 어휘·신규 스키마 0. 기존 패턴(`NicknamePolicy`·T058 봉투·`MemberPrincipal`)의 반복이라 복잡도 추가 요인이 없다.
 
+## 2026-09-17 프리셋 확장 (S15P21A604-858)
+
+회원별 프리셋 3슬롯은 현재 외형 필드와 분리한다. `avatar_presets`에 `(user_id, slot)` 복합 키와
+`avatar_code TEXT`를 두고, `GET/PUT/DELETE /users/me/avatar/presets`로만 접근한다. 현재 외형 저장의
+`AvatarCodePolicy`와 품목 소유권 검사를 재사용하며, 빈 슬롯 삭제는 멱등 `204`다. 사용자 삭제에는 FK
+`ON DELETE CASCADE`를 사용한다.
+
 ## Phase 2 준비 상태
 
 - [x] Phase 0 research.md — NEEDS CLARIFICATION 0건

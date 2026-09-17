@@ -21,6 +21,14 @@ cd backend && ./mvnw test
 
 **기대**: 전부 green. 기존 테스트(#58 봉투·닉네임·탈퇴)가 하나도 깨지지 않아야 한다 — `MyAccountResponse` 필드 추가는 가산적 변경이다.
 
+프리셋 API 회귀:
+
+```bash
+cd backend && ./mvnw test -Dtest=AvatarPresetApiIntegrationTest
+```
+
+**기대**: 빈 목록·슬롯 1~3 저장/덮어쓰기/삭제·오름차순·게스트 거부·3,800자 정책·회원 간 격리를 확인한다.
+
 ## 2. 수동 확인 (선택)
 
 ```bash

@@ -1,0 +1,51 @@
+/* 일일 미션 목록 — 한 줄에 문구·진행도·버튼 셋 (GitLab #234).
+   카드 그리드를 쓰지 않는다: 아홉 줄짜리 목록에 그리드는 세로를 낭비하고 스크롤을 부른다.
+   색·버튼·알약은 overlayFrame.css 의 것을 그대로 쓴다 — 여기 있는 것은 배치뿐이다. */
+.dm-total {
+  margin: 0 0 12px;
+  color: var(--ov-text);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ov-border);
+  border-radius: var(--ov-radius-control);
+  background: var(--ov-surface-sunken);
+}
+
+.dm-row[data-status='CLAIMED'] {
+  opacity: 0.6;
+}
+
+.dm-label {
+  flex-grow: 1;
+  min-width: 0;
+  color: var(--ov-text);
+  font-size: 13.5px;
+}
+
+.dm-progress {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dm-action {
+  flex-shrink: 0;
+  min-width: 68px;
+  justify-content: center;
+}

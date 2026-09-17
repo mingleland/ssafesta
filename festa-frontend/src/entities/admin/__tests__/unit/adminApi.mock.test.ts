@@ -84,11 +84,14 @@ describe('부스·상점·설문', () => {
     expect(await code(adminApi.unpublishBooth(11, '신고'))).toBe('MASTER_PROTECTED:403');
   });
 
-  it('구매 처리 상태는 필터·전이가 되고 취소는 되돌릴 수 없다', async () => {
+  // 전이 표는 BE `PurchaseFulfillment.canTransitionTo` 와 같다 — 지급 완료·취소는 둘 다 종단이다.
+  it('구매 처리 상태는 필터·전이가 되고, 종단 상태는 되돌릴 수 없다', async () => {
     expect((await adminApi.listPurchases('PENDING', 0, 10)).totalElements).toBe(1);
     const done = await adminApi.updateFulfillment(1, 'FULFILLED', '현장 수령');
     expect(done).toMatchObject({ fulfillment: 'FULFILLED', note: '현장 수령' });
-    expect(await code(adminApi.updateFulfillment(4, 'FULFILLED'))).toBe('PURCHASE_ALREADY_CANCELLED:409');
+    // 취소된 것을 되살리는 것도, 지급 완료된 것을 취소하는 것도 같은 코드로 막힌다
+    expect(await code(adminApi.updateFulfillment(4, 'FULFILLED'))).toBe('EVENT_PURCHASE_FULFILLMENT_INVALID:409');
+    expect(await code(adminApi.updateFulfillment(1, 'CANCELLED'))).toBe('EVENT_PURCHASE_FULFILLMENT_INVALID:409');
   });
 
   it('설문 요약·집계·개별 응답이 서로 맞는다', async () => {

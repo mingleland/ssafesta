@@ -160,8 +160,8 @@
 
 ### 사용자 스토리 4 구현
 
-- [ ] T065 [P] [US4] 보안 헤더, 요청 제한, 서버 토큰 숨김, 관리 경로 차단과 접근 로그 민감정보 제거를 `infra/environments/nginx/snippets/security.conf`에 추가한다
-- [ ] T066 [P] [US4] Full (strict) 원본 서버 인증서·키 참조, 최신 TLS 설정과 인증서 누락 시 조기 실패 동작을 `infra/environments/nginx/snippets/tls.conf`에 추가한다
+- [x] T065 [P] [US4] 보안 헤더, 요청 제한, 서버 토큰 숨김, 관리 경로 차단과 접근 로그 민감정보 제거를 `infra/environments/nginx/snippets/security.conf`에 추가한다
+- [x] T066 [P] [US4] Full (strict) 원본 서버 인증서·키 참조, 최신 TLS 설정과 인증서 누락 시 조기 실패 동작을 `infra/environments/nginx/snippets/tls.conf`에 추가한다
 - [ ] T067 [P] [US4] 80/443 허용과 내부 포트 차단 전에 현재 SSH 접속 출처를 보존하는 멱등 UFW 정책 스크립트를 `infra/environments/scripts/apply-ufw.sh`에 구현한다
 - [ ] T068 [US4] 데이터 서비스를 노출하지 않으면서 환경별 내부 네트워크와 명시적인 ingress 전용 연결을 `infra/environments/compose/security.override.yaml`에 추가한다
 - [ ] T069 [P] [US4] 필수 Secret Reference 목록, 교체 담당자 필드와 금지된 리터럴 패턴을 `infra/environments/config/secrets.required`에 정의한다
