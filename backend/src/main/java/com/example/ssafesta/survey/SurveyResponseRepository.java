@@ -16,6 +16,9 @@ import org.springframework.data.repository.query.Param;
  */
 public interface SurveyResponseRepository extends JpaRepository<SurveyResponse, Long> {
 
+    long countByRespondentUserIdAndSubmittedAtGreaterThanEqualAndSubmittedAtLessThan(
+            Long respondentUserId, Instant from, Instant to);
+
     /**
      * The only identifying response projection: it belongs to the administrator-only event entrant
      * list, never to a booth survey's anonymous results (S15P21A604-742 #59).

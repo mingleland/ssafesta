@@ -77,4 +77,23 @@ namespace Festa.Integration
         public static PurchaseResult Fail(string code, string reason) => new() { ok = false, code = code, reason = reason };
     }
 
+    /// <summary>
+    /// 저장된 아바타 프리셋 한 칸 (QA 요청 — 세 칸 저장, GitLab#237).
+    ///
+    /// <para>외형은 이미 인코딩된 문자열 하나로 저장되므로(헌법 23조) 프리셋도 그 문자열을
+    /// 칸 번호와 함께 들고 있는 것뿐이다. 새 인코딩을 만들지 않는다.</para>
+    /// </summary>
+    [System.Serializable]
+    public class AvatarPresetDto
+    {
+        /// <summary>1·2·3 고정. 칸 수를 설정값으로 두지 않는다 — 화면이 세 칸에 맞춰 그려진다.</summary>
+        public int slot;
+
+        /// <summary>인코딩된 외형 문자열. 빈 칸은 애초에 목록에 오지 않는다.</summary>
+        public string avatarCode;
+
+        /// <summary>서버 기록 시각(ISO8601). 칸을 구분하는 표시용이라 파싱 실패해도 무해하다.</summary>
+        public string updatedAt;
+    }
+
 }

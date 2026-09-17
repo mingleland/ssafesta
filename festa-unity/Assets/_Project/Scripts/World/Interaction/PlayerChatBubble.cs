@@ -9,8 +9,8 @@ namespace Festa.World
     /// <summary>
     /// 플레이어 머리 위에 채팅 한 줄을 띄우는 말풍선.
     ///
-    /// <para><b>이름표 위에 앉는다.</b> <see cref="WorldNameplate"/> 는 정수리에 붙고, 말풍선은 그보다 더
-    /// 위에 둔다. 같은 높이에 두면 이름과 말이 겹쳐 둘 다 못 읽는다.</para>
+    /// <para><b>말풍선이 이름표를 대신한다.</b> 헤더에 닉네임을 넣고 표시 중에는 기존 이름표를 숨긴다.
+    /// 그래서 둘을 세로로 쌓지 않아도 되고 말풍선을 캐릭터 가까이에 낮게 둘 수 있다.</para>
     ///
     /// <para><b>사라지는 시간은 길이에 비례한다.</b> 긴 문장을 짧은 시간에 지우면 다 읽기 전에 사라지고,
     /// 짧은 말을 오래 남기면 화면이 말풍선으로 덮인다. 최소 3초, 최대 7초 사이에서 글자 수로 정한다.</para>
@@ -27,8 +27,8 @@ namespace Festa.World
         /// <summary>이 거리(월드 유닛) 밖에서는 그리지 않는다. 이름표(260)보다 짧다 — 말은 가까이서만 읽는다.</summary>
         const float VisibleDistance = 220f;
 
-        /// <summary>정수리에서 말풍선까지 띄울 거리(월드 유닛). 이름표가 그 사이에 들어간다.</summary>
-        const float HeadroomAboveNameplate = 7.5f;
+        /// <summary>정수리에서 말풍선 하단까지의 간격. 기존 7.5u에서 낮췄다 — 이름표는 표시 중 숨긴다.</summary>
+        const float Headroom = 1.4f;
 
         /// <summary>캡슐을 못 찾았을 때 쓸 키(월드 유닛). 이 씬의 아바타 목표 높이가 22.375 다.</summary>
         const float FallbackHeight = 22.4f;
@@ -44,6 +44,7 @@ namespace Festa.World
         TextMeshPro _text;
         RectTransform _root;
         MeshRenderer _renderer;
+        PlayerNameplate _nameplate;
         float _hideAt;
         float _height = FallbackHeight;
 
@@ -51,24 +52,36 @@ namespace Festa.World
         /// 말풍선을 띄운다. 대상에 컴포넌트가 없으면 붙여서 쓴다 — 프리팹을 고치지 않아도
         /// 원격 아바타를 포함한 모든 플레이어에 적용된다.
         /// </summary>
-        public static void Show(GameObject target, string message)
+        public static void Show(GameObject target, string nickname, string message)
         {
             if (target == null || string.IsNullOrWhiteSpace(message)) return;
             var bubble = target.GetComponent<PlayerChatBubble>();
             if (bubble == null) bubble = target.AddComponent<PlayerChatBubble>();
-            bubble.Say(message);
+            bubble.Say(nickname, message);
         }
 
-        void Say(string message)
+        void Say(string nickname, string message)
         {
             if (_text == null) Build();
             if (_text == null) return;
 
             var trimmed = message.Trim();
-            _text.text = trimmed;
+            var shownName = string.IsNullOrWhiteSpace(nickname) ? _nameplate?.DisplayLabel : nickname.Trim();
+            if (string.IsNullOrWhiteSpace(shownName)) shownName = "Player";
+            // 채팅 문자열을 TMP 태그로 해석하지 않는다. 사용자가 크기·색·스프라이트 태그를 넣어
+            // 다른 사람 화면을 덮는 것을 막고, 이 컴포넌트가 만든 스타일 태그만 허용한다.
+            shownName = EscapeRichText(shownName);
+            trimmed = EscapeRichText(trimmed);
+            _text.text = "<mark=#111621E6 padding=\"1.2,1.2,0.7,0.7\">"
+                       + "<color=#B8D94B><b>" + shownName + "</b></color>\n"
+                       + "<color=#F7F7F4>" + trimmed + "</color></mark>";
             _hideAt = Time.time + Mathf.Clamp(MinSeconds + trimmed.Length * SecondsPerCharacter, MinSeconds, MaxSeconds);
             if (_renderer != null) _renderer.enabled = true;
+            if (_nameplate != null) _nameplate.SetChatBubbleVisible(true);
         }
+
+        static string EscapeRichText(string value)
+            => value.Replace("<", "＜").Replace(">", "＞");
 
         void Build()
         {
@@ -91,8 +104,9 @@ namespace Festa.World
             _text.textWrappingMode = TextWrappingModes.Normal;   // 긴 문장이 화면을 가로지르지 않게 접는다
             _text.overflowMode = TextOverflowModes.Overflow;
             _text.color = new Color(1f, 1f, 1f, 1f);
-            _text.fontSize = 10f;                                 // TMP 포인트 기준 10 = 월드 1 유닛
-            _root.sizeDelta = new Vector2(26f, 4f);
+            _text.fontSize = 9f;                                  // 닉네임 헤더 + 본문 2줄을 한 패널에 담는다
+            _text.richText = true;
+            _root.sizeDelta = new Vector2(28f, 6.5f);
             _root.pivot = new Vector2(0.5f, 0f);
 
             var material = _text.fontMaterial;                    // 공유본을 건드리면 UI 글자까지 물든다
@@ -106,6 +120,7 @@ namespace Festa.World
             _renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             _renderer.receiveShadows = false;
             _renderer.enabled = false;
+            _nameplate = GetComponent<PlayerNameplate>();
 
             var controller = GetComponent<CharacterController>();
             if (controller != null) _height = controller.height;
@@ -123,13 +138,14 @@ namespace Festa.World
             if (Time.time >= _hideAt)
             {
                 _renderer.enabled = false;
+                if (_nameplate != null) _nameplate.SetChatBubbleVisible(false);
                 return;
             }
 
             var cam = Camera.main;
             if (cam == null) { _renderer.enabled = false; return; }
 
-            var anchor = transform.position + Vector3.up * (_height + HeadroomAboveNameplate);
+            var anchor = transform.position + Vector3.up * (_height + Headroom);
             var toCamera = cam.transform.position - anchor;
 
             // 카메라 뒤로 지나간 대상까지 그리면 화면이 말풍선으로 덮인다.
@@ -165,6 +181,7 @@ namespace Festa.World
 
         void OnDestroy()
         {
+            if (_nameplate != null) _nameplate.SetChatBubbleVisible(false);
             if (_text != null && _text.gameObject != null) Destroy(_text.gameObject);
         }
     }

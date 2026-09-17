@@ -17,6 +17,11 @@ namespace Festa.Integration
         public static IWalletClient Wallet { get; private set; }
         /// <summary>slot machine 판정 (S15P21A604-439). BE 계약 전이라 두 모드 모두 Mock — 결과 DTO 의 simulated 가 그 사실을 실어 나른다.</summary>
         public static ISlotMachineClient Slot { get; private set; }
+        /// <summary>
+        /// 하이 스트라이커 한 판 기록 (GitLab #233). 일일 미션 STRIKER_PLAY_3·STRIKER_SCORE 의 유일한 근거다 —
+        /// 이 게임은 Netcode 로만 굴러 Spring 에 흔적이 없었다. BE 경로가 붙기 전에는 조용히 무해하게 멈춘다.
+        /// </summary>
+        public static IHighStrikerClient HighStriker { get; private set; }
         public static IAccessTokenProvider TokenProvider { get; private set; }
 
         public static bool IsMock { get; private set; }
@@ -59,6 +64,7 @@ namespace Festa.Integration
                 Game = new MockGameResultClient();
                 Wallet = new MockWalletClient();
                 Slot = new MockSlotMachineClient();
+                HighStriker = new MockHighStrikerClient();
             }
             else
             {
@@ -76,6 +82,9 @@ namespace Festa.Integration
                 // 체험판 대역을 둘 이유가 없어졌다. 폴백을 남겨 두면 서버가 잠깐 죽거나 라우팅이 어긋난 순간에
                 // 가짜 판정이 나가 코인 원장과 화면이 갈라진다 — 실패는 그대로 사용자에게 보인다 (T-24).
                 Slot = new HttpSlotMachineClient(springBaseUrl, TokenProvider);
+                // 하이 스트라이커도 같은 이유로 **서버 단일 경로**다 — Mock 으로 넘기면 "기록됐다" 는 로그만 남고
+                // 미션 진행도는 그대로여서 실패를 감추는 쪽이 된다. 경로가 없으면 한 번 경고하고 멈춘다 (#233).
+                HighStriker = new HttpHighStrikerClient(springBaseUrl, TokenProvider);
             }
 
             Debug.Log($"[ApiServices] Init — mock={useMock} spring={springBaseUrl}");
