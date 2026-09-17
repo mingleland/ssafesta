@@ -98,19 +98,21 @@
 
 ---
 
-## Phase 5: User Story 2 - 승인된 release를 demo 통합 환경에 배포한다 (Priority: P0)
+## Phase 5: User Story 2 - demo에서 검증된 release를 production(main) 환경에 수동 승격한다 (Priority: P0)
 
-**Goal**: develop 자동배포와 demo 통합배포를 분리하고, dev 검증된 release만 수동 승인으로 demo에 올린다.
+**Goal**: develop push 자동배포로 갱신된 demo.ssafesta.world 에서 팀 검증을 통과한 known-good 릴리스만 수동 승인(Production Promotion)으로 main 및 ssafesta.world 에 배포한다.
+**Architecture Invariant**: develop → main 승격 MR 은 절대 Squash 하지 않고 ancestry 를 보존한다 (`squash=false` 강제).
+**Artifact Invariant**: main 승격 시 아티팩트를 재빌드하지 않고 demo 에서 검증된 동일 아티팩트를 프로덕션에 승격한다 (`Demo Artifact == Production Artifact`).
 
-**Independent Test**: 비승인 release는 거절되고, 승인 manifest는 demo deploy 후 web→login→world→AI 검증을 모두 통과할 때만 성공이다.
+**Independent Test**: 미검증 current 및 비승인 release는 승격이 거절되고, human 검증된 known-good manifest 만 main 반영 및 프로덕션 배포 후 web→login→world→AI 검증을 모두 통과할 때만 성공이다.
 
-- [X] T026 [P] [US2] `infra/jenkins/tests/demo-promotion.sh`에 비승인·미검증 manifest 거절과 승인 dev manifest 수용 fixture를 작성한다
-- [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 승인된 active dev batch 또는 dev-verified release manifest만 입력으로 받는 수동 pipeline을 구현한다
-- [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용하도록 연결한다
-- [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
-- [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
+ - [X] T026 [P] [US2] `infra/jenkins/tests/demo-promotion.sh`에 비승인·미검증 manifest 거절과 승인 dev manifest 수용 fixture를 작성한다
+ - [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 demo 에서 검증된 known-good release manifest 만 입력으로 받는 수동 Production Promotion pipeline을 구현한다
+ - [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용해 프로덕션(`ssafesta.world`) 배포를 수행하도록 연결한다
+ - [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
+ - [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
 
-**Checkpoint**: develop push는 demo를 절대 변경하지 않으며 승인된 dev release만 demo에 배포된다.
+**Checkpoint**: develop push 는 demo.ssafesta.world 로 자동 배포되고, 사람 검증을 통과한 known-good 릴리스만 No-Squash MR 을 통해 main 및 ssafesta.world 에 배포된다.
 
 ---
 
