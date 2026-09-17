@@ -1,0 +1,12 @@
+name: festa-demo
+
+# Compose merges this project definition with exactly one component overlay.
+# game 은 여기 없다 — Dedicated Server 는 infra-003 의 festa-demo-world 프로젝트가 소유한다.
+services: {}
+
+networks:
+  ai-back:
+    name: festa-demo-ai-back-private
+  front-private:
+    name: festa-demo-front-private
+    internal: true

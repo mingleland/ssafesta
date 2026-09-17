@@ -27,7 +27,7 @@
 - [X] T047 `infra/jenkins/jobs/gitlab-unity-mr-validation.groovy`에 Game MR만 수신하고 source SHA·MR 식별자를 전달하는 Jenkins job을 정의한다
 - [X] T048 `.gitlab-ci.yml`에 `festa-unity/**`, Game CI adapter와 Unity project 설정 변경을 감지해 Jenkins Unity MR gate를 dispatch하고, Jenkins 결과가 GitLab pipeline의 필수 성공 상태가 되도록 연결한다
 - [X] T049 [P] `infra/jenkins/tests/test-foundation.sh`에 MR Unity job의 Unity agent label, no-deploy 명령 집합, GitLab status context와 Jenkins credential masking을 정적 검증한다
-- [ ] T050 `infra/evidence/gitlab-unity-mr-gate.md`에 정상 EditMode, 의도적 컴파일/EditMode 실패, agent 미가용 실패가 각각 GitLab merge를 차단하고 dev/demo 컨테이너 restart delta가 0인 실측을 기록한다
+- [ ] T050 `infra/evidence/gitlab-unity-mr-gate.md`에 정상 EditMode, 의도적 컴파일/EditMode 실패, agent 미가용 실패가 각각 GitLab merge를 차단하고 dev/demo 컨테이너 restart delta가 0인 실측을 기록한다 — 증거 파일과 수집 명령은 준비됐고, MR 3건 실행 결과만 남았다
 
 **Checkpoint**: Game MR의 Unity 컴파일 또는 EditMode가 실패·timeout·skip이면 merge되지 않으며, 성공·실패 어느 경우에도 dev/demo 런타임은 변경되지 않는다.
 
@@ -57,9 +57,9 @@
 
 ---
 
-## Phase 3: User Story 1 - 파트 변경을 독립적으로 검증하고 dev에 배포한다 (Priority: P0) 🎯 MVP
+## Phase 3: User Story 1 - 파트 변경을 독립적으로 검증하고 demo에 배포한다 (Priority: P0) 🎯 MVP
 
-**Goal**: Squash Merge된 `develop`의 변경 컴포넌트만 모두 검증한 뒤 하나의 dev batch로 안전하게 반영한다. WebGL은 Unity 담당자가 QA 완료 최종 zip을 GitLab Generic Package Registry에 업로드하면 별도 Jenkins job이 deploy-agent에서 EC2 nginx release로 승격한다.
+**Goal**: Squash Merge된 `develop`의 변경 컴포넌트만 모두 검증한 뒤 하나의 batch로 `demo.ssafesta.world`에 안전하게 반영한다. 별도 `dev` 환경은 운영하지 않는다 (spec §Session 2026-09-17). WebGL은 Unity 담당자가 QA 완료 최종 zip을 GitLab Generic Package Registry에 업로드하면 별도 Jenkins job이 deploy-agent에서 EC2 nginx release로 승격한다.
 
 **Independent Test**: back 단독 변경, shared CI 변경, back+front 동시 변경, 강제 verify 실패를 각각 실행해 selection·비배포·batch rollback을 확인한다. WebGL은 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패를 실행해 release 설치·원자적 current·rollback·retention을 확인한다.
 
@@ -68,6 +68,10 @@
 - [X] T015 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 candidate image 사전 검증, batch lock, affected current/known-good snapshot, ordered service-scoped deploy를 구현한다
 - [X] T016 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 모든 component verify 후 batch active 승격과 가역 실패 시 batch가 변경한 component만 snapshot 복원하는 처리를 구현한다
 - [X] T017 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 DB·secret/config·비가역·unknown 실패의 자동 rollback 금지 및 `MANUAL_ACTION_REQUIRED` evidence 출력을 구현한다
+- [X] T017A [US1] develop 머지 batch 의 배포 대상을 아무도 조회하지 않던 `festa-dev` 컨테이너에서 Nginx 가 실제로 프록시하는 `festa-demo`(18080/18081/18082)로 정합한다. `deploy-environment.sh`·`verify-environment.sh`가 `dev|demo`를 모두 받고, `deploy-dev-batch.sh`는 `FESTA_DEPLOY_ENVIRONMENT`(기본 `demo`)로 대상을 고른다
+- [X] T017B [US1] `infra/environments/compose/demo/{base,ai,back,front}.yaml`과 `infra/environments/config/manifests/demo.json`을 추가한다. DB·Redis 값은 compose 에 박지 않고 `COMPONENT_ENV_FILE` 하나에서만 읽으며, `PUBLIC_API_BASE_URL`·`PUBLIC_UNITY_BUILD_BASE`는 비면 기동을 거부한다. game 오버레이는 두지 않는다 (infra-003 소유)
+- [X] T017C [US1] `develop.groovy`가 `DEMO_*` credential 로 바인딩하고 `PUBLIC_API_BASE_URL`을 `ROOT_DOMAIN` 으로 보강하도록 연결한다. `DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID`를 controller·CASC 에 노출한다
+- [X] T017D [US1] `infra/environments/tests/contract/demo-components.sh`에 루프백 포트·fail-closed 공개 엔드포인트·env_file 단일 출처·demo game 오버레이 부재 계약을 검증하는 테스트를 추가한다
 - [X] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
 - [X] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
 - [X] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
@@ -81,7 +85,7 @@
 - [X] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 credential, 업로드, Jenkins job, MIME·Brotli·Cache-Control, rollback 확인 절차를 추가한다
 - [X] T022G [US1] Redis 세션 영속성을 위해 `infra/environments/redis/redis.conf`에 `appendonly yes`를, `infra/environments/compose/data/compose.yaml`에 `mem_limit: 256m`을 적용한다 (40명 피크 1.27MB 실측 기반)
 
-**Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
+**Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 `demo.ssafesta.world`에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
 
 ---
 
