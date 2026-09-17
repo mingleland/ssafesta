@@ -9,9 +9,8 @@ import coffeeUrl from '../../../assets/festa/eventShop/coffee.png';
 import mallangiUrl from '../../../assets/festa/eventShop/mallangi.png';
 import kyoboUrl from '../../../assets/festa/eventShop/kyobo.png';
 import chickenUrl from '../../../assets/festa/eventShop/chicken.png';
-import type { EventPrize } from '../../../entities/eventShop/types';
 
-// 서버 응답엔 이미지가 없다(EventPrize에 imageUrl 필드 자체가 없음) — 상품명으로 매핑한다.
+// 서버 응답엔 이미지가 없다(EventPrize·RafflePrize 둘 다 imageUrl 필드가 없음) — 상품명으로 매핑한다.
 // 매핑에 없는 이름은 undefined를 돌려주고, 화면은 기본 아이콘으로 대신한다.
 const PRIZE_IMAGES: Record<string, string> = {
   마이구미: mygummyUrl,
@@ -19,8 +18,18 @@ const PRIZE_IMAGES: Record<string, string> = {
   커피: coffeeUrl,
 };
 
+const RAFFLE_IMAGES: Record<string, string> = {
+  말랑이: mallangiUrl,
+  '교보 기프트카드': kyoboUrl,
+  치킨: chickenUrl,
+};
+
 export function imageForPrize(name: string): string | undefined {
   return PRIZE_IMAGES[name];
+}
+
+export function imageForRaffle(name: string): string | undefined {
+  return RAFFLE_IMAGES[name];
 }
 
 export function stockLabel(stock: number | null): string {
@@ -29,20 +38,7 @@ export function stockLabel(stock: number | null): string {
   return `재고 ${stock}개`;
 }
 
-export function isSoldOut(prize: EventPrize): boolean {
-  return prize.stock !== null && prize.stock <= 0;
+// EventPrize·RafflePrize 둘 다 만족하는 구조적 타입 — 도메인 타입을 여기서 import하지 않는다
+export function isSoldOut(item: { stock: number | null }): boolean {
+  return item.stock !== null && item.stock <= 0;
 }
-
-// 응모권 — mock 전용 표시 데이터. 구매 API가 없으므로 버튼은 항상 비활성이다.
-export interface RaffleDisplayItem {
-  id: string;
-  name: string;
-  priceCoin: number;
-  imageUrl: string;
-}
-
-export const RAFFLE_DISPLAY_ITEMS: RaffleDisplayItem[] = [
-  { id: 'raffle-mallangi', name: '말랑이', priceCoin: 250, imageUrl: mallangiUrl },
-  { id: 'raffle-kyobo', name: '교보 기프트카드', priceCoin: 250, imageUrl: kyoboUrl },
-  { id: 'raffle-chicken', name: '치킨', priceCoin: 250, imageUrl: chickenUrl },
-];

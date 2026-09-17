@@ -1,8 +1,8 @@
 // 이벤트 상점 Overlay (S15P21A604-599, 실 연동 S15P21A604-842/836).
 //
 // 즉시교환은 entities/eventShop(GET prizes·POST purchases)에 실제로 연결돼 있다. 응모권은
-// 대응 BE가 없다(-836 스펙에 추첨 개념 자체가 없음) — 정적 안내 카드만 두고 버튼을 비활성으로
-// 둔다. 없는 API를 mock으로 있는 척 흉내내면 코인이 빠졌는데 아무 일도 안 일어나는 화면이 된다.
+// entities/raffle을 쓰지만 그 너머는 아직 mock이다(-836 스펙에 추첨 개념 자체가 없음) —
+// api.select.ts만 real로 바꾸면 이 파일은 손대지 않고 그대로 실 연동이 된다.
 //
 // 화폐는 wallet Coin이다. 보유량은 기존 `WalletBadge`를 그대로 쓴다 — member 전용 가드까지 그 안에 있다.
 //
@@ -12,6 +12,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isApiError } from '../../../shared/api/client';
 import { eventShopApi } from '../../../entities/eventShop/api.select';
 import type { EventPrize } from '../../../entities/eventShop/types';
+import { raffleApi } from '../../../entities/raffle/api.select';
+import type { RafflePrize } from '../../../entities/raffle/types';
 import { closeOverlay } from '../../../shared/types/overlay';
 import { openVisitorOverlay } from '../../world/model/worldScreen';
 import { OverlayCardGrid } from '../../overlay/ui/OverlayCardGrid';
@@ -19,7 +21,7 @@ import type { OverlayCard } from '../../overlay/ui/OverlayCardGrid';
 import { OverlayFrame, OverlayError, OverlayLoading } from '../../overlay/ui/OverlayFrame';
 import { OverlayNotice } from '../../overlay/ui/OverlayNotice';
 import { WalletBadge } from '../../wallet/ui/WalletBadge';
-import { RAFFLE_DISPLAY_ITEMS, imageForPrize, isSoldOut, stockLabel } from '../model/rewardShop';
+import { imageForPrize, imageForRaffle, isSoldOut, stockLabel } from '../model/rewardShop';
 import { resolveEventSurveyTarget } from '../model/surveyEntry';
 import { showToast } from '../../../shared/ui/toast/toastStore';
 
@@ -42,6 +44,8 @@ const PURCHASE_ERROR_LABELS: Record<string, string> = {
   EVENT_PRIZE_INACTIVE: '판매가 중단된 경품입니다.',
   INSUFFICIENT_COIN: '코인이 부족합니다.',
   EVENT_PRIZE_NOT_FOUND: '경품을 찾을 수 없습니다.',
+  RAFFLE_OUT_OF_STOCK: '방금 응모권이 모두 소진됐습니다.',
+  RAFFLE_NOT_FOUND: '응모권을 찾을 수 없습니다.',
 };
 
 export function EventRewardShopOverlay() {
@@ -65,7 +69,24 @@ export function EventRewardShopOverlay() {
     },
   });
 
+  const enter = useMutation({
+    mutationFn: (raffle: RafflePrize) => raffleApi.enterRaffle(raffle.raffleId, crypto.randomUUID()),
+    onSuccess: (result) => {
+      showToast(`${result.raffleName} 응모 완료 — ${result.coinSpent.toLocaleString()}C 사용`, 'success');
+      void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+    },
+    onError: (error) => {
+      const message = isApiError(error) ? PURCHASE_ERROR_LABELS[error.code] ?? error.message : '응모에 실패했습니다.';
+      showToast(message, 'error');
+      void queryClient.invalidateQueries({ queryKey: ['event-shop-raffles'] });
+      void queryClient.invalidateQueries({ queryKey: ['wallet-balance'] });
+    },
+  });
+  const rafflesQuery = useQuery({ queryKey: ['event-shop-raffles'], queryFn: raffleApi.listRaffles });
+
   const [pendingPrizeId, setPendingPrizeId] = useState<number | null>(null);
+  const [pendingRaffleId, setPendingRaffleId] = useState<number | null>(null);
 
   function toInstantCard(prize: EventPrize): OverlayCard {
     const soldOut = isSoldOut(prize);
@@ -100,23 +121,38 @@ export function EventRewardShopOverlay() {
 
   const instantCards = prizesQuery.isSuccess ? prizesQuery.data.map(toInstantCard) : [];
 
-  const raffleCards: OverlayCard[] = RAFFLE_DISPLAY_ITEMS.map((item) => ({
-    id: item.id,
-    media: <img src={item.imageUrl} alt="" />,
-    title: item.name,
-    chips: (
-      <>
-        <span className="ov-chip ov-chip-coin">{item.priceCoin.toLocaleString()} C / 1장</span>
-        <span className="ov-chip">응모 준비 중</span>
-      </>
-    ),
-    action: (
-      <button type="button" className="ov-btn ov-btn-raffle" disabled title="응모권 기능은 백엔드 연동 후 열립니다">
-        응모
-      </button>
-    ),
-    disabled: true,
-  }));
+  function toRaffleCard(raffle: RafflePrize): OverlayCard {
+    const soldOut = isSoldOut(raffle);
+    const imageUrl = imageForRaffle(raffle.name);
+    const isPending = enter.isPending && pendingRaffleId === raffle.raffleId;
+    return {
+      id: `raffle-${raffle.raffleId}`,
+      media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
+      title: raffle.name,
+      chips: (
+        <>
+          <span className="ov-chip ov-chip-coin">{raffle.priceCoin.toLocaleString()} C / 1장</span>
+          <span className="ov-chip">{stockLabel(raffle.stock)}</span>
+        </>
+      ),
+      action: (
+        <button
+          type="button"
+          className="ov-btn ov-btn-raffle"
+          disabled={soldOut || enter.isPending}
+          onClick={() => {
+            setPendingRaffleId(raffle.raffleId);
+            enter.mutate(raffle);
+          }}
+        >
+          {isPending ? '응모 중...' : '응모'}
+        </button>
+      ),
+      disabled: soldOut,
+    };
+  }
+
+  const raffleCards = rafflesQuery.isSuccess ? rafflesQuery.data.map(toRaffleCard) : [];
 
   return (
     <OverlayFrame
@@ -158,9 +194,11 @@ export function EventRewardShopOverlay() {
       <div className="ov-section">
         <div className="ov-section-head">
           <span className="ov-section-title">응모권</span>
-          <span className="ov-section-desc">코인으로 응모권을 사서 추첨에 참여 — 준비 중</span>
+          <span className="ov-section-desc">코인으로 응모권을 사서 추첨에 참여</span>
         </div>
-        <OverlayCardGrid cards={raffleCards} label="응모권 목록" />
+        {rafflesQuery.isPending && <OverlayLoading label="응모권 목록을 불러오는 중..." />}
+        {rafflesQuery.isError && <OverlayError title="응모권 목록을 불러오지 못했습니다" onRetry={() => void rafflesQuery.refetch()} />}
+        {rafflesQuery.isSuccess && <OverlayCardGrid cards={raffleCards} label="응모권 목록" />}
       </div>
     </OverlayFrame>
   );
