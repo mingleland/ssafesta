@@ -39,10 +39,33 @@ namespace Festa.Content
             ApplyBoothImageAsync(runtimeObject.BoothId);
         }
 
+        /// <summary>
+        /// 화면을 채우는 순서 — <b>영상 → 로고 → 썸네일 → 검은 화면</b>.
+        ///
+        /// <para>영상은 <see cref="BoothScreenBillboard"/> 가 그 위에 띄운다. 정지 이미지는 영상이 있어도
+        /// 함께 깐다 — 전광판이 가려지거나 멀어져 숨을 때 검은 상자로 돌아가지 않게 하는 바닥판이다.</para>
+        /// </summary>
         async void ApplyBoothImageAsync(int boothId)
         {
+            BoothProjectDto first = null;
+            try
+            {
+                Festa.Integration.ApiServices.EnsureInitialized();
+                var projects = await Festa.Integration.ApiServices.Booth.GetPublishedProjectsAsync(boothId);
+                if (projects?.projects != null && projects.projects.Length > 0) first = projects.projects[0];
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[VideoScreen] booth={boothId} 전시 조회 실패: {e.Message}");
+            }
+            if (this == null) return;
+
+            // 등록된 영상 주소를 전광판에 넘긴다. 없으면 전광판은 스스로 꺼지고 아래 이미지만 남는다.
+            var billboard = GetComponent<BoothScreenBillboard>();
+            if (billboard != null) billboard.SetVideoUrl(first?.videoUrl);
+
             Texture texture = null;
-            try { texture = await ResolveImageAsync(boothId); }
+            try { texture = await ResolveImageAsync(boothId, first); }
             catch (System.Exception e)
             {
                 // 조용히 검은 화면으로 두지 않는다 — 로고를 등록했는데 안 뜨면 원인을 찾을 수 없다 (T-24).
@@ -53,10 +76,8 @@ namespace Festa.Content
         }
 
         /// <summary>부스 로고 → 프로젝트 썸네일 순. 둘 다 없으면 null.</summary>
-        static async Task<Texture> ResolveImageAsync(int boothId)
+        static async Task<Texture> ResolveImageAsync(int boothId, BoothProjectDto project)
         {
-            Festa.Integration.ApiServices.EnsureInitialized();
-
             var slots = await BoothSlotDirectory.GetAsync();
             if (slots != null)
                 foreach (var slot in slots)
@@ -67,9 +88,7 @@ namespace Festa.Content
                         break;
                     }
 
-            var projects = await Festa.Integration.ApiServices.Booth.GetPublishedProjectsAsync(boothId);
-            if (projects?.projects == null || projects.projects.Length == 0) return null;
-            return await LoadAsync(projects.projects[0]?.thumbnailUrl, boothId, "프로젝트 썸네일");
+            return await LoadAsync(project?.thumbnailUrl, boothId, "프로젝트 썸네일");
         }
 
         static async Task<Texture> LoadAsync(string url, int boothId, string label)

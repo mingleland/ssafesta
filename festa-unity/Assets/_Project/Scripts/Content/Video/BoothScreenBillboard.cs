@@ -32,8 +32,69 @@ namespace Festa.Content
         /// </summary>
         public static int OnlyBoothId = 0;
 
-        /// <summary>시험용 영상 (사용자 지정 2026-09-18).</summary>
-        public static string VideoId = "JAdgqzsLzEI";
+        /// <summary>
+        /// 이 스크린이 틀 영상. <b>임차인이 프로젝트에 등록한 <c>videoUrl</c></b> 에서 온다
+        /// (<see cref="VideoScreenPlaceholder"/> 가 전시 조회를 한 번만 하고 넘겨준다).
+        /// 비어 있으면 전광판은 뜨지 않고 아래 정지 이미지만 남는다.
+        /// </summary>
+        string _videoId;
+
+        /// <summary>등록된 영상 주소를 받는다. 유튜브가 아니거나 비었으면 스스로 꺼진다.</summary>
+        public void SetVideoUrl(string url)
+        {
+            _videoId = ParseYouTubeId(url);
+            if (string.IsNullOrEmpty(_videoId))
+            {
+                if (!string.IsNullOrWhiteSpace(url))
+                    Debug.Log($"[BoothScreen] 유튜브 주소가 아니라 전광판을 켜지 않는다 — '{url}'. 정지 이미지로 둔다.");
+                enabled = false;
+                Release();
+                return;
+            }
+            Debug.Log($"[BoothScreen] 전광판 영상 연결 — videoId={_videoId}");
+        }
+
+        /// <summary>
+        /// 유튜브 주소에서 영상 id 를 뽑는다. FE 의 <c>videoEmbed.ts</c> 와 같은 표기를 받는다 —
+        /// <c>watch?v=</c> · <c>youtu.be/</c> · <c>/embed/</c> · <c>/shorts/</c>.
+        /// 유튜브가 아니면 null 이다(임의 URL 을 iframe 에 넣지 않는다).
+        /// </summary>
+        public static string ParseYouTubeId(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            if (!System.Uri.TryCreate(url.Trim(), System.UriKind.Absolute, out var uri)) return null;
+            if (uri.Scheme != "https" && uri.Scheme != "http") return null;
+
+            var host = uri.Host.ToLowerInvariant();
+            if (host.StartsWith("www.")) host = host.Substring(4);
+            if (host.StartsWith("m.")) host = host.Substring(2);
+
+            string id = null;
+            if (host == "youtu.be")
+            {
+                id = uri.AbsolutePath.Trim('/');
+            }
+            else if (host == "youtube.com" || host == "music.youtube.com" || host == "youtube-nocookie.com")
+            {
+                var path = uri.AbsolutePath;
+                if (path.StartsWith("/embed/")) id = path.Substring(7);
+                else if (path.StartsWith("/shorts/")) id = path.Substring(8);
+                else
+                {
+                    foreach (var part in uri.Query.TrimStart('?').Split('&'))
+                        if (part.StartsWith("v=")) { id = part.Substring(2); break; }
+                }
+            }
+            if (string.IsNullOrEmpty(id)) return null;
+
+            int slash = id.IndexOf('/');
+            if (slash >= 0) id = id.Substring(0, slash);
+            // 유튜브 영상 id 는 11자 [A-Za-z0-9_-] 다. 다른 것이 오면 iframe 에 넣지 않는다.
+            if (id.Length != 11) return null;
+            foreach (var c in id)
+                if (!char.IsLetterOrDigit(c) && c != '_' && c != '-') return null;
+            return id;
+        }
 
         /// <summary>이 거리 밖에서는 숨긴다(월드 유닛). 부스 안에서만 보이면 된다.</summary>
         const float VisibleDistance = 260f;
@@ -53,7 +114,6 @@ namespace Festa.Content
             var runtime = GetComponent<BoothRuntimeObject>();
             if (OnlyBoothId != 0 && runtime.BoothId != OnlyBoothId) { enabled = false; return; }
             if (!TryMeasureCorners()) { enabled = false; return; }
-            Debug.Log($"[BoothScreen] 전광판 시제품 부착 — booth={runtime.BoothId} video={VideoId}");
 
 #if !UNITY_WEBGL || UNITY_EDITOR
             if (!s_warnedEditor)
@@ -122,9 +182,10 @@ namespace Festa.Content
                 _occluded = IsBlocked(cam, center);
             }
             if (_occluded) { Release(); return; }
+            if (string.IsNullOrEmpty(_videoId)) { Release(); return; }
 
             s_active = this;
-            Show(VideoId, n[0].x, n[0].y, n[1].x, n[1].y, n[2].x, n[2].y, n[3].x, n[3].y);
+            Show(_videoId, n[0].x, n[0].y, n[1].x, n[1].y, n[2].x, n[2].y, n[3].x, n[3].y);
         }
 
         /// <summary>중심이 가려졌는가. 실루엣 단위가 아니라 점 하나라 아바타는 못 거른다 — 그게 이 방식의 한계다.</summary>
