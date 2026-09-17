@@ -13,6 +13,7 @@ import { describeHttpError, shouldResetConversation } from '../../../entities/co
 import { consumeSseStream } from '../../../entities/conversation/stream.consumer';
 import type { SseConsumptionStatus } from '../../../entities/conversation/stream.consumer';
 import { OverlayFrame } from '../../overlay/ui/OverlayFrame';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import { useSession } from '../../auth/model/session';
 import { saveReturnTo } from '../../auth/model/returnTo';
 import { aiHandoffContext } from '../../consultation/model/startContext';
@@ -215,15 +216,16 @@ export function AiChatOverlay({ payload }: Props) {
       footer={
         isMember ? (
           <>
-            <button
-              type="button"
-              className="ov-btn ai-escalate"
-              disabled={consultationInProgress}
-              title={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : undefined}
-              onClick={escalateToHuman}
-            >
-              사람 상담 요청
-            </button>
+            <Tooltip content={consultationInProgress ? '이미 진행 중인 상담이 있습니다' : null}>
+              <button
+                type="button"
+                className="ov-btn ai-escalate"
+                disabled={consultationInProgress}
+                onClick={escalateToHuman}
+              >
+                사람 상담 요청
+              </button>
+            </Tooltip>
             <form
               className="ai-composer"
               onSubmit={(e) => {

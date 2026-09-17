@@ -6,6 +6,7 @@
 //
 // 표기는 상태 유무를 점(●)으로만 나타낸다 — 실제 데이터에 없는 unread count·숫자를 만들지 않는다.
 import { useVisitorConsultation } from '../../consultation/model/visitor';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './consultationQuickAccess.css';
 import { openVisitorOverlay } from '../model/worldScreen';
 
@@ -45,19 +46,23 @@ export function ConsultationQuickAccess() {
 
   return (
     <div className="cqa">
-      <button
-        type="button"
-        className={'cqa-btn' + (active ? ' cqa-btn-on' : '')}
-        aria-label={label}
-        title={canReopen ? label : '부스의 AI 직원과 대화하다 사람 상담을 요청할 수 있습니다'}
-        disabled={!canReopen}
-        onClick={() => {
-          if (boothId !== null) openVisitorOverlay('CONSULTATION', { boothId });
-        }}
+      <Tooltip
+        content={canReopen ? label : '부스의 AI 직원과 대화하다 사람 상담을 요청할 수 있습니다'}
+        placement="bottom"
       >
-        {IcBubble}
-        {active && <span className="cqa-dot" aria-hidden="true" />}
-      </button>
+        <button
+          type="button"
+          className={'cqa-btn' + (active ? ' cqa-btn-on' : '')}
+          aria-label={label}
+          disabled={!canReopen}
+          onClick={() => {
+            if (boothId !== null) openVisitorOverlay('CONSULTATION', { boothId });
+          }}
+        >
+          {IcBubble}
+          {active && <span className="cqa-dot" aria-hidden="true" />}
+        </button>
+      </Tooltip>
       {active && <span className="cqa-label">{label}</span>}
     </div>
   );

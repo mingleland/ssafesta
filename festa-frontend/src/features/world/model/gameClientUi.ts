@@ -25,6 +25,8 @@ export const IS_DEV_INTERACTION_BAR =
 export interface GameClientUiState {
   gameMenu: boolean;
   managementOverlay: boolean;
+  /** 부스 임대 — 월드 위 오버레이다(2026-09-17). 옛 `/app/booths` 페이지를 대체한다 */
+  boothRental: boolean;
   /**
    * 관리 오버레이 **안에서** 열린 상세 패널. 별도 소유자가 아니라 자식이다 —
    * `worldScreen` 은 이때도 `'management'` 를 말하고, ESC 만 상세 → 관리 → 월드 순으로 한 겹씩
@@ -41,6 +43,7 @@ export interface GameClientUiState {
 const initialState: GameClientUiState = {
   gameMenu: false,
   managementOverlay: false,
+  boothRental: false,
   managementPanel: null,
   menuPanel: null,
 };
@@ -57,6 +60,7 @@ function setState(patch: Partial<GameClientUiState>): void {
   if (
     next.gameMenu === state.gameMenu &&
     next.managementOverlay === state.managementOverlay &&
+    next.boothRental === state.boothRental &&
     next.managementPanel === state.managementPanel &&
     next.menuPanel === state.menuPanel
   ) {
@@ -85,7 +89,7 @@ export function useGameClientUi(): GameClientUiState {
 }
 
 export function openGameMenu(): void {
-  setState({ gameMenu: true, managementOverlay: false, managementPanel: null, menuPanel: null });
+  setState({ gameMenu: true, managementOverlay: false, managementPanel: null, menuPanel: null, boothRental: false });
 }
 
 export function closeGameMenu(): void {
@@ -115,6 +119,15 @@ export function openManagementPanel(panel: ManagementPanel): void {
 
 export function closeManagementPanel(): void {
   setState({ managementPanel: null });
+}
+
+/** 부스 임대 진입 seam — 월드의 임대 NPC·상호작용이 부른다 */
+export function openBoothRental(): void {
+  setState({ boothRental: true, managementOverlay: false, managementPanel: null, menuPanel: null });
+}
+
+export function closeBoothRental(): void {
+  setState({ boothRental: false });
 }
 
 /**

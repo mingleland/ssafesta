@@ -8,7 +8,7 @@
 // 예외는 구조 모드의 잠긴 자산뿐이다. 그건 목업이 아니라 보유하면 열리는 항목이고, 왜 못
 // 누르는지 title 이 말한다 — 그 경계도 함께 박아 둔다.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { LayoutObject } from '../../../../entities/layout/types';
 import { AssetPalette } from '../../ui/shell/AssetPalette';
 import { PropertiesPanel } from '../../ui/PropertiesPanel';
@@ -85,11 +85,16 @@ describe('변형 툴바', () => {
 });
 
 describe('에셋 팔레트', () => {
-  it('구조 모드에서 못 누르는 것은 잠긴 자산뿐이다 — 이유를 화면이 말한다', () => {
+  it('구조 모드에서 못 누르는 것은 잠긴 자산뿐이다 — 이유를 화면이 말한다', async () => {
     renderPalette('layout');
-    // 잠금은 목업이 아니다. 보유하면 열리고, 그때까지 왜 못 누르는지 title 이 말한다
-    for (const el of document.querySelectorAll('button:disabled')) {
-      expect(el.getAttribute('title')).toContain('잠금');
+    // 잠금은 목업이 아니다. 보유하면 열리고, 그때까지 왜 못 누르는지 화면이 말한다.
+    // 그 말은 2026-09-17 부터 공통 Tooltip 이 한다 — 비활성 버튼은 앵커가 hover 를 받는다.
+    for (const button of document.querySelectorAll('button:disabled')) {
+      const anchor = button.closest('.festa-tooltip-anchor');
+      expect(anchor, '비활성 버튼에는 설명을 받을 앵커가 있어야 한다').not.toBeNull();
+      fireEvent.mouseEnter(anchor as Element);
+      expect((await screen.findByRole('tooltip')).textContent).toContain('잠금');
+      fireEvent.mouseLeave(anchor as Element);
     }
   });
 

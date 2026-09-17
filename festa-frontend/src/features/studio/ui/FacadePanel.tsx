@@ -11,6 +11,7 @@ import { FACADE_PALETTE, THEME_CODES, isPaletteColor } from '../../../entities/b
 import type { BoothFacade, FacadePutRequest } from '../../../entities/booth/types';
 import { notifyCurrentBoothSlotChanged } from '../../../unity/host/boothLayoutBridge';
 import { IcSave } from './shell/icons';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 const HTTPS_URL = /^https:\/\//;
 const NAME_MAX = 100; // 계약 §6 — 1~100자
@@ -170,15 +171,20 @@ export function FacadePanel({ boothId, onChange, preset }: Props) {
         <fieldset style={{ border: 'none', margin: 0, padding: 0 }}>
           <legend className="studio-group-title">대표색</legend>
           <div className="studio-swatches">
-            <label className="studio-swatch studio-swatch-none" title="없음" aria-checked={form.primaryColor === null} role="radio">
-              <input type="radio" name="primaryColor" checked={form.primaryColor === null} onChange={() => setForm({ ...form, primaryColor: null })} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
-              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>없음</span>
-            </label>
-            {FACADE_PALETTE.map((c) => (
-              <label key={c.code} className="studio-swatch" title={c.label} style={{ background: c.hex }} aria-checked={form.primaryColor?.toUpperCase() === c.hex} role="radio">
-                <input type="radio" name="primaryColor" value={c.hex} checked={form.primaryColor?.toUpperCase() === c.hex} onChange={() => setForm({ ...form, primaryColor: c.hex })} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
-                <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{c.label}</span>
+            {/* 스와치는 색만 보여 준다 — 이름은 툴팁과 숨은 라벨 둘 다에 남는다 */}
+            <Tooltip content="없음">
+              <label className="studio-swatch studio-swatch-none" aria-checked={form.primaryColor === null} role="radio">
+                <input type="radio" name="primaryColor" checked={form.primaryColor === null} onChange={() => setForm({ ...form, primaryColor: null })} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>없음</span>
               </label>
+            </Tooltip>
+            {FACADE_PALETTE.map((c) => (
+              <Tooltip key={c.code} content={c.label}>
+                <label className="studio-swatch" style={{ background: c.hex }} aria-checked={form.primaryColor?.toUpperCase() === c.hex} role="radio">
+                  <input type="radio" name="primaryColor" value={c.hex} checked={form.primaryColor?.toUpperCase() === c.hex} onChange={() => setForm({ ...form, primaryColor: c.hex })} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
+                  <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{c.label}</span>
+                </label>
+              </Tooltip>
             ))}
           </div>
         </fieldset>
