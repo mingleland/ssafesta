@@ -87,6 +87,13 @@ app:
     # 두 탭이 함께 로그아웃된다 (S15P21A604-764, GitLab #198). 이 창 밖의 재사용은 그대로
     # 계보째 끊는다 — spec 001 시나리오 7 은 변하지 않는다.
     refresh-reuse-grace: PT30S
+    # 갱신으로 밀려난 sid 가 이 시간 동안은 아직 통과한다. React 와 Unity 가 Access Token 하나를
+    # 나눠 쓰므로, 유예가 없으면 한쪽의 정상 갱신이 다른 쪽이 들고 있는 토큰을 즉사시킨다 —
+    # 월드가 12슬롯 게시본·world-sessions 를 한꺼번에 401 로 잃는 경로가 이것이다 (GitLab #216).
+    # 위 refresh-reuse-grace 와 수치는 같지만 뜻이 다르다: 그쪽은 "같은 Refresh Token 을 두 번 쓴
+    # 것을 도난으로 볼지", 이쪽은 "두 Access Token 이 겹쳐 사는 시간" 이다. 새 로그인·로그아웃·
+    # 계보 폐기는 이 유예를 즉시 끝낸다 — 다른 기기 로그인이 밀어내는 규칙은 그대로다.
+    session-rotation-grace: PT30S
     refresh-cookie-path: /api/v1/auth/refresh
     # 기본값 없음 — localhost 로 조용히 뜨면 OAuth 마지막 리디렉트와 CORS 허용 오리진이
     # 배포에서 동시에 깨지고, 화면에는 로그인 실패로만 보인다.

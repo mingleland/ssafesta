@@ -47,6 +47,20 @@ public class EventPurchase {
     @Column(columnDefinition = "text")
     private String note;
 
+    /**
+     * Who the prize goes to (GitLab #239). Nullable because purchases made before this existed have
+     * no answer, and inventing one would read as "a buyer who left the field blank". New purchases
+     * are required to carry all three — {@link EventShopService#purchase} enforces that.
+     */
+    @Column(length = 20, updatable = false)
+    private String campus;
+
+    @Column(name = "team_name", length = 50, updatable = false)
+    private String teamName;
+
+    @Column(name = "recipient_name", length = 50, updatable = false)
+    private String recipientName;
+
     @Column(name = "idempotency_key", nullable = false, unique = true, length = 100, updatable = false)
     private String idempotencyKey;
 
@@ -59,12 +73,15 @@ public class EventPurchase {
     protected EventPurchase() {
     }
 
-    public EventPurchase(Long prizeId, Long buyerUserId, int quantity, int coinSpent, Long ledgerEntryId,
-                         String idempotencyKey, Instant now) {
+    public EventPurchase(Long prizeId, Long buyerUserId, int quantity, int coinSpent,
+                         PurchaseRecipient recipient, Long ledgerEntryId, String idempotencyKey, Instant now) {
         this.prizeId = prizeId;
         this.buyerUserId = buyerUserId;
         this.quantity = quantity;
         this.coinSpent = coinSpent;
+        this.campus = recipient.campus();
+        this.teamName = recipient.teamName();
+        this.recipientName = recipient.recipientName();
         this.ledgerEntryId = ledgerEntryId;
         this.fulfillment = PurchaseFulfillment.PURCHASED;
         this.idempotencyKey = idempotencyKey;
@@ -109,6 +126,11 @@ public class EventPurchase {
 
     public String getNote() {
         return note;
+    }
+
+    /** All three fields are {@code null} together on purchases made before GitLab #239. */
+    public PurchaseRecipient getRecipient() {
+        return new PurchaseRecipient(campus, teamName, recipientName);
     }
 
     public String getIdempotencyKey() {
