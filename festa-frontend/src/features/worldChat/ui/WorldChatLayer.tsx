@@ -34,6 +34,11 @@ function isJoinNotice(message: ReceivedChatMessage): message is WorldChatJoinNot
   return 'type' in message && message.type === 'JOIN';
 }
 
+type SpokenMessage = Exclude<ReceivedChatMessage, WorldChatJoinNotice & { seq: number }>;
+function isSpoken(message: ReceivedChatMessage): message is SpokenMessage {
+  return !isJoinNotice(message);
+}
+
 export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: number) => void }) {
   const { open, draft, messages, notice } = useWorldChat();
   const member = canUseWorldChat();
@@ -47,13 +52,15 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
   const lastSeqRef = useRef(0);
   const [unread, setUnread] = useState(0);
   const wasOpen = useRef(false);
-  const shown = open ? messages : messages.slice(-VISIBLE_WHEN_CLOSED);
-  const latest = messages[messages.length - 1];
+  // 입장 알림(JOIN)은 STOMP 연결 사건이라 재연결·같은 계정의 다른 창에서도 온다. 닫힌 상태의 옅은 줄과
+  // 읽기 알림은 **말**만 다룬다 — 안 그러면 막 들어온 사람의 첫 화면이 남의 연결 알림이다 (S15P21A604-855).
+  // 열었을 때는 그대로 보여 준다: 그때는 사건도 읽을 자리가 있다.
+  const spoken = messages.filter(isSpoken);
+  const shown = open ? messages : spoken.slice(-VISIBLE_WHEN_CLOSED);
+  const latest = spoken[spoken.length - 1];
   const latestAnnouncement = latest === undefined
     ? ''
-    : isJoinNotice(latest)
-      ? latest.nickname + '님이 입장하셨습니다.'
-      : latest.nickname + ': ' + latest.content;
+    : latest.nickname + ': ' + latest.content;
 
   useEffect(() => {
     if (open) {

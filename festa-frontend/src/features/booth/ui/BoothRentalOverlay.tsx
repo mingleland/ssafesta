@@ -5,13 +5,15 @@
 // 두지 않고, 고른 자리의 정보만 오른쪽에 둔다.
 //
 // 기능층은 그대로다 — 슬롯 조회·`useLeaseSlot`·확인 모달·오류 문구 매핑은 옛 화면에서 옮겨 왔다.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '../../auth/model/session';
 import { isApiError } from '../../../shared/api/client';
 import { leaseApi } from '../../../entities/booth/leaseApi.select';
 import { LEASE_COIN_COST } from '../../../entities/booth/types';
 import type { SlotView } from '../../../entities/booth/types';
+import { remainingMs } from '../../../entities/booth/remaining';
+import { openManagement } from '../../world/model/worldScreen';
 import { useLeaseSlot } from '../model/useLeaseSlot';
 import { LeaseConfirmDialog } from './LeaseConfirmDialog';
 import { SlotMap } from './SlotMap';
@@ -51,6 +53,15 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
 
   const slotsQuery = useQuery({ queryKey: ['booth-slots'], queryFn: leaseApi.getSlots });
+  // 임대 중이면 이 화면은 볼 일이 없다 — 어느 길(?panel=rental·"부스 임대하기" 버튼)로 왔든 관리 화면으로
+  // 돌린다 (S15P21A604-855). 만료된 임대는 막지 않는다: 그건 관리 화면이 "임대 만료" 로 다루는 상태다.
+  const myBoothQuery = useQuery({ queryKey: ['my-booth'], queryFn: leaseApi.getMyBooth, enabled: isMember });
+  const activeLease = myBoothQuery.data?.lease ?? null;
+  const alreadyLeasing = activeLease !== null && remainingMs(activeLease.endsAt, Date.now()) > 0;
+  useEffect(() => {
+    if (alreadyLeasing) openManagement();
+  }, [alreadyLeasing]);
+
   const lease = useLeaseSlot();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // 100코인은 환불이 없다(FR-013) — 버튼이 곧바로 요청하지 않는다
@@ -69,12 +80,12 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       status={<WalletBadge />}
     >
-      {slotsQuery.isLoading && <OverlayLoading label="자리를 불러오는 중..." />}
+      {(slotsQuery.isLoading || myBoothQuery.isLoading || alreadyLeasing) && <OverlayLoading label="자리를 불러오는 중..." />}
       {slotsQuery.isError && (
         <OverlayError title="자리를 불러오지 못했습니다" onRetry={() => void slotsQuery.refetch()} />
       )}
 
-      {slotsQuery.isSuccess && (
+      {slotsQuery.isSuccess && !myBoothQuery.isLoading && !alreadyLeasing && (
         <div className="br-body">
           <div className="br-map">
             <SlotMap slots={slots} selectedId={selectedId} onSelect={(slot) => setSelectedId(slot.slotId)} />
@@ -118,8 +129,10 @@ export function BoothRentalOverlay({ onClose }: { onClose: () => void }) {
           slot={confirming}
           pending={lease.isPending}
           onConfirm={() =>
-            // 성공이든 실패든 닫는다 — 실패 사유는 오른쪽 패널이 그 자리에서 말한다
+            // 성공이든 실패든 모달은 닫는다 — 실패 사유는 오른쪽 패널이 그 자리에서 말한다.
+            // 성공이면 이 화면에 남을 이유가 없다: 바로 관리 화면으로 넘어간다 (S15P21A604-855).
             lease.mutate(confirming.slotId, {
+              onSuccess: () => openManagement(),
               onSettled: () => {
                 setConfirming(null);
                 queryClient.invalidateQueries({ queryKey: ['booth-slots'] });
