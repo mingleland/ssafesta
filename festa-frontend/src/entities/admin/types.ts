@@ -100,6 +100,23 @@ export interface AdminBoothView {
 /** 지급 처리 상태. 실제 지급 방식(현장 수령·추첨·사후 지급)이 갈리면 여기에 값이 늘어난다 */
 export type PrizeFulfillmentStatus = 'PURCHASED' | 'PENDING' | 'FULFILLED' | 'CANCELLED';
 
+/**
+ * 지금 상태에서 갈 수 있는 다음 상태 — BE `PurchaseFulfillment.canTransitionTo` 와 같은 표다
+ * (S15P21A604-853, GitLab #217 4번). 화면과 mock 이 같은 것을 봐야 mock 에서만 도는 흐름이 없다.
+ *
+ * **`FULFILLED` 와 `CANCELLED` 는 둘 다 종단이다.** 물건이 나갔거나 주문이 무효가 된 뒤에는 이
+ * 상태를 되감지 않고, 잘못은 코인 조정과 메모로 바로잡는다(BE 판단). 여기서 열어 두면 누를 수 있는
+ * 버튼이 서버에서만 409 로 거절당한다.
+ */
+export function nextFulfillmentOptions(current: PrizeFulfillmentStatus): PrizeFulfillmentStatus[] {
+  switch (current) {
+    case 'PURCHASED': return ['PENDING', 'FULFILLED', 'CANCELLED'];
+    case 'PENDING': return ['FULFILLED', 'CANCELLED'];
+    case 'FULFILLED': return [];
+    case 'CANCELLED': return [];
+  }
+}
+
 export interface PrizeView {
   prizeId: number;
   name: string;
