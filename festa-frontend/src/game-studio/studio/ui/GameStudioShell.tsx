@@ -1266,7 +1266,10 @@ export const GameStudioShell = ({
     <main className={`gss-root${focusMode ? ' is-focus-mode' : ''}`} data-game-studio-route="edit">
       <header className="gss-topbar">
         <div className="gss-brand-area">
-          <Link aria-label="홈으로 돌아가기" className="gss-back" to="/app/home">‹</Link>
+          {/* S15P21A604-824 — 목록(/app/games)이 이 화면의 URL 상위 리소스다. 진입 경로가
+              나중에 뭐가 되든(지금은 URL 직접 접근, 나중엔 다른 경로일 수도 있다) 뒤로가기는
+              항상 목록으로 돌아가는 게 자연스럽다. */}
+          <Link aria-label="목록으로 돌아가기" className="gss-back" to="/app/games">‹</Link>
           <div className="gss-file-menu-anchor">
             <button
               aria-expanded={showFileMenu}
