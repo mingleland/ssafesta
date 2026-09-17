@@ -189,10 +189,11 @@ export function EventRewardShopOverlay() {
             <span className="ov-section-title">즉시 교환</span>
             <span className="ov-section-desc">코인으로 바로 받는 상품</span>
           </div>
-          {/* 그리드는 빈 목록에서도 걷지 않는다 — 준비 중 안내가 그 위에 얹히는 구조라서다 */}
-          <div className="ov-grid-wrap">
-            <OverlayCardGrid cards={instantCards} label="즉시 교환 경품 목록" />
-            {instantCards.length === 0 && (
+          {instantCards.length === 0 ? (
+            // 빈 목록일 때만 안내판이 얹힐 자리(min-height)가 필요하다 — 상품이 있으면
+            // 그 예약 공간이 카드 밑에 빈 틈으로 남는다(S15P21A604-842 QA)
+            <div className="ov-grid-wrap">
+              <OverlayCardGrid cards={instantCards} label="즉시 교환 경품 목록" />
               <OverlayNotice
                 title="경품 상점 준비 중"
                 message="설문 참여 시 추첨을 통해 경품을 드립니다."
@@ -203,8 +204,10 @@ export function EventRewardShopOverlay() {
                   </button>
                 }
               />
-            )}
-          </div>
+            </div>
+          ) : (
+            <OverlayCardGrid cards={instantCards} label="즉시 교환 경품 목록" />
+          )}
         </div>
       )}
 
