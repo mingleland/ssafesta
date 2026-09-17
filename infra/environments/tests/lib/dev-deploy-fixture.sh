@@ -83,7 +83,8 @@ SH
   export INTERNAL_SPRING_TO_AI_TOKENS='[TEST-ONLY]'
   export INTERNAL_AI_TO_SPRING_TOKENS='[TEST-ONLY]'
   export INTERNAL_INFRA_TO_SPRING_TOKENS='[TEST-ONLY]'
-  export PUBLIC_API_BASE_URL= PUBLIC_AI_API_BASE_URL= PUBLIC_AUTH_BASE_URL=https://api.example.test PUBLIC_UNITY_BUILD_BASE=/unity/
+  # demo front overlay 는 PUBLIC_API_BASE_URL 이 비면 기동을 거부한다 — 픽스처도 실제 값을 준다.
+  export PUBLIC_API_BASE_URL=https://api.example.test PUBLIC_AI_API_BASE_URL= PUBLIC_AUTH_BASE_URL=https://api.example.test PUBLIC_UNITY_BUILD_BASE=/unity/
   export ROOT_DOMAIN=example.test FRESHNESS_ACTUAL_SHA=0123456789abcdef0123456789abcdef01234567
   export ENVIRONMENT_STATE_DIR="${FIXTURE_ROOT}/runtime"
 

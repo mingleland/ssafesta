@@ -1,0 +1,45 @@
+# demo AI. dev 오버레이와 달리 DB·Redis·R2 를 compose 에 박지 않는다 —
+# 전부 COMPONENT_ENV_FILE(demo-ai.env)에서 읽는다. 같은 값이 두 곳에 있으면 언젠가 갈린다.
+services:
+  ai:
+    image: ${COMPONENT_IMAGE_REF:?COMPONENT_IMAGE_REF is required}
+    restart: unless-stopped
+    profiles: [ai]
+    labels:
+      com.ssafy-festa.environment: demo
+      com.ssafy-festa.owner: infra-002
+      com.ssafy-festa.release-id: ${RELEASE_ID:?RELEASE_ID is required}
+      com.ssafy-festa.source-commit: ${SOURCE_COMMIT:?SOURCE_COMMIT is required}
+      com.ssafy-festa.mock-components: ${DEV_MOCK_COMPONENTS:-}
+    ports:
+      - "127.0.0.1:${DEMO_AI_HOST_PORT:-18082}:8000"
+    env_file:
+      - ${COMPONENT_ENV_FILE:?COMPONENT_ENV_FILE is required}
+    environment:
+      FESTA_ENVIRONMENT: demo
+      SPRING_INTERNAL_BASE_URL: http://back:8080
+      INTERNAL_SPRING_TO_AI_TOKENS: ${INTERNAL_SPRING_TO_AI_TOKENS:?INTERNAL_SPRING_TO_AI_TOKENS is required}
+      INTERNAL_AI_TO_SPRING_TOKENS: ${INTERNAL_AI_TO_SPRING_TOKENS:?INTERNAL_AI_TO_SPRING_TOKENS is required}
+      DEV_MOCK_COMPONENTS: ${DEV_MOCK_COMPONENTS:-}
+    networks:
+      ai-back:
+        aliases: [ai]
+      data-private: {}
+    volumes:
+      - ai-data:/app/data
+    mem_limit: ${DEMO_AI_MEMORY_LIMIT:-1g}
+    cpus: ${DEMO_AI_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ai/v1/health/live', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  data-private:
+    external: true
+    name: festa-data-private
+
+volumes:
+  ai-data:
+    name: festa-demo-ai-data
