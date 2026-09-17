@@ -127,7 +127,13 @@ export function EventRewardShopOverlay() {
     const imageUrl = imageForPrize(prize.name);
     return {
       id: `prize-${prize.prizeId}`,
-      media: imageUrl === undefined ? IcRewardFallback : <img src={imageUrl} alt="" />,
+      media:
+        imageUrl === undefined ? (
+          IcRewardFallback
+        ) : (
+          // 초코송이 원본 사진이 다른 상품보다 작게 나와 20% 키운다(2026-09-18)
+          <img src={imageUrl} alt="" className={prize.name === '초코송이' ? 'ov-img-boost' : undefined} />
+        ),
       // 말랑이는 서울캠퍼스에서만 지급 가능 — 사진 아래 바로 표기한다(2026-09-17 확정)
       mediaNote: prize.name === '말랑이' ? '서울캠퍼스 한정' : undefined,
       title: prize.name,
