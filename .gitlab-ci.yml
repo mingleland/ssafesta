@@ -134,9 +134,9 @@ unity-mr-validation-dispatch:
   extends: .game-changes
   stage: test
   image: alpine:3.20
-  timeout: 45m
+  timeout: 5m
   before_script:
-    - apk add --no-cache curl jq
+    - apk add --no-cache curl
   script:
     - |
       : "${JENKINS_UNITY_VALIDATION_URL:?set GitLab CI/CD variable}"
@@ -153,26 +153,8 @@ unity-mr-validation-dispatch:
         "${base_url}/job/${JENKINS_UNITY_VALIDATION_JOB}/buildWithParameters"
       queue_url="$(awk 'BEGIN { IGNORECASE=1 } /^Location:/ { sub(/\r$/, "", $2); print $2 }' "$headers")"
       test -n "$queue_url"
-      case "$queue_url" in http://*|https://*) ;; *) queue_url="${base_url}${queue_url}" ;; esac
-      deadline=$(( $(date +%s) + 2400 ))
-      while [ "$(date +%s)" -lt "$deadline" ]; do
-        queue="$(curl --fail --silent --show-error --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" "${queue_url}api/json")"
-        test "$(printf '%s' "$queue" | jq -r '.cancelled // false')" = false || { printf '%s\n' "$queue" | jq -r '.why // "Jenkins queue cancelled"' >&2; exit 1; }
-        build_url="$(printf '%s' "$queue" | jq -r '.executable.url // empty')"
-        test -n "$build_url" && break
-        sleep 2
-      done
-      test -n "${build_url:-}" || { echo 'Jenkins Unity validation queue timeout' >&2; exit 1; }
-      while [ "$(date +%s)" -lt "$deadline" ]; do
-        build="$(curl --fail --silent --show-error --user "${JENKINS_UNITY_VALIDATION_USER}:${JENKINS_UNITY_VALIDATION_API_TOKEN}" "${build_url}api/json")"
-        building="$(printf '%s' "$build" | jq -r '.building')"
-        test "$building" = false && break
-        sleep 5
-      done
-      test "${building:-true}" = false || { echo 'Jenkins Unity validation timeout' >&2; exit 1; }
-      result="$(printf '%s' "$build" | jq -r '.result // "UNKNOWN"')"
-      echo "Jenkins Unity validation: ${build_url} (${result})"
-      test "$result" = SUCCESS
+      echo "Jenkins Unity validation dispatched successfully: ${queue_url}"
+      echo "Jenkins will post unity-mr-validation commit status callback upon completion."
 
 ai-test:
   extends:
