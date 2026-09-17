@@ -100,8 +100,36 @@ textarea,
 [contenteditable='true'] {
   cursor: text !important;
 }
+/* Game Studio 는 저작 도구라 커서가 곧 사용법이다 — 끌 수 있는지, 지금 끌고 있는지, 크기를 바꿀 수
+ * 있는지, 어디를 찍는지를 알려 주는 신호가 이것뿐이다. 위 전역 규칙이 `!important` 라 여기서
+ * 되돌리지 않으면 전부 브랜드 포인터로 덮인다(S15P21A604-854).
+ *
+ * 비활성(`not-allowed`)은 되돌리지 않는다 — 그쪽은 `disabled` 속성이 이미 뜻을 갖고 있고,
+ * 브랜드 포인터로 통일하는 것이 -835 의 판단이다. */
 .gss-panel-divider { cursor: col-resize !important; }
-.gss-canvas-scroll.is-panning { cursor: grabbing !important; }
+.gss-floating-panel-resize-handle { cursor: nwse-resize !important; }
+
+.gss-canvas-minimap,
+.gss-map-canvas.is-placing {
+  cursor: crosshair !important;
+}
+
+.gss-object-palette button,
+.gss-map-object,
+.gss-map-canvas.is-pan-tool,
+.gss-drag-handle,
+.gss-floating-panel-titlebar,
+.gss-flow-graph-viewport {
+  cursor: grab !important;
+}
+
+.gss-canvas-scroll.is-panning,
+.gss-canvas-scroll.is-panning .gss-map-canvas.is-pan-tool,
+.gss-drag-handle:active,
+.gss-floating-panel-titlebar:active,
+.gss-flow-graph-viewport.is-panning {
+  cursor: grabbing !important;
+}
 
 /* Unity WebGL 캔버스만 브랜드 포인터가 사라지던 자리.
  *
