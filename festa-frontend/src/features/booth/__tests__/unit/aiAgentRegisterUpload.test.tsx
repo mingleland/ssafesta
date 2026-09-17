@@ -112,7 +112,7 @@ describe('AI 직원 등록+문서 업로드 통합 (-724)', () => {
       expect(createAiAgent).toHaveBeenCalledWith(
         42,
         expect.objectContaining({
-          name: 'FESTA 안내 직원',
+          name: 'FESTA 안내 직원 #42',
           systemPrompt: '방문객의 질문에 친절하고 정확하게 답합니다. 모르는 내용은 모른다고 답하고, 확인되지 않은 정보를 지어내지 않습니다.',
         }),
       ),
