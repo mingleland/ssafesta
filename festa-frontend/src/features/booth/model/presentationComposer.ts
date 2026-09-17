@@ -30,13 +30,27 @@ export interface Presentation {
 
 export interface ComposeInputs {
   aiAgent: AiAgent | null;
+  /** 지금 방문자에게 보이는 게시본. 미게시면 null */
+  published: PublishedPresentation | null;
 }
 
-/** 지금 이 부스가 방문자에게 보여 줘야 할 것 */
+/**
+ * 지금 이 부스가 방문자에게 보여 줘야 할 것.
+ *
+ * 플래그 OFF 는 "FE 가 AI 바인딩을 관리하지 않는다" 는 뜻이지 "없앤다" 가 아니다 — Studio 시절
+ * 게시본에 이미 실린 AI_AGENT 는 그대로 이어받는다. 그래야 그것 하나 때문에 "변경사항 적용" 이
+ * 뜨지 않고, 다른 이유로 적용해도 직원 바인딩이 지워지지 않는다. 플래그 ON 이면 현재 등록된
+ * 직원이 정본이다.
+ */
 export function compose(inputs: ComposeInputs): Presentation {
+  const aiAgentId = PUBLISH_AI_AGENT_BINDING
+    ? (inputs.aiAgent?.agentId ?? null)
+    : inputs.published
+      ? publishedAiAgentId(inputs.published)
+      : null;
   return {
     template: LAYOUT_TEMPLATE,
-    aiAgentId: PUBLISH_AI_AGENT_BINDING && inputs.aiAgent ? inputs.aiAgent.agentId : null,
+    aiAgentId,
   };
 }
 
@@ -57,21 +71,23 @@ export function toLayout(presentation: Presentation): LayoutDocument {
 
 export type PublishedPresentation =
   | { kind: 'presentation'; presentation: Presentation }
-  /** Studio 시절 가구 등 지금 Presentation 이 표현하지 못하는 오브젝트가 남아 있다 — 적용하면 기준선으로 덮인다 */
-  | { kind: 'legacy' };
+  /** Studio 시절 가구 등 지금 Presentation 이 표현하지 못하는 오브젝트가 남아 있다 — 적용하면 기준선으로 덮인다.
+   *  AI 바인딩은 legacy 에서도 읽어 둔다 — 덮을 때 함께 지워지면 안 된다 */
+  | { kind: 'legacy'; aiAgentId: number | null };
 
 /** 게시본을 Presentation 으로 읽는다. 위치·회전·objectId 는 버리고 의미만 남긴다 */
 export function fromLayout(layout: LayoutDocument): PublishedPresentation {
-  if (layout.template !== LAYOUT_TEMPLATE) return { kind: 'legacy' };
   let aiAgentId: number | null = null;
+  let legacy = layout.template !== LAYOUT_TEMPLATE;
   for (const object of layout.objects) {
-    if (!AUTHORED_TYPES.has(object.type)) return { kind: 'legacy' };
+    if (!AUTHORED_TYPES.has(object.type)) legacy = true;
     if (object.type === 'AI_AGENT') {
       // 둘 이상이면 어느 것이 바인드될지 Unity 가 첫 것을 집는다 — 그 모양은 이 composer 가 만들지 않으므로 legacy
-      if (aiAgentId !== null) return { kind: 'legacy' };
-      aiAgentId = object.configId ?? null;
+      if (aiAgentId !== null) legacy = true;
+      else aiAgentId = object.configId ?? null;
     }
   }
+  if (legacy) return { kind: 'legacy', aiAgentId };
   return { kind: 'presentation', presentation: { template: LAYOUT_TEMPLATE, aiAgentId } };
 }
 
@@ -82,4 +98,9 @@ export function equals(a: Presentation, b: Presentation): boolean {
 /** 게시본이 지금 compose 결과를 이미 담고 있는가. legacy 는 항상 "다르다" */
 export function isUpToDate(published: PublishedPresentation, current: Presentation): boolean {
   return published.kind === 'presentation' && equals(published.presentation, current);
+}
+
+/** compose 입력용 — legacy 든 아니든 게시본이 들고 있는 AI 바인딩 */
+export function publishedAiAgentId(published: PublishedPresentation): number | null {
+  return published.kind === 'presentation' ? published.presentation.aiAgentId : published.aiAgentId;
 }

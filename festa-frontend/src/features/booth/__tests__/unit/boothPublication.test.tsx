@@ -201,4 +201,33 @@ describe('관리창 게시 흐름 (-898)', () => {
     expect(putDraft).toHaveBeenLastCalledWith(42, { expectedRevision: 2, ...emptyLayout });
     expect(publishLayout).toHaveBeenCalledTimes(1);
   });
+
+  // 플래그 OFF(기본) 에서 과거 Studio 게시본의 AI_AGENT 보존 — 머지 전 필수 확인
+  const aiObject = { objectId: 'ai-1', type: 'AI_AGENT', position: { x: -2.4, y: 0, z: -2.2 }, rotationY: 0, configId: 123 };
+
+  it('⑧ 게시본 AI_AGENT(123) + 직원 123, 플래그 OFF → 운영 중, 버튼 없음', async () => {
+    server.version = 5;
+    server.published = { ...emptyLayout, objects: [aiObject] };
+    getAiAgent.mockResolvedValue({ agentId: 123, boothId: 42 });
+    await renderOverlay();
+    await waitFor(() => expect(status()).toBe('운영 중'));
+    await waitFor(() => expect(getPublishedLayout).toHaveBeenCalled());
+    expect(actionButton()).toBeNull();
+  });
+
+  it('⑨ legacy 가구 + AI_AGENT(123) → 변경사항 적용해도 AI_AGENT 가 남는다', async () => {
+    server.version = 5;
+    server.published = { ...emptyLayout, objects: [aiObject, { objectId: 'w', type: 'WALL_PLAIN', position: { x: 0, y: 0, z: 0 }, rotationY: 0 }] };
+    server.draft = { ...server.published, revision: 9 };
+    getAiAgent.mockResolvedValue({ agentId: 123, boothId: 42 });
+    await renderOverlay();
+    await waitFor(() => expect(actionButton()?.textContent).toBe('변경사항 적용'));
+    fireEvent.click(actionButton()!);
+    await waitFor(() => expect(publishLayout).toHaveBeenCalled());
+    const body = putDraft.mock.calls[0][1] as { expectedRevision: number; objects: Array<{ type: string; configId?: number }> };
+    expect(body.expectedRevision).toBe(9);
+    expect(body.objects).toHaveLength(1);
+    expect(body.objects[0]).toMatchObject({ type: 'AI_AGENT', configId: 123 });
+    await waitFor(() => expect(actionButton()).toBeNull());
+  });
 });

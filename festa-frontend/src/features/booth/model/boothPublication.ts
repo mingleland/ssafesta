@@ -62,15 +62,16 @@ export function useBoothPublicationState({ boothId, detail, hasProject, aiAgent 
     enabled: boothId !== null && published,
   });
 
-  const current = compose({ aiAgent: aiAgent ?? null });
+  const publishedPresentation = publishedQuery.data ? fromLayout(publishedQuery.data) : null;
+  const current = compose({ aiAgent: aiAgent ?? null, published: publishedPresentation });
   const pending =
     detail === undefined || hasProject === undefined || aiAgent === undefined || (published && publishedQuery.data === undefined);
 
   let phase: PublicationPhase;
   if (!hasProject) phase = 'no-project';
   else if (!published) phase = 'ready';
-  else if (publishedQuery.data == null) phase = 'live'; // 조회 실패·미도착 — 낙관적으로 두고 pending 이 버튼을 막는다
-  else phase = isUpToDate(fromLayout(publishedQuery.data), current) ? 'live' : 'live-outdated';
+  else if (publishedPresentation === null) phase = 'live'; // 조회 실패·미도착 — 낙관적으로 두고 pending 이 버튼을 막는다
+  else phase = isUpToDate(publishedPresentation, current) ? 'live' : 'live-outdated';
 
   return { phase, pending, current };
 }
