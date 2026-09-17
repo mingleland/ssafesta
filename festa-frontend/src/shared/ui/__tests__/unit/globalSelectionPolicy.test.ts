@@ -70,4 +70,19 @@ describe('브랜드 포인터', () => {
     expect(canvas).toContain('image-set(');
     expect(canvas.match(/!important/g)).toHaveLength(2);
   });
+
+  // 비활성 버튼 위에서만 시스템 화살표로 돌아가던 자리(2026-09-17). 화면마다 적어 둔
+  // pointer·default·not-allowed 를 하나하나 쫓지 않고 전역 규칙으로 덮는다.
+  it('전역 규칙 하나가 모든 요소를 덮는다 — 비활성도 예외가 아니다', () => {
+    const all = blockFor(':where(*) {');
+    expect(all).toContain("cursor:url('/cursors/festa-pointer.png')72,auto!important");
+    expect(all).toContain('image-set(');
+    expect(css).not.toContain('button:not(:disabled)');
+  });
+
+  it('모양이 곧 사용법인 자리만 되돌린다 — 입력칸의 I빔과 끌기 손잡이', () => {
+    expect(css).toContain('cursor: text !important');
+    expect(css).toContain('cursor: col-resize !important');
+    expect(css).toContain('cursor: grabbing !important');
+  });
 });
