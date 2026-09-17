@@ -152,6 +152,25 @@ class AdminAccountApiIntegrationTest {
         assertTrue(users.findById(onlyAdmin).orElseThrow().isAdmin());
     }
 
+    /**
+     * A target with no row answers {@code 404 ADMIN_TARGET_NOT_FOUND} — not the {@code 401
+     * USER_NOT_FOUND} the actor's own auth failures use (S15P21A604-832, GitLab #217). The FE
+     * console's 401 interceptor rotates the refresh token, so a mistyped userId must not look like
+     * an auth failure.
+     */
+    @Test
+    void promotingOrDemotingANonexistentTargetIs404NotAnAuthFailure() throws Exception {
+        Long actor = newAdmin("존재확인자");
+
+        mockMvc.perform(post("/api/v1/admin/admins/999999999").header("Authorization", bearerFor(actor)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ADMIN_TARGET_NOT_FOUND"));
+
+        mockMvc.perform(delete("/api/v1/admin/admins/999999999").header("Authorization", bearerFor(actor)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ADMIN_TARGET_NOT_FOUND"));
+    }
+
     /** Demoting someone who never had the rights leaves the world as the caller asked for it. */
     @Test
     void demotingAPlainMemberSucceedsAndRecordsNothing() throws Exception {

@@ -1,7 +1,6 @@
 package com.example.ssafesta.ai;
 
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.expireLease;
 import static com.example.ssafesta.booth.BoothLayoutTestSupport.grantLease;
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
@@ -51,8 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>T030 — 파일은 Spring 을 통과하지 않는다. 브라우저가 저장소로 직접 PUT 하므로, 여기서
  * "업로드했다"는 것은 {@link FakeObjectStorage#putObject} 다.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class,
-        FakeDocumentProcessingClientConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class AiDocumentUploadIntegrationTest {

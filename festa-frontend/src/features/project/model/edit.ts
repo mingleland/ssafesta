@@ -1,6 +1,7 @@
 // 소유자 편집 상태 기계 — draft + dirty 키 추적, 저장은 dirty 키만 PATCH 직렬화 (S15P21A604-134).
 // BE PresenceField: 키 생략 = 유지, 명시적 null = 비우기 — 그래서 전체 객체 전송이 금지다.
 import { useSyncExternalStore } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
 import { projectApi } from '../../../entities/project/api.select';
 import { isApiError } from '../../../shared/api/client';
 import type { ProjectPatch, ProjectView } from '../../../entities/project/types';
@@ -118,14 +119,25 @@ export function updateField(key: ProjectFieldKey, value: string | null): void {
   });
 }
 
-export async function saveProject(): Promise<void> {
+/**
+ * 저장. `queryClient` 를 받는 이유는 내 부스 관리창 때문이다 (S15P21A604-817).
+ *
+ * 관리창 정체성 카드가 같은 프로젝트를 `['booth-projects', boothId]` 로 읽는데, 이 편집 화면은
+ * 그 관리창 **위에 얹히는 패널**이라 닫아도 관리창이 다시 마운트되지 않는다 — 재조회 계기가
+ * 없어서 저장한 이름·썸네일이 관리창에 그대로 옛 값으로 남았다. 쓰기 쪽에서 무효화한다.
+ *
+ * 주입으로 받는 것은 `notifyCurrentBoothSlotChanged(queryClient)` 와 같은 관례다 — 이 모듈은
+ * 훅 밖에서도 돌아가는 상태 기계라 전역 인스턴스를 직접 import 하지 않는다.
+ */
+export async function saveProject(queryClient?: QueryClient): Promise<void> {
   if (state.save.phase === 'submitting' || state.boothId === null) return;
+  const boothId = state.boothId;
   const patch: ProjectPatch = {};
   for (const key of state.dirty) patch[key] = state.draft[key];
   setState({ save: { phase: 'submitting' } });
   try {
     const saved = state.projectId === null
-      ? await projectApi.createProject(state.boothId, patch)
+      ? await projectApi.createProject(boothId, patch)
       : await projectApi.updateProject(state.projectId, patch);
     setState({
       projectId: saved.projectId,
@@ -134,6 +146,7 @@ export async function saveProject(): Promise<void> {
       fieldErrors: {},
       save: { phase: 'success' },
     });
+    void queryClient?.invalidateQueries({ queryKey: ['booth-projects', boothId] });
   } catch (error) {
     setState({ fieldErrors: fieldErrorsOf(error), save: { phase: 'error' } });
   }

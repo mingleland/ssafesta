@@ -16,6 +16,7 @@ import {
 } from '../../features/consultation/model/staff';
 import { ScreenEmpty, ScreenError, ScreenLoading } from '../../features/shell/ui/PageShell';
 import { ManagementScreen } from '../../features/booth/ui/ManagementScreen';
+import { Tooltip } from '../../shared/ui/tooltip/Tooltip';
 import './management.css';
 
 function when(iso: string): string {
@@ -35,11 +36,6 @@ export function ConsultationStaffPage() {
     <ManagementScreen
       title="상담 운영"
       subtitle="방문자가 보낸 상담 요청을 처리합니다"
-      actions={
-        <button type="button" className="sc-btn sc-btn-sm" disabled={state.status === 'loading'} onClick={() => void loadStaffQueue()}>
-          새로고침
-        </button>
-      }
     >
       {state.status === 'idle' || state.status === 'loading' ? (
         <ScreenLoading label="대기열을 불러오는 중..." />
@@ -47,6 +43,18 @@ export function ConsultationStaffPage() {
         <ScreenError title="대기열을 불러오지 못했습니다" message="잠시 후 다시 시도해 주세요." onRetry={() => void loadStaffQueue()} />
       ) : (
         <>
+          {/* 지금 어떤 상태인지부터 말한다. 서버가 주는 값만 쓴다 — "오늘 완료" 같은 지표는 없다 */}
+          <section className="mg-summary-row">
+            <div className="mg-stat">
+              <strong>{state.queue.length}</strong>
+              <span className="sc-note">대기 중</span>
+            </div>
+            <div className="mg-stat">
+              <strong>{state.active !== null ? 1 : 0}</strong>
+              <span className="sc-note">진행 중</span>
+            </div>
+          </section>
+
           {/* 진행 중인 상담 — C-06 상 동시에 1건뿐이다 */}
           {state.active !== null && (
             <section className="sc-card mg-active">
@@ -81,27 +89,38 @@ export function ConsultationStaffPage() {
           )}
 
           <section className="mg-queue">
-            <span className="sc-section-title">대기 중인 요청 {state.queue.length}건</span>
+            <div className="mg-list-head">
+              <span className="sc-section-title">요청 목록</span>
+              {/* 보조 액션이다 — 하단 주요 액션 자리를 차지하지 않는다 */}
+              <button type="button" className="sc-btn sc-btn-sm" onClick={() => void loadStaffQueue()}>
+                새로고침
+              </button>
+            </div>
             {state.queue.length === 0 ? (
               <ScreenEmpty title="대기 중인 요청이 없습니다" hint="방문자가 상담을 요청하면 여기에 표시됩니다." />
             ) : (
               <ul className="mg-cards">
                 {state.queue.map((card) => (
-                  <li key={card.requestId} className="sc-card mg-card">
-                    <div className="mg-card-head">
-                      <strong>{card.visitorNickname}</strong>
-                      <span className="sc-note">{when(card.requestedAt)} 요청</span>
+                  // 요청 하나가 한 덩어리다 — 누가·언제·무슨 맥락·어떤 조치가 흩어지지 않는다
+                  <li key={card.requestId} className="sc-card mg-req">
+                    <span className="mg-req-dot" aria-hidden="true" />
+                    <div className="mg-req-body">
+                      <div className="mg-req-head">
+                        <strong>{card.visitorNickname}</strong>
+                        <span className="sc-note">{when(card.requestedAt)} 요청 · 대기 중</span>
+                      </div>
+                      {card.handoffSummary !== null && <p className="mg-req-summary">{card.handoffSummary}</p>}
                     </div>
-                    {card.handoffSummary !== null && <p className="mg-summary">{card.handoffSummary}</p>}
-                    <button
-                      type="button"
-                      className="sc-btn sc-btn-primary sc-btn-sm"
-                      disabled={!acceptable}
-                      title={state.active !== null ? '이미 진행 중인 상담이 있습니다' : undefined}
-                      onClick={() => void acceptRequest(card.requestId)}
-                    >
-                      {state.accepting ? '처리 중...' : '수락'}
-                    </button>
+                    <Tooltip content={state.active !== null ? '이미 진행 중인 상담이 있습니다' : null}>
+                      <button
+                        type="button"
+                        className="sc-btn sc-btn-primary sc-btn-sm"
+                        disabled={!acceptable}
+                        onClick={() => void acceptRequest(card.requestId)}
+                      >
+                        {state.accepting ? '처리 중...' : '상담 수락'}
+                      </button>
+                    </Tooltip>
                   </li>
                 ))}
               </ul>

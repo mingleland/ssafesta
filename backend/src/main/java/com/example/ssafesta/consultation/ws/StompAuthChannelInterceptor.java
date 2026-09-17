@@ -2,6 +2,7 @@ package com.example.ssafesta.consultation.ws;
 
 import com.example.ssafesta.common.ApiException;
 import com.example.ssafesta.staff.StaffAccessGuard;
+import com.example.ssafesta.user.AdminGuard;
 import java.security.Principal;
 import java.util.List;
 import java.util.Set;
@@ -53,6 +54,10 @@ import org.springframework.stereotype.Component;
  * boothId 가 없어 멤버십을 검사할 수 없다. GitLab #133(2026-09-07) 에서 FE 에 약속한 동작인데
  * 구현이 빠져 있었다: WS Token 만 있으면 남의 부스 대기열(방문자 닉네임·AI 대화 요약)을 읽을 수
  * 있었다. 주체가 없는 구독도 거부다 — 판정할 대상이 없는데 통과시키면 게이트가 없는 것과 같다.
+ *
+ * <p><b>이벤트 상점 알림 토픽({@code /topic/admin/event-shop})은 관리자만 구독한다</b>
+ * (S15P21A604-836). 부스 토픽과 달리 자원 id 가 경로에 없는 전역 토픽이라 정확히 일치하는지만
+ * 보고, 판정은 {@code AdminGuard.isAdmin} 하나다.
  */
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
@@ -75,13 +80,21 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             StompCommand.CONNECTED, StompCommand.MESSAGE, StompCommand.RECEIPT, StompCommand.ERROR);
     /** 직원 대기열 토픽. 계약({@code contracts §B})의 문자열과 정확히 같은 모양만 잡는다. */
     private static final Pattern BOOTH_TOPIC = Pattern.compile("^/topic/booths/(\\d+)/consultation$");
+    /**
+     * 관리자 콘솔의 이벤트 상점 알림 토픽(S15P21A604-836). 부스 토픽과 달리 자원 id 가 없는
+     * 전역 토픽이라 정확히 일치하는지만 본다 — 부스처럼 경로에서 대상을 뽑아 멤버십을 확인할
+     * 것이 없고, 판정은 "이 회원이 관리자인가" 하나뿐이다.
+     */
+    private static final String ADMIN_EVENT_SHOP_TOPIC = "/topic/admin/event-shop";
 
     private final WsTokenService tokens;
     private final StaffAccessGuard staffGuard;
+    private final AdminGuard adminGuard;
 
-    public StompAuthChannelInterceptor(WsTokenService tokens, StaffAccessGuard staffGuard) {
+    public StompAuthChannelInterceptor(WsTokenService tokens, StaffAccessGuard staffGuard, AdminGuard adminGuard) {
         this.tokens = tokens;
         this.staffGuard = staffGuard;
+        this.adminGuard = adminGuard;
     }
 
     @Override
@@ -113,6 +126,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                         "개인 큐는 /user/queue/** destination 으로 구독해야 합니다.");
             }
             requireBoothMemberIfBoothTopic(accessor);
+            requireAdminIfAdminEventShopTopic(accessor);
         }
         if (!SimpMessageType.CONNECT.equals(type)) {
             return message;
@@ -145,6 +159,20 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             staffGuard.requireBoothMember(Long.valueOf(topic.group(1)), Long.valueOf(user.getName()));
         } catch (ApiException refused) {
             throw new IllegalArgumentException("부스 토픽 구독 권한이 없습니다.", refused);
+        }
+    }
+
+    /** 이벤트 상점 알림 토픽이면 구독자가 관리자인지 본다. */
+    private void requireAdminIfAdminEventShopTopic(StompHeaderAccessor accessor) {
+        if (!ADMIN_EVENT_SHOP_TOPIC.equals(accessor.getDestination())) {
+            return;
+        }
+        Principal user = accessor.getUser();
+        if (user == null) {
+            throw new IllegalArgumentException("이벤트 상점 알림 구독에는 인증된 연결이 필요합니다.");
+        }
+        if (!adminGuard.isAdmin(Long.valueOf(user.getName()))) {
+            throw new IllegalArgumentException("이벤트 상점 알림 구독 권한이 없습니다.");
         }
     }
 

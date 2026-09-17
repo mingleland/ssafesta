@@ -23,6 +23,7 @@ import type { LibraryItem } from '../../model/assetLibrary';
 import { BOOTH_TEMPLATES } from '../../model/boothTemplates';
 import type { BoothTemplate } from '../../model/boothTemplates';
 import { IcChevron, IcCube, IcLock } from './icons';
+import { Tooltip } from '../../../../shared/ui/tooltip/Tooltip';
 
 /** 하드코딩 팔레트의 검색 — 라벨과 assetCode 둘 다 본다(`filterLibrary` 와 같은 규칙) */
 function filterPaletteItems(items: PaletteItem[], query: string): PaletteItem[] {
@@ -52,18 +53,19 @@ function PaletteThumb({
   const cat = item.assetCode ? findCatalogItem(catalog, { code: item.assetCode }) : undefined;
   const locked = cat ? cat.locked : Boolean(item.locked);
   return (
-    <button
-      type="button"
-      className="studio-thumb"
-      disabled={full || locked}
-      title={locked ? '잠금 — 보유 후 사용' : `${item.label} 추가`}
-      onClick={() => onAdd(item)}
-    >
-      <span className="studio-thumb-art" data-kind={item.thumb} />
-      {locked && <span className="studio-thumb-lock"><IcLock size={10} /></span>}
-      <span className="studio-thumb-label">{item.label}</span>
-      {cat?.purchasable && <span className="studio-thumb-price">{cat.price.toLocaleString()} C</span>}
-    </button>
+    <Tooltip content={locked ? '잠금 — 보유 후 사용' : `${item.label} 추가`}>
+      <button
+        type="button"
+        className="studio-thumb"
+        disabled={full || locked}
+        onClick={() => onAdd(item)}
+      >
+        <span className="studio-thumb-art" data-kind={item.thumb} />
+        {locked && <span className="studio-thumb-lock"><IcLock size={10} /></span>}
+        <span className="studio-thumb-label">{item.label}</span>
+        {cat?.purchasable && <span className="studio-thumb-price">{cat.price.toLocaleString()} C</span>}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -128,16 +130,13 @@ export function AssetPalette({
           <Section title="빠른 시작">
             <div className="studio-preset-grid">
               {BOOTH_TEMPLATES.map((t) => (
-                <button
-                  key={t.templateCode}
-                  type="button"
-                  className="studio-preset"
-                  title={t.description}
-                  onClick={() => onApplyTemplate(t)}
-                >
-                  <span className="studio-preset-name">{t.name}</span>
-                  <span className="studio-preset-desc">{t.description}</span>
-                </button>
+                // 설명이 카드 안에 이미 보인다 — 잘렸을 때 전문을 읽는 용도다
+                <Tooltip key={t.templateCode} content={t.description}>
+                  <button type="button" className="studio-preset" onClick={() => onApplyTemplate(t)}>
+                    <span className="studio-preset-name">{t.name}</span>
+                    <span className="studio-preset-desc">{t.description}</span>
+                  </button>
+                </Tooltip>
               ))}
             </div>
           </Section>
@@ -174,28 +173,31 @@ export function AssetPalette({
               <Section key={section.category.id} title={section.category.label}>
                 <div className="studio-thumb-grid">
                   {section.items.map((item) => (
-                    <button
+                    <Tooltip
                       key={item.assetCode}
-                      type="button"
-                      className="studio-thumb"
-                      disabled={full || item.locked}
-                      title={item.locked ? '잠금 — 보유 후 사용' : `${item.displayName} 추가`}
-                      onClick={() => onAddAsset(item)}
+                      content={item.locked ? '잠금 — 보유 후 사용' : `${item.displayName} 추가`}
                     >
-                      {item.thumbnail === null ? (
-                        <span className="studio-thumb-art" data-kind="panel" />
-                      ) : (
-                        <img
-                          className="studio-thumb-img"
-                          src={resolveAssetUrl(item.thumbnail, boothAssetBaseUrl())}
-                          alt=""
-                          loading="lazy"
-                        />
-                      )}
-                      {item.locked && <span className="studio-thumb-lock"><IcLock size={10} /></span>}
-                      <span className="studio-thumb-label">{item.displayName}</span>
-                      {item.price !== null && <span className="studio-thumb-price">{item.price.toLocaleString()} C</span>}
-                    </button>
+                      <button
+                        type="button"
+                        className="studio-thumb"
+                        disabled={full || item.locked}
+                        onClick={() => onAddAsset(item)}
+                      >
+                        {item.thumbnail === null ? (
+                          <span className="studio-thumb-art" data-kind="panel" />
+                        ) : (
+                          <img
+                            className="studio-thumb-img"
+                            src={resolveAssetUrl(item.thumbnail, boothAssetBaseUrl())}
+                            alt=""
+                            loading="lazy"
+                          />
+                        )}
+                        {item.locked && <span className="studio-thumb-lock"><IcLock size={10} /></span>}
+                        <span className="studio-thumb-label">{item.displayName}</span>
+                        {item.price !== null && <span className="studio-thumb-price">{item.price.toLocaleString()} C</span>}
+                      </button>
+                    </Tooltip>
                   ))}
                 </div>
               </Section>

@@ -69,9 +69,8 @@ describe.each([
   });
 });
 
-// 전체화면 의도 (S15P21A604-733). 로그인 클릭은 곧 제공자 도메인으로 나가므로 여기서 전체화면을
-// 걸면 document 가 바뀌며 풀린다 — 의도만 남기고 '월드 입장' 클릭에서 쓴다.
-describe('로그인 클릭의 전체화면 의도 (-733)', () => {
+// 전체화면 (S15P21A604-733). 로그인은 전체화면과 무관하다 — 진입 경로는 HUD 토글 하나다.
+describe('로그인 클릭과 전체화면 (-733)', () => {
   it('클릭이 전체화면을 직접 부르지 않는다 — 걸어도 OAuth 이동에서 풀린다', async () => {
     const request = vi.fn();
     Object.defineProperty(document.documentElement, 'requestFullscreen', { value: request, configurable: true });
@@ -81,16 +80,5 @@ describe('로그인 클릭의 전체화면 의도 (-733)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Google 로그인' }));
 
     expect(request).not.toHaveBeenCalled();
-  });
-
-  it('의도는 남긴다 — 월드 입장 신호가 이것을 소비한다', async () => {
-    const { consumeFullscreenIntent } = await import('../../../../shared/ui/fullscreen');
-    window.sessionStorage.clear();
-    stubLocation('http://localhost:5173');
-    await renderLogin();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Google 로그인' }));
-
-    expect(consumeFullscreenIntent()).toBe(true);
   });
 });

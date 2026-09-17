@@ -48,7 +48,7 @@ import { useResolvedAssetUrls } from '../assets/useResolvedAssetUrls.ts';
 import { resolveTilesetVisual, tileBackgroundStyle } from '../assets/tilesetVisual.ts';
 import { resolveStaticImageVisual, staticImageBackgroundStyle } from '../assets/staticImageVisual.ts';
 import { createBrowserDraftRepository, type DraftSaveReceipt, type GameDraftRepository } from '../ports/draftRepository.ts';
-import { GameAuthoringApiError, type GamePublisher } from '../ports/gameAuthoringApi.ts';
+import { GameAuthoringApiError, type GamePublisher, type GameVisibility, type GameVisibilityPort } from '../ports/gameAuthoringApi.ts';
 import {
   createBrowserRecoveryJournal,
   shouldOfferRecovery,
@@ -290,6 +290,7 @@ interface GameStudioShellProps {
   readonly initialProject?: GameProject;
   readonly repository?: GameDraftRepository | null;
   readonly publisher?: GamePublisher | null;
+  readonly visibilityPort?: GameVisibilityPort | null;
   readonly persistenceLabel?: string;
   readonly assetRepository?: GameAssetRepository | null;
 }
@@ -320,6 +321,7 @@ export const GameStudioShell = ({
   initialProject,
   repository: repositoryProp,
   publisher = null,
+  visibilityPort = null,
   persistenceLabel = '브라우저',
   assetRepository: assetRepositoryProp,
 }: GameStudioShellProps) => {
@@ -369,6 +371,8 @@ export const GameStudioShell = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastPublishedVersion, setLastPublishedVersion] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [gameVisibility, setGameVisibility] = useState<GameVisibility | null>(null);
+  const [visibilityStatus, setVisibilityStatus] = useState<'idle' | 'loading' | 'saving' | 'error'>('idle');
   // S15P21A604-630 — 다중 이미지 업로드 진행 표시. 파일이 1장이면 즉시 끝나 굳이 안 보여준다.
   const [uploadProgress, setUploadProgress] = useState<{ readonly current: number; readonly total: number } | null>(null);
   const [zoom, setZoom] = useState(() => loadZoom(gameId));
@@ -551,6 +555,27 @@ export const GameStudioShell = ({
       });
     return () => { active = false; };
   }, [gameId, persistenceLabel, recoveryJournal, repository, store]);
+
+  useEffect(() => {
+    let active = true;
+    if (visibilityPort === null) {
+      setGameVisibility(null);
+      return () => { active = false; };
+    }
+    setVisibilityStatus('loading');
+    visibilityPort.get(gameId)
+      .then((summary) => {
+        if (!active) return;
+        setGameVisibility(summary.visibility);
+        setVisibilityStatus('idle');
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setVisibilityStatus('error');
+        setNotice(error instanceof Error ? error.message : '공개설정을 불러오지 못했습니다.');
+      });
+    return () => { active = false; };
+  }, [gameId, visibilityPort]);
 
   useEffect(() => {
     if (!hasUnsavedChanges || saveStatus === 'loading' || saveStatus === 'saving' || recoveryJournal === null || recoveryCandidate !== null) return undefined;
@@ -931,6 +956,23 @@ export const GameStudioShell = ({
     }
   }, [gameId, publisher, save, store]);
 
+  const toggleVisibility = useCallback(async (): Promise<void> => {
+    if (visibilityPort === null || gameVisibility === null) return;
+    const next: GameVisibility = gameVisibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+    setVisibilityStatus('saving');
+    try {
+      const summary = await visibilityPort.set(gameId, next);
+      setGameVisibility(summary.visibility);
+      setVisibilityStatus('idle');
+      setNotice(summary.visibility === 'PUBLIC'
+        ? '이 게임을 공개로 전환했습니다. 게시된 버전을 누구나 플레이할 수 있습니다.'
+        : '이 게임을 비공개로 전환했습니다.');
+    } catch (error) {
+      setVisibilityStatus('error');
+      setNotice(error instanceof Error ? error.message : '공개설정을 변경하지 못했습니다.');
+    }
+  }, [gameId, gameVisibility, visibilityPort]);
+
   const openPreview = useCallback(async (performanceMode = false): Promise<void> => {
     if (hasUnsavedChanges && (await save()) === null) return;
     if (previewRepository === null) {
@@ -1224,7 +1266,10 @@ export const GameStudioShell = ({
     <main className={`gss-root${focusMode ? ' is-focus-mode' : ''}`} data-game-studio-route="edit">
       <header className="gss-topbar">
         <div className="gss-brand-area">
-          <Link aria-label="홈으로 돌아가기" className="gss-back" to="/app/home">‹</Link>
+          {/* S15P21A604-824 — 목록(/app/games)이 이 화면의 URL 상위 리소스다. 진입 경로가
+              나중에 뭐가 되든(지금은 URL 직접 접근, 나중엔 다른 경로일 수도 있다) 뒤로가기는
+              항상 목록으로 돌아가는 게 자연스럽다. */}
+          <Link aria-label="목록으로 돌아가기" className="gss-back" to="/app/games">‹</Link>
           <div className="gss-file-menu-anchor">
             <button
               aria-expanded={showFileMenu}
@@ -1328,6 +1373,18 @@ export const GameStudioShell = ({
             title={publisher === null ? '서버 Draft/Publish 연결 시 자동 활성화됩니다.' : '현재 초안을 검증하고 새 공개 버전을 만듭니다.'}
             type="button"
           >게시하기</button>
+          {visibilityPort !== null && gameVisibility !== null && (
+            <button
+              aria-pressed={gameVisibility === 'PUBLIC'}
+              className="gss-guide-button"
+              disabled={visibilityStatus === 'loading' || visibilityStatus === 'saving'}
+              onClick={() => void toggleVisibility()}
+              title={gameVisibility === 'PUBLIC'
+                ? '클릭하면 비공개로 전환합니다. 게스트가 더 이상 플레이할 수 없습니다.'
+                : '클릭하면 공개로 전환합니다. 게시된 버전을 게스트도 플레이할 수 있게 됩니다.'}
+              type="button"
+            >{gameVisibility === 'PUBLIC' ? '🌐 공개됨' : '🔒 비공개'}</button>
+          )}
           {lastPublishedVersion !== null && (
             <button
               className="gss-guide-button"

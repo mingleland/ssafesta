@@ -117,17 +117,6 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
 
   return (
     <div ref={layerRef} className={open ? 'world-chat world-chat-open' : 'world-chat'}>
-      <button
-        type="button"
-        className="world-chat-launcher"
-        // 게스트에게도 버튼은 보인다. 실제 disabled 로 만들면 클릭이 오지 않아 왜 못 쓰는지
-        // 알려 줄 자리가 없다 — 표현만 비활성으로 두고 클릭은 받는다.
-        aria-disabled={!member}
-        onClick={() => (member ? openWorldChat() : noticeMemberOnly())}
-      >
-        채팅
-      </button>
-
       {/* 로그 전체에 aria-live 를 걸면 새 줄 하나마다 전부가 다시 읽힌다 — 새로 온 것만 따로 알린다 */}
       <p className="world-chat-sr" aria-live="polite">
         {latestAnnouncement}
@@ -173,33 +162,38 @@ export function WorldChatLayer({ onHeightChange }: { onHeightChange?: (height: n
         </p>
       )}
 
-      {open && (
-        <>
-          {/* 게스트는 연결 자체를 시도하지 않는다 — 그 상태를 끊김으로 알리면 거짓말이 된다 */}
-          {member && offline && (
-            <p className="world-chat-status" role="status">
-              {status === 'reconnecting' ? '채팅 연결 중…' : '채팅 연결이 끊어졌습니다'}
-            </p>
-          )}
-          <div className={offline ? 'world-chat-input-row world-chat-input-row-offline' : 'world-chat-input-row'}>
-          <input
-            id={WORLD_CHAT_INPUT_ID}
-            ref={inputRef}
-            className={over ? 'world-chat-input world-chat-input-over' : 'world-chat-input'}
-            value={draft}
-            onChange={(event) => setWorldChatDraft(event.target.value)}
-            placeholder="Enter 로 보내고 ESC 로 닫습니다"
-            aria-label="채팅 입력"
-            autoComplete="off"
-          />
-          {countCodePoints(draft) >= COUNTER_FROM && (
-            <span className="world-chat-count">
-              {countCodePoints(draft)}/{MAX_CHAT_CODE_POINTS}
-            </span>
-          )}
-          </div>
-        </>
+      {/* 게스트는 연결 자체를 시도하지 않는다 — 그 상태를 끊김으로 알리면 거짓말이 된다 */}
+      {open && member && offline && (
+        <p className="world-chat-status" role="status">
+          {status === 'reconnecting' ? '채팅 연결 중…' : '채팅 연결이 끊어졌습니다'}
+        </p>
       )}
+
+      {/* 입력창은 **항상 떠 있다** (2026-09-16). 예전에는 '채팅' 버튼을 눌러야 나타났는데, 버튼과
+          입력창이 같은 자리를 번갈아 쓰면서 쓸 수 있는지조차 한눈에 안 보였다. 지금은 늘 보이고,
+          거기 focus 가 있는 동안만 Active 다 — focus 가 곧 키보드 주인이라(`captureAllKeyboardInput=false`)
+          그 사실이 그대로 WASD 라우팅과 맞는다. */}
+      <div className={offline ? 'world-chat-input-row world-chat-input-row-offline' : 'world-chat-input-row'}>
+        <input
+          id={WORLD_CHAT_INPUT_ID}
+          ref={inputRef}
+          className={over ? 'world-chat-input world-chat-input-over' : 'world-chat-input'}
+          value={draft}
+          // 게스트는 칸을 보되 쓰지는 못한다. disabled 로 두면 focus 가 오지 않아 왜 못 쓰는지
+          // 알려 줄 자리가 없다 — readOnly 로 두고 이유를 말한다.
+          readOnly={!member}
+          onFocus={() => (member ? openWorldChat() : noticeMemberOnly())}
+          onChange={(event) => setWorldChatDraft(event.target.value)}
+          placeholder={member ? 'Enter 로 보냅니다' : '로그인하면 채팅할 수 있습니다'}
+          aria-label="채팅 입력"
+          autoComplete="off"
+        />
+        {countCodePoints(draft) >= COUNTER_FROM && (
+          <span className="world-chat-count">
+            {countCodePoints(draft)}/{MAX_CHAT_CODE_POINTS}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

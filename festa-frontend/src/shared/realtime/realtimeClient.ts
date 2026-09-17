@@ -185,9 +185,21 @@ export async function connectRealtime(): Promise<void> {
 
   next.onopen = () => {
     // 토큰은 CONNECT 헤더로만 넘긴다. URL query 에 실으면 접근 로그에 남는다 (헌법 13조).
+    //
+    // heart-beat 의 두 번째 값이 0 이 아닌 이유 (S15P21A604-819, GitLab #210): 이 소켓 위로
+    // 흐르는 것은 구독 둘뿐이고, 아무도 채팅을 치지 않으면 바이트가 0 이다. 그 유휴 소켓을
+    // 중간 계층이 Close handshake 없이 끊어 code=1006 reason="" 이 반복됐다 — 우리 nginx 는
+    // proxy_read_timeout 180s 이고 앞단 Cloudflare 도 유휴 연결을 자체적으로 정리한다.
+    //
+    // "0,20000" 은 "나는 보내지 않고, 서버는 20초 안쪽으로 보내 달라" 다. 협상값이
+    // max(서버 송신값, 클라 수신 희망값) 이라 **BE 의 setHeartbeatValue 와 짝이어야 효과가 난다** —
+    // 서버가 0 이면 아무것도 오지 않고 동작은 종전과 같다(무해).
+    //
+    // 타이머도 watchdog 도 만들지 않는다. 서버가 보내는 개행 한 줄은 decodeFrame 이 null 로
+    // 흘려보내고 handleFrame 이 첫 줄에서 반환한다 — 이미 통과하는 경로다.
     write({
       command: 'CONNECT',
-      headers: { 'accept-version': '1.2', 'heart-beat': '0,0', Authorization: 'Bearer ' + token },
+      headers: { 'accept-version': '1.2', 'heart-beat': '0,20000', Authorization: 'Bearer ' + token },
       body: '',
     });
   };

@@ -14,11 +14,13 @@ import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 
 /** Grants, spends and the balance/ledger invariant (spec 003 User Story 1). */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class WalletServiceIntegrationTest {
 
     @Autowired private WalletService wallets;

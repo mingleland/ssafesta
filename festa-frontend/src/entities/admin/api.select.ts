@@ -1,0 +1,7 @@
+// 관리자 API 의 mock/real 선택 지점 — 다른 entities 와 같은 상용구 (VITE_USE_MOCK)
+import { adminApi as realApi } from './api';
+import { adminApi as mockApi } from './api.mock';
+import type { AdminRepository } from './types';
+
+export const adminApi: AdminRepository = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : realApi;
+

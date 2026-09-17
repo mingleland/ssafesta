@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { openVisitorOverlay } from '../model/worldScreen';
 import { hasSeenWorldGuide } from '../model/worldGuide';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 const IcHelp = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -27,14 +28,15 @@ export function WorldGuideLauncher() {
   }, []);
 
   return (
-    <button
-      type="button"
-      className="world-hud-help"
-      aria-label="이용 안내"
-      title="이용 안내"
-      onClick={() => openVisitorOverlay('WORLD_GUIDE', {})}
-    >
-      {IcHelp}
-    </button>
+    <Tooltip content="이용 안내" placement="left">
+      <button
+        type="button"
+        className="world-hud-help"
+        aria-label="이용 안내"
+        onClick={() => openVisitorOverlay('WORLD_GUIDE', {})}
+      >
+        {IcHelp}
+      </button>
+    </Tooltip>
   );
 }

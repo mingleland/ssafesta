@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import com.example.ssafesta.storage.FakeObjectStorage;
-import com.example.ssafesta.storage.FakeObjectStorageConfiguration;
 import com.example.ssafesta.storage.StorageUnavailableException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +56,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * here rather than read from the service: its shape is in contract §8, and a key that quietly
  * changed shape would still round-trip through a helper that asked the service for it.
  */
-@Import({TestcontainersConfiguration.class, FakeObjectStorageConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 class GameAssetApiIntegrationTest {

@@ -1,5 +1,5 @@
 /// <reference types="node" />
-// 전역 선택 정책 회귀 (S15P21A604-464).
+// 전역 선택·포인터 정책 회귀 (S15P21A604-464).
 //
 // CSS 규칙이라 컴포넌트 테스트로는 잡히지 않는다 — jsdom 은 링크된 스타일시트를 적용하지
 // 않고 user-select 를 계산하지도 않는다. 그래서 규칙 자체가 index.css 에 남아 있는지를
@@ -53,5 +53,21 @@ describe('다시 여는 자리 — 하나라도 빠지면 사용자가 글자를
     const block = blockFor('.selectable {');
     expect(block).toContain('user-select:text');
     expect(block).toContain('-webkit-user-select:text');
+  });
+});
+
+// Unity 는 `Cursor.visible` 이 바뀔 때마다 캔버스에 `style.cursor` 를 인라인으로 쓴다.
+// `!important` 가 빠지면 캔버스 위에서만 브랜드 포인터가 조용히 사라진다.
+describe('브랜드 포인터', () => {
+  it('body 가 커스텀 포인터를 깐다', () => {
+    const body = blockFor('body {');
+    expect(body).toContain("cursor:url('/cursors/festa-pointer.png')72,auto");
+  });
+
+  it('Unity 캔버스는 인라인 커서를 이기도록 !important 로 되돌린다', () => {
+    const canvas = blockFor('#unity-canvas {');
+    expect(canvas).toContain("cursor:url('/cursors/festa-pointer.png')72,auto!important");
+    expect(canvas).toContain('image-set(');
+    expect(canvas.match(/!important/g)).toHaveLength(2);
   });
 });

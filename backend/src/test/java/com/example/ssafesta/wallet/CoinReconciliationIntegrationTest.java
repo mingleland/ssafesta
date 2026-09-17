@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.config.FixedDelayTask;
@@ -22,6 +23,7 @@ import org.springframework.scheduling.config.ScheduledTaskHolder;
 /** Reconciliation and administrator adjustment (spec 003 FR-013, FR-014). */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
+@AutoConfigureMockMvc
 class CoinReconciliationIntegrationTest {
 
     @Autowired private WalletService wallets;

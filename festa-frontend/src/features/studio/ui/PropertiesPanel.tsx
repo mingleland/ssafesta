@@ -10,6 +10,7 @@ import { resolveLocalBounds } from '../model/useBoothAssets';
 import { CONFIG_ID_MAX, CONFIG_ID_MIN } from '../../../shared/config/studio';
 import { clampObjectToBooth, normalizeRotation } from '../lib/coords';
 import { IcTrash } from './shell/icons';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 interface Props {
   object: LayoutObject;
@@ -102,9 +103,11 @@ export function PropertiesPanel({
           <label className="studio-input"><span className="studio-input-axis" data-axis="x">X</span>
             <input type="number" step={0.25} value={xText} aria-label="x" onChange={(e) => setXText(e.target.value)} onBlur={() => commitPosition(xText, zText)} />
           </label>
-          <label className="studio-input" title="편집기는 바닥 높이 0 으로 고정 기록한다"><span className="studio-input-axis" data-axis="y">Y</span>
-            <input type="number" value={0} aria-label="y" readOnly />
-          </label>
+          <Tooltip content="편집기는 바닥 높이 0 으로 고정 기록한다">
+            <label className="studio-input"><span className="studio-input-axis" data-axis="y">Y</span>
+              <input type="number" value={0} aria-label="y" readOnly />
+            </label>
+          </Tooltip>
           <label className="studio-input"><span className="studio-input-axis" data-axis="z">Z</span>
             <input type="number" step={0.25} value={zText} aria-label="z" onChange={(e) => setZText(e.target.value)} onBlur={() => commitPosition(xText, zText)} />
           </label>
@@ -168,7 +171,12 @@ export function PropertiesPanel({
             {info.warnOnMissingConfig && configText === '' && <p className="studio-note">연결이 없으면 게시 시 경고 대상입니다.</p>}
           </>
         ) : (
-          <p className="studio-note">홈페이지 주소는 부스 설정(외관 모드)에서 등록합니다.</p>
+          // 연결이 필요한데 configId 로 하지 않는 타입들 — 어디서 등록하는지가 타입마다 다르다.
+          <p className="studio-note">
+            {object.type === 'PROJECT_PANEL'
+              ? '전시 프로젝트는 부스 관리 › 프로젝트에서 등록합니다.'
+              : '홈페이지 주소는 부스 설정(외관 모드)에서 등록합니다.'}
+          </p>
         )}
       </div>
 

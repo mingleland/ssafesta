@@ -6,6 +6,7 @@
 //
 // Project 로고를 부스 대표 이미지로 쓰지 않는다(RULE 11) — Booth ≠ Project.
 import type { BoothFacade } from '../../../entities/booth/types';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 import './boothMiniPreview.css';
 
 /** themeCode 별 배경/차양 골격. primaryColor 가 없을 때의 기본 강조색도 여기서 준다 */
@@ -42,9 +43,10 @@ export function BoothMiniPreview({ facade, boothName }: Props) {
             {sign.slice(0, 1)}
           </span>
         )}
-        <span className="bmp-sign" title={sign}>
-          {sign}
-        </span>
+        {/* 간판은 폭이 좁아 잘린다 — 잘린 글자를 읽을 방법을 남긴다 */}
+        <Tooltip content={sign}>
+          <span className="bmp-sign">{sign}</span>
+        </Tooltip>
       </div>
 
       <div className="bmp-floor" aria-hidden="true" />

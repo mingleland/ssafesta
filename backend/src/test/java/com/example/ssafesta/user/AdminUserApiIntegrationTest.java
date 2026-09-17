@@ -86,6 +86,57 @@ class AdminUserApiIntegrationTest {
         assertEquals(actionsBefore + 2, count("admin_actions", target));
     }
 
+    /**
+     * The console's member search (S15P21A604-832, GitLab #217) — the one path that turns a
+     * nickname or a pasted id into the {@code userId} every other admin API requires.
+     */
+    @Test
+    void searchFindsByNicknameFragmentOrExactId() throws Exception {
+        Long actor = newAdmin("검색운영자");
+        Long target = newMember("검색대상닉네임");
+
+        mockMvc.perform(get("/api/v1/admin/users").param("query", "검색대상")
+                        .header("Authorization", bearerFor(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.userId == " + target + ")]").exists())
+                .andExpect(jsonPath("$.content[?(@.userId == " + target + ")].admin").value(false));
+
+        // A random test nickname can coincidentally contain the id's digits, so this only asserts
+        // the exact-id match is present — not that it is the only row.
+        mockMvc.perform(get("/api/v1/admin/users").param("query", target.toString())
+                        .header("Authorization", bearerFor(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.userId == " + target + ")]").exists());
+    }
+
+    @Test
+    void detailReturns404ForANonexistentUserAndNotAnAuthFailure() throws Exception {
+        Long actor = newAdmin("상세조회자");
+        Long target = newMember("상세대상");
+
+        mockMvc.perform(get("/api/v1/admin/users/" + target).header("Authorization", bearerFor(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(target))
+                .andExpect(jsonPath("$.admin").value(false));
+
+        mockMvc.perform(get("/api/v1/admin/users/999999999").header("Authorization", bearerFor(actor)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ADMIN_TARGET_NOT_FOUND"));
+    }
+
+    /** A mistyped userId must read as a missing resource, not as the caller's own auth failing. */
+    @Test
+    void suspendingANonexistentTargetIs404NotAnAuthFailure() throws Exception {
+        Long actor = newAdmin("정지시도자");
+
+        mockMvc.perform(post("/api/v1/admin/users/999999999/suspend")
+                        .header("Authorization", bearerFor(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"정책 위반\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ADMIN_TARGET_NOT_FOUND"));
+    }
+
     @Test
     void masterAndLastActiveAdminAreProtected() throws Exception {
         Long actor = newAdmin("운영자");

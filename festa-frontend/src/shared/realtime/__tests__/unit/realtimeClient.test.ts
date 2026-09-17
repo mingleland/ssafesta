@@ -217,3 +217,34 @@ describe('연결 상태 (S15P21A604-790)', () => {
     vi.restoreAllMocks();
   });
 });
+
+// S15P21A604-819 — 유휴 소켓이 Close handshake 없이 끊기던 자리(GitLab #210).
+describe('유휴 끊김 방지 heartbeat (S15P21A604-819)', () => {
+  it('CONNECT 가 서버에 heartbeat 를 요청한다 — 0,20000', async () => {
+    await connectRealtime();
+    const socket = FakeSocket.last!;
+    socket.accept();
+
+    const connect = socket.frames().find((f) => f?.command === 'CONNECT');
+    // 앞자리 0 은 그대로다 — 클라이언트는 보내지 않고 타이머도 만들지 않는다.
+    expect(connect?.headers['heart-beat']).toBe('0,20000');
+  });
+
+  it('서버 heartbeat(개행 한 줄)는 상태를 바꾸지 않고, 그 뒤 MESSAGE 가 그대로 온다', async () => {
+    const chat: string[] = [];
+    subscribeRealtime(WORLD_CHAT_TOPIC, (body) => chat.push(body));
+    await connectRealtime();
+    const socket = FakeSocket.last!;
+    socket.accept();
+    const subId = socket.frames().find((f) => f?.command === 'SUBSCRIBE')!.headers.id;
+
+    // STOMP heartbeat 는 개행 하나다. \r\n 으로 오는 서버도 있어 둘 다 본다.
+    expect(() => socket.onmessage?.({ data: '\n' })).not.toThrow();
+    expect(() => socket.onmessage?.({ data: '\r\n' })).not.toThrow();
+    expect(getRealtimeStatus()).toBe('connected');
+    expect(chat).toEqual([]);
+
+    socket.onmessage?.({ data: 'MESSAGE\nsubscription:' + subId + '\n\n{"content":"hi"}\u0000' });
+    expect(chat).toEqual(['{"content":"hi"}']);
+  });
+});

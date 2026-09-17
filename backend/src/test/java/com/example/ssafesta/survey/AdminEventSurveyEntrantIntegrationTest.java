@@ -87,6 +87,43 @@ class AdminEventSurveyEntrantIntegrationTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 
+    @Test
+    void listShowsTheSeededEventSurveyWithItsCounts() throws Exception {
+        Long earlier = member("목록참여자");
+        responses.saveAndFlush(SurveyResponse.byMember(eventSurveyId, earlier,
+                Instant.parse("2026-09-16T01:00:00Z")));
+        Long administrator = administrator("목록운영자");
+
+        mockMvc.perform(get("/api/v1/admin/event-surveys").header("Authorization", bearer(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.surveyKey == '" + EVENT_KEY + "')]").exists())
+                .andExpect(jsonPath("$[?(@.surveyKey == '" + EVENT_KEY + "')].entrantCount").value(1));
+    }
+
+    @Test
+    void aggregateAndResponseDetailReadOneSubmission() throws Exception {
+        Long respondent = member("집계참여자");
+        SurveyResponse response = responses.saveAndFlush(SurveyResponse.byMember(eventSurveyId, respondent,
+                Instant.parse("2026-09-16T03:00:00Z")));
+        Long administrator = administrator("집계운영자");
+
+        mockMvc.perform(get("/api/v1/admin/event-surveys/{key}/aggregate", EVENT_KEY)
+                        .header("Authorization", bearer(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+
+        mockMvc.perform(get("/api/v1/admin/event-surveys/{key}/responses/{id}", EVENT_KEY, response.getId())
+                        .header("Authorization", bearer(administrator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(respondent))
+                .andExpect(jsonPath("$.nickname").value(startsWith("집계참여자")));
+
+        mockMvc.perform(get("/api/v1/admin/event-surveys/{key}/responses/{id}", EVENT_KEY, 999999999L)
+                        .header("Authorization", bearer(administrator)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
     private Long member(String nickname) {
         return createMemberWithWallet(users, wallets, nickname);
     }
