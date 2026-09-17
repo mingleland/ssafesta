@@ -148,6 +148,18 @@ class AccountWithdrawalResourceCleanupIntegrationTest {
         assertEquals(0, count("SELECT count(*) FROM oauth_identities WHERE user_id = ?", userId));
     }
 
+    /** Presets are member-owned durable state too, so their FK must not make withdrawal fail. */
+    @Test
+    void withdrawingCascadesToAvatarPresets() {
+        Long userId = member("프리셋탈퇴");
+        jdbc.update("INSERT INTO avatar_presets(user_id, slot, avatar_code, updated_at) VALUES (?, 1, 'sk_01', now())", userId);
+
+        lifecycle.withdraw(userId);
+
+        assertEquals(0, count("SELECT count(*) FROM avatar_presets WHERE user_id = ?", userId));
+        assertEquals(0, count("SELECT count(*) FROM users WHERE id = ?", userId));
+    }
+
     // ── 도우미 ──────────────────────────────────────────────────────────────
 
     /**

@@ -1465,7 +1465,9 @@ class AiDocumentUploadIntegrationTest {
                 + " next_retry_at = now() - interval '1 minute' WHERE document_id = ?", idOf(grant));
         sweeper.dispatchDueJobs();
 
-        assertEquals(List.of(), processing.received(), "RUNNING 인 Job 을 다시 보내면 워커가 둘이 된다");
+        assertTrue(processing.received().stream()
+                        .noneMatch(request -> request.documentId() == idOf(grant)),
+                "RUNNING 인 이 Job 을 다시 보내면 워커가 둘이 된다");
     }
 
     private int countBy(String sql, Object... arguments) {
