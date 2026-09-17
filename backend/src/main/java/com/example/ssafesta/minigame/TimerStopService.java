@@ -18,7 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The timing-stop minigame — the one game spec 014 FR-009 allows (헌법 28조).
+ * The timing-stop minigame (spec 014). Since 2026-09-16 it is one of two — the plaza slot machine
+ * is the other ({@link SlotMachineService}, spec 021) — and the two share only the wallet.
  *
  * <p><b>The server owns the verdict.</b> It issues the target time, keeps its own start instant,
  * computes the error, picks the reward band, writes the ledger and applies the daily cap. The only

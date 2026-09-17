@@ -17,22 +17,17 @@
   background: rgba(10, 14, 34, 0.55);
 }
 
-.world-chat-launcher {
-  align-self: flex-start;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(10, 14, 34, 0.6);
-  color: #fff;
-  font-size: 0.8rem;
-  cursor: pointer;
+/* Passive 입력칸 — 늘 떠 있지만 월드를 가리지 않게 물러나 있다. 다만 여기가 채팅 자리라는
+   것은 읽혀야 해서 완전히 흐리게 두지 않는다. focus 하면 선명해진다. */
+.world-chat:not(.world-chat-open) .world-chat-input {
+  opacity: 0.72;
+  background: rgba(10, 14, 34, 0.62);
 }
+.world-chat-input:focus { opacity: 1; }
+.world-chat-input::placeholder { color: rgba(255, 255, 255, 0.62); }
 
-/* 게스트 — 표현만 비활성이다. 클릭은 그대로 받아 안내를 띄운다 */
-.world-chat-launcher[aria-disabled='true'] {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* 게스트 — 쓸 수 없다는 것만 보이고 이유는 focus 했을 때 말한다 */
+.world-chat-input[readonly] { cursor: not-allowed; }
 
 .world-chat-log {
   list-style: none;
@@ -65,6 +60,20 @@
 
 .world-chat:not(.world-chat-open) .world-chat-log li {
   animation: world-chat-fade 14s ease-in forwards;
+}
+
+/* 말 본문과 섞지 않는다. 입장 알림은 사람이 한 말이 아니라 월드 상태 변화다. */
+.world-chat-join {
+  align-self: center;
+  width: fit-content;
+  margin: 0.2rem auto;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid rgba(126, 224, 165, 0.42);
+  border-radius: 999px;
+  background: rgba(16, 50, 39, 0.56);
+  color: #a9eec2;
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 @media (prefers-reduced-motion: reduce) {

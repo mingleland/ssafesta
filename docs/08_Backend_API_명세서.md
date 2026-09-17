@@ -130,7 +130,18 @@ Idempotency-Key: <client-generated-uuid>
 Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh 정책은 보안 설계에서 확정한다.
 
 **세션이 없으면 `401 INVALID_MEMBER_TOKEN` 이다** (#113, 2026-08-27 확정). 쿠키가 **없는 경우·만료된 경우·
-이미 쓰인 경우**가 전부 같은 코드다 — 사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 두 이름을 주지 않는다.
+계보가 폐기된 경우**가 전부 같은 코드다 — 사용자에게는 "로그인돼 있지 않다" 하나의 사건이라 두 이름을 주지 않는다.
+
+**한 가지만 갈라져 있다 — `401 REFRESH_TOKEN_ROTATED`** (`S15P21A604-764`, GitLab #198). 방금 회전된 토큰이
+다시 온 경우이고, 탭을 하나 더 열면 그 탭도 부트스트랩에서 이 endpoint 를 부르기 때문에 정상 사용에서 생긴다.
+**세션은 살아 있고 쿠키는 이미 새 값으로 교체돼 있다** — 이 응답은 `Set-Cookie` 를 내지 않으며, 한 번 더 보내면
+성공한다. 로그인 화면으로 보내면 안 된다.
+
+> **즉시 한 번이 아니라 짧은 backoff 를 둔 제한 재시도로 붙인다.** 이 401 이 이긴 쪽의 `Set-Cookie` 보다 먼저
+> 도착할 수 있고, 그때 곧바로 재시도하면 옛 쿠키를 다시 보내게 된다. 서버가 보장하는 것은 "이 401 은 재시도
+> 가능하다" 까지이고 언제 재시도할지는 클라이언트 몫이다 — 응답 순서는 서버가 정할 수 없다.
+
+유예는 `app.auth.refresh-reuse-grace`(기본 `PT30S`)다. 그 창 밖의 재사용은 그대로 계보째 끊는다(spec 001 시나리오 7).
 
 - 쿠키가 없는 것은 **정상 상태**다. FE 는 페이지 로드마다 이 endpoint 를 1회 호출하는데, RT 는 HttpOnly 라
   FE 가 존재 여부를 읽을 수 없고 그게 설계 의도다(헌법 13조). 따라서 비로그인·게스트 방문자는 매번 이 401 을
@@ -407,7 +418,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
   "templates": [
     {
       "template": "PROJECT_EXHIBITION",
-      "footprint": {"width": 6.0, "depth": 6.0, "height": 2.72},
+      "footprint": {"width": 9.4, "depth": 6.0, "height": 5.9},
       "maxObjects": 12
     }
   ]
@@ -415,7 +426,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 ```
 
 - `template` 허용값은 `PROJECT_EXHIBITION` 단독 — `DEFAULT`는 셸 1종·1:1 확정으로 제거(V11 이관, #19 ④·#45 C-06).
-- `height` 2.72는 셸 벽 패널 실측이다. Layout 좌표·실물 검증도 같은 값을 쓴다 (`0 ≤ y ≤ 2.72`).
+- **치수는 `9.4 × 6 × 5.9`로 개정됐다** (`S15P21A604-698`, GitLab #181, 2026-09-15). `width`(x)와 `depth`(z)가 다르므로 **한 값을 양축에 쓰지 않는다** — Layout 좌표·실물 검증도 같은 값을 쓴다 (`|x| ≤ 4.7`, `|z| ≤ 3`, `0 ≤ y ≤ 5.9`). 옛 `6 × 6 × 2.72`의 높이는 방 높이가 아니라 셸 교체 이전 벽 패널 높이였다. 값은 서버 검증 상수에서 유도되므로 검증과 카탈로그가 어긋나지 않는다.
 - 검증 오류·경고 rule 추가분: 실물 영역 이탈 `AREA_OUT_OF_BOUNDS`(error), 통행 판정
   `FRONT_BLOCKED`·`ISOLATED_AREA`(warning, 공개 시점만). 기하 계약 상세는
   `specs/005-booth-studio-layout/contracts/layout-api.md` §10.
@@ -440,7 +451,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - `signText`: 60자 이하 또는 null
 - `logoUrl`: **https만 허용**, 2048자 이하 또는 null (http는 mixed content로 차단되어 조용히 안 보인다)
 
-소유자·Staff만 호출할 수 있고, 필드 검증 실패는 `400 VALIDATION_FAILED`(#17 확정 — 예:
+소유자·허용 Staff 또는 전역 Admin이 호출할 수 있다. 전역 Admin의 타 부스 변경은 `BOOTH_EDIT` 감사 대상이며, 마스터 소유 부스는 `403 MASTER_PROTECTED`다. 필드 검증 실패는 `400 VALIDATION_FAILED`(#17 확정 — 예:
 `"대표색은 #RRGGBB 형식이어야 합니다."`), 만료된 부스는 `409 BOOTH_LEASE_EXPIRED`다. 조회는
 `GET /booths/{boothId}`의 `facade` 필드를 쓴다.
 
@@ -463,10 +474,11 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 - `{ "homepageUrl": null }` = **등록 해제**. 빈 문자열 `""`은 해제가 아니라 400이고, **필드가 없는 `{}`도 400**이다 — 해제는 명시적 `null`만 인정한다(직렬화 실수로 URL이 조용히 지워지는 것을 막는다).
 - 검증은 순서대로 첫 위반에서 거부하고 **사유별 다른 문장**을 준다: 필드 부재 → blank → 길이 ≤ 2048 → URI 파싱·절대 URI → scheme ∈ {`http`, `https`} → host 존재. **scheme을 host보다 먼저 본다** — `javascript:`·`data:`는 host가 없어 순서가 뒤바뀌면 스킴 위반이라는 실제 사유가 전달되지 않는다.
 - **`http`를 허용한다**(facade `logoUrl`과 의도적 비대칭) — 로고는 페이지 안에 임베드되어 mixed content로 조용히 죽지만, 홈페이지는 이동 대상이고 iframe이 막히면 새 탭으로 연다. 혼합콘텐츠 경고 UX는 React 몫.
-- 소유자·Staff만 호출할 수 있다(facade·layout과 동일한 편집자 범위). 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 코드·rule 없음.**
+- 소유자·허용 Staff 또는 전역 Admin이 호출할 수 있다(facade·layout과 같은 편집자 범위). 전역 Admin이 타 부스를 변경하면 `admin_actions`에 `BOOTH_EDIT`를 남기며, 마스터 소유 부스는 `403 MASTER_PROTECTED`로 거부한다. 실패: `400 VALIDATION_FAILED` + `errors[0] = { rule: "FIELD_INVALID", field: "homepageUrl", message }` · `401` · `403 BOOTH_EDITOR_FORBIDDEN`/`MASTER_PROTECTED` · `404 BOOTH_NOT_FOUND` · `409 BOOTH_LEASE_EXPIRED`. **신규 오류 `rule` 없음.**
 - 서버는 URL의 도달성·iframe 삽입 가능 여부를 판정하지 않는다 — 사전 판정이 불가능하고, 시도·감지·fallback은 React 레이어다.
 - **Publish 검증 연동**: `LAPTOP` 오브젝트가 있는데 이 URL이 미등록이면 Publish 응답에 warning `CONFIG_NOT_LINKED`("홈페이지 주소가 등록되지 않았습니다.")가 실린다. `LAPTOP`은 `configId`를 갖지 않으므로 판정 근거가 `configId` 부재가 아니라 **URL 미등록**이다 — 코드·봉투는 기존 그대로. FE는 `LAPTOP`에 `configId`를 보내지 않는다(보내면 `CONFIG_UNVERIFIED`가 붙는다).
 - **`SURVEY_KIOSK`도 같은 모양이다** (`S15P21A604-699`, GitLab #181): 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 그래서 판정 근거가 `configId` 부재가 아니라 **그 부스에 설문이 없음**이고, warning `CONFIG_NOT_LINKED`("이 부스에 설문이 없습니다.")로 나간다. **게시는 막지 않는다**(C-04) — 키오스크를 먼저 놓고 설문을 나중에 만드는 순서가 정상이다. `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
+- **`PROJECT_PANEL`도 같은 모양이다** (`S15P21A604-765`, GitLab #194): 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다. 판정 근거는 **그 부스에 프로젝트가 없음**이고 warning `CONFIG_NOT_LINKED`("이 부스에 프로젝트가 없습니다.")로 나간다. **게시는 막지 않는다**(C-04). `configId`를 실어 보내도 서버가 읽지 않으며 `CONFIG_UNVERIFIED`도 붙지 않는다.
 
 ---
 
@@ -475,7 +487,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 부스가 전시하는 프로젝트. **부스당 1개**다 (spec 009 C-01, 2026-08-28 확정). 정본 계약은
 `specs/009-project-exhibition/contracts/project-api.md`.
 
-편집 권한은 **소유자 또는 스태프**(facade·layout과 같은 편집자 범위, `BoothAccessGuard`).
+편집 권한은 **소유자·허용 스태프 또는 전역 Admin**(facade·layout과 같은 편집자 범위, `BoothAccessGuard`)이다. 전역 Admin의 타 부스 변경은 17B의 마스터 보호·감사 규칙을 따른다.
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (009 FR-008 — 만료돼도 데이터는 보존된다).
 
@@ -626,7 +638,7 @@ Unity가 부스 방(앵커)에서 호출하는 경로. **인증 불필요.** 응
 AI 실행 자체는 FastAPI가 담당하지만 Agent 설정 Source of Truth는 Spring을 기본으로 한다.
 정본 계약은 `specs/007-ai-agent-document/spec.md`(C-12·C-13·C-14·C-15).
 
-편집 권한은 **소유자 또는 스태프**(`BoothAccessGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15).
+편집 권한은 **소유자·허용 스태프 또는 전역 Admin**(`BoothAccessGuard` — §4·§5와 같은 편집자 범위, spec 007 C-15)이다. 전역 Admin의 타 부스 변경은 17B의 마스터 보호·감사 규칙을 따른다.
 회원만 — 게스트는 `403 MEMBER_ONLY`. 쓰기는 **유효 임대**를 요구하고, 읽기는 만료돼도 된다
 (007 FR-015 — 만료돼도 설정은 보존된다).
 
@@ -1027,7 +1039,7 @@ Job 이라 `410 JOB_GONE` 으로 거부된다. 한 건이 실패하면 **남은 
 
 **AI 처리 서버가 죽어 있어도 답한다** (US2 시나리오 7). 모든 값이 Spring 의 문서 행에 있다.
 
-권한은 부스 편집자(소유자·Staff)다. 발급·완료와 달리 **활성 임대를 요구하지 않는다** — FR-015 가
+권한은 부스 편집자(소유자·허용 Staff·전역 Admin)다. 발급·완료와 달리 **활성 임대를 요구하지 않는다** — FR-015 가
 만료 시 원본과 메타데이터를 보존하므로, 조회까지 막으면 그 보존이 의미가 없다.
 실패: `401` · `403 MEMBER_ONLY`(게스트)·`BOOTH_EDITOR_FORBIDDEN` · `404 AGENT_NOT_FOUND`.
 
@@ -1134,7 +1146,7 @@ Unity 가 `{boothId, objectId}` 만 보내고 설문 식별자를 모르므로 �
 
 ### `GET /surveys/{surveyId}/results`
 
-Owner·허용된 Staff 용. 집계는 **서버가 계산**하고 원본 응답은 내려가지 않는다(FR-007). 전체 응답 수·최초/최근 응답 시각·문항별 응답 수·선택지별 수·별점 평균과 분포·주관식 첫 페이지. **비율은 싣지 않는다** — 복수선택은 합이 100% 를 넘으므로 화면이 `count / answeredCount` 로 계산한다. 응답 0건이면 모든 문항이 0 이고 `average` 는 `null` 이다(FR-012).
+Owner·허용된 Staff·전역 Admin 용. 집계는 **서버가 계산**하고 원본 응답은 내려가지 않는다(FR-007). 전체 응답 수·최초/최근 응답 시각·문항별 응답 수·선택지별 수·별점 평균과 분포·주관식 첫 페이지. **비율은 싣지 않는다** — 복수선택은 합이 100% 를 넘으므로 화면이 `count / answeredCount` 로 계산한다. 응답 0건이면 모든 문항이 0 이고 `average` 는 `null` 이다(FR-012).
 
 응답자 식별 정보는 어떤 필드에도 없다(FR-009). 주관식 항목의 `responseId` 는 같은 사람의 답을 묶는 열쇠일 뿐이다.
 
@@ -1242,7 +1254,7 @@ SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 �
 봉투        { type, requestId, occurredAt, … }
 ```
 
-방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`.
+방문자 `accepted`·`expired`·`ended` / 직원 `requested`·`cancelled`·`expired`·`taken`·`ended`. 종료는 양쪽으로 가며 종료를 호출한 직원 본인도 받는다 (2026-09-14, GitLab #133).
 
 > **이벤트 재전송은 P1 에 없다.** 끊긴 사이의 변화는 유실되고 클라이언트는 재연결 직후 대기열과 요청 상태를 REST 로 다시 읽는다. **정본은 REST 이고 STOMP 는 알림이다.**
 
@@ -1488,7 +1500,7 @@ Owner · `ADMIN` · `CONTENT_EDITOR` 만. `CONSULTANT` 는 제외된다 — 상�
 | 오류 | 조건 |
 |---|---|
 | `400 VALIDATION_FAILED` | `from` 이 `to` 보다 뒤이거나 같다 |
-| `403 BOOTH_EDITOR_FORBIDDEN` | 호출자가 Owner·`ADMIN`·`CONTENT_EDITOR` 가 아니다 |
+| `403 BOOTH_EDITOR_FORBIDDEN` | 호출자가 Owner·부스 Staff `ADMIN`·`CONTENT_EDITOR`·전역 Admin 중 어느 것도 아니다 |
 | `404 BOOTH_NOT_FOUND` | 그런 부스가 없다 |
 
 ---
@@ -1622,9 +1634,78 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 
 관리자가 아닌 회원을 강등하면 아무 일도 없이 `204` 다(요청이 바라는 상태가 이미 참이다). **마지막 관리자는 강등할 수 없다**(`409 ADMIN_LAST_ONE`) — 승격 API 자체가 관리자 전용이라 0명이 되면 API 로 되돌릴 수 없다.
 
+### POST `/admin/booths/{boothId}/unpublish`
+
+부스의 현재 공개 배치 포인터를 즉시 해제한다 (`S15P21A604-742` #40). 본문은 `{ "reason": "사유" }`이며 사유는 1~500자로 필수다. → `204 No Content`.
+
+Draft와 공개 회차 이력은 삭제하지 않는다. 방문자·Unity 공개 배치 조회만 즉시 `404 LAYOUT_NOT_PUBLISHED`가 되며, 임대·코인·부스 콘텐츠에도 영향을 주지 않는다. 이미 비공개면 `204` no-op이고 감사 행도 더 만들지 않는다. 성공만 `admin_actions`에 `BOOTH_UNPUBLISH`·`BOOTH`·사유를 남긴다.
+
+오류: `400 VALIDATION_FAILED`(사유 누락·길이 초과) · `403 FORBIDDEN`(관리자 아님) · `403 MASTER_PROTECTED`(마스터 소유 부스) · `404 BOOTH_NOT_FOUND`.
+
+### GET `/admin/event-surveys/{surveyKey}/entrants?page=0&size=20`
+
+이벤트 설문 참여 회원만 최신 제출순으로 페이지 조회한다 (`S15P21A604-742` #59). 전역 Admin 전용이고, 응답은 `{ content: [{ responseId, userId, nickname, submittedAt }], page, size, totalElements, totalPages }`다. 이벤트 설문은 회원 전용이라 게스트 식별자가 섞이지 않는다.
+
+이 식별 정보는 이벤트 운영 목록에만 허용한 예외다. 부스 설문의 결과·주관식 응답 API는 계속 익명이며, 이 경로는 추첨·당첨자 선정·경품 지급·코인 변경을 수행하지 않는다. 오류: `400 VALIDATION_FAILED`(page/size) · `403 FORBIDDEN` · `404 SURVEY_NOT_FOUND`.
+
 **감사** — 승격·강등은 `admin_actions` 에 행위자·대상·사유와 함께 남는다. 이 테이블은 **FK 를 걸지 않는다**: 탈퇴 정리의 마지막 문장이 `DELETE FROM users` 라, 참조가 있으면 한 번이라도 승격된 계정이 탈퇴하지 못한다.
 
-> ⚠️ **아직 없는 것** — 계정 정지·해제, 코인 조정, 부스 강제 회수, 신고, 운영 부스는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다.
+### 기존 부스 운영 API의 전역 Admin 접근 (S15P21A604-742)
+
+새 관리자 전용 URL을 만들지 않는다. 기존 부스의 외관·홈페이지·레이아웃·프로젝트·설문·AI 에이전트·문서·운영 대시보드가 공통 `BoothAccessGuard`를 거친다. 전역 Admin은 타 회원 부스를 **열람**할 수 있고, 활성 임대가 필요한 기존 변경·게시도 수행할 수 있다.
+
+관리자 자격만으로 타 부스를 **변경**할 때는 `admin_actions`에 `action=BOOTH_EDIT`, `target_type=BOOTH`, `target_id=부스 ID`를 같은 트랜잭션으로 남긴다. Owner·허용 Staff가 자신의 기존 권한으로 성공한 요청에는 이 행을 남기지 않는다. 마스터 소유 부스는 열람은 가능하지만 다른 Admin의 변경·게시는 `403 MASTER_PROTECTED`다. 일반 회원·CONSULTANT의 타 부스 요청은 기존 `403 BOOTH_EDITOR_FORBIDDEN`을 유지한다.
+
+> ⚠️ **아직 없는 것** — 신고·모더레이션, 이벤트 경품·추첨·지급, 전역 운영 대시보드는 같은 상위 이슈의 다음 블록이다. 이 절에 없으면 구현되지 않은 것이다. 코인 조정은 아래 17C 로 나갔다.
+
+---
+
+## 17C. Admin — 회원 지갑
+
+관리자가 다른 회원의 코인을 보고 조정한다 (`S15P21A604-806`, 상위 `S15P21A604-742` 블록 2). 판정은 17B 의 `AdminGuard` 를 그대로 쓴다.
+
+**조회는 조치가 아니다** — 잔액·거래내역은 마스터 계정도 대상이 된다. 조정만 `MASTER_PROTECTED` 로 막힌다.
+
+### POST `/admin/wallets/{userId}/adjustments`
+
+코인 지급·회수. 헤더 `Idempotency-Key` **필수**, 본문 `{ "signedAmount": 100, "note": "사유" }`.
+
+`signedAmount` 는 **양수면 지급, 음수면 회수**이고 `0` 은 `400` 이다. 원장에 `ADMIN_ADJUSTMENT` 사유로 한 행이 남고, 참조 칸에는 **수행한 관리자**(`ADMIN_USER` / actorUserId)가 들어간다.
+
+→ `200 { userId, entryId, balanceAfter, alreadyApplied }`
+
+**`Idempotency-Key` 는 조정 한 건의 이름이다.** UUID 여야 하며(`400` 아니면), 같은 조정을 다시 보낼 때는 **같은 값을 그대로** 보낸다. 매번 새로 만들면 재시도가 아니라 새 조정이 되어 두 번 반영된다.
+
+| 재요청 | 결과 |
+|---|---|
+| 같은 키 + 같은 내용 | `200`, `alreadyApplied: true`. 원장도 감사도 늘지 않는다 |
+| 같은 키 + 다른 금액 | `409 IDEMPOTENCY_CONFLICT`. 재시도가 아니라 키 재사용이다 |
+| 같은 키 + 다른 `note` | `200`. `note` 는 동일성 비교에 넣지 않는다 — 원장에 저장되지 않아 비교할 근거가 없다. **처음 문구가 남는다** |
+
+**멱등 범위는 대상 회원별**이다. 서버가 저장하는 키는 `ADMIN_ADJUSTMENT:{userId}:{Idempotency-Key}` 라, 대상이 다르면 같은 UUID 를 써도 별개의 조정이다. 관리자별이 아닌 이유는 그렇게 하면 **한 관리자의 두 번째 조정부터 전부 첫 요청으로 흡수**되기 때문이다.
+
+오류: `403 MASTER_PROTECTED` · `404 ADMIN_TARGET_NOT_FOUND`(회원 없음) · `404 WALLET_NOT_FOUND`(회원인데 지갑 행 없음) · `409 INSUFFICIENT_COIN`(잔액보다 많이 회수) · `409 COIN_BALANCE_OVERFLOW`(지급 후 잔액이 `int` 표현 범위 초과)
+
+### GET `/admin/wallets/{userId}`
+
+잔액. → `200 { userId, balance, updatedAt }`
+
+### GET `/admin/wallets/{userId}/ledger`
+
+거래내역. `page`(0부터)·`size`(1~100). 회원 본인이 `/wallets/me/transactions` 로 보는 것과 같은 원장이다. → `200 { content, page, size, totalElements, totalPages }`
+
+**감사** — 조정은 `admin_actions` 에 `COIN_ADJUST` 로 남는다. 멱등 재요청은 원장이 안 움직이므로 **감사도 안 남긴다** — 그러지 않으면 "몇 번 조정했는가" 를 원장과 감사가 다르게 답한다.
+### 계정 정지·해제 및 상태 이력 (S15P21A604-165)
+
+모든 경로는 관리자 DB 판정(`AdminGuard`)을 통과한다. 상태 변경·상태 이력·`admin_actions` 감사 행은 한 트랜잭션으로 기록한다. 이미 목표 상태인 요청은 `204` no-op이며 이력·감사·세션 폐기를 추가하지 않는다. 활성 관리자를 줄이는 정지·강등은 `account_type='ADMIN' AND status='ACTIVE'` 행을 id 오름차순으로 잠근 뒤 대상 행을 잠가 마지막 활성 관리자 보호를 원자적으로 판정한다.
+
+| Method | Path | Header | Request | Response | Errors |
+|---|---|---|---|---|---|
+| `POST` | `/admin/users/{userId}/suspend` | `Authorization: Bearer` | `{ "reason": "사유" }` (`1~500`자, 필수) | `204 No Content` | `400 VALIDATION_FAILED`, `403 FORBIDDEN`/`MASTER_PROTECTED`, `409 ADMIN_LAST_ONE` |
+| `POST` | `/admin/users/{userId}/unsuspend` | `Authorization: Bearer` | 없음 | `204 No Content` | `403 FORBIDDEN`/`MASTER_PROTECTED` |
+| `GET` | `/admin/users/{userId}/status-history?page=0&size=20` | `Authorization: Bearer` | 없음 | `200` 페이지 응답 | `400 VALIDATION_FAILED`, `401 USER_NOT_FOUND`, `403 FORBIDDEN` |
+
+상태 이력 페이지 응답은 `{ "content": [{ "userId", "previousStatus", "currentStatus", "reason", "actorUserId", "createdAt" }], "page", "size", "totalElements", "totalPages" }` 모양이며 `createdAt DESC, id DESC` 최신순이다. `page`는 0 이상, `size`는 1~100이다. 정지·해제 감사 action은 각각 `SUSPEND`, `UNSUSPEND`다.
 
 ---
 
@@ -1637,6 +1718,9 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `MASTER_PROTECTED` *(742)* | 마스터 계정(또는 그 소유 자원)을 관리자 조치 대상으로 지정했다 |
 | `ADMIN_LAST_ONE` *(742)* | 마지막 관리자는 강등·정지·탈퇴할 수 없다 |
 | `ADMIN_ALREADY` *(742)* | 이미 관리자다 |
+| `ADMIN_TARGET_NOT_FOUND` *(806)* | 관리자 동작의 대상 회원이 없다. `USER_NOT_FOUND` 는 401 이라 이 자리에 쓸 수 없다 |
+| `IDEMPOTENCY_CONFLICT` *(806)* | 같은 멱등키로 **다른 내용**의 요청이 왔다. 재시도가 아니라 키 재사용이다 |
+| `COIN_BALANCE_OVERFLOW` *(806)* | 지급 후 잔액이 `int` 표현 범위를 넘는다. 잔액 부족의 반대쪽이라 같은 409 다 |
 | `USER_NOT_FOUND` | 사용자 없음 |
 | `BOOTH_NOT_FOUND` | Booth 없음 |
 | `BOOTH_SLOT_ALREADY_LEASED` | 이미 임대됨 |
@@ -1649,7 +1733,7 @@ Asset 업로드는 [`contracts/game-asset-upload.md`](../specs/019-game-studio/c
 | `LAYOUT_NOT_PUBLISHED` | 공개된 배치 없음 |
 | `PROJECT_NOT_FOUND` *(009)* | 프로젝트 없음 |
 | `PROJECT_ALREADY_EXISTS` *(009)* | 이 부스에는 이미 프로젝트가 있다 — 부스당 1개(C-01). 수정은 `PATCH` |
-| `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·Staff 아님) |
+| `BOOTH_EDITOR_FORBIDDEN` | 부스 편집 권한 없음 (소유자·허용 Staff·전역 Admin 아님) |
 | `BOOTH_LEASE_EXPIRED` | 임대 만료 — 부스 입장·공개·AI 대화가 같은 코드를 쓴다 |
 | `BOOTH_SLOT_NOT_RENTABLE` / `ACTIVE_LEASE_LIMIT` | 임대 불가 슬롯 / 1인 1임대 위반 |
 | `VALIDATION_FAILED` | 요청 값 오류 (400) |

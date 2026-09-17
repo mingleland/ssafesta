@@ -38,7 +38,7 @@
 
 **불변식**:
 - 좌표 3필드는 전부 finite(FE 검증 4번 — 입력단에서 비숫자를 차단해 도달 자체를 막는다)
-- 앵커 위치가 `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`(=2.72) 안 (research.md R-05 — 상수에서 도출, 하드코딩 금지)
+- 앵커 위치가 `|x| ≤ BOOTH_SIZE.width / 2`, `|z| ≤ BOOTH_SIZE.depth / 2`, `0 ≤ y ≤ BOOTH_SIZE.height`(=5.9) 안 (research.md R-05 — 상수에서 도출, 하드코딩 금지). `width`와 `depth`가 다르다 (9.4 vs 6)
 - **앵커가 안이어도 실물이 밖일 수 있다** — 타입별 크기가 원점 기준 비대칭이라(`contracts/layout-api.md` §10-1), 회전 적용 후 AABB가 부스 밖으로 나가면 서버가 `AREA_OUT_OF_BOUNDS`로 거부한다. FE 사전 검증도 같은 회전식(`x' = x·cos + z·sin`, `z' = −x·sin + z·cos`)을 써야 서버와 답이 갈리지 않는다 — 아래 "서버 검증 규칙" 표 참조
 - 좌표 직렬화는 FE가 환산한 값을 그대로 보내고 BE가 값을 고치지 않는다. 단 `-0.0`→`0.0`, `1e2`→`100`처럼 **표기**가 바뀔 수 있음(PostgreSQL `numeric` 동작, #36) — 값 자체가 다른 게 아니므로 버그로 취급하지 않는다
 
@@ -50,7 +50,7 @@
 |---|---|---|---|---|
 | `AI_AGENT` | 기능 | `configId` | agentId 필요 | ✅ |
 | `VIDEO_SCREEN` | 기능 | `configId` | 영상 설정 ID 필요 | ✅ |
-| `PROJECT_PANEL` | 기능 | `configId` | projectId 필요 | ✅ |
+| `PROJECT_PANEL` | 기능 | — | **`configId`를 쓰지 않는다.** 프로젝트가 부스당 1개고(`ux_projects_booth`) `GET /booths/{boothId}/projects/published`가 부스로 찾는다. 방문자 계약(`BOOTH_PROJECT_INTERACT`)에도 `configId`가 없다(GitLab #110). 연결 요건은 "그 부스에 프로젝트가 있는가"이고 서버가 판정한다 (`S15P21A604-765`, GitLab #194) | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `SURVEY_KIOSK` | 기능 | — | **`configId`를 쓰지 않는다.** 설문 바인딩이 부스 기준이라(spec 010 C-06) 부스당 설문이 1개고 `GET /booths/{boothId}/survey/run`이 부스로 찾는다. 연결 요건은 "그 부스에 설문이 있는가"이고 서버가 판정한다 (`S15P21A604-699`, GitLab #181) | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |
 | `CONSULTATION_DESK` | 기능 | `configId` | 상담 설정 ID 필요 | ✅ |
 | `LAPTOP` | 기능 | — | **`configId`를 쓰지 않는다.** 016 확정([#97](https://lab.ssafy.com/s15-metaverse-game-sub1/S15P21A604/-/issues/97), 2026-08-26)으로 홈페이지 주소는 `booths.homepage_url`이 소유한다. 연결 요건은 "URL이 등록됐는가"이고 서버가 판정한다(계약 §3-1). `configId`를 실어 보내면 `CONFIG_UNVERIFIED`가 붙는다 | ✕ (사전 경고 대상 아님 — 서버가 부스 단위로 판정) |

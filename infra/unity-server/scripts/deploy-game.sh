@@ -20,6 +20,10 @@ lock_timeout_seconds="${GAME_DEPLOY_LOCK_TIMEOUT_SECONDS:-300}"
 
 [[ -f "${RELEASE_MANIFEST_PATH}" ]] || { echo 'release manifest is missing' >&2; exit 66; }
 [[ -f "${GAME_ENV_FILE}" ]] || { echo 'game environment file is missing' >&2; exit 66; }
+set -a
+# shellcheck disable=SC1090
+source "${GAME_ENV_FILE}"
+set +a
 [[ -f "${compose_file}" ]] || { echo 'game Compose file is missing' >&2; exit 66; }
 [[ "${compose_project}" == 'festa-demo-world' ]] || { echo 'unexpected game Compose project' >&2; exit 64; }
 [[ "${compose_service}" == 'demo-game' ]] || { echo 'unexpected game Compose service' >&2; exit 64; }
@@ -55,6 +59,37 @@ PY
 [[ "${source_commit}" =~ ^[0-9a-f]{40}$ ]] || { echo 'game source commit must be a full SHA' >&2; exit 65; }
 [[ "${image_ref}" =~ @sha256:[0-9a-f]{64}$ || "${image_ref}" =~ :[0-9a-f]{40}$ ]] || { echo 'game image ref must be immutable' >&2; exit 65; }
 [[ "${content_id}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'game image content ID is invalid' >&2; exit 65; }
+
+# 배포된 WebGL 클라이언트와 NGO 프리팹이 어긋나면 운영 월드를 건드리지 않는다 (INFRA-T-111).
+#
+# NGO 는 프리팹 위 NetworkBehaviour 를 **순서 인덱스**로 식별한다. 한쪽에만 있는 NetworkBehaviour 가
+# 하나라도 생기면 그 지점 이후의 RPC 가 전부 다른 컴포넌트로 디스패치되고, WebGL 에서는
+# `RuntimeError: function signature mismatch` 로 죽는다. 2026-09-14~16 에 클라이언트 bf90136a 와
+# 서버 85ae541f 가 어긋난 채 이틀을 돌았고, 사람이 그 NPC 근처에 갈 때까지 아무 경보가 없었다.
+#
+# **커밋 SHA 로 대조하지 않는다.** 문서·인프라 커밋도 SHA 는 달라지므로 그렇게 하면 게임 배포가 영영
+# 나가지 못한다(오늘 복구에 쓴 48c8e390 도 커밋은 다르지만 프리팹은 같다). 색인을 실제로 결정하는
+# 것은 프리팹이라 프리팹 트리 해시만 본다.
+# 한계: 프리팹을 건드리지 않고 RPC 시그니처만 바꾸는 변경은 이 검사로 잡지 못한다.
+#
+# **교체 전에 끝내야 하므로 docker 를 부르기 전에 둔다.** 여기서 빠져나가면 돌고 있는 컨테이너는
+# 손도 타지 않는다. exit 75 는 deploy-dev-batch.sh 와 같은 "건너뜀" 관례다 — 실패가 아니다.
+webgl_manifest="${WEBGL_MANIFEST_PATH:-${WEBGL_RELEASE_ROOT:-/srv/festa/webgl}/current/manifest.json}"
+prefab_tree="${GAME_PREFAB_TREE_PATH:-festa-unity/Assets/_Project/Prefabs}"
+if [[ -f "${webgl_manifest}" ]]; then
+  webgl_commit="$("${python_bin}" -c 'import json,pathlib,sys; print(json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("sourceCommit") or "")' "${webgl_manifest}" 2>/dev/null || true)"
+  [[ "${webgl_commit}" =~ ^[0-9a-f]{40}$ ]] \
+    || { echo "deployed WebGL manifest has no usable sourceCommit (${webgl_manifest}); leaving the running world untouched" >&2; exit 75; }
+  candidate_prefabs="$(git -C "${repo_root}" rev-parse "${source_commit}:${prefab_tree}" 2>/dev/null || true)"
+  webgl_prefabs="$(git -C "${repo_root}" rev-parse "${webgl_commit}:${prefab_tree}" 2>/dev/null || true)"
+  [[ -n "${candidate_prefabs}" && -n "${webgl_prefabs}" ]] \
+    || { echo "cannot resolve ${prefab_tree} for candidate ${source_commit} or deployed WebGL ${webgl_commit}; leaving the running world untouched" >&2; exit 75; }
+  [[ "${candidate_prefabs}" == "${webgl_prefabs}" ]] \
+    || { echo "deployed WebGL ${webgl_commit} and game candidate ${source_commit} disagree on ${prefab_tree}; leaving the running world untouched" >&2; exit 75; }
+  echo "WebGL ${webgl_commit} and game candidate ${source_commit} share one NGO prefab set"
+else
+  echo "no deployed WebGL manifest at ${webgl_manifest}; skipping the client/server prefab guard" >&2
+fi
 
 actual_content_id="$(${docker_bin} image inspect --format '{{.Id}}' "${image_ref}")"
 [[ "${actual_content_id}" == "${content_id}" ]] || { echo "game image content ID mismatch: expected=${content_id} actual=${actual_content_id}" >&2; exit 65; }

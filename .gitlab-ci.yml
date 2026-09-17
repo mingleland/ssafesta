@@ -33,13 +33,7 @@ workflow:
     # 해제 조건 — 둘 중 하나라도 성립하면 이 rule 과 .*-changes 의 target 가드를 함께 지운다.
     #   1. 러너 동시 실행 한도가 늘어 develop 직행이 다시 감당된다
     #   2. 파트 브랜치 배칭을 끝내고 develop 직행으로 돌아간다
-    #
-    # frontend-hold (2026-09-15, S15P21A604-798) — develop 머지가 일시 중단된 동안 FE 작업을
-    # 담아 두는 임시 통합 브랜치. 파트 브랜치와 같은 이유로 같은 취급이 필요하다 — 대상이
-    # "develop"도 "ai|back|front|game" 도 아니라서 이 rule 없이는 "Pipelines must succeed"
-    # 체크가 파이프라인 자체가 안 생겨 영원히 "Checking pipeline status." 로 멈춘다(MR !940·!943
-    # 에서 실측). develop 머지가 재개되면 frontend-hold 를 develop 으로 MR 하고 이 항목을 지운다.
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|game|frontend-hold)$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_PROJECT_ID == $CI_PROJECT_ID && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME =~ /^(?:ai|back|front|frontend.*|game)$/'
 
     # 위 둘에 해당하지 않으면 파이프라인을 만들지 않는다. 브랜치 push 도 여기서 멈춘다 — MR
     # 파이프라인과 중복 실행하지 않기 위해서다.

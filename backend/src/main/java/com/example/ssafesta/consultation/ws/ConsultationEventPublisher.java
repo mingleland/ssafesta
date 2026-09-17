@@ -78,8 +78,17 @@ public class ConsultationEventPublisher {
         toVisitor(visitorUserId, event);
     }
 
-    /** 상담이 끝났다 — 방문자에게. */
-    public void ended(Long visitorUserId, Long requestId) {
+    /**
+     * 상담이 끝났다 — 방문자와 그 부스 직원 양쪽에서 카드를 내린다.
+     *
+     * <p>직원 토픽이 빠지면 방문자가 먼저 나간 뒤에도 직원 화면에 "진행 중" 이 남고, 그 카드로
+     * 무언가를 더 하면 터진다 — {@code taken} 을 미리 넣은 사정과 같다 (GitLab #133, 2026-09-14 FE 확정).
+     *
+     * <p><b>종료한 직원 본인도 받는다.</b> 개인이 아니라 부스 토픽으로 보내기 때문이고,
+     * {@code taken}(수락한 본인도 받는다)이 이미 같은 성질이다.
+     */
+    public void ended(Long boothId, Long visitorUserId, Long requestId) {
+        toStaff(boothId, envelope("ended", requestId));
         toVisitor(visitorUserId, envelope("ended", requestId));
     }
 

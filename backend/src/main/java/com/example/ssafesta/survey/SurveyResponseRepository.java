@@ -2,6 +2,8 @@ package com.example.ssafesta.survey;
 
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,26 @@ import org.springframework.data.repository.query.Param;
  * response exists, because that is what locks a question set (C-08, invariant I-4).
  */
 public interface SurveyResponseRepository extends JpaRepository<SurveyResponse, Long> {
+
+    /**
+     * The only identifying response projection: it belongs to the administrator-only event entrant
+     * list, never to a booth survey's anonymous results (S15P21A604-742 #59).
+     */
+    @Query("""
+            select r.id as responseId, r.respondentUserId as userId, u.nickname as nickname,
+                   r.submittedAt as submittedAt
+            from SurveyResponse r join User u on u.id = r.respondentUserId
+            where r.surveyId = :surveyId
+            order by r.submittedAt desc, r.id desc
+            """)
+    Page<EventEntrantProjection> findEventEntrants(@Param("surveyId") Long surveyId, Pageable pageable);
+
+    interface EventEntrantProjection {
+        Long getResponseId();
+        Long getUserId();
+        String getNickname();
+        Instant getSubmittedAt();
+    }
 
     /** Zero means the question set may still be replaced. */
     long countBySurveyId(Long surveyId);

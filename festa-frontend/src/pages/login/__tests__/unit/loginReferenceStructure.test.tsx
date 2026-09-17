@@ -43,17 +43,13 @@ describe('로그인 레퍼런스 구조 (-379)', () => {
     expect((container.querySelector('.login-btn-guest') as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('푸터 좌측 3항목이 각각 아이콘을 단다 — 레퍼런스는 텍스트만 두지 않는다', async () => {
+  // S15P21A604-815 — 다섯 항목 다 갈 곳이 없어 숨겼다. 대상이 생기면 이 단언을 되돌린다.
+  it('푸터를 그리지 않는다 — 누를 수 없는 것을 보여 주지 않는다', async () => {
     const { container } = await renderLogin();
-    const items = [...container.querySelectorAll('.login-footer-item')];
-    expect(items.map((e) => e.textContent)).toEqual(['축제 안내', '이벤트', '고객센터']);
-    for (const item of items) expect(item.querySelector('svg.login-footer-icon')).not.toBeNull();
-  });
-
-  it('푸터 우측 약관 2항목은 그대로다', async () => {
-    await renderLogin();
-    expect(screen.getByText('개인정보처리방침')).toBeTruthy();
-    expect(screen.getByText('이용약관')).toBeTruthy();
+    expect(container.querySelector('.login-footer')).toBeNull();
+    for (const label of ['축제 안내', '이벤트', '고객센터', '개인정보처리방침', '이용약관']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
   });
 
   it('배경과 로고를 각각 한 번씩만 그린다 — 로고가 배경에 이미 있지 않다', async () => {

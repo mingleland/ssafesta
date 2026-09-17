@@ -125,3 +125,35 @@ backend/bruno/05-booth-layout/                   # 003·004와 같은 형식
 |---|---|---|
 | 전역 `ErrorCode` + 봉투를 005에서 신설 (`common/`) | FR-016이 `errors`·`warnings` **목록**을 요구하는데 현재는 실을 자리가 없다. 더 근본적으로 `ResponseStatusException` 33곳 중 **코드를 붙이는 곳이 1곳**이고 컨트롤러마다 `conflict()` 헬퍼가 복제돼 있다 — docs/08 코드 표가 응답에 없다 | ① 문자열에 계속 욱여넣기 → FE가 한국어 문장을 매칭한다 ② **005 endpoint에만 적용** → 한 API에 봉투가 두 종류가 되고 통일 시점에 한 번 더 바꾼다. 소비자가 없음을 확인했으므로(R-09) 지금 통일하는 것이 가장 싸다 |
 | `LayoutJson` 원문 보관 | 왕복 무손실(SC-004). 파싱한 객체를 다시 직렬화하면 키 순서·소수 표기가 바뀔 수 있다 | 파싱 후 재직렬화 → Unity·React가 받는 값이 저장한 값과 문자 단위로 달라진다. 좌표 규칙 왕복 검증(spec ④칸)이 무엇을 검증한 것인지 모호해진다 |
+
+---
+
+## 후속 변경: `S15P21A604-698` — 부스 배치 X 범위 확장
+
+**Branch**: `feat/S15P21A604-698-booth-footprint-x` | **Date**: 2026-09-16 | **근거**: GitLab #181 · research [R-11](research.md#r-11-부스-치수는-축마다-다른-상수여야-한다-s15p21a604-698) · data-model [§6](data-model.md)
+
+계약값을 `6 × 6 × 2.72` 에서 **`9.4 × 6 × 5.9`** 로 옮긴다. 넓히는 방향이라 마이그레이션이 없고, JSON 필드 형태가 그대로라 `schemaVersion` 은 **1** 을 유지한다. 구조 변경은 하나뿐이다 — **축마다 상수가 달라진다.**
+
+| # | 무엇 | 파일 |
+|---|---|---|
+| 1 | `MAX_HORIZONTAL`(3) → `MAX_X`(4.7) · `MAX_Z`(3), `MAX_HEIGHT` 2.72 → 5.9 | `booth/LayoutValidator.java` |
+| 2 | 앵커 검증·회전 AABB 검증이 x·z 각자의 경계를 본다 | 같은 파일 |
+| 3 | 오류 메시지가 x 경계와 z 경계를 따로 말한다 (`POSITION_OUT_OF_BOUNDS`·`AREA_OUT_OF_BOUNDS`) | 같은 파일 |
+| 4 | 통행 격자를 검증 상수에서 유도 — `188 × 120`, x 첫 셀 중심 −4.675 | `booth/LayoutPassageChecker.java` |
+| 5 | 카탈로그가 축별로 유도 — `Footprint(9.4, 6.0, 5.9)` | `booth/BoothLayoutTemplateController.java` |
+| 6 | 공용 계약 문서의 footprint·기하 경계 | `contracts/layout-api.md` §1·§9·§10-2·§10-3 |
+
+**왜 통행 격자까지인가** (지시 범위에는 없었다): `GRID`·`FIRST_CENTER` 가 경계 상수를 참조하지 않고 ±3 을 독립으로 박고 있어서, 검증만 넓히면 **공개 시 통행 판정은 6×6 바닥 위에서 돈다.** 넓어진 양옆 1.7m 는 바닥으로 존재하지 않고 거기 놓인 오브젝트는 점유 0 으로 계산돼 고립 경고가 조용히 사라진다 — 실패를 조용히 삼키는 부류(T-24)다. #181 §5 도 이것을 `-698` 범위로 적고 있다.
+
+**이 변경이 손대지 않는 것**:
+
+- **assetCode 단위 AABB 표** (`resolveLocalBounds(type, assetCode)`) — 게임 파트 회신 2건 대기 중이라 별도로 간다. 표를 다 못 채운 채로 넣으면 미등록 코드가 틀린 타입 기본값으로 조용히 떨어진다
+- 비대칭 min/max API · Layout JSON 필드 · Object type · DB 마이그레이션 · Unity 씬/프리팹
+
+**Consumer 통보** (헌법 24조 · 공용 Layout 계약 변경):
+
+| 파트 | 상태 |
+|---|---|
+| FE | **반영 완료** — `S15P21A604-785`(develop `d8671676`)로 `BOOTH_SIZE_FALLBACK` `9.4 × 6 × 5.9` · 통행 격자 x/z 분리. 정상 경로는 `template.footprint` 에서 받으므로 코드 변경 없음 |
+| 게임 | 방 경계 상수(`BoothObjectFactory` `RoomHalfXMeters`·`FestaInteriorBuilder`) 정렬 예정. **넓히는 방향이라 병합 조건이 아니다** — x 경계 재확인만 요청 |
+| Unity 클라 | 실측에서 배치·회전 8/8 일치 확인됨. 계약만 넓히면 수정 없음 |

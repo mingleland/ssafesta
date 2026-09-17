@@ -29,6 +29,15 @@ export interface WorldChatMessage {
   sentAt: string;
 }
 
+/** 채팅 본문과 구분해 렌더할 월드 입장 알림. 이름은 서버가 조회해 넣는다. */
+export interface WorldChatJoinNotice {
+  type: 'JOIN';
+  nickname: string;
+  sentAt: string;
+}
+
+export type WorldChatEntry = WorldChatMessage | WorldChatJoinNotice;
+
 /**
  * 수신 순서로 매긴 로컬 식별자를 붙인 메시지 (S15P21A604-791).
  *
@@ -36,9 +45,9 @@ export interface WorldChatMessage {
  * 시각에 두 줄을 보내면 겹친다. 문자열을 더 길게 잇는 대신 받은 순서를 그대로 쓴다 — 저장이
  * 없어 세션 밖으로 나갈 값이 아니고, 순서는 우리가 이미 알고 있다.
  */
-export interface ReceivedChatMessage extends WorldChatMessage {
+export type ReceivedChatMessage = WorldChatEntry & {
   seq: number;
-}
+};
 
 /** 한 번 뜬 안내가 화면에 눌러앉지 않게 한다 — 게스트 안내가 영구 잔류하던 자리 */
 export const NOTICE_TTL_MS = 6_000;
@@ -142,7 +151,7 @@ export function noticeMemberOnly(): void {
 
 export type ChatRejection = 'EMPTY' | 'TOO_LONG' | 'COOLDOWN';
 
-export type EnterAction = 'ignore' | 'open' | 'send' | 'focus';
+export type EnterAction = 'ignore' | 'open' | 'send' | 'focus' | 'close';
 
 /**
  * Enter 하나를 무엇으로 읽을지 정한다 — 판정은 `WorldPage` 의 리스너 한 곳이 쓰지만, 규칙 자체는
@@ -151,16 +160,30 @@ export type EnterAction = 'ignore' | 'open' | 'send' | 'focus';
  * **조합 중 Enter 를 먼저 거른다.** 한글을 확정하는 Enter 가 `isComposing: true` 로 들어오는데,
  * 이것을 거르지 않으면 "안녕" 을 확정하는 순간 그대로 전송된다. `keyCode 229` 는 `isComposing` 이
  * 오지 않는 경로의 같은 신호다.
+ *
+ * **그 다음이 화면 소유권이다** (2026-09-16). 오버레이·관리 화면·Game Menu 가 떠 있는 동안 Enter 는
+ * 그 화면의 것이다 — 폼 제출이나 확인 버튼을 채팅이 가로채면 안 된다. 여기서 `ignore` 를 돌려주면
+ * 호출부가 `preventDefault` 조차 하지 않으므로 그 화면의 기본 동작이 그대로 산다. ESC 가 위 레이어
+ * 부터 한 겹씩 걷는 것과 같은 규칙을 Enter 에도 적용하는 것이고, 오버레이가 자기 리스너를 걸어
+ * 가로채는 방식은 쓰지 않는다 — 같은 target 이라 등록 순서로만 갈리는 그 계열의 버그가 돌아온다.
+ *
+ * **채팅은 Enter 하나로만 제어한다.** 열기·전송·닫기가 전부 이 키다. 예전에는 닫기만 ESC 였는데,
+ * 그러면 같은 창을 여는 키와 닫는 키가 달라지고 ESC 계층(오버레이·메뉴)과도 뒤섞인다. 빈 입력에서
+ * 누른 Enter 를 닫기로 읽는다 — 보낼 것이 없을 때 그 키가 할 일은 그것뿐이다.
  */
 export function resolveEnterAction(
   event: { isComposing?: boolean; keyCode?: number; shiftKey?: boolean },
-  context: { open: boolean; inputFocused: boolean; member: boolean },
+  context: { worldOwnsScreen: boolean; open: boolean; inputFocused: boolean; member: boolean; draftEmpty?: boolean },
 ): EnterAction {
   if (event.isComposing === true || event.keyCode === 229) return 'ignore';
   if (event.shiftKey === true) return 'ignore';
+  if (!context.worldOwnsScreen) return 'ignore';
   // 패널은 열려 있는데 입력창이 focus 를 잃은 상태(캔버스 클릭 등)를 남기지 않는다 — Enter 로
   // 다시 그 입력창에 들어간다. 열려 있다는 것 자체가 회원이라는 뜻이다 (S15P21A604-791).
-  if (context.open) return context.inputFocused ? 'send' : 'focus';
+  if (context.open) {
+    if (!context.inputFocused) return 'focus';
+    return context.draftEmpty === true ? 'close' : 'send';
+  }
   return context.member ? 'open' : 'ignore';
 }
 
@@ -214,9 +237,27 @@ export function sendWorldChat(text: string, now = Date.now()): boolean {
   return true;
 }
 
+function isJoinNotice(value: unknown): value is WorldChatJoinNotice {
+  if (value === null || typeof value !== 'object') return false;
+  const event = value as Partial<WorldChatJoinNotice>;
+  return event.type === 'JOIN' && typeof event.nickname === 'string' && typeof event.sentAt === 'string';
+}
+
+function isChatMessage(value: unknown): value is WorldChatMessage {
+  if (value === null || typeof value !== 'object') return false;
+  const message = value as Partial<WorldChatMessage>;
+  return typeof message.senderUserId === 'number'
+    && typeof message.nickname === 'string'
+    && typeof message.content === 'string'
+    && typeof message.sentAt === 'string';
+}
+
 function pushMessage(raw: string): void {
   try {
-    const message = JSON.parse(raw) as WorldChatMessage;
+    const message: unknown = JSON.parse(raw);
+    if (!isJoinNotice(message) && !isChatMessage(message)) {
+      throw new Error('unknown chat event');
+    }
     const next = [...state.messages, { ...message, seq: nextSeq++ }];
     set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
   } catch {
@@ -268,7 +309,7 @@ export function __resetWorldChatForTests(): void {
 }
 
 /** 테스트 전용 — 서버 수신 경로를 거치지 않고 로그를 채운다 */
-export function __pushWorldChatForTests(messages: readonly WorldChatMessage[]): void {
+export function __pushWorldChatForTests(messages: readonly WorldChatEntry[]): void {
   const next = [...state.messages, ...messages.map((m) => ({ ...m, seq: nextSeq++ }))];
   set({ messages: next.slice(-MAX_BUFFERED_MESSAGES) });
 }
