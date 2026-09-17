@@ -22,6 +22,7 @@ import { MockInteractionBar } from '../../features/world/ui/MockInteractionBar';
 import { GameMenu } from '../../features/world/ui/GameMenu';
 import { MenuPanelHost } from '../../features/world/ui/MenuPanelHost';
 import { BoothManagementOverlay } from '../../features/booth/ui/BoothManagementOverlay';
+import { BoothRentalOverlay } from '../../features/booth/ui/BoothRentalOverlay';
 import { ManagementPanelHost } from '../../features/booth/ui/ManagementPanelHost';
 import { OverlayHost } from '../../features/overlay/OverlayHost';
 import { initInteractionDispatcher } from '../../features/interaction/dispatcher';
@@ -42,13 +43,14 @@ import { closeOverlay } from '../../shared/types/overlay';
 import {
   IS_DEV_INTERACTION_BAR,
   closeBoothManagement,
+  closeBoothRental,
   closeManagementPanel,
   closeGameMenu,
   closeMenuPanel,
   resetGameClientUi,
   useGameClientUi,
 } from '../../features/world/model/gameClientUi';
-import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen } from '../../features/world/model/worldScreen';
+import { closeTopScreen, getWorldScreen, openManagement, openMenu, openMenuPanelScreen, openRental } from '../../features/world/model/worldScreen';
 import { hasUnityModal, resetWorldUiState } from '../../unity/bridge/worldUiState';
 import { getReadyUnityInstance } from '../../unity/host/sessionManager';
 import { requestExitWorldUi } from '../../unity/host/worldUiBridge';
@@ -83,16 +85,18 @@ export function WorldPage() {
     return () => document.body.classList.remove('world-active');
   }, []);
 
-  // Booth Studio·관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
+  // 관리 상세에서 돌아왔다면(?panel=management) 관리 화면을 그 자리에 복원한다.
   // 모듈 상태의 "복귀 예약"이 아니라 URL 로 표현한다 — StrictMode 재mount 와 새로고침 양쪽에서
   // 같은 결과가 나오는 유일한 방법이다.
   //
   // `?panel=admin` 도 같은 자리를 쓴다 — 관리자 콘솔은 오버레이라 제 주소가 없고, 월드 밖에서
-  // 여는 유일한 길이 이 파라미터다(AdminConsoleLink).
+  // 여는 유일한 길이 이 파라미터다(AdminConsoleLink). `?panel=rental` 은 옛 `/app/booths` 주소가
+  // 여기로 넘어오는 자리다 — 임대는 2026-09-17 부터 월드 위 오버레이다.
   useEffect(() => {
     const panel = params.get('panel');
-    if (panel !== 'management' && panel !== 'admin') return;
+    if (panel !== 'management' && panel !== 'admin' && panel !== 'rental') return;
     if (panel === 'admin') openMenuPanelScreen('admin');
+    else if (panel === 'rental') openRental();
     else openManagement();
     // 한 번 열고 나면 쿼리는 지운다 — 이후 새로고침이 같은 화면을 강제로 다시 열지 않게
     setParams({}, { replace: true });
@@ -211,13 +215,30 @@ export function WorldPage() {
     };
   }, []);
 
-  // Tab 잠금 (S15P21A604-450, S15P21A604-838) — WorldPage가 활성화된 동안에는
-  // canvas·HUD·메뉴·입력창을 가리지 않고 브라우저의 Tab 기본 동작(포커스 이동)을 막는다.
-  // Unity 내부의 Tab 입력 처리는 게임 파트 소관이므로 이벤트 전파는 막지 않는다.
+  // Tab 잠금 (S15P21A604-450 · S15P21A604-838) — 두 갈래를 합친 규칙이다.
+  //
+  // **차단은 화면을 가리지 않는다(-838).** WorldPage 가 떠 있는 동안 웹 레이어에는 Tab 탐색이
+  // 없다. 이벤트 전파는 막지 않는다 — Unity 안에서 Tab 을 어떻게 쓰는지는 게임 파트 소관이다.
+  //
+  // **포커스 복귀는 월드가 주인일 때만 한다(-450).** Unity 6 WebGL 은 키보드 타깃을 canvas 로
+  // 잡으므로(captureAllKeyboardInput=false, !279) 포커스가 캔버스를 벗어나면 그 뒤 Tab 이
+  // Unity 에 들어가지 않는다. HUD 버튼을 누르거나 오버레이를 닫은 뒤가 그 상태라, 막기만 하면
+  // 미니맵이 영영 열리지 않는다. 그래서 캔버스로 돌려준다 — 그 다음 Tab 부터 Unity 가 받는다.
+  //
+  // 돌려주지 않는 자리 둘. 오버레이·관리·메뉴가 주인이면 월드가 키보드를 가져갈 이유가 없고,
+  // 텍스트 입력 중이면 캔버스로 끌려가는 순간 입력이 끊긴다.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Tab') return;
       e.preventDefault();
+      if (getWorldScreen() !== 'world') return;
+      const target = e.target;
+      const editing =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+      if (editing) return;
+      const canvas = document.getElementById('unity-canvas');
+      if (canvas !== null && target !== canvas) canvas.focus({ preventScroll: true });
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -237,6 +258,8 @@ export function WorldPage() {
       <OverlayHost />
       {/* Booth Management Layer — World 의 관리 NPC 가 연다(계약 G-1 전까지 dev trigger) */}
       {ui.managementOverlay && <BoothManagementOverlay onClose={closeBoothManagement} />}
+      {/* 부스 임대 — 월드를 떠나지 않는다. 맵이 곧 선택 UI다 */}
+      {ui.boothRental && <BoothRentalOverlay onClose={closeBoothRental} />}
       {/* 관리 상세는 관리 화면의 자식이다 — 위에 얹히고, 닫으면 관리 화면이 다시 드러난다 */}
       {ui.managementPanel !== null && (
         <ManagementPanelHost panel={ui.managementPanel} onClose={closeManagementPanel} />

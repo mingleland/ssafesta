@@ -96,6 +96,19 @@ input[type='reset']:not(:disabled) {
   cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, pointer !important;
 }
 
+/* Unity WebGL 캔버스만 브랜드 포인터가 사라지던 자리.
+ *
+ * 런타임이 `Cursor.visible` 이 바뀔 때마다 캔버스에 직접 쓴다 —
+ * `_JS_Cursor_SetShow(show){ Module.canvas.style.cursor = show ? "default" : "none" }`
+ * (`Cursor.SetCursor` 는 같은 자리에 `url(data:image/cur;...)` 를 쓴다). 인라인 선언이라
+ * body 에서 내려오던 포인터를 덮어쓴다. author `!important` 는 인라인 normal 선언을 이기므로
+ * 여기서 되돌린다. 바꾸는 것은 커서 그림 하나뿐이다 — 입력·포커스·포인터 락은 그대로이고,
+ * 락이 걸린 동안에는 어차피 브라우저가 커서를 감춘다. */
+#unity-canvas {
+  cursor: url('/cursors/festa-pointer.png') 7 2, auto !important;
+  cursor: image-set(url('/cursors/festa-pointer.png') 1x, url('/cursors/festa-pointer@2x.png') 2x) 7 2, auto !important;
+}
+
 /* 이미지는 기본이 draggable=true 라 CSS 로 따로 꺼야 한다.
    Firefox 는 이 속성을 모르므로 dragstart 가드(app/providers)가 함께 막는다. */
 img {

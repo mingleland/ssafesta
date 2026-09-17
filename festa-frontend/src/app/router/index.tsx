@@ -2,7 +2,6 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { LandingPage } from '../../pages/landing/LandingPage';
 import { ProfilePage } from '../../pages/profile/ProfilePage';
-import { SlotListPage } from '../../pages/booth/SlotListPage';
 import { ProjectManagementPage } from '../../pages/management/ProjectManagementPage';
 import { SurveyManagementPage } from '../../pages/management/SurveyManagementPage';
 import { ConsultationStaffPage } from '../../pages/management/ConsultationStaffPage';
@@ -55,13 +54,10 @@ export const routes = [
     ),
   },
   {
-    // spec 004 — 슬롯 조회는 공개 API라 guest-allowed. 임대 버튼은 페이지가 member만 연다(FR-016)
+    // spec 004 — 임대는 2026-09-17 부터 **월드 위 오버레이**다. 옛 전체 페이지는 route 를 갈아타
+    // 월드를 떠났고, 그때마다 Unity 가 언마운트됐다. 옛 주소는 살려 두고 오버레이로 보낸다.
     path: '/app/booths',
-    element: (
-      <RequireAuth level="guest-allowed">
-        <SlotListPage />
-      </RequireAuth>
-    ),
+    element: <Navigate to="/app/world?panel=rental" replace />,
   },
   {
     // Booth Management 하위 상세 화면 3종 — 전부 소유자 전용 상태 변경 기능이라 member-only.
@@ -98,19 +94,11 @@ export const routes = [
     ),
   },
   {
-    // Booth Studio — WorldPage 와 같은 이유로 lazy 다. 2.5D 렌더러(three)가 이 아래에 달리므로
-    // static import 로 두면 Studio 를 열지 않는 사용자도 3D 런타임을 받는다 (S15P21A604-470)
+    // Booth Studio 는 사용자 흐름에서 폐기했다 (2026-09-17). 편집기 코드는 `features/studio`·
+    // `pages/studio` 에 숨김 보존하되 **들어갈 길을 두지 않는다** — 옛 주소는 월드로 보낸다.
+    // 부스 런타임을 만드는 자동화(assets:build·manifest·ReloadBoothSlot)는 그대로다.
     path: '/app/studio/:boothId',
-    lazy: async () => {
-      const { StudioPage } = await import('../../pages/studio/StudioPage.tsx');
-      return {
-        Component: () => (
-          <RequireAuth level="member-only">
-            <StudioPage />
-          </RequireAuth>
-        ),
-      };
-    },
+    element: <Navigate to="/app/world" replace />,
   },
   {
     // spec 013a — Unity WebGL Host. 무거운 로더 코드를 메인 번들에서 뺀다(lazy)

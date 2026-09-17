@@ -1,6 +1,7 @@
 // Booth Studio 상단 툴바 — 뒤로 · 제목 · 부스명 · 편집 상태 | 저장 · 게시 | 실행취소 · 다시실행 | 줌
 import type { SaveStatus } from '../../model/editorReducer';
 import { IcBack, IcChevron, IcEdit, IcPlay, IcRedo, IcSave, IcTrash, IcUndo } from './icons';
+import { Tooltip } from '../../../../shared/ui/tooltip/Tooltip';
 
 interface Props {
   boothName: string;
@@ -62,38 +63,41 @@ export function TopToolbar(p: Props) {
       </div>
       <div className="studio-toolbar-group">
         {/* 전체 초기화 (S15P21A604-603) — 확인 다이얼로그는 '빈 부스' 템플릿 경로가 띄운다 */}
-        <button
-          type="button"
-          className="studio-btn studio-btn-ghost"
-          onClick={p.onReset}
-          disabled={!p.canReset}
-          title={p.canReset ? '배치를 모두 비웁니다' : '비울 배치가 없습니다'}
-        >
-          <IcTrash size={16} /> 초기화
-        </button>
+        <Tooltip content={p.canReset ? '배치를 모두 비웁니다' : '비울 배치가 없습니다'} placement="bottom">
+          <button
+            type="button"
+            className="studio-btn studio-btn-ghost"
+            onClick={p.onReset}
+            disabled={!p.canReset}
+          >
+            <IcTrash size={16} /> 초기화
+          </button>
+        </Tooltip>
       </div>
       <div className="studio-toolbar-group">
         {/* 실행취소/다시실행 (S15P21A604-605) — editorReducer 의 스냅샷 스택이 판정한다 */}
-        <button
-          type="button"
-          className="studio-btn studio-btn-ghost studio-btn-icon"
-          onClick={p.onUndo}
-          disabled={!p.canUndo}
-          aria-label="실행 취소"
-          title="실행 취소 (Ctrl+Z)"
-        >
-          <IcUndo size={18} />
-        </button>
-        <button
-          type="button"
-          className="studio-btn studio-btn-ghost studio-btn-icon"
-          onClick={p.onRedo}
-          disabled={!p.canRedo}
-          aria-label="다시 실행"
-          title="다시 실행 (Ctrl+Y)"
-        >
-          <IcRedo size={18} />
-        </button>
+        <Tooltip content="실행 취소 (Ctrl+Z)" placement="bottom">
+          <button
+            type="button"
+            className="studio-btn studio-btn-ghost studio-btn-icon"
+            onClick={p.onUndo}
+            disabled={!p.canUndo}
+            aria-label="실행 취소"
+          >
+            <IcUndo size={18} />
+          </button>
+        </Tooltip>
+        <Tooltip content="다시 실행 (Ctrl+Y)" placement="bottom">
+          <button
+            type="button"
+            className="studio-btn studio-btn-ghost studio-btn-icon"
+            onClick={p.onRedo}
+            disabled={!p.canRedo}
+            aria-label="다시 실행"
+          >
+            <IcRedo size={18} />
+          </button>
+        </Tooltip>
       </div>
       <div className="studio-toolbar-group">
         <button type="button" className="studio-btn studio-btn-ghost" onClick={p.onZoomToggle}>
