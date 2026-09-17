@@ -5,7 +5,7 @@
 // entities/raffle이 같은 모양의 mock 어댑터로 실제 응모 흐름을 흉내낸다. api.select.ts export
 // 한 줄만 바꾸면 실 연동으로 전환된다.
 import mygummyUrl from '../../../assets/festa/eventShop/mygummy.png';
-import pringlesUrl from '../../../assets/festa/eventShop/pringles.png';
+import chocosongiUrl from '../../../assets/festa/eventShop/chocosongi.png';
 import coffeeUrl from '../../../assets/festa/eventShop/coffee.png';
 import mallangiUrl from '../../../assets/festa/eventShop/mallangi.png';
 import kyoboUrl from '../../../assets/festa/eventShop/kyobo.png';
@@ -16,7 +16,7 @@ import chickenUrl from '../../../assets/festa/eventShop/chicken.png';
 // 말랑이·교보 기프트카드는 응모권에서 즉시교환으로 옮겨졌다(2026-09-17, S15P21A604-842 후속).
 const PRIZE_IMAGES: Record<string, string> = {
   마이구미: mygummyUrl,
-  프링글스: pringlesUrl,
+  초코송이: chocosongiUrl,
   커피: coffeeUrl,
   말랑이: mallangiUrl,
   '교보 기프트카드': kyoboUrl,

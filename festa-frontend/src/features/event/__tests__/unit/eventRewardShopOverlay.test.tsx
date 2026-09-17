@@ -93,7 +93,7 @@ describe('경품이 아직 없다', () => {
 describe('경품이 들어온 뒤', () => {
   const prizes = [
     { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
-    { prizeId: 2, name: '프링글스', priceCoin: 500, stock: 0, active: true },
+    { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 0, active: true },
   ];
 
   it('안내가 사라지고 같은 격자에 상품이 찬다 — shell을 다시 만들지 않는다', async () => {
@@ -123,8 +123,8 @@ describe('경품이 들어온 뒤', () => {
 
     renderOverlay();
 
-    await screen.findByText('프링글스');
-    const soldOutCard = screen.getByText('프링글스').closest('.ov-card');
+    await screen.findByText('초코송이');
+    const soldOutCard = screen.getByText('초코송이').closest('.ov-card');
     expect(soldOutCard?.getAttribute('data-disabled')).toBe('');
     const button = soldOutCard?.querySelector('button');
     expect(button?.disabled).toBe(true);
@@ -249,7 +249,7 @@ describe('경품이 들어온 뒤', () => {
 describe('구역 구분 없이 즉시구매·응모권이 한 격자에 3/3으로 같이 뜬다', () => {
   const prizes = [
     { prizeId: 1, name: '마이구미', priceCoin: 400, stock: 32, active: true },
-    { prizeId: 2, name: '프링글스', priceCoin: 500, stock: 15, active: true },
+    { prizeId: 2, name: '초코송이', priceCoin: 500, stock: 15, active: true },
   ];
   const raffles = [{ raffleId: 103, name: '치킨', priceCoin: 50, stock: 21, active: true, drawAt: null }];
 
@@ -266,7 +266,7 @@ describe('구역 구분 없이 즉시구매·응모권이 한 격자에 3/3으�
     const list = container.querySelector('[aria-label="이벤트 상점 상품 목록"]');
     expect(list?.children.length).toBe(3);
     expect(list?.textContent).toContain('마이구미');
-    expect(list?.textContent).toContain('프링글스');
+    expect(list?.textContent).toContain('초코송이');
     expect(list?.textContent).toContain('치킨');
   });
 
