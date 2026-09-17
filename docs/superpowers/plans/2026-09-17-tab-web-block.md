@@ -81,7 +81,7 @@ Expected: PASS 전부(ESC·Enter 판정자와 화면 소유권에 영향 없음�
 Run: `cd festa-frontend && npm test && npx tsc -b && npm run lint && npm run build`
 Expected: 테스트 실패 0, 타입 에러 0, 신규 lint 경고 0, build 성공.
 
-- [ ] **Step 6: 실 브라우저 확인**
+- [x] **Step 6: 실 브라우저 확인**
 
 `/app/world` 진입 후:
 
