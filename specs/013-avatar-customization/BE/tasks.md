@@ -161,3 +161,13 @@ Phase 1~4 = 12개 작업이 최소 배포 단위다. Phase 6은 머지 전 필�
 - **길이 상한을 낮추지 마라.** 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. 낮추면 모듈러 형식(`fa|…`, 파츠 이름이 그대로 들어가 길다)이 거부된다 — 헌법 23조·T-24
 - **실패를 조용히 삼키지 마라.** 거부는 사유 문장이 보이는 400이다(FR-012·SC-005). T-24가 정확히 "무반응"이었다
 - **`MyAccountResponse` 생성 지점이 둘이다**(T013). 하나만 고치면 닉네임 변경 응답에서만 필드가 사라진다
+
+---
+
+## Phase 7: 회원 프리셋 3슬롯 (S15P21A604-858)
+
+- [x] T021 `V39__avatar_presets.sql` — `(user_id, slot)` 기본 키, 슬롯 1~3 CHECK, `avatar_code TEXT`, 탈퇴 FK cascade를 추가한다.
+- [x] T022 `AvatarPreset`·Repository·Service — 현재 외형과 같은 문자열·품목 소유권 검증을 재사용하고, 목록은 슬롯 오름차순, 삭제는 멱등으로 처리한다.
+- [x] T023 `MyAccountController` — `GET/PUT/DELETE /users/me/avatar/presets`를 회원 전용으로 제공하고 슬롯 검증 오류를 `field: "slot"`으로 반환한다.
+- [x] T024 `AvatarPresetApiIntegrationTest` — 저장·덮어쓰기·정렬·삭제·권한·형식·회원 격리·TEXT 스키마를 검증한다.
+- [x] T025 공동 계약·API 문서·작업일지를 프리셋 3슬롯으로 동기화한다.
