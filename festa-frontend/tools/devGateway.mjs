@@ -40,6 +40,13 @@
  * `authorization_request_not_found` 로 떨어진다. 아래 프록시 **대상** 주소의 127.0.0.1 은 서버 간
  * 연결이라 무관하다 — 브라우저가 여는 주소만 `localhost` 면 된다.
  *
+ * `/ws` 는 STOMP 실시간 소켓이다(S15P21A604-840). 로컬은 `VITE_API_BASE_URL` 이 비어 있어
+ * `apiBaseUrl()` 이 FE 오리진으로 떨어지고, `realtimeClient` 가 `ws://localhost:5173/ws` 를 연다.
+ * 이 prefix 가 없으면 vite 가 자기 HMR 소켓으로 받아 핸드셰이크가 실패하고 화면에는
+ * `code=1006` 재연결 5회 실패만 남는다. `ws: true` 가 있어야 vite 가 Upgrade 를 넘긴다 —
+ * 빠지면 프록시는 등록돼 있는데 소켓만 조용히 안 된다. `/api` 와 같은 대상이어야 ws-token 을
+ * 발급한 BE 와 소켓을 받는 BE 가 같다.
+ *
  * @param {Record<string, string | undefined>} env process.env
  */
 export function createGatewayProxy(env = {}) {
@@ -47,6 +54,7 @@ export function createGatewayProxy(env = {}) {
   return {
     '/api': { target: api },
     '/oauth2': { target: api },
+    '/ws': { target: api, ws: true },
     '/unity': {
       target: env.VITE_PROXY_UNITY_TARGET ?? 'http://127.0.0.1:8000',
       rewrite: (path) => path.replace(/^\/unity/, ''),

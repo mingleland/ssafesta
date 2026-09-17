@@ -52,6 +52,23 @@ describe('dev 게이트웨이 proxy', () => {
     expect(keys.some((k) => k.startsWith('/login'))).toBe(false);
   });
 
+  // STOMP 실시간 소켓 (S15P21A604-840). 빠지면 vite 가 /ws 를 자기 HMR 소켓으로 받아
+  // code=1006 재연결 실패만 남는다.
+  it('/ws 를 /api 와 같은 Spring 으로 넘긴다 — ws-token 발급처와 소켓 수신처가 갈리면 안 된다', () => {
+    const proxy = createGatewayProxy({});
+    expect(proxy['/ws'].target).toBe(proxy['/api'].target);
+    expect(proxy['/ws']).not.toHaveProperty('rewrite');
+  });
+
+  it('/ws 는 ws: true 다 — 없으면 Upgrade 가 넘어가지 않아 소켓만 조용히 죽는다', () => {
+    expect(createGatewayProxy({})['/ws'].ws).toBe(true);
+  });
+
+  it('/ws 도 API 대상 재지정을 따른다', () => {
+    expect(createGatewayProxy({ VITE_PROXY_API_TARGET: 'http://spring:8081' })['/ws'].target)
+      .toBe('http://spring:8081');
+  });
+
   it('/ai/v1 은 대상을 준 경우에만 등록한다 — 로컬 8000 은 WebGL 정적 서버가 쓰고 있다', () => {
     expect(createGatewayProxy({})['/ai/v1']).toBeUndefined();
     expect(createGatewayProxy({ VITE_PROXY_AI_TARGET: 'http://127.0.0.1:8001' })['/ai/v1'])
