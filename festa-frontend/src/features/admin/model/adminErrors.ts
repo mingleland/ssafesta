@@ -27,6 +27,11 @@ const KNOWN: Record<string, { title: string; message: string }> = {
   WALLET_NOT_FOUND: { title: '지갑이 없는 회원입니다', message: '회원인데 지갑 행이 없습니다. BE 확인이 필요합니다.' },
   BOOTH_NOT_FOUND: { title: '부스를 찾을 수 없습니다', message: '이미 반납됐거나 번호가 틀렸을 수 있습니다.' },
   SURVEY_NOT_FOUND: { title: '이벤트 설문을 찾을 수 없습니다', message: '설문 key 를 확인해 주세요.' },
+  EVENT_PRIZE_NOT_FOUND: { title: '경품을 찾을 수 없습니다', message: '이미 삭제됐거나 번호가 틀렸을 수 있습니다.' },
+  EVENT_PURCHASE_FULFILLMENT_INVALID: {
+    title: '이 상태로는 바꿀 수 없습니다',
+    message: '지급 완료·취소는 되돌릴 수 없습니다. 목록을 새로 고친 뒤 현재 상태를 확인해 주세요 — 다른 관리자가 먼저 처리했을 수 있습니다.',
+  },
   VALIDATION_FAILED: { title: '입력값이 올바르지 않습니다', message: '' },
 };
 
