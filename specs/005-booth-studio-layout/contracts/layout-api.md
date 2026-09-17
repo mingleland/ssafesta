@@ -68,7 +68,7 @@
 | rule | 적용 | 뜻 |
 |---|---|---|
 | `CONFIG_NOT_LINKED` | 공개만 | 기능 오브젝트에 `configId` 미연결 (C-04 확정: 경고 유지 — #45). **`LAPTOP`·`SURVEY_KIOSK`·`PROJECT_PANEL`은 같은 rule 을 부스 단위 술어로 답한다** — 노트북은 홈페이지 URL 미등록(016 §3-1), 키오스크는 그 부스에 설문 없음(010 C-06, `S15P21A604-699`), 그래픽 패널은 그 부스에 프로젝트 없음(009 C-01, `S15P21A604-765`) |
-| `CONFIG_UNVERIFIED` | 공개만 | 연결 대상의 종류를 아직 서버가 확인할 수 없음 |
+| `CONFIG_UNVERIFIED` | 공개만 | 연결 대상의 종류를 아직 서버가 확인할 수 없음 (`RECRUITMENT_BOARD`·`CONSULTATION_DESK`·`LIKE_VOTE`). **장식(`FURNITURE`·`DECORATION`·`VIDEO_SCREEN`)에는 붙지 않는다** — `configId` 를 실어 보내도 저장만 하고 무시한다 (GitLab #194 ②) |
 | `FRONT_BLOCKED` | 공개만 | 관람 띠 도달 가능 비율 50% 미만 (§10-3, #19 ⑤) |
 | `ISOLATED_AREA` | 공개만 | 통행 불가 고립 공간 1㎡ 이상 — 배치 전체 항목이라 `objectId` 없음 (§10-3) |
 

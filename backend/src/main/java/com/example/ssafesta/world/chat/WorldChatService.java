@@ -46,12 +46,17 @@ public class WorldChatService {
      * 한 줄을 광장에 던진다.
      *
      * <p>순서가 계약이다 — 내용 검증 → 도배 판정 → 신원 확인 → 방송. 도배 판정을 먼저 하면 빈
-     * 문자열을 보낸 사람이 3초를 기다려야 하고, 신원을 먼저 확인하면 거부될 요청이 DB 를 읽는다.
+     * 문자열을 보낸 사람이 대기를 물고, 신원을 먼저 확인하면 거부될 요청이 DB 를 읽는다.
+     *
+     * <p>그래서 <b>창을 소비하는 것은 "내용 검증을 통과해 도배 판정이 허용한 전송 시도"</b> 다.
+     * 그 뒤 신원 확인에서 떨어진 요청은 이미 소비한 것으로 둔다 — 되돌리는 코드를 넣으면 판정이
+     * 원자적이지 않게 되고, 정지된 계정이 창을 공짜로 소모할 수 있게 된다 (GitLab #223).
      */
     public void say(Long senderUserId, WorldChatSend command) {
         String content = normalized(command);
-        if (!rateLimiter.tryAcquire(senderUserId)) {
-            throw new WorldChatTooFastException();
+        WorldChatRateLimiter.Decision decision = rateLimiter.tryAcquire(senderUserId);
+        if (!decision.allowed()) {
+            throw new WorldChatTooFastException(decision.retryAfterMs());
         }
         messaging.convertAndSend(TOPIC, (Object) new WorldChatMessage(
                 senderUserId, nicknameOf(senderUserId), content, Instant.now()));
