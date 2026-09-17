@@ -215,6 +215,7 @@ Token 재사용도 허용하지 않는다 — 토큰 4계층 분리의 이유다
 ```text
 /user/queue/consultation              방문자 — 내 요청의 상태 변화
 /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
+/user/queue/booth-lease-expiry        부스 운영자 — 자기 임대 만료 1시간 전 알림 (D07)
 ```
 
 ### Client → Server: **없다**
@@ -249,6 +250,17 @@ raw `/queue/**` 구독은 거부한다. 토픽별 SUBSCRIBE 자격 검증은 별
 요청 상태를 REST 로 다시 읽는다. `occurredAt` 이 그때 순서를 가르는 값이다.
 
 **정본은 REST 이고 이것은 알림이다.**
+
+### Lease 만료 사전 알림 (`S15P21A604-151`)
+
+```json
+{ "type": "lease-expiring", "leaseId": "901", "boothId": "41", "endsAt": "...", "remainingSeconds": 3599 }
+```
+
+`ACTIVE` 이면서 만료가 1시간 이내인 임대는 `expiry_warning_sent_at`을 트랜잭션에서 먼저 기록하고
+커밋 뒤에 그 임차인의 개인 큐로 한 번만 보낸다. 브로커 발행 실패는 임대를 되돌리지 않는다. 연결이
+없거나 재연결 중인 경우 이벤트는 재전송하지 않으며, React는 `GET /booths/mine`의 `endsAt`과
+`remainingSeconds`를 정본으로 계속 표시한다.
 
 ### 한계 — 단일 인스턴스 전제
 

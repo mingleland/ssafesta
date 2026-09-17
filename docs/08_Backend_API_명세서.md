@@ -1249,6 +1249,7 @@ STOMP 연결용 **5분짜리** 토큰(FR-019·FR-020, C-14). → `201 { token, e
 ```text
 엔드포인트  wss://<host>/ws/consultation     native WebSocket + STOMP, SockJS 없음 (C-05)
 구독        /user/queue/consultation              방문자 — 내 요청의 상태 변화
+/user/queue/booth-lease-expiry                    부스 운영자 — 임대 만료 1시간 전 알림
             /topic/booths/{boothId}/consultation  직원 — 그 부스 대기열 변화
 SEND        없다 — P1 은 서버에서 클라이언트로 가는 단방향 알림이고 행동은 전부 REST 다 (C-12)
 봉투        { type, requestId, occurredAt, … }
