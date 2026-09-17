@@ -68,8 +68,8 @@ public class AdminController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "승격된 계정"),
-            @ApiResponse(responseCode = "401", description = "`USER_NOT_FOUND` — 그런 회원이 없다"),
             @ApiResponse(responseCode = "403", description = "`FORBIDDEN` — 호출자가 관리자가 아니거나, 대상이 정지 계정이다"),
+            @ApiResponse(responseCode = "404", description = "`ADMIN_TARGET_NOT_FOUND` — 그런 회원이 없다"),
             @ApiResponse(responseCode = "409", description = "`ADMIN_ALREADY` — 이미 관리자다")})
     @PostMapping("/{userId}")
     public AdminAccountService.AdminView promote(@AuthenticationPrincipal Jwt jwt,
@@ -94,8 +94,8 @@ public class AdminController {
                     """)
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "강등 완료(또는 이미 관리자가 아니었다)"),
-            @ApiResponse(responseCode = "401", description = "`USER_NOT_FOUND` — 그런 회원이 없다"),
             @ApiResponse(responseCode = "403", description = "`FORBIDDEN`(호출자가 관리자가 아니다) 또는 `MASTER_PROTECTED`(마스터 계정이다)"),
+            @ApiResponse(responseCode = "404", description = "`ADMIN_TARGET_NOT_FOUND` — 그런 회원이 없다"),
             @ApiResponse(responseCode = "409", description = "`ADMIN_LAST_ONE` — 남은 관리자가 이 한 명이다")})
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> demote(@AuthenticationPrincipal Jwt jwt,

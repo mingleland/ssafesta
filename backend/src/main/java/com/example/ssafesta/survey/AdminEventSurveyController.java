@@ -37,6 +37,39 @@ public class AdminEventSurveyController {
         this.events = events;
     }
 
+    @Operation(summary = "이벤트 설문 목록", description = "관리자만 이벤트 설문 전체를 조회한다. 콘솔 진입점 — 알려진 키를 상수로 들고 있을 필요가 없다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "관리자 아님")})
+    @GetMapping
+    public List<AdminEventSurveyService.EventSurveyView> list(@AuthenticationPrincipal Jwt jwt) {
+        return events.list(admins.requireAdmin(jwt));
+    }
+
+    @Operation(summary = "이벤트 설문 문항별 집계", description = "선택형은 옵션별 픽 수, 서술형은 표본 응답 몇 건을 함께 돌려준다. "
+            + "회원용 결과 화면과 달리 부스 편집자 권한이 아니라 관리자 권한으로 연다 — 이벤트 설문에는 소유 부스가 없다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "관리자 아님"),
+            @ApiResponse(responseCode = "404", description = "SURVEY_NOT_FOUND")})
+    @GetMapping("/{surveyKey}/aggregate")
+    public List<AdminEventSurveyService.QuestionAggregateView> aggregate(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(example = "SSAFESTA_2026") @PathVariable String surveyKey) {
+        return events.aggregate(admins.requireAdmin(jwt), surveyKey);
+    }
+
+    @Operation(summary = "이벤트 설문 개별 응답 조회", description = "한 참여자의 문항별 답을 신원과 함께 돌려준다. `entrants` 목록에서 넘어온다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "관리자 아님"),
+            @ApiResponse(responseCode = "404", description = "SURVEY_NOT_FOUND(설문 없음) 또는 NOT_FOUND(그 설문의 응답이 아니다)")})
+    @GetMapping("/{surveyKey}/responses/{responseId}")
+    public AdminEventSurveyService.EventResponseView response(@AuthenticationPrincipal Jwt jwt,
+            @Parameter(example = "SSAFESTA_2026") @PathVariable String surveyKey,
+            @PathVariable Long responseId) {
+        return events.responseDetail(admins.requireAdmin(jwt), surveyKey, responseId);
+    }
+
     @Operation(summary = "이벤트 설문 참여자 조회", description = "이벤트 설문 참여 회원만 최신 제출순으로 조회한다. 경품 지급·추첨은 이 API 범위가 아니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "참여자 페이지"),

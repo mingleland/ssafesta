@@ -107,6 +107,15 @@ public class SurveyResponse {
         return surveyId;
     }
 
+    /**
+     * {@code null} for a guest. Exposed only for the admin event-entrant path
+     * ({@code AdminEventSurveyService}) — every other reader of a response gets the anonymous shape
+     * (FR-009, SC-003), and this getter is what that boundary is drawn around.
+     */
+    public Long getRespondentUserId() {
+        return respondentUserId;
+    }
+
     public Long getRewardLedgerEntryId() {
         return rewardLedgerEntryId;
     }

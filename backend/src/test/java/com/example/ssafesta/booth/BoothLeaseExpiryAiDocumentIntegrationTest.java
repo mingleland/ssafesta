@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import com.example.ssafesta.TestcontainersConfiguration;
 import com.example.ssafesta.ai.DocumentProcessingClient.CancelRequest;
 import com.example.ssafesta.ai.FakeDocumentProcessingClient;
-import com.example.ssafesta.ai.FakeDocumentProcessingClientConfiguration;
 import com.example.ssafesta.user.UserRepository;
 import com.example.ssafesta.wallet.WalletService;
 import java.time.Instant;
@@ -33,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * And every path that expires a lease has to do this, not only the batch — the lazy re-lease path
  * goes through the same private method precisely so it cannot drift.
  */
-@Import({TestcontainersConfiguration.class, FakeDocumentProcessingClientConfiguration.class})
+@Import(TestcontainersConfiguration.class)
 @SpringBootTest
 class BoothLeaseExpiryAiDocumentIntegrationTest {
 
