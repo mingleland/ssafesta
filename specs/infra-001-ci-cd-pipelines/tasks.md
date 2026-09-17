@@ -79,6 +79,7 @@
 - [X] T022D [US1] `infra/jenkins/scripts/publish-webgl-release.sh`, `infra/jenkins/jobs/gitlab-webgl-package-deploy.groovy`, `infra/jenkins/pipelines/webgl-package-deploy.groovy`로 upload 성공 후 Jenkins parameterized job→deploy-agent 흐름을 연결한다. Windows Agent는 추가하지 않는다
 - [X] T022E [US1] 동일 release/SHA 중복 trigger 멱등 처리, release ID의 다른 SHA 재사용 거부, `current`·`previous` 보호와 성공 배포 뒤 UTC timestamp legacy 최신 두 개만 보존하는 retention을 구현한다
 - [X] T022F [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 credential, 업로드, Jenkins job, MIME·Brotli·Cache-Control, rollback 확인 절차를 추가한다
+- [X] T022G [US1] Redis 세션 영속성을 위해 `infra/environments/redis/redis.conf`에 `appendonly yes`를, `infra/environments/compose/data/compose.yaml`에 `mem_limit: 256m`을 적용한다 (40명 피크 1.27MB 실측 기반)
 
 **Checkpoint**: feature MR 하나는 변경 파트 CI만 수행하고, 해당 Squash merge는 그 파트만 dev에서 갱신한다. QA 완료 WebGL package 업로드는 별도 Jenkins deploy-agent job으로 EC2 정적 release를 원자적으로 갱신하며, Linux Dedicated Server 배포·WSS 검증은 infra-003의 독립 경로로 유지된다.
 
