@@ -64,6 +64,25 @@ namespace Festa.World
         Vector2 _current;
         float _weight;
 
+        /// <summary>
+        /// 본 하나에 대해 "우리가 건드리기 전 포즈" 와 "우리가 써 넣은 값" 을 같이 들고 있는다.
+        ///
+        /// <para>왜 필요한가 — <see cref="Apply"/> 는 기존 회전 위에 offset 을 <b>곱한다.</b> 이건
+        /// 애니메이터가 매 프레임 기본 포즈를 다시 써 준다는 전제인데, <see cref="AvatarAnimationLod"/>
+        /// 는 원거리 아바타의 <c>Animator.enabled</c> 를 끄고 2~4프레임에 한 번만 <c>Animator.Update</c>
+        /// 를 돌린다. 그 사이 프레임에는 <b>이미 꺾인 값 위에 또 꺾여</b> 각도가 쌓이고, 평가 프레임에
+        /// 애니메이터가 포즈를 되쓰면 한꺼번에 돌아온다 — 멀리 있는 사람의 고개가 까딱거리던 원인
+        /// (사용자 보고 2026-09-17). 화면 밖 컬링으로 평가가 건너뛰어도 같은 일이 난다.</para>
+        /// </summary>
+        struct BoneState
+        {
+            public Quaternion Base;      // 애니메이터가 만든 포즈 (우리 offset 이 빠진 것)
+            public Quaternion Applied;   // 우리가 마지막으로 써 넣은 값
+            public bool HasApplied;
+        }
+
+        BoneState _headState, _neckState, _chestState;
+
         void Awake()
         {
             _player = GetComponent<NetworkPlayer>();
@@ -104,6 +123,7 @@ namespace Festa.World
             if (animator == _boundAnimator) return;
             _boundAnimator = animator;
             _head = _neck = _chest = null;
+            _headState = _neckState = _chestState = default;   // 아바타가 갈렸다 — 기억한 포즈는 남의 것이다
             if (animator == null || !animator.isHuman) return;
             _head = animator.GetBoneTransform(HumanBodyBones.Head);
             _neck = animator.GetBoneTransform(HumanBodyBones.Neck);
@@ -177,17 +197,39 @@ namespace Festa.World
             var yawRotation = Quaternion.AngleAxis(yaw, Vector3.up);
             var pitchAxis = yawRotation * transform.right;
 
-            Apply(_chest, yaw * _chestShare, pitch * _chestShare, pitchAxis);
-            Apply(_neck, yaw * _neckShare, pitch * _neckShare, pitchAxis);
-            Apply(_head, yaw * _headShare, pitch * _headShare, pitchAxis);
+            Apply(ref _chestState, _chest, yaw * _chestShare, pitch * _chestShare, pitchAxis);
+            Apply(ref _neckState, _neck, yaw * _neckShare, pitch * _neckShare, pitchAxis);
+            Apply(ref _headState, _head, yaw * _headShare, pitch * _headShare, pitchAxis);
         }
 
-        static void Apply(Transform bone, float yaw, float pitch, Vector3 pitchAxis)
+        /// <summary>
+        /// offset 을 <b>애니메이터가 만든 포즈에</b> 곱한다 — 직전에 우리가 써 넣은 값 위에 곱하지 않는다.
+        ///
+        /// <para>판정은 간단하다. 지금 본에 들어 있는 회전이 <b>우리가 마지막으로 써 넣은 그 값</b>이면
+        /// 애니메이터가 이번 프레임에 포즈를 다시 쓰지 않은 것이다 — 그때는 기억해 둔 기본 포즈를
+        /// 기준으로 삼는다. 값이 다르면 애니메이터가 새로 썼다는 뜻이라 그것이 곧 새 기준이다.</para>
+        ///
+        /// <para>이 방식은 평가가 <b>왜</b> 건너뛰었는지를 알 필요가 없다 — 거리 LOD 든 화면 밖
+        /// 컬링이든 같은 경로로 막힌다. 갱신이 정상인 근거리에서는 매 프레임 기준이 새로 잡히므로
+        /// 동작과 비용이 전과 같다.</para>
+        /// </summary>
+        static void Apply(ref BoneState state, Transform bone, float yaw, float pitch, Vector3 pitchAxis)
         {
             if (bone == null) return;
-            bone.rotation = Quaternion.AngleAxis(yaw, Vector3.up) *
-                            Quaternion.AngleAxis(pitch, pitchAxis) *
-                            bone.rotation;
+
+            var current = bone.rotation;
+            var baseRotation = state.HasApplied && Quaternion.Angle(current, state.Applied) < 0.01f
+                ? state.Base      // 애니메이터가 안 돌았다 — 우리 흔적을 걷어낸 포즈로 되돌린다
+                : current;        // 애니메이터가 새로 썼다 — 이것이 기준이다
+
+            var result = Quaternion.AngleAxis(yaw, Vector3.up) *
+                         Quaternion.AngleAxis(pitch, pitchAxis) *
+                         baseRotation;
+
+            bone.rotation = result;
+            state.Base = baseRotation;
+            state.Applied = result;
+            state.HasApplied = true;
         }
     }
 }
