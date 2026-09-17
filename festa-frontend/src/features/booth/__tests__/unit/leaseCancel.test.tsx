@@ -29,6 +29,13 @@ vi.mock('../../../../entities/aiAgent/api', async () => {
   );
   return { ...actual, getAiAgent: (...args: unknown[]) => getAiAgent(...args) };
 });
+// bridge 를 통째로 목하지 않는다 — 한 겹 아래 인스턴스만 세우면 slotId 변환과 SendMessage payload 까지
+// 실제 코드가 돈다 (publishReload.test.tsx 와 같은 방식, S15P21A604-786).
+const sendMessage = vi.fn();
+let unityInstance: { SendMessage: typeof sendMessage } | null = null;
+vi.mock('../../../../unity/host/sessionManager', () => ({
+  getReadyUnityInstance: () => unityInstance,
+}));
 
 // jsdom 에는 <dialog> 가 없다 — 모달이 뜨는지만 보므로 showModal 을 no-op 으로 채운다
 beforeEach(() => {
@@ -52,6 +59,10 @@ beforeEach(() => {
   getAiAgent.mockReset().mockResolvedValue({ agentId: 1, boothId: 42 });
   cancelMyLease.mockReset().mockResolvedValue(undefined);
   setMemberSession('member-token', future());
+});
+beforeEach(() => {
+  sendMessage.mockClear();
+  unityInstance = { SendMessage: sendMessage };
 });
 afterEach(() => {
   cleanup();
@@ -138,5 +149,47 @@ describe('부스 반납 (-753)', () => {
     fireEvent.click(await openCancelDialog());
 
     expect(await screen.findByText('반납하지 못했습니다. 잠시 후 다시 시도해 주세요.')).toBeTruthy();
+  });
+});
+
+// 반납 뒤 상주 월드 전파 (GitLab #199 게임 파트 요청). 이것이 없으면 반납해도 다른 접속자
+// 화면에는 직원·조명·포털이 켜진 채 남는다.
+describe('반납 성공 → 월드 슬롯 재조회 알림 (#199)', () => {
+  it('204 뒤 그 슬롯으로 재조회를 1회 알린다', async () => {
+    await renderOverlay();
+
+    fireEvent.click(await openCancelDialog());
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage).toHaveBeenCalledWith('BoothLayoutBridge', 'ReloadBoothSlot', '6');
+  });
+
+  it('404 ACTIVE_LEASE_NOT_FOUND 에서는 알리지 않는다 — 반납 사건이 아니다', async () => {
+    cancelMyLease.mockRejectedValue({ code: 'ACTIVE_LEASE_NOT_FOUND', message: '없습니다' });
+    const { invalidated } = await renderOverlay();
+
+    fireEvent.click(await openCancelDialog());
+
+    await waitFor(() => expect(invalidated).toContainEqual(['my-booth']));
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('확인 모달을 거치기 전에는 알리지 않는다', async () => {
+    await renderOverlay();
+
+    fireEvent.click(await screen.findByRole('button', { name: /^부스 반납하기/ }));
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('월드가 떠 있지 않으면 조용히 건너뛴다 — 반납과 재조회는 그대로다', async () => {
+    unityInstance = null;
+    const { invalidated } = await renderOverlay();
+
+    fireEvent.click(await openCancelDialog());
+
+    await waitFor(() => expect(cancelMyLease).toHaveBeenCalledWith(6));
+    await waitFor(() => expect(invalidated).toContainEqual(['booth-slots']));
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
