@@ -6,12 +6,15 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import type { UnityInstance, UnityProgressListener } from '../../types';
 import { WORLD_PREPARING_LONG_WAIT_MS, UNITY_BOOT_STALL_TIMEOUT_MS } from '../../../../shared/config/unity';
 
-type Boot = { resolve: (i: UnityInstance) => void };
+type Boot = {
+  resolve: (i: UnityInstance) => void;
+  progress: UnityProgressListener;
+};
 const boots: Boot[] = [];
 
 vi.mock('../../sessionManager', () => {
-  const start = (_c: HTMLCanvasElement, _p: UnityProgressListener) =>
-    new Promise<UnityInstance>((resolve) => { boots.push({ resolve }); });
+  const start = (_c: HTMLCanvasElement, progress: UnityProgressListener) =>
+    new Promise<UnityInstance>((resolve) => { boots.push({ resolve, progress }); });
   return { acquireUnitySession: start, restartUnitySession: start, releaseUnitySession: () => {} };
 });
 
@@ -43,18 +46,6 @@ describe('World Preparing UX (-429)', () => {
     expect(screen.getByText('축제장을 불러오고 있어요')).toBeTruthy();
   });
 
-  it('전환 중에는 dim을 불투명하게 — 직전 씬 canvas 프레임이 비치지 않는다 (S15P21A604-733)', async () => {
-    await renderReady();
-    loadStart();
-    expect(screen.getByRole('status').className).toContain('uh-status--opaque');
-  });
-
-  it('boot 대기 중에는 dim이 반투명 그대로다 — 아직 전환 중이 아니다', async () => {
-    const { UnityHost } = await import('../../UnityHost');
-    render(<UnityHost />);
-    expect(screen.getByRole('status').className).not.toContain('uh-status--opaque');
-  });
-
   it('길어지면 문구가 바뀌지만 실패로 넘어가지 않는다', async () => {
     await renderReady();
     loadStart();
@@ -72,10 +63,15 @@ describe('World Preparing UX (-429)', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
-  it('가짜 진행률을 만들지 않는다 — 로딩 구간에 백분율이 없다', async () => {
-    await renderReady();
-    loadStart();
-    expect(screen.queryByText(/%/)).toBeNull();
+  it('실제 WebGL progress는 기존 퍼센트 자리의 게이지만 움직이고 숫자로 노출하지 않는다', async () => {
+    const { UnityHost } = await import('../../UnityHost');
+    const { container } = render(<UnityHost />);
+    act(() => boots[0].progress(0.5));
+    expect(container.querySelector('.uh-boot-bg')).not.toBeNull();
+    expect(container.querySelector('.uh-boot-panel')).not.toBeNull();
+    expect(screen.getByRole('img', { name: 'SSAFESTA' })).toBeTruthy();
+    expect((container.querySelector('.uh-loading-bar-fill') as HTMLElement).style.width).toBe('50%');
+    expect(screen.queryByText(/\d+%/)).toBeNull();
   });
 
   it('boot 중에 온 신호는 무시한다 — 아직 로비가 아니다', async () => {

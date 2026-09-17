@@ -7,6 +7,7 @@ import { adminApi } from '../../../entities/admin/api.select';
 import { nextFulfillmentOptions } from '../../../entities/admin/types';
 import type { PrizeFulfillmentStatus, PrizePurchaseView } from '../../../entities/admin/types';
 import { showToast } from '../../../shared/ui/toast/toastStore';
+import { Select } from '../../../shared/ui/select/Select';
 import { ConfirmDialog, Empty, ErrorBanner, Loading, Pager, StatusChip, fmtTime, statusLabel } from './common';
 
 const FILTERS: (PrizeFulfillmentStatus | 'ALL')[] = ['ALL', 'PURCHASED', 'PENDING', 'FULFILLED', 'CANCELLED'];
@@ -48,9 +49,12 @@ export function EventShopSection() {
         <div className="ad-head">
           <h3 className="sc-section-title">구매 내역</h3>
           <div className="ad-toolbar">
-            <select aria-label="처리 상태 필터" value={filter} onChange={(e) => { setFilter(e.target.value as PrizeFulfillmentStatus | 'ALL'); setPage(0); }}>
-              {FILTERS.map((f) => <option key={f} value={f}>{f === 'ALL' ? '전체' : statusLabel(f)}</option>)}
-            </select>
+            <Select
+              aria-label="처리 상태 필터"
+              value={filter}
+              options={FILTERS.map((f) => ({ value: f, label: f === 'ALL' ? '전체' : statusLabel(f) }))}
+              onChange={(v) => { setFilter(v); setPage(0); }}
+            />
           </div>
         </div>
         <p className="sc-note">코인 차감과 경품 지급은 다른 사건입니다 — 원장에 차감이 남았다고 물건을 받은 것이 아닙니다.</p>
@@ -99,9 +103,13 @@ export function EventShopSection() {
           <div className="ad-form">
             <label className="ad-field" htmlFor="fulfill-next">
               <span className="ad-label">다음 상태 <em>현재: {statusLabel(target.fulfillment)}</em></span>
-              <select id="fulfill-next" className="ad-select" value={next} onChange={(e) => setNext(e.target.value as PrizeFulfillmentStatus)}>
-                {nextFulfillmentOptions(target.fulfillment).map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-              </select>
+              <Select
+                id="fulfill-next"
+                className="ad-select-block"
+                value={next}
+                options={nextFulfillmentOptions(target.fulfillment).map((s) => ({ value: s, label: statusLabel(s) }))}
+                onChange={setNext}
+              />
             </label>
             {(next === 'CANCELLED' || next === 'FULFILLED') && (
               <p className="sc-note">
