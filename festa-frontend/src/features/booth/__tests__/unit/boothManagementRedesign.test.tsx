@@ -169,7 +169,7 @@ describe('내 부스 관리창 개편 (-817)', () => {
       const img = () => document.querySelector('.bm-preview-img') as HTMLImageElement | null;
       await waitFor(() => expect(img()?.getAttribute('src')).toBe('/booth-preview/F11-R06.png'));
       fireEvent.error(img()!);
-      expect(img()?.getAttribute('src')).toBe('/booth-preview/default.png');
+      expect(img()?.getAttribute('src')).toBe('/booth-preview/default.webp');
       fireEvent.error(img()!);
       expect(img()).toBeNull();
       expect(screen.getByText('부스 미리보기를 불러올 수 없습니다.')).toBeTruthy();
@@ -180,7 +180,7 @@ describe('내 부스 관리창 개편 (-817)', () => {
       getMyBooth.mockResolvedValue({ ...myBooth, lease: { ...myBooth.lease, slotCode: null } });
       await renderOverlay();
       await waitFor(() =>
-        expect(document.querySelector('.bm-preview-img')?.getAttribute('src')).toBe('/booth-preview/default.png'),
+        expect(document.querySelector('.bm-preview-img')?.getAttribute('src')).toBe('/booth-preview/default.webp'),
       );
     });
   });
