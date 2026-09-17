@@ -35,6 +35,21 @@ namespace Festa.Booth
                 return null;
             }
 
+            // 저작 인테리어 안에서는 AI 직원·노트북·설문·전시패널을 **스폰하지 않는다.**
+            //
+            // 이 넷은 12부스 인테리어에 이미 고정으로 놓여 있고, 게시본이 같은 타입을 실어 오면
+            // AuthoredBoothContentBinder 가 그 configId 를 씬 오브젝트에 물린다. 여기서 또 만들면
+            // 같은 부스에 저작 NPC 와 스폰된 캡슐이 나란히 서서 둘 다 F 가 먹는다 (#244, FE 보고 2026-09-18).
+            // 게시본이 값의 출처인 것은 그대로다 — 배치만 건너뛰고 값은 binder 가 쓴다.
+            //
+            // 판정은 앵커의 루트 이름으로 한다. 저작 인테리어는 `@BoothInteriors` 아래에만 있고,
+            // 그 밖(단독 검증 씬·POC 부스)에서는 지금까지처럼 스폰해야 놓인 것이 아무것도 없는 사태를 피한다.
+            if (IsAuthoredInterior(anchor) && IsAuthoredContent(type))
+            {
+                Debug.Log($"[BoothObjectFactory] 저작 인테리어에는 {dto.type}(objectId={objectId})를 스폰하지 않는다 — 씬 오브젝트에 연결한다");
+                return null;
+            }
+
             var prefab = _registry != null ? _registry.GetPrefab(type, dto.assetCode) : null;
             if (prefab == null && type == BoothObjectType.Laptop)
             {
@@ -280,5 +295,16 @@ namespace Festa.Booth
                 // 에스컬레이션이다(spec 011 FR-005, S15P21A604-416). 데스크 진입은 후속.
             }
         }
+
+        /// <summary>앵커가 12부스 저작 인테리어(<c>@BoothInteriors</c>) 안에 있는가.</summary>
+        static bool IsAuthoredInterior(Transform anchor) =>
+            anchor != null && anchor.root != null && anchor.root.name == "@BoothInteriors";
+
+        /// <summary>인테리어에 이미 놓여 있어 게시본으로 또 만들면 안 되는 넷.</summary>
+        static bool IsAuthoredContent(BoothObjectType type) =>
+            type == BoothObjectType.AiAgent
+            || type == BoothObjectType.Laptop
+            || type == BoothObjectType.SurveyKiosk
+            || type == BoothObjectType.ProjectPanel;
     }
 }

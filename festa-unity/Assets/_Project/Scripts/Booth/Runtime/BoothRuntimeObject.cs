@@ -35,21 +35,5 @@ namespace Festa.Booth
             Type = type;
             ConfigId = dto.configId;
         }
-
-        /// <summary>
-        /// 레이아웃 밖에서 온 콘텐츠 연결을 뒤늦게 물린다.
-        ///
-        /// <para>씬에 고정으로 놓인 AI 직원이 이 경로를 쓴다 — 어느 AI 인지가 레이아웃이 아니라
-        /// 부스 자체에 붙어 있고, 그 조회가 비동기라 <see cref="Init"/> 시점에는 알 수 없다.</para>
-        ///
-        /// <para>이미 연결돼 있으면 덮지 않는다. 레이아웃이 명시한 값이 부스 기본값보다 우선이다 —
-        /// 배치로 지정한 것을 나중 조회가 뒤엎으면 무엇이 이겼는지 추적할 수 없게 된다.</para>
-        /// </summary>
-        public bool BindConfigIfEmpty(int configId)
-        {
-            if (configId <= 0 || ConfigId > 0) return false;
-            ConfigId = configId;
-            return true;
-        }
     }
 }
