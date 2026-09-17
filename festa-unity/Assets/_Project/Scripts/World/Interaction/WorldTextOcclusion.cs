@@ -29,6 +29,22 @@ namespace Festa.World
         /// Overlay 셰이더를 물고 있는 재질(Resources). <c>Shader.Find</c> 만 쓰면 빌드에 그 셰이더가 포함된다는
         /// 보장이 없다 — Resources 재질은 의존성까지 항상 빌드에 들어간다.
         /// </summary>
+        /// <remarks>
+        /// ⚠ <b>이 재질의 <c>OUTLINE_ON</c> 키워드를 끄지 마라.</b> TMP 의 외곽선은
+        /// <c>shader_feature</c> 라, 빌드에 포함된 재질 중 그 키워드가 켜진 것이 하나도 없으면
+        /// 해당 변형이 통째로 스트립된다. 그러면 런타임의 <c>EnableKeyword("OUTLINE_ON")</c> 은
+        /// 아무 일도 하지 않는다.
+        ///
+        /// <para>실제로 그렇게 깨졌다 — 이름표를 Overlay 셰이더로 옮긴 뒤(2026-09-16, -703 잔여)
+        /// 빌드에서 닉네임 테두리가 사라졌다. 프로젝트에서 <c>OUTLINE_ON</c> 이 켜진 재질은
+        /// TMP 기본 제공품뿐이고 그것들은 전부 <b>비-Overlay</b> 셰이더를 쓴다. 옮기기 전에는
+        /// 그 덕에 변형이 살아남아 있었을 뿐이다. 에디터는 변형을 즉석에서 컴파일하므로
+        /// 끝까지 멀쩡해 보인다 — 빌드에서만 드러난다(AGENTS 의 "셰이더 변형" 항목).</para>
+        ///
+        /// <para><c>FestaTrackedVariants.shadervariants</c> 는 이 문제를 막아 주지 않는다.
+        /// 셰이더 워밍업을 걷어내면서(-508) 아무도 참조하지 않는 기록이 됐고
+        /// <c>GraphicsSettings.m_PreloadedShaders</c> 도 비어 있다.</para>
+        /// </remarks>
         const string OverlayMaterialResourcePath = "Fonts/WorldTextOverlay";
         static readonly RaycastHit[] Hits = new RaycastHit[32];
         static readonly Vector3[] Samples = new Vector3[SampleCount];
