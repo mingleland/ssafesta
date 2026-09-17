@@ -21,7 +21,10 @@ import java.util.Optional;
 public enum LayoutObjectType {
 
     AI_AGENT(true, new LocalBounds(-0.31, 0, -0.16, 0.31, 1.15, 0.16)),
-    VIDEO_SCREEN(true, new LocalBounds(-1.50, 0, -0.15, 1.20, 2.10, 0.15)),
+    // 장식이다 (GitLab #194 ②, 2026-09-18). 게임 파트가 영상 기능화를 이번 축제에서 하지 않기로
+    // 정했고(S15P21A604-579 보류, Unity 반영은 -881), 그래서 이 타입은 가리킬 콘텐츠가 없다.
+    // 바운드는 그대로다 — 강등은 configId·관람 정면 판정만 바꾼다.
+    VIDEO_SCREEN(false, new LocalBounds(-1.50, 0, -0.15, 1.20, 2.10, 0.15)),
     PROJECT_PANEL(true, new LocalBounds(-0.78, 0, -0.18, 0.77, 2.72, 0.18)),
     SURVEY_KIOSK(true, new LocalBounds(-0.31, 0, -0.16, 0.31, 0.93, 0.16)),
     RECRUITMENT_BOARD(true, new LocalBounds(-1.50, 0, -0.18, 1.50, 2.72, 0.18)),
@@ -44,8 +47,12 @@ public enum LayoutObjectType {
      *
      * <p>Drives the {@code CONFIG_NOT_LINKED} warning only — whether an unlinked object blocks
      * publishing is C-04 and still undecided (research R-05). Also marks the kinds that get a
-     * viewing-band passage check on publish (#19 ⑤) — 장식(FURNITURE·DECORATION)에는 관람할
-     * 정면이 없다.
+     * viewing-band passage check on publish (#19 ⑤) — 장식(FURNITURE·DECORATION·VIDEO_SCREEN)에는
+     * 관람할 정면이 없다.
+     *
+     * <p>{@code false} 인 타입은 {@code configId} 판정 자체에서 빠진다 — 실려 오면 저장하되 무시하고
+     * 경고도 내지 않는다 (GitLab #194 ②). 무시하면서 경고만 남기면 FE 는 고칠 것이 없는 경고를
+     * 영구히 보게 된다.
      */
     public boolean requiresConfig() {
         return requiresConfig;
