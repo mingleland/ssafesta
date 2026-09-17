@@ -64,12 +64,12 @@ describe('관리 상세 패널 레이어 (-755)', () => {
   });
 
   it('다른 레이어가 열리면 상세도 걷힌다 — 배타는 그대로다', () => {
-    openManagementDetail({ kind: 'studio', boothId: 42 });
+    openManagementDetail({ kind: 'survey', boothId: 42 });
     openMenu();
     expect(getGameClientUiSnapshot().managementPanel).toBeNull();
     expect(getWorldScreen()).toBe('menu');
 
-    openManagementDetail({ kind: 'studio', boothId: 42 });
+    openManagementDetail({ kind: 'survey', boothId: 42 });
     openVisitorOverlay('WORLD_GUIDE', null);
     expect(getGameClientUiSnapshot().managementPanel).toBeNull();
     expect(getWorldScreen()).toBe('visitor');

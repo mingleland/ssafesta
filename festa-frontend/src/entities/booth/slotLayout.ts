@@ -1,41 +1,43 @@
-// 11F 부스 슬롯의 평면 배치 (S15P21A604-606).
+// 축제장 부스 슬롯 배치 (S15P21A604-606 · 2026-09-17 재작성).
 //
-// **좌표의 출처는 Unity 씬이다.** `festa-unity/Assets/_Project/Prefabs/World/Festival.prefab` 의
-// `Portal_Ext_01`~`Portal_Ext_12`(각 부스 외부 출입 포털)의 Transform 을 뽑아 정규화했다.
-// `main.unity` 에는 같은 boothId 로 내부 출구 포털이 하나씩 더 있는데, 그쪽은 부스 안의 좌표라
-// 평면도용이 아니다.
+// **정본은 Unity 월드다.** `Festival.prefab` 의 `FestivalSlot_01`~`12` Transform 실측:
 //
-// 왜 계약(`SlotView`)이 아니라 FE 상수인가: 슬롯은 12개 고정이고 `floorNo` 도 11 고정이라
-// (계약이 층 필터 UI 를 금지한다) 상수 표의 유지비가 BE·Unity·FE 3파트 계약 확장보다 싸다.
-// 배치가 자주 바뀌기 시작하면 그때 계약으로 올린다.
+//   슬롯   01/02   03/04   05/06   07/08   09/10   11/12
+//   world x  -300    -415    -530    -645    -760    -875      (홀짝 쌍이 같은 x)
+//   world z  홀수 230 · 짝수 60                                 (두 값뿐)
 //
-// 실측 원본(월드 유닛):
-//   x  -887.34 ~ -278.68   (폭 608.66)
-//   z  홀수 부스 ≈ 230 / 짝수 부스 ≈ 55   (폭 192.60)
-//   → 6열 × 2행 통로형. 부스 번호가 커질수록 x 가 작아지므로 화면에서는 좌→우로 1→12 가 되게 뒤집었다.
+// 화면 투영은 Unity 가 이미 정해 두었다 — `FestivalMinimapArea.Normalized`:
+//   가로 u = InverseLerp(z: -40 … 330)      → z 가 큰 **홀수가 오른쪽**
+//   세로 v = 1 - InverseLerp(x: -930 … -240) → x 가 큰 **01·02 가 아래(입구)**
+// 주석 그대로 "입구가 아래, 안쪽이 위다 — 걸어 들어가면 점이 올라간다".
+//
+// 그래서 실제 구조는 **2열 × 6행**이다. 옛 표는 이것을 6열 × 2행으로 눕혀 두어 월드와 90° 어긋나
+// 있었고, 번호도 좌→우 1→12 로 다시 매겨 미니맵과 맞지 않았다.
+//
+// 좌표를 %로 굳히지 않는다. 지시문대로 **실측 재현이 아니라 정돈된 추상 맵**이라 행·열만 주고
+// 간격은 CSS grid 가 균등하게 만든다.
 
-/** 평면도 안에서의 위치(%) — 좌상단 기준. 그림 크기와 무관하게 쓰려고 비율로 둔다 */
-export interface SlotSpot {
-  left: number;
-  top: number;
+/** 슬롯이 앉는 칸. row 1 = 입구 쪽(아래), row 6 = 안쪽(위) */
+export interface SlotCell {
+  row: number;
+  side: 'left' | 'right';
 }
 
-export const SLOT_SPOTS: Readonly<Record<number, SlotSpot>> = Object.freeze({
-  1: { left: 6.0, top: 10.4 },
-  2: { left: 9.2, top: 91.1 },
-  3: { left: 24.5, top: 6.0 },
-  4: { left: 26.8, top: 94.0 },
-  5: { left: 40.2, top: 10.9 },
-  6: { left: 43.4, top: 94.0 },
-  7: { left: 54.4, top: 12.1 },
-  8: { left: 61.0, top: 89.6 },
-  9: { left: 71.7, top: 10.2 },
-  10: { left: 77.8, top: 89.6 },
-  11: { left: 90.8, top: 11.4 },
-  12: { left: 94.0, top: 89.6 },
-});
+export const SLOT_ROWS = 6;
 
-/** 그림을 그릴 수 있는 슬롯인가 — 표에 없는 slotId 는 평면도에 얹지 않고 목록에만 남긴다 */
-export function slotSpot(slotId: number): SlotSpot | undefined {
-  return SLOT_SPOTS[slotId];
+/** 슬롯 번호 → 칸. 홀수는 오른쪽(z 230), 짝수는 왼쪽(z 60), 두 칸이 한 행을 이룬다 */
+export function slotCell(slotId: number): SlotCell | undefined {
+  if (!Number.isInteger(slotId) || slotId < 1 || slotId > SLOT_ROWS * 2) return undefined;
+  return { row: Math.ceil(slotId / 2), side: slotId % 2 === 1 ? 'right' : 'left' };
 }
+
+/**
+ * 그리는 순서 — **위(안쪽)에서 아래(입구)로**, 각 행은 [왼쪽, 오른쪽].
+ * `[[12,11],[10,9],[8,7],[6,5],[4,3],[2,1]]` 이 되고 미니맵과 같은 그림이다.
+ */
+export const SLOT_GRID: readonly (readonly [number, number])[] = Object.freeze(
+  Array.from({ length: SLOT_ROWS }, (_, index) => {
+    const row = SLOT_ROWS - index; // 첫 줄이 가장 안쪽
+    return Object.freeze([row * 2, row * 2 - 1]) as readonly [number, number];
+  }),
+);

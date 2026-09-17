@@ -103,8 +103,8 @@
   "slotId": 5,
   "startsAt": "2026-08-19T07:12:03Z",
   "endsAt": "2026-08-20T07:12:03Z",
-  "chargedCoin": 100,
-  "balanceAfter": 150
+  "chargedCoin": 50,
+  "balanceAfter": 200
 }
 ```
 
@@ -190,7 +190,7 @@
     "startsAt": "2026-08-19T07:12:03Z",
     "endsAt": "2026-08-20T07:12:03Z",
     "remainingSeconds": 71040,
-    "chargedCoin": 100
+    "chargedCoin": 50
   }
 }
 ```

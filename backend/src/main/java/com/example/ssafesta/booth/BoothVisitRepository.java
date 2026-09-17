@@ -9,6 +9,13 @@ import org.springframework.data.repository.query.Param;
 /** 부스 방문 기록과 집계 (S15P21A604-240). */
 public interface BoothVisitRepository extends JpaRepository<BoothVisit, Long> {
 
+    @Query("""
+            select count(distinct v.boothId) from BoothVisit v
+            where v.visitorUserId = :userId and v.enteredAt >= :from and v.enteredAt < :to
+            """)
+    long countDistinctBoothsVisitedByUserBetween(@Param("userId") Long userId,
+                                                  @Param("from") Instant from, @Param("to") Instant to);
+
     /**
      * 이 회원이 그 부스에 열어 둔 방문.
      *

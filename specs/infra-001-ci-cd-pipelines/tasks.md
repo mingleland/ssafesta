@@ -70,9 +70,9 @@
 - [X] T017 [US1] `infra/jenkins/scripts/deploy-dev-batch.sh`에 DB·secret/config·비가역·unknown 실패의 자동 rollback 금지 및 `MANUAL_ACTION_REQUIRED` evidence 출력을 구현한다
 - [X] T018 [US1] `infra/jenkins/pipelines/develop.groovy`에 `develop` range detector → selected CI 전체 성공 gate → dev batch 호출 순서를 연결한다
 - [X] T019 [US1] `infra/jenkins/pipelines/develop.groovy`에 deploy 직전 develop head 재확인과 superseded run 무변경 종료를 연결한다
-- [ ] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
+- [X] T020 [US1] `infra/environments/tests/integration/dev-component-isolation.sh`에 단일 component 배포가 나머지 세 service를 recreate하지 않는 EC2 rehearsal을 추가한다
 - [X] T021 [US1] `infra/environments/tests/failure/dev-deploy-failure.sh`에 다중 component deploy/verify 실패 시 snapshot rollback rehearsal을 추가한다
-- [ ] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
+- [X] T022 [US1] `specs/infra-001-ci-cd-pipelines/quickstart.md`에 GitLab MR gate와 Jenkins develop 단일·다중·rollback 실측 절차를 갱신한다
 - [X] T022A [P] [US1] `infra/jenkins/tests/deploy-webgl-release.sh`에 정상 package, bad SHA, ZIP traversal, bad manifest, 중복 trigger, 전환 후 HTTP 실패 rollback과 retention fixture를 작성한다
 - [X] T022B [US1] Jenkins에 `read_package_registry` 전용 GitLab Deploy Token credential을 만들고 Unity 담당자 PC→Jenkins 외부 trigger 접근, deploy-agent의 `/srv/festa/webgl` bind와 공개 URL 접근 preflight를 `infra/evidence/webgl-package-deploy-preflight.md`에 실측 기록한다
 - [X] T022C [US1] `infra/jenkins/scripts/deploy-webgl-release.sh`에 Registry download, SHA-256·안전한 ZIP·manifest 검증, immutable release 설치, 원자적 `current`, 공개 HTTP 검증과 실패 rollback을 구현하고 Nginx가 `.br`·`.unityweb`을 동일한 Brotli 계약으로 제공하게 한다
@@ -98,19 +98,21 @@
 
 ---
 
-## Phase 5: User Story 2 - 승인된 release를 demo 통합 환경에 배포한다 (Priority: P0)
+## Phase 5: User Story 2 - demo에서 검증된 release를 production(main) 환경에 수동 승격한다 (Priority: P0)
 
-**Goal**: develop 자동배포와 demo 통합배포를 분리하고, dev 검증된 release만 수동 승인으로 demo에 올린다.
+**Goal**: develop push 자동배포로 갱신된 demo.ssafesta.world 에서 팀 검증을 통과한 known-good 릴리스만 수동 승인(Production Promotion)으로 main 및 ssafesta.world 에 배포한다.
+**Architecture Invariant**: develop → main 승격 MR 은 절대 Squash 하지 않고 ancestry 를 보존한다 (`squash=false` 강제).
+**Artifact Invariant**: main 승격 시 아티팩트를 재빌드하지 않고 demo 에서 검증된 동일 아티팩트를 프로덕션에 승격한다 (`Demo Artifact == Production Artifact`).
 
-**Independent Test**: 비승인 release는 거절되고, 승인 manifest는 demo deploy 후 web→login→world→AI 검증을 모두 통과할 때만 성공이다.
+**Independent Test**: 미검증 current 및 비승인 release는 승격이 거절되고, human 검증된 known-good manifest 만 main 반영 및 프로덕션 배포 후 web→login→world→AI 검증을 모두 통과할 때만 성공이다.
 
-- [X] T026 [P] [US2] `infra/jenkins/tests/demo-promotion.sh`에 비승인·미검증 manifest 거절과 승인 dev manifest 수용 fixture를 작성한다
-- [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 승인된 active dev batch 또는 dev-verified release manifest만 입력으로 받는 수동 pipeline을 구현한다
-- [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용하도록 연결한다
-- [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
-- [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
+ - [X] T026 [P] [US2] `infra/jenkins/tests/demo-promotion.sh`에 비승인·미검증 manifest 거절과 승인 dev manifest 수용 fixture를 작성한다
+ - [X] T027 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`를 추가해 demo 에서 검증된 known-good release manifest 만 입력으로 받는 수동 Production Promotion pipeline을 구현한다
+ - [X] T028 [US2] `infra/jenkins/pipelines/demo-promotion.groovy`에서 기존 `build-release-manifest.sh`, `deploy-release.sh`, `verify-release.sh`, `decide-recovery.sh`, `rollback-release.sh`를 재사용해 프로덕션(`ssafesta.world`) 배포를 수행하도록 연결한다
+ - [X] T029 [US2] `infra/jenkins/jobs/gitlab-demo-promotion.groovy`를 추가해 승인 권한과 manifest 입력 파라미터를 가진 수동 Jenkins job을 정의한다
+ - [X] T030 [US2] `infra/tests/acceptance/us2-demo-promotion.sh`에 정상, 비AI 가역 rollback, DB·secret/config 수동대기, AI-only 재시도 대기 rehearsal을 추가한다
 
-**Checkpoint**: develop push는 demo를 절대 변경하지 않으며 승인된 dev release만 demo에 배포된다.
+**Checkpoint**: develop push 는 demo.ssafesta.world 로 자동 배포되고, 사람 검증을 통과한 known-good 릴리스만 No-Squash MR 을 통해 main 및 ssafesta.world 에 배포된다.
 
 ---
 
@@ -147,8 +149,8 @@
 
 **Purpose**: 구현이 아닌 실제 Jenkins/GitLab/EC2에서만 확인 가능한 항목을 기록한다.
 
-- [ ] T038 [P] `infra/evidence/server-preflight.md`에 EC2, Docker/rootless, UFW, DNS/TLS, webhook, 관리 포트, disk baseline 실측을 기록한다
-- [ ] T039 [P] `infra/evidence/unity-agent-preflight.md`에 영속 Unity license, agent 재생성 유지, Editor/module, credential 없는 batch smoke evidence를 기록한다
+- [X] T038 [P] `infra/evidence/server-preflight.md`에 EC2, Docker/rootless, UFW, DNS/TLS, webhook, 관리 포트, disk baseline 실측을 기록한다
+- [X] T039 [P] `infra/evidence/unity-agent-preflight.md`에 영속 Unity license, agent 재생성 유지, Editor/module, credential 없는 batch smoke evidence를 기록한다
 - [ ] T040 `infra/evidence/gitlab-component-pipeline-rehearsal.md`에 GitLab MR gate와 Jenkins develop selected dev deployment 실측을 기록한다
 - [ ] T041 `infra/evidence/demo-promotion-rehearsal.md`에 승인 release의 demo 통합 deploy/verification/rollback evidence를 기록한다
 - [ ] T042 `infra/evidence/quickstart-results.md`에 `specs/infra-001-ci-cd-pipelines/quickstart.md` 전체 실행 결과를 연결한다

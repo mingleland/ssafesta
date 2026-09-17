@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
 import { Empty, ErrorBanner, Loading, Pager, StatusChip } from './common';
+import { Tooltip } from '../../../shared/ui/tooltip/Tooltip';
 
 const PAGE_SIZE = 10;
 
@@ -29,7 +30,9 @@ export function MemberSearch({ selectedUserId, onSelect }: { selectedUserId: num
       >
         <input aria-label="회원 검색" placeholder="닉네임 또는 회원 번호" value={draft} onChange={(e) => setDraft(e.target.value)} />
         <button type="submit" className="sc-btn sc-btn-primary">검색</button>
-        <span className="ad-badge-fe" title="BE 검색 API 미도달 — FE 계약 기준">FE 계약</span>
+        <Tooltip content="BE 검색 API 미도달 — FE 계약 기준">
+          <span className="ad-badge-fe">FE 계약</span>
+        </Tooltip>
       </form>
       {result.isPending && <Loading label="회원을 찾는 중..." />}
       {result.isError && <ErrorBanner error={result.error} onRetry={() => void result.refetch()} />}

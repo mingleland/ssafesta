@@ -1,23 +1,16 @@
 // 이벤트 상점 — 구매 내역 표가 중심이다. 코인 차감(원장)과 경품 지급(처리 상태)은 다른 사건이라 열을 따로 둔다.
-// BE 에 이 도메인이 없다([FE contract] 전부) — mock 으로 흐름을 완성하고 계약을 역으로 요청한다.
+// BE 가 `!1064`(S15P21A604-836)로 이 도메인을 develop 에 넣었다 — FE 가 먼저 낸 계약과 응답 필드가
+// 그대로 맞아 어댑터는 손대지 않았다. 다른 것은 전이 규칙 하나다(S15P21A604-853, GitLab #217 4번).
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../../entities/admin/api.select';
+import { nextFulfillmentOptions } from '../../../entities/admin/types';
 import type { PrizeFulfillmentStatus, PrizePurchaseView } from '../../../entities/admin/types';
 import { showToast } from '../../../shared/ui/toast/toastStore';
+import { Select } from '../../../shared/ui/select/Select';
 import { ConfirmDialog, Empty, ErrorBanner, Loading, Pager, StatusChip, fmtTime, statusLabel } from './common';
 
 const FILTERS: (PrizeFulfillmentStatus | 'ALL')[] = ['ALL', 'PURCHASED', 'PENDING', 'FULFILLED', 'CANCELLED'];
-
-/** 지금 상태에서 갈 수 있는 다음 상태. 취소는 되돌리지 않는다 */
-export function nextFulfillmentOptions(current: PrizeFulfillmentStatus): PrizeFulfillmentStatus[] {
-  switch (current) {
-    case 'PURCHASED': return ['PENDING', 'FULFILLED', 'CANCELLED'];
-    case 'PENDING': return ['FULFILLED', 'CANCELLED'];
-    case 'FULFILLED': return ['CANCELLED'];
-    case 'CANCELLED': return [];
-  }
-}
 
 export function EventShopSection() {
   const qc = useQueryClient();
@@ -37,7 +30,7 @@ export function EventShopSection() {
   return (
     <div className="ad-work">
       <section className="sc-card">
-        <div className="ad-head"><h3 className="sc-section-title">경품 <span className="ad-badge-fe">FE 계약</span></h3></div>
+        <div className="ad-head"><h3 className="sc-section-title">경품</h3></div>
         {prizes.isPending && <Loading />}
         {prizes.isError && <ErrorBanner error={prizes.error} onRetry={() => void prizes.refetch()} />}
         {prizes.isSuccess && (
@@ -56,9 +49,12 @@ export function EventShopSection() {
         <div className="ad-head">
           <h3 className="sc-section-title">구매 내역</h3>
           <div className="ad-toolbar">
-            <select aria-label="처리 상태 필터" value={filter} onChange={(e) => { setFilter(e.target.value as PrizeFulfillmentStatus | 'ALL'); setPage(0); }}>
-              {FILTERS.map((f) => <option key={f} value={f}>{f === 'ALL' ? '전체' : statusLabel(f)}</option>)}
-            </select>
+            <Select
+              aria-label="처리 상태 필터"
+              value={filter}
+              options={FILTERS.map((f) => ({ value: f, label: f === 'ALL' ? '전체' : statusLabel(f) }))}
+              onChange={(v) => { setFilter(v); setPage(0); }}
+            />
           </div>
         </div>
         <p className="sc-note">코인 차감과 경품 지급은 다른 사건입니다 — 원장에 차감이 남았다고 물건을 받은 것이 아닙니다.</p>
@@ -107,11 +103,19 @@ export function EventShopSection() {
           <div className="ad-form">
             <label className="ad-field" htmlFor="fulfill-next">
               <span className="ad-label">다음 상태 <em>현재: {statusLabel(target.fulfillment)}</em></span>
-              <select id="fulfill-next" className="ad-select" value={next} onChange={(e) => setNext(e.target.value as PrizeFulfillmentStatus)}>
-                {nextFulfillmentOptions(target.fulfillment).map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
-              </select>
+              <Select
+                id="fulfill-next"
+                className="ad-select-block"
+                value={next}
+                options={nextFulfillmentOptions(target.fulfillment).map((s) => ({ value: s, label: statusLabel(s) }))}
+                onChange={setNext}
+              />
             </label>
-            {next === 'CANCELLED' && <p className="sc-note">취소는 되돌릴 수 없습니다. 코인 환불은 이 화면이 하지 않습니다 — 지갑 관리에서 따로 조정합니다.</p>}
+            {(next === 'CANCELLED' || next === 'FULFILLED') && (
+              <p className="sc-note">
+                {next === 'CANCELLED' ? '취소' : '지급 완료'}는 되돌릴 수 없습니다. 코인 환불은 이 화면이 하지 않습니다 — 지갑 관리에서 따로 조정합니다.
+              </p>
+            )}
             <label className="ad-field" htmlFor="fulfill-note">
               <span className="ad-label">메모 <em>선택</em></span>
               <input id="fulfill-note" className="ad-input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="예: 현장 수령 완료" />

@@ -17,22 +17,17 @@
   background: rgba(10, 14, 34, 0.55);
 }
 
-.world-chat-launcher {
-  align-self: flex-start;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(10, 14, 34, 0.6);
-  color: #fff;
-  font-size: 0.8rem;
-  cursor: pointer;
+/* Passive 입력칸 — 늘 떠 있지만 월드를 가리지 않게 물러나 있다. 다만 여기가 채팅 자리라는
+   것은 읽혀야 해서 완전히 흐리게 두지 않는다. focus 하면 선명해진다. */
+.world-chat:not(.world-chat-open) .world-chat-input {
+  opacity: 0.72;
+  background: rgba(10, 14, 34, 0.62);
 }
+.world-chat-input:focus { opacity: 1; }
+.world-chat-input::placeholder { color: rgba(255, 255, 255, 0.62); }
 
-/* 게스트 — 표현만 비활성이다. 클릭은 그대로 받아 안내를 띄운다 */
-.world-chat-launcher[aria-disabled='true'] {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* 게스트 — 쓸 수 없다는 것만 보이고 이유는 focus 했을 때 말한다 */
+.world-chat-input[readonly] { cursor: not-allowed; }
 
 .world-chat-log {
   list-style: none;

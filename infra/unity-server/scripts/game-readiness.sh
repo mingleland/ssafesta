@@ -53,7 +53,27 @@ listener="$("${docker_bin}" inspect --format '{{range (index .NetworkSettings.Po
 [[ "${listener}" =~ ^127\.0\.0\.1:[1-9][0-9]*$ ]] || { echo 'demo-game listener is not loopback-only' >&2; exit 1; }
 if [[ -z "${GAME_READINESS_SKIP_LISTENER_CONNECT:-}" ]]; then
   host="${listener%:*}"; port="${listener##*:}"
-  timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1 || { echo 'demo-game internal listener is unavailable' >&2; exit 1; }
+  # compose 헬스체크는 `pgrep -f festa-unity.x86_64` 로 **프로세스 존재만** 본다 — 7777 바인딩이 아니다.
+  # 그래서 `up -d --wait` 이 돌려주는 Healthy 는 "떴다" 지 "받을 준비가 됐다" 가 아니다.
+  # develop #389 실측: 컨테이너 Started 10:23:13.4 → Healthy 10:23:19.9(6.6초) → probe 10:23:20.2 →
+  # 0.25초 만에 거부. Unity 데디케이티드 서버가 월드 씬을 올려 포트를 열기 전이다.
+  # 단발 probe 는 구조적으로 이르므로 유한 예산 안에서 폴링한다. 예산을 넘기면 그대로 실패시킨다 —
+  # 게이트를 무르게 하지 않는다. 걸린 시간을 남기는 이유는 다음 배포에서 예산을 근거로 조정하기 위해서다.
+  listener_budget_seconds="${GAME_READINESS_LISTENER_TIMEOUT_SECONDS:-120}"
+  listener_started_at="${SECONDS}"
+  listener_deadline=$(( listener_started_at + listener_budget_seconds ))
+  listener_attempts=0
+  listener_ready=
+  while (( SECONDS <= listener_deadline )); do
+    listener_attempts=$(( listener_attempts + 1 ))
+    if timeout 5 bash -c "</dev/tcp/${host}/${port}" >/dev/null 2>&1; then listener_ready=1; break; fi
+    sleep 3
+  done
+  if [[ -z "${listener_ready}" ]]; then
+    echo "demo-game internal listener is unavailable — ${host}:${port} 에 ${listener_budget_seconds}초 동안 ${listener_attempts}회 시도했으나 모두 거부됐다" >&2
+    exit 1
+  fi
+  echo "demo-game internal listener ready — ${host}:${port} ($(( SECONDS - listener_started_at ))초, ${listener_attempts}회 시도)"
 fi
 
 before="${CI_ARTIFACT_DIR}/non-game-restarts-before.tsv"

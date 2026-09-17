@@ -197,6 +197,29 @@ Access Token 갱신. `refresh_token` 쿠키(HttpOnly)로 인증한다. Refresh �
 
 상한 3800은 Unity `AvatarAppearance.MaxEncodedLength`가 소유한 값이다. **낮추지 않는다** — 모듈러 인코딩(`fa|…`)은 파츠 이름이 그대로 들어가 길다.
 
+### GET `/users/me/avatar/presets`
+
+회원의 저장 프리셋 목록을 슬롯 오름차순으로 조회한다. 비어 있는 슬롯은 응답에서 생략된다.
+
+```json
+[
+  { "slot": 1, "avatarCode": "sk_01", "updatedAt": "2026-09-17T08:30:00Z" }
+]
+```
+
+### PUT `/users/me/avatar/presets/{slot}`
+
+회원 프리셋 슬롯 1~3 중 하나를 전체 외형 코드로 저장하거나 덮어쓴다. 요청 본문과 검증은
+`PUT /users/me/avatar`와 같다. 성공 시 `200`과 `{ slot, avatarCode, updatedAt }`를 돌려준다.
+
+### DELETE `/users/me/avatar/presets/{slot}`
+
+회원 프리셋 슬롯을 비운다. 이미 비어 있는 슬롯도 `204`로 성공하므로 재시도해도 안전하다.
+
+세 프리셋 경로는 게스트에게 `403 MEMBER_ONLY`, 슬롯 범위 밖에 `400 VALIDATION_FAILED`와
+`errors[0].field: "slot"`을 반환한다. 저장 테이블은 `avatar_presets.avatar_code TEXT`이며
+`users.avatar_code`와 같은 길이 제한 정책을 따른다.
+
 정본 계약: `specs/013-avatar-customization/contracts/avatar-profile-api.md`
 
 ---

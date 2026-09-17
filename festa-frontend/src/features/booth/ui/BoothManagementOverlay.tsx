@@ -10,8 +10,9 @@
 // 이 컴포넌트는 그대로다.
 //
 // 2026-09-16 개편 (S15P21A604-817): 부스 공간·기능형 에셋 배치는 Unity 의 부스별 고정 구성이
-// 정본이라 관리창에서 부스 스튜디오로 가는 길만 끊었다. 스튜디오·2.5D·게시 파이프라인은 코드째
-// 보존돼 있고 deep-link(/app/studio/:boothId)·ManagementPanel 'studio' 멤버는 그대로 남아 있다.
+// 정본이라 관리창에서 부스 스튜디오로 가는 길을 끊었다. 2026-09-17 에는 deep-link 와
+// ManagementPanel 'studio' 멤버를 걷고, 편집기 코드(features/studio·entities/layout·catalog)도 삭제했다
+// (S15P21A604-846). 부스 런타임 자동화(tools/assets·assets:build)는 그대로 돈다.
 // 이 화면은 layout publish/rebuild 를 부르지 않는다. 외관 편집은 부스 이름만 인라인으로 남겼다.
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -49,6 +50,15 @@ const IcClock = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <circle cx="12" cy="12" r="9" />
     <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+/** 프로젝트 미등록 자리의 글리프 — 문구 없이 "여기에 이미지가 올 자리" 만 말한다 */
+const IcImage = (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <circle cx="8.5" cy="10" r="1.6" />
+    <path d="M21 16l-5-5-8 8" />
   </svg>
 );
 
@@ -247,11 +257,15 @@ export function BoothManagementOverlay({ onClose }: Props) {
         <div className="bm-side">
           <section className="bm-identity">
             <div className="bm-identity-head">
-              <img
-                className="bm-thumb"
-                src={project?.thumbnailUrl ?? '/favicon.png'}
-                alt=""
-              />
+              {project?.thumbnailUrl ? (
+                <img className="bm-thumb" src={project.thumbnailUrl} alt="" />
+              ) : (
+                // 등록된 프로젝트가 없으면 빈 자리로 둔다. 파비콘을 채워 넣으면 "SSAFESTA 라는 프로젝트가
+                // 등록된 것" 처럼 읽힌다 (S15P21A604-855).
+                <span className="bm-thumb bm-thumb-empty" aria-hidden="true">
+                  {IcImage}
+                </span>
+              )}
               <div className="bm-identity-text">
                 <h3 className="bm-name">{project?.name ?? '프로젝트 미등록'}</h3>
                 <span className="bm-slot">부스 번호 {lease.slotCode ?? '미연결'}</span>
@@ -322,7 +336,8 @@ export function BoothManagementOverlay({ onClose }: Props) {
       </OverlayFrame>
       {showCancel && myBooth?.lease && (
         <LeaseCancelDialog
-          slotCode={myBooth.lease.slotCode ?? null}
+          boothName={myBooth.name}
+          coin={myBooth.lease.chargedCoin}
           pending={cancelLease.isPending}
           onConfirm={() => cancelLease.mutate(myBooth.lease!.slotId)}
           onCancel={() => setShowCancel(false)}

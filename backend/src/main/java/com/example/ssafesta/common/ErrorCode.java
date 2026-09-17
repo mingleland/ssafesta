@@ -35,6 +35,13 @@ public enum ErrorCode {
     MEMBER_ONLY(HttpStatus.FORBIDDEN, "회원 계정만 이용할 수 있습니다."),
     UNTRUSTED_ORIGIN(HttpStatus.FORBIDDEN, "허용되지 않은 요청 출처입니다."),
 
+    // ── 일일 미션 ───────────────────────────────────────────────────────────
+    NOT_COMPLETED(HttpStatus.BAD_REQUEST, "아직 완료하지 않은 일일 미션입니다."),
+    ALREADY_CLAIMED(HttpStatus.CONFLICT, "오늘 이미 수령한 일일 미션입니다."),
+    DAILY_CAP_REACHED(HttpStatus.CONFLICT, "오늘의 일일 미션 보상 한도에 도달했습니다."),
+    WORLD_MISSION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,
+            "월드 입장 미션 진행도를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+
     // ── 관리자 (S15P21A604-742) ─────────────────────────────────────────────
     /**
      * The master account, or something it owns, was named as the target of an admin action
@@ -286,6 +293,10 @@ public enum ErrorCode {
      * 모르는 경우를 갈라야 하고, 그 분기가 code 하나에 달려 있다 (GitLab #205 게임 파트 회신).
      */
     SLOT_MACHINE_NOT_FOUND(HttpStatus.NOT_FOUND, "슬롯머신을 찾을 수 없습니다."),
+    /** 하이스트라이커 월드 기계 id가 서버가 아는 기계와 다르다 (GitLab #233). */
+    HIGH_STRIKER_NOT_FOUND(HttpStatus.NOT_FOUND, "하이스트라이커 게임기를 찾을 수 없습니다."),
+    /** 승인된 스윙보다 빠른 클라이언트 재전송은 미션 사실로 남기지 않는다. */
+    HIGH_STRIKER_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "하이스트라이커 기록 요청이 너무 빠릅니다."),
 
     // ── 공통 ────────────────────────────────────────────────────────────────
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),

@@ -70,7 +70,7 @@ namespace Festa.Integration
             var speaker = FindSpeaker(payload.senderUserId, payload.nickname);
             if (speaker == null) return;   // 이 월드에 없는 사람이다 — 화면 로그는 React 가 이미 그렸다
 
-            Festa.World.PlayerChatBubble.Show(speaker.gameObject, payload.content);
+            Festa.World.PlayerChatBubble.Show(speaker.gameObject, payload.nickname, payload.content);
         }
 
         static Festa.Network.NetworkPlayer FindSpeaker(long userId, string nickname)

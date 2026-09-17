@@ -153,19 +153,20 @@ app:
         - plaza-slot-01
         - plaza-slot-02
       # 배수 오름차순. tier = 인덱스 + 1 이고 0 은 낙첨이다 — 낙첨에는 행이 없고 남는 가중치가
-      # 그대로 낙첨 확률이다(0.78). 합 1.00, RTP = 0.15×2 + 0.05×3 + 0.02×5 = 0.55 이라
-      # 10코인 한 판 기대 손실 4.5코인, 즉 이 기계는 코인 소각처다.
+      # 그대로 낙첨 확률이다(0.781). 합 1.00, 기본 RTP = 0.20×2 + 0.01×3 + 0.009×10 = 0.52 이라
+      # 10코인 한 판 기대 손실 4.8코인, 즉 이 기계는 코인 소각처다. 지급 없는 10연속 베팅 뒤
+      # 다음 1회는 service가 ×2(tier 1)로 보장한다. 보장 상태는 별도 저장하지 않고 원장에서 계산한다.
       #
       # ⚠️ 4번째 tier 를 붙이지 마라. Unity 가 tier 를 0..3 으로 자르고(HttpSlotMachineClient)
       # 릴 당첨 프리셋도 3개뿐이라, 코인은 나가는데 화면은 다른 등급을 보여 준다. 설정 검증이
       # 기동 시 거부하므로 여기서 조용히 어긋나지는 않는다.
       tiers:
         - multiplier: 2
-          weight: 0.15
+          weight: 0.20
         - multiplier: 3
-          weight: 0.05
-        - multiplier: 5
-          weight: 0.02
+          weight: 0.01
+        - multiplier: 10
+          weight: 0.009
 
   # Unity 월드 접속 정보 (spec 002 FR-010). 배포 값(wss / world.<domain> / 443)은
   # application-infra.yml 이 소유하고 이 세 기본값을 덮는다.
@@ -178,15 +179,12 @@ app:
     connection-token-secret: ${CONNECTION_TOKEN_SECRET}
 
   lease:
-    price-coin: 100
+    price-coin: 50
     duration: PT24H
     # 만료 배치의 "주기"다 (S15P21A604-152). 24시간 임대 기간 자체는 위 duration 이고, 만료
     # 판정의 권위는 여전히 조회 시점이다 (spec 004 C-02) — 이 값을 늘려도 만료 부스 입장은
     # 막힌다. 배치가 늦어지면 아무도 원하지 않는 슬롯의 연결 해제만 늦어진다.
     expiry-scan-interval: PT5M
-    # 만료 1시간 전 알림을 찾는 주기다 (S15P21A604-151). 1시간이라는 안내 시점은 D07 정책이라
-    # 코드에 고정하고, 이 값만 운영 부하에 맞춰 조절한다. 이미 보낸 lease는 DB 표시로 다시 잡지 않는다.
-    expiry-warning-scan-interval: PT1M
 
   # spec 010 C-01·C-02 는 기획 미결이다. 값이 정해지면 이 세 줄만 바꾼다 (헌법 30조,
   # docs/26 row 20·21). 나머지 상한(제목 200·문구 500·별점 1~10·단답 200·장문 2000)은

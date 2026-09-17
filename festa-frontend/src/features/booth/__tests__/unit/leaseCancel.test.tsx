@@ -50,7 +50,7 @@ const future = () => new Date(Date.now() + 60_000).toISOString();
 const myBooth = {
   boothId: 42,
   name: '내 부스',
-  lease: { slotId: 6, slotCode: 'F11-R06', endsAt: future() },
+  lease: { slotId: 6, slotCode: 'F11-R06', endsAt: future(), chargedCoin: 100 },
 };
 
 beforeEach(() => {
@@ -92,8 +92,11 @@ async function renderOverlay() {
 async function openCancelDialog() {
   // 반납 행은 제목+부제가 한 버튼이라(-817) 접근 이름이 문장으로 길다 — 앞부분만 본다
   fireEvent.click(await screen.findByRole('button', { name: /^부스 반납하기/ }));
-  return screen.findByRole('button', { name: '반납하기' });
+  return screen.findByRole('button', { name: '반납' });
 }
+
+/** 확인 모달만 본다 — 관리 화면 본문에는 슬롯 코드가 정상적으로 떠 있다 */
+const cancelDialog = () => document.querySelector('dialog.lease-cancel') as HTMLDialogElement;
 
 describe('부스 반납 (-753)', () => {
   it('확인 모달을 거치기 전에는 요청이 나가지 않는다', async () => {
@@ -191,5 +194,73 @@ describe('반납 성공 → 월드 슬롯 재조회 알림 (#199)', () => {
     await waitFor(() => expect(cancelMyLease).toHaveBeenCalledWith(6));
     await waitFor(() => expect(invalidated).toContainEqual(['booth-slots']));
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+// 이 모달은 OverlayFrame 의 형제라 .festa-overlay 안이 아니다. 토큰 선언부가 .lease-confirm 을
+// 직접 받지 않으면 월드에서 열었을 때 배경·테두리·글꼴이 통째로 무효가 된다(2026-09-17).
+// jsdom 은 커스텀 속성을 계산하지 않으므로 선언부 자체를 읽어 잠근다.
+describe('반납 모달 토큰 스코프', () => {
+  it('--sc-* 선언이 .lease-confirm 을 포함한다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync('src/features/shell/ui/pageShell.css', 'utf8');
+    const selectors = css.slice(0, css.indexOf('--sc-bg:'));
+    expect(selectors).toContain('.lease-confirm');
+  });
+});
+
+// 모달이 말하는 것은 셋뿐이다 — 무엇을 / 지금 무슨 일이 / 돈은 (2026-09-17).
+// Booth Studio 폐기로 사실이 아니게 된 보존·Draft 안내와 내부 슬롯 ID 노출을 함께 잠근다.
+describe('반납 모달 내용', () => {
+  it('BE 부스명을 보여 주고 내부 슬롯 ID 는 노출하지 않는다', async () => {
+    await renderOverlay();
+    await openCancelDialog();
+
+    const dialog = cancelDialog();
+    expect(dialog.textContent).toContain('내 부스');
+    expect(dialog.textContent).not.toContain('F11-R06');
+    // 관리 화면 본문에는 그대로 있어야 한다 — 모달에서만 뺀 것이다
+    expect(document.body.textContent).toContain('F11-R06');
+  });
+
+  it('부스명이 없으면 중립 문구로 떨어진다', async () => {
+    getMyBooth.mockResolvedValue({ ...myBooth, name: null });
+    await renderOverlay();
+    await openCancelDialog();
+
+    expect(cancelDialog().textContent).toContain('현재 부스');
+  });
+
+  it('실제 차감액과 즉시 종료만 말한다 — Booth Studio 시절 문구는 없다', async () => {
+    await renderOverlay();
+    await openCancelDialog();
+
+    const text = cancelDialog().textContent ?? '';
+    expect(text).toContain('부스를 반납할까요?');
+    expect(text).toContain('반납 즉시 이용이 종료됩니다.');
+    expect(text).toContain('사용한 100코인은 환불되지 않습니다.');
+    expect(text).not.toContain('Draft');
+    expect(text).not.toContain('그대로 남습니다');
+    expect(text).not.toContain('배치');
+  });
+
+  it('버튼은 반납 → 취소 순서이고 포커스는 취소에 있다 — Enter 가 반납을 실행하면 안 된다', async () => {
+    await renderOverlay();
+    await openCancelDialog();
+
+    const dialog = cancelDialog();
+    const labels = [...dialog.querySelectorAll('button')].map((b) => b.textContent);
+    expect(labels).toEqual(['반납', '취소']);
+    expect(document.activeElement).toBe(dialog.querySelector('button:last-of-type'));
+  });
+
+  it('취소를 누르면 모달만 닫히고 요청은 나가지 않는다', async () => {
+    await renderOverlay();
+    await openCancelDialog();
+
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    await waitFor(() => expect(cancelDialog()).toBeNull());
+    expect(cancelMyLease).not.toHaveBeenCalled();
   });
 });

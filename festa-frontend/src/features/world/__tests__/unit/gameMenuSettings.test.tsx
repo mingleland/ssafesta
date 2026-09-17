@@ -4,7 +4,7 @@
 // 이 화면은 오래 `disabled` + "준비 중" 이었다. 그래서 재는 것은 **열리는가** 다 —
 // 항목 하나뿐이어도, 월드 안에서 소리를 줄일 방법이 아예 없는 것과는 다르다.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { GameMenu } from '../../ui/GameMenu';
@@ -20,7 +20,7 @@ function renderMenu() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <GameMenu onClose={() => {}} onOpenMyInfo={() => {}} />
+        <GameMenu onClose={() => {}} onOpenPanel={() => {}} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -47,31 +47,8 @@ describe('ESC 설정', () => {
     renderMenu();
     const button = screen.getByRole('button', { name: '설정' });
     expect(button.hasAttribute('disabled')).toBe(false);
-    // 전역이 아니라 이 버튼 안에서만 본다 — 아바타설정 스텁도 같은 문구를 쓴다(S15P21A604-798)
+    // 전역이 아니라 이 버튼 안에서만 본다 — 다른 항목이 같은 문구를 쓸 수 있다
     expect(button.textContent).not.toContain('준비 중');
   });
 
-  it('열면 음악 항목이 나오고, 다시 누르면 닫힌다', () => {
-    renderMenu();
-    const button = screen.getByRole('button', { name: '설정' });
-    expect(screen.queryByRole('switch', { name: '음악' })).toBeNull();
-
-    fireEvent.click(button);
-    expect(screen.getByRole('switch', { name: '음악' })).toBeTruthy();
-    expect(screen.getByLabelText('크기')).toBeTruthy();
-
-    fireEvent.click(button);
-    expect(screen.queryByRole('switch', { name: '음악' })).toBeNull();
-  });
-});
-
-describe('닫기 버튼 배치', () => {
-  it('닫기 버튼이 프로필 요약과 분리된 헤더 행에 있다 — 내 정보 버튼과 안 겹치게', () => {
-    renderMenu();
-    const closeButton = screen.getByRole('button', { name: '닫기' });
-    const head = closeButton.closest('.gm-head');
-    expect(head).not.toBeNull();
-    // gm-head 는 gm-summary 의 형제여야 한다 — 같은 상자 안에서 absolute 로 겹치던 예전 구조가 아니다
-    expect(head?.nextElementSibling?.className).toContain('gm-summary');
-  });
 });

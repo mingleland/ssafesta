@@ -104,6 +104,10 @@ export function __lastUpdatePatchForTests(): ProjectPatch | null {
   return lastUpdatePatch;
 }
 
+export function __setOwnedProjectForTests(patch: Partial<ProjectView>): void {
+  owned = { ...sample, ...patch };
+}
+
 export function __resetProjectMockForTests(): void {
   owned = { ...sample };
   lastUpdatePatch = null;

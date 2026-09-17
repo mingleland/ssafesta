@@ -27,12 +27,13 @@ public class AdminActionRecorder {
     public static final String UNSUSPEND = "UNSUSPEND";
     public static final String BOOTH_EDIT = "BOOTH_EDIT";
     public static final String BOOTH_UNPUBLISH = "BOOTH_UNPUBLISH";
+
+    public static final String TARGET_USER = "USER";
+    public static final String TARGET_BOOTH = "BOOTH";
     public static final String PRIZE_CREATE = "PRIZE_CREATE";
     public static final String PRIZE_UPDATE = "PRIZE_UPDATE";
     public static final String PRIZE_FULFILLMENT_UPDATE = "PRIZE_FULFILLMENT_UPDATE";
 
-    public static final String TARGET_USER = "USER";
-    public static final String TARGET_BOOTH = "BOOTH";
     public static final String TARGET_EVENT_PRIZE = "EVENT_PRIZE";
     public static final String TARGET_EVENT_PURCHASE = "EVENT_PURCHASE";
 
