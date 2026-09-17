@@ -10,9 +10,9 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - 파트 변경을 독립적으로 검증하고 배포한다 (Priority: P0)
+### User Story 1 - 파트 변경을 독립적으로 검증하고 demo 환경에 자동 배포한다 (Priority: P0)
 
-파트 개발자는 `feature/*` MR에 변경을 올리면 GitLab CI의 필수 build·test 결과를 확인하고, 통과한 변경이 `develop`에 병합된 뒤 Jenkins의 해당 컴포넌트 dev 배포 결과를 확인한다.
+파트 개발자는 `feature/*` MR에 변경을 올리면 GitLab CI의 필수 build·test 결과를 확인하고, 통과한 변경이 `develop`에 병합된 뒤 Jenkins의 해당 컴포넌트 demo 통합 환경(`demo.ssafesta.world`) 자동 배포 결과를 확인한다.
 
 **Why this priority**: 네 파트가 서로의 배포를 기다리거나 다른 컴포넌트를 재시작하면 병렬 개발이 불가능해지므로, 프로젝트의 기본 개발 경로다.
 
@@ -20,27 +20,27 @@
 
 **Acceptance Scenarios**:
 
-1. **Given** `feature/*` MR에 유효한 Front·Back 또는 Game 변경이 제출되었을 때, **When** 해당 build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 dev 컴포넌트만 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
+1. **Given** `feature/*` MR에 유효한 Front·Back 또는 Game 변경이 제출되었을 때, **When** 해당 build·test gate가 통과하고 `develop`에 병합되면, **Then** Jenkins는 변경된 컴포넌트만 `demo.ssafesta.world`에 새 버전으로 갱신하고 다른 컴포넌트를 재시작하지 않는다.
 2. **Given** `feature/*` MR의 필수 GitLab CI build 또는 test가 실패했을 때, **When** 파이프라인이 종료되면, **Then** 해당 변경은 `develop` 병합과 dev 배포가 차단되고 실패 단계와 원인을 개발자가 확인할 수 있다.
-3. **Given** 같은 `feature/*` MR 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 dev 환경을 덮어쓰지 않는다.
+3. **Given** 같은 `feature/*` MR 브랜치에 새 변경이 연속으로 제출되었을 때, **When** 이전 실행보다 최신 실행이 먼저 배포 가능한 상태가 되면, **Then** 오래된 실행이 최신 demo 환경을 덮어쓰지 않는다.
 4. **Given** Unity 담당자가 QA를 끝낸 최종 WebGL zip을 immutable release ID로 GitLab Generic Package Registry에 업로드했을 때, **When** 업로드 도우미가 산출물 SHA-256과 함께 Jenkins job을 호출하면, **Then** Jenkins는 패키지를 검증해 EC2 정적 release로 원자적으로 승격하고 Dedicated Server를 재시작하지 않는다.
 5. **Given** `festa-unity/**` 또는 Game CI 경로를 바꾼 MR이 제출되었을 때, **When** Jenkins Unity agent가 해당 MR head SHA에서 Unity 스크립트 컴파일과 `ci/test` EditMode를 실행하면, **Then** 성공 결과만 GitLab MR의 필수 상태로 게시되고 어떤 이미지 빌드·패키지 업로드·dev/demo 배포·컨테이너 재시작도 발생하지 않는다.
 
 ---
 
-### User Story 2 - 승인된 release를 demo 통합 환경에 배포한다 (Priority: P0)
+### User Story 2 - demo에서 검증된 release를 production(main) 환경에 수동 승격한다 (Priority: P0)
 
-릴리스 담당자는 dev에서 검증된 `develop` release를 명시적으로 승인하고, 모든 컴포넌트가 함께 demo에 배포된 뒤 핵심 사용자 여정이 통과한 경우에만 통합 배포를 성공으로 판단한다.
+릴리스 담당자는 `demo.ssafesta.world`에서 팀 검증이 완료된 `develop` release의 소스 commit SHA와 동일 아티팩트를 명시적으로 승인하여 `main` 브랜치 및 프로덕션 환경(`ssafesta.world`)으로 수동 승격(Production Promotion)한다.
 
-**Why this priority**: demo는 통합 시연 환경이므로 개발 중인 모든 `develop` 변경이 자동으로 배포되면 안 되며, 승인된 release만 시연 가능 상태를 보장해야 한다.
+**Why this priority**: 프로덕션(`ssafesta.world`)은 실제 사용자와 평가위원이 접근하는 최종 운영 환경이므로 개발 중인 `develop` 변경이 자동으로 배포되면 안 되며, demo에서 충분히 검증된 동일 아티팩트만 승인을 거쳐 무중단·불변으로 승격되어야 한다.
 
-**Independent Test**: dev 검증된 `develop` release를 Jenkins에서 승인한 뒤 웹 접속, 로그인, 월드 입장, AI 응답으로 이어지는 demo 통합 헬스체크가 모두 통과해야 성공으로 기록되는지 확인한다.
+**Independent Test**: demo 검증을 마친 release를 선택해 `main` 승격 MR을 생성하고, Squash 없이 ancestry를 보존한 채 병합된 뒤 동일 아티팩트가 프로덕션으로 승격되어 웹 접속, 로그인, 월드 입장, AI 응답의 핵심 사용자 여정이 정상 동작하는지 확인한다.
 
 **Acceptance Scenarios**:
 
-1. **Given** dev 검증을 통과한 `develop` release가 승인되었을 때, **When** demo 통합 파이프라인이 실행되면, **Then** 배포 대상 전체가 동일한 릴리스로 갱신되고 핵심 사용자 여정 검증이 시작된다.
-2. **Given** 모든 컴포넌트 배포와 핵심 사용자 여정 검증이 통과했을 때, **When** 실행이 종료되면, **Then** 해당 릴리스는 성공 상태와 추적 가능한 버전 정보로 기록된다.
-3. **Given** 배포 또는 핵심 사용자 여정의 어느 한 단계가 실패했을 때, **When** 실행이 종료되면, **Then** 성공으로 표시되지 않으며 마지막 정상 릴리스를 복구할 수 있는 상태가 보존된다.
+1. **Given** `demo.ssafesta.world`에서 팀 검증을 통과한 `develop` release가 있을 때, **When** 담당자가 Production Promotion을 수행하면, **Then** 검증된 정확한 develop SHA가 Squash 없이(`squash=false`) `main` 브랜치에 계승되고, demo에서 검증된 동일 아티팩트가 재빌드 없이 프로덕션(`ssafesta.world`)에 배포된다.
+2. **Given** 프로덕션 배포가 완료되었을 때, **When** 핵심 사용자 여정 검증(웹, 로그인, 월드, AI)이 실행되면, **Then** 모든 검증이 통과해야 성공 상태와 추적 가능한 버전 정보(release ID, source SHA)로 기록된다.
+3. **Given** 프로덕션 배포 또는 검증 중 실패가 발생했을 때, **When** 복구가 실행되면, **Then** 마지막 정상 프로덕션 릴리스로 즉시 복구할 수 있는 상태가 보존된다.
 
 ---
 
@@ -117,12 +117,13 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 - **FR-003a**: GitLab CI/Runner의 초기 MR merge gate는 Front·Back을 `rules:changes`로 수행한다. Game MR gate는 Jenkins Unity agent가 수행하며, 병합 후 Jenkins `develop` CI·dev 배포 범위에는 네 컴포넌트를 모두 유지한다.
 - **FR-003b**: `festa-unity/**`, Game CI adapter 또는 Unity project 설정 변경 MR은 Jenkins Unity agent에서 해당 MR head SHA의 `ci/test` EditMode를 실행해야 한다. `ci/test`가 수행하는 Unity 스크립트 컴파일과 모든 EditMode 정적 검사는 이 gate의 일부다. 실행은 GitLab MR의 필수 성공 상태를 게시해야 하며, 실패·timeout·agent 미가용은 merge를 차단해야 한다.
 - **FR-003c**: MR용 Unity 검증 경로는 `ci/test`만 실행하고 이미지 build·package·Registry 업로드·Jenkins dev deploy·demo promotion·운영 컨테이너 재시작을 호출해서는 안 된다. merge 후 `develop`의 기존 build/package/deploy 흐름은 별도로 유지한다.
-- **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 개발환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
+- **FR-004**: `develop`에 병합된 변경의 성공한 배포는 변경된 컴포넌트의 `demo.ssafesta.world` 환경만 갱신해야 하며 다른 컴포넌트를 재시작하거나 교체해서는 안 된다.
 - **FR-005**: 시스템은 오래된 실행이 더 최신 변경의 배포 결과를 덮어쓰지 못하도록 실행 순서와 배포 권한을 통제해야 한다. 하나의 MR이 여러 컴포넌트를 변경하면 모든 변경 컴포넌트의 CI가 성공한 뒤에만 dev 배포를 시작해야 하며, 배포 또는 검증이 하나라도 실패하면 같은 MR에서 이미 갱신된 컴포넌트를 이전 정상 release로 자동 복구해야 한다.
 - **FR-006**: 모든 실행은 변경 식별자, 대상 파트, 단계별 결과, 산출물 식별자, 배포 대상과 최종 상태를 추적 가능하게 기록해야 한다.
-- **FR-007**: 승인된 `develop` release만 모든 서버 컴포넌트를 하나의 통합 릴리스 단위로 demo에 배포해야 한다. 데모 승격 주기는 매일 퇴근 전 1회 고정 승격(C안)을 기본선으로 하되, 업무시간 중에는 사용자 시나리오 완결 및 E2E/Smoke Gate를 통과한 건에 한해 예외 승격(B안)을 허용한다. 긴급 핫픽스는 시간 무관 즉시 승격한다 (GitLab 이슈 #220).
-- **FR-008**: demo 통합 배포는 웹 접속 → 로그인 → 월드 입장 → AI 응답의 핵심 사용자 여정을 순서대로 검증해야 한다.
-- **FR-009**: demo 통합 배포는 모든 필수 배포 단계와 핵심 사용자 여정이 통과한 경우에만 성공으로 기록해야 한다.
+- **FR-007**: `demo.ssafesta.world`에서 팀 통합 검증을 통과한 `develop` release만 담당자 승인을 거쳐 `main` 브랜치 및 프로덕션(`ssafesta.world`) 환경으로 수동 승격(Production Promotion)해야 하며, demo에서 검증한 동일 아티팩트를 재빌드 없이 프로덕션에 재사용해야 한다.
+- **FR-007a**: **Architecture Invariant: `develop → main` 승격 MR은 절대 Squash Merge를 적용해서는 안 되며 (`squash=false` 강제)**, develop의 커밋 계보(ancestry)를 main에 온전히 보존하여 후속 승격 시 전체 커밋이 다시 diff로 개입하는 문제를 원천 차단해야 한다.
+- **FR-008**: demo 자동 배포 및 production 승격 배포는 웹 접속 → 로그인 → 월드 입장 → AI 응답의 핵심 사용자 여정 검증을 지원해야 한다.
+- **FR-009**: 배포는 모든 필수 배포 단계와 핵심 사용자 여정이 통과한 경우에만 성공으로 기록해야 한다.
 - **FR-010**: 통합 배포 실패 시 시스템은 실패 릴리스의 승격을 막고 마지막 정상 릴리스를 식별·복구할 수 있는 상태를 보존해야 한다.
 - **FR-011**: 서버 컴포넌트의 배포 산출물은 헌법 7조에 따라 재현 가능한 컨테이너 이미지여야 한다.
 - **FR-012**: Unity 자동 빌드는 유효한 캐시를 재사용하고, 캐시가 유효하지 않을 때 안전하게 폐기한 뒤 재생성할 수 있어야 한다.
@@ -214,6 +215,17 @@ Infra 담당자는 수집 Agent가 모은 로그와 서버 사용량을 조회�
 ## Clarifications
 
 아래 항목은 요구 결과가 아니라 구현 선택이며, Infra 담당자가 `$speckit-clarify` 또는 계획 단계 전에 확정한다. 미확정 상태로 구현을 시작하지 않는다.
+
+### Session 2026-09-17
+
+- Q: `dev.ssafesta.world` 와 `demo.ssafesta.world` 의 환경 역할 분리와 실제 통합 검증 대상을 어떻게 정합화할 것인가? → A: 별도의 `dev.ssafesta.world` 환경은 운영하지 않으며, `demo.ssafesta.world` 가 `develop` 브랜치의 최신 통합 결과를 지속적으로 검증하는 통합 환경(Staging) 역할을 전담한다. `develop` 에 머지된 변경은 Jenkins develop 파이프라인을 통해 컴포넌트별 필수 검증 후 `demo.ssafesta.world` 에 자동 배포된다.
+- Q: Demo 릴리스 상태 모델(3단계)과 롤백 기준은 어떻게 정의하는가? → A: Demo 릴리스 상태를 candidate(배포 및 자동 검증 진행 중) → current(자동 readiness 성공, 실제 demo 서비스 중) → known-good(사람의 실제 서비스 검증 통과) 3단계로 엄격히 분리한다. Jenkins CI/readiness 성공만으로 known-good 을 자동 갱신해서는 안 되며(current ≠ known-good), 자동 readiness 실패는 candidate 자동 롤백, 이후 실제 서비스 장애 발견 시 수동 롤백은 미검증 current 가 아닌 마지막 정상 확인된 known-good 스냅샷을 재빌드 없이 복원한다.
+- Q: 수동 승격(Production Promotion)의 개념과 최종 운영 환경 대상은 무엇인가? → A: 수동 승격은 가상의 dev→demo가 아니라 **`develop → main` 승격 정책**으로 전환하며, `main` 브랜치는 `https://ssafesta.world` 에서 서비스되는 실제 사용자 프로덕션(Production) 운영 환경을 나타낸다. 팀이 `demo.ssafesta.world` 에서 특정 release 를 실제 사용자 검증까지 완료하여 known-good 으로 승인한 릴리스만 수동 Production Promotion 대상이 된다 (미검증 current 승격 금지).
+- Q: `develop → main` 승격 시 소스 반영 및 아티팩트 승격 원칙은 무엇인가? → A: 
+  1. **Source Promotion & Architecture Invariant**: demo 에서 검증 완료된 정확한 develop commit SHA 를 main 에 반영하며, **develop → main 승격 MR 은 절대 Squash Merge 를 금지한다 (`squash=false` 강제).** develop 의 커밋 계보(ancestry)를 그대로 보존하여 차기 승격 시 전체 커밋이 다시 diff 로 잡히는 문제를 원천 차단한다.
+  2. **Artifact Promotion**: Production 에서는 demo 에서 검증한 동일 artifact 를 그대로 승격하여 재사용하며(`Demo Artifact == Production Artifact`), main 반영 시 새로운 빌드 아티팩트를 재생성하지 않는다.
+- Q: Game Dedicated Server 및 WebGL 의 배포 흐름과 정합성은 어떻게 규정하는가? → A: Game Dedicated Server 는 Jenkins develop 파이프라인의 demo 자동 배포 흐름에 포함하되, 스모크 러너 의존성은 제거하고 1~3단계(`processRunning`, `internalListener`, `externalWebSocket`) 통과로 known-good 승격한다. WebGL 클라이언트 배포는 독립적인 릴리스 패키지/수동 배포 경로를 유지하며, `deploy-game.sh` 의 프리팹 트리 대조 가드로 클라이언트-서버 정합성을 보장한다.
+- Q: Redis 데이터 영속성 및 메모리 상한 기준을 어떻게 확정할 것인가? → A: 실측 결과 40명 동시 접속 시 Redis 메모리 피크가 1.27MiB 로 확인되었으므로, 컨테이너 OOM 방지를 위해 `mem_limit: 256m` 상한을 compose 에 강제한다. 또한 컨테이너 재시작 시 로그인 세션 키 일괄 소멸을 방지하기 위해 `appendonly yes` AOF 영속성을 적용한다.
 
 ### Session 2026-08-18
 
