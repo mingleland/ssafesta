@@ -53,6 +53,10 @@ public class BoothLease {
     @Column(name = "ends_at", nullable = false, updatable = false)
     private Instant endsAt;
 
+    /** When the D07 one-hour warning was claimed. Null means it has not been sent yet. */
+    @Column(name = "expiry_warning_sent_at")
+    private Instant expiryWarningSentAt;
+
     @Column(name = "charged_coin", nullable = false, updatable = false)
     private int chargedCoin;
 
@@ -79,7 +83,13 @@ public class BoothLease {
     public LeaseStatus getStatus() { return status; }
     public Instant getStartsAt() { return startsAt; }
     public Instant getEndsAt() { return endsAt; }
+    public Instant getExpiryWarningSentAt() { return expiryWarningSentAt; }
     public int getChargedCoin() { return chargedCoin; }
+
+    /** Claims the one-time expiry warning before its WebSocket event is published after commit. */
+    void markExpiryWarningSent(Instant sentAt) {
+        this.expiryWarningSentAt = sentAt;
+    }
 
     /** Marks a lease whose time has passed as expired, freeing the slot for re-lease (FR-017). */
     void expire() {

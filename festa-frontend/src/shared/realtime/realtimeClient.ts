@@ -241,6 +241,10 @@ export function subscribeRealtime(destination: string, handler: (body: string) =
   return () => {
     subscriptions.delete(sub.id);
     if (connected) write({ command: 'UNSUBSCRIBE', headers: { id: sub.id }, body: '' });
+    // A member logout can remove the last subscriber while the WebSocket still carries the former
+    // member's authenticated Principal. Keep shared consumers alive, but close immediately when
+    // none remain so that identity cannot outlive the client session.
+    if (subscriptions.size === 0) disconnectRealtime();
   };
 }
 
