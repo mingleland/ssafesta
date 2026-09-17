@@ -33,6 +33,15 @@ namespace Festa.World
         PlayerAppearanceController _appearance;
         WorldNameplate _plate;
 
+        /// <summary>말풍선 헤더에서 재사용할 현재 표시 이름.</summary>
+        public string DisplayLabel => _plate != null ? _plate.Label : string.Empty;
+
+        /// <summary>말풍선이 닉네임을 대신 표시하는 동안 기존 이름표를 감춘다 (GitLab #242).</summary>
+        public void SetChatBubbleVisible(bool visible)
+        {
+            if (_plate != null) _plate.SetSuppressed(visible);
+        }
+
         public override void OnNetworkSpawn()
         {
             _player = GetComponent<Festa.Network.NetworkPlayer>();

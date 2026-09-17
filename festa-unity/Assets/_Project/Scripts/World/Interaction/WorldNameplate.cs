@@ -65,6 +65,7 @@ namespace Festa.World
         TextMeshPro _text;
         MeshRenderer _renderer;
         Material _material;          // 인스턴스 — 색·외곽선을 이름표마다 따로 준다
+        bool _suppressed;
         float _topY;
         bool _measured;
 
@@ -87,6 +88,16 @@ namespace Festa.World
         /// <summary>런타임에 붙이는 쪽(플레이어 등)이 표시 거리를 정할 수 있게 한다.</summary>
         /// <summary>표시 거리(월드 유닛). 0 이하면 거리 제한 없음.</summary>
         public void SetVisibleDistance(float distance) => _visibleDistance = Mathf.Max(0f, distance);
+
+        /// <summary>
+        /// 말풍선처럼 이름을 대신 표시하는 UI가 떠 있는 동안 이름표 렌더링만 잠시 멈춘다.
+        /// Label 값은 보존하므로 해제하는 즉시 최신 닉네임으로 돌아온다 (GitLab #242).
+        /// </summary>
+        public void SetSuppressed(bool suppressed)
+        {
+            _suppressed = suppressed;
+            if (_suppressed && _renderer != null) _renderer.enabled = false;
+        }
 
         /// <summary>
         /// 글자 크기와 외곽선 두께를 올려 <b>배경이 무엇이든 읽히게</b> 한다. NPC 안내 이름표용.
@@ -409,7 +420,7 @@ namespace Festa.World
 
             bool inFront = Vector3.Dot(cam.transform.forward, -toCam) > 0f;
             bool withinDistance = _visibleDistance <= 0f || dist <= _visibleDistance;
-            bool show = inFront && withinDistance && !string.IsNullOrEmpty(_label)
+            bool show = !_suppressed && inFront && withinDistance && !string.IsNullOrEmpty(_label)
                         && IsBodyVisible() && !IsOccluded(cam);
             _renderer.enabled = show;
             if (!show) return;
