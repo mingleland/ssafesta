@@ -28,6 +28,7 @@ const sessionManager = await import('../../../../unity/host/sessionManager');
 const { __resetScreenAudioForTests } = await import('../../../audio/model/screenAudio');
 const { __resetGameClientUiForTests } = await import('../../model/gameClientUi');
 const { __resetProfileForTests } = await import('../../../profile/model/profile');
+const { closeOverlay, getCurrentOverlay } = await import('../../../../shared/types/overlay');
 
 const onClose = vi.fn();
 
@@ -60,6 +61,7 @@ afterEach(() => {
   cleanup();
   window.localStorage.clear();
   vi.restoreAllMocks();
+  closeOverlay();
   __resetSessionForTests();
   __resetProfileForTests();
   __resetScreenAudioForTests();
@@ -117,12 +119,16 @@ describe('ESC 아바타 변경', () => {
 // 패널 안에서 접었다 펴는 대신 자식 오버레이로 연다 — 메뉴 높이가 튀지 않고, 닫는 방법이
 // ESC 하나로 통일된다.
 describe('ESC 하위 화면 진입', () => {
-  it('이용 안내·설정은 목록을 펼치지 않고 오버레이 요청만 보낸다', () => {
+  it('이용 안내는 안내 가이드 오버레이를 열고 메뉴 패널을 쓰지 않는다 — 조작 안내는 HUD 우하단 버튼이 맡는다', () => {
     renderMenu();
     fireEvent.click(screen.getByRole('button', { name: '이용 안내' }));
-    expect(openPanel).toHaveBeenCalledWith('guide');
+    expect(openPanel).not.toHaveBeenCalled();
+    expect(getCurrentOverlay()?.type).toBe('WORLD_GUIDE');
     expect(screen.queryByText('이동')).toBeNull();
+  });
 
+  it('설정은 목록을 펼치지 않고 오버레이 요청만 보낸다', () => {
+    renderMenu();
     fireEvent.click(screen.getByRole('button', { name: '설정' }));
     expect(openPanel).toHaveBeenCalledWith('settings');
     expect(screen.queryByRole('switch', { name: '음악' })).toBeNull();
