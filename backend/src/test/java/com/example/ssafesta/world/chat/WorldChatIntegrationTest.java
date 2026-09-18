@@ -1,6 +1,7 @@
 package com.example.ssafesta.world.chat;
 
 import static com.example.ssafesta.booth.BoothTestSupport.createMemberWithWallet;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -107,6 +108,73 @@ class WorldChatIntegrationTest {
         WorldChatJoinNotice sent = assertInstanceOf(WorldChatJoinNotice.class, captor.getValue());
         assertEquals(WorldChatJoinNotice.TYPE, sent.type());
         assertEquals(users.findById(userId).orElseThrow().getNickname(), sent.nickname());
+    }
+
+    /**
+     * <b>재연결을 반복해도 입장 알림은 간격에 한 번이다</b> (S15P21A604-915 / GitLab #223 §5-5).
+     *
+     * <p>입장 알림에는 본문이 없어 {@code say} 의 창·벌칙에 걸리지 않는다. 막지 않으면 연결을
+     * 끊고 다시 붙는 것만으로 같은 토픽을 밀어 올릴 수 있다.
+     */
+    @Test
+    void repeatedReconnectsAnnounceTheJoinOnlyOnce() {
+        Long userId = member("재연결");
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            chat.announceJoin(userId);
+        }
+
+        assertEquals(1, allJoinNotices().size(), "재연결마다 입장 알림이 나갔습니다.");
+    }
+
+    /** 간격이 지나면 다시 알린다 — 영구히 막는 것이 아니라 도배만 자른다. */
+    @Test
+    void theJoinIsAnnouncedAgainOnceTheIntervalHasPassed() {
+        Long userId = member("재입장");
+        MutableClock clock = new MutableClock();
+        WorldChatService rejoining = new WorldChatService(messaging, users,
+                new WorldChatRateLimiter(redis, keyspace, clock));
+
+        rejoining.announceJoin(userId);
+        clock.advance(WorldChatRateLimiter.JOIN_NOTICE_INTERVAL_MS - 1);
+        rejoining.announceJoin(userId);
+        assertEquals(1, allJoinNotices().size(), "간격 안의 재연결이 알림을 냈습니다.");
+
+        clock.advance(2);
+        rejoining.announceJoin(userId);
+
+        assertEquals(2, allJoinNotices().size(), "간격이 지났는데도 알림이 나가지 않았습니다.");
+    }
+
+    /** 판정은 사람 단위다 — 한 사람의 재연결이 다른 사람의 입장을 막지 않는다. */
+    @Test
+    void oneMembersJoinDoesNotSilenceAnothers() {
+        chat.announceJoin(member("먼저"));
+        chat.announceJoin(member("나중"));
+
+        assertEquals(2, allJoinNotices().size());
+    }
+
+    /**
+     * Redis 가 답하지 않으면 <b>알리지 않는다</b>(fail-closed) — 그리고 예외는 연결 이벤트 밖으로
+     * 새지 않는다.
+     *
+     * <p>입장 알림은 없어도 기능이 성립하는 반면, 판정할 수 없을 때 열어 두면 Redis 가 흔들리는
+     * 순간 토픽이 밀린다. 예외를 던지면 STOMP 연결 이벤트 처리로 새어 나가는데, 알림 하나 때문에
+     * 연결을 흔들 이유가 없다.
+     */
+    @Test
+    void whenRedisIsDownTheJoinIsNotAnnouncedAndNothingIsThrown() {
+        Long userId = member("판정불가입장");
+        StringRedisTemplate downRedis = mock(StringRedisTemplate.class, invocation -> {
+            throw new RedisConnectionFailureException("redis down");
+        });
+        WorldChatService withoutRedis = new WorldChatService(messaging, users,
+                new WorldChatRateLimiter(downRedis, keyspace));
+
+        assertDoesNotThrow(() -> withoutRedis.announceJoin(userId));
+
+        assertEquals(List.of(), allJoinNotices(), "판정하지 못한 입장 알림이 토픽에 나갔습니다.");
     }
 
     /**
@@ -399,6 +467,20 @@ class WorldChatIntegrationTest {
 
     private void assertNothingSent() {
         assertEquals(List.of(), allCaptured(), "거부된 메시지가 토픽에 나갔습니다.");
+    }
+
+    private List<WorldChatJoinNotice> allJoinNotices() {
+        var captor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        var destination = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(messaging, org.mockito.Mockito.atLeast(0))
+                .convertAndSend(destination.capture(), captor.capture());
+        List<WorldChatJoinNotice> notices = new ArrayList<>();
+        for (Object value : captor.getAllValues()) {
+            if (value instanceof WorldChatJoinNotice notice) {
+                notices.add(notice);
+            }
+        }
+        return notices;
     }
 
     private List<WorldChatMessage> allCaptured() {
