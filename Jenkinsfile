@@ -4,7 +4,9 @@ pipeline {
     options {
         timestamps()
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 60, unit: 'MINUTES')
+        // Unity 빌드는 단독으로 45분을 넘고 실행기가 하나다. 60분이면 큐가 조금만 붐벼도
+        // 이미 끝난 앱 배포까지 ABORT 로 묶여 버린다 (2026-09-18 #468 실측).
+        timeout(time: 180, unit: 'MINUTES')
     }
 
     stages {
