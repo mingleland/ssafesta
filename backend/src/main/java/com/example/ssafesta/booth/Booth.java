@@ -45,6 +45,19 @@ public class Booth {
     private Long ownerUserId;
 
     /**
+     * An administrator's booth, which follows the <b>admin role</b> rather than the person who
+     * created it (S15P21A604-905).
+     *
+     * <p>Two things hang off this flag. {@code ux_booths_owner} skips these rows, which is what lets
+     * one administrator hold several booths at once; and {@link BoothAccessGuard} stops treating
+     * {@code owner_user_id} as authority over them, so a demoted administrator loses the booth while
+     * every current administrator keeps it. The owner column is still written — it records who set
+     * the booth up — but it no longer grants anything here.
+     */
+    @Column(name = "admin_owned", nullable = false, updatable = false)
+    private boolean adminOwned;
+
+    /**
      * The slot this booth currently occupies, or {@code null} when not leased.
      *
      * <p>The column is UNIQUE, so a stale value blocks anyone else from taking that slot — the
@@ -102,12 +115,18 @@ public class Booth {
     }
 
     public Booth(Long ownerUserId, String name) {
+        this(ownerUserId, name, false);
+    }
+
+    public Booth(Long ownerUserId, String name, boolean adminOwned) {
         this.ownerUserId = ownerUserId;
         this.name = name;
+        this.adminOwned = adminOwned;
     }
 
     public Long getId() { return id; }
     public Long getOwnerUserId() { return ownerUserId; }
+    public boolean isAdminOwned() { return adminOwned; }
     public Long getCurrentSlotId() { return currentSlotId; }
     public String getName() { return name; }
     public String getDescription() { return description; }
