@@ -6,6 +6,7 @@ import type { ApiError } from '../../shared/api/client';
 import { THEME_CODES, isPaletteColor } from './types';
 import type { BoothDetail, BoothFacade, FacadePutRequest } from './types';
 import { getMockHomepageUrl } from './homepageApi.mock';
+import { getMockPublishedVersion } from './layoutApi.mock';
 
 // 999 sentinel — 임대 만료 UX 수동 검증용 (옛 layout mock 과 같은 관용구).
 // 실 BE에는 없는 값이라 real facadeApi.ts에는 이 분기가 없다.
@@ -67,6 +68,7 @@ export async function getBooth(boothId: number): Promise<BoothDetail> {
     leaseStatus: boothId === LEASE_EXPIRED_BOOTH_ID ? 'EXPIRED' : 'ACTIVE',
     facade: facades.get(boothId) ?? defaultFacade(),
     homepageUrl: getMockHomepageUrl(boothId), // 016 — 등록 mock 저장소가 정본
+    publishedLayoutVersion: getMockPublishedVersion(boothId), // -898 — 게시 mock 저장소가 정본
   };
 }
 

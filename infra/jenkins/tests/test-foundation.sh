@@ -123,7 +123,8 @@ pass "WebGL publisher service account configuration"
 
 for name in GITLAB_PACKAGE_READ_CREDENTIAL_ID DEV_BACK_ENV_CREDENTIAL_ID DEV_AI_ENV_CREDENTIAL_ID DEV_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID \
   DEV_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID DEMO_BACK_ENV_CREDENTIAL_ID DEMO_AI_ENV_CREDENTIAL_ID \
-  DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID; do
+  DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID \
+  DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID; do
   grep -q "key: ${name}" "${repo_root}/infra/jenkins/casc/security.yaml" || fail "JCasC omits ${name}"
   grep -q "^[[:space:]]*${name}:.*\${${name}" "${controller_compose}" || fail "controller does not receive ${name}"
 done
@@ -179,7 +180,7 @@ grep -q "final List deployComponents = (selection.deployComponents as List).find
   || fail "dev batch must use the detector deployComponents contract and keep game Dedicated Server deployment outside it"
 grep -q 'withCredentials(credentialBindings)' "${develop_pipeline}" \
   || fail "dev batch does not bind selected component credentials"
-grep -q "credentialsId: env.DEV_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
+grep -q "credentialsId: env.DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID, variable: 'INTERNAL_INFRA_TO_SPRING_TOKENS'" "${develop_pipeline}" \
   || fail "dev backend does not bind the Infra-to-Spring token"
 grep -q 'gitUsernamePassword(credentialsId: checkoutCredentialId)' "${develop_pipeline}" \
   || fail "deploy freshness check does not bind the GitLab checkout credential"
@@ -328,6 +329,7 @@ export DEMO_BACK_ENV_CREDENTIAL_ID="foundation-demo-back-env"
 export DEMO_AI_ENV_CREDENTIAL_ID="foundation-demo-ai-env"
 export DEMO_INTERNAL_SPRING_TO_AI_TOKENS_CREDENTIAL_ID="foundation-demo-spring-to-ai"
 export DEMO_INTERNAL_AI_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-ai-to-spring"
+export DEMO_INTERNAL_INFRA_TO_SPRING_TOKENS_CREDENTIAL_ID="foundation-demo-infra-to-spring"
 
 if command -v docker >/dev/null 2>&1; then
   runtime_env_dir="$(mktemp -d)"

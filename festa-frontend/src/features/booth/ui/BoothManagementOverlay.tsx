@@ -14,6 +14,10 @@
 // ManagementPanel 'studio' 멤버를 걷고, 편집기 코드(features/studio·entities/layout·catalog)도 삭제했다
 // (S15P21A604-846). 부스 런타임 자동화(tools/assets·assets:build)는 그대로 돈다.
 // 이 화면은 layout publish/rebuild 를 부르지 않는다. 외관 편집은 부스 이름만 인라인으로 남겼다.
+//
+// 2026-09-18 (S15P21A604-898): 스튜디오 없이 관리창이 직접 게시한다. 사용자 흐름은
+// 임대 → 프로젝트 등록 → 게시 → 운영 중 → presentation 이 바뀌면 변경사항 적용. draft·revision·
+// version 은 model/boothPublication.ts 안에서만 산다 — 이 파일은 phase 와 버튼 한 개만 안다.
 import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +36,7 @@ import { BoothNameField } from './BoothNameField';
 import { BoothPreview } from './BoothPreview';
 import { LeaseCancelDialog } from './LeaseCancelDialog';
 import { isStaleViewError, useCancelLease } from '../model/cancelLease';
+import { isRevisionConflict, useBoothPublicationState, useBoothPublish } from '../model/boothPublication';
 import './boothManagement.css';
 
 const IcBooth = (
@@ -133,6 +138,7 @@ function OpsCard({
 export function BoothManagementOverlay({ onClose }: Props) {
   const navigate = useNavigate();
   const [showAgentGate, setShowAgentGate] = useState(false);
+  const [showProjectGate, setShowProjectGate] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const cancelLease = useCancelLease(() => setShowCancel(false));
 
@@ -179,6 +185,25 @@ export function BoothManagementOverlay({ onClose }: Props) {
     queryFn: () => getAiAgent(boothId as number),
     enabled: boothId !== null,
   });
+
+  // 게시 phase 는 캐시에서 파생된다. mutation 은 phase 를 읽지 않고 presentation 만 받는다
+  const publication = useBoothPublicationState({
+    boothId,
+    detail: boothQuery.data,
+    hasProject: projectQuery.data === undefined ? undefined : project !== null,
+    aiAgent: aiAgentQuery.data,
+  });
+  const publish = useBoothPublish();
+
+  function requestPublish() {
+    if (!myBooth?.lease) return;
+    if (publication.phase === 'no-project') {
+      // 비활성 버튼 하나로 끝내지 않는다 — AI 직원 게이트와 같은 다이얼로그로 "왜" 와 "다음" 을 함께 보인다
+      setShowProjectGate(true);
+      return;
+    }
+    publish.mutate({ boothId: myBooth.boothId, slotId: myBooth.lease.slotId, presentation: publication.current });
+  }
 
   // 관리 상세로 들어간다. **route 로 나가지 않는다** (S15P21A604-755) — 나가면 월드가 화면에서
   // 사라지고, 돌아오는 길을 URL 로 다시 만들어야 했다. 지금은 이 화면 위에 얹히고 ESC 한 번이면
@@ -240,6 +265,12 @@ export function BoothManagementOverlay({ onClose }: Props) {
 
     const lease = myBooth.lease;
     const expired = remainingMs(lease.endsAt, now) === 0;
+    // 임대 상태와 공개 상태를 갈라 적는다 — 임대만 됐고 아직 게시 전이면 "준비 중" 이다
+    const live = publication.phase === 'live' || publication.phase === 'live-outdated';
+    const statusLabel = expired ? '임대 만료' : live ? '운영 중' : '준비 중';
+    const actionLabel =
+      publication.phase === 'live-outdated' ? '변경사항 적용' : publication.phase === 'live' ? null : '게시';
+    const showAction = !expired && actionLabel !== null;
     const endsAt = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul',
       dateStyle: 'medium',
@@ -269,9 +300,9 @@ export function BoothManagementOverlay({ onClose }: Props) {
               <div className="bm-identity-text">
                 <h3 className="bm-name">{project?.name ?? '프로젝트 미등록'}</h3>
                 <span className="bm-slot">부스 번호 {lease.slotCode ?? '미연결'}</span>
-                <span className={'bm-status' + (expired ? ' bm-status-off' : '')}>
+                <span className={'bm-status' + (expired || !live ? ' bm-status-off' : '')}>
                   <span className="bm-dot" aria-hidden="true" />
-                  {expired ? '임대 만료' : '운영 중'}
+                  {statusLabel}
                 </span>
                 <span className="ov-note bm-remaining">
                   {IcClock}
@@ -280,7 +311,32 @@ export function BoothManagementOverlay({ onClose }: Props) {
                   ({endsAt} 종료)
                 </span>
               </div>
+              {showAction && (
+                <div className="bm-identity-action">
+                  <button
+                    type="button"
+                    className="ov-btn ov-btn-primary"
+                    disabled={publication.pending || publish.isPending}
+                    onClick={requestPublish}
+                  >
+                    {publish.isPending ? '게시 중...' : actionLabel}
+                  </button>
+                  {publication.phase === 'no-project' && (
+                    <span className="ov-note">프로젝트를 등록하면 게시할 수 있습니다</span>
+                  )}
+                  {publication.phase === 'ready' && (
+                    <span className="ov-note">게시하면 방문객에게 공개됩니다</span>
+                  )}
+                </div>
+              )}
             </div>
+            {publish.isError && (
+              <span className="ov-note bm-cancel-error" role="alert">
+                {isRevisionConflict(publish.error)
+                  ? '다른 곳에서 먼저 저장됐습니다. 다시 눌러 게시해 주세요.'
+                  : '게시하지 못했습니다. 잠시 후 다시 시도해 주세요.'}
+              </span>
+            )}
             <BoothNameField
               boothId={myBooth.boothId}
               initialName={myBooth.name}
@@ -366,6 +422,35 @@ export function BoothManagementOverlay({ onClose }: Props) {
                 직원 등록
               </button>
               <button type="button" className="bm-gate-btn" onClick={() => setShowAgentGate(false)}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showProjectGate && myBooth && (
+        <div className="bm-gate-backdrop" role="presentation" onClick={() => setShowProjectGate(false)}>
+          <div
+            className="bm-gate-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bm-project-gate-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="bm-project-gate-title">프로젝트 등록이 필요합니다.</h3>
+            <p>먼저 프로젝트를 등록해야 부스를 방문객에게 게시할 수 있습니다.</p>
+            <div className="bm-gate-actions">
+              <button
+                type="button"
+                className="bm-gate-btn bm-gate-btn-primary"
+                onClick={() => {
+                  setShowProjectGate(false);
+                  openPanel('project', myBooth.boothId);
+                }}
+              >
+                프로젝트 등록
+              </button>
+              <button type="button" className="bm-gate-btn" onClick={() => setShowProjectGate(false)}>
                 닫기
               </button>
             </div>

@@ -124,7 +124,7 @@ deploy_package() {
 old="$(make_package old00001)"
 deploy_package "${old}" old00001
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
-grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/current/webgl.json"
 # 릴리스 디렉터리는 웹 서버가 들어갈 수 있어야 한다. mktemp -d 가 만든 0700 을 그대로 두면
 # nginx 가 403 Forbidden 을 돌려주고, 그게 엣지 차단처럼 보인다 (S15P21A604-665, GitLab #165).
 [[ "$(stat -c '%a' "${WEBGL_RELEASE_ROOT}/releases/old00001")" == *5 ]]
@@ -165,7 +165,7 @@ touch -t 202609120001.01 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002"
 touch -t 202609120002.02 "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003"
 if deploy_package "${dirty_build}" dirty001 >/dev/null 2>&1; then echo 'dirty build was accepted' >&2; exit 1; fi
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
-grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/current/webgl.json"
 [[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
 [[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
 [[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]
@@ -179,7 +179,7 @@ if deploy_package "${candidate}" new00001 >/dev/null 2>&1; then echo 'failed HTT
 unset FAIL_HTTP
 grep -Fq '"status":"FAILED"' "${WEBGL_EVIDENCE_PATH}"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/old00001' ]]
-grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+grep -Fq '"releaseId": "old00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/current/webgl.json"
 
 # 엣지가 검증 요청만 막고 오리진은 멀쩡한 경우 — 릴리스를 되돌리지 않고 살려야 한다 (S15P21A604-656).
 export EDGE_BLOCK=1
@@ -187,7 +187,7 @@ deploy_package "${candidate}" new00001 >/dev/null 2>"${fixture}/edge-block.log"
 [[ "$(readlink "${WEBGL_RELEASE_ROOT}/current")" == 'releases/new00001' ]]
 grep -Fq '"status":"SUCCEEDED"' "${WEBGL_EVIDENCE_PATH}"
 grep -Fq '"verifiedVia":"origin"' "${WEBGL_EVIDENCE_PATH}"
-grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/known-good/webgl.json"
+grep -Fq '"releaseId": "new00001"' "${ENVIRONMENT_STATE_DIR}/dev/batches/current/webgl.json"
 [[ ! -e "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000001" ]]
 [[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000002" ]]
 [[ -d "${WEBGL_RELEASE_ROOT}/current.legacy.20260912000003" ]]

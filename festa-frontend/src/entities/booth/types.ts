@@ -61,6 +61,13 @@ export interface BoothDetail {
   // 016 확장(C-01 #97 확정) — 노트북 오버레이 URL 의 정본. 이벤트 payload 의 url 이 아니라 이 값이다.
   // null = 미등록. 방문자에게는 published gate 뒤에서만 값이 온다(BoothQueryService).
   homepageUrl: string | null;
+  // 방문자 공개 여부의 서버 술어 Booth.isPublished() = 이 값 != null (BoothQueryService.OwnerBoothView).
+  // 화면에는 숫자를 내지 않는다 — null 이면 "준비 중", 있으면 "운영 중" 으로만 읽는다 (S15P21A604-898).
+  publishedLayoutVersion: number | null;
+  // AI 채팅 '사람 상담 요청' 버튼의 사전 차단 근거 (S15P21A604-910/914, GitLab #249).
+  // ai_agents.handoff_enabled 그대로 — AI 직원 미등록 부스는 false, published gate 없다.
+  // optional 인 이유: 값이 없으면(구버전 서버) 버튼을 유지하는 무해 degrade 가 계약이다.
+  handoffEnabled?: boolean;
 }
 
 // PUT /booths/{boothId}/homepage 응답 (spec 016 contracts/homepage-api.md §2, BoothHomepageService 구현 정본)

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# 선택된 dev component를 하나의 batch로 배포하고, 실패 시 이 batch의 known-good snapshot만 복구한다.
+# 선택된 component를 하나의 batch로 배포하고, 실패 시 이 batch의 known-good snapshot만 복구한다.
+# 기본 대상은 demo 다 — develop 머지가 demo.ssafesta.world 를 갱신한다 (spec §Session 2026-09-17).
+# 성공 시 CURRENT 만 자동 갱신하며, KNOWN_GOOD 승격은 사람이 approve-known-good.sh 로 별도 수행한다 (spec §Session 2026-09-17).
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,6 +22,8 @@ done
 [[ -n "${python_bin}" ]] || { echo 'Python 3 is required' >&2; exit 69; }
 
 state_root="${DEV_BATCH_STATE_DIR:-${ENVIRONMENT_STATE_DIR:-/tmp/festa-environments}/dev/batches}"
+target_environment="${FESTA_DEPLOY_ENVIRONMENT:-demo}"
+case "${target_environment}" in dev|demo) ;; *) echo 'FESTA_DEPLOY_ENVIRONMENT must be dev or demo' >&2; exit 64 ;; esac
 batch_dir="${state_root}/${DEV_BATCH_ID}"
 snapshot_dir="${batch_dir}/before"
 status_path="${CI_ARTIFACT_DIR}/dev-batch-result.json"
@@ -120,8 +124,8 @@ run_component() {
     return $?
   fi
   case "${component}" in
-    ai) component_env="${DEV_AI_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
-    back) component_env="${DEV_BACK_ENV_FILE:-${COMPONENT_ENV_FILE:-}}" ;;
+    ai) component_env="${DEMO_AI_ENV_FILE:-${DEV_AI_ENV_FILE:-${COMPONENT_ENV_FILE:-}}}" ;;
+    back) component_env="${DEMO_BACK_ENV_FILE:-${DEV_BACK_ENV_FILE:-${COMPONENT_ENV_FILE:-}}}" ;;
   esac
   if [[ "${component}" =~ ^(ai|back)$ && -z "${component_env}" ]]; then
     echo "missing component environment file for ${component}" >&2
@@ -130,15 +134,15 @@ run_component() {
   case "${action}" in
     deploy)
       COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
+        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment "${target_environment}" --component "${component}" --release-manifest "${manifest}"
       ;;
     verify)
       COMPONENT_ENV_FILE="${component_env}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/verify-environment.sh" --environment dev --component "${component}"
+        bash "${repo_root}/infra/environments/scripts/verify-environment.sh" --environment "${target_environment}" --component "${component}"
       ;;
     rollback)
       COMPONENT_ENV_FILE="${component_env}" DEV_BATCH_ROLLBACK=1 DEV_BATCH_STATE_ROOT="${state_root}" CI_COMPONENT="${component}" RELEASE_MANIFEST_PATH="${manifest}" \
-        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment dev --component "${component}" --release-manifest "${manifest}"
+        bash "${repo_root}/infra/environments/scripts/deploy-environment.sh" --environment "${target_environment}" --component "${component}" --release-manifest "${manifest}"
       ;;
   esac
 }
@@ -207,7 +211,9 @@ for component in "${components[@]}"; do
 done
 
 for component in "${components[@]}"; do
-  target="${state_root}/known-good/${component}.json"
+  # 자동 승격은 CURRENT 까지만. KNOWN_GOOD 은 사람이 approve-known-good.sh 로 승인해야 갱신된다.
+  mkdir -p "${state_root}/current"
+  target="${state_root}/current/${component}.json"
   temp="${target}.tmp"
   cp "${RELEASE_MANIFEST_PATH}" "${temp}"
   mv -f "${temp}" "${target}"

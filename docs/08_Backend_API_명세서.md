@@ -273,6 +273,22 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
 - Coin Transaction 생성
 - Booth 연결
 
+#### 관리자 예외 — 무상·영구 (2026-09-18, spec 004 FR-022 · `S15P21A604-905`)
+
+호출자가 관리자면 같은 endpoint가 아래만 다르게 처리한다. 요청·응답 모양은 같다.
+
+| 항목 | 일반 회원 | 관리자 |
+|---|---|---|
+| 코인 | `app.lease.price-coin`(50) 차감 | **차감 없음.** `LEASE_PAYMENT` 원장 행을 만들지 않는다 (0 Coin 행도 남기지 않는다) |
+| 만료 | `app.lease.duration`(24시간) 뒤 | **없음.** `endsAt`이 `app.lease.admin-ends-at`(`2099-12-31T00:00:00Z`)이다 |
+| 활성 임대 수 | 1건 (`ux_booth_leases_active_lessee`) | **슬롯 수만큼.** 슬롯마다 부스가 하나씩 생긴다 |
+| 부스 권한 | 소유자·스태프 | **관리자 권한.** 강등되면 그 다음 요청부터 막히고, 현재 관리자는 누구나 접근한다 (FR-023). **마스터 보호를 적용하지 않는다** — 마스터가 설치한 관리자 부스도 다른 관리자가 조작한다. 마스터 **개인** 부스의 보호는 그대로다 |
+| 반납 후 | 부스와 콘텐츠 **보존** (FR-010) | **부스가 삭제된다** (FR-024) |
+
+슬롯당 활성 임대 1건(`ux_booth_leases_active_slot`)은 관리자에게도 그대로 적용된다 — 관리자 둘이 같은 슬롯을 가질 수 없다. `DELETE`(조기 반납)는 슬롯을 지목하므로 여러 개를 든 관리자도 그대로 쓴다.
+
+> ⚠️ **관리자 부스 반납은 파괴적이다.** 부스 행과 레이아웃·AI 에이전트·문서·프로젝트·설문이 함께 지워지고, **방문자가 남긴 설문 응답·방문 계측·상담 기록도 같이 사라진다.** `booths` 를 참조하는 15개 외래키에 cascade 가 하나도 없어 그것들을 남기는 삭제는 애초에 실행될 수 없다. 관리자 임대는 만료되지 않으므로 이 경로는 조기 반납에서만 일어난다. 회원 부스는 종전대로 전부 보존된다.
+
 #### Response
 
 ```json
@@ -298,6 +314,8 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
 
 내 Booth와 현재 Lease 조회. 응답에 **`homepageUrl`**(spec 016 신설)이 포함되며, 이쪽은 공개 여부와 무관하게 **항상 저장값**이다 — 미공개 상태에서도 스튜디오 폼을 프리필해야 하기 때문이다. 미등록이면 `null`.
 
+**관리자 부스는 제외된다** (2026-09-18, spec 004 FR-022 · `S15P21A604-905`). 관리자는 슬롯마다 부스를 하나씩 들 수 있어 "내 부스 하나"인 이 응답 모양에 담기지 않는다 — 관리자가 자기 부스를 찾을 때는 `GET /booth-slots`에서 `mine`이 `true`인 칸을 읽는다(그 응답이 슬롯마다 `boothId`를 함께 준다). 관리자가 일반 회원으로서 따로 임대한 부스가 있으면 그것은 여기에 그대로 나온다. **응답 스키마는 바뀌지 않았다** — FE·Unity 계약에 변경이 없다.
+
 ### GET `/booths/{boothId}`
 
 공개 가능한 Booth 기본 정보 조회.
@@ -316,7 +334,8 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
     "logoUrl": null
   },
   "publishedLayoutVersion": 4,
-  "homepageUrl": "https://my-team-project.example.com"
+  "homepageUrl": "https://my-team-project.example.com",
+  "handoffEnabled": false
 }
 ```
 
@@ -324,6 +343,10 @@ React 와 Unity 가 같은 Access Token 을 나눠 쓰기 때문이다 — 유�
   - **등록값이 없으면 그 부스 프로젝트의 `deployUrl`(서비스 주소)로 폴백한다** (2026-09-14 결정). `booths.homepage_url`은 등록 endpoint만 있고 **화면이 없어** 실서비스에서는 늘 비어 있었고, 소유자가 실제로 주소를 입력하는 칸은 프로젝트 관리의 "서비스 주소" 하나다. 우선순위는 **등록값 > 프로젝트 `deployUrl`** — 폴백은 빈 자리만 메우므로 등록 화면이 생기면 저절로 사라진다.
   - 둘 다 없으면 `null`이라 FE는 여전히 `null` 하나로 "미등록/미공개" 안내 분기를 끝낸다.
   - `GET /booths/mine`(소유자 프리필)에는 **폴백을 적용하지 않는다** — 등록한 적 없는 값을 폼에 채우면 소유자가 그것을 다시 저장해 한 주소가 두 컬럼으로 복제된다.
+- `handoffEnabled`: 이 부스가 **사람 상담 연결을 받는가** (2026-09-18 신설, `S15P21A604-914` · GitLab #249). 방문자 FE 는 이 값으로 AI 채팅의 '사람 상담 요청' 버튼을 **누르기 전에** 감춘다. 값은 소유자용 `GET /booths/{boothId}/agents` 의 `handoffEnabled` 와 항상 같다.
+  - **AI 직원이 없는 부스는 `false`** — 상담을 넘겨받을 사람이 없다는 뜻이다.
+  - **`homepageUrl` 과 달리 published 게이트가 없다** — 미공개 부스도 저장된 값 그대로 내려간다. 방문자는 미공개 부스에 진입 자체가 불가능하고, 이 값은 밖으로 나가는 주소가 아니라 boolean 하나다.
+  - FE 계약은 optional 이다 — 값이 없으면(구버전 서버) 버튼을 **유지**하고, 명시적 `false` 일 때만 숨긴다.
 - ⚠️ **회차 필드명은 endpoint마다 다르고 합치지 않는다** (2026-08-26 리드 확정, #97). 이 Booth 상세는 **`publishedLayoutVersion`**, Layout Draft 조회·Publish 결과는 **`publishedVersion`**이다.
 
 ### DELETE `/booth-slots/{slotId}/leases/mine` — spec 004 신설 (D12, 2026-09-14)

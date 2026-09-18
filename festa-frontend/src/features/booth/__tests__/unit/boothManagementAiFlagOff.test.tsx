@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { __resetSessionForTests, setMemberSession } from '../../../auth/model/session';
 
-vi.mock('../../model/boothManagementFlags', () => ({ SHOW_AI_ASSET_SECTION: false }));
+vi.mock('../../model/boothManagementFlags', () => ({ SHOW_AI_ASSET_SECTION: false, PUBLISH_AI_AGENT_BINDING: false }));
 
 const future = () => new Date(Date.now() + 60_000).toISOString();
 vi.mock('../../../../entities/booth/leaseApi.select', () => ({
