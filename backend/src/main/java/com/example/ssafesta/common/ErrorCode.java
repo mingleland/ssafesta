@@ -94,6 +94,10 @@ public enum ErrorCode {
     /** 관리자가 판매를 내린 경품이다 — 삭제하지 않고 {@code active=false} 로 내린다. */
     EVENT_PRIZE_INACTIVE(HttpStatus.CONFLICT, "현재 판매 중인 경품이 아닙니다."),
     EVENT_PRIZE_OUT_OF_STOCK(HttpStatus.CONFLICT, "재고가 부족합니다."),
+    /** 마감 시각이 지났다 (S15P21A604-922). 스케줄러가 판매를 내리기 전에도 이 시각이 경계다. */
+    EVENT_PRIZE_CLOSED(HttpStatus.CONFLICT, "응모가 마감됐습니다."),
+    /** 응모형 경품은 인당 1회다 (S15P21A604-922). */
+    EVENT_PRIZE_ALREADY_ENTERED(HttpStatus.CONFLICT, "이미 응모하셨습니다."),
     /**
      * 처리 상태 전이 규칙(PURCHASED→PENDING/FULFILLED/CANCELLED, PENDING→FULFILLED/CANCELLED)을
      * 벗어난 요청이다. {@code FULFILLED}·{@code CANCELLED} 는 종단 상태라 되돌리지 않는다.
