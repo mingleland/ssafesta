@@ -3,18 +3,15 @@
 // `Idempotency-Key` 는 **조정 한 건의 이름**이지 요청 한 번의 이름이 아니다. 폼을 열 때 하나를 만들어
 // 붙들고, 실패 후 재시도는 같은 값을 다시 보낸다 — 서버가 alreadyApplied 로 첫 결과를 돌려준다.
 // 클릭마다 새로 만들면 재시도가 아니라 새 조정이 되어 **두 번 지급**된다. 새 조정을 시작할 때만 새 키다.
+import { newIdempotencyKey } from '../../../shared/api/idempotencyKey';
+
 export interface AdjustmentDraft {
   key: string;
   signedAmount: number;
   note: string;
 }
 
-export function newIdempotencyKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  // 매우 오래된 런타임 폴백 — 서버는 UUID 형식만 받는다
-  const hex = (n: number) => Math.floor(Math.random() * 16 ** n).toString(16).padStart(n, '0');
-  return `${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}`;
-}
+export { newIdempotencyKey };
 
 export function createAdjustmentDraft(): AdjustmentDraft {
   return { key: newIdempotencyKey(), signedAmount: 0, note: '' };
