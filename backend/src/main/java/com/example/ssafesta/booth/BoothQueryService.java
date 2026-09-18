@@ -78,15 +78,31 @@ public class BoothQueryService {
         }).toList();
     }
 
-    /** The member's own booth and its lease, or empty when they have never leased (FR-007). */
+    /**
+     * The member's own booth and its lease, or empty when they have never leased (FR-007).
+     *
+     * <p><b>An administrator's booth answers here too</b> (S15P21A604-905 의 핫픽스). That ticket left it out
+     * on the assumption that the console would find it through {@code GET /booth-slots}'s {@code
+     * mine}, but nothing reads that field: 부스 관리 and the studio owner gate both ask this endpoint
+     * alone, so an administrator who had just leased was told they have no booth — they could not
+     * open, edit or publish the booth they were standing in.
+     *
+     * <p>The response shape is unchanged: one booth. An administrator holding several slots gets the
+     * most recent one, which is the one they just leased.
+     */
+    // ponytail: 다중 슬롯 관리자는 마지막 부스만 보인다 — 목록을 주는 응답이 필요해지면 그때 계약을 늘린다.
     @Transactional(readOnly = true)
     public Optional<MyBoothView> findMyBooth(Long userId) {
         Instant now = Instant.now();
-        return booths.findByOwnerUserIdAndAdminOwnedFalse(userId).map(booth -> {
-            BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
-            BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
-            return MyBoothView.of(booth, lease, slot, now);
-        });
+        // 관리자 부스가 먼저다: 그 부스는 임대를 들고 있는 동안에만 존재하고(반납하면 삭제된다),
+        // 회원 시절의 부스는 임대 없이도 남아 있어서 그것을 먼저 주면 지금 운영 중인 부스가 가려진다.
+        return booths.findFirstByOwnerUserIdAndAdminOwnedTrueOrderByIdDesc(userId)
+                .or(() -> booths.findByOwnerUserIdAndAdminOwnedFalse(userId))
+                .map(booth -> {
+                    BoothLease lease = leases.findValidByBoothId(booth.getId(), now).orElse(null);
+                    BoothSlot slot = lease == null ? null : slots.findById(lease.getSlotId()).orElse(null);
+                    return MyBoothView.of(booth, lease, slot, now);
+                });
     }
 
     /**

@@ -48,5 +48,16 @@ public interface BoothRepository extends JpaRepository<Booth, Long> {
      */
     Optional<Booth> findByOwnerUserIdAndAdminOwnedFalse(Long ownerUserId);
 
+    /**
+     * The administrator's most recently taken booth (S15P21A604-905 의 핫픽스).
+     *
+     * <p>{@code findFirst}, not {@code Optional} on the bare predicate: one administrator holds one
+     * per slot, so the plain derived query would throw exactly the way
+     * {@link #findByOwnerUserIdAndAdminOwnedFalse} explains. Newest first, because that is the booth
+     * they just leased and are looking at. The row only exists while the lease does — a returned
+     * administrator booth is deleted outright.
+     */
+    Optional<Booth> findFirstByOwnerUserIdAndAdminOwnedTrueOrderByIdDesc(Long ownerUserId);
+
     Optional<Booth> findByCurrentSlotId(Long currentSlotId);
 }
