@@ -275,15 +275,8 @@
 .ov-card-media-note { font-size: 10px; font-weight: 700; color: #ffb84d; text-align: center; max-width: 96px; line-height: 1.3; }
 .ov-card-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1; justify-content: center; }
 .ov-card-body .ov-card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* 코인·재고 chip·구매/응모 버튼 가로 폭 확대(S15P21A604-842 후속) — 이벤트 상점 카드 안에서만.
-   .ov-chip·.ov-btn은 ConsultationOverlay 등 다른 화면도 쓰는 공용 클래스라 전역으로 안 건드린다.
-   가로 길이를 원래(패딩 10px/15px 기준) 대비 약 2.5배로 늘린다 — 세로(height)는 그대로 둔다. */
-.ov-card-body .ov-chip { padding: 0 35px; }
-.ov-card-body .ov-btn { padding: 0 48px; }
-/* .ov-card-body는 align-items 기본값(stretch)이라 chip·버튼이 본문 폭 그대로 늘어져 있었다
-   (title의 nowrap+ellipsis는 stretch가 있어야 동작하니 body 자체는 그대로 두고 이 둘만 뺀다). */
-.ov-card-body .ov-chip,
-.ov-card-body .ov-btn { align-self: flex-start; }
+/* chip·구매/응모 버튼을 카드 본문 폭 그대로 채운다(2026-09-18 확정) — .ov-card-body가
+   align-items 기본값(stretch)이라 이렇게 된다. .ov-chip·.ov-btn 자체는 손대지 않는다. */
 
 /* 코인 가격을 나타내는 chip — 나머지(재고 등)는 기본 .ov-chip 톤 그대로 */
 .ov-chip-coin { background: rgba(255, 184, 77, 0.16); color: #ffd08a; }
