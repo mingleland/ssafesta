@@ -46,12 +46,7 @@ public class AdminWalletOperationService {
         if (!users.existsById(targetUserId)) {
             throw new ApiException(ErrorCode.ADMIN_TARGET_NOT_FOUND);
         }
-        // 마스터 계정 보호는 "타 관리자가 마스터를 건드리지 못한다" 는 규칙이다. 마스터 본인의
-        // 자기 조정은 예외로 허용한다 — 운영 중 자기 코인을 넣고 빼며 흐름을 검증할 일이 있고,
-        // 감사(actor=self)가 그 흔적을 그대로 남긴다.
-        if (!targetUserId.equals(actorUserId)) {
-            guard.requireTargetNotMaster(targetUserId);
-        }
+        guard.requireTargetNotMaster(targetUserId);
 
         LedgerResult result = wallets.adjustByAdmin(new CoinAdminAdjustCommand(
                 targetUserId, signedAmount, note, actorUserId, adjustmentKey(targetUserId, operationId)));

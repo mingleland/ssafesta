@@ -35,8 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
  * one is the wallet's own administrative surface.
  *
  * <p>Reading is not acting, so balance and ledger are allowed for every target including the
- * master. Adjustment is refused for a master target — except by the master itself, which may
- * adjust its own wallet.
+ * master. Only the adjustment is refused there.
  */
 @RestController
 @RequestMapping("/api/v1/admin/wallets")
@@ -73,7 +72,7 @@ public class AdminWalletController {
             @ApiResponse(responseCode = "400",
                     description = "`VALIDATION_FAILED` — `signedAmount` 가 0 이거나 `Idempotency-Key` 가 UUID 가 아니다"),
             @ApiResponse(responseCode = "403",
-                    description = "`FORBIDDEN`(관리자가 아니다) 또는 `MASTER_PROTECTED`(대상이 마스터다 — 단, 마스터 본인의 자기 조정은 허용)"),
+                    description = "`FORBIDDEN`(관리자가 아니다) 또는 `MASTER_PROTECTED`(대상이 마스터다)"),
             @ApiResponse(responseCode = "404",
                     description = "`ADMIN_TARGET_NOT_FOUND`(회원이 없다) 또는 `WALLET_NOT_FOUND`(회원인데 지갑 행이 없다)"),
             @ApiResponse(responseCode = "409",
