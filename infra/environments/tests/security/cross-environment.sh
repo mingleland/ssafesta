@@ -30,9 +30,11 @@ assert_contains "${demo_compose}" 'BACK_ENV_FILE:\?BACK_ENV_FILE is required' 'd
 assert_contains "${data_compose}" 'POSTGRES_.*PASSWORD_FILE' 'shared PostgreSQL credentials must be file references'
 assert_contains "${data_compose}" 'REDIS_ACL_FILE' 'shared Redis ACL must be file-backed'
 
-expected_grants=$'GRANT CONNECT ON DATABASE festa_dev_business TO festa_dev_back_app;\nGRANT CONNECT ON DATABASE festa_dev_ai TO festa_dev_ai_app;\nGRANT CONNECT ON DATABASE festa_demo_business TO festa_demo_back_app;\nGRANT CONNECT ON DATABASE festa_demo_ai TO festa_demo_ai_app;'
+# 조회 전용 역할은 런타임이 아니라 운영자 창구다. demo 두 database 만 붙고 dev 는 못 붙는다.
+expected_grants=$'GRANT CONNECT ON DATABASE festa_dev_business TO festa_dev_back_app;\nGRANT CONNECT ON DATABASE festa_dev_ai TO festa_dev_ai_app;\nGRANT CONNECT ON DATABASE festa_demo_business TO festa_demo_back_app;\nGRANT CONNECT ON DATABASE festa_demo_ai TO festa_demo_ai_app;\nGRANT CONNECT ON DATABASE festa_demo_business TO festa_demo_readonly;\nGRANT CONNECT ON DATABASE festa_demo_ai TO festa_demo_readonly;'
 actual_grants="$(grep '^GRANT CONNECT ON DATABASE' "${postgres_init}")"
 assert_equals "${expected_grants}" "${actual_grants}" 'PostgreSQL roles must have access only to their own environment database'
+assert_not_contains "${postgres_init}" 'GRANT .*(INSERT|UPDATE|DELETE|TRUNCATE|CREATE|ALL PRIVILEGES).*TO festa_demo_readonly' 'demo read-only role must never receive write privileges'
 
 assert_contains "${redis_acl}" '^user dev_back .*~dev:\*' 'dev backend Redis ACL must stay in dev namespace'
 assert_contains "${redis_acl}" '^user dev_ai .*~dev:ai:\*' 'dev AI Redis ACL must stay in dev namespace'
