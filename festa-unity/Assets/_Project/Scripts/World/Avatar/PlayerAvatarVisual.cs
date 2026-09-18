@@ -284,7 +284,8 @@ namespace Festa.World
         // 0.04 m 까지 내려간다. 접지 보정을 그대로 돌리면 그 프레임을 "바닥에 박힌 것" 으로 읽고 몸을
         // 끌어내려 파묻힌다(사용자 지적 2026-09-10). 원샷이라 끝나면 RestoreBaseGrounding 이 되돌린다.
         static bool ChangesGroundContact(PlayerEmoteId emote) =>
-            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike || LiePoseTable.IsLie(emote);
+            emote == PlayerEmoteId.SitGround || emote == PlayerEmoteId.Strike
+            || LiePoseTable.IsLie(emote) || SitPoseTable.IsSit(emote);
 
         /// <summary>
         /// **현재 포즈**의 최하단을 바닥에 맞춘다. 스킨 메시는 BakeMesh 로 굽으므로
