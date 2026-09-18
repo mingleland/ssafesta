@@ -12,6 +12,10 @@ import { getMockPublishedVersion } from './layoutApi.mock';
 // 실 BE에는 없는 값이라 real facadeApi.ts에는 이 분기가 없다.
 const LEASE_EXPIRED_BOOTH_ID = 999;
 
+// 998 sentinel — 사람 상담 미허용(handoffEnabled=false) 부스 수동 검증용 (S15P21A604-910).
+// 그 외 부스는 true 로 둔다 — 실 BE 는 ai_agents.handoff_enabled 를 그대로 준다(미등록=false).
+const HANDOFF_DISABLED_BOOTH_ID = 998;
+
 const HTTPS_URL = /^https:\/\//;
 
 function apiError(code: string, message: string): ApiError {
@@ -69,6 +73,7 @@ export async function getBooth(boothId: number): Promise<BoothDetail> {
     facade: facades.get(boothId) ?? defaultFacade(),
     homepageUrl: getMockHomepageUrl(boothId), // 016 — 등록 mock 저장소가 정본
     publishedLayoutVersion: getMockPublishedVersion(boothId), // -898 — 게시 mock 저장소가 정본
+    handoffEnabled: boothId !== HANDOFF_DISABLED_BOOTH_ID, // -910 — 998만 미허용, 나머지 허용
   };
 }
 
